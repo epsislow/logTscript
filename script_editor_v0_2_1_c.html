@@ -770,6 +770,10 @@ class Interpreter {
     const result = parts.join(' + ');
     return result + (truncateAt80 && binStr.length > 80 ? ' ..' : '');
   }
+  
+  getVal(value, width){
+    return (value === '-') ? '0'.repeat(width) : value;
+  }
 
   storeValue(value){
     const idx = this.nextIndex++;
@@ -1084,7 +1088,7 @@ class Interpreter {
           return part.value;
         } else if(part.ref && part.ref !== '&-'){
           const val = this.getValueFromRef(part.ref);
-          return val || '0';
+          return val || '-';
         }
         return '0'; // Default to 0 for uninitialized
       }).join('');
@@ -1104,7 +1108,7 @@ class Interpreter {
       
       if(argValues.length !== 3) throw Error(`REG${width} expects 3 arguments`);
       
-      const data = argValues[0];
+      const data = this.getVal(argValues[0], width);
       const clock = argValues[1];
       const clear = argValues[2];
       

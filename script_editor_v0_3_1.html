@@ -10,35 +10,67 @@ button { margin:6px; padding:6px 14px }
 pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .panel { border:1px solid #444; padding:10px; margin-top:10px }
 .flex { display:flex; gap:10px }
+.filename { font-size: 20px;}
 </style>
 </head>
 <body>
+<script type="text/javascript">
+  window.onerror = function(message, source, lineno) {
+    alert("Error: " + message + "\nLine: " + lineno);
+    return true;
+  };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+
+<!--script type="text/javascript" src="lz-string-min.js"></script-->
 
 <h2>Bit Language Interpreter for LogTScript v0.3.1</h2>
 
 <textarea id="code">
+MODE WIREWRITE
+
+2wire b
+2wire a = REG2(b, ~, 0)
+2wire c = REG2(a, ~, 0)
+#b= NOT(a.0) + NOT(a.1)
+b= a
+show(a,b,c)
+NEXT(~)
+NEXT(~)
+show(a,b,c)
+NEXT(~)
+NEXT(~)
+show(a,b,c)
+NEXT(~)
+NEXT(~)
+show(a,b,c)
+NEXT(~)
+NEXT(~)
+show(a,b,c)
+
 # Basic wire test
-1bit a = 0
-1wire b = a
-show(a)
-show(b)
-show(&a)
-show(&b)
+#1bit a = 0
+#1wire b = a
+#show(a)
+#show(b)
+#show(&a)
+#show(&b)
 
 # NEXT test
-1wire bb
-bb = XOR(~, bb)
-show(~)
-show(bb)
-NEXT(~)
-show(bb)
-show(&~)
+#1wire bb
+#bb = XOR(~, bb)
+#show(~)
+#show(bb)
+#NEXT(~)
+#show(bb)
+#show(&~)
 </textarea>
 
 <div>
   <button onclick="run()">Run</button>
   <button onclick="toggleCmd()">Cmd</button>
   <button onclick="toggleAST()">Toggle AST</button>
+  <button onclick="toggleFiles()">Files</button>
 </div>
 
 <div id="cmdPanel" style="display:none; margin:10px 0;">
@@ -63,6 +95,19 @@ show(&~)
 <div class="panel" id="astPanel" style="display:none">
   <h3>AST</h3>
   <pre id="ast"></pre>
+</div>
+
+
+<div class="panel" id="filesPanel" style="display:none">
+  <h3>Files</h3>
+  <button id="folderexit" onclick="folderExit()" disabled=1>&lt;</button>
+  <button id="folderenter" onclick="folderEnter()" disabled=1>&gt;</button>
+  <button id="folderload" onclick="fileLoad()" disabled=1>load</button>
+  <button id="folderdelete" onclick="fileDelete()" disabled=1>delete</button>
+  <br/>
+  <input id="filename" placeholder="name" class="filename"/>
+  <button id="filesave" onclick="fileSave" disabled=1>save</button>
+  <div id="filelist" class="filelist"></div>
 </div>
 
 <script>
@@ -784,6 +829,10 @@ class Interpreter {
     const result = parts.join(' + ');
     return result + (truncateAt80 && binStr.length > 80 ? ' ..' : '');
   }
+  
+  getVal(value, width){
+    return (value ==='-') ? '0'.repeat(width) : value;
+  }
 
   storeValue(value){
     const idx = this.nextIndex++;
@@ -1145,7 +1194,7 @@ class Interpreter {
         if(part.value && part.value !== '-'){
           return part.value;
         }
-        return '0'; // Default to 0 for uninitialized
+        return '-'; // Default to 0 for uninitialized
       }).join('');
       return value;
     });
@@ -1163,12 +1212,12 @@ class Interpreter {
       if(isNaN(width) || width < 1 || width > 99) throw Error(`Invalid REG instruction ${name}`);
       
       if(argValues.length !== 3) throw Error(`REG${width} expects 3 arguments`);
-      
-      const data = argValues[0];
+    
+      const data = this.getVal(argValues[0], width);
       const clock = argValues[1];
       const clear = argValues[2];
       
-      if(data.length !== width) throw Error(`REG${width} data argument must be ${width} bits`);
+      if(data.length !== width) throw Error(`REG${width} data argument must be ${width} bits, got ${data.length}: ${data}`);
       if(clock.length !== 1) throw Error(`REG${width} clock argument must be 1 bit`);
       if(clear.length !== 1) throw Error(`REG${width} clear argument must be 1 bit`);
       
@@ -2110,15 +2159,76 @@ class Interpreter {
 
 }
 
+
+class DbLocalStorage {
+  constructor(){
+    this.db = window.localStorage
+  }
+  get(name, defaul) {
+    return (
+      this.has(name) ?
+      window.localStorage.getItem(name)
+      : defaul
+    );
+  }
+  has(name) {
+    return window.localStorage.getItem(name) !== null;
+  }
+  set(name, value) {
+    return window.localStorage.setItem(name, value);
+  }
+}
+
 /* ================= DEBUGGER ================= */
 
 let prog=null, pc=0;
 let globalInterp = null;
 
+let sdb = new DbLocalStorage();
+let currentFilesLocation = '';
+function init() {
+  if (sdb.has("prog/last")) {
+    let last = sdb.get("prog/last");
+    document.getElementById("code").textContent = last;
+  }
+}
+
+function saveDb(prog) {
+  sdb.set("prog/last", prog);
+}
+
+function showFiles() {
+  document.getElementById("filelist").innerHTML="";
+  if(!sdb.has('prog/filelist')) {
+    return;
+  }
+  let filelistStr = sdb.get("prog/filelist");
+  let files = [];
+  let fileStrArr = filelistStr.split("|");
+  for(let i=0; i< fileStrArr.length; i++) {
+    let fileStr = fileStrArr[i];
+    let fileInfo = fileStr.split(",");
+    
+    files[files.length] = {
+      name: fileInfo[0],
+      type: fileInfo[1],
+      ref: fileInfo[2],
+      location: fileInfo[3]
+    }
+  }
+  let locSeparator = '>';
+  
+  // shows current location files:
+  let locationFiles = [];
+
+}
+
+init();
+
 function run(){
   try{
   document.getElementById('out').textContent='';
-
+  saveDb(code.value);
   const p = new Parser(new Tokenizer(code.value));
   const stmts = p.parse();
 
@@ -2144,6 +2254,16 @@ function toggleCmd(){
   } else {
     panel.style.display = 'none';
   }
+}
+
+function toggleFiles(){
+  const panel = document.getElementById('filesPanel');
+if (panel.style.display === 'none') {
+  panel.style.display = 'block';
+  showFiles()
+} else {
+  panel.style.display = 'none';
+}
 }
 
 function sendCmd(){
