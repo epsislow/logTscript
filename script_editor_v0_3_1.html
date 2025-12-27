@@ -11,6 +11,9 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .panel { border:1px solid #444; padding:10px; margin-top:10px }
 .flex { display:flex; gap:10px }
 .filename { font-size: 20px;}
+.filelist { border: 1px solid #3D4; width:90%; padding: 3px; margin: 5px; }
+.filelist .file { padding: 4px; color: mediumaquamarine}
+.filelist .dir { padding: 4px; color: yellow; }
 </style>
 </head>
 <body>
@@ -102,11 +105,13 @@ show(a,b,c)
   <h3>Files</h3>
   <button id="folderexit" onclick="folderExit()" disabled=1>&lt;</button>
   <button id="folderenter" onclick="folderEnter()" disabled=1>&gt;</button>
-  <button id="folderload" onclick="fileLoad()" disabled=1>load</button>
-  <button id="folderdelete" onclick="fileDelete()" disabled=1>delete</button>
+  <button id="fileload" onclick="fileLoad()" disabled=1>load</button>
+  <button id="filedirdelete" onclick="filedirDelete()" disabled=1>-del</button>
+  <button id="dirsave" onclick="fileSave(1)" disabled=1>+dir </button>
+  
   <br/>
   <input id="filename" placeholder="name" class="filename"/>
-  <button id="filesave" onclick="fileSave" disabled=1>save</button>
+  <button id="filesave" onclick="fileSave(0)" disabled=1>save</button>
   <div id="filelist" class="filelist"></div>
 </div>
 
@@ -2185,16 +2190,96 @@ let prog=null, pc=0;
 let globalInterp = null;
 
 let sdb = new DbLocalStorage();
-let currentFilesLocation = '';
+let currentFilesLocation = '>';
 function init() {
   if (sdb.has("prog/last")) {
     let last = sdb.get("prog/last");
     document.getElementById("code").textContent = last;
   }
+  
+  elName = document.getElementById("filename");
+  elSave = document.getElementById("filesave");
+  dirSave = document.getElementById("dirsave");
+
+  elName.addEventListener('input', (event) => {
+    if(elName.value.trim().length == 0) {
+      elSave.disabled=1;
+      dirSave.disable=1;
+    } else {
+      elSave.disabled=0;
+      dirSave.disabled=0;
+    }
+    //  console.log('Value finalized:', event.target.value);
+  });
 }
 
 function saveDb(prog) {
   sdb.set("prog/last", prog);
+}
+
+function filenameCheck(fileStrArr) {
+  let elName = document.getElementById("filename");
+  
+  if(filename.value.trim().length == 0) {
+    filename.value = "";
+    elSave.disabled= 0;
+    return;
+  }
+  for(let i=0; i< fileStrArr.length; i++) {
+    let fileStr = fileStrArr[i];
+    let fileInfo = fileStr.split(",");
+    let file = {
+      name: fileInfo[0],
+      type: fileInfo[1],
+      ref: fileInfo[2],
+      location: fileInfo[3]
+    }
+    if (file.location !== currentFilesLocation) {
+      continue;
+    }
+    if(file.name === filename.value) {
+      throw Error(filename.value + " already exists in this location");
+    }
+  }
+}
+
+function fileSave(isDir) {
+  let elName = document.getElementById("filename");
+  let elSave = document.getElementById("filesave");
+  let dirSave = document.getElementById("dirsave");
+  
+  if(filename.value.trim().length == 0) {
+    filename.value = "";
+    elSave.disabled= 0;
+    return;
+  }
+  
+  let filelistStr = sdb.get("prog/filelist");
+  let nextEmptyFileRef = parseInt(sdb.get("prog/nextEmptyFileRef", "0"), 10);
+  
+  let fileStrArr = [];
+  if(filelistStr) {
+    fileStrArr = filelistStr.split("|");
+  }
+  filenameCheck(fileStrArr);
+  
+  fileStrArr[fileStrArr.length] = [
+    filename.value,
+    isDir ?"dir":"file",
+    isDir? 0: nextEmptyFileRef,
+    currentFilesLocation,
+  ];
+  
+  if( !isDir) {
+    sdb.set("prog/nextEmptyFileRef", nextEmptyFileRef + 1);
+    sdb.set("prog/fileRef" + nextEmptyFileRef, code.value);
+  }
+  sdb.set("prog/filelist", fileStrArr.join("|"));
+  
+  elName.value = "";
+  elSave.disabled =1;
+  dirSave.disabled = 1;
+  showFiles();
 }
 
 function showFiles() {
@@ -2204,6 +2289,7 @@ function showFiles() {
   }
   let filelistStr = sdb.get("prog/filelist");
   let files = [];
+  let currentFiles = [];
   let fileStrArr = filelistStr.split("|");
   for(let i=0; i< fileStrArr.length; i++) {
     let fileStr = fileStrArr[i];
@@ -2220,7 +2306,38 @@ function showFiles() {
   
   // shows current location files:
   let locationFiles = [];
-
+  for (let i = 0; i < files.length; i++) {
+    let file = files[i];
+    if (file.location !== currentFilesLocation) {
+      continue;
+    }
+    if(file.type !== "dir") {
+      continue;
+    }
+    currentFiles[currentFiles.length] = file;
+  }
+  
+  for(let i=0; i< files.length; i++) {
+     let file = files[i];
+     if(file.location !== currentFilesLocation) {
+       continue;
+     }
+     if(file.type !== "file") {
+       continue;
+     }
+     currentFiles[currentFiles.length] = file;
+  }
+  
+  //show current files
+  let elList = document.getElementById("filelist");
+  for(let i=0; i< currentFiles.length; i++) {
+    let file = currentFiles[i];
+    if(file.type === 'file') {
+      elList.innerHTML += '<div class="file">'+ file.name +'<div>';
+    } else if(file.type === 'dir') {
+      elList.innerHTML += '<div class="dir">'+ file.name +'<div>';
+    }
+  } 
 }
 
 init();
