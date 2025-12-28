@@ -11,6 +11,7 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .panel { border:1px solid #444; padding:10px; margin-top:10px }
 .flex { display:flex; gap:10px }
 .filename { font-size: 20px;}
+.dirpath { font-size: 15px; color: #88f}
 .filelist { border: 1px solid #3D4; width:90%; padding: 3px; margin: 5px; }
 .filelist .file { padding: 4px; color: mediumaquamarine}
 .filelist .dir { padding: 4px; color: yellow; }
@@ -103,8 +104,8 @@ show(a,b,c)
 
 <div class="panel" id="filesPanel" style="display:none">
   <h3>Files</h3>
-  <button id="folderexit" onclick="folderExit()" disabled=1>&lt;</button>
-  <button id="folderenter" onclick="folderEnter()" disabled=1>&gt;</button>
+  <button id="direxit" onclick="dirExit()" disabled=1>&lt;</button>
+  <button id="direnter" onclick="dirEnter()" disabled=1>&gt;</button>
   <button id="fileload" onclick="fileLoad()" disabled=1>load</button>
   <button id="filedirdelete" onclick="filedirDelete()" disabled=1>-del</button>
   <button id="dirsave" onclick="fileSave(1)" disabled=1>+dir </button>
@@ -112,6 +113,7 @@ show(a,b,c)
   <br/>
   <input id="filename" placeholder="name" class="filename"/>
   <button id="filesave" onclick="fileSave(0)" disabled=1>save</button>
+  <div id="dirpath" class="dirpath"></div>
   <div id="filelist" class="filelist"></div>
 </div>
 
@@ -2191,6 +2193,18 @@ let globalInterp = null;
 
 let sdb = new DbLocalStorage();
 let currentFilesLocation = '>';
+
+function locationChanged() {
+  let dirPath = document.getElementById('dirpath');
+  let dirExit = document.getElementById('direxit');
+  
+  dirPath.textContent = currentFilesLocation.replaceAll('>', '\\');
+  
+  if(currentFilesLocation === '>') {
+    dirExit.disabled = 1;
+  }
+  dirExit.disabled = 0;
+}
 function init() {
   if (sdb.has("prog/last")) {
     let last = sdb.get("prog/last");
@@ -2200,7 +2214,9 @@ function init() {
   elName = document.getElementById("filename");
   elSave = document.getElementById("filesave");
   dirSave = document.getElementById("dirsave");
-
+  
+  locationChanged();
+  
   elName.addEventListener('input', (event) => {
     if(elName.value.trim().length == 0) {
       elSave.disabled=1;
@@ -2244,13 +2260,45 @@ function filenameCheck(fileStrArr) {
 }
 
 let fileActive = null;
+function dirExit() {
+  if(currentFilesLocation === '>') {
+    return;
+  }
+  let dirs = currentFilesLocation.split('>');
+  console.log(dirs);
+  if(dirs.length > 1) {
+    currentFilesLocation = dirs.slice(0, -2).join('>') + '>';
+  }
+//  console.log(dirs);
+  //currentFilesLocation = dirs.join('>');
+  console.log('= '+currentFilesLocation);
+  locationChanged();
+  showFiles();
+}
+
+function dirEnter() {
+  if (fileActive === null) {
+    return;
+  }
+  
+  if( fileActive.className !=='dir') {
+    return;
+  }
+  currentFilesLocation = currentFilesLocation + fileActive.textContent + '>';
+  locationChanged();
+  fileActive = null;
+  showFiles();
+}
+
 function fileClick(e) {
   let filedirdelete = document.getElementById("filedirdelete");
-  
+  let dirEnter = document.getElementById('direnter');
+
   if( fileActive === e) {
     fileActive.style = "";
     fileActive =null;
     filedirdelete.disabled = 1
+    dirEnter.disabled = 1;
     return;
   }
   if( fileActive !== null) {
@@ -2260,6 +2308,11 @@ function fileClick(e) {
   //console.log(e)
   e.style ="color: red";
   filedirdelete.disabled = 0;
+  if(fileActive.className === 'dir') {
+    dirEnter.disabled = 0;
+  } else {
+    dirEnter.disabled = 1;
+  }
 }
 
 function dirIsEmptyCheck(fileStrArr){
