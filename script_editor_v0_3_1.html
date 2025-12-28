@@ -2202,8 +2202,9 @@ function locationChanged() {
   
   if(currentFilesLocation === '>') {
     dirExit.disabled = 1;
+  } else {
+    dirExit.disabled = 0;
   }
-  dirExit.disabled = 0;
 }
 function init() {
   if (sdb.has("prog/last")) {
@@ -2290,15 +2291,21 @@ function dirEnter() {
   showFiles();
 }
 
+function fileLoad() {
+  
+}
+
 function fileClick(e) {
   let filedirdelete = document.getElementById("filedirdelete");
   let dirEnter = document.getElementById('direnter');
+  let fileLoad = document.getElementById('fileload');
 
   if( fileActive === e) {
     fileActive.style = "";
     fileActive =null;
     filedirdelete.disabled = 1
     dirEnter.disabled = 1;
+    fileLoad.disabled = 1;
     return;
   }
   if( fileActive !== null) {
@@ -2308,6 +2315,11 @@ function fileClick(e) {
   //console.log(e)
   e.style ="color: red";
   filedirdelete.disabled = 0;
+  if(fileActive.className === 'file') {
+    fileLoad.disabled = 0;
+  } else {
+    fileLoad.disabled = 1;
+  }
   if(fileActive.className === 'dir') {
     dirEnter.disabled = 0;
   } else {
@@ -2363,10 +2375,13 @@ function filedirDelete() {
     continue;
   }
   newFileStrArr[newFileStrArr.length] = fileStr;
-  
 }
   sdb.set("prog/filelist", newFileStrArr.join("|"));
   showFiles();
+    let filedirdelete = document.getElementById('filedirdelete');
+  filedirdelete.disabled = 1;
+    let fileload = document.getElementById('fileload');
+  fileload.disabled = 1;
 }
 
 function fileSave(isDir) {
