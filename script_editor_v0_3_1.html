@@ -2209,7 +2209,7 @@ function locationChanged() {
 function init() {
   if (sdb.has("prog/last")) {
     let last = sdb.get("prog/last");
-    document.getElementById("code").textContent = last;
+    document.getElementById("code").value = last;
   }
   
   elName = document.getElementById("filename");
@@ -2292,7 +2292,40 @@ function dirEnter() {
 }
 
 function fileLoad() {
-  
+  if(!fileActive) {
+    return;
+  }
+ 
+  let filelistStr = sdb.get("prog/filelist");
+  let fileStrArr = [];
+  if(filelistStr) {
+    fileStrArr = filelistStr.split("|");
+  }
+  let elCode = document.getElementById("code");
+  for (let i = 0; i < fileStrArr.length; i++) {
+  let fileStr = fileStrArr[i];
+  let fileInfo = fileStr.split(",");
+  let file = {
+    name: fileInfo[0],
+    type: fileInfo[1],
+    ref: fileInfo[2],
+    location: fileInfo[3]
+  }
+  if (file.location === currentFilesLocation && file.name != fileActive.textContent) {
+    continue;
+  }
+  if(sdb.has('prog/fileRef'+ file.ref)) {
+    let codeLoad = sdb.get('prog/fileRef'+ file.ref);
+    //console.log(codeLoad);
+    elCode.value = codeLoad;
+  }
+}
+
+ fileActive.style = "";
+ fileActive = null;
+ filedirdelete.disabled = 1
+ dirEnter.disabled = 1;
+ fileLoad.disabled = 1;
 }
 
 function fileClick(e) {
