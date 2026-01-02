@@ -1,0 +1,202 @@
+LogTScript
+[v] REG like flipflop
+[  ] Probe nodes using reference 
+[  ] test references
+[  ] test components
+[  ] Unassigned wire gives error in REG for not having the same bits for the first argument, because argValues returns '0' as default for an wire that is not defined and doesn't take into acount the number of bits. for 3wire the default should be 000, for 4wire the default should be 0000, etc
+[  ] REG changes the value of the return after two cycles, should change after one cycle
+[  ] 
+[  ] AND, OR, XOR, NOT, NAND, etc should work with more then 1bit/1wire
+[  ] Create documentation
+[  ] Add it in github
+[  ] Add devices like: screenbuffers where you can write and show on the screen
+[  ] Add input device like in page buttons, or text inputsc
+[  ] Add output device like 7segment displays  
+[  ] Libraries and importing functions
+[  ] FLIPFLOP
+[  ] HADD, FADD for half adder and full adder
+[  ] LSHIFTREG4(~, Xbit data, 1bit clr): Xbit d0, Xbit d1, Xbit d2, Xbit d3
+RSHIFTREG4
+[  ] COUNTER  its an adder
+[  ] @ is a 1bit variable that  at every NEXT(~) has a random value 0 or 1
+[  ] Don't allow wire values assignment, but you can assign wires to bit values
+[  ] References could contain the name of component like &AND@1i0.2
+[  ] References for components used &REG4@3i1
+3rd REG4 2nd input
+      &REG4@3:0
+  3rd REG4 1st output
+
+[  ] Decimal values base 10: /255 
+[  ] Showval(a) prints only the values of args
+[  ] Showref(a) prints only the ref of args
+[  ] Showname(a) prints the names of a ref if it has
+[  ] Bit indexing by named value
+3bit selc = /5
+8bit r = OR(^00, 1@selc)
+8bit r2 = 1>>selc
+TEST(r, r2)
+Or use LSHIFT or RSHIFT(~, data, sel)
+
+[  ] TRY calls a component with predefined values and shows all the returned values with show(..)
+TRY(REG4(1101, 0, 1))
+
+
+
+
+[  ] Repeat used to write less use ? Or ?0 (1st for i) Or ?1 (2nd for j) or ?$ (will use the number of loop from all fors)
+
+repeat 1..5:
+ 4wire a? = Reg4(q?, ~, clr)
+:
+show(a1,a2,a3,a4,a5)
+
+
+repeat 1..2:
+ repeat 1..5:
+4bit b?/$ = /?/$
+1bit clr?/0= 0
+ 2wire a?/0?/1 = reg4(q?/1, ~, clr?/0)
+ :
+show(a11, a25,q5,clr2)
+show(b3,b10)
+# prints ^3 ^A
+
+8bit test = /255
+
+===
+ def Aa(1 bit a):
+     1bit r= 0
+     ~
+     r=a
+     :1bit r
+or
+def Aa(1bit a, 1bit clr):
+    :1bit r
+
+def Aa(1bit a, 1bit clr):
+     :1bit  MUX1(~, 0, MUX1(clr, 0, a))
+===
+
+def [add1] < 1bit a, 1bit b, 1bit cin:
+      1bit o = [&] <- a, b
+      1bit cout = [^] <- o, cin
+      <1bit o
+      <1bit cout
+
+2bit out = [add1] < 1,1,0
+show < out
+1wire o, 1wire c < add1 < 1,0,1
+show < o,c
+
+
+8wire a < [REG] < data, ~, 0
+[show] < a, data
+[next~]
+[next10~]
+=====
+def Aa < 1 bit a, 1 bit clr:
+    <1bit and < xor < xor < ~, a ; xor < clr, ~ ;;~
+    :1bit and(xor(xor(~, a), xor(clr, ~)), ~)
+
+    <1bit mux1 < ~, 0, mux1 < clr, 0, a 
+
+def add1 < 1bit a, 1bit b, 1bit cin:
+      1bit o = and < a, b
+      1bit cout = xor < o, cin
+      <1bit o
+      <1bit cout
+
+2bit out = add1 < 1,1,0
+show < out
+1wire o, 1wire c < add1 < 1,0,1
+show < o,c
+
+
+3wire a, 1bit _ < reg4 < data.0-3, ~, 0
+show < a, data
+next~
+next10~
+=====
+
+
+=====
+< chip/gpu : gp 
+< chip/alu : al
+# chip is a lib directory, alu is a lib file
+# in js you can import and export libs
+
+
+>lib alu:
+
+a lib has only definitions
+if not a lib then can use 
+
+2wire q < reg2@al < data@gp, ~, 0
+show < q
+writeVideoBuf@gp < q, data@gp, ~
+
+====
+While executing:
+unlabel wires with command no
+unbind(a, b,c) or !a !b !c
+label bind wire at reference
+bind(2wire a, &2)
+or 
+!2wire b = &2.0/4 
+b@ &2.0/4
+
+@b &2.0/4
+
+
+====
+pcb [ab] {
+8pin port2
+8pin ab
+
+2wire w= port2.0-1
+
+aa = w.0 + AND(port2.3, port2.5) +port2.3/6
+
+8pout aa
+}
+
+Tnpn(1bit b, 1bit c):
+   :1bit MUX1(b, 0, c)
+
+Tpnp(1bit e)
+   :1bit MUX1(e, 0, e)
+   :1bit e
+
+
+
+pcb .[disp] {
+8pin seg1
+8pin seg2
+     _
+  /_ /
+/   /
+ " '
+
+SEG7(seg1)
+SEG7(seg2)
+}
+
+pcb [disp2] {
+  7pin num7
+
+   8wire seg1d, 8wire seg2d = BIN2SEG12( num7)
+   SEG7(seg1d)
+   SEG7(seg2d)
+}
+
+.[ab].port2 = ^FF
+.[ab].aa = 01
+
+8wire tout = .ab.aa
+
+[disp2].num7 = tout
+
+show(tout)
+
+next(~, 10)
+
