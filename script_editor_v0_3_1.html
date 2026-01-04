@@ -15,6 +15,9 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .filelist { border: 1px solid #3D4; width:90%; padding: 3px; margin: 5px; }
 .filelist .file { padding: 4px; color: mediumaquamarine}
 .filelist .dir { padding: 4px; color: yellow; }
+button.cls {
+  background-color: #afa;
+}
 </style>
 </head>
 <body>
@@ -30,7 +33,12 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 
 <h2>Bit Language Interpreter for LogTScript v0.3.1</h2>
 
-<textarea id="code">
+<textarea id="code" 
+   spellcheck="false" 
+   autocorrect="off" 
+   autocomplete="off" 
+   autocapitalize="off"
+>
 MODE WIREWRITE
 
 2wire b
@@ -73,7 +81,8 @@ show(a,b,c)
 <div>
   <button onclick="run()">Run</button>
   <button onclick="toggleCmd()">Cmd</button>
-  <button onclick="toggleAST()">Toggle AST</button>
+  <button onclick="toggleAST()">AST</button>
+  <button onclick="code.value=''" class="cls">cls</button>
   <button onclick="toggleFiles()">Files</button>
 </div>
 
