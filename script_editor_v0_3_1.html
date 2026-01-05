@@ -113,15 +113,15 @@ show(a,b,c)
 
 <div class="panel" id="filesPanel" style="display:none">
   <h3>Files</h3>
-  <button id="direxit" onclick="dirExit()" disabled=1>&lt;</button>
-  <button id="direnter" onclick="dirEnter()" disabled=1>&gt;</button>
-  <button id="fileload" onclick="fileLoad()" disabled=1>load</button>
-  <button id="filedirdelete" onclick="filedirDelete()" disabled=1>-del</button>
-  <button id="dirsave" onclick="fileSave(1)" disabled=1>+dir </button>
+  <button id="direxit" onclick="btndirExit()" disabled=1>&lt;</button>
+  <button id="direnter" onclick="btndirEnter()" disabled=1>&gt;</button>
+  <button id="fileload" onclick="btnfileLoad()" disabled=1>load</button>
+  <button id="filedirdelete" onclick="btnfiledirDelete()" disabled=1>-del</button>
+  <button id="dirsave" onclick="btnfileSave(1)" disabled=1>+dir </button>
   
   <br/>
   <input id="filename" placeholder="name" class="filename"/>
-  <button id="filesave" onclick="fileSave(0)" disabled=1>save</button>
+  <button id="filesave" onclick="btnfileSave(0)" disabled=1>save</button>
   <div id="dirpath" class="dirpath"></div>
   <div id="filelist" class="filelist"></div>
 </div>
