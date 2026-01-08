@@ -84,6 +84,7 @@ show(a,b,c)
   <button onclick="toggleAST()">AST</button>
   <button onclick="code.value=''" class="cls">cls</button>
   <button onclick="toggleFiles()">Files</button>
+  <button onclick="toggleDevices()">Dvi</button>
 </div>
 
 <div id="cmdPanel" style="display:none; margin:10px 0;">
@@ -110,6 +111,10 @@ show(a,b,c)
   <pre id="ast"></pre>
 </div>
 
+<div class="panel" id="devicesPanel" style="display:none">
+  <h3>Devices</h3>
+  <div id="devices"></div>
+</div>
 
 <div class="panel" id="filesPanel" style="display:none">
   <h3>Files</h3>
