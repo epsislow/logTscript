@@ -195,14 +195,17 @@ button.cls {
 
 
 /* ===== Wrapper ===== */
-.sevenseg-wrapper {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-}
 
 .sevenseg-wrapper {
+  display: inline-flex;
   align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.sevenseg-dot {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 6px; /* aligns dot with seg D */
 }
 
 .sevenseg-label {
@@ -238,6 +241,8 @@ button.cls {
     2px    /* spacer */
     10px;  /* D track */
   gap: 0;
+  position: relative;
+  overflow: visible; /* ← THIS IS REQUIRED */
 }
 
 /* ===== Hidden checkbox (logic only) ===== */
@@ -257,6 +262,14 @@ button.cls {
   cursor: pointer;
   filter: blur(0.2px); /* light diffusion */
   opacity: 0.35;       /* dim when off */
+}
+
+.sevenseg-dot {
+  position: absolute;
+  right: -4px;
+  bottom: -6px;
+  z-index: 2; /* ← IMPORTANT */
+/*  outline: 1px solid red;*/
 }
 
 /* ===== Horizontal segments (shorter than track) ===== */
@@ -280,6 +293,17 @@ button.cls {
   align-self: center;
 }
 
+.seg-h {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #1a1a1a;
+  box-shadow: inset 0 0 2px #000;
+  opacity: 0.35;
+  filter: blur(0.2px);
+  cursor: pointer;
+}
+
 /* ===== Segment positioning ===== */
 .seg-a { grid-column: 1 / 4; grid-row: 1; }
 .seg-f { grid-column: 1;     grid-row: 2; }
@@ -298,6 +322,17 @@ button.cls {
     0 0 8px var(--seg-color),
     0 0 18px var(--seg-color),
     0 0 36px rgba(109,255,156,0.6);
+}
+
+
+.seg-input:checked + .seg-h {
+  opacity: 1;
+  background-color: var(--seg-color, #6dff9c);
+  box-shadow:
+    inset 0 0 4px rgba(255,255,255,0.6),
+    0 0 6px var(--seg-color),
+    0 0 14px var(--seg-color),
+    0 0 24px rgba(109,255,156,0.6);
 }
 
 </style>
