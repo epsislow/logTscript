@@ -236,14 +236,17 @@ button.cls {
 
 .sevenseg {
   display: grid;
-  grid-template-columns: 26px 8px 26px;
+  grid-template-columns:
+    calc(26px * var(--seg-scale))
+    calc(8px  * var(--seg-scale))
+    calc(26px * var(--seg-scale));
   grid-template-rows:
-    10px   /* A track */
-    26px   /* F / B track */
-    10px   /* G track */
-    26px   /* E / C track */
-    2px    /* spacer */
-    10px;  /* D track */
+    calc(10px * var(--seg-scale)) /* A */
+    calc(26px * var(--seg-scale)) /* F / B */
+    calc(10px * var(--seg-scale)) /* G */
+    calc(26px * var(--seg-scale)) /* E / C */
+    calc(2px  * var(--seg-scale)) /* spacer */
+    calc(10px * var(--seg-scale));/* D */
   gap: 0;
   position: relative;
   overflow: visible; /* ← THIS IS REQUIRED */
@@ -280,8 +283,8 @@ button.cls {
 .seg-a,
 .seg-g,
 .seg-d {
-  width: 24px;
-  height: 8px;
+  width: calc(24px * var(--seg-scale));
+  height: calc(8px * var(--seg-scale));
   justify-self: center;
   align-self: center;
 }
@@ -291,15 +294,15 @@ button.cls {
 .seg-c,
 .seg-e,
 .seg-f {
-  width: 8px;
-  height: 24px;
+  width:  calc(8px  * var(--seg-scale));
+  height: calc(24px * var(--seg-scale));
   justify-self: center;
   align-self: center;
 }
 
 .seg-h {
-  width: 8px;
-  height: 8px;
+  width:  calc(8px * var(--seg-scale));
+  height: calc(8px * var(--seg-scale));
   border-radius: 50%;
   background-color: #1a1a1a;
   box-shadow: inset 0 0 2px #000;
@@ -322,10 +325,10 @@ button.cls {
   opacity: 1;
   background-color: var(--seg-color, #6dff9c);
   box-shadow:
-    inset 0 0 6px rgba(255,255,255,0.6),
-    0 0 8px var(--seg-color),
-    0 0 18px var(--seg-color),
-    0 0 36px rgba(109,255,156,0.6);
+    inset 0 0 calc(6px * var(--seg-scale)) rgba(255,255,255,0.6),
+    0 0 calc(8px * var(--seg-scale)) var(--seg-color),
+    0 0 calc(18px * var(--seg-scale)) var(--seg-color),
+    0 0 calc(36px * var(--seg-scale)) rgba(109,255,156,0.6);
 }
 
 
@@ -333,10 +336,10 @@ button.cls {
   opacity: 1;
   background-color: var(--seg-color, #6dff9c);
   box-shadow:
-    inset 0 0 4px rgba(255,255,255,0.6),
-    0 0 6px var(--seg-color),
-    0 0 14px var(--seg-color),
-    0 0 24px rgba(109,255,156,0.6);
+    inset 0 0 calc(4px * var(--seg-scale)) rgba(255,255,255,0.6),
+    0 0 calc(6px * var(--seg-scale)) var(--seg-color),
+    0 0 calc(14px * var(--seg-scale)) var(--seg-color),
+    0 0 calc(24px * var(--seg-scale)) rgba(109,255,156,0.6);
 }
 
 </style>
