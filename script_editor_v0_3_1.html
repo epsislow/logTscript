@@ -19,6 +19,7 @@ button.cls {
   background-color: #afa;
 }
 
+/*
 .led-3d {
   width: 25px;
   height: 25px;
@@ -26,7 +27,7 @@ button.cls {
   /* Gradient simulates light hidden behind plastic */
   background-image: radial-gradient(circle at 30% 30%, #ff9999, #ff0000 60%, #800000 100%);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3), 0 0 15px #ff0000;
-}
+}*/
 
 .led-red-glow {
   width: 20px;
@@ -41,6 +42,7 @@ button.cls {
     0 0 30px #ff0000;        /* Outer atmospheric glow */
 }
 
+/*
 .led-red-glow2 {
   width: 20px;
   height: 20px;
@@ -58,6 +60,51 @@ button.cls {
     background-color: #ff0000; /* Bright red (On) */
     box-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000;
   }
+}*/
+
+
+/* LED wrapper (optional label support) */
+.led-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Label (same rules as switch) */
+.led-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd;
+}
+
+/* Hidden checkbox (logic only) */
+.led-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* LED core */
+.led {
+ display: inline-block; 
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #222;
+  box-shadow: inset 0 0 3px #000;
+  margin: 0 0px -2px 0px;
+}
+
+/* ON state using CSS variable */
+.led-input:checked + .led {
+  background-color: var(--led-color, #ff0000);
+  box-shadow:
+    inset 0 0 4px #fff,
+    0 0 5px var(--led-color, #ff0000),
+    0 0 15px var(--led-color, #ff0000),
+    0 0 30px var(--led-color, #ff0000);
 }
 
 
