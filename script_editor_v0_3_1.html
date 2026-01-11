@@ -18,6 +18,125 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 button.cls {
   background-color: #afa;
 }
+
+.led-3d {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  /* Gradient simulates light hidden behind plastic */
+  background-image: radial-gradient(circle at 30% 30%, #ff9999, #ff0000 60%, #800000 100%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3), 0 0 15px #ff0000;
+}
+
+.led-red-glow {
+  width: 20px;
+  height: 20px;
+  background-color: #ff4d4d; /* Slightly lighter red for the core */
+  border-radius: 50%;
+  /* Stacking shadows for realistic glow */
+  box-shadow: 
+    inset 0 0 5px #fff,      /* Inner highlight */
+    0 0 5px #ff0000,         /* Close glow */
+    0 0 15px #ff0000,        /* Medium glow */
+    0 0 30px #ff0000;        /* Outer atmospheric glow */
+}
+
+.led-red-glow2 {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  /* Define the 'on' state animation */
+  animation: led-blink 2s infinite;
+}
+
+@keyframes led-blink {
+  0%, 100% {
+    background-color: #400000; /* Dull red (Off) */
+    box-shadow: none;
+  }
+  50% {
+    background-color: #ff0000; /* Bright red (On) */
+    box-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000;
+  }
+}
+
+
+/* Wrapper */
+.switch-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.switch-wrapper:active .switch {
+  transform: scale(0.96);
+}
+
+/* Label */
+.switch-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd; /* soft gray for dark bg */
+}
+
+/* Hide checkbox but keep accessible */
+.switch-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Switch track */
+.switch {
+  position: relative;
+  width: 36px;
+  height: 18px;
+  background-color: #2a2a2a;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px #3a3a3a;
+  transition: background-color 0.2s ease,
+       box-shadow 0.2s ease,
+       transform 0.05s ease;
+  
+}
+
+/* Knob */
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #e0e0e0;
+  border-radius: 50%;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+/* ON state */
+.switch-input:checked + .switch {
+  background-color: #1f6f3f; /* deep green */
+  box-shadow:
+    inset 0 0 0 1px #2ecc71,
+    0 0 6px rgba(46, 204, 113, 0.6);
+}
+
+.switch-input:checked + .switch::before {
+  transform: translateX(18px);
+  background-color: #dfffe9;
+}
+
+/* Focus (keyboard navigation) */
+.switch-input:focus-visible + .switch {
+  outline: 2px solid #2ecc71;
+  outline-offset: 2px;
+}
+
+
 </style>
 </head>
 <body>
@@ -113,7 +232,9 @@ show(a,b,c)
 
 <div class="panel" id="devicesPanel" style="display:none">
   <h3>Devices</h3>
-  <div id="devices"></div>
+  <div id="devices">
+    <div class="led-red-glow"></div>
+  </div>
 </div>
 
 <div class="panel" id="filesPanel" style="display:none">
