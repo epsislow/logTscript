@@ -24,7 +24,7 @@ button.cls {
   width: 25px;
   height: 25px;
   border-radius: 50%;
-  /* Gradient simulates light hidden behind plastic */
+   Gradient simulates light hidden behind plastic 
   background-image: radial-gradient(circle at 30% 30%, #ff9999, #ff0000 60%, #800000 100%);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3), 0 0 15px #ff0000;
 }*/
@@ -47,17 +47,17 @@ button.cls {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  /* Define the 'on' state animation */
+   Define the 'on' state animation 
   animation: led-blink 2s infinite;
 }
 
 @keyframes led-blink {
   0%, 100% {
-    background-color: #400000; /* Dull red (Off) */
+    background-color: #400000;
     box-shadow: none;
   }
   50% {
-    background-color: #ff0000; /* Bright red (On) */
+    background-color: #ff0000;
     box-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000;
   }
 }*/
@@ -67,7 +67,8 @@ button.cls {
 .led-wrapper {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
+  margin: 5px 0;
 }
 
 /* Label (same rules as switch) */
@@ -77,6 +78,13 @@ button.cls {
   width: 5ch;
   text-align: right;
   color: #bdbdbd;
+}
+.led-no-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 1px;
+  text-align: right;
+  color: transparent;
 }
 
 /* Hidden checkbox (logic only) */
@@ -91,10 +99,10 @@ button.cls {
  display: inline-block; 
   width: 14px;
   height: 14px;
-  border-radius: 50%;
+ /* border-radius: 50%;*/
   background-color: #222;
-  box-shadow: inset 0 0 3px #000;
-  margin: 0 0px -2px 0px;
+  box-shadow: inset 0 0 3px #fff;
+  /*margin: 0 0px -2px 0px;*/
 }
 
 /* ON state using CSS variable */
@@ -115,6 +123,7 @@ button.cls {
   gap: 0.5rem;
   cursor: pointer;
   user-select: none;
+  margin: 5px 0;
 }
 
 .switch-wrapper:active .switch {
@@ -280,7 +289,6 @@ show(a,b,c)
 <div class="panel" id="devicesPanel" style="display:none">
   <h3>Devices</h3>
   <div id="devices">
-    <div class="led-red-glow"></div>
   </div>
 </div>
 
