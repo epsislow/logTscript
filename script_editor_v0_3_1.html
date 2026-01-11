@@ -210,60 +210,96 @@ button.cls {
     color: #bdbdbd;
   }
 
-  /* Display grid */
-  .sevenseg {
-    display: grid;
-    grid-template-columns: 24px 6px 24px;
-    grid-template-rows: 6px 24px 6px 24px 6px;
-    gap: 4px;
-  }
-
-  /* Hide checkbox */
-  .seg-input {
-    position: absolute;
-    opacity: 0;
-  }
-
-  /* Segment base */
-  .segment {
-    background-color: #222;
-    border-radius: 4px;
-    box-shadow: inset 0 0 3px #000;
-    cursor: pointer;
-  }
-
-  /* Horizontal segments */
-  .seg-a, .seg-g, .seg-d {
-    width: 100%;
-    height: 6px;
-  }
-
-  /* Vertical segments */
-  .seg-b, .seg-c, .seg-e, .seg-f {
-    width: 6px;
-    height: 100%;
-  }
-
-  /* Positioning */
-  .seg-a { grid-column: 1 / 4; grid-row: 1; }
-  .seg-g { grid-column: 1 / 4; grid-row: 3; }
-  .seg-d { grid-column: 1 / 4; grid-row: 5; }
-
-  .seg-f { grid-column: 1; grid-row: 2 / 4; }
-  .seg-b { grid-column: 3; grid-row: 2 / 4; }
-  .seg-e { grid-column: 1; grid-row: 4 / 6; }
-  .seg-c { grid-column: 3; grid-row: 4 / 6; }
-
-  /* ON state */
-  .seg-input:checked + .segment {
-    background-color: var(--seg-color, #ff0000);
-    box-shadow:
-      inset 0 0 4px #fff,
-      0 0 6px var(--seg-color),
-      0 0 14px var(--seg-color);
-  }
 
 
+.seg-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Display grid – tighter and more realistic */
+/*.sevenseg {
+  display: grid;
+  grid-template-columns: 26px 8px 26px;
+  grid-template-rows: 8px 28px 8px 28px 8px;
+  gap: 3px;
+}*/
+
+.sevenseg {
+  display: grid;
+  grid-template-columns: 26px 8px 26px;
+  grid-template-rows:
+    8px    /* A */
+    28px   /* F B */
+    8px    /* G */
+    28px   /* E C */
+    6px    /* spacer */
+    8px;   /* D */
+  gap: 3px;
+}
+
+/* Base segment */
+.segment {
+  background-color: #1a1a1a;
+  border-radius: 999px; /* capsule */
+  box-shadow: inset 0 0 2px #000;
+  cursor: pointer;
+}
+
+/* Horizontal segments */
+.seg-a,
+.seg-g,
+.seg-d {
+  width: 75%;
+  height: 8px;
+}
+
+/* Vertical segments */
+.seg-b,
+.seg-c,
+.seg-e,
+.seg-f {
+  width: 8px;
+  height: 100%;
+}
+
+/* Placement 
+.seg-a { grid-column: 1 / 4; grid-row: 1; }
+.seg-g { grid-column: 1 / 4; grid-row: 3; }
+.seg-d { grid-column: 1 / 4; grid-row: 5; }
+
+.seg-f { grid-column: 1; grid-row: 2 / 4; }
+.seg-b { grid-column: 3; grid-row: 2 / 4; }
+.seg-e { grid-column: 1; grid-row: 4 / 6; }
+.seg-c { grid-column: 3; grid-row: 4 / 6; }
+
+*/
+
+
+/* Horizontals */
+.seg-a { grid-column: 1 / 4; grid-row: 1; }
+.seg-g { grid-column: 1 / 4; grid-row: 3; }
+.seg-d { grid-column: 1 / 4; grid-row: 6; }
+
+/* Verticals */
+.seg-f { grid-column: 1; grid-row: 2; }
+.seg-b { grid-column: 3; grid-row: 2; }
+
+.seg-e { grid-column: 1; grid-row: 4; }
+.seg-c { grid-column: 3; grid-row: 4; }
+
+/* ON state – softer, realistic glow */
+.seg-input:checked + .segment {
+  background-color: var(--seg-color, #6dff9c);
+  box-shadow:
+    inset 0 0 6px rgba(255,255,255,0.6),
+    0 0 8px var(--seg-color),
+    0 0 18px var(--seg-color),
+    0 0 36px rgba(109,255,156,0.6);
+}
 
 </style>
 </head>
