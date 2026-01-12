@@ -302,6 +302,13 @@ button.cls {
   z-index: 3;
 }
 
+.sevenseg-time-dot-down {
+  position: absolute;
+  right: -4px;
+  bottom: 20px;
+  z-index: 3;
+}
+
 /* ===== Horizontal segments (shorter than track) ===== */
 .seg-a,
 .seg-g,
@@ -334,7 +341,8 @@ button.cls {
   cursor: pointer;
 }
 
-.seg-i {
+.seg-i,
+.seg-j {
   width:  calc(9px * var(--seg-scale));
   height: calc(14px * var(--seg-scale));
   border-radius: 99px;
