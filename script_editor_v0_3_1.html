@@ -101,7 +101,7 @@ button.cls {
   height: 14px;
   border-radius: var(--led-radius, 50%);
   background-color: #222;
-  box-shadow: inset 0 0 3px #fff;
+  box-shadow: inset 1px 1px 2px #333;
   /*margin: 0 0px -2px 0px;*/
 }
 
@@ -110,9 +110,9 @@ button.cls {
   background-color: var(--led-color, #ff0000);
   box-shadow:
     inset 0 0 4px #fff,
-    0 0 5px var(--led-color, #ff0000),
-    0 0 15px var(--led-color, #ff0000),
-    0 0 30px var(--led-color, #ff0000);
+    0 0 2px var(--led-color, #ff0000),
+    0 0 4px var(--led-color, #ff0000),
+    0 0 8px var(--led-color, #ff0000);
 }
 
 
@@ -203,14 +203,21 @@ button.cls {
 .sevenseg-wrapper {
   display: inline-flex;
   align-items: flex-start;
-  gap: 0.4rem;
+  gap: 0.1rem;
   min-height: calc(1em + 2px);
+  padding-bottom: 5px;
 }
 
 .sevenseg-dot {
   display: flex;
   align-items: flex-end;
   padding-bottom: 6px; /* aligns dot with seg D */
+}
+
+.sevenseg-time-dot-up {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 6px;
 }
 
 .sevenseg-label {
@@ -274,7 +281,7 @@ button.cls {
 .segment {
   background-color: #1a1a1a;
   border-radius: 999px;
-  box-shadow: inset 0 0 2px #000;
+  box-shadow: inset 1px 1px 0px #777;
   cursor: pointer;
   filter: blur(0.2px); /* light diffusion */
   opacity: 0.35;       /* dim when off */
@@ -286,6 +293,13 @@ button.cls {
   bottom: -6px;
   z-index: 2; /* ← IMPORTANT */
 /*  outline: 1px solid red;*/
+}
+
+.sevenseg-time-dot-up {
+  position: absolute;
+  right: -4px;
+  bottom: 10px;
+  z-index: 3;
 }
 
 /* ===== Horizontal segments (shorter than track) ===== */
@@ -314,7 +328,18 @@ button.cls {
   height: calc(8px * var(--seg-scale));
   border-radius: 50%;
   background-color: #1a1a1a;
-  box-shadow: inset 0 0 2px #000;
+  box-shadow: inset 1px 1px 0px #777;
+  opacity: 0.35;
+  filter: blur(0.2px);
+  cursor: pointer;
+}
+
+.seg-i {
+  width:  calc(9px * var(--seg-scale));
+  height: calc(14px * var(--seg-scale));
+  border-radius: 99px;
+  background-color: #1a1a1a;
+  box-shadow: inset 1px 1px 0px #777;
   opacity: 0.35;
   filter: blur(0.2px);
   cursor: pointer;
@@ -351,14 +376,112 @@ button.cls {
     0 0 calc(24px * var(--seg-scale)) rgba(109,255,156,0.6);
 }
 
+
+
+/* =========================
+   DIP SWITCH WRAPPER
+========================= */
+
+.dip-wrapper {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+/* Label (same style as others) */
+.dip-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd;
+}
+
+/* =========================
+   DIP BODY
+========================= */
+
+.dip {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: #1a1a1a;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px #2a2a2a;
+}
+
+/* =========================
+   SINGLE DIP SWITCH
+========================= */
+
+.dip-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-family: monospace;
+  font-size: 0.65rem;
+  color: #aaa;
+}
+
+/* Hidden checkbox */
+.dip-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+
+/* Switch track */
+.dip-switch {
+  position: relative;
+  width: 18px;
+  height: 36px;
+  background: #2a2a2a;
+  border-radius: 999px;
+  box-shadow: inset 0 0 3px #000;
+  cursor: pointer;
+}
+
+/* Knob */
+.dip-switch::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  width: 14px;
+  height: 14px;
+  background: #ccc;
+  border-radius: 999px;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+/* ON (UP) */
+.dip-input:checked + .dip-switch {
+  background: #1f6f3f;
+  box-shadow:
+    inset 0 0 0 1px #2ecc71,
+    0 0 6px rgba(46, 204, 113, 0.6);
+}
+
+.dip-input:checked + .dip-switch::before {
+  transform: translateY(-18px);
+  background: #dfffe9;
+}
+
+
 </style>
 </head>
 <body>
 <script type="text/javascript">
-  window.onerror = function(message, source, lineno) {
+  /*window.onerror = function(message, source, lineno) {
     alert("Error: " + message + "\nLine: " + lineno);
     return true;
-  };
+  };*/
 </script>
 <!--script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script-->
 
