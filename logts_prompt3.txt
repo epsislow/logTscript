@@ -1,0 +1,143 @@
+please check script_editor_v0_3_1_last_version.html and lib/main.js. 
+I want a way to add devices from the script and give values or connect them to existing references, examples:
+
+#when executing the script, on run() the devices() will be cleared.
+
+2wire a = 11
+
+comp [led] 1bit .power:
+     text: "PWR"
+     color: ^2ecc71
+     = 0
+     :
+
+# this adds the device component .power that has a 1bit input 
+# the text is the label attribute of the led that will be added in the devices  
+# the color is the color attribute of the led 
+# the = 0 is the value given when the devices is added 
+# it should execute the js function: 
+#addLed({
+#  id: someGeneratedStringId,
+#  text: "PWR",
+#  color: "#2ecc71",
+#  value: true
+#});
+
+
+.power = a.0
+#this connects the value of the led to the reference a.0 -> the first bit of a is 1 -> led lights on
+#this means that if a.0 value changes the led should show the change 
+# executs the js function
+# setLed( someGeneratedStringId, true);
+
+
+a = 00
+#when this assignment happens because the first bit of a is now 0 -> led lights off
+# executs the js function
+# setLed( someGeneratedStringId, false)
+
+a.0 = 1
+#when this assignment happens because the first bit of a is now 1 -> led lights on
+# executs the js function
+# setLed( someGeneratedStringId, true)
+
+comp [led] 1bit .error:
+     color: ^f44
+     text:"ERR"
+     :
+#the attributes can be given in any order, the color can be short like in css
+#value can be missed this means it will be 0
+#will execute:
+#addLed({
+#  id: someGeneratedStringId2,
+#  text: "ERR",
+#  color: "#f44",
+#  value: false
+#});
+
+.error = 1
+.power = 0
+
+comp [led] 1bit .test:
+   color: ^f0f,
+   radius: 0
+   :
+#text can be missed this means it won't have a label 
+#radius is another attribute that gets into the js execution
+#will execute:
+#addLed({
+#  id: someGeneratedStringId3,
+#  color: "#f0f",
+#  radius: 0,
+#  value: false
+#});
+
+
+comp [led] 6bit .l:
+    color: ^00ff99
+    text: "OUT"
+    radius: 0
+    nl
+    :
+#this led has 6bits this means it converts into 6 consecutive leds
+#the text is for the first led js execution
+#nl attribute translates into the js execution as nl: true in the last led 
+#will execute a js like this:
+#addLed({ text: 'OUT',  id: "l.1", color: "#00ff99", value: false, radius:0 });
+#addLed({ id: "l.2", color: "#00ff99", value: false, radius:0 });
+#addLed({ id: "l.3", color: "#00ff99", value: false, radius:0 });
+#addLed({ id: "l.4", color: "#00ff99", value: false, radius:0 });
+#addLed({ id: "l.5", color: "#00ff99", value: false, radius:0 });
+#addLed({ id: "l.6", color: "#00ff99", value: false, radius:0, nl: true });
+
+.l = 000001
+#this assignemnt will trigger the led light changes accordingly
+#executes: 
+#setLed("l.1", false);
+#setLed("l.2", false);
+#setLed("l.3", false);
+#setLed("l.4", false);
+#setLed("l.5", false);
+#setLed("l.6", true);
+
+comp [led] 6bit .t:
+    color:^0f9
+    text: "OUT2"
+    radius: 0
+    = 011011
+    nl
+    :
+
+# the : is the return of the definition block and it means that the led components cannot be assigned to other values 
+
+1bit ret = .t 
+#this gives an error that ret cannot be assigned to a 0 bit component
+
+comp [switch] 1bit .wifi:
+    text: "WIFI"
+    :1bit
+#this is the switch component 
+# the text is the label attribute
+# it has a 1bit return that is the value that will change when the checkbox changes state (onclick)
+# executes: 
+#addSwitch({
+#    text: "WIFI",
+#    value: true,
+#    onChange: state => someInternalInterpretorMethod
+#});
+
+.power = .wifi
+#this is connects the .power led with the value of the .wifi switch
+#when the .wifi checkbox is pressed it will execute the js someInternalInterpretorMethod and the value of the .power will change checked means = 1 not checked means 0
+#it should execute a setLed()
+
+.l.0 = .wifi 
+#this also works
+#this means that the first bit of .l comes from the state of the .wifi checkbox
+#it should execute a setLed() 
+
+
+
+
+The switches that are checkboxes will trigger changes because the coresponding components change the value of the conected references and those references are connected with other elements functions/statements inside script and those should also be processed.
+
