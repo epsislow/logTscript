@@ -1,0 +1,628 @@
+In my script_editor.html file,
+I wanted to interpret a custom language and find syntax errors in javascript. 
+
+The rules before writing the file were:
+
+the text must be tokenized most probably. 
+The keywords are : bit show def _ ~ "1bit 2bit 3bit 4bit" until "99bit" 
+AND OR NOT XOR NAND NOR LATCH 
+all keywords are case sensitive
+
+The rules are like following:
+
+comments are only per line and starts with # 
+types are "1bit 2bit 3bit 4bit ... 99bit"
+variable names can contain letters and numbers but must start with a letter variables are case sensitive
+a variable must be defined and assigned a value.
+variables are always constant or immutable their value cannot be changed once assigned.
+
+values can either be 0 or 1 or the return of a function.
+
+examples of valid variable definitions like this:
+1bit a = 1
+1bit b = 0
+2bit c = 10
+3bit d = 001
+4bit e = 1111
+
+complex valid variable definitions:
+2bit c = 10
+5bit x = 01 + c + 0
+5bit f = c + 111
+# f will have the value 10111
+
+3bit d = 001
+1bit a2, 3bit c2 = d + 0
+# a2 has value 0 and c2 has value 010
+
+the _ is a special variable that doesn't get assigned any values it's used only like this:
+3bit a3, 2bit _ , 4bit q = 101010101
+# a3 has value 101 and q has value 0101
+
+functions look like this:
+show(a,b)
+
+the method show prints the argument values with space in between 
+3bit d = 001
+1bit a2, 3bit c2 = d + 0
+show(a2,c2) 
+# prints: 0 010
+
+the functions are defined like this:
+
+def Add(1bit a, 1bit b, 1bit cin): 
+   1bit s0 = XOR(a,b)
+   1bit s1 = XOR(s0, cin)
+   :1bit s1             # this is the first value returned
+   :1bit OR(AND(a,b), AND(s0, cin)) # this is the second value returned
+
+and called like this
+
+1bit s, 1bit c = Add(1, 1, 0)
+
+#this is invalid call because Add only returns 2 values not 3
+1bit a, 1bit b, 1bit c = Add(1, 1, 0)
+
+predefined functions: 
+
+show(..any number of arguments)
+ doesn't return any values only prints the arguments with a space between them
+ 
+NOT(1bit a)
+ :1bit
+ 
+returns the NOT of 1bit a
+ 
+AND(1bit a, 1bit b)
+ :1bit 
+ returns the AND between 1bit a and 1bit b
+ 
+OR(1bit a, 1bit b)
+ :1bit 
+ returns the OR between 1bit a and 1bit b
+ 
+XOR(1bit a, 1bit b)
+ :1bit 
+ returns the XOR between 1bit a and 1bit b 
+
+the same with NAND NOR 
+ 
+LATCH(1bit s, 1bit r)
+ :1bit Q
+ :1bit nQ
+ represents the SR-Latch with 2 arguments: 1bit s, 1bit r
+ returns two values 1bit Q and the 1bit negated value of Q of an SR-Latch
+
+1bit r = 0;
+1bit a1 = LATCH(s1,r)
+1bit a2 = LATCH(s2,r)
+
+
+~ is a special variable that represents the clock signal that first has the value 0 and can be changed 
+~ = NOT(~) 
+# negates the value of ~
+
+When a program runs it will execute and will show a syntax error in case it's not valid or execute the show instructions that will print the given arguments
+
+until this comment, the version is v0.1.1
+
+and it should be in the file script_editor.html
+
+NOW for version v0.2.1:
+
+I want to add a new type called 1wire, 2wire, ... 99wire that is like 8bit 
+the only difference is that wire won't store the value but the reference. 
+these should work:
+1bit a = 0   # value is at index &0
+1wire b = a
+show(a)
+#should print: 0
+show(b)
+#should print: 0
+
+show(&a)
+#should print the reference of a: &0
+show(&b)
+#should print the reference of b: &0
+
+2bit c = 01  # value is at index &1
+2wire d = c
+show(c)
+#should print: 01
+show(d)
+#should print: 01
+
+show(&c)
+#should print the reference of c: &1
+show(&d)
+#should print the reference of d: &1
+
+1wire d1, 1wire d2 = c;
+
+show(&d1)
+#should print the reference of d1: &1.0
+show(&d2)
+#should print the reference of d1: &1.1
+
+2wire d3  = a + 1
+show(&d3)
+#should print the reference of d3: &0(1)
+3wire d4 = a + a + 0
+show(&d4)
+#should print the reference of d4: &0&0(0)
+
+2bit e = 01 # value is at index &2
+
+4wire d5 = 11 + e
+show(d5)
+#should print the value of d5: 1101
+show(&d5)
+#should print the reference of d4: (11)&2
+
+2wire q1, 2wire q2 = d5
+show(q1, q2)
+#should print: 11 01
+show(&q1, &q2)
+#should print the reference of q1 and q2 like this: (11) &2
+
+1wire t1, 3wire t2 = d5
+show(t1, t2)
+#should print: 1 101
+show(&t1, &t2)
+#should print the reference of t1 and t2 like this: (1) (1)&2
+
+3wire s1, 1wire s2 = d5
+show(s1, s2)
+#should print: 110 1
+show(&s1, &s2)
+#should print the reference of s1 and s2 like this: (11)&2.0 &2.1
+
+the reference notation is either containing a binary literal between parantsesis like this: (1011) (1) (0) (00000)
+
+or containg a reference to a stored value like this : &index 
+example: &0 &1 &42 &154 &3213
+
+the reference can also retrive a bit with this notation: 
+&99.0 is the first bit in the stored value at the 99th index
+
+or can retrive more bits with this notation:
+&99.2-4  represents the 3rd, 4th and 5th bit in the stored value at the 99th index
+
+This way we can represent any kind of spliting and joining of bits from multiple stored values
+
+and will help us in the future where the wires are being used to recompute their values on execution
+
+
+4wire corresponds with 4bit meaning it can be used with the AND NAND OR NOR NOT etc and defined functions just like 
+any 4bit the only difference is that the wire label will remember the reference.
+
+We can think of wires a bit like the pointers from C++ and other languages.
+
+
+wires can be predefined without a value like this:
+
+1wire c
+8wire bus
+show(c)
+#prints the value of c but it has no value yet therefor it prints: -
+show(bus)
+#prints the value of bus, but it has no value yet therefor it prints: -
+show(&c)
+#prints the reference of c, but it has no reference yet therefor it prints: &-
+show(&bus)
+#prints the reference of bus, but it has no reference yet therefor it prints: &-
+
+predefined wires can be used in a more complex designs.
+
+A new instruction and very important that i want to add is NEXT(~)
+this will recompute the values of the wires by executing all the calls in the program where the ~ was used.
+
+the value of ~ is always 1 representing the moment when the clock at the edge pulse
+this means that NEXT(~) is passing to the next cycle moment when the clock gets to the next edge pulse.
+that's why the next value of ~ is still 1
+
+show(&~) should show not the reference of the ~ value but the number of cycles of the program starting with 1
+like this: >1    #means the 1st program cycle
+  >24   #means the 24th program cycle 
+
+
+1wire bb
+show(bb)
+#prints: -
+
+bb = XOR(~, bb)
+#when first using a wire that has no value set, the value will be considered as being 0
+#XOR between 1 and 0 is 1 therefor the value returned by the XOR is 1
+#the value of the AND is stored in a new index #1 that the bb references
+show(~)
+#prints: 1 because ~ is always 1
+show(bb)
+#prints: 1 because the value stored at #1 is 1
+NEXT(~)
+#this will start executing the statements again to recompute the values for the wires that's why:
+show(bb)
+#this will now print: 0 because when executing bb = XOR(~, bb) the XOR between 1 and 1 is 0
+
+
+
+I want all the instructions except "show" to have fixed length defined types wire
+
+This is why let's add the REG1, REG2, REG3, REG4 .. REG99 instructions. 
+REGx have the x coresponding with the x bits or x wires they can be used with.
+
+
+REG1(1bit data, 1bit clock, 1bit clear)
+  :1bit q
+  
+REG3(3bit data, 1bit clock, 1bit clear)
+  :3bit q
+
+REG4(4bit data, 1bit clock, 1bit clear)
+  :4bit q
+
+  
+complex wire examples:
+
+3bit data = 111 # this is stored at index #0
+show(&data)
+#prints: &-
+1wire clr
+show(clr)
+#prints: -
+3wire readA = REG3(data, ~, clr)
+#REG3 is just adding a new storage at index #1 with the value data if the clear bit was 0, 
+#  elseif the clear bit was 1 then the stored value is 000 no matter what was in data
+#when executing, the wires that don't have a reference set yet the value is evaluated to be 0, 
+#this is why clr is evaluated to be 0 but the clr wire doesn't have yet a reference
+#the result of REG3 is stored in a new index #1 with value 111
+
+show(&clr)
+#prints: &- because doesn't have a reference
+show(&readA)
+#prints: &1 because it references the result of REG3 statement
+show(readA)
+#prints: 111
+
+clr, 2bit _ = readA
+show(&clr)
+#prints: &1.0 because clr has been assigned to the first bit of the index #1 
+show(clr)
+#prints: 1 
+
+#this will start executing the statements again to recompute the values for the wires that's why:
+NEXT(~)
+#will execute REG3(data, ~, clr)
+#that changes the value stored at index 1 to 000 because now the clear bit is set to 1 because clr is 1
+#also the clr value changes to 0 because clr references &1.0 that was changed 
+
+show(readA)
+#prints: 000
+
+show(clr)
+#prints: 0 
+show(&clr)
+#prints: &1.0
+
+NEXT(~)
+#will execute REG3(data, ~, clr)
+#that changes the value stored at index 1 to 111 because now the clear bit is set to 0 because clr is 0
+#also the clr value changes to 1 because clr references &1.0 that was changed
+
+show(readA)
+#prints: 111
+show(clr)
+#prints: 1
+
+
+another example:
+1wire bb
+bb = XOR(~, bb)
+show(~)
+show(bb)
+NEXT(~)
+show(bb)
+
+should print:
+1
+1
+0
+
+Note: I want bb to remember only the reference of the return of the expression 
+also i want XOR to compute the value of 1, 0 and put 1 in the value of the return 
+
+When the NEXT(~) will execute it will recompute the expression value and will save it 
+in the reference of the expression from where the bb gets the value.
+
++ a new instruction called TEST with syntax:
+TEST(name, valueExpected)
+
+this will raise an error if the named variable value doesn't have the expected valueExpected, 
+ if it has the same value it won't raise an error and continue the execution
+ the error message should say: Error testing name reference expected to be: valueExpected but was: currentValueHere
+
+TEST(&name, &referenceExpected)
+
+this will raise an error if the named variable reference doesn't have the expected referenceExpected, 
+ if it has the same referenceExpected it won't raise an error and continue the execution
+ the error message should say: Error testing &name reference expected to be: &referenceExpected but was: &currentReferenceHere
+
+Note 2:
+I want show to compute till the show instruction to debug what happens, 
+also i want TEST to compute to asset the values and the wire connections using references.
+
+All this is version v0.2.1
+
+My current code for version v0.1.1 is in the script_editor.html file. 
+Most probably many of what is here have to be reimplemented for the 0.2.1 logic.
+
+Please implement these functionalities.
+
+Please test programs to check if the syntax and the expressions evaluated are correct.
+
+
+=============================================
+
+cursor prompts:
+
+add this behaviour, allow: NEXT(~, 3) 
+when executing should be the same as executing NEXT(~) three times
+this will allow more cycles to be computed without writting repeated NEXT(~)
+like NEXT(~, 25)
+
+
+=====
+
+another thing, i want the show instruction to also show the name of the variable and the type 
+like it's shown in the variable box:
+
+3wire data = 111
+1bit clr = 0
+data = REG3(data, ~, clr)
+show(data)
+#prints: data (3wire) = 111
+show(data, clr)
+#prints: data (3wire) = 111, clr (1bit) = 0
+
+
+==========
+
+when the number of bits is greater then 8 it should show it using hexadecimal like this:
+16bit a = 1111 + 1111 + 1111 + 1111
+show(a)
+#prints: a (16bit) = xFF
+
+when the number of bits is a not divisable with 8 like 10 bits it should show what it can with hexadecimal 
+and the rest with binary like this:
+
+10bit b = 11111 + 11111
+show(b)
+#prints a (10bit) = xF + 11
+
+also when assigning a value bigger then 8 bits can be done with hexadecimals like:
+10bit b = xF + 11
+show(b)
+#prints a (10bit) = xF + 11
+
+the same way should be shown in the variables panel for the program:
+10bit data = 1111 + 1111 + 11
+
+should show:
+data (10bit) = xF + 11 (ref: &0)
+
+
+=====
+
+when the value is bigger or equal with 32 bits it should be shown in groups of 4 hexadecimals like:
+32bit c = xFFFF + xFFFF
+show(c)
+#prints: c (32bit) = xFFFF FFFF
+
+67bit c = xFFFFFFFF + xFFFFFFFF + 000
+show(c)
+#prints: c (67bit) = xFFFF FFFF FFFF FFFF + 000
+
+the same way should be shown in the variables panel for the program:
+c (67bit) = xFFFF FFFF FFFF FFFF + 000 (ref: &0)
+
+
+
+i would also like to assign values the same way when using hexadecimal, meaning it should ignore the spaces
+67bit c = xFFFF FFFF FFFF FFFF + 000
+67bit c2 = xFFFFFFFF FFFFFFFF + 000
+67bit c3 = xFFFFFFFFFFFFFFFF + 000
+67bit c4 = xF FFFFFFFFFFFFFFF + 000
+
+but all of them would show the variables in groups of 4 hexadecimals 
+show(c4)
+#prints: c4 (67bit) = xFFFF FFFF FFFF FFFF + 000
+
+
+=============
+
+also in the show variables panel should not show more then 80bits meaning:
+
+81bit c5 = xF FFFFFFFFFFFFFFF + 00011111 + 00011111 + 1
+should show in the variables panel like:
+c5 (81bit) = xFFFF FFFF FFFF FFFF 1F1F .. (ref: &0)
+
+also i want to be able to do:
+
+67bit c6 = #F FFFFFFFFFFFFFFF + 000
+show(c6.30-46) 
+#prints: c6.30-46 (16bit) = #FFFF
+
+#the same way should be valid with TEST:
+TEST(c6.30-46, #FFFF)
+
+show(c6.0-3) 
+#prints the first 4 bits: 1111
+
+TEST(c6.0-3, 1111)
+
+====
+
+also i want to add the / symbol and be used like this:
+show(c6.0/3)
+#prints the first 3 bits starting with offset 0: 111
+#this notation  name.start/length should be the same as doing name.start-end by calculating the end as start + length
+
+======
+
+with this program: 
+1bit a = XOR(1,0)
+
+i get error:
+Invalid hexadecimal literal at 1:11
+
+but not only that, if we have a name of a function that starts with lowercase x it should be a name. 
+
+Ok i want to Change the x for hexadecimal to # 
+
+32bit c = #FFFF + #FFFF
+show(c)
+#prints: c (32bit) = #FFFF FFFF
+
+TEST(c, #FFFFFF FF)
+#test is valid
+
+======
+
+
+i want to add MUX1, MUX2, MUX3 instructions for multiplexers.
+the number controls the number of bits of the selector while the data parameters can be any number of bits X, but the same X for all the data:
+MUX1(1bit sel, Xbit data0, Xbit data1)
+
+it returns the value from the sel-th number of data parameter
+
+example:
+4bit def1 = 0001
+4bit def2 = 1010
+
+4wire ret = MUX1(0, def1, def2)
+show(ret) 
+#prints: ret (4wire) = 0001
+
+4wire ret2 = MUX1(1, def1, def2)
+show(ret2) 
+#prints: ret2 (4wire) = 1010
+
+for 
+MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3)
+
+example:
+16wire ret3 = MUX2(10, ^FFF0, ^FF0F, ^FF00, ^F0FF)
+show(ret3) 
+#prints: ret2 (16wire) = ^FF00
+
+for
+MUX3(3bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3, Xbit data4, Xbit data5, Xbit data6, Xbit data7)
+it must chose between 8 data parameters acording with the sel 3bit value
+
+
+==========
+
+i want to add DEMUX1, DEMUX2, DEMUX3 instructions for demultiplexers
+the number controls the number of bits of the selector while the data parameters can be any number of bits X, but the same X for all the data:
+
+for 
+DEMUX1(1bit sel, Xbit data): Xbit,Xbit (returns 2 Xbit values)
+
+example:
+
+8bit data = ^09
+8bit ret1, 8bit ret2 = DEMUX1(0, data)
+show(ret1, ret2)
+#prints ret1 (8bit) = 00001001, ret2 (8bit) = 00000000
+
+8bit ret3, 8bit ret4 = DEMUX1(1, data)
+show(ret3, ret4)
+#prints ret1 (8bit) = 00000000, ret2 (8bit) = 00001001
+
+for
+DEMUX2(2bit sel, Xbit data): Xbit,Xbit,Xbit,Xbit (returns 4 Xbit values)
+
+for
+DEMUX3(3bit sel, Xbit data): Xbit,Xbit,Xbit,Xbit,Xbit,Xbit,Xbit,Xbit (returns 8 Xbit values)
+
+8bit data = ^09
+8bit ret0, 8bit ret1, 8bit ret2, 8bit ret3, 8bit ret4, 8bit ret5, 8bit ret6, 8bit ret7 = DEMUX3(010, data)
+
+show(ret7, ret2)
+#prints ret7 (8bit) = 00000000, ret2 (8bit) = 00001001
+
+====
+
+For version v0.3.1:
+
+I want to add the keyword MODE
+this keyword can be used like this:
+
+MODE option1|option2|option3 endline
+where | means either option1 or option2 or option3
+
+only the MODE instruction can exist on this line
+
+by default MODE is STRICT 
+
+MODE STRICT
+  when executed, the wires are immutable and you cannot change the value of wires
+
+MODE WIREWRITE
+  when executed, the wires are no more immutable and you can change the value of a wire
+
+MODE STRICT WIREWRITE 
+
+
+you can switch between them at anytime
+
+example:
+
+MODE STRICT
+#this command is not required because the MODE is already set to STRICT by default
+4wire data = 1101
+# unable to change the value of the data
+
+MODE WIREWRITE
+# now the value of data can be changed
+data = data.0 + data.1 + 1 + data.3
+show(data)
+#prints 1111 because the 3rd bit was changed
+data = 0110
+show(data)
+#prints 0110 
+
+MODE STRICT
+# again now it's unable to change the values of wires
+
+======
+
+The REG instructions now changes the value when executed just like a LATCH but i want to have a behaviour like FLIPFLOPs
+
+such that when executed it wont change the bit right in that moment but in the next cycle
+
+This way you can chain REG intructions and create a shift register 
+
+Right now there is no way to have this because when executed it instantly changes the value
+
+REG1(1bit data, 1bit clock, 1bit clear)
+  :1bit q
+  
+REG3(3bit data, 1bit clock, 1bit clear)
+  :3bit q
+
+REG4(4bit data, 1bit clock, 1bit clear)
+  :4bit q
+
+this means that for this example:
+
+4wire data = 1101
+4wire readA = REG4(data, ~, 0)
+
+show(readA)
+#prints: 0000 because the internal REG4 doesn't have a value now 
+
+NEXT(~)
+
+show(readA)
+#prints: 1101 because when doing NEXT(~) now the REG4 instruction has changed the value to the data one
+======

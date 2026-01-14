@@ -1,0 +1,197 @@
+
+3bit data = 111 
+show(&data)
+1wire clr
+show(clr)
+3wire readA = REG3(data, ~, clr)
+
+show(&clr)
+show(&readA)
+show(readA)
+
+clr, 2bit _ = readA
+show(&clr)
+show(clr)
+
+NEXT(~)
+
+show(readA)
+
+show(clr)
+show(&clr)
+
+NEXT(~, 21)
+
+show(readA)
+show(clr)
+
+
+=====
+3bit data = 111 # this is stored at index #0
+show(&data)
+#prints: &-
+1wire clr
+show(clr)
+#prints: -
+3wire readA = REG3(data, ~, clr)
+#REG3 is just adding a new storage at index #1 with the value data if the clear bit was 0, 
+#  elseif the clear bit was 1 then the stored value is 000 no matter what was in data
+#when executing, the wires that don't have a reference set yet the value is evaluated to be 0, 
+#this is why clr is evaluated to be 0 but the clr wire doesn't have yet a reference
+#the result of REG3 is stored in a new index #1 with value 111
+
+show(&clr)
+#prints: &- because doesn't have a reference
+show(&readA)
+#prints: &1 because it references the result of REG3 statement
+show(readA)
+#prints: 111
+
+clr, 2bit _ = readA
+show(&clr)
+#prints: &1.0 because clr has been assigned to the first bit of the index #1 
+show(clr)
+#prints: 1 
+
+#this will start executing the statements again to recompute the values for the wires that's why:
+NEXT(~)
+#will execute REG3(data, ~, clr)
+#that changes the value stored at index 1 to 000 because now the clear bit is set to 1 because clr is 1
+#also the clr value changes to 0 because clr references &1.0 that was changed 
+
+show(readA)
+#prints: 000
+
+show(clr)
+#prints: 0 
+show(&clr)
+#prints: &1.0
+
+NEXT(~)
+#will execute REG3(data, ~, clr)
+#that changes the value stored at index 1 to 111 because now the clear bit is set to 0 because clr is 0
+#also the clr value changes to 1 because clr references &1.0 that was changed
+
+show(readA)
+#prints: 111
+show(clr)
+#prints: 1
+
+
+2bit a = 10
+1wire sel
+4wire data = 1101
+
+4wire wire, 4wire wire2 = DEMUX1(sel, data)
+
+sel = wire.0
+show(wire, wire2, sel)
+2bit b = 10
+
+NEXT(~, 12)
+show(wire, wire2, sel)
+
+=====
+
+
+8bit data = ^FF
+
+def Andd(8bit a, 8bit b, 1bit sel):
+   :8bit MUX1(0, a, b)
+
+8wire res
+show(res.0)
+res = Andd( ^FF, ^F0, res.0)
+show(res)
+
+=====
+def andd(1bit a, 1bit b): 
+   :1bit XOR(a,b)
+   :1bit AND(a,b)
+
+1bit s, 1bit c = andd(1, 1)
+
+show(s,c)
+
+====
+def AND2(2bit a, 2bit b):
+   2bit q = AND(a.0, b.0) + AND(a.1, b.1)
+   :2bit q
+
+2wire d = AND2( 10, 11)
+show(d)
+====
+1wire bb
+1wire bb = XOR(~, bb)
+show(~)
+show(bb)
+NEXT(~)
+show(bb)
+=====
+
+4wire data = 1101
+4wire readA = REG4(data, ~, 0)
+
+show(readA)
+#prints: 0000 because the internal REG4 doesn't have a value now 
+
+NEXT(~)
+
+show(readA)
+=====
+
+MODE WIREWRITE
+4wire data = 1101
+4wire readA = REG4(data, ~, 0)
+
+show(readA)
+#prints: 0000 because the internal REG4 doesn't have a value now 
+
+NEXT(~)
+show(readA)
+#prints: 1101 because REG is a flip-flow
+
+data = 1111
+# this should change the value of the storage ref that data
+NEXT(~)
+# this should recompute the readA = REG4(data, ~, 0) with the new value of data but the storage should not change now because its a flip-flop
+show(readA)
+# this should print the old value : 1101 
+NEXT(~)
+show(readA)
+# this should print the new value: 1111
+
+but right now it outputs:
+readA (4wire) = 0000
+readA (4wire) = 1101
+readA (4wire) = 1101
+readA (4wire) = 1101
+
+and i see that 
+data = 1111 
+adds a new storage ref meaning that the REG4 still looks at the old reference, i want the assignation to change only the value not create a new storage reference this way the connections already made will find the new value this is the correct behaviour
+
+=====
+MODE WIREWRITE
+4wire data = 1101
+4wire readA = REG4(data, ~, 0)
+
+show(readA)        # prints: 0000 (first time, no previous value)
+
+NEXT(~)
+show(readA)        # prints: 1101 (REG4 outputs previous pending value)
+
+data = data.0 + 111          # Updates existing storage, doesn't create new one
+NEXT(~)             # REG4 reads new data value but outputs old pending value (flip-flop behavior)
+show(readA)         # prints: 1101 (old value)
+
+NEXT(~,3)             # REG4 now outputs the new pending value
+show(readA)         # prints: 1111 (new value)
+
+
+=====
+MODE WIREWRITE
+4wire data = 1101
+data = data.0 + 000
+show(data)
+
