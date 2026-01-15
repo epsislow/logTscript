@@ -251,3 +251,99 @@ comp [led] 1bit .power:
 
 care executa in js atributul round: 0
 iar daca square  lipseste atunci in js nu va trimite atributul round 
+
+===== comp lcd/pcb ideas
+
+16bit b = 1111011011110110
+
+comp [7seg] 8bit .s1:
+   text: "R"
+   color: ^2c7
+   :
+comp [7seg] 8bit .s2:
+
+.s1 = b.0/8
+.s2 = b.8/8
+
+comp [dip] 8bit .dp:
+   text: "IN"
+   color: ^f37
+   :8bit
+
+.b.0/8 = .dp
+
+conp [lcd] 40bit .lcd1:
+  row: 8
+  cols: 5
+  pixelSize: 7
+  pixelGap: 1
+  glow
+  round: 0
+  color: ^58f
+  bg: ^000
+  nl
+  :
+  
+  
+pcb [display] {
+   1pin sel
+   8pin data
+   ...
+   .lcd0 = bus8wire
+#   8pout q
+}
+
+
+comp [display] 9bit .d2:
+
+
+
+comp [lcd-ctrl] 8bit lcd1Ctrl:
+   for: .lcd1
+   :
+
+1bit sel
+5bit instr = 00001
+3bit param = 101
+
+.lcdCtrl = sel + instr + param
+next
+sel = 0
+inste = 3
+next
+
+
+.lcd1 = ^7FF5 F301 4E
+
+send .lcd1:
+   x: 111
+   y: 100
+   len: 4
+   data: ^035
+   :
+
+send .lcd1:
+   clear
+   color: ^f9f
+   :
+
+
+
+
+addCharacterLCD({
+  id: "lcd2",
+  rows: 8,
+  cols: 30,
+  pixelSize: 7,
+  pixelGap:1,
+  glow: true,
+  pixelOnColor: "#5588ff",
+  backgroundColor: "#000",
+  round: false, 
+  nl: true,
+});
+
+
+comp [key] 
+
+====
