@@ -1,0 +1,81 @@
+TYPE: undefined main.js:195:13
+Object { type: "ID", value: "b", line: 1, col: 8, file: "" }
+main.js:198:15
+Object { type: "ID", value: "color", line: 7, col: 9, file: "" }
+main.js:198:15
+[DEBUG] Loop iteration, component: .s, current token: type=ID, value=color, line=7, col=9 main.js:740:15
+ID: undefined main.js:195:13
+Object { type: "SYM", value: ":", line: 7, col: 10, file: "" }
+main.js:198:15
+SYM: : main.js:195:13
+Object { type: "HEX", value: "2C7", line: 7, col: 15, file: "" }
+main.js:198:15
+[DEBUG] Loop iteration, component: .s, current token: type=SYM, value=:, line=8, col=5 main.js:740:15
+[DEBUG] Found ':' at line 8, col 5, component: .s main.js:748:17
+SYM: : main.js:195:13
+Object { type: "KEYWORD", value: "comp", line: 10, col: 5, file: "" }
+main.js:198:15
+[DEBUG] After ':', current token: type=KEYWORD, value=comp, line=10, col=5 main.js:756:17
+[DEBUG] beforeColonLine=8, current line=10, line diff=2 main.js:757:17
+[DEBUG] Final check: Peeking ahead from tokenizer position 104, current char="[" main.js:780:17
+[DEBUG] Final check: After skipping whitespace, index=104, char="[", foundNewline=false, next 30 chars="[7seg] 8bit .t:
+   color: ^2c7" main.js:787:17
+[DEBUG] On new line after ':', setting foundEndColon=true main.js:804:19
+KEYWORD: comp main.js:195:13
+Object { type: "SYM", value: "[", line: 10, col: 7, file: "" }
+main.js:198:15
+SYM: [ main.js:195:13
+Object { type: "DEC", value: "7seg", line: 10, col: 11, file: "" }
+main.js:198:15
+DEC: undefined main.js:195:13
+Object { type: "SYM", value: "]", line: 10, col: 12, file: "" }
+main.js:198:15
+SYM: ] main.js:195:13
+Object { type: "TYPE", value: "8bit", line: 10, col: 17, file: "" }
+main.js:198:15
+TYPE: undefined main.js:195:13
+Object { type: "SYM", value: ".", line: 10, col: 19, file: "" }
+main.js:198:15
+SYM: . main.js:195:13
+Object { type: "ID", value: "t", line: 10, col: 20, file: "" }
+main.js:198:15
+ID: undefined main.js:195:13
+Object { type: "SYM", value: ":", line: 10, col: 21, file: "" }
+main.js:198:15
+SYM: : main.js:195:13
+Object { type: "ID", value: "color", line: 11, col: 9, file: "" }
+main.js:198:15
+[DEBUG] Loop iteration, component: .t, current token: type=ID, value=color, line=11, col=9 main.js:740:15
+ID: undefined main.js:195:13
+Object { type: "SYM", value: ":", line: 11, col: 10, file: "" }
+main.js:198:15
+SYM: : main.js:195:13
+Object { type: "HEX", value: "2C7", line: 11, col: 15, file: "" }
+main.js:198:15
+[DEBUG] Loop iteration, component: .t, current token: type=ID, value=nl, line=12, col=6 main.js:740:15
+ID: undefined main.js:195:13
+Object { type: "SYM", value: ":", line: 13, col: 5, file: "" }
+main.js:198:15
+SYM: : main.js:195:13
+Object { type: "SYM", value: ".", line: 15, col: 2, file: "" }
+main.js:198:15
+ID: undefined main.js:195:13
+Object { type: "SYM", value: "=", line: 15, col: 5, file: "" }
+main.js:198:15
+[DEBUG] Loop iteration, component: .t, current token: type=SYM, value==, line=15, col=5 main.js:740:15
+[DEBUG] Found '=' in component context, component: .t, line: 15, col: 5 main.js:1021:19
+[DEBUG] foundEndColon=false, current token before '=': type=SYM, value== main.js:1022:19
+SYM: = main.js:195:13
+Object { type: "ID", value: "c", line: 15, col: 7, file: "" }
+main.js:198:15
+[DEBUG] After '=', current token: type=ID, value=c, line=15, col=7 main.js:1026:19
+[DEBUG] ERROR: Variable assignment after '=' in component declaration main.js:1046:21
+Error: Variable assignments after '=' in component declaration are not supported. Use a separate assignment statement like '.t = c' after the component declaration.
+    parseComp file:///C:/work/backup/wwwlogic/library/logTscript/lib/main.js:1047
+    stmt file:///C:/work/backup/wwwlogic/library/logTscript/lib/main.js:402
+    parse file:///C:/work/backup/wwwlogic/library/logTscript/lib/main.js:255
+    run file:///C:/work/backup/wwwlogic/library/logTscript/lib/main.js:4177
+    onclick file:///C:/work/backup/wwwlogic/library/logTscript/script_editor_v0_3_1_last_version.html:1
+main.js:4193:13
+
+​

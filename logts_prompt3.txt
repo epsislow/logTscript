@@ -261,6 +261,9 @@ comp [7seg] 8bit .s1:
    color: ^2c7
    :
 comp [7seg] 8bit .s2:
+   color: ^2c7
+   nl
+   :
 
 .s1 = b.0/8
 .s2 = b.8/8
@@ -347,3 +350,30 @@ addCharacterLCD({
 comp [key] 
 
 ====
+vreau sa adaugam compoenta 7seg 
+comp [7seg] 8bit .s1:
+   text: "SEG"
+   color: ^2ecc71
+   = 00001111
+   nl
+   :
+# text atribut pentru labelul pentru sevenSegment ca la celelalte componente
+# color pentru culoare ca la celelalte componente
+# nl ca la celelalte componente
+# = seteaza valoarea de 8 biti data sau o referinta ca la celelalte componente
+# executa js:
+addSevenSegment({
+  text: "SEG",
+  color: "#2ecc71",
+  values: "00001111"
+});
+
+# atributele sunt optionale ca la celalalte componente
+comp [7seg] 8bit .s2:
+   nl
+   :
+#executa doar
+addSevenSegment({
+    nl: true
+});
+
