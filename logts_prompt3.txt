@@ -141,3 +141,18 @@ comp [switch] 1bit .wifi:
 
 The switches that are checkboxes will trigger changes because the coresponding components change the value of the conected references and those references are connected with other elements functions/statements inside script and those should also be processed.
 
+2bit a = 01
+
+comp [led] 1bit .power:
+     text: "PWR"
+     color: ^2ecc71
+     = 0
+     :
+
+
+comp [switch] 1bit .wifi:
+    text: "WIFI"
+    :1bit
+
+
+.power = .wifi
