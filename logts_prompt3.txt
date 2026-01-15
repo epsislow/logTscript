@@ -156,3 +156,98 @@ comp [switch] 1bit .wifi:
 
 
 .power = .wifi
+
+
+========
+acum pentru programul:
+
+2bit a = 01
+
+comp [led] 1bit .power:
+     text: "PWR"
+     color: ^0000ff
+     = 0
+     :
+
+
+comp [switch] 1bit .wifi:
+    text: "WIFI"
+    :1bit
+
+
+.power = .wifi
+
+afiseaza corect acum, dar cand apas pe checkbox  pare ca nu se schimba nimic 
+Am adaugat un console.log la linia 3004:
+console.log('CHECK ' , checked, compInfo);
+
+if(compInfo){
+          // Update the value in storage if component is connected
+          if(compInfo.ref){
+            const storageIdx = parseInt(compInfo.ref.substring(1));
+                const stored = this.storage.find(s => s.index === storageIdx);
+                if(stored){
+                  stored.value = checked ? '1' : '0';
+                  // Update all connected components
+                  this.updateComponentConnections(name);
+                }
+          }
+        }
+
+vad in console ca ref = null :
+CHECK  true 
+Object { type: "switch", componentType: "1bit", attributes: {…}, initialValue: null, returnType: "1bit", ref: null, deviceIds: (1) […] }
+​attributes: Object { text: "WIFI" }
+componentType: "1bit"
+deviceIds: Array [ "wifi" ]
+initialValue: null
+ref: null
+returnType: "1bit"
+type: "switch"
+<prototype>: Object { … }
+
+dar cred ca ref este referinta de intrare precum componenta LED care ii spune daca led este aprins sau nu 
+
+pentru ca vad ca pe componenta led .power adica daca execut:
+globalInterp.components.get('.power')
+
+imi arata:
+Object { type: "led", componentType: "1bit", attributes: {…}, initialValue: "0", returnType: null, ref: "(0)", deviceIds: (1) […] }
+​attributes: Object { text: "PWR", color: "#0000FF" }​
+componentType: "1bit"
+deviceIds: Array [ "power" ]
+initialValue: "0"
+ref: "(0)"
+returnType: null
+type: "led"
+
+iar switch nu are o astfel de referinta are doar de iesire,
+ma gandesc ca ar trebuii sa fie referinte diferite daca o componenta poate sa aibe si referinta de intrare si de iesire?
+
+.power = .wifi 
+inseamna ca .wifi ar trebuii sa schimbe state-ul unei referinte de iesire deci sa aibe un storage nou. iar .power sa fie conectat cu referinta lui de intrare la referinta de iesire a lui .wifi 
+
+astfel incat sa aprinda sau sa stinga ledul conform cu stateul butonului
+
+
+===
+as vrea sa modificam attributul radius pt componentele led sa se numeasca square
+si sa nu mai fie folosit radius: 0 ci doar square adica:
+in loc de 
+comp [led] 1bit .power:
+     text: "PWR"
+     color: ^ff0
+     radius: 0
+     = 1
+     :
+
+sa scriem:
+comp [led] 1bit .power:
+     text: "PWR"
+     color: ^ff0
+     square
+     = 1
+     :
+
+care executa in js atributul round: 0
+iar daca square  lipseste atunci in js nu va trimite atributul round 
