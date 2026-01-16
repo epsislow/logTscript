@@ -195,3 +195,61 @@ MODE WIREWRITE
 data = data.0 + 000
 show(data)
 
+=====
+def seg7dec(4bit dat):
+   1bit a, 1bit b, 1bit c, 1bit d = dat
+   1bit nb = NOT(b)
+   1bit nc = NOT(c)
+   1bit nd = NOT(d)
+   1bit a1 = OR(a, AND(nb, nd))
+   1bit a2 = OR( AND(b, d),c)
+   :1bit OR(a1, a2)
+   :1bit a1
+
+
+
+comp [switch] 1bit .on:
+   text: 'Pwr'
+   :
+
+comp [led] 1bit .pwr:
+   color: ^21f
+   nl
+   text: 'ON'
+   :
+
+.pwr = .on
+
+comp [switch] 1bit .a1:
+   text: "a1"
+   :
+
+comp [switch] 1bit .a2:
+   text: "b2"
+   :
+
+comp [switch] 1bit .a3:
+   text: 'c4'
+   :
+
+
+comp [switch] 1bit .a4:
+   text: 'd8'
+   :
+
+comp [7seg] 8bit .a:
+   text: "b"
+   = 0011010
+   :
+
+
+.a = 01100 + .pwr + .pwr + 0
+
+
+2bit q = 1+ .a3
+2bit aa1 = seg7dec(.a1 + .a2 + .a3 + .a4)
+
+.a = .a1 + .a2 + .a3 + .a4 + .pwr + 000
+
+
+
