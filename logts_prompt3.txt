@@ -553,3 +553,41 @@ show(.sub:get)
 show(.sub:carry)
 #shows 1  shows the carry after a - b
 
+====
+as vrea sa mai adaugam o componenta numita divider:
+comp [divider] 4bit .div:
+   depth: 4
+   :
+
+.div:a = 1110
+.div:b = 0010
+show(.div:get)
+#shows 0111 shows the result of a / b
+show(.div:mod)
+#shows 0000 shows the modulo of a / b
+
+.div:a = 0111
+.div:b = 0010
+show(div:get)
+#shows 0011
+show(.div:mod)
+#shows 0001 
+====
+as vrea sa mai adaugam o componenta numita multiplier
+comp [multiplier] 4bit .mul:
+    depth: 4
+    :
+    
+.mul:a = 0010
+.mul:b = 0010
+show(.mul:get)
+#shows 0100 shows the result of a * b
+show(.mul:over)
+#shows 0000 shows the carry over after the result of a * b
+
+.mul:a = 1111
+.mul:b = 1111
+show(.mul:get)
+#shows 0001 shows the result of a * b
+show(.mul:over)
+#shows 1110 shows the carry over after the result of a * b
