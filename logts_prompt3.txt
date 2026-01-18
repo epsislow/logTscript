@@ -454,3 +454,36 @@ comp [mem] 4bit .rom:
 .rom:set = ~
 #this will set for address 5 the value 0 when NEXT(~)  will be executed
 =====
+
+add counter component 
+
+comp [counter] 5bit .c:
+   depth: 5
+   = 00100
+   :
+#this should have a js function like addCounter({ depth: 4, default: "0000" })
+#if no default is set then use 0
+#this should execute:
+#addCounter({depth: 5, default: "00100" })
+
+
+.c:dir = 1
+#sets the direction to increment
+.c:data = 10100
+#sets the date to be 10100 
+.c:set = 1
+#the value is changed imediatly and because the direction is increment it will changed to 10101 
+#if the value was 11111 then the increment should change it to 00000
+
+.c:set = ~
+#the value is changed on the next NEXT(~) 
+
+.c:dir = 0
+#sets the direction to decrement
+.c:data = 00000
+.c:set = 1
+#the value is changed imediatly and because the direction is decrement it will be changed to 11111
+
+
+show(.c:get) 
+#this should show the current value of the counter meaning 11111
