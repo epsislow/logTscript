@@ -591,3 +591,69 @@ show(.mul:get)
 #shows 0001 shows the result of a * b
 show(.mul:over)
 #shows 1110 shows the carry over after the result of a * b
+
+====
+
+ i want to add a component for a shift register that can shift to left or to right 
+comp [shifter] 8bit .sh:
+   depth: 8
+   :
+
+.sh:value = 00110111
+.sh:set = 1
+#this should set this value in the shifter
+
+that could be done with an attribute like direction :dir
+.sh:dir = 1 
+#meaning shifting to right or
+.sh:dir = 0
+#meaning shifting to left
+.sh:set = 1
+#the shifting is done now
+
+show(.sh:get) 
+#shows 00011011 shows the shifter value of 8bits and take into account if the shifter has circular set or not
+show(.sh:out)
+#shows 1 shows the bit that was shifted out 
+
+comp [shifter] 8bit .sh2:
+   depth: 8
+   circular
+   :
+#this shifter is circular 
+
+.sh:value = 00110111
+.sh:dir = 0
+.sh:set = 1
+#the shifting is done now
+
+show(.sh:get)
+#shows 10011011
+show(.sh:out)
+#shows 1 shows the bit that was shifted out 
+
+
+== 
+i want to add :in for the shifter component:
+comp [shifter] 5bit .sh2:
+   depth: 5
+   :
+
+.sh:value = 00010
+.sh:set = 1
+.sh:in = 1
+# this will be used when the shifter is not circular, 
+# and will use the bit to the shifter like folowing:
+.sh:dir = 1
+.sh:set = 1
+show(.sh:get)
+# shows 10001 the first bit comes from the in bit if it was .sh:in = 0 then the value was shown 00001
+
+.sh:value = 00010
+.sh:set = 1
+.sh:in = 1
+.sh:dir = 0
+.sh:set = 1
+# shows 00101 the last bit comes from the in bit if it was .sh:in = 0 then the value was shown 00100
+
+#if the comp is circular then the in value is not taken into account because the in value is equal with the out value
