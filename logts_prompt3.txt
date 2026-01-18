@@ -487,3 +487,69 @@ comp [counter] 5bit .c:
 
 show(.c:get) 
 #this should show the current value of the counter meaning 11111
+=========================
+
+
+as vrea sa mai adaugam o componenta numita adder:
+comp [adder] 4bit .add:
+   depth: 4
+   :
+
+#this should have a js function like addAdder({ depth: 4})
+#if no value was set for depth then use depth: 4
+
+.add:a = 1011
+.add:b = 0100
+#sets the numbers a and b
+show(.add:get)
+#shows 1111
+
+.add:a = 0001
+.add:b = 1111
+show(.add:get)
+#shows 0000
+show(.add:carry)
+#shows 1. the carry value is the first overflow bit after the a + b calculation
+
+.add:a = 0010
+.add:b = 1111
+show(.add:get)
+#shows 0001
+show(.add:carry)
+#shows 1
+
+comp [adder] 8bit .add:
+   depth: 8
+   :
+   
+
+.add:a = 00000001
+.add:b = 00001111
+show(.add:get)
+#shows 00010000
+show(.add:carry)
+#shows 0 the value is 0 because the a+b calculation gave no carry
+
+=====
+
+
+
+as vrea sa mai adaugam o componenta numita subtract:
+comp [subtract] 4bit .sub:
+   depth: 4
+   :
+
+.sub:a = 1111
+.sub:b = 0110
+show(.sub:get)
+#shows 1001 shows the result of a - b
+show(.sub:carry)
+#shows 0  shows the carry after a - b
+
+.sub:a = 0000
+.sub:b = 0001
+show(.sub:get)
+#shows 1111 shows the result of a - b
+show(.sub:carry)
+#shows 1  shows the carry after a - b
+
