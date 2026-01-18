@@ -377,3 +377,80 @@ addSevenSegment({
     nl: true
 });
 
+=====
+i want to add a new component called mem:
+
+comp [mem] 4bit .ram:
+   length: 3
+   depth: 4
+   = ^0
+   :
+#this should have a js function like addMem({ length: 3, depth: 4, default: "0000" })
+#this component doesn't add anything to the display
+#depth attribute sets the number of bits each memory address is having, default is 4 meaning 4 bits
+#length attribute sets the number of addresses that exists in the memory component
+#= is the default value that each address will have, must be the same bit length set with depth attribute
+
+
+#should execute the addMem() js function like:
+addMem({
+ id: someGeneratedStringId5,
+ length: 3,
+ depth: 4,
+ default: "0000"
+});
+
+#the addMem function should keep the memory data in an object or Map for each id 
+#there should be also a js function called setMem( id, address, value) that sets the value of an memory address to the given value be also a js function called setMem( id, address, 
+#there should be also a js function called getMem( id, address) and should return the value of the memory with given id and address, if the memory doesn't have a value set on that address should give the default value.
+#the addMem should not create all the addresses initialy, just use the default functionality. if the default value is not set by default is 0 
+
+#the attributes are optional like the rest of the components. the defaults are: length= 3, depth= 4 and each address have the value 0
+
+.ram = ^FFF
+#should give error: Cannot asign a value to a mem component
+
+
+.ram:at = 00
+#sets the memory address where we want to do some operation, must be between 0 and the given length, 
+#.ram:at = 11 should give error: Memory invalid address 3 ( length: 3 means adress can be between 0,1 or 2)
+.ram:data = ^5
+#sets the value for the said address
+.ram:set = 1
+#the value is changed imediatly, 
+.ram:set = ~
+#the value is changed on the next NEXT(~)
+
+.ram:at = 00
+.ram:data = ^5F
+.ram:set = 1
+#this will change the memory values: for address 0 to bits of 5, and the next address 1 to bits of F
+#you can perform multiple sets by given more bits to data, the number of bits must be divizibile with the depth number. If depth is 6 meaning 6bit then .ram:data must be 6bits, 12bits, 18bits, 24bits etc..
+
+.ram:adr = 00
+4bit val = .ram:get
+#this assigns to val the value that exists at adresss 0 at component .ram, should use a js method like getMem(id, address)
+
+.ram:get = 0
+#this throws an error: Invalid get property cannot be assigned to a value
+
+other examples:
+comp [mem] 4bit .rom:
+   depth: 8
+   length: 256
+   :
+#this adds a mem componet called .rom with 8bits depth and 256 memory addresses default value is 00000000
+
+
+.rom:at = 0
+.rom:data = ^1234 5678 9ABC + ^DF
+.rom:set = 1
+#this sets 7 values for address 0 to 6 now
+
+5bit adr = 00100
+8bit val2 = ^0
+.rom:at = adr
+.rom:data = val2
+.rom:set = ~
+#this will set for address 5 the value 0 when NEXT(~)  will be executed
+=====
