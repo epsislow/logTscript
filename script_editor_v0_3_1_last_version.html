@@ -24,6 +24,10 @@ button.cls {
   background-color: #afa;
 }
 
+button.next {
+  background-color: #89f;
+}
+
 #devices {
   display: flex;
   flex-wrap: wrap;
@@ -588,7 +592,8 @@ show(a,b,c)
 
 <div>
   <button onclick="run()">Run</button>
-  <button onclick="toggleCmd()">Cmd</button>
+  <!--button onclick="toggleCmd()">Cmd</button-->
+  <button onclick="doNext(1)">NEXT</button>
   <button onclick="toggleAST()">AST</button>
   <button onclick="code.value=''" class="cls">cls</button>
   <button onclick="toggleFiles()">Files</button>
