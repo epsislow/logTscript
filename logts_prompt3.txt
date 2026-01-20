@@ -735,3 +735,42 @@ lcdDisplays.get("lcd1").setRect(
 #cu rows = x cu cols = y
 #rowlen inseamna cati biti sunt pe fiecare rand
 #in data sunt datele tuturor bitilor
+
+≈===========
+maybe
+=====
+
+pcb [name]: 
+   4pin adr
+   8pin data
+   1pin write
+   1pin set
+   8pout get
+
+   comp [mem] .ram:
+      depth: 2
+      length: 16
+      
+   .ram:at = adr
+   
+   get = .ram:get
+   q= 00
+   
+   ~:
+   .ram:at = adr
+   .ram:data = data
+   .ram:set = set
+   get = MUX(set, .ram:get, ^00)
+   q = set + set
+   
+   :2bit q
+
+pcb [name] .a::
+
+pcb [name] .b::
+
+.a:data = 1
+.a:write = 1
+.a:set = 1
+
+show(.a:get)
