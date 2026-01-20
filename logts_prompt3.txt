@@ -275,18 +275,10 @@ comp [dip] 8bit .dp:
 
 .b.0/8 = .dp
 
-conp [lcd] 40bit .lcd1:
-  row: 8
-  cols: 5
-  pixelSize: 7
-  pixelGap: 1
-  glow
-  round: 0
-  color: ^58f
-  bg: ^000
-  nl
-  :
-  
+
+
+
+
   
 pcb [display] {
    1pin sel
@@ -686,3 +678,60 @@ show(.rot:get)
 
 
 
+
+====
+vreau sa adaug componenta lcd 
+comp [lcd] 4bit .lcd1:
+  row: 8
+  cols: 6
+  pixelSize: 7
+  pixelGap: 1
+  glow
+  round
+  color: ^58f
+  bg: ^000
+  nl
+  :
+#vezi mai multe informatii in js function addCharacterLCD
+#ar trebuii sa execute
+addCharacterLCD({
+  id: someGeneratedStringId6,
+  rows: 8,
+  cols: 6,
+  pixelSize: 7,
+  pixelGap:1,
+  glow: true,
+  pixelOnColor: "#58f",
+  backgroundColor: "#000",
+  round: false, 
+  nl: true,
+});
+#unele attribute pot sa lipseasca caz in care defaultul din addCharacterLCD va fi folosit
+
+
+.lcd1:clear = 1
+.lcd1:set = 1
+#ar trebuii sa nu mai afiseze nimic pe ecran vezi CharacterLCD
+# daca nu exista o metoda care sa faca asta te rog sa adaugi tu
+
+.lcd1:x = 1
+.lcd1:y = 0
+.lcd1:rowlen = 101
+.lcd1:data = 0111010001100000111000001100010111000000
+.lcd1:set = 1
+#acest set ar trebuii sa apeleze
+lcdDisplays.get("lcd1").setRect(
+  0, 1,
+  {
+  0: "01110",
+  1: "10001",
+  2: "10000",
+  3: "01110",
+  4: "00001",
+  5: "10001",
+  6: "01110",
+  7: "00000"
+});
+#cu rows = x cu cols = y
+#rowlen inseamna cati biti sunt pe fiecare rand
+#in data sunt datele tuturor bitilor
