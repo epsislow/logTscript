@@ -657,3 +657,32 @@ show(.sh:get)
 # shows 00101 the last bit comes from the in bit if it was .sh:in = 0 then the value was shown 00100
 
 #if the comp is circular then the in value is not taken into account because the in value is equal with the out value
+
+====
+ as vrea sa mai adaugam o componenta numita rotary
+comp [rotary] 4bit .rot:
+    text: "R1"
+    states: 6
+    color: ^3F3
+    :
+#this executes 
+addRotaryKnob({
+   label, // this comes from text, if text is not set it should be ""
+   states,
+   color,
+   onChange, //this should be the same as for dipSwitches or other components
+})
+
+.rot:data = 0010 
+.rot:set = 1 
+#the :set property is just like other components
+#this sets the state of the rotary knob to :data = 0010 which is the 3rd state
+#i think it should call a setRotaryKnob(id, newState) but method that doesn't exist now, can you create it?
+#trying to set a state that is bigger then the number of states defined should silently set it to the biggest value possible meaning the number of states.
+
+show(.rot:get)
+#shows 0010 because that's the stat we've set it at, if no state was set before the state is 0 of course.
+
+
+
+
