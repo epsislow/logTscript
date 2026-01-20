@@ -530,6 +530,36 @@ button.next {
   display: block; /* avoid baseline issues */
 }
 
+/* =========================
+   ROTARY KNOB WRAPPER
+========================= */
+
+.knob-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-right: 1rem;
+}
+
+.knob-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd;
+}
+
+.knob-wrapper canvas {
+  display: block; /* avoid baseline issues */
+}
+
+.knob-value {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #6dff9c;
+  min-width: 3ch;
+}
+
 </style>
 </head>
 <body>
