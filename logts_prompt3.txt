@@ -756,7 +756,7 @@ pcb [name]:
    get = .ram:get
    q= 00
    
-   ~:
+   ~~
    .ram:at = adr
    .ram:data = data
    .ram:set = set
@@ -764,6 +764,22 @@ pcb [name]:
    q = set + set
    
    :2bit q
+   
+   
+pcb [mychip]:
+   8pin din
+   8pout dout
+   comp [counter] .c:
+     depth:4
+     =0000
+     :
+     
+   .c:dir = 1
+   .c:set = ~
+   dout = .c:get + ^F
+   ~~
+   .c:set = 0
+   :
 
 pcb [name] .a::
 
