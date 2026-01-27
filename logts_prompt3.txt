@@ -740,32 +740,62 @@ lcdDisplays.get("lcd1").setRect(
 maybe
 =====
 
-pcb [name]: 
+i want to add a new idea instead of comp use pcb to define user defined chips or user defined components:
+
+pcb +[comp1]: 
    4pin adr
    8pin data
    1pin write
    1pin set
    8pout get
+   exec: set
+#this exec is a new attribute which connects which value will trigger the execution of this component
+#by default exec value is set meaning a this component must have a 1bit set variable already defined before this row
+#but you can set a new variable name here like exec: execute where execute was defined before as 1bit execute
+   on: raise
+#this on: raise is like in the existing components and tells how this user defined component will be executed
+#the values are like the normal components meaning on: 1 and on: edge
 
    comp [mem] .ram:
       depth: 2
       length: 16
+      on: 1
+      :
       
    .ram:at = adr
+   .ram:set = 0
    
    get = .ram:get
-   q= 00
    
    ~~
-   .ram:at = adr
-   .ram:data = data
-   .ram:set = set
-   get = MUX(set, .ram:get, ^00)
-   q = set + set
-   
-   :2bit q
-   
-   
+   .ram:{
+       at = adr
+       #here we say at propety equals 4pin adr variable, 
+       data = data
+       #here we say data propety equals 8pin data variable, 
+       set = set 
+       #here we say set propety equals 1pin set variable, 
+   }
+   get = MUX1(set, .ram:get, ^00)
+   #here we say that the 8pout get value will be   = MUX(set, .ram:get, ^00)
+   :1bit set
+
+#this will define the pcb called comp1.
+#the syntax for a definition is: pcb +[nameOfNewComponent]:
+#you cannot use names of user defined components that already exists or reserved components like mem, shifter, counter, lcd, 7seg 
+#the name must start with a letter and can continue with letters or numbers the name is case sensitive, for this example the name is comp1 and is valid.
+#4pin adr is a variable of type 4wire, pin tells us that it's an input
+#8pout get is a variable of type 4wire, pout tells us that it's an output
+#it defines a comp .ram of type [mem] this .ram exists as name only in this pcb block scope, out of pcb block scope .ram doesn't exist and the user can use .ram for a different compoent. maybe implement .ram as _comp1.ram or something like this.
+#in the same way the pin and pout only exists in this pcb block scope.
+#in this pcb block scope you cannot use variables out of this pcb block scope, or variables that were defined before.. the only way in is thru pin variables and the only way out of data is thru pout variables.
+#any functions defined before can be used in the pcb block scope including keyword functions like AND, OR, NOR, and user defined functions that were defined with def or loaded from other scripts
+#~~ is a new section of the pcb definition that tells us what statements will be executed at NEXT(~)
+#this ~~ section is optional and may be missing
+#:1bit set means that when the pcb component will be called with no property it will return a 1bit value of the 1pin set variable
+#instead of :1bit set you can also write : which means when the pc component will be called with no property it will not return anything
+
+
 pcb [mychip]:
    8pin din
    8pout dout
@@ -777,16 +807,96 @@ pcb [mychip]:
    .c:dir = 1
    .c:set = ~
    dout = .c:get + ^F
-   ~~
-   .c:set = 0
    :
+   
+#this is an example that has no ~~ section
 
-pcb [name] .a::
+pcb [comp1] .a::
+#this is how we define a variable .a to be a pcb user defined component
+#you cannot use .comp1 because there is no .comp1 nor comp1, you can use .a as a [comp1] and then set the properties for it
 
-pcb [name] .b::
+
+pcb [comp1] .b::
+#this is another variable .b to be a [comp1] user pcb component just like writting comp [mem] .a
+#the end of the definition is by using twice the symbol ::
 
 .a:data = 1
 .a:write = 1
 .a:set = 1
+#you can set the inputs like this 
+#.a:set = 1 like in any component means it will execute the pcb block because it was set in exec:set
+
+.a:{
+  data = 1
+  write = 1
+  set = ~
+}
+#or like this as any component block
+#.a:set = ~ means this propery block it will execute on the next execution of NEXT(~) just like any normal component
+
 
 show(.a:get)
+#this will show the value that was set in the 8pout get
+
+show(.a)
+#this will show the value in the 1pin set becuse that's how it what was defined in the component pcb [comp1] row to be :2bit set 
+
+
+
+=======
+
+
+.lcd1:{
+   clear = 1
+   x = .c:get
+   y = 0
+   rowlen = 101
+   chr = ^4 + 0 + .c:get
+   set = ~
+}
+
+
+I want a to have a new way of setting properties at once for a component
+.lcd1:{
+   clear = 1
+   x = .c:get
+   y = .mp:get
+   rowlen = 101
+   chr = ^4 + 0 + .c:get
+   set = ~
+}
+
+this means that if .c:get changes all these propreties are executed not just the   x = .c:get and chr = ^4 + 0 + .c:get
+and if .mp:get changes all these propreties are executed not just the  y = .mp:get this means that this code should clear the lcd and should call setRect. the assignations should be executed in the exact order.
+
+this is also valid:
+
+.lcd1:{
+   clear = 1
+   x = .c:get
+   y = .mp:get
+   rowlen = 101
+   chr = ^4 + 0 + .c:get
+   set = ~
+
+   x = 1 
+   y = 1
+   rowlen = 1
+   data = a1bitWire
+   set = ~
+}
+
+this should happen for any component not just [lcd]
+
+comp [rotary] 4bit .rot:
+    text: "R1"
+    states: 6
+    color: ^3F3
+    :
+
+.rot:{
+   data = 0010 
+   set = 1
+}
+
+show(.rot:get)
