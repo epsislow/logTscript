@@ -560,6 +560,10 @@ button.next {
   min-width: 3ch;
 }
 
+.confirm button {
+  color: #brown;
+}
+
 </style>
 </head>
 <body>
@@ -669,7 +673,11 @@ show(a,b,c)
   <button id="filedirdelete" onclick="btnfiledirDelete()" disabled=1>-del</button>
   <button id="dirsave" onclick="btnfileSave(1)" disabled=1>+dir </button>
   <button id="fileupdate" onclick="btnfileUpdate()" disabled=1>Upd</button>
-  
+  <div class="confirm" id="confirm" style="display:none">
+    <span>Sure?</span>
+    <button id="yes" onclick="yes()">yes</button>
+    <button id="no" onclick="no()">no</button>
+  </div>
   <br/>
   <input id="filename" placeholder="name" class="filename"/>
   <button id="filesave" onclick="btnfileSave(0)" disabled=1>save</button>
