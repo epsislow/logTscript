@@ -616,6 +616,80 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 }
 
 
+
+/*==== dropdown panels ==== */
+
+.panel-dropdown {
+  position: relative;
+  display: inline-block;
+  z-index: 1000;
+}
+
+/* Dropdown menu */
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+
+  min-width: 160px;
+  padding: 6px;
+
+  background: #1c1c1c;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+
+  display: none;
+  z-index: 100;
+}
+
+.panel-dropdown.open .dropdown-menu {
+  display: block;
+}
+
+/* Dropdown items */
+.dropdown-item {
+  display: flex;
+  align-items: center;
+
+  height: 30px;
+  padding: 0 12px;
+  width: 100%;
+
+  font-size: 13px;
+  color: #eaeaea;
+  background: transparent;
+
+  border: none;
+  border-radius: 999px;
+
+  cursor: pointer;
+  text-align: left;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.dropdown-item:hover {
+  background: #242424;
+}
+
+/* Active / toggled-on state */
+.dropdown-item.active {
+  background: #2a2a2a;
+  color: #ffffff;
+}
+
+.dropdown-item.active::after {
+  content: "✓";
+  margin-left: auto;
+  opacity: 0.8;
+}
+
+
+
 </style>
 </head>
 <body>
@@ -624,6 +698,7 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
     alert("Error: " + message + "\nLine: " + lineno);
     return true;
   };*/
+  
 </script>
 <!--script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script-->
 
@@ -685,6 +760,20 @@ show(a,b,c)
   <button onclick="code.value=''" class="btn cls btn--primary">cls</button>
   <button onclick="toggleFiles()" class="btn">Files</button>
   <button onclick="toggleDevices()" class="btn">Dvi</button>
+  
+    <div class="panel-dropdown">
+      <button class="btn dropdown-trigger" aria-expanded="false">
+        Panels ▾
+      </button>
+
+      <div class="dropdown-menu">
+        <button class="dropdown-item" data-panel="files">Files</button>
+        <button class="dropdown-item" data-panel="devices">Devices</button>
+        <button class="dropdown-item" data-panel="variables">Variables</button>
+        <button class="dropdown-item" data-panel="output">Output</button>
+      </div>
+    </div>  
+
 </div>
 
 <div id="cmdPanel" style="display:none; margin:10px 0;">
