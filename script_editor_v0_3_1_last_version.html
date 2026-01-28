@@ -11,21 +11,75 @@ textarea {
   overflow-wrap: normal;  /* Prevents breaking words in the middle */
   overflow-x: auto;       /* Adds a horizontal scrollbar only when needed */
 }
-button { margin:4px; padding:5px 9px }
+button { margin:4px; padding:5px 9px; cursor: pointer; }
 pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .panel { border:1px solid #444; padding:10px; margin-top:10px }
 .flex { display:flex; gap:10px }
 .filename { font-size: 20px;}
 .dirpath { font-size: 15px; color: #88f}
 .filelist { border: 1px solid #3D4; width:90%; padding: 3px; margin: 5px; }
-.filelist .file { padding: 4px; color: mediumaquamarine}
-.filelist .dir { padding: 4px; color: yellow; }
-button.cls {
-  background-color: #afa;
+.filelist .file { padding: 4px; color: mediumaquamarine; cursor: pointer;}
+.filelist .dir { padding: 4px; color: yellowgreen;  cursor: pointer; }
+.filelist .file:hover { color: cyan; }
+.filelist .dir:hover { color: yellow; }
+// button.cls { background-color: #7a7; }
+// button.cls:hover { background-color: #afa; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 30px;
+  min-width: 40px;
+  padding: 0 12px;
+
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 500;
+
+  color: #eaeaea;
+  background: #1c1c1c;
+
+  border: 1px solid #2a2a2a;
+  border-radius: 999px; /* pill shape */
+
+  cursor: pointer;
+  vertical-align: middle;
+
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.05s ease;
 }
 
-button.next {
-  background-color: #89f;
+.btn:hover {
+  background: #242424;
+  border-color: #3a3a3a;
+}
+
+.btn:active {
+  transform: translateY(1px);
+  background: #2a2a2a;
+}
+
+.btn--primary {
+  background: linear-gradient(180deg, #2f80ff, #1f66e0);
+  border-color: #2f80ff;
+  color: #fff;
+}
+
+.btn--primary:hover {
+  background: linear-gradient(180deg, #3a8cff, #2a72eb);
+}
+
+#confirm .btn.c {
+  background-color: brown;
+  color: #ffa;
+}
+
+#confirm .btn.c:hover {
+  background-color: chocolate;
 }
 
 #devices {
@@ -560,10 +614,6 @@ button.next {
   min-width: 3ch;
 }
 
-#confirm button.c {
-  color: #brown;
-  background-color: #ffa;
-}
 
 </style>
 </head>
@@ -626,14 +676,14 @@ show(a,b,c)
 </textarea>
 
 <div>
-  <button onclick="run()">Run</button>
+  <button onclick="run()" class="btn">Run</button>
   <!--button onclick="toggleCmd()">Cmd</button-->
-  <button onclick="doNext(1)">N</button>
-  <button onclick="toggleSEC()">S</button>
-  <button onclick="changeSECINT()">1</button>
-  <button onclick="code.value=''" class="cls">cls</button>
-  <button onclick="toggleFiles()">Files</button>
-  <button onclick="toggleDevices()">Dvi</button>
+  <button onclick="doNext(1)" class="btn">N</button>
+  <button onclick="toggleSEC()" class="btn">S</button>
+  <button onclick="changeSECINT()" class="btn">1</button>
+  <button onclick="code.value=''" class="btn cls btn--primary">cls</button>
+  <button onclick="toggleFiles()" class="btn">Files</button>
+  <button onclick="toggleDevices()" class="btn">Dvi</button>
 </div>
 
 <div id="cmdPanel" style="display:none; margin:10px 0;">
@@ -668,16 +718,16 @@ show(a,b,c)
 
 <div class="panel" id="filesPanel" style="display:none">
   <h3>Files</h3>
-  <button id="direxit" onclick="btndirExit()" disabled=1>&lt;</button>
-  <button id="direnter" onclick="btndirEnter()" disabled=1>&gt;</button>
-  <button id="fileload" onclick="btnfileLoad()" disabled=1>load</button>
-  <button id="filedirdelete" onclick="btnfiledirDelete()" disabled=1>-del</button>
-  <button id="dirsave" onclick="btnfileSave(1)" disabled=1>+dir </button>
-  <button id="fileupdate" onclick="btnfileUpdate()" disabled=1>Upd</button>
+  <button id="direxit" onclick="btndirExit()" class="btn" disabled=1>&lt;</button>
+  <button id="direnter" onclick="btndirEnter()" class="btn" disabled=1>&gt;</button>
+  <button id="fileload" onclick="btnfileLoad()" class="btn" disabled=1>load</button>
+  <button id="filedirdelete" onclick="btnfiledirDelete()" class="btn" disabled=1>-del</button>
+  <button id="dirsave" onclick="btnfileSave(1)" class="btn" disabled=1>+dir </button>
+  <button id="fileupdate" onclick="btnfileUpdate()" class="btn" disabled=1>Upd</button>
   <div class="confirm" id="confirm" style="display:none">
     <span>Sure?</span>
-    <button id="yes" onclick="yes()" class="c">yes</button>
-    <button id="no" onclick="no()" class="c">no</button>
+    <button id="yes" onclick="yes()" class="c btn">yes</button>
+    <button id="no" onclick="no()" class="c btn">no</button>
   </div>
   <br/>
   <input id="filename" placeholder="name" class="filename"/>
