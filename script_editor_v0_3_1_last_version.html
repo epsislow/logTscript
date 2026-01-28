@@ -560,8 +560,9 @@ button.next {
   min-width: 3ch;
 }
 
-.confirm button {
+#confirm button.c {
   color: #brown;
+  background-color: #ffa;
 }
 
 </style>
@@ -675,8 +676,8 @@ show(a,b,c)
   <button id="fileupdate" onclick="btnfileUpdate()" disabled=1>Upd</button>
   <div class="confirm" id="confirm" style="display:none">
     <span>Sure?</span>
-    <button id="yes" onclick="yes()">yes</button>
-    <button id="no" onclick="no()">no</button>
+    <button id="yes" onclick="yes()" class="c">yes</button>
+    <button id="no" onclick="no()" class="c">no</button>
   </div>
   <br/>
   <input id="filename" placeholder="name" class="filename"/>
