@@ -750,16 +750,15 @@ show(a,b,c)
 #show(bb)
 #show(&~)
 </textarea>
-
 <div>
   <button onclick="run()" class="btn">Run</button>
   <!--button onclick="toggleCmd()">Cmd</button-->
-  <button onclick="doNext(1)" class="btn">N</button>
+  <button onclick="doNext(1)" class="btn">Next</button>
   <button onclick="toggleSEC()" class="btn">S</button>
   <button onclick="changeSECINT()" class="btn">1</button>
   <button onclick="code.value=''" class="btn cls btn--primary">cls</button>
-  <button onclick="toggleFiles()" class="btn">Files</button>
-  <button onclick="toggleDevices()" class="btn">Dvi</button>
+  <!--button onclick="toggleFiles()" class="btn">Files</button>
+  <button onclick="toggleDevices()" class="btn">Dvi</button-->
   
     <div class="panel-dropdown">
       <button class="btn dropdown-trigger" aria-expanded="false">
@@ -767,10 +766,12 @@ show(a,b,c)
       </button>
 
       <div class="dropdown-menu">
+        <button class="dropdown-item active" data-panel="output">Output</button>
+        <button class="dropdown-item active" data-panel="variables">Variables</button>
         <button class="dropdown-item" data-panel="files">Files</button>
         <button class="dropdown-item" data-panel="devices">Devices</button>
-        <button class="dropdown-item" data-panel="variables">Variables</button>
-        <button class="dropdown-item" data-panel="output">Output</button>
+        <button class="dropdown-item" data-panel="ast">AST</button>
+        <button class="dropdown-item" data-panel="command">Command</button>
       </div>
     </div>  
 
@@ -784,12 +785,12 @@ show(a,b,c)
 </div>
 
 <div class="flex">
-  <div class="panel" style="flex:1">
+  <div class="panel" id="outputPanel" style="flex:1">
     <h3>Output</h3>
     <pre id="out"></pre>
   </div>
 
-  <div class="panel" style="flex:1">
+  <div class="panel" id="variablesPanel" style="flex:1">
     <h3>Variables</h3>
     <pre id="vars"></pre>
   </div>
