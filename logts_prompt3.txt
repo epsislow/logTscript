@@ -338,8 +338,28 @@ addCharacterLCD({
   nl: true,
 });
 
+Vreau sa adaugam componenta key care arata astfel:
+comp [key] .kA:
+   label: "A"
+   size: 36
+   nl
+   :
+#attributul size are valoarea default 36 daca lipseste atributul si poate fi asignat un alt numar
+#attributul nl nu are valoare trebuie sa fie ca la alte componente vezi la switch sau dip
+#se executa js function: 
+addKey({
+   label: "A",
+   onPress: functie callback care este apelata atunci cand ii se schimba starea, vezi cum exista la alte componente metoda onChange
+   size: 36,
+   nl: true
+});
 
-comp [key] 
+  
+1wire q = .ka
+
+key se comporta ca un switch are un bit 1 cand e apasat si 0 cand nu e apasat, schimbarea starii se va trimite cand se apeleaza callbackul setat pe onPress
+
+
 
 ====
 vreau sa adaugam compoenta 7seg 
