@@ -281,16 +281,145 @@ Should get> support bit ranges? - e.g., get>= j.0-3 to extract specific bits fro
 What if set property is missing but get> is present? - Should block execute on first run and output to get> target, or require explicit set=1? Recommend: get> only triggers after successful set execution.
 ====
 
-For 1: single get> per block 
-For 2: no allow only get>= j no bit ranges. Remember get>= j means j = :get  or j = the :get property of the block's current component
-For 3: block doesn't execute if set is missing, the behaviour is as is and should not change.
+Allow a single get> per block 
+Don't allow get>= j.0-2/3 with bit ranges only get>= j. Remember get>= j means j = :get  or j = the :get property of the block's current component
+////For 3: block doesn't execute if set is missing, the behaviour is as is and should not change.
 -----
 Validate Component Supports :get - Should an error be thrown if get> is used on a component without a :get property? Recommend: Yes, throw a helpful error at parse or first execution time.
 Validate Target Wire Exists - Should parsing validate the target wire exists? Recommend: No, validate at execution time like other assignments, allowing forward references.
 =====
-For 1: Validate Component Supports : get - yes it should throw an error if get> is used and the component has no :get property
-For 2: Validate at execution time like other assignments, allowing forward references
+Validate Component Supports : get - yes it should throw an error if get> is used and the component has no :get property
+//Validate at execution time like other assignments, allowing forward references
 ----
 Dependency re-evaluation vs execution - Should blocks with dependencies still have their lastSetValue updated even if they don't execute? Recommend: Yes, update lastSetValue so edge detection works correctly on subsequent triggers.
 ===
 Yes update lastSetValue
+
+
+========
+Please also add the change that only the block that has the change state should execute. Right now in this program:
+comp [key] .s1:
+   label: "1"
+   size: 36
+   :
+comp [key] .s2:
+   label: "2"
+   size: 36
+   :
+
+comp [mem] 8bit .mem:
+  depth: 8
+  length: 16
+  on: 1
+  :
+
+.mem:{
+  at= 10
+  data= ^FF
+  write= 1
+  set= .s1    <-- this means when the .s1 state will change to 1 (because .mem has on:1) it will execute only this mem block 
+}
+
+8wire j = ^00
+
+.mem:{
+   at= 10
+   set= .s2   <-- this means when the .s2 state will change to 1 (because .mem has on:1) it will execute only this mem block
+   get>= j    <--this means it after the execution of this block it will do j = .mem:get
+}
+
+Right now both blocks execute and i want only the one that change the state to execute. Again i say: 
+
+
+When first running no blocks will execute because .mem has on:1 and both block have set = 0 because .s1 and .s2 are 0 and that's correct.
+
+But when .s1 state changes to 1 it will change the value of set and become 1 and that block will execute but the second block that have set = .s2 won't execute. 
+
+When .s2 state changes to 2 it will change the value of set and become 1 and that block will execute but the first block that have set = .s1 won't execute. 
+Please see how componentPropertyBlock execute and plan the change for this to work like this.
+
+
+
+======
+In programul acesta:
+
+comp [key]1bit .s1:
+   label: "1"
+   size: 36
+   :
+comp [key]1bit .s2:
+   label: "2"
+   size: 36
+   :
+
+comp [mem] 8bit .mem:
+  depth: 8
+  length: 16
+  on:1
+  :
+
+.mem:{
+  at= 10
+  data= ^FF
+  write= 1
+  set= .s1
+}
+8wire k 
+.mem:{
+   at= 10
+   set= .s2
+   get>= k
+}
+8wire b = .mem:get
+
+Vad ca se executa ambele blockuri ale lui .mem atunci cand se apeleaza Running() desi set ar trebuii sa fie evaluate cu state 0 la running. 
+
+
+
+----
+
+Si sa fie apelate blockul in care set se evalueaza cu 1 , pentru ca componenta .mem are on: 1 
+
+
+
+Pentru primul block atunci cand .s1 se schimba in 1 ar trebuii sa se execute blockul 
+
+============
+In programul acesta:
+
+comp [key]1bit .s1:
+   label: "1"
+   size: 36
+   :
+comp [key]1bit .s2:
+   label: "2"
+   size: 36
+   :
+
+comp [mem] 8bit .mem:
+  depth: 8
+  length: 16
+  on:1
+  :
+
+.mem:{
+  at= 10
+  data= ^FF
+  write= 1
+  set= .s1
+}
+8wire k 
+.mem:{
+   at= 10
+   set= .s2
+   get>= k
+}
+8wire b = .mem:get
+
+Vad ca se executa ambele blockuri ale lui .mem atunci cand se apeleaza Running() desi set ar trebuii sa fie evaluate cu state 0 la running. 
+
+dar la running vad ca b are deja valoarea = 11111111
+Ma asteptam ca sa fie 0000000
+
+Si vad ca atunci cand .s2 devine 1 blockul al doilea nu se executa, ma astept ca la executia blocului cu set = .s2 sa se execute si get>= k si ar face k = 11111111 dar vad ca k ramane fara valoare adica 
+k (8wire) = - (ref: null)
