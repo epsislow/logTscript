@@ -18,7 +18,7 @@ LogTScript
 [  ] LSHIFTREG4(~, Xbit data, 1bit clr): Xbit d0, Xbit d1, Xbit d2, Xbit d3
 RSHIFTREG4
 [  ] COUNTER  its an adder
-[  ] @ is a 1bit variable that  at every NEXT(~) has a random value 0 or 1
+[  ] RND is a 1bit variable that  at every NEXT(~) has a random value 0 or 1
 [  ] Don't allow wire values assignment, but you can assign wires to bit values
 [  ] References could contain the name of component like &AND@1i0.2
 [  ] References for components used &REG4@3i1
@@ -200,3 +200,97 @@ show(tout)
 
 next(~, 10)
 
+===
+
+
+=======
+comp [lcd] 40bit .lcd1:
+  row: 8
+  cols: 100
+  pixelSize: 2
+  pixelGap: 1
+  glow
+  round: 0
+  color: ^58f
+  bg: ^000
+  rgb
+  nl
+  on:1
+  :
+
+.lcd1:{
+   clear = 0
+   x = 0
+   y = 0
+   rowlen = 101
+   chr = ^4 + 0 + .c:get
+   set = 1
+}
+
+.lcd1:{
+   clear = 1
+   set = 1
+}
+
+
+=====
+
+I want to change a bit how we execute component blocks and i want to add the "get>" property in component blocks that have :get like this:
+
+In this program:
+comp [key] .s1:
+   label: "1"
+   size: 36
+   :
+comp [key] .s2:
+   label: "2"
+   size: 36
+   :
+
+comp [mem] 8bit .mem:
+  depth: 8
+  length: 16
+  on: 1
+  :
+
+.mem:{
+  at= 10
+  data= ^FF
+  write= 1
+  set= .s1    <-- this means when the .s1 state will change to 1 (because .mem has on:1) it will execute only this mem block 
+}
+
+8wire j = ^00
+
+.mem:{
+   at= 10
+   set= .s2   <-- this means when the .s2 state will change to 1 (because .mem has on:1) it will execute only this mem block
+   get>= j    <--this means it after the execution of this block it will do j = .mem:get
+}
+
+When running no blocks will execute because .mem has on:1 and both block have set = 0 because .s1 and .s2 are 0 and that's correct.
+
+But when .s1 state changes to 1 it will change the value of set and become 1 and that block will execute but the second block that have set = .s2 won't execute. 
+
+When .s2 state changes to 2 it will change the value of set and become 1 and that block will execute but the first block that have set = .s1 won't execute. 
+Please see how componentPropertyBlock execute and plan the changes.
+
+--
+Should get> support multiple targets? - Allow get>= j and get>= k in same block for different destinations, or restrict to one? Recommend: single get> per block for simplicity.
+Should get> support bit ranges? - e.g., get>= j.0-3 to extract specific bits from :get value? Recommend: support full target syntax like assignments for flexibility.
+What if set property is missing but get> is present? - Should block execute on first run and output to get> target, or require explicit set=1? Recommend: get> only triggers after successful set execution.
+====
+
+For 1: single get> per block 
+For 2: no allow only get>= j no bit ranges. Remember get>= j means j = :get  or j = the :get property of the block's current component
+For 3: block doesn't execute if set is missing, the behaviour is as is and should not change.
+-----
+Validate Component Supports :get - Should an error be thrown if get> is used on a component without a :get property? Recommend: Yes, throw a helpful error at parse or first execution time.
+Validate Target Wire Exists - Should parsing validate the target wire exists? Recommend: No, validate at execution time like other assignments, allowing forward references.
+=====
+For 1: Validate Component Supports : get - yes it should throw an error if get> is used and the component has no :get property
+For 2: Validate at execution time like other assignments, allowing forward references
+----
+Dependency re-evaluation vs execution - Should blocks with dependencies still have their lastSetValue updated even if they don't execute? Recommend: Yes, update lastSetValue so edge detection works correctly on subsequent triggers.
+===
+Yes update lastSetValue
