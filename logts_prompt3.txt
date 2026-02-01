@@ -950,6 +950,22 @@ Vreau sa adaug ! ca fiind un not inline si face ca valorile sa isi schimbe valoa
 
 ======
 
+Vreau ca sa adaug shortname pentru fiecare componenta astfel:
+comp [7seg]1bit .seg:  
+#se poate scrie si astfel:
+comp [7]1bit .seg:
+Adica shortname-ul pentru [7seg] este [7].
+Restul de componente vor avea aceste shortnameuri:
+[adder] [+]
+[subtract] [-]
+[multiplier] [*]
+[divider] [/]
+[shifter] [>]
+[counter] [=]
+
+
+======
+
 Vreau sa adaug o componenta noua numita reg care sa se comporte ca un registry 
 
 comp [mem] .ram:
