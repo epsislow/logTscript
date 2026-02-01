@@ -920,3 +920,45 @@ comp [rotary] 4bit .rot:
 }
 
 show(.rot:get)
+====
+Vreau sa adaug ! ca fiind un not inline si face ca valorile sa isi schimbe valoarea precum not pe fiecare bit exemplu:
+
+3wire a = 100
+4wire b = !0000 
+#b va avea valoarea 1111
+4wire c = !^F
+#c va avea valoarea 0000
+4wire d = !c
+#d va avea valoarea 1111
+
+#Atentie la + 
+8wire a2 = !c + a
+#a2 va avea valoarea 1111100 pentru ca ! schimba doar valoarea lui c deci 1111 concatenat cu valoarea lui a neschimbata
+
+#bit range:
+2wire a3 = !a.1/2 
+#a3 va avea valoarea 11
+
+2wire a4= !a.0 + !a.1
+#a4 va avea valoarea 01
+
+16wire c2 = !^FF0F
+#c2 va avea valoarea ^00F0
+32wire c3 = !^FF0F 000F
+#c3 va avea valoarea ^00F0 FFF0
+
+
+======
+
+Vreau sa adaug o componenta noua numita reg care sa se comporte ca un registry 
+
+comp [mem] .ram:
+      depth: 2
+      length: 16
+      on: 1
+      :
+      
+   .ram:at = adr
+   .ram:set = 0
+   
+   get = .ram:get
