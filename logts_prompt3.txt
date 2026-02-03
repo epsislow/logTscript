@@ -965,16 +965,25 @@ Restul de componente vor avea aceste shortnameuri:
 
 
 ======
+Vreau sa adaug posibilitatea ca o componenta sa fie definita astfel:
+comp [lcd]7bit .lcd1 ::
+Adica simbolul :: inseamna ca nu exista atribute in configuratie, se vor folosii valorile default.
+
+comp [lcd]7bit .lcd1 ::
+
+inseamna acelasi lucru ca:
+comp [lcd]7bit .lcd1 :
+   :
+
+Simbolul :: este deja folosit la pcb astfel: 
+pcb [userDefinedComp] .numeVariabla ::
+
+====
 
 Vreau sa adaug o componenta noua numita reg care sa se comporte ca un registry 
 
-comp [mem] .ram:
+comp [reg]8bit .r1:
       depth: 2
-      length: 16
       on: 1
       :
       
-   .ram:at = adr
-   .ram:set = 0
-   
-   get = .ram:get
