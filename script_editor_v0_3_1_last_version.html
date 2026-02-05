@@ -24,6 +24,7 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .filelist .dir:hover { color: yellow; }
 // button.cls { background-color: #7a7; }
 // button.cls:hover { background-color: #afa; }
+.hidden { display: none;}
 
 .btn {
   display: inline-flex;
@@ -68,6 +69,10 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   background: linear-gradient(180deg, #2f80ff, #1f66e0);
   border-color: #2f80ff;
   color: #fff;
+}
+
+.btn[disabled="1"] {
+  color: #333;
 }
 
 .btn--primary:hover {
@@ -875,6 +880,7 @@ show(a,b,c)
   <button id="filedirdelete" onclick="btnfiledirDelete()" class="btn" disabled=1>-del</button>
   <button id="dirsave" onclick="btnfileSave(1)" class="btn" disabled=1>+dir </button>
   <button id="fileupdate" onclick="btnfileUpdate()" class="btn" disabled=1>Upd</button>
+  <button id="resetlib" onclick="btnresetLib()" class="btn">-lib</button>
   <div class="confirm" id="confirm" style="display:none">
     <span>Sure?</span>
     <button id="yes" onclick="yes()" class="c btn">yes</button>
