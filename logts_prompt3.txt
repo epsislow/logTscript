@@ -986,4 +986,26 @@ comp [reg]8bit .r1:
       depth: 2
       on: 1
       :
-      
+====
+Vreau sa mai adaug o variabila speciale:
+
+% este o variabila speciala care are valoarea 1 doar la prima rulare adica atunci cand se executa run().  Cand se termina prima rulare % devine 0. Nu este un wire. Daca devine 0 nu trebuie sa reexecute statements. Dar daca se vor reexecutau in caz ca se apasa ceva sau se schimba vre-un state dupa ce s-a terminat executia lui run() atunci % va avea valoarea 0. 
+
+$ este o variablila speciala care la fiecare NEXT(~) va avea o valoare random 1 sau 0. Dar Bit range daca este folosit pe variabila speciala $ va avea un alt efect, si anume va da un bit random pentru fiecare bit cerut exemplu: 
+
+1wire q = $
+#valoarea lui q va fi la fiecare NEXT(~) un alt bit
+1wire q = $.0 
+#valoarea lui q va fi la fiecare NEXT(~) un alt bit
+1wire q = $.2
+#valoarea lui q va fi la fiecare NEXT(~) un alt bit
+2wire q = $.0-1
+#0-1 are length 2 deci returneaza 2 biti random la fiecare NEXT(~)
+4wire q = $.2-5
+#2-5 are length 4 deci returneaza 4 biti random la fiecare NEXT(~)
+
+4wire q = $.2/4
+#2/4 are length 4 deci returneaza 4 biti random la fiecare NEXT(~)
+4wire q = $.0/4
+#2/4 are length 4 deci returneaza 4 biti random la fiecare NEXT(~)
+
