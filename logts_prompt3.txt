@@ -987,9 +987,12 @@ comp [reg]8bit .r1:
       on: 1
       :
 ====
-Vreau sa mai adaug o variabila speciale:
+Vreau sa mai adaug o variabila speciala:
 
 % este o variabila speciala care are valoarea 1 doar la prima rulare adica atunci cand se executa run().  Cand se termina prima rulare % devine 0. Nu este un wire. Daca devine 0 nu trebuie sa reexecute statements. Dar daca se vor reexecutau in caz ca se apasa ceva sau se schimba vre-un state dupa ce s-a terminat executia lui run() atunci % va avea valoarea 0. 
+
+----
+Vreau sa mai adaug o variabila speciala:
 
 $ este o variablila speciala care la fiecare NEXT(~) va avea o valoare random 1 sau 0. Dar Bit range daca este folosit pe variabila speciala $ va avea un alt efect, si anume va da un bit random pentru fiecare bit cerut exemplu: 
 
@@ -1008,4 +1011,9 @@ $ este o variablila speciala care la fiecare NEXT(~) va avea o valoare random 1 
 #2/4 are length 4 deci returneaza 4 biti random la fiecare NEXT(~)
 4wire q = $.0/4
 #2/4 are length 4 deci returneaza 4 biti random la fiecare NEXT(~)
+
+Pentru ca la fiecare NEXT(~) se schimba valoarea data de $ ar trebuii ca q sa isi schimbe valoarea si sa reevalueze statementul precum ar fi venit pe un call de onChange.
+
+Poate o solutie ar fi sa facem la fel ca la apelurile onChange iar $ ar fi ca un wire care isi schimba bitii la fiecare NEXT(~) si triggeruieste un apel de onChange.
+
 
