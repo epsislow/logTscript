@@ -1016,4 +1016,32 @@ Pentru ca la fiecare NEXT(~) se schimba valoarea data de $ ar trebuii ca q sa is
 
 Poate o solutie ar fi sa facem la fel ca la apelurile onChange iar $ ar fi ca un wire care isi schimba bitii la fiecare NEXT(~) si triggeruieste un apel de onChange.
 
+===÷÷÷=÷÷
+comp block wire def:
+
+comp [mem] .m::
+
+.m=[
+
+]
+
+or
+all must be wires and not constant,
+~,  @, % are allowed
+
+.m(
+  set = a
+  at = adr
+  data = dt
+  write = wr
+  get >= g
+  carry >= q
+  over >= over
+)
+
+pcb +[cm]:
+  __
+  
+  ~~
+  :
 
