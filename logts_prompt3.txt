@@ -1045,3 +1045,11 @@ pcb +[cm]:
   ~~
   :
 
+
+======
+comment block using
+#<
+#>
+
+
+if #> with no beginning only the line with the # is commented
