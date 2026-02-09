@@ -832,7 +832,7 @@ show(a,b,c)
       <div class="dropdown-menu">
         <button class="dropdown-item active" data-panel="output">Output</button>
         <button class="dropdown-item active" data-panel="variables">Variables</button>
-        <button class="dropdown-item" data-panel="tabs">Tabs</button>
+        <button class="dropdown-item active" data-panel="tabs">Tabs</button>
         <button class="dropdown-item" data-panel="files">Files</button>
         <button class="dropdown-item" data-panel="devices">Devices</button>
         <button class="dropdown-item" data-panel="ast">AST</button>
@@ -843,11 +843,13 @@ show(a,b,c)
 </div>
 
 
-<div class="panel" id="tabsPanel" style="display:none">
+<div class="panel" id="tabsPanel">
   <button class="btn" onclick="addTab()">+tab</button>
   <button class="btn" onclick="prevTab()">&lt;- </button>
   <button class="btn" onclick="nextTab()">-&gt;</button>
   <button class="btn" onclick="closeTab()">-close</button>
+  
+  <div id="tabsActive"></div>
 </div>
 
 <div id="cmdPanel" style="display:none; margin:10px 0;">
