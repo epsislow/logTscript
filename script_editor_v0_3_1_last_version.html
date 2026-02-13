@@ -860,7 +860,7 @@ show(a,b,c)
   <!--button onclick="toggleFiles()" class="btn">Files</button>
   <button onclick="toggleDevices()" class="btn">Dvi</button-->
   
-    <div class="panel-dropdown">
+    <div class="panel-dropdown" id="panel-dropdown">
       <button class="btn dropdown-trigger" aria-expanded="false">
         Win ▾
       </button>
@@ -876,6 +876,29 @@ show(a,b,c)
       </div>
     </div>  
   
+  
+    <div class="panel-dropdown" id="comp-dropdown">
+      <button class="btn dropdown-trigger" aria-expanded="false">
+        Comp ▾
+      </button>
+
+      <div class="dropdown-menu">
+        <button class="dropdown-item" onclick="insertComp('led')">led</button>
+        <button class="dropdown-item" onclick="insertComp('key')">key</button>
+        <button class="dropdown-item" onclick="insertComp('dip')">dip</button>
+        <button class="dropdown-item" onclick="insertComp('switch')">switch</button>
+        <button class="dropdown-item" onclick="insertComp('rotary')">rotary</button>
+        <button class="dropdown-item" onclick="insertComp('adder')">adder</button>
+        <button class="dropdown-item" onclick="insertComp('subtract')">subtract</button>
+        <button class="dropdown-item" onclick="insertComp('multiplier')">multiplier</button>
+        <button class="dropdown-item" onclick="insertComp('divider')">divider</button>
+        <button class="dropdown-item" onclick="insertComp('counter')">counter</button>
+        <button class="dropdown-item" onclick="insertComp('shifter')">shifter</button>
+        <button class="dropdown-item" onclick="insertComp('mem')">mem</button>
+        <button class="dropdown-item" onclick="insertComp('lec')">lcd</button>
+        <button class="dropdown-item" onclick="insertComp('7seg')">7seg</button>
+        
+      </div>
 </div>
 
 
