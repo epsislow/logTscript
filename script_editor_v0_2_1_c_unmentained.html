@@ -89,7 +89,28 @@ class Tokenizer {
   skip(){
     while(!this.eof()){
       if(/\s/.test(this.peek())) this.next();
-      else if(this.peek()=='#') while(!this.eof()&&this.next()!='\n');
+      else if(this.peek()=='#') {
+        this.next(); // Consume '#'
+        // Check if it's a block comment start #<
+        if(!this.eof() && this.peek()=='<') {
+          this.next(); // Consume '<'
+          // Skip until we find #>
+          while(!this.eof()) {
+            if(this.peek()=='#') {
+              this.next(); // Consume '#'
+              if(!this.eof() && this.peek()=='>') {
+                this.next(); // Consume '>'
+                break; // Found closing #>
+              }
+            } else {
+              this.next(); // Continue searching
+            }
+          }
+        } else {
+          // Regular line comment - skip until newline
+          while(!this.eof() && this.next()!='\n');
+        }
+      }
       else break;
     }
   }
