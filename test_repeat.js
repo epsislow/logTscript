@@ -323,6 +323,29 @@ console.log('\n=== Test 18: Decimal literal with repeat ===');
   );
 }
 
+console.log('\n=== Test 19: Decimal \\2 produces binary 10 (padding is interpreter-level) ===');
+{
+  // \2 in tokenizer → BIN '10'. Padding to 8 bits happens in interpreter.
+  const { tokens } = tokenize('8wire q2 = \\2');
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  assert('\\2 tokenized as BIN 10', binTokens[binTokens.length - 1].value, '10');
+}
+
+console.log('\n=== Test 20: HEX ^F produces 4-bit binary ===');
+{
+  const { tokens } = tokenize('8wire q3 = ^F');
+  const hexTokens = tokens.filter(t => t.type === 'HEX');
+  assert('^F tokenized as HEX F', hexTokens[0].value, 'F');
+}
+
+console.log('\n=== Test 21: Large decimal \\1024 ===');
+{
+  const { tokens } = tokenize('16wire q = \\1024');
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  // 1024 = 10000000000 (11 bits)
+  assert('\\1024 value is 10000000000', binTokens[binTokens.length - 1].value, '10000000000');
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);
