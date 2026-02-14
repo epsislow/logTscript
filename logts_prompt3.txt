@@ -1053,3 +1053,94 @@ comment block using
 
 
 if #> with no beginning only the line with the # is commented
+
+
+=======
+I want to add a new keyword called: repeat
+
+repeat works like this:
+
+repeat 1..5[
+   4wire a?
+   ]
+
+this will be equivalent with writing:
+4wire a1
+4wire a2
+4wire a3
+4wire a4
+4wire a5
+
+if there are two repeats like this:
+repeat 1..2[
+  repeat 1...3[
+     4wire b? = ^?1
+  ]
+ ]
+
+this will be equivalent with :
+4wire b1 = ^1
+4wire b2 = ^2
+4wire b3 = ^3
+4wire b4 = ^1
+4wire b5 = ^2
+4wire b6 = ^3
+
+?0 is between 1 and 2 
+?1 is between 1 and 3
+? is between 1 and 6 
+
+if repeat contains something like this:
+repeat 1..2[
+  repeat 1...3[
+     4wire c?0 = ^F
+  ]
+ ]
+
+this will be equivalent with:
+ 4wire c1 = ^F
+ 4wire c2 = ^F
+it won't double define c1 and c2 because it only depends to ?0
+
+if repeat contains something like this:
+repeat 1..2[
+  repeat 1...3[
+     4wire c?0 = ?1
+  ]
+ ]
+this is equivalent with:
+ 4wire c1 = ^1
+ 4wire c1 = ^2   # it will probably give error because c1 is already defined
+ 4wire c1 = ^3
+ 4wire c2 = ^1
+ 4wire c2 = ^2
+ 4wire c2 = ^3
+ because now it depends to ?0 and ?1 
+
+you can write as many repeats in repeats as you want but, the total maximum of loops for them cannot pass 256. 
+repeats 1..16[
+  repeats 1..16[
+  ]
+]
+this won't give error
+
+repeats 1..16[
+  repeats 1..17[
+  ]
+]
+this will give error: number of iterations in nested repeats passed the maximum of 256
+
+this program:
+repeats 1..16[
+  repeats 1..16[
+  ]
+]
+
+repeats 1..2[
+]
+#this won't give error because the number of iterations in nested repeats did not passed the maximum of 256
+
+
+I guess the repeat must be a preprocess step that genererates the final statements, that afterwords gets executed like no repeat was there.
+
+Also there is an error in pcb definition that ends the pcb definition block when gets to an empty line, that's a bug, the pcb definition block should always end when it finds the final : character.  If there are questions please ask.
