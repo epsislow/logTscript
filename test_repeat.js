@@ -279,6 +279,50 @@ console.log('\n=== Test 14: Unmatched bracket error ===');
   );
 }
 
+console.log('\n=== Test 15: Decimal literal \\N tokenized as BIN ===');
+{
+  // \15 should become BIN token with value '1111' (15 decimal = 1111 binary)
+  const { tokens } = tokenize('4wire c = \\15');
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  assert('\\15 produces BIN token', String(binTokens.length >= 1), 'true');
+  assert('\\15 value is 1111', binTokens[binTokens.length - 1].value, '1111');
+}
+
+console.log('\n=== Test 16: Decimal literal \\0 ===');
+{
+  const { tokens } = tokenize('4wire c = \\0');
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  assert('\\0 produces BIN with value 0', binTokens[binTokens.length - 1].value, '0');
+}
+
+console.log('\n=== Test 17: Decimal literal \\255 ===');
+{
+  const { tokens } = tokenize('4wire c = \\255');
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  assert('\\255 value is 11111111', binTokens[binTokens.length - 1].value, '11111111');
+}
+
+console.log('\n=== Test 18: Decimal literal with repeat ===');
+{
+  const src = `repeat 1..3[
+4wire c? = \\?0
+]`;
+  // After preprocess: 4wire c1 = \1, 4wire c2 = \2, 4wire c3 = \3
+  // \1 = 1, \2 = 10, \3 = 11
+  const { tokens } = tokenize(src);
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  // The assignment values: \1=1, \2=10, \3=11
+  // But there are also BIN tokens from wire names (c1, c2, c3) if they are 0/1 only... 
+  // Let's just check the processed text
+  const processed = preprocessRepeat(src);
+  assert('repeat + decimal literal expansion',
+    processed,
+    `4wire c1 = \\1
+4wire c2 = \\2
+4wire c3 = \\3`
+  );
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);
