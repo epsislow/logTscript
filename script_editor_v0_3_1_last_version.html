@@ -3,14 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <title>Bit Language Interpreter for LogTScript v0.3.1</title>
+<link rel="stylesheet" href="codemirror.min.css">
+<link rel="stylesheet" href="cm.show-hint.min.css">
 <style>
 body { font-family: monospace; background:#111; color:#eee; padding:20px }
 textarea { width:100%; height:340px; background:#000; color:#0f0; font-size: 20px; }
 textarea {
-  white-space: pre;       /* Keeps text on one line and preserves spaces */
-  overflow-wrap: normal;  /* Prevents breaking words in the middle */
-  overflow-x: auto;       /* Adds a horizontal scrollbar only when needed */
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
 }
+.CodeMirror {
+  height: 340px;
+  width: 100%;
+  background: #000;
+  color: #0f0;
+  font-size: 20px;
+  font-family: monospace;
+  border: none;
+  box-sizing: border-box;
+}
+.CodeMirror-scroll { height: 100%; }
+.CodeMirror-cursor { border-left: 2px solid #0f0; }
+.CodeMirror-linenumbers { background: #111; }
+.CodeMirror-linenumber { color: #555; }
+.CodeMirror-focused .CodeMirror-selected { background: rgba(0, 255, 0, 0.2); }
+.CodeMirror-selected { background: rgba(0, 255, 0, 0.12); }
+/* LogTScript syntax colors */
+.cm-logts-comment  { color: #556; font-style: italic; }
+.cm-logts-keyword  { color: #ff0; font-weight: bold; }
+.cm-logts-gate     { color: #0ff; font-weight: bold; }
+.cm-logts-type     { color: #0f0; font-weight: bold; }
+.cm-logts-number   { color: #f80; }
+.cm-logts-operator { color: #aaa; }
 button { margin:4px; padding:5px 9px; cursor: pointer; }
 pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .panel { border:1px solid #444; padding:10px; margin-top:10px }
@@ -818,6 +843,70 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 <!--script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script-->
 
 <script type="text/javascript" src="lz-string-min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="cm.show-hint.min.js"></script>
+
+<script>
+// ─── LogTScript CodeMirror mode ───────────────────────────────────────────────
+const _logtsKeywords = [
+  "show","def","repeat","MODE","WIREWRITE","NEXT",
+  "LOAD","LATCH","comp","pcb","out","in","on","off","at","depth","length",
+  "set","write","data","w0","w1"
+];
+const _logtsGates = [
+  "AND","ANDe","OR","ORe","NOT","NOTe","XOR","XORe",
+  "NAND","NANDe","NOR","NORe","LSHIFT","RSHIFT"
+];
+
+CodeMirror.defineMode("logts", function() {
+  return {
+    token: function(stream) {
+      // Comments
+      if (stream.match(/#.*/)) return "logts-comment";
+
+      // Hex literal  ^FF
+      if (stream.match(/\^[0-9A-Fa-f]+/)) return "logts-number";
+
+      // Decimal literal  \15
+      if (stream.match(/\\[0-9]+/)) return "logts-number";
+
+      // Wire/bit type declarations: 8wire, 4bit, etc.
+      if (stream.match(/\d+(?:wire|bit)\b/)) return "logts-type";
+
+      // Logic gates (before general keywords to take priority)
+      if (stream.match(new RegExp('\\b(' + _logtsGates.join('|') + ')\\b'))) return "logts-gate";
+
+      // Keywords
+      if (stream.match(new RegExp('\\b(' + _logtsKeywords.join('|') + ')\\b'))) return "logts-keyword";
+
+      // Operators and punctuation
+      if (stream.match(/[=:,.<>()\[\]{}\/\\~@!]/)) return "logts-operator";
+
+      // Binary literal (sequence of 0/1 not part of a word)
+      if (stream.match(/\b[01]+\b/)) return "logts-number";
+
+      stream.next();
+      return null;
+    }
+  };
+});
+
+// ─── Autocomplete helper ──────────────────────────────────────────────────────
+CodeMirror.registerHelper("hint", "logts", function(cm) {
+  const cursor = cm.getCursor();
+  const token  = cm.getTokenAt(cursor);
+  const start  = token.start;
+  const end    = cursor.ch;
+  const word   = token.string.slice(0, end - start);
+  const all    = _logtsKeywords.concat(_logtsGates);
+  const list   = all.filter(k => k.toLowerCase().startsWith(word.toLowerCase()));
+  return {
+    list,
+    from: CodeMirror.Pos(cursor.line, start),
+    to:   CodeMirror.Pos(cursor.line, end)
+  };
+});
+</script>
 
 <h2>Bit Language Interpreter for LogTScript v0.3.1</h2>
 
