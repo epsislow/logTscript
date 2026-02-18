@@ -860,8 +860,25 @@ const _logtsGates = [
 
 CodeMirror.defineMode("logts", function() {
   return {
-    token: function(stream) {
-      // Comments
+    startState: function() {
+      return { inBlockComment: false };
+    },
+    token: function(stream, state) {
+      // ── Block comment  #> ... #< ──────────────────────────────────────────
+      if (state.inBlockComment) {
+        if (stream.match(/#</)) {
+          state.inBlockComment = false;
+        } else {
+          stream.next();
+        }
+        return "logts-comment";
+      }
+      if (stream.match(/#>/)) {
+        state.inBlockComment = true;
+        return "logts-comment";
+      }
+
+      // ── Line comment  # ... ───────────────────────────────────────────────
       if (stream.match(/#.*/)) return "logts-comment";
 
       // Hex literal  ^FF
