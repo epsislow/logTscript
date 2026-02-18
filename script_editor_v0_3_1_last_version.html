@@ -37,6 +37,7 @@ textarea {
 .cm-logts-number   { color: #f80; }
 .cm-logts-bitrange   { color: #2ff; }
 .cm-logts-bitdynamic   { color: #2ff; }
+.cm-logts-component-name   { color: #2aa; font-weight: bold;}
 .cm-logts-component-type   { color: #ff0; }
 .cm-logts-comp-attr   { color: #f55; }
 .cm-logts-comp-prop   { color: #faa; }
@@ -947,7 +948,9 @@ CodeMirror.defineMode("logts", function() {
       }
 
       /* ───── IDENTIFIERS (CRITICAL SECTION) ───── */
-      if (!state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
+      if (
+        state.expectCompType && stream.match(/[7A-Za-z_][A-Za-z0-9_]*/) ||
+        !state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
         const word = stream.current();
         console.log('wordddd ' , word);
 
@@ -965,9 +968,15 @@ CodeMirror.defineMode("logts", function() {
         return null; // normal identifier
       }
       
-      if (stream.match(/[.]/)) {
+      if (!state.expectCompName && stream.match(/[.]/)) {
          state.expectBitrange = true;
          return null;
+      }
+      
+      if (state.expectCompName && stream.match(/[.]/)) {
+   //     state.expectBitrange = true;
+       
+        return 'logts-component-name';
       }
       
       if (stream.match(/[-]/)) {
@@ -1016,6 +1025,13 @@ CodeMirror.defineMode("logts", function() {
             console.log("expectCompType");
             return "logts-operator";
         }
+        
+        if (stream.peek() === "]") {
+          stream.next();
+          state.expectCompName = true;
+          console.log("expectCompName");
+          return "logts-operator";
+        }
 
         // cancel if something else appears
         console.log('defComp = false');
@@ -1027,7 +1043,7 @@ CodeMirror.defineMode("logts", function() {
       if (stream.match(/[=:,.<>()\[\]{}\/\\~@!]/)) {
         return "logts-operator";
       }
-
+console.log('or else');
       stream.next();
       return null;
     }
