@@ -35,6 +35,10 @@ textarea {
 .cm-logts-gate     { color: #0ff; font-weight: bold; }
 .cm-logts-type     { color: #0f0; font-weight: bold; }
 .cm-logts-number   { color: #f80; }
+.cm-logts-bitrange   { color: #2ff; }
+.cm-logts-bitdynamic   { color: #2ff; }
+.cm-logts-comp-attr   { color: #f55; }
+.cm-logts-comp-prop   { color: #faa; }
 .cm-logts-operator { color: #aaa; }
 button { margin:4px; padding:5px 9px; cursor: pointer; }
 pre { background:#000; padding:10px; max-height:260px; overflow:auto }
@@ -850,21 +854,39 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 // ─── LogTScript CodeMirror mode ───────────────────────────────────────────────
 const _logtsKeywords = [
   "show","def","repeat","MODE","WIREWRITE","NEXT",
-  "LOAD","LATCH","comp","pcb","out","in","on","off","at","depth","length",
-  "set","write","data","w0","w1"
+  "LOAD","LATCH","comp","pcb","w0","w1"
 ];
+
+const _logtsComponents = [
+'led','key','dip','switch','rotary','adder','subtract','divider','multiplier','counter','shifter','mem','reg','lcd','7seg','+','-','/','*','='
+]
+const _logtsAttributes = [
+  "depth","length","nl", "on", "text","label","color"
+]
+const _logtsProperties = [
+  "out","in","on","off","at","depth","length",
+  "set", "get", "write","data",
+]
 const _logtsGates = [
   "AND","ANDe","OR","ORe","NOT","NOTe","XOR","XORe",
   "NAND","NANDe","NOR","NORe","LSHIFT","RSHIFT"
 ];
 
+
 CodeMirror.defineMode("logts", function() {
-  return {
-    startState: function() {
-      return { inBlockComment: false };
-    },
-    token: function(stream, state) {
-      // ── Block comment  #> ... #< ──────────────────────────────────────────
+
+  const keywords = new Set(_logtsKeywords);
+  const compAttributes = new Set(_logtsAttributes);
+  const compProperties = new Set(_logtsProperties);
+  const gates    = new Set(_logtsGates);
+
+  function isWordChar(ch) {
+    return /[A-Za-z0-9_]/.test(ch);
+  }
+  
+  
+    function logTsToken (stream, state) {
+      /* ───── BLOCK COMMENT  #> ... #< ───── */
       if (state.inBlockComment) {
         if (stream.match(/#</)) {
           state.inBlockComment = false;
@@ -873,37 +895,130 @@ CodeMirror.defineMode("logts", function() {
         }
         return "logts-comment";
       }
+
       if (stream.match(/#>/)) {
         state.inBlockComment = true;
         return "logts-comment";
       }
 
-      // ── Line comment  # ... ───────────────────────────────────────────────
-      if (stream.match(/#.*/)) return "logts-comment";
+      /* ───── LINE COMMENT  # ... ───── */
+      if (stream.match(/#.*/)) {
+        return "logts-comment";
+      }
 
-      // Hex literal  ^FF
-      if (stream.match(/\^[0-9A-Fa-f]+/)) return "logts-number";
+      /* ───── HEX LITERAL  ^FF ───── */
+      if (stream.match(/\^[0-9A-Fa-f\s]+/)) {
+        return "logts-number";
+      }
 
-      // Decimal literal  \15
-      if (stream.match(/\\[0-9]+/)) return "logts-number";
+      /* ───── DECIMAL LITERAL  \15 ───── */
+      if (stream.match(/\\[0-9]+/)) {
+        return "logts-number";
+      }
 
-      // Wire/bit type declarations: 8wire, 4bit, etc.
-      if (stream.match(/\d+(?:wire|bit)\b/)) return "logts-type";
+      /* ───── TYPE DECLARATIONS 8bit 4wire ───── */
+      if (stream.match(/\d+(?:wire|bit)\b/)) {
+        return "logts-type";
+      }
+      
 
-      // Logic gates (before general keywords to take priority)
-      if (stream.match(new RegExp('\\b(' + _logtsGates.join('|') + ')\\b'))) return "logts-gate";
+      /* ───── OPERATOR '=' ───── */
+      if (stream.match("=")) {
+        state.expectBinary = true;
+        return "logts-operator";
+      }
+      
+      /* ───── Skip whitespace AFTER '=' ───── */
+        if (state.expectBinary && stream.eatSpace()) {
+          return null; // keep waiting
+        }
 
-      // Keywords
-      if (stream.match(new RegExp('\\b(' + _logtsKeywords.join('|') + ')\\b'))) return "logts-keyword";
+      /* ───── AFTER '=' → BINARY LITERAL ───── */
+      if (state.expectBinary && stream.match(/[01]+/)) {
+        state.expectBinary = false;
+        return "logts-number";
+      }
+      
+      if (state.expectBinary) {
+        state.expectBinary = false;
+      }
 
-      // Operators and punctuation
-      if (stream.match(/[=:,.<>()\[\]{}\/\\~@!]/)) return "logts-operator";
+      /* ───── IDENTIFIERS (CRITICAL SECTION) ───── */
+      if (!state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
+        const word = stream.current();
 
-      // Binary literal (sequence of 0/1 not part of a word)
-      if (stream.match(/\b[01]+\b/)) return "logts-number";
+        if (gates.has(word))    return "logts-gate";
+        if (keywords.has(word)) return "logts-keyword";
+
+        return null; // normal identifier
+      }
+      
+      if (stream.match(/[.]/)) {
+         state.expectBitrange = true;
+         return null;
+      }
+      
+      if (stream.match(/[-]/)) {
+         state.expectBitrange = true;
+         return null;
+      }
+      
+      if (stream.match(/[/]/)) {
+        console.log('bitrange/');
+         state.expectBitrange = true;
+         return null;
+      }
+
+      
+      if (state.expectBitrange && stream.match(/[0-9]+/)) {
+        state.expectBitrange = false;
+        return "logts-bitrange";
+      }
+      
+      if (state.expectBitrange && stream.match(/[(]+/)) {
+        console.log('h>');
+        return "logts-operator";
+      }
+      
+      if (state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
+        console.log('q');
+        state.expectBitrange = false;
+        return "logts-bitdynamic";
+      }
+      
+      if (state.expectBitrange) {
+      console.log('expectBitrange = false');
+        state.expectBitrange = false;
+      }
+
+
+      /* ───── OPERATORS / SYMBOLS ───── */
+      if (stream.match(/[=:,.<>()\[\]{}\/\\~@!]/)) {
+        return "logts-operator";
+      }
 
       stream.next();
       return null;
+    }
+    
+
+  return {
+    startState() {
+      return { 
+        inBlockComment: false,
+        expectBinary: false,
+        expectBitrange: false,
+        defComp: false,
+        defPcb: false,
+        expectCompProp: false
+      };
+    },
+
+    eatSpace: true,
+    token(stream, state) {
+        const t = logTsToken(stream,state);
+        console.log(t);
+        return t;
     }
   };
 });
