@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CodeMirror LogTScript Editor</title>
+
+<!-- CodeMirror core -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+
+<style>
+body {
+    background: #1e1e1e;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: monospace;
+}
+
+/* Make cursor visible */
+.CodeMirror-cursor {
+    border-left: 2px solid white;
+}
+
+/* Optional: smoother blinking */
+.CodeMirror-focused .CodeMirror-cursor {
+    animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+    50% { border-color: transparent; }
+}
+
+.CodeMirror-linenumbers {
+
+    background: #3a3a3a;
+}
+
+/* Selection when editor is focused */
+.CodeMirror-focused .CodeMirror-selected {
+    background: rgba(100, 150, 255, 0.35);
+}
+
+/* Selection when editor is NOT focused */
+.CodeMirror-selected {
+    background: rgba(100, 150, 255, 0.25);
+}
+
+#container {
+    width: 600px;
+}
+
+#runBtn {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    background: #3a3a3a;
+    color: white;
+    border: none;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+
+.CodeMirror {
+    height: 250px;
+    background: #2b2b2b;
+    color: white;
+    border-radius: 5px;
+}
+
+/* Custom colors */
+.cm-bit { color: lightgreen; }
+.cm-numberj { color: red; }
+.cm-keywordj { color: yellow; }
+.cm-action { color: lightblue; }
+.cm-logic { color: cyan; font-weight: bold; }
+.cm-comment {
+    color: #6a6a6a; /* VS Code–style green */
+    font-style: italic;
+}
+.cm-link {
+    text-decoration: underline;
+    cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div id="container">
+    <button id="runBtn">Run</button>
+    <textarea id="editor"></textarea>
+</div>
+
+<script>
+const keywords = [
+    "show", "def", "bit",
+    "AND", "NOT", "OR", "XOR", "NAND", "NOR", "LATCH"
+];
+
+
+CodeMirror.registerHelper("hint", "customLang", function (cm) {
+    const cursor = cm.getCursor();
+    const token = cm.getTokenAt(cursor);
+
+    const start = token.start;
+    const end = cursor.ch;
+    const word = token.string.slice(0, end - start);
+
+    const list = keywords.filter(k =>
+        k.toLowerCase().startsWith(word.toLowerCase())
+    );
+
+    return {
+        list,
+        from: CodeMirror.Pos(cursor.line, start),
+        to: CodeMirror.Pos(cursor.line, end)
+    };
+});
+
+CodeMirror.defineMode("customLang", function () {
+    return {
+        token: function (stream) {
+            // Comments (# ...)
+            if (stream.match(/#.*/)) {
+                return "comment";
+            }
+
+            // Logic keywords (AND, OR, NOT, etc.)
+            if (stream.match(/\b(AND|OR|NOT|XOR|NAND|NOR|LATCH)\b/i)) {
+                return "logic";
+            }
+			
+            // number + bit (8bit, 16bit)
+            if (stream.match(/\d+bit\b/, false)) {
+                stream.match(/\d+/);
+                return "numberj";
+            }
+            if (stream.match(/bit\b/)) {
+                return "bit";
+            }
+
+            // keywords
+            if (stream.match(/def\b|[=,:]/)) {
+                return "keywordj";
+            }
+
+            // show and +
+            if (stream.match(/show\b|\+/)) {
+                return "action";
+            }
+
+            // skip one char
+            stream.next();
+            return null;
+        }
+    };
+});
+const INDENT = 4;
+
+const editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+    mode: "customLang",
+    lineNumbers: true,
+    theme: "default",
+    indentUnit: 4,
+    tabSize: 4,
+
+    extraKeys: {
+        "Ctrl-Space": "autocomplete",
+        Enter: function (cm) {
+            const cursor = cm.getCursor();
+            const line = cm.getLine(cursor.line);
+
+            // Find "def" position
+            const defIndex = line.indexOf("def");
+
+            // If "def" exists before cursor
+            if (defIndex !== -1 && cursor.ch >= defIndex + 3) {
+                cm.replaceSelection("\n" + " ".repeat(defIndex + 4), "end");
+            } else {
+                // Default behavior
+                cm.execCommand("newlineAndIndent");
+            }
+        },
+		
+		Backspace(cm) {
+            const cursor = cm.getCursor();
+            const line = cm.getLine(cursor.line);
+
+            // Only act on empty or whitespace-only lines
+            if (!line || line.trim() !== "") {
+                return cm.execCommand("delCharBefore");
+            }
+
+            const indentMatch = line.match(/^(\s+)/);
+            if (!indentMatch) {
+                return cm.execCommand("delCharBefore");
+            }
+
+            const indentLength = indentMatch[1].length;
+
+            if (indentLength >= INDENT) {
+                cm.replaceRange(
+                    "",
+                    { line: cursor.line, ch: indentLength - INDENT },
+                    { line: cursor.line, ch: indentLength }
+                );
+                return;
+            }
+
+            cm.execCommand("delCharBefore");
+        }
+    }
+});
+
+
+editor.on("change", cm => {
+    cm.replaceSelection(cm.getSelection().toUpperCase());
+});
+
+document.getElementById("runBtn").onclick = () => {
+    alert("Run clicked:\n\n" + editor.getValue());
+};
+</script>
+
+</body>
+</html>
