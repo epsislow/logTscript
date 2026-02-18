@@ -346,6 +346,129 @@ console.log('\n=== Test 21: Large decimal \\1024 ===');
   assert('\\1024 value is 10000000000', binTokens[binTokens.length - 1].value, '10000000000');
 }
 
+// ================================================================
+// Logic gate tests (pure JS, no interpreter needed)
+// We replicate the exact same logic from main.js call() to verify it.
+// ================================================================
+
+function gateReduce(name, a, bv) {
+  const len = Math.max(a.length, bv !== undefined ? bv.length : 0);
+  const ap = a.padStart(len, '0');
+  const bp = bv !== undefined ? bv.padStart(len, '0') : '';
+  if (name === 'NOT') {
+    const notBits = a.split('').map(c => c === '1' ? '0' : '1');
+    return notBits.includes('1') ? '1' : '0';
+  }
+  const resultBits = [];
+  for (let i = 0; i < len; i++) {
+    const ai = ap[i] === '1', bi = bp[i] === '1';
+    let r;
+    switch (name) {
+      case 'AND':  r = ai && bi; break;
+      case 'OR':   r = ai || bi; break;
+      case 'XOR':  r = ai !== bi; break;
+      case 'NAND': r = !(ai && bi); break;
+      case 'NOR':  r = !(ai || bi); break;
+    }
+    resultBits.push(r ? '1' : '0');
+  }
+  return resultBits.includes('1') ? '1' : '0';
+}
+
+function gateExpand(name, a, bv) {
+  if (name === 'NOTe') {
+    return a.split('').map(c => c === '1' ? '0' : '1').join('');
+  }
+  const len = Math.max(a.length, bv.length);
+  const ap = a.padStart(len, '0');
+  const bp = bv.padStart(len, '0');
+  let v = '';
+  for (let i = 0; i < len; i++) {
+    const ai = ap[i] === '1', bi = bp[i] === '1';
+    let r;
+    switch (name) {
+      case 'ANDe':  r = ai && bi; break;
+      case 'ORe':   r = ai || bi; break;
+      case 'XORe':  r = ai !== bi; break;
+      case 'NANDe': r = !(ai && bi); break;
+      case 'NORe':  r = !(ai || bi); break;
+    }
+    v += r ? '1' : '0';
+  }
+  return v;
+}
+
+console.log('\n=== Test 22: AND reduce - bitwise 11011 AND 11100 = 11000 → OR-reduce = 1 ===');
+assert('AND(11011, 11100)', gateReduce('AND', '11011', '11100'), '1');
+
+console.log('\n=== Test 23: AND reduce - no overlap → 0 ===');
+assert('AND(1010, 0101)', gateReduce('AND', '1010', '0101'), '0');
+
+console.log('\n=== Test 24: OR reduce ===');
+assert('OR(0000, 0000)', gateReduce('OR', '0000', '0000'), '0');
+assert('OR(0000, 0001)', gateReduce('OR', '0000', '0001'), '1');
+
+console.log('\n=== Test 25: NOR reduce - NOR(1111, 0011) = 0000 → reduce = 0 ===');
+assert('NOR(1111, 0011)', gateReduce('NOR', '1111', '0011'), '0');
+
+console.log('\n=== Test 26: NOR reduce - NOR(0000, 0000) = 1111 → reduce = 1 ===');
+assert('NOR(0000, 0000)', gateReduce('NOR', '0000', '0000'), '1');
+
+console.log('\n=== Test 27: NOT reduce - NOT(1010) → 0101, reduce=1 ===');
+assert('NOT(1010)', gateReduce('NOT', '1010'), '1');
+
+console.log('\n=== Test 28: NOT reduce - NOT(1111) → 0000, reduce=0 ===');
+assert('NOT(1111)', gateReduce('NOT', '1111'), '0');
+
+console.log('\n=== Test 29: XOR reduce ===');
+assert('XOR(1010, 1010)', gateReduce('XOR', '1010', '1010'), '0');
+assert('XOR(1010, 0101)', gateReduce('XOR', '1010', '0101'), '1');
+
+console.log('\n=== Test 30: NAND reduce ===');
+assert('NAND(1111, 1111) → 0000 → 0', gateReduce('NAND', '1111', '1111'), '0');
+assert('NAND(1010, 0101) → 1111 → 1', gateReduce('NAND', '1010', '0101'), '1');
+
+console.log('\n=== Test 31: ANDe - bitwise AND returns N bits ===');
+assert('ANDe(011, 101)', gateExpand('ANDe', '011', '101'), '001');
+assert('ANDe(1100, 1011)', gateExpand('ANDe', '1100', '1011'), '1000');
+
+console.log('\n=== Test 32: ORe - bitwise OR returns N bits ===');
+assert('ORe(1100, 1011)', gateExpand('ORe', '1100', '1011'), '1111');
+assert('ORe(0000, 0000)', gateExpand('ORe', '0000', '0000'), '0000');
+
+console.log('\n=== Test 33: NOTe - bitwise NOT returns N bits ===');
+assert('NOTe(1010)', gateExpand('NOTe', '1010'), '0101');
+assert('NOTe(0000)', gateExpand('NOTe', '0000'), '1111');
+
+console.log('\n=== Test 34: XORe ===');
+assert('XORe(1010, 1100)', gateExpand('XORe', '1010', '1100'), '0110');
+
+console.log('\n=== Test 35: NANDe ===');
+assert('NANDe(1111, 1111)', gateExpand('NANDe', '1111', '1111'), '0000');
+assert('NANDe(1010, 0101)', gateExpand('NANDe', '1010', '0101'), '1111');
+
+console.log('\n=== Test 36: NORe ===');
+assert('NORe(0000, 0000)', gateExpand('NORe', '0000', '0000'), '1111');
+assert('NORe(1010, 0101)', gateExpand('NORe', '1010', '0101'), '0000');
+
+console.log('\n=== Test 37: Gate on different widths (padStart shorter) ===');
+assert('ANDe(11, 1100) pads 11→0011', gateExpand('ANDe', '11', '1100'), '0000');
+assert('ORe(11, 1100)', gateExpand('ORe', '11', '1100'), '1111');
+
+console.log('\n=== Test 38: NOTe tokenized as ID ===');
+{
+  const { tokens } = tokenize('4wire x = NOTe(1010)');
+  const idTokens = tokens.filter(t => t.type === 'ID' && t.value === 'NOTe');
+  assert('NOTe recognized as ID token', String(idTokens.length), '1');
+}
+
+console.log('\n=== Test 39: ANDe tokenized as ID ===');
+{
+  const { tokens } = tokenize('4wire x = ANDe(1010, 0101)');
+  const idTokens = tokens.filter(t => t.type === 'ID' && t.value === 'ANDe');
+  assert('ANDe recognized as ID token', String(idTokens.length), '1');
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);

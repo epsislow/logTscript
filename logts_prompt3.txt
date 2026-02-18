@@ -1054,7 +1054,6 @@ comment block using
 
 if #> with no beginning only the line with the # is commented
 
-
 =======
 I want to add a new keyword called: repeat
 
@@ -1144,3 +1143,99 @@ repeats 1..2[
 I guess the repeat must be a preprocess step that genererates the final statements, that afterwords gets executed like no repeat was there.
 
 Also there is an error in pcb definition that ends the pcb definition block when gets to an empty line, that's a bug, the pcb definition block should always end when it finds the final : character.  If there are questions please ask.
+
+
+======
+I've seen that 'NOT', 'AND', 'OR', 'XOR', 'NAND', 'NOR' see the table at main.js 4113 only work at 1 bit
+I want to change them to work with any number of bits and return 1 bit like for example: 
+  
+4wire d = ^F
+5wire e = 11011
+5wire s = AND(e, 11100)
+#s should be 11000
+1wire q = NOR(d, 0011)
+#q should be 0000
+1wire oneBit = OR(e.0, e.1)
+#q should be 1
+
+And i want to add:
+'NOTe', 'ANDe', 'ORe', 'XORe', 'NANDe', 'NORe', that are would return the same number of bits it works on, and performs the operation on each bit.
+
+4wire d0 = 1100
+4wire d1 = 1011
+4wire d2 = ORe(d0, d1)
+#d2 should be 1111
+3wire d3 = ANDe( 011, 101)
+#d3 should be 001
+------
+I want to add LSHIFT that is doing left bit shifting like this
+
+LSHIFT(Xbit data to be shifted, Xbit shifting number, optional 1bit fillNumber that tells what number will fill the bits after shifting this number is missing default has the value 0)
+and returns the Xbit data shifted to LEFT with the shifting number and filled with the fillNumber
+
+RSHIFT(Xbit data to be shifted, Xbit shifting number, optional 1bit fillNumber that tells what number will fill the bits after shifting this number is missing default has the value 0)
+and returns the Xbit data shifted to RIGHT with the shifting number and filled with the fillNumber
+
+show(LSHIFT(1, 1, 0))
+#shows 10
+show(LSHIFT(1, 1, 1)) 
+#shows 11
+show(LSHIFT(10, 1, 0)) 
+#shows 100
+show(LSHIFT(10, 1, 1))
+#shows 101
+
+show(LSHIFT(1, 1))
+#shows 10
+show(LSHIFT(10, 1)) 
+#shows 100
+
+show(RSHIFT(1, 1, 0))
+#shows 01
+show(RSHIFT(1, 1, 1)) 
+#shows 11
+show(RSHIFT(10, 1, 0)) 
+#shows 001
+show(RSHIFT(10, 1, 1))
+#shows 101
+
+show(RSHIFT(1, 1))
+#shows 01
+show(RSHIFT(10, 1)) 
+#shows 001
+
+
+i want to add the < operator that is short for LSHIFT 
+and the > operator that is short for RSHIFT 
+
+< syntax is :
+
+Literal or wire or bit variable "<" literal or wire or bit variable following by: "w0" that represents fill with 0 or "w1" that represents fill with 1.
+
+For example these are equivalent:
+5wire q0 = LSHIFT(1 ,11, 0)
+5wire q0 = 1 < 11  
+
+These are equivalent:
+5wire q1 = LSHIFT(1, 11, 0)
+5wire q1 = 1 < 11 w0
+
+These are equivalent:
+5wire q1 = RSHIFT(1, 11, 1)
+5wire q2 = 10 > 10 w1
+
+These are equivalent:
+5wire q1 = RSHIFT(1, 11)
+5wire q2 = 10 > 10 w1
+
+---------------
+1wire set = 0
+1wire clear = 0
+3wire n = 101
+
+5wire data1 = MUX1(set, data, ORe(data, 1 < n ) ))
+
+5wire cmask = 1 < n
+5wire data2 = MUX1(clear, data, ANDe(data, !cmask))
+
+5wire data = MUX1(set, data2 , ORe(data, 1 < n))
