@@ -949,6 +949,7 @@ CodeMirror.defineMode("logts", function() {
       /* ───── IDENTIFIERS (CRITICAL SECTION) ───── */
       if (!state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
         const word = stream.current();
+        console.log('wordddd ' , word);
 
         if (gates.has(word))    return "logts-gate";
         if (keywords.has(word)) {
