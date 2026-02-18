@@ -688,6 +688,25 @@ console.log('\n=== Test 60: resolveBitRange - dynamic range with evalExpr simula
   );
   assert('mixed static start=1', String(r3.start), '1');
   assert('mixed dynamic len => end=4', String(r3.end), '4');
+
+  // Mixed: dynamic start + static len  a.(start)/4 where start=2, len=4
+  function mockResolveDynStartStaticLen(bitRange, startVal) {
+    let start = bitRange.start !== undefined ? bitRange.start : null;
+    let end   = bitRange.end   !== undefined ? bitRange.end   : null;
+    if (bitRange.startExpr) start = evalBinStr(startVal);
+    if (bitRange.endExpr) { /* not set */ }
+    else if (bitRange.lenExpr) { /* not set */ }
+    else if (bitRange.len !== undefined && bitRange.len !== null) {
+      end = start + bitRange.len - 1;
+    } else if (end === null) { end = start; }
+    return { start, end };
+  }
+  const r4 = mockResolveDynStartStaticLen(
+    { startExpr: true, len: 4, isDynamic: true, isLength: true },
+    '10'  // binary for 2
+  );
+  assert('dynamic start=2, static len=4: start=2', String(r4.start), '2');
+  assert('dynamic start=2, static len=4: end=5 (2+4-1)', String(r4.end), '5');
 }
 
 // Summary
