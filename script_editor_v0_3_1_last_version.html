@@ -37,6 +37,7 @@ textarea {
 .cm-logts-number   { color: #f80; }
 .cm-logts-bitrange   { color: #2ff; }
 .cm-logts-bitdynamic   { color: #2ff; }
+.cm-logts-component-type   { color: #ff0; }
 .cm-logts-comp-attr   { color: #f55; }
 .cm-logts-comp-prop   { color: #faa; }
 .cm-logts-operator { color: #aaa; }
@@ -876,6 +877,7 @@ const _logtsGates = [
 CodeMirror.defineMode("logts", function() {
 
   const keywords = new Set(_logtsKeywords);
+  const components = new Set(_logtsComponents);
   const compAttributes = new Set(_logtsAttributes);
   const compProperties = new Set(_logtsProperties);
   const gates    = new Set(_logtsGates);
@@ -886,6 +888,7 @@ CodeMirror.defineMode("logts", function() {
   
   
     function logTsToken (stream, state) {
+    console.log("CHAR:", stream.peek(), "defComp:", state.defComp);
       /* ───── BLOCK COMMENT  #> ... #< ───── */
       if (state.inBlockComment) {
         if (stream.match(/#</)) {
@@ -948,7 +951,15 @@ CodeMirror.defineMode("logts", function() {
         const word = stream.current();
 
         if (gates.has(word))    return "logts-gate";
-        if (keywords.has(word)) return "logts-keyword";
+        if (keywords.has(word)) {
+            if (word === 'comp') {
+              state.defComp = true;
+            }
+            return "logts-keyword";
+        }
+        if (state.expectCompType && components.has(word)) {
+            return "logts-component-type";
+        }
 
         return null; // normal identifier
       }
@@ -990,7 +1001,26 @@ CodeMirror.defineMode("logts", function() {
       console.log('expectBitrange = false');
         state.expectBitrange = false;
       }
+            
+      if (state.defComp) {
+        // allow whitespace
+        if (stream.eatSpace()) {
+            return null;
+        }
 
+        // handle '['
+        if (stream.peek() === '[') {
+            stream.next();
+            state.expectCompType = true;
+            console.log("expectCompType");
+            return "logts-operator";
+        }
+
+        // cancel if something else appears
+        console.log('defComp = false');
+        state.defComp = false;
+    }
+      
 
       /* ───── OPERATORS / SYMBOLS ───── */
       if (stream.match(/[=:,.<>()\[\]{}\/\\~@!]/)) {
@@ -1009,6 +1039,8 @@ CodeMirror.defineMode("logts", function() {
         expectBinary: false,
         expectBitrange: false,
         defComp: false,
+        expectCompType: false,
+        expectCompName: false,
         defPcb: false,
         expectCompProp: false
       };
@@ -1017,7 +1049,7 @@ CodeMirror.defineMode("logts", function() {
     eatSpace: true,
     token(stream, state) {
         const t = logTsToken(stream,state);
-        console.log(t);
+        console.log(t, " -> ", stream.current());
         return t;
     }
   };
