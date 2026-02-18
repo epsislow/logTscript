@@ -875,6 +875,10 @@ const _logtsGates = [
 ];
 
 
+function consoleLog(...args) {
+//  console.log(...args);
+}
+
 CodeMirror.defineMode("logts", function() {
 
   const keywords = new Set(_logtsKeywords);
@@ -889,7 +893,7 @@ CodeMirror.defineMode("logts", function() {
   
   
     function logTsToken (stream, state) {
-    console.log("CHAR:", stream.peek(), "defComp:", state.defComp);
+    consoleLog("CHAR:", stream.peek(), "defComp:", state.defComp);
       /* ───── BLOCK COMMENT  #> ... #< ───── */
       if (state.inBlockComment) {
         if (stream.match(/#</)) {
@@ -952,7 +956,7 @@ CodeMirror.defineMode("logts", function() {
         state.expectCompType && stream.match(/[7A-Za-z_][A-Za-z0-9_]*/) ||
         !state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
         const word = stream.current();
-        console.log('wordddd ' , word);
+        consoleLog('wordddd ' , word);
 
         if (gates.has(word))    return "logts-gate";
         if (keywords.has(word)) {
@@ -985,7 +989,7 @@ CodeMirror.defineMode("logts", function() {
       }
       
       if (stream.match(/[/]/)) {
-        console.log('bitrange/');
+        consoleLog('bitrange/');
          state.expectBitrange = true;
          return null;
       }
@@ -1022,19 +1026,19 @@ CodeMirror.defineMode("logts", function() {
         if (stream.peek() === '[') {
             stream.next();
             state.expectCompType = true;
-            console.log("expectCompType");
+            consoleLog("expectCompType");
             return "logts-operator";
         }
         
         if (stream.peek() === "]") {
           stream.next();
           state.expectCompName = true;
-          console.log("expectCompName");
+          consoleLog("expectCompName");
           return "logts-operator";
         }
 
         // cancel if something else appears
-        console.log('defComp = false');
+        consoleLog('defComp = false');
         state.defComp = false;
     }
       
@@ -1043,7 +1047,7 @@ CodeMirror.defineMode("logts", function() {
       if (stream.match(/[=:,.<>()\[\]{}\/\\~@!]/)) {
         return "logts-operator";
       }
-console.log('or else');
+consoleLog('or else');
       stream.next();
       return null;
     }
@@ -1066,7 +1070,7 @@ console.log('or else');
     eatSpace: true,
     token(stream, state) {
         const t = logTsToken(stream,state);
-        console.log(t, " -> ", stream.current());
+        consoleLog(t, " -> ", stream.current());
         return t;
     }
   };
