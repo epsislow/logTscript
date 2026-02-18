@@ -469,6 +469,100 @@ console.log('\n=== Test 39: ANDe tokenized as ID ===');
   assert('ANDe recognized as ID token', String(idTokens.length), '1');
 }
 
+// ================================================================
+// LSHIFT / RSHIFT tests (pure JS logic replica)
+// ================================================================
+
+function lshift(data, n, fill = '0') {
+  return data + fill.repeat(n);
+}
+
+function rshift(data, n, fill = '0') {
+  const len = data.length;
+  if (n >= len) return fill.repeat(len);
+  return fill.repeat(n) + data.slice(0, len - n);
+}
+
+console.log('\n=== Test 40: LSHIFT basic ===');
+assert('LSHIFT(1, 1, 0)', lshift('1', 1, '0'), '10');
+assert('LSHIFT(1, 1, 1)', lshift('1', 1, '1'), '11');
+assert('LSHIFT(10, 1, 0)', lshift('10', 1, '0'), '100');
+assert('LSHIFT(10, 1, 1)', lshift('10', 1, '1'), '101');
+
+console.log('\n=== Test 41: LSHIFT default fill=0 ===');
+assert('LSHIFT(1, 1) default fill', lshift('1', 1), '10');
+assert('LSHIFT(10, 1) default fill', lshift('10', 1), '100');
+
+console.log('\n=== Test 42: LSHIFT n=0 ===');
+assert('LSHIFT(101, 0, 0)', lshift('101', 0, '0'), '101');
+
+console.log('\n=== Test 43: LSHIFT n > data.length ===');
+assert('LSHIFT(1, 3, 0)', lshift('1', 3, '0'), '1000');
+assert('LSHIFT(1, 3, 1)', lshift('1', 3, '1'), '1111');
+
+console.log('\n=== Test 44: RSHIFT basic ===');
+assert('RSHIFT(10, 1, 0)', rshift('10', 1, '0'), '01');
+assert('RSHIFT(10, 1, 1)', rshift('10', 1, '1'), '11');
+assert('RSHIFT(1, 1, 0)', rshift('1', 1, '0'), '0');
+assert('RSHIFT(1, 1, 1)', rshift('1', 1, '1'), '1');
+
+console.log('\n=== Test 45: RSHIFT default fill=0 ===');
+assert('RSHIFT(10, 1) default fill', rshift('10', 1), '01');
+assert('RSHIFT(1010, 2) default fill', rshift('1010', 2), '0010');
+
+console.log('\n=== Test 46: RSHIFT n=0 ===');
+assert('RSHIFT(101, 0, 0)', rshift('101', 0, '0'), '101');
+
+console.log('\n=== Test 47: RSHIFT n >= data.length ===');
+assert('RSHIFT(10, 2, 0)', rshift('10', 2, '0'), '00');
+assert('RSHIFT(10, 5, 1)', rshift('10', 5, '1'), '11');
+
+console.log('\n=== Test 48: RSHIFT keeps same width ===');
+assert('RSHIFT(1010, 1, 0) = 0101', rshift('1010', 1, '0'), '0101');
+assert('RSHIFT(1010, 1, 1) = 1101', rshift('1010', 1, '1'), '1101');
+
+console.log('\n=== Test 49: Tokenizer - < emits SYM when not LOAD ===');
+{
+  // "a < 1" - after tokenizing 'a', '<' should be SYM not LOAD
+  const { tokens } = tokenize('4wire x = 10 < 1');
+  const symLt = tokens.filter(t => t.type === 'SYM' && t.value === '<');
+  assert('< is SYM token in shift context', String(symLt.length), '1');
+}
+
+console.log('\n=== Test 49b: Tokenizer - < after variable name is SYM (not LOAD) ===');
+{
+  // test < sel - variable 'sel' starts with 's' (letter), must NOT be LOAD
+  const { tokens } = tokenize('4wire result = test < sel');
+  const symLt = tokens.filter(t => t.type === 'SYM' && t.value === '<');
+  const loadTok = tokens.filter(t => t.type === 'LOAD');
+  assert('< after variable is SYM not LOAD', String(symLt.length), '1');
+  assert('no LOAD token when < is mid-line', String(loadTok.length), '0');
+}
+
+console.log('\n=== Test 50: Tokenizer - <path remains LOAD ===');
+{
+  // <filename → LOAD token (letter immediately after <)
+  const { tokens } = tokenize('<myfile');
+  const loadTok = tokens.filter(t => t.type === 'LOAD');
+  assert('<myfile produces LOAD token', String(loadTok.length), '1');
+  assert('LOAD token value is myfile', loadTok[0].value, 'myfile');
+}
+
+console.log('\n=== Test 51: Tokenizer - > emits SYM ===');
+{
+  const { tokens } = tokenize('4wire x = 10 > 1');
+  const symGt = tokens.filter(t => t.type === 'SYM' && t.value === '>');
+  assert('> is SYM token', String(symGt.length), '1');
+}
+
+console.log('\n=== Test 52: LSHIFT w1 fill via operator - preprocessed text ===');
+{
+  // Verify preprocessRepeat passes through operator syntax unchanged
+  const src = '4wire x = 10 < 1 w1';
+  const result = preprocessRepeat(src);
+  assert('< w1 operator passes through preprocessor', result, src);
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);
