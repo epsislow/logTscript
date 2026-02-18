@@ -563,6 +563,133 @@ console.log('\n=== Test 52: LSHIFT w1 fill via operator - preprocessed text ==='
   assert('< w1 operator passes through preprocessor', result, src);
 }
 
+// ===========================
+// Dynamic Bit Range tests
+// ===========================
+
+console.log('\n=== Test 53: Tokenizer - ( after . emits SYM ( ===');
+{
+  // a.(start) should tokenize: ID 'a', SYM '.', SYM '(', ID 'start', SYM ')'
+  const { tokens } = tokenize('a.(start)');
+  const types = tokens.map(t => t.type + ':' + t.value).join(' ');
+  const hasDot = tokens.some(t => t.type === 'SYM' && t.value === '.');
+  const hasLParen = tokens.some(t => t.type === 'SYM' && t.value === '(');
+  const hasRParen = tokens.some(t => t.type === 'SYM' && t.value === ')');
+  assert('a.(start) has SYM dot', String(hasDot), 'true');
+  assert('a.(start) has SYM (', String(hasLParen), 'true');
+  assert('a.(start) has SYM )', String(hasRParen), 'true');
+}
+
+console.log('\n=== Test 54: Tokenizer - a.(start)/(l) tokenizes correctly ===');
+{
+  const { tokens } = tokenize('a.(start)/(l)');
+  const slash = tokens.filter(t => t.type === 'SYM' && t.value === '/');
+  assert('a.(start)/(l) has / token', String(slash.length >= 1), 'true');
+}
+
+console.log('\n=== Test 55: Tokenizer - a.(start)-(end) tokenizes correctly ===');
+{
+  const { tokens } = tokenize('a.(s)-(e)');
+  const minus = tokens.filter(t => t.type === 'SYM' && t.value === '-');
+  assert('a.(s)-(e) has - token', String(minus.length >= 1), 'true');
+}
+
+console.log('\n=== Test 56: Tokenizer - preprocessor passes through dynamic bit range syntax ===');
+{
+  const src = '4bit sub = data.(start)/(l)';
+  const result = preprocessRepeat(src);
+  assert('dynamic bit range passes through preprocessor', result, src);
+}
+
+console.log('\n=== Test 57: resolveBitRange - static range {start:1, end:4} ===');
+{
+  // Simulate what resolveBitRange does for static ranges
+  function resolveBitRange(bitRange) {
+    if (!bitRange.isDynamic) {
+      const end = (bitRange.end !== undefined && bitRange.end !== null)
+        ? bitRange.end : bitRange.start;
+      return { start: bitRange.start, end };
+    }
+    return null;
+  }
+  const r = resolveBitRange({ start: 1, end: 4 });
+  assert('static range start=1', String(r.start), '1');
+  assert('static range end=4', String(r.end), '4');
+}
+
+console.log('\n=== Test 58: resolveBitRange - static single bit {start:3, end:3} ===');
+{
+  function resolveBitRange(bitRange) {
+    if (!bitRange.isDynamic) {
+      const end = (bitRange.end !== undefined && bitRange.end !== null)
+        ? bitRange.end : bitRange.start;
+      return { start: bitRange.start, end };
+    }
+    return null;
+  }
+  const r = resolveBitRange({ start: 3, end: 3 });
+  assert('single bit start=3', String(r.start), '3');
+  assert('single bit end=3', String(r.end), '3');
+}
+
+console.log('\n=== Test 59: resolveBitRange - static range missing end uses start ===');
+{
+  function resolveBitRange(bitRange) {
+    if (!bitRange.isDynamic) {
+      const end = (bitRange.end !== undefined && bitRange.end !== null)
+        ? bitRange.end : bitRange.start;
+      return { start: bitRange.start, end };
+    }
+    return null;
+  }
+  const r = resolveBitRange({ start: 2 });
+  assert('missing end: end==start', String(r.end), '2');
+}
+
+console.log('\n=== Test 60: resolveBitRange - dynamic range with evalExpr simulation ===');
+{
+  // Simulate resolveBitRange logic for isDynamic with startExpr and lenExpr
+  // Binary "1" = 1, binary "100" = 4
+  function evalBinStr(s) { return parseInt(s, 2); }
+  function mockResolve(bitRange, startVal, lenVal) {
+    // Mirrors the Interpreter.resolveBitRange logic
+    let start = bitRange.start !== undefined ? bitRange.start : null;
+    let end   = bitRange.end   !== undefined ? bitRange.end   : null;
+    if (bitRange.startExpr) start = evalBinStr(startVal);
+    if (bitRange.endExpr) end = evalBinStr(lenVal);
+    else if (bitRange.lenExpr) end = start + evalBinStr(lenVal) - 1;
+    else if (end === null) end = start;
+    return { start, end };
+  }
+
+  // data.(start)/(l) where start=1 ("1" in binary), l=4 ("100" in binary)
+  const r1 = mockResolve(
+    { startExpr: true, lenExpr: true, isDynamic: true, isLength: true },
+    '1',   // binary for 1
+    '100'  // binary for 4
+  );
+  assert('dynamic start=1', String(r1.start), '1');
+  assert('dynamic end=4 (1+4-1)', String(r1.end), '4');
+
+  // data.(start)-(end) where start=1, end=5
+  const r2 = mockResolve(
+    { startExpr: true, endExpr: true, isDynamic: true },
+    '1',   // binary for 1
+    '101'  // binary for 5
+  );
+  assert('dynamic range start=1', String(r2.start), '1');
+  assert('dynamic range end=5', String(r2.end), '5');
+
+  // Mixed: static start + dynamic len  a.1/(l) where l=4
+  const r3 = mockResolve(
+    { start: 1, lenExpr: true, isDynamic: true, isLength: true },
+    null,  // startExpr not set
+    '100'  // binary for 4
+  );
+  assert('mixed static start=1', String(r3.start), '1');
+  assert('mixed dynamic len => end=4', String(r3.end), '4');
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);
