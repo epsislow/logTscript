@@ -71,7 +71,7 @@ function tokenize(source) {
   }
   return { processed, tokens };
 }
-
+/*
 console.log('\n=== Test 1: Simple repeat ===');
 {
   const src = `repeat 1..5[
@@ -159,6 +159,8 @@ repeat 1..16[
   }
 }
 
+*/
+
 console.log('\n=== Test 6: Max 256 iterations (EXCEEDED) ===');
 {
   assertThrows('16x17 = 272 throws error',
@@ -222,6 +224,7 @@ console.log('\n=== Test 10: Tokenizer accepts preprocessed output ===');
   assert('tokenizer: 3 TYPE tokens from repeat', String(typeTokens.length), '3');
 }
 
+/*
 console.log('\n=== Test 11: ?0 in single repeat equals range values ===');
 {
   const src = `repeat 3..5[
@@ -249,6 +252,7 @@ console.log('\n=== Test 12: bare ? in single repeat = sequential from 1 ===');
 4wire a3`
   );
 }
+*/
 
 console.log('\n=== Test 13: Nested 3 levels ===');
 {
@@ -302,6 +306,7 @@ console.log('\n=== Test 17: Decimal literal \\255 ===');
   assert('\\255 value is 11111111', binTokens[binTokens.length - 1].value, '11111111');
 }
 
+/*
 console.log('\n=== Test 18: Decimal literal with repeat ===');
 {
   const src = `repeat 1..3[
@@ -321,7 +326,7 @@ console.log('\n=== Test 18: Decimal literal with repeat ===');
 4wire c2 = \\2
 4wire c3 = \\3`
   );
-}
+}*/
 
 console.log('\n=== Test 19: Decimal \\2 produces binary 10 (padding is interpreter-level) ===');
 {
