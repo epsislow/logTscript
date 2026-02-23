@@ -714,6 +714,186 @@ console.log('\n=== Test 60: resolveBitRange - dynamic range with evalExpr simula
   assert('dynamic start=2, static len=4: end=5 (2+4-1)', String(r4.end), '5');
 }
 
+// ================================================================
+// NEW Bit Operation Tests (post-rewrite behaviour)
+// gate() mirrors the new dual-mode logic from main.js call():
+//   NOT(a)      → N bits (bitwise invert)
+//   op(a)       → 1 bit  (left-to-right fold/reduce)
+//   op(a, b)    → N bits (bitwise, aligned with padStart)
+// ================================================================
+
+function gate(name, a, bv) {
+  const applyOp = (ai, bi) => {
+    switch (name) {
+      case 'AND':  return ai && bi;
+      case 'OR':   return ai || bi;
+      case 'XOR':  return ai !== bi;
+      case 'NXOR': return ai === bi;
+      case 'NAND': return !(ai && bi);
+      case 'NOR':  return !(ai || bi);
+      case 'EQ':   return ai === bi;
+    }
+  };
+
+  if (name === 'NOT') {
+    return a.split('').map(c => c === '1' ? '0' : '1').join('');
+  }
+
+  if (bv === undefined) {
+    // 1 arg: fold left-to-right → 1 bit
+    const bits = a.split('');
+    let acc = bits[0] === '1';
+    for (let i = 1; i < bits.length; i++) {
+      acc = applyOp(acc, bits[i] === '1');
+    }
+    return acc ? '1' : '0';
+  }
+
+  // 2 args: bitwise → N bits
+  const len = Math.max(a.length, bv.length);
+  const ap = a.padStart(len, '0');
+  const bp = bv.padStart(len, '0');
+  const resultBits = [];
+  for (let i = 0; i < len; i++) {
+    resultBits.push(applyOp(ap[i] === '1', bp[i] === '1') ? '1' : '0');
+  }
+  return resultBits.join('');
+}
+
+// --- NOT ---
+console.log('\n=== Test 61: NOT returns same number of bits (N bits) ===');
+assert('NOT(1) = 0',    gate('NOT', '1'),    '0');
+assert('NOT(0) = 1',    gate('NOT', '0'),    '1');
+assert('NOT(111) = 000', gate('NOT', '111'), '000');
+assert('NOT(101) = 010', gate('NOT', '101'), '010');
+assert('NOT(0000) = 1111', gate('NOT', '0000'), '1111');
+assert('NOT(1010) = 0101', gate('NOT', '1010'), '0101');
+
+// --- AND ---
+console.log('\n=== Test 62: AND 2-arg: 1-bit operands → 1 bit ===');
+assert('AND(1,1) = 1', gate('AND', '1', '1'), '1');
+assert('AND(0,0) = 0', gate('AND', '0', '0'), '0');
+assert('AND(1,0) = 0', gate('AND', '1', '0'), '0');
+
+console.log('\n=== Test 63: AND 1-arg fold → 1 bit ===');
+assert('AND(110) = 0',  gate('AND', '110'),  '0');
+assert('AND(111) = 1',  gate('AND', '111'),  '1');
+assert('AND(1111) = 1', gate('AND', '1111'), '1');
+assert('AND(1110) = 0', gate('AND', '1110'), '0');
+
+console.log('\n=== Test 64: AND 2-arg bitwise → N bits ===');
+assert('AND(111,101) = 101',               gate('AND', '111', '101'),        '101');
+assert('AND(00100101,01001111) = 00000101', gate('AND', '00100101','01001111'),'00000101');
+assert('AND(11,10) = 10',                  gate('AND', '11', '10'),           '10');
+
+// --- OR ---
+console.log('\n=== Test 65: OR 2-arg: 1-bit operands → 1 bit ===');
+assert('OR(1,1) = 1', gate('OR', '1', '1'), '1');
+assert('OR(0,0) = 0', gate('OR', '0', '0'), '0');
+assert('OR(1,0) = 1', gate('OR', '1', '0'), '1');
+
+console.log('\n=== Test 66: OR 1-arg fold → 1 bit ===');
+assert('OR(110) = 1',  gate('OR', '110'),  '1');
+assert('OR(111) = 1',  gate('OR', '111'),  '1');
+assert('OR(000) = 0',  gate('OR', '000'),  '0');
+assert('OR(001) = 1',  gate('OR', '001'),  '1');
+
+console.log('\n=== Test 67: OR 2-arg bitwise → N bits ===');
+assert('OR(111,101) = 111',               gate('OR', '111', '101'),         '111');
+assert('OR(00100101,01001111) = 01101111', gate('OR', '00100101','01001111'), '01101111');
+assert('OR(11,10) = 11',                  gate('OR', '11', '10'),            '11');
+
+// --- NOR ---
+console.log('\n=== Test 68: NOR 2-arg: 1-bit operands → 1 bit ===');
+assert('NOR(1,1) = 0', gate('NOR', '1', '1'), '0');
+assert('NOR(0,0) = 1', gate('NOR', '0', '0'), '1');
+assert('NOR(1,0) = 0', gate('NOR', '1', '0'), '0');
+
+console.log('\n=== Test 69: NOR 1-arg fold → 1 bit ===');
+assert('NOR(110) = 1',  gate('NOR', '110'), '1');  // (1 NOR 1) NOR 0 = 0 NOR 0 = 1
+assert('NOR(111) = 0',  gate('NOR', '111'), '0');  // (1 NOR 1) NOR 1 = 0 NOR 1 = 0
+// NOR(000): fold: acc=0, NOR(0,0)=1, NOR(1,0)=0 → 0
+assert('NOR(000) = 0',  gate('NOR', '000'), '0');
+assert('NOR(001) = 0',  gate('NOR', '001'), '0');
+
+console.log('\n=== Test 70: NOR 2-arg bitwise → N bits ===');
+assert('NOR(111,101) = 000',               gate('NOR', '111', '101'),         '000');
+assert('NOR(00100101,01001111) = 10010000', gate('NOR', '00100101','01001111'), '10010000');
+assert('NOR(11,10) = 00',                  gate('NOR', '11', '10'),            '00');
+
+// --- XOR ---
+console.log('\n=== Test 71: XOR 2-arg: 1-bit operands → 1 bit ===');
+assert('XOR(1,1) = 0', gate('XOR', '1', '1'), '0');
+assert('XOR(0,0) = 0', gate('XOR', '0', '0'), '0');
+assert('XOR(1,0) = 1', gate('XOR', '1', '0'), '1');
+
+console.log('\n=== Test 72: XOR 1-arg fold → 1 bit ===');
+assert('XOR(110) = 0',  gate('XOR', '110'), '0');  // (1 XOR 1) XOR 0 = 0
+assert('XOR(111) = 1',  gate('XOR', '111'), '1');  // (1 XOR 1) XOR 1 = 1
+assert('XOR(1010) = 0', gate('XOR', '1010'), '0');
+assert('XOR(1011) = 1', gate('XOR', '1011'), '1');
+
+console.log('\n=== Test 73: XOR 2-arg bitwise → N bits ===');
+assert('XOR(111,101) = 010',               gate('XOR', '111', '101'),         '010');
+assert('XOR(00100101,01001111) = 01101010', gate('XOR', '00100101','01001111'), '01101010');
+assert('XOR(11,10) = 01',                  gate('XOR', '11', '10'),            '01');
+
+// --- NAND ---
+console.log('\n=== Test 74: NAND 2-arg: 1-bit operands → 1 bit ===');
+assert('NAND(1,1) = 0', gate('NAND', '1', '1'), '0');
+assert('NAND(0,0) = 1', gate('NAND', '0', '0'), '1');
+assert('NAND(1,0) = 1', gate('NAND', '1', '0'), '1');
+
+console.log('\n=== Test 75: NAND 1-arg fold → 1 bit ===');
+assert('NAND(110) = 1',  gate('NAND', '110'), '1');  // (1 NAND 1) NAND 0 = 0 NAND 0 = 1
+assert('NAND(111) = 1',  gate('NAND', '111'), '1');  // (1 NAND 1) NAND 1 = 0 NAND 1 = 1
+assert('NAND(1111) = 0', gate('NAND', '1111'), '0'); // …NAND 1 = 0 NAND 1=1 NAND 1=0
+assert('NAND(000) = 1',  gate('NAND', '000'), '1');
+
+console.log('\n=== Test 76: NAND 2-arg bitwise → N bits ===');
+assert('NAND(111,101) = 010',               gate('NAND', '111', '101'),         '010');
+assert('NAND(00100101,01001111) = 11111010', gate('NAND', '00100101','01001111'), '11111010');
+assert('NAND(11,10) = 01',                  gate('NAND', '11', '10'),            '01');
+
+// --- NXOR (XNOR) ---
+console.log('\n=== Test 77: NXOR 2-arg: 1-bit operands → 1 bit ===');
+assert('NXOR(1,1) = 1', gate('NXOR', '1', '1'), '1');
+assert('NXOR(0,0) = 1', gate('NXOR', '0', '0'), '1');
+assert('NXOR(1,0) = 0', gate('NXOR', '1', '0'), '0');
+assert('NXOR(0,1) = 0', gate('NXOR', '0', '1'), '0');
+
+console.log('\n=== Test 78: NXOR 1-arg fold → 1 bit ===');
+assert('NXOR(110) = 0',  gate('NXOR', '110'), '0');  // (1 NXOR 1) NXOR 0 = 1 NXOR 0 = 0
+assert('NXOR(111) = 1',  gate('NXOR', '111'), '1');  // (1 NXOR 1) NXOR 1 = 1 NXOR 1 = 1
+assert('NXOR(1010) = 1', gate('NXOR', '1010'), '1'); // (1X1)=1,(1X0)=0,(0X1)=0 → fold
+assert('NXOR(11) = 1',   gate('NXOR', '11'),   '1');
+
+console.log('\n=== Test 79: NXOR 2-arg bitwise → N bits ===');
+assert('NXOR(111,101) = 101',  gate('NXOR', '111', '101'), '101');
+assert('NXOR(11,10) = 10',     gate('NXOR', '11',  '10'),  '10');
+assert('NXOR(1010,0101) = 0000', gate('NXOR', '1010', '0101'), '0000');
+assert('NXOR(1010,1010) = 1111', gate('NXOR', '1010', '1010'), '1111');
+
+// --- Edge cases ---
+console.log('\n=== Test 80: Single-bit input for all operators ===');
+assert('NOT single 1', gate('NOT', '1'), '0');
+assert('NOT single 0', gate('NOT', '0'), '1');
+assert('AND fold single bit 1', gate('AND', '1'), '1');
+assert('AND fold single bit 0', gate('AND', '0'), '0');
+assert('OR  fold single bit 1', gate('OR',  '1'), '1');
+// Single-bit fold: no iterations → returns the bit unchanged (identity)
+assert('NOR fold single bit 1', gate('NOR', '1'), '1');
+assert('NOR fold single bit 0', gate('NOR', '0'), '0');
+assert('XOR fold single bit 1', gate('XOR', '1'), '1');
+assert('NAND fold single bit 0', gate('NAND', '0'), '0');
+assert('NXOR fold single bit 1', gate('NXOR', '1'), '1');
+
+console.log('\n=== Test 81: Different-width args get padded ===');
+assert('AND(11,1100) pads 11→0011 → 0000', gate('AND',  '11', '1100'), '0000');
+assert('OR(11,1100)  pads 11→0011 → 1111', gate('OR',   '11', '1100'), '1111');
+assert('XOR(11,1100) pads → 1111',          gate('XOR',  '11', '1100'), '1111');
+assert('NOR(11,1100) → bitwise NOR(0011,1100)=0000', gate('NOR', '11', '1100'), '0000');
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);
