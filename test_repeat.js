@@ -894,6 +894,211 @@ assert('OR(11,1100)  pads 11→0011 → 1111', gate('OR',   '11', '1100'), '1111
 assert('XOR(11,1100) pads → 1111',          gate('XOR',  '11', '1100'), '1111');
 assert('NOR(11,1100) → bitwise NOR(0011,1100)=0000', gate('NOR', '11', '1100'), '0000');
 
+// ================================================================
+// := Wire Initialization — Tokenizer tests
+// (uses existing Tokenizer sandbox)
+// ================================================================
+
+console.log('\n=== Test 82: := produces a single SYM token ===');
+{
+  const { tokens } = tokenize('1wire s := 1');
+  const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
+  assert(':= is a single SYM(:=) token', String(colonEq.length), '1');
+  // Must NOT produce separate SYM(':') and SYM('=')
+  const colonOnly = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+  assert('no stray SYM(:) when := present', String(colonOnly.length), '0');
+}
+
+console.log('\n=== Test 83: standalone : still produces SYM(:) ===');
+{
+  const { tokens } = tokenize('on: 1');
+  const colonTok = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+  assert('standalone : gives SYM(:)', String(colonTok.length), '1');
+  const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
+  assert('no := when only : present', String(colonEq.length), '0');
+}
+
+console.log('\n=== Test 84: :: still produces two SYM(:) tokens ===');
+{
+  const { tokens } = tokenize('comp [switch] .s ::');
+  const colonToks = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+  assert(':: gives two SYM(:)', String(colonToks.length), '2');
+  const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
+  assert(':: gives no SYM(:=)', String(colonEq.length), '0');
+}
+
+console.log('\n=== Test 85: full tokenization of "1wire s := 1" ===');
+{
+  const { tokens } = tokenize('1wire s := 1');
+  const types = tokens.map(t => t.type);
+  assert('TYPE token present',  String(types.includes('TYPE')),  'true');
+  assert('ID token present',    String(types.includes('ID')),    'true');
+  assert(':= SYM present',      String(tokens.some(t => t.type === 'SYM' && t.value === ':=')), 'true');
+  assert('BIN token present',   String(types.includes('BIN')),   'true');
+}
+
+console.log('\n=== Test 86: := with hex literal "4wire s := ^FF" ===');
+{
+  const { tokens } = tokenize('4wire s := ^FF');
+  const hexTok = tokens.filter(t => t.type === 'HEX');
+  assert('^FF hex token present after :=', String(hexTok.length), '1');
+  assert('^FF value is FF', hexTok[0].value, 'FF');
+}
+
+console.log('\n=== Test 87: := with decimal \\N (tokenized as BIN) ===');
+{
+  // \5 → decimal 5 → binary 101, produced as BIN token by tokenizer
+  const { tokens } = tokenize('4wire s := \\5');
+  const binTok = tokens.filter(t => t.type === 'BIN');
+  assert('\\5 after := gives BIN', String(binTok.length >= 1), 'true');
+  assert('\\5 BIN value is 101', binTok[binTok.length - 1].value, '101');
+}
+
+console.log('\n=== Test 88: := with NOT prefix "1wire s := !1" ===');
+{
+  const { tokens } = tokenize('1wire s := !1');
+  const notTok = tokens.filter(t => t.type === 'SYM' && t.value === '!');
+  assert('! token present after :=', String(notTok.length), '1');
+  const binTok = tokens.filter(t => t.type === 'BIN');
+  assert('BIN follows !', String(binTok.length >= 1), 'true');
+}
+
+console.log('\n=== Test 89: := does not interfere with .var:get syntax ===');
+{
+  const { tokens } = tokenize('1wire s = .sw:get');
+  const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
+  assert(':= not produced for :get syntax', String(colonEq.length), '0');
+  const colonTok = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+  assert(': produced for :get syntax', String(colonTok.length), '1');
+}
+
+// ================================================================
+// := Wire Initialization — Parser tests
+// Extend extraction to include the Parser class.
+// ================================================================
+
+{
+  const parserEnd = src.indexOf('/* ================= INTERPRETER ================= */');
+  const parserChunk = src.slice(tokStart, parserEnd);
+  const sandboxP = { Error, parseInt, String, Array, Set, Map, RegExp, console, Object };
+  const parserCode = parserChunk + `\nvar _Parser2 = Parser; var _Tokenizer2 = Tokenizer; var _preprocessRepeat2 = preprocessRepeat;`;
+  vm.runInNewContext(parserCode, sandboxP);
+  const Parser2 = sandboxP._Parser2;
+  const Tokenizer2 = sandboxP._Tokenizer2;
+  const preprocessRepeat2 = sandboxP._preprocessRepeat2;
+
+  function parse(code) {
+    const processed = preprocessRepeat2(code);
+    const p = new Parser2(new Tokenizer2(processed));
+    return p.parse();
+  }
+
+  console.log('\n=== Test 90: Parser — 1wire s := 1 produces initExpr {bin} ===');
+  {
+    const stmts = parse('1wire s := 1');
+    const s = stmts[0];
+    assert('stmt has decls', String(Array.isArray(s.decls)), 'true');
+    assert('decls[0].name is s', s.decls[0].name, 's');
+    assert('decls[0].type is 1wire', s.decls[0].type, '1wire');
+    assert('expr is null', String(s.expr), 'null');
+    assert('initExpr exists', String(s.initExpr !== undefined && s.initExpr !== null), 'true');
+    assert('initExpr.bin is 1', s.initExpr.bin, '1');
+  }
+
+  console.log('\n=== Test 91: Parser — 4wire s := 1101 produces initExpr {bin:1101} ===');
+  {
+    const stmts = parse('4wire s := 1101');
+    const s = stmts[0];
+    assert('4wire initExpr.bin is 1101', s.initExpr.bin, '1101');
+    assert('4wire expr is null', String(s.expr), 'null');
+  }
+
+  console.log('\n=== Test 92: Parser — 4wire s := ^FF produces initExpr {hex:FF} ===');
+  {
+    const stmts = parse('4wire s := ^FF');
+    const s = stmts[0];
+    assert('^FF initExpr.hex is FF', s.initExpr.hex, 'FF');
+  }
+
+  console.log('\n=== Test 93: Parser — 1wire s := \\5 produces initExpr {bin:101} ===');
+  {
+    // \5 is converted to BIN('101') by the tokenizer, so initExpr.bin = '101'
+    const stmts = parse('1wire s := \\5');
+    const s = stmts[0];
+    assert('\\5 initExpr.bin is 101', s.initExpr.bin, '101');
+  }
+
+  console.log('\n=== Test 94: Parser — 1wire s := !1 produces initExpr {bin:1, not:true} ===');
+  {
+    const stmts = parse('1wire s := !1');
+    const s = stmts[0];
+    assert('!1 initExpr.bin is 1', s.initExpr.bin, '1');
+    assert('!1 initExpr.not is true', String(s.initExpr.not), 'true');
+  }
+
+  console.log('\n=== Test 95: Parser — 1wire s := !0 produces initExpr {bin:0, not:true} ===');
+  {
+    const stmts = parse('1wire s := !0');
+    const s = stmts[0];
+    assert('!0 initExpr.bin is 0', s.initExpr.bin, '0');
+    assert('!0 initExpr.not is true', String(s.initExpr.not), 'true');
+  }
+
+  console.log('\n=== Test 96: Parser — := without not has no not field ===');
+  {
+    const stmts = parse('1wire s := 1');
+    const s = stmts[0];
+    assert('no not field when no !', String(!!s.initExpr.not), 'false');
+  }
+
+  console.log('\n=== Test 97: Parser — 1wire s = expr has NO initExpr (normal assignment) ===');
+  {
+    const stmts = parse('1wire s = 1');
+    const s = stmts[0];
+    assert('normal = has expr not null', String(s.expr !== null), 'true');
+    assert('normal = has no initExpr', String(s.initExpr === undefined || s.initExpr === null), 'true');
+  }
+
+  console.log('\n=== Test 98: Parser — 1wire s (no assignment) has no initExpr and no expr ===');
+  {
+    const stmts = parse('1wire s');
+    const s = stmts[0];
+    assert('bare decl has no initExpr', String(s.initExpr === undefined || s.initExpr === null), 'true');
+    assert('bare decl has no expr', String(s.expr), 'null');
+  }
+
+  console.log('\n=== Test 99: Parser — := with non-literal throws error ===');
+  {
+    assertThrows(
+      '1wire s := AND(x,y) throws',
+      () => parse('1wire s := AND(x,y)'),
+      'Expected a literal'
+    );
+  }
+
+  console.log('\n=== Test 100: Parser — multiple wires with := (8wire q := ^A5) ===');
+  {
+    const stmts = parse('8wire q := ^A5');
+    const s = stmts[0];
+    assert('8wire ^A5 type is 8wire', s.decls[0].type, '8wire');
+    assert('8wire ^A5 name is q', s.decls[0].name, 'q');
+    assert('8wire ^A5 initExpr.hex is A5', s.initExpr.hex, 'A5');
+  }
+
+  console.log('\n=== Test 101: Parser — multiple := statements in same script ===');
+  {
+    const stmts = parse(`1wire s := 1
+1wire r := 0
+1wire q := 1
+1wire nq := 0`);
+    assert('4 decl statements', String(stmts.length), '4');
+    assert('s initExpr.bin = 1',  stmts[0].initExpr.bin, '1');
+    assert('r initExpr.bin = 0',  stmts[1].initExpr.bin, '0');
+    assert('q initExpr.bin = 1',  stmts[2].initExpr.bin, '1');
+    assert('nq initExpr.bin = 0', stmts[3].initExpr.bin, '0');
+  }
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);

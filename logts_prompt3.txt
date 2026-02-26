@@ -1195,9 +1195,9 @@ show(RSHIFT(1, 1, 0))
 show(RSHIFT(1, 1, 1)) 
 #shows 11
 show(RSHIFT(10, 1, 0)) 
-#shows 001
+#shows 01
 show(RSHIFT(10, 1, 1))
-#shows 101
+#shows 11
 
 show(RSHIFT(1, 1))
 #shows 01
@@ -1239,3 +1239,18 @@ These are equivalent:
 5wire data2 = MUX1(clear, data, ANDe(data, !cmask))
 
 5wire data = MUX1(set, data2 , ORe(data, 1 < n))
+
+
+
+-----
+Instead of allowing recursion building up, can we add a counter of some sort and in MODE STRICT stop the propagation if the counter reaches a maximum value of let's say 101? Maybe we count the execution of the same statement or something like that?
+
+After everything stabilizes and the calls stop, we should reset the counters.
+
+Also this means that we cannot react to other triggers while this computation occurs. So maybe a lock is needed. If a new event normaly triggers a propagation of statement executions, if the lock is set, it would not start the propagation because the last event did not ended.
+
+Ask any questions regarding this if you need. 
+
+
+
+we should queue the event and.
