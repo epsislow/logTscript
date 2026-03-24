@@ -8054,6 +8054,19 @@ if (s.assignment) {
       }
       const pending = this.componentPendingProperties.get(component);
       
+      // For LCD components, clear chr/data if not in current block to prevent interference
+      // between blocks that use chr vs data independently
+      const comp = this.components.get(component);
+      if(comp && comp.type === 'lcd'){
+        const currentBlockPropNames = new Set(properties.map(p => p.property));
+        if(!currentBlockPropNames.has('chr') && pending.chr !== undefined){
+          delete pending.chr;
+        }
+        if(!currentBlockPropNames.has('data') && pending.data !== undefined){
+          delete pending.data;
+        }
+      }
+      
       // If reEvaluate is true, clear properties that are not in the current block
       // This ensures that only properties from the executing block are applied
       if(reEvaluate){

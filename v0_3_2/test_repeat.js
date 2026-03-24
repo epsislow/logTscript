@@ -1,0 +1,1059 @@
+/**
+ * Node.js tests for the repeat preprocessor.
+ * Run with: node test_repeat.js
+ *
+ * v0.3.2 — reads from modular core/ files instead of monolithic main.js.
+ */
+
+const fs = require('fs');
+const vm = require('vm');
+
+const tokenizerSrc    = fs.readFileSync('./core/tokenizer.js', 'utf-8');
+const preprocessorSrc = fs.readFileSync('./core/preprocessor.js', 'utf-8');
+const parserSrc       = fs.readFileSync('./core/parser.js', 'utf-8');
+
+const chunk = tokenizerSrc + '\n' + preprocessorSrc;
+
+const sandbox = { Error, parseInt, String, Array, Set, Map, RegExp, console };
+const codeToRun = chunk + `\nvar _Token = Token; var _Tokenizer = Tokenizer; var _preprocessRepeat = preprocessRepeat;`;
+vm.runInNewContext(codeToRun, sandbox);
+const preprocessRepeat = sandbox._preprocessRepeat;
+const Tokenizer = sandbox._Tokenizer;
+
+let passed = 0;
+let failed = 0;
+
+function assert(testName, actual, expected) {
+  const norm = s => s.split('\n').map(l => l.trimEnd()).join('\n').trim();
+  const a = norm(actual);
+  const e = norm(expected);
+  if (a === e) {
+    console.log(`  PASS: ${testName}`);
+    passed++;
+  } else {
+    console.log(`  FAIL: ${testName}`);
+    console.log(`    Expected:\n${e}`);
+    console.log(`    Got:\n${a}`);
+    failed++;
+  }
+}
+
+function assertThrows(testName, fn, expectedMsg) {
+  try {
+    fn();
+    console.log(`  FAIL: ${testName} (no error thrown)`);
+    failed++;
+  } catch (e) {
+    if (expectedMsg && !e.message.includes(expectedMsg)) {
+      console.log(`  FAIL: ${testName} (wrong error: "${e.message}")`);
+      failed++;
+    } else {
+      console.log(`  PASS: ${testName}`);
+      passed++;
+    }
+  }
+}
+
+function tokenize(source) {
+  const processed = preprocessRepeat(source);
+  const t = new Tokenizer(processed);
+  const tokens = [];
+  let tok;
+  while ((tok = t.get()).type !== 'EOF') {
+    tokens.push(tok);
+  }
+  return { processed, tokens };
+}
+/*
+console.log('\n=== Test 1: Simple repeat ===');
+{
+  const src = `repeat 1..5[
+4wire a?
+]`;
+  const result = preprocessRepeat(src);
+  assert('simple repeat 1..5 with bare ?',
+    result,
+    `4wire a1
+4wire a2
+4wire a3
+4wire a4
+4wire a5`
+  );
+}
+
+console.log('\n=== Test 2: Nested repeat with ? and ?1 ===');
+{
+  const src = `repeat 1..2[
+repeat 1..3[
+4wire b? = ^?1
+]
+]`;
+  const result = preprocessRepeat(src);
+  assert('nested repeat ? and ?1',
+    result,
+    `4wire b1 = ^1
+4wire b2 = ^2
+4wire b3 = ^3
+4wire b4 = ^1
+4wire b5 = ^2
+4wire b6 = ^3`
+  );
+}
+
+console.log('\n=== Test 3: Nested repeat only ?0 (dedup) ===');
+{
+  const src = `repeat 1..2[
+repeat 1..3[
+4wire c?0 = ^F
+]
+]`;
+  const result = preprocessRepeat(src);
+  assert('nested repeat only ?0 → dedup to 2 lines',
+    result,
+    `4wire c1 = ^F
+4wire c2 = ^F`
+  );
+}
+
+console.log('\n=== Test 4: Nested repeat ?0 and ?1 (all combos) ===');
+{
+  const src = `repeat 1..2[
+repeat 1..3[
+4wire c?0 = ^?1
+]
+]`;
+  const result = preprocessRepeat(src);
+  assert('nested repeat ?0 and ?1 → 6 lines',
+    result,
+    `4wire c1 = ^1
+4wire c1 = ^2
+4wire c1 = ^3
+4wire c2 = ^1
+4wire c2 = ^2
+4wire c2 = ^3`
+  );
+}
+
+console.log('\n=== Test 5: Max 256 iterations (OK) ===');
+{
+  const src = `repeat 1..16[
+repeat 1..16[
+4wire x?0?1
+]
+]`;
+  try {
+    const result = preprocessRepeat(src);
+    console.log(`  PASS: 16x16 = 256 does not throw`);
+    passed++;
+  } catch (e) {
+    console.log(`  FAIL: 16x16 should not throw, got: ${e.message}`);
+    failed++;
+  }
+}
+
+*/
+
+console.log('\n=== Test 6: Max 256 iterations (EXCEEDED) ===');
+{
+  assertThrows('16x17 = 272 throws error',
+    () => preprocessRepeat(`repeat 1..16[
+repeat 1..17[
+4wire x?0?1
+]
+]`),
+    'maximum of 256'
+  );
+}
+
+console.log('\n=== Test 7: Separate repeat groups (independent limits) ===');
+{
+  const src = `repeat 1..16[
+repeat 1..16[
+4wire x?0?1
+]
+]
+
+repeat 1..2[
+4wire y?
+]`;
+  try {
+    const result = preprocessRepeat(src);
+    const lines = result.trim().split('\n').filter(l => l.trim() !== '');
+    assert('separate groups: total lines', String(lines.length), '258');
+    console.log(`  PASS: separate repeat groups, independent limits`);
+    passed++;
+  } catch (e) {
+    console.log(`  FAIL: separate groups should not throw, got: ${e.message}`);
+    failed++;
+  }
+}
+
+console.log('\n=== Test 8: No repeat – passthrough ===');
+{
+  const src = `4wire a = ^FF
+4wire b = ^00`;
+  const result = preprocessRepeat(src);
+  assert('no repeat passthrough', result, src);
+}
+
+console.log('\n=== Test 9: Repeat inside comment is ignored ===');
+{
+  const src = `# repeat 1..5[
+4wire a = ^FF`;
+  const result = preprocessRepeat(src);
+  assert('repeat in comment ignored', result, src);
+}
+
+console.log('\n=== Test 10: Tokenizer accepts preprocessed output ===');
+{
+  const src = `repeat 1..3[
+4wire w?
+]`;
+  const { processed, tokens } = tokenize(src);
+  const typeTokens = tokens.filter(t => t.type === 'TYPE');
+  assert('tokenizer: 3 TYPE tokens from repeat', String(typeTokens.length), '3');
+}
+
+/*
+console.log('\n=== Test 11: ?0 in single repeat equals range values ===');
+{
+  const src = `repeat 3..5[
+4wire a?0
+]`;
+  const result = preprocessRepeat(src);
+  assert('single repeat ?0 takes range values',
+    result,
+    `4wire a3
+4wire a4
+4wire a5`
+  );
+}
+
+console.log('\n=== Test 12: bare ? in single repeat = sequential from 1 ===');
+{
+  const src = `repeat 3..5[
+4wire a?
+]`;
+  const result = preprocessRepeat(src);
+  assert('single repeat bare ? sequential from 1',
+    result,
+    `4wire a1
+4wire a2
+4wire a3`
+  );
+}
+*/
+
+console.log('\n=== Test 13: Nested 3 levels ===');
+{
+  const src = `repeat 1..2[
+repeat 1..2[
+repeat 1..2[
+4wire x?0?1?2
+]
+]
+]`;
+  const result = preprocessRepeat(src);
+  const lines = result.trim().split('\n').filter(l => l.trim() !== '');
+  assert('3-level nesting: 8 lines', String(lines.length), '8');
+  assert('3-level first line', lines[0].trim(), '4wire x111');
+  assert('3-level last line', lines[lines.length - 1].trim(), '4wire x222');
+}
+
+console.log('\n=== Test 14: Unmatched bracket error ===');
+{
+  assertThrows('unmatched bracket',
+    () => preprocessRepeat(`repeat 1..3[
+4wire a?
+`),
+    'unmatched'
+  );
+}
+
+console.log('\n=== Test 15: Decimal literal \\N tokenized as BIN ===');
+{
+  const { tokens } = tokenize('4wire c = \\15');
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  assert('\\15 produces BIN token', String(binTokens.length >= 1), 'true');
+  assert('\\15 value is 1111', binTokens[binTokens.length - 1].value, '1111');
+}
+
+console.log('\n=== Test 16: Decimal literal \\0 ===');
+{
+  const { tokens } = tokenize('4wire c = \\0');
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  assert('\\0 produces BIN with value 0', binTokens[binTokens.length - 1].value, '0');
+}
+
+console.log('\n=== Test 17: Decimal literal \\255 ===');
+{
+  const { tokens } = tokenize('4wire c = \\255');
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  assert('\\255 value is 11111111', binTokens[binTokens.length - 1].value, '11111111');
+}
+
+/*
+console.log('\n=== Test 18: Decimal literal with repeat ===');
+{
+  const src = `repeat 1..3[
+4wire c? = \\?0
+]`;
+  const { tokens } = tokenize(src);
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  const processed = preprocessRepeat(src);
+  assert('repeat + decimal literal expansion',
+    processed,
+    `4wire c1 = \\1
+4wire c2 = \\2
+4wire c3 = \\3`
+  );
+}*/
+
+console.log('\n=== Test 19: Decimal \\2 produces binary 10 (padding is interpreter-level) ===');
+{
+  const { tokens } = tokenize('8wire q2 = \\2');
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  assert('\\2 tokenized as BIN 10', binTokens[binTokens.length - 1].value, '10');
+}
+
+console.log('\n=== Test 20: HEX ^F produces 4-bit binary ===');
+{
+  const { tokens } = tokenize('8wire q3 = ^F');
+  const hexTokens = tokens.filter(t => t.type === 'HEX');
+  assert('^F tokenized as HEX F', hexTokens[0].value, 'F');
+}
+
+console.log('\n=== Test 21: Large decimal \\1024 ===');
+{
+  const { tokens } = tokenize('16wire q = \\1024');
+  const binTokens = tokens.filter(t => t.type === 'BIN');
+  assert('\\1024 value is 10000000000', binTokens[binTokens.length - 1].value, '10000000000');
+}
+
+// ================================================================
+// Logic gate tests (pure JS, no interpreter needed)
+// ================================================================
+
+function gateReduce(name, a, bv) {
+  const len = Math.max(a.length, bv !== undefined ? bv.length : 0);
+  const ap = a.padStart(len, '0');
+  const bp = bv !== undefined ? bv.padStart(len, '0') : '';
+  if (name === 'NOT') {
+    const notBits = a.split('').map(c => c === '1' ? '0' : '1');
+    return notBits.includes('1') ? '1' : '0';
+  }
+  const resultBits = [];
+  for (let i = 0; i < len; i++) {
+    const ai = ap[i] === '1', bi = bp[i] === '1';
+    let r;
+    switch (name) {
+      case 'AND':  r = ai && bi; break;
+      case 'OR':   r = ai || bi; break;
+      case 'XOR':  r = ai !== bi; break;
+      case 'NAND': r = !(ai && bi); break;
+      case 'NOR':  r = !(ai || bi); break;
+    }
+    resultBits.push(r ? '1' : '0');
+  }
+  return resultBits.includes('1') ? '1' : '0';
+}
+
+function gateExpand(name, a, bv) {
+  if (name === 'NOTe') {
+    return a.split('').map(c => c === '1' ? '0' : '1').join('');
+  }
+  const len = Math.max(a.length, bv.length);
+  const ap = a.padStart(len, '0');
+  const bp = bv.padStart(len, '0');
+  let v = '';
+  for (let i = 0; i < len; i++) {
+    const ai = ap[i] === '1', bi = bp[i] === '1';
+    let r;
+    switch (name) {
+      case 'ANDe':  r = ai && bi; break;
+      case 'ORe':   r = ai || bi; break;
+      case 'XORe':  r = ai !== bi; break;
+      case 'NANDe': r = !(ai && bi); break;
+      case 'NORe':  r = !(ai || bi); break;
+    }
+    v += r ? '1' : '0';
+  }
+  return v;
+}
+
+console.log('\n=== Test 22: AND reduce - bitwise 11011 AND 11100 = 11000 → OR-reduce = 1 ===');
+assert('AND(11011, 11100)', gateReduce('AND', '11011', '11100'), '1');
+
+console.log('\n=== Test 23: AND reduce - no overlap → 0 ===');
+assert('AND(1010, 0101)', gateReduce('AND', '1010', '0101'), '0');
+
+console.log('\n=== Test 24: OR reduce ===');
+assert('OR(0000, 0000)', gateReduce('OR', '0000', '0000'), '0');
+assert('OR(0000, 0001)', gateReduce('OR', '0000', '0001'), '1');
+
+console.log('\n=== Test 25: NOR reduce - NOR(1111, 0011) = 0000 → reduce = 0 ===');
+assert('NOR(1111, 0011)', gateReduce('NOR', '1111', '0011'), '0');
+
+console.log('\n=== Test 26: NOR reduce - NOR(0000, 0000) = 1111 → reduce = 1 ===');
+assert('NOR(0000, 0000)', gateReduce('NOR', '0000', '0000'), '1');
+
+console.log('\n=== Test 27: NOT reduce - NOT(1010) → 0101, reduce=1 ===');
+assert('NOT(1010)', gateReduce('NOT', '1010'), '1');
+
+console.log('\n=== Test 28: NOT reduce - NOT(1111) → 0000, reduce=0 ===');
+assert('NOT(1111)', gateReduce('NOT', '1111'), '0');
+
+console.log('\n=== Test 29: XOR reduce ===');
+assert('XOR(1010, 1010)', gateReduce('XOR', '1010', '1010'), '0');
+assert('XOR(1010, 0101)', gateReduce('XOR', '1010', '0101'), '1');
+
+console.log('\n=== Test 30: NAND reduce ===');
+assert('NAND(1111, 1111) → 0000 → 0', gateReduce('NAND', '1111', '1111'), '0');
+assert('NAND(1010, 0101) → 1111 → 1', gateReduce('NAND', '1010', '0101'), '1');
+
+console.log('\n=== Test 31: ANDe - bitwise AND returns N bits ===');
+assert('ANDe(011, 101)', gateExpand('ANDe', '011', '101'), '001');
+assert('ANDe(1100, 1011)', gateExpand('ANDe', '1100', '1011'), '1000');
+
+console.log('\n=== Test 32: ORe - bitwise OR returns N bits ===');
+assert('ORe(1100, 1011)', gateExpand('ORe', '1100', '1011'), '1111');
+assert('ORe(0000, 0000)', gateExpand('ORe', '0000', '0000'), '0000');
+
+console.log('\n=== Test 33: NOTe - bitwise NOT returns N bits ===');
+assert('NOTe(1010)', gateExpand('NOTe', '1010'), '0101');
+assert('NOTe(0000)', gateExpand('NOTe', '0000'), '1111');
+
+console.log('\n=== Test 34: XORe ===');
+assert('XORe(1010, 1100)', gateExpand('XORe', '1010', '1100'), '0110');
+
+console.log('\n=== Test 35: NANDe ===');
+assert('NANDe(1111, 1111)', gateExpand('NANDe', '1111', '1111'), '0000');
+assert('NANDe(1010, 0101)', gateExpand('NANDe', '1010', '0101'), '1111');
+
+console.log('\n=== Test 36: NORe ===');
+assert('NORe(0000, 0000)', gateExpand('NORe', '0000', '0000'), '1111');
+assert('NORe(1010, 0101)', gateExpand('NORe', '1010', '0101'), '0000');
+
+console.log('\n=== Test 37: Gate on different widths (padStart shorter) ===');
+assert('ANDe(11, 1100) pads 11→0011', gateExpand('ANDe', '11', '1100'), '0000');
+assert('ORe(11, 1100)', gateExpand('ORe', '11', '1100'), '1111');
+
+console.log('\n=== Test 38: NOTe tokenized as ID ===');
+{
+  const { tokens } = tokenize('4wire x = NOTe(1010)');
+  const idTokens = tokens.filter(t => t.type === 'ID' && t.value === 'NOTe');
+  assert('NOTe recognized as ID token', String(idTokens.length), '1');
+}
+
+console.log('\n=== Test 39: ANDe tokenized as ID ===');
+{
+  const { tokens } = tokenize('4wire x = ANDe(1010, 0101)');
+  const idTokens = tokens.filter(t => t.type === 'ID' && t.value === 'ANDe');
+  assert('ANDe recognized as ID token', String(idTokens.length), '1');
+}
+
+// ================================================================
+// LSHIFT / RSHIFT tests (pure JS logic replica)
+// ================================================================
+
+function lshift(data, n, fill = '0') {
+  return data + fill.repeat(n);
+}
+
+function rshift(data, n, fill = '0') {
+  const len = data.length;
+  if (n >= len) return fill.repeat(len);
+  return fill.repeat(n) + data.slice(0, len - n);
+}
+
+console.log('\n=== Test 40: LSHIFT basic ===');
+assert('LSHIFT(1, 1, 0)', lshift('1', 1, '0'), '10');
+assert('LSHIFT(1, 1, 1)', lshift('1', 1, '1'), '11');
+assert('LSHIFT(10, 1, 0)', lshift('10', 1, '0'), '100');
+assert('LSHIFT(10, 1, 1)', lshift('10', 1, '1'), '101');
+
+console.log('\n=== Test 41: LSHIFT default fill=0 ===');
+assert('LSHIFT(1, 1) default fill', lshift('1', 1), '10');
+assert('LSHIFT(10, 1) default fill', lshift('10', 1), '100');
+
+console.log('\n=== Test 42: LSHIFT n=0 ===');
+assert('LSHIFT(101, 0, 0)', lshift('101', 0, '0'), '101');
+
+console.log('\n=== Test 43: LSHIFT n > data.length ===');
+assert('LSHIFT(1, 3, 0)', lshift('1', 3, '0'), '1000');
+assert('LSHIFT(1, 3, 1)', lshift('1', 3, '1'), '1111');
+
+console.log('\n=== Test 44: RSHIFT basic ===');
+assert('RSHIFT(10, 1, 0)', rshift('10', 1, '0'), '01');
+assert('RSHIFT(10, 1, 1)', rshift('10', 1, '1'), '11');
+assert('RSHIFT(1, 1, 0)', rshift('1', 1, '0'), '0');
+assert('RSHIFT(1, 1, 1)', rshift('1', 1, '1'), '1');
+
+console.log('\n=== Test 45: RSHIFT default fill=0 ===');
+assert('RSHIFT(10, 1) default fill', rshift('10', 1), '01');
+assert('RSHIFT(1010, 2) default fill', rshift('1010', 2), '0010');
+
+console.log('\n=== Test 46: RSHIFT n=0 ===');
+assert('RSHIFT(101, 0, 0)', rshift('101', 0, '0'), '101');
+
+console.log('\n=== Test 47: RSHIFT n >= data.length ===');
+assert('RSHIFT(10, 2, 0)', rshift('10', 2, '0'), '00');
+assert('RSHIFT(10, 5, 1)', rshift('10', 5, '1'), '11');
+
+console.log('\n=== Test 48: RSHIFT keeps same width ===');
+assert('RSHIFT(1010, 1, 0) = 0101', rshift('1010', 1, '0'), '0101');
+assert('RSHIFT(1010, 1, 1) = 1101', rshift('1010', 1, '1'), '1101');
+
+console.log('\n=== Test 49: Tokenizer - < emits SYM when not LOAD ===');
+{
+  const { tokens } = tokenize('4wire x = 10 < 1');
+  const symLt = tokens.filter(t => t.type === 'SYM' && t.value === '<');
+  assert('< is SYM token in shift context', String(symLt.length), '1');
+}
+
+console.log('\n=== Test 49b: Tokenizer - < after variable name is SYM (not LOAD) ===');
+{
+  const { tokens } = tokenize('4wire result = test < sel');
+  const symLt = tokens.filter(t => t.type === 'SYM' && t.value === '<');
+  const loadTok = tokens.filter(t => t.type === 'LOAD');
+  assert('< after variable is SYM not LOAD', String(symLt.length), '1');
+  assert('no LOAD token when < is mid-line', String(loadTok.length), '0');
+}
+
+console.log('\n=== Test 50: Tokenizer - <path remains LOAD ===');
+{
+  const { tokens } = tokenize('<myfile');
+  const loadTok = tokens.filter(t => t.type === 'LOAD');
+  assert('<myfile produces LOAD token', String(loadTok.length), '1');
+  assert('LOAD token value is myfile', loadTok[0].value, 'myfile');
+}
+
+console.log('\n=== Test 51: Tokenizer - > emits SYM ===');
+{
+  const { tokens } = tokenize('4wire x = 10 > 1');
+  const symGt = tokens.filter(t => t.type === 'SYM' && t.value === '>');
+  assert('> is SYM token', String(symGt.length), '1');
+}
+
+console.log('\n=== Test 52: LSHIFT w1 fill via operator - preprocessed text ===');
+{
+  const src = '4wire x = 10 < 1 w1';
+  const result = preprocessRepeat(src);
+  assert('< w1 operator passes through preprocessor', result, src);
+}
+
+// ===========================
+// Dynamic Bit Range tests
+// ===========================
+
+console.log('\n=== Test 53: Tokenizer - ( after . emits SYM ( ===');
+{
+  const { tokens } = tokenize('a.(start)');
+  const types = tokens.map(t => t.type + ':' + t.value).join(' ');
+  const hasDot = tokens.some(t => t.type === 'SYM' && t.value === '.');
+  const hasLParen = tokens.some(t => t.type === 'SYM' && t.value === '(');
+  const hasRParen = tokens.some(t => t.type === 'SYM' && t.value === ')');
+  assert('a.(start) has SYM dot', String(hasDot), 'true');
+  assert('a.(start) has SYM (', String(hasLParen), 'true');
+  assert('a.(start) has SYM )', String(hasRParen), 'true');
+}
+
+console.log('\n=== Test 54: Tokenizer - a.(start)/(l) tokenizes correctly ===');
+{
+  const { tokens } = tokenize('a.(start)/(l)');
+  const slash = tokens.filter(t => t.type === 'SYM' && t.value === '/');
+  assert('a.(start)/(l) has / token', String(slash.length >= 1), 'true');
+}
+
+console.log('\n=== Test 55: Tokenizer - a.(start)-(end) tokenizes correctly ===');
+{
+  const { tokens } = tokenize('a.(s)-(e)');
+  const minus = tokens.filter(t => t.type === 'SYM' && t.value === '-');
+  assert('a.(s)-(e) has - token', String(minus.length >= 1), 'true');
+}
+
+console.log('\n=== Test 56: Tokenizer - preprocessor passes through dynamic bit range syntax ===');
+{
+  const src = '4bit sub = data.(start)/(l)';
+  const result = preprocessRepeat(src);
+  assert('dynamic bit range passes through preprocessor', result, src);
+}
+
+console.log('\n=== Test 57: resolveBitRange - static range {start:1, end:4} ===');
+{
+  function resolveBitRange(bitRange) {
+    if (!bitRange.isDynamic) {
+      const end = (bitRange.end !== undefined && bitRange.end !== null)
+        ? bitRange.end : bitRange.start;
+      return { start: bitRange.start, end };
+    }
+    return null;
+  }
+  const r = resolveBitRange({ start: 1, end: 4 });
+  assert('static range start=1', String(r.start), '1');
+  assert('static range end=4', String(r.end), '4');
+}
+
+console.log('\n=== Test 58: resolveBitRange - static single bit {start:3, end:3} ===');
+{
+  function resolveBitRange(bitRange) {
+    if (!bitRange.isDynamic) {
+      const end = (bitRange.end !== undefined && bitRange.end !== null)
+        ? bitRange.end : bitRange.start;
+      return { start: bitRange.start, end };
+    }
+    return null;
+  }
+  const r = resolveBitRange({ start: 3, end: 3 });
+  assert('single bit start=3', String(r.start), '3');
+  assert('single bit end=3', String(r.end), '3');
+}
+
+console.log('\n=== Test 59: resolveBitRange - static range missing end uses start ===');
+{
+  function resolveBitRange(bitRange) {
+    if (!bitRange.isDynamic) {
+      const end = (bitRange.end !== undefined && bitRange.end !== null)
+        ? bitRange.end : bitRange.start;
+      return { start: bitRange.start, end };
+    }
+    return null;
+  }
+  const r = resolveBitRange({ start: 2 });
+  assert('missing end: end==start', String(r.end), '2');
+}
+
+console.log('\n=== Test 60: resolveBitRange - dynamic range with evalExpr simulation ===');
+{
+  function evalBinStr(s) { return parseInt(s, 2); }
+  function mockResolve(bitRange, startVal, lenVal) {
+    let start = bitRange.start !== undefined ? bitRange.start : null;
+    let end   = bitRange.end   !== undefined ? bitRange.end   : null;
+    if (bitRange.startExpr) start = evalBinStr(startVal);
+    if (bitRange.endExpr) end = evalBinStr(lenVal);
+    else if (bitRange.lenExpr) end = start + evalBinStr(lenVal) - 1;
+    else if (end === null) end = start;
+    return { start, end };
+  }
+
+  const r1 = mockResolve(
+    { startExpr: true, lenExpr: true, isDynamic: true, isLength: true },
+    '1',
+    '100'
+  );
+  assert('dynamic start=1', String(r1.start), '1');
+  assert('dynamic end=4 (1+4-1)', String(r1.end), '4');
+
+  const r2 = mockResolve(
+    { startExpr: true, endExpr: true, isDynamic: true },
+    '1',
+    '101'
+  );
+  assert('dynamic range start=1', String(r2.start), '1');
+  assert('dynamic range end=5', String(r2.end), '5');
+
+  const r3 = mockResolve(
+    { start: 1, lenExpr: true, isDynamic: true, isLength: true },
+    null,
+    '100'
+  );
+  assert('mixed static start=1', String(r3.start), '1');
+  assert('mixed dynamic len => end=4', String(r3.end), '4');
+
+  function mockResolveDynStartStaticLen(bitRange, startVal) {
+    let start = bitRange.start !== undefined ? bitRange.start : null;
+    let end   = bitRange.end   !== undefined ? bitRange.end   : null;
+    if (bitRange.startExpr) start = evalBinStr(startVal);
+    if (bitRange.endExpr) { /* not set */ }
+    else if (bitRange.lenExpr) { /* not set */ }
+    else if (bitRange.len !== undefined && bitRange.len !== null) {
+      end = start + bitRange.len - 1;
+    } else if (end === null) { end = start; }
+    return { start, end };
+  }
+  const r4 = mockResolveDynStartStaticLen(
+    { startExpr: true, len: 4, isDynamic: true, isLength: true },
+    '10'
+  );
+  assert('dynamic start=2, static len=4: start=2', String(r4.start), '2');
+  assert('dynamic start=2, static len=4: end=5 (2+4-1)', String(r4.end), '5');
+}
+
+// ================================================================
+// NEW Bit Operation Tests
+// ================================================================
+
+function gate(name, a, bv) {
+  const applyOp = (ai, bi) => {
+    switch (name) {
+      case 'AND':  return ai && bi;
+      case 'OR':   return ai || bi;
+      case 'XOR':  return ai !== bi;
+      case 'NXOR': return ai === bi;
+      case 'NAND': return !(ai && bi);
+      case 'NOR':  return !(ai || bi);
+      case 'EQ':   return ai === bi;
+    }
+  };
+
+  if (name === 'NOT') {
+    return a.split('').map(c => c === '1' ? '0' : '1').join('');
+  }
+
+  if (bv === undefined) {
+    const bits = a.split('');
+    let acc = bits[0] === '1';
+    for (let i = 1; i < bits.length; i++) {
+      acc = applyOp(acc, bits[i] === '1');
+    }
+    return acc ? '1' : '0';
+  }
+
+  const len = Math.max(a.length, bv.length);
+  const ap = a.padStart(len, '0');
+  const bp = bv.padStart(len, '0');
+  const resultBits = [];
+  for (let i = 0; i < len; i++) {
+    resultBits.push(applyOp(ap[i] === '1', bp[i] === '1') ? '1' : '0');
+  }
+  return resultBits.join('');
+}
+
+// --- NOT ---
+console.log('\n=== Test 61: NOT returns same number of bits (N bits) ===');
+assert('NOT(1) = 0',    gate('NOT', '1'),    '0');
+assert('NOT(0) = 1',    gate('NOT', '0'),    '1');
+assert('NOT(111) = 000', gate('NOT', '111'), '000');
+assert('NOT(101) = 010', gate('NOT', '101'), '010');
+assert('NOT(0000) = 1111', gate('NOT', '0000'), '1111');
+assert('NOT(1010) = 0101', gate('NOT', '1010'), '0101');
+
+// --- AND ---
+console.log('\n=== Test 62: AND 2-arg: 1-bit operands → 1 bit ===');
+assert('AND(1,1) = 1', gate('AND', '1', '1'), '1');
+assert('AND(0,0) = 0', gate('AND', '0', '0'), '0');
+assert('AND(1,0) = 0', gate('AND', '1', '0'), '0');
+
+console.log('\n=== Test 63: AND 1-arg fold → 1 bit ===');
+assert('AND(110) = 0',  gate('AND', '110'),  '0');
+assert('AND(111) = 1',  gate('AND', '111'),  '1');
+assert('AND(1111) = 1', gate('AND', '1111'), '1');
+assert('AND(1110) = 0', gate('AND', '1110'), '0');
+
+console.log('\n=== Test 64: AND 2-arg bitwise → N bits ===');
+assert('AND(111,101) = 101',               gate('AND', '111', '101'),        '101');
+assert('AND(00100101,01001111) = 00000101', gate('AND', '00100101','01001111'),'00000101');
+assert('AND(11,10) = 10',                  gate('AND', '11', '10'),           '10');
+
+// --- OR ---
+console.log('\n=== Test 65: OR 2-arg: 1-bit operands → 1 bit ===');
+assert('OR(1,1) = 1', gate('OR', '1', '1'), '1');
+assert('OR(0,0) = 0', gate('OR', '0', '0'), '0');
+assert('OR(1,0) = 1', gate('OR', '1', '0'), '1');
+
+console.log('\n=== Test 66: OR 1-arg fold → 1 bit ===');
+assert('OR(110) = 1',  gate('OR', '110'),  '1');
+assert('OR(111) = 1',  gate('OR', '111'),  '1');
+assert('OR(000) = 0',  gate('OR', '000'),  '0');
+assert('OR(001) = 1',  gate('OR', '001'),  '1');
+
+console.log('\n=== Test 67: OR 2-arg bitwise → N bits ===');
+assert('OR(111,101) = 111',               gate('OR', '111', '101'),         '111');
+assert('OR(00100101,01001111) = 01101111', gate('OR', '00100101','01001111'), '01101111');
+assert('OR(11,10) = 11',                  gate('OR', '11', '10'),            '11');
+
+// --- NOR ---
+console.log('\n=== Test 68: NOR 2-arg: 1-bit operands → 1 bit ===');
+assert('NOR(1,1) = 0', gate('NOR', '1', '1'), '0');
+assert('NOR(0,0) = 1', gate('NOR', '0', '0'), '1');
+assert('NOR(1,0) = 0', gate('NOR', '1', '0'), '0');
+
+console.log('\n=== Test 69: NOR 1-arg fold → 1 bit ===');
+assert('NOR(110) = 1',  gate('NOR', '110'), '1');
+assert('NOR(111) = 0',  gate('NOR', '111'), '0');
+assert('NOR(000) = 0',  gate('NOR', '000'), '0');
+assert('NOR(001) = 0',  gate('NOR', '001'), '0');
+
+console.log('\n=== Test 70: NOR 2-arg bitwise → N bits ===');
+assert('NOR(111,101) = 000',               gate('NOR', '111', '101'),         '000');
+assert('NOR(00100101,01001111) = 10010000', gate('NOR', '00100101','01001111'), '10010000');
+assert('NOR(11,10) = 00',                  gate('NOR', '11', '10'),            '00');
+
+// --- XOR ---
+console.log('\n=== Test 71: XOR 2-arg: 1-bit operands → 1 bit ===');
+assert('XOR(1,1) = 0', gate('XOR', '1', '1'), '0');
+assert('XOR(0,0) = 0', gate('XOR', '0', '0'), '0');
+assert('XOR(1,0) = 1', gate('XOR', '1', '0'), '1');
+
+console.log('\n=== Test 72: XOR 1-arg fold → 1 bit ===');
+assert('XOR(110) = 0',  gate('XOR', '110'), '0');
+assert('XOR(111) = 1',  gate('XOR', '111'), '1');
+assert('XOR(1010) = 0', gate('XOR', '1010'), '0');
+assert('XOR(1011) = 1', gate('XOR', '1011'), '1');
+
+console.log('\n=== Test 73: XOR 2-arg bitwise → N bits ===');
+assert('XOR(111,101) = 010',               gate('XOR', '111', '101'),         '010');
+assert('XOR(00100101,01001111) = 01101010', gate('XOR', '00100101','01001111'), '01101010');
+assert('XOR(11,10) = 01',                  gate('XOR', '11', '10'),            '01');
+
+// --- NAND ---
+console.log('\n=== Test 74: NAND 2-arg: 1-bit operands → 1 bit ===');
+assert('NAND(1,1) = 0', gate('NAND', '1', '1'), '0');
+assert('NAND(0,0) = 1', gate('NAND', '0', '0'), '1');
+assert('NAND(1,0) = 1', gate('NAND', '1', '0'), '1');
+
+console.log('\n=== Test 75: NAND 1-arg fold → 1 bit ===');
+assert('NAND(110) = 1',  gate('NAND', '110'), '1');
+assert('NAND(111) = 1',  gate('NAND', '111'), '1');
+assert('NAND(1111) = 0', gate('NAND', '1111'), '0');
+assert('NAND(000) = 1',  gate('NAND', '000'), '1');
+
+console.log('\n=== Test 76: NAND 2-arg bitwise → N bits ===');
+assert('NAND(111,101) = 010',               gate('NAND', '111', '101'),         '010');
+assert('NAND(00100101,01001111) = 11111010', gate('NAND', '00100101','01001111'), '11111010');
+assert('NAND(11,10) = 01',                  gate('NAND', '11', '10'),            '01');
+
+// --- NXOR (XNOR) ---
+console.log('\n=== Test 77: NXOR 2-arg: 1-bit operands → 1 bit ===');
+assert('NXOR(1,1) = 1', gate('NXOR', '1', '1'), '1');
+assert('NXOR(0,0) = 1', gate('NXOR', '0', '0'), '1');
+assert('NXOR(1,0) = 0', gate('NXOR', '1', '0'), '0');
+assert('NXOR(0,1) = 0', gate('NXOR', '0', '1'), '0');
+
+console.log('\n=== Test 78: NXOR 1-arg fold → 1 bit ===');
+assert('NXOR(110) = 0',  gate('NXOR', '110'), '0');
+assert('NXOR(111) = 1',  gate('NXOR', '111'), '1');
+assert('NXOR(1010) = 1', gate('NXOR', '1010'), '1');
+assert('NXOR(11) = 1',   gate('NXOR', '11'),   '1');
+
+console.log('\n=== Test 79: NXOR 2-arg bitwise → N bits ===');
+assert('NXOR(111,101) = 101',  gate('NXOR', '111', '101'), '101');
+assert('NXOR(11,10) = 10',     gate('NXOR', '11',  '10'),  '10');
+assert('NXOR(1010,0101) = 0000', gate('NXOR', '1010', '0101'), '0000');
+assert('NXOR(1010,1010) = 1111', gate('NXOR', '1010', '1010'), '1111');
+
+// --- Edge cases ---
+console.log('\n=== Test 80: Single-bit input for all operators ===');
+assert('NOT single 1', gate('NOT', '1'), '0');
+assert('NOT single 0', gate('NOT', '0'), '1');
+assert('AND fold single bit 1', gate('AND', '1'), '1');
+assert('AND fold single bit 0', gate('AND', '0'), '0');
+assert('OR  fold single bit 1', gate('OR',  '1'), '1');
+assert('NOR fold single bit 1', gate('NOR', '1'), '1');
+assert('NOR fold single bit 0', gate('NOR', '0'), '0');
+assert('XOR fold single bit 1', gate('XOR', '1'), '1');
+assert('NAND fold single bit 0', gate('NAND', '0'), '0');
+assert('NXOR fold single bit 1', gate('NXOR', '1'), '1');
+
+console.log('\n=== Test 81: Different-width args get padded ===');
+assert('AND(11,1100) pads 11→0011 → 0000', gate('AND',  '11', '1100'), '0000');
+assert('OR(11,1100)  pads 11→0011 → 1111', gate('OR',   '11', '1100'), '1111');
+assert('XOR(11,1100) pads → 1111',          gate('XOR',  '11', '1100'), '1111');
+assert('NOR(11,1100) → bitwise NOR(0011,1100)=0000', gate('NOR', '11', '1100'), '0000');
+
+// ================================================================
+// := Wire Initialization — Tokenizer tests
+// ================================================================
+
+console.log('\n=== Test 82: := produces a single SYM token ===');
+{
+  const { tokens } = tokenize('1wire s := 1');
+  const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
+  assert(':= is a single SYM(:=) token', String(colonEq.length), '1');
+  const colonOnly = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+  assert('no stray SYM(:) when := present', String(colonOnly.length), '0');
+}
+
+console.log('\n=== Test 83: standalone : still produces SYM(:) ===');
+{
+  const { tokens } = tokenize('on: 1');
+  const colonTok = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+  assert('standalone : gives SYM(:)', String(colonTok.length), '1');
+  const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
+  assert('no := when only : present', String(colonEq.length), '0');
+}
+
+console.log('\n=== Test 84: :: still produces two SYM(:) tokens ===');
+{
+  const { tokens } = tokenize('comp [switch] .s ::');
+  const colonToks = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+  assert(':: gives two SYM(:)', String(colonToks.length), '2');
+  const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
+  assert(':: gives no SYM(:=)', String(colonEq.length), '0');
+}
+
+console.log('\n=== Test 85: full tokenization of "1wire s := 1" ===');
+{
+  const { tokens } = tokenize('1wire s := 1');
+  const types = tokens.map(t => t.type);
+  assert('TYPE token present',  String(types.includes('TYPE')),  'true');
+  assert('ID token present',    String(types.includes('ID')),    'true');
+  assert(':= SYM present',      String(tokens.some(t => t.type === 'SYM' && t.value === ':=')), 'true');
+  assert('BIN token present',   String(types.includes('BIN')),   'true');
+}
+
+console.log('\n=== Test 86: := with hex literal "4wire s := ^FF" ===');
+{
+  const { tokens } = tokenize('4wire s := ^FF');
+  const hexTok = tokens.filter(t => t.type === 'HEX');
+  assert('^FF hex token present after :=', String(hexTok.length), '1');
+  assert('^FF value is FF', hexTok[0].value, 'FF');
+}
+
+console.log('\n=== Test 87: := with decimal \\N (tokenized as BIN) ===');
+{
+  const { tokens } = tokenize('4wire s := \\5');
+  const binTok = tokens.filter(t => t.type === 'BIN');
+  assert('\\5 after := gives BIN', String(binTok.length >= 1), 'true');
+  assert('\\5 BIN value is 101', binTok[binTok.length - 1].value, '101');
+}
+
+console.log('\n=== Test 88: := with NOT prefix "1wire s := !1" ===');
+{
+  const { tokens } = tokenize('1wire s := !1');
+  const notTok = tokens.filter(t => t.type === 'SYM' && t.value === '!');
+  assert('! token present after :=', String(notTok.length), '1');
+  const binTok = tokens.filter(t => t.type === 'BIN');
+  assert('BIN follows !', String(binTok.length >= 1), 'true');
+}
+
+console.log('\n=== Test 89: := does not interfere with .var:get syntax ===');
+{
+  const { tokens } = tokenize('1wire s = .sw:get');
+  const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
+  assert(':= not produced for :get syntax', String(colonEq.length), '0');
+  const colonTok = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+  assert(': produced for :get syntax', String(colonTok.length), '1');
+}
+
+// ================================================================
+// := Wire Initialization — Parser tests
+// ================================================================
+
+{
+  const parserChunk = tokenizerSrc + '\n' + preprocessorSrc + '\n' + parserSrc;
+  const sandboxP = { Error, parseInt, String, Array, Set, Map, RegExp, console, Object };
+  const parserCode = parserChunk + `\nvar _Parser2 = Parser; var _Tokenizer2 = Tokenizer; var _preprocessRepeat2 = preprocessRepeat;`;
+  vm.runInNewContext(parserCode, sandboxP);
+  const Parser2 = sandboxP._Parser2;
+  const Tokenizer2 = sandboxP._Tokenizer2;
+  const preprocessRepeat2 = sandboxP._preprocessRepeat2;
+
+  function parse(code) {
+    const processed = preprocessRepeat2(code);
+    const p = new Parser2(new Tokenizer2(processed));
+    return p.parse();
+  }
+
+  console.log('\n=== Test 90: Parser — 1wire s := 1 produces initExpr {bin} ===');
+  {
+    const stmts = parse('1wire s := 1');
+    const s = stmts[0];
+    assert('stmt has decls', String(Array.isArray(s.decls)), 'true');
+    assert('decls[0].name is s', s.decls[0].name, 's');
+    assert('decls[0].type is 1wire', s.decls[0].type, '1wire');
+    assert('expr is null', String(s.expr), 'null');
+    assert('initExpr exists', String(s.initExpr !== undefined && s.initExpr !== null), 'true');
+    assert('initExpr.bin is 1', s.initExpr.bin, '1');
+  }
+
+  console.log('\n=== Test 91: Parser — 4wire s := 1101 produces initExpr {bin:1101} ===');
+  {
+    const stmts = parse('4wire s := 1101');
+    const s = stmts[0];
+    assert('4wire initExpr.bin is 1101', s.initExpr.bin, '1101');
+    assert('4wire expr is null', String(s.expr), 'null');
+  }
+
+  console.log('\n=== Test 92: Parser — 4wire s := ^FF produces initExpr {hex:FF} ===');
+  {
+    const stmts = parse('4wire s := ^FF');
+    const s = stmts[0];
+    assert('^FF initExpr.hex is FF', s.initExpr.hex, 'FF');
+  }
+
+  console.log('\n=== Test 93: Parser — 1wire s := \\5 produces initExpr {bin:101} ===');
+  {
+    const stmts = parse('1wire s := \\5');
+    const s = stmts[0];
+    assert('\\5 initExpr.bin is 101', s.initExpr.bin, '101');
+  }
+
+  console.log('\n=== Test 94: Parser — 1wire s := !1 produces initExpr {bin:1, not:true} ===');
+  {
+    const stmts = parse('1wire s := !1');
+    const s = stmts[0];
+    assert('!1 initExpr.bin is 1', s.initExpr.bin, '1');
+    assert('!1 initExpr.not is true', String(s.initExpr.not), 'true');
+  }
+
+  console.log('\n=== Test 95: Parser — 1wire s := !0 produces initExpr {bin:0, not:true} ===');
+  {
+    const stmts = parse('1wire s := !0');
+    const s = stmts[0];
+    assert('!0 initExpr.bin is 0', s.initExpr.bin, '0');
+    assert('!0 initExpr.not is true', String(s.initExpr.not), 'true');
+  }
+
+  console.log('\n=== Test 96: Parser — := without not has no not field ===');
+  {
+    const stmts = parse('1wire s := 1');
+    const s = stmts[0];
+    assert('no not field when no !', String(!!s.initExpr.not), 'false');
+  }
+
+  console.log('\n=== Test 97: Parser — 1wire s = expr has NO initExpr (normal assignment) ===');
+  {
+    const stmts = parse('1wire s = 1');
+    const s = stmts[0];
+    assert('normal = has expr not null', String(s.expr !== null), 'true');
+    assert('normal = has no initExpr', String(s.initExpr === undefined || s.initExpr === null), 'true');
+  }
+
+  console.log('\n=== Test 98: Parser — 1wire s (no assignment) has no initExpr and no expr ===');
+  {
+    const stmts = parse('1wire s');
+    const s = stmts[0];
+    assert('bare decl has no initExpr', String(s.initExpr === undefined || s.initExpr === null), 'true');
+    assert('bare decl has no expr', String(s.expr), 'null');
+  }
+
+  console.log('\n=== Test 99: Parser — := with non-literal throws error ===');
+  {
+    assertThrows(
+      '1wire s := AND(x,y) throws',
+      () => parse('1wire s := AND(x,y)'),
+      'Expected a literal'
+    );
+  }
+
+  console.log('\n=== Test 100: Parser — multiple wires with := (8wire q := ^A5) ===');
+  {
+    const stmts = parse('8wire q := ^A5');
+    const s = stmts[0];
+    assert('8wire ^A5 type is 8wire', s.decls[0].type, '8wire');
+    assert('8wire ^A5 name is q', s.decls[0].name, 'q');
+    assert('8wire ^A5 initExpr.hex is A5', s.initExpr.hex, 'A5');
+  }
+
+  console.log('\n=== Test 101: Parser — multiple := statements in same script ===');
+  {
+    const stmts = parse(`1wire s := 1
+1wire r := 0
+1wire q := 1
+1wire nq := 0`);
+    assert('4 decl statements', String(stmts.length), '4');
+    assert('s initExpr.bin = 1',  stmts[0].initExpr.bin, '1');
+    assert('r initExpr.bin = 0',  stmts[1].initExpr.bin, '0');
+    assert('q initExpr.bin = 1',  stmts[2].initExpr.bin, '1');
+    assert('nq initExpr.bin = 0', stmts[3].initExpr.bin, '0');
+  }
+}
+
+// Summary
+console.log(`\n========== RESULTS ==========`);
+console.log(`  Passed: ${passed}`);
+console.log(`  Failed: ${failed}`);
+console.log(`==============================\n`);
+
+process.exit(failed > 0 ? 1 : 0);

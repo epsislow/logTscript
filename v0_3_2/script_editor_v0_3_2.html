@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Bit Language Interpreter for LogTScript v0.3.2</title>
+<link rel="stylesheet" href="codemirror.min.css">
+<link rel="stylesheet" href="cm.show-hint.min.css">
+<style>
+body { font-family: monospace; background:#111; color:#eee; padding:20px }
+textarea { width:100%; height:340px; background:#000; color:#0f0; font-size: 20px; }
+textarea {
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+.CodeMirror {
+  height: 340px;
+  width: 100%;
+  background: #000;
+  color: #0f0;
+  font-size: 20px;
+  font-family: monospace;
+  border: none;
+  box-sizing: border-box;
+}
+.CodeMirror-scroll { height: 100%; padding-right: 100px;}
+.CodeMirror-cursor { border-left: 2px solid #0f0; }
+.CodeMirror-linenumbers { background: #111; }
+.CodeMirror-linenumber { color: #555; }
+.CodeMirror-focused .CodeMirror-selected { background: rgba(0, 255, 0, 0.2); }
+.CodeMirror-selected { background: rgba(0, 255, 0, 0.12); }
+/* LogTScript syntax colors */
+.cm-logts-comment  { color: #556; font-style: italic; }
+.cm-logts-keyword  { color: #ff0; font-weight: bold; }
+.cm-logts-gate     { color: #0ff; font-weight: bold; }
+.cm-logts-type     { color: #0f0; font-weight: bold; }
+.cm-logts-number   { color: #f80; }
+.cm-logts-bitrange   { color: #2ff; }
+.cm-logts-bitdynamic   { color: #2ff; }
+.cm-logts-component-name   { color: #2aa; font-weight: bold;}
+.cm-logts-component-type   { color: #ff0; }
+.cm-logts-comp-attr   { color: #f55; }
+.cm-logts-comp-prop   { color: #faa; }
+.cm-logts-operator { color: #aaa; }
+button { margin:4px; padding:5px 9px; cursor: pointer; }
+pre { background:#000; padding:10px; max-height:260px; overflow:auto }
+.panel { border:1px solid #444; padding:10px; margin-top:10px }
+.flex { display:flex; gap:10px }
+.filename { font-size: 20px;}
+.dirpath { font-size: 15px; color: #88f}
+.filelist { border: 1px solid #3D4; width:90%; padding: 3px; margin: 5px; height: 350px; overflow-y: auto; }
+.filelist .file { padding: 4px; color: mediumaquamarine; cursor: pointer;}
+.filelist .dir { padding: 4px; color: yellowgreen;  cursor: pointer; }
+.filelist .file:hover { color: cyan; }
+.filelist .dir:hover { color: yellow; }
+// button.cls { background-color: #7a7; }
+// button.cls:hover { background-color: #afa; }
+.hidden { display: none;}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 30px;
+  min-width: 20px;
+  padding: 0 10px;
+  margin: 6px 2px;
+
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 500;
+
+  color: #eaeaea;
+  background: #1c1c1c;
+
+  border: 1px solid #2a2a2a;
+  border-radius: 999px; /* pill shape */
+
+  cursor: pointer;
+  vertical-align: middle;
+
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.05s ease;
+}
+
+.btn:hover {
+  background: #242424;
+  border-color: #3a3a3a;
+}
+
+.btn:active {
+  transform: translateY(1px);
+  background: #2a2a2a;
+}
+
+.btn--primary {
+  background: linear-gradient(180deg, #2f80ff, #1f66e0);
+  border-color: #2f80ff;
+  color: #fff;
+}
+
+.btn[disabled="1"] {
+  color: #333;
+}
+
+.btn--primary:hover {
+  background: linear-gradient(180deg, #3a8cff, #2a72eb);
+}
+
+
+#tabsActive .tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 30px;
+  min-width: 20px;
+  padding: 0 10px;
+  margin: 6px 2px;
+
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 500;
+
+  color: #eaeaea;
+  background: #1c1c1c;
+
+  border: 1px solid #2a2a2a;
+  border-radius: 999px; /* pill shape */
+
+  cursor: pointer;
+  vertical-align: middle;
+
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.05s ease;
+}
+
+#tabsActive .tab-active {
+  background: linear-gradient(180deg, #2f80ff, #1f66e0);
+  border-color: #2f80ff;
+  color: #fff;
+}
+
+#confirm .btn.c {
+  background-color: brown;
+  color: #ffa;
+}
+
+#confirm .btn.c:hover {
+  background-color: chocolate;
+}
+
+#devices {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+#devices .break {
+  flex-basis: 100%;
+}
+
+.led-red-glow {
+  width: 20px;
+  height: 20px;
+  background-color: #ff4d4d;
+  border-radius: 50%;
+  box-shadow: 
+    inset 0 0 5px #fff,
+    0 0 5px #ff0000,
+    0 0 15px #ff0000,
+    0 0 30px #ff0000;
+}
+
+/* LED wrapper */
+.led-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 5px 0;
+}
+
+.led-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd;
+}
+.led-no-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 1px;
+  text-align: right;
+  color: transparent;
+}
+
+.led-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.led {
+ display: inline-block; 
+  width: 14px;
+  height: 14px;
+  border-radius: var(--led-radius, 50%);
+  background-color: #222;
+  box-shadow: inset 1px 1px 2px #333;
+}
+
+.led-input:checked + .led {
+  background-color: var(--led-color, #ff0000);
+  box-shadow:
+    inset 0 0 4px #fff,
+    0 0 2px var(--led-color, #ff0000),
+    0 0 4px var(--led-color, #ff0000),
+    0 0 8px var(--led-color, #ff0000);
+}
+
+.switch-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  margin: 5px 0;
+}
+
+.switch-wrapper:active .switch {
+  transform: scale(0.96);
+}
+
+.switch-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd;
+}
+
+.switch-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch {
+  position: relative;
+  width: 36px;
+  height: 18px;
+  background-color: #2a2a2a;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px #3a3a3a;
+  transition: background-color 0.2s ease,
+       box-shadow 0.2s ease,
+       transform 0.05s ease;
+}
+
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #e0e0e0;
+  border-radius: 50%;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.switch-input:checked + .switch {
+  background-color: #1f6f3f;
+  box-shadow:
+    inset 0 0 0 1px #2ecc71,
+    0 0 6px rgba(46, 204, 113, 0.6);
+}
+
+.switch-input:checked + .switch::before {
+  transform: translateX(18px);
+  background-color: #dfffe9;
+}
+
+.switch-input:focus-visible + .switch {
+  outline: 2px solid #2ecc71;
+  outline-offset: 2px;
+}
+
+.sevenseg {
+  --seg-scale:.75;
+}
+
+.sevenseg-wrapper {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-height: calc(1em + 2px);
+  padding-bottom: 5px;
+}
+
+.sevenseg-dot {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 6px;
+}
+
+.sevenseg-time-dot-up {
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 6px;
+}
+
+.sevenseg-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd;
+}
+
+.sevenseg-no-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 1px;
+  text-align: right;
+  color: transparent;
+}
+
+.sevenseg {
+  display: grid;
+  grid-template-columns:
+    calc(26px * var(--seg-scale))
+    calc(8px  * var(--seg-scale))
+    calc(26px * var(--seg-scale));
+  grid-template-rows:
+    calc(10px * var(--seg-scale)) /* A */
+    calc(26px * var(--seg-scale)) /* F / B */
+    calc(10px * var(--seg-scale)) /* G */
+    calc(26px * var(--seg-scale)) /* E / C */
+    calc(2px  * var(--seg-scale)) /* spacer */
+    calc(10px * var(--seg-scale));/* D */
+  gap: 0;
+  position: relative;
+  overflow: visible;
+}
+
+.seg-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segment {
+  background-color: #1a1a1a;
+  border-radius: 999px;
+  box-shadow: inset 1px 1px 0px #777;
+  cursor: pointer;
+  filter: blur(0.2px);
+  opacity: 0.35;
+}
+
+.sevenseg-dot {
+  position: absolute;
+  right: 0px;
+  bottom: -6px;
+  z-index: 2;
+}
+
+.sevenseg-time-dot-up {
+  position: absolute;
+  right: -4px;
+  bottom: 10px;
+  z-index: 3;
+}
+
+.sevenseg-time-dot-down {
+  position: absolute;
+  right: -4px;
+  bottom: 20px;
+  z-index: 3;
+}
+
+.seg-a,
+.seg-g,
+.seg-d {
+  width: calc(24px * var(--seg-scale));
+  height: calc(8px * var(--seg-scale));
+  justify-self: center;
+  align-self: center;
+}
+
+.seg-b,
+.seg-c,
+.seg-e,
+.seg-f {
+  width:  calc(8px  * var(--seg-scale));
+  height: calc(24px * var(--seg-scale));
+  justify-self: center;
+  align-self: center;
+}
+
+.seg-h {
+  width:  calc(8px * var(--seg-scale));
+  height: calc(8px * var(--seg-scale));
+  border-radius: 50%;
+  background-color: #1a1a1a;
+  box-shadow: inset 1px 1px 0px #777;
+  opacity: 0.35;
+  filter: blur(0.2px);
+  cursor: pointer;
+}
+
+.seg-i,
+.seg-j {
+  width:  calc(9px * var(--seg-scale));
+  height: calc(14px * var(--seg-scale));
+  border-radius: 99px;
+  background-color: #1a1a1a;
+  box-shadow: inset 1px 1px 0px #777;
+  opacity: 0.35;
+  filter: blur(0.2px);
+  cursor: pointer;
+}
+
+.seg-a { grid-column: 1 / 4; grid-row: 1; }
+.seg-f { grid-column: 1;     grid-row: 2; }
+.seg-b { grid-column: 3;     grid-row: 2; }
+.seg-g { grid-column: 1 / 4; grid-row: 3; }
+.seg-e { grid-column: 1;     grid-row: 4; }
+.seg-c { grid-column: 3;     grid-row: 4; }
+.seg-d { grid-column: 1 / 4; grid-row: 6; }
+
+.seg-input:checked + .segment {
+  opacity: 1;
+  background-color: var(--seg-color, #6dff9c);
+  box-shadow:
+    inset 0 0 calc(6px * var(--seg-scale)) rgba(255,255,255,0.6),
+    0 0 calc(8px * var(--seg-scale)) var(--seg-color),
+    0 0 calc(18px * var(--seg-scale)) var(--seg-color),
+    0 0 calc(36px * var(--seg-scale)) rgba(109,255,156,0.6);
+}
+
+.seg-input:checked + .seg-h {
+  opacity: 1;
+  background-color: var(--seg-color, #6dff9c);
+  box-shadow:
+    inset 0 0 calc(4px * var(--seg-scale)) rgba(255,255,255,0.6),
+    0 0 calc(6px * var(--seg-scale)) var(--seg-color),
+    0 0 calc(14px * var(--seg-scale)) var(--seg-color),
+    0 0 calc(24px * var(--seg-scale)) rgba(109,255,156,0.6);
+}
+
+.dip-wrapper {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.dip-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd;
+}
+
+.dip {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: #1a1a1a;
+  flex-direction: column;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px #2a2a2a;
+  margin-bottom: 5px;
+}
+
+.dip-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-family: monospace;
+  font-size: 0.65rem;
+  color: #aaa;
+}
+
+.dip-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dip-switch {
+  position: relative;
+  width: 18px;
+  height: 36px;
+  background: #2a2a2a;
+  border-radius: 999px;
+  box-shadow: inset 0 0 3px #000;
+  cursor: pointer;
+}
+
+.dip-switch::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  width: 14px;
+  height: 14px;
+  background: #ccc;
+  border-radius: 999px;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.dip-input:checked + .dip-switch {
+  background: #1f6f3f;
+  box-shadow:
+    inset 0 0 0 1px #2ecc71,
+    0 0 6px rgba(46, 204, 113, 0.6);
+}
+
+.dip-input:checked + .dip-switch::before {
+  transform: translateY(-18px);
+  background: #dfffe9;
+}
+
+.dip-visual-1 .dip-switch {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: #0e0e0e;
+  border: 1px solid #333;
+  box-shadow: inset 0 0 4px #000;
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.1s ease;
+}
+
+.dip-visual-1 .dip-switch::before {
+  display: none;
+}
+
+.dip-no-labels .dip-unit > span:first-child {
+  display: none;
+}
+
+.dip-visual-1 .dip-input:checked + .dip-switch {
+  background: #1f6f3f;
+  border-color: #2ecc71;
+  box-shadow:
+    inset 0 0 6px rgba(255,255,255,0.2),
+    0 0 10px rgba(46,204,113,0.6);
+}
+
+.dip-visual-1 .dip-switch:active {
+  transform: scale(0.92);
+}
+
+.dip-row {
+  display: flex;
+  gap: 6px;
+}
+
+.lcd-wrapper {
+  display: inline-flex;
+  align-items: flex-start;
+  margin: 4px;
+  padding: 6px 6px;              
+  background: #111;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 0 1px #2a2a2a,
+    0 0 12px rgba(0,0,0,0.6);
+}
+.lcd-wrapper canvas { display: block; }
+
+.key-wrapper {
+  display: inline-block;
+  margin-right: 6px;
+  margin-bottom: 6px;
+  vertical-align: top;
+}
+
+.key-wrapper canvas {
+  display: block;
+}
+
+.knob-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-right: 1rem;
+}
+
+.knob-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd;
+}
+
+.knob-wrapper canvas {
+  display: block;
+}
+
+.knob-value {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #6dff9c;
+  min-width: 3ch;
+}
+
+/*==== dropdown panels ==== */
+
+.panel-dropdown {
+  position: relative;
+  display: inline-block;
+  z-index: 1000;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+
+  min-width: 160px;
+  padding: 6px;
+
+  background: #1c1c1c;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+
+  display: none;
+  z-index: 100;
+}
+
+.panel-dropdown.open .dropdown-menu {
+  display: block;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+
+  height: 30px;
+  padding: 0 12px;
+  width: 100%;
+
+  font-size: 13px;
+  color: #eaeaea;
+  background: transparent;
+
+  border: none;
+  border-radius: 999px;
+
+  cursor: pointer;
+  text-align: left;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.dropdown-item:hover {
+  background: #242424;
+}
+
+.dropdown-item.active {
+  background: #2a2a2a;
+  color: #ffffff;
+}
+
+.dropdown-item.active::after {
+  content: "✓";
+  margin-left: auto;
+  opacity: 0.8;
+}
+
+</style>
+</head>
+<body>
+<script type="text/javascript">
+</script>
+
+<script>
+  if (typeof eruda !=='undefined') {
+    eruda.hide(); 
+  }
+</script>
+
+<script type="text/javascript" src="lz-string-min.js"></script>
+<script src="codemirror.min.js"></script>
+<script src="cm.show-hint.min.js"></script>
+
+<script>
+// ─── LogTScript CodeMirror mode ───────────────────────────────────────────────
+const _logtsKeywords = [
+  "show","def","repeat","MODE","WIREWRITE","NEXT",
+  "LOAD","LATCH","comp","pcb","w0","w1"
+];
+
+const _logtsComponents = [
+'led','key','dip','switch','rotary','adder','subtract','divider','multiplier','counter','shifter','mem','reg','lcd','7seg','+','-','/','*','='
+]
+const _logtsAttributes = [
+  "depth","length","nl", "on", "text","label","color"
+]
+const _logtsProperties = [
+  "out","in","on","off","at","depth","length",
+  "set", "get", "write","data",
+]
+const _logtsGates = [
+  "AND","ANDe","OR","ORe","NOT","NOTe","XOR","XORe",
+  "NAND","NANDe","NOR","NORe","LSHIFT","RSHIFT"
+];
+
+function consoleLog(...args) {
+}
+
+CodeMirror.defineMode("logts", function() {
+
+  const keywords = new Set(_logtsKeywords);
+  const components = new Set(_logtsComponents);
+  const compAttributes = new Set(_logtsAttributes);
+  const compProperties = new Set(_logtsProperties);
+  const gates    = new Set(_logtsGates);
+
+  function isWordChar(ch) {
+    return /[A-Za-z0-9_]/.test(ch);
+  }
+  
+    function logTsToken (stream, state) {
+    consoleLog("CHAR:", stream.peek(), "defComp:", state.defComp);
+      if (state.inBlockComment) {
+        if (stream.match(/#</)) {
+          state.inBlockComment = false;
+        } else {
+          stream.next();
+        }
+        return "logts-comment";
+      }
+
+      if (stream.match(/#>/)) {
+        state.inBlockComment = true;
+        return "logts-comment";
+      }
+
+      if (stream.match(/#.*/)) {
+        return "logts-comment";
+      }
+
+      if (stream.match(/\^[0-9A-Fa-f\s]+/)) {
+        return "logts-number";
+      }
+
+      if (stream.match(/\\[0-9]+/)) {
+        return "logts-number";
+      }
+
+      if (stream.match(/\d+(?:wire|bit)\b/)) {
+        return "logts-type";
+      }
+
+      if (stream.match("=")) {
+        state.expectBinary = true;
+        return "logts-operator";
+      }
+      
+        if (state.expectBinary && stream.eatSpace()) {
+          return null;
+        }
+
+      if (state.expectBinary && stream.match(/[01]+/)) {
+        state.expectBinary = false;
+        return "logts-number";
+      }
+      
+      if (state.expectBinary) {
+        state.expectBinary = false;
+      }
+
+      if (
+        state.expectCompType && stream.match(/[7A-Za-z_][A-Za-z0-9_]*/) ||
+        !state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
+        const word = stream.current();
+        consoleLog('wordddd ' , word);
+
+        if (gates.has(word))    return "logts-gate";
+        if (keywords.has(word)) {
+            if (word === 'comp') {
+              state.defComp = true;
+            }
+            return "logts-keyword";
+        }
+        if (state.expectCompType && components.has(word)) {
+            return "logts-component-type";
+        }
+
+        return null;
+      }
+      
+      if (!state.expectCompName && stream.match(/[.]/)) {
+         state.expectBitrange = true;
+         return null;
+      }
+      
+      if (state.expectCompName && stream.match(/[.]/)) {
+        return 'logts-component-name';
+      }
+      
+      if (stream.match(/[-]/)) {
+         state.expectBitrange = true;
+         return null;
+      }
+      
+      if (stream.match(/[/]/)) {
+        consoleLog('bitrange/');
+         state.expectBitrange = true;
+         return null;
+      }
+
+      if (state.expectBitrange && stream.match(/[0-9]+/)) {
+        state.expectBitrange = false;
+        return "logts-bitrange";
+      }
+      
+      if (state.expectBitrange && stream.match(/[(]+/)) {
+        console.log('h>');
+        return "logts-operator";
+      }
+      
+      if (state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
+        console.log('q');
+        state.expectBitrange = false;
+        return "logts-bitdynamic";
+      }
+      
+      if (state.expectBitrange) {
+      console.log('expectBitrange = false');
+        state.expectBitrange = false;
+      }
+            
+      if (state.defComp) {
+        if (stream.eatSpace()) {
+            return null;
+        }
+
+        if (stream.peek() === '[') {
+            stream.next();
+            state.expectCompType = true;
+            consoleLog("expectCompType");
+            return "logts-operator";
+        }
+        
+        if (stream.peek() === "]") {
+          stream.next();
+          state.expectCompName = true;
+          consoleLog("expectCompName");
+          return "logts-operator";
+        }
+
+        consoleLog('defComp = false');
+        state.defComp = false;
+    }
+
+      if (stream.match(/[=:,.<>()\[\]{}\/\\~@!]/)) {
+        return "logts-operator";
+      }
+consoleLog('or else');
+      stream.next();
+      return null;
+    }
+
+  return {
+    startState() {
+      return { 
+        inBlockComment: false,
+        expectBinary: false,
+        expectBitrange: false,
+        defComp: false,
+        expectCompType: false,
+        expectCompName: false,
+        defPcb: false,
+        expectCompProp: false
+      };
+    },
+
+    eatSpace: true,
+    token(stream, state) {
+        const t = logTsToken(stream,state);
+        consoleLog(t, " -> ", stream.current());
+        return t;
+    }
+  };
+});
+
+CodeMirror.registerHelper("hint", "logts", function(cm) {
+  const cursor = cm.getCursor();
+  const token  = cm.getTokenAt(cursor);
+  const start  = token.start;
+  const end    = cursor.ch;
+  const word   = token.string.slice(0, end - start);
+  const all    = _logtsKeywords.concat(_logtsGates);
+  const list   = all.filter(k => k.toLowerCase().startsWith(word.toLowerCase()));
+  return {
+    list,
+    from: CodeMirror.Pos(cursor.line, start),
+    to:   CodeMirror.Pos(cursor.line, end)
+  };
+});
+</script>
+
+<h2>Bit Language Interpreter for LogTScript v0.3.2</h2>
+
+<textarea id="code" 
+   spellcheck="false" 
+   autocorrect="off" 
+   autocomplete="off" 
+   autocapitalize="off"
+>
+MODE WIREWRITE
+
+2wire b
+2wire a = REG2(b, ~, 0)
+2wire c = REG2(a, ~, 0)
+#b= NOT(a.0) + NOT(a.1)
+b= a
+show(a,b,c)
+NEXT(~)
+NEXT(~)
+show(a,b,c)
+NEXT(~)
+NEXT(~)
+show(a,b,c)
+NEXT(~)
+NEXT(~)
+show(a,b,c)
+NEXT(~)
+NEXT(~)
+show(a,b,c)
+</textarea>
+<div id="fName">Filename:<span id="fileName"></span></div>
+<div>
+  <button onclick="run()" class="btn">Run</button>
+  <button onclick="doNext(1)" class="btn">Next</button>
+  <button onclick="toggleSEC()" id="sec" class="btn">S</button>
+  <button onclick="changeSECINT()" id="secint" class="btn">1</button>
+  
+    <div class="panel-dropdown" id="panel-dropdown">
+      <button class="btn dropdown-trigger" aria-expanded="false">
+        Win ▾
+      </button>
+
+      <div class="dropdown-menu">
+        <button class="dropdown-item active" data-panel="output">Output</button>
+        <button class="dropdown-item active" data-panel="variables">Variables</button>
+        <button class="dropdown-item active" data-panel="tabs">Tabs</button>
+        <button class="dropdown-item" data-panel="files">Files</button>
+        <button class="dropdown-item" data-panel="devices">Devices</button>
+        <button class="dropdown-item" data-panel="ast">AST</button>
+        <button class="dropdown-item" data-panel="command">Command</button>
+      </div>
+    </div>  
+  
+    <div class="panel-dropdown" id="comp-dropdown">
+      <button class="btn dropdown-trigger" aria-expanded="false">
+        Comp ▾
+      </button>
+
+      <div class="dropdown-menu">
+        <button class="dropdown-item" onclick="insertComp('led')">led</button>
+        <button class="dropdown-item" onclick="insertComp('key')">key</button>
+        <button class="dropdown-item" onclick="insertComp('dip')">dip</button>
+        <button class="dropdown-item" onclick="insertComp('switch')">switch</button>
+        <button class="dropdown-item" onclick="insertComp('rotary')">rotary</button>
+        <button class="dropdown-item" onclick="insertComp('adder')">adder</button>
+        <button class="dropdown-item" onclick="insertComp('subtract')">subtract</button>
+        <button class="dropdown-item" onclick="insertComp('multiplier')">multiplier</button>
+        <button class="dropdown-item" onclick="insertComp('divider')">divider</button>
+        <button class="dropdown-item" onclick="insertComp('counter')">counter</button>
+        <button class="dropdown-item" onclick="insertComp('shifter')">shifter</button>
+        <button class="dropdown-item" onclick="insertComp('mem')">mem</button>
+        <button class="dropdown-item" onclick="insertComp('lcd')">lcd</button>
+        <button class="dropdown-item" onclick="insertComp('7seg')">7seg</button>
+      </div>
+</div>
+
+
+<div class="panel" id="tabsPanel">
+  <button class="btn" onclick="addTab()">+tab</button>
+  <button class="btn" onclick="btnundo()" style="font-weight: bold; background-color:#042;">&#8630;</button>
+  <button class="btn" onclick="btnredo()" style="font-weight: bold; background-color:#042;">&#8631;</button>
+  <button class="btn" onclick="btncopy()" style="font-weight: bold; background-color:#048;">⿻</button>
+  <button class="btn" onclick="prevTab()">&lt;- </button>
+  <button class="btn" onclick="nextTab()">-&gt;</button>
+  <button class="btn" onclick="closeTab()">-close</button>
+  
+  <div id="tabsActive"></div>
+</div>
+
+<div id="cmdPanel" style="display:none; margin:10px 0;">
+  <div style="display:flex; align-items:center; gap:10px;">
+    <textarea id="cmdInput" style="flex:1; min-height:60px; font-family:monospace; background:#222; color:#eee; border:1px solid #444; padding:8px;" placeholder="Enter commands here..."></textarea>
+    <button onclick="sendCmd()" style="padding:8px 16px;">Send</button>
+  </div>
+</div>
+
+<div class="flex">
+  <div class="panel" id="outputPanel" style="flex:1">
+    <h3>Output</h3>
+    <pre id="out"></pre>
+  </div>
+
+  <div class="panel" id="variablesPanel" style="flex:1">
+    <h3>Variables</h3>
+    <pre id="vars"></pre>
+  </div>
+</div>
+
+<div class="panel" id="astPanel" style="display:none">
+  <h3>AST</h3>
+  <pre id="ast"></pre>
+</div>
+
+<div class="panel" id="devicesPanel" style="display:none">
+  <h3>Devices</h3>
+  <div id="devices">
+  </div>
+</div>
+
+<div class="panel" id="filesPanel" style="display:none">
+  <h3>Files</h3>
+  <button id="direxit" onclick="btndirExit()" class="btn" disabled=1>&lt;</button>
+  <button id="direnter" onclick="btndirEnter()" class="btn" disabled=1>&gt;</button>
+  <button onclick="btnClr()" class="btn cls">Cls</button>
+  <button id="fileload" onclick="btnfileLoad()" class="btn" disabled=1>load</button>
+  <button id="filedirdelete" onclick="btnfiledirDelete()" class="btn" disabled=1>-del</button>
+  <button id="dirsave" onclick="btnfileSave(1)" class="btn" disabled=1>+dir </button>
+  <button id="fileupdate" onclick="btnfileUpdate()" class="btn" disabled=1>Upd</button>
+  <button id="resetlib" onclick="btnresetLib()" class="btn">-lib</button>
+  <div class="confirm" id="confirm" style="display:none">
+    <span>Sure?</span>
+    <button id="yes" onclick="yes()" class="c btn">yes</button>
+    <button id="no" onclick="no()" class="c btn">no</button>
+  </div>
+  <br/>
+  <input id="filename" placeholder="name" class="filename"/>
+  <button id="filesave" onclick="btnfileSave(0)" disabled=1>save</button>
+  <div id="dirpath" class="dirpath"></div>
+  <div id="filelist" class="filelist"></div>
+</div>
+
+<!-- ================= MODULAR JS LOADING ================= -->
+
+<!-- Core: language processing pipeline -->
+<script src="core/tokenizer.js"></script>
+<script src="core/preprocessor.js"></script>
+<script src="core/parser.js"></script>
+<script src="core/interpreter.js"></script>
+
+<!-- Files: storage & library examples -->
+<script src="files/storage.js"></script>
+<script src="files/fs.js"></script>
+
+<!-- UI: panel toggles (defines showDevices, needed by devices) -->
+<script src="ui/panels.js"></script>
+
+<!-- Devices: hardware component renderers -->
+<script src="devices/device-manager.js"></script>
+<script src="devices/renderers.js"></script>
+<script src="devices/mem-devices.js"></script>
+<script src="devices/character-lcd.js"></script>
+<script src="devices/panel-key.js"></script>
+<script src="devices/rotary-knob.js"></script>
+
+<!-- UI: editor, file browser, app init -->
+<script src="ui/editor.js"></script>
+<script src="ui/file-browser.js"></script>
+<script src="ui/app.js"></script>
+
+</body>
+</html>
