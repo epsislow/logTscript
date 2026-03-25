@@ -15,9 +15,10 @@ const parserSrc       = fs.readFileSync('./core/parser.js', 'utf-8');
 const chunk = tokenizerSrc + '\n' + preprocessorSrc;
 
 const sandbox = { Error, parseInt, String, Array, Set, Map, RegExp, console };
-const codeToRun = chunk + `\nvar _Token = Token; var _Tokenizer = Tokenizer; var _preprocessRepeat = preprocessRepeat;`;
+const codeToRun = chunk + `\nvar _Token = Token; var _Tokenizer = Tokenizer; var _preprocessRepeat = preprocessRepeat; var _preprocessShortNotation = preprocessShortNotation;`;
 vm.runInNewContext(codeToRun, sandbox);
 const preprocessRepeat = sandbox._preprocessRepeat;
+const preprocessShortNotation = sandbox._preprocessShortNotation;
 const Tokenizer = sandbox._Tokenizer;
 
 let passed = 0;
@@ -1048,6 +1049,212 @@ console.log('\n=== Test 89: := does not interfere with .var:get syntax ===');
     assert('q initExpr.bin = 1',  stmts[2].initExpr.bin, '1');
     assert('nq initExpr.bin = 0', stmts[3].initExpr.bin, '0');
   }
+}
+
+// ================================================================
+// Short Notation Preprocessor tests
+// ================================================================
+
+console.log('\n=== Test 102: Short notation — prefix AND ===');
+{
+  const result = preprocessShortNotation('`& a`');
+  assert('`& a` → AND(a)', result, 'AND(a)');
+}
+
+console.log('\n=== Test 103: Short notation — prefix OR ===');
+{
+  const result = preprocessShortNotation('`| a`');
+  assert('`| a` → OR(a)', result, 'OR(a)');
+}
+
+console.log('\n=== Test 104: Short notation — prefix XOR ===');
+{
+  const result = preprocessShortNotation('`^ a`');
+  assert('`^ a` → XOR(a)', result, 'XOR(a)');
+}
+
+console.log('\n=== Test 105: Short notation — prefix NOR ===');
+{
+  const result = preprocessShortNotation('`-| a`');
+  assert('`-| a` → NOR(a)', result, 'NOR(a)');
+}
+
+console.log('\n=== Test 106: Short notation — prefix NAND, NXOR ===');
+{
+  assert('`-& a` → NAND(a)', preprocessShortNotation('`-& a`'), 'NAND(a)');
+  assert('`-^ a` → NXOR(a)', preprocessShortNotation('`-^ a`'), 'NXOR(a)');
+}
+
+console.log('\n=== Test 107: Short notation — infix AND ===');
+{
+  const result = preprocessShortNotation('`a & b`');
+  assert('`a & b` → AND(a,b)', result, 'AND(a,b)');
+}
+
+console.log('\n=== Test 108: Short notation — infix OR, XOR, EQ ===');
+{
+  assert('`a | b` → OR(a,b)', preprocessShortNotation('`a | b`'), 'OR(a,b)');
+  assert('`a ^ b` → XOR(a,b)', preprocessShortNotation('`a ^ b`'), 'XOR(a,b)');
+  assert('`a = b` → EQ(a,b)', preprocessShortNotation('`a = b`'), 'EQ(a,b)');
+}
+
+console.log('\n=== Test 109: Short notation — infix NAND, NOR, NXOR ===');
+{
+  assert('`a -& b` → NAND(a,b)', preprocessShortNotation('`a -& b`'), 'NAND(a,b)');
+  assert('`a -| b` → NOR(a,b)', preprocessShortNotation('`a -| b`'), 'NOR(a,b)');
+  assert('`a -^ b` → NXOR(a,b)', preprocessShortNotation('`a -^ b`'), 'NXOR(a,b)');
+}
+
+console.log('\n=== Test 110: Short notation — parentheses grouping ===');
+{
+  const result = preprocessShortNotation('`(a | b) & c`');
+  assert('`(a | b) & c` → AND(OR(a,b),c)', result, 'AND(OR(a,b),c)');
+}
+
+console.log('\n=== Test 111: Short notation — nested parentheses ===');
+{
+  const result = preprocessShortNotation('`(a | b) & (c | d)`');
+  assert('`(a | b) & (c | d)`', result, 'AND(OR(a,b),OR(c,d))');
+}
+
+console.log('\n=== Test 112: Short notation — left-to-right chaining ===');
+{
+  const result = preprocessShortNotation('`a | b | c`');
+  assert('`a | b | c` → OR(OR(a,b),c)', result, 'OR(OR(a,b),c)');
+}
+
+console.log('\n=== Test 113: Short notation — mixed prefix + infix ===');
+{
+  const result = preprocessShortNotation('`& a -| b`');
+  assert('`& a -| b` → NOR(AND(a),b)', result, 'NOR(AND(a),b)');
+}
+
+console.log('\n=== Test 114: Short notation — bit ranges ===');
+{
+  assert('`a.0/4 | b.0/4`', preprocessShortNotation('`a.0/4 | b.0/4`'), 'OR(a.0/4,b.0/4)');
+  assert('`& a.1-2/3`', preprocessShortNotation('`& a.1-2/3`'), 'AND(a.1-2/3)');
+}
+
+console.log('\n=== Test 115: Short notation — NOT prefix ===');
+{
+  assert('`!a & b` → AND(!a,b)', preprocessShortNotation('`!a & b`'), 'AND(!a,b)');
+  assert('`!(a | b)` → !OR(a,b)', preprocessShortNotation('`!(a | b)`'), '!OR(a,b)');
+}
+
+console.log('\n=== Test 116: Short notation — complex expression from spec ===');
+{
+  const result = preprocessShortNotation('`(a.0/4 | b.0/4) & (a.4/4 | b.4/4)`');
+  assert('complex bit range expr', result, 'AND(OR(a.0/4,b.0/4),OR(a.4/4,b.4/4))');
+}
+
+console.log('\n=== Test 117: Short notation — context with assignment ===');
+{
+  const result = preprocessShortNotation('8wire c = `& (a | b)`');
+  assert('8wire c = `& (a | b)`', result, '8wire c = AND(OR(a,b))');
+}
+
+console.log('\n=== Test 118: Short notation — context with def return ===');
+{
+  const result = preprocessShortNotation('   :4bit `(a | b)`');
+  assert(':4bit `(a | b)`', result, '   :4bit OR(a,b)');
+}
+
+console.log('\n=== Test 119: Short notation — binary literal operand ===');
+{
+  assert('`^ 111` → XOR(111)', preprocessShortNotation('`^ 111`'), 'XOR(111)');
+  assert('`a & 1010`', preprocessShortNotation('`a & 1010`'), 'AND(a,1010)');
+}
+
+console.log('\n=== Test 120: Short notation — hex literal with [] ===');
+{
+  assert('`^ [^F]` → XOR(^F)', preprocessShortNotation('`^ [^F]`'), 'XOR(^F)');
+  assert('`a | [^FF]`', preprocessShortNotation('`a | [^FF]`'), 'OR(a,^FF)');
+}
+
+console.log('\n=== Test 121: Short notation — decimal literal with [] ===');
+{
+  assert('`a | [\\31]`', preprocessShortNotation('`a | [\\31]`'), 'OR(a,\\31)');
+}
+
+console.log('\n=== Test 122: Short notation — mixed literals ===');
+{
+  const result = preprocessShortNotation('`a | [^FF] | 111`');
+  assert('`a | [^FF] | 111`', result, 'OR(OR(a,^FF),111)');
+}
+
+console.log('\n=== Test 123: Short notation — decimal literal without [] ===');
+{
+  const result = preprocessShortNotation('`a | \\31`');
+  assert('`a | \\31`', result, 'OR(a,\\31)');
+}
+
+console.log('\n=== Test 124: Short notation — passthrough without backticks ===');
+{
+  const src = '8wire c = AND(a,b)';
+  const result = preprocessShortNotation(src);
+  assert('no backticks passthrough', result, src);
+}
+
+console.log('\n=== Test 125: Short notation — backtick in comment ignored ===');
+{
+  const src = '# `a | b`\n8wire c = 1';
+  const result = preprocessShortNotation(src);
+  assert('backtick in line comment ignored', result, src);
+}
+
+console.log('\n=== Test 126: Short notation — backtick in block comment ignored ===');
+{
+  const src = '#> `a | b` #<\n8wire c = 1';
+  const result = preprocessShortNotation(src);
+  assert('backtick in block comment ignored', result, src);
+}
+
+console.log('\n=== Test 127: Short notation — multiple backtick regions ===');
+{
+  const result = preprocessShortNotation('`a & b` + `c | d`');
+  assert('two backtick regions', result, 'AND(a,b) + OR(c,d)');
+}
+
+console.log('\n=== Test 128: Short notation — unmatched backtick throws ===');
+{
+  assertThrows('unmatched backtick',
+    () => preprocessShortNotation('`a | b'),
+    'Unmatched backtick'
+  );
+}
+
+console.log('\n=== Test 129: Short notation — via preprocessRepeat pipeline ===');
+{
+  const result = preprocessRepeat('8wire c = `& (a | b)`');
+  assert('preprocessRepeat expands short notation', result, '8wire c = AND(OR(a,b))');
+}
+
+console.log('\n=== Test 130: Short notation — with repeat ===');
+{
+  const src = 'repeat 1..3[\n:1bit `a.? | b.?`\n]';
+  const result = preprocessRepeat(src);
+  const lines = result.trim().split('\n').filter(l => l.trim() !== '');
+  assert('repeat + short notation line count', String(lines.length), '3');
+  assert('repeat + short line 1', lines[0].trim(), ':1bit OR(a.1,b.1)');
+  assert('repeat + short line 2', lines[1].trim(), ':1bit OR(a.2,b.2)');
+  assert('repeat + short line 3', lines[2].trim(), ':1bit OR(a.3,b.3)');
+}
+
+console.log('\n=== Test 131: Short notation — special vars ===');
+{
+  assert('`~ & a` → AND(~,a)', preprocessShortNotation('`~ & a`'), 'AND(~,a)');
+  assert('`a | %` → OR(a,%)', preprocessShortNotation('`a | %`'), 'OR(a,%)');
+}
+
+console.log('\n=== Test 132: Short notation — single operand passthrough ===');
+{
+  assert('`a` → a', preprocessShortNotation('`a`'), 'a');
+}
+
+console.log('\n=== Test 133: Short notation — & (a | b) as return line ===');
+{
+  const result = preprocessShortNotation('   :1bit `& (a | b)`');
+  assert(':1bit `& (a | b)`', result, '   :1bit AND(OR(a,b))');
 }
 
 // Summary

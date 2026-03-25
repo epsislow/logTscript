@@ -474,7 +474,7 @@ a -| b    same as:  NOR(a,b)
 builtin-function: XOR
 short-notation: ^
 examples:  
-^ | a.0-3   same as: XOR(a.0-3)
+^ a.0-3   same as: XOR(a.0-3)
 a ^ b    same as:  XOR(a,b)
   
 
@@ -495,3 +495,33 @@ examples:
 a -& b    same as:  NAND(a,b)
 
 daca ai intrebari pentru clarificari poti sa mi le pui.
+
+as vrea sa pot folosii notatia si daca scriu:
+8wire c = `& (a | b)`
+sau 
+e = `(a.0/4 | b.0/4)`
+
+=====
+
+Inca ceva ar trebuii sa functionze si cu literals de genul:
+1010 ^FF sau \33:
+
+pentru hexadecimal ^ trebuie folosit paranteze patrate astfel: [^FF] defapt orice litaral poate fi pus intre [] dar ca sa nu avem situatia lui ^ XOR -^ NXOR vazut ca litaral hexadecimal propun sa fie nevoie de [^FF] atunci sigur ^ intre [] nu va fi XOR sau NXOR 
+
+exemple: 
+^ 111  same as: XOR(111)
+^  [^F]  same as: XOR(^F)
+
+a | [^FF] | [\31]    same as: (a | b) | c  same as: OR(OR(a,^FF),\31)
+
+a | [^FF] |  111    same as: (a | b) | c  same as: OR(OR(a,^FF), 111)
+a | [^FF] | \31    same as: (a | b) | c  same as: OR(OR(a,^FF),\31)
+
+daca ai intrebari pentru clarificari poti sa mi le pui.
+
+
+
+
+
+
+Daca nu se poate in parser, o idee ar fi sa facem o traducere din notatia scurta in preprocessor.

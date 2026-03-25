@@ -1,3 +1,178 @@
+/* ================= SHORT NOTATION PREPROCESSOR ================= */
+
+/**
+ * Expand backtick-delimited short notation into standard function calls.
+ * `& (a | b)` → AND(OR(a,b))
+ *
+ * Operator map:
+ *   &  → AND    |  → OR     ^  → XOR    =  → EQ
+ *   -& → NAND   -| → NOR    -^ → NXOR   !  → NOT (native prefix)
+ *
+ * Literals: binary works directly (1010), hex needs [^FF], decimal needs [\31].
+ * Parentheses () group sub-expressions. Evaluation is left-to-right, no precedence.
+ */
+
+const SHORT_OP_MAP = {
+  '&': 'AND', '|': 'OR', '^': 'XOR', '=': 'EQ',
+  '-&': 'NAND', '-|': 'NOR', '-^': 'NXOR'
+};
+
+function preprocessShortNotation(source) {
+  let result = '';
+  let i = 0;
+
+  while (i < source.length) {
+    if (source[i] === '#' && (i + 1 >= source.length || source[i + 1] !== '>')) {
+      while (i < source.length && source[i] !== '\n') { result += source[i]; i++; }
+      continue;
+    }
+    if (source[i] === '#' && i + 1 < source.length && source[i + 1] === '>') {
+      result += '#>';
+      i += 2;
+      while (i < source.length) {
+        if (source[i] === '#' && i + 1 < source.length && source[i + 1] === '<') {
+          result += '#<';
+          i += 2;
+          break;
+        }
+        result += source[i];
+        i++;
+      }
+      continue;
+    }
+
+    if (source[i] === '`') {
+      i++;
+      let end = source.indexOf('`', i);
+      if (end === -1) throw Error(`Unmatched backtick at position ${i - 1}`);
+      result += expandShortNotation(source.slice(i, end));
+      i = end + 1;
+      continue;
+    }
+
+    result += source[i];
+    i++;
+  }
+
+  return result;
+}
+
+function tokenizeShort(content) {
+  const tokens = [];
+  let i = 0;
+
+  while (i < content.length) {
+    const ch = content[i];
+
+    if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { i++; continue; }
+
+    if (ch === '-' && i + 1 < content.length && '&|^'.includes(content[i + 1])) {
+      tokens.push({ type: 'OP', value: ch + content[i + 1] });
+      i += 2;
+      continue;
+    }
+
+    if ('&|^='.includes(ch)) {
+      tokens.push({ type: 'OP', value: ch });
+      i++;
+      continue;
+    }
+
+    if (ch === '!') { tokens.push({ type: 'NOT', value: '!' }); i++; continue; }
+    if (ch === '(') { tokens.push({ type: 'LPAREN' }); i++; continue; }
+    if (ch === ')') { tokens.push({ type: 'RPAREN' }); i++; continue; }
+
+    if (ch === '[') {
+      i++;
+      let lit = '';
+      while (i < content.length && content[i] !== ']') { lit += content[i]; i++; }
+      if (i >= content.length) throw Error(`Unmatched '[' in short notation`);
+      i++;
+      tokens.push({ type: 'OPERAND', value: lit });
+      continue;
+    }
+
+    if (/[a-zA-Z0-9~%$_?]/.test(ch) || ch === '\\') {
+      let op = '';
+      while (i < content.length) {
+        const c = content[i];
+        if (/[a-zA-Z0-9._\/?~%$]/.test(c) || c === '\\') {
+          op += c; i++;
+        } else if (c === '-' && i + 1 < content.length && '&|^'.includes(content[i + 1])) {
+          break;
+        } else if (c === '-') {
+          op += c; i++;
+        } else {
+          break;
+        }
+      }
+      tokens.push({ type: 'OPERAND', value: op });
+      continue;
+    }
+
+    throw Error(`Unexpected character '${ch}' in short notation`);
+  }
+
+  return tokens;
+}
+
+function expandShortNotation(content) {
+  const tokens = tokenizeShort(content);
+  if (tokens.length === 0) return '';
+
+  let pos = 0;
+  function peek() { return pos < tokens.length ? tokens[pos] : null; }
+  function consume() { return tokens[pos++]; }
+
+  function shortExpr() {
+    let left = shortUnary();
+    while (peek() && peek().type === 'OP') {
+      const op = consume();
+      const right = shortUnary();
+      left = SHORT_OP_MAP[op.value] + '(' + left + ',' + right + ')';
+    }
+    return left;
+  }
+
+  function shortUnary() {
+    if (peek() && peek().type === 'OP') {
+      const op = consume();
+      const operand = shortAtom();
+      return SHORT_OP_MAP[op.value] + '(' + operand + ')';
+    }
+    return shortAtom();
+  }
+
+  function shortAtom() {
+    const t = peek();
+    if (!t) throw Error('Expected operand in short notation, got end of expression');
+
+    if (t.type === 'NOT') {
+      consume();
+      return '!' + shortAtom();
+    }
+
+    if (t.type === 'LPAREN') {
+      consume();
+      const inner = shortExpr();
+      if (!peek() || peek().type !== 'RPAREN') throw Error(`Expected ')' in short notation`);
+      consume();
+      return inner;
+    }
+
+    if (t.type === 'OPERAND') {
+      return consume().value;
+    }
+
+    throw Error(`Unexpected token '${t.value || t.type}' in short notation`);
+  }
+
+  const result = shortExpr();
+  if (pos < tokens.length) throw Error(`Unexpected token '${tokens[pos].value || tokens[pos].type}' after short notation expression`);
+  return result;
+}
+
+
 /* ================= REPEAT PREPROCESSOR ================= */
 
 /**
@@ -10,6 +185,7 @@
  * Max total iterations per nesting group: 256.
  */
 function preprocessRepeat(source) {
+  source = preprocessShortNotation(source);
   const tree = parseRepeatTree(source, 0);
   return expandTree(tree, [], {});
 }
