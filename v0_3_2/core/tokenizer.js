@@ -34,16 +34,16 @@ class Tokenizer {
         break;
       } else if(this.peek()=='#') {
         this.next(); // Consume '#'
-        // Check if it's a block comment start #<
-        if(!this.eof() && this.peek()=='<') {
-          this.next(); // Consume '<'
-          // Skip until we find #>
+        // Check if it's a block comment start #>
+        if(!this.eof() && this.peek()=='>') {
+          this.next(); // Consume '>'
+          // Skip until we find #<
           while(!this.eof()) {
             if(this.peek()=='#') {
               this.next(); // Consume '#'
-              if(!this.eof() && this.peek()=='>') {
-                this.next(); // Consume '>'
-                break; // Found closing #>
+              if(!this.eof() && this.peek()=='<') {
+                this.next(); // Consume '<'
+                break; // Found closing #<
               }
             } else {
               this.next(); // Continue searching

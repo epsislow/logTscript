@@ -98,15 +98,15 @@ function findRepeatKeyword(source, from) {
   let i = from;
   while (i < source.length) {
     // Line comment: skip to end of line
-    if (source[i] === '#' && source[i + 1] !== '<') {
+    if (source[i] === '#' && source[i + 1] !== '>') {
       while (i < source.length && source[i] !== '\n') i++;
       continue;
     }
-    // Block comment #< ... #>
-    if (source[i] === '#' && source[i + 1] === '<') {
+    // Block comment #> ... #<
+    if (source[i] === '#' && source[i + 1] === '>') {
       i += 2;
       while (i < source.length) {
-        if (source[i] === '#' && source[i + 1] === '>') { i += 2; break; }
+        if (source[i] === '#' && source[i + 1] === '<') { i += 2; break; }
         i++;
       }
       continue;
