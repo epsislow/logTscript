@@ -90,6 +90,8 @@ function run(){
   const processedCode = preprocessRepeat(code.value);
   const p = new Parser(new Tokenizer(processedCode));
   const stmts = p.parse();
+  document.getElementById('ast').textContent=JSON.stringify(stmts,null,2);
+
   console.log('STMTS: ',  stmts);
 
   globalInterp = new Interpreter(p.funcs, [], p.pcbs);
