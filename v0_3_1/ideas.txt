@@ -423,3 +423,75 @@ Ma asteptam ca sa fie 0000000
 
 Si vad ca atunci cand .s2 devine 1 blockul al doilea nu se executa, ma astept ca la executia blocului cu set = .s2 sa se execute si get>= k si ar face k = 11111111 dar vad ca k ramane fara valoare adica 
 k (8wire) = - (ref: null)
+
+=====
+
+i want to add a new notation
+def q(8bit a, 8bit b):
+   :4bit `(a.0/4 | b.0/4) & (a.4/4 | b.4/4)`
+   :1bit `& (a | b)`
+   
+` represents an flag that tells the parser that the next tokens will be given in short notation for some of the builtIn functions. The parser should reset this flag at the next `
+
+
+the short notations and syntax will be as follows: 
+
+builtin-function: AND
+short-notation: &
+examples:  
+& a      same as:  AND(a)
+a & b    same as:  AND(a,b)
+& a.1-2/3  same as: AND(a.1-2/3)
+
+builtin-function: NOT
+short-notation: !
+examples:  
+!a      same as:  !a
+!a.1-2/3  same as: !a.1-2/3
+(should work even without this short because of the ! operator)
+
+builtin-function: OR
+short-notation: |
+examples:  
+| a      same as:  OR(a)
+a | b    same as:  OR(a,b)
+| a.1-2/3  same as: OR(a.1-2/3)
+
+  
+builtin-function: EQ
+short-notation: =
+examples:  
+a = b    same as:  EQ(a,b)
+
+
+builtin-function: NOR
+short-notation: -|
+examples:  
+-| b.1/3  same as: NOR(b.1/3)
+a -| b    same as:  NOR(a,b)
+
+  
+builtin-function: XOR
+short-notation: ^
+examples:  
+^ | a.0-3   same as: XOR(a.0-3)
+a ^ b    same as:  XOR(a,b)
+  
+
+builtin-function: NXOR
+short-notation: -^
+examples:  
+-^ b   same as : NXOR(b)
+a -^ b    same as:  NXOR(a,b)
+
+mixed notation:
+a | b | c    same as: (a | b) | c  same as: OR(OR(a,b),c)
+
+& a -| b     same as: (& a) -| b    same as: NOR(AND(a), b)
+
+builtin-function: NAND
+short-notation: -&
+examples:  
+a -& b    same as:  NAND(a,b)
+
+daca ai intrebari pentru clarificari poti sa mi le pui.
