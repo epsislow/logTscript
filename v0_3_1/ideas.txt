@@ -525,3 +525,34 @@ daca ai intrebari pentru clarificari poti sa mi le pui.
 
 
 Daca nu se poate in parser, o idee ar fi sa facem o traducere din notatia scurta in preprocessor.
+
+====
+
+comp [osc] .osc1:
+or 
+comp [~] .osc1:
+  duration1: 1
+  dutation0: 7
+  length: 4 
+  #counter bit length starts at 0000
+  freq: 10 # in hertz
+  :
+#this is oscilator is set to tick 10 times per second (freq per sec). 
+#Initial value is 0 then at the first tick it becomes 1 and holds the value for 1/8 of the freq time and then it changes to 0 and holds it for 7/8 of the freq time.
+
+1 is holded by duration1/(duration1 + duration0) and 0 is holded by duration0/(duration0 + duration1).
+
+
+
+1wire osc1 = .osc1
+1wire osc1b = .osc1:get
+#osc1b and osc1 have the values in sync 0/1
+#changes from 1 to 0 when the oscilator ticks
+
+4wire counter1 = .osc1:counter
+#is 0000 (because the length is 4 bits)
+#it increments the value when the oscilator ticks
+
+for implementation duration0 and duration1 and freq is used to calculate the intervals when the value changes.
+An tool to change the named value should exist and then maybe a setInterval or such should exist.
+
