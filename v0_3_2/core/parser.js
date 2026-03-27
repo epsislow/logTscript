@@ -815,7 +815,8 @@ assignment() {
       '*': 'multiplier',
       '/': 'divider',
       '>': 'shifter',
-      '=': 'counter'
+      '=': 'counter',
+      '~': 'osc'
     };
 
     let compType = null;
@@ -823,7 +824,10 @@ assignment() {
     if(this.c.type === 'SYM' && componentShortnames[this.c.value]){
       compType = componentShortnames[this.c.value];
       this.eat('SYM');
-    } else if(this.c.type === 'ID' && (this.c.value === 'led' || this.c.value === 'switch' || this.c.value === 'dip' || this.c.value === 'mem' || this.c.value === 'reg' || this.c.value === 'counter' || this.c.value === 'adder' || this.c.value === 'subtract' || this.c.value === 'divider' || this.c.value === 'multiplier' || this.c.value === 'shifter' || this.c.value === 'rotary' || this.c.value === 'lcd' || this.c.value === 'key')){
+    } else if(this.c.type === 'SPECIAL' && this.c.value === '~'){
+      compType = 'osc';
+      this.eat('SPECIAL');
+    } else if(this.c.type === 'ID' && (this.c.value === 'led' || this.c.value === 'switch' || this.c.value === 'dip' || this.c.value === 'mem' || this.c.value === 'reg' || this.c.value === 'counter' || this.c.value === 'adder' || this.c.value === 'subtract' || this.c.value === 'divider' || this.c.value === 'multiplier' || this.c.value === 'shifter' || this.c.value === 'rotary' || this.c.value === 'lcd' || this.c.value === 'key' || this.c.value === 'osc')){
       compType = this.c.value;
       this.eat('ID');
     } else if(this.c.value === '7seg'){
@@ -833,7 +837,7 @@ assignment() {
       compType = '7seg';
       this.eat('DEC');
     } else {
-      throw Error(`Expected 'led', 'switch', '7seg' (or '7'), 'dip', 'mem', 'reg', 'counter' (or '='), 'adder' (or '+'), 'subtract' (or '-'), 'divider' (or '/'), 'multiplier' (or '*'), 'shifter' (or '>'), 'rotary', 'lcd', or 'key' after 'comp [' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      throw Error(`Expected 'led', 'switch', '7seg' (or '7'), 'dip', 'mem', 'reg', 'counter' (or '='), 'adder' (or '+'), 'subtract' (or '-'), 'divider' (or '/'), 'multiplier' (or '*'), 'shifter' (or '>'), 'rotary', 'lcd', 'key', or 'osc' (or '~') after 'comp [' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     this.eat('SYM', ']');
 

@@ -1,4 +1,19 @@
 window.lib_files = {
+    
+    ex_osc1: `
+    comp [osc] .osc1:
+  duration1: 1
+  duration0: 3
+  length: 4
+  freq: 2
+  freqIsSec: 1
+  eachCycle: 0
+  :
+  
+1wire osc1 = .osc1:get
+4wire osc1cnt = .osc1:counter
+
+    `,
   def_ands: `
   def A2(3bit a):
    :1bit XOR(a.0, a.1)

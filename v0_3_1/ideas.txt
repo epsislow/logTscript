@@ -527,21 +527,22 @@ daca ai intrebari pentru clarificari poti sa mi le pui.
 Daca nu se poate in parser, o idee ar fi sa facem o traducere din notatia scurta in preprocessor.
 
 ====
+I want to add the oscilator component, under the name [osc] or short [~]
 
-comp [osc] .osc1:
-or 
 comp [~] .osc1:
-  duration1: 1
-  dutation0: 7
-  length: 4 
-  #counter bit length starts at 0000
-  freq: 10 # in hertz
+or 
+comp [osc] .osc1:
+  duration1: 1 #minvalue 1, maxvalue 8, defaultvalue 4
+  duration0: 7 #minvalue 1, maxvalue 8, defaultvalue 4
+  length: 4 #default 4
+  eachCycle: 1 #"1" to increment for each cycle, "0" to increment for each state, default "1"
+  #counter bit length starts with 0000
+  freq: 10 # in hertz default value is 1
   :
-#this is oscilator is set to tick 10 times per second (freq per sec). 
+#this oscilator is set to tick 10 times per second (freq per sec). 
 #Initial value is 0 then at the first tick it becomes 1 and holds the value for 1/8 of the freq time and then it changes to 0 and holds it for 7/8 of the freq time.
 
 1 is holded by duration1/(duration1 + duration0) and 0 is holded by duration0/(duration0 + duration1).
-
 
 
 1wire osc1 = .osc1
@@ -556,3 +557,5 @@ comp [~] .osc1:
 for implementation duration0 and duration1 and freq is used to calculate the intervals when the value changes.
 An tool to change the named value should exist and then maybe a setInterval or such should exist.
 
+
+If you have any questions please ask.

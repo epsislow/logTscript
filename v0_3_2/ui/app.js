@@ -82,6 +82,13 @@ function run(){
     leds.clear();
   }
   
+  if(globalInterp && globalInterp.oscTimers){
+    for(const tid of globalInterp.oscTimers){
+      clearTimeout(tid);
+    }
+    globalInterp.oscTimers = [];
+  }
+  
   let currentFileName = null;
   if(sdb.has("prog/lastName")) {
     currentFileName = sdb.get("prog/lastName");

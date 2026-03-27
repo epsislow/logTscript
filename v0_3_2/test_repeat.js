@@ -1257,6 +1257,297 @@ console.log('\n=== Test 133: Short notation — & (a | b) as return line ===');
   assert(':1bit `& (a | b)`', result, '   :1bit AND(OR(a,b))');
 }
 
+// ================================================================
+// Oscillator Component — Parser tests
+// ================================================================
+
+{
+  const parserChunk2 = tokenizerSrc + '\n' + preprocessorSrc + '\n' + parserSrc;
+  const sandboxOsc = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object };
+  const parserCode2 = parserChunk2 + `\nvar _ParserOsc = Parser; var _TokenizerOsc = Tokenizer; var _preprocessRepeatOsc = preprocessRepeat;`;
+  vm.runInNewContext(parserCode2, sandboxOsc);
+  const ParserOsc = sandboxOsc._ParserOsc;
+  const TokenizerOsc = sandboxOsc._TokenizerOsc;
+  const preprocessRepeatOsc = sandboxOsc._preprocessRepeatOsc;
+
+  function parseOsc(code) {
+    const processed = preprocessRepeatOsc(code);
+    const p = new ParserOsc(new TokenizerOsc(processed));
+    return p.parse();
+  }
+
+  console.log('\n=== Test 134: Parser — comp [osc] .o1: with attributes ===');
+  {
+    const stmts = parseOsc(`comp [osc] .o1:
+  duration1: 2
+  duration0: 6
+  length: 4
+  freq: 10
+  eachCycle: 1
+  :`);
+    const s = stmts[0];
+    assert('osc stmt has comp', String(s.comp !== undefined), 'true');
+    assert('osc comp type is osc', s.comp.type, 'osc');
+    assert('osc comp name is .o1', s.comp.name, '.o1');
+    assert('osc duration1 is 2', String(s.comp.attributes.duration1), '2');
+    assert('osc duration0 is 6', String(s.comp.attributes.duration0), '6');
+    assert('osc length is 4', String(s.comp.attributes.length), '4');
+    assert('osc freq is 10', String(s.comp.attributes.freq), '10');
+    assert('osc eachCycle is 1', String(s.comp.attributes.eachCycle), '1');
+  }
+
+  console.log('\n=== Test 135: Parser — comp [~] .o2: shortname syntax ===');
+  {
+    const stmts = parseOsc(`comp [~] .o2:
+  duration1: 1
+  duration0: 7
+  freq: 5
+  :`);
+    const s = stmts[0];
+    assert('~ shortname has comp', String(s.comp !== undefined), 'true');
+    assert('~ shortname type is osc', s.comp.type, 'osc');
+    assert('~ shortname name is .o2', s.comp.name, '.o2');
+    assert('~ shortname duration1 is 1', String(s.comp.attributes.duration1), '1');
+    assert('~ shortname duration0 is 7', String(s.comp.attributes.duration0), '7');
+    assert('~ shortname freq is 5', String(s.comp.attributes.freq), '5');
+  }
+
+  console.log('\n=== Test 136: Parser — comp [osc] .o3:: minimal (no attributes) ===');
+  {
+    const stmts = parseOsc('comp [osc] .o3::');
+    const s = stmts[0];
+    assert('minimal osc has comp', String(s.comp !== undefined), 'true');
+    assert('minimal osc type is osc', s.comp.type, 'osc');
+    assert('minimal osc name is .o3', s.comp.name, '.o3');
+  }
+
+  console.log('\n=== Test 137: Parser — comp [~] .o4:: minimal shortname ===');
+  {
+    const stmts = parseOsc('comp [~] .o4::');
+    const s = stmts[0];
+    assert('minimal ~ has comp', String(s.comp !== undefined), 'true');
+    assert('minimal ~ type is osc', s.comp.type, 'osc');
+    assert('minimal ~ name is .o4', s.comp.name, '.o4');
+  }
+
+  console.log('\n=== Test 138: Parser — comp [osc] with eachCycle: 0 (each state) ===');
+  {
+    const stmts = parseOsc(`comp [osc] .o5:
+  eachCycle: 0
+  :`);
+    const s = stmts[0];
+    assert('osc eachCycle: 0', String(s.comp.attributes.eachCycle), '0');
+  }
+
+  console.log('\n=== Test 139: Parser — comp [osc] with wire assignments ===');
+  {
+    const stmts = parseOsc(`comp [~] .osc1:
+  duration1: 1
+  duration0: 7
+  length: 4
+  freq: 10
+  :
+1wire osc1 = .osc1`);
+    assert('osc + wire: 2 statements', String(stmts.length), '2');
+    assert('first stmt is comp', String(stmts[0].comp !== undefined), 'true');
+    assert('second stmt has decls', String(Array.isArray(stmts[1].decls)), 'true');
+    assert('wire name is osc1', stmts[1].decls[0].name, 'osc1');
+  }
+
+  console.log('\n=== Test 140: Parser — comp [osc] with :get wire ===');
+  {
+    const stmts = parseOsc(`comp [osc] .osc1:
+  freq: 2
+  :
+1wire v = .osc1:get`);
+    assert('osc + :get wire: 2 statements', String(stmts.length), '2');
+    const wireStmt = stmts[1];
+    assert(':get wire has expr', String(wireStmt.expr !== null), 'true');
+  }
+
+  console.log('\n=== Test 141: Parser — comp [osc] with :counter wire ===');
+  {
+    const stmts = parseOsc(`comp [osc] .osc1:
+  length: 4
+  freq: 2
+  :
+4wire cnt = .osc1:counter`);
+    assert('osc + :counter wire: 2 statements', String(stmts.length), '2');
+    const wireStmt = stmts[1];
+    assert(':counter wire has expr', String(wireStmt.expr !== null), 'true');
+  }
+
+  console.log('\n=== Test 142: Parser — comp [osc] full program with all outputs ===');
+  {
+    const stmts = parseOsc(`comp [~] .osc1:
+  duration1: 1
+  duration0: 7
+  length: 4
+  freq: 10
+  eachCycle: 1
+  :
+1wire osc1 = .osc1
+1wire osc1b = .osc1:get
+4wire counter1 = .osc1:counter`);
+    assert('full osc program: 4 statements', String(stmts.length), '4');
+    assert('stmt 0 is comp osc', stmts[0].comp.type, 'osc');
+    assert('stmt 1 wire osc1', stmts[1].decls[0].name, 'osc1');
+    assert('stmt 2 wire osc1b', stmts[2].decls[0].name, 'osc1b');
+    assert('stmt 3 wire counter1', stmts[3].decls[0].name, 'counter1');
+  }
+}
+
+// ================================================================
+// Oscillator Component — Tokenizer tests
+// ================================================================
+
+console.log('\n=== Test 143: Tokenizer — ~ inside [~] is SPECIAL token ===');
+{
+  const { tokens } = tokenize('comp [~] .osc1::');
+  const specialTilde = tokens.filter(t => t.type === 'SPECIAL' && t.value === '~');
+  assert('~ inside [] is SPECIAL', String(specialTilde.length), '1');
+}
+
+console.log('\n=== Test 144: Tokenizer — osc as ID token ===');
+{
+  const { tokens } = tokenize('comp [osc] .osc1::');
+  const oscId = tokens.filter(t => t.type === 'ID' && t.value === 'osc');
+  assert('osc is ID token', String(oscId.length), '1');
+}
+
+console.log('\n=== Test 145: Tokenizer — :counter after component name ===');
+{
+  const { tokens } = tokenize('4wire cnt = .osc1:counter');
+  const colonTok = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+  const counterTok = tokens.filter(t => t.type === 'ID' && t.value === 'counter');
+  assert(':counter has colon SYM', String(colonTok.length >= 1), 'true');
+  assert(':counter has counter ID', String(counterTok.length), '1');
+}
+
+console.log('\n=== Test 146: Tokenizer — :get after osc component ===');
+{
+  const { tokens } = tokenize('1wire v = .osc1:get');
+  const getTok = tokens.filter(t => t.type === 'ID' && t.value === 'get');
+  assert(':get has get ID token', String(getTok.length), '1');
+}
+
+console.log('\n=== Test 147: Tokenizer — comp [~] with all attributes ===');
+{
+  const src = `comp [~] .osc1:
+  duration1: 1
+  duration0: 7
+  length: 4
+  freq: 10
+  eachCycle: 1
+  :`;
+  const { tokens } = tokenize(src);
+  const duration1Tok = tokens.filter(t => t.type === 'ID' && t.value === 'duration1');
+  const duration0Tok = tokens.filter(t => t.type === 'ID' && t.value === 'duration0');
+  const freqTok = tokens.filter(t => t.type === 'ID' && t.value === 'freq');
+  const eachCycleTok = tokens.filter(t => t.type === 'ID' && t.value === 'eachCycle');
+  assert('duration1 tokenized', String(duration1Tok.length), '1');
+  assert('duration0 tokenized', String(duration0Tok.length), '1');
+  assert('freq tokenized', String(freqTok.length), '1');
+  assert('eachCycle tokenized', String(eachCycleTok.length), '1');
+}
+
+// ================================================================
+// Oscillator — freqIsSec attribute tests
+// ================================================================
+
+{
+  const parserChunk3 = tokenizerSrc + '\n' + preprocessorSrc + '\n' + parserSrc;
+  const sandboxFreq = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object };
+  const parserCode3 = parserChunk3 + `\nvar _ParserF = Parser; var _TokenizerF = Tokenizer; var _preprocessRepeatF = preprocessRepeat;`;
+  vm.runInNewContext(parserCode3, sandboxFreq);
+  const ParserF = sandboxFreq._ParserF;
+  const TokenizerF = sandboxFreq._TokenizerF;
+  const preprocessRepeatF = sandboxFreq._preprocessRepeatF;
+
+  function parseFreq(code) {
+    const processed = preprocessRepeatF(code);
+    const p = new ParserF(new TokenizerF(processed));
+    return p.parse();
+  }
+
+  console.log('\n=== Test 148: Parser — comp [osc] with freqIsSec: 0 (Hz mode, default) ===');
+  {
+    const stmts = parseFreq(`comp [osc] .o1:
+  freq: 10
+  freqIsSec: 0
+  :`);
+    const s = stmts[0];
+    assert('freqIsSec: 0 parsed', String(s.comp.attributes.freqIsSec), '0');
+    assert('freq: 10 parsed', String(s.comp.attributes.freq), '10');
+  }
+
+  console.log('\n=== Test 149: Parser — comp [osc] with freqIsSec: 1 (seconds mode) ===');
+  {
+    const stmts = parseFreq(`comp [osc] .o2:
+  freq: 5
+  freqIsSec: 1
+  :`);
+    const s = stmts[0];
+    assert('freqIsSec: 1 parsed', String(s.comp.attributes.freqIsSec), '1');
+    assert('freq: 5 parsed', String(s.comp.attributes.freq), '5');
+  }
+
+  console.log('\n=== Test 150: Parser — comp [~] freqIsSec: 1 with large period ===');
+  {
+    const stmts = parseFreq(`comp [~] .slow:
+  freq: 30
+  freqIsSec: 1
+  duration1: 1
+  duration0: 1
+  :`);
+    const s = stmts[0];
+    assert('slow osc freqIsSec: 1', String(s.comp.attributes.freqIsSec), '1');
+    assert('slow osc freq: 30', String(s.comp.attributes.freq), '30');
+    assert('slow osc duration1: 1', String(s.comp.attributes.duration1), '1');
+    assert('slow osc duration0: 1', String(s.comp.attributes.duration0), '1');
+  }
+
+  console.log('\n=== Test 151: Parser — comp [osc] without freqIsSec (default omitted) ===');
+  {
+    const stmts = parseFreq(`comp [osc] .o3:
+  freq: 2
+  :`);
+    const s = stmts[0];
+    assert('freqIsSec absent from attributes', String(s.comp.attributes.freqIsSec), 'undefined');
+    assert('freq: 2 still parsed', String(s.comp.attributes.freq), '2');
+  }
+
+  console.log('\n=== Test 152: Parser — comp [osc] full program with freqIsSec: 1 ===');
+  {
+    const stmts = parseFreq(`comp [~] .osc1:
+  duration1: 4
+  duration0: 4
+  length: 8
+  freq: 10
+  freqIsSec: 1
+  eachCycle: 1
+  :
+1wire v = .osc1
+8wire cnt = .osc1:counter`);
+    assert('full freqIsSec program: 3 statements', String(stmts.length), '3');
+    assert('comp type osc', stmts[0].comp.type, 'osc');
+    assert('freqIsSec: 1', String(stmts[0].comp.attributes.freqIsSec), '1');
+    assert('freq: 10', String(stmts[0].comp.attributes.freq), '10');
+    assert('length: 8', String(stmts[0].comp.attributes.length), '8');
+  }
+}
+
+console.log('\n=== Test 153: Tokenizer — freqIsSec tokenized as ID ===');
+{
+  const src = `comp [~] .osc1:
+  freq: 5
+  freqIsSec: 1
+  :`;
+  const { tokens } = tokenize(src);
+  const freqIsSecTok = tokens.filter(t => t.type === 'ID' && t.value === 'freqIsSec');
+  assert('freqIsSec is ID token', String(freqIsSecTok.length), '1');
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);

@@ -28,6 +28,9 @@ class Interpreter {
     this.insidePcbBody = false; // Flag to track if we're executing inside a PCB body
     this.currentPcbInstance = null; // Current PCB instance name when inside PCB body
     
+    // Oscillator timers (for cleanup on re-run)
+    this.oscTimers = [];
+    
     // Initialize ~
     this.vars.set('~', {type: '1bit', value: '0', ref: null});
     
@@ -74,6 +77,8 @@ class Interpreter {
       case 'reg':
         // Use 'depth' attribute, default 4
         return attributes['depth'] !== undefined ? parseInt(attributes['depth'], 10) : 4;
+      case 'osc':
+        return 1;
       case 'rotary':
         // Calculate from 'states' attribute, default 8 states -> 3 bits
         const states = attributes['states'] !== undefined ? parseInt(attributes['states'], 10) : 8;
@@ -787,6 +792,35 @@ class Interpreter {
               }
               
               return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: depth};
+            } else if(comp.type === 'osc' && a.property === 'get'){
+              let val = null;
+              if(comp.ref && comp.ref !== '&-'){
+                val = this.getValueFromRef(comp.ref);
+              }
+              if(val === null || val === undefined){
+                val = '0';
+              }
+              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: 1};
+            } else if(comp.type === 'osc' && a.property === 'counter'){
+              const oscState = comp.oscState;
+              if(!oscState){
+                throw Error(`Oscillator ${a.var} has no internal state`);
+              }
+              let val = oscState.counterValue;
+              const counterLength = oscState.length;
+
+              if(a.bitRange){
+                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
+                if(start < 0 || actualEnd >= val.length || start > actualEnd){
+                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:counter (length: ${val.length})`);
+                }
+                const extracted = val.substring(start, actualEnd + 1);
+                const bitWidth = actualEnd - start + 1;
+                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
+                return {value: extracted, ref: null, varName: `${a.var}:counter.${varNameSuffix}`, bitWidth: bitWidth};
+              }
+
+              return {value: val, ref: null, varName: `${a.var}:counter`, bitWidth: counterLength};
             } else if(comp.type === 'rotary' && a.property === 'get'){
               // Rotary get property: .rot:get
               // Get value from component's ref (storage)
@@ -2641,6 +2675,9 @@ if (s.assignment) {
     if(comp.type === 'counter'){
       throw Error(`Cannot assign a value to a counter component. Use :dir, :data, and :set properties instead.`);
     }
+    if(comp.type === 'osc'){
+      throw Error(`Cannot assign a value to an osc component directly.`);
+    }
     
     // Components with returnType (switches) cannot be assigned to
     if(comp.returnType){
@@ -3628,6 +3665,93 @@ if (s.assignment) {
       
       deviceIds.push(counterId);
       // Counter components don't have a ref (they can't be assigned to directly)
+    } else if(type === 'osc'){
+      const duration1 = attributes['duration1'] !== undefined ? parseInt(attributes['duration1'], 10) : 4;
+      const duration0 = attributes['duration0'] !== undefined ? parseInt(attributes['duration0'], 10) : 4;
+      const length = attributes['length'] !== undefined ? parseInt(attributes['length'], 10) : 4;
+      const freq = attributes['freq'] !== undefined ? parseFloat(attributes['freq']) : 1;
+      const freqIsSec = attributes['freqIsSec'] !== undefined ? parseInt(attributes['freqIsSec'], 10) : 0;
+      const eachCycle = attributes['eachCycle'] !== undefined ? parseInt(attributes['eachCycle'], 10) : 1;
+
+      if(duration1 < 1 || duration1 > 8){
+        throw Error(`Oscillator duration1 must be between 1 and 8 for component ${name}`);
+      }
+      if(duration0 < 1 || duration0 > 8){
+        throw Error(`Oscillator duration0 must be between 1 and 8 for component ${name}`);
+      }
+      if(length < 1){
+        throw Error(`Oscillator length must be positive for component ${name}`);
+      }
+      if(freq <= 0){
+        throw Error(`Oscillator freq must be positive for component ${name}`);
+      }
+      if(freqIsSec !== 0 && freqIsSec !== 1){
+        throw Error(`Oscillator freqIsSec must be 0 (Hz) or 1 (seconds) for component ${name}`);
+      }
+      if(eachCycle !== 0 && eachCycle !== 1){
+        throw Error(`Oscillator eachCycle must be 0 (each state) or 1 (each cycle) for component ${name}`);
+      }
+
+      const storageIdx = this.storeValue('0');
+      const oscRef = `&${storageIdx}`;
+
+      const oscState = {
+        counterValue: '0'.repeat(length),
+        length: length,
+        eachCycle: eachCycle
+      };
+
+      const period = freqIsSec === 1 ? freq * 1000 : 1000 / freq;
+      const highTime = period * duration1 / (duration1 + duration0);
+      const lowTime = period * duration0 / (duration1 + duration0);
+
+      const self = this;
+      const compName = name;
+
+      function incrementCounter(){
+        const maxVal = (1 << oscState.length) - 1;
+        let current = parseInt(oscState.counterValue, 2);
+        current = (current + 1) > maxVal ? 0 : current + 1;
+        oscState.counterValue = current.toString(2).padStart(oscState.length, '0');
+      }
+
+      function goHigh(){
+        const stored = self.storage.find(s => s.index === storageIdx);
+        if(stored) stored.value = '1';
+        if(eachCycle === 0) incrementCounter();
+        self.updateComponentConnections(compName);
+        if(typeof showVars === 'function') showVars();
+        const tid = setTimeout(goLow, highTime);
+        self.oscTimers.push(tid);
+      }
+
+      function goLow(){
+        const stored = self.storage.find(s => s.index === storageIdx);
+        if(stored) stored.value = '0';
+        incrementCounter();
+        self.updateComponentConnections(compName);
+        if(typeof showVars === 'function') showVars();
+        const tid = setTimeout(goHigh, lowTime);
+        self.oscTimers.push(tid);
+      }
+
+      const startTid = setTimeout(goHigh, lowTime);
+      this.oscTimers.push(startTid);
+
+      // Osc has a ref (1-bit value accessible via .osc1 or .osc1:get)
+      const compInfo = {
+        type: type,
+        componentType: null,
+        name: name,
+        attributes: attributes,
+        initialValue: '0',
+        returnType: returnType,
+        ref: oscRef,
+        deviceIds: [],
+        oscState: oscState
+      };
+      this.components.set(name, compInfo);
+      return;
     } else if(type === 'adder'){
       // Create adder component
       const depth = attributes['depth'] !== undefined ? parseInt(attributes['depth'], 10) : 4;
@@ -5289,7 +5413,7 @@ if (s.assignment) {
       }
       
       // Check if component type supports :get property
-      const supportsGet = comp.type === 'mem' || comp.type === 'counter' || comp.type === 'rotary' || comp.type === 'switch' || comp.type === 'dip' || comp.type === 'key' || comp.type === 'led' || comp.type === '7seg' || comp.type === 'lcd' || comp.type === 'adder' || comp.type === 'subtract' || comp.type === 'divider' || comp.type === 'multiplier' || comp.type === 'shifter';
+      const supportsGet = comp.type === 'mem' || comp.type === 'counter' || comp.type === 'rotary' || comp.type === 'switch' || comp.type === 'dip' || comp.type === 'key' || comp.type === 'led' || comp.type === '7seg' || comp.type === 'lcd' || comp.type === 'adder' || comp.type === 'subtract' || comp.type === 'divider' || comp.type === 'multiplier' || comp.type === 'shifter' || comp.type === 'osc';
       if(!supportsGet){
         throw Error(`Component ${component} (type: ${comp.type}) does not support :get property`);
       }

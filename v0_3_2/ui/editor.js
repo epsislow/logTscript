@@ -316,7 +316,15 @@ const snippets = {
     on:1
     :`,
   'lcd': ``,
-  '7seg': ``
+  '7seg': ``,
+  'osc': `comp [~] .|:
+    duration1: 4
+    duration0: 4
+    length: 4
+    freq: 1
+    freqIsSec: 0
+    eachCycle: 1
+    :`
 };
 
 function insertComp(name) {
