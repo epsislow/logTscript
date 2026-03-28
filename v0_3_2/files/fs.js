@@ -1,5 +1,50 @@
 window.lib_files = {
+    bad_osc2: `
+    4wire d = 1111
+
+7wire a = \`000000 -| \\5\`
+8wire a4 = \\2 < \\3 w1
+8wire a5= a4.7 < \\3 w0
+
+comp [~] .osc1:
+    duration1: 1
+    duration0: 7
+    length: 6
+    freq: 8
+    freqIsSec: 0
+    eachCycle: 1
+    :
+
+1wire o1= .osc1:get
+8wire cnt = .osc1:counter
+
+comp [7seg] .sev0:
+   color: ^99ffFF
+   : 
+   
+comp [7seg] .sev1:
+   color: ^99ffFF
+   :
+
+comp [divider] .div:
+   depth: 6
+   :
+
+.div:a = .osc1:counter
+.div:b = \\10
+
+6wire div0 = .div:mod
+6wire div1 = .div:get
+
+.sev0:hex= .div:get
+.sev0:set = .osc1:get
+ 
+.sev1:hex= .div:mod
+.sev1:set = .osc1:get
+
+
     
+    `,
     ex_osc1: `
     comp [osc] .osc1:
   duration1: 1

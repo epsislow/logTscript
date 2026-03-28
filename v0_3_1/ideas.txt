@@ -559,3 +559,19 @@ An tool to change the named value should exist and then maybe a setInterval or s
 
 
 If you have any questions please ask.
+====
+
+probe(.comp)
+should show in variables all pins and pout values
+
+.comp{
+  get= 4bit 0101 (&3)
+  counter= 3bit (&1)
+  
+}
+show(.comp) should show the pins and pouts at that moment
+
+show components tab
+where you can add a comp from def ones
+pcb comp must be here too 
+  
