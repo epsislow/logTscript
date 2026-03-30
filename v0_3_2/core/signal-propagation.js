@@ -1047,6 +1047,7 @@ Interpreter.prototype.updateComponentValue = function(compName, value, bitRange)
     }
   }
 
+  /*
   if(comp.type === 'led'){
     let bitsToUse = value;
     if(bitRange){
@@ -1077,7 +1078,7 @@ Interpreter.prototype.updateComponentValue = function(compName, value, bitRange)
       else if(segmentValue.length > 8) segmentValue = segmentValue.substring(0, 8);
       comp.lastSegmentValue = segmentValue;
     }
-  }
+  }*/
 };
 
 Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
