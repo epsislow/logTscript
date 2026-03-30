@@ -95,13 +95,14 @@ function run(){
   }
   saveDb(code.value, currentFileName);
   const processedCode = preprocessRepeat(code.value);
-  const p = new Parser(new Tokenizer(processedCode));
+  const _registry = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
+  const p = new Parser(new Tokenizer(processedCode), _registry);
   const stmts = p.parse();
   document.getElementById('ast').textContent=JSON.stringify(stmts,null,2);
 
   console.log('STMTS: ',  stmts);
 
-  globalInterp = new Interpreter(p.funcs, [], p.pcbs);
+  globalInterp = new Interpreter(p.funcs, [], p.pcbs, _registry);
   globalInterp.aliases = p.aliases;
 
   for (const s of stmts) {
@@ -131,9 +132,10 @@ function sendCmd(){
   
   try{
     if(!globalInterp){
-      const p = new Parser(new Tokenizer(preprocessRepeat(code.value)));
+      const _reg = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
+      const p = new Parser(new Tokenizer(preprocessRepeat(code.value)), _reg);
       const stmts = p.parse();
-      globalInterp = new Interpreter(p.funcs, [], p.pcbs);
+      globalInterp = new Interpreter(p.funcs, [], p.pcbs, _reg);
       
       for(const s of stmts){
         globalInterp.exec(s, true);
@@ -145,7 +147,8 @@ function sendCmd(){
       }
     }
     
-    const p = new Parser(new Tokenizer(preprocessRepeat(cmdText)));
+    const _cmdReg = globalInterp.componentRegistry;
+    const p = new Parser(new Tokenizer(preprocessRepeat(cmdText)), _cmdReg);
   const stmts = p.parse();
 
     for(const [name, fn] of p.funcs.entries()){
@@ -252,7 +255,8 @@ function showVars(){
 }
 
 function toggleAST(){
-  const p=new Parser(new Tokenizer(preprocessRepeat(code.value)));
+  const _reg = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
+  const p=new Parser(new Tokenizer(preprocessRepeat(code.value)), _reg);
   const ast=p.parse();
   const panel=document.getElementById('astPanel');
   panel.style.display=panel.style.display==='none'?'block':'none';

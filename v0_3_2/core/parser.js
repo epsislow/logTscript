@@ -1,10 +1,11 @@
 /* ================= PARSER ================= */
 
 class Parser {
-  constructor(t){
+  constructor(t, componentRegistry){
     this.t=t; this.c=t.get(); this.funcs=new Map();
     this.aliases = new Map();
     this.pcbs = new Map();
+    this.componentRegistry = componentRegistry || null;
   }
   eat(type,val){
   //  console.log(type + ': ' + val);
@@ -135,7 +136,7 @@ parseLoad() {
   }
 
   const processedContent = preprocessRepeat(content);
-  const subParser = new Parser(new Tokenizer(processedContent, path));
+  const subParser = new Parser(new Tokenizer(processedContent, path), this.componentRegistry);
   subParser.parse();
 
   for (const [fname, fdef] of subParser.funcs.entries()) {
@@ -233,7 +234,7 @@ parsePcbDefinition() {
   const name = this.c.value;
   this.eat('ID');
   
-  const reserved = ['led', 'switch', '7seg', 'dip', 'mem', 'counter', 'adder', 'subtract', 'divider', 'multiplier', 'shifter', 'rotary', 'lcd'];
+  const reserved = this.componentRegistry ? this.componentRegistry.getReservedNames() : ['led', 'switch', '7seg', 'dip', 'mem', 'counter', 'adder', 'subtract', 'divider', 'multiplier', 'shifter', 'rotary', 'lcd'];
   if (reserved.includes(name)) {
     throw Error(`PCB name '${name}' is reserved at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
@@ -808,16 +809,14 @@ assignment() {
     this.eat('KEYWORD', 'comp');
     this.eat('SYM', '[');
 
-    const componentShortnames = {
-      '7': '7seg',
-      '+': 'adder',
-      '-': 'subtract',
-      '*': 'multiplier',
-      '/': 'divider',
-      '>': 'shifter',
-      '=': 'counter',
-      '~': 'osc'
+    const componentShortnames = this.componentRegistry ? this.componentRegistry.getShortnames() : {
+      '7': '7seg', '+': 'adder', '-': 'subtract', '*': 'multiplier',
+      '/': 'divider', '>': 'shifter', '=': 'counter', '~': 'osc'
     };
+    const validTypes = this.componentRegistry ? this.componentRegistry.getAllTypes() : [
+      'led', 'switch', 'dip', 'mem', 'reg', 'counter', 'adder', 'subtract',
+      'divider', 'multiplier', 'shifter', 'rotary', 'lcd', 'key', 'osc'
+    ];
 
     let compType = null;
 
@@ -827,7 +826,7 @@ assignment() {
     } else if(this.c.type === 'SPECIAL' && this.c.value === '~'){
       compType = 'osc';
       this.eat('SPECIAL');
-    } else if(this.c.type === 'ID' && (this.c.value === 'led' || this.c.value === 'switch' || this.c.value === 'dip' || this.c.value === 'mem' || this.c.value === 'reg' || this.c.value === 'counter' || this.c.value === 'adder' || this.c.value === 'subtract' || this.c.value === 'divider' || this.c.value === 'multiplier' || this.c.value === 'shifter' || this.c.value === 'rotary' || this.c.value === 'lcd' || this.c.value === 'key' || this.c.value === 'osc')){
+    } else if(this.c.type === 'ID' && validTypes.includes(this.c.value)){
       compType = this.c.value;
       this.eat('ID');
     } else if(this.c.value === '7seg'){
@@ -837,7 +836,8 @@ assignment() {
       compType = '7seg';
       this.eat('DEC');
     } else {
-      throw Error(`Expected 'led', 'switch', '7seg' (or '7'), 'dip', 'mem', 'reg', 'counter' (or '='), 'adder' (or '+'), 'subtract' (or '-'), 'divider' (or '/'), 'multiplier' (or '*'), 'shifter' (or '>'), 'rotary', 'lcd', 'key', or 'osc' (or '~') after 'comp [' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      const typeList = validTypes.join("', '");
+      throw Error(`Expected '${typeList}' after 'comp [' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     this.eat('SYM', ']');
 
@@ -1087,7 +1087,15 @@ assignment() {
               checkI++;
             }
             
-            const segAttributes = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+            let segAttributes = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+            if (this.componentRegistry) {
+              const handler = this.componentRegistry.get(compType);
+              if (handler) {
+                const specialAttrs = handler.getSpecialParseAttributes();
+                if (specialAttrs && specialAttrs.segAttributes) segAttributes = specialAttrs.segAttributes;
+                else segAttributes = [];
+              }
+            }
             if (segAttributes.includes(attrName) && checkI < this.t.src.length && /[0-9]/.test(this.t.src[checkI])) {
               let numStr = '';
               while (checkI < this.t.src.length && /[0-9]/.test(this.t.src[checkI])) {

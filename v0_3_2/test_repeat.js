@@ -1548,6 +1548,141 @@ console.log('\n=== Test 153: Tokenizer — freqIsSec tokenized as ID ===');
   assert('freqIsSec is ID token', String(freqIsSecTok.length), '1');
 }
 
+// ================================================================
+// Component Registry & Extraction Tests
+// ================================================================
+
+console.log('\n=== Test 200: Component Registry — all types registered ===');
+{
+  const componentFiles = [
+    'component-base', 'builtin-component', 'component-registry',
+    'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
+    'adder', 'subtract', 'multiplier', 'divider', 'shifter',
+    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', 'index'
+  ];
+  let componentsSrc = '';
+  for (const f of componentFiles) {
+    componentsSrc += fs.readFileSync(`./core/components/${f}.js`, 'utf-8')
+      .replace(/^var \w+ = \(typeof require\b.*$/gm, '')
+      .replace(/^if \(typeof module\b.*\n.*module\.exports.*\n\}/gm, '') + '\n';
+  }
+
+  const fullChunk = tokenizerSrc + '\n' + preprocessorSrc + '\n' + componentsSrc + '\n' + parserSrc;
+  const sb = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, setTimeout, JSON, Number, isNaN };
+  const code = fullChunk + `\nvar _CR = createComponentRegistry; var _P = Parser; var _T = Tokenizer; var _PR = preprocessRepeat;`;
+  vm.runInNewContext(code, sb);
+  const registry = sb._CR();
+  const Parser3 = sb._P;
+  const Tokenizer3 = sb._T;
+  const preprocessRepeat3 = sb._PR;
+
+  const expectedTypes = ['led', 'switch', 'key', 'dip', '7seg', 'lcd', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'osc', 'rotary'];
+  for (const t of expectedTypes) {
+    assert(`registry has ${t}`, String(registry.has(t)), 'true');
+  }
+
+  console.log('\n=== Test 201: Component Registry — getWidthBits ===');
+  assert('led bits', String(registry.get('led').getWidthBits({})), '1');
+  assert('switch bits', String(registry.get('switch').getWidthBits({})), '1');
+  assert('7seg bits', String(registry.get('7seg').getWidthBits({})), '8');
+  assert('lcd bits', String(registry.get('lcd').getWidthBits({})), '8');
+  assert('dip default bits', String(registry.get('dip').getWidthBits({})), '4');
+  assert('dip with length 8', String(registry.get('dip').getWidthBits({length: '8'})), '8');
+  assert('adder default bits', String(registry.get('adder').getWidthBits({})), '4');
+  assert('adder depth 8', String(registry.get('adder').getWidthBits({depth: '8'})), '8');
+  assert('osc bits', String(registry.get('osc').getWidthBits({})), '1');
+  assert('rotary default bits', String(registry.get('rotary').getWidthBits({})), '3');
+  assert('rotary 4 states', String(registry.get('rotary').getWidthBits({states: '4'})), '2');
+
+  console.log('\n=== Test 202: Component Registry — shortnames ===');
+  const shortnames = registry.getShortnames();
+  assert('shortname 7', shortnames['7'], '7seg');
+  assert('shortname +', shortnames['+'], 'adder');
+  assert('shortname -', shortnames['-'], 'subtract');
+  assert('shortname *', shortnames['*'], 'multiplier');
+  assert('shortname /', shortnames['/'], 'divider');
+  assert('shortname >', shortnames['>'], 'shifter');
+  assert('shortname =', shortnames['='], 'counter');
+  assert('shortname ~', shortnames['~'], 'osc');
+
+  console.log('\n=== Test 203: Component Registry — supportsProperty ===');
+  assert('led supports get', String(registry.supportsProperty('led', 'get')), 'true');
+  assert('adder supports get', String(registry.supportsProperty('adder', 'get')), 'true');
+  assert('adder supports carry', String(registry.supportsProperty('adder', 'carry')), 'true');
+  assert('divider supports mod', String(registry.supportsProperty('divider', 'mod')), 'true');
+  assert('multiplier supports over', String(registry.supportsProperty('multiplier', 'over')), 'true');
+  assert('shifter supports out', String(registry.supportsProperty('shifter', 'out')), 'true');
+  assert('osc supports counter', String(registry.supportsProperty('osc', 'counter')), 'true');
+
+  console.log('\n=== Test 204: Component Registry — supportsRedirect ===');
+  assert('adder redirect carry', String(registry.supportsRedirect('adder', 'carry')), 'true');
+  assert('divider redirect mod', String(registry.supportsRedirect('divider', 'mod')), 'true');
+  assert('multiplier redirect over', String(registry.supportsRedirect('multiplier', 'over')), 'true');
+  assert('shifter redirect out', String(registry.supportsRedirect('shifter', 'out')), 'true');
+  assert('led no carry', String(registry.supportsRedirect('led', 'carry')), 'false');
+
+  console.log('\n=== Test 205: Component Registry — reservedNames ===');
+  const reserved = registry.getReservedNames();
+  assert('led is reserved', String(reserved.includes('led')), 'true');
+  assert('switch is reserved', String(reserved.includes('switch')), 'true');
+  assert('key is NOT reserved', String(reserved.includes('key')), 'false');
+  assert('osc is NOT reserved', String(reserved.includes('osc')), 'false');
+  assert('reg is NOT reserved', String(reserved.includes('reg')), 'false');
+
+  console.log('\n=== Test 206: Component Registry — specialParseAttributes ===');
+  const sevenSegAttrs = registry.get('7seg').getSpecialParseAttributes();
+  assert('7seg has segAttributes', String(sevenSegAttrs !== null), 'true');
+  assert('7seg segAttributes length', String(sevenSegAttrs.segAttributes.length), '8');
+  assert('led has no special attrs', String(registry.get('led').getSpecialParseAttributes()), 'null');
+
+  console.log('\n=== Test 207: Parser with registry — parseComp led ===');
+  {
+    const processed = preprocessRepeat3('comp [led] .myled::');
+    const p = new Parser3(new Tokenizer3(processed), registry);
+    const stmts = p.parse();
+    assert('comp type is led', stmts[0].comp.type, 'led');
+    assert('comp name is .myled', stmts[0].comp.name, '.myled');
+  }
+
+  console.log('\n=== Test 208: Parser with registry — parseComp 7seg shortname ===');
+  {
+    const processed = preprocessRepeat3('comp [7] .display::');
+    const p = new Parser3(new Tokenizer3(processed), registry);
+    const stmts = p.parse();
+    assert('comp type is 7seg', stmts[0].comp.type, '7seg');
+  }
+
+  console.log('\n=== Test 209: Parser with registry — parseComp adder shortname ===');
+  {
+    const processed = preprocessRepeat3('comp [+] .add1: depth:8 :');
+    const p = new Parser3(new Tokenizer3(processed), registry);
+    const stmts = p.parse();
+    assert('comp type is adder', stmts[0].comp.type, 'adder');
+    assert('adder depth is 8', String(stmts[0].comp.attributes.depth), '8');
+  }
+
+  console.log('\n=== Test 210: Parser with registry — parseComp osc ===');
+  {
+    const processed = preprocessRepeat3('comp [~] .osc1::');
+    const p = new Parser3(new Tokenizer3(processed), registry);
+    const stmts = p.parse();
+    assert('comp type is osc', stmts[0].comp.type, 'osc');
+  }
+
+  console.log('\n=== Test 211: getForbidDirectAssign ===');
+  assert('mem forbids', String(registry.get('mem').getForbidDirectAssign() !== null), 'true');
+  assert('counter forbids', String(registry.get('counter').getForbidDirectAssign() !== null), 'true');
+  assert('osc forbids', String(registry.get('osc').getForbidDirectAssign() !== null), 'true');
+  assert('led allows', String(registry.get('led').getForbidDirectAssign()), 'null');
+  assert('adder allows', String(registry.get('adder').getForbidDirectAssign()), 'null');
+
+  console.log('\n=== Test 212: hexTo7Seg static method ===');
+  const SevenSegComp = registry.get('7seg');
+  assert('hex 0 -> 1111110', SevenSegComp.constructor.hexTo7Seg('0000'), '1111110');
+  assert('hex 1 -> 0110000', SevenSegComp.constructor.hexTo7Seg('0001'), '0110000');
+  assert('hex F -> 1000111', SevenSegComp.constructor.hexTo7Seg('1111'), '1000111');
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);

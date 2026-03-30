@@ -1,9 +1,10 @@
 /* ================= INTERPRETER ================= */
 
 class Interpreter {
-  constructor(funcs,out,pcbs=null){
+  constructor(funcs,out,pcbs=null,componentRegistry=null){
     this.funcs=funcs;
     this.out=out;
+    this.componentRegistry = componentRegistry;
     this.storage=[]; // Array of stored values: [{value: "101", index: 0}, ...]
     this.nextIndex=0;
     this.vars=new Map(); // Variable name -> {type, value, ref}
@@ -52,40 +53,12 @@ class Interpreter {
     return m ? parseInt(m[1]) : null;
   }
 
-  // Get bit width for component based on type and attributes
   getComponentBits(compType, attributes){
-    switch(compType){
-      case 'led':
-      case 'switch':
-      case 'key':
-        return 1;
-      case '7seg':
-      case 'lcd':
-        return 8;
-      case 'dip':
-        // Use 'length' attribute, default 4
-        return attributes['length'] !== undefined ? parseInt(attributes['length'], 10) : 4;
-      case 'counter':
-      case 'adder':
-      case 'subtract':
-      case 'multiplier':
-      case 'divider':
-      case 'shifter':
-      case 'mem':
-        // Use 'depth' attribute, default 4
-        return attributes['depth'] !== undefined ? parseInt(attributes['depth'], 10) : 4;
-      case 'reg':
-        // Use 'depth' attribute, default 4
-        return attributes['depth'] !== undefined ? parseInt(attributes['depth'], 10) : 4;
-      case 'osc':
-        return 1;
-      case 'rotary':
-        // Calculate from 'states' attribute, default 8 states -> 3 bits
-        const states = attributes['states'] !== undefined ? parseInt(attributes['states'], 10) : 8;
-        return Math.ceil(Math.log2(states));
-      default:
-        return 4; // Default fallback
+    if(this.componentRegistry){
+      const handler = this.componentRegistry.get(compType);
+      if(handler) return handler.getWidthBits(attributes);
     }
+    return 4;
   }
 
   isWire(type){
@@ -672,556 +645,14 @@ class Interpreter {
         if(comp){
           // Check if it's a property access (e.g., .component:get)
           if(a.property){
-            if(comp.type === 'mem' && a.property === 'get'){
-              // Memory get property: .ram:get
-              const memId = comp.deviceIds[0];
-              const pending = this.componentPendingProperties.get(a.var);
-              const setWhen = this.componentPendingSet.get(a.var);
-              
-              // Get current address from pending.at
-              // IMPORTANT: Always re-evaluate the address expression to get current value
-              let address = 0;
-              if(pending && pending.at){
-                let addressValue = pending.at.value;
-                
-                // Re-evaluate the expression to get current value from references
-                if(pending.at.expr){
-                  const exprResult = this.evalExpr(pending.at.expr, false);
-                  addressValue = '';
-                  for(const part of exprResult){
-                    if(part.value && part.value !== '-'){
-                      addressValue += part.value;
-                    } else if(part.ref && part.ref !== '&-'){
-                      const val = this.getValueFromRef(part.ref);
-                      if(val) addressValue += val;
-                    }
-                  }
-                }
-                
-                address = parseInt(addressValue, 2);
+            if(this.componentRegistry){
+              const handler = this.componentRegistry.get(comp.type);
+              if(handler && handler.evalGetProperty){
+                const result = handler.evalGetProperty(comp, a.property, a, this);
+                if(result) return result;
               }
-              
-              // Get value from memory
-              // IMPORTANT: If :set = ~ was executed, don't read pending.data.value
-              // Only read from actual memory, not from pending properties that haven't been applied yet
-              let val = null;
-              if(typeof getMem === 'function'){
-                val = getMem(memId, address);
-              }
-              
-              // Get depth for bitWidth
-              const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-              
-              // If no value, use default
-              if(val === null || val === undefined){
-                val = comp.initialValue || '0'.repeat(depth);
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: depth};
-            } else if(comp.type === 'reg' && a.property === 'get'){
-              // Register get property: .r:get
-              const regId = comp.deviceIds[0];
-              
-              // Get value from register (no address needed, always address 0)
-              let val = null;
-              if(typeof getReg === 'function'){
-                val = getReg(regId);
-              }
-              
-              // Get depth for bitWidth
-              const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-              
-              // If no value, use default
-              if(val === null || val === undefined){
-                val = comp.initialValue || '0'.repeat(depth);
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: depth};
-            } else if(comp.type === 'counter' && a.property === 'get'){
-              // Counter get property: .c:get
-              const counterId = comp.deviceIds[0];
-              
-              // Get value from counter
-              let val = null;
-              if(typeof getCounter === 'function'){
-                val = getCounter(counterId);
-              }
-              
-              // Get depth for bitWidth
-              const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-              
-              // If no value, use default
-              if(val === null || val === undefined){
-                val = comp.initialValue || '0'.repeat(depth);
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: depth};
-            } else if(comp.type === 'osc' && a.property === 'get'){
-              let val = null;
-              if(comp.ref && comp.ref !== '&-'){
-                val = this.getValueFromRef(comp.ref);
-              }
-              if(val === null || val === undefined){
-                val = '0';
-              }
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: 1};
-            } else if(comp.type === 'osc' && a.property === 'counter'){
-              const oscState = comp.oscState;
-              if(!oscState){
-                throw Error(`Oscillator ${a.var} has no internal state`);
-              }
-              let val = oscState.counterValue;
-              const counterLength = oscState.length;
-
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:counter (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:counter.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-
-              return {value: val, ref: null, varName: `${a.var}:counter`, bitWidth: counterLength};
-            } else if(comp.type === 'rotary' && a.property === 'get'){
-              // Rotary get property: .rot:get
-              // Get value from component's ref (storage)
-              let val = null;
-              if(comp.ref){
-                val = this.getValueFromRef(comp.ref);
-              }
-              
-              // Get bit width
-              // For rotary:get, use calculatedBits (number of bits needed to represent states)
-              const states = comp.attributes['states'] !== undefined ? parseInt(comp.attributes['states'], 10) : 8;
-              const calculatedBits = Math.ceil(Math.log2(states));
-              const actualBits = calculatedBits; // Always use calculatedBits for rotary:get
-              
-              // If no value, use default (all zeros)
-              if(val === null || val === undefined){
-                val = '0'.repeat(actualBits);
-              } else {
-                // Ensure value has correct length (calculatedBits, not componentType bits)
-                if(val.length < actualBits){
-                  val = val.padStart(actualBits, '0');
-                } else if(val.length > actualBits){
-                  val = val.substring(0, actualBits);
-                }
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: actualBits};
-            } else if(comp.type === 'adder' && a.property === 'get'){
-              // Adder get property: .add:get
-              const adderId = comp.deviceIds[0];
-              
-              // Get value from adder
-              let val = null;
-              if(typeof getAdder === 'function'){
-                val = getAdder(adderId);
-              }
-              
-              // Get depth for bitWidth
-              const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-              
-              // If no value, use default (all zeros)
-              if(val === null || val === undefined){
-                val = '0'.repeat(depth);
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: depth};
-            } else if(comp.type === 'adder' && a.property === 'carry'){
-              // Adder carry property: .add:carry
-              const adderId = comp.deviceIds[0];
-              
-              // Get carry value from adder
-              let val = null;
-              if(typeof getAdderCarry === 'function'){
-                val = getAdderCarry(adderId);
-              }
-              
-              // If no value, use default (0)
-              if(val === null || val === undefined){
-                val = '0';
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:carry`, bitWidth: 1};
-            } else if(comp.type === 'subtract' && a.property === 'get'){
-              // Subtract get property: .sub:get
-              const subtractId = comp.deviceIds[0];
-              
-              // Get value from subtract
-              let val = null;
-              if(typeof getSubtract === 'function'){
-                val = getSubtract(subtractId);
-              }
-              
-              // Get depth for bitWidth
-              const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-              
-              // If no value, use default (all zeros)
-              if(val === null || val === undefined){
-                val = '0'.repeat(depth);
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: depth};
-            } else if(comp.type === 'subtract' && a.property === 'carry'){
-              // Subtract carry property: .sub:carry
-              const subtractId = comp.deviceIds[0];
-              
-              // Get carry value from subtract
-              let val = null;
-              if(typeof getSubtractCarry === 'function'){
-                val = getSubtractCarry(subtractId);
-              }
-              
-              // If no value, use default (0)
-              if(val === null || val === undefined){
-                val = '0';
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:carry`, bitWidth: 1};
-            } else if(comp.type === 'divider' && a.property === 'get'){
-              // Divider get property: .div:get
-              const dividerId = comp.deviceIds[0];
-              
-              // Get value from divider
-              let val = null;
-              if(typeof getDivider === 'function'){
-                val = getDivider(dividerId);
-              }
-              
-              // Get depth for bitWidth
-              const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-              
-              // If no value, use default (all zeros)
-              if(val === null || val === undefined){
-                val = '0'.repeat(depth);
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: depth};
-            } else if(comp.type === 'divider' && a.property === 'mod'){
-              // Divider mod property: .div:mod
-              const dividerId = comp.deviceIds[0];
-              
-              // Get mod value from divider
-              let val = null;
-              if(typeof getDividerMod === 'function'){
-                val = getDividerMod(dividerId);
-              }
-              
-              // Get depth for bitWidth
-              const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-              
-              // If no value, use default (all zeros)
-              if(val === null || val === undefined){
-                val = '0'.repeat(depth);
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:mod (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:mod.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:mod`, bitWidth: depth};
-            } else if(comp.type === 'multiplier' && a.property === 'get'){
-              // Multiplier get property: .mul:get
-              const multiplierId = comp.deviceIds[0];
-              
-              // Get value from multiplier
-              let val = null;
-              if(typeof getMultiplier === 'function'){
-                val = getMultiplier(multiplierId);
-              }
-              
-              // Get depth for bitWidth
-              const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-              
-              // If no value, use default (all zeros)
-              if(val === null || val === undefined){
-                val = '0'.repeat(depth);
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: depth};
-            } else if(comp.type === 'multiplier' && a.property === 'over'){
-              // Multiplier over property: .mul:over
-              const multiplierId = comp.deviceIds[0];
-              
-              // Get overflow value from multiplier
-              let val = null;
-              if(typeof getMultiplierOver === 'function'){
-                val = getMultiplierOver(multiplierId);
-              }
-              
-              // Get depth for bitWidth
-              const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-              
-              // If no value, use default (all zeros)
-              if(val === null || val === undefined){
-                val = '0'.repeat(depth);
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:over (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:over.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:over`, bitWidth: depth};
-            } else if(comp.type === 'shifter' && a.property === 'get'){
-              // Shifter get property: .sh:get
-              const shifterId = comp.deviceIds[0];
-              
-              // Get value from shifter
-              let val = null;
-              if(typeof getShifter === 'function'){
-                val = getShifter(shifterId);
-              }
-              
-              // Get depth for bitWidth
-              const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-              
-              // If no value, use default (all zeros)
-              if(val === null || val === undefined){
-                val = '0'.repeat(depth);
-              }
-              
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: depth};
-            } else if(comp.type === 'shifter' && a.property === 'out'){
-              // Shifter out property: .sh:out
-              const shifterId = comp.deviceIds[0];
-              
-              // Get out value from shifter
-              let val = null;
-              if(typeof getShifterOut === 'function'){
-                val = getShifterOut(shifterId);
-              }
-              
-              // If no value, use default (0)
-              if(val === null || val === undefined){
-                val = '0';
-              }
-              
-              return {value: val, ref: null, varName: `${a.var}:out`, bitWidth: 1};
-            } else if(comp.type === 'led' && a.property === 'get'){
-              // LED get property: .led:get
-              // Return current value from storage
-              let val = null;
-              if(comp.ref && comp.ref !== '&-'){
-                val = this.getValueFromRef(comp.ref);
-              }
-
-              // Get bit width from component type and attributes
-              const bits = this.getComponentBits(comp.type, comp.attributes) || 1;
-
-              // If no value, use default (all zeros)
-              if(val === null || val === undefined){
-                val = comp.initialValue || '0'.repeat(bits);
-              }
-
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: bits};
-            } else if((comp.type === 'switch' || comp.type === 'dip' || comp.type === 'key') && a.property === 'get'){
-              // Switch/DIP/Key get property: return current value from storage
-              let val = null;
-              if(comp.ref && comp.ref !== '&-'){
-                val = this.getValueFromRef(comp.ref);
-              }
-
-              // Get bit width from component type and attributes
-              const bits = this.getComponentBits(comp.type, comp.attributes) || 1;
-
-              // If no value, use default (all zeros)
-              if(val === null || val === undefined){
-                val = comp.initialValue || '0'.repeat(bits);
-              }
-
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: bits};
-            } else if(comp.type === '7seg' && a.property === 'get'){
-              // 7seg get property: return 8-bit segment pattern (a-h)
-              // Use lastSegmentValue stored on the component
-              let val = comp.lastSegmentValue || '00000000';
-
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: 8};
-            } else if(comp.type === 'lcd' && a.property === 'get'){
-              // LCD get property: return 8-bit last character value
-              // Use lastCharValue stored on the component
-              let val = comp.lastCharValue || '00000000';
-
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:get (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:get.${varNameSuffix}`, bitWidth: bitWidth};
-              }
-
-              return {value: val, ref: null, varName: `${a.var}:get`, bitWidth: 8};
-            } else {
-              // Other properties are not valid in expressions
-              throw Error(`Property ${a.property} cannot be used in expressions for component ${a.var}`);
             }
+            throw Error(`Property ${a.property} cannot be used in expressions for component ${a.var}`);
           }
           
           // Component found - get its value from ref
@@ -1619,7 +1050,7 @@ const idx = parseInt(
     throw Error(`Bad arity for ${name}`);
   }
 
-  const local = new Interpreter(this.funcs, this.out, this.pcbDefinitions);
+  const local = new Interpreter(this.funcs, this.out, this.pcbDefinitions, this.componentRegistry);
   local.aliases = this.aliases;
   local.storage = this.storage;
   local.nextIndex = this.nextIndex;
@@ -2543,123 +1974,10 @@ if (s.assignment) {
           value: value // Store current value
         };
         
-        // For adder, apply .a and .b properties immediately
-        if(comp && comp.type === 'adder' && (property === 'a' || property === 'b')){
-          const adderId = comp.deviceIds[0];
-          const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-          
-          // Ensure value has correct length
-          let binValue = value;
-          if(binValue.length < depth){
-            binValue = binValue.padStart(depth, '0');
-          } else if(binValue.length > depth){
-            binValue = binValue.substring(0, depth);
-          }
-          
-          // Apply immediately
-          if(property === 'a' && typeof setAdderA === 'function'){
-            setAdderA(adderId, binValue);
-          } else if(property === 'b' && typeof setAdderB === 'function'){
-            setAdderB(adderId, binValue);
-          }
-        }
-        
-        // For LCD, store properties (x, y, rowlen, data, clear) - will be applied when :set = 1
-        // No immediate application needed for LCD properties
-        
-        // For subtract, apply .a and .b properties immediately
-        if(comp && comp.type === 'subtract' && (property === 'a' || property === 'b')){
-          const subtractId = comp.deviceIds[0];
-          const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-          
-          // Ensure value has correct length
-          let binValue = value;
-          if(binValue.length < depth){
-            binValue = binValue.padStart(depth, '0');
-          } else if(binValue.length > depth){
-            binValue = binValue.substring(0, depth);
-          }
-          
-          // Apply immediately
-          if(property === 'a' && typeof setSubtractA === 'function'){
-            setSubtractA(subtractId, binValue);
-          } else if(property === 'b' && typeof setSubtractB === 'function'){
-            setSubtractB(subtractId, binValue);
-          }
-        }
-        
-        // For divider, apply .a and .b properties immediately
-        if(comp && comp.type === 'divider' && (property === 'a' || property === 'b')){
-          const dividerId = comp.deviceIds[0];
-          const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-          
-          // Ensure value has correct length
-          let binValue = value;
-          if(binValue.length < depth){
-            binValue = binValue.padStart(depth, '0');
-          } else if(binValue.length > depth){
-            binValue = binValue.substring(0, depth);
-          }
-          
-          // Apply immediately
-          if(property === 'a' && typeof setDividerA === 'function'){
-            setDividerA(dividerId, binValue);
-          } else if(property === 'b' && typeof setDividerB === 'function'){
-            setDividerB(dividerId, binValue);
-          }
-        }
-        
-        // For multiplier, apply .a and .b properties immediately
-        if(comp && comp.type === 'multiplier' && (property === 'a' || property === 'b')){
-          const multiplierId = comp.deviceIds[0];
-          const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-          
-          // Ensure value has correct length
-          let binValue = value;
-          if(binValue.length < depth){
-            binValue = binValue.padStart(depth, '0');
-          } else if(binValue.length > depth){
-            binValue = binValue.substring(0, depth);
-          }
-          
-          // Apply immediately
-          if(property === 'a' && typeof setMultiplierA === 'function'){
-            setMultiplierA(multiplierId, binValue);
-          } else if(property === 'b' && typeof setMultiplierB === 'function'){
-            setMultiplierB(multiplierId, binValue);
-          }
-        }
-        
-        // For shifter, apply .value, .dir, and .in properties immediately
-        if(comp && comp.type === 'shifter' && (property === 'value' || property === 'dir' || property === 'in')){
-          const shifterId = comp.deviceIds[0];
-          const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-          
-          if(property === 'value'){
-            // Ensure value has correct length
-            let binValue = value;
-            if(binValue.length < depth){
-              binValue = binValue.padStart(depth, '0');
-            } else if(binValue.length > depth){
-              binValue = binValue.substring(0, depth);
-            }
-            
-            // Apply immediately
-            if(typeof setShifterValue === 'function'){
-              setShifterValue(shifterId, binValue);
-            }
-          } else if(property === 'dir'){
-            // Direction: 1 = right, 0 = left
-            const dirValue = parseInt(value, 2);
-            if(typeof setShifterDir === 'function'){
-              setShifterDir(shifterId, dirValue);
-            }
-          } else if(property === 'in'){
-            // Input bit: '0' or '1'
-            const inValue = value.length > 0 ? value[value.length - 1] : '0'; // Take last bit if multiple bits
-            if(typeof setShifterIn === 'function'){
-              setShifterIn(shifterId, inValue);
-            }
+        if(comp && this.componentRegistry){
+          const handler = this.componentRegistry.get(comp.type);
+          if(handler && handler.handleImmediateAssignment){
+            handler.handleImmediateAssignment(comp, property, value, this);
           }
         }
       }
@@ -2667,16 +1985,12 @@ if (s.assignment) {
       return;
     }
     
-    // Regular component assignment: .power = a.0
-    // Memory and counter components cannot be assigned to directly
-    if(comp.type === 'mem'){
-      throw Error(`Cannot assign a value to a mem component. Use :at, :data, and :set properties instead.`);
-    }
-    if(comp.type === 'counter'){
-      throw Error(`Cannot assign a value to a counter component. Use :dir, :data, and :set properties instead.`);
-    }
-    if(comp.type === 'osc'){
-      throw Error(`Cannot assign a value to an osc component directly.`);
+    if(this.componentRegistry){
+      const handler = this.componentRegistry.get(comp.type);
+      if(handler){
+        const forbidMsg = handler.getForbidDirectAssign();
+        if(forbidMsg) throw Error(forbidMsg);
+      }
     }
     
     // Components with returnType (switches) cannot be assigned to
@@ -3339,6 +2653,35 @@ if (s.assignment) {
     
     // Generate unique ID for component
     const baseId = name.substring(1); // Remove leading '.'
+    
+    if(this.componentRegistry){
+      const handler = this.componentRegistry.get(type);
+      if(handler){
+        const result = handler.createDevice(name, baseId, bits, attributes, initialValue, returnType, this);
+        if(result.earlyReturn && result.compInfo){
+          this.components.set(name, result.compInfo);
+          return;
+        }
+        const compInfo = {
+          type: type,
+          componentType: null,
+          attributes: attributes,
+          initialValue: initialValue,
+          returnType: returnType,
+          ref: result.ref || null,
+          deviceIds: result.deviceIds
+        };
+        if(!compInfo.ref && initialValue && !result.ref){
+          const storageIdx = this.storeValue(initialValue);
+          compInfo.ref = `&${storageIdx}`;
+        }
+        handler.finalizeCompInfo(compInfo, attributes, initialValue, bits);
+        this.components.set(name, compInfo);
+        return;
+      }
+      throw Error(`Unknown component type: ${type}`);
+    }
+
     const deviceIds = [];
     
     if(type === 'led'){
@@ -4394,8 +3737,7 @@ if (s.assignment) {
         return;
       }
       
-      // Check if component type supports :get property
-      const supportsGet = comp.type === 'mem' || comp.type === 'counter' || comp.type === 'rotary' || comp.type === 'switch' || comp.type === 'dip' || comp.type === 'key' || comp.type === 'led' || comp.type === '7seg' || comp.type === 'lcd' || comp.type === 'adder' || comp.type === 'subtract' || comp.type === 'divider' || comp.type === 'multiplier' || comp.type === 'shifter' || comp.type === 'osc';
+      const supportsGet = this.componentRegistry ? this.componentRegistry.supportsProperty(comp.type, 'get') : true;
       if(!supportsGet){
         throw Error(`Component ${component} (type: ${comp.type}) does not support :get property`);
       }
@@ -4472,7 +3814,7 @@ if (s.assignment) {
         return;
       }
       
-      if(comp.type !== 'divider'){
+      if(!this.componentRegistry || !this.componentRegistry.supportsRedirect(comp.type, 'mod')){
         throw Error(`Component ${component} (type: ${comp.type}) does not support :mod property`);
       }
       
@@ -4548,7 +3890,7 @@ if (s.assignment) {
         return;
       }
       
-      if(comp.type !== 'adder' && comp.type !== 'subtract'){
+      if(!this.componentRegistry || !this.componentRegistry.supportsRedirect(comp.type, 'carry')){
         throw Error(`Component ${component} (type: ${comp.type}) does not support :carry property`);
       }
       
@@ -4624,7 +3966,7 @@ if (s.assignment) {
         return;
       }
       
-      if(comp.type !== 'multiplier'){
+      if(!this.componentRegistry || !this.componentRegistry.supportsRedirect(comp.type, 'over')){
         throw Error(`Component ${component} (type: ${comp.type}) does not support :over property`);
       }
       
@@ -4700,7 +4042,7 @@ if (s.assignment) {
         return;
       }
       
-      if(comp.type !== 'shifter'){
+      if(!this.componentRegistry || !this.componentRegistry.supportsRedirect(comp.type, 'out')){
         throw Error(`Component ${component} (type: ${comp.type}) does not support :out property`);
       }
       
@@ -5041,9 +4383,15 @@ if (s.assignment) {
       return;
     }
     
-    // For shifter, we always execute shift when :set is called (when === 'immediate')
-    // This allows multiple .sh:set = 1 calls to shift multiple times
-    // But we still need to process pending properties first if they exist
+    if(this.componentRegistry){
+      const handler = this.componentRegistry.get(comp.type);
+      if(handler && handler.applyProperties){
+        handler.applyProperties(comp, compName, pending, when, reEvaluate, this);
+        if(!reEvaluate) this.componentPendingSet.delete(compName);
+        return;
+      }
+    }
+
     if(comp.type === 'shifter'){
       // Process pending properties first (value, dir, in) if they exist
       // Then execute shift at the end

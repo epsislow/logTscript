@@ -1036,56 +1036,45 @@ Interpreter.prototype.exprDependsOnRandom = function(expr, visitedWires = new Se
 };
 
 Interpreter.prototype.updateComponentValue = function(compName, value, bitRange){
-  // Update a component's display value
   const comp = this.components.get(compName);
   if(!comp) return;
   
+  if(this.componentRegistry){
+    const handler = this.componentRegistry.get(comp.type);
+    if(handler && handler.updateDisplayValue){
+      handler.updateDisplayValue(comp, value, bitRange);
+      return;
+    }
+  }
+
   if(comp.type === 'led'){
-    // Extract bits based on bitRange if specified
     let bitsToUse = value;
     if(bitRange){
       const {start, end} = bitRange;
       const actualEnd = end !== undefined ? end : start;
       bitsToUse = value.substring(start, actualEnd + 1);
     }
-    
-    // Update each LED
     for(let i = 0; i < comp.deviceIds.length && i < bitsToUse.length; i++){
       const ledId = comp.deviceIds[i];
       const ledValue = bitsToUse[i] === '1';
-      if(typeof setLed === 'function'){
-        setLed(ledId, ledValue);
-      }
+      if(typeof setLed === 'function') setLed(ledId, ledValue);
     }
   } else if(comp.type === '7seg'){
-    // Update 7-segment display
     let bitsToUse = value;
     if(bitRange){
       const {start, end} = bitRange;
       const actualEnd = end !== undefined ? end : start;
       bitsToUse = value.substring(start, actualEnd + 1);
     }
-    
-    // Update the display (only first device ID for 7seg)
     if(comp.deviceIds.length > 0){
       const segId = comp.deviceIds[0];
-      // Update each segment (a-h, 8 bits)
       const segments = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
       for(let i = 0; i < segments.length && i < bitsToUse.length; i++){
-        const segName = segments[i];
-        const segValue = bitsToUse[i] === '1';
-        if(typeof setSegment === 'function'){
-          setSegment(segId, segName, segValue);
-        }
+        if(typeof setSegment === 'function') setSegment(segId, segments[i], bitsToUse[i] === '1');
       }
-
-      // Store lastSegmentValue for :get property (ensure 8 bits)
       let segmentValue = bitsToUse;
-      if(segmentValue.length < 8){
-        segmentValue = segmentValue.padEnd(8, '0');
-      } else if(segmentValue.length > 8){
-        segmentValue = segmentValue.substring(0, 8);
-      }
+      if(segmentValue.length < 8) segmentValue = segmentValue.padEnd(8, '0');
+      else if(segmentValue.length > 8) segmentValue = segmentValue.substring(0, 8);
       comp.lastSegmentValue = segmentValue;
     }
   }
