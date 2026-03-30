@@ -128,6 +128,30 @@ Cu `length: 4`, counter-ul are valori de la `0000` la `1111` (0-15), apoi revine
 
 ---
 
+## Intrari
+
+### `:reset` — resetare counter
+
+Proprietatea `:reset` permite resetarea counter-ului intern la `0`. Se utilizeaza in cadrul unui bloc cu `set` ca trigger:
+
+```
+.osc1:{
+  reset = 1
+  set = EQ(cnt, 1010)
+}
+```
+
+Cand expresia din `set` face tranzitia de la `0` la `1` (rising edge), blocul se executa si counter-ul este resetat la `0...0` (toti bitii pe `0`).
+
+**Comportament:**
+
+- `reset = 1` — counter-ul este resetat la valoarea `0` (pe `length` biti)
+- `reset = 0` — nu se intampla nimic (counter-ul continua normal)
+- Dupa reset, counter-ul reia numararea de la `0`
+- Semnalul oscilatorului (HIGH/LOW) nu este afectat — doar counter-ul este resetat
+
+---
+
 ## Exemple
 
 ### Oscilator simplu cu duty cycle 50%
@@ -186,6 +210,30 @@ comp [~] .osc2:
 ```
 
 Counter-ul se incrementeaza de 2 ori per ciclu (la fiecare schimbare de stare), deci numara de 10 ori pe secunda la `freq: 5`.
+
+### Counter cu reset la valoarea 10
+
+```
+comp [~] .osc1:
+  duration1: 4
+  duration0: 4
+  length: 6
+  freq: 2
+  eachCycle: 1
+  :
+
+1wire o1 = .osc1:get
+6wire cnt = .osc1:counter
+
+.osc1:{
+  reset = 1
+  set = EQ(cnt, 001010)
+}
+
+show(o1, cnt)
+```
+
+Counter-ul numara de la `000000` pana la `001010` (10 in decimal), apoi este resetat la `000000` si reia numararea. Oscilatorul continua sa oscileze normal.
 
 ### Program complet
 

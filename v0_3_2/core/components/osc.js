@@ -6,7 +6,7 @@ var OscComponent = class OscComponent extends BuiltinComponent {
   static get isReservedName() { return false; }
 
   getWidthBits(attributes) { return 1; }
-  getSupportedProperties() { return ['get', 'counter']; }
+  getSupportedProperties() { return ['get', 'counter', 'reset']; }
   getRedirectProperties() { return ['get']; }
 
   evalGetProperty(comp, property, a, ctx) {
@@ -96,6 +96,18 @@ var OscComponent = class OscComponent extends BuiltinComponent {
         oscState
       }
     };
+  }
+
+  applyProperties(comp, compName, pending, when, reEvaluate, ctx) {
+    if (when !== 'immediate') return;
+    if (!pending) return;
+
+    if (pending.reset !== undefined) {
+      let resetValue = this.reEvalPendingValue(pending, 'reset', reEvaluate, ctx);
+      if (resetValue === '1' || (resetValue && resetValue.length > 0 && resetValue[resetValue.length - 1] === '1')) {
+        comp.oscState.counterValue = '0'.repeat(comp.oscState.length);
+      }
+    }
   }
 
   getForbidDirectAssign() {

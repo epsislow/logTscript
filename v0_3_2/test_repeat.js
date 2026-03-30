@@ -1681,6 +1681,150 @@ console.log('\n=== Test 200: Component Registry — all types registered ===');
   assert('hex 0 -> 1111110', SevenSegComp.constructor.hexTo7Seg('0000'), '1111110');
   assert('hex 1 -> 0110000', SevenSegComp.constructor.hexTo7Seg('0001'), '0110000');
   assert('hex F -> 1000111', SevenSegComp.constructor.hexTo7Seg('1111'), '1000111');
+
+  // ================================================================
+  // Oscillator :reset property tests
+  // ================================================================
+
+  console.log('\n=== Test 213: osc supports reset property ===');
+  assert('osc supports reset', String(registry.supportsProperty('osc', 'reset')), 'true');
+
+  console.log('\n=== Test 214: osc getSupportedProperties includes reset ===');
+  {
+    const oscHandler = registry.get('osc');
+    const props = oscHandler.getSupportedProperties();
+    assert('reset in supported props', String(props.includes('reset')), 'true');
+    assert('get still in supported props', String(props.includes('get')), 'true');
+    assert('counter still in supported props', String(props.includes('counter')), 'true');
+  }
+
+  console.log('\n=== Test 215: osc applyProperties resets counter when reset=1 ===');
+  {
+    const oscHandler = registry.get('osc');
+    const comp = {
+      oscState: { counterValue: '101010', length: 6 }
+    };
+    const pending = {
+      reset: { expr: null, value: '1' }
+    };
+    oscHandler.applyProperties(comp, '.osc1', pending, 'immediate', false, {});
+    assert('counter reset to 000000', comp.oscState.counterValue, '000000');
+  }
+
+  console.log('\n=== Test 216: osc applyProperties does NOT reset when reset=0 ===');
+  {
+    const oscHandler = registry.get('osc');
+    const comp = {
+      oscState: { counterValue: '101010', length: 6 }
+    };
+    const pending = {
+      reset: { expr: null, value: '0' }
+    };
+    oscHandler.applyProperties(comp, '.osc1', pending, 'immediate', false, {});
+    assert('counter unchanged at 101010', comp.oscState.counterValue, '101010');
+  }
+
+  console.log('\n=== Test 217: osc applyProperties skips when when!=immediate ===');
+  {
+    const oscHandler = registry.get('osc');
+    const comp = {
+      oscState: { counterValue: '111111', length: 6 }
+    };
+    const pending = {
+      reset: { expr: null, value: '1' }
+    };
+    oscHandler.applyProperties(comp, '.osc1', pending, 'next', false, {});
+    assert('counter unchanged on when=next', comp.oscState.counterValue, '111111');
+  }
+
+  console.log('\n=== Test 218: osc applyProperties skips when no pending ===');
+  {
+    const oscHandler = registry.get('osc');
+    const comp = {
+      oscState: { counterValue: '001100', length: 6 }
+    };
+    oscHandler.applyProperties(comp, '.osc1', null, 'immediate', false, {});
+    assert('counter unchanged on null pending', comp.oscState.counterValue, '001100');
+  }
+
+  console.log('\n=== Test 219: osc applyProperties skips when no reset in pending ===');
+  {
+    const oscHandler = registry.get('osc');
+    const comp = {
+      oscState: { counterValue: '110011', length: 6 }
+    };
+    const pending = {};
+    oscHandler.applyProperties(comp, '.osc1', pending, 'immediate', false, {});
+    assert('counter unchanged without reset key', comp.oscState.counterValue, '110011');
+  }
+
+  console.log('\n=== Test 220: osc applyProperties resets with multi-bit value ending in 1 ===');
+  {
+    const oscHandler = registry.get('osc');
+    const comp = {
+      oscState: { counterValue: '1010', length: 4 }
+    };
+    const pending = {
+      reset: { expr: null, value: '01' }
+    };
+    oscHandler.applyProperties(comp, '.osc1', pending, 'immediate', false, {});
+    assert('counter reset with value 01 (last bit 1)', comp.oscState.counterValue, '0000');
+  }
+
+  console.log('\n=== Test 221: osc applyProperties does NOT reset with multi-bit value ending in 0 ===');
+  {
+    const oscHandler = registry.get('osc');
+    const comp = {
+      oscState: { counterValue: '1010', length: 4 }
+    };
+    const pending = {
+      reset: { expr: null, value: '10' }
+    };
+    oscHandler.applyProperties(comp, '.osc1', pending, 'immediate', false, {});
+    assert('counter unchanged with value 10 (last bit 0)', comp.oscState.counterValue, '1010');
+  }
+
+  console.log('\n=== Test 222: osc applyProperties with reEvaluate re-evaluates expression ===');
+  {
+    const oscHandler = registry.get('osc');
+    const comp = {
+      oscState: { counterValue: '111000', length: 6 }
+    };
+    const mockCtx = {
+      evalExpr: function(expr) {
+        return [{ value: '1' }];
+      },
+      getValueFromRef: function() { return null; }
+    };
+    const pending = {
+      reset: { expr: [{ bin: '1' }], value: '0' }
+    };
+    oscHandler.applyProperties(comp, '.osc1', pending, 'immediate', true, mockCtx);
+    assert('counter reset after reEval to 1', comp.oscState.counterValue, '000000');
+  }
+
+  console.log('\n=== Test 223: Parser — osc property block with reset and set ===');
+  {
+    const processed = preprocessRepeat3(`comp [~] .osc1:
+  length: 6
+  freq: 2
+  :
+6wire cnt = .osc1:counter
+.osc1:{
+  reset = 1
+  set = EQ(cnt, 001010)
+}`);
+    const p = new Parser3(new Tokenizer3(processed), registry);
+    const stmts = p.parse();
+    assert('3 statements parsed', String(stmts.length), '3');
+    assert('stmt 0 is comp osc', stmts[0].comp.type, 'osc');
+    assert('stmt 2 is property block', String(stmts[2].componentPropertyBlock !== undefined), 'true');
+    const block = stmts[2].componentPropertyBlock;
+    assert('block component is .osc1', block.component, '.osc1');
+    assert('block has 2 properties', String(block.properties.length), '2');
+    assert('block prop 0 is reset', block.properties[0].property, 'reset');
+    assert('block prop 1 is set', block.properties[1].property, 'set');
+  }
 }
 
 // Summary
