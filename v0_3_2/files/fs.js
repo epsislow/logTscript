@@ -21,6 +21,11 @@ comp [~] .osc1:
 1wire o1= .osc1:get
 8wire cnt = .osc1:counter
 
+.osc1:{
+  reset = 1
+  set = EQ(cnt, \\11)
+}
+
 comp [7seg] .sev0:
    color: ^99ffFF
    : 
