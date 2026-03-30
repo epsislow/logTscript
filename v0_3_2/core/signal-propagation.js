@@ -482,7 +482,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
   
   // Also update wires that reference this component
   // Re-execute wire statements that might depend on this component
-  console.log(`[DEBUG updateCompConn] ${compName}: scanning ${this.wireStatements.length} wireStatements`);
+//  console.log(`[DEBUG updateCompConn] ${compName}: scanning ${this.wireStatements.length} wireStatements`);
   for(const ws of this.wireStatements){
     // Handle assignment statements: name = expr
     if(ws.assignment){
@@ -491,7 +491,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
       if(wire && wire.ref){
         // Check if wire expression references this component
         const references = this.exprReferencesComponent(ws.assignment.expr, compName, comp.ref);
-        console.log(`[DEBUG updateCompConn] assignment wire '${wireName}' refs '${compName}'? ${references}`);
+        // console.log(`[DEBUG updateCompConn] assignment wire '${wireName}' refs '${compName}'? ${references}`);
         if(references){
           // Re-evaluate the expression
           try {
@@ -519,7 +519,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
               const stored = this.storage.find(s => s.index === storageIdx);
               if(stored){
                 const oldValue = stored.value;
-                console.log(`[DEBUG updateCompConn] wire '${wireName}' oldValue=${oldValue} newValue=${wireValue}`);
+                // console.log(`[DEBUG updateCompConn] wire '${wireName}' oldValue=${oldValue} newValue=${wireValue}`);
                 if(oldValue !== wireValue){
                   stored.value = wireValue;
                   // Update connected components only if value changed
@@ -528,7 +528,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
               }
             }
           } catch(e){
-            console.log(`[DEBUG updateCompConn] ERROR updating assignment wire '${wireName}':`, e.message);
+            // console.log(`[DEBUG updateCompConn] ERROR updating assignment wire '${wireName}':`, e.message);
           }
         }
       }
@@ -543,7 +543,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
           if(wire){
             // Check if wire expression references this component
             const references = this.exprReferencesComponent(ws.expr, compName, comp.ref);
-            console.log(`[DEBUG updateCompConn] decl wire '${wireName}' refs '${compName}'? ${references}`);
+            // console.log(`[DEBUG updateCompConn] decl wire '${wireName}' refs '${compName}'? ${references}`);
             if(references){
               // Re-evaluate the expression and update the wire
               try {
@@ -591,13 +591,13 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                     const stored = this.storage.find(s => s.index === storageIdx);
                     if(stored){
                       const oldValue = stored.value;
-                      console.log(`[DEBUG updateCompConn] decl wire '${wireName}' oldValue=${oldValue} newValue=${wireValue}`);
+                      // console.log(`[DEBUG updateCompConn] decl wire '${wireName}' oldValue=${oldValue} newValue=${wireValue}`);
                       if(oldValue !== wireValue){
                         stored.value = wireValue;
                         // Update connected components only if value changed
                         this.updateConnectedComponents(wireName, wireValue);
                       } else {
-                        console.log(`[DEBUG updateCompConn] decl wire '${wireName}' value unchanged (${oldValue}), skipping cascade`);
+                        // console.log(`[DEBUG updateCompConn] decl wire '${wireName}' value unchanged (${oldValue}), skipping cascade`);
                       }
                     }
                   }
@@ -613,7 +613,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                   this.updateConnectedComponents(wireName, wireValue);
                 }
               } catch(e){
-                console.log(`[DEBUG updateCompConn] ERROR updating decl wire '${wireName}':`, e.message);
+                // console.log(`[DEBUG updateCompConn] ERROR updating decl wire '${wireName}':`, e.message);
               }
             }
           }
@@ -1104,10 +1104,10 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
   const varRef = this.vars.has(varName) ? this.vars.get(varName).ref : 
                  (this.wires.has(varName) ? this.wires.get(varName).ref : null);
   
-  console.log(`[DEBUG updateConnected] called for '${varName}' newValue=${newValue} varRef=${varRef} isTopLevel=${isTopLevel}`);
+  //console.log(`[DEBUG updateConnected] called for '${varName}' newValue=${newValue} varRef=${varRef} isTopLevel=${isTopLevel}`);
   
   if(!varRef || varRef === '&-'){
-    console.log(`[DEBUG updateConnected] EARLY RETURN: varRef is null or &- for '${varName}'`);
+    //console.log(`[DEBUG updateConnected] EARLY RETURN: varRef is null or &- for '${varName}'`);
     if(isTopLevel) this._uccPendingBlocks = null;
     return;
   }
@@ -1135,7 +1135,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
   const dependentWires = new Set();
   const isWire = this.wires.has(varName);
   
-  console.log(`[DEBUG updateConnected] '${varName}' isWire=${isWire}, wireStatements.length=${this.wireStatements.length}`);
+  //console.log(`[DEBUG updateConnected] '${varName}' isWire=${isWire}, wireStatements.length=${this.wireStatements.length}`);
   
   if(isWire){
     // Find all wires that depend on varName
@@ -1143,7 +1143,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
       const expr = ws.assignment ? ws.assignment.expr : ws.expr;
       const wsName = ws.assignment ? ws.assignment.target.var : (ws.decls ? ws.decls.map(d=>d.name).join(',') : '?');
       const refs = expr ? this.exprReferencesWire(expr, varName) : false;
-      console.log(`[DEBUG updateConnected] checking ws '${wsName}' refs '${varName}'? ${refs}`);
+      // console.log(`[DEBUG updateConnected] checking ws '${wsName}' refs '${varName}'? ${refs}`);
       if(expr && refs){
         if(ws.assignment){
           // Single wire assignment: wireName = expr
@@ -1163,7 +1163,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
       }
     }
     
-    console.log(`[DEBUG updateConnected] dependentWires for '${varName}':`, [...dependentWires]);
+    //console.log(`[DEBUG updateConnected] dependentWires for '${varName}':`, [...dependentWires]);
     
     // Re-execute wire statements for dependent wires
     // This ensures that when db changes, q = ANDA4(!db.12/4) is re-executed
@@ -1194,7 +1194,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
         }
         
         if(shouldReexecute){
-          console.log(`[DEBUG updateConnected] re-executing wire statement for '${depWireName}'`);
+          //console.log(`[DEBUG updateConnected] re-executing wire statement for '${depWireName}'`);
           // Re-execute the wire statement
           this.execWireStatement(ws);
           
@@ -1205,13 +1205,13 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
               const storageIdx = parseInt(refMatch[1]);
               const stored = this.storage.find(s => s.index === storageIdx);
               if(stored){
-                console.log(`[DEBUG updateConnected] after re-exec, '${depWireName}' = ${stored.value}`);
+                //console.log(`[DEBUG updateConnected] after re-exec, '${depWireName}' = ${stored.value}`);
                 // Recursively update connected components for this dependent wire
                 this.updateConnectedComponents(depWireName, stored.value);
               }
             }
           } else {
-            console.log(`[DEBUG updateConnected] depWire '${depWireName}' has no ref after re-exec!`);
+            //console.log(`[DEBUG updateConnected] depWire '${depWireName}' has no ref after re-exec!`);
           }
           break; // Found and re-executed, move to next dependent wire
         }
