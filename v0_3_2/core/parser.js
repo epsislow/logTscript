@@ -10,7 +10,7 @@ class Parser {
   //  console.log(type + ': ' + val);
     if(this.c.type===type && (val==null||this.c.value===val)) {
       this.c=this.t.get();
-      console.log(this.c);
+      //console.log(this.c);
     }
     else throw Error(`Syntax error at ${this.c.file}: ${this.c.line}:${this.c.col}, expected ${type}${val?'='+val:''}, got ${this.c.type}=${this.c.value}`);
   }
