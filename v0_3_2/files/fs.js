@@ -1,4 +1,325 @@
 window.lib_files = {
+  ex_osc5: `
+  
+  
+  
+  
+    
+comp [~] .osc1:
+    duration1: 4
+    duration0: 4
+    length: 6
+    freq: 12
+    freqIsSec: 0
+    eachCycle: 1
+    :
+    
+    
+comp [counter] .min:
+   depth: 6
+   :
+   
+comp [counter] .hour:
+   depth: 6
+   :
+    
+
+1wire o1= .osc1:get
+8wire cnt = .osc1:counter
+
+1wire trig60 = EQ(cnt, \\60)
+
+.osc1:{
+  reset = 1
+  set = trig60
+}
+
+
+.min:{
+  dir=1
+  set= trig60
+}
+6wire min = .min:get
+1wire trigMin = EQ(min, \\60)
+.min:{
+  data=0
+  write=1
+  set= trigMin
+}
+
+.hour:{
+  dir=1
+  set= trigMin
+}
+6wire hour = .hour:get
+
+comp [7seg] .sev4:
+   color: ^0f9
+   : 
+comp [7seg] .sev5:
+   color: ^0f9
+   : 
+comp [7seg] .sev2:
+   color: ^09f
+   : 
+   
+comp [7seg] .sev3:
+   color: ^09f
+   :
+ 
+comp [7seg] .sev0:
+   color: ^99f
+   : 
+comp [7seg] .sev1:
+   color: ^99f
+   :
+
+comp [divider] .div:
+   depth: 6
+   :
+   
+   
+comp [divider] .div2:
+   depth: 6
+   :
+   
+comp [divider] .div3:
+   depth: 6
+   :
+
+.div:a = .osc1:counter
+.div:b = \\10
+
+6wire div0 = .div:get
+6wire div1 = .div:mod
+
+.div2:a = .min:get
+.div2:b = \\10
+6wire div2g = .div2:get
+6wire div2m = .div2:mod
+
+.div3:a = .hour:get
+.div3:b = \\10
+6wire div3g = .div3:get
+6wire div3m = .div3:mod
+
+
+.sev0:hex= div0.2/4
+.sev0:set = .osc1:get
+ 
+.sev1:hex= div1.2/4
+.sev1:set = .osc1:get
+
+.sev3:hex = div2m.2/4
+.sev3:set = .osc1:get
+
+.sev2:hex= div2g.2/4
+.sev2:set= .osc1:get
+    
+    
+.sev5:hex = div3m.2/4
+.sev5:set = .osc1:get
+
+.sev4:hex= div3g.2/4
+.sev4:set= .osc1:get
+1wire qq = EQ(div0, 000000)
+
+.sev1:h=1
+.sev3:h=1
+.sev5:h=1
+
+
+#>
+.sev1:{
+  a=0
+   b=0
+   c=0
+   d=0
+   set = EQ(div0, 000000)
+}
+
+#<
+
+
+
+  
+  `,
+  
+  
+  ex_osc4: `
+    
+    
+    
+comp [~] .osc1:
+    duration1: 4
+    duration0: 4
+    length: 6
+    freq: 10
+    freqIsSec: 0
+    eachCycle: 1
+    :
+    
+    
+comp [counter] .min:
+   depth: 4
+   :
+   
+comp [counter] .hour:
+   depth:4
+   :
+    
+
+1wire o1= .osc1:get
+8wire cnt = .osc1:counter
+
+1wire trig60 = EQ(cnt, \\11)
+
+.osc1:{
+  reset = 1
+  set = trig60
+}
+
+
+.min:{
+  dir=1
+  set= trig60
+}
+6wire min = .min:get
+1wire trigMin = EQ(min, \\3)
+.min:{
+  data=0
+  write=1
+  set= trigMin
+}
+
+.hour:{
+  dir=1
+  set= trigMin
+}
+4wire hour = .hour:get
+
+comp [7seg] .sev2:
+   color: ^99ffFF
+   : 
+   
+comp [7seg] .sev3:
+   color: ^99ffFF
+   :
+ 
+comp [7seg] .sev0:
+   color: ^99ffFF
+   : 
+   
+comp [7seg] .sev1:
+   color: ^99ffFF
+   :
+
+comp [divider] .div:
+   depth: 6
+   :
+
+.div:a = .osc1:counter
+.div:b = \\10
+
+6wire div0 = .div:get
+6wire div1 = .div:mod
+
+.sev0:hex= div0.2/4
+.sev0:set = .osc1:get
+ 
+.sev1:hex= div1.2/4
+.sev1:set = .osc1:get
+
+
+.sev3:hex = min
+.sev3:set = .osc1:get
+
+.sev2:hex= hour
+.sev2:set= .osc1:get
+    
+  
+  
+  
+
+`,
+  
+  ex_osc3 : `
+  
+  
+    
+comp [~] .osc1:
+    duration1: 4
+    duration0: 4
+    length: 6
+    freq: 10
+    freqIsSec: 0
+    eachCycle: 1
+    :
+    
+    
+comp [counter] .min:
+   depth: 4
+   :
+    
+
+1wire o1= .osc1:get
+8wire cnt = .osc1:counter
+
+1wire trig60 = EQ(cnt, \\11)
+
+.osc1:{
+  reset = 1
+  set = trig60
+}
+
+
+.min:{
+  dir=1
+  set= trig60
+}
+6wire min = .min:get
+
+
+comp [7seg] .sev2:
+   color: ^99ffFF
+   : 
+   
+comp [7seg] .sev3:
+   color: ^99ffFF
+   :
+ 
+comp [7seg] .sev0:
+   color: ^99ffFF
+   : 
+   
+comp [7seg] .sev1:
+   color: ^99ffFF
+   :
+
+comp [divider] .div:
+   depth: 6
+   :
+
+.div:a = .osc1:counter
+.div:b = \\10
+
+6wire div0 = .div:get
+6wire div1 = .div:mod
+
+.sev0:hex= div0.2/4
+.sev0:set = .osc1:get
+ 
+.sev1:hex= div1.2/4
+.sev1:set = .osc1:get
+
+
+.sev3:hex = min
+.sev3:set = .osc1:get
+    
+    
+  
+  
+  `,
     ex_osc2: `
     
     
