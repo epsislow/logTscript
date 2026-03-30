@@ -2505,7 +2505,7 @@ if (s.assignment) {
         }
         let wireValue = totalValue.substring(0, bits);
         if(wireValue.length < bits) wireValue = wireValue.padStart(bits, '0');
-        console.log(`[DEBUG execWireStmt] assignment '${wireName}' computed='${wireValue}'`);
+        //console.log(`[DEBUG execWireStmt] assignment '${wireName}' computed='${wireValue}'`);
         // Reuse existing storage slot (registered by wireStorageMap at first assignment)
         let storageIdx;
         if(this.wireStorageMap.has(wireName)){
@@ -2533,7 +2533,7 @@ if (s.assignment) {
         }
         wire.ref = `&${storageIdx}`;
       } catch(e){
-        console.log(`[DEBUG execWireStmt] ERROR in assignment '${wireName}':`, e.message);
+        //console.log(`[DEBUG execWireStmt] ERROR in assignment '${wireName}':`, e.message);
       } finally {
         this.currentStmt = prevStmt;
       }
@@ -2541,7 +2541,7 @@ if (s.assignment) {
     }
     
     const wsName = s.decls ? s.decls.map(d=>d.name).join(',') : '?';
-    console.log(`[DEBUG execWireStmt] re-executing for '${wsName}'`);
+    //console.log(`[DEBUG execWireStmt] re-executing for '${wsName}'`);
     
     try {
     // During NEXT(~) recomputation, use computeRefs=false to avoid creating new storage for literals
@@ -2563,7 +2563,7 @@ if (s.assignment) {
         totalValue += part.value;
       }
     }
-    console.log(`[DEBUG execWireStmt] '${wsName}' computed totalValue='${totalValue}'`);
+    //console.log(`[DEBUG execWireStmt] '${wsName}' computed totalValue='${totalValue}'`);
     
     let bitOffset = 0;
     for (const d of s.decls) {
@@ -2628,7 +2628,7 @@ if (s.assignment) {
       if(this.wires.has(d.name)){
         this.wires.get(d.name).ref = simpleRef;
       }
-      console.log(`[DEBUG execWireStmt] wire '${d.name}' stored value='${wireValue}' at ref=${simpleRef}`);
+      //console.log(`[DEBUG execWireStmt] wire '${d.name}' stored value='${wireValue}' at ref=${simpleRef}`);
       
       bitOffset += bits;
     }

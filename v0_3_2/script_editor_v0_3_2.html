@@ -730,7 +730,12 @@ const _logtsGates = [
   "NAND","NANDe","NOR","NORe","LSHIFT","RSHIFT"
 ];
 
+let debuglog = false;
+
 function consoleLog(...args) {
+  if (debuglog) {
+    console.log(...args);
+  }
 }
 
 CodeMirror.defineMode("logts", function() {
@@ -841,18 +846,18 @@ CodeMirror.defineMode("logts", function() {
       }
       
       if (state.expectBitrange && stream.match(/[(]+/)) {
-        console.log('h>');
+        consoleLog('h>');
         return "logts-operator";
       }
       
       if (state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
-        console.log('q');
+        consoleLog('q');
         state.expectBitrange = false;
         return "logts-bitdynamic";
       }
       
       if (state.expectBitrange) {
-      console.log('expectBitrange = false');
+        consoleLog('expectBitrange = false');
         state.expectBitrange = false;
       }
             
