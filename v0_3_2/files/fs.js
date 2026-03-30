@@ -1,5 +1,8 @@
 window.lib_files = {
-    bad_osc2: `
+    ex_osc2: `
+    
+    
+    
     4wire d = 1111
 
 7wire a = \`000000 -| \\5\`
@@ -7,10 +10,10 @@ window.lib_files = {
 8wire a5= a4.7 < \\3 w0
 
 comp [~] .osc1:
-    duration1: 1
-    duration0: 7
+    duration1: 4
+    duration0: 4
     length: 6
-    freq: 8
+    freq: 2
     freqIsSec: 0
     eachCycle: 1
     :
@@ -33,13 +36,13 @@ comp [divider] .div:
 .div:a = .osc1:counter
 .div:b = \\10
 
-6wire div0 = .div:mod
-6wire div1 = .div:get
+6wire div0 = .div:get
+6wire div1 = .div:mod
 
-.sev0:hex= .div:get
+.sev0:hex= div0.2/4
 .sev0:set = .osc1:get
  
-.sev1:hex= .div:mod
+.sev1:hex= div1.2/4
 .sev1:set = .osc1:get
 
 

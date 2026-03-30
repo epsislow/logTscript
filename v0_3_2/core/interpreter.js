@@ -4317,8 +4317,12 @@ if (s.assignment) {
     return false;
   }
   
-  updateComponentConnections(compName){
+  updateComponentConnections(compName, _visited = null){
     // Update all components and wires connected to this component
+    if(!_visited) _visited = new Set();
+    if(_visited.has(compName)) return;
+    _visited.add(compName);
+
     const comp = this.components.get(compName);
     if(!comp){
       return;
@@ -4370,6 +4374,9 @@ if (s.assignment) {
       }
     }
     
+    // Track components whose inputs were modified (for cascading updates)
+    const _affectedComponents = new Set();
+
     // Check pending component properties that reference this component
     for(const [propCompName, pending] of this.componentPendingProperties.entries()){
       const propComp = this.components.get(propCompName);
@@ -4441,6 +4448,7 @@ if (s.assignment) {
             } else if(propName === 'b' && typeof setAdderB === 'function'){
               setAdderB(adderId, binValue);
             }
+            _affectedComponents.add(propCompName);
           } else if(propComp && propComp.type === 'subtract' && (propName === 'a' || propName === 'b')){
             // For subtract, .a and .b properties are applied immediately (not through applyComponentProperties)
             // Re-evaluate and re-apply immediately
@@ -4476,6 +4484,7 @@ if (s.assignment) {
             } else if(propName === 'b' && typeof setSubtractB === 'function'){
               setSubtractB(subtractId, binValue);
             }
+            _affectedComponents.add(propCompName);
           } else if(propComp && propComp.type === 'divider' && (propName === 'a' || propName === 'b')){
             // For divider, .a and .b properties are applied immediately (not through applyComponentProperties)
             // Re-evaluate and re-apply immediately
@@ -4511,6 +4520,7 @@ if (s.assignment) {
             } else if(propName === 'b' && typeof setDividerB === 'function'){
               setDividerB(dividerId, binValue);
             }
+            _affectedComponents.add(propCompName);
           } else if(propComp && propComp.type === 'multiplier' && (propName === 'a' || propName === 'b')){
             // For multiplier, .a and .b properties are applied immediately (not through applyComponentProperties)
             // Re-evaluate and re-apply immediately
@@ -4546,6 +4556,7 @@ if (s.assignment) {
             } else if(propName === 'b' && typeof setMultiplierB === 'function'){
               setMultiplierB(multiplierId, binValue);
             }
+            _affectedComponents.add(propCompName);
           } else if(propComp && propComp.type === 'shifter' && (propName === 'value' || propName === 'dir' || propName === 'in')){
             // For shifter, .value, .dir, and .in properties are applied immediately (not through applyComponentProperties)
             // Re-evaluate and re-apply immediately
@@ -4593,6 +4604,7 @@ if (s.assignment) {
                 setShifterIn(shifterId, inValue);
               }
             }
+            _affectedComponents.add(propCompName);
           } else {
             // For other components, use the standard apply mechanism
             // BUT: Skip if this component has a property block with a setExpr that directly references
@@ -4678,10 +4690,12 @@ if (s.assignment) {
                 if(!blockWasJustExecuted){
                   // Apply immediately
                   this.applyComponentProperties(propCompName, 'immediate', true);
+                  _affectedComponents.add(propCompName);
                 }
               } else {
                 // No tracking active, apply immediately as normal
                 this.applyComponentProperties(propCompName, 'immediate', true);
+                _affectedComponents.add(propCompName);
               }
             } else if(setWhen === 'next'){
               // Mark for next iteration (already marked, but don't apply now)
@@ -4924,7 +4938,7 @@ if (s.assignment) {
           
           // After executing property block, update connections for the component itself
           // This ensures wires that reference the component (like b = .mem:get) are updated
-          this.updateComponentConnections(block.component);
+          this.updateComponentConnections(block.component, _visited);
           
           // Update UI after executing property block
           if(typeof showVars === 'function'){
@@ -5047,6 +5061,11 @@ if (s.assignment) {
         // Always update lastSetValue (even if block didn't execute)
         block.lastSetValue = setValue;
       }
+    }
+
+    // Cascade: propagate updates to components whose inputs were modified
+    for(const affectedName of _affectedComponents){
+      this.updateComponentConnections(affectedName, _visited);
     }
   }
   
