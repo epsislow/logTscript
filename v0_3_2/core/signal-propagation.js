@@ -1121,6 +1121,41 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
     }
   }
   
+  // Check componentPendingProperties for inline property assignments that reference this wire
+  // (e.g. .sev0:set = o1, where o1 is a wire that just changed)
+  for(const [propCompName, pending] of this.componentPendingProperties.entries()){
+    for(const [propName, propData] of Object.entries(pending)){
+      if(propData.expr && this.exprReferencesWire(propData.expr, varName)){
+        try {
+          const exprResult = this.evalExpr(propData.expr, false);
+          let value = '';
+          for(const part of exprResult){
+            if(part.value && part.value !== '-'){
+              value += part.value;
+            } else if(part.ref && part.ref !== '&-'){
+              const val = this.getValueFromRef(part.ref);
+              if(val) value += val;
+            }
+          }
+          
+          const oldValue = propData.value;
+          propData.value = value;
+          
+          if(propName === 'set'){
+            const oldBit = (oldValue && oldValue.length > 0) ? oldValue[oldValue.length - 1] : '0';
+            const newBit = (value && value.length > 0) ? value[value.length - 1] : '0';
+            
+            if(oldBit === '0' && newBit === '1'){
+              this.applyComponentProperties(propCompName, 'immediate', true);
+            }
+          }
+        } catch(e){
+          // Ignore errors during re-evaluation
+        }
+      }
+    }
+  }
+  
   // Find all wires that depend on this wire (cascade propagation)
   const dependentWires = new Set();
   const isWire = this.wires.has(varName);
