@@ -1,4 +1,205 @@
 window.lib_files = {
+  
+  
+  ex_osc6: `
+  
+  
+
+
+  
+comp [switch] .dire:
+   text: 'dir'
+   nl:1
+   :
+ 
+1wire dire = .dire:get
+    
+comp [~] .osc1:
+    duration1: 4
+    duration0: 4
+    length: 6
+    freq: 10
+    freqIsSec: 0
+    eachCycle: 1
+    :
+
+comp [counter] .sec:
+   depth: 6
+   on:1
+   :
+    
+comp [counter] .min:
+   depth: 6
+   on:1
+   :
+   
+comp [counter] .hour:
+   depth: 6
+   on:1
+   :
+    
+
+1wire o1= .osc1:get
+8wire cnt = .osc1:counter
+
+#>
+1wire trig60 = MUX1(dire, EQ(cnt, \\0), EQ(cnt, \\60))
+
+.osc1:{
+  reset = 1
+  set = trig60
+}
+#<
+
+#.sec:data = MUX1(dire, \\59, \\59)
+#.sec:set =1
+
+.sec:{
+  data=MUX1(dire,  \\59, \\0)
+  write=1
+  set= 1
+}
+
+.sec:{
+  dir=dire
+  set= .osc1:get
+}
+6wire sec = .sec:get
+1wire trigSec= MUX1(dire, EQ(sec, \\0), EQ(sec, \\60))
+.sec:{
+  data= MUX1(dire, \\59, \\0)
+  write=1
+  set=trigSec
+}
+
+
+.min:{
+  dir=dire
+  set= trigSec
+}
+6wire min = .min:get
+1wire trigMin = MUX1(dire, EQ(min, \\0), EQ(min, \\60))
+
+.min:{
+  data=MUX1(dire,  \\59, \\0)
+  write=1
+  set= trigMin
+}
+
+
+6wire hour = .hour:get
+1wire trigHour = MUX1(dire, EQ(hour, \\0), EQ(hour, \\23))
+.hour:{
+  data= MUX1(dire, \\24, \\0)
+  write=1
+  set= trigHour
+}
+#>
+.hour:{
+  data= \\23
+  write=1
+  set= trigHour
+}
+#<
+.hour:{
+  dir=dire
+  set= trigMin
+}
+
+
+comp [7seg] .sev4:
+   color: ^0f9
+   : 
+comp [7seg] .sev5:
+   color: ^0f9
+   : 
+comp [7seg] .sev2:
+   color: ^09f
+   : 
+   
+comp [7seg] .sev3:
+   color: ^09f
+   :
+ 
+comp [7seg] .sev0:
+   color: ^99f
+   : 
+comp [7seg] .sev1:
+   color: ^99f
+   :
+
+comp [divider] .div:
+   depth: 6
+   :
+   
+   
+comp [divider] .div2:
+   depth: 6
+   :
+   
+comp [divider] .div3:
+   depth: 6
+   :
+
+.div:a = .sec:get
+.div:b = \\10
+
+6wire div0 = .div:get
+6wire div1 = .div:mod
+
+.div2:a = .min:get
+.div2:b = \\10
+6wire div2g = .div2:get
+6wire div2m = .div2:mod
+
+.div3:a = .hour:get
+.div3:b = \\10
+6wire div3g = .div3:get
+6wire div3m = .div3:mod
+
+
+.sev0:hex= div0.2/4
+.sev0:set = .osc1:get
+ 
+.sev1:hex= div1.2/4
+.sev1:set = .osc1:get
+
+.sev3:hex = div2m.2/4
+.sev3:set = .osc1:get
+
+.sev2:hex= div2g.2/4
+.sev2:set= .osc1:get
+    
+    
+.sev5:hex = div3m.2/4
+.sev5:set = .osc1:get
+
+.sev4:hex= div3g.2/4
+.sev4:set= .osc1:get
+1wire qq = EQ(div0, 000000)
+
+.sev1:h=1
+.sev3:h=1
+.sev5:h=1
+
+
+#>
+.sev1:{
+  a=0
+   b=0
+   c=0
+   d=0
+   set = EQ(div0, 000000)
+}
+
+#<
+
+
+  
+  
+  `,
+  
+  
   ex_osc5: `
   
   
