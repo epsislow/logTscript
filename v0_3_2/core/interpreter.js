@@ -1101,6 +1101,15 @@ const idx = parseInt(
     this.currentStmt = s;
     
     try {
+    if(s.doc){
+      const name = s.doc;
+      const lines = Interpreter.getDocLines(name, this.funcs);
+      for (const line of lines) {
+        this.out.push(line);
+      }
+      return;
+    }
+
     if(s.show){
       const results = [];
       for(const e of s.show){
@@ -5989,4 +5998,52 @@ Interpreter.EXEC_DISPATCH = {
   next: '_execNext',
   test: '_execTest',
   assignment: '_execAssignment',
+};
+
+// ================= BUILTIN DOC TABLE =================
+Interpreter.BUILTIN_DOC = {
+  NOT:   ['NOT(Xbit)'],
+  AND:   ['AND(Xbit)', 'AND(Xbit, Xbit)'],
+  OR:    ['OR(Xbit)',  'OR(Xbit, Xbit)'],
+  XOR:   ['XOR(Xbit)', 'XOR(Xbit, Xbit)'],
+  NXOR:  ['NXOR(Xbit)', 'NXOR(Xbit, Xbit)'],
+  NAND:  ['NAND(Xbit)', 'NAND(Xbit, Xbit)'],
+  NOR:   ['NOR(Xbit)',  'NOR(Xbit, Xbit)'],
+  EQ:    ['EQ(Xbit, Xbit)'],
+  LATCH: ['LATCH(Xbit data, 1bit clock)'],
+  LSHIFT:['LSHIFT(Xbit data, Nbit n)', 'LSHIFT(Xbit data, Nbit n, 1bit fill)'],
+  RSHIFT:['RSHIFT(Xbit data, Nbit n)', 'RSHIFT(Xbit data, Nbit n, 1bit fill)'],
+  MUX1:  ['MUX1(1bit sel, Xbit data0, Xbit data1)'],
+  MUX2:  ['MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3)'],
+  MUX3:  ['MUX3(3bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3, Xbit data4, Xbit data5, Xbit data6, Xbit data7)'],
+  DEMUX1:['DEMUX1(1bit sel, Xbit data)'],
+  DEMUX2:['DEMUX2(2bit sel, Xbit data)'],
+  DEMUX3:['DEMUX3(3bit sel, Xbit data)'],
+};
+
+Interpreter.getDocLines = function(name, funcs) {
+  // Check static builtin table first
+  if (Interpreter.BUILTIN_DOC[name]) {
+    return Interpreter.BUILTIN_DOC[name];
+  }
+
+  // Check REGn pattern (e.g. REG4, REG8, REG16)
+  if (/^REG\d+$/.test(name)) {
+    const n = name.slice(3);
+    return [`${name}(${n}bit data, 1bit clock, 1bit clear)`];
+  }
+
+  // Check user-defined functions
+  if (funcs && funcs.has(name)) {
+    const f = funcs.get(name);
+    const paramStr = f.params.map(p => `${p.type} ${p.id}`).join(', ');
+    const sig = `${name}(${paramStr})`;
+    if (f.returns && f.returns.length > 0) {
+      const retStr = f.returns.map(r => r.type).join(', ');
+      return [`${sig} -> ${retStr}`];
+    }
+    return [sig];
+  }
+
+  return [`${name}: funcție nedefinită`];
 };

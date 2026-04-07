@@ -1827,6 +1827,273 @@ console.log('\n=== Test 200: Component Registry — all types registered ===');
   }
 }
 
+// ================================================================
+// doc() Tests — tokenizer + parser + interpreter
+// ================================================================
+
+{
+  // Bootstrap complet: tokenizer + preprocessor + componente + parser + interpreter
+  const interpreterSrc = fs.readFileSync('./core/interpreter.js', 'utf-8');
+  const componentFiles = [
+    'component-base', 'builtin-component', 'component-registry',
+    'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
+    'adder', 'subtract', 'multiplier', 'divider', 'shifter',
+    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', 'index'
+  ];
+  let componentsSrc = '';
+  for (const f of componentFiles) {
+    componentsSrc += fs.readFileSync(`./core/components/${f}.js`, 'utf-8')
+      .replace(/^var \w+ = \(typeof require\b.*$/gm, '')
+      .replace(/^if \(typeof module\b.*\n.*module\.exports.*\n\}/gm, '') + '\n';
+  }
+
+  const fullChunk = tokenizerSrc + '\n' + preprocessorSrc + '\n' + componentsSrc + '\n' + parserSrc + '\n' + interpreterSrc;
+  const sbDoc = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, setTimeout, clearTimeout, JSON, Number, isNaN };
+  const codeDoc = fullChunk + `
+var _CR = createComponentRegistry;
+var _P = Parser;
+var _T = Tokenizer;
+var _PR = preprocessRepeat;
+var _I = Interpreter;
+`;
+  vm.runInNewContext(codeDoc, sbDoc);
+  const registryDoc = sbDoc._CR();
+  const ParserDoc = sbDoc._P;
+  const TokenizerDoc = sbDoc._T;
+  const preprocessDoc = sbDoc._PR;
+  const InterpreterDoc = sbDoc._I;
+
+  function runDoc(src) {
+    const processed = preprocessDoc(src);
+    const p = new ParserDoc(new TokenizerDoc(processed), registryDoc);
+    const stmts = p.parse();
+    const out = [];
+    const interp = new InterpreterDoc(p.funcs, out, p.pcbs, registryDoc);
+    for (const s of stmts) interp.exec(s);
+    return out;
+  }
+
+  // ---- Tokenizer: 'doc' este KEYWORD ----
+  console.log('\n=== Test 300: Tokenizer — doc este KEYWORD ===');
+  {
+    const processed = preprocessDoc('doc(OR)');
+    const t = new TokenizerDoc(processed);
+    const tok = t.get();
+    assert('doc tokenizat ca KEYWORD', tok.type, 'KEYWORD');
+    assert('doc valoare corecta', tok.value, 'doc');
+  }
+
+  // ---- Parser: doc(OR) produce {doc: 'OR'} ----
+  console.log('\n=== Test 301: Parser — doc(OR) produce nodul AST corect ===');
+  {
+    const processed = preprocessDoc('doc(OR)');
+    const p = new ParserDoc(new TokenizerDoc(processed), registryDoc);
+    const stmts = p.parse();
+    assert('1 statement', String(stmts.length), '1');
+    assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
+    assert('doc.name este OR', stmts[0].doc, 'OR');
+  }
+
+  // ---- Parser: doc(MUX1) — token MUX ----
+  console.log('\n=== Test 302: Parser — doc(MUX1) accepta token MUX ===');
+  {
+    const processed = preprocessDoc('doc(MUX1)');
+    const p = new ParserDoc(new TokenizerDoc(processed), registryDoc);
+    const stmts = p.parse();
+    assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
+    assert('doc.name este MUX1', stmts[0].doc, 'MUX1');
+  }
+
+  // ---- Parser: doc(REG8) — token REG ----
+  console.log('\n=== Test 303: Parser — doc(REG8) accepta token REG ===');
+  {
+    const processed = preprocessDoc('doc(REG8)');
+    const p = new ParserDoc(new TokenizerDoc(processed), registryDoc);
+    const stmts = p.parse();
+    assert('doc.name este REG8', stmts[0].doc, 'REG8');
+  }
+
+  // ---- Interpreter: BUILTIN_DOC table ----
+  console.log('\n=== Test 304: BUILTIN_DOC — NOT ===');
+  {
+    const lines = InterpreterDoc.getDocLines('NOT', new Map());
+    assert('NOT semnatura', lines[0], 'NOT(Xbit)');
+  }
+
+  console.log('\n=== Test 305: BUILTIN_DOC — OR are 2 semnaturi ===');
+  {
+    const lines = InterpreterDoc.getDocLines('OR', new Map());
+    assert('OR 2 semnaturi', String(lines.length), '2');
+    assert('OR semnatura 1', lines[0], 'OR(Xbit)');
+    assert('OR semnatura 2', lines[1], 'OR(Xbit, Xbit)');
+  }
+
+  console.log('\n=== Test 306: BUILTIN_DOC — EQ are 1 semnatura ===');
+  {
+    const lines = InterpreterDoc.getDocLines('EQ', new Map());
+    assert('EQ 1 semnatura', String(lines.length), '1');
+    assert('EQ semnatura', lines[0], 'EQ(Xbit, Xbit)');
+  }
+
+  console.log('\n=== Test 307: BUILTIN_DOC — MUX1 ===');
+  {
+    const lines = InterpreterDoc.getDocLines('MUX1', new Map());
+    assert('MUX1 semnatura', lines[0], 'MUX1(1bit sel, Xbit data0, Xbit data1)');
+  }
+
+  console.log('\n=== Test 308: BUILTIN_DOC — MUX2 ===');
+  {
+    const lines = InterpreterDoc.getDocLines('MUX2', new Map());
+    assert('MUX2 semnatura', lines[0], 'MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3)');
+  }
+
+  console.log('\n=== Test 309: BUILTIN_DOC — MUX3 ===');
+  {
+    const lines = InterpreterDoc.getDocLines('MUX3', new Map());
+    assert('MUX3 are 8 intrari', String(lines[0].includes('data7')), 'true');
+  }
+
+  console.log('\n=== Test 310: BUILTIN_DOC — DEMUX1 ===');
+  {
+    const lines = InterpreterDoc.getDocLines('DEMUX1', new Map());
+    assert('DEMUX1 semnatura', lines[0], 'DEMUX1(1bit sel, Xbit data)');
+  }
+
+  console.log('\n=== Test 311: BUILTIN_DOC — DEMUX2 ===');
+  {
+    const lines = InterpreterDoc.getDocLines('DEMUX2', new Map());
+    assert('DEMUX2 semnatura', lines[0], 'DEMUX2(2bit sel, Xbit data)');
+  }
+
+  console.log('\n=== Test 312: BUILTIN_DOC — LSHIFT are 2 semnaturi ===');
+  {
+    const lines = InterpreterDoc.getDocLines('LSHIFT', new Map());
+    assert('LSHIFT 2 semnaturi', String(lines.length), '2');
+    assert('LSHIFT semnatura 1', lines[0], 'LSHIFT(Xbit data, Nbit n)');
+    assert('LSHIFT semnatura 2', lines[1], 'LSHIFT(Xbit data, Nbit n, 1bit fill)');
+  }
+
+  console.log('\n=== Test 313: BUILTIN_DOC — RSHIFT are 2 semnaturi ===');
+  {
+    const lines = InterpreterDoc.getDocLines('RSHIFT', new Map());
+    assert('RSHIFT 2 semnaturi', String(lines.length), '2');
+  }
+
+  console.log('\n=== Test 314: BUILTIN_DOC — LATCH ===');
+  {
+    const lines = InterpreterDoc.getDocLines('LATCH', new Map());
+    assert('LATCH semnatura', lines[0], 'LATCH(Xbit data, 1bit clock)');
+  }
+
+  // ---- REGn pattern dinamic ----
+  console.log('\n=== Test 315: getDocLines — REG4 dinamic ===');
+  {
+    const lines = InterpreterDoc.getDocLines('REG4', new Map());
+    assert('REG4 semnatura', lines[0], 'REG4(4bit data, 1bit clock, 1bit clear)');
+  }
+
+  console.log('\n=== Test 316: getDocLines — REG16 dinamic ===');
+  {
+    const lines = InterpreterDoc.getDocLines('REG16', new Map());
+    assert('REG16 semnatura', lines[0], 'REG16(16bit data, 1bit clock, 1bit clear)');
+  }
+
+  // ---- Functie user-defined ----
+  console.log('\n=== Test 317: getDocLines — functie user-defined fara return ===');
+  {
+    const funcs = new Map();
+    funcs.set('myGate', {
+      params: [{ type: '8bit', id: 'a' }, { type: '1bit', id: 'b' }],
+      returns: []
+    });
+    const lines = InterpreterDoc.getDocLines('myGate', funcs);
+    assert('myGate semnatura', lines[0], 'myGate(8bit a, 1bit b)');
+  }
+
+  console.log('\n=== Test 318: getDocLines — functie user-defined cu return ===');
+  {
+    const funcs = new Map();
+    funcs.set('split', {
+      params: [{ type: '8bit', id: 'x' }],
+      returns: [{ type: '4bit' }, { type: '4bit' }]
+    });
+    const lines = InterpreterDoc.getDocLines('split', funcs);
+    assert('split semnatura cu return', lines[0], 'split(8bit x) -> 4bit, 4bit');
+  }
+
+  // ---- Functie necunoscuta ----
+  console.log('\n=== Test 319: getDocLines — functie necunoscuta ===');
+  {
+    const lines = InterpreterDoc.getDocLines('Foo', new Map());
+    assert('Foo necunoscuta', lines[0], 'Foo: funcție nedefinită');
+  }
+
+  // ---- Interpreter end-to-end: doc(OR) ----
+  console.log('\n=== Test 320: Interpreter end-to-end — doc(OR) in out ===');
+  {
+    const out = runDoc('doc(OR)');
+    assert('OR linia 1', out[0], 'OR(Xbit)');
+    assert('OR linia 2', out[1], 'OR(Xbit, Xbit)');
+  }
+
+  // ---- Interpreter end-to-end: doc(NOT) ----
+  console.log('\n=== Test 321: Interpreter end-to-end — doc(NOT) ===');
+  {
+    const out = runDoc('doc(NOT)');
+    assert('NOT linia 1', out[0], 'NOT(Xbit)');
+    assert('NOT o singura linie', String(out.length), '1');
+  }
+
+  // ---- Interpreter end-to-end: doc(MUX1) ----
+  console.log('\n=== Test 322: Interpreter end-to-end — doc(MUX1) ===');
+  {
+    const out = runDoc('doc(MUX1)');
+    assert('MUX1 semnatura completa', out[0], 'MUX1(1bit sel, Xbit data0, Xbit data1)');
+  }
+
+  // ---- Interpreter end-to-end: doc(REG8) ----
+  console.log('\n=== Test 323: Interpreter end-to-end — doc(REG8) ===');
+  {
+    const out = runDoc('doc(REG8)');
+    assert('REG8 semnatura', out[0], 'REG8(8bit data, 1bit clock, 1bit clear)');
+  }
+
+  // ---- Interpreter end-to-end: doc(DEMUX2) ----
+  console.log('\n=== Test 324: Interpreter end-to-end — doc(DEMUX2) ===');
+  {
+    const out = runDoc('doc(DEMUX2)');
+    assert('DEMUX2 semnatura', out[0], 'DEMUX2(2bit sel, Xbit data)');
+  }
+
+  // ---- Interpreter end-to-end: functie user-defined ----
+  console.log('\n=== Test 325: Interpreter end-to-end — doc(myFunc) user-defined ===');
+  {
+    const src = `def myFunc(8bit a, 1bit b):
+  :1bit OR(a, b)
+doc(myFunc)`;
+    const out = runDoc(src);
+    assert('myFunc semnatura cu return', out[0], 'myFunc(8bit a, 1bit b) -> 1bit');
+  }
+
+  // ---- Interpreter end-to-end: functie necunoscuta ----
+  console.log('\n=== Test 326: Interpreter end-to-end — doc(Unknown) ===');
+  {
+    const out = runDoc('doc(Unknown)');
+    assert('Unknown nedefinita', out[0], 'Unknown: funcție nedefinită');
+  }
+
+  // ---- Toate portile logice ----
+  console.log('\n=== Test 327: Toate portile AND NAND NOR NXOR XOR ===');
+  {
+    for (const gate of ['AND', 'NAND', 'NOR', 'NXOR', 'XOR']) {
+      const lines = InterpreterDoc.getDocLines(gate, new Map());
+      assert(`${gate} are 2 semnaturi`, String(lines.length), '2');
+      assert(`${gate} semnatura 1 bit`, lines[0], `${gate}(Xbit)`);
+      assert(`${gate} semnatura 2 biti`, lines[1], `${gate}(Xbit, Xbit)`);
+    }
+  }
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);

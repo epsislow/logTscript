@@ -724,6 +724,16 @@ assignment() {
     return atom;
   }
 
+  doc(){
+    this.eat('KEYWORD');
+    this.eat('SYM', '(');
+    // Accept ID, MUX, REG, DEMUX tokens (all are valid function names)
+    const name = this.c.value;
+    this.c = this.t.get();
+    this.eat('SYM', ')');
+    return { doc: name };
+  }
+
   show(){
     this.eat('KEYWORD'); this.eat('SYM','(');
     const args=[];
@@ -1858,6 +1868,7 @@ isBuiltinFunction(name) {
 }
 
 Parser.KEYWORD_HANDLERS = {
+  doc: 'doc',
   show: 'show',
   NEXT: 'next',
   TEST: 'test',
