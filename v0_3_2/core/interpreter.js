@@ -627,7 +627,7 @@ class Interpreter {
             // Access PCB instance directly - return value based on returnSpec
             const returnSpec = pcbInstance.def.returnSpec;
             if(returnSpec){
-              // Return the specified variable
+              // First check if return value is a declared pin/pout
               const pinInfo = pcbInstance.pinStorage.get(returnSpec.varName);
               const poutInfo = pcbInstance.poutStorage.get(returnSpec.varName);
               const info = pinInfo || poutInfo;
@@ -635,9 +635,14 @@ class Interpreter {
                 const val = this.getValueFromRef(info.ref) || '0'.repeat(returnSpec.bits);
                 return {value: val, ref: info.ref, varName: a.var, bitWidth: returnSpec.bits};
               }
+              // Fallback: use cached returnValue from last executePcbBody (for internal wires like ret)
+              if(pcbInstance.returnValue !== undefined && pcbInstance.returnValue !== null){
+                const val = String(pcbInstance.returnValue).padStart(returnSpec.bits, '0').slice(-returnSpec.bits);
+                return {value: val, ref: null, varName: a.var, bitWidth: returnSpec.bits};
+              }
             }
             // No return spec or variable not found - return empty
-            return {value: '', ref: null, varName: a.var};
+            return {value: '0'.repeat((returnSpec && returnSpec.bits) || 1), ref: null, varName: a.var};
           }
         }
         
@@ -1340,9 +1345,14 @@ const idx = parseInt(
         }
       }
       
-      // Get onMode from component attributes (default: 'raise' for rising edge)
+      // Get onMode from component attributes or PCB instance def (default: 'raise' for rising edge)
       const comp = this.components.get(component);
-      const onMode = comp && comp.attributes && comp.attributes.on ? String(comp.attributes.on) : 'raise';
+      const pcbInst = this.pcbInstances ? this.pcbInstances.get(component) : null;
+      const onMode = (comp && comp.attributes && comp.attributes.on)
+        ? String(comp.attributes.on)
+        : (pcbInst && pcbInst.def && pcbInst.def.on)
+          ? String(pcbInst.def.on)
+          : 'raise';
       
       // Store the block for re-execution when dependencies change
       // BUT NOT when we're inside a PCB body (PCB internal blocks are executed inline)
@@ -3477,6 +3487,19 @@ if (s.assignment) {
         this.setValueAtRef(poutInfo.ref, currentVar.value);
       }
     }
+
+    // Save return value (wire/var named in returnSpec) so .q direct access works
+    if(def.returnSpec){
+      const retVarName = def.returnSpec.varName;
+      const retVar = this.vars.get(retVarName) || null;
+      const retWire = this.wires.get(retVarName) || null;
+      let retValue = null;
+      if(retVar && retVar.value) retValue = retVar.value;
+      else if(retWire && retWire.ref) retValue = this.getValueFromRef(retWire.ref);
+      if(retValue !== null){
+        instance.returnValue = retValue;
+      }
+    }
     
     // Restore original context (keeping internal components)
     // Merge new components with prefix to original (format: ._prefix_name)
@@ -4227,6 +4250,10 @@ if (s.assignment) {
         if(def.nextSection && def.nextSection.length > 0){
           instance.pendingNextSection = true;
         }
+        // Re-evaluate wire statements that reference this PCB instance
+        // so that wires like "8wire q = .q" reflect the updated pout/return values
+        this.reEvalWiresDependingOnPcb(instanceName);
+        if(typeof showVars === 'function') showVars();
       }
 
       instance.lastExecValue = newBit;
@@ -4283,6 +4310,55 @@ if (s.assignment) {
             this.wireStorageMap.set(targetName, storageIdx);
           }
           this.updateConnectedComponents(targetName, getValue);
+        }
+      }
+    }
+  }
+
+  // Re-evaluate all wire statements that reference a PCB instance by name
+  // Called after executePcbBody to propagate updated pout values to dependent wires
+  reEvalWiresDependingOnPcb(instanceName){
+    const checkExpr = (expr) => {
+      if(!Array.isArray(expr)) return false;
+      for(const atom of expr){
+        if(atom.var === instanceName) return true;
+        if(atom.args && atom.args.some(arg => checkExpr(arg))) return true;
+      }
+      return false;
+    };
+
+    for(const ws of this.wireStatements){
+      // Wire statements have shape: { decls: [{name, type}], expr: [...] }
+      if(!ws.decls || !ws.expr) continue;
+      if(!checkExpr(ws.expr)) continue;
+
+      // Re-evaluate for each declared wire in this statement
+      for(const d of ws.decls){
+        const wireName = d.name;
+        const wire = this.wires.get(wireName);
+        if(!wire) continue;
+
+        const bits = this.getBitWidth(wire.type);
+        const exprResult = this.evalExpr(ws.expr, false);
+        let wireValue = '';
+        for(const part of exprResult){
+          if(part.value && part.value !== '-'){
+            wireValue += part.value;
+          } else if(part.ref && part.ref !== '&-'){
+            const v = this.getValueFromRef(part.ref);
+            if(v) wireValue += v;
+          }
+        }
+        if(!wireValue) continue;
+        if(wireValue.length < bits) wireValue = wireValue.padStart(bits, '0');
+        else if(wireValue.length > bits) wireValue = wireValue.substring(wireValue.length - bits);
+
+        if(wire.ref){
+          this.setValueAtRef(wire.ref, wireValue);
+        } else {
+          const idx = this.storeValue(wireValue);
+          wire.ref = `&${idx}`;
+          this.wireStorageMap.set(wireName, idx);
         }
       }
     }

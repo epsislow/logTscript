@@ -1,4 +1,66 @@
 window.lib_files = {
+    
+    ex_pcb_regs: `
+    
+
+pcb +[regs]:
+   1pin set
+   1pin adr
+   4pin data
+   4pout reg1
+   4pout reg2
+   exec: set
+   on:1
+   
+   comp [reg] .s:
+   depth: 4
+   on:1
+   :
+   
+   comp [reg] .t:
+   depth: 4
+   on:1
+   :
+   
+   .s:{
+     data=data
+     set = EQ(adr,0)
+   }
+   
+   .t:{
+     data=data
+     write = 1
+     set = EQ(adr,1)
+   }
+   
+   reg1 = .s:get
+   reg2 = .t:get
+   8wire ret = reg1 + reg2
+   :8bit ret
+
+pcb [regs] .q::
+
+8wire q = .q
+
+comp [key] .aa:
+    label:'A'
+    size: 35
+    on:1
+    :
+
+1wire aa=.aa
+
+.q:{
+  adr = 1
+  data = ^F
+  set = 1
+}
+
+doc(pcb.regs)
+
+
+`,
+
   ex_demux: `
   
   def fr(1bit a, 1bit b):

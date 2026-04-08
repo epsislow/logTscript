@@ -2398,6 +2398,201 @@ doc(pcb.bcd)`;
   }
 }
 
+// ================================================================
+// PCB property block fix — Test 500+
+// ================================================================
+
+{
+  // Full sandbox: tokenizer + preprocessor + components + parser + interpreter
+  const interpSrc500 = fs.readFileSync('./core/interpreter.js', 'utf-8');
+  const signalSrc500 = fs.readFileSync('./core/signal-propagation.js', 'utf-8');
+  const compFiles500 = [
+    'component-base', 'builtin-component', 'component-registry',
+    'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
+    'adder', 'subtract', 'multiplier', 'divider', 'shifter',
+    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', 'index'
+  ];
+  let compSrc500 = '';
+  for (const f of compFiles500) {
+    compSrc500 += fs.readFileSync(`./core/components/${f}.js`, 'utf-8')
+      .replace(/^var \w+ = \(typeof require\b.*$/gm, '')
+      .replace(/^if \(typeof module\b.*\n.*module\.exports.*\n\}/gm, '') + '\n';
+  }
+
+  const chunk500 = tokenizerSrc + '\n' + preprocessorSrc + '\n' + compSrc500 + '\n' + parserSrc + '\n' + interpSrc500 + '\n' + signalSrc500;
+  const sb500 = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, setTimeout, clearTimeout, JSON, Number, isNaN };
+  vm.runInNewContext(chunk500 + `
+var _CR500 = createComponentRegistry;
+var _P500 = Parser;
+var _T500 = Tokenizer;
+var _PR500 = preprocessRepeat;
+var _I500 = Interpreter;
+`, sb500);
+
+  const registry500 = sb500._CR500();
+  const Parser500 = sb500._P500;
+  const Tokenizer500 = sb500._T500;
+  const preprocess500 = sb500._PR500;
+  const Interpreter500 = sb500._I500;
+
+  function run500(src) {
+    const processed = preprocess500(src);
+    const p = new Parser500(new Tokenizer500(processed), registry500);
+    const stmts = p.parse();
+    const out = [];
+    const interp = new Interpreter500(p.funcs, out, p.pcbs, registry500);
+    for (const s of stmts) interp.exec(s);
+    return { out, interp };
+  }
+
+  // Citeste valoarea unui pout dintr-o instanta PCB dupa nume instanta si pout
+  function getPcbPout500(interp, instanceName, poutName) {
+    const inst = interp.pcbInstances.get(instanceName);
+    if (!inst) return null;
+    const poutInfo = inst.poutStorage.get(poutName);
+    if (!poutInfo) return null;
+    return interp.getValueFromRef(poutInfo.ref) || '0'.repeat(poutInfo.bits);
+  }
+
+  // ---- Test 500: property block cu set=1 pe PCB cu on:1 declanseaza corpul ----
+  console.log('\n=== Test 500: PCB property block on:1 cu set=1 declanseaza executia ===');
+  {
+    // PCB simplu care copiaza pinul 'data' in pout-ul 'result'
+    const src = `pcb +[passthrough]:
+  4pin data
+  1pin set
+  4pout result
+  exec: set
+  on:1
+
+  result = data
+  :4bit result
+
+pcb [passthrough] .q::
+
+.q:{
+  data = 1111
+  set = 1
+}`;
+    const { interp } = run500(src);
+    const val = getPcbPout500(interp, '.q', 'result');
+    assert('PCB property block on:1 set=1 actualizeaza pout', val, '1111');
+  }
+
+  // ---- Test 501: property block cu set=0 pe PCB cu on:1 NU declanseaza corpul ----
+  console.log('\n=== Test 501: PCB property block on:1 cu set=0 nu declanseaza executia ===');
+  {
+    const src = `pcb +[passthrough2]:
+  4pin data
+  1pin set
+  4pout result
+  exec: set
+  on:1
+
+  result = data
+  :4bit result
+
+pcb [passthrough2] .q2::
+
+.q2:{
+  data = 1111
+  set = 0
+}`;
+    const { interp } = run500(src);
+    const val = getPcbPout500(interp, '.q2', 'result');
+    assert('PCB property block on:1 set=0 nu actualizeaza pout', val, '0000');
+  }
+
+  // ---- Test 502: scenario original din raportul de bug ----
+  console.log('\n=== Test 502: scenario regs PCB cu adr si data ===');
+  {
+    // NOT(1111) = 0000, verificam ca executia s-a produs (valoare diferita de init 0000 ar fi ambigua)
+    // Folosim NOT pe un pin pentru a verifica ca corpul PCB s-a executat cu datele corecte
+    const src = `pcb +[regs]:
+  1pin set
+  4pin data
+  4pout result
+  exec: set
+  on:1
+
+  result = NOT(data)
+  :4bit result
+
+pcb [regs] .q::
+
+.q:{
+  data = 0101
+  set = 1
+}`;
+    const { interp } = run500(src);
+    const val = getPcbPout500(interp, '.q', 'result');
+    // NOT(0101) = 1010
+    assert('PCB regs property block returneaza rezultat calculat', val, '1010');
+  }
+
+  // ---- Test 503: wire extern reflecta valoarea pout-ului dupa property block ----
+  console.log('\n=== Test 503: wire extern "q = .q" reflecta pout dupa property block ===');
+  {
+    const src = `pcb +[echo]:
+  4pin data
+  1pin set
+  4pout result
+  exec: set
+  on:1
+
+  result = data
+  :4bit result
+
+pcb [echo] .e::
+
+4wire q = .e
+
+.e:{
+  data = 0110
+  set = 1
+}`;
+    const { interp } = run500(src);
+    // Verifica poutStorage direct
+    const poutVal = getPcbPout500(interp, '.e', 'result');
+    assert('Test 503 pout result dupa block', poutVal, '0110');
+    // Verifica si wire-ul extern q (re-evaluat prin reEvalWiresDependingOnPcb)
+    const wire = interp.wires.get('q');
+    const wireVal = wire ? interp.getValueFromRef(wire.ref) : null;
+    assert('Test 503 wire q reflecta pout', wireVal, '0110');
+  }
+
+  // ---- Test 504: wire intern ca returnSpec (:Xbit wireName) este propagat corect ----
+  console.log('\n=== Test 504: wire intern ca returnSpec propagat in wire extern ===');
+  {
+    // PCB returneaza un wire intern (NOT(data)), nu un pout declarat
+    const src = `pcb +[inv]:
+  4pin data
+  1pin set
+  exec: set
+  on:1
+
+  4wire out = NOT(data)
+  :4bit out
+
+pcb [inv] .i::
+
+4wire q = .i
+
+.i:{
+  data = 0101
+  set = 1
+}`;
+    const { interp } = run500(src);
+    // returnValue trebuie salvat in instance dupa executePcbBody
+    const inst = interp.pcbInstances.get('.i');
+    assert('Test 504 instance.returnValue setat', inst ? String(inst.returnValue) : 'null', '1010');
+    // wire extern q trebuie actualizat prin reEvalWiresDependingOnPcb
+    const wire = interp.wires.get('q');
+    const wireVal = wire ? interp.getValueFromRef(wire.ref) : null;
+    assert('Test 504 wire q reflecta wire intern NOT(data)', wireVal, '1010');
+  }
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);
