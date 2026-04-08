@@ -6002,23 +6002,23 @@ Interpreter.EXEC_DISPATCH = {
 
 // ================= BUILTIN DOC TABLE =================
 Interpreter.BUILTIN_DOC = {
-  NOT:   ['NOT(Xbit)'],
-  AND:   ['AND(Xbit)', 'AND(Xbit, Xbit)'],
-  OR:    ['OR(Xbit)',  'OR(Xbit, Xbit)'],
-  XOR:   ['XOR(Xbit)', 'XOR(Xbit, Xbit)'],
-  NXOR:  ['NXOR(Xbit)', 'NXOR(Xbit, Xbit)'],
-  NAND:  ['NAND(Xbit)', 'NAND(Xbit, Xbit)'],
-  NOR:   ['NOR(Xbit)',  'NOR(Xbit, Xbit)'],
-  EQ:    ['EQ(Xbit, Xbit)'],
-  LATCH: ['LATCH(Xbit data, 1bit clock)'],
-  LSHIFT:['LSHIFT(Xbit data, Nbit n)', 'LSHIFT(Xbit data, Nbit n, 1bit fill)'],
-  RSHIFT:['RSHIFT(Xbit data, Nbit n)', 'RSHIFT(Xbit data, Nbit n, 1bit fill)'],
-  MUX1:  ['MUX1(1bit sel, Xbit data0, Xbit data1)'],
-  MUX2:  ['MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3)'],
-  MUX3:  ['MUX3(3bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3, Xbit data4, Xbit data5, Xbit data6, Xbit data7)'],
-  DEMUX1:['DEMUX1(1bit sel, Xbit data)'],
-  DEMUX2:['DEMUX2(2bit sel, Xbit data)'],
-  DEMUX3:['DEMUX3(3bit sel, Xbit data)'],
+  NOT:   ['NOT(Xbit) -> Xbit'],
+  AND:   ['AND(Xbit) -> 1bit', 'AND(Xbit, Xbit) -> Xbit'],
+  OR:    ['OR(Xbit) -> 1bit',  'OR(Xbit, Xbit) -> Xbit'],
+  XOR:   ['XOR(Xbit) -> 1bit', 'XOR(Xbit, Xbit) -> Xbit'],
+  NXOR:  ['NXOR(Xbit) -> 1bit', 'NXOR(Xbit, Xbit) -> Xbit'],
+  NAND:  ['NAND(Xbit) -> 1bit', 'NAND(Xbit, Xbit) -> Xbit'],
+  NOR:   ['NOR(Xbit) -> 1bit',  'NOR(Xbit, Xbit) -> Xbit'],
+  EQ:    ['EQ(Xbit, Xbit) -> 1bit'],
+  LATCH: ['LATCH(Xbit data, 1bit clock) -> Xbit'],
+  LSHIFT:['LSHIFT(Xbit data, Nbit n) -> Xbit', 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit'],
+  RSHIFT:['RSHIFT(Xbit data, Nbit n) -> Xbit', 'RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit'],
+  MUX1:  ['MUX1(1bit sel, Xbit data0, Xbit data1) -> Xbit'],
+  MUX2:  ['MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3) -> Xbit'],
+  MUX3:  ['MUX3(3bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3, Xbit data4, Xbit data5, Xbit data6, Xbit data7) -> Xbit'],
+  DEMUX1:['DEMUX1(1bit sel, Xbit data) -> Xbit, Xbit'],
+  DEMUX2:['DEMUX2(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit'],
+  DEMUX3:['DEMUX3(3bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit'],
 };
 
 Interpreter.getDocLines = function(name, funcs) {
@@ -6030,7 +6030,7 @@ Interpreter.getDocLines = function(name, funcs) {
   // Check REGn pattern (e.g. REG4, REG8, REG16)
   if (/^REG\d+$/.test(name)) {
     const n = name.slice(3);
-    return [`${name}(${n}bit data, 1bit clock, 1bit clear)`];
+    return [`${name}(${n}bit data, 1bit clock, 1bit clear) -> ${n}bit`];
   }
 
   // Check user-defined functions

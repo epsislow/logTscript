@@ -1917,34 +1917,34 @@ var _I = Interpreter;
   console.log('\n=== Test 304: BUILTIN_DOC — NOT ===');
   {
     const lines = InterpreterDoc.getDocLines('NOT', new Map());
-    assert('NOT semnatura', lines[0], 'NOT(Xbit)');
+    assert('NOT semnatura', lines[0], 'NOT(Xbit) -> Xbit');
   }
 
   console.log('\n=== Test 305: BUILTIN_DOC — OR are 2 semnaturi ===');
   {
     const lines = InterpreterDoc.getDocLines('OR', new Map());
     assert('OR 2 semnaturi', String(lines.length), '2');
-    assert('OR semnatura 1', lines[0], 'OR(Xbit)');
-    assert('OR semnatura 2', lines[1], 'OR(Xbit, Xbit)');
+    assert('OR semnatura 1', lines[0], 'OR(Xbit) -> 1bit');
+    assert('OR semnatura 2', lines[1], 'OR(Xbit, Xbit) -> Xbit');
   }
 
   console.log('\n=== Test 306: BUILTIN_DOC — EQ are 1 semnatura ===');
   {
     const lines = InterpreterDoc.getDocLines('EQ', new Map());
     assert('EQ 1 semnatura', String(lines.length), '1');
-    assert('EQ semnatura', lines[0], 'EQ(Xbit, Xbit)');
+    assert('EQ semnatura', lines[0], 'EQ(Xbit, Xbit) -> 1bit');
   }
 
   console.log('\n=== Test 307: BUILTIN_DOC — MUX1 ===');
   {
     const lines = InterpreterDoc.getDocLines('MUX1', new Map());
-    assert('MUX1 semnatura', lines[0], 'MUX1(1bit sel, Xbit data0, Xbit data1)');
+    assert('MUX1 semnatura', lines[0], 'MUX1(1bit sel, Xbit data0, Xbit data1) -> Xbit');
   }
 
   console.log('\n=== Test 308: BUILTIN_DOC — MUX2 ===');
   {
     const lines = InterpreterDoc.getDocLines('MUX2', new Map());
-    assert('MUX2 semnatura', lines[0], 'MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3)');
+    assert('MUX2 semnatura', lines[0], 'MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3) -> Xbit');
   }
 
   console.log('\n=== Test 309: BUILTIN_DOC — MUX3 ===');
@@ -1956,21 +1956,21 @@ var _I = Interpreter;
   console.log('\n=== Test 310: BUILTIN_DOC — DEMUX1 ===');
   {
     const lines = InterpreterDoc.getDocLines('DEMUX1', new Map());
-    assert('DEMUX1 semnatura', lines[0], 'DEMUX1(1bit sel, Xbit data)');
+    assert('DEMUX1 semnatura', lines[0], 'DEMUX1(1bit sel, Xbit data) -> Xbit, Xbit');
   }
 
   console.log('\n=== Test 311: BUILTIN_DOC — DEMUX2 ===');
   {
     const lines = InterpreterDoc.getDocLines('DEMUX2', new Map());
-    assert('DEMUX2 semnatura', lines[0], 'DEMUX2(2bit sel, Xbit data)');
+    assert('DEMUX2 semnatura', lines[0], 'DEMUX2(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit');
   }
 
   console.log('\n=== Test 312: BUILTIN_DOC — LSHIFT are 2 semnaturi ===');
   {
     const lines = InterpreterDoc.getDocLines('LSHIFT', new Map());
     assert('LSHIFT 2 semnaturi', String(lines.length), '2');
-    assert('LSHIFT semnatura 1', lines[0], 'LSHIFT(Xbit data, Nbit n)');
-    assert('LSHIFT semnatura 2', lines[1], 'LSHIFT(Xbit data, Nbit n, 1bit fill)');
+    assert('LSHIFT semnatura 1', lines[0], 'LSHIFT(Xbit data, Nbit n) -> Xbit');
+    assert('LSHIFT semnatura 2', lines[1], 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit');
   }
 
   console.log('\n=== Test 313: BUILTIN_DOC — RSHIFT are 2 semnaturi ===');
@@ -1982,20 +1982,20 @@ var _I = Interpreter;
   console.log('\n=== Test 314: BUILTIN_DOC — LATCH ===');
   {
     const lines = InterpreterDoc.getDocLines('LATCH', new Map());
-    assert('LATCH semnatura', lines[0], 'LATCH(Xbit data, 1bit clock)');
+    assert('LATCH semnatura', lines[0], 'LATCH(Xbit data, 1bit clock) -> Xbit');
   }
 
   // ---- REGn pattern dinamic ----
   console.log('\n=== Test 315: getDocLines — REG4 dinamic ===');
   {
     const lines = InterpreterDoc.getDocLines('REG4', new Map());
-    assert('REG4 semnatura', lines[0], 'REG4(4bit data, 1bit clock, 1bit clear)');
+    assert('REG4 semnatura', lines[0], 'REG4(4bit data, 1bit clock, 1bit clear) -> 4bit');
   }
 
   console.log('\n=== Test 316: getDocLines — REG16 dinamic ===');
   {
     const lines = InterpreterDoc.getDocLines('REG16', new Map());
-    assert('REG16 semnatura', lines[0], 'REG16(16bit data, 1bit clock, 1bit clear)');
+    assert('REG16 semnatura', lines[0], 'REG16(16bit data, 1bit clock, 1bit clear) -> 16bit');
   }
 
   // ---- Functie user-defined ----
@@ -2032,15 +2032,15 @@ var _I = Interpreter;
   console.log('\n=== Test 320: Interpreter end-to-end — doc(OR) in out ===');
   {
     const out = runDoc('doc(OR)');
-    assert('OR linia 1', out[0], 'OR(Xbit)');
-    assert('OR linia 2', out[1], 'OR(Xbit, Xbit)');
+    assert('OR linia 1', out[0], 'OR(Xbit) -> 1bit');
+    assert('OR linia 2', out[1], 'OR(Xbit, Xbit) -> Xbit');
   }
 
   // ---- Interpreter end-to-end: doc(NOT) ----
   console.log('\n=== Test 321: Interpreter end-to-end — doc(NOT) ===');
   {
     const out = runDoc('doc(NOT)');
-    assert('NOT linia 1', out[0], 'NOT(Xbit)');
+    assert('NOT linia 1', out[0], 'NOT(Xbit) -> Xbit');
     assert('NOT o singura linie', String(out.length), '1');
   }
 
@@ -2048,21 +2048,21 @@ var _I = Interpreter;
   console.log('\n=== Test 322: Interpreter end-to-end — doc(MUX1) ===');
   {
     const out = runDoc('doc(MUX1)');
-    assert('MUX1 semnatura completa', out[0], 'MUX1(1bit sel, Xbit data0, Xbit data1)');
+    assert('MUX1 semnatura completa', out[0], 'MUX1(1bit sel, Xbit data0, Xbit data1) -> Xbit');
   }
 
   // ---- Interpreter end-to-end: doc(REG8) ----
   console.log('\n=== Test 323: Interpreter end-to-end — doc(REG8) ===');
   {
     const out = runDoc('doc(REG8)');
-    assert('REG8 semnatura', out[0], 'REG8(8bit data, 1bit clock, 1bit clear)');
+    assert('REG8 semnatura', out[0], 'REG8(8bit data, 1bit clock, 1bit clear) -> 8bit');
   }
 
   // ---- Interpreter end-to-end: doc(DEMUX2) ----
   console.log('\n=== Test 324: Interpreter end-to-end — doc(DEMUX2) ===');
   {
     const out = runDoc('doc(DEMUX2)');
-    assert('DEMUX2 semnatura', out[0], 'DEMUX2(2bit sel, Xbit data)');
+    assert('DEMUX2 semnatura', out[0], 'DEMUX2(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit');
   }
 
   // ---- Interpreter end-to-end: functie user-defined ----
@@ -2088,8 +2088,8 @@ doc(myFunc)`;
     for (const gate of ['AND', 'NAND', 'NOR', 'NXOR', 'XOR']) {
       const lines = InterpreterDoc.getDocLines(gate, new Map());
       assert(`${gate} are 2 semnaturi`, String(lines.length), '2');
-      assert(`${gate} semnatura 1 bit`, lines[0], `${gate}(Xbit)`);
-      assert(`${gate} semnatura 2 biti`, lines[1], `${gate}(Xbit, Xbit)`);
+      assert(`${gate} semnatura 1 bit`, lines[0], `${gate}(Xbit) -> 1bit`);
+      assert(`${gate} semnatura 2 biti`, lines[1], `${gate}(Xbit, Xbit) -> Xbit`);
     }
   }
 }

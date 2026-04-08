@@ -39,15 +39,15 @@ OR(Xbit, Xbit)
 
 | Apel | Output |
 |------|--------|
-| `doc(NOT)` | `NOT(Xbit)` |
-| `doc(AND)` | `AND(Xbit)` / `AND(Xbit, Xbit)` |
-| `doc(OR)` | `OR(Xbit)` / `OR(Xbit, Xbit)` |
-| `doc(XOR)` | `XOR(Xbit)` / `XOR(Xbit, Xbit)` |
-| `doc(NXOR)` | `NXOR(Xbit)` / `NXOR(Xbit, Xbit)` |
-| `doc(NAND)` | `NAND(Xbit)` / `NAND(Xbit, Xbit)` |
-| `doc(NOR)` | `NOR(Xbit)` / `NOR(Xbit, Xbit)` |
-| `doc(EQ)` | `EQ(Xbit, Xbit)` |
-| `doc(LATCH)` | `LATCH(Xbit data, 1bit clock)` |
+| `doc(NOT)` | `NOT(Xbit) -> Xbit` |
+| `doc(AND)` | `AND(Xbit) -> 1bit` / `AND(Xbit, Xbit) -> Xbit` |
+| `doc(OR)` | `OR(Xbit) -> 1bit` / `OR(Xbit, Xbit) -> Xbit` |
+| `doc(XOR)` | `XOR(Xbit) -> 1bit` / `XOR(Xbit, Xbit) -> Xbit` |
+| `doc(NXOR)` | `NXOR(Xbit) -> 1bit` / `NXOR(Xbit, Xbit) -> Xbit` |
+| `doc(NAND)` | `NAND(Xbit) -> 1bit` / `NAND(Xbit, Xbit) -> Xbit` |
+| `doc(NOR)` | `NOR(Xbit) -> 1bit` / `NOR(Xbit, Xbit) -> Xbit` |
+| `doc(EQ)` | `EQ(Xbit, Xbit) -> 1bit` |
+| `doc(LATCH)` | `LATCH(Xbit data, 1bit clock) -> Xbit` |
 
 **`Xbit`** inseamna ca functia accepta un sir de biti de orice latime.
 
@@ -59,8 +59,8 @@ OR(Xbit, Xbit)
 
 | Apel | Output |
 |------|--------|
-| `doc(LSHIFT)` | `LSHIFT(Xbit data, Nbit n)` / `LSHIFT(Xbit data, Nbit n, 1bit fill)` |
-| `doc(RSHIFT)` | `RSHIFT(Xbit data, Nbit n)` / `RSHIFT(Xbit data, Nbit n, 1bit fill)` |
+| `doc(LSHIFT)` | `LSHIFT(Xbit data, Nbit n) -> Xbit` / `LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit` |
+| `doc(RSHIFT)` | `RSHIFT(Xbit data, Nbit n) -> Xbit` / `RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit` |
 
 - `data` — sirul de biti de shiftat
 - `n` — numarul de pozitii (in binar)
@@ -77,7 +77,7 @@ doc(REG4)
 Output:
 
 ```
-REG4(4bit data, 1bit clock, 1bit clear)
+REG4(4bit data, 1bit clock, 1bit clear) -> 4bit
 ```
 
 Parametri:
@@ -94,14 +94,14 @@ doc(MUX1)
 Output:
 
 ```
-MUX1(1bit sel, Xbit data0, Xbit data1)
+MUX1(1bit sel, Xbit data0, Xbit data1) -> Xbit
 ```
 
 | Apel | Semnatura |
 |------|-----------|
-| `doc(MUX1)` | `MUX1(1bit sel, Xbit data0, Xbit data1)` |
-| `doc(MUX2)` | `MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3)` |
-| `doc(MUX3)` | `MUX3(3bit sel, Xbit data0, ..., Xbit data7)` |
+| `doc(MUX1)` | `MUX1(1bit sel, Xbit data0, Xbit data1) -> Xbit` |
+| `doc(MUX2)` | `MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3) -> Xbit` |
+| `doc(MUX3)` | `MUX3(3bit sel, Xbit data0, ..., Xbit data7) -> Xbit` |
 
 `sel` este selectorul: `MUX1` → 1 bit (2 intrari), `MUX2` → 2 biti (4 intrari), `MUX3` → 3 biti (8 intrari).
 
@@ -114,14 +114,14 @@ doc(DEMUX1)
 Output:
 
 ```
-DEMUX1(1bit sel, Xbit data)
+DEMUX1(1bit sel, Xbit data) -> Xbit, Xbit
 ```
 
 | Apel | Semnatura |
 |------|-----------|
-| `doc(DEMUX1)` | `DEMUX1(1bit sel, Xbit data)` |
-| `doc(DEMUX2)` | `DEMUX2(2bit sel, Xbit data)` |
-| `doc(DEMUX3)` | `DEMUX3(3bit sel, Xbit data)` |
+| `doc(DEMUX1)` | `DEMUX1(1bit sel, Xbit data) -> Xbit, Xbit` |
+| `doc(DEMUX2)` | `DEMUX2(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit` |
+| `doc(DEMUX3)` | `DEMUX3(3bit sel, Xbit data) -> Xbit x8` |
 
 DEMUX returneaza un **vector** de `2^n` iesiri: una contine `data`, restul sunt `0`.
 
