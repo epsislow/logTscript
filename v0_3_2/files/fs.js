@@ -1,5 +1,24 @@
 window.lib_files = {
+  ex_demux: `
   
+  def fr(1bit a, 1bit b):
+   :1bit OR(a,b)
+   :2bit a + a
+
+comp [dip] .a:
+    size:3
+    noLabels
+    visual:1
+    on:1
+     :
+
+#doc(DEMUX2)
+2wire q = 1 + 0
+1wire _, 2wire c = fr(.a.0,.a.1)
+8wire b2 = DEMUX2(.a.2/2, c)
+
+  
+  `,
   
   ex_osc6: `
   
