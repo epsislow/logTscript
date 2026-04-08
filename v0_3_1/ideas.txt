@@ -575,3 +575,106 @@ show components tab
 where you can add a comp from def ones
 pcb comp must be here too 
   
+  
+====
+Ok vreau sa extind functionalitatea de doc ca sa includa si tipurile de componente interne dar si componentele pcb definite de catre utilizator. In felul urmator:
+
+doc(comp)
+#afiseaza lista cu toate tipurile de componentele interne:
+# comp.7seg, comp.led, comp.key, ... 
+# lista trebuie sa contina si numele short de preferat imediat dupa numele componentei complete exemplu:  comp.adder, comp.+, comp.divider, comp./
+
+
+doc(comp.7seg)
+#afizeaza pt componenta de tip 7seg
+  comp [7seg] .name:
+    text: string
+    color: 12bit/24bit
+    noLabels
+    nl
+    on: raise/edge/1/0 
+    = 8bit
+    :{
+      1pin set 
+      4pin hex
+      1pin a, 1pin b, 1pin c, 1pin d, 1pin e, 1pin f, 1pin g, 1pin h
+    }
+    -> 8bit
+
+#doc tb sa functioneze pt componentele cu nume short: doc(comp.+) returneaza la fel ca doc(comp.adder)
+
+
+doc(comp.dip)
+#afizeaza pt componenta de tip dip:
+   
+  comp [dip] .name:
+    text: string
+    length: integer
+    visual: 0/1
+    nl
+    = 16bit
+    on: raise/edge/1/0 
+    :{}
+    -> 16bit
+    
+doc(comp./)
+#afiseaza pt componenta de tip / short pt tipul divider:
+
+  comp [divider] .name:
+    depth: integer
+    on: raise/edge/1/0 
+    :{
+       Xpin a
+       Xpin b
+       1pin set
+       Xpout get
+       Xpout mod
+    }
+    -> Xbit
+   
+    
+doc(pcb)
+#afiseaza lista cu toate tipurile pcb definite de catre user:
+# pcb.bcd, pcb.abc, pcb.numeTipDatDeUser, ...
+
+pt componante cu tipul dat de user: bcd
+daca a fost definit astfel:
+
+pcb +[bcd]:
+   4pin sum
+   1pin set
+   4pout corr
+   1pout carry
+   exec: set
+   on:1
+
+   comp [-] .sub:
+      on:1
+      :
+
+   .sub:a = sum
+   .sub:b = MUX1(set, 0000, 1010)
+   .sub:set = set
+   corr = .sub:get
+   carry = .sub:carry 
+
+   :1bit set
+
+
+ar trebuii ca doc(pcb.bcd) sa afiseze:
+  pcb [bcd] .name:
+    exec: set
+    on: raise/edge/1/0
+    :{
+       1pin set
+       4pin sum
+       4pout corr
+       1pout carry
+    }
+    -> 1bit
+
+De adaugat documentatie si teste in test_repeat.
+Daca e nevoie de clarificari te rog pune intrebari.
+
+Posibila strategie de implementare: dat fiind ca componentele interne au fisiere js individuale poate logica de documentatie ar trebuii sa stea in fiecare fisier intr-o metoda getDoc() sau ceva asemanator? 
+
