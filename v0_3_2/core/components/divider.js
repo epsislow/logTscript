@@ -11,6 +11,16 @@ var DividerComponent = class DividerComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get', 'mod']; }
   getRedirectProperties() { return ['get', 'mod']; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'depth', value: 'integer' }],
+      initValue: 'Xbit',
+      pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'a' }, { bits: 'X', name: 'b' }],
+      pouts: [{ bits: 'X', name: 'get' }, { bits: 'X', name: 'mod' }],
+      returns: 'Xbit',
+    };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property === 'get') {
       const dividerId = comp.deviceIds[0];

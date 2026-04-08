@@ -12,6 +12,16 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get']; }
   getRedirectProperties() { return ['get']; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'text', value: 'string' }, { name: 'states', value: 'integer' }, { name: 'color', value: 'string' }, { name: 'nl', value: null }],
+      initValue: 'Xbit',
+      pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'data' }],
+      pouts: [{ bits: 'X', name: 'get' }],
+      returns: 'Xbit',
+    };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property !== 'get') return null;
     let val = null;

@@ -11,6 +11,16 @@ var RegComponent = class RegComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get']; }
   getRedirectProperties() { return ['get']; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'depth', value: 'integer' }],
+      initValue: 'Xbit',
+      pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'data' }],
+      pouts: [{ bits: 'X', name: 'get' }],
+      returns: 'Xbit',
+    };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property !== 'get') return null;
     const regId = comp.deviceIds[0];

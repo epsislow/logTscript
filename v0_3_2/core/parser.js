@@ -727,9 +727,15 @@ assignment() {
   doc(){
     this.eat('KEYWORD');
     this.eat('SYM', '(');
-    // Accept ID, MUX, REG, DEMUX tokens (all are valid function names)
-    const name = this.c.value;
+    // Consume first token (could be ID, KEYWORD like 'comp'/'pcb', MUX, REG, DEMUX)
+    let name = this.c.value;
     this.c = this.t.get();
+    // Consume optional .type suffix (e.g. comp.7seg, pcb.bcd)
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      this.eat('SYM', '.');
+      name = name + '.' + this.c.value;
+      this.c = this.t.get();
+    }
     this.eat('SYM', ')');
     return { doc: name };
   }

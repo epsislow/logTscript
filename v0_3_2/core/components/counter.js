@@ -11,6 +11,16 @@ var CounterComponent = class CounterComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get']; }
   getRedirectProperties() { return ['get']; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'depth', value: 'integer' }],
+      initValue: null,
+      pins: [{ bits: '1', name: 'set' }, { bits: '1', name: 'write' }, { bits: 'X', name: 'data' }, { bits: '1', name: 'dir' }],
+      pouts: [{ bits: 'X', name: 'get' }],
+      returns: 'Xbit',
+    };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property !== 'get') return null;
     const counterId = comp.deviceIds[0];

@@ -75,6 +75,16 @@ var LedComponent = class LedComponent extends BuiltinComponent {
     }
   }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'text', value: 'string' }, { name: 'color', value: 'string' }, { name: 'square', value: null }, { name: 'nl', value: null }],
+      initValue: '1bit',
+      pins: [{ bits: '1', name: 'set' }, { bits: '1', name: 'value' }],
+      pouts: [{ bits: '1', name: 'get' }],
+      returns: '1bit',
+    };
+  }
+
   updateDisplayValue(comp, value, bitRange) {
     let bitsToUse = value;
     if (bitRange) {

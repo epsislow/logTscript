@@ -11,6 +11,16 @@ var SubtractComponent = class SubtractComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get', 'carry']; }
   getRedirectProperties() { return ['get', 'carry']; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'depth', value: 'integer' }],
+      initValue: 'Xbit',
+      pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'a' }, { bits: 'X', name: 'b' }],
+      pouts: [{ bits: 'X', name: 'get' }, { bits: '1', name: 'carry' }],
+      returns: 'Xbit',
+    };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property === 'get') {
       const subtractId = comp.deviceIds[0];

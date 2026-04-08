@@ -10,6 +10,16 @@ var SevenSegComponent = class SevenSegComponent extends BuiltinComponent {
   getRedirectProperties() { return ['get']; }
   getSpecialParseAttributes() { return { segAttributes: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'] }; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'text', value: 'string' }, { name: 'color', value: 'string' }, { name: 'nl', value: null }],
+      initValue: '8bit',
+      pins: [{ bits: '1', name: 'set' }, { bits: '4', name: 'hex' }, { bits: '1', name: 'a' }, { bits: '1', name: 'b' }, { bits: '1', name: 'c' }, { bits: '1', name: 'd' }, { bits: '1', name: 'e' }, { bits: '1', name: 'f' }, { bits: '1', name: 'g' }, { bits: '1', name: 'h' }],
+      pouts: [{ bits: '8', name: 'get' }],
+      returns: '8bit',
+    };
+  }
+
   static hexTo7Seg(hexValue) {
     const hexMap = {
       '0000': '1111110', '0001': '0110000', '0010': '1101101', '0011': '1111001',

@@ -2094,6 +2094,310 @@ doc(myFunc)`;
   }
 }
 
+// ================================================================
+// doc(comp) and doc(pcb) Tests
+// ================================================================
+
+{
+  // Reuse same sandbox setup as doc tests above (full stack with interpreter)
+  const interpreterSrc2 = fs.readFileSync('./core/interpreter.js', 'utf-8');
+  const componentFiles2 = [
+    'component-base', 'builtin-component', 'component-registry',
+    'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
+    'adder', 'subtract', 'multiplier', 'divider', 'shifter',
+    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', 'index'
+  ];
+  let componentsSrc2 = '';
+  for (const f of componentFiles2) {
+    componentsSrc2 += fs.readFileSync(`./core/components/${f}.js`, 'utf-8')
+      .replace(/^var \w+ = \(typeof require\b.*$/gm, '')
+      .replace(/^if \(typeof module\b.*\n.*module\.exports.*\n\}/gm, '') + '\n';
+  }
+
+  const fullChunk2 = tokenizerSrc + '\n' + preprocessorSrc + '\n' + componentsSrc2 + '\n' + parserSrc + '\n' + interpreterSrc2;
+  const sbDoc2 = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, setTimeout, clearTimeout, JSON, Number, isNaN };
+  const codeDoc2 = fullChunk2 + `
+var _CR2 = createComponentRegistry;
+var _P2 = Parser;
+var _T2 = Tokenizer;
+var _PR2 = preprocessRepeat;
+var _I2 = Interpreter;
+`;
+  vm.runInNewContext(codeDoc2, sbDoc2);
+  const registryDoc2 = sbDoc2._CR2();
+  const ParserDoc2 = sbDoc2._P2;
+  const TokenizerDoc2 = sbDoc2._T2;
+  const preprocessDoc2 = sbDoc2._PR2;
+  const InterpreterDoc2 = sbDoc2._I2;
+
+  function runDoc2(src) {
+    const processed = preprocessDoc2(src);
+    const p = new ParserDoc2(new TokenizerDoc2(processed), registryDoc2);
+    const stmts = p.parse();
+    const out = [];
+    const interp = new InterpreterDoc2(p.funcs, out, p.pcbs, registryDoc2);
+    for (const s of stmts) interp.exec(s);
+    return out;
+  }
+
+  // ---- Parser: doc(comp) produce {doc: 'comp'} ----
+  console.log('\n=== Test 400: Parser — doc(comp) produce nodul AST corect ===');
+  {
+    const processed = preprocessDoc2('doc(comp)');
+    const p = new ParserDoc2(new TokenizerDoc2(processed), registryDoc2);
+    const stmts = p.parse();
+    assert('doc camp este comp', stmts[0].doc, 'comp');
+  }
+
+  // ---- Parser: doc(comp.adder) produce {doc: 'comp.adder'} ----
+  console.log('\n=== Test 401: Parser — doc(comp.adder) produce nodul AST corect ===');
+  {
+    const processed = preprocessDoc2('doc(comp.adder)');
+    const p = new ParserDoc2(new TokenizerDoc2(processed), registryDoc2);
+    const stmts = p.parse();
+    assert('doc camp este comp.adder', stmts[0].doc, 'comp.adder');
+  }
+
+  // ---- Parser: doc(pcb.bcd) produce {doc: 'pcb.bcd'} ----
+  console.log('\n=== Test 402: Parser — doc(pcb.bcd) produce nodul AST corect ===');
+  {
+    const processed = preprocessDoc2('doc(pcb.bcd)');
+    const p = new ParserDoc2(new TokenizerDoc2(processed), registryDoc2);
+    const stmts = p.parse();
+    assert('doc camp este pcb.bcd', stmts[0].doc, 'pcb.bcd');
+  }
+
+  // ---- doc(comp) lista componentelor ----
+  console.log('\n=== Test 403: doc(comp) contine comp.adder ===');
+  {
+    const out = runDoc2('doc(comp)');
+    const hasAdder = out.some(l => l.includes('comp.adder'));
+    assert('doc(comp) contine comp.adder', String(hasAdder), 'true');
+  }
+
+  console.log('\n=== Test 404: doc(comp) contine shortname comp.+ ===');
+  {
+    const out = runDoc2('doc(comp)');
+    const hasPlus = out.some(l => l.includes('comp.+'));
+    assert('doc(comp) contine comp.+', String(hasPlus), 'true');
+  }
+
+  console.log('\n=== Test 405: doc(comp) contine comp.7seg ===');
+  {
+    const out = runDoc2('doc(comp)');
+    const has7seg = out.some(l => l.includes('comp.7seg'));
+    assert('doc(comp) contine comp.7seg', String(has7seg), 'true');
+  }
+
+  console.log('\n=== Test 406: doc(comp) shortname comp.7 pe aceeasi linie cu comp.7seg ===');
+  {
+    const out = runDoc2('doc(comp)');
+    const line7seg = out.find(l => l.includes('comp.7seg'));
+    assert('linia cu 7seg contine si comp.7', String(line7seg && line7seg.includes('comp.7')), 'true');
+  }
+
+  // ---- doc(comp.adder) ----
+  console.log('\n=== Test 407: doc(comp.adder) prima linie ===');
+  {
+    const out = runDoc2('doc(comp.adder)');
+    assert('prima linie adder', out[0], 'comp [adder] .name:');
+  }
+
+  console.log('\n=== Test 408: doc(comp.adder) contine depth: integer ===');
+  {
+    const out = runDoc2('doc(comp.adder)');
+    assert('adder contine depth', String(out.some(l => l.includes('depth: integer'))), 'true');
+  }
+
+  console.log('\n=== Test 409: doc(comp.adder) contine = Xbit ===');
+  {
+    const out = runDoc2('doc(comp.adder)');
+    assert('adder contine = Xbit', String(out.some(l => l.trim() === '= Xbit')), 'true');
+  }
+
+  console.log('\n=== Test 410: doc(comp.adder) contine Xpin a ===');
+  {
+    const out = runDoc2('doc(comp.adder)');
+    assert('adder contine Xpin a', String(out.some(l => l.includes('Xpin a'))), 'true');
+  }
+
+  console.log('\n=== Test 411: doc(comp.adder) contine Xpout get ===');
+  {
+    const out = runDoc2('doc(comp.adder)');
+    assert('adder contine Xpout get', String(out.some(l => l.includes('Xpout get'))), 'true');
+  }
+
+  console.log('\n=== Test 412: doc(comp.adder) contine -> Xbit ===');
+  {
+    const out = runDoc2('doc(comp.adder)');
+    assert('adder contine -> Xbit', String(out.some(l => l.trim() === '-> Xbit')), 'true');
+  }
+
+  // ---- doc(comp.+) = shortname redirect pentru adder ----
+  console.log('\n=== Test 413: doc(comp.+) same output as doc(comp.adder) ===');
+  {
+    const outAdder = runDoc2('doc(comp.adder)');
+    const outPlus  = runDoc2('doc(comp.+)');
+    assert('doc(comp.+) prima linie', outPlus[0], 'comp [adder] .name:');
+    assert('doc(comp.+) lungime egala cu adder', String(outPlus.length), String(outAdder.length));
+  }
+
+  // ---- doc(comp.7seg) ----
+  console.log('\n=== Test 414: doc(comp.7seg) prima linie ===');
+  {
+    const out = runDoc2('doc(comp.7seg)');
+    assert('prima linie 7seg', out[0], 'comp [7seg] .name:');
+  }
+
+  console.log('\n=== Test 415: doc(comp.7seg) contine 1pin set ===');
+  {
+    const out = runDoc2('doc(comp.7seg)');
+    assert('7seg contine 1pin set', String(out.some(l => l.includes('1pin set'))), 'true');
+  }
+
+  console.log('\n=== Test 416: doc(comp.7seg) contine -> 8bit ===');
+  {
+    const out = runDoc2('doc(comp.7seg)');
+    assert('7seg contine -> 8bit', String(out.some(l => l.trim() === '-> 8bit')), 'true');
+  }
+
+  // ---- doc(comp.7) shortname pentru 7seg ----
+  console.log('\n=== Test 417: doc(comp.7) shortname pentru 7seg ===');
+  {
+    const out = runDoc2('doc(comp.7)');
+    assert('doc(comp.7) prima linie', out[0], 'comp [7seg] .name:');
+  }
+
+  // ---- mem nu are = Xbit (getForbidDirectAssign) ----
+  console.log('\n=== Test 418: doc(comp.mem) nu contine = Xbit ===');
+  {
+    const out = runDoc2('doc(comp.mem)');
+    assert('mem nu contine = Xbit', String(out.some(l => l.trim().startsWith('= '))), 'false');
+  }
+
+  // ---- doc(comp.xyz) — nedefinit ----
+  console.log('\n=== Test 419: doc(comp.xyz) tip nedefinit ===');
+  {
+    const out = runDoc2('doc(comp.xyz)');
+    assert('comp.xyz nedefinit', out[0], 'comp.xyz: tip de componentă nedefinit');
+  }
+
+  // ---- doc(pcb) cu PCB definit ----
+  console.log('\n=== Test 420: doc(pcb) cu PCB definit contine pcb.bcd ===');
+  {
+    const src = `pcb +[bcd]:
+  4pin sum
+  1pin set
+  4pout corr
+  1pout carry
+  exec: set
+  on: 1
+  :1bit set`;
+    const out = runDoc2(src + '\ndoc(pcb)');
+    assert('doc(pcb) contine pcb.bcd', String(out.some(l => l === 'pcb.bcd')), 'true');
+  }
+
+  // ---- doc(pcb.bcd) prima linie ----
+  console.log('\n=== Test 421: doc(pcb.bcd) prima linie ===');
+  {
+    const src = `pcb +[bcd]:
+  4pin sum
+  1pin set
+  4pout corr
+  1pout carry
+  exec: set
+  on: 1
+  :1bit set
+doc(pcb.bcd)`;
+    const out = runDoc2(src);
+    assert('pcb.bcd prima linie', out[0], 'pcb [bcd] .name:');
+  }
+
+  // ---- doc(pcb.bcd) contine 4pin sum ----
+  console.log('\n=== Test 422: doc(pcb.bcd) contine 4pin sum ===');
+  {
+    const src = `pcb +[bcd]:
+  4pin sum
+  1pin set
+  4pout corr
+  1pout carry
+  exec: set
+  on: 1
+  :1bit set
+doc(pcb.bcd)`;
+    const out = runDoc2(src);
+    assert('pcb.bcd contine 4pin sum', String(out.some(l => l.includes('4pin sum'))), 'true');
+  }
+
+  // ---- doc(pcb.bcd) contine 1pout carry ----
+  console.log('\n=== Test 423: doc(pcb.bcd) contine 1pout carry ===');
+  {
+    const src = `pcb +[bcd]:
+  4pin sum
+  1pin set
+  4pout corr
+  1pout carry
+  exec: set
+  on: 1
+  :1bit set
+doc(pcb.bcd)`;
+    const out = runDoc2(src);
+    assert('pcb.bcd contine 1pout carry', String(out.some(l => l.includes('1pout carry'))), 'true');
+  }
+
+  // ---- doc(pcb.bcd) contine -> 1bit ----
+  console.log('\n=== Test 424: doc(pcb.bcd) contine -> 1bit ===');
+  {
+    const src = `pcb +[bcd]:
+  4pin sum
+  1pin set
+  4pout corr
+  1pout carry
+  exec: set
+  on: 1
+  :1bit set
+doc(pcb.bcd)`;
+    const out = runDoc2(src);
+    assert('pcb.bcd contine -> 1bit', String(out.some(l => l.trim() === '-> 1bit')), 'true');
+  }
+
+  // ---- doc(pcb.xyz) — nedefinit ----
+  console.log('\n=== Test 425: doc(pcb.xyz) tip nedefinit ===');
+  {
+    const out = runDoc2('doc(pcb.xyz)');
+    assert('pcb.xyz nedefinit', out[0], 'pcb.xyz: tip PCB nedefinit');
+  }
+
+  // ---- formatCompDef pentru osc (fara = Xbit, are -> 1bit) ----
+  console.log('\n=== Test 426: doc(comp.osc) nu contine = si returneaza 1bit ===');
+  {
+    const out = runDoc2('doc(comp.osc)');
+    assert('osc fara = ', String(out.some(l => l.trim().startsWith('= '))), 'false');
+    assert('osc -> 1bit', String(out.some(l => l.trim() === '-> 1bit')), 'true');
+  }
+
+  // ---- formatCompDef static helper ----
+  console.log('\n=== Test 427: InterpreterDoc2.formatCompDef helper ===');
+  {
+    const def = {
+      attrs: [{ name: 'depth', value: 'integer' }],
+      initValue: 'Xbit',
+      pins: [{ bits: '1', name: 'set' }],
+      pouts: [{ bits: 'X', name: 'get' }],
+      returns: 'Xbit',
+    };
+    const lines = InterpreterDoc2.formatCompDef('testComp', def);
+    assert('formatCompDef linia 0', lines[0], 'comp [testComp] .name:');
+    assert('formatCompDef attr', lines[1], '  depth: integer');
+    assert('formatCompDef = Xbit', lines[2], '  = Xbit');
+    assert('formatCompDef :{', lines[3], '  :{');
+    assert('formatCompDef 1pin set', lines[4], '    1pin set');
+    assert('formatCompDef Xpout get', lines[5], '    Xpout get');
+    assert('formatCompDef }', lines[6], '  }');
+    assert('formatCompDef -> Xbit', lines[7], '  -> Xbit');
+  }
+}
+
 // Summary
 console.log(`\n========== RESULTS ==========`);
 console.log(`  Passed: ${passed}`);

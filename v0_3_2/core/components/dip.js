@@ -23,6 +23,16 @@ var DipComponent = class DipComponent extends BuiltinComponent {
     return { value: val, ref: null, varName: `${a.var}:get`, bitWidth: bits };
   }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'length', value: 'integer' }, { name: 'text', value: 'string' }, { name: 'nl', value: null }, { name: 'noLabels', value: null }, { name: 'visual', value: '0/1' }],
+      initValue: 'Xbit',
+      pins: [],
+      pouts: [{ bits: 'X', name: 'get' }],
+      returns: 'Xbit',
+    };
+  }
+
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const text = attributes.text !== undefined ? String(attributes.text) : '';
     const nl = attributes.nl || false;

@@ -9,6 +9,16 @@ var OscComponent = class OscComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get', 'counter', 'reset']; }
   getRedirectProperties() { return ['get']; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'duration1', value: 'integer' }, { name: 'duration0', value: 'integer' }, { name: 'length', value: 'integer' }, { name: 'freq', value: 'integer' }, { name: 'freqIsSec', value: '0/1' }, { name: 'eachCycle', value: '0/1' }],
+      initValue: null,
+      pins: [{ bits: '1', name: 'reset' }],
+      pouts: [{ bits: '1', name: 'get' }, { bits: 'X', name: 'counter' }],
+      returns: '1bit',
+    };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property === 'get') {
       let val = null;

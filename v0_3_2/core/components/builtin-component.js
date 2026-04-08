@@ -16,6 +16,10 @@ var BuiltinComponent = class BuiltinComponent extends ComponentBase {
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {}
 
   updateDisplayValue(comp, value, bitRange) {}
+
+  // Returns a structured definition object for doc() display.
+  // { attrs, initValue, pins, pouts, returns, on }
+  getDef() { return null; }
 };
 
 if (typeof module !== 'undefined' && module.exports) {

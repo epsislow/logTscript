@@ -1103,7 +1103,7 @@ const idx = parseInt(
     try {
     if(s.doc){
       const name = s.doc;
-      const lines = Interpreter.getDocLines(name, this.funcs);
+      const lines = Interpreter.getDocLines(name, this.funcs, this.componentRegistry, this.pcbDefinitions);
       for (const line of lines) {
         this.out.push(line);
       }
@@ -6021,19 +6021,70 @@ Interpreter.BUILTIN_DOC = {
   DEMUX3:['DEMUX3(3bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit'],
 };
 
-Interpreter.getDocLines = function(name, funcs) {
-  // Check static builtin table first
+Interpreter.getDocLines = function(name, funcs, registry, pcbDefinitions) {
+  // ---- doc(comp) — list all builtin component types ----
+  if (name === 'comp') {
+    if (!registry) return ['(no component registry available)'];
+    const allTypes = registry.getAllTypes ? registry.getAllTypes() : [];
+    const shortnames = registry.getShortnames ? registry.getShortnames() : {};
+    // build reverse map: canonicalType -> [shortkey, ...]
+    const reverseShort = {};
+    for (const [sk, canonical] of Object.entries(shortnames)) {
+      if (!reverseShort[canonical]) reverseShort[canonical] = [];
+      reverseShort[canonical].push(sk);
+    }
+    const lines = allTypes.map(type => {
+      const keys = reverseShort[type] || [];
+      let line = `comp.${type}`;
+      if (keys.length > 0) line += ', ' + keys.map(k => `comp.${k}`).join(', ');
+      return line;
+    });
+    return lines.length > 0 ? lines : ['(no components registered)'];
+  }
+
+  // ---- doc(comp.type) or doc(comp.shortname) ----
+  if (name.startsWith('comp.')) {
+    if (!registry) return [`${name}: (no component registry available)`];
+    const typeName = name.slice(5);
+    // resolve shortname → canonical type via getShortnames
+    let canonicalType = typeName;
+    if (!registry.has(typeName)) {
+      const shortnames = registry.getShortnames ? registry.getShortnames() : {};
+      if (shortnames[typeName]) canonicalType = shortnames[typeName];
+    }
+    const handler = registry.get(canonicalType);
+    if (!handler) return [`${name}: tip de componentă nedefinit`];
+    const def = handler.getDef ? handler.getDef() : null;
+    if (!def) return [`comp.${canonicalType}: (no doc available)`];
+    return Interpreter.formatCompDef(canonicalType, def);
+  }
+
+  // ---- doc(pcb) — list all user-defined PCB types ----
+  if (name === 'pcb') {
+    if (!pcbDefinitions || pcbDefinitions.size === 0) return ['(no PCB types defined)'];
+    return [...pcbDefinitions.keys()].map(k => `pcb.${k}`);
+  }
+
+  // ---- doc(pcb.type) ----
+  if (name.startsWith('pcb.')) {
+    const pcbName = name.slice(4);
+    if (!pcbDefinitions || !pcbDefinitions.has(pcbName)) return [`${name}: tip PCB nedefinit`];
+    const def = pcbDefinitions.get(pcbName);
+    return Interpreter.formatPcbDef(pcbName, def);
+  }
+
+  // ---- Static builtin function table ----
   if (Interpreter.BUILTIN_DOC[name]) {
     return Interpreter.BUILTIN_DOC[name];
   }
 
-  // Check REGn pattern (e.g. REG4, REG8, REG16)
+  // ---- REGn pattern (e.g. REG4, REG8, REG16) ----
   if (/^REG\d+$/.test(name)) {
     const n = name.slice(3);
     return [`${name}(${n}bit data, 1bit clock, 1bit clear) -> ${n}bit`];
   }
 
-  // Check user-defined functions
+  // ---- User-defined functions ----
   if (funcs && funcs.has(name)) {
     const f = funcs.get(name);
     const paramStr = f.params.map(p => `${p.type} ${p.id}`).join(', ');
@@ -6046,4 +6097,50 @@ Interpreter.getDocLines = function(name, funcs) {
   }
 
   return [`${name}: funcție nedefinită`];
+};
+
+Interpreter.formatCompDef = function(type, def) {
+  const lines = [];
+  lines.push(`comp [${type}] .name:`);
+  for (const attr of def.attrs) {
+    if (attr.value === null) {
+      lines.push(`  ${attr.name}`);
+    } else {
+      lines.push(`  ${attr.name}: ${attr.value}`);
+    }
+  }
+  if (def.initValue !== null) {
+    lines.push(`  = ${def.initValue}`);
+  }
+  lines.push('  :{');
+  for (const pin of def.pins) {
+    lines.push(`    ${pin.bits}pin ${pin.name}`);
+  }
+  for (const pout of def.pouts) {
+    lines.push(`    ${pout.bits}pout ${pout.name}`);
+  }
+  lines.push('  }');
+  if (def.returns !== null) {
+    lines.push(`  -> ${def.returns}`);
+  }
+  return lines;
+};
+
+Interpreter.formatPcbDef = function(name, def) {
+  const lines = [];
+  lines.push(`pcb [${name}] .name:`);
+  if (def.exec) lines.push(`  exec: ${def.exec}`);
+  lines.push(`  on: raise/edge/1/0`);
+  lines.push('  :{');
+  for (const pin of (def.pins || [])) {
+    lines.push(`    ${pin.bits}pin ${pin.name}`);
+  }
+  for (const pout of (def.pouts || [])) {
+    lines.push(`    ${pout.bits}pout ${pout.name}`);
+  }
+  lines.push('  }');
+  if (def.returnSpec) {
+    lines.push(`  -> ${def.returnSpec.bits}bit`);
+  }
+  return lines;
 };

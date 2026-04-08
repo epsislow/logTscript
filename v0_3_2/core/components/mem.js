@@ -11,6 +11,16 @@ var MemComponent = class MemComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get']; }
   getRedirectProperties() { return ['get']; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'length', value: 'integer' }, { name: 'depth', value: 'integer' }],
+      initValue: null,
+      pins: [{ bits: 'X', name: 'at' }, { bits: '1', name: 'write' }, { bits: 'X', name: 'data' }],
+      pouts: [{ bits: 'X', name: 'get' }],
+      returns: 'Xbit',
+    };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property !== 'get') return null;
     const memId = comp.deviceIds[0];

@@ -9,6 +9,16 @@ var LcdComponent = class LcdComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get']; }
   getRedirectProperties() { return ['get']; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'row', value: 'integer' }, { name: 'cols', value: 'integer' }, { name: 'pixelSize', value: 'integer' }, { name: 'pixelGap', value: 'integer' }, { name: 'color', value: 'string' }, { name: 'nl', value: null }, { name: 'rgb', value: null }],
+      initValue: '8bit',
+      pins: [{ bits: '1', name: 'set' }, { bits: '1', name: 'clear' }, { bits: 'X', name: 'x' }, { bits: 'X', name: 'y' }, { bits: 'X', name: 'rowlen' }, { bits: '1', name: 'not' }, { bits: '1', name: 'write0' }, { bits: '8', name: 'chr' }, { bits: 'X', name: 'data' }, { bits: '2', name: 'corner' }, { bits: 'X', name: 'rgb' }],
+      pouts: [{ bits: '8', name: 'get' }],
+      returns: '8bit',
+    };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property !== 'get') return null;
     let val = comp.lastCharValue || '00000000';

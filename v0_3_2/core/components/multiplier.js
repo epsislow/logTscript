@@ -11,6 +11,16 @@ var MultiplierComponent = class MultiplierComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get', 'over']; }
   getRedirectProperties() { return ['get', 'over']; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'depth', value: 'integer' }],
+      initValue: 'Xbit',
+      pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'a' }, { bits: 'X', name: 'b' }],
+      pouts: [{ bits: 'X', name: 'get' }, { bits: 'X', name: 'over' }],
+      returns: 'Xbit',
+    };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property === 'get') {
       const multiplierId = comp.deviceIds[0];

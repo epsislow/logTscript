@@ -11,6 +11,16 @@ var ShifterComponent = class ShifterComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get', 'out']; }
   getRedirectProperties() { return ['get', 'out']; }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'depth', value: 'integer' }, { name: 'circular', value: null }],
+      initValue: 'Xbit',
+      pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'value' }, { bits: '1', name: 'dir' }, { bits: '1', name: 'in' }],
+      pouts: [{ bits: 'X', name: 'get' }, { bits: '1', name: 'out' }],
+      returns: 'Xbit',
+    };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property === 'get') {
       const shifterId = comp.deviceIds[0];

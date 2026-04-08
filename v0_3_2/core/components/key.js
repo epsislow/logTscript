@@ -20,6 +20,16 @@ var KeyComponent = class KeyComponent extends BuiltinComponent {
     return { value: val, ref: null, varName: `${a.var}:get`, bitWidth: bits };
   }
 
+  getDef() {
+    return {
+      attrs: [{ name: 'label', value: 'string' }, { name: 'size', value: 'integer' }, { name: 'nl', value: null }],
+      initValue: '1bit',
+      pins: [],
+      pouts: [{ bits: '1', name: 'get' }],
+      returns: '1bit',
+    };
+  }
+
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const label = attributes.label !== undefined ? String(attributes.label) : '';
     const size = attributes.size !== undefined ? parseInt(attributes.size, 10) : 36;

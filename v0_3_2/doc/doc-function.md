@@ -178,9 +178,148 @@ Foo: funcție nedefinită
 
 ---
 
+---
+
+## Componente interne (comp)
+
+### doc(comp) — lista tuturor tipurilor
+
+Afiseaza toate tipurile de componente disponibile, cu shortname-urile pe aceeasi linie:
+
+```
+doc(comp)
+```
+
+Output (exemplu):
+
+```
+comp.led
+comp.switch
+comp.adder, comp.+
+comp.subtract, comp.-
+comp.7seg, comp.7
+comp.osc, comp.~
+...
+```
+
+### doc(comp.tip) — sintaxa unei componente
+
+Afiseaza sintaxa completa pentru un tip de componenta. Shortname-urile sunt acceptate si redirectioneaza la tipul canonic.
+
+```
+doc(comp.adder)
+doc(comp.+)        # echivalent cu doc(comp.adder)
+```
+
+Output:
+
+```
+comp [adder] .name:
+  depth: integer
+  = Xbit
+  :{
+    1pin set
+    Xpin a
+    Xpin b
+    Xpout get
+    1pout carry
+  }
+  -> Xbit
+```
+
+**Structura output:**
+- Atributele de declarare (pana la `:{`) — cu valoare (`depth: integer`) sau fara (`nl`, `circular`)
+- `= Xbit` — apare daca componenta accepta asignare directa cu `=`; lipseste daca nu (ex. `mem`, `counter`, `osc`)
+- `:{` ... `}` — pinii (intrari) si pout-ii (iesiri) disponibili in property block
+- `-> Xbit` — tipul valorii returnate de componenta
+
+### Toate componentele disponibile
+
+| Apel | Tip canonic |
+|------|-------------|
+| `doc(comp.led)` | led — 1bit, vizualizare LED |
+| `doc(comp.switch)` | switch — 1bit, comutator |
+| `doc(comp.key)` | key — 1bit, tasta momentana |
+| `doc(comp.dip)` | dip — Xbit, grup de comutatoare |
+| `doc(comp.7seg)` sau `doc(comp.7)` | 7seg — 8bit, afisaj 7 segmente |
+| `doc(comp.lcd)` | lcd — 8bit, afisaj matriceal |
+| `doc(comp.adder)` sau `doc(comp.+)` | adder — Xbit, adunare |
+| `doc(comp.subtract)` sau `doc(comp.-)` | subtract — Xbit, scadere |
+| `doc(comp.multiplier)` sau `doc(comp.*)` | multiplier — Xbit, inmultire |
+| `doc(comp.divider)` sau `doc(comp./)` | divider — Xbit, impartire |
+| `doc(comp.shifter)` sau `doc(comp.>)` | shifter — Xbit, registru de deplasare |
+| `doc(comp.mem)` | mem — Xbit, memorie RAM |
+| `doc(comp.reg)` | reg — Xbit, registru |
+| `doc(comp.counter)` sau `doc(comp.=)` | counter — Xbit, numarator |
+| `doc(comp.osc)` sau `doc(comp.~)` | osc — 1bit, oscilator |
+| `doc(comp.rotary)` | rotary — Xbit, selector rotativ |
+
+### Tip nedefinit
+
+```
+doc(comp.xyz)
+# afiseaza:
+comp.xyz: tip de componentă nedefinit
+```
+
+---
+
+## Componente PCB (pcb)
+
+### doc(pcb) — lista tipurilor PCB definite de utilizator
+
+```
+doc(pcb)
+```
+
+Output (daca au fost definite tipuri `bcd` si `alu`):
+
+```
+pcb.bcd
+pcb.alu
+```
+
+### doc(pcb.tip) — sintaxa unui tip PCB
+
+```
+doc(pcb.bcd)
+```
+
+Output:
+
+```
+pcb [bcd] .name:
+  exec: set
+  on: raise/edge/1/0
+  :{
+    4pin sum
+    1pin set
+    4pout corr
+    1pout carry
+  }
+  -> 1bit
+```
+
+**Structura output:**
+- `exec: set` — pinul care declanseaza executia
+- `on: raise/edge/1/0` — conditia de declansare (valoarea depinde de definitia PCB)
+- `:{` ... `}` — pinii (intrari) si pout-ii (iesiri) definiti
+- `-> Nbit` — tipul valorii returnate (daca exista `:Nbit varName` la sfarsitul definitiei)
+
+**Tip nedefinit:**
+
+```
+doc(pcb.xyz)
+# afiseaza:
+pcb.xyz: tip PCB nedefinit
+```
+
+---
+
 ## Note
 
 - `doc` este o **instructiune** (ca `show`), nu o expresie — nu poate fi folosita in dreapta unui `=`.
 - Argumentul este un **identificator** (nu un string intre ghilimele).
 - `doc` nu evalueaza nimic — afiseaza doar semnatura statica.
 - Poate fi plasat oriunde in cod, inclusiv inainte sau dupa definitii de functii.
+- `doc(comp.shortname)` este echivalent cu `doc(comp.tipCanonic)` — ex. `doc(comp.+)` = `doc(comp.adder)`.
