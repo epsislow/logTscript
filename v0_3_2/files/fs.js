@@ -1,4 +1,106 @@
 window.lib_files = {
+    ex_pcb_regs3: `
+
+
+
+pcb +[regs]:
+   1pin set
+   1pin adr
+   4pin data
+   4pout reg1
+   4pout reg2
+   exec: set
+   on:1
+   
+   comp [reg] .s:
+   depth: 4
+   on:1
+   :
+   
+   comp [reg] .t:
+   depth: 4
+   on:1
+   :
+   
+   .s:{
+     data=data
+     set = EQ(adr,0)
+   }
+   
+   .t:{
+     data=data
+     write = 1
+     set = EQ(adr,1)
+   }
+   
+   reg1 = .s:get
+   reg2 = .t:get
+   8wire ret = reg1 + reg2
+   :8bit ret
+
+pcb [regs] .q::
+
+8wire q = .q
+
+comp [key] .aa:
+    label:'A'
+    size: 35
+    on:1
+    :
+
+1wire aa=.aa
+
+comp [key] .bb:
+    label:'B'
+    size: 35
+    on:1
+    :
+
+1wire bb=.bb
+
+comp [key] .cc:
+    label:'.'
+    size: 35
+    on:1
+    :
+
+1wire cc=.cc
+
+.q:{
+  adr = 0
+  data = ^F
+  set = aa
+}
+.q:{
+  adr = 1
+  data = ^F
+  set = bb
+}
+
+
+.q:{
+  adr = 0
+  data = 1000
+  set = cc
+}
+.q:{
+  adr = 1
+  data = 0001
+  set = cc
+}
+
+
+comp [led] .rr:
+    length: 8
+    square
+    on:1
+     :
+
+.rr = .q:reg1 + .q:reg2
+     
+doc(comp.led)
+
+	`,
     ex_pcb_regs2: `
     
     
