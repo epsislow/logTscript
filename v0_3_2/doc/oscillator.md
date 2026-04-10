@@ -1,15 +1,15 @@
-# Oscillator (Oscilator)
+# Oscillator
 
-Componenta `osc` genereaza un semnal digital periodic de 1 bit, cu frecventa si duty cycle configurabile. Include un counter intern care numara ciclurile.
+The `osc` component generates a periodic 1-bit digital signal with configurable frequency and duty cycle. It includes an internal counter that counts cycles.
 
-Oscilatorul functioneaza in **timp real** — odata creat, oscileaza independent de `NEXT(~)`, folosind timere interne ale browser-ului.
+The oscillator works in **real time** — once created, it oscillates independently of `NEXT(~)`, using internal browser timers.
 
 ---
 
-## Sintaxa
+## Syntax
 
 ```
-comp [osc] .nume:
+comp [osc] .name:
   duration1: 4
   duration0: 4
   length: 4
@@ -19,88 +19,88 @@ comp [osc] .nume:
   :
 ```
 
-Forma scurta cu `~`:
+Short form using `~`:
 
 ```
-comp [~] .nume:
+comp [~] .name:
   ...
   :
 ```
 
-Forma minimala (fara atribute, toate valorile sunt default):
+Minimal form (no attributes, all values are default):
 
 ```
-comp [osc] .nume::
+comp [osc] .name::
 ```
 
 ---
 
-## Atribute
+## Attributes
 
-| Atribut     | Tip   | Min | Max | Default | Descriere |
-|-------------|-------|-----|-----|---------|-----------|
-| `duration1` | int   | 1   | 8   | 4       | Proportia de timp in care semnalul este `1` (HIGH) |
-| `duration0` | int   | 1   | 8   | 4       | Proportia de timp in care semnalul este `0` (LOW) |
-| `length`    | int   | 1   | -   | 4       | Numarul de biti ai counter-ului intern |
-| `freq`      | float | >0  | -   | 1       | Frecventa in Hz sau perioada in secunde (vezi `freqIsSec`) |
-| `freqIsSec` | int   | 0   | 1   | 0       | Modul de interpretare a lui `freq`: `0` = Hz (cicluri/secunda), `1` = secunde (perioada unui ciclu) |
-| `eachCycle`  | int   | 0   | 1   | 1       | Cand se incrementeaza counter-ul: `1` = la fiecare ciclu complet, `0` = la fiecare schimbare de stare |
+| Attribute    | Type  | Min | Max | Default | Description |
+|--------------|-------|-----|-----|---------|-------------|
+| `duration1`  | int   | 1   | 8   | 4       | Proportion of time the signal is `1` (HIGH) |
+| `duration0`  | int   | 1   | 8   | 4       | Proportion of time the signal is `0` (LOW) |
+| `length`     | int   | 1   | -   | 4       | Number of bits in the internal counter |
+| `freq`       | float | >0  | -   | 1       | Frequency in Hz or period in seconds (see `freqIsSec`) |
+| `freqIsSec`  | int   | 0   | 1   | 0       | How `freq` is interpreted: `0` = Hz (cycles/second), `1` = seconds (period of one cycle) |
+| `eachCycle`  | int   | 0   | 1   | 1       | When the counter increments: `1` = once per full cycle, `0` = on every state change |
 
-### Frecventa si freqIsSec
+### Frequency and freqIsSec
 
-Atributul `freq` controleaza viteza oscilatorului. Modul de interpretare depinde de `freqIsSec`:
+The `freq` attribute controls the speed of the oscillator. Interpretation depends on `freqIsSec`:
 
-- `freqIsSec: 0` (default) — `freq` este in **Hz** (cicluri pe secunda). Perioada = `1000 / freq` ms.
-- `freqIsSec: 1` — `freq` este in **secunde** (durata unui ciclu complet). Perioada = `freq * 1000` ms.
+- `freqIsSec: 0` (default) — `freq` is in **Hz** (cycles per second). Period = `1000 / freq` ms.
+- `freqIsSec: 1` — `freq` is in **seconds** (duration of one full cycle). Period = `freq * 1000` ms.
 
-**Exemple:**
+**Examples:**
 
-| freq | freqIsSec | Perioada | Descriere |
-|------|-----------|----------|-----------|
-| 10   | 0         | 100ms    | 10 cicluri pe secunda |
-| 1    | 0         | 1000ms   | 1 ciclu pe secunda |
-| 0.5  | 0         | 2000ms   | 1 ciclu la 2 secunde |
-| 5    | 1         | 5000ms   | 1 ciclu la 5 secunde |
-| 30   | 1         | 30000ms  | 1 ciclu la 30 secunde |
-| 120  | 1         | 120000ms | 1 ciclu la 2 minute |
+| freq | freqIsSec | Period   | Description |
+|------|-----------|----------|-------------|
+| 10   | 0         | 100ms    | 10 cycles per second |
+| 1    | 0         | 1000ms   | 1 cycle per second |
+| 0.5  | 0         | 2000ms   | 1 cycle every 2 seconds |
+| 5    | 1         | 5000ms   | 1 cycle every 5 seconds |
+| 30   | 1         | 30000ms  | 1 cycle every 30 seconds |
+| 120  | 1         | 120000ms | 1 cycle every 2 minutes |
 
-`freqIsSec: 1` este util pentru perioade lungi (peste 1 secunda) unde scrierea in Hz ar necesita valori fractionare sub 1.
+`freqIsSec: 1` is useful for long periods (over 1 second) where writing in Hz would require fractional values below 1.
 
 ### Duty Cycle
 
-Proportia HIGH/LOW este calculata din `duration1` si `duration0`:
+The HIGH/LOW ratio is calculated from `duration1` and `duration0`:
 
-- Timp HIGH = `duration1 / (duration1 + duration0)` din perioada
-- Timp LOW = `duration0 / (duration1 + duration0)` din perioada
+- HIGH time = `duration1 / (duration1 + duration0)` of the period
+- LOW time = `duration0 / (duration1 + duration0)` of the period
 
-**Exemplu:** Cu `duration1: 1` si `duration0: 7` la `freq: 10` (`freqIsSec: 0`):
-- Perioada = 100ms (10 cicluri/secunda)
-- HIGH = 1/8 din 100ms = 12.5ms
-- LOW = 7/8 din 100ms = 87.5ms
+**Example:** With `duration1: 1` and `duration0: 7` at `freq: 10` (`freqIsSec: 0`):
+- Period = 100ms (10 cycles/second)
+- HIGH = 1/8 of 100ms = 12.5ms
+- LOW = 7/8 of 100ms = 87.5ms
 
-**Exemplu cu freqIsSec: 1:** Cu `duration1: 4` si `duration0: 4` la `freq: 10` (`freqIsSec: 1`):
-- Perioada = 10000ms (10 secunde per ciclu)
-- HIGH = 5000ms (5 secunde)
-- LOW = 5000ms (5 secunde)
+**Example with freqIsSec: 1:** With `duration1: 4` and `duration0: 4` at `freq: 10` (`freqIsSec: 1`):
+- Period = 10000ms (10 seconds per cycle)
+- HIGH = 5000ms (5 seconds)
+- LOW = 5000ms (5 seconds)
 
 ### Counter
 
-Counter-ul este un numarator binar pe `length` biti. Porneste de la `0` si se incrementeaza conform atributului `eachCycle`:
+The counter is a binary counter on `length` bits. It starts at `0` and increments according to the `eachCycle` attribute:
 
-- `eachCycle: 1` — counter-ul creste cu 1 la fiecare ciclu complet (dupa faza HIGH + LOW)
-- `eachCycle: 0` — counter-ul creste cu 1 la fiecare schimbare de stare (de 2 ori per ciclu: la tranzitia 0→1 si la 1→0)
+- `eachCycle: 1` — counter increments by 1 on each full cycle (after HIGH + LOW phase)
+- `eachCycle: 0` — counter increments by 1 on each state change (twice per cycle: at 0→1 and at 1→0 transitions)
 
-Cand counter-ul ajunge la valoarea maxima (toti bitii pe 1), face **wrap-around** si revine la 0.
+When the counter reaches its maximum value (all bits set to 1), it **wraps around** and returns to 0.
 
 ---
 
-## Iesiri
+## Outputs
 
-Oscilatorul expune 3 proprietati de citire:
+The oscillator exposes 3 readable properties:
 
-### Valoarea directa — `.osc1`
+### Direct value — `.osc1`
 
-Returneaza valoarea curenta a semnalului (1 bit: `0` sau `1`).
+Returns the current signal value (1 bit: `0` or `1`).
 
 ```
 1wire osc1 = .osc1
@@ -108,31 +108,31 @@ Returneaza valoarea curenta a semnalului (1 bit: `0` sau `1`).
 
 ### `:get` — `.osc1:get`
 
-Identic cu valoarea directa. Returneaza semnalul curent de 1 bit.
+Identical to the direct value. Returns the current 1-bit signal.
 
 ```
 1wire osc1b = .osc1:get
 ```
 
-`.osc1` si `.osc1:get` sunt intotdeauna sincronizate — au aceeasi valoare in orice moment.
+`.osc1` and `.osc1:get` are always synchronized — they have the same value at any moment.
 
 ### `:counter` — `.osc1:counter`
 
-Returneaza valoarea counter-ului intern pe `length` biti.
+Returns the value of the internal counter on `length` bits.
 
 ```
 4wire counter1 = .osc1:counter
 ```
 
-Cu `length: 4`, counter-ul are valori de la `0000` la `1111` (0-15), apoi revine la `0000`.
+With `length: 4`, the counter has values from `0000` to `1111` (0–15), then wraps back to `0000`.
 
 ---
 
-## Intrari
+## Inputs
 
-### `:reset` — resetare counter
+### `:reset` — reset counter
 
-Proprietatea `:reset` permite resetarea counter-ului intern la `0`. Se utilizeaza in cadrul unui bloc cu `set` ca trigger:
+The `:reset` property allows resetting the internal counter to `0`. It is used inside a block with `set` as trigger:
 
 ```
 .osc1:{
@@ -141,20 +141,20 @@ Proprietatea `:reset` permite resetarea counter-ului intern la `0`. Se utilizeaz
 }
 ```
 
-Cand expresia din `set` face tranzitia de la `0` la `1` (rising edge), blocul se executa si counter-ul este resetat la `0...0` (toti bitii pe `0`).
+When the expression in `set` transitions from `0` to `1` (rising edge), the block executes and the counter is reset to `0...0` (all bits zero).
 
-**Comportament:**
+**Behavior:**
 
-- `reset = 1` — counter-ul este resetat la valoarea `0` (pe `length` biti)
-- `reset = 0` — nu se intampla nimic (counter-ul continua normal)
-- Dupa reset, counter-ul reia numararea de la `0`
-- Semnalul oscilatorului (HIGH/LOW) nu este afectat — doar counter-ul este resetat
+- `reset = 1` — counter is reset to `0` (on `length` bits)
+- `reset = 0` — nothing happens (counter continues normally)
+- After reset, the counter resumes counting from `0`
+- The oscillator signal (HIGH/LOW) is not affected — only the counter is reset
 
 ---
 
-## Exemple
+## Examples
 
-### Oscilator simplu cu duty cycle 50%
+### Simple oscillator with 50% duty cycle
 
 ```
 comp [~] .clk:
@@ -164,9 +164,9 @@ comp [~] .clk:
 1wire clock = .clk
 ```
 
-Semnalul oscileaza la 2 Hz (o data pe secunda HIGH, o data LOW), cu duty cycle de 50% (duration1 si duration0 sunt ambele 4 implicit).
+The signal oscillates at 2 Hz (once per second HIGH, once LOW), with 50% duty cycle (duration1 and duration0 are both 4 by default).
 
-### Oscilator rapid cu duty cycle asimetric
+### Fast oscillator with asymmetric duty cycle
 
 ```
 comp [osc] .fast:
@@ -180,9 +180,9 @@ comp [osc] .fast:
 4wire cnt = .fast:counter
 ```
 
-Semnalul pulseaza de 10 ori pe secunda. Este `1` pentru 12.5ms si `0` pentru 87.5ms in fiecare ciclu. Counter-ul numara ciclurile pe 4 biti (0-15).
+The signal pulses 10 times per second. It is `1` for 12.5ms and `0` for 87.5ms in each cycle. The counter counts cycles on 4 bits (0–15).
 
-### Oscilator lent (perioada in secunde)
+### Slow oscillator (period in seconds)
 
 ```
 comp [~] .heartbeat:
@@ -195,9 +195,9 @@ comp [~] .heartbeat:
 1wire pulse = .heartbeat
 ```
 
-Un ciclu dureaza 5 secunde. Semnalul este `1` pentru 1 secunda si `0` pentru 4 secunde (duty cycle 20%).
+One cycle lasts 5 seconds. The signal is `1` for 1 second and `0` for 4 seconds (20% duty cycle).
 
-### Counter care numara fiecare tranzitie
+### Counter that counts every state change
 
 ```
 comp [~] .osc2:
@@ -209,9 +209,9 @@ comp [~] .osc2:
 8wire transitions = .osc2:counter
 ```
 
-Counter-ul se incrementeaza de 2 ori per ciclu (la fiecare schimbare de stare), deci numara de 10 ori pe secunda la `freq: 5`.
+The counter increments twice per cycle (on each state change), so it counts 10 times per second at `freq: 5`.
 
-### Counter cu reset la valoarea 10
+### Counter with reset at value 10
 
 ```
 comp [~] .osc1:
@@ -233,9 +233,9 @@ comp [~] .osc1:
 show(o1, cnt)
 ```
 
-Counter-ul numara de la `000000` pana la `001010` (10 in decimal), apoi este resetat la `000000` si reia numararea. Oscilatorul continua sa oscileze normal.
+The counter counts from `000000` up to `001010` (10 in decimal), then resets to `000000` and starts again. The oscillator continues to oscillate normally.
 
-### Program complet
+### Complete program
 
 ```
 comp [~] .osc1:
@@ -255,24 +255,24 @@ show(osc1, osc1b, counter1)
 
 ---
 
-## Restrictii
+## Restrictions
 
-- Nu se poate atribui o valoare direct la un oscilator: `.osc1 = 1` produce eroare.
-- Oscilatorul nu are reprezentare vizuala in panoul de dispozitive (se poate conecta la LED-uri sau alte componente pentru vizualizare).
-- La re-rularea programului (`RUN`), toate timerele oscilatorilor sunt oprite automat si recreate.
-- Oscilatorul functioneaza independent de `NEXT(~)` — nu necesita cicluri de simulare pentru a oscila.
+- A value cannot be assigned directly to an oscillator: `.osc1 = 1` produces an error.
+- The oscillator has no visual representation in the devices panel (it can be connected to LEDs or other components for visualization).
+- When the program is re-run (`RUN`), all oscillator timers are stopped automatically and recreated.
+- The oscillator works independently of `NEXT(~)` — it does not require simulation cycles to oscillate.
 
 ---
 
-## Diagrama de functionare
+## Timing diagram
 
 ```
 freq: 10, duration1: 1, duration0: 7
-Perioada = 100ms
+Period = 100ms
 
-Valoare:  0  1  0        1  0        1  0
+Value:    0  1  0        1  0        1  0
           |  |  |        |  |        |  |
-Timp:     0 12.5 100    112.5 200   212.5 300  (ms)
+Time:     0 12.5 100    112.5 200   212.5 300  (ms)
           |<-->|<------>|
           HIGH   LOW
           12.5ms 87.5ms

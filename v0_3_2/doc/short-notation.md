@@ -1,60 +1,60 @@
-# Short Notation (Notatie Scurta)
+# Short Notation
 
-Notatia scurta permite scrierea expresiilor logice intr-un mod compact, folosind operatori simbolici in loc de apeluri explicite de functii.
+Short notation allows writing logical expressions in a compact way, using symbolic operators instead of explicit function calls.
 
-Zona de notatie scurta este delimitata de **backtick-uri** (`` ` ``). Tot ce se afla intre doua backtick-uri este expandat automat in apeluri standard de functii inainte de tokenizare.
+The short notation zone is delimited by **backticks** (`` ` ``). Everything between two backticks is automatically expanded into standard function calls before tokenization.
 
 ```
-`expresie scurta`  →  expandare in apeluri de functii
+`short expression`  →  expanded into function calls
 ```
 
 ---
 
-## Operatori
+## Operators
 
-| Operator | Functie | Tip        |
-|----------|---------|------------|
-| `&`      | AND     | prefix/infix |
-| `\|`     | OR      | prefix/infix |
-| `^`      | XOR     | prefix/infix |
-| `=`      | EQ      | infix      |
-| `!`      | NOT     | prefix     |
-| `-&`     | NAND    | prefix/infix |
-| `-\|`    | NOR     | prefix/infix |
-| `-^`     | NXOR    | prefix/infix |
+| Operator | Function | Type        |
+|----------|----------|-------------|
+| `&`      | AND      | prefix/infix |
+| `\|`     | OR       | prefix/infix |
+| `^`      | XOR      | prefix/infix |
+| `=`      | EQ       | infix        |
+| `!`      | NOT      | prefix       |
+| `-&`     | NAND     | prefix/infix |
+| `-\|`    | NOR      | prefix/infix |
+| `-^`     | NXOR     | prefix/infix |
 
-**Prefix** = operatorul apare inaintea operandului, cu un singur argument.
-**Infix** = operatorul apare intre doi operanzi, cu doua argumente.
+**Prefix** = operator appears before the operand, with a single argument.  
+**Infix** = operator appears between two operands, with two arguments.
 
 ---
 
 ## AND (`&`)
 
-Aplica functia AND pe unul sau doi operanzi.
+Applies the AND function to one or two operands.
 
-### Prefix (un operand)
+### Prefix (one operand)
 
 ```
 `& a`          →  AND(a)
 `& a.0/4`      →  AND(a.0/4)
 ```
 
-`AND(a)` cu un singur argument face AND pe toti bitii variabilei `a`, rezultand un singur bit.
-`AND(a.0/4)` face AND pe bitii 0-3 (4 biti incepand de la pozitia 0) ai variabilei `a`.
+`AND(a)` with a single argument applies AND across all bits of `a`, yielding one bit.  
+`AND(a.0/4)` applies AND across bits 0–3 (4 bits starting at position 0) of `a`.
 
-### Infix (doi operanzi)
+### Infix (two operands)
 
 ```
 `a & b`        →  AND(a,b)
 ```
 
-`AND(a,b)` face AND bit-cu-bit intre `a` si `b`.
+`AND(a,b)` applies AND bit-by-bit between `a` and `b`.
 
 ---
 
 ## OR (`|`)
 
-Aplica functia OR pe unul sau doi operanzi.
+Applies the OR function to one or two operands.
 
 ### Prefix
 
@@ -63,7 +63,7 @@ Aplica functia OR pe unul sau doi operanzi.
 `| a.0-3`      →  OR(a.0-3)
 ```
 
-`OR(a)` cu un singur argument face OR pe toti bitii, rezultand un singur bit (1 daca cel putin un bit este 1).
+`OR(a)` with a single argument applies OR across all bits, yielding one bit (1 if at least one bit is 1).
 
 ### Infix
 
@@ -71,13 +71,13 @@ Aplica functia OR pe unul sau doi operanzi.
 `a | b`        →  OR(a,b)
 ```
 
-`OR(a,b)` face OR bit-cu-bit intre `a` si `b`.
+`OR(a,b)` applies OR bit-by-bit between `a` and `b`.
 
 ---
 
 ## XOR (`^`)
 
-Aplica functia XOR pe unul sau doi operanzi.
+Applies the XOR function to one or two operands.
 
 ### Prefix
 
@@ -86,7 +86,7 @@ Aplica functia XOR pe unul sau doi operanzi.
 `^ a.0-3`      →  XOR(a.0-3)
 ```
 
-`XOR(a)` cu un singur argument face XOR pe toti bitii (paritate — 1 daca numarul de biti 1 este impar).
+`XOR(a)` with a single argument applies XOR across all bits (parity — 1 if the number of 1-bits is odd).
 
 ### Infix
 
@@ -94,27 +94,27 @@ Aplica functia XOR pe unul sau doi operanzi.
 `a ^ b`        →  XOR(a,b)
 ```
 
-`XOR(a,b)` face XOR bit-cu-bit intre `a` si `b`.
+`XOR(a,b)` applies XOR bit-by-bit between `a` and `b`.
 
-**Atentie:** `^` in notatia scurta este intotdeauna XOR, nu literal hexadecimal. Pentru hex, foloseste `[^FF]` (vezi sectiunea Literali).
+**Note:** `^` in short notation is always XOR, not a hex literal. For hex, use `[^FF]` (see Literals section).
 
 ---
 
 ## EQ (`=`)
 
-Compara doi operanzi bit-cu-bit. Rezulta un singur bit: 1 daca sunt egali, 0 daca nu.
+Compares two operands bit-by-bit. Yields one bit: 1 if equal, 0 if not.
 
 ```
 `a = b`        →  EQ(a,b)
 ```
 
-**Nota:** `=` este EQ doar in zona de backtick. In afara backtick-urilor, `=` ramane operator de atribuire (assignment).
+**Note:** `=` is EQ only inside backticks. Outside backticks, `=` remains the assignment operator.
 
 ---
 
 ## NOT (`!`)
 
-Inverseaza toti bitii operandului.
+Inverts all bits of the operand.
 
 ```
 `!a`           →  !a
@@ -122,13 +122,13 @@ Inverseaza toti bitii operandului.
 `!(a | b)`     →  !OR(a,b)
 ```
 
-`!` functioneaza si fara backtick-uri (este deja suportat nativ in limbaj). In notatia scurta poate fi combinat cu paranteze: `!(a | b)` inverseaza rezultatul OR-ului.
+`!` also works outside backticks (it is natively supported in the language). Inside short notation it can be combined with parentheses: `!(a | b)` inverts the result of the OR.
 
 ---
 
 ## NAND (`-&`)
 
-AND inversat — rezultatul este NOT(AND(operanzi)).
+AND inverted — result is NOT(AND(operands)).
 
 ### Prefix
 
@@ -146,7 +146,7 @@ AND inversat — rezultatul este NOT(AND(operanzi)).
 
 ## NOR (`-|`)
 
-OR inversat — rezultatul este NOT(OR(operanzi)).
+OR inverted — result is NOT(OR(operands)).
 
 ### Prefix
 
@@ -165,7 +165,7 @@ OR inversat — rezultatul este NOT(OR(operanzi)).
 
 ## NXOR (`-^`)
 
-XOR inversat (echivalenta) — rezulta 1 daca bitii sunt egali.
+XOR inverted (equivalence) — yields 1 if bits are equal.
 
 ### Prefix
 
@@ -181,9 +181,9 @@ XOR inversat (echivalenta) — rezulta 1 daca bitii sunt egali.
 
 ---
 
-## Paranteze si grupare
+## Parentheses and grouping
 
-Parantezele rotunde `()` grupeaza sub-expresii. Evaluarea este **stanga-la-dreapta** fara precedenta intre operatori.
+Round parentheses `()` group sub-expressions. Evaluation is **left-to-right** with no operator precedence.
 
 ```
 `(a | b) & c`              →  AND(OR(a,b),c)
@@ -192,9 +192,9 @@ Parantezele rotunde `()` grupeaza sub-expresii. Evaluarea este **stanga-la-dreap
                             →  AND(OR(a.0/4,b.0/4),OR(a.4/4,b.4/4))
 ```
 
-### Inlantuire stanga-la-dreapta
+### Left-to-right chaining
 
-Cand mai multi operatori se inlantuie fara paranteze, evaluarea este de la stanga la dreapta:
+When multiple operators are chained without parentheses, evaluation is left-to-right:
 
 ```
 `a | b | c`                →  OR(OR(a,b),c)
@@ -203,34 +203,34 @@ Cand mai multi operatori se inlantuie fara paranteze, evaluarea este de la stang
 
 ---
 
-## Expresii mixte
+## Mixed expressions
 
-Operatorii prefix si infix pot fi combinati. Prefixul se aplica pe urmatorul atom, apoi rezultatul participa ca operand in expresia infix:
+Prefix and infix operators can be combined. The prefix applies to the next atom, then the result participates as an operand in the infix expression:
 
 ```
 `& a -| b`                 →  NOR(AND(a),b)
 ```
 
-Pas cu pas:
-1. `& a` → `AND(a)` (prefix AND pe `a`)
-2. `AND(a) -| b` → `NOR(AND(a),b)` (infix NOR intre rezultatul AND si `b`)
+Step by step:
+1. `& a` → `AND(a)` (prefix AND on `a`)
+2. `AND(a) -| b` → `NOR(AND(a),b)` (infix NOR between AND result and `b`)
 
-Alt exemplu:
+Another example:
 
 ```
 `& (a | b)`                →  AND(OR(a,b))
 ```
 
-1. `(a | b)` → `OR(a,b)` (grupare cu paranteze)
-2. `& OR(a,b)` → `AND(OR(a,b))` (prefix AND pe rezultatul OR)
+1. `(a | b)` → `OR(a,b)` (grouping with parentheses)
+2. `& OR(a,b)` → `AND(OR(a,b))` (prefix AND on OR result)
 
 ---
 
-## Literali
+## Literals
 
-### Literali binari
+### Binary literals
 
-Functioneaza direct ca operanzi, fara delimitatori speciali:
+Work directly as operands, without special delimiters:
 
 ```
 `^ 111`                    →  XOR(111)
@@ -238,9 +238,9 @@ Functioneaza direct ca operanzi, fara delimitatori speciali:
 `a | 1010 | 111`           →  OR(OR(a,1010),111)
 ```
 
-### Literali hexadecimali — `[^hex]`
+### Hex literals — `[^hex]`
 
-Deoarece `^` este operator XOR in notatia scurta, literalii hexadecimali trebuie pusi intre paranteze patrate `[]`:
+Because `^` is the XOR operator in short notation, hex literals must be enclosed in square brackets `[]`:
 
 ```
 `^ [^F]`                   →  XOR(^F)
@@ -248,11 +248,11 @@ Deoarece `^` este operator XOR in notatia scurta, literalii hexadecimali trebuie
 `a | [^FF] | 111`          →  OR(OR(a,^FF),111)
 ```
 
-Parantezele patrate sunt delimitatori — se scot la expandare, continutul ajunge ca-atare la tokenizer.
+Square brackets are delimiters — they are stripped during expansion, and the content reaches the tokenizer as-is.
 
-### Literali decimali — `[\dec]`
+### Decimal literals — `[\dec]`
 
-Literalii decimali (cu `\`) pot fi folositi direct sau in `[]`:
+Decimal literals (with `\`) can be used directly or inside `[]`:
 
 ```
 `a | \31`                  →  OR(a,\31)
@@ -262,35 +262,35 @@ Literalii decimali (cu `\`) pot fi folositi direct sau in `[]`:
 
 ---
 
-## Utilizare in context
+## Usage in context
 
-Notatia scurta poate fi folosita oriunde apare o expresie in codul sursa.
+Short notation can be used anywhere an expression appears in source code.
 
-### In declaratii de variabile
+### In variable declarations
 
 ```
 8wire c = `& (a | b)`
 ```
 
-Se expandeaza in:
+Expands to:
 
 ```
 8wire c = AND(OR(a,b))
 ```
 
-### In atribuiri
+### In assignments
 
 ```
 e = `(a.0/4 | b.0/4)`
 ```
 
-Se expandeaza in:
+Expands to:
 
 ```
 e = OR(a.0/4,b.0/4)
 ```
 
-### In definitii de functii (def)
+### In function definitions (def)
 
 ```
 def q(8bit a, 8bit b):
@@ -298,7 +298,7 @@ def q(8bit a, 8bit b):
    :1bit `& (a | b)`
 ```
 
-Se expandeaza in:
+Expands to:
 
 ```
 def q(8bit a, 8bit b):
@@ -306,23 +306,23 @@ def q(8bit a, 8bit b):
    :1bit AND(OR(a,b))
 ```
 
-### Mai multe zone de backtick pe aceeasi linie
+### Multiple backtick zones on the same line
 
-Backtick-urile delimiteaza zone independente. Pot fi combinate cu `+` (concatenare):
+Backticks delimit independent zones. They can be combined with `+` (concatenation):
 
 ```
 `a & b` + `c | d`
 ```
 
-Se expandeaza in:
+Expands to:
 
 ```
 AND(a,b) + OR(c,d)
 ```
 
-### Combinatie cu repeat
+### Combination with repeat
 
-Notatia scurta functioneaza impreuna cu blocurile `repeat`. Placeholder-urile `?` sunt expandate de repeat dupa ce notatia scurta a fost procesata:
+Short notation works together with `repeat` blocks. The `?` placeholder is expanded by repeat after short notation has been processed:
 
 ```
 repeat 1..3[
@@ -330,7 +330,7 @@ repeat 1..3[
 ]
 ```
 
-Se expandeaza in:
+Expands to:
 
 ```
    :1bit OR(a.1,b.1)
@@ -340,9 +340,9 @@ Se expandeaza in:
 
 ---
 
-## Variabile speciale
+## Special variables
 
-Variabilele speciale ale limbajului (`~`, `%`, `$`, `_`) functioneaza ca operanzi in notatia scurta:
+The language's special variables (`~`, `%`, `$`, `_`) work as operands in short notation:
 
 ```
 `~ & a`                    →  AND(~,a)
@@ -351,9 +351,9 @@ Variabilele speciale ale limbajului (`~`, `%`, `$`, `_`) functioneaza ca operanz
 
 ---
 
-## Limitari
+## Limitations
 
-- `^` in backtick este intotdeauna **XOR**. Pentru literal hexadecimal, foloseste `[^FF]`.
-- `()` in backtick sunt pentru **grupare**, nu pentru bit range dinamic. Expresii de tipul `a.(expr)/4` nu sunt suportate in notatia scurta.
-- Backtick-urile nu pot fi nested (un backtick inchide zona deschisa de precedentul).
-- Backtick-urile din comentarii (`#` sau `#> ... #<`) sunt ignorate.
+- `^` inside backticks is always **XOR**. For hex literals, use `[^FF]`.
+- `()` inside backticks are for **grouping**, not dynamic bit ranges. Expressions like `a.(expr)/4` are not supported in short notation.
+- Backticks cannot be nested (a backtick closes the zone opened by the previous one).
+- Backticks inside comments (`#` or `#> ... #<`) are ignored.

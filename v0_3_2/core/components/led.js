@@ -5,7 +5,9 @@ var LedComponent = class LedComponent extends BuiltinComponent {
   static get shortnames() { return {}; }
   static get isReservedName() { return true; }
 
-  getWidthBits(attributes) { return 1; }
+  getWidthBits(attributes) {
+    return attributes['length'] !== undefined ? parseInt(attributes['length'], 10) : 1;
+  }
   getSupportedProperties() { return ['get']; }
   getRedirectProperties() { return ['get']; }
 
@@ -46,6 +48,13 @@ var LedComponent = class LedComponent extends BuiltinComponent {
       }
       deviceIds.push(ledId);
     }
+
+    // For multi-bit leds, allocate storage so direct assignment (led = 1010) works
+    if (bits > 1) {
+      const ledInitialValue = value.substring(0, bits).padEnd(bits, '0');
+      const storageIdx = ctx.storeValue(ledInitialValue);
+      return { deviceIds, ref: `&${storageIdx}` };
+    }
     return { deviceIds, ref: null };
   }
 
@@ -77,11 +86,11 @@ var LedComponent = class LedComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'text', value: 'string' }, { name: 'color', value: 'string' }, { name: 'square', value: null }, { name: 'nl', value: null }],
-      initValue: '1bit',
-      pins: [{ bits: '1', name: 'set' }, { bits: '1', name: 'value' }],
-      pouts: [{ bits: '1', name: 'get' }],
-      returns: '1bit',
+      attrs: [{ name: 'length', value: 'integer' }, { name: 'text', value: 'string' }, { name: 'color', value: 'string' }, { name: 'square', value: null }, { name: 'nl', value: null }],
+      initValue: 'Xbit',
+      pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'value' }],
+      pouts: [{ bits: 'X', name: 'get' }],
+      returns: 'Xbit',
     };
   }
 
