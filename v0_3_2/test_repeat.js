@@ -2591,6 +2591,121 @@ pcb [inv] .i::
     const wireVal = wire ? interp.getValueFromRef(wire.ref) : null;
     assert('Test 504 wire q reflecta wire intern NOT(data)', wireVal, '1010');
   }
+
+  // ---- Test 505: alternare A->B->A->B prin updateConnectedComponents ----
+  console.log('\n=== Test 505: alternare A->B->A->B intre doua blocuri PCB cu on:1 ===');
+  {
+    // PCB simplu: result = data, triggerat de setA sau setB
+    // Blocul A seteaza data=0101, blocul B seteaza data=1010
+    // Simulam apasari alternative de butoane prin schimbarea wire-urilor aa/bb
+    const src = `pcb +[sw]:
+  4pin data
+  1pin set
+  4pout result
+  exec: set
+  on:1
+
+  result = data
+  :4bit result
+
+pcb [sw] .p::
+
+1wire aa = 0
+1wire bb = 0
+
+.p:{
+  data = 0101
+  set = aa
+}
+.p:{
+  data = 1010
+  set = bb
+}`;
+    const { interp } = run500(src);
+
+    // Helper: seteaza un wire si propaga
+    function setWire(name, val) {
+      const w = interp.wires.get(name);
+      if(w && w.ref) interp.setValueAtRef(w.ref, val);
+      interp.updateConnectedComponents(name, val);
+    }
+
+    // A=1 -> blocul A executa, result=0101
+    setWire('aa', '1');
+    assert('505 A=1: result=0101', getPcbPout500(interp, '.p', 'result'), '0101');
+
+    // B=1 -> blocul B executa, result=1010
+    setWire('bb', '1');
+    assert('505 B=1: result=1010', getPcbPout500(interp, '.p', 'result'), '1010');
+
+    // A=1 din nou -> blocul A executa din nou, result=0101
+    setWire('aa', '0');
+    setWire('aa', '1');
+    assert('505 A=1 din nou: result=0101', getPcbPout500(interp, '.p', 'result'), '0101');
+
+    // B=1 din nou -> blocul B executa din nou, result=1010
+    setWire('bb', '0');
+    setWire('bb', '1');
+    assert('505 B=1 din nou: result=1010', getPcbPout500(interp, '.p', 'result'), '1010');
+  }
+
+  // ---- Test 506: componentele interne PCB nu sunt re-create la fiecare executie ----
+  console.log('\n=== Test 506: comp interne PCB nu sunt re-create la re-executie ===');
+  {
+    // Verificam ca execComp este sarit la a doua executie a body-ului PCB.
+    // Folosim un PCB simplu cu o componenta interna (led) si verificam ca
+    // this.components.has(compName) ramane true dupa a doua executie.
+    // De asemenea verificam ca componentPropertyBlocks nu se dubleaza.
+    const src = `pcb +[withcomp]:
+  1pin set
+  4pin data
+  4pout result
+  exec: set
+  on:1
+
+  comp [led] .L:
+  on:1
+  :
+
+  .L:{
+    set = 1
+  }
+
+  result = data
+  :4bit result
+
+pcb [withcomp] .wc::
+
+1wire aa = 0
+
+.wc:{
+  data = 0101
+  set = aa
+}`;
+    const { interp } = run500(src);
+
+    function setWire506(name, val) {
+      const w = interp.wires.get(name);
+      if(w && w.ref) interp.setValueAtRef(w.ref, val);
+      interp.updateConnectedComponents(name, val);
+    }
+
+    // Prima executie
+    setWire506('aa', '1');
+    const blocksAfter1 = interp.componentPropertyBlocks.length;
+
+    // A doua executie (aa trece prin 0 apoi 1)
+    setWire506('aa', '0');
+    setWire506('aa', '1');
+    const blocksAfter2 = interp.componentPropertyBlocks.length;
+
+    // Daca componenta ar fi re-creata, property blocks s-ar dubla
+    assert('506 componentPropertyBlocks nu creste la re-executie', String(blocksAfter1), String(blocksAfter2));
+
+    // Verifica si ca result este corect la a doua executie
+    const val = getPcbPout500(interp, '.wc', 'result');
+    assert('506 result corect la a doua executie', val, '0101');
+  }
 }
 
 // Summary

@@ -708,7 +708,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
         const blockKey = `${block.component}:${block.blockIndex}`;
         executedBlocks.add(blockKey);
         
-        this.executePropertyBlock(block.component, block.properties, true);
+        this.executePropertyBlock(block.component, block.properties, true, block);
         
         // After executing property block, update connections for the component itself
         // This ensures wires that reference the component (like b = .mem:get) are updated
@@ -819,7 +819,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
           executedBlocks.add(blockKey);
           
           // Execute the block
-          this.executePropertyBlock(block.component, block.properties, true);
+          this.executePropertyBlock(block.component, block.properties, true, block);
           
           // After executing property block, DO NOT call updateComponentConnections recursively
           // because it will be called after all blocks in updateConnectedComponents are done
@@ -1534,7 +1534,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
         const blockKey = `${block.component}:${block.blockIndex}`;
         if(!executedBlockKeys.has(blockKey)){
           executedBlockKeys.add(blockKey);
-          this.executePropertyBlock(block.component, block.properties, true);
+          this.executePropertyBlock(block.component, block.properties, true, block);
           if(!seenComponents.has(block.component)){
             seenComponents.add(block.component);
             executedComponents.push(block.component);

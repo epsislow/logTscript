@@ -1271,6 +1271,11 @@ const idx = parseInt(
 
     if(s.comp){
       // Component declaration: comp [led] .power: ...
+      // Inside a PCB body, skip re-declaration if the component already exists
+      // (it was created on the first execution; re-creating would reset its state)
+      if(this.insidePcbBody && this.components.has(s.comp.name)){
+        return;
+      }
       this.execComp(s.comp);
       return;
     }
@@ -3633,11 +3638,12 @@ if (s.assignment) {
   }
   
   // Execute a property block - set all properties in order
-  executePropertyBlock(component, properties, reEvaluate){
+  // block: the componentPropertyBlocks entry (optional, passed during re-execution)
+  executePropertyBlock(component, properties, reEvaluate, block){
     // Check if it's a PCB instance first
     const pcbInstance = this.pcbInstances.get(component);
     if(pcbInstance){
-      return this.executePcbPropertyBlock(component, pcbInstance, properties, reEvaluate);
+      return this.executePcbPropertyBlock(component, pcbInstance, properties, reEvaluate, block);
     }
 
     const comp = this.components.get(component);
@@ -4131,7 +4137,8 @@ if (s.assignment) {
   }
   
   // Execute a PCB property block - handle pin assignments, pout>= and set trigger
-  executePcbPropertyBlock(instanceName, instance, properties, reEvaluate){
+  // block: the componentPropertyBlocks entry — used for per-block lastExecValue tracking
+  executePcbPropertyBlock(instanceName, instance, properties, reEvaluate, block){
     const def = instance.def;
     let shouldTriggerExec = false;
 
@@ -4228,20 +4235,20 @@ if (s.assignment) {
 
     // Trigger exec if set = 1 was specified
     if(shouldTriggerExec){
-      // Simulate rising edge on exec pin
-      const prevBit = instance.lastExecValue || '0';
-      const newBit = '1';
-
-      let shouldExecute = false;
       const onMode = def.on || 'raise';
+      let shouldExecute = false;
 
-      if(onMode === 'raise' || onMode === 'rising'){
-        shouldExecute = (prevBit === '0' && newBit === '1');
+      if(onMode === '1' || onMode === 'level'){
+        // Level triggered: execute whenever set=1 (no edge tracking needed)
+        shouldExecute = true;
+      } else if(onMode === 'raise' || onMode === 'rising'){
+        // Rising edge: execute only on 0→1 transition, tracked per block
+        const prevBit = block ? (block.lastExecValue || '0') : (instance.lastExecValue || '0');
+        shouldExecute = (prevBit === '0');
+        if(block) block.lastExecValue = '1';
+        else instance.lastExecValue = '1';
       } else if(onMode === 'edge' || onMode === 'falling'){
-        shouldExecute = false; // Falling edge won't trigger on set = 1
-      } else if(onMode === '1' || onMode === 'level'){
-        // Level triggered: execute when set is 1 AND value has changed
-        shouldExecute = (newBit === '1') && (newBit !== prevBit);
+        shouldExecute = false;
       }
 
       if(shouldExecute){
@@ -4255,8 +4262,6 @@ if (s.assignment) {
         this.reEvalWiresDependingOnPcb(instanceName);
         if(typeof showVars === 'function') showVars();
       }
-
-      instance.lastExecValue = newBit;
     }
 
     // Process pout> properties (after all pin assignments and exec)
