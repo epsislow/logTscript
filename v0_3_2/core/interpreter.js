@@ -2371,11 +2371,16 @@ if (s.assignment) {
         // Wire assignment
         if(this.wires.has(d.name)){
           const existing = this.wires.get(d.name);
-          // Check mode only if wire was already assigned (ref is not null and not '&-')
-          if(this.mode === 'STRICT' && existing.ref !== null && existing.ref !== '&-'){
-            throw Error(`Cannot reassign wire ${d.name} in STRICT mode`);
+          if(existing.initOnly){
+            // initOnly: PCB-injected wire — allow assignment, clear flag
+            existing.initOnly = false;
+          } else if(existing.ref !== null && existing.ref !== '&-'){
+            // Already assigned
+            if(this.mode === 'STRICT'){
+              throw Error(`Cannot reassign wire ${d.name} in STRICT mode`);
+            }
+            throw Error(`Wire ${d.name} already assigned`);
           }
-          if(existing.ref !== null && existing.ref !== '&-') throw Error(`Wire ${d.name} already assigned`);
         }
         
         // Build reference from expression parts, starting at bitOffset
@@ -2452,11 +2457,23 @@ if (s.assignment) {
         
         // Default behavior: reuse existing storage or create new one
         if(this.wireStorageMap.has(d.name)){
-          // Reuse existing storage
+          // Reuse existing storage slot for this wire
           storageIdx = this.wireStorageMap.get(d.name);
           const stored = this.storage.find(s => s.index === storageIdx);
           if(stored){
             stored.value = wireValue || '0'.repeat(bits);
+            // Remove any temporary storage slot created by expression evaluation (e.g. NOT, functions)
+            // that is different from the slot we are reusing.
+            if(wireRef && wireRef.startsWith('&')){
+              const tmpMatch = wireRef.match(/^&(\d+)$/);
+              if(tmpMatch){
+                const tmpIdx = parseInt(tmpMatch[1]);
+                if(tmpIdx !== storageIdx){
+                  const tmpPos = this.storage.findIndex(s => s.index === tmpIdx);
+                  if(tmpPos !== -1) this.storage.splice(tmpPos, 1);
+                }
+              }
+            }
           } else {
             // Storage was lost, create new one
             storageIdx = this.storeValue(wireValue || '0'.repeat(bits));
@@ -3462,7 +3479,7 @@ if (s.assignment) {
     this.currentPcbInstance = instanceName;
     
     // Inject pins as wires so assignments like "reg1 = .s:get" reuse storage slots.
-    // initOnly=true allows the single assignment inside the body even in STRICT mode.
+    // initOnly=true allows re-assignment each time the body executes.
     for(const [pinName, pinInfo] of pinStorage){
       this.wires.set(pinName, {
         type: `${pinInfo.bits}wire`,
@@ -3475,7 +3492,7 @@ if (s.assignment) {
     }
 
     // Inject pouts as wires so assignments like "reg1 = .s:get" reuse storage slots.
-    // initOnly=true allows the single assignment inside the body even in STRICT mode.
+    // initOnly=true allows re-assignment each time the body executes.
     for(const [poutName, poutInfo] of poutStorage){
       this.wires.set(poutName, {
         type: `${poutInfo.bits}wire`,
@@ -3487,6 +3504,18 @@ if (s.assignment) {
       }
     }
     
+    // Re-inject internal body wires from previous executions so typed wire
+    // declarations (e.g. "4wire tmp = NOT(data)") reuse existing storage slots.
+    // initOnly=true allows re-declaration/assignment each time the body executes.
+    if(instance.internalBodyWires){
+      for(const [k, v] of instance.internalBodyWires){
+        this.wires.set(k, {type: v.type, ref: v.ref, initOnly: true});
+        if(v.ref && v.ref.startsWith('&')){
+          this.wireStorageMap.set(k, parseInt(v.ref.slice(1)));
+        }
+      }
+    }
+
     // Execute statements, renaming internal components
     for(const stmt of statements){
       const renamedStmt = this.renamePcbStatement(stmt, internalPrefix);
@@ -3521,11 +3550,23 @@ if (s.assignment) {
       }
     }
     
+    // Save internal body wires (not in outer context, not pin/pout) for reuse next run.
+    // Always rebuild the map so refs are up-to-date after this execution.
+    instance.internalBodyWires = new Map();
+    for(const [k, v] of this.wires){
+      if(!savedWires.has(k) && !pinStorage.has(k) && !poutStorage.has(k)){
+        instance.internalBodyWires.set(k, {type: v.type, ref: v.ref});
+      }
+    }
+
     this.vars = savedVars;
     this.wires = savedWires;
-    // Clean up wireStorageMap entries added for pins/pouts during body execution
+    // Clean up wireStorageMap entries added for pins/pouts/internal wires during body execution
     for(const pinName of pinStorage.keys()) this.wireStorageMap.delete(pinName);
     for(const poutName of poutStorage.keys()) this.wireStorageMap.delete(poutName);
+    if(instance.internalBodyWires){
+      for(const k of instance.internalBodyWires.keys()) this.wireStorageMap.delete(k);
+    }
     this.components = savedComponents;
     this.insidePcbBody = savedInsidePcbBody;
     this.currentPcbInstance = savedCurrentPcbInstance;

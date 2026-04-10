@@ -2706,6 +2706,128 @@ pcb [withcomp] .wc::
     const val = getPcbPout500(interp, '.wc', 'result');
     assert('506 result corect la a doua executie', val, '0101');
   }
+
+  // ---- Test 507: storage nu creste la re-executii repetate ----
+  console.log('\n=== Test 507: storage nu creste la re-executii PCB repetate ===');
+  {
+    // PCB cu pout-uri si wire intern — la fiecare executie storage trebuie sa ramana stabil
+    const src = `pcb +[stable]:
+  4pin data
+  1pin set
+  4pout result
+  exec: set
+  on:1
+
+  4wire tmp = NOT(data)
+  result = tmp
+  :4bit result
+
+pcb [stable] .s::
+
+1wire aa = 0
+
+.s:{
+  data = 0101
+  set = aa
+}`;
+    const { interp } = run500(src);
+
+    function setWire507(name, val) {
+      const w = interp.wires.get(name);
+      if(w && w.ref) interp.setValueAtRef(w.ref, val);
+      interp.updateConnectedComponents(name, val);
+    }
+
+    // Prima executie — stabilizeaza storage
+    setWire507('aa', '1');
+    setWire507('aa', '0');
+    setWire507('aa', '1');
+    const snap1 = new Set(interp.storage.map(s => s.index));
+    const storageAfter1 = interp.storage.length;
+
+    // A doua executie — storage nu trebuie sa creasca
+    setWire507('aa', '0');
+    setWire507('aa', '1');
+    const snap2 = new Set(interp.storage.map(s => s.index));
+    const storageAfter2 = interp.storage.length;
+    const newIn2 = interp.storage.filter(s => !snap1.has(s.index)).map(s => `&${s.index}=${s.value}`);
+    if(newIn2.length) console.log('  [debug] new storage after exec2:', newIn2);
+
+    // A treia executie — storage nu trebuie sa creasca
+    setWire507('aa', '0');
+    setWire507('aa', '1');
+    const storageAfter3 = interp.storage.length;
+    const newIn3 = interp.storage.filter(s => !snap2.has(s.index)).map(s => `&${s.index}=${s.value}`);
+    if(newIn3.length) console.log('  [debug] new storage after exec3:', newIn3);
+
+    assert('507 storage stabil dupa executia 2', String(storageAfter2), String(storageAfter1));
+    assert('507 storage stabil dupa executia 3', String(storageAfter3), String(storageAfter1));
+
+    // Verifica ca rezultatul este corect
+    const val = getPcbPout500(interp, '.s', 'result');
+    assert('507 result corect NOT(0101)=1010', val, '1010');
+  }
+
+  // ---- Test 508: storage stabil cu doua blocuri alternante (scenariul A->B->A) ----
+  console.log('\n=== Test 508: storage stabil cu doua blocuri PCB alternante ===');
+  {
+    const src = `pcb +[dual2]:
+  4pin data
+  1pin setA
+  1pin setB
+  4pout result
+  exec: setA
+  on:1
+
+  result = data
+  :4bit result
+
+pcb [dual2] .d::
+
+1wire aa = 0
+1wire bb = 0
+
+.d:{
+  data = 0101
+  setA = aa
+  setB = 0
+}
+.d:{
+  data = 1010
+  setA = 0
+  setB = bb
+}`;
+    const { interp } = run500(src);
+
+    function setWire508(name, val) {
+      const w = interp.wires.get(name);
+      if(w && w.ref) interp.setValueAtRef(w.ref, val);
+      interp.updateConnectedComponents(name, val);
+    }
+
+    // A=1
+    setWire508('aa', '1');
+    const s1 = interp.storage.length;
+
+    // B=1
+    setWire508('aa', '0');
+    setWire508('bb', '1');
+    const s2 = interp.storage.length;
+
+    // A=1 din nou
+    setWire508('bb', '0');
+    setWire508('aa', '1');
+    const s3 = interp.storage.length;
+
+    // B=1 din nou
+    setWire508('aa', '0');
+    setWire508('bb', '1');
+    const s4 = interp.storage.length;
+
+    assert('508 storage stabil A->B', String(s1), String(s2));
+    assert('508 storage stabil B->A', String(s2), String(s3));
+    assert('508 storage stabil A->B din nou', String(s3), String(s4));
+  }
 }
 
 // Summary
