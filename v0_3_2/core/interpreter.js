@@ -3461,22 +3461,30 @@ if (s.assignment) {
     this.insidePcbBody = true;
     this.currentPcbInstance = instanceName;
     
-    // Create isolated context with pins as variables
+    // Inject pins as wires so assignments like "reg1 = .s:get" reuse storage slots.
+    // initOnly=true allows the single assignment inside the body even in STRICT mode.
     for(const [pinName, pinInfo] of pinStorage){
-      this.vars.set(pinName, {
-        type: `${pinInfo.bits}bit`,
-        value: this.getValueFromRef(pinInfo.ref) || '0'.repeat(pinInfo.bits),
-        ref: pinInfo.ref
+      this.wires.set(pinName, {
+        type: `${pinInfo.bits}wire`,
+        ref: pinInfo.ref,
+        initOnly: true
       });
+      if(pinInfo.ref && pinInfo.ref.startsWith('&')){
+        this.wireStorageMap.set(pinName, parseInt(pinInfo.ref.slice(1)));
+      }
     }
-    
-    // Create isolated context with pouts as variables
+
+    // Inject pouts as wires so assignments like "reg1 = .s:get" reuse storage slots.
+    // initOnly=true allows the single assignment inside the body even in STRICT mode.
     for(const [poutName, poutInfo] of poutStorage){
-      this.vars.set(poutName, {
-        type: `${poutInfo.bits}bit`,
-        value: this.getValueFromRef(poutInfo.ref) || '0'.repeat(poutInfo.bits),
-        ref: poutInfo.ref
+      this.wires.set(poutName, {
+        type: `${poutInfo.bits}wire`,
+        ref: poutInfo.ref,
+        initOnly: true
       });
+      if(poutInfo.ref && poutInfo.ref.startsWith('&')){
+        this.wireStorageMap.set(poutName, parseInt(poutInfo.ref.slice(1)));
+      }
     }
     
     // Execute statements, renaming internal components
@@ -3485,22 +3493,21 @@ if (s.assignment) {
       this.exec(renamedStmt, true);
     }
     
-    // Update pout storage from current variable values
+    // Update pout storage from current wire values
     for(const [poutName, poutInfo] of poutStorage){
-      const currentVar = this.vars.get(poutName);
-      if(currentVar && currentVar.value){
-        this.setValueAtRef(poutInfo.ref, currentVar.value);
-      }
+      const currentWire = this.wires.get(poutName);
+      const value = currentWire ? this.getValueFromRef(currentWire.ref) : null;
+      if(value) this.setValueAtRef(poutInfo.ref, value);
     }
 
     // Save return value (wire/var named in returnSpec) so .q direct access works
     if(def.returnSpec){
       const retVarName = def.returnSpec.varName;
-      const retVar = this.vars.get(retVarName) || null;
       const retWire = this.wires.get(retVarName) || null;
+      const retVar = this.vars.get(retVarName) || null;
       let retValue = null;
-      if(retVar && retVar.value) retValue = retVar.value;
-      else if(retWire && retWire.ref) retValue = this.getValueFromRef(retWire.ref);
+      if(retWire && retWire.ref) retValue = this.getValueFromRef(retWire.ref);
+      else if(retVar && retVar.value) retValue = retVar.value;
       if(retValue !== null){
         instance.returnValue = retValue;
       }
@@ -3516,6 +3523,9 @@ if (s.assignment) {
     
     this.vars = savedVars;
     this.wires = savedWires;
+    // Clean up wireStorageMap entries added for pins/pouts during body execution
+    for(const pinName of pinStorage.keys()) this.wireStorageMap.delete(pinName);
+    for(const poutName of poutStorage.keys()) this.wireStorageMap.delete(poutName);
     this.components = savedComponents;
     this.insidePcbBody = savedInsidePcbBody;
     this.currentPcbInstance = savedCurrentPcbInstance;
