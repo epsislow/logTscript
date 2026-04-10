@@ -2141,8 +2141,8 @@ if (s.assignment) {
     entry.ref = `&${idx}`;
     // Cache in wireStorageMap so execWireStatement can reuse this slot on cascade re-execution
     this.wireStorageMap.set(name, idx);
-    // Track this assignment statement for reactive cascade re-execution
-    if(!this.wireStatements.includes(s)){
+    // Track this assignment statement for reactive cascade re-execution (not inside PCB body)
+    if(!this.insidePcbBody && !this.wireStatements.includes(s)){
       this.wireStatements.push(s);
     }
     
@@ -2194,8 +2194,8 @@ if (s.assignment) {
               // Update existing storage value
               stored.value = wireValue;
               // Keep the same reference - wire.ref stays the same (pointing to the updated storage)
-              // Track for NEXT
-              if(!this.wireStatements.includes(s)){
+              // Track for NEXT (not inside PCB body)
+              if(!this.insidePcbBody && !this.wireStatements.includes(s)){
                 this.wireStatements.push(s);
               }
               return;
@@ -2212,8 +2212,8 @@ if (s.assignment) {
               // Keep the same reference - wire.ref stays the same
               // Update wireStorageMap
               this.wireStorageMap.set(name, storageIdx);
-              // Track for NEXT
-              if(!this.wireStatements.includes(s)){
+              // Track for NEXT (not inside PCB body)
+              if(!this.insidePcbBody && !this.wireStatements.includes(s)){
                 this.wireStatements.push(s);
               }
               return;
@@ -2244,8 +2244,8 @@ if (s.assignment) {
         // Set wire reference to the storage index
         wire.ref = `&${storageIdx}`;
         
-        // Track for NEXT
-        if(!this.wireStatements.includes(s)){
+        // Track for NEXT (not inside PCB body)
+        if(!this.insidePcbBody && !this.wireStatements.includes(s)){
           this.wireStatements.push(s);
         }
         return;
@@ -2425,8 +2425,8 @@ if (s.assignment) {
                 // Update existing storage value
                 stored.value = wireValue || '0'.repeat(bits);
                 // Keep the same reference - don't change existing.ref
-                // Track for NEXT
-                if(!this.wireStatements.includes(s)){
+                // Track for NEXT (not inside PCB body)
+                if(!this.insidePcbBody && !this.wireStatements.includes(s)){
                   this.wireStatements.push(s);
                 }
                 bitOffset += bits;
@@ -2444,8 +2444,8 @@ if (s.assignment) {
                 // Keep the same reference - don't change existing.ref
                 // Update wireStorageMap
                 this.wireStorageMap.set(d.name, storageIdx);
-                // Track for NEXT
-                if(!this.wireStatements.includes(s)){
+                // Track for NEXT (not inside PCB body)
+                if(!this.insidePcbBody && !this.wireStatements.includes(s)){
                   this.wireStatements.push(s);
                 }
                 bitOffset += bits;
@@ -2493,8 +2493,8 @@ if (s.assignment) {
           this.wires.get(d.name).ref = simpleRef;
         }
         
-        // Track wire statement for NEXT
-        if(!this.wireStatements.includes(s)){
+        // Track wire statement for NEXT (not inside PCB body)
+        if(!this.insidePcbBody && !this.wireStatements.includes(s)){
           this.wireStatements.push(s);
         }
       } else {

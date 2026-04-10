@@ -310,9 +310,12 @@ function doNext(count = 1) {
   if (!globalInterp) {
     throw Error("Program not running");
   }
-
-  globalInterp.exec({ next: count }, false);
-
+  try {
+    globalInterp.exec({ next: count }, false);
+  } catch(e) {
+    render([`Error: ${e.message}`]);
+    console.log(e);
+  }
   showVars();
 }
 
