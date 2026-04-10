@@ -298,25 +298,65 @@ const snippets = {
     visual:1
     on:1
     :`,
-  'switch': ``,
-  'rotary': ``,
-  'adder': ``,
-  'subtract': ``,
-  'divider': ``,
-  'multiplier': ``,
-  'counter': ``,
-  'shifter': ``,
-  'mem': `comp [reg] .|:
-    length: 8
+  'switch': `comp [switch] .|:
+    text: 'Pwr'
+    :`,
+  'rotary': `comp [rotary] .|:
+    text: 'R1'
+    for.0: '+'
+    for.1: '-'
+    for.2: 'x'
+    for.3: ':'
+    states: 4
+    :`,
+  'adder': `comp [adder] .|:
+    depth: 4
+    :`,
+  'subtract': `comp [-] .|:
     depth: 4
     on:1
     :`,
-  'reg': `comp [reg] .|:
-    depth: 5
+  'divider': `comp [/] .|:
+    depth: 4
     on:1
     :`,
-  'lcd': ``,
-  '7seg': ``,
+  'multiplier': `comp [*] .|:
+    depth: 4
+    :`,
+  'counter': `comp [counter] .|:
+    depth: 4
+    on:1
+    :`,
+  'shifter': `comp [shifter] .|:
+    depth: 8
+    on:1
+    :`,
+  'mem': `comp [mem] .|:
+    depth: 8
+    length: 16
+    on:1
+    :`,
+  'reg': `comp [reg] .|:
+    depth: 4
+    on:1
+    :`,
+  'lcd': `comp [lcd] .|:
+    row: 8
+    cols: 20
+    pixelSize: 7
+    pixelGap: 1
+    glow
+    round: 0
+    color: ^58f
+    bg: ^000
+    rgb
+    nl
+    on:1
+    :`,
+  '7seg': `comp [7seg] .|:
+    color: ^9b3
+    on:1
+    :`,
   'osc': `comp [~] .|:
     duration1: 4
     duration0: 4
