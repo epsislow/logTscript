@@ -1,5 +1,130 @@
 window.lib_files = {
   
+  ex_lcd_nx_pv: `
+  comp [lcd] .ttt:
+    row: 8
+    cols: 21
+    pixelSize: 7
+    pixelGap: 1
+    glow
+    round: 0
+    color: ^f70
+    bg: ^310
+    rgb
+    nl
+    on:1
+    :
+    
+comp [key] .prv:
+    label:'<'
+    size: 35
+    on:1
+    :
+    
+    
+comp [key] .nxt:
+    label:'>'
+    size: 35
+    on:1
+    :
+
+comp [counter] .pos:
+    depth: 3
+    on:1
+    :
+    
+.pos:{
+   dir=1
+   set=.nxt
+}
+
+.pos:{
+   dir=0
+   set=.prv
+}
+
+
+3wire pos = .pos:get
+
+.pos:{
+   data=000
+   write= 1
+   set=EQ(pos,101)
+}
+
+.pos:{
+   data=100
+   write= 1
+   set=EQ(pos,111)
+}
+
+1wire clr = OR(.nxt,.prv)
+
+.ttt:{
+  x=0
+  y=0
+  data= 0 < \\167 w0
+  rowlen= \\21
+  rgb= ^fff
+  set= clr
+}
+
+doc(comp.lcd)
+
+.ttt:{
+   x=1
+   y=1
+   rowlen=11
+   data = 111111010
+   rgb = ^f70
+   set=EQ(pos,000)
+}
+
+
+.ttt:{
+   x=\\5
+   y=1
+   rowlen=11
+   data = 111111010
+   rgb = ^f70
+   set=EQ(pos, 001)
+}
+
+
+.ttt:{
+   x=\\9
+   y=1
+   rowlen=11
+   data = 111111010
+   rgb = ^f70
+   set=EQ(pos, 010)
+}
+
+
+.ttt:{
+   x=\\13
+   y=1
+   rowlen=11
+   data = 111111010
+   rgb = ^f70
+   set=EQ(pos, 011)
+}
+
+
+.ttt:{
+   x=\\17
+   y=1
+   rowlen=11
+   data = 111111010
+   rgb = ^f70
+   set=EQ(pos, 100)
+}
+
+
+
+
+  
+  `,
   
   ex_lcd_nx_pv: `
   
