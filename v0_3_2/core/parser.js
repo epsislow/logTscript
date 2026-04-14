@@ -1361,6 +1361,15 @@ assignment() {
           if (this.c.type === 'BIN') {
             initialValue = this.c.value;
             this.eat('BIN');
+          } else if (this.c.type === 'HEX') {
+            // Convert hex to binary string
+            const hexStr = this.c.value;
+            let binStr = '';
+            for (let i = 0; i < hexStr.length; i++) {
+              binStr += parseInt(hexStr[i], 16).toString(2).padStart(4, '0');
+            }
+            initialValue = binStr;
+            this.eat('HEX');
           } else if (this.c.type === 'DEC') {
             const dec = parseInt(this.c.value, 10);
             const typeMatch = type.match(/^(\d+)(bit|wire)$/);
