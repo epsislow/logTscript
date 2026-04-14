@@ -3029,6 +3029,62 @@ comp [key] .k:
     // Testam cu valori de 8 biti: \192 = 11000000, ^0f = 00001111
     assert('512 \\192./8 + ^0f./8 = 1100000000001111', getWire512('16wire combo = \\192./8 + ^0f./8', 'combo'), '1100000000001111');
   }
+
+  // ---- Test 513: operatorul ;p de padding ----
+  console.log('\n=== Test 513: operatorul ;p de padding ===');
+  {
+    function getWire513(src, name) {
+      const { interp } = run500(src);
+      const w = interp.wires.get(name);
+      return w ? interp.getValueFromRef(w.ref) : null;
+    }
+
+    // Literali BIN cu padding
+    // \12 = 1100 (4 biti), ;8 → 00001100
+    assert('513 \\12;8 = 00001100', getWire513('8wire a = \\12;8', 'a'), '00001100');
+
+    // \3 = 11 (2 biti), ;8 → 00000011
+    assert('513 \\3;8 = 00000011', getWire513('8wire b = \\3;8', 'b'), '00000011');
+
+    // Literali HEX cu padding
+    // ^2 = 0010 (4 biti), ;8 → 00000010
+    assert('513 ^2;8 = 00000010', getWire513('8wire c = ^2;8', 'c'), '00000010');
+
+    // ^f = 1111 (4 biti), ;8 → 00001111
+    assert('513 ^f;8 = 00001111', getWire513('8wire d = ^f;8', 'd'), '00001111');
+
+    // Padding mai mic decat lungimea — nu se trunchiaza
+    // \255 = 11111111 (8 biti), ;4 → 11111111 (neschimbat)
+    assert('513 \\255;4 = 11111111 (no truncate)', getWire513('8wire e = \\255;4', 'e'), '11111111');
+
+    // BIN bitrange + padding
+    // \12 = 1100, .0-2 = 110, ;8 → 00000110
+    assert('513 \\12.0-2;8 = 00000110', getWire513('8wire f = \\12.0-2;8', 'f'), '00000110');
+
+    // \12 = 1100, ./3 = 110, ;8 → 00000110
+    assert('513 \\12./3;8 = 00000110', getWire513('8wire g = \\12./3;8', 'g'), '00000110');
+
+    // HEX bitrange + padding
+    // ^0f = 00001111, .4-7 = 1111, ;8 → 00001111
+    assert('513 ^0f.4-7;8 = 00001111', getWire513('8wire h = ^0f.4-7;8', 'h'), '00001111');
+
+    // Variabile cu padding
+    // 1wire aa = 1, aa;8 → 00000001
+    assert('513 variabila aa;8 = 00000001', getWire513('1wire aa = 1\n8wire i = aa;8', 'i'), '00000001');
+
+    // Variabila cu bitrange si padding
+    // 8wire data = 11001100, data.0-3 = 1100, data.0-3;8 → 00001100
+    assert('513 data.0-3;8 = 00001100', getWire513('8wire data = 11001100\n8wire j = data.0-3;8', 'j'), '00001100');
+
+    // Expresie combinata cu padding — exemplul din cerinta
+    // \12;8 = 00001100, ^2;8 = 00000010, concatenare → 16 biti
+    assert('513 \\12;8 + ^2;8 = 0000110000000010', getWire513('16wire df = \\12;8 + ^2;8', 'df'), '0000110000000010');
+
+    // Short notation cu padding
+    // `\12;8 & [^ff]` → AND(00001100, 11111111) = 00001100
+    // In short notation ^ e XOR, deci hex trebuie scris intre []: [^ff]
+    assert('513 short notation \\12;8 & [^ff] = 00001100', getWire513('8wire sn = `\\12;8 & [^ff]`', 'sn'), '00001100');
+  }
 }
 
 // Summary

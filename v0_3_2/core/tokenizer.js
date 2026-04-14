@@ -104,7 +104,7 @@ pushSource({ src, alias }) {
   }
 
   // Symbols (including { and } for property blocks, ! for NOT prefix, * for multiplier shortname)
-    if ('=,+():-./@[]\"\'{}>!*'.includes(c)) return this.token('SYM', this.next());
+    if ('=,+():-./@[]\"\'{}>!*;'.includes(c)) return this.token('SYM', this.next());
 
   // Special vars and ~~ symbol
   if (c === '_') return this.token('SPECIAL', this.next());

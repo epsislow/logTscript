@@ -96,7 +96,7 @@ function tokenizeShort(content) {
       let op = '';
       while (i < content.length) {
         const c = content[i];
-        if (/[a-zA-Z0-9._\/?~%$]/.test(c) || c === '\\') {
+        if (/[a-zA-Z0-9._\/?~%$;]/.test(c) || c === '\\') {
           op += c; i++;
         } else if (c === '-' && i + 1 < content.length && '&|^'.includes(content[i + 1])) {
           break;

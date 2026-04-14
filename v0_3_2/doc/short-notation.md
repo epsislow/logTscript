@@ -317,7 +317,7 @@ Literal bit-ranges can be combined with `+` (concatenation) or used as arguments
 8wire q = data./4 + \0./4    # upper nibble of data, lower nibble = 0000
 ```
 
-### Notes
+### Notes on bit range
 
 - `\N` is converted to binary first (e.g. `\12` → `1100`), then the bit range is applied.
 - `^N` is converted to binary first (e.g. `^f` → `1111`, `^ff` → `11111111`), then the bit range is applied.
@@ -329,6 +329,90 @@ Literal bit-ranges can be combined with `+` (concatenation) or used as arguments
 3wire c = \12.0-2          # outside backticks — works
 3wire d = `\12 & 111`      # inside backticks — works (no bitrange needed here)
 ```
+
+---
+
+## Padding operator `;p`
+
+The `;p` operator pads a value to `p` bits by adding zeroes on the left (`padStart`). It can be applied to literals and variables, optionally combined with a bit range.
+
+### Syntax
+
+```
+value;p                 # pad value to p bits
+value.bitrange;p        # extract bit range, then pad to p bits
+```
+
+If the value is already `p` bits or longer, no change is made (no truncation).
+
+### Binary literal with padding
+
+```
+\12;8    →  00001100   (\12 = 1100, padded to 8 bits)
+\3;8     →  00000011   (\3  = 11,   padded to 8 bits)
+\255;4   →  11111111   (already 8 bits, no truncation)
+```
+
+### Hex literal with padding
+
+```
+^2;8     →  00000010   (^2  = 0010, padded to 8 bits)
+^f;8     →  00001111   (^f  = 1111, padded to 8 bits)
+^ff;16   →  0000000011111111
+```
+
+### Bit range combined with padding
+
+```
+\12.0-2;8    →  00000110   (bits 0–2 of 1100 = 110, padded to 8)
+\12./3;8     →  00000110   (first 3 bits = 110, padded to 8)
+^0f.4-7;8   →  00001111   (bits 4–7 of 00001111 = 1111, padded to 8)
+```
+
+### Variables with padding
+
+```
+1wire aa = 1
+8wire b = aa;8          # 00000001
+
+8wire data = 11001100
+8wire c = data.0-3;8    # bits 0–3 = 1100, padded to 8 → 00001100
+```
+
+### Expressions combining padded values
+
+The primary use case is building multi-bit values from smaller parts using `+` (concatenation):
+
+```
+16wire df = \12;8 + ^2;8
+# \12;8 = 00001100
+# ^2;8  = 00000010
+# df    = 0000110000000010
+```
+
+This is equivalent to:
+
+```
+8wire  tmp1 = \12
+8wire  tmp2 = ^2
+16wire df   = tmp1 + tmp2
+```
+
+### In short notation
+
+`;p` works inside backticks. Note that hex literals inside backticks must use `[^hex]` syntax (because `^` is the XOR operator):
+
+```
+8wire sn = `\12;8 & [^ff]`
+# expands to: AND(00001100, 11111111) = 00001100
+```
+
+### Notes on padding
+
+- Padding uses `padStart(p, '0')` — zeroes are added on the **left**.
+- If `value.length >= p`, the value is returned unchanged (no truncation occurs).
+- Padding is applied **after** bit range extraction: first bits are selected, then the result is padded.
+- After padding, the value has no storage reference (`ref = null`) — it is a computed value.
 
 ---
 

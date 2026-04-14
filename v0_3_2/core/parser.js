@@ -1436,6 +1436,17 @@ assignment() {
 
     return p;
   }
+  // Parsează paddingul `;p` care urmează după un literal sau variabilă (opțional după bitrange).
+  parsePadding() {
+    this.eat('SYM', ';');
+    if (this.c.type !== 'BIN' && this.c.type !== 'DEC') {
+      throw Error(`Expected padding width after ';' at ${this.c.line}:${this.c.col}`);
+    }
+    const pad = parseInt(this.c.value, 10);
+    this.eat(this.c.type);
+    return pad;
+  }
+
   // Parsează un bitrange care urmează direct după un literal BIN sau HEX.
   // Formele acceptate: .start-end, .start/len, ./len (shorthand .0/len), .bit
   parseLiteralBitRange() {
@@ -1620,21 +1631,29 @@ assignment() {
   if (this.c.type === 'BIN') {
     const v = this.c.value;
     this.eat('BIN');
+    let br = null;
     if (this.c.type === 'SYM' && this.c.value === '.') {
-      const br = this.parseLiteralBitRange();
-      return addNot({ bin: v, bitRange: br });
+      br = this.parseLiteralBitRange();
     }
-    return addNot({ bin: v });
+    const atomBin = br ? { bin: v, bitRange: br } : { bin: v };
+    if (this.c.type === 'SYM' && this.c.value === ';') {
+      atomBin.pad = this.parsePadding();
+    }
+    return addNot(atomBin);
   }
   
   if (this.c.type === 'HEX') {
     const v = this.c.value;
     this.eat('HEX');
+    let br = null;
     if (this.c.type === 'SYM' && this.c.value === '.') {
-      const br = this.parseLiteralBitRange();
-      return addNot({ hex: v, bitRange: br });
+      br = this.parseLiteralBitRange();
     }
-    return addNot({ hex: v });
+    const atomHex = br ? { hex: v, bitRange: br } : { hex: v };
+    if (this.c.type === 'SYM' && this.c.value === ';') {
+      atomHex.pad = this.parsePadding();
+    }
+    return addNot(atomHex);
   }
   
   if (this.c.type === 'SPECIAL') {
@@ -1663,7 +1682,9 @@ assignment() {
         end = parseInt(this.c.value, 10);
         this.eat(this.c.type);
         
-        return addNot({ var: v, bitRange: { start, end } });
+        const specialAtom1 = { var: v, bitRange: { start, end } };
+        if (this.c.type === 'SYM' && this.c.value === ';') specialAtom1.pad = this.parsePadding();
+        return addNot(specialAtom1);
       }
       
       if (this.c.type === 'SYM' && this.c.value === '/') {
@@ -1677,13 +1698,19 @@ assignment() {
         this.eat(this.c.type);
         end = start + len - 1;
         
-        return addNot({ var: v, bitRange: { start, end } });
+        const specialAtom2 = { var: v, bitRange: { start, end } };
+        if (this.c.type === 'SYM' && this.c.value === ';') specialAtom2.pad = this.parsePadding();
+        return addNot(specialAtom2);
       }
       
-      return addNot({ var: v, bitRange: { start, end } });
+      const specialAtom3 = { var: v, bitRange: { start, end } };
+      if (this.c.type === 'SYM' && this.c.value === ';') specialAtom3.pad = this.parsePadding();
+      return addNot(specialAtom3);
     }
     
-    return addNot({ var: v });
+    const specialAtom0 = { var: v };
+    if (this.c.type === 'SYM' && this.c.value === ';') specialAtom0.pad = this.parsePadding();
+    return addNot(specialAtom0);
   }
   
   if (this.c.type === 'REG' || this.c.type === 'MUX' || this.c.type === 'DEMUX') {
@@ -1868,8 +1895,14 @@ assignment() {
         } else {
           throw Error(`Expected bit number or '(' after '-' at ${this.c.line}:${this.c.col}`);
         }
-        if (!isDynamic) return addNot({ var: name, bitRange: { start, end } });
-        return addNot({ var: name, bitRange: { start, startExpr, end, endExpr, isDynamic } });
+        if (!isDynamic) {
+          const idAtom1 = { var: name, bitRange: { start, end } };
+          if (this.c.type === 'SYM' && this.c.value === ';') idAtom1.pad = this.parsePadding();
+          return addNot(idAtom1);
+        }
+        const idAtom2 = { var: name, bitRange: { start, startExpr, end, endExpr, isDynamic } };
+        if (this.c.type === 'SYM' && this.c.value === ';') idAtom2.pad = this.parsePadding();
+        return addNot(idAtom2);
       }
 
       if (this.c.type === 'SYM' && this.c.value === '/') {
@@ -1887,15 +1920,29 @@ assignment() {
         } else {
           throw Error(`Expected length or '(' after '/' at ${this.c.line}:${this.c.col}`);
         }
-        if (!isDynamic) return addNot({ var: name, bitRange: { start, end: start + len - 1 } });
-        return addNot({ var: name, bitRange: { start, startExpr, len, lenExpr, isDynamic, isLength: true } });
+        if (!isDynamic) {
+          const idAtom3 = { var: name, bitRange: { start, end: start + len - 1 } };
+          if (this.c.type === 'SYM' && this.c.value === ';') idAtom3.pad = this.parsePadding();
+          return addNot(idAtom3);
+        }
+        const idAtom4 = { var: name, bitRange: { start, startExpr, len, lenExpr, isDynamic, isLength: true } };
+        if (this.c.type === 'SYM' && this.c.value === ';') idAtom4.pad = this.parsePadding();
+        return addNot(idAtom4);
       }
 
-      if (!isDynamic) return addNot({ var: name, bitRange: { start, end: start } });
-      return addNot({ var: name, bitRange: { start, startExpr, isDynamic } });
+      if (!isDynamic) {
+        const idAtom5 = { var: name, bitRange: { start, end: start } };
+        if (this.c.type === 'SYM' && this.c.value === ';') idAtom5.pad = this.parsePadding();
+        return addNot(idAtom5);
+      }
+      const idAtom6 = { var: name, bitRange: { start, startExpr, isDynamic } };
+      if (this.c.type === 'SYM' && this.c.value === ';') idAtom6.pad = this.parsePadding();
+      return addNot(idAtom6);
     }
     
-    return addNot({ var: name });
+    const idAtom0 = { var: name };
+    if (this.c.type === 'SYM' && this.c.value === ';') idAtom0.pad = this.parsePadding();
+    return addNot(idAtom0);
   }
   
   throw Error(`Bad expression at ${this.c.line}:${this.c.col}`);

@@ -497,6 +497,11 @@ class Interpreter {
     return { start, end };
   }
 
+  applyPad(value, pad){
+    if(pad && value && value.length < pad) return value.padStart(pad, '0');
+    return value;
+  }
+
   evalAtom(a, computeRefs=false, varName=null){
     // Handle NOT prefix - if present, evaluate without it and then invert the result
     if(a.not){
@@ -528,7 +533,10 @@ class Interpreter {
       if(a.bitRange){
         const {start, end} = a.bitRange;
         binStr = binStr.substring(start, end + 1);
-        return {value: binStr, ref: null, varName: null, bitWidth: end - start + 1};
+      }
+      if(a.pad) binStr = this.applyPad(binStr, a.pad);
+      if(a.bitRange || a.pad){
+        return {value: binStr, ref: null, varName: null, bitWidth: binStr.length};
       }
       // If computeRefs is true (wire assignment), store in storage and return reference
       if(computeRefs){
@@ -548,7 +556,10 @@ class Interpreter {
       if(a.bitRange){
         const {start, end} = a.bitRange;
         binStr = binStr.substring(start, end + 1);
-        return {value: binStr, ref: null, varName: null, bitWidth: end - start + 1};
+      }
+      if(a.pad) binStr = this.applyPad(binStr, a.pad);
+      if(a.bitRange || a.pad){
+        return {value: binStr, ref: null, varName: null, bitWidth: binStr.length};
       }
       // If computeRefs is true (wire assignment), store in storage and return reference
       if(computeRefs){
@@ -759,9 +770,14 @@ class Interpreter {
         // Format varName: use single bit notation if start === actualEnd, otherwise range notation
         const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
         const refSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-        return {value: extracted, ref: ref ? `${ref}.${refSuffix}` : null, varName: `${a.var}.${varNameSuffix}`, bitWidth: bitWidth};
+        const extractedPadded = a.pad ? this.applyPad(extracted, a.pad) : extracted;
+        return {value: extractedPadded, ref: a.pad ? null : (ref ? `${ref}.${refSuffix}` : null), varName: `${a.var}.${varNameSuffix}`, bitWidth: extractedPadded.length};
       }
       
+      if(a.pad && val && val !== '-'){
+        const paddedVal = this.applyPad(val, a.pad);
+        return {value: paddedVal, ref: null, varName: a.var, bitWidth: paddedVal.length};
+      }
       return {value: val, ref: ref, varName: a.var};
     }
     if(a.ref){
