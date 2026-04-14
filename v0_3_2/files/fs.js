@@ -1,6 +1,6 @@
 window.lib_files = {
   
-  ex_lcd_nx_pv: `
+  ex_lcd_nx_pv2: `
   comp [lcd] .ttt:
     row: 8
     cols: 21
