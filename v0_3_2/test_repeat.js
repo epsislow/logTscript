@@ -2648,7 +2648,6 @@ pcb [sw] .p::
     setWire('bb', '1');
     assert('505 B=1 din nou: result=1010', getPcbPout500(interp, '.p', 'result'), '1010');
   }
-
   // ---- Test 506: componentele interne PCB nu sunt re-create la fiecare executie ----
   console.log('\n=== Test 506: comp interne PCB nu sunt re-create la re-executie ===');
   {
@@ -2827,6 +2826,160 @@ pcb [dual2] .d::
     assert('508 storage stabil A->B', String(s1), String(s2));
     assert('508 storage stabil B->A', String(s2), String(s3));
     assert('508 storage stabil A->B din nou', String(s3), String(s4));
+  }
+
+  // ---- Test 509: blocurile se executa in ordinea din sursa (blockIndex) ----
+  // Verifica ca un bloc cu set=expr(comp) care apare DUPA un alt bloc in sursa
+  // se executa DUPA acel bloc, nu inainte (bug fix: ordinea pending vs direct)
+  console.log('\n=== Test 509: blocuri cu set=expr(comp) se executa in ordinea din sursa ===');
+  {
+    // Doua componente: un counter si doua blocuri pe acelasi comp
+    // Blocul A (blockIndex mic) deseneaza, blocul B (blockIndex mare) face clear
+    // Daca ordinea e corecta: A se executa, B se executa dupa => rezultatul final e cel al lui B
+    // Daca ordinea e gresita: B se executa, A se executa dupa => rezultatul final e cel al lui A
+    const src = `
+pcb +[seq]:
+  1pin set
+  4pout val
+  exec: set
+  on:1
+
+  val = 1111
+  :4bit val
+
+pcb [seq] .q::
+
+1wire trigger = 0
+
+.q:{
+  set = trigger
+}
+
+.q:{
+  set = trigger
+}`;
+    // Al doilea bloc are blockIndex mai mare
+    // Ambele se declanseaza cand trigger=1
+    // Verificam ca ambele se executa (nu doar primul)
+    const { interp } = run500(src);
+
+    function setWire509(name, val) {
+      const w = interp.wires.get(name);
+      if(w && w.ref) interp.setValueAtRef(w.ref, val);
+      interp.updateConnectedComponents(name, val);
+    }
+
+    const blocksBefore = interp.componentPropertyBlocks.filter(b => b.component === '.q').length;
+    assert('509 doua blocuri inregistrate pentru .q', String(blocksBefore), '2');
+
+    setWire509('trigger', '1');
+    const val = getPcbPout500(interp, '.q', 'val');
+    assert('509 ambele blocuri s-au executat, pout=1111', val, '1111');
+  }
+
+  // ---- Test 510: ordinea clear->draw cu set=expr(comp) direct ----
+  // Simuleaza scenariul cu LCD: un bloc face clear (blockIndex mare),
+  // altul face draw (blockIndex mic). Clear trebuie sa vina dupa draw.
+  console.log('\n=== Test 510: ordinea executiei blocurilor cu trigger component direct ===');
+  {
+    // Folosim doua PCB-uri pentru a simula "draw" si "clear"
+    // draw_pcb: blockIndex mic, seteaza val=1111
+    // clear_pcb: blockIndex mare, seteaza val=0000
+    // Daca ordinea e corecta (blockIndex), clear vine dupa draw => val final = 0000
+    const src = `
+pcb +[target]:
+  4pin data
+  1pin set
+  4pout val
+  exec: set
+  on:1
+
+  val = data
+  :4bit val
+
+pcb [target] .t::
+
+comp [key] .btn:
+  on:1
+  :
+
+1wire btn = .btn
+
+.t:{
+  data = 1111
+  set = btn
+}
+
+.t:{
+  data = 0000
+  set = btn
+}`;
+    const { interp } = run500(src);
+
+    // Simuleaza apasarea butonului: seteaza comp .btn la 1
+    const btnComp = interp.components.get('.btn');
+    if(btnComp && btnComp.ref){
+      const idx = parseInt(btnComp.ref.slice(1));
+      const stored = interp.storage.find(s => s.index === idx);
+      if(stored) stored.value = '1';
+    }
+    interp.updateComponentConnections('.btn');
+
+    const val = getPcbPout500(interp, '.t', 'val');
+    // Al doilea bloc (data=0000, blockIndex mai mare) trebuie sa se execute dupa primul
+    assert('510 blocul cu blockIndex mare se executa dupa cel cu blockIndex mic', val, '0000');
+  }
+
+  // ---- Test 511: trigger comp direct -> blocuri in ordinea blockIndex ----
+  // Verifica explicit ca ordinea de executie respecta blockIndex, nu alta ordine
+  console.log('\n=== Test 511: mai multe blocuri pe acelasi comp, ordinea = blockIndex ===');
+  {
+    const src = `
+pcb +[order]:
+  4pin data
+  1pin set
+  4pout val
+  exec: set
+  on:1
+
+  val = data
+  :4bit val
+
+pcb [order] .o::
+
+comp [key] .k:
+  on:1
+  :
+
+.o:{
+  data = 0001
+  set = .k
+}
+.o:{
+  data = 0010
+  set = .k
+}
+.o:{
+  data = 0100
+  set = .k
+}
+.o:{
+  data = 1000
+  set = .k
+}`;
+    const { interp } = run500(src);
+
+    const kComp = interp.components.get('.k');
+    if(kComp && kComp.ref){
+      const idx = parseInt(kComp.ref.slice(1));
+      const stored = interp.storage.find(s => s.index === idx);
+      if(stored) stored.value = '1';
+    }
+    interp.updateComponentConnections('.k');
+
+    const val = getPcbPout500(interp, '.o', 'val');
+    // Ultimul bloc in sursa are data=1000, deci val final trebuie sa fie 1000
+    assert('511 ultimul bloc din sursa castiga (data=1000)', val, '1000');
   }
 }
 

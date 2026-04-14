@@ -97,8 +97,17 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
   if(_visited.has(compName)) return;
   _visited.add(compName);
 
+  // If no pending map exists, this is a top-level entry point (e.g. from key.onPress).
+  // Create one so all blocks triggered during this call are collected and executed
+  // in program order (blockIndex) at the end, not immediately out of order.
+  const isUccTopLevel = !this._uccPendingBlocks;
+  if(isUccTopLevel){
+    this._uccPendingBlocks = new Map();
+  }
+
   const comp = this.components.get(compName);
   if(!comp){
+    if(isUccTopLevel) this._uccPendingBlocks = null;
     return;
   }
   
@@ -818,16 +827,16 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
         if(!executedBlocks.has(blockKey)){
           executedBlocks.add(blockKey);
           
-          // Execute the block
-          this.executePropertyBlock(block.component, block.properties, true, block);
-          
-          // After executing property block, DO NOT call updateComponentConnections recursively
-          // because it will be called after all blocks in updateConnectedComponents are done
-          // this.updateComponentConnections(block.component);
-          
-          // Update UI after executing property block
-          if(typeof showVars === 'function'){
-            showVars();
+          // If a top-level updateConnectedComponents is active, defer to pending
+          // so all blocks execute together in blockIndex (program) order.
+          if(this._uccPendingBlocks){
+            this._uccPendingBlocks.set(block.blockIndex, block);
+          } else {
+            // Execute the block immediately (no active top-level cascade)
+            this.executePropertyBlock(block.component, block.properties, true, block);
+            if(typeof showVars === 'function'){
+              showVars();
+            }
           }
         }
       }
@@ -840,6 +849,53 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
   // Cascade: propagate updates to components whose inputs were modified
   for(const affectedName of _affectedComponents){
     this.updateComponentConnections(affectedName, _visited);
+  }
+
+  // TOP-LEVEL ONLY: execute all pending blocks in program order
+  if(isUccTopLevel && this._uccPendingBlocks){
+    const executedBlockKeys = new Set();
+    const seenComponents = new Set();
+    const executedComponents = [];
+
+    while(this._uccPendingBlocks && this._uccPendingBlocks.size > 0){
+      const pendingBlocks = this._uccPendingBlocks;
+      this._uccPendingBlocks = new Map();
+
+      const sortedPending = [...pendingBlocks.values()]
+        .sort((a, b) => a.blockIndex - b.blockIndex);
+
+      for(const block of sortedPending){
+        const blockKey = `${block.component}:${block.blockIndex}`;
+        if(!executedBlockKeys.has(blockKey)){
+          executedBlockKeys.add(blockKey);
+          this.executePropertyBlock(block.component, block.properties, true, block);
+          // Update lastSetValue after execution so next trigger sees correct previous state
+          if(block.setExpr){
+            const res = this.evalExpr(block.setExpr, false);
+            let sv = '';
+            for(const p of res){
+              if(p.value !== undefined && p.value !== null && p.value !== '-') sv += p.value;
+              else if(p.ref && p.ref !== '&-'){ const v = this.getValueFromRef(p.ref); if(v) sv += v; }
+            }
+            block.lastSetValue = sv || '0';
+          }
+          if(!seenComponents.has(block.component)){
+            seenComponents.add(block.component);
+            executedComponents.push(block.component);
+          }
+        }
+      }
+    }
+
+    this._uccPendingBlocks = null;
+
+    if(executedBlockKeys.size > 0){
+      if(!this.justExecutedBlocks) this.justExecutedBlocks = new Set();
+      for(const key of executedBlockKeys) this.justExecutedBlocks.add(key);
+      for(const compName of executedComponents) this.updateComponentConnections(compName);
+      this.justExecutedBlocks = null;
+      if(typeof showVars === 'function') showVars();
+    }
   }
 };
 
@@ -1469,9 +1525,13 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
           const valueChanged = (setValue !== prevSetValue);
 
           // Execute if set=1 AND:
-          // - the set wire itself changed (edge/level on set), OR
-          // - a data wire triggered this (set=1, data dependency changed)
-          if(setBit === '1' && (valueChanged || !isSetWireTrigger)){
+          // - the set value itself changed (covers both set-wire trigger and data-wire trigger
+          //   when set stays 1 because a data dependency changed), OR
+          // - this was triggered by a non-set wire AND set is still 1 AND the triggering
+          //   wire is an actual data dependency of the block (not just any wire change)
+          const triggeredByDataWire = !isSetWireTrigger &&
+            block.wireDependencies && block.wireDependencies.has(varName);
+          if(setBit === '1' && (valueChanged || triggeredByDataWire)){
             // Add to shared pending map (keyed by blockIndex for deduplication)
             // Top-level call will execute all pending in program order
             this._uccPendingBlocks.set(block.blockIndex, block);
@@ -1515,33 +1575,50 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
   }
 
   // TOP-LEVEL ONLY: execute all pending blocks in program order (by blockIndex).
-  // This ensures blocks run in the order they appear in the source, regardless
-  // of which cascade depth triggered them.
+  // Keep _uccPendingBlocks active during execution so any newly triggered blocks
+  // (from cascades inside executePropertyBlock) are also collected and sorted,
+  // not executed immediately out of order.
   if(isTopLevel){
-    const pendingBlocks = this._uccPendingBlocks;
-    this._uccPendingBlocks = null;
+    const executedBlockKeys = new Set();
+    const seenComponents = new Set();
+    const executedComponents = [];
 
-    if(pendingBlocks.size > 0){
-      // Sort all pending blocks by their blockIndex (= program order)
+    // Loop until no new pending blocks are added (handles cascades)
+    while(this._uccPendingBlocks && this._uccPendingBlocks.size > 0){
+      // Snapshot current pending and reset map so cascades fill a fresh one
+      const pendingBlocks = this._uccPendingBlocks;
+      this._uccPendingBlocks = new Map();
+
+      // Sort by blockIndex (= program order)
       const sortedPending = [...pendingBlocks.values()]
         .sort((a, b) => a.blockIndex - b.blockIndex);
-
-      const executedBlockKeys = new Set();
-      const executedComponents = [];
-      const seenComponents = new Set();
 
       for(const block of sortedPending){
         const blockKey = `${block.component}:${block.blockIndex}`;
         if(!executedBlockKeys.has(blockKey)){
           executedBlockKeys.add(blockKey);
           this.executePropertyBlock(block.component, block.properties, true, block);
+          // Update lastSetValue after execution so next trigger sees correct previous state
+          if(block.setExpr){
+            const res = this.evalExpr(block.setExpr, false);
+            let sv = '';
+            for(const p of res){
+              if(p.value !== undefined && p.value !== null && p.value !== '-') sv += p.value;
+              else if(p.ref && p.ref !== '&-'){ const v = this.getValueFromRef(p.ref); if(v) sv += v; }
+            }
+            block.lastSetValue = sv || '0';
+          }
           if(!seenComponents.has(block.component)){
             seenComponents.add(block.component);
             executedComponents.push(block.component);
           }
         }
       }
+    }
 
+    this._uccPendingBlocks = null;
+
+    if(executedBlockKeys.size > 0){
       // Prevent re-execution in updateComponentConnections callbacks
       if(!this.justExecutedBlocks){
         this.justExecutedBlocks = new Set();
@@ -1555,7 +1632,8 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
         this.updateComponentConnections(compName);
       }
 
-      setTimeout(() => { this.justExecutedBlocks = null; }, 0);
+      // Clear justExecutedBlocks synchronously so next event loop tick starts fresh
+      this.justExecutedBlocks = null;
 
       if(typeof showVars === 'function') showVars();
     }
