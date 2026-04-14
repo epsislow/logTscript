@@ -262,6 +262,76 @@ Decimal literals (with `\`) can be used directly or inside `[]`:
 
 ---
 
+## Bit range on literals
+
+Both binary (`\N`) and hex (`^N`) literals support bit-range extraction directly, using the same `.` syntax used on variables.
+
+### Syntax
+
+```
+literal.start-end       # bits from index start to end (inclusive)
+literal.start/len       # len bits starting at index start
+literal./len            # len bits starting at index 0 (shorthand)
+literal.bit             # single bit at index bit
+```
+
+Bit indices are **0-based from the left** (MSB = index 0).
+
+### Binary literal examples
+
+```
+\12 = 1100  (4 bits, decimal 12)
+
+3wire c = \12.0-2        # bits 0–2 of 1100 → 110
+3wire d = \12./3         # first 3 bits of 1100 → 110  (shorthand for .0/3)
+3wire e = \12.1-3        # bits 1–3 of 1100 → 100
+1wire f = \12.0          # bit 0 of 1100 → 1
+```
+
+### Hex literal examples
+
+```
+^f  = 1111  (4 bits, hex F)
+^0f = 00001111  (8 bits, hex 0F)
+
+4wire a = ^f./4          # first 4 bits of 1111 → 1111
+3wire b = ^f.0-2         # bits 0–2 of 1111 → 111
+4wire c = ^0f.4-7        # bits 4–7 of 00001111 → 1111
+8wire d = ^0f./8         # first 8 bits of 00001111 → 00001111
+```
+
+### Use in expressions
+
+Literal bit-ranges can be combined with `+` (concatenation) or used as arguments to functions:
+
+```
+# Concatenate two 8-bit slices into a 16-bit wire
+16wire e = \192./8 + ^0f./8
+# \192 = 11000000, ^0f = 00001111
+# result: 1100000000001111
+
+# Use as function argument
+1wire p = OR(\255./8)    # OR across all 8 bits of 11111111 → 1
+
+# Mix with variables
+8wire q = data./4 + \0./4    # upper nibble of data, lower nibble = 0000
+```
+
+### Notes
+
+- `\N` is converted to binary first (e.g. `\12` → `1100`), then the bit range is applied.
+- `^N` is converted to binary first (e.g. `^f` → `1111`, `^ff` → `11111111`), then the bit range is applied.
+- The shorthand `./len` is equivalent to `.0/len` — start is always 0.
+- If the requested range exceeds the literal's length, only the available bits are returned.
+- Bit-range on literals works **outside** short notation too (anywhere an expression is accepted):
+
+```
+3wire c = \12.0-2          # outside backticks — works
+3wire d = `\12 & 111`      # inside backticks — works (no bitrange needed here)
+```
+
+---
+
 ## Usage in context
 
 Short notation can be used anywhere an expression appears in source code.
