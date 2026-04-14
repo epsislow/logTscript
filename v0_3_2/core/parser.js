@@ -1381,7 +1381,8 @@ assignment() {
             }
             this.eat('DEC');
           } else if (this.c.type === 'ID' || this.c.type === 'SPECIAL') {
-            throw Error(`Variable assignments after '=' in component declaration are not supported. Use a separate assignment statement like '.${name.substring(1)} = ${this.c.value}' after the component declaration.`);
+            initialValue = { varRef: this.c.value };
+            this.eat(this.c.type);
           } else if (this.c.type === 'SYM' && this.c.value === '.') {
             throw Error(`Component assignments after '=' in component declaration are not supported. Use a separate assignment statement after the component declaration.`);
           } else {

@@ -13,6 +13,10 @@ var BuiltinComponent = class BuiltinComponent extends ComponentBase {
 
   getForbidDirectAssign() { return null; }
 
+  // Called when `.comp = expr` direct assignment is executed.
+  // Return true if handled, false/null to fall through to default behavior.
+  handleDirectAssign(comp, value, ctx) { return false; }
+
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {}
 
   updateDisplayValue(comp, value, bitRange) {}

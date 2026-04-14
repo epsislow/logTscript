@@ -231,9 +231,11 @@ comp [adder] .name:
 
 **Output structure:**
 - Declaration attributes (before `:{`) — with value (`depth: integer`) or without (`nl`, `circular`)
-- `= Xbit` — appears if the component accepts direct assignment with `=`; omitted if not (e.g. `mem`, `counter`, `osc`)
+- `= Xbit` — appears if the component accepts direct assignment with `=`; omitted if not (e.g. `counter`, `osc`)
 - `:{` ... `}` — pins (inputs) and pouts (outputs) available in the property block
 - `-> Xbit` — the return type of the component
+
+> **Note on `mem`:** `doc(comp.mem)` shows `= Xbit` because `mem` supports initialization with `= literal`, `= ^hex`, or `= varName` in the declaration, and bulk re-initialization via `.mem = value` after declaration. The value is split into `depth`-bit chunks across consecutive addresses. See [mem.md](mem.md) for details.
 
 ### All available components
 

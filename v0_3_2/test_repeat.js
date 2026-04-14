@@ -1669,8 +1669,9 @@ console.log('\n=== Test 200: Component Registry — all types registered ===');
     assert('comp type is osc', stmts[0].comp.type, 'osc');
   }
 
-  console.log('\n=== Test 211: getForbidDirectAssign ===');
-  assert('mem forbids', String(registry.get('mem').getForbidDirectAssign() !== null), 'true');
+  console.log('\n=== Test 211: getForbidDirectAssign / handleDirectAssign ===');
+  // mem now supports direct assignment via handleDirectAssign (bulk init), so getForbidDirectAssign is null
+  assert('mem allows direct assign (handleDirectAssign)', String(registry.get('mem').getForbidDirectAssign()), 'null');
   assert('counter forbids', String(registry.get('counter').getForbidDirectAssign() !== null), 'true');
   assert('osc forbids', String(registry.get('osc').getForbidDirectAssign() !== null), 'true');
   assert('led allows', String(registry.get('led').getForbidDirectAssign()), 'null');
@@ -2268,11 +2269,11 @@ var _I2 = Interpreter;
     assert('doc(comp.7) prima linie', out[0], 'comp [7seg] .name:');
   }
 
-  // ---- mem nu are = Xbit (getForbidDirectAssign) ----
-  console.log('\n=== Test 418: doc(comp.mem) nu contine = Xbit ===');
+  // ---- mem are acum = Xbit (suporta initializare cu variabila si .mem = d) ----
+  console.log('\n=== Test 418: doc(comp.mem) contine = Xbit ===');
   {
     const out = runDoc2('doc(comp.mem)');
-    assert('mem nu contine = Xbit', String(out.some(l => l.trim().startsWith('= '))), 'false');
+    assert('mem contine = Xbit', String(out.some(l => l.trim().startsWith('= '))), 'true');
   }
 
   // ---- doc(comp.xyz) — nedefinit ----
@@ -3252,6 +3253,122 @@ pcb [ret8] .g::
       assert('514 PCB direct;4 nu trunchiaza (11001100)',
         getWire514(src, 'x'),
         '11001100');
+    }
+  }
+
+  // ---- Test 515: mem comp = variabila / .mem = d ----
+  console.log('\n=== Test 515: mem comp = variabila si .mem = d ===');
+  {
+    // Helper: ruleaza src, citeste memoria la adresa addr
+    function getMem515(src, instanceName, addr) {
+      const { interp } = run500(src);
+      const comp = interp.components.get(instanceName);
+      if (!comp) return null;
+      const memId = comp.deviceIds[0];
+      if (typeof getMem === 'function') return getMem(memId, addr);
+      // In Node.js getMem nu exista, verificam prin .mem:get cu :at
+      return null;
+    }
+
+    // Helper: ruleaza src si verifica valoarea .mem:get cu at setat
+    function getMemAt515(src, instanceName, atBin) {
+      // Injecteaza un wire 'result' care citeste memoria la adresa atBin
+      const bits = atBin.length;
+      const readSrc = src + `\n${bits}wire __at = ${atBin}\n.${instanceName.substring(1)}:{\nat = __at\n}\n8wire __result = ${instanceName}:get;8`;
+      const { interp } = run500(readSrc);
+      const w = interp.wires.get('__result');
+      return w ? interp.getValueFromRef(w.ref) : null;
+    }
+
+    // Test 1: = literal binar in declaratie (deja functional)
+    // comp [mem] cu depth=4, = 1100 → adresa 0 = 1100
+    {
+      const src = `comp [mem] .m:\ndepth:4\nlength:4\n= \\12\n:\n8wire x = .m:get;8`;
+      const { interp } = run500(src);
+      const w = interp.wires.get('x');
+      const val = w ? interp.getValueFromRef(w.ref) : null;
+      assert('515 = literal \\12 in declaratie (adresa 0 = 1100, padded 8)', val, '00001100');
+    }
+
+    // Test 2: = variabila in declaratie
+    // 4wire d = 1010, comp [mem] .m: = d → adresa 0 = 1010
+    {
+      const src = `4wire d = 1010\ncomp [mem] .m:\ndepth:4\nlength:4\n= d\n:\n8wire x = .m:get;8`;
+      const { interp } = run500(src);
+      const w = interp.wires.get('x');
+      const val = w ? interp.getValueFromRef(w.ref) : null;
+      assert('515 = variabila d=1010 in declaratie (adresa 0 = 1010, padded 8)', val, '00001010');
+    }
+
+    // Test 3: = HEX in declaratie — valoare pe mai multe adrese
+    // ^ffff = 1111111111111111 (16 biti), depth=8, length=4
+    // → adresa 0 = 11111111, adresa 1 = 11111111
+    {
+      const src = `comp [mem] .m:\ndepth:8\nlength:4\n= ^ffff\n:\n8wire x = .m:get;8`;
+      const { interp } = run500(src);
+      const w = interp.wires.get('x');
+      const val = w ? interp.getValueFromRef(w.ref) : null;
+      assert('515 = ^ffff in declaratie (adresa 0 = 11111111)', val, '11111111');
+    }
+
+    // Test 4: = variabila pe mai multe adrese in declaratie
+    // 16wire d = ^ffff, comp [mem] depth=8, length=4, = d
+    // → 2 adrese scrise: 0 = 11111111, 1 = 11111111
+    {
+      const src = `16wire d = ^ffff\ncomp [mem] .m:\ndepth:8\nlength:4\n= d\n:\n8wire x = .m:get;8`;
+      const { interp } = run500(src);
+      const w = interp.wires.get('x');
+      const val = w ? interp.getValueFromRef(w.ref) : null;
+      assert('515 = variabila d=^ffff in declaratie (adresa 0 = 11111111)', val, '11111111');
+    }
+
+    // Test 5: padding — valoare mai scurta decat depth, se face padStart
+    // 4wire d = 1100, comp [mem] depth=8, = d → adresa 0 = 00001100
+    {
+      const src = `4wire d = 1100\ncomp [mem] .m:\ndepth:8\nlength:4\n= d\n:\n8wire x = .m:get;8`;
+      const { interp } = run500(src);
+      const w = interp.wires.get('x');
+      const val = w ? interp.getValueFromRef(w.ref) : null;
+      assert('515 = variabila mai scurta decat depth, pad (00001100)', val, '00001100');
+    }
+
+    // Test 6: .mem = d dupa declaratie — initializeaza memoria
+    // PCB care seteaza .m:at si citeste .m:get
+    // Verificam ca .mem = d functioneaza scriind o valoare si citind-o inapoi
+    {
+      const src = `
+comp [mem] .m:
+depth:4
+length:4
+:
+
+4wire d = 1010
+.m = d
+
+8wire x = .m:get;8`;
+      const { interp } = run500(src);
+      const w = interp.wires.get('x');
+      const val = w ? interp.getValueFromRef(w.ref) : null;
+      assert('515 .mem = d dupa declaratie (adresa 0 = 1010, padded 8)', val, '00001010');
+    }
+
+    // Test 7: .mem = d cu valoare pe mai multe adrese
+    // 16wire d = ^f0f0, depth=8, .m = d → adresa 0 = 11110000, adresa 1 = 11110000
+    {
+      const src = `
+comp [mem] .m:
+depth:8
+length:4
+:
+
+16wire d = ^f0f0
+.m = d
+
+8wire x = .m:get;8`;
+      const { interp } = run500(src);
+      const w = interp.wires.get('x');
+      const val = w ? interp.getValueFromRef(w.ref) : null;
+      assert('515 .mem = d multi-adresa (adresa 0 = 11110000)', val, '11110000');
     }
   }
 }

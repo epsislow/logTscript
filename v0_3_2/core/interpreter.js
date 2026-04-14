@@ -2062,6 +2062,20 @@ if (s.assignment) {
     if(this.componentRegistry){
       const handler = this.componentRegistry.get(comp.type);
       if(handler){
+        // Check if handler supports direct assignment (e.g. mem bulk init)
+        if(handler.handleDirectAssign){
+          const exprResultForDirect = this.evalExpr(expr, false);
+          let directValue = '';
+          for(const part of exprResultForDirect){
+            if(part.value && part.value !== '-') directValue += part.value;
+            else if(part.ref && part.ref !== '&-'){
+              const v = this.getValueFromRef(part.ref);
+              if(v) directValue += v;
+            }
+          }
+          const handled = handler.handleDirectAssign(comp, directValue, this);
+          if(handled !== false && handled !== null && handled !== undefined) return;
+        }
         const forbidMsg = handler.getForbidDirectAssign();
         if(forbidMsg) throw Error(forbidMsg);
       }
@@ -2730,11 +2744,25 @@ if (s.assignment) {
 
   execComp(comp){
     // Execute component declaration: comp [led] .power: ...
-    const {type, componentType, name, attributes, initialValue, returnType} = comp;
+    const {type, componentType, name, attributes, returnType} = comp;
+    let initialValue = comp.initialValue;
     let dipRef = null; // For DIP switches
     let switchRef = null; // For switches, store the output reference
     let rotaryRef = null; // For rotary knobs, store the output reference
     let keyRef = null; // For keys, store the output reference
+
+    // Resolve variable reference for initialValue (e.g. = d in comp declaration)
+    if(initialValue && typeof initialValue === 'object' && initialValue.varRef){
+      const varName = initialValue.varRef;
+      const wire = this.wires.get(varName);
+      if(wire && wire.ref){
+        const resolved = this.getValueFromRef(wire.ref);
+        if(resolved !== null) initialValue = resolved;
+        else throw Error(`Wire '${varName}' has no value yet at component declaration '${name}'`);
+      } else {
+        throw Error(`Undefined variable '${varName}' used in component declaration '${name}'`);
+      }
+    }
     
     // Calculate bits from component type and attributes (componentType is now null)
     const bits = this.getComponentBits(type, attributes);
@@ -2757,7 +2785,7 @@ if (s.assignment) {
           type: type,
           componentType: null,
           attributes: attributes,
-          initialValue: initialValue,
+          initialValue: result.initialValueAddr0 !== undefined ? result.initialValueAddr0 : initialValue,
           returnType: returnType,
           ref: result.ref || null,
           deviceIds: result.deviceIds
