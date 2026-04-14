@@ -53,8 +53,12 @@ var MemComponent = class MemComponent extends BuiltinComponent {
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const length = attributes['length'] !== undefined ? parseInt(attributes['length'], 10) : 3;
     const depth = attributes['depth'] !== undefined ? parseInt(attributes['depth'], 10) : 4;
-    const defaultValue = initialValue || '0'.repeat(depth);
-    if (defaultValue.length !== depth) throw Error(`Memory default value length (${defaultValue.length}) must match depth (${depth}) for component ${name}`);
+    let defaultValue = initialValue || '0'.repeat(depth);
+    if (defaultValue.length < depth) {
+      defaultValue = defaultValue.padStart(depth, '0');
+    } else if (defaultValue.length > depth) {
+      throw Error(`Memory default value length (${defaultValue.length}) exceeds depth (${depth}) for component ${name}`);
+    }
     if (length <= 0 || depth <= 0) throw Error(`Memory length and depth must be positive for component ${name}`);
     const memId = baseId;
     if (typeof addMem === 'function') addMem({ id: memId, length, depth, default: defaultValue });
