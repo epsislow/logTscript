@@ -1764,11 +1764,9 @@ assignment() {
           end = parseInt(this.c.value, 10);
           this.eat(this.c.type);
 
-          return addNot({
-            var: compName,
-            property: property,
-            bitRange: { start, end }
-          });
+          { const _a = { var: compName, property: property, bitRange: { start, end } };
+            if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+            return addNot(_a); }
         }
 
         if (this.c.type === 'SYM' && this.c.value === '/') {
@@ -1782,24 +1780,19 @@ assignment() {
           this.eat(this.c.type);
           end = start + len - 1;
 
-          return addNot({
-            var: compName,
-            property: property,
-            bitRange: { start, end }
-          });
+          { const _a = { var: compName, property: property, bitRange: { start, end } };
+            if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+            return addNot(_a); }
         }
 
-        return addNot({
-          var: compName,
-          property: property,
-          bitRange: { start, end }
-        });
+        { const _a = { var: compName, property: property, bitRange: { start, end } };
+          if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+          return addNot(_a); }
       }
 
-      return addNot({
-        var: compName,
-        property: property
-      });
+      { const _a = { var: compName, property: property };
+        if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+        return addNot(_a); }
     }
     
     if (this.c.type === 'SYM' && this.c.value === '.') {
@@ -1830,13 +1823,14 @@ assignment() {
         end = start + len - 1;
       }
       
-      return addNot({
-        var: compName,
-        bitRange: { start, end }
-      });
+      { const _a = { var: compName, bitRange: { start, end } };
+        if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+        return addNot(_a); }
     }
     
-    return addNot({ var: compName });
+    { const _a = { var: compName };
+      if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+      return addNot(_a); }
   }
   
   if (this.c.type === 'ID') {

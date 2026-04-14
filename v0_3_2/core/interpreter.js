@@ -616,11 +616,15 @@ class Interpreter {
                   throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:${a.property} (length: ${val.length})`);
                 }
                 const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
                 const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:${a.property}.${varNameSuffix}`, bitWidth: bitWidth};
+                const extractedPadded = a.pad ? this.applyPad(extracted, a.pad) : extracted;
+                return {value: extractedPadded, ref: null, varName: `${a.var}:${a.property}.${varNameSuffix}`, bitWidth: extractedPadded.length};
               }
 
+              if(a.pad){
+                const padded = this.applyPad(val, a.pad);
+                return {value: padded, ref: null, varName: `${a.var}:${a.property}`, bitWidth: padded.length};
+              }
               return {value: val, ref: poutInfo.ref, varName: `${a.var}:${a.property}`, bitWidth: poutInfo.bits};
             }
             
@@ -636,11 +640,15 @@ class Interpreter {
                   throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:${a.property} (length: ${val.length})`);
                 }
                 const extracted = val.substring(start, actualEnd + 1);
-                const bitWidth = actualEnd - start + 1;
                 const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                return {value: extracted, ref: null, varName: `${a.var}:${a.property}.${varNameSuffix}`, bitWidth: bitWidth};
+                const extractedPadded = a.pad ? this.applyPad(extracted, a.pad) : extracted;
+                return {value: extractedPadded, ref: null, varName: `${a.var}:${a.property}.${varNameSuffix}`, bitWidth: extractedPadded.length};
               }
 
+              if(a.pad){
+                const padded = this.applyPad(val, a.pad);
+                return {value: padded, ref: null, varName: `${a.var}:${a.property}`, bitWidth: padded.length};
+              }
               return {value: val, ref: pinInfo.ref, varName: `${a.var}:${a.property}`, bitWidth: pinInfo.bits};
             }
             
@@ -654,17 +662,21 @@ class Interpreter {
               const poutInfo = pcbInstance.poutStorage.get(returnSpec.varName);
               const info = pinInfo || poutInfo;
               if(info){
-                const val = this.getValueFromRef(info.ref) || '0'.repeat(returnSpec.bits);
-                return {value: val, ref: info.ref, varName: a.var, bitWidth: returnSpec.bits};
+                let val = this.getValueFromRef(info.ref) || '0'.repeat(returnSpec.bits);
+                if(a.pad) val = this.applyPad(val, a.pad);
+                return {value: val, ref: a.pad ? null : info.ref, varName: a.var, bitWidth: val.length};
               }
               // Fallback: use cached returnValue from last executePcbBody (for internal wires like ret)
               if(pcbInstance.returnValue !== undefined && pcbInstance.returnValue !== null){
-                const val = String(pcbInstance.returnValue).padStart(returnSpec.bits, '0').slice(-returnSpec.bits);
-                return {value: val, ref: null, varName: a.var, bitWidth: returnSpec.bits};
+                let val = String(pcbInstance.returnValue).padStart(returnSpec.bits, '0').slice(-returnSpec.bits);
+                if(a.pad) val = this.applyPad(val, a.pad);
+                return {value: val, ref: null, varName: a.var, bitWidth: val.length};
               }
             }
             // No return spec or variable not found - return empty
-            return {value: '0'.repeat((returnSpec && returnSpec.bits) || 1), ref: null, varName: a.var};
+            let emptyVal = '0'.repeat((returnSpec && returnSpec.bits) || 1);
+            if(a.pad) emptyVal = this.applyPad(emptyVal, a.pad);
+            return {value: emptyVal, ref: null, varName: a.var};
           }
         }
         
@@ -676,7 +688,14 @@ class Interpreter {
               const handler = this.componentRegistry.get(comp.type);
               if(handler && handler.evalGetProperty){
                 const result = handler.evalGetProperty(comp, a.property, a, this);
-                if(result) return result;
+                if(result){
+                  if(a.pad && result.value){
+                    result.value = this.applyPad(result.value, a.pad);
+                    result.ref = null;
+                    result.bitWidth = result.value.length;
+                  }
+                  return result;
+                }
               }
             }
             throw Error(`Property ${a.property} cannot be used in expressions for component ${a.var}`);
@@ -713,12 +732,16 @@ class Interpreter {
               throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var} (length: ${val.length})`);
             }
             const extracted = val.substring(start, actualEnd + 1);
-            const bitWidth = actualEnd - start + 1;
             const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
             const refSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-            return {value: extracted, ref: ref ? `${ref}.${refSuffix}` : null, varName: `${a.var}.${varNameSuffix}`, bitWidth: bitWidth};
+            const extractedPadded = a.pad ? this.applyPad(extracted, a.pad) : extracted;
+            return {value: extractedPadded, ref: a.pad ? null : (ref ? `${ref}.${refSuffix}` : null), varName: `${a.var}.${varNameSuffix}`, bitWidth: extractedPadded.length};
           }
-          
+
+          if(a.pad && val && val !== '-'){
+            const paddedVal = this.applyPad(val, a.pad);
+            return {value: paddedVal, ref: null, varName: a.var, bitWidth: paddedVal.length};
+          }
           return {value: val, ref: ref, varName: a.var};
         }
       }

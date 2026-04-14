@@ -3085,6 +3085,175 @@ comp [key] .k:
     // In short notation ^ e XOR, deci hex trebuie scris intre []: [^ff]
     assert('513 short notation \\12;8 & [^ff] = 00001100', getWire513('8wire sn = `\\12;8 & [^ff]`', 'sn'), '00001100');
   }
+
+  // ---- Test 514: padding ;p pe componente si PCB-uri ----
+  console.log('\n=== Test 514: padding ;p pe componente si PCB-uri ===');
+  {
+    function getWire514(src, name) {
+      const { interp } = run500(src);
+      const w = interp.wires.get(name);
+      return w ? interp.getValueFromRef(w.ref) : null;
+    }
+
+    function getPcbPout514(src, instanceName, poutName) {
+      const { interp } = run500(src);
+      return getPcbPout500(interp, instanceName, poutName);
+    }
+
+    // --- Componente built-in cu proprietate ---
+
+    // .mem:get;8 — mem cu depth=4, valoarea default=0000, pad la 8 → 00000000
+    {
+      const src = `comp [mem] .m:\ndepth:4\nlength:1\n:\n8wire x = .m:get;8`;
+      assert('514 .mem:get;8 = 00000000',
+        getWire514(src, 'x'),
+        '00000000');
+    }
+
+    // .mem:get cu initialValue=1100, pad la 8 → 00001100
+    {
+      const src = `comp [mem] .m:\ndepth:4\nlength:1\n= \\12\n:\n8wire x = .m:get;8`;
+      assert('514 .mem:get;8 cu initVal=1100 = 00001100',
+        getWire514(src, 'x'),
+        '00001100');
+    }
+
+    // .mem:get.0-1;8 — biti 0-1 din 1100 = 11, pad la 8 → 00000011
+    {
+      const src = `comp [mem] .m:\ndepth:4\nlength:1\n= \\12\n:\n8wire x = .m:get.0-1;8`;
+      assert('514 .mem:get.0-1;8 = 00000011',
+        getWire514(src, 'x'),
+        '00000011');
+    }
+
+    // .mem:get.0/2;8 — 2 biti incepand de la 0 din 1100 = 11, pad la 8 → 00000011
+    {
+      const src = `comp [mem] .m:\ndepth:4\nlength:1\n= \\12\n:\n8wire x = .m:get.0/2;8`;
+      assert('514 .mem:get.0/2;8 = 00000011',
+        getWire514(src, 'x'),
+        '00000011');
+    }
+
+    // --- Componente directe (valoarea componentei) ---
+
+    // reg nu are getReg/setReg in Node.js, testam direct pe comp cu wire
+    // .r;8 cu wire de 4 biti = 1100, pad la 8 → 00001100
+    {
+      const src = `4wire r = \\12\n8wire x = r;8`;
+      assert('514 wire;8 = 00001100',
+        getWire514(src, 'x'),
+        '00001100');
+    }
+
+    // wire de 8 biti = 11001100, .0-3;8 → primii 4 biti = 1100, pad la 8 → 00001100
+    {
+      const src = `8wire r = 11001100\n8wire x = r.0-3;8`;
+      assert('514 wire.0-3;8 = 00001100',
+        getWire514(src, 'x'),
+        '00001100');
+    }
+
+    // --- PCB pout cu padding ---
+
+    // PCB cu pout de 4 biti, valoare 1010, ;8 → 00001010
+    {
+      const src = `
+pcb +[gen4]:
+  1pin set
+  4pout val
+  exec: set
+  on:1
+
+  val = 1010
+  :4bit val
+
+pcb [gen4] .g::
+
+.g:{
+  set = 1
+}
+
+8wire x = .g:val;8`;
+      assert('514 PCB pout;8 = 00001010',
+        getWire514(src, 'x'),
+        '00001010');
+    }
+
+    // PCB pout cu bitrange + padding: pout=11001100 (8 biti), .0-3 = 1100, ;8 → 00001100
+    {
+      const src = `
+pcb +[gen8]:
+  1pin set
+  8pout val
+  exec: set
+  on:1
+
+  val = 11001100
+  :8bit val
+
+pcb [gen8] .g::
+
+.g:{
+  set = 1
+}
+
+8wire x = .g:val.0-3;8`;
+      assert('514 PCB pout.0-3;8 = 00001100',
+        getWire514(src, 'x'),
+        '00001100');
+    }
+
+    // --- PCB direct (returnul PCB) ---
+
+    // PCB cu return de 4 biti = 1010, .g;8 → 00001010
+    {
+      const src = `
+pcb +[ret4]:
+  1pin set
+  4pout val
+  exec: set
+  on:1
+
+  val = 1010
+  :4bit val
+
+pcb [ret4] .g::
+
+.g:{
+  set = 1
+}
+
+8wire x = .g;8`;
+      assert('514 PCB direct;8 = 00001010',
+        getWire514(src, 'x'),
+        '00001010');
+    }
+
+    // Padding mai mic decat valoarea — nu se trunchiaza
+    // PCB return 8 biti = 11001100, ;4 → 11001100 (neschimbat)
+    {
+      const src = `
+pcb +[ret8]:
+  1pin set
+  8pout val
+  exec: set
+  on:1
+
+  val = 11001100
+  :8bit val
+
+pcb [ret8] .g::
+
+.g:{
+  set = 1
+}
+
+8wire x = .g;4`;
+      assert('514 PCB direct;4 nu trunchiaza (11001100)',
+        getWire514(src, 'x'),
+        '11001100');
+    }
+  }
 }
 
 // Summary

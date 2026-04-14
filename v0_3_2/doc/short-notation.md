@@ -407,12 +407,52 @@ This is equivalent to:
 # expands to: AND(00001100, 11111111) = 00001100
 ```
 
+### Components and PCB instances with padding
+
+The `;p` operator works on component property reads, direct component access, and PCB instance outputs:
+
+```
+# Built-in component property
+.mem:get;8          # pad memory read (4 bits) to 8 bits
+.mem:get.0-1;8      # bits 0–1 of memory read, then pad to 8
+
+# PCB pout
+.myPcb:val;8        # pad PCB pout to 8 bits
+.myPcb:val.0-3;8    # bits 0–3 of PCB pout, then pad to 8
+
+# PCB direct return value
+.myPcb;8            # pad PCB return value to 8 bits
+.myPcb.0-3;8        # bits 0–3 of PCB return value, then pad to 8
+```
+
+Example — extract and pad a PCB output:
+
+```
+pcb +[alu]:
+  1pin set
+  4pout result
+  exec: set
+  on:1
+
+  result = 1010
+  :4bit result
+
+pcb [alu] .a::
+
+.a:{ set = 1 }
+
+8wire x = .a:result;8    # 1010 padded to 8 bits → 00001010
+8wire y = .a;8           # same via direct return → 00001010
+8wire z = .a:result.0-1;8  # bits 0–1 = 10, padded to 8 → 00000010
+```
+
 ### Notes on padding
 
 - Padding uses `padStart(p, '0')` — zeroes are added on the **left**.
 - If `value.length >= p`, the value is returned unchanged (no truncation occurs).
 - Padding is applied **after** bit range extraction: first bits are selected, then the result is padded.
 - After padding, the value has no storage reference (`ref = null`) — it is a computed value.
+- On PCB pouts without padding, the storage reference is preserved; padding breaks the reference (computed value only).
 
 ---
 
