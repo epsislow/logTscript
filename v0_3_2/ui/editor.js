@@ -29,7 +29,9 @@ function btnredo() {
 }
 
 function btncopy() {
-  const codeText = cmEditor.getValue(); 
+  const codeText = cmEditor.getValue()
+    .replaceAll("\\", "\\\\")
+    .replaceAll("`", "\\`"); 
     
     navigator.clipboard.writeText(codeText).then(() => {
     });
