@@ -1436,6 +1436,52 @@ assignment() {
 
     return p;
   }
+  // Parsează un bitrange care urmează direct după un literal BIN sau HEX.
+  // Formele acceptate: .start-end, .start/len, ./len (shorthand .0/len), .bit
+  parseLiteralBitRange() {
+    this.eat('SYM', '.');
+
+    // ./len — start implicit 0
+    if (this.c.type === 'SYM' && this.c.value === '/') {
+      this.eat('SYM', '/');
+      if (this.c.type !== 'BIN' && this.c.type !== 'DEC') {
+        throw Error(`Expected length after './' at ${this.c.line}:${this.c.col}`);
+      }
+      const len = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      return { start: 0, end: len - 1 };
+    }
+
+    // start obligatoriu
+    if (this.c.type !== 'BIN' && this.c.type !== 'DEC') {
+      throw Error(`Expected bit index or '/' after '.' at ${this.c.line}:${this.c.col}`);
+    }
+    const start = parseInt(this.c.value, 10);
+    this.eat(this.c.type);
+
+    if (this.c.type === 'SYM' && this.c.value === '-') {
+      this.eat('SYM', '-');
+      if (this.c.type !== 'BIN' && this.c.type !== 'DEC') {
+        throw Error(`Expected bit index after '-' at ${this.c.line}:${this.c.col}`);
+      }
+      const end = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      return { start, end };
+    }
+
+    if (this.c.type === 'SYM' && this.c.value === '/') {
+      this.eat('SYM', '/');
+      if (this.c.type !== 'BIN' && this.c.type !== 'DEC') {
+        throw Error(`Expected length after '/' at ${this.c.line}:${this.c.col}`);
+      }
+      const len = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      return { start, end: start + len - 1 };
+    }
+
+    return { start, end: start };
+  }
+
   atom() {
     let notPrefix = false;
     if (this.c.type === 'SYM' && this.c.value === '!') {
@@ -1574,12 +1620,20 @@ assignment() {
   if (this.c.type === 'BIN') {
     const v = this.c.value;
     this.eat('BIN');
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      const br = this.parseLiteralBitRange();
+      return addNot({ bin: v, bitRange: br });
+    }
     return addNot({ bin: v });
   }
   
   if (this.c.type === 'HEX') {
     const v = this.c.value;
     this.eat('HEX');
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      const br = this.parseLiteralBitRange();
+      return addNot({ hex: v, bitRange: br });
+    }
     return addNot({ hex: v });
   }
   

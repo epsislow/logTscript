@@ -524,12 +524,18 @@ class Interpreter {
     }
 
     if(a.bin){
+      let binStr = a.bin;
+      if(a.bitRange){
+        const {start, end} = a.bitRange;
+        binStr = binStr.substring(start, end + 1);
+        return {value: binStr, ref: null, varName: null, bitWidth: end - start + 1};
+      }
       // If computeRefs is true (wire assignment), store in storage and return reference
       if(computeRefs){
-        const idx = this.storeValue(a.bin);
-        return {value: a.bin, ref: `&${idx}`, varName: null};
+        const idx = this.storeValue(binStr);
+        return {value: binStr, ref: `&${idx}`, varName: null};
       }
-      return {value: a.bin, ref: null, varName: null};
+      return {value: binStr, ref: null, varName: null};
     }
     if(a.hex){
       // Convert hex to binary
@@ -538,6 +544,11 @@ class Interpreter {
       for(let i = 0; i < hexStr.length; i++){
         const hexDigit = parseInt(hexStr[i], 16);
         binStr += hexDigit.toString(2).padStart(4, '0');
+      }
+      if(a.bitRange){
+        const {start, end} = a.bitRange;
+        binStr = binStr.substring(start, end + 1);
+        return {value: binStr, ref: null, varName: null, bitWidth: end - start + 1};
       }
       // If computeRefs is true (wire assignment), store in storage and return reference
       if(computeRefs){

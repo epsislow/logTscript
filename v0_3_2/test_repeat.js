@@ -2981,6 +2981,54 @@ comp [key] .k:
     // Ultimul bloc in sursa are data=1000, deci val final trebuie sa fie 1000
     assert('511 ultimul bloc din sursa castiga (data=1000)', val, '1000');
   }
+
+  // ---- Test 512: bitrange pe literali BIN si HEX ----
+  console.log('\n=== Test 512: bitrange pe literali BIN (\\N) si HEX (^N) ===');
+  {
+    // Helper: ruleaza src si returneaza valoarea unui wire
+    function getWire512(src, name) {
+      const { interp } = run500(src);
+      const w = interp.wires.get(name);
+      return w ? interp.getValueFromRef(w.ref) : null;
+    }
+
+    // \12 = 1100 (4 biti), .0-2 = primii 3 biti = 110
+    assert('512 \\12.0-2 = 110', getWire512('3wire c = \\12.0-2', 'c'), '110');
+
+    // \12 = 1100, ./3 = primii 3 biti (shorthand .0/3) = 110
+    assert('512 \\12./3 = 110', getWire512('3wire d = \\12./3', 'd'), '110');
+
+    // \12.1-3 = 1100 -> biti 1-3 = 100
+    assert('512 \\12.1-3 = 100', getWire512('3wire e = \\12.1-3', 'e'), '100');
+
+    // ^f = 1111 (4 biti: F hex = 1111), ./4 = primii 4 biti = 1111
+    assert('512 ^f./4 = 1111', getWire512('4wire f = ^f./4', 'f'), '1111');
+
+    // ^f = 1111, .0-2 = primii 3 biti = 111
+    assert('512 ^f.0-2 = 111', getWire512('3wire g = ^f.0-2', 'g'), '111');
+
+    // ^f = 1111, .1-3 = biti 1-3 = 111
+    assert('512 ^f.1-3 = 111', getWire512('3wire h = ^f.1-3', 'h'), '111');
+
+    // ^0f = 00001111 (8 biti), ./8 = 00001111
+    assert('512 ^0f./8 = 00001111', getWire512('8wire i = ^0f./8', 'i'), '00001111');
+
+    // ^0f = 00001111, .4-7 = ultimii 4 biti = 1111
+    assert('512 ^0f.4-7 = 1111', getWire512('4wire j = ^0f.4-7', 'j'), '1111');
+
+    // \255 = 11111111 (8 biti), ./8 = toti 8 biti = 11111111
+    assert('512 \\255./8 = 11111111', getWire512('8wire k = \\255./8', 'k'), '11111111');
+
+    // \12./4 + ^f./4 = 1100 + 1111 = 11001111 (concatenare)
+    assert('512 \\12./4 + ^f./4 = 11001111', getWire512('8wire r = \\12./4 + ^f./4', 'r'), '11001111');
+
+    // Exemplul din cerinta: 16wire e = \12./8 + ^f./8
+    // \12 = 1100 (4 biti), ./8 solicita biti 0-7 dintr-un sir de 4 → extrage ce poate: '1100'
+    // ^f = 1111 (4 biti), ./8 → '1111'
+    // Concatenare: 1100 + 1111 = 11001111, wire 16bit → padded: 0000000011001111
+    // Testam cu valori de 8 biti: \192 = 11000000, ^0f = 00001111
+    assert('512 \\192./8 + ^0f./8 = 1100000000001111', getWire512('16wire combo = \\192./8 + ^0f./8', 'combo'), '1100000000001111');
+  }
 }
 
 // Summary
