@@ -81,7 +81,8 @@ class Interpreter {
     if (name === 'show') return true;
   
     if (['NOT', 'AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR', 'EQ', 'LATCH',
-         'LSHIFT', 'RSHIFT'].includes(name)) {
+         'LSHIFT', 'RSHIFT',
+         'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE'].includes(name)) {
       return true;
     }
   
@@ -1082,6 +1083,83 @@ const idx = parseInt(
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
+  }
+
+  // ================= BUILTIN: ADD =================
+  if (name === 'ADD') {
+    if (argValues.length !== 2) throw Error('ADD expects 2 arguments');
+    const a = argValues[0], b = argValues[1];
+    const depth = Math.max(a.length, b.length);
+    const aNum = BigInt('0b' + a.padStart(depth, '0'));
+    const bNum = BigInt('0b' + b.padStart(depth, '0'));
+    const sum  = aNum + bNum;
+    const mask = (BigInt(1) << BigInt(depth)) - BigInt(1);
+    const carry  = sum > mask ? '1' : '0';
+    const result = (sum & mask).toString(2).padStart(depth, '0');
+    return [
+      computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+      computeRefs ? { value: carry,  ref: `&${this.storeValue(carry)}`  } : { value: carry,  ref: null },
+    ];
+  }
+
+  // ================= BUILTIN: SUBTRACT =================
+  if (name === 'SUBTRACT') {
+    if (argValues.length !== 2) throw Error('SUBTRACT expects 2 arguments');
+    const a = argValues[0], b = argValues[1];
+    const depth = Math.max(a.length, b.length);
+    const aNum = BigInt('0b' + a.padStart(depth, '0'));
+    const bNum = BigInt('0b' + b.padStart(depth, '0'));
+    let diff = aNum - bNum;
+    const wrap = BigInt(1) << BigInt(depth);
+    const mask = wrap - BigInt(1);
+    const carry = diff < BigInt(0) ? '1' : '0';
+    if (diff < BigInt(0)) diff = diff + wrap;
+    const result = (diff & mask).toString(2).padStart(depth, '0');
+    return [
+      computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+      computeRefs ? { value: carry,  ref: `&${this.storeValue(carry)}`  } : { value: carry,  ref: null },
+    ];
+  }
+
+  // ================= BUILTIN: MULTIPLY =================
+  if (name === 'MULTIPLY') {
+    if (argValues.length !== 2) throw Error('MULTIPLY expects 2 arguments');
+    const a = argValues[0], b = argValues[1];
+    const depth = Math.max(a.length, b.length);
+    const aNum = BigInt('0b' + a.padStart(depth, '0'));
+    const bNum = BigInt('0b' + b.padStart(depth, '0'));
+    const product = aNum * bNum;
+    const mask = (BigInt(1) << BigInt(depth)) - BigInt(1);
+    const result = (product & mask).toString(2).padStart(depth, '0');
+    const over   = ((product >> BigInt(depth)) & mask).toString(2).padStart(depth, '0');
+    return [
+      computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+      computeRefs ? { value: over,   ref: `&${this.storeValue(over)}`   } : { value: over,   ref: null },
+    ];
+  }
+
+  // ================= BUILTIN: DIVIDE =================
+  if (name === 'DIVIDE') {
+    if (argValues.length !== 2) throw Error('DIVIDE expects 2 arguments');
+    const a = argValues[0], b = argValues[1];
+    const depth = Math.max(a.length, b.length);
+    const aNum = BigInt('0b' + a.padStart(depth, '0'));
+    const bNum = BigInt('0b' + b.padStart(depth, '0'));
+    const mask = (BigInt(1) << BigInt(depth)) - BigInt(1);
+    let quotient, remainder;
+    if (bNum === BigInt(0)) {
+      quotient  = BigInt(0);
+      remainder = BigInt(0);
+    } else {
+      quotient  = aNum / bNum;
+      remainder = aNum % bNum;
+    }
+    const result = (quotient  & mask).toString(2).padStart(depth, '0');
+    const mod    = (remainder & mask).toString(2).padStart(depth, '0');
+    return [
+      computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+      computeRefs ? { value: mod,    ref: `&${this.storeValue(mod)}`    } : { value: mod,    ref: null },
+    ];
   }
 
   // ================= USER FUNCTIONS =================
@@ -6229,9 +6307,34 @@ Interpreter.BUILTIN_DOC = {
   DEMUX1:['DEMUX1(1bit sel, Xbit data) -> Xbit, Xbit'],
   DEMUX2:['DEMUX2(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit'],
   DEMUX3:['DEMUX3(3bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit'],
+  ADD:      ['ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
+  SUBTRACT: ['SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
+  MULTIPLY: ['MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over'],
+  DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
 };
 
 Interpreter.getDocLines = function(name, funcs, registry, pcbDefinitions) {
+  // ---- doc(def) — list all built-in functions and user-defined functions ----
+  if (name === 'def') {
+    const builtinNames = Object.keys(Interpreter.BUILTIN_DOC);
+    // Include REGn, MUXn, DEMUXn patterns as representative examples
+    const extraBuiltins = ['REG<N>', 'MUX1', 'MUX2', 'MUX3', 'DEMUX1', 'DEMUX2', 'DEMUX3'];
+    // Filter out MUX/DEMUX already in BUILTIN_DOC to avoid duplicates
+    const allBuiltins = builtinNames.concat(
+      extraBuiltins.filter(x => !builtinNames.includes(x))
+    );
+    const lines = ['built-in:'];
+    lines.push(allBuiltins.join(', '));
+    lines.push('');
+    lines.push('user defined:');
+    if (funcs && funcs.size > 0) {
+      lines.push([...funcs.keys()].join(', '));
+    } else {
+      lines.push('(none)');
+    }
+    return lines;
+  }
+
   // ---- doc(comp) — list all builtin component types ----
   if (name === 'comp') {
     if (!registry) return ['(no component registry available)'];

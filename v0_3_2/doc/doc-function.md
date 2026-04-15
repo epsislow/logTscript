@@ -129,6 +129,138 @@ DEMUX1(1bit sel, Xbit data) -> Xbit, Xbit
 
 DEMUX returns a **vector** of `2^n` outputs: one contains `data`, the rest are `0`.
 
+### Arithmetic (ADD / SUBTRACT / MULTIPLY / DIVIDE)
+
+These functions perform **instant** binary arithmetic and return **two values**: the result and an overflow/borrow indicator.
+
+```
+doc(ADD)
+doc(SUBTRACT)
+doc(MULTIPLY)
+doc(DIVIDE)
+```
+
+| Call | Signature |
+|------|-----------|
+| `doc(ADD)` | `ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry` |
+| `doc(SUBTRACT)` | `SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry` |
+| `doc(MULTIPLY)` | `MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over` |
+| `doc(DIVIDE)` | `DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod` |
+
+Since these functions return **two values**, they must be assigned to two variables:
+
+```
+4wire result, 1wire carry = ADD(a, b)
+4wire result, 1wire carry = SUBTRACT(a, b)
+4wire result, 4wire over  = MULTIPLY(a, b)
+4wire result, 4wire mod   = DIVIDE(a, b)
+```
+
+The bit width of both inputs is taken as `max(len(a), len(b))`. The result is always that same width.
+
+**ADD** — binary addition, modular (wraps at `2^N`):
+- `carry = 1` if the sum exceeds `2^N - 1`; `0` otherwise
+
+**SUBTRACT** — binary subtraction, modular (wraps at `2^N`):
+- `carry = 1` if `a < b` (borrow); `0` otherwise
+
+**MULTIPLY** — binary multiplication:
+- `result` = low `N` bits of the product
+- `over` = high `N` bits of the product (shifted right by `N`)
+
+**DIVIDE** — binary integer division:
+- `result` = quotient (`a / b`, truncated)
+- `mod` = remainder (`a % b`)
+- Division by zero returns `0` for both outputs
+
+#### ADD examples
+
+```
+4wire idx = 0011
+4wire inc = 0001
+4wire nextIdx, 1wire carry = ADD(idx, inc)
+# nextIdx = 0100, carry = 0
+
+4wire idx2 = 1111
+4wire inc2 = 0001
+4wire nextIdx2, 1wire carry2 = ADD(idx2, inc2)
+# nextIdx2 = 0000, carry2 = 1
+```
+
+#### SUBTRACT examples
+
+```
+4wire idx = 0011
+4wire dec = 0001
+4wire prevIdx, 1wire carry = SUBTRACT(idx, dec)
+# prevIdx = 0010, carry = 0
+
+4wire idx2 = 0000
+4wire dec2 = 0001
+4wire prevIdx2, 1wire carry2 = SUBTRACT(idx2, dec2)
+# prevIdx2 = 1111, carry2 = 1
+```
+
+#### MULTIPLY examples
+
+```
+4wire a = 0010
+4wire b = 0011
+4wire result, 4wire over = MULTIPLY(a, b)
+# result = 0110 (6), over = 0000
+
+4wire a2 = 1111
+4wire b2 = 1111
+4wire result2, 4wire over2 = MULTIPLY(a2, b2)
+# result2 = 0001 (225 & 0xF), over2 = 1110 (225 >> 4)
+```
+
+#### DIVIDE examples
+
+```
+4wire a = 0110
+4wire b = 0010
+4wire result, 4wire mod = DIVIDE(a, b)
+# result = 0011 (3), mod = 0000
+
+4wire a2 = 0111
+4wire b2 = 0010
+4wire result2, 4wire mod2 = DIVIDE(a2, b2)
+# result2 = 0011 (3), mod2 = 0001 (remainder 1)
+```
+
+> **Note:** These built-in functions compute results **instantly** (no clock cycle needed), unlike `comp.adder`, `comp.subtract`, `comp.multiplier`, and `comp.divider` which are hardware components that require explicit input/output wiring.
+
+---
+
+## Listing all functions: doc(def)
+
+`doc(def)` displays all available built-in functions and all user-defined functions, separated into two sections:
+
+```
+doc(def)
+```
+
+Output:
+
+```
+built-in:
+NOT, AND, OR, XOR, NXOR, NAND, NOR, EQ, LATCH, LSHIFT, RSHIFT, MUX1, MUX2, MUX3, DEMUX1, DEMUX2, DEMUX3, ADD, SUBTRACT, MULTIPLY, DIVIDE, REG<N>
+
+user defined:
+myFunc, helper, ...
+```
+
+If no user-defined functions exist:
+
+```
+built-in:
+NOT, AND, OR, ...
+
+user defined:
+(none)
+```
+
 ---
 
 ## User-defined functions
@@ -327,3 +459,4 @@ pcb.xyz: undefined PCB type
 - `doc` does not evaluate anything — it only displays the static signature.
 - It can be placed anywhere in the code, including before or after function definitions.
 - `doc(comp.shortname)` is equivalent to `doc(comp.canonicalType)` — e.g. `doc(comp.+)` = `doc(comp.adder)`.
+- `doc(def)` lists **all** built-in functions on one line and all user-defined functions on another. It is useful for quick reference when working in the script editor.

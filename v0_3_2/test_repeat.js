@@ -1874,6 +1874,22 @@ var _I = Interpreter;
     return out;
   }
 
+  function runArith(src) {
+    const processed = preprocessDoc(src);
+    const p = new ParserDoc(new TokenizerDoc(processed), registryDoc);
+    const stmts = p.parse();
+    const out = [];
+    const interp = new InterpreterDoc(p.funcs, out, p.pcbs, registryDoc);
+    for (const s of stmts) interp.exec(s);
+    return interp;
+  }
+
+  function getWire(interp, name) {
+    const w = interp.wires.get(name);
+    if (!w) return null;
+    return interp.getValueFromRef(w.ref);
+  }
+
   // ---- Tokenizer: 'doc' este KEYWORD ----
   console.log('\n=== Test 300: Tokenizer — doc este KEYWORD ===');
   {
@@ -2091,6 +2107,212 @@ doc(myFunc)`;
       assert(`${gate} are 2 semnaturi`, String(lines.length), '2');
       assert(`${gate} semnatura 1 bit`, lines[0], `${gate}(Xbit) -> 1bit`);
       assert(`${gate} semnatura 2 biti`, lines[1], `${gate}(Xbit, Xbit) -> Xbit`);
+    }
+  }
+
+  // ---- BUILTIN_DOC: ADD, SUBTRACT, MULTIPLY, DIVIDE ----
+  console.log('\n=== Test 328: BUILTIN_DOC — ADD signature ===');
+  {
+    const lines = InterpreterDoc.getDocLines('ADD', new Map());
+    assert('ADD 1 signature', String(lines.length), '1');
+    assert('ADD signature', lines[0], 'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry');
+  }
+
+  console.log('\n=== Test 329: BUILTIN_DOC — SUBTRACT signature ===');
+  {
+    const lines = InterpreterDoc.getDocLines('SUBTRACT', new Map());
+    assert('SUBTRACT 1 signature', String(lines.length), '1');
+    assert('SUBTRACT signature', lines[0], 'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry');
+  }
+
+  console.log('\n=== Test 330: BUILTIN_DOC — MULTIPLY signature ===');
+  {
+    const lines = InterpreterDoc.getDocLines('MULTIPLY', new Map());
+    assert('MULTIPLY 1 signature', String(lines.length), '1');
+    assert('MULTIPLY signature', lines[0], 'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over');
+  }
+
+  console.log('\n=== Test 331: BUILTIN_DOC — DIVIDE signature ===');
+  {
+    const lines = InterpreterDoc.getDocLines('DIVIDE', new Map());
+    assert('DIVIDE 1 signature', String(lines.length), '1');
+    assert('DIVIDE signature', lines[0], 'DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod');
+  }
+
+  // ---- doc(def): built-in and user-defined listing ----
+  console.log('\n=== Test 332: doc(def) — lists built-in and user-defined separately ===');
+  {
+    const funcs = new Map();
+    funcs.set('myFunc', { params: [{ type: '4bit', id: 'x' }], returns: [{ type: '4bit' }] });
+    funcs.set('helper', { params: [], returns: [] });
+    const lines = InterpreterDoc.getDocLines('def', funcs);
+    assert('first line is built-in:', lines[0], 'built-in:');
+    // built-in list contains ADD, SUBTRACT, MULTIPLY, DIVIDE
+    assert('built-in list contains ADD', String(lines[1].includes('ADD')), 'true');
+    assert('built-in list contains SUBTRACT', String(lines[1].includes('SUBTRACT')), 'true');
+    assert('built-in list contains MULTIPLY', String(lines[1].includes('MULTIPLY')), 'true');
+    assert('built-in list contains DIVIDE', String(lines[1].includes('DIVIDE')), 'true');
+    assert('built-in list contains NOT', String(lines[1].includes('NOT')), 'true');
+    assert('built-in list contains AND', String(lines[1].includes('AND')), 'true');
+    // user defined section
+    assert('user defined: label present', lines[3], 'user defined:');
+    assert('user functions listed', String(lines[4].includes('myFunc')), 'true');
+    assert('user functions listed helper', String(lines[4].includes('helper')), 'true');
+  }
+
+  console.log('\n=== Test 333: doc(def) — no user-defined functions shows (none) ===');
+  {
+    const lines = InterpreterDoc.getDocLines('def', new Map());
+    assert('no user-defined shows (none)', lines[4], '(none)');
+  }
+
+  // ---- Interpreter end-to-end: doc(ADD) ----
+  console.log('\n=== Test 334: Interpreter end-to-end — doc(ADD) ===');
+  {
+    const out = runDoc('doc(ADD)');
+    assert('ADD signature in output', out[0], 'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry');
+  }
+
+  console.log('\n=== Test 335: Interpreter end-to-end — doc(SUBTRACT) ===');
+  {
+    const out = runDoc('doc(SUBTRACT)');
+    assert('SUBTRACT signature in output', out[0], 'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry');
+  }
+
+  console.log('\n=== Test 336: Interpreter end-to-end — doc(MULTIPLY) ===');
+  {
+    const out = runDoc('doc(MULTIPLY)');
+    assert('MULTIPLY signature in output', out[0], 'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over');
+  }
+
+  console.log('\n=== Test 337: Interpreter end-to-end — doc(DIVIDE) ===');
+  {
+    const out = runDoc('doc(DIVIDE)');
+    assert('DIVIDE signature in output', out[0], 'DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod');
+  }
+
+  // ---- ADD arithmetic ----
+  console.log('\n=== Test 338: ADD — 4bit addition without carry ===');
+  {
+    // 0011 + 0001 = 0100, carry = 0
+    const interp = runArith('4wire idx = 0011\n4wire inc = 0001\n4wire nextIdx, 1wire carry = ADD(idx, inc)');
+    assert('ADD 0011+0001 result', getWire(interp, 'nextIdx'), '0100');
+    assert('ADD 0011+0001 carry', getWire(interp, 'carry'), '0');
+  }
+
+  console.log('\n=== Test 339: ADD — 4bit addition with carry (overflow) ===');
+  {
+    // 1111 + 0001 = 0000, carry = 1
+    const interp = runArith('4wire idx = 1111\n4wire inc = 0001\n4wire nextIdx, 1wire carry = ADD(idx, inc)');
+    assert('ADD 1111+0001 result', getWire(interp, 'nextIdx'), '0000');
+    assert('ADD 1111+0001 carry', getWire(interp, 'carry'), '1');
+  }
+
+  console.log('\n=== Test 340: ADD — 8bit addition ===');
+  {
+    // 00001111 + 00000001 = 00010000, carry = 0
+    const interp = runArith('8wire a = 00001111\n8wire b = 00000001\n8wire r, 1wire c = ADD(a, b)');
+    assert('ADD 8bit result', getWire(interp, 'r'), '00010000');
+    assert('ADD 8bit carry 0', getWire(interp, 'c'), '0');
+  }
+
+  console.log('\n=== Test 341: ADD — all-ones + 1 produces zero with carry ===');
+  {
+    // 11111111 + 00000001 = 00000000, carry = 1
+    const interp = runArith('8wire a = 11111111\n8wire b = 00000001\n8wire r, 1wire c = ADD(a, b)');
+    assert('ADD 8bit all-ones+1 result', getWire(interp, 'r'), '00000000');
+    assert('ADD 8bit all-ones+1 carry', getWire(interp, 'c'), '1');
+  }
+
+  // ---- SUBTRACT arithmetic ----
+  console.log('\n=== Test 342: SUBTRACT — 4bit subtraction without borrow ===');
+  {
+    // 0011 - 0001 = 0010, carry = 0
+    const interp = runArith('4wire idx = 0011\n4wire dec = 0001\n4wire prevIdx, 1wire carry = SUBTRACT(idx, dec)');
+    assert('SUBTRACT 0011-0001 result', getWire(interp, 'prevIdx'), '0010');
+    assert('SUBTRACT 0011-0001 carry', getWire(interp, 'carry'), '0');
+  }
+
+  console.log('\n=== Test 343: SUBTRACT — 4bit subtraction with borrow (underflow) ===');
+  {
+    // 0000 - 0001 = 1111, carry = 1
+    const interp = runArith('4wire idx = 0000\n4wire dec = 0001\n4wire prevIdx, 1wire carry = SUBTRACT(idx, dec)');
+    assert('SUBTRACT 0000-0001 result', getWire(interp, 'prevIdx'), '1111');
+    assert('SUBTRACT 0000-0001 carry', getWire(interp, 'carry'), '1');
+  }
+
+  console.log('\n=== Test 344: SUBTRACT — equal values gives zero without borrow ===');
+  {
+    // 1010 - 1010 = 0000, carry = 0
+    const interp = runArith('4wire a = 1010\n4wire b = 1010\n4wire r, 1wire c = SUBTRACT(a, b)');
+    assert('SUBTRACT equal result 0000', getWire(interp, 'r'), '0000');
+    assert('SUBTRACT equal carry 0', getWire(interp, 'c'), '0');
+  }
+
+  // ---- MULTIPLY arithmetic ----
+  console.log('\n=== Test 345: MULTIPLY — 4bit multiplication without overflow ===');
+  {
+    // 0010 * 0011 = 0110, over = 0000
+    const interp = runArith('4wire a = 0010\n4wire b = 0011\n4wire r, 4wire over = MULTIPLY(a, b)');
+    assert('MULTIPLY 2*3 result', getWire(interp, 'r'), '0110');
+    assert('MULTIPLY 2*3 over', getWire(interp, 'over'), '0000');
+  }
+
+  console.log('\n=== Test 346: MULTIPLY — 4bit multiplication with overflow ===');
+  {
+    // 1111 * 1111 = 225 decimal = 11100001, masked to 4 bits: 0001, over = 1110
+    const interp = runArith('4wire a = 1111\n4wire b = 1111\n4wire r, 4wire over = MULTIPLY(a, b)');
+    assert('MULTIPLY 15*15=225 result (low 4 bits)', getWire(interp, 'r'), '0001');
+    assert('MULTIPLY 15*15=225 over (high 4 bits)', getWire(interp, 'over'), '1110');
+  }
+
+  console.log('\n=== Test 347: MULTIPLY — zero produces zero ===');
+  {
+    const interp = runArith('4wire a = 1111\n4wire b = 0000\n4wire r, 4wire over = MULTIPLY(a, b)');
+    assert('MULTIPLY x*0 result', getWire(interp, 'r'), '0000');
+    assert('MULTIPLY x*0 over', getWire(interp, 'over'), '0000');
+  }
+
+  // ---- DIVIDE arithmetic ----
+  console.log('\n=== Test 348: DIVIDE — 4bit division without remainder ===');
+  {
+    // 0110 / 0010 = 0011, mod = 0000
+    const interp = runArith('4wire a = 0110\n4wire b = 0010\n4wire r, 4wire mod = DIVIDE(a, b)');
+    assert('DIVIDE 6/2 result', getWire(interp, 'r'), '0011');
+    assert('DIVIDE 6/2 mod', getWire(interp, 'mod'), '0000');
+  }
+
+  console.log('\n=== Test 349: DIVIDE — 4bit division with remainder ===');
+  {
+    // 0111 / 0010 = 0011, mod = 0001
+    const interp = runArith('4wire a = 0111\n4wire b = 0010\n4wire r, 4wire mod = DIVIDE(a, b)');
+    assert('DIVIDE 7/2 result', getWire(interp, 'r'), '0011');
+    assert('DIVIDE 7/2 mod', getWire(interp, 'mod'), '0001');
+  }
+
+  console.log('\n=== Test 350: DIVIDE — division by zero returns zero ===');
+  {
+    const interp = runArith('4wire a = 0110\n4wire b = 0000\n4wire r, 4wire mod = DIVIDE(a, b)');
+    assert('DIVIDE by zero result', getWire(interp, 'r'), '0000');
+    assert('DIVIDE by zero mod', getWire(interp, 'mod'), '0000');
+  }
+
+  console.log('\n=== Test 351: DIVIDE — dividend smaller than divisor gives 0 result ===');
+  {
+    // 0001 / 0011 = 0, mod = 0001
+    const interp = runArith('4wire a = 0001\n4wire b = 0011\n4wire r, 4wire mod = DIVIDE(a, b)');
+    assert('DIVIDE 1/3 result 0', getWire(interp, 'r'), '0000');
+    assert('DIVIDE 1/3 mod 1', getWire(interp, 'mod'), '0001');
+  }
+
+  // ---- isBuiltinFunction checks ----
+  console.log('\n=== Test 352: isBuiltinFunction — ADD, SUBTRACT, MULTIPLY, DIVIDE recognized ===');
+  {
+    // We cannot instantiate Interpreter directly without full setup, but we can check via getDocLines
+    // returning actual signatures (not the 'funcție nedefinită' fallback)
+    for (const fn of ['ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE']) {
+      const lines = InterpreterDoc.getDocLines(fn, new Map());
+      assert(`${fn} recognized (not undefined)`, String(lines[0].includes('funcție nedefinită')), 'false');
     }
   }
 }
