@@ -1,5 +1,164 @@
 window.lib_files = {
+  ex_lcd_nx_pv4: `
+  
+  
+  
+  comp [lcd] .ttt:
+    row: 8
+    cols: 21
+    pixelSize: 7
+    pixelGap: 1
+    glow
+    round: 0
+    color: ^f70
+    bg: ^310
+    rgb
+    nl
+    on:1
+    :
     
+comp [key] .prv:
+    label:'<'
+    size: 35
+    on:1
+    :
+    
+    
+comp [key] .nxt:
+    label:'>'
+    size: 35
+    on:1
+    :
+
+104wire dmem = 1;8 + 1;8 + \\5;8 + 1;8   + \\9;8 + 1;8 + \\13;8 + 1;8    + \\17;8 + 1;8 + \\3;8 + 111111010;16
+
+
+
+
+comp [counter] .pos:
+    depth: 3
+    on:1
+    :
+    
+.pos:{
+   dir=1
+   set=.nxt
+}
+
+.pos:{
+   dir=0
+   set=.prv
+}
+
+
+3wire pos = .pos:get
+
+.pos:{
+   data=000
+   write= 1
+   set=EQ(pos,101)
+}
+
+.pos:{
+   data=100
+   write= 1
+   set=EQ(pos,111)
+}
+
+1wire clr = OR(.nxt,.prv)
+
+.ttt:{
+  clear = 1
+  set=  OR(.nxt,.prv)
+}
+
+pcb +[mgr]:
+    5pin pos
+    1pin set
+    8pout x
+    8pout y
+    16pout dat
+    exec:set
+    on:1
+    
+    
+104wire dmem = 1;8 + 1;8 + \\5;8 + 1;8   + \\9;8 + 1;8 + \\13;8 + 1;8    + \\17;8 + 1;8 + \\3;8 + 111111010;16
+
+comp [mem] .mem:
+    depth: 8
+    length: 16
+    on:1
+    = dmem
+    :
+    
+    .mem:{
+       adr = pos
+       get >= x
+    }
+    
+    #show(.mem:get)
+    
+    :8bit get
+
+doc(pcb.mgr)
+
+
+
+.ttt:{
+   x=dmem.0/8
+   y=dmem.8/8
+   rowlen=11
+   data = 111111010
+   rgb = ^f70
+   set=EQ(pos,000)
+}
+
+
+.ttt:{
+   x=dmem.16/8
+   y=dmem.24/8
+   rowlen=11
+   data = 111111010
+   rgb = ^f70
+   set=EQ(pos, 001)
+}
+
+
+.ttt:{
+   x=\\9
+   y=1
+   rowlen=11
+   data = 111111010
+   rgb = ^f70
+   set=EQ(pos, 010)
+}
+
+
+.ttt:{
+   x=\\13
+   y=1
+   rowlen=11
+   data = 111111010
+   rgb = ^f70
+   set=EQ(pos, 011)
+}
+
+
+.ttt:{
+   x=\\17
+   y=1
+   rowlen=11
+   data = 111111010
+   rgb = ^f70
+   set=EQ(pos, 100)
+}
+
+
+  
+  
+  
+  
+  `,
   ex_lcd_nx_pv3: `
   
   
