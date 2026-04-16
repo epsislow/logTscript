@@ -6324,7 +6324,13 @@ Interpreter.getDocLines = function(name, funcs, registry, pcbDefinitions) {
       extraBuiltins.filter(x => !builtinNames.includes(x))
     );
     const lines = ['built-in:'];
-    lines.push(allBuiltins.join(', '));
+    
+    for (let i = 0; i < allBuiltins.length; i += 4) {
+      chunk = allBuiltins.slice(i, i + 4);
+      lines.push(chunk.join(', '));
+    }
+
+    //lines.push(allBuiltins.join(', '));
     lines.push('');
     lines.push('user defined:');
     if (funcs && funcs.size > 0) {
