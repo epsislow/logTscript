@@ -142,7 +142,8 @@ pushSource({ src, alias }) {
       v += this.next();
     }
 
-      if (/^\d+(bit|wire|pin|pout)$/.test(v)) {
+    if (/^\d+(bit|wire|b|w|pin|pout)$/.test(v)) {  
+      v = v.replace(/b$/, 'bit').replace(/w$/, 'wire');
       return this.token('TYPE', v);
     }
 
