@@ -700,63 +700,114 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   gap: 0.1rem;
   margin: 5px;
 }
+/* ===== IMPROVED 14 SEG DISPLAY ===== */
 
 .fourteenseg {
-  --seg-scale: .75;
-
+  --seg-scale: 0.8;
   position: relative;
   width: calc(60px * var(--seg-scale));
   height: calc(100px * var(--seg-scale));
 }
 
-/* generic segment */
+/* Base segment */
 .fseg {
   position: absolute;
   background: #1a1a1a;
-  opacity: 0.3;
-  border-radius: 999px;
-  box-shadow: inset 1px 1px 0px #777;
-  transition: 0.15s;
+  opacity: 0.25;
+  border-radius: 4px;
+  transition: 0.12s ease;
 }
 
+/* ON state */
 .fseg.on {
   opacity: 1;
   background-color: var(--seg-color, #6dff9c);
   box-shadow:
-          inset 0 0 calc(6px * var(--seg-scale)) rgba(255,255,255,0.6),
-          0 0 calc(8px * var(--seg-scale)) var(--seg-color),
-          0 0 calc(18px * var(--seg-scale)) var(--seg-color);
+          0 0 calc(6px * var(--seg-scale)) var(--seg-color),
+          0 0 calc(12px * var(--seg-scale)) var(--seg-color);
 }
 
-/* horizontal */
-.fseg-a { top: 0; left: 10px; width: 40px; height: 6px; }
-.fseg-d { bottom: 0; left: 10px; width: 40px; height: 6px; }
-.fseg-g1 { top: 45px; left: 10px; width: 18px; height: 6px; }
-.fseg-g2 { top: 45px; right: 10px; width: 18px; height: 6px; }
+/* ===== HORIZONTAL ===== */
+.fseg-a { top: 0; left: 12px; width: 36px; height: 6px; }
+.fseg-d { bottom: 0; left: 12px; width: 36px; height: 6px; }
 
-/* vertical */
-.fseg-b { top: 5px; right: 0; width: 6px; height: 35px; }
-.fseg-c { bottom: 5px; right: 0; width: 6px; height: 35px; }
-.fseg-e { bottom: 5px; left: 0; width: 6px; height: 35px; }
-.fseg-f { top: 5px; left: 0; width: 6px; height: 35px; }
+/* split middle */
+.fseg-g1 { top: 47px; left: 12px; width: 16px; height: 6px; }
+.fseg-g2 { top: 47px; right: 12px; width: 16px; height: 6px; }
 
-/* diagonals */
-.fseg-h { top: 10px; left: 10px; width: 6px; height: 30px; transform: rotate(45deg); }
-.fseg-i { top: 10px; right: 10px; width: 6px; height: 30px; transform: rotate(-45deg); }
-.fseg-j { bottom: 10px; left: 10px; width: 6px; height: 30px; transform: rotate(-45deg); }
-.fseg-k { bottom: 10px; right: 10px; width: 6px; height: 30px; transform: rotate(45deg); }
+/* ===== VERTICAL ===== */
+.fseg-f { top: 6px; left: 0; width: 6px; height: 36px; }
+.fseg-b { top: 6px; right: 0; width: 6px; height: 36px; }
 
-/* center vertical */
-.fseg-l { top: 30px; left: 27px; width: 6px; height: 20px; }
-.fseg-m { bottom: 30px; left: 27px; width: 6px; height: 20px; }
+.fseg-e { bottom: 6px; left: 0; width: 6px; height: 36px; }
+.fseg-c { bottom: 6px; right: 0; width: 6px; height: 36px; }
 
-/* dot */
+/* ===== DIAGONALS (FIXED LENGTH + ANGLE) ===== */
+
+/* TOP LEFT (h) → should go \ */
+.fseg-h {
+  top: 12px;
+  left: 10px;
+  width: 6px;
+  height: 26px;
+  transform: rotate(-30deg); /* flipped */
+  transform-origin: top left;
+}
+
+/* TOP RIGHT (i) → should go / */
+.fseg-i {
+  top: 12px;
+  right: 10px;
+  width: 6px;
+  height: 26px;
+  transform: rotate(30deg); /* flipped */
+  transform-origin: top right;
+}
+
+/* BOTTOM LEFT (j) → should go / */
+.fseg-j {
+  bottom: 12px;
+  left: 10px;
+  width: 6px;
+  height: 26px;
+  transform: rotate(30deg); /* flipped */
+  transform-origin: bottom left;
+}
+
+/* BOTTOM RIGHT (k) → should go \ */
+.fseg-k {
+  bottom: 12px;
+  right: 10px;
+  width: 6px;
+  height: 26px;
+  transform: rotate(-30deg); /* flipped */
+  transform-origin: bottom right;
+}
+
+/* ===== CENTER VERTICAL ===== */
+.fseg-l {
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 18px;
+}
+
+.fseg-m {
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 18px;
+}
+
+/* ===== DOT (FIXED POSITION) ===== */
 .fseg-dp {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  bottom: -10px;
-  right: -10px;
+  bottom: -6px;
+  right: -6px;
 }
 
 </style>
