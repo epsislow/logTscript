@@ -3119,6 +3119,69 @@ if (s.assignment) {
       }
       
       deviceIds.push(segId);
+    } else if(type === '14seg'){
+      // Create 14-segment display
+      const text = attributes.text !== undefined ? String(attributes.text) : '';
+      const color = attributes.color || '#6dff9c';
+      const nl = attributes.nl || false;
+
+      // Build initial value (15 segments)
+      let segInitialValue = initialValue || '0'.repeat(bits);
+
+      if(attributes.segments){
+        const segments = [
+          'a','b','c','d','e','f',
+          'g1','g2',
+          'h','i','j','k',
+          'l','m',
+          'dp'
+        ];
+
+        const segArray = segInitialValue.split('');
+
+        for(let i = 0; i < segments.length; i++){
+          const segName = segments[i];
+          if(attributes.segments[segName] !== undefined){
+            segArray[i] = attributes.segments[segName];
+          }
+        }
+
+        segInitialValue = segArray.join('');
+      }
+
+      const segId = baseId;
+
+      // Create device
+      if(typeof addFourteenSegment === 'function'){
+        const segParams = {
+          id: segId,
+          text: text,
+          color: color,
+          values: segInitialValue,
+          nl: nl
+        };
+        addFourteenSegment(segParams);
+      }
+
+      // Apply individual segment values
+      if(attributes.segments && typeof setSegment14 === 'function'){
+        const segments = [
+          'a','b','c','d','e','f',
+          'g1','g2',
+          'h','i','j','k',
+          'l','m',
+          'dp'
+        ];
+
+        for(const segName of segments){
+          if(attributes.segments[segName] !== undefined){
+            const segValue = attributes.segments[segName] === '1';
+            setSegment14(segId, segName, segValue);
+          }
+        }
+      }
+
+      deviceIds.push(segId);
     } else if(type === 'mem'){
       // Create memory component
       // Use bracket notation to avoid conflict with JavaScript's built-in 'length' property
@@ -3557,6 +3620,32 @@ if (s.assignment) {
         segValue = segArray.join('');
       }
       compInfo.lastSegmentValue = segValue;
+    } else if(type === '14seg'){
+      // Rebuild value from segment attributes if present
+      let segValue = initialValue || '0'.repeat(bits);
+
+      if(attributes.segments){
+        const segments = [
+          'a','b','c','d','e','f',
+          'g1','g2',
+          'h','i','j','k',
+          'l','m',
+          'dp'
+        ];
+
+        const segArray = segValue.split('');
+
+        for(let i = 0; i < segments.length; i++){
+          const segName = segments[i];
+          if(attributes.segments[segName] !== undefined){
+            segArray[i] = attributes.segments[segName];
+          }
+        }
+
+        segValue = segArray.join('');
+      }
+
+      compInfo.lastSegmentValue = segValue;
     }
     
     this.components.set(name, compInfo);
@@ -3842,6 +3931,116 @@ if (s.assignment) {
     }
     
     return hexMap[normalized] || '0000000';
+  }
+
+
+  // Convert hex digit (4 bits) to 14-segment pattern
+  hexTo14Seg(hexValue){
+    const hexMap = {
+      // a b c d e f g1 g2 h i j k l m dp
+      '0000': '111111000000000', // 0
+      '0001': '011000000000000', // 1
+      '0010': '110110110000000', // 2
+      '0011': '111100110000000', // 3
+      '0100': '011001110000000', // 4
+      '0101': '101101110000000', // 5
+      '0110': '101111110000000', // 6
+      '0111': '111000000000000', // 7
+      '1000': '111111110000000', // 8
+      '1001': '111101110000000', // 9
+
+      '1010': '111011110000000', // A
+      '1011': '001111110000000', // b
+      '1100': '100111000000000', // C
+      '1101': '011110110000000', // d
+      '1110': '100111110000000', // E
+      '1111': '100011110000000'  // F
+    };
+
+    let normalized = hexValue;
+
+    if(normalized.length < 4){
+      normalized = normalized.padStart(4, '0');
+    } else if(normalized.length > 4){
+      normalized = normalized.substring(0, 4);
+    }
+
+    return hexMap[normalized] || '000000000000000';
+  }
+
+  bitsTo14Seg(bitsValue){
+    // Normalize to 8 bits (ASCII-like)
+    let bits = bitsValue;
+    if(bits.length < 8) bits = bits.padStart(8, '0');
+    else if(bits.length > 8) bits = bits.substring(0, 8);
+
+    const code = parseInt(bits, 2);
+
+    // Convert to character
+    let ch = String.fromCharCode(code);
+
+    return this.charTo14Seg(ch);
+  }
+
+  charTo14Seg(ch){
+    const map = {
+      // digits
+      '0': '111111000000000',
+      '1': '011000000000000',
+      '2': '110110110000000',
+      '3': '111100110000000',
+      '4': '011001110000000',
+      '5': '101101110000000',
+      '6': '101111110000000',
+      '7': '111000000000000',
+      '8': '111111110000000',
+      '9': '111101110000000',
+
+      // uppercase
+      'A': '111011110011000',
+      'B': '001111110011000',
+      'C': '100111000000000',
+      'D': '011110110011000',
+      'E': '100111110000000',
+      'F': '100011110000000',
+      'G': '101111010000000',
+      'H': '011011110011000',
+      'I': '100100000011000',
+      'J': '011110000000000',
+      'K': '000011110101000',
+      'L': '000111000000000',
+      'M': '011011000101010',
+      'N': '011011000100010',
+      'O': '111111000000000',
+      'P': '110011110000000',
+      'Q': '111111000100010',
+      'R': '110011110100010',
+      'S': '101101110000000',
+      'T': '100000000011000',
+      'U': '011111000000000',
+      'V': '000011000101000',
+      'W': '011011000100101',
+      'X': '000000001111111',
+      'Y': '011001110000000',
+      'Z': '110100000101000',
+
+      // lowercase (fallback to uppercase)
+      'a': '111011110011000',
+      'b': '001111110011000',
+      'c': '000110110000000',
+      'd': '011110110011000',
+      'e': '110111110000000',
+      'f': '100011110000000',
+
+      // special
+      '-': '000000110000000',
+      '_': '000100000000000',
+      '=': '000100110000000',
+      ' ': '000000000000000',
+      '.': '000000000000001'
+    };
+
+    return map[ch] || '000000000000000';
   }
   
   // Execute a property block - set all properties in order
@@ -5043,6 +5242,168 @@ if (s.assignment) {
                 }
               }
             }
+          }
+        }
+      }
+    } else if(comp.type === '14seg'){
+
+      const segments = [
+        'a','b','c','d','e','f',
+        'g1','g2',
+        'h','i','j','k',
+        'l','m',
+        'dp'
+      ];
+
+      /* ================= HEX PROPERTY ================= */
+      if(pending.hex !== undefined){
+        let hexValue = pending.hex.value;
+
+        if(reEvaluate && pending.hex.expr){
+          const exprResult = this.evalExpr(pending.hex.expr, false);
+          hexValue = '';
+          for(const part of exprResult){
+            if(part.value && part.value !== '-') hexValue += part.value;
+            else if(part.ref && part.ref !== '&-'){
+              const val = this.getValueFromRef(part.ref);
+              if(val) hexValue += val;
+            }
+          }
+          pending.hex.value = hexValue;
+        }
+
+        const segPattern = this.hexTo14Seg(hexValue);
+
+        if(comp.deviceIds.length > 0){
+          const segId = comp.deviceIds[0];
+
+          for(let i = 0; i < segments.length; i++){
+            if(typeof setSegment14 === 'function'){
+              setSegment14(segId, segments[i], segPattern[i] === '1');
+            }
+          }
+
+          comp.lastSegmentValue = segPattern;
+        }
+      }
+
+      /* ================= CHAR PROPERTY ================= */
+      if(pending.char !== undefined){
+        let charValue = pending.char.value;
+
+        if(reEvaluate && pending.char.expr){
+          const exprResult = this.evalExpr(pending.char.expr, false);
+          charValue = '';
+          for(const part of exprResult){
+            if(part.value && part.value !== '-') charValue += part.value;
+            else if(part.ref && part.ref !== '&-'){
+              const val = this.getValueFromRef(part.ref);
+              if(val) charValue += val;
+            }
+          }
+          pending.char.value = charValue;
+        }
+
+        const segPattern = this.bitsTo14Seg(charValue);
+
+        if(comp.deviceIds.length > 0){
+          const segId = comp.deviceIds[0];
+
+          for(let i = 0; i < segments.length; i++){
+            if(typeof setSegment14 === 'function'){
+              setSegment14(segId, segments[i], segPattern[i] === '1');
+            }
+          }
+
+          comp.lastSegmentValue = segPattern;
+        }
+      }
+
+      /* ================= INDIVIDUAL SEGMENTS ================= */
+      let hasSegmentProperty = segments.some(s => pending[s] !== undefined);
+
+      if(hasSegmentProperty && comp.deviceIds.length > 0){
+        const segId = comp.deviceIds[0];
+
+        for(const segName of segments){
+          if(pending[segName] !== undefined){
+
+            let segValue = pending[segName].value;
+
+            if(reEvaluate && pending[segName].expr){
+              const exprResult = this.evalExpr(pending[segName].expr, false);
+              segValue = '';
+              for(const part of exprResult){
+                if(part.value && part.value !== '-') segValue += part.value;
+                else if(part.ref && part.ref !== '&-'){
+                  const val = this.getValueFromRef(part.ref);
+                  if(val) segValue += val;
+                }
+              }
+              pending[segName].value = segValue;
+            }
+
+            const segBit = segValue.length > 0 ? segValue[segValue.length - 1] : '0';
+
+            if(segBit !== '0' && segBit !== '1'){
+              throw Error(`Segment ${segName} must be 0 or 1`);
+            }
+
+            if(typeof setSegment14 === 'function'){
+              setSegment14(segId, segName, segBit === '1');
+            }
+
+            if(!comp.lastSegmentValue){
+              comp.lastSegmentValue = '0'.repeat(15);
+            }
+
+            const arr = comp.lastSegmentValue.split('');
+            const idx = segments.indexOf(segName);
+            if(idx >= 0){
+              arr[idx] = segBit;
+              comp.lastSegmentValue = arr.join('');
+            }
+          }
+        }
+      }
+
+      /* ================= SET PROPERTY ================= */
+      if(pending.set !== undefined){
+        let setValue = pending.set.value;
+
+        if(reEvaluate && pending.set.expr){
+          const exprResult = this.evalExpr(pending.set.expr, false);
+          setValue = '';
+          for(const part of exprResult){
+            if(part.value && part.value !== '-') setValue += part.value;
+            else if(part.ref && part.ref !== '&-'){
+              const val = this.getValueFromRef(part.ref);
+              if(val) setValue += val;
+            }
+          }
+          pending.set.value = setValue;
+        }
+
+        if(setValue === '1' || setValue[setValue.length - 1] === '1'){
+
+          let segPattern = null;
+
+          if(pending.char !== undefined){
+            segPattern = this.bitsTo14Seg(pending.char.value);
+          } else if(pending.hex !== undefined){
+            segPattern = this.hexTo14Seg(pending.hex.value);
+          }
+
+          if(segPattern && comp.deviceIds.length > 0){
+            const segId = comp.deviceIds[0];
+
+            for(let i = 0; i < segments.length; i++){
+              if(typeof setSegment14 === 'function'){
+                setSegment14(segId, segments[i], segPattern[i] === '1');
+              }
+            }
+
+            comp.lastSegmentValue = segPattern;
           }
         }
       }
