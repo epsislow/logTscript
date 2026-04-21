@@ -1,5 +1,75 @@
 window.lib_files = {
+  ex_mem_op2: `
   
+  comp [mem] .mem:
+    depth: 4
+    length: 16
+    on:1
+    :
+    
+comp [key] .set:
+    label:'S'
+    size: 35
+    on:1
+    :   
+
+comp [key] .rst:
+    label:'R'
+    size: 35
+    on:1
+    :
+    
+comp [dip] .adr:
+    length: 4
+    noLabels 
+    visual:1
+    on:1
+    :
+4w adr = .adr
+
+    
+comp [key] .read:
+    label:'G'
+    size: 35
+    on:1
+    :
+
+comp [dip] .val:
+    length: 4
+    noLabels 
+    visual:1
+    on:1
+    nl
+    :
+4w val = .val   
+
+
+comp [led] .gett:
+    length: 4
+    square
+    on:1
+     :
+
+.mem:{
+   at= adr
+   data = val
+   write = 1
+   set= .set
+}
+4w get := 0000
+.mem:{
+   at=adr
+   get >= get
+   set= .read
+}
+.gett = get
+
+doc(comp.led)
+    
+  
+  
+  
+  `,
   ex_mem_op1: `
   comp [mem] .mem:
     depth: 4
