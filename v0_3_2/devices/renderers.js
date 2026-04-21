@@ -296,3 +296,45 @@ function getDipState(id) {
   const dips = dipSwitches.get(id);
   return dips ? dips.map(d => d.checked) : [];
 }
+
+
+
+function addFourteenSegment({ id, color = "#6dff9c" }) {
+  const container = document.getElementById("devices");
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "fourteenseg-wrapper";
+
+  const disp = document.createElement("div");
+  disp.className = "fourteenseg";
+  disp.dataset.id = id;
+  disp.style.setProperty("--seg-color", color);
+
+  const segments = [
+    "a","b","c","d","e","f",
+    "g1","g2",
+    "h","i","j","k",
+    "l","m",
+    "dp"
+  ];
+
+  segments.forEach(s => {
+    const el = document.createElement("div");
+    el.className = "fseg fseg-" + s;
+    el.dataset.seg = s;
+    disp.appendChild(el);
+  });
+
+  wrapper.appendChild(disp);
+  container.appendChild(wrapper);
+}
+
+function setSegment14(id, seg, state) {
+  const disp = document.querySelector(`.fourteenseg[data-id="${id}"]`);
+  if (!disp) return;
+
+  const el = disp.querySelector(`.fseg-${seg}`);
+  if (!el) return;
+
+  el.classList.toggle("on", state);
+}
