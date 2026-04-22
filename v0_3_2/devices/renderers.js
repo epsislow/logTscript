@@ -298,55 +298,49 @@ function getDipState(id) {
 }
 
 function addFourteenSegment({ id, text = '', color = '#6dff9c', values = '', nl = false }) {
-
   const container = document.getElementById("devices");
+  if (!container) return;
 
-  /* ===== WRAPPER ===== */
   const wrapper = document.createElement("div");
   wrapper.className = "fourteenseg-wrapper";
 
-  /* ===== LABEL ===== */
-  if (text) {
-    const label = document.createElement("div");
-    label.className = "sevenseg-label"; // reuse your existing label style
-    label.textContent = text;
-    wrapper.appendChild(label);
-  } else {
-    const spacer = document.createElement("div");
-    spacer.className = "sevenseg-no-label";
-    wrapper.appendChild(spacer);
-  }
+  // Label (reuse 7-seg styles)
+  const label = document.createElement("span");
+  label.className = text ? "sevenseg-label" : "sevenseg-no-label";
+  label.textContent = text || " ";
+  wrapper.appendChild(label);
 
-  /* ===== DISPLAY ===== */
-  const disp = document.createElement("div");
-  disp.className = "fourteenseg";
-  disp.dataset.id = id;
-  disp.style.setProperty("--seg-color", color);
+  const display = document.createElement("div");
+  display.className = "fourteenseg";
+  display.style.setProperty("--seg-color", color);
 
-  /* ===== SEGMENTS ===== */
-  const segments = [
-    'a','b','c','d','e','f',
-    'g1','g2',
-    'h','i','j','k',
-    'l','m',
-    'dp'
-  ];
+  const segments = ['a','b','c','d','e','f','g1','g2','h','i','j','k','l','m','dp'];
+  const segmentMap = {};
 
-  const segmentMap = {}; // store refs for fast updates
+  segments.forEach((segName, index) => {
+    const segLabel = document.createElement("label");
+    segLabel.style.display = "contents";
 
-  segments.forEach((name, i) => {
-    const seg = document.createElement("div");
-    seg.className = "fseg fseg-" + name;
-    seg.dataset.seg = name;
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.className = "seg-input";
+    // Check if current bit in 'values' string is '1'
+    input.checked = values[index] === '1';
 
-    disp.appendChild(seg);
-    segmentMap[name] = seg;
+    const span = document.createElement("span");
+    span.className = `fseg fseg-${segName}`;
+
+    // Diagonals need a wrapper to center properly in the grid
+    if(['h','i','j','k'].includes(segName)) {
+      span.classList.add('fseg-diag');
+    }
+
+    segLabel.append(input, span);
+    display.appendChild(segLabel);
+    segmentMap[segName] = input;
   });
 
-  /* store references directly on DOM */
-  disp._segments = segmentMap;
-
-  wrapper.appendChild(disp);
+  wrapper.appendChild(display);
   container.appendChild(wrapper);
 
   if (nl) {
@@ -355,24 +349,28 @@ function addFourteenSegment({ id, text = '', color = '#6dff9c', values = '', nl 
     container.appendChild(br);
   }
 
-  /* ===== APPLY INITIAL VALUE ===== */
-  if (values) {
-    for (let i = 0; i < segments.length && i < values.length; i++) {
-      const segName = segments[i];
-      const segEl = segmentMap[segName];
-      if (segEl) {
-        segEl.classList.toggle("on", values[i] === '1');
-      }
-    }
+  // Store in your global map (assuming sevenSegDisplays exists)
+  if (typeof sevenSegDisplays !== 'undefined') {
+    sevenSegDisplays.set(id, segmentMap);
   }
 }
 
 function setSegment14(id, seg, state) {
-  const disp = document.querySelector(`.fourteenseg[data-id="${id}"]`);
-  if (!disp || !disp._segments) return;
+  // We look into the global Map where we stored the input references
+  const segments = sevenSegDisplays.get(id);
 
-  const el = disp._segments[seg];
-  if (!el) return;
+  if (!segments) {
+    // Fallback: If not in Map, try to find it via DOM
+    const disp = document.querySelector(`.fourteenseg[data-id="${id}"]`);
+    if (!disp || !disp._segments) return;
 
-  el.classList.toggle("on", state);
+    const el = disp._segments[seg];
+    if (el) el.checked = state;
+    return;
+  }
+
+  const input = segments[seg];
+  if (input) {
+    input.checked = state;
+  }
 }

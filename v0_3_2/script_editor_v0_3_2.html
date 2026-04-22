@@ -693,122 +693,137 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 }
 
 /* ================= 14 SEGMENT DISPLAY ================= */
-
+/* Container to match 7-seg wrapper */
 .fourteenseg-wrapper {
   display: inline-flex;
   align-items: flex-start;
   gap: 0.1rem;
-  margin: 5px;
+  padding-bottom: 5px;
+  padding-right: 10px;
 }
-/* ===== IMPROVED 14 SEG DISPLAY ===== */
 
+/* The Grid for 14 segments */
 .fourteenseg {
-  --seg-scale: 0.8;
+  --seg-scale: .75;
+  display: grid;
+  /* Columns: Side | Gap | Center | Gap | Side */
+  grid-template-columns:
+    calc(8px * var(--seg-scale))
+    calc(12px * var(--seg-scale))
+    calc(8px * var(--seg-scale))
+    calc(12px * var(--seg-scale))
+    calc(8px * var(--seg-scale));
+  grid-template-rows:
+    calc(10px * var(--seg-scale))  /* a */
+    calc(24px * var(--seg-scale)) /* upper verticals/diagonals */
+    calc(10px * var(--seg-scale))  /* g1, g2 */
+    calc(24px * var(--seg-scale)) /* lower verticals/diagonals */
+    calc(10px * var(--seg-scale)); /* d */
+  gap: 1px;
   position: relative;
-  width: calc(60px * var(--seg-scale));
-  height: calc(100px * var(--seg-scale));
 }
 
-/* Base segment */
+/* Base styling to match your 7-seg segments */
 .fseg {
-  position: absolute;
-  background: #1a1a1a;
-  opacity: 0.25;
-  border-radius: 4px;
-  transition: 0.12s ease;
+  background-color: #1a1a1a;
+  border-radius: 999px;
+  box-shadow: inset 1px 1px 0px #777;
+  cursor: pointer;
+  filter: blur(0.2px);
+  opacity: 0.35;
+  transition: all 0.2s;
 }
 
-/* ON state */
-.fseg.on {
+/* Hover effect like the 7-seg */
+.fseg:hover { opacity: 0.5; }
+
+/* The "ON" state via Checkbox (matches your 7-seg logic) */
+.seg-input:checked + .fseg {
   opacity: 1;
   background-color: var(--seg-color, #6dff9c);
   box-shadow:
-          0 0 calc(6px * var(--seg-scale)) var(--seg-color),
-          0 0 calc(12px * var(--seg-scale)) var(--seg-color);
+          inset 0 0 calc(6px * var(--seg-scale)) rgba(255,255,255,0.6),
+          0 0 calc(8px * var(--seg-scale)) var(--seg-color),
+          0 0 calc(18px * var(--seg-scale)) var(--seg-color);
 }
 
-/* ===== HORIZONTAL ===== */
-.fseg-a { top: 0; left: 12px; width: 36px; height: 6px; }
-.fseg-d { bottom: 0; left: 12px; width: 36px; height: 6px; }
+/* Placement for 14 segments */
+/* Horizontal & Vertical Outer Segments */
+.fseg-a { grid-column: 1 / 6; grid-row: 1; margin: 0 10%; height: 80%; }
+.fseg-d { grid-column: 1 / 6; grid-row: 5; margin: 0 10%; height: 80%; align-self: end; }
+.fseg-f { grid-column: 1;     grid-row: 2; width: 80%; height: 100%; }
+.fseg-b { grid-column: 5;     grid-row: 2; width: 80%; height: 100%; }
+.fseg-e { grid-column: 1;     grid-row: 4; width: 80%; height: 100%; }
+.fseg-c { grid-column: 5;     grid-row: 4; width: 80%; height: 100%; }
 
-/* split middle */
-.fseg-g1 { top: 47px; left: 12px; width: 16px; height: 6px; }
-.fseg-g2 { top: 47px; right: 12px; width: 16px; height: 6px; }
+/* Middle Splits */
+.fseg-g1 { grid-column: 1 / 4; grid-row: 3; width: 60%; height: 80%; justify-self: start; margin-left: 3px; }
+.fseg-g2 { grid-column: 3 / 6; grid-row: 3; width: 60%; height: 80%; justify-self: end; margin-right: 3px; }
 
-/* ===== VERTICAL ===== */
-.fseg-f { top: 6px; left: 0; width: 6px; height: 36px; }
-.fseg-b { top: 6px; right: 0; width: 6px; height: 36px; }
+/* Center Verticals */
+.fseg-i { grid-column: 3; grid-row: 2; width: 80%; height: 100%; justify-self: center; }
+.fseg-l { grid-column: 3; grid-row: 4; width: 80%; height: 100%; justify-self: center; }
 
-.fseg-e { bottom: 6px; left: 0; width: 6px; height: 36px; }
-.fseg-c { bottom: 6px; right: 0; width: 6px; height: 36px; }
+/* Diagonals - Meeting at Center Point */
+/* Diagonals - Updated to point to corners */
+.fseg-h, .fseg-j, .fseg-m, .fseg-k {
+  width: calc(6px * var(--seg-scale));
+  height: 110%; /* Slightly longer to reach the corners */
+  justify-self: center;
+}
 
-/* ===== DIAGONALS (FIXED LENGTH + ANGLE) ===== */
-
-/* TOP LEFT (h) → should go \ */
+/* TOP LEFT (h) - Points to top-left corner */
 .fseg-h {
-  top: 12px;
-  left: 10px;
-  width: 6px;
-  height: 26px;
-  transform: rotate(-30deg); /* flipped */
-  transform-origin: top left;
-}
-
-/* TOP RIGHT (i) → should go / */
-.fseg-i {
-  top: 12px;
-  right: 10px;
-  width: 6px;
-  height: 26px;
-  transform: rotate(30deg); /* flipped */
-  transform-origin: top right;
-}
-
-/* BOTTOM LEFT (j) → should go / */
-.fseg-j {
-  bottom: 12px;
-  left: 10px;
-  width: 6px;
-  height: 26px;
-  transform: rotate(30deg); /* flipped */
-  transform-origin: bottom left;
-}
-
-/* BOTTOM RIGHT (k) → should go \ */
-.fseg-k {
-  bottom: 12px;
-  right: 10px;
-  width: 6px;
-  height: 26px;
-  transform: rotate(-30deg); /* flipped */
+  grid-column: 2; grid-row: 2;
+  margin-left: 7px; margin-top: -4px;
+  transform: rotate(-25deg);
   transform-origin: bottom right;
 }
 
-/* ===== CENTER VERTICAL ===== */
-.fseg-l {
-  top: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px;
-  height: 18px;
+/* TOP RIGHT (j) - Points to top-right corner */
+.fseg-j {
+  grid-column: 4; grid-row: 2;
+  margin-left: -7px; margin-top: -4px;
+  transform: rotate(25deg);
+  transform-origin: bottom left;
 }
 
+/* BOTTOM LEFT (m) - Points to bottom-left corner */
 .fseg-m {
-  bottom: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px;
-  height: 18px;
+  grid-column: 2; grid-row: 4;
+  margin-left: 9px; margin-top: 0px;
+  transform: rotate(25deg);
+  transform-origin: top right;
 }
 
-/* ===== DOT (FIXED POSITION) ===== */
-.fseg-dp {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  bottom: -6px;
-  right: -6px;
+/* BOTTOM RIGHT (k) - Points to bottom-right corner */
+.fseg-k {
+  grid-column: 4; grid-row: 4;
+  margin-left: -8px; margin-top: 0px;
+  transform: rotate(-25deg);
+  transform-origin: top left;
 }
+
+/* Shared glow styling (ensure it matches your 7-seg) */
+.seg-input:checked + .fseg {
+  opacity: 1;
+  background-color: var(--seg-color, #6dff9c);
+  box-shadow:
+          inset 0 0 calc(4px * var(--seg-scale)) rgba(255,255,255,0.6),
+          0 0 calc(10px * var(--seg-scale)) var(--seg-color),
+          0 0 calc(20px * var(--seg-scale)) var(--seg-color);
+}
+
+/* Decimal Point */
+.fseg-dp {
+  position: absolute;
+  right: calc(-10px * var(--seg-scale));
+  bottom: 0;
+  width: calc(8px * var(--seg-scale));
+  height: calc(8px * var(--seg-scale));
+  border-radius: 50%;
+}
+
 
 </style>
 </head>
