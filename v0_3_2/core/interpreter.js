@@ -2868,6 +2868,7 @@ if (s.assignment) {
           ref: result.ref || null,
           deviceIds: result.deviceIds
         };
+        console.log('')
         if(!compInfo.ref && initialValue && !result.ref){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;
@@ -3120,6 +3121,7 @@ if (s.assignment) {
       
       deviceIds.push(segId);
     } else if(type === '14seg'){
+      console.log('14segA');
       // Create 14-segment display
       const text = attributes.text !== undefined ? String(attributes.text) : '';
       const color = attributes.color || '#6dff9c';
@@ -3621,6 +3623,7 @@ if (s.assignment) {
       }
       compInfo.lastSegmentValue = segValue;
     } else if(type === '14seg'){
+      console.log('14segB');
       // Rebuild value from segment attributes if present
       let segValue = initialValue || '0'.repeat(bits);
 
@@ -5246,7 +5249,7 @@ if (s.assignment) {
         }
       }
     } else if(comp.type === '14seg'){
-
+console.log('14segC');
       const segments = [
         'a','b','c','d','e','f',
         'g1','g2',
@@ -5288,7 +5291,7 @@ if (s.assignment) {
       }
 
       /* ================= CHAR PROPERTY ================= */
-      if(pending.char !== undefined){
+      if(pending.chr !== undefined){
         let charValue = pending.char.value;
 
         if(reEvaluate && pending.char.expr){
@@ -5388,8 +5391,8 @@ if (s.assignment) {
 
           let segPattern = null;
 
-          if(pending.char !== undefined){
-            segPattern = this.bitsTo14Seg(pending.char.value);
+          if(pending.chr !== undefined){
+            segPattern = this.bitsTo14Seg(pending.chr.value);
           } else if(pending.hex !== undefined){
             segPattern = this.hexTo14Seg(pending.hex.value);
           }

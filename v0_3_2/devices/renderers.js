@@ -297,43 +297,81 @@ function getDipState(id) {
   return dips ? dips.map(d => d.checked) : [];
 }
 
+function addFourteenSegment({ id, text = '', color = '#6dff9c', values = '', nl = false }) {
 
-
-function addFourteenSegment({ id, color = "#6dff9c" }) {
   const container = document.getElementById("devices");
 
+  /* ===== WRAPPER ===== */
   const wrapper = document.createElement("div");
   wrapper.className = "fourteenseg-wrapper";
 
+  /* ===== LABEL ===== */
+  if (text) {
+    const label = document.createElement("div");
+    label.className = "sevenseg-label"; // reuse your existing label style
+    label.textContent = text;
+    wrapper.appendChild(label);
+  } else {
+    const spacer = document.createElement("div");
+    spacer.className = "sevenseg-no-label";
+    wrapper.appendChild(spacer);
+  }
+
+  /* ===== DISPLAY ===== */
   const disp = document.createElement("div");
   disp.className = "fourteenseg";
   disp.dataset.id = id;
   disp.style.setProperty("--seg-color", color);
 
+  /* ===== SEGMENTS ===== */
   const segments = [
-    "a","b","c","d","e","f",
-    "g1","g2",
-    "h","i","j","k",
-    "l","m",
-    "dp"
+    'a','b','c','d','e','f',
+    'g1','g2',
+    'h','i','j','k',
+    'l','m',
+    'dp'
   ];
 
-  segments.forEach(s => {
-    const el = document.createElement("div");
-    el.className = "fseg fseg-" + s;
-    el.dataset.seg = s;
-    disp.appendChild(el);
+  const segmentMap = {}; // store refs for fast updates
+
+  segments.forEach((name, i) => {
+    const seg = document.createElement("div");
+    seg.className = "fseg fseg-" + name;
+    seg.dataset.seg = name;
+
+    disp.appendChild(seg);
+    segmentMap[name] = seg;
   });
+
+  /* store references directly on DOM */
+  disp._segments = segmentMap;
 
   wrapper.appendChild(disp);
   container.appendChild(wrapper);
+
+  if (nl) {
+    const br = document.createElement("div");
+    br.className = "break";
+    container.appendChild(br);
+  }
+
+  /* ===== APPLY INITIAL VALUE ===== */
+  if (values) {
+    for (let i = 0; i < segments.length && i < values.length; i++) {
+      const segName = segments[i];
+      const segEl = segmentMap[segName];
+      if (segEl) {
+        segEl.classList.toggle("on", values[i] === '1');
+      }
+    }
+  }
 }
 
 function setSegment14(id, seg, state) {
   const disp = document.querySelector(`.fourteenseg[data-id="${id}"]`);
-  if (!disp) return;
+  if (!disp || !disp._segments) return;
 
-  const el = disp.querySelector(`.fseg-${seg}`);
+  const el = disp._segments[seg];
   if (!el) return;
 
   el.classList.toggle("on", state);
