@@ -33,6 +33,7 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
             initValue: '15bit',
             pins: [
                 { bits: '1', name: 'set' },
+                { bits: '15', name: 'data' },
                 { bits: '4', name: 'hex' },
                 { bits: '8', name: 'chr' },
                 
@@ -249,19 +250,18 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
     /* ================= APPLY ================= */
     applyProperties(comp, compName, pending, when, reEvaluate, ctx) {
         if (!pending) return;
-        //console.log(pending, reEvaluate, 'pending');
+        console.log('pending', pending);
         
         const segments = this.getSpecialParseAttributes().segAttributes;
-        
-        if (pending.chr !== undefined) {
+
+        if (pending.data !== undefined) {
+            const data = this.reEvalPendingValue(pending, 'data', reEvaluate, ctx);
+            this._applyPattern(comp, data);
+        } else if (pending.chr !== undefined) {
             const val = this.reEvalPendingValue(pending, 'chr', reEvaluate, ctx);
-           // val = this.padOrTruncate(val, 8);
-          //  console.log('padval', val);
             const pattern = FourteenSegComponent.bitsTo14Seg(val);
             this._applyPattern(comp, pattern);
-        }
-        
-        else if (pending.hex !== undefined) {
+        } else if (pending.hex !== undefined) {
             const val = this.reEvalPendingValue(pending, 'hex', reEvaluate, ctx);
             const pattern = FourteenSegComponent.hexTo14Seg(val);
             this._applyPattern(comp, pattern);
