@@ -177,15 +177,22 @@ function setSegment(displayId, segment, state) {
   }
 }
 
-function getSegmentStates(displayId, asString = false) {
-  const display = sevenSegDisplays.get(displayId);
+function getSegmentStates(displayId, asString = true) {
+  if(!displayId) {
+    const keys = Array.from(sevenSegDisplays.entries());
+    displayId = keys[0][0];
+  }
+
+const display = sevenSegDisplays.get(displayId);
   if (!display) {
-      return -1;
+    return -1;
   }
   
   const states = {};
   const values = [];
-  ["a","b","c","d","e","f","g","h"].forEach(seg => {
+  const segments = ['a','b','c','d','e','f','g1','g2','h','i','j','k','l','m','dp'];
+  
+  segments.forEach(seg => {
     if(!display[seg]) {
         return;
     }
@@ -195,6 +202,7 @@ function getSegmentStates(displayId, asString = false) {
   
   return (asString) ? values.join(''): states;
 }
+window.ssd = getSegmentStates;
 
 function addDipSwitch({
   id,
