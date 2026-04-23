@@ -98,7 +98,7 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
         
         const code = parseInt(bits, 2);
         const ch = String.fromCharCode(code);
-        console.log('charr', ch);
+        console.log('charr', ch, code);
         return FourteenSegComponent.charTo14Seg(ch);
     }
     
@@ -129,20 +129,20 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
       'J': '011110000000000',
       'K': '000011100011000', // 75
       'L': '000111000000000',
-      'M': '011011000101010',
-      'N': '011011000100010',
+      'M': '011011001010000', // 77
+      'N': '011011001001000',
       'O': '111111000000000',
       'P': '110011110000000',
-      'Q': '111111000100010',
-      'R': '110011110100010',
+      'Q': '111111000001000', // 81
+      'R': '110011110001000',
       'S': '101101110000000',
-      'T': '100000000011000',
+      'T': '100000000100100', // 84
       'U': '011111000000000',
-      'V': '000011000101000',
-      'W': '011011000100101',
-      'X': '000000001111111',
-      'Y': '011001110000000',
-      'Z': '110100000101000',
+      'V': '000011000010010',
+      'W': '011011000101010',
+      'X': '000000001011010',
+      'Y': '000000001010100',
+      'Z': '100100000010010', // 90
 
       // lowercase (fallback to uppercase)
       'a': '111011110011000', // \97
