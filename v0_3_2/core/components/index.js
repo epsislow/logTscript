@@ -4,6 +4,7 @@ var SwitchComponent = (typeof require !== 'undefined') ? require('./switch') : S
 var KeyComponent = (typeof require !== 'undefined') ? require('./key') : KeyComponent;
 var DipComponent = (typeof require !== 'undefined') ? require('./dip') : DipComponent;
 var SevenSegComponent = (typeof require !== 'undefined') ? require('./seven-seg') : SevenSegComponent;
+var ClockDotsComponent = (typeof require !== 'undefined') ? require('./dots') : ClockDotsComponent;
 var FourteenSegComponent = (typeof require !== 'undefined') ? require('./14seg') : FourteenSegComponent;
 var LcdComponent = (typeof require !== 'undefined') ? require('./lcd') : LcdComponent;
 var AdderComponent = (typeof require !== 'undefined') ? require('./adder') : AdderComponent;
@@ -25,6 +26,7 @@ function createComponentRegistry() {
   registry.register(KeyComponent);
   registry.register(DipComponent);
   registry.register(SevenSegComponent);
+  register.register(ClockDotsComponent);
   registry.register(FourteenSegComponent);
   registry.register(LcdComponent);
   registry.register(AdderComponent);

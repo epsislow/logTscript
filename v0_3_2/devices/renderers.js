@@ -412,3 +412,88 @@ function setSegment14(id, seg, state) {
     input.checked = state;
   }
 }
+
+function addClockDots({
+    id,
+    color = '#6dff9c',
+    values = '11', // Default both dots ON
+    nl = false,
+    bgColor = "#1a1a1a",
+    lgColor = "#444444",
+    tranSec = 2,
+    scale = .75
+}) {
+  const container = document.getElementById("devices");
+  if (!container || !id) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "clockdots-wrapper";
+  wrapper.style.setProperty("--seg-scale", scale);
+
+  const display = document.createElement("div");
+  display.className = "clockdots";
+  display.style.setProperty("--seg-color", color);
+  display.style.setProperty("--seg-scale", scale);
+  display.style.setProperty("--seg-bgcolor", bgColor);
+  display.style.setProperty("--seg-lgcolor", lgColor);
+  display.style.setProperty("--seg-transec", tranSec);
+
+  const dotNames = ['up', 'down'];
+  const segmentMap = {};
+
+  dotNames.forEach((name, index) => {
+    const dotLabel = document.createElement("label");
+    dotLabel.style.display = "contents";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.className = "seg-input";
+    // Check if corresponding bit in 'values' is '1'
+    input.checked = values[index] === '1';
+
+    const span = document.createElement("span");
+    span.className = `fseg-dot fseg-dot-${name}`;
+
+    dotLabel.append(input, span);
+    display.appendChild(dotLabel);
+    segmentMap[name] = input;
+  });
+
+  wrapper.appendChild(display);
+  container.appendChild(wrapper);
+
+  if (nl) {
+    const br = document.createElement("div");
+    br.className = "break";
+    container.appendChild(br);
+  }
+
+  if (typeof sevenSegDisplays !== 'undefined') {
+    sevenSegDisplays.set(id, segmentMap);
+  }
+}
+
+
+function setClockDots(id, dot, state) {
+  // dot should be 'up' or 'down'
+  const segments = sevenSegDisplays.get(id);
+
+  if (!segments) {
+    // Fallback: search DOM if map lookup fails
+    const disp = document.querySelector(`.clockdots-wrapper .clockdots[data-id="${id}"]`);
+    if (!disp) return;
+    
+    // Search for the input preceding the specific dot class
+    const input = disp.querySelector(`.fseg-dot-${dot}`).previousElementSibling;
+    if (input) input.checked = state;
+    return;
+  }
+
+  const input = segments[dot];
+  if (input) {
+    input.checked = state;
+  }
+}
+
+
+
