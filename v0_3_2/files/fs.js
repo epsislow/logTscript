@@ -31,6 +31,126 @@ comp [led] .v:
   
   `,
 
+
+  ex_14seg_osc2: `
+  
+  2w tsec = 0
+
+comp [7seg] .w:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: tsec
+    on:1
+    :
+
+
+comp [14seg] .qqq:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: tsec
+    on:1
+    :
+comp [14seg] .qq2:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: tsec
+    on:1
+    :
+comp [14seg] .qq3:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: tsec
+    on:1
+    :
+comp [14seg] .qq4:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: tsec
+    on:1
+    :
+    
+comp [14seg] .qq5:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: tsec
+    on:1
+    :
+    
+comp [14seg] .qq6:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: tsec
+    nl
+    on:1
+    :
+    
+comp [key] .q:
+    label:'A'
+    size: 35
+    on:1
+    :
+ 
+comp [dip] .val:
+    length: 15
+    visual: 1
+    noLabels
+    on:1
+    :
+    
+15w a = 0000 + 1111 + 0000  + 110
+
+comp [~] .osc:
+    duration1: 4
+    duration0: 4
+    length: 8
+    freq: 3
+    freqIsSec: 0
+    eachCycle: 1
+    :
+    
+8w osc = .osc:counter
+16w div = DIVIDE(osc, \\48)
+8w mod = div.8/8
+8w chrr = ADD(mod, \\43)
+
+.qqq:{
+   #data = .val
+   chr = chrr
+   set = .osc
+}
+.qq2:{
+   chr = ADD(chrr, \\1)
+   set = .osc
+}
+.qq3:{
+   chr = ADD(chrr, \\2)
+   set = .osc
+}
+.qq4:{
+   chr = ADD(chrr, \\3)
+   set = .osc
+}
+.qq5:{
+   chr = ADD(chrr, \\4)
+   set = .osc
+}
+.qq6:{
+   chr = ADD(chrr, \\5)
+   set = .osc
+}
+
+#doc(comp.14seg)
+
+  
+  
+  `,
   ex_14seg_osc1: `
 
 comp [7seg] .w:
