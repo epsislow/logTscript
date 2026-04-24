@@ -234,7 +234,7 @@ parsePcbDefinition() {
   const name = this.c.value;
   this.eat('ID');
   
-  const reserved = this.componentRegistry ? this.componentRegistry.getReservedNames() : ['led', 'switch', '7seg', '14seg', 'dip', 'mem', 'counter', 'adder', 'subtract', 'divider', 'multiplier', 'shifter', 'rotary', 'lcd'];
+  const reserved = this.componentRegistry ? this.componentRegistry.getReservedNames() : ['led', 'switch', 'dots', '7seg', '14seg', 'dip', 'mem', 'counter', 'adder', 'subtract', 'divider', 'multiplier', 'shifter', 'rotary', 'lcd'];
   if (reserved.includes(name)) {
     throw Error(`PCB name '${name}' is reserved at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
@@ -828,7 +828,7 @@ assignment() {
     const componentShortnames = this.componentRegistry ? this.componentRegistry.getShortnames() : {
       '7': '7seg', '+': 'adder', '-': 'subtract', '*': 'multiplier',
       '/': 'divider', '>': 'shifter', '=': 'counter', '~': 'osc',
-      '14': '14seg',
+      '14': '14seg', ':': 'dots'
     };
     const validTypes = this.componentRegistry ? this.componentRegistry.getAllTypes() : [
       'led', 'switch', 'dip', 'mem', 'reg', 'counter', 'adder', 'subtract',
@@ -846,6 +846,9 @@ assignment() {
     } else if(this.c.type === 'ID' && validTypes.includes(this.c.value)){
       compType = this.c.value;
       this.eat('ID');
+    } else if(this.c.value === 'dots'){
+      compType = 'dots';
+      this.eat(this.c.type);
     } else if(this.c.value === '7seg'){
       compType = '7seg';
       this.eat(this.c.type);

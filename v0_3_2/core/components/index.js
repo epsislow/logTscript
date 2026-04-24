@@ -26,7 +26,7 @@ function createComponentRegistry() {
   registry.register(KeyComponent);
   registry.register(DipComponent);
   registry.register(SevenSegComponent);
-  register.register(ClockDotsComponent);
+//  register.register(ClockDotsComponent);
   registry.register(FourteenSegComponent);
   registry.register(LcdComponent);
   registry.register(AdderComponent);
