@@ -1,4 +1,35 @@
 window.lib_files = {
+  
+  ex_14seg1: `
+  comp [14seg] .a:
+    color: ^9b3
+    on:1
+    :
+
+
+comp [key] .b:
+    label:'A'
+    size: 35
+    on:1
+    nl
+    :
+    
+comp [led] .v:
+    length: 15
+    square
+    on:1
+     :
+15w v := \\0 
+.a:{
+   chr = \\90
+  # hex = \\0
+   set = .b
+   get >= v
+}
+.v = v
+
+  
+  `,
 
   ex_14seg_osc1: `
 
