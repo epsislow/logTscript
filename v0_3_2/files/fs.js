@@ -1,5 +1,95 @@
 window.lib_files = {
-  
+
+  ex_14seg_osc1: `
+
+comp [7seg] .w:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: 3
+    on:1
+    :
+
+
+comp [14seg] .qqq:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: 0
+    on:1
+    :
+comp [14seg] .qq2:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: 0
+    on:1
+    :
+comp [14seg] .qq3:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: 0
+    on:1
+    :
+comp [14seg] .qq4:
+    color: ^b93
+    lgColor: ^963
+    bgColor: ^321
+    tranSec: 0
+    on:1
+    :
+    
+comp [key] .q:
+    label:'A'
+    size: 35
+    on:1
+    :
+ 
+comp [dip] .val:
+    length: 15
+    visual: 1
+    noLabels
+    on:1
+    :
+    
+15w a = 0000 + 1111 + 0000  + 110
+
+comp [~] .osc:
+    duration1: 4
+    duration0: 4
+    length: 8
+    freq: 5
+    freqIsSec: 0
+    eachCycle: 1
+    :
+    
+8w osc = .osc:counter
+16w div = DIVIDE(osc, \\48)
+8w mod = div.8/8
+8w chrr = ADD(mod, \\43)
+
+.qqq:{
+   #data = .val
+   chr = chrr
+   set = .osc
+}
+.qq2:{
+   chr = ADD(chrr, \\1)
+   set = .osc
+}
+.qq3:{
+   chr = ADD(chrr, \\2)
+   set = .osc
+}
+.qq4:{
+   chr = ADD(chrr, \\3)
+   set = .osc
+}
+
+#doc(comp.14seg)
+
+  `,
   
   ex_mem_op3: `
   

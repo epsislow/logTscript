@@ -28,6 +28,9 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
             attrs: [
                 { name: 'text', value: 'string' },
                 { name: 'color', value: 'string' },
+                { name: 'bgColor', value: 'string' },
+                { name: 'lgColor', value: 'string' },
+                { name: 'tranSec', value: 'integer' },
                 { name: 'nl', value: null }
             ],
             initValue: '15bit',
@@ -98,7 +101,7 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
         
         const code = parseInt(bits, 2);
         const ch = String.fromCharCode(code);
-        console.log('charr', ch, code);
+//        console.log('charr', ch, code);
         return FourteenSegComponent.charTo14Seg(ch);
     }
     
@@ -186,6 +189,9 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
         
         const text = attributes.text !== undefined ? String(attributes.text) : '';
         const color = attributes.color || '#6dff9c';
+        const lgColor = attributes.lgColor || '#444444';
+        const bgColor = attributes.bgColor || '#1a1a1a';
+        const tranSec = attributes.tranSec || 2;
         const nl = attributes.nl || false;
         
         let segInitialValue = initialValue || '0'.repeat(bits);
@@ -211,7 +217,10 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
                 text,
                 color,
                 values: segInitialValue,
-                nl
+                nl,
+                bgColor,
+                lgColor,
+                tranSec
             });
         }
         
@@ -250,7 +259,7 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
     /* ================= APPLY ================= */
     applyProperties(comp, compName, pending, when, reEvaluate, ctx) {
         if (!pending) return;
-        console.log('pending', pending);
+//        console.log('pending', pending);
         
         const segments = this.getSpecialParseAttributes().segAttributes;
 

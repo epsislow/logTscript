@@ -12,7 +12,14 @@ var SevenSegComponent = class SevenSegComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'text', value: 'string' }, { name: 'color', value: 'string' }, { name: 'nl', value: null }],
+      attrs: [
+        { name: 'text', value: 'string' },
+        { name: 'color', value: 'string' },
+        { name: 'bgColor', value: 'string' },
+        { name: 'lgColor', value: 'string' },
+        { name: 'tranSec', value: 'integer' },
+        { name: 'nl', value: null }
+      ],
       initValue: '8bit',
       pins: [{ bits: '1', name: 'set' }, { bits: '4', name: 'hex' }, { bits: '1', name: 'a' }, { bits: '1', name: 'b' }, { bits: '1', name: 'c' }, { bits: '1', name: 'd' }, { bits: '1', name: 'e' }, { bits: '1', name: 'f' }, { bits: '1', name: 'g' }, { bits: '1', name: 'h' }],
       pouts: [{ bits: '8', name: 'get' }],
@@ -44,6 +51,9 @@ var SevenSegComponent = class SevenSegComponent extends BuiltinComponent {
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const text = attributes.text !== undefined ? String(attributes.text) : '';
     const color = attributes.color || '#ff0000';
+    const lgColor = attributes.lgColor || '#444444';
+    const bgColor = attributes.bgColor || '#1a1a1a';
+    const tranSec = attributes.tranSec || 2;
     const nl = attributes.nl || false;
 
     let segInitialValue = initialValue || '0'.repeat(bits);
@@ -60,7 +70,16 @@ var SevenSegComponent = class SevenSegComponent extends BuiltinComponent {
 
     const segId = baseId;
     if (typeof addSevenSegment === 'function') {
-      addSevenSegment({ id: segId, text, color, values: segInitialValue, nl });
+      addSevenSegment({
+        id: segId,
+        text,
+        color,
+        values: segInitialValue,
+        nl,
+        bgColor,
+        lgColor,
+        tranSec
+      });
     }
     if (attributes.segments && typeof setSegment === 'function') {
       const segments = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
