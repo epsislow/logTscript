@@ -93,7 +93,18 @@ function setLed(id, state) {
   }
 }
 
-function addSevenSegment({ id, text = "", color = "#ff0000", initial = {}, values = "", nl = false, bgColor = "#1a1a1a", lgColor = "#444444", tranSec = 2 }) {
+function addSevenSegment({
+     id,
+     text = "",
+     color = "#ff0000",
+     initial = {},
+     values = "",
+     nl = false,
+     bgColor = "#1a1a1a",
+     lgColor = "#444444",
+     tranSec = 2,
+     scale = .75
+}) {
     if(values !== null && typeof(values) === "string" ) {
         values.split('').forEach(function (value, index) {
             const key = String.fromCharCode(97 + index);
@@ -118,6 +129,7 @@ function addSevenSegment({ id, text = "", color = "#ff0000", initial = {}, value
   display.style.setProperty("--seg-color", color);
   display.style.setProperty("--seg-bgcolor", bgColor);
   display.style.setProperty("--seg-lgcolor", lgColor);
+  display.style.setProperty("--seg-scale", scale);
   display.style.setProperty("--seg-transec", tranSec);
 
   const segments = {};
@@ -308,12 +320,23 @@ function getDipState(id) {
   return dips ? dips.map(d => d.checked) : [];
 }
 
-function addFourteenSegment({ id, text = '', color = '#6dff9c', values = '', nl = false, bgColor = "#1a1a1a", lgColor = "#444444", tranSec = 2 }) {
+function addFourteenSegment({
+    id,
+    text = '',
+    color = '#6dff9c',
+    values = '',
+    nl = false,
+    bgColor = "#1a1a1a",
+    lgColor = "#444444",
+    tranSec = 2,
+    scale = .75
+}) {
   const container = document.getElementById("devices");
   if (!container) return;
 
   const wrapper = document.createElement("div");
   wrapper.className = "fourteenseg-wrapper";
+  wrapper.style.setProperty("--seg-scale", scale);
 
   // Label (reuse 7-seg styles)
   const label = document.createElement("span");
@@ -324,6 +347,7 @@ function addFourteenSegment({ id, text = '', color = '#6dff9c', values = '', nl 
   const display = document.createElement("div");
   display.className = "fourteenseg";
   display.style.setProperty("--seg-color", color);
+  display.style.setProperty("--seg-scale", scale);
   display.style.setProperty("--seg-bgcolor", bgColor);
   display.style.setProperty("--seg-lgcolor", lgColor);
   display.style.setProperty("--seg-transec", tranSec);

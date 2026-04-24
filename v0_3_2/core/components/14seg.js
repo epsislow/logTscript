@@ -31,6 +31,7 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
                 { name: 'bgColor', value: 'string' },
                 { name: 'lgColor', value: 'string' },
                 { name: 'tranSec', value: 'integer' },
+                { name: 'scale', value: 'integer' },
                 { name: 'nl', value: null }
             ],
             initValue: '15bit',
@@ -192,6 +193,7 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
         const lgColor = attributes.lgColor || '#444444';
         const bgColor = attributes.bgColor || '#1a1a1a';
         const tranSec = attributes.tranSec || 2;
+        const scale = 0.35 + (attributes.scale || 5) * 0.05;
         const nl = attributes.nl || false;
         
         let segInitialValue = initialValue || '0'.repeat(bits);
@@ -220,7 +222,8 @@ var FourteenSegComponent = class FourteenSegComponent extends BuiltinComponent {
                 nl,
                 bgColor,
                 lgColor,
-                tranSec
+                tranSec,
+                scale
             });
         }
         
