@@ -830,6 +830,55 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 }
 
 
+/* ================= CLOCK COLON DISPLAY ================= */
+.clockdots-wrapper {
+  display: inline-flex;
+  align-items: flex-start; /* Matches your other wrappers */
+  gap: 0.1rem;
+  padding-bottom: 5px;
+}
+
+.clockdots {
+  display: grid;
+  grid-template-columns: calc(12px * var(--seg-scale));
+  /* Matches your 14-seg row heights exactly for alignment */
+  grid-template-rows:
+    calc(10px * var(--seg-scale)) 
+    calc(24px * var(--seg-scale)) 
+    calc(10px * var(--seg-scale)) 
+    calc(24px * var(--seg-scale)) 
+    calc(10px * var(--seg-scale));
+  justify-items: center;
+}
+
+/* New class for the dots */
+.fseg-dot {
+  width: calc(10px * var(--seg-scale)); 
+  height: calc(10px * var(--seg-scale));
+  border-radius: 50%;
+  background-color: var(--seg-bgcolor, #1a1a1a);
+  box-shadow: inset 1px 1px 0px var(--seg-lgcolor, #444);
+  cursor: pointer;
+  filter: blur(0.2px);
+  opacity: 0.35;
+  transition: all calc(0.1s * var(--seg-transec));
+}
+
+/* Reusing your existing .seg-input logic */
+.fseg-dot-up { grid-row: 2; align-self: center; }
+.fseg-dot-down { grid-row: 4; align-self: center; }
+
+/* This uses your existing logic to "light up" the new dots */
+.seg-input:checked + .fseg-dot {
+  opacity: 1;
+  background-color: var(--seg-color, #6dff9c);
+  box-shadow:
+          inset 0 0 calc(4px * var(--seg-scale)) rgba(255,255,255,0.6),
+          0 0 calc(10px * var(--seg-scale)) var(--seg-color),
+          0 0 calc(20px * var(--seg-scale)) var(--seg-color);
+}
+
+
 </style>
 </head>
 <body>
@@ -854,7 +903,7 @@ const _logtsKeywords = [
 ];
 
 const _logtsComponents = [
-'led','key','dip','switch','rotary','adder','subtract','divider','multiplier','counter','shifter','mem','reg','lcd','7seg','+','-','/','*','='
+'led','key','dip','switch','rotary','adder','subtract','divider','multiplier','counter','shifter','mem','reg','lcd','dots', '14seg', '7seg','+','-','/','*','='
 ]
 const _logtsAttributes = [
   "depth","length","nl", "on", "text","label","color"

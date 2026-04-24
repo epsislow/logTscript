@@ -2,8 +2,8 @@ var BuiltinComponent = (typeof require !== 'undefined') ? require('./builtin-com
 
 var ClockDotsComponent = class ClockDotsComponent extends BuiltinComponent {
     
-    static get type() { return 'clockdots'; }
-    static get shortnames() { return { 'dots': 'clockdots' }; }
+    static get type() { return 'dots'; }
+    static get shortnames() { return { ':': 'dots' }; }
     static get isReservedName() { return true; }
     
     getWidthBits() { return 2; }
