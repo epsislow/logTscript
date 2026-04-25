@@ -158,7 +158,7 @@ comp [~] .osc:
    set = .osc
 }
 
-#doc(comp.14seg)
+doc(comp.14seg)
 
   
   
