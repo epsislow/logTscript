@@ -125,7 +125,7 @@ var ClockDotsComponent = class ClockDotsComponent extends BuiltinComponent {
     }
     
     /* ================= FINALIZE ================= */
-    finalizeCompInfo(compInfo, attributes, initialValue, bits) {
+    finalizeCompInfo0(compInfo, attributes, initialValue, bits) {
         let segValue = initialValue || '00';
         if (attributes.segments) {
             const segments = this.getSpecialParseAttributes().segAttributes;
@@ -139,6 +139,110 @@ var ClockDotsComponent = class ClockDotsComponent extends BuiltinComponent {
         }
         compInfo.lastSegmentValue = segValue;
     }
+    
+    
+        /* ================= FINALIZE ================= */
+    finalizeCompInfo(compInfo, attributes, initialValue, bits) {
+        let segValue = initialValue || '00';
+        
+        if (attributes.segments) {
+            const segments = this.getSpecialParseAttributes().segAttributes; // ['up', 'down']
+            const arr = segValue.split('');
+            
+            for (let i = 0; i < segments.length; i++) {
+                if (attributes.segments[segments[i]] !== undefined) {
+                    arr[i] = attributes.segments[segments[i]];
+                }
+            }
+            
+            segValue = arr.join('');
+        }
+        
+        compInfo.lastSegmentValue = segValue;
+    }
+    
+    /* ================= APPLY ================= */
+    applyProperties(comp, compName, pending, when, reEvaluate, ctx) {
+        if (!pending) return;
+        
+        const segments = this.getSpecialParseAttributes().segAttributes;
+
+        if (pending.data !== undefined) {
+            const data = this.reEvalPendingValue(pending, 'data', reEvaluate, ctx);
+            this._applyPattern(comp, data);
+        } else if (pending.chr !== undefined) {
+            const val = this.reEvalPendingValue(pending, 'chr', reEvaluate, ctx);
+            const pattern = ClockDotsComponent.bitsToClockDots(val);
+            this._applyPattern(comp, pattern);
+        }
+        
+        // Handle individual pin updates (up, down)
+        for (const s of segments) {
+            if (pending[s] !== undefined) {
+                let v = this.reEvalPendingValue(pending, s, reEvaluate, ctx);
+                const bit = v[v.length - 1] === '1';
+                
+                if (typeof setClockDots === 'function') {
+                    setClockDots(comp.deviceIds[0], s, bit);
+                }
+                
+                if (!comp.lastSegmentValue) comp.lastSegmentValue = '00';
+                
+                const arr = comp.lastSegmentValue.split('');
+                const idx = segments.indexOf(s);
+                arr[idx] = bit ? '1' : '0';
+                comp.lastSegmentValue = arr.join('');
+            }
+        }
+    }
+    
+    _applyPattern(comp, pattern) {
+        if (comp.deviceIds.length === 0) return;
+        
+        const segId = comp.deviceIds[0];
+        const segments = this.getSpecialParseAttributes().segAttributes;
+        
+        // Ensure pattern is the right length for 2 dots
+        let p = pattern;
+        if (p.length < 2) p = p.padEnd(2, '0');
+
+        for (let i = 0; i < segments.length; i++) {
+            if (typeof setClockDots === 'function') {
+                setClockDots(segId, segments[i], p[i] === '1');
+            }
+        }
+        
+        comp.lastSegmentValue = p.substring(0, 2);
+    }
+    
+    /* ================= UPDATE DISPLAY ================= */
+    updateDisplayValue(comp, value, bitRange) {
+        let bitsToUse = value;
+        
+        if (bitRange) {
+            const { start, end } = bitRange;
+            const actualEnd = end !== undefined ? end : start;
+            bitsToUse = value.substring(start, actualEnd + 1);
+        }
+        
+        if (comp.deviceIds.length > 0) {
+            const segId = comp.deviceIds[0];
+            const segments = this.getSpecialParseAttributes().segAttributes;
+            
+            for (let i = 0; i < segments.length && i < bitsToUse.length; i++) {
+                if (typeof setClockDots === 'function') {
+                    setClockDots(segId, segments[i], bitsToUse[i] === '1');
+                }
+            }
+            
+            let v = bitsToUse;
+            if (v.length < 2) v = v.padEnd(2, '0');
+            else if (v.length > 2) v = v.substring(0, 2);
+            
+            comp.lastSegmentValue = v;
+        }
+    }
+
 };
 
 if (typeof module !== 'undefined') module.exports = ClockDotsComponent;
