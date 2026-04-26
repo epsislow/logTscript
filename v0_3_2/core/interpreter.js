@@ -70,11 +70,11 @@ class Interpreter {
   }
   
   isBuiltinMUX(name) {
-    if (/^MUX[123]$/.test(name)) return true;
+    return name === 'MUX';
   }
   
   isBuiltinDEMUX(name) {
-    if (/^DEMUX[123]$/.test(name)) return true;
+    return name = 'DEMUX';
   }
   
   isBuiltinFunction(name) {
@@ -1019,7 +1019,7 @@ const idx = parseInt(
   }
 
   // ================= BUILTIN: MUXn =================
-  if (this.isBuiltinMUX(name)) {
+  if (0 && this.isBuiltinMUX(name)) {
     const selBits = parseInt(name.slice(3), 10);
     const inputs = 1 << selBits;
 
@@ -1034,9 +1034,32 @@ const idx = parseInt(
       ? { value, ref: `&${this.storeValue(value)}` }
       : { value, ref: null };
   }
+  
+  
+  // ================= BUILTIN: MUX =================
+if (this.isBuiltinMUX(name)) {
+  const selectorBitWidth = argValues[0].length; // Get bit width from selector
+  const expectedInputs = 1 << selectorBitWidth; // 2^selectorBitWidth
+
+  if (argValues.length !== 1 + expectedInputs) {
+    throw Error(
+      `MUX with ${selectorBitWidth}-bit selector expects ${1 + expectedInputs} arguments, ` +
+      `but got ${argValues.length}`
+    );
+  }
+
+  const sel = parseInt(argValues[0], 2);
+  const value = argValues[1 + sel];
+
+  return computeRefs
+    ? { value, ref: `&${this.storeValue(value)}` }
+    : { value, ref: null };
+}
+
+
 
   // ================= BUILTIN: DEMUXn =================
-  if (this.isBuiltinDEMUX(name)) {
+  if (0 && this.isBuiltinDEMUX(name)) {
     const selBits = parseInt(name.slice(5), 10);
     const outputs = 1 << selBits;
 
@@ -1056,6 +1079,30 @@ const idx = parseInt(
         : { value: v, ref: null }
     );
   }
+  
+  
+  // ================= BUILTIN: DEMUX =================
+if (this.isBuiltinDEMUX(name)) {
+  const selectorBitWidth = argValues[0].length; // Get bit width from selector
+  const outputs = 1 << selectorBitWidth; // 2^selectorBitWidth
+
+  if (argValues.length !== 2) {
+    throw Error(`DEMUX expects 2 arguments (selector, data), but got ${argValues.length}`);
+  }
+
+  const sel = parseInt(argValues[0], 2);
+  const data = argValues[1];
+
+  const res = Array(outputs).fill('0'.repeat(data.length));
+  res[sel] = data;
+
+  return res.map(v =>
+    computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null }
+  );
+}
+
 
   // ================= BUILTIN: LSHIFT / RSHIFT =================
   if (name === 'LSHIFT' || name === 'RSHIFT') {
@@ -6661,12 +6708,12 @@ Interpreter.BUILTIN_DOC = {
   LATCH: ['LATCH(Xbit data, 1bit clock) -> Xbit'],
   LSHIFT:['LSHIFT(Xbit data, Nbit n) -> Xbit', 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit'],
   RSHIFT:['RSHIFT(Xbit data, Nbit n) -> Xbit', 'RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit'],
-  MUX1:  ['MUX1(1bit sel, Xbit data0, Xbit data1) -> Xbit'],
-  MUX2:  ['MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3) -> Xbit'],
-  MUX3:  ['MUX3(3bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3, Xbit data4, Xbit data5, Xbit data6, Xbit data7) -> Xbit'],
-  DEMUX1:['DEMUX1(1bit sel, Xbit data) -> Xbit, Xbit'],
-  DEMUX2:['DEMUX2(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit'],
-  DEMUX3:['DEMUX3(3bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit'],
+  MUX:  ['MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit'],
+//  MUX2:  ['MUX(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3) -> Xbit'],
+//  MUX3:  ['MUX(3bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3, Xbit data4, Xbit data5, Xbit data6, Xbit data7) -> Xbit'],
+  DEMUX:['DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..'],
+//  DEMUX2:['DEMUX(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit'],
+//  DEMUX3:['DEMUX(3bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit'],
   ADD:      ['ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
   SUBTRACT: ['SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
   MULTIPLY: ['MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over'],

@@ -1728,6 +1728,7 @@ assignment() {
     const n = this.c.value;
     this.eat(this.c.type);
     if (this.c.type === 'SYM' && this.c.value === '(') {
+      //console.log({name: n, alias: null });
       return addNot(this.call({ name: n, alias: null }));
     }
     throw Error(`${n} must be called as a function at ${this.c.line}:${this.c.col}`);
@@ -1962,8 +1963,8 @@ isBuiltinFunction(name) {
   }
 
   if (/^REG\d+$/.test(name)) return true;
-  if (/^MUX[123]$/.test(name)) return true;
-  if (/^DEMUX[123]$/.test(name)) return true;
+  if (/^MUX$/.test(name)) return true;
+  if (/^DEMUX$/.test(name)) return true;
 
   return false;
 }

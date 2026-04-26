@@ -254,12 +254,12 @@ pushSource({ src, alias }) {
 }
 
       // Check for MUX instructions
-      if (/^MUX[123]$/.test(v)) {
+      if (/^MUX$/.test(v)) {
         return this.token('MUX', v);
       }
   
       // Check for DEMUX instructions
-      if (/^DEMUX[123]$/.test(v)) {
+      if (/^DEMUX$/.test(v)) {
         return this.token('DEMUX', v);
       }
   
