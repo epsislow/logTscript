@@ -1,4 +1,63 @@
 window.lib_files = {
+  
+  ex_repeat_reg_rot: `
+  
+  
+
+comp [rotary] .sel:
+    text: 'sel'
+    for.0: '0'
+    for.1: '1'
+    for.2: '2'
+    for.3: '3'
+    states: 4
+    :
+    
+2w sel = .sel:get
+    
+comp [dip] .dat:
+    length: 2
+    noLabels 
+    visual:1
+    on:1
+    :
+    
+comp [key] .set:
+    label:'Set'
+    size: 35
+    on:1
+    : 
+
+    
+repeat 1..4[
+    comp [reg] .rg?:
+        depth: 2
+        on:1
+        :
+    2w rg? = .rg?:get
+    
+    .rg?:{
+      data = .dat
+      write = 1
+      set = AND(EQ(.sel, \\?), .set)
+    }
+]
+    
+
+doc(comp.reg)  
+
+#3w a = MUX(10,100,001,010,101)
+
+#3w d = MUX(00, 100001010101)
+
+#2w sel = 00
+#3w dat = 111
+#3w b1, 3w b2, 3w b3, 3w b4 = DEMUX(sel, dat)
+
+#doc(DEMUX)
+  
+  `,
+  
   ex_14seg_osc3: `
   
   2w tsec = 0
