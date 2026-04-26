@@ -1037,7 +1037,7 @@ const idx = parseInt(
   
   
   // ================= BUILTIN: MUX =================
-if (this.isBuiltinMUX(name)) {
+if (0 & 0 & this.isBuiltinMUX(name)) {
   const selectorBitWidth = argValues[0].length; // Get bit width from selector
   const expectedInputs = 1 << selectorBitWidth; // 2^selectorBitWidth
 
@@ -1055,6 +1055,59 @@ if (this.isBuiltinMUX(name)) {
     ? { value, ref: `&${this.storeValue(value)}` }
     : { value, ref: null };
 }
+
+// ================= BUILTIN: MUX =================
+if (this.isBuiltinMUX(name)) {
+  const selectorBitWidth = argValues[0].length; // Get bit width from selector
+  const expectedInputs = 1 << selectorBitWidth; // 2^selectorBitWidth
+
+  let inputs;
+
+  // Case 1: Multiple arguments (existing behavior)
+  if (argValues.length > 2) {
+    inputs = argValues.slice(1);
+    
+    if (inputs.length !== expectedInputs) {
+      throw Error(
+        `MUX with ${selectorBitWidth}-bit selector expects ${expectedInputs} arguments, ` +
+        `but got ${inputs.length}`
+      );
+    }
+  }
+  // Case 2: Single data argument that needs expansion
+  else if (argValues.length === 2) {
+    const data = argValues[1];
+    
+    if (data.length % expectedInputs !== 0) {
+      throw Error(
+        `MUX with ${selectorBitWidth}-bit selector expects data length divisible by ${expectedInputs}, ` +
+        `but got ${data.length} bits`
+      );
+    }
+
+    const dataWidth = data.length / expectedInputs;
+
+    // Expand the data into separate inputs
+    inputs = [];
+    for (let i = 0; i < expectedInputs; i++) {
+      inputs[i] = data.slice(i * dataWidth, (i + 1) * dataWidth);
+    }
+  }
+  else {
+    throw Error(`MUX expects at least 2 arguments`);
+  }
+
+  const sel = parseInt(argValues[0], 2);
+  const value = inputs[sel];
+
+  return computeRefs
+    ? { value, ref: `&${this.storeValue(value)}` }
+    : { value, ref: null };
+}
+
+
+
+
 
 
 
