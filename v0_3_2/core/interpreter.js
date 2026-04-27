@@ -74,7 +74,7 @@ class Interpreter {
   }
   
   isBuiltinDEMUX(name) {
-    return name = 'DEMUX';
+    return name === 'DEMUX';
   }
   
   isBuiltinFunction(name) {
