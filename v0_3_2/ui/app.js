@@ -219,6 +219,7 @@ function exportVars() {
   return JSON.stringify(data);
 }
 
+let watchList = [];
 function showVars(){
   let t='';
   if(globalInterp){

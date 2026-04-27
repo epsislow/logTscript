@@ -724,6 +724,18 @@ assignment() {
     return atom;
   }
 
+  watch(){
+  this.eat('KEYWORD', 'watch');
+  this.eat('SYM', '(');
+  this.eat('SYM', '.');
+  
+  let name = '.' + this.c.value;
+  this.c = this.t.get();
+  
+  this.eat('SYM', ')');
+  return { watch: name };
+}
+
   doc(){
     this.eat('KEYWORD');
     this.eat('SYM', '(');
@@ -1991,6 +2003,7 @@ isBuiltinFunction(name) {
 
 Parser.KEYWORD_HANDLERS = {
   doc: 'doc',
+  watch: 'watch',
   show: 'show',
   NEXT: 'next',
   TEST: 'test',

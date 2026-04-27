@@ -1334,6 +1334,11 @@ if (this.isBuiltinDEMUX(name)) {
     this.currentStmt = s;
     
     try {
+    if(s.watch){
+      const name = s.watch;
+      Interpreter.addToWatchList(name, this.components, this.componentRegistry);
+      return;
+    }
     if(s.doc){
       const name = s.doc;
       const lines = Interpreter.getDocLines(name, this.funcs, this.componentRegistry, this.pcbDefinitions);
@@ -6747,6 +6752,33 @@ Interpreter.EXEC_DISPATCH = {
   test: '_execTest',
   assignment: '_execAssignment',
 };
+
+
+Interpreter.addToWatchList = function (name, components, componentRegistry) {
+    watchList.push(name);
+    
+    const comp = components.get(name);
+    console.log(comp);
+        /*if(comp){
+          // Check if it's a property access (e.g., .component:get)
+          if(a.property){
+            if(this.componentRegistry){
+              const handler = this.componentRegistry.get(comp.type);
+              if(handler && handler.evalGetProperty){
+                const result = handler.evalGetProperty(comp, a.property, a, this);
+                if(result){
+                  if(a.pad && result.value){
+                    result.value = this.applyPad(result.value, a.pad);
+                    result.ref = null;
+                    result.bitWidth = result.value.length;
+                  }
+                  return result;
+                }
+              }
+            }
+            throw Error(`Property ${a.property} cannot be used in expressions for component ${a.var}`);
+          }*/
+}
 
 // ================= BUILTIN DOC TABLE =================
 Interpreter.BUILTIN_DOC = {
