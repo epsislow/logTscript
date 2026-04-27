@@ -1336,7 +1336,7 @@ if (this.isBuiltinDEMUX(name)) {
     try {
     if(s.watch){
       const name = s.watch;
-      Interpreter.addToWatchList(name, this.components, this.componentRegistry);
+      Interpreter.addToWatchList(name, this.components, this.componentRegistry, this);
       return;
     }
     if(s.doc){
@@ -6754,18 +6754,36 @@ Interpreter.EXEC_DISPATCH = {
 };
 
 
-Interpreter.addToWatchList = function (name, components, componentRegistry) {
-    watchList.push(name);
-    
+Interpreter.addToWatchList = function (name, components, componentRegistry, ctx) {
     const comp = components.get(name);
-    console.log(comp);
-        /*if(comp){
-          // Check if it's a property access (e.g., .component:get)
-          if(a.property){
+    if(!comp) {
+       return;
+    }
+    if(!componentRegistry) {
+      return;
+    }
+    const handler = componentRegistry.get(comp.type);
+    if(!handler) {
+      return;
+    }
+    
+    let winfo = {
+      name,
+      comp,
+      handler,
+      ctx
+    }
+    
+    if(0){
             if(this.componentRegistry){
-              const handler = this.componentRegistry.get(comp.type);
+              const props = handler.getSupportedProperties();
+              for(pid in props) {
+                const property = props[pid];
+                a = {
+                  property
+                };
               if(handler && handler.evalGetProperty){
-                const result = handler.evalGetProperty(comp, a.property, a, this);
+                const result = handler.evalGetProperty(comp, a.property, a, ctx);
                 if(result){
                   if(a.pad && result.value){
                     result.value = this.applyPad(result.value, a.pad);
@@ -6774,10 +6792,14 @@ Interpreter.addToWatchList = function (name, components, componentRegistry) {
                   }
                   return result;
                 }
-              }
+             
+             }
+             }
             }
             throw Error(`Property ${a.property} cannot be used in expressions for component ${a.var}`);
-          }*/
+    }
+        
+    watchList.push(winfo);
 }
 
 // ================= BUILTIN DOC TABLE =================

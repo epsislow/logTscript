@@ -89,6 +89,8 @@ function run(){
     globalInterp.oscTimers = [];
   }
   
+  watchList = [];
+  
   let currentFileName = null;
   if(sdb.has("prog/lastName")) {
     currentFileName = sdb.get("prog/lastName");
@@ -220,6 +222,46 @@ function exportVars() {
 }
 
 let watchList = [];
+function applyPad(value, pad){
+    if(pad && value && value.length < pad) return value.padStart(pad, '0');
+    return value;
+}
+function lookIntoWatch(watch) {
+  let look = {};
+  const props = watch.handler.getSupportedProperties();
+  for (pid in props) {
+    a = {
+      'var': watch.name,
+      property: props[pid]
+    };
+    if (watch.handler.evalGetProperty) {
+      const result = watch.handler.evalGetProperty(watch.comp, a.property, a, watch.ctx);
+      if (result) {
+        if (a.pad && result.value) {
+          result.value = applyPad(result.value, a.pad);
+          result.ref = null;
+          result.bitWidth = result.value.length;
+        }
+      }
+      look[a.property] = result;
+    }
+  }
+  return look;
+}
+
+function getWatches(){
+  let t = '';
+  for(wid in watchList) {
+    const w = watchList[wid];
+    t += '>' + w.name + '\n';
+    look = lookIntoWatch(w);
+    for(name in look) {
+      console.log(look[name]);
+      t += ':'+ name + ' = ' + (look[name]? look[name].value : '-') + '\n';
+    }
+  }
+  return t;
+}
 function showVars(){
   let t='';
   if(globalInterp){
@@ -249,6 +291,7 @@ function showVars(){
       }
       t += `${k} (${w.type}) = ${valueStr} (ref: ${w.ref || 'null'})\n`;
     });
+    t += getWatches();
     t += `\nCycle: ${globalInterp.cycle}\n`;
     t += `Storage: ${globalInterp.storage.length} entries\n`;
   }
