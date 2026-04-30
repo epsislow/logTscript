@@ -1558,7 +1558,7 @@ console.log('\n=== Test 200: Component Registry — all types registered ===');
     'component-base', 'builtin-component', 'component-registry',
     'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
     'adder', 'subtract', 'multiplier', 'divider', 'shifter',
-    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', 'index'
+    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', '14seg', 'dots', 'index'
   ];
   let componentsSrc = '';
   for (const f of componentFiles) {
@@ -1839,7 +1839,7 @@ console.log('\n=== Test 200: Component Registry — all types registered ===');
     'component-base', 'builtin-component', 'component-registry',
     'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
     'adder', 'subtract', 'multiplier', 'divider', 'shifter',
-    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', 'index'
+    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', '14seg', 'dots', 'index'
   ];
   let componentsSrc = '';
   for (const f of componentFiles) {
@@ -2147,23 +2147,26 @@ doc(myFunc)`;
     funcs.set('helper', { params: [], returns: [] });
     const lines = InterpreterDoc.getDocLines('def', funcs);
     assert('first line is built-in:', lines[0], 'built-in:');
-    // built-in list contains ADD, SUBTRACT, MULTIPLY, DIVIDE
-    assert('built-in list contains ADD', String(lines[1].includes('ADD')), 'true');
-    assert('built-in list contains SUBTRACT', String(lines[1].includes('SUBTRACT')), 'true');
-    assert('built-in list contains MULTIPLY', String(lines[1].includes('MULTIPLY')), 'true');
-    assert('built-in list contains DIVIDE', String(lines[1].includes('DIVIDE')), 'true');
-    assert('built-in list contains NOT', String(lines[1].includes('NOT')), 'true');
-    assert('built-in list contains AND', String(lines[1].includes('AND')), 'true');
+    // built-in list is spread across multiple lines (4 per line); search all lines
+    const builtinBlock = lines.slice(1).join(' ');
+    assert('built-in list contains ADD', String(builtinBlock.includes('ADD')), 'true');
+    assert('built-in list contains SUBTRACT', String(builtinBlock.includes('SUBTRACT')), 'true');
+    assert('built-in list contains MULTIPLY', String(builtinBlock.includes('MULTIPLY')), 'true');
+    assert('built-in list contains DIVIDE', String(builtinBlock.includes('DIVIDE')), 'true');
+    assert('built-in list contains NOT', String(builtinBlock.includes('NOT')), 'true');
+    assert('built-in list contains AND', String(builtinBlock.includes('AND')), 'true');
     // user defined section
-    assert('user defined: label present', lines[3], 'user defined:');
-    assert('user functions listed', String(lines[4].includes('myFunc')), 'true');
-    assert('user functions listed helper', String(lines[4].includes('helper')), 'true');
+    const userLabelIdx = lines.indexOf('user defined:');
+    assert('user defined: label present', lines[userLabelIdx], 'user defined:');
+    assert('user functions listed', String(lines[userLabelIdx + 1].includes('myFunc')), 'true');
+    assert('user functions listed helper', String(lines[userLabelIdx + 1].includes('helper')), 'true');
   }
 
   console.log('\n=== Test 333: doc(def) — no user-defined functions shows (none) ===');
   {
     const lines = InterpreterDoc.getDocLines('def', new Map());
-    assert('no user-defined shows (none)', lines[4], '(none)');
+    const userLabelIdx = lines.indexOf('user defined:');
+    assert('no user-defined shows (none)', lines[userLabelIdx + 1], '(none)');
   }
 
   // ---- Interpreter end-to-end: doc(ADD) ----
@@ -2328,7 +2331,7 @@ doc(myFunc)`;
     'component-base', 'builtin-component', 'component-registry',
     'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
     'adder', 'subtract', 'multiplier', 'divider', 'shifter',
-    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', 'index'
+    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', '14seg', 'dots', 'index'
   ];
   let componentsSrc2 = '';
   for (const f of componentFiles2) {
@@ -2633,7 +2636,7 @@ doc(pcb.bcd)`;
     'component-base', 'builtin-component', 'component-registry',
     'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
     'adder', 'subtract', 'multiplier', 'divider', 'shifter',
-    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', 'index'
+    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', '14seg', 'dots', 'index'
   ];
   let compSrc500 = '';
   for (const f of compFiles500) {

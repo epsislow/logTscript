@@ -6844,7 +6844,6 @@ Interpreter.getDocLines = function(name, funcs, registry, pcbDefinitions) {
       lines.push(chunk.join(', '));
     }
 
-    //lines.push(allBuiltins.join(', '));
     lines.push('');
     lines.push('user defined:');
     if (funcs && funcs.size > 0) {
@@ -6916,6 +6915,22 @@ Interpreter.getDocLines = function(name, funcs, registry, pcbDefinitions) {
     const n = name.slice(3);
     return [`${name}(${n}bit data, 1bit clock, 1bit clear) -> ${n}bit`];
   }
+
+  // ---- MUXn pattern (e.g. MUX1, MUX2, MUX3) ----
+  /*if (/^MUX(\d+)$/.test(name)) {
+    const n = parseInt(name.slice(3), 10);
+    const inputs = 1 << n;
+    const dataParams = Array.from({length: inputs}, (_, i) => `Xbit data${i}`).join(', ');
+    return [`${name}(${n}bit sel, ${dataParams}) -> Xbit`];
+  }
+
+  // ---- DEMUXn pattern (e.g. DEMUX1, DEMUX2, DEMUX3) ----
+  if (/^DEMUX(\d+)$/.test(name)) {
+    const n = parseInt(name.slice(5), 10);
+    const outputs = 1 << n;
+    const retStr = Array.from({length: outputs}, () => 'Xbit').join(', ');
+    return [`${name}(${n}bit sel, Xbit data) -> ${retStr}`];
+  }*/
 
   // ---- User-defined functions ----
   if (funcs && funcs.has(name)) {
