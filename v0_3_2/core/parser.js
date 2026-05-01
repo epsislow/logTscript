@@ -747,6 +747,10 @@ assignment() {
       this.eat('SYM', '.');
       name = name + '.' + this.c.value;
       this.c = this.t.get();
+    } else if(name === '.' && this.c.type == 'ID') {
+      //console.log(name);
+      name = name + this.c.value;
+      this.c = this.t.get();
     }
     this.eat('SYM', ')');
     return { doc: name };

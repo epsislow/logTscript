@@ -1340,7 +1340,12 @@ if (this.isBuiltinDEMUX(name)) {
       return;
     }
     if(s.doc){
-      const name = s.doc;
+      let name = s.doc;
+      const comp = this.components.get(name);
+      if(comp) {
+        name = 'comp.'+comp.type;
+      }
+    
       const lines = Interpreter.getDocLines(name, this.funcs, this.componentRegistry, this.pcbDefinitions);
       for (const line of lines) {
         this.out.push(line);
