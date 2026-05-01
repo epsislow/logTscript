@@ -1345,6 +1345,10 @@ if (this.isBuiltinDEMUX(name)) {
       if(comp) {
         name = 'comp.'+comp.type;
       }
+      const pcb = this.pcbInstances.get(name);
+      if(pcb) {
+        name = 'pcb.' + pcb.pcbName
+      }
     
       const lines = Interpreter.getDocLines(name, this.funcs, this.componentRegistry, this.pcbDefinitions);
       for (const line of lines) {
