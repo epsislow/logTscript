@@ -752,6 +752,15 @@ assignment() {
       name = name + this.c.value;
       this.c = this.t.get();
     }
+    
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      this.eat('SYM', '.');
+      name = name + '.' + this.c.value;
+      this.c = this.t.get();
+      
+      name = '.' + name.replaceAll('.', '_');
+    }
+    
     this.eat('SYM', ')');
     return { doc: name };
   }

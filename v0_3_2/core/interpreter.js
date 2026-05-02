@@ -1352,7 +1352,11 @@ if (this.isBuiltinDEMUX(name)) {
         alias = name;
         name = 'pcb.' + pcb.pcbName
       }
-    
+      
+      if(alias.indexOf('_') > 0) {
+        alias = '.'+  alias.split('_')[2];
+      }
+      
       const lines = Interpreter.getDocLines(name, alias, this.funcs, this.componentRegistry, this.pcbDefinitions);
       for (const line of lines) {
         this.out.push(line);
