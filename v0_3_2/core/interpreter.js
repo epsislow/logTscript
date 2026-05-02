@@ -3910,9 +3910,11 @@ if (s.assignment) {
     
     // Restore original context (keeping internal components)
     // Merge new components with prefix to original (format: ._prefix_name)
+    instance.internalComponentName = [];
     for(const [compName, compInfo] of this.components){
       if(compName.startsWith('.' + internalPrefix + '_')){
         savedComponents.set(compName, compInfo);
+        instance.internalComponentName.push(compName);
       }
     }
     
