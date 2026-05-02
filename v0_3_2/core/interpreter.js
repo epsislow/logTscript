@@ -1341,16 +1341,19 @@ if (this.isBuiltinDEMUX(name)) {
     }
     if(s.doc){
       let name = s.doc;
+      let alias = '.name';
       const comp = this.components.get(name);
       if(comp) {
+        alias = name;
         name = 'comp.'+comp.type;
       }
       const pcb = this.pcbInstances.get(name);
       if(pcb) {
+        alias = name;
         name = 'pcb.' + pcb.pcbName
       }
     
-      const lines = Interpreter.getDocLines(name, this.funcs, this.componentRegistry, this.pcbDefinitions);
+      const lines = Interpreter.getDocLines(name, alias, this.funcs, this.componentRegistry, this.pcbDefinitions);
       for (const line of lines) {
         this.out.push(line);
       }
@@ -6836,7 +6839,7 @@ Interpreter.BUILTIN_DOC = {
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
 };
 
-Interpreter.getDocLines = function(name, funcs, registry, pcbDefinitions) {
+Interpreter.getDocLines = function(name, alias,  funcs, registry, pcbDefinitions) {
   // ---- doc(def) — list all built-in functions and user-defined functions ----
   if (name === 'def') {
     const builtinNames = Object.keys(Interpreter.BUILTIN_DOC);
@@ -6897,7 +6900,7 @@ Interpreter.getDocLines = function(name, funcs, registry, pcbDefinitions) {
     if (!handler) return [`${name}: tip de componentă nedefinit`];
     const def = handler.getDef ? handler.getDef() : null;
     if (!def) return [`comp.${canonicalType}: (no doc available)`];
-    return Interpreter.formatCompDef(canonicalType, def);
+    return Interpreter.formatCompDef(alias, canonicalType, def);
   }
 
   // ---- doc(pcb) — list all user-defined PCB types ----
@@ -6911,7 +6914,7 @@ Interpreter.getDocLines = function(name, funcs, registry, pcbDefinitions) {
     const pcbName = name.slice(4);
     if (!pcbDefinitions || !pcbDefinitions.has(pcbName)) return [`${name}: tip PCB nedefinit`];
     const def = pcbDefinitions.get(pcbName);
-    return Interpreter.formatPcbDef(pcbName, def);
+    return Interpreter.formatPcbDef(alias, pcbName, def);
   }
 
   // ---- Static builtin function table ----
@@ -6956,9 +6959,9 @@ Interpreter.getDocLines = function(name, funcs, registry, pcbDefinitions) {
   return [`${name}: funcție nedefinită`];
 };
 
-Interpreter.formatCompDef = function(type, def) {
+Interpreter.formatCompDef = function(alias, type, def) {
   const lines = [];
-  lines.push(`comp [${type}] .name:`);
+  lines.push(`comp [${type}] ${alias}:`);
   for (const attr of def.attrs) {
     if (attr.value === null) {
       lines.push(`  ${attr.name}`);
@@ -6983,9 +6986,9 @@ Interpreter.formatCompDef = function(type, def) {
   return lines;
 };
 
-Interpreter.formatPcbDef = function(name, def) {
+Interpreter.formatPcbDef = function(alias, name, def) {
   const lines = [];
-  lines.push(`pcb [${name}] .name:`);
+  lines.push(`pcb [${name}] ${alias}:`);
   if (def.exec) lines.push(`  exec: ${def.exec}`);
   lines.push(`  on: raise/edge/1/0`);
   lines.push('  :{');
