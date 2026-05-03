@@ -1357,7 +1357,14 @@ if (this.isBuiltinDEMUX(name)) {
         alias = '.'+  alias.split('_')[2];
       }
       
-      const lines = Interpreter.getDocLines(name, alias, this.funcs, this.componentRegistry, this.pcbDefinitions);
+      const lines = Interpreter.getDocLines(
+        name, 
+        alias, 
+        this.funcs, 
+        this.componentRegistry, 
+        this.pcbDefinitions, 
+        pcb ? pcb.internalComponentName : []
+      );
       for (const line of lines) {
         this.out.push(line);
       }
@@ -6846,7 +6853,7 @@ Interpreter.BUILTIN_DOC = {
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
 };
 
-Interpreter.getDocLines = function(name, alias,  funcs, registry, pcbDefinitions) {
+Interpreter.getDocLines = function(name, alias,  funcs, registry, pcbDefinitions, pcbCompNames) {
   // ---- doc(def) — list all built-in functions and user-defined functions ----
   if (name === 'def') {
     const builtinNames = Object.keys(Interpreter.BUILTIN_DOC);
@@ -6921,7 +6928,7 @@ Interpreter.getDocLines = function(name, alias,  funcs, registry, pcbDefinitions
     const pcbName = name.slice(4);
     if (!pcbDefinitions || !pcbDefinitions.has(pcbName)) return [`${name}: tip PCB nedefinit`];
     const def = pcbDefinitions.get(pcbName);
-    return Interpreter.formatPcbDef(alias, pcbName, def);
+    return Interpreter.formatPcbDef(alias, pcbName, def, pcbCompNames);
   }
 
   // ---- Static builtin function table ----
@@ -6993,7 +7000,7 @@ Interpreter.formatCompDef = function(alias, type, def) {
   return lines;
 };
 
-Interpreter.formatPcbDef = function(alias, name, def) {
+Interpreter.formatPcbDef = function(alias, name, def, compNames) {
   const lines = [];
   lines.push(`pcb [${name}] ${alias}:`);
   if (def.exec) lines.push(`  exec: ${def.exec}`);
@@ -7008,6 +7015,13 @@ Interpreter.formatPcbDef = function(alias, name, def) {
   lines.push('  }');
   if (def.returnSpec) {
     lines.push(`  -> ${def.returnSpec.bits}bit`);
+  }
+  if(compNames) {
+    lines.push('');
+    lines.push('Sub Components:');
+    for (const compName of (compNames || [])) {
+      lines.push(`: ${compName}`);
+    }
   }
   return lines;
 };
