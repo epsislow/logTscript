@@ -3914,9 +3914,10 @@ if (s.assignment) {
     for(const [compName, compInfo] of this.components){
       if(compName.startsWith('.' + internalPrefix + '_')){
         savedComponents.set(compName, compInfo);
-        instance.internalComponentName.push(compName);
+        instance.internalComponentName.push(compName.replace('.'+ internalPrefix + '_','.'));
       }
     }
+    //console.log(instance);
     
     // Save internal body wires (not in outer context, not pin/pout) for reuse next run.
     // Always rebuild the map so refs are up-to-date after this execution.
