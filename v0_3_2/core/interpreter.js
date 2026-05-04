@@ -1363,7 +1363,7 @@ if (this.isBuiltinDEMUX(name)) {
         this.funcs, 
         this.componentRegistry, 
         this.pcbDefinitions, 
-        pcb ? pcb.internalComponentName : []
+        pcb ? pcb.internalComponentName : false
       );
       for (const line of lines) {
         this.out.push(line);
@@ -3917,11 +3917,12 @@ if (s.assignment) {
     
     // Restore original context (keeping internal components)
     // Merge new components with prefix to original (format: ._prefix_name)
-    instance.internalComponentName = [];
+    instance.internalComponentName = new Map();
     for(const [compName, compInfo] of this.components){
       if(compName.startsWith('.' + internalPrefix + '_')){
         savedComponents.set(compName, compInfo);
-        instance.internalComponentName.push(compName.replace('.'+ internalPrefix + '_','.'));
+        //console.log(compName, compInfo.type);
+        instance.internalComponentName.set(compName.replace('.'+ internalPrefix + '_','.'), compInfo.type);
       }
     }
     //console.log(instance);
@@ -7018,9 +7019,9 @@ Interpreter.formatPcbDef = function(alias, name, def, compNames) {
   }
   if(compNames) {
     lines.push('');
-    lines.push('Sub Components:');
-    for (const compName of (compNames || [])) {
-      lines.push(`: ${compName}`);
+    lines.push('Sub components:');
+    for (const [compName, compType] of (compNames || [])) {
+      lines.push(` ${alias}${compName} (comp.${compType})`);
     }
   }
   return lines;
