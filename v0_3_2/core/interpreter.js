@@ -1356,11 +1356,12 @@ if (this.isBuiltinDEMUX(name)) {
       if(alias.indexOf('_') > 0) {
         alias = '.'+  alias.split('_')[2];
       }
-      
+
       const lines = Interpreter.getDocLines(
         name, 
         alias, 
-        this.funcs, 
+        this.funcs,
+        this.components,
         this.componentRegistry, 
         this.pcbDefinitions, 
         pcb ? pcb.internalComponentName : false
@@ -6854,7 +6855,7 @@ Interpreter.BUILTIN_DOC = {
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
 };
 
-Interpreter.getDocLines = function(name, alias,  funcs, registry, pcbDefinitions, pcbCompNames) {
+Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbDefinitions, pcbCompNames) {
   // ---- doc(def) — list all built-in functions and user-defined functions ----
   if (name === 'def') {
     const builtinNames = Object.keys(Interpreter.BUILTIN_DOC);
@@ -6898,6 +6899,16 @@ Interpreter.getDocLines = function(name, alias,  funcs, registry, pcbDefinitions
       if (keys.length > 0) line += ', ' + keys.map(k => `comp.${k}`).join(', ');
       return line;
     });
+    
+    if (!compDefs || compDefs.size === 0) {
+      lines.push('(no user defined comps)');
+    } else {
+      lines.push('');
+      lines.push('User defined comp:');
+      
+      lines.push([...compDefs.keys()].map(k => `${k} `));
+    }
+    
     return lines.length > 0 ? lines : ['(no components registered)'];
   }
 

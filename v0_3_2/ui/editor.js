@@ -366,7 +366,14 @@ const snippets = {
     freq: 1
     freqIsSec: 0
     eachCycle: 1
-    :`
+    :`,
+  'pcb': `pcb +[|]:
+   1pin set
+   exec: set
+   on:1
+   :1bit set
+
+pcb [a] .b::`
 };
 
 function insertComp(name) {

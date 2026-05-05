@@ -256,7 +256,7 @@ function getWatches(){
     t += '>' + w.name + '\n';
     look = lookIntoWatch(w);
     for(name in look) {
-      console.log(look[name]);
+      //console.log(look[name]);
       t += ':'+ name + ' = ' + (look[name]? look[name].value : '-') + '\n';
     }
   }
