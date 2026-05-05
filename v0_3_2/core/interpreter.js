@@ -1356,6 +1356,12 @@ if (this.isBuiltinDEMUX(name)) {
       if(alias.indexOf('_') > 0) {
         alias = '.'+  alias.split('_')[2];
       }
+      
+      let pcbInstNames = new Map();
+      for(const [pcbName, pcbInst] of this.pcbInstances) {
+        pcbInstNames.set(pcbName, pcbInst.pcbName);
+      }
+      //console.log(Array.from(pcbInstNames.entries()));
 
       const lines = Interpreter.getDocLines(
         name, 
@@ -1363,6 +1369,7 @@ if (this.isBuiltinDEMUX(name)) {
         this.funcs,
         this.components,
         this.componentRegistry, 
+        pcbInstNames,
         this.pcbDefinitions, 
         pcb ? pcb.internalComponentName : false
       );
@@ -6855,7 +6862,7 @@ Interpreter.BUILTIN_DOC = {
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
 };
 
-Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbDefinitions, pcbCompNames) {
+Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames) {
   // ---- doc(def) — list all built-in functions and user-defined functions ----
   if (name === 'def') {
     const builtinNames = Object.keys(Interpreter.BUILTIN_DOC);
@@ -6932,7 +6939,19 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbD
   // ---- doc(pcb) — list all user-defined PCB types ----
   if (name === 'pcb') {
     if (!pcbDefinitions || pcbDefinitions.size === 0) return ['(no PCB types defined)'];
-    return [...pcbDefinitions.keys()].map(k => `pcb.${k}`);
+    let lines =  [...pcbDefinitions.keys()].map(k => `pcb.${k}`);
+    
+    if(!pcbInstNames || pcbInstNames.size == 0) {
+      lines.push('(no user defined pcb)');
+    } else {
+      lines.push('');
+      lines.push('User defined pcb:');
+      
+      for(const [pcbName, pcbType] of pcbInstNames) {
+        lines.push( `${pcbName} (pcb.${pcbType})`);
+      }
+    }
+    return lines;
   }
 
   // ---- doc(pcb.type) ----
@@ -6941,6 +6960,7 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbD
     if (!pcbDefinitions || !pcbDefinitions.has(pcbName)) return [`${name}: tip PCB nedefinit`];
     const def = pcbDefinitions.get(pcbName);
     return Interpreter.formatPcbDef(alias, pcbName, def, pcbCompNames);
+    
   }
 
   // ---- Static builtin function table ----
