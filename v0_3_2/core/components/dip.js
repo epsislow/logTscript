@@ -77,6 +77,22 @@ var DipComponent = class DipComponent extends BuiltinComponent {
     }
     return { deviceIds, ref: dipRef };
   }
+
+  updateDisplayValue(comp, value, bitRange) {
+    let bitsToUse = value;
+    if (bitRange) {
+      const { start, end } = bitRange;
+      const actualEnd = end !== undefined ? end : start;
+      bitsToUse = value.substring(start, actualEnd + 1);
+    }
+    const dipId = comp.deviceIds[0];
+    for (let i = 0; i < bitsToUse.length; i++) {
+      const dipValue = bitsToUse[i] === '1';
+      if (typeof setDip === 'function') {
+        setDip(dipId, i, dipValue);
+      }
+    }
+  }
 };
 
 if (typeof module !== 'undefined' && module.exports) { module.exports = DipComponent; }
