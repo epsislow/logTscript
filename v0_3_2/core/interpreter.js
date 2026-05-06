@@ -6912,8 +6912,15 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     } else {
       lines.push('');
       lines.push('User defined comp:');
-      
-      lines.push([...compDefs.keys()].map(k => `${k} `));
+      console.log(Array.from(compDefs.entries()));
+      for(let [compName, compDef] of compDefs) {
+        if(compName.indexOf('_') > 0) {
+          compName = compName
+           .replace('.', '')
+           .replaceAll('_', '.');
+        }
+        lines.push(`${compName} (comp.${compDef.type})`)
+      }
     }
     
     return lines.length > 0 ? lines : ['(no components registered)'];
