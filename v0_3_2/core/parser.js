@@ -891,6 +891,23 @@ assignment() {
       throw Error(`Expected '${typeList}' after 'comp [' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     this.eat('SYM', ']');
+    
+    let attrNamesArray = [];
+    let def = null;
+    
+    if (this.componentRegistry) {
+      const handler = this.componentRegistry.get(compType);
+      if (handler) {
+        if (typeof handler.getDef === 'function') {
+            def = handler.getDef ? handler.getDef() : null;
+            const defAttrs = def.attrs ? def.attrs : [];
+            attrNamesArray = defAttrs
+              .filter(attr => attr.type === 'array')
+              .map(attr => attr.name);
+        }
+      }
+    }
+
 
     if (this.c.value !== '.') {
       throw Error(`Expected '.' but got ${this.c.type === 'TYPE' ? `type '${this.c.value}'` : `'${this.c.value}'`} at ${this.c.file}: ${this.c.line}:${this.c.col}`);
@@ -1023,9 +1040,27 @@ assignment() {
 
       if (this.c.type === 'ID') {
         const attrName = this.c.value;
+        const isArray = attrNamesArray.includes(attrName);
+        let stateNum = 0;
         this.eat('ID');
 
         const attributesWithNoValues = ['square', 'nl', 'circular', 'glow', 'rgb', 'noLabels'];
+        
+        
+        if (attrNamesArray.includes(attrName) && this.c.type === 'SYM' && this.c.value === '.') {
+          this.eat('SYM', '.');
+            
+          if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+            throw Error(`Expected state number after 'for.' at ${this.c.line}:${this.c.col}`);
+          }
+          
+          stateNum = parseInt(this.c.value, 10);
+          if (isNaN(stateNum)) {
+            throw Error(`Invalid state number in attribute 'for.${this.c.value}' at ${this.c.line}:${this.c.col}`);
+          }
+          
+          this.eat(this.c.type);
+        }
         
         if (attrName === 'for' && this.c.type === 'SYM' && this.c.value === '.') {
           this.eat('SYM', '.');
@@ -1034,7 +1069,7 @@ assignment() {
             throw Error(`Expected state number after 'for.' at ${this.c.line}:${this.c.col}`);
           }
           
-          const stateNum = parseInt(this.c.value, 10);
+          stateNum = parseInt(this.c.value, 10);
           if (isNaN(stateNum)) {
             throw Error(`Invalid state number in attribute 'for.${this.c.value}' at ${this.c.line}:${this.c.col}`);
           }
@@ -1252,12 +1287,27 @@ assignment() {
           }
           
           if (this.c.type === 'HEX') {
-            attributes[attrName] = '#' + this.c.value;
+            if(isArray) {
+              if (!attributes[attrName]) {
+                attributes[attrName] = {};
+              }
+              attributes[attrName][stateNum] = '#' + this.c.value;
+            } else {
+              attributes[attrName] = '#' + this.c.value;
+            }
             this.eat('HEX');
           } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
-            attributes[attrName] = this.c.value;
+            if(isArray) {
+              if (!attributes[attrName]) {
+                attributes[attrName] = {};
+              }
+              attributes[attrName][stateNum] = this.c.value;
+            } else {
+              attributes[attrName] = this.c.value;
+            }
+            
             this.eat(this.c.type);
-              } else if (this.c.type === 'SYM' && (this.c.value === '"' || this.c.value === "'")) {
+          } else if (this.c.type === 'SYM' && (this.c.value === '"' || this.c.value === "'")) {
                 const quote = this.c.value;
                 
                 let quotePos = -1;
@@ -1327,7 +1377,15 @@ assignment() {
                 this.t.line = tempLine;
                 this.t.col = tempCol;
                 
-                attributes[attrName] = strValue;
+                
+                if(isArray) {
+                  if (!attributes[attrName]) {
+                    attributes[attrName] = {};
+                  }
+                  attributes[attrName][stateNum] = strValue;
+                } else {
+                    attributes[attrName] = strValue;
+                }
                 this.c = this.t.get();
               } else {
                 let strValue = '';
@@ -1340,7 +1398,14 @@ assignment() {
                   }
                 }
                 if (strValue) {
-                  attributes[attrName] = strValue.trim();
+                  if(isArray) {
+                    if (!attributes[attrName]) {
+                      attributes[attrName] = {};
+                    }
+                    attributes[attrName][stateNum] = strValue.trim();
+                  } else {
+                    attributes[attrName] = strValue.trim();
+                  }
                 }
               }
         }
