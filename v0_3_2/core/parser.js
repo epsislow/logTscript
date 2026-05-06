@@ -859,7 +859,7 @@ assignment() {
       'led', 'switch', 'dip', 'mem', 'reg', 'counter', 'adder', 'subtract',
       'divider', 'multiplier', 'shifter', 'rotary', 'lcd', 'key', 'osc'
     ];
-
+    
     let compType = null;
 
     if(this.c.type === 'SYM' && componentShortnames[this.c.value]){
@@ -1061,100 +1061,8 @@ assignment() {
           
           this.eat(this.c.type);
         }
-        
-        if (attrName === 'for' && this.c.type === 'SYM' && this.c.value === '.') {
-          this.eat('SYM', '.');
-          
-          if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
-            throw Error(`Expected state number after 'for.' at ${this.c.line}:${this.c.col}`);
-          }
-          
-          stateNum = parseInt(this.c.value, 10);
-          if (isNaN(stateNum)) {
-            throw Error(`Invalid state number in attribute 'for.${this.c.value}' at ${this.c.line}:${this.c.col}`);
-          }
-          
-          this.eat(this.c.type);
-          
-          if (this.c.type !== 'SYM' || this.c.value !== ':') {
-            throw Error(`Expected ':' after 'for.${stateNum}' at ${this.c.line}:${this.c.col}`);
-          }
-          
-          this.eat('SYM', ':');
-          
-          let colonPos = -1;
-          for (let i = this.t.i - 1; i >= 0 && i >= this.t.i - 50; i--) {
-            if (this.t.src[i] === ':') {
-              colonPos = i;
-              break;
-            }
-          }
-          
-          if (colonPos === -1) {
-            this.c = this.t.get();
-          } else {
-            let checkI = colonPos + 1;
-            while (checkI < this.t.src.length && (this.t.src[checkI] === ' ' || this.t.src[checkI] === '\t')) {
-              checkI++;
-            }
-            
-            if (checkI < this.t.src.length && (this.t.src[checkI] === '"' || this.t.src[checkI] === "'")) {
-              const quote = this.t.src[checkI];
-              let pos = checkI + 1;
-              let strValue = '';
-              let foundClosingQuote = false;
-              
-              while (pos < this.t.src.length) {
-                const char = this.t.src[pos];
-                
-                if (char === '\n') {
-                  throw Error(`Unclosed string literal starting at ${this.c.line}:${this.c.col} - newline found before closing quote`);
-                }
-                
-                if (char === quote) {
-                  foundClosingQuote = true;
-                  pos++;
-                  break;
-                }
-                
-                strValue += char;
-                pos++;
-              }
-              
-              if (!foundClosingQuote) {
-                throw Error(`Unclosed string literal starting at ${this.c.line}:${this.c.col}`);
-              }
-              
-              let tempLine = this.t.line;
-              let tempCol = this.t.col;
-              for (let i = checkI; i < pos; i++) {
-                const char = this.t.src[i];
-                if (char === '\n') {
-                  tempLine++;
-                  tempCol = 1;
-                } else {
-                  tempCol++;
-                }
-              }
-              this.t.i = pos;
-              this.t.line = tempLine;
-              this.t.col = tempCol;
-              
-              if (!attributes.forLabels) {
-                attributes.forLabels = {};
-              }
-              attributes.forLabels[stateNum] = strValue;
-              
-              this.c = this.t.get();
-              continue;
-            } else {
-              this.c = this.t.get();
-            }
-          }
-        }
 
         if (this.c.value === ':' && !attributesWithNoValues.includes(attrName)) {
-          
           this.eat('SYM', ':');
           
           let colonPos = -1;
@@ -1278,14 +1186,22 @@ assignment() {
               this.t.line = tempLine;
               this.t.col = tempCol;
               
-              attributes[attrName] = strValue;
+              if(isArray) {
+                if (!attributes[attrName]) {
+                  attributes[attrName] = {};
+                }
+                attributes[attrName][stateNum] = strValue;
+              } else {
+                attributes[attrName] = strValue;
+              }
+              
               this.c = this.t.get();
               continue;
             } else {
               this.c = this.t.get();
             }
           }
-          
+
           if (this.c.type === 'HEX') {
             if(isArray) {
               if (!attributes[attrName]) {
@@ -1376,7 +1292,6 @@ assignment() {
                 this.t.i = pos;
                 this.t.line = tempLine;
                 this.t.col = tempCol;
-                
                 
                 if(isArray) {
                   if (!attributes[attrName]) {

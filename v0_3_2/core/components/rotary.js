@@ -14,7 +14,7 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'text', value: 'string' }, { name: 'states', value: 'integer' }, { name: 'color', value: 'string' }, { name: 'nl', value: null }],
+      attrs: [{ name: 'text', value: 'string' }, { name: 'states', value: 'integer' }, { name: 'color', value: 'string' },  { name: 'for', type: 'array', value: 'string' }, { name: 'nl', value: null }],
       initValue: 'Xbit',
       pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'data' }],
       pouts: [{ bits: 'X', name: 'get' }],
@@ -44,7 +44,7 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
     const states = attributes.states !== undefined ? parseInt(attributes.states, 10) : 8;
     const color = attributes.color || '#6dff9c';
     const nl = attributes.nl || false;
-    const forLabels = attributes.forLabels || {};
+    const forLabels = attributes['for'] || {};
     if (states < 2) throw Error(`Rotary states must be at least 2 for component ${name}`);
     const calculatedBits = Math.ceil(Math.log2(states));
     const actualBits = bits || calculatedBits;

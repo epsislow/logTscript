@@ -41,8 +41,7 @@ var DipComponent = class DipComponent extends BuiltinComponent {
     const colorFor = attributes.colorFor || {};
     const visual = attributes.visual !== undefined ? parseInt(attributes.visual, 10) : 0;
     const count = bits;
-    
-    console.log('attr', attributes);
+    //console.log('attr', colorFor);
 
     let initial = [];
     if (initialValue) {

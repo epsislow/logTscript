@@ -228,7 +228,7 @@ function addDipSwitch({
   onChange,
   noLabels = false, 
   color = '#2ecc71',
-  forColors = [],
+  colorFor = {},
   visual = 1
 }) {
   const getRowSize = function getRowSize(count) {
@@ -274,7 +274,7 @@ function addDipSwitch({
 
     const unit = document.createElement("label");
     unit.className = "dip-unit";
-    unit.style.setProperty("--seg-color", color);
+    unit.style.setProperty("--seg-color", colorFor[i] ?? color);
 
     const num = document.createElement("span");
     num.textContent = i + 1;
