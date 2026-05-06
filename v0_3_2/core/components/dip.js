@@ -37,7 +37,7 @@ var DipComponent = class DipComponent extends BuiltinComponent {
     const text = attributes.text !== undefined ? String(attributes.text) : '';
     const nl = attributes.nl || false;
     const noLabels = attributes.noLabels || false;
-    const color = attributes.color || false;
+    const color = attributes.color || '#2ecc71';
     const colorFor = attributes.colorFor || {};
     const noTransition = attributes.noTrans || 1;
     const visual = attributes.visual !== undefined ? parseInt(attributes.visual, 10) : 0;
