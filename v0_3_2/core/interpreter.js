@@ -7011,6 +7011,8 @@ Interpreter.formatCompDef = function(alias, type, def) {
   for (const attr of def.attrs) {
     if (attr.value === null) {
       lines.push(`  ${attr.name}`);
+    } else if (attr.type && attr.type === 'array') {
+      lines.push(`  ${attr.name}.X: ${attr.value}`);
     } else {
       lines.push(`  ${attr.name}: ${attr.value}`);
     }
