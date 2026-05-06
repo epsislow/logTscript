@@ -1,4 +1,41 @@
 window.lib_files = {
+    
+  ex_dip_rotary_osc: `
+  
+comp [dip] .val:
+    length: 15
+    visual: 1
+    noLabels
+    color: ^F03
+    colorFor.3: ^FF0
+    colorFor.10: ^0F0
+    colorFor.0: ^FFF
+    colorFor.1: ^F0F
+    on:1
+    noTrans
+    :
+
+comp [rotary] .aa:
+    text: 'R1'
+    for.0: '+'
+    for.1: '-'
+    for.2: 'x'
+    for.3: ':'
+    states: 4
+    :
+    
+    comp [~] .osc:
+    duration1: 4
+    duration0: 4
+    length: 15
+    freq: 10
+    freqIsSec: 0
+    eachCycle: 1
+    :
+    
+.val = .osc:counter
+
+  `,
   
   ex_repeat_reg_rot: `
   
