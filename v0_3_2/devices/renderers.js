@@ -229,7 +229,8 @@ function addDipSwitch({
   noLabels = false, 
   color = '#2ecc71',
   colorFor = {},
-  visual = 1
+  visual = 1,
+  noTransition = false
 }) {
   const getRowSize = function getRowSize(count) {
       if (count >= 16) return 8;
@@ -292,6 +293,9 @@ function addDipSwitch({
 
     const sw = document.createElement("span");
     sw.className = "dip-switch";
+    if (noTransition) {
+      sw.style.transition = 'none';
+    }
 
     unit.append(num, input, sw);
     row.appendChild(unit);

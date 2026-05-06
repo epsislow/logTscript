@@ -25,7 +25,7 @@ var DipComponent = class DipComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'length', value: 'integer' }, { name: 'text', value: 'string' }, { name: 'color', value: 'string' }, { name: 'colorFor', type: 'array', value: 'string' }, { name: 'nl', value: null }, { name: 'noLabels', value: null }, { name: 'visual', value: '0/1' }],
+      attrs: [{ name: 'length', value: 'integer' }, { name: 'text', value: 'string' }, { name: 'color', value: 'string' }, { name: 'colorFor', type: 'array', value: 'string' }, { name: 'nl', value: null }, { name: 'noLabels', value: null }, { name: 'noTrans', value: null }, { name: 'visual', value: '0/1' }],
       initValue: 'Xbit',
       pins: [],
       pouts: [{ bits: 'X', name: 'get' }],
@@ -39,6 +39,7 @@ var DipComponent = class DipComponent extends BuiltinComponent {
     const noLabels = attributes.noLabels || false;
     const color = attributes.color || false;
     const colorFor = attributes.colorFor || {};
+    const noTransition = attributes.noTrans || 1;
     const visual = attributes.visual !== undefined ? parseInt(attributes.visual, 10) : 0;
     const count = bits;
     //console.log('attr', colorFor);
@@ -76,7 +77,7 @@ var DipComponent = class DipComponent extends BuiltinComponent {
     };
 
     if (typeof addDipSwitch === 'function') {
-      addDipSwitch({ id: dipId, text, count, initial, nl, noLabels, visual, color, colorFor, onChange });
+      addDipSwitch({ id: dipId, text, count, initial, nl, noLabels, visual, color, colorFor, onChange, noTransition });
     }
     return { deviceIds, ref: dipRef };
   }
