@@ -502,5 +502,62 @@ function setClockDots(id, dot, state) {
   }
 }
 
+function addBarDevice({ id, length, width = 10, gap = 2, color = "#6dff9c", values = "" }) {
+  const container = document.getElementById("devices");
+  if (!container || !id) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "led-bar-wrapper";
+
+  const bar = document.createElement("div");
+  bar.className = "led-bar";
+  bar.dataset.id = id;
+  // Apply the custom width and gap to the CSS variables
+  bar.style.setProperty("--led-width", width + "px");
+  bar.style.setProperty("--led-gap", gap + "px");
+  bar.style.setProperty("--seg-color", color);
+
+  const segmentMap = {};
+
+  for (let i = 0; i < length; i++) {
+    const label = document.createElement("label");
+    label.style.display = "contents";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.className = "seg-input";
+    // Check initial state from 'values' string (e.g., "1010")
+    input.checked = values[i] === '1';
+
+    const segment = document.createElement("span");
+    segment.className = "led-segment";
+
+    label.append(input, segment);
+    bar.appendChild(label);
+    
+    // Key the segments by index for easy lookup
+    segmentMap[i] = input;
+  }
+
+  wrapper.appendChild(bar);
+  container.appendChild(wrapper);
+
+  if (typeof sevenSegDisplays !== 'undefined') {
+    sevenSegDisplays.set(id, segmentMap);
+  }
+}
+
+function setBarState(barId, stateBits) {
+  const segments = sevenSegDisplays.get(barId);
+  if (!segments) return;
+
+  // Loop through the bits and update the corresponding LED
+  for (let i = 0; i < stateBits.length; i++) {
+    const input = segments[i];
+    if (input) {
+      input.checked = stateBits[i] === '1';
+    }
+  }
+}
 
 

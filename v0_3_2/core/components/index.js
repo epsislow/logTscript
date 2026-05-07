@@ -1,5 +1,6 @@
 var ComponentRegistry = (typeof require !== 'undefined') ? require('./component-registry') : ComponentRegistry;
 var LedComponent = (typeof require !== 'undefined') ? require('./led') : LedComponent;
+var LedBarComponent = (typeof require !== 'undefined') ? require('./ledBar') : LedBarComponent;
 var SwitchComponent = (typeof require !== 'undefined') ? require('./switch') : SwitchComponent;
 var KeyComponent = (typeof require !== 'undefined') ? require('./key') : KeyComponent;
 var DipComponent = (typeof require !== 'undefined') ? require('./dip') : DipComponent;
@@ -22,6 +23,7 @@ var PcbComponent = (typeof require !== 'undefined') ? require('./pcb-component')
 function createComponentRegistry() {
   const registry = new ComponentRegistry();
   registry.register(LedComponent);
+  registry.register(LedBarComponent);
   registry.register(SwitchComponent);
   registry.register(KeyComponent);
   registry.register(DipComponent);
