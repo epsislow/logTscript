@@ -17,8 +17,10 @@ class CharacterLCD {
     id,
     rows = 8,
     cols = 5,
-    pixelSize = 10,
-    pixelGap = 3,
+    pixelSizeX = 10,
+    pixelSizeY = 10,
+    pixelGapX = 3,
+    pixelGapY = 3,
     pixelOnColor = "#6dff9c",
     backgroundColor = "transparent",
     glow = true,
@@ -29,8 +31,10 @@ class CharacterLCD {
     this.id = id;
     this.rows = rows;
     this.cols = cols;
-    this.pixelSize = pixelSize;
-    this.pixelGap = pixelGap;
+    this.pixelSizeX = pixelSizeX;
+    this.pixelSizeY = pixelSizeY;
+    this.pixelGapX = pixelGapX;
+    this.pixelGapY = pixelGapY;
     this.pixelOnColor = pixelOnColor;
     this.backgroundColor = backgroundColor;
     this.glow = glow;
@@ -53,9 +57,9 @@ class CharacterLCD {
     this.ctx = this.canvas.getContext("2d");
 
     this.canvas.width =
-      cols * (pixelSize + pixelGap) + pixelGap;
+      cols * (pixelSizeX + pixelGapX) + pixelGapX;
     this.canvas.height =
-      rows * (pixelSize + pixelGap) + pixelGap;
+      rows * (pixelSizeY + pixelGapY) + pixelGapY;
 
     /* ---- batching state ---- */
     this._dirty = false;
@@ -200,9 +204,9 @@ if (changed) this.requestDraw();
         if (!this.pixels[r][c]) continue;
 
         const x =
-          this.pixelGap + c * (this.pixelSize + this.pixelGap);
+          this.pixelGapX + c * (this.pixelSizeX + this.pixelGapX);
         const y =
-          this.pixelGap + r * (this.pixelSize + this.pixelGap);
+          this.pixelGapY + r * (this.pixelSizeY + this.pixelGapY);
 
         // Determine the color for this pixel
         // Use stored pixel color if available, otherwise use default pixelOnColor
@@ -210,7 +214,7 @@ if (changed) this.requestDraw();
 
         if (this.glow) {
           ctx.shadowColor = pixelColor;
-          ctx.shadowBlur = this.pixelSize * 0.8;
+          ctx.shadowBlur = (this.pixelSizeX + this.pixelSizeY) * 0.4;
         } else {
           ctx.shadowBlur = 0;
         }
@@ -221,16 +225,16 @@ if (changed) this.requestDraw();
         ctx.roundRect(
           x,
           y,
-          this.pixelSize,
-          this.pixelSize,
-          this.pixelSize * 0.3
+          this.pixelSizeX,
+          this.pixelSizeY,
+          (this.pixelSizeX + this.pixelSizeY) * 0.2
         );
         } else {
           ctx.rect(
             x,y,
-            this.pixelSize,
-            this.pixelSize,
-            this.pixelSize * 0.3
+            this.pixelSizeX,
+            this.pixelSizeY,
+            (this.pixelSizeX + this.pixelSizeY) * 0.2
           )
         }
         ctx.fill();

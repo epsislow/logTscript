@@ -11,7 +11,19 @@ var LcdComponent = class LcdComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'row', value: 'integer' }, { name: 'cols', value: 'integer' }, { name: 'pixelSize', value: 'integer' }, { name: 'pixelGap', value: 'integer' }, { name: 'color', value: 'string' }, { name: 'nl', value: null }, { name: 'rgb', value: null }],
+      attrs: [
+        { name: 'row', value: 'integer' },
+        { name: 'cols', value: 'integer' },
+        { name: 'pixelSize', value: 'integer' },
+        { name: 'pixelSizeX', value: 'integer' },
+        { name: 'pixelSizeY', value: 'integer' },
+        { name: 'pixelGap', value: 'integer' },
+        { name: 'pixelGapX', value: 'integer' },
+        { name: 'pixelGapY', value: 'integer' },
+        { name: 'color', value: 'string' },
+        { name: 'nl', value: null },
+        { name: 'rgb', value: null }
+      ],
       initValue: '8bit',
       pins: [{ bits: '1', name: 'set' }, { bits: '1', name: 'clear' }, { bits: 'X', name: 'x' }, { bits: 'X', name: 'y' }, { bits: 'X', name: 'rowlen' }, { bits: '1', name: 'not' }, { bits: '1', name: 'write0' }, { bits: '8', name: 'chr' }, { bits: 'X', name: 'data' }, { bits: '2', name: 'corner' }, { bits: 'X', name: 'rgb' }],
       pouts: [{ bits: '8', name: 'get' }],
@@ -31,7 +43,11 @@ var LcdComponent = class LcdComponent extends BuiltinComponent {
     const rows = attributes['row'] !== undefined ? parseInt(attributes['row'], 10) : 8;
     const cols = attributes['cols'] !== undefined ? parseInt(attributes['cols'], 10) : 5;
     const pixelSize = attributes['pixelSize'] !== undefined ? parseInt(attributes['pixelSize'], 10) : 10;
+    const pixelSizeX = attributes['pixelSizeX'] !== undefined ? parseInt(attributes['pixelSizeX'], 10) : pixelSize;
+    const pixelSizeY = attributes['pixelSizeY'] !== undefined ? parseInt(attributes['pixelSizeY'], 10) : pixelSize;
     const pixelGap = attributes['pixelGap'] !== undefined ? parseInt(attributes['pixelGap'], 10) : 3;
+    const pixelGapX = attributes['pixelGapX'] !== undefined ? parseInt(attributes['pixelGapX'], 10) : pixelGap;
+    const pixelGapY = attributes['pixelGapY'] !== undefined ? parseInt(attributes['pixelGapY'], 10) : pixelGap;
     const glow = true;
     const round = true;
     const color = attributes['color'] || attributes['pixelOnColor'] || '#6dff9c';
@@ -41,7 +57,7 @@ var LcdComponent = class LcdComponent extends BuiltinComponent {
     const lcdId = baseId;
 
     if (typeof addCharacterLCD === 'function') {
-      addCharacterLCD({ id: lcdId, rows, cols, pixelSize, pixelGap, glow, pixelOnColor: color, backgroundColor: bg, round, nl, rgb });
+      addCharacterLCD({ id: lcdId, rows, cols, pixelSizeX, pixelSizeY, pixelGapX, pixelGapY, glow, pixelOnColor: color, backgroundColor: bg, round, nl, rgb });
     }
     return { deviceIds: [lcdId], ref: null };
   }
