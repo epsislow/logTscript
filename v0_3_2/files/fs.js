@@ -1438,8 +1438,8 @@ comp [mem] .mem:
 
 #posx2 = pos + 0
 #posx2, 1bit_ = MULTIPLY(pos;4, \\2)
-#xp = MUX1( EQ(pos, 0), pos + 0, pos;4)
-#yp = MUX1( EQ(pos, 0), pos + 1, 1;4)
+#xp = MUX( EQ(pos, 0), pos + 0, pos;4)
+#yp = MUX( EQ(pos, 0), pos + 1, 1;4)
 
 xp = pos + 0
 yp = pos + 1
@@ -2488,10 +2488,10 @@ comp [dip] .a:
     on:1
      :
 
-#doc(DEMUX2)
+#doc(DEMUX)
 2wire q = 1 + 0
 1wire _, 2wire c = fr(.a.0,.a.1)
-8wire b2 = DEMUX2(.a.2/2, c)
+8wire b2 = DEMUX(.a.2/2, c)
 
   
   `,
@@ -2538,7 +2538,7 @@ comp [counter] .hour:
 8wire cnt = .osc1:counter
 
 #>
-1wire trig60 = MUX1(dire, EQ(cnt, \\0), EQ(cnt, \\60))
+1wire trig60 = MUX(dire, EQ(cnt, \\0), EQ(cnt, \\60))
 
 .osc1:{
   reset = 1
@@ -2546,11 +2546,11 @@ comp [counter] .hour:
 }
 #<
 
-#.sec:data = MUX1(dire, \\59, \\59)
+#.sec:data = MUX(dire, \\59, \\59)
 #.sec:set =1
 
 .sec:{
-  data=MUX1(dire,  \\59, \\0)
+  data=MUX(dire,  \\59, \\0)
   write=1
   set= 1
 }
@@ -2560,9 +2560,9 @@ comp [counter] .hour:
   set= .osc1:get
 }
 6wire sec = .sec:get
-1wire trigSec= MUX1(dire, EQ(sec, \\0), EQ(sec, \\60))
+1wire trigSec= MUX(dire, EQ(sec, \\0), EQ(sec, \\60))
 .sec:{
-  data= MUX1(dire, \\59, \\0)
+  data= MUX(dire, \\59, \\0)
   write=1
   set=trigSec
 }
@@ -2573,19 +2573,19 @@ comp [counter] .hour:
   set= trigSec
 }
 6wire min = .min:get
-1wire trigMin = MUX1(dire, EQ(min, \\0), EQ(min, \\60))
+1wire trigMin = MUX(dire, EQ(min, \\0), EQ(min, \\60))
 
 .min:{
-  data=MUX1(dire,  \\59, \\0)
+  data=MUX(dire,  \\59, \\0)
   write=1
   set= trigMin
 }
 
 
 6wire hour = .hour:get
-1wire trigHour = MUX1(dire, EQ(hour, \\0), EQ(hour, \\23))
+1wire trigHour = MUX(dire, EQ(hour, \\0), EQ(hour, \\23))
 .hour:{
-  data= MUX1(dire, \\24, \\0)
+  data= MUX(dire, \\24, \\0)
   write=1
   set= trigHour
 }
@@ -3642,7 +3642,7 @@ comp [mem] .pos:
 4wire pos
 .pos:{
   at=0
-  data = MUX1(.k1, MUX1(.k2, MUX1(.k3, \\0, \\3), \\2), \\1)       
+  data = MUX(.k1, MUX(.k2, MUX(.k3, \\0, \\3), \\2), \\1)       
   write = 1
   set = k
   get>= pos
@@ -3674,10 +3674,10 @@ comp [mem] .pos:
 4wire rnd3 = r.8/4
 4wire rnd4 = r.12/4
 #01111110
-8wire o = MUX1(rnd.0, MUX1(rnd.1, MUX1(rnd.2, ^00, 10010000 ), odata.8/8), odata.0/8)
-8wire o2 =  MUX1(rnd2.0, MUX1(rnd2.1, MUX1(rnd2.2, ^00, 10010000 ), odata.8/8), odata.0/8)
-8wire o3 =  MUX1(rnd3.0, MUX1(rnd3.1, MUX1(rnd3.2, ^00, 10010000 ), odata.8/8), odata.0/8)
-8wire o4 =  MUX1(rnd4.0, MUX1(rnd4.1, MUX1(rnd4.2, ^00, 10010000 ), odata.8/8), odata.0/8)
+8wire o = MUX(rnd.0, MUX(rnd.1, MUX(rnd.2, ^00, 10010000 ), odata.8/8), odata.0/8)
+8wire o2 =  MUX(rnd2.0, MUX(rnd2.1, MUX(rnd2.2, ^00, 10010000 ), odata.8/8), odata.0/8)
+8wire o3 =  MUX(rnd3.0, MUX(rnd3.1, MUX(rnd3.2, ^00, 10010000 ), odata.8/8), odata.0/8)
+8wire o4 =  MUX(rnd4.0, MUX(rnd4.1, MUX(rnd4.2, ^00, 10010000 ), odata.8/8), odata.0/8)
 
 
 
@@ -3773,7 +3773,7 @@ comp [mem] .pos:
 4wire pos
 .pos:{
   at=0
-  data = MUX1(.k1, MUX1(.k2, MUX1(.k3, \\0, \\3), \\2), \\1)       
+  data = MUX(.k1, MUX(.k2, MUX(.k3, \\0, \\3), \\2), \\1)       
   write = 1
   set = k
   get>= pos
@@ -5563,7 +5563,7 @@ comp [dip] .as:
    noLabels
    :16bit
 
-16wire as = MUX1(.sg, .as, !.as)
+16wire as = MUX(.sg, .as, !.as)
 
 
 comp [7seg] .f:
@@ -5647,7 +5647,7 @@ comp [divider] .dz:
    mod>= dh
 }
 .f:{
-  g = MUX1(.sg, 0, 1)
+  g = MUX(.sg, 0, 1)
   set = 1
 }
 .e:{
@@ -5898,7 +5898,7 @@ pcb +[bcd]:
       :
 
    .sub:a = sum
-   .sub:b = MUX1(set, 0000, 1010)
+   .sub:b = MUX(set, 0000, 1010)
    .sub:set = set
    corr = .sub:get
    carry = .sub:carry 
@@ -6073,10 +6073,10 @@ show(.ad:get)
 show(.ad:carry)
 
 
-.c:hex = MUX2(.op, .ad:carry, .sb:carry, .mp:over, .dv:mod)
+.c:hex = MUX(.op, .ad:carry, .sb:carry, .mp:over, .dv:mod)
 .c:set = 1
 
-.d:hex = MUX2(.op, .ad:get, .sb:get, .mp:get, .dv:get)
+.d:hex = MUX(.op, .ad:get, .sb:get, .mp:get, .dv:get)
 .d:set = 1
 
 2wire qq = .op
@@ -6180,10 +6180,10 @@ show(.ad:get)
 show(.ad:carry)
 
 
-.c:hex = MUX2(.op.0/2, .ad:carry, .sb:carry, .mp:over, .dv:mod)
+.c:hex = MUX(.op.0/2, .ad:carry, .sb:carry, .mp:over, .dv:mod)
 .c:set = 1
 
-.d:hex = MUX2(.op.0/2, .ad:get, .sb:get, .mp:get, .dv:get)
+.d:hex = MUX(.op.0/2, .ad:get, .sb:get, .mp:get, .dv:get)
 .d:set = 1
 
 .c:set = ~
@@ -6487,7 +6487,7 @@ comp [adder] .add:
 4wire q= .c:get
 1wire clr = .clr
 
-1wire k = MUX1(clr, 1, ~)
+1wire k = MUX(clr, 1, ~)
 
 
 .c:{
@@ -6527,7 +6527,7 @@ comp [adder] .add:
 .lcd1:{ 
   x = .ml:over + .ml:get
   y = 0
-  rgb = MUX2(q.0/2, ^F33, ^FF3, ^F3F, ^3FF)
+  rgb = MUX(q.0/2, ^F33, ^FF3, ^F3F, ^3FF)
   rowlen = 101
   chr = .mem:get
   set = k
@@ -6595,8 +6595,8 @@ comp [multiplier] .ml:
 
 4wire q= .c:get
 1wire clr = .clr
-#1wire clr = MUX1(AND4(NOTE(q)), .clr, 1)
-1wire k = MUX1(clr, 1, ~)
+#1wire clr = MUX(AND4(NOTE(q)), .clr, 1)
+1wire k = MUX(clr, 1, ~)
 
 .c:{
   dir = 1
@@ -6625,7 +6625,7 @@ comp [multiplier] .ml:
   clear = clr
   x = .ml:over + .ml:get
   y = 0
-  rgb = MUX2(q.0/2, ^F33, ^FF3, ^F3F, ^3FF)
+  rgb = MUX(q.0/2, ^F33, ^FF3, ^F3F, ^3FF)
   rowlen = 101
   chr = .mem:get
  # chr = ^4 + q
@@ -6682,7 +6682,7 @@ comp [multiplier] .ml:
 
 
 1wire clr = .clr
-1wire k = MUX1(clr, 1, ~)
+1wire k = MUX(clr, 1, ~)
 
 .c:dir = 1
 .c:set = ~
@@ -6707,7 +6707,7 @@ comp [multiplier] .ml:
   clear = clr
   x = .ml:over + .ml:get
   y = 0
-  rgb = MUX2(q.0/2, ^F33, ^FF3, ^F3F, ^3FF)
+  rgb = MUX(q.0/2, ^F33, ^FF3, ^F3F, ^3FF)
   rowlen = 101
   chr = .mem:get
  # chr = ^4 + q
@@ -6757,10 +6757,10 @@ comp [multiplier] .ml:
 }
 
 .lcd1:{ 
-  clear = MUX2(q.0/2,1,0,0,0)
+  clear = MUX(q.0/2,1,0,0,0)
   x = .ml:get
   y = 0
-  rgb = MUX2(q.0/2, ^F33, ^FF3, ^F3F, ^3FF)
+  rgb = MUX(q.0/2, ^F33, ^FF3, ^F3F, ^3FF)
   rowlen = 101
   chr = ^4 + q
   set = ~
@@ -6839,10 +6839,10 @@ pcb +[sh4]:
    .sh1:dir=i
    .sh2:dir=i
    .sh3:dir=i
-   .sh0:in=MUX1(i, 0, in.0)
-   .sh1:in=MUX1(i, 0, in.1)
-   .sh2:in=MUX1(i, 0, in.2)
-   .sh3:in=MUX1(i, 0, in.3)
+   .sh0:in=MUX(i, 0, in.0)
+   .sh1:in=MUX(i, 0, in.1)
+   .sh2:in=MUX(i, 0, in.2)
+   .sh3:in=MUX(i, 0, in.3)
    .sh0:set= set
    .sh1:set= set
    .sh2:set= set
@@ -6915,10 +6915,10 @@ pcb +[sh4]:
    .sh1:dir=i
    .sh2:dir=i
    .sh3:dir=i
-   .sh0:in=MUX1(i, 0, in.0)
-   .sh1:in=MUX1(i, 0, in.1)
-   .sh2:in=MUX1(i, 0, in.2)
-   .sh3:in=MUX1(i, 0, in.3)
+   .sh0:in=MUX(i, 0, in.0)
+   .sh1:in=MUX(i, 0, in.1)
+   .sh2:in=MUX(i, 0, in.2)
+   .sh3:in=MUX(i, 0, in.3)
    .sh0:set= set
    .sh1:set= set
    .sh2:set= set
