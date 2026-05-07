@@ -3,7 +3,7 @@ var BuiltinComponent = (typeof require !== 'undefined') ? require('./builtin-com
 var LedBarComponent = class LedBarComponent extends BuiltinComponent {
     
     static get type() { return 'bar'; }
-    static get shortnames() { return { }; }
+    static get shortnames() { return { '': 'bar' }; }
     static get isReservedName() { return true; }
     
     // The width is dynamic based on the 'length' attribute
@@ -24,6 +24,7 @@ var LedBarComponent = class LedBarComponent extends BuiltinComponent {
                 { name: 'color', value: 'string' },
                 { name: 'bgColor', value: 'string' },
                 { name: 'lgColor', value: 'string' },
+                { name: 'orientation', value: 'integer' },
                 { name: 'tranSec', value: 'integer' },
                 { name: 'scale', value: 'integer' },
                 { name: 'nl', value: null }
@@ -104,6 +105,7 @@ var LedBarComponent = class LedBarComponent extends BuiltinComponent {
         const color = attributes.color || '#6dff9c';
         const lgColor = attributes.lgColor || '#444444';
         const bgColor = attributes.bgColor || '#1a1a1a';
+        const orientation = attributes.orientation || 0;
         const tranSec = attributes.tranSec || 2;
         const scale = 0.35 + (attributes.scale || 5) * 0.05;
         const nl = attributes.nl || false;
@@ -123,7 +125,8 @@ var LedBarComponent = class LedBarComponent extends BuiltinComponent {
                 bgColor,
                 lgColor,
                 tranSec,
-                scale
+                scale,
+                orientation
             });
         }
         

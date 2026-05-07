@@ -502,7 +502,7 @@ function setClockDots(id, dot, state) {
   }
 }
 
-function addBarDevice({ id, length, width = 10, gap = 2, color = "#6dff9c", values = "" }) {
+function addBarDevice({ id, length, width = 10, gap = 2, color = "#6dff9c", values = "", orientation = 0 }) {
   const container = document.getElementById("devices");
   if (!container || !id) return;
 
@@ -511,6 +511,8 @@ function addBarDevice({ id, length, width = 10, gap = 2, color = "#6dff9c", valu
 
   const bar = document.createElement("div");
   bar.className = "led-bar";
+  if (parseInt(orientation) === 1) bar.classList.add("vertical");
+  
   bar.dataset.id = id;
   // Apply the custom width and gap to the CSS variables
   bar.style.setProperty("--led-width", width + "px");
