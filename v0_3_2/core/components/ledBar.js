@@ -25,6 +25,7 @@ var LedBarComponent = class LedBarComponent extends BuiltinComponent {
                 { name: 'bgColor', value: 'string' },
                 { name: 'lgColor', value: 'string' },
                 { name: 'orientation', value: 'integer' },
+                { name: 'barWidth', value: 'integer' },
                 { name: 'tranSec', value: 'integer' },
                 { name: 'scale', value: 'integer' },
                 { name: 'nl', value: null }
@@ -101,6 +102,7 @@ var LedBarComponent = class LedBarComponent extends BuiltinComponent {
     createDevice(name, baseId, bits, attributes, initialValue) {
         const length = attributes.length || 8;
         const width = attributes.width || 10;
+        const barWidth = attributes.barWidth || 20;
         const gap = attributes.gap || 2;
         const color = attributes.color || '#6dff9c';
         const lgColor = attributes.lgColor || '#444444';
@@ -118,6 +120,7 @@ var LedBarComponent = class LedBarComponent extends BuiltinComponent {
                 id: barId,
                 length,
                 width,
+                barWidth,
                 gap,
                 color,
                 values: barInitialValue,
