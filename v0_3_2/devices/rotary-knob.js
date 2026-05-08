@@ -257,6 +257,7 @@ function addRotaryKnob({
                           onChange,
                           color = "#6dff9c",
                           forLabels = {},
+                          nl = false,
                         }) {
     const analog = true;
   const container = document.getElementById("devices");
@@ -314,6 +315,12 @@ function addRotaryKnob({
   wrapper.append(value);
 
   container.appendChild(wrapper);
+  
+  if (nl) {
+    const br = document.createElement('div');
+    br.className = 'break';
+    container.appendChild(br);
+  }
   
   if (!window.rotaryKnobs) {
     window.rotaryKnobs = new Map();

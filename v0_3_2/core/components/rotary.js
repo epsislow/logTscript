@@ -43,12 +43,12 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
     const text = attributes.text !== undefined ? String(attributes.text) : '';
     const states = attributes.states !== undefined ? parseInt(attributes.states, 10) : 8;
     const color = attributes.color || '#6dff9c';
-    const nl = attributes.nl || false;
+
     const forLabels = attributes['for'] || {};
     if (states < 2) throw Error(`Rotary states must be at least 2 for component ${name}`);
     const calculatedBits = Math.ceil(Math.log2(states));
     const actualBits = bits || calculatedBits;
-
+    const nl = attributes['nl'] || false;
     const rotaryInitialValue = initialValue || '0'.repeat(actualBits);
     const storageIdx = ctx.storeValue(rotaryInitialValue);
     const rotaryRef = `&${storageIdx}`;
@@ -73,7 +73,7 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
     };
 
     if (typeof addRotaryKnob === 'function') {
-      addRotaryKnob({ id: rotaryId, label: text, states, color, forLabels, onChange });
+      addRotaryKnob({ id: rotaryId, label: text, states, color, forLabels, onChange, nl });
     }
     return { deviceIds: [rotaryId], ref: rotaryRef };
   }
