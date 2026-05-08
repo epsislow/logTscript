@@ -1261,12 +1261,14 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
           // Single wire assignment: wireName = expr
           wireName = ws.assignment.target.var;
           if(wireName === depWireName){
-            shouldReexecute = true;
+          //  console.log('y1', wireName, depWireName );
+         //   shouldReexecute = true;
           }
         } else if(ws.decls && ws.expr){
           // Multiple wire declaration: type wire1 wire2 wire3 = expr
           for(const decl of ws.decls){
             if(decl.name === depWireName){
+              console.log('y2');
               shouldReexecute = true;
               wireName = depWireName;
               break;
@@ -1275,7 +1277,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
         }
         
         if(shouldReexecute){
-          //console.log(`[DEBUG updateConnected] re-executing wire statement for '${depWireName}'`);
+          console.log(`[DEBUG updateConnected] re-executing wire statement for '${depWireName}'`, ws);
           // Re-execute the wire statement
           this.execWireStatement(ws);
           
