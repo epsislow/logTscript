@@ -85,14 +85,17 @@ var LedBarComponent = class LedBarComponent extends BuiltinComponent {
         if (comp.deviceIds.length > 0) {
             const barId = comp.deviceIds[0];
             
-            if (typeof setBarState === 'function') {
-                setBarState(barId, bitsToUse);
-            }
-            
-            // Ensure internal value remains the correct length
             let v = bitsToUse;
             if (v.length < len) v = v.padEnd(len, '0');
             else if (v.length > len) v = v.substring(0, len);
+            
+            if (typeof setBarState === 'function') {
+            //    if(barId =='bar2') {
+                //  console.log(len);
+                //  console.log('=', bitsToUse);
+              //  }
+                setBarState(barId, v);
+            }
             
             comp.lastSegmentValue = v;
         }
