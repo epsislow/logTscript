@@ -1,6 +1,6 @@
 window.lib_files = {
-  nex_key_led_toggle: `
-   comp [led] .power:
+  ex_key_led_toggle: `
+    comp [led] .pw:
     square
     on:1
     nl
@@ -11,10 +11,11 @@ window.lib_files = {
     on:1
     :
     
-  1w p = .p
-  1w tg := 0
- tg = MUX(p, tg, NOT(tg))
+1w p = .p
+1w tg := 0
+ tg = MUX(.p, tg, NOT(tg))
  
+ .pw = tg
 `, 
   ex_dip_rotary_osc_bar3: `
   
