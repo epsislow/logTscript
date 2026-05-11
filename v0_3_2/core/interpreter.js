@@ -310,7 +310,6 @@ class Interpreter {
 
   for (const x of expr) {
       const v = this.evalAtom(x, computeRefs);
-
     if (Array.isArray(v)) {
       for (const part of v) parts.push(part);
     } else {
@@ -761,7 +760,7 @@ class Interpreter {
         // If wire has no value yet, treat as 0 for computation (but show as -)
         if(val === null){
           if(wire.ref === null || wire.ref === '&-'){
-            val = '-';
+            val = '0'.repeat(this.getBitWidth(wire.type));
           } else {
             // Reference exists but value not computed yet - compute it
             val = '0'.repeat(this.getBitWidth(wire.type));
@@ -3075,7 +3074,7 @@ if (s.assignment) {
             stored.value = checked ? '1' : '0';
             // Update all connected components
             this.updateComponentConnections(name);
-            console.log(`[DEBUG on change] after updateComponentConnections, wires:`, [...this.wires.entries()].map(([k,v]) => `${k}=${this.getValueFromRef(v.ref)}`).join(', '));
+            //console.log(`[DEBUG on change] after updateComponentConnections, wires:`, [...this.wires.entries()].map(([k,v]) => `${k}=${this.getValueFromRef(v.ref)}`).join(', '));
             showVars();
           }
         }
@@ -6450,7 +6449,6 @@ if (s.assignment) {
                 charCode = parseInt(chrValue, 2);
               }
               debug.ex = debug.ex === undefined? 0: debug.ex+1; 
-              console.log(debug.ex, pending, (pending.data)? 'y': 'n');
               // Get character bits from LCD instance
               if(typeof lcdDisplays !== 'undefined' && lcdDisplays.has(lcdId)){
                 const lcdInstance = lcdDisplays.get(lcdId);
