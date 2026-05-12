@@ -1144,6 +1144,10 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
   const isTopLevel = !this._uccPendingBlocks;
   if(isTopLevel){
     this._uccPendingBlocks = new Map(); // blockIndex → block
+    // Tracks wire statements already executed in this cascade so a self-referential
+    // assignment like tg0 = MUX(p, tg0, NOT(tg0)) is not re-executed when tg0 itself
+    // changes, preventing infinite oscillation.
+    this._uccExecutedStatements = new Set();
   }
 
   // Update all components connected to this variable/wire
@@ -1154,7 +1158,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
   
   if(!varRef || varRef === '&-'){
     //console.log(`[DEBUG updateConnected] EARLY RETURN: varRef is null or &- for '${varName}'`);
-    if(isTopLevel) this._uccPendingBlocks = null;
+    if(isTopLevel){ this._uccPendingBlocks = null; this._uccExecutedStatements = null; }
     return;
   }
   
@@ -1246,57 +1250,53 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
     
     //console.log(`[DEBUG updateConnected] dependentWires for '${varName}':`, [...dependentWires]);
     
-    // Re-execute wire statements for dependent wires
-    // This ensures that when db changes, q = ANDA4(!db.12/4) is re-executed
+    // Re-execute wire statements for dependent wires and propagate only if value changed.
+    // _uccExecutedStatements (shared across recursive calls) prevents a statement from
+    // being re-executed more than once per top-level cascade event, which stops
+    // self-referential assignments like tg0 = MUX(p, tg0, NOT(tg0)) from oscillating.
     for(const depWireName of dependentWires){
       const depWire = this.wires.get(depWireName);
       if(!depWire) continue;
-      
-      // Find the wire statement for this dependent wire
+
       for(const ws of this.wireStatements){
-        let shouldReexecute = false;
-        let wireName = null;
-        
-        if(ws.assignment){
+        if(ws.assignment && ws.assignment.target.var === depWireName){
           // Single wire assignment: wireName = expr
-          wireName = ws.assignment.target.var;
-          if(wireName === depWireName){
-          //  console.log('y1', wireName, depWireName );
-         //   shouldReexecute = true;
-          }
-        } else if(ws.decls && ws.expr){
-          // Multiple wire declaration: type wire1 wire2 wire3 = expr
-          for(const decl of ws.decls){
-            if(decl.name === depWireName){
-              console.log('y2');
-              shouldReexecute = true;
-              wireName = depWireName;
-              break;
-            }
-          }
-        }
-        
-        if(shouldReexecute){
-          console.log(`[DEBUG updateConnected] re-executing wire statement for '${depWireName}'`, ws);
-          // Re-execute the wire statement
+          if(this._uccExecutedStatements && this._uccExecutedStatements.has(ws)) break;
+          if(this._uccExecutedStatements) this._uccExecutedStatements.add(ws);
+
+          const oldValue = this.getValueFromRef(depWire.ref);
           this.execWireStatement(ws);
-          
-          // Get the new value
-          if(depWire.ref){
-            const refMatch = depWire.ref.match(/^&(\d+)/);
-            if(refMatch){
-              const storageIdx = parseInt(refMatch[1]);
-              const stored = this.storage.find(s => s.index === storageIdx);
-              if(stored){
-                //console.log(`[DEBUG updateConnected] after re-exec, '${depWireName}' = ${stored.value}`);
-                // Recursively update connected components for this dependent wire
-                this.updateConnectedComponents(depWireName, stored.value);
-              }
-            }
-          } else {
-            //console.log(`[DEBUG updateConnected] depWire '${depWireName}' has no ref after re-exec!`);
+          const newWireValue = this.getValueFromRef(depWire.ref);
+          if(newWireValue !== null && newWireValue !== oldValue){
+            this.updateConnectedComponents(depWireName, newWireValue);
           }
-          break; // Found and re-executed, move to next dependent wire
+          break;
+
+        } else if(ws.decls && ws.expr && ws.decls.some(d => d.name === depWireName)){
+          // Multi-wire declaration: 1w a b c = expr
+          if(this._uccExecutedStatements && this._uccExecutedStatements.has(ws)) break;
+          if(this._uccExecutedStatements) this._uccExecutedStatements.add(ws);
+
+          // Capture old values for ALL declared wires before re-execution
+          const oldDeclValues = new Map();
+          for(const decl of ws.decls){
+            const w = this.wires.get(decl.name);
+            if(w) oldDeclValues.set(decl.name, this.getValueFromRef(w.ref));
+          }
+
+          this.execWireStatement(ws);
+
+          // Propagate for each declared wire whose value changed
+          for(const decl of ws.decls){
+            const w = this.wires.get(decl.name);
+            if(!w) continue;
+            const newDeclValue = this.getValueFromRef(w.ref);
+            const oldDeclValue = oldDeclValues.get(decl.name);
+            if(newDeclValue !== null && newDeclValue !== oldDeclValue){
+              this.updateConnectedComponents(decl.name, newDeclValue);
+            }
+          }
+          break;
         }
       }
     }
@@ -1619,6 +1619,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
     }
 
     this._uccPendingBlocks = null;
+    this._uccExecutedStatements = null;
 
     if(executedBlockKeys.size > 0){
       // Prevent re-execution in updateComponentConnections callbacks
