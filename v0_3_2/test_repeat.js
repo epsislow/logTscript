@@ -1556,7 +1556,7 @@ console.log('\n=== Test 200: Component Registry — all types registered ===');
 {
   const componentFiles = [
     'component-base', 'builtin-component', 'component-registry',
-    'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
+    'led', 'ledBar', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
     'adder', 'subtract', 'multiplier', 'divider', 'shifter',
     'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', '14seg', 'dots', 'index'
   ];
@@ -1837,7 +1837,7 @@ console.log('\n=== Test 200: Component Registry — all types registered ===');
   const interpreterSrc = fs.readFileSync('./core/interpreter.js', 'utf-8');
   const componentFiles = [
     'component-base', 'builtin-component', 'component-registry',
-    'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
+    'led', 'ledBar', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
     'adder', 'subtract', 'multiplier', 'divider', 'shifter',
     'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', '14seg', 'dots', 'index'
   ];
@@ -2329,7 +2329,7 @@ doc(myFunc)`;
   const interpreterSrc2 = fs.readFileSync('./core/interpreter.js', 'utf-8');
   const componentFiles2 = [
     'component-base', 'builtin-component', 'component-registry',
-    'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
+    'led', 'ledBar', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
     'adder', 'subtract', 'multiplier', 'divider', 'shifter',
     'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', '14seg', 'dots', 'index'
   ];
@@ -2612,7 +2612,7 @@ doc(pcb.bcd)`;
       pouts: [{ bits: 'X', name: 'get' }],
       returns: 'Xbit',
     };
-    const lines = InterpreterDoc2.formatCompDef('testComp', def);
+    const lines = InterpreterDoc2.formatCompDef('.name', 'testComp', def);
     assert('formatCompDef linia 0', lines[0], 'comp [testComp] .name:');
     assert('formatCompDef attr', lines[1], '  depth: integer');
     assert('formatCompDef = Xbit', lines[2], '  = Xbit');
@@ -2634,7 +2634,7 @@ doc(pcb.bcd)`;
   const signalSrc500 = fs.readFileSync('./core/signal-propagation.js', 'utf-8');
   const compFiles500 = [
     'component-base', 'builtin-component', 'component-registry',
-    'led', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
+    'led', 'ledBar', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
     'adder', 'subtract', 'multiplier', 'divider', 'shifter',
     'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', '14seg', 'dots', 'index'
   ];
@@ -3595,6 +3595,241 @@ length:4
       const val = w ? interp.getValueFromRef(w.ref) : null;
       assert('515 .mem = d multi-adresa (adresa 0 = 11110000)', val, '11110000');
     }
+  }
+}
+
+// ===========================================================================
+// Tests 600-609: Wire cascade propagation (signal-propagation.js fixes)
+// ===========================================================================
+{
+  const interpSrc600 = fs.readFileSync('./core/interpreter.js', 'utf-8');
+  const signalSrc600 = fs.readFileSync('./core/signal-propagation.js', 'utf-8');
+  const compFiles600 = [
+    'component-base', 'builtin-component', 'component-registry',
+    'led', 'ledBar', 'switch', 'key', 'dip', 'seven-seg', 'lcd',
+    'adder', 'subtract', 'multiplier', 'divider', 'shifter',
+    'mem', 'reg', 'counter', 'osc', 'rotary', 'pcb-component', '14seg', 'dots', 'index'
+  ];
+  let compSrc600 = '';
+  for (const f of compFiles600) {
+    compSrc600 += fs.readFileSync(`./core/components/${f}.js`, 'utf-8')
+      .replace(/^var \w+ = \(typeof require\b.*$/gm, '')
+      .replace(/^if \(typeof module\b.*\n.*module\.exports.*\n\}/gm, '') + '\n';
+  }
+  const chunk600 = tokenizerSrc + '\n' + preprocessorSrc + '\n' + compSrc600 + '\n' + parserSrc + '\n' + interpSrc600 + '\n' + signalSrc600;
+  const sb600 = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, setTimeout, clearTimeout, JSON, Number, isNaN };
+  vm.runInNewContext(chunk600 + `
+var _CR600 = createComponentRegistry;
+var _P600 = Parser;
+var _T600 = Tokenizer;
+var _PR600 = preprocessRepeat;
+var _I600 = Interpreter;
+`, sb600);
+
+  const registry600 = sb600._CR600();
+  const Parser600 = sb600._P600;
+  const Tokenizer600 = sb600._T600;
+  const preprocess600 = sb600._PR600;
+  const Interpreter600 = sb600._I600;
+
+  function run600(src) {
+    const processed = preprocess600(src);
+    const p = new Parser600(new Tokenizer600(processed), registry600);
+    const stmts = p.parse();
+    const out = [];
+    const interp = new Interpreter600(p.funcs, out, p.pcbs, registry600);
+    for (const s of stmts) interp.exec(s);
+    return { out, interp };
+  }
+
+  // Helper: scrie o valoare intr-un wire si declanseaza propagarea
+  function setWire600(interp, name, val) {
+    const w = interp.wires.get(name);
+    if (w && w.ref) interp.setValueAtRef(w.ref, val);
+    interp.updateConnectedComponents(name, val);
+  }
+
+  function getWire600(interp, name) {
+    const w = interp.wires.get(name);
+    return w ? interp.getValueFromRef(w.ref) : null;
+  }
+
+  // ---- Test 600: wire simplu propagat prin assignment cascadat ----
+  console.log('\n=== Test 600: wire simplu — propagare cascadat prin assignment ===');
+  {
+    // a = 0 initial; b = NOT(a); c = NOT(b)
+    // dupa ce a devine 1: b=0, c=1
+    const src = `
+1wire a = 0
+1wire b = NOT(a)
+1wire c = NOT(b)`;
+    const { interp } = run600(src);
+
+    setWire600(interp, 'a', '1');
+    assert('600 b=NOT(a) dupa a=1', getWire600(interp, 'b'), '0');
+    assert('600 c=NOT(b) cascadat dupa a=1', getWire600(interp, 'c'), '1');
+  }
+
+  // ---- Test 601: cascada de 3 niveluri ----
+  console.log('\n=== Test 601: cascada de 3 niveluri a->b->c->d ===');
+  {
+    const src = `
+1wire a = 0
+1wire b = a
+1wire c = b
+1wire d = c`;
+    const { interp } = run600(src);
+
+    setWire600(interp, 'a', '1');
+    assert('601 b=a dupa a=1', getWire600(interp, 'b'), '1');
+    assert('601 c=b cascadat', getWire600(interp, 'c'), '1');
+    assert('601 d=c cascadat', getWire600(interp, 'd'), '1');
+  }
+
+  // ---- Test 602: MUX toggle — logica butonului din scenariul utilizatorului ----
+  console.log('\n=== Test 602: MUX toggle — tg0 se toggleaza cand p trece 1->0 ===');
+  {
+    // tg0 = MUX(p, tg0, NOT(tg0))
+    // Cand p=1: MUX returneaza tg0 (hold) → tg0 ramane 0
+    // Cand p=0: MUX returneaza NOT(tg0) (toggle) → tg0 devine 1
+    // La urmatoarea apasare (1→0 din nou) tg0 revine la 0
+    const src = `
+1wire p := 0
+1wire tg0 := 0
+
+tg0 = MUX(p, tg0, NOT(tg0))`;
+    const { interp } = run600(src);
+
+    assert('602 tg0 initial = 0', getWire600(interp, 'tg0'), '0');
+
+    // MUX(sel, a, b): sel=0 → a, sel=1 → b
+    // MUX(p, tg0, NOT(tg0)): p=1 → NOT(tg0) (toggle), p=0 → tg0 (hold)
+    setWire600(interp, 'p', '1');
+    assert('602 tg0 dupa p=1 (toggle → 1)', getWire600(interp, 'tg0'), '1');
+
+    setWire600(interp, 'p', '0');
+    assert('602 tg0 dupa p=0 (hold la 1)', getWire600(interp, 'tg0'), '1');
+
+    setWire600(interp, 'p', '1');
+    assert('602 tg0 dupa p=1 din nou (toggle → 0)', getWire600(interp, 'tg0'), '0');
+
+    setWire600(interp, 'p', '0');
+    assert('602 tg0 dupa p=0 din nou (hold la 0)', getWire600(interp, 'tg0'), '0');
+  }
+
+  // ---- Test 603: counter binar pe 3 biti (scenariul complet al utilizatorului) ----
+  console.log('\n=== Test 603: counter binar tg0/tg1/tg2 cascadat ===');
+  {
+    const src = `
+1wire p := 0
+1wire tg0 := 0
+1wire tg1 := 0
+1wire tg2 := 0
+
+tg0 = MUX(p, tg0, NOT(tg0))
+tg1 = MUX(tg0, tg1, NOT(tg1))
+tg2 = MUX(tg1, tg2, NOT(tg2))`;
+    const { interp } = run600(src);
+
+    // MUX(sel, a, b): sel=0→a, sel=1→b
+    // tg0 = MUX(p, tg0, NOT(tg0)): p=1 → toggle, p=0 → hold
+    // tg1 = MUX(tg0, tg1, NOT(tg1)): tg0=1 → toggle, tg0=0 → hold
+    // tg2 = MUX(tg1, tg2, NOT(tg2)): tg1=1 → toggle, tg1=0 → hold
+    //
+    // Cascada se propaga SIMULTAN: p=1 → tg0 toggle → tg1 toggle → tg2 toggle (daca in lant)
+    // _uccExecutedStatements previne re-executia aceluiasi statement in aceeasi cascada.
+    //
+    // Secventa reala (fiecare press = p:0→1 toggle, p:1→0 hold):
+    //   press 1 (p=1): tg0:0→1, tg1:0→1, tg2:0→1
+    //   press 1 (p=0): nimeni nu se schimba (hold)
+    //   press 2 (p=1): tg0:1→0, tg1 = MUX(0,1,0)=1 hold, tg2 nu cascadeaza
+    //   press 3 (p=1): tg0:0→1, tg1:1→0, tg2 = MUX(0,1,0)=1 hold
+    //   press 4 (p=1): tg0:1→0, tg1 hold la 0, tg2 nu cascadeaza
+    function press() {
+      setWire600(interp, 'p', '1');
+      setWire600(interp, 'p', '0');
+    }
+
+    // Starea initiala: 000
+    assert('603 stare initiala tg0=0', getWire600(interp, 'tg0'), '0');
+    assert('603 stare initiala tg1=0', getWire600(interp, 'tg1'), '0');
+    assert('603 stare initiala tg2=0', getWire600(interp, 'tg2'), '0');
+
+    press(); // p=1: tg0:0→1, tg1:0→1, tg2:0→1 (cascada simultana)
+    assert('603 apasare 1: tg0=1', getWire600(interp, 'tg0'), '1');
+    assert('603 apasare 1: tg1=1', getWire600(interp, 'tg1'), '1');
+    assert('603 apasare 1: tg2=1', getWire600(interp, 'tg2'), '1');
+
+    press(); // p=1: tg0:1→0, tg1=MUX(0,1,0)=1 hold, tg2 neschimbat
+    assert('603 apasare 2: tg0=0', getWire600(interp, 'tg0'), '0');
+    assert('603 apasare 2: tg1=1', getWire600(interp, 'tg1'), '1');
+    assert('603 apasare 2: tg2=1', getWire600(interp, 'tg2'), '1');
+
+    press(); // p=1: tg0:0→1, tg1:1→0, tg2=MUX(0,1,0)=1 hold
+    assert('603 apasare 3: tg0=1', getWire600(interp, 'tg0'), '1');
+    assert('603 apasare 3: tg1=0', getWire600(interp, 'tg1'), '0');
+    assert('603 apasare 3: tg2=1', getWire600(interp, 'tg2'), '1');
+
+    press(); // p=1: tg0:1→0, tg1=MUX(0,0,1)=0 hold, tg2 neschimbat
+    assert('603 apasare 4: tg0=0', getWire600(interp, 'tg0'), '0');
+    assert('603 apasare 4: tg1=0', getWire600(interp, 'tg1'), '0');
+    assert('603 apasare 4: tg2=1', getWire600(interp, 'tg2'), '1');
+  }
+
+  // ---- Test 604: valoarea wire-ului nu se schimba → NU se propaga mai departe ----
+  console.log('\n=== Test 604: propagare se opreste daca valoarea nu s-a schimbat ===');
+  {
+    // a = 0, b = a
+    // setam a=0 din nou → b nu trebuie sa fie re-calculat
+    const src = `
+1wire a = 0
+1wire b = NOT(a)`;
+    const { interp } = run600(src);
+
+    const bBefore = getWire600(interp, 'b'); // NOT(0) = 1
+    // setam a la aceeasi valoare 0 — b NU trebuie sa se schimbe
+    setWire600(interp, 'a', '0');
+    assert('604 b ramane acelasi cand a nu se schimba', getWire600(interp, 'b'), bBefore);
+  }
+
+  // ---- Test 605: auto-referinta stabilizata — a = NOT(a) se executa o singura data ----
+  console.log('\n=== Test 605: auto-referinta a = NOT(a) — executata o singura data per cascada ===');
+  {
+    // a := 0, a = NOT(a)
+    // Cand setam a=0 extern: cascada executa a = NOT(0) = 1, marcheaza statement-ul.
+    // Cand a devine 1, cascada gaseste din nou a = NOT(a) dar e deja executat → skip.
+    // Rezultat final: a = 1 (o singura evaluare, fara oscilatie infinita).
+    const src = `
+1wire a := 0
+a = NOT(a)`;
+    const { interp } = run600(src);
+
+    setWire600(interp, 'a', '0');
+    assert('605 a = NOT(0) = 1 dupa o singura evaluare', getWire600(interp, 'a'), '1');
+  }
+
+  // ---- Test 606: wire multi-decl — fiecare wire schimbat este propagat independent ----
+  console.log('\n=== Test 606: wire multi-decl — propagare individuala per wire ===');
+  {
+    // 1w x y = src_expr_giving_two_bits
+    // Simulam schimbarea unui wire de la care depind x si y
+    // Verificam ca ambele sunt propagate
+    const src = `
+2wire src = 00
+1wire x = src.1/1
+1wire y = src.0/1
+1wire cx = NOT(x)
+1wire cy = NOT(y)`;
+    const { interp } = run600(src);
+
+    // src='10': bit index 0 (stanga/MSB)='1', bit index 1 (dreapta/LSB)='0'
+    // x = src.1/1 = bitul 1 = '0'
+    // y = src.0/1 = bitul 0 = '1'
+    setWire600(interp, 'src', '10');
+    assert('606 x=src.1/1=0 dupa src=10', getWire600(interp, 'x'), '0');
+    assert('606 y=src.0/1=1 dupa src=10', getWire600(interp, 'y'), '1');
+    assert('606 cx=NOT(x)=1 cascadat', getWire600(interp, 'cx'), '1');
+    assert('606 cy=NOT(y)=0 cascadat', getWire600(interp, 'cy'), '0');
   }
 }
 
