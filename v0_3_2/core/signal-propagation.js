@@ -1137,17 +1137,19 @@ Interpreter.prototype.updateComponentValue = function(compName, value, bitRange)
   }*/
 };
 
-Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
+Interpreter.prototype.updateConnectedComponents = function(varName, newValue, exclWs){
   // Track if this is the top-level call (not a recursive cascade call).
   // All blocks collected from any cascade depth are stored in _uccPendingBlocks
   // and executed in program order (by blockIndex) only at the top level.
   const isTopLevel = !this._uccPendingBlocks;
+  const excludedWs = exclWs || null;
   if(isTopLevel){
     this._uccPendingBlocks = new Map(); // blockIndex → block
     // Tracks wire statements already executed in this cascade so a self-referential
     // assignment like tg0 = MUX(p, tg0, NOT(tg0)) is not re-executed when tg0 itself
     // changes, preventing infinite oscillation.
     this._uccExecutedStatements = new Set();
+    this._uccWireDependStmts = new Map();
   }
 
   // Update all components connected to this variable/wire
@@ -1219,6 +1221,9 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
   // Find all wires that depend on this wire (cascade propagation)
   const dependentWires = new Set();
   const isWire = this.wires.has(varName);
+  if(!this._uccWireDependStmts.has(varName)) {
+    this._uccWireDependStmts.set(varName, new Set());
+  }
   
   //console.log(`[DEBUG updateConnected] '${varName}' isWire=${isWire}, wireStatements.length=${this.wireStatements.length}`);
   
@@ -1228,17 +1233,20 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
       const expr = ws.assignment ? ws.assignment.expr : ws.expr;
       const wsName = ws.assignment ? ws.assignment.target.var : (ws.decls ? ws.decls.map(d=>d.name).join(',') : '?');
       const refs = expr ? this.exprReferencesWire(expr, varName) : false;
-      // console.log(`[DEBUG updateConnected] checking ws '${wsName}' refs '${varName}'? ${refs}`);
+    //   console.log(`[DEBUG updateConnected] checking ws '${wsName}' refs '${varName}'? ${refs}`);
       if(expr && refs){
         if(ws.assignment){
           // Single wire assignment: wireName = expr
           const wireName = ws.assignment.target.var;
-          if(wireName){
+          if(wireName && ws != excludedWs){
+            this._uccWireDependStmts.get(varName).add(ws);
             dependentWires.add(wireName);
           }
         } else if(ws.decls && ws.expr){
           // Multiple wire declaration: type wire1 wire2 wire3 = expr
           // All declared wires depend on varName
+          this._uccWireDependStmts.get(varName).add(ws);
+            
           for(const decl of ws.decls){
             if(decl.name){
               dependentWires.add(decl.name);
@@ -1247,14 +1255,64 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
         }
       }
     }
-    
-    //console.log(`[DEBUG updateConnected] dependentWires for '${varName}':`, [...dependentWires]);
+   // console.log('all', [...this.wireStatements]);
+    console.log(`[DEBUG updateConnected] dependentWires for '${varName}':`, [...this._uccWireDependStmts.get(varName)]);
     
     // Re-execute wire statements for dependent wires and propagate only if value changed.
     // _uccExecutedStatements (shared across recursive calls) prevents a statement from
     // being re-executed more than once per top-level cascade event, which stops
     // self-referential assignments like tg0 = MUX(p, tg0, NOT(tg0)) from oscillating.
-    for(const depWireName of dependentWires){
+    for(const ds of this._uccWireDependStmts.get(varName)) {
+      if(ds.assignment) {
+        const target = ds.assignment.target;
+        const wire = this.wires.get(target.var);
+        if(!wire) continue;
+
+        // Single wire assignment: wireName = expr
+        if (this._uccExecutedStatements && this._uccExecutedStatements.has(ds)) {
+          console.log('pre-break')
+          break;
+        }
+        if (this._uccExecutedStatements) this._uccExecutedStatements.add(ds);
+
+        const oldValue = this.getValueFromRef(wire.ref);
+        this.execWireStatement(ds);
+        console.log('[DEBUG exec as]', target);
+        const newWireValue = this.getValueFromRef(wire.ref);
+        console.log('[DEBUG]', target.var, oldValue, newWireValue);
+        
+        if (newWireValue !== null && newWireValue !== oldValue) {
+          this.updateConnectedComponents(target.var, newWireValue, ds);
+        }
+      } else if (ds.decls && ds.expr) {
+        // Multi-wire declaration: 1w a b c = expr
+        if (this._uccExecutedStatements && this._uccExecutedStatements.has(ds)) break;
+        if (this._uccExecutedStatements) this._uccExecutedStatements.add(ds);
+  
+        // Capture old values for ALL declared wires before re-execution
+        const oldDeclValues = new Map();
+        for (const decl of ds.decls) {
+          const w = this.wires.get(decl.name);
+          if (w) oldDeclValues.set(decl.name, this.getValueFromRef(w.ref));
+        }
+  
+        this.execWireStatement(ds);
+  
+       // Propagate for each declared wire whose value changed
+       for (const decl of ds.decls) {
+         const w = this.wires.get(decl.name);
+         if (!w) continue;
+         const newDeclValue = this.getValueFromRef(w.ref);
+         const oldDeclValue = oldDeclValues.get(decl.name);
+         if (newDeclValue !== null && newDeclValue !== oldDeclValue) {
+           this.updateConnectedComponents(decl.name, newDeclValue, ds);
+         }
+       }
+        
+      }
+    }
+    
+    /*for(const depWireName of dependentWires){
       const depWire = this.wires.get(depWireName);
       if(!depWire) continue;
 
@@ -1268,7 +1326,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
           this.execWireStatement(ws);
           const newWireValue = this.getValueFromRef(depWire.ref);
           if(newWireValue !== null && newWireValue !== oldValue){
-            this.updateConnectedComponents(depWireName, newWireValue);
+        //    this.updateConnectedComponents(depWireName, newWireValue);
           }
           break;
 
@@ -1299,7 +1357,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue){
           break;
         }
       }
-    }
+    }*/
   }
   
   
