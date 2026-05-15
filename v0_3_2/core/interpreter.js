@@ -14,6 +14,7 @@ class Interpreter {
     this.regStatements=[]; // REG statements (for NEXT)
     this.regStorageMap=new Map(); // Map from statement to REG storage index
     this.regPendingMap=new Map(); // Map from statement to REG pending input value (for next cycle)
+    this.regOutputMap=new Map();  // Map from statement to REG current output value (for wire clock)
     this.wireStorageMap=new Map(); // Map from wire name to storage index (for reuse during NEXT)
     this.mode='STRICT'; // Default mode: STRICT (wires immutable)
     this.aliases = new Map();
@@ -66,7 +67,7 @@ class Interpreter {
   }
   
   isBuiltinREG(name) {
-    if (/^REG\d+$/.test(name)) return true;
+    return name === 'REG';
   }
   
   isBuiltinMUX(name) {
@@ -987,34 +988,62 @@ const idx = parseInt(
   }
 
 
-  // ================= BUILTIN: REGn =================
+  // ================= BUILTIN: REG =================
   if (this.isBuiltinREG(name)) {
-    const width = parseInt(name.slice(3), 10);
-
     if (argValues.length !== 3) {
-      throw Error(`REG${width} expects 3 arguments`);
+      throw Error(`REG expects 3 arguments`);
     }
 
     const data  = argValues[0];
     const clock = argValues[1];
     const clear = argValues[2];
+    const width = data.length;
 
-    let output = '0'.repeat(width);
+    const clockIsTilde = args[1] && args[1].length === 1 && args[1][0].var === '~';
 
-    if (this.currentStmt && this.regPendingMap?.has(this.currentStmt)) {
-      output = this.regPendingMap.get(this.currentStmt);
+    if (clockIsTilde) {
+      // --- comportament NEXT-based cu cycle number ---
+      // Pending stochează: { value, cycle, output }
+      // Dacă cycle s-a schimbat față de ultima evaluare → suntem într-un NEXT nou → latchăm
+      // Dacă cycle e același → suntem într-o re-evaluare în aceeași cascadă → ținem output-ul
+      const pending = this.regPendingMap.get(this.currentStmt);
+      let output;
+
+      if (!pending) {
+        output = '0'.repeat(width);
+      } else if (pending.cycle !== this.cycle) {
+        // Ciclu nou (NEXT a fost apelat) → latchăm valoarea pending
+        output = pending.value;
+      } else {
+        // Același ciclu (re-eval din cascadă wire) → ținem output-ul anterior
+        output = pending.output;
+      }
+
+      const next = clear === '1' ? '0'.repeat(width) : data;
+      if (this.currentStmt) {
+        if (!this.regPendingMap) this.regPendingMap = new Map();
+        this.regPendingMap.set(this.currentStmt, { value: next, cycle: this.cycle, output });
+      }
+      return computeRefs
+        ? { value: output, ref: `&${this.storeValue(output)}` }
+        : { value: output, ref: null };
     }
 
-    let next = clear === '1' ? '0'.repeat(width) : data;
+    // --- latch transparent pe clock wire ---
+    if (!this.regOutputMap) this.regOutputMap = new Map();
+    let stored = this.regOutputMap.get(this.currentStmt) ?? '0'.repeat(width);
 
-    if (this.currentStmt) {
-      if (!this.regPendingMap) this.regPendingMap = new Map();
-      this.regPendingMap.set(this.currentStmt, next);
+    if (clear === '1') {
+      stored = '0'.repeat(width);
+    } else if (clock === '1') {
+      stored = data;
     }
+    // clock === '0': stored rămâne nemodificat (hold)
 
+    this.regOutputMap.set(this.currentStmt, stored);
     return computeRefs
-      ? { value: output, ref: `&${this.storeValue(output)}` }
-      : { value: output, ref: null };
+      ? { value: stored, ref: `&${this.storeValue(stored)}` }
+      : { value: stored, ref: null };
   }
 
   // ================= BUILTIN: MUXn =================
@@ -6848,6 +6877,7 @@ Interpreter.BUILTIN_DOC = {
   LATCH: ['LATCH(Xbit data, 1bit clock) -> Xbit'],
   LSHIFT:['LSHIFT(Xbit data, Nbit n) -> Xbit', 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit'],
   RSHIFT:['RSHIFT(Xbit data, Nbit n) -> Xbit', 'RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit'],
+  REG:  ['REG(Xbit data, 1bit clock, 1bit clear) -> Xbit'],
   MUX:  ['MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit'],
 //  MUX2:  ['MUX(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3) -> Xbit'],
 //  MUX3:  ['MUX(3bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3, Xbit data4, Xbit data5, Xbit data6, Xbit data7) -> Xbit'],
@@ -6864,8 +6894,8 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
   // ---- doc(def) — list all built-in functions and user-defined functions ----
   if (name === 'def') {
     const builtinNames = Object.keys(Interpreter.BUILTIN_DOC);
-    // Include REGn, MUXn, DEMUXn patterns as representative examples
-    const extraBuiltins = ['REG<N>', 'MUX1', 'MUX2', 'MUX3', 'DEMUX1', 'DEMUX2', 'DEMUX3'];
+    // Include MUXn, DEMUXn patterns as representative examples
+    const extraBuiltins = ['MUX1', 'MUX2', 'MUX3', 'DEMUX1', 'DEMUX2', 'DEMUX3'];
     // Filter out MUX/DEMUX already in BUILTIN_DOC to avoid duplicates
     const allBuiltins = builtinNames.concat(
       extraBuiltins.filter(x => !builtinNames.includes(x))
@@ -6972,11 +7002,6 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     return Interpreter.BUILTIN_DOC[name];
   }
 
-  // ---- REGn pattern (e.g. REG4, REG8, REG16) ----
-  if (/^REG\d+$/.test(name)) {
-    const n = name.slice(3);
-    return [`${name}(${n}bit data, 1bit clock, 1bit clear) -> ${n}bit`];
-  }
 
   // ---- MUXn pattern (e.g. MUX1, MUX2, MUX3) ----
   /*if (/^MUX(\d+)$/.test(name)) {

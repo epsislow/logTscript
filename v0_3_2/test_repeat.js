@@ -1952,34 +1952,36 @@ var _I = Interpreter;
     assert('EQ semnatura', lines[0], 'EQ(Xbit, Xbit) -> 1bit');
   }
 
-  console.log('\n=== Test 307: BUILTIN_DOC — MUX1 ===');
+  console.log('\n=== Test 307: BUILTIN_DOC — MUX ===');
   {
-    const lines = InterpreterDoc.getDocLines('MUX1', new Map());
-    assert('MUX1 semnatura', lines[0], 'MUX1(1bit sel, Xbit data0, Xbit data1) -> Xbit');
+    const lines = InterpreterDoc.getDocLines('MUX', new Map());
+    assert('MUX semnatura', lines[0], 'MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit');
   }
 
-  console.log('\n=== Test 308: BUILTIN_DOC — MUX2 ===');
+  console.log('\n=== Test 308: BUILTIN_DOC — DEMUX ===');
   {
-    const lines = InterpreterDoc.getDocLines('MUX2', new Map());
-    assert('MUX2 semnatura', lines[0], 'MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3) -> Xbit');
+    const lines = InterpreterDoc.getDocLines('DEMUX', new Map());
+    assert('DEMUX semnatura', lines[0], 'DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..');
   }
 
-  console.log('\n=== Test 309: BUILTIN_DOC — MUX3 ===');
+  console.log('\n=== Test 309: BUILTIN_DOC — REG ===');
   {
-    const lines = InterpreterDoc.getDocLines('MUX3', new Map());
-    assert('MUX3 are 8 intrari', String(lines[0].includes('data7')), 'true');
+    const lines = InterpreterDoc.getDocLines('REG', new Map());
+    assert('REG semnatura', lines[0], 'REG(Xbit data, 1bit clock, 1bit clear) -> Xbit');
   }
 
-  console.log('\n=== Test 310: BUILTIN_DOC — DEMUX1 ===');
+  console.log('\n=== Test 310: BUILTIN_DOC — MUX/DEMUX vechi nedefinite ===');
   {
-    const lines = InterpreterDoc.getDocLines('DEMUX1', new Map());
-    assert('DEMUX1 semnatura', lines[0], 'DEMUX1(1bit sel, Xbit data) -> Xbit, Xbit');
+    const linesMUX1 = InterpreterDoc.getDocLines('MUX1', new Map());
+    assert('MUX1 nedefinit', linesMUX1[0], 'MUX1: funcție nedefinită');
+    const linesDEMUX1 = InterpreterDoc.getDocLines('DEMUX1', new Map());
+    assert('DEMUX1 nedefinit', linesDEMUX1[0], 'DEMUX1: funcție nedefinită');
   }
 
-  console.log('\n=== Test 311: BUILTIN_DOC — DEMUX2 ===');
+  console.log('\n=== Test 311: BUILTIN_DOC — REG are un singur rand ===');
   {
-    const lines = InterpreterDoc.getDocLines('DEMUX2', new Map());
-    assert('DEMUX2 semnatura', lines[0], 'DEMUX2(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit');
+    const lines = InterpreterDoc.getDocLines('REG', new Map());
+    assert('REG 1 rand', String(lines.length), '1');
   }
 
   console.log('\n=== Test 312: BUILTIN_DOC — LSHIFT are 2 semnaturi ===');
@@ -2002,17 +2004,17 @@ var _I = Interpreter;
     assert('LATCH semnatura', lines[0], 'LATCH(Xbit data, 1bit clock) -> Xbit');
   }
 
-  // ---- REGn pattern dinamic ----
-  console.log('\n=== Test 315: getDocLines — REG4 dinamic ===');
+  // ---- REG pattern generic ----
+  console.log('\n=== Test 315: getDocLines — REG generic ===');
   {
-    const lines = InterpreterDoc.getDocLines('REG4', new Map());
-    assert('REG4 semnatura', lines[0], 'REG4(4bit data, 1bit clock, 1bit clear) -> 4bit');
+    const lines = InterpreterDoc.getDocLines('REG', null, new Map());
+    assert('REG semnatura din BUILTIN_DOC', lines[0], 'REG(Xbit data, 1bit clock, 1bit clear) -> Xbit');
   }
 
-  console.log('\n=== Test 316: getDocLines — REG16 dinamic ===');
+  console.log('\n=== Test 316: getDocLines — REG unic rand ===');
   {
-    const lines = InterpreterDoc.getDocLines('REG16', new Map());
-    assert('REG16 semnatura', lines[0], 'REG16(16bit data, 1bit clock, 1bit clear) -> 16bit');
+    const lines = InterpreterDoc.getDocLines('REG', null, new Map());
+    assert('REG are exact 1 rand', String(lines.length), '1');
   }
 
   // ---- Functie user-defined ----
@@ -2023,7 +2025,7 @@ var _I = Interpreter;
       params: [{ type: '8bit', id: 'a' }, { type: '1bit', id: 'b' }],
       returns: []
     });
-    const lines = InterpreterDoc.getDocLines('myGate', funcs);
+    const lines = InterpreterDoc.getDocLines('myGate', null, funcs);
     assert('myGate semnatura', lines[0], 'myGate(8bit a, 1bit b)');
   }
 
@@ -2034,7 +2036,7 @@ var _I = Interpreter;
       params: [{ type: '8bit', id: 'x' }],
       returns: [{ type: '4bit' }, { type: '4bit' }]
     });
-    const lines = InterpreterDoc.getDocLines('split', funcs);
+    const lines = InterpreterDoc.getDocLines('split', null, funcs);
     assert('split semnatura cu return', lines[0], 'split(8bit x) -> 4bit, 4bit');
   }
 
@@ -2062,24 +2064,24 @@ var _I = Interpreter;
   }
 
   // ---- Interpreter end-to-end: doc(MUX1) ----
-  console.log('\n=== Test 322: Interpreter end-to-end — doc(MUX1) ===');
+  console.log('\n=== Test 322: Interpreter end-to-end — doc(MUX) ===');
   {
-    const out = runDoc('doc(MUX1)');
-    assert('MUX1 semnatura completa', out[0], 'MUX1(1bit sel, Xbit data0, Xbit data1) -> Xbit');
+    const out = runDoc('doc(MUX)');
+    assert('MUX semnatura completa', out[0], 'MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit');
   }
 
-  // ---- Interpreter end-to-end: doc(REG8) ----
-  console.log('\n=== Test 323: Interpreter end-to-end — doc(REG8) ===');
+  // ---- Interpreter end-to-end: doc(REG) ----
+  console.log('\n=== Test 323: Interpreter end-to-end — doc(REG) ===');
   {
-    const out = runDoc('doc(REG8)');
-    assert('REG8 semnatura', out[0], 'REG8(8bit data, 1bit clock, 1bit clear) -> 8bit');
+    const out = runDoc('doc(REG)');
+    assert('REG semnatura', out[0], 'REG(Xbit data, 1bit clock, 1bit clear) -> Xbit');
   }
 
-  // ---- Interpreter end-to-end: doc(DEMUX2) ----
-  console.log('\n=== Test 324: Interpreter end-to-end — doc(DEMUX2) ===');
+  // ---- Interpreter end-to-end: doc(DEMUX) ----
+  console.log('\n=== Test 324: Interpreter end-to-end — doc(DEMUX) ===');
   {
-    const out = runDoc('doc(DEMUX2)');
-    assert('DEMUX2 semnatura', out[0], 'DEMUX2(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit');
+    const out = runDoc('doc(DEMUX)');
+    assert('DEMUX semnatura', out[0], 'DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..');
   }
 
   // ---- Interpreter end-to-end: functie user-defined ----
@@ -2145,7 +2147,7 @@ doc(myFunc)`;
     const funcs = new Map();
     funcs.set('myFunc', { params: [{ type: '4bit', id: 'x' }], returns: [{ type: '4bit' }] });
     funcs.set('helper', { params: [], returns: [] });
-    const lines = InterpreterDoc.getDocLines('def', funcs);
+    const lines = InterpreterDoc.getDocLines('def', null, funcs);
     assert('first line is built-in:', lines[0], 'built-in:');
     // built-in list is spread across multiple lines (4 per line); search all lines
     const builtinBlock = lines.slice(1).join(' ');
@@ -3830,6 +3832,105 @@ a = NOT(a)`;
     assert('606 y=src.0/1=1 dupa src=10', getWire600(interp, 'y'), '1');
     assert('606 cx=NOT(x)=1 cascadat', getWire600(interp, 'cx'), '1');
     assert('606 cy=NOT(y)=0 cascadat', getWire600(interp, 'cy'), '0');
+  }
+}
+
+// ============================================================
+// Test 700-703: REG builtin
+// ============================================================
+{
+  console.log('\n=== Test 700: REG cu wire clock — latch transparent ===');
+  {
+    const src = `
+1wire data = 0
+1wire clk = 0
+1wire clr = 0
+1wire read = REG(data, clk, clr)`;
+    const { interp } = run600(src);
+
+    assert('700 initial read=0', getWire600(interp, 'read'), '0');
+
+    setWire600(interp, 'data', '1');
+    assert('700 data=1 clk=0 → read=0 (hold)', getWire600(interp, 'read'), '0');
+
+    setWire600(interp, 'clk', '1');
+    assert('700 clk=1 → read=1 (transparent)', getWire600(interp, 'read'), '1');
+
+    setWire600(interp, 'data', '0');
+    assert('700 data=0 clk=1 → read=0 (transparent)', getWire600(interp, 'read'), '0');
+
+    setWire600(interp, 'clk', '0');
+    assert('700 clk=0 → read=0 (hold)', getWire600(interp, 'read'), '0');
+
+    setWire600(interp, 'data', '1');
+    assert('700 data=1 clk=0 → read=0 (hold)', getWire600(interp, 'read'), '0');
+
+    setWire600(interp, 'clk', '1');
+    assert('700 clk=1 → read=1 (transparent)', getWire600(interp, 'read'), '1');
+  }
+
+  console.log('\n=== Test 701: REG cu clock ~ — NEXT-based ===');
+  {
+    const src = `
+1wire data = 1
+1wire read = REG(data, ~, 0)`;
+    const { interp } = run600(src);
+
+    assert('701 initial read=0', getWire600(interp, 'read'), '0');
+
+    interp.exec({ next: 1 });
+    assert('701 dupa NEXT(1) read=1 (latchat data=1)', getWire600(interp, 'read'), '1');
+
+    setWire600(interp, 'data', '0');
+    assert('701 data=0 fara NEXT → read=1 (hold)', getWire600(interp, 'read'), '1');
+
+    interp.exec({ next: 1 });
+    assert('701 dupa NEXT(2) read=0 (latchat data=0)', getWire600(interp, 'read'), '0');
+  }
+
+  console.log('\n=== Test 702: REG clear override ===');
+  {
+    const src = `
+1wire data = 1
+1wire clk = 1
+1wire clr = 0
+1wire read = REG(data, clk, clr)`;
+    const { interp } = run600(src);
+
+    assert('702 initial clk=1 data=1 → read=1', getWire600(interp, 'read'), '1');
+
+    setWire600(interp, 'clr', '1');
+    assert('702 clr=1 → read=0', getWire600(interp, 'read'), '0');
+
+    setWire600(interp, 'clr', '0');
+    assert('702 clr=0 clk=1 data=1 → read=1', getWire600(interp, 'read'), '1');
+  }
+
+  console.log('\n=== Test 703: REG multi-bit (4bit) ===');
+  {
+    const src = `
+4wire data = 0000
+1wire clk = 0
+1wire clr = 0
+4wire read = REG(data, clk, clr)`;
+    const { interp } = run600(src);
+
+    assert('703 initial read=0000', getWire600(interp, 'read'), '0000');
+
+    setWire600(interp, 'data', '1010');
+    assert('703 data=1010 clk=0 → read=0000 (hold)', getWire600(interp, 'read'), '0000');
+
+    setWire600(interp, 'clk', '1');
+    assert('703 clk=1 → read=1010 (transparent)', getWire600(interp, 'read'), '1010');
+
+    setWire600(interp, 'data', '0101');
+    assert('703 data=0101 clk=1 → read=0101 (transparent)', getWire600(interp, 'read'), '0101');
+
+    setWire600(interp, 'clk', '0');
+    assert('703 clk=0 → read=0101 (hold)', getWire600(interp, 'read'), '0101');
+
+    setWire600(interp, 'data', '1111');
+    assert('703 data=1111 clk=0 → read=0101 (hold)', getWire600(interp, 'read'), '0101');
   }
 }
 

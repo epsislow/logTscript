@@ -249,9 +249,9 @@ pushSource({ src, alias }) {
   }
 
       // Check for REG instructions
-      if (/^REG\d+$/.test(v)) {
+      if (/^REG$/.test(v)) {
         return this.token('REG', v);
-}
+      }
 
       // Check for MUX instructions
       if (/^MUX$/.test(v)) {

@@ -1967,7 +1967,7 @@ isBuiltinFunction(name) {
     return true;
   }
 
-  if (/^REG\d+$/.test(name)) return true;
+  if (name === 'REG') return true;
   if (/^MUX$/.test(name)) return true;
   if (/^DEMUX$/.test(name)) return true;
 
