@@ -6,7 +6,8 @@ class PanelKey {
     size = 48,
     onPress = () => {},
     onRelease = () => {},
-    pressDuration = 150
+    pressDuration = 150,
+    type = 0
   }) {
     this.label = label;
     this.size = size;
@@ -14,6 +15,7 @@ class PanelKey {
     this.onRelease = onRelease;
     this.pressDuration = pressDuration;
     this.pressed = false;
+    this.type = type;
     this._releaseTimer = null;
 
     this.canvas = document.createElement("canvas");
@@ -26,6 +28,14 @@ class PanelKey {
       e.preventDefault();
       this.press();
     });
+    
+   if(this.type == 1) {
+    this.canvas.addEventListener("mouseup", () => this.release());
+    this.canvas.addEventListener("touchend", e => {
+      e.preventDefault();
+      this.release();
+    });
+   }
 
     this.draw();
   }
@@ -41,11 +51,13 @@ class PanelKey {
     this.draw();
 
     this.onPress(this.label);
-
+    
+   if(this.type == 0) {
     clearTimeout(this._releaseTimer);
     this._releaseTimer = setTimeout(() => {
       this.release();
     }, this.pressDuration);
+   }
   }
 
   release() {
@@ -108,7 +120,8 @@ function addKey({
   onPress,
   onRelease,
   size = 36,
-  nl = false
+  nl = false,
+  type,
 }) {
   const container = document.getElementById("devices");
   if (!container) return;
@@ -117,7 +130,7 @@ function addKey({
   const wrapper = document.createElement("span");
   wrapper.className = "key-wrapper";
 
-  const key = new PanelKey({ label, size, onPress, onRelease });
+  const key = new PanelKey({ label, size, onPress, onRelease, type });
   key.mount(wrapper);
 
   container.appendChild(wrapper);

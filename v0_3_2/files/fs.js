@@ -1,4 +1,45 @@
 window.lib_files = {
+  ex_toggle_test: `
+  comp [led] .pw:
+    square
+    length: 5
+    on:1
+    nl
+    :
+comp [key] .p:
+    label:'pwr'
+    size: 35
+    on:1
+    :
+    
+1wire p = .p
+5wire tg5bits := 00000
+
+# Pre-define next-state wires for forward-referencing
+1wire nextTg0 := 0
+1wire nextTg1 := 0
+1wire nextTg2 := 0
+
+# 1. Read current states from registers
+1wire pPrev = REG(p, ~, 0)
+1wire tg0 = REG(nextTg0, ~, 0)
+1wire tg0Prev = REG(tg0, ~, 0)
+1wire tg1 = REG(nextTg1, ~, 0)
+1wire tg1Prev = REG(tg1, ~, 0)
+1wire tg2 = REG(nextTg2, ~, 0)
+
+# 2. Logic Assignments
+# AND(p, NOT(pPrev)) captures only the initial 0->1 click frame and ignores the 1-second hold
+nextTg0 = XOR(tg0, AND(p, NOT(pPrev)))
+
+# AND(tg0Prev, NOT(tg0)) captures only the frame where Bit 0 flips from 1 to 0
+nextTg1 = XOR(tg1, AND(tg0Prev, NOT(tg0)))
+nextTg2 = XOR(tg2, AND(tg1Prev, NOT(tg1)))
+
+# 3. Output to display
+tg5bits = 00 + tg2 + tg1 + tg0
+.pw = tg5bits
+  `,
   ex_key_led_toggle: `
     comp [led] .pw:
     square

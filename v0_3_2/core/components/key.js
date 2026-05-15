@@ -22,7 +22,12 @@ var KeyComponent = class KeyComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'label', value: 'string' }, { name: 'size', value: 'integer' }, { name: 'nl', value: null }],
+      attrs: [
+        { name: 'label', value: 'string' },
+        { name: 'size', value: 'integer' }, 
+        { name: 'nl', value: null }, 
+        { name: 'type', value: 'integer'},
+      ],
       initValue: '1bit',
       pins: [],
       pouts: [{ bits: '1', name: 'get' }],
@@ -34,6 +39,7 @@ var KeyComponent = class KeyComponent extends BuiltinComponent {
     const label = attributes.label !== undefined ? String(attributes.label) : '';
     const size = attributes.size !== undefined ? parseInt(attributes.size, 10) : 36;
     const nl = attributes.nl || false;
+    const type = attributes.type || 0;
     const keyInitialValue = '0';
     const storageIdx = ctx.storeValue(keyInitialValue);
     const keyRef = `&${storageIdx}`;
@@ -61,7 +67,7 @@ var KeyComponent = class KeyComponent extends BuiltinComponent {
     };
 
     if (typeof addKey === 'function') {
-      addKey({ id: keyId, label, size, nl, onPress, onRelease });
+      addKey({ id: keyId, label, size, nl, onPress, onRelease, type});
     }
     return { deviceIds, ref: keyRef };
   }
