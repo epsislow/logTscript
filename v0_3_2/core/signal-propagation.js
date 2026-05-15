@@ -1221,6 +1221,11 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
   // Find all wires that depend on this wire (cascade propagation)
   const dependentWires = new Set();
   const isWire = this.wires.has(varName);
+  // _uccWireDependStmts is only initialized when isTopLevel; guard against undefined
+  // when called non-top-level from updateComponentConnections (e.g. key/switch onPress)
+  if(!this._uccWireDependStmts) {
+    this._uccWireDependStmts = new Map();
+  }
   if(!this._uccWireDependStmts.has(varName)) {
     this._uccWireDependStmts.set(varName, new Set());
   }
@@ -1256,7 +1261,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
       }
     }
    // console.log('all', [...this.wireStatements]);
-    console.log(`[DEBUG updateConnected] dependentWires for '${varName}':`, [...this._uccWireDependStmts.get(varName)]);
+    // console.log(`[DEBUG updateConnected] dependentWires for '${varName}':`, [...this._uccWireDependStmts.get(varName)]);
     
     // Re-execute wire statements for dependent wires and propagate only if value changed.
     // _uccExecutedStatements (shared across recursive calls) prevents a statement from
@@ -1270,23 +1275,20 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
 
         // Single wire assignment: wireName = expr
         if (this._uccExecutedStatements && this._uccExecutedStatements.has(ds)) {
-          console.log('pre-break')
-          break;
+          continue;
         }
         if (this._uccExecutedStatements) this._uccExecutedStatements.add(ds);
 
         const oldValue = this.getValueFromRef(wire.ref);
         this.execWireStatement(ds);
-        console.log('[DEBUG exec as]', target);
         const newWireValue = this.getValueFromRef(wire.ref);
-        console.log('[DEBUG]', target.var, oldValue, newWireValue);
         
         if (newWireValue !== null && newWireValue !== oldValue) {
           this.updateConnectedComponents(target.var, newWireValue, ds);
         }
       } else if (ds.decls && ds.expr) {
         // Multi-wire declaration: 1w a b c = expr
-        if (this._uccExecutedStatements && this._uccExecutedStatements.has(ds)) break;
+        if (this._uccExecutedStatements && this._uccExecutedStatements.has(ds)) continue;
         if (this._uccExecutedStatements) this._uccExecutedStatements.add(ds);
   
         // Capture old values for ALL declared wires before re-execution
