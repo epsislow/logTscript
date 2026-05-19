@@ -1230,7 +1230,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
     this._uccWireDependStmts.set(varName, new Set());
   }
   
-  //console.log(`[DEBUG updateConnected] '${varName}' isWire=${isWire}, wireStatements.length=${this.wireStatements.length}`);
+  // console.log(`[DEBUG updateConnected] '${varName}' isWire=${isWire}, wireStatements.length=${this.wireStatements.length}`);
   
   if(isWire){
     // Find all wires that depend on varName
@@ -1238,18 +1238,22 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
       const expr = ws.assignment ? ws.assignment.expr : ws.expr;
       const wsName = ws.assignment ? ws.assignment.target.var : (ws.decls ? ws.decls.map(d=>d.name).join(',') : '?');
       const refs = expr ? this.exprReferencesWire(expr, varName) : false;
-    //   console.log(`[DEBUG updateConnected] checking ws '${wsName}' refs '${varName}'? ${refs}`);
+      console.log(`[DEBUG updateConnected] check ws '${wsName}' refs '${varName}'? ${refs} asg: ${ws.assignment ?'y':'n'} decls: ${ws.decls ?'y':'n'}`);
+     // console.log(expr);
       if(expr && refs){
-        if(ws.assignment){
+        if(ws.assignment) {
           // Single wire assignment: wireName = expr
           const wireName = ws.assignment.target.var;
           if(wireName && ws != excludedWs){
+            console.log(`add for ${varName} stmt of ${wireName}`);
             this._uccWireDependStmts.get(varName).add(ws);
             dependentWires.add(wireName);
           }
-        } else if(ws.decls && ws.expr){
+        } else if(ws.decls){
           // Multiple wire declaration: type wire1 wire2 wire3 = expr
           // All declared wires depend on varName
+          console.log(`add for ${varName} stmt of ${wsName}`);
+            
           this._uccWireDependStmts.get(varName).add(ws);
             
           for(const decl of ws.decls){
