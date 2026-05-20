@@ -1143,6 +1143,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
   // and executed in program order (by blockIndex) only at the top level.
   const isTopLevel = !this._uccPendingBlocks;
   const excludedWs = exclWs || null;
+      console.log('VarName: ', varName, newValue,excludedWs, 'isTop: ', isTopLevel);
   if(isTopLevel){
     this._uccPendingBlocks = new Map(); // blockIndex → block
     // Tracks wire statements already executed in this cascade so a self-referential
@@ -1238,21 +1239,21 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
       const expr = ws.assignment ? ws.assignment.expr : ws.expr;
       const wsName = ws.assignment ? ws.assignment.target.var : (ws.decls ? ws.decls.map(d=>d.name).join(',') : '?');
       const refs = expr ? this.exprReferencesWire(expr, varName) : false;
-      console.log(`[DEBUG updateConnected] check ws '${wsName}' refs '${varName}'? ${refs} asg: ${ws.assignment ?'y':'n'} decls: ${ws.decls ?'y':'n'}`);
+     // console.log(`[DEBUG updateConnected] check ws '${wsName}' refs '${varName}'? ${refs} asg: ${ws.assignment ?'y':'n'} decls: ${ws.decls ?'y':'n'}`);
      // console.log(expr);
       if(expr && refs){
         if(ws.assignment) {
           // Single wire assignment: wireName = expr
           const wireName = ws.assignment.target.var;
           if(wireName && ws != excludedWs){
-            console.log(`add for ${varName} stmt of ${wireName}`);
+      //      console.log(`add for ${varName} stmt of ${wireName}`);
             this._uccWireDependStmts.get(varName).add(ws);
             dependentWires.add(wireName);
           }
         } else if(ws.decls){
           // Multiple wire declaration: type wire1 wire2 wire3 = expr
           // All declared wires depend on varName
-          console.log(`add for ${varName} stmt of ${wsName}`);
+      //    console.log(`add for ${varName} stmt of ${wsName}`);
             
           this._uccWireDependStmts.get(varName).add(ws);
             
@@ -1272,6 +1273,12 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
     // being re-executed more than once per top-level cascade event, which stops
     // self-referential assignments like tg0 = MUX(p, tg0, NOT(tg0)) from oscillating.
     for(const ds of this._uccWireDependStmts.get(varName)) {
+      const dsName = ds.assignment ? ds.assignment.target.var : (ds.decls ? ds.decls.map(d=>d.name).join(',') : '?');
+      console.log('stmt', dsName, ds);
+      if (ds == excludedWs) {
+          console.log('isExcluded: ', ds == excludedWs);
+          continue;
+      }
       if(ds.assignment) {
         const target = ds.assignment.target;
         const wire = this.wires.get(target.var);
@@ -1288,6 +1295,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         const newWireValue = this.getValueFromRef(wire.ref);
         
         if (newWireValue !== null && newWireValue !== oldValue) {
+          console.log('ex.asg: ',target.var, newWireValue, ds);
           this.updateConnectedComponents(target.var, newWireValue, ds);
         }
       } else if (ds.decls && ds.expr) {
@@ -1311,6 +1319,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
          const newDeclValue = this.getValueFromRef(w.ref);
          const oldDeclValue = oldDeclValues.get(decl.name);
          if (newDeclValue !== null && newDeclValue !== oldDeclValue) {
+           console.log('ex.dcl: ',target.var, newWireValue, ds);
            this.updateConnectedComponents(decl.name, newDeclValue, ds);
          }
        }
