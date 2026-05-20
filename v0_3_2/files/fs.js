@@ -1,4 +1,29 @@
 window.lib_files = {
+  ex_toggle_test3: `
+  
+    comp [led] .pw:
+    square
+    length: 2
+    on:1
+    nl
+     :
+ comp [key] .p:
+    label:'pwr'
+    size: 35
+    on:1
+    type: 1
+    :
+    
+1w p = .p
+1w tg := 0
+1w tg2 := 0
+ tg = MUX(.p, tg, NOT(tg))
+2w tt = tg + tg2
+ tg2 = EQ(tt, 10)
+
+.pw = tg + 0
+
+  `,
   ex_toggle_test2: `
 
     comp [led] .pw:
