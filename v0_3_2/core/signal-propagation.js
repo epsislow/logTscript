@@ -1140,7 +1140,14 @@ Interpreter.prototype.updateComponentValue = function(compName, value, bitRange)
 Interpreter.prototype.clog = function(...args) {
   // Map each item to a string (handles objects/arrays nicely) and join with spaces
   const logLine = args
-    .map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg))
+    .map(arg => typeof arg === 'object' ? 
+      (arg.assignment? this.jstmt(arg): ( 
+          arg.decls ? 
+            this.jstmt(arg) :
+            JSON.stringify(arg) 
+        )
+      )
+      : String(arg))
     .join(' ');
   
   this.cLogs.push(logLine);
@@ -1335,13 +1342,17 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         this.execWireStatement(ds);
         const newWireValue = this.getValueFromRef(wire.ref);
     //    this.clog('pex1');
+        this.clog(`${target.var} = ${oldWireValue} -> ${newWireValue}`);
         if (newWireValue !== null && newWireValue !== oldValue) {
           this.clog('ex.asg: ',target.var, newWireValue, ds);
           this.updateConnectedComponents(target.var, newWireValue, ds);
         }
       } else if (ds.decls && ds.expr) {
         // Multi-wire declaration: 1w a b c = expr
-        if (this._uccExecutedStatements && this._uccExecutedStatements.has(ds)) continue;
+        if (this._uccExecutedStatements && this._uccExecutedStatements.has(ds)) {
+          this.clog('pre no-exec', ds);
+          continue;
+        }
         if (this._uccExecutedStatements) this._uccExecutedStatements.add(ds);
   
         // Capture old values for ALL declared wires before re-execution
@@ -1361,8 +1372,8 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
          if (!w) continue;
          const newDeclValue = this.getValueFromRef(w.ref);
          const oldDeclValue = oldDeclValues.get(decl.name);
-         this.clog(` ${oldDeclValue} -> ${newDeclValue}`);
-         if (newDeclValue !== oldDeclValue) {
+         this.clog(`${decl.name} = ${oldDeclValue} -> ${newDeclValue}`);
+         if (newDeclValue !== null && newDeclValue !== oldDeclValue) {
            this.clog(`ex.dcl: ${decl.name} ${this.jstmt(ds)}`);
            this.updateConnectedComponents(decl.name, newDeclValue, ds);
          }
