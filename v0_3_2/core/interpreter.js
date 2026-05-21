@@ -313,6 +313,7 @@ class Interpreter {
 
   for (const x of expr) {
       const v = this.evalAtom(x, computeRefs);
+      this.clog('q', v);
     if (Array.isArray(v)) {
       for (const part of v) parts.push(part);
     } else {
@@ -1000,6 +1001,7 @@ const idx = parseInt(
     const clock = argValues[1];
     const clear = argValues[2];
     const width = data.length;
+    this.clog(`REG( d= ${data}/${width} , ~= ${clock}, cls= ${clear} )`);
 
     const clockIsTilde = args[1] && args[1].length === 1 && args[1][0].var === '~';
 
@@ -1041,7 +1043,7 @@ const idx = parseInt(
       stored = data;
     }
     // clock === '0': stored rămâne nemodificat (hold)
-
+this.clog('reg out = ', this.currentStmt, stored );
     this.regOutputMap.set(this.currentStmt, stored);
     return computeRefs
       ? { value: stored, ref: `&${this.storeValue(stored)}` }
@@ -2882,7 +2884,7 @@ if (s.assignment) {
         }
         wire.ref = `&${storageIdx}`;
       } catch(e){
-        //console.log(`[DEBUG execWireStmt] ERROR in assignment '${wireName}':`, e.message);
+        console.log(`[DEBUG execWireStmt] ERROR in assignment '${wireName}':`, e.message);
       } finally {
         this.currentStmt = prevStmt;
       }

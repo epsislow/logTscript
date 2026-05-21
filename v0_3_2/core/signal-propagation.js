@@ -1165,15 +1165,15 @@ Interpreter.prototype.showlog = function(reset) {
   }
 };
 
-Interpreter.prototype.cstack = function () {
+Interpreter.prototype.cstack = function (preText) {
   const err = new Error();
 
     // Optional: Clean up the stack string to remove this 'clog' line itself
     const stackLines = err.stack ? err.stack.split('\n') : [];
     const filteredStack = stackLines.slice(2).join('\n'); // Removes 'Error' and 'clog' lines
     // 3. Print the stack immediately
-  console.log(`--- Stack Trace ---`);
-  console.log(filteredStack);
+  this.clog(preText? preText : `--- Stack Trace ---`);
+  this.clog(filteredStack);
 }
 
 Interpreter.prototype.jstmt = function (ds) {
@@ -1181,7 +1181,8 @@ Interpreter.prototype.jstmt = function (ds) {
     return '(-)';
   }
   const dsName = ds.assignment ? ds.assignment.target.var : (ds.decls ? ds.decls.map(d=>d.name).join(',') : '?');
-  return 'st(' + dsName + ')';
+  const dsType = ds.assignment ? 'asg': ( ds.decls ? 'dcl' : '');
+  return 'st(' + dsName + ':' + dsType + ')';
 }
 
 Interpreter.prototype.updateConnectedComponents = function(varName, newValue, exclWs){
@@ -1320,34 +1321,40 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
     // _uccExecutedStatements (shared across recursive calls) prevents a statement from
     // being re-executed more than once per top-level cascade event, which stops
     // self-referential assignments like tg0 = MUX(p, tg0, NOT(tg0)) from oscillating.
+    
     for(const ds of this._uccWireDependStmts.get(varName)) {
       const dsName = ds.assignment ? ds.assignment.target.var : (ds.decls ? ds.decls.map(d=>d.name).join(',') : '?');
-      this.clog('stmt to execute', dsName, this.jstmt(ds));
+      this.clog('stmt to execute', dsName, ds);
       if (ds == excludedWs) {
           console.log('isExcluded: ', ds == excludedWs);
           continue;
       }
       if(ds.assignment) {
+        this.clog('isAsg', ds);
         const target = ds.assignment.target;
         const wire = this.wires.get(target.var);
-        if(!wire) continue;
+        if(!wire) {
+          this.clog('pre no-wire');
+          continue;
+        }
 
         // Single wire assignment: wireName = expr
         if (this._uccExecutedStatements && this._uccExecutedStatements.has(ds)) {
+          this.clog('pre no-exec', ds);
           continue;
         }
         if (this._uccExecutedStatements) this._uccExecutedStatements.add(ds);
 
-        const oldValue = this.getValueFromRef(wire.ref);
+        const oldWireValue = this.getValueFromRef(wire.ref);
         this.execWireStatement(ds);
         const newWireValue = this.getValueFromRef(wire.ref);
-    //    this.clog('pex1');
         this.clog(`${target.var} = ${oldWireValue} -> ${newWireValue}`);
-        if (newWireValue !== null && newWireValue !== oldValue) {
+        if (newWireValue !== oldWireValue) {
           this.clog('ex.asg: ',target.var, newWireValue, ds);
           this.updateConnectedComponents(target.var, newWireValue, ds);
         }
       } else if (ds.decls && ds.expr) {
+        this.clog('isDecl');
         // Multi-wire declaration: 1w a b c = expr
         if (this._uccExecutedStatements && this._uccExecutedStatements.has(ds)) {
           this.clog('pre no-exec', ds);
@@ -1361,14 +1368,14 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
           const w = this.wires.get(decl.name);
           if (w) oldDeclValues.set(decl.name, this.getValueFromRef(w.ref));
         }
-  
+        this.clog('pre-exec', ds);
         this.execWireStatement(ds);
-  
+        this.clog('post-exec', ds);
        // Propagate for each declared wire whose value changed
        for (const decl of ds.decls) {
-         // console.log('pex2');
+          console.log('pex2');
          const w = this.wires.get(decl.name);
-     //    this.clog(`pex2, ${w ?'y': 'n'} `);
+         this.clog(`pex2, ${w ?'y': 'n'} `);
          if (!w) continue;
          const newDeclValue = this.getValueFromRef(w.ref);
          const oldDeclValue = oldDeclValues.get(decl.name);
