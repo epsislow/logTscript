@@ -23,6 +23,8 @@ class Interpreter {
     this.componentPendingProperties=new Map(); // Component name -> {property: {expr, value}} - properties waiting to be applied
     this.componentPendingSet=new Map(); // Component name -> 'immediate' | 'next' - when to apply pending properties
     this.componentPropertyBlocks=[]; // Array of {component, properties, dependencies} - property blocks for re-execution
+    this.debugLogs = {};
+    this.cLogs = [];
     
     // PCB support
     this.pcbDefinitions = pcbs || new Map(); // name -> { pins, pouts, exec, on, body, nextSection, returnSpec }

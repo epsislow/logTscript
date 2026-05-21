@@ -51,7 +51,9 @@ var KeyComponent = class KeyComponent extends BuiltinComponent {
       const stored = ctx.storage.find(s => s.index === keyStorageIdx);
       if (stored) {
         stored.value = '1';
+        ctx.clog('onPress');
         ctx.updateComponentConnections(name);
+        ctx.showlog(1);
         if (typeof showVars === 'function') showVars();
       }
     };
@@ -61,7 +63,9 @@ var KeyComponent = class KeyComponent extends BuiltinComponent {
       const stored = ctx.storage.find(s => s.index === keyStorageIdx);
       if (stored) {
         stored.value = '0';
+        ctx.clog('onRelease');
         ctx.updateComponentConnections(name);
+        ctx.showlog(1);
         if (typeof showVars === 'function') showVars();
       }
     };

@@ -1137,13 +1137,54 @@ Interpreter.prototype.updateComponentValue = function(compName, value, bitRange)
   }*/
 };
 
+Interpreter.prototype.clog = function(...args) {
+  // Map each item to a string (handles objects/arrays nicely) and join with spaces
+  const logLine = args
+    .map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg))
+    .join(' ');
+  
+  this.cLogs.push(logLine);
+};
+
+// 2. Output all saved logs as a single multiline string
+Interpreter.prototype.showlog = function(reset) {
+  if (this.cLogs.length === 0) {
+    console.log("(No logs recorded)");
+    return;
+  }
+  console.log(this.cLogs.join('\n'));
+  if(reset) {
+    this.cLogs = [];
+  }
+};
+
+Interpreter.prototype.cstack = function () {
+  const err = new Error();
+
+    // Optional: Clean up the stack string to remove this 'clog' line itself
+    const stackLines = err.stack ? err.stack.split('\n') : [];
+    const filteredStack = stackLines.slice(2).join('\n'); // Removes 'Error' and 'clog' lines
+    // 3. Print the stack immediately
+  console.log(`--- Stack Trace ---`);
+  console.log(filteredStack);
+}
+
+Interpreter.prototype.jstmt = function (ds) {
+  if(!ds) {
+    return '(-)';
+  }
+  const dsName = ds.assignment ? ds.assignment.target.var : (ds.decls ? ds.decls.map(d=>d.name).join(',') : '?');
+  return 'st(' + dsName + ')';
+}
+
 Interpreter.prototype.updateConnectedComponents = function(varName, newValue, exclWs){
   // Track if this is the top-level call (not a recursive cascade call).
   // All blocks collected from any cascade depth are stored in _uccPendingBlocks
   // and executed in program order (by blockIndex) only at the top level.
   const isTopLevel = !this._uccPendingBlocks;
   const excludedWs = exclWs || null;
-      console.log('VarName: ', varName, newValue,excludedWs, 'isTop: ', isTopLevel);
+  this.clog('{');
+      this.clog('VarName: ', varName, newValue, this.jstmt(excludedWs), 'isTop: ', isTopLevel);
   if(isTopLevel){
     this._uccPendingBlocks = new Map(); // blockIndex → block
     // Tracks wire statements already executed in this cascade so a self-referential
@@ -1274,7 +1315,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
     // self-referential assignments like tg0 = MUX(p, tg0, NOT(tg0)) from oscillating.
     for(const ds of this._uccWireDependStmts.get(varName)) {
       const dsName = ds.assignment ? ds.assignment.target.var : (ds.decls ? ds.decls.map(d=>d.name).join(',') : '?');
-      console.log('stmt', dsName, ds);
+      this.clog('stmt to execute', dsName, this.jstmt(ds));
       if (ds == excludedWs) {
           console.log('isExcluded: ', ds == excludedWs);
           continue;
@@ -1293,9 +1334,9 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         const oldValue = this.getValueFromRef(wire.ref);
         this.execWireStatement(ds);
         const newWireValue = this.getValueFromRef(wire.ref);
-        
+    //    this.clog('pex1');
         if (newWireValue !== null && newWireValue !== oldValue) {
-          console.log('ex.asg: ',target.var, newWireValue, ds);
+          this.clog('ex.asg: ',target.var, newWireValue, ds);
           this.updateConnectedComponents(target.var, newWireValue, ds);
         }
       } else if (ds.decls && ds.expr) {
@@ -1314,12 +1355,15 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
   
        // Propagate for each declared wire whose value changed
        for (const decl of ds.decls) {
+         // console.log('pex2');
          const w = this.wires.get(decl.name);
+     //    this.clog(`pex2, ${w ?'y': 'n'} `);
          if (!w) continue;
          const newDeclValue = this.getValueFromRef(w.ref);
          const oldDeclValue = oldDeclValues.get(decl.name);
-         if (newDeclValue !== null && newDeclValue !== oldDeclValue) {
-           console.log('ex.dcl: ',target.var, newWireValue, ds);
+         this.clog(` ${oldDeclValue} -> ${newDeclValue}`);
+         if (newDeclValue !== oldDeclValue) {
+           this.clog(`ex.dcl: ${decl.name} ${this.jstmt(ds)}`);
            this.updateConnectedComponents(decl.name, newDeclValue, ds);
          }
        }
@@ -1373,8 +1417,8 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         }
       }
     }*/
+    this.clog('}');
   }
-  
   
   // Check property blocks that have dependencies on this wire/variable or dependent wires
   // This handles cases where a block depends on a wire (like hex = da.3/4) but setExprDirectRef is null or constant
@@ -1392,6 +1436,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
     }
     blocksByComponent.get(block.component).push(block);
   }
+  
   
   // Process blocks for each component in order
   for(const [compName, blocks] of blocksByComponent.entries()){
@@ -1654,6 +1699,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
   // (from cascades inside executePropertyBlock) are also collected and sorted,
   // not executed immediately out of order.
   if(isTopLevel){
+    console.log('q44');
     const executedBlockKeys = new Set();
     const seenComponents = new Set();
     const executedComponents = [];
@@ -1714,4 +1760,6 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
       if(typeof showVars === 'function') showVars();
     }
   }
+  
+
 };
