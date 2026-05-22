@@ -70,8 +70,11 @@ var DipComponent = class DipComponent extends BuiltinComponent {
           const bitsArr = currentValue.split('');
           bitsArr[index] = checked ? '1' : '0';
           stored.value = bitsArr.join('');
+          
+          ctx.clog('onChange');
           ctx.updateComponentConnections(name);
           if (typeof showVars === 'function') showVars();
+          ctx.showlog(1);
         }
       }
     };
