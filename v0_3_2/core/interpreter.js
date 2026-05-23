@@ -1033,6 +1033,42 @@ const idx = parseInt(
         : { value: output, ref: null };
     }
 
+
+    // --- LATCH (FALLING EDGE TRIGGERED) ---
+    if (!this.regOutputMap) this.regOutputMap = new Map();
+    
+    // Extract previous state: { storedValue, lastClock }
+    let regState = this.regOutputMap.get(this.currentStmt) ?? {
+      storedValue: '0'.repeat(width),
+      lastClock: '0'
+    };
+
+    let stored = regState.storedValue;
+    const previousClock = regState.lastClock;
+
+    if (clear === '1') {
+      stored = '0'.repeat(width);
+    } else {
+      // DETECT EDGE clk a was '1' now is '0'
+      const isFallingEdge = (previousClock === '1' && clock === '0');
+      
+      if (isFallingEdge) {
+        stored = data;
+      }
+    }
+
+    this.clog('reg out = ', this.currentStmt, stored);
+    
+    // SALVARE STATE: actualizăm atât valoarea stocată cât și starea curentă a clock-ului pentru tura următoare
+    this.regOutputMap.set(this.currentStmt, {
+      storedValue: stored,
+      lastClock: clock // Salvăm clock-ul curent pentru a detecta tranzitia data viitoare
+    });
+
+    return computeRefs
+      ? { value: stored, ref: `&${this.storeValue(stored)}` }
+      : { value: stored, ref: null };
+/*
     // --- latch transparent pe clock wire ---
     if (!this.regOutputMap) this.regOutputMap = new Map();
     let stored = this.regOutputMap.get(this.currentStmt) ?? '0'.repeat(width);
@@ -1048,6 +1084,8 @@ this.clog('reg out = ', this.currentStmt, stored );
     return computeRefs
       ? { value: stored, ref: `&${this.storeValue(stored)}` }
       : { value: stored, ref: null };
+      
+      */
   }
 
   // ================= BUILTIN: MUXn =================

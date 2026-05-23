@@ -1,4 +1,49 @@
 window.lib_files = {
+  ex_toggle_test5_works: `
+  comp [led] .l:
+    square
+    length: 2
+    color: ^fff
+    on:1
+     :
+comp [led] .l2:
+    square
+    color: ^9f9
+    length: 3
+    on:1
+    nl
+     :
+     
+comp [dip] .d:
+    length: 2
+    noLabels 
+    visual:1
+    color: ^f9f
+    on:1
+    :
+
+# The Master Trigger (Shared by all)
+1w clk   = .d.0
+1w reset = .d.1
+
+.l = clk + reset
+
+# Clear the memory slots
+1w bit1 := 0
+1w bit2 := 0
+
+# BIT 1: Evaluates what the state SHOULD be, then updates on falling edge
+1w bit1Next = NOT(bit1)
+bit1 = REG(bit1Next, clk, reset)
+
+# BIT 2: Toggles ONLY when bit1 is currently high (Forward Count)
+1w bit2Toggle = MUX(bit1, NOT(bit2), bit2)
+bit2 = REG(bit2Toggle, clk, reset)
+
+# Show the bits on the two LEDs
+.l2 = bit1 + bit2
+  `,
+  
   ex_toggle_test4: `
   comp [led] .l:
     square
