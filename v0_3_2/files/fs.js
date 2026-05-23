@@ -1,4 +1,67 @@
 window.lib_files = {
+  ex_toggle_test4: `
+  comp [led] .l:
+    square
+    length: 2
+    color: ^fff
+    on:1
+     :
+comp [led] .l2:
+    square
+    color: ^9f9
+    length: 3
+    on:1
+    nl
+     :
+     
+comp [dip] .d:
+    length: 2
+    noLabels 
+    visual:1
+    color: ^f9f
+    on:1
+    :
+
+
+# The Master Trigger (Shared by all)
+1w clk   = .d.0
+1w reset = .d.1
+
+.l = clk + reset
+
+1w bit1slave := 0
+1w bit1master := 0
+1w bit2slave := 0
+1w bit2master := 0
+# BIT 1: Always toggles
+#1w bit1Next = NOT(bit1)
+#bit1      = REG(bit1Next, clk, reset)
+
+1w bit1masternext = MUX(clk, NOT(bit1slave), bit1master)
+bit1master     = REG(bit1masternext, 1, reset)
+
+# Phase 2: The Slave Latch (Passes value to output when button is RELEASED)
+1w bit1slavenext  = MUX(clk, bit1slave, bit1master)
+bit1slave       = REG(bit1slavenext, 1, reset)
+
+
+
+1w bit2toggle = MUX(bit1slave, NOT(bit2slave), bit2slave)
+
+# Phase 1: The Master Latch for Bit 2 (Captures on PRESS)
+1w bit2masternext = MUX(clk, bit2toggle, bit2master)
+bit2master      = REG(bit2masternext, 1, reset)
+
+# Phase 2: The Slave Latch for Bit 2 (Passes to output on RELEASE)
+1w bit2slavenext  = MUX(clk, bit2slave, bit2master)
+bit2slave       = REG(bit2slavenext, 1, reset)
+
+
+
+.l2 = bit1slave + bit2slave
+
+  
+  `,
   ex_toggle_test3: `
   
     comp [led] .pw:
