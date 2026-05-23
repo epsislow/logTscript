@@ -1,4 +1,61 @@
 window.lib_files = {
+  ex_toggl3_test6_works_3bits: `
+  comp [led] .l:
+    square
+    length: 2
+    color: ^fff
+    on:1
+     :
+comp [led] .l2:
+    square
+    color: ^9f9
+    length: 4        
+    on:1
+    nl
+     :
+     
+comp [dip] .d:
+    length: 2
+    noLabels 
+    visual:1
+    color: ^f9f
+    on:1
+    :
+
+# The Master Trigger (Shared by all)
+1w clk   = .d.0
+1w reset = .d.1
+
+.l = clk + reset
+
+# Clear memory arrays at start
+1w bit1 = 0
+1w bit2 = 0
+1w bit3 = 0
+
+# --- FORWARD COUNTING COMBINATIONAL LAYER ---
+# Bit 1: Always flips
+1w bit1Next = NOT(bit1)
+
+# Bit 2: Flips ONLY when Bit 1 is currently 1 (Up Count Rule)
+1w bit2Next = XOR(bit1, bit2)
+
+# Bit 3: Flips ONLY when BOTH Bit 1 and Bit 2 are currently 1
+1w bit3Toggle = AND(bit1, bit2)
+1w bit3Next = XOR(bit3Toggle, bit3)
+
+
+# --- STATE REGISTER LAYER ---
+# Pass the forward math to the registers
+bit1 = REG(bit1Next, clk, reset)
+bit2 = REG(bit2Next, clk, reset)
+bit3 = REG(bit3Next, clk, reset)
+
+
+# Show the bits on the LEDs (MSB to LSB layout)
+.l2 = bit3 + bit2 + bit1
+
+  `,
   ex_toggle_test5_works: `
   comp [led] .l:
     square
