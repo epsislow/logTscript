@@ -8,6 +8,9 @@
 const fs = require('fs');
 const vm = require('vm');
 
+// interpreter.js calls clog; no-op when signal-propagation.js is not in the sandbox
+const INTERPRETER_CLOG_STUB = 'Interpreter.prototype.clog = function() {};';
+
 const tokenizerSrc    = fs.readFileSync('./core/tokenizer.js', 'utf-8');
 const preprocessorSrc = fs.readFileSync('./core/preprocessor.js', 'utf-8');
 const parserSrc       = fs.readFileSync('./core/parser.js', 'utf-8');
@@ -1851,6 +1854,7 @@ console.log('\n=== Test 200: Component Registry — all types registered ===');
   const fullChunk = tokenizerSrc + '\n' + preprocessorSrc + '\n' + componentsSrc + '\n' + parserSrc + '\n' + interpreterSrc;
   const sbDoc = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, setTimeout, clearTimeout, JSON, Number, isNaN };
   const codeDoc = fullChunk + `
+${INTERPRETER_CLOG_STUB}
 var _CR = createComponentRegistry;
 var _P = Parser;
 var _T = Tokenizer;
@@ -2345,6 +2349,7 @@ doc(myFunc)`;
   const fullChunk2 = tokenizerSrc + '\n' + preprocessorSrc + '\n' + componentsSrc2 + '\n' + parserSrc + '\n' + interpreterSrc2;
   const sbDoc2 = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, setTimeout, clearTimeout, JSON, Number, isNaN };
   const codeDoc2 = fullChunk2 + `
+${INTERPRETER_CLOG_STUB}
 var _CR2 = createComponentRegistry;
 var _P2 = Parser;
 var _T2 = Tokenizer;
