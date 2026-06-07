@@ -139,8 +139,17 @@
     setTestStatus(test.id, ok ? 'pass' : 'fail', h.failures());
     return ok;
   }
+  
+  async function resetStatus(tests) {
+    for (const test of tests) {
+      setTestStatus(test.id,'pending', false);
+    }
+  }
 
   async function runTests(tests) {
+    await resetStatus(tests);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     for (const test of tests) {
       await runOneTest(test);
       await new Promise(r => setTimeout(r, 0));
