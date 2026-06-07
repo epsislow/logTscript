@@ -148,7 +148,7 @@
 
   async function runTests(tests) {
     await resetStatus(tests);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     for (const test of tests) {
       await runOneTest(test);
