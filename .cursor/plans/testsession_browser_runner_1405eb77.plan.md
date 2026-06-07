@@ -4,22 +4,22 @@ overview: Refactorarea runner-ului browser pe modelul TestSession (Interpreter +
 todos:
   - id: session-infra
     content: Creează test_session.js (createSession, run, getWire, setWire, getPcbPout, cleanup oscTimers)
-    status: pending
+    status: completed
   - id: manifest
     content: Creează test_manifest.js + generator din test_repeat headers (exclude comentate)
-    status: pending
+    status: completed
   - id: runner-refactor
     content: Actualizează run_tests.js (session per test, UI placeholder not ported) și run_tests.html (core stack complet)
-    status: pending
+    status: completed
   - id: migrate-existing
     content: "Refactor cele 120 teste existente: ctx → session, păstrează logica"
-    status: pending
+    status: completed
   - id: port-groups
     content: Portare manuală grup cu grup în ordine numerică (90–101, 134–152, 200+, …) cu strategie C pentru surse
-    status: pending
+    status: completed
   - id: validate
     content: Verificare Run All pe teste portate; manifest arată corect neportate gri
-    status: pending
+    status: completed
 isProject: false
 ---
 

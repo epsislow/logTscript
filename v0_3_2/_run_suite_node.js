@@ -1,11 +1,42 @@
-/** Quick validation: load core + test_suite, run all tests. */
+/** Quick validation: load core + test_suite, run all ported tests with isolated sessions. */
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
 
 const dir = __dirname;
 const files = [
-  'core/tokenizer.js', 'core/preprocessor.js', 'test_suite.js'
+  'core/tokenizer.js',
+  'core/preprocessor.js',
+  'core/components/component-base.js',
+  'core/components/builtin-component.js',
+  'core/components/component-registry.js',
+  'core/components/led.js',
+  'core/components/ledBar.js',
+  'core/components/switch.js',
+  'core/components/key.js',
+  'core/components/dip.js',
+  'core/components/seven-seg.js',
+  'core/components/14seg.js',
+  'core/components/dots.js',
+  'core/components/lcd.js',
+  'core/components/adder.js',
+  'core/components/subtract.js',
+  'core/components/multiplier.js',
+  'core/components/divider.js',
+  'core/components/shifter.js',
+  'core/components/mem.js',
+  'core/components/reg.js',
+  'core/components/counter.js',
+  'core/components/osc.js',
+  'core/components/rotary.js',
+  'core/components/pcb-component.js',
+  'core/components/index.js',
+  'core/parser.js',
+  'core/interpreter.js',
+  'core/signal-propagation.js',
+  'test_session.js',
+  'test_suite.js',
+  'test_suite_ported.js'
 ];
 
 let src = '';
@@ -13,12 +44,14 @@ for (const f of files) {
   src += fs.readFileSync(path.join(dir, f), 'utf8') + '\n';
 }
 
-const sandbox = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, JSON, Number, isNaN, window: {} };
+const sandbox = {
+  Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, JSON, Number, isNaN,
+  clearTimeout, setTimeout, window: {}
+};
 sandbox.window = sandbox;
 vm.runInNewContext(src, sandbox);
 
 const suite = sandbox.LogTScriptTestSuite;
-const ctx = suite.createContext();
 
 function createHarness() {
   const assertions = [];
@@ -48,11 +81,14 @@ function createHarness() {
 let passed = 0, failed = 0;
 const failures = [];
 for (const test of suite.tests) {
+  const session = suite.createSession();
   const h = createHarness();
   try {
-    test.run(h, ctx);
+    test.run(h, session);
   } catch (e) {
     h.setUnexpected(e);
+  } finally {
+    session.cleanup();
   }
   if (h.ok()) passed++;
   else {

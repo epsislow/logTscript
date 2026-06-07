@@ -2,18 +2,27 @@
   'use strict';
 
   const suite = window.LogTScriptTestSuite;
-  if (!suite) {
-    document.getElementById('testList').textContent = 'Error: LogTScriptTestSuite not loaded.';
+  const manifest = window.LogTScriptManifest;
+  if (!suite || !manifest) {
+    document.getElementById('testList').textContent =
+      'Error: LogTScriptTestSuite or LogTScriptManifest not loaded.';
     return;
   }
 
-  const ctx = suite.createContext();
   const testListEl = document.getElementById('testList');
   const summaryEl = document.getElementById('summary');
+  const subtitleEl = document.getElementById('subtitle');
   const btnRunAll = document.getElementById('btnRunAll');
 
   const statusById = new Map();
   let running = false;
+
+  const portedCount = suite.tests.length;
+  const totalCount = manifest.entries.length;
+  if (subtitleEl) {
+    subtitleEl.textContent =
+      portedCount + ' / ' + totalCount + ' tests ported. Grey rows without ▶ are not yet ported.';
+  }
 
   function createHarness() {
     const assertions = [];
@@ -94,12 +103,17 @@
     let passed = 0;
     let failed = 0;
     let pending = 0;
-    for (const s of statusById.values()) {
+    let notPorted = 0;
+    for (const entry of manifest.entries) {
+      const s = statusById.get(entry.id);
       if (s === 'pass') passed++;
       else if (s === 'fail') failed++;
+      else if (s === 'not-ported') notPorted++;
       else pending++;
     }
-    summaryEl.textContent = 'Passed: ' + passed + ' | Failed: ' + failed + ' | Pending: ' + pending;
+    summaryEl.textContent =
+      'Passed: ' + passed + ' | Failed: ' + failed + ' | Pending: ' + pending +
+      ' | Not ported: ' + notPorted;
   }
 
   function setRunningUI(isRunning) {
@@ -113,7 +127,7 @@
     const row = document.querySelector('.test-row[data-id="' + id + '"]');
     if (!row) return;
     const dot = row.querySelector('.dot');
-    dot.className = 'dot ' + (status === 'pending' ? '' : status);
+    dot.className = 'dot ' + (status === 'pending' || status === 'not-ported' ? '' : status);
     row.classList.toggle('fail-open', status === 'fail');
     const detail = row.querySelector('.test-detail');
     if (status === 'fail' && failures && failures.length) {
@@ -124,33 +138,45 @@
     updateSummary();
   }
 
+  function entryForTest(entry) {
+    const run = suite.getRun(entry.id);
+    return { id: entry.id, title: entry.title, group: entry.group, run };
+  }
+
   async function runOneTest(test) {
+    if (!test.run) return null;
+
     const row = document.querySelector('.test-row[data-id="' + test.id + '"]');
     if (row) row.querySelector('.dot').className = 'dot running';
 
+    const session = suite.createSession();
     const h = createHarness();
     try {
-      test.run(h, ctx);
+      test.run(h, session);
     } catch (e) {
       h.setUnexpected(e);
+    } finally {
+      session.cleanup();
     }
 
     const ok = h.ok();
     setTestStatus(test.id, ok ? 'pass' : 'fail', h.failures());
     return ok;
   }
-  
+
   async function resetStatus(tests) {
     for (const test of tests) {
-      setTestStatus(test.id,'pending', false);
+      const status = test.run ? 'pending' : 'not-ported';
+      setTestStatus(test.id, status, null);
     }
   }
 
   async function runTests(tests) {
+    const runnable = tests.filter(t => t.run);
     await resetStatus(tests);
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    for (const test of tests) {
+    for (const test of runnable) {
       await runOneTest(test);
       await new Promise(r => setTimeout(r, 0));
     }
@@ -158,16 +184,23 @@
 
   function testsForGroup(group) {
     const idSet = new Set(group.testIds);
-    return suite.tests.filter(t => idSet.has(t.id));
+    return manifest.entries
+      .filter(e => idSet.has(e.id))
+      .map(entryForTest);
+  }
+
+  function allTests() {
+    return manifest.entries.map(entryForTest);
   }
 
   function buildUI() {
-    for (const test of suite.tests) {
-      statusById.set(test.id, 'pending');
+    for (const entry of manifest.entries) {
+      const run = suite.getRun(entry.id);
+      statusById.set(entry.id, run ? 'pending' : 'not-ported');
     }
     updateSummary();
 
-    for (const group of suite.groups) {
+    for (const group of manifest.groups) {
       const section = document.createElement('div');
       section.className = 'test-group';
       section.dataset.group = group.id;
@@ -206,7 +239,7 @@
       const groupTests = testsForGroup(group);
       for (const test of groupTests) {
         const row = document.createElement('div');
-        row.className = 'test-row';
+        row.className = 'test-row' + (test.run ? '' : ' not-ported');
         row.dataset.id = test.id;
 
         const dot = document.createElement('span');
@@ -223,26 +256,33 @@
         titleSpan.className = 'test-title';
         titleSpan.textContent = 'Test ' + test.id + ': ' + test.title;
 
-        const btnRun = document.createElement('button');
-        btnRun.type = 'button';
-        btnRun.className = 'btn btn--run';
-        btnRun.textContent = '\u25B6';
-        btnRun.title = 'Run test ' + test.id;
-        btnRun.addEventListener('click', async () => {
-          if (running) return;
-          setRunningUI(true);
-          try {
-            await runOneTest(test);
-          } finally {
-            setRunningUI(false);
-          }
-        });
+        body.appendChild(titleSpan);
+
+        if (test.run) {
+          const btnRun = document.createElement('button');
+          btnRun.type = 'button';
+          btnRun.className = 'btn btn--run';
+          btnRun.textContent = '\u25B6';
+          btnRun.title = 'Run test ' + test.id;
+          btnRun.addEventListener('click', async () => {
+            if (running) return;
+            setRunningUI(true);
+            try {
+              await runOneTest(test);
+            } finally {
+              setRunningUI(false);
+            }
+          });
+          body.appendChild(btnRun);
+        } else {
+          const badge = document.createElement('span');
+          badge.className = 'not-ported-badge';
+          badge.textContent = 'not ported';
+          body.appendChild(badge);
+        }
 
         const detail = document.createElement('div');
         detail.className = 'test-detail';
-
-        body.appendChild(titleSpan);
-        body.appendChild(btnRun);
         body.appendChild(detail);
 
         row.appendChild(dot);
@@ -259,7 +299,7 @@
     if (running) return;
     setRunningUI(true);
     try {
-      await runTests(suite.tests);
+      await runTests(allTests().filter(t => t.run));
     } finally {
       setRunningUI(false);
     }

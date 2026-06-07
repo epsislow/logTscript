@@ -1,9 +1,7 @@
 /**
- * LogTScript browser test suite (subset from test_repeat.js).
- * Regenerate: node _gen_test_suite.js
- *
- * Not yet ported: parser (90-101), osc parser (134-142, 148-152), registry (200+),
- * doc, PCB, signal propagation, REG tests — add when ready.
+ * LogTScript browser test suite (from test_repeat.js).
+ * Preprocessor/parser/registry tests (6–223). Interpreter tests in test_suite_ported.js.
+ * Manifest: node _gen_manifest.js
  */
 (function () {
   'use strict';
@@ -100,20 +98,16 @@
     return fill.repeat(n) + data.slice(0, len - n);
   }
 
-  function createContext() {
-    return {
-      preprocessRepeat,
-      preprocessShortNotation,
-      tokenize(source) {
-        const processed = preprocessRepeat(source);
-        const t = new Tokenizer(processed);
-        const tokens = [];
-        let tok;
-        while ((tok = t.get()).type !== 'EOF') tokens.push(tok);
-        return { processed, tokens };
-      },
-      gateReduce, gateExpand, gate, lshift, rshift
-    };
+  function createSession() {
+    const session = LogTScriptSession.createSession();
+    session.preprocessRepeat = preprocessRepeat;
+    session.preprocessShortNotation = preprocessShortNotation;
+    session.gateReduce = gateReduce;
+    session.gateExpand = gateExpand;
+    session.gate = gate;
+    session.lshift = lshift;
+    session.rshift = rshift;
+    return session;
   }
 
   const tests = [];
@@ -121,7 +115,7 @@
     tests.push({ id, group, title, run });
   }
 
-  reg(6, 'repeat', 'Max 256 iterations (EXCEEDED)', function(h, ctx) {
+  reg(6, 'repeat', 'Max 256 iterations (EXCEEDED)', function(h, session) {
     {
       h.assertThrows('16x17 = 272 throws error',
         () => preprocessRepeat(`repeat 1..16[
@@ -134,7 +128,7 @@
     }
   });
 
-  reg(7, 'repeat', 'Separate repeat groups (independent limits)', function(h, ctx) {
+  reg(7, 'repeat', 'Separate repeat groups (independent limits)', function(h, session) {
     {
       const src = `repeat 1..16[
     repeat 1..16[
@@ -151,7 +145,7 @@
     }
   });
 
-  reg(8, 'repeat', 'No repeat – passthrough', function(h, ctx) {
+  reg(8, 'repeat', 'No repeat – passthrough', function(h, session) {
     {
       const src = `4wire a = ^FF
     4wire b = ^00`;
@@ -160,7 +154,7 @@
     }
   });
 
-  reg(9, 'repeat', 'Repeat inside comment is ignored', function(h, ctx) {
+  reg(9, 'repeat', 'Repeat inside comment is ignored', function(h, session) {
     {
       const src = `# repeat 1..5[
     4wire a = ^FF`;
@@ -169,18 +163,18 @@
     }
   });
 
-  reg(10, 'repeat', 'Tokenizer accepts preprocessed output', function(h, ctx) {
+  reg(10, 'repeat', 'Tokenizer accepts preprocessed output', function(h, session) {
     {
       const src = `repeat 1..3[
     4wire w?
     ]`;
-      const { processed, tokens } = ctx.tokenize(src);
+      const { processed, tokens } = session.tokenize(src);
       const typeTokens = tokens.filter(t => t.type === 'TYPE');
       h.assert('tokenizer: 3 TYPE tokens from repeat', String(typeTokens.length), '3');
     }
   });
 
-  reg(13, 'repeat', 'Nested 3 levels', function(h, ctx) {
+  reg(13, 'repeat', 'Nested 3 levels', function(h, session) {
     {
       const src = `repeat 1..2[
     repeat 1..2[
@@ -197,7 +191,7 @@
     }
   });
 
-  reg(14, 'repeat', 'Unmatched bracket error', function(h, ctx) {
+  reg(14, 'repeat', 'Unmatched bracket error', function(h, session) {
     {
       h.assertThrows('unmatched bracket',
         () => preprocessRepeat(`repeat 1..3[
@@ -208,202 +202,202 @@
     }
   });
 
-  reg(15, 'repeat', 'Decimal literal \\\\N tokenized as BIN', function(h, ctx) {
+  reg(15, 'repeat', 'Decimal literal \\\\N tokenized as BIN', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire c = \\15');
+      const { tokens } = session.tokenize('4wire c = \\15');
       const binTokens = tokens.filter(t => t.type === 'BIN');
       h.assert('\\15 produces BIN token', String(binTokens.length >= 1), 'true');
       h.assert('\\15 value is 1111', binTokens[binTokens.length - 1].value, '1111');
     }
   });
 
-  reg(16, 'repeat', 'Decimal literal \\\\0', function(h, ctx) {
+  reg(16, 'repeat', 'Decimal literal \\\\0', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire c = \\0');
+      const { tokens } = session.tokenize('4wire c = \\0');
       const binTokens = tokens.filter(t => t.type === 'BIN');
       h.assert('\\0 produces BIN with value 0', binTokens[binTokens.length - 1].value, '0');
     }
   });
 
-  reg(17, 'repeat', 'Decimal literal \\\\255', function(h, ctx) {
+  reg(17, 'repeat', 'Decimal literal \\\\255', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire c = \\255');
+      const { tokens } = session.tokenize('4wire c = \\255');
       const binTokens = tokens.filter(t => t.type === 'BIN');
       h.assert('\\255 value is 11111111', binTokens[binTokens.length - 1].value, '11111111');
     }
   });
 
-  reg(19, 'repeat', 'Decimal \\\\2 produces binary 10 (padding is interpreter-level)', function(h, ctx) {
+  reg(19, 'repeat', 'Decimal \\\\2 produces binary 10 (padding is interpreter-level)', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('8wire q2 = \\2');
+      const { tokens } = session.tokenize('8wire q2 = \\2');
       const binTokens = tokens.filter(t => t.type === 'BIN');
       h.assert('\\2 tokenized as BIN 10', binTokens[binTokens.length - 1].value, '10');
     }
   });
 
-  reg(20, 'repeat', 'HEX ^F produces 4-bit binary', function(h, ctx) {
+  reg(20, 'repeat', 'HEX ^F produces 4-bit binary', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('8wire q3 = ^F');
+      const { tokens } = session.tokenize('8wire q3 = ^F');
       const hexTokens = tokens.filter(t => t.type === 'HEX');
       h.assert('^F tokenized as HEX F', hexTokens[0].value, 'F');
     }
   });
 
-  reg(21, 'repeat', 'Large decimal \\\\1024', function(h, ctx) {
+  reg(21, 'repeat', 'Large decimal \\\\1024', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('16wire q = \\1024');
+      const { tokens } = session.tokenize('16wire q = \\1024');
       const binTokens = tokens.filter(t => t.type === 'BIN');
       h.assert('\\1024 value is 10000000000', binTokens[binTokens.length - 1].value, '10000000000');
     }
   });
 
-  reg(22, 'gates-reduce', 'AND reduce - bitwise 11011 AND 11100 = 11000 → OR-reduce = 1', function(h, ctx) {
-    h.assert('AND(11011, 11100)', ctx.gateReduce('AND', '11011', '11100'), '1');
+  reg(22, 'gates-reduce', 'AND reduce - bitwise 11011 AND 11100 = 11000 → OR-reduce = 1', function(h, session) {
+    h.assert('AND(11011, 11100)', session.gateReduce('AND', '11011', '11100'), '1');
   });
 
-  reg(23, 'gates-reduce', 'AND reduce - no overlap → 0', function(h, ctx) {
-    h.assert('AND(1010, 0101)', ctx.gateReduce('AND', '1010', '0101'), '0');
+  reg(23, 'gates-reduce', 'AND reduce - no overlap → 0', function(h, session) {
+    h.assert('AND(1010, 0101)', session.gateReduce('AND', '1010', '0101'), '0');
   });
 
-  reg(24, 'gates-reduce', 'OR reduce', function(h, ctx) {
-    h.assert('OR(0000, 0000)', ctx.gateReduce('OR', '0000', '0000'), '0');
-    h.assert('OR(0000, 0001)', ctx.gateReduce('OR', '0000', '0001'), '1');
+  reg(24, 'gates-reduce', 'OR reduce', function(h, session) {
+    h.assert('OR(0000, 0000)', session.gateReduce('OR', '0000', '0000'), '0');
+    h.assert('OR(0000, 0001)', session.gateReduce('OR', '0000', '0001'), '1');
   });
 
-  reg(25, 'gates-reduce', 'NOR reduce - NOR(1111, 0011) = 0000 → reduce = 0', function(h, ctx) {
-    h.assert('NOR(1111, 0011)', ctx.gateReduce('NOR', '1111', '0011'), '0');
+  reg(25, 'gates-reduce', 'NOR reduce - NOR(1111, 0011) = 0000 → reduce = 0', function(h, session) {
+    h.assert('NOR(1111, 0011)', session.gateReduce('NOR', '1111', '0011'), '0');
   });
 
-  reg(26, 'gates-reduce', 'NOR reduce - NOR(0000, 0000) = 1111 → reduce = 1', function(h, ctx) {
-    h.assert('NOR(0000, 0000)', ctx.gateReduce('NOR', '0000', '0000'), '1');
+  reg(26, 'gates-reduce', 'NOR reduce - NOR(0000, 0000) = 1111 → reduce = 1', function(h, session) {
+    h.assert('NOR(0000, 0000)', session.gateReduce('NOR', '0000', '0000'), '1');
   });
 
-  reg(27, 'gates-reduce', 'NOT reduce - NOT(1010) → 0101, reduce=1', function(h, ctx) {
-    h.assert('NOT(1010)', ctx.gateReduce('NOT', '1010'), '1');
+  reg(27, 'gates-reduce', 'NOT reduce - NOT(1010) → 0101, reduce=1', function(h, session) {
+    h.assert('NOT(1010)', session.gateReduce('NOT', '1010'), '1');
   });
 
-  reg(28, 'gates-reduce', 'NOT reduce - NOT(1111) → 0000, reduce=0', function(h, ctx) {
-    h.assert('NOT(1111)', ctx.gateReduce('NOT', '1111'), '0');
+  reg(28, 'gates-reduce', 'NOT reduce - NOT(1111) → 0000, reduce=0', function(h, session) {
+    h.assert('NOT(1111)', session.gateReduce('NOT', '1111'), '0');
   });
 
-  reg(29, 'gates-reduce', 'XOR reduce', function(h, ctx) {
-    h.assert('XOR(1010, 1010)', ctx.gateReduce('XOR', '1010', '1010'), '0');
-    h.assert('XOR(1010, 0101)', ctx.gateReduce('XOR', '1010', '0101'), '1');
+  reg(29, 'gates-reduce', 'XOR reduce', function(h, session) {
+    h.assert('XOR(1010, 1010)', session.gateReduce('XOR', '1010', '1010'), '0');
+    h.assert('XOR(1010, 0101)', session.gateReduce('XOR', '1010', '0101'), '1');
   });
 
-  reg(30, 'gates-reduce', 'NAND reduce', function(h, ctx) {
-    h.assert('NAND(1111, 1111) → 0000 → 0', ctx.gateReduce('NAND', '1111', '1111'), '0');
-    h.assert('NAND(1010, 0101) → 1111 → 1', ctx.gateReduce('NAND', '1010', '0101'), '1');
+  reg(30, 'gates-reduce', 'NAND reduce', function(h, session) {
+    h.assert('NAND(1111, 1111) → 0000 → 0', session.gateReduce('NAND', '1111', '1111'), '0');
+    h.assert('NAND(1010, 0101) → 1111 → 1', session.gateReduce('NAND', '1010', '0101'), '1');
   });
 
-  reg(31, 'gates-reduce', 'ANDe - bitwise AND returns N bits', function(h, ctx) {
-    h.assert('ANDe(011, 101)', ctx.gateExpand('ANDe', '011', '101'), '001');
-    h.assert('ANDe(1100, 1011)', ctx.gateExpand('ANDe', '1100', '1011'), '1000');
+  reg(31, 'gates-reduce', 'ANDe - bitwise AND returns N bits', function(h, session) {
+    h.assert('ANDe(011, 101)', session.gateExpand('ANDe', '011', '101'), '001');
+    h.assert('ANDe(1100, 1011)', session.gateExpand('ANDe', '1100', '1011'), '1000');
   });
 
-  reg(32, 'gates-reduce', 'ORe - bitwise OR returns N bits', function(h, ctx) {
-    h.assert('ORe(1100, 1011)', ctx.gateExpand('ORe', '1100', '1011'), '1111');
-    h.assert('ORe(0000, 0000)', ctx.gateExpand('ORe', '0000', '0000'), '0000');
+  reg(32, 'gates-reduce', 'ORe - bitwise OR returns N bits', function(h, session) {
+    h.assert('ORe(1100, 1011)', session.gateExpand('ORe', '1100', '1011'), '1111');
+    h.assert('ORe(0000, 0000)', session.gateExpand('ORe', '0000', '0000'), '0000');
   });
 
-  reg(33, 'gates-reduce', 'NOTe - bitwise NOT returns N bits', function(h, ctx) {
-    h.assert('NOTe(1010)', ctx.gateExpand('NOTe', '1010'), '0101');
-    h.assert('NOTe(0000)', ctx.gateExpand('NOTe', '0000'), '1111');
+  reg(33, 'gates-reduce', 'NOTe - bitwise NOT returns N bits', function(h, session) {
+    h.assert('NOTe(1010)', session.gateExpand('NOTe', '1010'), '0101');
+    h.assert('NOTe(0000)', session.gateExpand('NOTe', '0000'), '1111');
   });
 
-  reg(34, 'gates-reduce', 'XORe', function(h, ctx) {
-    h.assert('XORe(1010, 1100)', ctx.gateExpand('XORe', '1010', '1100'), '0110');
+  reg(34, 'gates-reduce', 'XORe', function(h, session) {
+    h.assert('XORe(1010, 1100)', session.gateExpand('XORe', '1010', '1100'), '0110');
   });
 
-  reg(35, 'gates-reduce', 'NANDe', function(h, ctx) {
-    h.assert('NANDe(1111, 1111)', ctx.gateExpand('NANDe', '1111', '1111'), '0000');
-    h.assert('NANDe(1010, 0101)', ctx.gateExpand('NANDe', '1010', '0101'), '1111');
+  reg(35, 'gates-reduce', 'NANDe', function(h, session) {
+    h.assert('NANDe(1111, 1111)', session.gateExpand('NANDe', '1111', '1111'), '0000');
+    h.assert('NANDe(1010, 0101)', session.gateExpand('NANDe', '1010', '0101'), '1111');
   });
 
-  reg(36, 'gates-reduce', 'NORe', function(h, ctx) {
-    h.assert('NORe(0000, 0000)', ctx.gateExpand('NORe', '0000', '0000'), '1111');
-    h.assert('NORe(1010, 0101)', ctx.gateExpand('NORe', '1010', '0101'), '0000');
+  reg(36, 'gates-reduce', 'NORe', function(h, session) {
+    h.assert('NORe(0000, 0000)', session.gateExpand('NORe', '0000', '0000'), '1111');
+    h.assert('NORe(1010, 0101)', session.gateExpand('NORe', '1010', '0101'), '0000');
   });
 
-  reg(37, 'gates-reduce', 'Gate on different widths (padStart shorter)', function(h, ctx) {
-    h.assert('ANDe(11, 1100) pads 11→0011', ctx.gateExpand('ANDe', '11', '1100'), '0000');
-    h.assert('ORe(11, 1100)', ctx.gateExpand('ORe', '11', '1100'), '1111');
+  reg(37, 'gates-reduce', 'Gate on different widths (padStart shorter)', function(h, session) {
+    h.assert('ANDe(11, 1100) pads 11→0011', session.gateExpand('ANDe', '11', '1100'), '0000');
+    h.assert('ORe(11, 1100)', session.gateExpand('ORe', '11', '1100'), '1111');
   });
 
-  reg(38, 'other', 'NOTe tokenized as ID', function(h, ctx) {
+  reg(38, 'other', 'NOTe tokenized as ID', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire x = NOTe(1010)');
+      const { tokens } = session.tokenize('4wire x = NOTe(1010)');
       const idTokens = tokens.filter(t => t.type === 'ID' && t.value === 'NOTe');
       h.assert('NOTe recognized as ID token', String(idTokens.length), '1');
     }
   });
 
-  reg(39, 'other', 'ANDe tokenized as ID', function(h, ctx) {
+  reg(39, 'other', 'ANDe tokenized as ID', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire x = ANDe(1010, 0101)');
+      const { tokens } = session.tokenize('4wire x = ANDe(1010, 0101)');
       const idTokens = tokens.filter(t => t.type === 'ID' && t.value === 'ANDe');
       h.assert('ANDe recognized as ID token', String(idTokens.length), '1');
     }
   });
 
-  reg(40, 'shifts', 'LSHIFT basic', function(h, ctx) {
-    h.assert('LSHIFT(1, 1, 0)', ctx.lshift('1', 1, '0'), '10');
-    h.assert('LSHIFT(1, 1, 1)', ctx.lshift('1', 1, '1'), '11');
-    h.assert('LSHIFT(10, 1, 0)', ctx.lshift('10', 1, '0'), '100');
-    h.assert('LSHIFT(10, 1, 1)', ctx.lshift('10', 1, '1'), '101');
+  reg(40, 'shifts', 'LSHIFT basic', function(h, session) {
+    h.assert('LSHIFT(1, 1, 0)', session.lshift('1', 1, '0'), '10');
+    h.assert('LSHIFT(1, 1, 1)', session.lshift('1', 1, '1'), '11');
+    h.assert('LSHIFT(10, 1, 0)', session.lshift('10', 1, '0'), '100');
+    h.assert('LSHIFT(10, 1, 1)', session.lshift('10', 1, '1'), '101');
   });
 
-  reg(41, 'shifts', 'LSHIFT default fill=0', function(h, ctx) {
-    h.assert('LSHIFT(1, 1) default fill', ctx.lshift('1', 1), '10');
-    h.assert('LSHIFT(10, 1) default fill', ctx.lshift('10', 1), '100');
+  reg(41, 'shifts', 'LSHIFT default fill=0', function(h, session) {
+    h.assert('LSHIFT(1, 1) default fill', session.lshift('1', 1), '10');
+    h.assert('LSHIFT(10, 1) default fill', session.lshift('10', 1), '100');
   });
 
-  reg(42, 'shifts', 'LSHIFT n=0', function(h, ctx) {
-    h.assert('LSHIFT(101, 0, 0)', ctx.lshift('101', 0, '0'), '101');
+  reg(42, 'shifts', 'LSHIFT n=0', function(h, session) {
+    h.assert('LSHIFT(101, 0, 0)', session.lshift('101', 0, '0'), '101');
   });
 
-  reg(43, 'shifts', 'LSHIFT n > data.length', function(h, ctx) {
-    h.assert('LSHIFT(1, 3, 0)', ctx.lshift('1', 3, '0'), '1000');
-    h.assert('LSHIFT(1, 3, 1)', ctx.lshift('1', 3, '1'), '1111');
+  reg(43, 'shifts', 'LSHIFT n > data.length', function(h, session) {
+    h.assert('LSHIFT(1, 3, 0)', session.lshift('1', 3, '0'), '1000');
+    h.assert('LSHIFT(1, 3, 1)', session.lshift('1', 3, '1'), '1111');
   });
 
-  reg(44, 'shifts', 'RSHIFT basic', function(h, ctx) {
-    h.assert('RSHIFT(10, 1, 0)', ctx.rshift('10', 1, '0'), '01');
-    h.assert('RSHIFT(10, 1, 1)', ctx.rshift('10', 1, '1'), '11');
-    h.assert('RSHIFT(1, 1, 0)', ctx.rshift('1', 1, '0'), '0');
-    h.assert('RSHIFT(1, 1, 1)', ctx.rshift('1', 1, '1'), '1');
+  reg(44, 'shifts', 'RSHIFT basic', function(h, session) {
+    h.assert('RSHIFT(10, 1, 0)', session.rshift('10', 1, '0'), '01');
+    h.assert('RSHIFT(10, 1, 1)', session.rshift('10', 1, '1'), '11');
+    h.assert('RSHIFT(1, 1, 0)', session.rshift('1', 1, '0'), '0');
+    h.assert('RSHIFT(1, 1, 1)', session.rshift('1', 1, '1'), '1');
   });
 
-  reg(45, 'shifts', 'RSHIFT default fill=0', function(h, ctx) {
-    h.assert('RSHIFT(10, 1) default fill', ctx.rshift('10', 1), '01');
-    h.assert('RSHIFT(1010, 2) default fill', ctx.rshift('1010', 2), '0010');
+  reg(45, 'shifts', 'RSHIFT default fill=0', function(h, session) {
+    h.assert('RSHIFT(10, 1) default fill', session.rshift('10', 1), '01');
+    h.assert('RSHIFT(1010, 2) default fill', session.rshift('1010', 2), '0010');
   });
 
-  reg(46, 'shifts', 'RSHIFT n=0', function(h, ctx) {
-    h.assert('RSHIFT(101, 0, 0)', ctx.rshift('101', 0, '0'), '101');
+  reg(46, 'shifts', 'RSHIFT n=0', function(h, session) {
+    h.assert('RSHIFT(101, 0, 0)', session.rshift('101', 0, '0'), '101');
   });
 
-  reg(47, 'shifts', 'RSHIFT n >= data.length', function(h, ctx) {
-    h.assert('RSHIFT(10, 2, 0)', ctx.rshift('10', 2, '0'), '00');
-    h.assert('RSHIFT(10, 5, 1)', ctx.rshift('10', 5, '1'), '11');
+  reg(47, 'shifts', 'RSHIFT n >= data.length', function(h, session) {
+    h.assert('RSHIFT(10, 2, 0)', session.rshift('10', 2, '0'), '00');
+    h.assert('RSHIFT(10, 5, 1)', session.rshift('10', 5, '1'), '11');
   });
 
-  reg(48, 'shifts', 'RSHIFT keeps same width', function(h, ctx) {
-    h.assert('RSHIFT(1010, 1, 0) = 0101', ctx.rshift('1010', 1, '0'), '0101');
-    h.assert('RSHIFT(1010, 1, 1) = 1101', ctx.rshift('1010', 1, '1'), '1101');
+  reg(48, 'shifts', 'RSHIFT keeps same width', function(h, session) {
+    h.assert('RSHIFT(1010, 1, 0) = 0101', session.rshift('1010', 1, '0'), '0101');
+    h.assert('RSHIFT(1010, 1, 1) = 1101', session.rshift('1010', 1, '1'), '1101');
   });
 
-  reg(49, 'shifts', 'Tokenizer - < emits SYM when not LOAD', function(h, ctx) {
+  reg(49, 'shifts', 'Tokenizer - < emits SYM when not LOAD', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire x = 10 < 1');
+      const { tokens } = session.tokenize('4wire x = 10 < 1');
       const symLt = tokens.filter(t => t.type === 'SYM' && t.value === '<');
       h.assert('< is SYM token in shift context', String(symLt.length), '1');
     }
   });
 
-  reg(492, 'shifts', 'Tokenizer - < after variable name is SYM (not LOAD)', function(h, ctx) {
+  reg(492, 'shifts', 'Tokenizer - < after variable name is SYM (not LOAD)', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire result = test < sel');
+      const { tokens } = session.tokenize('4wire result = test < sel');
       const symLt = tokens.filter(t => t.type === 'SYM' && t.value === '<');
       const loadTok = tokens.filter(t => t.type === 'LOAD');
       h.assert('< after variable is SYM not LOAD', String(symLt.length), '1');
@@ -411,24 +405,24 @@
     }
   });
 
-  reg(50, 'shifts', 'Tokenizer - <path remains LOAD', function(h, ctx) {
+  reg(50, 'shifts', 'Tokenizer - <path remains LOAD', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('<myfile');
+      const { tokens } = session.tokenize('<myfile');
       const loadTok = tokens.filter(t => t.type === 'LOAD');
       h.assert('<myfile produces LOAD token', String(loadTok.length), '1');
       h.assert('LOAD token value is myfile', loadTok[0].value, 'myfile');
     }
   });
 
-  reg(51, 'shifts', 'Tokenizer - > emits SYM', function(h, ctx) {
+  reg(51, 'shifts', 'Tokenizer - > emits SYM', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire x = 10 > 1');
+      const { tokens } = session.tokenize('4wire x = 10 > 1');
       const symGt = tokens.filter(t => t.type === 'SYM' && t.value === '>');
       h.assert('> is SYM token', String(symGt.length), '1');
     }
   });
 
-  reg(52, 'shifts', 'LSHIFT w1 fill via operator - preprocessed text', function(h, ctx) {
+  reg(52, 'shifts', 'LSHIFT w1 fill via operator - preprocessed text', function(h, session) {
     {
       const src = '4wire x = 10 < 1 w1';
       const result = preprocessRepeat(src);
@@ -436,9 +430,9 @@
     }
   });
 
-  reg(53, 'bitrange', 'Tokenizer - ( after . emits SYM (', function(h, ctx) {
+  reg(53, 'bitrange', 'Tokenizer - ( after . emits SYM (', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('a.(start)');
+      const { tokens } = session.tokenize('a.(start)');
       const types = tokens.map(t => t.type + ':' + t.value).join(' ');
       const hasDot = tokens.some(t => t.type === 'SYM' && t.value === '.');
       const hasLParen = tokens.some(t => t.type === 'SYM' && t.value === '(');
@@ -449,23 +443,23 @@
     }
   });
 
-  reg(54, 'bitrange', 'Tokenizer - a.(start)/(l) tokenizes correctly', function(h, ctx) {
+  reg(54, 'bitrange', 'Tokenizer - a.(start)/(l) tokenizes correctly', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('a.(start)/(l)');
+      const { tokens } = session.tokenize('a.(start)/(l)');
       const slash = tokens.filter(t => t.type === 'SYM' && t.value === '/');
       h.assert('a.(start)/(l) has / token', String(slash.length >= 1), 'true');
     }
   });
 
-  reg(55, 'bitrange', 'Tokenizer - a.(start)-(end) tokenizes correctly', function(h, ctx) {
+  reg(55, 'bitrange', 'Tokenizer - a.(start)-(end) tokenizes correctly', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('a.(s)-(e)');
+      const { tokens } = session.tokenize('a.(s)-(e)');
       const minus = tokens.filter(t => t.type === 'SYM' && t.value === '-');
       h.assert('a.(s)-(e) has - token', String(minus.length >= 1), 'true');
     }
   });
 
-  reg(56, 'bitrange', 'Tokenizer - preprocessor passes through dynamic bit range syntax', function(h, ctx) {
+  reg(56, 'bitrange', 'Tokenizer - preprocessor passes through dynamic bit range syntax', function(h, session) {
     {
       const src = '4bit sub = data.(start)/(l)';
       const result = preprocessRepeat(src);
@@ -473,7 +467,7 @@
     }
   });
 
-  reg(57, 'bitrange', 'resolveBitRange - static range {start:1, end:4}', function(h, ctx) {
+  reg(57, 'bitrange', 'resolveBitRange - static range {start:1, end:4}', function(h, session) {
     {
       function resolveBitRange(bitRange) {
         if (!bitRange.isDynamic) {
@@ -489,7 +483,7 @@
     }
   });
 
-  reg(58, 'bitrange', 'resolveBitRange - static single bit {start:3, end:3}', function(h, ctx) {
+  reg(58, 'bitrange', 'resolveBitRange - static single bit {start:3, end:3}', function(h, session) {
     {
       function resolveBitRange(bitRange) {
         if (!bitRange.isDynamic) {
@@ -505,7 +499,7 @@
     }
   });
 
-  reg(59, 'bitrange', 'resolveBitRange - static range missing end uses start', function(h, ctx) {
+  reg(59, 'bitrange', 'resolveBitRange - static range missing end uses start', function(h, session) {
     {
       function resolveBitRange(bitRange) {
         if (!bitRange.isDynamic) {
@@ -520,7 +514,7 @@
     }
   });
 
-  reg(60, 'bitrange', 'resolveBitRange - dynamic range with evalExpr simulation', function(h, ctx) {
+  reg(60, 'bitrange', 'resolveBitRange - dynamic range with evalExpr simulation', function(h, session) {
     {
       function evalBinStr(s) { return parseInt(s, 2); }
       function mockResolve(bitRange, startVal, lenVal) {
@@ -577,168 +571,168 @@
     }
   });
 
-  reg(61, 'bit-ops', 'NOT returns same number of bits (N bits)', function(h, ctx) {
-    h.assert('NOT(1) = 0',    ctx.gate('NOT', '1'),    '0');
-    h.assert('NOT(0) = 1',    ctx.gate('NOT', '0'),    '1');
-    h.assert('NOT(111) = 000', ctx.gate('NOT', '111'), '000');
-    h.assert('NOT(101) = 010', ctx.gate('NOT', '101'), '010');
-    h.assert('NOT(0000) = 1111', ctx.gate('NOT', '0000'), '1111');
-    h.assert('NOT(1010) = 0101', ctx.gate('NOT', '1010'), '0101');
+  reg(61, 'bit-ops', 'NOT returns same number of bits (N bits)', function(h, session) {
+    h.assert('NOT(1) = 0',    session.gate('NOT', '1'),    '0');
+    h.assert('NOT(0) = 1',    session.gate('NOT', '0'),    '1');
+    h.assert('NOT(111) = 000', session.gate('NOT', '111'), '000');
+    h.assert('NOT(101) = 010', session.gate('NOT', '101'), '010');
+    h.assert('NOT(0000) = 1111', session.gate('NOT', '0000'), '1111');
+    h.assert('NOT(1010) = 0101', session.gate('NOT', '1010'), '0101');
     
     // --- AND ---
   });
 
-  reg(62, 'bit-ops', 'AND 2-arg: 1-bit operands → 1 bit', function(h, ctx) {
-    h.assert('AND(1,1) = 1', ctx.gate('AND', '1', '1'), '1');
-    h.assert('AND(0,0) = 0', ctx.gate('AND', '0', '0'), '0');
-    h.assert('AND(1,0) = 0', ctx.gate('AND', '1', '0'), '0');
+  reg(62, 'bit-ops', 'AND 2-arg: 1-bit operands → 1 bit', function(h, session) {
+    h.assert('AND(1,1) = 1', session.gate('AND', '1', '1'), '1');
+    h.assert('AND(0,0) = 0', session.gate('AND', '0', '0'), '0');
+    h.assert('AND(1,0) = 0', session.gate('AND', '1', '0'), '0');
   });
 
-  reg(63, 'bit-ops', 'AND 1-arg fold → 1 bit', function(h, ctx) {
-    h.assert('AND(110) = 0',  ctx.gate('AND', '110'),  '0');
-    h.assert('AND(111) = 1',  ctx.gate('AND', '111'),  '1');
-    h.assert('AND(1111) = 1', ctx.gate('AND', '1111'), '1');
-    h.assert('AND(1110) = 0', ctx.gate('AND', '1110'), '0');
+  reg(63, 'bit-ops', 'AND 1-arg fold → 1 bit', function(h, session) {
+    h.assert('AND(110) = 0',  session.gate('AND', '110'),  '0');
+    h.assert('AND(111) = 1',  session.gate('AND', '111'),  '1');
+    h.assert('AND(1111) = 1', session.gate('AND', '1111'), '1');
+    h.assert('AND(1110) = 0', session.gate('AND', '1110'), '0');
   });
 
-  reg(64, 'bit-ops', 'AND 2-arg bitwise → N bits', function(h, ctx) {
-    h.assert('AND(111,101) = 101',               ctx.gate('AND', '111', '101'),        '101');
-    h.assert('AND(00100101,01001111) = 00000101', ctx.gate('AND', '00100101','01001111'),'00000101');
-    h.assert('AND(11,10) = 10',                  ctx.gate('AND', '11', '10'),           '10');
+  reg(64, 'bit-ops', 'AND 2-arg bitwise → N bits', function(h, session) {
+    h.assert('AND(111,101) = 101',               session.gate('AND', '111', '101'),        '101');
+    h.assert('AND(00100101,01001111) = 00000101', session.gate('AND', '00100101','01001111'),'00000101');
+    h.assert('AND(11,10) = 10',                  session.gate('AND', '11', '10'),           '10');
     
     // --- OR ---
   });
 
-  reg(65, 'bit-ops', 'OR 2-arg: 1-bit operands → 1 bit', function(h, ctx) {
-    h.assert('OR(1,1) = 1', ctx.gate('OR', '1', '1'), '1');
-    h.assert('OR(0,0) = 0', ctx.gate('OR', '0', '0'), '0');
-    h.assert('OR(1,0) = 1', ctx.gate('OR', '1', '0'), '1');
+  reg(65, 'bit-ops', 'OR 2-arg: 1-bit operands → 1 bit', function(h, session) {
+    h.assert('OR(1,1) = 1', session.gate('OR', '1', '1'), '1');
+    h.assert('OR(0,0) = 0', session.gate('OR', '0', '0'), '0');
+    h.assert('OR(1,0) = 1', session.gate('OR', '1', '0'), '1');
   });
 
-  reg(66, 'bit-ops', 'OR 1-arg fold → 1 bit', function(h, ctx) {
-    h.assert('OR(110) = 1',  ctx.gate('OR', '110'),  '1');
-    h.assert('OR(111) = 1',  ctx.gate('OR', '111'),  '1');
-    h.assert('OR(000) = 0',  ctx.gate('OR', '000'),  '0');
-    h.assert('OR(001) = 1',  ctx.gate('OR', '001'),  '1');
+  reg(66, 'bit-ops', 'OR 1-arg fold → 1 bit', function(h, session) {
+    h.assert('OR(110) = 1',  session.gate('OR', '110'),  '1');
+    h.assert('OR(111) = 1',  session.gate('OR', '111'),  '1');
+    h.assert('OR(000) = 0',  session.gate('OR', '000'),  '0');
+    h.assert('OR(001) = 1',  session.gate('OR', '001'),  '1');
   });
 
-  reg(67, 'bit-ops', 'OR 2-arg bitwise → N bits', function(h, ctx) {
-    h.assert('OR(111,101) = 111',               ctx.gate('OR', '111', '101'),         '111');
-    h.assert('OR(00100101,01001111) = 01101111', ctx.gate('OR', '00100101','01001111'), '01101111');
-    h.assert('OR(11,10) = 11',                  ctx.gate('OR', '11', '10'),            '11');
+  reg(67, 'bit-ops', 'OR 2-arg bitwise → N bits', function(h, session) {
+    h.assert('OR(111,101) = 111',               session.gate('OR', '111', '101'),         '111');
+    h.assert('OR(00100101,01001111) = 01101111', session.gate('OR', '00100101','01001111'), '01101111');
+    h.assert('OR(11,10) = 11',                  session.gate('OR', '11', '10'),            '11');
     
     // --- NOR ---
   });
 
-  reg(68, 'bit-ops', 'NOR 2-arg: 1-bit operands → 1 bit', function(h, ctx) {
-    h.assert('NOR(1,1) = 0', ctx.gate('NOR', '1', '1'), '0');
-    h.assert('NOR(0,0) = 1', ctx.gate('NOR', '0', '0'), '1');
-    h.assert('NOR(1,0) = 0', ctx.gate('NOR', '1', '0'), '0');
+  reg(68, 'bit-ops', 'NOR 2-arg: 1-bit operands → 1 bit', function(h, session) {
+    h.assert('NOR(1,1) = 0', session.gate('NOR', '1', '1'), '0');
+    h.assert('NOR(0,0) = 1', session.gate('NOR', '0', '0'), '1');
+    h.assert('NOR(1,0) = 0', session.gate('NOR', '1', '0'), '0');
   });
 
-  reg(69, 'bit-ops', 'NOR 1-arg fold → 1 bit', function(h, ctx) {
-    h.assert('NOR(110) = 1',  ctx.gate('NOR', '110'), '1');
-    h.assert('NOR(111) = 0',  ctx.gate('NOR', '111'), '0');
-    h.assert('NOR(000) = 0',  ctx.gate('NOR', '000'), '0');
-    h.assert('NOR(001) = 0',  ctx.gate('NOR', '001'), '0');
+  reg(69, 'bit-ops', 'NOR 1-arg fold → 1 bit', function(h, session) {
+    h.assert('NOR(110) = 1',  session.gate('NOR', '110'), '1');
+    h.assert('NOR(111) = 0',  session.gate('NOR', '111'), '0');
+    h.assert('NOR(000) = 0',  session.gate('NOR', '000'), '0');
+    h.assert('NOR(001) = 0',  session.gate('NOR', '001'), '0');
   });
 
-  reg(70, 'bit-ops', 'NOR 2-arg bitwise → N bits', function(h, ctx) {
-    h.assert('NOR(111,101) = 000',               ctx.gate('NOR', '111', '101'),         '000');
-    h.assert('NOR(00100101,01001111) = 10010000', ctx.gate('NOR', '00100101','01001111'), '10010000');
-    h.assert('NOR(11,10) = 00',                  ctx.gate('NOR', '11', '10'),            '00');
+  reg(70, 'bit-ops', 'NOR 2-arg bitwise → N bits', function(h, session) {
+    h.assert('NOR(111,101) = 000',               session.gate('NOR', '111', '101'),         '000');
+    h.assert('NOR(00100101,01001111) = 10010000', session.gate('NOR', '00100101','01001111'), '10010000');
+    h.assert('NOR(11,10) = 00',                  session.gate('NOR', '11', '10'),            '00');
     
     // --- XOR ---
   });
 
-  reg(71, 'bit-ops', 'XOR 2-arg: 1-bit operands → 1 bit', function(h, ctx) {
-    h.assert('XOR(1,1) = 0', ctx.gate('XOR', '1', '1'), '0');
-    h.assert('XOR(0,0) = 0', ctx.gate('XOR', '0', '0'), '0');
-    h.assert('XOR(1,0) = 1', ctx.gate('XOR', '1', '0'), '1');
+  reg(71, 'bit-ops', 'XOR 2-arg: 1-bit operands → 1 bit', function(h, session) {
+    h.assert('XOR(1,1) = 0', session.gate('XOR', '1', '1'), '0');
+    h.assert('XOR(0,0) = 0', session.gate('XOR', '0', '0'), '0');
+    h.assert('XOR(1,0) = 1', session.gate('XOR', '1', '0'), '1');
   });
 
-  reg(72, 'bit-ops', 'XOR 1-arg fold → 1 bit', function(h, ctx) {
-    h.assert('XOR(110) = 0',  ctx.gate('XOR', '110'), '0');
-    h.assert('XOR(111) = 1',  ctx.gate('XOR', '111'), '1');
-    h.assert('XOR(1010) = 0', ctx.gate('XOR', '1010'), '0');
-    h.assert('XOR(1011) = 1', ctx.gate('XOR', '1011'), '1');
+  reg(72, 'bit-ops', 'XOR 1-arg fold → 1 bit', function(h, session) {
+    h.assert('XOR(110) = 0',  session.gate('XOR', '110'), '0');
+    h.assert('XOR(111) = 1',  session.gate('XOR', '111'), '1');
+    h.assert('XOR(1010) = 0', session.gate('XOR', '1010'), '0');
+    h.assert('XOR(1011) = 1', session.gate('XOR', '1011'), '1');
   });
 
-  reg(73, 'bit-ops', 'XOR 2-arg bitwise → N bits', function(h, ctx) {
-    h.assert('XOR(111,101) = 010',               ctx.gate('XOR', '111', '101'),         '010');
-    h.assert('XOR(00100101,01001111) = 01101010', ctx.gate('XOR', '00100101','01001111'), '01101010');
-    h.assert('XOR(11,10) = 01',                  ctx.gate('XOR', '11', '10'),            '01');
+  reg(73, 'bit-ops', 'XOR 2-arg bitwise → N bits', function(h, session) {
+    h.assert('XOR(111,101) = 010',               session.gate('XOR', '111', '101'),         '010');
+    h.assert('XOR(00100101,01001111) = 01101010', session.gate('XOR', '00100101','01001111'), '01101010');
+    h.assert('XOR(11,10) = 01',                  session.gate('XOR', '11', '10'),            '01');
     
     // --- NAND ---
   });
 
-  reg(74, 'bit-ops', 'NAND 2-arg: 1-bit operands → 1 bit', function(h, ctx) {
-    h.assert('NAND(1,1) = 0', ctx.gate('NAND', '1', '1'), '0');
-    h.assert('NAND(0,0) = 1', ctx.gate('NAND', '0', '0'), '1');
-    h.assert('NAND(1,0) = 1', ctx.gate('NAND', '1', '0'), '1');
+  reg(74, 'bit-ops', 'NAND 2-arg: 1-bit operands → 1 bit', function(h, session) {
+    h.assert('NAND(1,1) = 0', session.gate('NAND', '1', '1'), '0');
+    h.assert('NAND(0,0) = 1', session.gate('NAND', '0', '0'), '1');
+    h.assert('NAND(1,0) = 1', session.gate('NAND', '1', '0'), '1');
   });
 
-  reg(75, 'bit-ops', 'NAND 1-arg fold → 1 bit', function(h, ctx) {
-    h.assert('NAND(110) = 1',  ctx.gate('NAND', '110'), '1');
-    h.assert('NAND(111) = 1',  ctx.gate('NAND', '111'), '1');
-    h.assert('NAND(1111) = 0', ctx.gate('NAND', '1111'), '0');
-    h.assert('NAND(000) = 1',  ctx.gate('NAND', '000'), '1');
+  reg(75, 'bit-ops', 'NAND 1-arg fold → 1 bit', function(h, session) {
+    h.assert('NAND(110) = 1',  session.gate('NAND', '110'), '1');
+    h.assert('NAND(111) = 1',  session.gate('NAND', '111'), '1');
+    h.assert('NAND(1111) = 0', session.gate('NAND', '1111'), '0');
+    h.assert('NAND(000) = 1',  session.gate('NAND', '000'), '1');
   });
 
-  reg(76, 'bit-ops', 'NAND 2-arg bitwise → N bits', function(h, ctx) {
-    h.assert('NAND(111,101) = 010',               ctx.gate('NAND', '111', '101'),         '010');
-    h.assert('NAND(00100101,01001111) = 11111010', ctx.gate('NAND', '00100101','01001111'), '11111010');
-    h.assert('NAND(11,10) = 01',                  ctx.gate('NAND', '11', '10'),            '01');
+  reg(76, 'bit-ops', 'NAND 2-arg bitwise → N bits', function(h, session) {
+    h.assert('NAND(111,101) = 010',               session.gate('NAND', '111', '101'),         '010');
+    h.assert('NAND(00100101,01001111) = 11111010', session.gate('NAND', '00100101','01001111'), '11111010');
+    h.assert('NAND(11,10) = 01',                  session.gate('NAND', '11', '10'),            '01');
     
     // --- NXOR (XNOR) ---
   });
 
-  reg(77, 'bit-ops', 'NXOR 2-arg: 1-bit operands → 1 bit', function(h, ctx) {
-    h.assert('NXOR(1,1) = 1', ctx.gate('NXOR', '1', '1'), '1');
-    h.assert('NXOR(0,0) = 1', ctx.gate('NXOR', '0', '0'), '1');
-    h.assert('NXOR(1,0) = 0', ctx.gate('NXOR', '1', '0'), '0');
-    h.assert('NXOR(0,1) = 0', ctx.gate('NXOR', '0', '1'), '0');
+  reg(77, 'bit-ops', 'NXOR 2-arg: 1-bit operands → 1 bit', function(h, session) {
+    h.assert('NXOR(1,1) = 1', session.gate('NXOR', '1', '1'), '1');
+    h.assert('NXOR(0,0) = 1', session.gate('NXOR', '0', '0'), '1');
+    h.assert('NXOR(1,0) = 0', session.gate('NXOR', '1', '0'), '0');
+    h.assert('NXOR(0,1) = 0', session.gate('NXOR', '0', '1'), '0');
   });
 
-  reg(78, 'bit-ops', 'NXOR 1-arg fold → 1 bit', function(h, ctx) {
-    h.assert('NXOR(110) = 0',  ctx.gate('NXOR', '110'), '0');
-    h.assert('NXOR(111) = 1',  ctx.gate('NXOR', '111'), '1');
-    h.assert('NXOR(1010) = 1', ctx.gate('NXOR', '1010'), '1');
-    h.assert('NXOR(11) = 1',   ctx.gate('NXOR', '11'),   '1');
+  reg(78, 'bit-ops', 'NXOR 1-arg fold → 1 bit', function(h, session) {
+    h.assert('NXOR(110) = 0',  session.gate('NXOR', '110'), '0');
+    h.assert('NXOR(111) = 1',  session.gate('NXOR', '111'), '1');
+    h.assert('NXOR(1010) = 1', session.gate('NXOR', '1010'), '1');
+    h.assert('NXOR(11) = 1',   session.gate('NXOR', '11'),   '1');
   });
 
-  reg(79, 'bit-ops', 'NXOR 2-arg bitwise → N bits', function(h, ctx) {
-    h.assert('NXOR(111,101) = 101',  ctx.gate('NXOR', '111', '101'), '101');
-    h.assert('NXOR(11,10) = 10',     ctx.gate('NXOR', '11',  '10'),  '10');
-    h.assert('NXOR(1010,0101) = 0000', ctx.gate('NXOR', '1010', '0101'), '0000');
-    h.assert('NXOR(1010,1010) = 1111', ctx.gate('NXOR', '1010', '1010'), '1111');
+  reg(79, 'bit-ops', 'NXOR 2-arg bitwise → N bits', function(h, session) {
+    h.assert('NXOR(111,101) = 101',  session.gate('NXOR', '111', '101'), '101');
+    h.assert('NXOR(11,10) = 10',     session.gate('NXOR', '11',  '10'),  '10');
+    h.assert('NXOR(1010,0101) = 0000', session.gate('NXOR', '1010', '0101'), '0000');
+    h.assert('NXOR(1010,1010) = 1111', session.gate('NXOR', '1010', '1010'), '1111');
     
     // --- Edge cases ---
   });
 
-  reg(80, 'bit-ops', 'Single-bit input for all operators', function(h, ctx) {
-    h.assert('NOT single 1', ctx.gate('NOT', '1'), '0');
-    h.assert('NOT single 0', ctx.gate('NOT', '0'), '1');
-    h.assert('AND fold single bit 1', ctx.gate('AND', '1'), '1');
-    h.assert('AND fold single bit 0', ctx.gate('AND', '0'), '0');
-    h.assert('OR  fold single bit 1', ctx.gate('OR',  '1'), '1');
-    h.assert('NOR fold single bit 1', ctx.gate('NOR', '1'), '1');
-    h.assert('NOR fold single bit 0', ctx.gate('NOR', '0'), '0');
-    h.assert('XOR fold single bit 1', ctx.gate('XOR', '1'), '1');
-    h.assert('NAND fold single bit 0', ctx.gate('NAND', '0'), '0');
-    h.assert('NXOR fold single bit 1', ctx.gate('NXOR', '1'), '1');
+  reg(80, 'bit-ops', 'Single-bit input for all operators', function(h, session) {
+    h.assert('NOT single 1', session.gate('NOT', '1'), '0');
+    h.assert('NOT single 0', session.gate('NOT', '0'), '1');
+    h.assert('AND fold single bit 1', session.gate('AND', '1'), '1');
+    h.assert('AND fold single bit 0', session.gate('AND', '0'), '0');
+    h.assert('OR  fold single bit 1', session.gate('OR',  '1'), '1');
+    h.assert('NOR fold single bit 1', session.gate('NOR', '1'), '1');
+    h.assert('NOR fold single bit 0', session.gate('NOR', '0'), '0');
+    h.assert('XOR fold single bit 1', session.gate('XOR', '1'), '1');
+    h.assert('NAND fold single bit 0', session.gate('NAND', '0'), '0');
+    h.assert('NXOR fold single bit 1', session.gate('NXOR', '1'), '1');
   });
 
-  reg(81, 'bit-ops', 'Different-width args get padded', function(h, ctx) {
-    h.assert('AND(11,1100) pads 11→0011 → 0000', ctx.gate('AND',  '11', '1100'), '0000');
-    h.assert('OR(11,1100)  pads 11→0011 → 1111', ctx.gate('OR',   '11', '1100'), '1111');
-    h.assert('XOR(11,1100) pads → 1111',          ctx.gate('XOR',  '11', '1100'), '1111');
-    h.assert('NOR(11,1100) → bitwise NOR(0011,1100)=0000', ctx.gate('NOR', '11', '1100'), '0000');
+  reg(81, 'bit-ops', 'Different-width args get padded', function(h, session) {
+    h.assert('AND(11,1100) pads 11→0011 → 0000', session.gate('AND',  '11', '1100'), '0000');
+    h.assert('OR(11,1100)  pads 11→0011 → 1111', session.gate('OR',   '11', '1100'), '1111');
+    h.assert('XOR(11,1100) pads → 1111',          session.gate('XOR',  '11', '1100'), '1111');
+    h.assert('NOR(11,1100) → bitwise NOR(0011,1100)=0000', session.gate('NOR', '11', '1100'), '0000');
   });
 
-  reg(82, 'wire-init', ':= produces a single SYM token', function(h, ctx) {
+  reg(82, 'wire-init', ':= produces a single SYM token', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('1wire s := 1');
+      const { tokens } = session.tokenize('1wire s := 1');
       const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
       h.assert(':= is a single SYM(:=) token', String(colonEq.length), '1');
       const colonOnly = tokens.filter(t => t.type === 'SYM' && t.value === ':');
@@ -746,9 +740,9 @@
     }
   });
 
-  reg(83, 'wire-init', 'standalone : still produces SYM(:)', function(h, ctx) {
+  reg(83, 'wire-init', 'standalone : still produces SYM(:)', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('on: 1');
+      const { tokens } = session.tokenize('on: 1');
       const colonTok = tokens.filter(t => t.type === 'SYM' && t.value === ':');
       h.assert('standalone : gives SYM(:)', String(colonTok.length), '1');
       const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
@@ -756,9 +750,9 @@
     }
   });
 
-  reg(84, 'wire-init', ':: still produces two SYM(:) tokens', function(h, ctx) {
+  reg(84, 'wire-init', ':: still produces two SYM(:) tokens', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('comp [switch] .s ::');
+      const { tokens } = session.tokenize('comp [switch] .s ::');
       const colonToks = tokens.filter(t => t.type === 'SYM' && t.value === ':');
       h.assert(':: gives two SYM(:)', String(colonToks.length), '2');
       const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
@@ -766,9 +760,9 @@
     }
   });
 
-  reg(85, 'wire-init', 'full tokenization of "1wire s := 1"', function(h, ctx) {
+  reg(85, 'wire-init', 'full tokenization of "1wire s := 1"', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('1wire s := 1');
+      const { tokens } = session.tokenize('1wire s := 1');
       const types = tokens.map(t => t.type);
       h.assert('TYPE token present',  String(types.includes('TYPE')),  'true');
       h.assert('ID token present',    String(types.includes('ID')),    'true');
@@ -777,27 +771,27 @@
     }
   });
 
-  reg(86, 'wire-init', ':= with hex literal "4wire s := ^FF"', function(h, ctx) {
+  reg(86, 'wire-init', ':= with hex literal "4wire s := ^FF"', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire s := ^FF');
+      const { tokens } = session.tokenize('4wire s := ^FF');
       const hexTok = tokens.filter(t => t.type === 'HEX');
       h.assert('^FF hex token present after :=', String(hexTok.length), '1');
       h.assert('^FF value is FF', hexTok[0].value, 'FF');
     }
   });
 
-  reg(87, 'wire-init', ':= with decimal \\\\N (tokenized as BIN)', function(h, ctx) {
+  reg(87, 'wire-init', ':= with decimal \\\\N (tokenized as BIN)', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire s := \\5');
+      const { tokens } = session.tokenize('4wire s := \\5');
       const binTok = tokens.filter(t => t.type === 'BIN');
       h.assert('\\5 after := gives BIN', String(binTok.length >= 1), 'true');
       h.assert('\\5 BIN value is 101', binTok[binTok.length - 1].value, '101');
     }
   });
 
-  reg(88, 'wire-init', ':= with NOT prefix "1wire s := !1"', function(h, ctx) {
+  reg(88, 'wire-init', ':= with NOT prefix "1wire s := !1"', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('1wire s := !1');
+      const { tokens } = session.tokenize('1wire s := !1');
       const notTok = tokens.filter(t => t.type === 'SYM' && t.value === '!');
       h.assert('! token present after :=', String(notTok.length), '1');
       const binTok = tokens.filter(t => t.type === 'BIN');
@@ -805,9 +799,9 @@
     }
   });
 
-  reg(89, 'wire-init', ':= does not interfere with .var:get syntax', function(h, ctx) {
+  reg(89, 'wire-init', ':= does not interfere with .var:get syntax', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('1wire s = .sw:get');
+      const { tokens } = session.tokenize('1wire s = .sw:get');
       const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
       h.assert(':= not produced for :get syntax', String(colonEq.length), '0');
       const colonTok = tokens.filter(t => t.type === 'SYM' && t.value === ':');
@@ -815,209 +809,209 @@
     }
   });
 
-  reg(102, 'short-notation', 'Short notation — prefix AND', function(h, ctx) {
+  reg(102, 'short-notation', 'Short notation — prefix AND', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`& a`');
+      const result = session.preprocessShortNotation('`& a`');
       h.assert('`& a` → AND(a)', result, 'AND(a)');
     }
   });
 
-  reg(103, 'short-notation', 'Short notation — prefix OR', function(h, ctx) {
+  reg(103, 'short-notation', 'Short notation — prefix OR', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`| a`');
+      const result = session.preprocessShortNotation('`| a`');
       h.assert('`| a` → OR(a)', result, 'OR(a)');
     }
   });
 
-  reg(104, 'short-notation', 'Short notation — prefix XOR', function(h, ctx) {
+  reg(104, 'short-notation', 'Short notation — prefix XOR', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`^ a`');
+      const result = session.preprocessShortNotation('`^ a`');
       h.assert('`^ a` → XOR(a)', result, 'XOR(a)');
     }
   });
 
-  reg(105, 'short-notation', 'Short notation — prefix NOR', function(h, ctx) {
+  reg(105, 'short-notation', 'Short notation — prefix NOR', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`-| a`');
+      const result = session.preprocessShortNotation('`-| a`');
       h.assert('`-| a` → NOR(a)', result, 'NOR(a)');
     }
   });
 
-  reg(106, 'short-notation', 'Short notation — prefix NAND, NXOR', function(h, ctx) {
+  reg(106, 'short-notation', 'Short notation — prefix NAND, NXOR', function(h, session) {
     {
-      h.assert('`-& a` → NAND(a)', ctx.preprocessShortNotation('`-& a`'), 'NAND(a)');
-      h.assert('`-^ a` → NXOR(a)', ctx.preprocessShortNotation('`-^ a`'), 'NXOR(a)');
+      h.assert('`-& a` → NAND(a)', session.preprocessShortNotation('`-& a`'), 'NAND(a)');
+      h.assert('`-^ a` → NXOR(a)', session.preprocessShortNotation('`-^ a`'), 'NXOR(a)');
     }
   });
 
-  reg(107, 'short-notation', 'Short notation — infix AND', function(h, ctx) {
+  reg(107, 'short-notation', 'Short notation — infix AND', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`a & b`');
+      const result = session.preprocessShortNotation('`a & b`');
       h.assert('`a & b` → AND(a,b)', result, 'AND(a,b)');
     }
   });
 
-  reg(108, 'short-notation', 'Short notation — infix OR, XOR, EQ', function(h, ctx) {
+  reg(108, 'short-notation', 'Short notation — infix OR, XOR, EQ', function(h, session) {
     {
-      h.assert('`a | b` → OR(a,b)', ctx.preprocessShortNotation('`a | b`'), 'OR(a,b)');
-      h.assert('`a ^ b` → XOR(a,b)', ctx.preprocessShortNotation('`a ^ b`'), 'XOR(a,b)');
-      h.assert('`a = b` → EQ(a,b)', ctx.preprocessShortNotation('`a = b`'), 'EQ(a,b)');
+      h.assert('`a | b` → OR(a,b)', session.preprocessShortNotation('`a | b`'), 'OR(a,b)');
+      h.assert('`a ^ b` → XOR(a,b)', session.preprocessShortNotation('`a ^ b`'), 'XOR(a,b)');
+      h.assert('`a = b` → EQ(a,b)', session.preprocessShortNotation('`a = b`'), 'EQ(a,b)');
     }
   });
 
-  reg(109, 'short-notation', 'Short notation — infix NAND, NOR, NXOR', function(h, ctx) {
+  reg(109, 'short-notation', 'Short notation — infix NAND, NOR, NXOR', function(h, session) {
     {
-      h.assert('`a -& b` → NAND(a,b)', ctx.preprocessShortNotation('`a -& b`'), 'NAND(a,b)');
-      h.assert('`a -| b` → NOR(a,b)', ctx.preprocessShortNotation('`a -| b`'), 'NOR(a,b)');
-      h.assert('`a -^ b` → NXOR(a,b)', ctx.preprocessShortNotation('`a -^ b`'), 'NXOR(a,b)');
+      h.assert('`a -& b` → NAND(a,b)', session.preprocessShortNotation('`a -& b`'), 'NAND(a,b)');
+      h.assert('`a -| b` → NOR(a,b)', session.preprocessShortNotation('`a -| b`'), 'NOR(a,b)');
+      h.assert('`a -^ b` → NXOR(a,b)', session.preprocessShortNotation('`a -^ b`'), 'NXOR(a,b)');
     }
   });
 
-  reg(110, 'short-notation', 'Short notation — parentheses grouping', function(h, ctx) {
+  reg(110, 'short-notation', 'Short notation — parentheses grouping', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`(a | b) & c`');
+      const result = session.preprocessShortNotation('`(a | b) & c`');
       h.assert('`(a | b) & c` → AND(OR(a,b),c)', result, 'AND(OR(a,b),c)');
     }
   });
 
-  reg(111, 'short-notation', 'Short notation — nested parentheses', function(h, ctx) {
+  reg(111, 'short-notation', 'Short notation — nested parentheses', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`(a | b) & (c | d)`');
+      const result = session.preprocessShortNotation('`(a | b) & (c | d)`');
       h.assert('`(a | b) & (c | d)`', result, 'AND(OR(a,b),OR(c,d))');
     }
   });
 
-  reg(112, 'short-notation', 'Short notation — left-to-right chaining', function(h, ctx) {
+  reg(112, 'short-notation', 'Short notation — left-to-right chaining', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`a | b | c`');
+      const result = session.preprocessShortNotation('`a | b | c`');
       h.assert('`a | b | c` → OR(OR(a,b),c)', result, 'OR(OR(a,b),c)');
     }
   });
 
-  reg(113, 'short-notation', 'Short notation — mixed prefix + infix', function(h, ctx) {
+  reg(113, 'short-notation', 'Short notation — mixed prefix + infix', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`& a -| b`');
+      const result = session.preprocessShortNotation('`& a -| b`');
       h.assert('`& a -| b` → NOR(AND(a),b)', result, 'NOR(AND(a),b)');
     }
   });
 
-  reg(114, 'short-notation', 'Short notation — bit ranges', function(h, ctx) {
+  reg(114, 'short-notation', 'Short notation — bit ranges', function(h, session) {
     {
-      h.assert('`a.0/4 | b.0/4`', ctx.preprocessShortNotation('`a.0/4 | b.0/4`'), 'OR(a.0/4,b.0/4)');
-      h.assert('`& a.1-2/3`', ctx.preprocessShortNotation('`& a.1-2/3`'), 'AND(a.1-2/3)');
+      h.assert('`a.0/4 | b.0/4`', session.preprocessShortNotation('`a.0/4 | b.0/4`'), 'OR(a.0/4,b.0/4)');
+      h.assert('`& a.1-2/3`', session.preprocessShortNotation('`& a.1-2/3`'), 'AND(a.1-2/3)');
     }
   });
 
-  reg(115, 'short-notation', 'Short notation — NOT prefix', function(h, ctx) {
+  reg(115, 'short-notation', 'Short notation — NOT prefix', function(h, session) {
     {
-      h.assert('`!a & b` → AND(!a,b)', ctx.preprocessShortNotation('`!a & b`'), 'AND(!a,b)');
-      h.assert('`!(a | b)` → !OR(a,b)', ctx.preprocessShortNotation('`!(a | b)`'), '!OR(a,b)');
+      h.assert('`!a & b` → AND(!a,b)', session.preprocessShortNotation('`!a & b`'), 'AND(!a,b)');
+      h.assert('`!(a | b)` → !OR(a,b)', session.preprocessShortNotation('`!(a | b)`'), '!OR(a,b)');
     }
   });
 
-  reg(116, 'short-notation', 'Short notation — complex expression from spec', function(h, ctx) {
+  reg(116, 'short-notation', 'Short notation — complex expression from spec', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`(a.0/4 | b.0/4) & (a.4/4 | b.4/4)`');
+      const result = session.preprocessShortNotation('`(a.0/4 | b.0/4) & (a.4/4 | b.4/4)`');
       h.assert('complex bit range expr', result, 'AND(OR(a.0/4,b.0/4),OR(a.4/4,b.4/4))');
     }
   });
 
-  reg(117, 'short-notation', 'Short notation — context with assignment', function(h, ctx) {
+  reg(117, 'short-notation', 'Short notation — context with assignment', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('8wire c = `& (a | b)`');
+      const result = session.preprocessShortNotation('8wire c = `& (a | b)`');
       h.assert('8wire c = `& (a | b)`', result, '8wire c = AND(OR(a,b))');
     }
   });
 
-  reg(118, 'short-notation', 'Short notation — context with def return', function(h, ctx) {
+  reg(118, 'short-notation', 'Short notation — context with def return', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('   :4bit `(a | b)`');
+      const result = session.preprocessShortNotation('   :4bit `(a | b)`');
       h.assert(':4bit `(a | b)`', result, '   :4bit OR(a,b)');
     }
   });
 
-  reg(119, 'short-notation', 'Short notation — binary literal operand', function(h, ctx) {
+  reg(119, 'short-notation', 'Short notation — binary literal operand', function(h, session) {
     {
-      h.assert('`^ 111` → XOR(111)', ctx.preprocessShortNotation('`^ 111`'), 'XOR(111)');
-      h.assert('`a & 1010`', ctx.preprocessShortNotation('`a & 1010`'), 'AND(a,1010)');
+      h.assert('`^ 111` → XOR(111)', session.preprocessShortNotation('`^ 111`'), 'XOR(111)');
+      h.assert('`a & 1010`', session.preprocessShortNotation('`a & 1010`'), 'AND(a,1010)');
     }
   });
 
-  reg(120, 'short-notation', 'Short notation — hex literal with []', function(h, ctx) {
+  reg(120, 'short-notation', 'Short notation — hex literal with []', function(h, session) {
     {
-      h.assert('`^ [^F]` → XOR(^F)', ctx.preprocessShortNotation('`^ [^F]`'), 'XOR(^F)');
-      h.assert('`a | [^FF]`', ctx.preprocessShortNotation('`a | [^FF]`'), 'OR(a,^FF)');
+      h.assert('`^ [^F]` → XOR(^F)', session.preprocessShortNotation('`^ [^F]`'), 'XOR(^F)');
+      h.assert('`a | [^FF]`', session.preprocessShortNotation('`a | [^FF]`'), 'OR(a,^FF)');
     }
   });
 
-  reg(121, 'short-notation', 'Short notation — decimal literal with []', function(h, ctx) {
+  reg(121, 'short-notation', 'Short notation — decimal literal with []', function(h, session) {
     {
-      h.assert('`a | [\\31]`', ctx.preprocessShortNotation('`a | [\\31]`'), 'OR(a,\\31)');
+      h.assert('`a | [\\31]`', session.preprocessShortNotation('`a | [\\31]`'), 'OR(a,\\31)');
     }
   });
 
-  reg(122, 'short-notation', 'Short notation — mixed literals', function(h, ctx) {
+  reg(122, 'short-notation', 'Short notation — mixed literals', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`a | [^FF] | 111`');
+      const result = session.preprocessShortNotation('`a | [^FF] | 111`');
       h.assert('`a | [^FF] | 111`', result, 'OR(OR(a,^FF),111)');
     }
   });
 
-  reg(123, 'short-notation', 'Short notation — decimal literal without []', function(h, ctx) {
+  reg(123, 'short-notation', 'Short notation — decimal literal without []', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`a | \\31`');
+      const result = session.preprocessShortNotation('`a | \\31`');
       h.assert('`a | \\31`', result, 'OR(a,\\31)');
     }
   });
 
-  reg(124, 'short-notation', 'Short notation — passthrough without backticks', function(h, ctx) {
+  reg(124, 'short-notation', 'Short notation — passthrough without backticks', function(h, session) {
     {
       const src = '8wire c = AND(a,b)';
-      const result = ctx.preprocessShortNotation(src);
+      const result = session.preprocessShortNotation(src);
       h.assert('no backticks passthrough', result, src);
     }
   });
 
-  reg(125, 'short-notation', 'Short notation — backtick in comment ignored', function(h, ctx) {
+  reg(125, 'short-notation', 'Short notation — backtick in comment ignored', function(h, session) {
     {
       const src = '# `a | b`\n8wire c = 1';
-      const result = ctx.preprocessShortNotation(src);
+      const result = session.preprocessShortNotation(src);
       h.assert('backtick in line comment ignored', result, src);
     }
   });
 
-  reg(126, 'short-notation', 'Short notation — backtick in block comment ignored', function(h, ctx) {
+  reg(126, 'short-notation', 'Short notation — backtick in block comment ignored', function(h, session) {
     {
       const src = '#> `a | b` #<\n8wire c = 1';
-      const result = ctx.preprocessShortNotation(src);
+      const result = session.preprocessShortNotation(src);
       h.assert('backtick in block comment ignored', result, src);
     }
   });
 
-  reg(127, 'short-notation', 'Short notation — multiple backtick regions', function(h, ctx) {
+  reg(127, 'short-notation', 'Short notation — multiple backtick regions', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('`a & b` + `c | d`');
+      const result = session.preprocessShortNotation('`a & b` + `c | d`');
       h.assert('two backtick regions', result, 'AND(a,b) + OR(c,d)');
     }
   });
 
-  reg(128, 'short-notation', 'Short notation — unmatched backtick throws', function(h, ctx) {
+  reg(128, 'short-notation', 'Short notation — unmatched backtick throws', function(h, session) {
     {
       h.assertThrows('unmatched backtick',
-        () => ctx.preprocessShortNotation('`a | b'),
+        () => session.preprocessShortNotation('`a | b'),
         'Unmatched backtick'
       );
     }
   });
 
-  reg(129, 'short-notation', 'Short notation — via preprocessRepeat pipeline', function(h, ctx) {
+  reg(129, 'short-notation', 'Short notation — via preprocessRepeat pipeline', function(h, session) {
     {
       const result = preprocessRepeat('8wire c = `& (a | b)`');
       h.assert('preprocessRepeat expands short notation', result, '8wire c = AND(OR(a,b))');
     }
   });
 
-  reg(130, 'short-notation', 'Short notation — with repeat', function(h, ctx) {
+  reg(130, 'short-notation', 'Short notation — with repeat', function(h, session) {
     {
       const src = 'repeat 1..3[\n:1bit `a.? | b.?`\n]';
       const result = preprocessRepeat(src);
@@ -1029,45 +1023,45 @@
     }
   });
 
-  reg(131, 'short-notation', 'Short notation — special vars', function(h, ctx) {
+  reg(131, 'short-notation', 'Short notation — special vars', function(h, session) {
     {
-      h.assert('`~ & a` → AND(~,a)', ctx.preprocessShortNotation('`~ & a`'), 'AND(~,a)');
-      h.assert('`a | %` → OR(a,%)', ctx.preprocessShortNotation('`a | %`'), 'OR(a,%)');
+      h.assert('`~ & a` → AND(~,a)', session.preprocessShortNotation('`~ & a`'), 'AND(~,a)');
+      h.assert('`a | %` → OR(a,%)', session.preprocessShortNotation('`a | %`'), 'OR(a,%)');
     }
   });
 
-  reg(132, 'short-notation', 'Short notation — single operand passthrough', function(h, ctx) {
+  reg(132, 'short-notation', 'Short notation — single operand passthrough', function(h, session) {
     {
-      h.assert('`a` → a', ctx.preprocessShortNotation('`a`'), 'a');
+      h.assert('`a` → a', session.preprocessShortNotation('`a`'), 'a');
     }
   });
 
-  reg(133, 'short-notation', 'Short notation — & (a | b) as return line', function(h, ctx) {
+  reg(133, 'short-notation', 'Short notation — & (a | b) as return line', function(h, session) {
     {
-      const result = ctx.preprocessShortNotation('   :1bit `& (a | b)`');
+      const result = session.preprocessShortNotation('   :1bit `& (a | b)`');
       h.assert(':1bit `& (a | b)`', result, '   :1bit AND(OR(a,b))');
     }
   });
 
-  reg(143, 'osc', 'Tokenizer — ~ inside [~] is SPECIAL token', function(h, ctx) {
+  reg(143, 'osc', 'Tokenizer — ~ inside [~] is SPECIAL token', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('comp [~] .osc1::');
+      const { tokens } = session.tokenize('comp [~] .osc1::');
       const specialTilde = tokens.filter(t => t.type === 'SPECIAL' && t.value === '~');
       h.assert('~ inside [] is SPECIAL', String(specialTilde.length), '1');
     }
   });
 
-  reg(144, 'osc', 'Tokenizer — osc as ID token', function(h, ctx) {
+  reg(144, 'osc', 'Tokenizer — osc as ID token', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('comp [osc] .osc1::');
+      const { tokens } = session.tokenize('comp [osc] .osc1::');
       const oscId = tokens.filter(t => t.type === 'ID' && t.value === 'osc');
       h.assert('osc is ID token', String(oscId.length), '1');
     }
   });
 
-  reg(145, 'osc', 'Tokenizer — :counter after component name', function(h, ctx) {
+  reg(145, 'osc', 'Tokenizer — :counter after component name', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('4wire cnt = .osc1:counter');
+      const { tokens } = session.tokenize('4wire cnt = .osc1:counter');
       const colonTok = tokens.filter(t => t.type === 'SYM' && t.value === ':');
       const counterTok = tokens.filter(t => t.type === 'ID' && t.value === 'counter');
       h.assert(':counter has colon SYM', String(colonTok.length >= 1), 'true');
@@ -1075,15 +1069,15 @@
     }
   });
 
-  reg(146, 'osc', 'Tokenizer — :get after osc component', function(h, ctx) {
+  reg(146, 'osc', 'Tokenizer — :get after osc component', function(h, session) {
     {
-      const { tokens } = ctx.tokenize('1wire v = .osc1:get');
+      const { tokens } = session.tokenize('1wire v = .osc1:get');
       const getTok = tokens.filter(t => t.type === 'ID' && t.value === 'get');
       h.assert(':get has get ID token', String(getTok.length), '1');
     }
   });
 
-  reg(147, 'osc', 'Tokenizer — comp [~] with all attributes', function(h, ctx) {
+  reg(147, 'osc', 'Tokenizer — comp [~] with all attributes', function(h, session) {
     {
       const src = `comp [~] .osc1:
       duration1: 1
@@ -1092,7 +1086,7 @@
       freq: 10
       eachCycle: 1
       :`;
-      const { tokens } = ctx.tokenize(src);
+      const { tokens } = session.tokenize(src);
       const duration1Tok = tokens.filter(t => t.type === 'ID' && t.value === 'duration1');
       const duration0Tok = tokens.filter(t => t.type === 'ID' && t.value === 'duration0');
       const freqTok = tokens.filter(t => t.type === 'ID' && t.value === 'freq');
@@ -1104,31 +1098,504 @@
     }
   });
 
-  reg(153, 'osc', 'Tokenizer — freqIsSec tokenized as ID', function(h, ctx) {
+  reg(153, 'osc', 'Tokenizer — freqIsSec tokenized as ID', function(h, session) {
     {
       const src = `comp [~] .osc1:
       freq: 5
       freqIsSec: 1
       :`;
-      const { tokens } = ctx.tokenize(src);
+      const { tokens } = session.tokenize(src);
       const freqIsSecTok = tokens.filter(t => t.type === 'ID' && t.value === 'freqIsSec');
       h.assert('freqIsSec is ID token', String(freqIsSecTok.length), '1');
     }
   });
-  tests.sort((a, b) => a.id - b.id);
+
+  reg(90, 'wire-init', 'Parser — 1wire s := 1 produces initExpr {bin}', function(h, session) {
+    const stmts = session.parse('1wire s := 1');
+    const s = stmts[0];
+    h.assert('stmt has decls', String(Array.isArray(s.decls)), 'true');
+    h.assert('decls[0].name is s', s.decls[0].name, 's');
+    h.assert('decls[0].type is 1wire', s.decls[0].type, '1wire');
+    h.assert('expr is null', String(s.expr), 'null');
+    h.assert('initExpr exists', String(s.initExpr !== undefined && s.initExpr !== null), 'true');
+    h.assert('initExpr.bin is 1', s.initExpr.bin, '1');
+  });
+
+  reg(91, 'wire-init', 'Parser — 4wire s := 1101 produces initExpr {bin:1101}', function(h, session) {
+    const stmts = session.parse('4wire s := 1101');
+    const s = stmts[0];
+    h.assert('4wire initExpr.bin is 1101', s.initExpr.bin, '1101');
+    h.assert('4wire expr is null', String(s.expr), 'null');
+  });
+
+  reg(92, 'wire-init', 'Parser — 4wire s := ^FF produces initExpr {hex:FF}', function(h, session) {
+    const stmts = session.parse('4wire s := ^FF');
+    const s = stmts[0];
+    h.assert('^FF initExpr.hex is FF', s.initExpr.hex, 'FF');
+  });
+
+  reg(93, 'wire-init', 'Parser — 1wire s := \\5 produces initExpr {bin:101}', function(h, session) {
+    const stmts = session.parse('1wire s := \\5');
+    const s = stmts[0];
+    h.assert('\\5 initExpr.bin is 101', s.initExpr.bin, '101');
+  });
+
+  reg(94, 'wire-init', 'Parser — 1wire s := !1 produces initExpr {bin:1, not:true}', function(h, session) {
+    const stmts = session.parse('1wire s := !1');
+    const s = stmts[0];
+    h.assert('!1 initExpr.bin is 1', s.initExpr.bin, '1');
+    h.assert('!1 initExpr.not is true', String(s.initExpr.not), 'true');
+  });
+
+  reg(95, 'wire-init', 'Parser — 1wire s := !0 produces initExpr {bin:0, not:true}', function(h, session) {
+    const stmts = session.parse('1wire s := !0');
+    const s = stmts[0];
+    h.assert('!0 initExpr.bin is 0', s.initExpr.bin, '0');
+    h.assert('!0 initExpr.not is true', String(s.initExpr.not), 'true');
+  });
+
+  reg(96, 'wire-init', 'Parser — := without not has no not field', function(h, session) {
+    const stmts = session.parse('1wire s := 1');
+    const s = stmts[0];
+    h.assert('no not field when no !', String(!!s.initExpr.not), 'false');
+  });
+
+  reg(97, 'wire-init', 'Parser — 1wire s = expr has NO initExpr (normal assignment)', function(h, session) {
+    const stmts = session.parse('1wire s = 1');
+    const s = stmts[0];
+    h.assert('normal = has expr not null', String(s.expr !== null), 'true');
+    h.assert('normal = has no initExpr', String(s.initExpr === undefined || s.initExpr === null), 'true');
+  });
+
+  reg(98, 'wire-init', 'Parser — 1wire s (no assignment) has no initExpr and no expr', function(h, session) {
+    const stmts = session.parse('1wire s');
+    const s = stmts[0];
+    h.assert('bare decl has no initExpr', String(s.initExpr === undefined || s.initExpr === null), 'true');
+    h.assert('bare decl has no expr', String(s.expr), 'null');
+  });
+
+  reg(99, 'wire-init', 'Parser — := with non-literal throws error', function(h, session) {
+    h.assertThrows(
+      '1wire s := AND(x,y) throws',
+      () => session.parse('1wire s := AND(x,y)'),
+      'Expected a literal'
+    );
+  });
+
+  reg(100, 'wire-init', 'Parser — multiple wires with := (8wire q := ^A5)', function(h, session) {
+    const stmts = session.parse('8wire q := ^A5');
+    const s = stmts[0];
+    h.assert('8wire ^A5 type is 8wire', s.decls[0].type, '8wire');
+    h.assert('8wire ^A5 name is q', s.decls[0].name, 'q');
+    h.assert('8wire ^A5 initExpr.hex is A5', s.initExpr.hex, 'A5');
+  });
+
+  reg(101, 'wire-init', 'Parser — multiple := statements in same script', function(h, session) {
+    const stmts = session.parse(`1wire s := 1
+1wire r := 0
+1wire q := 1
+1wire nq := 0`);
+    h.assert('4 decl statements', String(stmts.length), '4');
+    h.assert('s initExpr.bin = 1',  stmts[0].initExpr.bin, '1');
+    h.assert('r initExpr.bin = 0',  stmts[1].initExpr.bin, '0');
+    h.assert('q initExpr.bin = 1',  stmts[2].initExpr.bin, '1');
+    h.assert('nq initExpr.bin = 0', stmts[3].initExpr.bin, '0');
+  });
+
+  reg(134, 'osc', 'Parser — comp [osc] .o1: with attributes', function(h, session) {
+    const stmts = session.parse(`comp [osc] .o1:
+  duration1: 2
+  duration0: 6
+  length: 4
+  freq: 10
+  eachCycle: 1
+  :`);
+    const s = stmts[0];
+    h.assert('osc stmt has comp', String(s.comp !== undefined), 'true');
+    h.assert('osc comp type is osc', s.comp.type, 'osc');
+    h.assert('osc comp name is .o1', s.comp.name, '.o1');
+    h.assert('osc duration1 is 2', String(s.comp.attributes.duration1), '2');
+    h.assert('osc duration0 is 6', String(s.comp.attributes.duration0), '6');
+    h.assert('osc length is 4', String(s.comp.attributes.length), '4');
+    h.assert('osc freq is 10', String(s.comp.attributes.freq), '10');
+    h.assert('osc eachCycle is 1', String(s.comp.attributes.eachCycle), '1');
+  });
+
+  reg(135, 'osc', 'Parser — comp [~] .o2: shortname syntax', function(h, session) {
+    const stmts = session.parse(`comp [~] .o2:
+  duration1: 1
+  duration0: 7
+  freq: 5
+  :`);
+    const s = stmts[0];
+    h.assert('~ shortname has comp', String(s.comp !== undefined), 'true');
+    h.assert('~ shortname type is osc', s.comp.type, 'osc');
+    h.assert('~ shortname name is .o2', s.comp.name, '.o2');
+    h.assert('~ shortname duration1 is 1', String(s.comp.attributes.duration1), '1');
+    h.assert('~ shortname duration0 is 7', String(s.comp.attributes.duration0), '7');
+    h.assert('~ shortname freq is 5', String(s.comp.attributes.freq), '5');
+  });
+
+  reg(136, 'osc', 'Parser — comp [osc] .o3:: minimal (no attributes)', function(h, session) {
+    const stmts = session.parse('comp [osc] .o3::');
+    const s = stmts[0];
+    h.assert('minimal osc has comp', String(s.comp !== undefined), 'true');
+    h.assert('minimal osc type is osc', s.comp.type, 'osc');
+    h.assert('minimal osc name is .o3', s.comp.name, '.o3');
+  });
+
+  reg(137, 'osc', 'Parser — comp [~] .o4:: minimal shortname', function(h, session) {
+    const stmts = session.parse('comp [~] .o4::');
+    const s = stmts[0];
+    h.assert('minimal ~ has comp', String(s.comp !== undefined), 'true');
+    h.assert('minimal ~ type is osc', s.comp.type, 'osc');
+    h.assert('minimal ~ name is .o4', s.comp.name, '.o4');
+  });
+
+  reg(138, 'osc', 'Parser — comp [osc] with eachCycle: 0 (each state)', function(h, session) {
+    const stmts = session.parse(`comp [osc] .o5:
+  eachCycle: 0
+  :`);
+    const s = stmts[0];
+    h.assert('osc eachCycle: 0', String(s.comp.attributes.eachCycle), '0');
+  });
+
+  reg(139, 'osc', 'Parser — comp [osc] with wire assignments', function(h, session) {
+    const stmts = session.parse(`comp [~] .osc1:
+  duration1: 1
+  duration0: 7
+  length: 4
+  freq: 10
+  :
+1wire osc1 = .osc1`);
+    h.assert('osc + wire: 2 statements', String(stmts.length), '2');
+    h.assert('first stmt is comp', String(stmts[0].comp !== undefined), 'true');
+    h.assert('second stmt has decls', String(Array.isArray(stmts[1].decls)), 'true');
+    h.assert('wire name is osc1', stmts[1].decls[0].name, 'osc1');
+  });
+
+  reg(140, 'osc', 'Parser — comp [osc] with :get wire', function(h, session) {
+    const stmts = session.parse(`comp [osc] .osc1:
+  freq: 2
+  :
+1wire v = .osc1:get`);
+    h.assert('osc + :get wire: 2 statements', String(stmts.length), '2');
+    const wireStmt = stmts[1];
+    h.assert(':get wire has expr', String(wireStmt.expr !== null), 'true');
+  });
+
+  reg(141, 'osc', 'Parser — comp [osc] with :counter wire', function(h, session) {
+    const stmts = session.parse(`comp [osc] .osc1:
+  length: 4
+  freq: 2
+  :
+4wire cnt = .osc1:counter`);
+    h.assert('osc + :counter wire: 2 statements', String(stmts.length), '2');
+    const wireStmt = stmts[1];
+    h.assert(':counter wire has expr', String(wireStmt.expr !== null), 'true');
+  });
+
+  reg(142, 'osc', 'Parser — comp [osc] full program with all outputs', function(h, session) {
+    const stmts = session.parse(`comp [~] .osc1:
+  duration1: 1
+  duration0: 7
+  length: 4
+  freq: 10
+  eachCycle: 1
+  :
+1wire osc1 = .osc1
+1wire osc1b = .osc1:get
+4wire counter1 = .osc1:counter`);
+    h.assert('full osc program: 4 statements', String(stmts.length), '4');
+    h.assert('stmt 0 is comp osc', stmts[0].comp.type, 'osc');
+    h.assert('stmt 1 wire osc1', stmts[1].decls[0].name, 'osc1');
+    h.assert('stmt 2 wire osc1b', stmts[2].decls[0].name, 'osc1b');
+    h.assert('stmt 3 wire counter1', stmts[3].decls[0].name, 'counter1');
+  });
+
+  reg(148, 'osc', 'Parser — comp [osc] with freqIsSec: 0 (Hz mode, default)', function(h, session) {
+    const stmts = session.parse(`comp [osc] .o1:
+  freq: 10
+  freqIsSec: 0
+  :`);
+    const s = stmts[0];
+    h.assert('freqIsSec: 0 parsed', String(s.comp.attributes.freqIsSec), '0');
+    h.assert('freq: 10 parsed', String(s.comp.attributes.freq), '10');
+  });
+
+  reg(149, 'osc', 'Parser — comp [osc] with freqIsSec: 1 (seconds mode)', function(h, session) {
+    const stmts = session.parse(`comp [osc] .o2:
+  freq: 5
+  freqIsSec: 1
+  :`);
+    const s = stmts[0];
+    h.assert('freqIsSec: 1 parsed', String(s.comp.attributes.freqIsSec), '1');
+    h.assert('freq: 5 parsed', String(s.comp.attributes.freq), '5');
+  });
+
+  reg(150, 'osc', 'Parser — comp [~] freqIsSec: 1 with large period', function(h, session) {
+    const stmts = session.parse(`comp [~] .slow:
+  freq: 30
+  freqIsSec: 1
+  duration1: 1
+  duration0: 1
+  :`);
+    const s = stmts[0];
+    h.assert('slow osc freqIsSec: 1', String(s.comp.attributes.freqIsSec), '1');
+    h.assert('slow osc freq: 30', String(s.comp.attributes.freq), '30');
+    h.assert('slow osc duration1: 1', String(s.comp.attributes.duration1), '1');
+    h.assert('slow osc duration0: 1', String(s.comp.attributes.duration0), '1');
+  });
+
+  reg(151, 'osc', 'Parser — comp [osc] without freqIsSec (default omitted)', function(h, session) {
+    const stmts = session.parse(`comp [osc] .o3:
+  freq: 2
+  :`);
+    const s = stmts[0];
+    h.assert('freqIsSec absent from attributes', String(s.comp.attributes.freqIsSec), 'undefined');
+    h.assert('freq: 2 still parsed', String(s.comp.attributes.freq), '2');
+  });
+
+  reg(152, 'osc', 'Parser — comp [osc] full program with freqIsSec: 1', function(h, session) {
+    const stmts = session.parse(`comp [~] .osc1:
+  duration1: 4
+  duration0: 4
+  length: 8
+  freq: 10
+  freqIsSec: 1
+  eachCycle: 1
+  :
+1wire v = .osc1
+8wire cnt = .osc1:counter`);
+    h.assert('full freqIsSec program: 3 statements', String(stmts.length), '3');
+    h.assert('comp type osc', stmts[0].comp.type, 'osc');
+    h.assert('freqIsSec: 1', String(stmts[0].comp.attributes.freqIsSec), '1');
+    h.assert('freq: 10', String(stmts[0].comp.attributes.freq), '10');
+    h.assert('length: 8', String(stmts[0].comp.attributes.length), '8');
+  });
+
+  reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
+    const registry = session._ensureRegistry();
+    const expectedTypes = ['led', 'switch', 'key', 'dip', '7seg', 'lcd', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'osc', 'rotary'];
+    for (const t of expectedTypes) {
+      h.assert('registry has ' + t, String(registry.has(t)), 'true');
+    }
+  });
+
+  reg(201, 'registry', 'Component Registry — getWidthBits', function(h, session) {
+    const registry = session._ensureRegistry();
+    h.assert('led bits', String(registry.get('led').getWidthBits({})), '1');
+    h.assert('switch bits', String(registry.get('switch').getWidthBits({})), '1');
+    h.assert('7seg bits', String(registry.get('7seg').getWidthBits({})), '8');
+    h.assert('lcd bits', String(registry.get('lcd').getWidthBits({})), '8');
+    h.assert('dip default bits', String(registry.get('dip').getWidthBits({})), '4');
+    h.assert('dip with length 8', String(registry.get('dip').getWidthBits({length: '8'})), '8');
+    h.assert('adder default bits', String(registry.get('adder').getWidthBits({})), '4');
+    h.assert('adder depth 8', String(registry.get('adder').getWidthBits({depth: '8'})), '8');
+    h.assert('osc bits', String(registry.get('osc').getWidthBits({})), '1');
+    h.assert('rotary default bits', String(registry.get('rotary').getWidthBits({})), '3');
+    h.assert('rotary 4 states', String(registry.get('rotary').getWidthBits({states: '4'})), '2');
+  });
+
+  reg(202, 'registry', 'Component Registry — shortnames', function(h, session) {
+    const registry = session._ensureRegistry();
+    const shortnames = registry.getShortnames();
+    h.assert('shortname 7', shortnames['7'], '7seg');
+    h.assert('shortname +', shortnames['+'], 'adder');
+    h.assert('shortname -', shortnames['-'], 'subtract');
+    h.assert('shortname *', shortnames['*'], 'multiplier');
+    h.assert('shortname /', shortnames['/'], 'divider');
+    h.assert('shortname >', shortnames['>'], 'shifter');
+    h.assert('shortname =', shortnames['='], 'counter');
+    h.assert('shortname ~', shortnames['~'], 'osc');
+  });
+
+  reg(203, 'registry', 'Component Registry — supportsProperty', function(h, session) {
+    const registry = session._ensureRegistry();
+    h.assert('led supports get', String(registry.supportsProperty('led', 'get')), 'true');
+    h.assert('adder supports get', String(registry.supportsProperty('adder', 'get')), 'true');
+    h.assert('adder supports carry', String(registry.supportsProperty('adder', 'carry')), 'true');
+    h.assert('divider supports mod', String(registry.supportsProperty('divider', 'mod')), 'true');
+    h.assert('multiplier supports over', String(registry.supportsProperty('multiplier', 'over')), 'true');
+    h.assert('shifter supports out', String(registry.supportsProperty('shifter', 'out')), 'true');
+    h.assert('osc supports counter', String(registry.supportsProperty('osc', 'counter')), 'true');
+  });
+
+  reg(204, 'registry', 'Component Registry — supportsRedirect', function(h, session) {
+    const registry = session._ensureRegistry();
+    h.assert('adder redirect carry', String(registry.supportsRedirect('adder', 'carry')), 'true');
+    h.assert('divider redirect mod', String(registry.supportsRedirect('divider', 'mod')), 'true');
+    h.assert('multiplier redirect over', String(registry.supportsRedirect('multiplier', 'over')), 'true');
+    h.assert('shifter redirect out', String(registry.supportsRedirect('shifter', 'out')), 'true');
+    h.assert('led no carry', String(registry.supportsRedirect('led', 'carry')), 'false');
+  });
+
+  reg(205, 'registry', 'Component Registry — reservedNames', function(h, session) {
+    const registry = session._ensureRegistry();
+    const reserved = registry.getReservedNames();
+    h.assert('led is reserved', String(reserved.includes('led')), 'true');
+    h.assert('switch is reserved', String(reserved.includes('switch')), 'true');
+    h.assert('key is NOT reserved', String(reserved.includes('key')), 'false');
+    h.assert('osc is NOT reserved', String(reserved.includes('osc')), 'false');
+    h.assert('reg is NOT reserved', String(reserved.includes('reg')), 'false');
+  });
+
+  reg(206, 'registry', 'Component Registry — specialParseAttributes', function(h, session) {
+    const registry = session._ensureRegistry();
+    const sevenSegAttrs = registry.get('7seg').getSpecialParseAttributes();
+    h.assert('7seg has segAttributes', String(sevenSegAttrs !== null), 'true');
+    h.assert('7seg segAttributes length', String(sevenSegAttrs.segAttributes.length), '8');
+    h.assert('led has no special attrs', String(registry.get('led').getSpecialParseAttributes()), 'null');
+  });
+
+  reg(207, 'registry', 'Parser with registry — parseComp led', function(h, session) {
+    const stmts = session.parse('comp [led] .myled::');
+    h.assert('comp type is led', stmts[0].comp.type, 'led');
+    h.assert('comp name is .myled', stmts[0].comp.name, '.myled');
+  });
+
+  reg(208, 'registry', 'Parser with registry — parseComp 7seg shortname', function(h, session) {
+    const stmts = session.parse('comp [7] .display::');
+    h.assert('comp type is 7seg', stmts[0].comp.type, '7seg');
+  });
+
+  reg(209, 'registry', 'Parser with registry — parseComp adder shortname', function(h, session) {
+    const stmts = session.parse('comp [+] .add1: depth:8 :');
+    h.assert('comp type is adder', stmts[0].comp.type, 'adder');
+    h.assert('adder depth is 8', String(stmts[0].comp.attributes.depth), '8');
+  });
+
+  reg(210, 'registry', 'Parser with registry — parseComp osc', function(h, session) {
+    const stmts = session.parse('comp [~] .osc1::');
+    h.assert('comp type is osc', stmts[0].comp.type, 'osc');
+  });
+
+  reg(211, 'registry', 'getForbidDirectAssign / handleDirectAssign', function(h, session) {
+    const registry = session._ensureRegistry();
+    h.assert('mem allows direct assign (handleDirectAssign)', String(registry.get('mem').getForbidDirectAssign()), 'null');
+    h.assert('counter forbids', String(registry.get('counter').getForbidDirectAssign() !== null), 'true');
+    h.assert('osc forbids', String(registry.get('osc').getForbidDirectAssign() !== null), 'true');
+    h.assert('led allows', String(registry.get('led').getForbidDirectAssign()), 'null');
+    h.assert('adder allows', String(registry.get('adder').getForbidDirectAssign()), 'null');
+  });
+
+  reg(212, 'registry', 'hexTo7Seg static method', function(h, session) {
+    const registry = session._ensureRegistry();
+    const SevenSegComp = registry.get('7seg');
+    h.assert('hex 0 -> 1111110', SevenSegComp.constructor.hexTo7Seg('0000'), '1111110');
+    h.assert('hex 1 -> 0110000', SevenSegComp.constructor.hexTo7Seg('0001'), '0110000');
+    h.assert('hex F -> 1000111', SevenSegComp.constructor.hexTo7Seg('1111'), '1000111');
+  });
+
+  reg(213, 'registry', 'osc supports reset property', function(h, session) {
+    const registry = session._ensureRegistry();
+    h.assert('osc supports reset', String(registry.supportsProperty('osc', 'reset')), 'true');
+  });
+
+  reg(214, 'registry', 'osc getSupportedProperties includes reset', function(h, session) {
+    const oscHandler = session._ensureRegistry().get('osc');
+    const props = oscHandler.getSupportedProperties();
+    h.assert('reset in supported props', String(props.includes('reset')), 'true');
+    h.assert('get still in supported props', String(props.includes('get')), 'true');
+    h.assert('counter still in supported props', String(props.includes('counter')), 'true');
+  });
+
+  reg(215, 'registry', 'osc applyProperties resets counter when reset=1', function(h, session) {
+    const oscHandler = session._ensureRegistry().get('osc');
+    const comp = { oscState: { counterValue: '101010', length: 6 } };
+    oscHandler.applyProperties(comp, '.osc1', { reset: { expr: null, value: '1' } }, 'immediate', false, {});
+    h.assert('counter reset to 000000', comp.oscState.counterValue, '000000');
+  });
+
+  reg(216, 'registry', 'osc applyProperties does NOT reset when reset=0', function(h, session) {
+    const oscHandler = session._ensureRegistry().get('osc');
+    const comp = { oscState: { counterValue: '101010', length: 6 } };
+    oscHandler.applyProperties(comp, '.osc1', { reset: { expr: null, value: '0' } }, 'immediate', false, {});
+    h.assert('counter unchanged at 101010', comp.oscState.counterValue, '101010');
+  });
+
+  reg(217, 'registry', 'osc applyProperties skips when when!=immediate', function(h, session) {
+    const oscHandler = session._ensureRegistry().get('osc');
+    const comp = { oscState: { counterValue: '111111', length: 6 } };
+    oscHandler.applyProperties(comp, '.osc1', { reset: { expr: null, value: '1' } }, 'next', false, {});
+    h.assert('counter unchanged on when=next', comp.oscState.counterValue, '111111');
+  });
+
+  reg(218, 'registry', 'osc applyProperties skips when no pending', function(h, session) {
+    const oscHandler = session._ensureRegistry().get('osc');
+    const comp = { oscState: { counterValue: '001100', length: 6 } };
+    oscHandler.applyProperties(comp, '.osc1', null, 'immediate', false, {});
+    h.assert('counter unchanged on null pending', comp.oscState.counterValue, '001100');
+  });
+
+  reg(219, 'registry', 'osc applyProperties skips when no reset in pending', function(h, session) {
+    const oscHandler = session._ensureRegistry().get('osc');
+    const comp = { oscState: { counterValue: '110011', length: 6 } };
+    oscHandler.applyProperties(comp, '.osc1', {}, 'immediate', false, {});
+    h.assert('counter unchanged without reset key', comp.oscState.counterValue, '110011');
+  });
+
+  reg(220, 'registry', 'osc applyProperties resets with multi-bit value ending in 1', function(h, session) {
+    const oscHandler = session._ensureRegistry().get('osc');
+    const comp = { oscState: { counterValue: '1010', length: 4 } };
+    oscHandler.applyProperties(comp, '.osc1', { reset: { expr: null, value: '01' } }, 'immediate', false, {});
+    h.assert('counter reset with value 01 (last bit 1)', comp.oscState.counterValue, '0000');
+  });
+
+  reg(221, 'registry', 'osc applyProperties does NOT reset with multi-bit value ending in 0', function(h, session) {
+    const oscHandler = session._ensureRegistry().get('osc');
+    const comp = { oscState: { counterValue: '1010', length: 4 } };
+    oscHandler.applyProperties(comp, '.osc1', { reset: { expr: null, value: '10' } }, 'immediate', false, {});
+    h.assert('counter unchanged with value 10 (last bit 0)', comp.oscState.counterValue, '1010');
+  });
+
+  reg(222, 'registry', 'osc applyProperties with reEvaluate re-evaluates expression', function(h, session) {
+    const oscHandler = session._ensureRegistry().get('osc');
+    const comp = { oscState: { counterValue: '111000', length: 6 } };
+    const mockCtx = {
+      evalExpr: function() { return [{ value: '1' }]; },
+      getValueFromRef: function() { return null; }
+    };
+    oscHandler.applyProperties(comp, '.osc1', { reset: { expr: [{ bin: '1' }], value: '0' } }, 'immediate', true, mockCtx);
+    h.assert('counter reset after reEval to 1', comp.oscState.counterValue, '000000');
+  });
+
+  reg(223, 'registry', 'Parser — osc property block with reset and set', function(h, session) {
+    const stmts = session.parse(`comp [~] .osc1:
+  length: 6
+  freq: 2
+  :
+6wire cnt = .osc1:counter
+.osc1:{
+  reset = 1
+  set = EQ(cnt, 001010)
+}`);
+    h.assert('3 statements parsed', String(stmts.length), '3');
+    h.assert('stmt 0 is comp osc', stmts[0].comp.type, 'osc');
+    h.assert('stmt 2 is property block', String(stmts[2].componentPropertyBlock !== undefined), 'true');
+    const block = stmts[2].componentPropertyBlock;
+    h.assert('block component is .osc1', block.component, '.osc1');
+    h.assert('block has 2 properties', String(block.properties.length), '2');
+    h.assert('block prop 0 is reset', block.properties[0].property, 'reset');
+    h.assert('block prop 1 is set', block.properties[1].property, 'set');
+  });
+
+  function registerTest(id, group, title, run) {
+    tests.push({ id, group, title, run });
+  }
 
   window.LogTScriptTestSuite = {
-    groups: [
-    { id: 'repeat', label: 'Repeat preprocessor', rangeLabel: '6–21', testIds: [6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21] },
-    { id: 'gates-reduce', label: 'Logic gate reduce / expand', rangeLabel: '22–37', testIds: [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37] },
-    { id: 'shifts', label: 'LSHIFT / RSHIFT', rangeLabel: '40–52', testIds: [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 492, 50, 51, 52] },
-    { id: 'bitrange', label: 'Dynamic bit range', rangeLabel: '53–60', testIds: [53, 54, 55, 56, 57, 58, 59, 60] },
-    { id: 'bit-ops', label: 'Bit operations', rangeLabel: '61–81', testIds: [61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81] },
-    { id: 'wire-init', label: ':= wire initialization (tokenizer)', rangeLabel: '82–89', testIds: [82, 83, 84, 85, 86, 87, 88, 89] },
-    { id: 'short-notation', label: 'Short notation preprocessor', rangeLabel: '102–133', testIds: [102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133] },
-    { id: 'osc', label: 'Oscillator tokenizer', rangeLabel: '143–153', testIds: [143, 144, 145, 146, 147, 153] }
-    ],
     tests,
-    createContext
+    runMap: null,
+    createSession,
+    registerTest,
+    getRun(id) {
+      return this.runMap ? this.runMap.get(id) || null : null;
+    },
+    finalize() {
+      tests.sort((a, b) => a.id - b.id);
+      this.runMap = new Map();
+      for (const t of tests) this.runMap.set(t.id, t.run);
+    }
   };
 })();

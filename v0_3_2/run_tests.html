@@ -113,6 +113,16 @@ h1 {
 .test-row:last-child {
   border-bottom: none;
 }
+.test-row.not-ported .test-title {
+  color: #666;
+}
+.not-ported-badge {
+  font-size: 11px;
+  color: #666;
+  padding: 2px 8px;
+  border: 1px solid #333;
+  border-radius: 999px;
+}
 .dot {
   flex-shrink: 0;
   width: 10px;
@@ -129,6 +139,9 @@ h1 {
   width: 36px;
   color: #88f;
   text-align: right;
+}
+.test-row.not-ported .test-id {
+  color: #555;
 }
 .test-title {
   flex: 1;
@@ -163,11 +176,9 @@ h1 {
 <body>
 <div id="app">
   <h1>LogTScript Tests v0.3.2</h1>
-  <p id="subtitle" style="color:#888;font-size:13px;margin:0 0 12px 0">
-    Subset browser runner (120 tests). Parser, registry, doc, PCB, signal și REG — de portat ulterior.
-  </p>
+  <p id="subtitle" style="color:#888;font-size:13px;margin:0 0 12px 0"></p>
   <div id="toolbar">
-    <button type="button" id="btnRunAll" class="btn btn--primary">Run All</button>
+    <button type="button" id="btnRunAll" class="btn btn--primary">Run All (ported)</button>
     <span id="summary">Passed: 0 | Failed: 0 | Pending: 0</span>
   </div>
   <div id="testList"></div>
@@ -175,7 +186,37 @@ h1 {
 
 <script src="core/tokenizer.js"></script>
 <script src="core/preprocessor.js"></script>
+<script src="core/components/component-base.js"></script>
+<script src="core/components/builtin-component.js"></script>
+<script src="core/components/component-registry.js"></script>
+<script src="core/components/led.js"></script>
+<script src="core/components/ledBar.js"></script>
+<script src="core/components/switch.js"></script>
+<script src="core/components/key.js"></script>
+<script src="core/components/dip.js"></script>
+<script src="core/components/seven-seg.js"></script>
+<script src="core/components/14seg.js"></script>
+<script src="core/components/dots.js"></script>
+<script src="core/components/lcd.js"></script>
+<script src="core/components/adder.js"></script>
+<script src="core/components/subtract.js"></script>
+<script src="core/components/multiplier.js"></script>
+<script src="core/components/divider.js"></script>
+<script src="core/components/shifter.js"></script>
+<script src="core/components/mem.js"></script>
+<script src="core/components/reg.js"></script>
+<script src="core/components/counter.js"></script>
+<script src="core/components/osc.js"></script>
+<script src="core/components/rotary.js"></script>
+<script src="core/components/pcb-component.js"></script>
+<script src="core/components/index.js"></script>
+<script src="core/parser.js"></script>
+<script src="core/interpreter.js"></script>
+<script src="core/signal-propagation.js"></script>
+<script src="test_session.js"></script>
+<script src="test_manifest.js"></script>
 <script src="test_suite.js"></script>
+<script src="test_suite_ported.js"></script>
 <script src="run_tests.js"></script>
 </body>
 </html>
