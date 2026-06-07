@@ -93,6 +93,35 @@ h1 {
   padding: 10px 12px;
   background: #1a1a1a;
   border-bottom: 1px solid #333;
+  cursor: pointer;
+  user-select: none;
+}
+.group-header:hover {
+  background: #222;
+}
+.test-group.collapsed .group-header {
+  border-bottom: none;
+}
+.group-header-main {
+  flex: 1;
+  min-width: 0;
+}
+.group-title-line {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.group-toggle {
+  flex-shrink: 0;
+  width: 14px;
+  color: #666;
+  font-size: 11px;
+}
+.test-group.collapsed .group-toggle::before {
+  content: '\25B6';
+}
+.test-group:not(.collapsed) .group-toggle::before {
+  content: '\25BC';
 }
 .group-title {
   font-size: 14px;
@@ -101,6 +130,14 @@ h1 {
 .group-range {
   color: #666;
   font-size: 12px;
+}
+.group-summary {
+  margin-top: 4px;
+  color: #888;
+  font-size: 12px;
+}
+.test-group.collapsed .test-row {
+  display: none;
 }
 .test-row {
   display: flex;

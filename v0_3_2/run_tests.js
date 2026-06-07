@@ -99,6 +99,23 @@
     }).join('\n\n');
   }
 
+  function countStatuses(ids) {
+    let passed = 0;
+    let failed = 0;
+    let pending = 0;
+    for (const id of ids) {
+      const s = statusById.get(id);
+      if (s === 'pass') passed++;
+      else if (s === 'fail') failed++;
+      else if (s !== 'not-ported') pending++;
+    }
+    return { passed, failed, pending };
+  }
+
+  function formatStatusCounts(counts) {
+    return 'Passed: ' + counts.passed + ' | Failed: ' + counts.failed + ' | Pending: ' + counts.pending;
+  }
+
   function updateSummary() {
     let passed = 0;
     let failed = 0;
@@ -114,6 +131,15 @@
     summaryEl.textContent =
       'Passed: ' + passed + ' | Failed: ' + failed + ' | Pending: ' + pending +
       ' | Not ported: ' + notPorted;
+
+    for (const group of manifest.groups) {
+      const el = document.querySelector(
+        '.test-group[data-group="' + group.id + '"] .group-summary'
+      );
+      if (el) {
+        el.textContent = formatStatusCounts(countStatuses(group.testIds));
+      }
+    }
   }
 
   function setRunningUI(isRunning) {
@@ -202,27 +228,46 @@
 
     for (const group of manifest.groups) {
       const section = document.createElement('div');
-      section.className = 'test-group';
+      section.className = 'test-group collapsed';
       section.dataset.group = group.id;
 
       const header = document.createElement('div');
       header.className = 'group-header';
 
-      const titleWrap = document.createElement('div');
+      const main = document.createElement('div');
+      main.className = 'group-header-main';
+
+      const titleLine = document.createElement('div');
+      titleLine.className = 'group-title-line';
+
+      const toggle = document.createElement('span');
+      toggle.className = 'group-toggle';
+      toggle.setAttribute('aria-hidden', 'true');
+
       const title = document.createElement('span');
       title.className = 'group-title';
       title.textContent = group.label;
       const range = document.createElement('span');
       range.className = 'group-range';
       range.textContent = ' (' + group.rangeLabel + ')';
-      titleWrap.appendChild(title);
-      titleWrap.appendChild(range);
+
+      titleLine.appendChild(toggle);
+      titleLine.appendChild(title);
+      titleLine.appendChild(range);
+
+      const groupSummary = document.createElement('div');
+      groupSummary.className = 'group-summary';
+      groupSummary.textContent = formatStatusCounts(countStatuses(group.testIds));
+
+      main.appendChild(titleLine);
+      main.appendChild(groupSummary);
 
       const btnGroup = document.createElement('button');
       btnGroup.type = 'button';
       btnGroup.className = 'btn btn--group';
       btnGroup.textContent = 'Run group';
-      btnGroup.addEventListener('click', async () => {
+      btnGroup.addEventListener('click', async (e) => {
+        e.stopPropagation();
         if (running) return;
         setRunningUI(true);
         try {
@@ -232,7 +277,12 @@
         }
       });
 
-      header.appendChild(titleWrap);
+      header.addEventListener('click', (e) => {
+        if (e.target.closest('.btn')) return;
+        section.classList.toggle('collapsed');
+      });
+
+      header.appendChild(main);
       header.appendChild(btnGroup);
       section.appendChild(header);
 
