@@ -129,8 +129,8 @@
       else pending++;
     }
     summaryEl.textContent =
-      'Passed: ' + passed + ' | Failed: ' + failed + ' | Pending: ' + pending +
-      ' | Not ported: ' + notPorted;
+      'Passed: ' + passed + ' | Failed: ' + failed + ' | Pending: ' + pending;
+    // +' | Not ported: ' + notPorted;
 
     for (const group of manifest.groups) {
       const el = document.querySelector(
@@ -318,6 +318,9 @@
             if (running) return;
             setRunningUI(true);
             try {
+              await resetStatus([test]);
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
               await runOneTest(test);
             } finally {
               setRunningUI(false);
