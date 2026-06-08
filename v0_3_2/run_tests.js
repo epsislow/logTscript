@@ -21,7 +21,7 @@
   const totalCount = manifest.entries.length;
   if (subtitleEl) {
     subtitleEl.textContent =
-      portedCount + ' / ' + totalCount + ' tests ported. Grey rows without ▶ are not yet ported.';
+      portedCount + ' / ' + totalCount; // + ' tests ported. Grey rows without ▶ are not yet ported.';
   }
 
   function createHarness() {
@@ -356,6 +356,10 @@
     } finally {
       setRunningUI(false);
     }
+  });
+  
+  btnEditor.addEventListener('click', async() => {
+    window.location.href = 'script_editor_v0_3_2.html';
   });
 
   buildUI();
