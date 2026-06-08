@@ -363,6 +363,12 @@ function doNext(count = 1) {
   showVars();
 }
 
+function goto(param) {
+  window.location.href = param + '.html';
+  //if(param == 'run_tests') {
+  //}
+}
+
 const compdown = document.getElementById('comp-dropdown');
 const comptrigger = compdown.querySelector('.dropdown-trigger');
 const compitems = compdown.querySelectorAll('.dropdown-item');
