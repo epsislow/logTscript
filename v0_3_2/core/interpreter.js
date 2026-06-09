@@ -1,9 +1,10 @@
 /* ================= INTERPRETER ================= */
 
 class Interpreter {
-  constructor(funcs,out,pcbs=null,componentRegistry=null){
+  constructor(funcs,out,pcbs=null,componentRegistry=null, signalPropagationStrategy=null){
     this.funcs=funcs;
     this.out=out;
+    this.signalPropagationStrategy = signalPropagationStrategy;
     this.componentRegistry = componentRegistry;
     this.storage=[]; // Array of stored values: [{value: "101", index: 0}, ...]
     this.nextIndex=0;
@@ -1353,7 +1354,7 @@ if (this.isBuiltinDEMUX(name)) {
     throw Error(`Bad arity for ${name}`);
   }
 
-  const local = new Interpreter(this.funcs, this.out, this.pcbDefinitions, this.componentRegistry);
+  const local = new Interpreter(this.funcs, this.out, this.pcbDefinitions, this.componentRegistry, this.signalPropagationStrategy);
   local.aliases = this.aliases;
   local.storage = this.storage;
   local.nextIndex = this.nextIndex;

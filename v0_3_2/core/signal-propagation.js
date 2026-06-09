@@ -1,4 +1,18 @@
 /* ================= SIGNAL PROPAGATION ================= */
+
+
+class SignalPropagationStrategy {
+  constructor() {
+    this.cLogs = []
+    this.debugLevel = 0;
+  }
+  
+  setDebugLevel(level) {
+    this.debugLevel = level;
+    //console.log('debug strategy signal()')
+  }
+}
+
 /* Extracted from interpreter.js — dependency analysis and signal propagation logic */
 
 Interpreter.prototype.exprReferencesComponent = function(expr, compName, compRef){

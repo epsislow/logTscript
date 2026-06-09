@@ -98,13 +98,14 @@ function run(){
   saveDb(code.value, currentFileName);
   const processedCode = preprocessRepeat(code.value);
   const _registry = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
+  const _signalPropagationStrategy = (typeof createSignalPropagationStrategy === 'function') ? createSignalPropagationStrategy() : null;
   const p = new Parser(new Tokenizer(processedCode), _registry);
   const stmts = p.parse();
   document.getElementById('ast').textContent=JSON.stringify(stmts,null,2);
 
   console.log('STMTS: ',  stmts);
 
-  globalInterp = new Interpreter(p.funcs, [], p.pcbs, _registry);
+  globalInterp = new Interpreter(p.funcs, [], p.pcbs, _registry, _signalPropagationStrategy);
   globalInterp.aliases = p.aliases;
 
   for (const s of stmts) {
@@ -135,9 +136,10 @@ function sendCmd(){
   try{
     if(!globalInterp){
       const _reg = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
+      const _sig = (typeof createSignalPropagationStrategy === 'function') ? createSignalPropagationStrategy() : null;
       const p = new Parser(new Tokenizer(preprocessRepeat(code.value)), _reg);
       const stmts = p.parse();
-      globalInterp = new Interpreter(p.funcs, [], p.pcbs, _reg);
+      globalInterp = new Interpreter(p.funcs, [], p.pcbs, _reg, _sig);
       
       for(const s of stmts){
         globalInterp.exec(s, true);

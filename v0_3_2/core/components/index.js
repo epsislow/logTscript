@@ -44,6 +44,15 @@ function createComponentRegistry() {
   return registry;
 }
 
+function createSignalPropagationStrategy() {
+  if(typeof SignalPropagationStrategy === 'undefined') {
+    return null;
+  }
+  const signalPropagationStrategy = new SignalPropagationStrategy();
+  signalPropagationStrategy.setDebugLevel(0);
+  return signalPropagationStrategy;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createComponentRegistry, ComponentRegistry, PcbComponent };
+  module.exports = { createComponentRegistry, ComponentRegistry, PcbComponent, createSignalPropagationStrategy };
 }

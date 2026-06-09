@@ -7,10 +7,19 @@
   function createSession() {
     const session = {
       registry: null,
+      signalPropagationStrategy: null,
       interp: null,
       out: [],
       aliases: null,
 
+      _ensureSignalPropagationStrategy() {
+        if (!this.signalPropagationStrategy) {
+          this.registry = typeof createSignalPropagationStrategy === 'function'
+            ? createSignalPropagationStrategy()
+            : null;
+        }
+        return this.registry;
+      },
       _ensureRegistry() {
         if (!this.registry) {
           this.registry = typeof createComponentRegistry === 'function'
@@ -39,10 +48,11 @@
       run(src) {
         const processed = preprocessRepeat(src);
         const registry = this._ensureRegistry();
+        const signalPropagationStrategy = this._ensureSignalPropagationStrategy();
         const p = new Parser(new Tokenizer(processed), registry);
         const stmts = p.parse();
         this.out = [];
-        this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry);
+        this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry, signalPropagationStrategy);
         this.interp.aliases = p.aliases;
         this.aliases = p.aliases;
         for (const s of stmts) {
