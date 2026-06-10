@@ -117,6 +117,8 @@ The current value of the LED group can be read back:
 
 ## Examples
 
+Input components (`switch`, `key`, `dip`) are described in [interactive-components.md](interactive-components.md).
+
 ### Power indicator
 
 ```

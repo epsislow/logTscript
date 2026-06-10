@@ -377,6 +377,8 @@ comp [adder] .name:
 | `doc(comp.switch)` | switch — 1bit, toggle switch |
 | `doc(comp.key)` | key — 1bit, momentary button |
 | `doc(comp.dip)` | dip — Xbit, group of toggle switches |
+
+See [interactive-components.md](interactive-components.md) for switch, key, and dip usage (panel inputs, wires, examples).
 | `doc(comp.7seg)` or `doc(comp.7)` | 7seg — 8bit, 7-segment display |
 | `doc(comp.lcd)` | lcd — 8bit, pixel matrix display |
 | `doc(comp.adder)` or `doc(comp.+)` | adder — Xbit, addition |

@@ -37,7 +37,7 @@ These components can push their output into wires that read them (e.g. `1wire x 
 
 | Component | Trigger |
 |-----------|---------|
-| `switch` | Toggle on/off |
+| `switch` | Toggle on/off — see [interactive-components.md](interactive-components.md) |
 | `key` | Press / release |
 | `dip` | Change DIP positions |
 | `rotary` | Turn the knob |
@@ -130,6 +130,7 @@ Programs that use **PCB** instances and `on:1` / `set = ...` property blocks fol
 
 ## Related documentation
 
+- [Interactive components](interactive-components.md) — switch, key, and dip inputs
 - [REG](reg.md) — register clock modes and `NEXT`
 - [Oscillator](oscillator.md) — real-time `osc` and wire connections
 - [LED](led.md) — displays driven by wires and components
