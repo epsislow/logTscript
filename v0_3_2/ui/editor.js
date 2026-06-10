@@ -1,6 +1,7 @@
 /* ================= EDITOR & TABS ================= */
 
 const maxTabs = 10;
+const TABS_STORAGE_KEY = 'prog/tabs';
 const tabs = new Map();
 let currentTab = 0;
 let lastTab = 0;
@@ -8,6 +9,112 @@ let originalHash = '';
 let codeCheckDisabled = false;
 let cmEditor;
 let debug = {};
+let persistTabsTimer = null;
+
+function tabsDb() {
+  if (typeof sdb !== 'undefined') return sdb;
+  if (!window._tabsDb) window._tabsDb = new DbLocalStorage();
+  return window._tabsDb;
+}
+
+function serializeTabsSession() {
+  if (typeof code !== 'undefined') {
+    tabSave();
+  }
+  const tabList = [];
+  for (const id of tabs.keys()) {
+    const t = tabs.get(id);
+    tabList.push({
+      id,
+      filename: t.filename,
+      code: t.code,
+      hash: t.hash,
+      isChanged: t.isChanged
+    });
+  }
+  tabList.sort((a, b) => a.id - b.id);
+  return {
+    version: 1,
+    currentTab,
+    lastTab,
+    tabs: tabList
+  };
+}
+
+function persistTabs() {
+  tabsDb().set(TABS_STORAGE_KEY, JSON.stringify(serializeTabsSession()));
+}
+
+function schedulePersistTabs() {
+  if (persistTabsTimer) clearTimeout(persistTabsTimer);
+  persistTabsTimer = setTimeout(persistTabs, 500);
+}
+
+function restoreTabs(defaultCode) {
+  tabs.clear();
+  const db = tabsDb();
+
+  if (db.has(TABS_STORAGE_KEY)) {
+    try {
+      const session = JSON.parse(db.get(TABS_STORAGE_KEY));
+      if (session && session.version === 1 && Array.isArray(session.tabs) && session.tabs.length) {
+        for (const t of session.tabs) {
+          tabs.set(t.id, {
+            filename: t.filename || ('tab ' + t.id),
+            code: t.code || '',
+            hash: typeof t.hash === 'number' ? t.hash : getHashForStr(t.code || ''),
+            isChanged: !!t.isChanged
+          });
+        }
+        currentTab = session.currentTab;
+        if (!tabs.has(currentTab)) {
+          currentTab = session.tabs[0].id;
+        }
+        lastTab = session.lastTab;
+        if (typeof lastTab !== 'number' || isNaN(lastTab)) {
+          lastTab = Math.max(...Array.from(tabs.keys()));
+        } else if (lastTab < currentTab) {
+          lastTab = Math.max(...Array.from(tabs.keys()));
+        }
+        return;
+      }
+    } catch (e) {
+      console.warn('restoreTabs: invalid prog/tabs', e);
+    }
+  }
+
+  let lastName = 'new';
+  let last = defaultCode || '';
+  let lastHash = getHashForStr(last);
+  let isChanged = false;
+
+  if (db.has('prog/last')) {
+    last = db.get('prog/last');
+    lastHash = getHashForStr(last);
+  }
+  if (db.has('prog/lastName')) {
+    lastName = db.get('prog/lastName');
+  }
+  if (db.has('prog/lastHash')) {
+    lastHash = parseInt(db.get('prog/lastHash'), 10);
+  }
+  isChanged = isStrChanged(last, lastHash);
+
+  currentTab = 0;
+  lastTab = 0;
+  tabUpdate(0, lastName, last, lastHash, isChanged);
+  persistTabs();
+}
+
+function syncLegacyLastKeys() {
+  tabSave();
+  const tabInfo = tabs.get(currentTab);
+  if (!tabInfo) return;
+  const db = tabsDb();
+  db.set('prog/last', tabInfo.code);
+  db.set('prog/lastHash', String(tabInfo.hash));
+  db.set('prog/lastName', tabInfo.filename);
+}
 
 function nameIsValid(name, isDir) {
   fileReg = /^[a-zA-Z0-9._]+$/;
@@ -39,6 +146,7 @@ function btncopy() {
 
 function onCodeChange() {
     checkForTabChanged();
+    schedulePersistTabs();
 }
 
 function checkForTabChanged() {
@@ -71,7 +179,9 @@ function isStrChanged(str, originalHash) {
 function tabSaved() {
   originalHash = getHashForStr(code.value);
   tabUpdateIsChanged(currentTab, false);
+  tabSave(true);
   fShowTabs();
+  persistTabs();
 }
 
 function addTab() {
@@ -112,21 +222,24 @@ function tabSwitch(newTab) {
     currentTab = parseInt(newTab, 10);
     tabShowCurrent();
     fShowTabs();
+    persistTabs();
 }
 
 function tabAdd(filename, code) {
-  if(Array.from(tabs.keys()).length > maxTabs) {
-      return;
+  if(Array.from(tabs.keys()).length >= maxTabs) {
+      return false;
   }
   const idx = lastTab + 1;
   if(filename===''){
     filename = 'tab '+ idx;
   }
-  tabUpdate(idx, filename, code, getHashForStr(''), false);
+  tabUpdate(idx, filename, code, getHashForStr(code || ''), false);
   currentTab = idx;
   lastTab = idx;
   tabShowCurrent();
   fShowTabs();
+  persistTabs();
+  return true;
 }
 
 function closeTab() {
@@ -145,23 +258,35 @@ function tabClose() {
   currentTab = [...tabs.keys()].at(-1);
   tabShowCurrent();
   fShowTabs();
+  persistTabs();
 }
 
 function tabShowCurrent() {
   const tabInfo = tabs.get(currentTab);
+  if (!tabInfo) return;
   updateFileNameDisplay(tabInfo.filename);
-  code.value = tabInfo.code;
-  originalHash = getHashForStr(tabInfo.hash);
+  if (typeof code !== 'undefined') {
+    codeCheckDisabled = true;
+    code.value = tabInfo.code;
+    codeCheckDisabled = false;
+  }
+  originalHash = tabInfo.hash;
 }
 
 function tabSave(isLoad = false) {
-  const fileNameEl = document.getElementById("fileName");
+  const tabInfo = tabs.get(currentTab);
+  if (!tabInfo) return;
   let isChangedValue = tabGetIsChanged(currentTab);
-  hash = false;
+  let hash = false;
   if (isLoad === true) {
       hash = getHashForStr(code.value);
+      isChangedValue = false;
   }
-  tabUpdate(currentTab, fileNameEl.textContent, code.value, hash, isChangedValue);
+  const fileNameEl = document.getElementById('fileName');
+  const filename = (fileNameEl && fileNameEl.textContent)
+    ? fileNameEl.textContent
+    : tabInfo.filename;
+  tabUpdate(currentTab, filename, code.value, hash, isChangedValue);
 }
 
 function tabUpdate(idx, filename, code, hash = false, isChanged = false) {
@@ -388,3 +513,7 @@ function closeCompDropdown() {
     compdown.classList.remove('open');
     comptrigger.setAttribute('aria-expanded', 'false');
 }
+
+window.addEventListener('beforeunload', function() {
+  persistTabs();
+});

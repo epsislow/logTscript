@@ -32,7 +32,7 @@ When `clock` is a regular wire, `REG` behaves as a **falling-edge register**:
 
 This matches typical counter / state-machine usage with a DIP or key as clock: prepare `data` while `clk = 1`, then pulse `clk` low to capture.
 
-```
+```logts-play
 1wire data = 0
 1wire clk  = 0
 1wire clr  = 0

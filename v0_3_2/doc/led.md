@@ -44,7 +44,7 @@ comp [led] .name::
 
 Assign a 1-bit value directly to the LED:
 
-```
+```logts-play
 comp [led] .power:
   color: ^0f0
   nl

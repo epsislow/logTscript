@@ -52,32 +52,16 @@ function createInterpreter(funcs, pcbs, registry) {
 async function init() {
   initFiles();
   const elCode = document.getElementById('code');
-  let lastName ="new";
-  let last = elCode.value;
-  let lastHash = getHashForStr(last);
-  let isChanged = false;
-  if (sdb.has("prog/last")) {
-    last = sdb.get("prog/last");
-    elCode.value = last;
-    lastHash = getHashForStr(last);
-  }
-  if (sdb.has("prog/lastName")) {
-    lastName = sdb.get("prog/lastName");
-    updateFileNameDisplay(lastName);
-  }
-  if (sdb.has("prog/lastHash")) {
-    lastHash = parseInt(sdb.get("prog/lastHash"), 10);
-  }
-  isChanged = isStrChanged(last, lastHash);
-  tabUpdate(currentTab, lastName, last, lastHash, isChanged);
-  fShowTabs();
-  
+  const defaultCode = elCode.value;
+
+  restoreTabs(defaultCode);
+
   const elName = document.getElementById("filename");
   const elSave = document.getElementById("filesave");
   const dirSave = document.getElementById("dirsave");
-  
+
   locationChanged();
-  
+
   elName.addEventListener('input', (event) => {
     if(elName.value.trim().length == 0) {
       elSave.disabled=1;
@@ -103,6 +87,9 @@ async function init() {
     set value(v) { cmEditor.setValue(v); }
   };
 
+  tabShowCurrent();
+  fShowTabs();
+
   cmEditor.on("change", function() {
     if (!codeCheckDisabled) {
       onCodeChange();
@@ -110,6 +97,10 @@ async function init() {
   });
 
   updatePropagationToggleUI();
+
+  if (!openDocViewFromHash()) {
+    showEditorView();
+  }
 }
 
 function run(){
@@ -133,12 +124,10 @@ function run(){
   }
   
   watchList = [];
-  
-  let currentFileName = null;
-  if(sdb.has("prog/lastName")) {
-    currentFileName = sdb.get("prog/lastName");
-  }
-  saveDb(code.value, currentFileName);
+
+  tabSave();
+  syncLegacyLastKeys();
+  persistTabs();
   const processedCode = preprocessRepeat(code.value);
   const _registry = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
   const p = new Parser(new Tokenizer(processedCode), _registry);

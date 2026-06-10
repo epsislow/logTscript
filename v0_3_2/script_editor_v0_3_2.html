@@ -968,9 +968,234 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 }
 
 
+/* ================= DOC VIEW (full screen) ================= */
+#docView {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  flex-direction: column;
+  font-family: monospace;
+  background: #111;
+  color: #eee;
+}
+body.doc-mode #editorView {
+  display: none !important;
+}
+body.doc-mode #docView {
+  display: flex !important;
+}
+#docView .doc-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #333;
+}
+#docView .doc-toolbar h1 {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin: 0;
+  color: #ccc;
+}
+#docView .doc-layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+#docSidebar {
+  flex-shrink: 0;
+  width: 220px;
+  border-right: 1px solid #333;
+  overflow-y: auto;
+  padding: 12px 8px;
+  box-sizing: border-box;
+}
+#docNav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.doc-nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #bdbdbd;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.doc-nav-item:hover {
+  background: #242424;
+  color: #eee;
+}
+.doc-nav-item.active {
+  background: linear-gradient(180deg, #2f80ff, #1f66e0);
+  color: #fff;
+}
+#docMain {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 28px 40px;
+  box-sizing: border-box;
+}
+.doc-body {
+  max-width: 820px;
+  line-height: 1.55;
+  font-size: 14px;
+}
+.doc-body h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #eee;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #333;
+}
+.doc-body h2 {
+  font-size: 1.15rem;
+  color: #ddd;
+  margin: 28px 0 12px 0;
+}
+.doc-body h3 {
+  font-size: 1rem;
+  color: #ccc;
+  margin: 20px 0 8px 0;
+}
+.doc-body p {
+  margin: 0 0 12px 0;
+  color: #ccc;
+}
+.doc-body a {
+  color: #6af;
+  text-decoration: none;
+}
+.doc-body a:hover {
+  text-decoration: underline;
+}
+.doc-body code {
+  font-family: monospace;
+  font-size: 0.92em;
+  background: #1a1a1a;
+  color: #0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.doc-body pre {
+  background: #000;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 12px 0 16px 0;
+}
+.doc-body pre code {
+  background: none;
+  padding: 0;
+  color: #0f0;
+}
+.doc-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0 16px 0;
+  font-size: 13px;
+}
+.doc-body th,
+.doc-body td {
+  border: 1px solid #444;
+  padding: 8px 10px;
+  text-align: left;
+}
+.doc-body th {
+  background: #222;
+  color: #eee;
+}
+.doc-body tr:nth-child(even) td {
+  background: #1a1a1a;
+}
+.doc-body hr {
+  border: none;
+  border-top: 1px solid #333;
+  margin: 24px 0;
+}
+.doc-body blockquote {
+  margin: 12px 0;
+  padding: 8px 16px;
+  border-left: 3px solid #555;
+  color: #aaa;
+}
+.doc-body ul,
+.doc-body ol {
+  margin: 0 0 12px 0;
+  padding-left: 24px;
+  color: #ccc;
+}
+.doc-body li {
+  margin-bottom: 4px;
+}
+.doc-error {
+  color: #f88;
+}
+.doc-play-pre {
+  max-height: 28em;
+  overflow: auto;
+  margin-bottom: 0;
+}
+.doc-play-block {
+  margin: 12px 0 16px 0;
+}
+.doc-play-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+.doc-play-mode {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: lowercase;
+  color: #fa0;
+  padding: 2px 8px;
+  border: 1px solid #5a4018;
+  border-radius: 999px;
+  background: #2e2210;
+}
+#docView .btn--primary {
+  background: linear-gradient(180deg, #2f80ff, #1f66e0);
+  border-color: #2f80ff;
+  color: #fff;
+}
+#docView .btn--primary:hover {
+  background: linear-gradient(180deg, #3a8cff, #2a72eb);
+}
+
 </style>
 </head>
 <body>
+
+<div id="docView">
+  <div class="doc-toolbar">
+    <button type="button" class="btn" onclick="showEditorView()">&larr; Editor</button>
+    <h1>LogTScript Documentation v0.3.2</h1>
+  </div>
+  <div class="doc-layout">
+    <aside id="docSidebar">
+      <nav id="docNav"></nav>
+    </aside>
+    <main id="docMain">
+      <article id="docContent" class="doc-body"></article>
+    </main>
+  </div>
+</div>
+
 <script type="text/javascript">
 </script>
 
@@ -1207,6 +1432,8 @@ CodeMirror.registerHelper("hint", "logts", function(cm) {
 });
 </script>
 
+<div id="editorView">
+
 <h2>Bit Language Interpreter for LogTScript v0.3.2</h2>
 
 <textarea id="code" 
@@ -1283,8 +1510,9 @@ show(a,b,c)
         <button class="dropdown-item" onclick="insertComp('osc')">osc</button>
         <button class="dropdown-item" onclick="insertComp('pcb')">pcb</button>
       </div>
+    </div>
       
-  <button onclick="goto('script_doc_v0_3_2')" class="btn" title="Documentation">Doc</button>
+  <button onclick="showDocView()" class="btn" title="Documentation">Doc</button>
   <button onclick="goto('run_tests')" class="btn">T</button>
 </div>
 
@@ -1353,6 +1581,8 @@ show(a,b,c)
   <div id="filelist" class="filelist"></div>
 </div>
 
+</div><!-- #editorView -->
+
 <!-- ================= MODULAR JS LOADING ================= -->
 
 <!-- Core: language processing pipeline -->
@@ -1407,6 +1637,10 @@ show(a,b,c)
 <!-- UI: editor, file browser, app init -->
 <script src="ui/editor.js"></script>
 <script src="ui/file-browser.js"></script>
+
+<script src="marked.min.js"></script>
+<script src="ui/doc-data.js"></script>
+<script src="ui/doc-viewer.js"></script>
 <script src="ui/app.js"></script>
 
 </body>

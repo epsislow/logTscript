@@ -139,6 +139,9 @@ function saveDb(prog, fileName = null) {
     sdb.set("prog/lastName", fileName);
     updateFileNameDisplay(fileName);
   }
+  if (typeof persistTabs === 'function') {
+    persistTabs();
+  }
 }
 
 function updateFileNameDisplay(fileName) {
@@ -253,6 +256,7 @@ function btnfileLoad() {
   fileLoad.disabled=1;
   tabSave(true);
   fShowTabs();
+  persistTabs();
 }
 
 function fileLoad() {

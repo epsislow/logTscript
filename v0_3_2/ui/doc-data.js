@@ -599,7 +599,7 @@ These components can push their output into wires that read them (e.g. \`1wire x
 
 Example:
 
-\`\`\`
+\`\`\`logts-play
 comp [switch] .sw::
 
 1wire a = .sw:get
@@ -809,7 +809,7 @@ comp [switch] .en:
 
 **Driving an LED**
 
-\`\`\`
+\`\`\`logts-play
 comp [switch] .pwr:
   text: 'Power'
   :
@@ -1175,7 +1175,7 @@ When \`clock\` is a regular wire, \`REG\` behaves as a **falling-edge register**
 
 This matches typical counter / state-machine usage with a DIP or key as clock: prepare \`data\` while \`clk = 1\`, then pulse \`clk\` low to capture.
 
-\`\`\`
+\`\`\`logts-play
 1wire data = 0
 1wire clk  = 0
 1wire clr  = 0
@@ -2400,7 +2400,7 @@ comp [led] .name::
 
 Assign a 1-bit value directly to the LED:
 
-\`\`\`
+\`\`\`logts-play
 comp [led] .power:
   color: ^0f0
   nl

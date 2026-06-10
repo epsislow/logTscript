@@ -101,7 +101,7 @@ comp [switch] .en:
 
 **Driving an LED**
 
-```
+```logts-play
 comp [switch] .pwr:
   text: 'Power'
   :
