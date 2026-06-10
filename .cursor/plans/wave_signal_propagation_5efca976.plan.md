@@ -4,36 +4,39 @@ overview: Refactorizarea propagării semnalelor din modelul cascade recursiv (to
 todos:
   - id: strategy-base
     content: Implementează SignalPropagationStrategy (bind, wirePendingStates, scheduleWireChange, commitPendingWires) + WavePropagationStrategy + LegacyCascadePropagationStrategy
-    status: pending
+    status: completed
   - id: defer-elaboration
     content: "Modifică exec() wire paths în interpreter.js: elaborare fără scriere stable și fără updateConnectedComponents pentru wire-uri"
-    status: pending
+    status: completed
   - id: exec-pending
     content: Adaugă execWireStatement mod pending + buildWireDependentsIndex la finalul elaborării
-    status: pending
+    status: completed
   - id: propagate-loop
-    content: Implementează WavePropagationStrategy.propagate() — delta cycles cu protecție bucle și _executedThisWave
-    status: pending
+    content: Implementează WavePropagationStrategy.propagate() — delta cycles cu protecție bucle și executedThisPropagate
+    status: completed
   - id: hooks-setwire
-    content: Conectează postExecSrc/postExecNext, fix test_session.js, actualizează setWire și handlers UI
-    status: pending
+    content: Conectează postExecSrc/postExecNext, fix test_session.js, actualizează setWire și component→wire pe wave
+    status: completed
   - id: component-sync
     content: Extrage syncComponentsAfterWireStable din logica existentă (display LED/7seg, fără cascadă wire)
-    status: pending
+    status: completed
   - id: show-peek-wave
     content: "Wave: coadă show amânat + flush la postExecSrc/postExecNext; peek() citire imediată; Legacy: show top-down ca acum"
-    status: pending
+    status: completed
   - id: test-session-propagation
     content: "test_session: createSession({ propagation }) default legacy; setWire/postExecNext respectă strategia; fix _ensureSignalPropagationStrategy"
-    status: pending
+    status: completed
   - id: reg-metadata
-    content: "registerTest + getTest + run_tests propagation; 600–606 wave; 704=701 wave duplicate + manifest"
-    status: pending
+    content: "registerTest + getTest + run_tests propagation; 600–607 wave; 704 amânat faza 2"
+    status: completed
   - id: ui-strategy-toggle
     content: "Editor app.js: createSignalPropagationStrategy('wave') explicit; toggle UI incremental"
-    status: pending
+    status: completed
   - id: validate-600
-    content: "Teste 600–606 + paralelism A/B rulează cu createSession({ propagation: 'wave' }); restul suite rămân legacy default"
+    content: "Teste 600–607 pe wave; restul suite legacy default; 704 amânat"
+    status: completed
+  - id: reg-wave-faza2
+    content: "REG + ~ pe wave (test 704) — aliniere regPendingMap/cycle cu postExecNext"
     status: pending
 isProject: false
 ---
@@ -566,7 +569,7 @@ execNext(interp, count = 1) {
 
 1. **Run All cu default legacy** — testele fără metadata trec neschimbate
 2. **Grup signal** — 600–606 (+607) pe wave
-3. **701 legacy + 704 wave** — același scenariu REG(`~`)+NEXT; ambele trec
+3. **701 legacy** — REG(`~`)+NEXT; **704 wave** amânat faza 2
 
 ---
 
@@ -582,7 +585,7 @@ Teste din [`test_suite_ported.js`](v0_3_2/test_suite_ported.js):
 - **605** — auto-referință o singură evaluare per undă
 - **606** — multi-decl propagare individuală
 - **701** — REG(`~`)+NEXT pe **legacy**
-- **704** — același scenariu ca 701 pe **wave**
+- ~~**704** — același scenariu ca 701 pe **wave**~~ → **amânat faza 2** (vezi mai jos)
 
 Test suplimentar recomandat (nou, mic):
 
@@ -623,3 +626,58 @@ flowchart LR
   step7 --> step8["8. test_session propagation"]
   step8 --> step9["9. Teste 600-606 wave"]
 ```
+
+---
+
+## Faza 2 — REG + wave (test 704, amânat)
+
+**Status:** testul **704** nu e înregistrat în `test_suite_ported.js` până la integrarea REG pe wave. Funcția `runReg701NextBased` și comentariul de reactivare sunt lângă testul 701.
+
+### Ce validează 704 (când va fi activat)
+
+Același scenariu ca **701**, cu `{ propagation: 'wave' }`:
+
+```logtscript
+1wire data = 1
+1wire read = REG(data, ~, 0)
+```
+
+1. După elaborare: `read = 0`
+2. După `NEXT(1)`: `read = 1` (latch la `data=1`)
+3. `data = 0` fără NEXT: `read = 1` (hold)
+4. După `NEXT(2)`: `read = 0` (latch la `data=0`)
+
+### De ce eșuează pe wave (nu e problemă de așteptări în test)
+
+REG cu clock `~` folosește în `interpreter.js` (`regPendingMap` + `cycle`):
+
+- **Ciclu nou** (`pending.cycle !== this.cycle`, după NEXT): latch `pending.value` → `output`
+- **Același ciclu** (re-evaluare în cascadă): păstrează `pending.output`
+
+**Legacy (701):** la `exec({ next })`, wire-urile (inclusiv `read = REG(...)`) se re-evaluează **în interiorul** handler-ului NEXT, înainte de `postExecNext`. REG vede `cycle` deja incrementat în contextul re-exec-ului imediat.
+
+**Wave (704):** `deferWirePropagation()` sare loop-ul de wire din NEXT; recompute-ul vine din `postExecNext` → `onNextCycle()` → `_recomputeAllWires` → `propagate()`. Ordinea și numărul de evaluări REG per tranziție NEXT **nu coincid** încă cu legacy.
+
+### Ce trebuie reparat (faza 2 — mecanism, nu test)
+
+1. **Aliniere timing REG ↔ wave la NEXT**  
+   Asigură că după `NEXT`, `read = REG(data, ~, 0)` e evaluat o dată per ciclu nou, cu `cycle` și `currentStmt` corecte, astfel încât ramura `pending.cycle !== this.cycle` să latch-uiască la momentul potrivit.
+
+2. **`_recomputeAllWires` + `executedThisPropagate`**  
+   După recompute global (NEXT), statement-urile deja rulate nu trebuie re-executate în delta-loop în mod care să strice starea REG (marcare în `executedThisPropagate` după `_recomputeAllWires` — de verificat interacțiunea cu `regPendingMap`).
+
+3. **Opțional: hook dedicat REG la `onNextCycle()`**  
+   Dacă recompute-ul generic nu e suficient, invalidare/actualizare explicită a stării REG pentru statement-uri cu `~` înainte de `propagate()`.
+
+4. **Reactivare test** — decomentează în `test_suite_ported.js`:
+
+   ```js
+   reg(704, 'reg', 'REG cu clock ~ — NEXT-based (wave)', runReg701NextBased, { propagation: 'wave' });
+   ```
+
+   Readaugă intrarea 704 în `test_manifest.js`.
+
+### Ce nu face parte din această reparație
+
+- Testele **700, 702, 703** (REG cu `clk` wire, clear, multi-bit) — eșecuri preexistente pe legacy, separate.
+- Property blocks componente / PCB — rămân pe legacy și în faza 2.
