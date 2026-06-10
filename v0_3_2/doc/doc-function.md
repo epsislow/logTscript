@@ -458,6 +458,200 @@ pcb.xyz: undefined PCB type
 
 ---
 
+## Chip components (chip)
+
+Chip types are lightweight reusable blocks (similar to PCB) without `~~`, `def`, nested `chip +[...]`, or UI components (`switch`, `key`, `led`, etc.). A chip body may instantiate other top-level chip types via `chip [type] .inst::`.
+
+### Syntax
+
+**Definition (top-level only):**
+
+```
+chip +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum
+```
+
+**Instantiation:**
+
+```
+chip [halfAdd] .u1::
+```
+
+**Property block (pins + exec trigger):**
+
+```
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+```
+
+**External wire from pout:**
+
+```
+4wire r = .u1:sum
+```
+
+### doc(chip) — list of user-defined chip types
+
+```
+doc(chip)
+```
+
+Output (if `halfAdd` is defined):
+
+```
+chip.halfAdd
+```
+
+### doc(chip.type) — syntax of a chip type
+
+```
+doc(chip.halfAdd)
+```
+
+Output:
+
+```
+chip [halfAdd] .name:
+  exec: set
+  on: 1
+  :{
+    4pin a
+    4pin b
+    1pin set
+    4pout sum
+    1pout carry
+  }
+  -> 4bit
+```
+
+**Undefined type:**
+
+```
+doc(chip.xyz)
+# displays:
+chip.xyz: tip chip nedefinit
+```
+
+### doc(.inst) and doc(.inst.sub)
+
+After instantiation, `doc(.u1)` shows the instance signature; `doc(.u1.add)` shows an internal component (when present).
+
+Example:
+
+```logts-play
+chip +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum
+
+chip [halfAdd] .u1::
+doc(chip)
+doc(chip.halfAdd)
+```
+
+### Runnable example — half-adder instance
+
+```logts-play
+chip +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum
+
+chip [halfAdd] .u1::
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+4wire r = .u1:sum
+show(r)
+```
+
+Wave propagation (same script, wave mode):
+
+```logts-play wave
+chip +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum
+
+chip [halfAdd] .u1::
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+4wire r = .u1:sum
+show(r)
+```
+
+---
+
+## Debug output (`show`, `peek`, `probe`)
+
+Built-in display statements for the Output panel. Full reference with runnable examples:
+
+**[debug.md](debug.md)** — `show`, `peek`, `probe` syntax, formats, when to use each, Wave vs Legacy.
+
+---
+
 ## Notes
 
 - `doc` is a **statement** (like `show`), not an expression — it cannot be used on the right side of `=`.

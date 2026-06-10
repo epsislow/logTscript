@@ -29,7 +29,7 @@ The **Wave** model is used when you run programs in the editor (orange pill in t
 
 - Combinational logic (`NOT`, `AND`, `MUX`, wires feeding other wires) behaves as you would expect in a schematic: all related outputs settle together before the screen updates.
 - `show(...)` at the end of **RUN** or **NEXT** shows values **after** propagation finishes, not halfway through.
-- `peek(...)` reads the current value **immediately**, without waiting for propagation — useful inside the same script when you need an instant snapshot.
+- `peek(...)` and `probe(...)` behave differently — see [debug.md](debug.md).
 
 ### Components that drive wires
 
@@ -90,23 +90,11 @@ Changing `a` or `b` eventually updates `sum`.
 
 ---
 
-## `show` vs `peek`
+## Debug output (`show`, `peek`, `probe`)
 
-| Form | When to use |
-|------|-------------|
-| `show(x, y, ...)` | Normal output at the end of a run or cycle — values are shown after propagation. |
-| `peek(x, y, ...)` | Read values **now**, in the middle of execution, before downstream wires have caught up. |
+How values appear in the Output panel — syntax, timing, and runnable examples:
 
-Example where `peek` matters:
-
-```
-1wire a = 0
-1wire b = NOT(a)
-peek(a, b)    # may still show old b if read before propagation in some contexts
-show(a, b)    # always shows settled values at end of RUN
-```
-
-In practice, use `show` for display and `peek` only when you deliberately need an immediate read.
+**[debug.md](debug.md)**
 
 ---
 
@@ -131,6 +119,21 @@ For examples and edge cases, see PCB tests **500–515** (legacy) and **516–53
 
 ---
 
+## Chip components
+
+Chip bodies follow the **global** propagation strategy (wave or legacy), unlike PCB bodies which still run in the immediate `insidePcbBody` model.
+
+| Area | Behaviour |
+|------|-----------|
+| **Chip definition body** | Uses wave scheduling when wave mode is active; legacy cascade otherwise. |
+| **External wires** (`4wire r = .u1:sum`) | Updated after chip exec / property block, like PCB pouts. |
+| **Property blocks** (`.u1:{ a = … set = 1 }`) | Same trigger semantics as PCB (`on:1`, `on:raise`, etc.). |
+| **Nested chip instances** | Top-level chip types only; `chip +[inner]` inside a body is a parse error. |
+
+See chip tests **540–543** (legacy) and **556–557** (wave) in the test runner.
+
+---
+
 ## Quick reference
 
 | Topic | Wave (editor) | Legacy |
@@ -140,12 +143,14 @@ For examples and edge cases, see PCB tests **500–515** (legacy) and **516–53
 | `REG(..., ~, ...)` + `NEXT` | Same as Legacy | Reference |
 | `REG(data, clk, clr)` wire clock | Falling edge (`clk` 1→0); same semantics | Same |
 | `show` | After settle | After each top-level step |
+| `probe` | On every commit (elaboration registry) | On every commit |
 | Self-referential wires (e.g. `a = NOT(a)`) | One update per user action | May differ in edge cases |
 
 ---
 
 ## Related documentation
 
+- [Debug output](debug.md) — `show`, `peek`, `probe`
 - [Editor run controls](editorUI.md) — Run, Next, Wave / Legacy toggle
 - [Interactive components](interactive-components.md) — switch, key, dip, rotary inputs
 - [REG](reg.md) — wire-clock falling edge and `NEXT` clock (`~`)

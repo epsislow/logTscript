@@ -4,6 +4,7 @@ const DOCS = [
   { file: 'doc-function.md', label: 'doc() function' },
   { file: 'editorUI.md', label: 'Editor UI' },
   { file: 'signal-propagation.md', label: 'Signal propagation' },
+  { file: 'debug.md', label: 'Debug (show/peek/probe)' },
   { file: 'interactive-components.md', label: 'Interactive components' },
   { file: 'reg.md', label: 'REG' },
   { file: 'arithmetic.md', label: 'Arithmetic' },

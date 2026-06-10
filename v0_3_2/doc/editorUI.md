@@ -15,7 +15,7 @@ Executes the full program from the editor:
 1. Clears the devices panel and output (fresh run).
 2. Parses and runs all statements.
 3. Creates a new interpreter using the **propagation mode** selected in the pill toggle (see below).
-4. Shows `show` output and updates the Variables panel.
+4. Shows `show` / `peek` / `probe` output and updates the Variables panel (see [debug.md](debug.md)).
 
 Use **Run** after changing code or after switching Wave / Legacy so the new mode takes effect.
 
@@ -72,6 +72,7 @@ If you run a command from the Command panel before any **Run**, the lazy-started
 
 ## Related documentation
 
+- [Debug output](debug.md) — `show`, `peek`, `probe`
 - [Signal propagation](signal-propagation.md) — Wave vs Legacy behaviour
 - [REG](reg.md) — registers and `NEXT`
 - [Interactive components](interactive-components.md) — panel inputs and wire updates

@@ -182,6 +182,7 @@ class SignalPropagationStrategy {
   _finishPropagate(allChanged) {
     this._syncComponentsAfterPropagate(allChanged);
     this.flushDeferredShows();
+    if (this.interp) this.interp._probeInitialising = false;
   }
 }
 

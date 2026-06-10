@@ -244,7 +244,7 @@ pushSource({ src, alias }) {
     }
       
       // Check for keywords
-      if (['def', 'show', 'peek', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'comp', 'pcb', 'doc', 'watch'].includes(v)) {
+      if (['def', 'show', 'peek', 'probe', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'comp', 'pcb', 'chip', 'doc', 'watch'].includes(v)) {
         return this.token('KEYWORD', v);
   }
 

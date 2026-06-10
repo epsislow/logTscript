@@ -54,7 +54,8 @@
         const p = new Parser(new Tokenizer(processed), registry);
         const stmts = p.parse();
         this.out = [];
-        this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry, signalPropagationStrategy);
+        this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry, signalPropagationStrategy, p.chips);
+        this.interp.pendingProbeExprs = p.probes || [];
         this.interp.aliases = p.aliases;
         this.aliases = p.aliases;
         for (const s of stmts) {

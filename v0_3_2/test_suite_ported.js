@@ -1419,5 +1419,267 @@ reg(707, 'reg', 'REG falling edge — data ignorat pana la clk 1→0 (wave)', fu
   h.assert('707 shadow=0101', session.getWire(interp, 'shadow'), '0101');
 }, { propagation: 'wave' });
 
+const CHIP_HALFADD = `chip +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum`;
+
+reg(428, 'doc-comp', 'doc(chip) cu chip definit contine chip.halfAdd', function(h, session) {
+  const out = session.runDoc(CHIP_HALFADD + '\ndoc(chip)');
+  h.assert('doc(chip) contine chip.halfAdd', String(out.some(l => l === 'chip.halfAdd')), 'true');
+});
+
+reg(429, 'doc-comp', 'doc(chip.halfAdd) prima linie', function(h, session) {
+  const out = session.runDoc(CHIP_HALFADD + '\ndoc(chip.halfAdd)');
+  h.assert('chip.halfAdd prima linie', out[0], 'chip [halfAdd] .name:');
+});
+
+reg(430, 'doc-comp', 'doc(chip.halfAdd) contine 4pin a', function(h, session) {
+  const out = session.runDoc(CHIP_HALFADD + '\ndoc(chip.halfAdd)');
+  h.assert('chip.halfAdd contine 4pin a', String(out.some(l => l.includes('4pin a'))), 'true');
+});
+
+reg(431, 'doc-comp', 'doc(chip.xyz) tip nedefinit', function(h, session) {
+  const out = session.runDoc('doc(chip.xyz)');
+  h.assert('chip.xyz nedefinit', out[0], 'chip.xyz: tip chip nedefinit');
+});
+
+const CHIP_U1_INIT = `.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}`;
+
+function runChipInstTest(h, session) {
+  const src = CHIP_HALFADD + `
+chip [halfAdd] .u1::
+` + CHIP_U1_INIT + `
+4wire r = .u1:sum
+`;
+  const { interp } = session.run(src);
+  h.assert('chip inst sum', session.getWire(interp, 'r'), '1000');
+}
+
+reg(540, 'chip', 'chip instanțiere și acces pout', runChipInstTest);
+
+reg(541, 'chip', 'chip +[inner] în body — eroare parse', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`chip +[outer]:
+  chip +[inner]:
+    1pin x
+  :
+  :1bit x`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('eroare chip nested def', String(err.includes('cannot define new chip')), 'true');
+});
+
+reg(542, 'chip', 'chip body interzice comp switch', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`chip +[bad]:
+  comp [switch] .s::
+  :1bit x`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('eroare switch in chip', String(err.includes('switch')), 'true');
+});
+
+reg(543, 'chip', 'chip property block on:1 exec', function(h, session) {
+  const src = CHIP_HALFADD + `
+chip [halfAdd] .u1::
+.u1:{
+  a = 0001
+  b = 0010
+  set = 1
+}
+4wire r = .u1:sum`;
+  const { interp } = session.run(src);
+  h.assert('chip property block sum', session.getWire(interp, 'r'), '0011');
+});
+
+function regChipWave(id, title, run) {
+  reg(id, 'chip', title + ' (wave)', run, { propagation: 'wave' });
+}
+regChipWave(556, 'chip instanțiere și acces pout', runChipInstTest);
+regChipWave(557, 'chip property block on:1 exec', function(h, session) {
+  const src = CHIP_HALFADD + `
+chip [halfAdd] .u1::
+.u1:{
+  a = 0001
+  b = 0010
+  set = 1
+}
+4wire r = .u1:sum`;
+  const { interp } = session.run(src);
+  h.assert('chip property block sum wave', session.getWire(interp, 'r'), '0011');
+});
+
+function runProbeBasic(h, session) {
+  const { interp, out } = session.run(`
+1wire b = 0
+1wire a := 0
+a = AND(b, 1)
+probe(a)`);
+  h.assert('probe initialised', String(out.some(l => l.includes('# a = 0') && l.includes('initialised'))), 'true');
+  session.setWire(interp, 'b', '1');
+  h.assert('probe changed', String(out.some(l => l.includes('# a = 1') && l.includes('changed'))), 'true');
+}
+
+reg(800, 'probe', 'probe wire initialised și changed', runProbeBasic);
+reg(801, 'probe', 'probe wire initialised și changed (wave)', runProbeBasic, { propagation: 'wave' });
+
+reg(802, 'probe', 'Parser — probe este KEYWORD', function(h, session) {
+  const { tokens } = session.tokenize('probe(a)');
+  h.assert('probe tokenizat', tokens[0].value, 'probe');
+});
+
+reg(803, 'probe', 'Parser — probe(a) produce nod AST', function(h, session) {
+  const stmts = session.parse('probe(a)');
+  h.assert('stmt probe', String(stmts[0].probe !== undefined), 'true');
+});
+
+const SHOW_SIMPLE = `1wire a = 0
+1wire b = 1
+1wire c = AND(a, b)
+show(a, b, c)`;
+
+function runShowSimple(h, session) {
+  const { out } = session.run(SHOW_SIMPLE);
+  h.assert('show c=0', String(out.some(l => l.includes('c') && l.includes('= 0'))), 'true');
+}
+
+reg(804, 'debug', 'show combinational fără NEXT (legacy)', runShowSimple);
+reg(805, 'debug', 'show combinational fără NEXT (wave)', runShowSimple, { propagation: 'wave' });
+
+const MID_CHANGE = `1wire a := 0
+1wire b = NOT(a)
+show(a, b)
+a = 1
+peek(a, b)
+show(a, b)`;
+
+function debugOutLines(out) {
+  return out.filter(l => l.includes('(ref:'));
+}
+
+function runMidChangeLegacy(h, session) {
+  const { out, interp } = session.run(MID_CHANGE);
+  const lines = debugOutLines(out);
+  h.assert('3 linii show/peek', String(lines.length === 3), 'true');
+  h.assert('show initial b=1', String(/b \(1wire\) = 1/.test(lines[0])), 'true');
+  h.assert('peek după a=1 b=0', String(/b \(1wire\) = 0/.test(lines[1])), 'true');
+  h.assert('show final b=0', String(/b \(1wire\) = 0/.test(lines[2])), 'true');
+  h.assert('wire b=0', session.getWire(interp, 'b'), '0');
+}
+
+function runMidChangeWave(h, session) {
+  const { out, interp } = session.run(MID_CHANGE);
+  const lines = debugOutLines(out);
+  h.assert('3 linii show/peek', String(lines.length === 3), 'true');
+  h.assert('peek după a=1 b=1 (înainte de settle)', String(/b \(1wire\) = 1/.test(lines[1])), 'true');
+  h.assert('toate liniile b=1 pe wave', String(lines.every(l => /b \(1wire\) = 1/.test(l))), 'true');
+  h.assert('wire b=1 la final RUN wave', session.getWire(interp, 'b'), '1');
+}
+
+reg(806, 'debug', 'show/peek la schimbare wire — legacy cascade', runMidChangeLegacy);
+reg(807, 'debug', 'show/peek la schimbare wire — wave amână show', runMidChangeWave, { propagation: 'wave' });
+
+const REG_SHOW_ONLY = `1wire data = 1
+1wire q = REG(data, ~, 0)
+show(q)`;
+
+function runRegShowOnly(h, session) {
+  const { out, interp } = session.run(REG_SHOW_ONLY);
+  h.assert('show q=0 fără NEXT', String(out.some(l => l.includes('q') && l.includes('= 0'))), 'true');
+  h.assert('q=0', session.getWire(interp, 'q'), '0');
+}
+
+reg(808, 'debug', 'show REG(~) fără NEXT în script — legacy', runRegShowOnly);
+reg(809, 'debug', 'show REG(~) fără NEXT în script — wave', runRegShowOnly, { propagation: 'wave' });
+
+const REG_WITH_NEXT = `1wire data = 1
+1wire q = REG(data, ~, 0)
+show(q)
+NEXT(~)
+show(q)`;
+
+function runRegNextLegacy(h, session) {
+  const lines = debugOutLines(session.run(REG_WITH_NEXT).out);
+  h.assert('2 show', String(lines.length === 2), 'true');
+  h.assert('primul q=0', String(/q \(1wire\) = 0/.test(lines[0])), 'true');
+  h.assert('după NEXT q=1', String(/q \(1wire\) = 1/.test(lines[1])), 'true');
+}
+
+function runRegNextWave(h, session) {
+  const { out, interp } = session.run(REG_WITH_NEXT);
+  const lines = debugOutLines(out);
+  h.assert('2 show amânate', String(lines.length === 2), 'true');
+  h.assert('ambele q=1 după flush', String(lines.every(l => /q \(1wire\) = 1/.test(l))), 'true');
+  h.assert('q=1', session.getWire(interp, 'q'), '1');
+}
+
+reg(810, 'debug', 'show înainte/după NEXT(~) în script — legacy', runRegNextLegacy);
+reg(811, 'debug', 'show înainte/după NEXT(~) în script — wave', runRegNextWave, { propagation: 'wave' });
+
+const MULTI_SHOW = `1wire a := 0
+1wire b = NOT(a)
+show(b)
+a = 1
+show(b)`;
+
+function runMultiShowLegacy(h, session) {
+  const lines = debugOutLines(session.run(MULTI_SHOW).out);
+  h.assert('2 show', String(lines.length === 2), 'true');
+  h.assert('primul b=1', String(/b \(1wire\) = 1/.test(lines[0])), 'true');
+  h.assert('al doilea b=0', String(/b \(1wire\) = 0/.test(lines[1])), 'true');
+}
+
+function runMultiShowWave(h, session) {
+  const lines = debugOutLines(session.run(MULTI_SHOW).out);
+  h.assert('2 show', String(lines.length === 2), 'true');
+  h.assert('ambele b=1 pe wave', String(lines.every(l => /b \(1wire\) = 1/.test(l))), 'true');
+}
+
+reg(812, 'debug', 'două show(b) după schimbare a — legacy', runMultiShowLegacy);
+reg(813, 'debug', 'două show(b) după schimbare a — wave', runMultiShowWave, { propagation: 'wave' });
+
+const PROBE_AND_SETTLE = `1wire a := 0
+1wire b := 1
+a = AND(b, 1)
+probe(a)`;
+
+function runProbeInitThenChangedLegacy(h, session) {
+  const { out } = session.run(PROBE_AND_SETTLE);
+  h.assert('legacy o singură linie', String(out.filter(l => l.startsWith('# a =')).length === 1), 'true');
+  h.assert('legacy a=1 initialised', String(out.some(l => l.includes('# a = 1') && l.includes('initialised'))), 'true');
+}
+
+function runProbeInitThenChangedWave(h, session) {
+  const { out } = session.run(PROBE_AND_SETTLE);
+  h.assert('wave a=0 initialised', String(out.some(l => l.includes('# a = 0') && l.includes('initialised'))), 'true');
+  h.assert('wave a=1 changed', String(out.some(l => l.includes('# a = 1') && l.includes('changed'))), 'true');
+  h.assert('wave fără al doilea initialised', String(!out.some(l => l.includes('# a = 1') && l.includes('initialised'))), 'true');
+}
+
+reg(814, 'debug', 'probe settle RUN — legacy o linie', runProbeInitThenChangedLegacy);
+reg(815, 'debug', 'probe settle RUN — wave initialised apoi changed', runProbeInitThenChangedWave, { propagation: 'wave' });
+
   suite.finalize();
 })();

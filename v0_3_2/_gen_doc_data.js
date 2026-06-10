@@ -12,6 +12,7 @@ const DOC_FILES = [
   'doc-function.md',
   'editorUI.md',
   'signal-propagation.md',
+  'debug.md',
   'interactive-components.md',
   'reg.md',
   'arithmetic.md',

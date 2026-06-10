@@ -1,7 +1,7 @@
 /* ================= INTERPRETER ================= */
 
 class Interpreter {
-  constructor(funcs,out,pcbs=null,componentRegistry=null, signalPropagationStrategy=null){
+  constructor(funcs,out,pcbs=null,componentRegistry=null, signalPropagationStrategy=null, chips=null){
     this.funcs=funcs;
     this.out=out;
     this.signalPropagationStrategy = signalPropagationStrategy
@@ -38,7 +38,20 @@ class Interpreter {
     this.pcbInstances = new Map(); // .instanceName -> { pcbName, pinStorage, poutStorage, internalPrefix, context }
     this.insidePcbBody = false; // Flag to track if we're executing inside a PCB body
     this.currentPcbInstance = null; // Current PCB instance name when inside PCB body
-    
+
+    // Chip support
+    this.chipDefinitions = chips || new Map();
+    this.chipInstances = new Map();
+    this.insideChipBody = false;
+    this.currentChipInstance = null;
+
+    // Probe debug
+    this.probeTargets = [];
+    this.probeByKey = new Map();
+    this.probeReasonContext = 'normal';
+    this._probeInitialising = true;
+    this.pendingProbeExprs = [];
+
     // Oscillator timers (for cleanup on re-run)
     this.oscTimers = [];
     
@@ -104,6 +117,182 @@ class Interpreter {
     }
     this.wireStorageMap.set(name, storageIdx);
     wire.ref = `&${storageIdx}`;
+    this._emitProbeForWire(name, v);
+  }
+
+  _probeReasonLabel() {
+    if (this.probeReasonContext === 'edge_block') return 'edge committed';
+    return 'changed';
+  }
+
+  _registerProbeTarget(target) {
+    if (!target || !target.key) return;
+    if (this.probeByKey.has(target.key)) return;
+    this.probeByKey.set(target.key, target);
+    this.probeTargets.push(target);
+  }
+
+  _resolveProbeExpr(expr) {
+    if (!expr || !expr.length) return null;
+    const atom = expr[0];
+    if (atom.var) {
+      const wire = this.wires.get(atom.var);
+      if (!wire) return null;
+      return {
+        kind: 'wire',
+        key: 'w:' + atom.var,
+        label: atom.var,
+        ref: wire.ref,
+        wireName: atom.var,
+        bitWidth: this.getBitWidth(wire.type),
+        seen: false,
+        lastValue: null
+      };
+    }
+    if (atom.ref || atom.refLiteral) {
+      const refStr = atom.ref || atom.refLiteral;
+      const baseMatch = String(refStr).match(/^&(\d+)/);
+      if (!baseMatch) return null;
+      const label = String(refStr);
+      return {
+        kind: 'ref',
+        key: 'r:' + label,
+        label,
+        ref: label,
+        wireName: null,
+        bitWidth: null,
+        seen: false,
+        lastValue: null
+      };
+    }
+    return null;
+  }
+
+  activateProbes(exprs) {
+    if (!exprs || !exprs.length) return;
+    for (const expr of exprs) {
+      const target = this._resolveProbeExpr(expr);
+      if (target) this._registerProbeTarget(target);
+    }
+    for (const target of this.probeTargets) {
+      let value = null;
+      if (target.kind === 'wire' && target.wireName) {
+        value = this.getWireStableValue(target.wireName);
+        const wire = this.wires.get(target.wireName);
+        if (wire) target.ref = wire.ref;
+      } else if (target.kind === 'ref' && target.ref) {
+        value = this.getValueFromRef(target.ref);
+      }
+      if (value !== null && value !== undefined) {
+        this._emitProbeTarget(target, value, 'initialised');
+      }
+    }
+  }
+
+  _emitProbeTarget(target, value, reasonOverride) {
+    if (!target) return;
+    let valueStr = value == null ? '-' : String(value);
+    if (target.bitWidth && valueStr !== '-') {
+      valueStr = this.formatValue(valueStr, target.bitWidth);
+    }
+    if (target.lastValue === valueStr) return;
+    let reason = reasonOverride;
+    if (!reason) {
+      reason = target.seen ? this._probeReasonLabel() : 'initialised';
+    }
+    target.seen = true;
+    target.lastValue = valueStr;
+    const ref = target.ref && target.ref !== '&-' ? target.ref : (target.wireName ? (this.wires.get(target.wireName)?.ref) : null);
+    const refPart = ref ? ` (${ref})` : '';
+    const name = target.label || target.wireName || target.ref || '?';
+    this.out.push(`# ${name} = ${valueStr}${refPart} - ${reason}`);
+  }
+
+  _emitProbeForWire(name, value) {
+    const key = 'w:' + name;
+    const target = this.probeByKey.get(key);
+    if (!target) return;
+    const wire = this.wires.get(name);
+    if (wire) target.ref = wire.ref;
+    this._emitProbeTarget(target, value);
+  }
+
+  _emitProbeForRef(refStr, value) {
+    if (!refStr) return;
+    const base = String(refStr).match(/^&(\d+)/);
+    if (!base) return;
+    for (const target of this.probeTargets) {
+      if (target.kind !== 'ref') continue;
+      const tBase = String(target.ref).match(/^&(\d+)/);
+      if (!tBase || tBase[1] !== base[1]) continue;
+      if (target.ref === refStr || target.ref === ('&' + base[1])) {
+        this._emitProbeTarget(target, value);
+      }
+    }
+  }
+
+  _evalCompositeInstanceAtom(a, instance) {
+    const kind = instance.pcbName ? 'PCB' : 'Chip';
+    if (a.property) {
+      const poutInfo = instance.poutStorage.get(a.property);
+      if (poutInfo) {
+        let val = this.getValueFromRef(poutInfo.ref) || '0'.repeat(poutInfo.bits);
+        if (a.bitRange) {
+          const { start, end: actualEnd } = this.resolveBitRange(a.bitRange);
+          if (start < 0 || actualEnd >= val.length || start > actualEnd) {
+            throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:${a.property} (length: ${val.length})`);
+          }
+          const extracted = val.substring(start, actualEnd + 1);
+          const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
+          const extractedPadded = a.pad ? this.applyPad(extracted, a.pad) : extracted;
+          return { value: extractedPadded, ref: null, varName: `${a.var}:${a.property}.${varNameSuffix}`, bitWidth: extractedPadded.length };
+        }
+        if (a.pad) {
+          const padded = this.applyPad(val, a.pad);
+          return { value: padded, ref: null, varName: `${a.var}:${a.property}`, bitWidth: padded.length };
+        }
+        return { value: val, ref: poutInfo.ref, varName: `${a.var}:${a.property}`, bitWidth: poutInfo.bits };
+      }
+      const pinInfo = instance.pinStorage.get(a.property);
+      if (pinInfo) {
+        let val = this.getValueFromRef(pinInfo.ref) || '0'.repeat(pinInfo.bits);
+        if (a.bitRange) {
+          const { start, end: actualEnd } = this.resolveBitRange(a.bitRange);
+          if (start < 0 || actualEnd >= val.length || start > actualEnd) {
+            throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:${a.property} (length: ${val.length})`);
+          }
+          const extracted = val.substring(start, actualEnd + 1);
+          const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
+          const extractedPadded = a.pad ? this.applyPad(extracted, a.pad) : extracted;
+          return { value: extractedPadded, ref: null, varName: `${a.var}:${a.property}.${varNameSuffix}`, bitWidth: extractedPadded.length };
+        }
+        if (a.pad) {
+          const padded = this.applyPad(val, a.pad);
+          return { value: padded, ref: null, varName: `${a.var}:${a.property}`, bitWidth: padded.length };
+        }
+        return { value: val, ref: pinInfo.ref, varName: `${a.var}:${a.property}`, bitWidth: pinInfo.bits };
+      }
+      throw Error(`Unknown property '${a.property}' for ${kind} instance ${a.var}. Available: ${[...instance.pinStorage.keys(), ...instance.poutStorage.keys()].join(', ')}`);
+    }
+    const returnSpec = instance.def.returnSpec;
+    if (returnSpec) {
+      const pinInfo = instance.pinStorage.get(returnSpec.varName);
+      const poutInfo = instance.poutStorage.get(returnSpec.varName);
+      const info = pinInfo || poutInfo;
+      if (info) {
+        let val = this.getValueFromRef(info.ref) || '0'.repeat(returnSpec.bits);
+        if (a.pad) val = this.applyPad(val, a.pad);
+        return { value: val, ref: a.pad ? null : info.ref, varName: a.var, bitWidth: val.length };
+      }
+      if (instance.returnValue !== undefined && instance.returnValue !== null) {
+        let val = String(instance.returnValue).padStart(returnSpec.bits, '0').slice(-returnSpec.bits);
+        if (a.pad) val = this.applyPad(val, a.pad);
+        return { value: val, ref: null, varName: a.var, bitWidth: val.length };
+      }
+    }
+    let emptyVal = '0'.repeat((returnSpec && returnSpec.bits) || 1);
+    if (a.pad) emptyVal = this.applyPad(emptyVal, a.pad);
+    return { value: emptyVal, ref: null, varName: a.var };
   }
 
   ensureWireSlot(name, type, defaultValue = null) {
@@ -359,6 +548,19 @@ class Interpreter {
     const stored = this.storage.find(s => s.index === idx);
     if(stored){
       stored.value = value;
+      this._emitProbeForRef(refStr, value);
+      const baseMatch = refStr.match(/^&(\d+)/);
+      if (baseMatch) {
+        const baseRef = '&' + baseMatch[1];
+        for (const [wireName, wire] of this.wires) {
+          if (!wire.ref) continue;
+          const wireBase = wire.ref.match(/^&(\d+)/);
+          if (wireBase && wireBase[1] === baseMatch[1]) {
+            const v = this.getValueFromRef(wire.ref);
+            if (v !== null) this._emitProbeForWire(wireName, v);
+          }
+        }
+      }
       return true;
     }
     return false;
@@ -777,82 +979,14 @@ class Interpreter {
         // First check if it's a PCB instance
         const pcbInstance = this.pcbInstances.get(a.var);
         if(pcbInstance){
-          // PCB instance access
-          if(a.property){
-            // Check if it's a pout (output)
-            const poutInfo = pcbInstance.poutStorage.get(a.property);
-            if(poutInfo){
-              let val = this.getValueFromRef(poutInfo.ref) || '0'.repeat(poutInfo.bits);
+          const compositeResult = this._evalCompositeInstanceAtom(a, pcbInstance);
+          if (compositeResult) return compositeResult;
+        }
 
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:${a.property} (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                const extractedPadded = a.pad ? this.applyPad(extracted, a.pad) : extracted;
-                return {value: extractedPadded, ref: null, varName: `${a.var}:${a.property}.${varNameSuffix}`, bitWidth: extractedPadded.length};
-              }
-
-              if(a.pad){
-                const padded = this.applyPad(val, a.pad);
-                return {value: padded, ref: null, varName: `${a.var}:${a.property}`, bitWidth: padded.length};
-              }
-              return {value: val, ref: poutInfo.ref, varName: `${a.var}:${a.property}`, bitWidth: poutInfo.bits};
-            }
-            
-            // Check if it's a pin (input) - can also read pins
-            const pinInfo = pcbInstance.pinStorage.get(a.property);
-            if(pinInfo){
-              let val = this.getValueFromRef(pinInfo.ref) || '0'.repeat(pinInfo.bits);
-
-              // Handle bit range if specified
-              if(a.bitRange){
-                const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
-                if(start < 0 || actualEnd >= val.length || start > actualEnd){
-                  throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var}:${a.property} (length: ${val.length})`);
-                }
-                const extracted = val.substring(start, actualEnd + 1);
-                const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-                const extractedPadded = a.pad ? this.applyPad(extracted, a.pad) : extracted;
-                return {value: extractedPadded, ref: null, varName: `${a.var}:${a.property}.${varNameSuffix}`, bitWidth: extractedPadded.length};
-              }
-
-              if(a.pad){
-                const padded = this.applyPad(val, a.pad);
-                return {value: padded, ref: null, varName: `${a.var}:${a.property}`, bitWidth: padded.length};
-              }
-              return {value: val, ref: pinInfo.ref, varName: `${a.var}:${a.property}`, bitWidth: pinInfo.bits};
-            }
-            
-            throw Error(`Unknown property '${a.property}' for PCB instance ${a.var}. Available: ${[...pcbInstance.pinStorage.keys(), ...pcbInstance.poutStorage.keys()].join(', ')}`);
-          } else {
-            // Access PCB instance directly - return value based on returnSpec
-            const returnSpec = pcbInstance.def.returnSpec;
-            if(returnSpec){
-              // First check if return value is a declared pin/pout
-              const pinInfo = pcbInstance.pinStorage.get(returnSpec.varName);
-              const poutInfo = pcbInstance.poutStorage.get(returnSpec.varName);
-              const info = pinInfo || poutInfo;
-              if(info){
-                let val = this.getValueFromRef(info.ref) || '0'.repeat(returnSpec.bits);
-                if(a.pad) val = this.applyPad(val, a.pad);
-                return {value: val, ref: a.pad ? null : info.ref, varName: a.var, bitWidth: val.length};
-              }
-              // Fallback: use cached returnValue from last executePcbBody (for internal wires like ret)
-              if(pcbInstance.returnValue !== undefined && pcbInstance.returnValue !== null){
-                let val = String(pcbInstance.returnValue).padStart(returnSpec.bits, '0').slice(-returnSpec.bits);
-                if(a.pad) val = this.applyPad(val, a.pad);
-                return {value: val, ref: null, varName: a.var, bitWidth: val.length};
-              }
-            }
-            // No return spec or variable not found - return empty
-            let emptyVal = '0'.repeat((returnSpec && returnSpec.bits) || 1);
-            if(a.pad) emptyVal = this.applyPad(emptyVal, a.pad);
-            return {value: emptyVal, ref: null, varName: a.var};
-          }
+        const chipInstance = this.chipInstances.get(a.var);
+        if (chipInstance) {
+          const compositeResult = this._evalCompositeInstanceAtom(a, chipInstance);
+          if (compositeResult) return compositeResult;
         }
         
         const comp = this.components.get(a.var);
@@ -1561,9 +1695,14 @@ if (this.isBuiltinDEMUX(name)) {
   }
   
   postExecSrc() {
+    if (this.pendingProbeExprs && this.pendingProbeExprs.length) {
+      this.activateProbes(this.pendingProbeExprs);
+    }
     if (!this.signalPropagationStrategy) return;
+    this._probeInitialising = true;
     this.signalPropagationStrategy.initializeFromElaboration();
     this.startProc();
+    this._probeInitialising = false;
   }
   
   startProc() {
@@ -1677,6 +1816,11 @@ if (this.isBuiltinDEMUX(name)) {
         alias = name;
         name = 'pcb.' + pcb.pcbName
       }
+      const chip = this.chipInstances.get(name);
+      if(chip) {
+        alias = name;
+        name = 'chip.' + chip.chipName;
+      }
       
       if(alias.indexOf('_') > 0) {
         alias = '.'+  alias.split('_')[2];
@@ -1686,7 +1830,12 @@ if (this.isBuiltinDEMUX(name)) {
       for(const [pcbName, pcbInst] of this.pcbInstances) {
         pcbInstNames.set(pcbName, pcbInst.pcbName);
       }
-      //console.log(Array.from(pcbInstNames.entries()));
+      let chipInstNames = new Map();
+      for(const [chipInstName, chipInst] of this.chipInstances) {
+        chipInstNames.set(chipInstName, chipInst.chipName);
+      }
+
+      const compNames = pcb ? pcb.internalComponentName : (chip ? chip.internalComponentName : false);
 
       const lines = Interpreter.getDocLines(
         name, 
@@ -1695,8 +1844,10 @@ if (this.isBuiltinDEMUX(name)) {
         this.components,
         this.componentRegistry, 
         pcbInstNames,
-        this.pcbDefinitions, 
-        pcb ? pcb.internalComponentName : false
+        this.pcbDefinitions,
+        compNames,
+        chipInstNames,
+        this.chipDefinitions
       );
       for (const line of lines) {
         this.out.push(line);
@@ -1728,7 +1879,7 @@ if (this.isBuiltinDEMUX(name)) {
       // Component declaration: comp [led] .power: ...
       // Inside a PCB body, skip re-declaration if the component already exists
       // (it was created on the first execution; re-creating would reset its state)
-      if(this.insidePcbBody && this.components.has(s.comp.name)){
+      if((this.insidePcbBody || this.insideChipBody) && this.components.has(s.comp.name)){
         return;
       }
       this.execComp(s.comp);
@@ -1738,6 +1889,18 @@ if (this.isBuiltinDEMUX(name)) {
     if(s.pcbInstance){
       // PCB instance: pcb [name] .var::
       this.execPcbInstance(s.pcbInstance);
+      return;
+    }
+
+    if(s.chipInstance){
+      if(this.insideChipBody && this.chipInstances.has(s.chipInstance.instanceName)){
+        return;
+      }
+      this.execChipInstance(s.chipInstance);
+      return;
+    }
+
+    if(s.probe){
       return;
     }
 
@@ -1808,15 +1971,18 @@ if (this.isBuiltinDEMUX(name)) {
       // Get onMode from component attributes or PCB instance def (default: 'raise' for rising edge)
       const comp = this.components.get(component);
       const pcbInst = this.pcbInstances ? this.pcbInstances.get(component) : null;
+      const chipInst = this.chipInstances ? this.chipInstances.get(component) : null;
       const onMode = (comp && comp.attributes && comp.attributes.on)
         ? String(comp.attributes.on)
         : (pcbInst && pcbInst.def && pcbInst.def.on)
           ? String(pcbInst.def.on)
-          : 'raise';
+          : (chipInst && chipInst.def && chipInst.def.on)
+            ? String(chipInst.def.on)
+            : 'raise';
       
       // Store the block for re-execution when dependencies change
-      // BUT NOT when we're inside a PCB body (PCB internal blocks are executed inline)
-      if(!this.insidePcbBody){
+      // BUT NOT when we're inside a PCB/chip body (internal blocks are executed inline)
+      if(!this.insidePcbBody && !this.insideChipBody){
         const blockIndex = this.componentPropertyBlocks.length; // Unique index for this block
         this.componentPropertyBlocks.push({
           component,
@@ -2372,6 +2538,59 @@ if (s.assignment) {
       // Direct assignment to PCB instance (if no property)
       throw Error(`Cannot assign directly to PCB instance ${name}. Use ${name}:pinName = value`);
     }
+  }
+
+  if (this.chipInstances.has(name)) {
+    const instance = this.chipInstances.get(name);
+    if (property) {
+      const pinInfo = instance.pinStorage.get(property);
+      const poutInfo = instance.poutStorage.get(property);
+      if (pinInfo) {
+        const exprResult = this.evalExpr(expr, computeRefs);
+        let value = '';
+        for (const part of exprResult) {
+          if (part.value && part.value !== '-') value += part.value;
+          else if (part.ref && part.ref !== '&-') {
+            const val = this.getValueFromRef(part.ref);
+            if (val) value += val;
+          }
+        }
+        if (value.length < pinInfo.bits) value = value.padStart(pinInfo.bits, '0');
+        else if (value.length > pinInfo.bits) value = value.substring(value.length - pinInfo.bits);
+        this.setValueAtRef(pinInfo.ref, value);
+        if (property === instance.def.exec) {
+          const newBit = value[value.length - 1] || '0';
+          const prevBit = instance.lastExecValue || '0';
+          let shouldExecute = false;
+          const onMode = instance.def.on || 'raise';
+          if (onMode === 'raise' || onMode === 'rising') shouldExecute = (prevBit === '0' && newBit === '1');
+          else if (onMode === 'edge' || onMode === 'falling') shouldExecute = (prevBit === '1' && newBit === '0');
+          else if (onMode === '1' || onMode === 'level') shouldExecute = (newBit === '1') && (newBit !== prevBit);
+          if (shouldExecute) {
+            this.executeChipBody(name, instance.def.body);
+            this.reEvalWiresDependingOnChip(name);
+          }
+          instance.lastExecValue = newBit;
+        }
+        return;
+      } else if (poutInfo) {
+        const exprResult = this.evalExpr(expr, computeRefs);
+        let value = '';
+        for (const part of exprResult) {
+          if (part.value && part.value !== '-') value += part.value;
+          else if (part.ref && part.ref !== '&-') {
+            const val = this.getValueFromRef(part.ref);
+            if (val) value += val;
+          }
+        }
+        if (value.length < poutInfo.bits) value = value.padStart(poutInfo.bits, '0');
+        else if (value.length > poutInfo.bits) value = value.substring(value.length - poutInfo.bits);
+        this.setValueAtRef(poutInfo.ref, value);
+        return;
+      }
+      throw Error(`Unknown property '${property}' for chip instance ${name}`);
+    }
+    throw Error(`Cannot assign directly to chip instance ${name}. Use ${name}:pinName = value`);
   }
 
   // Check if it's a component first
@@ -3093,6 +3312,7 @@ if (s.assignment) {
             this.wireStorageMap.set(wireName, storageIdx);
           }
           wire.ref = `&${storageIdx}`;
+          this._emitProbeForWire(wireName, wireValue);
         }
       } catch(e){
         console.log(`[DEBUG execWireStmt] ERROR in assignment '${wireName}':`, e.message);
@@ -3186,6 +3406,7 @@ if (s.assignment) {
         if(this.wires.has(d.name)){
           this.wires.get(d.name).ref = simpleRef;
         }
+        this._emitProbeForWire(d.name, wireValue || '0'.repeat(bits));
       }
       
       bitOffset += bits;
@@ -4204,6 +4425,14 @@ if (s.assignment) {
     if(renamed.comp && renamed.comp.name){
       renamed.comp.name = renameComp(renamed.comp.name);
     }
+
+    if (renamed.chipInstance && renamed.chipInstance.instanceName) {
+      renamed.chipInstance.instanceName = renameComp(renamed.chipInstance.instanceName);
+    }
+
+    if (renamed.pcbInstance && renamed.pcbInstance.instanceName) {
+      renamed.pcbInstance.instanceName = renameComp(renamed.pcbInstance.instanceName);
+    }
     
     // Rename component property assignments
     if(renamed.compAssign && renamed.compAssign.component){
@@ -4253,7 +4482,7 @@ if (s.assignment) {
       const parts = obj.var.split(':');
       const compName = parts[0];
       // Only rename if it's not a pin or pout name
-      const instance = [...this.pcbInstances.values()].find(i => i.internalPrefix === prefix);
+      const instance = [...this.pcbInstances.values(), ...this.chipInstances.values()].find(i => i.internalPrefix === prefix);
       if(instance){
         const isPinOrPout = instance.pinStorage.has(compName.substring(1)) || 
                            instance.poutStorage.has(compName.substring(1));
@@ -4415,10 +4644,20 @@ if (s.assignment) {
   // Execute a property block - set all properties in order
   // block: the componentPropertyBlocks entry (optional, passed during re-execution)
   executePropertyBlock(component, properties, reEvaluate, block){
+    const onMode = block && block.onMode ? String(block.onMode) : null;
+    const isEdgeMode = onMode === 'raise' || onMode === 'edge' || onMode === 'rising' || onMode === 'falling';
+    const useEdgeProbe = !!(reEvaluate && block && isEdgeMode);
+    if (useEdgeProbe) this.probeReasonContext = 'edge_block';
+    try {
     // Check if it's a PCB instance first
     const pcbInstance = this.pcbInstances.get(component);
     if(pcbInstance){
       return this.executePcbPropertyBlock(component, pcbInstance, properties, reEvaluate, block);
+    }
+
+    const chipInstance = this.chipInstances.get(component);
+    if(chipInstance){
+      return this.executeChipPropertyBlock(component, chipInstance, properties, reEvaluate, block);
     }
 
     const comp = this.components.get(component);
@@ -4909,6 +5148,9 @@ if (s.assignment) {
         this.updateConnectedComponents(targetName, outValue);
       }
     }
+    } finally {
+      if (useEdgeProbe) this.probeReasonContext = 'normal';
+    }
   }
   
   // Execute a PCB property block - handle pin assignments, pout>= and set trigger
@@ -5144,6 +5386,251 @@ if (s.assignment) {
 
     for (const ws of this.wireStatements) {
       publishFromWs(ws);
+    }
+  }
+
+  reEvalWiresDependingOnChip(instanceName) {
+    this.reEvalWiresDependingOnPcb(instanceName);
+  }
+
+  execChipInstance(inst) {
+    const { chipName, instanceName } = inst;
+    const def = this.chipDefinitions.get(chipName);
+    if (!def) {
+      throw Error(`Chip '${chipName}' is not defined. Available chips: ${[...this.chipDefinitions.keys()].join(', ')}`);
+    }
+
+    const prefix = instanceName.substring(1);
+    const pinStorage = new Map();
+    const poutStorage = new Map();
+
+    for (const pin of def.pins) {
+      const initialValue = '0'.repeat(pin.bits);
+      const storageIdx = this.storeValue(initialValue);
+      pinStorage.set(pin.name, { bits: pin.bits, storageIdx, ref: `&${storageIdx}` });
+    }
+
+    for (const pout of def.pouts) {
+      const initialValue = '0'.repeat(pout.bits);
+      const storageIdx = this.storeValue(initialValue);
+      poutStorage.set(pout.name, { bits: pout.bits, storageIdx, ref: `&${storageIdx}` });
+    }
+
+    const instanceInfo = {
+      chipName,
+      def,
+      pinStorage,
+      poutStorage,
+      internalPrefix: `_${prefix}`,
+      lastExecValue: '0'
+    };
+    this.chipInstances.set(instanceName, instanceInfo);
+    this.executeChipBody(instanceName, def.body);
+  }
+
+  executeChipBody(instanceName, statements) {
+    const instance = this.chipInstances.get(instanceName);
+    if (!instance) return;
+
+    const { def, pinStorage, poutStorage, internalPrefix } = instance;
+
+    const savedVars = new Map(this.vars);
+    const savedWires = new Map(this.wires);
+    const savedComponents = new Map(this.components);
+    const savedChipInstances = new Map(this.chipInstances);
+    const savedInsideChipBody = this.insideChipBody;
+    const savedCurrentChipInstance = this.currentChipInstance;
+
+    this.insideChipBody = true;
+    this.currentChipInstance = instanceName;
+
+    for (const [pinName, pinInfo] of pinStorage) {
+      this.wires.set(pinName, { type: `${pinInfo.bits}wire`, ref: pinInfo.ref, initOnly: true });
+      if (pinInfo.ref && pinInfo.ref.startsWith('&')) {
+        this.wireStorageMap.set(pinName, parseInt(pinInfo.ref.slice(1), 10));
+      }
+    }
+
+    for (const [poutName, poutInfo] of poutStorage) {
+      this.wires.set(poutName, { type: `${poutInfo.bits}wire`, ref: poutInfo.ref, initOnly: true });
+      if (poutInfo.ref && poutInfo.ref.startsWith('&')) {
+        this.wireStorageMap.set(poutName, parseInt(poutInfo.ref.slice(1), 10));
+      }
+    }
+
+    if (instance.internalBodyWires) {
+      for (const [k, v] of instance.internalBodyWires) {
+        this.wires.set(k, { type: v.type, ref: v.ref, initOnly: true });
+        if (v.ref && v.ref.startsWith('&')) {
+          this.wireStorageMap.set(k, parseInt(v.ref.slice(1), 10));
+        }
+      }
+    }
+
+    for (const stmt of statements) {
+      const renamedStmt = this.renamePcbStatement(stmt, internalPrefix);
+      this.exec(renamedStmt, true);
+    }
+    this.postExecBody();
+
+    if (this.deferWirePropagation() && this.signalPropagationStrategy) {
+      this.signalPropagationStrategy.propagate();
+    }
+
+    for (const [poutName, poutInfo] of poutStorage) {
+      const currentWire = this.wires.get(poutName);
+      const value = currentWire ? this.getValueFromRef(currentWire.ref) : null;
+      if (value) this.setValueAtRef(poutInfo.ref, value);
+    }
+
+    if (def.returnSpec) {
+      const retVarName = def.returnSpec.varName;
+      const retWire = this.wires.get(retVarName) || null;
+      const retVar = this.vars.get(retVarName) || null;
+      let retValue = null;
+      if (retWire && retWire.ref) retValue = this.getValueFromRef(retWire.ref);
+      else if (retVar && retVar.value) retValue = retVar.value;
+      if (retValue !== null) instance.returnValue = retValue;
+    }
+
+    instance.internalComponentName = new Map();
+    for (const [compName, compInfo] of this.components) {
+      if (compName.startsWith('.' + internalPrefix + '_')) {
+        savedComponents.set(compName, compInfo);
+        instance.internalComponentName.set(compName.replace('.' + internalPrefix + '_', '.'), 'comp.' + compInfo.type);
+      }
+    }
+    for (const [chipInstName, chipInst] of this.chipInstances) {
+      if (chipInstName.startsWith('.' + internalPrefix + '_')) {
+        savedChipInstances.set(chipInstName, chipInst);
+        instance.internalComponentName.set(chipInstName.replace('.' + internalPrefix + '_', '.'), 'chip.' + chipInst.chipName);
+      }
+    }
+
+    instance.internalBodyWires = new Map();
+    for (const [k, v] of this.wires) {
+      if (!savedWires.has(k) && !pinStorage.has(k) && !poutStorage.has(k)) {
+        instance.internalBodyWires.set(k, { type: v.type, ref: v.ref });
+      }
+    }
+
+    this.vars = savedVars;
+    this.wires = savedWires;
+    for (const pinName of pinStorage.keys()) this.wireStorageMap.delete(pinName);
+    for (const poutName of poutStorage.keys()) this.wireStorageMap.delete(poutName);
+    if (instance.internalBodyWires) {
+      for (const k of instance.internalBodyWires.keys()) this.wireStorageMap.delete(k);
+    }
+    this.components = savedComponents;
+    this.chipInstances = savedChipInstances;
+    this.insideChipBody = savedInsideChipBody;
+    this.currentChipInstance = savedCurrentChipInstance;
+  }
+
+  executeChipPropertyBlock(instanceName, instance, properties, reEvaluate, block) {
+    const def = instance.def;
+    let shouldTriggerExec = false;
+
+    for (const prop of properties) {
+      const property = prop.property;
+      if (property === 'pout>') continue;
+
+      if (property === 'set') {
+        const expr = prop.expr;
+        let value = '';
+        if (expr && expr.length === 1 && expr[0].var === '~') {
+          value = '~';
+        } else if (expr) {
+          const exprResult = this.evalExpr(expr, false);
+          for (const part of exprResult) {
+            if (part.value && part.value !== '-') value += part.value;
+            else if (part.ref && part.ref !== '&-') {
+              const val = this.getValueFromRef(part.ref);
+              if (val) value += val;
+            }
+          }
+        }
+        if (value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
+          shouldTriggerExec = true;
+        }
+        continue;
+      }
+
+      const pinInfo = instance.pinStorage.get(property);
+      if (pinInfo) {
+        const exprResult = this.evalExpr(prop.expr, false);
+        let value = '';
+        for (const part of exprResult) {
+          if (part.value && part.value !== '-') value += part.value;
+          else if (part.ref && part.ref !== '&-') {
+            const val = this.getValueFromRef(part.ref);
+            if (val) value += val;
+          }
+        }
+        if (value.length < pinInfo.bits) value = value.padStart(pinInfo.bits, '0');
+        else if (value.length > pinInfo.bits) value = value.substring(value.length - pinInfo.bits);
+        this.setValueAtRef(pinInfo.ref, value);
+        continue;
+      }
+
+      const poutInfo = instance.poutStorage.get(property);
+      if (poutInfo) {
+        const exprResult = this.evalExpr(prop.expr, false);
+        let value = '';
+        for (const part of exprResult) {
+          if (part.value && part.value !== '-') value += part.value;
+          else if (part.ref && part.ref !== '&-') {
+            const val = this.getValueFromRef(part.ref);
+            if (val) value += val;
+          }
+        }
+        if (value.length < poutInfo.bits) value = value.padStart(poutInfo.bits, '0');
+        else if (value.length > poutInfo.bits) value = value.substring(value.length - poutInfo.bits);
+        this.setValueAtRef(poutInfo.ref, value);
+        continue;
+      }
+
+      throw Error(`Unknown property '${property}' for chip instance ${instanceName}. Available pins: ${[...instance.pinStorage.keys()].join(', ')}. Available pouts: ${[...instance.poutStorage.keys()].join(', ')}`);
+    }
+
+    if (shouldTriggerExec) {
+      const onMode = def.on || 'raise';
+      let shouldExecute = false;
+
+      if (onMode === '1' || onMode === 'level') {
+        shouldExecute = true;
+      } else if (onMode === 'raise' || onMode === 'rising') {
+        const prevBit = block ? (block.lastExecValue || '0') : (instance.lastExecValue || '0');
+        shouldExecute = (prevBit === '0');
+        if (block) block.lastExecValue = '1';
+        else instance.lastExecValue = '1';
+      }
+
+      if (shouldExecute) {
+        this.executeChipBody(instanceName, def.body);
+        this.reEvalWiresDependingOnChip(instanceName);
+        if (typeof showVars === 'function') showVars();
+      }
+    }
+
+    for (const prop of properties) {
+      if (prop.property === 'pout>') {
+        const poutName = prop.poutName;
+        const target = prop.target;
+        const poutInfo = instance.poutStorage.get(poutName);
+        if (!poutInfo) {
+          throw Error(`Unknown pout '${poutName}' for chip instance ${instanceName}`);
+        }
+        const poutValue = this.getValueFromRef(poutInfo.ref) || '0'.repeat(poutInfo.bits);
+        const targetName = target.var;
+        const wire = this.wires.get(targetName);
+        if (!wire) throw Error(`Wire ${targetName} not found for ${poutName}>= assignment`);
+        const bits = this.getBitWidth(wire.type);
+        let getValue = poutValue;
+        if (getValue.length < bits) getValue = getValue.padStart(bits, '0');
+        else if (getValue.length > bits) getValue = getValue.substring(getValue.length - bits);
+        this.publishWireValue(targetName, getValue);
+      }
     }
   }
 
@@ -7094,7 +7581,7 @@ Interpreter.BUILTIN_DOC = {
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
 };
 
-Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames) {
+Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions) {
   // ---- doc(def) — list all built-in functions and user-defined functions ----
   if (name === 'def') {
     const builtinNames = Object.keys(Interpreter.BUILTIN_DOC);
@@ -7198,7 +7685,30 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     if (!pcbDefinitions || !pcbDefinitions.has(pcbName)) return [`${name}: tip PCB nedefinit`];
     const def = pcbDefinitions.get(pcbName);
     return Interpreter.formatPcbDef(alias, pcbName, def, pcbCompNames);
-    
+  }
+
+  // ---- doc(chip) — list all user-defined chip types ----
+  if (name === 'chip') {
+    if (!chipDefinitions || chipDefinitions.size === 0) return ['(no chip types defined)'];
+    let lines = [...chipDefinitions.keys()].map(k => `chip.${k}`);
+    if (!chipInstNames || chipInstNames.size === 0) {
+      lines.push('(no user defined chip)');
+    } else {
+      lines.push('');
+      lines.push('User defined chip:');
+      for (const [instName, chipType] of chipInstNames) {
+        lines.push(`${instName} (chip.${chipType})`);
+      }
+    }
+    return lines;
+  }
+
+  // ---- doc(chip.type) ----
+  if (name.startsWith('chip.')) {
+    const chipName = name.slice(5);
+    if (!chipDefinitions || !chipDefinitions.has(chipName)) return [`${name}: tip chip nedefinit`];
+    const def = chipDefinitions.get(chipName);
+    return Interpreter.formatChipDef(alias, chipName, def, pcbCompNames);
   }
 
   // ---- Static builtin function table ----
@@ -7287,6 +7797,32 @@ Interpreter.formatPcbDef = function(alias, name, def, compNames) {
     lines.push('Sub components:');
     for (const [compName, compType] of (compNames || [])) {
       lines.push(` ${alias}${compName} (comp.${compType})`);
+    }
+  }
+  return lines;
+};
+
+Interpreter.formatChipDef = function(alias, name, def, compNames) {
+  const lines = [];
+  lines.push(`chip [${name}] ${alias}:`);
+  if (def.exec) lines.push(`  exec: ${def.exec}`);
+  lines.push(`  on: raise/edge/1/0`);
+  lines.push('  :{');
+  for (const pin of (def.pins || [])) {
+    lines.push(`    ${pin.bits}pin ${pin.name}`);
+  }
+  for (const pout of (def.pouts || [])) {
+    lines.push(`    ${pout.bits}pout ${pout.name}`);
+  }
+  lines.push('  }');
+  if (def.returnSpec) {
+    lines.push(`  -> ${def.returnSpec.bits}bit`);
+  }
+  if (compNames) {
+    lines.push('');
+    lines.push('Sub components:');
+    for (const [compName, compType] of (compNames || [])) {
+      lines.push(` ${alias}${compName} (${compType})`);
     }
   }
   return lines;

@@ -31,6 +31,7 @@ const files = [
   'core/components/rotary.js',
   'core/components/pcb-component.js',
   'core/components/index.js',
+  'devices/mem-devices.js',
   'core/parser.js',
   'core/interpreter.js',
   'core/signal-propagation.js',
