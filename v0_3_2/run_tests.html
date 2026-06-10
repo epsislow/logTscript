@@ -108,8 +108,9 @@ h1 {
 }
 .group-title-line {
   display: flex;
-  align-items: baseline;
-  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 4px;
 }
 .group-toggle {
   flex-shrink: 0;
@@ -159,6 +160,62 @@ h1 {
   padding: 2px 8px;
   border: 1px solid #333;
   border-radius: 999px;
+}
+.prop-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.prop-badge--legacy {
+  color: #5c8;
+  background: #1a2e1a;
+  border-color: #3a5a3a;
+}
+.prop-badge--wave {
+  color: #fa0;
+  background: #2e2210;
+  border-color: #5a4018;
+}
+.prop-badge--mixed {
+  color: #5ce;
+  background: #10282e;
+  border-color: #2a5a66;
+}
+.prop-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #888;
+  margin-left: 4px;
+}
+.prop-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.prop-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.prop-legend-swatch--legacy {
+  background: #1a2e1a;
+  border-color: #5c8;
+}
+.prop-legend-swatch--wave {
+  background: #2e2210;
+  border-color: #fa0;
+}
+.prop-legend-swatch--mixed {
+  background: #10282e;
+  border-color: #5ce;
 }
 .dot {
   flex-shrink: 0;
@@ -217,6 +274,11 @@ h1 {
   <div id="toolbar">
     <button type="button" id="btnRunAll" class="btn btn--primary">Run All</button>
     <span id="summary">Passed: 0 | Failed: 0 | Pending: 0</span>
+    <span class="prop-legend" aria-label="Propagation mode legend">
+      <span class="prop-legend-item"><span class="prop-legend-swatch prop-legend-swatch--legacy"></span>legacy</span>
+      <span class="prop-legend-item"><span class="prop-legend-swatch prop-legend-swatch--wave"></span>wave</span>
+      <span class="prop-legend-item"><span class="prop-legend-swatch prop-legend-swatch--mixed"></span>mixed</span>
+    </span>
   </div>
   <div id="testList"></div>
   <div id="bottom-toolbar">

@@ -852,13 +852,7 @@ comp [key] .btn:
   data = 0000
   set = btn
 }`);
-  const btnComp = interp.components.get('.btn');
-  if (btnComp && btnComp.ref) {
-    const idx = parseInt(btnComp.ref.slice(1));
-    const stored = interp.storage.find(s => s.index === idx);
-    if (stored) stored.value = '1';
-  }
-  interp.updateComponentConnections('.btn');
+  session.setComp(interp, '.btn', '1');
   h.assert('510 blocul cu blockIndex mare se executa dupa cel cu blockIndex mic', session.getPcbPout(interp, '.t', 'val'), '0000');
 });
 
@@ -896,13 +890,7 @@ comp [key] .k:
   data = 1000
   set = .k
 }`);
-  const kComp = interp.components.get('.k');
-  if (kComp && kComp.ref) {
-    const idx = parseInt(kComp.ref.slice(1));
-    const stored = interp.storage.find(s => s.index === idx);
-    if (stored) stored.value = '1';
-  }
-  interp.updateComponentConnections('.k');
+  session.setComp(interp, '.k', '1');
   h.assert('511 ultimul bloc din sursa castiga (data=1000)', session.getPcbPout(interp, '.o', 'val'), '1000');
 });
 
@@ -1083,6 +1071,20 @@ length:4
 8wire x = .m:get;8`));
   h.assert('515 .mem = d multi-adresa (adresa 0 = 11110000)', session.getWire(interp, 'x'), '11110000');
 });
+
+function regPcbWave(id, legacyId, title, run) {
+  reg(id, 'pcb', title + ' (wave)', run, { propagation: 'wave' });
+}
+
+const _pcbWavePairs = [
+  [500, 516], [501, 517], [502, 518], [503, 519], [504, 520], [505, 521],
+  [506, 522], [507, 523], [508, 524], [509, 525], [510, 526], [511, 527],
+  [512, 528], [513, 529], [514, 530], [515, 531]
+];
+for (const [legacyId, waveId] of _pcbWavePairs) {
+  const t = suite.getTest(legacyId);
+  if (t) regPcbWave(waveId, legacyId, t.title, t.run);
+}
 
 reg(600, 'signal', 'wire simplu — propagare cascadat prin assignment', function(h, session) {
   const { interp } = session.run(`

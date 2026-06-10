@@ -1548,10 +1548,6 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
     }
   }
 
-  if (skipWireCascade) {
-    return;
-  }
-  
   // Find all wires that depend on this wire (cascade propagation)
   const dependentWires = new Set();
   const isWire = this.wires.has(varName);
@@ -1566,7 +1562,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
   
   // console.log(`[DEBUG updateConnected] '${varName}' isWire=${isWire}, wireStatements.length=${this.wireStatements.length}`);
   
-  if(isWire && !this.deferWirePropagation()){
+  if(isWire && !this.deferWirePropagation() && !skipWireCascade){
     // Find all wires that depend on varName
     for(const ws of this.wireStatements){
       const expr = ws.assignment ? ws.assignment.expr : ws.expr;

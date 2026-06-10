@@ -112,7 +112,22 @@ In practice, use `show` for display and `peek` only when you deliberately need a
 
 ## PCB and property blocks
 
-Programs that use **PCB** instances and `on:1` / `set = ...` property blocks follow the same propagation rules for wires **inside** and **outside** the PCB. Complex PCB timing is documented with PCB examples in the test suite; for day-to-day use, treat PCB pins and pouts like ordinary wires once the PCB has run.
+Programs that use **PCB** instances and property blocks (`.instance:{ data=… set=wire on:1 }`) work on **Wave** the same way as on Legacy for everything **outside** the PCB:
+
+| Area | Wave behaviour |
+|------|----------------|
+| **External wires** (`4wire q = .e`, `4wire out = .p:pout`) | Updated through wave propagation after the PCB runs or after a trigger (`setWire`, switch, key). |
+| **PCB pins** (`setWire` on an input pin) | Can fire property blocks with `on:1` / `set = …`; dependent external wires settle in the same propagation step. |
+| **PCB pouts** | Output pins publish to external wires via wave scheduling (not a direct storage write). |
+| **Inside the PCB body** | Still runs in the older immediate model (`insidePcbBody`). Internal wires are not wave-deferred. |
+
+**What this means for you:**
+
+- Connect a PCB to the outside world as usual — pins, pouts, and `4wire … = .instance:pin` expressions behave like normal combinational links once propagation finishes.
+- Interactive triggers (`setWire`, toggling a switch or key wired to `set=`) update external wires after the PCB block runs, in one settled step.
+- A wire declared earlier in the same **RUN** (e.g. `4wire d = 1010` then `comp [mem] … = d`) is visible to component init and `.mem = d` on Wave — values are scheduled during elaboration before dependent statements run.
+
+For examples and edge cases, see PCB tests **500–515** (legacy) and **516–531** (wave) in the test runner.
 
 ---
 

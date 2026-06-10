@@ -1,8 +1,28 @@
 # Interactive components
 
-**Switch**, **key**, and **dip** are input components you control from the devices panel while the program is running. Their values feed into wires and logic — when you flip a switch, press a key, or change a DIP, connected wires update automatically.
+**Switch**, **key**, **dip**, and **rotary** are input components you control from the devices panel while the program is running. Their values feed into wires and logic — when you flip a switch, press a key, change a DIP position, or turn a rotary knob, connected wires update automatically.
 
 See [signal-propagation.md](signal-propagation.md) for how those updates spread through your circuit.
+
+The **oscillator** (`osc`) also drives wires in real time, but it is **not** a panel control — it runs on its own timer. See [oscillator.md](oscillator.md).
+
+---
+
+## Panel callbacks (press vs toggle)
+
+Inside the engine, each panel control uses a small callback when you interact with it. You do not write these callbacks in LogTScript; they are wired up when the component is created.
+
+| Component | UI callback | When it runs |
+|-----------|-------------|--------------|
+| `key` | **`onPress`** | Mouse/touch down — output becomes `1` |
+| `key` | **`onRelease`** | Mouse/touch up — output returns to `0` |
+| `switch` | `onChange` | Each time you toggle the control |
+| `dip` | `onChange` | Each time you flip one DIP position (`index`, `checked`) |
+| `rotary` | `onChange` | When the selected **state** changes (drag or step the knob) |
+
+**Only `key` uses `onPress` / `onRelease`.** All other panel inputs above use `onChange` (or, for the oscillator, automatic HIGH/LOW transitions — not user clicks).
+
+From your script’s point of view, the effect is the same: wires that read `.name:get` (or `.name` where supported) are updated through signal propagation after the interaction.
 
 ---
 
@@ -27,11 +47,11 @@ After **RUN**, `on` is `0` and `off` is `1`. Toggle the switch in the panel and 
 
 | Form | Width | Description |
 |------|-------|-------------|
-| `.name` | 1 bit (switch, key) or N bits (dip) | Direct value |
+| `.name` | 1 bit (switch, key) or multi-bit (dip, rotary) | Direct value |
 | `.name:get` | Same | Explicit read (equivalent for these components) |
 | `.name.N` | 1 bit | Single bit `N` of a **dip** only (leftmost = `0`) |
 
-Use a wire width that matches the component: `1wire` for switch and key, `Nwire` for a dip with `length: N`.
+Use a wire width that matches the component: `1wire` for switch and key, `Nwire` for a dip with `length: N`, and `ceil(log₂(states))` bits for a rotary with `states: N` (e.g. `states: 8` → `3wire`).
 
 ---
 
@@ -285,13 +305,113 @@ comp [adder] .add:
 
 ---
 
+## Rotary knob
+
+A **rotary selector**: drag vertically on the knob (or use touch) to pick one of several discrete **states**. Each state is a small integer encoded as binary on the output.
+
+### Syntax
+
+```
+comp [rotary] .name:
+  text: 'Select'
+  states: 8
+  color: ^6dff9c
+  for.0: 'A'
+  for.1: 'B'
+  for.2: 'C'
+  nl
+  :
+```
+
+Minimal form (8 states, 3 output bits):
+
+```
+comp [rotary] .name::
+```
+
+### Attributes
+
+| Attribute | Type    | Default   | Description |
+|-----------|---------|-----------|-------------|
+| `text`    | string  | `''`      | Label next to the knob |
+| `states`  | integer | `8`       | Number of positions (minimum `2`) |
+| `color`   | hex     | `#6dff9c` | Accent color on the knob |
+| `for.N`   | string  | —         | Optional label shown for state `N` (`for.0`, `for.1`, …) |
+| `nl`      | flag    | (no)      | Newline after the control |
+
+### Output
+
+- **`ceil(log₂(states))` bits** — binary index of the current state, left-padded with zeros
+- State `0` is the first position; state `states - 1` is the last
+- Examples: `states: 4` → `2wire`, values `00`…`11`; `states: 8` → `3wire`, values `000`…`111`
+- Starts at state `0` (all zeros on the output) after **RUN** unless initialized with `=`
+
+### Interaction
+
+- **Drag** up/down on the knob to change state; each new state fires `onChange` and updates wires
+- Unlike a **key**, the value **stays** at the selected state when you release the mouse — similar to a **switch**, but with more than two positions
+- You can also drive the knob from logic with a property block: `set = 1` and `data = …` (see `doc(comp.rotary)`)
+
+### Examples
+
+**Wire follows the knob**
+
+```
+comp [rotary] .sel:
+  text: 'Channel'
+  states: 4
+  for.0: '0'
+  for.1: '1'
+  for.2: '2'
+  for.3: '3'
+  :
+
+2wire channel = .sel:get
+```
+
+**Labeled modes (e.g. calculator operator)**
+
+```
+comp [rotary] .op:
+  text: 'Op'
+  states: 4
+  for.0: '+'
+  for.1: '-'
+  for.2: 'x'
+  for.3: ':'
+  :
+
+2wire op = .op:get
+```
+
+**MUX driven by rotary position**
+
+```
+comp [rotary] .rr:
+  states: 4
+  :
+
+2wire rr = .rr:get
+4wire choice = MUX(.rr, default, pathA, pathB, pathC, pathD)
+```
+
+### Notes
+
+- Match wire width to `ceil(log₂(states))`, not to `states` itself.
+- For exactly two positions, a **switch** is simpler; use **rotary** when you need 3+ named or numbered choices in one control.
+- Panel interaction uses `onChange`, not `onPress` / `onRelease`.
+
+---
+
 ## Comparison
 
-| Component | Bits | User action | Value while idle |
-|-----------|------|-------------|------------------|
-| `switch`  | 1    | Toggle      | Stays `0` or `1` |
-| `key`     | 1    | Press/release | `0` |
-| `dip`     | N    | Flip each position | Holds last pattern |
+| Component | Bits | User action | Panel callback | Value while idle |
+|-----------|------|-------------|----------------|------------------|
+| `switch`  | 1    | Toggle      | `onChange`     | Stays `0` or `1` |
+| `key`     | 1    | Press/release | **`onPress` / `onRelease`** | `0` |
+| `dip`     | N    | Flip each position | `onChange` | Holds last pattern |
+| `rotary`  | `ceil(log₂(states))` | Drag / step knob | `onChange` | Holds last state |
+| `osc`     | 1 (+ counter) | *(automatic timer)* | HIGH/LOW ticks | Oscillates — see [oscillator.md](oscillator.md) |
 
 ---
 
@@ -301,6 +421,7 @@ comp [adder] .add:
 doc(comp.switch)
 doc(comp.key)
 doc(comp.dip)
+doc(comp.rotary)
 ```
 
 ---
@@ -308,5 +429,6 @@ doc(comp.dip)
 ## Related documentation
 
 - [Signal propagation](signal-propagation.md) — when wires update after UI changes
+- [Oscillator](oscillator.md) — real-time `osc` (not a panel button, but live wire driver)
 - [LED](led.md) — displaying values driven by switches and keys
 - [doc() function](doc-function.md) — full `doc(comp.*)` listing

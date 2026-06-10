@@ -222,6 +222,34 @@
       .map(entryForTest);
   }
 
+  /** legacy | wave | mixed | null (no ported tests in group) */
+  function groupPropagationMode(tests) {
+    let hasLegacy = false;
+    let hasWave = false;
+    for (const test of tests) {
+      if (!test.run) continue;
+      if (test.propagation === 'wave') hasWave = true;
+      else hasLegacy = true;
+    }
+    if (!hasLegacy && !hasWave) return null;
+    if (hasLegacy && hasWave) return 'mixed';
+    if (hasWave) return 'wave';
+    return 'legacy';
+  }
+
+  function createPropBadge(mode) {
+    const propBadge = document.createElement('span');
+    propBadge.className = 'prop-badge prop-badge--' + mode;
+    propBadge.textContent = mode;
+    const titles = {
+      legacy: 'Signal propagation: legacy',
+      wave: 'Signal propagation: wave',
+      mixed: 'Signal propagation: mixed (legacy + wave)'
+    };
+    propBadge.title = titles[mode] || titles.legacy;
+    return propBadge;
+  }
+
   function allTests() {
     return manifest.entries.map(entryForTest);
   }
@@ -234,6 +262,9 @@
     updateSummary();
 
     for (const group of manifest.groups) {
+      const groupTests = testsForGroup(group);
+      const groupPropMode = groupPropagationMode(groupTests);
+
       const section = document.createElement('div');
       section.className = 'test-group collapsed';
       section.dataset.group = group.id;
@@ -261,6 +292,9 @@
       titleLine.appendChild(toggle);
       titleLine.appendChild(title);
       titleLine.appendChild(range);
+      if (groupPropMode) {
+        titleLine.appendChild(createPropBadge(groupPropMode));
+      }
 
       const groupSummary = document.createElement('div');
       groupSummary.className = 'group-summary';
@@ -293,7 +327,6 @@
       header.appendChild(btnGroup);
       section.appendChild(header);
 
-      const groupTests = testsForGroup(group);
       for (const test of groupTests) {
         const row = document.createElement('div');
         row.className = 'test-row' + (test.run ? '' : ' not-ported');
@@ -314,6 +347,11 @@
         titleSpan.textContent = 'Test ' + test.id + ': ' + test.title;
 
         body.appendChild(titleSpan);
+
+        if (test.run) {
+          const mode = test.propagation === 'wave' ? 'wave' : 'legacy';
+          body.appendChild(createPropBadge(mode));
+        }
 
         if (test.run) {
           const btnRun = document.createElement('button');

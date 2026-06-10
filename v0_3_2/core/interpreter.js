@@ -135,6 +135,36 @@ class Interpreter {
     return true;
   }
 
+  publishWireValue(wireName, value) {
+    const wire = this.wires.get(wireName);
+    if (!wire || value === null || value === undefined) return;
+
+    const bits = this.getBitWidth(wire.type);
+    let v = String(value);
+    if (bits) {
+      if (v.length < bits) v = v.padStart(bits, '0');
+      else if (v.length > bits) v = v.substring(v.length - bits);
+    }
+
+    if (this.deferWirePropagation() && this.signalPropagationStrategy) {
+      if (this.scheduleWireChange(wireName, v)) {
+        this.signalPropagationStrategy.propagate();
+      }
+      return;
+    }
+
+    if (wire.ref && wire.ref !== '&-') {
+      this.setValueAtRef(wire.ref, v);
+    } else {
+      const storageIdx = this.storeValue(v);
+      wire.ref = `&${storageIdx}`;
+      if (!this.wireStorageMap.has(wireName)) {
+        this.wireStorageMap.set(wireName, storageIdx);
+      }
+    }
+    this.updateConnectedComponents(wireName, v);
+  }
+
   getComponentStableValue(compName) {
     const comp = this.components.get(compName);
     if (!comp || !comp.ref || comp.ref === '&-') return null;
@@ -2544,6 +2574,10 @@ if (s.assignment) {
 
   if (isWire && !range && this.deferWirePropagation()) {
     this.trackWireStatement(s);
+    const pendingOutputs = this.execWireStatement(s, true);
+    for (const [wName, wVal] of pendingOutputs) {
+      this.scheduleWireChange(wName, wVal);
+    }
     return;
   }
 
@@ -2797,6 +2831,12 @@ if (s.assignment) {
       }
       if (allWires) {
         this.trackWireStatement(s);
+        if (s.expr || s.assignment) {
+          const pendingOutputs = this.execWireStatement(s, true);
+          for (const [wName, wVal] of pendingOutputs) {
+            this.scheduleWireChange(wName, wVal);
+          }
+        }
         return;
       }
     }
@@ -3191,8 +3231,8 @@ if (s.assignment) {
     if(initialValue && typeof initialValue === 'object' && initialValue.varRef){
       const varName = initialValue.varRef;
       const wire = this.wires.get(varName);
-      if(wire && wire.ref){
-        const resolved = this.getValueFromRef(wire.ref);
+      if(wire){
+        const resolved = this.getWireEffectiveValue(varName);
         if(resolved !== null) initialValue = resolved;
         else throw Error(`Wire '${varName}' has no value yet at component declaration '${name}'`);
       } else {
@@ -5053,26 +5093,7 @@ if (s.assignment) {
           getValue = getValue.substring(getValue.length - bits);
         }
 
-        // Update wire storage
-        if(wire.ref){
-          const refMatch = wire.ref.match(/^&(\d+)/);
-          if(refMatch){
-            const storageIdx = parseInt(refMatch[1]);
-            const stored = this.storage.find(s => s.index === storageIdx);
-            if(stored){
-              stored.value = getValue;
-              this.updateConnectedComponents(targetName, getValue);
-            }
-          }
-        } else {
-          // Wire has no ref yet - create storage and set ref
-          const storageIdx = this.storeValue(getValue);
-          wire.ref = `&${storageIdx}`;
-          if(!this.wireStorageMap.has(targetName)){
-            this.wireStorageMap.set(targetName, storageIdx);
-          }
-          this.updateConnectedComponents(targetName, getValue);
-        }
+        this.publishWireValue(targetName, getValue);
       }
     }
   }
@@ -5089,40 +5110,62 @@ if (s.assignment) {
       return false;
     };
 
-    for(const ws of this.wireStatements){
-      // Wire statements have shape: { decls: [{name, type}], expr: [...] }
-      if(!ws.decls || !ws.expr) continue;
-      if(!checkExpr(ws.expr)) continue;
+    const publishFromWs = (ws) => {
+      const expr = ws.assignment ? ws.assignment.expr : ws.expr;
+      if (!expr || !checkExpr(expr)) return;
 
-      // Re-evaluate for each declared wire in this statement
-      for(const d of ws.decls){
-        const wireName = d.name;
+      if (ws.assignment) {
+        const wireName = ws.assignment.target.var;
         const wire = this.wires.get(wireName);
-        if(!wire) continue;
-
+        if (!wire) return;
         const bits = this.getBitWidth(wire.type);
-        const exprResult = this.evalExpr(ws.expr, false);
+        const exprResult = this.evalExpr(expr, false);
         let wireValue = '';
-        for(const part of exprResult){
-          if(part.value && part.value !== '-'){
+        for (const part of exprResult) {
+          if (part.value !== undefined && part.value !== null && part.value !== '-') {
             wireValue += part.value;
-          } else if(part.ref && part.ref !== '&-'){
+          } else if (part.ref && part.ref !== '&-') {
             const v = this.getValueFromRef(part.ref);
-            if(v) wireValue += v;
+            if (v) wireValue += v;
           }
         }
-        if(!wireValue) continue;
-        if(wireValue.length < bits) wireValue = wireValue.padStart(bits, '0');
-        else if(wireValue.length > bits) wireValue = wireValue.substring(wireValue.length - bits);
-
-        if(wire.ref){
-          this.setValueAtRef(wire.ref, wireValue);
-        } else {
-          const idx = this.storeValue(wireValue);
-          wire.ref = `&${idx}`;
-          this.wireStorageMap.set(wireName, idx);
+        if (!wireValue) return;
+        if (bits) {
+          if (wireValue.length < bits) wireValue = wireValue.padStart(bits, '0');
+          else if (wireValue.length > bits) wireValue = wireValue.substring(wireValue.length - bits);
         }
+        this.publishWireValue(wireName, wireValue);
+        return;
       }
+
+      if (!ws.decls) return;
+      for (const d of ws.decls) {
+        const wireName = d.name;
+        const wire = this.wires.get(wireName);
+        if (!wire) continue;
+
+        const bits = this.getBitWidth(wire.type);
+        const exprResult = this.evalExpr(expr, false);
+        let wireValue = '';
+        for (const part of exprResult) {
+          if (part.value !== undefined && part.value !== null && part.value !== '-') {
+            wireValue += part.value;
+          } else if (part.ref && part.ref !== '&-') {
+            const v = this.getValueFromRef(part.ref);
+            if (v) wireValue += v;
+          }
+        }
+        if (!wireValue) continue;
+        if (bits) {
+          if (wireValue.length < bits) wireValue = wireValue.padStart(bits, '0');
+          else if (wireValue.length > bits) wireValue = wireValue.substring(wireValue.length - bits);
+        }
+        this.publishWireValue(wireName, wireValue);
+      }
+    };
+
+    for (const ws of this.wireStatements) {
+      publishFromWs(ws);
     }
   }
 

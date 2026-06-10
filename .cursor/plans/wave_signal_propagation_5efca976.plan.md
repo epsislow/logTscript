@@ -1,6 +1,6 @@
 ---
 name: Wave Signal Propagation
-overview: Refactorizarea propagării semnalelor din modelul cascade recursiv (top-down) într-un model wave/delta-cycle orchestrat de `SignalPropagationStrategy`, cu strategie obligatorie în `Interpreter` și fază 1 limitată la wire-uri + `wireStatements`.
+overview: "Refactorizare propagare semnale (Legacy → Wave). Faza 1–2 done. Faza 3 done: PCB pe wave (516–531), badge-uri run_tests, 297/300 (excl. 700–703)."
 todos:
   - id: strategy-base
     content: Implementează SignalPropagationStrategy (bind, wirePendingStates, scheduleWireChange, commitPendingWires) + WavePropagationStrategy + LegacyCascadePropagationStrategy
@@ -53,9 +53,27 @@ todos:
   - id: components-wave-tests
     content: "Teste 608-611 wave; regresie 600-607, 701, 704; Run All 281/284"
     status: completed
+  - id: ui-propagation-badges
+    content: "run_tests.html/js: badge verde legacy / portocaliu wave + legendă toolbar"
+    status: completed
+  - id: p3-audit
+    content: Audit 500–515 pe wave manual — listă eșecuri înainte de fix
+    status: completed
+  - id: p3-reeval-pcb
+    content: reEvalWiresDependingOnPcb + pout> → scheduleWireChange pe wave
+    status: completed
+  - id: p3-block-order
+    content: Ordinea _uccPendingBlocks PCB la granița propagate(); fix test 510 setComp
+    status: completed
+  - id: p3-tests-516-531
+    content: Refactor funcții partajate; reg 516–531 wave; manifest pcb 500–531
+    status: completed
+  - id: p3-docs
+    content: Actualizare signal-propagation.md secțiune PCB
+    status: completed
   - id: pcb-faza3
-    content: "PCB property blocks on:1 + teste 500–515 pe wave — fază separată"
-    status: pending
+    content: "Faza 3 completă: PCB wave + UI badges + teste 516–531"
+    status: completed
 isProject: false
 ---
 
@@ -581,13 +599,13 @@ execNext(interp, count = 1) {
 ### `run_tests.js` — UI faza 1
 
 - Run All / Run group: propagare automată din metadata `reg` — fără checkbox suplimentar
-- Opțional viitor: badge în UI „wave” pe rândurile testelor cu `propagation: 'wave'`
+- Badge UI legacy/wave în run_tests — **faza 3** (nu opțional)
 
 ### Criterii testare
 
 1. **Run All cu default legacy** — testele fără metadata trec neschimbate
 2. **Grup signal** — 600–606 (+607) pe wave
-3. **701 legacy** — REG(`~`)+NEXT; **704 wave** amânat faza 2
+3. **701 legacy** — REG(`~`)+NEXT; **704 wave** — done faza 2
 
 ---
 
@@ -603,7 +621,7 @@ Teste din [`test_suite_ported.js`](v0_3_2/test_suite_ported.js):
 - **605** — auto-referință o singură evaluare per undă
 - **606** — multi-decl propagare individuală
 - **701** — REG(`~`)+NEXT pe **legacy**
-- ~~**704** — același scenariu ca 701 pe **wave**~~ → **amânat faza 2** (vezi mai jos)
+- **704** — același scenariu ca 701 pe **wave** — **done** faza 2
 
 Test suplimentar recomandat (nou, mic):
 
@@ -651,7 +669,7 @@ flowchart LR
 
 **Organizare (decizie utilizator):**
 - **Faza 2:** REG builtin `~` (test 704) + **toate componentele builtin** (switch, key, dip, osc, led, lcd, mem, reg component, etc.)
-- **Faza 3:** PCB (teste 500–515, property blocks `on:1` pe instanțe PCB) — complex, amânat
+- **Faza 3:** PCB pe wave (teste 516–531) + badge-uri propagation în run_tests — vezi secțiunea Faza 3
 - **Legacy:** testele existente PCB/componente rămân pe `propagation: 'legacy'` (Run All neschimbat)
 - **Wave:** prioritate pentru editor + teste **noi** acolo unde comportamentul diferă sau trebuie validat explicit
 
@@ -969,7 +987,7 @@ flowchart LR
 3. **C3** — index + `_scheduleWiresDependingOnComponent`; elimină `waveWireScheduled`
 4. **C6** — switch, key, dip, rotary, osc, reg component
 5. **C4–C5** — sync extins, property blocks smoke
-6. **Teste 608–612** + regresie 600–607, 701, Run All
+6. **Teste 608–611** + regresie 600–607, 701, 704, Run All — **done**
 
 ---
 
@@ -1042,17 +1060,8 @@ REG cu clock `~` folosește în `interpreter.js` (`regPendingMap` + `cycle`):
 ### Ce nu face parte din faza 2
 
 - Testele **700, 702, 703** (REG cu `clk` wire) — bug-uri legacy preexistente, separate.
-- **PCB 500–515** — faza 3.
+- **PCB 516–531** pe wave — faza 3 (500–515 rămân legacy).
 - Migrarea property blocks `on:1` / `on:raise` în delta-cycle complet — după PCB sau faza 4.
-
----
-
-## Faza 3 — PCB pe wave (viitor)
-
-- Property blocks pe instanțe PCB (`on:1`, `exec: set`, pin `set = wire`)
-- Teste 500–515 cu `{ propagation: 'wave' }` sau grup duplicat
-- `_uccPendingBlocks` / ordine program — aliniere la granița `propagate()`
-- Complexitate: re-executie PCB body, `insidePcbBody`, instanțe multiple
 
 ---
 
@@ -1061,6 +1070,165 @@ REG cu clock `~` folosește în `interpreter.js` (`regPendingMap` + `cycle`):
 - **704** trece pe wave (REG builtin `~`)
 - **600–607** rămân verzi pe wave
 - **701** trece pe legacy
-- **608–612** (sau subset agreat) trec pe wave pentru componente builtin
+- **608–611** trec pe wave pentru componente builtin
 - Editor pe wave: switch/key/dip/osc funcționale fără cascadă legacy pe wire-uri
-- Run All legacy: fără regresii (excl. 700–703 cunoscute)
+- Run All: **281/284** (excl. 700–703 cunoscute)
+
+---
+
+## Faza 3 — PCB pe wave + UI propagation badges
+
+### Recap decizii
+
+| Subiect | Decizie |
+|---------|---------|
+| Teste PCB legacy | **500–515** rămân pe `propagation` implicit (legacy) |
+| Teste PCB wave | **516–531** — aceleași scenarii, `{ propagation: 'wave' }` |
+| Run All | Un singur buton; fiecare test folosește `registerTest` propagation — **nu** există „Run All legacy” separat |
+| Corp PCB intern | Rămâne legacy (`insidePcbBody` → `deferWirePropagation()` false) |
+| Documentație user | [`signal-propagation.md`](v0_3_2/doc/signal-propagation.md), [`interactive-components.md`](v0_3_2/doc/interactive-components.md) |
+
+### Clarificare: Run All și propagation
+
+În [`run_tests.js`](v0_3_2/run_tests.js) fiecare test primește strategia din manifest:
+
+```js
+propagation: ported ? ported.propagation : 'legacy'
+const session = suite.createSession({ propagation: test.propagation || 'legacy' });
+```
+
+- Majoritatea testelor → **legacy** (implicit)
+- **600–611**, **704** → **wave** (explicit)
+- După faza 3: **516–531** → **wave**
+
+---
+
+### UI: badge propagation pe fiecare test (run_tests)
+
+**Fișiere:** [`run_tests.html`](v0_3_2/run_tests.html), [`run_tests.js`](v0_3_2/run_tests.js)
+
+| Mod | Badge | Culoare (dark theme) |
+|-----|-------|----------------------|
+| `legacy` | `legacy` | verde — fundal `#1a2e1a`, text/border `#5c8` |
+| `wave` | `wave` | portocaliu — fundal `#2e2210`, text/border `#fa0` |
+
+- Poziție: în `.test-body`, după titlu, înainte de butonul ▶
+- `entryForTest()` citește deja `propagation` din `suite.getTest(id)`
+- Teste **not ported**: fără badge
+- **Legendă** în `#toolbar`: verde = legacy, portocaliu = wave
+
+```html
+<span class="prop-badge prop-badge--legacy" title="Signal propagation: legacy">legacy</span>
+<span class="prop-badge prop-badge--wave" title="Signal propagation: wave">wave</span>
+```
+
+**Opțional (faza 4):** filtru toolbar wave/legacy; contor `Wave: N | Legacy: M` în summary.
+
+---
+
+### Scop faza 3 PCB
+
+Programele cu **instanțe PCB** și property blocks (`.instance:{ data=… set=wire }`) funcționează corect pe **wave** — trigger din `setWire` / componente, fire externe (`4wire q = .e`) actualizate după exec PCB.
+
+### Ce rămâne legacy în faza 3
+
+**Corpul PCB** (`executePcbBody`, `insidePcbBody = true`) — deja forțat în [`interpreter.js`](v0_3_2/core/interpreter.js):
+
+```js
+deferWirePropagation() {
+  return !!(this.signalPropagationStrategy.deferWireWrites && !this.insidePcbBody);
+}
+```
+
+Wire-urile **interne** PCB nu migrează la wave. Se migrează **legătura PCB ↔ lumea exterioară**.
+
+### Probleme actuale pe wave
+
+```mermaid
+flowchart LR
+  setWire["setWire(aa,1)"] --> propagate["propagate()"]
+  propagate --> ucc["updateConnectedComponents skipWireCascade"]
+  ucc --> pcbBlock["executePcbPropertyBlock"]
+  pcbBlock --> body["executePcbBody legacy"]
+  body --> reEval["reEvalWiresDependingOnPcb"]
+  reEval --> directWrite["setValueAtRef direct pe wire extern"]
+```
+
+1. **Trigger property block** — `setWire` pe wave → `_uccPendingBlocks` pentru `.p:{ set=aa }` cu `on:1` (505, 509)
+2. **`reEvalWiresDependingOnPcb`** (L5082) — scrie direct storage; ocolește `scheduleWireChange` (503)
+3. **`pout>` în `executePcbPropertyBlock`** (L5056+) — trebuie `scheduleWireChange` pe wave
+4. **Test 510** — manual `storage` + `updateComponentConnections`; pe wave: `session.setComp`
+
+### Pași implementare
+
+#### P3.1 — Audit rapid
+
+Rulare manuală 500–515 cu `{ propagation: 'wave' }` — listă eșecuri înainte de cod.
+
+#### P3.2 — `reEvalWiresDependingOnPcb` pe wave
+
+- `deferWirePropagation()` → `scheduleWireChange` în loc de `setValueAtRef`
+- `propagate()` cu guard anti-recursie (`_inPropagate` sau flag strategie)
+- Prefer `part.value` la eval (ca REG faza 2)
+
+#### P3.3 — `pout>` → wire extern pe wave
+
+În `executePcbPropertyBlock`: wave = `scheduleWireChange` + propagare; legacy = comportament actual.
+
+#### P3.4 — Ordinea property blocks PCB
+
+Blocuri PCB din `_uccPendingBlocks` (post-`propagate`, `skipWireCascade`) executate **înainte** de `flushDeferredShows`, ordine `blockIndex` (509–511).
+
+Scenarii: `set=wire` (505, 509); `set=.key` (510, 511); alternanță A/B (505); comp intern PCB (506–507).
+
+#### P3.5 — Index PCB (opțional)
+
+`_pcbDependentsIndex` sau extindere `buildWireDependentsIndex` pentru `.instance` / pout — înlocuiește scan în `reEvalWiresDependingOnPcb`.
+
+#### P3.6 — Teste 516–531 (wave)
+
+Refactor [`test_suite_ported.js`](v0_3_2/test_suite_ported.js):
+
+```js
+function runPcb500(h, session) { /* corp actual */ }
+reg(500, 'pcb', '...', runPcb500);
+reg(516, 'pcb', '...(wave)', runPcb500, { propagation: 'wave' });
+// 501→517 … 515→531
+```
+
+- [`test_manifest.js`](v0_3_2/test_manifest.js) — grup `pcb`: `500–531`
+- [`_run_suite_node.js`](v0_3_2/_run_suite_node.js) — automat via suite
+
+#### P3.7 — Documentație utilizator
+
+Actualizare [`signal-propagation.md`](v0_3_2/doc/signal-propagation.md) — secțiune PCB pe wave.
+
+### Ordine recomandată faza 3
+
+```mermaid
+flowchart LR
+  UI["UI badges run_tests"] --> P31["P3.1 audit"]
+  P31 --> P32["P3.2 reEvalWires PCB"]
+  P32 --> P33["P3.3 pout wave"]
+  P33 --> P34["P3.4 block order"]
+  P34 --> P36["P3.6 teste 516-531"]
+  P36 --> P37["P3.7 docs"]
+```
+
+UI badges pot fi făcute **în paralel** cu P3.1.
+
+### Criterii acceptare faza 3
+
+- Badge **legacy** (verde) / **wave** (portocaliu) pe fiecare test portat în run_tests
+- **500–515** trec pe legacy (neschimbat)
+- **516–531** trec pe wave
+- **600–611**, **704** rămân verzi; **701** pe legacy
+- Editor: PCB + `setWire` / switch / key declanșează blocuri și fire externe
+- Run All: **297/300** (excl. 700–703) — **done**
+
+### În afara scope-ului (faza 4)
+
+- Wave **în interiorul** `executePcbBody`
+- Property blocks `on:1` pe componente non-PCB în delta-cycle complet
+- Fix REG 700, 702, 703
+- Filtru toolbar wave/legacy în run_tests
