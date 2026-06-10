@@ -36,7 +36,25 @@ todos:
     content: "Teste 600–607 pe wave; restul suite legacy default; 704 amânat"
     status: completed
   - id: reg-wave-faza2
-    content: "REG + ~ pe wave (test 704) — aliniere regPendingMap/cycle cu postExecNext"
+    content: "REG builtin ~ pe wave (test 704) — advanceRegTildeLatchesForWave + onNextCycle"
+    status: pending
+  - id: components-c1-c2
+    content: "C1-C2: componentPendingStates, scheduleComponentOutputChange, extindere propagate() (commit comp înainte de wire)"
+    status: pending
+  - id: components-c3
+    content: "C3: buildComponentDependentsIndex + _scheduleWiresDependingOnComponent; elimină waveWireScheduled"
+    status: pending
+  - id: components-c6
+    content: "C6: handlers switch/key/dip/rotary/osc/reg → scheduleComponentOutputChange"
+    status: pending
+  - id: components-c4-c5
+    content: "C4-C5: sync extins _finishPropagate + updateComponentConnections fără scriere wire directă pe wave"
+    status: pending
+  - id: components-wave-tests
+    content: "Teste 608-612 wave; regresie 600-607, 701, Run All legacy"
+    status: pending
+  - id: pcb-faza3
+    content: "PCB property blocks on:1 + teste 500–515 pe wave — fază separată"
     status: pending
 isProject: false
 ---
@@ -629,7 +647,351 @@ flowchart LR
 
 ---
 
-## Faza 2 — REG + wave (test 704, amânat)
+## Faza 2 — REG builtin + componente pe wave (fără PCB)
+
+**Organizare (decizie utilizator):**
+- **Faza 2:** REG builtin `~` (test 704) + **toate componentele builtin** (switch, key, dip, osc, led, lcd, mem, reg component, etc.)
+- **Faza 3:** PCB (teste 500–515, property blocks `on:1` pe instanțe PCB) — complex, amânat
+- **Legacy:** testele existente PCB/componente rămân pe `propagation: 'legacy'` (Run All neschimbat)
+- **Wave:** prioritate pentru editor + teste **noi** acolo unde comportamentul diferă sau trebuie validat explicit
+
+---
+
+### Ce spune planul faza 1 despre componente (deja decis)
+
+| Mecanism | Faza 1 (implementat) | Faza 2 (rămas) |
+|----------|---------------------|----------------|
+| Wire cascade | Wave | — |
+| `show` / `peek` | Wave defer + Legacy imediat | — |
+| `syncComponentsAfterWireStable` | După propagate: `updateConnectedComponents(wire, skipWireCascade)` | Extinde la output-uri componentă |
+| `updateComponentConnections` | Legacy + parțial wave (`scheduleWireChange` pentru comp→wire) | Unifică intrările utilizator |
+| Property blocks `on:1` pe **comp** | Legacy, declanșate la sync | Rămân legacy în faza 2 (trigger post-propagate) |
+| Property blocks pe **PCB** | Legacy, teste 500–515 legacy-only | **Faza 3** |
+
+Ordinea post-propagate (faza 1, păstrată):
+
+```
+propagate()  →  syncComponentsAfterWireStable()  →  flushDeferredShows()
+```
+
+---
+
+### Model țintă: output componentă = schimbare de wire (commit la final)
+
+Principiu: când un **output de componentă** se schimbă (switch, key, dip, osc tick, reg component set, etc.), pe **Wave** nu se face cascadă DFS imediată. Se programează schimbarea și se **commit-uiește la granița de propagare**, ca la wire-uri.
+
+```mermaid
+flowchart TD
+  input["User/timer: switch/key/osc"] --> pending["scheduleComponentOutputChange"]
+  pending --> prop["signalPropagationStrategy.propagate"]
+  prop --> commitWire["commitPendingWires"]
+  prop --> commitComp["commitComponentOutputs stable storage"]
+  commitComp --> wireDep["scheduleWireChange pentru wire-uri dependente de comp"]
+  wireDep --> delta["delta-cycle wireStatements"]
+  delta --> sync["syncComponentsAfterWireStable legacy display"]
+  sync --> show["flushDeferredShows"]
+```
+
+**Legacy** păstrează fluxul actual: scriere directă în `storage` + `updateComponentConnections` sincron.
+
+#### API propus (Interpreter + Strategy)
+
+```js
+// Wave: nu scrie stable imediat, nu apelează updateComponentConnections imediat
+scheduleComponentOutputChange(compName, value) {
+  if (deferWirePropagation()) {
+    return this.signalPropagationStrategy.scheduleComponentChange(compName, value);
+  }
+  // Legacy: comportament actual
+  this.writeComponentStable(compName, value);
+  this.updateComponentConnections(compName);
+}
+
+// WavePropagationStrategy — extinde SignalPropagationStrategy
+componentPendingStates = new Map(); // compName → value
+commitComponentOutputs() { /* stable storage + return Set changed comps */ }
+propagate() {
+  // 1. commit component outputs (dacă există)
+  // 2. pentru comps schimbate: scheduleWireChange pe wire-uri dependente (reutilizează index)
+  // 3. delta-cycle wire existent
+  // 4. _finishPropagate
+}
+```
+
+**De ce nu doar `scheduleWireChange` pe un nume virtual:** componentele au `comp.ref` în storage separat de `wires`; wire-urile citesc comp prin `exprReferencesComponent`. Trebuie commit la `comp.ref` **înainte** de re-evaluarea wire-urilor dependente.
+
+**OSC (timer async):** fiecare tranziție high/low = un apel `scheduleComponentOutputChange` + `propagate()` (ca un `setWire` repetat), nu cascadă în timer.
+
+**LED/LCD/mem (consumatori):** rămân actualizați prin `syncComponentsAfterWireStable` / `updateComponentValue` după ce wire-urile/comp-urile sursă sunt stabile — fără cascadă wire pe wave.
+
+**Reg component (`comp [reg]`):** `applyProperties` la `set=1` scrie în device UI; pe wave trece prin același `scheduleComponentOutputChange`.
+
+**Property blocks `on:1` pe componente simple (ex. led `.L:{ set=1 on:1 }`):** faza 2 — **rămân pe mecanismul legacy** declanșat din `syncComponentsAfterWireStable` când wire-urile s-au stabilizat (nu migrare delta-cycle pentru blocks încă).
+
+---
+
+### Componente de modificat (faza 2)
+
+| Fișier | Schimbare |
+|--------|-----------|
+| [signal-propagation.js](v0_3_2/core/signal-propagation.js) | `componentPendingStates`, `commitComponentOutputs`, extindere `propagate()` |
+| [interpreter.js](v0_3_2/core/interpreter.js) | `scheduleComponentOutputChange`, `writeComponentStable`, `getComponentStableValue` |
+| [switch.js](v0_3_2/core/components/switch.js), [key.js](v0_3_2/core/components/key.js), [dip.js](v0_3_2/core/components/dip.js), [rotary.js](v0_3_2/core/components/rotary.js) | `onChange`/`onPress` → `scheduleComponentOutputChange` |
+| [osc.js](v0_3_2/core/components/osc.js) | `goHigh`/`goLow` → schedule + propagate |
+| [interpreter.js](v0_3_2/core/interpreter.js) L3344+ | key handlers inline (dacă încă există) — aliniere la același API |
+| [reg.js](v0_3_2/core/components/reg.js) | `applyProperties` pe wave |
+
+Elimină duplicarea: `updateComponentConnections` wave path (`waveWireScheduled`) devine consecință a `propagate()`, nu apel separat din handlers.
+
+---
+
+### Stare actuală vs țintă (cod existent)
+
+| Eveniment | Legacy (azi) | Wave (azi, incomplet) | Wave (țintă faza 2) |
+|-----------|--------------|------------------------|---------------------|
+| `session.setWire` | `setValueAtRef` + `updateConnectedComponents` DFS | `scheduleWireChange` + `propagate()` | la fel (done) |
+| Switch `onChange` | scrie `storage` → `updateComponentConnections` | la fel ca legacy | `scheduleComponentOutputChange` + `propagate()` |
+| Key `onPress`/`onRelease` | scrie `storage` → `updateComponentConnections` | la fel | idem switch |
+| Dip `onChange` | scrie `storage` → `updateComponentConnections` | la fel | idem (valoare N-bit) |
+| Osc `goHigh`/`goLow` | scrie `storage` → `updateComponentConnections` | la fel | schedule + `propagate()` per tick |
+| Comp → wire în `updateComponentConnections` | scrie wire direct + `updateConnectedComponents` | `scheduleWireChange` + `propagate()` la final | mutat în strategie după `commitComponentOutputs` |
+| Wire → LED display | `syncComponentsAfterWireStable` | `updateConnectedComponents(wire, skipWireCascade)` | + sync pentru `comp` schimbat |
+| Property block `on:1` pe comp | `updateConnectedComponents` / `_uccPendingBlocks` | legacy neschimbat | declanșat după propagate stabil |
+
+**Problema curentă:** pe editor wave, inputurile utilizator (switch/key) încă folosesc cascada legacy imediată, amestecată cu wire-uri wave — comportament inconsistent.
+
+---
+
+### Implementare componente wave — pași concreți
+
+#### Pas C1 — Infrastructură Strategy + Interpreter
+
+În [`signal-propagation.js`](v0_3_2/core/signal-propagation.js), clasa bază `SignalPropagationStrategy`:
+
+```js
+componentPendingStates = new Map(); // compName → string value (binar, lățime din comp)
+
+scheduleComponentChange(compName, value) {
+  const stable = this.interp.getComponentStableValue(compName);
+  if (stable === value) return false;
+  this.componentPendingStates.set(compName, value);
+  return true;
+}
+
+hasPendingChanges() {
+  return this.wirePendingStates.size > 0
+    || this.componentPendingStates.size > 0
+    || this._recomputeAllWires;
+}
+
+commitComponentOutputs() {
+  const changed = new Set();
+  for (const [name, value] of this.componentPendingStates.entries()) {
+    const stable = this.interp.getComponentStableValue(name);
+    if (stable !== value) {
+      this.interp.writeComponentStable(name, value);
+      changed.add(name);
+    }
+  }
+  this.componentPendingStates.clear();
+  return changed;
+}
+```
+
+În [`interpreter.js`](v0_3_2/core/interpreter.js):
+
+```js
+getComponentStableValue(compName) {
+  const comp = this.components.get(compName);
+  if (!comp?.ref || comp.ref === '&-') return null;
+  return this.getValueFromRef(comp.ref);
+}
+
+writeComponentStable(compName, value) {
+  const comp = this.components.get(compName);
+  if (!comp?.ref) return;
+  const bits = this.getComponentBits(comp.type, comp.attributes) || value.length;
+  let v = value;
+  if (v.length < bits) v = v.padStart(bits, '0');
+  else if (v.length > bits) v = v.substring(v.length - bits);
+  this.setValueAtRef(comp.ref, v);
+}
+
+scheduleComponentOutputChange(compName, value) {
+  if (this.deferWirePropagation()) {
+    const scheduled = this.signalPropagationStrategy.scheduleComponentChange(compName, value);
+    if (scheduled) this.signalPropagationStrategy.propagate();
+    return;
+  }
+  this.writeComponentStable(compName, value);
+  this.updateComponentConnections(compName);
+}
+```
+
+`LegacyCascadePropagationStrategy`: `scheduleComponentChange` no-op; `commitComponentOutputs` returnează set gol.
+
+#### Pas C2 — Extindere `WavePropagationStrategy.propagate()`
+
+Ordine **obligatorie** într-un singur `propagate()`:
+
+```js
+propagate() {
+  const executedThisPropagate = new Set();
+  const allChanged = new Set();
+
+  // A) Recompute global (NEXT / postExecSrc) — ca acum
+  if (this._recomputeAllWires) { /* ... */ }
+
+  for (let wave = 0; wave < maxWaves; wave++) {
+    // B) Commit component outputs ÎNAINTE de wire în fiecare undă
+    const compsChanged = this.commitComponentOutputs();
+    for (const c of compsChanged) allChanged.add(c); // track pentru sync
+
+    // C) Pentru fiecare comp schimbat: programează wire-uri dependente
+    for (const compName of compsChanged) {
+      this._scheduleWiresDependingOnComponent(compName);
+    }
+
+    // D) Commit wire pending + delta-cycle (existent)
+    const wiresChanged = this.commitPendingWires();
+    // ... collectAffectedStatements, execWireStatement, executedThisPropagate ...
+
+    if (compsChanged.size === 0 && wiresChanged.size === 0 && !anyScheduled) break;
+  }
+
+  this._finishPropagate(allChanged); // sync + show
+}
+```
+
+#### Pas C3 — Index dependențe comp → wire (evită scan O(n))
+
+La `initializeFromElaboration()` (wave), după `buildWireDependentsIndex()`:
+
+```js
+buildComponentDependentsIndex() {
+  // compName → Set<wireStatement> unde exprReferencesComponent(expr, compName, comp.ref)
+  this._componentDependentsIndex = new Map();
+  for (const ws of interp.wireStatements) {
+    const expr = ws.assignment ? ws.assignment.expr : ws.expr;
+    if (!expr) continue;
+    for (const compName of interp.components.keys()) {
+      const comp = interp.components.get(compName);
+      if (interp.exprReferencesComponent(expr, compName, comp?.ref)) {
+        if (!this._componentDependentsIndex.has(compName))
+          this._componentDependentsIndex.set(compName, new Set());
+        this._componentDependentsIndex.get(compName).add(ws);
+      }
+    }
+  }
+}
+```
+
+`_scheduleWiresDependingOnComponent(compName)`:
+
+1. Ia stmts din index (fallback: scan ca în `updateComponentConnections` L685+ dacă index lipsă)
+2. Pentru fiecare stmt: `outputs = execWireStatement(ws, true)` → `scheduleWireChange` per output
+3. Adaugă stmt în `executedThisPropagate` (aceeași regulă ca MUX — o execuție per propagate)
+
+**Nu** rescrie wire storage direct în `updateComponentConnections` pe wave — elimină blocul `waveWireScheduled` (L297, L724, L1097) după ce C3 e stabil.
+
+#### Pas C4 — Propagare comp → comp (lanț led, conexiuni)
+
+După `commitComponentOutputs`, pentru comps schimbate:
+
+```js
+for (const compName of compsChanged) {
+  this.interp.updateComponentConnections(compName, new Set()); // fără cascadă wire
+}
+```
+
+`updateComponentConnections` pe wave:
+- actualizează `componentConnections` (comp alimentează comp)
+- **nu** mai scrie wire-uri direct (delegat la C3)
+- property blocks: colectează în `_uccPendingBlocks`, execută la final top-level (legacy, păstrat)
+
+#### Pas C5 — Extindere `_syncComponentsAfterWireStable`
+
+```js
+_finishPropagate(allChanged) {
+  // allChanged = wire names + comp names din undă
+  for (const name of allChanged) {
+    if (interp.wires.has(name)) {
+      interp.updateConnectedComponents(name, interp.getWireStableValue(name), null, true);
+    } else if (interp.components.has(name)) {
+      interp.updateComponentConnections(name); // display LED/LCD/mem; skip wire write pe wave
+    }
+  }
+  this.flushDeferredShows();
+}
+```
+
+Consumatori (LED citește wire/comp sursă) văd starea stabilă după întreaga undă.
+
+#### Pas C6 — Refactor handlers componente
+
+| Componentă | Fișier | Modificare |
+|------------|--------|------------|
+| switch | `switch.js` L43–54 | `stored.value = …` → `ctx.scheduleComponentOutputChange(name, val)` |
+| key | `key.js` L49–67 | idem press/release |
+| dip | `dip.js` L61–75 | reconstruiește valoare N-bit, apoi schedule |
+| rotary | `rotary.js` L57–71 | idem |
+| osc | `osc.js` L70–84 | `goHigh`/`goLow` → schedule + propagate (păstrează `setTimeout`) |
+| reg comp | `reg.js` `applyProperties` | scriere device → `scheduleComponentOutputChange` pe wave |
+| key inline | `interpreter.js` L3344+ | delegă la același API sau elimină duplicat |
+
+**LED/LCD/mem:** fără handler user — doar Pas C5 (sync downstream).
+
+#### Pas C7 — Property blocks `on:1` pe componente (non-PCB)
+
+Nu intră în delta-cycle. După wire+comp stabile:
+
+- `updateConnectedComponents(wire)` cu `skipWireCascade` poate declanșa property blocks prin logica existentă L1635+
+- Verificare: `.led:{ on:1 set=wire }` — block rulează la sync post-propagate, nu la elaborare
+
+Dacă block depinde de comp output schimbat prin user input: `updateComponentConnections(compName)` la Pas C4 trebuie să evalueze rising edge `on:1` ca acum.
+
+---
+
+### Ordine implementare recomandată (faza 2 completă)
+
+```mermaid
+flowchart LR
+  R1["2a REG: advanceRegTildeLatches"] --> R2["Reactivare test 704"]
+  C1["2b C1-C2: component pending + propagate"] --> C3["C3: component dependents index"]
+  C3 --> C6["C6: switch/key/dip/osc handlers"]
+  C6 --> C4["C4-C5: sync + refactor updateComponentConnections"]
+  C4 --> T["Teste 608-612"]
+  R2 --> C1
+```
+
+1. **2a REG** — `advanceRegTildeLatchesForWave()` + test 704 (independent, deblochează NEXT pe wave)
+2. **C1–C2** — infrastructură `componentPendingStates` + loop propagate
+3. **C3** — index + `_scheduleWiresDependingOnComponent`; elimină `waveWireScheduled`
+4. **C6** — switch, key, dip, rotary, osc, reg component
+5. **C4–C5** — sync extins, property blocks smoke
+6. **Teste 608–612** + regresie 600–607, 701, Run All
+
+---
+
+### Teste faza 2 componente (noi, wave)
+
+Teste **noi** cu `{ propagation: 'wave' }` — nu mutăm 500–515 pe wave:
+
+| ID sugerat | Scenariu |
+|------------|----------|
+| 608 | switch → wire → wire cascadat (wave) |
+| 609 | key press/release → wire (wave) |
+| 610 | dip bit change → wire multi-bit (wave) |
+| 611 | osc tick → wire dependent (wave, mock timer sau step manual) |
+| 612 | `show(.sw:get)` după toggle — vede valoarea post-propagate |
+
+Unde comportamentul e identic cu legacy, un singur test wave e suficient; nu duplicăm tot grupul registry (134–153) pe wave în faza 2.
+
+**Regresie:** Run All legacy — 500–515, 134–153, restul suite neschimbate.
+
+---
+
+## Faza 2a — REG builtin + wave (test 704)
 
 **Status:** testul **704** nu e înregistrat în `test_suite_ported.js` până la integrarea REG pe wave. Funcția `runReg701NextBased` și comentariul de reactivare sunt lângă testul 701.
 
@@ -677,7 +1039,28 @@ REG cu clock `~` folosește în `interpreter.js` (`regPendingMap` + `cycle`):
 
    Readaugă intrarea 704 în `test_manifest.js`.
 
-### Ce nu face parte din această reparație
+### Ce nu face parte din faza 2
 
-- Testele **700, 702, 703** (REG cu `clk` wire, clear, multi-bit) — eșecuri preexistente pe legacy, separate.
-- Property blocks componente / PCB — rămân pe legacy și în faza 2.
+- Testele **700, 702, 703** (REG cu `clk` wire) — bug-uri legacy preexistente, separate.
+- **PCB 500–515** — faza 3.
+- Migrarea property blocks `on:1` / `on:raise` în delta-cycle complet — după PCB sau faza 4.
+
+---
+
+## Faza 3 — PCB pe wave (viitor)
+
+- Property blocks pe instanțe PCB (`on:1`, `exec: set`, pin `set = wire`)
+- Teste 500–515 cu `{ propagation: 'wave' }` sau grup duplicat
+- `_uccPendingBlocks` / ordine program — aliniere la granița `propagate()`
+- Complexitate: re-executie PCB body, `insidePcbBody`, instanțe multiple
+
+---
+
+## Criterii acceptare faza 2 (complet)
+
+- **704** trece pe wave (REG builtin `~`)
+- **600–607** rămân verzi pe wave
+- **701** trece pe legacy
+- **608–612** (sau subset agreat) trec pe wave pentru componente builtin
+- Editor pe wave: switch/key/dip/osc funcționale fără cascadă legacy pe wire-uri
+- Run All legacy: fără regresii (excl. 700–703 cunoscute)
