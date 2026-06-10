@@ -133,6 +133,38 @@ class Interpreter {
     this.probeTargets.push(target);
   }
 
+  _resolveProbeCompositeTarget(atom) {
+    if (!atom.property || atom.bitRange) return null;
+    const instanceName = atom.var;
+    const portName = atom.property;
+    const chipInst = this.chipInstances.get(instanceName);
+    const pcbInst = this.pcbInstances.get(instanceName);
+    const instance = chipInst || pcbInst;
+    if (!instance) return null;
+    const portInfo = instance.poutStorage.get(portName) || instance.pinStorage.get(portName);
+    if (!portInfo || !portInfo.ref) return null;
+    return {
+      kind: 'composite',
+      key: 'x:' + instanceName + ':' + portName,
+      label: instanceName + ':' + portName,
+      instanceName,
+      portName,
+      ref: portInfo.ref,
+      bitWidth: portInfo.bits,
+      seen: false,
+      lastValue: null
+    };
+  }
+
+  _readCompositeProbeValue(target) {
+    const instance = this.chipInstances.get(target.instanceName) || this.pcbInstances.get(target.instanceName);
+    if (!instance) return null;
+    const portInfo = instance.poutStorage.get(target.portName) || instance.pinStorage.get(target.portName);
+    if (!portInfo || !portInfo.ref) return null;
+    target.ref = portInfo.ref;
+    return this.getValueFromRef(portInfo.ref);
+  }
+
   _resolveProbeComponentTarget(atom) {
     const compName = atom.var;
     const property = atom.property || 'get';
@@ -178,6 +210,10 @@ class Interpreter {
     const atom = expr[0];
     if (atom.var) {
       if (atom.var.startsWith('.')) {
+        if (atom.property) {
+          const composite = this._resolveProbeCompositeTarget(atom);
+          if (composite) return composite;
+        }
         return this._resolveProbeComponentTarget(atom);
       }
       const wire = this.wires.get(atom.var);
@@ -230,6 +266,8 @@ class Interpreter {
         const comp = this.components.get(target.compName);
         if (comp) target.ref = comp.ref;
         value = this._readComponentProbeValue(target);
+      } else if (target.kind === 'composite') {
+        value = this._readCompositeProbeValue(target);
       }
       if (value !== null && value !== undefined) {
         this._emitProbeTarget(target, value, 'initialised');
@@ -281,7 +319,7 @@ class Interpreter {
         if (target.ref === refStr || target.ref === ('&' + base[1])) {
           this._emitProbeTarget(target, value);
         }
-      } else if (target.kind === 'component' && target.ref) {
+      } else if ((target.kind === 'component' || target.kind === 'composite') && target.ref) {
         const tBase = String(target.ref).match(/^&(\d+)/);
         if (tBase && tBase[1] === base[1]) {
           this._emitProbeTarget(target, value);

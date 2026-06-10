@@ -1049,6 +1049,7 @@ probe(expr)
 | Wire name | \`probe(a)\` |
 | Component \`:get\` (implicit) | \`probe(.clk)\` → \`probe(.clk:get)\` |
 | Component property | \`probe(.clk:get)\` |
+| Chip / PCB pin sau pout | \`probe(.u1:sum)\`, \`probe(.q:result)\` |
 | Storage reference | \`probe(&1)\` |
 | Bit / slice | \`probe(&1.0)\`, \`probe(&1.2-4)\` |
 
@@ -1069,7 +1070,7 @@ probe(expr)
 | \`[divider]\` \`:get\`, \`:mod\` | \`probe(.d:mod)\` | nu (faza 2) | idem |
 | \`[mem]\` / \`[reg]\` / \`[counter]\` | \`probe(.m:get)\` | nu (faza 2) | citire din device |
 | \`[lcd]\`, \`[7seg]\`, \`[dots]\` … | \`probe(.disp:get)\` | nu (faza 2) | display, fără ref la \`:get\` |
-| instanță \`pcb\` / \`chip\` | \`probe(.u:out)\` | nu (faza 2) | pout-uri composite |
+| instanță \`pcb\` / \`chip\` — pin sau pout | \`probe(.u1:sum)\`, \`probe(.q:data)\` | da (827–830) | după exec body / property block |
 
 \\* LED multi-bit primește \`comp.ref\` la creare; LED 1-bit îl poate aloca doar după primul property block — \`probe\` nu îl vede la elaborare.
 
@@ -1079,6 +1080,45 @@ probe(expr)
 - **Fără slice** pe componentă — \`probe(.dip.0)\` nu e suportat încă; folosește un wire sau \`probe(&N.0)\` dacă știi ref-ul.
 - **Motiv** la componente interactive: mereu \`initialised\` / \`changed\` (nu \`edge committed\` pe \`:get\` în sine).
 - **Dublare**: dacă ai \`1wire x = .sw\` și \`probe(.sw)\`, aceeași schimbare poate produce **două linii** (componentă + wire).
+
+#### Exemplu — chip / PCB pout din script principal (827–830)
+
+Instanța trebuie creată **înainte** de \`probe\` în același RUN (probe se înregistrează la finalul RUN, când instanța există deja):
+
+\`\`\`logts-play
+chip +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum
+
+chip [halfAdd] .u1::
+probe(.u1:sum)
+
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+\`\`\`
+
+După RUN: \`# .u1:sum = 1000 … - initialised\`. La un nou pulse pe \`set\` cu alte \`a\`/\`b\`: \`# .u1:sum = … - changed\`.
+
+Același model pentru PCB: \`probe(.q:result)\` unde \`result\` e \`4pout\` declarat în \`pcb +[…]\`.
+
+**Notă:** \`probe(.u1:sum)\` și \`1wire r = .u1:sum\` + \`probe(r)\` pot emite **două linii** pentru aceeași schimbare (același ref în storage).
 
 #### Exemplu — \`[switch]\` (821 / 822)
 

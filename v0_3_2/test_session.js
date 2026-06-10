@@ -118,11 +118,21 @@
       getPcbPout(interp, instanceName, poutName) {
         const i = interp || this.interp;
         if (!i) return null;
-        const inst = i.pcbInstances.get(instanceName);
+        const inst = i.pcbInstances.get(instanceName) || i.chipInstances.get(instanceName);
         if (!inst) return null;
         const poutInfo = inst.poutStorage.get(poutName);
         if (!poutInfo) return null;
         return i.getValueFromRef(poutInfo.ref) || '0'.repeat(poutInfo.bits);
+      },
+
+      execStmts(interp, src) {
+        const i = interp || this.interp;
+        if (!i) return;
+        const processed = preprocessRepeat(src);
+        const p = new Parser(new Tokenizer(processed), this._ensureRegistry());
+        for (const s of p.parse()) {
+          i.exec(s);
+        }
       },
 
       cleanup() {

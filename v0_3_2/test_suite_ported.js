@@ -1770,5 +1770,62 @@ probe(.div:mod)`;
   h.assert('fără linie probe', String(!out.some(l => l.startsWith('# .div'))), 'true');
 });
 
+reg(826, 'probe', 'Parser — probe(.u1:sum) produce nod AST', function(h, session) {
+  const stmts = session.parse('probe(.u1:sum)');
+  h.assert('stmt probe', String(stmts[0].probe !== undefined), 'true');
+  h.assert('chip inst atom', stmts[0].probe[0].var, '.u1');
+  h.assert('pout name', stmts[0].probe[0].property, 'sum');
+});
+
+function runProbeChipPout(h, session) {
+  const src = CHIP_HALFADD + `
+chip [halfAdd] .u1::
+probe(.u1:sum)
+` + CHIP_U1_INIT;
+  const { out, interp } = session.run(src);
+  h.assert('pout sum', session.getPcbPout(interp, '.u1', 'sum'), '1000');
+  h.assert('probe initialised', String(out.some(l => l.includes('# .u1:sum = 1000') && l.includes('initialised'))), 'true');
+  session.execStmts(interp, `.u1:{
+  a = 0000
+  b = 0000
+  set = 1
+}`);
+  h.assert('probe changed', String(out.some(l => l.includes('# .u1:sum = 0000') && l.includes('changed'))), 'true');
+}
+
+reg(827, 'probe', 'probe(.u1:sum) chip pout — initialised și changed', runProbeChipPout);
+reg(828, 'probe', 'probe(.u1:sum) chip pout — initialised și changed (wave)', runProbeChipPout, { propagation: 'wave' });
+
+const PROBE_PCB_POUT = `pcb +[passthrough]:
+  4pin data
+  1pin set
+  4pout result
+  exec: set
+  on:1
+
+  result = data
+  :4bit result
+
+pcb [passthrough] .q::
+probe(.q:result)
+.q:{
+  data = 1111
+  set = 1
+}`;
+
+function runProbePcbPout(h, session) {
+  const { out, interp } = session.run(PROBE_PCB_POUT);
+  h.assert('pout result', session.getPcbPout(interp, '.q', 'result'), '1111');
+  h.assert('probe initialised', String(out.some(l => l.includes('# .q:result = 1111') && l.includes('initialised'))), 'true');
+  session.execStmts(interp, `.q:{
+  data = 0000
+  set = 1
+}`);
+  h.assert('probe changed', String(out.some(l => l.includes('# .q:result = 0000') && l.includes('changed'))), 'true');
+}
+
+reg(829, 'probe', 'probe(.q:result) PCB pout — initialised și changed', runProbePcbPout);
+reg(830, 'probe', 'probe(.q:result) PCB pout — initialised și changed (wave)', runProbePcbPout, { propagation: 'wave' });
+
   suite.finalize();
 })();
