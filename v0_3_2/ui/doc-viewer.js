@@ -203,6 +203,10 @@ function loadDoc(filename) {
   el.scrollTop = 0;
   const main = document.getElementById('docMain');
   if (main) main.scrollTop = 0;
+
+  if (window.matchMedia('(max-width: 768px)').matches && main) {
+    main.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
 }
 
 function resolveMdHref(href) {

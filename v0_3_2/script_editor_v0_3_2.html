@@ -1177,6 +1177,70 @@ body.doc-mode #docView {
   background: linear-gradient(180deg, #3a8cff, #2a72eb);
 }
 
+@media (max-width: 768px) {
+  #docView .doc-toolbar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  #docView .doc-toolbar h1 {
+    font-size: 0.9rem;
+    flex: 1;
+    min-width: 0;
+  }
+  #docView .doc-layout {
+    flex-direction: column;
+  }
+  #docSidebar {
+    width: 100%;
+    flex-shrink: 0;
+    border-right: none;
+    border-bottom: 1px solid #333;
+    padding: 8px 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  #docNav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 6px;
+    width: max-content;
+    min-width: 100%;
+  }
+  .doc-nav-item {
+    width: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+  #docMain {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    padding: 14px 12px 28px;
+  }
+  .doc-body {
+    max-width: none;
+    font-size: 13px;
+  }
+  .doc-body h1 {
+    font-size: 1.25rem;
+  }
+  .doc-body pre {
+    padding: 10px;
+    font-size: 11px;
+  }
+  .doc-body table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .doc-play-pre {
+    max-height: 14em;
+  }
+}
+
 </style>
 </head>
 <body>
