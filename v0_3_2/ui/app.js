@@ -117,7 +117,7 @@ function run(){
     globalInterp.firstRun = false;
     globalInterp.vars.set('%', {type: '1bit', value: '0', ref: null});
   }
-  globalInterp.postExec();
+  globalInterp.postExecSrc();
 
   render(globalInterp.out);
   showVars();
@@ -151,6 +151,7 @@ function sendCmd(){
         globalInterp.vars.set('%', {type: '1bit', value: '0', ref: null});
       }
       //postExec must be called after interpretting both the code and the cmd
+      
     }
     
     const _cmdReg = globalInterp.componentRegistry;
@@ -164,7 +165,7 @@ function sendCmd(){
     for(const s of stmts){
       globalInterp.exec(s, true);
     }
-    globalInterp.postExec();
+    globalInterp.postExecSrc();
     
   render(globalInterp.out);
   showVars();

@@ -58,7 +58,7 @@
         for (const s of stmts) {
           this.interp.exec(s);
         }
-        this.interp.postExec();
+        this.interp.postExecSrc();
         
         if (this.interp.firstRun) {
           this.interp.firstRun = false;

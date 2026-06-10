@@ -1401,18 +1401,35 @@ if (this.isBuiltinDEMUX(name)) {
   }
   
   postExecBody() {
-    
+    if(!this.signalPropagationStrategy) {
+      return;
+    }
+    //nothing here, after interpretor just
+    //finished execute all body stmts of a pcb or function
   }
   
   postExecNext() {
-    
+    if(!this.signalPropagationStrategy) {
+      return;
+    }
+    //interp just executed a next stmt now we expect 
+    //to propagate the next cycle state
+    this.startProc();
   }
   
-  postExec() {
+  postExecSrc() {
+    if(!this.signalPropagationStrategy) {
+      return;
+    }
+    //interp just executed a source body and we expect
+    //to propagate the initial values
     this.startProc();
   }
   
   startProc() {
+    //this method should start the signal propagation
+    //whenever a state of one or multiple wires states changed
+    //either after a source exec or after a wire state changed
     this.signalPropagationStrategy.propagate();
   }
 
