@@ -338,7 +338,13 @@
       { id: 816, group: 'debug', title: 'probe REG clk 1→0 — edge committed' },
       { id: 817, group: 'debug', title: 'probe REG clk 1→0 — edge committed (wave)' },
       { id: 818, group: 'debug', title: 'probe key + REG — edge committed la release' },
-      { id: 819, group: 'debug', title: 'probe key + REG — edge committed la release (wave)' }
+      { id: 819, group: 'debug', title: 'probe key + REG — edge committed la release (wave)' },
+      { id: 820, group: 'probe', title: 'Parser — probe(.sw) produce nod AST' },
+      { id: 821, group: 'probe', title: 'probe(.sw) — initialised și changed' },
+      { id: 822, group: 'probe', title: 'probe(.sw) — initialised și changed (wave)' },
+      { id: 823, group: 'probe', title: 'probe(.clk:get) — press/release' },
+      { id: 824, group: 'probe', title: 'probe(.clk:get) — press/release (wave)' },
+      { id: 825, group: 'probe', title: 'probe(.div:mod) ignorat fără ref (faza 1)' }
     ],
     groups: [
       { id: 'repeat', label: 'Repeat preprocessor', rangeLabel: '6–21', testIds: [6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21] },
@@ -353,7 +359,7 @@
       { id: 'doc', label: 'doc() tests', rangeLabel: '300–352', testIds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352] },
       { id: 'doc-comp', label: 'doc(comp) / doc(pcb) / doc(chip)', rangeLabel: '400–431', testIds: [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431] },
       { id: 'chip', label: 'Chip component', rangeLabel: '540–557', testIds: [540, 541, 542, 543, 556, 557] },
-      { id: 'probe', label: 'probe debug', rangeLabel: '800–803', testIds: [800, 801, 802, 803] },
+      { id: 'probe', label: 'probe debug', rangeLabel: '800–803, 820–825', testIds: [800, 801, 802, 803, 820, 821, 822, 823, 824, 825] },
       { id: 'debug', label: 'show / peek / probe', rangeLabel: '804–819', testIds: [804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819] },
       { id: 'pcb', label: 'PCB property block', rangeLabel: '500–531', testIds: [500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611] },

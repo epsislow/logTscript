@@ -1721,5 +1721,54 @@ function runProbeKeyReg(h, session) {
 reg(818, 'debug', 'probe key + REG — edge committed la release', runProbeKeyReg);
 reg(819, 'debug', 'probe key + REG — edge committed la release (wave)', runProbeKeyReg, { propagation: 'wave' });
 
+reg(820, 'probe', 'Parser — probe(.sw) produce nod AST', function(h, session) {
+  const stmts = session.parse('probe(.sw)');
+  h.assert('stmt probe', String(stmts[0].probe !== undefined), 'true');
+  h.assert('atom component', stmts[0].probe[0].var, '.sw');
+});
+
+const PROBE_COMP_SWITCH = `comp [switch] .sw:
+    text:'T'
+    :
+probe(.sw)`;
+
+function runProbeComponentSwitch(h, session) {
+  const { out, interp } = session.run(PROBE_COMP_SWITCH);
+  h.assert('probe .sw:get initialised', String(out.some(l => l.includes('# .sw:get = 0') && l.includes('initialised'))), 'true');
+  session.setComp(interp, '.sw', '1');
+  h.assert('probe .sw:get changed', String(out.some(l => l.includes('# .sw:get = 1') && l.includes('changed'))), 'true');
+}
+
+reg(821, 'probe', 'probe(.sw) — initialised și changed', runProbeComponentSwitch);
+reg(822, 'probe', 'probe(.sw) — initialised și changed (wave)', runProbeComponentSwitch, { propagation: 'wave' });
+
+const PROBE_KEY_DIRECT = `comp [key] .clk:
+    label:'A'
+    size: 35
+    on:1
+    :
+probe(.clk:get)`;
+
+function runProbeKeyDirect(h, session) {
+  const { out, interp } = session.run(PROBE_KEY_DIRECT);
+  h.assert('probe .clk:get initialised', String(out.some(l => l.includes('# .clk:get = 0') && l.includes('initialised'))), 'true');
+  session.setComp(interp, '.clk', '1');
+  h.assert('press changed', String(out.some(l => l.includes('# .clk:get = 1') && l.includes('changed'))), 'true');
+  session.setComp(interp, '.clk', '0');
+  h.assert('release changed', String(out.some(l => l.includes('# .clk:get = 0') && l.includes('changed'))), 'true');
+}
+
+reg(823, 'probe', 'probe(.clk:get) — press/release', runProbeKeyDirect);
+reg(824, 'probe', 'probe(.clk:get) — press/release (wave)', runProbeKeyDirect, { propagation: 'wave' });
+
+reg(825, 'probe', 'probe(.div:mod) ignorat fără ref (faza 1)', function(h, session) {
+  const script = `comp [divider] .div:
+    depth:4
+    :
+probe(.div:mod)`;
+  const { out } = session.run(script);
+  h.assert('fără linie probe', String(!out.some(l => l.startsWith('# .div'))), 'true');
+});
+
   suite.finalize();
 })();

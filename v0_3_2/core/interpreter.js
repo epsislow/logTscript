@@ -133,10 +133,53 @@ class Interpreter {
     this.probeTargets.push(target);
   }
 
+  _resolveProbeComponentTarget(atom) {
+    const compName = atom.var;
+    const property = atom.property || 'get';
+    if (atom.bitRange) return null;
+    const comp = this.components.get(compName);
+    if (!comp) return null;
+    if (!this.componentRegistry || !this.componentRegistry.supportsProperty(comp.type, property)) return null;
+    if (property !== 'get') return null;
+    if (!comp.ref || comp.ref === '&-') return null;
+    const bits = this.getComponentBits(comp.type, comp.attributes) || 1;
+    return {
+      kind: 'component',
+      key: 'c:' + compName + ':' + property,
+      label: compName + ':' + property,
+      compName,
+      property,
+      ref: comp.ref,
+      bitWidth: bits,
+      seen: false,
+      lastValue: null
+    };
+  }
+
+  _readComponentProbeValue(target) {
+    const comp = this.components.get(target.compName);
+    if (!comp) return null;
+    if (this.componentRegistry) {
+      const handler = this.componentRegistry.get(comp.type);
+      if (handler && handler.evalGetProperty) {
+        const a = { var: target.compName, property: target.property };
+        const result = handler.evalGetProperty(comp, target.property, a, this);
+        if (result && result.value != null && result.value !== '-') return result.value;
+      }
+    }
+    if (target.property === 'get' && comp.ref && comp.ref !== '&-') {
+      return this.getValueFromRef(comp.ref);
+    }
+    return null;
+  }
+
   _resolveProbeExpr(expr) {
     if (!expr || !expr.length) return null;
     const atom = expr[0];
     if (atom.var) {
+      if (atom.var.startsWith('.')) {
+        return this._resolveProbeComponentTarget(atom);
+      }
       const wire = this.wires.get(atom.var);
       if (!wire) return null;
       return {
@@ -183,6 +226,10 @@ class Interpreter {
         if (wire) target.ref = wire.ref;
       } else if (target.kind === 'ref' && target.ref) {
         value = this.getValueFromRef(target.ref);
+      } else if (target.kind === 'component') {
+        const comp = this.components.get(target.compName);
+        if (comp) target.ref = comp.ref;
+        value = this._readComponentProbeValue(target);
       }
       if (value !== null && value !== undefined) {
         this._emitProbeTarget(target, value, 'initialised');
@@ -228,11 +275,17 @@ class Interpreter {
     const base = String(refStr).match(/^&(\d+)/);
     if (!base) return;
     for (const target of this.probeTargets) {
-      if (target.kind !== 'ref') continue;
-      const tBase = String(target.ref).match(/^&(\d+)/);
-      if (!tBase || tBase[1] !== base[1]) continue;
-      if (target.ref === refStr || target.ref === ('&' + base[1])) {
-        this._emitProbeTarget(target, value);
+      if (target.kind === 'ref') {
+        const tBase = String(target.ref).match(/^&(\d+)/);
+        if (!tBase || tBase[1] !== base[1]) continue;
+        if (target.ref === refStr || target.ref === ('&' + base[1])) {
+          this._emitProbeTarget(target, value);
+        }
+      } else if (target.kind === 'component' && target.ref) {
+        const tBase = String(target.ref).match(/^&(\d+)/);
+        if (tBase && tBase[1] === base[1]) {
+          this._emitProbeTarget(target, value);
+        }
       }
     }
   }
