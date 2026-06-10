@@ -4,7 +4,13 @@ class Interpreter {
   constructor(funcs,out,pcbs=null,componentRegistry=null, signalPropagationStrategy=null){
     this.funcs=funcs;
     this.out=out;
-    this.signalPropagationStrategy = signalPropagationStrategy;
+    this.signalPropagationStrategy = signalPropagationStrategy
+      ?? (typeof createSignalPropagationStrategy === 'function'
+        ? createSignalPropagationStrategy('wave')
+        : null);
+    if (this.signalPropagationStrategy) {
+      this.signalPropagationStrategy.bind(this);
+    }
     this.componentRegistry = componentRegistry;
     this.storage=[]; // Array of stored values: [{value: "101", index: 0}, ...]
     this.nextIndex=0;
@@ -49,6 +55,93 @@ class Interpreter {
     this.generateRandomBit(); // Initialize with a random bit
     
     this.cycle=1;
+  }
+
+  deferWirePropagation() {
+    return !!(this.signalPropagationStrategy
+      && this.signalPropagationStrategy.deferWireWrites
+      && !this.insidePcbBody);
+  }
+
+  getWireStableValue(name) {
+    const wire = this.wires.get(name);
+    if (!wire || !wire.ref || wire.ref === '&-') return null;
+    return this.getValueFromRef(wire.ref);
+  }
+
+  writeWireStable(name, value) {
+    const wire = this.wires.get(name);
+    if (!wire) return;
+    const bits = this.getBitWidth(wire.type);
+    let v = value;
+    if (bits) {
+      if (v.length < bits) v = v.padStart(bits, '0');
+      else if (v.length > bits) v = v.substring(v.length - bits);
+    }
+    let storageIdx;
+    if (this.wireStorageMap.has(name)) {
+      storageIdx = this.wireStorageMap.get(name);
+      const stored = this.storage.find(s => s.index === storageIdx);
+      if (stored) stored.value = v;
+      else storageIdx = this.storeValue(v);
+    } else if (wire.ref && wire.ref.startsWith('&')) {
+      storageIdx = parseInt(wire.ref.slice(1), 10);
+      const stored = this.storage.find(s => s.index === storageIdx);
+      if (stored) stored.value = v;
+      else storageIdx = this.storeValue(v);
+    } else {
+      storageIdx = this.storeValue(v);
+    }
+    this.wireStorageMap.set(name, storageIdx);
+    wire.ref = `&${storageIdx}`;
+  }
+
+  ensureWireSlot(name, type, defaultValue = null) {
+    const bits = this.getBitWidth(type);
+    if (!bits) return;
+    const init = defaultValue != null ? defaultValue : '0'.repeat(bits);
+    if (!this.wires.has(name)) {
+      const storageIdx = this.storeValue(init);
+      this.wireStorageMap.set(name, storageIdx);
+      this.wires.set(name, { type, ref: `&${storageIdx}` });
+    } else if (!this.wires.get(name).ref || this.wires.get(name).ref === '&-') {
+      const storageIdx = this.storeValue(init);
+      this.wireStorageMap.set(name, storageIdx);
+      this.wires.get(name).ref = `&${storageIdx}`;
+    }
+  }
+
+  trackWireStatement(s) {
+    if (!this.insidePcbBody && !this.wireStatements.includes(s)) {
+      this.wireStatements.push(s);
+    }
+  }
+
+  scheduleWireChange(name, value) {
+    if (this.signalPropagationStrategy) {
+      return this.signalPropagationStrategy.scheduleWireChange(name, value);
+    }
+    this.writeWireStable(name, value);
+    return true;
+  }
+
+  collectWireInputsFromExpr(expr, outSet) {
+    if (!expr || !Array.isArray(expr)) return;
+    for (const atom of expr) {
+      if (atom.var && !atom.var.startsWith('.') && atom.var !== '~' && atom.var !== '%' && atom.var !== '$') {
+        if (this.wires.has(atom.var)) outSet.add(atom.var);
+      }
+      if (atom.call && atom.args) {
+        for (const arg of atom.args) {
+          if (Array.isArray(arg)) this.collectWireInputsFromExpr(arg, outSet);
+        }
+      }
+      if (atom.func && atom.args) {
+        for (const arg of atom.args) {
+          if (Array.isArray(arg)) this.collectWireInputsFromExpr(arg, outSet);
+        }
+      }
+    }
   }
 
   getBitWidth(type){
@@ -1401,36 +1494,105 @@ if (this.isBuiltinDEMUX(name)) {
   }
   
   postExecBody() {
-    if(!this.signalPropagationStrategy) {
-      return;
-    }
-    //nothing here, after interpretor just
-    //finished execute all body stmts of a pcb or function
   }
   
   postExecNext() {
-    if(!this.signalPropagationStrategy) {
-      return;
-    }
-    //interp just executed a next stmt now we expect 
-    //to propagate the next cycle state
+    if (!this.signalPropagationStrategy) return;
+    this.signalPropagationStrategy.onNextCycle();
     this.startProc();
   }
   
   postExecSrc() {
-    if(!this.signalPropagationStrategy) {
-      return;
-    }
-    //interp just executed a source body and we expect
-    //to propagate the initial values
+    if (!this.signalPropagationStrategy) return;
+    this.signalPropagationStrategy.initializeFromElaboration();
     this.startProc();
   }
   
   startProc() {
-    //this method should start the signal propagation
-    //whenever a state of one or multiple wires states changed
-    //either after a source exec or after a wire state changed
-    this.signalPropagationStrategy.propagate();
+    if (this.signalPropagationStrategy) {
+      this.signalPropagationStrategy.propagate();
+    }
+  }
+
+  _execShowImmediate(s, computeRefs = false) {
+    const args = s.show || s.peek;
+    if (!args) return;
+    const results = [];
+    for (const e of args) {
+      let varName = null;
+      let varType = null;
+      let bitRange = null;
+      if (e && e.length === 1 && e[0].var) {
+        varName = e[0].var;
+        bitRange = e[0].bitRange;
+        const wire = this.wires.get(varName);
+        if (wire) varType = wire.type;
+        else {
+          const varInfo = this.vars.get(varName);
+          if (varInfo) varType = varInfo.type;
+        }
+      } else if (e && e.length === 1 && e[0].ref) {
+        varName = e[0].ref;
+        const wire = this.wires.get(varName);
+        if (wire) varType = wire.type;
+        else {
+          const varInfo = this.vars.get(varName);
+          if (varInfo) varType = varInfo.type;
+        }
+      }
+      const r = this.evalExpr(e, computeRefs);
+      for (const part of r) {
+        if (!part) continue;
+        let displayName = part.varName;
+        if (!displayName && varName && bitRange) {
+          const { start, end } = bitRange;
+          const actualEnd = end !== undefined && end !== null ? end : start;
+          displayName = start === actualEnd ? `${varName}.${start}` : `${varName}.${start}-${actualEnd}`;
+        }
+        if (!displayName) displayName = varName;
+        let displayType = varType;
+        if (part.bitWidth) displayType = `${part.bitWidth}bit`;
+        if (part.isRef) {
+          const v = this.getValueFromRef(part.ref);
+          let valueStr = (v == null) ? '-' : v;
+          if (valueStr !== '-') {
+            if (part.bitWidth) valueStr = this.formatValue(valueStr, part.bitWidth);
+            else if (displayType) {
+              const bw = this.getBitWidth(displayType);
+              if (bw) valueStr = this.formatValue(valueStr, bw);
+            }
+          }
+          if (displayName && displayType) {
+            const wire = this.wires.get(displayName);
+            const variable = this.vars.get(displayName);
+            const ref = wire?.ref ?? variable?.ref;
+            const refStr = (ref && ref !== '&-') ? ` (ref: ${ref})` : '';
+            results.push(`${displayName} (${displayType}) = ${valueStr}${refStr}`);
+          } else {
+            results.push(valueStr);
+          }
+        } else {
+          let valueStr = part.value !== null ? part.value : '-';
+          if (valueStr !== '-') {
+            if (part.bitWidth) valueStr = this.formatValue(valueStr, part.bitWidth);
+            else if (displayType) {
+              const bw = this.getBitWidth(displayType);
+              if (bw) valueStr = this.formatValue(valueStr, bw);
+            }
+          }
+          if (displayName && displayType) {
+            const wire = this.wires.get(displayName);
+            const variable = this.vars.get(displayName);
+            const ref = wire?.ref ?? variable?.ref;
+            const refStr = (ref && ref !== '&-') ? ` (ref: ${ref})` : '';
+            results.push(`${displayName} (${displayType}) = ${valueStr}${refStr}`);
+          } else {
+            results.push(valueStr);
+          }
+        }
+      }
+    }
+    this.out.push(results.join(', '));
   }
 
   exec(s, computeRefs=false){
@@ -1484,151 +1646,17 @@ if (this.isBuiltinDEMUX(name)) {
       return;
     }
 
-    if(s.show){
-      const results = [];
-      for(const e of s.show){
-        // Extract variable name from expression if it's a simple variable reference
-        let varName = null;
-        let varType = null;
-        let bitRange = null;
-        if(e && e.length === 1 && e[0].var){
-          varName = e[0].var;
-          bitRange = e[0].bitRange;
-          // Look up type from original variable (not the bit range)
-          const wire = this.wires.get(varName);
-          if(wire){
-            varType = wire.type;
-          } else {
-            const varInfo = this.vars.get(varName);
-            if(varInfo){
-              varType = varInfo.type;
-            }
-          }
-        } else if(e && e.length === 1 && e[0].ref){
-          // Reference expression like &variable
-          varName = e[0].ref;
-          const wire = this.wires.get(varName);
-          if(wire){
-            varType = wire.type;
-          } else {
-            const varInfo = this.vars.get(varName);
-            if(varInfo){
-              varType = varInfo.type;
-            }
-          }
-        }
-        
-        const r = this.evalExpr(e, computeRefs);
-        for(const part of r){
-          //console.log('[show part]', part);
-          if(!part) continue; // Skip undefined parts
-          
-          // Use varName from part if it has bit range info, otherwise construct from bitRange if available
-          let displayName = part.varName;
-          if(!displayName && varName && bitRange){
-            // Construct varName from bitRange if part.varName is not set
-            const {start, end} = bitRange;
-            const actualEnd = end !== undefined && end !== null ? end : start;
-            if(start === actualEnd){
-              displayName = `${varName}.${start}`;
-            } else {
-              displayName = `${varName}.${start}-${actualEnd}`;
-            }
-          }
-          if(!displayName) displayName = varName;
-          
-          let displayType = varType;
-          
-          // If bit range, calculate type from bit width
-          if(part.bitWidth){
-            displayType = `${part.bitWidth}bit`;
-          }
-          
-          if (part.isRef) {
-  // Dereference
-  const v = this.getValueFromRef(part.ref);
-  let valueStr = (v == null) ? '-' : v;
-
-  // 🔥 FORMAT: slice ALWAYS wins
-  if (valueStr !== '-') {
-    if (part.bitWidth) {
-      // Slice width has absolute priority
-      valueStr = this.formatValue(valueStr, part.bitWidth);
-    } else if (displayType) {
-      const bw = this.getBitWidth(displayType);
-      if (bw) {
-        valueStr = this.formatValue(valueStr, bw);
+    if (s.show) {
+      if (this.signalPropagationStrategy && this.signalPropagationStrategy.deferShow) {
+        this.signalPropagationStrategy.enqueueShow(s);
+        return;
       }
+      this._execShowImmediate(s, computeRefs);
+      return;
     }
-  }
 
- /* if (displayName && displayType) {
-    results.push(`${displayName} (${displayType}) = ${valueStr}`);
-  } else {
-    results.push(valueStr);
-  }*/
-  if (displayName && displayType) {
-  // Try to find a reference for named variables / wires
-  let refStr = '';
-
-  const wire = this.wires.get(displayName);
-  const variable = this.vars.get(displayName);
-  const ref = wire?.ref ?? variable?.ref;
-
-  if (ref && ref !== '&-') {
-    refStr = ` (ref: ${ref})`;
-  }
-
-  results.push(`${displayName} (${displayType}) = ${valueStr}${refStr}`);
-} else {
-  results.push(valueStr);
-}
-} else {
-  // ---------- Normal value ----------
-  let valueStr = part.value !== null ? part.value : '-';
-
-  // 🔥 FORMAT: slice ALWAYS wins
-  if (valueStr !== '-') {
-    if (part.bitWidth) {
-      // Slice width has absolute priority
-      valueStr = this.formatValue(valueStr, part.bitWidth);
-    } else if (displayType) {
-      const bw = this.getBitWidth(displayType);
-      if (bw) {
-        valueStr = this.formatValue(valueStr, bw);
-      }
-    }
-  }
-
-  /*if (displayName && displayType) {
-    results.push(`${displayName} (${displayType}) = ${valueStr}`);
-  } else {
-    results.push(valueStr);
-  }*/
-  if (displayName && displayType) {
-  // Try to find a reference for named variables / wires
-  let refStr = '';
-
-  const wire = this.wires.get(displayName);
-  const variable = this.vars.get(displayName);
-  const ref = wire?.ref ?? variable?.ref;
-
-  if (ref && ref !== '&-') {
-    refStr = ` (ref: ${ref})`;
-  }
-
-  results.push(`${displayName} (${displayType}) = ${valueStr}${refStr}`);
-} else {
-  results.push(valueStr);
-}
-}
-          
-          
-          
-          
-        }
-      }
-      this.out.push(results.join(', '));
+    if (s.peek) {
+      this._execShowImmediate(s, computeRefs);
       return;
     }
 
@@ -1848,10 +1876,12 @@ if (this.isBuiltinDEMUX(name)) {
         
         // Re-execute all wire statements in program order (they will recompute based on current storage state)
         // This ensures that assignments like "data = data.0 + data.1 + 00" can use the old value of data
-        for(const ws of this.wireStatements){
+        if (!this.deferWirePropagation()) for(const ws of this.wireStatements){
           if(ws.assignment){
             // Handle assignment statement
-            const name = ws.assignment.name;
+            const name = ws.assignment.target
+              ? ws.assignment.target.var
+              : ws.assignment.name;
             const wire = this.wires.get(name);
             if(wire){
               // During NEXT(~), evaluate expression without computeRefs to avoid creating new storage for literals
@@ -2462,6 +2492,11 @@ if (s.assignment) {
     currentValue = entry.value;
   }
 
+  if (isWire && !range && this.deferWirePropagation()) {
+    this.trackWireStatement(s);
+    return;
+  }
+
   // Evaluate RHS
   const exprResult = this.evalExpr(expr, computeRefs);
   let rhs = '';
@@ -2524,13 +2559,13 @@ if (s.assignment) {
     entry.ref = `&${idx}`;
     // Cache in wireStorageMap so execWireStatement can reuse this slot on cascade re-execution
     this.wireStorageMap.set(name, idx);
-    // Track this assignment statement for reactive cascade re-execution (not inside PCB body)
-    if(!this.insidePcbBody && !this.wireStatements.includes(s)){
-      this.wireStatements.push(s);
+    this.trackWireStatement(s);
+
+    if (this.deferWirePropagation()) {
+      this.scheduleWireChange(name, newValue);
+    } else {
+      this.updateConnectedComponents(name, newValue);
     }
-    
-    // Update connected components
-    this.updateConnectedComponents(name, newValue);
   } else {
     // Variable (immutable unless slice)
     const idx = this.storeValue(newValue);
@@ -2666,6 +2701,9 @@ if (s.assignment) {
           const storageIdx = this.storeValue(initValue);
           this.wireStorageMap.set(d.name, storageIdx);
           this.wires.set(d.name, {type: d.type, ref: `&${storageIdx}`, initOnly: true});
+          if (this.deferWirePropagation()) {
+            this.scheduleWireChange(d.name, initValue);
+          }
         }
         // Do NOT add to wireStatements — no cascading re-execution for literal init
         return;
@@ -2681,6 +2719,36 @@ if (s.assignment) {
         this.wires.set(d.name, {type: d.type, ref: null});
       }
       return;
+    }
+
+    if (this.deferWirePropagation()) {
+      let bitOffsetDefer = 0;
+      let allWires = true;
+      for (const d of s.decls) {
+        let actualType = d.type;
+        if (d.existing) {
+          const wire = this.wires.get(d.name);
+          if (wire) actualType = wire.type;
+          else {
+            const varInfo = this.vars.get(d.name);
+            if (varInfo) actualType = varInfo.type;
+          }
+        }
+        if (d.name === '~' || d.name === '%' || d.name === '$' || d.name === '_') {
+          bitOffsetDefer += this.getBitWidth(actualType) || 0;
+          continue;
+        }
+        if (!this.isWire(actualType)) {
+          allWires = false;
+          break;
+        }
+        this.ensureWireSlot(d.name, actualType);
+        bitOffsetDefer += this.getBitWidth(actualType);
+      }
+      if (allWires) {
+        this.trackWireStatement(s);
+        return;
+      }
     }
 
     const exprResult = this.evalExpr(s.expr, computeRefs);
@@ -2904,19 +2972,20 @@ if (s.assignment) {
     }
   }
 
-  execWireStatement(s){
+  execWireStatement(s, toPending = false){
     // Re-execute a wire assignment statement
     // Set current statement context for REG calls
     const prevStmt = this.currentStmt;
     this.currentStmt = s;
+    const outputs = [];
 
     // Handle pure assignment statements: name = expr  (no type declaration)
     if(s.assignment){
       const wireName = s.assignment.target.var;
       const wire = this.wires.get(wireName);
-      if(!wire){ this.currentStmt = prevStmt; return; }
+      if(!wire){ this.currentStmt = prevStmt; return outputs; }
       const bits = this.getBitWidth(wire.type);
-      if(!bits){ this.currentStmt = prevStmt; return; }
+      if(!bits){ this.currentStmt = prevStmt; return outputs; }
       try {
         const exprResult = this.evalExpr(s.assignment.expr, false);
         let totalValue = '';
@@ -2929,39 +2998,37 @@ if (s.assignment) {
         }
         let wireValue = totalValue.substring(0, bits);
         if(wireValue.length < bits) wireValue = wireValue.padStart(bits, '0');
-        //console.log(`[DEBUG execWireStmt] assignment '${wireName}' computed='${wireValue}'`);
-        // Reuse existing storage slot (registered by wireStorageMap at first assignment)
-        let storageIdx;
-        if(this.wireStorageMap.has(wireName)){
-          storageIdx = this.wireStorageMap.get(wireName);
-          const stored = this.storage.find(st => st.index === storageIdx);
-          if(stored){
-            stored.value = wireValue;
-          } else {
-            storageIdx = this.storeValue(wireValue);
-            this.wireStorageMap.set(wireName, storageIdx);
-          }
-        } else if(wire.ref && wire.ref.startsWith('&')){
-          storageIdx = parseInt(wire.ref.slice(1));
-          const stored = this.storage.find(st => st.index === storageIdx);
-          if(stored){
-            stored.value = wireValue;
-            this.wireStorageMap.set(wireName, storageIdx);
-          } else {
-            storageIdx = this.storeValue(wireValue);
-            this.wireStorageMap.set(wireName, storageIdx);
-          }
+        if (toPending) {
+          outputs.push([wireName, wireValue]);
         } else {
-          storageIdx = this.storeValue(wireValue);
-          this.wireStorageMap.set(wireName, storageIdx);
+          let storageIdx;
+          if(this.wireStorageMap.has(wireName)){
+            storageIdx = this.wireStorageMap.get(wireName);
+            const stored = this.storage.find(st => st.index === storageIdx);
+            if(stored) stored.value = wireValue;
+            else storageIdx = this.storeValue(wireValue);
+          } else if(wire.ref && wire.ref.startsWith('&')){
+            storageIdx = parseInt(wire.ref.slice(1));
+            const stored = this.storage.find(st => st.index === storageIdx);
+            if(stored){
+              stored.value = wireValue;
+              this.wireStorageMap.set(wireName, storageIdx);
+            } else {
+              storageIdx = this.storeValue(wireValue);
+              this.wireStorageMap.set(wireName, storageIdx);
+            }
+          } else {
+            storageIdx = this.storeValue(wireValue);
+            this.wireStorageMap.set(wireName, storageIdx);
+          }
+          wire.ref = `&${storageIdx}`;
         }
-        wire.ref = `&${storageIdx}`;
       } catch(e){
         console.log(`[DEBUG execWireStmt] ERROR in assignment '${wireName}':`, e.message);
       } finally {
         this.currentStmt = prevStmt;
       }
-      return;
+      return outputs;
     }
     
     const wsName = s.decls ? s.decls.map(d=>d.name).join(',') : '?';
@@ -3028,37 +3095,34 @@ if (s.assignment) {
         wireValue = wireValue.substring(wireValue.length - bits);
       }
       
-      // Reuse existing storage or create new one
-      let storageIdx;
-      if(this.wireStorageMap.has(d.name)){
-        // Reuse existing storage
-        storageIdx = this.wireStorageMap.get(d.name);
-        const stored = this.storage.find(s => s.index === storageIdx);
-        if(stored){
-          stored.value = wireValue || '0'.repeat(bits);
+      if (toPending) {
+        outputs.push([d.name, wireValue || '0'.repeat(bits)]);
+      } else {
+        let storageIdx;
+        if(this.wireStorageMap.has(d.name)){
+          storageIdx = this.wireStorageMap.get(d.name);
+          const stored = this.storage.find(st => st.index === storageIdx);
+          if(stored) stored.value = wireValue || '0'.repeat(bits);
+          else {
+            storageIdx = this.storeValue(wireValue || '0'.repeat(bits));
+            this.wireStorageMap.set(d.name, storageIdx);
+          }
         } else {
-          // Storage was lost, create new one
           storageIdx = this.storeValue(wireValue || '0'.repeat(bits));
           this.wireStorageMap.set(d.name, storageIdx);
         }
-      } else {
-        // Create new storage
-        storageIdx = this.storeValue(wireValue || '0'.repeat(bits));
-        this.wireStorageMap.set(d.name, storageIdx);
+        const simpleRef = `&${storageIdx}`;
+        if(this.wires.has(d.name)){
+          this.wires.get(d.name).ref = simpleRef;
+        }
       }
-      
-      // Set wire reference to the storage index
-      const simpleRef = `&${storageIdx}`;
-      if(this.wires.has(d.name)){
-        this.wires.get(d.name).ref = simpleRef;
-      }
-      //console.log(`[DEBUG execWireStmt] wire '${d.name}' stored value='${wireValue}' at ref=${simpleRef}`);
       
       bitOffset += bits;
     }
     } finally {
       this.currentStmt = prevStmt;
     }
+    return outputs;
   }
 
   execComp(comp){

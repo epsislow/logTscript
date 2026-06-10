@@ -209,7 +209,7 @@ parseDef() {
     
     if (
       this.c.type === 'TYPE' ||
-      (this.c.type === 'KEYWORD' && this.c.value === 'show') ||
+      (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek')) ||
       this.c.type === 'ID' ||
       this.c.type === 'SPECIAL'
     ) {
@@ -777,6 +777,20 @@ assignment() {
     }
     this.eat('SYM',')');
     return {show:args};
+  }
+
+  peek(){
+    this.eat('KEYWORD'); this.eat('SYM','(');
+    const args=[];
+    if(this.c.value!==')'){
+      do{
+        args.push(this.expr());
+        if(this.c.value===',') this.eat('SYM',',');
+        else break;
+      }while(true);
+    }
+    this.eat('SYM',')');
+    return {peek:args};
   }
 
   next(){
@@ -1998,6 +2012,7 @@ Parser.KEYWORD_HANDLERS = {
   doc: 'doc',
   watch: 'watch',
   show: 'show',
+  peek: 'peek',
   NEXT: 'next',
   TEST: 'test',
   MODE: 'mode',

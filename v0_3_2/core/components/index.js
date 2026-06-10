@@ -44,13 +44,15 @@ function createComponentRegistry() {
   return registry;
 }
 
-function createSignalPropagationStrategy() {
-  if(typeof SignalPropagationStrategy === 'undefined') {
+function createSignalPropagationStrategy(kind = 'wave') {
+  if (typeof WavePropagationStrategy === 'undefined') {
     return null;
   }
-  const signalPropagationStrategy = new SignalPropagationStrategy();
-  signalPropagationStrategy.setDebugLevel(0);
-  return signalPropagationStrategy;
+  const strategy = kind === 'legacy'
+    ? new LegacyCascadePropagationStrategy()
+    : new WavePropagationStrategy();
+  strategy.setDebugLevel(0);
+  return strategy;
 }
 
 if (typeof module !== 'undefined' && module.exports) {

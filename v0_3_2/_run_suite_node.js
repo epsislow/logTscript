@@ -81,7 +81,7 @@ function createHarness() {
 let passed = 0, failed = 0;
 const failures = [];
 for (const test of suite.tests) {
-  const session = suite.createSession();
+  const session = suite.createSession({ propagation: test.propagation || 'legacy' });
   const h = createHarness();
   try {
     test.run(h, session);

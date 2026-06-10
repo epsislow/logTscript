@@ -166,7 +166,14 @@
 
   function entryForTest(entry) {
     const run = suite.getRun(entry.id);
-    return { id: entry.id, title: entry.title, group: entry.group, run };
+    const ported = suite.getTest(entry.id);
+    return {
+      id: entry.id,
+      title: entry.title,
+      group: entry.group,
+      run,
+      propagation: ported ? ported.propagation : 'legacy'
+    };
   }
 
   async function runOneTest(test) {
@@ -175,7 +182,7 @@
     const row = document.querySelector('.test-row[data-id="' + test.id + '"]');
     if (row) row.querySelector('.dot').className = 'dot running';
 
-    const session = suite.createSession();
+    const session = suite.createSession({ propagation: test.propagation || 'legacy' });
     const h = createHarness();
     try {
       test.run(h, session);

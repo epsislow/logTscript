@@ -2,7 +2,7 @@
   'use strict';
   const suite = window.LogTScriptTestSuite;
   if (!suite) return;
-  const reg = suite.registerTest.bind(suite);
+  const reg = (id, group, title, run, opts) => suite.registerTest(id, group, title, run, opts);
 
 reg(300, 'doc', 'Tokenizer — doc este KEYWORD', function(h, session) {
   const { tokens } = session.tokenize('doc(OR)');
@@ -1092,7 +1092,7 @@ reg(600, 'signal', 'wire simplu — propagare cascadat prin assignment', functio
   session.setWire(interp, 'a', '1');
   h.assert('600 b=NOT(a) dupa a=1', session.getWire(interp, 'b'), '0');
   h.assert('600 c=NOT(b) cascadat dupa a=1', session.getWire(interp, 'c'), '1');
-});
+}, { propagation: 'wave' });
 
 reg(601, 'signal', 'cascada de 3 niveluri a->b->c->d', function(h, session) {
   const { interp } = session.run(`
@@ -1104,7 +1104,7 @@ reg(601, 'signal', 'cascada de 3 niveluri a->b->c->d', function(h, session) {
   h.assert('601 b=a dupa a=1', session.getWire(interp, 'b'), '1');
   h.assert('601 c=b cascadat', session.getWire(interp, 'c'), '1');
   h.assert('601 d=c cascadat', session.getWire(interp, 'd'), '1');
-});
+}, { propagation: 'wave' });
 
 reg(602, 'signal', 'MUX toggle — tg0 se toggleaza cand p trece 1->0', function(h, session) {
   const { interp } = session.run(`
@@ -1121,7 +1121,7 @@ tg0 = MUX(p, tg0, NOT(tg0))`);
   h.assert('602 tg0 dupa p=1 din nou (toggle → 0)', session.getWire(interp, 'tg0'), '0');
   session.setWire(interp, 'p', '0');
   h.assert('602 tg0 dupa p=0 din nou (hold la 0)', session.getWire(interp, 'tg0'), '0');
-});
+}, { propagation: 'wave' });
 
 reg(603, 'signal', 'counter binar tg0/tg1/tg2 cascadat', function(h, session) {
   const { interp } = session.run(`
@@ -1156,7 +1156,7 @@ tg2 = MUX(tg1, tg2, NOT(tg2))`);
   h.assert('603 apasare 4: tg0=0', session.getWire(interp, 'tg0'), '0');
   h.assert('603 apasare 4: tg1=0', session.getWire(interp, 'tg1'), '0');
   h.assert('603 apasare 4: tg2=1', session.getWire(interp, 'tg2'), '1');
-});
+}, { propagation: 'wave' });
 
 reg(604, 'signal', 'propagare se opreste daca valoarea nu s-a schimbat', function(h, session) {
   const { interp } = session.run(`
@@ -1165,7 +1165,7 @@ reg(604, 'signal', 'propagare se opreste daca valoarea nu s-a schimbat', functio
   const bBefore = session.getWire(interp, 'b');
   session.setWire(interp, 'a', '0');
   h.assert('604 b ramane acelasi cand a nu se schimba', session.getWire(interp, 'b'), bBefore);
-});
+}, { propagation: 'wave' });
 
 reg(605, 'signal', 'auto-referinta a = NOT(a) — executata o singura data per cascada', function(h, session) {
   const { interp } = session.run(`
@@ -1173,7 +1173,7 @@ reg(605, 'signal', 'auto-referinta a = NOT(a) — executata o singura data per c
 a = NOT(a)`);
   session.setWire(interp, 'a', '0');
   h.assert('605 a = NOT(0) = 1 dupa o singura evaluare', session.getWire(interp, 'a'), '1');
-});
+}, { propagation: 'wave' });
 
 reg(606, 'signal', 'wire multi-decl — propagare individuala per wire', function(h, session) {
   const { interp } = session.run(`
@@ -1187,7 +1187,21 @@ reg(606, 'signal', 'wire multi-decl — propagare individuala per wire', functio
   h.assert('606 y=src.0/1=1 dupa src=10', session.getWire(interp, 'y'), '1');
   h.assert('606 cx=NOT(x)=1 cascadat', session.getWire(interp, 'cx'), '1');
   h.assert('606 cy=NOT(y)=0 cascadat', session.getWire(interp, 'cy'), '0');
-});
+}, { propagation: 'wave' });
+
+reg(607, 'signal', 'paralelism ramuri — ordinea sursei nu conteaza', function(h, session) {
+  const { interp } = session.run(`
+1wire A := 1
+1wire B := 0
+1wire X = NOT(A)
+1wire Y = AND(X, A)
+1wire Z = NOT(B)
+1wire T = AND(Z, B)`);
+  h.assert('607 X=NOT(A)=0', session.getWire(interp, 'X'), '0');
+  h.assert('607 Y=AND(X,A)=0', session.getWire(interp, 'Y'), '0');
+  h.assert('607 Z=NOT(B)=1', session.getWire(interp, 'Z'), '1');
+  h.assert('607 T=AND(Z,B)=0', session.getWire(interp, 'T'), '0');
+}, { propagation: 'wave' });
 
 reg(700, 'reg', 'REG cu wire clock — latch transparent', function(h, session) {
   const { interp } = session.run(`
@@ -1210,20 +1224,25 @@ reg(700, 'reg', 'REG cu wire clock — latch transparent', function(h, session) 
   h.assert('700 clk=1 → read=1 (transparent)', session.getWire(interp, 'read'), '1');
 });
 
-reg(701, 'reg', 'REG cu clock ~ — NEXT-based', function(h, session) {
+function runReg701NextBased(h, session) {
   const { interp } = session.run(`
 1wire data = 1
 1wire read = REG(data, ~, 0)`);
   h.assert('701 initial read=0', session.getWire(interp, 'read'), '0');
-  interp.exec({ next: 1 });
-  interp.postExecNext();
+  session.execNext(interp, 1);
   h.assert('701 dupa NEXT(1) read=1 (latchat data=1)', session.getWire(interp, 'read'), '1');
   session.setWire(interp, 'data', '0');
   h.assert('701 data=0 fara NEXT → read=1 (hold)', session.getWire(interp, 'read'), '1');
-  interp.exec({ next: 1 });
-  interp.postExecNext();
+  session.execNext(interp, 1);
   h.assert('701 dupa NEXT(2) read=0 (latchat data=0)', session.getWire(interp, 'read'), '0');
-});
+}
+
+reg(701, 'reg', 'REG cu clock ~ — NEXT-based', runReg701NextBased);
+
+// Test 704 (REG + ~ + NEXT pe wave) — amânat faza 2.
+// Vezi .cursor/plans/wave_signal_propagation_5efca976.plan.md secțiunea „Faza 2 — REG + wave”.
+// Funcția runReg701NextBased rămâne partajată pentru când reactivăm:
+// reg(704, 'reg', 'REG cu clock ~ — NEXT-based (wave)', runReg701NextBased, { propagation: 'wave' });
 
 reg(702, 'reg', 'REG clear override', function(h, session) {
   const { interp } = session.run(`

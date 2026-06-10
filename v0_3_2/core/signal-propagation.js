@@ -1,31 +1,191 @@
 /* ================= SIGNAL PROPAGATION ================= */
 
-
 class SignalPropagationStrategy {
   constructor() {
-    this.cLogs = []
+    this.interp = null;
     this.debugLevel = 0;
-    this._dirty = false;
+    this.deferWireWrites = false;
+    this.deferShow = false;
+    this.wirePendingStates = new Map();
+    this._deferredShows = [];
+    this._wireDependentsIndex = null;
+    this._recomputeAllWires = false;
   }
-  isStable() {
-    return this._dirty;
+
+  bind(interp) {
+    this.interp = interp;
   }
-  resetStable() {
-    this._dirty = false;
-  }
-  setStable() {
-    this._dirty = true;
-  }
-  
-  propagate() {
-    if(this.isStable()) {
-      return;
-    }
-  }
-  
+
   setDebugLevel(level) {
     this.debugLevel = level;
-    //console.log('debug strategy signal()')
+  }
+
+  scheduleWireChange(name, value) {
+    if (value === null || value === undefined) return false;
+    const stable = this.interp.getWireStableValue(name);
+    if (stable === value) return false;
+    this.wirePendingStates.set(name, value);
+    return true;
+  }
+
+  hasPendingChanges() {
+    return this.wirePendingStates.size > 0 || this._recomputeAllWires;
+  }
+
+  commitPendingWires() {
+    const changed = new Set();
+    for (const [name, value] of this.wirePendingStates.entries()) {
+      const stable = this.interp.getWireStableValue(name);
+      if (stable !== value) {
+        this.interp.writeWireStable(name, value);
+        changed.add(name);
+      }
+    }
+    this.wirePendingStates.clear();
+    return changed;
+  }
+
+  buildWireDependentsIndex() {
+    const index = new Map();
+    const interp = this.interp;
+    for (const ws of interp.wireStatements) {
+      const expr = ws.assignment ? ws.assignment.expr : ws.expr;
+      if (!expr) continue;
+      const inputs = new Set();
+      interp.collectWireInputsFromExpr(expr, inputs);
+      for (const input of inputs) {
+        if (!index.has(input)) index.set(input, new Set());
+        index.get(input).add(ws);
+      }
+    }
+    this._wireDependentsIndex = index;
+  }
+
+  collectAffectedStatements(changedWires) {
+    const index = this._wireDependentsIndex;
+    const toExec = new Set();
+    if (!index) return toExec;
+    for (const wireName of changedWires) {
+      const stmts = index.get(wireName);
+      if (stmts) for (const ws of stmts) toExec.add(ws);
+    }
+    return toExec;
+  }
+
+  initializeFromElaboration() {
+    this.buildWireDependentsIndex();
+    this._recomputeAllWires = true;
+  }
+
+  onNextCycle() {
+    this._recomputeAllWires = true;
+  }
+
+  enqueueShow(stmt) {
+    this._deferredShows.push(stmt);
+  }
+
+  flushDeferredShows() {
+    if (!this.interp || this._deferredShows.length === 0) return;
+    const pending = this._deferredShows;
+    this._deferredShows = [];
+    for (const stmt of pending) {
+      this.interp._execShowImmediate(stmt, true);
+    }
+  }
+
+  propagate() {}
+
+  _syncComponentsAfterPropagate(allChanged) {
+    const interp = this.interp;
+    if (!interp || allChanged.size === 0) return;
+    for (const wireName of allChanged) {
+      const val = interp.getWireStableValue(wireName);
+      if (val !== null) {
+        interp.updateConnectedComponents(wireName, val, null, true);
+      }
+    }
+    if (typeof showVars === 'function') showVars();
+  }
+
+  _finishPropagate(allChanged) {
+    this._syncComponentsAfterPropagate(allChanged);
+    this.flushDeferredShows();
+  }
+}
+
+class LegacyCascadePropagationStrategy extends SignalPropagationStrategy {
+  constructor() {
+    super();
+    this.deferWireWrites = false;
+    this.deferShow = false;
+  }
+
+  initializeFromElaboration() {
+    this.buildWireDependentsIndex();
+  }
+
+  propagate() {}
+}
+
+class WavePropagationStrategy extends SignalPropagationStrategy {
+  constructor() {
+    super();
+    this.deferWireWrites = true;
+    this.deferShow = true;
+  }
+
+  propagate() {
+    const interp = this.interp;
+    if (!interp) return;
+
+    const allChanged = new Set();
+    const maxWaves = Math.max(interp.wires.size * 2 + 10, 16);
+    // Each wire statement runs at most once per propagate() — mirrors legacy
+    // _uccExecutedStatements and prevents self-ref loops (MUX toggle, NOT(a)).
+    const executedThisPropagate = new Set();
+
+    if (this._recomputeAllWires) {
+      this._recomputeAllWires = false;
+      for (const ws of interp.wireStatements) {
+        const outputs = interp.execWireStatement(ws, true);
+        if (outputs && outputs.length) {
+          for (const [name, val] of outputs) {
+            this.scheduleWireChange(name, val);
+          }
+        }
+        executedThisPropagate.add(ws);
+      }
+    }
+
+    if (!this.hasPendingChanges() && allChanged.size === 0) {
+      return;
+    }
+
+    for (let wave = 0; wave < maxWaves; wave++) {
+      const changed = this.commitPendingWires();
+      if (changed.size === 0 && wave > 0) break;
+      for (const n of changed) allChanged.add(n);
+
+      const toExec = this.collectAffectedStatements(changed);
+      let anyScheduled = false;
+
+      for (const ws of toExec) {
+        if (executedThisPropagate.has(ws)) continue;
+        executedThisPropagate.add(ws);
+        const outputs = interp.execWireStatement(ws, true);
+        if (outputs && outputs.length) {
+          for (const [name, val] of outputs) {
+            if (this.scheduleWireChange(name, val)) anyScheduled = true;
+          }
+        }
+      }
+
+      if (changed.size === 0 && !anyScheduled) break;
+      if (!anyScheduled && changed.size === 0) break;
+    }
+
+    this._finishPropagate(allChanged);
   }
 }
 
@@ -134,6 +294,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
   if(isUccTopLevel){
     this._uccPendingBlocks = new Map();
   }
+  let waveWireScheduled = false;
 
   const comp = this.components.get(compName);
   if(!comp){
@@ -560,9 +721,12 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                 const oldValue = stored.value;
                 // console.log(`[DEBUG updateCompConn] wire '${wireName}' oldValue=${oldValue} newValue=${wireValue}`);
                 if(oldValue !== wireValue){
-                  stored.value = wireValue;
-                  // Update connected components only if value changed
-                  this.updateConnectedComponents(wireName, wireValue);
+                  if (this.deferWirePropagation()) {
+                    if (this.scheduleWireChange(wireName, wireValue)) waveWireScheduled = true;
+                  } else {
+                    stored.value = wireValue;
+                    this.updateConnectedComponents(wireName, wireValue);
+                  }
                 }
               }
             }
@@ -632,24 +796,26 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                       const oldValue = stored.value;
                       // console.log(`[DEBUG updateCompConn] decl wire '${wireName}' oldValue=${oldValue} newValue=${wireValue}`);
                       if(oldValue !== wireValue){
-                        stored.value = wireValue;
-                        // Update connected components only if value changed
-                        this.updateConnectedComponents(wireName, wireValue);
-                      } else {
-                        // console.log(`[DEBUG updateCompConn] decl wire '${wireName}' value unchanged (${oldValue}), skipping cascade`);
+                        if (this.deferWirePropagation()) {
+                          if (this.scheduleWireChange(wireName, wireValue)) waveWireScheduled = true;
+                        } else {
+                          stored.value = wireValue;
+                          this.updateConnectedComponents(wireName, wireValue);
+                        }
                       }
                     }
                   }
                 } else {
-                  // Wire has no ref yet - create storage and set ref
-                  const storageIdx = this.storeValue(wireValue);
-                  wire.ref = `&${storageIdx}`;
-                  // Also update wireStorageMap for NEXT support
-                  if(!this.wireStorageMap.has(wireName)){
-                    this.wireStorageMap.set(wireName, storageIdx);
+                  if (this.deferWirePropagation()) {
+                    if (this.scheduleWireChange(wireName, wireValue)) waveWireScheduled = true;
+                  } else {
+                    const storageIdx = this.storeValue(wireValue);
+                    wire.ref = `&${storageIdx}`;
+                    if(!this.wireStorageMap.has(wireName)){
+                      this.wireStorageMap.set(wireName, storageIdx);
+                    }
+                    this.updateConnectedComponents(wireName, wireValue);
                   }
-                  // Update connected components (new wire, always trigger)
-                  this.updateConnectedComponents(wireName, wireValue);
                 }
               } catch(e){
                 // console.log(`[DEBUG updateCompConn] ERROR updating decl wire '${wireName}':`, e.message);
@@ -926,6 +1092,10 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
       this.justExecutedBlocks = null;
       if(typeof showVars === 'function') showVars();
     }
+  }
+
+  if (waveWireScheduled && this.signalPropagationStrategy) {
+    this.signalPropagationStrategy.propagate();
   }
 };
 
@@ -1215,7 +1385,7 @@ Interpreter.prototype.jstmt = function (ds) {
   return 'st(' + dsName + ':' + dsType + ')';
 }
 
-Interpreter.prototype.updateConnectedComponents = function(varName, newValue, exclWs){
+Interpreter.prototype.updateConnectedComponents = function(varName, newValue, exclWs, skipWireCascade){
   // Track if this is the top-level call (not a recursive cascade call).
   // All blocks collected from any cascade depth are stored in _uccPendingBlocks
   // and executed in program order (by blockIndex) only at the top level.
@@ -1297,6 +1467,10 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
       }
     }
   }
+
+  if (skipWireCascade) {
+    return;
+  }
   
   // Find all wires that depend on this wire (cascade propagation)
   const dependentWires = new Set();
@@ -1312,7 +1486,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
   
   // console.log(`[DEBUG updateConnected] '${varName}' isWire=${isWire}, wireStatements.length=${this.wireStatements.length}`);
   
-  if(isWire){
+  if(isWire && !this.deferWirePropagation()){
     // Find all wires that depend on varName
     for(const ws of this.wireStatements){
       const expr = ws.assignment ? ws.assignment.expr : ws.expr;
@@ -1356,7 +1530,6 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
       const dsName = ds.assignment ? ds.assignment.target.var : (ds.decls ? ds.decls.map(d=>d.name).join(',') : '?');
       this.clog('stmt to execute', dsName, ds);
       if (ds == excludedWs) {
-          console.log('isExcluded: ', ds == excludedWs);
           continue;
       }
       if(ds.assignment) {
@@ -1403,7 +1576,6 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         this.clog('post-exec', ds);
        // Propagate for each declared wire whose value changed
        for (const decl of ds.decls) {
-          console.log('pex2');
          const w = this.wires.get(decl.name);
          this.clog(`pex2, ${w ?'y': 'n'} `);
          if (!w) continue;
@@ -1747,7 +1919,6 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
   // (from cascades inside executePropertyBlock) are also collected and sorted,
   // not executed immediately out of order.
   if(isTopLevel){
-    console.log('q44');
     const executedBlockKeys = new Set();
     const seenComponents = new Set();
     const executedComponents = [];

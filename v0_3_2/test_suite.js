@@ -98,8 +98,8 @@
     return fill.repeat(n) + data.slice(0, len - n);
   }
 
-  function createSession() {
-    const session = LogTScriptSession.createSession();
+  function createSession(opts) {
+    const session = LogTScriptSession.createSession(opts || {});
     session.preprocessRepeat = preprocessRepeat;
     session.preprocessShortNotation = preprocessShortNotation;
     session.gateReduce = gateReduce;
@@ -1580,8 +1580,14 @@
     h.assert('block prop 1 is set', block.properties[1].property, 'set');
   });
 
-  function registerTest(id, group, title, run) {
-    tests.push({ id, group, title, run });
+  function registerTest(id, group, title, run, options = {}) {
+    tests.push({
+      id,
+      group,
+      title,
+      run,
+      propagation: options.propagation || 'legacy'
+    });
   }
 
   window.LogTScriptTestSuite = {
@@ -1589,6 +1595,9 @@
     runMap: null,
     createSession,
     registerTest,
+    getTest(id) {
+      return this.tests.find(t => t.id === id) || null;
+    },
     getRun(id) {
       return this.runMap ? this.runMap.get(id) || null : null;
     },

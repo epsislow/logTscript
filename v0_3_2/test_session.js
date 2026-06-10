@@ -4,8 +4,10 @@
 (function () {
   'use strict';
 
-  function createSession() {
+  function createSession(options = {}) {
+    const propagation = options.propagation || 'legacy';
     const session = {
+      propagation,
       registry: null,
       signalPropagationStrategy: null,
       interp: null,
@@ -14,11 +16,11 @@
 
       _ensureSignalPropagationStrategy() {
         if (!this.signalPropagationStrategy) {
-          this.registry = typeof createSignalPropagationStrategy === 'function'
-            ? createSignalPropagationStrategy()
+          this.signalPropagationStrategy = typeof createSignalPropagationStrategy === 'function'
+            ? createSignalPropagationStrategy(this.propagation)
             : null;
         }
-        return this.registry;
+        return this.signalPropagationStrategy;
       },
       _ensureRegistry() {
         if (!this.registry) {
@@ -59,7 +61,7 @@
           this.interp.exec(s);
         }
         this.interp.postExecSrc();
-        
+
         if (this.interp.firstRun) {
           this.interp.firstRun = false;
           this.interp.vars.set('%', { type: '1bit', value: '0', ref: null });
@@ -87,8 +89,23 @@
         const i = interp || this.interp;
         if (!i) return;
         const w = i.wires.get(name);
-        if (w && w.ref) i.setValueAtRef(w.ref, val);
-        i.updateConnectedComponents(name, val);
+        if (!w) return;
+        if (i.deferWirePropagation()) {
+          i.scheduleWireChange(name, val);
+          if (i.signalPropagationStrategy) {
+            i.signalPropagationStrategy.propagate();
+          }
+        } else {
+          if (w.ref) i.setValueAtRef(w.ref, val);
+          i.updateConnectedComponents(name, val);
+        }
+      },
+
+      execNext(interp, count = 1) {
+        const i = interp || this.interp;
+        if (!i) return;
+        i.exec({ next: count });
+        i.postExecNext();
       },
 
       getPcbPout(interp, instanceName, poutName) {
@@ -111,6 +128,7 @@
         this.interp = null;
         this.out = [];
         this.registry = null;
+        this.signalPropagationStrategy = null;
       }
     };
     return session;
