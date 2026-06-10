@@ -1216,10 +1216,12 @@ reg(701, 'reg', 'REG cu clock ~ — NEXT-based', function(h, session) {
 1wire read = REG(data, ~, 0)`);
   h.assert('701 initial read=0', session.getWire(interp, 'read'), '0');
   interp.exec({ next: 1 });
+  interp.postExecNext();
   h.assert('701 dupa NEXT(1) read=1 (latchat data=1)', session.getWire(interp, 'read'), '1');
   session.setWire(interp, 'data', '0');
   h.assert('701 data=0 fara NEXT → read=1 (hold)', session.getWire(interp, 'read'), '1');
   interp.exec({ next: 1 });
+  interp.postExecNext();
   h.assert('701 dupa NEXT(2) read=0 (latchat data=0)', session.getWire(interp, 'read'), '0');
 });
 

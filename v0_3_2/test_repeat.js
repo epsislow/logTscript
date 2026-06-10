@@ -3884,12 +3884,14 @@ a = NOT(a)`;
     assert('701 initial read=0', getWire600(interp, 'read'), '0');
 
     interp.exec({ next: 1 });
+    interp.postExecNext();
     assert('701 dupa NEXT(1) read=1 (latchat data=1)', getWire600(interp, 'read'), '1');
 
     setWire600(interp, 'data', '0');
     assert('701 data=0 fara NEXT → read=1 (hold)', getWire600(interp, 'read'), '1');
 
     interp.exec({ next: 1 });
+    interp.postExecNext();
     assert('701 dupa NEXT(2) read=0 (latchat data=0)', getWire600(interp, 'read'), '0');
   }
 

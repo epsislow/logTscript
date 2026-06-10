@@ -58,6 +58,8 @@
         for (const s of stmts) {
           this.interp.exec(s);
         }
+        this.interp.postExec();
+        
         if (this.interp.firstRun) {
           this.interp.firstRun = false;
           this.interp.vars.set('%', { type: '1bit', value: '0', ref: null });

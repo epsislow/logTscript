@@ -1371,6 +1371,7 @@ if (this.isBuiltinDEMUX(name)) {
   for (const s of f.body) {
     local.exec(s, computeRefs);
   }
+  local.postExecBody();
 
   if (!f.returns.length) {
     return { value: '', ref: null };
@@ -1397,6 +1398,22 @@ if (this.isBuiltinDEMUX(name)) {
     if(d && d.line && d.col) return `${d.line}:${d.col}`;
     // Fallback
     return 'unknown location';
+  }
+  
+  postExecBody() {
+    
+  }
+  
+  postExecNext() {
+    
+  }
+  
+  postExec() {
+    this.startProc();
+  }
+  
+  startProc() {
+    this.signalPropagationStrategy.propagate();
   }
 
   exec(s, computeRefs=false){
@@ -3973,6 +3990,7 @@ if (s.assignment) {
       const renamedStmt = this.renamePcbStatement(stmt, internalPrefix);
       this.exec(renamedStmt, true);
     }
+    this.postExecBody();
     
     // Update pout storage from current wire values
     for(const [poutName, poutInfo] of poutStorage){

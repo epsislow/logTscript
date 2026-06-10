@@ -6,6 +6,9 @@ class SignalPropagationStrategy {
     this.cLogs = []
     this.debugLevel = 0;
   }
+  propagate() {
+    
+  }
   
   setDebugLevel(level) {
     this.debugLevel = level;
