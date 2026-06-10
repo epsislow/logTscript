@@ -1188,8 +1188,8 @@ CodeMirror.registerHelper("hint", "logts", function(cm) {
 MODE WIREWRITE
 
 2wire b
-2wire a = REG2(b, ~, 0)
-2wire c = REG2(a, ~, 0)
+2wire a = REG(b, ~, 0)
+2wire c = REG(a, ~, 0)
 #b= NOT(a.0) + NOT(a.1)
 b= a
 show(a,b,c)

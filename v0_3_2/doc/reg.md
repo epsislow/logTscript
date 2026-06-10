@@ -132,16 +132,9 @@ clk = 0
 
 ---
 
-## Comparison with old REG1 / REG2 / REG3
+## No fixed-width REGn
 
-The old fixed-width instructions `REG1`, `REG2`, `REG3` have been replaced by the single generic `REG`. The width is now inferred from `data` at runtime, just like `DEMUX` infers its selector width.
-
-| Old syntax | New syntax |
-|------------|------------|
-| `REG1(data, clk, clr)` | `REG(data, clk, clr)` where `data` is `1wire` |
-| `REG2(data, clk, clr)` | `REG(data, clk, clr)` where `data` is `2wire` |
-| `REG3(data, clk, clr)` | `REG(data, clk, clr)` where `data` is `3wire` |
-| `REGn(data, clk, clr)` | `REG(data, clk, clr)` where `data` is `nwire` |
+Older drafts used names like `REG1`, `REG2`, `REG8`. These are **not** valid — use the single builtin `REG(data, clk, clr)` only. Width comes from `data` (e.g. `1wire` → 1 bit, `4wire` → 4 bits), similar to how `MUX` infers selector width from usage.
 
 ---
 

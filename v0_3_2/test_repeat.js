@@ -1925,13 +1925,14 @@ var _I = Interpreter;
     assert('doc.name este MUX1', stmts[0].doc, 'MUX1');
   }
 
-  // ---- Parser: doc(REG8) — token REG ----
-  console.log('\n=== Test 303: Parser — doc(REG8) accepta token REG ===');
+  // ---- Parser: doc(REG) ----
+  console.log('\n=== Test 303: Parser — doc(REG) produce nodul AST corect ===');
   {
-    const processed = preprocessDoc('doc(REG8)');
+    const processed = preprocessDoc('doc(REG)');
     const p = new ParserDoc(new TokenizerDoc(processed), registryDoc);
     const stmts = p.parse();
-    assert('doc.name este REG8', stmts[0].doc, 'REG8');
+    assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
+    assert('doc.name este REG', stmts[0].doc, 'REG');
   }
 
   // ---- Interpreter: BUILTIN_DOC table ----

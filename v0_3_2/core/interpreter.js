@@ -7206,7 +7206,6 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     return Interpreter.BUILTIN_DOC[name];
   }
 
-
   // ---- MUXn pattern (e.g. MUX1, MUX2, MUX3) ----
   /*if (/^MUX(\d+)$/.test(name)) {
     const n = parseInt(name.slice(3), 10);

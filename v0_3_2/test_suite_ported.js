@@ -23,9 +23,10 @@ reg(302, 'doc', 'Parser — doc(MUX1) accepta token MUX', function(h, session) {
   h.assert('doc.name este MUX1', stmts[0].doc, 'MUX1');
 });
 
-reg(303, 'doc', 'Parser — doc(REG8) accepta token REG', function(h, session) {
-  const stmts = session.parse('doc(REG8)');
-  h.assert('doc.name este REG8', stmts[0].doc, 'REG8');
+reg(303, 'doc', 'Parser — doc(REG) produce nodul AST corect', function(h, session) {
+  const stmts = session.parse('doc(REG)');
+  h.assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
+  h.assert('doc.name este REG', stmts[0].doc, 'REG');
 });
 
 reg(304, 'doc', 'BUILTIN_DOC — NOT', function(h, session) {
@@ -61,11 +62,13 @@ reg(309, 'doc', 'BUILTIN_DOC — REG', function(h, session) {
   h.assert('REG semnatura', lines[0], 'REG(Xbit data, 1bit clock, 1bit clear) -> Xbit');
 });
 
-reg(310, 'doc', 'BUILTIN_DOC — MUX/DEMUX vechi nedefinite', function(h, session) {
+reg(310, 'doc', 'BUILTIN_DOC — MUX/DEMUX/REGn vechi nedefinite', function(h, session) {
   const linesMUX1 = Interpreter.getDocLines('MUX1', new Map());
   h.assert('MUX1 nedefinit', linesMUX1[0], 'MUX1: funcție nedefinită');
   const linesDEMUX1 = Interpreter.getDocLines('DEMUX1', new Map());
   h.assert('DEMUX1 nedefinit', linesDEMUX1[0], 'DEMUX1: funcție nedefinită');
+  const linesREG8 = Interpreter.getDocLines('REG8', new Map());
+  h.assert('REG8 nedefinit', linesREG8[0], 'REG8: funcție nedefinită');
 });
 
 reg(311, 'doc', 'BUILTIN_DOC — REG are un singur rand', function(h, session) {
@@ -211,6 +214,8 @@ reg(332, 'doc', 'doc(def) — lists built-in and user-defined separately', funct
   h.assert('built-in list contains DIVIDE', String(builtinBlock.includes('DIVIDE')), 'true');
   h.assert('built-in list contains NOT', String(builtinBlock.includes('NOT')), 'true');
   h.assert('built-in list contains AND', String(builtinBlock.includes('AND')), 'true');
+  h.assert('built-in list contains REG', String(builtinBlock.includes('REG')), 'true');
+  h.assert('built-in list does not list REG<N> pattern', String(!/\bREG\d+\b/.test(builtinBlock)), 'true');
   const userLabelIdx = lines.indexOf('user defined:');
   h.assert('user defined: label present', lines[userLabelIdx], 'user defined:');
   h.assert('user functions listed', String(lines[userLabelIdx + 1].includes('myFunc')), 'true');

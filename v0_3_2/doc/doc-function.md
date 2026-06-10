@@ -70,24 +70,28 @@ OR(Xbit, Xbit)
 - `n` — number of positions (in binary)
 - `fill` *(optional)* — fill bit (default `0`)
 
-### Registers (REGn)
+### Register (REG)
 
-`REGn` accepts any number `n` (e.g. `REG4`, `REG8`, `REG16`):
+Width is inferred from `data` at runtime — there is only the generic `REG` (no `REG1`, `REG4`, `REG8`, etc.):
 
 ```
-doc(REG4)
+doc(REG)
 ```
 
 Output:
 
 ```
-REG4(4bit data, 1bit clock, 1bit clear) -> 4bit
+REG(Xbit data, 1bit clock, 1bit clear) -> Xbit
 ```
 
 Parameters:
-- `data` — value to store (width = `n`)
-- `clock` — rising edge stores `data`
+- `data` — value to store (determines register width)
+- `clock` — wire: **falling edge** (`1` → `0`) captures `data`; `~`: updates on `NEXT(~)` (see [reg.md](reg.md))
 - `clear` — `1` resets the register to zero
+
+`doc(REG8)` and similar fixed-width names are **not** supported — use `doc(REG)` only.
+
+Full behaviour: [reg.md](reg.md).
 
 ### Multiplexers (MUX1 / MUX2 / MUX3)
 
@@ -245,7 +249,7 @@ Output:
 
 ```
 built-in:
-NOT, AND, OR, XOR, NXOR, NAND, NOR, EQ, LATCH, LSHIFT, RSHIFT, MUX1, MUX2, MUX3, DEMUX1, DEMUX2, DEMUX3, ADD, SUBTRACT, MULTIPLY, DIVIDE, REG<N>
+NOT, AND, OR, XOR, NXOR, NAND, NOR, EQ, LATCH, LSHIFT, RSHIFT, REG, MUX, DEMUX, MUX1, MUX2, MUX3, DEMUX1, DEMUX2, DEMUX3, ADD, SUBTRACT, MULTIPLY, DIVIDE
 
 user defined:
 myFunc, helper, ...
@@ -378,7 +382,7 @@ comp [adder] .name:
 | `doc(comp.key)` | key — 1bit, momentary button |
 | `doc(comp.dip)` | dip — Xbit, group of toggle switches |
 
-See [interactive-components.md](interactive-components.md) for switch, key, and dip usage (panel inputs, wires, examples).
+See [interactive-components.md](interactive-components.md) for switch, key, dip, and rotary usage (panel inputs, wires, examples).
 | `doc(comp.7seg)` or `doc(comp.7)` | 7seg — 8bit, 7-segment display |
 | `doc(comp.lcd)` | lcd — 8bit, pixel matrix display |
 | `doc(comp.adder)` or `doc(comp.+)` | adder — Xbit, addition |

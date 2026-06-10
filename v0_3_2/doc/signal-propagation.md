@@ -138,6 +138,7 @@ For examples and edge cases, see PCB tests **500–515** (legacy) and **516–53
 | Default in editor | Yes | No |
 | Wire + component updates | Settle together, then refresh UI | Update as each step runs |
 | `REG(..., ~, ...)` + `NEXT` | Same as Legacy | Reference |
+| `REG(data, clk, clr)` wire clock | Falling edge (`clk` 1→0); same semantics | Same |
 | `show` | After settle | After each top-level step |
 | Self-referential wires (e.g. `a = NOT(a)`) | One update per user action | May differ in edge cases |
 
@@ -145,7 +146,7 @@ For examples and edge cases, see PCB tests **500–515** (legacy) and **516–53
 
 ## Related documentation
 
-- [Interactive components](interactive-components.md) — switch, key, and dip inputs
-- [REG](reg.md) — register clock modes and `NEXT`
+- [Interactive components](interactive-components.md) — switch, key, dip, rotary inputs
+- [REG](reg.md) — wire-clock falling edge and `NEXT` clock (`~`)
 - [Oscillator](oscillator.md) — real-time `osc` and wire connections
 - [LED](led.md) — displays driven by wires and components
