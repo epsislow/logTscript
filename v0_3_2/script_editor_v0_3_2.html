@@ -110,6 +110,15 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   background: linear-gradient(180deg, #3a8cff, #2a72eb);
 }
 
+.btn-run-active {
+  background: linear-gradient(180deg, #1f8f4a, #1a7038) !important;
+  border-color: #2ecc71 !important;
+  color: #fff !important;
+}
+.btn-run-active:hover {
+  background: linear-gradient(180deg, #28a055, #1f8540) !important;
+}
+
 .prop-toggle {
   font-size: 11px;
   font-weight: 600;
@@ -174,6 +183,25 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   background: linear-gradient(180deg, #2f80ff, #1f66e0);
   border-color: #2f80ff;
   color: #fff;
+}
+
+#tabsActive .tab-run-other {
+  background: #1a3324;
+  border-color: #2a6b3a;
+  color: #9fdf9f;
+}
+#tabsActive .tab-run-other:hover {
+  background: #243d2e;
+  border-color: #3a8f5a;
+}
+
+#tabsActive .tab-run-current {
+  background: linear-gradient(180deg, #3daf5c, #2d9448);
+  border-color: #5fdc8c;
+  color: #fff;
+}
+#tabsActive .tab-run-current:hover {
+  background: linear-gradient(180deg, #48bf68, #35a052);
 }
 
 #confirm .btn.c {
@@ -1162,11 +1190,18 @@ body.doc-mode #docView {
   font-size: 11px;
   font-weight: 600;
   text-transform: lowercase;
-  color: #fa0;
   padding: 2px 8px;
-  border: 1px solid #5a4018;
   border-radius: 999px;
+}
+.doc-play-mode--wave {
+  color: #fa0;
+  border: 1px solid #5a4018;
   background: #2e2210;
+}
+.doc-play-mode--legacy {
+  color: #5c8;
+  border: 1px solid #3a5a3a;
+  background: #1a2e1a;
 }
 #docView .btn--primary {
   background: linear-gradient(180deg, #2f80ff, #1f66e0);
@@ -1529,7 +1564,7 @@ show(a,b,c)
 </textarea>
 <div id="fName">Filename:<span id="fileName"></span></div>
 <div>
-  <button onclick="run()" class="btn">Run</button>
+  <button onclick="run()" id="runBtn" class="btn">Run</button>
   <button onclick="doNext(1)" class="btn">Next</button>
   <button type="button" id="propMode" class="btn prop-toggle prop-toggle--wave" onclick="togglePropagationMode()" title="Signal propagation: wave (applies on next Run)">wave</button>
   <button onclick="toggleSEC()" id="sec" class="btn">S</button>

@@ -599,7 +599,7 @@ These components can push their output into wires that read them (e.g. \`1wire x
 
 Example:
 
-\`\`\`logts-play
+\`\`\`logts-play wave
 comp [switch] .sw::
 
 1wire a = .sw:get

@@ -22,6 +22,9 @@ function setPropagationMode(mode) {
   const m = mode === 'legacy' ? 'legacy' : 'wave';
   sdb.set(PROPAGATION_STORAGE_KEY, m);
   updatePropagationToggleUI();
+  if (typeof tabs !== 'undefined' && tabs.get(currentTab)) {
+    tabs.get(currentTab).propagation = m;
+  }
 }
 
 function togglePropagationMode() {
@@ -125,6 +128,10 @@ function run(){
   
   watchList = [];
 
+  if (typeof clearTabHasRun === 'function') {
+    clearTabHasRun();
+  }
+
   tabSave();
   syncLegacyLastKeys();
   persistTabs();
@@ -152,10 +159,16 @@ function run(){
 
   render(globalInterp.out);
   showVars();
+  if (typeof markTabHasRun === 'function') {
+    markTabHasRun();
+  }
   }catch(e){ 
     render([e.message ]); 
     console.log(e);
     if(globalInterp) showVars();
+    if (typeof clearTabHasRun === 'function') {
+      clearTabHasRun();
+    }
   }
 }
 

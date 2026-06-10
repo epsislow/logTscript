@@ -29,7 +29,9 @@ function serializeTabsSession() {
       filename: t.filename,
       code: t.code,
       hash: t.hash,
-      isChanged: t.isChanged
+      isChanged: t.isChanged,
+      propagation: t.propagation === 'legacy' ? 'legacy' : 'wave',
+      hasRun: !!t.hasRun
     });
   }
   tabList.sort((a, b) => a.id - b.id);
@@ -63,7 +65,9 @@ function restoreTabs(defaultCode) {
             filename: t.filename || ('tab ' + t.id),
             code: t.code || '',
             hash: typeof t.hash === 'number' ? t.hash : getHashForStr(t.code || ''),
-            isChanged: !!t.isChanged
+            isChanged: !!t.isChanged,
+            propagation: t.propagation === 'legacy' ? 'legacy' : 'wave',
+            hasRun: !!t.hasRun
           });
         }
         currentTab = session.currentTab;
@@ -102,7 +106,10 @@ function restoreTabs(defaultCode) {
 
   currentTab = 0;
   lastTab = 0;
-  tabUpdate(0, lastName, last, lastHash, isChanged);
+  tabUpdate(0, lastName, last, lastHash, isChanged, {
+    propagation: typeof getPropagationMode === 'function' ? getPropagationMode() : 'wave',
+    hasRun: false
+  });
   persistTabs();
 }
 
@@ -225,7 +232,41 @@ function tabSwitch(newTab) {
     persistTabs();
 }
 
-function tabAdd(filename, code) {
+function tabMetaDefaults(meta) {
+  const m = meta || {};
+  return {
+    propagation: m.propagation === 'legacy' ? 'legacy' : 'wave',
+    hasRun: !!m.hasRun
+  };
+}
+
+function updateRunButtonUI() {
+  const btn = document.getElementById('runBtn');
+  if (!btn) return;
+  const tabInfo = tabs.get(currentTab);
+  btn.classList.toggle('btn-run-active', !!(tabInfo && tabInfo.hasRun));
+}
+
+function clearTabHasRun() {
+  for (const id of tabs.keys()) {
+    tabs.get(id).hasRun = false;
+  }
+  updateRunButtonUI();
+  fShowTabs();
+  persistTabs();
+}
+
+function markTabHasRun() {
+  for (const id of tabs.keys()) {
+    const t = tabs.get(id);
+    t.hasRun = id === currentTab;
+  }
+  updateRunButtonUI();
+  fShowTabs();
+  persistTabs();
+}
+
+function tabAdd(filename, code, meta) {
   if(Array.from(tabs.keys()).length >= maxTabs) {
       return false;
   }
@@ -233,7 +274,12 @@ function tabAdd(filename, code) {
   if(filename===''){
     filename = 'tab '+ idx;
   }
-  tabUpdate(idx, filename, code, getHashForStr(code || ''), false);
+  const extra = tabMetaDefaults(meta);
+  if (!meta || meta.propagation === undefined) {
+    extra.propagation = typeof getPropagationMode === 'function'
+      ? getPropagationMode() : 'wave';
+  }
+  tabUpdate(idx, filename, code, getHashForStr(code || ''), false, extra);
   currentTab = idx;
   lastTab = idx;
   tabShowCurrent();
@@ -271,11 +317,18 @@ function tabShowCurrent() {
     codeCheckDisabled = false;
   }
   originalHash = tabInfo.hash;
+  if (typeof setPropagationMode === 'function') {
+    setPropagationMode(tabInfo.propagation || 'wave');
+  }
+  updateRunButtonUI();
 }
 
 function tabSave(isLoad = false) {
   const tabInfo = tabs.get(currentTab);
   if (!tabInfo) return;
+  if (!isLoad && typeof getPropagationMode === 'function') {
+    tabInfo.propagation = getPropagationMode();
+  }
   let isChangedValue = tabGetIsChanged(currentTab);
   let hash = false;
   if (isLoad === true) {
@@ -289,23 +342,32 @@ function tabSave(isLoad = false) {
   tabUpdate(currentTab, filename, code.value, hash, isChangedValue);
 }
 
-function tabUpdate(idx, filename, code, hash = false, isChanged = false) {
+function tabUpdate(idx, filename, code, hash = false, isChanged = false, meta) {
   const keys = Array.from(tabs.keys());
   const index = keys.indexOf(idx);
   if (index == -1) {
       if(hash === false) {
           hash = getHashForStr(code);
       }
-      tabs.set(idx, {filename, code, hash, isChanged});
+      tabs.set(idx, Object.assign(
+        { filename, code, hash, isChanged },
+        tabMetaDefaults(meta)
+      ));
       return;
   }
-  
+
   const tabInfo = tabs.get(idx);
   tabInfo.filename = filename;
   tabInfo.code = code;
   tabInfo.isChanged = isChanged;
   if (hash !== false) {
       tabInfo.hash = hash;
+  }
+  if (meta && meta.propagation !== undefined) {
+    tabInfo.propagation = meta.propagation === 'legacy' ? 'legacy' : 'wave';
+  }
+  if (meta && meta.hasRun !== undefined) {
+    tabInfo.hasRun = !!meta.hasRun;
   }
   tabs.set(idx, tabInfo);
 }
@@ -325,9 +387,17 @@ function fShowTabs() {
   tabsActiveEl.innerHTML ='';
   for(const k of tabs.keys()) {
     const tab= tabs.get(k);
-    const activeClass = (k === currentTab)? ' tab-active':'';
+    const isActive = k === currentTab;
+    let tabClass = 'tab';
+    if (isActive && tab.hasRun) {
+      tabClass += ' tab-run tab-run-current';
+    } else if (isActive) {
+      tabClass += ' tab-active';
+    } else if (tab.hasRun) {
+      tabClass += ' tab-run tab-run-other';
+    }
     const isChangedText = tab.isChanged? ' ✎': '';
-    tabsActiveEl.innerHTML += '<div class="tab'+activeClass+'" data-key="'+k+'" onClick="tabClick(this)">'+tab.filename+isChangedText+'</div>';
+    tabsActiveEl.innerHTML += '<div class="'+tabClass+'" data-key="'+k+'" onClick="tabClick(this)">'+tab.filename+isChangedText+'</div>';
   }
 }
 

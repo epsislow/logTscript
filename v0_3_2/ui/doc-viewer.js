@@ -101,18 +101,16 @@ function loadExampleInEditor(code, autoRun, propagation, label) {
     return;
   }
 
-  if (propagation && typeof setPropagationMode === 'function') {
-    setPropagationMode(propagation);
-  }
+  tabSave();
+  const mode = propagation || (typeof getPropagationMode === 'function' ? getPropagationMode() : 'wave');
 
-  if (!tabAdd(label || 'example', code || '')) {
+  if (!tabAdd(label || 'example', code || '', { propagation: mode, hasRun: false })) {
     alert('Max tabs reached — close a tab first.');
     return;
   }
 
   tabSaved();
   syncLegacyLastKeys();
-  fShowTabs();
 
   if (autoRun && typeof run === 'function') {
     run();
@@ -164,7 +162,7 @@ function enhancePlayBlocks(container) {
 
     if (propagation) {
       const badge = document.createElement('span');
-      badge.className = 'doc-play-mode';
+      badge.className = 'doc-play-mode doc-play-mode--' + propagation;
       badge.textContent = propagation;
       actions.appendChild(badge);
     }
