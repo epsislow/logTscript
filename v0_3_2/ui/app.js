@@ -347,6 +347,9 @@ function showVars(){
     t += `Storage: ${globalInterp.storage.length} entries\n`;
   }
   document.getElementById('vars').textContent=t;
+  if (globalInterp && globalInterp.out) {
+    render(globalInterp.out);
+  }
 }
 
 function toggleAST(){

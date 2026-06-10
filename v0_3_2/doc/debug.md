@@ -180,9 +180,9 @@ After RUN, `probe(a)` still reports `initialised` for `a` when its first value i
 |--------|------|
 | `initialised` | First emission for this target |
 | `changed` | Value changed after initialisation |
-| `edge committed` | Value committed while an edge-triggered property block runs (`on: raise`, `edge`, `rising`, `falling`) |
+| `edge committed` | Latch la **frontiera descendentă** a ceasului wire al `REG(data, clk, clr)`, sau commit în timpul unui property block `on: raise` / `edge` / `rising` / `falling` |
 
-`edge committed` does **not** apply to level-triggered blocks (`on: 1`).
+`edge committed` nu se aplică la property blocks `on: 1` (level) și nici la `REG(..., ~, ...)` pe `NEXT(~)` (acolo apare `changed`).
 
 ### Multiple probes
 
@@ -233,29 +233,86 @@ x = 1010
 
 `&1` is the ref allocated to `x` on first assignment. The same ref appears in `show(x)` output.
 
-### Example — edge-triggered property block
+### Example — `REG` wire clock + `edge committed` (816 / 817)
+
+`REG(data, clk, clr)` cu **wire** ca `clk` (nu `~`) face latch pe frontiera **descendentă** `clk`: `1` → `0`. Când `q` se actualizează la acel moment, probe emite motivul **`edge committed`**.
+
+**Pas 1 — Load & Run** (script de setup):
 
 ```logts-play
-comp [mem] .m:
-  depth: 4
-  length: 4
-  on: raise
-  :
-
-4wire data = 1010
-1wire clk = 0
-1wire q = .m:get
+1wire data := 0
+1wire clk := 0
+1wire q = REG(data, clk, 0)
 probe(q)
+```
 
-.m:{
-  data = data
-  set = clk
-}
+După RUN, Output:
+
+```text
+# q = 0 (&…) - initialised
+```
+
+**Pas 2 — pulse pe `clk`** (panou Variables: `data=1`, `clk=1`, apoi `clk=0`; sau DIP/key pe firele respective):
+
+```text
+# q = 1 (&…) - edge committed
+```
+
+Același scenariu pe Wave (`logts-play wave` la pasul 1). Testele automate folosesc `setWire` după RUN — comportament identic.
+
+Variantă cu mai multe scrieri pe aceeași linie în script (editor, **Legacy** + `MODE WIREWRITE`):
+
+```logts-play
+MODE WIREWRITE
+1wire data := 0
+1wire clk := 0
+1wire q = REG(data, clk, 0)
+probe(q)
+data = 1
 clk = 1
 clk = 0
 ```
 
-When `clk` falls (`1` → `0`), the mem block may run on the rising-edge semantics of `set`; if `q` changes during that edge-triggered execution, you may see `# q = … - edge committed`.
+Pe **Wave**, `clk = 1` apoi `clk = 0` în același RUN nu garantează pulse-ul (scrierile sunt amânate); preferă pulse din panou după RUN sau modul Legacy de mai sus.
+
+### Example — `[key]` + `REG` + `probe` (818 / 819)
+
+Același latch pe frontiera descendentă a lui `clk`, dar ceasul vine de la o tastă din panoul **Devices**. `data` este deja `1`; după RUN, `q` rămâne `0` până la primul pulse complet pe `clk`.
+
+**Pas 1 — Load & Run:**
+
+```logts-play
+1wire data := 1
+comp [key] .clk:
+    label:'A'
+    size: 35
+    on:1
+    :
+1wire clk = .clk
+1wire q = REG(data, clk, 0)
+probe(q)
+```
+
+După RUN, Output:
+
+```text
+# q = 0 (&…) - initialised
+```
+
+**Pas 2 — interacțiune cu tasta A** (apăsare apoi **eliberare**):
+
+| Moment | `clk` | `q` | Probe |
+|--------|-------|-----|-------|
+| Apăsare (press) | `1` | `0` | — (încă nu s-a făcut latch) |
+| Eliberare (release) | `0` | `1` | `# q = 1 (&…) - edge committed` |
+
+La **apăsare**, `clk` urcă la `1`, dar `REG` nu copiază încă `data` în `q`. La **eliberare**, frontiera `clk` `1` → `0` face latch — `q` devine `1` și panoul **Output** se actualizează (la fel ca la alte componente interactive din Devices).
+
+Același scenariu pe Wave (`logts-play wave` la pasul 1). Testele **818** / **819** simulează press/release cu `setComp('.clk', …)` după RUN.
+
+### Example — property block `on: raise` (mem / reg)
+
+Pentru `comp [mem]` / `comp [reg]` cu `on: raise`, la re-execuția unui property block declanșată de frontiera `set`, ieșirea probe poate folosi tot **`edge committed`** (dacă valoarea `:get` se modifică în acel bloc).
 
 ---
 
@@ -411,6 +468,8 @@ b (1wire) = 1 …
 | `show` + `NEXT(~)` în script | `q=0` apoi `q=1` | Ambele `show` după `NEXT` → ambele `q=1` |
 | `probe` după RUN + schimbare UI | `initialised` apoi `changed` | La fel (teste 800–801) |
 | `probe` în timpul settle RUN (`a = AND(b,1)`) | O linie: `# a = 1 - initialised` (cascade imediat) | Două linii: `# a = 0 - initialised`, `# a = 1 - changed` (814–815) |
+| `probe` + `REG` latch la `clk` 1→0 | `# q = 0 - initialised`, apoi `# q = 1 - edge committed` (816–817) | La fel |
+| `probe` + `[key]` + `REG` după RUN | `initialised` la RUN; `edge committed` la release tastă (818–819) | La fel |
 
 ### 7. `probe` — `initialised` apoi `changed` la settle (815 wave)
 
@@ -465,7 +524,7 @@ probe(a)
 | `peek` | Immediate read at statement | Immediate read + cascade already applied |
 | `probe` | On every value commit | Same |
 
-`probe` is the only one that keeps reporting when values change **after** the initial RUN (e.g. toggling a switch, `setWire` in tests, oscillator ticks). See runnable examples above and tests **804–813** / **800–801**.
+`probe` is the only one that keeps reporting when values change **after** the initial RUN (e.g. toggling a switch, pressing a key, `setWire` in tests, oscillator ticks). See runnable examples above and tests **804–819** / **800–801**.
 
 ---
 

@@ -49,6 +49,7 @@ class Interpreter {
     this.probeTargets = [];
     this.probeByKey = new Map();
     this.probeReasonContext = 'normal';
+    this._probeRegEdgeCommit = false;
     this._probeInitialising = true;
     this.pendingProbeExprs = [];
 
@@ -198,7 +199,12 @@ class Interpreter {
     if (target.lastValue === valueStr) return;
     let reason = reasonOverride;
     if (!reason) {
-      reason = target.seen ? this._probeReasonLabel() : 'initialised';
+      if (this._probeRegEdgeCommit) {
+        reason = 'edge committed';
+        this._probeRegEdgeCommit = false;
+      } else {
+        reason = target.seen ? this._probeReasonLabel() : 'initialised';
+      }
     }
     target.seen = true;
     target.lastValue = valueStr;
@@ -1358,6 +1364,9 @@ const idx = parseInt(
     } else {
       const isFallingEdge = (previousClock === '1' && clock === '0');
       if (isFallingEdge) {
+        if (data !== stored) {
+          this._probeRegEdgeCommit = true;
+        }
         stored = data;
       }
     }

@@ -1681,5 +1681,45 @@ function runProbeInitThenChangedWave(h, session) {
 reg(814, 'debug', 'probe settle RUN — legacy o linie', runProbeInitThenChangedLegacy);
 reg(815, 'debug', 'probe settle RUN — wave initialised apoi changed', runProbeInitThenChangedWave, { propagation: 'wave' });
 
+const PROBE_REG_EDGE = `1wire data := 0
+1wire clk := 0
+1wire q = REG(data, clk, 0)
+probe(q)`;
+
+function runProbeRegEdge(h, session) {
+  const { out, interp } = session.run(PROBE_REG_EDGE);
+  h.assert('probe q=0 initialised', String(out.some(l => l.includes('# q = 0') && l.includes('initialised'))), 'true');
+  session.setWire(interp, 'data', '1');
+  session.setWire(interp, 'clk', '1');
+  session.setWire(interp, 'clk', '0');
+  h.assert('probe q=1 edge committed', String(out.some(l => l.includes('# q = 1') && l.includes('edge committed'))), 'true');
+}
+
+reg(816, 'debug', 'probe REG clk 1→0 — edge committed', runProbeRegEdge);
+reg(817, 'debug', 'probe REG clk 1→0 — edge committed (wave)', runProbeRegEdge, { propagation: 'wave' });
+
+const PROBE_KEY_REG = `1wire data := 1
+comp [key] .clk:
+    label:'A'
+    size: 35
+    on:1
+    :
+1wire clk = .clk
+1wire q = REG(data, clk, 0)
+probe(q)`;
+
+function runProbeKeyReg(h, session) {
+  const { out, interp } = session.run(PROBE_KEY_REG);
+  h.assert('probe q=0 initialised', String(out.some(l => l.includes('# q = 0') && l.includes('initialised'))), 'true');
+  session.setComp(interp, '.clk', '1');
+  h.assert('press — q încă 0', String(session.getWire(interp, 'q')), '0');
+  session.setComp(interp, '.clk', '0');
+  h.assert('release — q=1', String(session.getWire(interp, 'q')), '1');
+  h.assert('probe q=1 edge committed', String(out.some(l => l.includes('# q = 1') && l.includes('edge committed'))), 'true');
+}
+
+reg(818, 'debug', 'probe key + REG — edge committed la release', runProbeKeyReg);
+reg(819, 'debug', 'probe key + REG — edge committed la release (wave)', runProbeKeyReg, { propagation: 'wave' });
+
   suite.finalize();
 })();
