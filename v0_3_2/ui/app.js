@@ -8,6 +8,47 @@ let fss = new FileStorageSystem(sdb);
 let currentFilesLocation = '>';
 window.lib_files = window.lib_files || {};
 
+const PROPAGATION_STORAGE_KEY = 'prog/propagation';
+
+function getPropagationMode() {
+  if (sdb.has(PROPAGATION_STORAGE_KEY)) {
+    const v = sdb.get(PROPAGATION_STORAGE_KEY);
+    return v === 'legacy' ? 'legacy' : 'wave';
+  }
+  return 'wave';
+}
+
+function setPropagationMode(mode) {
+  const m = mode === 'legacy' ? 'legacy' : 'wave';
+  sdb.set(PROPAGATION_STORAGE_KEY, m);
+  updatePropagationToggleUI();
+}
+
+function togglePropagationMode() {
+  setPropagationMode(getPropagationMode() === 'wave' ? 'legacy' : 'wave');
+}
+
+function createSignalStrategy() {
+  const mode = getPropagationMode();
+  if (typeof createSignalPropagationStrategy === 'function') {
+    return createSignalPropagationStrategy(mode);
+  }
+  return null;
+}
+
+function updatePropagationToggleUI() {
+  const btn = document.getElementById('propMode');
+  if (!btn) return;
+  const mode = getPropagationMode();
+  btn.textContent = mode;
+  btn.className = 'btn prop-toggle prop-toggle--' + mode;
+  btn.title = 'Signal propagation: ' + mode + ' (applies on next Run)';
+}
+
+function createInterpreter(funcs, pcbs, registry) {
+  return new Interpreter(funcs, [], pcbs, registry, createSignalStrategy());
+}
+
 async function init() {
   initFiles();
   const elCode = document.getElementById('code');
@@ -67,6 +108,8 @@ async function init() {
       onCodeChange();
     }
   });
+
+  updatePropagationToggleUI();
 }
 
 function run(){
@@ -98,14 +141,13 @@ function run(){
   saveDb(code.value, currentFileName);
   const processedCode = preprocessRepeat(code.value);
   const _registry = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
-  const _signalPropagationStrategy = (typeof createSignalPropagationStrategy === 'function') ? createSignalPropagationStrategy('wave') : null;
   const p = new Parser(new Tokenizer(processedCode), _registry);
   const stmts = p.parse();
   document.getElementById('ast').textContent=JSON.stringify(stmts,null,2);
 
   console.log('STMTS: ',  stmts);
 
-  globalInterp = new Interpreter(p.funcs, [], p.pcbs, _registry, _signalPropagationStrategy);
+  globalInterp = createInterpreter(p.funcs, p.pcbs, _registry);
   globalInterp.aliases = p.aliases;
 
   for (const s of stmts) {
@@ -137,10 +179,9 @@ function sendCmd(){
   try{
     if(!globalInterp){
       const _reg = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
-      const _sig = (typeof createSignalPropagationStrategy === 'function') ? createSignalPropagationStrategy('wave') : null;
       const p = new Parser(new Tokenizer(preprocessRepeat(code.value)), _reg);
       const stmts = p.parse();
-      globalInterp = new Interpreter(p.funcs, [], p.pcbs, _reg, _sig);
+      globalInterp = createInterpreter(p.funcs, p.pcbs, _reg);
       
       for(const s of stmts){
         globalInterp.exec(s, true);

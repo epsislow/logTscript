@@ -19,7 +19,7 @@ This document explains **what you see** when values spread through your circuit.
 
 ## Wave (default in the editor)
 
-The **Wave** model is used when you run programs in the editor. It works like a small simulation:
+The **Wave** model is used when you run programs in the editor (orange pill in the toolbar; see [editorUI.md](editorUI.md)). It works like a small simulation:
 
 1. Changes are collected (wires and component outputs).
 2. Dependent wires are recalculated until nothing else changes.
@@ -60,7 +60,7 @@ After **RUN**, `a` is `0` and `b` is `1`. When you flip the switch in the panel,
 
 ## Legacy
 
-**Legacy** propagation is the older model, still available for compatibility and some automated tests. It updates wires **immediately** as each assignment runs, in program order.
+**Legacy** propagation is the older model (green pill in the editor toolbar; see [editorUI.md](editorUI.md)). It updates wires **immediately** as each assignment runs, in program order. Automated tests in `run_tests` also use Legacy unless marked **wave**.
 
 For most small programs the result is the same as Wave. Differences are rare and usually involve unusual feedback loops (a wire that depends on its own previous value in the same update). New projects should rely on the editor’s default (Wave); you do not need to configure anything.
 
@@ -146,6 +146,7 @@ For examples and edge cases, see PCB tests **500–515** (legacy) and **516–53
 
 ## Related documentation
 
+- [Editor run controls](editorUI.md) — Run, Next, Wave / Legacy toggle
 - [Interactive components](interactive-components.md) — switch, key, dip, rotary inputs
 - [REG](reg.md) — wire-clock falling edge and `NEXT` clock (`~`)
 - [Oscillator](oscillator.md) — real-time `osc` and wire connections
