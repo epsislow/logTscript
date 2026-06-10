@@ -68,21 +68,15 @@ var OscComponent = class OscComponent extends BuiltinComponent {
     }
 
     function goHigh() {
-      const stored = ctx.storage.find(s => s.index === storageIdx);
-      if (stored) stored.value = '1';
       if (eachCycle === 0) incrementCounter();
-      ctx.updateComponentConnections(name);
-      if (typeof showVars === 'function') showVars();
+      ctx.scheduleComponentOutputChange(name, '1');
       const tid = setTimeout(goLow, highTime);
       ctx.oscTimers.push(tid);
     }
 
     function goLow() {
-      const stored = ctx.storage.find(s => s.index === storageIdx);
-      if (stored) stored.value = '0';
       incrementCounter();
-      ctx.updateComponentConnections(name);
-      if (typeof showVars === 'function') showVars();
+      ctx.scheduleComponentOutputChange(name, '0');
       const tid = setTimeout(goHigh, lowTime);
       ctx.oscTimers.push(tid);
     }

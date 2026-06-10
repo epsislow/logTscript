@@ -94,6 +94,23 @@ When the counter reaches its maximum value (all bits set to 1), it **wraps aroun
 
 ---
 
+## Connecting to wires
+
+Wires that read the oscillator (`.osc1`, `.osc1:get`, or `.osc1:counter`) follow the signal as it changes in real time. You do not need to call `NEXT(~)` for the oscillator to run — only for logic that depends on `~` elsewhere in the program.
+
+```
+comp [~] .clk:
+  freq: 2
+  :
+
+1wire clock = .clk:get
+1wire ledOn = clock
+```
+
+Each time the oscillator goes HIGH or LOW, `clock` and any wires derived from it are updated automatically. See [signal-propagation.md](signal-propagation.md).
+
+---
+
 ## Outputs
 
 The oscillator exposes 3 readable properties:

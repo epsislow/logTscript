@@ -36,23 +36,23 @@ todos:
     content: "Teste 600–607 pe wave; restul suite legacy default; 704 amânat"
     status: completed
   - id: reg-wave-faza2
-    content: "REG builtin ~ pe wave (test 704) — advanceRegTildeLatchesForWave + onNextCycle"
-    status: pending
+    content: "REG builtin ~ pe wave (test 704) — advanceRegTildeLatchesForWave + getWireEffectiveValue"
+    status: completed
   - id: components-c1-c2
     content: "C1-C2: componentPendingStates, scheduleComponentOutputChange, extindere propagate() (commit comp înainte de wire)"
-    status: pending
+    status: completed
   - id: components-c3
     content: "C3: buildComponentDependentsIndex + _scheduleWiresDependingOnComponent; elimină waveWireScheduled"
-    status: pending
+    status: completed
   - id: components-c6
     content: "C6: handlers switch/key/dip/rotary/osc/reg → scheduleComponentOutputChange"
-    status: pending
+    status: completed
   - id: components-c4-c5
     content: "C4-C5: sync extins _finishPropagate + updateComponentConnections fără scriere wire directă pe wave"
-    status: pending
+    status: completed
   - id: components-wave-tests
-    content: "Teste 608-612 wave; regresie 600-607, 701, Run All legacy"
-    status: pending
+    content: "Teste 608-611 wave; regresie 600-607, 701, 704; Run All 281/284"
+    status: completed
   - id: pcb-faza3
     content: "PCB property blocks on:1 + teste 500–515 pe wave — fază separată"
     status: pending

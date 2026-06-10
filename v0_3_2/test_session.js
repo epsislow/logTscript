@@ -101,6 +101,12 @@
         }
       },
 
+      setComp(interp, name, val) {
+        const i = interp || this.interp;
+        if (!i) return;
+        i.scheduleComponentOutputChange(name, val);
+      },
+
       execNext(interp, count = 1) {
         const i = interp || this.interp;
         if (!i) return;

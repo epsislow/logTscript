@@ -69,6 +69,16 @@ class Interpreter {
     return this.getValueFromRef(wire.ref);
   }
 
+  getWireEffectiveValue(name) {
+    if (this.deferWirePropagation() && this.signalPropagationStrategy) {
+      const pending = this.signalPropagationStrategy.wirePendingStates;
+      if (pending && pending.has(name)) {
+        return pending.get(name);
+      }
+    }
+    return this.getWireStableValue(name);
+  }
+
   writeWireStable(name, value) {
     const wire = this.wires.get(name);
     if (!wire) return;
@@ -123,6 +133,43 @@ class Interpreter {
     }
     this.writeWireStable(name, value);
     return true;
+  }
+
+  getComponentStableValue(compName) {
+    const comp = this.components.get(compName);
+    if (!comp || !comp.ref || comp.ref === '&-') return null;
+    return this.getValueFromRef(comp.ref);
+  }
+
+  writeComponentStable(compName, value) {
+    const comp = this.components.get(compName);
+    if (!comp || !comp.ref || comp.ref === '&-') return;
+    const bits = this.getComponentBits(comp.type, comp.attributes) || value.length;
+    let v = value;
+    if (v.length < bits) v = v.padStart(bits, '0');
+    else if (v.length > bits) v = v.substring(v.length - bits);
+    this.setValueAtRef(comp.ref, v);
+  }
+
+  scheduleComponentOutputChange(compName, value) {
+    if (this.deferWirePropagation() && this.signalPropagationStrategy) {
+      const scheduled = this.signalPropagationStrategy.scheduleComponentChange(compName, value);
+      if (scheduled) this.signalPropagationStrategy.propagate();
+      return;
+    }
+    this.writeComponentStable(compName, value);
+    this.updateComponentConnections(compName);
+    if (typeof showVars === 'function') showVars();
+  }
+
+  advanceRegTildeLatchesForWave() {
+    if (!this.regPendingMap) return;
+    for (const pending of this.regPendingMap.values()) {
+      if (pending && pending.cycle < this.cycle) {
+        pending.output = pending.value;
+        pending.cycle = this.cycle;
+      }
+    }
   }
 
   collectWireInputsFromExpr(expr, outSet) {
@@ -850,9 +897,9 @@ class Interpreter {
       let type = null;
       
       if(wire){
-        // Always read the current value from storage (don't cache)
-        // This ensures we get the updated value when storage is modified in WIREWRITE mode
-        val = this.getValueFromRef(wire.ref);
+        // Wave: citește și valorile pending din aceeași propagare (ordine program).
+        val = this.getWireEffectiveValue(a.var);
+        if (val === null) val = this.getValueFromRef(wire.ref);
         ref = wire.ref;
         type = wire.type;
         // If wire has no value yet, treat as 0 for computation (but show as -)
@@ -1013,6 +1060,9 @@ const idx = parseInt(
   const argValues = args.map(x => {
     const r = this.evalExpr(x, computeRefs);
     return r.map(p => {
+      if (p.value !== undefined && p.value !== null && p.value !== '-') {
+        return p.value;
+      }
       if (p.ref && p.ref !== '&-') {
         const v = this.getValueFromRef(p.ref);
         if (v != null) return v;
@@ -2990,11 +3040,14 @@ if (s.assignment) {
         const exprResult = this.evalExpr(s.assignment.expr, false);
         let totalValue = '';
         for(const part of exprResult){
+          if(part.value !== undefined && part.value !== null && part.value !== '-'){
+            totalValue += part.value;
+            continue;
+          }
           if(part.ref && part.ref !== '&-'){
             const val = this.getValueFromRef(part.ref);
             if(val){ totalValue += val; continue; }
           }
-          if(part.value) totalValue += part.value;
         }
         let wireValue = totalValue.substring(0, bits);
         if(wireValue.length < bits) wireValue = wireValue.padStart(bits, '0');
@@ -3042,16 +3095,16 @@ if (s.assignment) {
     // Always prefer reading from ref to get current value (important for WIREWRITE mode)
     let totalValue = '';
     for(const part of exprResult){
+      if(part.value !== undefined && part.value !== null && part.value !== '-'){
+        totalValue += part.value;
+        continue;
+      }
       if(part.ref && part.ref !== '&-'){
         const val = this.getValueFromRef(part.ref);
         if(val) {
           totalValue += val;
           continue;
         }
-      }
-      // Fallback to part.value if no ref or ref didn't yield a value
-      if(part.value){
-        totalValue += part.value;
       }
     }
     //console.log(`[DEBUG execWireStmt] '${wsName}' computed totalValue='${totalValue}'`);
@@ -3344,25 +3397,13 @@ if (s.assignment) {
       // Create onPress handler (sets to 1 immediately)
       // Capture keyRef directly in closure
       const onPress = (pressedLabel) => {
-        const keyStorageIdx = parseInt(keyRef.substring(1));
-        const stored = this.storage.find(s => s.index === keyStorageIdx);
-        if(stored){
-          stored.value = '1';
-          this.updateComponentConnections(name);
-          showVars();
-        }
+        this.scheduleComponentOutputChange(name, '1');
       };
       
       // Create onRelease handler (sets to 0 after pressDuration)
       // Capture keyRef directly in closure
       const onRelease = () => {
-        const keyStorageIdx = parseInt(keyRef.substring(1));
-        const stored = this.storage.find(s => s.index === keyStorageIdx);
-        if(stored){
-          stored.value = '0';
-          this.updateComponentConnections(name);
-          showVars();
-        }
+        this.scheduleComponentOutputChange(name, '0');
       };
       
       if(typeof addKey === 'function'){

@@ -74,6 +74,8 @@ Bit order is left-to-right: the leftmost bit controls the first (leftmost) LED.
 
 ## Wire connection
 
+When a wire connected to an LED changes (from code, from another component, or after **RUN** / **NEXT**), the LEDs update to match. See [signal-propagation.md](signal-propagation.md).
+
 Connect the LED group to a wire of matching width:
 
 ```

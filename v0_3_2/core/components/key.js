@@ -47,27 +47,15 @@ var KeyComponent = class KeyComponent extends BuiltinComponent {
     const deviceIds = [keyId];
 
     const onPress = (pressedLabel) => {
-      const keyStorageIdx = parseInt(keyRef.substring(1));
-      const stored = ctx.storage.find(s => s.index === keyStorageIdx);
-      if (stored) {
-        stored.value = '1';
-        ctx.clog('onPress');
-        ctx.updateComponentConnections(name);
-        ctx.showlog(1);
-        if (typeof showVars === 'function') showVars();
-      }
+      ctx.clog('onPress');
+      ctx.scheduleComponentOutputChange(name, '1');
+      ctx.showlog(1);
     };
 
     const onRelease = () => {
-      const keyStorageIdx = parseInt(keyRef.substring(1));
-      const stored = ctx.storage.find(s => s.index === keyStorageIdx);
-      if (stored) {
-        stored.value = '0';
-        ctx.clog('onRelease');
-        ctx.updateComponentConnections(name);
-        ctx.showlog(1);
-        if (typeof showVars === 'function') showVars();
-      }
+      ctx.clog('onRelease');
+      ctx.scheduleComponentOutputChange(name, '0');
+      ctx.showlog(1);
     };
 
     if (typeof addKey === 'function') {

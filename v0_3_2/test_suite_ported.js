@@ -1203,6 +1203,54 @@ reg(607, 'signal', 'paralelism ramuri — ordinea sursei nu conteaza', function(
   h.assert('607 T=AND(Z,B)=0', session.getWire(interp, 'T'), '0');
 }, { propagation: 'wave' });
 
+reg(608, 'signal', 'switch → wire → cascadat NOT (wave)', function(h, session) {
+  const { interp } = session.run(`
+comp [switch] .sw::
+
+1wire a = .sw:get
+1wire b = NOT(a)`);
+  h.assert('608 initial b=NOT(0)=1', session.getWire(interp, 'b'), '1');
+  session.setComp(interp, '.sw', '1');
+  h.assert('608 a=1 dupa switch', session.getWire(interp, 'a'), '1');
+  h.assert('608 b=0 dupa switch', session.getWire(interp, 'b'), '0');
+}, { propagation: 'wave' });
+
+reg(609, 'signal', 'key press → wire (wave)', function(h, session) {
+  const { interp } = session.run(`
+comp [key] .k::
+
+1wire a = .k:get`);
+  h.assert('609 initial a=0', session.getWire(interp, 'a'), '0');
+  session.setComp(interp, '.k', '1');
+  h.assert('609 a=1 dupa key press', session.getWire(interp, 'a'), '1');
+  session.setComp(interp, '.k', '0');
+  h.assert('609 a=0 dupa key release', session.getWire(interp, 'a'), '0');
+}, { propagation: 'wave' });
+
+reg(610, 'signal', 'dip → wire multi-bit (wave)', function(h, session) {
+  const { interp } = session.run(`
+comp [dip] .d:
+  length: 4
+  :
+
+4wire a = .d:get`);
+  h.assert('610 initial a=0000', session.getWire(interp, 'a'), '0000');
+  session.setComp(interp, '.d', '1010');
+  h.assert('610 a=1010 dupa dip', session.getWire(interp, 'a'), '1010');
+}, { propagation: 'wave' });
+
+reg(611, 'signal', 'osc output → wire (wave, manual tick)', function(h, session) {
+  const { interp } = session.run(`
+comp [osc] .o .freq=10 .duration1=1 .duration0=1::
+
+1wire a = .o:get`);
+  h.assert('611 initial a=0', session.getWire(interp, 'a'), '0');
+  session.setComp(interp, '.o', '1');
+  h.assert('611 a=1 dupa osc high', session.getWire(interp, 'a'), '1');
+  session.setComp(interp, '.o', '0');
+  h.assert('611 a=0 dupa osc low', session.getWire(interp, 'a'), '0');
+}, { propagation: 'wave' });
+
 reg(700, 'reg', 'REG cu wire clock — latch transparent', function(h, session) {
   const { interp } = session.run(`
 1wire data = 0
@@ -1239,10 +1287,7 @@ function runReg701NextBased(h, session) {
 
 reg(701, 'reg', 'REG cu clock ~ — NEXT-based', runReg701NextBased);
 
-// Test 704 (REG + ~ + NEXT pe wave) — amânat faza 2.
-// Vezi .cursor/plans/wave_signal_propagation_5efca976.plan.md secțiunea „Faza 2 — REG + wave”.
-// Funcția runReg701NextBased rămâne partajată pentru când reactivăm:
-// reg(704, 'reg', 'REG cu clock ~ — NEXT-based (wave)', runReg701NextBased, { propagation: 'wave' });
+reg(704, 'reg', 'REG cu clock ~ — NEXT-based (wave)', runReg701NextBased, { propagation: 'wave' });
 
 reg(702, 'reg', 'REG clear override', function(h, session) {
   const { interp } = session.run(`

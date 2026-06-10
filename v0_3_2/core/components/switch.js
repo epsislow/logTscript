@@ -41,16 +41,7 @@ var SwitchComponent = class SwitchComponent extends BuiltinComponent {
     const deviceIds = [switchId];
 
     const onChange = (checked) => {
-      const compInfo = ctx.components.get(name);
-      if (compInfo && compInfo.ref) {
-        const sIdx = parseInt(compInfo.ref.substring(1));
-        const stored = ctx.storage.find(s => s.index === sIdx);
-        if (stored) {
-          stored.value = checked ? '1' : '0';
-          ctx.updateComponentConnections(name);
-          if (typeof showVars === 'function') showVars();
-        }
-      }
+      ctx.scheduleComponentOutputChange(name, checked ? '1' : '0');
     };
 
     if (typeof addSwitch === 'function') {

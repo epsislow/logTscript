@@ -60,23 +60,15 @@ var DipComponent = class DipComponent extends BuiltinComponent {
 
     const onChange = (index, checked) => {
       const compInfo = ctx.components.get(name);
-      if (compInfo && compInfo.ref) {
-        const sIdx = parseInt(compInfo.ref.substring(1));
-        const stored = ctx.storage.find(s => s.index === sIdx);
-        if (stored) {
-          let currentValue = stored.value || '0'.repeat(count);
-          if (currentValue.length < count) { currentValue = currentValue.padEnd(count, '0'); }
-          else if (currentValue.length > count) { currentValue = currentValue.substring(0, count); }
-          const bitsArr = currentValue.split('');
-          bitsArr[index] = checked ? '1' : '0';
-          stored.value = bitsArr.join('');
-          
-          ctx.clog('onChange');
-          ctx.updateComponentConnections(name);
-          if (typeof showVars === 'function') showVars();
-          ctx.showlog(1);
-        }
-      }
+      if (!compInfo || !compInfo.ref) return;
+      let currentValue = ctx.getComponentStableValue(name) || '0'.repeat(count);
+      if (currentValue.length < count) currentValue = currentValue.padEnd(count, '0');
+      else if (currentValue.length > count) currentValue = currentValue.substring(0, count);
+      const bitsArr = currentValue.split('');
+      bitsArr[index] = checked ? '1' : '0';
+      ctx.clog('onChange');
+      ctx.scheduleComponentOutputChange(name, bitsArr.join(''));
+      ctx.showlog(1);
     };
 
     if (typeof addDipSwitch === 'function') {

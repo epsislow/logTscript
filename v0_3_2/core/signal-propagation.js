@@ -7,8 +7,10 @@ class SignalPropagationStrategy {
     this.deferWireWrites = false;
     this.deferShow = false;
     this.wirePendingStates = new Map();
+    this.componentPendingStates = new Map();
     this._deferredShows = [];
     this._wireDependentsIndex = null;
+    this._componentDependentsIndex = null;
     this._recomputeAllWires = false;
   }
 
@@ -28,8 +30,31 @@ class SignalPropagationStrategy {
     return true;
   }
 
+  scheduleComponentChange(compName, value) {
+    if (value === null || value === undefined) return false;
+    const stable = this.interp.getComponentStableValue(compName);
+    if (stable === value) return false;
+    this.componentPendingStates.set(compName, value);
+    return true;
+  }
+
   hasPendingChanges() {
-    return this.wirePendingStates.size > 0 || this._recomputeAllWires;
+    return this.wirePendingStates.size > 0
+      || this.componentPendingStates.size > 0
+      || this._recomputeAllWires;
+  }
+
+  commitComponentOutputs() {
+    const changed = new Set();
+    for (const [name, value] of this.componentPendingStates.entries()) {
+      const stable = this.interp.getComponentStableValue(name);
+      if (stable !== value) {
+        this.interp.writeComponentStable(name, value);
+        changed.add(name);
+      }
+    }
+    this.componentPendingStates.clear();
+    return changed;
   }
 
   commitPendingWires() {
@@ -72,13 +97,55 @@ class SignalPropagationStrategy {
     return toExec;
   }
 
+  buildComponentDependentsIndex() {
+    const index = new Map();
+    const interp = this.interp;
+    if (!interp) return;
+    for (const ws of interp.wireStatements) {
+      const expr = ws.assignment ? ws.assignment.expr : ws.expr;
+      if (!expr) continue;
+      for (const [compName, comp] of interp.components.entries()) {
+        if (interp.exprReferencesComponent(expr, compName, comp.ref)) {
+          if (!index.has(compName)) index.set(compName, new Set());
+          index.get(compName).add(ws);
+        }
+      }
+    }
+    this._componentDependentsIndex = index;
+  }
+
   initializeFromElaboration() {
     this.buildWireDependentsIndex();
+    this.buildComponentDependentsIndex();
     this._recomputeAllWires = true;
   }
 
   onNextCycle() {
     this._recomputeAllWires = true;
+  }
+
+  _scheduleWiresDependingOnComponent(compName, executedThisPropagate) {
+    const interp = this.interp;
+    if (!interp) return false;
+    let anyScheduled = false;
+    const index = this._componentDependentsIndex;
+    const toExec = index && index.has(compName)
+      ? index.get(compName)
+      : null;
+
+    if (toExec) {
+      for (const ws of toExec) {
+        if (executedThisPropagate.has(ws)) continue;
+        executedThisPropagate.add(ws);
+        const outputs = interp.execWireStatement(ws, true);
+        if (outputs && outputs.length) {
+          for (const [name, val] of outputs) {
+            if (this.scheduleWireChange(name, val)) anyScheduled = true;
+          }
+        }
+      }
+    }
+    return anyScheduled;
   }
 
   enqueueShow(stmt) {
@@ -99,10 +166,14 @@ class SignalPropagationStrategy {
   _syncComponentsAfterPropagate(allChanged) {
     const interp = this.interp;
     if (!interp || allChanged.size === 0) return;
-    for (const wireName of allChanged) {
-      const val = interp.getWireStableValue(wireName);
-      if (val !== null) {
-        interp.updateConnectedComponents(wireName, val, null, true);
+    for (const name of allChanged) {
+      if (interp.wires.has(name)) {
+        const val = interp.getWireStableValue(name);
+        if (val !== null) {
+          interp.updateConnectedComponents(name, val, null, true);
+        }
+      } else if (interp.components.has(name)) {
+        interp.updateComponentConnections(name);
       }
     }
     if (typeof showVars === 'function') showVars();
@@ -123,6 +194,15 @@ class LegacyCascadePropagationStrategy extends SignalPropagationStrategy {
 
   initializeFromElaboration() {
     this.buildWireDependentsIndex();
+    this.buildComponentDependentsIndex();
+  }
+
+  scheduleComponentChange() {
+    return false;
+  }
+
+  commitComponentOutputs() {
+    return new Set();
   }
 
   propagate() {}
@@ -135,14 +215,22 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
     this.deferShow = true;
   }
 
+  onNextCycle() {
+    this._recomputeAllWires = true;
+    if (this.interp && typeof this.interp.advanceRegTildeLatchesForWave === 'function') {
+      this.interp.advanceRegTildeLatchesForWave();
+    }
+  }
+
   propagate() {
     const interp = this.interp;
     if (!interp) return;
 
     const allChanged = new Set();
-    const maxWaves = Math.max(interp.wires.size * 2 + 10, 16);
-    // Each wire statement runs at most once per propagate() — mirrors legacy
-    // _uccExecutedStatements and prevents self-ref loops (MUX toggle, NOT(a)).
+    const maxWaves = Math.max(
+      (interp.wires.size + interp.components.size) * 2 + 10,
+      16
+    );
     const executedThisPropagate = new Set();
 
     if (this._recomputeAllWires) {
@@ -158,18 +246,26 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
       }
     }
 
-    if (!this.hasPendingChanges() && allChanged.size === 0) {
-      return;
+    if (!this.hasPendingChanges()) {
+      if (allChanged.size === 0) return;
     }
 
     for (let wave = 0; wave < maxWaves; wave++) {
+      const compsChanged = this.commitComponentOutputs();
+      for (const c of compsChanged) allChanged.add(c);
+
+      let anyScheduled = false;
+      for (const compName of compsChanged) {
+        if (this._scheduleWiresDependingOnComponent(compName, executedThisPropagate)) {
+          anyScheduled = true;
+        }
+        interp.updateComponentConnections(compName, new Set());
+      }
+
       const changed = this.commitPendingWires();
-      if (changed.size === 0 && wave > 0) break;
       for (const n of changed) allChanged.add(n);
 
       const toExec = this.collectAffectedStatements(changed);
-      let anyScheduled = false;
-
       for (const ws of toExec) {
         if (executedThisPropagate.has(ws)) continue;
         executedThisPropagate.add(ws);
@@ -181,8 +277,11 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         }
       }
 
-      if (changed.size === 0 && !anyScheduled) break;
-      if (!anyScheduled && changed.size === 0) break;
+      if (compsChanged.size === 0 && changed.size === 0 && !anyScheduled) {
+        if (wave > 0) break;
+        if (!this.hasPendingChanges()) break;
+      }
+      if (wave > 0 && compsChanged.size === 0 && changed.size === 0 && !anyScheduled) break;
     }
 
     this._finishPropagate(allChanged);
@@ -294,8 +393,6 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
   if(isUccTopLevel){
     this._uccPendingBlocks = new Map();
   }
-  let waveWireScheduled = false;
-
   const comp = this.components.get(compName);
   if(!comp){
     if(isUccTopLevel) this._uccPendingBlocks = null;
@@ -680,10 +777,8 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
     }
   }
   
-  // Also update wires that reference this component
-  // Re-execute wire statements that might depend on this component
-//  console.log(`[DEBUG updateCompConn] ${compName}: scanning ${this.wireStatements.length} wireStatements`);
-  for(const ws of this.wireStatements){
+  // Also update wires that reference this component (legacy only — wave uses propagate index)
+  if (!this.deferWirePropagation()) for(const ws of this.wireStatements){
     // Handle assignment statements: name = expr
     if(ws.assignment){
       const wireName = ws.assignment.target.var;
@@ -721,12 +816,8 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                 const oldValue = stored.value;
                 // console.log(`[DEBUG updateCompConn] wire '${wireName}' oldValue=${oldValue} newValue=${wireValue}`);
                 if(oldValue !== wireValue){
-                  if (this.deferWirePropagation()) {
-                    if (this.scheduleWireChange(wireName, wireValue)) waveWireScheduled = true;
-                  } else {
-                    stored.value = wireValue;
-                    this.updateConnectedComponents(wireName, wireValue);
-                  }
+                  stored.value = wireValue;
+                  this.updateConnectedComponents(wireName, wireValue);
                 }
               }
             }
@@ -796,26 +887,18 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                       const oldValue = stored.value;
                       // console.log(`[DEBUG updateCompConn] decl wire '${wireName}' oldValue=${oldValue} newValue=${wireValue}`);
                       if(oldValue !== wireValue){
-                        if (this.deferWirePropagation()) {
-                          if (this.scheduleWireChange(wireName, wireValue)) waveWireScheduled = true;
-                        } else {
-                          stored.value = wireValue;
-                          this.updateConnectedComponents(wireName, wireValue);
-                        }
+                        stored.value = wireValue;
+                        this.updateConnectedComponents(wireName, wireValue);
                       }
                     }
                   }
                 } else {
-                  if (this.deferWirePropagation()) {
-                    if (this.scheduleWireChange(wireName, wireValue)) waveWireScheduled = true;
-                  } else {
-                    const storageIdx = this.storeValue(wireValue);
-                    wire.ref = `&${storageIdx}`;
-                    if(!this.wireStorageMap.has(wireName)){
-                      this.wireStorageMap.set(wireName, storageIdx);
-                    }
-                    this.updateConnectedComponents(wireName, wireValue);
+                  const storageIdx = this.storeValue(wireValue);
+                  wire.ref = `&${storageIdx}`;
+                  if(!this.wireStorageMap.has(wireName)){
+                    this.wireStorageMap.set(wireName, storageIdx);
                   }
+                  this.updateConnectedComponents(wireName, wireValue);
                 }
               } catch(e){
                 // console.log(`[DEBUG updateCompConn] ERROR updating decl wire '${wireName}':`, e.message);
@@ -1094,9 +1177,6 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
     }
   }
 
-  if (waveWireScheduled && this.signalPropagationStrategy) {
-    this.signalPropagationStrategy.propagate();
-  }
 };
 
 // Collect all component and wire dependencies from an expression

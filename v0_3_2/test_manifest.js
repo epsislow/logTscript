@@ -281,10 +281,15 @@
       { id: 605, group: 'signal', title: 'auto-referinta a = NOT(a) — executata o singura data per cascada' },
       { id: 606, group: 'signal', title: 'wire multi-decl — propagare individuala per wire' },
       { id: 607, group: 'signal', title: 'paralelism ramuri — ordinea sursei nu conteaza' },
+      { id: 608, group: 'signal', title: 'switch → wire → cascadat NOT (wave)' },
+      { id: 609, group: 'signal', title: 'key press → wire (wave)' },
+      { id: 610, group: 'signal', title: 'dip → wire multi-bit (wave)' },
+      { id: 611, group: 'signal', title: 'osc output → wire (wave, manual tick)' },
       { id: 700, group: 'reg', title: 'REG cu wire clock — latch transparent' },
       { id: 701, group: 'reg', title: 'REG cu clock ~ — NEXT-based' },
       { id: 702, group: 'reg', title: 'REG clear override' },
-      { id: 703, group: 'reg', title: 'REG multi-bit (4bit)' }
+      { id: 703, group: 'reg', title: 'REG multi-bit (4bit)' },
+      { id: 704, group: 'reg', title: 'REG cu clock ~ — NEXT-based (wave)' }
     ],
     groups: [
       { id: 'repeat', label: 'Repeat preprocessor', rangeLabel: '6–21', testIds: [6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21] },
@@ -299,8 +304,8 @@
       { id: 'doc', label: 'doc() tests', rangeLabel: '300–352', testIds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352] },
       { id: 'doc-comp', label: 'doc(comp) / doc(pcb)', rangeLabel: '400–427', testIds: [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427] },
       { id: 'pcb', label: 'PCB property block', rangeLabel: '500–515', testIds: [500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515] },
-      { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–607', testIds: [600, 601, 602, 603, 604, 605, 606, 607] },
-      { id: 'reg', label: 'REG builtin', rangeLabel: '700–703', testIds: [700, 701, 702, 703] }
+      { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611] },
+      { id: 'reg', label: 'REG builtin', rangeLabel: '700–704', testIds: [700, 701, 702, 703, 704] }
     ]
   };
 })();

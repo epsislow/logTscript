@@ -55,10 +55,6 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
     const rotaryId = baseId;
 
     const onChange = (binValue) => {
-      if (!rotaryRef) return;
-      const sIdx = parseInt(rotaryRef.substring(1));
-      const stored = ctx.storage.find(s => s.index === sIdx);
-      if (!stored) return;
       const compInfo = ctx.components.get(name);
       if (!compInfo) return;
       if (!compInfo.ref) compInfo.ref = rotaryRef;
@@ -67,9 +63,7 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
       let value = binValue;
       if (value.length < cb) value = value.padStart(cb, '0');
       else if (value.length > cb) value = value.substring(0, cb);
-      stored.value = value;
-      ctx.updateComponentConnections(name);
-      if (typeof showVars === 'function') showVars();
+      ctx.scheduleComponentOutputChange(name, value);
     };
 
     if (typeof addRotaryKnob === 'function') {

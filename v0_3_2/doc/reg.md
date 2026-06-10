@@ -64,6 +64,8 @@ When `clock` is the special symbol `~`, `REG` behaves as an **edge-triggered reg
 - Wire changes to `data` between two NEXT calls **do not affect the output**
 - `clear = 1` clears the pending value so the next NEXT produces all zeros
 
+This behavior is the same in the editor (Wave propagation) and in Legacy mode. See [signal-propagation.md](signal-propagation.md) for when wires and displays update.
+
 ```
 1wire data = 1
 1wire q = REG(data, ~, 0)
