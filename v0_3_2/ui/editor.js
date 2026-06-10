@@ -129,7 +129,7 @@ function nameIsValid(name, isDir) {
   invalidFileReg = /[^a-zA-Z0-9._]/;
   invalidDirReg = /[^a-zA-Z0-9_]/;
   if(!(isDir ? dirReg: fileReg).test(name)) {
-    let invalidMatch = name.match(isDir? invalidFileReg: invalidDirReg);
+    let invalidMatch = name.match(isDir ? invalidDirReg : invalidFileReg);
     throw Error('Name contains bad caracter: ' + invalidMatch[0]);
   }
 }

@@ -68,7 +68,7 @@ async function init() {
   elName.addEventListener('input', (event) => {
     if(elName.value.trim().length == 0) {
       elSave.disabled=1;
-      dirSave.disable=1;
+      dirSave.disabled=1;
     } else {
       elSave.disabled=0;
       dirSave.disabled=0;

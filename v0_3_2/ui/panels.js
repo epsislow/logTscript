@@ -33,7 +33,6 @@ function toggleOutput() {
   const panel = document.getElementById('outputPanel');
   if (panel.style.display === 'none') {
     panel.style.display = 'block';
-    fShowFiles();
   } else {
     panel.style.display = 'none';
   }
@@ -43,7 +42,7 @@ function toggleFiles(){
   const panel = document.getElementById('filesPanel');
   if (panel.style.display === 'none') {
     panel.style.display = 'block';
-    fShowFiles();
+    showFiles();
   } else {
     panel.style.display = 'none';
   }
