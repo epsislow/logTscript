@@ -22,13 +22,15 @@ The bit width is inferred automatically from the `data` argument at runtime — 
 
 ## Clock modes
 
-### Wire clock — transparent latch
+### Wire clock — falling-edge triggered
 
-When `clock` is a regular wire, `REG` behaves as a **transparent latch**:
+When `clock` is a regular wire, `REG` behaves as a **falling-edge register**:
 
-- `clock = 1` → output follows `data` immediately (transparent)
-- `clock = 0` → output holds its last captured value
-- `clear = 1` → output is forced to all zeros (overrides clock)
+- On **falling edge** (`clock` goes `1` → `0`): output ← current `data`
+- Between edges: output **holds** its last latched value (changes to `data` while `clk = 1` do not update the output yet)
+- `clear = 1` → output is forced to all zeros immediately (overrides clock)
+
+This matches typical counter / state-machine usage with a DIP or key as clock: prepare `data` while `clk = 1`, then pulse `clk` low to capture.
 
 ```
 1wire data = 0
@@ -38,23 +40,26 @@ When `clock` is a regular wire, `REG` behaves as a **transparent latch**:
 # q = 0
 
 data = 1
-# q = 0  (clk is 0, hold)
+# q = 0  (no falling edge yet)
 
 clk = 1
-# q = 1  (transparent: clk=1, data=1)
+# q = 0  (rising edge does not latch)
 
 data = 0
-# q = 0  (transparent: clk still 1, data changed)
+# q = 0  (still holding; data can change while clk=1)
 
 clk = 0
-# q = 0  (hold)
+# q = 0  (falling edge: captured data=0)
 
 data = 1
-# q = 0  (hold: clk=0, pending=1)
-
 clk = 1
-# q = 1  (transparent: clk=1, latches current data=1)
+# q = 0  (hold until next falling edge)
+
+clk = 0
+# q = 1  (falling edge: captured data=1)
 ```
+
+Works the same in **Legacy** and **Wave** propagation — on Wave, a `setWire(clk, 0)` that completes a `1→0` transition triggers the latch and propagates to downstream wires in the same step.
 
 ### NEXT clock — `~`
 
@@ -111,13 +116,18 @@ The register width is determined entirely by `data`. No suffix is required:
 1wire clk  = 1
 1wire clr  = 0
 4wire q = REG(data, clk, clr)
-# q = 1111  (clk=1, transparent)
+# q = 0000  (no falling edge yet)
+
+clk = 0
+# q = 1111  (falling edge captured data)
 
 clr = 1
 # q = 0000  (clear overrides)
 
 clr = 0
-# q = 1111  (transparent again: clk=1, data=1111)
+clk = 1
+clk = 0
+# q = 1111  (falling edge captured data again)
 ```
 
 ---

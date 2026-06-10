@@ -1253,25 +1253,35 @@ comp [osc] .o .freq=10 .duration1=1 .duration0=1::
   h.assert('611 a=0 dupa osc low', session.getWire(interp, 'a'), '0');
 }, { propagation: 'wave' });
 
-reg(700, 'reg', 'REG cu wire clock — latch transparent', function(h, session) {
+function runReg700FallingEdge(h, session, prefix) {
   const { interp } = session.run(`
 1wire data = 0
 1wire clk = 0
 1wire clr = 0
 1wire read = REG(data, clk, clr)`);
-  h.assert('700 initial read=0', session.getWire(interp, 'read'), '0');
+  h.assert(prefix + ' initial read=0', session.getWire(interp, 'read'), '0');
   session.setWire(interp, 'data', '1');
-  h.assert('700 data=1 clk=0 → read=0 (hold)', session.getWire(interp, 'read'), '0');
+  h.assert(prefix + ' data=1 clk=0 → read=0 (no edge)', session.getWire(interp, 'read'), '0');
   session.setWire(interp, 'clk', '1');
-  h.assert('700 clk=1 → read=1 (transparent)', session.getWire(interp, 'read'), '1');
+  h.assert(prefix + ' clk=1 → read=0 (rising, no capture)', session.getWire(interp, 'read'), '0');
   session.setWire(interp, 'data', '0');
-  h.assert('700 data=0 clk=1 → read=0 (transparent)', session.getWire(interp, 'read'), '0');
+  h.assert(prefix + ' data=0 clk=1 → read=0 (hold)', session.getWire(interp, 'read'), '0');
   session.setWire(interp, 'clk', '0');
-  h.assert('700 clk=0 → read=0 (hold)', session.getWire(interp, 'read'), '0');
+  h.assert(prefix + ' falling edge data=0 → read=0', session.getWire(interp, 'read'), '0');
   session.setWire(interp, 'data', '1');
-  h.assert('700 data=1 clk=0 → read=0 (hold)', session.getWire(interp, 'read'), '0');
   session.setWire(interp, 'clk', '1');
-  h.assert('700 clk=1 → read=1 (transparent)', session.getWire(interp, 'read'), '1');
+  h.assert(prefix + ' clk=1 data=1 → read=0 (hold)', session.getWire(interp, 'read'), '0');
+  session.setWire(interp, 'clk', '0');
+  h.assert(prefix + ' falling edge data=1 → read=1', session.getWire(interp, 'read'), '1');
+  session.setWire(interp, 'data', '0');
+  session.setWire(interp, 'clk', '1');
+  h.assert(prefix + ' data=0 clk=1 → read=1 (hold)', session.getWire(interp, 'read'), '1');
+  session.setWire(interp, 'clk', '0');
+  h.assert(prefix + ' falling edge data=0 → read=0', session.getWire(interp, 'read'), '0');
+}
+
+reg(700, 'reg', 'REG cu wire clock — falling edge', function(h, session) {
+  runReg700FallingEdge(h, session, '700');
 });
 
 function runReg701NextBased(h, session) {
@@ -1291,37 +1301,118 @@ reg(701, 'reg', 'REG cu clock ~ — NEXT-based', runReg701NextBased);
 
 reg(704, 'reg', 'REG cu clock ~ — NEXT-based (wave)', runReg701NextBased, { propagation: 'wave' });
 
-reg(702, 'reg', 'REG clear override', function(h, session) {
+function runReg702ClearOverride(h, session, prefix) {
   const { interp } = session.run(`
 1wire data = 1
 1wire clk = 1
 1wire clr = 0
 1wire read = REG(data, clk, clr)`);
-  h.assert('702 initial clk=1 data=1 → read=1', session.getWire(interp, 'read'), '1');
+  h.assert(prefix + ' initial clk=1 data=1 → read=0 (no falling edge yet)', session.getWire(interp, 'read'), '0');
+  session.setWire(interp, 'clk', '0');
+  h.assert(prefix + ' falling edge → read=1', session.getWire(interp, 'read'), '1');
   session.setWire(interp, 'clr', '1');
-  h.assert('702 clr=1 → read=0', session.getWire(interp, 'read'), '0');
+  h.assert(prefix + ' clr=1 → read=0', session.getWire(interp, 'read'), '0');
   session.setWire(interp, 'clr', '0');
-  h.assert('702 clr=0 clk=1 data=1 → read=1', session.getWire(interp, 'read'), '1');
+  session.setWire(interp, 'clk', '1');
+  h.assert(prefix + ' clr=0 clk=1 → read=0 (hold)', session.getWire(interp, 'read'), '0');
+  session.setWire(interp, 'clk', '0');
+  h.assert(prefix + ' falling edge data=1 → read=1', session.getWire(interp, 'read'), '1');
+}
+
+reg(702, 'reg', 'REG clear override', function(h, session) {
+  runReg702ClearOverride(h, session, '702');
 });
 
-reg(703, 'reg', 'REG multi-bit (4bit)', function(h, session) {
+function runReg703MultiBit(h, session, prefix) {
   const { interp } = session.run(`
 4wire data = 0000
 1wire clk = 0
 1wire clr = 0
 4wire read = REG(data, clk, clr)`);
-  h.assert('703 initial read=0000', session.getWire(interp, 'read'), '0000');
+  h.assert(prefix + ' initial read=0000', session.getWire(interp, 'read'), '0000');
   session.setWire(interp, 'data', '1010');
-  h.assert('703 data=1010 clk=0 → read=0000 (hold)', session.getWire(interp, 'read'), '0000');
+  h.assert(prefix + ' data=1010 clk=0 → read=0000 (no edge)', session.getWire(interp, 'read'), '0000');
   session.setWire(interp, 'clk', '1');
-  h.assert('703 clk=1 → read=1010 (transparent)', session.getWire(interp, 'read'), '1010');
+  h.assert(prefix + ' clk=1 → read=0000 (hold)', session.getWire(interp, 'read'), '0000');
   session.setWire(interp, 'data', '0101');
-  h.assert('703 data=0101 clk=1 → read=0101 (transparent)', session.getWire(interp, 'read'), '0101');
   session.setWire(interp, 'clk', '0');
-  h.assert('703 clk=0 → read=0101 (hold)', session.getWire(interp, 'read'), '0101');
+  h.assert(prefix + ' falling edge data=0101 → read=0101', session.getWire(interp, 'read'), '0101');
   session.setWire(interp, 'data', '1111');
-  h.assert('703 data=1111 clk=0 → read=0101 (hold)', session.getWire(interp, 'read'), '0101');
+  h.assert(prefix + ' data=1111 clk=0 → read=0101 (hold)', session.getWire(interp, 'read'), '0101');
+  session.setWire(interp, 'clk', '1');
+  session.setWire(interp, 'clk', '0');
+  h.assert(prefix + ' falling edge data=1111 → read=1111', session.getWire(interp, 'read'), '1111');
+}
+
+reg(703, 'reg', 'REG multi-bit (4bit)', function(h, session) {
+  runReg703MultiBit(h, session, '703');
 });
+
+reg(705, 'reg', 'REG falling edge — cascadă downstream (wave)', function(h, session) {
+  const { interp } = session.run(`
+1wire data = 0
+1wire clk = 0
+1wire clr = 0
+1wire read = REG(data, clk, clr)
+1wire inv = NOT(read)`);
+  h.assert('705 initial read=0', session.getWire(interp, 'read'), '0');
+  h.assert('705 initial inv=1', session.getWire(interp, 'inv'), '1');
+  session.setWire(interp, 'data', '1');
+  session.setWire(interp, 'clk', '1');
+  h.assert('705 clk=1 data=1 → read=0 (hold)', session.getWire(interp, 'read'), '0');
+  h.assert('705 inv=1 inainte de falling edge', session.getWire(interp, 'inv'), '1');
+  session.setWire(interp, 'clk', '0');
+  h.assert('705 falling edge → read=1', session.getWire(interp, 'read'), '1');
+  h.assert('705 inv=0 dupa propagate', session.getWire(interp, 'inv'), '0');
+  session.setWire(interp, 'data', '0');
+  session.setWire(interp, 'clk', '1');
+  session.setWire(interp, 'clk', '0');
+  h.assert('705 falling edge data=0 → read=0', session.getWire(interp, 'read'), '0');
+  h.assert('705 inv=1 dupa al doilea falling edge', session.getWire(interp, 'inv'), '1');
+}, { propagation: 'wave' });
+
+reg(706, 'reg', 'REG clear — cascadă multi-bit falling edge (wave)', function(h, session) {
+  const { interp } = session.run(`
+4wire data = 1010
+1wire clk = 1
+1wire clr = 0
+4wire read = REG(data, clk, clr)
+4wire bus = read`);
+  h.assert('706 initial read=0000 (no falling edge)', session.getWire(interp, 'read'), '0000');
+  session.setWire(interp, 'clk', '0');
+  h.assert('706 falling edge → read=1010', session.getWire(interp, 'read'), '1010');
+  h.assert('706 bus=1010', session.getWire(interp, 'bus'), '1010');
+  session.setWire(interp, 'clr', '1');
+  h.assert('706 clr=1 → read=0000', session.getWire(interp, 'read'), '0000');
+  h.assert('706 bus=0000 dupa clear propagate', session.getWire(interp, 'bus'), '0000');
+  session.setWire(interp, 'clr', '0');
+  session.setWire(interp, 'clk', '1');
+  session.setWire(interp, 'clk', '0');
+  h.assert('706 falling edge dupa clear → read=1010', session.getWire(interp, 'read'), '1010');
+  h.assert('706 bus=1010 dupa re-latch', session.getWire(interp, 'bus'), '1010');
+}, { propagation: 'wave' });
+
+reg(707, 'reg', 'REG falling edge — data ignorat pana la clk 1→0 (wave)', function(h, session) {
+  const { interp } = session.run(`
+4wire data = 0000
+1wire clk = 0
+1wire clr = 0
+4wire read = REG(data, clk, clr)
+4wire shadow = read`);
+  session.setWire(interp, 'data', '1111');
+  h.assert('707 data=1111 clk=0 → read=0000', session.getWire(interp, 'read'), '0000');
+  session.setWire(interp, 'clk', '1');
+  h.assert('707 clk=1 → read=0000 (hold)', session.getWire(interp, 'read'), '0000');
+  session.setWire(interp, 'clk', '0');
+  h.assert('707 falling edge → read=1111', session.getWire(interp, 'read'), '1111');
+  h.assert('707 shadow=1111', session.getWire(interp, 'shadow'), '1111');
+  session.setWire(interp, 'data', '0101');
+  h.assert('707 data=0101 clk=0 → read=1111 (hold)', session.getWire(interp, 'read'), '1111');
+  session.setWire(interp, 'clk', '1');
+  session.setWire(interp, 'clk', '0');
+  h.assert('707 falling edge data=0101 → read=0101', session.getWire(interp, 'read'), '0101');
+  h.assert('707 shadow=0101', session.getWire(interp, 'shadow'), '0101');
+}, { propagation: 'wave' });
 
   suite.finalize();
 })();

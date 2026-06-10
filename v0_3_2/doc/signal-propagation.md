@@ -82,7 +82,7 @@ Changing `a` or `b` eventually updates `sum`.
 
 ### `REG` with wire clock
 
-`REG(data, clk, clr)` with a normal wire as `clk` acts as a **transparent latch**: when `clk = 1`, the output follows `data`; when `clk = 0`, it holds. See [reg.md](reg.md).
+`REG(data, clk, clr)` with a normal wire as `clk` is **falling-edge triggered**: output updates when `clk` goes `1` → `0`, sampling the current `data`. Between edges the output holds. See [reg.md](reg.md).
 
 ### `REG` with `~` (NEXT clock)
 
