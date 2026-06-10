@@ -5,9 +5,22 @@ class SignalPropagationStrategy {
   constructor() {
     this.cLogs = []
     this.debugLevel = 0;
+    this._dirty = false;
   }
+  isStable() {
+    return this._dirty;
+  }
+  resetStable() {
+    this._dirty = false;
+  }
+  setStable() {
+    this._dirty = true;
+  }
+  
   propagate() {
-    
+    if(this.isStable()) {
+      return;
+    }
   }
   
   setDebugLevel(level) {
