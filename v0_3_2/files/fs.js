@@ -1,4 +1,43 @@
 window.lib_files = {
+  
+  ex_chip_led: `
+
+
+chip +[kp]:
+   1pin set
+   4pin in
+   4pout out
+   exec: set
+   out = MUX( EQ(in.0,1), !in, in)
+   on:1
+   
+   :1bit set
+
+chip [kp] .b::
+
+
+comp [osc] .tick:
+    duration1:2
+    duration0:2
+    length:4
+    freq:1
+    :
+4w c= .tick:counter
+4w o = .b:out
+.b:{
+  in = c
+  set = 1
+}
+
+comp [led] .o2:
+    square
+    length: 4
+    on:1
+     :
+.o2 = o
+
+`,
+  
   ex_toggl3_test6_works_3bits: `
   comp [led] .l:
     square
