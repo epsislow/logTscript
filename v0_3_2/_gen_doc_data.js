@@ -1,6 +1,8 @@
 /**
  * Bundle doc/*.md into ui/doc-data.js for file:// viewer (no fetch).
  * Run: node _gen_doc_data.js
+ *
+ * Every *.md file in doc/ is included automatically (sorted by name).
  */
 const fs = require('fs');
 const path = require('path');
@@ -8,40 +10,16 @@ const path = require('path');
 const DOC_DIR = path.join(__dirname, 'doc');
 const OUT = path.join(__dirname, 'ui', 'doc-data.js');
 
-const DOC_FILES = [
-  'doc-function.md',
-  'components.md',
-  'board.md',
-  'chip.md',
-  'mini-cpu.md',
-  'mini-cpu-plan.md',
-  'pcb.md',
-  'interactive-components.md',
-  'switch.md',
-  'key.md',
-  'dip.md',
-  'rotary.md',
-  'led.md',
-  'led-bar.md',
-  'seven-seg.md',
-  '14seg.md',
-  'lcd.md',
-  'dots.md',
-  'adder.md',
-  'subtract.md',
-  'multiplier.md',
-  'divider.md',
-  'shifter.md',
-  'counter.md',
-  'mem.md',
-  'reg.md',
-  'oscillator.md',
-  'arithmetic.md',
-  'debug.md',
-  'signal-propagation.md',
-  'editorUI.md',
-  'short-notation.md',
-];
+function listDocMarkdownFiles() {
+  return fs
+    .readdirSync(DOC_DIR)
+    .filter(function (name) {
+      return name.endsWith('.md') && fs.statSync(path.join(DOC_DIR, name)).isFile();
+    })
+    .sort(function (a, b) {
+      return a.localeCompare(b, 'en');
+    });
+}
 
 function escForJs(str) {
   return str
@@ -50,13 +28,15 @@ function escForJs(str) {
     .replace(/\$\{/g, '\\${');
 }
 
+const DOC_FILES = listDocMarkdownFiles();
+if (!DOC_FILES.length) {
+  console.error('No .md files in', DOC_DIR);
+  process.exit(1);
+}
+
 const entries = [];
 for (const file of DOC_FILES) {
   const full = path.join(DOC_DIR, file);
-  if (!fs.existsSync(full)) {
-    console.warn('Missing:', full);
-    continue;
-  }
   const content = fs.readFileSync(full, 'utf8');
   entries.push({ file, content });
 }
@@ -64,6 +44,7 @@ for (const file of DOC_FILES) {
 const out = `/**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
+ * Files: ${DOC_FILES.join(', ')}
  */
 (function () {
   'use strict';

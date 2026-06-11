@@ -65,23 +65,40 @@ const DOC_SECTIONS = [
   },
 ];
 
+/** In DOC_CONTENT + search only — not listed on the doc index page */
+const DOC_SEARCH_ONLY = [
+  {
+    file: 'future-component-ideas.md',
+    label: 'Future component ideas',
+    section: 'Backlog',
+    searchExtra:
+      'planning roadmap backlog alu dpram lut mux demux decoder rom stack fifo uart gpio slider irq dma eeprom',
+  },
+];
+
 const DOCS = DOC_SECTIONS.flatMap(function (section) {
   return section.items;
 });
 
 const DOC_SEARCH_INDEX = (function () {
   const list = [];
+  function pushEntry(sectionTitle, item) {
+    const stem = item.file.replace(/\.md$/, '');
+    const extra = item.searchExtra ? ' ' + item.searchExtra : '';
+    list.push({
+      file: item.file,
+      label: item.label,
+      section: sectionTitle,
+      haystack: (item.label + ' ' + stem + ' ' + stem.replace(/-/g, ' ') + extra).toLowerCase(),
+    });
+  }
   DOC_SECTIONS.forEach(function (section) {
     section.items.forEach(function (item) {
-      const stem = item.file.replace(/\.md$/, '');
-      const extra = item.searchExtra ? ' ' + item.searchExtra : '';
-      list.push({
-        file: item.file,
-        label: item.label,
-        section: section.title,
-        haystack: (item.label + ' ' + stem + ' ' + stem.replace(/-/g, ' ') + extra).toLowerCase(),
-      });
+      pushEntry(section.title, item);
     });
+  });
+  DOC_SEARCH_ONLY.forEach(function (item) {
+    pushEntry(item.section || 'Other', item);
   });
   return list;
 })();
