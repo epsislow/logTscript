@@ -48,8 +48,8 @@ function updatePropagationToggleUI() {
   btn.title = 'Signal propagation: ' + mode + ' (applies on next Run)';
 }
 
-function createInterpreter(funcs, pcbs, registry, chips, probes) {
-  const interp = new Interpreter(funcs, [], pcbs, registry, createSignalStrategy(), chips);
+function createInterpreter(funcs, pcbs, registry, chips, boards, probes) {
+  const interp = new Interpreter(funcs, [], pcbs, registry, createSignalStrategy(), chips, boards);
   interp.pendingProbeExprs = probes || [];
   return interp;
 }
@@ -145,7 +145,7 @@ function run(){
 
   console.log('STMTS: ',  stmts);
 
-  globalInterp = createInterpreter(p.funcs, p.pcbs, _registry, p.chips, p.probes);
+  globalInterp = createInterpreter(p.funcs, p.pcbs, _registry, p.chips, p.boards, p.probes);
   globalInterp.aliases = p.aliases;
 
   for (const s of stmts) {
@@ -185,7 +185,7 @@ function sendCmd(){
       const _reg = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
       const p = new Parser(new Tokenizer(preprocessRepeat(code.value)), _reg);
       const stmts = p.parse();
-      globalInterp = createInterpreter(p.funcs, p.pcbs, _reg, p.chips, p.probes);
+      globalInterp = createInterpreter(p.funcs, p.pcbs, _reg, p.chips, p.boards, p.probes);
       
       for(const s of stmts){
         globalInterp.exec(s, true);

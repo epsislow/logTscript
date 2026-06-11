@@ -11,8 +11,9 @@ const OUT = path.join(__dirname, 'ui', 'doc-data.js');
 const DOC_FILES = [
   'doc-function.md',
   'components.md',
-  'pcb.md',
+  'board.md',
   'chip.md',
+  'pcb.md',
   'interactive-components.md',
   'switch.md',
   'key.md',

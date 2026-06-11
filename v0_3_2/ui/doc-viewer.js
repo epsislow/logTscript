@@ -16,8 +16,9 @@ const DOC_SECTIONS = [
   {
     title: 'Composite blocks',
     items: [
-      { file: 'pcb.md', label: 'PCB' },
+      { file: 'board.md', label: 'Board' },
       { file: 'chip.md', label: 'Chip' },
+      { file: 'pcb.md', label: 'PCB (deprecated)' },
     ],
   },
   {

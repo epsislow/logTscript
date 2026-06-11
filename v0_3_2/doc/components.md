@@ -1,6 +1,6 @@
 # Component index
 
-LogTscript includes built-in **components** (`comp`), reusable **PCB** blocks (`pcb`), and lightweight **chip** blocks (`chip`). Use `doc(comp)`, `doc(pcb)`, or `doc(chip)` in the editor for live signatures.
+LogTscript includes built-in **components** (`comp`), reusable **board** blocks (`board`), lightweight **chip** blocks (`chip`), and legacy **PCB** (`pcb`). Use `doc(comp)`, `doc(board)`, `doc(chip)`, or `doc(pcb)` in the editor for live signatures.
 
 ---
 
@@ -8,8 +8,9 @@ LogTscript includes built-in **components** (`comp`), reusable **PCB** blocks (`
 
 | Topic | Page |
 |-------|------|
-| PCB — full circuits with UI, `~~`, nested defs | [pcb.md](pcb.md) |
+| **Board** — interactive circuits, wave propagation (recommended) | [board.md](board.md) |
 | Chip — reusable logic without UI | [chip.md](chip.md) |
+| PCB — deprecated, legacy propagation | [pcb.md](pcb.md) |
 
 ---
 

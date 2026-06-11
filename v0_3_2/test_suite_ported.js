@@ -1964,5 +1964,283 @@ probe(.u1.sum)
 
 reg(839, 'probe', 'probe(.u1:sum) vs probe(.u1.sum) — dot nu urmărește pout', runProbePoutVsInternalDot);
 
+const BOARD_HALFADD = `board +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum`;
+
+const BOARD_U1_INIT = `.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}`;
+
+function runBoardInstTest(h, session) {
+  const src = BOARD_HALFADD + `
+board [halfAdd] .u1::
+` + BOARD_U1_INIT + `
+4wire r = .u1:sum
+`;
+  const { interp } = session.run(src);
+  h.assert('board inst sum', session.getWire(interp, 'r'), '1000');
+}
+
+reg(840, 'board', 'board instanțiere și acces pout', runBoardInstTest);
+
+reg(841, 'board', 'board +[inner] în body — eroare parse', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`board +[outer]:
+  board +[inner]:
+    1pin x
+  :
+  :1bit x`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('eroare board nested def', String(err.includes('cannot define new board')), 'true');
+});
+
+reg(842, 'board', 'def în body board — eroare parse', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`board +[bad]:
+  def foo(1bit x):
+    :1bit x
+  :1bit x`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('eroare def in board', String(err.includes("'def'")), 'true');
+});
+
+reg(843, 'board', 'pcb instanță în body board — eroare parse', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`pcb +[p]:
+  1pin x
+  1pout y
+  exec: x
+  on: 1
+  y = x
+  :1bit y
+board +[b]:
+  pcb [p] .q::
+  :1bit x`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('eroare pcb in board', String(err.includes('PCB')), 'true');
+});
+
+reg(844, 'board', 'comp switch permis în body board', function(h, session) {
+  const src = `board +[sw]:
+  1pin set
+  1pout out
+  exec: set
+  on: 1
+  comp [switch] .en::
+  out = .en:get
+  :1bit out
+board [sw] .u::
+.u:{ set = 1 }
+1wire r = .u:out`;
+  const { interp } = session.run(src);
+  h.assert('switch in board out', session.getWire(interp, 'r'), '0');
+});
+
+reg(845, 'board', 'board property block on:1 exec', function(h, session) {
+  const src = BOARD_HALFADD + `
+board [halfAdd] .u1::
+.u1:{
+  a = 0001
+  b = 0010
+  set = 1
+}
+4wire r = .u1:sum`;
+  const { interp } = session.run(src);
+  h.assert('board property block sum', session.getWire(interp, 'r'), '0011');
+});
+
+function regBoardWave(id, title, run) {
+  reg(id, 'board', title + ' (wave)', run, { propagation: 'wave' });
+}
+regBoardWave(846, 'board instanțiere și acces pout', runBoardInstTest);
+regBoardWave(847, 'board property block on:1 exec', function(h, session) {
+  const src = BOARD_HALFADD + `
+board [halfAdd] .u1::
+.u1:{
+  a = 0001
+  b = 0010
+  set = 1
+}
+4wire r = .u1:sum`;
+  const { interp } = session.run(src);
+  h.assert('board property block sum wave', session.getWire(interp, 'r'), '0011');
+});
+
+reg(848, 'doc-comp', 'doc(board) cu board definit contine board.halfAdd', function(h, session) {
+  const out = session.runDoc(BOARD_HALFADD + '\ndoc(board)');
+  h.assert('doc(board) contine board.halfAdd', String(out.some(l => l === 'board.halfAdd')), 'true');
+});
+
+reg(849, 'doc-comp', 'doc(board.halfAdd) prima linie', function(h, session) {
+  const out = session.runDoc(BOARD_HALFADD + '\ndoc(board.halfAdd)');
+  h.assert('board.halfAdd prima linie', out[0], 'board [halfAdd] .name:');
+});
+
+reg(850, 'doc-comp', 'doc(board.xyz) tip nedefinit', function(h, session) {
+  const out = session.runDoc('doc(board.xyz)');
+  h.assert('board.xyz nedefinit', out[0], 'board.xyz: tip board nedefinit');
+});
+
+function runProbeBoardPout(h, session) {
+  const src = BOARD_HALFADD + `
+board [halfAdd] .u1::
+probe(.u1:sum)
+` + BOARD_U1_INIT;
+  const { out } = session.run(src);
+  h.assert('board sum initialised', String(out.some(l => l.includes('# .u1:sum = 1000') && l.includes('initialised'))), 'true');
+}
+
+reg(851, 'probe', 'probe(.u1:sum) board pout — initialised', runProbeBoardPout);
+reg(852, 'probe', 'probe(.u1:sum) board pout — initialised (wave)', runProbeBoardPout, { propagation: 'wave' });
+
+const BOARD_HALFADD_DBG = `board +[halfAddDbg]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  4wire partial = .add:get
+  sum = partial
+  carry = .add:carry
+  :4bit sum`;
+
+function runProbeBoardInternal(h, session) {
+  const src = BOARD_HALFADD_DBG + `
+board [halfAddDbg] .u1::
+probe(.u1.partial)
+` + BOARD_U1_INIT;
+  const { out } = session.run(src);
+  h.assert('board internal wire', String(out.some(l => l.includes('# .u1.partial = 1000') && l.includes('initialised'))), 'true');
+}
+
+reg(853, 'probe', 'probe(.u1.partial) board wire intern', runProbeBoardInternal);
+reg(854, 'probe', 'probe(.u1.partial) board wire intern (wave)', runProbeBoardInternal, { propagation: 'wave' });
+
+reg(855, 'board', 'nested chip în board', function(h, session) {
+  const src = CHIP_HALFADD + `
+board +[wrap]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  chip [halfAdd] .ha::
+  .ha:a = a
+  .ha:b = b
+  .ha:{ set = 1 }
+  sum = .ha:sum
+  :4bit sum
+board [wrap] .w::
+.w:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+4wire r = .w:sum`;
+  const { interp } = session.run(src);
+  h.assert('chip nested in board', session.getWire(interp, 'r'), '1000');
+});
+
+reg(856, 'board', 'nested board în board', function(h, session) {
+  const src = BOARD_HALFADD + `
+board +[wrap]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  board [halfAdd] .ha::
+  .ha:a = a
+  .ha:b = b
+  .ha:{ set = 1 }
+  sum = .ha:sum
+  :4bit sum
+board [wrap] .w::
+.w:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+4wire r = .w:sum`;
+  const { interp } = session.run(src);
+  h.assert('board nested in board', session.getWire(interp, 'r'), '1000');
+});
+
+reg(857, 'chip', 'board +[inner] în body chip — eroare parse', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`chip +[outer]:
+  board +[inner]:
+    1pin x
+  :
+  :1bit x`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('eroare board def in chip', String(err.includes('cannot define new board')), 'true');
+});
+
+reg(858, 'chip', 'board instanță în body chip — permis', function(h, session) {
+  const src = BOARD_HALFADD + `
+chip +[wrap]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  board [halfAdd] .ha::
+  .ha:a = a
+  .ha:b = b
+  .ha:{ set = 1 }
+  sum = .ha:sum
+  :4bit sum
+chip [wrap] .w::
+.w:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+4wire r = .w:sum`;
+  const { interp } = session.run(src);
+  h.assert('board inst in chip', session.getWire(interp, 'r'), '1000');
+});
+
   suite.finalize();
 })();

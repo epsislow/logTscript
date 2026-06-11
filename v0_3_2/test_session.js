@@ -54,7 +54,7 @@
         const p = new Parser(new Tokenizer(processed), registry);
         const stmts = p.parse();
         this.out = [];
-        this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry, signalPropagationStrategy, p.chips);
+        this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry, signalPropagationStrategy, p.chips, p.boards);
         this.interp.pendingProbeExprs = p.probes || [];
         this.interp.aliases = p.aliases;
         this.aliases = p.aliases;
@@ -118,7 +118,7 @@
       getPcbPout(interp, instanceName, poutName) {
         const i = interp || this.interp;
         if (!i) return null;
-        const inst = i.pcbInstances.get(instanceName) || i.chipInstances.get(instanceName);
+        const inst = i.pcbInstances.get(instanceName) || i.chipInstances.get(instanceName) || i.boardInstances.get(instanceName);
         if (!inst) return null;
         const poutInfo = inst.poutStorage.get(poutName);
         if (!poutInfo) return null;

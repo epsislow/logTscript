@@ -1,6 +1,6 @@
 # Chip components
 
-A **chip** is a lightweight reusable block — same pin/pout/exec model as PCB, but **without** UI components, `def`, nested PCB definitions, or `~~`. Use chips to build libraries of logic (adders, multiplexers, ALU slices) that you compose inside PCBs or other chips.
+A **chip** is a lightweight reusable block — same pin/pout/exec model as [board.md](board.md), but **without** UI components, `def`, nested PCB/board definitions, or `~~`. Use chips to build libraries of logic (adders, multiplexers, ALU slices) that you compose inside **boards** or other chips.
 
 Full signature reference: `doc(chip)` and `doc(chip.type)` — see [doc-function.md](doc-function.md).
 
@@ -71,12 +71,14 @@ Read pout from outside:
 
 - `comp` for logic devices: `adder`, `subtract`, `mem`, `reg`, `counter`, `shifter`, `divider`, `multiplier`, …
 - `chip [existingType] .sub::` — nest other **defined** chip types
+- `board [existingType] .sub::` — nest **defined** board types (UI inside board)
 - Wire assignments and property blocks on internal components
 
 **Forbidden**
 
 - `def` user functions
 - `pcb +[...]` or `pcb [type] .inst::`
+- `chip +[...]` or `board +[...]` nested definitions
 - `~~` next section
 - UI / panel types: `switch`, `key`, `dip`, `rotary`, `osc`, `led`, `7seg`, `14seg`, `lcd`, `dots`, `ledBar`
 
@@ -144,4 +146,4 @@ PCBs are for complete interactive circuits; chips are building blocks. A typical
 2. Instantiate inside `pcb +[board]:` with `chip [aluSlice] .slice::`
 3. Add `led`, `switch`, and panel wiring only in the PCB
 
-PCB guide: [pcb.md](pcb.md). Component catalog: [components.md](components.md).
+Interactive circuits: [board.md](board.md). Component catalog: [components.md](components.md).

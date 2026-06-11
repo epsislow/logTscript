@@ -1,5 +1,7 @@
 # PCB components
 
+> **Deprecated** — use [board.md](board.md) for new circuits. PCB remains supported for existing scripts but is not recommended (legacy propagation in body, no wave alignment). Behavior is unchanged.
+
 A **PCB** is a reusable circuit block: you define its interface (pins, pouts, exec trigger), its internal wiring, and optional `~~` next-tick section. PCBs can use any built-in component, nested PCBs, `def` functions, and panel controls (`switch`, `key`, `led`, …).
 
 Full signature reference: `doc(pcb)` and `doc(pcb.type)` — see [doc-function.md](doc-function.md).

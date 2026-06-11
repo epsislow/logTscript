@@ -6,6 +6,8 @@ The `doc` instruction displays the syntax (signature) of a built-in or user-defi
 doc(FunctionName)
 doc(comp)
 doc(comp.type)
+doc(board)
+doc(board.type)
 doc(pcb)
 doc(pcb.type)
 ```
@@ -320,7 +322,7 @@ Foo: undefined function
 
 ## Internal components (comp)
 
-Per-component guides (syntax, examples, pins): **[components.md](components.md)**. Composite blocks: [pcb.md](pcb.md), [chip.md](chip.md).
+Per-component guides (syntax, examples, pins): **[components.md](components.md)**. Composite blocks: [board.md](board.md), [chip.md](chip.md), [pcb.md](pcb.md) (deprecated).
 
 ### doc(comp) — list of all component types
 
@@ -411,7 +413,27 @@ comp.xyz: undefined component type
 
 ---
 
+## Board components (board)
+
+User guide: **[board.md](board.md)**.
+
+### doc(board) — list of user-defined board types
+
+```
+doc(board)
+```
+
+### doc(board.type) — syntax of a board type
+
+```
+doc(board.halfAdd)
+```
+
+---
+
 ## PCB components (pcb)
+
+> Deprecated — prefer [board.md](board.md).
 
 User guide: **[pcb.md](pcb.md)**.
 

@@ -1376,7 +1376,7 @@ body.doc-mode #docView {
 // ─── LogTScript CodeMirror mode ───────────────────────────────────────────────
 const _logtsKeywords = [
   "show","def","repeat","MODE","WIREWRITE","NEXT",
-  "LOAD","LATCH","comp","pcb","w0","w1"
+  "LOAD","LATCH","comp","pcb","chip","board","w0","w1"
 ];
 
 const _logtsComponents = [
@@ -1671,6 +1671,8 @@ show(a,b,c)
         <button class="dropdown-item" onclick="insertComp('lcd')">lcd</button>
         <button class="dropdown-item" onclick="insertComp('7seg')">7seg</button>
         <button class="dropdown-item" onclick="insertComp('osc')">osc</button>
+        <button class="dropdown-item" onclick="insertComp('board')">board</button>
+        <button class="dropdown-item" onclick="insertComp('chip')">chip</button>
         <button class="dropdown-item" onclick="insertComp('pcb')">pcb</button>
       </div>
     </div>

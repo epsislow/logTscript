@@ -6,6 +6,7 @@ class Parser {
     this.aliases = new Map();
     this.pcbs = new Map();
     this.chips = new Map();
+    this.boards = new Map();
     this.probes = [];
     this.componentRegistry = componentRegistry || null;
   }
@@ -86,6 +87,19 @@ parse() {
         this.parseChipDefinition();
       } else {
         stmts.push(this.parseChipInstance());
+      }
+      continue;
+    }
+
+    if (this.c.type === 'KEYWORD' && this.c.value === 'board') {
+      let peekI = this.t.i;
+      while (peekI < this.t.src.length && /\s/.test(this.t.src[peekI])) peekI++;
+      const nextChar = this.t.src[peekI];
+
+      if (nextChar === '+') {
+        this.parseBoardDefinition();
+      } else {
+        stmts.push(this.parseBoardInstance());
       }
       continue;
     }
@@ -425,6 +439,20 @@ peekChipIsDefinition() {
   return this.t.src[peekI] === '+';
 }
 
+peekBoardIsDefinition() {
+  return this.peekChipIsDefinition();
+}
+
+validateBoardBodyStatement(stmt, file, line, col) {
+  if (!stmt) return;
+  if (stmt.def) {
+    throw Error(`Board body cannot contain 'def' at ${file}: ${line}:${col}`);
+  }
+  if (stmt.pcbInstance) {
+    throw Error(`Board body cannot contain PCB instances at ${file}: ${line}:${col}`);
+  }
+}
+
 parseChipDefinition() {
   this.eat('KEYWORD', 'chip');
   this.eat('SYM', '+');
@@ -516,6 +544,10 @@ parseChipDefinition() {
       throw Error(`Chip body cannot define new chip types (chip +[...]) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
 
+    if (this.c.type === 'KEYWORD' && this.c.value === 'board' && this.peekBoardIsDefinition()) {
+      throw Error(`Chip body cannot define new board types (board +[...]) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+
     if (
       this.c.type === 'TYPE' ||
       this.c.type === 'KEYWORD' ||
@@ -573,6 +605,164 @@ parseChipInstance() {
   this.eat('SYM', ':');
 
   return { chipInstance: { chipName, instanceName } };
+}
+
+parseBoardDefinition() {
+  this.eat('KEYWORD', 'board');
+  this.eat('SYM', '+');
+  this.eat('SYM', '[');
+
+  const name = this.c.value;
+  this.eat('ID');
+
+  const reserved = this.componentRegistry ? this.componentRegistry.getReservedNames() : [];
+  if (reserved.includes(name) || name === 'board') {
+    throw Error(`Board name '${name}' is reserved at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  this.eat('SYM', ']');
+  this.eat('SYM', ':');
+
+  while (this.c.type === 'EOL') {
+    this.c = this.t.get();
+  }
+
+  const pins = [];
+  const pouts = [];
+  let exec = 'set';
+  let on = 'raise';
+  const body = [];
+  let returnSpec = null;
+
+  while (this.c.type !== 'EOF') {
+    if (this.c.type === 'EOL') {
+      this.c = this.t.get();
+      continue;
+    }
+
+    if (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+
+      if (this.c.type === 'TYPE') {
+        const retType = this.c.value;
+        this.eat('TYPE');
+
+        const retVar = this.c.value;
+        this.eat('ID');
+
+        const bits = parseInt(retType);
+        returnSpec = { bits, varName: retVar };
+      }
+      break;
+    }
+
+    if (this.c.type === 'TYPE' && (this.c.value.endsWith('pin') || this.c.value.endsWith('pout'))) {
+      const typeVal = this.c.value;
+      const isPout = typeVal.endsWith('pout');
+      const bits = parseInt(typeVal);
+      this.eat('TYPE');
+
+      const varName = this.c.value;
+      this.eat('ID');
+
+      if (isPout) {
+        pouts.push({ bits, name: varName });
+      } else {
+        pins.push({ bits, name: varName });
+      }
+      continue;
+    }
+
+    if (this.c.type === 'ID' && this.c.value === 'exec') {
+      this.eat('ID');
+      this.eat('SYM', ':');
+      exec = this.c.value;
+      this.eat('ID');
+      continue;
+    }
+
+    if (this.c.type === 'ID' && this.c.value === 'on') {
+      this.eat('ID');
+      this.eat('SYM', ':');
+      if (this.c.type === 'ID') {
+        on = this.c.value;
+        this.eat('ID');
+      } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
+        on = this.c.value;
+        this.eat(this.c.type);
+      }
+      continue;
+    }
+
+    if (this.c.type === 'KEYWORD' && this.c.value === 'board' && this.peekBoardIsDefinition()) {
+      throw Error(`Board body cannot define new board types (board +[...]) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+
+    if (this.c.type === 'KEYWORD' && this.c.value === 'chip' && this.peekChipIsDefinition()) {
+      throw Error(`Board body cannot define new chip types (chip +[...]) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+
+    if (this.c.type === 'KEYWORD' && this.c.value === 'pcb' && this.peekChipIsDefinition()) {
+      throw Error(`Board body cannot define new PCB types (pcb +[...]) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+
+    if (
+      this.c.type === 'TYPE' ||
+      this.c.type === 'KEYWORD' ||
+      this.c.type === 'ID' ||
+      this.c.type === 'SPECIAL' ||
+      (this.c.type === 'SYM' && this.c.value === '.')
+    ) {
+      const stmtLine = this.c.line;
+      const stmtCol = this.c.col;
+      const stmt = this.stmt();
+      this.validateBoardBodyStatement(stmt, this.c.file, stmtLine, stmtCol);
+      if (stmt.probe) {
+        this.probes.push(stmt.probe);
+      }
+      body.push(stmt);
+      continue;
+    }
+
+    break;
+  }
+
+  const allPins = [...pins, ...pouts];
+  const execPin = allPins.find(p => p.name === exec);
+  if (!execPin) {
+    throw Error(`Board '${name}': exec '${exec}' must reference an existing pin. Available pins: ${allPins.map(p => p.name).join(', ')}`);
+  }
+
+  this.boards.set(name, {
+    pins,
+    pouts,
+    exec,
+    on,
+    body,
+    returnSpec
+  });
+}
+
+parseBoardInstance() {
+  this.eat('KEYWORD', 'board');
+  this.eat('SYM', '[');
+
+  const boardName = this.c.value;
+  this.eat('ID');
+
+  this.eat('SYM', ']');
+
+  if (this.c.value !== '.') {
+    throw Error(`Expected instance name starting with '.' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  this.eat('SYM', '.');
+  const instanceName = '.' + this.c.value;
+  this.eat('ID');
+
+  this.eat('SYM', ':');
+  this.eat('SYM', ':');
+
+  return { boardInstance: { boardName, instanceName } };
 }
 
   // --- Dispatch map for keyword statements ---
@@ -2226,4 +2416,5 @@ Parser.KEYWORD_HANDLERS = {
   comp: 'parseComp',
   pcb: 'parsePcbInstance',
   chip: 'parseChipInstance',
+  board: 'parseBoardInstance',
 };

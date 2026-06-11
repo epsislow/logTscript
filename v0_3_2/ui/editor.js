@@ -568,7 +568,25 @@ const snippets = {
    on:1
    :1bit set
 
-pcb [a] .b::`
+pcb [a] .b::`,
+  'board': `board +[|]:
+   1pin set
+   1pout out
+   exec: set
+   on: 1
+   out = 0
+   :1bit out
+
+board [a] .b::`,
+  'chip': `chip +[|]:
+   1pin set
+   1pout out
+   exec: set
+   on: 1
+   out = 0
+   :1bit out
+
+chip [a] .b::`
 };
 
 function insertComp(name) {

@@ -13,6 +13,8 @@ The \`doc\` instruction displays the syntax (signature) of a built-in or user-de
 doc(FunctionName)
 doc(comp)
 doc(comp.type)
+doc(board)
+doc(board.type)
 doc(pcb)
 doc(pcb.type)
 \`\`\`
@@ -327,7 +329,7 @@ Foo: undefined function
 
 ## Internal components (comp)
 
-Per-component guides (syntax, examples, pins): **[components.md](components.md)**. Composite blocks: [pcb.md](pcb.md), [chip.md](chip.md).
+Per-component guides (syntax, examples, pins): **[components.md](components.md)**. Composite blocks: [board.md](board.md), [chip.md](chip.md), [pcb.md](pcb.md) (deprecated).
 
 ### doc(comp) — list of all component types
 
@@ -418,7 +420,27 @@ comp.xyz: undefined component type
 
 ---
 
+## Board components (board)
+
+User guide: **[board.md](board.md)**.
+
+### doc(board) — list of user-defined board types
+
+\`\`\`
+doc(board)
+\`\`\`
+
+### doc(board.type) — syntax of a board type
+
+\`\`\`
+doc(board.halfAdd)
+\`\`\`
+
+---
+
 ## PCB components (pcb)
+
+> Deprecated — prefer [board.md](board.md).
 
 User guide: **[pcb.md](pcb.md)**.
 
@@ -679,7 +701,7 @@ Built-in display statements for the Output panel. Full reference with runnable e
 `,
     'components.md': `# Component index
 
-LogTscript includes built-in **components** (\`comp\`), reusable **PCB** blocks (\`pcb\`), and lightweight **chip** blocks (\`chip\`). Use \`doc(comp)\`, \`doc(pcb)\`, or \`doc(chip)\` in the editor for live signatures.
+LogTscript includes built-in **components** (\`comp\`), reusable **board** blocks (\`board\`), lightweight **chip** blocks (\`chip\`), and legacy **PCB** (\`pcb\`). Use \`doc(comp)\`, \`doc(board)\`, \`doc(chip)\`, or \`doc(pcb)\` in the editor for live signatures.
 
 ---
 
@@ -687,8 +709,9 @@ LogTscript includes built-in **components** (\`comp\`), reusable **PCB** blocks 
 
 | Topic | Page |
 |-------|------|
-| PCB — full circuits with UI, \`~~\`, nested defs | [pcb.md](pcb.md) |
+| **Board** — interactive circuits, wave propagation (recommended) | [board.md](board.md) |
 | Chip — reusable logic without UI | [chip.md](chip.md) |
+| PCB — deprecated, legacy propagation | [pcb.md](pcb.md) |
 
 ---
 
@@ -751,7 +774,289 @@ Instant built-in functions (\`ADD\`, \`SUBTRACT\`, …) without \`comp\`: [arith
 | \`show\` / \`peek\` / \`probe\` | [debug.md](debug.md) |
 | Signal propagation (Wave / Legacy) | [signal-propagation.md](signal-propagation.md) |
 `,
+    'board.md': `# Board components
+
+A **board** is the recommended way to build reusable interactive circuits. It uses the same pin/pout/exec model as [chip.md](chip.md), with **wave propagation** in the body, but allows **UI components** (\`switch\`, \`led\`, \`osc\`, …).
+
+Use **board** instead of [pcb.md](pcb.md) for new designs (PCB is deprecated).
+
+Signature reference: \`doc(board)\` and \`doc(board.type)\` — see [doc-function.md](doc-function.md).
+
+---
+
+## Definition
+
+\`\`\`
+board +[name]:
+  Npin inputName
+  Mpout outputName
+  exec: triggerPin
+  on: raise/edge/1/0
+  comp [switch] .sw::
+  # wiring, chip/board instances, probe
+  :Nbit returnVar
+\`\`\`
+
+---
+
+## Instantiation
+
+\`\`\`
+board [name] .instance::
+\`\`\`
+
+Property block:
+
+\`\`\`
+.instance:{
+  inputName = 0101
+  triggerPin = 1
+}
+\`\`\`
+
+Read pouts:
+
+\`\`\`
+4wire out = .instance:outputName
+\`\`\`
+
+---
+
+## Allowed in board body
+
+- All \`comp\` types (including panel UI)
+- \`chip [type] .inst::\` — nested chip instances
+- \`board [type] .inst::\` — nested board instances
+- \`probe(...)\` in body (collected at parse)
+- Wire assignments and property blocks
+
+## Forbidden in board body
+
+| Construct | Reason |
+|-----------|--------|
+| \`def\` | Use top-level functions only |
+| \`pcb +[...]\` / \`pcb [t] .x::\` | PCB deprecated; use board |
+| \`chip +[...]\` / \`board +[...]\` | No nested type definitions |
+| \`~~\` next section | Not supported (chip/board model) |
+
+---
+
+## Chip vs board
+
+| Feature | Chip | Board |
+|---------|------|-------|
+| UI components | No | **Yes** |
+| \`board [t] .x::\` in chip body | **Yes** | — |
+| Wave in body | Yes | Yes |
+| Use case | Logic library | Full interactive blocks |
+
+In a **chip** body: \`board +[...]\` is forbidden, but \`board [type] .x::\` is allowed.
+
+---
+
+## Runnable example
+
+\`\`\`logts-play
+board +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum
+
+board [halfAdd] .u1::
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+4wire r = .u1:sum
+show(r)
+\`\`\`
+
+---
+
+## Probe
+
+| Form | Target |
+|------|--------|
+| \`probe(.u1:sum)\` | pout |
+| \`probe(.u1.partial)\` | internal wire in body |
+
+See [debug.md](debug.md).
+
+---
+
+## Related
+
+- [chip.md](chip.md) — logic-only blocks
+- [pcb.md](pcb.md) — deprecated
+- [components.md](components.md) — index
+`,
+    'chip.md': `# Chip components
+
+A **chip** is a lightweight reusable block — same pin/pout/exec model as [board.md](board.md), but **without** UI components, \`def\`, nested PCB/board definitions, or \`~~\`. Use chips to build libraries of logic (adders, multiplexers, ALU slices) that you compose inside **boards** or other chips.
+
+Full signature reference: \`doc(chip)\` and \`doc(chip.type)\` — see [doc-function.md](doc-function.md).
+
+---
+
+## Definition
+
+\`\`\`
+chip +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum
+\`\`\`
+
+| Part | Meaning |
+|------|---------|
+| \`chip +[name]:\` | Define chip type (top-level only) |
+| \`Npin\` / \`Npout\` | External ports |
+| \`exec\` / \`on\` | Same as PCB — property-block trigger |
+| body | \`comp\`, assignments, \`chip [other] .inst::\` |
+| \`:Nbit var\` | Optional return spec for \`doc()\` |
+
+Chip names cannot collide with reserved component names (\`adder\`, \`chip\`, \`7seg\`, …).
+
+---
+
+## Instantiation
+
+\`\`\`
+chip [halfAdd] .u1::
+\`\`\`
+
+Property block (drive pins + exec):
+
+\`\`\`
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+\`\`\`
+
+Read pout from outside:
+
+\`\`\`
+4wire r = .u1:sum
+1wire c = .u1:carry
+\`\`\`
+
+---
+
+## Allowed and forbidden in chip body
+
+**Allowed**
+
+- \`comp\` for logic devices: \`adder\`, \`subtract\`, \`mem\`, \`reg\`, \`counter\`, \`shifter\`, \`divider\`, \`multiplier\`, …
+- \`chip [existingType] .sub::\` — nest other **defined** chip types
+- \`board [existingType] .sub::\` — nest **defined** board types (UI inside board)
+- Wire assignments and property blocks on internal components
+
+**Forbidden**
+
+- \`def\` user functions
+- \`pcb +[...]\` or \`pcb [type] .inst::\`
+- \`chip +[...]\` or \`board +[...]\` nested definitions
+- \`~~\` next section
+- UI / panel types: \`switch\`, \`key\`, \`dip\`, \`rotary\`, \`osc\`, \`led\`, \`7seg\`, \`14seg\`, \`lcd\`, \`dots\`, \`ledBar\`
+
+---
+
+## Internal wiring
+
+Use \`.inst:pin\` for component pins and bare names for chip-level wires:
+
+\`\`\`
+.add:a = a
+sum = .add:get
+\`\`\`
+
+Probe from outside:
+
+| Form | Target |
+|------|--------|
+| \`probe(.u1:sum)\` | pout \`sum\` |
+| \`probe(.u1.partial)\` | internal wire \`partial\` in chip body |
+| \`probe(.u1:carry)\` | pout or component property \`:carry\` |
+
+See [debug.md](debug.md).
+
+---
+
+## Runnable example
+
+\`\`\`logts-play
+chip +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum
+
+chip [halfAdd] .u1::
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+4wire r = .u1:sum
+show(r)
+\`\`\`
+
+---
+
+## Chip vs PCB
+
+PCBs are for complete interactive circuits; chips are building blocks. A typical flow:
+
+1. Define \`chip +[aluSlice]:\` …
+2. Instantiate inside \`pcb +[board]:\` with \`chip [aluSlice] .slice::\`
+3. Add \`led\`, \`switch\`, and panel wiring only in the PCB
+
+Interactive circuits: [board.md](board.md). Component catalog: [components.md](components.md).
+`,
     'pcb.md': `# PCB components
+
+> **Deprecated** — use [board.md](board.md) for new circuits. PCB remains supported for existing scripts but is not recommended (legacy propagation in body, no wave alignment). Behavior is unchanged.
 
 A **PCB** is a reusable circuit block: you define its interface (pins, pouts, exec trigger), its internal wiring, and optional \`~~\` next-tick section. PCBs can use any built-in component, nested PCBs, \`def\` functions, and panel controls (\`switch\`, \`key\`, \`led\`, …).
 
@@ -909,154 +1214,6 @@ See [debug.md](debug.md) for \`:\` (pin/pout) vs \`.\` (internal wire) conventio
 | Use case | Full interactive circuits | Pure reusable logic |
 
 Chip details: [chip.md](chip.md).
-`,
-    'chip.md': `# Chip components
-
-A **chip** is a lightweight reusable block — same pin/pout/exec model as PCB, but **without** UI components, \`def\`, nested PCB definitions, or \`~~\`. Use chips to build libraries of logic (adders, multiplexers, ALU slices) that you compose inside PCBs or other chips.
-
-Full signature reference: \`doc(chip)\` and \`doc(chip.type)\` — see [doc-function.md](doc-function.md).
-
----
-
-## Definition
-
-\`\`\`
-chip +[halfAdd]:
-  4pin a
-  4pin b
-  1pin set
-  4pout sum
-  1pout carry
-  exec: set
-  on: 1
-  comp [adder] .add:
-    depth: 4
-    on: 1
-    :
-  .add:a = a
-  .add:b = b
-  sum = .add:get
-  carry = .add:carry
-  :4bit sum
-\`\`\`
-
-| Part | Meaning |
-|------|---------|
-| \`chip +[name]:\` | Define chip type (top-level only) |
-| \`Npin\` / \`Npout\` | External ports |
-| \`exec\` / \`on\` | Same as PCB — property-block trigger |
-| body | \`comp\`, assignments, \`chip [other] .inst::\` |
-| \`:Nbit var\` | Optional return spec for \`doc()\` |
-
-Chip names cannot collide with reserved component names (\`adder\`, \`chip\`, \`7seg\`, …).
-
----
-
-## Instantiation
-
-\`\`\`
-chip [halfAdd] .u1::
-\`\`\`
-
-Property block (drive pins + exec):
-
-\`\`\`
-.u1:{
-  a = 0101
-  b = 0011
-  set = 1
-}
-\`\`\`
-
-Read pout from outside:
-
-\`\`\`
-4wire r = .u1:sum
-1wire c = .u1:carry
-\`\`\`
-
----
-
-## Allowed and forbidden in chip body
-
-**Allowed**
-
-- \`comp\` for logic devices: \`adder\`, \`subtract\`, \`mem\`, \`reg\`, \`counter\`, \`shifter\`, \`divider\`, \`multiplier\`, …
-- \`chip [existingType] .sub::\` — nest other **defined** chip types
-- Wire assignments and property blocks on internal components
-
-**Forbidden**
-
-- \`def\` user functions
-- \`pcb +[...]\` or \`pcb [type] .inst::\`
-- \`~~\` next section
-- UI / panel types: \`switch\`, \`key\`, \`dip\`, \`rotary\`, \`osc\`, \`led\`, \`7seg\`, \`14seg\`, \`lcd\`, \`dots\`, \`ledBar\`
-
----
-
-## Internal wiring
-
-Use \`.inst:pin\` for component pins and bare names for chip-level wires:
-
-\`\`\`
-.add:a = a
-sum = .add:get
-\`\`\`
-
-Probe from outside:
-
-| Form | Target |
-|------|--------|
-| \`probe(.u1:sum)\` | pout \`sum\` |
-| \`probe(.u1.partial)\` | internal wire \`partial\` in chip body |
-| \`probe(.u1:carry)\` | pout or component property \`:carry\` |
-
-See [debug.md](debug.md).
-
----
-
-## Runnable example
-
-\`\`\`logts-play
-chip +[halfAdd]:
-  4pin a
-  4pin b
-  1pin set
-  4pout sum
-  1pout carry
-  exec: set
-  on: 1
-  comp [adder] .add:
-    depth: 4
-    on: 1
-    :
-  .add:a = a
-  .add:b = b
-  sum = .add:get
-  carry = .add:carry
-  :4bit sum
-
-chip [halfAdd] .u1::
-.u1:{
-  a = 0101
-  b = 0011
-  set = 1
-}
-4wire r = .u1:sum
-show(r)
-\`\`\`
-
----
-
-## Chip vs PCB
-
-PCBs are for complete interactive circuits; chips are building blocks. A typical flow:
-
-1. Define \`chip +[aluSlice]:\` …
-2. Instantiate inside \`pcb +[board]:\` with \`chip [aluSlice] .slice::\`
-3. Add \`led\`, \`switch\`, and panel wiring only in the PCB
-
-PCB guide: [pcb.md](pcb.md). Component catalog: [components.md](components.md).
 `,
     'interactive-components.md': `# Interactive components
 
