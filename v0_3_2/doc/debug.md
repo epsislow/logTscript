@@ -141,52 +141,52 @@ probe(expr)
 | Wire name | `probe(a)` |
 | Component `:get` (implicit) | `probe(.clk)` → `probe(.clk:get)` |
 | Component property | `probe(.clk:get)` |
-| Chip / PCB pin sau pout | `probe(.u1:sum)`, `probe(.q:result)` |
-| Chip / PCB wire intern | `probe(.u1.partial)`, `probe(.q.shadow)` |
-| Componentă calculată | `probe(.div:mod)`, `probe(.add:carry)` |
+| Chip / PCB pin or pout | `probe(.u1:sum)`, `probe(.q:result)` |
+| Chip / PCB internal wire | `probe(.u1.partial)`, `probe(.q.shadow)` |
+| Computed component | `probe(.div:mod)`, `probe(.add:carry)` |
 | Storage reference | `probe(&1)` |
 | Bit / slice | `probe(&1.0)`, `probe(&1.2-4)` |
 
-### Sintaxă `:` vs `.` (chip / PCB / componentă)
+### Syntax `:` vs `.` (chip / PCB / component)
 
-| Punctuație | Exemplu | Țintă |
-|------------|---------|--------|
-| **`:`** după instanță | `probe(.u1:sum)` | pin sau **pout** declarat |
-| **`.`** după instanță | `probe(.u1.partial)` | **wire intern** din body (nu pin/pout) |
-| **`:`** după componentă | `probe(.div:mod)` | proprietate componentă (`:get`, `:mod`, `:carry`…) |
+| Punctuation | Example | Target |
+|-------------|---------|--------|
+| **`:`** after instance | `probe(.u1:sum)` | declared pin or **pout** |
+| **`.`** after instance | `probe(.u1.partial)` | **internal wire** from body (not pin/pout) |
+| **`:`** after component | `probe(.div:mod)` | component property (`:get`, `:mod`, `:carry`…) |
 
-`probe(.u1.sum)` **nu** urmărește pout-ul `sum` — folosește `probe(.u1:sum)` pentru pout (test **839**).
+`probe(.u1.sum)` does **not** track pout `sum` — use `probe(.u1:sum)` for pout (test **839**).
 
-### Component outputs — ce acceptă `probe`
+### Component outputs — what `probe` accepts
 
-**Cu `comp.ref` (faza 1):** `probe(.comp)` sau `probe(.comp:get)` — key, switch, DIP, rotary, osc (`:get`).
+**With `comp.ref` (phase 1):** `probe(.comp)` or `probe(.comp:get)` — key, switch, DIP, rotary, osc (`:get`).
 
-**Fără `comp.ref` (faza 2):** `probe(.comp:prop)` — valoare calculată la `:set` / recalcul device:
+**Without `comp.ref` (phase 2):** `probe(.comp:prop)` — computed value on `:set` / device recalc:
 
-| Tip | Proprietăți | Teste |
-|-----|-------------|-------|
+| Type | Properties | Tests |
+|------|------------|-------|
 | divider | `:get`, `:mod` | 825, 836–837 |
 | adder, subtract | `:get`, `:carry` | 838 |
 | multiplier | `:get`, `:over` | — |
 | shifter | `:get`, `:out` | — |
 | mem, reg, counter | `:get` | — |
-| osc | `:counter` (`:get` rămâne pe ref) | — |
+| osc | `:counter` (`:get` stays on ref) | — |
 | display (7seg, lcd…) | `:get` | — |
 
-| Tip instanță | Formă | Teste |
-|--------------|-------|-------|
-| chip / PCB pin sau pout | `probe(.u1:sum)` | 827–830 |
-| chip / PCB wire intern | `probe(.u1.partial)` | 832–835 |
+| Instance type | Form | Tests |
+|---------------|------|-------|
+| chip / PCB pin or pout | `probe(.u1:sum)` | 827–830 |
+| chip / PCB internal wire | `probe(.u1.partial)` | 832–835 |
 
-**Reguli**
+**Rules**
 
-- **Fără slice** pe componentă / wire intern — `probe(.dip.0)` / `probe(.u1.tmp.0)` nu sunt suportate încă.
-- **Motiv:** `initialised` / `changed` (display și aritmetică la recalcul); `edge committed` doar pe fire REG / property blocks edge.
-- **Dublare:** același ref poate produce două linii dacă probe și wire top-level urmăresc aceeași sursă.
+- **No slice** on component / internal wire — `probe(.dip.0)` / `probe(.u1.tmp.0)` are not supported yet.
+- **Note:** `initialised` / `changed` (display and arithmetic on recalc); `edge committed` only on REG wires / edge property blocks.
+- **Duplication:** the same ref may produce two lines if probe and a top-level wire watch the same source.
 
-#### Exemplu — chip / PCB pout din script principal (827–830)
+#### Example — chip / PCB pout from main script (827–830)
 
-Instanța trebuie creată **înainte** de `probe` în același RUN (probe se înregistrează la finalul RUN, când instanța există deja):
+The instance must be created **before** `probe` in the same RUN (probe registers at end of RUN, when the instance already exists):
 
 ```logts-play
 chip +[halfAdd]:
@@ -217,13 +217,13 @@ probe(.u1:sum)
 }
 ```
 
-După RUN: `# .u1:sum = 1000 … - initialised`. La un nou pulse pe `set` cu alte `a`/`b`: `# .u1:sum = … - changed`.
+After RUN: `# .u1:sum = 1000 … - initialised`. On a new pulse on `set` with different `a`/`b`: `# .u1:sum = … - changed`.
 
-Același model pentru PCB: `probe(.q:result)` unde `result` e `4pout` declarat în `pcb +[…]`.
+Same pattern for PCB: `probe(.q:result)` where `result` is a `4pout` declared in `pcb +[…]`.
 
-**Notă:** `probe(.u1:sum)` și `1wire r = .u1:sum` + `probe(r)` pot emite **două linii** pentru aceeași schimbare (același ref în storage).
+**Note:** `probe(.u1:sum)` and `1wire r = .u1:sum` + `probe(r)` may emit **two lines** for the same change (same ref in storage).
 
-#### Exemplu — wire intern chip (832–833)
+#### Example — chip internal wire (832–833)
 
 ```logts-play
 chip +[halfAddDbg]:
@@ -255,9 +255,9 @@ probe(.u1.partial)
 }
 ```
 
-`partial` e wire din body, nu pout — `# .u1.partial = 1000 … - initialised`.
+`partial` is a wire in the body, not a pout — `# .u1.partial = 1000 … - initialised`.
 
-#### Exemplu — divider `:mod` (836–837)
+#### Example — divider `:mod` (836–837)
 
 ```logts-play
 comp [divider] .div:
@@ -272,9 +272,9 @@ probe(.div:mod)
 }
 ```
 
-După RUN: `# .div:mod = 0000 … - initialised`. La alt pulse `:set` cu `a`/`b` noi → `changed`.
+After RUN: `# .div:mod = 0000 … - initialised`. On another `:set` pulse with new `a`/`b` → `changed`.
 
-#### Exemplu — `[switch]` (821 / 822)
+#### Example — `[switch]` (821 / 822)
 
 ```logts-play
 comp [switch] .sw:
@@ -283,9 +283,9 @@ comp [switch] .sw:
 probe(.sw)
 ```
 
-După RUN: `# .sw:get = 0 … - initialised`. Toggle în panou → `# .sw:get = 1 … - changed`.
+After RUN: `# .sw:get = 0 … - initialised`. Toggle in panel → `# .sw:get = 1 … - changed`.
 
-#### Exemplu — `[key]` (823 / 824)
+#### Example — `[key]` (823 / 824)
 
 ```logts-play
 comp [key] .clk:
@@ -296,9 +296,9 @@ comp [key] .clk:
 probe(.clk:get)
 ```
 
-Apăsare: `# .clk:get = 1 … - changed`. Eliberare: `# .clk:get = 0 … - changed`.
+Press: `# .clk:get = 1 … - changed`. Release: `# .clk:get = 0 … - changed`.
 
-#### Exemplu — `[dip]` (multi-bit)
+#### Example — `[dip]` (multi-bit)
 
 ```logts-play
 comp [dip] .mode:
@@ -308,9 +308,9 @@ comp [dip] .mode:
 probe(.mode)
 ```
 
-După RUN: `# .mode:get = 0000 … - initialised`. Fiecare comutator schimbat în panou actualizează întregul bus (ex. `# .mode:get = 0001 … - changed`).
+After RUN: `# .mode:get = 0000 … - initialised`. Each toggled switch in the panel updates the entire bus (e.g. `# .mode:get = 0001 … - changed`).
 
-#### Exemplu — `[osc]` (output periodic)
+#### Example — `[osc]` (periodic output)
 
 ```logts-play
 comp [osc] .tick:
@@ -322,9 +322,9 @@ comp [osc] .tick:
 probe(.tick)
 ```
 
-După RUN: `initialised`, apoi linii `changed` la fiecare comutare automată a ieșirii (vizibil în Output după interacțiuni / refresh panou).
+After RUN: `initialised`, then `changed` lines on each automatic output toggle (visible in Output after interaction / panel refresh).
 
-#### Ce nu funcționează încă — divider `:mod`
+#### What does not work yet — divider `:mod`
 
 ```logts-play
 comp [divider] .div:
@@ -333,7 +333,7 @@ comp [divider] .div:
 probe(.div:mod)
 ```
 
-După RUN: **nicio linie** `#` — quotient/remainder sunt calculate la citire, nu stocate în `comp.ref`. Pentru debug, folosește un wire:
+After RUN: **no** `#` lines — quotient/remainder are computed on read, not stored in `comp.ref`. For debugging, use a wire:
 
 ```logts-play
 comp [divider] .div:
@@ -343,7 +343,7 @@ comp [divider] .div:
 probe(mod)
 ```
 
-(pulse pe `.div:set` + `a`/`b` ca în doc divider; `probe(mod)` raportează wire-ul după propagare.)
+(pulse on `.div:set` + `a`/`b` as in divider doc; `probe(mod)` reports the wire after propagation.)
 
 ### Output format
 
@@ -383,9 +383,9 @@ After RUN, `probe(a)` still reports `initialised` for `a` when its first value i
 |--------|------|
 | `initialised` | First emission for this target |
 | `changed` | Value changed after initialisation |
-| `edge committed` | Latch la **frontiera descendentă** a ceasului wire al `REG(data, clk, clr)`, sau commit în timpul unui property block `on: raise` / `edge` / `rising` / `falling` |
+| `edge committed` | Latch on the **falling edge** of the wire clock of `REG(data, clk, clr)`, or commit during a property block `on: raise` / `edge` / `rising` / `falling` |
 
-`edge committed` nu se aplică la property blocks `on: 1` (level) și nici la `REG(..., ~, ...)` pe `NEXT(~)` (acolo apare `changed`).
+`edge committed` does not apply to property blocks `on: 1` (level) nor to `REG(..., ~, ...)` on `NEXT(~)` (there you get `changed`).
 
 ### Multiple probes
 
@@ -401,9 +401,9 @@ probe(c)
 a = 1
 ```
 
-### Example — wire, initialised + changed (după RUN)
+### Example — wire, initialised + changed (after RUN)
 
-`probe` raportează `changed` când valoarea se modifică **după** elaborare (ex. toggle switch, `setWire` în teste). Scriptul de mai jos este același ca testele **800** / **801**:
+`probe` reports `changed` when the value changes **after** elaboration (e.g. toggle switch, `setWire` in tests). The script below is the same as tests **800** / **801**:
 
 ```logts-play
 1wire b = 0
@@ -412,19 +412,19 @@ a = AND(b, 1)
 probe(a)
 ```
 
-După **RUN**, Output:
+After **RUN**, Output:
 
 ```text
 # a = 0 (&…) - initialised
 ```
 
-Schimbă `b` la `1` (panou Devices / DIP / switch conectat la `b`, sau butonul **Next** dacă e cazul) — apare:
+Change `b` to `1` (Devices panel / DIP / switch wired to `b`, or the **Next** button if applicable) — you get:
 
 ```text
 # a = 1 (&…) - changed
 ```
 
-Wave — același script (`logts-play wave`); comportament identic la schimbarea lui `b` după RUN.
+Wave — same script (`logts-play wave`); identical behavior when changing `b` after RUN.
 
 ### Example — storage reference
 
@@ -438,9 +438,9 @@ x = 1010
 
 ### Example — `REG` wire clock + `edge committed` (816 / 817)
 
-`REG(data, clk, clr)` cu **wire** ca `clk` (nu `~`) face latch pe frontiera **descendentă** `clk`: `1` → `0`. Când `q` se actualizează la acel moment, probe emite motivul **`edge committed`**.
+`REG(data, clk, clr)` with a **wire** as `clk` (not `~`) latches on the **falling** edge of `clk`: `1` → `0`. When `q` updates at that moment, probe emits reason **`edge committed`**.
 
-**Pas 1 — Load & Run** (script de setup):
+**Step 1 — Load & Run** (setup script):
 
 ```logts-play
 1wire data := 0
@@ -449,21 +449,21 @@ x = 1010
 probe(q)
 ```
 
-După RUN, Output:
+After RUN, Output:
 
 ```text
 # q = 0 (&…) - initialised
 ```
 
-**Pas 2 — pulse pe `clk`** (panou Variables: `data=1`, `clk=1`, apoi `clk=0`; sau DIP/key pe firele respective):
+**Step 2 — pulse on `clk`** (Variables panel: `data=1`, `clk=1`, then `clk=0`; or DIP/key on those wires):
 
 ```text
 # q = 1 (&…) - edge committed
 ```
 
-Același scenariu pe Wave (`logts-play wave` la pasul 1). Testele automate folosesc `setWire` după RUN — comportament identic.
+Same scenario on Wave (`logts-play wave` at step 1). Automated tests use `setWire` after RUN — identical behavior.
 
-Variantă cu mai multe scrieri pe aceeași linie în script (editor, **Legacy** + `MODE WIREWRITE`):
+Variant with multiple writes on the same script line (editor, **Legacy** + `MODE WIREWRITE`):
 
 ```logts-play
 MODE WIREWRITE
@@ -476,11 +476,11 @@ clk = 1
 clk = 0
 ```
 
-Pe **Wave**, `clk = 1` apoi `clk = 0` în același RUN nu garantează pulse-ul (scrierile sunt amânate); preferă pulse din panou după RUN sau modul Legacy de mai sus.
+On **Wave**, `clk = 1` then `clk = 0` in the same RUN does not guarantee the pulse (writes are deferred); prefer a panel pulse after RUN or Legacy mode above.
 
-### Example — `probe(.clk)` direct pe componentă (821–824)
+### Example — `probe(.clk)` directly on component (821–824)
 
-Fără fire intermediare — monitorizezi output-ul tastei:
+No intermediate wires — you monitor the key output:
 
 ```logts-play
 comp [key] .clk:
@@ -491,21 +491,21 @@ comp [key] .clk:
 probe(.clk)
 ```
 
-După RUN:
+After RUN:
 
 ```text
 # .clk:get = 0 (&…) - initialised
 ```
 
-Apăsare → `# .clk:get = 1 … - changed`; eliberare → `# .clk:get = 0 … - changed`.
+Press → `# .clk:get = 1 … - changed`; release → `# .clk:get = 0 … - changed`.
 
-La fel pentru `comp [switch] .sw` cu `probe(.sw)` (teste **821** / **822**).
+Same for `comp [switch] .sw` with `probe(.sw)` (tests **821** / **822**).
 
 ### Example — `[key]` + `REG` + `probe` (818 / 819)
 
-Același latch pe frontiera descendentă a lui `clk`, dar ceasul vine de la o tastă din panoul **Devices**. `data` este deja `1`; după RUN, `q` rămâne `0` până la primul pulse complet pe `clk`.
+Same falling-edge latch on `clk`, but the clock comes from a key in the **Devices** panel. `data` is already `1`; after RUN, `q` stays `0` until the first complete pulse on `clk`.
 
-**Pas 1 — Load & Run:**
+**Step 1 — Load & Run:**
 
 ```logts-play
 1wire data := 1
@@ -519,36 +519,36 @@ comp [key] .clk:
 probe(q)
 ```
 
-După RUN, Output:
+After RUN, Output:
 
 ```text
 # q = 0 (&…) - initialised
 ```
 
-**Pas 2 — interacțiune cu tasta A** (apăsare apoi **eliberare**):
+**Step 2 — interaction with key A** (press then **release**):
 
 | Moment | `clk` | `q` | Probe |
 |--------|-------|-----|-------|
-| Apăsare (press) | `1` | `0` | — (încă nu s-a făcut latch) |
-| Eliberare (release) | `0` | `1` | `# q = 1 (&…) - edge committed` |
+| Press | `1` | `0` | — (latch not done yet) |
+| Release | `0` | `1` | `# q = 1 (&…) - edge committed` |
 
-La **apăsare**, `clk` urcă la `1`, dar `REG` nu copiază încă `data` în `q`. La **eliberare**, frontiera `clk` `1` → `0` face latch — `q` devine `1` și panoul **Output** se actualizează (la fel ca la alte componente interactive din Devices).
+On **press**, `clk` goes to `1`, but `REG` does not copy `data` into `q` yet. On **release**, the `clk` `1` → `0` edge latches — `q` becomes `1` and the **Output** panel updates (same as other interactive Devices components).
 
-Același scenariu pe Wave (`logts-play wave` la pasul 1). Testele **818** / **819** simulează press/release cu `setComp('.clk', …)` după RUN.
+Same scenario on Wave (`logts-play wave` at step 1). Tests **818** / **819** simulate press/release with `setComp('.clk', …)` after RUN.
 
 ### Example — property block `on: raise` (mem / reg)
 
-Pentru `comp [mem]` / `comp [reg]` cu `on: raise`, la re-execuția unui property block declanșată de frontiera `set`, ieșirea probe poate folosi tot **`edge committed`** (dacă valoarea `:get` se modifică în acel bloc).
+For `comp [mem]` / `comp [reg]` with `on: raise`, when a property block re-executes on the `set` edge, probe output may also use **`edge committed`** (if the `:get` value changes in that block).
 
 ---
 
 ## Legacy vs Wave — runnable examples
 
-Blocurile `logts-play` folosesc **Legacy**; `logts-play wave` setează modul **Wave** (pill portocaliu în editor). Toate exemplele de mai jos sunt verificate de testele **804–813** din test runner.
+`logts-play` blocks use **Legacy**; `logts-play wave` sets **Wave** mode (orange pill in the editor). All examples below are verified by tests **804–813** in the test runner.
 
-### 1. `show` combinational — fără `NEXT(~)` (804 / 805)
+### 1. `show` combinational — without `NEXT(~)` (804 / 805)
 
-Identic pe Legacy și Wave: un singur `show` la final, firele sunt deja stabile.
+Same on Legacy and Wave: a single `show` at the end, wires are already stable.
 
 ```logts-play
 1wire a = 0
@@ -566,9 +566,9 @@ show(a, b, c)
 
 Output: `c (1wire) = 0`, `a = 0`, `b = 1`.
 
-### 2. `show` + `peek` după schimbare wire — Legacy cascade (806)
+### 2. `show` + `peek` after wire change — Legacy cascade (806)
 
-Pe **Legacy**, `a = 1` propagă imediat la `b = NOT(a)`; `peek` vede `b = 0`.
+On **Legacy**, `a = 1` propagates immediately to `b = NOT(a)`; `peek` sees `b = 0`.
 
 ```logts-play
 1wire a := 0
@@ -579,15 +579,15 @@ peek(a, b)
 show(a, b)
 ```
 
-Output (3 linii):
+Output (3 lines):
 
 ```text
-a (1wire) = 0 …, b (1wire) = 1 …     ← show după declarații
-a (1wire) = 1 …, b (1wire) = 0 …     ← peek după a = 1
-a (1wire) = 1 …, b (1wire) = 0 …     ← show final
+a (1wire) = 0 …, b (1wire) = 1 …     ← show after declarations
+a (1wire) = 1 …, b (1wire) = 0 …     ← peek after a = 1
+a (1wire) = 1 …, b (1wire) = 0 …     ← final show
 ```
 
-### 3. Același script pe Wave — `show` amânat, `peek` imediat (807)
+### 3. Same script on Wave — deferred `show`, immediate `peek` (807)
 
 ```logts-play wave
 1wire a := 0
@@ -598,13 +598,13 @@ peek(a, b)
 show(a, b)
 ```
 
-Pe Wave, `show` este amânat până la sfârșitul RUN; `peek` după `a = 1` citește **înainte** de settle — `b` rămâne `1`:
+On Wave, `show` is deferred until end of RUN; `peek` after `a = 1` reads **before** settle — `b` stays `1`:
 
 ```text
-a (1wire) = 1 …, b (1wire) = 1 …     ← toate cele 3 linii (show-urile flush la final)
+a (1wire) = 1 …, b (1wire) = 1 …     ← all 3 lines (shows flush at end)
 ```
 
-### 4. `show` pe `REG(data, ~, 0)` — fără `NEXT` în script (808 / 809)
+### 4. `show` on `REG(data, ~, 0)` — no `NEXT` in script (808 / 809)
 
 ```logts-play
 1wire data = 1
@@ -618,11 +618,11 @@ show(q)
 show(q)
 ```
 
-Output: `q (1wire) = 0` — registrul nu a făcut încă latch (lipsește `NEXT(~)`).
+Output: `q (1wire) = 0` — register has not latched yet (`NEXT(~)` missing).
 
-### 5. `show` înainte și după `NEXT(~)` în același script (810 / 811)
+### 5. `show` before and after `NEXT(~)` in the same script (810 / 811)
 
-**Legacy** — fiecare `show` la momentul execuției:
+**Legacy** — each `show` at execution time:
 
 ```logts-play
 1wire data = 1
@@ -637,7 +637,7 @@ q (1wire) = 0 …
 q (1wire) = 1 …
 ```
 
-**Wave** — ambele `show` sunt flush-uite după propagare, **după** `NEXT(~)`:
+**Wave** — both `show` calls are flushed after propagation, **after** `NEXT(~)`:
 
 ```logts-play wave
 1wire data = 1
@@ -652,7 +652,7 @@ q (1wire) = 1 …
 q (1wire) = 1 …
 ```
 
-### 6. Două `show(b)` după `a = 1` — Legacy vs Wave (812 / 813)
+### 6. Two `show(b)` after `a = 1` — Legacy vs Wave (812 / 813)
 
 ```logts-play
 1wire a := 0
@@ -677,33 +677,33 @@ a = 1
 show(b)
 ```
 
-Wave Output — ambele linii la flush final, `b` încă `1`:
+Wave Output — both lines at final flush, `b` still `1`:
 
 ```text
 b (1wire) = 1 …
 b (1wire) = 1 …
 ```
 
-### Rezumat Legacy vs Wave (fără `NEXT` vs cu `NEXT`)
+### Summary — Legacy vs Wave (without `NEXT` vs with `NEXT`)
 
-| Scenariu | Legacy | Wave |
+| Scenario | Legacy | Wave |
 |----------|--------|------|
-| `show` la final, logică combinatională | Valori stabile | La fel |
-| `peek` după `wire =` în mijlocul RUN | Cascade imediat | Citește storage curent (poate fi înainte de settle) |
-| `show` în mijlocul RUN | La fiecare statement | Amânat — flush la sfârșitul RUN |
-| `show` + `NEXT(~)` în script | `q=0` apoi `q=1` | Ambele `show` după `NEXT` → ambele `q=1` |
-| `probe` după RUN + schimbare UI | `initialised` apoi `changed` | La fel (teste 800–801) |
-| `probe` în timpul settle RUN (`a = AND(b,1)`) | O linie: `# a = 1 - initialised` (cascade imediat) | Două linii: `# a = 0 - initialised`, `# a = 1 - changed` (814–815) |
-| `probe` + `REG` latch la `clk` 1→0 | `# q = 0 - initialised`, apoi `# q = 1 - edge committed` (816–817) | La fel |
-| `probe` + `[key]` + `REG` după RUN | `initialised` la RUN; `edge committed` la release tastă (818–819) | La fel |
-| `probe(.comp)` pe key/switch/dip/rotary/osc | `initialised` la RUN; `changed` la UI (821–824) | La fel |
-| `probe(.div:mod)` componentă calculată | `initialised` / `changed` la `:set` (836–837) | La fel |
-| `probe(.u1.partial)` wire intern chip/PCB | `initialised` / `changed` la re-exec body (832–835) | La fel |
-| `probe(.u1.sum)` dot pe pout | ignorat — folosește `probe(.u1:sum)` (839) | La fel |
+| `show` at end, combinational logic | Stable values | Same |
+| `peek` after `wire =` mid-RUN | Immediate cascade | Reads current storage (may be before settle) |
+| `show` mid-RUN | At each statement | Deferred — flush at end of RUN |
+| `show` + `NEXT(~)` in script | `q=0` then `q=1` | Both `show` after `NEXT` → both `q=1` |
+| `probe` after RUN + UI change | `initialised` then `changed` | Same (tests 800–801) |
+| `probe` during RUN settle (`a = AND(b,1)`) | One line: `# a = 1 - initialised` (immediate cascade) | Two lines: `# a = 0 - initialised`, `# a = 1 - changed` (814–815) |
+| `probe` + `REG` latch at `clk` 1→0 | `# q = 0 - initialised`, then `# q = 1 - edge committed` (816–817) | Same |
+| `probe` + `[key]` + `REG` after RUN | `initialised` at RUN; `edge committed` on key release (818–819) | Same |
+| `probe(.comp)` on key/switch/dip/rotary/osc | `initialised` at RUN; `changed` on UI (821–824) | Same |
+| `probe(.div:mod)` computed component | `initialised` / `changed` on `:set` (836–837) | Same |
+| `probe(.u1.partial)` chip/PCB internal wire | `initialised` / `changed` on body re-exec (832–835) | Same |
+| `probe(.u1.sum)` dot on pout | ignored — use `probe(.u1:sum)` (839) | Same |
 
-### 7. `probe` — `initialised` apoi `changed` la settle (815 wave)
+### 7. `probe` — `initialised` then `changed` at settle (815 wave)
 
-Pe **Wave**, propagarea de la sfârșitul RUN poate schimba `a` după prima citire a probe-ului — a doua linie trebuie să fie **`changed`**, nu `initialised`:
+On **Wave**, propagation at end of RUN may change `a` after the probe’s first read — the second line must be **`changed`**, not `initialised`:
 
 ```logts-play wave
 1wire a := 0
@@ -719,7 +719,7 @@ Output:
 # a = 1 (&0) - changed
 ```
 
-Pe **Legacy**, cascade-ul rulează înainte de `activateProbes` — o singură linie:
+On **Legacy**, the cascade runs before `activateProbes` — a single line:
 
 ```logts-play
 1wire a := 0
@@ -741,10 +741,10 @@ probe(a)
 | Show final results in a script | `show` |
 | Inspect values mid-script (rare) | `peek` |
 | Trace every change to a wire or ref | `probe` |
-| Trace key / switch / DIP / osc output direct | `probe(.comp)` sau `probe(.comp:get)` |
+| Trace key / switch / DIP / osc output direct | `probe(.comp)` or `probe(.comp:get)` |
 | Log UI / `setWire` updates after RUN | `probe` |
 | Trace divider `:mod`, adder `:carry` | `probe(.div:mod)`, `probe(.add:carry)` |
-| Trace wire intern chip/PCB | `probe(.u1.partial)` (punct, nu `:`) |
+| Trace chip/PCB internal wire | `probe(.u1.partial)` (dot, not `:`) |
 | Document a circuit for a reader | `show` at the end |
 
 ---

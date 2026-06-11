@@ -1,27 +1,27 @@
-# Mini CPU / ALU cu memorie — fezabilitate
+# Mini CPU / ALU with memory — feasibility
 
-## Răspuns scurt
+## Short answer
 
-**Da** — poți face un script mic, demonstrativ, de tip „CPU cu 1 registru + RAM + ALU” folosind doar ce există acum. **`comp [mem]` singur nu e suficient conceptual**, dar împreună cu câteva primitive deja în limbaj acoperi un ALU + stocare + pași de execuție.
+**Yes** — you can build a small demonstrator script (“CPU with 1 register + RAM + ALU”) using only what exists today. **`comp [mem]` alone is not enough conceptually**, but together with a few existing language primitives you cover ALU + storage + execution steps.
 
-**Nu e nevoie de componente noi** în engine pentru un demo didactic. Ce „mai lipsește” sunt mai degrabă **organizare** (chip-uri/board-uri) și **disciplină de clock** (un pas = un impuls), nu tipuri noi (`instruction`, `bus`, etc.).
+**No new component types** are required in the engine for a teaching demo. What is “missing” is mostly **organization** (chips/boards) and **clock discipline** (one step = one pulse), not new types (`instruction`, `bus`, etc.).
 
 ---
 
-## Ce ai deja (suficient pentru un mini-CPU)
+## What you already have (enough for a mini-CPU)
 
-| Rol în CPU | Primitive LogTScript | Note |
-|------------|----------------------|------|
-| **RAM / program** | `comp [mem]` | ROM inițial cu `= ^hex`; read/write cu `.ram:{ at, data, write }` — [mem.md](mem.md) |
-| **ALU (ADD/SUB/AND…)** | `comp [adder]` / `[subtract]` sau `ADD()` / `SUBTRACT()` | Pentru CPU persistent, preferă **componente** în `chip`, nu funcții instant — [adder.md](adder.md) |
-| **Selectare operație** | `MUX1` / `MUX2` / `MUX3` | Alegi între rezultate ALU după câțiva biți din instrucțiune |
-| **Accumulator / IR** | `REG(data, clk, clr)` sau `comp [reg]` | Stare între pași — [reg.md](reg.md) |
-| **Program Counter** | `comp [counter]` | Load + increment pe `dir` — [counter.md](counter.md) |
-| **Flags (carry, zero)** | `carry` de la adder; `EQ` pentru zero | Fără componentă dedicată „flags” |
-| **Shift** (opțional) | `LSHIFT` / `RSHIFT` sau `comp [shifter]` | Pentru instrucțiuni simple nu e obligatoriu |
-| **Clock / step** | `comp [key]` sau `comp [osc]` + `comp [switch]` | Un **pas** = un impuls (manual sau automat) |
-| **UI program / stare** | `board` + `dip`, `switch`, `led`, `7seg` | Board permite panel + wave în body — [board.md](board.md) |
-| **Logică reutilizabilă** | `chip` (ALU, decoder) în `board` (sistem) | ALU fără UI în chip; mem + display în board — [chip.md](chip.md) |
+| CPU role | LogTScript primitive | Notes |
+|----------|----------------------|-------|
+| **RAM / program** | `comp [mem]` | ROM init with `= ^hex`; read/write via `.ram:{ at, data, write }` — [mem.md](mem.md) |
+| **ALU (ADD/SUB/AND…)** | `comp [adder]` / `[subtract]` or `ADD()` / `SUBTRACT()` | For a persistent CPU, prefer **components** in a `chip`, not instant functions — [adder.md](adder.md) |
+| **Operation select** | `MUX` / `MUX2` / `MUX3` | Pick ALU result from a few instruction bits |
+| **Accumulator / IR** | `REG(data, clk, clr)` or `comp [reg]` | State between steps — [reg.md](reg.md) |
+| **Program counter** | `comp [counter]` | Load + increment on `dir` — [counter.md](counter.md) |
+| **Flags (carry, zero)** | `carry` from adder; `EQ` for zero | No dedicated “flags” component |
+| **Shift** (optional) | `LSHIFT` / `RSHIFT` or `comp [shifter]` | Not required for simple instructions |
+| **Clock / step** | `comp [key]` or `comp [osc]` + `comp [switch]` | One **step** = one pulse (manual or automatic) |
+| **UI program / state** | `board` + `dip`, `switch`, `led`, `7seg` | Board allows panel + wave in body — [board.md](board.md) |
+| **Reusable logic** | `chip` (ALU, decoder) inside `board` (system) | ALU without UI in chip; mem + display in board — [chip.md](chip.md) |
 
 ```mermaid
 flowchart TB
@@ -29,7 +29,7 @@ flowchart TB
     UI[dip_switch_key_led]
     RAM[comp_mem]
     PC[comp_counter]
-    ACC[REG_sau_reg]
+    ACC[REG_or_reg]
     subgraph chipAlu [chip aluCore]
       MUX[MUX_op_select]
       ADD[comp_adder]
@@ -45,57 +45,57 @@ flowchart TB
 
 ---
 
-## Arhitectură recomandată
+## Recommended architecture
 
-### Variantă A — „Harvard didactic” (implementată)
+### Variant A — “Teaching Harvard” (implemented)
 
-- **`mem` program** (ROM): instrucțiuni preîncărcate cu `= ^....`
-- **`mem` date** (RAM): variabile runtime
-- **PC** (`counter`): adresa instrucțiunii curente
-- **Accumulator** (`comp [reg]`): operand + rezultat
-- **ALU** (`chip +[alu4]`): add/sub + MUX pe `op[0]`
-- **Board top** (`board +[cpu4]`): clock (`step`), reset (`rst`), afișaj (`7seg`), pout `acc` / `pc` / `ir`
+- **`mem` program** (ROM): instructions preloaded with `= ^....`
+- **`mem` data** (RAM): runtime variables
+- **PC** (`counter`): current instruction address
+- **Accumulator** (`comp [reg]`): operand + result
+- **ALU** (`chip +[alu4]`): add/sub + MUX on `op[1]`
+- **Top board** (`board +[cpu4]`): clock (`set`), reset (`rst`), display (`7seg`), pout `acc` / `pc` / `ir`
 
-**Un ciclu (manual):**
+**One cycle (manual):**
 
-1. Citește instrucțiune de la `PC` din memoria program
-2. Decode simplu (nibble înalt = opcode, nibble jos = operand)
-3. Execută (ALU / write mem / load mem / jump)
-4. `PC++` sau load nou la jump
-5. Așteaptă următorul impuls pe `step`
+1. Fetch instruction at `PC` from program memory
+2. Simple decode (high nibble = opcode, low nibble = operand)
+3. Execute (ALU / mem write / mem load / jump)
+4. `PC++` or load new PC on jump
+5. Wait for next pulse on `set`
 
-Vezi [mini-cpu.md](mini-cpu.md) pentru ISA și scriptul complet.
+See [mini-cpu.md](mini-cpu.md) for the ISA and full script.
 
-### Variantă B — „ALU demo” (fără fetch complet)
+### Variant B — “ALU demo” (no full fetch)
 
-Doar: DIP pentru operanzi + opcode, `adder`/`subtract`, `led`/`7seg` pentru rezultat. **Fără mem program** — util ca prim pas înainte de CPU complet.
-
----
-
-## Ce NU îți trebuie ca tip nou de componentă
-
-| Idee | Alternativă existentă |
-|------|------------------------|
-| „Instruction register” | `REG` / wire + property block la step |
-| „Bus” | MUX + wiring în chip |
-| „Decoder hardware” | `chip` cu MUX pe opcode; sau `def` la **top-level** |
-| „Stack” | al doilea `counter` + `mem` |
-| „Program loader” | inițializare `mem` cu `=` sau `.ram = ^hex` |
+DIP for operands + opcode, `adder`/`subtract`, `led`/`7seg` for result. **No program memory** — useful as a first step before a full CPU.
 
 ---
 
-## Limitări de ținut minte
+## What you do NOT need as a new component type
 
-1. **`mem` nu e combinational** — citirea/scrierea merge prin property blocks (`at`, `write`, `set`). CPU-ul trebuie gândit **clocked / step-by-step**.
-2. **Wave în board** — comportament previzibil la step; evită bucle combinaționale implicite în același tick.
-3. **Lățimi mici** — pentru demo: `depth: 4`, `length: 8–16`, opcode 4 biți (nibble înalt), 6 tipuri de instrucțiuni.
-4. **`def` în body board/chip** — interzis; logica de decode în wiring/MUX.
+| Idea | Existing alternative |
+|------|----------------------|
+| “Instruction register” | `REG` / wire + property block on step |
+| “Bus” | MUX + wiring in chip |
+| “Hardware decoder” | `chip` with MUX on opcode; or top-level `def` |
+| “Stack” | second `counter` + `mem` |
+| “Program loader” | `mem` init with `=` or `.ram = ^hex` |
 
 ---
 
-## Pași implementare (Variantă A)
+## Limitations to keep in mind
+
+1. **`mem` is not combinational** — read/write goes through property blocks (`at`, `write`, `set`). Design the CPU **clocked / step-by-step**.
+2. **Wave in board** — predictable behavior per step; avoid implicit combinational loops in the same tick.
+3. **Small widths** — for demo: `depth: 4`, `length: 8–16`, 4-bit opcode (high nibble), ~6 instruction types.
+4. **`def` in board/chip body** — forbidden; decode logic via wiring/MUX.
+
+---
+
+## Implementation steps (variant A)
 
 1. **ALU chip** (`chip +[alu4]`): `a`, `b`, `op[2]`, `result`, `carry`
-2. **Board step CPU** (`board +[cpu4]`): mem program, mem date, PC, ACC, instanță ALU, pin `step`, `7seg`, pout `acc`/`pc`/`ir`
-3. **ISA minimă** pe 8 biți: nibble opcode + nibble operand
-4. Teste + `probe(.cpu:acc)`; program demo în ROM
+2. **Step CPU board** (`board +[cpu4]`): program mem, data mem, PC, ACC, ALU instance, pin `set`, `7seg`, pout `acc`/`pc`/`ir`
+3. **Minimal ISA** on 8 bits: opcode nibble + operand nibble
+4. Tests + `probe(.cpu:acc)`; demo program in ROM

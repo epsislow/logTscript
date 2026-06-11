@@ -1,63 +1,63 @@
 # Mini CPU 4-bit (Harvard, step-by-step)
 
-Demonstrație didactică: CPU cu **ROM program**, **RAM date**, **PC**, **accumulator** și **ALU** — fără componente noi în engine. Implementarea folosește `chip +[alu4]` și `board +[cpu4]`.
+Teaching demo: a CPU with **program ROM**, **data RAM**, **PC**, **accumulator**, and **ALU** — no new engine component types. Implementation uses `chip +[alu4]` and `board +[cpu4]`.
 
-Plan de fezabilitate: [mini-cpu-plan.md](mini-cpu-plan.md).
+Feasibility plan: [mini-cpu-plan.md](mini-cpu-plan.md).
 
 ---
 
-## Arhitectură
+## Architecture
 
-| Bloc | Rol |
-|------|-----|
-| `chip +[alu4]` | ADD/SUB pe 4 biți, select cu `op.1` |
-| `board +[cpu4]` | Fetch-decode-execute la fiecare impuls `set` |
-| `comp [mem] .prog` | ROM 8×4 (instrucțiuni 8 biți) |
+| Block | Role |
+|-------|------|
+| `chip +[alu4]` | 4-bit ADD/SUB, selected with `op.1` |
+| `board +[cpu4]` | Fetch-decode-execute on each `set` pulse |
+| `comp [mem] .prog` | ROM 8×4 (8-bit instructions) |
 | `comp [mem] .data` | RAM 4×16 |
 | `comp [counter] .pcnt` | Program counter |
 | `comp [reg] .accum` | Accumulator |
-| `comp [7seg] .disp` | Afișaj hex ACC (în panoul UI) |
+| `comp [7seg] .disp` | Hex ACC display (in the UI panel) |
 
 ---
 
-## ISA (8 biți per instrucțiune)
+## ISA (8 bits per instruction)
 
-Format: `[opcode:4][operand:4]` — în memorie 8 biți, **biții 0–3 (MSB)** = opcode, **biții 4–7** = operand (`instr.0/4` / `instr.4/4` în LogTScript).
+Format: `[opcode:4][operand:4]` — in memory as 8 bits, **bits 0–3 (MSB)** = opcode, **bits 4–7** = operand (`instr.0/4` / `instr.4/4` in LogTScript).
 
-| Opcode | Mnemonic | Efect |
-|--------|----------|-------|
-| `0000` | NOP | Fără efect |
+| Opcode | Mnemonic | Effect |
+|--------|----------|--------|
+| `0000` | NOP | No effect |
 | `0001` | LOAD | `ACC ← RAM[operand]` |
 | `0010` | STORE | `RAM[operand] ← ACC` |
 | `0011` | ADDI | `ACC ← ACC + operand` |
 | `0100` | SUBI | `ACC ← ACC - operand` |
 | `0101` | JMP | `PC ← operand` |
-| `0111` | HALT | Oprește incrementarea PC |
+| `0111` | HALT | Stop PC increment |
 
 ---
 
-## Program demo (preîncărcat în ROM)
+## Demo program (preloaded in ROM)
 
-ROM: `= ^10334221` (4 cuvinte × 8 biți).
+ROM: `= ^10334221` (4 words × 8 bits).
 
-| PC | Instr | Efect |
-|----|-------|-------|
+| PC | Instr | Effect |
+|----|-------|--------|
 | 0 | `LOAD 0` | ACC = RAM[0] (= 7) |
 | 1 | `ADDI 3` | ACC = 10 |
 | 2 | `SUBI 2` | ACC = 8 |
 | 3 | `STORE 1` | RAM[1] = 8 |
 
-Inițializare RAM: `= ^7` → adresa 0 conține `0111` (7).
+RAM init: `= ^7` → address 0 holds `0111` (7).
 
-După **4 pași** (`set = 1` de patru ori): **ACC = 8**, **PC = 4**.
+After **4 steps** (`set = 1` four times): **ACC = 8**, **PC = 4**.
 
 ---
 
-## Exemplu rapid (toți pașii instant)
+## Quick example (all steps instant)
 
-Apasă **Load & Run** — programul rulează **4 cicluri imediat** (util pentru teste). Pentru a **vedea 7seg schimbându-se lent**, folosește exemplul cu oscilator de mai jos.
+Press **Load & Run** — the program runs **4 cycles immediately** (useful for tests). To **watch 7seg change slowly**, use the oscillator example below.
 
-În panoul din dreapta: **7seg** (ACC) + mem/counter/reg. În consolă: `probe` + `show`.
+In the right panel: **7seg** (ACC) + mem/counter/reg. In the console: `probe` + `show`.
 
 ```logts-play
 chip +[alu4]:
@@ -211,27 +211,27 @@ show(.cpu:acc)
 show(.cpu:pc)
 ```
 
-**Rezultat așteptat** după RUN: ACC = `1000` (8), PC = `0100` (4). După primul pas: ACC = `0111` (7), PC = `0001`.
+**Expected result** after RUN: ACC = `1000` (8), PC = `0100` (4). After the first step: ACC = `0111` (7), PC = `0001`.
 
 ---
 
-## Exemplu vizual — oscilator (~4 s / pas)
+## Visual example — oscillator (~4 s / step)
 
-**Load & Run** o singură dată, apoi:
+**Load & Run** once, then:
 
-1. Pornește **switch**-ul `.run` din panou (enable).
-2. Urmărește **7seg** `.disp` — la fiecare **~4 secunde** CPU execută **un** ciclu (frontiera rising a oscilatorului).
-3. LED `.beat` e aprins când `tick = 1` (feedback vizual clock).
+1. Turn on the `.run` **switch** in the panel (enable).
+2. Watch **7seg** `.disp` — every **~4 seconds** the CPU runs **one** cycle (oscillator rising edge).
+3. LED `.beat` is on when `tick = 1` (visual clock feedback).
 
-| Pas | ACC (7seg) | PC |
-|-----|------------|-----|
+| Step | ACC (7seg) | PC |
+|------|------------|-----|
 | start | 0 | 0 |
 | 1 | 7 | 1 |
 | 2 | 10 | 2 |
 | 3 | 8 | 3 |
 | 4 | 8 | 4 |
 
-Oscilator: `freq: 4`, `freqIsSec: 1` → perioadă **4 secunde** / ciclu complet. CPU avansează pe **rising edge** (`on: 1` + `.cpu:{ set = step }`).
+Oscillator: `freq: 4`, `freqIsSec: 1` → **4 second** period per full cycle. The CPU advances on the **rising edge** (`on: 1` + `.cpu:{ set = step }`).
 
 ```logts-play
 chip +[alu4]:
@@ -392,9 +392,9 @@ comp [led] .beat::
 
 ---
 
-## Exemplu vizual — tastă (un pas per click)
+## Visual example — key (one step per click)
 
-Copiază definițiile `chip +[alu4]` și `board +[cpu4]` din exemplul oscilator, apoi folosește coada de mai jos (sau înlocuiește blocul oscilator/switch/led):
+Copy the `chip +[alu4]` and `board +[cpu4]` definitions from the oscillator example, then use the tail below (or replace the oscillator/switch/led block):
 
 ```logts-play
 board [cpu4] .cpu::
@@ -404,13 +404,13 @@ comp [key] .step::
 .cpu:{ set = .step:get }
 ```
 
-**Load & Run**, apoi apasă tasta **`.step`** din panou — fiecare apăsare = un ciclu CPU; **7seg** se actualizează imediat.
+**Load & Run**, then press the **`.step`** key in the panel — each press = one CPU cycle; **7seg** updates immediately.
 
 ---
 
-## Exemplu cu NEXT(~) — pas cu pas din toolbar
+## NEXT(~) example — step from toolbar
 
-La fel, după definiții + `board [cpu4] .cpu::`:
+Same setup, after definitions + `board [cpu4] .cpu::`:
 
 ```logts-play
 board [cpu4] .cpu::
@@ -418,24 +418,24 @@ board [cpu4] .cpu::
 .cpu:{ set = ~ }
 ```
 
-**Load & Run** (fără `NEXT` în script), apoi apasă butonul **NEXT** din toolbar de **4 ori** — fiecare NEXT = un ciclu. Urmărește **7seg** și panoul de variabile.
+**Load & Run** (no `NEXT` in the script), then press the **NEXT** toolbar button **4 times** — each NEXT = one cycle. Watch **7seg** and the variables panel.
 
 ---
 
-## Utilizare manuală
+## Manual usage
 
-| Acțiune | Script |
-|---------|--------|
-| Instanțiere | `board [cpu4] .cpu::` |
-| Un ciclu CPU | `.cpu:{ set = 1 }` |
-| Citește ACC / PC / IR | `4wire a = .cpu:acc` etc. sau `probe(.cpu:acc)` |
+| Action | Script |
+|--------|--------|
+| Instantiate | `board [cpu4] .cpu::` |
+| One CPU cycle | `.cpu:{ set = 1 }` |
+| Read ACC / PC / IR | `4wire a = .cpu:acc` etc. or `probe(.cpu:acc)` |
 | Reset | `.cpu:{ rst = 1 }` |
 
-Cu panou interactiv: `comp [key]` pe pinul `set` al instanței `.cpu` (vezi [key.md](key.md)).
+With an interactive panel: `comp [key]` on the instance `.cpu` `set` pin (see [key.md](key.md)).
 
 ---
 
-## Fișiere relevante
+## Related files
 
-- Teste automate: `test_suite_ported.js` (859–866)
-- Constante în teste: `CHIP_ALU4`, `BOARD_CPU4`
+- Automated tests: `test_suite_ported.js` (859–866)
+- Test constants: `CHIP_ALU4`, `BOARD_CPU4`
