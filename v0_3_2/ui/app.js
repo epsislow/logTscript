@@ -48,9 +48,18 @@ function updatePropagationToggleUI() {
   btn.title = 'Signal propagation: ' + mode + ' (applies on next Run)';
 }
 
+function bindInterpErrorHandler(interp) {
+  if (!interp) return;
+  interp.onRuntimeError = function(err, out) {
+    render(out);
+    if (typeof showVars === 'function') showVars();
+  };
+}
+
 function createInterpreter(funcs, pcbs, registry, chips, boards, probes) {
   const interp = new Interpreter(funcs, [], pcbs, registry, createSignalStrategy(), chips, boards);
   interp.pendingProbeExprs = probes || [];
+  bindInterpErrorHandler(interp);
   return interp;
 }
 
@@ -164,9 +173,12 @@ function run(){
   if (typeof markTabHasRun === 'function') {
     markTabHasRun();
   }
-  }catch(e){ 
-    render([e.message ]); 
-    console.log(e);
+  }catch(e){
+    if (globalInterp && typeof globalInterp.reportRuntimeError === 'function') {
+      globalInterp.reportRuntimeError(e);
+    } else {
+      render(['Error: ' + e.message]);
+    }
     if(globalInterp) showVars();
     if (typeof clearTabHasRun === 'function') {
       clearTabHasRun();
@@ -217,7 +229,11 @@ function sendCmd(){
     
     cmdInput.value = '';
   } catch(e){
-    render([`Error: ${e.message}`]);
+    if (globalInterp && typeof globalInterp.reportRuntimeError === 'function') {
+      globalInterp.reportRuntimeError(e);
+    } else {
+      render([`Error: ${e.message}`]);
+    }
     if(globalInterp) showVars();
   }
 }
@@ -412,8 +428,11 @@ function doNext(count = 1) {
     globalInterp.exec({ next: count }, false);
     globalInterp.postExecNext();
   } catch(e) {
-    render([`Error: ${e.message}`]);
-    console.log(e);
+    if (globalInterp && typeof globalInterp.reportRuntimeError === 'function') {
+      globalInterp.reportRuntimeError(e);
+    } else {
+      render([`Error: ${e.message}`]);
+    }
   }
   showVars();
 }

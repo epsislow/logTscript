@@ -2442,5 +2442,29 @@ probe(.cpu:acc)`;
   h.assert('cpu acc după step', session.getPcbPout(interp, '.cpu', 'acc'), '0111');
 });
 
+reg(865, 'board', 'cpu4 clock pulse .cpu:{ set = wire }', function(h, session) {
+  const { interp } = session.run(CHIP_ALU4 + '\n' + BOARD_CPU4 + `
+board [cpu4] .cpu::
+1wire clk = 0
+.cpu:{ set = clk }
+`);
+  for (let i = 0; i < 4; i++) {
+    session.setWire(interp, 'clk', '1');
+    session.setWire(interp, 'clk', '0');
+  }
+  h.assert('cpu acc după 4 pulse', session.getPcbPout(interp, '.cpu', 'acc'), '1000');
+  h.assert('cpu pc după 4 pulse', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+});
+
+reg(866, 'board', 'cpu4 NEXT(~) step', function(h, session) {
+  const { interp } = session.run(CHIP_ALU4 + '\n' + BOARD_CPU4 + `
+board [cpu4] .cpu::
+.cpu:{ set = ~ }
+`);
+  for (let i = 0; i < 4; i++) session.execNext(interp, 1);
+  h.assert('cpu acc după 4 NEXT', session.getPcbPout(interp, '.cpu', 'acc'), '1000');
+  h.assert('cpu pc după 4 NEXT', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+});
+
   suite.finalize();
 })();

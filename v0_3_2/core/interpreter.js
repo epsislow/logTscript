@@ -537,6 +537,28 @@ class Interpreter {
     }
   }
 
+  reportRuntimeError(err) {
+    const msg = (err && err.message) ? err.message : String(err);
+    const line = 'Error: ' + msg;
+    if (!this.out) this.out = [];
+    this.out.push(line);
+    if (typeof this.onRuntimeError === 'function') {
+      this.onRuntimeError(err, this.out);
+    } else if (typeof render === 'function') {
+      render(this.out);
+    }
+    if (err && err.stack) console.error(err);
+  }
+
+  runSafely(fn) {
+    try {
+      return fn();
+    } catch (err) {
+      this.reportRuntimeError(err);
+      return undefined;
+    }
+  }
+
   scheduleWireChange(name, value) {
     if (this.signalPropagationStrategy) {
       return this.signalPropagationStrategy.scheduleWireChange(name, value);
@@ -557,22 +579,26 @@ class Interpreter {
     }
 
     if (this.deferWirePropagation() && this.signalPropagationStrategy) {
-      if (this.scheduleWireChange(wireName, v)) {
-        this.signalPropagationStrategy.propagate();
-      }
+      this.runSafely(() => {
+        if (this.scheduleWireChange(wireName, v)) {
+          this.signalPropagationStrategy.propagate();
+        }
+      });
       return;
     }
 
-    if (wire.ref && wire.ref !== '&-') {
-      this.setValueAtRef(wire.ref, v);
-    } else {
-      const storageIdx = this.storeValue(v);
-      wire.ref = `&${storageIdx}`;
-      if (!this.wireStorageMap.has(wireName)) {
-        this.wireStorageMap.set(wireName, storageIdx);
+    this.runSafely(() => {
+      if (wire.ref && wire.ref !== '&-') {
+        this.setValueAtRef(wire.ref, v);
+      } else {
+        const storageIdx = this.storeValue(v);
+        wire.ref = `&${storageIdx}`;
+        if (!this.wireStorageMap.has(wireName)) {
+          this.wireStorageMap.set(wireName, storageIdx);
+        }
       }
-    }
-    this.updateConnectedComponents(wireName, v);
+      this.updateConnectedComponents(wireName, v);
+    });
   }
 
   getComponentStableValue(compName) {
@@ -592,14 +618,16 @@ class Interpreter {
   }
 
   scheduleComponentOutputChange(compName, value) {
-    if (this.deferWirePropagation() && this.signalPropagationStrategy) {
-      const scheduled = this.signalPropagationStrategy.scheduleComponentChange(compName, value);
-      if (scheduled) this.signalPropagationStrategy.propagate();
-      return;
-    }
-    this.writeComponentStable(compName, value);
-    this.updateComponentConnections(compName);
-    if (typeof showVars === 'function') showVars();
+    this.runSafely(() => {
+      if (this.deferWirePropagation() && this.signalPropagationStrategy) {
+        const scheduled = this.signalPropagationStrategy.scheduleComponentChange(compName, value);
+        if (scheduled) this.signalPropagationStrategy.propagate();
+        return;
+      }
+      this.writeComponentStable(compName, value);
+      this.updateComponentConnections(compName);
+      if (typeof showVars === 'function') showVars();
+    });
   }
 
   advanceRegTildeLatchesForWave() {
@@ -1937,7 +1965,7 @@ if (this.isBuiltinDEMUX(name)) {
   
   startProc() {
     if (this.signalPropagationStrategy) {
-      this.signalPropagationStrategy.propagate();
+      this.runSafely(() => this.signalPropagationStrategy.propagate());
     }
   }
 
@@ -5890,13 +5918,13 @@ if (s.assignment) {
         const execPin = def.exec || 'set';
         const execPinInfo = instance.pinStorage.get(execPin);
         if (execPinInfo && property === execPin) {
-          let pinVal = value;
+          let pinVal = (value === '~' && reEvaluate) ? '1' : value;
           if (pinVal.length < execPinInfo.bits) pinVal = pinVal.padStart(execPinInfo.bits, '0');
           else if (pinVal.length > execPinInfo.bits) pinVal = pinVal.substring(pinVal.length - execPinInfo.bits);
           this.setValueAtRef(execPinInfo.ref, pinVal);
         }
         if (property === 'set' || property === execPin) {
-          if (value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
+          if ((value === '~' && reEvaluate) || value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
             shouldTriggerExec = true;
           }
         }
@@ -6156,13 +6184,13 @@ if (s.assignment) {
         const execPin = def.exec || 'set';
         const execPinInfo = instance.pinStorage.get(execPin);
         if (execPinInfo && property === execPin) {
-          let pinVal = value;
+          let pinVal = (value === '~' && reEvaluate) ? '1' : value;
           if (pinVal.length < execPinInfo.bits) pinVal = pinVal.padStart(execPinInfo.bits, '0');
           else if (pinVal.length > execPinInfo.bits) pinVal = pinVal.substring(pinVal.length - execPinInfo.bits);
           this.setValueAtRef(execPinInfo.ref, pinVal);
         }
         if (property === 'set' || property === execPin) {
-          if (value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
+          if ((value === '~' && reEvaluate) || value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
             shouldTriggerExec = true;
           }
         }

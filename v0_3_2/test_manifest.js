@@ -383,7 +383,9 @@
       { id: 861, group: 'board', title: 'cpu4 stare inițială acc=0 pc=0' },
       { id: 862, group: 'board', title: 'cpu4 un pas LOAD 0 → acc=7 pc=1' },
       { id: 863, group: 'board', title: 'cpu4 program demo complet' },
-      { id: 864, group: 'probe', title: 'probe(.cpu:acc) cpu4' }
+      { id: 864, group: 'probe', title: 'probe(.cpu:acc) cpu4' },
+      { id: 865, group: 'board', title: 'cpu4 clock pulse .cpu:{ set = wire }' },
+      { id: 866, group: 'board', title: 'cpu4 NEXT(~) step' }
     ],
     groups: [
       { id: 'repeat', label: 'Repeat preprocessor', rangeLabel: '6–21', testIds: [6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21] },
@@ -398,7 +400,7 @@
       { id: 'doc', label: 'doc() tests', rangeLabel: '300–352', testIds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352] },
       { id: 'doc-comp', label: 'doc(comp) / doc(pcb) / doc(chip) / doc(board)', rangeLabel: '400–431, 848–850', testIds: [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 848, 849, 850] },
       { id: 'chip', label: 'Chip component', rangeLabel: '540–557, 857–860', testIds: [540, 541, 542, 543, 556, 557, 857, 858, 859, 860] },
-      { id: 'board', label: 'Board component', rangeLabel: '840–856, 861–863', testIds: [840, 841, 842, 843, 844, 845, 846, 847, 848, 849, 850, 855, 856, 861, 862, 863] },
+      { id: 'board', label: 'Board component', rangeLabel: '840–856, 861–863, 865–866', testIds: [840, 841, 842, 843, 844, 845, 846, 847, 848, 849, 850, 855, 856, 861, 862, 863, 865, 866] },
       { id: 'probe', label: 'probe debug', rangeLabel: '800–803, 820–839, 851–854, 864', testIds: [800, 801, 802, 803, 820, 821, 822, 823, 824, 825, 826, 827, 828, 829, 830, 831, 832, 833, 834, 835, 836, 837, 838, 839, 851, 852, 853, 854, 864] },
       { id: 'debug', label: 'show / peek / probe', rangeLabel: '804–819', testIds: [804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819] },
       { id: 'pcb', label: 'PCB property block', rangeLabel: '500–531', testIds: [500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531] },
