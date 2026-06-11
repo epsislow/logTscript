@@ -1,75 +1,354 @@
 /* ================= DOC VIEWER ================= */
 
-const DOCS = [
-  { file: 'doc-function.md', label: 'doc() function' },
-  { file: 'editorUI.md', label: 'Editor UI' },
-  { file: 'signal-propagation.md', label: 'Signal propagation' },
-  { file: 'debug.md', label: 'Debug (show/peek/probe)' },
-  { file: 'interactive-components.md', label: 'Interactive components' },
-  { file: 'reg.md', label: 'REG' },
-  { file: 'arithmetic.md', label: 'Arithmetic' },
-  { file: 'short-notation.md', label: 'Short notation' },
-  { file: 'mem.md', label: 'MEM' },
-  { file: 'led.md', label: 'LED' },
-  { file: 'oscillator.md', label: 'Oscillator' },
+const DOC_SECTIONS = [
+  {
+    title: 'Reference',
+    items: [
+      { file: 'doc-function.md', label: 'doc() function' },
+      { file: 'components.md', label: 'Component catalog' },
+      { file: 'short-notation.md', label: 'Short notation' },
+      { file: 'arithmetic.md', label: 'Arithmetic (built-in)' },
+      { file: 'debug.md', label: 'Debug (show / peek / probe)' },
+      { file: 'signal-propagation.md', label: 'Signal propagation' },
+      { file: 'editorUI.md', label: 'Editor UI' },
+    ],
+  },
+  {
+    title: 'Composite blocks',
+    items: [
+      { file: 'pcb.md', label: 'PCB' },
+      { file: 'chip.md', label: 'Chip' },
+    ],
+  },
+  {
+    title: 'Interactive inputs',
+    items: [
+      { file: 'interactive-components.md', label: 'Overview' },
+      { file: 'switch.md', label: 'switch' },
+      { file: 'key.md', label: 'key' },
+      { file: 'dip.md', label: 'dip' },
+      { file: 'rotary.md', label: 'rotary' },
+    ],
+  },
+  {
+    title: 'Displays',
+    items: [
+      { file: 'led.md', label: 'led' },
+      { file: 'led-bar.md', label: 'LED bar' },
+      { file: 'seven-seg.md', label: '7seg' },
+      { file: '14seg.md', label: '14seg' },
+      { file: 'lcd.md', label: 'lcd' },
+      { file: 'dots.md', label: 'dots' },
+    ],
+  },
+  {
+    title: 'Arithmetic devices',
+    items: [
+      { file: 'adder.md', label: 'adder' },
+      { file: 'subtract.md', label: 'subtract' },
+      { file: 'multiplier.md', label: 'multiplier' },
+      { file: 'divider.md', label: 'divider' },
+      { file: 'shifter.md', label: 'shifter' },
+      { file: 'counter.md', label: 'counter' },
+    ],
+  },
+  {
+    title: 'Storage & timing',
+    items: [
+      { file: 'mem.md', label: 'mem' },
+      { file: 'reg.md', label: 'reg' },
+      { file: 'oscillator.md', label: 'oscillator' },
+    ],
+  },
 ];
+
+const DOCS = DOC_SECTIONS.flatMap(function (section) {
+  return section.items;
+});
+
+const DOC_SEARCH_INDEX = (function () {
+  const list = [];
+  DOC_SECTIONS.forEach(function (section) {
+    section.items.forEach(function (item) {
+      const stem = item.file.replace(/\.md$/, '');
+      const extra = item.searchExtra ? ' ' + item.searchExtra : '';
+      list.push({
+        file: item.file,
+        label: item.label,
+        section: section.title,
+        haystack: (item.label + ' ' + stem + ' ' + stem.replace(/-/g, ' ') + extra).toLowerCase(),
+      });
+    });
+  });
+  return list;
+})();
 
 let currentDocFile = '';
 let playBlockIndex = 0;
 let docViewerReady = false;
+let docSearchActiveIndex = -1;
+let docSearchResults = [];
 
 function initDocViewer() {
   if (docViewerReady) return;
   docViewerReady = true;
 
-  buildSidebar();
-
   const content = document.getElementById('docContent');
   if (content) {
     content.addEventListener('click', onDocContentClick);
+  }
+  initDocSearch();
+}
+
+function initDocSearch() {
+  const input = document.getElementById('docSearchInput');
+  const menu = document.getElementById('docSearchMenu');
+  const wrap = document.getElementById('docSearch');
+  if (!input || !menu) return;
+
+  input.addEventListener('input', function () {
+    renderDocSearchMenu(input.value);
+  });
+  input.addEventListener('focus', function () {
+    renderDocSearchMenu(input.value);
+  });
+  input.addEventListener('keydown', onDocSearchKeydown);
+  input.addEventListener('blur', function () {
+    setTimeout(closeDocSearchMenu, 120);
+  });
+
+  menu.addEventListener('mousedown', function (e) {
+    e.preventDefault();
+  });
+
+  document.addEventListener('click', function (e) {
+    if (wrap && !wrap.contains(e.target)) {
+      closeDocSearchMenu();
+    }
+  });
+}
+
+function docSearchRank(entry, query) {
+  const label = entry.label.toLowerCase();
+  const stem = entry.file.replace(/\.md$/, '').toLowerCase();
+  if (label === query || stem === query) return 0;
+  if (label.startsWith(query) || stem.startsWith(query)) return 1;
+  if (label.includes(query) || stem.includes(query)) return 2;
+  return 3;
+}
+
+function filterDocSearch(query) {
+  const q = query.trim().toLowerCase();
+  let list;
+  if (!q) {
+    list = DOC_SEARCH_INDEX.slice();
+  } else {
+    const tokens = q.split(/\s+/).filter(Boolean);
+    list = DOC_SEARCH_INDEX.filter(function (entry) {
+      return tokens.every(function (token) {
+        return entry.haystack.indexOf(token) !== -1;
+      });
+    });
+    list.sort(function (a, b) {
+      const ra = docSearchRank(a, q);
+      const rb = docSearchRank(b, q);
+      if (ra !== rb) return ra - rb;
+      return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+    });
+  }
+  return list;
+}
+
+function closeDocSearchMenu() {
+  const menu = document.getElementById('docSearchMenu');
+  const input = document.getElementById('docSearchInput');
+  if (!menu) return;
+  menu.hidden = true;
+  menu.innerHTML = '';
+  docSearchActiveIndex = -1;
+  docSearchResults = [];
+  if (input) input.setAttribute('aria-expanded', 'false');
+}
+
+function selectDocSearchResult(index) {
+  const entry = docSearchResults[index];
+  if (!entry) return;
+  const input = document.getElementById('docSearchInput');
+  closeDocSearchMenu();
+  if (input) {
+    input.value = '';
+    input.blur();
+  }
+  loadDoc(entry.file);
+}
+
+function renderDocSearchMenu(query) {
+  const menu = document.getElementById('docSearchMenu');
+  const input = document.getElementById('docSearchInput');
+  if (!menu || !input) return;
+
+  docSearchResults = filterDocSearch(query);
+  docSearchActiveIndex = docSearchResults.length ? 0 : -1;
+
+  if (!docSearchResults.length) {
+    menu.innerHTML = '<li class="doc-search-empty">No matching title</li>';
+    menu.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+    return;
+  }
+
+  menu.innerHTML = docSearchResults.map(function (entry, i) {
+    const active = i === docSearchActiveIndex ? ' doc-search-active' : '';
+    return (
+      '<li class="' + active + '" role="option" data-index="' + i + '">' +
+      '<button type="button" data-index="' + i + '">' +
+      escapeHtml(entry.label) +
+      '<span class="doc-search-section">' + escapeHtml(entry.section) + '</span>' +
+      '</button></li>'
+    );
+  }).join('');
+
+  menu.hidden = false;
+  input.setAttribute('aria-expanded', 'true');
+
+  menu.querySelectorAll('button[data-index]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      selectDocSearchResult(parseInt(btn.getAttribute('data-index'), 10));
+    });
+  });
+}
+
+function highlightDocSearchItem(index) {
+  const menu = document.getElementById('docSearchMenu');
+  if (!menu) return;
+  const items = menu.querySelectorAll('li[data-index]');
+  items.forEach(function (li, i) {
+    li.classList.toggle('doc-search-active', i === index);
+  });
+  const active = items[index];
+  if (active && typeof active.scrollIntoView === 'function') {
+    active.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function onDocSearchKeydown(e) {
+  if (e.key === 'Escape') {
+    closeDocSearchMenu();
+    e.target.blur();
+    return;
+  }
+  const menu = document.getElementById('docSearchMenu');
+  if (!menu || menu.hidden || !docSearchResults.length) {
+    if (e.key === 'Enter') {
+      const first = filterDocSearch(e.target.value)[0];
+      if (first) {
+        e.preventDefault();
+        selectDocSearchResult(0);
+      }
+    }
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    docSearchActiveIndex = Math.min(docSearchActiveIndex + 1, docSearchResults.length - 1);
+    highlightDocSearchItem(docSearchActiveIndex);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    docSearchActiveIndex = Math.max(docSearchActiveIndex - 1, 0);
+    highlightDocSearchItem(docSearchActiveIndex);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (docSearchActiveIndex >= 0) {
+      selectDocSearchResult(docSearchActiveIndex);
+    }
+  }
+}
+
+function syncDocSearchInput() {
+  const input = document.getElementById('docSearchInput');
+  if (!input || document.activeElement === input) return;
+  input.value = '';
+}
+
+function updateDocToolbar() {
+  const btn = document.getElementById('btnDocIndex');
+  if (btn) {
+    btn.style.display = currentDocFile ? '' : 'none';
   }
 }
 
 function showDocView() {
   document.body.classList.add('doc-mode');
   initDocViewer();
-  if (!currentDocFile) {
+  const hash = location.hash.replace(/^#/, '');
+  if (hash && hash !== 'index' && window.DOC_CONTENT && window.DOC_CONTENT[hash]) {
     try {
-      loadDoc(DOCS[0].file);
+      loadDoc(hash);
     } catch (e) {
       console.error('loadDoc failed', e);
-      showDocError(DOCS[0].file, 'Failed to render doc: ' + e.message);
+      showDocError(hash, 'Failed to render doc: ' + e.message);
     }
+  } else {
+    loadDocIndex();
   }
 }
 
 function showEditorView() {
   document.body.classList.remove('doc-mode');
+  closeDocSearchMenu();
   if (typeof cmEditor !== 'undefined' && cmEditor) {
-    setTimeout(function() { cmEditor.refresh(); }, 0);
+    setTimeout(function () { cmEditor.refresh(); }, 0);
   }
 }
 
-function buildSidebar() {
-  const nav = document.getElementById('docNav');
-  if (!nav) return;
+function renderDocIndexHtml() {
+  const sections = DOC_SECTIONS.map(function (section) {
+    const items = section.items.map(function (item) {
+      return (
+        '<li><a href="' + item.file + '">' + escapeHtml(item.label) + '</a></li>'
+      );
+    }).join('');
+    return (
+      '<section class="doc-index-section">' +
+      '<h2>' + escapeHtml(section.title) + '</h2>' +
+      '<ul class="doc-index-list">' + items + '</ul>' +
+      '</section>'
+    );
+  }).join('');
 
-  nav.innerHTML = '';
-  for (const doc of DOCS) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'doc-nav-item';
-    btn.dataset.file = doc.file;
-    btn.textContent = doc.label;
-    btn.addEventListener('click', () => loadDoc(doc.file));
-    nav.appendChild(btn);
-  }
+  return (
+    '<div class="doc-index">' +
+    '<h1>LogTScript documentation</h1>' +
+    '<p class="doc-index-lead">Choose a topic below, or use <strong>Search</strong> in the toolbar to jump by title. Use <strong>Index</strong> to return here from any page.</p>' +
+    sections +
+    '</div>'
+  );
 }
 
-function highlightActiveSidebar(filename) {
-  document.querySelectorAll('.doc-nav-item').forEach(item => {
-    item.classList.toggle('active', item.dataset.file === filename);
-  });
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function loadDocIndex() {
+  currentDocFile = '';
+  const el = document.getElementById('docContent');
+  if (!el) return;
+
+  el.innerHTML = renderDocIndexHtml();
+  updateDocToolbar();
+  syncDocSearchInput();
+
+  if (location.hash !== '#index') {
+    history.replaceState(null, '', '#index');
+  }
+
+  el.scrollTop = 0;
+  const main = document.getElementById('docMain');
+  if (main) main.scrollTop = 0;
 }
 
 function showDocError(filename, message) {
@@ -80,10 +359,11 @@ function showDocError(filename, message) {
     message +
     (filename ? ' (<code>' + filename + '</code>)' : '') +
     '</p>';
+  updateDocToolbar();
 }
 
 function docLabelForPlay() {
-  const doc = DOCS.find(d => d.file === currentDocFile);
+  const doc = DOCS.find(function (d) { return d.file === currentDocFile; });
   return doc ? doc.label : currentDocFile.replace('.md', '');
 }
 
@@ -126,7 +406,7 @@ function sendExampleToEditor(code, autoRun, propagation) {
 function enhancePlayBlocks(container) {
   playBlockIndex = 0;
   const blocks = container.querySelectorAll('pre > code[class*="logts-play"]');
-  blocks.forEach(codeEl => {
+  blocks.forEach(function (codeEl) {
     playBlockIndex += 1;
     const pre = codeEl.parentElement;
     if (!pre || pre.parentElement && pre.parentElement.classList.contains('doc-play-block')) {
@@ -149,7 +429,7 @@ function enhancePlayBlocks(container) {
     btnLoad.type = 'button';
     btnLoad.className = 'btn';
     btnLoad.textContent = 'Load';
-    btnLoad.addEventListener('click', () => {
+    btnLoad.addEventListener('click', function () {
       sendExampleToEditor(source, false, propagation);
     });
 
@@ -157,7 +437,7 @@ function enhancePlayBlocks(container) {
     btnRun.type = 'button';
     btnRun.className = 'btn btn--primary';
     btnRun.textContent = 'Load & Run';
-    btnRun.addEventListener('click', () => {
+    btnRun.addEventListener('click', function () {
       sendExampleToEditor(source, true, propagation);
     });
 
@@ -192,7 +472,9 @@ function loadDoc(filename) {
   }
   el.innerHTML = marked.parse(content, { gfm: true, breaks: false });
   enhancePlayBlocks(el);
-  highlightActiveSidebar(filename);
+  updateDocToolbar();
+  syncDocSearchInput();
+  closeDocSearchMenu();
 
   const hash = '#' + filename;
   if (location.hash !== hash) {
@@ -235,6 +517,12 @@ function onDocContentClick(e) {
 
 function openDocViewFromHash() {
   const hash = location.hash.replace(/^#/, '');
+  if (hash === 'index') {
+    initDocViewer();
+    loadDocIndex();
+    document.body.classList.add('doc-mode');
+    return true;
+  }
   if (hash && window.DOC_CONTENT && window.DOC_CONTENT[hash]) {
     initDocViewer();
     loadDoc(hash);

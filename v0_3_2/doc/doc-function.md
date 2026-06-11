@@ -320,6 +320,8 @@ Foo: undefined function
 
 ## Internal components (comp)
 
+Per-component guides (syntax, examples, pins): **[components.md](components.md)**. Composite blocks: [pcb.md](pcb.md), [chip.md](chip.md).
+
 ### doc(comp) — list of all component types
 
 Displays all available component types, with shortnames on the same line:
@@ -375,26 +377,29 @@ comp [adder] .name:
 
 ### All available components
 
-| Call | Canonical type |
-|------|----------------|
-| `doc(comp.led)` | led — Xbit, LED display |
-| `doc(comp.switch)` | switch — 1bit, toggle switch |
-| `doc(comp.key)` | key — 1bit, momentary button |
-| `doc(comp.dip)` | dip — Xbit, group of toggle switches |
+| Call | Guide |
+|------|-------|
+| `doc(comp.led)` | [led.md](led.md) |
+| `doc(comp.switch)` | [switch.md](switch.md) |
+| `doc(comp.key)` | [key.md](key.md) |
+| `doc(comp.dip)` | [dip.md](dip.md) |
+| `doc(comp.rotary)` | [rotary.md](rotary.md) |
+| `doc(comp.bar)` | [led-bar.md](led-bar.md) |
+| `doc(comp.7seg)` / `doc(comp.7)` | [seven-seg.md](seven-seg.md) |
+| `doc(comp.14seg)` / `doc(comp.14)` | [14seg.md](14seg.md) |
+| `doc(comp.lcd)` | [lcd.md](lcd.md) |
+| `doc(comp.dots)` / `doc(comp.:)` | [dots.md](dots.md) |
+| `doc(comp.adder)` / `doc(comp.+)` | [adder.md](adder.md) |
+| `doc(comp.subtract)` / `doc(comp.-)` | [subtract.md](subtract.md) |
+| `doc(comp.multiplier)` / `doc(comp.*)` | [multiplier.md](multiplier.md) |
+| `doc(comp.divider)` / `doc(comp./)` | [divider.md](divider.md) |
+| `doc(comp.shifter)` / `doc(comp.>)` | [shifter.md](shifter.md) |
+| `doc(comp.counter)` / `doc(comp.=)` | [counter.md](counter.md) |
+| `doc(comp.mem)` | [mem.md](mem.md) |
+| `doc(comp.reg)` | [reg.md](reg.md) |
+| `doc(comp.osc)` / `doc(comp.~)` | [oscillator.md](oscillator.md) |
 
-See [interactive-components.md](interactive-components.md) for switch, key, dip, and rotary usage (panel inputs, wires, examples).
-| `doc(comp.7seg)` or `doc(comp.7)` | 7seg — 8bit, 7-segment display |
-| `doc(comp.lcd)` | lcd — 8bit, pixel matrix display |
-| `doc(comp.adder)` or `doc(comp.+)` | adder — Xbit, addition |
-| `doc(comp.subtract)` or `doc(comp.-)` | subtract — Xbit, subtraction |
-| `doc(comp.multiplier)` or `doc(comp.*)` | multiplier — Xbit, multiplication |
-| `doc(comp.divider)` or `doc(comp./)` | divider — Xbit, division |
-| `doc(comp.shifter)` or `doc(comp.>)` | shifter — Xbit, shift register |
-| `doc(comp.mem)` | mem — Xbit, RAM memory |
-| `doc(comp.reg)` | reg — Xbit, register |
-| `doc(comp.counter)` or `doc(comp.=)` | counter — Xbit, counter |
-| `doc(comp.osc)` or `doc(comp.~)` | osc — 1bit, oscillator |
-| `doc(comp.rotary)` | rotary — Xbit, rotary selector |
+Panel inputs overview: [interactive-components.md](interactive-components.md). Full index: [components.md](components.md).
 
 ### Undefined type
 
@@ -407,6 +412,8 @@ comp.xyz: undefined component type
 ---
 
 ## PCB components (pcb)
+
+User guide: **[pcb.md](pcb.md)**.
 
 ### doc(pcb) — list of user-defined PCB types
 
@@ -459,6 +466,8 @@ pcb.xyz: undefined PCB type
 ---
 
 ## Chip components (chip)
+
+User guide: **[chip.md](chip.md)**.
 
 Chip types are lightweight reusable blocks (similar to PCB) without `~~`, `def`, nested `chip +[...]`, or UI components (`switch`, `key`, `led`, etc.). A chip body may instantiate other top-level chip types via `chip [type] .inst::`.
 

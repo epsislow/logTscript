@@ -1,5 +1,7 @@
 # Interactive components
 
+Per-component pages: [switch.md](switch.md), [key.md](key.md), [dip.md](dip.md), [rotary.md](rotary.md). Full catalog: [components.md](components.md).
+
 **Switch**, **key**, **dip**, and **rotary** are input components you control from the devices panel while the program is running. Their values feed into wires and logic — when you flip a switch, press a key, change a DIP position, or turn a rotary knob, connected wires update automatically.
 
 See [signal-propagation.md](signal-propagation.md) for how those updates spread through your circuit.
