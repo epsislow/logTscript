@@ -2251,10 +2251,16 @@ if (this.isBuiltinDEMUX(name)) {
       }
       
       // Execute properties in order (first run)
-      // BUT: If component has on:1, only execute if set evaluates to 1
-      // If component has on:raise/edge, don't execute on first run (wait for edge)
+      // Inside PCB/chip/board body: blocks run inline each time the body runs — use level-style
+      // gating on :set when present; edge mode applies only to top-level blocks (registered above).
+      const insideBody = this.insidePcbBody || this.insideChipBody || this.insideBoardBody;
       let shouldExecuteFirstRun = true;
-      if(onMode === '1' || onMode === 'level'){
+      if(insideBody){
+        if(setExpr){
+          const setBit = (initialSetValue && initialSetValue.length > 0) ? initialSetValue[initialSetValue.length - 1] : '0';
+          shouldExecuteFirstRun = (setBit === '1');
+        }
+      } else if(onMode === '1' || onMode === 'level'){
         // Level triggered: only execute if set is 1
         if(setExpr){
           // initialSetValue should be evaluated above, but ensure it's not null
@@ -3301,7 +3307,10 @@ if (s.assignment) {
         if(!bits) throw Error(`Invalid type ${d.type} at ${loc}`);
         if(!this.isWire(d.type)) throw Error(`Only wires can be declared without assignment at ${loc} (found ${d.type} for ${d.name})`);
         if(d.name === '_') continue;
-        if(this.wires.has(d.name)) throw Error(`Wire ${d.name} already declared at ${loc}`);
+        if(this.wires.has(d.name)) {
+          if (this.insideBoardBody || this.insideChipBody) continue;
+          throw Error(`Wire ${d.name} already declared at ${loc}`);
+        }
         this.wires.set(d.name, {type: d.type, ref: null});
       }
       return;
@@ -5863,7 +5872,7 @@ if (s.assignment) {
       const property = prop.property;
       if (property === 'pout>') continue;
 
-      if (property === 'set') {
+      if (property === 'set' || property === def.exec) {
         const expr = prop.expr;
         let value = '';
         if (expr && expr.length === 1 && expr[0].var === '~') {
@@ -5878,8 +5887,18 @@ if (s.assignment) {
             }
           }
         }
-        if (value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
-          shouldTriggerExec = true;
+        const execPin = def.exec || 'set';
+        const execPinInfo = instance.pinStorage.get(execPin);
+        if (execPinInfo && property === execPin) {
+          let pinVal = value;
+          if (pinVal.length < execPinInfo.bits) pinVal = pinVal.padStart(execPinInfo.bits, '0');
+          else if (pinVal.length > execPinInfo.bits) pinVal = pinVal.substring(pinVal.length - execPinInfo.bits);
+          this.setValueAtRef(execPinInfo.ref, pinVal);
+        }
+        if (property === 'set' || property === execPin) {
+          if (value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
+            shouldTriggerExec = true;
+          }
         }
         continue;
       }
@@ -6119,7 +6138,7 @@ if (s.assignment) {
       const property = prop.property;
       if (property === 'pout>') continue;
 
-      if (property === 'set') {
+      if (property === 'set' || property === def.exec) {
         const expr = prop.expr;
         let value = '';
         if (expr && expr.length === 1 && expr[0].var === '~') {
@@ -6134,8 +6153,18 @@ if (s.assignment) {
             }
           }
         }
-        if (value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
-          shouldTriggerExec = true;
+        const execPin = def.exec || 'set';
+        const execPinInfo = instance.pinStorage.get(execPin);
+        if (execPinInfo && property === execPin) {
+          let pinVal = value;
+          if (pinVal.length < execPinInfo.bits) pinVal = pinVal.padStart(execPinInfo.bits, '0');
+          else if (pinVal.length > execPinInfo.bits) pinVal = pinVal.substring(pinVal.length - execPinInfo.bits);
+          this.setValueAtRef(execPinInfo.ref, pinVal);
+        }
+        if (property === 'set' || property === execPin) {
+          if (value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
+            shouldTriggerExec = true;
+          }
         }
         continue;
       }

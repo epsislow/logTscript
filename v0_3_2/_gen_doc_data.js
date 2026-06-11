@@ -13,6 +13,8 @@ const DOC_FILES = [
   'components.md',
   'board.md',
   'chip.md',
+  'mini-cpu.md',
+  'mini-cpu-plan.md',
   'pcb.md',
   'interactive-components.md',
   'switch.md',

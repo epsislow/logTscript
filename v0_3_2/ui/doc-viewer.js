@@ -18,6 +18,8 @@ const DOC_SECTIONS = [
     items: [
       { file: 'board.md', label: 'Board' },
       { file: 'chip.md', label: 'Chip' },
+      { file: 'mini-cpu.md', label: 'Mini CPU demo', searchExtra: 'harvard alu cpu4 step' },
+      { file: 'mini-cpu-plan.md', label: 'Mini CPU plan', searchExtra: 'fezabilitate varianta' },
       { file: 'pcb.md', label: 'PCB (deprecated)' },
     ],
   },

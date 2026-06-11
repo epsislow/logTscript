@@ -2242,5 +2242,205 @@ chip [wrap] .w::
   h.assert('board inst in chip', session.getWire(interp, 'r'), '1000');
 });
 
+const CHIP_ALU4 = `chip +[alu4]:
+  4pin a
+  4pin b
+  2pin op
+  1pin set
+  4pout y
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  comp [subtract] .sub:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  .sub:a = a
+  .sub:b = b
+  y = MUX(op.1, .add:get, .sub:get)
+  carry = MUX(op.1, .add:carry, .sub:carry)
+  :4bit y`;
+
+const BOARD_CPU4 = `board +[cpu4]:
+  1pin set
+  1pin rst
+  4pout acc
+  4pout pc
+  8pout ir
+  exec: set
+  on: 1
+  comp [mem] .prog:
+    depth: 8
+    length: 4
+    = ^10334221
+    on: raise
+    :
+  comp [mem] .data:
+    depth: 4
+    length: 16
+    = ^7
+    on: raise
+    :
+  comp [counter] .pcnt:
+    depth: 4
+    on: 1
+    :
+  comp [reg] .accum:
+    depth: 4
+    on: 1
+    :
+  comp [7seg] .disp:
+    on: 1
+    nl
+    :
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  comp [subtract] .sub:
+    depth: 4
+    on: 1
+    :
+  4wire pcval
+  4wire pcout
+  8wire instr
+  4wire opc
+  4wire opd
+  4wire curacc
+  4wire loadval
+  4wire addres
+  4wire subres
+  1wire isload
+  1wire isstore
+  1wire isaddi
+  1wire issubi
+  1wire isjmp
+  1wire ishalt
+  4wire t0
+  4wire t1
+  4wire accnext
+  1wire doinc
+  1wire inc
+  pcval = .pcnt:get
+  .prog:{ at = pcval
+    set = set }
+  instr = .prog:get
+  opc = instr.0/4
+  opd = instr.4/4
+  curacc = .accum:get
+  .data:at = opd
+  .data:{ set = set }
+  loadval = .data:get
+  .add:a = curacc
+  .add:b = opd
+  .sub:a = curacc
+  .sub:b = opd
+  addres = .add:get
+  subres = .sub:get
+  isload = EQ(opc, 0001)
+  isstore = EQ(opc, 0010)
+  isaddi = EQ(opc, 0011)
+  issubi = EQ(opc, 0100)
+  isjmp = EQ(opc, 0101)
+  ishalt = EQ(opc, 0111)
+  t0 = MUX(issubi, curacc, subres)
+  t1 = MUX(isaddi, t0, addres)
+  accnext = MUX(isload, t1, loadval)
+  doinc = AND(NOT(ishalt), NOT(isjmp))
+  inc = AND(doinc, set)
+  .pcnt:{ data = opd
+    write = 1
+    set = AND(isjmp, set) }
+  .pcnt:{ dir = 1
+    set = inc }
+  pcout = .pcnt:get
+  .data:at = opd
+  .data:{ data = curacc
+    write = AND(isstore, set)
+    set = AND(isstore, set) }
+  .accum:{ data = accnext
+    set = set }
+  .pcnt:{ data = 0000
+    write = 1
+    set = rst }
+  .accum:{ data = 0000
+    set = rst }
+  .disp:{ hex = .accum:get
+    set = set }
+  acc = .accum:get
+  pc = pcout
+  ir = instr
+  :4bit acc`;
+
+function cpuStep(session, interp, n) {
+  for (let i = 0; i < n; i++) {
+    session.execStmts(interp, '.cpu:{ set = 1 }');
+  }
+}
+
+reg(859, 'chip', 'chip alu4 ADD 5+3', function(h, session) {
+  const src = CHIP_ALU4 + `
+chip [alu4] .u::
+.u:{
+  a = 0101
+  b = 0011
+  op = 00
+  set = 1
+}
+4wire r = .u:y`;
+  const { interp } = session.run(src);
+  h.assert('alu4 add', session.getWire(interp, 'r'), '1000');
+});
+
+reg(860, 'chip', 'chip alu4 SUB 5-3', function(h, session) {
+  const src = CHIP_ALU4 + `
+chip [alu4] .u::
+.u:{
+  a = 0101
+  b = 0011
+  op = 01
+  set = 1
+}
+4wire r = .u:y`;
+  const { interp } = session.run(src);
+  h.assert('alu4 sub', session.getWire(interp, 'r'), '0010');
+});
+
+reg(861, 'board', 'cpu4 stare inițială acc=0 pc=0', function(h, session) {
+  const { interp } = session.run(CHIP_ALU4 + '\n' + BOARD_CPU4 + '\nboard [cpu4] .cpu::\n');
+  h.assert('cpu acc init', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
+  h.assert('cpu pc init', session.getPcbPout(interp, '.cpu', 'pc'), '0000');
+});
+
+reg(862, 'board', 'cpu4 un pas LOAD 0 → acc=7 pc=1', function(h, session) {
+  const { interp } = session.run(CHIP_ALU4 + '\n' + BOARD_CPU4 + '\nboard [cpu4] .cpu::\n');
+  cpuStep(session, interp, 1);
+  h.assert('cpu acc după LOAD', session.getPcbPout(interp, '.cpu', 'acc'), '0111');
+  h.assert('cpu pc după LOAD', session.getPcbPout(interp, '.cpu', 'pc'), '0001');
+});
+
+reg(863, 'board', 'cpu4 program demo complet', function(h, session) {
+  const { interp } = session.run(CHIP_ALU4 + '\n' + BOARD_CPU4 + '\nboard [cpu4] .cpu::\n');
+  cpuStep(session, interp, 4);
+  h.assert('cpu acc final', session.getPcbPout(interp, '.cpu', 'acc'), '1000');
+  h.assert('cpu pc final', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+});
+
+reg(864, 'probe', 'probe(.cpu:acc) cpu4', function(h, session) {
+  const src = CHIP_ALU4 + '\n' + BOARD_CPU4 + `
+board [cpu4] .cpu::
+probe(.cpu:acc)`;
+  const { out, interp } = session.run(src);
+  h.assert('probe acc initialised', String(out.some(l => l.includes('# .cpu:acc = 0000') && l.includes('initialised'))), 'true');
+  cpuStep(session, interp, 1);
+  h.assert('cpu acc după step', session.getPcbPout(interp, '.cpu', 'acc'), '0111');
+});
+
   suite.finalize();
 })();

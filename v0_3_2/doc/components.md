@@ -11,6 +11,7 @@ LogTscript includes built-in **components** (`comp`), reusable **board** blocks 
 | **Board** — interactive circuits, wave propagation (recommended) | [board.md](board.md) |
 | Chip — reusable logic without UI | [chip.md](chip.md) |
 | PCB — deprecated, legacy propagation | [pcb.md](pcb.md) |
+| **Mini CPU demo** — Harvard step CPU (chip ALU + board) | [mini-cpu.md](mini-cpu.md) |
 
 ---
 
