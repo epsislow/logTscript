@@ -39,8 +39,9 @@ textarea {
 .cm-logts-bitdynamic   { color: #2ff; }
 .cm-logts-component-name   { color: #2aa; font-weight: bold;}
 .cm-logts-component-type   { color: #ff0; }
-.cm-logts-comp-attr   { color: #f55; }
-.cm-logts-comp-prop   { color: #faa; }
+.cm-logts-block-name   { color: #ff9; }
+.cm-logts-comp-attr   { color: #fc6; }
+.cm-logts-comp-prop   { color: #8ef; }
 .cm-logts-operator { color: #aaa; }
 button { margin:4px; padding:5px 9px; cursor: pointer; }
 pre { background:#000; padding:10px; max-height:260px; overflow:auto }
@@ -1375,13 +1376,17 @@ body.doc-mode #docView {
 <script>
 // ─── LogTScript CodeMirror mode ───────────────────────────────────────────────
 const _logtsKeywords = [
-  "show","def","repeat","MODE","WIREWRITE","NEXT",
-  "LOAD","LATCH","comp","pcb","chip","board","w0","w1"
+  "show","def","repeat","MODE","STRICT","WIREWRITE","NEXT","TEST","LOAD",
+  "comp","pcb","chip","board",
+  "peek","probe","doc","watch"
 ];
 
 const _logtsComponents = [
-'led','key','dip','switch','rotary','adder','subtract','divider','multiplier','counter','shifter','mem','reg','lcd','dots', '14seg', '7seg','+','-','/','*','='
-]
+  'led','key','dip','switch','rotary','bar','osc',
+  'adder','subtract','divider','multiplier','counter','shifter','mem','reg',
+  'lcd','dots','14seg','7seg',
+  '+','-','/','*','=','>','~','7','14',':'
+];
 const _logtsAttributes = [
   "depth","length","nl", "on", "text","label","color"
 ]
@@ -1390,8 +1395,11 @@ const _logtsProperties = [
   "set", "get", "write","data",
 ]
 const _logtsGates = [
-  "AND","ANDe","OR","ORe","NOT","NOTe","XOR","XORe",
-  "NAND","NANDe","NOR","NORe","LSHIFT","RSHIFT"
+  "AND","ANDe","OR","ORe","NOT","NOTe","XOR","XORe","NXOR",
+  "NAND","NANDe","NOR","NORe","EQ","LATCH",
+  "LSHIFT","RSHIFT",
+  "REG","MUX","DEMUX",
+  "ADD","SUBTRACT","MULTIPLY","DIVIDE"
 ];
 
 let debuglog = false;
@@ -1413,9 +1421,71 @@ CodeMirror.defineMode("logts", function() {
   function isWordChar(ch) {
     return /[A-Za-z0-9_]/.test(ch);
   }
+
+  function skipWsOnLine(line, p) {
+    while (p < line.length && (line[p] === ' ' || line[p] === '\t')) p++;
+    return p;
+  }
+
+  function syncLineState(stream, state) {
+    if (stream.line !== state.lastLine) {
+      state.lineHadDot = false;
+      state.lastLine = stream.line;
+    }
+  }
+
+  function looksLikeAttrNameAfterWord(stream, state) {
+    if ((!state.inAttrBlock && !state.inBlockDef) || state.lineHadDot) return false;
+    const line = stream.string;
+    let p = skipWsOnLine(line, stream.pos);
+    if (p < line.length && line[p] === ':') {
+      return line[p + 1] !== ':';
+    }
+    if (state.inAttrBlock) {
+      return p >= line.length || line[p] === '#';
+    }
+    return false;
+  }
+
+  function looksLikePropNameAfterWord(stream) {
+    const line = stream.string;
+    const p = skipWsOnLine(line, stream.pos);
+    return p < line.length && (line[p] === '=' || line[p] === '>');
+  }
+
+  function styleWord(word, stream, state) {
+    if (state.expectProperty) {
+      state.expectProperty = false;
+      return "logts-comp-prop";
+    }
+    if (state.inPropBlock && looksLikePropNameAfterWord(stream)) {
+      return "logts-comp-prop";
+    }
+    if (looksLikeAttrNameAfterWord(stream, state)) {
+      return "logts-comp-attr";
+    }
+    if (gates.has(word)) return "logts-gate";
+    if (keywords.has(word)) {
+      if (word === 'comp') state.defComp = true;
+      if (word === 'board' || word === 'pcb' || word === 'chip') {
+        state.awaitBlockDef = true;
+      }
+      return "logts-keyword";
+    }
+    if (state.expectCompType && components.has(word)) {
+      return "logts-component-type";
+    }
+    if (state.expectCompName) {
+      state.expectCompName = false;
+      state.expectCompAttrColon = true;
+    }
+    return null;
+  }
   
     function logTsToken (stream, state) {
     consoleLog("CHAR:", stream.peek(), "defComp:", state.defComp);
+      syncLineState(stream, state);
+
       if (state.inBlockComment) {
         if (stream.match(/#</)) {
           state.inBlockComment = false;
@@ -1446,8 +1516,47 @@ CodeMirror.defineMode("logts", function() {
         return "logts-type";
       }
 
+      if (state.awaitBlockDef && stream.match(/\+/)) {
+        state.expectBlockBracket = true;
+        return "logts-operator";
+      }
+
+      if (state.expectBlockBracket && stream.match(/\s*\[/)) {
+        state.expectBlockBracket = false;
+        state.expectBlockDefName = true;
+        return "logts-operator";
+      }
+
+      if (state.expectBlockDefName && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
+        state.expectBlockDefName = false;
+        state.expectBlockClose = true;
+        return "logts-block-name";
+      }
+
+      if (state.expectBlockClose && stream.match(/\s*\]\s*:/)) {
+        state.awaitBlockDef = false;
+        state.expectBlockClose = false;
+        state.inBlockDef = true;
+        return "logts-operator";
+      }
+
+      if (state.inBlockDef && !state.lineHadDot && stream.match(/:(?=\s*\d)/)) {
+        state.inBlockDef = false;
+        state.inAttrBlock = false;
+        return "logts-operator";
+      }
+
+      if (state.inAttrBlock && !state.lineHadDot && stream.peek() === ':') {
+        const rest = stream.string.slice(stream.pos + 1);
+        if (/^\s*(?:#.*)?$/.test(rest) || /^\s*\./.test(rest) || /^\s*\d/.test(rest)) {
+          stream.next();
+          state.inAttrBlock = false;
+          return "logts-operator";
+        }
+      }
+
       if (stream.match("=")) {
-        state.expectBinary = true;
+        if (!state.inPropBlock) state.expectBinary = true;
         return "logts-operator";
       }
       
@@ -1466,31 +1575,32 @@ CodeMirror.defineMode("logts", function() {
 
       if (
         state.expectCompType && stream.match(/[7A-Za-z_][A-Za-z0-9_]*/) ||
+        state.compRefPending && stream.match(/[A-Za-z_][A-Za-z0-9_]*/) ||
         !state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
         const word = stream.current();
         consoleLog('wordddd ' , word);
-
-        if (gates.has(word))    return "logts-gate";
-        if (keywords.has(word)) {
-            if (word === 'comp') {
-              state.defComp = true;
-            }
-            return "logts-keyword";
+        if (state.compRefPending) {
+          state.compRefPending = false;
+          state.compRefNamed = true;
+          state.expectBitrange = false;
         }
-        if (state.expectCompType && components.has(word)) {
-            return "logts-component-type";
+        return styleWord(word, stream, state);
+      }
+      
+      if (stream.match(/[.]/)) {
+        state.lineHadDot = true;
+        if (state.expectCompName) {
+          return 'logts-component-name';
         }
-
+        if (state.compRefNamed) {
+          state.compRefNamed = false;
+          state.internalWire = true;
+          state.expectBitrange = true;
+          return null;
+        }
+        state.compRefPending = true;
+        state.expectBitrange = true;
         return null;
-      }
-      
-      if (!state.expectCompName && stream.match(/[.]/)) {
-         state.expectBitrange = true;
-         return null;
-      }
-      
-      if (state.expectCompName && stream.match(/[.]/)) {
-        return 'logts-component-name';
       }
       
       if (stream.match(/[-]/)) {
@@ -1517,6 +1627,10 @@ CodeMirror.defineMode("logts", function() {
       if (state.expectBitrange && stream.match(/[A-Za-z_][A-Za-z0-9_]*/)) {
         consoleLog('q');
         state.expectBitrange = false;
+        if (state.internalWire) {
+          state.internalWire = false;
+          return null;
+        }
         return "logts-bitdynamic";
       }
       
@@ -1548,7 +1662,40 @@ CodeMirror.defineMode("logts", function() {
         state.defComp = false;
     }
 
-      if (stream.match(/[=:,.<>()\[\]{}\/\\~@!]/)) {
+      if (stream.match(':')) {
+        if (stream.peek() === ':') {
+          stream.next();
+          state.expectCompAttrColon = false;
+          return "logts-operator";
+        }
+        if (state.compRefNamed) {
+          state.compRefNamed = false;
+          if (stream.peek() === '{') {
+            stream.next();
+            state.inPropBlock = true;
+          } else {
+            state.expectProperty = true;
+          }
+          return "logts-operator";
+        }
+        if (state.expectCompAttrColon) {
+          state.expectCompAttrColon = false;
+          state.inAttrBlock = true;
+          return "logts-operator";
+        }
+        return "logts-operator";
+      }
+
+      if (stream.match('{')) {
+        return "logts-operator";
+      }
+
+      if (stream.match('}')) {
+        if (state.inPropBlock) state.inPropBlock = false;
+        return "logts-operator";
+      }
+
+      if (stream.match(/[,.<>()\[\]\/\\~@!]/)) {
         return "logts-operator";
       }
 consoleLog('or else');
@@ -1565,8 +1712,20 @@ consoleLog('or else');
         defComp: false,
         expectCompType: false,
         expectCompName: false,
-        defPcb: false,
-        expectCompProp: false
+        expectCompAttrColon: false,
+        inAttrBlock: false,
+        inBlockDef: false,
+        awaitBlockDef: false,
+        expectBlockBracket: false,
+        expectBlockDefName: false,
+        expectBlockClose: false,
+        inPropBlock: false,
+        expectProperty: false,
+        compRefPending: false,
+        compRefNamed: false,
+        internalWire: false,
+        lineHadDot: false,
+        lastLine: 0
       };
     },
 
