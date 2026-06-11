@@ -299,6 +299,9 @@ function showDocView() {
 function showEditorView() {
   document.body.classList.remove('doc-mode');
   closeDocSearchMenu();
+  if (location.hash) {
+    history.replaceState(null, '', location.pathname + location.search);
+  }
   if (typeof cmEditor !== 'undefined' && cmEditor) {
     setTimeout(function () { cmEditor.refresh(); }, 0);
   }
