@@ -2027,8 +2027,16 @@ assignment() {
     if (this.c.type === 'SYM' && this.c.value === '.') {
       this.eat('SYM', '.');
       
+      if (this.c.type === 'ID') {
+        const internalWire = this.c.value;
+        this.eat('ID');
+        { const _a = { var: compName, internalWire };
+          if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+          return addNot(_a); }
+      }
+
       if (this.c.type !== 'BIN' && this.c.type !== 'DEC') {
-        throw Error(`Expected bit number after '.' at ${this.c.line}:${this.c.col}`);
+        throw Error(`Expected bit number or internal wire name after '.' at ${this.c.line}:${this.c.col}`);
       }
       
       const start = parseInt(this.c.value, 10);

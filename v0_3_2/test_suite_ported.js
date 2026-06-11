@@ -1761,13 +1761,13 @@ function runProbeKeyDirect(h, session) {
 reg(823, 'probe', 'probe(.clk:get) — press/release', runProbeKeyDirect);
 reg(824, 'probe', 'probe(.clk:get) — press/release (wave)', runProbeKeyDirect, { propagation: 'wave' });
 
-reg(825, 'probe', 'probe(.div:mod) ignorat fără ref (faza 1)', function(h, session) {
+reg(825, 'probe', 'probe(.div:mod) — initialised la RUN fără pulse', function(h, session) {
   const script = `comp [divider] .div:
     depth:4
     :
 probe(.div:mod)`;
   const { out } = session.run(script);
-  h.assert('fără linie probe', String(!out.some(l => l.startsWith('# .div'))), 'true');
+  h.assert('mod initialised', String(out.some(l => l.includes('# .div:mod = 0000') && l.includes('initialised'))), 'true');
 });
 
 reg(826, 'probe', 'Parser — probe(.u1:sum) produce nod AST', function(h, session) {
@@ -1826,6 +1826,143 @@ function runProbePcbPout(h, session) {
 
 reg(829, 'probe', 'probe(.q:result) PCB pout — initialised și changed', runProbePcbPout);
 reg(830, 'probe', 'probe(.q:result) PCB pout — initialised și changed (wave)', runProbePcbPout, { propagation: 'wave' });
+
+reg(831, 'probe', 'Parser — probe(.u1.tmp) produce nod AST', function(h, session) {
+  const stmts = session.parse('probe(.u1.tmp)');
+  h.assert('stmt probe', String(stmts[0].probe !== undefined), 'true');
+  h.assert('inst atom', stmts[0].probe[0].var, '.u1');
+  h.assert('internalWire', stmts[0].probe[0].internalWire, 'tmp');
+});
+
+const CHIP_HALFADD_DBG = `chip +[halfAddDbg]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  4wire partial = .add:get
+  sum = partial
+  carry = .add:carry
+  :4bit sum`;
+
+function runProbeChipInternal(h, session) {
+  const src = CHIP_HALFADD_DBG + `
+chip [halfAddDbg] .u1::
+probe(.u1.partial)
+` + CHIP_U1_INIT;
+  const { out, interp } = session.run(src);
+  h.assert('partial value', session.getPcbPout(interp, '.u1', 'sum'), '1000');
+  h.assert('probe initialised', String(out.some(l => l.includes('# .u1.partial = 1000') && l.includes('initialised'))), 'true');
+  session.execStmts(interp, `.u1:{
+  a = 0000
+  b = 0000
+  set = 1
+}`);
+  h.assert('probe changed', String(out.some(l => l.includes('# .u1.partial = 0000') && l.includes('changed'))), 'true');
+}
+
+reg(832, 'probe', 'probe(.u1.partial) chip wire intern', runProbeChipInternal);
+reg(833, 'probe', 'probe(.u1.partial) chip wire intern (wave)', runProbeChipInternal, { propagation: 'wave' });
+
+const PROBE_PCB_INTERNAL = `pcb +[invDbg]:
+  4pin data
+  1pin set
+  4pout result
+  exec: set
+  on:1
+
+  4wire shadow = NOT(data)
+  result = shadow
+  :4bit result
+
+pcb [invDbg] .q::
+probe(.q.shadow)
+.q:{
+  data = 1111
+  set = 1
+}`;
+
+function runProbePcbInternal(h, session) {
+  const { out, interp } = session.run(PROBE_PCB_INTERNAL);
+  h.assert('result', session.getPcbPout(interp, '.q', 'result'), '0000');
+  h.assert('probe initialised', String(out.some(l => l.includes('# .q.shadow = 0000') && l.includes('initialised'))), 'true');
+  session.execStmts(interp, `.q:{
+  data = 1010
+  set = 1
+}`);
+  h.assert('probe changed', String(out.some(l => l.includes('# .q.shadow = 0101') && l.includes('changed'))), 'true');
+}
+
+reg(834, 'probe', 'probe(.q.shadow) PCB wire intern', runProbePcbInternal);
+reg(835, 'probe', 'probe(.q.shadow) PCB wire intern (wave)', runProbePcbInternal, { propagation: 'wave' });
+
+const PROBE_DIV_MOD = `comp [divider] .div:
+  depth:4
+  on:1
+  :
+probe(.div:mod)
+.div:{
+  a = 1100
+  b = 0011
+  set = 1
+}`;
+
+function runProbeDivMod(h, session) {
+  const { out, interp } = session.run(PROBE_DIV_MOD);
+  h.assert('mod=0000', String(out.some(l => l.includes('# .div:mod = 0000') && l.includes('initialised'))), 'true');
+  session.execStmts(interp, `.div:{
+  a = 1101
+  b = 0011
+  set = 1
+}`);
+  h.assert('mod changed', String(out.some(l => l.includes('# .div:mod = 0001') && l.includes('changed'))), 'true');
+}
+
+reg(836, 'probe', 'probe(.div:mod) — initialised și changed', runProbeDivMod);
+reg(837, 'probe', 'probe(.div:mod) — initialised și changed (wave)', runProbeDivMod, { propagation: 'wave' });
+
+const PROBE_ADD_CARRY = `comp [adder] .add:
+  depth:4
+  on:1
+  :
+probe(.add:carry)
+.add:{
+  a = 0101
+  b = 0011
+  set = 1
+}`;
+
+reg(838, 'probe', 'probe(.add:carry) — carry la overflow', function(h, session) {
+  const { out, interp } = session.run(PROBE_ADD_CARRY);
+  h.assert('carry initialised 0', String(out.some(l => l.includes('# .add:carry = 0') && l.includes('initialised'))), 'true');
+  session.execStmts(interp, `.add:{
+  a = 1111
+  b = 1111
+  set = 1
+}`);
+  h.assert('carry changed 1', String(out.some(l => l.includes('# .add:carry = 1') && l.includes('changed'))), 'true');
+});
+
+function runProbePoutVsInternalDot(h, session) {
+  const src = CHIP_HALFADD + `
+chip [halfAdd] .u1::
+probe(.u1:sum)
+probe(.u1.sum)
+` + CHIP_U1_INIT;
+  const { out } = session.run(src);
+  h.assert('colon sum probe', String(out.some(l => l.includes('# .u1:sum = 1000'))), 'true');
+  h.assert('dot sum fără linie', String(!out.some(l => l.includes('# .u1.sum'))), 'true');
+}
+
+reg(839, 'probe', 'probe(.u1:sum) vs probe(.u1.sum) — dot nu urmărește pout', runProbePoutVsInternalDot);
 
   suite.finalize();
 })();

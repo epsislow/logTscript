@@ -142,36 +142,47 @@ probe(expr)
 | Component `:get` (implicit) | `probe(.clk)` → `probe(.clk:get)` |
 | Component property | `probe(.clk:get)` |
 | Chip / PCB pin sau pout | `probe(.u1:sum)`, `probe(.q:result)` |
+| Chip / PCB wire intern | `probe(.u1.partial)`, `probe(.q.shadow)` |
+| Componentă calculată | `probe(.div:mod)`, `probe(.add:carry)` |
 | Storage reference | `probe(&1)` |
 | Bit / slice | `probe(&1.0)`, `probe(&1.2-4)` |
 
-### Component outputs — ce acceptă `probe` (faza 1)
+### Sintaxă `:` vs `.` (chip / PCB / componentă)
 
-`probe` pe componentă monitorizează **doar proprietatea `:get`**, scrisă explicit (`probe(.sw:get)`) sau implicit (`probe(.sw)`). Condiția tehnică: la elaborare, componenta are deja un **`comp.ref`** în storage — valoarea `:get` se actualizează acolo când interacționezi cu Devices sau când oscilatorul comută.
+| Punctuație | Exemplu | Țintă |
+|------------|---------|--------|
+| **`:`** după instanță | `probe(.u1:sum)` | pin sau **pout** declarat |
+| **`.`** după instanță | `probe(.u1.partial)` | **wire intern** din body (nu pin/pout) |
+| **`:`** după componentă | `probe(.div:mod)` | proprietate componentă (`:get`, `:mod`, `:carry`…) |
 
-| Tip `comp […]` | Formă `probe` | Status | Când emite `changed` |
-|----------------|---------------|--------|----------------------|
-| `[key]` | `probe(.clk)`, `probe(.clk:get)` | da | apăsare / eliberare tastă |
-| `[switch]` | `probe(.sw)` | da | toggle în panou |
-| `[dip]` | `probe(.dip)` | da | fiecare comutator DIP |
-| `[rotary]` | `probe(.knob)` | da | rotire encoder |
-| `[osc]` / `[~]` | `probe(.clk)` | da | fiecare tranziție 0↔1 (timer) |
-| `[led]` multi-bit (`length` > 1) | `probe(.led)` | da* | la `:set` + `:value` (property block) |
-| `[led]` 1-bit | `probe(.led)` | nu încă | `comp.ref` lipsește la RUN |
-| `[adder]` `:get`, `:carry` | `probe(.a:carry)` | nu (faza 2) | valoare calculată, fără ref |
-| `[divider]` `:get`, `:mod` | `probe(.d:mod)` | nu (faza 2) | idem |
-| `[mem]` / `[reg]` / `[counter]` | `probe(.m:get)` | nu (faza 2) | citire din device |
-| `[lcd]`, `[7seg]`, `[dots]` … | `probe(.disp:get)` | nu (faza 2) | display, fără ref la `:get` |
-| instanță `pcb` / `chip` — pin sau pout | `probe(.u1:sum)`, `probe(.q:data)` | da (827–830) | după exec body / property block |
+`probe(.u1.sum)` **nu** urmărește pout-ul `sum` — folosește `probe(.u1:sum)` pentru pout (test **839**).
 
-\* LED multi-bit primește `comp.ref` la creare; LED 1-bit îl poate aloca doar după primul property block — `probe` nu îl vede la elaborare.
+### Component outputs — ce acceptă `probe`
 
-**Reguli faza 1**
+**Cu `comp.ref` (faza 1):** `probe(.comp)` sau `probe(.comp:get)` — key, switch, DIP, rotary, osc (`:get`).
 
-- Doar **`:get`** — `probe(.div:mod)`, `probe(.a:carry)` etc. sunt ignorate silențios (test **825**).
-- **Fără slice** pe componentă — `probe(.dip.0)` nu e suportat încă; folosește un wire sau `probe(&N.0)` dacă știi ref-ul.
-- **Motiv** la componente interactive: mereu `initialised` / `changed` (nu `edge committed` pe `:get` în sine).
-- **Dublare**: dacă ai `1wire x = .sw` și `probe(.sw)`, aceeași schimbare poate produce **două linii** (componentă + wire).
+**Fără `comp.ref` (faza 2):** `probe(.comp:prop)` — valoare calculată la `:set` / recalcul device:
+
+| Tip | Proprietăți | Teste |
+|-----|-------------|-------|
+| divider | `:get`, `:mod` | 825, 836–837 |
+| adder, subtract | `:get`, `:carry` | 838 |
+| multiplier | `:get`, `:over` | — |
+| shifter | `:get`, `:out` | — |
+| mem, reg, counter | `:get` | — |
+| osc | `:counter` (`:get` rămâne pe ref) | — |
+| display (7seg, lcd…) | `:get` | — |
+
+| Tip instanță | Formă | Teste |
+|--------------|-------|-------|
+| chip / PCB pin sau pout | `probe(.u1:sum)` | 827–830 |
+| chip / PCB wire intern | `probe(.u1.partial)` | 832–835 |
+
+**Reguli**
+
+- **Fără slice** pe componentă / wire intern — `probe(.dip.0)` / `probe(.u1.tmp.0)` nu sunt suportate încă.
+- **Motiv:** `initialised` / `changed` (display și aritmetică la recalcul); `edge committed` doar pe fire REG / property blocks edge.
+- **Dublare:** același ref poate produce două linii dacă probe și wire top-level urmăresc aceeași sursă.
 
 #### Exemplu — chip / PCB pout din script principal (827–830)
 
@@ -211,6 +222,57 @@ După RUN: `# .u1:sum = 1000 … - initialised`. La un nou pulse pe `set` cu alt
 Același model pentru PCB: `probe(.q:result)` unde `result` e `4pout` declarat în `pcb +[…]`.
 
 **Notă:** `probe(.u1:sum)` și `1wire r = .u1:sum` + `probe(r)` pot emite **două linii** pentru aceeași schimbare (același ref în storage).
+
+#### Exemplu — wire intern chip (832–833)
+
+```logts-play
+chip +[halfAddDbg]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  4wire partial = .add:get
+  sum = partial
+  carry = .add:carry
+  :4bit sum
+
+chip [halfAddDbg] .u1::
+probe(.u1.partial)
+
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+```
+
+`partial` e wire din body, nu pout — `# .u1.partial = 1000 … - initialised`.
+
+#### Exemplu — divider `:mod` (836–837)
+
+```logts-play
+comp [divider] .div:
+  depth:4
+  on:1
+  :
+probe(.div:mod)
+.div:{
+  a = 1100
+  b = 0011
+  set = 1
+}
+```
+
+După RUN: `# .div:mod = 0000 … - initialised`. La alt pulse `:set` cu `a`/`b` noi → `changed`.
 
 #### Exemplu — `[switch]` (821 / 822)
 
@@ -635,7 +697,9 @@ b (1wire) = 1 …
 | `probe` + `REG` latch la `clk` 1→0 | `# q = 0 - initialised`, apoi `# q = 1 - edge committed` (816–817) | La fel |
 | `probe` + `[key]` + `REG` după RUN | `initialised` la RUN; `edge committed` la release tastă (818–819) | La fel |
 | `probe(.comp)` pe key/switch/dip/rotary/osc | `initialised` la RUN; `changed` la UI (821–824) | La fel |
-| `probe(.div:mod)` fără ref | ignorat — fără linii (825) | La fel |
+| `probe(.div:mod)` componentă calculată | `initialised` / `changed` la `:set` (836–837) | La fel |
+| `probe(.u1.partial)` wire intern chip/PCB | `initialised` / `changed` la re-exec body (832–835) | La fel |
+| `probe(.u1.sum)` dot pe pout | ignorat — folosește `probe(.u1:sum)` (839) | La fel |
 
 ### 7. `probe` — `initialised` apoi `changed` la settle (815 wave)
 
@@ -679,7 +743,8 @@ probe(a)
 | Trace every change to a wire or ref | `probe` |
 | Trace key / switch / DIP / osc output direct | `probe(.comp)` sau `probe(.comp:get)` |
 | Log UI / `setWire` updates after RUN | `probe` |
-| Trace divider carry/mod sau mem `:get` | wire intermediar + `probe(wire)` (până la faza 2) |
+| Trace divider `:mod`, adder `:carry` | `probe(.div:mod)`, `probe(.add:carry)` |
+| Trace wire intern chip/PCB | `probe(.u1.partial)` (punct, nu `:`) |
 | Document a circuit for a reader | `show` at the end |
 
 ---

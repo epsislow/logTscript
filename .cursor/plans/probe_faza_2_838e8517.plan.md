@@ -4,19 +4,19 @@ overview: "Extindere probe în două direcții: (1) proprietăți componentă f�
 todos:
   - id: parser-internal-wire
     content: "Parser: atom { var, internalWire } pentru .inst.wire în atom()"
-    status: pending
+    status: completed
   - id: probe-composite-internal
     content: "interpreter: compositeInternal target, bind după executeChipBody/executePcbBody, emit via setValueAtRef"
-    status: pending
+    status: completed
   - id: probe-component-computed
     content: "interpreter: componentComputed pentru :get/:mod/:carry fără comp.ref + _emitComputedComponentProbes după applyProperties"
-    status: pending
+    status: completed
   - id: tests-831
     content: Teste 831-839 în test_suite_ported.js + test_manifest.js
-    status: pending
+    status: completed
   - id: doc-faza2
     content: "Actualizare debug.md + _gen_doc_data.js cu sintaxă : vs . și tabele componente"
-    status: pending
+    status: completed
 isProject: false
 ---
 

@@ -165,27 +165,133 @@ class Interpreter {
     return this.getValueFromRef(portInfo.ref);
   }
 
-  _resolveProbeComponentTarget(atom) {
-    const compName = atom.var;
-    const property = atom.property || 'get';
+  _resolveProbeInternalWireTarget(atom) {
     if (atom.bitRange) return null;
-    const comp = this.components.get(compName);
-    if (!comp) return null;
-    if (!this.componentRegistry || !this.componentRegistry.supportsProperty(comp.type, property)) return null;
-    if (property !== 'get') return null;
-    if (!comp.ref || comp.ref === '&-') return null;
-    const bits = this.getComponentBits(comp.type, comp.attributes) || 1;
+    const instanceName = atom.var;
+    const wireName = atom.internalWire;
+    if (!wireName) return null;
+    const instance = this.chipInstances.get(instanceName) || this.pcbInstances.get(instanceName);
+    if (!instance) return null;
+    let ref = null;
+    let bitWidth = null;
+    const iw = instance.internalBodyWires && instance.internalBodyWires.get(wireName);
+    if (iw && iw.ref) {
+      ref = iw.ref;
+      bitWidth = iw.type ? this.getBitWidth(iw.type) : null;
+    }
     return {
-      kind: 'component',
-      key: 'c:' + compName + ':' + property,
-      label: compName + ':' + property,
-      compName,
-      property,
-      ref: comp.ref,
-      bitWidth: bits,
+      kind: 'compositeInternal',
+      key: 'xi:' + instanceName + ':' + wireName,
+      label: instanceName + '.' + wireName,
+      instanceName,
+      wireName,
+      ref,
+      bitWidth,
       seen: false,
       lastValue: null
     };
+  }
+
+  _syncInternalProbeTarget(target) {
+    const instance = this.chipInstances.get(target.instanceName) || this.pcbInstances.get(target.instanceName);
+    if (!instance || !instance.internalBodyWires) return;
+    const iw = instance.internalBodyWires.get(target.wireName);
+    if (iw && iw.ref) {
+      target.ref = iw.ref;
+      if (!target.bitWidth && iw.type) target.bitWidth = this.getBitWidth(iw.type);
+    }
+  }
+
+  _bindInternalProbeTargets(instanceName) {
+    for (const target of this.probeTargets) {
+      if (target.kind !== 'compositeInternal' || target.instanceName !== instanceName) continue;
+      this._syncInternalProbeTarget(target);
+    }
+  }
+
+  _emitInternalProbeTargets(instanceName) {
+    for (const target of this.probeTargets) {
+      if (target.kind !== 'compositeInternal' || target.instanceName !== instanceName) continue;
+      this._syncInternalProbeTarget(target);
+      if (!target.ref) continue;
+      const value = this.getValueFromRef(target.ref);
+      if (value !== null && value !== undefined) {
+        this._emitProbeTarget(target, value);
+      }
+    }
+  }
+
+  _resolveProbeComponentTarget(atom) {
+    const compName = atom.var;
+    const property = atom.property || 'get';
+    if (atom.bitRange || atom.internalWire) return null;
+    const comp = this.components.get(compName);
+    if (!comp) return null;
+    if (!this.componentRegistry || !this.componentRegistry.supportsProperty(comp.type, property)) return null;
+    const hasRef = comp.ref && comp.ref !== '&-';
+    if (hasRef && property === 'get') {
+      const bits = this.getComponentBits(comp.type, comp.attributes) || 1;
+      return {
+        kind: 'component',
+        key: 'c:' + compName + ':' + property,
+        label: compName + ':' + property,
+        compName,
+        property,
+        ref: comp.ref,
+        bitWidth: bits,
+        seen: false,
+        lastValue: null
+      };
+    }
+    let bitWidth = this.getComponentBits(comp.type, comp.attributes) || 1;
+    const handler = this.componentRegistry.get(comp.type);
+    if (handler && handler.evalGetProperty) {
+      const result = handler.evalGetProperty(comp, property, { var: compName, property }, this);
+      if (result && result.bitWidth) bitWidth = result.bitWidth;
+    }
+    return {
+      kind: 'componentComputed',
+      key: 'cc:' + compName + ':' + property,
+      label: compName + ':' + property,
+      compName,
+      property,
+      ref: null,
+      bitWidth,
+      seen: false,
+      lastValue: null
+    };
+  }
+
+  _readComputedComponentProbeValue(target) {
+    const comp = this.components.get(target.compName);
+    if (!comp) return null;
+    if (this.componentRegistry) {
+      const handler = this.componentRegistry.get(comp.type);
+      if (handler && handler.evalGetProperty) {
+        const a = { var: target.compName, property: target.property };
+        const result = handler.evalGetProperty(comp, target.property, a, this);
+        if (result && result.value != null && result.value !== '-') return result.value;
+      }
+    }
+    return null;
+  }
+
+  _emitComputedComponentProbes(compName) {
+    for (const target of this.probeTargets) {
+      if (target.kind !== 'componentComputed' || target.compName !== compName) continue;
+      const value = this._readComputedComponentProbeValue(target);
+      if (value !== null && value !== undefined) {
+        this._emitProbeTarget(target, value);
+      }
+    }
+  }
+
+  _emitComputedForBodyComponents(internalPrefix) {
+    for (const [compName] of this.components) {
+      if (compName.startsWith('.' + internalPrefix + '_')) {
+        this._emitComputedComponentProbes(compName);
+      }
+    }
   }
 
   _readComponentProbeValue(target) {
@@ -210,6 +316,9 @@ class Interpreter {
     const atom = expr[0];
     if (atom.var) {
       if (atom.var.startsWith('.')) {
+        if (atom.internalWire) {
+          return this._resolveProbeInternalWireTarget(atom);
+        }
         if (atom.property) {
           const composite = this._resolveProbeCompositeTarget(atom);
           if (composite) return composite;
@@ -268,6 +377,11 @@ class Interpreter {
         value = this._readComponentProbeValue(target);
       } else if (target.kind === 'composite') {
         value = this._readCompositeProbeValue(target);
+      } else if (target.kind === 'compositeInternal') {
+        this._syncInternalProbeTarget(target);
+        if (target.ref) value = this.getValueFromRef(target.ref);
+      } else if (target.kind === 'componentComputed') {
+        value = this._readComputedComponentProbeValue(target);
       }
       if (value !== null && value !== undefined) {
         this._emitProbeTarget(target, value, 'initialised');
@@ -319,7 +433,7 @@ class Interpreter {
         if (target.ref === refStr || target.ref === ('&' + base[1])) {
           this._emitProbeTarget(target, value);
         }
-      } else if ((target.kind === 'component' || target.kind === 'composite') && target.ref) {
+      } else if ((target.kind === 'component' || target.kind === 'composite' || target.kind === 'compositeInternal') && target.ref) {
         const tBase = String(target.ref).match(/^&(\d+)/);
         if (tBase && tBase[1] === base[1]) {
           this._emitProbeTarget(target, value);
@@ -4502,6 +4616,9 @@ if (s.assignment) {
     if(instance.internalBodyWires){
       for(const k of instance.internalBodyWires.keys()) this.wireStorageMap.delete(k);
     }
+    this._bindInternalProbeTargets(instanceName);
+    this._emitInternalProbeTargets(instanceName);
+    this._emitComputedForBodyComponents(internalPrefix);
     this.components = savedComponents;
     this.insidePcbBody = savedInsidePcbBody;
     this.currentPcbInstance = savedCurrentPcbInstance;
@@ -5621,6 +5738,9 @@ if (s.assignment) {
     if (instance.internalBodyWires) {
       for (const k of instance.internalBodyWires.keys()) this.wireStorageMap.delete(k);
     }
+    this._bindInternalProbeTargets(instanceName);
+    this._emitInternalProbeTargets(instanceName);
+    this._emitComputedForBodyComponents(internalPrefix);
     this.components = savedComponents;
     this.chipInstances = savedChipInstances;
     this.insideChipBody = savedInsideChipBody;
@@ -5843,6 +5963,7 @@ if (s.assignment) {
       if(handler && handler.applyProperties){
         handler.applyProperties(comp, compName, pending, when, reEvaluate, this);
         if(!reEvaluate) this.componentPendingSet.delete(compName);
+        this._emitComputedComponentProbes(compName);
         return;
       }
     }
@@ -5971,6 +6092,7 @@ if (s.assignment) {
         }
       }
       
+      this._emitComputedComponentProbes(compName);
       return;
     }
     
