@@ -291,9 +291,9 @@
 
       titleLine.appendChild(toggle);
       titleLine.appendChild(title);
-      titleLine.appendChild(range);
+     // titleLine.appendChild(range);
       if (groupPropMode) {
-        titleLine.appendChild(createPropBadge(groupPropMode));
+     //   titleLine.appendChild(createPropBadge(groupPropMode));
       }
 
       const groupSummary = document.createElement('div');
@@ -317,13 +317,17 @@
           setRunningUI(false);
         }
       });
-
+      
       header.addEventListener('click', (e) => {
         if (e.target.closest('.btn')) return;
         section.classList.toggle('collapsed');
       });
 
       header.appendChild(main);
+      if (groupPropMode) {
+        header.appendChild(createPropBadge(groupPropMode));
+      }
+
       header.appendChild(btnGroup);
       section.appendChild(header);
 
