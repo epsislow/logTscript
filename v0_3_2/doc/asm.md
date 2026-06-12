@@ -1,10 +1,40 @@
 # Inline ASM — Instruction Set Architecture
 
-Define a custom ISA with `inline [asm]`, then assemble programs to a **binary blob** with `.myisa { ... }` or `myisa { ... }` anywhere an expression is allowed.
+Define a custom ISA with `inline [asm]`, then assemble programs to a **binary blob** with `.myisa { ... }` anywhere an expression is allowed.
 
-Instance names use letters and digits only (no `_`).
+`[asm]` is the **inline kind**. Memory (`comp [mem]`) receives the assembled blob unchanged.
 
-`[asm]` is the **inline kind** (more kinds may follow later). Memory (`comp [mem]`) receives the assembled blob unchanged.
+There is **no panel UI** in v1 — logic only.
+
+---
+
+## Naming rules
+
+| Rule | Example |
+|------|---------|
+| Instance name **must** start with `.` | `.myisa` ✓ — `myisa` ✗ |
+| Letters and digits only (no `_`) | `.myisa` ✓ — `.my_isa` ✗ |
+| Same name at declaration and use | `inline [asm] .myisa:` → `.myisa { NOP }` |
+
+`myisa { ... }` without the leading dot is a **parse error**:
+
+```text
+Expected '.' before inline instance name (use '.myisa' not 'myisa')
+```
+
+This applies to wire expressions (`8wire x = .myisa { NOP }`) and to `comp [mem]` initializers (`= .myisa { ... }`).
+
+---
+
+## Declare vs use
+
+| Step | Syntax |
+|------|--------|
+| Define ISA | `inline [asm] .myisa:` … closing `:` |
+| Assemble | `.myisa { MNEMONIC … }` or multi-line `{ … }` |
+| Load into mem | `comp [mem] .prog: … = .myisa { … }` or `.prog = .myisa { … }` |
+
+ASM uses **`{ }`** for programs. LUT (see [lut.md](lut.md)) uses **`(...)`** for lookup — different inline kind, different call syntax.
 
 ---
 
@@ -41,8 +71,8 @@ inline [asm] .myisa:
   BEQ   : 0100 + S4b
   :
 
-8wire nop = myisa { NOP }
-8wire load = myisa { LOAD R1 A3 }
+8wire nop = .myisa { NOP }
+8wire load = .myisa { LOAD R1 A3 }
 show(nop)
 show(load)
 ```
@@ -131,7 +161,7 @@ inline [asm] .myisa:
 comp [mem] .prog:
   depth: 8
   length: 4
-  = myisa {
+  = .myisa {
     NOP
     LOAD R1 A3
   }
@@ -158,7 +188,7 @@ comp [mem] .prog:
   length: 4
   :
 
-.prog = myisa { NOP }
+.prog = .myisa { NOP }
 8wire slot0 = .prog:get
 show(slot0)
 ```
@@ -176,17 +206,23 @@ inline [asm] .myisa:
   :
 
 doc(inline)
+doc(inline.asm)
 doc(.myisa)
 ```
 
-`doc(inline)` lists instances; `doc(.myisa)` shows the opcode layout for that instance.
+| Call | Output |
+|------|--------|
+| `doc(inline)` | Lists all inline instances (asm, lut, …) |
+| `doc(inline.asm)` | ISA declaration template |
+| `doc(.myisa)` | Opcode layout for that asm instance |
 
 ---
 
 ## Errors
 
 | Situation | Example message |
-|-----------|-----------------|
+|-----------|-------------------|
+| Name without `.` | `Expected '.' before inline instance name (use '.myisa' not 'myisa')` |
 | Undefined label | `Undefined label 'nowhere'` |
 | Signed overflow | `Relative jump offset (-21) is out of bounds...` |
 | Wrong prefix | `'LOAD' expects a Register prefix (R)...` |
@@ -194,3 +230,11 @@ doc(.myisa)
 | Wire width | `Bit-width mismatch: x is 50bit but assembled program provides 48 bits` |
 
 Assembler errors include the source line and `^^^` under the problematic token when possible.
+
+---
+
+## Related
+
+- [mem.md](mem.md) — store assembled blob
+- [lut.md](lut.md) — inline lookup tables (`inline [lut]`)
+- [debug.md](debug.md) — `show`, `peek`

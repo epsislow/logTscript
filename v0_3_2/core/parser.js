@@ -1817,10 +1817,7 @@ assignment() {
             const bareName = this.parseBareNameRef();
             this.t.skip();
             if (this.c.type === 'SYM' && this.c.value === '{') {
-              const bracePos = this.t.i - 1;
-              initialValue = this.parseAsmProgramRaw(bracePos);
-              initialValue.isaRef = '.' + bareName;
-              continue;
+              throw Error(`Expected '.' before inline instance name (use '.${bareName}' not '${bareName}') at ${this.c.file}: ${this.c.line}:${this.c.col}`);
             }
             initialValue = { varRef: bareName };
           } else if (this.c.type === 'SPECIAL') {
@@ -2302,12 +2299,9 @@ assignment() {
     const name = this.parseBareNameRef();
 
     if (this.c.type === 'SYM' && this.c.value === '{') {
-      const bracePos = this.t.i - 1;
-      const program = this.parseAsmProgramRaw(bracePos);
-      program.isaRef = '.' + name;
-      return addNot({ asmProgram: program });
+      throw Error(`Expected '.' before inline instance name (use '.${name}' not '${name}') at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    
+
     if (this.c.type === 'SYM' && this.c.value === '@') {
       this.eat('SYM', '@');
       
@@ -2494,8 +2488,8 @@ isBuiltinFunction(name) {
     if (pos >= src.length || src[pos] !== ']') {
       throw Error(`Expected ']' after inline kind at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    if (kind !== 'asm') {
-      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm)`);
+    if (kind !== 'asm' && kind !== 'lut') {
+      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut)`);
     }
     this._syncTokenizerAt(pos + 1);
     const instanceName = this.parseDotComponentRef();
@@ -2548,6 +2542,43 @@ isBuiltinFunction(name) {
     pos++;
     this._syncTokenizerAt(pos);
     return { kind: 'asmProgram', raw };
+  }
+
+  parseLutInlineBody(bodyRaw) {
+    const attributes = {};
+    const dataRe = /\bdata\s*\{/;
+    const dataMatch = dataRe.exec(bodyRaw);
+    if (!dataMatch) {
+      throw Error(`inline [lut] body requires 'data { ... }' block`);
+    }
+    const beforeData = bodyRaw.substring(0, dataMatch.index);
+    for (const line of beforeData.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const colon = trimmed.indexOf(':');
+      if (colon < 0) continue;
+      const key = trimmed.slice(0, colon).trim();
+      const val = trimmed.slice(colon + 1).trim();
+      if (key === 'depth' || key === 'length') {
+        const n = parseInt(val, 10);
+        if (isNaN(n)) throw Error(`Invalid LUT ${key} value '${val}'`);
+        attributes[key] = n;
+      } else if (key === 'fillwith') {
+        attributes.fillwith = val;
+      }
+    }
+    const bracePos = bodyRaw.indexOf('{', dataMatch.index);
+    if (bracePos < 0) {
+      throw Error(`inline [lut] body requires 'data { ... }' block`);
+    }
+    const savedSrc = this.t.src;
+    const savedI = this.t.i;
+    this.t.src = bodyRaw;
+    this._syncTokenizerAt(bracePos);
+    const initialValue = this.parseLutDataRaw(bracePos, attributes);
+    this.t.src = savedSrc;
+    this._syncTokenizerAt(savedI);
+    return { attributes, initialValue };
   }
 
   parseLutDataRaw(bracePos, attributes) {
@@ -2674,25 +2705,30 @@ isBuiltinFunction(name) {
       if (this.c.type === 'EOF') {
         throw Error(`Unclosed '(' in component invocation at ${this.c.line}:${this.c.col}`);
       }
-      if (this.c.type !== 'ID') {
-        throw Error(`Expected argument name in component invocation at ${this.c.line}:${this.c.col}`);
+      if (Object.keys(args).length > 0) {
+        throw Error(`Component invocation accepts at most one argument at ${this.c.line}:${this.c.col}`);
       }
-      const argName = this.c.value;
-      this.eat('ID');
-      this.t.skip();
-      if (!(this.c.type === 'SYM' && this.c.value === '=')) {
-        throw Error(`Expected '=' after argument '${argName}' at ${this.c.line}:${this.c.col}`);
-      }
-      this.eat('SYM', '=');
-      this.t.skip();
-      args[argName] = this.expr();
-      this.t.skip();
-      if (this.c.type === 'SYM' && this.c.value === ',') {
-        this.eat('SYM', ',');
+      if (this.c.type === 'ID') {
+        const peekPos = this.t.i;
+        const argName = this.c.value;
+        this.eat('ID');
         this.t.skip();
+        if (this.c.type === 'SYM' && this.c.value === '=') {
+          this.eat('SYM', '=');
+          this.t.skip();
+          args[argName] = this.expr();
+        } else {
+          this._syncTokenizerAt(peekPos);
+          args.in = this.expr();
+        }
       } else {
-        break;
+        args.in = this.expr();
       }
+      this.t.skip();
+      if (!(this.c.type === 'SYM' && this.c.value === ')')) {
+        throw Error(`Component invocation accepts at most one argument at ${this.c.line}:${this.c.col}`);
+      }
+      break;
     }
     this.eat('SYM', ')');
     return { compInvoke: { var: compName, args } };

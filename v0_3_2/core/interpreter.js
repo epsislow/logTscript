@@ -301,6 +301,10 @@ class Interpreter {
 
   evalCompInvoke(invoke, computeRefs) {
     const compName = invoke.var;
+    const inlineInst = this.inlineInstances.get(compName);
+    if (inlineInst && inlineInst.kind === 'lut') {
+      return this.evalInlineLutInvoke(inlineInst, invoke, computeRefs);
+    }
     const comp = this.components.get(compName);
     if (!comp) throw Error(`Unknown component ${compName} in invocation`);
     if (!this.componentRegistry) throw Error(`Component registry unavailable for ${compName}`);
@@ -360,21 +364,92 @@ class Interpreter {
     return { value: result.value, ref: null, bitWidth: totalBits, asmBlob: true };
   }
 
-  execInline(inline) {
-    if (inline.kind !== 'asm') {
-      throw Error(`Unknown inline kind '${inline.kind}' (supported: asm)`);
+  evalInlineLutInvoke(inst, invoke, computeRefs) {
+    if (!this.componentRegistry) throw Error('Component registry unavailable for inline LUT');
+    const handler = this.componentRegistry.get('lut');
+    if (!handler) throw Error('LUT handler unavailable for inline invocation');
+    const length = inst.attributes.length !== undefined ? parseInt(inst.attributes.length, 10) : 16;
+    const depth = inst.attributes.depth !== undefined ? parseInt(inst.attributes.depth, 10) : 4;
+    const addrBits = handler._addrBits(length);
+    const inExpr = invoke.args.in;
+    if (!inExpr) throw Error(`LUT invocation ${inst.name}(...) requires address argument 'in'`);
+    const exprResult = this.evalExpr(inExpr, false);
+    let value = '';
+    for (const part of exprResult) {
+      if (part.value && part.value !== '-') value += part.value;
+      else if (part.ref && part.ref !== '&-') {
+        const val = this.getValueFromRef(part.ref);
+        if (val) value += val;
+      }
     }
-    const parseIsaFn = typeof parseIsaBody === 'function' ? parseIsaBody : null;
-    if (!parseIsaFn) throw Error('ASM assembler is not loaded');
-    const isa = parseIsaFn(inline.bodyRaw);
-    this.inlineInstances.set(inline.name, {
-      kind: inline.kind,
-      name: inline.name,
-      opcodes: isa.opcodes,
-      wordWidth: isa.wordWidth,
-      opcodeOrder: isa.opcodeOrder,
-      bodyRaw: inline.bodyRaw,
-    });
+    const binValue = handler.padOrTruncate(value, addrBits);
+    const addr = parseInt(binValue, 2);
+    if (isNaN(addr) || addr < 0 || addr >= length) {
+      throw Error(`LUT address ${addr} >= length ${length}`);
+    }
+    const outVal = inst.lutTable[addr];
+    if (computeRefs && outVal) {
+      const idx = this.storeValue(outVal);
+      return { value: outVal, ref: `&${idx}`, varName: `${inst.name}:get`, bitWidth: depth };
+    }
+    return { value: outVal, ref: null, bitWidth: depth };
+  }
+
+  execInline(inline) {
+    if (inline.kind === 'asm') {
+      const parseIsaFn = typeof parseIsaBody === 'function' ? parseIsaBody : null;
+      if (!parseIsaFn) throw Error('ASM assembler is not loaded');
+      const isa = parseIsaFn(inline.bodyRaw);
+      this.inlineInstances.set(inline.name, {
+        kind: inline.kind,
+        name: inline.name,
+        opcodes: isa.opcodes,
+        wordWidth: isa.wordWidth,
+        opcodeOrder: isa.opcodeOrder,
+        bodyRaw: inline.bodyRaw,
+      });
+      return;
+    }
+    if (inline.kind === 'lut') {
+      const parseBodyFn = (typeof Parser !== 'undefined' && typeof Tokenizer !== 'undefined'
+        && Parser.prototype.parseLutInlineBody)
+        ? (bodyRaw) => {
+          const p = new Parser(new Tokenizer(bodyRaw + '\n'), this.componentRegistry);
+          return p.parseLutInlineBody(bodyRaw);
+        }
+        : null;
+      if (!parseBodyFn) throw Error('LUT inline parser is not available');
+      if (!this.componentRegistry) throw Error('Component registry unavailable for inline LUT');
+      const handler = this.componentRegistry.get('lut');
+      if (!handler) throw Error('LUT handler unavailable for inline LUT');
+      const parsed = parseBodyFn(inline.bodyRaw);
+      const attributes = parsed.attributes;
+      const initialValue = parsed.initialValue;
+      const length = attributes.length !== undefined ? parseInt(attributes.length, 10) : 16;
+      const depth = attributes.depth !== undefined ? parseInt(attributes.depth, 10) : 4;
+      if (length <= 0 || depth <= 0) throw Error(`LUT length and depth must be positive for ${inline.name}`);
+      const fillwith = handler._resolveFillwith(attributes, depth);
+      if (initialValue && initialValue.entries) {
+        for (const entry of initialValue.entries) {
+          if (entry.value.length !== depth) {
+            throw Error(`LUT value must be exactly ${depth} bits at address ${entry.from}`);
+          }
+        }
+      }
+      const lutTable = handler._buildTable(length, depth, fillwith, initialValue);
+      this.inlineInstances.set(inline.name, {
+        kind: inline.kind,
+        name: inline.name,
+        attributes,
+        fillwithValue: fillwith,
+        lutEntries: initialValue.entries,
+        lutRawEntries: initialValue.rawEntries,
+        lutTable,
+        bodyRaw: inline.bodyRaw,
+      });
+      return;
+    }
+    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut)`);
   }
 
   _emitComputedForBodyComponents(internalPrefix) {
@@ -8517,29 +8592,50 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
   // ---- doc(inline.kind) or doc(.myisa) ----
   if (name.startsWith('inline.')) {
     const kindName = name.slice(7);
-    const formatInstFn = typeof formatInstanceDoc === 'function' ? formatInstanceDoc : null;
-    const formatTypeFn = typeof formatAsmTypeDoc === 'function' ? formatAsmTypeDoc : null;
+    const LutCtor = typeof LutComponent !== 'undefined' ? LutComponent : null;
     if (typeof alias === 'string' && alias.startsWith('.') && inlineInstances && inlineInstances.has(alias)) {
       const inst = inlineInstances.get(alias);
-      if (inst && inst.kind === kindName && formatInstFn) {
-        return formatInstFn(alias, inst);
+      if (inst && inst.kind === kindName) {
+        if (kindName === 'lut' && LutCtor && LutCtor.formatInlineInstanceDoc) {
+          return LutCtor.formatInlineInstanceDoc(alias, inst);
+        }
+        if (kindName === 'asm' && typeof formatInstanceDoc === 'function') {
+          return formatInstanceDoc(alias, inst);
+        }
       }
     }
     if (inlineInstances) {
       for (const [instName, inst] of inlineInstances) {
-        if (inst.kind === kindName && formatInstFn) {
-          return formatInstFn(instName, inst);
+        if (inst.kind === kindName) {
+          if (kindName === 'lut' && LutCtor && LutCtor.formatInlineInstanceDoc) {
+            return LutCtor.formatInlineInstanceDoc(instName, inst);
+          }
+          if (kindName === 'asm' && typeof formatInstanceDoc === 'function') {
+            return formatInstanceDoc(instName, inst);
+          }
         }
       }
     }
-    if (formatTypeFn) return formatTypeFn(kindName, null);
+    if (kindName === 'lut' && LutCtor && LutCtor.formatInlineTypeDoc) {
+      return LutCtor.formatInlineTypeDoc();
+    }
+    if (kindName === 'asm' && typeof formatAsmTypeDoc === 'function') {
+      return formatAsmTypeDoc(kindName, null);
+    }
     return [`${name}: (no inline doc available)`];
   }
 
   if (typeof alias === 'string' && alias.startsWith('.') && inlineInstances && inlineInstances.has(name)) {
     const inst = inlineInstances.get(name);
-    const formatInstFn = typeof formatInstanceDoc === 'function' ? formatInstanceDoc : null;
-    if (inst && formatInstFn) return formatInstFn(name, inst);
+    if (inst) {
+      const LutCtor = typeof LutComponent !== 'undefined' ? LutComponent : null;
+      if (inst.kind === 'lut' && LutCtor && LutCtor.formatInlineInstanceDoc) {
+        return LutCtor.formatInlineInstanceDoc(name, inst);
+      }
+      if (inst.kind === 'asm' && typeof formatInstanceDoc === 'function') {
+        return formatInstanceDoc(name, inst);
+      }
+    }
   }
 
   // ---- Static builtin function table ----

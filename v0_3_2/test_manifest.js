@@ -426,7 +426,13 @@
       { id: 904, group: 'asm', title: 'doc(asm) listează instanțe' },
       { id: 905, group: 'asm', title: 'doc(.myisa) opcodes definite' },
       { id: 906, group: 'asm', title: '.prog = .myisa { } wave' },
-      { id: 907, group: 'asm', title: 'myisa { } fără punct + show' }
+      { id: 907, group: 'asm', title: 'myisa { } fără punct → eroare' },
+      { id: 908, group: 'lut', title: 'inline [lut] — .decoder(in = addr)' },
+      { id: 909, group: 'lut', title: 'inline [lut] — .decoder(0011) pozițional' },
+      { id: 910, group: 'lut', title: 'inline [lut] — fillwith slot nemapat' },
+      { id: 911, group: 'lut', title: 'decoder(in=...) fără punct → eroare' },
+      { id: 912, group: 'lut', title: 'doc(inline.lut) — sintaxă tip' },
+      { id: 913, group: 'lut', title: 'doc(.decoder) — instanță inline map + fill' }
     ],
     groups: [
       { id: 'repeat', label: 'Repeat preprocessor', rangeLabel: '6–21', testIds: [6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21] },
@@ -442,7 +448,7 @@
       { id: 'doc-comp', label: 'Doc for body comps', rangeLabel: '400–431, 848–850', testIds: [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 848, 849, 850] },
       { id: 'chip', label: 'Chip component', rangeLabel: '540–557, 857–860', testIds: [540, 541, 542, 543, 556, 557, 857, 858, 859, 860] },
       { id: 'board', label: 'Board component', rangeLabel: '840–856, 861–863, 865–866', testIds: [840, 841, 842, 843, 844, 845, 846, 847, 848, 849, 850, 855, 856, 861, 862, 863, 865, 866] },
-      { id: 'lut', label: 'LUT lookup table', rangeLabel: '867–882', testIds: [867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 881, 882] },
+      { id: 'lut', label: 'LUT lookup table', rangeLabel: '867–913', testIds: [867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 881, 882, 908, 909, 910, 911, 912, 913] },
       { id: 'asm', label: 'Inline ASM (inline [asm])', rangeLabel: '883–907', testIds: [883, 884, 885, 886, 887, 888, 889, 890, 891, 892, 893, 894, 895, 896, 897, 898, 899, 900, 901, 902, 903, 904, 905, 906, 907] },
       { id: 'probe', label: 'probe debug', rangeLabel: '800–803, 820–839, 851–854, 864, 876–877', testIds: [800, 801, 802, 803, 820, 821, 822, 823, 824, 825, 826, 827, 828, 829, 830, 831, 832, 833, 834, 835, 836, 837, 838, 839, 851, 852, 853, 854, 864, 876, 877] },
       { id: 'debug', label: 'show / peek / probe', rangeLabel: '804–819', testIds: [804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819] },

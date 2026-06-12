@@ -2915,13 +2915,91 @@ reg(905, 'asm', 'doc(.myisa) opcodes definite', function(h, session) {
   h.assert('S4b', String(out.some(l => l.includes('S4b'))), 'true');
 });
 
-reg(907, 'asm', 'myisa { } fără punct + show', function(h, session) {
-  const { out, interp } = session.run(INLINE_ASM_ISA + `
-show(myisa { NOP })`);
-  h.assert('show output', String(out.some(l => l.includes('00000000'))), 'true');
-  h.assert('bare brace wire', String(true), 'true');
-  const { interp: i2 } = session.run(INLINE_ASM_ISA + '\n8wire x = myisa { LOAD R1 A3 }');
-  h.assert('bare name LOAD', session.getWire(i2, 'x'), '00010111');
+reg(907, 'asm', 'myisa { } fără punct → eroare', function(h, session) {
+  let err1 = '';
+  try {
+    session.parse(INLINE_ASM_ISA + '\n8wire x = myisa { NOP }');
+  } catch (e) { err1 = String(e.message || e); }
+  h.assert('bare brace parse error', String(err1.length > 0), 'true');
+  let err2 = '';
+  try {
+    session.parse(INLINE_ASM_ISA + `
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  = myisa { NOP }
+  :`);
+  } catch (e) { err2 = String(e.message || e); }
+  h.assert('bare mem init parse error', String(err2.length > 0), 'true');
+});
+
+const INLINE_LUT_BASIC = `inline [lut] .decoder:
+  depth: 4
+  length: 16
+  data {
+    0         : 0001
+    \\1 - \\5  : 0010
+  }
+  :`;
+
+reg(908, 'lut', 'inline [lut] — .decoder(in = addr)', function(h, session) {
+  const { interp } = session.run(INLINE_LUT_BASIC + `
+4wire addr = 0001
+4wire y = .decoder(in = addr)`);
+  h.assert('inline method A slot 1', session.getWire(interp, 'y'), '0010');
+});
+
+reg(909, 'lut', 'inline [lut] — .decoder(0011) pozițional', function(h, session) {
+  const { interp } = session.run(INLINE_LUT_BASIC + `
+4wire y = .decoder(0011)`);
+  h.assert('inline positional slot 3', session.getWire(interp, 'y'), '0010');
+});
+
+reg(910, 'lut', 'inline [lut] — fillwith slot nemapat', function(h, session) {
+  const src = `inline [lut] .decoder:
+  depth: 4
+  length: 16
+  fillwith: 0110
+  data {
+    0         : 0001
+    \\1 - \\5  : 0010
+  }
+  :
+4wire y = .decoder(in = 0110)`;
+  const { interp } = session.run(src);
+  h.assert('inline slot 6 fillwith', session.getWire(interp, 'y'), '0110');
+});
+
+reg(911, 'lut', 'decoder(in=...) fără punct → eroare', function(h, session) {
+  let err = '';
+  try {
+    session.parse(INLINE_LUT_BASIC + '\n4wire y = decoder(in = 0001)');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('bare invoke parse error', String(err.length > 0), 'true');
+});
+
+reg(912, 'lut', 'doc(inline.lut) — sintaxă tip', function(h, session) {
+  const out = session.runDoc('doc(inline.lut)');
+  h.assert('inline header', String(out.some(l => l.includes('inline [lut]'))), 'true');
+  h.assert('data block', String(out.some(l => l.includes('data {'))), 'true');
+  h.assert('invoke named', String(out.some(l => l.includes('.name(in = addr)'))), 'true');
+});
+
+reg(913, 'lut', 'doc(.decoder) — instanță inline map + fill', function(h, session) {
+  const out = session.runDoc(`inline [lut] .decoder:
+  depth: 4
+  length: 16
+  fillwith: 0110
+  data {
+    0         : 0001
+    \\1 - \\5  : 0010
+    ^a - ^f   : 1111
+  }
+  :
+doc(.decoder)`);
+  h.assert('header', String(out.some(l => l.includes('.decoder (inline [lut])'))), 'true');
+  h.assert('map 0001', String(out.some(l => l.includes('0001'))), 'true');
+  h.assert('fillwith slots', String(out.some(l => l.includes('fillwith'))), 'true');
 });
 
   suite.finalize();

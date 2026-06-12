@@ -127,6 +127,84 @@ var LutComponent = class LutComponent extends BuiltinComponent {
     return true;
   }
 
+  static formatInlineTypeDoc() {
+    const lines = [];
+    lines.push('inline [lut] .name:');
+    lines.push('  depth: 4');
+    lines.push('  length: 16');
+    lines.push('  fillwith: 0110');
+    lines.push('  data {');
+    lines.push('    0         : 0001');
+    lines.push('    \\1 - \\5   : 0010');
+    lines.push('  }');
+    lines.push('  :');
+    lines.push('');
+    lines.push('Lookup (combinational):');
+    lines.push('  .name(in = addr)   # named address');
+    lines.push('  .name(0011)        # positional address');
+    return lines;
+  }
+
+  static formatInlineInstanceDoc(alias, inst) {
+    const depth = inst.attributes && inst.attributes.depth !== undefined ? parseInt(inst.attributes.depth, 10) : 4;
+    const length = inst.attributes && inst.attributes.length !== undefined ? parseInt(inst.attributes.length, 10) : 16;
+    const fill = inst.fillwithValue || '0'.repeat(depth);
+    const lines = [];
+    lines.push(`${alias} (inline [lut])`);
+    lines.push(`  depth: ${depth}`);
+    lines.push(`  length: ${length}`);
+    lines.push(`  fillwith: ${fill}`);
+    lines.push('  map:');
+    const raw = inst.lutRawEntries || [];
+    const entries = inst.lutEntries || [];
+    if (raw.length) {
+      for (let i = 0; i < raw.length; i++) {
+        const r = raw[i];
+        const e = entries[i];
+        const fromLabel = r.fromRaw;
+        const toLabel = (e && e.to !== e.from) ? (r.toRaw || r.fromRaw) : null;
+        const rangeLabel = toLabel ? `${fromLabel}-${toLabel}` : fromLabel;
+        lines.push(`    ${rangeLabel} -> ${e ? e.value : r.value}`);
+      }
+    } else if (entries.length) {
+      for (const e of entries) {
+        const rangeLabel = e.to !== e.from ? `${e.from}-${e.to}` : String(e.from);
+        lines.push(`    ${rangeLabel} -> ${e.value}`);
+      }
+    } else {
+      lines.push('    (none)');
+    }
+    const mapped = new Set();
+    for (const e of entries) {
+      for (let i = e.from; i <= e.to; i++) mapped.add(i);
+    }
+    const gaps = [];
+    let gapStart = null;
+    for (let i = 0; i < length; i++) {
+      if (!mapped.has(i)) {
+        if (gapStart === null) gapStart = i;
+      } else if (gapStart !== null) {
+        gaps.push([gapStart, i - 1]);
+        gapStart = null;
+      }
+    }
+    if (gapStart !== null) gaps.push([gapStart, length - 1]);
+    if (gaps.length) {
+      lines.push('  fill:');
+      for (const [a, b] of gaps) {
+        const label = a === b ? String(a) : `${a}-${b}`;
+        lines.push(`    ${label} -> ${fill} (fillwith)`);
+      }
+    }
+    if (length <= 16 && inst.lutTable) {
+      lines.push('  table:');
+      for (let i = 0; i < inst.lutTable.length; i++) {
+        lines.push(`    [${i}]=${inst.lutTable[i]}`);
+      }
+    }
+    return lines;
+  }
+
   static formatInstanceDoc(alias, comp) {
     const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
     const length = comp.attributes['length'] !== undefined ? parseInt(comp.attributes['length'], 10) : 16;

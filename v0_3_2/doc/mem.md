@@ -82,6 +82,93 @@ comp [mem] .ram:
 
 The variable `d` must already be declared before the `comp` statement. The value is read at the time of declaration. Same splitting behavior as a literal.
 
+### ASM program (`inline [asm]`)
+
+Instead of hand-encoding hex, initialize program ROM from an [inline ASM](asm.md) instance. The ISA name **must** start with `.` (e.g. `.myisa`, not `myisa`).
+
+```
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  :
+```
+
+At declaration:
+
+```
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  = .myisa {
+    NOP
+    LOAD R1 A3
+  }
+  :
+```
+
+The assembler produces one `depth`-bit word per instruction; words are packed into the mem blob in order (address 0, 1, 2, …).
+
+**Validations:** `wordWidth` of the ISA must equal `mem.depth`; number of instructions must not exceed `mem.length`.
+
+Runtime reload (resets all addresses, then writes from address 0):
+
+```
+.prog = .myisa { NOP; LOAD R1 A3 }
+```
+
+See [asm.md](asm.md) for ISA syntax, labels, and errors.
+
+Runnable coverage here is **partial** — declaration init and runtime reload only. A full system demo (CPU + inline components together) is planned separately; see [future-component-ideas.md](future-component-ideas.md).
+
+### Runnable — ASM init at declaration
+
+```logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  = .myisa {
+    NOP
+    LOAD R1 A3
+  }
+  :
+
+8wire w0 = .prog:get
+show(w0)
+```
+
+First ROM slot = first assembled instruction (`NOP` → `00000000`).
+
+### Runnable — runtime reload (`.mem = .isa { … }`)
+
+Empty `mem` at declaration; program loaded on assignment (all addresses cleared first):
+
+```logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  :
+
+.prog = .myisa { NOP; LOAD R1 A3 }
+8wire w0 = .prog:get
+show(w0)
+```
+
+Same result as init-at-declaration for address 0; use this pattern when the program is chosen or patched after setup.
+
 ### Padding
 
 If the initializer is shorter than `depth`, it is padded with leading zeros:
@@ -229,7 +316,16 @@ The `= Xbit` line indicates that `mem` accepts an initializer. The value is spli
 
 - `depth` is the **word size** — the number of bits stored per address.
 - `length` is the **number of addresses** — the total number of words.
-- The initializer (`= value`) splits the value into `depth`-bit chunks. The last chunk is padded with leading zeros if shorter than `depth`.
-- `.mem = value` resets **all** addresses to `0` before writing, even those not covered by the value.
+- Initializers: binary/hex literal, wire variable, or **ASM program** (`= .isa { ... }`) — see [asm.md](asm.md).
+- The literal initializer (`= value`) splits the value into `depth`-bit chunks. The last chunk is padded with leading zeros if shorter than `depth`.
+- `.mem = value` (or `.mem = .isa { ... }`) resets **all** addresses to `0` before writing, even those not covered by the value.
 - To write individual addresses without resetting others, always use the `:at`, `:data`, `:write` property block.
 - `getMem`/`setMem` are browser-side functions. In the test environment (Node.js), address 0 is accessible via `comp.initialValue`; other addresses require the browser runtime.
+
+---
+
+## Related
+
+- [asm.md](asm.md) — define ISA and load programs into `mem`
+- [lut.md](lut.md) — combinational lookup (different from sequential `mem`)
+- [mini-cpu.md](mini-cpu.md) — teaching CPU using `comp [mem]` for program and data

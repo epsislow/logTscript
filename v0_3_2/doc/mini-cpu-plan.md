@@ -12,7 +12,7 @@
 
 | CPU role | LogTScript primitive | Notes |
 |----------|----------------------|-------|
-| **RAM / program** | `comp [mem]` | ROM init with `= ^hex`; read/write via `.ram:{ at, data, write }` — [mem.md](mem.md) |
+| **RAM / program** | `comp [mem]` | ROM init with `= ^hex`, `= .isa { … }` ([inline ASM](asm.md)), or `.ram =` reload — [mem.md](mem.md) |
 | **ALU (ADD/SUB/AND…)** | `comp [adder]` / `[subtract]` or `ADD()` / `SUBTRACT()` | For a persistent CPU, prefer **components** in a `chip`, not instant functions — [adder.md](adder.md) |
 | **Operation select** | `MUX` / `MUX2` / `MUX3` | Pick ALU result from a few instruction bits |
 | **Accumulator / IR** | `REG(data, clk, clr)` or `comp [reg]` | State between steps — [reg.md](reg.md) |
@@ -49,7 +49,7 @@ flowchart TB
 
 ### Variant A — “Teaching Harvard” (implemented)
 
-- **`mem` program** (ROM): instructions preloaded with `= ^....`
+- **`mem` program** (ROM): instructions preloaded with `= ^....` or `= .cpuisa { LOAD \0; … }` ([asm.md](asm.md))
 - **`mem` data** (RAM): runtime variables
 - **PC** (`counter`): current instruction address
 - **Accumulator** (`comp [reg]`): operand + result
@@ -80,7 +80,7 @@ DIP for operands + opcode, `adder`/`subtract`, `led`/`7seg` for result. **No pro
 | “Bus” | MUX + wiring in chip |
 | “Hardware decoder” | `chip` with MUX on opcode; or top-level `def` |
 | “Stack” | second `counter` + `mem` |
-| “Program loader” | `mem` init with `=` or `.ram = ^hex` |
+| “Program loader” | `mem` init with `=`, `.ram = ^hex`, or `inline [asm]` + `= .isa { … }` — [asm.md](asm.md) |
 
 ---
 

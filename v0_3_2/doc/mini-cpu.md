@@ -38,7 +38,65 @@ Format: `[opcode:4][operand:4]` — in memory as 8 bits, **bits 0–3 (MSB)** = 
 
 ## Demo program (preloaded in ROM)
 
-ROM: `= ^10334221` (4 words × 8 bits).
+ROM: `= ^10334221` (4 words × 8 bits) — hand-encoded hex.
+
+Equivalent via [inline ASM](asm.md) (mnemonics instead of hex):
+
+```logts
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + 4b
+  STORE : 0010 + 4b
+  ADDI  : 0011 + 4b
+  SUBI  : 0100 + 4b
+  JMP   : 0101 + 4b
+  HALT  : 0111 + 4b
+  :
+
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  = .cpuisa {
+    LOAD \0
+    ADDI \3
+    SUBI \2
+    STORE \1
+  }
+  on: raise
+  :
+```
+
+Each mnemonic encodes to one 8-bit word: `[opcode:4][operand:4]`. Operand immediates use decimal `\N` (see [asm.md](asm.md)). ISA name must be `.cpuisa` (with dot).
+
+Runnable check (first ROM word only):
+
+```logts-play
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + 4b
+  STORE : 0010 + 4b
+  ADDI  : 0011 + 4b
+  SUBI  : 0100 + 4b
+  JMP   : 0101 + 4b
+  HALT  : 0111 + 4b
+  :
+
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  = .cpuisa {
+    LOAD \0
+    ADDI \3
+    SUBI \2
+    STORE \1
+  }
+  :
+
+8wire w0 = .prog:get
+show(w0)
+```
+
+Expected: `w0` = `00010000` (`LOAD 0` instruction).
 
 | PC | Instr | Effect |
 |----|-------|--------|
@@ -435,7 +493,11 @@ With an interactive panel: `comp [key]` on the instance `.cpu` `set` pin (see [k
 
 ---
 
-## Related files
+## Related
 
+- [mem.md](mem.md) — program ROM and data RAM (`comp [mem]`)
+- [asm.md](asm.md) — load ROM from mnemonics (`inline [asm]` + `= .cpuisa { … }`)
+- [lut.md](lut.md) — optional opcode decode via lookup table instead of `EQ` wiring
+- [mini-cpu-plan.md](mini-cpu-plan.md) — feasibility notes
 - Automated tests: `test_suite_ported.js` (859–866)
 - Test constants: `CHIP_ALU4`, `BOARD_CPU4`

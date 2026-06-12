@@ -427,11 +427,41 @@ user defined:
 `,
     'asm.md': `# Inline ASM — Instruction Set Architecture
 
-Define a custom ISA with \`inline [asm]\`, then assemble programs to a **binary blob** with \`.myisa { ... }\` or \`myisa { ... }\` anywhere an expression is allowed.
+Define a custom ISA with \`inline [asm]\`, then assemble programs to a **binary blob** with \`.myisa { ... }\` anywhere an expression is allowed.
 
-Instance names use letters and digits only (no \`_\`).
+\`[asm]\` is the **inline kind**. Memory (\`comp [mem]\`) receives the assembled blob unchanged.
 
-\`[asm]\` is the **inline kind** (more kinds may follow later). Memory (\`comp [mem]\`) receives the assembled blob unchanged.
+There is **no panel UI** in v1 — logic only.
+
+---
+
+## Naming rules
+
+| Rule | Example |
+|------|---------|
+| Instance name **must** start with \`.\` | \`.myisa\` ✓ — \`myisa\` ✗ |
+| Letters and digits only (no \`_\`) | \`.myisa\` ✓ — \`.my_isa\` ✗ |
+| Same name at declaration and use | \`inline [asm] .myisa:\` → \`.myisa { NOP }\` |
+
+\`myisa { ... }\` without the leading dot is a **parse error**:
+
+\`\`\`text
+Expected '.' before inline instance name (use '.myisa' not 'myisa')
+\`\`\`
+
+This applies to wire expressions (\`8wire x = .myisa { NOP }\`) and to \`comp [mem]\` initializers (\`= .myisa { ... }\`).
+
+---
+
+## Declare vs use
+
+| Step | Syntax |
+|------|--------|
+| Define ISA | \`inline [asm] .myisa:\` … closing \`:\` |
+| Assemble | \`.myisa { MNEMONIC … }\` or multi-line \`{ … }\` |
+| Load into mem | \`comp [mem] .prog: … = .myisa { … }\` or \`.prog = .myisa { … }\` |
+
+ASM uses **\`{ }\`** for programs. LUT (see [lut.md](lut.md)) uses **\`(...)\`** for lookup — different inline kind, different call syntax.
 
 ---
 
@@ -468,8 +498,8 @@ inline [asm] .myisa:
   BEQ   : 0100 + S4b
   :
 
-8wire nop = myisa { NOP }
-8wire load = myisa { LOAD R1 A3 }
+8wire nop = .myisa { NOP }
+8wire load = .myisa { LOAD R1 A3 }
 show(nop)
 show(load)
 \`\`\`
@@ -558,7 +588,7 @@ inline [asm] .myisa:
 comp [mem] .prog:
   depth: 8
   length: 4
-  = myisa {
+  = .myisa {
     NOP
     LOAD R1 A3
   }
@@ -585,7 +615,7 @@ comp [mem] .prog:
   length: 4
   :
 
-.prog = myisa { NOP }
+.prog = .myisa { NOP }
 8wire slot0 = .prog:get
 show(slot0)
 \`\`\`
@@ -603,17 +633,23 @@ inline [asm] .myisa:
   :
 
 doc(inline)
+doc(inline.asm)
 doc(.myisa)
 \`\`\`
 
-\`doc(inline)\` lists instances; \`doc(.myisa)\` shows the opcode layout for that instance.
+| Call | Output |
+|------|--------|
+| \`doc(inline)\` | Lists all inline instances (asm, lut, …) |
+| \`doc(inline.asm)\` | ISA declaration template |
+| \`doc(.myisa)\` | Opcode layout for that asm instance |
 
 ---
 
 ## Errors
 
 | Situation | Example message |
-|-----------|-----------------|
+|-----------|-------------------|
+| Name without \`.\` | \`Expected '.' before inline instance name (use '.myisa' not 'myisa')\` |
 | Undefined label | \`Undefined label 'nowhere'\` |
 | Signed overflow | \`Relative jump offset (-21) is out of bounds...\` |
 | Wrong prefix | \`'LOAD' expects a Register prefix (R)...\` |
@@ -621,6 +657,14 @@ doc(.myisa)
 | Wire width | \`Bit-width mismatch: x is 50bit but assembled program provides 48 bits\` |
 
 Assembler errors include the source line and \`^^^\` under the problematic token when possible.
+
+---
+
+## Related
+
+- [mem.md](mem.md) — store assembled blob
+- [lut.md](lut.md) — inline lookup tables (\`inline [lut]\`)
+- [debug.md](debug.md) — \`show\`, \`peek\`
 `,
     'board.md': `# Board components
 
@@ -2344,7 +2388,7 @@ comp [adder] .name:
 - \`:{\` ... \`}\` — pins (inputs) and pouts (outputs) available in the property block
 - \`-> Xbit\` — the return type of the component
 
-> **Note on \`mem\`:** \`doc(comp.mem)\` shows \`= Xbit\` because \`mem\` supports initialization with \`= literal\`, \`= ^hex\`, or \`= varName\` in the declaration, and bulk re-initialization via \`.mem = value\` after declaration. The value is split into \`depth\`-bit chunks across consecutive addresses. See [mem.md](mem.md) for details.
+> **Note on \`mem\`:** \`doc(comp.mem)\` shows \`= Xbit\` because \`mem\` supports initialization with \`= literal\`, \`= ^hex\`, \`= varName\`, or \`= .isa { … }\` ([inline ASM](asm.md)) in the declaration, and bulk re-initialization via \`.mem = value\` (or \`.mem = .isa { … }\`) after declaration. The value is split into \`depth\`-bit chunks across consecutive addresses. See [mem.md](mem.md) for details.
 
 ### All available components
 
@@ -4125,44 +4169,60 @@ comp [led] .name:
 - The \`color\` attribute applies to all LEDs in the group. Individual LED colors are not supported within a single component — declare separate \`led\` components for different colors.
 - \`nl\` places a line break after the **last** LED in the group.
 `,
-    'lut.md': `# LUT component (\`lut\`)
+    'lut.md': `# LUT — lookup table (\`lut\`)
 
-The \`lut\` component is a **combinational lookup table**: when the address on pin \`in\` changes, output \`get\` updates in the **same propagation step** (like \`ADD()\` / \`MUX()\`, not like clocked \`mem\`).
+A **combinational lookup table**: address in → value out in the **same propagation step** (like \`ADD()\` / \`MUX()\`, not like clocked \`mem\`).
 
-There is **no panel UI** in v1 — logic only (similar to divider/adder devices).
+There is **no panel UI** in v1 — logic only.
 
 ---
 
-## Declaration
+## Naming rules
 
-\`\`\`logts
-comp [lut] .decoder:
-  depth: 4
-  length: 16
-  fillwith: 0110
-  = data {
-    0         : 0001
-    \\1 - \\5   : 0010
-    ^a - ^f   : 1111
-  }
-  :
-\`\`\`
+| Rule | Example |
+|------|---------|
+| Instance name **must** start with \`.\` | \`.decoder\` ✓ — \`decoder\` ✗ |
+| Letters and digits only (no \`_\`) | \`.decoder\` ✓ — \`.my_lut\` ✗ |
+| Invoke with \`.\` prefix | \`.decoder(in = addr)\` or \`.decoder(0011)\` |
 
-### Attributes
+\`decoder(in = …)\` without the leading dot is a **parse error** (unknown identifier).
+
+---
+
+## Two forms
+
+| Form | Declaration | Lookup |
+|------|-------------|--------|
+| **\`inline [lut]\`** | \`data { }\` in body (no \`=\`) | \`.name(in = addr)\` or \`.name(0011)\` |
+| **\`comp [lut]\`** | \`= data { }\` after attrs | Method B: \`.name:in\` + \`.name:get\` — or Method A: \`.name(in = addr)\` |
+
+Use **\`inline [lut]\`** for pure combinational lookup in expressions.
+
+Use **\`comp [lut]\`** when you need pin wiring, wave propagation on pins, or \`probe(.name:get)\`.
+
+LUT uses **\`(...)\`** for lookup. ASM (see [asm.md](asm.md)) uses **\`{ }\`** for program assembly — different inline kind.
+
+---
+
+## Shared attributes
+
+Apply to both \`inline [lut]\` and \`comp [lut]\`:
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
-| \`depth\` | \`4\` | Output width (bits after \`:\` in \`data\` and on pout \`get\`) |
+| \`depth\` | \`4\` | Output width (bits after \`:\` in \`data\` and on result) |
 | \`length\` | \`16\` | Number of table slots (addresses \`0 .. length-1\`) |
 | \`fillwith\` | \`000…0\` (\`depth\` zeros) | Value for slots **not** listed in \`data { }\` |
 
-Pin \`in\` width is \`max(1, ceil(log2(length)))\` bits.
+Address width on pin \`in\` (comp only): \`max(1, ceil(log2(length)))\` bits.
 
 ---
 
-## \`= data { }\` — table contents
+## \`data { }\` — table contents
 
-Parsed from source (decimal \`\\N\` and hex \`^N\` are **address indices**, not wire literals).
+Same parser for inline body and \`comp\` initializer.
+
+Decimal \`\\N\` and hex \`^N\` are **address indices**, not wire literals.
 
 | Address format | Example | Meaning |
 |----------------|---------|---------|
@@ -4177,7 +4237,136 @@ Unmapped slots use \`fillwith\`. Overlapping ranges: **last entry wins**. Addres
 
 ---
 
-## Runnable — basic lookup (method B)
+## Inline declaration (\`inline [lut]\`)
+
+\`\`\`logts
+inline [lut] .decoder:
+  depth: 4
+  length: 16
+  fillwith: 0110
+  data {
+    0         : 0001
+    \\1 - \\5   : 0010
+    ^a - ^f   : 1111
+  }
+  :
+\`\`\`
+
+Body uses \`data { }\` **without** \`=\` (unlike \`comp [lut]\`).
+
+### Runnable — invoke (named address)
+
+\`\`\`logts-play
+inline [lut] .decoder:
+  depth: 4
+  length: 16
+  data {
+    0         : 0001
+    \\1 - \\5   : 0010
+  }
+  :
+
+4wire addr = 0001
+4wire y = .decoder(in = addr)
+show(y)
+\`\`\`
+
+Slot **1** → value \`0010\`.
+
+### Runnable — invoke (positional address)
+
+\`\`\`logts-play
+inline [lut] .decoder:
+  depth: 4
+  length: 16
+  data {
+    0         : 0001
+    \\1 - \\5   : 0010
+  }
+  :
+
+4wire y = .decoder(0011)
+show(y)
+\`\`\`
+
+Address \`0011\` (binary) = slot **3** → value \`0010\`.
+
+Positional form also accepts wire refs: \`.decoder(addr)\` where \`addr\` is a wire variable.
+
+### Runnable — unmapped slots and \`fillwith\`
+
+\`\`\`logts-play
+inline [lut] .decoder:
+  depth: 4
+  length: 16
+  fillwith: 0110
+  data {
+    0         : 0001
+    \\1 - \\5   : 0010
+  }
+  :
+
+4wire y = .decoder(in = 0110)
+show(y)
+\`\`\`
+
+Slot **6** is not in \`data { }\` → output is \`fillwith\` (\`0110\`).
+
+### Runnable — \`doc()\` (inline)
+
+\`\`\`logts-play
+inline [lut] .decoder:
+  depth: 4
+  length: 16
+  fillwith: 0110
+  data {
+    0         : 0001
+    \\1 - \\5   : 0010
+    ^a - ^f   : 1111
+  }
+  :
+
+doc(inline.lut)
+doc(.decoder)
+\`\`\`
+
+\`doc(inline.lut)\` — declaration template and invoke syntax.
+
+\`doc(.decoder)\` on an inline instance:
+
+\`\`\`text
+.decoder (inline [lut])
+  depth: 4
+  length: 16
+  fillwith: 0110
+  map:
+    0 -> 0001
+    \\1-\\5 -> 0010
+    ^a-^f -> 1111
+  fill:
+    6-9 -> 0110 (fillwith)
+\`\`\`
+
+---
+
+## Component declaration (\`comp [lut]\`)
+
+\`\`\`logts
+comp [lut] .decoder:
+  depth: 4
+  length: 16
+  fillwith: 0110
+  = data {
+    0         : 0001
+    \\1 - \\5   : 0010
+    ^a - ^f   : 1111
+  }
+  :
+\`\`\`
+
+Requires \`= data { ... }\` initializer at parse time.
+
+### Runnable — method B (pin wiring)
 
 \`\`\`logts-play
 comp [lut] .lut:
@@ -4195,33 +4384,32 @@ comp [lut] .lut:
 show(y)
 \`\`\`
 
-Address \`0011\` (binary) = slot **3** → value \`0010\`.
+Address \`0011\` = slot **3** → value \`0010\`.
 
----
+### Runnable — method A (parentheses invoke)
 
-## Runnable — unmapped slots and \`fillwith\`
+Same \`(...)\` syntax as \`inline [lut]\` — works on \`comp\` instances too:
 
 \`\`\`logts-play
 comp [lut] .lut:
   depth: 4
   length: 16
-  fillwith: 0110
   = data {
     0         : 0001
     \\1 - \\5   : 0010
   }
   :
 
-.lut:in = 0110
-4wire y = .lut:get
+4wire addr = 0001
+4wire y = .lut(in = addr)
+4wire z = .lut(0011)
 show(y)
+show(z)
 \`\`\`
 
-Slot **6** is not in \`data { }\` → output is \`fillwith\` (\`0110\`).
+Only pin \`in\` is supported; result is always pout \`get\`.
 
----
-
-## Runnable — address formats
+### Runnable — address formats (comp, method B)
 
 Binary index:
 
@@ -4287,30 +4475,9 @@ comp [lut] .lut:
 show(y)
 \`\`\`
 
----
+### Runnable — \`probe\` and \`doc()\` (comp)
 
-## Runnable — method A (inline invocation)
-
-\`\`\`logts-play
-comp [lut] .lut:
-  depth: 4
-  length: 16
-  = data {
-    0         : 0001
-    \\1 - \\5   : 0010
-  }
-  :
-
-4wire addr = 0001
-4wire y = .lut(in = addr)
-show(y)
-\`\`\`
-
-Only pin \`in\` is supported in v1; result is always pout \`get\`.
-
----
-
-## Runnable — \`probe\` and \`doc()\`
+\`probe\` requires a \`comp\` instance (pins on the netlist):
 
 \`\`\`logts-play
 comp [lut] .decoder:
@@ -4331,20 +4498,9 @@ doc(comp.lut)
 doc(.decoder)
 \`\`\`
 
-\`doc(.decoder)\` example output:
+\`doc(comp.lut)\` — component type syntax (pins \`in\` / \`get\`).
 
-\`\`\`text
-.decoder (comp [lut])
-  depth: 4
-  length: 16
-  fillwith: 0110
-  map:
-    0 -> 0001
-    \\1-\\5 -> 0010
-    ^a-^f -> 1111
-  fill:
-    6-9 -> 0110 (fillwith)
-\`\`\`
+\`doc(.decoder)\` on a comp instance shows header \`comp [lut]\` (not \`inline [lut]\`).
 
 ---
 
@@ -4352,9 +4508,9 @@ doc(.decoder)
 
 | | \`lut\` | \`mem\` |
 |---|-------|-------|
-| Timing | Combinational (zero extra delay) | Property blocks + \`on:\` trigger |
-| Read | \`.lut:get\` or inline invoke | \`.mem:get\` inside \`:{ at = … }\` |
-| Init | \`= data { }\` only | \`=\` binary/hex bulk, \`.mem =\` |
+| Timing | Combinational (same step) | Property blocks + \`on:\` trigger |
+| Read | \`.name(in=…)\` / \`.name:get\` | \`.mem:get\` inside \`:{ at = … }\` |
+| Init | \`data { }\` (inline) or \`= data { }\` (comp) | \`=\` binary/hex bulk, \`.mem =\` |
 
 ---
 
@@ -4362,10 +4518,12 @@ doc(.decoder)
 
 | Error | Cause |
 |-------|-------|
-| \`LUT address N >= length L\` | Index outside table |
+| \`Expected '.' before inline instance name\` | ASM program without dot (see [asm.md](asm.md)) |
+| \`inline [lut] body requires 'data { ... }' block\` | Missing \`data { }\` in inline body |
+| \`LUT address N >= length L\` | Index outside table at runtime |
 | \`LUT value must be exactly D bits\` | Value or \`fillwith\` wrong width |
 | \`LUT range inverted\` | \`end < start\` in a range |
-| \`requires '= data { ... }'\` | Missing initializer |
+| \`requires '= data { ... }'\` | \`comp [lut]\` missing initializer |
 
 ---
 
@@ -4374,7 +4532,6 @@ doc(.decoder)
 - [mem.md](mem.md) — sequential RAM
 - [asm.md](asm.md) — inline assembler (blob into \`mem\`)
 - [debug.md](debug.md) — \`probe\`, \`show\`, \`peek\`
-- [future-component-ideas.md](future-component-ideas.md) — backlog (B2 LUT)
 `,
     'mem.md': `# Memory Component (mem)
 
@@ -4459,6 +4616,93 @@ comp [mem] .ram:
 \`\`\`
 
 The variable \`d\` must already be declared before the \`comp\` statement. The value is read at the time of declaration. Same splitting behavior as a literal.
+
+### ASM program (\`inline [asm]\`)
+
+Instead of hand-encoding hex, initialize program ROM from an [inline ASM](asm.md) instance. The ISA name **must** start with \`.\` (e.g. \`.myisa\`, not \`myisa\`).
+
+\`\`\`
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  :
+\`\`\`
+
+At declaration:
+
+\`\`\`
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  = .myisa {
+    NOP
+    LOAD R1 A3
+  }
+  :
+\`\`\`
+
+The assembler produces one \`depth\`-bit word per instruction; words are packed into the mem blob in order (address 0, 1, 2, …).
+
+**Validations:** \`wordWidth\` of the ISA must equal \`mem.depth\`; number of instructions must not exceed \`mem.length\`.
+
+Runtime reload (resets all addresses, then writes from address 0):
+
+\`\`\`
+.prog = .myisa { NOP; LOAD R1 A3 }
+\`\`\`
+
+See [asm.md](asm.md) for ISA syntax, labels, and errors.
+
+Runnable coverage here is **partial** — declaration init and runtime reload only. A full system demo (CPU + inline components together) is planned separately; see [future-component-ideas.md](future-component-ideas.md).
+
+### Runnable — ASM init at declaration
+
+\`\`\`logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  = .myisa {
+    NOP
+    LOAD R1 A3
+  }
+  :
+
+8wire w0 = .prog:get
+show(w0)
+\`\`\`
+
+First ROM slot = first assembled instruction (\`NOP\` → \`00000000\`).
+
+### Runnable — runtime reload (\`.mem = .isa { … }\`)
+
+Empty \`mem\` at declaration; program loaded on assignment (all addresses cleared first):
+
+\`\`\`logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  :
+
+.prog = .myisa { NOP; LOAD R1 A3 }
+8wire w0 = .prog:get
+show(w0)
+\`\`\`
+
+Same result as init-at-declaration for address 0; use this pattern when the program is chosen or patched after setup.
 
 ### Padding
 
@@ -4607,10 +4851,19 @@ The \`= Xbit\` line indicates that \`mem\` accepts an initializer. The value is 
 
 - \`depth\` is the **word size** — the number of bits stored per address.
 - \`length\` is the **number of addresses** — the total number of words.
-- The initializer (\`= value\`) splits the value into \`depth\`-bit chunks. The last chunk is padded with leading zeros if shorter than \`depth\`.
-- \`.mem = value\` resets **all** addresses to \`0\` before writing, even those not covered by the value.
+- Initializers: binary/hex literal, wire variable, or **ASM program** (\`= .isa { ... }\`) — see [asm.md](asm.md).
+- The literal initializer (\`= value\`) splits the value into \`depth\`-bit chunks. The last chunk is padded with leading zeros if shorter than \`depth\`.
+- \`.mem = value\` (or \`.mem = .isa { ... }\`) resets **all** addresses to \`0\` before writing, even those not covered by the value.
 - To write individual addresses without resetting others, always use the \`:at\`, \`:data\`, \`:write\` property block.
 - \`getMem\`/\`setMem\` are browser-side functions. In the test environment (Node.js), address 0 is accessible via \`comp.initialValue\`; other addresses require the browser runtime.
+
+---
+
+## Related
+
+- [asm.md](asm.md) — define ISA and load programs into \`mem\`
+- [lut.md](lut.md) — combinational lookup (different from sequential \`mem\`)
+- [mini-cpu.md](mini-cpu.md) — teaching CPU using \`comp [mem]\` for program and data
 `,
     'mini-cpu-plan.md': `# Mini CPU / ALU with memory — feasibility
 
@@ -4626,7 +4879,7 @@ The \`= Xbit\` line indicates that \`mem\` accepts an initializer. The value is 
 
 | CPU role | LogTScript primitive | Notes |
 |----------|----------------------|-------|
-| **RAM / program** | \`comp [mem]\` | ROM init with \`= ^hex\`; read/write via \`.ram:{ at, data, write }\` — [mem.md](mem.md) |
+| **RAM / program** | \`comp [mem]\` | ROM init with \`= ^hex\`, \`= .isa { … }\` ([inline ASM](asm.md)), or \`.ram =\` reload — [mem.md](mem.md) |
 | **ALU (ADD/SUB/AND…)** | \`comp [adder]\` / \`[subtract]\` or \`ADD()\` / \`SUBTRACT()\` | For a persistent CPU, prefer **components** in a \`chip\`, not instant functions — [adder.md](adder.md) |
 | **Operation select** | \`MUX\` / \`MUX2\` / \`MUX3\` | Pick ALU result from a few instruction bits |
 | **Accumulator / IR** | \`REG(data, clk, clr)\` or \`comp [reg]\` | State between steps — [reg.md](reg.md) |
@@ -4663,7 +4916,7 @@ flowchart TB
 
 ### Variant A — “Teaching Harvard” (implemented)
 
-- **\`mem\` program** (ROM): instructions preloaded with \`= ^....\`
+- **\`mem\` program** (ROM): instructions preloaded with \`= ^....\` or \`= .cpuisa { LOAD \\0; … }\` ([asm.md](asm.md))
 - **\`mem\` data** (RAM): runtime variables
 - **PC** (\`counter\`): current instruction address
 - **Accumulator** (\`comp [reg]\`): operand + result
@@ -4694,7 +4947,7 @@ DIP for operands + opcode, \`adder\`/\`subtract\`, \`led\`/\`7seg\` for result. 
 | “Bus” | MUX + wiring in chip |
 | “Hardware decoder” | \`chip\` with MUX on opcode; or top-level \`def\` |
 | “Stack” | second \`counter\` + \`mem\` |
-| “Program loader” | \`mem\` init with \`=\` or \`.ram = ^hex\` |
+| “Program loader” | \`mem\` init with \`=\`, \`.ram = ^hex\`, or \`inline [asm]\` + \`= .isa { … }\` — [asm.md](asm.md) |
 
 ---
 
@@ -4754,7 +5007,65 @@ Format: \`[opcode:4][operand:4]\` — in memory as 8 bits, **bits 0–3 (MSB)** 
 
 ## Demo program (preloaded in ROM)
 
-ROM: \`= ^10334221\` (4 words × 8 bits).
+ROM: \`= ^10334221\` (4 words × 8 bits) — hand-encoded hex.
+
+Equivalent via [inline ASM](asm.md) (mnemonics instead of hex):
+
+\`\`\`logts
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + 4b
+  STORE : 0010 + 4b
+  ADDI  : 0011 + 4b
+  SUBI  : 0100 + 4b
+  JMP   : 0101 + 4b
+  HALT  : 0111 + 4b
+  :
+
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  = .cpuisa {
+    LOAD \\0
+    ADDI \\3
+    SUBI \\2
+    STORE \\1
+  }
+  on: raise
+  :
+\`\`\`
+
+Each mnemonic encodes to one 8-bit word: \`[opcode:4][operand:4]\`. Operand immediates use decimal \`\\N\` (see [asm.md](asm.md)). ISA name must be \`.cpuisa\` (with dot).
+
+Runnable check (first ROM word only):
+
+\`\`\`logts-play
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + 4b
+  STORE : 0010 + 4b
+  ADDI  : 0011 + 4b
+  SUBI  : 0100 + 4b
+  JMP   : 0101 + 4b
+  HALT  : 0111 + 4b
+  :
+
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  = .cpuisa {
+    LOAD \\0
+    ADDI \\3
+    SUBI \\2
+    STORE \\1
+  }
+  :
+
+8wire w0 = .prog:get
+show(w0)
+\`\`\`
+
+Expected: \`w0\` = \`00010000\` (\`LOAD 0\` instruction).
 
 | PC | Instr | Effect |
 |----|-------|--------|
@@ -5151,8 +5462,12 @@ With an interactive panel: \`comp [key]\` on the instance \`.cpu\` \`set\` pin (
 
 ---
 
-## Related files
+## Related
 
+- [mem.md](mem.md) — program ROM and data RAM (\`comp [mem]\`)
+- [asm.md](asm.md) — load ROM from mnemonics (\`inline [asm]\` + \`= .cpuisa { … }\`)
+- [lut.md](lut.md) — optional opcode decode via lookup table instead of \`EQ\` wiring
+- [mini-cpu-plan.md](mini-cpu-plan.md) — feasibility notes
 - Automated tests: \`test_suite_ported.js\` (859–866)
 - Test constants: \`CHIP_ALU4\`, \`BOARD_CPU4\`
 `,

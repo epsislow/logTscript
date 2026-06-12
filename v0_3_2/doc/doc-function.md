@@ -375,7 +375,7 @@ comp [adder] .name:
 - `:{` ... `}` — pins (inputs) and pouts (outputs) available in the property block
 - `-> Xbit` — the return type of the component
 
-> **Note on `mem`:** `doc(comp.mem)` shows `= Xbit` because `mem` supports initialization with `= literal`, `= ^hex`, or `= varName` in the declaration, and bulk re-initialization via `.mem = value` after declaration. The value is split into `depth`-bit chunks across consecutive addresses. See [mem.md](mem.md) for details.
+> **Note on `mem`:** `doc(comp.mem)` shows `= Xbit` because `mem` supports initialization with `= literal`, `= ^hex`, `= varName`, or `= .isa { … }` ([inline ASM](asm.md)) in the declaration, and bulk re-initialization via `.mem = value` (or `.mem = .isa { … }`) after declaration. The value is split into `depth`-bit chunks across consecutive addresses. See [mem.md](mem.md) for details.
 
 ### All available components
 
