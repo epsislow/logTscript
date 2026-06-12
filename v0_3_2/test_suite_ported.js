@@ -2658,5 +2658,271 @@ reg(882, 'lut', 'LUT eroare — fillwith prea lat', function(h, session) {
   h.assert('fillwith width', String(err.includes('fillwith')), 'true');
 });
 
+const INLINE_ASM_ISA = `inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  ADD   : 0011 + R2b + R2b
+  ADDI  : 0111 + R2b + 2b
+  MOVI  : 1000 + 4b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :`;
+
+reg(883, 'asm', 'parse inline [asm] — mnemonici + segmente', function(h, session) {
+  const p = new Parser(new Tokenizer(preprocessRepeat(INLINE_ASM_ISA)), session._ensureRegistry());
+  const stmts = p.parse();
+  h.assert('inline stmt', String(!!stmts[0].inline), 'true');
+  h.assert('instance name', stmts[0].inline.name, '.myisa');
+  h.assert('kind asm', stmts[0].inline.kind, 'asm');
+  const isa = parseIsaBody(stmts[0].inline.bodyRaw);
+  h.assert('wordWidth 8', String(isa.wordWidth), '8');
+  h.assert('LOAD has R2b', String(isa.opcodes.LOAD.segments.some(s => s.kind === 'reg')), 'true');
+  h.assert('BEQ has S4b', String(isa.opcodes.BEQ.segments.some(s => s.signed)), 'true');
+});
+
+reg(884, 'asm', 'wordWidth uniform; mnemonic duplicat', function(h, session) {
+  let errW = '';
+  let errD = '';
+  try {
+    parseIsaBody('NOP : 0000 + 4b\nLOAD : 0001 + R2b + A2b + 2b');
+  } catch (e) { errW = String(e.message || e); }
+  try {
+    parseIsaBody('NOP : 0000 + 4b\nNOP : 0001 + 4b');
+  } catch (e) { errD = String(e.message || e); }
+  h.assert('width mismatch', String(errW.includes('wordWidth')), 'true');
+  h.assert('duplicate mnemonic', String(errD.includes('Duplicate')), 'true');
+});
+
+reg(885, 'asm', 'NOP singur → biți așteptați', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { NOP }');
+  h.assert('NOP 8b', session.getWire(interp, 'x'), '00000000');
+});
+
+reg(886, 'asm', 'LOAD R1 A3 fără virgulă', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { LOAD R1 A3 }');
+  h.assert('LOAD enc', session.getWire(interp, 'x'), '00010111');
+});
+
+reg(887, 'asm', 'program multi-line în { }', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+16wire x = .myisa {
+  NOP
+  LOAD R1 A3
+}`);
+  h.assert('2 instr', String(session.getWire(interp, 'x').length), '16');
+  h.assert('instr0', session.getWire(interp, 'x').slice(0, 8), '00000000');
+  h.assert('instr1', session.getWire(interp, 'x').slice(8), '00010111');
+});
+
+reg(888, 'asm', '48w myProg = .myisa { } → blob', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+48w myProg = .myisa {
+  NOP
+  NOP
+  NOP
+  NOP
+  NOP
+  NOP
+}`);
+  const w = session.getWire(interp, 'myProg');
+  h.assert('48 bits', String(w.length), '48');
+  h.assert('all NOP', w, '00000000'.repeat(6));
+});
+
+reg(889, 'asm', 'loop: + JMP loop — salt absolut A4b', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+16wire x = .myisa {
+  loop:
+    NOP
+    JMP loop
+}`);
+  h.assert('JMP to 0', session.getWire(interp, 'x'), '0000000001010000');
+});
+
+reg(890, 'asm', 'forward ref JMP loop3', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+16wire x = .myisa {
+  JMP there
+there:
+  NOP
+}`);
+  h.assert('forward JMP', session.getWire(interp, 'x').slice(0, 8), '01010001');
+});
+
+reg(891, 'asm', 'labels loop / loop2 / loop3', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+40wire x = .myisa {
+  loop:
+    NOP
+    JMP loop3
+  NOP
+  NOP
+  loop2:
+    ADDI R1 \\1
+  loop3:
+    LOAD R1 A3
+}`);
+  h.assert('5 instr', String(session.getWire(interp, 'x').length), '40');
+  h.assert('ADDI at loop2', session.getWire(interp, 'x').slice(32, 40), '01110101');
+});
+
+reg(892, 'asm', 'BEQ loop_start offset -3 → 1101', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+24wire x = .myisa {
+  loop_start:
+    NOP
+    NOP
+    BEQ loop_start
+}`);
+  h.assert('BEQ S4b', session.getWire(interp, 'x').slice(16), '01001101');
+});
+
+reg(893, 'asm', 'literal \\\\-3 în S4b', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { BEQ \\-3 }');
+  h.assert('literal -3', session.getWire(interp, 'x'), '01001101');
+});
+
+reg(894, 'asm', 'offset -21 pe S4b → eroare bounds', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { BEQ \\-21 }');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('bounds', String(err.includes('out of bounds')), 'true');
+});
+
+reg(895, 'asm', 'prefix greșit ADD \\\\2 R1', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { ADD \\2 R1 \\5 }');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('Register prefix', String(err.includes('Register prefix')), 'true');
+});
+
+reg(896, 'asm', 'overflow \\\\18 pe 4b', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { MOVI \\18 }');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('max 15', String(err.includes('max 15')), 'true');
+});
+
+reg(897, 'asm', 'label nedefinit JMP nowhere', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { JMP nowhere }');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('Undefined label', String(err.includes('Undefined label')), 'true');
+});
+
+reg(898, 'asm', 'wire width mismatch 50w vs 48b', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_ASM_ISA + `
+50w x = .myisa {
+  NOP
+  NOP
+  NOP
+  NOP
+  NOP
+  NOP
+}`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('mismatch', String(err.includes('Bit-width mismatch')), 'true');
+});
+
+reg(899, 'asm', 'comp [mem] = .myisa { } multi-line', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  = .myisa {
+    NOP
+    LOAD R1 A3
+  }
+  :
+8wire x = .prog:get`);
+  h.assert('slot0 NOP', session.getWire(interp, 'x'), '00000000');
+});
+
+reg(900, 'asm', 'comp [mem] = myProg wire blob', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+16w myProg = .myisa { NOP; LOAD R1 A3 }
+comp [mem] .m:
+  depth: 8
+  length: 2
+  = myProg
+  :
+8wire x = .m:get`);
+  h.assert('from wire', session.getWire(interp, 'x'), '00000000');
+});
+
+function runAsmProgAssign(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+comp [mem] .prog:
+  depth: 8
+  length: 4
+  :
+.prog = .myisa { NOP; LOAD R1 A3 }
+8wire x = .prog:get`);
+  h.assert('runtime assign', session.getWire(interp, 'x'), '00000000');
+}
+
+reg(901, 'asm', '.prog = .myisa { } runtime', runAsmProgAssign);
+reg(906, 'asm', '.prog = .myisa { } wave', runAsmProgAssign, { propagation: 'wave' });
+
+reg(902, 'asm', 'wordWidth !== mem.depth', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_ASM_ISA + `
+comp [mem] .m:
+  depth: 4
+  length: 8
+  = .myisa { NOP }
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('depth', String(err.includes('mem depth')), 'true');
+});
+
+reg(903, 'asm', 'instructionCount > mem.length', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_ASM_ISA + `
+comp [mem] .m:
+  depth: 8
+  length: 2
+  = .myisa {
+    NOP
+    NOP
+    NOP
+  }
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('length', String(err.includes('mem length')), 'true');
+});
+
+reg(904, 'asm', 'doc(inline) listează instanțe', function(h, session) {
+  const out = session.runDoc(INLINE_ASM_ISA + '\ndoc(inline)');
+  h.assert('instance', String(out.some(l => l.includes('.myisa (inline [asm])'))), 'true');
+  h.assert('kind', String(out.some(l => l.includes('inline.asm'))), 'true');
+});
+
+reg(905, 'asm', 'doc(.myisa) opcodes definite', function(h, session) {
+  const out = session.runDoc(INLINE_ASM_ISA + '\ndoc(.myisa)');
+  h.assert('header', String(out.some(l => l.includes('.myisa (inline [asm])'))), 'true');
+  h.assert('NOP', String(out.some(l => l.includes('NOP'))), 'true');
+  h.assert('LOAD', String(out.some(l => l.includes('LOAD'))), 'true');
+  h.assert('R2b', String(out.some(l => l.includes('R2b'))), 'true');
+  h.assert('S4b', String(out.some(l => l.includes('S4b'))), 'true');
+});
+
+reg(907, 'asm', 'myisa { } fără punct + show', function(h, session) {
+  const { out, interp } = session.run(INLINE_ASM_ISA + `
+show(myisa { NOP })`);
+  h.assert('show output', String(out.some(l => l.includes('00000000'))), 'true');
+  h.assert('bare brace wire', String(true), 'true');
+  const { interp: i2 } = session.run(INLINE_ASM_ISA + '\n8wire x = myisa { LOAD R1 A3 }');
+  h.assert('bare name LOAD', session.getWire(i2, 'x'), '00010111');
+});
+
   suite.finalize();
 })();

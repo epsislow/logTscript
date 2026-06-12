@@ -49,6 +49,7 @@ const files = [
   'core/components/pcb-component.js',   'core/components/index.js',
   'devices/mem-devices.js',
   'devices/lut-devices.js',
+  'core/asm-assembler.js',
   'core/parser.js', 'core/interpreter.js', 'core/signal-propagation.js',
   'test_session.js', 'test_suite.js', 'test_suite_ported.js'
 ];

@@ -34,6 +34,7 @@ const files = [
   'core/components/index.js',
   'devices/mem-devices.js',
   'devices/lut-devices.js',
+  'core/asm-assembler.js',
   'core/parser.js',
   'core/interpreter.js',
   'core/signal-propagation.js',

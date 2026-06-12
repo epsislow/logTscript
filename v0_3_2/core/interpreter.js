@@ -51,6 +51,9 @@ class Interpreter {
     this.insideBoardBody = false;
     this.currentBoardInstance = null;
 
+    // Inline definitions (e.g. inline [asm] .myisa:)
+    this.inlineInstances = new Map();
+
     // Probe debug
     this.probeTargets = [];
     this.probeByKey = new Map();
@@ -328,6 +331,50 @@ class Interpreter {
       return { value: getResult.value, ref: `&${idx}`, varName: `${compName}:get`, bitWidth: getResult.bitWidth };
     }
     return getResult;
+  }
+
+  evalAsmProgram(prog, memAttributes) {
+    const isaRef = prog.isaRef;
+    const inst = this.inlineInstances.get(isaRef);
+    if (!inst) throw Error(`Undefined inline instance '${isaRef}'`);
+    if (inst.kind !== 'asm') throw Error(`Inline instance '${isaRef}' is not an asm ISA`);
+    const isa = { opcodes: inst.opcodes, wordWidth: inst.wordWidth };
+    const opts = {};
+    if (memAttributes) {
+      if (memAttributes.depth !== undefined) opts.depth = parseInt(memAttributes.depth, 10);
+      if (memAttributes.length !== undefined) opts.length = parseInt(memAttributes.length, 10);
+    }
+    const assembleFn = typeof assembleProgram === 'function' ? assembleProgram : null;
+    if (!assembleFn) throw Error('ASM assembler is not loaded');
+    const result = assembleFn(isa, prog.raw, opts);
+    return { value: result.blob, bitWidth: result.wordWidth, instructionCount: result.instructionCount };
+  }
+
+  evalAsmProgramAtom(prog, computeRefs) {
+    const result = this.evalAsmProgram(prog, null);
+    const totalBits = result.value.length;
+    if (computeRefs) {
+      const idx = this.storeValue(result.value);
+      return { value: result.value, ref: `&${idx}`, bitWidth: totalBits, asmBlob: true };
+    }
+    return { value: result.value, ref: null, bitWidth: totalBits, asmBlob: true };
+  }
+
+  execInline(inline) {
+    if (inline.kind !== 'asm') {
+      throw Error(`Unknown inline kind '${inline.kind}' (supported: asm)`);
+    }
+    const parseIsaFn = typeof parseIsaBody === 'function' ? parseIsaBody : null;
+    if (!parseIsaFn) throw Error('ASM assembler is not loaded');
+    const isa = parseIsaFn(inline.bodyRaw);
+    this.inlineInstances.set(inline.name, {
+      kind: inline.kind,
+      name: inline.name,
+      opcodes: isa.opcodes,
+      wordWidth: isa.wordWidth,
+      opcodeOrder: isa.opcodeOrder,
+      bodyRaw: inline.bodyRaw,
+    });
   }
 
   _emitComputedForBodyComponents(internalPrefix) {
@@ -1190,6 +1237,10 @@ class Interpreter {
 
     if (a.compInvoke) {
       return this.evalCompInvoke(a.compInvoke, computeRefs);
+    }
+
+    if (a.asmProgram) {
+      return this.evalAsmProgramAtom(a.asmProgram, computeRefs);
     }
 
     if(a.bin){
@@ -2122,6 +2173,11 @@ if (this.isBuiltinDEMUX(name)) {
         alias = name;
         name = 'board.' + board.boardName;
       }
+      const inlineInst = this.inlineInstances.get(name);
+      if (inlineInst) {
+        alias = name;
+        name = 'inline.' + inlineInst.kind;
+      }
       
       if(alias.indexOf('_') > 0) {
         alias = '.'+  alias.split('_')[2];
@@ -2154,11 +2210,17 @@ if (this.isBuiltinDEMUX(name)) {
         chipInstNames,
         this.chipDefinitions,
         boardInstNames,
-        this.boardDefinitions
+        this.boardDefinitions,
+        this.inlineInstances
       );
       for (const line of lines) {
         this.out.push(line);
       }
+      return;
+    }
+
+    if (s.inline) {
+      this.execInline(s.inline);
       return;
     }
 
@@ -3511,6 +3573,10 @@ if (s.assignment) {
         
         // Bit-width enforcement: pad literals, reject wire-to-wire mismatch
         if(wireValue && wireValue.length !== bits){
+          const hasAsmBlob = exprResult.some(p => p.asmBlob);
+          if (hasAsmBlob) {
+            throw Error(`Bit-width mismatch: ${d.name} is ${bits}bit but assembled program provides ${wireValue.length} bits`);
+          }
           // Check if expression references any user-defined wires
           const hasWireRef = exprResult.some(p => p.varName && this.wires.has(p.varName));
           if(hasWireRef){
@@ -3807,6 +3873,12 @@ if (s.assignment) {
     let switchRef = null; // For switches, store the output reference
     let rotaryRef = null; // For rotary knobs, store the output reference
     let keyRef = null; // For keys, store the output reference
+
+    // Resolve asm program initializer (e.g. = .myisa { ... })
+    if (initialValue && typeof initialValue === 'object' && initialValue.kind === 'asmProgram') {
+      const assembled = this.evalAsmProgram(initialValue, attributes);
+      initialValue = assembled.value;
+    }
 
     // Resolve variable reference for initialValue (e.g. = d in comp declaration)
     if(initialValue && typeof initialValue === 'object' && initialValue.varRef){
@@ -8264,7 +8336,7 @@ Interpreter.BUILTIN_DOC = {
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
 };
 
-Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions, boardInstNames, boardDefinitions) {
+Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions, boardInstNames, boardDefinitions, inlineInstances) {
   // ---- doc(def) — list all built-in functions and user-defined functions ----
   if (name === 'def') {
     const builtinNames = Object.keys(Interpreter.BUILTIN_DOC);
@@ -8422,6 +8494,52 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     if (!boardDefinitions || !boardDefinitions.has(boardName)) return [`${name}: tip board nedefinit`];
     const def = boardDefinitions.get(boardName);
     return Interpreter.formatBoardDef(alias, boardName, def, pcbCompNames);
+  }
+
+  // ---- doc(inline) — list inline instances ----
+  if (name === 'inline') {
+    const lines = [];
+    if (!inlineInstances || inlineInstances.size === 0) {
+      lines.push('(no inline instances defined)');
+    } else {
+      for (const [instName, inst] of inlineInstances) {
+        lines.push(`${instName} (inline [${inst.kind}])`);
+      }
+      const kinds = new Set();
+      for (const inst of inlineInstances.values()) kinds.add(inst.kind);
+      lines.push('');
+      lines.push('Kinds:');
+      for (const k of kinds) lines.push(`inline.${k}`);
+    }
+    return lines;
+  }
+
+  // ---- doc(inline.kind) or doc(.myisa) ----
+  if (name.startsWith('inline.')) {
+    const kindName = name.slice(7);
+    const formatInstFn = typeof formatInstanceDoc === 'function' ? formatInstanceDoc : null;
+    const formatTypeFn = typeof formatAsmTypeDoc === 'function' ? formatAsmTypeDoc : null;
+    if (typeof alias === 'string' && alias.startsWith('.') && inlineInstances && inlineInstances.has(alias)) {
+      const inst = inlineInstances.get(alias);
+      if (inst && inst.kind === kindName && formatInstFn) {
+        return formatInstFn(alias, inst);
+      }
+    }
+    if (inlineInstances) {
+      for (const [instName, inst] of inlineInstances) {
+        if (inst.kind === kindName && formatInstFn) {
+          return formatInstFn(instName, inst);
+        }
+      }
+    }
+    if (formatTypeFn) return formatTypeFn(kindName, null);
+    return [`${name}: (no inline doc available)`];
+  }
+
+  if (typeof alias === 'string' && alias.startsWith('.') && inlineInstances && inlineInstances.has(name)) {
+    const inst = inlineInstances.get(name);
+    const formatInstFn = typeof formatInstanceDoc === 'function' ? formatInstanceDoc : null;
+    if (inst && formatInstFn) return formatInstFn(name, inst);
   }
 
   // ---- Static builtin function table ----

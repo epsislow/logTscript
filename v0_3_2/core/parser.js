@@ -7,6 +7,7 @@ class Parser {
     this.pcbs = new Map();
     this.chips = new Map();
     this.boards = new Map();
+    this.inlines = new Map();
     this.probes = [];
     this.componentRegistry = componentRegistry || null;
   }
@@ -101,6 +102,11 @@ parse() {
       } else {
         stmts.push(this.parseBoardInstance());
       }
+      continue;
+    }
+
+    if (this.c.type === 'KEYWORD' && this.c.value === 'inline') {
+      stmts.push(this.parseInline());
       continue;
     }
     
@@ -1807,11 +1813,29 @@ assignment() {
               initialValue = this.c.value;
             }
             this.eat('DEC');
-          } else if (this.c.type === 'ID' || this.c.type === 'SPECIAL') {
+          } else if (this.c.type === 'ID') {
+            const bareName = this.parseBareNameRef();
+            this.t.skip();
+            if (this.c.type === 'SYM' && this.c.value === '{') {
+              const bracePos = this.t.i - 1;
+              initialValue = this.parseAsmProgramRaw(bracePos);
+              initialValue.isaRef = '.' + bareName;
+              continue;
+            }
+            initialValue = { varRef: bareName };
+          } else if (this.c.type === 'SPECIAL') {
             initialValue = { varRef: this.c.value };
-            this.eat(this.c.type);
+            this.eat('SPECIAL');
           } else if (this.c.type === 'SYM' && this.c.value === '.') {
-            throw Error(`Component assignments after '=' in component declaration are not supported. Use a separate assignment statement after the component declaration.`);
+            const isaRef = this.parseDotComponentRef();
+            this.t.skip();
+            if (this.c.type === 'SYM' && this.c.value === '{') {
+              const bracePos = this.t.i - 1;
+              initialValue = this.parseAsmProgramRaw(bracePos);
+              initialValue.isaRef = isaRef;
+              continue;
+            }
+            throw Error(`Expected '{' after '= ${isaRef}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
           } else {
             throw Error(`Expected binary or decimal value after '=' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
           }
@@ -2152,14 +2176,14 @@ assignment() {
   }
   
   if (this.c.type === 'SYM' && this.c.value === '.') {
-    this.eat('SYM', '.');
-    
-    if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
-      throw Error(`Expected component name after '.' at ${this.c.line}:${this.c.col}`);
+    const compName = this.parseDotComponentRef();
+
+    if (this.c.type === 'SYM' && this.c.value === '{') {
+      const bracePos = this.t.i - 1;
+      const program = this.parseAsmProgramRaw(bracePos);
+      program.isaRef = compName;
+      return addNot({ asmProgram: program });
     }
-    
-    const compName = '.' + this.c.value;
-    this.eat(this.c.type);
     
     if (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
@@ -2275,8 +2299,14 @@ assignment() {
   }
   
   if (this.c.type === 'ID') {
-    const name = this.c.value;
-    this.eat('ID');
+    const name = this.parseBareNameRef();
+
+    if (this.c.type === 'SYM' && this.c.value === '{') {
+      const bracePos = this.t.i - 1;
+      const program = this.parseAsmProgramRaw(bracePos);
+      program.isaRef = '.' + name;
+      return addNot({ asmProgram: program });
+    }
     
     if (this.c.type === 'SYM' && this.c.value === '@') {
       this.eat('SYM', '@');
@@ -2426,6 +2456,98 @@ isBuiltinFunction(name) {
     this.t.line = line;
     this.t.col = col;
     this.c = this.t.get();
+  }
+
+  parseBareNameRef() {
+    if (this.c.type !== 'ID') {
+      throw Error(`Expected name at ${this.c.line}:${this.c.col}`);
+    }
+    const name = this.c.value;
+    this.eat('ID');
+    return name;
+  }
+
+  parseDotComponentRef() {
+    this.eat('SYM', '.');
+    if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+      throw Error(`Expected name after '.' at ${this.c.line}:${this.c.col}`);
+    }
+    const name = '.' + this.c.value;
+    this.eat(this.c.type);
+    return name;
+  }
+
+  parseInline() {
+    this.eat('KEYWORD', 'inline');
+    this.eat('SYM', '[');
+    const src = this.t.src;
+    let bracketPos = this.t.i - 1;
+    while (bracketPos >= 0 && src[bracketPos] !== '[') bracketPos--;
+    let pos = bracketPos + 1;
+    while (pos < src.length && /\s/.test(src[pos])) pos++;
+    const typeStart = pos;
+    while (pos < src.length && src[pos] !== ']') pos++;
+    const kind = src.substring(typeStart, pos).trim();
+    if (!kind) {
+      throw Error(`Expected inline kind inside '[ ]' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    if (pos >= src.length || src[pos] !== ']') {
+      throw Error(`Expected ']' after inline kind at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    if (kind !== 'asm') {
+      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm)`);
+    }
+    this._syncTokenizerAt(pos + 1);
+    const instanceName = this.parseDotComponentRef();
+    this.eat('SYM', ':');
+
+    const bodyStart = this.t.i;
+    let foundEnd = false;
+    let colonPos = -1;
+    pos = bodyStart;
+    while (pos < src.length) {
+      const lineStart = pos;
+      while (pos < src.length && src[pos] !== '\n') pos++;
+      const line = src.substring(lineStart, pos).trim();
+      if (line === ':') {
+        colonPos = src.indexOf(':', lineStart);
+        if (colonPos < 0) colonPos = lineStart;
+        foundEnd = true;
+        break;
+      }
+      if (pos < src.length) pos++;
+    }
+    if (!foundEnd) {
+      throw Error(`Unclosed inline block — expected closing ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const bodyRaw = src.substring(bodyStart, colonPos).trim();
+    this._syncTokenizerAt(colonPos + 1);
+    const stmt = { inline: { kind, name: instanceName, bodyRaw } };
+    this.inlines.set(instanceName, stmt.inline);
+    return stmt;
+  }
+
+  parseAsmProgramRaw(bracePos) {
+    const src = this.t.src;
+    let pos = bracePos + 1;
+    let depth = 1;
+    const start = pos;
+    while (pos < src.length && depth > 0) {
+      const c = src[pos];
+      if (c === '{') depth++;
+      else if (c === '}') {
+        depth--;
+        if (depth === 0) break;
+      }
+      pos++;
+    }
+    if (depth !== 0) {
+      throw Error(`Unclosed asm program block — expected '}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const raw = src.substring(start, pos);
+    pos++;
+    this._syncTokenizerAt(pos);
+    return { kind: 'asmProgram', raw };
   }
 
   parseLutDataRaw(bracePos, attributes) {
