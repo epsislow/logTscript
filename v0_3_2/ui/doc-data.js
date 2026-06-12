@@ -2877,7 +2877,9 @@ Each table is followed by numbered subsections (A1, B2, …) with a short explan
 
 ## Short context (what exists today)
 
-**\`comp\` components:** switch, key, dip, rotary, led, bar, 7seg, 14seg, lcd, dots, adder, subtract, multiplier, divider, shifter, counter, mem, reg, osc.
+**\`comp\` components:** switch, key, dip, rotary, led, bar, 7seg, 14seg, lcd, dots, adder, subtract, multiplier, divider, shifter, counter, mem, lut, reg, osc.
+
+**\`inline\` (language):** asm, lut — see [asm.md](asm.md), [lut.md](lut.md).
 
 **Built-ins (no panel):** logic (NOT, AND, OR, MUX, DEMUX, EQ, LATCH…), REG, instant arithmetic (ADD, SUBTRACT, MULTIPLY, DIVIDE), LSHIFT/RSHIFT.
 
@@ -2987,7 +2989,7 @@ Already exist as built-in functions; as **components** they would show up unifor
 | Idea | Summary |
 |------|---------|
 | **MUX / DEMUX** | Multiplexer/demultiplexer as a visual device |
-| **LUT / lookup table** | Small address → value table without explicit logic |
+| **LUT / lookup table** | Small address → value table without explicit logic — **done** |
 | **Priority encoder** | For IRQ, keyboard scan, simple arbiter |
 | **Tristate / bus buffer** | Shared bus, enable/disable output |
 | **Latch / D-FF as comp** | Clear level-trigger vs edge (alongside REG and reg) |
@@ -3004,13 +3006,13 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 ---
 
-### B2. LUT / lookup table
+### B2. LUT / lookup table — done
 
 **What it does:** Fixed table: address in (e.g. 4 bits) → value out (e.g. 8 bits) **combinational**, no clocked read cycle. Every address maps to a preloaded word.
 
 **How I see it used:** Opcode → control signals (one LUT replaces many \`EQ\` lines); hex digit → 7-segment pattern; microcode ROM; small math tables (square, sine quantized). Teaching “FPGA uses LUTs to implement any truth table”.
 
-**Today:** Read-only pattern via \`mem\` + property blocks (sequential), or many MUX/EQ wires. A true LUT comp would behave like \`ADD()\` — instant read — with init \`= ^hex\` like \`mem\`.
+**Done:** [lut.md](lut.md) — \`inline [lut] .name:\` with \`.name(in = addr)\` / \`.name(0011)\`; \`comp [lut]\` for pin wiring and \`probe\`.
 
 ---
 
@@ -3199,16 +3201,16 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 | Idea | Summary |
 |------|---------|
-| **Assembler / program loader** | Language feature, not a panel device |
+| **Assembler / program loader** | Language feature, not a panel device — **done** |
 | **Logic analyzer / timeline** | Wire visualization over time (mostly UI/debug) |
 
-### E1. Assembler / program loader
+### E1. Assembler / program loader — done
 
 **What it does:** Tool or language syntax that turns mnemonics (\`LOAD 0\`, \`ADDI 3\`) into \`= ^hex\` ROM init or \`.mem =\` blobs — optionally labels, branches, listing file.
 
 **How I see it used:** Students write assembly in editor tab; Run loads words into \`.prog\` mem. Avoids hand-encoding \`10334221\`. Could be preprocessor, separate panel, or \`asm { ... }\` block.
 
-**Today:** Manual hex in \`mem\` init (mini-CPU demo). Loader improves workflow, not simulation semantics.
+**Done:** [asm.md](asm.md) — \`inline [asm] .myisa:\` + \`.myisa { … }\`; load into \`comp [mem]\` with \`= .myisa { … }\` or \`.prog = .myisa { … }\`. See also [mem.md](mem.md).
 
 ---
 
@@ -3228,7 +3230,8 @@ From mini-CPU and existing docs — useful when an idea above seems “already c
 
 - IR, bus, decoder → **chip** + MUX + wires
 - Stack → second **counter** + **mem**
-- Program in ROM → \`= ^hex\` init on **mem**
+- Program in ROM → \`= ^hex\` init on **mem**, or mnemonics via **asm** ([asm.md](asm.md))
+- Opcode / digit lookup → **lut** ([lut.md](lut.md))
 - Clock / step → **key**, **osc**, **switch**, **NEXT(~)**
 
 ---
@@ -3255,7 +3258,7 @@ Subjective **teaching value** vs **estimated complexity** — for comparison onl
 **Natural direction groups** (mix as you like):
 
 1. **Teaching CPU v2** — ALU, flags, decoder, stack, ROM
-2. **More combinational \`comp\`** — MUX, LUT, buffer, latch
+2. **More combinational \`comp\`** — MUX, buffer, latch (LUT: done — [lut.md](lut.md))
 3. **I/O and interfaces** — UART, slider, GPIO, terminal
 4. **Infrastructure** — dual-port mem, FIFO, timer
 
@@ -3264,6 +3267,7 @@ Subjective **teaching value** vs **estimated complexity** — for comparison onl
 ## Related docs
 
 - [Component index](components.md)
+- [asm](asm.md) · [lut](lut.md)
 - [Mini CPU demo](mini-cpu.md)
 - [Mini CPU feasibility plan](mini-cpu-plan.md)
 `,
