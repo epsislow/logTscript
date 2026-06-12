@@ -1376,7 +1376,7 @@
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'dip', '7seg', 'lcd', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'osc', 'rotary'];
+    const expectedTypes = ['led', 'switch', 'key', 'dip', '7seg', 'lcd', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'osc', 'rotary'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -1388,6 +1388,7 @@
     h.assert('switch bits', String(registry.get('switch').getWidthBits({})), '1');
     h.assert('7seg bits', String(registry.get('7seg').getWidthBits({})), '8');
     h.assert('lcd bits', String(registry.get('lcd').getWidthBits({})), '8');
+    h.assert('terminal bits', String(registry.get('terminal').getWidthBits({})), '1');
     h.assert('dip default bits', String(registry.get('dip').getWidthBits({})), '4');
     h.assert('dip with length 8', String(registry.get('dip').getWidthBits({length: '8'})), '8');
     h.assert('adder default bits', String(registry.get('adder').getWidthBits({})), '4');

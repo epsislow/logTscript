@@ -5566,6 +5566,15 @@ if (s.assignment) {
           delete pending.data;
         }
       }
+
+      if(comp && comp.type === 'terminal'){
+        const currentBlockPropNames = new Set(properties.map(p => p.property));
+        for(const pin of ['append', 'newline', 'clear']){
+          if(!currentBlockPropNames.has(pin) && pending[pin] !== undefined){
+            delete pending[pin];
+          }
+        }
+      }
       
       // If reEvaluate is true, clear properties that are not in the current block
       // This ensures that only properties from the executing block are applied

@@ -20,6 +20,7 @@ const GROUP_META = [
   { id: 'short-notation', label: 'Short notation preprocessor' },
   { id: 'osc', label: 'Oscillator' },
   { id: 'registry', label: 'Component registry' },
+  { id: 'terminal', label: 'Terminal component' },
   { id: 'doc', label: 'doc() tests' },
   { id: 'doc-comp', label: 'Doc for body comps' },
   { id: 'chip', label: 'Chip component' },

@@ -206,7 +206,7 @@ Already exist as built-in functions; as **components** they would show up unifor
 | **GPIO port** | DIP + LED block (input/output port) |
 | **UART / serial** | Teaching serial communication (bit by bit) |
 | **Buzzer / tone** | Audio feedback on events |
-| **Text terminal** | Text “console” beyond simple LCD |
+| **Text terminal** | Text “console” beyond simple LCD | **done** — [terminal.md](terminal.md) |
 
 ### C1. Slider
 
@@ -258,13 +258,13 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 ---
 
-### C6. Text terminal
+### C6. Text terminal — done
 
-**What it does:** Scrollable text area: append characters or lines when written to a port; optional cursor, newline, simple escape codes — richer than fixed `comp [lcd]` rows.
+**What it does:** Scrollable text area: append characters or lines when written to a port; optional line numbers and word wrap — richer than fixed `comp [lcd]` rows.
 
-**How I see it used:** `PRINT` instruction on teaching CPU; serial RX shows incoming bytes as ASCII; shell demo. Program output students can read without parsing 7seg hex.
+**How I see it used:** `PRINT` instruction on teaching CPU; serial RX shows incoming bytes as ASCII; shell demo.
 
-**Today:** `comp [lcd]` for fixed character grids. Terminal is more lines, scrolling, and stream semantics.
+**Done:** [terminal.md](terminal.md) — `comp [terminal]` with `append`, `newline`, `clear`, scroll, and devices-panel display.
 
 ---
 

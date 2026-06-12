@@ -550,6 +550,16 @@ const snippets = {
     nl
     on:1
     :`,
+  'terminal': `comp [terminal] .|:
+    rows: 20
+    columns: 80
+    fontSize: 12
+    wordWrap: 1
+    lineNumbers: 0
+    cursorStyle: 1
+    color: ^0f0
+    on:1
+    :`,
   '7seg': `comp [7seg] .|:
     color: ^9b3
     on:1

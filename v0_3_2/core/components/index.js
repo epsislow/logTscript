@@ -8,6 +8,7 @@ var SevenSegComponent = (typeof require !== 'undefined') ? require('./seven-seg'
 var ClockDotsComponent = (typeof require !== 'undefined') ? require('./dots') : ClockDotsComponent;
 var FourteenSegComponent = (typeof require !== 'undefined') ? require('./14seg') : FourteenSegComponent;
 var LcdComponent = (typeof require !== 'undefined') ? require('./lcd') : LcdComponent;
+var TerminalComponent = (typeof require !== 'undefined') ? require('./terminal') : TerminalComponent;
 var AdderComponent = (typeof require !== 'undefined') ? require('./adder') : AdderComponent;
 var SubtractComponent = (typeof require !== 'undefined') ? require('./subtract') : SubtractComponent;
 var MultiplierComponent = (typeof require !== 'undefined') ? require('./multiplier') : MultiplierComponent;
@@ -31,6 +32,7 @@ function createComponentRegistry() {
   registry.register(SevenSegComponent);
   registry.register(FourteenSegComponent);
   registry.register(LcdComponent);
+  registry.register(TerminalComponent);
   registry.register(AdderComponent);
   registry.register(SubtractComponent);
   registry.register(MultiplierComponent);

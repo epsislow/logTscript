@@ -3408,5 +3408,271 @@ reg(952, 'lut', 'labels bloc syntax', function(h, session) {
   h.assert('fetch', session.getWire(interp, 'x'), '001');
 });
 
+function _termId(interp, name) {
+  const comp = interp.components.get(name);
+  return comp && comp.deviceIds ? comp.deviceIds[0] : null;
+}
+
+const TERMINAL_BASE = `comp [terminal] .term:
+  rows: 5
+  columns: 20
+  on: 1
+  :`;
+
+reg(960, 'terminal', 'registry has terminal', function(h, session) {
+  const registry = session._ensureRegistry();
+  h.assert('has terminal', String(registry.has('terminal')), 'true');
+});
+
+reg(961, 'terminal', 'parse comp terminal attrs', function(h, session) {
+  const stmts = session.parse(`comp [terminal] .term:
+  rows: 10
+  columns: 40
+  fontSize: 14
+  wordWrap: 0
+  lineNumbers: 1
+  :`);
+  h.assert('one stmt', String(stmts.length), '1');
+  h.assert('type', stmts[0].comp.type, 'terminal');
+  h.assert('rows', String(stmts[0].comp.attributes.rows), '10');
+  h.assert('columns', String(stmts[0].comp.attributes.columns), '40');
+  h.assert('lineNumbers', String(stmts[0].comp.attributes.lineNumbers), '1');
+});
+
+reg(962, 'terminal', 'append single byte ^41 → A', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + '\n.term:{ append = ^41\n  set = 1 }');
+  const id = _termId(interp, '.term');
+  h.assert('text', getTerminalText(id), 'A');
+});
+
+reg(963, 'terminal', 'append multi-byte ^414243 → ABC', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + '\n.term:{ append = ^414243\n  set = 1 }');
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'ABC');
+});
+
+reg(964, 'terminal', 'append twice → AB', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^41
+  set = 1 }
+.term:{ append = ^42
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'AB');
+});
+
+reg(965, 'terminal', 'newline + append → Hello / World', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^48656C6C6F
+  set = 1 }
+.term:{ newline = 1
+  set = 1 }
+.term:{ append = ^576F726C64
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'Hello\nWorld');
+});
+
+reg(966, 'terminal', 'clear empties buffer', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^41
+  set = 1 }
+.term:{ clear = 1
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), '');
+});
+
+reg(967, 'terminal', 'word wrap columns 10', function(h, session) {
+  const src = `comp [terminal] .term:
+  rows: 5
+  columns: 10
+  wordWrap: 1
+  on: 1
+  :
+.term:{ append = ^48656C6C6F576F726C64414243
+  set = 1 }`;
+  const { interp } = session.run(src);
+  h.assert('line1', getTerminalVisibleLines(_termId(interp, '.term'))[0], 'HelloWorld');
+  h.assert('line2', getTerminalVisibleLines(_termId(interp, '.term'))[1], 'ABC');
+});
+
+reg(968, 'terminal', 'scroll shows last rows', function(h, session) {
+  const src = `comp [terminal] .term:
+  rows: 3
+  columns: 20
+  on: 1
+  :
+.term:{ append = ^4C696E6531
+  set = 1 }
+.term:{ newline = 1
+  set = 1 }
+.term:{ append = ^4C696E6532
+  set = 1 }
+.term:{ newline = 1
+  set = 1 }
+.term:{ append = ^4C696E6533
+  set = 1 }
+.term:{ newline = 1
+  set = 1 }
+.term:{ append = ^4C696E6534
+  set = 1 }`;
+  const { interp } = session.run(src);
+  const vis = getTerminalVisibleLines(_termId(interp, '.term'));
+  h.assert('line0', vis[0], 'Line2');
+  h.assert('line1', vis[1], 'Line3');
+  h.assert('line2', vis[2], 'Line4');
+});
+
+reg(969, 'terminal', 'lineNumbers enabled on device', function(h, session) {
+  const { interp } = session.run(`comp [terminal] .term:
+  rows: 3
+  columns: 10
+  lineNumbers: 1
+  on: 1
+  :
+.term:{ append = ^41
+  set = 1 }`);
+  const term = terminalDisplays.get(_termId(interp, '.term'));
+  h.assert('lineNumbers flag', String(term.lineNumbers), '1');
+  h.assert('gutter nums', String(term.buffer.getVisibleLineNumbers()[0]), '1');
+});
+
+reg(970, 'terminal', 'append < 8 bits throws', function(h, session) {
+  h.assertThrows('short append', function() {
+    session.run(TERMINAL_BASE + '\n.term:{ append = ^4\n  set = 1 }');
+  }, 'append expects at least 8 bits');
+});
+
+reg(971, 'terminal', 'rows must be > 0', function(h, session) {
+  h.assertThrows('rows 0', function() {
+    session.run('comp [terminal] .term:\n  rows: 0\n  columns: 10\n  :');
+  }, 'rows must be greater than 0');
+});
+
+reg(972, 'terminal', 'unknown terminal property', function(h, session) {
+  h.assertThrows('bogus prop', function() {
+    session.run(TERMINAL_BASE + '\n.term:{ bogus = 1\n  set = 1 }');
+  }, 'Unknown terminal property');
+});
+
+reg(973, 'terminal', 'doc(comp.terminal) signature', function(h, session) {
+  const out = session.runDoc('doc(comp.terminal)');
+  h.assert('first line', out[0], 'comp [terminal] .name:');
+  h.assert('has append pin', String(out.some(function(l) { return l.includes('append'); })), 'true');
+});
+
+reg(974, 'terminal', 'Hello World runnable', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + '\n.term:{ append = ^48656C6C6F20576F726C64\n  set = 1 }');
+  h.assert('hello', getTerminalText(_termId(interp, '.term')), 'Hello World');
+});
+
+reg(975, 'terminal', 'Log output runnable', function(h, session) {
+  const src = `comp [terminal] .log:
+  rows: 8
+  columns: 60
+  lineNumbers: 1
+  on: 1
+  :
+.log:{ append = ^426F6F74206F6B
+  set = 1 }
+.log:{ newline = 1
+  set = 1 }
+.log:{ append = ^435055207265616479
+  set = 1 }`;
+  const { interp } = session.run(src);
+  h.assert('line1', getTerminalText(_termId(interp, '.log')).split('\n')[0], 'Boot ok');
+  h.assert('line2', getTerminalText(_termId(interp, '.log')).split('\n')[1], 'CPU ready');
+});
+
+reg(976, 'terminal', 'cursorStyle 2 block after append', function(h, session) {
+  const src = `comp [terminal] .term:
+  rows: 3
+  columns: 10
+  cursorStyle: 2
+  on: 1
+  :
+.term:{ append = ^41
+  set = 1 }`;
+  const { interp } = session.run(src);
+  const line = getTerminalRenderedLines(_termId(interp, '.term'))[0];
+  h.assert('char A', line[0], 'A');
+  h.assert('block cursor', line[1], '\u2588');
+});
+
+reg(977, 'terminal', 'cursorStyle 0 no block in render', function(h, session) {
+  const src = `comp [terminal] .term:
+  rows: 3
+  columns: 10
+  cursorStyle: 0
+  on: 1
+  :
+.term:{ append = ^41
+  set = 1 }`;
+  const { interp } = session.run(src);
+  const line = getTerminalRenderedLines(_termId(interp, '.term'))[0];
+  h.assert('no block', String(line.indexOf('\u2588') === -1), 'true');
+  h.assert('starts with A', line.trim()[0], 'A');
+});
+
+reg(978, 'terminal', 'cursorStyle 1 device flag', function(h, session) {
+  const { interp } = session.run(`comp [terminal] .term:
+  rows: 3
+  columns: 10
+  cursorStyle: 1
+  on: 1
+  :`);
+  const term = getTerminalDevice(_termId(interp, '.term'));
+  h.assert('cursorStyle', String(term.cursorStyle), '1');
+});
+
+reg(979, 'terminal', 'color attribute on device', function(h, session) {
+  const { interp } = session.run(`comp [terminal] .term:
+  rows: 3
+  columns: 10
+  color: ^f3f
+  on: 1
+  :`);
+  const term = getTerminalDevice(_termId(interp, '.term'));
+  h.assert('color', term.color.toLowerCase(), '#f3f');
+});
+
+reg(980, 'terminal', 'nl attribute on device', function(h, session) {
+  const { interp } = session.run(`comp [terminal] .term:
+  rows: 3
+  columns: 10
+  nl
+  on: 1
+  :`);
+  const term = getTerminalDevice(_termId(interp, '.term'));
+  h.assert('nl', String(term.nl), 'true');
+});
+
+reg(981, 'terminal', 'invalid cursorStyle throws', function(h, session) {
+  h.assertThrows('cursorStyle 3', function() {
+    session.run('comp [terminal] .term:\n  rows: 3\n  columns: 10\n  cursorStyle: 3\n  :');
+  }, 'cursorStyle must be 0, 1, or 2');
+});
+
+reg(982, 'terminal', 'parse cursorStyle and color attrs', function(h, session) {
+  const stmts = session.parse(`comp [terminal] .term:
+  rows: 5
+  columns: 20
+  cursorStyle: 2
+  color: ^0f0
+  nl
+  :`);
+  h.assert('cursorStyle', String(stmts[0].comp.attributes.cursorStyle), '2');
+  h.assert('color', String(stmts[0].comp.attributes.color).toLowerCase(), '#0f0');
+  h.assert('nl flag', String(stmts[0].comp.attributes.nl === true), 'true');
+});
+
+reg(983, 'terminal', 'block cursor at col 0 on empty', function(h, session) {
+  const { interp } = session.run(`comp [terminal] .term:
+  rows: 3
+  columns: 10
+  cursorStyle: 2
+  on: 1
+  :`);
+  const line = getTerminalRenderedLines(_termId(interp, '.term'))[0];
+  h.assert('block at start', line[0], '\u2588');
+});
+
   suite.finalize();
 })();

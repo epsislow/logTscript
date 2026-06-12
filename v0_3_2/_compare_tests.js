@@ -41,7 +41,7 @@ const files = [
   'core/components/component-registry.js', 'core/components/led.js',
   'core/components/ledBar.js', 'core/components/switch.js', 'core/components/key.js',
   'core/components/dip.js', 'core/components/seven-seg.js', 'core/components/14seg.js',
-  'core/components/dots.js', 'core/components/lcd.js', 'core/components/adder.js',
+  'core/components/dots.js', 'core/components/lcd.js', 'core/components/terminal.js', 'core/components/adder.js',
   'core/components/subtract.js', 'core/components/multiplier.js',   'core/components/divider.js',
   'core/components/lut.js',
   'core/components/shifter.js', 'core/components/mem.js', 'core/components/reg.js',

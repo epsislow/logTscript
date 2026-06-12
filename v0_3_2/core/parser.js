@@ -423,7 +423,7 @@ parsePcbInstance() {
 
 static CHIP_FORBIDDEN_TYPES = [
   'switch', 'key', 'dip', 'rotary', 'osc',
-  'led', '7seg', '14seg', 'lcd', 'dots', 'ledBar'
+  'led', '7seg', '14seg', 'lcd', 'terminal', 'dots', 'ledBar'
 ];
 
 validateChipBodyStatement(stmt, file, line, col) {
