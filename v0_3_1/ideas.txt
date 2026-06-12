@@ -678,3 +678,120 @@ Daca e nevoie de clarificari te rog pune intrebari.
 
 Posibila strategie de implementare: dat fiind ca componentele interne au fisiere js individuale poate logica de documentatie ar trebuii sa stea in fiecare fisier intr-o metoda getDoc() sau ceva asemanator? 
 
+=====
+
+The Combinational Lookup Table (lut)
+
+The lut component is a zero-delay, combinational data matrix. The moment the input signal changes, the output updates instantly in the exact same execution step without waiting for a clock cycle.Syntax DefinitionUses the data { ... } block to declare address mappings.Supports single address declarations in decimal (\) or hex (^).
+Supports Range Selectors (X - Y : value) to bulk-assign multiple addresses to a single constant output.Unmapped addresses automatically default to all zeros 
+
+comp [lut] .decoder:
+  depth: 4         # Output bit-width
+  length: 16       # Total addressable slots
+  = data {
+    0           : 0001   # Address 0 outputs 0001
+    \1 - \5     : 0010   # Addresses 1, 2, 3, 4, and 5 all output 0010
+    ^a - ^f     : 1111   # Hex addresses 0xA through 0xF all output 1111
+    # All skipped addresses (6, 7, 8, 9) automatically output 0000
+  }
+  :
+  
+Use code with caution.How to Use the LUTBecause it is fully combinational, you completely bypass sequential property blocks (:{ at = X }). You read and write directly on the main circuit board via inline function mappings or raw pin assignments.
+
+# Method A: Direct Inline Functional Mapping (Cleanest)
+
+4wire current_index = .my_counter:get
+4wire current_state = .decoder(in = current_index) # 'current_state' updates instantly
+
+# Method B: Structural Wire Assignments
+.decoder:in = .my_counter:get
+4wire current_state = .decoder:out
+Use code with caution.This framework maximizes visual readability while enforcing strict bit-budget constraints for students building custom virtual processors.
+
+====
+
+1. The Assembler Block (asm)The asm block defines an Instruction Set Architecture (ISA) mapping text mnemonics to precise binary words using explicit bit-widths.Syntax DefinitionUse the + character to visually separate opcode and argument bit-fields.Specify exact bit-widths using the Nb format (e.g., 3b = 3 bits).Enclose argument names in parentheses () to map them left-to-right to the bit-fields.Enforce variable prefixes by adding R_ (Register) or A_ (Address) to the argument name.Comments are written with #.logts-play# Step 1: Define the CPU Instruction Set
+asm [mini-cpu] .my_isa:
+  # Format: MNEMONIC(args) : OPCODE + bit_width + bit_width
+  NOP                     : 0000 + 4b              # 4-bit opcode + 4-bit hardcoded padding
+  LOAD(R_reg, A_addr)    : 0001 + 2b + 2b         # 4-bit opcode + 2-bit Register + 2-bit Address
+  ADD(R_dst, R_src, imm)  : 0010 + 2b + 2b + 4b    # 4-bit opcode + 2-bit R_dst + 2-bit R_src + 4-bit immediate
+  :
+
+# Step 2: Use the ISA to initialize a standard Program ROM
+comp [mem] .prog:
+  depth: 8
+  length: 16
+  = .my_isa {
+    NOP
+    LOAD R1, A3         # Maps to: 0001 + 01 (R1) + 11 (A3) -> 00010111
+    ADD R2, R1, \5      # Maps to: 0010 + 10 (R2) + 01 (R1) + 0101 (\5 decimal)
+  }
+  :
+Use code with caution.Labels and LoopsThe assembler naturally processes label definitions (label_name:) using a two-pass architecture to calculate jump positions automatically.logts-play  = .my_isa {
+  start_loop:
+    ADD R1, R1, \1
+    LOAD R2, start_loop  # The assembler automatically swaps 'start_loop' with its address (\0)
+  }
+  
+====
+
+
+
+The asm block defines an Instruction Set Architecture (ISA). It maps human-readable assembly text directly into precise binary instructions based purely on argument position.1. Syntax DefinitionUse the + character to visually separate opcode and argument bit-fields.Specify exact bit-widths using the Nb format (e.g., 4b = 4 bits).Enforce variable prefixes by attaching them directly to the bit-width token:RNb = Requires a Register prefix (R). Strips the R and packs the number into N bits.ANb = Requires an Address prefix (A). Strips the A and packs the number into N bits.Nb = A plain numeric field. Accepts raw decimal (\) or hex (^) constants with no prefix.Comments are written with #.logts-play# Step 1: Define the CPU Instruction Set Blueprint
+asm [mini-cpu] .my_isa:
+  # Format: MNEMONIC : OPCODE + field1 + field2 + field3
+  NOP                : 0000 + 4b             # 4-bit opcode + 4-bit hardcoded padding zeros
+  LOAD               : 0001 + R2b + A2b      # Requires Register (2 bits) + Address (2 bits)
+  STORE              : 0010 + R2b + A2b      # Requires Register (2 bits) + Address (2 bits)
+  ADD                : 0011 + R2b + R2b + 4b # Requires two Registers + 4-bit plain number
+  :
+
+# Step 2: Use the ISA to initialize a standard Program ROM
+comp [mem] .prog:
+  depth: 8
+  length: 16
+  = .my_isa {
+    NOP                 # Maps to: 0000 + 0000 -> 00000000
+    LOAD R1, A3         # Maps to: 0001 + 01 (R1) + 11 (A3) -> 00010111
+    ADD R2, R1, \5      # Maps to: 0011 + 10 (R2) + 01 (R1) + 0101 (\5 decimal)
+  }
+  :
+Use code with caution.2. Argument Resolution RulesThe compiler parses arguments strictly from left to right by mapping them directly to the layout definition:Positional Matching: The first item written after the mnemonic goes into the first bit-field, the second item goes into the second, and so on.Auto-Sizing & Padding: The compiler automatically converts the given argument to binary and pads it with leading zeros to perfectly fit the specified bit-width (2b, 4b, etc.).3. Labels and Branch ResolutionThe assembler uses a two-pass layout compiler to automatically handle text labels (label_name:) for jumping or branching around code.When a label is passed into a plain (Nb) or Address (ANb) field, the compiler calculates its destination memory slot and packs the raw address index into that field automatically.logts-playcomp [mem] .prog:
+  depth: 8
+  length: 16
+  = .my_isa {
+  start_loop:           # Pass 1 saves 'start_loop' as address 0 (\0)
+    ADD R1, R1, \1
+    LOAD R2, start_loop # Pass 2 automatically replaces 'start_loop' with address 00 (A0)
+  }
+  :
+Use code with caution.4. Strict Compilation Error RulesBy omitting named arguments and embedding the constraints into the types, the compiler can generate instant, crystal-clear error messages for students:Prefix Mismatch Error:textADD \2, R1, \5
+^^^ ERROR: 'ADD' expects a Register prefix (R) for argument 1, but found '\2'.
+Use code with caution.Bit-Width Overflow Error:textADD R2, R1, \18
+^^^ ERROR: Argument 3 (\18) exceeds the maximum value allowed for a 4b field (max 15).
+Use code with caution.This revised approach removes all variable-naming boilerplate while keeping your instruction set incredibly strict and easy to debug for beginners.
+
+
+To handle negative numbers and relative jumps (like jumping 3 lines backward or 4 lines forward), the assembler needs to know whether a bit-field should treat numbers as standard unsigned positive numbers, or as signed numbers using Two's Complement.We can add a simple modifier to our bit-width tokens—the letter S for Signed:4b = Unsigned 4-bit field (Values from 0 to 15).S4b = Signed 4-bit field (Values from -8 to +7).RS4b or AS4b = Signed fields that also require a Register (R) or Address (A) prefix.Here is exactly how this works in the definition and under the hood during compilation.1. Defining a Relative Branch InstructionIf you are designing a conditional branch instruction (like BEQ - Branch if Equal), the jump distance is relative to the current position of the Program Counter (PC). You define it with a signed field (S4b):logts-playasm [mini-cpu] .my_isa:
+  # 4-bit opcode + 4-bit signed relative jump offset
+  BEQ : 0100 + S4b  
+  :
+
+2. How the Compiler Calculates the Math (Behind the Scenes)
+When a student uses a label with a signed field, the assembler calculates a relative offset instead of a hardcoded absolute address:
+\(\text{Offset}=\text{Target\ Label\ Address}-(\text{Current\ Instruction\ Address}+1)\)(Note: We add +1 because by the time the CPU executes an instruction, the Program Counter has already moved to the next line)
+
+.Look at this example:logts-play= .my_isa {
+  loop_start:         # Address \0
+    NOP               # Address \0
+    NOP               # Address \1
+    BEQ loop_start    # Address \2 (This instruction!)
+  }
+Use code with caution.When the compiler hits line 3 (BEQ loop_start at Address 2), it runs the math:Target Address (loop_start) = 0Next Address (Current Address 2 + 1) = 3Math: 0 - 3 = -3The assembler needs to pack the negative number -3 into the S4b field.3. Converting to Two's Complement BinaryTo turn -3 into a 4-bit binary string, the compiler uses standard Two's Complement logic:Take the positive binary version of the number 3 ➔ 0011Invert all the bits (flip 0 to 1 and 1 to 0) ➔ 1100Add 1 to the result ➔ 1101The assembler safely packs 1101 into the instruction template:Final Output Bits: 0100 (Opcode) + 1101 (Offset) ➔ 01001101When the CPU runs this instruction, it takes its current PC (3), adds the signed value -3 (1101), and its PC instantly becomes 0, perfectly looping back to loop_start!4. Catching Student ErrorsIf a student writes a loop that is too far away, the signed bounds check will catch it instantly:logts-play= .my_isa {
+  loop_start:
+    # ... imagine 20 lines of NOPs here ...
+    BEQ loop_start 
+}
+# ^^^ ERROR: Relative jump offset (-21) is out of bounds for a signed 4b field (Must be between -8 and +7).
+Use code with caution.By simply looking for that S modifier in your definition (S4b), the LogTScript assembler completely automates this tedious binary math for the student!
