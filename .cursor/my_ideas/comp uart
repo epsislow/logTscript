@@ -1,0 +1,478 @@
+UART
+
+Universal Asynchronous Receiver / Transmitter.
+
+The "uart" component transmits and receives bytes over a serial connection.
+
+UART is commonly used to:
+
+• connect CPUs to terminals
+• communicate between boards
+• send debug messages
+• implement simple serial protocols
+
+The component handles:
+
+• transmission timing
+• reception timing
+• busy state
+• byte buffering
+
+Internally, UART transmits frames according to a protocol definition.
+
+There is no dedicated panel UI in v1. UART is typically used together with "terminal", "fifo", "protocol", or a teaching CPU.
+
+───
+
+Syntax
+
+comp [uart] .name:
+baud: 9600
+protocol: .uart8n1
+:
+
+───
+
+Attributes
+
+Attribute| Type| Default| Description
+baud| int| 9600| Transmission speed in bits per second
+protocol| inline [protocol]| required| Frame format used by this UART
+
+───
+
+Baud
+
+Baud specifies how many bits are transmitted per second.
+
+Example:
+
+baud: 9600
+
+means:
+
+9600 bits/second
+
+Changing baud changes transmission speed but does not change the transmitted data.
+
+───
+
+Protocol
+
+UART uses an "inline [protocol]" definition to describe the serial frame format.
+
+Example:
+
+inline [protocol] .uart8n1:
+
+tx:
+0
+data 8b
+1
+
+:
+
+Meaning:
+
+start bit
+8 data bits
+stop bit
+
+This is a simplified UART 8N1 frame.
+
+───
+
+Inputs
+
+send
+
+Transmit one value.
+
+.uart:{
+send = value
+set = signal
+}
+
+When:
+
+signal
+
+transitions:
+
+0 -> 1
+
+the value is queued for transmission.
+
+───
+
+rx
+
+Serial receive line.
+
+.uart:rx = wire
+
+Usually connected to another UART's "tx".
+
+───
+
+Outputs
+
+tx
+
+Serial transmit line.
+
+1wire tx =
+.uart:tx
+
+Provides the serial bit stream generated from the selected protocol.
+
+───
+
+data
+
+Last received value.
+
+8wire data =
+.uart:data
+
+───
+
+dataReady
+
+Reception event.
+
+1bit ready =
+.uart:dataReady
+
+Transitions:
+
+0 -> 1
+
+when a complete frame has been received and decoded.
+
+───
+
+busy
+
+Transmission status.
+
+1bit busy =
+.uart:busy
+
+Returns:
+
+1
+
+while UART is transmitting.
+
+Returns:
+
+0
+
+when idle.
+
+───
+
+Runnable — simple transmit
+
+Protocol:
+
+inline [protocol] .uart8n1:
+
+tx:
+0
+data 8b
+1
+
+:
+
+UART:
+
+comp [uart] .uart0:
+baud: 9600
+protocol: .uart8n1
+:
+
+Transmit:
+
+.uart0:{
+send = ^41
+set = 1
+}
+
+Transmits:
+
+A
+
+───
+
+Runnable — two UARTs
+
+Protocol:
+
+inline [protocol] .uart8n1:
+
+tx:
+0
+data 8b
+1
+
+:
+
+Devices:
+
+comp [uart] .a:
+baud: 9600
+protocol: .uart8n1
+:
+
+comp [uart] .b:
+baud: 9600
+protocol: .uart8n1
+:
+
+Connection:
+
+.a:tx = .b:rx
+.b:tx = .a:rx
+
+Transmit:
+
+.a:{
+send = ^41
+set = 1
+}
+
+Receive:
+
+8wire data =
+.b:data
+
+1bit ready =
+.b:dataReady
+
+Result:
+
+data = ^41
+
+───
+
+Runnable — UART to Terminal
+
+Protocol:
+
+inline [protocol] .uart8n1:
+
+tx:
+0
+data 8b
+1
+
+:
+
+UART:
+
+comp [uart] .uart0:
+baud: 9600
+protocol: .uart8n1
+:
+
+Terminal:
+
+comp [terminal] .console:
+rows: 10
+columns: 40
+:
+
+Display received characters:
+
+.console:{
+append = .uart0:data
+set = .uart0:dataReady
+}
+
+Every received byte is appended to the terminal.
+
+───
+
+Runnable — Hello World
+
+UART:
+
+comp [uart] .uart0:
+baud: 9600
+protocol: .uart8n1
+:
+
+Terminal:
+
+comp [terminal] .console:
+rows: 10
+columns: 40
+:
+
+Transmission:
+
+.uart0:{
+send = ^48
+set = 1
+}
+
+.uart0:{
+send = ^65
+set = 1
+}
+
+.uart0:{
+send = ^6C
+set = 1
+}
+
+.uart0:{
+send = ^6C
+set = 1
+}
+
+.uart0:{
+send = ^6F
+set = 1
+}
+
+Terminal output:
+
+Hello
+
+───
+
+Runnable — UART with FIFO
+
+Transmit queue:
+
+comp [fifo] .tx:
+width: 8
+length: 64
+:
+
+UART:
+
+comp [uart] .uart0:
+baud: 9600
+protocol: .uart8n1
+:
+
+Producer:
+
+.tx:{
+push = acc
+set = printInstruction
+}
+
+Consumer:
+
+.uart0:{
+send = .tx:front
+set = txNext
+}
+
+.tx:{
+pop = 1
+set = txNext
+}
+
+FIFO stores bytes while UART is busy.
+
+───
+
+Runnable — CPU debug output
+
+comp [uart] .debug:
+baud: 9600
+protocol: .uart8n1
+:
+
+comp [terminal] .console:
+rows: 20
+columns: 80
+:
+
+CPU:
+
+.debug:{
+send = acc
+set = print
+}
+
+Display:
+
+.console:{
+append = .debug:data
+set = .debug:dataReady
+}
+
+Whenever the CPU executes a print instruction, the accumulator value is transmitted and displayed.
+
+───
+
+Relationship to Protocol
+
+"inline [protocol]" defines:
+
+value
+↓
+frame bits
+
+Example:
+
+data = ^41
+
+↓
+
+0 01000001 1
+
+───
+
+"comp [uart]" defines:
+
+frame bits
+↓
+time
+
+according to:
+
+baud
+
+Therefore:
+
+• "protocol" describes the frame format
+• "uart" describes transmission over time
+
+───
+
+Common Errors
+
+Error| Cause
+protocol is required| Missing protocol definition
+Unknown protocol instance| Invalid protocol reference
+UART receive width mismatch| RX frame incompatible with protocol
+send value width mismatch| Value cannot be encoded by protocol
+baud must be greater than 0| Invalid baud value
+
+───
+
+Notes
+
+UART does not define the frame format itself.
+
+Frame structure is always provided by an "inline [protocol]" instance.
+
+This allows custom UART variants to be implemented without changing the UART component.
+
+Examples:
+
+.uart8n1
+.uart7e1
+.uartCustom
+
+all use the same UART component while transmitting different frame layouts.
+
+

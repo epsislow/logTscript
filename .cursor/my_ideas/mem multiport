@@ -1,0 +1,430 @@
+
+Mem Multi-Port Memory (ports)
+The mem component can expose multiple independent access ports to the same physical memory array.
+This allows multiple readers and writers to access the same memory during the same simulation step.
+Common uses:
+• Von Neumann CPUs (instruction fetch + data access)
+• Shared lookup tables
+• DMA demonstrations
+• Multiple processors sharing memory
+• CPU + peripheral accessing the same RAM
+
+───
+
+Syntax
+Single-port memory (default):
+text
+comp [mem] .ram:
+  depth: 8
+  length: 256
+:
+
+Equivalent to:
+text
+comp [mem] .ram:
+  depth: 8
+  length: 256
+  ports: 1
+:
+
+
+───
+
+Dual-port memory:
+text
+comp [mem] .ram:
+  depth: 8
+  length: 256
+  ports: 2
+:
+
+
+───
+
+Triple-port memory:
+text
+comp [mem] .ram:
+  depth: 8
+  length: 256
+  ports: 3
+:
+
+
+───
+
+Port Naming
+Port 1 uses the original names:
+text
+adr
+data
+write
+get
+
+Additional ports use a numeric prefix:
+text
+2adr
+2data
+2write
+2get
+
+3adr
+3data
+3write
+3get
+
+...
+
+
+───
+
+Port 1
+Read:
+text
+.ram:{
+  adr = 0010
+}
+
+8wire x = .ram:get
+
+
+───
+
+Write:
+text
+.ram:{
+  adr = 0010
+  data = 10101010
+  write = 1
+}
+
+
+───
+
+Port 2
+Read:
+text
+.ram:{
+  2adr = 0100
+}
+
+8wire y = .ram:2get
+
+
+───
+
+Write:
+text
+.ram:{
+  2adr = 0100
+  2data = 11110000
+  2write = 1
+}
+
+
+───
+
+Simultaneous Reads
+Multiple ports may read simultaneously.
+text
+comp [mem] .ram:
+  depth: 8
+  length: 256
+  ports: 2
+:
+
+text
+.ram:{
+  adr  = 0001
+  2adr = 0010
+}
+
+8wire a = .ram:get
+8wire b = .ram:2get
+
+Both values are read during the same propagation step.
+
+───
+
+Simultaneous Read + Write
+Allowed.
+text
+.ram:{
+  adr = 0001
+}
+
+.ram:{
+  2adr = 0100
+  2data = 11110000
+  2write = 1
+}
+
+Port 1 reads while port 2 writes.
+
+───
+
+Dual-Port CPU Example
+Instruction fetch and data access simultaneously.
+text
+comp [mem] .ram:
+  depth: 8
+  length: 256
+  ports: 2
+:
+
+Instruction port:
+text
+.ram:{
+  adr = pc
+}
+
+8wire opcode =
+.ram:get
+
+Data port:
+text
+.ram:{
+  2adr = operandAddress
+}
+
+8wire value =
+.ram:2get
+
+Both accesses happen during the same simulation step.
+
+───
+
+Shared CPU + DMA Example
+text
+comp [mem] .ram:
+  depth: 8
+  length: 256
+  ports: 2
+:
+
+CPU:
+text
+.ram:{
+  adr = cpuAddress
+}
+
+DMA:
+text
+.ram:{
+  2adr = dmaAddress
+}
+
+CPU and DMA access the same RAM independently.
+
+───
+
+Multi-Word Writes
+All ports support the same multi-word write behavior.
+Example:
+text
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  ports: 2
+:
+
+text
+.ram:{
+  2adr = 0000
+  2data = 1111000011110000
+  2write = 1
+}
+
+Result:
+text
+address 0 = 11110000
+address 1 = 11110000
+
+
+───
+
+Read Semantics
+Reads are combinational.
+text
+.ram:{
+  adr = 0100
+}
+
+8wire x =
+.ram:get
+
+returns the current value stored at address 4.
+
+───
+
+Write Semantics
+Writes occur during the memory commit phase.
+If multiple writes occur during the same simulation step, collision rules apply.
+
+───
+
+Write Collision
+Two ports writing to the same address during the same simulation step is illegal.
+Example:
+text
+.ram:{
+  adr = 0010
+  data = ^AA
+  write = 1
+}
+
+.ram:{
+  2adr = 0010
+  2data = ^55
+  2write = 1
+}
+
+Error:
+text
+Memory write collision at address 2
+
+Memory contents remain unchanged.
+
+───
+
+Port Out Of Range
+Using a port that does not exist is an error.
+Example:
+text
+comp [mem] .ram:
+  depth: 8
+  length: 256
+  ports: 2
+:
+
+text
+.ram:{
+  3adr = 0001
+}
+
+Error:
+text
+Memory port 3 does not exist
+
+
+───
+
+Address Width Validation
+Each port uses the same address width.
+Example:
+text
+length: 256
+
+requires:
+text
+8-bit addresses
+
+for:
+text
+adr
+2adr
+3adr
+...
+
+Address width mismatches produce the same errors as single-port memories.
+
+───
+
+Documentation Example
+text
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  ports: 2
+:
+
+Available properties:
+text
+adr
+data
+write
+get
+
+2adr
+2data
+2write
+2get
+
+
+───
+
+text
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  ports: 4
+:
+
+Available properties:
+text
+adr
+data
+write
+get
+
+2adr
+2data
+2write
+2get
+
+3adr
+3data
+3write
+3get
+
+4adr
+4data
+4write
+4get
+
+
+───
+
+Common Errors
+
+Error
+Cause
+
+Memory port N does not exist
+Accessing a port greater than ports
+
+Memory write collision at address A
+Multiple ports writing the same address during the same simulation step
+
+Address width mismatch
+Invalid address width
+
+Write data width mismatch
+Invalid write data width
+
+Address out of bounds
+Address exceeds memory length
+
+
+
+───
+
+Notes
+All ports access the same underlying memory.
+Creating:
+text
+ports: 2
+
+does not create two memories.
+It creates:
+text
+one memory
+two access ports
+
+with shared storage.
+
+===
+also add readonly attribute that when set will make memory not writeable,
+only write allowed is when initialised
+get is allowed write not allowed
+
+

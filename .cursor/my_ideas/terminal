@@ -1,0 +1,414 @@
+Terminal
+The terminal component is a scrollable text console.
+Text is appended as a stream. The component automatically manages:
+• cursor position
+• new lines
+• word wrapping
+• scrolling
+• optional line numbers
+Unlike lcd, text is not written at fixed coordinates. Characters are appended sequentially.
+The terminal has a visual representation in the editor.
+
+───
+
+Syntax
+text
+comp [terminal] .name:
+  rows: 20
+  columns: 80
+  fontSize: 12
+  wordWrap: 1
+  lineNumbers: 0
+  :
+
+
+───
+
+Attributes
+
+Attribute
+Type
+Default
+Description
+
+rows
+int
+20
+Number of visible rows
+
+columns
+int
+80
+Maximum characters per row before wrapping
+
+fontSize
+int
+12
+Font size in editor
+
+wordWrap
+0/1
+1
+Automatically wrap text when reaching column limit
+
+lineNumbers
+0/1
+0
+Display line numbers
+
+
+
+───
+
+Visual behavior
+The terminal is rendered directly in the editor.
+Example:
+text
++----------------------+
+| Hello                |
+| World                |
+|                      |
++----------------------+
+
+If line numbers are enabled:
+text
++----------------------+
+| 1 | Hello            |
+| 2 | World            |
+|                      |
++----------------------+
+
+
+───
+
+Appending text
+Characters are appended to the current cursor position.
+text
+.term:{
+  append = ^41
+  set = 1
+}
+
+Result:
+text
+A
+
+
+───
+
+Appending another character:
+text
+.term:{
+  append = ^42
+  set = 1
+}
+
+Result:
+text
+AB
+
+
+───
+
+Writing multiple characters
+Values wider than 8 bits are interpreted as consecutive bytes.
+text
+.term:{
+  append = ^414243
+  set = 1
+}
+
+Result:
+text
+ABC
+
+
+───
+
+New line
+Move the cursor to the next line.
+text
+.term:{
+  newline = 1
+  set = 1
+}
+
+
+───
+
+Example:
+text
+.term:{
+  append = ^48656C6C6F
+  set = 1
+}
+
+.term:{
+  newline = 1
+  set = 1
+}
+
+.term:{
+  append = ^576F726C64
+  set = 1
+}
+
+Result:
+text
+Hello
+World
+
+
+───
+
+Clear
+Erase all terminal contents.
+text
+.term:{
+  clear = 1
+  set = 1
+}
+
+After clear:
+text
+
+(empty terminal)
+
+───
+
+Word wrap
+When enabled:
+text
+wordWrap: 1
+
+text automatically continues on the next line.
+Example:
+text
+columns: 10
+
+Appending:
+text
+HelloWorldABC
+
+Produces:
+text
+HelloWorld
+ABC
+
+
+───
+
+Scrolling
+When the cursor reaches the last row, the terminal automatically scrolls upward.
+Example:
+text
+rows: 3
+
+Before:
+text
+Line1
+Line2
+Line3
+
+Appending:
+text
+Line4
+
+Produces:
+text
+Line2
+Line3
+Line4
+
+
+───
+
+Line numbers
+Enable:
+text
+lineNumbers: 1
+
+Display:
+text
+1 | Booting...
+2 | CPU Ready
+3 | Running
+
+Line numbers are visual only.
+They are not part of the stored text.
+
+───
+
+Cursor position
+The terminal maintains an internal cursor.
+The cursor automatically advances after each appended character.
+Users cannot directly modify the cursor position in v1.
+
+───
+
+Runnable — Hello World
+text
+comp [terminal] .term:
+  rows: 5
+  columns: 20
+  :
+
+text
+.term:{
+  append = ^48656C6C6F20576F726C64
+  set = 1
+}
+
+Display:
+text
+Hello World
+
+
+───
+
+Runnable — CPU output
+text
+comp [terminal] .console:
+  rows: 10
+  columns: 40
+  :
+
+text
+.console:{
+  append = acc
+  set = printInstruction
+}
+
+Whenever:
+text
+printInstruction
+
+becomes active, the accumulator value is appended to the terminal.
+
+───
+
+Runnable — Log output
+text
+comp [terminal] .log:
+  rows: 8
+  columns: 60
+  lineNumbers: 1
+  :
+
+text
+.log:{
+  append = ^426F6F74206F6B
+  set = 1
+}
+
+.log:{
+  newline = 1
+  set = 1
+}
+
+.log:{
+  append = ^435055207265616479
+  set = 1
+}
+
+Display:
+text
+1 | Boot ok
+2 | CPU ready
+
+
+───
+
+Inputs
+append
+Append one or more bytes.
+text
+append = value
+
+
+───
+
+newline
+Move cursor to next line.
+text
+newline = 1
+
+
+───
+
+clear
+Erase all contents.
+text
+clear = 1
+
+
+───
+
+set
+Trigger execution.
+text
+set = expression
+
+The block executes when the expression transitions from 0 to 1.
+
+───
+
+Common Errors
+
+Error
+Cause
+
+append expects at least 8 bits
+Invalid character value
+
+rows must be greater than 0
+Invalid rows
+
+columns must be greater than 0
+Invalid columns
+
+fontSize must be greater than 0
+Invalid font size
+
+Unknown terminal property
+Invalid property name
+
+
+
+───
+
+vs LCD
+
+Feature
+terminal
+lcd
+
+Stream append
+✓
+✗
+
+Automatic cursor
+✓
+✗
+
+Word wrap
+✓
+✗
+
+Scroll
+✓
+✗
+
+Fixed coordinates
+✗
+✓
+
+Character grid display
+✓
+✓
+
+
+Use terminal for logs, serial output, debugging, and console-style applications.
+Use lcd when text must be written to specific screen positions.
+
+

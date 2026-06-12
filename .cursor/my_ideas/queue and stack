@@ -1,0 +1,977 @@
+QUEUE (Fifo)
+PS: Must rename [Fifo] to [queue]
+
+First-In First-Out queue.
+A FIFO stores values and returns them in the same order they were inserted.
+Example:
+text
+A
+B
+C
+
+Inserted in this order:
+text
+push(A)
+push(B)
+push(C)
+
+Retrieved in this order:
+text
+A
+B
+C
+
+FIFO is useful for:
+• UART transmit buffers
+• UART receive buffers
+• keyboard buffers
+• event queues
+• packet queues
+• producer / consumer systems
+There is no panel UI in v1 — logic only.
+
+───
+
+Syntax
+text
+comp [fifo] .name:
+  width: 8
+  length: 64
+  :
+
+
+───
+
+Attributes
+
+Attribute
+Type
+Min
+Default
+Description
+
+width
+int
+1
+8
+Bit width of each stored value
+
+length
+int
+1
+64
+Maximum number of stored entries
+
+
+
+───
+
+Behavior
+FIFO preserves insertion order.
+Example:
+text
+push(A)
+push(B)
+push(C)
+
+Internal queue:
+text
+front -> A B C
+
+
+───
+
+After one pop:
+text
+A
+
+is removed.
+Queue becomes:
+text
+front -> B C
+
+
+───
+
+Outputs
+:front
+Returns the next value that would be removed.
+text
+8wire value =
+.fifo:front
+
+Does not remove the value.
+
+───
+
+:empty
+Returns:
+text
+1
+
+when the FIFO contains no entries.
+Otherwise:
+text
+0
+
+text
+1wire isEmpty =
+.fifo:empty
+
+
+───
+
+:full
+Returns:
+text
+1
+
+when the FIFO cannot accept more entries.
+Otherwise:
+text
+0
+
+text
+1wire isFull =
+.fifo:full
+
+
+───
+
+:count
+Returns the number of stored entries.
+Bit width is automatically chosen to represent:
+text
+0 .. length
+
+text
+6wire count =
+.fifo:count
+
+
+───
+
+Inputs
+FIFO operations are performed through property blocks.
+
+───
+
+push
+Insert a value.
+text
+.fifo:{
+  push = value
+  set = signal
+}
+
+When:
+text
+signal
+
+transitions:
+text
+0 -> 1
+
+the value is appended to the queue.
+
+───
+
+pop
+Remove the front value.
+text
+.fifo:{
+  pop = 1
+  set = signal
+}
+
+When:
+text
+signal
+
+transitions:
+text
+0 -> 1
+
+the current front entry is removed.
+
+───
+
+clear
+Remove all entries.
+text
+.fifo:{
+  clear = 1
+  set = signal
+}
+
+
+───
+
+Runnable — simple queue
+Definition:
+text
+comp [fifo] .q:
+  width: 8
+  length: 8
+  :
+
+Push:
+text
+.q:{
+  push = ^41
+  set = 1
+}
+
+.q:{
+  push = ^42
+  set = 1
+}
+
+.q:{
+  push = ^43
+  set = 1
+}
+
+Queue:
+text
+A B C
+
+
+───
+
+Read front:
+text
+8wire x =
+.q:front
+
+Result:
+text
+^41
+
+(A)
+
+───
+
+Pop:
+text
+.q:{
+  pop = 1
+  set = 1
+}
+
+Queue becomes:
+text
+B C
+
+
+───
+
+Runnable — count
+text
+comp [fifo] .q:
+  width: 8
+  length: 16
+  :
+
+After:
+text
+push(A)
+push(B)
+push(C)
+
+Result:
+text
+.q:count = 3
+
+
+───
+
+Runnable — empty
+Empty queue:
+text
+.q:empty = 1
+
+After:
+text
+push(A)
+
+Result:
+text
+.q:empty = 0
+
+
+───
+
+Runnable — full
+text
+comp [fifo] .q:
+  width: 8
+  length: 2
+  :
+
+After:
+text
+push(A)
+push(B)
+
+Result:
+text
+.q:full = 1
+
+
+───
+
+UART transmit buffer example
+text
+comp [fifo] .tx:
+  width: 8
+  length: 64
+  :
+
+CPU writes:
+text
+.tx:{
+  push = acc
+  set = sendInstruction
+}
+
+UART consumes:
+text
+.tx:{
+  pop = uartReady
+  set = uartReady
+}
+
+The FIFO stores bytes until UART is ready to transmit them.
+
+───
+
+Terminal example
+text
+comp [fifo] .log:
+  width: 8
+  length: 128
+  :
+
+comp [terminal] .term:
+  rows: 10
+  columns: 40
+  :
+
+Producer:
+text
+.log:{
+  push = ^41
+  set = 1
+}
+
+.log:{
+  push = ^42
+  set = 1
+}
+
+.log:{
+  push = ^43
+  set = 1
+}
+
+Queue:
+text
+A B C
+
+Consumer:
+text
+.term:{
+  append = .log:front
+  set = consume
+}
+
+.log:{
+  pop = 1
+  set = consume
+}
+
+When:
+text
+consume
+
+transitions:
+text
+0 -> 1
+
+the terminal receives:
+text
+A
+
+and the FIFO removes:
+text
+A
+
+The next consume event displays:
+text
+B
+
+then:
+text
+C
+
+
+───
+
+Runnable — serial monitor
+text
+comp [fifo] .uartRx:
+  width: 8
+  length: 256
+  :
+
+comp [terminal] .console:
+  rows: 20
+  columns: 80
+  :
+
+Whenever UART receives a byte:
+text
+.uartRx:{
+  push = receivedByte
+  set = byteReady
+}
+
+Display:
+text
+.console:{
+  append = .uartRx:front
+  set = readByte
+}
+
+.uartRx:{
+  pop = 1
+  set = readByte
+}
+
+The terminal gradually displays incoming UART traffic.
+
+───
+
+Overflow
+When:
+text
+count == length
+
+the FIFO is full.
+Additional pushes produce:
+text
+FIFO is full
+
+runtime error.
+The queue remains unchanged.
+
+───
+
+Underflow
+When:
+text
+count == 0
+
+the FIFO is empty.
+Attempting:
+text
+pop
+
+produces:
+text
+FIFO is empty
+
+runtime error.
+The queue remains unchanged.
+
+───
+
+Common Errors
+
+Error
+Cause
+
+width must be greater than 0
+Invalid width
+
+length must be greater than 0
+Invalid length
+
+push value width mismatch
+Wrong value width
+
+FIFO is full
+Queue overflow
+
+FIFO is empty
+Queue underflow
+
+Unknown FIFO property
+Invalid property name
+
+
+
+───
+
+vs FILO (Stack)
+FIFO:
+text
+A B C
+
+↓
+text
+A
+B
+C
+
+First inserted, first removed.
+
+───
+
+FILO:
+text
+A B C
+
+↓
+text
+C
+B
+A
+
+Last inserted, first removed.
+
+====
+Stack
+comp [stack] is a Last-In-First-Out (LIFO) storage component.
+The last value pushed into the stack is the first value returned when popping.
+Stacks are commonly used for:
+• CPU call stacks (CALL / RET)
+• Expression evaluation
+• Temporary value storage
+• Undo/redo systems
+• State saving and restoration
+Internally, stack uses the same storage engine as comp [queue], but operates in LIFO mode instead of FIFO mode.
+
+───
+
+Syntax
+text
+comp [stack] .name:
+  width: 8
+  length: 16
+  :
+
+
+───
+
+Attributes
+
+Attribute
+Type
+Default
+Description
+
+width
+int
+8
+Width of each stored value
+
+length
+int
+16
+Maximum number of entries
+
+
+
+───
+
+Pins and Pouts
+Inputs
+
+Property
+Width
+Description
+
+push
+width
+Value to push onto the stack
+
+pop
+1
+Removes the current top value
+
+clear
+1
+Removes all values from the stack
+
+
+
+───
+
+Outputs
+
+Property
+Width
+Description
+
+top
+width
+Current top value
+
+count
+ceil(log2(length+1))
+Number of stored entries
+
+empty
+1
+Returns 1 when stack is empty
+
+full
+1
+Returns 1 when stack is full
+
+
+
+───
+
+Behavior
+Push:
+text
+A
+B
+C
+
+Stack contents:
+text
+bottom
+ A
+ B
+ C
+top
+
+
+───
+
+Pop sequence:
+text
+C
+B
+A
+
+The most recently pushed value is always returned first.
+
+───
+
+Runnable — Simple Push
+text
+comp [stack] .s:
+  width: 8
+  length: 8
+  :
+
+text
+.s:{
+  push = ^41
+  set = 1
+}
+
+Current state:
+text
+top   = ^41
+count = 1
+
+
+───
+
+Runnable — Multiple Pushes
+text
+comp [stack] .s:
+  width: 8
+  length: 8
+  :
+
+text
+.s:{
+  push = ^41
+  set = 1
+}
+
+.s:{
+  push = ^42
+  set = 1
+}
+
+.s:{
+  push = ^43
+  set = 1
+}
+
+Stack:
+text
+A
+B
+C
+
+Current outputs:
+text
+.s:top   = ^43
+.s:count = 3
+
+
+───
+
+Runnable — Pop
+Continuing from the previous example:
+text
+.s:{
+  pop = 1
+  set = 1
+}
+
+Result:
+text
+.s:top = ^42
+
+Another pop:
+text
+.s:{
+  pop = 1
+  set = 1
+}
+
+Result:
+text
+.s:top = ^41
+
+
+───
+
+Runnable — Empty Flag
+text
+comp [stack] .s:
+  width: 8
+  length: 4
+  :
+
+text
+1wire e = .s:empty
+show(e)
+
+Result:
+text
+1
+
+because the stack contains no entries.
+
+───
+
+Runnable — Full Flag
+text
+comp [stack] .s:
+  width: 8
+  length: 2
+  :
+
+text
+.s:{
+  push = ^11
+  set = 1
+}
+
+.s:{
+  push = ^22
+  set = 1
+}
+
+Result:
+text
+.s:full = 1
+
+
+───
+
+Runnable — Clear
+text
+.s:{
+  clear = 1
+  set = 1
+}
+
+Result:
+text
+count = 0
+empty = 1
+
+All stored values are removed.
+
+───
+
+CPU Call Stack Example
+A simplified return-address stack:
+text
+comp [stack] .callStack:
+  width: 16
+  length: 32
+  :
+
+CALL:
+text
+.callStack:{
+  push = pc
+  set = callInstruction
+}
+
+RET:
+text
+16wire returnAddress =
+.callStack:top
+
+.callStack:{
+  pop = 1
+  set = retInstruction
+}
+
+The most recently saved program counter is restored first.
+
+───
+
+Expression Evaluation Example
+Evaluate:
+text
+(2 + 3) * 4
+
+Store intermediate values:
+text
+comp [stack] .expr:
+  width: 8
+  length: 16
+  :
+
+Push:
+text
+.expr:{
+  push = 2
+  set = 1
+}
+
+.expr:{
+  push = 3
+  set = 1
+}
+
+Later:
+text
+pop -> 3
+pop -> 2
+
+Compute:
+text
+5
+
+Push result:
+text
+.expr:{
+  push = 5
+  set = 1
+}
+
+
+───
+
+Queue vs Stack
+Queue:
+text
+A
+B
+C
+
+Pop order:
+text
+A
+B
+C
+
+(FIFO)
+
+───
+
+Stack:
+text
+A
+B
+C
+
+Pop order:
+text
+C
+B
+A
+
+(LIFO)
+
+───
+
+Relationship to Queue
+comp [stack] and comp [queue] share the same underlying storage implementation.
+Conceptually:
+text
+comp [queue]
+
+operates in:
+text
+FIFO
+
+mode.
+
+───
+
+text
+comp [stack]
+
+operates in:
+text
+LIFO
+
+mode.
+
+───
+
+This distinction exists to keep the language aligned with the terminology used in computer architecture and data structures while reusing the same storage model internally.
+
+───
+
+Common Errors
+
+Error
+Cause
+
+Stack overflow
+Attempt to push when full
+
+Stack underflow
+Attempt to pop when empty
+
+Width mismatch
+Push value width differs from stack width
+
+Invalid length
+Length must be greater than 0
+
+
+
+───
+
+Notes
+A stack is not a memory component.
+Values can only be accessed through:
+text
+push
+pop
+top
+
+There is no random-access address input.
+The component is intended to model the classic stack behavior used by CPUs, interpreters, and expression evaluators.
+
+
+

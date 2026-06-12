@@ -1,0 +1,318 @@
+
+PRIOENC
+Priority encoder.
+Returns the index of the highest active bit in the input value.
+PRIOENC() is a combinational function with no internal state.
+There is no panel UI in v1 — logic only.
+
+───
+
+Syntax
+text
+Ybit index =
+PRIOENC(Xbit value)
+
+Where:
+text
+Xbit
+
+is any bit width.
+The return width is:
+text
+ceil(log2(X))
+
+bits.
+
+───
+
+Behavior
+The highest set bit has priority.
+Example:
+text
+00101010
+
+contains active bits:
+text
+bit 5
+bit 3
+bit 1
+
+Result:
+text
+101
+
+because bit 5 is the highest active bit.
+
+───
+
+Return width
+
+Input width
+Return width
+
+2bit
+1bit
+
+4bit
+2bit
+
+8bit
+3bit
+
+16bit
+4bit
+
+32bit
+5bit
+
+64bit
+6bit
+
+
+Formula:
+text
+ceil(log2(inputWidth))
+
+
+───
+
+Runnable — 4bit input
+text
+4bit requests = 0101
+
+2bit irq =
+PRIOENC(requests)
+
+show(irq)
+
+Output:
+text
+10
+
+Because:
+text
+bit 2 = 1
+bit 0 = 1
+
+and bit 2 has higher priority.
+
+───
+
+Runnable — 8bit input
+text
+8bit requests = 00101010
+
+3bit irq =
+PRIOENC(requests)
+
+show(irq)
+
+Output:
+text
+101
+
+Because:
+text
+bit 5 = 1
+bit 3 = 1
+bit 1 = 1
+
+and bit 5 has highest priority.
+
+───
+
+Runnable — single active bit
+text
+8bit requests = 00010000
+
+3bit irq =
+PRIOENC(requests)
+
+show(irq)
+
+Output:
+text
+100
+
+Because:
+text
+bit 4 = 1
+
+
+───
+
+Runnable — interrupt selection
+text
+8bit interrupts
+
+interrupts.7 = timer
+interrupts.6 = uart
+interrupts.5 = keyboard
+interrupts.4 = dma
+
+3bit irq =
+PRIOENC(interrupts)
+
+If:
+text
+timer    = 0
+uart     = 1
+keyboard = 1
+dma      = 0
+
+Then:
+text
+interrupts = 01100000
+
+Result:
+text
+irq = 110
+
+Because UART (bit 6) has higher priority than keyboard (bit 5).
+
+───
+
+Runnable — CPU interrupt controller
+text
+8bit irqRequests
+
+3bit irq =
+PRIOENC(irqRequests)
+
+1bit isTimer =
+EQ(irq, 111)
+
+1bit isUart =
+EQ(irq, 110)
+
+1bit isKeyboard =
+EQ(irq, 101)
+
+
+───
+
+All-zero input
+When no bits are active:
+text
+requests = 00000000
+
+Result:
+text
+index = 000...
+
+The exact value is implementation-defined and should not be relied upon.
+Applications that must detect an active request should verify the input separately.
+Example:
+text
+1bit hasRequest =
+OR(requests)
+
+3bit irq =
+PRIOENC(requests)
+
+Use:
+text
+hasRequest
+
+to determine whether any bit was active.
+
+───
+
+Relationship to Decoder
+Decoder:
+text
+N bits
+  ↓
+2^N bits
+
+Example:
+text
+0011
+
+↓
+text
+00001000
+
+
+───
+
+Priority Encoder:
+text
+2^N bits
+  ↓
+N bits
+
+Example:
+text
+00101010
+
+↓
+text
+101
+
+(bit 5)
+
+───
+
+Comparison with MUX
+A priority encoder can be constructed manually using nested MUX operations.
+Example:
+text
+MUX(
+  requests.7,
+  111,
+
+  MUX(
+    requests.6,
+    110,
+
+    MUX(
+      requests.5,
+      101,
+      ...
+    )
+  )
+)
+
+PRIOENC() is a compact built-in equivalent.
+
+───
+
+Common Errors
+
+Error
+Cause
+
+PRIOENC expects exactly one argument
+Wrong parameter count
+
+PRIOENC argument must be a bit value
+Invalid argument type
+
+Cannot infer output width
+Invalid assignment target width
+
+Bit-width mismatch
+Assigned wire width does not match return width
+
+
+
+───
+
+Notes
+Priority is always assigned to the highest set bit.
+Example:
+text
+00101010
+
+returns:
+text
+101
+
+(bit 5)
+not:
+text
+001
+
+(bit 1)
+There is no low-priority variant in v1.

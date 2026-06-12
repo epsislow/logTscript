@@ -1,0 +1,2118 @@
+DECODE
+Several inline types support reverse transformation through :decode(...).
+Decode behavior depends on the inline type.
+
+Inline
+Decode Result
+Can be used in expressions
+
+protocol
+Bit values
+✓
+
+lut
+Bit values
+✓
+
+asm
+Text
+✗
+
+
+
+───
+
+Protocol Decode
+Protocol decode extracts parameter values from one or more protocol channels.
+The returned values may be assigned directly to wires.
+Syntax
+Single output channel:
+text
+params =
+.protocol:decode(
+  channel
+)
+
+Multiple output channels:
+text
+params =
+.protocol:decode(
+  channel1,
+  channel2,
+  ...
+)
+
+Channels must be supplied in the same order they were declared in the protocol definition.
+
+───
+
+Runnable — UART
+Definition:
+text
+inline [protocol] .uart8n1:
+
+  tx:
+    0
+    reverse(data 8b)
+    1
+
+:
+
+Decode:
+text
+8bit data =
+.uart8n1:decode(
+  0100000101
+)
+
+Result:
+text
+data = ^41
+
+
+───
+
+Runnable — I2C
+Definition:
+text
+inline [protocol] .i2c:
+
+  clockType: lowFirst
+
+  sda:
+    0
+    address 7b
+    rw 1b
+    ack1 1b
+    data 8b
+    ack2 1b
+    1
+
+  scl:
+    clock 20b
+
+:
+
+Decode:
+text
+7bit address,
+1bit rw,
+1bit ack1,
+8bit data,
+1bit ack2
+=
+.i2c:decode(
+  sdaBits,
+  sclBits
+)
+
+Result:
+text
+address = ^42
+rw      = 0
+ack1    = 0
+data    = ^55
+ack2    = 0
+
+
+───
+
+Decode validation
+All protocol-generated segments are verified during decode.
+Example:
+text
+tx:
+  0
+  reverse(data 8b)
+  1
+
+Input:
+text
+1100000101
+
+Error:
+text
+Protocol decode failed:
+expected start bit '0'
+but received '1'
+
+
+───
+
+Example:
+text
+scl:
+  clock 20b
+
+Input:
+text
+00000000000000000000
+
+Error:
+text
+Protocol decode failed:
+expected clock waveform
+
+
+───
+
+LUT Decode
+LUT decode performs the reverse lookup operation.
+Syntax
+text
+.lut:decode(
+  value
+)
+
+Optional match index:
+text
+.lut:decode(
+  value,
+  matchIndex
+)
+
+matchIndex is zero-based.
+Default:
+text
+matchIndex = 0
+
+(first matching entry)
+
+───
+
+Runnable — Unique mapping
+Definition:
+text
+inline [lut] .decoder:
+  depth: 4
+  length: 16
+
+  data {
+    0000 : 0001
+    0001 : 0010
+    0010 : 0100
+  }
+:
+
+Decode:
+text
+4bit x =
+.decoder:decode(
+  0010
+)
+
+Result:
+text
+0001
+
+
+───
+
+Runnable — Ambiguous mapping
+Definition:
+text
+inline [lut] .decoder:
+  depth: 4
+  length: 16
+
+  data {
+    0000 : 1111
+    0001 : 1111
+    0010 : 1111
+  }
+:
+
+Decode:
+text
+4bit x =
+.decoder:decode(
+  1111
+)
+
+Result:
+text
+0000
+
+(first match)
+
+───
+
+Select another match:
+text
+4bit x =
+.decoder:decode(
+  1111,
+  2
+)
+
+Result:
+text
+0010
+
+(third match)
+
+───
+
+Decode validation
+If no matching entry exists:
+text
+.decoder:decode(
+  1010
+)
+
+Error:
+text
+LUT decode failed:
+value 1010 does not exist in lookup table
+
+
+───
+
+If the requested match index is out of range:
+text
+.decoder:decode(
+  1111,
+  10
+)
+
+Error:
+text
+LUT decode failed:
+match index 10 exceeds available matches (3)
+
+
+───
+
+ASM Decode
+ASM decode performs disassembly.
+Unlike protocol and LUT decode, ASM decode produces text rather than bit values.
+Because the result is textual, it cannot be assigned to wires or memory.
+ASM decode may only be used inside debugging functions.
+
+───
+
+Syntax
+text
+.asmInstance:decode(
+  instruction
+)
+
+
+───
+
+Runnable — show()
+Definition:
+text
+inline [asm] .cpu:
+  LOAD : 0001 + R2b + A2b
+  STORE: 0010 + R2b + A2b
+:
+
+Decode:
+text
+show(
+  .cpu:decode(
+    00010111
+  )
+)
+
+Output:
+text
+LOAD R1 A3
+
+
+───
+
+Runnable — ROM debugging
+text
+show(
+  .cpu:decode(
+    .program:get
+  )
+)
+
+Output:
+text
+LOAD R1 A3
+
+
+───
+
+Invalid usage
+ASM decode cannot be assigned.
+Invalid:
+text
+8bit x =
+.cpu:decode(
+  00010111
+)
+
+Error:
+text
+ASM decode produces text and cannot be assigned to wires
+
+
+───
+
+doc()
+text
+doc(.uart8n1)
+
+Displays protocol decode information.
+Example:
+text
+parameters:
+  data 8b
+
+channels:
+  tx
+
+
+───
+
+text
+doc(.decoder)
+
+Displays LUT decode information.
+Example:
+text
+decode:
+  supported
+
+matches:
+  reverse lookup
+
+
+───
+
+text
+doc(.cpu)
+
+Displays ASM decode information.
+Example:
+text
+decode:
+  disassembler only
+
+valid contexts:
+  show()
+  doc()
+
+
+───
+
+Common Errors
+
+Error
+Cause
+
+Protocol decode failed
+Input does not match protocol definition
+
+LUT decode failed
+Value not present in LUT
+
+LUT decode failed: match index exceeds available matches
+Invalid decode index
+
+ASM decode produces text and cannot be assigned to wires
+Invalid assignment
+
+Expected N protocol channels but received M
+Wrong decode channel count
+
+Protocol output width mismatch
+Channel width does not match definition
+
+
+Am pus-o în format de documentație, în același stil cu ASM/LUT/PROTOCOL.
+Un lucru pe care l-aș adăuga ulterior (nu acum) este un :canDecode(...) pentru protocol și LUT care să returneze 1bit, util în circuite care trebuie să valideze un frame înainte de a-l decoda. ASM nu ar avea nevoie de așa ceva.
+
+
+=====
+
+LUT Labels
+Labels provide symbolic names for LUT addresses and values.
+They improve readability and allow LUTs to model state machines, token maps, opcode transitions, and other symbolic relationships.
+Labels are optional.
+There is no panel UI in v1 — logic only.
+
+───
+
+Labels block
+Labels are declared before the data {} block.
+text
+inline [lut] .traffic:
+
+  labels {
+    RED    = 00
+    YELLOW = 01
+    GREEN  = 10
+  }
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+
+───
+
+Label rules
+
+Rule
+Example
+
+Must start with a letter
+RED ✓ — 1RED ✗
+
+Letters and digits only
+STATE0 ✓ — STATE_A ✗
+
+Unique within the LUT
+Duplicate labels are not allowed
+
+Width must match LUT address/value width
+RED = 00 ✓
+
+
+
+───
+
+Using labels in data
+Labels may appear anywhere a binary value could normally appear.
+Example:
+text
+inline [lut] .traffic:
+
+  labels {
+    RED    = 00
+    YELLOW = 01
+    GREEN  = 10
+  }
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+Equivalent to:
+text
+inline [lut] .traffic:
+
+  data {
+    00 : 10
+    10 : 01
+    01 : 00
+  }
+
+:
+
+
+───
+
+Runnable — state transition table
+Definition:
+text
+inline [lut] .traffic:
+
+  labels {
+    RED    = 00
+    YELLOW = 01
+    GREEN  = 10
+  }
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+Usage:
+text
+2bit next =
+.traffic(RED)
+
+Result:
+text
+GREEN
+
+Internal value:
+text
+10
+
+
+───
+
+Runnable — symbolic decoder
+Definition:
+text
+inline [lut] .token:
+
+  labels {
+    NOP   = 0000
+    LOAD  = 0001
+    STORE = 0010
+  }
+
+  data {
+    NOP   : LOAD
+    LOAD  : STORE
+    STORE : NOP
+  }
+
+:
+
+Usage:
+text
+4bit x =
+.token(LOAD)
+
+Result:
+text
+STORE
+
+Internal value:
+text
+0010
+
+
+───
+
+isValid()
+Checks whether an exact LUT mapping exists.
+Returns:
+text
+1bit
+
+Result:
+text
+1
+
+if the mapping exists.
+Result:
+text
+0
+
+if the mapping does not exist.
+
+───
+
+Syntax
+Binary values:
+text
+.lut:isValid(
+  key,
+  value
+)
+
+Labels:
+text
+.lut:isValid(
+  LABEL1,
+  LABEL2
+)
+
+Mixed usage is allowed.
+
+───
+
+Runnable — valid transition
+Definition:
+text
+inline [lut] .traffic:
+
+  labels {
+    RED    = 00
+    YELLOW = 01
+    GREEN  = 10
+  }
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+Usage:
+text
+1bit ok =
+.traffic:isValid(
+  RED,
+  GREEN
+)
+
+Result:
+text
+1
+
+Because:
+text
+RED : GREEN
+
+exists.
+
+───
+
+Runnable — invalid transition
+Usage:
+text
+1bit ok =
+.traffic:isValid(
+  RED,
+  YELLOW
+)
+
+Result:
+text
+0
+
+Because:
+text
+RED : YELLOW
+
+does not exist.
+
+───
+
+Using wires
+Labels are compile-time symbols.
+Runtime values may also be used.
+text
+1bit ok =
+.traffic:isValid(
+  currentState,
+  wantedState
+)
+
+Result:
+text
+1
+
+if the LUT contains:
+text
+currentState : wantedState
+
+Otherwise:
+text
+0
+
+
+───
+
+State machine style example
+text
+inline [lut] .fsm:
+
+  labels {
+    IDLE    = 00
+    RECEIVE = 01
+    STOP    = 10
+  }
+
+  data {
+    IDLE    : RECEIVE
+    RECEIVE : STOP
+    STOP    : IDLE
+  }
+
+:
+
+Usage:
+text
+2bit next =
+.fsm(currentState)
+
+1bit valid =
+.fsm:isValid(
+  currentState,
+  wantedState
+)
+
+
+───
+
+Decode with labels
+Labels participate in decode.
+Definition:
+text
+inline [lut] .traffic:
+
+  labels {
+    RED    = 00
+    YELLOW = 01
+    GREEN  = 10
+  }
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+Usage:
+text
+2bit x =
+.traffic:decode(
+  GREEN
+)
+
+Result:
+text
+RED
+
+Internal value:
+text
+00
+
+
+───
+
+doc()
+text
+doc(.traffic)
+
+Output:
+text
+.traffic (inline [lut])
+
+  labels:
+    RED    = 00
+    YELLOW = 01
+    GREEN  = 10
+
+  data:
+    RED    -> GREEN
+    GREEN  -> YELLOW
+    YELLOW -> RED
+
+
+───
+
+Common errors
+
+Error
+Cause
+
+Duplicate label 'RED'
+Label already declared
+
+Unknown label 'BLUE'
+Label not found
+
+Label value width mismatch
+Label width differs from LUT width
+
+isValid() expects two arguments
+Missing key or value
+
+decode() found no matching entry
+Reverse lookup failed
+
+decode() match index exceeds available matches
+Invalid decode index
+
+
+
+───
+
+vs FSM
+Many finite state machines can be represented directly using a labeled LUT.
+Example:
+text
+IDLE    : RECEIVE
+RECEIVE : STOP
+STOP    : IDLE
+
+Because LUT labels are symbolic and isValid() can verify transitions, a separate FSM inline is often unnecessary.
+LUT remains the underlying primitive while labels provide a state-oriented view of the same mapping.
+
+
+
+------
+
+LUT Labels
+Labels provide symbolic names for binary values.
+Labels may be used with or without a data {} block.
+A label behaves like a named constant and may be referenced anywhere a binary value is expected.
+There is no panel UI in v1 — logic only.
+
+───
+
+Labels-only LUT
+A LUT may contain only labels.
+text
+inline [lut] .flag:
+
+  ZERO     = 000
+  NEGATIVE = 001
+  OVERFLOW = 010
+
+:
+
+This LUT acts as a symbolic constant table.
+
+───
+
+Accessing labels
+Syntax:
+text
+.instance:LABEL
+
+Example:
+text
+3wire state =
+.flag:OVERFLOW
+
+Result:
+text
+010
+
+
+───
+
+Runnable — EQ()
+Definition:
+text
+inline [lut] .flag:
+
+  ZERO     = 000
+  NEGATIVE = 001
+  OVERFLOW = 010
+
+:
+
+Usage:
+text
+1bit isZero =
+EQ(
+  state,
+  .flag:ZERO
+)
+
+Equivalent to:
+text
+EQ(
+  state,
+  000
+)
+
+
+───
+
+Runnable — assignments
+Definition:
+text
+inline [lut] .opcode:
+
+  NOP   = 0000
+  LOAD  = 0001
+  STORE = 0010
+  JMP   = 0011
+
+:
+
+Usage:
+text
+4wire op =
+.opcode:JMP
+
+Result:
+text
+0011
+
+
+───
+
+Runnable — state constants
+Definition:
+text
+inline [lut] .state:
+
+  IDLE    = 000
+  FETCH   = 001
+  DECODE  = 010
+  EXECUTE = 011
+
+:
+
+Usage:
+text
+3wire current =
+.state:FETCH
+
+Result:
+text
+001
+
+
+───
+
+Labels with data {}
+Labels may also be used inside LUT mappings.
+text
+inline [lut] .traffic:
+
+  RED    = 00
+  YELLOW = 01
+  GREEN  = 10
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+Equivalent to:
+text
+inline [lut] .traffic:
+
+  data {
+    00 : 10
+    10 : 01
+    01 : 00
+  }
+
+:
+
+
+───
+
+Runnable — lookup using labels
+Definition:
+text
+inline [lut] .traffic:
+
+  RED    = 00
+  YELLOW = 01
+  GREEN  = 10
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+Usage:
+text
+2wire next =
+.traffic(
+  .traffic:RED
+)
+
+Result:
+text
+10
+
+Meaning:
+text
+GREEN
+
+
+───
+
+Runnable — FSM-style usage
+Definition:
+text
+inline [lut] .fsm:
+
+  IDLE    = 00
+  RECEIVE = 01
+  STOP    = 10
+
+  data {
+    IDLE    : RECEIVE
+    RECEIVE : STOP
+    STOP    : IDLE
+  }
+
+:
+
+Current state:
+text
+2wire current =
+.fsm:IDLE
+
+Transition:
+text
+2wire next =
+.fsm(current)
+
+Result:
+text
+01
+
+Meaning:
+text
+RECEIVE
+
+
+───
+
+Using labels with isValid()
+Definition:
+text
+inline [lut] .fsm:
+
+  IDLE    = 00
+  RECEIVE = 01
+  STOP    = 10
+
+  data {
+    IDLE    : RECEIVE
+    RECEIVE : STOP
+    STOP    : IDLE
+  }
+
+:
+
+Valid transition:
+text
+1bit ok =
+.fsm:isValid(
+  .fsm:IDLE,
+  .fsm:RECEIVE
+)
+
+Result:
+text
+1
+
+
+───
+
+Invalid transition:
+text
+1bit ok =
+.fsm:isValid(
+  .fsm:IDLE,
+  .fsm:STOP
+)
+
+Result:
+text
+0
+
+
+───
+
+show()
+Labels improve readability in debugging output.
+Definition:
+text
+inline [lut] .state:
+
+  IDLE    = 000
+  FETCH   = 001
+  DECODE  = 010
+
+:
+
+Usage:
+text
+show(
+  .state:FETCH
+)
+
+Output:
+text
+001
+
+Possible expanded output:
+text
+FETCH (001)
+
+implementation dependent.
+
+───
+
+doc()
+text
+doc(.state)
+
+Output:
+text
+.state (inline [lut])
+
+  labels:
+    IDLE    = 000
+    FETCH   = 001
+    DECODE  = 010
+
+
+───
+
+Common Errors
+
+Error
+Cause
+
+Duplicate label 'IDLE'
+Label already declared
+
+Unknown label 'RUNNING'
+Label does not exist
+
+Label width mismatch
+Label values do not share the same width
+
+Expected '.' before inline instance name
+Missing instance prefix
+
+Cannot access label on unknown LUT instance
+Invalid LUT reference
+
+
+
+Notes
+A labels-only LUT acts as a symbolic constant table.
+Example:
+text
+inline [lut] .flag:
+
+  ZERO     = 000
+  NEGATIVE = 001
+  OVERFLOW = 010
+
+:
+
+Usage:
+text
+.flag:ZERO
+.flag:NEGATIVE
+.flag:OVERFLOW
+
+This makes LUT labels useful for:
+• CPU opcodes
+• CPU flags
+• FSM states
+• protocol tokens
+• error codes
+• enumerations
+• symbolic constants
+without requiring a separate enum or constant declaration system.
+
+
+
+
+====
+
+
+
+LUT Labels
+Labels provide symbolic names for binary values.
+Labels may be used with or without a data {} block.
+A label behaves like a named constant and may be referenced anywhere a binary value is expected.
+There is no panel UI in v1 — logic only.
+
+───
+
+Labels-only LUT
+A LUT may contain only labels.
+text
+inline [lut] .flag:
+
+  ZERO     = 000
+  NEGATIVE = 001
+  OVERFLOW = 010
+
+:
+
+This LUT acts as a symbolic constant table.
+
+───
+
+Label Rules
+
+Rule
+Example
+
+Must start with a letter
+RED ✓ — 1RED ✗
+
+Letters and digits only
+STATE0 ✓ — STATE_A ✗
+
+Unique within the LUT
+Duplicate labels are not allowed
+
+All labels must have the same width
+RED = 00, GREEN = 10 ✓
+
+
+
+───
+
+Accessing Labels
+Syntax:
+text
+.instance:LABEL
+
+Example:
+text
+3wire state =
+.flag:OVERFLOW
+
+Result:
+text
+010
+
+
+───
+
+Using Labels in Expressions
+Labels behave like constants and may participate in expressions.
+text
+inline [lut] .flags:
+
+  ZERO     = 0001
+  NEGATIVE = 0010
+  OVERFLOW = 0100
+  CARRY    = 1000
+
+:
+
+Usage:
+text
+4wire status =
+.flags:ZERO |
+.flags:CARRY
+
+Result:
+text
+1001
+
+Any operator valid for binary values may be used:
+text
+|
+&
+!
+^
+
+or the equivalent function forms:
+text
+OR()
+AND()
+NOT()
+XOR()
+
+
+───
+
+Local Label References
+Inside a LUT body, labels may be referenced directly.
+Example:
+text
+inline [lut] .ctrl:
+
+  ACCLOAD = 00000001
+  MEMREAD = 00000010
+
+  LOAD = ACCLOAD | MEMREAD
+
+:
+
+Equivalent to:
+text
+inline [lut] .ctrl:
+
+  ACCLOAD = 00000001
+  MEMREAD = 00000010
+
+  LOAD = 00000011
+
+:
+
+The current LUT is searched first.
+
+───
+
+External Label References
+Labels from other LUTs may be referenced explicitly.
+text
+inline [lut] .flags:
+
+  ZERO     = 0001
+  OVERFLOW = 0010
+
+:
+
+inline [lut] .status:
+
+  ERROR = .flags:OVERFLOW
+
+:
+
+External references always use:
+text
+.lutName:LABEL
+
+
+───
+
+Labels with data {}
+Labels may be used anywhere a binary value could normally appear.
+text
+inline [lut] .traffic:
+
+  RED    = 00
+  YELLOW = 01
+  GREEN  = 10
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+Equivalent to:
+text
+inline [lut] .traffic:
+
+  data {
+    00 : 10
+    10 : 01
+    01 : 00
+  }
+
+:
+
+
+───
+
+Expressions in data {}
+The value side of a mapping may be an expression.
+text
+inline [lut] .ctrl:
+
+  ACCLOAD = 00000001
+  MEMREAD = 00000010
+
+  data {
+    LOAD : ACCLOAD | MEMREAD
+  }
+
+:
+
+Result:
+text
+LOAD : 00000011
+
+
+───
+
+Runnable — Lookup Using Labels
+Definition:
+text
+inline [lut] .traffic:
+
+  RED    = 00
+  YELLOW = 01
+  GREEN  = 10
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+Usage:
+text
+2wire next =
+.traffic(
+  .traffic:RED
+)
+
+Result:
+text
+10
+
+Meaning:
+text
+GREEN
+
+
+───
+
+Runnable — State Constants
+Definition:
+text
+inline [lut] .state:
+
+  IDLE    = 000
+  FETCH   = 001
+  DECODE  = 010
+  EXECUTE = 011
+
+:
+
+Usage:
+text
+3wire current =
+.state:FETCH
+
+Result:
+text
+001
+
+
+───
+
+Runnable — FSM Style
+Definition:
+text
+inline [lut] .fsm:
+
+  IDLE    = 00
+  RECEIVE = 01
+  STOP    = 10
+
+  data {
+    IDLE    : RECEIVE
+    RECEIVE : STOP
+    STOP    : IDLE
+  }
+
+:
+
+Current state:
+text
+2wire current =
+.fsm:IDLE
+
+Transition:
+text
+2wire next =
+.fsm(current)
+
+Result:
+text
+01
+
+Meaning:
+text
+RECEIVE
+
+
+───
+
+isValid()
+Checks whether an exact LUT mapping exists.
+Returns:
+text
+1bit
+
+Result:
+text
+1
+
+if the mapping exists.
+Result:
+text
+0
+
+if the mapping does not exist.
+
+───
+
+Syntax
+Binary values:
+text
+.lut:isValid(
+  key,
+  value
+)
+
+Labels:
+text
+.lut:isValid(
+  LABEL1,
+  LABEL2
+)
+
+Mixed usage is allowed.
+
+───
+
+Runnable — Valid Transition
+Definition:
+text
+inline [lut] .traffic:
+
+  RED    = 00
+  YELLOW = 01
+  GREEN  = 10
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+Usage:
+text
+1bit ok =
+.traffic:isValid(
+  RED,
+  GREEN
+)
+
+Result:
+text
+1
+
+Because:
+text
+RED : GREEN
+
+exists.
+
+───
+
+Runnable — Invalid Transition
+Usage:
+text
+1bit ok =
+.traffic:isValid(
+  RED,
+  YELLOW
+)
+
+Result:
+text
+0
+
+Because:
+text
+RED : YELLOW
+
+does not exist.
+
+───
+
+Using Wires
+Labels are compile-time symbols.
+Runtime values may also be used.
+text
+1bit ok =
+.traffic:isValid(
+  currentState,
+  wantedState
+)
+
+Result:
+text
+1
+
+if the LUT contains:
+text
+currentState : wantedState
+
+Otherwise:
+text
+0
+
+
+───
+
+decode()
+Performs a reverse lookup.
+Returns the key associated with a value.
+Syntax:
+text
+.lut:decode(
+  value
+)
+
+Optional match index:
+text
+.lut:decode(
+  value,
+  index
+)
+
+When multiple entries map to the same value:
+text
+A : X
+B : X
+C : X
+
+index selects which matching key is returned.
+Default:
+text
+index = 0
+
+(first match).
+
+───
+
+Runnable — Decode with Labels
+Definition:
+text
+inline [lut] .traffic:
+
+  RED    = 00
+  YELLOW = 01
+  GREEN  = 10
+
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+
+:
+
+Usage:
+text
+2wire x =
+.traffic:decode(
+  GREEN
+)
+
+Result:
+text
+RED
+
+Internal value:
+text
+00
+
+
+───
+
+Runnable — Flags
+Definition:
+text
+inline [lut] .flags:
+
+  ZERO     = 0001
+  NEGATIVE = 0010
+  OVERFLOW = 0100
+  CARRY    = 1000
+
+:
+
+Usage:
+text
+4wire status =
+.flags:ZERO |
+.flags:CARRY
+
+Result:
+text
+1001
+
+Flags LUTs are useful for:
+text
+CPU status registers
+interrupt masks
+permissions
+bit masks
+
+
+───
+
+Runnable — Control ROM
+Definition:
+text
+inline [lut] .ctrl:
+
+  ACCLOAD = 00000001
+  MEMREAD = 00000010
+  MEMWRITE = 00000100
+  ALUADD = 00001000
+  ALUSUB = 00010000
+  PCLOAD = 00100000
+
+  LOAD  = ACCLOAD | MEMREAD
+  STORE = MEMWRITE
+  ADDI  = ACCLOAD | ALUADD
+  SUBI  = ACCLOAD | ALUSUB
+  JMP   = PCLOAD
+
+:
+
+Usage:
+text
+8wire control =
+.ctrl:ADDI
+
+Result:
+text
+00001001
+
+This pattern may be used as a simple control ROM or microcode table.
+
+───
+
+show()
+Labels improve readability in debugging output.
+Definition:
+text
+inline [lut] .state:
+
+  IDLE    = 000
+  FETCH   = 001
+  DECODE  = 010
+
+:
+
+Usage:
+text
+show(
+  .state:FETCH
+)
+
+Output:
+text
+001
+
+Possible expanded output:
+text
+FETCH (001)
+
+Implementation dependent.
+
+───
+
+doc()
+text
+doc(.state)
+
+Output:
+text
+.state (inline [lut])
+
+  labels:
+    IDLE    = 000
+    FETCH   = 001
+    DECODE  = 010
+
+For LUTs with mappings:
+text
+.traffic (inline [lut])
+
+  labels:
+    RED    = 00
+    YELLOW = 01
+    GREEN  = 10
+
+  data:
+    RED    -> GREEN
+    GREEN  -> YELLOW
+    YELLOW -> RED
+
+
+───
+
+Common Errors
+
+Error
+Cause
+
+Duplicate label 'RED'
+Label already declared
+
+Unknown label 'BLUE'
+Label not found
+
+Label width mismatch
+Label values do not share the same width
+
+Unknown LUT reference '.other'
+Referenced LUT does not exist
+
+Cannot resolve '.other:LABEL'
+Label not found in referenced LUT
+
+isValid() expects two arguments
+Missing key or value
+
+decode() found no matching entry
+Reverse lookup failed
+
+decode() match index exceeds available matches
+Invalid decode index
+
+
+
+───
+
+Notes
+A labels-only LUT acts as a symbolic constant table.
+Example:
+text
+inline [lut] .opcode:
+
+  NOP   = 0000
+  LOAD  = 0001
+  STORE = 0010
+  JMP   = 0011
+
+:
+
+Usage:
+text
+.opcode:LOAD
+.opcode:STORE
+.opcode:JMP
+
+This makes LUT labels useful for:
+• CPU opcodes
+• CPU flags
+• FSM states
+• protocol tokens
+• error codes
+• enumerations
+• symbolic constants
+• control ROMs
+• microcode tables
+without requiring a separate enum, constants, flags, or microcode declaration system.
+
+───
+
+LUT vs FSM
+Many finite state machines can be represented directly using a labeled LUT.
+Example:
+text
+IDLE    : RECEIVE
+RECEIVE : STOP
+STOP    : IDLE
+
+Because LUT labels are symbolic and isValid() can verify transitions, a separate FSM inline is often unnecessary.
+LUT remains the underlying primitive while labels provide a state-oriented view of the same mapping.
+
+
+
+
+
+
+
+
+
+
+
+fără data {} → tabel de constante
+cu data {} → tabel de mapare
+cu isValid() → validator de tranziții
+cu decode() → reverse lookup
+cu labeluri → enum-uri și state-uri
+cu expresii → flags și control words
+
+=====.
+LUT Constant Expressions
+LUT labels and data {} values may contain constant expressions.
+Expressions are evaluated at parse time and produce a binary value.
+In addition to the computed value, the original expression AST is preserved for debugging, documentation, show(), probe(), and future logic analyzer integrations.
+
+───
+
+Supported operators
+The following operators are supported:
+text
+|
+&
+!
+
+Meaning:
+text
+A | B
+
+Bitwise OR.
+text
+A & B
+
+Bitwise AND.
+text
+!A
+
+Bitwise NOT.
+
+───
+
+Examples
+OR
+text
+inline [lut] .ctrl:
+
+  ACCLOAD = 00000001
+  MEMREAD = 00000010
+
+  LOAD = ACCLOAD | MEMREAD
+
+:
+
+Computed value:
+text
+00000011
+
+Stored expression:
+text
+ACCLOAD | MEMREAD
+
+
+───
+
+AND
+text
+inline [lut] .mask:
+
+  USER = 1111
+  VISIBLE = 1010
+
+  RESULT = USER & VISIBLE
+
+:
+
+Computed value:
+text
+1010
+
+Stored expression:
+text
+USER & VISIBLE
+
+
+───
+
+NOT
+text
+inline [lut] .flags:
+
+  WRITE = 0010
+  ALL = 1111
+
+  USER = ALL & !WRITE
+
+:
+
+Computed value:
+text
+1101
+
+Stored expression:
+text
+ALL & !WRITE
+
+
+───
+
+Parentheses
+Parentheses may be used to explicitly group expressions.
+Example:
+text
+RESULT =
+(A | B | C)
+&
+!D
+
+
+───
+
+Expressions in labels
+Labels may be defined using constant expressions.
+text
+inline [lut] .ctrl:
+
+  ACCLOAD = 00000001
+  MEMREAD = 00000010
+
+  LOAD = ACCLOAD | MEMREAD
+
+:
+
+Equivalent value:
+text
+LOAD = 00000011
+
+
+───
+
+Expressions in data {}
+Expressions may also appear on the value side of LUT mappings.
+text
+inline [lut] .ctrl:
+
+  ACCLOAD = 00000001
+  MEMREAD = 00000010
+
+  data {
+    LOAD : ACCLOAD | MEMREAD
+  }
+
+:
+
+Equivalent mapping:
+text
+LOAD : 00000011
+
+
+───
+
+Debugging
+The computed binary value is used during execution.
+The original expression is preserved for debugging.
+Example:
+text
+LOAD = ACCLOAD | MEMREAD
+
+Possible debug output:
+text
+LOAD
+ACCLOAD | MEMREAD
+00000011
+
+
+───
+
+doc()
+Possible output:
+text
+LOAD = ACCLOAD | MEMREAD
+       00000011
+
+USER = ALL & !WRITE
+       1101
+
+This preserves both:
+• the symbolic meaning
+• the final binary value
+
+───
+
+Notes
+Constant expressions are intended for:
+• CPU control words
+• microcode tables
+• status flags
+• interrupt masks
+• permissions
+• protocol constants
+• symbolic bit masks
+The expression is evaluated once at parse time and never at runtime.
+===
+
+
