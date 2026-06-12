@@ -42,10 +42,13 @@ const files = [
   'core/components/ledBar.js', 'core/components/switch.js', 'core/components/key.js',
   'core/components/dip.js', 'core/components/seven-seg.js', 'core/components/14seg.js',
   'core/components/dots.js', 'core/components/lcd.js', 'core/components/adder.js',
-  'core/components/subtract.js', 'core/components/multiplier.js', 'core/components/divider.js',
+  'core/components/subtract.js', 'core/components/multiplier.js',   'core/components/divider.js',
+  'core/components/lut.js',
   'core/components/shifter.js', 'core/components/mem.js', 'core/components/reg.js',
   'core/components/counter.js', 'core/components/osc.js', 'core/components/rotary.js',
-  'core/components/pcb-component.js', 'core/components/index.js',
+  'core/components/pcb-component.js',   'core/components/index.js',
+  'devices/mem-devices.js',
+  'devices/lut-devices.js',
   'core/parser.js', 'core/interpreter.js', 'core/signal-propagation.js',
   'test_session.js', 'test_suite.js', 'test_suite_ported.js'
 ];

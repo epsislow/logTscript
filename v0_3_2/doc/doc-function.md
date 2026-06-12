@@ -398,6 +398,7 @@ comp [adder] .name:
 | `doc(comp.shifter)` / `doc(comp.>)` | [shifter.md](shifter.md) |
 | `doc(comp.counter)` / `doc(comp.=)` | [counter.md](counter.md) |
 | `doc(comp.mem)` | [mem.md](mem.md) |
+| `doc(comp.lut)` | [lut.md](lut.md) — type syntax; `doc(.inst)` shows mapped table |
 | `doc(comp.reg)` | [reg.md](reg.md) |
 | `doc(comp.osc)` / `doc(comp.~)` | [oscillator.md](oscillator.md) |
 

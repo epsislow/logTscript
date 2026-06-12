@@ -2466,5 +2466,197 @@ board [cpu4] .cpu::
   h.assert('cpu pc după 4 NEXT', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
 });
 
+const LUT_BASIC = `comp [lut] .lut:
+  depth: 4
+  length: 16
+  = data {
+    0         : 0001
+    \\1 - \\5  : 0010
+  }
+  :`;
+
+reg(867, 'lut', 'LUT init — slot nemapat default 0000', function(h, session) {
+  const { interp } = session.run(LUT_BASIC + `
+.lut:in = 0110
+4wire y = .lut:get`);
+  h.assert('slot 0', session.getWire(interp, 'y'), '0000');
+});
+
+reg(868, 'lut', 'LUT fillwith — slot 6-9 = 0110', function(h, session) {
+  const src = `comp [lut] .lut:
+  depth: 4
+  length: 16
+  fillwith: 0110
+  = data {
+    0         : 0001
+    \\1 - \\5  : 0010
+  }
+  :
+.lut:in = 0110
+4wire y = .lut:get`;
+  const { interp } = session.run(src);
+  h.assert('slot 6 fillwith', session.getWire(interp, 'y'), '0110');
+});
+
+reg(869, 'lut', 'LUT adresă binară 010 → slot 2', function(h, session) {
+  const src = `comp [lut] .lut:
+  depth: 4
+  length: 16
+  = data {
+    010 : 1000
+  }
+  :
+.lut:in = 010
+4wire y = .lut:get`;
+  const { interp } = session.run(src);
+  h.assert('slot 2', session.getWire(interp, 'y'), '1000');
+});
+
+reg(870, 'lut', 'LUT adresă zecimală \\\\50', function(h, session) {
+  const src = `comp [lut] .lut:
+  depth: 4
+  length: 64
+  = data {
+    \\50 : 1111
+  }
+  :
+.lut:in = \\50
+4wire y = .lut:get`;
+  const { interp } = session.run(src);
+  h.assert('slot 50', session.getWire(interp, 'y'), '1111');
+});
+
+reg(871, 'lut', 'LUT range hex ^a - ^f', function(h, session) {
+  const src = `comp [lut] .lut:
+  depth: 4
+  length: 16
+  = data {
+    ^a - ^f : 1111
+  }
+  :
+.lut:in = ^c
+4wire y = .lut:get`;
+  const { interp } = session.run(src);
+  h.assert('slot 12', session.getWire(interp, 'y'), '1111');
+});
+
+reg(872, 'lut', 'LUT range mixt 010 - \\\\5', function(h, session) {
+  const src = `comp [lut] .lut:
+  depth: 4
+  length: 16
+  = data {
+    010 - \\5 : 0010
+  }
+  :
+.lut:in = 0100
+4wire y = .lut:get`;
+  const { interp } = session.run(src);
+  h.assert('slot 4', session.getWire(interp, 'y'), '0010');
+});
+
+function runLutMethodB(h, session) {
+  const src = LUT_BASIC + `
+4wire addr = 0011
+.lut:in = addr
+4wire y = .lut:get`;
+  const { interp } = session.run(src);
+  h.assert('method B slot 3', session.getWire(interp, 'y'), '0010');
+  session.setWire(interp, 'addr', '0000');
+  const comp = interp.components.get('.lut');
+  const handler = interp.componentRegistry.get('lut');
+  const got = handler.evalGetProperty(comp, 'get', { var: '.lut', property: 'get' }, interp).value;
+  h.assert('method B slot 0 după schimbare addr', got, '0001');
+}
+
+reg(873, 'lut', 'LUT metoda B — .lut:in + .lut:get', runLutMethodB);
+reg(874, 'lut', 'LUT metoda B (wave)', runLutMethodB, { propagation: 'wave' });
+
+reg(875, 'lut', 'LUT metoda A — .lut(in = expr)', function(h, session) {
+  const { interp } = session.run(LUT_BASIC + `
+4wire addr = 0001
+4wire y = .lut(in = addr)`);
+  h.assert('method A slot 1', session.getWire(interp, 'y'), '0010');
+});
+
+const PROBE_LUT = LUT_BASIC + `
+probe(.lut:get)
+.lut:in = 0000`;
+
+function runProbeLut(h, session) {
+  const { out, interp } = session.run(PROBE_LUT);
+  h.assert('probe init', String(out.some(l => l.includes('# .lut:get = 0001') && l.includes('initialised'))), 'true');
+  session.execStmts(interp, `.lut:in = 0011`);
+  h.assert('probe changed', String(out.some(l => l.includes('# .lut:get = 0010') && l.includes('changed'))), 'true');
+}
+
+reg(876, 'lut', 'probe(.lut:get) — initialised și changed', runProbeLut);
+reg(877, 'lut', 'probe(.lut:get) — wave', runProbeLut, { propagation: 'wave' });
+
+reg(878, 'lut', 'doc(comp.lut) — sintaxă tip', function(h, session) {
+  const out = session.runDoc('doc(comp.lut)');
+  h.assert('data block', String(out.some(l => l.includes('data {'))), 'true');
+  h.assert('fillwith attr', String(out.some(l => l.includes('fillwith'))), 'true');
+  h.assert('Xpout get', String(out.some(l => l.includes('Xpout get'))), 'true');
+});
+
+reg(879, 'lut', 'doc(.decoder) — instanță map + fill', function(h, session) {
+  const out = session.runDoc(`comp [lut] .decoder:
+  depth: 4
+  length: 16
+  fillwith: 0110
+  = data {
+    0         : 0001
+    \\1 - \\5  : 0010
+    ^a - ^f   : 1111
+  }
+  :
+doc(.decoder)`);
+  h.assert('header', String(out.some(l => l.includes('.decoder (comp [lut])'))), 'true');
+  h.assert('map 0001', String(out.some(l => l.includes('0001'))), 'true');
+  h.assert('map 0010', String(out.some(l => l.includes('0010'))), 'true');
+  h.assert('fillwith slots', String(out.some(l => l.includes('fillwith'))), 'true');
+});
+
+reg(880, 'lut', 'LUT eroare — adresă >= length', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`comp [lut] .x:
+  depth: 4
+  length: 8
+  = data {
+    \\10 : 0001
+  }
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('addr too large', String(err.includes('>= length')), 'true');
+});
+
+reg(881, 'lut', 'LUT eroare — valoare prea lată', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`comp [lut] .x:
+  depth: 4
+  length: 8
+  = data {
+    0 : 00001
+  }
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('value width', String(err.includes('exactly 4 bits')), 'true');
+});
+
+reg(882, 'lut', 'LUT eroare — fillwith prea lat', function(h, session) {
+  let err = '';
+  try {
+    session.run(`comp [lut] .x:
+  depth: 4
+  length: 8
+  fillwith: 011
+  = data { 0 : 0000 }
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('fillwith width', String(err.includes('fillwith')), 'true');
+});
+
   suite.finalize();
 })();

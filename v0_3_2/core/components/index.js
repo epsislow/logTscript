@@ -12,6 +12,7 @@ var AdderComponent = (typeof require !== 'undefined') ? require('./adder') : Add
 var SubtractComponent = (typeof require !== 'undefined') ? require('./subtract') : SubtractComponent;
 var MultiplierComponent = (typeof require !== 'undefined') ? require('./multiplier') : MultiplierComponent;
 var DividerComponent = (typeof require !== 'undefined') ? require('./divider') : DividerComponent;
+var LutComponent = (typeof require !== 'undefined') ? require('./lut') : LutComponent;
 var ShifterComponent = (typeof require !== 'undefined') ? require('./shifter') : ShifterComponent;
 var MemComponent = (typeof require !== 'undefined') ? require('./mem') : MemComponent;
 var RegComponent = (typeof require !== 'undefined') ? require('./reg') : RegComponent;
@@ -34,6 +35,7 @@ function createComponentRegistry() {
   registry.register(SubtractComponent);
   registry.register(MultiplierComponent);
   registry.register(DividerComponent);
+  registry.register(LutComponent);
   registry.register(ShifterComponent);
   registry.register(MemComponent);
   registry.register(RegComponent);

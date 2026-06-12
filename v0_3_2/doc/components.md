@@ -62,6 +62,7 @@ Instant built-in functions (`ADD`, `SUBTRACT`, …) without `comp`: [arithmetic.
 | Component | Shortname | Page |
 |-----------|-----------|------|
 | `mem` | — | [mem.md](mem.md) |
+| `lut` | — | [lut.md](lut.md) |
 | `reg` | — | [reg.md](reg.md) |
 | `osc` | `~` | [oscillator.md](oscillator.md) |
 

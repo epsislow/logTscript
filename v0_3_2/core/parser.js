@@ -1775,6 +1775,16 @@ assignment() {
         } else if (this.c.value === '=') {
           this.eat('SYM', '=');
           this.t.skip();
+          if (this.c.type === 'ID' && this.c.value === 'data') {
+            this.eat('ID');
+            this.t.skip();
+            if (!(this.c.type === 'SYM' && this.c.value === '{')) {
+              throw Error(`Expected '{' after '= data' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+            }
+            const bracePos = this.t.i - 1;
+            initialValue = this.parseLutDataRaw(bracePos, attributes);
+            continue;
+          }
           if (this.c.type === 'BIN') {
             initialValue = this.c.value;
             this.eat('BIN');
@@ -2255,6 +2265,10 @@ assignment() {
         return addNot(_a); }
     }
     
+    if (this.c.type === 'SYM' && this.c.value === '(') {
+      return addNot(this.parseCompInvoke(compName));
+    }
+
     { const _a = { var: compName };
       if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
       return addNot(_a); }
@@ -2400,8 +2414,168 @@ isBuiltinFunction(name) {
 
   return { call: fn, args };
  }
- 
- 
+
+  _syncTokenizerAt(pos) {
+    this.t.i = pos;
+    let line = 1;
+    let col = 1;
+    for (let i = 0; i < pos; i++) {
+      if (this.t.src[i] === '\n') { line++; col = 1; }
+      else col++;
+    }
+    this.t.line = line;
+    this.t.col = col;
+    this.c = this.t.get();
+  }
+
+  parseLutDataRaw(bracePos, attributes) {
+    const src = this.t.src;
+    const length = attributes.length !== undefined ? parseInt(attributes.length, 10) : 16;
+    const depth = attributes.depth !== undefined ? parseInt(attributes.depth, 10) : 4;
+    let pos = bracePos + 1;
+    const entries = [];
+    const rawEntries = [];
+
+    const skipWS = () => {
+      while (pos < src.length) {
+        if (src[pos] === ' ' || src[pos] === '\t' || src[pos] === '\r' || src[pos] === '\n') {
+          pos++;
+          continue;
+        }
+        if (src[pos] === '#') {
+          while (pos < src.length && src[pos] !== '\n') pos++;
+          continue;
+        }
+        break;
+      }
+    };
+
+    const parseAddress = () => {
+      skipWS();
+      const startPos = pos;
+      if (pos >= src.length) {
+        throw Error(`Expected LUT address at ${this.c.line}:${this.c.col}`);
+      }
+      if (src[pos] === '\\') {
+        pos++;
+        let num = '';
+        while (pos < src.length && src[pos] >= '0' && src[pos] <= '9') {
+          num += src[pos];
+          pos++;
+        }
+        if (!num) throw Error(`Expected decimal digits after '\\' in LUT address at ${this.c.line}:${this.c.col}`);
+        return { index: parseInt(num, 10), raw: src.substring(startPos, pos) };
+      }
+      if (src[pos] === '^') {
+        pos++;
+        let hex = '';
+        while (pos < src.length && /[0-9a-fA-F]/.test(src[pos])) {
+          hex += src[pos];
+          pos++;
+        }
+        if (!hex) throw Error(`Expected hex digits after '^' in LUT address at ${this.c.line}:${this.c.col}`);
+        return { index: parseInt(hex, 16), raw: src.substring(startPos, pos) };
+      }
+      let bits = '';
+      while (pos < src.length && (src[pos] === '0' || src[pos] === '1')) {
+        bits += src[pos];
+        pos++;
+      }
+      if (!bits) throw Error(`Expected binary LUT address at ${this.c.line}:${this.c.col}`);
+      return { index: parseInt(bits, 2), raw: bits };
+    };
+
+    const parseValue = () => {
+      skipWS();
+      if (pos >= src.length || src[pos] !== ':') {
+        throw Error(`Expected ':' before LUT value at ${this.c.line}:${this.c.col}`);
+      }
+      pos++;
+      skipWS();
+      const vStart = pos;
+      let bits = '';
+      while (pos < src.length && (src[pos] === '0' || src[pos] === '1')) {
+        bits += src[pos];
+        pos++;
+      }
+      if (!bits) throw Error(`Expected binary LUT value at ${this.c.line}:${this.c.col}`);
+      if (depth > 0 && bits.length !== depth) {
+        throw Error(`LUT value must be exactly ${depth} bits, got ${bits.length} at ${this.c.line}:${this.c.col}`);
+      }
+      return bits;
+    };
+
+    skipWS();
+    while (pos < src.length && src[pos] !== '}') {
+      const addrStart = parseAddress();
+      skipWS();
+      let addrEnd = addrStart;
+      if (pos < src.length && src[pos] === '-') {
+        pos++;
+        skipWS();
+        addrEnd = parseAddress();
+        if (addrEnd.index < addrStart.index) {
+          throw Error(`LUT address range inverted (${addrStart.index}-${addrEnd.index}) at ${this.c.line}:${this.c.col}`);
+        }
+      }
+      const value = parseValue();
+      for (let i = addrStart.index; i <= addrEnd.index; i++) {
+        if (i >= length) {
+          throw Error(`LUT address ${i} >= length ${length} at ${this.c.line}:${this.c.col}`);
+        }
+      }
+      entries.push({ from: addrStart.index, to: addrEnd.index, value });
+      rawEntries.push({
+        fromRaw: addrStart.raw,
+        toRaw: addrEnd.raw,
+        value,
+      });
+      skipWS();
+      if (pos < src.length && src[pos] === ',') {
+        pos++;
+        skipWS();
+      }
+    }
+    if (pos >= src.length || src[pos] !== '}') {
+      throw Error(`Unclosed LUT data block — expected '}' at ${this.c.line}:${this.c.col}`);
+    }
+    pos++;
+    this._syncTokenizerAt(pos);
+    return { kind: 'lutData', entries, rawEntries };
+  }
+
+  parseCompInvoke(compName) {
+    this.eat('SYM', '(');
+    const args = {};
+    this.t.skip();
+    while (!(this.c.type === 'SYM' && this.c.value === ')')) {
+      if (this.c.type === 'EOF') {
+        throw Error(`Unclosed '(' in component invocation at ${this.c.line}:${this.c.col}`);
+      }
+      if (this.c.type !== 'ID') {
+        throw Error(`Expected argument name in component invocation at ${this.c.line}:${this.c.col}`);
+      }
+      const argName = this.c.value;
+      this.eat('ID');
+      this.t.skip();
+      if (!(this.c.type === 'SYM' && this.c.value === '=')) {
+        throw Error(`Expected '=' after argument '${argName}' at ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', '=');
+      this.t.skip();
+      args[argName] = this.expr();
+      this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        this.eat('SYM', ',');
+        this.t.skip();
+      } else {
+        break;
+      }
+    }
+    this.eat('SYM', ')');
+    return { compInvoke: { var: compName, args } };
+  }
+
 }
 
 Parser.KEYWORD_HANDLERS = {

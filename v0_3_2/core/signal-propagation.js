@@ -629,6 +629,27 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
             setMultiplierB(multiplierId, binValue);
           }
           _affectedComponents.add(propCompName);
+        } else if(propComp && propComp.type === 'lut' && propName === 'in'){
+          const exprResult = this.evalExpr(propData.expr, false);
+          let value = '';
+          for(const part of exprResult){
+            if(part.value && part.value !== '-'){
+              value += part.value;
+            } else if(part.ref && part.ref !== '&-'){
+              const val = this.getValueFromRef(part.ref);
+              if(val) value += val;
+            }
+          }
+          propData.value = value;
+          if(this.componentRegistry){
+            const handler = this.componentRegistry.get('lut');
+            if(handler && handler.handleImmediateAssignment){
+              if(handler.handleImmediateAssignment(propComp, 'in', value, this)){
+                this._emitComputedComponentProbes(propCompName);
+              }
+            }
+          }
+          _affectedComponents.add(propCompName);
         } else if(propComp && propComp.type === 'shifter' && (propName === 'value' || propName === 'dir' || propName === 'in')){
           // For shifter, .value, .dir, and .in properties are applied immediately (not through applyComponentProperties)
           // Re-evaluate and re-apply immediately
@@ -1540,6 +1561,16 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
             
             if(oldBit === '0' && newBit === '1'){
               this.applyComponentProperties(propCompName, 'immediate', true);
+            }
+          } else {
+            const propComp = this.components.get(propCompName);
+            if(propComp && this.componentRegistry){
+              const handler = this.componentRegistry.get(propComp.type);
+              if(handler && handler.handleImmediateAssignment){
+                if(handler.handleImmediateAssignment(propComp, propName, value, this)){
+                  this._emitComputedComponentProbes(propCompName);
+                }
+              }
             }
           }
         } catch(e){

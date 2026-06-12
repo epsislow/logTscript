@@ -296,6 +296,40 @@ class Interpreter {
     }
   }
 
+  evalCompInvoke(invoke, computeRefs) {
+    const compName = invoke.var;
+    const comp = this.components.get(compName);
+    if (!comp) throw Error(`Unknown component ${compName} in invocation`);
+    if (!this.componentRegistry) throw Error(`Component registry unavailable for ${compName}`);
+    const handler = this.componentRegistry.get(comp.type);
+    if (!handler || !handler.handleImmediateAssignment) {
+      throw Error(`Component ${compName} does not support inline invocation`);
+    }
+    const args = invoke.args || {};
+    for (const [argName, argExpr] of Object.entries(args)) {
+      const exprResult = this.evalExpr(argExpr, false);
+      let value = '';
+      for (const part of exprResult) {
+        if (part.value && part.value !== '-') value += part.value;
+        else if (part.ref && part.ref !== '&-') {
+          const val = this.getValueFromRef(part.ref);
+          if (val) value += val;
+        }
+      }
+      if (!handler.handleImmediateAssignment(comp, argName, value, this)) {
+        throw Error(`Invalid argument '${argName}' for component ${compName}`);
+      }
+    }
+    this._emitComputedComponentProbes(compName);
+    const getResult = handler.evalGetProperty(comp, 'get', { var: compName, property: 'get' }, this);
+    if (!getResult) throw Error(`Component ${compName} has no readable output after invocation`);
+    if (computeRefs && getResult.value) {
+      const idx = this.storeValue(getResult.value);
+      return { value: getResult.value, ref: `&${idx}`, varName: `${compName}:get`, bitWidth: getResult.bitWidth };
+    }
+    return getResult;
+  }
+
   _emitComputedForBodyComponents(internalPrefix) {
     for (const [compName] of this.components) {
       if (compName.startsWith('.' + internalPrefix + '_')) {
@@ -1152,6 +1186,10 @@ class Interpreter {
         }
       }
       return result;
+    }
+
+    if (a.compInvoke) {
+      return this.evalCompInvoke(a.compInvoke, computeRefs);
     }
 
     if(a.bin){
@@ -3016,7 +3054,9 @@ if (s.assignment) {
         if(comp && this.componentRegistry){
           const handler = this.componentRegistry.get(comp.type);
           if(handler && handler.handleImmediateAssignment){
-            handler.handleImmediateAssignment(comp, property, value, this);
+            if(handler.handleImmediateAssignment(comp, property, value, this)){
+              this._emitComputedComponentProbes(name);
+            }
           }
         }
       }
@@ -3807,7 +3847,7 @@ if (s.assignment) {
           ref: result.ref || null,
           deviceIds: result.deviceIds
         };
-        if(!compInfo.ref && initialValue && !result.ref){
+        if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;
         }
@@ -8299,6 +8339,12 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     }
     const handler = registry.get(canonicalType);
     if (!handler) return [`${name}: tip de componentă nedefinit`];
+    if (alias && alias.startsWith('.') && compDefs && compDefs.has(alias)) {
+      const compInst = compDefs.get(alias);
+      if (compInst && compInst.type === canonicalType && handler.constructor && handler.constructor.formatInstanceDoc) {
+        return handler.constructor.formatInstanceDoc(alias, compInst);
+      }
+    }
     const def = handler.getDef ? handler.getDef() : null;
     if (!def) return [`comp.${canonicalType}: (no doc available)`];
     return Interpreter.formatCompDef(alias, canonicalType, def);
