@@ -6067,6 +6067,22 @@ Use **\`Nwire\`** for assignable signal wires (same as [ASM](asm.md)). **\`Nbit\
 
 Protocol uses **\`{ }\`** with named parameters (\`data = ^41\`). ASM uses **\`{ }\`** with mnemonics. LUT uses **\`(...)\`** for lookup.
 
+### Runnable — quick start
+
+\`\`\`logts-play
+inline [protocol] .uart8n1:
+  tx:
+    0
+    reverse(data 8b)
+    1
+  :
+
+10wire tx = .uart8n1 { data = ^41 }
+show(tx)
+\`\`\`
+
+Single channel, one parameter — result on wire \`tx\`.
+
 ---
 
 ## Protocol structure
@@ -6120,7 +6136,9 @@ The compiler concatenates all channel outputs internally in declaration order:
 <mosi bits><sclk bits><cs bits>
 \`\`\`
 
-Assignments split the result according to the widths on the left side.
+Assignments split the result according to the widths on the left side (see **Runnable — SPI** below).
+
+Multi-line assignment before \`=\` is supported:
 
 \`\`\`logts
 8wire mosi,
@@ -6205,115 +6223,178 @@ Parameter 'data' was previously declared as 8b but is used here as 7b
 
 ## Built-in generators
 
-### reverse()
+Syntax reference:
 
-Reverses bit order (UART LSB-first).
+| Generator | Example | Result |
+|-----------|---------|--------|
+| \`reverse(param)\` | \`reverse(data 8b)\` | bit-reversed parameter |
+| \`parityEven(param)\` | \`parityEven(data)\` | \`0\` or \`1\` (even parity) |
+| \`parityOdd(param)\` | \`parityOdd(data)\` | \`0\` or \`1\` (odd parity) |
+| \`clock Nb\` | \`clock 8b\` | toggling waveform per \`clockType\` |
+| \`repeat bit Nb\` | \`repeat 0 8b\` | constant bit repeated |
 
-\`\`\`logts
-reverse(data 8b)
+### Runnable — reverse()
+
+\`\`\`logts-play
+inline [protocol] .revtest:
+  out:
+    reverse(data 8b)
+  :
+
+8wire out = .revtest { data = 01000001 }
+show(out)
 \`\`\`
 
-\`01000001\` → \`10000010\`
+\`01000001\` → \`10000010\`.
 
-### parityEven() / parityOdd()
+### Runnable — parityEven() / parityOdd()
 
-One parity bit from the popcount of the parameter value.
+\`\`\`logts-play
+inline [protocol] .pareven:
+  out:
+    parityEven(data 8b)
+  :
 
-### clock
+inline [protocol] .parodd:
+  out:
+    parityOdd(data 8b)
+  :
 
-\`\`\`logts
-clock 8b
+1wire evenPar = .pareven { data = 01100110 }
+1wire oddPar  = .parodd  { data = 01100110 }
+show(evenPar)
+show(oddPar)
 \`\`\`
 
-Uses \`clockType\` (\`lowFirst\` → \`01010101\`, \`highFirst\` → \`10101010\`).
+Four set bits (even popcount) → \`parityEven\` = \`0\`, \`parityOdd\` = \`1\`.
 
-### repeat
+### Runnable — clock (\`lowFirst\` / \`highFirst\`)
 
-\`\`\`logts
-repeat 0 8b    → 00000000
-repeat 1 4b    → 1111
+\`\`\`logts-play
+inline [protocol] .clklow:
+  clockType: lowFirst
+  out:
+    clock 8b
+  :
+
+inline [protocol] .clkhigh:
+  clockType: highFirst
+  out:
+    clock 8b
+  :
+
+8wire low  = .clklow  { }
+8wire high = .clkhigh { }
+show(low)
+show(high)
 \`\`\`
+
+\`lowFirst\` → \`01010101\`, \`highFirst\` → \`10101010\`.
+
+### Runnable — repeat
+
+\`\`\`logts-play
+inline [protocol] .rep0:
+  out:
+    repeat 0 4b
+  :
+
+inline [protocol] .rep1:
+  out:
+    repeat 1 4b
+  :
+
+4wire zeros = .rep0 { }
+4wire ones  = .rep1 { }
+show(zeros)
+show(ones)
+\`\`\`
+
+\`repeat 0 4b\` → \`0000\`, \`repeat 1 4b\` → \`1111\`.
 
 ---
 
 ## Runnable — UART 8N1
 
-\`\`\`logts
+\`\`\`logts-play
 inline [protocol] .uart8n1:
-
   tx:
     0
     reverse(data 8b)
     1
-
-:
+  :
 
 10wire tx = .uart8n1 { data = ^41 }
+show(tx)
 \`\`\`
 
-\`^41\` → \`01000001\`, reversed → \`10000010\`, with start/stop → \`0100000101\`.
+\`^41\` = \`01000001\`, reversed = \`10000010\`, with start \`0\` and stop \`1\` → **\`0100000101\`**.
 
 ---
 
 ## Runnable — UART 8E1 / 8O1
 
-\`\`\`logts
+\`\`\`logts-play
 inline [protocol] .uart8e1:
-
   tx:
     0
     reverse(data 8b)
     parityEven(data)
     1
-
-:
+  :
 
 inline [protocol] .uart8o1:
-
   tx:
     0
     reverse(data 8b)
     parityOdd(data)
     1
+  :
 
-:
+11wire e1 = .uart8e1 { data = ^41 }
+11wire o1 = .uart8o1 { data = ^41 }
+show(e1)
+show(o1)
 \`\`\`
+
+11 bits: start + 8 data (reversed) + parity + stop. For \`^41\` (even popcount): 8E1 → \`01000001001\`, 8O1 → \`01000001011\`.
 
 ---
 
-## Runnable — SPI
+## Runnable — SPI (multi-output)
 
-\`\`\`logts
+\`\`\`logts-play
 inline [protocol] .spi:
-
   clockType: lowFirst
-
   mosi:
     data 8b
-
   sclk:
     clock 8b
-
   cs:
     repeat 0 8b
-
-:
+  :
 
 8wire mosi,
 8wire sclk,
 8wire cs
 = .spi { data = ^A5 }
+
+show(mosi)
+show(sclk)
+show(cs)
 \`\`\`
+
+\`^A5\` → mosi \`10100101\`, sclk \`01010101\` (\`lowFirst\`), cs \`00000000\`.
+
+Channels are concatenated in declaration order (\`mosi\` + \`sclk\` + \`cs\`); assignment widths split the 24-bit blob.
 
 ---
 
-## Runnable — I2C
+## Runnable — I2C (multi-output)
 
-\`\`\`logts
+\`\`\`logts-play
 inline [protocol] .i2c:
-
   clockType: lowFirst
-
   sda:
     0
     address 7b
@@ -6322,11 +6403,9 @@ inline [protocol] .i2c:
     data 8b
     ack2 1b
     1
-
   scl:
     clock 20b
-
-:
+  :
 
 20wire sda,
 20wire scl
@@ -6337,7 +6416,12 @@ inline [protocol] .i2c:
   data = ^55
   ack2 = 0
 }
+
+show(sda)
+show(scl)
 \`\`\`
+
+Invoke parameters may span multiple lines inside \`{ }\`. sda = 20 data bits; scl = 20-bit \`lowFirst\` clock.
 
 ---
 
