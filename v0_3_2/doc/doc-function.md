@@ -350,7 +350,7 @@ comp.osc, comp.~
 doc(inline)
 ```
 
-Lists every `inline [asm]` / `inline [lut]` instance in the script (e.g. `.myisa (inline [asm])`). Kinds: `inline.asm`, `inline.lut`.
+Lists every `inline [asm]` / `inline [lut]` / `inline [protocol]` instance in the script (e.g. `.myisa (inline [asm])`). Kinds: `inline.asm`, `inline.lut`, `inline.protocol`.
 
 ### doc(inline.kind) — declaration template
 
@@ -358,10 +358,11 @@ Lists every `inline [asm]` / `inline [lut]` instance in the script (e.g. `.myisa
 |------|-------|------|
 | `doc(inline.asm)` | asm | [asm.md](asm.md) |
 | `doc(inline.lut)` | lut | [lut.md](lut.md) |
+| `doc(inline.protocol)` | protocol | [protocol.md](protocol.md) |
 
 ### doc(.name) — specific inline instance
 
-After `inline [asm] .myisa:` or `inline [lut] .decoder:`, `doc(.myisa)` / `doc(.decoder)` shows opcodes or the LUT map for that instance. See [asm.md](asm.md) and [lut.md](lut.md).
+After `inline [asm] .myisa:`, `inline [lut] .decoder:`, or `inline [protocol] .uart8n1:`, `doc(.myisa)` / `doc(.decoder)` / `doc(.uart8n1)` shows opcodes, LUT map, or protocol channels for that instance. See [asm.md](asm.md), [lut.md](lut.md), and [protocol.md](protocol.md).
 
 ### doc(comp.type) — syntax of a component
 

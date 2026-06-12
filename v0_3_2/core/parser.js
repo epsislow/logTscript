@@ -1053,10 +1053,17 @@ assignment() {
 
     if (this.c.value === ',') {
       this.eat('SYM', ',');
+      while (this.c.type === 'EOL') {
+        this.c = this.t.get();
+      }
     } else {
       break;
     }
   } while (this.c.type === 'TYPE');
+
+  while (this.c.type === 'EOL') {
+    this.c = this.t.get();
+  }
 
     if (this.c.value === ':=') {
       this.eat('SYM', ':=');
@@ -2177,6 +2184,12 @@ assignment() {
 
     if (this.c.type === 'SYM' && this.c.value === '{') {
       const bracePos = this.t.i - 1;
+      const inlineDef = this.inlines.get(compName);
+      if (inlineDef && inlineDef.kind === 'protocol') {
+        const invoke = this.parseProtocolInvoke(bracePos);
+        invoke.protocolRef = compName;
+        return addNot({ protocolInvoke: invoke });
+      }
       const program = this.parseAsmProgramRaw(bracePos);
       program.isaRef = compName;
       return addNot({ asmProgram: program });
@@ -2488,8 +2501,8 @@ isBuiltinFunction(name) {
     if (pos >= src.length || src[pos] !== ']') {
       throw Error(`Expected ']' after inline kind at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    if (kind !== 'asm' && kind !== 'lut') {
-      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut)`);
+    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol') {
+      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol)`);
     }
     this._syncTokenizerAt(pos + 1);
     const instanceName = this.parseDotComponentRef();
@@ -2542,6 +2555,36 @@ isBuiltinFunction(name) {
     pos++;
     this._syncTokenizerAt(pos);
     return { kind: 'asmProgram', raw };
+  }
+
+  parseProtocolInvoke(bracePos) {
+    this.eat('SYM', '{');
+    const args = {};
+    this.t.skip();
+    while (!(this.c.type === 'SYM' && this.c.value === '}')) {
+      if (this.c.type === 'EOF') {
+        throw Error(`Unclosed '{' in protocol invocation at ${this.c.line}:${this.c.col}`);
+      }
+      while (this.c.type === 'EOL') {
+        this.c = this.t.get();
+      }
+      if (this.c.type === 'SYM' && this.c.value === '}') break;
+      if (this.c.type !== 'ID') {
+        throw Error(`Expected parameter name in protocol invocation at ${this.c.line}:${this.c.col}`);
+      }
+      const argName = this.c.value;
+      this.eat('ID');
+      this.t.skip();
+      if (!(this.c.type === 'SYM' && this.c.value === '=')) {
+        throw Error(`Expected '=' after parameter '${argName}' in protocol invocation at ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', '=');
+      this.t.skip();
+      args[argName] = this.expr();
+      this.t.skip();
+    }
+    this.eat('SYM', '}');
+    return { kind: 'protocolInvoke', args };
   }
 
   parseLutInlineBody(bodyRaw) {

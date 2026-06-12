@@ -364,6 +364,51 @@ class Interpreter {
     return { value: result.value, ref: null, bitWidth: totalBits, asmBlob: true };
   }
 
+  _exprToBinary(exprResult) {
+    let value = '';
+    for (const part of exprResult) {
+      if (part.value && part.value !== '-') value += part.value;
+      else if (part.ref && part.ref !== '&-') {
+        const val = this.getValueFromRef(part.ref);
+        if (val) value += val;
+      }
+    }
+    return value;
+  }
+
+  evalProtocolInvoke(invoke) {
+    const protoRef = invoke.protocolRef;
+    const inst = this.inlineInstances.get(protoRef);
+    if (!inst) throw Error(`Undefined inline instance '${protoRef}'`);
+    if (inst.kind !== 'protocol') throw Error(`Inline instance '${protoRef}' is not a protocol`);
+    const generateFn = typeof generateProtocol === 'function' ? generateProtocol : null;
+    if (!generateFn) throw Error('Protocol assembler is not loaded');
+
+    const argValues = {};
+    const args = invoke.args || {};
+    for (const [argName, argExpr] of Object.entries(args)) {
+      argValues[argName] = this._exprToBinary(this.evalExpr(argExpr, false));
+    }
+
+    for (const paramName of Object.keys(inst.parameters || {})) {
+      if (argValues[paramName] === undefined) {
+        throw Error(`Unknown parameter '${paramName}'`);
+      }
+    }
+
+    const result = generateFn(inst, argValues);
+    return { value: result.blob, bitWidth: result.totalWidth, channelWidths: result.channelWidths };
+  }
+
+  evalProtocolInvokeAtom(invoke, computeRefs) {
+    const result = this.evalProtocolInvoke(invoke);
+    if (computeRefs) {
+      const idx = this.storeValue(result.value);
+      return { value: result.value, ref: `&${idx}`, bitWidth: result.bitWidth, protocolBlob: true };
+    }
+    return { value: result.value, ref: null, bitWidth: result.bitWidth, protocolBlob: true };
+  }
+
   evalInlineLutInvoke(inst, invoke, computeRefs) {
     if (!this.componentRegistry) throw Error('Component registry unavailable for inline LUT');
     const handler = this.componentRegistry.get('lut');
@@ -449,7 +494,22 @@ class Interpreter {
       });
       return;
     }
-    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut)`);
+    if (inline.kind === 'protocol') {
+      const parseBodyFn = typeof parseProtocolBody === 'function' ? parseProtocolBody : null;
+      if (!parseBodyFn) throw Error('Protocol assembler is not loaded');
+      const proto = parseBodyFn(inline.bodyRaw);
+      this.inlineInstances.set(inline.name, {
+        kind: inline.kind,
+        name: inline.name,
+        attributes: proto.attributes,
+        channels: proto.channels,
+        parameters: proto.parameters,
+        channelOrder: proto.channelOrder,
+        bodyRaw: inline.bodyRaw,
+      });
+      return;
+    }
+    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol)`);
   }
 
   _emitComputedForBodyComponents(internalPrefix) {
@@ -1316,6 +1376,10 @@ class Interpreter {
 
     if (a.asmProgram) {
       return this.evalAsmProgramAtom(a.asmProgram, computeRefs);
+    }
+
+    if (a.protocolInvoke) {
+      return this.evalProtocolInvokeAtom(a.protocolInvoke, computeRefs);
     }
 
     if(a.bin){
@@ -3649,8 +3713,12 @@ if (s.assignment) {
         // Bit-width enforcement: pad literals, reject wire-to-wire mismatch
         if(wireValue && wireValue.length !== bits){
           const hasAsmBlob = exprResult.some(p => p.asmBlob);
+          const hasProtocolBlob = exprResult.some(p => p.protocolBlob);
           if (hasAsmBlob) {
             throw Error(`Bit-width mismatch: ${d.name} is ${bits}bit but assembled program provides ${wireValue.length} bits`);
+          }
+          if (hasProtocolBlob) {
+            throw Error(`Protocol output width mismatch: ${d.name} is ${bits}bit but protocol provides ${wireValue.length} bits`);
           }
           // Check if expression references any user-defined wires
           const hasWireRef = exprResult.some(p => p.varName && this.wires.has(p.varName));
@@ -8602,6 +8670,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
         if (kindName === 'asm' && typeof formatInstanceDoc === 'function') {
           return formatInstanceDoc(alias, inst);
         }
+        if (kindName === 'protocol' && typeof formatProtocolInstanceDoc === 'function') {
+          return formatProtocolInstanceDoc(alias, inst);
+        }
       }
     }
     if (inlineInstances) {
@@ -8613,6 +8684,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
           if (kindName === 'asm' && typeof formatInstanceDoc === 'function') {
             return formatInstanceDoc(instName, inst);
           }
+          if (kindName === 'protocol' && typeof formatProtocolInstanceDoc === 'function') {
+            return formatProtocolInstanceDoc(instName, inst);
+          }
         }
       }
     }
@@ -8621,6 +8695,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     }
     if (kindName === 'asm' && typeof formatAsmTypeDoc === 'function') {
       return formatAsmTypeDoc(kindName, null);
+    }
+    if (kindName === 'protocol' && typeof formatProtocolTypeDoc === 'function') {
+      return formatProtocolTypeDoc();
     }
     return [`${name}: (no inline doc available)`];
   }
@@ -8634,6 +8711,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
       }
       if (inst.kind === 'asm' && typeof formatInstanceDoc === 'function') {
         return formatInstanceDoc(name, inst);
+      }
+      if (inst.kind === 'protocol' && typeof formatProtocolInstanceDoc === 'function') {
+        return formatProtocolInstanceDoc(name, inst);
       }
     }
   }

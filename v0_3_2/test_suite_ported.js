@@ -3002,5 +3002,239 @@ doc(.decoder)`);
   h.assert('fillwith slots', String(out.some(l => l.includes('fillwith'))), 'true');
 });
 
+const INLINE_REV = `inline [protocol] .revtest:
+  out:
+    reverse(data 8b)
+  :`;
+
+const INLINE_PAR_EVEN = `inline [protocol] .pareven:
+  out:
+    parityEven(data 8b)
+  :`;
+
+const INLINE_PAR_ODD = `inline [protocol] .parodd:
+  out:
+    parityOdd(data 8b)
+  :`;
+
+const INLINE_CLK_LOW = `inline [protocol] .clklow:
+  clockType: lowFirst
+  out:
+    clock 8b
+  :`;
+
+const INLINE_CLK_HIGH = `inline [protocol] .clkhigh:
+  clockType: highFirst
+  out:
+    clock 8b
+  :`;
+
+const INLINE_REPEAT0 = `inline [protocol] .rep0:
+  out:
+    repeat 0 4b
+  :`;
+
+const INLINE_REPEAT1 = `inline [protocol] .rep1:
+  out:
+    repeat 1 4b
+  :`;
+
+const INLINE_UART8N1 = `inline [protocol] .uart8n1:
+  tx:
+    0
+    reverse(data 8b)
+    1
+  :`;
+
+const INLINE_UART8E1 = `inline [protocol] .uart8e1:
+  tx:
+    0
+    reverse(data 8b)
+    parityEven(data)
+    1
+  :`;
+
+const INLINE_UART8O1 = `inline [protocol] .uart8o1:
+  tx:
+    0
+    reverse(data 8b)
+    parityOdd(data)
+    1
+  :`;
+
+const INLINE_SPI = `inline [protocol] .spi:
+  clockType: lowFirst
+  mosi:
+    data 8b
+  sclk:
+    clock 8b
+  cs:
+    repeat 0 8b
+  :`;
+
+const INLINE_I2C = `inline [protocol] .i2c:
+  clockType: lowFirst
+  sda:
+    0
+    address 7b
+    rw 1b
+    ack1 1b
+    data 8b
+    ack2 1b
+    1
+  scl:
+    clock 20b
+  :`;
+
+reg(914, 'protocol', 'parse inline [protocol] — canale + parametri + attributes', function(h, session) {
+  const p = new Parser(new Tokenizer(INLINE_SPI), session._ensureRegistry());
+  const stmts = p.parse();
+  h.assert('inline stmt', String(!!stmts[0].inline), 'true');
+  h.assert('kind protocol', stmts[0].inline.kind, 'protocol');
+  h.assert('instance name', stmts[0].inline.name, '.spi');
+  const proto = parseProtocolBody(stmts[0].inline.bodyRaw);
+  h.assert('channelOrder', proto.channelOrder.join(','), 'mosi,sclk,cs');
+  h.assert('clockType', proto.attributes.clockType, 'lowFirst');
+  h.assert('param data', String(proto.parameters.data), '8');
+});
+
+reg(915, 'protocol', 'reverse — .revtest', function(h, session) {
+  const { interp } = session.run(INLINE_REV + '\n8wire out = .revtest { data = 01000001 }');
+  h.assert('reversed', session.getWire(interp, 'out'), '10000010');
+});
+
+reg(916, 'protocol', 'parityEven — par (4 biți setați)', function(h, session) {
+  const { interp } = session.run(INLINE_PAR_EVEN + '\n1wire p = .pareven { data = 01100110 }');
+  h.assert('even parity', session.getWire(interp, 'p'), '0');
+});
+
+reg(917, 'protocol', 'parityEven — impar (5 biți setați)', function(h, session) {
+  const { interp } = session.run(INLINE_PAR_EVEN + '\n1wire p = .pareven { data = 01100111 }');
+  h.assert('odd data even parity', session.getWire(interp, 'p'), '1');
+});
+
+reg(918, 'protocol', 'parityOdd — par → 1', function(h, session) {
+  const { interp } = session.run(INLINE_PAR_ODD + '\n1wire p = .parodd { data = 01100110 }');
+  h.assert('even data odd parity', session.getWire(interp, 'p'), '1');
+});
+
+reg(919, 'protocol', 'parityOdd — impar → 0', function(h, session) {
+  const { interp } = session.run(INLINE_PAR_ODD + '\n1wire p = .parodd { data = 01100111 }');
+  h.assert('odd data odd parity', session.getWire(interp, 'p'), '0');
+});
+
+reg(920, 'protocol', 'clock lowFirst — 01010101', function(h, session) {
+  const { interp } = session.run(INLINE_CLK_LOW + '\n8wire out = .clklow { }');
+  h.assert('lowFirst', session.getWire(interp, 'out'), '01010101');
+});
+
+reg(921, 'protocol', 'clock highFirst — 10101010', function(h, session) {
+  const { interp } = session.run(INLINE_CLK_HIGH + '\n8wire out = .clkhigh { }');
+  h.assert('highFirst', session.getWire(interp, 'out'), '10101010');
+});
+
+reg(922, 'protocol', 'repeat 0 — 0000', function(h, session) {
+  const { interp } = session.run(INLINE_REPEAT0 + '\n4wire out = .rep0 { }');
+  h.assert('repeat0', session.getWire(interp, 'out'), '0000');
+});
+
+reg(923, 'protocol', 'repeat 1 — 1111', function(h, session) {
+  const { interp } = session.run(INLINE_REPEAT1 + '\n4wire out = .rep1 { }');
+  h.assert('repeat1', session.getWire(interp, 'out'), '1111');
+});
+
+reg(924, 'protocol', 'UART 8N1 — reverse + start/stop', function(h, session) {
+  const { interp } = session.run(INLINE_UART8N1 + '\n10wire tx = .uart8n1 { data = ^41 }');
+  h.assert('uart8n1', session.getWire(interp, 'tx'), '0100000101');
+});
+
+reg(925, 'protocol', 'UART 8E1 — parityEven', function(h, session) {
+  const { interp } = session.run(INLINE_UART8E1 + '\n11wire tx = .uart8e1 { data = ^41 }');
+  h.assert('uart8e1', session.getWire(interp, 'tx'), '01000001001');
+});
+
+reg(926, 'protocol', 'UART 8O1 — parityOdd', function(h, session) {
+  const { interp } = session.run(INLINE_UART8O1 + '\n11wire tx = .uart8o1 { data = ^41 }');
+  h.assert('uart8o1', session.getWire(interp, 'tx'), '01000001011');
+});
+
+reg(927, 'protocol', 'SPI multi-output — mosi + sclk + cs', function(h, session) {
+  const { interp } = session.run(INLINE_SPI + `
+8wire mosi,
+8wire sclk,
+8wire cs
+= .spi { data = ^A5 }`);
+  h.assert('mosi', session.getWire(interp, 'mosi'), '10100101');
+  h.assert('sclk', session.getWire(interp, 'sclk'), '01010101');
+  h.assert('cs', session.getWire(interp, 'cs'), '00000000');
+});
+
+reg(928, 'protocol', 'I2C multi-output — sda + scl', function(h, session) {
+  const { interp } = session.run(INLINE_I2C + `
+20wire sda,
+20wire scl
+= .i2c {
+  address = ^42
+  rw = 0
+  ack1 = 0
+  data = ^55
+  ack2 = 0
+}`);
+  h.assert('sda', session.getWire(interp, 'sda'), '01000010000101010101');
+  h.assert('scl', session.getWire(interp, 'scl'), '01010101010101010101');
+});
+
+reg(929, 'protocol', 'eroare — parametru width mismatch la declarație', function(h, session) {
+  let err = '';
+  try {
+    parseProtocolBody('tx:\n  data 8b\n  reverse(data 7b)\n');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('width mismatch', String(err.includes('previously declared')), 'true');
+});
+
+reg(930, 'protocol', 'eroare — parametru lipsă la invocare', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_UART8N1 + '\n10wire tx = .uart8n1 { }');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('missing param', String(err.includes("Unknown parameter 'data'")), 'true');
+});
+
+reg(931, 'protocol', 'eroare — output width mismatch', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_UART8N1 + '\n12wire tx = .uart8n1 { data = ^41 }');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('width mismatch', String(err.includes('Protocol output width mismatch')), 'true');
+});
+
+reg(932, 'protocol', 'uart8n1 { } fără punct → eroare', function(h, session) {
+  let err = '';
+  try {
+    session.parse(INLINE_UART8N1 + '\n10wire tx = uart8n1 { data = ^41 }');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('bare brace parse error', String(err.length > 0), 'true');
+});
+
+reg(933, 'protocol', 'doc(inline.protocol) — template', function(h, session) {
+  const out = session.runDoc('doc(inline.protocol)');
+  h.assert('inline header', String(out.some(l => l.includes('inline [protocol]'))), 'true');
+  h.assert('reverse', String(out.some(l => l.includes('reverse'))), 'true');
+  h.assert('clockType', String(out.some(l => l.includes('clockType'))), 'true');
+});
+
+reg(934, 'protocol', 'doc(.uart8n1) — instanță', function(h, session) {
+  const out = session.runDoc(INLINE_UART8N1 + '\ndoc(.uart8n1)');
+  h.assert('header', String(out.some(l => l.includes('.uart8n1 (inline [protocol])'))), 'true');
+  h.assert('outputs tx', String(out.some(l => l.includes('tx'))), 'true');
+  h.assert('param data', String(out.some(l => l.includes('data 8b'))), 'true');
+});
+
+reg(935, 'protocol', 'doc(inline) listează instanță protocol', function(h, session) {
+  const out = session.runDoc(INLINE_UART8N1 + '\ndoc(inline)');
+  h.assert('instance', String(out.some(l => l.includes('.uart8n1 (inline [protocol])'))), 'true');
+  h.assert('kind', String(out.some(l => l.includes('inline.protocol'))), 'true');
+});
+
   suite.finalize();
 })();

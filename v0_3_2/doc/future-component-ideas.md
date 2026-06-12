@@ -10,7 +10,7 @@ Each table is followed by numbered subsections (A1, B2, …) with a short explan
 
 **`comp` components:** switch, key, dip, rotary, led, bar, 7seg, 14seg, lcd, dots, adder, subtract, multiplier, divider, shifter, counter, mem, lut, reg, osc.
 
-**`inline` (language):** asm, lut — see [asm.md](asm.md), [lut.md](lut.md).
+**`inline` (language):** asm, lut, protocol — see [asm.md](asm.md), [lut.md](lut.md), [protocol.md](protocol.md).
 
 **Built-ins (no panel):** logic (NOT, AND, OR, MUX, DEMUX, EQ, LATCH…), REG, instant arithmetic (ADD, SUBTRACT, MULTIPLY, DIVIDE), LSHIFT/RSHIFT.
 

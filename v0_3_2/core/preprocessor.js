@@ -287,14 +287,18 @@ function findRepeatKeyword(source, from) {
       }
       continue;
     }
-    // Check for `repeat` keyword followed by whitespace
+    // Check for `repeat N..M[` directive (not protocol `repeat bit Nb` segments)
     if (source.startsWith('repeat', i)) {
       const after = i + 'repeat'.length;
-      // Must be preceded by start-of-string, newline, or whitespace
       if (i === 0 || /[\s]/.test(source[i - 1])) {
-        // Must be followed by whitespace
         if (after < source.length && (source[after] === ' ' || source[after] === '\t')) {
-          return i;
+          let j = after;
+          while (j < source.length && (source[j] === ' ' || source[j] === '\t')) j++;
+          let startStr = '';
+          while (j < source.length && /[0-9]/.test(source[j])) { startStr += source[j]; j++; }
+          if (startStr && source[j] === '.' && source[j + 1] === '.') {
+            return i;
+          }
         }
       }
     }

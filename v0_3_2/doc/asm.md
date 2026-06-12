@@ -212,7 +212,7 @@ doc(.myisa)
 
 | Call | Output |
 |------|--------|
-| `doc(inline)` | Lists all inline instances (asm, lut, …) |
+| `doc(inline)` | Lists all inline instances (asm, lut, protocol, …) |
 | `doc(inline.asm)` | ISA declaration template |
 | `doc(.myisa)` | Opcode layout for that asm instance |
 
