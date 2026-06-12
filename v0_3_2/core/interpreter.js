@@ -1,5 +1,25 @@
 /* ================= INTERPRETER ================= */
 
+function isGetRedirectProperty(property) {
+  return /^(2|3|4)?get>$/.test(property);
+}
+
+function memPortFromAdrPin(pinName) {
+  if (pinName === 'adr') return 1;
+  const m = /^([2-4])adr$/.exec(pinName);
+  return m ? parseInt(m[1], 10) : 1;
+}
+
+function memGetPropForPort(port) {
+  return port === 1 ? 'get' : String(port) + 'get';
+}
+
+function memPortsFromAttributes(attributes) {
+  const p = attributes && attributes['ports'] !== undefined ? parseInt(attributes['ports'], 10) : 1;
+  if (isNaN(p) || p < 1) return 1;
+  return Math.min(4, Math.max(1, p));
+}
+
 class Interpreter {
   constructor(funcs,out,pcbs=null,componentRegistry=null, signalPropagationStrategy=null, chips=null, boards=null){
     this.funcs=funcs;
@@ -2650,7 +2670,7 @@ if (this.isBuiltinDEMUX(name)) {
       
       for(const prop of properties){
         // Skip get> properties when collecting dependencies (they don't have expr)
-        if(prop.property !== 'get>' && prop.property !== 'mod>' && prop.property !== 'carry>' && prop.property !== 'over>' && prop.property !== 'out>'){
+        if(!isGetRedirectProperty(prop.property) && prop.property !== 'mod>' && prop.property !== 'carry>' && prop.property !== 'over>' && prop.property !== 'out>'){
           this.collectExprDependencies(prop.expr, allDependencies, allWireDependencies);
         }
         
@@ -2695,7 +2715,7 @@ if (this.isBuiltinDEMUX(name)) {
       // Extract getTarget if present
       let getTargetAtom = null;
       for(const prop of properties){
-        if(prop.property === 'get>'){
+        if(isGetRedirectProperty(prop.property)){
           getTargetAtom = prop.target;
           break;
         }
@@ -5524,7 +5544,7 @@ if (s.assignment) {
       const property = prop.property;
       
       // Skip get>, mod>, carry>, over>, out>, and pout> properties - they are processed after all properties are applied
-      if(property === 'get>' || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>'){
+      if(isGetRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>'){
         continue;
       }
       
@@ -5622,55 +5642,42 @@ if (s.assignment) {
       }
     }
     
-    // Process get> property if present (after all properties are applied)
-    let getTarget = null;
+    // Process get>/2get>/… redirects after all properties are applied
     for(const prop of properties){
-      if(prop.property === 'get>'){
-        if(getTarget){
-          throw Error(`Only one get> property allowed per block`);
-        }
-        getTarget = prop.target;
-      }
-    }
-    
-    if(getTarget){
-      // Validate component supports :get
+      if(!isGetRedirectProperty(prop.property)) continue;
+
+      const getProp = prop.property.slice(0, -1);
       const comp = this.components.get(component);
-      if(!comp){
-        return;
-      }
-      
-      const supportsGet = this.componentRegistry ? this.componentRegistry.supportsProperty(comp.type, 'get', comp.attributes) : true;
+      if(!comp) continue;
+
+      const supportsGet = this.componentRegistry
+        ? this.componentRegistry.supportsProperty(comp.type, getProp, comp.attributes)
+        : (getProp === 'get');
       if(!supportsGet){
-        throw Error(`Component ${component} (type: ${comp.type}) does not support :get property`);
+        throw Error(`Component ${component} (type: ${comp.type}) does not support :${getProp} property`);
       }
-      
-      // Evaluate component:get
+
       const getAtom = {
         var: component,
-        property: 'get'
+        property: getProp
       };
       const getResult = this.evalAtom(getAtom, false);
-      
-      // Assign result to target wire
-      const targetName = getTarget.var;
+
+      const targetName = prop.target.var;
       const wire = this.wires.get(targetName);
       if(!wire){
-        throw Error(`Wire ${targetName} not found for get> assignment`);
+        throw Error(`Wire ${targetName} not found for ${prop.property} assignment`);
       }
-      
-      // Get bit width for target wire
+
       const bits = this.getBitWidth(wire.type);
       let getValue = getResult.value || '0'.repeat(bits);
-      
-      // Ensure value has correct length
+
       if(getValue.length < bits){
         getValue = getValue.padEnd(bits, '0');
       } else if(getValue.length > bits){
         getValue = getValue.substring(0, bits);
       }
-      
-      // Update wire storage
+
       let storageIdx = null;
       if(wire.ref){
         const refMatch = wire.ref.match(/^&(\d+)/);
@@ -5681,20 +5688,16 @@ if (s.assignment) {
             const oldValue = stored.value;
             if(oldValue !== getValue){
               stored.value = getValue;
-              // Update connected components only if value changed
               this.updateConnectedComponents(targetName, getValue);
             }
           }
         }
       } else {
-        // Wire has no ref yet - create storage and set ref
         storageIdx = this.storeValue(getValue);
         wire.ref = `&${storageIdx}`;
-        // Also update wireStorageMap for NEXT support
         if(!this.wireStorageMap.has(targetName)){
           this.wireStorageMap.set(targetName, storageIdx);
         }
-        // Update connected components (new wire, always trigger)
         this.updateConnectedComponents(targetName, getValue);
       }
     }

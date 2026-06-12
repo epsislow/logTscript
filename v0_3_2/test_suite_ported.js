@@ -3888,5 +3888,87 @@ on: 1
   h.assert('wave port2', session.getWire(interp, 'v1'), '0000');
 }, { propagation: 'wave' });
 
+reg(997, 'mem-ports', 'dual get> and 2get> in one block', function(h, session) {
+  const { interp } = session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+on: 1
+= 1010
+:
+4wire a0 = 0000
+4wire a1 = 0001
+4wire v0
+4wire v1
+.ram:{
+  adr = a0
+  get >= v0
+  2adr = a1
+  2get >= v1
+  set = 1
+}
+show(v0)
+show(v1)`);
+  h.assert('v0 port1 addr0', session.getWire(interp, 'v0'), '1010');
+  h.assert('v1 port2 addr1', session.getWire(interp, 'v1'), '0000');
+});
+
+reg(998, 'mem-ports', 'dual write different addresses in one block', function(h, session) {
+  const { interp } = session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+on: 1
+= 0000
+:
+4wire r0
+4wire r1
+.ram:{
+  adr = 0000
+  data = 1010
+  write = 1
+  2adr = 0001
+  2data = 1100
+  2write = 1
+  set = 1
+}
+.ram:{ adr = 0000
+  get >= r0
+  set = 1 }
+.ram:{ 2adr = 0001
+  2get >= r1
+  set = 1 }`);
+  h.assert('addr0 via get>', session.getWire(interp, 'r0'), '1010');
+  h.assert('addr1 via 2get>', session.getWire(interp, 'r1'), '1100');
+  const id = _memId(interp, '.ram');
+  if (typeof getMem === 'function') {
+    h.assert('addr0 storage', getMem(id, 0), '1010');
+    h.assert('addr1 storage', getMem(id, 1), '1100');
+  }
+});
+
+reg(999, 'mem-ports', 'duplicate get> in same block throws', function(h, session) {
+  h.assertThrows('two get>= in one block', function() {
+    session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+on: 1
+= 1010
+:
+4wire a0 = 0000
+4wire a1 = 0001
+4wire v0
+4wire v1
+.ram:{
+  adr = a0
+  get >= v0
+  2adr = a1
+  get >= v1
+  set = 1
+}`);
+  }, 'Only one get> property allowed per property block');
+});
+
   suite.finalize();
 })();

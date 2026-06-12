@@ -837,8 +837,9 @@ parseBoardInstance() {
     this.eat('SYM', '{');
     
     const properties = [];
-    let hasGetProperty = false;
-    const REDIRECT_PROPS = new Set(['get', 'mod', 'carry', 'over', 'out']);
+    const usedGetRedirects = new Set();
+    const REDIRECT_PROPS = new Set(['mod', 'carry', 'over', 'out']);
+    const isGetRedirectProp = (name) => /^(2|3|4)?get$/.test(name);
     
     while (!(this.c.type === 'SYM' && this.c.value === '}')) {
       if (this.c.type === 'EOL') {
@@ -857,13 +858,13 @@ parseBoardInstance() {
       const propName = this.c.value;
       this.eat('ID');
       
-      // --- DRY redirect properties: get>, mod>, carry>, over>, out> ---
-      if (REDIRECT_PROPS.has(propName) && this.c.type === 'SYM' && this.c.value === '>') {
-        if (propName === 'get') {
-          if (hasGetProperty) {
-            throw Error(`Only one get> property allowed per property block at ${this.c.line}:${this.c.col}`);
+      // --- DRY redirect properties: get>/2get>/…, mod>, carry>, over>, out> ---
+      if ((isGetRedirectProp(propName) || REDIRECT_PROPS.has(propName)) && this.c.type === 'SYM' && this.c.value === '>') {
+        if (isGetRedirectProp(propName)) {
+          if (usedGetRedirects.has(propName)) {
+            throw Error(`Only one ${propName}> property allowed per property block at ${this.c.line}:${this.c.col}`);
           }
-          hasGetProperty = true;
+          usedGetRedirects.add(propName);
         }
 
         this.eat('SYM', '>');

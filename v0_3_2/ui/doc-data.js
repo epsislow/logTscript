@@ -5155,6 +5155,34 @@ show(v1)
 
 **Read-only (\`readonly\`):** use for program ROM semantics — property-block writes are rejected; bulk assign and declaration init still work.
 
+**Redirect reads in one block:** use \`get >= wire\` for port 1 and \`2get >= wire\` for port 2 (also \`3get>\`, \`4get>\`). Multiple ports may be read in the same property block after setting each port’s \`adr\` pin.
+
+\`\`\`logts-play
+comp [mem] .ram:
+  ports: 2
+  length: 4
+  depth: 4
+  on: 1
+  = 1010
+  :
+
+4wire a0 = 0000
+4wire a1 = 0001
+4wire v0
+4wire v1
+.ram:{
+  adr = a0
+  get >= v0
+  2adr = a1
+  2get >= v1
+  set = 1
+}
+show(v0)
+show(v1)
+\`\`\`
+
+Dual writes in one block (different addresses, no collision): set \`write\`/\`data\` on port 1 and \`2write\`/\`2data\` on port 2 in the same \`{ … }\` block.
+
 > **Breaking change (v0.3.x):** the address pin was renamed from \`at\` to **\`adr\`**. Update all \`comp [mem]\` property blocks and inline assignments (\`.data:adr = …\`).
 
 ---
