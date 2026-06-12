@@ -61,6 +61,7 @@ const DOC_SECTIONS = [
       { file: 'mem.md', label: 'mem' },
       { file: 'asm.md', label: 'asm', searchExtra: 'inline assembler isa mnemonic program blob myisa' },
       { file: 'lut.md', label: 'lut', searchExtra: 'inline lookup table decoder comp' },
+      { file: 'protocol.md', label: 'protocol', searchExtra: 'inline uart spi i2c reverse parity clock repeat tx sda scl mosi' },
       { file: 'reg.md', label: 'reg' },
       { file: 'oscillator.md', label: 'oscillator' },
     ],
