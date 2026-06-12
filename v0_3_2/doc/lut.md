@@ -50,35 +50,161 @@ Unmapped slots use `fillwith`. Overlapping ranges: **last entry wins**. Address 
 
 ---
 
-## Usage
+## Runnable — basic lookup (method B)
 
-### Method B — structural wiring
+```logts-play
+comp [lut] .lut:
+  depth: 4
+  length: 16
+  = data {
+    0         : 0001
+    \1 - \5   : 0010
+  }
+  :
 
-```logts
-4wire index = 0011
-.decoder:in = index
-4wire value = .decoder:get
+4wire addr = 0011
+.lut:in = addr
+4wire y = .lut:get
+show(y)
 ```
 
-### Method A — inline invocation
+Address `0011` (binary) = slot **3** → value `0010`.
 
-```logts
-4wire value = .decoder(in = index)
+---
+
+## Runnable — unmapped slots and `fillwith`
+
+```logts-play
+comp [lut] .lut:
+  depth: 4
+  length: 16
+  fillwith: 0110
+  = data {
+    0         : 0001
+    \1 - \5   : 0010
+  }
+  :
+
+.lut:in = 0110
+4wire y = .lut:get
+show(y)
+```
+
+Slot **6** is not in `data { }` → output is `fillwith` (`0110`).
+
+---
+
+## Runnable — address formats
+
+Binary index:
+
+```logts-play
+comp [lut] .lut:
+  depth: 4
+  length: 16
+  = data {
+    010 : 1000
+  }
+  :
+
+.lut:in = 010
+4wire y = .lut:get
+show(y)
+```
+
+Decimal index `\50`:
+
+```logts-play
+comp [lut] .lut:
+  depth: 4
+  length: 64
+  = data {
+    \50 : 1111
+  }
+  :
+
+.lut:in = \50
+4wire y = .lut:get
+show(y)
+```
+
+Hex range `^a - ^f`:
+
+```logts-play
+comp [lut] .lut:
+  depth: 4
+  length: 16
+  = data {
+    ^a - ^f : 1111
+  }
+  :
+
+.lut:in = ^c
+4wire y = .lut:get
+show(y)
+```
+
+Mixed range (binary start, decimal end):
+
+```logts-play
+comp [lut] .lut:
+  depth: 4
+  length: 16
+  = data {
+    010 - \5 : 0010
+  }
+  :
+
+.lut:in = 0100
+4wire y = .lut:get
+show(y)
+```
+
+---
+
+## Runnable — method A (inline invocation)
+
+```logts-play
+comp [lut] .lut:
+  depth: 4
+  length: 16
+  = data {
+    0         : 0001
+    \1 - \5   : 0010
+  }
+  :
+
+4wire addr = 0001
+4wire y = .lut(in = addr)
+show(y)
 ```
 
 Only pin `in` is supported in v1; result is always pout `get`.
 
 ---
 
-## `probe` and `doc()`
+## Runnable — `probe` and `doc()`
 
-```logts
+```logts-play
+comp [lut] .decoder:
+  depth: 4
+  length: 16
+  fillwith: 0110
+  = data {
+    0         : 0001
+    \1 - \5   : 0010
+    ^a - ^f   : 1111
+  }
+  :
+
 probe(.decoder:get)
-doc(comp.lut)    @ syntax template for the type
-doc(.decoder)    @ instance: map + fillwith gaps
+.decoder:in = 0000
+.decoder:in = 0011
+doc(comp.lut)
+doc(.decoder)
 ```
 
-`doc(.decoder)` example sections:
+`doc(.decoder)` example output:
 
 ```text
 .decoder (comp [lut])
@@ -119,5 +245,6 @@ doc(.decoder)    @ instance: map + fillwith gaps
 ## Related
 
 - [mem.md](mem.md) — sequential RAM
+- [asm.md](asm.md) — inline assembler (blob into `mem`)
 - [debug.md](debug.md) — `probe`, `show`, `peek`
 - [future-component-ideas.md](future-component-ideas.md) — backlog (B2 LUT)
