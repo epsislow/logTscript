@@ -15,6 +15,7 @@
   const btnRunAll = document.getElementById('btnRunAll');
 
   const statusById = new Map();
+  const manifestById = new Map(manifest.entries.map(e => [e.id, e]));
   let running = false;
 
   const portedCount = suite.tests.length;
@@ -155,13 +156,134 @@
     const dot = row.querySelector('.dot');
     dot.className = 'dot ' + (status === 'pending' || status === 'not-ported' ? '' : status);
     row.classList.toggle('fail-open', status === 'fail');
-    const detail = row.querySelector('.test-detail');
-    if (status === 'fail' && failures && failures.length) {
-      detail.textContent = formatFailures(failures);
-    } else {
-      detail.textContent = '';
+    const failDetail = row.querySelector('.test-fail-detail');
+    if (failDetail) {
+      if (status === 'fail' && failures && failures.length) {
+        failDetail.textContent = formatFailures(failures);
+      } else {
+        failDetail.textContent = '';
+      }
     }
     updateSummary();
+  }
+
+  function getTestSource(id) {
+    const ported = suite.getTest(id);
+    if (!ported || typeof ported.run !== 'function') return '';
+    return ported.run.toString();
+  }
+
+  function defaultInfoTab(detail) {
+    if (detail.scripts && detail.scripts.length) return 'script';
+    if (detail.steps && detail.steps.length) return 'steps';
+    return 'checks';
+  }
+
+  function renderInfoTabContent(tab, entry) {
+    const detail = entry.detail || { scripts: [], steps: [], assertions: [] };
+    if (tab === 'script') {
+      if (!detail.scripts || !detail.scripts.length) {
+        return '<p class="test-info-empty">Niciun script LogTScript extras. Vezi tab-ul Pași sau Sursă JS.</p>';
+      }
+      return detail.scripts.map((s, i) => {
+        const label = detail.scripts.length > 1 ? 'Script ' + (i + 1) : 'Script';
+        return '<div style="margin-bottom:8px"><div style="color:#888;font-size:10px;margin-bottom:4px">' +
+          label + '</div><pre class="test-info-pre">' + escapeHtml(s) + '</pre></div>';
+      }).join('');
+    }
+    if (tab === 'steps') {
+      if (!detail.steps || !detail.steps.length) {
+        return '<p class="test-info-empty">Niciun pas API extras (gateReduce, getDocLines, registry, …).</p>';
+      }
+      return '<ul class="test-info-list test-info-list--steps">' +
+        detail.steps.map(s => '<li><code>' + escapeHtml(s) + '</code></li>').join('') +
+        '</ul>';
+    }
+    if (tab === 'checks') {
+      if (!detail.assertions || !detail.assertions.length) {
+        return '<p class="test-info-empty">Nicio verificare extrasă din h.assert / h.assertThrows.</p>';
+      }
+      return '<ul class="test-info-list">' +
+        detail.assertions.map(a => '<li>' + escapeHtml(a) + '</li>').join('') +
+        '</ul>';
+    }
+    const source = getTestSource(entry.id);
+    if (!source) {
+      return '<p class="test-info-empty">Test neportat — fără sursă.</p>';
+    }
+    return '<pre class="test-info-pre test-info-pre--source">' + escapeHtml(source) + '</pre>';
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function activateInfoTab(infoEl, tabName) {
+    infoEl.querySelectorAll('.test-info-tab').forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.tab === tabName);
+    });
+    infoEl.querySelectorAll('.test-info-panel').forEach(panel => {
+      panel.classList.toggle('is-active', panel.dataset.tab === tabName);
+    });
+  }
+
+  function createTestInfo(entry) {
+    const info = document.createElement('div');
+    info.className = 'test-info';
+    const detail = entry.detail || { scripts: [], steps: [], assertions: [] };
+    const initialTab = defaultInfoTab(detail);
+
+    const tabs = document.createElement('div');
+    tabs.className = 'test-info-tabs';
+
+    const tabDefs = [
+      { id: 'script', label: 'Script' },
+      { id: 'steps', label: 'Pași' },
+      { id: 'checks', label: 'Verificări' },
+      { id: 'source', label: 'Sursă JS' }
+    ];
+
+    for (const def of tabDefs) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn test-info-tab' + (def.id === initialTab ? ' is-active' : '');
+      btn.dataset.tab = def.id;
+      btn.textContent = def.label;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activateInfoTab(info, def.id);
+      });
+      tabs.appendChild(btn);
+
+      const panel = document.createElement('div');
+      panel.className = 'test-info-panel' + (def.id === initialTab ? ' is-active' : '');
+      panel.dataset.tab = def.id;
+      panel.innerHTML = renderInfoTabContent(def.id, entry);
+      info.appendChild(panel);
+    }
+
+    info.insertBefore(tabs, info.firstChild);
+    return info;
+  }
+
+  function toggleTestInfo(row) {
+    const opening = !row.classList.contains('info-open');
+    row.classList.toggle('info-open', opening);
+    const title = row.querySelector('.test-title');
+    if (title) {
+      title.classList.toggle('is-open', opening);
+      title.title = opening ? 'Ascunde detalii' : 'Arată detalii test';
+    }
+    if (opening) {
+      const entry = manifestById.get(Number(row.dataset.id));
+      const sourcePanel = row.querySelector('.test-info-panel[data-tab="source"]');
+      if (entry && sourcePanel) {
+        sourcePanel.innerHTML = renderInfoTabContent('source', entry);
+      }
+    }
   }
 
   function entryForTest(entry) {
@@ -171,6 +293,7 @@
       id: entry.id,
       title: entry.title,
       group: entry.group,
+      detail: entry.detail || { scripts: [], steps: [], assertions: [] },
       run,
       propagation: ported ? ported.propagation : 'legacy'
     };
@@ -332,6 +455,12 @@
       section.appendChild(header);
 
       for (const test of groupTests) {
+        const manifestEntry = manifestById.get(test.id) || {
+          id: test.id,
+          title: test.title,
+          detail: { scripts: [], steps: [], assertions: [] }
+        };
+
         const row = document.createElement('div');
         row.className = 'test-row' + (test.run ? '' : ' not-ported');
         row.dataset.id = test.id;
@@ -346,46 +475,56 @@
         const body = document.createElement('div');
         body.className = 'test-body';
 
+        const head = document.createElement('div');
+        head.className = 'test-head';
+
         const titleSpan = document.createElement('span');
         titleSpan.className = 'test-title';
         titleSpan.textContent = 'Test ' + test.id + ': ' + test.title;
+        titleSpan.title = 'Arată detalii test';
+        titleSpan.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleTestInfo(row);
+        });
 
-        body.appendChild(titleSpan);
+        head.appendChild(titleSpan);
 
         if (test.run) {
           const mode = test.propagation === 'wave' ? 'wave' : 'legacy';
-          body.appendChild(createPropBadge(mode));
-        }
+          head.appendChild(createPropBadge(mode));
 
-        if (test.run) {
           const btnRun = document.createElement('button');
           btnRun.type = 'button';
           btnRun.className = 'btn btn--run';
           btnRun.textContent = '\u25B6';
           btnRun.title = 'Run test ' + test.id;
-          btnRun.addEventListener('click', async () => {
+          btnRun.addEventListener('click', async (e) => {
+            e.stopPropagation();
             if (running) return;
             setRunningUI(true);
             try {
               await resetStatus([test]);
               await new Promise(resolve => setTimeout(resolve, 300));
-              
+
               await runOneTest(test);
             } finally {
               setRunningUI(false);
             }
           });
-          body.appendChild(btnRun);
+          head.appendChild(btnRun);
         } else {
           const badge = document.createElement('span');
           badge.className = 'not-ported-badge';
           badge.textContent = 'not ported';
-          body.appendChild(badge);
+          head.appendChild(badge);
         }
 
-        const detail = document.createElement('div');
-        detail.className = 'test-detail';
-        body.appendChild(detail);
+        body.appendChild(head);
+        body.appendChild(createTestInfo(manifestEntry));
+
+        const failDetail = document.createElement('div');
+        failDetail.className = 'test-fail-detail';
+        body.appendChild(failDetail);
 
         row.appendChild(dot);
         row.appendChild(idSpan);

@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { loadSharedConstMap, extractTestDetail } = require('./_test_detail_extract');
 
 const dir = __dirname;
 const OUT = path.join(dir, 'test_manifest.js');
@@ -75,13 +76,19 @@ function rangeLabel(ids) {
   return parts.join(', ');
 }
 
+const sharedConsts = loadSharedConstMap(dir, ['test_suite.js', 'test_suite_ported.js']);
+const suiteSource = ['test_suite.js', 'test_suite_ported.js']
+  .map(f => fs.readFileSync(path.join(dir, f), 'utf8'))
+  .join('\n');
+
 const tests = loadSuite();
 tests.sort((a, b) => a.id - b.id);
 
 const entries = tests.map(t => ({
   id: t.id,
   group: t.group || 'other',
-  title: t.title
+  title: t.title,
+  detail: extractTestDetail(t.run, sharedConsts, suiteSource)
 }));
 
 const byGroup = new Map();
@@ -130,7 +137,7 @@ const out = `/**
   'use strict';
   window.LogTScriptManifest = {
     entries: [
-${entries.map(e => `      { id: ${e.id}, group: '${e.group}', title: '${esc(e.title)}' }`).join(',\n')}
+${entries.map(e => '      ' + JSON.stringify(e)).join(',\n')}
     ],
     groups: [
 ${knownGroups.map(g => `      { id: '${g.id}', label: '${esc(g.label)}', rangeLabel: '${g.rangeLabel}', testIds: [${g.testIds.join(', ')}] }`).join(',\n')}

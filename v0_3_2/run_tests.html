@@ -151,9 +151,6 @@ h1 {
 .test-row:last-child {
   border-bottom: none;
 }
-.test-row.not-ported .test-title {
-  color: #666;
-}
 .not-ported-badge {
   font-size: 11px;
   color: #666;
@@ -241,8 +238,100 @@ h1 {
   flex: 1;
   color: #ddd;
   word-break: break-word;
+  cursor: pointer;
+  user-select: none;
 }
-.test-detail {
+.test-title:hover {
+  color: #fff;
+}
+.test-title.is-open {
+  color: #cfe8ff;
+}
+.test-row.not-ported .test-title {
+  color: #666;
+  cursor: default;
+}
+.test-row.not-ported .test-title:hover {
+  color: #666;
+}
+.test-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.test-info {
+  display: none;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  background: #141820;
+  border: 1px solid #2a3545;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+.test-row.info-open .test-info {
+  display: block;
+}
+.test-info-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.test-info-tab {
+  min-height: 24px;
+  padding: 0 10px;
+  font-size: 11px;
+  border-radius: 999px;
+}
+.test-info-tab.is-active {
+  background: #243040;
+  border-color: #4a7090;
+  color: #cfe8ff;
+}
+.test-info-panel {
+  display: none;
+}
+.test-info-panel.is-active {
+  display: block;
+}
+.test-info-pre {
+  margin: 0;
+  padding: 8px;
+  background: #0d1117;
+  border: 1px solid #222;
+  border-radius: 4px;
+  color: #b8d4a8;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
+}
+.test-info-pre--source {
+  color: #c9d1d9;
+}
+.test-info-list {
+  margin: 0;
+  padding: 0 0 0 18px;
+  color: #ccc;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.test-info-list--steps code {
+  color: #9cf;
+  font-size: 11px;
+}
+.test-info-empty {
+  margin: 0;
+  color: #777;
+  font-size: 12px;
+  font-style: italic;
+}
+.test-fail-detail {
   display: none;
   width: 100%;
   margin-top: 6px;
@@ -255,8 +344,14 @@ h1 {
   white-space: pre-wrap;
   word-break: break-word;
 }
-.test-row.fail-open .test-detail {
+.test-row.fail-open .test-fail-detail {
   display: block;
+}
+.test-detail {
+  display: none;
+}
+.test-row.fail-open .test-detail {
+  display: none;
 }
 .test-body {
   flex: 1;
