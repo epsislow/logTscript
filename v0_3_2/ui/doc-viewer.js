@@ -1,5 +1,6 @@
 /* ================= DOC VIEWER ================= */
 
+// BEGIN GENERATED DOC_SECTIONS (_gen_doc_data.js)
 const DOC_SECTIONS = [
   {
     title: 'Reference',
@@ -10,7 +11,7 @@ const DOC_SECTIONS = [
       { file: 'arithmetic.md', label: 'Arithmetic (built-in)' },
       { file: 'debug.md', label: 'Debug (show / peek / probe)' },
       { file: 'signal-propagation.md', label: 'Signal propagation' },
-      { file: 'editorUI.md', label: 'Editor UI' },
+      { file: 'editorUI.md', label: 'Editor UI' }
     ],
   },
   {
@@ -20,7 +21,7 @@ const DOC_SECTIONS = [
       { file: 'chip.md', label: 'Chip' },
       { file: 'mini-cpu.md', label: 'Mini CPU demo', searchExtra: 'harvard alu cpu4 step' },
       { file: 'mini-cpu-plan.md', label: 'Mini CPU plan', searchExtra: 'feasibility variant harvard' },
-      { file: 'pcb.md', label: 'PCB (deprecated)' },
+      { file: 'pcb.md', label: 'PCB (deprecated)' }
     ],
   },
   {
@@ -30,7 +31,7 @@ const DOC_SECTIONS = [
       { file: 'switch.md', label: 'switch' },
       { file: 'key.md', label: 'key' },
       { file: 'dip.md', label: 'dip' },
-      { file: 'rotary.md', label: 'rotary' },
+      { file: 'rotary.md', label: 'rotary' }
     ],
   },
   {
@@ -41,7 +42,7 @@ const DOC_SECTIONS = [
       { file: 'seven-seg.md', label: '7seg' },
       { file: '14seg.md', label: '14seg' },
       { file: 'lcd.md', label: 'lcd' },
-      { file: 'dots.md', label: 'dots' },
+      { file: 'dots.md', label: 'dots' }
     ],
   },
   {
@@ -52,7 +53,7 @@ const DOC_SECTIONS = [
       { file: 'multiplier.md', label: 'multiplier' },
       { file: 'divider.md', label: 'divider' },
       { file: 'shifter.md', label: 'shifter' },
-      { file: 'counter.md', label: 'counter' },
+      { file: 'counter.md', label: 'counter' }
     ],
   },
   {
@@ -63,21 +64,18 @@ const DOC_SECTIONS = [
       { file: 'lut.md', label: 'lut', searchExtra: 'inline lookup table decoder comp' },
       { file: 'protocol.md', label: 'protocol', searchExtra: 'inline uart spi i2c reverse parity clock repeat tx sda scl mosi' },
       { file: 'reg.md', label: 'reg' },
-      { file: 'oscillator.md', label: 'oscillator' },
+      { file: 'oscillator.md', label: 'oscillator' }
     ],
-  },
+  }
 ];
 
 /** In DOC_CONTENT + search only — not listed on the doc index page */
 const DOC_SEARCH_ONLY = [
-  {
-    file: 'future-component-ideas.md',
-    label: 'Future component ideas',
-    section: 'Backlog',
-    searchExtra:
-      'planning roadmap backlog alu dpram lut mux demux decoder rom stack fifo uart gpio slider irq dma eeprom',
-  },
+    { file: 'future-component-ideas.md', label: 'Future component ideas', section: 'Backlog',
+      searchExtra:
+        'planning roadmap backlog alu dpram lut mux demux decoder rom stack fifo uart gpio slider irq dma eeprom' }
 ];
+// END GENERATED DOC_SECTIONS
 
 const DOCS = DOC_SECTIONS.flatMap(function (section) {
   return section.items;

@@ -1,0 +1,78 @@
+{
+  "autoSection": "Other",
+  "sections": [
+    {
+      "title": "Reference",
+      "items": [
+        { "file": "doc-function.md", "label": "doc() function" },
+        { "file": "components.md", "label": "Component catalog" },
+        { "file": "short-notation.md", "label": "Short notation" },
+        { "file": "arithmetic.md", "label": "Arithmetic (built-in)" },
+        { "file": "debug.md", "label": "Debug (show / peek / probe)" },
+        { "file": "signal-propagation.md", "label": "Signal propagation" },
+        { "file": "editorUI.md", "label": "Editor UI" }
+      ]
+    },
+    {
+      "title": "Composite blocks",
+      "items": [
+        { "file": "board.md", "label": "Board" },
+        { "file": "chip.md", "label": "Chip" },
+        { "file": "mini-cpu.md", "label": "Mini CPU demo", "searchExtra": "harvard alu cpu4 step" },
+        { "file": "mini-cpu-plan.md", "label": "Mini CPU plan", "searchExtra": "feasibility variant harvard" },
+        { "file": "pcb.md", "label": "PCB (deprecated)" }
+      ]
+    },
+    {
+      "title": "Interactive inputs",
+      "items": [
+        { "file": "interactive-components.md", "label": "Overview" },
+        { "file": "switch.md", "label": "switch" },
+        { "file": "key.md", "label": "key" },
+        { "file": "dip.md", "label": "dip" },
+        { "file": "rotary.md", "label": "rotary" }
+      ]
+    },
+    {
+      "title": "Displays",
+      "items": [
+        { "file": "led.md", "label": "led" },
+        { "file": "led-bar.md", "label": "LED bar" },
+        { "file": "seven-seg.md", "label": "7seg" },
+        { "file": "14seg.md", "label": "14seg" },
+        { "file": "lcd.md", "label": "lcd" },
+        { "file": "dots.md", "label": "dots" }
+      ]
+    },
+    {
+      "title": "Arithmetic devices",
+      "items": [
+        { "file": "adder.md", "label": "adder" },
+        { "file": "subtract.md", "label": "subtract" },
+        { "file": "multiplier.md", "label": "multiplier" },
+        { "file": "divider.md", "label": "divider" },
+        { "file": "shifter.md", "label": "shifter" },
+        { "file": "counter.md", "label": "counter" }
+      ]
+    },
+    {
+      "title": "Storage & timing",
+      "items": [
+        { "file": "mem.md", "label": "mem" },
+        { "file": "asm.md", "label": "asm", "searchExtra": "inline assembler isa mnemonic program blob myisa" },
+        { "file": "lut.md", "label": "lut", "searchExtra": "inline lookup table decoder comp" },
+        { "file": "protocol.md", "label": "protocol", "searchExtra": "inline uart spi i2c reverse parity clock repeat tx sda scl mosi" },
+        { "file": "reg.md", "label": "reg" },
+        { "file": "oscillator.md", "label": "oscillator" }
+      ]
+    }
+  ],
+  "searchOnly": [
+    {
+      "file": "future-component-ideas.md",
+      "label": "Future component ideas",
+      "section": "Backlog",
+      "searchExtra": "planning roadmap backlog alu dpram lut mux demux decoder rom stack fifo uart gpio slider irq dma eeprom"
+    }
+  ]
+}
