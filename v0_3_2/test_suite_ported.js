@@ -2328,13 +2328,13 @@ const BOARD_CPU4 = `board +[cpu4]:
   1wire doinc
   1wire inc
   pcval = .pcnt:get
-  .prog:{ at = pcval
+  .prog:{ adr = pcval
     set = set }
   instr = .prog:get
   opc = instr.0/4
   opd = instr.4/4
   curacc = .accum:get
-  .data:at = opd
+  .data:adr = opd
   .data:{ set = set }
   loadval = .data:get
   .add:a = curacc
@@ -2360,7 +2360,7 @@ const BOARD_CPU4 = `board +[cpu4]:
   .pcnt:{ dir = 1
     set = inc }
   pcout = .pcnt:get
-  .data:at = opd
+  .data:adr = opd
   .data:{ data = curacc
     write = AND(isstore, set)
     set = AND(isstore, set) }
@@ -3673,6 +3673,220 @@ reg(983, 'terminal', 'block cursor at col 0 on empty', function(h, session) {
   const line = getTerminalRenderedLines(_termId(interp, '.term'))[0];
   h.assert('block at start', line[0], '\u2588');
 });
+
+function _memId(interp, name) {
+  const comp = interp.components.get(name);
+  return comp ? comp.deviceIds[0] : null;
+}
+
+reg(984, 'mem-ports', 'ports default 1 — adr/get', function(h, session) {
+  const { interp } = session.run(`comp [mem] .ram:
+depth: 4
+length: 4
+on: 1
+= \\12
+:
+4wire a = 0000
+.ram:{ adr = a
+  set = 1 }
+4wire r = .ram:get`);
+  h.assert('ports default', String(interp.components.get('.ram').attributes.ports === undefined), 'true');
+  h.assert('read addr 0', session.getWire(interp, 'r'), '1100');
+});
+
+reg(985, 'mem-ports', 'parse ports:2 + tokenizer 2get', function(h, session) {
+  const { tokens } = session.tokenize('2get');
+  h.assert('2get ID', tokens[0].type, 'ID');
+  h.assert('2get value', tokens[0].value, '2get');
+  const stmts = session.parse(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+:`);
+  h.assert('ports attr', String(stmts[0].comp.attributes.ports), '2');
+});
+
+reg(986, 'mem-ports', 'dual simultaneous read', function(h, session) {
+  const { interp } = session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+on: 1
+= 1010
+:
+4wire a0 = 0000
+4wire a1 = 0001
+.ram:{ adr = a0
+  set = 1 }
+4wire v0 = .ram:get
+.ram:{ 2adr = a1
+  set = 1 }
+4wire v1 = .ram:2get`);
+  h.assert('port1 addr0', session.getWire(interp, 'v0'), '1010');
+  h.assert('port2 addr1', session.getWire(interp, 'v1'), '0000');
+});
+
+reg(987, 'mem-ports', 'write port2 updates storage', function(h, session) {
+  const { interp } = session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+on: 1
+= 1010
+:
+.ram:{ 2adr = 0000
+  2data = 0101
+  2write = 1
+  set = 1
+}
+4wire r = .ram:2get`);
+  h.assert('after port2 write', session.getWire(interp, 'r'), '0101');
+  const id = _memId(interp, '.ram');
+  h.assert('getMem addr0', typeof getMem === 'function' ? getMem(id, 0) : '', '0101');
+});
+
+reg(988, 'mem-ports', 'write collision same address', function(h, session) {
+  h.assertThrows('collision', function() {
+    session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+on: 1
+= 1010
+:
+.ram:{ adr = 0000
+  data = 1111
+  write = 1
+  2adr = 0000
+  2data = 0101
+  2write = 1
+  set = 1
+}`);
+  }, 'Memory write collision at address 0');
+  const { interp } = session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+= 1010
+:`);
+  const id = _memId(interp, '.ram');
+  if (typeof getMem === 'function') {
+    h.assert('storage unchanged', getMem(id, 0), '1010');
+  }
+});
+
+reg(989, 'mem-ports', 'port 3 does not exist', function(h, session) {
+  h.assertThrows('port 3', function() {
+    session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+:
+4wire x = .ram:3get`);
+  }, 'Memory port 3 does not exist');
+});
+
+reg(990, 'mem-ports', 'multi-word 2write', function(h, session) {
+  const { interp } = session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 8
+on: 1
+= ^ff00
+:
+.ram:{ 2adr = 0000
+  2data = 1111000011110000
+  2write = 1
+  set = 1
+}`);
+  const id = _memId(interp, '.ram');
+  if (typeof getMem === 'function') {
+    h.assert('addr0', getMem(id, 0), '11110000');
+    h.assert('addr1', getMem(id, 1), '11110000');
+  }
+});
+
+reg(991, 'mem-ports', 'readonly blocks property write', function(h, session) {
+  h.assertThrows('readonly write', function() {
+    session.run(`comp [mem] .rom:
+readonly
+length: 4
+depth: 4
+on: 1
+:
+.rom:{ adr = 0000
+  data = 1010
+  write = 1
+  set = 1
+}`);
+  }, 'Memory is read-only');
+});
+
+reg(992, 'mem-ports', 'readonly allows init', function(h, session) {
+  const { interp } = session.run(`comp [mem] .rom:
+readonly
+length: 4
+depth: 4
+= ^ff
+:
+8wire x = .rom:get;8`);
+  h.assert('init ok', session.getWire(interp, 'x'), '00001111');
+});
+
+reg(993, 'mem-ports', 'readonly allows bulk assign', function(h, session) {
+  const { interp } = session.run(`comp [mem] .rom:
+readonly
+length: 4
+depth: 4
+:
+4wire d = 1010
+.rom = d
+8wire x = .rom:get;8`);
+  h.assert('bulk assign', session.getWire(interp, 'x'), '00001010');
+});
+
+reg(994, 'mem-ports', 'doc(.ram) lists 2adr when ports:2', function(h, session) {
+  const { out } = session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+:
+doc(.ram)`);
+  h.assert('has 2adr', String(out.some(l => l.includes('2adr'))), 'true');
+  h.assert('has 2get', String(out.some(l => l.includes('2get'))), 'true');
+});
+
+reg(995, 'mem-ports', 'reg component unchanged', function(h, session) {
+  const { interp } = session.run(`comp [reg] .r:
+depth: 4
+on: 1
+:
+.r:{ data = 1010
+  set = 1
+}
+4wire x = .r:get`);
+  h.assert('reg write', session.getWire(interp, 'x'), '1010');
+});
+
+reg(996, 'mem-ports', 'wave dual simultaneous read', function(h, session) {
+  const { interp } = session.run(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+on: 1
+= 1010
+:
+4wire a0 = 0000
+4wire a1 = 0001
+.ram:{ adr = a0
+  set = 1 }
+4wire v0 = .ram:get
+.ram:{ 2adr = a1
+  set = 1 }
+4wire v1 = .ram:2get`);
+  h.assert('wave port1', session.getWire(interp, 'v0'), '1010');
+  h.assert('wave port2', session.getWire(interp, 'v1'), '0000');
+}, { propagation: 'wave' });
 
   suite.finalize();
 })();

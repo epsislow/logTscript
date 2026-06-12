@@ -445,7 +445,7 @@ doc(.decoder)
 | | `lut` | `mem` |
 |---|-------|-------|
 | Timing | Combinational (same step) | Property blocks + `on:` trigger |
-| Read | `.name(in=…)` / `.name:get` | `.mem:get` inside `:{ at = … }` |
+| Read | `.name(in=…)` / `.name:get` | `.mem:get` inside `:{ adr = … }` |
 | Init | `data { }` (inline) or `= data { }` (comp) | `=` binary/hex bulk, `.mem =` |
 
 ---

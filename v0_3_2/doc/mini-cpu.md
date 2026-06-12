@@ -204,13 +204,13 @@ board +[cpu4]:
   1wire doinc
   1wire inc
   pcval = .pcnt:get
-  .prog:{ at = pcval
+  .prog:{ adr = pcval
     set = set }
   instr = .prog:get
   opc = instr.0/4
   opd = instr.4/4
   curacc = .accum:get
-  .data:at = opd
+  .data:adr = opd
   .data:{ set = set }
   loadval = .data:get
   .add:a = curacc
@@ -236,7 +236,7 @@ board +[cpu4]:
   .pcnt:{ dir = 1
     set = inc }
   pcout = .pcnt:get
-  .data:at = opd
+  .data:adr = opd
   .data:{ data = curacc
     write = AND(isstore, set)
     set = AND(isstore, set) }
@@ -378,13 +378,13 @@ board +[cpu4]:
   1wire doinc
   1wire inc
   pcval = .pcnt:get
-  .prog:{ at = pcval
+  .prog:{ adr = pcval
     set = set }
   instr = .prog:get
   opc = instr.0/4
   opd = instr.4/4
   curacc = .accum:get
-  .data:at = opd
+  .data:adr = opd
   .data:{ set = set }
   loadval = .data:get
   .add:a = curacc
@@ -410,7 +410,7 @@ board +[cpu4]:
   .pcnt:{ dir = 1
     set = inc }
   pcout = .pcnt:get
-  .data:at = opd
+  .data:adr = opd
   .data:{ data = curacc
     write = AND(isstore, set)
     set = AND(isstore, set) }

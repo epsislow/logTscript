@@ -3499,15 +3499,15 @@ pcb [ret8] .g::
       if (!comp) return null;
       const memId = comp.deviceIds[0];
       if (typeof getMem === 'function') return getMem(memId, addr);
-      // In Node.js getMem nu exista, verificam prin .mem:get cu :at
+      // In Node.js getMem nu exista, verificam prin .mem:get cu :adr
       return null;
     }
 
     // Helper: ruleaza src si verifica valoarea .mem:get cu at setat
-    function getMemAt515(src, instanceName, atBin) {
-      // Injecteaza un wire 'result' care citeste memoria la adresa atBin
-      const bits = atBin.length;
-      const readSrc = src + `\n${bits}wire __at = ${atBin}\n.${instanceName.substring(1)}:{\nat = __at\n}\n8wire __result = ${instanceName}:get;8`;
+    function getMemAdr515(src, instanceName, adrBin) {
+      // Injecteaza un wire 'result' care citeste memoria la adresa adrBin
+      const bits = adrBin.length;
+      const readSrc = src + `\n${bits}wire __adr = ${adrBin}\n.${instanceName.substring(1)}:{\nadr = __adr\n}\n8wire __result = ${instanceName}:get;8`;
       const { interp } = run500(readSrc);
       const w = interp.wires.get('__result');
       return w ? interp.getValueFromRef(w.ref) : null;
@@ -3566,7 +3566,7 @@ pcb [ret8] .g::
     }
 
     // Test 6: .mem = d dupa declaratie — initializeaza memoria
-    // PCB care seteaza .m:at si citeste .m:get
+    // PCB care seteaza .m:adr si citeste .m:get
     // Verificam ca .mem = d functioneaza scriind o valoare si citind-o inapoi
     {
       const src = `

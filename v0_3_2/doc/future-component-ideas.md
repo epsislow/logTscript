@@ -67,7 +67,7 @@ Each table is followed by numbered subsections (A1, B2, …) with a short explan
 
 **What it does:** Memory that can be read by address but **cannot** be written at runtime (or writes are ignored / error). Program bytes live here; accidental `STORE` into program space is impossible.
 
-**How I see it used:** Harvard teaching CPU with one memory type that is clearly “program” — `.rom:` with `= ^10334221` init, fetch via `.rom:{ at = pc }` and `.rom:get`, no write pins in student-facing docs. Clearer story than `comp [mem] .prog` where the same component also supports writes.
+**How I see it used:** Harvard teaching CPU with one memory type that is clearly “program” — `.rom:` with `= ^10334221` init, fetch via `.rom:{ adr = pc }` and `.rom:get`, no write pins in student-facing docs. Clearer story than `comp [mem] .prog` where the same component also supports writes.
 
 **Today:** `comp [mem] .prog` works; you simply never send `write = 1`. ROM is semantic clarity and possibly simpler API (no write properties in `doc()`).
 

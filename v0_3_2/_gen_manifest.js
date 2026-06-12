@@ -21,6 +21,7 @@ const GROUP_META = [
   { id: 'osc', label: 'Oscillator' },
   { id: 'registry', label: 'Component registry' },
   { id: 'terminal', label: 'Terminal component' },
+  { id: 'mem-ports', label: 'Memory multi-port' },
   { id: 'doc', label: 'doc() tests' },
   { id: 'doc-comp', label: 'Doc for body comps' },
   { id: 'chip', label: 'Chip component' },

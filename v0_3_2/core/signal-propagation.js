@@ -252,6 +252,9 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
     }
 
     for (let wave = 0; wave < maxWaves; wave++) {
+      if (typeof beginAllMemWritePhases === 'function') beginAllMemWritePhases();
+      if (interp) interp.memWriteBatching = true;
+
       const compsChanged = this.commitComponentOutputs();
       for (const c of compsChanged) allChanged.add(c);
 
@@ -277,6 +280,9 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
           }
         }
       }
+
+      if (typeof commitAllMemWrites === 'function') commitAllMemWrites();
+      if (interp) interp.memWriteBatching = false;
 
       if (compsChanged.size === 0 && changed.size === 0 && !anyScheduled) {
         if (wave > 0) break;
@@ -1497,6 +1503,8 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
       this.clog('VarName: ', varName, newValue, this.jstmt(excludedWs), 'isTop: ', isTopLevel);
   if(isTopLevel){
     this._uccPendingBlocks = new Map(); // blockIndex → block
+    if (typeof beginAllMemWritePhases === 'function') beginAllMemWritePhases();
+    this.memWriteBatching = true;
     // Tracks wire statements already executed in this cascade so a self-referential
     // assignment like tg0 = MUX(p, tg0, NOT(tg0)) is not re-executed when tg0 itself
     // changes, preventing infinite oscillation.
@@ -1512,7 +1520,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
   
   if(!varRef || varRef === '&-'){
     //console.log(`[DEBUG updateConnected] EARLY RETURN: varRef is null or &- for '${varName}'`);
-    if(isTopLevel){ this._uccPendingBlocks = null; this._uccExecutedStatements = null; }
+    if(isTopLevel){ this._uccPendingBlocks = null; this._uccExecutedStatements = null; this.memWriteBatching = false; }
     return;
   }
   
@@ -2066,6 +2074,9 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
 
     this._uccPendingBlocks = null;
     this._uccExecutedStatements = null;
+
+    if (typeof commitAllMemWrites === 'function') commitAllMemWrites();
+    this.memWriteBatching = false;
 
     if(executedBlockKeys.size > 0){
       // Prevent re-execution in updateComponentConnections callbacks

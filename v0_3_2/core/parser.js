@@ -1459,7 +1459,7 @@ assignment() {
         let stateNum = 0;
         this.eat('ID');
 
-        const attributesWithNoValues = ['square', 'nl', 'circular', 'glow', 'rgb', 'noLabels', 'noTrans'];
+        const attributesWithNoValues = ['square', 'nl', 'circular', 'glow', 'rgb', 'noLabels', 'noTrans', 'readonly'];
         
         
         if (attrNamesArray.includes(attrName) && this.c.type === 'SYM' && this.c.value === '.') {
@@ -1782,6 +1782,10 @@ assignment() {
           attributes.rgb = true;
         } else if (attrName === 'noLabels') {
           attributes.noLabels = true;
+        } else if (attrName === 'readonly') {
+          attributes.readonly = true;
+        } else if (attrName === 'noTrans') {
+          attributes.noTrans = true;
         } else {
           continue;
         }

@@ -29,6 +29,7 @@ class Interpreter {
     this.componentConnections=new Map(); // Component name -> {source: ref or expr, bitRange}
     this.componentPendingProperties=new Map(); // Component name -> {property: {expr, value}} - properties waiting to be applied
     this.componentPendingSet=new Map(); // Component name -> 'immediate' | 'next' - when to apply pending properties
+    this.memWriteBatching = false;
     this.componentPropertyBlocks=[]; // Array of {component, properties, dependencies} - property blocks for re-execution
     this.debugLogs = {};
     this.cLogs = [];
@@ -241,7 +242,7 @@ class Interpreter {
     if (atom.bitRange || atom.internalWire) return null;
     const comp = this.components.get(compName);
     if (!comp) return null;
-    if (!this.componentRegistry || !this.componentRegistry.supportsProperty(comp.type, property)) return null;
+    if (!this.componentRegistry || !this.componentRegistry.supportsProperty(comp.type, property, comp.attributes)) return null;
     const hasRef = comp.ref && comp.ref !== '&-';
     if (hasRef && property === 'get') {
       const bits = this.getComponentBits(comp.type, comp.attributes) || 1;
@@ -5575,6 +5576,22 @@ if (s.assignment) {
           }
         }
       }
+
+      if(comp && comp.type === 'mem'){
+        const currentBlockPropNames = new Set(properties.map(p => p.property));
+        const ports = comp.attributes && comp.attributes['ports'] !== undefined
+          ? Math.min(4, Math.max(1, parseInt(comp.attributes['ports'], 10)))
+          : 1;
+        for(let port = 1; port <= ports; port++){
+          const prefix = port === 1 ? '' : String(port);
+          for(const pin of ['adr', 'data', 'write']){
+            const pinName = prefix + pin;
+            if(!currentBlockPropNames.has(pinName) && pending[pinName] !== undefined){
+              delete pending[pinName];
+            }
+          }
+        }
+      }
       
       // If reEvaluate is true, clear properties that are not in the current block
       // This ensures that only properties from the executing block are applied
@@ -5623,7 +5640,7 @@ if (s.assignment) {
         return;
       }
       
-      const supportsGet = this.componentRegistry ? this.componentRegistry.supportsProperty(comp.type, 'get') : true;
+      const supportsGet = this.componentRegistry ? this.componentRegistry.supportsProperty(comp.type, 'get', comp.attributes) : true;
       if(!supportsGet){
         throw Error(`Component ${component} (type: ${comp.type}) does not support :get property`);
       }
@@ -7388,142 +7405,6 @@ if (s.assignment) {
           }
         }
       }
-    } else if(comp.type === 'mem'){
-      // Handle memory properties: at, data, set
-      // Note: when === 'next' is already handled at the start of this function
-      // Double-check: Only apply if when === 'immediate' (not 'next')
-      // This is a safety check in case the early return didn't work
-      if(when !== 'immediate'){
-        // Should not reach here if when === 'next' (should have returned earlier)
-        // But just in case, return here too
-        return;
-      }
-      
-      const memId = comp.deviceIds[0];
-      // Use bracket notation to avoid conflict with JavaScript's built-in 'length' property
-      const length = comp.attributes['length'] !== undefined ? parseInt(comp.attributes['length'], 10) : 3;
-      const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
-      
-      // Get current address (stored in pending.at)
-      // IMPORTANT: Always re-evaluate the address expression when :set is executed
-      // This ensures that if .rom:at = .c:get, it uses the current value of .c:get
-      let currentAddress = 0;
-      if(pending && pending.at !== undefined){
-        let addressValue = pending.at.value;
-        
-        // Always re-evaluate the expression when applying properties (not just when reEvaluate is true)
-        // This ensures that references like .c:get are re-read with their current values
-        // IMPORTANT: The expression stored in pending.at.expr contains the original atoms (like .c:get)
-        // When we re-evaluate it, evalAtom will be called again for .c:get, which will get the current value
-        // So we don't need to worry about old refs - the atoms will be re-evaluated
-        if(pending.at.expr){
-          // Re-evaluate the expression - this will re-evaluate all atoms including component properties
-          const exprResult = this.evalExpr(pending.at.expr, false);
-          addressValue = '';
-          for(const part of exprResult){
-            // For component properties like .c:get, part.value will contain the current value
-            // and part.ref will be null (component properties don't create refs when computeRefs=false)
-            if(part.value && part.value !== '-'){
-              addressValue += part.value;
-            } else if(part.ref && part.ref !== '&-'){
-              // This is a reference to storage - get current value
-              const val = this.getValueFromRef(part.ref);
-              if(val) addressValue += val;
-            }
-          }
-          // Update stored value for future use
-          pending.at.value = addressValue;
-        }
-        
-        // Convert address value to number
-        currentAddress = parseInt(addressValue, 2);
-        
-        // Validate address
-        if(currentAddress < 0 || currentAddress >= length){
-          throw Error(`Memory invalid address ${currentAddress} (length: ${length} means address can be between 0 and ${length - 1})`);
-        }
-      }
-      
-      // Check if :write is set to 1
-      let shouldWrite = false;
-      if(pending && pending.write !== undefined){
-        let writeValue = pending.write.value;
-        
-        // If re-evaluating, re-evaluate the expression
-        if(reEvaluate && pending.write.expr){
-          const exprResult = this.evalExpr(pending.write.expr, false);
-          writeValue = '';
-          for(const part of exprResult){
-            if(part.value && part.value !== '-'){
-              writeValue += part.value;
-            } else if(part.ref && part.ref !== '&-'){
-              const val = this.getValueFromRef(part.ref);
-              if(val) writeValue += val;
-            }
-          }
-          pending.write.value = writeValue;
-        }
-        
-        // Check if write is set to 1
-        shouldWrite = (writeValue === '1');
-      }
-      
-      // Apply data if :write = 1
-      if(shouldWrite){
-        if(pending && pending.data !== undefined){
-          let dataValue = pending.data.value;
-          
-          // Always re-evaluate the expression when applying properties (not just when reEvaluate is true)
-          // This ensures that references like .c:get are re-read with their current values
-          const Q = pending;
-          if(pending.data.expr){
-            const exprResult = this.evalExpr(pending.data.expr, false);
-         //   Q = exprResult;
-            dataValue = '';
-            for(const part of exprResult){
-              if(part.value && part.value !== '-'){
-                dataValue += part.value;
-              } else if(part.ref && part.ref !== '&-'){
-                const val = this.getValueFromRef(part.ref);
-                if(val) dataValue += val;
-              }
-            }
-            // Update stored value for future use
-            pending.data.value = dataValue;
-          }
-          
-          // Pad data to next multiple of depth if shorter, else validate divisibility
-          if(dataValue.length < depth){
-            dataValue = dataValue.padStart(depth, '0');
-            pending.data.value = dataValue;
-          } else if(dataValue.length % depth !== 0){
-            throw Error(`Memory data length (${dataValue.length}) must be divisible by depth (${depth}). [expr] ` + JSON.stringify(Q, null, 4));
-          }
-          
-          // Split data into chunks of depth bits and set each address
-          const numAddresses = dataValue.length / depth;
-          if(currentAddress + numAddresses > length){
-            throw Error(`Memory write would exceed memory length. Starting at address ${currentAddress}, trying to write ${numAddresses} addresses, but memory length is ${length}`);
-          }
-          
-          // Set each address
-          for(let i = 0; i < numAddresses; i++){
-            const address = currentAddress + i;
-            const value = dataValue.substring(i * depth, (i + 1) * depth);
-            if(typeof setMem === 'function'){
-              setMem(memId, address, value);
-            }
-          }
-          
-          // Clear :write after writing (it should not persist)
-          if(!reEvaluate){
-            delete pending.write;
-          }
-        } else {
-          throw Error(`Memory :write = 1 requires :data to be set`);
-        }
-      }
-      // If :write is not set to 1, don't write data (just update address for reading)
     } else if(comp.type === 'reg'){
       // Handle register properties: data, write, set
       // Note: Register doesn't have :at property (always address 0)
@@ -8779,13 +8660,14 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     }
     const handler = registry.get(canonicalType);
     if (!handler) return [`${name}: tip de componentă nedefinit`];
+    let compInst = null;
     if (alias && alias.startsWith('.') && compDefs && compDefs.has(alias)) {
-      const compInst = compDefs.get(alias);
+      compInst = compDefs.get(alias);
       if (compInst && compInst.type === canonicalType && handler.constructor && handler.constructor.formatInstanceDoc) {
         return handler.constructor.formatInstanceDoc(alias, compInst);
       }
     }
-    const def = handler.getDef ? handler.getDef() : null;
+    const def = handler.getDef ? handler.getDef(compInst && compInst.attributes ? compInst.attributes : null) : null;
     if (!def) return [`comp.${canonicalType}: (no doc available)`];
     return Interpreter.formatCompDef(alias, canonicalType, def);
   }

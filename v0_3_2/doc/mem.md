@@ -205,35 +205,35 @@ comp [mem] .ram:
 
 The value is split into `depth`-bit chunks exactly like initialization. The number of chunks must not exceed `length`.
 
-> **Note:** `.mem = value` always resets the entire memory before writing. To write a single address without affecting others, use the `:at`, `:data`, `:write` property block.
+> **Note:** `.mem = value` always resets the entire memory before writing. To write a single address without affecting others, use the `:adr`, `:data`, `:write` property block.
 
 ---
 
 ## Property block — read and write
 
-### Reading (`:at` + `:get`)
+### Reading (`:adr` + `:get`)
 
 Set the address in a property block, then read via `:get`:
 
 ```
 .ram:{
-  at = 0010    # address 2
+  adr = 0010    # address 2
 }
 
 8wire val = .ram:get   # reads address 2
 ```
 
-### Writing (`:at` + `:data` + `:write`)
+### Writing (`:adr` + `:data` + `:write`)
 
 ```
 .ram:{
-  at   = 0001    # address 1
+  adr   = 0001    # address 1
   data = 10101010
   write = 1
 }
 ```
 
-When `write = 1`, the value in `data` is written to address `at`.
+When `write = 1`, the value in `data` is written to address `adr`.
 
 ### Writing multiple addresses at once
 
@@ -241,7 +241,7 @@ If `data` is a multiple of `depth`, multiple consecutive addresses are written s
 
 ```
 .ram:{
-  at   = 0000
+  adr   = 0000
   data = 1111000011110000   # 16 bits, depth=8 → 2 addresses
   write = 1
 }
@@ -255,16 +255,16 @@ If `data` is a multiple of `depth`, multiple consecutive addresses are written s
 
 | Name    | Type | Description |
 |---------|------|-------------|
-| `at`    | pin  | Address to read or write (binary, `log2(length)` bits) |
+| `adr`    | pin  | Address to read or write (binary, `log2(length)` bits) |
 | `data`  | pin  | Data to write (one or more `depth`-bit words) |
-| `write` | pin  | `1` = write `data` to `at`; `0` = do nothing |
-| `get`   | pout | Value at the current address (`at`) |
+| `write` | pin  | `1` = write `data` to `adr`; `0` = do nothing |
+| `get`   | pout | Value at the current address (`adr`) |
 
 ---
 
 ## Direct value (`:get` at address 0)
 
-Reading the component directly (without `:at`) returns the value at address 0:
+Reading the component directly (without `:adr`) returns the value at address 0:
 
 ```
 8wire x = .ram:get       # address is 0 by default
@@ -300,7 +300,7 @@ comp [mem] .name:
   on: raise/edge/1/0
   = Xbit
   :{
-    Xpin at
+    Xpin adr
     1pin write
     Xpin data
     Xpout get
@@ -312,6 +312,46 @@ The `= Xbit` line indicates that `mem` accepts an initializer. The value is spli
 
 ---
 
+## Multi-port memory (`ports`)
+
+A single physical memory array can expose **1–4 independent ports** in the same simulation step (e.g. Harvard CPU fetch + data access, or CPU + DMA).
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| `ports` | `1` | Number of ports (1–4) |
+| `readonly` | off | Blocks writes from property blocks; init (`=`) and `.mem =` still allowed |
+
+Port 1 uses `adr`, `data`, `write`, `get`. Port 2+ prefix the pin names: `2adr`, `2data`, `2write`, `2get`, … up to `4get`.
+
+```logts-play
+comp [mem] .ram:
+  ports: 2
+  length: 4
+  depth: 4
+  on: 1
+  = 1010
+  :
+
+4wire a0 = 0000
+4wire a1 = 0001
+.ram:{ adr = a0
+  set = 1 }
+4wire v0 = .ram:get
+.ram:{ 2adr = a1
+  set = 1 }
+4wire v1 = .ram:2get
+show(v0)
+show(v1)
+```
+
+**Write rules:** writes are queued per simulation step and committed together. If two ports write the same address in one step → `Memory write collision at address N` (storage unchanged). Reads (`:get`, `:2get`, …) are combinational from committed storage (value from the previous step).
+
+**Read-only (`readonly`):** use for program ROM semantics — property-block writes are rejected; bulk assign and declaration init still work.
+
+> **Breaking change (v0.3.x):** the address pin was renamed from `at` to **`adr`**. Update all `comp [mem]` property blocks and inline assignments (`.data:adr = …`).
+
+---
+
 ## Notes
 
 - `depth` is the **word size** — the number of bits stored per address.
@@ -319,7 +359,7 @@ The `= Xbit` line indicates that `mem` accepts an initializer. The value is spli
 - Initializers: binary/hex literal, wire variable, or **ASM program** (`= .isa { ... }`) — see [asm.md](asm.md).
 - The literal initializer (`= value`) splits the value into `depth`-bit chunks. The last chunk is padded with leading zeros if shorter than `depth`.
 - `.mem = value` (or `.mem = .isa { ... }`) resets **all** addresses to `0` before writing, even those not covered by the value.
-- To write individual addresses without resetting others, always use the `:at`, `:data`, `:write` property block.
+- To write individual addresses without resetting others, always use the `:adr`, `:data`, `:write` property block.
 - `getMem`/`setMem` are browser-side functions. In the test environment (Node.js), address 0 is accessible via `comp.initialValue`; other addresses require the browser runtime.
 
 ---

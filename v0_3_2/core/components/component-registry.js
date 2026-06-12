@@ -50,9 +50,12 @@ var ComponentRegistry = class ComponentRegistry {
     return result;
   }
 
-  supportsProperty(type, property) {
+  supportsProperty(type, property, attributes) {
     const comp = this._components.get(type);
     if (!comp) return false;
+    if (comp.supportsPropertyName) {
+      return comp.supportsPropertyName(property, attributes || {});
+    }
     return comp.getSupportedProperties().includes(property);
   }
 

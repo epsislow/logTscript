@@ -147,6 +147,11 @@ pushSource({ src, alias }) {
       return this.token('TYPE', v);
     }
 
+      // mem multi-port pins: 2adr, 2get, … 4get (port 1 uses adr/get without prefix)
+      if (/^[2-9](adr|data|write|get)$/.test(v)) {
+        return this.token('ID', v);
+      }
+
       // If it contains digits 2-9, it's definitely decimal
       if (/[2-9]/.test(v)) {
         return this.token('DEC', v);

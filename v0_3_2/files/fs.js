@@ -1423,14 +1423,14 @@ comp [led] .gett:
      :
 
 .mem:{
-   at= adr
+   adr = adr
    data = val
    write = 1
    set= .set
 }
 4w get := 0000
 .mem:{
-   at=adr
+   adr =adr
    get >= get
    set= .read
 }
@@ -1494,14 +1494,14 @@ comp [led] .gett:
      :
 
 .mem:{
-   at= adr
+   adr = adr
    data = val
    write = 1
    set= .set
 }
 4w get := 0000
 .mem:{
-   at=adr
+   adr =adr
    get >= get
    set= .read
 }
@@ -1564,7 +1564,7 @@ comp [led] .get:
      :
 
 .mem:{
-   at= adr
+   adr = adr
    data = val
    write = 1
    set= .set
@@ -1850,13 +1850,13 @@ yp = pos + 1
 #, 1bit _ = ADD(posx2, 1)
 
 .mem:{
-   at = xp
+   adr = xp
    set = press
    get >= x
 }
 
 .mem:{
-   at = yp
+   adr = yp
    set = press
    get >= y
 }
@@ -4045,7 +4045,7 @@ comp [mem] .pos:
 1wire k= OR(OR(.k1, .k2), .k3)
 4wire pos
 .pos:{
-  at=0
+  adr =0
   data = MUX(.k1, MUX(.k2, MUX(.k3, \\0, \\3), \\2), \\1)       
   write = 1
   set = k
@@ -4176,7 +4176,7 @@ comp [mem] .pos:
 1wire k= OR(OR(.k1, .k2), .k3)
 4wire pos
 .pos:{
-  at=0
+  adr =0
   data = MUX(.k1, MUX(.k2, MUX(.k3, \\0, \\3), \\2), \\1)       
   write = 1
   set = k
@@ -4325,87 +4325,87 @@ comp [mem] .r:
 4wire f1
 4wire f2
 .r:{
-   at=01
+   adr =01
    get>= f0
    set = k2
 }
 .r:{
-   at=0
+   adr =0
    data = f0
    write = k2
    set = k2
 }
 .r:{
-   at=10
+   adr =10
    get>= f1
    set = k2
 }
 .r:{
-   at=01
+   adr =01
    data = f1
    write = k2
    set = k2
 }
 .r:{
-   at=11
+   adr =11
    get>= f2
    set = k2
 }
 .r:{
-   at=10
+   adr =10
    data = f2
    write = k2
    set = k2
 }
 .r:{
-   at=11
+   adr =11
    data = 0000
    write = k2
    set = k2
 }
 
 .r:{
-   at=10
+   adr =10
    get>= r2
    set = k
 }
 .r:{
-   at=11
+   adr =11
    data= r2
    write =k
    set= k
 }
 .r:{
-   at=1
+   adr =1
    get>= r1
    set = k
 }
 .r:{
-   at=10
+   adr =10
    data= r1
    write = k
    set= k
 }
 .r:{
-   at=0
+   adr =0
    get>= r0
    set = k
 }
 .r:{
-   at=1
+   adr =1
    data = r0
    write = k
    set = k
 }
 .r:{
-   at=0
+   adr =0
    data = i0
    write = k
    set = k
 }
 4wire t0 = 0000
 .r:{
-   at=0
+   adr =0
    get>= t0
    set= OR(k, k2)
 }
@@ -4416,7 +4416,7 @@ comp [mem] .r:
 
 4wire t1 = 0000
 .r:{
-   at=1
+   adr =1
    get>= t1
    set= OR(k, k2)
 }
@@ -4427,7 +4427,7 @@ comp [mem] .r:
 
 4wire t2 = 0000
 .r:{
-   at=10
+   adr =10
    get>= t2
    set= OR(k, k2)
 }
@@ -4438,7 +4438,7 @@ comp [mem] .r:
 
 4wire t3 = 0000
 .r:{
-   at=11
+   adr =11
    get>= t3
    set= OR(k, k2)
 }
@@ -4584,47 +4584,47 @@ comp [mem] .r:
 4wire r1
 4wire r2
 .r:{
-   at=10
+   adr =10
    get>= r2
    set = k
 }
 .r:{
-   at=11
+   adr =11
    data= r2
    write =k
    set= k
 }
 .r:{
-   at=1
+   adr =1
    get>= r1
    set = k
 }
 .r:{
-   at=10
+   adr =10
    data= r1
    write = k
    set= k
 }
 .r:{
-   at=0
+   adr =0
    get>= r0
    set = k
 }
 .r:{
-   at=1
+   adr =1
    data = r0
    write = k
    set = k
 }
 .r:{
-   at=0
+   adr =0
    data = i0
    write = k
    set = k
 }
 4wire t0 = 0000
 .r:{
-   at=0
+   adr =0
    get>= t0
    set= k
 }
@@ -4635,7 +4635,7 @@ comp [mem] .r:
 
 4wire t1 = 0000
 .r:{
-   at=1
+   adr =1
    get>= t1
    set= k
 }
@@ -4646,7 +4646,7 @@ comp [mem] .r:
 
 4wire t2 = 0000
 .r:{
-   at=10
+   adr =10
    get>= t2
    set= k
 }
@@ -4657,7 +4657,7 @@ comp [mem] .r:
 
 4wire t3 = 0000
 .r:{
-   at=11
+   adr =11
    get>= t3
    set= k
 }
@@ -4787,47 +4787,47 @@ comp [mem] .r:
 4wire r1
 4wire r2
 .r:{
-   at=10
+   adr =10
    get>= r2
    set = k
 }
 .r:{
-   at=11
+   adr =11
    data= r2
    write =k
    set= k
 }
 .r:{
-   at=1
+   adr =1
    get>= r1
    set = k
 }
 .r:{
-   at=10
+   adr =10
    data= r1
    write = k
    set= k
 }
 .r:{
-   at=0
+   adr =0
    get>= r0
    set = k
 }
 .r:{
-   at=1
+   adr =1
    data = r0
    write = k
    set = k
 }
 .r:{
-   at=0
+   adr =0
    data = i0
    write = k
    set = k
 }
 4wire t0 = 0000
 .r:{
-   at=0
+   adr =0
    get>= t0
    set= k
 }
@@ -4838,7 +4838,7 @@ comp [mem] .r:
 
 4wire t1 = 0000
 .r:{
-   at=1
+   adr =1
    get>= t1
    set= k
 }
@@ -4849,7 +4849,7 @@ comp [mem] .r:
 
 4wire t2 = 0000
 .r:{
-   at=10
+   adr =10
    get>= t2
    set= k
 }
@@ -4860,7 +4860,7 @@ comp [mem] .r:
 
 4wire t3 = 0000
 .r:{
-   at=11
+   adr =11
    get>= t3
    set= k
 }
@@ -4959,47 +4959,47 @@ comp [mem] .r:
 4wire r1
 4wire r2
 .r:{
-   at=10
+   adr =10
    get>= r2
    set = k
 }
 .r:{
-   at=11
+   adr =11
    data= r2
    write =k
    set= k
 }
 .r:{
-   at=1
+   adr =1
    get>= r1
    set = k
 }
 .r:{
-   at=10
+   adr =10
    data= r1
    write = k
    set= k
 }
 .r:{
-   at=0
+   adr =0
    get>= r0
    set = k
 }
 .r:{
-   at=1
+   adr =1
    data = r0
    write = k
    set = k
 }
 .r:{
-   at=0
+   adr =0
    data = i0
    write = k
    set = k
 }
 4wire t0 = 0000
 .r:{
-   at=0
+   adr =0
    get>= t0
    set= k
 }
@@ -5010,7 +5010,7 @@ comp [mem] .r:
 
 4wire t1 = 0000
 .r:{
-   at=1
+   adr =1
    get>= t1
    set= k
 }
@@ -5021,7 +5021,7 @@ comp [mem] .r:
 
 4wire t2 = 0000
 .r:{
-   at=10
+   adr =10
    get>= t2
    set= k
 }
@@ -5032,7 +5032,7 @@ comp [mem] .r:
 
 4wire t3 = 0000
 .r:{
-   at=11
+   adr =11
    get>= t3
    set= k
 }
@@ -5185,13 +5185,13 @@ comp [mem] .q1:
    :
 
 .q1:{
-   at= crs
+   adr = crs
    data = 0010
    write= 1
    set = .k2 
 }
 .q1:{
-   at= crs
+   adr = crs
    data = 0001
    write= 1
    set = .k1
@@ -5202,7 +5202,7 @@ comp [mem] .q1:
 4wire mem2
 
 .q1:{
-   at= crs
+   adr = crs
    set= k
    get>= mem0
 }
@@ -5354,14 +5354,14 @@ comp [mem] .q1:
    :
 
 .q1:{
-   at= crs
+   adr = crs
    data = 0010
    write= 1
    set = .k2 
 }
 
 .q1:{
-   at= crs
+   adr = crs
    data = 0001
    write= 1
    set = .k1
@@ -5372,32 +5372,32 @@ comp [mem] .q1:
 4wire mem2
 1wire k = OR(.k1, .k2)
 .q1:{
-   at=0
+   adr =0
    set= .k1
    get>= mem0
 }
 .q1:{
-   at=1
+   adr =1
    set= .k1
    get>= mem1
 }
 .q1:{
-   at=10
+   adr =10
    set= .k1
    get>= mem2
 }
 .q1:{
-   at=0
+   adr =0
    set= .k2
    get>= mem0
 }
 .q1:{
-   at=1
+   adr =1
    set= .k2
    get>= mem1
 }
 .q1:{
-   at=10
+   adr =10
    set= .k2
    get>= mem2
 }
@@ -5550,20 +5550,20 @@ comp [mem] .q1:
 
 
 .q1:{
-   at= crs
+   adr = crs
    data= 0011
    write=1
    set= .k3
 }
 .q1:{
-   at= crs
+   adr = crs
    data = 0010
    write= 1
    set = .k2 
 }
 
 .q1:{
-   at= crs
+   adr = crs
    data = 0001
    write= 1
    set = .k1
@@ -5577,27 +5577,27 @@ comp [mem] .q1:
 
 1wire k = OR( OR(.k1, .k2), .k3)
 .q1:{
-   at=0
+   adr =0
    set= .k1
    get>= mem0
 }
 .q1:{
-   at=1
+   adr =1
    set= .k1
    get>= mem1
 }
 .q1:{
-   at=10
+   adr =10
    set= .k1
    get>= mem2
 }
 .q1:{
-   at=11
+   adr =11
    set= .k1
    get>= mem3
 }
 .q1:{
-   at=100
+   adr =100
    set= .k1
    get>= mem4
 }
@@ -5605,53 +5605,53 @@ comp [mem] .q1:
 
 
 .q1:{
-   at=0
+   adr =0
    set= .k2
    get>= mem0
 }
 .q1:{
-   at=1
+   adr =1
    set= .k2
    get>= mem1
 }
 .q1:{
-   at=10
+   adr =10
    set= .k2
    get>= mem2
 }
 .q1:{
-   at=11
+   adr =11
    set= .k2
    get>= mem3
 }
 .q1:{
-   at=100
+   adr =100
    set= .k2
    get>= mem4
 }
 
 .q1:{
-   at=0
+   adr =0
    set= .k3
    get>= mem0
 }
 .q1:{
-   at=1
+   adr =1
    set= .k3
    get>= mem1
 }
 .q1:{
-   at=10
+   adr =10
    set= .k3
    get>= mem2
 }
 .q1:{
-   at=11
+   adr =11
    set= .k3
    get>= mem3
 }
 .q1:{
-   at=100
+   adr =100
    set= .k3
    get>= mem4
 }
@@ -5812,7 +5812,7 @@ comp [mem] .q1:
    :
 
 .q1:{
-   at= crs
+   adr = crs
    data = 0010
    write= 1
    set = .k2 
@@ -5823,17 +5823,17 @@ comp [mem] .q1:
 4wire mem2
 
 .q1:{
-   at=0
+   adr =0
    set= .k2
    get>= mem0
 }
 .q1:{
-   at=1
+   adr =1
    set= .k2
    get>= mem1
 }
 .q1:{
-   at=10
+   adr =10
    set= .k2
    get>= mem2
 }
@@ -6269,7 +6269,7 @@ comp [mem] .mem:
 8wire at10
 
 .mem:{
-  at= 10
+  adr = 10
   data= ^FF
   write= 1
   set= .s1
@@ -6277,7 +6277,7 @@ comp [mem] .mem:
 }
 8wire k 
 .mem:{
-   at= 10
+   adr = 10
    set= .s2
    get>= k
 }
@@ -6338,11 +6338,11 @@ pcb +[comp1]:
       length: 16
       on: 1
       :
-   .ram:at = adr
+   . = adr
    get = .ram:get
    ~~
    .ram:{ 
-      at = adr
+      adr = adr
       data = data
       write = 1
       set = set
@@ -6677,7 +6677,7 @@ show(.ad:carry)
    :
 
 
-.rom:at = 0
+. = 0
 .rom:data = ^1234 5678 9ABC + ^DF FF
 .rom:write = 1
 .rom:set = 1
@@ -6685,7 +6685,7 @@ show(.ad:carry)
 .c:dir = 1
 .c:set = 1
 
-.rom:at = .c:get
+. = .c:get
 show(.c:get)
 show(.rom:get)
 
@@ -6782,7 +6782,7 @@ show(.c:get)
    :
 
 
-.rom:at = 0
+. = 0
 .rom:data = ^1234 5678 9ABC + ^DF
 .rom:write = 1
 .rom:set = 1
@@ -6790,7 +6790,7 @@ show(.c:get)
 
 5bit adr = 00100
 8bit val2 = ^0F
-.rom:at = adr
+. = adr
 .rom:data = val2
 
 show(.rom:get)
@@ -6841,7 +6841,7 @@ comp [mem] .mem:
   :
 
 
-.mem:at = 0
+. = 0
 .mem:data = ^4865 6c6c 6f20 576f 726c 6420 3a21 205f 
 .mem:write = 1
 .mem:set = 1
@@ -6918,7 +6918,7 @@ comp [adder] .add:
 
 8wire j 
 .mem:{
-   at= q
+   adr = q
    set= ~
    get>= j
 }
@@ -6969,7 +6969,7 @@ comp [mem] .mem:
   :
 
 
-.mem:at = 0
+. = 0
 .mem:data = ^4865 6c6c 6f20 576f 726c 6420 3a21 205f 
 .mem:write = 1
 .mem:set = 1
@@ -7020,7 +7020,7 @@ comp [multiplier] .ml:
 }
 
 .mem:{
-   at= q
+   adr = q
    set= 1
 }
 8bit j = .mem:get
@@ -7057,7 +7057,7 @@ comp [mem] .mem:
   :
 
 
-.mem:at = 0
+. = 0
 .mem:data = ^48 65 6c 6c 6f 20 57 6f 72 6c 64 20 3a 21 20 5f 
 .mem:write = 1
 .mem:set = 1
@@ -7102,7 +7102,7 @@ comp [multiplier] .ml:
 }
 
 .mem:{
-   at= q
+   adr = q
    set= 1
 }
 8bit j = .mem:get

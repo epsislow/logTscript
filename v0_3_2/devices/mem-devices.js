@@ -2,7 +2,7 @@
 
 const memories = new Map();
 
-function addMem({ id, length = 3, depth = 4, default: defaultValue = null }) {
+function addMem({ id, length = 3, depth = 4, default: defaultValue = null, ports = 1, readonly = false }) {
   if (!id) return;
   
   let defaultBin = defaultValue;
@@ -13,13 +13,60 @@ function addMem({ id, length = 3, depth = 4, default: defaultValue = null }) {
   if (defaultBin.length !== depth) {
     defaultBin = defaultBin.padStart(depth, '0').substring(0, depth);
   }
+
+  const portCount = Math.min(4, Math.max(1, ports));
   
   memories.set(id, {
     length: length,
     depth: depth,
     default: defaultBin,
-    data: new Map()
+    data: new Map(),
+    ports: portCount,
+    readonly: !!readonly,
+    writeQueue: new Map()
   });
+}
+
+function beginMemWritePhase(id) {
+  const mem = memories.get(id);
+  if (mem) mem.writeQueue = new Map();
+}
+
+function beginAllMemWritePhases() {
+  for (const [id] of memories) {
+    beginMemWritePhase(id);
+  }
+}
+
+function queueMemWrite(id, port, startAddress, words) {
+  const mem = memories.get(id);
+  if (!mem) return;
+  for (let i = 0; i < words.length; i++) {
+    const address = startAddress + i;
+    const value = words[i];
+    if (mem.writeQueue.has(address)) {
+      const existing = mem.writeQueue.get(address);
+      if (existing.port !== port) {
+        throw Error(`Memory write collision at address ${address}`);
+      }
+    }
+    mem.writeQueue.set(address, { port, value });
+  }
+}
+
+function commitMemWrites(id) {
+  const mem = memories.get(id);
+  if (!mem || mem.writeQueue.size === 0) return;
+  for (const [address, entry] of mem.writeQueue.entries()) {
+    setMem(id, address, entry.value);
+  }
+  mem.writeQueue.clear();
+}
+
+function commitAllMemWrites() {
+  for (const [id] of memories) {
+    commitMemWrites(id);
+  }
 }
 
 function setMem(id, address, value) {
