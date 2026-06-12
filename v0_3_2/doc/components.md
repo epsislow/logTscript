@@ -1,6 +1,6 @@
 # Component index
 
-LogTscript includes built-in **components** (`comp`), reusable **board** blocks (`board`), lightweight **chip** blocks (`chip`), and legacy **PCB** (`pcb`). Use `doc(comp)`, `doc(board)`, `doc(chip)`, or `doc(pcb)` in the editor for live signatures.
+LogTscript includes built-in **components** (`comp`), **inline** declarations (`inline [asm]`, `inline [lut]`), reusable **board** blocks (`board`), lightweight **chip** blocks (`chip`), and legacy **PCB** (`pcb`). Use `doc(comp)`, `doc(inline)`, `doc(board)`, `doc(chip)`, or `doc(pcb)` in the editor for live signatures.
 
 ---
 
@@ -59,12 +59,15 @@ Instant built-in functions (`ADD`, `SUBTRACT`, …) without `comp`: [arithmetic.
 
 ## Storage & timing
 
-| Component | Shortname | Page |
-|-----------|-----------|------|
+| Name | Shortname | Page |
+|------|-----------|------|
 | `mem` | — | [mem.md](mem.md) |
-| `lut` | — | [lut.md](lut.md) |
+| `asm` | — | [asm.md](asm.md) — declare `inline [asm]`; assemble with `.name { … }` |
+| `lut` | — | [lut.md](lut.md) — `inline [lut]` or `comp [lut]` |
 | `reg` | — | [reg.md](reg.md) |
 | `osc` | `~` | [oscillator.md](oscillator.md) |
+
+`doc(inline.asm)` / `doc(inline.lut)` — declaration templates; `doc(.name)` — specific instance.
 
 ---
 

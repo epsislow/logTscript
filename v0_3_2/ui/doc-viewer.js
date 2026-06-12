@@ -59,6 +59,8 @@ const DOC_SECTIONS = [
     title: 'Storage & timing',
     items: [
       { file: 'mem.md', label: 'mem' },
+      { file: 'asm.md', label: 'asm', searchExtra: 'inline assembler isa mnemonic program blob myisa' },
+      { file: 'lut.md', label: 'lut', searchExtra: 'inline lookup table decoder comp' },
       { file: 'reg.md', label: 'reg' },
       { file: 'oscillator.md', label: 'oscillator' },
     ],

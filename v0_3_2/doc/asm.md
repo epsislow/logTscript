@@ -1,8 +1,8 @@
-# Inline ASM — Instruction Set Architecture
+# ASM
 
 Define a custom ISA with `inline [asm]`, then assemble programs to a **binary blob** with `.myisa { ... }` anywhere an expression is allowed.
 
-`[asm]` is the **inline kind**. Memory (`comp [mem]`) receives the assembled blob unchanged.
+Memory (`comp [mem]`) receives the assembled blob unchanged.
 
 There is **no panel UI** in v1 — logic only.
 
@@ -236,5 +236,5 @@ Assembler errors include the source line and `^^^` under the problematic token w
 ## Related
 
 - [mem.md](mem.md) — store assembled blob
-- [lut.md](lut.md) — inline lookup tables (`inline [lut]`)
+- [lut.md](lut.md) — lookup tables
 - [debug.md](debug.md) — `show`, `peek`

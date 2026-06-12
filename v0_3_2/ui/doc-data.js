@@ -425,11 +425,11 @@ user defined:
 (none)
 \`\`\`
 `,
-    'asm.md': `# Inline ASM — Instruction Set Architecture
+    'asm.md': `# ASM
 
 Define a custom ISA with \`inline [asm]\`, then assemble programs to a **binary blob** with \`.myisa { ... }\` anywhere an expression is allowed.
 
-\`[asm]\` is the **inline kind**. Memory (\`comp [mem]\`) receives the assembled blob unchanged.
+Memory (\`comp [mem]\`) receives the assembled blob unchanged.
 
 There is **no panel UI** in v1 — logic only.
 
@@ -663,7 +663,7 @@ Assembler errors include the source line and \`^^^\` under the problematic token
 ## Related
 
 - [mem.md](mem.md) — store assembled blob
-- [lut.md](lut.md) — inline lookup tables (\`inline [lut]\`)
+- [lut.md](lut.md) — lookup tables
 - [debug.md](debug.md) — \`show\`, \`peek\`
 `,
     'board.md': `# Board components
@@ -948,7 +948,7 @@ Interactive circuits: [board.md](board.md). Component catalog: [components.md](c
 `,
     'components.md': `# Component index
 
-LogTscript includes built-in **components** (\`comp\`), reusable **board** blocks (\`board\`), lightweight **chip** blocks (\`chip\`), and legacy **PCB** (\`pcb\`). Use \`doc(comp)\`, \`doc(board)\`, \`doc(chip)\`, or \`doc(pcb)\` in the editor for live signatures.
+LogTscript includes built-in **components** (\`comp\`), **inline** declarations (\`inline [asm]\`, \`inline [lut]\`), reusable **board** blocks (\`board\`), lightweight **chip** blocks (\`chip\`), and legacy **PCB** (\`pcb\`). Use \`doc(comp)\`, \`doc(inline)\`, \`doc(board)\`, \`doc(chip)\`, or \`doc(pcb)\` in the editor for live signatures.
 
 ---
 
@@ -1007,12 +1007,15 @@ Instant built-in functions (\`ADD\`, \`SUBTRACT\`, …) without \`comp\`: [arith
 
 ## Storage & timing
 
-| Component | Shortname | Page |
-|-----------|-----------|------|
+| Name | Shortname | Page |
+|------|-----------|------|
 | \`mem\` | — | [mem.md](mem.md) |
-| \`lut\` | — | [lut.md](lut.md) |
+| \`asm\` | — | [asm.md](asm.md) — declare \`inline [asm]\`; assemble with \`.name { … }\` |
+| \`lut\` | — | [lut.md](lut.md) — \`inline [lut]\` or \`comp [lut]\` |
 | \`reg\` | — | [reg.md](reg.md) |
 | \`osc\` | \`~\` | [oscillator.md](oscillator.md) |
+
+\`doc(inline.asm)\` / \`doc(inline.lut)\` — declaration templates; \`doc(.name)\` — specific instance.
 
 ---
 
@@ -2356,6 +2359,25 @@ comp.7seg, comp.7
 comp.osc, comp.~
 ...
 \`\`\`
+
+### doc(inline) — list inline instances
+
+\`\`\`
+doc(inline)
+\`\`\`
+
+Lists every \`inline [asm]\` / \`inline [lut]\` instance in the script (e.g. \`.myisa (inline [asm])\`). Kinds: \`inline.asm\`, \`inline.lut\`.
+
+### doc(inline.kind) — declaration template
+
+| Call | Topic | Page |
+|------|-------|------|
+| \`doc(inline.asm)\` | asm | [asm.md](asm.md) |
+| \`doc(inline.lut)\` | lut | [lut.md](lut.md) |
+
+### doc(.name) — specific inline instance
+
+After \`inline [asm] .myisa:\` or \`inline [lut] .decoder:\`, \`doc(.myisa)\` / \`doc(.decoder)\` shows opcodes or the LUT map for that instance. See [asm.md](asm.md) and [lut.md](lut.md).
 
 ### doc(comp.type) — syntax of a component
 
@@ -4169,7 +4191,7 @@ comp [led] .name:
 - The \`color\` attribute applies to all LEDs in the group. Individual LED colors are not supported within a single component — declare separate \`led\` components for different colors.
 - \`nl\` places a line break after the **last** LED in the group.
 `,
-    'lut.md': `# LUT — lookup table (\`lut\`)
+    'lut.md': `# LUT
 
 A **combinational lookup table**: address in → value out in the **same propagation step** (like \`ADD()\` / \`MUX()\`, not like clocked \`mem\`).
 
@@ -4237,7 +4259,7 @@ Unmapped slots use \`fillwith\`. Overlapping ranges: **last entry wins**. Addres
 
 ---
 
-## Inline declaration (\`inline [lut]\`)
+## Declaration — \`inline [lut]\`
 
 \`\`\`logts
 inline [lut] .decoder:
@@ -4617,7 +4639,7 @@ comp [mem] .ram:
 
 The variable \`d\` must already be declared before the \`comp\` statement. The value is read at the time of declaration. Same splitting behavior as a literal.
 
-### ASM program (\`inline [asm]\`)
+### ASM program
 
 Instead of hand-encoding hex, initialize program ROM from an [inline ASM](asm.md) instance. The ISA name **must** start with \`.\` (e.g. \`.myisa\`, not \`myisa\`).
 

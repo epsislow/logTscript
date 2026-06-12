@@ -344,6 +344,25 @@ comp.osc, comp.~
 ...
 ```
 
+### doc(inline) — list inline instances
+
+```
+doc(inline)
+```
+
+Lists every `inline [asm]` / `inline [lut]` instance in the script (e.g. `.myisa (inline [asm])`). Kinds: `inline.asm`, `inline.lut`.
+
+### doc(inline.kind) — declaration template
+
+| Call | Topic | Page |
+|------|-------|------|
+| `doc(inline.asm)` | asm | [asm.md](asm.md) |
+| `doc(inline.lut)` | lut | [lut.md](lut.md) |
+
+### doc(.name) — specific inline instance
+
+After `inline [asm] .myisa:` or `inline [lut] .decoder:`, `doc(.myisa)` / `doc(.decoder)` shows opcodes or the LUT map for that instance. See [asm.md](asm.md) and [lut.md](lut.md).
+
 ### doc(comp.type) — syntax of a component
 
 Displays the full syntax for a component type. Shortnames are accepted and redirect to the canonical type.

@@ -82,7 +82,7 @@ comp [mem] .ram:
 
 The variable `d` must already be declared before the `comp` statement. The value is read at the time of declaration. Same splitting behavior as a literal.
 
-### ASM program (`inline [asm]`)
+### ASM program
 
 Instead of hand-encoding hex, initialize program ROM from an [inline ASM](asm.md) instance. The ISA name **must** start with `.` (e.g. `.myisa`, not `myisa`).
 

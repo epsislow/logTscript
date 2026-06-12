@@ -1,4 +1,4 @@
-# LUT — lookup table (`lut`)
+# LUT
 
 A **combinational lookup table**: address in → value out in the **same propagation step** (like `ADD()` / `MUX()`, not like clocked `mem`).
 
@@ -66,7 +66,7 @@ Unmapped slots use `fillwith`. Overlapping ranges: **last entry wins**. Address 
 
 ---
 
-## Inline declaration (`inline [lut]`)
+## Declaration — `inline [lut]`
 
 ```logts
 inline [lut] .decoder:
