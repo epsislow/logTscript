@@ -36,6 +36,8 @@ const files = [
   'devices/lut-devices.js',
   'core/asm-assembler.js',
   'core/protocol-assembler.js',
+  'core/lut-labels.js',
+  'core/lut-decode.js',
   'core/parser.js',
   'core/interpreter.js',
   'core/signal-propagation.js',

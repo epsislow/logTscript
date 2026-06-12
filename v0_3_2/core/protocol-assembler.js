@@ -207,11 +207,124 @@ function generateProtocol(inst, args) {
   return { blob, channelWidths, totalWidth: blob.length };
 }
 
+function decodeChannel(channel, bits, attributes, paramOutputs) {
+  let pos = 0;
+  let lastParamBits = null;
+
+  for (const seg of channel.segments) {
+    switch (seg.kind) {
+      case 'literal': {
+        const expected = seg.bits;
+        const actual = bits.substr(pos, expected.length);
+        if (actual !== expected) {
+          const expBit = expected.length === 1 ? expected : `literal '${expected}'`;
+          const gotBit = actual.length ? actual[0] : '?';
+          throw new Error(`Protocol decode failed:\nexpected ${expBit}\nbut received '${gotBit}'`);
+        }
+        pos += expected.length;
+        break;
+      }
+      case 'param': {
+        const val = bits.substr(pos, seg.width);
+        if (val.length !== seg.width) {
+          throw new Error('Protocol decode failed:\nunexpected end of channel data');
+        }
+        pos += seg.width;
+        lastParamBits = val;
+        paramOutputs.push(val);
+        break;
+      }
+      case 'reverse': {
+        const raw = bits.substr(pos, seg.width);
+        if (raw.length !== seg.width) {
+          throw new Error('Protocol decode failed:\nunexpected end of channel data');
+        }
+        const val = raw.split('').reverse().join('');
+        pos += seg.width;
+        lastParamBits = val;
+        paramOutputs.push(val);
+        break;
+      }
+      case 'parityEven': {
+        if (lastParamBits == null) throw new Error('Protocol decode failed:\nparity without prior parameter');
+        const expected = String(popcount(lastParamBits) % 2 === 0 ? 0 : 1);
+        const actual = bits[pos];
+        if (actual !== expected) {
+          throw new Error(`Protocol decode failed:\nexpected parity bit '${expected}'\nbut received '${actual || '?'}'`);
+        }
+        pos++;
+        break;
+      }
+      case 'parityOdd': {
+        if (lastParamBits == null) throw new Error('Protocol decode failed:\nparity without prior parameter');
+        const expected = String(popcount(lastParamBits) % 2 === 0 ? 1 : 0);
+        const actual = bits[pos];
+        if (actual !== expected) {
+          throw new Error(`Protocol decode failed:\nexpected parity bit '${expected}'\nbut received '${actual || '?'}'`);
+        }
+        pos++;
+        break;
+      }
+      case 'clock': {
+        const pair = (attributes.clockType || 'lowFirst') === 'highFirst' ? '10' : '01';
+        let wave = '';
+        while (wave.length < seg.width) wave += pair;
+        const expected = wave.slice(0, seg.width);
+        const actual = bits.substr(pos, seg.width);
+        if (actual !== expected) {
+          throw new Error('Protocol decode failed:\nexpected clock waveform');
+        }
+        pos += seg.width;
+        break;
+      }
+      case 'repeat': {
+        const expected = seg.bit.repeat(seg.width);
+        const actual = bits.substr(pos, seg.width);
+        if (actual !== expected) {
+          throw new Error(`Protocol decode failed:\nexpected repeat bit '${seg.bit}'`);
+        }
+        pos += seg.width;
+        break;
+      }
+      default:
+        throw new Error(`Unknown protocol segment kind '${seg.kind}'`);
+    }
+  }
+
+  if (pos !== bits.length) {
+    throw new Error('Protocol output width mismatch');
+  }
+}
+
+function decodeProtocol(inst, channelBitStrings) {
+  const order = inst.channelOrder || [];
+  if (!Array.isArray(channelBitStrings)) {
+    throw new Error(`Expected ${order.length} protocol channels but received 0`);
+  }
+  if (channelBitStrings.length !== order.length) {
+    throw new Error(`Expected ${order.length} protocol channels but received ${channelBitStrings.length}`);
+  }
+
+  const paramOutputs = [];
+  for (let i = 0; i < order.length; i++) {
+    const chName = order[i];
+    const channel = inst.channels.find(c => c.name === chName);
+    if (!channel) throw new Error(`Missing channel '${chName}' in protocol instance`);
+    decodeChannel(channel, String(channelBitStrings[i]), inst.attributes || {}, paramOutputs);
+  }
+
+  const blob = paramOutputs.join('');
+  return { params: paramOutputs, blob, totalWidth: blob.length };
+}
+
 function formatProtocolInstanceDoc(alias, inst) {
   const lines = [];
   lines.push(`${alias} (inline [protocol])`);
   lines.push('');
-  lines.push('  outputs:');
+  lines.push('  decode:');
+  lines.push('    supported');
+  lines.push('');
+  lines.push('  channels:');
   for (const name of inst.channelOrder || []) lines.push(`    ${name}`);
   for (const ch of inst.channels || []) {
     lines.push('');
@@ -262,6 +375,7 @@ function formatProtocolTypeDoc() {
 const protocolAssemblerExports = {
   parseProtocolBody,
   generateProtocol,
+  decodeProtocol,
   formatProtocolInstanceDoc,
   formatProtocolTypeDoc,
 };

@@ -61,6 +61,7 @@ class Interpreter {
     this._probeRegEdgeCommit = false;
     this._probeInitialising = true;
     this.pendingProbeExprs = [];
+    this.evalContext = 'expr';
 
     // Oscillator timers (for cleanup on re-run)
     this.oscTimers = [];
@@ -440,6 +441,99 @@ class Interpreter {
     return { value: outVal, ref: null, bitWidth: depth };
   }
 
+  _lutInstFromComp(compName) {
+    const comp = this.components.get(compName);
+    if (!comp || comp.type !== 'lut') return null;
+    return {
+      kind: 'lut',
+      name: compName,
+      attributes: comp.attributes,
+      fillwithValue: comp.fillwithValue,
+      lutEntries: comp.lutEntries,
+      lutRawEntries: comp.lutRawEntries,
+      lutTable: comp.lutTable,
+      labelMap: comp.labelMap,
+      labelExprs: comp.labelExprs,
+    };
+  }
+
+  _getLutInst(name) {
+    const inlineInst = this.inlineInstances.get(name);
+    if (inlineInst && inlineInst.kind === 'lut') return inlineInst;
+    return this._lutInstFromComp(name);
+  }
+
+  _evalExprToBits(expr) {
+    const r = this.evalExpr(expr, false);
+    let bits = '';
+    for (const part of r) {
+      if (part.isText) throw new Error('ASM decode produces text and cannot be assigned to wires');
+      if (part.value && part.value !== '-') bits += part.value;
+      else if (part.ref && part.ref !== '&-') {
+        const v = this.getValueFromRef(part.ref);
+        if (v) bits += v;
+      }
+    }
+    return bits;
+  }
+
+  evalProtocolDecode(inst, argExprs, computeRefs) {
+    const channelBits = [];
+    for (const argExpr of argExprs) {
+      channelBits.push(this._evalExprToBits(argExpr));
+    }
+    const decodeFn = typeof decodeProtocol === 'function' ? decodeProtocol : null;
+    if (!decodeFn) throw new Error('Protocol decoder is not loaded');
+    const result = decodeFn(inst, channelBits);
+    const out = { value: result.blob, bitWidth: result.totalWidth, protocolDecode: true };
+    if (computeRefs) {
+      const idx = this.storeValue(result.blob);
+      out.ref = `&${idx}`;
+      out.isRef = true;
+    }
+    return out;
+  }
+
+  evalAsmDecode(inst, argExpr) {
+    const bits = this._evalExprToBits(argExpr);
+    const disFn = typeof disassembleInstruction === 'function' ? disassembleInstruction : null;
+    if (!disFn) throw new Error('ASM disassembler is not loaded');
+    const isa = { opcodes: inst.opcodes, wordWidth: inst.wordWidth, opcodeOrder: inst.opcodeOrder };
+    const text = disFn(isa, bits);
+    return { value: text, isText: true, varName: `${inst.name}:decode` };
+  }
+
+  evalInlineMethod(invoke, computeRefs) {
+    const instName = invoke.var;
+    const method = invoke.method;
+    const args = invoke.args || [];
+
+    const lutInst = this._getLutInst(instName);
+    if (lutInst) {
+      if (method === 'isValid') {
+        if (typeof lutIsValid !== 'function') throw new Error('LUT decode module is not loaded');
+        return lutIsValid(lutInst, args[0], args[1], this);
+      }
+      if (method === 'decode') {
+        if (typeof lutDecode !== 'function') throw new Error('LUT decode module is not loaded');
+        return lutDecode(lutInst, args[0], args[1], this);
+      }
+    }
+
+    const inlineInst = this.inlineInstances.get(instName);
+    if (inlineInst && inlineInst.kind === 'protocol' && method === 'decode') {
+      return this.evalProtocolDecode(inlineInst, args, computeRefs);
+    }
+    if (inlineInst && inlineInst.kind === 'asm' && method === 'decode') {
+      if (this.evalContext !== 'show' && this.evalContext !== 'doc') {
+        throw new Error('ASM decode produces text and cannot be assigned to wires');
+      }
+      return this.evalAsmDecode(inlineInst, args[0]);
+    }
+
+    throw new Error(`Unknown method '${method}' for ${instName}`);
+  }
+
   execInline(inline) {
     if (inline.kind === 'asm') {
       const parseIsaFn = typeof parseIsaBody === 'function' ? parseIsaBody : null;
@@ -456,11 +550,18 @@ class Interpreter {
       return;
     }
     if (inline.kind === 'lut') {
+      const resolveExternal = (instName, label) => {
+        const other = this.inlineInstances.get(instName);
+        if (other && other.labelMap && other.labelMap[label]) return other.labelMap[label].bits;
+        const comp = this.components.get(instName);
+        if (comp && comp.labelMap && comp.labelMap[label]) return comp.labelMap[label].bits;
+        return null;
+      };
       const parseBodyFn = (typeof Parser !== 'undefined' && typeof Tokenizer !== 'undefined'
         && Parser.prototype.parseLutInlineBody)
         ? (bodyRaw) => {
           const p = new Parser(new Tokenizer(bodyRaw + '\n'), this.componentRegistry);
-          return p.parseLutInlineBody(bodyRaw);
+          return p.parseLutInlineBody(bodyRaw, resolveExternal);
         }
         : null;
       if (!parseBodyFn) throw Error('LUT inline parser is not available');
@@ -469,7 +570,7 @@ class Interpreter {
       if (!handler) throw Error('LUT handler unavailable for inline LUT');
       const parsed = parseBodyFn(inline.bodyRaw);
       const attributes = parsed.attributes;
-      const initialValue = parsed.initialValue;
+      const initialValue = parsed.initialValue || { kind: 'lutData', entries: [], rawEntries: [] };
       const length = attributes.length !== undefined ? parseInt(attributes.length, 10) : 16;
       const depth = attributes.depth !== undefined ? parseInt(attributes.depth, 10) : 4;
       if (length <= 0 || depth <= 0) throw Error(`LUT length and depth must be positive for ${inline.name}`);
@@ -487,9 +588,11 @@ class Interpreter {
         name: inline.name,
         attributes,
         fillwithValue: fillwith,
-        lutEntries: initialValue.entries,
-        lutRawEntries: initialValue.rawEntries,
+        lutEntries: initialValue.entries || [],
+        lutRawEntries: initialValue.rawEntries || [],
         lutTable,
+        labelMap: parsed.labelMap || {},
+        labelExprs: parsed.labelExprs || {},
         bodyRaw: inline.bodyRaw,
       });
       return;
@@ -537,6 +640,51 @@ class Interpreter {
     return null;
   }
 
+  _resolveProbeLutLabelTarget(atom) {
+    if (!atom.property || atom.bitRange) return null;
+    const instName = atom.var;
+    const label = atom.property;
+    const inlineInst = this.inlineInstances.get(instName);
+    if (inlineInst && inlineInst.labelMap && inlineInst.labelMap[label]) {
+      const entry = inlineInst.labelMap[label];
+      const meta = typeof makeSymbolicMeta === 'function'
+        ? makeSymbolicMeta(instName, label, entry.exprSource)
+        : { labelName: label, exprSource: entry.exprSource };
+      return {
+        kind: 'lutLabel',
+        key: 'll:' + instName + ':' + label,
+        label: instName + ':' + label,
+        lutInst: inlineInst,
+        symbolicMeta: meta,
+        bitWidth: entry.bits.length,
+        constantValue: entry.bits,
+        isText: false,
+        seen: false,
+        lastValue: null,
+      };
+    }
+    const comp = this.components.get(instName);
+    if (comp && comp.type === 'lut' && comp.labelMap && comp.labelMap[label]) {
+      const entry = comp.labelMap[label];
+      const meta = typeof makeSymbolicMeta === 'function'
+        ? makeSymbolicMeta(instName, label, entry.exprSource)
+        : { labelName: label, exprSource: entry.exprSource };
+      return {
+        kind: 'lutLabel',
+        key: 'll:' + instName + ':' + label,
+        label: instName + ':' + label,
+        lutInst: comp,
+        symbolicMeta: meta,
+        bitWidth: entry.bits.length,
+        constantValue: entry.bits,
+        isText: false,
+        seen: false,
+        lastValue: null,
+      };
+    }
+    return null;
+  }
+
   _resolveProbeExpr(expr) {
     if (!expr || !expr.length) return null;
     const atom = expr[0];
@@ -546,6 +694,8 @@ class Interpreter {
           return this._resolveProbeInternalWireTarget(atom);
         }
         if (atom.property) {
+          const lutLabel = this._resolveProbeLutLabelTarget(atom);
+          if (lutLabel) return lutLabel;
           const composite = this._resolveProbeCompositeTarget(atom);
           if (composite) return composite;
         }
@@ -608,6 +758,12 @@ class Interpreter {
         if (target.ref) value = this.getValueFromRef(target.ref);
       } else if (target.kind === 'componentComputed') {
         value = this._readComputedComponentProbeValue(target);
+        if (value != null && target.compName && typeof formatLutSymbolic === 'function') {
+          const comp = this.components.get(target.compName);
+          if (comp && comp.type === 'lut') target.lutInst = comp;
+        }
+      } else if (target.kind === 'lutLabel') {
+        value = target.constantValue;
       }
       if (value !== null && value !== undefined) {
         this._emitProbeTarget(target, value, 'initialised');
@@ -615,13 +771,30 @@ class Interpreter {
     }
   }
 
+  _probeSymbolicSuffix(target, valueStr) {
+    if (target.symbolicMeta) {
+      if (target.symbolicMeta.labelName && target.symbolicMeta.exprSource) {
+        return ` (${target.symbolicMeta.labelName} = ${target.symbolicMeta.exprSource})`;
+      }
+      if (target.symbolicMeta.labelName) {
+        return ` (${target.symbolicMeta.labelName})`;
+      }
+    }
+    if (target.lutInst && valueStr !== '-' && typeof formatLutSymbolic === 'function') {
+      const sym = formatLutSymbolic(target.lutInst, valueStr);
+      if (sym !== valueStr) return ` (${sym})`;
+    }
+    return '';
+  }
+
   _emitProbeTarget(target, value, reasonOverride) {
     if (!target) return;
     let valueStr = value == null ? '-' : String(value);
-    if (target.bitWidth && valueStr !== '-') {
+    if (target.bitWidth && valueStr !== '-' && !target.isText) {
       valueStr = this.formatValue(valueStr, target.bitWidth);
     }
-    if (target.lastValue === valueStr) return;
+    const displayKey = valueStr + (target.symbolicMeta ? JSON.stringify(target.symbolicMeta) : '');
+    if (target.lastValue === displayKey) return;
     let reason = reasonOverride;
     if (!reason) {
       if (this._probeRegEdgeCommit) {
@@ -632,11 +805,12 @@ class Interpreter {
       }
     }
     target.seen = true;
-    target.lastValue = valueStr;
+    target.lastValue = displayKey;
     const ref = target.ref && target.ref !== '&-' ? target.ref : (target.wireName ? (this.wires.get(target.wireName)?.ref) : null);
     const refPart = ref ? ` (${ref})` : '';
+    const symPart = this._probeSymbolicSuffix(target, valueStr);
     const name = target.label || target.wireName || target.ref || '?';
-    this.out.push(`# ${name} = ${valueStr}${refPart} - ${reason}`);
+    this.out.push(`# ${name} = ${valueStr}${refPart}${symPart} - ${reason}`);
   }
 
   _emitProbeForWire(name, value) {
@@ -1370,6 +1544,10 @@ class Interpreter {
       return result;
     }
 
+    if (a.inlineMethod) {
+      return this.evalInlineMethod(a.inlineMethod, computeRefs);
+    }
+
     if (a.compInvoke) {
       return this.evalCompInvoke(a.compInvoke, computeRefs);
     }
@@ -1470,6 +1648,23 @@ class Interpreter {
         if (boardInstance) {
           const compositeResult = this._evalCompositeInstanceAtom(a, boardInstance);
           if (compositeResult) return compositeResult;
+        }
+
+        const inlineInst = this.inlineInstances.get(a.var);
+        if (inlineInst && a.property && inlineInst.labelMap && inlineInst.labelMap[a.property]) {
+          const entry = inlineInst.labelMap[a.property];
+          const meta = typeof makeSymbolicMeta === 'function'
+            ? makeSymbolicMeta(a.var, a.property, entry.exprSource)
+            : { labelName: a.property, exprSource: entry.exprSource, lutRef: a.var };
+          let val = entry.bits;
+          if (a.pad) val = this.applyPad(val, a.pad);
+          return {
+            value: val,
+            ref: null,
+            varName: `${a.var}:${a.property}`,
+            bitWidth: val.length,
+            symbolicMeta: meta,
+          };
         }
         
         const comp = this.components.get(a.var);
@@ -2197,10 +2392,26 @@ if (this.isBuiltinDEMUX(name)) {
     }
   }
 
+  _formatShowValue(part, valueStr) {
+    if (part.symbolicMeta) {
+      if (part.symbolicMeta.labelName && part.symbolicMeta.exprSource) {
+        return `${part.symbolicMeta.labelName} = ${part.symbolicMeta.exprSource} (${valueStr})`;
+      }
+      if (part.symbolicMeta.labelName) {
+        return `${part.symbolicMeta.labelName} (${valueStr})`;
+      }
+    }
+    if (part.isText) return valueStr;
+    return valueStr;
+  }
+
   _execShowImmediate(s, computeRefs = false) {
     const args = s.show || s.peek;
     if (!args) return;
+    const prevCtx = this.evalContext;
+    this.evalContext = 'show';
     const results = [];
+    try {
     for (const e of args) {
       let varName = null;
       let varType = null;
@@ -2245,37 +2456,42 @@ if (this.isBuiltinDEMUX(name)) {
               if (bw) valueStr = this.formatValue(valueStr, bw);
             }
           }
+          const shown = this._formatShowValue(part, valueStr);
           if (displayName && displayType) {
             const wire = this.wires.get(displayName);
             const variable = this.vars.get(displayName);
             const ref = wire?.ref ?? variable?.ref;
             const refStr = (ref && ref !== '&-') ? ` (ref: ${ref})` : '';
-            results.push(`${displayName} (${displayType}) = ${valueStr}${refStr}`);
+            results.push(`${displayName} (${displayType}) = ${shown}${refStr}`);
           } else {
-            results.push(valueStr);
+            results.push(shown);
           }
         } else {
           let valueStr = part.value !== null ? part.value : '-';
-          if (valueStr !== '-') {
+          if (valueStr !== '-' && !part.isText) {
             if (part.bitWidth) valueStr = this.formatValue(valueStr, part.bitWidth);
             else if (displayType) {
               const bw = this.getBitWidth(displayType);
               if (bw) valueStr = this.formatValue(valueStr, bw);
             }
           }
+          const shown = this._formatShowValue(part, valueStr);
           if (displayName && displayType) {
             const wire = this.wires.get(displayName);
             const variable = this.vars.get(displayName);
             const ref = wire?.ref ?? variable?.ref;
             const refStr = (ref && ref !== '&-') ? ` (ref: ${ref})` : '';
-            results.push(`${displayName} (${displayType}) = ${valueStr}${refStr}`);
+            results.push(`${displayName} (${displayType}) = ${shown}${refStr}`);
           } else {
-            results.push(valueStr);
+            results.push(shown);
           }
         }
       }
     }
     this.out.push(results.join(', '));
+    } finally {
+      this.evalContext = prevCtx;
+    }
   }
 
   exec(s, computeRefs=false){

@@ -62,6 +62,7 @@
         { "file": "asm.md", "label": "asm", "searchExtra": "inline assembler isa mnemonic program blob myisa" },
         { "file": "lut.md", "label": "lut", "searchExtra": "inline lookup table decoder comp" },
         { "file": "protocol.md", "label": "protocol", "searchExtra": "inline uart spi i2c reverse parity clock repeat tx sda scl mosi" },
+        { "file": "decode.md", "label": "decode", "searchExtra": "decode isValid disassemble reverse lookup labels" },
         { "file": "reg.md", "label": "reg" },
         { "file": "oscillator.md", "label": "oscillator" }
       ]

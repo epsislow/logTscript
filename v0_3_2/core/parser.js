@@ -2253,6 +2253,22 @@ assignment() {
           return addNot(_a); }
       }
 
+      if (this.c.type === 'SYM' && this.c.value === '(') {
+        const methodArgs = [];
+        this.eat('SYM', '(');
+        this.t.skip();
+        while (!(this.c.type === 'SYM' && this.c.value === ')')) {
+          if (this.c.type === 'EOF') {
+            throw Error(`Unclosed '(' in inline method at ${this.c.line}:${this.c.col}`);
+          }
+          if (methodArgs.length > 0) this.eat('SYM', ',');
+          methodArgs.push(this.expr());
+          this.t.skip();
+        }
+        this.eat('SYM', ')');
+        return addNot({ inlineMethod: { var: compName, method: property, args: methodArgs } });
+      }
+
       { const _a = { var: compName, property: property };
         if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
         return addNot(_a); }
@@ -2587,12 +2603,22 @@ isBuiltinFunction(name) {
     return { kind: 'protocolInvoke', args };
   }
 
-  parseLutInlineBody(bodyRaw) {
+  parseLutInlineBody(bodyRaw, resolveExternal) {
+    const resolveFn = typeof resolveLutBody === 'function' ? resolveLutBody : null;
+    if (resolveFn) {
+      const resolved = resolveFn(bodyRaw, resolveExternal || null);
+      return {
+        attributes: resolved.attributes,
+        initialValue: resolved.initialValue,
+        labelMap: resolved.labelMap,
+        labelExprs: resolved.labelExprs,
+      };
+    }
     const attributes = {};
     const dataRe = /\bdata\s*\{/;
     const dataMatch = dataRe.exec(bodyRaw);
     if (!dataMatch) {
-      throw Error(`inline [lut] body requires 'data { ... }' block`);
+      throw Error(`inline [lut] body requires at least one label or a data { } block`);
     }
     const beforeData = bodyRaw.substring(0, dataMatch.index);
     for (const line of beforeData.split('\n')) {
@@ -2621,7 +2647,7 @@ isBuiltinFunction(name) {
     const initialValue = this.parseLutDataRaw(bracePos, attributes);
     this.t.src = savedSrc;
     this._syncTokenizerAt(savedI);
-    return { attributes, initialValue };
+    return { attributes, initialValue, labelMap: {}, labelExprs: {} };
   }
 
   parseLutDataRaw(bracePos, attributes) {

@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, arithmetic.md, asm.md, board.md, chip.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, interactive-components.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, subtract.md, switch.md
+ * Files: 14seg.md, adder.md, arithmetic.md, asm.md, board.md, chip.md, components.md, counter.md, debug.md, decode.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, interactive-components.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, subtract.md, switch.md
  */
 (function () {
   'use strict';
@@ -1865,6 +1865,138 @@ probe(a)
 - [Editor UI](editorUI.md) — Output panel, Run, Next, Wave / Legacy toggle
 - [doc() function](doc-function.md) — \`doc(def)\` lists \`show\` as a built-in
 - [REG](reg.md) — \`NEXT(~)\` and wire-clock behaviour with \`show\`
+`,
+    'decode.md': `# DECODE
+
+Several inline types support reverse transformation through \`:decode(...)\`.
+
+| Inline | Decode result | In expressions |
+|--------|---------------|----------------|
+| protocol | Bit values | ✓ |
+| lut | Bit values | ✓ |
+| asm | Text | ✗ (\`show()\` / \`doc()\` only) |
+
+---
+
+## Protocol \`:decode(channels...)\`
+
+Extracts parameter values from one or more protocol channels.
+
+\`\`\`logts
+8bit data =
+.uart8n1:decode(
+  0100000101
+)
+\`\`\`
+
+Multi-channel (order must match declaration):
+
+\`\`\`logts
+7bit address,
+1bit rw,
+1bit ack1,
+8bit data,
+1bit ack2
+=
+.i2c:decode(
+  sdaBits,
+  sclBits
+)
+\`\`\`
+
+All protocol-generated segments are verified during decode.
+
+| Error | Cause |
+|-------|-------|
+| \`Protocol decode failed: expected ...\` | Input does not match definition |
+| \`Expected N protocol channels but received M\` | Wrong channel count |
+| \`Protocol output width mismatch\` | Channel width mismatch |
+
+---
+
+## LUT \`:decode(value [, matchIndex])\`
+
+Reverse lookup: value → address (key). Optional zero-based \`matchIndex\` when multiple keys map to the same value (default \`0\`).
+
+\`\`\`logts
+4bit x =
+.decoder:decode(
+  0010
+)
+\`\`\`
+
+Ambiguous value:
+
+\`\`\`logts
+4bit x =
+.decoder:decode(
+  1111,
+  2
+)
+\`\`\`
+
+With labels:
+
+\`\`\`logts
+2bit x =
+.traffic:decode(
+  GREEN
+)
+\`\`\`
+
+| Error | Cause |
+|-------|-------|
+| \`LUT decode failed: value ... does not exist\` | Value not in table |
+| \`LUT decode failed: match index N exceeds available matches (M)\` | Invalid index |
+
+See also [lut.md](lut.md) for \`:isValid()\`, labels, and constant expressions.
+
+---
+
+## ASM \`:decode(instruction)\`
+
+Disassembly — returns **text**, not bits.
+
+\`\`\`logts
+show(
+  .cpu:decode(
+    00010111
+  )
+)
+\`\`\`
+
+Output example: \`LOAD R1 A3\`
+
+| Error | Cause |
+|-------|-------|
+| \`ASM decode produces text and cannot be assigned to wires\` | Used in wire assignment |
+
+Valid contexts: \`show()\`, \`doc()\`.
+
+---
+
+## \`doc()\`
+
+\`\`\`logts
+doc(.uart8n1)
+doc(.decoder)
+doc(.cpu)
+\`\`\`
+
+Protocol: \`parameters:\`, \`channels:\`, \`decode: supported\`.
+
+LUT: \`labels:\`, \`data:\`, \`decode: supported\`.
+
+ASM: \`decode: disassembler only\`, \`valid contexts: show(), doc()\`.
+
+---
+
+## Related
+
+- [lut.md](lut.md) — labels, \`isValid()\`, expressions, probe/show
+- [protocol.md](protocol.md) — encode / channel syntax
+- [asm.md](asm.md) — ISA definition
+- [debug.md](debug.md) — \`show\`, \`probe\`
 `,
     'dip.md': `# DIP switch component
 
@@ -4221,7 +4353,7 @@ There is **no panel UI** in v1 — logic only.
 
 | Form | Declaration | Lookup |
 |------|-------------|--------|
-| **\`inline [lut]\`** | \`data { }\` in body (no \`=\`) | \`.name(in = addr)\` or \`.name(0011)\` |
+| **\`inline [lut]\`** | labels and/or \`data { }\` in body (no \`=\`) | \`.name(in = addr)\`, \`.name:LABEL\`, \`.name:decode(...)\` |
 | **\`comp [lut]\`** | \`= data { }\` after attrs | Method B: \`.name:in\` + \`.name:get\` — or Method A: \`.name(in = addr)\` |
 
 Use **\`inline [lut]\`** for pure combinational lookup in expressions.
@@ -4280,7 +4412,114 @@ inline [lut] .decoder:
   :
 \`\`\`
 
-Body uses \`data { }\` **without** \`=\` (unlike \`comp [lut]\`).
+Body uses labels and/or \`data { }\` **without** \`=\` (unlike \`comp [lut]\`). A LUT with **only labels** (no \`data { }\`) acts as a symbolic constant table.
+
+---
+
+## Labels
+
+Symbolic names for binary values. Syntax: **flat** (\`RED = 00\`) or **block** (\`labels { RED = 00 }\`).
+
+| Rule | Example |
+|------|---------|
+| Must start with a letter | \`RED\` ✓ — \`1RED\` ✗ |
+| Letters and digits only | \`STATE0\` ✓ — \`STATE_A\` ✗ |
+| Unique within the LUT | duplicate → error |
+| All labels same width | \`RED = 00\`, \`GREEN = 10\` ✓ |
+
+### Access
+
+\`\`\`logts
+3wire state = .flag:OVERFLOW
+\`\`\`
+
+### Labels-only (constants)
+
+\`\`\`logts
+inline [lut] .flag:
+  ZERO     = 000
+  NEGATIVE = 001
+  OVERFLOW = 010
+  :
+
+3wire s = .flag:OVERFLOW
+\`\`\`
+
+### Labels with \`data { }\`
+
+\`\`\`logts
+inline [lut] .traffic:
+  RED    = 00
+  YELLOW = 01
+  GREEN  = 10
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+  :
+
+2wire next = .traffic(.traffic:RED)
+\`\`\`
+
+Bare label names (\`RED\`, \`GREEN\`) resolve in \`.traffic:isValid(RED, GREEN)\` on the same instance.
+
+---
+
+## Constant expressions
+
+Labels and \`data { }\` values may use \`|\`, \`&\`, \`!\`, and parentheses. Evaluated at parse time; \`exprSource\` is preserved for \`show()\`, \`probe()\`, and \`doc()\`.
+
+\`\`\`logts
+inline [lut] .ctrl:
+  depth: 8
+  ACCLOAD = 00000001
+  MEMREAD = 00000010
+  LOAD = ACCLOAD | MEMREAD
+  :
+
+8wire w = .ctrl:LOAD
+\`\`\`
+
+Chaining: \`A | B | C\`. Precedence: \`!\` > \`&\` > \`|\`.
+
+Display uses infix operators (\`ACCLOAD | MEMREAD\`), not \`OR()\` / \`AND()\` / \`NOT()\`.
+
+---
+
+## \`isValid(key, value)\` → \`1bit\`
+
+Checks whether an exact mapping exists in \`data { }\`.
+
+\`\`\`logts
+1bit ok = .traffic:isValid(RED, GREEN)
+1bit ok = .traffic:isValid(currentState, wantedState)
+\`\`\`
+
+---
+
+## \`decode(value [, matchIndex])\` → address bits
+
+Reverse lookup. See [decode.md](decode.md) for protocol and ASM decode.
+
+\`\`\`logts
+4bit x = .decoder:decode(0010)
+4bit x = .decoder:decode(1111, 2)
+2bit x = .traffic:decode(GREEN)
+\`\`\`
+
+---
+
+## \`show()\` and \`probe()\` with labels
+
+\`\`\`logts
+show(.state:FETCH)
+probe(.ctrl:LOAD)
+\`\`\`
+
+Output includes label name and expression when present, e.g. \`LOAD = ACCLOAD | MEMREAD (00000011)\`.
+
+---
 
 ### Runnable — invoke (named address)
 
@@ -4547,7 +4786,10 @@ doc(.decoder)
 | Error | Cause |
 |-------|-------|
 | \`Expected '.' before inline instance name\` | ASM program without dot (see [asm.md](asm.md)) |
-| \`inline [lut] body requires 'data { ... }' block\` | Missing \`data { }\` in inline body |
+| \`inline [lut] body requires at least one label or a data { } block\` | Empty inline LUT body |
+| \`Duplicate label 'RED'\` | Label declared twice |
+| \`Unknown label 'BLUE'\` | Label not found |
+| \`LUT decode failed: value ... does not exist\` | Reverse lookup miss |
 | \`LUT address N >= length L\` | Index outside table at runtime |
 | \`LUT value must be exactly D bits\` | Value or \`fillwith\` wrong width |
 | \`LUT range inverted\` | \`end < start\` in a range |
@@ -4557,6 +4799,7 @@ doc(.decoder)
 
 ## Related
 
+- [decode.md](decode.md) — \`:decode()\`, protocol/ASM reverse
 - [mem.md](mem.md) — sequential RAM
 - [asm.md](asm.md) — inline assembler (blob into \`mem\`)
 - [debug.md](debug.md) — \`probe\`, \`show\`, \`peek\`

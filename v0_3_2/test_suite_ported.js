@@ -3236,5 +3236,177 @@ reg(935, 'protocol', 'doc(inline) listează instanță protocol', function(h, se
   h.assert('kind', String(out.some(l => l.includes('inline.protocol'))), 'true');
 });
 
+const INLINE_LUT_FLAGS = `inline [lut] .flags:
+  ZERO     = 0001
+  NEGATIVE = 0010
+  OVERFLOW = 0100
+  CARRY    = 1000
+  :`;
+
+const INLINE_LUT_CTRL = `inline [lut] .ctrl:
+  depth: 8
+  ACCLOAD = 00000001
+  MEMREAD = 00000010
+  LOAD = ACCLOAD | MEMREAD
+  :`;
+
+const INLINE_LUT_DECODER = `inline [lut] .decoder:
+  depth: 4
+  length: 16
+  data {
+    0000 : 0001
+    0001 : 0010
+    0010 : 0100
+  }
+  :`;
+
+const INLINE_LUT_TRAFFIC = `inline [lut] .traffic:
+  RED    = 00
+  YELLOW = 01
+  GREEN  = 10
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+  :`;
+
+reg(936, 'lut-labels', 'labels-only — .flags:ZERO', function(h, session) {
+  const { interp } = session.run(INLINE_LUT_FLAGS + '\n4wire x = .flags:ZERO');
+  h.assert('zero', session.getWire(interp, 'x'), '0001');
+});
+
+reg(937, 'lut-labels', 'expresie OR — .ctrl:LOAD', function(h, session) {
+  const { interp } = session.run(INLINE_LUT_CTRL + '\n8wire x = .ctrl:LOAD');
+  h.assert('load', session.getWire(interp, 'x'), '00000011');
+});
+
+reg(938, 'lut-labels', 'expresie lanț | și paranteze', function(h, session) {
+  const src = `inline [lut] .mask:
+    depth: 4
+    A = 0001
+    B = 0010
+    C = 0100
+    UNION = A | B | C
+    USER = 1111
+    VISIBLE = 1010
+    RESULT = USER & VISIBLE
+    :
+  4wire u = .mask:UNION
+  4wire r = .mask:RESULT`;
+  const { interp } = session.run(src);
+  h.assert('union', session.getWire(interp, 'u'), '0111');
+  h.assert('and', session.getWire(interp, 'r'), '1010');
+});
+
+reg(939, 'lut-isvalid', 'tranziție validă RED -> GREEN', function(h, session) {
+  const { interp } = session.run(INLINE_LUT_TRAFFIC + '\n1wire ok = .traffic:isValid(RED, GREEN)');
+  h.assert('valid', session.getWire(interp, 'ok'), '1');
+});
+
+reg(940, 'lut-isvalid', 'tranziție invalidă RED -> YELLOW', function(h, session) {
+  const { interp } = session.run(INLINE_LUT_TRAFFIC + '\n1wire ok = .traffic:isValid(RED, YELLOW)');
+  h.assert('invalid', session.getWire(interp, 'ok'), '0');
+});
+
+reg(941, 'lut-decode', 'reverse lookup unic', function(h, session) {
+  const { interp } = session.run(INLINE_LUT_DECODER + '\n4wire x = .decoder:decode(0010)');
+  h.assert('key', session.getWire(interp, 'x'), '0001');
+});
+
+reg(942, 'lut-decode', 'reverse lookup ambiguu index 0', function(h, session) {
+  const src = `inline [lut] .amb:
+    depth: 4
+    length: 16
+    data {
+      0000 : 1111
+      0001 : 1111
+      0010 : 1111
+    }
+    :
+  4wire x = .amb:decode(1111)`;
+  const { interp } = session.run(src);
+  h.assert('first', session.getWire(interp, 'x'), '0000');
+});
+
+reg(943, 'lut-decode', 'reverse lookup cu matchIndex 2', function(h, session) {
+  const src = `inline [lut] .amb:
+    depth: 4
+    length: 16
+    data {
+      0000 : 1111
+      0001 : 1111
+      0010 : 1111
+    }
+    :
+  4wire x = .amb:decode(1111, 0010)`;
+  const { interp } = session.run(src);
+  h.assert('third', session.getWire(interp, 'x'), '0010');
+});
+
+reg(944, 'lut-decode', 'decode cu label GREEN -> RED', function(h, session) {
+  const { interp } = session.run(INLINE_LUT_TRAFFIC + '\n2wire x = .traffic:decode(GREEN)');
+  h.assert('red', session.getWire(interp, 'x'), '00');
+});
+
+reg(945, 'protocol-decode', 'uart8n1 decode single channel', function(h, session) {
+  const { interp } = session.run(INLINE_UART8N1 + '\n8wire data = .uart8n1:decode(0100000101)');
+  h.assert('data', session.getWire(interp, 'data'), '01000001');
+});
+
+reg(946, 'protocol-decode', 'eroare start bit', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_UART8N1 + '\n8wire data = .uart8n1:decode(1100000101)');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('start bit', String(err.includes('Protocol decode failed')), 'true');
+});
+
+const INLINE_CPU = `inline [asm] .cpu:
+  LOAD : 0001 + R2b + A2b
+  STORE: 0010 + R2b + A2b
+  :`;
+
+reg(947, 'asm-decode', 'show disassemble', function(h, session) {
+  const { out } = session.run(INLINE_CPU + '\nshow(.cpu:decode(00010111))');
+  h.assert('mnemonic', String(out.some(l => l.includes('LOAD'))), 'true');
+});
+
+reg(948, 'asm-decode', 'assignment interzis', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_CPU + '\n8wire x = .cpu:decode(00010111)');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('no assign', String(err.includes('ASM decode produces text')), 'true');
+});
+
+reg(949, 'lut-show', 'show label cu expresie |', function(h, session) {
+  const { out } = session.run(INLINE_LUT_CTRL + '\nshow(.ctrl:LOAD)');
+  h.assert('expr', String(out.some(l => l.includes('ACCLOAD | MEMREAD'))), 'true');
+  h.assert('not or fn', String(!out.some(l => l.includes('OR('))), 'true');
+});
+
+reg(950, 'lut-probe', 'probe label constant', function(h, session) {
+  const { out } = session.run(INLINE_LUT_FLAGS + '\nprobe(.flags:ZERO)');
+  h.assert('probe line', String(out.some(l => l.includes('.flags:ZERO') && l.includes('0001'))), 'true');
+});
+
+reg(951, 'lut-probe', 'probe label cu expresie', function(h, session) {
+  const { out } = session.run(INLINE_LUT_CTRL + '\nprobe(.ctrl:LOAD)');
+  h.assert('expr probe', String(out.some(l => l.includes('ACCLOAD | MEMREAD'))), 'true');
+});
+
+reg(952, 'lut', 'labels bloc syntax', function(h, session) {
+  const src = `inline [lut] .state:
+    labels {
+      IDLE = 000
+      FETCH = 001
+    }
+    :
+  3wire x = .state:FETCH`;
+  const { interp } = session.run(src);
+  h.assert('fetch', session.getWire(interp, 'x'), '001');
+});
+
   suite.finalize();
 })();

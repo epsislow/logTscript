@@ -267,6 +267,50 @@ function encodeInstruction(isa, entry, labels) {
   return bits;
 }
 
+function disassembleInstruction(isa, bitsStr) {
+  const bits = String(bitsStr);
+  for (const mn of isa.opcodeOrder || Object.keys(isa.opcodes)) {
+    const def = isa.opcodes[mn];
+    if (!def) continue;
+    let pos = 0;
+    const argTexts = [];
+    let matched = true;
+
+    for (const seg of def.segments) {
+      if (seg.kind === 'literal') {
+        if (bits.substr(pos, seg.bits.length) !== seg.bits) {
+          matched = false;
+          break;
+        }
+        pos += seg.bits.length;
+        continue;
+      }
+      const field = bits.substr(pos, seg.width);
+      if (field.length !== seg.width) {
+        matched = false;
+        break;
+      }
+      pos += seg.width;
+      if (seg.kind === 'reg') {
+        argTexts.push('R' + parseInt(field, 2));
+      } else if (seg.kind === 'addr') {
+        argTexts.push('A' + parseInt(field, 2));
+      } else if (seg.kind === 'imm') {
+        let num = parseInt(field, 2);
+        if (seg.signed && field[0] === '1') {
+          num -= (1 << seg.width);
+        }
+        argTexts.push(String(num));
+      }
+    }
+
+    if (matched && pos === bits.length) {
+      return argTexts.length ? `${mn} ${argTexts.join(' ')}` : mn;
+    }
+  }
+  throw new Error('Cannot disassemble instruction — no matching opcode');
+}
+
 function assembleProgram(isa, programRaw, options = {}) {
   const entries = parseProgramLines(programRaw);
   const labels = pass1CollectLabels(entries);
@@ -294,6 +338,11 @@ function assembleProgram(isa, programRaw, options = {}) {
 function formatInstanceDoc(alias, inst) {
   const lines = [];
   lines.push(`${alias} (inline [${inst.kind || inst.type || 'asm'}])`);
+  lines.push('  decode:');
+  lines.push('    disassembler only');
+  lines.push('  valid contexts:');
+  lines.push('    show()');
+  lines.push('    doc()');
   lines.push(`  wordWidth: ${inst.wordWidth}`);
   lines.push('  opcodes:');
   for (const mn of inst.opcodeOrder || Object.keys(inst.opcodes)) {
@@ -328,6 +377,7 @@ const asmAssemblerExports = {
   parseIsaBody,
   parseProgramLines,
   assembleProgram,
+  disassembleInstruction,
   formatAsmError,
   formatInstanceDoc,
   formatAsmTypeDoc,

@@ -107,6 +107,17 @@ var LutComponent = class LutComponent extends BuiltinComponent {
   }
 
   evalGetProperty(comp, property, a, ctx) {
+    if (comp.labelMap && comp.labelMap[property]) {
+      const entry = comp.labelMap[property];
+      const meta = typeof makeSymbolicMeta === 'function'
+        ? makeSymbolicMeta(a.var, property, entry.exprSource)
+        : { labelName: property, exprSource: entry.exprSource, lutRef: a.var };
+      let val = entry.bits;
+      const br = this.handleBitRange(a, val, a.var, property, ctx);
+      if (br) return br;
+      return { value: val, ref: null, varName: `${a.var}:${property}`, bitWidth: val.length, symbolicMeta: meta };
+    }
+    if (property === 'isValid' || property === 'decode') return null;
     if (property !== 'get') return null;
     const lutId = comp.deviceIds[0];
     const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
@@ -154,24 +165,45 @@ var LutComponent = class LutComponent extends BuiltinComponent {
     lines.push(`  depth: ${depth}`);
     lines.push(`  length: ${length}`);
     lines.push(`  fillwith: ${fill}`);
-    lines.push('  map:');
+    const labelMap = inst.labelMap || {};
+    const labelNames = Object.keys(labelMap);
+    if (labelNames.length) {
+      lines.push('  labels:');
+      for (const name of labelNames) {
+        const entry = labelMap[name];
+        if (entry.exprSource) {
+          lines.push(`    ${name} = ${entry.exprSource}`);
+          lines.push(`           ${entry.bits}`);
+        } else {
+          lines.push(`    ${name} = ${entry.bits}`);
+        }
+      }
+    }
+    lines.push('  decode:');
+    lines.push('    supported');
+    lines.push('  matches:');
+    lines.push('    reverse lookup');
     const raw = inst.lutRawEntries || [];
     const entries = inst.lutEntries || [];
     if (raw.length) {
+      lines.push(labelNames.length ? '  data:' : '  map:');
       for (let i = 0; i < raw.length; i++) {
         const r = raw[i];
         const e = entries[i];
         const fromLabel = r.fromRaw;
         const toLabel = (e && e.to !== e.from) ? (r.toRaw || r.fromRaw) : null;
         const rangeLabel = toLabel ? `${fromLabel}-${toLabel}` : fromLabel;
-        lines.push(`    ${rangeLabel} -> ${e ? e.value : r.value}`);
+        const valShow = r.valueRaw || (e ? e.value : r.value);
+        lines.push(`    ${rangeLabel} -> ${valShow}`);
       }
     } else if (entries.length) {
+      lines.push('  map:');
       for (const e of entries) {
         const rangeLabel = e.to !== e.from ? `${e.from}-${e.to}` : String(e.from);
         lines.push(`    ${rangeLabel} -> ${e.value}`);
       }
-    } else {
+    } else if (!labelNames.length) {
+      lines.push('  map:');
       lines.push('    (none)');
     }
     const mapped = new Set();
