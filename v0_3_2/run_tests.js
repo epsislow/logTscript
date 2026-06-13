@@ -221,6 +221,250 @@
       .replace(/>/g, '&gt;');
   }
 
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  let testSearchIndex = [];
+  let testSearchResults = [];
+  let testSearchActiveIndex = -1;
+
+  function buildTestSearchIndex() {
+    const index = [];
+    for (const group of manifest.groups) {
+      index.push({
+        kind: 'group',
+        groupId: group.id,
+        label: group.label,
+        sublabel: group.rangeLabel,
+        haystack: (group.label + ' ' + group.id + ' ' + group.rangeLabel).toLowerCase()
+      });
+      for (const testId of group.testIds) {
+        index.push({
+          kind: 'test',
+          id: testId,
+          groupId: group.id,
+          label: 'Test ' + testId,
+          sublabel: group.label,
+          haystack: String(testId)
+        });
+      }
+    }
+    return index;
+  }
+
+  function testSearchRank(entry, query) {
+    if (entry.kind === 'test') {
+      const sid = String(entry.id);
+      if (sid === query) return 0;
+      if (sid.startsWith(query)) return 1;
+      if (sid.includes(query)) return 2;
+      return 3;
+    }
+    const label = entry.label.toLowerCase();
+    if (label === query) return 0;
+    if (label.startsWith(query)) return 1;
+    if (label.includes(query)) return 2;
+    return 3;
+  }
+
+  function filterTestSearch(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) {
+      return testSearchIndex.filter(entry => entry.kind === 'group');
+    }
+
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const numericQuery = /^\d+$/.test(q);
+
+    const list = testSearchIndex.filter(function (entry) {
+      if (entry.kind === 'test') {
+        const sid = String(entry.id);
+        if (numericQuery) return sid.includes(q);
+        return tokens.some(token => /^\d+$/.test(token) && sid.includes(token));
+      }
+      return tokens.every(token => entry.haystack.indexOf(token) !== -1);
+    });
+
+    list.sort(function (a, b) {
+      const kindOrder = a.kind === b.kind ? 0 : (a.kind === 'group' ? -1 : 1);
+      if (kindOrder !== 0) return kindOrder;
+      const ra = testSearchRank(a, q);
+      const rb = testSearchRank(b, q);
+      if (ra !== rb) return ra - rb;
+      if (a.kind === 'test') return a.id - b.id;
+      return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+    });
+
+    return list.slice(0, 40);
+  }
+
+  function closeTestSearchMenu() {
+    const menu = document.getElementById('testSearchMenu');
+    const input = document.getElementById('testSearchInput');
+    if (!menu) return;
+    menu.hidden = true;
+    menu.innerHTML = '';
+    testSearchActiveIndex = -1;
+    testSearchResults = [];
+    if (input) input.setAttribute('aria-expanded', 'false');
+  }
+
+  function flashSearchTarget(el) {
+    if (!el) return;
+    el.classList.remove('search-highlight');
+    void el.offsetWidth;
+    el.classList.add('search-highlight');
+    setTimeout(() => el.classList.remove('search-highlight'), 1300);
+  }
+
+  function scrollToTestSearchResult(result) {
+    if (!result) return;
+    if (result.kind === 'group') {
+      const section = document.querySelector('.test-group[data-group="' + result.groupId + '"]');
+      if (!section) return;
+      section.classList.remove('collapsed');
+      flashSearchTarget(section);
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const row = document.querySelector('.test-row[data-id="' + result.id + '"]');
+    if (!row) return;
+    const section = row.closest('.test-group');
+    if (section) section.classList.remove('collapsed');
+    flashSearchTarget(row);
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function selectTestSearchResult(index) {
+    const result = testSearchResults[index];
+    if (!result) return;
+    const input = document.getElementById('testSearchInput');
+    closeTestSearchMenu();
+    if (input) {
+      input.value = '';
+      input.blur();
+    }
+    scrollToTestSearchResult(result);
+  }
+
+  function highlightTestSearchItem(index) {
+    const menu = document.getElementById('testSearchMenu');
+    if (!menu) return;
+    const items = menu.querySelectorAll('li[data-index]');
+    items.forEach(function (li, i) {
+      li.classList.toggle('test-search-active', i === index);
+    });
+    const active = items[index];
+    if (active && typeof active.scrollIntoView === 'function') {
+      active.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function renderTestSearchMenu(query) {
+    const menu = document.getElementById('testSearchMenu');
+    const input = document.getElementById('testSearchInput');
+    if (!menu || !input) return;
+
+    testSearchResults = filterTestSearch(query);
+    testSearchActiveIndex = testSearchResults.length ? 0 : -1;
+
+    if (!testSearchResults.length) {
+      menu.innerHTML = '<li class="test-search-empty">No matching group or test #</li>';
+      menu.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+      return;
+    }
+
+    menu.innerHTML = testSearchResults.map(function (entry, i) {
+      const active = i === testSearchActiveIndex ? ' test-search-active' : '';
+      const section = entry.kind === 'group'
+        ? 'group · ' + escapeHtml(entry.sublabel)
+        : escapeHtml(entry.sublabel);
+      return (
+        '<li class="' + active + '" role="option" data-index="' + i + '">' +
+        '<button type="button" data-index="' + i + '">' +
+        escapeHtml(entry.label) +
+        '<span class="test-search-section">' + section + '</span>' +
+        '</button></li>'
+      );
+    }).join('');
+
+    menu.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+
+    menu.querySelectorAll('button[data-index]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        selectTestSearchResult(parseInt(btn.getAttribute('data-index'), 10));
+      });
+    });
+  }
+
+  function onTestSearchKeydown(e) {
+    if (e.key === 'Escape') {
+      closeTestSearchMenu();
+      e.target.blur();
+      return;
+    }
+    const menu = document.getElementById('testSearchMenu');
+    if (!menu || menu.hidden || !testSearchResults.length) {
+      if (e.key === 'Enter') {
+        const first = filterTestSearch(e.target.value)[0];
+        if (first) {
+          e.preventDefault();
+          testSearchResults = filterTestSearch(e.target.value);
+          selectTestSearchResult(0);
+        }
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      testSearchActiveIndex = Math.min(testSearchActiveIndex + 1, testSearchResults.length - 1);
+      highlightTestSearchItem(testSearchActiveIndex);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      testSearchActiveIndex = Math.max(testSearchActiveIndex - 1, 0);
+      highlightTestSearchItem(testSearchActiveIndex);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (testSearchActiveIndex >= 0) {
+        selectTestSearchResult(testSearchActiveIndex);
+      }
+    }
+  }
+
+  function initTestSearch() {
+    const input = document.getElementById('testSearchInput');
+    const menu = document.getElementById('testSearchMenu');
+    const wrap = document.getElementById('testSearch');
+    if (!input || !menu) return;
+
+    input.addEventListener('input', function () {
+      renderTestSearchMenu(input.value);
+    });
+    input.addEventListener('focus', function () {
+      renderTestSearchMenu(input.value);
+    });
+    input.addEventListener('keydown', onTestSearchKeydown);
+    input.addEventListener('blur', function () {
+      setTimeout(closeTestSearchMenu, 120);
+    });
+
+    menu.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+    });
+
+    document.addEventListener('click', function (e) {
+      if (wrap && !wrap.contains(e.target)) {
+        closeTestSearchMenu();
+      }
+    });
+  }
+
   function activateInfoTab(infoEl, tabName) {
     infoEl.querySelectorAll('.test-info-tab').forEach(btn => {
       btn.classList.toggle('is-active', btn.dataset.tab === tabName);
@@ -551,4 +795,6 @@
   });
 
   buildUI();
+  testSearchIndex = buildTestSearchIndex();
+  initTestSearch();
 })();

@@ -4537,5 +4537,28 @@ reg(1054, 'queue-stack', 'forbid direct assign queue', function(h, session) {
   }, 'Cannot assign a value to a queue component');
 });
 
+reg(1055, 'queue-stack', 'show după front>= size>= free>= — wave', function(h, session) {
+  const { out } = session.run(QUEUE_BASE + `.q:{ push = ^41
+  set = 1 }
+.q:{ push = ^42
+  set = 1 }
+
+4wire data
+5wire n
+5wire slots
+.q:{
+  front >= data
+  size >= n
+  free >= slots
+  set = 1
+}
+show(data)
+show(n)
+show(slots)`);
+  h.assert('show data', String(out.some(l => l.includes('data') && l.includes('0100'))), 'true');
+  h.assert('show n', String(out.some(l => l.includes('n') && l.includes('00010'))), 'true');
+  h.assert('show slots', String(out.some(l => l.includes('slots') && l.includes('01110'))), 'true');
+}, { propagation: 'wave' });
+
   suite.finalize();
 })();

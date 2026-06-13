@@ -248,7 +248,10 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
     }
 
     if (!this.hasPendingChanges()) {
-      if (allChanged.size === 0) return;
+      if (allChanged.size === 0) {
+        this._finishPropagate(allChanged);
+        return;
+      }
     }
 
     for (let wave = 0; wave < maxWaves; wave++) {

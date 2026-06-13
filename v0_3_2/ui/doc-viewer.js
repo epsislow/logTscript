@@ -117,6 +117,7 @@ const DOC_SEARCH_INDEX = (function () {
 })();
 
 let currentDocFile = '';
+let lastDocScrollTop = 0;
 let playBlockIndex = 0;
 let docViewerReady = false;
 let docSearchActiveIndex = -1;
@@ -310,6 +311,18 @@ function updateDocToolbar() {
   }
 }
 
+function captureDocScroll() {
+  const main = document.getElementById('docMain');
+  return main ? main.scrollTop : 0;
+}
+
+function applyDocScroll(scrollTop) {
+  const main = document.getElementById('docMain');
+  const el = document.getElementById('docContent');
+  if (main) main.scrollTop = scrollTop;
+  if (el) el.scrollTop = scrollTop;
+}
+
 function showDocView() {
   document.body.classList.add('doc-mode');
   initDocViewer();
@@ -321,12 +334,22 @@ function showDocView() {
       console.error('loadDoc failed', e);
       showDocError(hash, 'Failed to render doc: ' + e.message);
     }
+  } else if (currentDocFile && window.DOC_CONTENT && window.DOC_CONTENT[currentDocFile]) {
+    try {
+      loadDoc(currentDocFile, { restoreScroll: true });
+    } catch (e) {
+      console.error('loadDoc failed', e);
+      showDocError(currentDocFile, 'Failed to render doc: ' + e.message);
+    }
   } else {
     loadDocIndex();
   }
 }
 
 function showEditorView() {
+  if (document.body.classList.contains('doc-mode') && currentDocFile) {
+    lastDocScrollTop = captureDocScroll();
+  }
   document.body.classList.remove('doc-mode');
   closeDocSearchMenu();
   if (location.hash) {
@@ -371,6 +394,7 @@ function escapeHtml(str) {
 
 function loadDocIndex() {
   currentDocFile = '';
+  lastDocScrollTop = 0;
   const el = document.getElementById('docContent');
   if (!el) return;
 
@@ -490,7 +514,7 @@ function enhancePlayBlocks(container) {
   });
 }
 
-function loadDoc(filename) {
+function loadDoc(filename, options) {
   const content = window.DOC_CONTENT && window.DOC_CONTENT[filename];
   if (!content) {
     showDocError(
@@ -498,6 +522,11 @@ function loadDoc(filename) {
       'Document not found in bundle. Run: node _gen_doc_data.js'
     );
     return;
+  }
+
+  const restoreScroll = options && options.restoreScroll;
+  if (!restoreScroll) {
+    lastDocScrollTop = 0;
   }
 
   currentDocFile = filename;
@@ -517,11 +546,19 @@ function loadDoc(filename) {
     history.replaceState(null, '', hash);
   }
 
-  el.scrollTop = 0;
   const main = document.getElementById('docMain');
-  if (main) main.scrollTop = 0;
+  const savedScroll = restoreScroll ? lastDocScrollTop : 0;
 
-  if (window.matchMedia('(max-width: 768px)').matches && main) {
+  if (savedScroll > 0) {
+    requestAnimationFrame(function () {
+      applyDocScroll(savedScroll);
+    });
+  } else {
+    el.scrollTop = 0;
+    if (main) main.scrollTop = 0;
+  }
+
+  if (!restoreScroll && window.matchMedia('(max-width: 768px)').matches && main) {
     main.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 }

@@ -614,7 +614,8 @@
       {"id":1051,"group":"queue-stack","title":"stack size and free","detail":{"scripts":["comp [stack] .s:\n  width: 8\n  length: 16\n  on: 1\n  :"],"steps":[],"assertions":["size 2","free 14"]}},
       {"id":1052,"group":"queue-stack","title":"stack clear + push","detail":{"scripts":["comp [stack] .s:\n  width: 8\n  length: 16\n  on: 1\n  :"],"steps":[],"assertions":["only B"]}},
       {"id":1053,"group":"queue-stack","title":"stack wave propagation","detail":{"scripts":["comp [stack] .s:\n  width: 8\n  length: 16\n  on: 1\n  :\n.s:{ push = ^41\n  set = 1 }\n8wire g = .s:get"],"steps":[],"assertions":["stack wave"]}},
-      {"id":1054,"group":"queue-stack","title":"forbid direct assign queue","detail":{"scripts":["comp [queue] .q:\n  width: 8\n  length: 16\n  on: 1\n  :\n.q = ^41"],"steps":[],"assertions":["direct assign"]}}
+      {"id":1054,"group":"queue-stack","title":"forbid direct assign queue","detail":{"scripts":["comp [queue] .q:\n  width: 8\n  length: 16\n  on: 1\n  :\n.q = ^41"],"steps":[],"assertions":["direct assign"]}},
+      {"id":1055,"group":"queue-stack","title":"show după front>= size>= free>= — wave","detail":{"scripts":["comp [queue] .q:\n  width: 8\n  length: 16\n  on: 1\n  :\n.q:{ push = ^41\n  set = 1 }\n.q:{ push = ^42\n  set = 1 }\n\n4wire data\n5wire n\n5wire slots\n.q:{\n  front >= data\n  size >= n\n  free >= slots\n  set = 1\n}\nshow(data)\nshow(n)\nshow(slots)"],"steps":[],"assertions":["show data","show n","show slots"]}}
     ],
     groups: [
       { id: 'repeat', label: 'Repeat preprocessor', rangeLabel: '6–10, 13–17, 19–21', testIds: [6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21] },
@@ -634,7 +635,7 @@
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983] },
       { id: 'mem-ports', label: 'Memory multi-port', rangeLabel: '984–999', testIds: [984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 996, 997, 998, 999] },
       { id: 'queue-storage', label: 'Queue storage engine', rangeLabel: '251–258', testIds: [251, 252, 253, 254, 255, 256, 257, 258] },
-      { id: 'queue-stack', label: 'Queue & Stack components', rangeLabel: '1020–1054', testIds: [1020, 1021, 1022, 1023, 1024, 1025, 1026, 1027, 1028, 1029, 1030, 1031, 1032, 1033, 1034, 1035, 1036, 1037, 1038, 1039, 1040, 1041, 1042, 1043, 1044, 1045, 1046, 1047, 1048, 1049, 1050, 1051, 1052, 1053, 1054] },
+      { id: 'queue-stack', label: 'Queue & Stack components', rangeLabel: '1020–1055', testIds: [1020, 1021, 1022, 1023, 1024, 1025, 1026, 1027, 1028, 1029, 1030, 1031, 1032, 1033, 1034, 1035, 1036, 1037, 1038, 1039, 1040, 1041, 1042, 1043, 1044, 1045, 1046, 1047, 1048, 1049, 1050, 1051, 1052, 1053, 1054, 1055] },
       { id: 'doc', label: 'doc() tests', rangeLabel: '300–362', testIds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362] },
       { id: 'doc-comp', label: 'Doc for body comps', rangeLabel: '400–431, 848–850', testIds: [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 848, 849, 850] },
       { id: 'chip', label: 'Chip component', rangeLabel: '540–543, 556–557, 857–860', testIds: [540, 541, 542, 543, 556, 557, 857, 858, 859, 860] },
