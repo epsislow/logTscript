@@ -1,6 +1,6 @@
 /* ================= EDITOR & TABS ================= */
 
-const maxTabs = 10;
+const maxTabs = 25;
 const TABS_STORAGE_KEY = 'prog/tabs';
 const tabs = new Map();
 let currentTab = 0;
