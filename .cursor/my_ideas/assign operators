@@ -1,0 +1,177 @@
+Assignment Operators
+
+LogTScript supports multiple assignment operators with different width-handling behaviors.
+
+---
+
+"="
+
+Strict assignment.
+
+The assigned value must have exactly the same width as the destination.
+
+No padding is performed.
+
+Syntax
+
+wire = value
+
+Examples
+
+3wire q = 001
+
+Result:
+
+001
+
+---
+
+3wire q = 1
+
+Error:
+
+Expected 3 bits, got 1 bit.
+
+---
+
+8wire q = 10101010
+
+Result:
+
+10101010
+
+---
+
+":="
+
+Left-pad assignment.
+
+If the assigned value is shorter than the destination width, zeros are added on the left.
+
+Syntax
+
+wire := value
+
+Examples
+
+3wire q := 1
+
+Result:
+
+001
+
+---
+
+3wire q := 10
+
+Result:
+
+010
+
+---
+
+8wire q := 101
+
+Result:
+
+00000101
+
+---
+
+8wire q := 11110000
+
+Result:
+
+11110000
+
+---
+
+"=:"
+
+Right-pad assignment.
+
+If the assigned value is shorter than the destination width, zeros are added on the right.
+
+Syntax
+
+wire =: value
+
+Examples
+
+3wire q =: 1
+
+Result:
+
+100
+
+---
+
+3wire q =: 10
+
+Result:
+
+100
+
+---
+
+8wire q =: 101
+
+Result:
+
+10100000
+
+---
+
+8wire q =: 11110000
+
+Result:
+
+11110000
+
+---
+
+Example with ASM
+
+32wire prog =:
+.myisa {
+  LOAD \0
+  ADDI \3
+  SUBI \2
+  STORE \1
+}
+
+The generated bitstream is stored starting from the most significant side and padded with zeros on the right if needed.
+
+---
+
+":"
+
+Initial assignment.
+
+Assigns the initial value of a wire.
+
+Syntax
+
+wire : value
+
+Examples
+
+3wire q : 1
+
+---
+
+8wire counter : 00000000
+
+---
+
+1wire state : 0
+
+---
+
+Summary
+
+Operator| Behavior
+"=" Strict assignment
+":=" Left-pad assignment
+"=:" Right-pad assignment
+":" Initial assignment
