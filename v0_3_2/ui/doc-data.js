@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, arithmetic.md, asm.md, board.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, components.md, counter.md, debug.md, decode.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, interactive-components.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, subtract.md, switch.md, terminal.md
+ * Files: 14seg.md, adder.md, arithmetic.md, asm.md, assignment-operators.md, board.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, components.md, counter.md, debug.md, decode.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, interactive-components.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, subtract.md, switch.md, terminal.md
  */
 (function () {
   'use strict';
@@ -600,6 +600,24 @@ show(slot0)
 
 Validations (interpreter): \`wordWidth === mem.depth\`, \`instructionCount <= mem.length\`.
 
+### Wire slot with \`=:\` (right-pad)
+
+To store an assembled program in a wire wider than the blob (zeros on the right), use [\`=:\`](assignment-operators.md):
+
+\`\`\`logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+
+16wire prog =: .myisa {
+  LOAD R1 A2
+}
+show(prog)
+\`\`\`
+
 Runtime reassignment:
 
 \`\`\`logts-play
@@ -665,6 +683,135 @@ Assembler errors include the source line and \`^^^\` under the problematic token
 - [mem.md](mem.md) — store assembled blob
 - [lut.md](lut.md) — lookup tables
 - [debug.md](debug.md) — \`show\`, \`peek\`
+`,
+    'assignment-operators.md': `# Assignment operators
+
+LogTScript supports multiple assignment operators with different width-handling behaviors for **wires**.
+
+See also: [signal propagation](signal-propagation.md), [ASM](asm.md).
+
+---
+
+## Summary
+
+| Operator | Behavior | Where |
+|----------|----------|-------|
+| \`=\` | Left-pad assignment | declaration, re-assignment |
+| \`=:\` | Right-pad assignment | declaration, re-assignment |
+| \`:=\` | Initial assignment (literal only) | wire declaration only |
+| \`:\` | (unchanged) | component / block syntax |
+
+### Phase notes
+
+- **Phase 1 (current):** \`=:\` is implemented (right-pad). \`=\` keeps left-pad on declaration; \`:=\` is literal-only initial assignment.
+- **Phase 2 (planned):** strict \`=\` (exact width, error on mismatch); \`:\` as initial assignment (replacing \`:=\` semantics).
+- **Phase 3 (incomplete):** unify truncation rules across runtime; unify ASM + \`=\` behavior between legacy and wave propagation.
+
+**Truncation:** when a value is longer than the wire, padding direction does not change truncation — the same truncation rule applies as for \`=\` in each execution path. Only **padding** (shorter values) differs between \`=\` and \`=:\`.
+
+---
+
+## \`=:\` — Right-pad assignment
+
+If the assigned value is shorter than the destination width, zeros are added on the **right**.
+
+### Syntax
+
+\`\`\`logts
+wire =: value
+\`\`\`
+
+### Examples
+
+\`\`\`logts-play
+3wire q =: 1
+show(q)
+\`\`\`
+
+Result: \`100\`
+
+\`\`\`logts-play
+3wire q =: 10
+show(q)
+\`\`\`
+
+Result: \`100\`
+
+\`\`\`logts-play
+8wire q =: 101
+show(q)
+\`\`\`
+
+Result: \`10100000\`
+
+\`\`\`logts-play
+8wire q =: 11110000
+show(q)
+\`\`\`
+
+Result: \`11110000\` (exact width, no padding)
+
+### Re-assignment
+
+\`\`\`logts-play
+4wire q =: 1
+q =: 11
+show(q)
+\`\`\`
+
+Result: \`1100\`
+
+### ASM — program in a wide slot
+
+The assembled bitstream is stored from the **left** (MSB side); shorter programs are padded with zeros on the **right**.
+
+\`\`\`logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+
+16wire x =: .myisa { LOAD R1 A2 }
+show(x)
+\`\`\`
+
+Compare with left-pad \`=\` on the same program: \`show\` displays \`^16 + ^00\` for \`=:\` vs \`^00 + ^16\` for \`=\`.
+
+---
+
+## \`=\` — Left-pad assignment (current)
+
+If the assigned value is shorter than the destination width, zeros are added on the **left**.
+
+\`\`\`logts-play
+3wire q = 1
+show(q)
+\`\`\`
+
+Result: \`001\`
+
+*Phase 2 will make \`=\` strict (exact width required, error on mismatch).*
+
+---
+
+## \`:=\` — Initial assignment (current)
+
+Literal-only initialization at wire declaration.
+
+\`\`\`logts-play
+1wire s := 1
+show(s)
+\`\`\`
+
+Only binary, hex (\`^\`), decimal (\`\\\`), and \`!\` literals are allowed after \`:=\`.
+
+---
+
+## \`:\` — Initial assignment (planned, Phase 2)
+
+Reserved for future use as initial assignment at declaration (replacing \`:=\` in Phase 2). Not changed in Phase 1.
 `,
     'board.md': `# Board components
 
@@ -8439,6 +8586,8 @@ The language's special variables (\`~\`, \`%\`, \`$\`, \`_\`) work as operands i
     'signal-propagation.md': `# Signal propagation
 
 When a wire or component output changes, every wire and display that depends on it is updated automatically. You do not need to call anything extra — assignments like \`1wire b = NOT(a)\` stay in sync with their inputs.
+
+Wire assignment operators (\`=\`, \`=:\`) control how shorter values are padded to wire width; see [assignment-operators.md](assignment-operators.md).
 
 This document explains **what you see** when values spread through your circuit. It does not describe internal engine details.
 

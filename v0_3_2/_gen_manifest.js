@@ -19,6 +19,7 @@ const GROUP_META = [
   { id: 'bitrange', label: 'Dynamic bit range' },
   { id: 'bit-ops', label: 'Bit operations' },
   { id: 'wire-init', label: ':= wire initialization' },
+  { id: 'right-pad-assign', label: '=: right-pad assignment' },
   { id: 'short-notation', label: 'Short notation preprocessor' },
   { id: 'osc', label: 'Oscillator' },
   { id: 'registry', label: 'Component registry' },

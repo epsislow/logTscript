@@ -4019,6 +4019,74 @@ on: 1
   }
 });
 
+const RIGHT_PAD_ASM_ISA = `inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+`;
+
+reg(1001, 'right-pad-assign', '3wire q =: 1 → 100', function(h, session) {
+  const { interp } = session.run('3wire q =: 1');
+  h.assert('q = 100', session.getWire(interp, 'q'), '100');
+});
+
+reg(1002, 'right-pad-assign', '3wire q =: 10 → 100', function(h, session) {
+  const { interp } = session.run('3wire q =: 10');
+  h.assert('q = 100', session.getWire(interp, 'q'), '100');
+});
+
+reg(1003, 'right-pad-assign', '8wire q =: 101 → 10100000', function(h, session) {
+  const { interp } = session.run('8wire q =: 101');
+  h.assert('q = 10100000', session.getWire(interp, 'q'), '10100000');
+});
+
+reg(1004, 'right-pad-assign', '8wire q =: 11110000 — exact width', function(h, session) {
+  const { interp } = session.run('8wire q =: 11110000');
+  h.assert('q = 11110000', session.getWire(interp, 'q'), '11110000');
+});
+
+reg(1005, 'right-pad-assign', '4wire q := 1 then q =: 11 — first assign after init', function(h, session) {
+  const { interp } = session.run('4wire q := 1\nq =: 11');
+  h.assert('q = 1100', session.getWire(interp, 'q'), '1100');
+});
+
+reg(1006, 'right-pad-assign', '3wire q =: 11001 — same truncate as =', function(h, session) {
+  const { interp: i1 } = session.run('3wire a =: 11001');
+  const { interp: i2 } = session.run('3wire b = 11001');
+  h.assert('=:', session.getWire(i1, 'a'), session.getWire(i2, 'b'));
+});
+
+reg(1007, 'right-pad-assign', '16wire ASM =: LOAD R1 A2 — right-pad', function(h, session) {
+  const src = RIGHT_PAD_ASM_ISA + '16wire x =: .myisa { LOAD R1 A2 }';
+  const { interp } = session.run(src);
+  h.assert('x = program + zeros right', session.getWire(interp, 'x'), '0001011000000000');
+});
+
+reg(1008, 'right-pad-assign', '16wire ASM = LOAD R1 A2 — left-pad control (wave)', function(h, session) {
+  const src = RIGHT_PAD_ASM_ISA + '16wire x = .myisa { LOAD R1 A2 }';
+  const { interp } = session.run(src);
+  h.assert('x = zeros left + program', session.getWire(interp, 'x'), '0000000000010110');
+}, { propagation: 'wave' });
+
+reg(1009, 'right-pad-assign', 'MODE WIREWRITE — 4wire q =: 1 then q =: 11 re-assign', function(h, session) {
+  const { interp } = session.run('MODE WIREWRITE\n4wire q =: 1\nq =: 11');
+  h.assert('q = 1100', session.getWire(interp, 'q'), '1100');
+});
+
+reg(1010, 'right-pad-assign', '16wire ASM = LOAD R1 A2 — legacy mismatch throws', function(h, session) {
+  const src = RIGHT_PAD_ASM_ISA + '16wire x = .myisa { LOAD R1 A2 }';
+  h.assertThrows('legacy = shorter ASM than wire', function() {
+    session.run(src);
+  }, 'Bit-width mismatch');
+});
+
+reg(1000, 'right-pad-assign', '3wire q =: 1 — wave propagation', function(h, session) {
+  const { interp } = session.run('3wire q =: 1');
+  h.assert('q = 100', session.getWire(interp, 'q'), '100');
+}, { propagation: 'wave' });
+
 reg(999, 'mem-ports', 'duplicate get> in same block throws', function(h, session) {
   h.assertThrows('two get>= in one block', function() {
     session.run(`comp [mem] .ram:

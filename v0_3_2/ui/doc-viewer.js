@@ -15,6 +15,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-bit-transform-functions.md', label: 'Built-in bit transform', searchExtra: 'LSHIFT RSHIFT REVERSE LROTATE RROTATE rotate shift' },
       { file: 'components.md', label: 'Component catalog' },
       { file: 'short-notation.md', label: 'Short notation' },
+      { file: 'assignment-operators.md', label: 'Assignment operators (=, =:, :=)', searchExtra: 'right pad left pad wire assignment initial' },
       { file: 'arithmetic.md', label: 'Arithmetic (built-in)' },
       { file: 'debug.md', label: 'Debug (show / peek / probe)' },
       { file: 'signal-propagation.md', label: 'Signal propagation' },

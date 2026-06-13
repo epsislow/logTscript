@@ -943,6 +943,72 @@
     h.assert('BITSIZE(0101010)', session.bitSize('0101010'), '111');
   });
 
+  reg(235, 'right-pad-assign', '=: produces a single SYM token', function(h, session) {
+    const { tokens } = session.tokenize('3wire q =: 1');
+    const rightPad = tokens.filter(t => t.type === 'SYM' && t.value === '=:');
+    h.assert('=: is a single SYM(=:) token', String(rightPad.length), '1');
+  });
+
+  reg(236, 'right-pad-assign', '3wire q =: 1 — no stray : after =', function(h, session) {
+    const { tokens } = session.tokenize('3wire q =: 1');
+    const eqColon = tokens.filter(t => t.type === 'SYM' && t.value === '=:');
+    h.assert('=: present', String(eqColon.length), '1');
+    const loneColon = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+    h.assert('no standalone : after =:', String(loneColon.length), '0');
+  });
+
+  reg(237, 'right-pad-assign', ':= and =: coexist in one script', function(h, session) {
+    const src = '1wire a := 1\n3wire q =: 1';
+    const { tokens } = session.tokenize(src);
+    const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
+    const eqColon = tokens.filter(t => t.type === 'SYM' && t.value === '=:');
+    h.assert('one := token', String(colonEq.length), '1');
+    h.assert('one =: token', String(eqColon.length), '1');
+  });
+
+  reg(238, 'right-pad-assign', 'Parser — 3wire q =: 1 → expr + assignPad right', function(h, session) {
+    const stmts = session.parse('3wire q =: 1');
+    const s = stmts[0];
+    h.assert('expr present', String(s.expr !== null && s.expr !== undefined), 'true');
+    h.assert('assignPad is right', s.assignPad, 'right');
+    h.assert('no initExpr', String(s.initExpr === undefined), 'true');
+  });
+
+  reg(239, 'right-pad-assign', 'Parser — q =: 1 → assignment.assignPad right', function(h, session) {
+    const stmts = session.parse('1wire q\nq =: 1');
+    const assign = stmts.find(st => st.assignment);
+    h.assert('assignment found', String(assign !== undefined), 'true');
+    h.assert('assignPad is right', assign.assignment.assignPad, 'right');
+  });
+
+  reg(240, 'right-pad-assign', 'Parser — 3wire q = 1 has no assignPad right', function(h, session) {
+    const stmts = session.parse('3wire q = 1');
+    h.assert('no assignPad on = decl', String(stmts[0].assignPad === undefined), 'true');
+  });
+
+  reg(241, 'right-pad-assign', 'padWireBits — right-pad short literal', function(h) {
+    h.assert('3wire + 1', padWireBits('1', 3, 'right'), '100');
+    h.assert('3wire + 10', padWireBits('10', 3, 'right'), '100');
+  });
+
+  reg(242, 'right-pad-assign', 'padWireBits — left-pad short literal', function(h) {
+    h.assert('3wire + 1 left', padWireBits('1', 3, 'left'), '001');
+    h.assert('8wire + 101 left', padWireBits('101', 8, 'left'), '00000101');
+  });
+
+  reg(243, 'right-pad-assign', 'padWireBits — exact width unchanged', function(h) {
+    h.assert('8wire exact', padWireBits('11110000', 8, 'right'), '11110000');
+  });
+
+  reg(244, 'right-pad-assign', 'padWireBits — empty becomes zeros', function(h) {
+    h.assert('empty right', padWireBits('', 4, 'right'), '0000');
+    h.assert('empty left', padWireBits('', 4, 'left'), '0000');
+  });
+
+  reg(245, 'right-pad-assign', 'padWireBits — longer value passed through', function(h) {
+    h.assert('no truncate in helper', padWireBits('11001', 3, 'right'), '11001');
+  });
+
   reg(82, 'wire-init', ':= produces a single SYM token', function(h, session) {
     {
       const { tokens } = session.tokenize('1wire s := 1');

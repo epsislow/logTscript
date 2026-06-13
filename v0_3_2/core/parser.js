@@ -968,14 +968,21 @@ assignment() {
     );
   }
   
-  this.eat('SYM', '=');
-  
+  let assignPad = 'left';
+  if (this.c.value === '=:') {
+    this.eat('SYM', '=:');
+    assignPad = 'right';
+  } else {
+    this.eat('SYM', '=');
+  }
+
   const expr = this.expr();
-  
+
   return {
     assignment: {
       target: targetAtom,
-      expr
+      expr,
+      assignPad
     }
   };
 }
@@ -1073,6 +1080,15 @@ assignment() {
         decls,
         expr: null,
         initExpr,
+        line: this.c.line,
+        col: this.c.col
+      };
+    } else if (this.c.value === '=:') {
+      this.eat('SYM', '=:');
+      return {
+        decls,
+        expr: this.expr(),
+        assignPad: 'right',
         line: this.c.line,
         col: this.c.col
       };

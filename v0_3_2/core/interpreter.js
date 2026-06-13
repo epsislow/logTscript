@@ -33,6 +33,21 @@ function binPadInt(n, width) {
   return n.toString(2).padStart(width, '0');
 }
 
+function padWireBits(value, bits, assignPad) {
+  if (!value) return '0'.repeat(bits);
+  if (value.length >= bits) return value;
+  return assignPad === 'right'
+    ? value.padEnd(bits, '0')
+    : value.padStart(bits, '0');
+}
+
+function stmtAssignPad(s) {
+  if (!s) return 'left';
+  if (s.assignPad) return s.assignPad;
+  if (s.assignment && s.assignment.assignPad) return s.assignment.assignPad;
+  return 'left';
+}
+
 function countOnesBin(s) {
   let c = 0;
   for (let i = 0; i < s.length; i++) if (s[i] === '1') c++;
@@ -3086,8 +3101,9 @@ if (this.isBuiltinDEMUX(name)) {
               }
               
               // Ensure we have the right number of bits
+              const assignPad = stmtAssignPad(ws);
               if(wireValue.length < bits){
-                wireValue = wireValue.padEnd(bits, '0');
+                wireValue = padWireBits(wireValue, bits, assignPad);
               } else if(wireValue.length > bits){
                 wireValue = wireValue.substring(0, bits);
               }
@@ -3393,7 +3409,7 @@ if (this.isBuiltinDEMUX(name)) {
     }
 
 if (s.assignment) {
-  const { target, expr } = s.assignment;
+  const { target, expr, assignPad: assignmentPad } = s.assignment;
   const name = target.var;
   const range = target.bitRange || null;
   const property = target.property || null;
@@ -3807,6 +3823,11 @@ if (s.assignment) {
 
   const sliceWidth = end - start + 1;
 
+  const wireAssignPad = assignmentPad || 'left';
+  if (isWire && !range && rhs.length < bitWidth && wireAssignPad === 'right') {
+    rhs = padWireBits(rhs, bitWidth, 'right');
+  }
+
   if (rhs.length !== sliceWidth) {
     throw Error(
       `Bit-width mismatch: assigning ${rhs.length} bits to ${sliceWidth}-bit slice ${name}.${start}-${end}`
@@ -4138,10 +4159,14 @@ if (s.assignment) {
         if(wireValue && wireValue.length !== bits){
           const hasAsmBlob = exprResult.some(p => p.asmBlob);
           const hasProtocolBlob = exprResult.some(p => p.protocolBlob);
+          const declAssignPad = stmtAssignPad(s);
           if (hasAsmBlob) {
-            throw Error(`Bit-width mismatch: ${d.name} is ${bits}bit but assembled program provides ${wireValue.length} bits`);
-          }
-          if (hasProtocolBlob) {
+            if (wireValue.length < bits && declAssignPad === 'right') {
+              wireValue = padWireBits(wireValue, bits, 'right');
+            } else {
+              throw Error(`Bit-width mismatch: ${d.name} is ${bits}bit but assembled program provides ${wireValue.length} bits`);
+            }
+          } else if (hasProtocolBlob) {
             throw Error(`Protocol output width mismatch: ${d.name} is ${bits}bit but protocol provides ${wireValue.length} bits`);
           }
           // Check if expression references any user-defined wires
@@ -4151,7 +4176,7 @@ if (s.assignment) {
           }
           // Pure literals / special vars: left-pad or truncate to wire width
           if(wireValue.length < bits){
-            wireValue = wireValue.padStart(bits, '0');
+            wireValue = padWireBits(wireValue, bits, declAssignPad);
           } else {
             wireValue = wireValue.substring(wireValue.length - bits);
           }
@@ -4302,7 +4327,8 @@ if (s.assignment) {
           }
         }
         let wireValue = totalValue.substring(0, bits);
-        if(wireValue.length < bits) wireValue = wireValue.padStart(bits, '0');
+        const assignPad = stmtAssignPad(s);
+        if(wireValue.length < bits) wireValue = padWireBits(wireValue, bits, assignPad);
         if (toPending) {
           outputs.push([wireName, wireValue]);
         } else {
@@ -4394,9 +4420,10 @@ if (s.assignment) {
       const valueBits = totalValue.substring(bitOffset, bitOffset + bits);
       let wireValue = valueBits;
       
-      // Ensure we have the right number of bits (left-pad with zeros for numeric correctness)
+      // Ensure we have the right number of bits (pad with zeros for numeric correctness)
+      const declPad = stmtAssignPad(s);
       if(wireValue.length < bits){
-        wireValue = wireValue.padStart(bits, '0');
+        wireValue = padWireBits(wireValue, bits, declPad);
       } else if(wireValue.length > bits){
         wireValue = wireValue.substring(wireValue.length - bits);
       }
@@ -6392,7 +6419,8 @@ if (s.assignment) {
         }
         if (!wireValue) return;
         if (bits) {
-          if (wireValue.length < bits) wireValue = wireValue.padStart(bits, '0');
+          const assignPad = stmtAssignPad(ws);
+          if (wireValue.length < bits) wireValue = padWireBits(wireValue, bits, assignPad);
           else if (wireValue.length > bits) wireValue = wireValue.substring(wireValue.length - bits);
         }
         this.publishWireValue(wireName, wireValue);
@@ -6418,7 +6446,8 @@ if (s.assignment) {
         }
         if (!wireValue) continue;
         if (bits) {
-          if (wireValue.length < bits) wireValue = wireValue.padStart(bits, '0');
+          const assignPad = stmtAssignPad(ws);
+          if (wireValue.length < bits) wireValue = padWireBits(wireValue, bits, assignPad);
           else if (wireValue.length > bits) wireValue = wireValue.substring(wireValue.length - bits);
         }
         this.publishWireValue(wireName, wireValue);

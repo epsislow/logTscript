@@ -829,8 +829,9 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                 wireValue += part.value;
               }
             }
+            const assignPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'left';
             if(wireValue.length < bits){
-              wireValue = wireValue.padEnd(bits, '0');
+              wireValue = padWireBits(wireValue, bits, assignPad);
             } else if(wireValue.length > bits){
               wireValue = wireValue.substring(0, bits);
             }
@@ -898,8 +899,9 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                       if(val) wireValue += val;
                     }
                   }
+                  const declPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'left';
                   if(wireValue.length < bits){
-                    wireValue = wireValue.padEnd(bits, '0');
+                    wireValue = padWireBits(wireValue, bits, declPad);
                   } else if(wireValue.length > bits){
                     wireValue = wireValue.substring(0, bits);
                   }

@@ -103,6 +103,16 @@ pushSource({ src, alias }) {
     return this.token('SYM', ':');
   }
 
+  // =: operator (right-pad assignment)
+  if (c === '=') {
+    this.next();
+    if (!this.eof() && this.peek() === ':') {
+      this.next();
+      return this.token('SYM', '=:');
+    }
+    return this.token('SYM', '=');
+  }
+
   // Symbols (including { and } for property blocks, ! for NOT prefix, * for multiplier shortname)
     if ('=,+():-./@[]\"\'{}>!*;'.includes(c)) return this.token('SYM', this.next());
 
