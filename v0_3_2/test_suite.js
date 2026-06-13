@@ -98,6 +98,104 @@
     return fill.repeat(n) + data.slice(0, len - n);
   }
 
+  function ceilLog2Bits(n) {
+    if (n <= 1) return 1;
+    return Math.ceil(Math.log2(n + 1));
+  }
+
+  function countOnesBin(s) {
+    let c = 0;
+    for (let i = 0; i < s.length; i++) if (s[i] === '1') c++;
+    return c;
+  }
+
+  function highBit(s) {
+    const len = s.length;
+    for (let i = 0; i < len; i++) {
+      if (s[i] === '1') return '0'.repeat(i) + '1' + '0'.repeat(len - i - 1);
+    }
+    return '0'.repeat(len);
+  }
+
+  function lowBit(s) {
+    const len = s.length;
+    for (let i = len - 1; i >= 0; i--) {
+      if (s[i] === '1') return '0'.repeat(i) + '1' + '0'.repeat(len - i - 1);
+    }
+    return '0'.repeat(len);
+  }
+
+  function anyBit(s) {
+    return s.includes('1') ? '1' : '0';
+  }
+
+  function zeroBit(s) {
+    return s.includes('1') ? '0' : '1';
+  }
+
+  function bitIndexWidth(len) {
+    return len <= 1 ? 1 : 32 - Math.clz32(len - 1);
+  }
+
+  function bitIndexPair(s) {
+    const len = s.length;
+    const idxWidth = bitIndexWidth(len);
+    let count = 0;
+    let pos = 0;
+    for (let i = 0; i < len; i++) {
+      if (s[i] === '1') { count++; pos = len - 1 - i; }
+    }
+    const isInvalid = count !== 1 ? '1' : '0';
+    const index = count === 1 ? pos.toString(2).padStart(idxWidth, '0') : '0'.repeat(idxWidth);
+    return { index, isInvalid };
+  }
+
+  function oneHot(indexStr) {
+    const idxWidth = indexStr.length;
+    const outWidth = 1 << idxWidth;
+    const idx = parseInt(indexStr, 2);
+    if (isNaN(idx) || idx < 0 || idx >= outWidth) return '0'.repeat(outWidth);
+    return '0'.repeat(outWidth - idx - 1) + '1' + '0'.repeat(idx);
+  }
+
+  function parityBit(s) {
+    const bits = s.split('');
+    let acc = bits[0] === '1';
+    for (let i = 1; i < bits.length; i++) acc = acc !== (bits[i] === '1');
+    return acc ? '1' : '0';
+  }
+
+  function cntOne(s) {
+    return countOnesBin(s).toString(2);
+  }
+
+  function cntZero(s) {
+    return (s.length - countOnesBin(s)).toString(2);
+  }
+
+  function bitSize(s) {
+    const w = bitIndexWidth(s.length);
+    return s.length.toString(2).padStart(w, '0');
+  }
+
+  function reverseBits(s) {
+    return s.split('').reverse().join('');
+  }
+
+  function lrotate(data, count) {
+    const len = data.length;
+    if (len === 0) return '';
+    const n = parseInt(count, 2) % len;
+    return data.slice(n) + data.slice(0, n);
+  }
+
+  function rrotate(data, count) {
+    const len = data.length;
+    if (len === 0) return '';
+    const n = parseInt(count, 2) % len;
+    return data.slice(len - n) + data.slice(0, len - n);
+  }
+
   function createSession(opts) {
     const session = LogTScriptSession.createSession(opts || {});
     session.preprocessRepeat = preprocessRepeat;
@@ -107,6 +205,19 @@
     session.gate = gate;
     session.lshift = lshift;
     session.rshift = rshift;
+    session.highBit = highBit;
+    session.lowBit = lowBit;
+    session.anyBit = anyBit;
+    session.zeroBit = zeroBit;
+    session.bitIndexPair = bitIndexPair;
+    session.oneHot = oneHot;
+    session.parityBit = parityBit;
+    session.cntOne = cntOne;
+    session.cntZero = cntZero;
+    session.bitSize = bitSize;
+    session.reverseBits = reverseBits;
+    session.lrotate = lrotate;
+    session.rrotate = rrotate;
     return session;
   }
 
@@ -340,54 +451,54 @@
     }
   });
 
-  reg(40, 'shifts', 'LSHIFT basic', function(h, session) {
+  reg(40, 'bit-transform', 'LSHIFT basic', function(h, session) {
     h.assert('LSHIFT(1, 1, 0)', session.lshift('1', 1, '0'), '10');
     h.assert('LSHIFT(1, 1, 1)', session.lshift('1', 1, '1'), '11');
     h.assert('LSHIFT(10, 1, 0)', session.lshift('10', 1, '0'), '100');
     h.assert('LSHIFT(10, 1, 1)', session.lshift('10', 1, '1'), '101');
   });
 
-  reg(41, 'shifts', 'LSHIFT default fill=0', function(h, session) {
+  reg(41, 'bit-transform', 'LSHIFT default fill=0', function(h, session) {
     h.assert('LSHIFT(1, 1) default fill', session.lshift('1', 1), '10');
     h.assert('LSHIFT(10, 1) default fill', session.lshift('10', 1), '100');
   });
 
-  reg(42, 'shifts', 'LSHIFT n=0', function(h, session) {
+  reg(42, 'bit-transform', 'LSHIFT n=0', function(h, session) {
     h.assert('LSHIFT(101, 0, 0)', session.lshift('101', 0, '0'), '101');
   });
 
-  reg(43, 'shifts', 'LSHIFT n > data.length', function(h, session) {
+  reg(43, 'bit-transform', 'LSHIFT n > data.length', function(h, session) {
     h.assert('LSHIFT(1, 3, 0)', session.lshift('1', 3, '0'), '1000');
     h.assert('LSHIFT(1, 3, 1)', session.lshift('1', 3, '1'), '1111');
   });
 
-  reg(44, 'shifts', 'RSHIFT basic', function(h, session) {
+  reg(44, 'bit-transform', 'RSHIFT basic', function(h, session) {
     h.assert('RSHIFT(10, 1, 0)', session.rshift('10', 1, '0'), '01');
     h.assert('RSHIFT(10, 1, 1)', session.rshift('10', 1, '1'), '11');
     h.assert('RSHIFT(1, 1, 0)', session.rshift('1', 1, '0'), '0');
     h.assert('RSHIFT(1, 1, 1)', session.rshift('1', 1, '1'), '1');
   });
 
-  reg(45, 'shifts', 'RSHIFT default fill=0', function(h, session) {
+  reg(45, 'bit-transform', 'RSHIFT default fill=0', function(h, session) {
     h.assert('RSHIFT(10, 1) default fill', session.rshift('10', 1), '01');
     h.assert('RSHIFT(1010, 2) default fill', session.rshift('1010', 2), '0010');
   });
 
-  reg(46, 'shifts', 'RSHIFT n=0', function(h, session) {
+  reg(46, 'bit-transform', 'RSHIFT n=0', function(h, session) {
     h.assert('RSHIFT(101, 0, 0)', session.rshift('101', 0, '0'), '101');
   });
 
-  reg(47, 'shifts', 'RSHIFT n >= data.length', function(h, session) {
+  reg(47, 'bit-transform', 'RSHIFT n >= data.length', function(h, session) {
     h.assert('RSHIFT(10, 2, 0)', session.rshift('10', 2, '0'), '00');
     h.assert('RSHIFT(10, 5, 1)', session.rshift('10', 5, '1'), '11');
   });
 
-  reg(48, 'shifts', 'RSHIFT keeps same width', function(h, session) {
+  reg(48, 'bit-transform', 'RSHIFT keeps same width', function(h, session) {
     h.assert('RSHIFT(1010, 1, 0) = 0101', session.rshift('1010', 1, '0'), '0101');
     h.assert('RSHIFT(1010, 1, 1) = 1101', session.rshift('1010', 1, '1'), '1101');
   });
 
-  reg(49, 'shifts', 'Tokenizer - < emits SYM when not LOAD', function(h, session) {
+  reg(49, 'bit-transform', 'Tokenizer - < emits SYM when not LOAD', function(h, session) {
     {
       const { tokens } = session.tokenize('4wire x = 10 < 1');
       const symLt = tokens.filter(t => t.type === 'SYM' && t.value === '<');
@@ -395,7 +506,7 @@
     }
   });
 
-  reg(492, 'shifts', 'Tokenizer - < after variable name is SYM (not LOAD)', function(h, session) {
+  reg(492, 'bit-transform', 'Tokenizer - < after variable name is SYM (not LOAD)', function(h, session) {
     {
       const { tokens } = session.tokenize('4wire result = test < sel');
       const symLt = tokens.filter(t => t.type === 'SYM' && t.value === '<');
@@ -405,7 +516,7 @@
     }
   });
 
-  reg(50, 'shifts', 'Tokenizer - <path remains LOAD', function(h, session) {
+  reg(50, 'bit-transform', 'Tokenizer - <path remains LOAD', function(h, session) {
     {
       const { tokens } = session.tokenize('<myfile');
       const loadTok = tokens.filter(t => t.type === 'LOAD');
@@ -414,7 +525,7 @@
     }
   });
 
-  reg(51, 'shifts', 'Tokenizer - > emits SYM', function(h, session) {
+  reg(51, 'bit-transform', 'Tokenizer - > emits SYM', function(h, session) {
     {
       const { tokens } = session.tokenize('4wire x = 10 > 1');
       const symGt = tokens.filter(t => t.type === 'SYM' && t.value === '>');
@@ -422,12 +533,33 @@
     }
   });
 
-  reg(52, 'shifts', 'LSHIFT w1 fill via operator - preprocessed text', function(h, session) {
+  reg(52, 'bit-transform', 'LSHIFT w1 fill via operator - preprocessed text', function(h, session) {
     {
       const src = '4wire x = 10 < 1 w1';
       const result = preprocessRepeat(src);
       h.assert('< w1 operator passes through preprocessor', result, src);
     }
+  });
+
+  reg(493, 'bit-transform', 'REVERSE basic', function(h, session) {
+    h.assert('REVERSE(0011)', session.reverseBits('0011'), '1100');
+    h.assert('REVERSE(001)', session.reverseBits('001'), '100');
+  });
+
+  reg(494, 'bit-transform', 'LROTATE basic', function(h, session) {
+    h.assert('LROTATE(1011, 1)', session.lrotate('1011', '1'), '0111');
+    h.assert('LROTATE(1011, 01)', session.lrotate('1011', '01'), '0111');
+    h.assert('LROTATE(1011, 10)', session.lrotate('1011', '10'), '1110');
+    h.assert('LROTATE(1011, 010)', session.lrotate('1011', '010'), '1110');
+  });
+
+  reg(495, 'bit-transform', 'RROTATE basic', function(h, session) {
+    h.assert('RROTATE(1011, 1)', session.rrotate('1011', '1'), '1101');
+    h.assert('RROTATE(1011, 10)', session.rrotate('1011', '10'), '1110');
+  });
+
+  reg(496, 'bit-transform', 'LROTATE count modulo width', function(h, session) {
+    h.assert('LROTATE(1011, 100) mod 4', session.lrotate('1011', '100'), '1011');
   });
 
   reg(53, 'bitrange', 'Tokenizer - ( after . emits SYM (', function(h, session) {
@@ -728,6 +860,87 @@
     h.assert('OR(11,1100)  pads 11→0011 → 1111', session.gate('OR',   '11', '1100'), '1111');
     h.assert('XOR(11,1100) pads → 1111',          session.gate('XOR',  '11', '1100'), '1111');
     h.assert('NOR(11,1100) → bitwise NOR(0011,1100)=0000', session.gate('NOR', '11', '1100'), '0000');
+  });
+
+  reg(224, 'bit-selection', 'HIGH — highest set bit', function(h, session) {
+    h.assert('HIGH(00101010)', session.highBit('00101010'), '00100000');
+    h.assert('HIGH(00010000)', session.highBit('00010000'), '00010000');
+    h.assert('HIGH(00000000)', session.highBit('00000000'), '00000000');
+  });
+
+  reg(225, 'bit-selection', 'LOW — lowest set bit', function(h, session) {
+    h.assert('LOW(00101010)', session.lowBit('00101010'), '00000010');
+    h.assert('LOW(00010000)', session.lowBit('00010000'), '00010000');
+    h.assert('LOW(00000000)', session.lowBit('00000000'), '00000000');
+  });
+
+  reg(226, 'bit-selection', 'ANY and ZERO', function(h, session) {
+    h.assert('ANY(00000000)', session.anyBit('00000000'), '0');
+    h.assert('ANY(00010000)', session.anyBit('00010000'), '1');
+    h.assert('ZERO(00000000)', session.zeroBit('00000000'), '1');
+    h.assert('ZERO(00101010)', session.zeroBit('00101010'), '0');
+  });
+
+  reg(227, 'bit-selection', 'BITINDEX — one-hot valid', function(h, session) {
+    const r1 = session.bitIndexPair('00000001');
+    h.assert('BITINDEX(00000001) index', r1.index, '000');
+    h.assert('BITINDEX(00000001) isInvalid', r1.isInvalid, '0');
+    const r2 = session.bitIndexPair('00000100');
+    h.assert('BITINDEX(00000100) index', r2.index, '010');
+    const r3 = session.bitIndexPair('00100000');
+    h.assert('BITINDEX(00100000) index', r3.index, '101');
+  });
+
+  reg(228, 'bit-selection', 'BITINDEX — invalid (zero or multiple bits)', function(h, session) {
+    const r0 = session.bitIndexPair('000');
+    h.assert('BITINDEX(000) index', r0.index, '00');
+    h.assert('BITINDEX(000) isInvalid', r0.isInvalid, '1');
+    const r2 = session.bitIndexPair('00101010');
+    h.assert('BITINDEX(multi) isInvalid', r2.isInvalid, '1');
+    const r3 = session.bitIndexPair('100');
+    h.assert('BITINDEX(100) one-hot index', r3.index, '10');
+    h.assert('BITINDEX(100) isInvalid', r3.isInvalid, '0');
+  });
+
+  reg(229, 'bit-selection', 'ONEHOT basic', function(h, session) {
+    h.assert('ONEHOT(000)', session.oneHot('000'), '00000001');
+    h.assert('ONEHOT(001)', session.oneHot('001'), '00000010');
+    h.assert('ONEHOT(010)', session.oneHot('010'), '00000100');
+    h.assert('ONEHOT(101)', session.oneHot('101'), '00100000');
+    h.assert('ONEHOT(111)', session.oneHot('111'), '10000000');
+  });
+
+  reg(230, 'bit-selection', 'BITINDEX(ONEHOT(x)) inverse', function(h, session) {
+    const x = '101';
+    const hot = session.oneHot(x);
+    const r = session.bitIndexPair(hot);
+    h.assert('BITINDEX(ONEHOT(101)) index', r.index, x);
+    h.assert('BITINDEX(ONEHOT(101)) isInvalid', r.isInvalid, '0');
+  });
+
+  reg(231, 'bit-selection', 'Priority encoder pattern', function(h, session) {
+    const requests = '00101010';
+    const winner = session.highBit(requests);
+    h.assert('winner', winner, '00100000');
+    h.assert('valid', session.anyBit(requests), '1');
+    const r = session.bitIndexPair(winner);
+    h.assert('index', r.index, '101');
+    h.assert('bad', r.isInvalid, '0');
+  });
+
+  reg(232, 'bit-analysis', 'PARITY', function(h, session) {
+    h.assert('PARITY(1011)', session.parityBit('1011'), '1');
+    h.assert('PARITY(1110)', session.parityBit('1110'), '1');
+    h.assert('PARITY(1010)', session.parityBit('1010'), '0');
+  });
+
+  reg(233, 'bit-analysis', 'CNTONE and CNTZERO', function(h, session) {
+    h.assert('CNTONE(00101010)', session.cntOne('00101010'), '11');
+    h.assert('CNTZERO(0101010)', session.cntZero('0101010'), '100');
+  });
+
+  reg(234, 'bit-analysis', 'BITSIZE', function(h, session) {
+    h.assert('BITSIZE(0101010)', session.bitSize('0101010'), '111');
   });
 
   reg(82, 'wire-init', ':= produces a single SYM token', function(h, session) {

@@ -12,7 +12,7 @@ Each table is followed by numbered subsections (A1, B2, …) with a short explan
 
 **`inline` (language):** asm, lut, protocol — see [asm.md](asm.md), [lut.md](lut.md), [protocol.md](protocol.md).
 
-**Built-ins (no panel):** logic (NOT, AND, OR, MUX, DEMUX, EQ, LATCH…), REG, instant arithmetic (ADD, SUBTRACT, MULTIPLY, DIVIDE), LSHIFT/RSHIFT.
+**Built-ins (no panel):** logic, REG, arithmetic, MUX/DEMUX, bit selection (`HIGH`, `BITINDEX`, `ONEHOT`, …), bit analysis (`PARITY`, `BITSIZE`, …), bit transform (`LSHIFT`, `LROTATE`, …) — see [builtin-functions.md](builtin-functions.md).
 
 **Composites:** chip, board (recommended), pcb (legacy).
 

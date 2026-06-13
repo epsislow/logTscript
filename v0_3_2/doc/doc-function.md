@@ -41,9 +41,11 @@ OR(Xbit, Xbit)
 
 ## Built-in functions
 
-Grouped catalogue (logic, shift, routing, arithmetic, …): **[builtin-functions.md](builtin-functions.md)**.
+Grouped catalogue: **[builtin-functions.md](builtin-functions.md)** (index with links per category).
 
 ### Logic gates
+
+See [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md).
 
 | Call | Output |
 |------|--------|
@@ -63,16 +65,47 @@ Grouped catalogue (logic, shift, routing, arithmetic, …): **[builtin-functions
 
 **2-argument mode** (bitwise): `OR(a, b)` applies OR bit-by-bit between `a` and `b`, yielding **N bits**.
 
-### Shift
+### Bit transform (shift / rotate / reverse)
 
 | Call | Output |
 |------|--------|
-| `doc(LSHIFT)` | `LSHIFT(Xbit data, Nbit n) -> Xbit` / `LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit` |
-| `doc(RSHIFT)` | `RSHIFT(Xbit data, Nbit n) -> Xbit` / `RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit` |
+| `doc(LSHIFT)` | `LSHIFT(Xbit data, Nbit n) -> Xbit` / optional `fill` |
+| `doc(RSHIFT)` | `RSHIFT(Xbit data, Nbit n) -> Xbit` / optional `fill` |
+| `doc(REVERSE)` | `REVERSE(Xbit) -> Xbit` |
+| `doc(LROTATE)` | `LROTATE(Xbit data, Ybit count) -> Xbit` |
+| `doc(RROTATE)` | `RROTATE(Xbit data, Ybit count) -> Xbit` |
 
-- `data` — the bit string to shift
-- `n` — number of positions (in binary)
-- `fill` *(optional)* — fill bit (default `0`)
+Full behaviour, short notation (`<`, `>`), and examples: [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md).
+
+### Bit selection and detection
+
+| Call | Output |
+|------|--------|
+| `doc(HIGH)` | `HIGH(Xbit) -> Xbit` |
+| `doc(LOW)` | `LOW(Xbit) -> Xbit` |
+| `doc(ANY)` | `ANY(Xbit) -> 1bit` |
+| `doc(ZERO)` | `ZERO(Xbit) -> 1bit` |
+| `doc(BITINDEX)` | `BITINDEX(Xbit) -> Ybit index, 1bit isInvalid` |
+| `doc(ONEHOT)` | `ONEHOT(Xbit index) -> 2^X bits` |
+
+`BITINDEX` returns **two values** — assign both wires (index width ≈ `bitIndexWidth(len(input))`).
+
+Full behaviour and priority-encoder pattern: [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md).
+
+### Bit analysis
+
+| Call | Output |
+|------|--------|
+| `doc(PARITY)` | `PARITY(Xbit) -> 1bit` |
+| `doc(CNTONE)` | `CNTONE(Xbit) -> Ybit` |
+| `doc(CNTZERO)` | `CNTZERO(Xbit) -> Ybit` |
+| `doc(BITSIZE)` | `BITSIZE(Xbit) -> Ybit` |
+
+Full behaviour: [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md).
+
+### Shift (legacy anchor)
+
+Moved to **Bit transform** — see [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md#lshift).
 
 ### Register (REG)
 
@@ -112,7 +145,7 @@ MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit
 - `sel` — `N` bits → `2^N` data inputs
 - Pass separate `data0`, `data1`, … **or** one packed `Xbit` string split into equal chunks
 
-Full behaviour and examples: [builtin-functions.md](builtin-functions.md#routing-mux--demux).
+Full behaviour and examples: [builtin-routing-functions.md](builtin-routing-functions.md).
 
 ### Demultiplexer (DEMUX)
 
@@ -128,7 +161,7 @@ DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..
 
 DEMUX returns **`2^N` values**: the selected output carries `data`, the rest are `0`.
 
-See [builtin-functions.md](builtin-functions.md#routing-mux--demux).
+See [builtin-routing-functions.md](builtin-routing-functions.md).
 
 ### Arithmetic (ADD / SUBTRACT / MULTIPLY / DIVIDE)
 
@@ -246,7 +279,8 @@ Output:
 
 ```
 built-in:
-NOT, AND, OR, XOR, NXOR, NAND, NOR, EQ, LATCH, LSHIFT, RSHIFT, REG, MUX, DEMUX, ADD, SUBTRACT, MULTIPLY, DIVIDE
+NOT, AND, OR, … HIGH, LOW, BITINDEX, ONEHOT, PARITY, BITSIZE, LROTATE, …
+```
 
 user defined:
 myFunc, helper, ...

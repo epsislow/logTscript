@@ -339,6 +339,78 @@ reg(352, 'doc', 'isBuiltinFunction — ADD, SUBTRACT, MULTIPLY, DIVIDE recognize
   }
 });
 
+reg(353, 'doc', 'doc(HIGH) — signature', function(h, session) {
+  const out = session.runDoc('doc(HIGH)');
+  h.assert('doc(HIGH) has signature', String(out.some(l => l.includes('HIGH(Xbit)'))), 'true');
+});
+
+reg(354, 'doc', 'doc(BITINDEX) — dual return signature', function(h, session) {
+  const out = session.runDoc('doc(BITINDEX)');
+  h.assert('doc(BITINDEX) has isInvalid', String(out.some(l => l.includes('isInvalid'))), 'true');
+});
+
+reg(355, 'doc', 'HIGH — interpreter E2E', function(h, session) {
+  const { interp } = session.run('8wire winner = HIGH(00101010)');
+  h.assert('HIGH result', session.getWire(interp, 'winner'), '00100000');
+});
+
+reg(356, 'doc', 'BITINDEX — dual return E2E', function(h, session) {
+  const { interp } = session.run('2wire q, 1wire inv = BITINDEX(100)');
+  h.assert('index', session.getWire(interp, 'q'), '10');
+  h.assert('isInvalid', session.getWire(interp, 'inv'), '0');
+});
+
+reg(357, 'doc', 'BITINDEX(000) — invalid', function(h, session) {
+  const { interp } = session.run('2wire q, 1wire inv = BITINDEX(000)');
+  h.assert('index', session.getWire(interp, 'q'), '00');
+  h.assert('isInvalid', session.getWire(interp, 'inv'), '1');
+});
+
+reg(358, 'doc', 'ONEHOT — interpreter E2E', function(h, session) {
+  const { interp } = session.run('8wire sel = ONEHOT(101)');
+  h.assert('ONEHOT', session.getWire(interp, 'sel'), '00100000');
+});
+
+reg(359, 'doc', 'Priority encoder E2E', function(h, session) {
+  const { interp } = session.run(
+    '8wire requests = 00101010\n' +
+    '8wire winner = HIGH(requests)\n' +
+    '1wire valid = ANY(requests)\n' +
+    '3wire index, 1wire bad = BITINDEX(winner)'
+  );
+  h.assert('winner', session.getWire(interp, 'winner'), '00100000');
+  h.assert('valid', session.getWire(interp, 'valid'), '1');
+  h.assert('index', session.getWire(interp, 'index'), '101');
+  h.assert('bad', session.getWire(interp, 'bad'), '0');
+});
+
+reg(360, 'doc', 'PARITY, CNTONE, BITSIZE E2E', function(h, session) {
+  const { interp } = session.run(
+    '1wire p = PARITY(1011)\n' +
+    '2wire c = CNTONE(00101010)\n' +
+    '3wire sz = BITSIZE(0101010)'
+  );
+  h.assert('PARITY', session.getWire(interp, 'p'), '1');
+  h.assert('CNTONE', session.getWire(interp, 'c'), '11');
+  h.assert('BITSIZE', session.getWire(interp, 'sz'), '111');
+});
+
+reg(361, 'doc', 'REVERSE and LROTATE E2E', function(h, session) {
+  const { interp } = session.run(
+    '4wire r = REVERSE(0011)\n' +
+    '4wire rot = LROTATE(1011, 10)'
+  );
+  h.assert('REVERSE', session.getWire(interp, 'r'), '1100');
+  h.assert('LROTATE', session.getWire(interp, 'rot'), '1110');
+});
+
+reg(362, 'doc', 'isBuiltinFunction — new bit builtins recognized', function(h, session) {
+  for (const fn of ['HIGH', 'BITINDEX', 'ONEHOT', 'BITSIZE', 'LROTATE']) {
+    const lines = Interpreter.getDocLines(fn, new Map());
+    h.assert(fn + ' recognized', String(lines[0].includes('funcție nedefinită')), 'false');
+  }
+});
+
 reg(400, 'doc-comp', 'Parser — doc(comp) produce nodul AST corect', function(h, session) {
   const stmts = session.parse('doc(comp)');
   h.assert('doc camp este comp', stmts[0].doc, 'comp');

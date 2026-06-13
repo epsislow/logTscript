@@ -20,6 +20,65 @@ function memPortsFromAttributes(attributes) {
   return Math.min(4, Math.max(1, p));
 }
 
+function ceilLog2Bits(n) {
+  if (n <= 1) return 1;
+  return Math.ceil(Math.log2(n + 1));
+}
+
+function bitIndexWidth(len) {
+  return len <= 1 ? 1 : 32 - Math.clz32(len - 1);
+}
+
+function binPadInt(n, width) {
+  return n.toString(2).padStart(width, '0');
+}
+
+function countOnesBin(s) {
+  let c = 0;
+  for (let i = 0; i < s.length; i++) if (s[i] === '1') c++;
+  return c;
+}
+
+function highBitMask(s) {
+  const len = s.length;
+  for (let i = 0; i < len; i++) {
+    if (s[i] === '1') return '0'.repeat(i) + '1' + '0'.repeat(len - i - 1);
+  }
+  return '0'.repeat(len);
+}
+
+function lowBitMask(s) {
+  const len = s.length;
+  for (let i = len - 1; i >= 0; i--) {
+    if (s[i] === '1') return '0'.repeat(i) + '1' + '0'.repeat(len - i - 1);
+  }
+  return '0'.repeat(len);
+}
+
+function bitIndexFromValue(s) {
+  const len = s.length;
+  const idxWidth = bitIndexWidth(len);
+  let count = 0;
+  let pos = 0;
+  for (let i = 0; i < len; i++) {
+    if (s[i] === '1') {
+      count++;
+      pos = len - 1 - i;
+    }
+  }
+  const isInvalid = count !== 1 ? '1' : '0';
+  const index = count === 1 ? binPadInt(pos, idxWidth) : '0'.repeat(idxWidth);
+  return { index, isInvalid };
+}
+
+function oneHotFromIndex(indexStr) {
+  const idxWidth = indexStr.length;
+  const outWidth = 1 << idxWidth;
+  const idx = parseInt(indexStr, 2);
+  if (isNaN(idx) || idx < 0 || idx >= outWidth) return '0'.repeat(outWidth);
+  return '0'.repeat(outWidth - idx - 1) + '1' + '0'.repeat(idx);
+}
+
 class Interpreter {
   constructor(funcs,out,pcbs=null,componentRegistry=null, signalPropagationStrategy=null, chips=null, boards=null){
     this.funcs=funcs;
@@ -1105,6 +1164,9 @@ class Interpreter {
   
     if (['NOT', 'AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR', 'EQ', 'LATCH',
          'LSHIFT', 'RSHIFT',
+         'HIGH', 'LOW', 'ANY', 'ZERO', 'BITINDEX', 'ONEHOT',
+         'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE',
+         'REVERSE', 'LROTATE', 'RROTATE',
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE'].includes(name)) {
       return true;
     }
@@ -2238,6 +2300,131 @@ if (this.isBuiltinDEMUX(name)) {
       }
     }
 
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  // ================= BUILTIN: BIT SELECTION =================
+  if (name === 'HIGH') {
+    if (argValues.length !== 1) throw Error('HIGH expects 1 argument');
+    const v = highBitMask(argValues[0]);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'LOW') {
+    if (argValues.length !== 1) throw Error('LOW expects 1 argument');
+    const v = lowBitMask(argValues[0]);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'ANY') {
+    if (argValues.length !== 1) throw Error('ANY expects 1 argument');
+    const bits = argValues[0].split('');
+    let acc = bits[0] === '1';
+    for (let i = 1; i < bits.length; i++) acc = acc || bits[i] === '1';
+    const v = acc ? '1' : '0';
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'ZERO') {
+    if (argValues.length !== 1) throw Error('ZERO expects 1 argument');
+    const bits = argValues[0].split('');
+    let any = bits[0] === '1';
+    for (let i = 1; i < bits.length; i++) any = any || bits[i] === '1';
+    const v = any ? '0' : '1';
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'BITINDEX') {
+    if (argValues.length !== 1) throw Error('BITINDEX expects 1 argument');
+    const { index, isInvalid } = bitIndexFromValue(argValues[0]);
+    const idxWidth = index.length;
+    return [
+      computeRefs
+        ? { value: index, ref: `&${this.storeValue(index)}`, bitWidth: idxWidth }
+        : { value: index, ref: null, bitWidth: idxWidth },
+      computeRefs
+        ? { value: isInvalid, ref: `&${this.storeValue(isInvalid)}`, bitWidth: 1 }
+        : { value: isInvalid, ref: null, bitWidth: 1 },
+    ];
+  }
+
+  if (name === 'ONEHOT') {
+    if (argValues.length !== 1) throw Error('ONEHOT expects 1 argument');
+    const v = oneHotFromIndex(argValues[0]);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  // ================= BUILTIN: BIT ANALYSIS =================
+  if (name === 'PARITY') {
+    if (argValues.length !== 1) throw Error('PARITY expects 1 argument');
+    const bits = argValues[0].split('');
+    let acc = bits[0] === '1';
+    for (let i = 1; i < bits.length; i++) acc = acc !== (bits[i] === '1');
+    const v = acc ? '1' : '0';
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'CNTONE') {
+    if (argValues.length !== 1) throw Error('CNTONE expects 1 argument');
+    const v = countOnesBin(argValues[0]).toString(2);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'CNTZERO') {
+    if (argValues.length !== 1) throw Error('CNTZERO expects 1 argument');
+    const s = argValues[0];
+    const v = (s.length - countOnesBin(s)).toString(2);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'BITSIZE') {
+    if (argValues.length !== 1) throw Error('BITSIZE expects 1 argument');
+    const len = argValues[0].length;
+    const w = bitIndexWidth(len);
+    const v = binPadInt(len, w);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  // ================= BUILTIN: BIT TRANSFORM (rotate / reverse) =================
+  if (name === 'REVERSE') {
+    if (argValues.length !== 1) throw Error('REVERSE expects 1 argument');
+    const v = argValues[0].split('').reverse().join('');
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'LROTATE' || name === 'RROTATE') {
+    if (argValues.length !== 2) throw Error(`${name} expects 2 arguments`);
+    const data = argValues[0];
+    const len = data.length;
+    let n = len === 0 ? 0 : parseInt(argValues[1], 2) % len;
+    let v;
+    if (name === 'LROTATE') {
+      v = len === 0 ? '' : data.slice(n) + data.slice(0, n);
+    } else {
+      v = len === 0 ? '' : data.slice(len - n) + data.slice(0, len - n);
+    }
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -8582,6 +8769,19 @@ Interpreter.BUILTIN_DOC = {
   SUBTRACT: ['SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
   MULTIPLY: ['MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over'],
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
+  HIGH:     ['HIGH(Xbit) -> Xbit'],
+  LOW:      ['LOW(Xbit) -> Xbit'],
+  ANY:      ['ANY(Xbit) -> 1bit'],
+  ZERO:     ['ZERO(Xbit) -> 1bit'],
+  BITINDEX: ['BITINDEX(Xbit) -> Ybit index, 1bit isInvalid'],
+  ONEHOT:   ['ONEHOT(Xbit index) -> 2^X bits'],
+  PARITY:   ['PARITY(Xbit) -> 1bit'],
+  CNTONE:   ['CNTONE(Xbit) -> Ybit'],
+  CNTZERO:  ['CNTZERO(Xbit) -> Ybit'],
+  BITSIZE:  ['BITSIZE(Xbit) -> Ybit'],
+  REVERSE:  ['REVERSE(Xbit) -> Xbit'],
+  LROTATE:  ['LROTATE(Xbit data, Ybit count) -> Xbit'],
+  RROTATE:  ['RROTATE(Xbit data, Ybit count) -> Xbit'],
 };
 
 Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions, boardInstNames, boardDefinitions, inlineInstances) {

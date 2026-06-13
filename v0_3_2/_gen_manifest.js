@@ -13,7 +13,9 @@ const OUT = path.join(dir, 'test_manifest.js');
 const GROUP_META = [
   { id: 'repeat', label: 'Repeat preprocessor' },
   { id: 'gates-reduce', label: 'Logic gate reduce / expand' },
-  { id: 'shifts', label: 'LSHIFT / RSHIFT' },
+  { id: 'bit-transform', label: 'Bit transform built-ins' },
+  { id: 'bit-selection', label: 'Bit selection built-ins' },
+  { id: 'bit-analysis', label: 'Bit analysis built-ins' },
   { id: 'bitrange', label: 'Dynamic bit range' },
   { id: 'bit-ops', label: 'Bit operations' },
   { id: 'wire-init', label: ':= wire initialization' },

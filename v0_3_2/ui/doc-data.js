@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, arithmetic.md, asm.md, board.md, builtin-functions.md, chip.md, components.md, counter.md, debug.md, decode.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, interactive-components.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, subtract.md, switch.md, terminal.md
+ * Files: 14seg.md, adder.md, arithmetic.md, asm.md, board.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, components.md, counter.md, debug.md, decode.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, interactive-components.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, subtract.md, switch.md, terminal.md
  */
 (function () {
   'use strict';
@@ -796,6 +796,434 @@ See [debug.md](debug.md).
 - [pcb.md](pcb.md) — deprecated
 - [components.md](components.md) — index
 `,
+    'builtin-bit-analysis-functions.md': `# Built-in bit analysis functions
+
+Counting, parity, and size helpers on arbitrary-width bit strings.
+
+Index: [builtin-functions.md](builtin-functions.md)
+
+---
+
+## PARITY
+
+Returns \`1\` when the number of set bits is **odd** (XOR fold across all bits).
+
+\`\`\`
+PARITY(Xbit value) -> 1bit
+\`\`\`
+
+### Examples
+
+| Input | Result |
+|-------|--------|
+| \`PARITY(1011)\` | \`1\` |
+| \`PARITY(1110)\` | \`1\` |
+| \`PARITY(1010)\` | \`0\` |
+
+### Runnable example
+
+\`\`\`logts-play
+4wire data = 1011
+1wire p = PARITY(data)
+probe(p)
+\`\`\`
+
+---
+
+## CNTONE
+
+Counts how many bits are \`1\`. Returns the count as a binary value (minimal width, unpadded).
+
+\`\`\`
+CNTONE(Xbit value) -> Ybit
+\`\`\`
+
+### Example
+
+\`\`\`
+CNTONE(00101010) -> 11    # 3 ones
+\`\`\`
+
+### Runnable example
+
+\`\`\`logts-play
+8wire data = 00101010
+2wire n = CNTONE(data)
+show(n)
+\`\`\`
+
+---
+
+## CNTZERO
+
+Counts how many bits are \`0\`.
+
+\`\`\`
+CNTZERO(Xbit value) -> Ybit
+\`\`\`
+
+### Example
+
+\`\`\`
+CNTZERO(0101010) -> 100   # 4 zeros (7-bit input)
+\`\`\`
+
+### Runnable example
+
+\`\`\`logts-play
+7wire data = 0101010
+3wire z = CNTZERO(data)
+probe(z)
+\`\`\`
+
+---
+
+## BITSIZE
+
+Returns the **length** of the bit string as a binary number (not the numeric value of the bits).
+
+\`\`\`
+BITSIZE(Xbit value) -> Ybit
+\`\`\`
+
+### Example
+
+\`\`\`
+BITSIZE(0101010) -> 111   # 7 bits long
+\`\`\`
+
+### Runnable example
+
+\`\`\`logts-play
+7wire data = 0101010
+3wire len = BITSIZE(data)
+show(len)
+\`\`\`
+`,
+    'builtin-bit-selection-functions.md': `# Built-in bit selection and detection functions
+
+These built-ins operate on arbitrary-width binary values. Useful for priority selection, interrupt handling, one-hot encoding, bit scanning, masking, and state decoding.
+
+Index: [builtin-functions.md](builtin-functions.md)
+
+---
+
+## HIGH
+
+Returns the highest (most significant) bit that is set to \`1\`. All other bits become \`0\`.
+
+\`\`\`
+HIGH(Xbit value) -> Xbit
+\`\`\`
+
+### Examples
+
+| Input | Result |
+|-------|--------|
+| \`HIGH(00101010)\` | \`00100000\` |
+| \`HIGH(00010000)\` | \`00010000\` |
+| \`HIGH(00000000)\` | \`00000000\` |
+
+### Runnable example
+
+\`\`\`logts-play
+8wire requests = 00101010
+8wire winner = HIGH(requests)
+probe(winner)
+show(winner)
+\`\`\`
+
+**Typical uses:** interrupt priority selection, highest-priority request detection, bus arbitration.
+
+---
+
+## LOW
+
+Returns the lowest (least significant) bit that is set to \`1\`.
+
+\`\`\`
+LOW(Xbit value) -> Xbit
+\`\`\`
+
+### Examples
+
+| Input | Result |
+|-------|--------|
+| \`LOW(00101010)\` | \`00000010\` |
+| \`LOW(00010000)\` | \`00010000\` |
+| \`LOW(00000000)\` | \`00000000\` |
+
+### Runnable example
+
+\`\`\`logts-play
+8wire requests = 00101010
+8wire picked = LOW(requests)
+probe(picked)
+\`\`\`
+
+**Typical uses:** lowest-priority selection, round-robin allocators, bit scanning.
+
+---
+
+## ANY
+
+Returns whether any bit is set (\`1\` if at least one bit is \`1\`).
+
+\`\`\`
+ANY(Xbit value) -> 1bit
+\`\`\`
+
+Equivalent to \`OR(value)\` (fold).
+
+### Runnable example
+
+\`\`\`logts-play
+8wire requests = 00101010
+1wire pending = ANY(requests)
+probe(pending)
+\`\`\`
+
+---
+
+## ZERO
+
+Returns whether all bits are zero (\`1\` when every bit is \`0\`).
+
+\`\`\`
+ZERO(Xbit value) -> 1bit
+\`\`\`
+
+Equivalent to \`NOT(ANY(value))\`.
+
+### Runnable example
+
+\`\`\`logts-play
+8wire status = 00000000
+1wire empty = ZERO(status)
+show(empty)
+\`\`\`
+
+---
+
+## BITINDEX
+
+Returns the index of the active bit (LSB = bit \`0\`). Input is **typically** one-hot; when zero or multiple bits are set, \`isInvalid = 1\` and \`index\` is all zeros.
+
+\`\`\`
+BITINDEX(Xbit value) -> Ybit index, 1bit isInvalid
+\`\`\`
+
+\`Y\` = number of bits needed to encode indices \`0 … len(value)-1\`.
+
+### Examples
+
+| Input | index | isInvalid |
+|-------|-------|-----------|
+| \`BITINDEX(00000001)\` | \`000\` | \`0\` |
+| \`BITINDEX(00000100)\` | \`010\` | \`0\` |
+| \`BITINDEX(00100000)\` | \`101\` | \`0\` |
+| \`BITINDEX(000)\` | \`00\` | \`1\` |
+
+Assign both return values:
+
+\`\`\`
+2wire q, 1wire isInvalid = BITINDEX(100)
+\`\`\`
+
+### Runnable example
+
+\`\`\`logts-play
+8wire winner = 00100000
+3wire idx, 1wire bad = BITINDEX(winner)
+probe(idx)
+probe(bad)
+\`\`\`
+
+---
+
+## ONEHOT
+
+Converts a binary index into a one-hot value (exactly one bit set).
+
+\`\`\`
+ONEHOT(Xbit index) -> 2^X bits
+\`\`\`
+
+Output width = \`2^(width of index)\`.
+
+### Examples
+
+| Input | Result |
+|-------|--------|
+| \`ONEHOT(000)\` | \`00000001\` |
+| \`ONEHOT(001)\` | \`00000010\` |
+| \`ONEHOT(101)\` | \`00100000\` |
+| \`ONEHOT(111)\` | \`10000000\` |
+
+### Runnable example
+
+\`\`\`logts-play
+3wire sel = 101
+8wire line = ONEHOT(sel)
+show(line)
+\`\`\`
+
+---
+
+## BITINDEX and ONEHOT (inverses)
+
+\`\`\`
+BITINDEX(ONEHOT(x))  ->  (x, 0)   # when x is in range
+\`\`\`
+
+---
+
+## Building a priority encoder
+
+A dedicated priority encoder built-in is usually unnecessary:
+
+\`\`\`
+8wire requests = 00101010
+8wire winner = HIGH(requests)
+1wire valid  = ANY(requests)
+3wire index, 1wire bad = BITINDEX(winner)
+# winner = 00100000, valid = 1, index = 101, bad = 0
+\`\`\`
+
+### Runnable example
+
+\`\`\`logts-play
+8wire requests = 00101010
+8wire winner = HIGH(requests)
+1wire valid = ANY(requests)
+3wire index, 1wire bad = BITINDEX(winner)
+probe(winner)
+probe(valid)
+probe(index)
+probe(bad)
+\`\`\`
+`,
+    'builtin-bit-transform-functions.md': `# Built-in bit transform functions
+
+Shift, rotate, and reverse operations on bit strings.
+
+Index: [builtin-functions.md](builtin-functions.md) · Short notation (\`<\`, \`>\`): [short-notation.md](short-notation.md)
+
+---
+
+## LSHIFT
+
+Logical shift left — appends \`n\` fill bits on the right; **width increases**.
+
+\`\`\`
+LSHIFT(Xbit data, Nbit n) -> Xbit
+LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
+\`\`\`
+
+- \`data\` — value to shift
+- \`n\` — positions (binary)
+- \`fill\` *(optional)* — fill bit (default \`0\`)
+
+### Runnable example
+
+\`\`\`logts-play
+4wire x = 1011
+5wire y = LSHIFT(x, 1)
+show(y)
+\`\`\`
+
+Sugar: \`data < n\` and \`data < n w1\` (see [short-notation.md](short-notation.md)).
+
+---
+
+## RSHIFT
+
+Logical shift right — same width; MSBs filled with \`fill\`.
+
+\`\`\`
+RSHIFT(Xbit data, Nbit n) -> Xbit
+RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
+\`\`\`
+
+### Runnable example
+
+\`\`\`logts-play
+4wire x = 1010
+4wire y = RSHIFT(x, 1)
+probe(y)
+\`\`\`
+
+Sugar: \`data > n\` and \`data > n w1\`.
+
+---
+
+## REVERSE
+
+Reverses bit order (MSB ↔ LSB).
+
+\`\`\`
+REVERSE(Xbit value) -> Xbit
+\`\`\`
+
+### Examples
+
+| Input | Result |
+|-------|--------|
+| \`REVERSE(0011)\` | \`1100\` |
+| \`REVERSE(001)\` | \`100\` |
+
+### Runnable example
+
+\`\`\`logts-play
+4wire x = 0011
+4wire y = REVERSE(x)
+show(y)
+\`\`\`
+
+---
+
+## LROTATE
+
+Circular rotate left — width unchanged; \`count\` is taken modulo width.
+
+\`\`\`
+LROTATE(Xbit data, Ybit count) -> Xbit
+\`\`\`
+
+### Examples
+
+| Call | Result |
+|------|--------|
+| \`LROTATE(1011, 1)\` | \`0111\` |
+| \`LROTATE(1011, 01)\` | \`0111\` |
+| \`LROTATE(1011, 10)\` | \`1110\` |
+
+### Runnable example
+
+\`\`\`logts-play
+4wire x = 1011
+4wire y = LROTATE(x, 10)
+probe(y)
+\`\`\`
+
+---
+
+## RROTATE
+
+Circular rotate right — width unchanged; \`count\` modulo width.
+
+\`\`\`
+RROTATE(Xbit data, Ybit count) -> Xbit
+\`\`\`
+
+### Runnable example
+
+\`\`\`logts-play
+4wire x = 1011
+4wire y = RROTATE(x, 1)
+show(y)
+\`\`\`
+`,
     'builtin-functions.md': `# Built-in functions (internal)
 
 LogTscript provides **built-in functions** — combinational or stateful primitives invoked directly in expressions (\`OR(a, b)\`, \`MUX(sel, a, b)\`, \`REG(data, clk, clr)\`, …). They have no panel device; use \`doc(Name)\` for the live signature.
@@ -813,19 +1241,36 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 
 | Category | Functions | Detail |
 |----------|-----------|--------|
-| **Logic gates** | \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, \`EQ\` | [below](#logic-gates) |
-| **Sequential** | \`LATCH\`, \`REG\` | [below](#sequential) · \`REG\` → [reg.md](reg.md) |
-| **Shift** | \`LSHIFT\`, \`RSHIFT\` | [below](#shift) |
-| **Routing** | \`MUX\`, \`DEMUX\` | [below](#routing-mux--demux) |
+| **Logic gates** | \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, \`EQ\` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) |
+| **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
+| **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
 | **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\` | [arithmetic.md](arithmetic.md) |
+| **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
+| **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
+| **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
 
-> **Adding new built-ins:** extend \`Interpreter.BUILTIN_DOC\` in \`core/interpreter.js\`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching section (or a new subsection).
+> **Adding new built-ins:** extend \`Interpreter.BUILTIN_DOC\` in \`core/interpreter.js\`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.
 
 ---
 
-## Logic gates
+## Related
 
-\`Xbit\` = bit string of any width.
+| Topic | Page |
+|-------|------|
+| \`doc()\` syntax | [doc-function.md](doc-function.md) |
+| Short notation (\`&\`, \`\\|\`, \`<\`, \`>\`) | [short-notation.md](short-notation.md) |
+| Panel devices (\`comp\`) | [components.md](components.md) |
+| User \`def\` functions | [doc-function.md](doc-function.md#user-defined-functions) |
+`,
+    'builtin-logic-gate-functions.md': `# Built-in logic gate functions
+
+Combinational logic gates invoked directly in expressions. \`Xbit\` = bit string of any width.
+
+Index: [builtin-functions.md](builtin-functions.md) · Short notation (\`&\`, \`|\`, \`^\`): [short-notation.md](short-notation.md)
+
+---
+
+## Signatures
 
 | Call | Signature |
 |------|-----------|
@@ -833,15 +1278,140 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | \`doc(AND)\` … \`doc(NOR)\` | \`Gate(Xbit) -> 1bit\` **or** \`Gate(Xbit, Xbit) -> Xbit\` |
 | \`doc(EQ)\` | \`EQ(Xbit, Xbit) -> 1bit\` |
 
-**1-argument mode (fold):** \`OR(a)\` folds OR across all bits of \`a\` → **1 bit**.
+**1-argument mode (fold):** \`OR(a)\` folds across all bits of \`a\` → **1 bit**.
 
 **2-argument mode (bitwise):** \`OR(a, b)\` applies the gate bit-by-bit → **N bits** (width of operands).
 
 ---
 
-## Sequential
+## NOT
 
-### LATCH
+\`\`\`
+NOT(Xbit) -> Xbit
+\`\`\`
+
+Bitwise inversion; output width equals input width.
+
+### Runnable example
+
+\`\`\`logts-play
+4wire a = 1010
+4wire y = NOT(a)
+show(y)
+\`\`\`
+
+---
+
+## AND / OR / XOR / NXOR / NAND / NOR
+
+Dual-mode gates (fold or bitwise). Example with OR:
+
+### Runnable example
+
+\`\`\`logts-play
+4wire a = 1100
+4wire b = 1010
+4wire y = OR(a, b)
+1wire any = OR(a)
+probe(y)
+show(any)
+\`\`\`
+
+---
+
+## EQ
+
+\`\`\`
+EQ(Xbit, Xbit) -> 1bit
+\`\`\`
+
+Compares two operands bit-by-bit; returns \`1\` only if every bit pair matches.
+
+### Runnable example
+
+\`\`\`logts-play
+4wire a = 0011
+4wire b = 0011
+1wire same = EQ(a, b)
+probe(same)
+\`\`\`
+`,
+    'builtin-routing-functions.md': `# Built-in routing functions (MUX / DEMUX)
+
+Selector width \`N\` is inferred from the \`sel\` argument at runtime → \`2^N\` data inputs (MUX) or outputs (DEMUX).
+
+Index: [builtin-functions.md](builtin-functions.md)
+
+---
+
+## MUX
+
+\`\`\`
+MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit
+\`\`\`
+
+**Multiple data arguments** — pass \`2^N\` separate inputs after \`sel\`:
+
+### Runnable example
+
+\`\`\`logts-play
+1wire sel = 0
+4wire a = 0001
+4wire b = 0010
+4wire y = MUX(sel, a, b)
+probe(y)
+\`\`\`
+
+**Packed data argument** — one bit-string split into \`2^N\` equal chunks:
+
+### Runnable example
+
+\`\`\`logts-play
+1wire sel = 1
+8wire packed = 00010010
+4wire y = MUX(sel, packed)
+show(y)
+\`\`\`
+
+---
+
+## DEMUX
+
+\`\`\`
+DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..
+\`\`\`
+
+Returns **\`2^N\` values**: the selected output carries \`data\`, all others are zero (same width as \`data\`).
+
+### Runnable example
+
+\`\`\`logts-play
+1wire sel = 0
+4wire data = 1010
+4wire out0, 4wire out1 = DEMUX(sel, data)
+probe(out0)
+probe(out1)
+\`\`\`
+
+---
+
+## Typical uses
+
+\`\`\`
+# ALU result select (mini-CPU pattern)
+4wire y = MUX(op.1, .add:get, .sub:get)
+
+# Toggle when p falls (hold vs invert)
+tg0 = MUX(p, tg0, NOT(tg0))
+\`\`\`
+`,
+    'builtin-sequential-functions.md': `# Built-in sequential functions
+
+Stateful built-ins (no panel device). Index: [builtin-functions.md](builtin-functions.md)
+
+---
+
+## LATCH
 
 \`\`\`
 LATCH(Xbit data, 1bit clock) -> Xbit
@@ -849,7 +1419,18 @@ LATCH(Xbit data, 1bit clock) -> Xbit
 
 Transparent latch: when \`clock = 1\`, output follows \`data\`; when \`clock = 0\`, output holds.
 
-### REG
+### Runnable example
+
+\`\`\`logts-play
+4wire data = 1010
+1wire clk = 1
+4wire out = LATCH(data, clk)
+probe(out)
+\`\`\`
+
+---
+
+## REG
 
 \`\`\`
 REG(Xbit data, 1bit clock, 1bit clear) -> Xbit
@@ -859,99 +1440,15 @@ Width is inferred from \`data\`. Falling-edge wire clock or \`~\` + \`NEXT(~)\`;
 
 Full behaviour, examples, and \`comp [reg]\` comparison: **[reg.md](reg.md)**.
 
----
+### Runnable example
 
-## Shift
-
+\`\`\`logts-play
+4wire data = 1100
+1wire clk = 0
+1wire clr = 0
+4wire out = REG(data, clk, clr)
+probe(out)
 \`\`\`
-LSHIFT(Xbit data, Nbit n) -> Xbit
-LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
-RSHIFT(Xbit data, Nbit n) -> Xbit
-RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
-\`\`\`
-
-- \`data\` — value to shift
-- \`n\` — positions (binary)
-- \`fill\` *(optional)* — fill bit (default \`0\`)
-
----
-
-## Routing (MUX / DEMUX)
-
-Selector width \`N\` is inferred from the \`sel\` argument at runtime → \`2^N\` data inputs (MUX) or outputs (DEMUX).
-
-### MUX
-
-\`\`\`
-MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit
-\`\`\`
-
-**Multiple data arguments** — pass \`2^N\` separate inputs after \`sel\`:
-
-\`\`\`
-1wire sel = 0
-4wire a = 0001
-4wire b = 0010
-4wire y = MUX(sel, a, b)    # 1-bit selector → 2 inputs
-\`\`\`
-
-**Packed data argument** — one bit-string split into \`2^N\` equal chunks (width must divide evenly):
-
-\`\`\`
-1wire sel = 1
-8wire packed = 00010010    # two 4-bit fields
-4wire y = MUX(sel, packed) # sel=1 → second nibble 0010
-\`\`\`
-
-### DEMUX
-
-\`\`\`
-DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..
-\`\`\`
-
-Returns **\`2^N\` values**: the selected output carries \`data\`, all others are zero (same width as \`data\`).
-
-\`\`\`
-1wire sel = 0
-4wire data = 1010
-4wire out0, 4wire out1 = DEMUX(sel, data)
-# out0 = 1010, out1 = 0000
-\`\`\`
-
-### Examples
-
-\`\`\`
-# ALU result select (mini-CPU pattern)
-4wire y = MUX(op.1, .add:get, .sub:get)
-
-# Toggle when p falls (hold vs invert)
-tg0 = MUX(p, tg0, NOT(tg0))
-\`\`\`
-
----
-
-## Arithmetic
-
-Instant binary arithmetic — each returns **two** values (result + carry / over / mod):
-
-| Function | Signature |
-|----------|-----------|
-| \`ADD\` | \`ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry\` |
-| \`SUBTRACT\` | \`SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry\` |
-| \`MULTIPLY\` | \`MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over\` |
-| \`DIVIDE\` | \`DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod\` |
-
-Full semantics, examples, and comparison with \`comp [adder]\` etc.: **[arithmetic.md](arithmetic.md)**.
-
----
-
-## Related
-
-| Topic | Page |
-|-------|------|
-| \`doc()\` syntax | [doc-function.md](doc-function.md) |
-| Panel devices (\`comp\`) | [components.md](components.md) |
-| User \`def\` functions | [doc-function.md](doc-function.md#user-defined-functions) |
 `,
     'chip.md': `# Chip components
 
@@ -2349,9 +2846,11 @@ OR(Xbit, Xbit)
 
 ## Built-in functions
 
-Grouped catalogue (logic, shift, routing, arithmetic, …): **[builtin-functions.md](builtin-functions.md)**.
+Grouped catalogue: **[builtin-functions.md](builtin-functions.md)** (index with links per category).
 
 ### Logic gates
+
+See [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md).
 
 | Call | Output |
 |------|--------|
@@ -2371,16 +2870,47 @@ Grouped catalogue (logic, shift, routing, arithmetic, …): **[builtin-functions
 
 **2-argument mode** (bitwise): \`OR(a, b)\` applies OR bit-by-bit between \`a\` and \`b\`, yielding **N bits**.
 
-### Shift
+### Bit transform (shift / rotate / reverse)
 
 | Call | Output |
 |------|--------|
-| \`doc(LSHIFT)\` | \`LSHIFT(Xbit data, Nbit n) -> Xbit\` / \`LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit\` |
-| \`doc(RSHIFT)\` | \`RSHIFT(Xbit data, Nbit n) -> Xbit\` / \`RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit\` |
+| \`doc(LSHIFT)\` | \`LSHIFT(Xbit data, Nbit n) -> Xbit\` / optional \`fill\` |
+| \`doc(RSHIFT)\` | \`RSHIFT(Xbit data, Nbit n) -> Xbit\` / optional \`fill\` |
+| \`doc(REVERSE)\` | \`REVERSE(Xbit) -> Xbit\` |
+| \`doc(LROTATE)\` | \`LROTATE(Xbit data, Ybit count) -> Xbit\` |
+| \`doc(RROTATE)\` | \`RROTATE(Xbit data, Ybit count) -> Xbit\` |
 
-- \`data\` — the bit string to shift
-- \`n\` — number of positions (in binary)
-- \`fill\` *(optional)* — fill bit (default \`0\`)
+Full behaviour, short notation (\`<\`, \`>\`), and examples: [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md).
+
+### Bit selection and detection
+
+| Call | Output |
+|------|--------|
+| \`doc(HIGH)\` | \`HIGH(Xbit) -> Xbit\` |
+| \`doc(LOW)\` | \`LOW(Xbit) -> Xbit\` |
+| \`doc(ANY)\` | \`ANY(Xbit) -> 1bit\` |
+| \`doc(ZERO)\` | \`ZERO(Xbit) -> 1bit\` |
+| \`doc(BITINDEX)\` | \`BITINDEX(Xbit) -> Ybit index, 1bit isInvalid\` |
+| \`doc(ONEHOT)\` | \`ONEHOT(Xbit index) -> 2^X bits\` |
+
+\`BITINDEX\` returns **two values** — assign both wires (index width ≈ \`bitIndexWidth(len(input))\`).
+
+Full behaviour and priority-encoder pattern: [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md).
+
+### Bit analysis
+
+| Call | Output |
+|------|--------|
+| \`doc(PARITY)\` | \`PARITY(Xbit) -> 1bit\` |
+| \`doc(CNTONE)\` | \`CNTONE(Xbit) -> Ybit\` |
+| \`doc(CNTZERO)\` | \`CNTZERO(Xbit) -> Ybit\` |
+| \`doc(BITSIZE)\` | \`BITSIZE(Xbit) -> Ybit\` |
+
+Full behaviour: [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md).
+
+### Shift (legacy anchor)
+
+Moved to **Bit transform** — see [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md#lshift).
 
 ### Register (REG)
 
@@ -2420,7 +2950,7 @@ MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit
 - \`sel\` — \`N\` bits → \`2^N\` data inputs
 - Pass separate \`data0\`, \`data1\`, … **or** one packed \`Xbit\` string split into equal chunks
 
-Full behaviour and examples: [builtin-functions.md](builtin-functions.md#routing-mux--demux).
+Full behaviour and examples: [builtin-routing-functions.md](builtin-routing-functions.md).
 
 ### Demultiplexer (DEMUX)
 
@@ -2436,7 +2966,7 @@ DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..
 
 DEMUX returns **\`2^N\` values**: the selected output carries \`data\`, the rest are \`0\`.
 
-See [builtin-functions.md](builtin-functions.md#routing-mux--demux).
+See [builtin-routing-functions.md](builtin-routing-functions.md).
 
 ### Arithmetic (ADD / SUBTRACT / MULTIPLY / DIVIDE)
 
@@ -2554,7 +3084,8 @@ Output:
 
 \`\`\`
 built-in:
-NOT, AND, OR, XOR, NXOR, NAND, NOR, EQ, LATCH, LSHIFT, RSHIFT, REG, MUX, DEMUX, ADD, SUBTRACT, MULTIPLY, DIVIDE
+NOT, AND, OR, … HIGH, LOW, BITINDEX, ONEHOT, PARITY, BITSIZE, LROTATE, …
+\`\`\`
 
 user defined:
 myFunc, helper, ...
@@ -3169,7 +3700,7 @@ Each table is followed by numbered subsections (A1, B2, …) with a short explan
 
 **\`inline\` (language):** asm, lut, protocol — see [asm.md](asm.md), [lut.md](lut.md), [protocol.md](protocol.md).
 
-**Built-ins (no panel):** logic (NOT, AND, OR, MUX, DEMUX, EQ, LATCH…), REG, instant arithmetic (ADD, SUBTRACT, MULTIPLY, DIVIDE), LSHIFT/RSHIFT.
+**Built-ins (no panel):** logic, REG, arithmetic, MUX/DEMUX, bit selection (\`HIGH\`, \`BITINDEX\`, \`ONEHOT\`, …), bit analysis (\`PARITY\`, \`BITSIZE\`, …), bit transform (\`LSHIFT\`, \`LROTATE\`, …) — see [builtin-functions.md](builtin-functions.md).
 
 **Composites:** chip, board (recommended), pcb (legacy).
 
