@@ -395,3 +395,101 @@ valid  = 1
 index  = 101
 
 This provides the same information as a traditional priority encoder while keeping the primitives reusable for many other applications.
+
+
+
+
+
+---
+
+PARITY()
+
+Returns whether the number of set bits is odd.
+
+
+Syntax
+
+PARITY(Xbit value)
+
+Returns
+1bit
+
+Examples
+
+PAIRTY(1011)
+
+Result:
+1
+
+PAIRTY(1110)
+
+Result:
+1
+
+PAIRTY(1010)
+
+Result:
+0
+
+
+---
+REVERSE(Xbit) -> Xbit
+
+Bit reversal
+
+Examples
+
+REVERSE(0011)
+
+Result:
+1100
+
+REVERSE(001)
+
+Result:
+100
+---
+
+CNTONE(Xbit) -> Ybit
+Counts how many bits are set.
+
+Example:
+CNTONE(00101010)
+
+Result:
+11
+#3 bits with 1
+---
+
+CNTZERO(Xbit) ->  Ybit
+Counts how many bits are not set.
+
+Example:
+CNTZERO(0101010)
+
+Result: 
+100 
+#4 bits with 0
+---
+
+SIZE(Xbit) -> Ybit
+
+Example:
+SIZE(0101010)
+
+Result:
+111
+# 0101010 has 7bits length doesnt matter the value it has => 7 => 111
+---
+
+LROTATE(Xbit data, Ybit count)
+RROTATE(Xbit data, Ybit count)
+
+Rotate left/right Y values with not changing the length X of the given value 
+
+LROTATE(1011, 1) returns 0111
+LROTATE(1011, 01) returns 0111
+LROTATE(1011, 10) returns 1100
+LROTATE(1011, 010) returns 1100
+
+---

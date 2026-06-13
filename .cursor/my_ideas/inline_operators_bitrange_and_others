@@ -1,0 +1,5 @@
+
+next phase i want to add bit range and bit length to () like writing:
+
+3wire s = 1010101
+3wire q = (s.0/3);4
