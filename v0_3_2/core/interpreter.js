@@ -4,6 +4,12 @@ function isGetRedirectProperty(property) {
   return /^(2|3|4)?get>$/.test(property);
 }
 
+function isGenericPoutRedirectProperty(property) {
+  if (!property.endsWith('>') || property === 'pout>') return false;
+  const base = property.slice(0, -1);
+  return ['front', 'top', 'empty', 'full', 'size', 'capacity', 'free'].includes(base);
+}
+
 function memPortFromAdrPin(pinName) {
   if (pinName === 'adr') return 1;
   const m = /^([2-4])adr$/.exec(pinName);
@@ -2930,7 +2936,7 @@ if (this.isBuiltinDEMUX(name)) {
       
       for(const prop of properties){
         // Skip get> properties when collecting dependencies (they don't have expr)
-        if(!isGetRedirectProperty(prop.property) && prop.property !== 'mod>' && prop.property !== 'carry>' && prop.property !== 'over>' && prop.property !== 'out>'){
+        if(!isGetRedirectProperty(prop.property) && !isGenericPoutRedirectProperty(prop.property) && prop.property !== 'mod>' && prop.property !== 'carry>' && prop.property !== 'over>' && prop.property !== 'out>'){
           this.collectExprDependencies(prop.expr, allDependencies, allWireDependencies);
         }
         
@@ -5817,7 +5823,7 @@ if (s.assignment) {
       const property = prop.property;
       
       // Skip get>, mod>, carry>, over>, out>, and pout> properties - they are processed after all properties are applied
-      if(isGetRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>'){
+      if(isGetRedirectProperty(property) || isGenericPoutRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>'){
         continue;
       }
       
@@ -5972,6 +5978,63 @@ if (s.assignment) {
           this.wireStorageMap.set(targetName, storageIdx);
         }
         this.updateConnectedComponents(targetName, getValue);
+      }
+    }
+    
+    // Process generic pout redirects (front>, top>, size>, etc.)
+    for(const prop of properties){
+      if(!isGenericPoutRedirectProperty(prop.property)) continue;
+
+      const baseProp = prop.property.slice(0, -1);
+      const comp = this.components.get(component);
+      if(!comp) continue;
+
+      if(!this.componentRegistry || !this.componentRegistry.supportsRedirect(comp.type, baseProp)){
+        throw Error(`Component ${component} (type: ${comp.type}) does not support :${baseProp} property`);
+      }
+
+      const redirectAtom = {
+        var: component,
+        property: baseProp
+      };
+      const redirectResult = this.evalAtom(redirectAtom, false);
+
+      const targetName = prop.target.var;
+      const wire = this.wires.get(targetName);
+      if(!wire){
+        throw Error(`Wire ${targetName} not found for ${prop.property} assignment`);
+      }
+
+      const bits = this.getBitWidth(wire.type);
+      let redirectValue = redirectResult.value || '0'.repeat(bits);
+
+      if(redirectValue.length < bits){
+        redirectValue = redirectValue.padEnd(bits, '0');
+      } else if(redirectValue.length > bits){
+        redirectValue = redirectValue.substring(0, bits);
+      }
+
+      let storageIdx = null;
+      if(wire.ref){
+        const refMatch = wire.ref.match(/^&(\d+)/);
+        if(refMatch){
+          storageIdx = parseInt(refMatch[1]);
+          const stored = this.storage.find(s => s.index === storageIdx);
+          if(stored){
+            const oldValue = stored.value;
+            if(oldValue !== redirectValue){
+              stored.value = redirectValue;
+              this.updateConnectedComponents(targetName, redirectValue);
+            }
+          }
+        }
+      } else {
+        storageIdx = this.storeValue(redirectValue);
+        wire.ref = `&${storageIdx}`;
+        if(!this.wireStorageMap.has(targetName)){
+          this.wireStorageMap.set(targetName, storageIdx);
+        }
+        this.updateConnectedComponents(targetName, redirectValue);
       }
     }
     

@@ -30,7 +30,7 @@ Each table is followed by numbered subsections (A1, B2, …) with a short explan
 | **Read-only ROM** (`rom` or mem readonly) | Same as mem semantically, but ROM (no writes) |
 | **Dual-port RAM** (`dpram`) | Simultaneous read from two addresses/ports (fetch + data, pipeline) |
 | **Combinational barrel shifter** | Instant logical/arithmetic shift by N bits (unlike the current sequential shifter) |
-| **Stack** (`stack`) | Push/pop + stack pointer, for subroutines |
+| **Stack** (`stack`) | **done** — `comp [stack]` / `[lifo]` |
 | **Instruction register** (`ir`) | “Ready-made” instruction register (opcode + operand) |
 
 ### A1. Opcode ALU (`alu`)
@@ -93,13 +93,9 @@ Each table is followed by numbered subsections (A1, B2, …) with a short explan
 
 ---
 
-### A7. Stack (`stack`)
+### A7. Stack (`stack`) — **implemented**
 
-**What it does:** A LIFO structure: `push` writes value at stack pointer and decrements/increments SP; `pop` reads and adjusts SP. Often bundled with a small RAM or internal storage and a `sp` output for debugging.
-
-**How I see it used:** Subroutines (`CALL` / `RET`), saving return address on push, restoring on pop. Expression evaluation demos. Students see SP move in the variables panel or via `probe(.stack:sp)`.
-
-**Today:** Second `comp [counter]` as SP + `comp [mem]` as stack array + manual address arithmetic in property blocks. A `stack` comp hides index math and documents the pattern.
+Implemented as `comp [stack]` / `comp [lifo]` — see [stack.md](stack.md). Push/pop/clear via property blocks; pouts `top`, `get`, `size`, `capacity`, `free`, `empty`, `full`.
 
 ---
 
@@ -272,19 +268,15 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 | Idea | Summary |
 |------|---------|
-| **FIFO / queue** | Buffer for serial, pipeline, waiting for data |
+| **FIFO / queue** | **done** — `comp [queue]` / `[fifo]` |
 | **Timer / watchdog** | Timeout, periodic reset |
 | **Interrupt controller** | Event / IRQ model |
 | **DMA / bus arbiter** | Master/slave on shared bus |
 | **EEPROM / persistence** | State that survives page reload |
 
-### D1. FIFO / queue
+### D1. Queue (`queue`) — **implemented**
 
-**What it does:** First-in-first-out buffer: `push` on one side, `pop` on the other; `full`/`empty` flags; fixed depth (e.g. 8 entries).
-
-**How I see it used:** Decouple UART RX from CPU (bytes queue until CPU pops); pipeline stage between fetch and execute; producer/consumer without losing data when speeds differ.
-
-**Today:** No queue primitive; `mem` + read/write pointers in script approximates it with manual discipline. FIFO comp encodes pointer wrap and flags.
+Implemented as `comp [queue]` / `comp [fifo]` — see [queue.md](queue.md). Ring-buffer FIFO with `push`/`pop`/`clear`, flags `empty`/`full`, and `size`/`capacity`/`free`.
 
 ---
 

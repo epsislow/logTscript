@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, arithmetic.md, asm.md, assignment-operators.md, board.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, components.md, counter.md, debug.md, decode.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, interactive-components.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, subtract.md, switch.md, terminal.md
+ * Files: 14seg.md, adder.md, arithmetic.md, asm.md, assignment-operators.md, board.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, components.md, counter.md, debug.md, decode.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, interactive-components.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, stack.md, subtract.md, switch.md, terminal.md
  */
 (function () {
   'use strict';
@@ -1950,6 +1950,9 @@ Instant built-in functions (\`ADD\`, \`SUBTRACT\`, …) without \`comp\`: [arith
 | \`lut\` | — | [lut.md](lut.md) — \`inline [lut]\` or \`comp [lut]\` |
 | \`protocol\` | — | [protocol.md](protocol.md) — declare \`inline [protocol]\`; generate with \`.name { params }\` |
 | \`reg\` | — | [reg.md](reg.md) |
+| \`queue\` | \`fifo\` | [queue.md](queue.md) |
+| \`stack\` | \`lifo\` | [stack.md](stack.md) |
+| \`counter\` | \`=\` | [counter.md](counter.md) |
 | \`osc\` | \`~\` | [oscillator.md](oscillator.md) |
 
 \`doc(inline.asm)\` / \`doc(inline.lut)\` / \`doc(inline.protocol)\` — declaration templates; \`doc(.name)\` — specific instance.
@@ -3999,7 +4002,7 @@ Each table is followed by numbered subsections (A1, B2, …) with a short explan
 | **Read-only ROM** (\`rom\` or mem readonly) | Same as mem semantically, but ROM (no writes) |
 | **Dual-port RAM** (\`dpram\`) | Simultaneous read from two addresses/ports (fetch + data, pipeline) |
 | **Combinational barrel shifter** | Instant logical/arithmetic shift by N bits (unlike the current sequential shifter) |
-| **Stack** (\`stack\`) | Push/pop + stack pointer, for subroutines |
+| **Stack** (\`stack\`) | **done** — \`comp [stack]\` / \`[lifo]\` |
 | **Instruction register** (\`ir\`) | “Ready-made” instruction register (opcode + operand) |
 
 ### A1. Opcode ALU (\`alu\`)
@@ -4062,13 +4065,9 @@ Each table is followed by numbered subsections (A1, B2, …) with a short explan
 
 ---
 
-### A7. Stack (\`stack\`)
+### A7. Stack (\`stack\`) — **implemented**
 
-**What it does:** A LIFO structure: \`push\` writes value at stack pointer and decrements/increments SP; \`pop\` reads and adjusts SP. Often bundled with a small RAM or internal storage and a \`sp\` output for debugging.
-
-**How I see it used:** Subroutines (\`CALL\` / \`RET\`), saving return address on push, restoring on pop. Expression evaluation demos. Students see SP move in the variables panel or via \`probe(.stack:sp)\`.
-
-**Today:** Second \`comp [counter]\` as SP + \`comp [mem]\` as stack array + manual address arithmetic in property blocks. A \`stack\` comp hides index math and documents the pattern.
+Implemented as \`comp [stack]\` / \`comp [lifo]\` — see [stack.md](stack.md). Push/pop/clear via property blocks; pouts \`top\`, \`get\`, \`size\`, \`capacity\`, \`free\`, \`empty\`, \`full\`.
 
 ---
 
@@ -4241,19 +4240,15 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 | Idea | Summary |
 |------|---------|
-| **FIFO / queue** | Buffer for serial, pipeline, waiting for data |
+| **FIFO / queue** | **done** — \`comp [queue]\` / \`[fifo]\` |
 | **Timer / watchdog** | Timeout, periodic reset |
 | **Interrupt controller** | Event / IRQ model |
 | **DMA / bus arbiter** | Master/slave on shared bus |
 | **EEPROM / persistence** | State that survives page reload |
 
-### D1. FIFO / queue
+### D1. Queue (\`queue\`) — **implemented**
 
-**What it does:** First-in-first-out buffer: \`push\` on one side, \`pop\` on the other; \`full\`/\`empty\` flags; fixed depth (e.g. 8 entries).
-
-**How I see it used:** Decouple UART RX from CPU (bytes queue until CPU pops); pipeline stage between fetch and execute; producer/consumer without losing data when speeds differ.
-
-**Today:** No queue primitive; \`mem\` + read/write pointers in script approximates it with manual discipline. FIFO comp encodes pointer wrap and flags.
+Implemented as \`comp [queue]\` / \`comp [fifo]\` — see [queue.md](queue.md). Ring-buffer FIFO with \`push\`/\`pop\`/\`clear\`, flags \`empty\`/\`full\`, and \`size\`/\`capacity\`/\`free\`.
 
 ---
 
@@ -7769,6 +7764,120 @@ Example \`doc(.uart8n1)\`:
 
 A protocol definition is entirely generic. The compiler has no knowledge of UART, SPI, I2C, SDA, SCL, MOSI, or SCLK — these are user-defined channel and parameter names.
 `,
+    'queue.md': `# Queue component (FIFO)
+
+\`comp [queue]\` (shortname \`comp [fifo]\`) is a **first-in, first-out** buffer. Each slot holds a fixed-width binary value; capacity is \`length\` elements.
+
+Use \`on: 1\` for level-triggered property blocks (push/pop run when \`set = 1\` in the same block).
+
+---
+
+## Syntax
+
+\`\`\`
+comp [queue] .q:
+  width: 8
+  length: 64
+  on: 1
+  :
+\`\`\`
+
+| Attribute | Default | Meaning |
+|-----------|---------|---------|
+| \`width\` | 8 | Bit width of each element |
+| \`length\` | 64 | Maximum number of elements |
+
+---
+
+## Pins and pouts
+
+| Port | Width | Role |
+|------|-------|------|
+| \`set\` | 1 | Trigger (last bit \`1\` applies other pins in the block) |
+| \`push\` | \`width\` | Value to insert at the back |
+| \`pop\` | 1 | Remove front element when \`1\` |
+| \`clear\` | 1 | Empty the queue when \`1\` |
+| \`get\` | \`width\` | Peek at front (same as \`front\`) |
+| \`front\` | \`width\` | Peek at front without \`pop\` |
+| \`empty\` | 1 | \`1\` when queue has no elements |
+| \`full\` | 1 | \`1\` when queue cannot accept another push |
+| \`size\` | \`sizeWidth\` | Current element count (zero-padded) |
+| \`capacity\` | \`sizeWidth\` | \`length\` in binary |
+| \`free\` | \`sizeWidth\` | \`length - size\` (slots remaining) |
+
+\`sizeWidth\` = enough bits to represent \`0 .. length\` (e.g. \`length: 16\` → 5 bits).
+
+---
+
+## Example — push and peek
+
+\`\`\`logts-play
+comp [queue] .q:
+  width: 8
+  length: 8
+  on: 1
+  :
+
+.q:{ push = ^41
+  set = 1 }
+.q:{ push = ^42
+  set = 1 }
+
+8wire x = .q:get
+show(x)
+\`\`\`
+
+\`:get\` and \`:front\` return the same value (\`^41\` = \`A\` at the front).
+
+---
+
+## Example — \`front >=\`, \`size >=\`, \`free >=\`
+
+\`\`\`logts-play
+comp [queue] .q:
+  width: 8
+  length: 16
+  on: 1
+  :
+
+.q:{ push = ^41
+  set = 1 }
+.q:{ push = ^42
+  set = 1 }
+
+4wire data
+5wire n
+5wire slots
+.q:{
+  front >= data
+  size >= n
+  free >= slots
+  set = 1
+}
+show(data)
+show(n)
+show(slots)
+\`\`\`
+
+---
+
+## Combination rules (same block, \`set\` edge)
+
+| Combination | Behaviour |
+|-------------|-----------|
+| \`clear\` + \`push\` | clear, then push |
+| \`clear\` + \`pop\` | pop, then clear |
+| \`push\` + \`pop\` | error |
+| all three | error |
+
+---
+
+## Related
+
+- [stack.md](stack.md) — LIFO counterpart
+- [mem.md](mem.md) — random-access storage
+- [components.md](components.md)
+`,
     'reg.md': `# REG — Register Built-in Function
 
 \`REG\` is a built-in stateful register. It stores a bit-string of any width and updates its output based on a clock signal or a NEXT cycle.
@@ -8877,6 +8986,103 @@ See chip tests **540–543** (legacy) and **556–557** (wave) in the test runne
 - [REG](reg.md) — wire-clock falling edge and \`NEXT\` clock (\`~\`)
 - [Oscillator](oscillator.md) — real-time \`osc\` and wire connections
 - [LED](led.md) — displays driven by wires and components
+`,
+    'stack.md': `# Stack component (LIFO)
+
+\`comp [stack]\` (shortname \`comp [lifo]\`) is a **last-in, first-out** stack. Same attributes and status pouts as [queue](queue.md); peek uses \`top\` instead of \`front\`.
+
+Use \`on: 1\` for level-triggered property blocks.
+
+---
+
+## Syntax
+
+\`\`\`
+comp [stack] .s:
+  width: 8
+  length: 64
+  on: 1
+  :
+\`\`\`
+
+| Attribute | Default | Meaning |
+|-----------|---------|---------|
+| \`width\` | 8 | Bit width of each element |
+| \`length\` | 64 | Maximum stack depth |
+
+---
+
+## Pins and pouts
+
+| Port | Width | Role |
+|------|-------|------|
+| \`set\` | 1 | Trigger |
+| \`push\` | \`width\` | Push value onto stack |
+| \`pop\` | 1 | Pop top when \`1\` |
+| \`clear\` | 1 | Empty stack when \`1\` |
+| \`get\` | \`width\` | Peek at top (same as \`top\`) |
+| \`top\` | \`width\` | Peek without \`pop\` |
+| \`empty\` / \`full\` / \`size\` / \`capacity\` / \`free\` | — | Same semantics as queue |
+
+---
+
+## Example — push and pop (LIFO)
+
+\`\`\`logts-play
+comp [stack] .s:
+  width: 8
+  length: 8
+  on: 1
+  :
+
+.s:{ push = ^41
+  set = 1 }
+.s:{ push = ^42
+  set = 1 }
+.s:{ push = ^43
+  set = 1 }
+
+8wire t = .s:top
+show(t)
+
+.s:{ pop = 1
+  set = 1 }
+
+8wire t2 = .s:top
+show(t2)
+\`\`\`
+
+After three pushes, \`:top\` is \`C\` (\`^43\`). After one pop, \`:top\` is \`B\` (\`^42\`).
+
+---
+
+## Example — \`top >=\` redirect
+
+\`\`\`logts-play
+comp [stack] .s:
+  width: 8
+  length: 16
+  on: 1
+  :
+
+.s:{ push = ^41
+  set = 1 }
+
+8wire data
+.s:{
+  top >= data
+  set = 1
+}
+show(data)
+\`\`\`
+
+---
+
+## Related
+
+- [queue.md](queue.md) — FIFO counterpart
+- [counter.md](counter.md) — alternative for manual SP + mem
+- [components.md](components.md)
 `,
     'subtract.md': `# Subtract component
 

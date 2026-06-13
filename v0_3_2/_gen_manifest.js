@@ -27,6 +27,8 @@ const GROUP_META = [
   { id: 'registry', label: 'Component registry' },
   { id: 'terminal', label: 'Terminal component' },
   { id: 'mem-ports', label: 'Memory multi-port' },
+  { id: 'queue-storage', label: 'Queue storage engine' },
+  { id: 'queue-stack', label: 'Queue & Stack components' },
   { id: 'doc', label: 'doc() tests' },
   { id: 'doc-comp', label: 'Doc for body comps' },
   { id: 'chip', label: 'Chip component' },

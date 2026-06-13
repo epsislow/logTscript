@@ -4162,5 +4162,380 @@ on: 1
   }, 'Only one get> property allowed per property block');
 });
 
+const QUEUE_BASE = `comp [queue] .q:
+  width: 8
+  length: 16
+  on: 1
+  :
+`;
+
+const STACK_BASE = `comp [stack] .s:
+  width: 8
+  length: 16
+  on: 1
+  :
+`;
+
+function pushQueue(session, interp, hex) {
+  session.execStmts(interp, `.q:{
+  push = ${hex}
+  set = 1
+}`);
+}
+
+reg(1020, 'queue-stack', 'registry queue + shortname fifo parse', function(h, session) {
+  const stmts = session.parse(`comp [queue] .q:
+  width: 8
+  length: 8
+  :
+comp [fifo] .f:
+  width: 8
+  length: 4
+  :`);
+  h.assert('queue comp', stmts[0].comp.type, 'queue');
+  h.assert('fifo resolves queue', stmts[1].comp.type, 'queue');
+});
+
+reg(1021, 'queue-stack', 'push A,B,C — get and front = A', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  pushQueue(session, interp, '^41');
+  pushQueue(session, interp, '^42');
+  pushQueue(session, interp, '^43');
+  session.execStmts(interp, '8wire g = .q:get\n8wire f = .q:front');
+  h.assert('get A', session.getWire(interp, 'g'), '01000001');
+  h.assert('front A', session.getWire(interp, 'f'), '01000001');
+});
+
+reg(1022, 'queue-stack', 'pop — get becomes B', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  pushQueue(session, interp, '^41');
+  pushQueue(session, interp, '^42');
+  pushQueue(session, interp, '^43');
+  session.execStmts(interp, `.q:{ pop = 1
+  set = 1 }
+8wire g = .q:get`);
+  h.assert('get B', session.getWire(interp, 'g'), '01000010');
+});
+
+reg(1023, 'queue-stack', 'size after 3 push = 00011', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  pushQueue(session, interp, '^41');
+  pushQueue(session, interp, '^42');
+  pushQueue(session, interp, '^43');
+  session.execStmts(interp, '5wire n = .q:size');
+  h.assert('size 3', session.getWire(interp, 'n'), '00011');
+});
+
+reg(1024, 'queue-stack', 'capacity and free after 3 push', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  pushQueue(session, interp, '^41');
+  pushQueue(session, interp, '^42');
+  pushQueue(session, interp, '^43');
+  session.execStmts(interp, '5wire cap = .q:capacity\n5wire fr = .q:free');
+  h.assert('capacity 16', session.getWire(interp, 'cap'), '10000');
+  h.assert('free 13', session.getWire(interp, 'fr'), '01101');
+});
+
+reg(1025, 'queue-stack', 'empty/full/free when empty', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  session.execStmts(interp, '1wire e = .q:empty\n1wire f = .q:full\n5wire fr = .q:free\n5wire cap = .q:capacity');
+  h.assert('empty', session.getWire(interp, 'e'), '1');
+  h.assert('not full', session.getWire(interp, 'f'), '0');
+  h.assert('free = capacity', session.getWire(interp, 'fr'), session.getWire(interp, 'cap'));
+});
+
+reg(1026, 'queue-stack', 'overflow push throws Queue is full', function(h, session) {
+  const src = `comp [queue] .q:
+  width: 8
+  length: 2
+  on: 1
+  :
+.q:{ push = ^41
+  set = 1 }
+.q:{ push = ^42
+  set = 1 }
+.q:{ push = ^43
+  set = 1 }`;
+  h.assertThrows('overflow', function() { session.run(src); }, 'Queue is full');
+});
+
+reg(1027, 'queue-stack', 'underflow pop throws Queue is empty', function(h, session) {
+  h.assertThrows('underflow', function() {
+    session.run(QUEUE_BASE + `.q:{ pop = 1
+  set = 1 }`);
+  }, 'Queue is empty');
+});
+
+reg(1028, 'queue-stack', 'clear + push in same block', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  pushQueue(session, interp, '^41');
+  pushQueue(session, interp, '^42');
+  session.execStmts(interp, `.q:{
+  clear = 1
+  push = ^43
+  set = 1 }
+5wire n = .q:size
+8wire g = .q:get`);
+  h.assert('size 1', session.getWire(interp, 'n'), '00001');
+  h.assert('only C', session.getWire(interp, 'g'), '01000011');
+});
+
+reg(1029, 'queue-stack', 'pop + clear in same block', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  pushQueue(session, interp, '^41');
+  pushQueue(session, interp, '^42');
+  session.execStmts(interp, `.q:{
+  pop = 1
+  clear = 1
+  set = 1 }
+5wire n = .q:size`);
+  h.assert('empty after pop+clear', session.getWire(interp, 'n'), '00000');
+});
+
+reg(1030, 'queue-stack', 'push + pop same block throws', function(h, session) {
+  h.assertThrows('conflict', function() {
+    session.run(QUEUE_BASE + `.q:{
+  push = ^41
+  pop = 1
+  set = 1 }`);
+  }, 'Conflicting queue operations');
+});
+
+reg(1031, 'queue-stack', 'shortname comp [fifo] works', function(h, session) {
+  const { interp } = session.run(`comp [fifo] .f:
+  width: 8
+  length: 8
+  on: 1
+  :`);
+  session.execStmts(interp, `.f:{ push = ^41
+  set = 1 }
+8wire g = .f:get`);
+  h.assert('fifo push', session.getWire(interp, 'g'), '01000001');
+});
+
+reg(1032, 'queue-stack', 'get >= in property block', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  pushQueue(session, interp, '^41');
+  session.execStmts(interp, `8wire data
+.q:{
+  get >= data
+  set = 1 }`);
+  h.assert('get redirect', session.getWire(interp, 'data'), '01000001');
+});
+
+reg(1033, 'queue-stack', 'front >= + pop — v is new front after pop', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  pushQueue(session, interp, '^41');
+  pushQueue(session, interp, '^42');
+  session.execStmts(interp, `8wire v
+.q:{
+  front >= v
+  pop = 1
+  set = 1 }`);
+  h.assert('v is B after pop', session.getWire(interp, 'v'), '01000010');
+});
+
+reg(1034, 'queue-stack', 'size >= and free >= in property block', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  pushQueue(session, interp, '^41');
+  pushQueue(session, interp, '^42');
+  session.execStmts(interp, `5wire n
+5wire slots
+.q:{
+  size >= n
+  free >= slots
+  set = 1 }`);
+  h.assert('size 2', session.getWire(interp, 'n'), '00010');
+  h.assert('free 14', session.getWire(interp, 'slots'), '01110');
+});
+
+function runQueueWave(h, session) {
+  const { interp } = session.run(QUEUE_BASE + `.q:{ push = ^41
+  set = 1 }
+8wire g = .q:get`);
+  h.assert('wave get', session.getWire(interp, 'g'), '01000001');
+}
+
+reg(1035, 'queue-stack', 'wave propagation queue get', runQueueWave, { propagation: 'wave' });
+
+reg(1036, 'queue-stack', 'doc(comp.queue) — Xpout get and front', function(h, session) {
+  const out = session.runDoc('doc(comp.queue)');
+  h.assert('Xpout get', String(out.some(l => l.includes('Xpout get'))), 'true');
+  h.assert('Xpout front', String(out.some(l => l.includes('Xpout front'))), 'true');
+});
+
+reg(1037, 'queue-stack', 'doc(comp.fifo) shortname', function(h, session) {
+  const out = session.runDoc('doc(comp.fifo)');
+  h.assert('fifo doc', String(out.some(l => l.includes('Xpout get'))), 'true');
+});
+
+reg(1038, 'queue-stack', 'probe(.q:get) and probe(.q:front)', function(h, session) {
+  const script = QUEUE_BASE + `probe(.q:get)
+probe(.q:front)`;
+  const { out } = session.run(script);
+  h.assert('probe get', String(out.some(l => l.includes('# .q:get =') && l.includes('initialised'))), 'true');
+  h.assert('probe front', String(out.some(l => l.includes('# .q:front =') && l.includes('initialised'))), 'true');
+});
+
+reg(1039, 'queue-stack', 'probe(.q:size) and probe(.q:free)', function(h, session) {
+  const script = QUEUE_BASE + `.q:{ push = ^41
+  set = 1 }
+probe(.q:size)
+probe(.q:free)`;
+  const { out } = session.run(script);
+  h.assert('probe size', String(out.some(l => l.includes('# .q:size = 00001'))), 'true');
+  h.assert('probe free', String(out.some(l => l.includes('# .q:free = 01111'))), 'true');
+});
+
+reg(1040, 'queue-stack', 'empty >= flag redirect', function(h, session) {
+  const { interp } = session.run(QUEUE_BASE);
+  session.execStmts(interp, `1wire flag
+.q:{
+  empty >= flag
+  set = 1 }`);
+  h.assert('empty flag', session.getWire(interp, 'flag'), '1');
+});
+
+function pushStack(session, interp, hex) {
+  session.execStmts(interp, `.s:{
+  push = ${hex}
+  set = 1
+}`);
+}
+
+reg(1041, 'queue-stack', 'stack push A,B,C — top = C', function(h, session) {
+  const { interp } = session.run(STACK_BASE);
+  pushStack(session, interp, '^41');
+  pushStack(session, interp, '^42');
+  pushStack(session, interp, '^43');
+  session.execStmts(interp, '8wire t = .s:top\n8wire g = .s:get');
+  h.assert('top C', session.getWire(interp, 't'), '01000011');
+  h.assert('get C', session.getWire(interp, 'g'), '01000011');
+});
+
+reg(1042, 'queue-stack', 'stack pop — top becomes B', function(h, session) {
+  const { interp } = session.run(STACK_BASE);
+  pushStack(session, interp, '^41');
+  pushStack(session, interp, '^42');
+  pushStack(session, interp, '^43');
+  session.execStmts(interp, `.s:{ pop = 1
+  set = 1 }
+8wire t = .s:top`);
+  h.assert('top B', session.getWire(interp, 't'), '01000010');
+});
+
+reg(1043, 'queue-stack', 'stack LIFO pop order C,B,A', function(h, session) {
+  const { interp } = session.run(STACK_BASE);
+  pushStack(session, interp, '^41');
+  pushStack(session, interp, '^42');
+  pushStack(session, interp, '^43');
+  session.execStmts(interp, `.s:{ pop = 1
+  set = 1 }
+8wire v = .s:top`);
+  h.assert('after pop C top B', session.getWire(interp, 'v'), '01000010');
+  session.execStmts(interp, `.s:{ pop = 1
+  set = 1 }
+8wire v2 = .s:top`);
+  h.assert('after pop B top A', session.getWire(interp, 'v2'), '01000001');
+});
+
+reg(1044, 'queue-stack', 'stack overflow throws Stack is full', function(h, session) {
+  const src = `comp [stack] .s:
+  width: 8
+  length: 2
+  on: 1
+  :
+.s:{ push = ^41
+  set = 1 }
+.s:{ push = ^42
+  set = 1 }
+.s:{ push = ^43
+  set = 1 }`;
+  h.assertThrows('stack overflow', function() { session.run(src); }, 'Stack is full');
+});
+
+reg(1045, 'queue-stack', 'stack underflow throws Stack is empty', function(h, session) {
+  h.assertThrows('stack underflow', function() {
+    session.run(STACK_BASE + `.s:{ pop = 1
+  set = 1 }`);
+  }, 'Stack is empty');
+});
+
+reg(1046, 'queue-stack', 'stack shortname lifo', function(h, session) {
+  const { interp } = session.run(`comp [lifo] .s:
+  width: 8
+  length: 8
+  on: 1
+  :`);
+  session.execStmts(interp, `.s:{ push = ^41
+  set = 1 }
+8wire g = .s:get`);
+  h.assert('lifo push', session.getWire(interp, 'g'), '01000001');
+});
+
+reg(1047, 'queue-stack', 'stack top >= redirect', function(h, session) {
+  const { interp } = session.run(STACK_BASE);
+  pushStack(session, interp, '^41');
+  session.execStmts(interp, `8wire data
+.s:{
+  top >= data
+  set = 1 }`);
+  h.assert('top redirect', session.getWire(interp, 'data'), '01000001');
+});
+
+reg(1048, 'queue-stack', 'stack push + pop conflict', function(h, session) {
+  h.assertThrows('stack conflict', function() {
+    session.run(STACK_BASE + `.s:{
+  push = ^41
+  pop = 1
+  set = 1 }`);
+  }, 'Conflicting stack operations');
+});
+
+reg(1049, 'queue-stack', 'doc(comp.stack) and doc(comp.lifo)', function(h, session) {
+  const outStack = session.runDoc('doc(comp.stack)');
+  const outLifo = session.runDoc('doc(comp.lifo)');
+  h.assert('stack Xpout top', String(outStack.some(l => l.includes('Xpout top'))), 'true');
+  h.assert('lifo doc', String(outLifo.some(l => l.includes('Xpout top'))), 'true');
+});
+
+reg(1050, 'queue-stack', 'probe(.s:top)', function(h, session) {
+  const { out } = session.run(STACK_BASE + 'probe(.s:top)');
+  h.assert('probe top', String(out.some(l => l.includes('# .s:top =') && l.includes('initialised'))), 'true');
+});
+
+reg(1051, 'queue-stack', 'stack size and free', function(h, session) {
+  const { interp } = session.run(STACK_BASE);
+  pushStack(session, interp, '^41');
+  pushStack(session, interp, '^42');
+  session.execStmts(interp, '5wire n = .s:size\n5wire fr = .s:free');
+  h.assert('size 2', session.getWire(interp, 'n'), '00010');
+  h.assert('free 14', session.getWire(interp, 'fr'), '01110');
+});
+
+reg(1052, 'queue-stack', 'stack clear + push', function(h, session) {
+  const { interp } = session.run(STACK_BASE);
+  pushStack(session, interp, '^41');
+  session.execStmts(interp, `.s:{
+  clear = 1
+  push = ^42
+  set = 1 }
+8wire g = .s:top`);
+  h.assert('only B', session.getWire(interp, 'g'), '01000010');
+});
+
+reg(1053, 'queue-stack', 'stack wave propagation', function(h, session) {
+  const { interp } = session.run(STACK_BASE + `.s:{ push = ^41
+  set = 1 }
+8wire g = .s:get`);
+  h.assert('stack wave', session.getWire(interp, 'g'), '01000001');
+}, { propagation: 'wave' });
+
+reg(1054, 'queue-stack', 'forbid direct assign queue', function(h, session) {
+  h.assertThrows('direct assign', function() {
+    session.run(QUEUE_BASE + `.q = ^41`);
+  }, 'Cannot assign a value to a queue component');
+});
+
   suite.finalize();
 })();

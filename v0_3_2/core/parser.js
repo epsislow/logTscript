@@ -840,7 +840,9 @@ parseBoardInstance() {
     
     const properties = [];
     const usedGetRedirects = new Set();
+    const usedGenericRedirects = new Set();
     const REDIRECT_PROPS = new Set(['mod', 'carry', 'over', 'out']);
+    const GENERIC_REDIRECT_PROPS = new Set(['front', 'top', 'empty', 'full', 'size', 'capacity', 'free']);
     const isGetRedirectProp = (name) => /^(2|3|4)?get$/.test(name);
     
     while (!(this.c.type === 'SYM' && this.c.value === '}')) {
@@ -861,12 +863,18 @@ parseBoardInstance() {
       this.eat('ID');
       
       // --- DRY redirect properties: get>/2get>/…, mod>, carry>, over>, out> ---
-      if ((isGetRedirectProp(propName) || REDIRECT_PROPS.has(propName)) && this.c.type === 'SYM' && this.c.value === '>') {
+      if ((isGetRedirectProp(propName) || REDIRECT_PROPS.has(propName) || GENERIC_REDIRECT_PROPS.has(propName)) && this.c.type === 'SYM' && this.c.value === '>') {
         if (isGetRedirectProp(propName)) {
           if (usedGetRedirects.has(propName)) {
             throw Error(`Only one ${propName}> property allowed per property block at ${this.c.line}:${this.c.col}`);
           }
           usedGetRedirects.add(propName);
+        }
+        if (GENERIC_REDIRECT_PROPS.has(propName)) {
+          if (usedGenericRedirects.has(propName)) {
+            throw Error(`Only one ${propName}> property allowed per property block at ${this.c.line}:${this.c.col}`);
+          }
+          usedGenericRedirects.add(propName);
         }
 
         this.eat('SYM', '>');
@@ -1316,6 +1324,9 @@ assignment() {
     } else if(this.c.type === 'SPECIAL' && this.c.value === '~'){
       compType = 'osc';
       this.eat('SPECIAL');
+    } else if(this.c.type === 'ID' && componentShortnames[this.c.value]){
+      compType = componentShortnames[this.c.value];
+      this.eat('ID');
     } else if(this.c.type === 'ID' && validTypes.includes(this.c.value)){
       compType = this.c.value;
       this.eat('ID');

@@ -74,6 +74,8 @@ const DOC_SECTIONS = [
       { file: 'protocol.md', label: 'protocol', searchExtra: 'inline uart spi i2c reverse parity clock repeat tx sda scl mosi' },
       { file: 'decode.md', label: 'decode', searchExtra: 'decode isValid disassemble reverse lookup labels' },
       { file: 'reg.md', label: 'reg' },
+      { file: 'queue.md', label: 'queue', searchExtra: 'fifo buffer push pop front empty full size capacity free' },
+      { file: 'stack.md', label: 'stack', searchExtra: 'lifo push pop top call stack subroutine' },
       { file: 'oscillator.md', label: 'oscillator' }
     ],
   }

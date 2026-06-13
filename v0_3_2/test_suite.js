@@ -1690,7 +1690,7 @@
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'dip', '7seg', 'lcd', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'osc', 'rotary'];
+    const expectedTypes = ['led', 'switch', 'key', 'dip', '7seg', 'lcd', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -1722,6 +1722,8 @@
     h.assert('shortname /', shortnames['/'], 'divider');
     h.assert('shortname >', shortnames['>'], 'shifter');
     h.assert('shortname =', shortnames['='], 'counter');
+    h.assert('shortname fifo', shortnames['fifo'], 'queue');
+    h.assert('shortname lifo', shortnames['lifo'], 'stack');
     h.assert('shortname ~', shortnames['~'], 'osc');
   });
 
@@ -1734,6 +1736,9 @@
     h.assert('multiplier supports over', String(registry.supportsProperty('multiplier', 'over')), 'true');
     h.assert('shifter supports out', String(registry.supportsProperty('shifter', 'out')), 'true');
     h.assert('osc supports counter', String(registry.supportsProperty('osc', 'counter')), 'true');
+    h.assert('queue supports front', String(registry.supportsProperty('queue', 'front')), 'true');
+    h.assert('stack supports top', String(registry.supportsProperty('stack', 'top')), 'true');
+    h.assert('queue supports free', String(registry.supportsProperty('queue', 'free')), 'true');
   });
 
   reg(204, 'registry', 'Component Registry — supportsRedirect', function(h, session) {
@@ -1742,6 +1747,9 @@
     h.assert('divider redirect mod', String(registry.supportsRedirect('divider', 'mod')), 'true');
     h.assert('multiplier redirect over', String(registry.supportsRedirect('multiplier', 'over')), 'true');
     h.assert('shifter redirect out', String(registry.supportsRedirect('shifter', 'out')), 'true');
+    h.assert('queue redirect front', String(registry.supportsRedirect('queue', 'front')), 'true');
+    h.assert('queue redirect size', String(registry.supportsRedirect('queue', 'size')), 'true');
+    h.assert('stack redirect top', String(registry.supportsRedirect('stack', 'top')), 'true');
     h.assert('led no carry', String(registry.supportsRedirect('led', 'carry')), 'false');
   });
 
@@ -1893,6 +1901,71 @@
     h.assert('block has 2 properties', String(block.properties.length), '2');
     h.assert('block prop 0 is reset', block.properties[0].property, 'reset');
     h.assert('block prop 1 is set', block.properties[1].property, 'set');
+  });
+
+  reg(251, 'queue-storage', 'FIFO push/pop order A,B,C', function(h) {
+    addQueueStorage({ id: 'q1', width: 8, length: 8, mode: 'fifo' });
+    queuePush('q1', '01000001');
+    queuePush('q1', '01000010');
+    queuePush('q1', '01000011');
+    h.assert('peek front A', queuePeek('q1'), '01000001');
+    h.assert('pop A', queuePop('q1'), '01000001');
+    h.assert('pop B', queuePop('q1'), '01000010');
+    h.assert('pop C', queuePop('q1'), '01000011');
+  });
+
+  reg(252, 'queue-storage', 'LIFO push/pop order C,B,A', function(h) {
+    addQueueStorage({ id: 's1', width: 8, length: 8, mode: 'lifo' });
+    queuePush('s1', '01000001');
+    queuePush('s1', '01000010');
+    queuePush('s1', '01000011');
+    h.assert('peek top C', queuePeek('s1'), '01000011');
+    h.assert('pop C', queuePop('s1'), '01000011');
+    h.assert('pop B', queuePop('s1'), '01000010');
+    h.assert('pop A', queuePop('s1'), '01000001');
+  });
+
+  reg(253, 'queue-storage', 'overflow throws, state unchanged', function(h) {
+    addQueueStorage({ id: 'qf', width: 4, length: 2, mode: 'fifo' });
+    queuePush('qf', '0001');
+    queuePush('qf', '0010');
+    h.assertThrows('third push', function() { queuePush('qf', '0011'); }, 'Queue is full');
+    h.assert('size still 2', String(queueGetSize('qf')), '2');
+  });
+
+  reg(254, 'queue-storage', 'underflow throws, state unchanged', function(h) {
+    addQueueStorage({ id: 'qe', width: 4, length: 4, mode: 'fifo' });
+    queuePush('qe', '0001');
+    queuePop('qe');
+    h.assertThrows('pop empty', function() { queuePop('qe'); }, 'Queue is empty');
+    h.assert('size still 0', String(queueGetSize('qe')), '0');
+  });
+
+  reg(255, 'queue-storage', 'bitIndexWidth(17) === 5', function(h) {
+    h.assert('width bits', String(bitIndexWidth(17)), '5');
+  });
+
+  reg(256, 'queue-storage', 'push width mismatch throws', function(h) {
+    addQueueStorage({ id: 'qm', width: 8, length: 4, mode: 'fifo' });
+    h.assertThrows('short value', function() { queuePush('qm', '01'); }, 'push value width mismatch');
+  });
+
+  reg(257, 'queue-storage', 'empty/full flags', function(h) {
+    addQueueStorage({ id: 'qq', width: 4, length: 2, mode: 'fifo' });
+    h.assert('empty', queueIsEmpty('qq'), '1');
+    h.assert('not full', queueIsFull('qq'), '0');
+    queuePush('qq', '0001');
+    h.assert('not empty', queueIsEmpty('qq'), '0');
+    queuePush('qq', '0010');
+    h.assert('full', queueIsFull('qq'), '1');
+  });
+
+  reg(258, 'queue-storage', 'clear resets storage', function(h) {
+    addQueueStorage({ id: 'qc', width: 4, length: 4, mode: 'fifo' });
+    queuePush('qc', '0001');
+    queueClear('qc');
+    h.assert('size 0', String(queueGetSize('qc')), '0');
+    h.assert('empty', queueIsEmpty('qc'), '1');
   });
 
   function registerTest(id, group, title, run, options = {}) {

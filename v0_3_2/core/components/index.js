@@ -18,6 +18,8 @@ var ShifterComponent = (typeof require !== 'undefined') ? require('./shifter') :
 var MemComponent = (typeof require !== 'undefined') ? require('./mem') : MemComponent;
 var RegComponent = (typeof require !== 'undefined') ? require('./reg') : RegComponent;
 var CounterComponent = (typeof require !== 'undefined') ? require('./counter') : CounterComponent;
+var QueueComponent = (typeof require !== 'undefined') ? require('./queue') : QueueComponent;
+var StackComponent = (typeof require !== 'undefined') ? require('./stack') : StackComponent;
 var OscComponent = (typeof require !== 'undefined') ? require('./osc') : OscComponent;
 var RotaryComponent = (typeof require !== 'undefined') ? require('./rotary') : RotaryComponent;
 var PcbComponent = (typeof require !== 'undefined') ? require('./pcb-component') : PcbComponent;
@@ -42,6 +44,8 @@ function createComponentRegistry() {
   registry.register(MemComponent);
   registry.register(RegComponent);
   registry.register(CounterComponent);
+  registry.register(QueueComponent);
+  registry.register(StackComponent);
   registry.register(OscComponent);
   registry.register(RotaryComponent);
   registry.register(ClockDotsComponent);

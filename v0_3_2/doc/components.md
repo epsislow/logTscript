@@ -67,6 +67,9 @@ Instant built-in functions (`ADD`, `SUBTRACT`, …) without `comp`: [arithmetic.
 | `lut` | — | [lut.md](lut.md) — `inline [lut]` or `comp [lut]` |
 | `protocol` | — | [protocol.md](protocol.md) — declare `inline [protocol]`; generate with `.name { params }` |
 | `reg` | — | [reg.md](reg.md) |
+| `queue` | `fifo` | [queue.md](queue.md) |
+| `stack` | `lifo` | [stack.md](stack.md) |
+| `counter` | `=` | [counter.md](counter.md) |
 | `osc` | `~` | [oscillator.md](oscillator.md) |
 
 `doc(inline.asm)` / `doc(inline.lut)` / `doc(inline.protocol)` — declaration templates; `doc(.name)` — specific instance.
