@@ -1266,8 +1266,9 @@ class Interpreter {
     }
     
     // If 8 bits or less, show as binary
-    if(bitWidth <= 8){
-      return displayStr + (truncateAt80 && binStr.length > 80 ? ' ..' : '');
+    if(bitWidth <= 16){
+      let preFormat = displayStr + (truncateAt80 && binStr.length > 80 ? ' ..' : '');
+      return preFormat.match(/.{1,8}/g).join(' ');
     }
     
     // For >= 32 bits, format hex in groups of 4 hex digits
