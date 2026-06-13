@@ -1046,6 +1046,14 @@
     }, 'Expected 3 bits');
   });
 
+  reg(250, 'strict-assign', 'fitWireAssignBits — strict rejects too long', function(h) {
+    h.assertThrows('strict long', function() {
+      fitWireAssignBits('11111', 4, 'strict', 'msb');
+    }, 'Expected 4 bits, got 5');
+    h.assert('strict exact', fitWireAssignBits('1111', 4, 'strict', 'msb'), '1111');
+    h.assert('left trunc msb', fitWireAssignBits('11111', 4, 'left', 'msb'), '1111');
+  });
+
   reg(83, 'wire-init', 'standalone : still produces SYM(:)', function(h, session) {
     {
       const { tokens } = session.tokenize('on: 1');

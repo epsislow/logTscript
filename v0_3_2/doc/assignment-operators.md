@@ -10,7 +10,7 @@ See also: [signal propagation](signal-propagation.md), [ASM](asm.md).
 
 | Operator | Behavior | Where |
 |----------|----------|-------|
-| `=` | Strict assignment — exact width, error on mismatch | declaration, re-assignment |
+| `=` | Strict assignment — exact width, error on shorter **or longer** value | declaration, re-assignment |
 | `:=` | Left-pad assignment | declaration, re-assignment |
 | `=:` | Right-pad assignment | declaration, re-assignment |
 | `:` | Initial assignment (literal only) | wire declaration only |
@@ -44,6 +44,13 @@ show(q)
 ```
 
 Error: `Expected 3 bits, got 1 bit.`
+
+```logts-play
+4wire q = 11111
+show(q)
+```
+
+Error: `Expected 4 bits, got 5 bits.`
 
 ```logts-play
 8wire q = 10101010

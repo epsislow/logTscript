@@ -271,7 +271,7 @@ doc(.myisa)
 | Signed overflow | `Relative jump offset (-21) is out of bounds...` |
 | Wrong prefix | `'LOAD' expects a Register prefix (R)...` |
 | mem depth | `ISA encodes 8 bits per instruction but mem depth is 4` |
-| Wire width | `Bit-width mismatch: x is 50bit but assembled program provides 48 bits` |
+| Wire width (`=` strict) | `Expected 50 bits, got 48 bits.` or `Bit-width mismatch: x is 50bit but assembled program provides 48 bits` |
 
 Assembler errors include the source line and `^^^` under the problematic token when possible.
 

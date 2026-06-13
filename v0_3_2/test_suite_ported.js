@@ -2823,7 +2823,7 @@ there:
 
 reg(891, 'asm', 'labels loop / loop2 / loop3', function(h, session) {
   const { interp } = session.run(INLINE_ASM_ISA + `
-40wire x = .myisa {
+48wire x = .myisa {
   loop:
     NOP
     JMP loop3
@@ -2834,7 +2834,7 @@ reg(891, 'asm', 'labels loop / loop2 / loop3', function(h, session) {
   loop3:
     LOAD R1 A3
 }`);
-  h.assert('5 instr', String(session.getWire(interp, 'x').length), '40');
+  h.assert('6 instr', String(session.getWire(interp, 'x').length), '48');
   h.assert('ADDI at loop2', session.getWire(interp, 'x').slice(32, 40), '01110101');
 });
 
@@ -2899,7 +2899,7 @@ reg(898, 'asm', 'wire width mismatch 50w vs 48b', function(h, session) {
   NOP
 }`);
   } catch (e) { err = String(e.message || e); }
-  h.assert('mismatch', String(err.includes('Bit-width mismatch')), 'true');
+  h.assert('mismatch', String(err.includes('Bit-width mismatch') || err.includes('Expected 50 bits')), 'true');
 });
 
 reg(899, 'asm', 'comp [mem] = .myisa { } multi-line', function(h, session) {
@@ -3277,7 +3277,7 @@ reg(931, 'protocol', 'eroare — output width mismatch', function(h, session) {
   try {
     session.run(INLINE_UART8N1 + '\n12wire tx = .uart8n1 { data = ^41 }');
   } catch (e) { err = String(e.message || e); }
-  h.assert('width mismatch', String(err.includes('Protocol output width mismatch')), 'true');
+  h.assert('width mismatch', String(err.includes('Protocol output width mismatch') || err.includes('Expected 12 bits')), 'true');
 });
 
 reg(932, 'protocol', 'uart8n1 { } fără punct → eroare', function(h, session) {
@@ -3417,8 +3417,8 @@ reg(943, 'lut-decode', 'reverse lookup cu matchIndex 2', function(h, session) {
 });
 
 reg(944, 'lut-decode', 'decode cu label GREEN -> RED', function(h, session) {
-  const { interp } = session.run(INLINE_LUT_TRAFFIC + '\n2wire x = .traffic:decode(GREEN)');
-  h.assert('red', session.getWire(interp, 'x'), '00');
+  const { interp } = session.run(INLINE_LUT_TRAFFIC + '\n4wire x = .traffic:decode(GREEN)');
+  h.assert('red key addr', session.getWire(interp, 'x'), '0000');
 });
 
 reg(945, 'protocol-decode', 'uart8n1 decode single channel', function(h, session) {
@@ -4096,6 +4096,32 @@ reg(1015, 'strict-assign', '3wire q = 001 — strict exact OK', function(h, sess
   h.assert('q = 001', session.getWire(interp, 'q'), '001');
 });
 
+reg(1016, 'strict-assign', '4wire q = 11111 — strict error (too long)', function(h, session) {
+  h.assertThrows('strict = long literal', function() {
+    session.run('4wire q = 11111');
+  }, 'Expected 4 bits, got 5');
+});
+
+reg(1017, 'strict-assign', '23wire ASM = program too long — strict error', function(h, session) {
+  const src = RIGHT_PAD_ASM_ISA + `23wire x = .myisa {
+  loop:
+  NOP
+  NOP
+  NOP
+  NOP
+  NOP
+  BEQ loop
+}`;
+  h.assertThrows('strict = long ASM', function() {
+    session.run(src);
+  }, 'Expected 23 bits');
+});
+
+reg(1018, 'left-pad-assign', '4wire q := 11111 — truncate OK (not strict)', function(h, session) {
+  const { interp } = session.run('4wire q := 11111');
+  h.assert('q = 1111', session.getWire(interp, 'q'), '1111');
+});
+
 reg(1009, 'right-pad-assign', 'MODE WIREWRITE — 4wire q =: 1 then q =: 11 re-assign', function(h, session) {
   const { interp } = session.run('MODE WIREWRITE\n4wire q =: 1\nq =: 11');
   h.assert('q = 1100', session.getWire(interp, 'q'), '1100');
@@ -4105,7 +4131,7 @@ reg(1010, 'right-pad-assign', '16wire ASM = LOAD R1 A2 — legacy mismatch throw
   const src = RIGHT_PAD_ASM_ISA + '16wire x = .myisa { LOAD R1 A2 }';
   h.assertThrows('legacy = shorter ASM than wire', function() {
     session.run(src);
-  }, 'Bit-width mismatch');
+  }, 'Expected 16 bits');
 });
 
 reg(1000, 'right-pad-assign', '3wire q =: 1 — wave propagation', function(h, session) {

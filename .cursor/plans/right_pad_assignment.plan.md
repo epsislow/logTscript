@@ -1,212 +1,205 @@
 ---
 name: "Assignment operators = =: := :"
-overview: "Faza 1 (completă): `=:` right-pad. Faza 2 (planificată, în ordine): (1) `:` init literal în loc de `:=`, (2) `=` strict, (3) `:=` left-pad. Faza 3: unificare truncare."
+overview: "Faza 1–2 (completă): operatori `=`, `:=`, `=:` , `:`. Faza 2.5 (următoare): `=` strict simetric (eroare și prea lung). Faza 3: unificare truncare doar pentru `:=` / `=:`, neschimbată."
 todos:
-  - id: p1-tokenizer
-    content: "Faza 1 DONE: token SYM(=:)"
+  - id: p1-all
+    content: "Faza 1 DONE: =: right-pad, teste 235-245 + 1000-1010"
     status: completed
-  - id: p1-parser
-    content: "Faza 1 DONE: parser assignPad right pentru =:"
+  - id: p2-all
+    content: "Faza 2 DONE: : init, = strict (prea scurt), := left-pad, doc, fs cleanup — 562/562"
     status: completed
-  - id: p1-interpreter
-    content: "Faza 1 DONE: padWireBits + căi wire + ASM =:"
-    status: completed
-  - id: p1-tests
-    content: "Faza 1 DONE: teste 235-245 + 1000-1010, manifest, doc"
-    status: completed
-  - id: p2-step1-colon-parser
-    content: "Faza 2.1: Parser — wireDecl acceptă `:` (SYM) pentru initExpr literal (ca `:=` azi)"
+  - id: p25-strict-symmetric
+    content: "Faza 2.5: = strict simetric — eroare când length > bits (înainte de substring), legacy + wave"
     status: pending
-  - id: p2-step1-colon-interpreter
-    content: "Faza 2.1: Interpreter — path initExpr pentru `:`; flag initOnly neschimbat"
+  - id: p25-interpreter-paths
+    content: "Faza 2.5: execWireStatement, NEXT re-exec, publishFromWs, signal-propagation — verificare pe raw length"
     status: pending
-  - id: p2-step1-colon-migrate
-    content: "Faza 2.1: Migrează `:=` init → `:` în doc, teste wire-init, fs.js (ex. 1wire s := 1 → 3wire q : 1)"
+  - id: p25-tests
+    content: "Faza 2.5: teste 4wire q = 11111, 23wire ASM prea lung, legacy + wave; fără schimbare teste := truncation"
     status: pending
-  - id: p2-step1-colon-tests
-    content: "Faza 2.1: Teste tokenizer/parser/grup wire-init pentru `:` init; `:=` init deprecated sau alias temporar"
+  - id: p25-doc
+    content: "Faza 2.5: assignment-operators.md — = eroare la mai lung; exemplu eroare; asm.md notă"
     status: pending
-  - id: p2-step2-strict-parser
-    content: "Faza 2.2: Parser — `=` fără assignPad left implicit; assignPad doar pentru := și =:"
+  - id: p25-migrate-audit
+    content: "Faza 2.5: audit grep — doar unde = se baza pe truncare silențioasă → = exact sau :="
     status: pending
-  - id: p2-step2-strict-interpreter
-    content: "Faza 2.2: Interpreter — `=` strict în toate căile (decl, re-asignare, execWireStatement, wave, hasAsmBlob); eroare la mismatch"
-    status: pending
-  - id: p2-step2-strict-tests
-    content: "Faza 2.2: Teste = strict (3wire q = 1 → eroare; 3wire q = 001 → OK); 1010 + wave; șterge/rescrie 1008"
-    status: pending
-  - id: p2-step3-coloneq-parser
-    content: "Faza 2.3: Parser — `:=` repurposed: wireDecl + assignment() cu assignPad left + expr (nu initExpr)"
-    status: pending
-  - id: p2-step3-coloneq-interpreter
-    content: "Faza 2.3: Interpreter — `:=` left-pad via padWireBits(..., left) în aceleași căi ca `=:` azi"
-    status: pending
-  - id: p2-step3-coloneq-asm
-    content: "Faza 2.3: ASM — `:=` left-pad slot lat (ex. 16wire := .myisa { LOAD }); `=` strict; `=:` right-pad; legacy = wave"
-    status: pending
-  - id: p2-step3-coloneq-tests
-    content: "Faza 2.3: Teste := left-pad (3wire := 1 → 001, 8wire := 101 → 00000101); ASM := left-pad; grup nou left-pad-assign"
-    status: pending
-  - id: p2-docs
-    content: "Faza 2: Rescrie assignment-operators.md după spec completă (= strict, := left, =: right, : init); asm.md; signal-propagation; _gen_doc_data.js"
-    status: pending
-  - id: p2-fs-cleanup
-    content: "Faza 2: Șterge ex_dv_7seg din files/fs.js (exemplu exploratoriu padding/width)"
-    status: pending
-  - id: p2-verify
-    content: "Faza 2: _gen_manifest.js + _run_suite_node.js — zero regresii"
+  - id: p25-verify
+    content: "Faza 2.5: _run_suite_node.js verde"
     status: pending
   - id: p3-truncation
-    content: "Faza 3: unificare truncare substring(0,bits) vs substring(length-bits) în tot runtime-ul"
+    content: "Faza 3: unificare truncare MSB vs LSB pentru := și =: doar — NU atinge = strict"
     status: pending
 isProject: false
 ---
 
 # Plan: operatori de asignare
 
-## Specificație țintă (sursă utilizator)
+## Specificație țintă
 
-| Operator | Comportament | Unde |
-|----------|--------------|------|
-| `=` | **Strict** — lățime exactă, fără padding; eroare la mismatch | declarație, re-asignare |
-| `:=` | **Left-pad** — zerouri la stânga când valoarea e mai scurtă | declarație, re-asignare |
-| `=:` | **Right-pad** — zerouri la dreapta când valoarea e mai scurtă | declarație, re-asignare |
-| `:` | **Initial assignment** — valoare inițială literală la declarație wire | declarație wire only |
+| Operator | Prea scurt | Exact | Prea lung |
+|----------|------------|-------|-----------|
+| `=` | **Eroare** | OK | **Eroare** (Faza 2.5) |
+| `:=` | Left-pad | OK | Truncare (Faza 3 — neschimbat până atunci) |
+| `=:` | Right-pad | OK | Truncare (Faza 3 — neschimbat până atunci) |
+| `:` | Left-pad la init | OK | Truncare la init |
+
+| Operator | Unde |
+|----------|------|
+| `=` | declarație, re-asignare — **lățime exactă** |
+| `:=` | declarație, re-asignare — left-pad |
+| `=:` | declarație, re-asignare — right-pad |
+| `:` | declarație wire — init literal only |
 
 ### Exemple canonice
 
 ```logts
-3wire q = 001          # OK — strict exact
-3wire q = 1            # EROARE: Expected 3 bits, got 1 bit
+3wire q = 001          # OK
+3wire q = 1            # EROARE (prea scurt)
+4wire q = 11111        # EROARE (prea lung) — Faza 2.5
 
-3wire q := 1           # 001 — left-pad
-3wire q =: 1           # 100 — right-pad
+3wire q := 1           # 001
+3wire q =: 1           # 100
+3wire q : 1            # init
 
-3wire q : 1            # init literal (echivalent fost 1wire s := 1)
-
-32wire prog =: .myisa { LOAD \0; ADDI \3; ... }   # ASM right-pad în slot lat
-8wire prog = .myisa { LOAD R1 A2 }                # ASM lățime exactă
-16wire slot := .myisa { LOAD R1 A2 }              # ASM left-pad în slot lat (Faza 2.3)
-16wire slot = .myisa { LOAD R1 A2 }               # EROARE — strict
+8wire prog = .myisa { LOAD R1 A2 }     # OK — exact
+16wire slot := .myisa { LOAD R1 A2 }   # left-pad
+16wire slot =: .myisa { LOAD R1 A2 }   # right-pad
+23wire x = .myisa { NOP; NOP; BEQ }     # EROARE (24 > 23) — Faza 2.5
+24wire x = .myisa { NOP; NOP; BEQ }     # OK
 ```
 
 ---
 
-## Faza 1 — COMPLETĂ (553/553)
+## Faza 1 — COMPLETĂ
 
-Implementat: `=:` (right-pad). `=` încă left-pad (comportament vechi). `:=` încă init literal.
-
-Teste: 235–245, 1000–1010. Doc: [`assignment-operators.md`](v0_3_2/doc/assignment-operators.md) (notă Phase 2).
+Operator `=:` (right-pad). Teste 235–245, 1000–1010.
 
 ---
 
-## Faza 2 — Ordine obligatorie de implementare
+## Faza 2 — COMPLETĂ (562/562)
+
+Implementat în ordine:
+
+1. **`:`** init literal (fost `:=` init)
+2. **`=`** strict la **prea scurt** + unificare ASM legacy/wave la mismatch
+3. **`:=`** left-pad repurposed
+
+Fișiere: [`parser.js`](v0_3_2/core/parser.js), [`interpreter.js`](v0_3_2/core/interpreter.js), [`signal-propagation.js`](v0_3_2/core/signal-propagation.js), teste, [`assignment-operators.md`](v0_3_2/doc/assignment-operators.md), `ex_dv_7seg` șters din [`fs.js`](v0_3_2/files/fs.js).
+
+### Lacună cunoscută (motiv Faza 2.5)
+
+`=` e strict doar la **prea scurt**. La **prea lung**, wave taie **înainte** de verificare:
+
+```javascript
+// execWireStatement ~4452 — PROBLEMA
+const valueBits = totalValue.substring(bitOffset, bitOffset + bits);
+if (declPad === 'strict') {
+  if (wireValue.length !== bits) throw ...  // vede deja 4 caractere, nu 5
+}
+```
+
+Exemple care **nu** dau eroare azi dar ar trebui:
+
+- `4wire q = 11111` → afișează `1111`
+- `23wire x = .myisa { NOP; NOP; BEQ loop }` → truncare silențioasă
+
+Legacy la literale/ASM cu `=` aruncă deja la `length !== bits` pe blob întreg; **wave** ocolesc prin pre-slice.
+
+---
+
+## Faza 2.5 — `=` strict simetric (următoare implementare)
+
+### Decizie
+
+- **`=`** = eroare la **orice** `length !== bits` (mai scurt **și** mai lung)
+- **Nu modificăm** truncarea pentru `:=` / `=:` — rămâne pentru **Faza 3**
+- **Nu** introducem operator nou de truncare
 
 ```mermaid
-flowchart LR
-  s1["2.1 : init\nînlocuiește := init"]
-  s2["2.2 = strict\nfără padding"]
-  s3["2.3 := left-pad\nrepurposed"]
-  s1 --> s2 --> s3
+flowchart TD
+  eval[Lungime reală L din expr]
+  op{Operator}
+  eq["= strict"]
+  padOps[":= sau =:"]
+  err[Eroare L ≠ bits]
+  ok[OK]
+  pad[Pad dacă L mai scurt]
+  trunc[Truncare dacă L mai lung — Faza 3 neschimbat]
+
+  eval --> op
+  op --> eq
+  op --> padOps
+  eq -->|L ≠ bits| err
+  eq -->|L = bits| ok
+  padOps -->|L < bits| pad
+  padOps -->|L > bits| trunc
+  padOps -->|L = bits| ok
 ```
 
-**De ce această ordine:**
+### Implementare
 
-1. **`:` preia init-ul** — eliberează tokenul `:=` fără a schimba încă semantica lui `:=` în cod
-2. **`=` devine strict** — elimină padding-ul de pe `=` (și unifică legacy/wave la ASM + `=`)
-3. **`:=` devine left-pad** — reutilizează tokenul pentru comportamentul care azi e pe `=` (padStart)
+**Principiu:** verificare strict pe lungimea **completă** înainte de `substring` / pad.
 
-**Fereastră între 2.2 și 2.3:** după `=` strict, left-pad temporar indisponibil până la 2.3 — folosiți `=:` sau lățime exactă; ideal implementați 2.2 + 2.3 în același PR sau imediat consecutiv.
+| Locație | [`interpreter.js`](v0_3_2/core/interpreter.js) ~linii | Schimbare |
+|---------|--------------------------------------------------------|-----------|
+| `execWireStatement` decl | ~4452–4465 | extrage `raw` din `totalValue` (slice fără trunchiere); dacă `strict` și `raw.length !== bits` → throw; altfel `wireValue = raw` |
+| `execWireStatement` assignment | ~4355–4360 | idem — nu `substring(0, bits)` înainte de strict |
+| NEXT re-exec | ~3104–3126 | verificare pe valoare completă înainte de trunc |
+| `publishFromWs` | ~6457–6497 | idem |
+| Legacy decl literals | ~4200 | deja OK — păstrează |
+| `hasAsmBlob` + `=` | ~4187–4191 | deja OK — păstrează |
+| [`signal-propagation.js`](v0_3_2/core/signal-propagation.js) | ~832–910 | aliniere: strict înainte de slice |
 
----
+Helper sugerat (evită duplicare):
 
-### Faza 2.1 — `:` initial assignment (înlocuiește `:=` init)
+```javascript
+function enforceWireStrictOrFit(raw, bits, assignPad, truncateFrom) {
+  if (assignPad === 'strict') {
+    if (raw.length !== bits) throw Error(wireBitsMismatchError(bits, raw.length));
+    return raw;
+  }
+  // := / =: — logică existentă (pad + truncare neschimbată)
+}
+```
 
-**Stare actuală:** `:=` în `wireDecl` → `initExpr` (literal only), `initOnly: true`.
+**Out of scope 2.5:** schimbarea regulii MSB vs LSB la trunc pe `:=` / `=:` (Faza 3).
 
-**Țintă:** `3wire q : 1` — aceeași logică ca `3wire q := 1` azi.
+### Teste noi
 
-| Fișier | Acțiune |
-|--------|---------|
-| [`parser.js`](v0_3_2/core/parser.js) | `wireDecl`: ramură `:` (SYM după nume wire) → `initExpr`; disambiguare față de `comp [...] .x:` |
-| [`tokenizer.js`](v0_3_2/core/tokenizer.js) | verifică că `:` după ID wire e parsabil (nu confundat cu label ASM) |
-| [`interpreter.js`](v0_3_2/core/interpreter.js) | același path `initExpr` / `initOnly` |
-| **Migrație** | doc, `test_suite.js` wire-init 82–101, `fs.js` (`:=` → `:` pentru init) |
-| **Compat** | `:=` init: deprecated cu mesaj „use `:`” sau alias temporar până la 2.3 |
+| ID | Scenariu | Așteptat |
+|----|----------|----------|
+| 1016 | `4wire q = 11111` | throw legacy + wave |
+| 1017 | `23wire x = .myisa { NOP; NOP; BEQ loop }` | throw |
+| 1018 | `4wire q := 11111` | trunc OK (comportament neschimbat) |
+| 1015 | `4wire q = 1111` | OK (deja existent) |
 
-**To-do:** `p2-step1-colon-parser`, `p2-step1-colon-interpreter`, `p2-step1-colon-migrate`, `p2-step1-colon-tests`
+### Migrare teste și documentație
 
----
+**Regulă:** nu înlocui global `=` cu `:=`. Doar unde intenția era pad/truncare:
 
-### Faza 2.2 — `=` strict
+| Situație | Acțiune |
+|----------|---------|
+| Lățime deja exactă (`4wire = 1010`) | **Păstrează `=`** — majoritatea doc/testelor |
+| Prea scurt, vrei pad | `:=` / `=:` / `:` sau literal exact pentru `=` |
+| Prea lung, accepti truncare | `:=` sau `=:` — **nu** `=` |
+| Prea lung, vrei tot programul | mărește `Nwire` sau scurtează expr |
 
-**Țintă:** `3wire q = 1` → eroare; `3wire q = 001` → OK.
+**Audit minim:**
 
-| Fișier | Acțiune |
-|--------|---------|
-| [`parser.js`](v0_3_2/core/parser.js) | `=` → fără `assignPad: 'left'` implicit; strict flag sau lipsă assignPad |
-| [`interpreter.js`](v0_3_2/core/interpreter.js) | elimină `padWireBits` când operator e `=`; throw `Expected N bits, got M bits` la decl, re-asignare, `execWireStatement`, NEXT, `publishFromWs` |
-| [`interpreter.js`](v0_3_2/core/interpreter.js) ~4163 | `hasAsmBlob` + `=` → mereu throw la mismatch (legacy = wave) |
-| [`signal-propagation.js`](v0_3_2/core/signal-propagation.js) | aliniere wave |
+```bash
+# literale BIN mai lungi decât Nwire cu =
+# ASM unde instrCount × wordWidth > Nwire cu =
+```
 
-**Teste de rescris:**
+Impact estimat: **mic** — suite-ul folosește deja 8/16/24wire potrivite la ASM; doc folosește literale exacte.
 
-| ID | Acțiune |
-|----|---------|
-| 1008 | șters — left-pad pe `=` nu mai există |
-| 1010 | păstrat + extins la wave |
-| teste `3wire q = 1` → left-pad | devin eroare sau `3wire q = 001` |
+**Doc de actualizat:**
 
-**To-do:** `p2-step2-strict-parser`, `p2-step2-strict-interpreter`, `p2-step2-strict-tests`
+- [`assignment-operators.md`](v0_3_2/doc/assignment-operators.md) — tabel: `=` → Error la „longer value”; exemplu `4wire q = 11111`
+- [`asm.md`](v0_3_2/doc/asm.md) — `=` + program mai lung decât wire → eroare
+- `_gen_doc_data.js`
 
----
-
-### Faza 2.3 — `:=` left-pad assignment (repurposed)
-
-**Țintă:** comportamentul left-pad care **azi** e pe `=` devine pe `:=`.
-
-| Fișier | Acțiune |
-|--------|---------|
-| [`parser.js`](v0_3_2/core/parser.js) | `wireDecl`: `:=` → `{ expr, assignPad: 'left' }` (nu `initExpr`); `assignment()`: `:=` → `assignPad: 'left'` |
-| [`interpreter.js`](v0_3_2/core/interpreter.js) | `:=` → `padWireBits(..., 'left')` în toate căile unde azi `assignPad === 'left'` sau default `=` |
-| **ASM** | `16wire x := .myisa { LOAD R1 A2 }` → `^00 + ^16` (left-pad); unificat legacy + wave |
-
-**Teste noi (grup `left-pad-assign` sau extindere):**
-
-| Exemplu | Așteptat |
-|---------|----------|
-| `3wire q := 1` | `001` |
-| `3wire q := 10` | `010` |
-| `8wire q := 101` | `00000101` |
-| `16wire x := .myisa { LOAD R1 A2 }` | `0000000000010110` (înlocuiește vechiul 1008) |
-
-**To-do:** `p2-step3-coloneq-parser`, `p2-step3-coloneq-interpreter`, `p2-step3-coloneq-asm`, `p2-step3-coloneq-tests`
-
----
-
-### Faza 2 — Documentație
-
-Rescrie [`assignment-operators.md`](v0_3_2/doc/assignment-operators.md) după spec completă utilizator (secțiuni `=`, `:=`, `=:` , `:` + Summary table + ASM example cu `=:`).
-
-| Fișier | Acțiune |
-|--------|---------|
-| [`asm.md`](v0_3_2/doc/asm.md) | `=` strict; `:=` left-pad ASM; `=:` right-pad; lățimi exacte în exemple |
-| [`signal-propagation.md`](v0_3_2/doc/signal-propagation.md) | operatori identici legacy/wave |
-| `_gen_doc_data.js` | regenerare |
-
-**To-do:** `p2-docs`
-
----
-
-### Faza 2 — Curățare fs.js
-
-Șterge `ex_dv_7seg` (~3603–3671 în [`files/fs.js`](v0_3_2/files/fs.js)) — exemplu exploratoriu (`16wire as = .as`); a motivat investigația padding.
-
-**To-do:** `p2-fs-cleanup`
-
----
-
-### Faza 2 — Verificare
+### Verificare
 
 ```bash
 node v0_3_2/_gen_manifest.js
@@ -214,32 +207,45 @@ node v0_3_2/_run_suite_node.js
 node v0_3_2/_gen_doc_data.js
 ```
 
-**To-do:** `p2-verify`
+---
+
+## Faza 3 — Unificare truncare (out of scope 2.5)
+
+- O singură regulă documentată: `substring(0, bits)` vs `substring(length - bits)` pentru **`:=` și `=:`** (și `:` init)
+- **`=` strict** rămâne fără truncare — doar eroare
+- Teste cross-cale legacy/wave pentru pad/trunc
+
+**Rezolvat în Faza 2:** unificare ASM + `=` legacy vs wave (eroare la mismatch scurt).
+
+**Rezolvat în Faza 2.5:** `=` strict și la prea lung; wave nu mai taie silențios.
 
 ---
 
-## Faza 3 — Unificare truncare (out of scope Faza 2)
+## Checklist
 
-- O singură regulă `substring(0,bits)` vs `substring(length-bits)` în [`interpreter.js`](v0_3_2/core/interpreter.js), [`signal-propagation.js`](v0_3_2/core/signal-propagation.js), handlers
-- Teste regresie + doc
+### Faza 2 (done)
 
-**To-do:** `p3-truncation`
+- [x] `:` init
+- [x] `=` strict prea scurt
+- [x] `:=` left-pad
+- [x] Doc + fs + 562 teste
 
-**Rezolvat în Faza 2 (nu mai e Faza 3):** unificare ASM + `=` legacy vs wave → `=` strict + `:=`/`=:` pentru padding.
+### Faza 2.5 (pending)
+
+- [ ] Strict simetric `=` — verificare înainte de substring (interpreter + signal-propagation)
+- [ ] Teste 1016–1018 + 1015 confirmat
+- [ ] Doc tabel + exemple eroare prea lung
+- [ ] Audit grep migrări (puține așteptate)
+- [ ] Suite verde
+
+### Faza 3 (pending)
+
+- [ ] Unificare truncare `:=` / `=:`
 
 ---
 
-## Checklist vizibil Faza 2
+## Referință tehnică (arhivă)
 
-- [ ] **2.1** `:` init — parser, interpreter, migrație doc/teste/fs, teste wire-init
-- [ ] **2.2** `=` strict — interpreter toate căile, teste eroare + 1010 wave
-- [ ] **2.3** `:=` left-pad — parser repurposed, interpreter, teste + ASM `:=`
-- [ ] Doc completă după spec utilizator
-- [ ] Șterge `ex_dv_7seg` din fs.js
-- [ ] Suite 553+ verde
+`padWireBits`, `wireBitsMismatchError`, `stmtAssignPad` default `'strict'`, `peekNextIsAssign` recunoaște `:=`.
 
----
-
-## Referință Faza 1 (arhivă)
-
-`padWireBits`, token `=:`, teste 1000–1010 — vezi git history / secțiunea Faza 1 completă mai sus.
+Grupuri manifest: `wire-init`, `left-pad-assign`, `strict-assign`, `right-pad-assign`.

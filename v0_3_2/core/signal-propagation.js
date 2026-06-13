@@ -830,15 +830,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
               }
             }
             const assignPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'strict';
-            if (assignPad === 'strict') {
-              if (wireValue.length !== bits) {
-                throw Error(wireBitsMismatchError(bits, wireValue.length));
-              }
-            } else if(wireValue.length < bits){
-              wireValue = padWireBits(wireValue, bits, assignPad);
-            } else if(wireValue.length > bits){
-              wireValue = wireValue.substring(0, bits);
-            }
+            wireValue = fitWireAssignBits(wireValue, bits, assignPad, 'msb');
             
             // Update wire storage
             const refMatch = wire.ref.match(/^&(\d+)/);
@@ -904,15 +896,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                     }
                   }
                   const declPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'strict';
-                  if (declPad === 'strict') {
-                    if (wireValue.length !== bits) {
-                      throw Error(wireBitsMismatchError(bits, wireValue.length));
-                    }
-                  } else if(wireValue.length < bits){
-                    wireValue = padWireBits(wireValue, bits, declPad);
-                  } else if(wireValue.length > bits){
-                    wireValue = wireValue.substring(0, bits);
-                  }
+                  wireValue = fitWireAssignBits(wireValue, bits, declPad, 'msb');
                 }
                 
                 // Update wire storage

@@ -698,7 +698,7 @@ doc(.myisa)
 | Signed overflow | \`Relative jump offset (-21) is out of bounds...\` |
 | Wrong prefix | \`'LOAD' expects a Register prefix (R)...\` |
 | mem depth | \`ISA encodes 8 bits per instruction but mem depth is 4\` |
-| Wire width | \`Bit-width mismatch: x is 50bit but assembled program provides 48 bits\` |
+| Wire width (\`=\` strict) | \`Expected 50 bits, got 48 bits.\` or \`Bit-width mismatch: x is 50bit but assembled program provides 48 bits\` |
 
 Assembler errors include the source line and \`^^^\` under the problematic token when possible.
 
@@ -722,7 +722,7 @@ See also: [signal propagation](signal-propagation.md), [ASM](asm.md).
 
 | Operator | Behavior | Where |
 |----------|----------|-------|
-| \`=\` | Strict assignment — exact width, error on mismatch | declaration, re-assignment |
+| \`=\` | Strict assignment — exact width, error on shorter **or longer** value | declaration, re-assignment |
 | \`:=\` | Left-pad assignment | declaration, re-assignment |
 | \`=:\` | Right-pad assignment | declaration, re-assignment |
 | \`:\` | Initial assignment (literal only) | wire declaration only |
@@ -756,6 +756,13 @@ show(q)
 \`\`\`
 
 Error: \`Expected 3 bits, got 1 bit.\`
+
+\`\`\`logts-play
+4wire q = 11111
+show(q)
+\`\`\`
+
+Error: \`Expected 4 bits, got 5 bits.\`
 
 \`\`\`logts-play
 8wire q = 10101010
