@@ -2,7 +2,7 @@
 
 When a wire or component output changes, every wire and display that depends on it is updated automatically. You do not need to call anything extra — assignments like `1wire b = NOT(a)` stay in sync with their inputs.
 
-Wire assignment operators (`=`, `=:`) control how shorter values are padded to wire width; see [assignment-operators.md](assignment-operators.md).
+Wire assignment operators (`=`, `:=`, `=:`) and initial `:` control width handling; see [assignment-operators.md](assignment-operators.md). Legacy and wave use the same rules per operator.
 
 This document explains **what you see** when values spread through your circuit. It does not describe internal engine details.
 

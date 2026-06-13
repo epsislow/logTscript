@@ -125,8 +125,8 @@ comp [dip] .d:
 .l = clk + reset
 
 # Clear the memory slots
-1w bit1 := 0
-1w bit2 := 0
+1w bit1 : 0
+1w bit2 : 0
 
 # BIT 1: Evaluates what the state SHOULD be, then updates on falling edge
 1w bit1Next = NOT(bit1)
@@ -170,10 +170,10 @@ comp [dip] .d:
 
 .l = clk + reset
 
-1w bit1slave := 0
-1w bit1master := 0
-1w bit2slave := 0
-1w bit2master := 0
+1w bit1slave : 0
+1w bit1master : 0
+1w bit2slave : 0
+1w bit2master : 0
 # BIT 1: Always toggles
 #1w bit1Next = NOT(bit1)
 #bit1      = REG(bit1Next, clk, reset)
@@ -219,8 +219,8 @@ bit2slave       = REG(bit2slavenext, 1, reset)
     :
     
 1w p = .p
-1w tg := 0
-1w tg2 := 0
+1w tg : 0
+1w tg2 : 0
  tg = MUX(.p, tg, NOT(tg))
 2w tt = tg + tg2
  tg2 = EQ(tt, 10)
@@ -244,8 +244,8 @@ bit2slave       = REG(bit2slavenext, 1, reset)
     :
     
 1w p = .p
-1w tg := 0
-1w tg2 := 0
+1w tg : 0
+1w tg2 : 0
  tg = MUX(.p, tg, NOT(tg))
  tg2 = EQ(tg + tg2, 10)
  
@@ -267,12 +267,12 @@ comp [key] .p:
     :
     
 1wire p = .p
-5wire tg5bits := 00000
+5wire tg5bits : 00000
 
 # Pre-define next-state wires for forward-referencing
-1wire nextTg0 := 0
-1wire nextTg1 := 0
-1wire nextTg2 := 0
+1wire nextTg0 : 0
+1wire nextTg1 : 0
+1wire nextTg2 : 0
 
 # 1. Read current states from registers
 1wire pPrev = REG(p, ~, 0)
@@ -307,7 +307,7 @@ tg5bits = 00 + tg2 + tg1 + tg0
     :
     
 1w p = .p
-1w tg := 0
+1w tg : 0
  tg = MUX(.p, tg, NOT(tg))
  
  .pw = tg
@@ -1147,7 +1147,7 @@ comp [led] .v:
     square
     on:1
      :
-15w v := \\0 
+15w v : \\0 
 .a:{
    chr = \\90
   # hex = \\0
@@ -1428,7 +1428,7 @@ comp [led] .gett:
    write = 1
    set= .set
 }
-4w get := 0000
+4w get : 0000
 .mem:{
    adr =adr
    get >= get
@@ -1499,7 +1499,7 @@ comp [led] .gett:
    write = 1
    set= .set
 }
-4w get := 0000
+4w get : 0000
 .mem:{
    adr =adr
    get >= get
@@ -3600,110 +3600,6 @@ comp [mem] .ram:
 
 
 `,
-ex_dv_7seg: `
-
-
-
-comp [dip] .as:
-   text: 'A'
-   length: 16
-   = 0000000000000000
-   nl
-   visual:1
-   noLabels
-   :16bit
-
-16wire as = .as
-
-comp [7seg] .b:
-   on:1
-   :
-
-comp [7seg] .a:
-   on:1
-   :
-
-   
-comp [/] .dv:
-   depth: 4
-    on:1
-   :
-   
-4wire dv1
-4wire dv2
-.dv:{
-  a= as
-  b= 1010
-  set = 1
-  get>=dv1
-  mod>=dv2
-}
-1wire is0= AND(!dv2,1111)
-1wire is0b= AND(!dv1,1111)
-.a:{
-  hex = dv2
-  set= 1
-}
-.a:{
-  a=0
-  b=0
-  c=0
-  d=0
-  e=0
-  f=0
-  set=is0
-}
-.b:{
-  hex = dv1
-  set=1
-}
-.b:{
-  a=0
-  b=0
-  c=0
-  d=0
-  e=0
-  f=0
-  set= is0b
-}
-
-
-`,
-
-bad_dv_7seg : `
-
-comp [dip] .as:
-   text: 'A'
-   length: 16
-   = 0000000000000000
-   nl
-   visual:1
-   noLabels
-   :16bit
-
-4wire as = .as
-
-comp [7seg] .a:
-   :
-   
-comp [/] .dv:
-   depth: 4
-    on:1
-   :
-   
-.dv:{
-  a= as
-  b= 1010
-  set = ~
-}
-4wire dv1 = .dv:get
-4wire dv2= .dv:mod
-
-.a:hex = dv2
-.a:set= 1
-
-`,
-
 ex_scr5:`
 
 

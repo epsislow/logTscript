@@ -10,18 +10,105 @@ See also: [signal propagation](signal-propagation.md), [ASM](asm.md).
 
 | Operator | Behavior | Where |
 |----------|----------|-------|
-| `=` | Left-pad assignment | declaration, re-assignment |
+| `=` | Strict assignment — exact width, error on mismatch | declaration, re-assignment |
+| `:=` | Left-pad assignment | declaration, re-assignment |
 | `=:` | Right-pad assignment | declaration, re-assignment |
-| `:=` | Initial assignment (literal only) | wire declaration only |
-| `:` | (unchanged) | component / block syntax |
+| `:` | Initial assignment (literal only) | wire declaration only |
 
-### Phase notes
+**Truncation:** when a value is longer than the wire, padding direction does not change truncation — the same truncation rule applies in each execution path. Phase 3 will unify truncation rules across the runtime.
 
-- **Phase 1 (current):** `=:` is implemented (right-pad). `=` keeps left-pad on declaration; `:=` is literal-only initial assignment.
-- **Phase 2 (planned):** strict `=` (exact width, error on mismatch); `:` as initial assignment (replacing `:=` semantics).
-- **Phase 3 (incomplete):** unify truncation rules across runtime; unify ASM + `=` behavior between legacy and wave propagation.
+---
 
-**Truncation:** when a value is longer than the wire, padding direction does not change truncation — the same truncation rule applies as for `=` in each execution path. Only **padding** (shorter values) differs between `=` and `=:`.
+## `=` — Strict assignment
+
+The assigned value must have exactly the same width as the destination. No padding is performed.
+
+### Syntax
+
+```logts
+wire = value
+```
+
+### Examples
+
+```logts-play
+3wire q = 001
+show(q)
+```
+
+Result: `001`
+
+```logts-play
+3wire q = 1
+show(q)
+```
+
+Error: `Expected 3 bits, got 1 bit.`
+
+```logts-play
+8wire q = 10101010
+show(q)
+```
+
+Result: `10101010`
+
+---
+
+## `:=` — Left-pad assignment
+
+If the assigned value is shorter than the destination width, zeros are added on the **left**.
+
+### Syntax
+
+```logts
+wire := value
+```
+
+### Examples
+
+```logts-play
+3wire q := 1
+show(q)
+```
+
+Result: `001`
+
+```logts-play
+3wire q := 10
+show(q)
+```
+
+Result: `010`
+
+```logts-play
+8wire q := 101
+show(q)
+```
+
+Result: `00000101`
+
+```logts-play
+8wire q := 11110000
+show(q)
+```
+
+Result: `11110000`
+
+### ASM — program in a wide slot (left-pad)
+
+```logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+
+16wire x := .myisa { LOAD R1 A2 }
+show(x)
+```
+
+Shorter program → zeros on the **left** (`^00 + ^16`).
 
 ---
 
@@ -58,26 +145,7 @@ show(q)
 
 Result: `10100000`
 
-```logts-play
-8wire q =: 11110000
-show(q)
-```
-
-Result: `11110000` (exact width, no padding)
-
-### Re-assignment
-
-```logts-play
-4wire q =: 1
-q =: 11
-show(q)
-```
-
-Result: `1100`
-
-### ASM — program in a wide slot
-
-The assembled bitstream is stored from the **left** (MSB side); shorter programs are padded with zeros on the **right**.
+### ASM — program in a wide slot (right-pad)
 
 ```logts-play
 inline [asm] .myisa:
@@ -91,38 +159,71 @@ inline [asm] .myisa:
 show(x)
 ```
 
-Compare with left-pad `=` on the same program: `show` displays `^16 + ^00` for `=:` vs `^00 + ^16` for `=`.
+Shorter program → zeros on the **right** (`^16 + ^00`).
 
----
-
-## `=` — Left-pad assignment (current)
-
-If the assigned value is shorter than the destination width, zeros are added on the **left**.
+### Re-assignment after init
 
 ```logts-play
-3wire q = 1
+MODE WIREWRITE
+4wire q : 1
+q =: 11
 show(q)
 ```
 
-Result: `001`
-
-*Phase 2 will make `=` strict (exact width required, error on mismatch).*
+Result: `1100`
 
 ---
 
-## `:=` — Initial assignment (current)
+## `:` — Initial assignment
 
-Literal-only initialization at wire declaration.
+Assigns the initial value of a wire at declaration. **Literal only** (binary, hex `^`, decimal `\`, `!`).
 
-```logts-play
-1wire s := 1
-show(s)
+### Syntax
+
+```logts
+wire : value
 ```
 
-Only binary, hex (`^`), decimal (`\`), and `!` literals are allowed after `:=`.
+### Examples
+
+```logts-play
+3wire q : 1
+show(q)
+```
+
+Result: `001` (left-padded at init)
+
+```logts-play
+8wire counter : 00000000
+show(counter)
+```
+
+```logts-play
+1wire state : 0
+show(state)
+```
+
+After `:` init, the first real assignment (`=`, `:=`, or `=:`) is allowed in STRICT mode.
 
 ---
 
-## `:` — Initial assignment (planned, Phase 2)
+## Operator comparison
 
-Reserved for future use as initial assignment at declaration (replacing `:=` in Phase 2). Not changed in Phase 1.
+| Operator | Shorter value | Exact width | Longer value |
+|----------|---------------|-------------|--------------|
+| `=` | Error | OK | Truncate (per path) |
+| `:=` | Left-pad | OK | Truncate (per path) |
+| `=:` | Right-pad | OK | Truncate (per path) |
+| `:` | Left-pad at init | OK | Truncate at init |
+
+---
+
+## ASM width rules
+
+| Declaration | Blob shorter than wire |
+|-------------|------------------------|
+| `Nwire x = .isa { ... }` | **Error** (strict) |
+| `Nwire x := .isa { ... }` | Left-pad |
+| `Nwire x =: .isa { ... }` | Right-pad |
+
+Use exact wire width with `=` when the assembled program matches, e.g. `8wire prog = .myisa { LOAD R1 A2 }`.

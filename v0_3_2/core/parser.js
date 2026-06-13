@@ -45,7 +45,9 @@ class Parser {
     while (i < src.length && /\s/.test(src[i])) i++;
   }
 
-  return src[i] === '=';
+  if (src[i] === '=') return true;
+  if (src[i] === ':' && src[i + 1] === '=') return true;
+  return false;
 }
 
 parse() {
@@ -968,12 +970,16 @@ assignment() {
     );
   }
   
-  let assignPad = 'left';
+  let assignPad;
   if (this.c.value === '=:') {
     this.eat('SYM', '=:');
     assignPad = 'right';
+  } else if (this.c.value === ':=') {
+    this.eat('SYM', ':=');
+    assignPad = 'left';
   } else {
     this.eat('SYM', '=');
+    assignPad = 'strict';
   }
 
   const expr = this.expr();
@@ -1075,11 +1081,10 @@ assignment() {
 
     if (this.c.value === ':=') {
       this.eat('SYM', ':=');
-      const initExpr = this.initLiteral();
       return {
         decls,
-        expr: null,
-        initExpr,
+        expr: this.expr(),
+        assignPad: 'left',
         line: this.c.line,
         col: this.c.col
       };
@@ -1093,10 +1098,21 @@ assignment() {
         col: this.c.col
       };
     } else if (this.c.value === '=') {
-  this.eat('SYM', '=');
-  return {
-    decls,
+      this.eat('SYM', '=');
+      return {
+        decls,
         expr: this.expr(),
+        assignPad: 'strict',
+        line: this.c.line,
+        col: this.c.col
+      };
+    } else if (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+      const initExpr = this.initLiteral();
+      return {
+        decls,
+        expr: null,
+        initExpr,
         line: this.c.line,
         col: this.c.col
       };
@@ -1127,7 +1143,7 @@ assignment() {
       atom = {dec: this.c.value};
       this.eat('DEC');
     } else {
-      throw Error(`Expected a literal value (binary, hex ^, or decimal \\) after := at ${this.c.line}:${this.c.col}`);
+      throw Error(`Expected a literal value (binary, hex ^, or decimal \\) after : at ${this.c.line}:${this.c.col}`);
     }
     if(notPrefix) atom.not = true;
     return atom;

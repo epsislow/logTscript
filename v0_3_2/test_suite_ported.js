@@ -1187,8 +1187,8 @@ reg(601, 'signal', 'cascada de 3 niveluri a->b->c->d', function(h, session) {
 
 reg(602, 'signal', 'MUX toggle — tg0 se toggleaza cand p trece 1->0', function(h, session) {
   const { interp } = session.run(`
-1wire p := 0
-1wire tg0 := 0
+1wire p : 0
+1wire tg0 : 0
 
 tg0 = MUX(p, tg0, NOT(tg0))`);
   h.assert('602 tg0 initial = 0', session.getWire(interp, 'tg0'), '0');
@@ -1204,10 +1204,10 @@ tg0 = MUX(p, tg0, NOT(tg0))`);
 
 reg(603, 'signal', 'counter binar tg0/tg1/tg2 cascadat', function(h, session) {
   const { interp } = session.run(`
-1wire p := 0
-1wire tg0 := 0
-1wire tg1 := 0
-1wire tg2 := 0
+1wire p : 0
+1wire tg0 : 0
+1wire tg1 : 0
+1wire tg2 : 0
 
 tg0 = MUX(p, tg0, NOT(tg0))
 tg1 = MUX(tg0, tg1, NOT(tg1))
@@ -1248,7 +1248,7 @@ reg(604, 'signal', 'propagare se opreste daca valoarea nu s-a schimbat', functio
 
 reg(605, 'signal', 'auto-referinta a = NOT(a) — executata o singura data per cascada', function(h, session) {
   const { interp } = session.run(`
-1wire a := 0
+1wire a : 0
 a = NOT(a)`);
   session.setWire(interp, 'a', '0');
   h.assert('605 a = NOT(0) = 1 dupa o singura evaluare', session.getWire(interp, 'a'), '1');
@@ -1270,8 +1270,8 @@ reg(606, 'signal', 'wire multi-decl — propagare individuala per wire', functio
 
 reg(607, 'signal', 'paralelism ramuri — ordinea sursei nu conteaza', function(h, session) {
   const { interp } = session.run(`
-1wire A := 1
-1wire B := 0
+1wire A : 1
+1wire B : 0
 1wire X = NOT(A)
 1wire Y = AND(X, A)
 1wire Z = NOT(B)
@@ -1606,7 +1606,7 @@ chip [halfAdd] .u1::
 function runProbeBasic(h, session) {
   const { interp, out } = session.run(`
 1wire b = 0
-1wire a := 0
+1wire a : 0
 a = AND(b, 1)
 probe(a)`);
   h.assert('probe initialised', String(out.some(l => l.includes('# a = 0') && l.includes('initialised'))), 'true');
@@ -1640,7 +1640,7 @@ function runShowSimple(h, session) {
 reg(804, 'debug', 'show combinational fără NEXT (legacy)', runShowSimple);
 reg(805, 'debug', 'show combinational fără NEXT (wave)', runShowSimple, { propagation: 'wave' });
 
-const MID_CHANGE = `1wire a := 0
+const MID_CHANGE = `1wire a : 0
 1wire b = NOT(a)
 show(a, b)
 a = 1
@@ -1710,7 +1710,7 @@ function runRegNextWave(h, session) {
 reg(810, 'debug', 'show înainte/după NEXT(~) în script — legacy', runRegNextLegacy);
 reg(811, 'debug', 'show înainte/după NEXT(~) în script — wave', runRegNextWave, { propagation: 'wave' });
 
-const MULTI_SHOW = `1wire a := 0
+const MULTI_SHOW = `1wire a : 0
 1wire b = NOT(a)
 show(b)
 a = 1
@@ -1732,8 +1732,8 @@ function runMultiShowWave(h, session) {
 reg(812, 'debug', 'două show(b) după schimbare a — legacy', runMultiShowLegacy);
 reg(813, 'debug', 'două show(b) după schimbare a — wave', runMultiShowWave, { propagation: 'wave' });
 
-const PROBE_AND_SETTLE = `1wire a := 0
-1wire b := 1
+const PROBE_AND_SETTLE = `1wire a : 0
+1wire b : 1
 a = AND(b, 1)
 probe(a)`;
 
@@ -1753,8 +1753,8 @@ function runProbeInitThenChangedWave(h, session) {
 reg(814, 'debug', 'probe settle RUN — legacy o linie', runProbeInitThenChangedLegacy);
 reg(815, 'debug', 'probe settle RUN — wave initialised apoi changed', runProbeInitThenChangedWave, { propagation: 'wave' });
 
-const PROBE_REG_EDGE = `1wire data := 0
-1wire clk := 0
+const PROBE_REG_EDGE = `1wire data : 0
+1wire clk : 0
 1wire q = REG(data, clk, 0)
 probe(q)`;
 
@@ -1770,7 +1770,7 @@ function runProbeRegEdge(h, session) {
 reg(816, 'debug', 'probe REG clk 1→0 — edge committed', runProbeRegEdge);
 reg(817, 'debug', 'probe REG clk 1→0 — edge committed (wave)', runProbeRegEdge, { propagation: 'wave' });
 
-const PROBE_KEY_REG = `1wire data := 1
+const PROBE_KEY_REG = `1wire data : 1
 comp [key] .clk:
     label:'A'
     size: 35
@@ -4047,14 +4047,14 @@ reg(1004, 'right-pad-assign', '8wire q =: 11110000 — exact width', function(h,
   h.assert('q = 11110000', session.getWire(interp, 'q'), '11110000');
 });
 
-reg(1005, 'right-pad-assign', '4wire q := 1 then q =: 11 — first assign after init', function(h, session) {
-  const { interp } = session.run('4wire q := 1\nq =: 11');
+reg(1005, 'right-pad-assign', '4wire q : 1 then q =: 11 — first assign after init', function(h, session) {
+  const { interp } = session.run('4wire q : 1\nq =: 11');
   h.assert('q = 1100', session.getWire(interp, 'q'), '1100');
 });
 
-reg(1006, 'right-pad-assign', '3wire q =: 11001 — same truncate as =', function(h, session) {
+reg(1006, 'right-pad-assign', '3wire q =: 11001 — same truncate as :=', function(h, session) {
   const { interp: i1 } = session.run('3wire a =: 11001');
-  const { interp: i2 } = session.run('3wire b = 11001');
+  const { interp: i2 } = session.run('3wire b := 11001');
   h.assert('=:', session.getWire(i1, 'a'), session.getWire(i2, 'b'));
 });
 
@@ -4064,11 +4064,37 @@ reg(1007, 'right-pad-assign', '16wire ASM =: LOAD R1 A2 — right-pad', function
   h.assert('x = program + zeros right', session.getWire(interp, 'x'), '0001011000000000');
 });
 
-reg(1008, 'right-pad-assign', '16wire ASM = LOAD R1 A2 — left-pad control (wave)', function(h, session) {
-  const src = RIGHT_PAD_ASM_ISA + '16wire x = .myisa { LOAD R1 A2 }';
+reg(1008, 'left-pad-assign', '16wire ASM := LOAD R1 A2 — left-pad', function(h, session) {
+  const src = RIGHT_PAD_ASM_ISA + '16wire x := .myisa { LOAD R1 A2 }';
   const { interp } = session.run(src);
   h.assert('x = zeros left + program', session.getWire(interp, 'x'), '0000000000010110');
-}, { propagation: 'wave' });
+});
+
+reg(1011, 'left-pad-assign', '3wire q := 1 → 001', function(h, session) {
+  const { interp } = session.run('3wire q := 1');
+  h.assert('q = 001', session.getWire(interp, 'q'), '001');
+});
+
+reg(1012, 'left-pad-assign', '3wire q := 10 → 010', function(h, session) {
+  const { interp } = session.run('3wire q := 10');
+  h.assert('q = 010', session.getWire(interp, 'q'), '010');
+});
+
+reg(1013, 'left-pad-assign', '8wire q := 101 → 00000101', function(h, session) {
+  const { interp } = session.run('8wire q := 101');
+  h.assert('q = 00000101', session.getWire(interp, 'q'), '00000101');
+});
+
+reg(1014, 'strict-assign', '3wire q = 1 — strict error', function(h, session) {
+  h.assertThrows('strict mismatch', function() {
+    session.run('3wire q = 1');
+  }, 'Expected 3 bits');
+});
+
+reg(1015, 'strict-assign', '3wire q = 001 — strict exact OK', function(h, session) {
+  const { interp } = session.run('3wire q = 001');
+  h.assert('q = 001', session.getWire(interp, 'q'), '001');
+});
 
 reg(1009, 'right-pad-assign', 'MODE WIREWRITE — 4wire q =: 1 then q =: 11 re-assign', function(h, session) {
   const { interp } = session.run('MODE WIREWRITE\n4wire q =: 1\nq =: 11');

@@ -957,13 +957,13 @@
     h.assert('no standalone : after =:', String(loneColon.length), '0');
   });
 
-  reg(237, 'right-pad-assign', ':= and =: coexist in one script', function(h, session) {
-    const src = '1wire a := 1\n3wire q =: 1';
+  reg(237, 'right-pad-assign', ': init and =: coexist in one script', function(h, session) {
+    const src = '1wire a : 1\n3wire q =: 1';
     const { tokens } = session.tokenize(src);
-    const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
     const eqColon = tokens.filter(t => t.type === 'SYM' && t.value === '=:');
-    h.assert('one := token', String(colonEq.length), '1');
     h.assert('one =: token', String(eqColon.length), '1');
+    const initColon = tokens.filter((t, i, arr) => t.type === 'SYM' && t.value === ':' && arr[i - 1] && arr[i - 1].type === 'ID' && arr[i - 1].value === 'a');
+    h.assert('init : after wire name', String(initColon.length >= 1), 'true');
   });
 
   reg(238, 'right-pad-assign', 'Parser — 3wire q =: 1 → expr + assignPad right', function(h, session) {
@@ -981,9 +981,9 @@
     h.assert('assignPad is right', assign.assignment.assignPad, 'right');
   });
 
-  reg(240, 'right-pad-assign', 'Parser — 3wire q = 1 has no assignPad right', function(h, session) {
+  reg(240, 'right-pad-assign', 'Parser — 3wire q = 1 has assignPad strict', function(h, session) {
     const stmts = session.parse('3wire q = 1');
-    h.assert('no assignPad on = decl', String(stmts[0].assignPad === undefined), 'true');
+    h.assert('assignPad strict on = decl', stmts[0].assignPad, 'strict');
   });
 
   reg(241, 'right-pad-assign', 'padWireBits — right-pad short literal', function(h) {
@@ -1009,14 +1009,41 @@
     h.assert('no truncate in helper', padWireBits('11001', 3, 'right'), '11001');
   });
 
-  reg(82, 'wire-init', ':= produces a single SYM token', function(h, session) {
+  reg(82, 'wire-init', ': init produces SYM(:) after wire name', function(h, session) {
     {
-      const { tokens } = session.tokenize('1wire s := 1');
+      const { tokens } = session.tokenize('1wire s : 1');
+      const colonOnly = tokens.filter(t => t.type === 'SYM' && t.value === ':');
+      h.assert(': SYM present for init', String(colonOnly.length >= 1), 'true');
+    }
+  });
+
+  reg(246, 'left-pad-assign', ':= produces SYM(:=) for left-pad', function(h, session) {
+    {
+      const { tokens } = session.tokenize('3wire q := 1');
       const colonEq = tokens.filter(t => t.type === 'SYM' && t.value === ':=');
       h.assert(':= is a single SYM(:=) token', String(colonEq.length), '1');
-      const colonOnly = tokens.filter(t => t.type === 'SYM' && t.value === ':');
-      h.assert('no stray SYM(:) when := present', String(colonOnly.length), '0');
     }
+  });
+
+  reg(247, 'left-pad-assign', 'Parser — 3wire q := 1 → expr + assignPad left', function(h, session) {
+    const stmts = session.parse('3wire q := 1');
+    const s = stmts[0];
+    h.assert('expr present', String(s.expr !== null && s.expr !== undefined), 'true');
+    h.assert('assignPad is left', s.assignPad, 'left');
+    h.assert('no initExpr', String(s.initExpr === undefined), 'true');
+  });
+
+  reg(248, 'left-pad-assign', 'Parser — q := 1 → assignment.assignPad left', function(h, session) {
+    const stmts = session.parse('1wire q\nq := 1');
+    const assign = stmts.find(st => st.assignment);
+    h.assert('assignment found', String(assign !== undefined), 'true');
+    h.assert('assignPad is left', assign.assignment.assignPad, 'left');
+  });
+
+  reg(249, 'strict-assign', 'Parser — 3wire q = 1 throws on run (strict)', function(h, session) {
+    h.assertThrows('strict = short literal', function() {
+      session.run('3wire q = 1');
+    }, 'Expected 3 bits');
   });
 
   reg(83, 'wire-init', 'standalone : still produces SYM(:)', function(h, session) {
@@ -1039,40 +1066,40 @@
     }
   });
 
-  reg(85, 'wire-init', 'full tokenization of "1wire s := 1"', function(h, session) {
+  reg(85, 'wire-init', 'full tokenization of "1wire s : 1"', function(h, session) {
     {
-      const { tokens } = session.tokenize('1wire s := 1');
+      const { tokens } = session.tokenize('1wire s : 1');
       const types = tokens.map(t => t.type);
       h.assert('TYPE token present',  String(types.includes('TYPE')),  'true');
       h.assert('ID token present',    String(types.includes('ID')),    'true');
-      h.assert(':= SYM present',      String(tokens.some(t => t.type === 'SYM' && t.value === ':=')), 'true');
+      h.assert(': SYM present',      String(tokens.some(t => t.type === 'SYM' && t.value === ':')), 'true');
       h.assert('BIN token present',   String(types.includes('BIN')),   'true');
     }
   });
 
-  reg(86, 'wire-init', ':= with hex literal "4wire s := ^FF"', function(h, session) {
+  reg(86, 'wire-init', ': init with hex literal "4wire s : ^FF"', function(h, session) {
     {
-      const { tokens } = session.tokenize('4wire s := ^FF');
+      const { tokens } = session.tokenize('4wire s : ^FF');
       const hexTok = tokens.filter(t => t.type === 'HEX');
-      h.assert('^FF hex token present after :=', String(hexTok.length), '1');
+      h.assert('^FF hex token present after :', String(hexTok.length), '1');
       h.assert('^FF value is FF', hexTok[0].value, 'FF');
     }
   });
 
-  reg(87, 'wire-init', ':= with decimal \\\\N (tokenized as BIN)', function(h, session) {
+  reg(87, 'wire-init', ': init with decimal \\\\N (tokenized as BIN)', function(h, session) {
     {
-      const { tokens } = session.tokenize('4wire s := \\5');
+      const { tokens } = session.tokenize('4wire s : \\5');
       const binTok = tokens.filter(t => t.type === 'BIN');
-      h.assert('\\5 after := gives BIN', String(binTok.length >= 1), 'true');
+      h.assert('\\5 after : gives BIN', String(binTok.length >= 1), 'true');
       h.assert('\\5 BIN value is 101', binTok[binTok.length - 1].value, '101');
     }
   });
 
-  reg(88, 'wire-init', ':= with NOT prefix "1wire s := !1"', function(h, session) {
+  reg(88, 'wire-init', ': init with NOT prefix "1wire s : !1"', function(h, session) {
     {
-      const { tokens } = session.tokenize('1wire s := !1');
+      const { tokens } = session.tokenize('1wire s : !1');
       const notTok = tokens.filter(t => t.type === 'SYM' && t.value === '!');
-      h.assert('! token present after :=', String(notTok.length), '1');
+      h.assert('! token present after :', String(notTok.length), '1');
       const binTok = tokens.filter(t => t.type === 'BIN');
       h.assert('BIN follows !', String(binTok.length >= 1), 'true');
     }
@@ -1389,8 +1416,8 @@
     }
   });
 
-  reg(90, 'wire-init', 'Parser — 1wire s := 1 produces initExpr {bin}', function(h, session) {
-    const stmts = session.parse('1wire s := 1');
+  reg(90, 'wire-init', 'Parser — 1wire s : 1 produces initExpr {bin}', function(h, session) {
+    const stmts = session.parse('1wire s : 1');
     const s = stmts[0];
     h.assert('stmt has decls', String(Array.isArray(s.decls)), 'true');
     h.assert('decls[0].name is s', s.decls[0].name, 's');
@@ -1400,41 +1427,41 @@
     h.assert('initExpr.bin is 1', s.initExpr.bin, '1');
   });
 
-  reg(91, 'wire-init', 'Parser — 4wire s := 1101 produces initExpr {bin:1101}', function(h, session) {
-    const stmts = session.parse('4wire s := 1101');
+  reg(91, 'wire-init', 'Parser — 4wire s : 1101 produces initExpr {bin:1101}', function(h, session) {
+    const stmts = session.parse('4wire s : 1101');
     const s = stmts[0];
     h.assert('4wire initExpr.bin is 1101', s.initExpr.bin, '1101');
     h.assert('4wire expr is null', String(s.expr), 'null');
   });
 
-  reg(92, 'wire-init', 'Parser — 4wire s := ^FF produces initExpr {hex:FF}', function(h, session) {
-    const stmts = session.parse('4wire s := ^FF');
+  reg(92, 'wire-init', 'Parser — 4wire s : ^FF produces initExpr {hex:FF}', function(h, session) {
+    const stmts = session.parse('4wire s : ^FF');
     const s = stmts[0];
     h.assert('^FF initExpr.hex is FF', s.initExpr.hex, 'FF');
   });
 
-  reg(93, 'wire-init', 'Parser — 1wire s := \\5 produces initExpr {bin:101}', function(h, session) {
-    const stmts = session.parse('1wire s := \\5');
+  reg(93, 'wire-init', 'Parser — 1wire s : \\5 produces initExpr {bin:101}', function(h, session) {
+    const stmts = session.parse('1wire s : \\5');
     const s = stmts[0];
     h.assert('\\5 initExpr.bin is 101', s.initExpr.bin, '101');
   });
 
-  reg(94, 'wire-init', 'Parser — 1wire s := !1 produces initExpr {bin:1, not:true}', function(h, session) {
-    const stmts = session.parse('1wire s := !1');
+  reg(94, 'wire-init', 'Parser — 1wire s : !1 produces initExpr {bin:1, not:true}', function(h, session) {
+    const stmts = session.parse('1wire s : !1');
     const s = stmts[0];
     h.assert('!1 initExpr.bin is 1', s.initExpr.bin, '1');
     h.assert('!1 initExpr.not is true', String(s.initExpr.not), 'true');
   });
 
-  reg(95, 'wire-init', 'Parser — 1wire s := !0 produces initExpr {bin:0, not:true}', function(h, session) {
-    const stmts = session.parse('1wire s := !0');
+  reg(95, 'wire-init', 'Parser — 1wire s : !0 produces initExpr {bin:0, not:true}', function(h, session) {
+    const stmts = session.parse('1wire s : !0');
     const s = stmts[0];
     h.assert('!0 initExpr.bin is 0', s.initExpr.bin, '0');
     h.assert('!0 initExpr.not is true', String(s.initExpr.not), 'true');
   });
 
-  reg(96, 'wire-init', 'Parser — := without not has no not field', function(h, session) {
-    const stmts = session.parse('1wire s := 1');
+  reg(96, 'wire-init', 'Parser — : init without not has no not field', function(h, session) {
+    const stmts = session.parse('1wire s : 1');
     const s = stmts[0];
     h.assert('no not field when no !', String(!!s.initExpr.not), 'false');
   });
@@ -1453,27 +1480,27 @@
     h.assert('bare decl has no expr', String(s.expr), 'null');
   });
 
-  reg(99, 'wire-init', 'Parser — := with non-literal throws error', function(h, session) {
+  reg(99, 'wire-init', 'Parser — : init with non-literal throws error', function(h, session) {
     h.assertThrows(
-      '1wire s := AND(x,y) throws',
-      () => session.parse('1wire s := AND(x,y)'),
+      '1wire s : AND(x,y) throws',
+      () => session.parse('1wire s : AND(x,y)'),
       'Expected a literal'
     );
   });
 
-  reg(100, 'wire-init', 'Parser — multiple wires with := (8wire q := ^A5)', function(h, session) {
-    const stmts = session.parse('8wire q := ^A5');
+  reg(100, 'wire-init', 'Parser — multiple wires with : init (8wire q : ^A5)', function(h, session) {
+    const stmts = session.parse('8wire q : ^A5');
     const s = stmts[0];
     h.assert('8wire ^A5 type is 8wire', s.decls[0].type, '8wire');
     h.assert('8wire ^A5 name is q', s.decls[0].name, 'q');
     h.assert('8wire ^A5 initExpr.hex is A5', s.initExpr.hex, 'A5');
   });
 
-  reg(101, 'wire-init', 'Parser — multiple := statements in same script', function(h, session) {
-    const stmts = session.parse(`1wire s := 1
-1wire r := 0
-1wire q := 1
-1wire nq := 0`);
+  reg(101, 'wire-init', 'Parser — multiple : init statements in same script', function(h, session) {
+    const stmts = session.parse(`1wire s : 1
+1wire r : 0
+1wire q : 1
+1wire nq : 0`);
     h.assert('4 decl statements', String(stmts.length), '4');
     h.assert('s initExpr.bin = 1',  stmts[0].initExpr.bin, '1');
     h.assert('r initExpr.bin = 0',  stmts[1].initExpr.bin, '0');

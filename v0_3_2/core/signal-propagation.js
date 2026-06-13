@@ -829,8 +829,12 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                 wireValue += part.value;
               }
             }
-            const assignPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'left';
-            if(wireValue.length < bits){
+            const assignPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'strict';
+            if (assignPad === 'strict') {
+              if (wireValue.length !== bits) {
+                throw Error(wireBitsMismatchError(bits, wireValue.length));
+              }
+            } else if(wireValue.length < bits){
               wireValue = padWireBits(wireValue, bits, assignPad);
             } else if(wireValue.length > bits){
               wireValue = wireValue.substring(0, bits);
@@ -899,8 +903,12 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                       if(val) wireValue += val;
                     }
                   }
-                  const declPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'left';
-                  if(wireValue.length < bits){
+                  const declPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'strict';
+                  if (declPad === 'strict') {
+                    if (wireValue.length !== bits) {
+                      throw Error(wireBitsMismatchError(bits, wireValue.length));
+                    }
+                  } else if(wireValue.length < bits){
                     wireValue = padWireBits(wireValue, bits, declPad);
                   } else if(wireValue.length > bits){
                     wireValue = wireValue.substring(0, bits);

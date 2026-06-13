@@ -173,6 +173,32 @@ show(slot0)
 
 Validations (interpreter): `wordWidth === mem.depth`, `instructionCount <= mem.length`.
 
+### Wire width and assignment operators
+
+| Operator | ASM shorter than wire |
+|----------|------------------------|
+| `=` | Error — use exact width, e.g. `8wire x = .myisa { LOAD R1 A2 }` |
+| `:=` | Left-pad (zeros on the left) |
+| `=:` | Right-pad (zeros on the right) |
+
+See [assignment-operators.md](assignment-operators.md).
+
+### Wire slot with `:=` (left-pad)
+
+```logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+
+16wire prog := .myisa {
+  LOAD R1 A2
+}
+show(prog)
+```
+
 ### Wire slot with `=:` (right-pad)
 
 To store an assembled program in a wire wider than the blob (zeros on the right), use [`=:`](assignment-operators.md):
