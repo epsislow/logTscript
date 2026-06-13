@@ -1,4 +1,22 @@
 
+HIGH(Xbit) -> Xbit
+returns same number bits but only first on bit 1
+LOW(Xbit) -> Xbit
+returns same number bits but only last on bit 1
+
+ZERO(Xbit) -> 1bit 
+returns if all Xbits are 0
+ANY(Xbit) -> 1bit
+returns if any bit is 1
+
+BITDECODE(Xbit counter) -> Ybit
+you send the count of bits and receive 
+a number binary with 1 folowed by counter-1 bits of 0
+
+
+
+
+
 PRIOENC
 Priority encoder.
 Returns the index of the highest active bit in the input value.

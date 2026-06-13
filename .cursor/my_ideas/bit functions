@@ -1,0 +1,397 @@
+Bit Selection and Detection Functions
+
+These built-in functions operate on arbitrary-width binary values and are useful for priority selection, interrupt handling, one-hot encoding, bit scanning, masking, and state decoding.
+
+---
+
+HIGH()
+
+Returns the highest (most significant) bit that is set to "1".
+
+All other bits become "0".
+
+Syntax
+
+HIGH(Xbit value)
+
+Returns
+
+Xbit
+
+Same width as the input.
+
+Examples
+
+HIGH(00101010)
+
+Result:
+
+00100000
+
+---
+
+HIGH(00010000)
+
+Result:
+
+00010000
+
+---
+
+HIGH(00000000)
+
+Result:
+
+00000000
+
+---
+
+Typical Uses
+
+Interrupt priority selection
+Highest-priority request detection
+Bus arbitration
+First-active source selection
+
+---
+
+LOW()
+
+Returns the lowest (least significant) bit that is set to "1".
+
+All other bits become "0".
+
+Syntax
+
+LOW(Xbit value)
+
+Returns
+
+Xbit
+
+Same width as the input.
+
+Examples
+
+LOW(00101010)
+
+Result:
+
+00000010
+
+---
+
+LOW(00010000)
+
+Result:
+
+00010000
+
+---
+
+LOW(00000000)
+
+Result:
+
+00000000
+
+---
+
+Typical Uses
+
+Lowest-priority request selection
+Round-robin allocators
+Bit scanning
+Resource assignment
+
+---
+
+ANY()
+
+Returns whether any bit is set.
+
+Syntax
+
+ANY(Xbit value)
+
+Returns
+
+1bit
+
+Examples
+
+ANY(00000000)
+
+Result:
+
+0
+
+---
+
+ANY(00010000)
+
+Result:
+
+1
+
+---
+
+ANY(00101010)
+
+Result:
+
+1
+
+---
+
+Equivalent Logic
+
+OR(all bits)
+
+---
+
+Typical Uses
+
+Interrupt pending detection
+Queue not empty
+At least one key pressed
+Error detection
+
+---
+
+ZERO()
+
+Returns whether all bits are zero.
+
+Syntax
+
+ZERO(Xbit value)
+
+Returns
+
+1bit
+
+Examples
+
+ZERO(00000000)
+
+Result:
+
+1
+
+---
+
+ZERO(00010000)
+
+Result:
+
+0
+
+---
+
+ZERO(00101010)
+
+Result:
+
+0
+
+---
+
+Equivalent Logic
+
+NOT(ANY(value))
+
+---
+
+Typical Uses
+
+Zero flag generation
+CPU comparisons
+Counter completion tests
+Empty-state detection
+
+---
+
+BITINDEX()
+
+Returns the index of the active bit.
+
+The input is typically expected to contain exactly one bit set ("one-hot" value).
+
+Bit numbering starts at "0" from the least significant bit.
+
+Syntax
+
+BITINDEX(Xbit value)
+
+Returns
+
+log2(X) bits
+
+Examples
+
+BITINDEX(00000001)
+
+Result:
+
+000
+
+---
+
+BITINDEX(00000100)
+
+Result:
+
+010
+
+---
+
+BITINDEX(00100000)
+
+Result:
+
+101
+
+---
+
+Typical Uses
+
+Priority encoder construction
+Interrupt vector generation
+One-hot decoding reversal
+Address selection
+
+---
+
+Example
+
+8wire requests = 00101010
+
+8wire selected = HIGH(requests)
+
+3wire irq =
+BITINDEX(selected)
+
+Result:
+
+selected = 00100000
+irq      = 101
+
+---
+
+ONEHOT()
+
+Converts a binary index into a one-hot value.
+
+The output contains exactly one bit set to "1".
+
+Bit position equals the supplied index.
+
+Syntax
+
+ONEHOT(Xbit index)
+
+Returns
+
+2^X bits
+
+Examples
+
+ONEHOT(000)
+
+Result:
+
+00000001
+
+---
+
+ONEHOT(001)
+
+Result:
+
+00000010
+
+---
+
+ONEHOT(010)
+
+Result:
+
+00000100
+
+---
+
+ONEHOT(101)
+
+Result:
+
+00100000
+
+---
+
+ONEHOT(111)
+
+Result:
+
+10000000
+
+---
+
+Typical Uses
+
+Address decoding
+State decoding
+Memory bank selection
+Peripheral enables
+Instruction decoding
+
+---
+
+BITINDEX() and ONEHOT()
+
+These functions are inverses of each other.
+
+BITINDEX(
+  ONEHOT(x)
+)
+
+returns:
+
+x
+
+Example:
+
+BITINDEX(
+  ONEHOT(101)
+)
+
+Result:
+
+101
+
+---
+
+Building a Priority Encoder
+
+A dedicated priority encoder function is usually unnecessary.
+
+Example:
+
+8wire requests = 00101010
+
+8wire winner =
+HIGH(requests)
+
+1wire valid =
+ANY(requests)
+
+3wire index =
+BITINDEX(winner)
+
+Result:
+
+winner = 00100000
+valid  = 1
+index  = 101
+
+This provides the same information as a traditional priority encoder while keeping the primitives reusable for many other applications.
