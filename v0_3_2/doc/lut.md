@@ -11,10 +11,30 @@ There is **no panel UI** in v1 — logic only.
 | Rule | Example |
 |------|---------|
 | Instance name **must** start with `.` | `.decoder` ✓ — `decoder` ✗ |
-| Letters and digits only (no `_`) | `.decoder` ✓ — `.my_lut` ✗ |
+| Letters, digits, `_` | `.my_lut` ✓ |
 | Invoke with `.` prefix | `.decoder(in = addr)` or `.decoder(0011)` |
+| **Global** ref from board/chip/pcb body | `^.decoder:LOAD` — skips instance prefix (see below) |
 
 `decoder(in = …)` without the leading dot is a **parse error** (unknown identifier).
+
+### Global reference `^.name`
+
+Inside a **board**, **chip**, or **pcb** body, local component names are prefixed at instantiation (`.ctl` → `._cpu_ctl`). Top-level `inline [lut]` / `inline [asm]` instances keep their global name (`.ctl`).
+
+Use **`^`** before the dot to refer to the **global** instance from inside a composite body:
+
+```logts
+inline [lut] .ctl:
+  LOAD = 0001
+  :
+
+board +[cpu]:
+  4wire ctl = ^.ctl:LOAD    # global .ctl, not ._cpu_ctl
+  doc(^.ctl)                # works inside board body
+  :
+```
+
+`^` before a hex literal is unchanged: `^FF` is still hex, not global (global form is `^.name` only).
 
 ---
 

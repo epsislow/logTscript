@@ -19,6 +19,7 @@ const GROUP_META = [
   { id: 'bitrange', label: 'Dynamic bit range' },
   { id: 'bit-ops', label: 'Bit operations' },
   { id: 'wire-init', label: ': wire initial assignment' },
+  { id: 'global-ref', label: 'Global ^.ref (board/chip)' },
   { id: 'left-pad-assign', label: ':= left-pad assignment' },
   { id: 'strict-assign', label: '= strict assignment' },
   { id: 'right-pad-assign', label: '=: right-pad assignment' },

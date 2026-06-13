@@ -116,8 +116,18 @@ pushSource({ src, alias }) {
   // Symbols (including { and } for property blocks, ! for NOT prefix, * for multiplier shortname)
     if ('=,+():-./@[]\"\'{}>!*;'.includes(c)) return this.token('SYM', this.next());
 
-  // Special vars and ~~ symbol
-  if (c === '_') return this.token('SPECIAL', this.next());
+  // Lone _ is unpack wildcard; _foo is a normal identifier
+  if (c === '_') {
+    this.next();
+    if (!this.eof() && /[a-zA-Z0-9_]/.test(this.peek())) {
+      let v = '_';
+      while (!this.eof() && /[a-zA-Z0-9_]/.test(this.peek())) {
+        v += this.next();
+      }
+      return this.tokenizeIdentifier(v);
+    }
+    return this.token('SPECIAL', '_');
+  }
   if (c === '%') return this.token('SPECIAL', this.next());
   if (c === '$') return this.token('SPECIAL', this.next());
   if (c === '~') {
@@ -214,8 +224,17 @@ pushSource({ src, alias }) {
       }
       return this.token('SYM', '<');
     }
-    // Hexadecimal literal: ^ followed by hex digits (spaces are ignored, but newlines stop parsing)
+    // Global inline/component ref: ^.name (not hex — hex is ^ without leading dot)
     if (c === '^') {
+      if (this.i + 1 < this.src.length && this.src[this.i + 1] === '.') {
+        this.next();
+        this.next();
+        let v = '.';
+        while (!this.eof() && /[a-zA-Z0-9_]/.test(this.peek())) {
+          v += this.next();
+        }
+        return this.token('GREF', v);
+      }
       this.next();
       let hex = '';
       while (!this.eof()) {
@@ -254,34 +273,29 @@ pushSource({ src, alias }) {
     // Starts with letter a-z ID or keyword
   if (/[a-zA-Z]/.test(c)) {
     let v = '';
-    while (!this.eof() && /[a-zA-Z0-9]/.test(this.peek())) {
+    while (!this.eof() && /[a-zA-Z0-9_]/.test(this.peek())) {
       v += this.next();
     }
-      
-      // Check for keywords
-      if (['def', 'show', 'peek', 'probe', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'comp', 'pcb', 'chip', 'board', 'inline', 'doc', 'watch'].includes(v)) {
-        return this.token('KEYWORD', v);
-  }
-
-      // Check for REG instructions
-      if (/^REG$/.test(v)) {
-        return this.token('REG', v);
-      }
-
-      // Check for MUX instructions
-      if (/^MUX$/.test(v)) {
-        return this.token('MUX', v);
-      }
-  
-      // Check for DEMUX instructions
-      if (/^DEMUX$/.test(v)) {
-        return this.token('DEMUX', v);
-      }
-  
-      return this.token('ID', v);
+    return this.tokenizeIdentifier(v);
     }
   
     throw Error(`Unexpected char '${c}' at ${this.file}: ${this.line}:${this.col}`);
+  }
+
+  tokenizeIdentifier(v) {
+    if (['def', 'show', 'peek', 'probe', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'comp', 'pcb', 'chip', 'board', 'inline', 'doc', 'watch'].includes(v)) {
+      return this.token('KEYWORD', v);
+    }
+    if (/^REG$/.test(v)) {
+      return this.token('REG', v);
+    }
+    if (/^MUX$/.test(v)) {
+      return this.token('MUX', v);
+    }
+    if (/^DEMUX$/.test(v)) {
+      return this.token('DEMUX', v);
+    }
+    return this.token('ID', v);
   }
 }
 

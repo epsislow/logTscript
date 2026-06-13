@@ -13,8 +13,9 @@ There is **no panel UI** in v1 — logic only.
 | Rule | Example |
 |------|---------|
 | Instance name **must** start with `.` | `.myisa` ✓ — `myisa` ✗ |
-| Letters and digits only (no `_`) | `.myisa` ✓ — `.my_isa` ✗ |
+| Letters, digits, `_` | `.my_isa` ✓ |
 | Same name at declaration and use | `inline [asm] .myisa:` → `.myisa { NOP }` |
+| **Global** from board/chip/pcb body | `^.myisa { NOP }` — see [lut.md](lut.md#global-reference-name) |
 
 `myisa { ... }` without the leading dot is a **parse error**:
 

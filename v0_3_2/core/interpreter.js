@@ -5556,14 +5556,14 @@ if (s.assignment) {
     
     // Rename component property assignments
     if(renamed.compAssign && renamed.compAssign.component){
-      if(renamed.compAssign.component.startsWith('.')){
+      if(renamed.compAssign.component.startsWith('.') && !renamed.compAssign.globalRef){
         renamed.compAssign.component = renameComp(renamed.compAssign.component);
       }
     }
     
     // Rename component property blocks
     if(renamed.componentPropertyBlock && renamed.componentPropertyBlock.component){
-      if(renamed.componentPropertyBlock.component.startsWith('.')){
+      if(renamed.componentPropertyBlock.component.startsWith('.') && !renamed.componentPropertyBlock.globalRef){
         renamed.componentPropertyBlock.component = renameComp(renamed.componentPropertyBlock.component);
       }
     }
@@ -5597,7 +5597,7 @@ if (s.assignment) {
     };
     
     // Rename .component references in expressions
-    if(obj.var && typeof obj.var === 'string' && obj.var.startsWith('.')){
+    if(obj.var && typeof obj.var === 'string' && obj.var.startsWith('.') && !obj.globalRef){
       // Check if it's a component reference (not a pin/pout)
       const parts = obj.var.split(':');
       const compName = parts[0];
@@ -5612,6 +5612,22 @@ if (s.assignment) {
       } else {
         obj.var = renameCompVar(obj.var);
       }
+    }
+
+    if (obj.isaRef && typeof obj.isaRef === 'string' && obj.isaRef.startsWith('.') && !obj.globalRef) {
+      obj.isaRef = renameCompVar(obj.isaRef);
+    }
+
+    if (obj.protocolRef && typeof obj.protocolRef === 'string' && obj.protocolRef.startsWith('.') && !obj.globalRef) {
+      obj.protocolRef = renameCompVar(obj.protocolRef);
+    }
+
+    if (obj.compInvoke && obj.compInvoke.var && obj.compInvoke.var.startsWith('.') && !obj.compInvoke.globalRef) {
+      obj.compInvoke.var = renameCompVar(obj.compInvoke.var);
+    }
+
+    if (obj.inlineMethod && obj.inlineMethod.var && obj.inlineMethod.var.startsWith('.') && !obj.inlineMethod.globalRef) {
+      obj.inlineMethod.var = renameCompVar(obj.inlineMethod.var);
     }
     
     // Recurse into nested objects

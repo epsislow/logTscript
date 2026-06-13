@@ -2,6 +2,8 @@
 
 LogTscript includes built-in **components** (`comp`), **inline** declarations (`inline [asm]`, `inline [lut]`), reusable **board** blocks (`board`), lightweight **chip** blocks (`chip`), and legacy **PCB** (`pcb`). Use `doc(comp)`, `doc(inline)`, `doc(board)`, `doc(chip)`, or `doc(pcb)` in the editor for live signatures.
 
+**Global refs in composite bodies:** inside `board` / `chip` / `pcb`, prefix a top-level inline or component name with `^` to skip instance renaming — e.g. `^.myisa { … }`, `^.ctl:LOAD`, `doc(^.ctl)`. Details: [lut.md](lut.md#global-reference-name).
+
 ---
 
 ## Composite blocks

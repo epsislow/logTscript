@@ -440,8 +440,9 @@ There is **no panel UI** in v1 — logic only.
 | Rule | Example |
 |------|---------|
 | Instance name **must** start with \`.\` | \`.myisa\` ✓ — \`myisa\` ✗ |
-| Letters and digits only (no \`_\`) | \`.myisa\` ✓ — \`.my_isa\` ✗ |
+| Letters, digits, \`_\` | \`.my_isa\` ✓ |
 | Same name at declaration and use | \`inline [asm] .myisa:\` → \`.myisa { NOP }\` |
+| **Global** from board/chip/pcb body | \`^.myisa { NOP }\` — see [lut.md](lut.md#global-reference-name) |
 
 \`myisa { ... }\` without the leading dot is a **parse error**:
 
@@ -1885,6 +1886,8 @@ Interactive circuits: [board.md](board.md). Component catalog: [components.md](c
     'components.md': `# Component index
 
 LogTscript includes built-in **components** (\`comp\`), **inline** declarations (\`inline [asm]\`, \`inline [lut]\`), reusable **board** blocks (\`board\`), lightweight **chip** blocks (\`chip\`), and legacy **PCB** (\`pcb\`). Use \`doc(comp)\`, \`doc(inline)\`, \`doc(board)\`, \`doc(chip)\`, or \`doc(pcb)\` in the editor for live signatures.
+
+**Global refs in composite bodies:** inside \`board\` / \`chip\` / \`pcb\`, prefix a top-level inline or component name with \`^\` to skip instance renaming — e.g. \`^.myisa { … }\`, \`^.ctl:LOAD\`, \`doc(^.ctl)\`. Details: [lut.md](lut.md#global-reference-name).
 
 ---
 
@@ -5305,10 +5308,30 @@ There is **no panel UI** in v1 — logic only.
 | Rule | Example |
 |------|---------|
 | Instance name **must** start with \`.\` | \`.decoder\` ✓ — \`decoder\` ✗ |
-| Letters and digits only (no \`_\`) | \`.decoder\` ✓ — \`.my_lut\` ✗ |
+| Letters, digits, \`_\` | \`.my_lut\` ✓ |
 | Invoke with \`.\` prefix | \`.decoder(in = addr)\` or \`.decoder(0011)\` |
+| **Global** ref from board/chip/pcb body | \`^.decoder:LOAD\` — skips instance prefix (see below) |
 
 \`decoder(in = …)\` without the leading dot is a **parse error** (unknown identifier).
+
+### Global reference \`^.name\`
+
+Inside a **board**, **chip**, or **pcb** body, local component names are prefixed at instantiation (\`.ctl\` → \`._cpu_ctl\`). Top-level \`inline [lut]\` / \`inline [asm]\` instances keep their global name (\`.ctl\`).
+
+Use **\`^\`** before the dot to refer to the **global** instance from inside a composite body:
+
+\`\`\`logts
+inline [lut] .ctl:
+  LOAD = 0001
+  :
+
+board +[cpu]:
+  4wire ctl = ^.ctl:LOAD    # global .ctl, not ._cpu_ctl
+  doc(^.ctl)                # works inside board body
+  :
+\`\`\`
+
+\`^\` before a hex literal is unchanged: \`^FF\` is still hex, not global (global form is \`^.name\` only).
 
 ---
 
@@ -6381,7 +6404,11 @@ comp [mem] .prog:
 
 ## LUT opcode decode
 
-\`comp [lut]\` inside the board (not \`inline [lut]\` at top level — board instantiation renames \`.ctl\` to \`._cpu_ctl\`; use a **component** LUT in the board body).
+\`comp [lut]\` inside the board is the usual choice for per-cycle decode with \`.ctl:in\` / \`.ctl:get\`.
+
+Alternatively, declare \`inline [lut] .ctl\` at **top level** and reference it from the board with **\`^.ctl\`** (global ref — no instance prefix). Example: \`^.ctl:LOAD\`, \`^.ctl(in = opc)\`, \`doc(^.ctl)\`.
+
+\`^.name\` works for any top-level \`inline\` (\`asm\`, \`lut\`, \`protocol\`) from inside board/chip/pcb bodies. Hex literals are unchanged: \`^FF\` is not global.
 
 Control word (7 bits, LSB = bit \`ctl.6/1\`):
 

@@ -4809,5 +4809,73 @@ reg(1063, 'mini-cpu-v2', 'cpu4v2 terminal trace la HALT', function(h, session) {
   h.assert('terminal la HALT', String(getTerminalText(_termId(interp, '._cpu_trace')).includes('A')), 'true');
 });
 
+const INLINE_OPCTL = `inline [lut] .opctl:
+  depth: 4
+  length: 16
+  fillwith: 0000
+  LOAD = 0001
+  HALT = 1111
+  :
+`;
+
+const BOARD_GBLUT = `board +[gblut]:
+  1pin set
+  4pout out
+  exec: set
+  on: 1
+  4wire y = ^.opctl:LOAD
+  out = y
+  :
+`;
+
+reg(1064, 'global-ref', 'board — ^.opctl:LOAD from top-level inline', function(h, session) {
+  const src = INLINE_OPCTL + BOARD_GBLUT + `
+board [gblut] .u::
+.u:{ set = 1 }
+4wire r = .u:out`;
+  const { interp } = session.run(src);
+  h.assert('global lut label in board', session.getWire(interp, 'r'), '0001');
+});
+
+reg(1065, 'global-ref', 'board — doc(^.opctl) in board body', function(h, session) {
+  const src = INLINE_OPCTL + `board +[docgb]:
+  1pin set
+  exec: set
+  on: 1
+doc(^.opctl)
+  :
+board [docgb] .d::
+`;
+  const { out } = session.run(src);
+  const text = out.join('\n');
+  h.assert('doc lists LOAD label', String(text.includes('LOAD')), 'true');
+  h.assert('doc targets .opctl', String(text.includes('.opctl')), 'true');
+});
+
+reg(1066, 'global-ref', 'board — ^.opctl(in = addr) LUT invoke', function(h, session) {
+  const src = `inline [lut] .opctl:
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    0010: 1111
+  }
+  :
+board +[lutin]:
+  1pin set
+  4pout out
+  exec: set
+  on: 1
+  4wire addr = 0010
+  4wire y = ^.opctl(in = addr)
+  out = y
+  :
+board [lutin] .u::
+.u:{ set = 1 }
+4wire r = .u:out`;
+  const { interp } = session.run(src);
+  h.assert('global lut invoke by address', session.getWire(interp, 'r'), '1111');
+});
+
   suite.finalize();
 })();

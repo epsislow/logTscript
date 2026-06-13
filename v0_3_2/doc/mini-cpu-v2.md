@@ -109,7 +109,11 @@ comp [mem] .prog:
 
 ## LUT opcode decode
 
-`comp [lut]` inside the board (not `inline [lut]` at top level — board instantiation renames `.ctl` to `._cpu_ctl`; use a **component** LUT in the board body).
+`comp [lut]` inside the board is the usual choice for per-cycle decode with `.ctl:in` / `.ctl:get`.
+
+Alternatively, declare `inline [lut] .ctl` at **top level** and reference it from the board with **`^.ctl`** (global ref — no instance prefix). Example: `^.ctl:LOAD`, `^.ctl(in = opc)`, `doc(^.ctl)`.
+
+`^.name` works for any top-level `inline` (`asm`, `lut`, `protocol`) from inside board/chip/pcb bodies. Hex literals are unchanged: `^FF` is not global.
 
 Control word (7 bits, LSB = bit `ctl.6/1`):
 

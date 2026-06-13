@@ -1424,6 +1424,51 @@
     }
   });
 
+  reg(497, 'wire-init', 'Tokenizer — underscore in wire name is ID', function(h, session) {
+    const { tokens } = session.tokenize('4wire isbeq_taken = 0000');
+    const idTok = tokens.filter(t => t.type === 'ID' && t.value === 'isbeq_taken');
+    h.assert('isbeq_taken is ID token', String(idTok.length), '1');
+  });
+
+  reg(498, 'wire-init', 'Tokenizer — lone _ stays SPECIAL wildcard', function(h, session) {
+    const { tokens } = session.tokenize('1wire _, 2wire c = MUX(sel, a, b)');
+    const wild = tokens.filter(t => t.type === 'SPECIAL' && t.value === '_');
+    const idUnderscore = tokens.filter(t => t.type === 'ID' && t.value === '_');
+    h.assert('lone _ is SPECIAL', String(wild.length), '1');
+    h.assert('no ID named _', String(idUnderscore.length), '0');
+  });
+
+  reg(499, 'wire-init', 'Parser — wire name with underscore', function(h, session) {
+    const stmts = session.parse('4wire isbeq_taken = 0000');
+    h.assert('decl name', stmts[0].decls[0].name, 'isbeq_taken');
+  });
+
+  reg(500, 'global-ref', 'Tokenizer — ^.ctl is GREF token', function(h, session) {
+    const { tokens } = session.tokenize('4wire y = ^.ctl:LOAD');
+    const gref = tokens.filter(t => t.type === 'GREF' && t.value === '.ctl');
+    h.assert('GREF .ctl', String(gref.length), '1');
+  });
+
+  reg(501, 'global-ref', 'Tokenizer — ^FF remains HEX literal', function(h, session) {
+    const { tokens } = session.tokenize('4wire y = ^FF');
+    const hex = tokens.filter(t => t.type === 'HEX' && t.value === 'FF');
+    h.assert('^FF is HEX', String(hex.length), '1');
+  });
+
+  reg(502, 'global-ref', 'Parser — ^.ctl:LOAD sets globalRef', function(h, session) {
+    const stmts = session.parse('4wire y = ^.ctl:LOAD');
+    const atom = stmts[0].expr[0];
+    h.assert('var is .ctl', atom.var, '.ctl');
+    h.assert('property LOAD', atom.property, 'LOAD');
+    h.assert('globalRef true', String(atom.globalRef === true), 'true');
+  });
+
+  reg(503, 'global-ref', 'Parser — doc(^.ctl) AST', function(h, session) {
+    const stmts = session.parse('doc(^.ctl)');
+    h.assert('doc stmt', String(!!stmts[0].doc), 'true');
+    h.assert('doc name', stmts[0].doc, '.ctl');
+  });
+
   reg(90, 'wire-init', 'Parser — 1wire s : 1 produces initExpr {bin}', function(h, session) {
     const stmts = session.parse('1wire s : 1');
     const s = stmts[0];

@@ -782,6 +782,9 @@ parseBoardInstance() {
       if (handler) return this[handler]();
     }
 
+    if (this.c.type === 'GREF') {
+      return this.assignment();
+    }
     if (this.c.type === 'SYM' && this.c.value === '.' && this.peekNextIsComponentAssign()) {
       return this.assignment();
     }
@@ -800,9 +803,9 @@ parseBoardInstance() {
     
     while (i < src.length && /\s/.test(src[i])) i++;
     
-    if (i >= src.length || !/[a-zA-Z]/.test(src[i])) return false;
+    if (i >= src.length || !/[a-zA-Z_]/.test(src[i])) return false;
     
-    while (i < src.length && /[a-zA-Z0-9]/.test(src[i])) i++;
+    while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
     
     while (i < src.length && /\s/.test(src[i])) i++;
     
@@ -816,8 +819,8 @@ parseBoardInstance() {
       
       while (i < src.length && /\s/.test(src[i])) i++;
       
-      if (i >= src.length || !/[a-zA-Z]/.test(src[i])) return false;
-      while (i < src.length && /[a-zA-Z0-9]/.test(src[i])) i++;
+      if (i >= src.length || !/[a-zA-Z_]/.test(src[i])) return false;
+      while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
       while (i < src.length && /\s/.test(src[i])) i++;
       return i < src.length && src[i] === '=';
     } else {
@@ -937,6 +940,40 @@ parseBoardInstance() {
   }
 
 assignment() {
+  if (this.c.type === 'GREF') {
+    const compName = this.c.value;
+    this.eat('GREF');
+    this.eat('SYM', ':');
+    if (this.c.type === 'SYM' && this.c.value === '{') {
+      const block = this.parsePropertyBlock(compName);
+      block.componentPropertyBlock.globalRef = true;
+      return block;
+    }
+    if (this.c.type !== 'ID') {
+      throw Error(`Expected property name after '${compName}:' at ${this.c.line}:${this.c.col}`);
+    }
+    const property = this.c.value;
+    this.eat('ID');
+    let assignPad;
+    if (this.c.value === '=:') {
+      this.eat('SYM', '=:');
+      assignPad = 'right';
+    } else if (this.c.value === ':=') {
+      this.eat('SYM', ':=');
+      assignPad = 'left';
+    } else {
+      this.eat('SYM', '=');
+      assignPad = 'strict';
+    }
+    const expr = this.expr();
+    return {
+      assignment: {
+        target: { var: compName, property, globalRef: true },
+        expr,
+        assignPad
+      }
+    };
+  }
   if (this.c.type === 'SYM' && this.c.value === '.') {
     const savedPos = this.t.i;
     const savedLine = this.t.line;
@@ -947,8 +984,8 @@ assignment() {
     
     while (i < src.length && /\s/.test(src[i])) i++;
     
-    if (i < src.length && /[a-zA-Z]/.test(src[i])) {
-      while (i < src.length && /[a-zA-Z0-9]/.test(src[i])) i++;
+    if (i < src.length && /[a-zA-Z_]/.test(src[i])) {
+      while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
       
       while (i < src.length && (src[i] === ' ' || src[i] === '\t')) i++;
       
@@ -1172,6 +1209,12 @@ assignment() {
   doc(){
     this.eat('KEYWORD');
     this.eat('SYM', '(');
+    if (this.c.type === 'GREF') {
+      const name = this.c.value;
+      this.eat('GREF');
+      this.eat('SYM', ')');
+      return { doc: name };
+    }
     // Consume first token (could be ID, KEYWORD like 'comp'/'pcb', MUX, REG, DEMUX)
     let name = this.c.value;
     this.c = this.t.get();
@@ -2227,8 +2270,20 @@ assignment() {
     throw Error(`${n} must be called as a function at ${this.c.line}:${this.c.col}`);
   }
   
-  if (this.c.type === 'SYM' && this.c.value === '.') {
-    const compName = this.parseDotComponentRef();
+  if (this.c.type === 'GREF' || (this.c.type === 'SYM' && this.c.value === '.')) {
+    let globalRef = false;
+    let compName;
+    if (this.c.type === 'GREF') {
+      compName = this.c.value;
+      globalRef = true;
+      this.eat('GREF');
+    } else {
+      compName = this.parseDotComponentRef();
+    }
+    const tagGlobal = (obj) => {
+      if (globalRef) obj.globalRef = true;
+      return addNot(obj);
+    };
 
     if (this.c.type === 'SYM' && this.c.value === '{') {
       const bracePos = this.t.i - 1;
@@ -2236,11 +2291,13 @@ assignment() {
       if (inlineDef && inlineDef.kind === 'protocol') {
         const invoke = this.parseProtocolInvoke(bracePos);
         invoke.protocolRef = compName;
-        return addNot({ protocolInvoke: invoke });
+        if (globalRef) invoke.globalRef = true;
+        return tagGlobal({ protocolInvoke: invoke });
       }
       const program = this.parseAsmProgramRaw(bracePos);
       program.isaRef = compName;
-      return addNot({ asmProgram: program });
+      if (globalRef) program.globalRef = true;
+      return tagGlobal({ asmProgram: program });
     }
     
     if (this.c.type === 'SYM' && this.c.value === ':') {
@@ -2277,7 +2334,7 @@ assignment() {
 
           { const _a = { var: compName, property: property, bitRange: { start, end } };
             if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
-            return addNot(_a); }
+            return tagGlobal(_a); }
         }
 
         if (this.c.type === 'SYM' && this.c.value === '/') {
@@ -2293,12 +2350,12 @@ assignment() {
 
           { const _a = { var: compName, property: property, bitRange: { start, end } };
             if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
-            return addNot(_a); }
+            return tagGlobal(_a); }
         }
 
         { const _a = { var: compName, property: property, bitRange: { start, end } };
           if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
-          return addNot(_a); }
+          return tagGlobal(_a); }
       }
 
       if (this.c.type === 'SYM' && this.c.value === '(') {
@@ -2314,12 +2371,14 @@ assignment() {
           this.t.skip();
         }
         this.eat('SYM', ')');
-        return addNot({ inlineMethod: { var: compName, method: property, args: methodArgs } });
+        const method = { var: compName, method: property, args: methodArgs };
+        if (globalRef) method.globalRef = true;
+        return tagGlobal({ inlineMethod: method });
       }
 
       { const _a = { var: compName, property: property };
         if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
-        return addNot(_a); }
+        return tagGlobal(_a); }
     }
     
     if (this.c.type === 'SYM' && this.c.value === '.') {
@@ -2330,7 +2389,7 @@ assignment() {
         this.eat('ID');
         { const _a = { var: compName, internalWire };
           if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
-          return addNot(_a); }
+          return tagGlobal(_a); }
       }
 
       if (this.c.type !== 'BIN' && this.c.type !== 'DEC') {
@@ -2360,16 +2419,16 @@ assignment() {
       
       { const _a = { var: compName, bitRange: { start, end } };
         if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
-        return addNot(_a); }
+        return tagGlobal(_a); }
     }
     
     if (this.c.type === 'SYM' && this.c.value === '(') {
-      return addNot(this.parseCompInvoke(compName));
+      return addNot(this.parseCompInvoke(compName, globalRef));
     }
 
     { const _a = { var: compName };
       if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
-      return addNot(_a); }
+      return tagGlobal(_a); }
   }
   
   if (this.c.type === 'ID') {
@@ -2814,7 +2873,7 @@ isBuiltinFunction(name) {
     return { kind: 'lutData', entries, rawEntries };
   }
 
-  parseCompInvoke(compName) {
+  parseCompInvoke(compName, globalRef) {
     this.eat('SYM', '(');
     const args = {};
     this.t.skip();
@@ -2848,7 +2907,9 @@ isBuiltinFunction(name) {
       break;
     }
     this.eat('SYM', ')');
-    return { compInvoke: { var: compName, args } };
+    const invoke = { var: compName, args };
+    if (globalRef) invoke.globalRef = true;
+    return { compInvoke: invoke };
   }
 
 }
