@@ -280,5 +280,6 @@ Assembler errors include the source line and `^^^` under the problematic token w
 ## Related
 
 - [mem.md](mem.md) — store assembled blob
+- [mini-cpu-v2.md](mini-cpu-v2.md) — end-to-end CPU with ASM program and `BEQ`
 - [lut.md](lut.md) — lookup tables
 - [debug.md](debug.md) — `show`, `peek`

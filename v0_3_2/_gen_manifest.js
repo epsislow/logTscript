@@ -33,6 +33,7 @@ const GROUP_META = [
   { id: 'doc-comp', label: 'Doc for body comps' },
   { id: 'chip', label: 'Chip component' },
   { id: 'board', label: 'Board component' },
+  { id: 'mini-cpu-v2', label: 'Mini CPU v2 demo' },
   { id: 'lut', label: 'LUT lookup table' },
   { id: 'lut-labels', label: 'LUT labels & const expr' },
   { id: 'lut-isvalid', label: 'LUT isValid()' },

@@ -499,5 +499,6 @@ With an interactive panel: `comp [key]` on the instance `.cpu` `set` pin (see [k
 - [asm.md](asm.md) — load ROM from mnemonics (`inline [asm]` + `= .cpuisa { … }`)
 - [lut.md](lut.md) — optional opcode decode via lookup table instead of `EQ` wiring
 - [mini-cpu-plan.md](mini-cpu-plan.md) — feasibility notes
+- [mini-cpu-v2.md](mini-cpu-v2.md) — v2 demo (ASM, BEQ, LUT, terminal)
 - Automated tests: `test_suite_ported.js` (859–866)
 - Test constants: `CHIP_ALU4`, `BOARD_CPU4`

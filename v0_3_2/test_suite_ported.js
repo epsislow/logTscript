@@ -4560,5 +4560,254 @@ show(slots)`);
   h.assert('show slots', String(out.some(l => l.includes('slots') && l.includes('01110'))), 'true');
 }, { propagation: 'wave' });
 
+const CPUISA_V2 = `inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + 4b
+  STORE : 0010 + 4b
+  ADDI  : 0011 + 4b
+  SUBI  : 0100 + 4b
+  JMP   : 0101 + 4b
+  BEQ   : 0110 + S4b
+  HALT  : 0111 + 4b
+  :`;
+
+const CPU4V2_ROM = '40wire romblob = .cpuisa {\n  LOAD \\0\nloop:\n  SUBI \\1\n  BEQ done\n  JMP loop\ndone:\n  HALT\n}\n';
+
+const BOARD_CPU4V2 = `board +[cpu4v2]:
+  1pin set
+  1pin rst
+  4pout acc
+  4pout pc
+  8pout ir
+  exec: set
+  on: 1
+  comp [mem] .prog:
+    depth: 8
+    length: 8
+    = romblob
+    on: raise
+    :
+  comp [mem] .data:
+    depth: 4
+    length: 16
+    = ^3
+    on: raise
+    :
+  comp [counter] .pcnt:
+    depth: 4
+    on: 1
+    :
+  comp [reg] .accum:
+    depth: 4
+    on: 1
+    :
+  comp [7seg] .disp:
+    on: 1
+    nl
+    :
+  comp [terminal] .trace:
+    rows: 4
+    columns: 20
+    on: 1
+    :
+  comp [adder] .pcinc:
+    depth: 4
+    on: 1
+    :
+  comp [adder] .bradd:
+    depth: 4
+    on: 1
+    :
+  comp [lut] .ctl:
+    depth: 7
+    length: 16
+    fillwith: 0000000
+    = data {
+      0000: 0000000
+      0001: 0000001
+      0010: 0000010
+      0011: 0000100
+      0100: 0001000
+      0101: 0010000
+      0110: 0100000
+      0111: 1000000
+    }
+    :
+  chip [alu4] .alu::
+  4wire pcval
+  4wire pcout
+  8wire instr
+  4wire opc
+  4wire opd
+  4wire curacc
+  4wire loadval
+  4wire aluy
+  7wire ctl
+  1wire isload
+  1wire isstore
+  1wire isaddi
+  1wire issubi
+  1wire isjmp
+  1wire isbeq
+  1wire ishalt
+  1wire iszero
+  1wire isbeqtaken
+  1wire dobranch
+  1wire doinc
+  1wire inc
+  2wire aluop
+  4wire t0
+  4wire t1
+  4wire accnext
+  4wire pcplus1
+  4wire brtgt
+  4wire pcload
+  pcval = .pcnt:get
+  .prog:{ adr = pcval
+    set = set }
+  instr = .prog:get
+  opc = instr.0/4
+  opd = instr.4/4
+  .ctl:in = opc
+  ctl = .ctl:get
+  isload = ctl.6/1
+  isstore = ctl.5/1
+  isaddi = ctl.4/1
+  issubi = ctl.3/1
+  isjmp = ctl.2/1
+  isbeq = ctl.1/1
+  ishalt = ctl.0/1
+  curacc = .accum:get
+  iszero = ZERO(curacc)
+  isbeqtaken = AND(isbeq, iszero)
+  dobranch = OR(isjmp, isbeqtaken)
+  .data:adr = opd
+  .data:{ set = set }
+  loadval = .data:get
+  aluop = MUX(issubi, 00, 01)
+  .alu:a = curacc
+  .alu:b = opd
+  .alu:op = aluop
+  aluy = .alu:y
+  t0 = MUX(issubi, curacc, aluy)
+  t1 = MUX(isaddi, t0, aluy)
+  accnext = MUX(isload, t1, loadval)
+  .pcinc:a = pcval
+  .pcinc:b = 0001
+  pcplus1 = .pcinc:get
+  .bradd:a = pcplus1
+  .bradd:b = opd
+  brtgt = .bradd:get
+  pcload = MUX(isbeqtaken, opd, brtgt)
+  .pcnt:{ data = pcload
+    write = 1
+    set = AND(dobranch, set) }
+  doinc = AND(NOT(ishalt), NOT(dobranch))
+  inc = AND(doinc, set)
+  .pcnt:{ dir = 1
+    set = inc }
+  pcout = .pcnt:get
+  .data:adr = opd
+  .data:{ data = curacc
+    write = AND(isstore, set)
+    set = AND(isstore, set) }
+  .accum:{ data = accnext
+    set = set }
+  .pcnt:{ data = 0000
+    write = 1
+    set = rst }
+  .accum:{ data = 0000
+    set = rst }
+  .disp:{ hex = .accum:get
+    set = set }
+  .trace:{ append = ^41
+    set = AND(ishalt, set) }
+  acc = .accum:get
+  pc = pcout
+  ir = instr
+  :4bit acc`;
+
+const CPU4V2_BASE = CPUISA_V2 + '\n' + CPU4V2_ROM + '\n' + CHIP_ALU4 + '\n' + BOARD_CPU4V2;
+
+function cpuV2Step(session, interp, n) {
+  for (let i = 0; i < n; i++) {
+    session.execStmts(interp, '.cpu:{ set = 1 }');
+  }
+}
+
+const CPU4V2_STEPS_FULL = 9;
+
+reg(1056, 'mini-cpu-v2', 'cpu4v2 stare inițială acc=0 pc=0', function(h, session) {
+  const { interp } = session.run(CPU4V2_BASE + '\nboard [cpu4v2] .cpu::\n');
+  h.assert('cpu acc init', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
+  h.assert('cpu pc init', session.getPcbPout(interp, '.cpu', 'pc'), '0000');
+});
+
+reg(1057, 'mini-cpu-v2', 'cpu4v2 un pas LOAD 0 → acc=3 pc=1', function(h, session) {
+  const { interp } = session.run(CPU4V2_BASE + '\nboard [cpu4v2] .cpu::\n');
+  cpuV2Step(session, interp, 1);
+  h.assert('cpu acc după LOAD', session.getPcbPout(interp, '.cpu', 'acc'), '0011');
+  h.assert('cpu pc după LOAD', session.getPcbPout(interp, '.cpu', 'pc'), '0001');
+});
+
+reg(1058, 'mini-cpu-v2', 'cpu4v2 countdown complet', function(h, session) {
+  const { interp } = session.run(CPU4V2_BASE + '\nboard [cpu4v2] .cpu::\n');
+  cpuV2Step(session, interp, CPU4V2_STEPS_FULL);
+  h.assert('cpu acc final', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
+  h.assert('cpu pc final', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+});
+
+reg(1059, 'mini-cpu-v2', 'cpu4v2 BEQ sare la done', function(h, session) {
+  const { interp } = session.run(CPU4V2_BASE + '\nboard [cpu4v2] .cpu::\n');
+  cpuV2Step(session, interp, 7);
+  h.assert('acc zero înainte de BEQ', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
+  const pcBefore = session.getPcbPout(interp, '.cpu', 'pc');
+  h.assert('pc la BEQ sau done', String(pcBefore === '0010' || pcBefore === '0100'), 'true');
+  if (pcBefore === '0010') {
+    cpuV2Step(session, interp, 1);
+    h.assert('pc după BEQ la done', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+  }
+});
+
+reg(1060, 'mini-cpu-v2', 'probe(.cpu:acc) cpu4v2', function(h, session) {
+  const src = CPU4V2_BASE + `
+board [cpu4v2] .cpu::
+probe(.cpu:acc)`;
+  const { out, interp } = session.run(src);
+  h.assert('probe acc initialised', String(out.some(l => l.includes('# .cpu:acc = 0000') && l.includes('initialised'))), 'true');
+  cpuV2Step(session, interp, 1);
+  h.assert('cpu acc după step', session.getPcbPout(interp, '.cpu', 'acc'), '0011');
+});
+
+reg(1061, 'mini-cpu-v2', 'cpu4v2 clock pulse', function(h, session) {
+  const { interp } = session.run(CPU4V2_BASE + `
+board [cpu4v2] .cpu::
+1wire clk = 0
+.cpu:{ set = clk }
+`);
+  for (let i = 0; i < CPU4V2_STEPS_FULL; i++) {
+    session.setWire(interp, 'clk', '1');
+    session.setWire(interp, 'clk', '0');
+  }
+  h.assert('cpu acc după pulse', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
+  h.assert('cpu pc după pulse', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+});
+
+reg(1062, 'mini-cpu-v2', 'cpu4v2 NEXT(~) step', function(h, session) {
+  const { interp } = session.run(CPU4V2_BASE + `
+board [cpu4v2] .cpu::
+.cpu:{ set = ~ }
+`);
+  for (let i = 0; i < CPU4V2_STEPS_FULL; i++) session.execNext(interp, 1);
+  h.assert('cpu acc după NEXT', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
+  h.assert('cpu pc după NEXT', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+});
+
+reg(1063, 'mini-cpu-v2', 'cpu4v2 terminal trace la HALT', function(h, session) {
+  const { interp } = session.run(CPU4V2_BASE + '\nboard [cpu4v2] .cpu::\n');
+  cpuV2Step(session, interp, CPU4V2_STEPS_FULL);
+  h.assert('terminal la HALT', String(getTerminalText(_termId(interp, '._cpu_trace')).includes('A')), 'true');
+});
+
   suite.finalize();
 })();

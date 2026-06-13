@@ -397,3 +397,4 @@ Dual writes in one block (different addresses, no collision): set `write`/`data`
 - [asm.md](asm.md) — define ISA and load programs into `mem`
 - [lut.md](lut.md) — combinational lookup (different from sequential `mem`)
 - [mini-cpu.md](mini-cpu.md) — teaching CPU using `comp [mem]` for program and data
+- [mini-cpu-v2.md](mini-cpu-v2.md) — full CPU demo with ASM ROM and `BEQ`

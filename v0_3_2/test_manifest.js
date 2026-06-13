@@ -615,7 +615,15 @@
       {"id":1052,"group":"queue-stack","title":"stack clear + push","detail":{"scripts":["comp [stack] .s:\n  width: 8\n  length: 16\n  on: 1\n  :"],"steps":[],"assertions":["only B"]}},
       {"id":1053,"group":"queue-stack","title":"stack wave propagation","detail":{"scripts":["comp [stack] .s:\n  width: 8\n  length: 16\n  on: 1\n  :\n.s:{ push = ^41\n  set = 1 }\n8wire g = .s:get"],"steps":[],"assertions":["stack wave"]}},
       {"id":1054,"group":"queue-stack","title":"forbid direct assign queue","detail":{"scripts":["comp [queue] .q:\n  width: 8\n  length: 16\n  on: 1\n  :\n.q = ^41"],"steps":[],"assertions":["direct assign"]}},
-      {"id":1055,"group":"queue-stack","title":"show după front>= size>= free>= — wave","detail":{"scripts":["comp [queue] .q:\n  width: 8\n  length: 16\n  on: 1\n  :\n.q:{ push = ^41\n  set = 1 }\n.q:{ push = ^42\n  set = 1 }\n\n4wire data\n5wire n\n5wire slots\n.q:{\n  front >= data\n  size >= n\n  free >= slots\n  set = 1\n}\nshow(data)\nshow(n)\nshow(slots)"],"steps":[],"assertions":["show data","show n","show slots"]}}
+      {"id":1055,"group":"queue-stack","title":"show după front>= size>= free>= — wave","detail":{"scripts":["comp [queue] .q:\n  width: 8\n  length: 16\n  on: 1\n  :\n.q:{ push = ^41\n  set = 1 }\n.q:{ push = ^42\n  set = 1 }\n\n4wire data\n5wire n\n5wire slots\n.q:{\n  front >= data\n  size >= n\n  free >= slots\n  set = 1\n}\nshow(data)\nshow(n)\nshow(slots)"],"steps":[],"assertions":["show data","show n","show slots"]}},
+      {"id":1056,"group":"mini-cpu-v2","title":"cpu4v2 stare inițială acc=0 pc=0","detail":{"scripts":[],"steps":["run(CPU4V2_BASE + '\\nboard [cpu4v2] .cpu::\\n') [nerezolvat]"],"assertions":["cpu acc init","cpu pc init"]}},
+      {"id":1057,"group":"mini-cpu-v2","title":"cpu4v2 un pas LOAD 0 → acc=3 pc=1","detail":{"scripts":[],"steps":["run(CPU4V2_BASE + '\\nboard [cpu4v2] .cpu::\\n') [nerezolvat]"],"assertions":["cpu acc după LOAD","cpu pc după LOAD"]}},
+      {"id":1058,"group":"mini-cpu-v2","title":"cpu4v2 countdown complet","detail":{"scripts":[],"steps":["run(CPU4V2_BASE + '\\nboard [cpu4v2] .cpu::\\n') [nerezolvat]"],"assertions":["cpu acc final","cpu pc final"]}},
+      {"id":1059,"group":"mini-cpu-v2","title":"cpu4v2 BEQ sare la done","detail":{"scripts":[],"steps":["run(CPU4V2_BASE + '\\nboard [cpu4v2] .cpu::\\n') [nerezolvat]"],"assertions":["acc zero înainte de BEQ","pc la BEQ sau done","pc după BEQ la done"]}},
+      {"id":1060,"group":"mini-cpu-v2","title":"probe(.cpu:acc) cpu4v2","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["probe acc initialised","cpu acc după step"]}},
+      {"id":1061,"group":"mini-cpu-v2","title":"cpu4v2 clock pulse","detail":{"scripts":[],"steps":["run(CPU4V2_BASE + ` board [cpu4v2] .cpu:: 1wire clk = 0 .cpu:{ set = clk } `) [nerezolvat]"],"assertions":["cpu acc după pulse","cpu pc după pulse"]}},
+      {"id":1062,"group":"mini-cpu-v2","title":"cpu4v2 NEXT(~) step","detail":{"scripts":[],"steps":["run(CPU4V2_BASE + ` board [cpu4v2] .cpu:: .cpu:{ set = ~ } `) [nerezolvat]"],"assertions":["cpu acc după NEXT","cpu pc după NEXT"]}},
+      {"id":1063,"group":"mini-cpu-v2","title":"cpu4v2 terminal trace la HALT","detail":{"scripts":[],"steps":["run(CPU4V2_BASE + '\\nboard [cpu4v2] .cpu::\\n') [nerezolvat]"],"assertions":["terminal la HALT"]}}
     ],
     groups: [
       { id: 'repeat', label: 'Repeat preprocessor', rangeLabel: '6–10, 13–17, 19–21', testIds: [6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21] },
@@ -640,6 +648,7 @@
       { id: 'doc-comp', label: 'Doc for body comps', rangeLabel: '400–431, 848–850', testIds: [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 848, 849, 850] },
       { id: 'chip', label: 'Chip component', rangeLabel: '540–543, 556–557, 857–860', testIds: [540, 541, 542, 543, 556, 557, 857, 858, 859, 860] },
       { id: 'board', label: 'Board component', rangeLabel: '840–847, 855–856, 861–863, 865–866', testIds: [840, 841, 842, 843, 844, 845, 846, 847, 855, 856, 861, 862, 863, 865, 866] },
+      { id: 'mini-cpu-v2', label: 'Mini CPU v2 demo', rangeLabel: '1056–1063', testIds: [1056, 1057, 1058, 1059, 1060, 1061, 1062, 1063] },
       { id: 'lut', label: 'LUT lookup table', rangeLabel: '867–882, 908–913, 952', testIds: [867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 881, 882, 908, 909, 910, 911, 912, 913, 952] },
       { id: 'lut-labels', label: 'LUT labels & const expr', rangeLabel: '936–938', testIds: [936, 937, 938] },
       { id: 'lut-isvalid', label: 'LUT isValid()', rangeLabel: '939–940', testIds: [939, 940] },

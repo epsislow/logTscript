@@ -4,22 +4,22 @@ overview: Documentație nouă `mini-cpu-v2.md` + teste automate E2E (1056–1063
 todos:
   - id: draft-v2-doc
     content: "Scrie mini-cpu-v2.md: arhitectură, ISA ASM, LUT decode, BEQ+ZERO, terminal, exemple logts-play"
-    status: pending
+    status: completed
   - id: board-script
     content: Compune board +[cpu4v2] + constante test (CHIP_ALU4, CPUISA_V2, LUT_DECODE, BOARD_CPU4V2)
-    status: pending
+    status: completed
   - id: e2e-tests
     content: "test_suite_ported.js reg(1056–1063): mirror v1 + BEQ + terminal; node _gen_manifest.js"
-    status: pending
+    status: completed
   - id: optional-sections
     content: "Adaugă secțiuni Advanced: queue call-stack + mem multi-port sidebar"
-    status: pending
+    status: completed
   - id: index-crossref
     content: Actualizează doc-index.json, components.md, Related în mini-cpu/mem/asm + secțiune Tests în doc
-    status: pending
+    status: completed
   - id: verify-suite
     content: "node _run_suite_node.js verde + _gen_doc_data.js + smoke Load&Run"
-    status: pending
+    status: completed
 isProject: false
 ---
 

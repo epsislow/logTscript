@@ -12,6 +12,7 @@ LogTscript includes built-in **components** (`comp`), **inline** declarations (`
 | Chip — reusable logic without UI | [chip.md](chip.md) |
 | PCB — deprecated, legacy propagation | [pcb.md](pcb.md) |
 | **Mini CPU demo** — Harvard step CPU (chip ALU + board) | [mini-cpu.md](mini-cpu.md) |
+| **Mini CPU v2** — ASM, BEQ, LUT decode, terminal | [mini-cpu-v2.md](mini-cpu-v2.md) |
 | **Future component ideas** — brainstorming backlog (no roadmap) | [future-component-ideas.md](future-component-ideas.md) |
 
 ---
