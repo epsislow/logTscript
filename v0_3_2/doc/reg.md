@@ -132,9 +132,9 @@ clk = 0
 
 ---
 
-## No fixed-width REGn
+## Width
 
-Older drafts used names like `REG1`, `REG2`, `REG8`. These are **not** valid — use the single builtin `REG(data, clk, clr)` only. Width comes from `data` (e.g. `1wire` → 1 bit, `4wire` → 4 bits), similar to how `MUX` infers selector width from usage.
+Width comes from `data` (e.g. `1wire` → 1 bit, `4wire` → 4 bits), similar to how `MUX` infers selector width from usage.
 
 ---
 

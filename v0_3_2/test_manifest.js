@@ -177,7 +177,7 @@
       {"id":223,"group":"registry","title":"Parser — osc property block with reset and set","detail":{"scripts":["comp [~] .osc1:\n  length: 6\n  freq: 2\n  :\n6wire cnt = .osc1:counter\n.osc1:{\n  reset = 1\n  set = EQ(cnt, 001010)\n}"],"steps":[],"assertions":["3 statements parsed","stmt 0 is comp osc","stmt 2 is property block","block component is .osc1","block has 2 properties","block prop 0 is reset","block prop 1 is set"]}},
       {"id":300,"group":"doc","title":"Tokenizer — doc este KEYWORD","detail":{"scripts":["doc(OR)"],"steps":[],"assertions":["doc tokenizat ca KEYWORD","doc valoare corecta"]}},
       {"id":301,"group":"doc","title":"Parser — doc(OR) produce nodul AST corect","detail":{"scripts":["doc(OR)"],"steps":[],"assertions":["1 statement","stmt are camp doc","doc.name este OR"]}},
-      {"id":302,"group":"doc","title":"Parser — doc(MUX1) accepta token MUX","detail":{"scripts":["doc(MUX1)"],"steps":[],"assertions":["stmt are camp doc","doc.name este MUX1"]}},
+      {"id":302,"group":"doc","title":"Parser — doc(MUX) accepta token MUX","detail":{"scripts":["doc(MUX)"],"steps":[],"assertions":["stmt are camp doc","doc.name este MUX"]}},
       {"id":303,"group":"doc","title":"Parser — doc(REG) produce nodul AST corect","detail":{"scripts":["doc(REG)"],"steps":[],"assertions":["stmt are camp doc","doc.name este REG"]}},
       {"id":304,"group":"doc","title":"BUILTIN_DOC — NOT","detail":{"scripts":[],"steps":["getDocLines(NOT)"],"assertions":["NOT semnatura"]}},
       {"id":305,"group":"doc","title":"BUILTIN_DOC — OR are 2 semnaturi","detail":{"scripts":[],"steps":["getDocLines(OR)"],"assertions":["OR 2 semnaturi","OR semnatura 1","OR semnatura 2"]}},

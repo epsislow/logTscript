@@ -8577,11 +8577,7 @@ Interpreter.BUILTIN_DOC = {
   RSHIFT:['RSHIFT(Xbit data, Nbit n) -> Xbit', 'RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit'],
   REG:  ['REG(Xbit data, 1bit clock, 1bit clear) -> Xbit'],
   MUX:  ['MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit'],
-//  MUX2:  ['MUX(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3) -> Xbit'],
-//  MUX3:  ['MUX(3bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3, Xbit data4, Xbit data5, Xbit data6, Xbit data7) -> Xbit'],
   DEMUX:['DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..'],
-//  DEMUX2:['DEMUX(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit'],
-//  DEMUX3:['DEMUX(3bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit, Xbit'],
   ADD:      ['ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
   SUBTRACT: ['SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
   MULTIPLY: ['MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over'],
@@ -8592,16 +8588,10 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
   // ---- doc(def) — list all built-in functions and user-defined functions ----
   if (name === 'def') {
     const builtinNames = Object.keys(Interpreter.BUILTIN_DOC);
-    // Include MUXn, DEMUXn patterns as representative examples
-    const extraBuiltins = ['MUX1', 'MUX2', 'MUX3', 'DEMUX1', 'DEMUX2', 'DEMUX3'];
-    // Filter out MUX/DEMUX already in BUILTIN_DOC to avoid duplicates
-    const allBuiltins = builtinNames.concat(
-      extraBuiltins.filter(x => !builtinNames.includes(x))
-    );
     const lines = ['built-in:'];
     
-    for (let i = 0; i < allBuiltins.length; i += 4) {
-      chunk = allBuiltins.slice(i, i + 4);
+    for (let i = 0; i < builtinNames.length; i += 4) {
+      chunk = builtinNames.slice(i, i + 4);
       lines.push(chunk.join(', '));
     }
 
@@ -8832,22 +8822,6 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
   if (Interpreter.BUILTIN_DOC[name]) {
     return Interpreter.BUILTIN_DOC[name];
   }
-
-  // ---- MUXn pattern (e.g. MUX1, MUX2, MUX3) ----
-  /*if (/^MUX(\d+)$/.test(name)) {
-    const n = parseInt(name.slice(3), 10);
-    const inputs = 1 << n;
-    const dataParams = Array.from({length: inputs}, (_, i) => `Xbit data${i}`).join(', ');
-    return [`${name}(${n}bit sel, ${dataParams}) -> Xbit`];
-  }
-
-  // ---- DEMUXn pattern (e.g. DEMUX1, DEMUX2, DEMUX3) ----
-  if (/^DEMUX(\d+)$/.test(name)) {
-    const n = parseInt(name.slice(5), 10);
-    const outputs = 1 << n;
-    const retStr = Array.from({length: outputs}, () => 'Xbit').join(', ');
-    return [`${name}(${n}bit sel, Xbit data) -> ${retStr}`];
-  }*/
 
   // ---- User-defined functions ----
   if (funcs && funcs.has(name)) {

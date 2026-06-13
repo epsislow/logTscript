@@ -17,10 +17,10 @@ reg(301, 'doc', 'Parser — doc(OR) produce nodul AST corect', function(h, sessi
   h.assert('doc.name este OR', stmts[0].doc, 'OR');
 });
 
-reg(302, 'doc', 'Parser — doc(MUX1) accepta token MUX', function(h, session) {
-  const stmts = session.parse('doc(MUX1)');
+reg(302, 'doc', 'Parser — doc(MUX) accepta token MUX', function(h, session) {
+  const stmts = session.parse('doc(MUX)');
   h.assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
-  h.assert('doc.name este MUX1', stmts[0].doc, 'MUX1');
+  h.assert('doc.name este MUX', stmts[0].doc, 'MUX');
 });
 
 reg(303, 'doc', 'Parser — doc(REG) produce nodul AST corect', function(h, session) {

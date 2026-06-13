@@ -6,6 +6,7 @@ const DOC_SECTIONS = [
     title: 'Reference',
     items: [
       { file: 'doc-function.md', label: 'doc() function' },
+      { file: 'builtin-functions.md', label: 'Built-in functions', searchExtra: 'internal MUX DEMUX REG LATCH NOT AND OR shift arithmetic builtin' },
       { file: 'components.md', label: 'Component catalog' },
       { file: 'short-notation.md', label: 'Short notation' },
       { file: 'arithmetic.md', label: 'Arithmetic (built-in)' },

@@ -14,7 +14,7 @@
 |----------|----------------------|-------|
 | **RAM / program** | `comp [mem]` | ROM init with `= ^hex`, `= .isa { … }` ([inline ASM](asm.md)), or `.ram =` reload — [mem.md](mem.md) |
 | **ALU (ADD/SUB/AND…)** | `comp [adder]` / `[subtract]` or `ADD()` / `SUBTRACT()` | For a persistent CPU, prefer **components** in a `chip`, not instant functions — [adder.md](adder.md) |
-| **Operation select** | `MUX` / `MUX2` / `MUX3` | Pick ALU result from a few instruction bits |
+| **Operation select** | `MUX` | Pick ALU result from a few instruction bits |
 | **Accumulator / IR** | `REG(data, clk, clr)` or `comp [reg]` | State between steps — [reg.md](reg.md) |
 | **Program counter** | `comp [counter]` | Load + increment on `dir` — [counter.md](counter.md) |
 | **Flags (carry, zero)** | `carry` from adder; `EQ` for zero | No dedicated “flags” component |

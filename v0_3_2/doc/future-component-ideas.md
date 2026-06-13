@@ -133,7 +133,7 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 **How I see it used:** ALU output select (add vs sub), building buses, routing one RAM output to PC or ACC. In the panel as `.mux_sel:` with pins `d0`, `d1`, `sel`, `y` so beginners see the chip shape, not only `MUX(sel, a, b)` in code.
 
-**Today:** `MUX`, `MUX1`–`MUX3`, `DEMUX`, `DEMUX1`–`DEMUX3` are built-ins; mini-CPU uses `MUX()` inline. As `comp`, same logic, plus `probe(.mux:y)`, property blocks, and consistency with `comp [adder]`.
+**Today:** `MUX` and `DEMUX` are built-ins; mini-CPU uses `MUX()` inline. As `comp`, same logic, plus `probe(.mux:y)`, property blocks, and consistency with `comp [adder]`.
 
 ---
 

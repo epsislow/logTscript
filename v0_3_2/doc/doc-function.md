@@ -41,6 +41,8 @@ OR(Xbit, Xbit)
 
 ## Built-in functions
 
+Grouped catalogue (logic, shift, routing, arithmetic, …): **[builtin-functions.md](builtin-functions.md)**.
+
 ### Logic gates
 
 | Call | Output |
@@ -74,7 +76,7 @@ OR(Xbit, Xbit)
 
 ### Register (REG)
 
-Width is inferred from `data` at runtime — there is only the generic `REG` (no `REG1`, `REG4`, `REG8`, etc.):
+Width is inferred from `data` at runtime:
 
 ```
 doc(REG)
@@ -91,49 +93,42 @@ Parameters:
 - `clock` — wire: **falling edge** (`1` → `0`) captures `data`; `~`: updates on `NEXT(~)` (see [reg.md](reg.md))
 - `clear` — `1` resets the register to zero
 
-`doc(REG8)` and similar fixed-width names are **not** supported — use `doc(REG)` only.
-
 Full behaviour: [reg.md](reg.md).
 
-### Multiplexers (MUX1 / MUX2 / MUX3)
+### Multiplexer (MUX)
+
+Selector width is inferred from `sel` at runtime:
 
 ```
-doc(MUX1)
-```
-
-Output:
-
-```
-MUX1(1bit sel, Xbit data0, Xbit data1) -> Xbit
-```
-
-| Call | Signature |
-|------|-----------|
-| `doc(MUX1)` | `MUX1(1bit sel, Xbit data0, Xbit data1) -> Xbit` |
-| `doc(MUX2)` | `MUX2(2bit sel, Xbit data0, Xbit data1, Xbit data2, Xbit data3) -> Xbit` |
-| `doc(MUX3)` | `MUX3(3bit sel, Xbit data0, ..., Xbit data7) -> Xbit` |
-
-`sel` is the selector: `MUX1` → 1 bit (2 inputs), `MUX2` → 2 bits (4 inputs), `MUX3` → 3 bits (8 inputs).
-
-### Demultiplexers (DEMUX1 / DEMUX2 / DEMUX3)
-
-```
-doc(DEMUX1)
+doc(MUX)
 ```
 
 Output:
 
 ```
-DEMUX1(1bit sel, Xbit data) -> Xbit, Xbit
+MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit
 ```
 
-| Call | Signature |
-|------|-----------|
-| `doc(DEMUX1)` | `DEMUX1(1bit sel, Xbit data) -> Xbit, Xbit` |
-| `doc(DEMUX2)` | `DEMUX2(2bit sel, Xbit data) -> Xbit, Xbit, Xbit, Xbit` |
-| `doc(DEMUX3)` | `DEMUX3(3bit sel, Xbit data) -> Xbit x8` |
+- `sel` — `N` bits → `2^N` data inputs
+- Pass separate `data0`, `data1`, … **or** one packed `Xbit` string split into equal chunks
 
-DEMUX returns a **vector** of `2^n` outputs: one contains `data`, the rest are `0`.
+Full behaviour and examples: [builtin-functions.md](builtin-functions.md#routing-mux--demux).
+
+### Demultiplexer (DEMUX)
+
+```
+doc(DEMUX)
+```
+
+Output:
+
+```
+DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..
+```
+
+DEMUX returns **`2^N` values**: the selected output carries `data`, the rest are `0`.
+
+See [builtin-functions.md](builtin-functions.md#routing-mux--demux).
 
 ### Arithmetic (ADD / SUBTRACT / MULTIPLY / DIVIDE)
 
@@ -251,7 +246,7 @@ Output:
 
 ```
 built-in:
-NOT, AND, OR, XOR, NXOR, NAND, NOR, EQ, LATCH, LSHIFT, RSHIFT, REG, MUX, DEMUX, MUX1, MUX2, MUX3, DEMUX1, DEMUX2, DEMUX3, ADD, SUBTRACT, MULTIPLY, DIVIDE
+NOT, AND, OR, XOR, NXOR, NAND, NOR, EQ, LATCH, LSHIFT, RSHIFT, REG, MUX, DEMUX, ADD, SUBTRACT, MULTIPLY, DIVIDE
 
 user defined:
 myFunc, helper, ...

@@ -1915,14 +1915,14 @@ var _I = Interpreter;
     assert('doc.name este OR', stmts[0].doc, 'OR');
   }
 
-  // ---- Parser: doc(MUX1) — token MUX ----
-  console.log('\n=== Test 302: Parser — doc(MUX1) accepta token MUX ===');
+  // ---- Parser: doc(MUX) — token MUX ----
+  console.log('\n=== Test 302: Parser — doc(MUX) accepta token MUX ===');
   {
-    const processed = preprocessDoc('doc(MUX1)');
+    const processed = preprocessDoc('doc(MUX)');
     const p = new ParserDoc(new TokenizerDoc(processed), registryDoc);
     const stmts = p.parse();
     assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
-    assert('doc.name este MUX1', stmts[0].doc, 'MUX1');
+    assert('doc.name este MUX', stmts[0].doc, 'MUX');
   }
 
   // ---- Parser: doc(REG) ----
