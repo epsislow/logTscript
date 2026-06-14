@@ -24,60 +24,9 @@ const STEP_CALLEES = [
   'session.rshift'
 ];
 
-function extractFileConstMap(code) {
-  const map = new Map();
-  const re = /const\s+([A-Z][A-Z0-9_]*)\s*=\s*`([\s\S]*?)`/g;
-  let m;
-  while ((m = re.exec(code)) !== null) {
-    map.set(m[1], m[2]);
-  }
-  return map;
-}
-
-function loadSharedConstMap(dir, files) {
-  const map = new Map();
-  for (const f of files) {
-    const code = fs.readFileSync(path.join(dir, f), 'utf8');
-    for (const [k, v] of extractFileConstMap(code)) map.set(k, v);
-  }
-  return map;
-}
-
-function functionBody(source) {
-  const start = source.indexOf('{');
-  const end = source.lastIndexOf('}');
-  if (start < 0 || end <= start) return source;
-  return source.slice(start + 1, end);
-}
-
-function extractNamedFunctionBody(suiteSource, name) {
-  const re = new RegExp('function\\s+' + name + '\\s*\\([^)]*\\)\\s*\\{');
-  const m = re.exec(suiteSource);
-  if (!m) return null;
-  const start = m.index + m[0].length;
-  let depth = 1;
-  let i = start;
-  while (i < suiteSource.length && depth > 0) {
-    const quoted = readQuotedString(suiteSource, i);
-    if (quoted) {
-      i = quoted.end;
-      continue;
-    }
-    const c = suiteSource[i];
-    if (c === '{') depth++;
-    else if (c === '}') depth--;
-    i++;
-  }
-  if (depth !== 0) return null;
-  return suiteSource.slice(start, i - 1);
-}
-
-function resolveDelegateBody(body, suiteSource) {
-  const trimmed = body.trim();
-  const delegate = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\(h,\s*session[^)]*\);\s*$/);
-  if (!delegate || !suiteSource) return body;
-  const helperBody = extractNamedFunctionBody(suiteSource, delegate[1]);
-  return helperBody || body;
+function skipWs(s, i) {
+  while (i < s.length && /\s/.test(s[i])) i++;
+  return i;
 }
 
 function unescapeJsString(s, quote) {
@@ -88,11 +37,6 @@ function unescapeJsString(s, quote) {
     .replace(/\\\\/g, '\\')
     .replace(quote === '`' ? /\\`/g : /\\'/g, quote)
     .replace(quote === '"' ? /\\"/g : /\\'/g, quote);
-}
-
-function skipWs(s, i) {
-  while (i < s.length && /\s/.test(s[i])) i++;
-  return i;
 }
 
 function readQuotedString(s, i) {
@@ -145,7 +89,7 @@ function readExpression(s, start) {
         return { text: s.slice(exprStart, i).trim(), value: null, end: i };
       }
       depth--;
-    } else if (depth === 0 && c === ',') {
+    } else if (depth === 0 && (c === ',' || c === ';')) {
       return { text: s.slice(exprStart, i).trim(), value: null, end: i };
     }
     i++;
@@ -155,6 +99,144 @@ function readExpression(s, start) {
     return { text: s.slice(exprStart, i).trim(), value: null, end: i };
   }
   return null;
+}
+
+function splitConcatParts(expr) {
+  const parts = [];
+  let i = 0;
+  while (i < expr.length) {
+    i = skipWs(expr, i);
+    if (i >= expr.length) break;
+    const partStart = i;
+    let depth = 0;
+    while (i < expr.length) {
+      const quoted = readQuotedString(expr, i);
+      if (quoted) {
+        i = quoted.end;
+        continue;
+      }
+      const c = expr[i];
+      if (c === '(' || c === '[' || c === '{') depth++;
+      else if (c === ')' || c === ']' || c === '}') depth--;
+      else if (depth === 0 && c === '+') break;
+      i++;
+    }
+    const part = expr.slice(partStart, i).trim();
+    if (part) parts.push(part);
+    i = skipWs(expr, i);
+    if (i < expr.length && expr[i] === '+') {
+      i++;
+      continue;
+    }
+    break;
+  }
+  return parts.length ? parts : [expr.trim()];
+}
+
+function resolveExpr(expr, localConsts, sharedConsts, depth = 0) {
+  if (depth > 32) return null;
+  const trimmed = expr.trim();
+  if (!trimmed) return null;
+
+  const quoted = readQuotedString(trimmed, 0);
+  if (quoted && quoted.end === trimmed.length) {
+    return quoted.text;
+  }
+
+  if (localConsts.has(trimmed)) return localConsts.get(trimmed);
+  if (sharedConsts.has(trimmed)) return sharedConsts.get(trimmed);
+
+  const parts = splitConcatParts(trimmed);
+  if (parts.length > 1) {
+    let out = '';
+    for (const part of parts) {
+      const r = resolveExpr(part, localConsts, sharedConsts, depth + 1);
+      if (r == null) return null;
+      out += r;
+    }
+    return out;
+  }
+
+  return null;
+}
+
+function extractConstExprs(code) {
+  const exprs = new Map();
+  const re = /const\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*/g;
+  let m;
+  while ((m = re.exec(code)) !== null) {
+    const name = m[1];
+    const valueStart = m.index + m[0].length;
+    const expr = readExpression(code, valueStart);
+    if (expr) exprs.set(name, expr.text);
+  }
+  return exprs;
+}
+
+function resolveConstMap(exprs, externalConsts = new Map()) {
+  const resolved = new Map(externalConsts);
+  for (let pass = 0; pass < 64; pass++) {
+    let progress = false;
+    for (const [name, exprText] of exprs) {
+      const v = resolveExpr(exprText, resolved, resolved);
+      if (v != null && resolved.get(name) !== v) {
+        resolved.set(name, v);
+        progress = true;
+      }
+    }
+    if (!progress) break;
+  }
+  return resolved;
+}
+
+function extractFileConstMap(code) {
+  return resolveConstMap(extractConstExprs(code));
+}
+
+function loadSharedConstMap(dir, files) {
+  const exprs = new Map();
+  for (const f of files) {
+    const fileCode = fs.readFileSync(path.join(dir, f), 'utf8');
+    for (const [k, v] of extractConstExprs(fileCode)) exprs.set(k, v);
+  }
+  return resolveConstMap(exprs);
+}
+
+function functionBody(source) {
+  const start = source.indexOf('{');
+  const end = source.lastIndexOf('}');
+  if (start < 0 || end <= start) return source;
+  return source.slice(start + 1, end);
+}
+
+function extractNamedFunctionBody(suiteSource, name) {
+  const re = new RegExp('function\\s+' + name + '\\s*\\([^)]*\\)\\s*\\{');
+  const m = re.exec(suiteSource);
+  if (!m) return null;
+  const start = m.index + m[0].length;
+  let depth = 1;
+  let i = start;
+  while (i < suiteSource.length && depth > 0) {
+    const quoted = readQuotedString(suiteSource, i);
+    if (quoted) {
+      i = quoted.end;
+      continue;
+    }
+    const c = suiteSource[i];
+    if (c === '{') depth++;
+    else if (c === '}') depth--;
+    i++;
+  }
+  if (depth !== 0) return null;
+  return suiteSource.slice(start, i - 1);
+}
+
+function resolveDelegateBody(body, suiteSource) {
+  const trimmed = body.trim();
+  const delegate = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\(h,\s*session[^)]*\);\s*$/);
+  if (!delegate || !suiteSource) return body;
+  const helperBody = extractNamedFunctionBody(suiteSource, delegate[1]);
+  return helperBody || body;
 }
 
 function readFirstCallArg(s, openParenIndex) {
@@ -187,41 +269,17 @@ function findCalls(body, callees) {
   return calls;
 }
 
-function extractLocalConsts(body) {
-  const map = new Map();
+function extractLocalConsts(body, sharedConsts) {
+  const exprs = new Map();
   const declRe = /(?:const|let)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*/g;
   let m;
   while ((m = declRe.exec(body)) !== null) {
     const name = m[1];
     const valueStart = m.index + m[0].length;
     const expr = readExpression(body, valueStart);
-    if (!expr) continue;
-    const resolved = resolveExpr(expr.text, map, new Map());
-    if (resolved != null) map.set(name, resolved);
+    if (expr) exprs.set(name, expr.text);
   }
-  return map;
-}
-
-function resolveExpr(expr, localConsts, sharedConsts) {
-  const trimmed = expr.trim();
-  if (!trimmed) return null;
-
-  const concat = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*\+\s*(.+)$/s);
-  if (concat) {
-    const base = resolveExpr(concat[1], localConsts, sharedConsts);
-    const tail = resolveExpr(concat[2], localConsts, sharedConsts);
-    if (base != null && tail != null) return base + tail;
-    return null;
-  }
-
-  const quoted = readQuotedString(trimmed, 0);
-  if (quoted && quoted.end === trimmed.length) {
-    return quoted.text;
-  }
-
-  if (localConsts.has(trimmed)) return localConsts.get(trimmed);
-  if (sharedConsts.has(trimmed)) return sharedConsts.get(trimmed);
-  return null;
+  return resolveConstMap(exprs, sharedConsts);
 }
 
 function pushUnique(arr, value) {
@@ -271,13 +329,9 @@ function formatStepFromCall(callee, args, localConsts, sharedConsts) {
   return short + '(' + args.map(a => formatArgLabel(a, localConsts, sharedConsts)).join(', ') + ')';
 }
 
-function formatStepCall(callee, argExpr, localConsts, sharedConsts) {
-  return formatStepFromCall(callee, [argExpr], localConsts, sharedConsts);
-}
-
 function extractScripts(body, sharedConsts) {
   const scripts = [];
-  const localConsts = extractLocalConsts(body);
+  const localConsts = extractLocalConsts(body, sharedConsts);
 
   for (const call of findCalls(body, SCRIPT_CALLEES)) {
     const resolved = resolveExpr(call.argExpr, localConsts, sharedConsts);
@@ -289,10 +343,18 @@ function extractScripts(body, sharedConsts) {
       '(?:session\\.(?:run|runDoc|runArith|tokenize|parse|preprocessShortNotation)|preprocessRepeat)\\(\\s*' +
       name + '\\b'
     );
-    if (used.test(body)) pushUnique(scripts, value);
+    if (used.test(body) && value && !scripts.includes(value)) {
+      pushUnique(scripts, value);
+    }
   }
 
-  return scripts;
+  return finalizeScripts(scripts);
+}
+
+function finalizeScripts(scripts) {
+  if (scripts.length <= 1) return scripts;
+  const sorted = [...scripts].sort((a, b) => b.length - a.length);
+  return [sorted[0]];
 }
 
 function extractInterpreterSteps(body) {
@@ -360,6 +422,7 @@ function extractInlineHelperSteps(body) {
 
 function extractRegistrySteps(body) {
   const steps = [];
+  let m;
 
   const expectedRe = /const\s+expectedTypes\s*=\s*\[([\s\S]*?)\]/;
   const em = body.match(expectedRe);
@@ -371,7 +434,6 @@ function extractRegistrySteps(body) {
   }
 
   const getRe = /registry\.get\(\s*'((?:\\'|[^'])*)'\)(?:\.([a-zA-Z0-9_]+)\([^)]*\))?/g;
-  let m;
   while ((m = getRe.exec(body)) !== null) {
     const type = unescapeJsString(m[1], "'");
     const method = m[2] ? '.' + m[2] + '(…)' : '';
@@ -391,7 +453,7 @@ function extractRegistrySteps(body) {
 
 function extractTokenizerParserSteps(body, sharedConsts) {
   const steps = [];
-  const localConsts = extractLocalConsts(body);
+  const localConsts = extractLocalConsts(body, sharedConsts);
 
   const tokRe = /new\s+Tokenizer\(/g;
   let m;
@@ -406,7 +468,7 @@ function extractTokenizerParserSteps(body, sharedConsts) {
 
   const parRe = /new\s+Parser\(/g;
   while ((m = parRe.exec(body)) !== null) {
-    pushUnique(steps, 'Parser(…)'); // args are usually token streams
+    pushUnique(steps, 'Parser(…)');
   }
 
   return steps;
@@ -414,7 +476,7 @@ function extractTokenizerParserSteps(body, sharedConsts) {
 
 function extractSteps(body, sharedConsts, scripts) {
   const steps = [];
-  const localConsts = extractLocalConsts(body);
+  const localConsts = extractLocalConsts(body, sharedConsts);
   const scriptSet = new Set(scripts);
 
   for (const call of findCalls(body, STEP_CALLEES)) {
@@ -480,5 +542,8 @@ function extractTestDetail(runFn, sharedConsts, suiteSource) {
 
 module.exports = {
   loadSharedConstMap,
-  extractTestDetail
+  extractTestDetail,
+  resolveExpr,
+  extractConstExprs,
+  resolveConstMap
 };

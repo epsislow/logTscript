@@ -188,7 +188,7 @@
       return detail.scripts.map((s, i) => {
         const label = detail.scripts.length > 1 ? 'Script ' + (i + 1) : 'Script';
         return '<div style="margin-bottom:8px"><div style="color:#888;font-size:10px;margin-bottom:4px">' +
-          label + '</div><pre class="test-info-pre">' + escapeHtml(s) + '</pre></div>';
+          label + ' (' + s.split('\n').length + ' linii)</div><pre class="test-info-pre test-info-pre--script">' + escapeHtml(s) + '</pre></div>';
       }).join('');
     }
     if (tab === 'steps') {
@@ -212,13 +212,6 @@
       return '<p class="test-info-empty">Test neportat — fără sursă.</p>';
     }
     return '<pre class="test-info-pre test-info-pre--source">' + escapeHtml(source) + '</pre>';
-  }
-
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
   }
 
   function escapeHtml(s) {

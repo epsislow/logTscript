@@ -401,8 +401,11 @@ body {
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 320px;
+  max-height: min(70vh, 560px);
   overflow: auto;
+}
+.test-info-pre--script {
+  font-family: Consolas, "Courier New", monospace;
 }
 .test-info-pre--source {
   color: #c9d1d9;

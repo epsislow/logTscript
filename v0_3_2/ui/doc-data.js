@@ -6494,23 +6494,424 @@ After the full countdown, the terminal shows \`A\` (hex \`^41\`). See [terminal.
 
 ---
 
-## Quick example (9 steps)
+## Exemplu rulabil complet
 
-Uses \`chip +[alu4]\` from v1, \`board +[cpu4v2]\`, and prelude \`CPUISA_V2\` + \`romblob\` (see \`test_suite_ported.js\` constants \`CPU4V2_BASE\`).
+### mini-cpu-v2-full
+
+Prelude: ISA + ROM + \`chip [alu4]\` + \`board +[cpu4v2]\` (doar definiții).
 
 \`\`\`logts-play
-# Paste CPUISA_V2 + romblob + CHIP_ALU4 + BOARD_CPU4V2 from test_suite_ported.js
-# Then:
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + 4b
+  STORE : 0010 + 4b
+  ADDI  : 0011 + 4b
+  SUBI  : 0100 + 4b
+  JMP   : 0101 + 4b
+  BEQ   : 0110 + S4b
+  HALT  : 0111 + 4b
+  :
+40wire romblob = .cpuisa {
+  LOAD \\0
+loop:
+  SUBI \\1
+  BEQ done
+  JMP loop
+done:
+  HALT
+}
+
+chip +[alu4]:
+  4pin a
+  4pin b
+  2pin op
+  1pin set
+  4pout y
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  comp [subtract] .sub:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  .sub:a = a
+  .sub:b = b
+  y = MUX(op.1, .add:get, .sub:get)
+  carry = MUX(op.1, .add:carry, .sub:carry)
+  :4bit y
+board +[cpu4v2]:
+  1pin set
+  1pin rst
+  4pout acc
+  4pout pc
+  8pout ir
+  exec: set
+  on: 1
+  comp [mem] .prog:
+    depth: 8
+    length: 8
+    = romblob
+    on: raise
+    :
+  comp [mem] .data:
+    depth: 4
+    length: 16
+    = ^3
+    on: raise
+    :
+  comp [counter] .pcnt:
+    depth: 4
+    on: 1
+    :
+  comp [reg] .accum:
+    depth: 4
+    on: 1
+    :
+  comp [7seg] .disp:
+    on: 1
+    nl
+    :
+  comp [terminal] .trace:
+    rows: 4
+    columns: 20
+    on: 1
+    :
+  comp [adder] .pcinc:
+    depth: 4
+    on: 1
+    :
+  comp [adder] .bradd:
+    depth: 4
+    on: 1
+    :
+  comp [lut] .ctl:
+    depth: 7
+    length: 16
+    fillwith: 0000000
+    = data {
+      0000: 0000000
+      0001: 0000001
+      0010: 0000010
+      0011: 0000100
+      0100: 0001000
+      0101: 0010000
+      0110: 0100000
+      0111: 1000000
+    }
+    :
+  chip [alu4] .alu::
+  4wire pcval
+  4wire pcout
+  8wire instr
+  4wire opc
+  4wire opd
+  4wire curacc
+  4wire loadval
+  4wire aluy
+  7wire ctl
+  1wire isload
+  1wire isstore
+  1wire isaddi
+  1wire issubi
+  1wire isjmp
+  1wire isbeq
+  1wire ishalt
+  1wire iszero
+  1wire isbeqtaken
+  1wire dobranch
+  1wire doinc
+  1wire inc
+  2wire aluop
+  4wire t0
+  4wire t1
+  4wire accnext
+  4wire pcplus1
+  4wire brtgt
+  4wire pcload
+  pcval = .pcnt:get
+  .prog:{ adr = pcval
+    set = set }
+  instr = .prog:get
+  opc = instr.0/4
+  opd = instr.4/4
+  .ctl:in = opc
+  ctl = .ctl:get
+  isload = ctl.6/1
+  isstore = ctl.5/1
+  isaddi = ctl.4/1
+  issubi = ctl.3/1
+  isjmp = ctl.2/1
+  isbeq = ctl.1/1
+  ishalt = ctl.0/1
+  curacc = .accum:get
+  iszero = ZERO(curacc)
+  isbeqtaken = AND(isbeq, iszero)
+  dobranch = OR(isjmp, isbeqtaken)
+  .data:adr = opd
+  .data:{ set = set }
+  loadval = .data:get
+  aluop = MUX(issubi, 00, 01)
+  .alu:a = curacc
+  .alu:b = opd
+  .alu:op = aluop
+  aluy = .alu:y
+  t0 = MUX(issubi, curacc, aluy)
+  t1 = MUX(isaddi, t0, aluy)
+  accnext = MUX(isload, t1, loadval)
+  .pcinc:a = pcval
+  .pcinc:b = 0001
+  pcplus1 = .pcinc:get
+  .bradd:a = pcplus1
+  .bradd:b = opd
+  brtgt = .bradd:get
+  pcload = MUX(isbeqtaken, opd, brtgt)
+  .pcnt:{ data = pcload
+    write = 1
+    set = AND(dobranch, set) }
+  doinc = AND(NOT(ishalt), NOT(dobranch))
+  inc = AND(doinc, set)
+  .pcnt:{ dir = 1
+    set = inc }
+  pcout = .pcnt:get
+  .data:adr = opd
+  .data:{ data = curacc
+    write = AND(isstore, set)
+    set = AND(isstore, set) }
+  .accum:{ data = accnext
+    set = set }
+  .pcnt:{ data = 0000
+    write = 1
+    set = rst }
+  .accum:{ data = 0000
+    set = rst }
+  .disp:{ hex = .accum:get
+    set = set }
+  .trace:{ append = ^41
+    set = AND(ishalt, set) }
+  acc = .accum:get
+  pc = pcout
+  ir = instr
+  :4bit acc
+\`\`\`
+
+### mini-cpu-v2-demo
+
+Același prelude + instanțiere \`.cpu\` + un pas clock + \`show\`. Identic cu testele **1056–1063** (\`run_tests\` → tab **Script**).
+
+\`\`\`logts-play
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + 4b
+  STORE : 0010 + 4b
+  ADDI  : 0011 + 4b
+  SUBI  : 0100 + 4b
+  JMP   : 0101 + 4b
+  BEQ   : 0110 + S4b
+  HALT  : 0111 + 4b
+  :
+40wire romblob = .cpuisa {
+  LOAD \\0
+loop:
+  SUBI \\1
+  BEQ done
+  JMP loop
+done:
+  HALT
+}
+
+chip +[alu4]:
+  4pin a
+  4pin b
+  2pin op
+  1pin set
+  4pout y
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  comp [subtract] .sub:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  .sub:a = a
+  .sub:b = b
+  y = MUX(op.1, .add:get, .sub:get)
+  carry = MUX(op.1, .add:carry, .sub:carry)
+  :4bit y
+board +[cpu4v2]:
+  1pin set
+  1pin rst
+  4pout acc
+  4pout pc
+  8pout ir
+  exec: set
+  on: 1
+  comp [mem] .prog:
+    depth: 8
+    length: 8
+    = romblob
+    on: raise
+    :
+  comp [mem] .data:
+    depth: 4
+    length: 16
+    = ^3
+    on: raise
+    :
+  comp [counter] .pcnt:
+    depth: 4
+    on: 1
+    :
+  comp [reg] .accum:
+    depth: 4
+    on: 1
+    :
+  comp [7seg] .disp:
+    on: 1
+    nl
+    :
+  comp [terminal] .trace:
+    rows: 4
+    columns: 20
+    on: 1
+    :
+  comp [adder] .pcinc:
+    depth: 4
+    on: 1
+    :
+  comp [adder] .bradd:
+    depth: 4
+    on: 1
+    :
+  comp [lut] .ctl:
+    depth: 7
+    length: 16
+    fillwith: 0000000
+    = data {
+      0000: 0000000
+      0001: 0000001
+      0010: 0000010
+      0011: 0000100
+      0100: 0001000
+      0101: 0010000
+      0110: 0100000
+      0111: 1000000
+    }
+    :
+  chip [alu4] .alu::
+  4wire pcval
+  4wire pcout
+  8wire instr
+  4wire opc
+  4wire opd
+  4wire curacc
+  4wire loadval
+  4wire aluy
+  7wire ctl
+  1wire isload
+  1wire isstore
+  1wire isaddi
+  1wire issubi
+  1wire isjmp
+  1wire isbeq
+  1wire ishalt
+  1wire iszero
+  1wire isbeqtaken
+  1wire dobranch
+  1wire doinc
+  1wire inc
+  2wire aluop
+  4wire t0
+  4wire t1
+  4wire accnext
+  4wire pcplus1
+  4wire brtgt
+  4wire pcload
+  pcval = .pcnt:get
+  .prog:{ adr = pcval
+    set = set }
+  instr = .prog:get
+  opc = instr.0/4
+  opd = instr.4/4
+  .ctl:in = opc
+  ctl = .ctl:get
+  isload = ctl.6/1
+  isstore = ctl.5/1
+  isaddi = ctl.4/1
+  issubi = ctl.3/1
+  isjmp = ctl.2/1
+  isbeq = ctl.1/1
+  ishalt = ctl.0/1
+  curacc = .accum:get
+  iszero = ZERO(curacc)
+  isbeqtaken = AND(isbeq, iszero)
+  dobranch = OR(isjmp, isbeqtaken)
+  .data:adr = opd
+  .data:{ set = set }
+  loadval = .data:get
+  aluop = MUX(issubi, 00, 01)
+  .alu:a = curacc
+  .alu:b = opd
+  .alu:op = aluop
+  aluy = .alu:y
+  t0 = MUX(issubi, curacc, aluy)
+  t1 = MUX(isaddi, t0, aluy)
+  accnext = MUX(isload, t1, loadval)
+  .pcinc:a = pcval
+  .pcinc:b = 0001
+  pcplus1 = .pcinc:get
+  .bradd:a = pcplus1
+  .bradd:b = opd
+  brtgt = .bradd:get
+  pcload = MUX(isbeqtaken, opd, brtgt)
+  .pcnt:{ data = pcload
+    write = 1
+    set = AND(dobranch, set) }
+  doinc = AND(NOT(ishalt), NOT(dobranch))
+  inc = AND(doinc, set)
+  .pcnt:{ dir = 1
+    set = inc }
+  pcout = .pcnt:get
+  .data:adr = opd
+  .data:{ data = curacc
+    write = AND(isstore, set)
+    set = AND(isstore, set) }
+  .accum:{ data = accnext
+    set = set }
+  .pcnt:{ data = 0000
+    write = 1
+    set = rst }
+  .accum:{ data = 0000
+    set = rst }
+  .disp:{ hex = .accum:get
+    set = set }
+  .trace:{ append = ^41
+    set = AND(ishalt, set) }
+  acc = .accum:get
+  pc = pcout
+  ir = instr
+  :4bit acc
 board [cpu4v2] .cpu::
 
 .cpu:{ set = 1 }
-# … repeat 9 times, or use a key/oscillator wrapper
+# Repeta .cpu:{ set = 1 } de 9 ori pentru countdown complet
 
 show(.cpu:acc)
 show(.cpu:pc)
 \`\`\`
 
-**Expected:** ACC = \`0000\`, PC = \`0100\` (HALT).
+**După 9 pași** (\`.cpu:{ set = 1 }\` repetat): ACC = \`0000\`, PC = \`0100\` (HALT). Trace-ul terminal afișează \`A\` (\`^41\`).
 
 ---
 
@@ -6542,7 +6943,7 @@ Push/pop return addresses on \`comp [queue]\` — see [queue.md](queue.md). Not 
 
 \`test_suite_ported.js\` — group \`mini-cpu-v2\`, IDs **1056–1063** (init, LOAD, full countdown, BEQ, probe, clock, NEXT, terminal).
 
-Constants: \`CPUISA_V2\`, \`CPU4V2_ROM\`, \`BOARD_CPU4V2\`, \`CPU4V2_BASE\`, \`CPU4V2_STEPS_FULL = 9\`.
+În **run_tests.html**, tab-ul **Script** al fiecărui test arată **scriptul LogTScript complet** rulat (constante precum \`CPU4V2_BASE\` / \`BOARD_HALFADD\` sunt expandate automat din sursă).
 
 ---
 
