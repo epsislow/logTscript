@@ -43,6 +43,8 @@ const files = [
   'core/protocol-assembler.js',
   'core/lut-labels.js',
   'core/lut-decode.js',
+  'core/boolean-minimize.js',
+  'core/boolean-lut.js',
   'core/parser.js',
   'core/interpreter.js',
   'core/signal-propagation.js',

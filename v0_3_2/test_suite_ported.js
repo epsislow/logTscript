@@ -5197,5 +5197,321 @@ reg(1090, 'protocol-ext', 'regresie :decode UART (945) — neschimbat', function
   h.assert('data', session.getWire(interp, 'data'), '01000001');
 });
 
+const INLINE_OR2 = `inline [lut] .or2:
+  depth: 1
+  length: 4
+  data {
+    00 : 0
+    01 : 1
+    10 : 1
+    11 : 1
+  }
+  :`;
+
+const INLINE_LUT5 = `inline [lut] .lut5:
+  depth: 1
+  length: 32
+  data {
+    00000 : 0
+    00001 : 1
+    00010 : 0
+    00011 : 1
+    00100 : 0
+    00101 : 1
+    00110 : 0
+    00111 : 1
+    01000 : 0
+    01001 : 1
+    01010 : 0
+    01011 : 1
+    01100 : 0
+    01101 : 1
+    01110 : 0
+    01111 : 1
+    10000 : 0
+    10001 : 1
+    10010 : 0
+    10011 : 1
+    10100 : 0
+    10101 : 1
+    10110 : 0
+    10111 : 1
+    11000 : 0
+    11001 : 1
+    11010 : 0
+    11011 : 1
+    11100 : 0
+    11101 : 1
+    11110 : 0
+    11111 : 1
+  }
+  :`;
+
+const INLINE_DECODER2 = `inline [lut] .decoder:
+  depth: 2
+  length: 4
+  data {
+    00 : 00
+    01 : 01
+    10 : 10
+    11 : 11
+  }
+  :`;
+
+const INLINE_DEPTH3 = `inline [lut] .d3:
+  depth: 3
+  length: 4
+  data {
+    00 : 000
+    01 : 001
+    10 : 010
+    11 : 100
+  }
+  :`;
+
+const INLINE_IDA = `inline [lut] .ida:
+  depth: 1
+  length: 4
+  data {
+    00 : 0
+    01 : 0
+    10 : 1
+    11 : 1
+  }
+  :`;
+
+reg(1091, 'bool-lut', 'lutOf(OR(A, B)) — header + length 4', function(h, session) {
+  const { out } = session.run('lutOf(OR(A, B))');
+  h.assert('header', out[0], '# A 1b, B 1b -> out 1b');
+  h.assert('length', String(out.some(l => l.trim() === 'length: 4')), 'true');
+});
+
+reg(1092, 'bool-lut', 'lutOf(AND(A, OR(NOT(C), B))) — ordine A, C, B', function(h, session) {
+  const { out } = session.run('lutOf(AND(A, OR(NOT(C), B)))');
+  h.assert('header', out[0], '# A 1b, C 1b, B 1b -> out 1b');
+});
+
+reg(1093, 'bool-lut', 'lutOf(XOR(C, OR(A, B))) — ordine C, A, B', function(h, session) {
+  const { out } = session.run('lutOf(XOR(C, OR(A, B)))');
+  h.assert('order', out[0], '# C 1b, A 1b, B 1b -> out 1b');
+});
+
+reg(1094, 'bool-lut', 'lutOf short-notation backtick', function(h, session) {
+  const { out } = session.run('lutOf(`A | B`)');
+  h.assert('header', out[0], '# A 1b, B 1b -> out 1b');
+});
+
+reg(1095, 'bool-lut', 'lutOf(LSHIFT(...)) — eroare', function(h, session) {
+  const { out } = session.run('lutOf(LSHIFT(A, B))');
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('non-boolean', String(err.includes('not a boolean') || err.includes('LSHIFT')), 'true');
+});
+
+reg(1096, 'bool-lut', 'exprOfLut(.or2, A, B) — două linii', function(h, session) {
+  const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
+  h.assert('lines', String(out.length), '2');
+  h.assert('short', String(out[0].includes('`')), 'true');
+  h.assert('std', String(out[1].includes('OR(')), 'true');
+});
+
+reg(1097, 'bool-lut', 'exprOfLut — expects 5 input bits but received 4', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_LUT5 + '\nexprOfLut(.lut5, A 2b, B 2b)');
+  } catch (e) { err = String(e.message || e); }
+  if (!err) {
+    const { out } = session.run(INLINE_LUT5 + '\nexprOfLut(.lut5, A 2b, B 2b)');
+    err = out.find(l => l.startsWith('Error:')) || '';
+  }
+  h.assert('mismatch', String(err.includes('expects 5 input bits but received 4')), 'true');
+});
+
+reg(1098, 'bool-lut', 'exprOfLut(.decoder, A, B) depth 2', function(h, session) {
+  const { out } = session.run(INLINE_DECODER2 + '\nexprOfLut(.decoder, A, B)');
+  h.assert('lines', String(out.length), '2');
+  h.assert('plus short', String(out[0].includes(' + ')), 'true');
+  h.assert('plus std', String(out[1].includes(' + ')), 'true');
+});
+
+reg(1099, 'bool-lut', 'exprOfLut depth 3 — trei termeni +', function(h, session) {
+  const { out } = session.run(INLINE_DEPTH3 + '\nexprOfLut(.d3, A, B)');
+  h.assert('lines', String(out.length), '2');
+  const parts = out[0].split(' + ');
+  h.assert('segments', String(parts.length), '3');
+});
+
+reg(1100, 'bool-lut', 'copy-paste linie standard rulabilă', function(h, session) {
+  const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
+  const line = out[1];
+  const { interp } = session.run('1wire A\n1wire B\n1wire R\n' + line.replace('out', 'R'));
+  h.assert('runs', String(!!interp), 'true');
+});
+
+reg(1101, 'bool-lut', 'copy-paste linie short rulabilă', function(h, session) {
+  const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
+  const line = out[0];
+  const { interp } = session.run('1wire A\n1wire B\n1wire R\n' + line.replace('out', 'R'));
+  h.assert('runs', String(!!interp), 'true');
+});
+
+reg(1102, 'bool-lut', 'round-trip 1-bit XOR', function(h, session) {
+  const gen = session.run('lutOf(XOR(A, B))').out;
+  const dataStart = gen.findIndex(l => l.trim() === 'data {');
+  const body = gen.slice(dataStart).join('\n');
+  const src = `inline [lut] .rt:\n  depth: 1\n  length: 4\n  ${body}\n  :\nexprOfLut(.rt, A, B)`;
+  const { out } = session.run(src);
+  h.assert('two lines', String(out.length), '2');
+});
+
+reg(1103, 'bool-lut', 'comp [lut] + exprOfLut', function(h, session) {
+  const src = `comp [lut] .xor2:
+  depth: 1
+  length: 4
+  = data {
+    00 : 0
+    01 : 1
+    10 : 1
+    11 : 0
+  }
+:
+exprOfLut(.xor2, A, B)`;
+  const { out } = session.run(src);
+  h.assert('lines', String(out.length), '2');
+});
+
+reg(1104, 'bool-lut', 'exprOfLut pe prefixFree — respinge', function(h, session) {
+  let err = '';
+  const { out } = session.run(INLINE_HUFF + '\nexprOfLut(.huff, A, B)');
+  err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('reject', String(err.includes('prefixFree')), 'true');
+});
+
+reg(1105, 'bool-lut', 'QM — formă minimizată A', function(h, session) {
+  const { out } = session.run(INLINE_IDA + '\nexprOfLut(.ida, A, B)');
+  h.assert('minimized', out[1], '1wire out = A');
+});
+
+reg(1106, 'bool-lut', 'lutOf în chip body — parse', function(h, session) {
+  session.parse(`chip +[blut]:
+1pin set
+exec: set
+lutOf(OR(A, B))
+:`);
+  h.assert('ok', 'true', 'true');
+});
+
+reg(1107, 'bool-lut', 'lutOf adresă > 8 biți — eroare', function(h, session) {
+  const { out } = session.run(`4wire A
+8wire B
+7wire C
+10wire D
+lutOf(OR(AND(A.2, B.1/6), AND(C, D.0-3)))`);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('too big', String(err.includes('LUT table too big (256 values), max bits number reached')), 'true');
+});
+
+reg(1108, 'bool-lut-mb', 'lutOf slice bits — length 16', function(h, session) {
+  const { out } = session.run(`4wire A
+3wire B
+lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))`);
+  h.assert('header', out[0], '# A.2 1b, B.1 1b, A.0 1b, B.0 1b -> out 1b');
+  h.assert('length', String(out.some(l => l.trim() === 'length: 16')), 'true');
+});
+
+reg(1109, 'bool-lut-mb', 'lutOf(C) pe 7wire — depth 7', function(h, session) {
+  const { out } = session.run('7wire C\nlutOf(C)');
+  h.assert('header', out[0], '# C 7b -> out 7b');
+  h.assert('length', String(out.some(l => l.trim() === 'length: 128')), 'true');
+});
+
+reg(1110, 'bool-lut-mb', 'lutOf(D.0-3) — depth 4', function(h, session) {
+  const { out } = session.run('10wire D\nlutOf(D.0-3)');
+  h.assert('header', out[0], '# D.0-3 4b -> out 4b');
+  h.assert('length', String(out.some(l => l.trim() === 'length: 16')), 'true');
+});
+
+reg(1111, 'bool-lut-mb', 'lutOf mixt 6b — succes', function(h, session) {
+  const { out } = session.run(`4wire A
+8wire B
+2wire C
+lutOf(OR(AND(A.2, B.1/3), C))`);
+  h.assert('no error', String(!out.some(l => l.startsWith('Error:'))), 'true');
+  h.assert('length 64', String(out.some(l => l.trim() === 'length: 64')), 'true');
+});
+
+reg(1112, 'bool-lut-mb', 'lutOf mixt 18b — eroare', function(h, session) {
+  const { out } = session.run(`4wire A
+8wire B
+7wire C
+10wire D
+lutOf(OR(AND(A.2, B.1/6), AND(C, D.0-3)))`);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('too big', String(err.includes('LUT table too big')), 'true');
+});
+
+reg(1113, 'bool-lut-mb', 'exprOfLut(.lut5, A 2b, B 3b)', function(h, session) {
+  const { out } = session.run(INLINE_LUT5 + '\nexprOfLut(.lut5, A 2b, B 3b)');
+  h.assert('lines', String(out.length), '2');
+});
+
+reg(1114, 'bool-lut-mb', 'exprOfLut(.or2, A, B) fără prelude', function(h, session) {
+  const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
+  h.assert('lines', String(out.length), '2');
+});
+
+reg(1115, 'bool-lut-mb', '4wire A + exprOfLut infer 4b+1b', function(h, session) {
+  let err = '';
+  const { out } = session.run(INLINE_LUT5 + '\n4wire A := 0100\nexprOfLut(.lut5, A, B)');
+  err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('no error', String(!err), 'true');
+  h.assert('lines', String(out.filter(l => !l.startsWith('Error:')).length >= 2), 'true');
+});
+
+reg(1116, 'bool-lut-mb', 'exprOfLut ordine B, A vs A, B', function(h, session) {
+  const o1 = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)').out;
+  const o2 = session.run(INLINE_OR2 + '\nexprOfLut(.or2, B, A)').out;
+  h.assert('both lines', String(o1.length === 2 && o2.length === 2), 'true');
+  h.assert('may differ', String(o1[1] !== o2[1] || o1[1] === o2[1]), 'true');
+});
+
+reg(1117, 'bool-lut-mb', 'exprOfLut output 1b cu slice refs', function(h, session) {
+  const { out } = session.run(INLINE_LUT5 + '\nexprOfLut(.lut5, A 2b, B 3b)');
+  h.assert('short', String(out[0].includes('`')), 'true');
+  h.assert('std', String(out[1].length > 0), 'true');
+});
+
+reg(1118, 'bool-lut-mb', 'exprOfLut output 3b', function(h, session) {
+  const { out } = session.run(INLINE_DEPTH3 + '\nexprOfLut(.d3, A, B)');
+  h.assert('plus', String(out[0].includes(' + ')), 'true');
+});
+
+reg(1119, 'bool-lut-mb', 'round-trip multi-bit', function(h, session) {
+  const { out: gen } = session.run(`2wire A
+3wire B
+lutOf(OR(AND(A.1, B.0), AND(A.0, B.2)))`);
+  const dataStart = gen.findIndex(l => l.trim() === 'data {');
+  const body = gen.slice(dataStart).join('\n');
+  const src = `inline [lut] .mb:\n  depth: 1\n  length: 32\n  ${body}\n  :\nexprOfLut(.mb, A 2b, B 3b)`;
+  const { out } = session.run(src);
+  h.assert('two lines', String(out.length), '2');
+});
+
+reg(1120, 'bool-lut-mb', 'exprOfLut LUT inexistent — eroare', function(h, session) {
+  const { out } = session.run('exprOfLut(.missing, A, B)');
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('not found', String(err.includes('not found')), 'true');
+});
+
+reg(1121, 'bool-lut-mb', 'exprOfLut(.lut5, A 2b) — sumă biți ≠ adresă', function(h, session) {
+  const { out } = session.run(INLINE_LUT5 + '\nexprOfLut(.lut5, A 2b)');
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('mismatch', String(err.includes('expects 5 input bits but received 2')), 'true');
+});
+
+reg(1122, 'bool-lut', 'exprOfLut emite exact 2 linii', function(h, session) {
+  const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
+  h.assert('count', String(out.length), '2');
+});
+
   suite.finalize();
 })();

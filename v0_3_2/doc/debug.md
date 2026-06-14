@@ -766,4 +766,5 @@ probe(a)
 - [Signal propagation](signal-propagation.md) — when wires and displays update
 - [Editor UI](editorUI.md) — Output panel, Run, Next, Wave / Legacy toggle
 - [doc() function](doc-function.md) — `doc(def)` lists `show` as a built-in
+- [Boolean LUT utilities](boolean-lut.md) — `lutOf` / `exprOfLut` (analysis output like `show`)
 - [REG](reg.md) — `NEXT(~)` and wire-clock behaviour with `show`

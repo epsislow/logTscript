@@ -2796,6 +2796,50 @@ if (this.isBuiltinDEMUX(name)) {
     }
   }
 
+  _makeWidthResolver() {
+    const self = this;
+    return function (name) {
+      const wire = self.wires.get(name);
+      if (wire && wire.type) return self.getBitWidth(wire.type);
+      return null;
+    };
+  }
+
+  _resolveLutInstance(lutRef) {
+    const inline = this.inlineInstances.get(lutRef);
+    if (inline && inline.kind === 'lut') return inline;
+    const comp = this.components.get(lutRef);
+    if (comp && comp.type === 'lut') return comp;
+    throw new Error(`exprOfLut: LUT '${lutRef}' not found`);
+  }
+
+  _execLutOf(s) {
+    const gen = typeof lutOfGenerate === 'function' ? lutOfGenerate : null;
+    if (!gen) throw new Error('boolean-lut.js is not loaded');
+    try {
+      const text = gen(s.lutOf.expr, this._makeWidthResolver());
+      for (const line of text.split('\n')) {
+        this.out.push(line);
+      }
+    } catch (e) {
+      this.reportRuntimeError(e);
+    }
+  }
+
+  _execExprOfLut(s) {
+    const gen = typeof exprOfLutGenerate === 'function' ? exprOfLutGenerate : null;
+    if (!gen) throw new Error('boolean-lut.js is not loaded');
+    try {
+      const lutInst = this._resolveLutInstance(s.exprOfLut.lutRef);
+      const lines = gen(lutInst, s.exprOfLut.varSpecs, this._makeWidthResolver());
+      for (const line of lines) {
+        this.out.push(line);
+      }
+    } catch (e) {
+      this.reportRuntimeError(e);
+    }
+  }
+
   exec(s, computeRefs=false){
     // Set current statement context for REG calls
     const prevStmt = this.currentStmt;
@@ -2892,6 +2936,16 @@ if (this.isBuiltinDEMUX(name)) {
 
     if (s.peek) {
       this._execShowImmediate(s, computeRefs);
+      return;
+    }
+
+    if (s.lutOf) {
+      this._execLutOf(s);
+      return;
+    }
+
+    if (s.exprOfLut) {
+      this._execExprOfLut(s);
       return;
     }
 

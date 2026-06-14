@@ -637,6 +637,7 @@ doc(.decoder)
 
 ## Related
 
+- [boolean-lut.md](boolean-lut.md) — `lutOf` / `exprOfLut` (generate or reverse boolean LUTs)
 - [huffman.md](huffman.md) — end-to-end Huffman example (`prefixFree` + `expand` / `collapse`)
 - [protocol.md](protocol.md) — `expand` / `collapse` with LUT; `:decode()` on channels
 - [mem.md](mem.md) — sequential RAM

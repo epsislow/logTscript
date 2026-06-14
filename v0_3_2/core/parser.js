@@ -246,7 +246,7 @@ parseDef() {
     
     if (
       this.c.type === 'TYPE' ||
-      (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek')) ||
+      (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek' || this.c.value === 'lutOf' || this.c.value === 'exprOfLut')) ||
       this.c.type === 'ID' ||
       this.c.type === 'SPECIAL'
     ) {
@@ -1253,6 +1253,41 @@ assignment() {
     }
     this.eat('SYM',')');
     return {show:args};
+  }
+
+  lutOf(){
+    this.eat('KEYWORD', 'lutOf');
+    this.eat('SYM', '(');
+    const expr = this.expr();
+    this.eat('SYM', ')');
+    return { lutOf: { expr } };
+  }
+
+  exprOfLut(){
+    this.eat('KEYWORD', 'exprOfLut');
+    this.eat('SYM', '(');
+    const lutRef = this.parseDotComponentRef();
+    const varSpecs = [];
+    if (this.c.value === ',') {
+      this.eat('SYM', ',');
+      do {
+        if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+          throw Error(`Expected variable name in exprOfLut at ${this.c.line}:${this.c.col}`);
+        }
+        const name = this.c.value;
+        this.eat(this.c.type);
+        let width = null;
+        if (this.c.type === 'TYPE' && /^\d+bit$/.test(this.c.value)) {
+          width = parseInt(this.c.value, 10);
+          this.eat('TYPE');
+        }
+        varSpecs.push({ name, width });
+        if (this.c.value === ',') this.eat('SYM', ',');
+        else break;
+      } while (true);
+    }
+    this.eat('SYM', ')');
+    return { exprOfLut: { lutRef, varSpecs } };
   }
 
   peek(){
@@ -2544,7 +2579,7 @@ assignment() {
 }
 
 isBuiltinFunction(name) {
-  if (name === 'show') return true;
+  if (name === 'show' || name === 'lutOf' || name === 'exprOfLut') return true;
 
   if (['NOT','AND','OR','XOR','NXOR','NAND','NOR','EQ','LATCH',
        'LSHIFT','RSHIFT'].includes(name)) {
@@ -2919,6 +2954,8 @@ Parser.KEYWORD_HANDLERS = {
   watch: 'watch',
   show: 'show',
   peek: 'peek',
+  lutOf: 'lutOf',
+  exprOfLut: 'exprOfLut',
   probe: 'probe',
   NEXT: 'next',
   TEST: 'test',
