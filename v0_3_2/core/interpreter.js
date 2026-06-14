@@ -556,7 +556,9 @@ class Interpreter {
       }
     }
 
-    const result = generateFn(inst, argValues);
+    const result = generateFn(inst, argValues, {
+      getInlineLut: (name) => this._getLutInst(name),
+    });
     return { value: result.blob, bitWidth: result.totalWidth, channelWidths: result.channelWidths };
   }
 
@@ -593,11 +595,13 @@ class Interpreter {
       throw Error(`LUT address ${addr} >= length ${length}`);
     }
     const outVal = inst.lutTable[addr];
+    const variableDepth = inst.attributes && inst.attributes.variableDepth;
+    const outWidth = variableDepth ? (outVal ? outVal.length : 1) : depth;
     if (computeRefs && outVal) {
       const idx = this.storeValue(outVal);
-      return { value: outVal, ref: `&${idx}`, varName: `${inst.name}:get`, bitWidth: depth };
+      return { value: outVal, ref: `&${idx}`, varName: `${inst.name}:get`, bitWidth: outWidth };
     }
-    return { value: outVal, ref: null, bitWidth: depth };
+    return { value: outVal, ref: null, bitWidth: outWidth };
   }
 
   _lutInstFromComp(compName) {
@@ -731,10 +735,12 @@ class Interpreter {
       const attributes = parsed.attributes;
       const initialValue = parsed.initialValue || { kind: 'lutData', entries: [], rawEntries: [] };
       const length = attributes.length !== undefined ? parseInt(attributes.length, 10) : 16;
-      const depth = attributes.depth !== undefined ? parseInt(attributes.depth, 10) : 4;
-      if (length <= 0 || depth <= 0) throw Error(`LUT length and depth must be positive for ${inline.name}`);
-      const fillwith = handler._resolveFillwith(attributes, depth);
-      if (initialValue && initialValue.entries) {
+      const variableDepth = !!attributes.variableDepth;
+      const depth = attributes.depth !== undefined ? parseInt(attributes.depth, 10) : (variableDepth ? 1 : 4);
+      if (length <= 0) throw Error(`LUT length must be positive for ${inline.name}`);
+      if (!variableDepth && depth <= 0) throw Error(`LUT depth must be positive for ${inline.name}`);
+      const fillwith = handler._resolveFillwith(attributes, depth, variableDepth);
+      if (initialValue && initialValue.entries && !variableDepth) {
         for (const entry of initialValue.entries) {
           if (entry.value.length !== depth) {
             throw Error(`LUT value must be exactly ${depth} bits at address ${entry.from}`);
@@ -760,6 +766,12 @@ class Interpreter {
       const parseBodyFn = typeof parseProtocolBody === 'function' ? parseProtocolBody : null;
       if (!parseBodyFn) throw Error('Protocol assembler is not loaded');
       const proto = parseBodyFn(inline.bodyRaw);
+      const getLut = (name) => {
+        const lut = this.inlineInstances.get(name);
+        return (lut && lut.kind === 'lut') ? lut : null;
+      };
+      const inferFn = typeof inferProtocolWidth === 'function' ? inferProtocolWidth : null;
+      const widthInfo = inferFn ? inferFn(proto, getLut) : { kind: 'dynamic' };
       this.inlineInstances.set(inline.name, {
         kind: inline.kind,
         name: inline.name,
@@ -767,6 +779,8 @@ class Interpreter {
         channels: proto.channels,
         parameters: proto.parameters,
         channelOrder: proto.channelOrder,
+        localDefs: proto.localDefs || {},
+        widthInfo,
         bodyRaw: inline.bodyRaw,
       });
       return;
@@ -4235,7 +4249,11 @@ if (s.assignment) {
               throw Error(`Bit-width mismatch: ${d.name} is ${bits}bit but assembled program provides ${wireValue.length} bits`);
             }
           } else if (hasProtocolBlob) {
-            throw Error(`Protocol output width mismatch: ${d.name} is ${bits}bit but protocol provides ${wireValue.length} bits`);
+            if (wireValue.length < bits && (declAssignPad === 'left' || declAssignPad === 'right')) {
+              wireValue = padWireBits(wireValue, bits, declAssignPad);
+            } else {
+              throw Error(`Protocol output width mismatch: ${d.name} is ${bits}bit but protocol provides ${wireValue.length} bits`);
+            }
           } else {
             const hasWireRef = exprResult.some(p => p.varName && this.wires.has(p.varName));
             if(hasWireRef){

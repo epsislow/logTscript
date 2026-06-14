@@ -240,6 +240,33 @@ show(slot0)
 
 ---
 
+## `:decode(instruction)`
+
+Disassembly — returns **text**, not bits. Valid only inside `show()` and `doc()`.
+
+### Runnable — show disassembly
+
+```logts-play
+inline [asm] .cpu:
+  LOAD  : 0001 + R2b + A2b
+  STORE : 0010 + R2b + A2b
+  :
+
+show(.cpu:decode(00010111))
+```
+
+Output example: **`LOAD R1 A3`**
+
+| Error | Cause |
+|-------|-------|
+| `ASM decode produces text and cannot be assigned to wires` | Used in wire assignment |
+
+```logts
+8wire x = .cpu:decode(00010111)   # error
+```
+
+---
+
 ## `doc()`
 
 ```logts-play

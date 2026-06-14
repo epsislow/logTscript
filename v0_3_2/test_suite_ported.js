@@ -4877,5 +4877,325 @@ board [lutin] .u::
   h.assert('global lut invoke by address', session.getWire(interp, 'r'), '1111');
 });
 
+const INLINE_LUT_VD = `inline [lut] .vd:
+  variableDepth
+  data {
+    00: 0
+    01: 101
+    10: 11
+  }
+  :`;
+
+const INLINE_HUFF = `inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :`;
+
+const INLINE_MAP2 = `inline [lut] .map2:
+  depth: 2
+  length: 4
+  data {
+    00: 01
+    01: 01
+    10: 10
+    11: 11
+  }
+  :`;
+
+const INLINE_MAP3 = `inline [lut] .map3:
+  depth: 3
+  length: 4
+  data {
+    00: 010
+    01: 110
+    10: 000
+    11: 111
+  }
+  :`;
+
+const INLINE_TABLE4 = `inline [lut] .table:
+  depth: 4
+  length: 16
+  data {
+    0000: 0000
+    0001: 0001
+    0010: 0010
+    0011: 0011
+  }
+  :`;
+
+const INLINE_HUFF_PACKET = INLINE_HUFF + `
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :`;
+
+const INLINE_HUFF_RECOVER = INLINE_HUFF + `
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 2b)
+  :`;
+
+reg(1067, 'lut-ext', 'variableDepth — valori de lățimi diferite', function(h, session) {
+  const { interp } = session.run(INLINE_LUT_VD + `
+1wire a = .vd(00)
+3wire b = .vd(01)
+2wire c = .vd(10)`);
+  h.assert('addr 00', session.getWire(interp, 'a'), '0');
+  h.assert('addr 01', session.getWire(interp, 'b'), '101');
+  h.assert('addr 10', session.getWire(interp, 'c'), '11');
+});
+
+reg(1068, 'lut-ext', 'variableDepth + depth: → eroare', function(h, session) {
+  let err = '';
+  try {
+    session.run(`inline [lut] .bad:
+  depth: 4
+  variableDepth
+  data { 00: 0 }
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('conflict', String(err.includes('variableDepth cannot be combined with depth')), 'true');
+});
+
+reg(1069, 'lut-ext', 'prefixFree — Huffman valid', function(h, session) {
+  const { interp } = session.run(INLINE_HUFF + '\n2wire x = .huff(01)');
+  h.assert('lookup 01', session.getWire(interp, 'x'), '10');
+});
+
+reg(1070, 'lut-ext', 'prefixFree — violare prefix', function(h, session) {
+  let err = '';
+  try {
+    session.run(`inline [lut] .bad:
+  prefixFree
+  data {
+    00: 0
+    01: 01
+  }
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('prefix violation', String(err.includes('prefixFree violation')), 'true');
+});
+
+reg(1071, 'lut-ext', 'prefixFree + depth: → eroare', function(h, session) {
+  let err = '';
+  try {
+    session.run(`inline [lut] .bad:
+  depth: 4
+  prefixFree
+  data { 00: 0 }
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('conflict', String(err.includes('prefixFree cannot be combined with depth')), 'true');
+});
+
+reg(1072, 'lut-ext', 'prefixFree implică variableDepth', function(h, session) {
+  session.run(INLINE_HUFF);
+  const inst = session.interp.inlineInstances.get('.huff');
+  h.assert('variableDepth', String(!!inst.attributes.variableDepth), 'true');
+  h.assert('prefixFree', String(!!inst.attributes.prefixFree), 'true');
+  h.assert('no depth attr', String(inst.attributes.depth === undefined), 'true');
+});
+
+reg(1073, 'lut-ext', 'doc(.huff)', function(h, session) {
+  const out = session.runDoc(INLINE_HUFF + '\ndoc(.huff)');
+  h.assert('prefixFree', String(out.some(l => l.includes('prefixFree'))), 'true');
+  h.assert('header', String(out.some(l => l.includes('.huff (inline [lut])'))), 'true');
+});
+
+reg(1074, 'lut-ext', '.huff(in=01) → 10', function(h, session) {
+  const { interp } = session.run(INLINE_HUFF + '\n2wire y = .huff(in = 01)');
+  h.assert('value', session.getWire(interp, 'y'), '10');
+});
+
+reg(1075, 'protocol-ext', 'def — length(data) 8b + data în payload', function(h, session) {
+  const src = `inline [protocol] .pkt:
+  def payload:
+    length(data) 8b
+    data 8b
+  out:
+    payload
+  :
+16wire out = .pkt { data = 10101010 }`;
+  const { interp } = session.run(src);
+  h.assert('length+data', session.getWire(interp, 'out'), '0000100010101010');
+});
+
+reg(1076, 'protocol-ext', 'length(data) 16b + data ~b = 101010', function(h, session) {
+  const src = `inline [protocol] .packet:
+  out:
+    length(data) 16b
+    data ~b
+  :
+22wire out = .packet { data = 101010 }`;
+  const { interp } = session.run(src);
+  h.assert('var packet', session.getWire(interp, 'out'), '0000000000000110101010');
+});
+
+reg(1077, 'protocol-ext', 'length(data) 8b fix → 00001000', function(h, session) {
+  const src = `inline [protocol] .lenfix:
+  out:
+    length(data) 8b
+  :
+8wire out = .lenfix { data = 11110000 }`;
+  const { interp } = session.run(src);
+  h.assert('fixed len', session.getWire(interp, 'out'), '00001000');
+});
+
+reg(1078, 'protocol-ext', 'lengthOf(encoded) 8b — tokens 01 → 00000011 + 010', function(h, session) {
+  const src = INLINE_HUFF + `
+inline [protocol] .lof:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+11wire out = .lof { tokens = 0001 }`;
+  const { interp } = session.run(src);
+  h.assert('lengthOf+encoded', session.getWire(interp, 'out'), '00000011010');
+});
+
+reg(1079, 'protocol-ext', 'length(tokens) ≠ lengthOf(encoded)', function(h, session) {
+  const src = INLINE_HUFF + `
+inline [protocol] .cmp:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    length(tokens) 8b
+    lengthOf(encoded) 8b
+  :
+8wire a,
+8wire b
+= .cmp { tokens = 0001 }`;
+  const { interp } = session.run(src);
+  h.assert('len tokens', session.getWire(interp, 'a'), '00000100');
+  h.assert('len encoded', session.getWire(interp, 'b'), '00000011');
+});
+
+reg(1080, 'protocol-ext', 'expand — 000110 → 010110', function(h, session) {
+  const src = INLINE_MAP2 + `
+inline [protocol] .exp:
+  out:
+    expand(tokens, .map2, 2b)
+  :
+6wire out = .exp { tokens = 000110 }`;
+  const { interp } = session.run(src);
+  h.assert('expanded', session.getWire(interp, 'out'), '010110');
+});
+
+reg(1081, 'protocol-ext', 'expand — input nu e multiplu de keyWidth → eroare', function(h, session) {
+  let err = '';
+  try {
+    session.run(INLINE_MAP2 + `
+inline [protocol] .exp:
+  out:
+    expand(tokens, .map2, 2b)
+  :
+5wire out = .exp { tokens = 00011 }`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('keyWidth', String(err.includes('not a multiple of keyWidth')), 'true');
+});
+
+reg(1082, 'protocol-ext', 'collapse — fixed depth LUT', function(h, session) {
+  const src = INLINE_MAP3 + `
+inline [protocol] .col:
+  out:
+    collapse(data, .map3, 2b)
+  :
+6wire out = .col { data = 010110000 }`;
+  const { interp } = session.run(src);
+  h.assert('collapsed', session.getWire(interp, 'out'), '000110');
+});
+
+reg(1083, 'protocol-ext', 'collapse — prefixFree greedy', function(h, session) {
+  const src = INLINE_HUFF + `
+inline [protocol] .col:
+  out:
+    collapse(data, .huff, 2b)
+  :
+4wire out = .col { data = 010 }`;
+  const { interp } = session.run(src);
+  h.assert('greedy', session.getWire(interp, 'out'), '0001');
+});
+
+reg(1084, 'protocol-ext', 'withLength(data, 8b) → 010', function(h, session) {
+  const src = `inline [protocol] .wl:
+  out:
+    withLength(data, 8b)
+  :
+3wire out = .wl { data = 0000001101000000 }`;
+  const { interp } = session.run(src);
+  h.assert('payload', session.getWire(interp, 'out'), '010');
+});
+
+reg(1085, 'protocol-ext', 'withLength(data, 16b)', function(h, session) {
+  const src = `inline [protocol] .wl16:
+  out:
+    withLength(data, 16b)
+  :
+8wire out = .wl16 { data = 000000000000100010101010 }`;
+  const { interp } = session.run(src);
+  h.assert('payload16', session.getWire(interp, 'out'), '10101010');
+});
+
+reg(1086, 'protocol-ext', 'Round-trip 0001 → 00000011010 → 0001', function(h, session) {
+  const src = INLINE_HUFF + `
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 2b)
+  :
+4wire source = 0001
+11wire encoded = .huffPacket { tokens = source }
+4wire recovered = .huffRecover { data = encoded }`;
+  const { interp } = session.run(src);
+  h.assert('encoded', session.getWire(interp, 'encoded'), '00000011010');
+  h.assert('recovered', session.getWire(interp, 'recovered'), '0001');
+});
+
+reg(1087, 'protocol-ext', 'lățime STATIC — expand + LUT depth:4, tokens 8b → 16 biți', function(h, session) {
+  session.run(INLINE_TABLE4 + `
+inline [protocol] .enc:
+  out:
+    expand(tokens 8b, .table, 2b)
+  :`);
+  const inst = session.interp.inlineInstances.get('.enc');
+  h.assert('static', inst.widthInfo.kind, 'static');
+  h.assert('width 16', String(inst.widthInfo.width), '16');
+});
+
+reg(1088, 'protocol-ext', 'lățime DYNAMIC — .huffPacket marcat dynamic', function(h, session) {
+  session.run(INLINE_HUFF_PACKET);
+  const inst = session.interp.inlineInstances.get('.huffPacket');
+  h.assert('dynamic', inst.widthInfo.kind, 'dynamic');
+});
+
+reg(1089, 'protocol-ext', 'doc(inline.protocol) — generatoare noi', function(h, session) {
+  const out = session.runDoc('doc(inline.protocol)');
+  h.assert('length', String(out.some(l => l.includes('length('))), 'true');
+  h.assert('expand', String(out.some(l => l.includes('expand'))), 'true');
+  h.assert('def', String(out.some(l => l.includes('def payload'))), 'true');
+});
+
+reg(1090, 'protocol-ext', 'regresie :decode UART (945) — neschimbat', function(h, session) {
+  const { interp } = session.run(INLINE_UART8N1 + '\n8wire data = .uart8n1:decode(0100000101)');
+  h.assert('data', session.getWire(interp, 'data'), '01000001');
+});
+
   suite.finalize();
 })();

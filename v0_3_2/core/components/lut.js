@@ -31,7 +31,19 @@ var LutComponent = class LutComponent extends BuiltinComponent {
     };
   }
 
-  _resolveFillwith(attributes, depth) {
+  _resolveFillwith(attributes, depth, variableDepth) {
+    if (variableDepth || attributes.variableDepth) {
+      let fill = attributes.fillwith;
+      if (fill === undefined || fill === null) return '0';
+      fill = String(fill);
+      if (fill.length !== 1) {
+        throw Error(`LUT fillwith must be exactly 1 bit for variableDepth, got ${fill.length}`);
+      }
+      if (!/^[01]$/.test(fill)) {
+        throw Error(`LUT fillwith must be a binary literal`);
+      }
+      return fill;
+    }
     let fill = attributes.fillwith;
     if (fill === undefined || fill === null) return '0'.repeat(depth);
     fill = String(fill);
@@ -121,10 +133,12 @@ var LutComponent = class LutComponent extends BuiltinComponent {
     if (property !== 'get') return null;
     const lutId = comp.deviceIds[0];
     const depth = comp.attributes['depth'] !== undefined ? parseInt(comp.attributes['depth'], 10) : 4;
+    const variableDepth = !!(comp.attributes && comp.attributes.variableDepth);
     let val = this._lookup(comp, lutId);
     const br = this.handleBitRange(a, val, a.var, 'get', ctx);
     if (br) return br;
-    return { value: val, ref: null, varName: `${a.var}:get`, bitWidth: depth };
+    const bitWidth = variableDepth ? val.length : depth;
+    return { value: val, ref: null, varName: `${a.var}:get`, bitWidth };
   }
 
   handleImmediateAssignment(comp, property, value, ctx) {
@@ -157,12 +171,21 @@ var LutComponent = class LutComponent extends BuiltinComponent {
   }
 
   static formatInlineInstanceDoc(alias, inst) {
-    const depth = inst.attributes && inst.attributes.depth !== undefined ? parseInt(inst.attributes.depth, 10) : 4;
-    const length = inst.attributes && inst.attributes.length !== undefined ? parseInt(inst.attributes.length, 10) : 16;
-    const fill = inst.fillwithValue || '0'.repeat(depth);
+    const attrs = inst.attributes || {};
+    const variableDepth = !!attrs.variableDepth;
+    const prefixFree = !!attrs.prefixFree;
+    const depth = attrs.depth !== undefined ? parseInt(attrs.depth, 10) : 4;
+    const length = attrs.length !== undefined ? parseInt(attrs.length, 10) : 16;
+    const fill = inst.fillwithValue || (variableDepth ? '0' : '0'.repeat(depth));
     const lines = [];
     lines.push(`${alias} (inline [lut])`);
-    lines.push(`  depth: ${depth}`);
+    if (prefixFree) {
+      lines.push('  prefixFree');
+    } else if (variableDepth) {
+      lines.push('  variableDepth');
+    } else {
+      lines.push(`  depth: ${depth}`);
+    }
     lines.push(`  length: ${length}`);
     lines.push(`  fillwith: ${fill}`);
     const labelMap = inst.labelMap || {};

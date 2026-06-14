@@ -295,6 +295,15 @@ function parseLutBody(bodyRaw) {
       continue;
     }
 
+    if (trimmed === 'variableDepth') {
+      attributes.variableDepth = true;
+      continue;
+    }
+    if (trimmed === 'prefixFree') {
+      attributes.prefixFree = true;
+      continue;
+    }
+
     const colon = trimmed.indexOf(':');
     if (colon >= 0 && trimmed.indexOf('=') < 0) {
       const key = trimmed.slice(0, colon).trim();
@@ -323,21 +332,22 @@ function parseLutBody(bodyRaw) {
   return { attributes, labelDefs, dataBracePos, bodyRaw };
 }
 
-function resolveLabelValue(valueSource, labelMap, depth, resolveExternal) {
+function resolveLabelValue(valueSource, labelMap, depth, resolveExternal, variableDepth) {
   const trimmed = valueSource.trim();
   if (/^[01]+$/.test(trimmed)) {
-    if (depth && trimmed.length !== depth) {
+    if (!trimmed.length) throw new Error('Empty binary value not allowed');
+    if (!variableDepth && depth && trimmed.length !== depth) {
       throw new Error(`Label value width mismatch: expected ${depth} bits, got ${trimmed.length}`);
     }
-    return { bits: padBits(trimmed, depth), exprSource: null, ast: null };
+    return { bits: variableDepth ? trimmed : padBits(trimmed, depth), exprSource: null, ast: null };
   }
   if (isLabelName(trimmed) && labelMap[trimmed]) {
     const e = labelMap[trimmed];
     return { bits: e.bits, exprSource: e.exprSource || null, ast: e.ast || null };
   }
   const { ast, exprSource } = parseLutConstExpr(trimmed);
-  const bits = evalLutConstExpr(ast, { labelMap, depth, resolveExternal });
-  if (depth && bits.length !== depth) {
+  const bits = evalLutConstExpr(ast, { labelMap, depth: variableDepth ? null : depth, resolveExternal });
+  if (!variableDepth && depth && bits.length !== depth) {
     throw new Error(`Label value width mismatch: expected ${depth} bits, got ${bits.length}`);
   }
   return { bits, exprSource, ast };
@@ -392,7 +402,24 @@ function buildLabelMap(labelDefs, depth, resolveExternal) {
   return { labelMap, labelExprs };
 }
 
+function validatePrefixFreeValues(values) {
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (!v || v.length === 0) {
+      throw new Error('prefixFree requires non-empty binary values');
+    }
+    for (let j = 0; j < values.length; j++) {
+      if (i === j) continue;
+      const u = values[j];
+      if (v.length < u.length && u.startsWith(v)) {
+        throw new Error(`prefixFree violation: value '${v}' is a prefix of value '${u}'`);
+      }
+    }
+  }
+}
+
 function parseLutDataWithLabels(bodyRaw, bracePos, attributes, labelMap, depth, length, resolveExternal) {
+  const variableDepth = !!attributes.variableDepth;
   const src = bodyRaw;
   let pos = bracePos + 1;
   const entries = [];
@@ -473,7 +500,7 @@ function parseLutDataWithLabels(bodyRaw, bracePos, attributes, labelMap, depth, 
       if (addrEnd.index < addrStart.index) throw new Error('LUT address range inverted');
     }
     const valueSource = readValueSource();
-    const resolved = resolveLabelValue(valueSource, labelMap, depth, resolveExternal);
+    const resolved = resolveLabelValue(valueSource, labelMap, depth, resolveExternal, variableDepth);
     const value = resolved.bits;
     for (let i = addrStart.index; i <= addrEnd.index; i++) {
       if (i >= length) throw new Error(`LUT address ${i} >= length ${length}`);
@@ -496,27 +523,46 @@ function parseLutDataWithLabels(bodyRaw, bracePos, attributes, labelMap, depth, 
 function resolveLutBody(bodyRaw, resolveExternal) {
   const parsed = parseLutBody(bodyRaw);
   const attributes = { ...parsed.attributes };
+
+  if (attributes.prefixFree) attributes.variableDepth = true;
+
+  if (attributes.depth !== undefined && attributes.variableDepth) {
+    throw new Error(attributes.prefixFree
+      ? 'prefixFree cannot be combined with depth'
+      : 'variableDepth cannot be combined with depth');
+  }
+
   let depth = attributes.depth !== undefined ? parseInt(attributes.depth, 10) : null;
   const length = attributes.length !== undefined ? parseInt(attributes.length, 10) : 16;
+  const variableDepth = !!attributes.variableDepth;
 
-  const { labelMap, labelExprs } = buildLabelMap(parsed.labelDefs, depth, resolveExternal);
+  const { labelMap, labelExprs } = buildLabelMap(
+    parsed.labelDefs, variableDepth ? null : depth, resolveExternal
+  );
 
-  if (depth == null) {
-    depth = inferDepthFromLabels(labelMap);
-    if (depth == null) depth = 4;
-    attributes.depth = depth;
-  } else if (Object.keys(labelMap).length) {
-    const inferred = inferDepthFromLabels(labelMap);
-    if (inferred != null && inferred !== depth) {
-      throw new Error('Label width mismatch');
+  if (!variableDepth) {
+    if (depth == null) {
+      depth = inferDepthFromLabels(labelMap);
+      if (depth == null) depth = 4;
+      attributes.depth = depth;
+    } else if (Object.keys(labelMap).length) {
+      const inferred = inferDepthFromLabels(labelMap);
+      if (inferred != null && inferred !== depth) {
+        throw new Error('Label width mismatch');
+      }
     }
   }
 
   let initialValue = { kind: 'lutData', entries: [], rawEntries: [] };
   if (parsed.dataBracePos >= 0) {
     initialValue = parseLutDataWithLabels(
-      bodyRaw, parsed.dataBracePos, attributes, labelMap, depth, length, resolveExternal
+      bodyRaw, parsed.dataBracePos, attributes, labelMap,
+      variableDepth ? null : depth, length, resolveExternal
     );
+  }
+
+  if (attributes.prefixFree && initialValue.entries.length) {
+    validatePrefixFreeValues(initialValue.entries.map(e => e.value));
   }
 
   if (!attributes.length) attributes.length = length;
@@ -537,6 +583,7 @@ const lutLabelsExports = {
   parseLutBody,
   resolveLutBody,
   parseLutDataWithLabels,
+  validatePrefixFreeValues,
   buildLabelMap,
   bitwiseOr,
   bitwiseAnd,

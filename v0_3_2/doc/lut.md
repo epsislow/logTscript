@@ -65,6 +65,89 @@ Apply to both `inline [lut]` and `comp [lut]`:
 
 Address width on pin `in` (comp only): `max(1, ceil(log2(length)))` bits.
 
+### `variableDepth`
+
+When set, each LUT value may have a **different bit width**. Mutually exclusive with `depth:`.
+
+| Rule | Detail |
+|------|--------|
+| Attribute | `variableDepth` (no value) |
+| Values in `data { }` | Any non-empty binary literal per slot |
+| `fillwith` | Must be exactly **1 bit** (default `0`) |
+| Output width | Matches the selected value's length |
+
+### Runnable — variableDepth lookup
+
+```logts-play
+inline [lut] .vd:
+  variableDepth
+  data {
+    00: 0
+    01: 101
+    10: 11
+  }
+  :
+
+1wire a = .vd(00)
+3wire b = .vd(01)
+2wire c = .vd(10)
+show(a)
+show(b)
+show(c)
+```
+
+Address `01` → 3-bit value **`101`**; address `10` → 2-bit value **`11`**.
+
+Combining `variableDepth` with `depth:` is a parse error.
+
+### `prefixFree`
+
+Declares a **prefix-free** codeword table (Huffman-style). Implies `variableDepth`; mutually exclusive with `depth:`.
+
+At parse time every value is checked: no codeword may be a prefix of another.
+
+| Rule | Detail |
+|------|--------|
+| Attribute | `prefixFree` (no value) |
+| Values | Variable-length binary codewords |
+| Lookup | `.name(in = addr)` — encode key → codeword |
+| Reverse in protocol | `collapse(data, .name, keyWidth)` — greedy decode; see [protocol.md — expand / collapse](protocol.md#expand--collapse-with-lut) |
+
+For a full encode → packet → decode walkthrough (`.huff`, `.huffPacket`, `.huffRecover`), see **[huffman.md](huffman.md)**.
+
+### Runnable — prefixFree Huffman table
+
+```logts-play
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+
+2wire y = .huff(01)
+show(y)
+```
+
+Key `01` → codeword **`10`**.
+
+Prefix violation example (parse error):
+
+```logts
+inline [lut] .bad:
+  prefixFree
+  data {
+    00: 0
+    01: 01    # '0' is a prefix of '01'
+  }
+  :
+```
+
+Combining `prefixFree` with `depth:` is a parse error.
+
 ---
 
 ## `data { }` — table contents
@@ -189,13 +272,76 @@ Checks whether an exact mapping exists in `data { }`.
 
 ## `decode(value [, matchIndex])` → address bits
 
-Reverse lookup. See [decode.md](decode.md) for protocol and ASM decode.
+Reverse lookup: encoded value → address (key). Optional zero-based `matchIndex` when multiple keys map to the same value (default `0`).
 
-```logts
-4bit x = .decoder:decode(0010)
-4bit x = .decoder:decode(1111, 2)
-2bit x = .traffic:decode(GREEN)
+Works with binary literals and label names as the value argument.
+
+### Runnable — unique reverse lookup
+
+```logts-play
+inline [lut] .decoder:
+  depth: 4
+  length: 16
+  data {
+    0000 : 0001
+    0001 : 0010
+    0010 : 0100
+  }
+  :
+
+4wire x = .decoder:decode(0010)
+show(x)
 ```
+
+Value `0010` → key address **`0010`**.
+
+### Runnable — ambiguous value (matchIndex)
+
+```logts-play
+inline [lut] .amb:
+  depth: 4
+  length: 16
+  data {
+    0000 : 1111
+    0001 : 1111
+    0010 : 1111
+  }
+  :
+
+4wire first = .amb:decode(1111)
+4wire third = .amb:decode(1111, 0010)
+show(first)
+show(third)
+```
+
+Default index `0` → **`0000`**; index `2` (binary `0010`) → **`0010`**.
+
+### Runnable — decode with label value
+
+```logts-play
+inline [lut] .traffic:
+  RED    = 00
+  YELLOW = 01
+  GREEN  = 10
+  data {
+    RED    : GREEN
+    GREEN  : YELLOW
+    YELLOW : RED
+  }
+  :
+
+2wire x = .traffic:decode(GREEN)
+show(x)
+```
+
+Value label `GREEN` (`10`) maps to key **`RED`** (`00`).
+
+| Error | Cause |
+|-------|-------|
+| `LUT decode failed: value ... does not exist` | Value not in table |
+| `LUT decode failed: match index N exceeds available matches (M)` | Invalid `matchIndex` |
+
+Protocol reverse transform: [protocol.md — `:decode()`](protocol.md#decodechannels). ASM disassembly: [asm.md — `:decode()`](asm.md#decodeinstruction).
 
 ---
 
@@ -483,12 +629,16 @@ doc(.decoder)
 | `LUT value must be exactly D bits` | Value or `fillwith` wrong width |
 | `LUT range inverted` | `end < start` in a range |
 | `requires '= data { ... }'` | `comp [lut]` missing initializer |
+| `variableDepth cannot be combined with depth` | Both attributes set |
+| `prefixFree cannot be combined with depth` | Both attributes set |
+| `prefixFree violation: value '...' is a prefix of value '...'` | Codewords not prefix-free |
 
 ---
 
 ## Related
 
-- [decode.md](decode.md) — `:decode()`, protocol/ASM reverse
+- [huffman.md](huffman.md) — end-to-end Huffman example (`prefixFree` + `expand` / `collapse`)
+- [protocol.md](protocol.md) — `expand` / `collapse` with LUT; `:decode()` on channels
 - [mem.md](mem.md) — sequential RAM
 - [asm.md](asm.md) — inline assembler (blob into `mem`)
 - [debug.md](debug.md) — `probe`, `show`, `peek`

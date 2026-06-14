@@ -106,12 +106,37 @@ function lutDecode(inst, valueExpr, matchIndexExpr, ctx) {
   return { value: keyBits, bitWidth: addrWidth, symbolicMeta: meta };
 }
 
+function lutCollapsePrefixFree(inst, dataBits, keyWidth) {
+  if (!inst || !inst.lutTable) throw new Error('LUT collapse requires a lookup table');
+  const length = inst.attributes.length !== undefined ? parseInt(inst.attributes.length, 10) : 16;
+  let pos = 0;
+  let out = '';
+  while (pos < dataBits.length) {
+    let matched = false;
+    for (let i = 0; i < length; i++) {
+      const val = inst.lutTable[i];
+      if (!val || val.length === 0) continue;
+      if (dataBits.substr(pos, val.length) === val) {
+        out += i.toString(2).padStart(keyWidth, '0');
+        pos += val.length;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      throw new Error(`prefixFree collapse failed at bit offset ${pos}`);
+    }
+  }
+  return out;
+}
+
 const lutDecodeExports = {
   lutAddrBits,
   resolveLutArgValue,
   lutMappingExists,
   lutIsValid,
   lutDecode,
+  lutCollapsePrefixFree,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = lutDecodeExports;

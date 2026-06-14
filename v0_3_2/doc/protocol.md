@@ -404,6 +404,450 @@ Invoke parameters may span multiple lines inside `{ }`. sda = 20 data bits; scl 
 
 ---
 
+## `:decode(channels...)`
+
+Reverse a protocol encode: extract parameter values from one or more channel bit strings.
+
+Channel order must match the protocol declaration. All literal, parity, clock, and repeat segments are verified during decode.
+
+| Inline | Decode result | In expressions |
+|--------|---------------|----------------|
+| protocol | Bit values (concatenated params) | ✓ |
+| lut | Address bits | ✓ — see [lut.md](lut.md#decodevalue-matchindex--address-bits) |
+| asm | Text (disassembly) | ✗ — see [asm.md](asm.md#decodeinstruction) |
+
+**Decode is not extended** to the v2 generators (`expand`, `collapse`, `length`, `lengthOf`, `withLength`, or `def` references). For Huffman-style payloads, define a separate recovery protocol (e.g. `.huffRecover` with `collapse` + `withLength`) instead of calling `:decode()` on the encoder.
+
+### Runnable — UART single channel
+
+```logts-play
+inline [protocol] .uart8n1:
+  tx:
+    0
+    reverse(data 8b)
+    1
+  :
+
+10wire tx = .uart8n1 { data = ^41 }
+8wire data = .uart8n1:decode(tx)
+show(tx)
+show(data)
+```
+
+`^41` → `0100000101` on `tx`; decode recovers `01000001`.
+
+### Runnable — I2C multi-channel
+
+```logts-play
+inline [protocol] .i2c:
+  clockType: lowFirst
+  sda:
+    0
+    address 7b
+    rw 1b
+    ack1 1b
+    data 8b
+    ack2 1b
+    1
+  scl:
+    clock 20b
+  :
+
+20wire sda,
+20wire scl
+= .i2c {
+  address = ^42
+  rw = 0
+  ack1 = 0
+  data = ^55
+  ack2 = 0
+}
+
+7wire address,
+1wire rw,
+1wire ack1,
+8wire data,
+1wire ack2
+= .i2c:decode(sda, scl)
+
+show(address)
+show(data)
+```
+
+Multi-target assignment splits the decoded parameter blob by left-side wire widths. Only the `sda` channel contributes parameters; `scl` is verified as a clock waveform.
+
+| Error | Cause |
+|-------|-------|
+| `Protocol decode failed: expected ...` | Input does not match definition |
+| `Expected N protocol channels but received M` | Wrong channel count |
+| `Protocol output width mismatch` | Channel width mismatch |
+| `Protocol decode does not support segment kind '...'` | Decode used on a protocol with v2 generators |
+
+---
+
+## `def` — local segments
+
+A **`def`** block names a reusable segment sequence inside a protocol body. Reference it in channels with the def name alone (same as a segment label).
+
+```logts
+def payload:
+  length(data) 8b
+  data 8b
+
+out:
+  payload
+```
+
+Defs are evaluated lazily and may be referenced by `lengthOf(def)`.
+
+### Runnable — def payload
+
+```logts-play
+inline [protocol] .pkt:
+  def payload:
+    length(data) 8b
+    data 8b
+  out:
+    payload
+  :
+
+16wire out = .pkt { data = 10101010 }
+show(out)
+```
+
+`length(data)` = `00001000` (8 bits), then `data` → **`0000100010101010`**.
+
+---
+
+## `length(param) Nb` and `lengthOf(def) Nb`
+
+| Generator | Meaning |
+|-----------|---------|
+| `length(param) Nb` | Bit length of the invoke parameter at encode time, encoded as an `Nb` field |
+| `lengthOf(def) Nb` | Bit length of a local def's evaluated output, encoded as an `Nb` field |
+
+For a fixed-width parameter (`data 8b`), `length(data) 8b` is always the constant width (8 → `00001000`), not a runtime measure of semantic content.
+
+For variable-width parameters (`data ~b`), `length(data) Nb` reflects the actual bit count passed at invoke.
+
+### Runnable — `length` vs `lengthOf`
+
+```logts-play
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+
+inline [protocol] .cmp:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    length(tokens) 8b
+    lengthOf(encoded) 8b
+  :
+
+8wire tokenLen,
+8wire encodedLen
+= .cmp { tokens = 0001 }
+
+show(tokenLen)
+show(encodedLen)
+```
+
+`tokens = 0001` → 4 bits; Huffman-encoded `010` → 3 bits. **`00000100`** vs **`00000011`**.
+
+### Runnable — length prefix + payload
+
+```logts-play
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+
+inline [protocol] .lof:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+
+11wire out = .lof { tokens = 0001 }
+show(out)
+```
+
+→ **`00000011010`** (3-bit length + 3-bit codeword).
+
+---
+
+## `withLength(data, Nb)`
+
+Strip a length-prefixed bit stream: read the first `Nb` bits as an unsigned length, then return the next `len` bits as the payload. Used when recovering packets that were built with `lengthOf(def) Nb` + payload.
+
+### Runnable — 8-bit length prefix
+
+```logts-play
+inline [protocol] .wl:
+  out:
+    withLength(data, 8b)
+  :
+
+3wire out = .wl { data = 0000001101000000 }
+show(out)
+```
+
+First 8 bits = `00000011` (length 3); payload = **`010`**.
+
+---
+
+## `expand` / `collapse` with LUT
+
+Map a token stream through an [inline LUT](lut.md) in both directions.
+
+| Generator | Syntax | Direction |
+|-----------|--------|-----------|
+| `expand` | `expand(param, .lut, keyWidth)` | Concatenate `keyWidth`-bit keys → LUT values |
+| `collapse` | `collapse(param, .lut, keyWidth)` | Split value stream → keys (fixed-depth LUT) or greedy prefix match ([`prefixFree`](lut.md#prefixfree) LUT) |
+
+`keyWidth` is the bit width of each LUT address key. Input to `expand` must be a multiple of `keyWidth`.
+
+With a **`prefixFree`** LUT, `collapse` uses greedy longest-prefix decoding (Huffman-style). See [lut.md — prefixFree](lut.md#prefixfree) and the full walkthrough in **[huffman.md](huffman.md)**.
+
+### Runnable — expand (fixed-depth LUT)
+
+```logts-play
+inline [lut] .map2:
+  depth: 2
+  length: 4
+  data {
+    00: 01
+    01: 01
+    10: 10
+    11: 11
+  }
+  :
+
+inline [protocol] .exp:
+  out:
+    expand(tokens, .map2, 2b)
+  :
+
+6wire out = .exp { tokens = 000110 }
+show(out)
+```
+
+`00`→`01`, `01`→`01`, `10`→`10` → **`010110`**.
+
+### Runnable — collapse (fixed-depth LUT)
+
+```logts-play
+inline [lut] .map3:
+  depth: 3
+  length: 4
+  data {
+    00: 010
+    01: 110
+    10: 000
+    11: 111
+  }
+  :
+
+inline [protocol] .col:
+  out:
+    collapse(data, .map3, 2b)
+  :
+
+6wire out = .col { data = 010110000 }
+show(out)
+```
+
+Fixed-depth LUT: consume 3-bit chunks → **`000110`**.
+
+### Runnable — collapse (prefixFree / greedy)
+
+```logts-play
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+
+inline [protocol] .col:
+  out:
+    collapse(data, .huff, 2b)
+  :
+
+4wire out = .col { data = 010 }
+show(out)
+```
+
+Greedy decode of `010` → keys `01`, `10` → **`0001`**.
+
+| Error | Cause |
+|-------|-------|
+| `expand input length N is not a multiple of keyWidth M` | Token stream not aligned |
+| `collapse failed: no LUT entry for value '...'` | Value not in table (fixed-depth) |
+| `prefixFree collapse failed at bit offset N` | No valid prefix at position |
+
+---
+
+## Combined Huffman round-trip (`.huffPacket` / `.huffRecover`)
+
+Typical pattern: encode with `lengthOf(encoded)` + `expand`; recover with `withLength` + `collapse` in a **separate** protocol (`:decode()` does not reverse `expand` directly).
+
+**[huffman.md](huffman.md)** documents the full example: codebook layout, packet format, greedy decode trace, `length` vs `lengthOf`, dynamic width, and runnable scripts for encode-only, decode-only, and round-trip.
+
+### Runnable — quick round-trip
+
+```logts-play
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 2b)
+  :
+
+4wire source = 0001
+11wire packet = .huffPacket { tokens = source }
+4wire recovered = .huffRecover { data = packet }
+
+show(source)
+show(packet)
+show(recovered)
+```
+
+`0001` → packet **`00000011010`** → recovered **`0001`**. Step-by-step bit layout: [huffman.md — packet layout](huffman.md#packet-layout).
+
+---
+
+## Static vs dynamic width (`inferProtocolWidth`)
+
+At parse time the compiler classifies each protocol instance:
+
+| Kind | When | `doc()` shows |
+|------|------|---------------|
+| **static** | All segment widths known (fixed params, fixed-depth LUT expand) | `width: static Nb` |
+| **dynamic** | Variable params (`~b`), `withLength`, `prefixFree` expand/collapse, or other runtime-sized segments | `width: dynamic` |
+
+Dynamic protocols may produce different bit counts per invoke. Assign to a wire wide enough for the maximum case, or rely on runtime width checking with `=`.
+
+### Runnable — static vs dynamic
+
+```logts-play
+inline [lut] .table:
+  depth: 4
+  length: 16
+  data {
+    0000: 0000
+    0001: 0001
+    0010: 0010
+    0011: 0011
+  }
+  :
+
+inline [protocol] .encStatic:
+  out:
+    expand(tokens 8b, .table, 2b)
+  :
+
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+
+inline [protocol] .encDynamic:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+
+doc(.encStatic)
+doc(.encDynamic)
+```
+
+`.encStatic` → `width: static 16b`. `.encDynamic` → `width: dynamic`.
+
+---
+
+## `data ~b` — variable-width parameters
+
+Append **`~b`** instead of a fixed width to declare a parameter whose bit length comes from the invoke value:
+
+```logts
+data ~b
+```
+
+At invoke, `data = 101010` supplies six bits; the protocol emits exactly six data bits (no padding).
+
+### Runnable — length prefix + variable payload
+
+```logts-play
+inline [protocol] .packet:
+  out:
+    length(data) 16b
+    data ~b
+  :
+
+22wire out = .packet { data = 101010 }
+show(out)
+```
+
+16-bit length = `0000000000000110` (6), payload = `101010` → **`0000000000000110101010`**.
+
+---
+
+## Not included (planned)
+
+These generators are **not** implemented in v2:
+
+| Planned | Purpose |
+|---------|---------|
+| `concat(...)` | Concatenate arbitrary segment expressions |
+| `padLeft(param, Nb)` | Left-pad parameter to width |
+| `padRight(param, Nb)` | Right-pad parameter to width |
+| `checksum(...)` | Checksum over segment range |
+
+Use literals, `def` blocks, and existing generators for now.
+
+---
+
 ## doc()
 
 ```logts-play
@@ -455,6 +899,11 @@ Example `doc(.uart8n1)`:
 | clockType must be 'lowFirst' or 'highFirst' | Invalid clock type |
 | parityEven() expects a parameter | Invalid argument |
 | reverse() expects a parameter | Invalid argument |
+| Protocol decode does not support segment kind 'expand' | `:decode()` on protocol using v2 generators |
+| expand input length N is not a multiple of keyWidth M | Token stream not aligned to LUT key width |
+| length(param) value N exceeds maximum for Nb field | Parameter too long for length prefix |
+| withLength: input shorter than length prefix | Packet shorter than declared length |
+| prefixFree violation | LUT codewords not prefix-free (parse time) |
 
 ---
 
@@ -470,3 +919,12 @@ Example `doc(.uart8n1)`:
 | Typical use | Machine code | UART, SPI, I2C, custom serial |
 
 A protocol definition is entirely generic. The compiler has no knowledge of UART, SPI, I2C, SDA, SCL, MOSI, or SCLK — these are user-defined channel and parameter names.
+
+---
+
+## Related
+
+- [huffman.md](huffman.md) — Huffman coding walkthrough (`.huff` + `.huffPacket` / `.huffRecover`)
+- [lut.md](lut.md) — `prefixFree`, `variableDepth`, LUT invoke
+- [asm.md](asm.md) — single-blob machine code
+- [assignment-operators.md](assignment-operators.md) — dynamic-width assignment
