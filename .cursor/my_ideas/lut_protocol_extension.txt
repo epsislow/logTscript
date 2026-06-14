@@ -1,0 +1,723 @@
+# Protocol Extensions: `def`, `length()`, `lengthOf()`, `withLength()`, `checksum()`, `expand()`, `collapse()`
+
+This document defines the protocol extensions used for variable-length data, encoded streams, checksums and LUT-based transformations.
+
+Protocols remain generic bitstream generators and transformers.
+
+The language does not distinguish between encoder protocols and decoder protocols. Users may define separate protocols when needed.
+
+---
+
+# Local Segments (`def`)
+
+Protocols may define reusable local segments.
+
+Syntax:
+
+```logts
+def name:
+  segment1
+  segment2
+  segment3
+```
+
+Each line is concatenated automatically.
+
+Equivalent to:
+
+```text
+name =
+  segment1 +
+  segment2 +
+  segment3
+```
+
+---
+
+## Example
+
+```logts
+inline [protocol] .packet:
+
+  def payload:
+    header
+    data
+    checksum(data)
+
+  out:
+    payload
+
+:
+```
+
+Generated output:
+
+```text
+header + data + checksum(data)
+```
+
+---
+
+## Notes
+
+A `def` does not generate output by itself.
+
+Only segments referenced from an output channel are emitted.
+
+---
+
+# `length()`
+
+Returns the runtime bit length of a protocol parameter.
+
+Typically used with variable-length parameters.
+
+Syntax:
+
+```text
+length(param) Nb
+```
+
+Where:
+
+| Parameter | Description                   |
+| --------- | ----------------------------- |
+| param     | Protocol parameter            |
+| N         | Width of emitted length field |
+
+---
+
+## Example
+
+```logts
+inline [protocol] .packet:
+
+  out:
+    length(data) 16b
+    data
+
+:
+```
+
+Invocation:
+
+```logts
+.packet {
+  data = 101010
+}
+```
+
+Generated:
+
+```text
+0000000000000110
+101010
+```
+
+---
+
+## Fixed-length parameters
+
+```logts
+data 8b
+```
+
+Result:
+
+```text
+length(data)
+```
+
+↓
+
+```text
+8
+```
+
+---
+
+## Variable-length parameters
+
+```logts
+data ~
+```
+
+Result depends on the actual invocation value.
+
+---
+
+# `lengthOf()`
+
+Returns the generated bit length of a protocol segment.
+
+Syntax:
+
+```text
+lengthOf(segment) Nb
+```
+
+Where:
+
+| Parameter | Description                          |
+| --------- | ------------------------------------ |
+| segment   | Protocol segment or local definition |
+| N         | Width of emitted length field        |
+
+---
+
+## Example
+
+```logts
+inline [protocol] .packet:
+
+  def encoded:
+    expand(
+      tokens,
+      .huff,
+      2b
+    )
+
+  out:
+    lengthOf(encoded) 8b
+    encoded
+
+:
+```
+
+If:
+
+```text
+encoded = 010
+```
+
+Generated output:
+
+```text
+00000011
+010
+```
+
+---
+
+## Difference between `length()` and `lengthOf()`
+
+```text
+length(param)
+```
+
+returns:
+
+```text
+input parameter size
+```
+
+---
+
+```text
+lengthOf(segment)
+```
+
+returns:
+
+```text
+generated segment size
+```
+
+---
+
+Example:
+
+```logts
+def encoded:
+  expand(
+    tokens,
+    .huff,
+    2b
+  )
+
+out:
+  length(tokens) 8b
+  lengthOf(encoded) 8b
+```
+
+The two values may differ.
+
+---
+
+# `withLength()`
+
+Extracts a payload from a bitstream containing a length prefix.
+
+Syntax:
+
+```text
+withLength(
+  data,
+  Nb
+)
+```
+
+Where:
+
+| Parameter | Description           |
+| --------- | --------------------- |
+| data      | Input bit stream      |
+| N         | Width of length field |
+
+---
+
+## Algorithm
+
+```text
+read first N bits
+interpret them as length L
+return next L bits
+```
+
+---
+
+## Example
+
+Input:
+
+```text
+00000011 01000000
+```
+
+Usage:
+
+```text
+withLength(
+  data,
+  8b
+)
+```
+
+Length field:
+
+```text
+00000011
+```
+
+↓
+
+```text
+3
+```
+
+Returned payload:
+
+```text
+010
+```
+
+Remaining bits are ignored.
+
+---
+
+# `checksum()`
+
+Generates a modular additive checksum.
+
+Syntax:
+
+```text
+checksum(data)
+```
+
+or
+
+```text
+checksum(
+  data,
+  wordLength
+)
+```
+
+---
+
+## Parameters
+
+| Parameter  | Description                     |
+| ---------- | ------------------------------- |
+| data       | Input bit stream                |
+| wordLength | Word size used during summation |
+
+---
+
+## Default
+
+If omitted:
+
+```text
+wordLength = 8
+```
+
+---
+
+## Algorithm
+
+```text
+split data into words
+sum all words
+truncate result to wordLength bits
+```
+
+---
+
+## Example
+
+```logts
+checksum(data)
+```
+
+Equivalent to:
+
+```logts
+checksum(
+  data,
+  8
+)
+```
+
+---
+
+## Example
+
+```logts
+checksum(
+  payload,
+  16
+)
+```
+
+Produces a 16-bit checksum.
+
+---
+
+# `expand()`
+
+Expands fixed-width symbols using a LUT.
+
+Syntax:
+
+```text
+expand(
+  data,
+  .lut,
+  keyWidth
+)
+```
+
+Where:
+
+| Parameter | Description          |
+| --------- | -------------------- |
+| data      | Input bit stream     |
+| .lut      | LUT instance         |
+| keyWidth  | Width of each symbol |
+
+---
+
+## Algorithm
+
+```text
+split input into keyWidth chunks
+lookup each chunk in LUT
+concatenate resulting values
+```
+
+---
+
+## Example
+
+LUT:
+
+```logts
+inline [lut] .huff:
+
+  prefixFree
+
+  00 : 0
+  01 : 10
+  10 : 110
+  11 : 111
+
+:
+```
+
+Input:
+
+```text
+000110
+```
+
+Split:
+
+```text
+00
+01
+10
+```
+
+Lookups:
+
+```text
+00 -> 0
+01 -> 10
+10 -> 110
+```
+
+Result:
+
+```text
+010110
+```
+
+---
+
+# `collapse()`
+
+Inverse operation of `expand()`.
+
+Syntax:
+
+```text
+collapse(
+  data,
+  .lut,
+  keyWidth
+)
+```
+
+Where:
+
+| Parameter | Description           |
+| --------- | --------------------- |
+| data      | Encoded bit stream    |
+| .lut      | LUT instance          |
+| keyWidth  | Width of emitted keys |
+
+---
+
+## Fixed-depth LUTs
+
+For LUTs using:
+
+```text
+depth
+```
+
+Input is split using the LUT value width.
+
+Example:
+
+```logts
+inline [lut] .table:
+
+  depth: 4
+
+  00 : 0001
+  01 : 0010
+  10 : 0011
+  11 : 0100
+
+:
+```
+
+Input:
+
+```text
+000100100011
+```
+
+Split:
+
+```text
+0001
+0010
+0011
+```
+
+Reverse lookups:
+
+```text
+0001 -> 00
+0010 -> 01
+0011 -> 10
+```
+
+Result:
+
+```text
+000110
+```
+
+---
+
+## Prefix-free LUTs
+
+For LUTs using:
+
+```text
+prefixFree
+```
+
+Input is consumed until a matching LUT value is found.
+
+Example:
+
+```logts
+inline [lut] .huff:
+
+  prefixFree
+
+  00 : 0
+  01 : 10
+  10 : 110
+  11 : 111
+
+:
+```
+
+Input:
+
+```text
+010110
+```
+
+Decoding:
+
+```text
+0    -> 00
+10   -> 01
+110  -> 10
+```
+
+Result:
+
+```text
+000110
+```
+
+---
+
+# Combined Example
+
+LUT:
+
+```logts
+inline [lut] .huff:
+
+  prefixFree
+
+  00 : 0
+  01 : 10
+  10 : 110
+  11 : 111
+
+:
+```
+
+Protocol A:
+
+```logts
+inline [protocol] .huffPacket:
+
+  def encoded:
+    expand(
+      tokens,
+      .huff,
+      2b
+    )
+
+  out:
+    lengthOf(encoded) 8b
+    encoded
+
+:
+```
+
+Protocol B:
+
+```logts
+inline [protocol] .huffRecover:
+
+  out:
+    collapse(
+      withLength(
+        data,
+        8b
+      ),
+      .huff,
+      2b
+    )
+
+:
+```
+
+Encoding:
+
+```logts
+4wire source = 0001
+
+11wire encoded =
+.huffPacket {
+  tokens = source
+}
+```
+
+Generated:
+
+```text
+00000011
+010
+```
+
+Right-padded:
+
+```text
+00000011 01000000
+```
+
+Decoding:
+
+```logts
+4wire recovered =
+.huffRecover {
+  data = 0000001101000000
+}
+```
+
+Result:
+
+```text
+0001
+```
+
+The recovered value matches the original source.
+
+---
+
+# Not Included
+
+The following are intentionally not part of the protocol system:
+
+```text
+concat()
+padLeft()
+padRight()
+```
+
+Concatenation is already performed automatically by protocol segments.
+
+Padding is handled by assignment operators:
+
+```logts
+:=
+=:
+=
+:
+```
+
+and not by protocol generators.
