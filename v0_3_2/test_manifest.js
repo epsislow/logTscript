@@ -689,7 +689,9 @@
       {"id":1119,"group":"bool-lut-mb","title":"round-trip multi-bit","detail":{"scripts":["inline [lut] .mb:\n  depth: 1\n  length: 32\n  ${body}\n  :\nexprOfLut(.mb, A 2b, B 3b)"],"steps":[],"assertions":["two lines"]}},
       {"id":1120,"group":"bool-lut-mb","title":"exprOfLut LUT inexistent — eroare","detail":{"scripts":["exprOfLut(.missing, A, B)"],"steps":[],"assertions":["not found"]}},
       {"id":1121,"group":"bool-lut-mb","title":"exprOfLut(.lut5, A 2b) — sumă biți ≠ adresă","detail":{"scripts":["inline [lut] .lut5:\n  depth: 1\n  length: 32\n  data {\n    00000 : 0\n    00001 : 1\n    00010 : 0\n    00011 : 1\n    00100 : 0\n    00101 : 1\n    00110 : 0\n    00111 : 1\n    01000 : 0\n    01001 : 1\n    01010 : 0\n    01011 : 1\n    01100 : 0\n    01101 : 1\n    01110 : 0\n    01111 : 1\n    10000 : 0\n    10001 : 1\n    10010 : 0\n    10011 : 1\n    10100 : 0\n    10101 : 1\n    10110 : 0\n    10111 : 1\n    11000 : 0\n    11001 : 1\n    11010 : 0\n    11011 : 1\n    11100 : 0\n    11101 : 1\n    11110 : 0\n    11111 : 1\n  }\n  :\nexprOfLut(.lut5, A 2b)"],"steps":[],"assertions":["mismatch"]}},
-      {"id":1122,"group":"bool-lut","title":"exprOfLut emite exact 2 linii","detail":{"scripts":["inline [lut] .or2:\n  depth: 1\n  length: 4\n  data {\n    00 : 0\n    01 : 1\n    10 : 1\n    11 : 1\n  }\n  :\nexprOfLut(.or2, A, B)"],"steps":[],"assertions":["count"]}}
+      {"id":1122,"group":"bool-lut","title":"exprOfLut emite exact 2 linii","detail":{"scripts":["inline [lut] .or2:\n  depth: 1\n  length: 4\n  data {\n    00 : 0\n    01 : 1\n    10 : 1\n    11 : 1\n  }\n  :\nexprOfLut(.or2, A, B)"],"steps":[],"assertions":["count"]}},
+      {"id":1123,"group":"bool-lut-mb","title":"exprOfLut coloane slice A.2, B.1, A.0, B.0","detail":{"scripts":["4wire A\n3wire B\ninline [lut] .l:\n  depth: 1\n  length: 16\n  data {\n    0000 : 0\n    0001 : 0\n    0010 : 0\n    0011 : 1\n    0100 : 0\n    0101 : 0\n    0110 : 0\n    0111 : 1\n    1000 : 0\n    1001 : 0\n    1010 : 0\n    1011 : 1\n    1100 : 1\n    1101 : 1\n    1110 : 1\n    1111 : 1\n  }\n:\nexprOfLut(.l, A.2, B.1, A.0, B.0)"],"steps":[],"assertions":["lines","slice std","or"]}},
+      {"id":1124,"group":"bool-lut-mb","title":"exprOfLut coloane slice cu 1b explicit","detail":{"scripts":["inline [lut] .l:\n  depth: 1\n  length: 16\n  ${body}\n:\nexprOfLut(.l, A.2 1b, B.1 1b, A.0 1b, B.0 1b)"],"steps":[],"assertions":["lines","slice refs"]}}
     ],
     groups: [
       { id: 'repeat', label: 'Repeat preprocessor', rangeLabel: '6–10, 13–17, 19–21', testIds: [6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21] },
@@ -735,7 +737,7 @@
       { id: 'lut-ext', label: 'lut-ext', rangeLabel: '1067–1074', testIds: [1067, 1068, 1069, 1070, 1071, 1072, 1073, 1074] },
       { id: 'protocol-ext', label: 'protocol-ext', rangeLabel: '1075–1090', testIds: [1075, 1076, 1077, 1078, 1079, 1080, 1081, 1082, 1083, 1084, 1085, 1086, 1087, 1088, 1089, 1090] },
       { id: 'bool-lut', label: 'bool-lut', rangeLabel: '1091–1107, 1122', testIds: [1091, 1092, 1093, 1094, 1095, 1096, 1097, 1098, 1099, 1100, 1101, 1102, 1103, 1104, 1105, 1106, 1107, 1122] },
-      { id: 'bool-lut-mb', label: 'bool-lut-mb', rangeLabel: '1108–1121', testIds: [1108, 1109, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121] }
+      { id: 'bool-lut-mb', label: 'bool-lut-mb', rangeLabel: '1108–1121, 1123–1124', testIds: [1108, 1109, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121, 1123, 1124] }
     ]
   };
 })();

@@ -244,6 +244,11 @@ function lutOfGenerate(exprAst, widthResolver) {
 
 function resolveVarWidth(spec, widthResolver) {
   if (spec.width != null) return spec.width;
+  if (spec.bitRange) {
+    const br = spec.bitRange;
+    const end = br.end !== undefined && br.end !== null ? br.end : br.start;
+    return end - br.start + 1;
+  }
   const w = widthResolver(spec.name);
   return w != null && w >= 1 ? w : 1;
 }
@@ -252,10 +257,39 @@ function expandExprOfLutVars(varSpecs, widthResolver) {
   const labels = [];
   const resolved = [];
   for (const spec of varSpecs) {
-    const width = resolveVarWidth(spec, widthResolver);
-    resolved.push({ name: spec.name, width });
-    for (let b = width - 1; b >= 0; b--) {
-      labels.push(width === 1 ? spec.name : `${spec.name}.${b}`);
+    let width;
+    if (spec.bitRange) {
+      const br = spec.bitRange;
+      const end = br.end !== undefined && br.end !== null ? br.end : br.start;
+      width = end - br.start + 1;
+    } else if (spec.width != null) {
+      width = spec.width;
+    } else {
+      const w = widthResolver(spec.name);
+      width = w != null && w >= 1 ? w : 1;
+    }
+    if (spec.width != null && spec.width !== width) {
+      throw new Error(`exprOfLut column width mismatch for '${spec.name}'`);
+    }
+    resolved.push({ name: spec.name, bitRange: spec.bitRange || null, width });
+
+    if (spec.bitRange) {
+      const br = spec.bitRange;
+      const start = br.start;
+      const end = br.end !== undefined && br.end !== null ? br.end : start;
+      if (start === end) {
+        labels.push(`${spec.name}.${start}`);
+      } else {
+        for (let b = end; b >= start; b--) {
+          labels.push(`${spec.name}.${b}`);
+        }
+      }
+    } else if (width === 1) {
+      labels.push(spec.name);
+    } else {
+      for (let b = width - 1; b >= 0; b--) {
+        labels.push(`${spec.name}.${b}`);
+      }
     }
   }
   return { labels, resolved };

@@ -1271,17 +1271,7 @@ assignment() {
     if (this.c.value === ',') {
       this.eat('SYM', ',');
       do {
-        if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
-          throw Error(`Expected variable name in exprOfLut at ${this.c.line}:${this.c.col}`);
-        }
-        const name = this.c.value;
-        this.eat(this.c.type);
-        let width = null;
-        if (this.c.type === 'TYPE' && /^\d+bit$/.test(this.c.value)) {
-          width = parseInt(this.c.value, 10);
-          this.eat('TYPE');
-        }
-        varSpecs.push({ name, width });
+        varSpecs.push(this.parseExprOfLutColumnSpec());
         if (this.c.value === ',') this.eat('SYM', ',');
         else break;
       } while (true);
@@ -2069,10 +2059,29 @@ assignment() {
       }
       const len = parseInt(this.c.value, 10);
       this.eat(this.c.type);
-      return { start, end: start + len - 1 };
+      return { start, end: start + len - 1, isLength: true, len };
     }
 
     return { start, end: start };
+  }
+
+  // Column in exprOfLut: A, A 2b, A.2, A.2 1b, B.1/3, D.0-3 4b
+  parseExprOfLutColumnSpec() {
+    if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+      throw Error(`Expected column reference in exprOfLut at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const name = this.c.value;
+    this.eat(this.c.type);
+    let bitRange = null;
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      bitRange = this.parseLiteralBitRange();
+    }
+    let width = null;
+    if (this.c.type === 'TYPE' && /^\d+bit$/.test(this.c.value)) {
+      width = parseInt(this.c.value, 10);
+      this.eat('TYPE');
+    }
+    return { name, bitRange, width };
   }
 
   atom() {

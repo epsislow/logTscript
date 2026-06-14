@@ -5513,5 +5513,54 @@ reg(1122, 'bool-lut', 'exprOfLut emite exact 2 linii', function(h, session) {
   h.assert('count', String(out.length), '2');
 });
 
+reg(1123, 'bool-lut-mb', 'exprOfLut coloane slice A.2, B.1, A.0, B.0', function(h, session) {
+  const src = `4wire A
+3wire B
+inline [lut] .l:
+  depth: 1
+  length: 16
+  data {
+    0000 : 0
+    0001 : 0
+    0010 : 0
+    0011 : 1
+    0100 : 0
+    0101 : 0
+    0110 : 0
+    0111 : 1
+    1000 : 0
+    1001 : 0
+    1010 : 0
+    1011 : 1
+    1100 : 1
+    1101 : 1
+    1110 : 1
+    1111 : 1
+  }
+:
+exprOfLut(.l, A.2, B.1, A.0, B.0)`;
+  const { out } = session.run(src);
+  h.assert('lines', String(out.length), '2');
+  h.assert('slice std', String(out[1].includes('A.2') && out[1].includes('B.1')), 'true');
+  h.assert('or', String(out[1].includes('OR(')), 'true');
+});
+
+reg(1124, 'bool-lut-mb', 'exprOfLut coloane slice cu 1b explicit', function(h, session) {
+  const { out: gen } = session.run(`4wire A
+3wire B
+lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))`);
+  const dataStart = gen.findIndex(l => l.trim() === 'data {');
+  const body = gen.slice(dataStart).join('\n');
+  const src = `inline [lut] .l:
+  depth: 1
+  length: 16
+  ${body}
+:
+exprOfLut(.l, A.2 1b, B.1 1b, A.0 1b, B.0 1b)`;
+  const { out } = session.run(src);
+  h.assert('lines', String(out.length), '2');
+  h.assert('slice refs', String(out[1].includes('A.2') && out[1].includes('A.0')), 'true');
+});
+
   suite.finalize();
 })();

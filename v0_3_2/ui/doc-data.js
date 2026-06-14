@@ -1187,13 +1187,22 @@ Output:
 |--------|-------|
 | \`A\` | **1b** if undeclared; else \`Nwire\` / \`Nbit\` from script |
 | \`A 4b\` | **4b** explicit (overrides declaration) |
+| \`A.2\` | **1b** (single bit column — same as \`lutOf\` header) |
+| \`A.2 1b\` | **1b** explicit |
+| \`B.1/3\` | **3b** (length slice) |
+| \`D.0-3\` | **4b** (bit range) |
+
+Match the **\`lutOf\` header columns** for round-trip:
 
 \`\`\`logts-play
-4wire A := 0100
-exprOfLut(.or2, A, B)
-\`\`\`
+4wire A
+3wire B
+lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))
+# → # A.2 1b, B.1 1b, A.0 1b, B.0 1b -> out 1b
 
-→ \`A\` = 4b, \`B\` = 1b (when LUT address is 5 bits).
+exprOfLut(.l, A.2, B.1, A.0, B.0)
+# → OR(AND(A.2, B.1), AND(A.0, B.0)) or equivalent minimised form
+\`\`\`
 
 Validation: \`sum(widths) === lutAddrBits(length)\` using \`bitIndexWidth\` (not \`Math.log2\`).  
 Mismatch → \`exprOfLut expects N input bits but received M\`.
@@ -3011,7 +3020,11 @@ Rebuild boolean logic from an existing LUT (inline or \`comp [lut]\`).
 \`\`\`
 exprOfLut(.name, A, B)
 exprOfLut(.name, A 2b, B 3b)
+exprOfLut(.name, A.2, B.1, A.0, B.0)
+exprOfLut(.name, A.2 1b, B.1 1b, A.0 1b, B.0 1b)
 \`\`\`
+
+Column list can mirror the **\`lutOf\` header** (bit slices \`A.2\`, ranges \`D.0-3\`, length \`B.1/3\`) — not only whole variables.
 
 - **Always two Output lines:** short-notation assignment, then standard notation — both copy-pasteable
 - Variable width: \`A\` alone → **1b** if undeclared, else wire width; \`A 4b\` overrides explicitly
