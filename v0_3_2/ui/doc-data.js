@@ -1127,20 +1127,24 @@ One argument — any boolean expression using built-ins \`NOT\`, \`AND\`, \`OR\`
 lutOf(OR(A, B))
 \`\`\`
 
-Output (example):
+Output (copy-pasteable \`inline [lut]\` block):
 
 \`\`\`text
-# A 1b, B 1b -> out 1b
+inline [lut] .generated:
+  # A 1b, B 1b -> out 1b
 
-depth: 1
-length: 4
-data {
-  00 : 0
-  01 : 1
-  10 : 1
-  11 : 1
-}
+  depth: 1
+  length: 4
+  data {
+    00 : 0
+    01 : 1
+    10 : 1
+    11 : 1
+  }
+:
 \`\`\`
+
+Instance name is always **\`.generated\`**. Paste the block into a script, then use \`exprOfLut(.generated, …)\`.
 
 ### Rules
 
@@ -1198,9 +1202,9 @@ Match the **\`lutOf\` header columns** for round-trip:
 4wire A
 3wire B
 lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))
-# → # A.2 1b, B.1 1b, A.0 1b, B.0 1b -> out 1b
+# → inline [lut] .generated: … (header lists columns)
 
-exprOfLut(.l, A.2, B.1, A.0, B.0)
+exprOfLut(.generated, A.2, B.1, A.0, B.0)
 # → OR(AND(A.2, B.1), AND(A.0, B.0)) or equivalent minimised form
 \`\`\`
 
@@ -1256,10 +1260,10 @@ exprOfLut(.example, A 2b, B 3b)
 lutOf(XOR(A, B))
 \`\`\`
 
-Copy the generated \`data { … }\` block into \`inline [lut] .gen:\`, then:
+Paste the full Output block, then:
 
 \`\`\`logts
-exprOfLut(.gen, A, B)
+exprOfLut(.generated, A, B)
 \`\`\`
 
 ---
@@ -3001,16 +3005,18 @@ lutOf(OR(A, B))
 Example output:
 
 \`\`\`text
-# A 1b, B 1b -> out 1b
+inline [lut] .generated:
+  # A 1b, B 1b -> out 1b
 
-depth: 1
-length: 4
-data {
-  00 : 0
-  01 : 1
-  10 : 1
-  11 : 1
-}
+  depth: 1
+  length: 4
+  data {
+    00 : 0
+    01 : 1
+    10 : 1
+    11 : 1
+  }
+:
 \`\`\`
 
 ### \`exprOfLut(.lut, variables…)\`
@@ -3065,8 +3071,8 @@ Allowed wherever \`show\` works: main script, **chip** body, **board** body. Sam
 
 ### Round-trip (sketch)
 
-1. \`lutOf(OR(A, B))\` → copy \`data { … }\` into \`inline [lut] .gen:\`
-2. \`exprOfLut(.gen, A, B)\` → paste the two assignment lines into a test script
+1. \`lutOf(OR(A, B))\` → paste Output (\`inline [lut] .generated:\` …)
+2. \`exprOfLut(.generated, A, B)\` → paste the two assignment lines
 
 Details and multi-bit examples: [boolean-lut.md](boolean-lut.md). LUT runtime syntax: [lut.md](lut.md).
 

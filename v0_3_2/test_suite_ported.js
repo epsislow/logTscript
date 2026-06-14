@@ -5282,23 +5282,25 @@ const INLINE_IDA = `inline [lut] .ida:
 
 reg(1091, 'bool-lut', 'lutOf(OR(A, B)) — header + length 4', function(h, session) {
   const { out } = session.run('lutOf(OR(A, B))');
-  h.assert('header', out[0], '# A 1b, B 1b -> out 1b');
+  h.assert('wrapper', out[0], 'inline [lut] .generated:');
+  h.assert('header', out[1], '  # A 1b, B 1b -> out 1b');
   h.assert('length', String(out.some(l => l.trim() === 'length: 4')), 'true');
+  h.assert('close', out[out.length - 1], ':');
 });
 
 reg(1092, 'bool-lut', 'lutOf(AND(A, OR(NOT(C), B))) — ordine A, C, B', function(h, session) {
   const { out } = session.run('lutOf(AND(A, OR(NOT(C), B)))');
-  h.assert('header', out[0], '# A 1b, C 1b, B 1b -> out 1b');
+  h.assert('header', out[1], '  # A 1b, C 1b, B 1b -> out 1b');
 });
 
 reg(1093, 'bool-lut', 'lutOf(XOR(C, OR(A, B))) — ordine C, A, B', function(h, session) {
   const { out } = session.run('lutOf(XOR(C, OR(A, B)))');
-  h.assert('order', out[0], '# C 1b, A 1b, B 1b -> out 1b');
+  h.assert('order', out[1], '  # C 1b, A 1b, B 1b -> out 1b');
 });
 
 reg(1094, 'bool-lut', 'lutOf short-notation backtick', function(h, session) {
   const { out } = session.run('lutOf(`A | B`)');
-  h.assert('header', out[0], '# A 1b, B 1b -> out 1b');
+  h.assert('header', out[1], '  # A 1b, B 1b -> out 1b');
 });
 
 reg(1095, 'bool-lut', 'lutOf(LSHIFT(...)) — eroare', function(h, session) {
@@ -5355,11 +5357,8 @@ reg(1101, 'bool-lut', 'copy-paste linie short rulabilă', function(h, session) {
 });
 
 reg(1102, 'bool-lut', 'round-trip 1-bit XOR', function(h, session) {
-  const gen = session.run('lutOf(XOR(A, B))').out;
-  const dataStart = gen.findIndex(l => l.trim() === 'data {');
-  const body = gen.slice(dataStart).join('\n');
-  const src = `inline [lut] .rt:\n  depth: 1\n  length: 4\n  ${body}\n  :\nexprOfLut(.rt, A, B)`;
-  const { out } = session.run(src);
+  const gen = session.run('lutOf(XOR(A, B))').out.join('\n');
+  const { out } = session.run(gen + '\nexprOfLut(.generated, A, B)');
   h.assert('two lines', String(out.length), '2');
 });
 
@@ -5414,19 +5413,19 @@ reg(1108, 'bool-lut-mb', 'lutOf slice bits — length 16', function(h, session) 
   const { out } = session.run(`4wire A
 3wire B
 lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))`);
-  h.assert('header', out[0], '# A.2 1b, B.1 1b, A.0 1b, B.0 1b -> out 1b');
+  h.assert('header', out[1], '  # A.2 1b, B.1 1b, A.0 1b, B.0 1b -> out 1b');
   h.assert('length', String(out.some(l => l.trim() === 'length: 16')), 'true');
 });
 
 reg(1109, 'bool-lut-mb', 'lutOf(C) pe 7wire — depth 7', function(h, session) {
   const { out } = session.run('7wire C\nlutOf(C)');
-  h.assert('header', out[0], '# C 7b -> out 7b');
+  h.assert('header', out[1], '  # C 7b -> out 7b');
   h.assert('length', String(out.some(l => l.trim() === 'length: 128')), 'true');
 });
 
 reg(1110, 'bool-lut-mb', 'lutOf(D.0-3) — depth 4', function(h, session) {
   const { out } = session.run('10wire D\nlutOf(D.0-3)');
-  h.assert('header', out[0], '# D.0-3 4b -> out 4b');
+  h.assert('header', out[1], '  # D.0-3 4b -> out 4b');
   h.assert('length', String(out.some(l => l.trim() === 'length: 16')), 'true');
 });
 
@@ -5486,13 +5485,10 @@ reg(1118, 'bool-lut-mb', 'exprOfLut output 3b', function(h, session) {
 });
 
 reg(1119, 'bool-lut-mb', 'round-trip multi-bit', function(h, session) {
-  const { out: gen } = session.run(`2wire A
+  const gen = session.run(`2wire A
 3wire B
-lutOf(OR(AND(A.1, B.0), AND(A.0, B.2)))`);
-  const dataStart = gen.findIndex(l => l.trim() === 'data {');
-  const body = gen.slice(dataStart).join('\n');
-  const src = `inline [lut] .mb:\n  depth: 1\n  length: 32\n  ${body}\n  :\nexprOfLut(.mb, A 2b, B 3b)`;
-  const { out } = session.run(src);
+lutOf(OR(AND(A.1, B.0), AND(A.0, B.2)))`).out.join('\n');
+  const { out } = session.run(gen + '\nexprOfLut(.generated, A.1, B.0, A.0, B.2)');
   h.assert('two lines', String(out.length), '2');
 });
 
@@ -5546,18 +5542,10 @@ exprOfLut(.l, A.2, B.1, A.0, B.0)`;
 });
 
 reg(1124, 'bool-lut-mb', 'exprOfLut coloane slice cu 1b explicit', function(h, session) {
-  const { out: gen } = session.run(`4wire A
+  const gen = session.run(`4wire A
 3wire B
-lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))`);
-  const dataStart = gen.findIndex(l => l.trim() === 'data {');
-  const body = gen.slice(dataStart).join('\n');
-  const src = `inline [lut] .l:
-  depth: 1
-  length: 16
-  ${body}
-:
-exprOfLut(.l, A.2 1b, B.1 1b, A.0 1b, B.0 1b)`;
-  const { out } = session.run(src);
+lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))`).out.join('\n');
+  const { out } = session.run(gen + '\nexprOfLut(.generated, A.2 1b, B.1 1b, A.0 1b, B.0 1b)');
   h.assert('lines', String(out.length), '2');
   h.assert('slice refs', String(out[1].includes('A.2') && out[1].includes('A.0')), 'true');
 });

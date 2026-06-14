@@ -211,6 +211,8 @@ function formatMinimizedStandard(min) {
   return `OR(${inner})`;
 }
 
+const LUT_OF_INLINE_NAME = '.generated';
+
 function lutOfGenerate(exprAst, widthResolver) {
   const columns = discoverLutOfInputs(exprAst, widthResolver);
   const addrWidth = columns.reduce((s, c) => s + c.width, 0);
@@ -231,14 +233,20 @@ function lutOfGenerate(exprAst, widthResolver) {
   }
 
   const header = `# ${columns.map(c => c.header).join(', ')} -> out ${outWidth}b`;
-  const lines = [header, '', `depth: ${outWidth}`, `length: ${length}`, 'data {'];
+  const inner = [header, '', `depth: ${outWidth}`, `length: ${length}`, 'data {'];
 
   const addrPad = addrWidth;
   for (let addr = 0; addr < length; addr++) {
     const addrStr = addr.toString(2).padStart(addrPad, '0');
-    lines.push(`  ${addrStr} : ${outputs[addr]}`);
+    inner.push(`  ${addrStr} : ${outputs[addr]}`);
   }
-  lines.push('}');
+  inner.push('}');
+
+  const lines = [`inline [lut] ${LUT_OF_INLINE_NAME}:`];
+  for (const line of inner) {
+    lines.push(line === '' ? '' : `  ${line}`);
+  }
+  lines.push(':');
   return lines.join('\n');
 }
 

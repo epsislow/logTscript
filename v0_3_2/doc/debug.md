@@ -763,16 +763,18 @@ lutOf(OR(A, B))
 Example output:
 
 ```text
-# A 1b, B 1b -> out 1b
+inline [lut] .generated:
+  # A 1b, B 1b -> out 1b
 
-depth: 1
-length: 4
-data {
-  00 : 0
-  01 : 1
-  10 : 1
-  11 : 1
-}
+  depth: 1
+  length: 4
+  data {
+    00 : 0
+    01 : 1
+    10 : 1
+    11 : 1
+  }
+:
 ```
 
 ### `exprOfLut(.lut, variables…)`
@@ -827,8 +829,8 @@ Allowed wherever `show` works: main script, **chip** body, **board** body. Same 
 
 ### Round-trip (sketch)
 
-1. `lutOf(OR(A, B))` → copy `data { … }` into `inline [lut] .gen:`
-2. `exprOfLut(.gen, A, B)` → paste the two assignment lines into a test script
+1. `lutOf(OR(A, B))` → paste Output (`inline [lut] .generated:` …)
+2. `exprOfLut(.generated, A, B)` → paste the two assignment lines
 
 Details and multi-bit examples: [boolean-lut.md](boolean-lut.md). LUT runtime syntax: [lut.md](lut.md).
 
