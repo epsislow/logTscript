@@ -1,21 +1,24 @@
-# Debug output — `show`, `peek`, and `probe`
+# Debug output — `show`, `peek`, `probe`, and boolean LUT utilities
 
-Three statements write values to the **Output** panel. They are useful for inspecting wires, storage references, and how values change over time.
+Statements in this group write text to the **Output** panel. The first three inspect live values; **`lutOf`** and **`exprOfLut`** generate copy-pasteable boolean logic (LUT definitions or expressions) for analysis only — they do not change the circuit.
 
-All three are **statements** (like `doc`) — they cannot appear on the right side of `=`.
+All are **statements** (like `doc`) — they cannot appear on the right side of `=`.
+
+For full LUT generation / reversal (multi-bit, limits, errors), see **[boolean-lut.md](boolean-lut.md)**.
 
 ---
 
 ## Quick comparison
 
-| | `show` | `peek` | `probe` |
-|---|--------|--------|---------|
-| **Purpose** | Display settled values | Instant snapshot | Monitor every value commit |
-| **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change |
-| **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) |
-| **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression |
-| **Output format** | `name (type) = value` | same | `# name = value (ref) - reason` |
-| **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes |
+| | `show` | `peek` | `probe` | `lutOf` / `exprOfLut` |
+|---|--------|--------|---------|------------------------|
+| **Purpose** | Display settled values | Instant snapshot | Monitor every value commit | Generate or reverse boolean LUT text |
+| **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change | Immediately at statement |
+| **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) | Matters |
+| **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression | See below |
+| **Output format** | `name (type) = value` | same | `# name = value (ref) - reason` | LUT block or `Nwire out = …` lines |
+| **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Immediate (no propagation) |
+| **Runtime effect** | None (read-only) | None | None (logging only) | **None** — text for copy-paste |
 
 For when wires update in the circuit, see [signal-propagation.md](signal-propagation.md).
 
@@ -734,6 +737,99 @@ probe(a)
 
 ---
 
+## `lutOf` and `exprOfLut`
+
+Boolean LUT utilities complement `show`: instead of displaying wire values, they emit **structured text** you can paste back into a script (inline `[lut]`, `comp [lut]`, or wire assignments).
+
+**Full reference:** [boolean-lut.md](boolean-lut.md) — multi-bit variables, address limits, round-trip, error messages.
+
+### `lutOf(expression)`
+
+Build a LUT from a boolean expression.
+
+```
+lutOf(expr)
+```
+
+- **One argument** — built-ins `NOT`, `AND`, `OR`, `XOR`, … or short-notation in backticks: `` lutOf(`A | B`) ``
+- **Output:** comment header, `depth:`, `length:`, and `data { … }` block
+- **Address limit:** at most **8** input bits (256 rows). Wider → `LUT table too big (256 values), max bits number reached`
+- Undeclared names in gates (`A`, `B`) are treated as **1 bit**; whole wires use `Nwire` width when declared above
+
+```logts-play
+lutOf(OR(A, B))
+```
+
+Example output:
+
+```text
+# A 1b, B 1b -> out 1b
+
+depth: 1
+length: 4
+data {
+  00 : 0
+  01 : 1
+  10 : 1
+  11 : 1
+}
+```
+
+### `exprOfLut(.lut, variables…)`
+
+Rebuild boolean logic from an existing LUT (inline or `comp [lut]`).
+
+```
+exprOfLut(.name, A, B)
+exprOfLut(.name, A 2b, B 3b)
+```
+
+- **Always two Output lines:** short-notation assignment, then standard notation — both copy-pasteable
+- Variable width: `A` alone → **1b** if undeclared, else wire width; `A 4b` overrides explicitly
+- Not supported on `prefixFree` / `variableDepth` LUTs
+
+```logts-play
+inline [lut] .or2:
+  depth: 1
+  length: 4
+  data {
+    00 : 0
+    01 : 1
+    10 : 1
+    11 : 1
+  }
+  :
+
+exprOfLut(.or2, A, B)
+```
+
+Example output:
+
+```logts
+1wire out = `A | B`
+1wire out = OR(A, B)
+```
+
+### When to use
+
+| Goal | Use |
+|------|-----|
+| Truth table → LUT definition for paste into script | `lutOf` |
+| LUT → minimised boolean expression (two notations) | `exprOfLut` |
+| Document or share logic outside the simulator | either — Output is plain text |
+| Run logic in the circuit | **Do not** use these — assign wires or use `comp [lut]` |
+
+Allowed wherever `show` works: main script, **chip** body, **board** body. Same as `show`: no semicolon at end of line.
+
+### Round-trip (sketch)
+
+1. `lutOf(OR(A, B))` → copy `data { … }` into `inline [lut] .gen:`
+2. `exprOfLut(.gen, A, B)` → paste the two assignment lines into a test script
+
+Details and multi-bit examples: [boolean-lut.md](boolean-lut.md). LUT runtime syntax: [lut.md](lut.md).
+
+---
+
 ## Which one should I use?
 
 | Goal | Use |
@@ -746,6 +842,8 @@ probe(a)
 | Trace divider `:mod`, adder `:carry` | `probe(.div:mod)`, `probe(.add:carry)` |
 | Trace chip/PCB internal wire | `probe(.u1.partial)` (dot, not `:`) |
 | Document a circuit for a reader | `show` at the end |
+| Expression → LUT text for paste | `lutOf` |
+| LUT → boolean expression (short + standard) | `exprOfLut` |
 
 ---
 
@@ -756,6 +854,7 @@ probe(a)
 | `show` | Deferred until end of RUN / propagate flush | Emitted when the statement runs |
 | `peek` | Immediate read at statement | Immediate read + cascade already applied |
 | `probe` | On every value commit | Same |
+| `lutOf` / `exprOfLut` | Immediate at statement | Immediate at statement |
 
 `probe` is the only one that keeps reporting when values change **after** the initial RUN (e.g. toggling a switch, pressing a key, `setWire` in tests, oscillator ticks). See runnable examples above and tests **804–819** / **800–801**.
 
@@ -766,5 +865,6 @@ probe(a)
 - [Signal propagation](signal-propagation.md) — when wires and displays update
 - [Editor UI](editorUI.md) — Output panel, Run, Next, Wave / Legacy toggle
 - [doc() function](doc-function.md) — `doc(def)` lists `show` as a built-in
-- [Boolean LUT utilities](boolean-lut.md) — `lutOf` / `exprOfLut` (analysis output like `show`)
+- [Boolean LUT utilities](boolean-lut.md) — `lutOf` / `exprOfLut` (full syntax, multi-bit, limits)
+- [LUT component](lut.md) — runtime `inline [lut]` / `comp [lut]`
 - [REG](reg.md) — `NEXT(~)` and wire-clock behaviour with `show`
