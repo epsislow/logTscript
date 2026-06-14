@@ -6702,7 +6702,7 @@ board +[cpu4v2]:
 
 ### mini-cpu-v2-demo
 
-Același prelude + instanțiere \`.cpu\` + un pas clock + \`show\`. Identic cu testele **1056–1063** (\`run_tests\` → tab **Script**).
+Același prelude + instanțiere \`.cpu\` + countdown complet (9 pași clock) + \`probe\`.
 
 \`\`\`logts-play
 inline [asm] .cpuisa:
@@ -6904,14 +6904,17 @@ board +[cpu4v2]:
   :4bit acc
 board [cpu4v2] .cpu::
 
+repeat 1..9[
 .cpu:{ set = 1 }
-# Repeta .cpu:{ set = 1 } de 9 ori pentru countdown complet
+]
 
-show(.cpu:acc)
-show(.cpu:pc)
+probe(.cpu:acc)
+probe(.cpu:pc)
 \`\`\`
 
-**După 9 pași** (\`.cpu:{ set = 1 }\` repetat): ACC = \`0000\`, PC = \`0100\` (HALT). Trace-ul terminal afișează \`A\` (\`^41\`).
+**Rezultat** după **Load & Run**: ACC = \`0000\`, PC = \`0100\` (HALT). 7-seg: \`0\`. Terminal: \`A\` (\`^41\`). În Output: \`# .cpu:acc = 0000\`, \`# .cpu:pc = 0100\`.
+
+După **un singur** pas clock: ACC = \`0011\` (încarcă \`^3\` din memoria de date), PC = \`0001\`.
 
 ---
 
