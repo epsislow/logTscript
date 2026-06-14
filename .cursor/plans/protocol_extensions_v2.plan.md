@@ -18,7 +18,7 @@ todos:
     content: Teste noi 1067+ (lut-ext + protocol-ext) + _gen_manifest.js
     status: pending
   - id: doc-lut-protocol
-    content: "Extinde lut.md + protocol.md + asm.md cu :decode; șterge decode.md; actualizează index/viewer; logts-play + _gen_doc_data.js"
+    content: "lut.md + protocol.md + asm.md: toate exemplele rulabile în ```logts-play```; migrare decode.md; șterge decode.md; _gen_doc_data.js"
     status: pending
 isProject: false
 ---
@@ -344,6 +344,24 @@ inline [protocol] .huffRecover:
 
 ## Partea 4 — Documentație
 
+### Exemple rulabile (`logts-play`)
+
+Orice exemplu pe care utilizatorul îl poate rula în editor folosește fence **`logts-play`** (nu `logts`). Viewer-ul (`doc-viewer.js` → `enhancePlayBlocks`) adaugă butoane **Load** și **Load & Run**.
+
+| Tip conținut | Fence |
+|--------------|-------|
+| Script complet rulabil | ` ```logts-play ` |
+| Sintaxă / fragment non-rulabil | ` ```logts ` sau ` ```text ` |
+| Output așteptat, mesaje eroare | ` ```text ` |
+
+**Reguli:**
+
+- Fiecare secțiune „Runnable” din tabelele de mai jos = **cel puțin un** bloc `logts-play` cu script autocontinut (prelude + invoke unde e cazul)
+- Exemple combinate (Huffman round-trip): un bloc sau două (`huffPacket` / `huffRecover`) — ambele `logts-play`
+- Migrare din `decode.md`: exemplele UART / I2C / LUT decode / ASM `show(.cpu:decode(...))` → `logts-play`
+- După editare: `node v0_3_2/_gen_doc_data.js`
+- Nu descrie în prose butoanele Load — UI-ul le oferă implicit pe `logts-play`
+
 ### Migrare `decode.md` → inline per tip
 
 **Decizie:** eliminăm [`decode.md`](v0_3_2/doc/decode.md). Conținutul merge în documentația fiecărui inline — un fișier separat nu ajută utilizatorul.
@@ -352,7 +370,7 @@ inline [protocol] .huffRecover:
 |----------------------|------------|---------|
 | Protocol `:decode(channels...)` | [`protocol.md`](v0_3_2/doc/protocol.md) | Secțiune nouă + `logts-play` UART / I2C; erori; notă: **nu** extins la generatoare noi — transformare inversă = alt protocol (`.huffRecover`) |
 | LUT `:decode(value [, matchIndex])` | [`lut.md`](v0_3_2/doc/lut.md) | Extinde secțiunea existentă (~L190); scoate linkurile către `decode.md`; păstrează/adaaugă `logts-play`; erori; `matchIndex` |
-| ASM `:decode(instruction)` | [`asm.md`](v0_3_2/doc/asm.md) | Secțiune nouă; doar `show()` / `doc()`; eroare la assignment pe wire |
+| ASM `:decode(instruction)` | [`asm.md`](v0_3_2/doc/asm.md) | Secțiune nouă + **`logts-play`**; doar `show()` / `doc()`; eroare la assignment pe wire |
 | Tabel comparativ inline + `doc()` decode hints | Scurt în fiecare fișier la `doc()` | Protocol/LUT/ASM fiecare cu propriul „decode: supported” |
 
 **Ștergere / actualizări index:**
@@ -388,10 +406,10 @@ inline [protocol] .huffRecover:
 
 ### [`asm.md`](v0_3_2/doc/asm.md) — `:decode`
 
-| Secțiune | Runnable `logts-play` |
-|----------|------------------------|
-| **`:decode(instruction)`** | `show(.cpu:decode(00010111))` → text `LOAD …` |
-| Erori | assignment pe wire interzis |
+| Secțiune | `logts-play` |
+|----------|----------------|
+| **`:decode(instruction)`** | `show(.cpu:decode(00010111))` — prelude ISA minimal + show |
+| Erori | exemplu rulabil comentat sau secțiune text (assignment interzis) |
 
 - `doc-index.json`, `_gen_doc_data.js`
 - **Nu** recrea `decode.md`
@@ -459,7 +477,7 @@ După: `_gen_manifest.js`, `_run_suite_node.js`.
 2. Protocol `def` + parametri `~b`
 3. `expand` / `collapse`
 4. `length` / `lengthOf` / `withLength` + `inferProtocolWidth`
-5. Documentație (inclusiv migrare `decode.md`) + teste + manifest
+5. Documentație (`logts-play` pe toate exemplele rulabile; migrare `decode.md`) + teste + manifest
 
 ## Riscuri
 
