@@ -1,0 +1,259 @@
+Boolean Expression Utilities And Lut representations
+
+Boolean expression utilities provide conversion between boolean expressions and LUT representations.
+
+These functions are intended for analysis, debugging, optimization, and code generation.
+
+They do not create runtime logic.
+
+lutOf()
+
+Generates a LUT from a boolean expression.
+
+Syntax:
+
+lutOf(
+  expression
+)
+
+The generated LUT contains the truth table of the expression.
+
+Variable order is determined by first appearance while traversing the expression from left to right.
+
+Repeated variables are ignored after their first occurrence.
+
+Example
+
+Expression:
+
+A | B
+
+Generation:
+
+lutOf(
+  A | B
+)
+
+Result:
+
+# A B -> OUT
+
+depth: 1
+length: 4
+
+data {
+  00 : 0
+  01 : 1
+  10 : 1
+  11 : 1
+}
+Example
+
+Expression:
+
+A & (!C | B)
+
+Variable discovery:
+
+A
+C
+B
+
+Generated header:
+
+# A C B -> OUT
+
+Result:
+
+# A C B -> OUT
+
+depth: 1
+length: 8
+
+data {
+  ...
+}
+Variable Order
+
+Variables are collected using first appearance order.
+
+Example:
+
+A & (!C | B)
+
+Produces:
+
+# A C B -> OUT
+
+Example:
+
+C xor (A | B)
+
+Produces:
+
+# C A B -> OUT
+exprOfLut()
+
+Generates a LogTScript expression equivalent to a LUT.
+
+Syntax:
+
+exprOfLut(
+  .lut,
+  var1 var2 var3 ...
+)
+
+Parameters:
+
+Parameter	Description
+.lut	LUT instance
+var1 ...	Variable names corresponding to LUT address bits
+Requirements
+
+The number of supplied variables must exactly match the LUT address width.
+
+Address width is:
+
+ceil(log2(length))
+Error
+exprOfLut expects N variables but received M
+Single-Bit Output LUT
+
+Example:
+
+inline [lut] .or2:
+
+  depth: 1
+  length: 4
+
+  data {
+    00 : 0
+    01 : 1
+    10 : 1
+    11 : 1
+  }
+
+:
+
+Usage:
+
+exprOfLut(
+  .or2,
+  A B
+)
+
+Result:
+
+1wire out = A | B
+Multi-Bit Output LUT
+
+For LUTs with output width greater than 1, each output bit is converted independently.
+
+The resulting bit expressions are concatenated using +.
+
+Example:
+
+inline [lut] .decoder:
+
+  depth: 2
+  length: 4
+
+  data {
+    00 : 00
+    01 : 10
+    10 : 01
+    11 : 11
+  }
+
+:
+
+Usage:
+
+exprOfLut(
+  .decoder,
+  A B
+)
+
+Result:
+
+2wire out = B + A
+Example
+
+LUT:
+
+A B -> OUT
+
+00 -> 000
+01 -> 001
+10 -> 010
+11 -> 111
+
+Generated bit expressions:
+
+bit2 = A & B
+bit1 = A
+bit0 = B
+
+Result:
+
+3wire out =
+  (A & B) +
+  A +
+  B
+Generated Expressions
+
+exprOfLut() returns an expression in valid LogTScript syntax.
+
+The result may be copied directly into source code.
+
+Example:
+
+3wire out =
+  (A & B) +
+  (A | C) +
+  (!A)
+Expression Minimization
+
+Generated expressions are logically equivalent to the LUT.
+
+Implementations may minimize expressions before generation.
+
+Possible minimization techniques include:
+
+Karnaugh Maps
+Quine-McCluskey
+Espresso
+
+The generated expression is not required to preserve the original LUT structure.
+
+Only logical equivalence is guaranteed.
+
+Typical Workflow
+
+Expression → LUT:
+
+lutOf(
+  (A & B) | !C
+)
+
+↓
+
+# A B C -> OUT
+
+data {
+  ...
+}
+
+LUT → Expression:
+
+exprOfLut(
+  .logic,
+  A B C
+)
+
+↓
+
+1wire out =
+  (A & B) | !C
+
+These functions allow boolean logic to be freely converted between expression form and LUT form for debugging, optimization, documentation, and design exploration.
