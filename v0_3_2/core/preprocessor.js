@@ -7,6 +7,7 @@
  * Operator map:
  *   &  → AND    |  → OR     ^  → XOR    =  → EQ
  *   -& → NAND   -| → NOR    -^ → NXOR   !  → NOT (native prefix)
+ *   +  → concatenation (multi-bit), lower precedence than boolean ops
  *
  * Literals: binary works directly (1010), hex needs [^FF], decimal needs [\31].
  * Parentheses () group sub-expressions. Evaluation is left-to-right, no precedence.
@@ -71,6 +72,8 @@ function tokenizeShort(content) {
       i += 2;
       continue;
     }
+
+    if (ch === '+') { tokens.push({ type: 'CONCAT' }); i++; continue; }
 
     if ('&|^='.includes(ch)) {
       tokens.push({ type: 'OP', value: ch });
@@ -167,7 +170,17 @@ function expandShortNotation(content) {
     throw Error(`Unexpected token '${t.value || t.type}' in short notation`);
   }
 
-  const result = shortExpr();
+  function shortConcat() {
+    const parts = [shortExpr()];
+    while (peek() && peek().type === 'CONCAT') {
+      consume();
+      parts.push(shortExpr());
+    }
+    if (parts.length === 1) return parts[0];
+    return parts.join(' + ');
+  }
+
+  const result = shortConcat();
   if (pos < tokens.length) throw Error(`Unexpected token '${tokens[pos].value || tokens[pos].type}' after short notation expression`);
   return result;
 }

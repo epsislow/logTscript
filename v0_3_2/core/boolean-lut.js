@@ -562,6 +562,53 @@ function formatMinimizedStandard(min) {
   return `OR(${inner})`;
 }
 
+function isConstBitSegment(s) {
+  return s === '0' || s === '1';
+}
+
+function groupMultiBitSegments(segments) {
+  const groups = [];
+  let i = 0;
+  while (i < segments.length) {
+    if (isConstBitSegment(segments[i])) {
+      let j = i;
+      while (j < segments.length && isConstBitSegment(segments[j])) j++;
+      groups.push({ kind: 'const', bits: segments.slice(i, j) });
+      i = j;
+    } else {
+      groups.push({ kind: 'expr', text: segments[i] });
+      i++;
+    }
+  }
+  return groups;
+}
+
+function formatConstGroupShort(bits) {
+  return bits.length === 1 ? `(${bits[0]})` : `(${bits.join('')})`;
+}
+
+function formatMultiBitShort(segments) {
+  const groups = groupMultiBitSegments(segments);
+  if (groups.length === 1) {
+    const g = groups[0];
+    return g.kind === 'const' ? formatConstGroupShort(g.bits) : `(${g.text})`;
+  }
+  return groups.map(g => (
+    g.kind === 'const' ? formatConstGroupShort(g.bits) : `(${g.text})`
+  )).join(' + ');
+}
+
+function formatMultiBitStandard(segments) {
+  const groups = groupMultiBitSegments(segments);
+  if (groups.length === 1) {
+    const g = groups[0];
+    return g.kind === 'const' ? g.bits.join('') : g.text;
+  }
+  return groups.map(g => (
+    g.kind === 'const' ? g.bits.join('') : g.text
+  )).join(' + ');
+}
+
 const LUT_OF_INLINE_NAME = '.generated';
 
 function lutOfGenerate(exprAst, widthResolver, filters) {
@@ -741,8 +788,8 @@ function exprOfLutGenerate(lutInst, varSpecs, widthResolver) {
     shortExpr = segmentsShort[0];
     stdExpr = segmentsStd[0];
   } else {
-    shortExpr = segmentsShort.map(s => `(${s})`).join(' + ');
-    stdExpr = segmentsStd.map(s => `(${s})`).join(' + ');
+    shortExpr = formatMultiBitShort(segmentsShort);
+    stdExpr = formatMultiBitStandard(segmentsStd);
   }
 
   return [
@@ -771,6 +818,8 @@ if (typeof module !== 'undefined' && module.exports) {
     costFromMinimized,
     formatMinimizedShort,
     formatMinimizedStandard,
+    formatMultiBitShort,
+    formatMultiBitStandard,
     lutOfGenerate,
     expandExprOfLutVars,
     exprOfLutGenerate,

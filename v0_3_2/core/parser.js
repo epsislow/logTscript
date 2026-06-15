@@ -2186,6 +2186,14 @@ assignment() {
       return result;
     };
 
+    if (this.c.type === 'SYM' && this.c.value === '(') {
+      this.eat('SYM', '(');
+      const inner = this.expr();
+      this.eat('SYM', ')');
+      if (inner.length === 1) return addNot(inner[0]);
+      return addNot({ group: inner });
+    }
+
     if (
   this.c.type === 'REF' &&
   this.c.value.includes('.') &&

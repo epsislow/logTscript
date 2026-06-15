@@ -137,9 +137,9 @@ Reduction possible: 4 (100%)
 | Goal | Statement |
 |------|-----------|
 | Expression → truth table | `truthTableOf` |
-| Expression → LUT block | `lutOf` |
+| Expression → `inline [lut]` block | `lutOf` |
 | Expression → minimized form | `simplify` |
-| LUT → expression | `exprOfLut` |
+| `inline [lut]` → expression (manual or via `filters:`) | `exprOfLut` |
 | Equivalence check | `equivalent` |
 
-`lutOf` also supports the same filter syntax; see [boolean-lut.md](boolean-lut.md).
+`lutOf` emits `description:` and optional `filters:` attributes; `exprOfLut` can rebuild the expression from those when `filters:` is present. Details: [boolean-lut.md](boolean-lut.md).

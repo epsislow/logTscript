@@ -1721,6 +1721,10 @@ class Interpreter {
       return result;
     }
 
+    if (a.group) {
+      return this.evalExpr(a.group, computeRefs);
+    }
+
     if (a.inlineMethod) {
       return this.evalInlineMethod(a.inlineMethod, computeRefs);
     }

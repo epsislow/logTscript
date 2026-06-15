@@ -739,28 +739,30 @@ probe(a)
 
 ## `lutOf` and `exprOfLut`
 
-Boolean LUT utilities complement `show`: instead of displaying wire values, they emit **structured text** you can paste back into a script (inline `[lut]`, `comp [lut]`, or wire assignments).
+Boolean LUT utilities complement `show`: they emit **structured text** you can paste into a script as `inline [lut]`, or wire assignments from `exprOfLut`.
 
-**Full reference:** [boolean-lut.md](boolean-lut.md) — multi-bit variables, address limits, round-trip, error messages.
+**Full reference:** [boolean-lut.md](boolean-lut.md) — filters, `description:` / `filters:` attributes, multi-bit, round-trip.
 
-### `lutOf(expression)`
+**Related:** [boolean-analysis.md](boolean-analysis.md) — `truthTableOf`, `simplify`, `equivalent`, `inputsOf`, `costOf`.
 
-Build a LUT from a boolean expression.
+### `lutOf(expression [, filters])`
+
+Build an `inline [lut]` block from a boolean expression.
 
 ```
 lutOf(expr)
+lutOf(expr, A=01x1x, B=x, C=000xx)
 ```
 
-- **One argument** — built-ins `NOT`, `AND`, `OR`, `XOR`, … or short-notation in backticks: `` lutOf(`A | B`) ``
-- **Output:** comment header, `depth:`, `length:`, and `data { … }` block
-- **Address limit:** at most **8** input bits (256 rows). Wider → `LUT table too big (256 values), max bits number reached`
-- Undeclared names in gates (`A`, `B`) are treated as **1 bit**; whole wires use `Nwire` width when declared above
+- Built-ins `NOT`, `AND`, `OR`, `XOR`, … or short-notation in backticks: `` lutOf(`A | B`) ``
+- **Output:** `description:`, optional `filters:`, then `depth:`, `length:`, `data { … }`
+- **Row limit:** max **256** data rows (`Boolean analysis exceeds maximum supported table size (256 rows)`)
+- With filters, more than 8 input bits are allowed if the filtered row count stays ≤ 256
+- Undeclared names in gates (`A`, `B`) are **1 bit**; whole wires use declared `Nwire` width
 
 ```logts-play
 lutOf(OR(A, B))
 ```
-
-Example output:
 
 ```text
 inline [lut] .generated:
@@ -777,22 +779,29 @@ inline [lut] .generated:
 :
 ```
 
-### `exprOfLut(.lut, variables…)`
+### `exprOfLut(.lut [, variables…])`
 
-Rebuild boolean logic from an existing LUT (inline or `comp [lut]`).
+Rebuild boolean logic from an **`inline [lut]`** instance.
 
 ```
+exprOfLut(.generated)
 exprOfLut(.name, A, B)
 exprOfLut(.name, A 2b, B 3b)
 exprOfLut(.name, A.2, B.1, A.0, B.0)
-exprOfLut(.name, A.2 1b, B.1 1b, A.0 1b, B.0 1b)
 ```
 
-Column list can mirror the **`lutOf` header** (bit slices `A.2`, ranges `D.0-3`, length `B.1/3`) — not only whole variables.
-
-- **Always two Output lines:** short-notation assignment, then standard notation — both copy-pasteable
-- Variable width: `A` alone → **1b** if undeclared, else wire width; `A 4b` overrides explicitly
+- With **`filters:`** on the LUT, omit variables — `exprOfLut` derives them from the filter patterns
+- Without `filters:`, list columns matching `description:` (or address width vs `length`)
+- **Always two Output lines:** short-notation assignment, then standard notation
 - Not supported on `prefixFree` / `variableDepth` LUTs
+
+```logts-play
+5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+exprOfLut(.generated)
+```
 
 ```logts-play
 inline [lut] .or2:
@@ -809,30 +818,26 @@ inline [lut] .or2:
 exprOfLut(.or2, A, B)
 ```
 
-Example output:
-
-```logts
-1wire out = `A | B`
-1wire out = OR(A, B)
-```
-
 ### When to use
 
 | Goal | Use |
 |------|-----|
-| Truth table → LUT definition for paste into script | `lutOf` |
-| LUT → minimised boolean expression (two notations) | `exprOfLut` |
-| Document or share logic outside the simulator | either — Output is plain text |
-| Run logic in the circuit | **Do not** use these — assign wires or use `comp [lut]` |
+| Expression → truth table text | `truthTableOf` — [boolean-analysis.md](boolean-analysis.md) |
+| Expression → `inline [lut]` for paste / invoke | `lutOf` |
+| `inline [lut]` → minimised boolean expression | `exprOfLut` |
+| Document or share logic outside the simulator | any of the above — Output is plain text |
+| Run logic in the circuit | paste `inline [lut]` and use `^.name(in=addr)` — [lut.md](lut.md) |
 
-Allowed wherever `show` works: main script, **chip** body, **board** body. Same as `show`: no semicolon at end of line.
+Allowed wherever `show` works: main script, **chip** body, **board** body. No semicolon at end of line.
 
 ### Round-trip (sketch)
 
 1. `lutOf(OR(A, B))` → paste Output (`inline [lut] .generated:` …)
 2. `exprOfLut(.generated, A, B)` → paste the two assignment lines
 
-Details and multi-bit examples: [boolean-lut.md](boolean-lut.md). LUT runtime syntax: [lut.md](lut.md).
+With filters: `lutOf(…, A=01x1x, B=x, C=1001x)` then `exprOfLut(.generated)` (no variable list).
+
+Details: [boolean-lut.md](boolean-lut.md). LUT invoke syntax: [lut.md](lut.md).
 
 ---
 
@@ -848,8 +853,9 @@ Details and multi-bit examples: [boolean-lut.md](boolean-lut.md). LUT runtime sy
 | Trace divider `:mod`, adder `:carry` | `probe(.div:mod)`, `probe(.add:carry)` |
 | Trace chip/PCB internal wire | `probe(.u1.partial)` (dot, not `:`) |
 | Document a circuit for a reader | `show` at the end |
-| Expression → LUT text for paste | `lutOf` |
-| LUT → boolean expression (short + standard) | `exprOfLut` |
+| Expression → truth table text | `truthTableOf` — [boolean-analysis.md](boolean-analysis.md) |
+| Expression → `inline [lut]` block | `lutOf` |
+| `inline [lut]` → boolean expression | `exprOfLut` |
 
 ---
 
@@ -871,7 +877,7 @@ Details and multi-bit examples: [boolean-lut.md](boolean-lut.md). LUT runtime sy
 - [Signal propagation](signal-propagation.md) — when wires and displays update
 - [Editor UI](editorUI.md) — Output panel, Run, Next, Wave / Legacy toggle
 - [doc() function](doc-function.md) — `doc(def)` lists `show` as a built-in
-- [Boolean LUT utilities](boolean-lut.md) — `lutOf` / `exprOfLut` (full syntax, multi-bit, limits)
+- [Boolean LUT utilities](boolean-lut.md) — `lutOf` / `exprOfLut` (`description:`, `filters:`, multi-bit)
 - [Boolean analysis helpers](boolean-analysis.md) — `truthTableOf`, `simplify`, `equivalent`, `inputsOf`, `costOf`
-- [LUT component](lut.md) — runtime `inline [lut]` / `comp [lut]`
+- [LUT component](lut.md) — runtime `inline [lut]` invoke (`^.name(in=…)`)
 - [REG](reg.md) — `NEXT(~)` and wire-clock behaviour with `show`

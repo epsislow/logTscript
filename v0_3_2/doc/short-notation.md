@@ -22,9 +22,12 @@ The short notation zone is delimited by **backticks** (`` ` ``). Everything betw
 | `-&`     | NAND     | prefix/infix |
 | `-\|`    | NOR      | prefix/infix |
 | `-^`     | NXOR     | prefix/infix |
+| `+`      | concat   | infix        |
 
 **Prefix** = operator appears before the operand, with a single argument.  
 **Infix** = operator appears between two operands, with two arguments.
+
+`+` joins multi-bit segments inside one backtick zone. It has **lower precedence** than boolean operators (`&`, `|`, `^`, …): `` `a & b + c & d` `` → `AND(a,b) + AND(c,d)`.
 
 ---
 
@@ -498,6 +501,22 @@ Expands to:
 def q(8bit a, 8bit b):
    :4bit AND(OR(a.0/4,b.0/4),OR(a.4/4,b.4/4))
    :1bit AND(OR(a,b))
+```
+
+### Concatenation (`+`) inside one backtick zone
+
+Use `+` between parenthesized segments to build a multi-bit value in a single short-notation zone:
+
+```
+`(0) + (1) + (1) + (0)`              →  0 + 1 + 1 + 0
+`(0110) + ((!C.4) | (A.4 & B))`      →  0110 + OR(!C.4,AND(A.4,B))
+`(a | b) + (c | d)`                  →  OR(a,b) + OR(c,d)
+```
+
+Boolean operators bind tighter than `+`:
+
+```
+`a & b + c & d`   →   AND(a,b) + AND(c,d)
 ```
 
 ### Multiple backtick zones on the same line

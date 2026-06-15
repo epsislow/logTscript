@@ -637,9 +637,10 @@ doc(.decoder)
 
 ## Related
 
-- [boolean-lut.md](boolean-lut.md) — `lutOf` / `exprOfLut` (generate or reverse boolean LUTs)
+- [boolean-lut.md](boolean-lut.md) — `lutOf` / `exprOfLut` (generate or reverse boolean LUTs from expressions)
+- [boolean-analysis.md](boolean-analysis.md) — `truthTableOf`, `simplify`, `equivalent`, `inputsOf`, `costOf`
 - [huffman.md](huffman.md) — end-to-end Huffman example (`prefixFree` + `expand` / `collapse`)
 - [protocol.md](protocol.md) — `expand` / `collapse` with LUT; `:decode()` on channels
 - [mem.md](mem.md) — sequential RAM
 - [asm.md](asm.md) — inline assembler (blob into `mem`)
-- [debug.md](debug.md) — `probe`, `show`, `peek`
+- [debug.md](debug.md) — `probe`, `show`, `peek`, `lutOf`, `exprOfLut`

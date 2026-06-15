@@ -65,8 +65,8 @@ function simplifyGenerate(exprAst, widthResolver) {
     shortExpr = segmentsShort[0];
     stdExpr = segmentsStd[0];
   } else {
-    shortExpr = segmentsShort.map(s => `(${s})`).join(' + ');
-    stdExpr = segmentsStd.map(s => `(${s})`).join(' + ');
+    shortExpr = formatMultiBitShort(segmentsShort);
+    stdExpr = formatMultiBitStandard(segmentsStd);
   }
   return [
     `${outType} out = \`${shortExpr}\``,

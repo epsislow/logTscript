@@ -5342,6 +5342,41 @@ reg(1099, 'bool-lut', 'exprOfLut depth 3 — trei termeni +', function(h, sessio
   h.assert('segments', String(parts.length), '3');
 });
 
+reg(1099.5, 'bool-lut', 'exprOfLut constant multi-bit — minimizat (0110)', function(h, session) {
+  const lut = `inline [lut] .c4:
+  depth: 4
+  length: 2
+  data {
+    0 : 0110
+    1 : 0110
+  }
+  :`;
+  const { out } = session.run(lut + '\nexprOfLut(.c4, A)');
+  h.assert('short minimized', out[0], '4wire out = `(0110)`');
+  h.assert('std minimized', out[1], '4wire out = 0110');
+  const { interp } = session.run('1wire A\n4wire R\n' + out[0].replace('out', 'R'));
+  h.assert('short runs', String(!!interp), 'true');
+  const { interp: interp2 } = session.run('1wire A\n4wire R\n' + out[1].replace('out', 'R'));
+  h.assert('std runs', String(!!interp2), 'true');
+});
+
+reg(1099.6, 'bool-lut', 'exprOfLut filtered — short + concat rulabil', function(h, session) {
+  const gen = session.run(`5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+  const { out } = session.run(gen + '\nexprOfLut(.generated)');
+  h.assert('grouped constants', String(out[0].includes('`(0110) +')), 'true');
+  const prelude = '5wire A\n1wire B\n5wire C\n5wire R\n';
+  const { interp } = session.run(prelude + out[0].replace('out', 'R'));
+  h.assert('short runs', String(!!interp), 'true');
+  h.assert('std no expr parens', String(!out[1].includes('(OR(')), 'true');
+  const { interp: interpStd } = session.run(prelude + out[1].replace('out', 'R'));
+  h.assert('std runs', String(!!interpStd), 'true');
+  const { interp: interpParens } = session.run(prelude + '5wire R = 0110 + (OR(NOT(C.4), AND(A.4, B)))');
+  h.assert('std with parens runs', String(!!interpParens), 'true');
+});
+
 reg(1100, 'bool-lut', 'copy-paste linie standard rulabilă', function(h, session) {
   const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
   const line = out[1];

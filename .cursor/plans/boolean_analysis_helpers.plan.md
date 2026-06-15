@@ -30,7 +30,7 @@ isProject: false
 | `simplify()` output | Ca `exprOfLut`: două assignment-uri; multi-bit cu ` + ` |
 | **Limită `truthTableOf` / `lutOf`** | **Două concepte:** (1) spațiu adrese `2^totalBits` → câmp `length:` în LUT; (2) limită tooling max **256 rânduri generate**; eroare: `…table size (256 rows)` |
 | **`lutOf` filtre** | Parametru 2 cu virgulă; emite `description:` + `filters:` (atribute LUT, nu `#`) |
-| **`exprOfLut` + filtre** | **Plan separat** [`filtre_virgula_exproflut.plan.md`](filtre_virgula_exproflut.plan.md): ordine biți, virgulă apeluri, `attributes.filters` / `attributes.description` |
+| **`exprOfLut` + filtre** | Implementat: citește `attributes.description` + `attributes.filters`; variabile auto din pozițiile `x` |
 | **Limită `simplify` / `equivalent`** | Neschimbată: max **8 biți** intrare; eroare: `Boolean analysis exceeds maximum supported input width (8 bits)` |
 | **`inputsOf` / `costOf`** | Neschimbate (fără truth table completă) |
 | `truthTableOf` filtre | Al 2-lea parametru: `A=01x1x, B=x, C=000xx` (virgulă între asignări); pattern index `i` ↔ bit `.i` stânga→dreapta |
