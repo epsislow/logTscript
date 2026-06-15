@@ -1761,7 +1761,7 @@
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'dip', 'ioport', '7seg', 'lcd', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary'];
+    const expectedTypes = ['led', 'switch', 'key', 'dip', 'ioport', '7seg', 'lcd', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -1782,6 +1782,8 @@
     h.assert('osc bits', String(registry.get('osc').getWidthBits({})), '1');
     h.assert('rotary default bits', String(registry.get('rotary').getWidthBits({})), '3');
     h.assert('rotary 4 states', String(registry.get('rotary').getWidthBits({states: '4'})), '2');
+    h.assert('slider default bits', String(registry.get('slider').getWidthBits({})), '4');
+    h.assert('slider length 8', String(registry.get('slider').getWidthBits({length: '8'})), '8');
   });
 
   reg(202, 'registry', 'Component Registry — shortnames', function(h, session) {
@@ -8477,6 +8479,157 @@ reg(1205, 'bool-lut-use', 'doc smoke — useLutAs + useExpr script', function(h,
 1wire u = useExpr(exprOfLut(.gen, A, B))`);
   h.assert('runs', String(!!interp), 'true');
   h.assert('u=1', session.getWire(interp, 'u'), '1');
+});
+
+reg(1206, 'slider', 'doc(comp.slider) / getWidthBits length 8', function(h, session) {
+  const registry = session._ensureRegistry();
+  h.assert('slider registered', String(registry.has('slider')), 'true');
+  h.assert('getWidthBits length 8', String(registry.get('slider').getWidthBits({length: '8'})), '8');
+  const out = session.runDoc('doc(comp.slider)');
+  h.assert('doc first line', out[0], 'comp [slider] .name:');
+  h.assert('doc length attr', String(out.some(l => l.includes('length: integer'))), 'true');
+  h.assert('doc orientation', String(out.some(l => l.includes('orientation: 0/1'))), 'true');
+});
+
+reg(1207, 'slider', 'parse minimal comp [slider] .v::', function(h, session) {
+  const stmts = session.parse('comp [slider] .v::');
+  h.assert('one stmt', String(stmts.length), '1');
+  h.assert('type slider', stmts[0].comp.type, 'slider');
+  h.assert('name .v', stmts[0].comp.name, '.v');
+});
+
+reg(1208, 'slider', 'length 3 — 8 trepte wire 000/111', function(h, session) {
+  const { interp } = session.run(`comp [slider] .s:
+  length: 3
+  :
+
+3wire a = .s:get`);
+  h.assert('initial 000', session.getWire(interp, 'a'), '000');
+  session.setComp(interp, '.s', '111');
+  h.assert('after 111', session.getWire(interp, 'a'), '111');
+});
+
+reg(1209, 'slider', 'setComp — valoare pe :get', function(h, session) {
+  const { interp } = session.run(`comp [slider] .v:
+  length: 4
+  :
+
+4wire a = .v:get`);
+  session.setComp(interp, '.v', '1010');
+  h.assert('a=1010', session.getWire(interp, 'a'), '1010');
+});
+
+reg(1210, 'slider', 'orientation 1 vertical — parse', function(h, session) {
+  const stmts = session.parse(`comp [slider] .v:
+  orientation: 1
+  :`);
+  h.assert('orientation 1', String(stmts[0].comp.attributes.orientation), '1');
+});
+
+reg(1211, 'slider', 'reversed — valori inversate, poziție fizică separată', function(h, session) {
+  const slider = session._ensureRegistry().get('slider');
+  const C = slider.constructor;
+  h.assert('ratio 0 normal → state 0', String(C.ratioToState(0, 3, false)), '0');
+  h.assert('ratio 1 normal → state 7', String(C.ratioToState(1, 3, false)), '7');
+  h.assert('ratio 0 reversed → state 7', String(C.ratioToState(0, 3, true)), '7');
+  h.assert('ratio 1 reversed → state 0', String(C.ratioToState(1, 3, true)), '0');
+  h.assert('state 0 reversed → ratio 1', String(C.stateToRatio(0, 3, true)), '1');
+  h.assert('state 7 reversed → ratio 0', String(C.stateToRatio(7, 3, true)), '0');
+  const stmts = session.parse(`comp [slider] .v:
+  reversed
+  :`);
+  h.assert('reversed attr', String(stmts[0].comp.attributes.reversed === true), 'true');
+});
+
+reg(1212, 'slider', 'for labels — formatDisplay decimal sau etichetă', function(h, session) {
+  const slider = session._ensureRegistry().get('slider');
+  h.assert('decimal 5', slider.constructor.formatDisplay(5, {}), '5');
+  h.assert('for label', slider.constructor.formatDisplay(2, {2: 'MID'}), 'MID');
+  const stmts = session.parse(`comp [slider] .v:
+  for.2: 'C'
+  :`);
+  h.assert('for parsed', stmts[0].comp.attributes['for']['2'], 'C');
+});
+
+reg(1213, 'slider', 'property block set/data drive', function(h, session) {
+  const { interp } = session.run(`comp [slider] .s:
+  length: 3
+  on: 1
+  :
+
+3wire out = .s:get
+1wire trig = 0
+3wire val = 101
+
+.s:{
+  data = val
+  set = trig
+}`);
+  h.assert('initial 000', session.getWire(interp, 'out'), '000');
+  session.setWire(interp, 'trig', '1');
+  h.assert('after set/data 101', session.getWire(interp, 'out'), '101');
+});
+
+reg(1214, 'slider', 'propagare wire wave la schimbare slider', function(h, session) {
+  const { interp } = session.run(`comp [slider] .s:
+  length: 4
+  :
+
+4wire a = .s:get`);
+  h.assert('initial', session.getWire(interp, 'a'), '0000');
+  session.setComp(interp, '.s', '0110');
+  h.assert('after slider', session.getWire(interp, 'a'), '0110');
+}, { propagation: 'wave' });
+
+reg(1215, 'slider', 'propagare legacy', function(h, session) {
+  const { interp } = session.run(`comp [slider] .s:
+  length: 4
+  :
+
+4wire a = .s:get`);
+  session.setComp(interp, '.s', '1001');
+  h.assert('legacy a=1001', session.getWire(interp, 'a'), '1001');
+});
+
+reg(1216, 'slider', 'show(.slider) — bin în output', function(h, session) {
+  const { interp } = session.run(`comp [slider] .s:
+  length: 4
+  on: 1
+  :
+
+1wire trig = 0
+4wire val = 1010
+.s:{
+  data = val
+  set = trig
+}`);
+  session.setWire(interp, 'trig', '1');
+  const outBefore = session.out.length;
+  session.execStmts(interp, 'show(.s)');
+  const showLines = session.out.slice(outBefore);
+  h.assert('show bin 1010', String(showLines.some(l => l.includes('1010'))), 'true');
+});
+
+reg(1217, 'slider', 'length 8 — valoare max 11111111', function(h, session) {
+  const { interp } = session.run(`comp [slider] .s:
+  length: 8
+  :
+
+8wire a = .s:get`);
+  session.setComp(interp, '.s', '11111111');
+  h.assert('max value', session.getWire(interp, 'a'), '11111111');
+  h.assert('step count 256', String(1 << 8), '256');
+});
+
+reg(1218, 'slider', 'doc smoke script din slider.md', function(h, session) {
+  const { interp } = session.run(`comp [slider] .op:
+  length: 4
+  text: 'A'
+  :
+
+4wire val = .op:get`);
+  h.assert('runs', String(!!interp), 'true');
+  h.assert('initial val', session.getWire(interp, 'val'), '0000');
 });
 
 

@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, stack.md, subtract.md, switch.md, terminal.md
+ * Files: 14seg.md, adder.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md
  */
 (function () {
   'use strict';
@@ -2385,6 +2385,7 @@ LogTscript includes built-in **components** (\`comp\`), **inline** declarations 
 | \`dip\` | — | [dip.md](dip.md) |
 | \`ioport\` | — | [ioport.md](ioport.md) |
 | \`rotary\` | — | [rotary.md](rotary.md) |
+| \`slider\` | — | [slider.md](slider.md) |
 
 Overview (panel callbacks, common patterns): [interactive-components.md](interactive-components.md).
 
@@ -4086,6 +4087,7 @@ comp [adder] .name:
 | \`doc(comp.key)\` | [key.md](key.md) |
 | \`doc(comp.dip)\` | [dip.md](dip.md) |
 | \`doc(comp.rotary)\` | [rotary.md](rotary.md) |
+| \`doc(comp.slider)\` | [slider.md](slider.md) |
 | \`doc(comp.bar)\` | [led-bar.md](led-bar.md) |
 | \`doc(comp.7seg)\` / \`doc(comp.7)\` | [seven-seg.md](seven-seg.md) |
 | \`doc(comp.14seg)\` / \`doc(comp.14)\` | [14seg.md](14seg.md) |
@@ -4751,13 +4753,13 @@ Already exist as built-in functions; as **components** they would show up unifor
 | **Buzzer / tone** | Audio feedback on events |
 | **Text terminal** | Text “console” beyond simple LCD | **done** — [terminal.md](terminal.md) |
 
-### C1. Slider
+### C1. Slider — **implemented**
 
-**What it does:** Panel control (drag or buttons) that outputs an N-bit binary value, continuously or in steps — one widget instead of N toggle bits.
+**What it does:** Panel control (drag or click track) that outputs an N-bit binary value in steps \`0 … 2^length − 1\` — one widget instead of N toggle bits.
 
-**How I see it used:** Set operand A for ALU demos; simulate analog-ish input (volume, threshold); program speed. Friendlier than \`comp [dip]\` with \`length: 8\` for quick labs.
+**How I see it used:** Set operand A for ALU demos; simulate threshold or speed. Friendlier than \`comp [dip]\` with \`length: 8\` for quick labs.
 
-**Today:** \`comp [dip]\` or \`comp [rotary]\` cover discrete values; slider fills the gap for “many values, one control” UX.
+**Docs:** [slider.md](slider.md) — plan: [componenta_slider.plan.md](../../.cursor/plans/componenta_slider.plan.md)
 
 ---
 
@@ -5332,9 +5334,9 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 `,
     'interactive-components.md': `# Interactive components
 
-Per-component pages: [switch.md](switch.md), [key.md](key.md), [dip.md](dip.md), [rotary.md](rotary.md). Full catalog: [components.md](components.md).
+Per-component pages: [switch.md](switch.md), [key.md](key.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md). Full catalog: [components.md](components.md).
 
-**Switch**, **key**, **dip**, and **rotary** are input components you control from the devices panel while the program is running. Their values feed into wires and logic — when you flip a switch, press a key, change a DIP position, or turn a rotary knob, connected wires update automatically.
+**Switch**, **key**, **dip**, **rotary**, and **slider** are input components you control from the devices panel while the program is running. Their values feed into wires and logic — when you flip a switch, press a key, change a DIP position, turn a rotary knob, or drag a slider, connected wires update automatically.
 
 See [signal-propagation.md](signal-propagation.md) for how those updates spread through your circuit.
 
@@ -5353,6 +5355,7 @@ Inside the engine, each panel control uses a small callback when you interact wi
 | \`switch\` | \`onChange\` | Each time you toggle the control |
 | \`dip\` | \`onChange\` | Each time you flip one DIP position (\`index\`, \`checked\`) |
 | \`rotary\` | \`onChange\` | When the selected **state** changes (drag or step the knob) |
+| \`slider\` | \`onChange\` | When the scalar **value** changes (drag thumb or click track) |
 
 **Only \`key\` uses \`onPress\` / \`onRelease\`.** All other panel inputs above use \`onChange\` (or, for the oscillator, automatic HIGH/LOW transitions — not user clicks).
 
@@ -5381,11 +5384,11 @@ After **RUN**, \`on\` is \`0\` and \`off\` is \`1\`. Toggle the switch in the pa
 
 | Form | Width | Description |
 |------|-------|-------------|
-| \`.name\` | 1 bit (switch, key) or multi-bit (dip, rotary) | Direct value |
+| \`.name\` | 1 bit (switch, key) or multi-bit (dip, rotary, slider) | Direct value |
 | \`.name:get\` | Same | Explicit read (equivalent for these components) |
 | \`.name.N\` | 1 bit | Single bit \`N\` of a **dip** only (leftmost = \`0\`) |
 
-Use a wire width that matches the component: \`1wire\` for switch and key, \`Nwire\` for a dip with \`length: N\`, and \`ceil(log₂(states))\` bits for a rotary with \`states: N\` (e.g. \`states: 8\` → \`3wire\`).
+Use a wire width that matches the component: \`1wire\` for switch and key, \`Nwire\` for a dip or slider with \`length: N\`, and \`ceil(log₂(states))\` bits for a rotary with \`states: N\` (e.g. \`states: 8\` → \`3wire\`).
 
 ---
 
@@ -5737,6 +5740,66 @@ comp [rotary] .rr:
 
 ---
 
+## Slider (\`comp [slider]\`)
+
+A **slider** outputs a scalar value from \`0\` to \`2^length − 1\` as binary on \`:get\`. Drag the thumb horizontally or vertically, or click the track to jump.
+
+\`\`\`
+comp [slider] .name:
+  length: 8
+  text: 'Op'
+  color: ^6dff9c
+  orientation: 0
+  reversed
+  for: ['0','1','2','3']
+  nl
+  :
+\`\`\`
+
+Minimal:
+
+\`\`\`
+comp [slider] .name::
+\`\`\`
+
+### Attributes
+
+| Attribute | Default | Notes |
+|-----------|---------|-------|
+| \`length\` | \`4\` | Output width in bits |
+| \`text\` | \`''\` | Label (max 5 chars in panel) |
+| \`color\` | \`#6dff9c\` | Thumb and value color |
+| \`orientation\` | \`0\` | \`0\` horizontal, \`1\` vertical |
+| \`reversed\` | off | Swap min/max on track |
+| \`for\` | — | Per-step labels in panel (else decimal) |
+| \`nl\` | off | Newline after control |
+
+### Panel vs debug
+
+The panel shows the **decimal** step (or a \`for\` label). \`show\`, \`peek\`, and \`probe\` still show the **binary** wire value.
+
+### Property block
+
+Drive the slider from logic with \`set\` and \`data\` (see \`doc(comp.slider)\`).
+
+### Example
+
+\`\`\`logts-play
+comp [slider] .op:
+  length: 4
+  text: 'A'
+  :
+
+4wire val = .op:get
+\`\`\`
+
+### Notes
+
+- Use **slider** for many sequential values; use **dip** for arbitrary bit patterns; use **rotary** when \`states\` is not a power of two.
+- Panel interaction uses \`onChange\`.
+
+---
+
 ## Comparison
 
 | Component | Bits | User action | Panel callback | Value while idle |
@@ -5745,6 +5808,7 @@ comp [rotary] .rr:
 | \`key\`     | 1    | Press/release | **\`onPress\` / \`onRelease\`** | \`0\` |
 | \`dip\`     | N    | Flip each position | \`onChange\` | Holds last pattern |
 | \`rotary\`  | \`ceil(log₂(states))\` | Drag / step knob | \`onChange\` | Holds last state |
+| \`slider\`  | \`length\` | Drag / click track | \`onChange\` | Holds last value |
 | \`osc\`     | 1 (+ counter) | *(automatic timer)* | HIGH/LOW ticks | Oscillates — see [oscillator.md](oscillator.md) |
 
 ---
@@ -5756,6 +5820,7 @@ doc(comp.switch)
 doc(comp.key)
 doc(comp.dip)
 doc(comp.rotary)
+doc(comp.slider)
 \`\`\`
 
 ---
@@ -11898,6 +11963,121 @@ See chip tests **540–543** (legacy) and **556–557** (wave) in the test runne
 - [REG](reg.md) — wire-clock falling edge and \`NEXT\` clock (\`~\`)
 - [Oscillator](oscillator.md) — real-time \`osc\` and wire connections
 - [LED](led.md) — displays driven by wires and components
+`,
+    'slider.md': `# Slider component
+
+\`comp [slider]\` is a **panel slider** for scalar N-bit values. The user drags a thumb along a track; the output is the step index as an unsigned binary value (\`0 … 2^length − 1\`).
+
+Signature: \`doc(comp.slider)\` — see also [interactive-components.md](interactive-components.md).
+
+---
+
+## Syntax
+
+\`\`\`
+comp [slider] .name:
+  length: 8
+  text: 'Operand'
+  color: ^6dff9c
+  orientation: 0
+  reversed
+  for: ['0','1','2','3']
+  nl
+  :
+\`\`\`
+
+Minimal (4 bits, default):
+
+\`\`\`
+comp [slider] .name::
+\`\`\`
+
+---
+
+## Attributes
+
+| Attribute     | Type    | Default   | Description |
+|---------------|---------|-----------|-------------|
+| \`length\`      | integer | \`4\`       | Output width in bits (\`Nwire\`) |
+| \`text\`        | string  | \`''\`      | Panel label (max 5 chars displayed) |
+| \`color\`       | hex     | \`#6dff9c\` | Thumb and value accent color |
+| \`orientation\` | \`0\`/\`1\` | \`0\`       | \`0\` horizontal (min left), \`1\` vertical (min bottom) |
+| \`reversed\`    | flag    | (no)      | Swap which **value** sits at each end; drag direction unchanged. Default \`0\` appears at the opposite end (right / top) |
+| \`for\`         | array   | —         | Optional label per step index (shown in panel instead of decimal) |
+| \`nl\`          | flag    | (no)      | Newline after the control |
+
+**Steps:** \`2^length\` (e.g. \`length: 8\` → 256 positions, \`00000000\` … \`11111111\`).
+
+---
+
+## Panel display vs debug
+
+| Context | Display |
+|---------|---------|
+| **Panel** (\`.slider-value\`) | Decimal step index, or \`for[state]\` label when provided |
+| **\`show\` / \`peek\` / \`probe\`** | Binary wire value |
+
+---
+
+## Output width
+
+Output bits = \`length\` directly (unlike rotary, which uses \`ceil(log₂(states))\`).
+
+| \`length\` | Wire width | Max value (decimal) |
+|----------|------------|---------------------|
+| 3        | \`3wire\`    | 7 (\`111\`) |
+| 4        | \`4wire\`    | 15 (\`1111\`) |
+| 8        | \`8wire\`    | 255 (\`11111111\`) |
+
+Read with \`.name:get\` or \`.name\`.
+
+### \`reversed\`
+
+Drag always moves the thumb in the direction of the pointer. With \`reversed\`, only the **value mapping** changes: left/bottom outputs \`max\`, right/top outputs \`0\`. Initial value \`0\` places the thumb at the far end (right or top).
+
+---
+
+## Property block
+
+Slider supports \`set\` and \`data\` pins like rotary:
+
+\`\`\`
+comp [slider] .sel:
+  length: 4
+  on: 1
+  :
+
+.sel:{
+  data = externalValue
+  set = trigger
+}
+\`\`\`
+
+When \`set = 1\`, \`data\` drives the slider position.
+
+---
+
+## Example
+
+\`\`\`logts-play
+comp [slider] .op:
+  length: 4
+  text: 'A'
+  for: ['0','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15']
+  :
+
+4wire val = .op:get
+\`\`\`
+
+---
+
+## Compared to dip and rotary
+
+| Control | Best for |
+|---------|----------|
+| **dip** | Arbitrary bit patterns (each bit independent) |
+| **rotary** | Few named states (\`states\` not necessarily \`2^bits\`) |
+| **slider** | Many sequential values (\`0 … 2^length−1\`) with one drag control |
 `,
     'stack.md': `# Stack component (LIFO)
 

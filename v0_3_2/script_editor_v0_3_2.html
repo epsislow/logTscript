@@ -807,6 +807,71 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   min-width: 3ch;
 }
 
+.slider-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 8px 4px 0;
+  vertical-align: middle;
+}
+
+.slider-wrapper.slider-vertical {
+  flex-direction: column;
+  align-items: center;
+}
+
+.slider-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd;
+}
+
+.slider-track {
+  position: relative;
+  width: 140px;
+  height: 20px;
+  background: #1a1a1a;
+  border: 1px inset #2a2a2a;
+  border-radius: 6px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.slider-track-vertical {
+  width: 20px;
+  height: 140px;
+}
+
+.slider-thumb {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  bottom: 2px;
+  left: 2px;
+  border-radius: 4px;
+  background: var(--slider-color, #6dff9c);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--slider-color, #6dff9c) 50%, transparent);
+  pointer-events: none;
+}
+
+.slider-thumb.active {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--slider-color, #6dff9c) 70%, transparent);
+}
+
+.slider-track-vertical .slider-thumb {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.slider-value {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #6dff9c;
+  min-width: 3ch;
+}
+
 /*==== dropdown panels ==== */
 
 .panel-dropdown {
@@ -1504,7 +1569,7 @@ const _logtsKeywords = [
 ];
 
 const _logtsComponents = [
-  'led','key','dip','switch','rotary','bar','osc',
+  'led','key','dip','switch','rotary','slider','bar','osc',
   'adder','subtract','divider','multiplier','counter','shifter','mem','reg',
   'lcd','terminal','dots','14seg','7seg',
   '+','-','/','*','=','>','~','7','14',':'
@@ -1946,6 +2011,7 @@ show(a,b,c)
         <button class="dropdown-item" onclick="insertComp('dip')">dip</button>
         <button class="dropdown-item" onclick="insertComp('switch')">switch</button>
         <button class="dropdown-item" onclick="insertComp('rotary')">rotary</button>
+        <button class="dropdown-item" onclick="insertComp('slider')">slider</button>
         <button class="dropdown-item" onclick="insertComp('adder')">adder</button>
         <button class="dropdown-item" onclick="insertComp('subtract')">subtract</button>
         <button class="dropdown-item" onclick="insertComp('multiplier')">multiplier</button>
@@ -2080,6 +2146,7 @@ show(a,b,c)
 <script src="core/components/stack.js"></script>
 <script src="core/components/osc.js"></script>
 <script src="core/components/rotary.js"></script>
+<script src="core/components/slider.js"></script>
 <script src="core/components/pcb-component.js"></script>
 <script src="core/components/index.js"></script>
 
@@ -2112,6 +2179,7 @@ show(a,b,c)
 <script src="devices/terminal.js"></script>
 <script src="devices/panel-key.js"></script>
 <script src="devices/rotary-knob.js"></script>
+<script src="devices/slider-widget.js"></script>
 
 <!-- UI: editor, file browser, app init -->
 <script src="ui/editor.js"></script>

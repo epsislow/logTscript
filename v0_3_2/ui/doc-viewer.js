@@ -82,6 +82,12 @@ const DOC_SECTIONS = [
       { file: 'stack.md', label: 'stack', searchExtra: 'lifo push pop top call stack subroutine' },
       { file: 'oscillator.md', label: 'oscillator' }
     ],
+  },
+  {
+    title: 'Other',
+    items: [
+      { file: 'slider.md', label: 'Slider component' }
+    ],
   }
 ];
 

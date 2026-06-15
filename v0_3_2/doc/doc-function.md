@@ -435,6 +435,7 @@ comp [adder] .name:
 | `doc(comp.key)` | [key.md](key.md) |
 | `doc(comp.dip)` | [dip.md](dip.md) |
 | `doc(comp.rotary)` | [rotary.md](rotary.md) |
+| `doc(comp.slider)` | [slider.md](slider.md) |
 | `doc(comp.bar)` | [led-bar.md](led-bar.md) |
 | `doc(comp.7seg)` / `doc(comp.7)` | [seven-seg.md](seven-seg.md) |
 | `doc(comp.14seg)` / `doc(comp.14)` | [14seg.md](14seg.md) |

@@ -204,13 +204,13 @@ Already exist as built-in functions; as **components** they would show up unifor
 | **Buzzer / tone** | Audio feedback on events |
 | **Text terminal** | Text “console” beyond simple LCD | **done** — [terminal.md](terminal.md) |
 
-### C1. Slider
+### C1. Slider — **implemented**
 
-**What it does:** Panel control (drag or buttons) that outputs an N-bit binary value, continuously or in steps — one widget instead of N toggle bits.
+**What it does:** Panel control (drag or click track) that outputs an N-bit binary value in steps `0 … 2^length − 1` — one widget instead of N toggle bits.
 
-**How I see it used:** Set operand A for ALU demos; simulate analog-ish input (volume, threshold); program speed. Friendlier than `comp [dip]` with `length: 8` for quick labs.
+**How I see it used:** Set operand A for ALU demos; simulate threshold or speed. Friendlier than `comp [dip]` with `length: 8` for quick labs.
 
-**Today:** `comp [dip]` or `comp [rotary]` cover discrete values; slider fills the gap for “many values, one control” UX.
+**Docs:** [slider.md](slider.md) — plan: [componenta_slider.plan.md](../../.cursor/plans/componenta_slider.plan.md)
 
 ---
 

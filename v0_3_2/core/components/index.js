@@ -23,6 +23,7 @@ var QueueComponent = (typeof require !== 'undefined') ? require('./queue') : Que
 var StackComponent = (typeof require !== 'undefined') ? require('./stack') : StackComponent;
 var OscComponent = (typeof require !== 'undefined') ? require('./osc') : OscComponent;
 var RotaryComponent = (typeof require !== 'undefined') ? require('./rotary') : RotaryComponent;
+var SliderComponent = (typeof require !== 'undefined') ? require('./slider') : SliderComponent;
 var PcbComponent = (typeof require !== 'undefined') ? require('./pcb-component') : PcbComponent;
 
 function createComponentRegistry() {
@@ -50,6 +51,7 @@ function createComponentRegistry() {
   registry.register(StackComponent);
   registry.register(OscComponent);
   registry.register(RotaryComponent);
+  registry.register(SliderComponent);
   registry.register(ClockDotsComponent);
   return registry;
 }

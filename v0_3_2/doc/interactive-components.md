@@ -1,8 +1,8 @@
 # Interactive components
 
-Per-component pages: [switch.md](switch.md), [key.md](key.md), [dip.md](dip.md), [rotary.md](rotary.md). Full catalog: [components.md](components.md).
+Per-component pages: [switch.md](switch.md), [key.md](key.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md). Full catalog: [components.md](components.md).
 
-**Switch**, **key**, **dip**, and **rotary** are input components you control from the devices panel while the program is running. Their values feed into wires and logic — when you flip a switch, press a key, change a DIP position, or turn a rotary knob, connected wires update automatically.
+**Switch**, **key**, **dip**, **rotary**, and **slider** are input components you control from the devices panel while the program is running. Their values feed into wires and logic — when you flip a switch, press a key, change a DIP position, turn a rotary knob, or drag a slider, connected wires update automatically.
 
 See [signal-propagation.md](signal-propagation.md) for how those updates spread through your circuit.
 
@@ -21,6 +21,7 @@ Inside the engine, each panel control uses a small callback when you interact wi
 | `switch` | `onChange` | Each time you toggle the control |
 | `dip` | `onChange` | Each time you flip one DIP position (`index`, `checked`) |
 | `rotary` | `onChange` | When the selected **state** changes (drag or step the knob) |
+| `slider` | `onChange` | When the scalar **value** changes (drag thumb or click track) |
 
 **Only `key` uses `onPress` / `onRelease`.** All other panel inputs above use `onChange` (or, for the oscillator, automatic HIGH/LOW transitions — not user clicks).
 
@@ -49,11 +50,11 @@ After **RUN**, `on` is `0` and `off` is `1`. Toggle the switch in the panel and 
 
 | Form | Width | Description |
 |------|-------|-------------|
-| `.name` | 1 bit (switch, key) or multi-bit (dip, rotary) | Direct value |
+| `.name` | 1 bit (switch, key) or multi-bit (dip, rotary, slider) | Direct value |
 | `.name:get` | Same | Explicit read (equivalent for these components) |
 | `.name.N` | 1 bit | Single bit `N` of a **dip** only (leftmost = `0`) |
 
-Use a wire width that matches the component: `1wire` for switch and key, `Nwire` for a dip with `length: N`, and `ceil(log₂(states))` bits for a rotary with `states: N` (e.g. `states: 8` → `3wire`).
+Use a wire width that matches the component: `1wire` for switch and key, `Nwire` for a dip or slider with `length: N`, and `ceil(log₂(states))` bits for a rotary with `states: N` (e.g. `states: 8` → `3wire`).
 
 ---
 
@@ -405,6 +406,66 @@ comp [rotary] .rr:
 
 ---
 
+## Slider (`comp [slider]`)
+
+A **slider** outputs a scalar value from `0` to `2^length − 1` as binary on `:get`. Drag the thumb horizontally or vertically, or click the track to jump.
+
+```
+comp [slider] .name:
+  length: 8
+  text: 'Op'
+  color: ^6dff9c
+  orientation: 0
+  reversed
+  for: ['0','1','2','3']
+  nl
+  :
+```
+
+Minimal:
+
+```
+comp [slider] .name::
+```
+
+### Attributes
+
+| Attribute | Default | Notes |
+|-----------|---------|-------|
+| `length` | `4` | Output width in bits |
+| `text` | `''` | Label (max 5 chars in panel) |
+| `color` | `#6dff9c` | Thumb and value color |
+| `orientation` | `0` | `0` horizontal, `1` vertical |
+| `reversed` | off | Swap min/max on track |
+| `for` | — | Per-step labels in panel (else decimal) |
+| `nl` | off | Newline after control |
+
+### Panel vs debug
+
+The panel shows the **decimal** step (or a `for` label). `show`, `peek`, and `probe` still show the **binary** wire value.
+
+### Property block
+
+Drive the slider from logic with `set` and `data` (see `doc(comp.slider)`).
+
+### Example
+
+```logts-play
+comp [slider] .op:
+  length: 4
+  text: 'A'
+  :
+
+4wire val = .op:get
+```
+
+### Notes
+
+- Use **slider** for many sequential values; use **dip** for arbitrary bit patterns; use **rotary** when `states` is not a power of two.
+- Panel interaction uses `onChange`.
+
+---
+
 ## Comparison
 
 | Component | Bits | User action | Panel callback | Value while idle |
@@ -413,6 +474,7 @@ comp [rotary] .rr:
 | `key`     | 1    | Press/release | **`onPress` / `onRelease`** | `0` |
 | `dip`     | N    | Flip each position | `onChange` | Holds last pattern |
 | `rotary`  | `ceil(log₂(states))` | Drag / step knob | `onChange` | Holds last state |
+| `slider`  | `length` | Drag / click track | `onChange` | Holds last value |
 | `osc`     | 1 (+ counter) | *(automatic timer)* | HIGH/LOW ticks | Oscillates — see [oscillator.md](oscillator.md) |
 
 ---
@@ -424,6 +486,7 @@ doc(comp.switch)
 doc(comp.key)
 doc(comp.dip)
 doc(comp.rotary)
+doc(comp.slider)
 ```
 
 ---

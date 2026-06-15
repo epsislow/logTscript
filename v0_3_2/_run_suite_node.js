@@ -34,6 +34,7 @@ const files = [
   'core/components/stack.js',
   'core/components/osc.js',
   'core/components/rotary.js',
+  'core/components/slider.js',
   'core/components/pcb-component.js',
   'core/components/index.js',
   'devices/mem-devices.js',

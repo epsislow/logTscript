@@ -4,16 +4,16 @@ overview: comp [slider] — control panel N-bit (length), valori 0…2^length−
 todos:
   - id: slider-core
     content: core/components/slider.js + index.js register; getWidthBits din length, set/data ca rotary
-    status: pending
+    status: completed
   - id: slider-ui
     content: devices/slider-widget.js + CSS în script_editor; orientation + reversed; afișaj decimal/for ca rotary (.slider-value)
-    status: pending
+    status: completed
   - id: slider-tests
     content: test_suite.js 1206–1218 grup slider + _gen_manifest.js
-    status: pending
+    status: completed
   - id: slider-doc
     content: slider.md, components.md, interactive-components.md, future-component-ideas, _gen_doc_data.js
-    status: pending
+    status: completed
 isProject: false
 ---
 
