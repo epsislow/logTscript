@@ -9,6 +9,10 @@
     return;
   }
 
+  if (typeof suite.finalize === 'function' && !suite.runMap) {
+    suite.finalize();
+  }
+
   const testListEl = document.getElementById('testList');
   const summaryEl = document.getElementById('summary');
   const subtitleEl = document.getElementById('subtitle');
@@ -18,11 +22,10 @@
   const manifestById = new Map(manifest.entries.map(e => [e.id, e]));
   let running = false;
 
-  const portedCount = suite.tests.length;
+  const portedCount = suite.runMap ? suite.runMap.size : suite.tests.length;
   const totalCount = manifest.entries.length;
   if (subtitleEl) {
-    subtitleEl.textContent =
-      portedCount + ' / ' + totalCount; // + ' tests ported. Grey rows without ▶ are not yet ported.';
+    subtitleEl.textContent = portedCount + ' / ' + totalCount + ' tests';
   }
 
   function createHarness() {

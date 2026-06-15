@@ -1357,7 +1357,7 @@
     }
   });
 
-  reg(134, 'short-notation', 'Short notation — + concatenation inside backticks', function(h, session) {
+  reg(1334, 'short-notation', 'Short notation — + concatenation inside backticks', function(h, session) {
     {
       h.assert('bit constants', session.preprocessShortNotation('`(0) + (1) + (1) + (0)`'), '0 + 1 + 1 + 0');
       h.assert('grouped bool', session.preprocessShortNotation('`(a | b) + (c | d)`'), 'OR(a,b) + OR(c,d)');
@@ -1366,14 +1366,14 @@
     }
   });
 
-  reg(135, 'short-notation', 'Short notation — + concat runnable assignment', function(h, session) {
+  reg(1335, 'short-notation', 'Short notation — + concat runnable assignment', function(h, session) {
     {
       const { interp } = session.run('5wire R\n5wire A\n1wire B\n5wire C\n5wire R = `(0110) + ((!C.4) | (A.4 & B))`');
       h.assert('runs', String(!!interp), 'true');
     }
   });
 
-  reg(136, 'short-notation', 'Short notation — paranteze extra (concat și grupare)', function(h, session) {
+  reg(1336, 'short-notation', 'Short notation — paranteze extra (concat și grupare)', function(h, session) {
     {
       h.assert('outer wrap concat', session.preprocessShortNotation('`((0110) + ((!C.4) | (A.4 & B)))`'), '0110 + OR(!C.4,AND(A.4,B))');
       h.assert('double const parens', session.preprocessShortNotation('`((0110))`'), '0110');
