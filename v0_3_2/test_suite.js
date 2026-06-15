@@ -8481,6 +8481,18 @@ reg(1205, 'bool-lut-use', 'doc smoke — useLutAs + useExpr script', function(h,
   h.assert('u=1', session.getWire(interp, 'u'), '1');
 });
 
+reg(1221, 'bool-lut-use', 'LUT invoke .gen(C) with wire address', function(h, session) {
+  const { interp, out } = session.run(`useLutAs(lutOf(OR(A, B)), .gen)
+1wire A := 1
+1wire B := 0
+2wire C = 10
+
+1wire y = .gen(C)
+show(y)`);
+  h.assert('y=1', session.getWire(interp, 'y'), '1');
+  h.assert('show y=1', String(out.some(l => l.includes('1'))), 'true');
+});
+
 reg(1206, 'slider', 'doc(comp.slider) / getWidthBits length 8', function(h, session) {
   const registry = session._ensureRegistry();
   h.assert('slider registered', String(registry.has('slider')), 'true');

@@ -233,6 +233,18 @@ useLutAs(lutOf(OR(A, B)), .gen)
 show(y)
 ```
 
+Address may be a **binary literal** (`10`, `01`) or a **wire** (`C`, `addr`):
+
+```logts-play
+useLutAs(lutOf(OR(A, B)), .gen)
+1wire A := 1
+1wire B := 0
+2wire C = 10
+
+1wire y = .gen(C)
+show(y)
+```
+
 ### Inline body `lutOf`
 
 ```logts-play

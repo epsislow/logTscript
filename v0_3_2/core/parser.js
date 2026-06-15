@@ -3092,8 +3092,8 @@ isBuiltinFunction(name) {
         throw Error(`Component invocation accepts at most one argument at ${this.c.line}:${this.c.col}`);
       }
       if (this.c.type === 'ID') {
-        const peekPos = this.t.i;
         const argName = this.c.value;
+        const idStartPos = this.t.i - argName.length;
         this.eat('ID');
         this.t.skip();
         if (this.c.type === 'SYM' && this.c.value === '=') {
@@ -3101,7 +3101,7 @@ isBuiltinFunction(name) {
           this.t.skip();
           args[argName] = this.expr();
         } else {
-          this._syncTokenizerAt(peekPos);
+          this._syncTokenizerAt(idStartPos);
           args.in = this.expr();
         }
       } else {
