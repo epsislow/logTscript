@@ -1,8 +1,23 @@
 /* ================= SLIDER WIDGET ================= */
 
-const SLIDER_TRACK_H = 140;
-const SLIDER_TRACK_V = 140;
 const SLIDER_THUMB = 16;
+const SLIDER_SIZE_DEFAULT = 10;
+const SLIDER_SIZE_REF_PX = 140;
+const SLIDER_SIZE_MIN = 1;
+const SLIDER_SIZE_MAX = 20;
+
+function clampSliderSize(size) {
+  let s = size !== undefined ? parseInt(size, 10) : SLIDER_SIZE_DEFAULT;
+  if (isNaN(s)) s = SLIDER_SIZE_DEFAULT;
+  return Math.max(SLIDER_SIZE_MIN, Math.min(SLIDER_SIZE_MAX, s));
+}
+
+function trackLengthFromSize(size) {
+  const s = clampSliderSize(size);
+  const minLen = 3 * SLIDER_THUMB;
+  const perUnit = (SLIDER_SIZE_REF_PX - minLen) / (SLIDER_SIZE_DEFAULT - 1);
+  return Math.round(minLen + (s - 1) * perUnit);
+}
 
 function formatSliderDisplay(stateNum, forLabels) {
   const labels = forLabels || {};
@@ -29,6 +44,7 @@ class SliderWidget {
     color = '#6dff9c',
     orientation = 0,
     reversed = false,
+    size = SLIDER_SIZE_DEFAULT,
     forLabels = {},
     onChange = () => {},
     initialBin = null,
@@ -41,6 +57,8 @@ class SliderWidget {
     this.color = color;
     this.orientation = orientation;
     this.reversed = reversed;
+    this.size = clampSliderSize(size);
+    this.trackPx = trackLengthFromSize(this.size);
     this.forLabels = forLabels;
     this.onChange = onChange;
     this.dragging = false;
@@ -53,6 +71,11 @@ class SliderWidget {
 
     this.track = document.createElement('div');
     this.track.className = 'slider-track' + (orientation === 1 ? ' slider-track-vertical' : '');
+    if (orientation === 1) {
+      this.track.style.height = `${this.trackPx}px`;
+    } else {
+      this.track.style.width = `${this.trackPx}px`;
+    }
 
     this.thumb = document.createElement('div');
     this.thumb.className = 'slider-thumb';
@@ -65,6 +88,10 @@ class SliderWidget {
 
   mount(parent) {
     parent.appendChild(this.track);
+  }
+
+  _trackSpan() {
+    return Math.max(SLIDER_THUMB, this.trackPx);
   }
 
   _ratioFromPointer(clientX, clientY) {
@@ -134,13 +161,12 @@ class SliderWidget {
 
   _updateThumb() {
     const displayRatio = this.ratio;
+    const usable = Math.max(0, this._trackSpan() - SLIDER_THUMB);
     if (this.orientation === 1) {
-      const usable = SLIDER_TRACK_V - SLIDER_THUMB;
       this.thumb.style.bottom = `${displayRatio * usable}px`;
       this.thumb.style.left = '50%';
       this.thumb.style.transform = 'translateX(-50%)';
     } else {
-      const usable = SLIDER_TRACK_H - SLIDER_THUMB;
       this.thumb.style.left = `${displayRatio * usable}px`;
       this.thumb.style.bottom = '';
       this.thumb.style.transform = '';
@@ -171,6 +197,7 @@ function addSlider({
   color = '#6dff9c',
   orientation = 0,
   reversed = false,
+  size = SLIDER_SIZE_DEFAULT,
   forLabels = {},
   onChange,
   nl = false,
@@ -202,6 +229,7 @@ function addSlider({
     color,
     orientation,
     reversed,
+    size,
     forLabels,
     onChange: () => {},
     initialBin,

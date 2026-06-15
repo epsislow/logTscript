@@ -8632,6 +8632,24 @@ reg(1218, 'slider', 'doc smoke script din slider.md', function(h, session) {
   h.assert('initial val', session.getWire(interp, 'val'), '0000');
 });
 
+reg(1219, 'slider', 'size — trackLengthFromSize 1 / 10 / 20', function(h, session) {
+  const C = session._ensureRegistry().get('slider').constructor;
+  h.assert('size 1 → 48px (3× thumb)', String(C.trackLengthFromSize(1)), '48');
+  h.assert('size 10 → 140px', String(C.trackLengthFromSize(10)), '140');
+  h.assert('size 20 → 242px', String(C.trackLengthFromSize(20)), '242');
+  h.assert('clamp below min', String(C.clampSize(0)), '1');
+  h.assert('clamp above max', String(C.clampSize(99)), '20');
+});
+
+reg(1220, 'slider', 'parse size attribute', function(h, session) {
+  const stmts = session.parse(`comp [slider] .v:
+  size: 15
+  :`);
+  h.assert('size 15', String(stmts[0].comp.attributes.size), '15');
+  const out = session.runDoc('doc(comp.slider)');
+  h.assert('doc size attr', String(out.some(l => l.includes('size: integer'))), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

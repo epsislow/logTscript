@@ -5770,7 +5770,8 @@ comp [slider] .name::
 | \`text\` | \`''\` | Label (max 5 chars in panel) |
 | \`color\` | \`#6dff9c\` | Thumb and value color |
 | \`orientation\` | \`0\` | \`0\` horizontal, \`1\` vertical |
-| \`reversed\` | off | Swap min/max on track |
+| \`reversed\` | off | Swap value mapping at track ends |
+| \`size\` | \`10\` | Track length scale \`1…20\` (panel only) |
 | \`for\` | — | Per-step labels in panel (else decimal) |
 | \`nl\` | off | Newline after control |
 
@@ -12003,6 +12004,7 @@ comp [slider] .name::
 | \`color\`       | hex     | \`#6dff9c\` | Thumb and value accent color |
 | \`orientation\` | \`0\`/\`1\` | \`0\`       | \`0\` horizontal (min left), \`1\` vertical (min bottom) |
 | \`reversed\`    | flag    | (no)      | Swap which **value** sits at each end; drag direction unchanged. Default \`0\` appears at the opposite end (right / top) |
+| \`size\`        | integer | \`10\`      | Track length \`1…20\` (panel only); \`1\` = 3× thumb, \`10\` = default |
 | \`for\`         | array   | —         | Optional label per step index (shown in panel instead of decimal) |
 | \`nl\`          | flag    | (no)      | Newline after the control |
 
@@ -12034,6 +12036,16 @@ Read with \`.name:get\` or \`.name\`.
 ### \`reversed\`
 
 Drag always moves the thumb in the direction of the pointer. With \`reversed\`, only the **value mapping** changes: left/bottom outputs \`max\`, right/top outputs \`0\`. Initial value \`0\` places the thumb at the far end (right or top).
+
+### \`size\`
+
+Panel track length only (does not affect wire width). Linear scale from \`1\` to \`20\`, default \`10\`:
+
+| \`size\` | Track length (approx.) |
+|--------|------------------------|
+| \`1\`    | 48px (3× thumb) |
+| \`10\`   | 140px (default) |
+| \`20\`   | 242px |
 
 ---
 

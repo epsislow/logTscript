@@ -436,7 +436,8 @@ comp [slider] .name::
 | `text` | `''` | Label (max 5 chars in panel) |
 | `color` | `#6dff9c` | Thumb and value color |
 | `orientation` | `0` | `0` horizontal, `1` vertical |
-| `reversed` | off | Swap min/max on track |
+| `reversed` | off | Swap value mapping at track ends |
+| `size` | `10` | Track length scale `1…20` (panel only) |
 | `for` | — | Per-step labels in panel (else decimal) |
 | `nl` | off | Newline after control |
 

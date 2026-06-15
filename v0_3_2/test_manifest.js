@@ -779,6 +779,8 @@
       {"id":1216,"group":"slider","title":"show(.slider) — bin în output","detail":{"scripts":["comp [slider] .s:\n  length: 4\n  on: 1\n  :\n\n1wire trig = 0\n4wire val = 1010\n.s:{\n  data = val\n  set = trig\n}"],"steps":[],"assertions":["show bin 1010"]}},
       {"id":1217,"group":"slider","title":"length 8 — valoare max 11111111","detail":{"scripts":["comp [slider] .s:\n  length: 8\n  :\n\n8wire a = .s:get"],"steps":[],"assertions":["max value","step count 256"]}},
       {"id":1218,"group":"slider","title":"doc smoke script din slider.md","detail":{"scripts":["comp [slider] .op:\n  length: 4\n  text: 'A'\n  :\n\n4wire val = .op:get"],"steps":[],"assertions":["runs","initial val"]}},
+      {"id":1219,"group":"slider","title":"size — trackLengthFromSize 1 / 10 / 20","detail":{"scripts":[],"steps":["session._ensureRegistry()"],"assertions":["size 1 → 48px (3× thumb)","size 10 → 140px","size 20 → 242px","clamp below min","clamp above max"]}},
+      {"id":1220,"group":"slider","title":"parse size attribute","detail":{"scripts":["comp [slider] .v:\n  size: 15\n  :"],"steps":[],"assertions":["size 15","doc size attr"]}},
       {"id":1334,"group":"short-notation","title":"Short notation — + concatenation inside backticks","detail":{"scripts":["`(0110) + ((!C.4) | (A.4 & B))`"],"steps":[],"assertions":["bit constants","grouped bool","precedence","mixed"]}},
       {"id":1335,"group":"short-notation","title":"Short notation — + concat runnable assignment","detail":{"scripts":["5wire R\n5wire A\n1wire B\n5wire C\n5wire R = `(0110) + ((!C.4) | (A.4 & B))`"],"steps":[],"assertions":["runs"]}},
       {"id":1336,"group":"short-notation","title":"Short notation — extra parentheses (concat and grouping)","detail":{"scripts":["5wire R\n5wire A\n1wire B\n5wire C\n5wire R = `((0110) + ((!C.4) | (A.4 & B)))`"],"steps":[],"assertions":["outer wrap concat","double const parens","extra segment parens","redundant bool parens","outer wrap runs"]}}
@@ -832,7 +834,7 @@
       { id: 'bool-analysis', label: 'bool-analysis', rangeLabel: '1125–1133, 1137–1140, 1142, 1147, 1154–1156', testIds: [1125, 1126, 1127, 1128, 1129, 1130, 1131, 1132, 1133, 1137, 1138, 1139, 1140, 1142, 1147, 1154, 1155, 1156] },
       { id: 'bool-analysis-mb', label: 'bool-analysis-mb', rangeLabel: '1134–1135, 1141', testIds: [1134, 1135, 1141] },
       { id: 'bool-lut-use', label: 'bool-lut-use', rangeLabel: '1192–1205', testIds: [1192, 1193, 1194, 1195, 1196, 1197, 1198, 1199, 1200, 1201, 1202, 1203, 1204, 1205] },
-      { id: 'slider', label: 'slider', rangeLabel: '1206–1218', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218] }
+      { id: 'slider', label: 'slider', rangeLabel: '1206–1220', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220] }
     ]
   };
 })();

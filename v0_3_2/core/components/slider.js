@@ -30,6 +30,21 @@ var SliderComponent = class SliderComponent extends BuiltinComponent {
     return (labels[stateNum] !== undefined) ? labels[stateNum] : stateNum.toString();
   }
 
+  static clampSize(size) {
+    let s = size !== undefined ? parseInt(size, 10) : 10;
+    if (isNaN(s)) s = 10;
+    return Math.max(1, Math.min(20, s));
+  }
+
+  static trackLengthFromSize(size) {
+    const s = SliderComponent.clampSize(size);
+    const thumb = 16;
+    const minLen = 3 * thumb;
+    const refLen = 140;
+    const refSize = 10;
+    return Math.round(minLen + (s - 1) * (refLen - minLen) / (refSize - 1));
+  }
+
   getWidthBits(attributes) {
     return attributes['length'] !== undefined ? parseInt(attributes['length'], 10) : 4;
   }
@@ -45,6 +60,7 @@ var SliderComponent = class SliderComponent extends BuiltinComponent {
         { name: 'color', value: 'string' },
         { name: 'orientation', value: '0/1' },
         { name: 'reversed', value: null },
+        { name: 'size', value: 'integer' },
         { name: 'for', type: 'array', value: 'string' },
         { name: 'nl', value: null },
       ],
@@ -80,6 +96,7 @@ var SliderComponent = class SliderComponent extends BuiltinComponent {
     const color = attributes.color || '#6dff9c';
     const orientation = attributes.orientation !== undefined ? parseInt(attributes.orientation, 10) : 0;
     const reversed = !!attributes.reversed;
+    const size = SliderComponent.clampSize(attributes.size);
     const forLabels = attributes['for'] || {};
     const nl = attributes.nl || false;
     const actualBits = bits || length;
@@ -109,6 +126,7 @@ var SliderComponent = class SliderComponent extends BuiltinComponent {
         color,
         orientation,
         reversed,
+        size,
         forLabels,
         onChange,
         nl,
