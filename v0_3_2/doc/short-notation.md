@@ -513,6 +513,13 @@ Use `+` between parenthesized segments to build a multi-bit value in a single sh
 `(a | b) + (c | d)`                  →  OR(a,b) + OR(c,d)
 ```
 
+Extra parentheses for grouping are allowed (including around the whole concat or individual segments):
+
+```
+`((0110) + ((!C.4) | (A.4 & B)))`    →  0110 + OR(!C.4,AND(A.4,B))
+`((a | b) & c)`                      →  AND(OR(a,b),c)
+```
+
 Boolean operators bind tighter than `+`:
 
 ```

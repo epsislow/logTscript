@@ -1373,6 +1373,17 @@
     }
   });
 
+  reg(136, 'short-notation', 'Short notation — paranteze extra (concat și grupare)', function(h, session) {
+    {
+      h.assert('outer wrap concat', session.preprocessShortNotation('`((0110) + ((!C.4) | (A.4 & B)))`'), '0110 + OR(!C.4,AND(A.4,B))');
+      h.assert('double const parens', session.preprocessShortNotation('`((0110))`'), '0110');
+      h.assert('extra segment parens', session.preprocessShortNotation('`(0110) + (((!C.4) | (A.4 & B)))`'), '0110 + OR(!C.4,AND(A.4,B))');
+      h.assert('redundant bool parens', session.preprocessShortNotation('`((a | b) & c)`'), 'AND(OR(a,b),c)');
+      const { interp } = session.run('5wire R\n5wire A\n1wire B\n5wire C\n5wire R = `((0110) + ((!C.4) | (A.4 & B)))`');
+      h.assert('outer wrap runs', String(!!interp), 'true');
+    }
+  });
+
   reg(143, 'osc', 'Tokenizer — ~ inside [~] is SPECIAL token', function(h, session) {
     {
       const { tokens } = session.tokenize('comp [~] .osc1::');

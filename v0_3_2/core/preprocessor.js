@@ -157,7 +157,7 @@ function expandShortNotation(content) {
 
     if (t.type === 'LPAREN') {
       consume();
-      const inner = shortExpr();
+      const inner = shortConcat();
       if (!peek() || peek().type !== 'RPAREN') throw Error(`Expected ')' in short notation`);
       consume();
       return inner;
