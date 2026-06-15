@@ -1,5 +1,5 @@
 /**
- * Generate test_manifest.js from LogTScriptTestSuite (test_suite.js + test_suite_ported.js).
+ * Generate test_manifest.js from LogTScriptTestSuite (test_suite.js).
  * Run: node _gen_manifest.js
  */
 const fs = require('fs');
@@ -55,7 +55,7 @@ const GROUP_META = [
 ];
 
 function loadSuite() {
-  const files = ['test_suite.js', 'test_suite_ported.js'];
+  const files = ['test_suite.js'];
   let src = '';
   for (const f of files) src += fs.readFileSync(path.join(dir, f), 'utf8') + '\n';
   const sb = {
@@ -88,8 +88,8 @@ function rangeLabel(ids) {
   return parts.join(', ');
 }
 
-const sharedConsts = loadSharedConstMap(dir, ['test_suite.js', 'test_suite_ported.js']);
-const suiteSource = ['test_suite.js', 'test_suite_ported.js']
+const sharedConsts = loadSharedConstMap(dir, ['test_suite.js']);
+const suiteSource = ['test_suite.js']
   .map(f => fs.readFileSync(path.join(dir, f), 'utf8'))
   .join('\n');
 

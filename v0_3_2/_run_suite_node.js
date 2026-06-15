@@ -1,4 +1,4 @@
-/** Quick validation: load core + test_suite, run all ported tests with isolated sessions. */
+/** Quick validation: load core + test_suite, run all tests with isolated sessions. */
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
@@ -51,8 +51,7 @@ const files = [
   'core/interpreter.js',
   'core/signal-propagation.js',
   'test_session.js',
-  'test_suite.js',
-  'test_suite_ported.js'
+  'test_suite.js'
 ];
 
 let src = '';
