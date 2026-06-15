@@ -705,14 +705,15 @@
       {"id":1135,"group":"bool-analysis-mb","title":"costOf (A&B)|A pe 4wire → 8","detail":{"scripts":["4wire A\n4wire B\ncostOf(OR(AND(A, B), A))"],"steps":[],"assertions":["cost"]}},
       {"id":1136,"group":"bool-lut","title":"lutOf 9wire — eroare table size","detail":{"scripts":["9wire A\nlutOf(A)"],"steps":[],"assertions":["too big"]}},
       {"id":1137,"group":"bool-analysis","title":"truthTableOf short-notation","detail":{"scripts":["truthTableOf(`A | B`)"],"steps":[],"assertions":["header","rows"]}},
-      {"id":1138,"group":"bool-analysis","title":"truthTableOf filtre — 32 rânduri","detail":{"scripts":["5wire A\n1wire B\n5wire C\ntruthTableOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)"],"steps":[],"assertions":["header","rows"]}},
+      {"id":1138,"group":"bool-analysis","title":"truthTableOf filtre — 32 rânduri","detail":{"scripts":["5wire A\n1wire B\n5wire C\ntruthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)"],"steps":[],"assertions":["header","rows"]}},
       {"id":1139,"group":"bool-analysis","title":"truthTableOf filtre parțiale","detail":{"scripts":["truthTableOf(OR(A, B), A=0)"],"steps":[],"assertions":["rows","only A0","only A0 B1"]}},
       {"id":1140,"group":"bool-analysis","title":"filtre produs > 256 — eroare","detail":{"scripts":["9wire A\ntruthTableOf(A, A=xxxxxxxxx)"],"steps":[],"assertions":["too big"]}},
-      {"id":1141,"group":"bool-analysis-mb","title":"truthTableOf >8 biți + filtre OK","detail":{"scripts":["5wire A\n1wire B\n5wire C\ntruthTableOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)"],"steps":[],"assertions":["no err","rows"]}},
+      {"id":1141,"group":"bool-analysis-mb","title":"truthTableOf >8 biți + filtre OK","detail":{"scripts":["5wire A\n1wire B\n5wire C\ntruthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)"],"steps":[],"assertions":["no err","rows"]}},
       {"id":1142,"group":"bool-analysis","title":"pattern invalid — eroare","detail":{"scripts":["truthTableOf(OR(A, B), A=01?1)"],"steps":[],"assertions":["invalid"]}},
-      {"id":1143,"group":"bool-lut","title":"lutOf cu filtre — length 32 + comentariu","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)"],"steps":[],"assertions":["filter comment","length","data count"]}},
-      {"id":1144,"group":"bool-lut","title":"lutOf fără filtre — fără linie filtru","detail":{"scripts":["lutOf(OR(A, B))"],"steps":[],"assertions":["no filter line","length"]}},
-      {"id":1145,"group":"bool-lut-mb","title":"lutOf filtre >8 biți intrare OK","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)"],"steps":[],"assertions":["no err","length 32"]}}
+      {"id":1143,"group":"bool-lut","title":"lutOf cu filtre — length 32 + attributes","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)"],"steps":[],"assertions":["description","filters attr","length","data count"]}},
+      {"id":1144,"group":"bool-lut","title":"lutOf fără filtre — description fără filters","detail":{"scripts":["lutOf(OR(A, B))"],"steps":[],"assertions":["description","no filters attr","length"]}},
+      {"id":1145,"group":"bool-lut-mb","title":"lutOf filtre >8 biți intrare OK","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)"],"steps":[],"assertions":["no err","length 32"]}},
+      {"id":1147,"group":"bool-analysis","title":"filtre fără virgulă — eroare parse","detail":{"scripts":["lutOf(OR(A, B), A=01x1x B=x)"],"steps":[],"assertions":["comma required"]}}
     ],
     groups: [
       { id: 'repeat', label: 'Repeat preprocessor', rangeLabel: '6–10, 13–17, 19–21', testIds: [6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21] },
@@ -759,7 +760,7 @@
       { id: 'protocol-ext', label: 'protocol-ext', rangeLabel: '1075–1090', testIds: [1075, 1076, 1077, 1078, 1079, 1080, 1081, 1082, 1083, 1084, 1085, 1086, 1087, 1088, 1089, 1090] },
       { id: 'bool-lut', label: 'bool-lut', rangeLabel: '1091–1107, 1122, 1136, 1143–1144', testIds: [1091, 1092, 1093, 1094, 1095, 1096, 1097, 1098, 1099, 1100, 1101, 1102, 1103, 1104, 1105, 1106, 1107, 1122, 1136, 1143, 1144] },
       { id: 'bool-lut-mb', label: 'bool-lut-mb', rangeLabel: '1108–1121, 1123–1124, 1145', testIds: [1108, 1109, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121, 1123, 1124, 1145] },
-      { id: 'bool-analysis', label: 'bool-analysis', rangeLabel: '1125–1133, 1137–1140, 1142', testIds: [1125, 1126, 1127, 1128, 1129, 1130, 1131, 1132, 1133, 1137, 1138, 1139, 1140, 1142] },
+      { id: 'bool-analysis', label: 'bool-analysis', rangeLabel: '1125–1133, 1137–1140, 1142, 1147', testIds: [1125, 1126, 1127, 1128, 1129, 1130, 1131, 1132, 1133, 1137, 1138, 1139, 1140, 1142, 1147] },
       { id: 'bool-analysis-mb', label: 'bool-analysis-mb', rangeLabel: '1134–1135, 1141', testIds: [1134, 1135, 1141] }
     ]
   };

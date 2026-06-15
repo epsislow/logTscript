@@ -5283,24 +5283,24 @@ const INLINE_IDA = `inline [lut] .ida:
 reg(1091, 'bool-lut', 'lutOf(OR(A, B)) — header + length 4', function(h, session) {
   const { out } = session.run('lutOf(OR(A, B))');
   h.assert('wrapper', out[0], 'inline [lut] .generated:');
-  h.assert('header', out[1], '  # A 1b, B 1b -> out 1b');
+  h.assert('header', out[1], '  description: A 1b, B 1b -> out 1b');
   h.assert('length', String(out.some(l => l.trim() === 'length: 4')), 'true');
   h.assert('close', out[out.length - 1], ':');
 });
 
 reg(1092, 'bool-lut', 'lutOf(AND(A, OR(NOT(C), B))) — ordine A, C, B', function(h, session) {
   const { out } = session.run('lutOf(AND(A, OR(NOT(C), B)))');
-  h.assert('header', out[1], '  # A 1b, C 1b, B 1b -> out 1b');
+  h.assert('header', out[1], '  description: A 1b, C 1b, B 1b -> out 1b');
 });
 
 reg(1093, 'bool-lut', 'lutOf(XOR(C, OR(A, B))) — ordine C, A, B', function(h, session) {
   const { out } = session.run('lutOf(XOR(C, OR(A, B)))');
-  h.assert('order', out[1], '  # C 1b, A 1b, B 1b -> out 1b');
+  h.assert('order', out[1], '  description: C 1b, A 1b, B 1b -> out 1b');
 });
 
 reg(1094, 'bool-lut', 'lutOf short-notation backtick', function(h, session) {
   const { out } = session.run('lutOf(`A | B`)');
-  h.assert('header', out[1], '  # A 1b, B 1b -> out 1b');
+  h.assert('header', out[1], '  description: A 1b, B 1b -> out 1b');
 });
 
 reg(1095, 'bool-lut', 'lutOf(LSHIFT(...)) — eroare', function(h, session) {
@@ -5413,19 +5413,19 @@ reg(1108, 'bool-lut-mb', 'lutOf slice bits — length 16', function(h, session) 
   const { out } = session.run(`4wire A
 3wire B
 lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))`);
-  h.assert('header', out[1], '  # A.2 1b, B.1 1b, A.0 1b, B.0 1b -> out 1b');
+  h.assert('header', out[1], '  description: A.2 1b, B.1 1b, A.0 1b, B.0 1b -> out 1b');
   h.assert('length', String(out.some(l => l.trim() === 'length: 16')), 'true');
 });
 
 reg(1109, 'bool-lut-mb', 'lutOf(C) pe 7wire — depth 7', function(h, session) {
   const { out } = session.run('7wire C\nlutOf(C)');
-  h.assert('header', out[1], '  # C 7b -> out 7b');
+  h.assert('header', out[1], '  description: C 7b -> out 7b');
   h.assert('length', String(out.some(l => l.trim() === 'length: 128')), 'true');
 });
 
 reg(1110, 'bool-lut-mb', 'lutOf(D.0-3) — depth 4', function(h, session) {
   const { out } = session.run('10wire D\nlutOf(D.0-3)');
-  h.assert('header', out[1], '  # D.0-3 4b -> out 4b');
+  h.assert('header', out[1], '  description: D.0-3 4b -> out 4b');
   h.assert('length', String(out.some(l => l.trim() === 'length: 16')), 'true');
 });
 
@@ -5642,7 +5642,7 @@ reg(1138, 'bool-analysis', 'truthTableOf filtre — 32 rânduri', function(h, se
   const { out } = session.run(`5wire A
 1wire B
 5wire C
-truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)`);
+truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
   h.assert('header', out[0], 'A B C | OUT');
   h.assert('rows', String(out.length), '34');
 });
@@ -5664,7 +5664,7 @@ reg(1141, 'bool-analysis-mb', 'truthTableOf >8 biți + filtre OK', function(h, s
   const { out } = session.run(`5wire A
 1wire B
 5wire C
-truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)`);
+truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
   h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
   h.assert('rows', String(out.length), '34');
 });
@@ -5675,20 +5675,22 @@ reg(1142, 'bool-analysis', 'pattern invalid — eroare', function(h, session) {
   h.assert('invalid', String(err.includes('pattern length mismatch') || err.includes('invalid pattern')), 'true');
 });
 
-reg(1143, 'bool-lut', 'lutOf cu filtre — length 32 + comentariu', function(h, session) {
+reg(1143, 'bool-lut', 'lutOf cu filtre — length 32 + attributes', function(h, session) {
   const { out } = session.run(`5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)`);
-  h.assert('filter comment', String(out.some(l => l.includes('# A=01x1x B=x C=000xx'))), 'true');
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
+  h.assert('description', String(out.some(l => l.includes('description: A 5b, B 1b, C 5b -> out'))), 'true');
+  h.assert('filters attr', String(out.some(l => l.includes('filters: A=01x1x, B=x, C=000xx'))), 'true');
   h.assert('length', String(out.some(l => l.trim() === 'length: 32')), 'true');
   const dataLines = out.filter(l => /^\s+[01]+ : [01]+$/.test(l));
   h.assert('data count', String(dataLines.length), '32');
 });
 
-reg(1144, 'bool-lut', 'lutOf fără filtre — fără linie filtru', function(h, session) {
+reg(1144, 'bool-lut', 'lutOf fără filtre — description fără filters', function(h, session) {
   const { out } = session.run('lutOf(OR(A, B))');
-  h.assert('no filter line', String(!out.some(l => /# .+=/.test(l))), 'true');
+  h.assert('description', String(out.some(l => l.includes('description: A 1b, B 1b -> out 1b'))), 'true');
+  h.assert('no filters attr', String(!out.some(l => l.trim().startsWith('filters:'))), 'true');
   h.assert('length', String(out.some(l => l.trim() === 'length: 4')), 'true');
 });
 
@@ -5696,9 +5698,17 @@ reg(1145, 'bool-lut-mb', 'lutOf filtre >8 biți intrare OK', function(h, session
   const { out } = session.run(`5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)`);
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
   h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
   h.assert('length 32', String(out.some(l => l.trim() === 'length: 32')), 'true');
+});
+
+reg(1147, 'bool-analysis', 'filtre fără virgulă — eroare parse', function(h, session) {
+  let err = '';
+  try {
+    session.parse('lutOf(OR(A, B), A=01x1x B=x)');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('comma required', String(err.includes("Expected ',' between filter assignments")), 'true');
 });
 
   suite.finalize();

@@ -318,6 +318,10 @@ function parseLutBody(bodyRaw) {
         attributes.fillwith = val;
         continue;
       }
+      if (key === 'description' || key === 'filters') {
+        attributes[key] = val;
+        continue;
+      }
     }
 
     if (parseLabelLine(trimmed, lineNo)) continue;

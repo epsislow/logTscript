@@ -1156,14 +1156,16 @@ A B | OUT
 
 ### With filters (\`x\` = don't-care)
 
-Optional second argument: \`column=pattern\` assignments, separated by whitespace (flexible).
+Optional second argument: \`column=pattern\` assignments, separated by commas.
 
 \`\`\`logts-play
 5wire A
 1wire B
 5wire C
-truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)
+truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)
 \`\`\`
+
+- Pattern index \`i\` maps to bit \`.i\` (left to right), same as \`bitRange\` in the language.
 
 - Pattern length must match column width.
 - Characters: \`0\`, \`1\`, \`x\` (case insensitive).
@@ -1267,7 +1269,7 @@ See also: [lut.md](lut.md) (LUT runtime), [boolean-analysis.md](boolean-analysis
 
 Boolean expression using built-ins \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, or short-notation in backticks.
 
-Optional filters (same as \`truthTableOf\`): \`lutOf(expr, A=01x1x B=x C=000xx)\`.
+Optional filters (same as \`truthTableOf\`): \`lutOf(expr, A=01x1x, B=x, C=000xx)\`.
 
 \`\`\`logts-play
 lutOf(OR(A, B))
@@ -1277,7 +1279,7 @@ Output (copy-pasteable \`inline [lut]\` block):
 
 \`\`\`text
 inline [lut] .generated:
-  # A 1b, B 1b -> out 1b
+  description: A 1b, B 1b -> out 1b
 
   depth: 1
   length: 4
@@ -1290,12 +1292,19 @@ inline [lut] .generated:
 :
 \`\`\`
 
+With filters, a \`filters:\` line is added (not a \`#\` comment):
+
+\`\`\`text
+  description: A 5b, B 1b, C 5b -> out 5b
+  filters: A=01x1x, B=x, C=000xx
+\`\`\`
+
 Instance name is always **\`.generated\`**. Paste the block into a script, then use \`exprOfLut(.generated, …)\`.
 
 ### Rules
 
 - **Row limit:** max **256 rows** in \`data { }\`. Error: \`Boolean analysis exceeds maximum supported table size (256 rows)\`.
-- **With filters:** \`length\` = number of rows emitted (≤ 256); comment line \`# A=01x1x B=x\` documents filters. No \`fillwith\` / sparse full address space.
+- **With filters:** \`length\` = number of rows emitted (≤ 256); \`filters:\` attribute documents filter patterns. No \`fillwith\` / sparse full address space.
 - **Without filters:** \`length = 2^(sum column widths)\` (≤ 256).
 - Undeclared atomic variables (\`A\`, \`B\` in gates) default to **1 bit**.
 - Whole wires (\`lutOf(C)\` on \`7wire C\`) use the declared wire width.
@@ -1397,7 +1406,7 @@ Other forms:
 exprOfLut(.example, A 2b, B 3b)
 \`\`\`
 
-→ internal bits: \`A.1, A.0, B.2, B.1, B.0\` (MSB first per variable).
+→ internal bits: \`A.0, A.1, B.0, B.1, B.2\` (index 0 = \`.0\` leftmost, same as bitRange).
 
 ---
 
@@ -3153,7 +3162,7 @@ Example output:
 
 \`\`\`text
 inline [lut] .generated:
-  # A 1b, B 1b -> out 1b
+  description: A 1b, B 1b -> out 1b
 
   depth: 1
   length: 4

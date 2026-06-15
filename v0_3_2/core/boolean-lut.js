@@ -185,8 +185,8 @@ function rowMatchesFilters(columns, env, filterMap) {
   return true;
 }
 
-function formatFilterComment(filters) {
-  return '# ' + filters.map(f => `${filterSpecKey(f)}=${f.pattern}`).join(' ');
+function formatFiltersAttribute(filters) {
+  return filters.map(f => `${filterSpecKey(f)}=${f.pattern}`).join(', ');
 }
 
 function addrBitsToColumns(columns, addr) {
@@ -200,7 +200,7 @@ function addrBitsToColumns(columns, addr) {
     } else {
       let bits = '';
       for (let b = 0; b < col.width; b++) {
-        bits = (((addr >> shift) & 1) ? '1' : '0') + bits;
+        bits += ((addr >> shift) & 1) ? '1' : '0';
         shift++;
       }
       env[col.key] = bits;
@@ -220,12 +220,12 @@ function columnToBitLabels(col) {
     if (start === end) {
       labels.push(`${atom.var}.${start}`);
     } else {
-      for (let b = end; b >= start; b--) labels.push(`${atom.var}.${b}`);
+      for (let b = start; b <= end; b++) labels.push(`${atom.var}.${b}`);
     }
   } else if (w === 1) {
     labels.push(atom.var);
   } else {
-    for (let b = w - 1; b >= 0; b--) labels.push(`${atom.var}.${b}`);
+    for (let b = 0; b < w; b++) labels.push(`${atom.var}.${b}`);
   }
   return labels;
 }
@@ -419,10 +419,10 @@ function lutOfGenerate(exprAst, widthResolver, filters) {
   const filterMap = validateAndBuildFilterMap(columns, filters, 'lutOf');
   const { rows, addrWidth, outWidth } = collectFilteredRows(exprAst, columns, widthResolver, filterMap);
 
-  const header = `# ${columns.map(c => c.header).join(', ')} -> out ${outWidth}b`;
-  const inner = [header];
+  const description = `${columns.map(c => c.header).join(', ')} -> out ${outWidth}b`;
+  const inner = [`description: ${description}`];
   if (filters && filters.length > 0) {
-    inner.push(formatFilterComment(filters));
+    inner.push(`filters: ${formatFiltersAttribute(filters)}`);
   }
 
   const length = filterMap ? rows.length : (1 << addrWidth);
@@ -483,14 +483,14 @@ function expandExprOfLutVars(varSpecs, widthResolver) {
       if (start === end) {
         labels.push(`${spec.name}.${start}`);
       } else {
-        for (let b = end; b >= start; b--) {
+        for (let b = start; b <= end; b++) {
           labels.push(`${spec.name}.${b}`);
         }
       }
     } else if (width === 1) {
       labels.push(spec.name);
     } else {
-      for (let b = width - 1; b >= 0; b--) {
+      for (let b = 0; b < width; b++) {
         labels.push(`${spec.name}.${b}`);
       }
     }

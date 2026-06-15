@@ -764,7 +764,7 @@ Example output:
 
 ```text
 inline [lut] .generated:
-  # A 1b, B 1b -> out 1b
+  description: A 1b, B 1b -> out 1b
 
   depth: 1
   length: 4

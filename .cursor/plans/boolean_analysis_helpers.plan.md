@@ -3,7 +3,7 @@ name: Boolean Analysis Helpers
 overview: "5 funcții analiză booleană + truthTableOf/lutOf cu filtre x. Max 256 rânduri emise; lutOf filtrat: length=rowsToGenerate, fără fillwith/sparse. Teste de la 1125."
 todos:
   - id: shared-limit-err
-    content: "boolean-lut.js — MAX_TABLE_ROWS=256, countFilteredRows, rowMatchesFilters; lutOfGenerate cu filtre + comentariu # A=…; length=rowsToGenerate (nu sparse/fillwith)"
+    content: "boolean-lut.js — MAX_TABLE_ROWS=256, countFilteredRows, rowMatchesFilters; lutOfGenerate cu filtre + attributes description:/filters:; length=rowsToGenerate"
     status: completed
   - id: core-boolean-analysis
     content: "boolean-analysis.js — truthTableOf (+ filtre), inputsOf, simplify, equivalent, computeSyntacticCost, costOf"
@@ -29,11 +29,11 @@ isProject: false
 | Sintaxă expresii | Doar LogTScript + short-notation în backticks (ca `lutOf`) |
 | `simplify()` output | Ca `exprOfLut`: două assignment-uri; multi-bit cu ` + ` |
 | **Limită `truthTableOf` / `lutOf`** | **Două concepte:** (1) spațiu adrese `2^totalBits` → câmp `length:` în LUT; (2) limită tooling max **256 rânduri generate**; eroare: `…table size (256 rows)` |
-| **`lutOf` filtre** | Același parametru 2 ca `truthTableOf`; comentariu extra `# A=01x1x B=x` după header |
-| **`exprOfLut` + filtre** | **Viitor** — citește comentariul cu filtre din LUT; acum variabilele se dau manual în apel |
+| **`lutOf` filtre** | Parametru 2 cu virgulă; emite `description:` + `filters:` (atribute LUT, nu `#`) |
+| **`exprOfLut` + filtre** | **Plan separat** [`filtre_virgula_exproflut.plan.md`](filtre_virgula_exproflut.plan.md): ordine biți, virgulă apeluri, `attributes.filters` / `attributes.description` |
 | **Limită `simplify` / `equivalent`** | Neschimbată: max **8 biți** intrare; eroare: `Boolean analysis exceeds maximum supported input width (8 bits)` |
 | **`inputsOf` / `costOf`** | Neschimbate (fără truth table completă) |
-| `truthTableOf` filtre | Al 2-lea parametru opțional: `A=01x1x B=x C=000xx` (spații flexibile între asignări) |
+| `truthTableOf` filtre | Al 2-lea parametru: `A=01x1x, B=x, C=000xx` (virgulă între asignări); pattern index `i` ↔ bit `.i` stânga→dreapta |
 | Filtre parțiale | Coloane nelistate → enumerare completă `2^width` |
 | Chei filtru | Coloane detectate (`A`, `A.1`, `B.1/6`, `D.0-3`) — ca `inputsOf` / header `lutOf` |
 | Pattern | `0`, `1`, `x` (case insensitive); lungime = lățimea coloanei; `x` = don't-care |

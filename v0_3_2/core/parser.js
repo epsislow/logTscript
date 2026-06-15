@@ -1320,7 +1320,7 @@ assignment() {
     let pos = this.t.i;
     while (pos < src.length && /\s/.test(src[pos])) pos++;
     const start = pos;
-    while (pos < src.length && !/\s/.test(src[pos]) && src[pos] !== ')') pos++;
+    while (pos < src.length && !/\s/.test(src[pos]) && src[pos] !== ')' && src[pos] !== ',') pos++;
     if (pos === start) {
       throw Error(`Expected filter pattern at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
@@ -1343,6 +1343,10 @@ assignment() {
       const pattern = this.parseTruthPattern();
       filters.push({ name: spec.name, bitRange: spec.bitRange, width: spec.width, pattern });
       if (this.c.type === 'SYM' && this.c.value === ')') break;
+      if (!(this.c.type === 'SYM' && this.c.value === ',')) {
+        throw Error(`Expected ',' between filter assignments at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', ',');
     }
     return filters;
   }
@@ -2869,6 +2873,8 @@ isBuiltinFunction(name) {
         attributes[key] = n;
       } else if (key === 'fillwith') {
         attributes.fillwith = val;
+      } else if (key === 'description' || key === 'filters') {
+        attributes[key] = val;
       }
     }
     const bracePos = bodyRaw.indexOf('{', dataMatch.index);

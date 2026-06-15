@@ -48,14 +48,16 @@ A B | OUT
 
 ### With filters (`x` = don't-care)
 
-Optional second argument: `column=pattern` assignments, separated by whitespace (flexible).
+Optional second argument: `column=pattern` assignments, separated by commas.
 
 ```logts-play
 5wire A
 1wire B
 5wire C
-truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)
+truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)
 ```
+
+- Pattern index `i` maps to bit `.i` (left to right), same as `bitRange` in the language.
 
 - Pattern length must match column width.
 - Characters: `0`, `1`, `x` (case insensitive).
