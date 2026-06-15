@@ -4,10 +4,10 @@ let prog=null, pc=0;
 let globalInterp = null;
 let timelineAnalyzer = null;
 
-function watchLabelsFromExprs(exprs, wireWidths) {
+function watchLabelsFromExprs(exprs, wireWidths, compPropWidths) {
   const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
-  if (WE && wireWidths) {
-    return WE.watchLabelsFromExprs(exprs, wireWidths);
+  if (WE && (wireWidths || compPropWidths)) {
+    return WE.watchLabelsFromExprs(exprs, wireWidths, null, compPropWidths);
   }
   return (exprs || []).map((expr, i) => {
     const a = expr && expr[0];
@@ -27,11 +27,12 @@ function watchLabelsFromExprs(exprs, wireWidths) {
   });
 }
 
-function prepareTimelineForRun(watches, stmts) {
+function prepareTimelineForRun(watches, stmts, registry) {
   if (timelineAnalyzer) {
     const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
     const wireWidths = WE ? WE.buildWireWidthMapFromStmts(stmts) : null;
-    timelineAnalyzer.reset(watchLabelsFromExprs(watches, wireWidths));
+    const compPropWidths = WE && registry ? WE.buildComponentPropertyWidthMap(stmts, registry) : null;
+    timelineAnalyzer.reset(watchLabelsFromExprs(watches, wireWidths, compPropWidths));
   }
 }
 
@@ -214,7 +215,7 @@ function run(){
   const stmts = p.parse();
   document.getElementById('ast').textContent=JSON.stringify(stmts,null,2);
 
-  prepareTimelineForRun(p.watches, stmts);
+  prepareTimelineForRun(p.watches, stmts, _registry);
 
   globalInterp = createInterpreter(p.funcs, p.pcbs, _registry, p.chips, p.boards, p.probes, p.watches);
   globalInterp.aliases = p.aliases;

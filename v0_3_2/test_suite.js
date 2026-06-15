@@ -8229,6 +8229,51 @@ reg(1184, 'debug', 'seedWatchTimeline records row after label reset', function(h
   h.assert('all five channels', String(flat.length), '5');
 });
 
+reg(1185, 'debug', 'Parser — watch(.o:counter) property syntax', function(h, session) {
+  const processed = preprocessRepeat('comp [~] .o:\n  length: 4\n  :\n4wire o = .o:counter\nwatch(.o:counter)');
+  const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
+  const stmts = p.parse();
+  h.assert('watch stmt', String(!!stmts[2].watch), 'true');
+  const atom = stmts[2].watch[0];
+  h.assert('var .o', atom.var, '.o');
+  h.assert('property counter', atom.property, 'counter');
+});
+
+reg(1186, 'debug', 'watch(.o:counter) expands to bit channels', function(h, session) {
+  const { interp } = session.run(`comp [~] .o:
+  duration1: 4
+  duration0: 4
+  length: 4
+  freq: 1
+  freqIsSec: 0
+  eachCycle: 1
+  :
+4wire o = .o:counter
+watch(.o:counter)`);
+  h.assert('four bit targets', String(interp.watchTargets.length), '4');
+  h.assert('first label', interp.watchTargets[0].label, '.o:counter.0');
+  h.assert('component .o', String(interp.watchTargets[0].compName), '.o');
+  h.assert('property counter', interp.watchTargets[0].property, 'counter');
+});
+
+reg(1187, 'debug', 'watch(.o:counter) records on osc tick (wave)', function(h, session) {
+  const samples = [];
+  const { interp } = session.run(`comp [~] .o:
+  duration1: 4
+  duration0: 4
+  length: 4
+  freq: 100
+  freqIsSec: 0
+  eachCycle: 1
+  :
+watch(.o:counter)`);
+  interp.watchRecorder = (s) => samples.push(s);
+  interp._emitComputedComponentProbes('.o');
+  h.assert('emit after tick', String(samples.length >= 1), 'true');
+  const flat = samples.flatMap(s => s.channels || []);
+  h.assert('counter channels', String(flat.length >= 4), 'true');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

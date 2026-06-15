@@ -507,10 +507,25 @@ class Interpreter {
   _resolveProbeComponentTarget(atom) {
     const compName = atom.var;
     const property = atom.property || 'get';
-    if (atom.bitRange || atom.internalWire) return null;
+    if (atom.internalWire) return null;
     const comp = this.components.get(compName);
     if (!comp) return null;
     if (!this.componentRegistry || !this.componentRegistry.supportsProperty(comp.type, property, comp.attributes)) return null;
+    if (atom.bitRange) {
+      const { start, end } = this.resolveBitRange(atom.bitRange);
+      return {
+        kind: 'componentComputedSlice',
+        key: 'ccs:' + compName + ':' + property + ':' + start + '-' + end,
+        label: this._propertySliceLabel(compName, property, start, end),
+        compName,
+        property,
+        sliceStart: start,
+        sliceEnd: end,
+        bitWidth: 1,
+        seen: false,
+        lastValue: null
+      };
+    }
     const hasRef = comp.ref && comp.ref !== '&-';
     if (hasRef && property === 'get') {
       const bits = this.getComponentBits(comp.type, comp.attributes) || 1;
@@ -987,6 +1002,47 @@ class Interpreter {
     return start === end ? `${varName}.${start}` : `${varName}.${start}-${end}`;
   }
 
+  _propertySliceLabel(varName, property, start, end) {
+    const base = `${varName}:${property}`;
+    return start === end ? `${base}.${start}` : `${base}.${start}-${end}`;
+  }
+
+  _getWatchPropertyBitWidth(compName, property) {
+    const comp = this.components.get(compName);
+    if (!comp) return 1;
+    let bitWidth = this.getComponentBits(comp.type, comp.attributes) || 1;
+    const handler = this.componentRegistry && this.componentRegistry.get(comp.type);
+    if (handler && handler.evalGetProperty) {
+      const result = handler.evalGetProperty(comp, property, { var: compName, property }, this);
+      if (result && result.bitWidth) bitWidth = result.bitWidth;
+    }
+    return bitWidth;
+  }
+
+  _buildComponentPropertyWidthMap() {
+    const map = new Map();
+    for (const [compName, comp] of this.components) {
+      const handler = this.componentRegistry && this.componentRegistry.get(comp.type);
+      const props = handler && handler.getSupportedProperties ? handler.getSupportedProperties() : [];
+      for (const property of props) {
+        if (this.componentRegistry && !this.componentRegistry.supportsProperty(comp.type, property, comp.attributes)) {
+          continue;
+        }
+        map.set(compName + ':' + property, this._getWatchPropertyBitWidth(compName, property));
+      }
+    }
+    return map;
+  }
+
+  _readComponentPropertySliceValue(target) {
+    const full = this._readComputedComponentProbeValue(target);
+    if (full == null || full === '-' || full === '') return null;
+    const start = target.sliceStart;
+    const end = target.sliceEnd;
+    if (start < 0 || end >= full.length || start > end) return null;
+    return full.substring(start, end + 1);
+  }
+
   _readWireSliceValue(target, fullValueOptional) {
     const full = fullValueOptional != null ? String(fullValueOptional)
       : this.getWireStableValue(target.wireName);
@@ -1028,6 +1084,8 @@ class Interpreter {
       if (target.ref) value = this.getValueFromRef(target.ref);
     } else if (target.kind === 'componentComputed') {
       value = this._readComputedComponentProbeValue(target);
+    } else if (target.kind === 'componentComputedSlice') {
+      value = this._readComponentPropertySliceValue(target);
     } else if (target.kind === 'lutLabel') {
       value = target.constantValue;
     }
@@ -1040,8 +1098,10 @@ class Interpreter {
     for (const { target, value } of updates) {
       if (!target) continue;
       let valueStr = value == null ? '-' : String(value);
-      const sliceBits = target.kind === 'wireSlice' ? 1 : target.bitWidth;
-      if (target.bitWidth && valueStr !== '-' && !target.isText && target.kind !== 'wireSlice') {
+      const sliceBits = (target.kind === 'wireSlice' || target.kind === 'componentComputedSlice')
+        ? 1 : target.bitWidth;
+      if (target.bitWidth && valueStr !== '-' && !target.isText
+          && target.kind !== 'wireSlice' && target.kind !== 'componentComputedSlice') {
         valueStr = this.formatValue(valueStr, target.bitWidth);
       }
       if (target.lastWatchValue === valueStr) continue;
@@ -1093,9 +1153,10 @@ class Interpreter {
     for (const [name, wire] of this.wires) {
       wireWidths.set(name, this.getBitWidth(wire.type));
     }
+    const compPropWidths = this._buildComponentPropertyWidthMap();
     const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
     const expanded = WE
-      ? WE.expandWatchExprs(exprs, wireWidths, (br) => this.resolveBitRange(br))
+      ? WE.expandWatchExprs(exprs, wireWidths, (br) => this.resolveBitRange(br), compPropWidths)
       : exprs;
     for (const expr of expanded) {
       const target = this._resolveProbeExpr(expr);
@@ -1154,13 +1215,17 @@ class Interpreter {
   }
 
   _emitWatchForComputedComponent(compName) {
+    const batch = [];
     for (const target of this.watchTargets) {
-      if (target.kind !== 'componentComputed' || target.compName !== compName) continue;
-      const value = this._readComputedComponentProbeValue(target);
-      if (value !== null && value !== undefined) {
-        this._recordWatchSample(target, value);
+      if (target.kind === 'componentComputed' && target.compName === compName) {
+        const value = this._readComputedComponentProbeValue(target);
+        if (value !== null && value !== undefined) batch.push({ target, value });
+      } else if (target.kind === 'componentComputedSlice' && target.compName === compName) {
+        const value = this._readComponentPropertySliceValue(target);
+        if (value !== null && value !== undefined) batch.push({ target, value });
       }
     }
+    this._recordWatchBatch(batch);
   }
 
   _resolveProbeExpr(expr) {
@@ -1516,10 +1581,12 @@ class Interpreter {
           this.signalPropagationStrategy.propagate();
           this._notifyIoportMemberChange(compName);
         }
+        this._emitComputedComponentProbes(compName);
         return;
       }
       this.writeComponentStable(compName, value);
       this.updateComponentConnections(compName);
+      this._emitComputedComponentProbes(compName);
       this._notifyIoportMemberChange(compName);
       if (typeof showVars === 'function') showVars();
     });
@@ -5511,6 +5578,7 @@ if (s.assignment) {
         if(stored) stored.value = '1';
         if(eachCycle === 0) incrementCounter();
         self.updateComponentConnections(compName);
+        self._emitComputedComponentProbes(compName);
         if(typeof showVars === 'function') showVars();
         const tid = setTimeout(goLow, highTime);
         self.oscTimers.push(tid);
@@ -5521,6 +5589,7 @@ if (s.assignment) {
         if(stored) stored.value = '0';
         incrementCounter();
         self.updateComponentConnections(compName);
+        self._emitComputedComponentProbes(compName);
         if(typeof showVars === 'function') showVars();
         const tid = setTimeout(goHigh, lowTime);
         self.oscTimers.push(tid);
