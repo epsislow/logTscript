@@ -73,6 +73,7 @@ const DOC_SECTIONS = [
       { file: 'asm.md', label: 'asm', searchExtra: 'inline assembler isa mnemonic program blob myisa decode disassemble disassembly' },
       { file: 'lut.md', label: 'lut', searchExtra: 'inline lookup table decoder comp variableDepth prefixFree Huffman decode isValid' },
       { file: 'boolean-lut.md', label: 'Boolean LUT (lutOf / exprOfLut)', searchExtra: 'lutOf exprOfLut truth table minimize Quine analysis show' },
+      { file: 'boolean-analysis.md', label: 'Boolean analysis helpers', searchExtra: 'truthTableOf simplify equivalent inputsOf costOf filters x' },
       { file: 'protocol.md', label: 'protocol', searchExtra: 'inline uart spi i2c reverse parity clock repeat tx sda scl mosi decode expand collapse length lengthOf withLength def huffPacket huffRecover variable width' },
       { file: 'huffman.md', label: 'Huffman example', searchExtra: 'prefixFree expand collapse huffPacket huffRecover variable length coding codebook packet round-trip greedy decode' },
       { file: 'reg.md', label: 'reg' },

@@ -5406,7 +5406,7 @@ reg(1107, 'bool-lut', 'lutOf adresă > 8 biți — eroare', function(h, session)
 10wire D
 lutOf(OR(AND(A.2, B.1/6), AND(C, D.0-3)))`);
   const err = out.find(l => l.startsWith('Error:')) || '';
-  h.assert('too big', String(err.includes('LUT table too big (256 values), max bits number reached')), 'true');
+  h.assert('too big', String(err.includes('Boolean analysis exceeds maximum supported table size (256 rows)')), 'true');
 });
 
 reg(1108, 'bool-lut-mb', 'lutOf slice bits — length 16', function(h, session) {
@@ -5445,7 +5445,7 @@ reg(1112, 'bool-lut-mb', 'lutOf mixt 18b — eroare', function(h, session) {
 10wire D
 lutOf(OR(AND(A.2, B.1/6), AND(C, D.0-3)))`);
   const err = out.find(l => l.startsWith('Error:')) || '';
-  h.assert('too big', String(err.includes('LUT table too big')), 'true');
+  h.assert('too big', String(err.includes('table size (256 rows)')), 'true');
 });
 
 reg(1113, 'bool-lut-mb', 'exprOfLut(.lut5, A 2b, B 3b)', function(h, session) {
@@ -5548,6 +5548,157 @@ lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))`).out.join('\n');
   const { out } = session.run(gen + '\nexprOfLut(.generated, A.2 1b, B.1 1b, A.0 1b, B.0 1b)');
   h.assert('lines', String(out.length), '2');
   h.assert('slice refs', String(out[1].includes('A.2') && out[1].includes('A.0')), 'true');
+});
+
+reg(1125, 'bool-analysis', 'truthTableOf(OR(A,B)) — header + 4 rânduri', function(h, session) {
+  const { out } = session.run('truthTableOf(OR(A, B))');
+  h.assert('header', out[0], 'A B | OUT');
+  h.assert('sep', out[1], '--------------');
+  h.assert('rows', String(out.length), '6');
+  h.assert('row0', out[2], '0 0 | 0');
+  h.assert('row3', out[5], '1 1 | 1');
+});
+
+reg(1126, 'bool-analysis', 'truthTableOf multi-bit A.1 & B', function(h, session) {
+  const { out } = session.run('2wire A\n1wire B\ntruthTableOf(AND(A.1, B))');
+  h.assert('header', out[0], 'A.1 B | OUT');
+  h.assert('rows', String(out.length), '6');
+});
+
+reg(1127, 'bool-analysis', 'truthTableOf 9wire — eroare table size', function(h, session) {
+  const { out } = session.run('9wire A\ntruthTableOf(A)');
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('too big', String(err.includes('table size (256 rows)')), 'true');
+});
+
+reg(1128, 'bool-analysis', 'simplify — forma B', function(h, session) {
+  const { out } = session.run('simplify(OR(AND(NOT(A), B), AND(A, B)))');
+  h.assert('lines', String(out.length), '2');
+  h.assert('short', out[0], '1wire out = `B`');
+  h.assert('std', out[1], '1wire out = B');
+});
+
+reg(1129, 'bool-analysis', 'simplify multi-bit depth 2', function(h, session) {
+  const { out } = session.run('2wire A\n2wire B\nsimplify(OR(A, B))');
+  h.assert('lines', String(out.length), '2');
+  h.assert('2wire', String(out[0].startsWith('2wire out')), 'true');
+  h.assert('plus', String(out[0].includes(' + ')), 'true');
+});
+
+reg(1130, 'bool-analysis', 'equivalent true', function(h, session) {
+  const { out } = session.run('equivalent(OR(A, B), OR(B, A))');
+  h.assert('result', out[0], 'true');
+});
+
+reg(1131, 'bool-analysis', 'equivalent false', function(h, session) {
+  const { out } = session.run('equivalent(AND(A, B), OR(A, B))');
+  h.assert('result', out[0], 'false');
+});
+
+reg(1132, 'bool-analysis', 'inputsOf — linii aliniate', function(h, session) {
+  const { out } = session.run(`4wire A
+8wire B
+7wire C
+10wire D
+inputsOf(OR(AND(A.2, B.1/6), OR(C, D.0-3)))`);
+  h.assert('lines', String(out.length), '4');
+  h.assert('A.2', out[0], 'A.2    1b');
+  h.assert('B slice', out[1], 'B.1-6  6b');
+  h.assert('C', out[2], 'C      7b');
+  h.assert('D range', out[3], 'D.0-3  4b');
+});
+
+reg(1133, 'bool-analysis', 'costOf 1-bit literal vs minimized', function(h, session) {
+  const { out } = session.run('costOf(OR(AND(NOT(A), B), AND(A, B)))');
+  h.assert('lines', String(out.length), '3');
+  h.assert('expr', out[0], 'Expression cost: 4');
+  h.assert('min', out[1], 'Minimized cost: 0');
+  h.assert('red', String(out[2].startsWith('Reduction possible: 4')), 'true');
+});
+
+reg(1134, 'bool-analysis-mb', 'costOf 4wire A & B → 4', function(h, session) {
+  const { out } = session.run('4wire A\n4wire B\ncostOf(AND(A, B))');
+  h.assert('cost', out[0], 'Expression cost: 4');
+});
+
+reg(1135, 'bool-analysis-mb', 'costOf (A&B)|A pe 4wire → 8', function(h, session) {
+  const { out } = session.run('4wire A\n4wire B\ncostOf(OR(AND(A, B), A))');
+  h.assert('cost', out[0], 'Expression cost: 8');
+});
+
+reg(1136, 'bool-lut', 'lutOf 9wire — eroare table size', function(h, session) {
+  const { out } = session.run('9wire A\nlutOf(A)');
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('too big', String(err.includes('table size (256 rows)')), 'true');
+});
+
+reg(1137, 'bool-analysis', 'truthTableOf short-notation', function(h, session) {
+  const { out } = session.run('truthTableOf(`A | B`)');
+  h.assert('header', out[0], 'A B | OUT');
+  h.assert('rows', String(out.length), '6');
+});
+
+reg(1138, 'bool-analysis', 'truthTableOf filtre — 32 rânduri', function(h, session) {
+  const { out } = session.run(`5wire A
+1wire B
+5wire C
+truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)`);
+  h.assert('header', out[0], 'A B C | OUT');
+  h.assert('rows', String(out.length), '34');
+});
+
+reg(1139, 'bool-analysis', 'truthTableOf filtre parțiale', function(h, session) {
+  const { out } = session.run('truthTableOf(OR(A, B), A=0)');
+  h.assert('rows', String(out.length), '4');
+  h.assert('only A0', out[2], '0 0 | 0');
+  h.assert('only A0 B1', out[3], '0 1 | 1');
+});
+
+reg(1140, 'bool-analysis', 'filtre produs > 256 — eroare', function(h, session) {
+  const { out } = session.run('9wire A\ntruthTableOf(A, A=xxxxxxxxx)');
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('too big', String(err.includes('table size (256 rows)')), 'true');
+});
+
+reg(1141, 'bool-analysis-mb', 'truthTableOf >8 biți + filtre OK', function(h, session) {
+  const { out } = session.run(`5wire A
+1wire B
+5wire C
+truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)`);
+  h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
+  h.assert('rows', String(out.length), '34');
+});
+
+reg(1142, 'bool-analysis', 'pattern invalid — eroare', function(h, session) {
+  const { out } = session.run('truthTableOf(OR(A, B), A=01?1)');
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('invalid', String(err.includes('pattern length mismatch') || err.includes('invalid pattern')), 'true');
+});
+
+reg(1143, 'bool-lut', 'lutOf cu filtre — length 32 + comentariu', function(h, session) {
+  const { out } = session.run(`5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)`);
+  h.assert('filter comment', String(out.some(l => l.includes('# A=01x1x B=x C=000xx'))), 'true');
+  h.assert('length', String(out.some(l => l.trim() === 'length: 32')), 'true');
+  const dataLines = out.filter(l => /^\s+[01]+ : [01]+$/.test(l));
+  h.assert('data count', String(dataLines.length), '32');
+});
+
+reg(1144, 'bool-lut', 'lutOf fără filtre — fără linie filtru', function(h, session) {
+  const { out } = session.run('lutOf(OR(A, B))');
+  h.assert('no filter line', String(!out.some(l => /# .+=/.test(l))), 'true');
+  h.assert('length', String(out.some(l => l.trim() === 'length: 4')), 'true');
+});
+
+reg(1145, 'bool-lut-mb', 'lutOf filtre >8 biți intrare OK', function(h, session) {
+  const { out } = session.run(`5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)`);
+  h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
+  h.assert('length 32', String(out.some(l => l.trim() === 'length: 32')), 'true');
 });
 
   suite.finalize();

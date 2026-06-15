@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, stack.md, subtract.md, switch.md, terminal.md
+ * Files: 14seg.md, adder.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, stack.md, subtract.md, switch.md, terminal.md
  */
 (function () {
   'use strict';
@@ -1106,6 +1106,150 @@ See [debug.md](debug.md).
 - [pcb.md](pcb.md) — deprecated
 - [components.md](components.md) — index
 `,
+    'boolean-analysis.md': `# Boolean expression analysis helpers
+
+Analysis-only statements (like \`show\` / \`lutOf\`): they emit text to **Output**. They do **not** create runtime logic.
+
+| Statement | Role |
+|-----------|------|
+| \`truthTableOf(expr [, filters])\` | Truth table text |
+| \`simplify(expr)\` | Minimized expression (Quine–McCluskey) |
+| \`equivalent(e1, e2)\` | \`true\` / \`false\` |
+| \`inputsOf(expr)\` | Detected input columns + widths |
+| \`costOf(expr)\` | Syntactic cost (literal vs minimized) |
+
+See also: [boolean-lut.md](boolean-lut.md) (\`lutOf\` / \`exprOfLut\`), [debug.md](debug.md), [short-notation.md](short-notation.md).
+
+Expression parameters use the same syntax as \`lutOf\`: built-ins \`NOT\`, \`AND\`, \`OR\`, … or short-notation in backticks.
+
+---
+
+## Limits
+
+| Functions | Limit | Error |
+|-----------|-------|-------|
+| \`truthTableOf\`, \`lutOf\` | Max **256 rows** generated | \`Boolean analysis exceeds maximum supported table size (256 rows)\` |
+| \`simplify\`, \`equivalent\` | Max **8 input bits** | \`Boolean analysis exceeds maximum supported input width (8 bits)\` |
+
+Without filters, \`truthTableOf\` / \`lutOf\` generate \`2^(sum column widths)\` rows — practically ≤ 8 bits.
+
+With **filters** (see below), you may have more than 8 input bits if the filtered row count stays ≤ 256.
+
+---
+
+## \`truthTableOf(expression [, filters])\`
+
+### Without filters
+
+\`\`\`logts-play
+truthTableOf(OR(A, B))
+\`\`\`
+
+\`\`\`text
+A B | OUT
+--------------
+0 0 | 0
+0 1 | 1
+1 0 | 1
+1 1 | 1
+\`\`\`
+
+### With filters (\`x\` = don't-care)
+
+Optional second argument: \`column=pattern\` assignments, separated by whitespace (flexible).
+
+\`\`\`logts-play
+5wire A
+1wire B
+5wire C
+truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x B=x C=000xx)
+\`\`\`
+
+- Pattern length must match column width.
+- Characters: \`0\`, \`1\`, \`x\` (case insensitive).
+- Partial filters OK — unlisted columns enumerate all combinations.
+- Rows are emitted in full-address scan order; only matching combinations appear.
+
+---
+
+## \`simplify(expression)\`
+
+Emits **two assignment lines** (short + standard), like \`exprOfLut\`:
+
+\`\`\`logts-play
+simplify(OR(AND(NOT(A), B), AND(A, B)))
+\`\`\`
+
+\`\`\`text
+1wire out = \`B\`
+1wire out = B
+\`\`\`
+
+Multi-bit output uses \` + \` between segments.
+
+---
+
+## \`equivalent(expr1, expr2)\`
+
+\`\`\`logts-play
+equivalent(OR(A, B), OR(B, A))
+\`\`\`
+
+Output: \`true\` or \`false\` (one line).
+
+---
+
+## \`inputsOf(expression)\`
+
+Aligned list of discovered columns:
+
+\`\`\`logts-play
+4wire A
+8wire B
+inputsOf(OR(A.2, B.1))
+\`\`\`
+
+\`\`\`text
+A.2    1b
+B.1    1b
+\`\`\`
+
+---
+
+## \`costOf(expression)\`
+
+**Syntactic** cost (not hardware gates): width-aware sum of boolean operators in the AST.
+
+\`\`\`logts-play
+costOf(OR(AND(NOT(A), B), AND(A, B)))
+\`\`\`
+
+\`\`\`text
+Expression cost: 4
+Minimized cost: 0
+Reduction possible: 4 (100%)
+\`\`\`
+
+| Operator | Cost |
+|----------|------|
+| \`NOT\` | \`width(input)\` |
+| \`AND\`, \`OR\`, \`XOR\`, … | \`width(result)\` |
+| identifiers / literals | \`0\` |
+
+---
+
+## Relation to LUT utilities
+
+| Goal | Statement |
+|------|-----------|
+| Expression → truth table | \`truthTableOf\` |
+| Expression → LUT block | \`lutOf\` |
+| Expression → minimized form | \`simplify\` |
+| LUT → expression | \`exprOfLut\` |
+| Equivalence check | \`equivalent\` |
+
+\`lutOf\` also supports the same filter syntax; see [boolean-lut.md](boolean-lut.md).
+`,
     'boolean-lut.md': `# Boolean LUT utilities — \`lutOf\` and \`exprOfLut\`
 
 Analysis-only statements (like \`show\`): they emit copy-pasteable text to **Output**. They do **not** create runtime logic.
@@ -1115,13 +1259,15 @@ Analysis-only statements (like \`show\`): they emit copy-pasteable text to **Out
 | \`lutOf(expr)\` | Build a LUT definition from a boolean expression |
 | \`exprOfLut(.lut, vars…)\` | Rebuild a boolean expression from an existing LUT |
 
-See also: [lut.md](lut.md) (LUT runtime), [short-notation.md](short-notation.md) (backtick syntax), [debug.md](debug.md) (\`show\` output).
+See also: [lut.md](lut.md) (LUT runtime), [boolean-analysis.md](boolean-analysis.md) (\`truthTableOf\`, \`simplify\`, …), [short-notation.md](short-notation.md) (backtick syntax), [debug.md](debug.md) (\`show\` output).
 
 ---
 
-## \`lutOf(expression)\`
+## \`lutOf(expression [, filters])\`
 
-One argument — any boolean expression using built-ins \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, or short-notation in backticks.
+Boolean expression using built-ins \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, or short-notation in backticks.
+
+Optional filters (same as \`truthTableOf\`): \`lutOf(expr, A=01x1x B=x C=000xx)\`.
 
 \`\`\`logts-play
 lutOf(OR(A, B))
@@ -1148,8 +1294,9 @@ Instance name is always **\`.generated\`**. Paste the block into a script, then 
 
 ### Rules
 
-- **Address limit:** sum of input column widths ≤ **8 bits** (\`length\` max **256**). Otherwise:
-  \`LUT table too big (256 values), max bits number reached\`
+- **Row limit:** max **256 rows** in \`data { }\`. Error: \`Boolean analysis exceeds maximum supported table size (256 rows)\`.
+- **With filters:** \`length\` = number of rows emitted (≤ 256); comment line \`# A=01x1x B=x\` documents filters. No \`fillwith\` / sparse full address space.
+- **Without filters:** \`length = 2^(sum column widths)\` (≤ 256).
 - Undeclared atomic variables (\`A\`, \`B\` in gates) default to **1 bit**.
 - Whole wires (\`lutOf(C)\` on \`7wire C\`) use the declared wire width.
 - Non-boolean ops (\`LSHIFT\`, etc.) → error.
@@ -1272,7 +1419,7 @@ exprOfLut(.generated, A, B)
 
 | Case | Message |
 |------|---------|
-| Address > 8b | \`LUT table too big (256 values), max bits number reached\` |
+| > 256 rows | \`Boolean analysis exceeds maximum supported table size (256 rows)\` |
 | Width mismatch | \`exprOfLut expects N input bits but received M\` |
 | Non-boolean in \`lutOf\` | \`'LSHIFT' is not a boolean operation\` |
 | prefixFree / variableDepth LUT | \`exprOfLut: prefixFree LUT not supported\` |
@@ -2246,7 +2393,7 @@ Statements in this group write text to the **Output** panel. The first three ins
 
 All are **statements** (like \`doc\`) — they cannot appear on the right side of \`=\`.
 
-For full LUT generation / reversal (multi-bit, limits, errors), see **[boolean-lut.md](boolean-lut.md)**.
+For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md](boolean-lut.md)** and **[boolean-analysis.md](boolean-analysis.md)**.
 
 ---
 
@@ -3114,6 +3261,7 @@ Details and multi-bit examples: [boolean-lut.md](boolean-lut.md). LUT runtime sy
 - [Editor UI](editorUI.md) — Output panel, Run, Next, Wave / Legacy toggle
 - [doc() function](doc-function.md) — \`doc(def)\` lists \`show\` as a built-in
 - [Boolean LUT utilities](boolean-lut.md) — \`lutOf\` / \`exprOfLut\` (full syntax, multi-bit, limits)
+- [Boolean analysis helpers](boolean-analysis.md) — \`truthTableOf\`, \`simplify\`, \`equivalent\`, \`inputsOf\`, \`costOf\`
 - [LUT component](lut.md) — runtime \`inline [lut]\` / \`comp [lut]\`
 - [REG](reg.md) — \`NEXT(~)\` and wire-clock behaviour with \`show\`
 `,

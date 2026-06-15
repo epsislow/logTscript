@@ -4,19 +4,19 @@ overview: "5 funcții analiză booleană + truthTableOf/lutOf cu filtre x. Max 2
 todos:
   - id: shared-limit-err
     content: "boolean-lut.js — MAX_TABLE_ROWS=256, countFilteredRows, rowMatchesFilters; lutOfGenerate cu filtre + comentariu # A=…; length=rowsToGenerate (nu sparse/fillwith)"
-    status: pending
+    status: completed
   - id: core-boolean-analysis
     content: "boolean-analysis.js — truthTableOf (+ filtre), inputsOf, simplify, equivalent, computeSyntacticCost, costOf"
-    status: pending
+    status: completed
   - id: parse-exec-analysis
     content: "parser parseBooleanAnalysisFilters partajat; lutOf/truthTableOf(expr [, filtre]); bundle HTML/Node"
-    status: pending
+    status: completed
   - id: tests-1125
     content: Teste 1125–1145 în test_suite_ported.js + _gen_manifest.js (inclusiv lutOf filtre)
-    status: pending
+    status: completed
   - id: doc-boolean-analysis
     content: boolean-analysis.md (filtre x + limite), actualizare boolean-lut.md + debug.md + _gen_doc_data.js
-    status: pending
+    status: completed
 isProject: false
 ---
 

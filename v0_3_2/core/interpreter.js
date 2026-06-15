@@ -2817,10 +2817,65 @@ if (this.isBuiltinDEMUX(name)) {
     const gen = typeof lutOfGenerate === 'function' ? lutOfGenerate : null;
     if (!gen) throw new Error('boolean-lut.js is not loaded');
     try {
-      const text = gen(s.lutOf.expr, this._makeWidthResolver());
+      const text = gen(s.lutOf.expr, this._makeWidthResolver(), s.lutOf.filters);
       for (const line of text.split('\n')) {
         this.out.push(line);
       }
+    } catch (e) {
+      this.reportRuntimeError(e);
+    }
+  }
+
+  _execTruthTableOf(s) {
+    const gen = typeof truthTableOfGenerate === 'function' ? truthTableOfGenerate : null;
+    if (!gen) throw new Error('boolean-analysis.js is not loaded');
+    try {
+      const lines = gen(s.truthTableOf.expr, this._makeWidthResolver(), s.truthTableOf.filters);
+      for (const line of lines) this.out.push(line);
+    } catch (e) {
+      this.reportRuntimeError(e);
+    }
+  }
+
+  _execSimplify(s) {
+    const gen = typeof simplifyGenerate === 'function' ? simplifyGenerate : null;
+    if (!gen) throw new Error('boolean-analysis.js is not loaded');
+    try {
+      const lines = gen(s.simplify.expr, this._makeWidthResolver());
+      for (const line of lines) this.out.push(line);
+    } catch (e) {
+      this.reportRuntimeError(e);
+    }
+  }
+
+  _execEquivalent(s) {
+    const gen = typeof equivalentGenerate === 'function' ? equivalentGenerate : null;
+    if (!gen) throw new Error('boolean-analysis.js is not loaded');
+    try {
+      const lines = gen(s.equivalent.expr1, s.equivalent.expr2, this._makeWidthResolver());
+      for (const line of lines) this.out.push(line);
+    } catch (e) {
+      this.reportRuntimeError(e);
+    }
+  }
+
+  _execInputsOf(s) {
+    const gen = typeof inputsOfGenerate === 'function' ? inputsOfGenerate : null;
+    if (!gen) throw new Error('boolean-analysis.js is not loaded');
+    try {
+      const lines = gen(s.inputsOf.expr, this._makeWidthResolver());
+      for (const line of lines) this.out.push(line);
+    } catch (e) {
+      this.reportRuntimeError(e);
+    }
+  }
+
+  _execCostOf(s) {
+    const gen = typeof costOfGenerate === 'function' ? costOfGenerate : null;
+    if (!gen) throw new Error('boolean-analysis.js is not loaded');
+    try {
+      const lines = gen(s.costOf.expr, this._makeWidthResolver());
+      for (const line of lines) this.out.push(line);
     } catch (e) {
       this.reportRuntimeError(e);
     }
@@ -2946,6 +3001,31 @@ if (this.isBuiltinDEMUX(name)) {
 
     if (s.exprOfLut) {
       this._execExprOfLut(s);
+      return;
+    }
+
+    if (s.truthTableOf) {
+      this._execTruthTableOf(s);
+      return;
+    }
+
+    if (s.simplify) {
+      this._execSimplify(s);
+      return;
+    }
+
+    if (s.equivalent) {
+      this._execEquivalent(s);
+      return;
+    }
+
+    if (s.inputsOf) {
+      this._execInputsOf(s);
+      return;
+    }
+
+    if (s.costOf) {
+      this._execCostOf(s);
       return;
     }
 

@@ -1,8 +1,16 @@
 /* ================= BOOLEAN LUT — lutOf / exprOfLut ================= */
 
 const BOOLEAN_OPS = new Set(['NOT', 'AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR']);
-const LUT_ADDR_MAX_BITS = 8;
-const LUT_TOO_BIG_ERR = 'LUT table too big (256 values), max bits number reached';
+
+const BOOLEAN_ANALYSIS_MAX_TABLE_ROWS = 256;
+const BOOLEAN_ANALYSIS_TABLE_TOO_BIG_ERR =
+  'Boolean analysis exceeds maximum supported table size (256 rows)';
+
+const BOOLEAN_ANALYSIS_MAX_INPUT_BITS = 8;
+const BOOLEAN_ANALYSIS_TOO_WIDE_ERR =
+  'Boolean analysis exceeds maximum supported input width (8 bits)';
+
+const LUT_TOO_BIG_ERR = BOOLEAN_ANALYSIS_TABLE_TOO_BIG_ERR;
 
 function bitIndexWidth(len) {
   return len <= 1 ? 1 : 32 - Math.clz32(len - 1);
@@ -25,6 +33,10 @@ function columnKey(atom) {
     return `${name}.${start}-${end}`;
   }
   return null;
+}
+
+function filterSpecKey(spec) {
+  return columnKey({ var: spec.name, bitRange: spec.bitRange || null });
 }
 
 function columnWidth(atom, widthResolver) {
@@ -89,6 +101,94 @@ function discoverLutOfInputs(exprAst, widthResolver) {
   return columns;
 }
 
+function mergeDiscoveredColumns(colsA, colsB) {
+  const seen = new Set();
+  const merged = [];
+  for (const c of [...colsA, ...colsB]) {
+    if (seen.has(c.key)) continue;
+    seen.add(c.key);
+    merged.push(c);
+  }
+  return merged;
+}
+
+function countFullTableRows(columns) {
+  return 1 << columns.reduce((s, c) => s + c.width, 0);
+}
+
+function assertTableRowsWithinLimit(rowCount) {
+  if (rowCount > BOOLEAN_ANALYSIS_MAX_TABLE_ROWS) {
+    throw new Error(BOOLEAN_ANALYSIS_TABLE_TOO_BIG_ERR);
+  }
+}
+
+function assertInputWidthWithinLimit(columns) {
+  const bits = columns.reduce((s, c) => s + c.width, 0);
+  if (bits > BOOLEAN_ANALYSIS_MAX_INPUT_BITS) {
+    throw new Error(BOOLEAN_ANALYSIS_TOO_WIDE_ERR);
+  }
+}
+
+function validateAndBuildFilterMap(columns, filters, contextName) {
+  if (!filters || filters.length === 0) return null;
+  const colByKey = new Map(columns.map(c => [c.key, c]));
+  const map = new Map();
+  for (const f of filters) {
+    const key = filterSpecKey(f);
+    if (!colByKey.has(key)) {
+      throw new Error(`${contextName}: unknown filter column '${key}'`);
+    }
+    if (map.has(key)) {
+      throw new Error(`${contextName}: duplicate filter for '${key}'`);
+    }
+    const col = colByKey.get(key);
+    const pattern = String(f.pattern).toLowerCase();
+    if (pattern.length !== col.width) {
+      throw new Error(`${contextName}: pattern length mismatch for '${key}'`);
+    }
+    for (const ch of pattern) {
+      if (ch !== '0' && ch !== '1' && ch !== 'x') {
+        throw new Error(`${contextName}: invalid pattern character in '${key}=${f.pattern}'`);
+      }
+    }
+    map.set(key, pattern);
+  }
+  return map;
+}
+
+function countRowsToGenerate(columns, filterMap) {
+  let product = 1;
+  for (const col of columns) {
+    if (filterMap && filterMap.has(col.key)) {
+      const p = filterMap.get(col.key);
+      let combos = 1;
+      for (const ch of p) if (ch === 'x') combos *= 2;
+      product *= combos;
+    } else {
+      product *= (1 << col.width);
+    }
+  }
+  return product;
+}
+
+function rowMatchesFilters(columns, env, filterMap) {
+  if (!filterMap) return true;
+  for (const col of columns) {
+    const p = filterMap.get(col.key);
+    if (!p) continue;
+    const val = env[col.key];
+    for (let i = 0; i < p.length; i++) {
+      if (p[i] === 'x') continue;
+      if (val[i] !== p[i]) return false;
+    }
+  }
+  return true;
+}
+
+function formatFilterComment(filters) {
+  return '# ' + filters.map(f => `${filterSpecKey(f)}=${f.pattern}`).join(' ');
+}
+
 function addrBitsToColumns(columns, addr) {
   const env = {};
   let shift = 0;
@@ -107,6 +207,57 @@ function addrBitsToColumns(columns, addr) {
     }
   }
   return env;
+}
+
+function columnToBitLabels(col) {
+  const labels = [];
+  const atom = col.atom;
+  const w = col.width;
+  if (atom.bitRange) {
+    const br = atom.bitRange;
+    const start = br.start;
+    const end = br.end !== undefined && br.end !== null ? br.end : start;
+    if (start === end) {
+      labels.push(`${atom.var}.${start}`);
+    } else {
+      for (let b = end; b >= start; b--) labels.push(`${atom.var}.${b}`);
+    }
+  } else if (w === 1) {
+    labels.push(atom.var);
+  } else {
+    for (let b = w - 1; b >= 0; b--) labels.push(`${atom.var}.${b}`);
+  }
+  return labels;
+}
+
+function columnsToInputLabels(columns) {
+  const labels = [];
+  for (const col of columns) {
+    labels.push(...columnToBitLabels(col));
+  }
+  return labels;
+}
+
+function collectFilteredRows(exprAst, columns, widthResolver, filterMap) {
+  const addrWidth = columns.reduce((s, c) => s + c.width, 0);
+  const rowsToGenerate = countRowsToGenerate(columns, filterMap);
+  assertTableRowsWithinLimit(rowsToGenerate);
+
+  const fullLength = 1 << addrWidth;
+  const rows = [];
+  let outWidth = 1;
+
+  for (let addr = 0; addr < fullLength; addr++) {
+    const env = addrBitsToColumns(columns, addr);
+    if (!rowMatchesFilters(columns, env, filterMap)) continue;
+    const result = evalBooleanParts(exprAst, env, widthResolver);
+    if (rows.length === 0) outWidth = result.length;
+    else if (result.length !== outWidth) {
+      throw new Error('lutOf: inconsistent output width');
+    }
+    rows.push({ env, output: result });
+  }
+  return { rows, addrWidth, outWidth };
 }
 
 function evalAtomBoolean(atom, env, widthResolver) {
@@ -179,6 +330,56 @@ function evalBooleanCall(part, env, widthResolver) {
   return resultBits.join('');
 }
 
+function evalBooleanPartsWidth(parts, widthResolver) {
+  if (!parts || parts.length !== 1) return 1;
+  return evalBooleanPartWidth(parts[0], widthResolver);
+}
+
+function evalBooleanPartWidth(part, widthResolver) {
+  if (part.call) {
+    const name = part.call.name;
+    if (name === 'NOT') return evalBooleanPartsWidth(part.args[0], widthResolver);
+    const ws = part.args.map(a => evalBooleanPartsWidth(a, widthResolver));
+    return Math.max(...ws);
+  }
+  if (part.var) return columnWidth(part, widthResolver);
+  return 1;
+}
+
+function computeSyntacticCost(exprAst, widthResolver) {
+  if (!exprAst || exprAst.length !== 1) return 0;
+  return evalBooleanPartCost(exprAst[0], widthResolver);
+}
+
+function evalBooleanPartCost(part, widthResolver) {
+  if (part.call) {
+    const name = part.call.name;
+    if (!BOOLEAN_OPS.has(name)) return 0;
+    const childCost = part.args.reduce((s, a) => s + evalBooleanPartsCost(a, widthResolver), 0);
+    if (name === 'NOT') {
+      return evalBooleanPartsWidth(part.args[0], widthResolver) + childCost;
+    }
+    const ws = part.args.map(a => evalBooleanPartsWidth(a, widthResolver));
+    return Math.max(...ws) + childCost;
+  }
+  return 0;
+}
+
+function evalBooleanPartsCost(parts, widthResolver) {
+  if (!parts || parts.length !== 1) return 0;
+  return evalBooleanPartCost(parts[0], widthResolver);
+}
+
+function costFromMinimized(min) {
+  if (min.constant === true || min.constant === false) return 0;
+  let cost = 0;
+  if (min.terms.length > 1) cost += 1;
+  for (const term of min.terms) {
+    if (term.length > 1) cost += 1;
+  }
+  return cost;
+}
+
 function formatTermShort(literals) {
   if (literals.length === 0) return '1';
   return literals.map(l => (l.negated ? '!' : '') + l.label).join(' & ');
@@ -213,32 +414,26 @@ function formatMinimizedStandard(min) {
 
 const LUT_OF_INLINE_NAME = '.generated';
 
-function lutOfGenerate(exprAst, widthResolver) {
+function lutOfGenerate(exprAst, widthResolver, filters) {
   const columns = discoverLutOfInputs(exprAst, widthResolver);
-  const addrWidth = columns.reduce((s, c) => s + c.width, 0);
-  if (addrWidth > LUT_ADDR_MAX_BITS) throw new Error(LUT_TOO_BIG_ERR);
-
-  const length = 1 << addrWidth;
-  const outputs = [];
-  let outWidth = 1;
-
-  for (let addr = 0; addr < length; addr++) {
-    const env = addrBitsToColumns(columns, addr);
-    const result = evalBooleanParts(exprAst, env, widthResolver);
-    if (addr === 0) outWidth = result.length;
-    else if (result.length !== outWidth) {
-      throw new Error('lutOf: inconsistent output width');
-    }
-    outputs.push(result);
-  }
+  const filterMap = validateAndBuildFilterMap(columns, filters, 'lutOf');
+  const { rows, addrWidth, outWidth } = collectFilteredRows(exprAst, columns, widthResolver, filterMap);
 
   const header = `# ${columns.map(c => c.header).join(', ')} -> out ${outWidth}b`;
-  const inner = [header, '', `depth: ${outWidth}`, `length: ${length}`, 'data {'];
+  const inner = [header];
+  if (filters && filters.length > 0) {
+    inner.push(formatFilterComment(filters));
+  }
 
-  const addrPad = addrWidth;
-  for (let addr = 0; addr < length; addr++) {
-    const addrStr = addr.toString(2).padStart(addrPad, '0');
-    inner.push(`  ${addrStr} : ${outputs[addr]}`);
+  const length = filterMap ? rows.length : (1 << addrWidth);
+  const addrPad = filterMap ? bitIndexWidth(length) : addrWidth;
+
+  inner.push('', `depth: ${outWidth}`, `length: ${length}`, 'data {');
+  for (let i = 0; i < rows.length; i++) {
+    const addrStr = filterMap
+      ? i.toString(2).padStart(addrPad, '0')
+      : i.toString(2).padStart(addrPad, '0');
+    inner.push(`  ${addrStr} : ${rows[i].output}`);
   }
   inner.push('}');
 
@@ -376,9 +571,28 @@ if (typeof module !== 'undefined' && module.exports) {
     bitIndexWidth,
     lutAddrBits,
     discoverLutOfInputs,
+    mergeDiscoveredColumns,
+    countFullTableRows,
+    assertTableRowsWithinLimit,
+    assertInputWidthWithinLimit,
+    validateAndBuildFilterMap,
+    countRowsToGenerate,
+    rowMatchesFilters,
+    collectFilteredRows,
+    columnsToInputLabels,
+    evalBooleanParts,
+    addrBitsToColumns,
+    computeSyntacticCost,
+    costFromMinimized,
+    formatMinimizedShort,
+    formatMinimizedStandard,
     lutOfGenerate,
     expandExprOfLutVars,
     exprOfLutGenerate,
+    BOOLEAN_ANALYSIS_MAX_TABLE_ROWS,
+    BOOLEAN_ANALYSIS_TABLE_TOO_BIG_ERR,
+    BOOLEAN_ANALYSIS_MAX_INPUT_BITS,
+    BOOLEAN_ANALYSIS_TOO_WIDE_ERR,
     LUT_TOO_BIG_ERR
   };
 }

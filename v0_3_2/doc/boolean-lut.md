@@ -7,13 +7,15 @@ Analysis-only statements (like `show`): they emit copy-pasteable text to **Outpu
 | `lutOf(expr)` | Build a LUT definition from a boolean expression |
 | `exprOfLut(.lut, vars…)` | Rebuild a boolean expression from an existing LUT |
 
-See also: [lut.md](lut.md) (LUT runtime), [short-notation.md](short-notation.md) (backtick syntax), [debug.md](debug.md) (`show` output).
+See also: [lut.md](lut.md) (LUT runtime), [boolean-analysis.md](boolean-analysis.md) (`truthTableOf`, `simplify`, …), [short-notation.md](short-notation.md) (backtick syntax), [debug.md](debug.md) (`show` output).
 
 ---
 
-## `lutOf(expression)`
+## `lutOf(expression [, filters])`
 
-One argument — any boolean expression using built-ins `NOT`, `AND`, `OR`, `XOR`, `NXOR`, `NAND`, `NOR`, or short-notation in backticks.
+Boolean expression using built-ins `NOT`, `AND`, `OR`, `XOR`, `NXOR`, `NAND`, `NOR`, or short-notation in backticks.
+
+Optional filters (same as `truthTableOf`): `lutOf(expr, A=01x1x B=x C=000xx)`.
 
 ```logts-play
 lutOf(OR(A, B))
@@ -40,8 +42,9 @@ Instance name is always **`.generated`**. Paste the block into a script, then us
 
 ### Rules
 
-- **Address limit:** sum of input column widths ≤ **8 bits** (`length` max **256**). Otherwise:
-  `LUT table too big (256 values), max bits number reached`
+- **Row limit:** max **256 rows** in `data { }`. Error: `Boolean analysis exceeds maximum supported table size (256 rows)`.
+- **With filters:** `length` = number of rows emitted (≤ 256); comment line `# A=01x1x B=x` documents filters. No `fillwith` / sparse full address space.
+- **Without filters:** `length = 2^(sum column widths)` (≤ 256).
 - Undeclared atomic variables (`A`, `B` in gates) default to **1 bit**.
 - Whole wires (`lutOf(C)` on `7wire C`) use the declared wire width.
 - Non-boolean ops (`LSHIFT`, etc.) → error.
@@ -164,7 +167,7 @@ exprOfLut(.generated, A, B)
 
 | Case | Message |
 |------|---------|
-| Address > 8b | `LUT table too big (256 values), max bits number reached` |
+| > 256 rows | `Boolean analysis exceeds maximum supported table size (256 rows)` |
 | Width mismatch | `exprOfLut expects N input bits but received M` |
 | Non-boolean in `lutOf` | `'LSHIFT' is not a boolean operation` |
 | prefixFree / variableDepth LUT | `exprOfLut: prefixFree LUT not supported` |

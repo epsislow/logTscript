@@ -246,7 +246,7 @@ parseDef() {
     
     if (
       this.c.type === 'TYPE' ||
-      (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek' || this.c.value === 'lutOf' || this.c.value === 'exprOfLut')) ||
+      (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek' || this.c.value === 'lutOf' || this.c.value === 'exprOfLut' || this.c.value === 'truthTableOf' || this.c.value === 'simplify' || this.c.value === 'equivalent' || this.c.value === 'inputsOf' || this.c.value === 'costOf')) ||
       this.c.type === 'ID' ||
       this.c.type === 'SPECIAL'
     ) {
@@ -1259,8 +1259,92 @@ assignment() {
     this.eat('KEYWORD', 'lutOf');
     this.eat('SYM', '(');
     const expr = this.expr();
+    let filters = null;
+    if (this.c.value === ',') {
+      this.eat('SYM', ',');
+      filters = this.parseBooleanAnalysisFilters();
+    }
     this.eat('SYM', ')');
-    return { lutOf: { expr } };
+    return { lutOf: { expr, filters } };
+  }
+
+  truthTableOf(){
+    this.eat('KEYWORD', 'truthTableOf');
+    this.eat('SYM', '(');
+    const expr = this.expr();
+    let filters = null;
+    if (this.c.value === ',') {
+      this.eat('SYM', ',');
+      filters = this.parseBooleanAnalysisFilters();
+    }
+    this.eat('SYM', ')');
+    return { truthTableOf: { expr, filters } };
+  }
+
+  simplify(){
+    this.eat('KEYWORD', 'simplify');
+    this.eat('SYM', '(');
+    const expr = this.expr();
+    this.eat('SYM', ')');
+    return { simplify: { expr } };
+  }
+
+  equivalent(){
+    this.eat('KEYWORD', 'equivalent');
+    this.eat('SYM', '(');
+    const expr1 = this.expr();
+    this.eat('SYM', ',');
+    const expr2 = this.expr();
+    this.eat('SYM', ')');
+    return { equivalent: { expr1, expr2 } };
+  }
+
+  inputsOf(){
+    this.eat('KEYWORD', 'inputsOf');
+    this.eat('SYM', '(');
+    const expr = this.expr();
+    this.eat('SYM', ')');
+    return { inputsOf: { expr } };
+  }
+
+  costOf(){
+    this.eat('KEYWORD', 'costOf');
+    this.eat('SYM', '(');
+    const expr = this.expr();
+    this.eat('SYM', ')');
+    return { costOf: { expr } };
+  }
+
+  parseTruthPattern() {
+    const src = this.t.src;
+    let pos = this.t.i;
+    while (pos < src.length && /\s/.test(src[pos])) pos++;
+    const start = pos;
+    while (pos < src.length && !/\s/.test(src[pos]) && src[pos] !== ')') pos++;
+    if (pos === start) {
+      throw Error(`Expected filter pattern at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const pattern = src.slice(start, pos);
+    this._syncTokenizerAt(pos);
+    return pattern;
+  }
+
+  parseBooleanAnalysisFilters() {
+    const filters = [];
+    while (!(this.c.type === 'SYM' && this.c.value === ')')) {
+      if (this.c.type === 'EOL') {
+        this.c = this.t.get();
+        continue;
+      }
+      const spec = this.parseExprOfLutColumnSpec();
+      if (!(this.c.type === 'SYM' && this.c.value === '=')) {
+        throw Error(`Expected = after filter column at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const pattern = this.parseTruthPattern();
+      filters.push({ name: spec.name, bitRange: spec.bitRange, width: spec.width, pattern });
+      if (this.c.type === 'SYM' && this.c.value === ')') break;
+    }
+    return filters;
   }
 
   exprOfLut(){
@@ -2965,6 +3049,11 @@ Parser.KEYWORD_HANDLERS = {
   peek: 'peek',
   lutOf: 'lutOf',
   exprOfLut: 'exprOfLut',
+  truthTableOf: 'truthTableOf',
+  simplify: 'simplify',
+  equivalent: 'equivalent',
+  inputsOf: 'inputsOf',
+  costOf: 'costOf',
   probe: 'probe',
   NEXT: 'next',
   TEST: 'test',

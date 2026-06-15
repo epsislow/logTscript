@@ -4,7 +4,7 @@ Statements in this group write text to the **Output** panel. The first three ins
 
 All are **statements** (like `doc`) — they cannot appear on the right side of `=`.
 
-For full LUT generation / reversal (multi-bit, limits, errors), see **[boolean-lut.md](boolean-lut.md)**.
+For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md](boolean-lut.md)** and **[boolean-analysis.md](boolean-analysis.md)**.
 
 ---
 
@@ -872,5 +872,6 @@ Details and multi-bit examples: [boolean-lut.md](boolean-lut.md). LUT runtime sy
 - [Editor UI](editorUI.md) — Output panel, Run, Next, Wave / Legacy toggle
 - [doc() function](doc-function.md) — `doc(def)` lists `show` as a built-in
 - [Boolean LUT utilities](boolean-lut.md) — `lutOf` / `exprOfLut` (full syntax, multi-bit, limits)
+- [Boolean analysis helpers](boolean-analysis.md) — `truthTableOf`, `simplify`, `equivalent`, `inputsOf`, `costOf`
 - [LUT component](lut.md) — runtime `inline [lut]` / `comp [lut]`
 - [REG](reg.md) — `NEXT(~)` and wire-clock behaviour with `show`
