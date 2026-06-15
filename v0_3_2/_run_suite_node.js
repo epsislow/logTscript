@@ -47,6 +47,7 @@ const files = [
   'core/boolean-minimize.js',
   'core/boolean-lut.js',
   'core/boolean-analysis.js',
+  'core/watch-expand.js',
   'core/parser.js',
   'core/interpreter.js',
   'core/signal-propagation.js',

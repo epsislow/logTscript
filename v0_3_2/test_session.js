@@ -56,6 +56,7 @@
         this.out = [];
         this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry, signalPropagationStrategy, p.chips, p.boards);
         this.interp.pendingProbeExprs = p.probes || [];
+        this.interp.pendingWatchExprs = p.watches || [];
         this.interp.aliases = p.aliases;
         this.aliases = p.aliases;
         for (const s of stmts) {

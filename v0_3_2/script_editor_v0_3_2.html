@@ -47,6 +47,22 @@ button { margin:4px; padding:5px 9px; cursor: pointer; }
 pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .panel { border:1px solid #444; padding:10px; margin-top:10px }
 .flex { display:flex; gap:10px }
+.panel-stack { display:flex; flex-direction:column; gap:10px; min-height:0; }
+.timeline-panel { flex-shrink:0; padding:8px 10px; }
+.timeline-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+.timeline-head h3 { margin:0; font-size:14px; }
+.timeline-toolbar { display:flex; gap:6px; }
+.timeline-toolbar .btn { font-size:11px; padding:4px 10px; }
+#timelineCanvas {
+  display:block;
+  width:100%;
+  max-width:100%;
+  height:auto;
+  background:#0d0d0f;
+  border:1px solid #2d2d34;
+  border-radius:6px;
+  touch-action:none;
+}
 .filename { font-size: 18px;}
 .dirpath { font-size: 15px; color: #88f}
 .filelist { border: 1px solid #3D4; width:90%; padding: 3px; margin: 5px; height: 350px; overflow-y: auto; }
@@ -1908,6 +1924,7 @@ show(a,b,c)
       </button>
 
       <div class="dropdown-menu">
+        <button class="dropdown-item active" data-panel="timeline">Timeline</button>
         <button class="dropdown-item active" data-panel="output">Output</button>
         <button class="dropdown-item active" data-panel="variables">Variables</button>
         <button class="dropdown-item active" data-panel="tabs">Tabs</button>
@@ -1971,9 +1988,21 @@ show(a,b,c)
 </div>
 
 <div class="flex">
-  <div class="panel" id="outputPanel" style="flex:1">
-    <h3>Output</h3>
-    <pre id="out"></pre>
+  <div class="panel-stack" id="outputStack" style="flex:1">
+    <div class="panel timeline-panel" id="timelinePanel">
+      <div class="timeline-head">
+        <h3>Timeline</h3>
+        <div class="timeline-toolbar">
+          <button type="button" id="timelinePauseBtn" class="btn">Pause</button>
+          <button type="button" id="timelineLiveBtn" class="btn">Live</button>
+        </div>
+      </div>
+      <canvas id="timelineCanvas" width="640" height="220"></canvas>
+    </div>
+    <div class="panel" id="outputPanel" style="flex:1; min-height:100px;">
+      <h3>Output</h3>
+      <pre id="out"></pre>
+    </div>
   </div>
 
   <div class="panel" id="variablesPanel" style="flex:1">
@@ -2061,6 +2090,7 @@ show(a,b,c)
 <script src="core/boolean-minimize.js"></script>
 <script src="core/boolean-lut.js"></script>
 <script src="core/boolean-analysis.js"></script>
+<script src="core/watch-expand.js"></script>
 <script src="core/parser.js"></script>
 <script src="core/interpreter.js"></script>
 <script src="core/signal-propagation.js"></script>
@@ -2090,6 +2120,7 @@ show(a,b,c)
 <script src="marked.min.js"></script>
 <script src="ui/doc-data.js"></script>
 <script src="ui/doc-viewer.js"></script>
+<script src="ui/timeline-analyzer.js"></script>
 <script src="ui/app.js"></script>
 
 </body>

@@ -8094,6 +8094,141 @@ comp [ioport] .p:
   h.assert('dupa dip', session.getWire(interp, 'a'), '1010');
 }, { propagation: 'wave' });
 
+reg(1176, 'debug', 'Parser — watch(clk) AST and watches[]', function(h, session) {
+  const registry = session._ensureRegistry();
+  const processed = preprocessRepeat('1wire clk = 0\nwatch(clk)');
+  const p = new Parser(new Tokenizer(processed), registry);
+  const stmts = p.parse();
+  h.assert('watch stmt', String(!!stmts[1].watch), 'true');
+  h.assert('watches collected', String(p.watches.length), '1');
+  h.assert('watch expr var', stmts[1].watch[0].var, 'clk');
+});
+
+reg(1177, 'debug', 'watch(clk) records samples on wire change', function(h, session) {
+  const samples = [];
+  const { interp } = session.run(`1wire clk = 0
+1wire en = 0
+watch(clk)
+watch(en)`);
+  interp.watchRecorder = (s) => samples.push(s);
+  session.setWire(interp, 'clk', '1');
+  session.setWire(interp, 'en', '1');
+  const flat = samples.flatMap(s => s.channels || [s]);
+  h.assert('two channels', String(interp.watchTargets.length), '2');
+  h.assert('samples recorded', String(samples.length >= 2), 'true');
+  h.assert('clk channel', String(flat.some(s => s.channelIndex === 0)), 'true');
+  h.assert('en channel', String(flat.some(s => s.channelIndex === 1)), 'true');
+});
+
+reg(1178, 'debug', 'watch(.dip) component channel', function(h, session) {
+  const samples = [];
+  const { interp } = session.run(`comp [dip] .sw:
+  length: 4
+  = 0000
+  :
+watch(.sw)`);
+  interp.watchRecorder = (s) => samples.push(s);
+  session.setComp(interp, '.sw', '1010');
+  const flat = samples.flatMap(s => s.channels || [s]);
+  h.assert('dip watch target', String(interp.watchTargets.length), '1');
+  h.assert('sample after dip', String(flat.some(s => s.valueStr === '1010')), 'true');
+});
+
+reg(1179, 'debug', 'watch(o.0..o.3) wire slices distinct and batched', function(h, session) {
+  const samples = [];
+  const { interp } = session.run(`comp [~] .o:
+  duration1: 4
+  duration0: 4
+  length: 4
+  freq: 1
+  freqIsSec: 0
+  eachCycle: 1
+  :
+4wire o = .o:counter
+1wire c = .o
+watch(o.0)
+watch(o.1)
+watch(o.2)
+watch(o.3)
+watch(c)`);
+  interp.watchRecorder = (s) => samples.push(s);
+  h.assert('five watch targets', String(interp.watchTargets.length), '5');
+  const keys = interp.watchTargets.map(t => t.key).sort().join(',');
+  h.assert('slice keys distinct', String(new Set(interp.watchTargets.map(t => t.key)).size), '5');
+  h.assert('has w:o:0-0', String(keys.includes('w:o:0-0')), 'true');
+  h.assert('has w:o:3-3', String(keys.includes('w:o:3-3')), 'true');
+  const labels = interp.watchTargets.map(t => t.label).join(',');
+  h.assert('labels o.0 and o.3', String(labels.includes('o.0') && labels.includes('o.3')), 'true');
+  session.setWire(interp, 'o', '1010');
+  session.setWire(interp, 'o', '0101');
+  const batched = samples.filter(s => s.channels && s.channels.length >= 2);
+  h.assert('batched multi-slice row', String(batched.length >= 1), 'true');
+});
+
+reg(1180, 'debug', 'watch(o) expands to all wire bits', function(h, session) {
+  const { interp } = session.run(`4wire o = 0000
+1wire c = 0
+watch(o)
+watch(c)`);
+  h.assert('o expands to 4 bits', String(interp.watchTargets.length), '5');
+  const labels = interp.watchTargets.map(t => t.label).join(',');
+  h.assert('labels o.0..o.3', String(/o\.0/.test(labels) && /o\.3/.test(labels)), 'true');
+  h.assert('label c', String(labels.includes('c')), 'true');
+});
+
+reg(1181, 'debug', 'watch(o.1-3) expands bit range', function(h, session) {
+  const { interp } = session.run(`4wire o = 0000
+watch(o.1-3)`);
+  h.assert('three bit channels', String(interp.watchTargets.length), '3');
+  const labels = interp.watchTargets.map(t => t.label).sort().join(',');
+  h.assert('labels o.1 o.2 o.3', labels, 'o.1,o.2,o.3');
+});
+
+reg(1182, 'debug', 'watch-expand labels from stmts', function(h, session) {
+  const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
+  h.assert('module loaded', String(!!WE), 'true');
+  const processed = preprocessRepeat('4wire o = 0\nwatch(o)\nwatch(o.1-3)');
+  const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
+  const stmts = p.parse();
+  const widths = WE.buildWireWidthMapFromStmts(stmts);
+  h.assert('o is 4wire', String(widths.get('o')), '4');
+  const labels = WE.watchLabelsFromExprs(p.watches, widths);
+  h.assert('four columns deduped', String(labels.length), '4');
+  h.assert('labels o.0..o.3', labels.join(','), 'o.0,o.1,o.2,o.3');
+});
+
+reg(1183, 'debug', 'duplicate watch() dedupes channels', function(h, session) {
+  const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
+  const script = `4wire o = 0000
+1wire c = 0
+watch(o.0-3)
+watch(o.0)
+watch(o.1)
+watch(o.2)
+watch(o.3)
+watch(c)`;
+  const { interp } = session.run(script);
+  h.assert('five targets', String(interp.watchTargets.length), '5');
+  const processed = preprocessRepeat(script);
+  const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
+  const stmts = p.parse();
+  const widths = WE.buildWireWidthMapFromStmts(stmts);
+  const labels = WE.watchLabelsFromExprs(p.watches, widths);
+  h.assert('five labels not nine', String(labels.length), '5');
+  h.assert('labels match targets', labels.join(','), interp.watchTargets.map(t => t.label).join(','));
+  h.assert('c is last channel', String(interp.watchTargets[4].wireName), 'c');
+});
+
+reg(1184, 'debug', 'seedWatchTimeline records row after label reset', function(h, session) {
+  const samples = [];
+  const { interp } = session.run(`4wire o = 0000\n1wire c = 0\nwatch(o)\nwatch(c)`);
+  interp.watchRecorder = (s) => samples.push(s);
+  interp.seedWatchTimeline();
+  h.assert('seed produces sample', String(samples.length >= 1), 'true');
+  const flat = samples[0].channels || [];
+  h.assert('all five channels', String(flat.length), '5');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

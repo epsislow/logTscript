@@ -29,6 +29,16 @@ function toggleVariables() {
   }
 }
 
+function toggleTimeline() {
+  const panel = document.getElementById('timelinePanel');
+  if (!panel) return;
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
 function toggleOutput() {
   const panel = document.getElementById('outputPanel');
   if (panel.style.display === 'none') {

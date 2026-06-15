@@ -2,6 +2,67 @@
 
 let prog=null, pc=0;
 let globalInterp = null;
+let timelineAnalyzer = null;
+
+function watchLabelsFromExprs(exprs, wireWidths) {
+  const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
+  if (WE && wireWidths) {
+    return WE.watchLabelsFromExprs(exprs, wireWidths);
+  }
+  return (exprs || []).map((expr, i) => {
+    const a = expr && expr[0];
+    if (!a) return 'ch' + i;
+    if (a.var) {
+      if (a.property) return a.var + ':' + a.property;
+      if (a.internalWire) return a.var + '.' + a.internalWire;
+      if (a.bitRange) {
+        const start = a.bitRange.start;
+        const end = a.bitRange.end != null ? a.bitRange.end : start;
+        return start === end ? `${a.var}.${start}` : `${a.var}.${start}-${end}`;
+      }
+      return a.var;
+    }
+    if (a.ref || a.refLiteral) return String(a.ref || a.refLiteral);
+    return 'ch' + i;
+  });
+}
+
+function prepareTimelineForRun(watches, stmts) {
+  if (timelineAnalyzer) {
+    const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
+    const wireWidths = WE ? WE.buildWireWidthMapFromStmts(stmts) : null;
+    timelineAnalyzer.reset(watchLabelsFromExprs(watches, wireWidths));
+  }
+}
+
+function bindWatchRecorder(interp) {
+  if (!interp) return;
+  interp.watchSeq = 0;
+  interp.watchRecorder = timelineAnalyzer ? (sample) => timelineAnalyzer.ingest(sample) : null;
+}
+
+function initTimelineAnalyzer() {
+  const canvas = document.getElementById('timelineCanvas');
+  if (!canvas || typeof TimelineAnalyzer !== 'function') return;
+  timelineAnalyzer = new TimelineAnalyzer(canvas);
+  const pauseBtn = document.getElementById('timelinePauseBtn');
+  const liveBtn = document.getElementById('timelineLiveBtn');
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', () => {
+      if (!timelineAnalyzer) return;
+      timelineAnalyzer.setPaused(!timelineAnalyzer.isPaused);
+      pauseBtn.textContent = timelineAnalyzer.isPaused ? 'Resume' : 'Pause';
+    });
+  }
+  if (liveBtn) {
+    liveBtn.addEventListener('click', () => {
+      if (!timelineAnalyzer) return;
+      timelineAnalyzer.setPaused(false);
+      if (pauseBtn) pauseBtn.textContent = 'Pause';
+    });
+  }
+  timelineAnalyzer.reset([]);
+}
 
 let sdb = new DbLocalStorage();
 let fss = new FileStorageSystem(sdb);
@@ -56,9 +117,10 @@ function bindInterpErrorHandler(interp) {
   };
 }
 
-function createInterpreter(funcs, pcbs, registry, chips, boards, probes) {
+function createInterpreter(funcs, pcbs, registry, chips, boards, probes, watches) {
   const interp = new Interpreter(funcs, [], pcbs, registry, createSignalStrategy(), chips, boards);
   interp.pendingProbeExprs = probes || [];
+  interp.pendingWatchExprs = watches || [];
   bindInterpErrorHandler(interp);
   return interp;
 }
@@ -115,6 +177,8 @@ async function init() {
   if (!openDocViewFromHash()) {
     showEditorView();
   }
+
+  initTimelineAnalyzer();
 }
 
 function run(){
@@ -136,8 +200,6 @@ function run(){
     }
     globalInterp.oscTimers = [];
   }
-  
-  watchList = [];
 
   if (typeof clearTabHasRun === 'function') {
     clearTabHasRun();
@@ -152,10 +214,11 @@ function run(){
   const stmts = p.parse();
   document.getElementById('ast').textContent=JSON.stringify(stmts,null,2);
 
-  console.log('STMTS: ',  stmts);
+  prepareTimelineForRun(p.watches, stmts);
 
-  globalInterp = createInterpreter(p.funcs, p.pcbs, _registry, p.chips, p.boards, p.probes);
+  globalInterp = createInterpreter(p.funcs, p.pcbs, _registry, p.chips, p.boards, p.probes, p.watches);
   globalInterp.aliases = p.aliases;
+  bindWatchRecorder(globalInterp);
 
   for (const s of stmts) {
       const isShow = s.show !== undefined;
@@ -167,6 +230,11 @@ function run(){
     globalInterp.vars.set('%', {type: '1bit', value: '0', ref: null});
   }
   globalInterp.postExecSrc();
+
+  if (timelineAnalyzer && globalInterp.watchTargets && globalInterp.watchTargets.length) {
+    timelineAnalyzer.reset(globalInterp.watchTargets.map((t) => t.label));
+    globalInterp.seedWatchTimeline();
+  }
 
   render(globalInterp.out);
   showVars();
@@ -197,7 +265,8 @@ function sendCmd(){
       const _reg = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
       const p = new Parser(new Tokenizer(preprocessRepeat(code.value)), _reg);
       const stmts = p.parse();
-      globalInterp = createInterpreter(p.funcs, p.pcbs, _reg, p.chips, p.boards, p.probes);
+      globalInterp = createInterpreter(p.funcs, p.pcbs, _reg, p.chips, p.boards, p.probes, p.watches);
+      bindWatchRecorder(globalInterp);
       
       for(const s of stmts){
         globalInterp.exec(s, true);
@@ -288,47 +357,6 @@ function exportVars() {
   return JSON.stringify(data);
 }
 
-let watchList = [];
-function applyPad(value, pad){
-    if(pad && value && value.length < pad) return value.padStart(pad, '0');
-    return value;
-}
-function lookIntoWatch(watch) {
-  let look = {};
-  const props = watch.handler.getSupportedProperties();
-  for (pid in props) {
-    a = {
-      'var': watch.name,
-      property: props[pid]
-    };
-    if (watch.handler.evalGetProperty) {
-      const result = watch.handler.evalGetProperty(watch.comp, a.property, a, watch.ctx);
-      if (result) {
-        if (a.pad && result.value) {
-          result.value = applyPad(result.value, a.pad);
-          result.ref = null;
-          result.bitWidth = result.value.length;
-        }
-      }
-      look[a.property] = result;
-    }
-  }
-  return look;
-}
-
-function getWatches(){
-  let t = '';
-  for(wid in watchList) {
-    const w = watchList[wid];
-    t += '>' + w.name + '\n';
-    look = lookIntoWatch(w);
-    for(name in look) {
-      //console.log(look[name]);
-      t += ':'+ name + ' = ' + (look[name]? look[name].value : '-') + '\n';
-    }
-  }
-  return t;
-}
 function showVars(){
   let t='';
   if(globalInterp){
@@ -358,7 +386,6 @@ function showVars(){
       }
       t += `${k} (${w.type}) = ${valueStr} (ref: ${w.ref || 'null'})\n`;
     });
-    t += getWatches();
     t += `\nCycle: ${globalInterp.cycle}\n`;
     t += `Storage: ${globalInterp.storage.length} entries\n`;
   }
@@ -474,7 +501,9 @@ items.forEach(item => {
     const panelName = item.dataset.panel;
     const isActive = item.classList.contains('active');
 
-    if (panelName === 'output') {
+    if (panelName === 'timeline') {
+        toggleTimeline();
+    } else if (panelName === 'output') {
         toggleOutput();
     } else if (panelName === 'variables') {
         toggleVariables();

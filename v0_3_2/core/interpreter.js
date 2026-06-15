@@ -221,6 +221,11 @@ class Interpreter {
     this._probeRegEdgeCommit = false;
     this._probeInitialising = true;
     this.pendingProbeExprs = [];
+    this.watchTargets = [];
+    this.watchByKey = new Map();
+    this.pendingWatchExprs = [];
+    this.watchRecorder = null;
+    this.watchSeq = 0;
     this.evalContext = 'expr';
 
     // Oscillator timers (for cleanup on re-run)
@@ -562,6 +567,7 @@ class Interpreter {
         this._emitProbeTarget(target, value);
       }
     }
+    this._emitWatchForComputedComponent(compName);
   }
 
   evalCompInvoke(invoke, computeRefs) {
@@ -963,6 +969,200 @@ class Interpreter {
     return null;
   }
 
+  _resolveSignalTarget(expr) {
+    return this._resolveProbeExpr(expr);
+  }
+
+  _registerWatchTarget(target) {
+    if (!target || !target.key) return;
+    if (this.watchByKey.has(target.key)) return;
+    target.channelIndex = this.watchTargets.length;
+    target.lastWatchValue = null;
+    target.lastCollapsed = null;
+    this.watchByKey.set(target.key, target);
+    this.watchTargets.push(target);
+  }
+
+  _wireSliceLabel(varName, start, end) {
+    return start === end ? `${varName}.${start}` : `${varName}.${start}-${end}`;
+  }
+
+  _readWireSliceValue(target, fullValueOptional) {
+    const full = fullValueOptional != null ? String(fullValueOptional)
+      : this.getWireStableValue(target.wireName);
+    if (full == null || full === '-' || full === '') return null;
+    const start = target.sliceStart;
+    const end = target.sliceEnd;
+    if (start < 0 || end >= full.length || start > end) return null;
+    return full.substring(start, end + 1);
+  }
+
+  _watchCollapsedBit(valueStr, bitWidth) {
+    if (valueStr == null || valueStr === '-' || valueStr === '') return false;
+    const s = String(valueStr);
+    if (bitWidth === 1) return s === '1';
+    return /1/.test(s);
+  }
+
+  _readWatchTargetValue(target) {
+    if (!target) return null;
+    let value = null;
+    if (target.kind === 'wireSlice' && target.wireName) {
+      const wire = this.wires.get(target.wireName);
+      if (wire) target.ref = wire.ref;
+      value = this._readWireSliceValue(target);
+    } else if (target.kind === 'wire' && target.wireName) {
+      value = this.getWireStableValue(target.wireName);
+      const wire = this.wires.get(target.wireName);
+      if (wire) target.ref = wire.ref;
+    } else if (target.kind === 'ref' && target.ref) {
+      value = this.getValueFromRef(target.ref);
+    } else if (target.kind === 'component') {
+      const comp = this.components.get(target.compName);
+      if (comp) target.ref = comp.ref;
+      value = this._readComponentProbeValue(target);
+    } else if (target.kind === 'composite') {
+      value = this._readCompositeProbeValue(target);
+    } else if (target.kind === 'compositeInternal') {
+      this._syncInternalProbeTarget(target);
+      if (target.ref) value = this.getValueFromRef(target.ref);
+    } else if (target.kind === 'componentComputed') {
+      value = this._readComputedComponentProbeValue(target);
+    } else if (target.kind === 'lutLabel') {
+      value = target.constantValue;
+    }
+    return value;
+  }
+
+  _recordWatchBatch(updates) {
+    if (!this.watchRecorder || !updates || !updates.length) return;
+    const channels = [];
+    for (const { target, value } of updates) {
+      if (!target) continue;
+      let valueStr = value == null ? '-' : String(value);
+      const sliceBits = target.kind === 'wireSlice' ? 1 : target.bitWidth;
+      if (target.bitWidth && valueStr !== '-' && !target.isText && target.kind !== 'wireSlice') {
+        valueStr = this.formatValue(valueStr, target.bitWidth);
+      }
+      if (target.lastWatchValue === valueStr) continue;
+      const collapsed = this._watchCollapsedBit(valueStr, sliceBits);
+      const state = collapsed ? 2 : 0;
+      target.lastWatchValue = valueStr;
+      target.lastCollapsed = collapsed;
+      channels.push({
+        channelIndex: target.channelIndex,
+        label: target.label || target.wireName || target.ref || '?',
+        state,
+        valueStr
+      });
+    }
+    if (!channels.length) return;
+    this.watchSeq++;
+    this.watchRecorder({
+      seq: this.watchSeq,
+      cycle: this.cycle,
+      channels
+    });
+  }
+
+  _recordWatchSample(target, value) {
+    this._recordWatchBatch([{ target, value }]);
+  }
+
+  _emitWatchRowForWire(name, fullValue) {
+    const batch = [];
+    for (const target of this.watchTargets) {
+      if (target.wireName !== name) continue;
+      if (target.kind === 'wireSlice') {
+        const wire = this.wires.get(name);
+        if (wire) target.ref = wire.ref;
+        const v = this._readWireSliceValue(target, fullValue);
+        if (v !== null) batch.push({ target, value: v });
+      } else if (target.kind === 'wire') {
+        const wire = this.wires.get(name);
+        if (wire) target.ref = wire.ref;
+        batch.push({ target, value: fullValue });
+      }
+    }
+    this._recordWatchBatch(batch);
+  }
+
+  activateWatches(exprs) {
+    if (!exprs || !exprs.length) return;
+    const wireWidths = new Map();
+    for (const [name, wire] of this.wires) {
+      wireWidths.set(name, this.getBitWidth(wire.type));
+    }
+    const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
+    const expanded = WE
+      ? WE.expandWatchExprs(exprs, wireWidths, (br) => this.resolveBitRange(br))
+      : exprs;
+    for (const expr of expanded) {
+      const target = this._resolveProbeExpr(expr);
+      if (target) this._registerWatchTarget(target);
+    }
+    const initialBatch = [];
+    for (const target of this.watchTargets) {
+      const value = this._readWatchTargetValue(target);
+      if (value !== null && value !== undefined) {
+        initialBatch.push({ target, value });
+      }
+    }
+    this._recordWatchBatch(initialBatch);
+  }
+
+  seedWatchTimeline() {
+    for (const target of this.watchTargets) {
+      target.lastWatchValue = null;
+      target.lastCollapsed = null;
+    }
+    this.watchSeq = 0;
+    const batch = [];
+    for (const target of this.watchTargets) {
+      const value = this._readWatchTargetValue(target);
+      if (value !== null && value !== undefined) {
+        batch.push({ target, value });
+      }
+    }
+    this._recordWatchBatch(batch);
+  }
+
+  _emitWatchForWire(name, value) {
+    this._emitWatchRowForWire(name, value);
+  }
+
+  _emitWatchForRef(refStr, value) {
+    if (!refStr) return;
+    const base = String(refStr).match(/^&(\d+)/);
+    if (!base) return;
+    const batch = [];
+    for (const target of this.watchTargets) {
+      if (target.kind === 'ref') {
+        const tBase = String(target.ref).match(/^&(\d+)/);
+        if (!tBase || tBase[1] !== base[1]) continue;
+        if (target.ref === refStr || target.ref === ('&' + base[1])) {
+          batch.push({ target, value });
+        }
+      } else if ((target.kind === 'component' || target.kind === 'composite' || target.kind === 'compositeInternal') && target.ref) {
+        const tBase = String(target.ref).match(/^&(\d+)/);
+        if (tBase && tBase[1] === base[1]) {
+          batch.push({ target, value });
+        }
+      }
+    }
+    this._recordWatchBatch(batch);
+  }
+
+  _emitWatchForComputedComponent(compName) {
+    for (const target of this.watchTargets) {
+      if (target.kind !== 'componentComputed' || target.compName !== compName) continue;
+      const value = this._readComputedComponentProbeValue(target);
+      if (value !== null && value !== undefined) {
+        this._recordWatchSample(target, value);
+      }
+    }
+  }
+
   _resolveProbeExpr(expr) {
     if (!expr || !expr.length) return null;
     const atom = expr[0];
@@ -981,6 +1181,23 @@ class Interpreter {
       }
       const wire = this.wires.get(atom.var);
       if (!wire) return null;
+      if (atom.bitRange) {
+        const { start, end } = this.resolveBitRange(atom.bitRange);
+        const label = this._wireSliceLabel(atom.var, start, end);
+        return {
+          kind: 'wireSlice',
+          key: 'w:' + atom.var + ':' + start + '-' + end,
+          label,
+          ref: wire.ref,
+          wireName: atom.var,
+          bitRange: atom.bitRange,
+          sliceStart: start,
+          sliceEnd: end,
+          bitWidth: end - start + 1,
+          seen: false,
+          lastValue: null
+        };
+      }
       return {
         kind: 'wire',
         key: 'w:' + atom.var,
@@ -1094,30 +1311,36 @@ class Interpreter {
   _emitProbeForWire(name, value) {
     const key = 'w:' + name;
     const target = this.probeByKey.get(key);
-    if (!target) return;
-    const wire = this.wires.get(name);
-    if (wire) target.ref = wire.ref;
-    this._emitProbeTarget(target, value);
+    if (target) {
+      const wire = this.wires.get(name);
+      if (wire) target.ref = wire.ref;
+      this._emitProbeTarget(target, value);
+    }
+    this._emitWatchRowForWire(name, value);
   }
 
   _emitProbeForRef(refStr, value) {
     if (!refStr) return;
     const base = String(refStr).match(/^&(\d+)/);
     if (!base) return;
+    let probeHit = false;
     for (const target of this.probeTargets) {
       if (target.kind === 'ref') {
         const tBase = String(target.ref).match(/^&(\d+)/);
         if (!tBase || tBase[1] !== base[1]) continue;
         if (target.ref === refStr || target.ref === ('&' + base[1])) {
           this._emitProbeTarget(target, value);
+          probeHit = true;
         }
       } else if ((target.kind === 'component' || target.kind === 'composite' || target.kind === 'compositeInternal') && target.ref) {
         const tBase = String(target.ref).match(/^&(\d+)/);
         if (tBase && tBase[1] === base[1]) {
           this._emitProbeTarget(target, value);
+          probeHit = true;
         }
       }
     }
+    this._emitWatchForRef(refStr, value);
   }
 
   _evalCompositeInstanceAtom(a, instance) {
@@ -2794,6 +3017,9 @@ if (this.isBuiltinDEMUX(name)) {
     if (this.pendingProbeExprs && this.pendingProbeExprs.length) {
       this.activateProbes(this.pendingProbeExprs);
     }
+    if (this.pendingWatchExprs && this.pendingWatchExprs.length) {
+      this.activateWatches(this.pendingWatchExprs);
+    }
     if (!this.signalPropagationStrategy) return;
     this._probeInitialising = true;
     this.signalPropagationStrategy.initializeFromElaboration();
@@ -3015,8 +3241,6 @@ if (this.isBuiltinDEMUX(name)) {
     
     try {
     if(s.watch){
-      const name = s.watch;
-      Interpreter.addToWatchList(name, this.components, this.componentRegistry, this);
       return;
     }
     if(s.doc){
@@ -9147,54 +9371,6 @@ Interpreter.EXEC_DISPATCH = {
   assignment: '_execAssignment',
 };
 
-
-Interpreter.addToWatchList = function (name, components, componentRegistry, ctx) {
-    const comp = components.get(name);
-    if(!comp) {
-       return;
-    }
-    if(!componentRegistry) {
-      return;
-    }
-    const handler = componentRegistry.get(comp.type);
-    if(!handler) {
-      return;
-    }
-    
-    let winfo = {
-      name,
-      comp,
-      handler,
-      ctx
-    }
-    
-    if(0){
-            if(this.componentRegistry){
-              const props = handler.getSupportedProperties();
-              for(pid in props) {
-                const property = props[pid];
-                a = {
-                  property
-                };
-              if(handler && handler.evalGetProperty){
-                const result = handler.evalGetProperty(comp, a.property, a, ctx);
-                if(result){
-                  if(a.pad && result.value){
-                    result.value = this.applyPad(result.value, a.pad);
-                    result.ref = null;
-                    result.bitWidth = result.value.length;
-                  }
-                  return result;
-                }
-             
-             }
-             }
-            }
-            throw Error(`Property ${a.property} cannot be used in expressions for component ${a.var}`);
-    }
-        
-    watchList.push(winfo);
-}
 
 // ================= BUILTIN DOC TABLE =================
 Interpreter.BUILTIN_DOC = {

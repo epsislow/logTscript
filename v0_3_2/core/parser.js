@@ -9,6 +9,7 @@ class Parser {
     this.boards = new Map();
     this.inlines = new Map();
     this.probes = [];
+    this.watches = [];
     this.componentRegistry = componentRegistry || null;
   }
   eat(type,val){
@@ -570,6 +571,9 @@ parseChipDefinition() {
       if (stmt.probe) {
         this.probes.push(stmt.probe);
       }
+      if (stmt.watch) {
+        this.watches.push(stmt.watch);
+      }
       body.push(stmt);
       continue;
     }
@@ -727,6 +731,9 @@ parseBoardDefinition() {
       this.validateBoardBodyStatement(stmt, this.c.file, stmtLine, stmtCol);
       if (stmt.probe) {
         this.probes.push(stmt.probe);
+      }
+      if (stmt.watch) {
+        this.watches.push(stmt.watch);
       }
       body.push(stmt);
       continue;
@@ -1195,16 +1202,13 @@ assignment() {
   }
 
   watch(){
-  this.eat('KEYWORD', 'watch');
-  this.eat('SYM', '(');
-  this.eat('SYM', '.');
-  
-  let name = '.' + this.c.value;
-  this.c = this.t.get();
-  
-  this.eat('SYM', ')');
-  return { watch: name };
-}
+    this.eat('KEYWORD');
+    this.eat('SYM', '(');
+    const expr = this.expr();
+    this.eat('SYM', ')');
+    this.watches.push(expr);
+    return { watch: expr };
+  }
 
   doc(){
     this.eat('KEYWORD');

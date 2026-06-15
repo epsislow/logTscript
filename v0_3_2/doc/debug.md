@@ -1,6 +1,6 @@
-# Debug output — `show`, `peek`, `probe`, and boolean LUT utilities
+# Debug output — `show`, `peek`, `probe`, `watch`, and boolean LUT utilities
 
-Statements in this group write text to the **Output** panel. The first three inspect live values; **`lutOf`** and **`exprOfLut`** generate copy-pasteable boolean logic (LUT definitions or expressions) for analysis only — they do not change the circuit.
+Statements in this group write text to the **Output** panel (or the **Timeline** panel for `watch`). The first three inspect live values; **`lutOf`** and **`exprOfLut`** generate copy-pasteable boolean logic (LUT definitions or expressions) for analysis only — they do not change the circuit.
 
 All are **statements** (like `doc`) — they cannot appear on the right side of `=`.
 
@@ -10,15 +10,15 @@ For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md]
 
 ## Quick comparison
 
-| | `show` | `peek` | `probe` | `lutOf` / `exprOfLut` |
-|---|--------|--------|---------|------------------------|
-| **Purpose** | Display settled values | Instant snapshot | Monitor every value commit | Generate or reverse boolean LUT text |
-| **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change | Immediately at statement |
-| **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) | Matters |
-| **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression | See below |
-| **Output format** | `name (type) = value` | same | `# name = value (ref) - reason` | LUT block or `Nwire out = …` lines |
-| **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Immediate (no propagation) |
-| **Runtime effect** | None (read-only) | None | None (logging only) | **None** — text for copy-paste |
+| | `show` | `peek` | `probe` | `watch` | `lutOf` / `exprOfLut` |
+|---|--------|--------|---------|---------|------------------------|
+| **Purpose** | Display settled values | Instant snapshot | Monitor every value commit | Waveform trace per signal | Generate or reverse boolean LUT text |
+| **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change | On every **committed** change | Immediately at statement |
+| **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) | **Does not matter** (registered at elaboration) | Matters |
+| **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression | **Exactly one** expression (same as `probe`) | See below |
+| **Output format** | `name (type) = value` | same | `# name = value (ref) - reason` | Timeline canvas (per channel) | LUT block or `Nwire out = …` lines |
+| **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Same commit hooks in both modes | Immediate (no propagation) |
+| **Runtime effect** | None (read-only) | None | None (logging only) | None (UI trace only) | **None** — text for copy-paste |
 
 For when wires update in the circuit, see [signal-propagation.md](signal-propagation.md).
 
@@ -734,6 +734,52 @@ probe(a)
 ```text
 # a = 1 (&0) - initialised
 ```
+
+---
+
+## `watch`
+
+### Syntax
+
+Same as `probe` — one expression per statement:
+
+```
+watch(clk)
+watch(.sw)
+watch(.u1:sum)
+watch(.P0:in)
+```
+
+Collected during **elaboration** (end of RUN), like `probe`. Does not write to **Output**; samples appear in the editor **Timeline** panel above Output.
+
+### Timeline display
+
+- One **channel** per `watch()` call (order = order in script).
+- Multi-bit values are shown as a **single digital trace**: HIGH when any bit is `1`, LOW when all bits are `0`.
+- **RISE** / **FALL** edges are drawn when that collapsed level changes; the formatted value is shown on edges.
+- Time axis = **event order** (monotonic sample index + cycle), not simulated milliseconds.
+- **Pause** / **Live** on the panel freeze or resume auto-scroll; drag on the canvas to scroll history.
+
+### Example
+
+```logts-play
+1wire clk = 0
+1wire en = 0
+
+watch(clk)
+watch(en)
+
+clk = 1
+en = 1
+```
+
+After **Run**, open the Timeline panel to see both channels toggle.
+
+### Rules
+
+- Same target rules and limitations as `probe` (wires, `.comp:prop`, chip pout `:name`, internal `.inst.wire`).
+- Duplicate `watch` on the same signal creates duplicate channels.
+- Editor-only (not in `run_tests.html`).
 
 ---
 
