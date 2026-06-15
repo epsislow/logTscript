@@ -13,10 +13,10 @@ todos:
     status: completed
   - id: phase2-exprOfLut-auto
     content: "exprOfLut din attributes.description/filters; varyingBitLabels, replayFilteredEnvs; varSpecs manual fallback"
-    status: pending
+    status: completed
   - id: phase2-tests-doc
-    content: Teste 1148-1152; boolean-lut.md + boolean_analysis_helpers.plan.md; _gen_manifest.js
-    status: pending
+    content: Teste 1148-1153; boolean-lut.md; _gen_manifest.js
+    status: completed
 isProject: false
 ---
 

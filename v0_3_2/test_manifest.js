@@ -713,7 +713,13 @@
       {"id":1143,"group":"bool-lut","title":"lutOf cu filtre — length 32 + attributes","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)"],"steps":[],"assertions":["description","filters attr","length","data count"]}},
       {"id":1144,"group":"bool-lut","title":"lutOf fără filtre — description fără filters","detail":{"scripts":["lutOf(OR(A, B))"],"steps":[],"assertions":["description","no filters attr","length"]}},
       {"id":1145,"group":"bool-lut-mb","title":"lutOf filtre >8 biți intrare OK","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)"],"steps":[],"assertions":["no err","length 32"]}},
-      {"id":1147,"group":"bool-analysis","title":"filtre fără virgulă — eroare parse","detail":{"scripts":["lutOf(OR(A, B), A=01x1x B=x)"],"steps":[],"assertions":["comma required"]}}
+      {"id":1147,"group":"bool-analysis","title":"filtre fără virgulă — eroare parse","detail":{"scripts":["lutOf(OR(A, B), A=01x1x B=x)"],"steps":[],"assertions":["comma required"]}},
+      {"id":1148,"group":"bool-lut","title":"exprOfLut auto din filters — 2 linii","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)"],"steps":["run(gen + '\\nexprOfLut(.generated)') [nerezolvat]"],"assertions":["lines","no err"]}},
+      {"id":1149,"group":"bool-lut-mb","title":"exprOfLut auto — slice refs din filtre","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)"],"steps":["run(gen + '\\nexprOfLut(.generated)') [nerezolvat]"],"assertions":["A.4","C.4","B ref","not whole A"]}},
+      {"id":1150,"group":"bool-lut-mb","title":"exprOfLut manual = auto cu filtre","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)"],"steps":["run(gen + '\\nexprOfLut(.generated)') [nerezolvat]","run(gen + '\\nexprOfLut(.generated, A.2, A.4, B, C.4)') [nerezolvat]"],"assertions":["same std"]}},
+      {"id":1151,"group":"bool-lut","title":"exprOfLut fără variabile și fără filters — eroare","detail":{"scripts":["inline [lut] .or2:\n  depth: 1\n  length: 4\n  data {\n    00 : 0\n    01 : 1\n    10 : 1\n    11 : 1\n  }\n  :\nexprOfLut(.or2)"],"steps":[],"assertions":["err"]}},
+      {"id":1152,"group":"bool-lut-mb","title":"exprOfLut variabile incompatibile cu filters","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)"],"steps":["run(gen + '\\nexprOfLut(.generated, A, B, C)') [nerezolvat]"],"assertions":["mismatch"]}},
+      {"id":1153,"group":"bool-lut-mb","title":"exprOfLut ignoră # — folosește filters:","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)"],"steps":["run(tampered + '\\nexprOfLut(.generated)') [nerezolvat]"],"assertions":["lines","slice"]}}
     ],
     groups: [
       { id: 'repeat', label: 'Repeat preprocessor', rangeLabel: '6–10, 13–17, 19–21', testIds: [6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 19, 20, 21] },
@@ -758,8 +764,8 @@
       { id: 'other', label: 'Other', rangeLabel: '38–39', testIds: [38, 39] },
       { id: 'lut-ext', label: 'lut-ext', rangeLabel: '1067–1074', testIds: [1067, 1068, 1069, 1070, 1071, 1072, 1073, 1074] },
       { id: 'protocol-ext', label: 'protocol-ext', rangeLabel: '1075–1090', testIds: [1075, 1076, 1077, 1078, 1079, 1080, 1081, 1082, 1083, 1084, 1085, 1086, 1087, 1088, 1089, 1090] },
-      { id: 'bool-lut', label: 'bool-lut', rangeLabel: '1091–1107, 1122, 1136, 1143–1144', testIds: [1091, 1092, 1093, 1094, 1095, 1096, 1097, 1098, 1099, 1100, 1101, 1102, 1103, 1104, 1105, 1106, 1107, 1122, 1136, 1143, 1144] },
-      { id: 'bool-lut-mb', label: 'bool-lut-mb', rangeLabel: '1108–1121, 1123–1124, 1145', testIds: [1108, 1109, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121, 1123, 1124, 1145] },
+      { id: 'bool-lut', label: 'bool-lut', rangeLabel: '1091–1107, 1122, 1136, 1143–1144, 1148, 1151', testIds: [1091, 1092, 1093, 1094, 1095, 1096, 1097, 1098, 1099, 1100, 1101, 1102, 1103, 1104, 1105, 1106, 1107, 1122, 1136, 1143, 1144, 1148, 1151] },
+      { id: 'bool-lut-mb', label: 'bool-lut-mb', rangeLabel: '1108–1121, 1123–1124, 1145, 1149–1150, 1152–1153', testIds: [1108, 1109, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121, 1123, 1124, 1145, 1149, 1150, 1152, 1153] },
       { id: 'bool-analysis', label: 'bool-analysis', rangeLabel: '1125–1133, 1137–1140, 1142, 1147', testIds: [1125, 1126, 1127, 1128, 1129, 1130, 1131, 1132, 1133, 1137, 1138, 1139, 1140, 1142, 1147] },
       { id: 'bool-analysis-mb', label: 'bool-analysis-mb', rangeLabel: '1134–1135, 1141', testIds: [1134, 1135, 1141] }
     ]

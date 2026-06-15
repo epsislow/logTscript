@@ -5711,5 +5711,63 @@ reg(1147, 'bool-analysis', 'filtre fără virgulă — eroare parse', function(h
   h.assert('comma required', String(err.includes("Expected ',' between filter assignments")), 'true');
 });
 
+reg(1148, 'bool-lut', 'exprOfLut auto din filters — 2 linii', function(h, session) {
+  const gen = session.run(`5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+  const { out } = session.run(gen + '\nexprOfLut(.generated)');
+  h.assert('lines', String(out.length), '2');
+  h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
+});
+
+reg(1149, 'bool-lut-mb', 'exprOfLut auto — slice refs din filtre', function(h, session) {
+  const gen = session.run(`5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+  const { out } = session.run(gen + '\nexprOfLut(.generated)');
+  const std = out[1] || '';
+  h.assert('A.4', String(std.includes('A.4')), 'true');
+  h.assert('C.4', String(std.includes('C.4')), 'true');
+  h.assert('B ref', String(std.includes('B')), 'true');
+  h.assert('not whole A', String(!/OR\(A,/.test(std) && !/AND\(A,/.test(std)), 'true');
+});
+
+reg(1150, 'bool-lut-mb', 'exprOfLut manual = auto cu filtre', function(h, session) {
+  const gen = session.run(`5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+  const auto = session.run(gen + '\nexprOfLut(.generated)').out;
+  const manual = session.run(gen + '\nexprOfLut(.generated, A.2, A.4, B, C.4)').out;
+  h.assert('same std', manual[1], auto[1]);
+});
+
+reg(1151, 'bool-lut', 'exprOfLut fără variabile și fără filters — eroare', function(h, session) {
+  const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2)');
+  h.assert('err', String(out.some(l => l.includes('supply variables') || l.includes('filters:'))), 'true');
+});
+
+reg(1152, 'bool-lut-mb', 'exprOfLut variabile incompatibile cu filters', function(h, session) {
+  const gen = session.run(`5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+  const { out } = session.run(gen + '\nexprOfLut(.generated, A, B, C)');
+  h.assert('mismatch', String(out.some(l => l.includes('do not match LUT filters') || l.includes('expects'))), 'true');
+});
+
+reg(1153, 'bool-lut-mb', 'exprOfLut ignoră # — folosește filters:', function(h, session) {
+  const gen = session.run(`5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+  const tampered = gen.replace('filters:', '# filters: fake\n  filters:');
+  const { out } = session.run(tampered + '\nexprOfLut(.generated)');
+  h.assert('lines', String(out.length), '2');
+  h.assert('slice', String((out[1] || '').includes('A.4')), 'true');
+});
+
   suite.finalize();
 })();

@@ -1312,12 +1312,30 @@ Instance name is always **\`.generated\`**. Paste the block into a script, then 
 
 ---
 
-## \`exprOfLut(.lut, variables…)\`
+## \`exprOfLut(.lut [, variables…])\`
 
 Rebuild logic from a LUT instance (inline \`[lut]\` or \`comp [lut]\`). **Always emits two lines:**
 
 1. Short-notation assignment (backticks)
 2. Standard notation assignment (\`OR\`, \`AND\`, …)
+
+### With \`filters:\` attribute (auto)
+
+When the LUT has \`description:\` and \`filters:\` (as emitted by \`lutOf\` with filters), variables can be omitted:
+
+\`\`\`logts-play
+5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+exprOfLut(.generated)
+\`\`\`
+
+\`exprOfLut\` reads \`attributes.description\` and \`attributes.filters\` — not \`#\` comments. Only bit positions marked \`x\` in the filter patterns become variables (e.g. \`A.2\`, \`A.4\`, \`B\`, \`C.4\` for \`A=01x1x, B=x, C=1001x\`).
+
+You can still pass variables explicitly; they must match the varying bits from \`filters:\`.
+
+### Manual variables (LUT without filters)
 
 \`\`\`logts-play
 inline [lut] .or2:

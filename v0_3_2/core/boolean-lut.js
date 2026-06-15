@@ -189,6 +189,156 @@ function formatFiltersAttribute(filters) {
   return filters.map(f => `${filterSpecKey(f)}=${f.pattern}`).join(', ');
 }
 
+function parseColumnRefString(ref) {
+  const s = ref.trim();
+  const dot = s.indexOf('.');
+  if (dot < 0) return { name: s, bitRange: null };
+  const name = s.slice(0, dot);
+  const rest = s.slice(dot + 1);
+  if (rest.includes('/')) {
+    const slash = rest.indexOf('/');
+    const start = parseInt(rest.slice(0, slash), 10);
+    const len = parseInt(rest.slice(slash + 1), 10);
+    if (isNaN(start) || isNaN(len)) {
+      throw new Error(`exprOfLut: invalid column reference '${ref}'`);
+    }
+    return { name, bitRange: { start, end: start + len - 1, isLength: true, len } };
+  }
+  if (rest.includes('-')) {
+    const dash = rest.indexOf('-');
+    const start = parseInt(rest.slice(0, dash), 10);
+    const end = parseInt(rest.slice(dash + 1), 10);
+    if (isNaN(start) || isNaN(end)) {
+      throw new Error(`exprOfLut: invalid column reference '${ref}'`);
+    }
+    return { name, bitRange: { start, end } };
+  }
+  const start = parseInt(rest, 10);
+  if (isNaN(start)) throw new Error(`exprOfLut: invalid column reference '${ref}'`);
+  return { name, bitRange: { start, end: start } };
+}
+
+function parseLutDescriptionString(s) {
+  const arrow = s.indexOf('->');
+  if (arrow < 0) throw new Error('exprOfLut: invalid description (missing ->)');
+  const left = s.slice(0, arrow).trim();
+  const columns = [];
+  for (const part of left.split(',')) {
+    const seg = part.trim();
+    if (!seg) continue;
+    const m = seg.match(/^(.+?)\s+(\d+)b$/);
+    if (!m) throw new Error(`exprOfLut: invalid description column '${seg}'`);
+    const ref = parseColumnRefString(m[1].trim());
+    const width = parseInt(m[2], 10);
+    const atom = { var: ref.name, bitRange: ref.bitRange };
+    const key = columnKey(atom);
+    columns.push({ key, atom, width, header: formatColumnHeader(atom, width) });
+  }
+  if (columns.length === 0) throw new Error('exprOfLut: description has no columns');
+  return columns;
+}
+
+function parseFiltersAttributeString(s) {
+  const filters = [];
+  for (const part of s.split(',')) {
+    const seg = part.trim();
+    if (!seg) continue;
+    const eq = seg.indexOf('=');
+    if (eq < 0) throw new Error(`exprOfLut: invalid filter segment '${seg}'`);
+    const ref = parseColumnRefString(seg.slice(0, eq).trim());
+    const pattern = seg.slice(eq + 1).trim();
+    if (!pattern) throw new Error(`exprOfLut: missing pattern in filter '${seg}'`);
+    filters.push({ name: ref.name, bitRange: ref.bitRange, pattern });
+  }
+  if (filters.length === 0) throw new Error('exprOfLut: filters attribute is empty');
+  return filters;
+}
+
+function varyingBitLabels(columns, filterMap) {
+  const labels = [];
+  for (const col of columns) {
+    const bitLabels = columnToBitLabels(col);
+    const pattern = filterMap ? filterMap.get(col.key) : null;
+    if (!pattern) {
+      labels.push(...bitLabels);
+    } else {
+      for (let i = 0; i < pattern.length; i++) {
+        if (pattern[i] === 'x') labels.push(bitLabels[i]);
+      }
+    }
+  }
+  return labels;
+}
+
+function replayFilteredEnvs(columns, filterMap) {
+  const addrWidth = columns.reduce((s, c) => s + c.width, 0);
+  const fullLength = 1 << addrWidth;
+  const envs = [];
+  for (let addr = 0; addr < fullLength; addr++) {
+    const env = addrBitsToColumns(columns, addr);
+    if (!rowMatchesFilters(columns, env, filterMap)) continue;
+    envs.push(env);
+  }
+  return envs;
+}
+
+function extractVaryingBitsFromEnv(env, columns, filterMap) {
+  let bits = '';
+  for (const col of columns) {
+    const pattern = filterMap ? filterMap.get(col.key) : null;
+    const val = env[col.key];
+    if (!pattern) {
+      bits += val;
+    } else {
+      for (let i = 0; i < pattern.length; i++) {
+        if (pattern[i] === 'x') bits += val[i];
+      }
+    }
+  }
+  return bits;
+}
+
+function buildFilteredOutputsByMinterm(lutInst, columns, filterMap) {
+  const { length, depth, outputsByBit } = extractLutOutputs(lutInst);
+  const labels = varyingBitLabels(columns, filterMap);
+  const numVars = labels.length;
+  const envs = replayFilteredEnvs(columns, filterMap);
+
+  if (envs.length !== length) {
+    throw new Error(`exprOfLut: LUT row count ${length} does not match filter replay ${envs.length}`);
+  }
+  if (numVars > 8) {
+    throw new Error(BOOLEAN_ANALYSIS_TOO_WIDE_ERR);
+  }
+
+  const tableSize = 1 << numVars;
+  if (length !== tableSize) {
+    throw new Error(`exprOfLut expects ${lutAddrBits(length)} input bits but received ${numVars}`);
+  }
+
+  const reindexed = [];
+  for (let b = 0; b < depth; b++) reindexed.push(new Array(tableSize).fill(false));
+
+  for (let rowIdx = 0; rowIdx < length; rowIdx++) {
+    const varyingBits = extractVaryingBitsFromEnv(envs[rowIdx], columns, filterMap);
+    const mintermIdx = parseInt(varyingBits, 2);
+    if (isNaN(mintermIdx) || mintermIdx < 0 || mintermIdx >= tableSize) {
+      throw new Error(`exprOfLut: invalid varying bits '${varyingBits}' at row ${rowIdx}`);
+    }
+    for (let b = 0; b < depth; b++) {
+      reindexed[b][mintermIdx] = outputsByBit[b][rowIdx];
+    }
+  }
+
+  return { labels, outputsByBit: reindexed, depth, numVars };
+}
+
+function labelsMatch(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 function addrBitsToColumns(columns, addr) {
   const env = {};
   let shift = 0;
@@ -528,13 +678,48 @@ function extractLutOutputs(lutInst) {
 }
 
 function exprOfLutGenerate(lutInst, varSpecs, widthResolver) {
-  const { labels, resolved } = expandExprOfLutVars(varSpecs, widthResolver);
-  const sumWidth = resolved.reduce((s, r) => s + r.width, 0);
-  const { length, depth, outputsByBit } = extractLutOutputs(lutInst);
-  const expected = lutAddrBits(length);
+  const attrs = lutInst.attributes || {};
+  let labels;
+  let outputsByBit;
+  let depth;
 
-  if (sumWidth !== expected) {
-    throw new Error(`exprOfLut expects ${expected} input bits but received ${sumWidth}`);
+  if (varSpecs.length > 0 && attrs.filters && attrs.description) {
+    const columns = parseLutDescriptionString(attrs.description);
+    const filters = parseFiltersAttributeString(attrs.filters);
+    const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut');
+    const autoLabels = varyingBitLabels(columns, filterMap);
+    const expanded = expandExprOfLutVars(varSpecs, widthResolver);
+    if (!labelsMatch(expanded.labels, autoLabels)) {
+      throw new Error(`exprOfLut: variables do not match LUT filters: expected [${autoLabels.join(', ')}]`);
+    }
+    const built = buildFilteredOutputsByMinterm(lutInst, columns, filterMap);
+    labels = built.labels;
+    outputsByBit = built.outputsByBit;
+    depth = built.depth;
+  } else if (varSpecs.length > 0) {
+    const expanded = expandExprOfLutVars(varSpecs, widthResolver);
+    labels = expanded.labels;
+    const sumWidth = expanded.resolved.reduce((s, r) => s + r.width, 0);
+    const extracted = extractLutOutputs(lutInst);
+    depth = extracted.depth;
+    outputsByBit = extracted.outputsByBit;
+    const expected = lutAddrBits(extracted.length);
+    if (sumWidth !== expected) {
+      throw new Error(`exprOfLut expects ${expected} input bits but received ${sumWidth}`);
+    }
+  } else if (attrs.filters) {
+    if (!attrs.description) {
+      throw new Error('exprOfLut: LUT has filters: but no description: attribute');
+    }
+    const columns = parseLutDescriptionString(attrs.description);
+    const filters = parseFiltersAttributeString(attrs.filters);
+    const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut');
+    const built = buildFilteredOutputsByMinterm(lutInst, columns, filterMap);
+    labels = built.labels;
+    outputsByBit = built.outputsByBit;
+    depth = built.depth;
+  } else {
+    throw new Error('exprOfLut: supply variables or use a LUT with filters: attribute');
   }
 
   const minimizeFn = typeof minimizeBoolean === 'function' ? minimizeBoolean : null;

@@ -305,22 +305,24 @@ function parseLutBody(bodyRaw) {
     }
 
     const colon = trimmed.indexOf(':');
-    if (colon >= 0 && trimmed.indexOf('=') < 0) {
+    if (colon >= 0) {
       const key = trimmed.slice(0, colon).trim();
       const val = trimmed.slice(colon + 1).trim();
-      if (key === 'depth' || key === 'length') {
-        const n = parseInt(val, 10);
-        if (isNaN(n)) throw new Error(`Invalid LUT ${key} value '${val}'`);
-        attributes[key] = n;
-        continue;
-      }
-      if (key === 'fillwith') {
-        attributes.fillwith = val;
-        continue;
-      }
       if (key === 'description' || key === 'filters') {
         attributes[key] = val;
         continue;
+      }
+      if (trimmed.indexOf('=') < 0) {
+        if (key === 'depth' || key === 'length') {
+          const n = parseInt(val, 10);
+          if (isNaN(n)) throw new Error(`Invalid LUT ${key} value '${val}'`);
+          attributes[key] = n;
+          continue;
+        }
+        if (key === 'fillwith') {
+          attributes.fillwith = val;
+          continue;
+        }
       }
     }
 
