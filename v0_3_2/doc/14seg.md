@@ -59,4 +59,4 @@ Shows **A** (ASCII 65).
 
 - Segment names include `g1`, `g2` for the two center bars.
 - Not allowed in [chip.md](chip.md) bodies.
-- Related: [seven-seg.md](seven-seg.md), [lcd.md](lcd.md).
+- Related: [seven-seg.md](seven-seg.md), [lcd.md](lcd.md), [lut.md](lut.md#display-decode--hex-0f) (hex 0–F via LUT).

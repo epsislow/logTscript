@@ -4702,6 +4702,89 @@ function runProbeLut(h, session) {
 reg(876, 'lut', 'probe(.lut:get) — initialised and changed', runProbeLut);
 reg(877, 'lut', 'probe(.lut:get) — wave', runProbeLut, { propagation: 'wave' });
 
+const LUT_DIP_INLINE = `comp [dip] .sw:
+  length: 4
+  = 0000
+  :
+
+inline [lut] .hex7:
+  depth: 8
+  length: 16
+  data {
+    0000: 11111100
+    0001: 01100000
+    0101: 10110110
+    1111: 10001110
+  }
+  :
+
+8wire segs = .hex7(.sw:get)`;
+
+function runLutDipInlinePropagate(h, session) {
+  const { interp } = session.run(LUT_DIP_INLINE);
+  h.assert('initial digit 0', session.getWire(interp, 'segs'), '11111100');
+  session.setComp(interp, '.sw', '0101');
+  h.assert('digit 5', session.getWire(interp, 'segs'), '10110110');
+  session.setComp(interp, '.sw', '1111');
+  h.assert('digit F', session.getWire(interp, 'segs'), '10001110');
+}
+
+reg(1188, 'lut', 'inline LUT invoke propagates on dip change (wave)', runLutDipInlinePropagate, { propagation: 'wave' });
+reg(1189, 'lut', 'inline LUT invoke propagates on dip change (legacy)', runLutDipInlinePropagate, { propagation: 'legacy' });
+
+reg(1190, 'lut', 'inline LUT invoke propagates via wire address (wave)', function(h, session) {
+  const src = LUT_DIP_INLINE.replace(
+    '8wire segs = .hex7(.sw:get)',
+    '4wire sw = .sw:get\n8wire segs = .hex7(in = sw)'
+  );
+  const { interp } = session.run(src);
+  h.assert('initial', session.getWire(interp, 'segs'), '11111100');
+  session.setComp(interp, '.sw', '0101');
+  h.assert('after dip via wire', session.getWire(interp, 'segs'), '10110110');
+}, { propagation: 'wave' });
+
+const LUT_7SEG_DISPLAY = `comp [dip] .sw:
+  length: 4
+  = 0000
+  :
+
+inline [lut] .hex7:
+  depth: 8
+  length: 16
+  data {
+    0000: 11111100
+    1110: 10011110
+    1111: 10001110
+  }
+  :
+
+8wire segs = .hex7(.sw:get)
+
+comp [7seg] .digit:
+  on: 1
+  nl
+  :
+
+.digit:{
+  a = segs.0
+  b = segs.1
+  c = segs.2
+  d = segs.3
+  e = segs.4
+  f = segs.5
+  g = segs.6
+  h = segs.7
+  set = 1
+}`;
+
+reg(1191, 'lut', '7seg segments from LUT wire (MSB=a, wave)', function(h, session) {
+  const { interp } = session.run(LUT_7SEG_DISPLAY);
+  const comp = interp.components.get('.digit');
+  h.assert('digit 0 pattern', comp.lastSegmentValue, '11111100');
+  session.setComp(interp, '.sw', '1110');
+  h.assert('digit E pattern', comp.lastSegmentValue, '10011110');
+}, { propagation: 'wave' });
+
 reg(878, 'lut', 'doc(comp.lut) — type syntax', function(h, session) {
   const out = session.runDoc('doc(comp.lut)');
   h.assert('data block', String(out.some(l => l.includes('data {'))), 'true');

@@ -300,6 +300,30 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
 
 /* Extracted from interpreter.js — dependency analysis and signal propagation logic */
 
+Interpreter.prototype.forEachSubExprInAtom = function(atom, visit) {
+  if (!atom || typeof visit !== 'function') return;
+  const nested = [];
+  if (atom.group) nested.push(atom.group);
+  if (atom.call && Array.isArray(atom.args)) nested.push(...atom.args);
+  if (atom.func && atom.args) {
+    for (const argExpr of atom.args) {
+      if (Array.isArray(argExpr)) nested.push(argExpr);
+    }
+  }
+  if (atom.compInvoke && atom.compInvoke.args) {
+    nested.push(...Object.values(atom.compInvoke.args));
+  }
+  if (atom.protocolInvoke && atom.protocolInvoke.args) {
+    nested.push(...Object.values(atom.protocolInvoke.args));
+  }
+  if (atom.inlineMethod && atom.inlineMethod.args) {
+    nested.push(...atom.inlineMethod.args);
+  }
+  for (const sub of nested) {
+    if (Array.isArray(sub)) visit(sub);
+  }
+};
+
 Interpreter.prototype.exprReferencesComponent = function(expr, compName, compRef){
   if(!expr) return false;
   
@@ -318,14 +342,12 @@ Interpreter.prototype.exprReferencesComponent = function(expr, compName, compRef
     if(atom.ref && compRef && atom.ref === compRef){
       return true;
     }
-    // Check if it's a function call - recursively check arguments
-    if(atom.call){
-      for(const argExpr of atom.args){
-        if(this.exprReferencesComponent(argExpr, compName, compRef)){
-          return true;
-        }
-      }
-    }
+    // Check nested sub-expressions (calls, LUT/comp invoke, protocol, inline methods)
+    let nestedRef = false;
+    this.forEachSubExprInAtom(atom, (sub) => {
+      if (!nestedRef && this.exprReferencesComponent(sub, compName, compRef)) nestedRef = true;
+    });
+    if (nestedRef) return true;
   }
   
   // Check all atoms in the expression
@@ -346,14 +368,11 @@ Interpreter.prototype.exprReferencesComponent = function(expr, compName, compRef
     if(atom.ref && compRef && atom.ref.includes(compRef)){
       return true;
     }
-    // Check if it's a function call - recursively check arguments
-    if(atom.call){
-      for(const argExpr of atom.args){
-        if(this.exprReferencesComponent(argExpr, compName, compRef)){
-          return true;
-        }
-      }
-    }
+    let nestedRef = false;
+    this.forEachSubExprInAtom(atom, (sub) => {
+      if (!nestedRef && this.exprReferencesComponent(sub, compName, compRef)) nestedRef = true;
+    });
+    if (nestedRef) return true;
   }
   
   return false;
@@ -368,23 +387,11 @@ Interpreter.prototype.exprReferencesWire = function(expr, wireName){
       return true;
     }
     
-    // Check if it's a function call - recursively check arguments
-    if(atom.call){
-      for(const argExpr of atom.args){
-        if(this.exprReferencesWire(argExpr, wireName)){
-          return true;
-        }
-      }
-    }
-    
-    // Check if it's a user-defined function call - recursively check arguments
-    if(atom.func && atom.args){
-      for(const argExpr of atom.args){
-        if(Array.isArray(argExpr) && this.exprReferencesWire(argExpr, wireName)){
-          return true;
-        }
-      }
-    }
+    let nestedRef = false;
+    this.forEachSubExprInAtom(atom, (sub) => {
+      if (!nestedRef && this.exprReferencesWire(sub, wireName)) nestedRef = true;
+    });
+    if (nestedRef) return true;
   }
   
   return false;
@@ -1218,23 +1225,9 @@ Interpreter.prototype.collectExprDependencies = function(expr, deps, wireDeps = 
       wireDeps.add(atom.var);
     }
     
-    // Also check nested expressions in function calls (like MUX)
-    if(atom.func && atom.args){
-      for(const arg of atom.args){
-        if(Array.isArray(arg)){
-          this.collectExprDependencies(arg, deps, wireDeps);
-        }
-      }
-    }
-    
-    // Also check user-defined function calls (atom.call)
-    if(atom.call && atom.args){
-      for(const arg of atom.args){
-        if(Array.isArray(arg)){
-          this.collectExprDependencies(arg, deps, wireDeps);
-        }
-      }
-    }
+    this.forEachSubExprInAtom(atom, (sub) => {
+      this.collectExprDependencies(sub, deps, wireDeps);
+    });
   }
 };
 

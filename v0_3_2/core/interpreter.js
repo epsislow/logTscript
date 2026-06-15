@@ -1608,15 +1608,8 @@ class Interpreter {
       if (atom.var && !atom.var.startsWith('.') && atom.var !== '~' && atom.var !== '%' && atom.var !== '$') {
         if (this.wires.has(atom.var)) outSet.add(atom.var);
       }
-      if (atom.call && atom.args) {
-        for (const arg of atom.args) {
-          if (Array.isArray(arg)) this.collectWireInputsFromExpr(arg, outSet);
-        }
-      }
-      if (atom.func && atom.args) {
-        for (const arg of atom.args) {
-          if (Array.isArray(arg)) this.collectWireInputsFromExpr(arg, outSet);
-        }
+      if (typeof this.forEachSubExprInAtom === 'function') {
+        this.forEachSubExprInAtom(atom, (sub) => this.collectWireInputsFromExpr(sub, outSet));
       }
     }
   }

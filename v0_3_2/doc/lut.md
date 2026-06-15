@@ -606,6 +606,129 @@ doc(.decoder)
 
 ---
 
+## Display decode — hex 0–F
+
+A **lookup table** can replace the built-in hex decoder on [7seg](seven-seg.md) or [14seg](14seg.md): 4-bit address in → segment pattern out, combinational in the same step.
+
+Segment patterns below match the `hex` pin maps in `doc(comp.7seg)` / `doc(comp.14seg)` (7-seg: 8 bits `a`–`g` + DP `h`; 14-seg: 15 bits including `dp`).
+
+### Runnable — 7-segment hex decoder
+
+**Load & Run**, then flip the **Hex** DIP switches (`0000` … `1111`) — the display shows digits **0**–**F**.
+
+```logts-play
+comp [dip] .sw:
+  length: 4
+  text: 'Hex'
+  visual: 1
+  = 0000
+  :
+
+inline [lut] .hex7:
+  depth: 8
+  length: 16
+  data {
+    0000: 11111100
+    0001: 01100000
+    0010: 11011010
+    0011: 11110010
+    0100: 01100110
+    0101: 10110110
+    0110: 10111110
+    0111: 11100000
+    1000: 11111110
+    1001: 11110110
+    1010: 11101110
+    1011: 00111110
+    1100: 10011100
+    1101: 01111010
+    1110: 10011110
+    1111: 10001110
+  }
+  :
+
+8wire segs = .hex7(.sw:get)
+
+comp [7seg] .digit:
+  color: ^f00
+  scale: 2
+  nl
+  on: 1
+  :
+
+.digit:{
+  a = segs.0
+  b = segs.1
+  c = segs.2
+  d = segs.3
+  e = segs.4
+  f = segs.5
+  g = segs.6
+  h = segs.7
+  set = 1
+}
+```
+
+`8wire segs = .hex7(.sw:get)` — address from the DIP bus; each LUT row is one hex digit’s segment pattern (`11111100` = digit **0**, `10001110` = **F**).
+
+Wire bits are **MSB-first** ([short-notation.md](short-notation.md)): `segs.0` = segment **a**, …, `segs.7` = decimal point **h**. The 8-bit LUT values match `hexTo7Seg` + `h = 0` (same order as pin `hex` on `7seg`).
+
+When the DIP changes (wave or legacy propagation), wires that use `.hex7(.sw:get)` or `.hex7(in = sw)` with `sw = .sw:get` are **re-evaluated** in the same step. Use `.sw:get` (or `in = addr` with a wire fed from `:get`), not bare `.sw` on a wire assignment.
+
+### Runnable — 14-segment hex decoder
+
+**Load & Run**, then flip **Hex** DIP — alphanumeric **0**–**F** on the 14-seg panel.
+
+```logts-play
+comp [dip] .sw:
+  length: 4
+  text: 'Hex'
+  visual: 1
+  = 0000
+  :
+
+inline [lut] .hex14:
+  depth: 15
+  length: 16
+  data {
+    0000: 111111000010010
+    0001: 011000000010000
+    0010: 110110110000000
+    0011: 111100110000000
+    0100: 011001110000000
+    0101: 101101110000000
+    0110: 101111110000000
+    0111: 111000000000000
+    1000: 111111110000000
+    1001: 111101110000000
+    1010: 111011110000000
+    1011: 001111110000000
+    1100: 100111000000000
+    1101: 011110110000000
+    1110: 100111110000000
+    1111: 100011110000000
+  }
+  :
+
+15wire pat = .hex14(.sw:get)
+
+comp [14seg] .disp:
+  color: ^0f0
+  scale: 2
+  nl
+  on: 1
+  :
+
+.disp:{
+  data = pat
+  set = 1
+}
+```
+
+On [14seg](14seg.md), pin `data` (15 bits) accepts the full LUT output in one assignment — no per-segment wiring.
+
+---
+
 ## vs `mem`
 
 | | `lut` | `mem` |
@@ -641,6 +764,7 @@ doc(.decoder)
 - [boolean-analysis.md](boolean-analysis.md) — `truthTableOf`, `simplify`, `equivalent`, `inputsOf`, `costOf`
 - [huffman.md](huffman.md) — end-to-end Huffman example (`prefixFree` + `expand` / `collapse`)
 - [protocol.md](protocol.md) — `expand` / `collapse` with LUT; `:decode()` on channels
+- [seven-seg.md](seven-seg.md), [14seg.md](14seg.md) — display decode examples (hex 0–F LUT)
 - [mem.md](mem.md) — sequential RAM
 - [asm.md](asm.md) — inline assembler (blob into `mem`)
 - [debug.md](debug.md) — `probe`, `show`, `peek`, `lutOf`, `exprOfLut`

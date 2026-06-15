@@ -74,4 +74,4 @@ Shows digit **5**.
 
 - Not allowed in [chip.md](chip.md) bodies.
 - `probe(.disp:get)` — [debug.md](debug.md).
-- Related: [14seg.md](14seg.md), [dots.md](dots.md).
+- Related: [14seg.md](14seg.md), [dots.md](dots.md), [lut.md](lut.md#display-decode--hex-0f) (hex 0–F via LUT).
