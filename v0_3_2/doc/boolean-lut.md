@@ -209,3 +209,75 @@ exprOfLut(.generated)
 | Non-boolean in `lutOf` | `'LSHIFT' is not a boolean operation` |
 | prefixFree / variableDepth LUT | `exprOfLut: prefixFree LUT not supported` |
 | Missing LUT | `exprOfLut: LUT '.name' not found` |
+
+---
+
+## Runtime bridge — `useLutAs`, inline `lutOf` body, `useExpr`
+
+These forms apply the same generators **at runtime** in one script (no copy-paste). They do **not** emit Output.
+
+| Form | Role |
+|------|------|
+| `lutOf` / `exprOfLut` | Unchanged — analysis only, emit Output |
+| `useLutAs(lutOf(expr [, filters]), .name)` | Register `inline [lut] .name` from expression |
+| `inline [lut] .name: lutOf(expr) :` | Same as `useLutAs`, declarative body |
+| `Nw u = useExpr(exprOfLut(.lut [, vars…]))` | Assign wire from minimized boolean expr |
+
+### `useLutAs(lutOf(…), .name)`
+
+```logts-play
+useLutAs(lutOf(OR(A, B)), .gen)
+1wire A := 1
+1wire B := 0
+1wire y = .gen(10)
+show(y)
+```
+
+### Inline body `lutOf`
+
+```logts-play
+inline [lut] .gen:
+  lutOf(`A | B`)
+  :
+
+1wire y = .gen(01)
+show(y)
+```
+
+### `useExpr(exprOfLut(…))` — assignment only
+
+Only valid as the **right-hand side** of a wire assignment (including `Nw u = …` or `u = …` after a declaration).
+
+```logts-play
+inline [lut] .or2:
+  depth: 1
+  length: 4
+  data { 00:0, 01:1, 10:1, 11:1 }
+  :
+
+1wire A := 0
+1wire B := 1
+1wire u = useExpr(exprOfLut(.or2, A, B))
+show(u)
+```
+
+Split declaration:
+
+```logts-play
+1wire A := 0
+1wire B := 1
+1wire u
+u = useExpr(exprOfLut(.or2, A, B))
+```
+
+### Lowering (re-execution)
+
+On the **first** execution of a `useExpr` assignment, the runtime:
+
+1. Runs `exprOfLut` / QM **once**
+2. Replaces the assignment AST with the standard boolean expression (e.g. `OR(A, B)`)
+3. On later propagations (when `A` or `B` change), only that expression is re-evaluated — **no** repeated `exprOfLut`
+
+Wire width on the left must match LUT `depth`; mismatch → `useExpr: wire width Nb does not match expression depth Mb`.
+
+`useExpr(…)` as a standalone statement is a **parse error**.

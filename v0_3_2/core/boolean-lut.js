@@ -611,35 +611,90 @@ function formatMultiBitStandard(segments) {
 
 const LUT_OF_INLINE_NAME = '.generated';
 
-function lutOfGenerate(exprAst, widthResolver, filters) {
+function lutOfBuild(exprAst, widthResolver, filters) {
   const columns = discoverLutOfInputs(exprAst, widthResolver);
   const filterMap = validateAndBuildFilterMap(columns, filters, 'lutOf');
   const { rows, addrWidth, outWidth } = collectFilteredRows(exprAst, columns, widthResolver, filterMap);
 
   const description = `${columns.map(c => c.header).join(', ')} -> out ${outWidth}b`;
-  const inner = [`description: ${description}`];
+  const attributes = { description };
   if (filters && filters.length > 0) {
-    inner.push(`filters: ${formatFiltersAttribute(filters)}`);
+    attributes.filters = formatFiltersAttribute(filters);
   }
 
   const length = filterMap ? rows.length : (1 << addrWidth);
   const addrPad = filterMap ? bitIndexWidth(length) : addrWidth;
 
-  inner.push('', `depth: ${outWidth}`, `length: ${length}`, 'data {');
+  attributes.depth = outWidth;
+  attributes.length = length;
+
+  const entries = [];
+  const rawEntries = [];
   for (let i = 0; i < rows.length; i++) {
-    const addrStr = filterMap
-      ? i.toString(2).padStart(addrPad, '0')
-      : i.toString(2).padStart(addrPad, '0');
-    inner.push(`  ${addrStr} : ${rows[i].output}`);
+    const addrStr = i.toString(2).padStart(addrPad, '0');
+    const addrIndex = parseInt(addrStr, 2);
+    entries.push({ from: addrIndex, to: addrIndex, value: rows[i].output });
+    rawEntries.push({ from: addrStr, value: rows[i].output });
+  }
+
+  return {
+    attributes,
+    initialValue: { kind: 'lutData', entries, rawEntries },
+    labelMap: {},
+    labelExprs: {},
+  };
+}
+
+function formatInlineLutText(instanceName, built) {
+  const { attributes, initialValue } = built;
+  const inner = [`description: ${attributes.description}`];
+  if (attributes.filters) {
+    inner.push(`filters: ${attributes.filters}`);
+  }
+  const depth = attributes.depth;
+  const length = attributes.length;
+  const addrPad = bitIndexWidth(length);
+
+  inner.push('', `depth: ${depth}`, `length: ${length}`, 'data {');
+  for (const entry of initialValue.entries) {
+    const addrStr = entry.from.toString(2).padStart(addrPad, '0');
+    inner.push(`  ${addrStr} : ${entry.value}`);
   }
   inner.push('}');
 
-  const lines = [`inline [lut] ${LUT_OF_INLINE_NAME}:`];
+  const lines = [`inline [lut] ${instanceName}:`];
   for (const line of inner) {
     lines.push(line === '' ? '' : `  ${line}`);
   }
   lines.push(':');
   return lines.join('\n');
+}
+
+function lutOfGenerate(exprAst, widthResolver, filters, instanceName) {
+  const built = lutOfBuild(exprAst, widthResolver, filters);
+  return formatInlineLutText(instanceName || LUT_OF_INLINE_NAME, built);
+}
+
+function isLutOfBodyRaw(bodyRaw) {
+  return /^\s*lutOf\s*\(/m.test(bodyRaw || '');
+}
+
+function parseLutOfFromSource(src, componentRegistry) {
+  if (typeof Parser === 'undefined' || typeof Tokenizer === 'undefined') {
+    throw new Error('Parser is not loaded');
+  }
+  const processed = typeof preprocessRepeat === 'function' ? preprocessRepeat(src.trim()) : src.trim();
+  const p = new Parser(new Tokenizer(processed), componentRegistry || null);
+  return p.parseLutOfCallInner();
+}
+
+function parseStdExprToAst(stdExpr, componentRegistry) {
+  if (typeof Parser === 'undefined' || typeof Tokenizer === 'undefined') {
+    throw new Error('Parser is not loaded');
+  }
+  const processed = typeof preprocessRepeat === 'function' ? preprocessRepeat(stdExpr) : stdExpr;
+  const p = new Parser(new Tokenizer(processed), componentRegistry || null);
+  return p.expr();
 }
 
 function resolveVarWidth(spec, widthResolver) {
@@ -724,7 +779,7 @@ function extractLutOutputs(lutInst) {
   return { length, depth, outputsByBit };
 }
 
-function exprOfLutGenerate(lutInst, varSpecs, widthResolver) {
+function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
   const attrs = lutInst.attributes || {};
   let labels;
   let outputsByBit;
@@ -781,6 +836,23 @@ function exprOfLutGenerate(lutInst, varSpecs, widthResolver) {
     segmentsStd.push(formatMinimizedStandard(min));
   }
 
+  return { depth, segmentsShort, segmentsStd };
+}
+
+function exprOfLutBuild(lutInst, varSpecs, widthResolver) {
+  const { depth, segmentsStd } = exprOfLutBuildCore(lutInst, varSpecs, widthResolver);
+  let stdExpr;
+  if (depth === 1) {
+    stdExpr = segmentsStd[0];
+  } else {
+    stdExpr = formatMultiBitStandard(segmentsStd);
+  }
+  return { depth, stdExpr };
+}
+
+function exprOfLutGenerate(lutInst, varSpecs, widthResolver) {
+  const { depth, segmentsShort, segmentsStd } = exprOfLutBuildCore(lutInst, varSpecs, widthResolver);
+
   const outType = `${depth}wire`;
   let shortExpr;
   let stdExpr;
@@ -821,7 +893,14 @@ if (typeof module !== 'undefined' && module.exports) {
     formatMultiBitShort,
     formatMultiBitStandard,
     lutOfGenerate,
+    lutOfBuild,
+    formatInlineLutText,
+    isLutOfBodyRaw,
+    parseLutOfFromSource,
+    parseStdExprToAst,
     expandExprOfLutVars,
+    exprOfLutBuild,
+    exprOfLutBuildCore,
     exprOfLutGenerate,
     BOOLEAN_ANALYSIS_MAX_TABLE_ROWS,
     BOOLEAN_ANALYSIS_TABLE_TOO_BIG_ERR,

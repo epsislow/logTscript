@@ -823,6 +823,41 @@ class Interpreter {
     throw new Error(`Unknown method '${method}' for ${instName}`);
   }
 
+  registerInlineLutFromBuild(name, built, bodyRaw) {
+    if (!this.componentRegistry) throw Error('Component registry unavailable for inline LUT');
+    const handler = this.componentRegistry.get('lut');
+    if (!handler) throw Error('LUT handler unavailable for inline LUT');
+
+    const attributes = built.attributes;
+    const initialValue = built.initialValue || { kind: 'lutData', entries: [], rawEntries: [] };
+    const length = attributes.length !== undefined ? parseInt(attributes.length, 10) : 16;
+    const variableDepth = !!attributes.variableDepth;
+    const depth = attributes.depth !== undefined ? parseInt(attributes.depth, 10) : (variableDepth ? 1 : 4);
+    if (length <= 0) throw Error(`LUT length must be positive for ${name}`);
+    if (!variableDepth && depth <= 0) throw Error(`LUT depth must be positive for ${name}`);
+    const fillwith = handler._resolveFillwith(attributes, depth, variableDepth);
+    if (initialValue && initialValue.entries && !variableDepth) {
+      for (const entry of initialValue.entries) {
+        if (entry.value.length !== depth) {
+          throw Error(`LUT value must be exactly ${depth} bits at address ${entry.from}`);
+        }
+      }
+    }
+    const lutTable = handler._buildTable(length, depth, fillwith, initialValue);
+    this.inlineInstances.set(name, {
+      kind: 'lut',
+      name,
+      attributes,
+      fillwithValue: fillwith,
+      lutEntries: initialValue.entries || [],
+      lutRawEntries: initialValue.rawEntries || [],
+      lutTable,
+      labelMap: built.labelMap || {},
+      labelExprs: built.labelExprs || {},
+      bodyRaw: bodyRaw != null ? bodyRaw : '(lutOf)',
+    });
+  }
+
   execInline(inline) {
     if (inline.kind === 'asm') {
       const parseIsaFn = typeof parseIsaBody === 'function' ? parseIsaBody : null;
@@ -839,6 +874,20 @@ class Interpreter {
       return;
     }
     if (inline.kind === 'lut') {
+      const isLutOfFn = typeof isLutOfBodyRaw === 'function' ? isLutOfBodyRaw : null;
+      const parseLutOfFn = typeof parseLutOfFromSource === 'function' ? parseLutOfFromSource : null;
+      const buildFn = typeof lutOfBuild === 'function' ? lutOfBuild : null;
+      if (isLutOfFn && isLutOfFn(inline.bodyRaw) && parseLutOfFn && buildFn) {
+        try {
+          const lutOfData = parseLutOfFn(inline.bodyRaw, this.componentRegistry);
+          const built = buildFn(lutOfData.expr, this._makeWidthResolver(), lutOfData.filters);
+          this.registerInlineLutFromBuild(inline.name, built, inline.bodyRaw);
+        } catch (e) {
+          this.reportRuntimeError(e);
+        }
+        return;
+      }
+
       const resolveExternal = (instName, label) => {
         const other = this.inlineInstances.get(instName);
         if (other && other.labelMap && other.labelMap[label]) return other.labelMap[label].bits;
@@ -860,32 +909,12 @@ class Interpreter {
       const parsed = parseBodyFn(inline.bodyRaw);
       const attributes = parsed.attributes;
       const initialValue = parsed.initialValue || { kind: 'lutData', entries: [], rawEntries: [] };
-      const length = attributes.length !== undefined ? parseInt(attributes.length, 10) : 16;
-      const variableDepth = !!attributes.variableDepth;
-      const depth = attributes.depth !== undefined ? parseInt(attributes.depth, 10) : (variableDepth ? 1 : 4);
-      if (length <= 0) throw Error(`LUT length must be positive for ${inline.name}`);
-      if (!variableDepth && depth <= 0) throw Error(`LUT depth must be positive for ${inline.name}`);
-      const fillwith = handler._resolveFillwith(attributes, depth, variableDepth);
-      if (initialValue && initialValue.entries && !variableDepth) {
-        for (const entry of initialValue.entries) {
-          if (entry.value.length !== depth) {
-            throw Error(`LUT value must be exactly ${depth} bits at address ${entry.from}`);
-          }
-        }
-      }
-      const lutTable = handler._buildTable(length, depth, fillwith, initialValue);
-      this.inlineInstances.set(inline.name, {
-        kind: inline.kind,
-        name: inline.name,
+      this.registerInlineLutFromBuild(inline.name, {
         attributes,
-        fillwithValue: fillwith,
-        lutEntries: initialValue.entries || [],
-        lutRawEntries: initialValue.rawEntries || [],
-        lutTable,
+        initialValue,
         labelMap: parsed.labelMap || {},
         labelExprs: parsed.labelExprs || {},
-        bodyRaw: inline.bodyRaw,
-      });
+      }, inline.bodyRaw);
       return;
     }
     if (inline.kind === 'protocol') {
@@ -3212,6 +3241,77 @@ if (this.isBuiltinDEMUX(name)) {
     throw new Error(`exprOfLut: LUT '${lutRef}' not found`);
   }
 
+  lowerUseExprInStatement(s, wireWidth) {
+    if (s._loweredFromUseExpr) return;
+
+    let expr = null;
+    if (s.assignment && s.assignment.expr) {
+      expr = s.assignment.expr;
+    } else if (s.expr) {
+      expr = s.expr;
+    } else {
+      return;
+    }
+
+    if (!expr || !Array.isArray(expr) || expr.length !== 1 || !expr[0].useExpr) return;
+
+    const buildFn = typeof exprOfLutBuild === 'function' ? exprOfLutBuild : null;
+    const parseFn = typeof parseStdExprToAst === 'function' ? parseStdExprToAst : null;
+    if (!buildFn || !parseFn) throw new Error('boolean-lut.js is not loaded');
+
+    const { exprOfLut } = expr[0].useExpr;
+    const lutInst = this._resolveLutInstance(exprOfLut.lutRef);
+    const { depth, stdExpr } = buildFn(lutInst, exprOfLut.varSpecs || [], this._makeWidthResolver());
+
+    if (wireWidth != null && depth !== wireWidth) {
+      throw new Error(`useExpr: wire width ${wireWidth}b does not match expression depth ${depth}b`);
+    }
+
+    const lowered = parseFn(stdExpr, this.componentRegistry);
+    if (s.assignment && s.assignment.expr === expr) {
+      s.assignment.expr = lowered;
+    } else if (s.expr === expr) {
+      s.expr = lowered;
+    }
+    s._loweredFromUseExpr = true;
+  }
+
+  _resolveUseExprWireWidth(s) {
+    if (s.assignment && s.assignment.target) {
+      const wire = this.wires.get(s.assignment.target.var);
+      return wire ? this.getBitWidth(wire.type) : null;
+    }
+    if (s.decls) {
+      for (const d of s.decls) {
+        if (d.name === '_' || d.name === '~' || d.name === '%' || d.name === '$') continue;
+        let actualType = d.type;
+        if (d.existing) {
+          const wire = this.wires.get(d.name);
+          if (wire) actualType = wire.type;
+          else {
+            const varInfo = this.vars.get(d.name);
+            if (varInfo) actualType = varInfo.type;
+          }
+        }
+        if (actualType && this.isWire(actualType)) {
+          return this.getBitWidth(actualType);
+        }
+      }
+    }
+    return null;
+  }
+
+  _execUseLutAs(s) {
+    const buildFn = typeof lutOfBuild === 'function' ? lutOfBuild : null;
+    if (!buildFn) throw new Error('boolean-lut.js is not loaded');
+    try {
+      const built = buildFn(s.useLutAs.lutOf.expr, this._makeWidthResolver(), s.useLutAs.lutOf.filters);
+      this.registerInlineLutFromBuild(s.useLutAs.name, built, 'lutOf(...)');
+    } catch (e) {
+      this.reportRuntimeError(e);
+    }
+  }
+
   _execLutOf(s) {
     const gen = typeof lutOfGenerate === 'function' ? lutOfGenerate : null;
     if (!gen) throw new Error('boolean-lut.js is not loaded');
@@ -3393,6 +3493,11 @@ if (this.isBuiltinDEMUX(name)) {
 
     if (s.lutOf) {
       this._execLutOf(s);
+      return;
+    }
+
+    if (s.useLutAs) {
+      this._execUseLutAs(s);
       return;
     }
 
@@ -4014,7 +4119,8 @@ if (this.isBuiltinDEMUX(name)) {
     }
 
 if (s.assignment) {
-  const { target, expr, assignPad: assignmentPad } = s.assignment;
+  const { target, expr: assignmentExpr, assignPad: assignmentPad } = s.assignment;
+  let expr = assignmentExpr;
   const name = target.var;
   const range = target.bitRange || null;
   const property = target.property || null;
@@ -4394,6 +4500,16 @@ if (s.assignment) {
     currentValue = entry.value;
   }
 
+  if (isWire && !range && expr) {
+    try {
+      this.lowerUseExprInStatement(s, bitWidth);
+      expr = s.assignment ? s.assignment.expr : expr;
+    } catch (e) {
+      this.reportRuntimeError(e);
+      return;
+    }
+  }
+
   if (isWire && !range && this.deferWirePropagation()) {
     this.trackWireStatement(s);
     const pendingOutputs = this.execWireStatement(s, true);
@@ -4677,6 +4793,16 @@ if (s.assignment) {
       }
     }
 
+    const useExprWidth = this._resolveUseExprWireWidth(s);
+    if (useExprWidth != null) {
+      try {
+        this.lowerUseExprInStatement(s, useExprWidth);
+      } catch (e) {
+        this.reportRuntimeError(e);
+        return;
+      }
+    }
+
     const exprResult = this.evalExpr(s.expr, computeRefs);
     
     // Compute total value from expression
@@ -4920,7 +5046,6 @@ if (s.assignment) {
 
   execWireStatement(s, toPending = false){
     // Re-execute a wire assignment statement
-    // Set current statement context for REG calls
     const prevStmt = this.currentStmt;
     this.currentStmt = s;
     const outputs = [];
@@ -4933,6 +5058,7 @@ if (s.assignment) {
       const bits = this.getBitWidth(wire.type);
       if(!bits){ this.currentStmt = prevStmt; return outputs; }
       try {
+        this.lowerUseExprInStatement(s, bits);
         const exprResult = this.evalExpr(s.assignment.expr, false);
         let totalValue = '';
         for(const part of exprResult){
@@ -4985,6 +5111,10 @@ if (s.assignment) {
     //console.log(`[DEBUG execWireStmt] re-executing for '${wsName}'`);
     
     try {
+    const declUseExprWidth = this._resolveUseExprWireWidth(s);
+    if (declUseExprWidth != null) {
+      this.lowerUseExprInStatement(s, declUseExprWidth);
+    }
     // During NEXT(~) recomputation, use computeRefs=false to avoid creating new storage for literals
     const exprResult = this.evalExpr(s.expr, false);
     

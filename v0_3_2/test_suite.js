@@ -8357,6 +8357,128 @@ watch(.o:counter)`);
   h.assert('counter channels', String(flat.length >= 4), 'true');
 }, { propagation: 'wave' });
 
+reg(1192, 'bool-lut-use', 'useLutAs(lutOf(OR(A,B)), .gen) — invoke', function(h, session) {
+  const { interp } = session.run(`useLutAs(lutOf(OR(A, B)), .gen)
+1wire A := 1
+1wire B := 0
+1wire y = .gen(10)`);
+  h.assert('y=1', session.getWire(interp, 'y'), '1');
+  h.assert('inline .gen', String(interp.inlineInstances.has('.gen')), 'true');
+});
+
+reg(1193, 'bool-lut-use', 'useLutAs with filters — LUT has filters attribute', function(h, session) {
+  const { interp } = session.run(`useLutAs(lutOf(OR(A, B), A=x, B=x), .f)
+1wire A := 0
+1wire B := 1`);
+  const lut = interp.inlineInstances.get('.f');
+  h.assert('has filters', String(!!(lut && lut.attributes && lut.attributes.filters)), 'true');
+  h.assert('length 4', String(lut.attributes.length), '4');
+});
+
+reg(1194, 'bool-lut-use', 'inline [lut] .gen: lutOf(`A | B`) :', function(h, session) {
+  const { interp } = session.run(`inline [lut] .gen:
+  lutOf(\`A | B\`)
+  :
+1wire A := 0
+1wire B := 1
+1wire y = .gen(01)`);
+  h.assert('y=1', session.getWire(interp, 'y'), '1');
+});
+
+reg(1195, 'bool-lut-use', 'useLutAs — LUT too big error', function(h, session) {
+  const { out } = session.run('9wire A\nuseLutAs(lutOf(A), .big)');
+  h.assert('error line', String(out.some(l => /table size \(256 rows\)/.test(l))), 'true');
+});
+
+reg(1196, 'bool-lut-use', '1wire u = useExpr(exprOfLut(.or2, A, B))', function(h, session) {
+  const { interp } = session.run(INLINE_OR2 + `
+1wire A := 0
+1wire B := 1
+1wire u = useExpr(exprOfLut(.or2, A, B))`);
+  h.assert('u=1', session.getWire(interp, 'u'), '1');
+});
+
+reg(1197, 'bool-lut-use', 'useExpr multi-bit depth 2', function(h, session) {
+  const { interp } = session.run(INLINE_DECODER2 + `
+1wire A := 0
+1wire B := 1
+2wire u = useExpr(exprOfLut(.decoder, A, B))`);
+  h.assert('u=01', session.getWire(interp, 'u'), '01');
+});
+
+reg(1198, 'bool-lut-use', 'useExpr(exprOfLut(.lut)) with filters auto', function(h, session) {
+  const { interp } = session.run(`useLutAs(lutOf(OR(A, B), A=x, B=x), .f)
+1wire A := 0
+1wire B := 1
+1wire u = useExpr(exprOfLut(.f))`);
+  h.assert('u=1', session.getWire(interp, 'u'), '1');
+});
+
+reg(1199, 'bool-lut-use', 'useExpr width mismatch', function(h, session) {
+  const { out } = session.run(INLINE_OR2 + `
+1wire A := 0
+1wire B := 0
+2wire u = useExpr(exprOfLut(.or2, A, B))`);
+  h.assert('error in out', String(out.some(l => /wire width 2b does not match expression depth 1b/.test(l))), 'true');
+});
+
+reg(1200, 'bool-lut-use', 'round-trip useLutAs + useExpr', function(h, session) {
+  const { interp } = session.run(`useLutAs(lutOf(XOR(A, B)), .xor)
+1wire A := 1
+1wire B := 0
+1wire u = useExpr(exprOfLut(.xor, A, B))`);
+  h.assert('u=1', session.getWire(interp, 'u'), '1');
+  session.setWire(interp, 'B', '1');
+  h.assert('xor 1,1', session.getWire(interp, 'u'), '0');
+}, { propagation: 'wave' });
+
+reg(1201, 'bool-lut-use', 'useExpr alone — parse error', function(h, session) {
+  h.assertThrows('parse', () => session.parse('useExpr(exprOfLut(.x, A, B))'), 'Invalid statement');
+});
+
+reg(1202, 'bool-lut-use', 'inline lutOf body — second invoke', function(h, session) {
+  const { interp } = session.run(`inline [lut] .orlut:
+  lutOf(\`A | B\`)
+  :
+1wire y1 = .orlut(01)
+1wire y2 = .orlut(11)`);
+  h.assert('y1=1', session.getWire(interp, 'y1'), '1');
+  h.assert('y2=1', session.getWire(interp, 'y2'), '1');
+});
+
+reg(1203, 'bool-lut-use', 'useExpr lowered — propagates on A change (wave)', function(h, session) {
+  const { interp } = session.run(INLINE_OR2 + `
+1wire A := 0
+1wire B := 0
+1wire u = useExpr(exprOfLut(.or2, A, B))`);
+  h.assert('initial u=0', session.getWire(interp, 'u'), '0');
+  const ws = interp.wireStatements.find(w => (w.decls && w.decls.some(d => d.name === 'u')) || (w.assignment && w.assignment.target.var === 'u'));
+  h.assert('has wire stmt', String(!!ws), 'true');
+  h.assert('lowered AST', String(!JSON.stringify(ws.expr || ws.assignment && ws.assignment.expr).includes('useExpr')), 'true');
+  session.setWire(interp, 'A', '1');
+  h.assert('A=1 u=1', session.getWire(interp, 'u'), '1');
+}, { propagation: 'wave' });
+
+reg(1204, 'bool-lut-use', 'split decl u = useExpr + propagation', function(h, session) {
+  const { interp } = session.run(INLINE_OR2 + `
+1wire A := 0
+1wire B := 0
+1wire u
+u = useExpr(exprOfLut(.or2, A, B))`);
+  h.assert('initial', session.getWire(interp, 'u'), '0');
+  session.setWire(interp, 'B', '1');
+  h.assert('B=1 u=1', session.getWire(interp, 'u'), '1');
+}, { propagation: 'wave' });
+
+reg(1205, 'bool-lut-use', 'doc smoke — useLutAs + useExpr script', function(h, session) {
+  const { interp } = session.run(`useLutAs(lutOf(OR(A, B)), .gen)
+1wire A := 1
+1wire B := 1
+1wire u = useExpr(exprOfLut(.gen, A, B))`);
+  h.assert('runs', String(!!interp), 'true');
+  h.assert('u=1', session.getWire(interp, 'u'), '1');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

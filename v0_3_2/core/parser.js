@@ -247,7 +247,7 @@ parseDef() {
     
     if (
       this.c.type === 'TYPE' ||
-      (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek' || this.c.value === 'lutOf' || this.c.value === 'exprOfLut' || this.c.value === 'truthTableOf' || this.c.value === 'simplify' || this.c.value === 'equivalent' || this.c.value === 'inputsOf' || this.c.value === 'costOf')) ||
+      (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek' || this.c.value === 'lutOf' || this.c.value === 'exprOfLut' || this.c.value === 'useLutAs' || this.c.value === 'truthTableOf' || this.c.value === 'simplify' || this.c.value === 'equivalent' || this.c.value === 'inputsOf' || this.c.value === 'costOf')) ||
       this.c.type === 'ID' ||
       this.c.type === 'SPECIAL'
     ) {
@@ -1259,7 +1259,7 @@ assignment() {
     return {show:args};
   }
 
-  lutOf(){
+  parseLutOfCallInner() {
     this.eat('KEYWORD', 'lutOf');
     this.eat('SYM', '(');
     const expr = this.expr();
@@ -1269,7 +1269,44 @@ assignment() {
       filters = this.parseBooleanAnalysisFilters();
     }
     this.eat('SYM', ')');
-    return { lutOf: { expr, filters } };
+    return { expr, filters };
+  }
+
+  lutOf(){
+    const lutOfData = this.parseLutOfCallInner();
+    return { lutOf: lutOfData };
+  }
+
+  parseExprOfLutArgs() {
+    const lutRef = this.parseDotComponentRef();
+    const varSpecs = [];
+    if (this.c.value === ',') {
+      this.eat('SYM', ',');
+      do {
+        varSpecs.push(this.parseExprOfLutColumnSpec());
+        if (this.c.value === ',') this.eat('SYM', ',');
+        else break;
+      } while (true);
+    }
+    return { lutRef, varSpecs };
+  }
+
+  parseExprOfLutCallInner() {
+    this.eat('KEYWORD', 'exprOfLut');
+    this.eat('SYM', '(');
+    const data = this.parseExprOfLutArgs();
+    this.eat('SYM', ')');
+    return data;
+  }
+
+  useLutAs() {
+    this.eat('KEYWORD', 'useLutAs');
+    this.eat('SYM', '(');
+    const lutOfData = this.parseLutOfCallInner();
+    this.eat('SYM', ',');
+    const name = this.parseDotComponentRef();
+    this.eat('SYM', ')');
+    return { useLutAs: { lutOf: lutOfData, name } };
   }
 
   truthTableOf(){
@@ -1361,20 +1398,8 @@ assignment() {
   }
 
   exprOfLut(){
-    this.eat('KEYWORD', 'exprOfLut');
-    this.eat('SYM', '(');
-    const lutRef = this.parseDotComponentRef();
-    const varSpecs = [];
-    if (this.c.value === ',') {
-      this.eat('SYM', ',');
-      do {
-        varSpecs.push(this.parseExprOfLutColumnSpec());
-        if (this.c.value === ',') this.eat('SYM', ',');
-        else break;
-      } while (true);
-    }
-    this.eat('SYM', ')');
-    return { exprOfLut: { lutRef, varSpecs } };
+    const data = this.parseExprOfLutCallInner();
+    return { exprOfLut: data };
   }
 
   peek(){
@@ -2430,6 +2455,14 @@ assignment() {
     return addNot(specialAtom0);
   }
   
+  if (this.c.type === 'KEYWORD' && this.c.value === 'useExpr') {
+    this.eat('KEYWORD', 'useExpr');
+    this.eat('SYM', '(');
+    const exprOfLutData = this.parseExprOfLutCallInner();
+    this.eat('SYM', ')');
+    return addNot({ useExpr: { exprOfLut: exprOfLutData } });
+  }
+
   if (this.c.type === 'REG' || this.c.type === 'MUX' || this.c.type === 'DEMUX') {
     const n = this.c.value;
     this.eat(this.c.type);
@@ -3093,6 +3126,7 @@ Parser.KEYWORD_HANDLERS = {
   peek: 'peek',
   lutOf: 'lutOf',
   exprOfLut: 'exprOfLut',
+  useLutAs: 'useLutAs',
   truthTableOf: 'truthTableOf',
   simplify: 'simplify',
   equivalent: 'equivalent',
