@@ -5804,5 +5804,32 @@ lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
   h.assert('slice', String((out[1] || '').includes('A.4')), 'true');
 });
 
+reg(1154, 'bool-analysis', 'simplify cu filtre — match exprOfLut', function(h, session) {
+  const prelude = `5wire A
+1wire B
+5wire C`;
+  const filters = 'A=01x1x, B=x, C=1001x';
+  const gen = session.run(prelude + `\nlutOf(OR(AND(A, B), NOT(C)), ${filters})`).out.join('\n');
+  const exprOut = session.run(gen + '\nexprOfLut(.generated)').out;
+  const simpOut = session.run(prelude + `\nsimplify(OR(AND(A, B), NOT(C)), ${filters})`).out;
+  h.assert('two lines', String(simpOut.length), '2');
+  h.assert('same short', simpOut[0], exprOut[0]);
+  h.assert('same std', simpOut[1], exprOut[1]);
+});
+
+reg(1155, 'bool-analysis', 'simplify filtre parțiale A=0', function(h, session) {
+  const { out } = session.run('simplify(OR(A, B), A=0)');
+  h.assert('lines', String(out.length), '2');
+  h.assert('std B', out[1], '1wire out = B');
+});
+
+reg(1156, 'bool-analysis', 'simplify filtre fără virgulă — eroare parse', function(h, session) {
+  let err = '';
+  try {
+    session.parse('simplify(OR(A, B) A=0)');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('comma', String(err.includes("Expected ',' between filter assignments") || err.includes('SYM=)')), 'true');
+});
+
   suite.finalize();
 })();

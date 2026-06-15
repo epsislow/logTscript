@@ -722,6 +722,9 @@
       {"id":1151,"group":"bool-lut","title":"exprOfLut fără variabile și fără filters — eroare","detail":{"scripts":["inline [lut] .or2:\n  depth: 1\n  length: 4\n  data {\n    00 : 0\n    01 : 1\n    10 : 1\n    11 : 1\n  }\n  :\nexprOfLut(.or2)"],"steps":[],"assertions":["err"]}},
       {"id":1152,"group":"bool-lut-mb","title":"exprOfLut variabile incompatibile cu filters","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)"],"steps":["run(gen + '\\nexprOfLut(.generated, A, B, C)') [nerezolvat]"],"assertions":["mismatch"]}},
       {"id":1153,"group":"bool-lut-mb","title":"exprOfLut ignoră # — folosește filters:","detail":{"scripts":["5wire A\n1wire B\n5wire C\nlutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)"],"steps":["run(tampered + '\\nexprOfLut(.generated)') [nerezolvat]"],"assertions":["lines","slice"]}},
+      {"id":1154,"group":"bool-analysis","title":"simplify cu filtre — match exprOfLut","detail":{"scripts":["5wire A\n1wire B\n5wire C\nsimplify(OR(AND(A, B), NOT(C)), ${filters})"],"steps":["run(gen + '\\nexprOfLut(.generated)') [nerezolvat]"],"assertions":["two lines","same short","same std"]}},
+      {"id":1155,"group":"bool-analysis","title":"simplify filtre parțiale A=0","detail":{"scripts":["simplify(OR(A, B), A=0)"],"steps":[],"assertions":["lines","std B"]}},
+      {"id":1156,"group":"bool-analysis","title":"simplify filtre fără virgulă — eroare parse","detail":{"scripts":["simplify(OR(A, B) A=0)"],"steps":[],"assertions":["comma"]}},
       {"id":1334,"group":"short-notation","title":"Short notation — + concatenation inside backticks","detail":{"scripts":["`(0110) + ((!C.4) | (A.4 & B))`"],"steps":[],"assertions":["bit constants","grouped bool","precedence","mixed"]}},
       {"id":1335,"group":"short-notation","title":"Short notation — + concat runnable assignment","detail":{"scripts":["5wire R\n5wire A\n1wire B\n5wire C\n5wire R = `(0110) + ((!C.4) | (A.4 & B))`"],"steps":[],"assertions":["runs"]}},
       {"id":1336,"group":"short-notation","title":"Short notation — paranteze extra (concat și grupare)","detail":{"scripts":["5wire R\n5wire A\n1wire B\n5wire C\n5wire R = `((0110) + ((!C.4) | (A.4 & B)))`"],"steps":[],"assertions":["outer wrap concat","double const parens","extra segment parens","redundant bool parens","outer wrap runs"]}}
@@ -771,7 +774,7 @@
       { id: 'protocol-ext', label: 'protocol-ext', rangeLabel: '1075–1090', testIds: [1075, 1076, 1077, 1078, 1079, 1080, 1081, 1082, 1083, 1084, 1085, 1086, 1087, 1088, 1089, 1090] },
       { id: 'bool-lut', label: 'bool-lut', rangeLabel: '1091–1099, 1099.5, 1099.6, 1100–1107, 1122, 1136, 1143–1144, 1148, 1151', testIds: [1091, 1092, 1093, 1094, 1095, 1096, 1097, 1098, 1099, 1099.5, 1099.6, 1100, 1101, 1102, 1103, 1104, 1105, 1106, 1107, 1122, 1136, 1143, 1144, 1148, 1151] },
       { id: 'bool-lut-mb', label: 'bool-lut-mb', rangeLabel: '1108–1121, 1123–1124, 1145, 1149–1150, 1152–1153', testIds: [1108, 1109, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121, 1123, 1124, 1145, 1149, 1150, 1152, 1153] },
-      { id: 'bool-analysis', label: 'bool-analysis', rangeLabel: '1125–1133, 1137–1140, 1142, 1147', testIds: [1125, 1126, 1127, 1128, 1129, 1130, 1131, 1132, 1133, 1137, 1138, 1139, 1140, 1142, 1147] },
+      { id: 'bool-analysis', label: 'bool-analysis', rangeLabel: '1125–1133, 1137–1140, 1142, 1147, 1154–1156', testIds: [1125, 1126, 1127, 1128, 1129, 1130, 1131, 1132, 1133, 1137, 1138, 1139, 1140, 1142, 1147, 1154, 1155, 1156] },
       { id: 'bool-analysis-mb', label: 'bool-analysis-mb', rangeLabel: '1134–1135, 1141', testIds: [1134, 1135, 1141] }
     ]
   };

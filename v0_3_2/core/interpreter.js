@@ -2845,7 +2845,7 @@ if (this.isBuiltinDEMUX(name)) {
     const gen = typeof simplifyGenerate === 'function' ? simplifyGenerate : null;
     if (!gen) throw new Error('boolean-analysis.js is not loaded');
     try {
-      const lines = gen(s.simplify.expr, this._makeWidthResolver());
+      const lines = gen(s.simplify.expr, this._makeWidthResolver(), s.simplify.filters);
       for (const line of lines) this.out.push(line);
     } catch (e) {
       this.reportRuntimeError(e);

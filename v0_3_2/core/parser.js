@@ -1285,8 +1285,13 @@ assignment() {
     this.eat('KEYWORD', 'simplify');
     this.eat('SYM', '(');
     const expr = this.expr();
+    let filters = null;
+    if (this.c.value === ',') {
+      this.eat('SYM', ',');
+      filters = this.parseBooleanAnalysisFilters();
+    }
     this.eat('SYM', ')');
-    return { simplify: { expr } };
+    return { simplify: { expr, filters } };
   }
 
   equivalent(){

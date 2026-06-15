@@ -5,7 +5,7 @@ Analysis-only statements (like `show` / `lutOf`): they emit text to **Output**. 
 | Statement | Role |
 |-----------|------|
 | `truthTableOf(expr [, filters])` | Truth table text |
-| `simplify(expr)` | Minimized expression (Quine–McCluskey) |
+| `simplify(expr [, filters])` | Minimized expression (Quine–McCluskey) |
 | `equivalent(e1, e2)` | `true` / `false` |
 | `inputsOf(expr)` | Detected input columns + widths |
 | `costOf(expr)` | Syntactic cost (literal vs minimized) |
@@ -20,8 +20,8 @@ Expression parameters use the same syntax as `lutOf`: built-ins `NOT`, `AND`, `O
 
 | Functions | Limit | Error |
 |-----------|-------|-------|
-| `truthTableOf`, `lutOf` | Max **256 rows** generated | `Boolean analysis exceeds maximum supported table size (256 rows)` |
-| `simplify`, `equivalent` | Max **8 input bits** | `Boolean analysis exceeds maximum supported input width (8 bits)` |
+| `truthTableOf`, `lutOf`, `simplify` | Max **256 rows** generated | `Boolean analysis exceeds maximum supported table size (256 rows)` |
+| `simplify`, `equivalent` (no filters) | Max **8 input bits** | `Boolean analysis exceeds maximum supported input width (8 bits)` |
 
 Without filters, `truthTableOf` / `lutOf` generate `2^(sum column widths)` rows — practically ≤ 8 bits.
 
@@ -66,9 +66,11 @@ truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)
 
 ---
 
-## `simplify(expression)`
+## `simplify(expression [, filters])`
 
-Emits **two assignment lines** (short + standard), like `exprOfLut`:
+Emits **two assignment lines** (short + standard), like `exprOfLut`.
+
+### Without filters
 
 ```logts-play
 simplify(OR(AND(NOT(A), B), AND(A, B)))
@@ -79,7 +81,20 @@ simplify(OR(AND(NOT(A), B), AND(A, B)))
 1wire out = B
 ```
 
-Multi-bit output uses ` + ` between segments.
+### With filters
+
+Same `column=pattern` syntax as `truthTableOf` / `lutOf` (comma between assignments; `x` = varying bit):
+
+```logts-play
+5wire A
+1wire B
+5wire C
+simplify(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+```
+
+Minimization uses only the **varying** bits (`x` positions) as QM inputs — same rules as `exprOfLut(.generated)` with `filters:`.
+
+Multi-bit output uses ` + ` between segments (grouped constants when possible).
 
 ---
 

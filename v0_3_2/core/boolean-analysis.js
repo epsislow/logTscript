@@ -28,19 +28,51 @@ function inputsOfGenerate(exprAst, widthResolver) {
   return columns.map(c => `${c.key.padEnd(keyWidth)} ${c.width}b`);
 }
 
-function minimizeExprOutputs(exprAst, columns, widthResolver) {
-  const filterMap = null;
+function minimizeExprOutputs(exprAst, columns, widthResolver, filters) {
+  const filterMap = filters && filters.length > 0
+    ? validateAndBuildFilterMap(columns, filters, 'simplify')
+    : null;
   const { rows, outWidth } = collectFilteredRows(exprAst, columns, widthResolver, filterMap);
-  const labels = columnsToInputLabels(columns);
   const minimizeFn = typeof minimizeBoolean === 'function' ? minimizeBoolean : null;
   if (!minimizeFn) throw new Error('boolean-minimize.js is not loaded');
 
-  const outputsByBit = [];
-  for (let b = 0; b < outWidth; b++) outputsByBit.push([]);
-  for (const row of rows) {
-    const padded = row.output.padStart(outWidth, '0');
-    for (let b = 0; b < outWidth; b++) {
-      outputsByBit[b].push(padded[b] === '1');
+  let labels;
+  let outputsByBit;
+
+  if (filterMap) {
+    labels = varyingBitLabels(columns, filterMap);
+    const numVars = labels.length;
+    if (numVars > BOOLEAN_ANALYSIS_MAX_INPUT_BITS) {
+      throw new Error(BOOLEAN_ANALYSIS_TOO_WIDE_ERR);
+    }
+    const tableSize = 1 << numVars;
+    if (rows.length !== tableSize) {
+      throw new Error(
+        `simplify: expected ${tableSize} rows for ${numVars} varying bit(s), got ${rows.length}`
+      );
+    }
+    outputsByBit = [];
+    for (let b = 0; b < outWidth; b++) outputsByBit.push(new Array(tableSize).fill(false));
+    for (const row of rows) {
+      const varyingBits = extractVaryingBitsFromEnv(row.env, columns, filterMap);
+      const mintermIdx = parseInt(varyingBits, 2);
+      if (isNaN(mintermIdx) || mintermIdx < 0 || mintermIdx >= tableSize) {
+        throw new Error(`simplify: invalid varying bits '${varyingBits}'`);
+      }
+      const padded = row.output.padStart(outWidth, '0');
+      for (let b = 0; b < outWidth; b++) {
+        outputsByBit[b][mintermIdx] = padded[b] === '1';
+      }
+    }
+  } else {
+    labels = columnsToInputLabels(columns);
+    outputsByBit = [];
+    for (let b = 0; b < outWidth; b++) outputsByBit.push([]);
+    for (const row of rows) {
+      const padded = row.output.padStart(outWidth, '0');
+      for (let b = 0; b < outWidth; b++) {
+        outputsByBit[b].push(padded[b] === '1');
+      }
     }
   }
 
@@ -51,10 +83,12 @@ function minimizeExprOutputs(exprAst, columns, widthResolver) {
   return { mins, outWidth };
 }
 
-function simplifyGenerate(exprAst, widthResolver) {
+function simplifyGenerate(exprAst, widthResolver, filters) {
   const columns = discoverLutOfInputs(exprAst, widthResolver);
-  assertInputWidthWithinLimit(columns);
-  const { mins, outWidth } = minimizeExprOutputs(exprAst, columns, widthResolver);
+  if (!filters || filters.length === 0) {
+    assertInputWidthWithinLimit(columns);
+  }
+  const { mins, outWidth } = minimizeExprOutputs(exprAst, columns, widthResolver, filters);
 
   const segmentsShort = mins.map(formatMinimizedShort);
   const segmentsStd = mins.map(formatMinimizedStandard);
