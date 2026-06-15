@@ -616,7 +616,7 @@ reg(427, 'doc-comp', 'InterpreterDoc2.formatCompDef helper', function(h, session
   h.assert('formatCompDef -> Xbit', lines[7], '  -> Xbit');
 });
 
-reg(500, 'pcb', 'PCB property block on:1 cu set=1 declanseaza executia', function(h, session) {
+reg(1168, 'pcb', 'PCB property block on:1 cu set=1 declanseaza executia', function(h, session) {
   const { interp } = session.run(`pcb +[passthrough]:
   4pin data
   1pin set
@@ -636,7 +636,7 @@ pcb [passthrough] .q::
   h.assert('PCB property block on:1 set=1 actualizeaza pout', session.getPcbPout(interp, '.q', 'result'), '1111');
 });
 
-reg(501, 'pcb', 'PCB property block on:1 cu set=0 nu declanseaza executia', function(h, session) {
+reg(1169, 'pcb', 'PCB property block on:1 cu set=0 nu declanseaza executia', function(h, session) {
   const { interp } = session.run(`pcb +[passthrough2]:
   4pin data
   1pin set
@@ -656,7 +656,7 @@ pcb [passthrough2] .q2::
   h.assert('PCB property block on:1 set=0 nu actualizeaza pout', session.getPcbPout(interp, '.q2', 'result'), '0000');
 });
 
-reg(502, 'pcb', 'scenario regs PCB cu adr si data', function(h, session) {
+reg(1170, 'pcb', 'scenario regs PCB cu adr si data', function(h, session) {
   const { interp } = session.run(`pcb +[regs]:
   1pin set
   4pin data
@@ -676,7 +676,7 @@ pcb [regs] .q::
   h.assert('PCB regs property block returneaza rezultat calculat', session.getPcbPout(interp, '.q', 'result'), '1010');
 });
 
-reg(503, 'pcb', 'wire extern "q = .q" reflecta pout dupa property block', function(h, session) {
+reg(1171, 'pcb', 'wire extern "q = .q" reflecta pout dupa property block', function(h, session) {
   const { interp } = session.run(`pcb +[echo]:
   4pin data
   1pin set
