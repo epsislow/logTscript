@@ -1,5 +1,41 @@
 window.lib_files = {
-  
+ex_bad_simplify_why: `
+
+5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+
+inline [lut] .generated:
+  description: A 5b, B 1b, C 5b -> out 5b
+  filters: A=01x1x, B=x, C=1001x
+
+  depth: 5
+  length: 16
+  data {
+    0000 : 01101
+    0001 : 01100
+    0010 : 01101
+    0011 : 01100
+    0100 : 01101
+    0101 : 01100
+    0110 : 01101
+    0111 : 01100
+    1000 : 01101
+    1001 : 01100
+    1010 : 01101
+    1011 : 01101
+    1100 : 01101
+    1101 : 01100
+    1110 : 01101
+    1111 : 01101
+  }
+:
+
+
+simplfy(OR(AND(A, B), NOT(C)))
+
+`,  
   ex_chip_led: `
 
 
