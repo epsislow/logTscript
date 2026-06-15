@@ -49,6 +49,7 @@ const GROUP_META = [
   { id: 'debug', label: 'show / peek / probe' },
   { id: 'pcb', label: 'PCB property block' },
   { id: 'signal', label: 'Wire cascade propagation' },
+  { id: 'ioport', label: 'I/O port (ioport)' },
   { id: 'reg', label: 'REG builtin' },
   { id: 'other', label: 'Other' }
 ];

@@ -216,6 +216,7 @@ class Interpreter {
     // Probe debug
     this.probeTargets = [];
     this.probeByKey = new Map();
+    this.ioportMemberOwners = new Map();
     this.probeReasonContext = 'normal';
     this._probeRegEdgeCommit = false;
     this._probeInitialising = true;
@@ -288,6 +289,110 @@ class Interpreter {
     this.wireStorageMap.set(name, storageIdx);
     wire.ref = `&${storageIdx}`;
     this._emitProbeForWire(name, v);
+  }
+
+  _registerIoportMember(memberName, portName) {
+    if (!this.ioportMemberOwners) this.ioportMemberOwners = new Map();
+    const existing = this.ioportMemberOwners.get(memberName);
+    if (existing && existing !== portName) {
+      throw Error(`Component '${memberName}' already belongs to ioport '${existing}'`);
+    }
+    this.ioportMemberOwners.set(memberName, portName);
+  }
+
+  _notifyIoportMemberChange(memberName) {
+    if (!this.ioportMemberOwners) return;
+    const portName = this.ioportMemberOwners.get(memberName);
+    if (!portName) return;
+    this.updateComponentConnections(portName);
+    this._refreshIoportWireDependents(portName);
+    this._emitComputedComponentProbes(portName);
+  }
+
+  _refreshIoportWireDependents(portName) {
+    for (const ws of this.wireStatements) {
+      if (ws.assignment) {
+        const wireName = ws.assignment.target.var;
+        const wire = this.wires.get(wireName);
+        if (!wire || !wire.ref) continue;
+        if (!this.exprReferencesComponent(ws.assignment.expr, portName, null)) continue;
+        try {
+          const exprResult = this.evalExpr(ws.assignment.expr, false);
+          const bits = this.getBitWidth(wire.type);
+          let wireValue = '';
+          for (const part of exprResult) {
+            if (part.ref && part.ref !== '&-') {
+              const val = this.getValueFromRef(part.ref);
+              if (val) wireValue += val;
+            } else if (part.value) {
+              wireValue += part.value;
+            }
+          }
+          const assignPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'strict';
+          wireValue = fitWireAssignBits(wireValue, bits, assignPad, 'msb');
+          const refMatch = wire.ref.match(/^&(\d+)/);
+          if (refMatch) {
+            const storageIdx = parseInt(refMatch[1], 10);
+            const stored = this.storage.find(s => s.index === storageIdx);
+            if (stored && stored.value !== wireValue) {
+              stored.value = wireValue;
+              if (!this.deferWirePropagation()) {
+                this.updateConnectedComponents(wireName, wireValue);
+              } else if (this.signalPropagationStrategy) {
+                this.signalPropagationStrategy.scheduleWireChange(wireName, wireValue);
+                this.signalPropagationStrategy.propagate();
+              }
+              this._emitProbeForWire(wireName, wireValue);
+            }
+          }
+        } catch (e) { /* ignore */ }
+      } else if (ws.decls && ws.expr) {
+        for (const decl of ws.decls) {
+          if (!this.isWire(decl.type)) continue;
+          const wireName = decl.name;
+          const wire = this.wires.get(wireName);
+          if (!wire) continue;
+          if (!this.exprReferencesComponent(ws.expr, portName, null)) continue;
+          try {
+            const exprResult = this.evalExpr(ws.expr, false);
+            const bits = this.getBitWidth(wire.type);
+            let bitOffset = 0;
+            for (const d of ws.decls) {
+              if (d.name === wireName) break;
+              bitOffset += this.getBitWidth(d.type);
+            }
+            const wireRef = this.buildRefFromParts(exprResult, bits, bitOffset);
+            let wireValue = '';
+            if (wireRef && wireRef !== '&-') {
+              wireValue = this.getValueFromRef(wireRef) || '';
+            } else {
+              for (const part of exprResult) {
+                if (part.value) wireValue += part.value;
+                else if (part.ref && part.ref !== '&-') {
+                  const val = this.getValueFromRef(part.ref);
+                  if (val) wireValue += val;
+                }
+              }
+            }
+            const assignPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'strict';
+            wireValue = fitWireAssignBits(wireValue, bits, assignPad, 'msb');
+            if (wire.ref) {
+              const old = this.getValueFromRef(wire.ref);
+              if (old !== wireValue) {
+                this.setValueAtRef(wire.ref, wireValue);
+                if (!this.deferWirePropagation()) {
+                  this.updateConnectedComponents(wireName, wireValue);
+                } else if (this.signalPropagationStrategy) {
+                  this.signalPropagationStrategy.scheduleWireChange(wireName, wireValue);
+                  this.signalPropagationStrategy.propagate();
+                }
+                this._emitProbeForWire(wireName, wireValue);
+              }
+            }
+          } catch (e) { /* ignore */ }
+        }
+      }
+    }
   }
 
   _probeReasonLabel() {
@@ -1184,11 +1289,15 @@ class Interpreter {
     this.runSafely(() => {
       if (this.deferWirePropagation() && this.signalPropagationStrategy) {
         const scheduled = this.signalPropagationStrategy.scheduleComponentChange(compName, value);
-        if (scheduled) this.signalPropagationStrategy.propagate();
+        if (scheduled) {
+          this.signalPropagationStrategy.propagate();
+          this._notifyIoportMemberChange(compName);
+        }
         return;
       }
       this.writeComponentStable(compName, value);
       this.updateComponentConnections(compName);
+      this._notifyIoportMemberChange(compName);
       if (typeof showVars === 'function') showVars();
     });
   }

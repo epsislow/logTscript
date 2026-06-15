@@ -4,6 +4,7 @@ var LedBarComponent = (typeof require !== 'undefined') ? require('./ledBar') : L
 var SwitchComponent = (typeof require !== 'undefined') ? require('./switch') : SwitchComponent;
 var KeyComponent = (typeof require !== 'undefined') ? require('./key') : KeyComponent;
 var DipComponent = (typeof require !== 'undefined') ? require('./dip') : DipComponent;
+var IoportComponent = (typeof require !== 'undefined') ? require('./ioport') : IoportComponent;
 var SevenSegComponent = (typeof require !== 'undefined') ? require('./seven-seg') : SevenSegComponent;
 var ClockDotsComponent = (typeof require !== 'undefined') ? require('./dots') : ClockDotsComponent;
 var FourteenSegComponent = (typeof require !== 'undefined') ? require('./14seg') : FourteenSegComponent;
@@ -31,6 +32,7 @@ function createComponentRegistry() {
   registry.register(SwitchComponent);
   registry.register(KeyComponent);
   registry.register(DipComponent);
+  registry.register(IoportComponent);
   registry.register(SevenSegComponent);
   registry.register(FourteenSegComponent);
   registry.register(LcdComponent);

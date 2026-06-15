@@ -1762,7 +1762,7 @@
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'dip', '7seg', 'lcd', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary'];
+    const expectedTypes = ['led', 'switch', 'key', 'dip', 'ioport', '7seg', 'lcd', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -1777,6 +1777,7 @@
     h.assert('terminal bits', String(registry.get('terminal').getWidthBits({})), '1');
     h.assert('dip default bits', String(registry.get('dip').getWidthBits({})), '4');
     h.assert('dip with length 8', String(registry.get('dip').getWidthBits({length: '8'})), '8');
+    h.assert('ioport placeholder bits', String(registry.get('ioport').getWidthBits({})), '1');
     h.assert('adder default bits', String(registry.get('adder').getWidthBits({})), '4');
     h.assert('adder depth 8', String(registry.get('adder').getWidthBits({depth: '8'})), '8');
     h.assert('osc bits', String(registry.get('osc').getWidthBits({})), '1');
@@ -1811,6 +1812,8 @@
     h.assert('queue supports front', String(registry.supportsProperty('queue', 'front')), 'true');
     h.assert('stack supports top', String(registry.supportsProperty('stack', 'top')), 'true');
     h.assert('queue supports free', String(registry.supportsProperty('queue', 'free')), 'true');
+    h.assert('ioport supports in', String(registry.supportsProperty('ioport', 'in')), 'true');
+    h.assert('ioport supports out', String(registry.supportsProperty('ioport', 'out')), 'true');
   });
 
   reg(204, 'registry', 'Component Registry — supportsRedirect', function(h, session) {

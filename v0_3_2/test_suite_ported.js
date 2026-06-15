@@ -5831,5 +5831,230 @@ reg(1156, 'bool-analysis', 'simplify filtre fără virgulă — eroare parse', f
   h.assert('comma', String(err.includes("Expected ',' between filter assignments") || err.includes('SYM=)')), 'true');
 });
 
+reg(1157, 'ioport', 'parse in/out bindings', function(h, session) {
+  const stmts = session.parse(`comp [dip] .addr:
+  length: 4
+  :
+
+comp [led] .result:
+  length: 8
+  :
+
+comp [ioport] .P0:
+  in = .addr
+  out = .result
+  :`);
+  const s = stmts[2];
+  h.assert('ioport type', s.comp.type, 'ioport');
+  h.assert('in members', JSON.stringify(s.comp.attributes.inMembers), '[".addr"]');
+  h.assert('out members', JSON.stringify(s.comp.attributes.outMembers), '[".result"]');
+});
+
+reg(1158, 'ioport', 'input aggregation 16+8=24', function(h, session) {
+  const { interp } = session.run(`comp [dip] .addr:
+  length: 16
+  = ^ffff
+  :
+
+comp [dip] .data:
+  length: 8
+  = ^aa
+  :
+
+comp [ioport] .P0:
+  in = .addr
+  in = .data
+  :
+
+24wire bus = .P0:in`);
+  h.assert('bus width value', session.getWire(interp, 'bus'), '111111111111111110101010');
+});
+
+reg(1159, 'ioport', 'output split 8+4=12', function(h, session) {
+  const { interp } = session.run(`comp [led] .result:
+  length: 8
+  :
+
+comp [led] .flags:
+  length: 4
+  :
+
+comp [ioport] .P0:
+  out = .result
+  out = .flags
+  :
+
+.P0:out = 101010101111`);
+  const result = interp.components.get('.result');
+  const flags = interp.components.get('.flags');
+  h.assert('result leds', interp.getValueFromRef(result.ref), '10101010');
+  h.assert('flags leds', interp.getValueFromRef(flags.ref), '1111');
+});
+
+reg(1160, 'ioport', 'loopback wave', function(h, session) {
+  const { interp } = session.run(`comp [dip] .sw:
+  length: 8
+  visual: 1
+  :
+
+comp [led] .led:
+  length: 8
+  :
+
+comp [ioport] .P0:
+  in = .sw
+  out = .led
+  :
+
+.P0:out = .P0:in`);
+  session.setComp(interp, '.sw', '10101010');
+  const ledComp = interp.components.get('.led');
+  h.assert('loopback', interp.getValueFromRef(ledComp.ref), '10101010');
+}, { propagation: 'wave' });
+
+reg(1161, 'ioport', 'ownership conflict', function(h, session) {
+  let err = '';
+  try {
+    session.run(`comp [dip] .addr:
+  length: 4
+  :
+
+comp [ioport] .P0:
+  in = .addr
+  :
+
+comp [ioport] .P1:
+  in = .addr
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('already belongs', String(err.includes("already belongs to ioport")), 'true');
+});
+
+reg(1162, 'ioport', 'portA to portB', function(h, session) {
+  const { interp } = session.run(`comp [dip] .portASw:
+  length: 8
+  = 11110000
+  :
+
+comp [led] .portALed:
+  length: 8
+  :
+
+comp [ioport] .portA:
+  in = .portASw
+  out = .portALed
+  :
+
+comp [dip] .portBSw:
+  length: 8
+  :
+
+comp [led] .portBLed:
+  length: 8
+  :
+
+comp [ioport] .portB:
+  in = .portBSw
+  out = .portBLed
+  :
+
+.portB:out = .portA:in`);
+  const ledB = interp.components.get('.portBLed');
+  h.assert('port B leds', interp.getValueFromRef(ledB.ref), '11110000');
+});
+
+reg(1163, 'doc-comp', 'doc(comp.ioport) signature', function(h, session) {
+  const out = session.runDoc('doc(comp.ioport)');
+  h.assert('first line', out[0], 'comp [ioport] .name:');
+  h.assert('has in binding', String(out.some(l => l.includes('in') && l.includes('.component'))), 'true');
+});
+
+reg(1164, 'ioport', 'doc(.P0) bit map', function(h, session) {
+  const out = session.run(`comp [dip] .addr:
+  length: 16
+  :
+
+comp [dip] .data:
+  length: 8
+  :
+
+comp [led] .result:
+  length: 8
+  :
+
+comp [led] .flags:
+  length: 4
+  :
+
+comp [ioport] .P0:
+  in = .addr
+  in = .data
+  out = .result
+  out = .flags
+  :
+
+doc(.P0)`).out;
+  h.assert('header', out[0], '.P0 (ioport)');
+  h.assert('addr range', String(out.some(l => l.includes('0-15') && l.includes('.addr'))), 'true');
+  h.assert('data range', String(out.some(l => l.includes('16-23') && l.includes('.data'))), 'true');
+});
+
+reg(1165, 'ioport', 'show peek probe :in', function(h, session) {
+  const { out, interp } = session.run(`comp [dip] .sw:
+  length: 4
+  = 1010
+  :
+
+comp [ioport] .P0:
+  in = .sw
+  :
+
+4wire bus = .P0:in
+show(bus, .P0:in)
+peek(.P0:in)
+probe(.P0:in)`);
+  h.assert('show bus', String(out.some(l => l.includes('bus') && l.includes('1010'))), 'true');
+  h.assert('show port in', String(out.some(l => l.includes('.P0:in') && l.includes('1010'))), 'true');
+  h.assert('peek in', String(out.some(l => l.includes('.P0:in') && l.includes('1010'))), 'true');
+  h.assert('probe init', String(out.some(l => l.includes('.P0:in') && l.includes('initialised'))), 'true');
+  session.setComp(interp, '.sw', '0101');
+  interp.out = [];
+  interp.exec({ peek: [[{ var: '.P0', property: 'in' }]] });
+  h.assert('peek after change', String(interp.out.some(l => l.includes('.P0:in') && l.includes('0101'))), 'true');
+});
+
+reg(1166, 'ioport', 'show peek probe :out', function(h, session) {
+  const { out } = session.run(`comp [led] .led:
+  length: 4
+  :
+
+comp [ioport] .P0:
+  out = .led
+  :
+
+.P0:out = 1100
+show(.P0:out)
+peek(.P0:out)
+probe(.P0:out)`);
+  h.assert('show out', String(out.some(l => l.includes('.P0:out') && l.includes('1100'))), 'true');
+  h.assert('peek out', String(out.some(l => l.includes('.P0:out') && l.includes('1100'))), 'true');
+  h.assert('probe out init', String(out.some(l => l.includes('.P0:out') && l.includes('initialised'))), 'true');
+});
+
+reg(1167, 'ioport', 'propagare dip → wire via :in wave', function(h, session) {
+  const { interp } = session.run(`comp [dip] .d:
+  length: 4
+  :
+
+comp [ioport] .p:
+  in = .d
+  :
+
+4wire a = .p:in`);
+  h.assert('initial', session.getWire(interp, 'a'), '0000');
+  session.setComp(interp, '.d', '1010');
+  h.assert('dupa dip', session.getWire(interp, 'a'), '1010');
+}, { propagation: 'wave' });
+
   suite.finalize();
 })();

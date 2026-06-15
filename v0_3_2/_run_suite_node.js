@@ -15,6 +15,7 @@ const files = [
   'core/components/switch.js',
   'core/components/key.js',
   'core/components/dip.js',
+  'core/components/ioport.js',
   'core/components/seven-seg.js',
   'core/components/14seg.js',
   'core/components/dots.js',

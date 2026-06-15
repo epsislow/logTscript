@@ -563,4 +563,84 @@ function setBarState(barId, stateBits) {
   }
 }
 
+const ioportContainers = new Map();
+
+function addIoportContainer({ id, label = '', nl = false }) {
+  const container = document.getElementById('devices');
+  if (!container || !id) return;
+  showDevices();
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'ioport-wrapper';
+  wrapper.dataset.ioportId = id;
+
+  const box = document.createElement('div');
+  box.className = 'ioport-box';
+
+  const header = document.createElement('div');
+  header.className = 'ioport-header';
+  header.textContent = label || id;
+  box.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'ioport-body';
+  box.appendChild(body);
+
+  wrapper.appendChild(box);
+  container.appendChild(wrapper);
+
+  if (nl) {
+    const br = document.createElement('div');
+    br.className = 'break';
+    container.appendChild(br);
+  }
+
+  ioportContainers.set(id, body);
+}
+
+function mountIoportMember(containerId, memberCompName, kind) {
+  const body = ioportContainers.get(containerId);
+  if (!body) return;
+
+  const baseId = memberCompName.startsWith('.') ? memberCompName.slice(1) : memberCompName;
+  const row = document.createElement('div');
+  row.className = 'ioport-member-row ioport-member-' + kind;
+
+  const nameLabel = document.createElement('span');
+  nameLabel.className = 'ioport-member-label';
+  nameLabel.textContent = baseId;
+  row.appendChild(nameLabel);
+
+  const slot = document.createElement('div');
+  slot.className = 'ioport-member-slot';
+  row.appendChild(slot);
+
+  if (kind === 'in') {
+    const dips = dipSwitches.get(baseId);
+    if (dips && dips[0]) {
+      let el = dips[0];
+      while (el && !el.classList?.contains('dip-wrapper')) el = el.parentElement;
+      if (el) slot.appendChild(el);
+    }
+  } else {
+    const group = document.createElement('div');
+    group.className = 'ioport-led-group';
+    let ledInput = leds.get(baseId);
+    if (ledInput) {
+      const w = ledInput.closest('.led-wrapper');
+      if (w) group.appendChild(w);
+    } else {
+      for (let i = 1; leds.has(baseId + '.' + i); i++) {
+        const inp = leds.get(baseId + '.' + i);
+        if (inp) {
+          const w = inp.closest('.led-wrapper');
+          if (w) group.appendChild(w);
+        }
+      }
+    }
+    slot.appendChild(group);
+  }
+
+  body.appendChild(row);
+}
 

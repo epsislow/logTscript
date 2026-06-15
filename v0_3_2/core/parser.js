@@ -1664,6 +1664,27 @@ assignment() {
         let stateNum = 0;
         this.eat('ID');
 
+        let bindingAttrs = [];
+        if (this.componentRegistry) {
+          const bindHandler = this.componentRegistry.get(compType);
+          if (bindHandler && bindHandler.getSpecialParseAttributes) {
+            const special = bindHandler.getSpecialParseAttributes();
+            if (special && special.bindingAttrs) bindingAttrs = special.bindingAttrs;
+          }
+        }
+        if (bindingAttrs.includes(attrName) && this.c.value === '=') {
+          this.eat('SYM', '=');
+          this.t.skip();
+          if (this.c.type !== 'SYM' || this.c.value !== '.') {
+            throw Error(`Expected component reference after '${attrName} =' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+          }
+          const memberRef = this.parseDotComponentRef();
+          const listKey = attrName + 'Members';
+          if (!attributes[listKey]) attributes[listKey] = [];
+          attributes[listKey].push(memberRef);
+          continue;
+        }
+
         const attributesWithNoValues = ['square', 'nl', 'circular', 'glow', 'rgb', 'noLabels', 'noTrans', 'readonly'];
         
         

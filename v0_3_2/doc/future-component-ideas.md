@@ -230,7 +230,7 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 **How I see it used:** “Write `0b10101010` to port B, read switches from port A” without eight separate declarations. Microcontroller-style labs on the teaching CPU (OUT / IN instructions).
 
-**Today:** Eight `dip` + eight `led` comps. GPIO is grouping and naming for cleaner scripts and docs.
+**Today:** Eight `dip` + eight `led` comps. GPIO is grouping and naming for cleaner scripts and docs. **Implemented** as `comp [ioport]` — see [ioport.md](ioport.md).
 
 ---
 

@@ -40,6 +40,7 @@ const DOC_SECTIONS = [
       { file: 'switch.md', label: 'switch' },
       { file: 'key.md', label: 'key' },
       { file: 'dip.md', label: 'dip' },
+      { file: 'ioport.md', label: 'ioport', searchExtra: 'I/O port gpio port aggregation in out bus' },
       { file: 'rotary.md', label: 'rotary' }
     ],
   },
