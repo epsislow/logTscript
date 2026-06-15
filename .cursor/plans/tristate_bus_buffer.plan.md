@@ -9,7 +9,7 @@ todos:
     content: "core/logic-value.js — alfabet 0/1/Z/X, resolveWireBit, porți IEEE 1164 + teste 1222–1235"
     status: pending
   - id: z-builtin
-    content: "Built-in Z(wireName) — atribuie Z pe toți biții; doc + teste 1236–1240"
+    content: "Built-in Z(wireName) + literal ?X1X (prefix LOGIC în ZSTATE); tokenizer/parser + teste 1236–1245"
     status: pending
   - id: wire-init-resolver
     content: "Init wire fără `=` → Z în ZSTATE; coadă contribuții + commitWireResolves per pas propagare + teste 1241–1265"
@@ -52,6 +52,7 @@ Referință: [future-component-ideas.md](v0_3_2/doc/future-component-ideas.md) s
 | Componente noi | **Niciuna** |
 | **X pe wire** | **Nu e sticky** — se recalculează la fiecare commit; un singur driver curat în pasul următor → `0`/`1` |
 | **Folosire X** | **show/peek/probe/watch** — mereu OK; **porți** — IEEE (fără eroare); **arithmetic/MUX/LUT/REG/shift** — **eroare la eval** |
+| **Literal Z/X în sursă** | Prefix **`?`** obligatoriu când literalul începe cu `Z` sau `X`; doar în `MODE ZSTATE` |
 
 ---
 
@@ -99,6 +100,8 @@ Mesaj tip: `Wire 'databus' has unresolved value (X) at bit 3` sau `cannot use wi
 
 **Nu** dăm eroare „la următoarea folosire” generică — doar când expresia **necesită** binar definit. `show` după conflict rămâne mereu valid.
 
+**Confirmat:** varianta strictă (eroare la orice citire a unui wire cu `X`, inclusiv porți) — **respinsă**. Rămâne modelul de mai sus.
+
 ### Rezumat
 
 | Acțiune | Wire cu `X` |
@@ -108,6 +111,52 @@ Mesaj tip: `Wire 'databus' has unresolved value (X) at bit 3` sau `cannot use wi
 | `ADD` / `MUX` / `REG` / … | Eroare la eval |
 | Pas nou, un driver curat | `X` → `0`/`1` automat |
 | `Z(wire)` | `X` → `Z` |
+
+---
+
+## Literal `Z` / `X` în declarație wire
+
+### Are sens?
+
+**Da**, dar cu roluri diferite:
+
+| Literal | Rol pedagogic |
+|---------|----------------|
+| **`Z`** | Echivalent explicit cu wire fără `=` sau cu `Z(wire)` — „nedrivit” |
+| **`X`** | **Seed pentru teste/demo** (`show`, `probe`, porți IEEE) — în scenarii reale X vine de la **resolver** (conflict), nu din sursă |
+
+Nu înlocuiește conflictul din multi-driver; îl **simulează** la init pentru laborator.
+
+### Sintaxă — **confirmat**
+
+Prefix **`?`** când literalul **începe cu `Z` sau `X`** (lexerul altfel le citește ca identificator):
+
+```logts
+MODE ZSTATE
+
+3wire btest = ?X1X      // MSB→LSB: X, 1, X
+8wire bus   = ?ZZZZZZZZ // echivalent 8wire bus fără =
+3wire mix   = ?Z01      // începe cu Z → necesită ?
+```
+
+Dacă literalul **începe cu `0` sau `1`**, rămâne sintaxa binară existentă, extinsă cu `Z`/`X` în mijloc:
+
+```logts
+3wire mix2 = 10Z      // fără ? — token digit-started
+3wire ok   = 101      // binar pur, ca azi
+```
+
+Reguli:
+- Permis **doar** cu `MODE ZSTATE` activ
+- Caractere permise în literal logic: `0`, `1`, `Z`, `X`
+- Lățimea = lățimea wire
+- **`?` + `Z(wire)`** — fără conflict (prefix vs apel funcție)
+
+**Confirmat de user:** varianta cu `?` înainte când începe cu `X` sau `Z`.
+
+### Comportament după init
+
+Literalul `?X1X` setează starea inițială; la pasul următor cu multi-driver, resolverul **suprascrie** din contribuții.
 
 ---
 
@@ -296,7 +345,7 @@ Mai mic decât planul vechi cu `comp [bus]`/`[buffer]` (~4–5 zile economiseșt
 - Pull-up / pull-down pe Z
 - Built-in `BUS(en1,d1,...)` agregat
 - Tristate în `comp [ioport]`
-- Literal sursă `8'b01Z0` în v1.0 (Z/X doar din init, resolver, Z())
+- ~~Literal sursă Z/X~~ — **în scope**: prefix `?` în ZSTATE (vezi secțiunea de mai sus)
 
 ---
 
