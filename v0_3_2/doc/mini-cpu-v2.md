@@ -199,11 +199,11 @@ After the full countdown, the terminal shows `A` (hex `^41`). See [terminal.md](
 
 ---
 
-## Exemplu rulabil complet
+## Runnable complete example
 
 ### mini-cpu-v2-full
 
-Prelude: ISA + ROM + `chip [alu4]` + `board +[cpu4v2]` (doar definiții).
+Prelude: ISA + ROM + `chip [alu4]` + `board +[cpu4v2]` (definitions only).
 
 ```logts-play
 inline [asm] .cpuisa:
@@ -407,7 +407,7 @@ board +[cpu4v2]:
 
 ### mini-cpu-v2-demo
 
-Același prelude + instanțiere `.cpu` + countdown complet (9 pași clock) + `probe`.
+Same prelude + `.cpu` instance + full countdown (9 clock steps) + `probe`.
 
 ```logts-play
 inline [asm] .cpuisa:
@@ -617,9 +617,9 @@ probe(.cpu:acc)
 probe(.cpu:pc)
 ```
 
-**Rezultat** după **Load & Run**: ACC = `0000`, PC = `0100` (HALT). 7-seg: `0`. Terminal: `A` (`^41`). În Output: `# .cpu:acc = 0000`, `# .cpu:pc = 0100`.
+**Result** after **Load & Run**: ACC = `0000`, PC = `0100` (HALT). 7-seg: `0`. Terminal: `A` (`^41`). In Output: `# .cpu:acc = 0000`, `# .cpu:pc = 0100`.
 
-După **un singur** pas clock: ACC = `0011` (încarcă `^3` din memoria de date), PC = `0001`.
+After **one** clock step: ACC = `0011` (loads `^3` from data memory), PC = `0001`.
 
 ---
 
@@ -651,7 +651,7 @@ Push/pop return addresses on `comp [queue]` — see [queue.md](queue.md). Not re
 
 `test_suite_ported.js` — group `mini-cpu-v2`, IDs **1056–1063** (init, LOAD, full countdown, BEQ, probe, clock, NEXT, terminal).
 
-În **run_tests.html**, tab-ul **Script** al fiecărui test arată **scriptul LogTScript complet** rulat (constante precum `CPU4V2_BASE` / `BOARD_HALFADD` sunt expandate automat din sursă).
+In **run_tests.html**, each test's **Script** tab shows the **full LogTScript** run (constants such as `CPU4V2_BASE` / `BOARD_HALFADD` are expanded automatically from source).
 
 ---
 

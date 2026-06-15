@@ -1073,7 +1073,7 @@
     }
   });
 
-  reg(85, 'wire-init', 'full tokenization of "1wire s : 1"', function(h, session) {
+  reg(85, 'wire-init', 'full tokenizedion of "1wire s : 1"', function(h, session) {
     {
       const { tokens } = session.tokenize('1wire s : 1');
       const types = tokens.map(t => t.type);
@@ -1372,7 +1372,7 @@
     }
   });
 
-  reg(1336, 'short-notation', 'Short notation — paranteze extra (concat și grupare)', function(h, session) {
+  reg(1336, 'short-notation', 'Short notation — extra parentheses (concat and grouping)', function(h, session) {
     {
       h.assert('outer wrap concat', session.preprocessShortNotation('`((0110) + ((!C.4) | (A.4 & B)))`'), '0110 + OR(!C.4,AND(A.4,B))');
       h.assert('double const parens', session.preprocessShortNotation('`((0110))`'), '0110');
@@ -2042,13 +2042,13 @@
     h.assert('empty', queueIsEmpty('qc'), '1');
   });
 
-reg(300, 'doc', 'Tokenizer — doc este KEYWORD', function(h, session) {
+reg(300, 'doc', 'Tokenizer — doc is KEYWORD', function(h, session) {
   const { tokens } = session.tokenize('doc(OR)');
-  h.assert('doc tokenizat ca KEYWORD', tokens[0].type, 'KEYWORD');
-  h.assert('doc valoare corecta', tokens[0].value, 'doc');
+  h.assert('doc tokenized as KEYWORD', tokens[0].type, 'KEYWORD');
+  h.assert('doc correct value', tokens[0].value, 'doc');
 });
 
-reg(301, 'doc', 'Parser — doc(OR) produce nodul AST corect', function(h, session) {
+reg(301, 'doc', 'Parser — doc(OR) produces correct AST node', function(h, session) {
   const stmts = session.parse('doc(OR)');
   h.assert('1 statement', String(stmts.length), '1');
   h.assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
@@ -2061,7 +2061,7 @@ reg(302, 'doc', 'Parser — doc(MUX) accepta token MUX', function(h, session) {
   h.assert('doc.name este MUX', stmts[0].doc, 'MUX');
 });
 
-reg(303, 'doc', 'Parser — doc(REG) produce nodul AST corect', function(h, session) {
+reg(303, 'doc', 'Parser — doc(REG) produces correct AST node', function(h, session) {
   const stmts = session.parse('doc(REG)');
   h.assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
   h.assert('doc.name este REG', stmts[0].doc, 'REG');
@@ -2069,56 +2069,56 @@ reg(303, 'doc', 'Parser — doc(REG) produce nodul AST corect', function(h, sess
 
 reg(304, 'doc', 'BUILTIN_DOC — NOT', function(h, session) {
   const lines = Interpreter.getDocLines('NOT', new Map());
-  h.assert('NOT semnatura', lines[0], 'NOT(Xbit) -> Xbit');
+  h.assert('NOT signature', lines[0], 'NOT(Xbit) -> Xbit');
 });
 
 reg(305, 'doc', 'BUILTIN_DOC — OR are 2 semnaturi', function(h, session) {
   const lines = Interpreter.getDocLines('OR', new Map());
   h.assert('OR 2 semnaturi', String(lines.length), '2');
-  h.assert('OR semnatura 1', lines[0], 'OR(Xbit) -> 1bit');
-  h.assert('OR semnatura 2', lines[1], 'OR(Xbit, Xbit) -> Xbit');
+  h.assert('OR signature 1', lines[0], 'OR(Xbit) -> 1bit');
+  h.assert('OR signature 2', lines[1], 'OR(Xbit, Xbit) -> Xbit');
 });
 
-reg(306, 'doc', 'BUILTIN_DOC — EQ are 1 semnatura', function(h, session) {
+reg(306, 'doc', 'BUILTIN_DOC — EQ are 1 signature', function(h, session) {
   const lines = Interpreter.getDocLines('EQ', new Map());
-  h.assert('EQ 1 semnatura', String(lines.length), '1');
-  h.assert('EQ semnatura', lines[0], 'EQ(Xbit, Xbit) -> 1bit');
+  h.assert('EQ 1 signature', String(lines.length), '1');
+  h.assert('EQ signature', lines[0], 'EQ(Xbit, Xbit) -> 1bit');
 });
 
 reg(307, 'doc', 'BUILTIN_DOC — MUX', function(h, session) {
   const lines = Interpreter.getDocLines('MUX', new Map());
-  h.assert('MUX semnatura', lines[0], 'MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit');
+  h.assert('MUX signature', lines[0], 'MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit');
 });
 
 reg(308, 'doc', 'BUILTIN_DOC — DEMUX', function(h, session) {
   const lines = Interpreter.getDocLines('DEMUX', new Map());
-  h.assert('DEMUX semnatura', lines[0], 'DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..');
+  h.assert('DEMUX signature', lines[0], 'DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..');
 });
 
 reg(309, 'doc', 'BUILTIN_DOC — REG', function(h, session) {
   const lines = Interpreter.getDocLines('REG', new Map());
-  h.assert('REG semnatura', lines[0], 'REG(Xbit data, 1bit clock, 1bit clear) -> Xbit');
+  h.assert('REG signature', lines[0], 'REG(Xbit data, 1bit clock, 1bit clear) -> Xbit');
 });
 
-reg(310, 'doc', 'BUILTIN_DOC — MUX/DEMUX/REGn vechi nedefinite', function(h, session) {
+reg(310, 'doc', 'BUILTIN_DOC — old MUX/DEMUX/REGn undefined', function(h, session) {
   const linesMUX1 = Interpreter.getDocLines('MUX1', new Map());
-  h.assert('MUX1 nedefinit', linesMUX1[0], 'MUX1: funcție nedefinită');
+  h.assert('MUX1 undefined', linesMUX1[0], 'MUX1: undefined function');
   const linesDEMUX1 = Interpreter.getDocLines('DEMUX1', new Map());
-  h.assert('DEMUX1 nedefinit', linesDEMUX1[0], 'DEMUX1: funcție nedefinită');
+  h.assert('DEMUX1 undefined', linesDEMUX1[0], 'DEMUX1: undefined function');
   const linesREG8 = Interpreter.getDocLines('REG8', new Map());
-  h.assert('REG8 nedefinit', linesREG8[0], 'REG8: funcție nedefinită');
+  h.assert('REG8 undefined', linesREG8[0], 'REG8: undefined function');
 });
 
-reg(311, 'doc', 'BUILTIN_DOC — REG are un singur rand', function(h, session) {
+reg(311, 'doc', 'BUILTIN_DOC — REG has single row', function(h, session) {
   const lines = Interpreter.getDocLines('REG', new Map());
-  h.assert('REG 1 rand', String(lines.length), '1');
+  h.assert('REG 1 row', String(lines.length), '1');
 });
 
 reg(312, 'doc', 'BUILTIN_DOC — LSHIFT are 2 semnaturi', function(h, session) {
   const lines = Interpreter.getDocLines('LSHIFT', new Map());
   h.assert('LSHIFT 2 semnaturi', String(lines.length), '2');
-  h.assert('LSHIFT semnatura 1', lines[0], 'LSHIFT(Xbit data, Nbit n) -> Xbit');
-  h.assert('LSHIFT semnatura 2', lines[1], 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit');
+  h.assert('LSHIFT signature 1', lines[0], 'LSHIFT(Xbit data, Nbit n) -> Xbit');
+  h.assert('LSHIFT signature 2', lines[1], 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit');
 });
 
 reg(313, 'doc', 'BUILTIN_DOC — RSHIFT are 2 semnaturi', function(h, session) {
@@ -2128,69 +2128,69 @@ reg(313, 'doc', 'BUILTIN_DOC — RSHIFT are 2 semnaturi', function(h, session) {
 
 reg(314, 'doc', 'BUILTIN_DOC — LATCH', function(h, session) {
   const lines = Interpreter.getDocLines('LATCH', new Map());
-  h.assert('LATCH semnatura', lines[0], 'LATCH(Xbit data, 1bit clock) -> Xbit');
+  h.assert('LATCH signature', lines[0], 'LATCH(Xbit data, 1bit clock) -> Xbit');
 });
 
 reg(315, 'doc', 'getDocLines — REG generic', function(h, session) {
   const lines = Interpreter.getDocLines('REG', null, new Map());
-  h.assert('REG semnatura din BUILTIN_DOC', lines[0], 'REG(Xbit data, 1bit clock, 1bit clear) -> Xbit');
+  h.assert('REG signature from BUILTIN_DOC', lines[0], 'REG(Xbit data, 1bit clock, 1bit clear) -> Xbit');
 });
 
-reg(316, 'doc', 'getDocLines — REG unic rand', function(h, session) {
+reg(316, 'doc', 'getDocLines — REG single row', function(h, session) {
   const lines = Interpreter.getDocLines('REG', null, new Map());
-  h.assert('REG are exact 1 rand', String(lines.length), '1');
+  h.assert('REG are exact 1 row', String(lines.length), '1');
 });
 
-reg(317, 'doc', 'getDocLines — functie user-defined fara return', function(h, session) {
+reg(317, 'doc', 'getDocLines — user-defined function without return', function(h, session) {
   const funcs = new Map();
   funcs.set('myGate', {
     params: [{ type: '8bit', id: 'a' }, { type: '1bit', id: 'b' }],
     returns: []
   });
   const lines = Interpreter.getDocLines('myGate', null, funcs);
-  h.assert('myGate semnatura', lines[0], 'myGate(8bit a, 1bit b)');
+  h.assert('myGate signature', lines[0], 'myGate(8bit a, 1bit b)');
 });
 
-reg(318, 'doc', 'getDocLines — functie user-defined cu return', function(h, session) {
+reg(318, 'doc', 'getDocLines — function user-defined with return', function(h, session) {
   const funcs = new Map();
   funcs.set('split', {
     params: [{ type: '8bit', id: 'x' }],
     returns: [{ type: '4bit' }, { type: '4bit' }]
   });
   const lines = Interpreter.getDocLines('split', null, funcs);
-  h.assert('split semnatura cu return', lines[0], 'split(8bit x) -> 4bit, 4bit');
+  h.assert('split signature with return', lines[0], 'split(8bit x) -> 4bit, 4bit');
 });
 
-reg(319, 'doc', 'getDocLines — functie necunoscuta', function(h, session) {
+reg(319, 'doc', 'getDocLines — unknown function', function(h, session) {
   const lines = Interpreter.getDocLines('Foo', new Map());
-  h.assert('Foo necunoscuta', lines[0], 'Foo: funcție nedefinită');
+  h.assert('Foo unknown', lines[0], 'Foo: undefined function');
 });
 
 reg(320, 'doc', 'Interpreter end-to-end — doc(OR) in out', function(h, session) {
   const out = session.runDoc('doc(OR)');
-  h.assert('OR linia 1', out[0], 'OR(Xbit) -> 1bit');
-  h.assert('OR linia 2', out[1], 'OR(Xbit, Xbit) -> Xbit');
+  h.assert('OR line 1', out[0], 'OR(Xbit) -> 1bit');
+  h.assert('OR line 2', out[1], 'OR(Xbit, Xbit) -> Xbit');
 });
 
 reg(321, 'doc', 'Interpreter end-to-end — doc(NOT)', function(h, session) {
   const out = session.runDoc('doc(NOT)');
-  h.assert('NOT linia 1', out[0], 'NOT(Xbit) -> Xbit');
-  h.assert('NOT o singura linie', String(out.length), '1');
+  h.assert('NOT line 1', out[0], 'NOT(Xbit) -> Xbit');
+  h.assert('NOT a single line', String(out.length), '1');
 });
 
 reg(322, 'doc', 'Interpreter end-to-end — doc(MUX)', function(h, session) {
   const out = session.runDoc('doc(MUX)');
-  h.assert('MUX semnatura completa', out[0], 'MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit');
+  h.assert('MUX signature complete', out[0], 'MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit');
 });
 
 reg(323, 'doc', 'Interpreter end-to-end — doc(REG)', function(h, session) {
   const out = session.runDoc('doc(REG)');
-  h.assert('REG semnatura', out[0], 'REG(Xbit data, 1bit clock, 1bit clear) -> Xbit');
+  h.assert('REG signature', out[0], 'REG(Xbit data, 1bit clock, 1bit clear) -> Xbit');
 });
 
 reg(324, 'doc', 'Interpreter end-to-end — doc(DEMUX)', function(h, session) {
   const out = session.runDoc('doc(DEMUX)');
-  h.assert('DEMUX semnatura', out[0], 'DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..');
+  h.assert('DEMUX signature', out[0], 'DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..');
 });
 
 reg(325, 'doc', 'Interpreter end-to-end — doc(myFunc) user-defined', function(h, session) {
@@ -2198,20 +2198,20 @@ reg(325, 'doc', 'Interpreter end-to-end — doc(myFunc) user-defined', function(
   :1bit OR(a, b)
 doc(myFunc)`;
   const out = session.runDoc(src);
-  h.assert('myFunc semnatura cu return', out[0], 'myFunc(8bit a, 1bit b) -> 1bit');
+  h.assert('myFunc signature with return', out[0], 'myFunc(8bit a, 1bit b) -> 1bit');
 });
 
 reg(326, 'doc', 'Interpreter end-to-end — doc(Unknown)', function(h, session) {
   const out = session.runDoc('doc(Unknown)');
-  h.assert('Unknown nedefinita', out[0], 'Unknown: funcție nedefinită');
+  h.assert('Unknown undefined', out[0], 'Unknown: undefined function');
 });
 
 reg(327, 'doc', 'Toate portile AND NAND NOR NXOR XOR', function(h, session) {
   for (const gate of ['AND', 'NAND', 'NOR', 'NXOR', 'XOR']) {
     const lines = Interpreter.getDocLines(gate, new Map());
     h.assert(gate + ' are 2 semnaturi', String(lines.length), '2');
-    h.assert(gate + ' semnatura 1 bit', lines[0], gate + '(Xbit) -> 1bit');
-    h.assert(gate + ' semnatura 2 biti', lines[1], gate + '(Xbit, Xbit) -> Xbit');
+    h.assert(gate + ' signature 1 bit', lines[0], gate + '(Xbit) -> 1bit');
+    h.assert(gate + ' signature 2 bits', lines[1], gate + '(Xbit, Xbit) -> Xbit');
   }
 });
 
@@ -2373,7 +2373,7 @@ reg(351, 'doc', 'DIVIDE — dividend smaller than divisor gives 0 result', funct
 reg(352, 'doc', 'isBuiltinFunction — ADD, SUBTRACT, MULTIPLY, DIVIDE recognized', function(h, session) {
   for (const fn of ['ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE']) {
     const lines = Interpreter.getDocLines(fn, new Map());
-    h.assert(fn + ' recognized (not undefined)', String(lines[0].includes('funcție nedefinită')), 'false');
+    h.assert(fn + ' recognized (not undefined)', String(lines[0].includes('undefined function')), 'false');
   }
 });
 
@@ -2445,117 +2445,117 @@ reg(361, 'doc', 'REVERSE and LROTATE E2E', function(h, session) {
 reg(362, 'doc', 'isBuiltinFunction — new bit builtins recognized', function(h, session) {
   for (const fn of ['HIGH', 'BITINDEX', 'ONEHOT', 'BITSIZE', 'LROTATE']) {
     const lines = Interpreter.getDocLines(fn, new Map());
-    h.assert(fn + ' recognized', String(lines[0].includes('funcție nedefinită')), 'false');
+    h.assert(fn + ' recognized', String(lines[0].includes('undefined function')), 'false');
   }
 });
 
-reg(400, 'doc-comp', 'Parser — doc(comp) produce nodul AST corect', function(h, session) {
+reg(400, 'doc-comp', 'Parser — doc(comp) produces correct AST node', function(h, session) {
   const stmts = session.parse('doc(comp)');
   h.assert('doc camp este comp', stmts[0].doc, 'comp');
 });
 
-reg(401, 'doc-comp', 'Parser — doc(comp.adder) produce nodul AST corect', function(h, session) {
+reg(401, 'doc-comp', 'Parser — doc(comp.adder) produces correct AST node', function(h, session) {
   const stmts = session.parse('doc(comp.adder)');
   h.assert('doc camp este comp.adder', stmts[0].doc, 'comp.adder');
 });
 
-reg(402, 'doc-comp', 'Parser — doc(pcb.bcd) produce nodul AST corect', function(h, session) {
+reg(402, 'doc-comp', 'Parser — doc(pcb.bcd) produces correct AST node', function(h, session) {
   const stmts = session.parse('doc(pcb.bcd)');
   h.assert('doc camp este pcb.bcd', stmts[0].doc, 'pcb.bcd');
 });
 
-reg(403, 'doc-comp', 'doc(comp) contine comp.adder', function(h, session) {
+reg(403, 'doc-comp', 'doc(comp) contains comp.adder', function(h, session) {
   const out = session.runDoc('doc(comp)');
   const hasAdder = out.some(l => l.includes('comp.adder'));
-  h.assert('doc(comp) contine comp.adder', String(hasAdder), 'true');
+  h.assert('doc(comp) contains comp.adder', String(hasAdder), 'true');
 });
 
-reg(404, 'doc-comp', 'doc(comp) contine shortname comp.+', function(h, session) {
+reg(404, 'doc-comp', 'doc(comp) contains shortname comp.+', function(h, session) {
   const out = session.runDoc('doc(comp)');
   const hasPlus = out.some(l => l.includes('comp.+'));
-  h.assert('doc(comp) contine comp.+', String(hasPlus), 'true');
+  h.assert('doc(comp) contains comp.+', String(hasPlus), 'true');
 });
 
-reg(405, 'doc-comp', 'doc(comp) contine comp.7seg', function(h, session) {
+reg(405, 'doc-comp', 'doc(comp) contains comp.7seg', function(h, session) {
   const out = session.runDoc('doc(comp)');
   const has7seg = out.some(l => l.includes('comp.7seg'));
-  h.assert('doc(comp) contine comp.7seg', String(has7seg), 'true');
+  h.assert('doc(comp) contains comp.7seg', String(has7seg), 'true');
 });
 
-reg(406, 'doc-comp', 'doc(comp) shortname comp.7 pe aceeasi linie cu comp.7seg', function(h, session) {
+reg(406, 'doc-comp', 'doc(comp) shortname comp.7 on same line as comp.7seg', function(h, session) {
   const out = session.runDoc('doc(comp)');
   const line7seg = out.find(l => l.includes('comp.7seg'));
-  h.assert('linia cu 7seg contine si comp.7', String(line7seg && line7seg.includes('comp.7')), 'true');
+  h.assert('line with 7seg contains and comp.7', String(line7seg && line7seg.includes('comp.7')), 'true');
 });
 
-reg(407, 'doc-comp', 'doc(comp.adder) prima linie', function(h, session) {
+reg(407, 'doc-comp', 'doc(comp.adder) first line', function(h, session) {
   const out = session.runDoc('doc(comp.adder)');
-  h.assert('prima linie adder', out[0], 'comp [adder] .name:');
+  h.assert('first line adder', out[0], 'comp [adder] .name:');
 });
 
-reg(408, 'doc-comp', 'doc(comp.adder) contine depth: integer', function(h, session) {
+reg(408, 'doc-comp', 'doc(comp.adder) contains depth: integer', function(h, session) {
   const out = session.runDoc('doc(comp.adder)');
-  h.assert('adder contine depth', String(out.some(l => l.includes('depth: integer'))), 'true');
+  h.assert('adder contains depth', String(out.some(l => l.includes('depth: integer'))), 'true');
 });
 
-reg(409, 'doc-comp', 'doc(comp.adder) contine = Xbit', function(h, session) {
+reg(409, 'doc-comp', 'doc(comp.adder) contains = Xbit', function(h, session) {
   const out = session.runDoc('doc(comp.adder)');
-  h.assert('adder contine = Xbit', String(out.some(l => l.trim() === '= Xbit')), 'true');
+  h.assert('adder contains = Xbit', String(out.some(l => l.trim() === '= Xbit')), 'true');
 });
 
-reg(410, 'doc-comp', 'doc(comp.adder) contine Xpin a', function(h, session) {
+reg(410, 'doc-comp', 'doc(comp.adder) contains Xpin a', function(h, session) {
   const out = session.runDoc('doc(comp.adder)');
-  h.assert('adder contine Xpin a', String(out.some(l => l.includes('Xpin a'))), 'true');
+  h.assert('adder contains Xpin a', String(out.some(l => l.includes('Xpin a'))), 'true');
 });
 
-reg(411, 'doc-comp', 'doc(comp.adder) contine Xpout get', function(h, session) {
+reg(411, 'doc-comp', 'doc(comp.adder) contains Xpout get', function(h, session) {
   const out = session.runDoc('doc(comp.adder)');
-  h.assert('adder contine Xpout get', String(out.some(l => l.includes('Xpout get'))), 'true');
+  h.assert('adder contains Xpout get', String(out.some(l => l.includes('Xpout get'))), 'true');
 });
 
-reg(412, 'doc-comp', 'doc(comp.adder) contine -> Xbit', function(h, session) {
+reg(412, 'doc-comp', 'doc(comp.adder) contains -> Xbit', function(h, session) {
   const out = session.runDoc('doc(comp.adder)');
-  h.assert('adder contine -> Xbit', String(out.some(l => l.trim() === '-> Xbit')), 'true');
+  h.assert('adder contains -> Xbit', String(out.some(l => l.trim() === '-> Xbit')), 'true');
 });
 
 reg(413, 'doc-comp', 'doc(comp.+) same output as doc(comp.adder)', function(h, session) {
   const outAdder = session.runDoc('doc(comp.adder)');
   const outPlus = session.runDoc('doc(comp.+)');
-  h.assert('doc(comp.+) prima linie', outPlus[0], 'comp [adder] .name:');
-  h.assert('doc(comp.+) lungime egala cu adder', String(outPlus.length), String(outAdder.length));
+  h.assert('doc(comp.+) first line', outPlus[0], 'comp [adder] .name:');
+  h.assert('doc(comp.+) same length as adder', String(outPlus.length), String(outAdder.length));
 });
 
-reg(414, 'doc-comp', 'doc(comp.7seg) prima linie', function(h, session) {
+reg(414, 'doc-comp', 'doc(comp.7seg) first line', function(h, session) {
   const out = session.runDoc('doc(comp.7seg)');
-  h.assert('prima linie 7seg', out[0], 'comp [7seg] .name:');
+  h.assert('first line 7seg', out[0], 'comp [7seg] .name:');
 });
 
-reg(415, 'doc-comp', 'doc(comp.7seg) contine 1pin set', function(h, session) {
+reg(415, 'doc-comp', 'doc(comp.7seg) contains 1pin set', function(h, session) {
   const out = session.runDoc('doc(comp.7seg)');
-  h.assert('7seg contine 1pin set', String(out.some(l => l.includes('1pin set'))), 'true');
+  h.assert('7seg contains 1pin set', String(out.some(l => l.includes('1pin set'))), 'true');
 });
 
-reg(416, 'doc-comp', 'doc(comp.7seg) contine -> 8bit', function(h, session) {
+reg(416, 'doc-comp', 'doc(comp.7seg) contains -> 8bit', function(h, session) {
   const out = session.runDoc('doc(comp.7seg)');
-  h.assert('7seg contine -> 8bit', String(out.some(l => l.trim() === '-> 8bit')), 'true');
+  h.assert('7seg contains -> 8bit', String(out.some(l => l.trim() === '-> 8bit')), 'true');
 });
 
-reg(417, 'doc-comp', 'doc(comp.7) shortname pentru 7seg', function(h, session) {
+reg(417, 'doc-comp', 'doc(comp.7) shortname for 7seg', function(h, session) {
   const out = session.runDoc('doc(comp.7)');
-  h.assert('doc(comp.7) prima linie', out[0], 'comp [7seg] .name:');
+  h.assert('doc(comp.7) first line', out[0], 'comp [7seg] .name:');
 });
 
-reg(418, 'doc-comp', 'doc(comp.mem) contine = Xbit', function(h, session) {
+reg(418, 'doc-comp', 'doc(comp.mem) contains = Xbit', function(h, session) {
   const out = session.runDoc('doc(comp.mem)');
-  h.assert('mem contine = Xbit', String(out.some(l => l.trim().startsWith('= '))), 'true');
+  h.assert('mem contains = Xbit', String(out.some(l => l.trim().startsWith('= '))), 'true');
 });
 
-reg(419, 'doc-comp', 'doc(comp.xyz) tip nedefinit', function(h, session) {
+reg(419, 'doc-comp', 'doc(comp.xyz) undefined type', function(h, session) {
   const out = session.runDoc('doc(comp.xyz)');
-  h.assert('comp.xyz nedefinit', out[0], 'comp.xyz: tip de componentă nedefinit');
+  h.assert('comp.xyz undefined', out[0], 'comp.xyz: undefined component type');
 });
 
-reg(420, 'doc-comp', 'doc(pcb) cu PCB definit contine pcb.bcd', function(h, session) {
+reg(420, 'doc-comp', 'doc(pcb) with PCB defined contains pcb.bcd', function(h, session) {
   const src = `pcb +[bcd]:
   4pin sum
   1pin set
@@ -2565,10 +2565,10 @@ reg(420, 'doc-comp', 'doc(pcb) cu PCB definit contine pcb.bcd', function(h, sess
   on: 1
   :1bit set`;
   const out = session.runDoc(src + '\ndoc(pcb)');
-  h.assert('doc(pcb) contine pcb.bcd', String(out.some(l => l === 'pcb.bcd')), 'true');
+  h.assert('doc(pcb) contains pcb.bcd', String(out.some(l => l === 'pcb.bcd')), 'true');
 });
 
-reg(421, 'doc-comp', 'doc(pcb.bcd) prima linie', function(h, session) {
+reg(421, 'doc-comp', 'doc(pcb.bcd) first line', function(h, session) {
   const src = `pcb +[bcd]:
   4pin sum
   1pin set
@@ -2579,10 +2579,10 @@ reg(421, 'doc-comp', 'doc(pcb.bcd) prima linie', function(h, session) {
   :1bit set
 doc(pcb.bcd)`;
   const out = session.runDoc(src);
-  h.assert('pcb.bcd prima linie', out[0], 'pcb [bcd] .name:');
+  h.assert('pcb.bcd first line', out[0], 'pcb [bcd] .name:');
 });
 
-reg(422, 'doc-comp', 'doc(pcb.bcd) contine 4pin sum', function(h, session) {
+reg(422, 'doc-comp', 'doc(pcb.bcd) contains 4pin sum', function(h, session) {
   const src = `pcb +[bcd]:
   4pin sum
   1pin set
@@ -2593,10 +2593,10 @@ reg(422, 'doc-comp', 'doc(pcb.bcd) contine 4pin sum', function(h, session) {
   :1bit set
 doc(pcb.bcd)`;
   const out = session.runDoc(src);
-  h.assert('pcb.bcd contine 4pin sum', String(out.some(l => l.includes('4pin sum'))), 'true');
+  h.assert('pcb.bcd contains 4pin sum', String(out.some(l => l.includes('4pin sum'))), 'true');
 });
 
-reg(423, 'doc-comp', 'doc(pcb.bcd) contine 1pout carry', function(h, session) {
+reg(423, 'doc-comp', 'doc(pcb.bcd) contains 1pout carry', function(h, session) {
   const src = `pcb +[bcd]:
   4pin sum
   1pin set
@@ -2607,10 +2607,10 @@ reg(423, 'doc-comp', 'doc(pcb.bcd) contine 1pout carry', function(h, session) {
   :1bit set
 doc(pcb.bcd)`;
   const out = session.runDoc(src);
-  h.assert('pcb.bcd contine 1pout carry', String(out.some(l => l.includes('1pout carry'))), 'true');
+  h.assert('pcb.bcd contains 1pout carry', String(out.some(l => l.includes('1pout carry'))), 'true');
 });
 
-reg(424, 'doc-comp', 'doc(pcb.bcd) contine -> 1bit', function(h, session) {
+reg(424, 'doc-comp', 'doc(pcb.bcd) contains -> 1bit', function(h, session) {
   const src = `pcb +[bcd]:
   4pin sum
   1pin set
@@ -2621,17 +2621,17 @@ reg(424, 'doc-comp', 'doc(pcb.bcd) contine -> 1bit', function(h, session) {
   :1bit set
 doc(pcb.bcd)`;
   const out = session.runDoc(src);
-  h.assert('pcb.bcd contine -> 1bit', String(out.some(l => l.trim() === '-> 1bit')), 'true');
+  h.assert('pcb.bcd contains -> 1bit', String(out.some(l => l.trim() === '-> 1bit')), 'true');
 });
 
-reg(425, 'doc-comp', 'doc(pcb.xyz) tip nedefinit', function(h, session) {
+reg(425, 'doc-comp', 'doc(pcb.xyz) undefined type', function(h, session) {
   const out = session.runDoc('doc(pcb.xyz)');
-  h.assert('pcb.xyz nedefinit', out[0], 'pcb.xyz: tip PCB nedefinit');
+  h.assert('pcb.xyz undefined', out[0], 'pcb.xyz: undefined PCB type');
 });
 
-reg(426, 'doc-comp', 'doc(comp.osc) nu contine = si returneaza 1bit', function(h, session) {
+reg(426, 'doc-comp', 'doc(comp.osc) does not contain = and returns 1bit', function(h, session) {
   const out = session.runDoc('doc(comp.osc)');
-  h.assert('osc fara = ', String(out.some(l => l.trim().startsWith('= '))), 'false');
+  h.assert('osc without = ', String(out.some(l => l.trim().startsWith('= '))), 'false');
   h.assert('osc -> 1bit', String(out.some(l => l.trim() === '-> 1bit')), 'true');
 });
 
@@ -2644,7 +2644,7 @@ reg(427, 'doc-comp', 'InterpreterDoc2.formatCompDef helper', function(h, session
     returns: 'Xbit',
   };
   const lines = Interpreter.formatCompDef('.name', 'testComp', def);
-  h.assert('formatCompDef linia 0', lines[0], 'comp [testComp] .name:');
+  h.assert('formatCompDef line 0', lines[0], 'comp [testComp] .name:');
   h.assert('formatCompDef attr', lines[1], '  depth: integer');
   h.assert('formatCompDef = Xbit', lines[2], '  = Xbit');
   h.assert('formatCompDef :{', lines[3], '  :{');
@@ -2654,7 +2654,7 @@ reg(427, 'doc-comp', 'InterpreterDoc2.formatCompDef helper', function(h, session
   h.assert('formatCompDef -> Xbit', lines[7], '  -> Xbit');
 });
 
-reg(1168, 'pcb', 'PCB property block on:1 cu set=1 declanseaza executia', function(h, session) {
+reg(1168, 'pcb', 'PCB property block on:1 with set=1 triggers execution', function(h, session) {
   const { interp } = session.run(`pcb +[passthrough]:
   4pin data
   1pin set
@@ -2674,7 +2674,7 @@ pcb [passthrough] .q::
   h.assert('PCB property block on:1 set=1 actualizeaza pout', session.getPcbPout(interp, '.q', 'result'), '1111');
 });
 
-reg(1169, 'pcb', 'PCB property block on:1 cu set=0 nu declanseaza executia', function(h, session) {
+reg(1169, 'pcb', 'PCB property block on:1 with set=0 does not trigger execution', function(h, session) {
   const { interp } = session.run(`pcb +[passthrough2]:
   4pin data
   1pin set
@@ -2691,10 +2691,10 @@ pcb [passthrough2] .q2::
   data = 1111
   set = 0
 }`);
-  h.assert('PCB property block on:1 set=0 nu actualizeaza pout', session.getPcbPout(interp, '.q2', 'result'), '0000');
+  h.assert('PCB property block on:1 set=0 does not update pout', session.getPcbPout(interp, '.q2', 'result'), '0000');
 });
 
-reg(1170, 'pcb', 'scenario regs PCB cu adr si data', function(h, session) {
+reg(1170, 'pcb', 'scenario regs PCB with adr and data', function(h, session) {
   const { interp } = session.run(`pcb +[regs]:
   1pin set
   4pin data
@@ -2711,10 +2711,10 @@ pcb [regs] .q::
   data = 0101
   set = 1
 }`);
-  h.assert('PCB regs property block returneaza rezultat calculat', session.getPcbPout(interp, '.q', 'result'), '1010');
+  h.assert('PCB regs property block returns computed result', session.getPcbPout(interp, '.q', 'result'), '1010');
 });
 
-reg(1171, 'pcb', 'wire extern "q = .q" reflecta pout dupa property block', function(h, session) {
+reg(1171, 'pcb', 'wire external "q = .q" reflects pout after property block', function(h, session) {
   const { interp } = session.run(`pcb +[echo]:
   4pin data
   1pin set
@@ -2733,7 +2733,7 @@ pcb [echo] .e::
   data = 0110
   set = 1
 }`);
-  h.assert('Test 503 pout result dupa block', session.getPcbPout(interp, '.e', 'result'), '0110');
+  h.assert('Test 503 pout result after block', session.getPcbPout(interp, '.e', 'result'), '0110');
   h.assert('Test 503 wire q reflecta pout', session.getWire(interp, 'q'), '0110');
 });
 
@@ -2756,11 +2756,11 @@ pcb [inv] .i::
   set = 1
 }`);
   const inst = interp.pcbInstances.get('.i');
-  h.assert('Test 504 instance.returnValue setat', inst ? String(inst.returnValue) : 'null', '1010');
+  h.assert('Test 504 instance.returnValue set', inst ? String(inst.returnValue) : 'null', '1010');
   h.assert('Test 504 wire q reflecta wire intern NOT(data)', session.getWire(interp, 'q'), '1010');
 });
 
-reg(505, 'pcb', 'alternare A->B->A->B intre doua blocuri PCB cu on:1', function(h, session) {
+reg(505, 'pcb', 'alternation A->B->A->B between two PCB blocks with on:1', function(h, session) {
   const { interp } = session.run(`pcb +[sw]:
   4pin data
   1pin set
@@ -2790,13 +2790,13 @@ pcb [sw] .p::
   h.assert('505 B=1: result=1010', session.getPcbPout(interp, '.p', 'result'), '1010');
   session.setWire(interp, 'aa', '0');
   session.setWire(interp, 'aa', '1');
-  h.assert('505 A=1 din nou: result=0101', session.getPcbPout(interp, '.p', 'result'), '0101');
+  h.assert('505 A=1 again: result=0101', session.getPcbPout(interp, '.p', 'result'), '0101');
   session.setWire(interp, 'bb', '0');
   session.setWire(interp, 'bb', '1');
-  h.assert('505 B=1 din nou: result=1010', session.getPcbPout(interp, '.p', 'result'), '1010');
+  h.assert('505 B=1 again: result=1010', session.getPcbPout(interp, '.p', 'result'), '1010');
 });
 
-reg(506, 'pcb', 'comp interne PCB nu sunt re-create la re-executie', function(h, session) {
+reg(506, 'pcb', 'comp interne PCB are not re-create at re-run', function(h, session) {
   const { interp } = session.run(`pcb +[withcomp]:
   1pin set
   4pin data
@@ -2828,11 +2828,11 @@ pcb [withcomp] .wc::
   session.setWire(interp, 'aa', '0');
   session.setWire(interp, 'aa', '1');
   const blocksAfter2 = interp.componentPropertyBlocks.length;
-  h.assert('506 componentPropertyBlocks nu creste la re-executie', String(blocksAfter1), String(blocksAfter2));
-  h.assert('506 result corect la a doua executie', session.getPcbPout(interp, '.wc', 'result'), '0101');
+  h.assert('506 componentPropertyBlocks does not grow on re-run', String(blocksAfter1), String(blocksAfter2));
+  h.assert('506 correct result on second execution', session.getPcbPout(interp, '.wc', 'result'), '0101');
 });
 
-reg(507, 'pcb', 'storage nu creste la re-executii PCB repetate', function(h, session) {
+reg(507, 'pcb', 'storage does not grow on repeated PCB re-runs', function(h, session) {
   const { interp } = session.run(`pcb +[stable]:
   4pin data
   1pin set
@@ -2862,12 +2862,12 @@ pcb [stable] .s::
   session.setWire(interp, 'aa', '0');
   session.setWire(interp, 'aa', '1');
   const storageAfter3 = interp.storage.length;
-  h.assert('507 storage stabil dupa executia 2', String(storageAfter2), String(storageAfter1));
-  h.assert('507 storage stabil dupa executia 3', String(storageAfter3), String(storageAfter1));
-  h.assert('507 result corect NOT(0101)=1010', session.getPcbPout(interp, '.s', 'result'), '1010');
+  h.assert('507 stable storage after run 2', String(storageAfter2), String(storageAfter1));
+  h.assert('507 stable storage after run 3', String(storageAfter3), String(storageAfter1));
+  h.assert('507 correct result NOT(0101)=1010', session.getPcbPout(interp, '.s', 'result'), '1010');
 });
 
-reg(508, 'pcb', 'storage stabil cu doua blocuri PCB alternante', function(h, session) {
+reg(508, 'pcb', 'stable storage with two alternating PCB blocks', function(h, session) {
   const { interp } = session.run(`pcb +[dual2]:
   4pin data
   1pin setA
@@ -2905,12 +2905,12 @@ pcb [dual2] .d::
   session.setWire(interp, 'aa', '0');
   session.setWire(interp, 'bb', '1');
   const s4 = interp.storage.length;
-  h.assert('508 storage stabil A->B', String(s1), String(s2));
-  h.assert('508 storage stabil B->A', String(s2), String(s3));
-  h.assert('508 storage stabil A->B din nou', String(s3), String(s4));
+  h.assert('508 stable storage A->B', String(s1), String(s2));
+  h.assert('508 stable storage B->A', String(s2), String(s3));
+  h.assert('508 stable storage A->B again', String(s3), String(s4));
 });
 
-reg(509, 'pcb', 'blocuri cu set=expr(comp) se executa in ordinea din sursa', function(h, session) {
+reg(509, 'pcb', 'blocks with set=expr(comp) execute in source order', function(h, session) {
   const { interp } = session.run(`
 pcb +[seq]:
   1pin set
@@ -2933,12 +2933,12 @@ pcb [seq] .q::
   set = trigger
 }`);
   const blocksBefore = interp.componentPropertyBlocks.filter(b => b.component === '.q').length;
-  h.assert('509 doua blocuri inregistrate pentru .q', String(blocksBefore), '2');
+  h.assert('509 two blocks registered for .q', String(blocksBefore), '2');
   session.setWire(interp, 'trigger', '1');
-  h.assert('509 ambele blocuri s-au executat, pout=1111', session.getPcbPout(interp, '.q', 'val'), '1111');
+  h.assert('509 both blocks executed, pout=1111', session.getPcbPout(interp, '.q', 'val'), '1111');
 });
 
-reg(510, 'pcb', 'ordinea executiei blocurilor cu trigger component direct', function(h, session) {
+reg(510, 'pcb', 'property block execution order with direct component trigger', function(h, session) {
   const { interp } = session.run(`
 pcb +[target]:
   4pin data
@@ -2968,10 +2968,10 @@ comp [key] .btn:
   set = btn
 }`);
   session.setComp(interp, '.btn', '1');
-  h.assert('510 blocul cu blockIndex mare se executa dupa cel cu blockIndex mic', session.getPcbPout(interp, '.t', 'val'), '0000');
+  h.assert('510 block with higher blockIndex runs after lower blockIndex', session.getPcbPout(interp, '.t', 'val'), '0000');
 });
 
-reg(511, 'pcb', 'mai multe blocuri pe acelasi comp, ordinea = blockIndex', function(h, session) {
+reg(511, 'pcb', 'multiple blocks on same comp, order = blockIndex', function(h, session) {
   const { interp } = session.run(`
 pcb +[order]:
   4pin data
@@ -3006,10 +3006,10 @@ comp [key] .k:
   set = .k
 }`);
   session.setComp(interp, '.k', '1');
-  h.assert('511 ultimul bloc din sursa castiga (data=1000)', session.getPcbPout(interp, '.o', 'val'), '1000');
+  h.assert('511 ultimul bloc from source castiga (data=1000)', session.getPcbPout(interp, '.o', 'val'), '1000');
 });
 
-reg(512, 'pcb', 'bitrange pe literali BIN (\\N) si HEX (^N)', function(h, session) {
+reg(512, 'pcb', 'bitrange on literali BIN (\\N) and HEX (^N)', function(h, session) {
   let interp;
   ({ interp } = session.run('3wire c = \\12.0-2'));
   h.assert('512 \\12.0-2 = 110', session.getWire(interp, 'c'), '110');
@@ -3054,7 +3054,7 @@ reg(513, 'pcb', 'operatorul ;p de padding', function(h, session) {
   ({ interp } = session.run('8wire h = ^0f.4-7;8'));
   h.assert('513 ^0f.4-7;8 = 00001111', session.getWire(interp, 'h'), '00001111');
   ({ interp } = session.run('1wire aa = 1\n8wire i = aa;8'));
-  h.assert('513 variabila aa;8 = 00000001', session.getWire(interp, 'i'), '00000001');
+  h.assert('513 variable aa;8 = 00000001', session.getWire(interp, 'i'), '00000001');
   ({ interp } = session.run('8wire data = 11001100\n8wire j = data.0-3;8'));
   h.assert('513 data.0-3;8 = 00001100', session.getWire(interp, 'j'), '00001100');
   ({ interp } = session.run('16wire df = \\12;8 + ^2;8'));
@@ -3063,12 +3063,12 @@ reg(513, 'pcb', 'operatorul ;p de padding', function(h, session) {
   h.assert('513 short notation \\12;8 & [^ff] = 00001100', session.getWire(interp, 'sn'), '00001100');
 });
 
-reg(514, 'pcb', 'padding ;p pe componente si PCB-uri', function(h, session) {
+reg(514, 'pcb', 'padding ;p on componente and PCB-uri', function(h, session) {
   let interp;
   ({ interp } = session.run('comp [mem] .m:\ndepth:4\nlength:1\n:\n8wire x = .m:get;8'));
   h.assert('514 .mem:get;8 = 00000000', session.getWire(interp, 'x'), '00000000');
   ({ interp } = session.run('comp [mem] .m:\ndepth:4\nlength:1\n= \\12\n:\n8wire x = .m:get;8'));
-  h.assert('514 .mem:get;8 cu initVal=1100 = 00001100', session.getWire(interp, 'x'), '00001100');
+  h.assert('514 .mem:get;8 with initVal=1100 = 00001100', session.getWire(interp, 'x'), '00001100');
   ({ interp } = session.run('comp [mem] .m:\ndepth:4\nlength:1\n= \\12\n:\n8wire x = .m:get.0-1;8'));
   h.assert('514 .mem:get.0-1;8 = 00000011', session.getWire(interp, 'x'), '00000011');
   ({ interp } = session.run('comp [mem] .m:\ndepth:4\nlength:1\n= \\12\n:\n8wire x = .m:get.0/2;8'));
@@ -3148,21 +3148,21 @@ pcb [ret8] .g::
 }
 
 8wire x = .g;4`));
-  h.assert('514 PCB direct;4 nu trunchiaza (11001100)', session.getWire(interp, 'x'), '11001100');
+  h.assert('514 PCB direct;4 does not truncate (11001100)', session.getWire(interp, 'x'), '11001100');
 });
 
-reg(515, 'pcb', 'mem comp = variabila si .mem = d', function(h, session) {
+reg(515, 'pcb', 'mem comp = variable and .mem = d', function(h, session) {
   let interp;
   ({ interp } = session.run('comp [mem] .m:\ndepth:4\nlength:4\n= \\12\n:\n8wire x = .m:get;8'));
-  h.assert('515 = literal \\12 in declaratie (adresa 0 = 1100, padded 8)', session.getWire(interp, 'x'), '00001100');
+  h.assert('515 = literal \\12 in declaration (address 0 = 1100, padded 8)', session.getWire(interp, 'x'), '00001100');
   ({ interp } = session.run('4wire d = 1010\ncomp [mem] .m:\ndepth:4\nlength:4\n= d\n:\n8wire x = .m:get;8'));
-  h.assert('515 = variabila d=1010 in declaratie (adresa 0 = 1010, padded 8)', session.getWire(interp, 'x'), '00001010');
+  h.assert('515 = variable d=1010 in declaration (address 0 = 1010, padded 8)', session.getWire(interp, 'x'), '00001010');
   ({ interp } = session.run('comp [mem] .m:\ndepth:8\nlength:4\n= ^ffff\n:\n8wire x = .m:get;8'));
-  h.assert('515 = ^ffff in declaratie (adresa 0 = 11111111)', session.getWire(interp, 'x'), '11111111');
+  h.assert('515 = ^ffff in declaration (address 0 = 11111111)', session.getWire(interp, 'x'), '11111111');
   ({ interp } = session.run('16wire d = ^ffff\ncomp [mem] .m:\ndepth:8\nlength:4\n= d\n:\n8wire x = .m:get;8'));
-  h.assert('515 = variabila d=^ffff in declaratie (adresa 0 = 11111111)', session.getWire(interp, 'x'), '11111111');
+  h.assert('515 = variable d=^ffff in declaration (address 0 = 11111111)', session.getWire(interp, 'x'), '11111111');
   ({ interp } = session.run('4wire d = 1100\ncomp [mem] .m:\ndepth:8\nlength:4\n= d\n:\n8wire x = .m:get;8'));
-  h.assert('515 = variabila mai scurta decat depth, pad (00001100)', session.getWire(interp, 'x'), '00001100');
+  h.assert('515 = variable shorter than depth, pad (00001100)', session.getWire(interp, 'x'), '00001100');
   ({ interp } = session.run(`
 comp [mem] .m:
 depth:4
@@ -3173,7 +3173,7 @@ length:4
 .m = d
 
 8wire x = .m:get;8`));
-  h.assert('515 .mem = d dupa declaratie (adresa 0 = 1010, padded 8)', session.getWire(interp, 'x'), '00001010');
+  h.assert('515 .mem = d after declaration (address 0 = 1010, padded 8)', session.getWire(interp, 'x'), '00001010');
   ({ interp } = session.run(`
 comp [mem] .m:
 depth:8
@@ -3184,7 +3184,7 @@ length:4
 .m = d
 
 8wire x = .m:get;8`));
-  h.assert('515 .mem = d multi-adresa (adresa 0 = 11110000)', session.getWire(interp, 'x'), '11110000');
+  h.assert('515 .mem = d multi-address (address 0 = 11110000)', session.getWire(interp, 'x'), '11110000');
 });
 
 function regPcbWave(id, legacyId, title, run) {
@@ -3201,14 +3201,14 @@ for (const [legacyId, waveId] of _pcbWavePairs) {
   if (t) regPcbWave(waveId, legacyId, t.title, t.run);
 }
 
-reg(600, 'signal', 'wire simplu — propagare cascadat prin assignment', function(h, session) {
+reg(600, 'signal', 'simple wire — cascaded propagation through assignment', function(h, session) {
   const { interp } = session.run(`
 1wire a = 0
 1wire b = NOT(a)
 1wire c = NOT(b)`);
   session.setWire(interp, 'a', '1');
-  h.assert('600 b=NOT(a) dupa a=1', session.getWire(interp, 'b'), '0');
-  h.assert('600 c=NOT(b) cascadat dupa a=1', session.getWire(interp, 'c'), '1');
+  h.assert('600 b=NOT(a) after a=1', session.getWire(interp, 'b'), '0');
+  h.assert('600 c=NOT(b) cascaded after a=1', session.getWire(interp, 'c'), '1');
 }, { propagation: 'wave' });
 
 reg(601, 'signal', 'cascada de 3 niveluri a->b->c->d', function(h, session) {
@@ -3218,9 +3218,9 @@ reg(601, 'signal', 'cascada de 3 niveluri a->b->c->d', function(h, session) {
 1wire c = b
 1wire d = c`);
   session.setWire(interp, 'a', '1');
-  h.assert('601 b=a dupa a=1', session.getWire(interp, 'b'), '1');
-  h.assert('601 c=b cascadat', session.getWire(interp, 'c'), '1');
-  h.assert('601 d=c cascadat', session.getWire(interp, 'd'), '1');
+  h.assert('601 b=a after a=1', session.getWire(interp, 'b'), '1');
+  h.assert('601 c=b cascaded', session.getWire(interp, 'c'), '1');
+  h.assert('601 d=c cascaded', session.getWire(interp, 'd'), '1');
 }, { propagation: 'wave' });
 
 reg(602, 'signal', 'MUX toggle — tg0 se toggleaza cand p trece 1->0', function(h, session) {
@@ -3231,16 +3231,16 @@ reg(602, 'signal', 'MUX toggle — tg0 se toggleaza cand p trece 1->0', function
 tg0 = MUX(p, tg0, NOT(tg0))`);
   h.assert('602 tg0 initial = 0', session.getWire(interp, 'tg0'), '0');
   session.setWire(interp, 'p', '1');
-  h.assert('602 tg0 dupa p=1 (toggle → 1)', session.getWire(interp, 'tg0'), '1');
+  h.assert('602 tg0 after p=1 (toggle → 1)', session.getWire(interp, 'tg0'), '1');
   session.setWire(interp, 'p', '0');
-  h.assert('602 tg0 dupa p=0 (hold la 1)', session.getWire(interp, 'tg0'), '1');
+  h.assert('602 tg0 after p=0 (hold at 1)', session.getWire(interp, 'tg0'), '1');
   session.setWire(interp, 'p', '1');
-  h.assert('602 tg0 dupa p=1 din nou (toggle → 0)', session.getWire(interp, 'tg0'), '0');
+  h.assert('602 tg0 after p=1 again (toggle → 0)', session.getWire(interp, 'tg0'), '0');
   session.setWire(interp, 'p', '0');
-  h.assert('602 tg0 dupa p=0 din nou (hold la 0)', session.getWire(interp, 'tg0'), '0');
+  h.assert('602 tg0 after p=0 again (hold at 0)', session.getWire(interp, 'tg0'), '0');
 }, { propagation: 'wave' });
 
-reg(603, 'signal', 'counter binar tg0/tg1/tg2 cascadat', function(h, session) {
+reg(603, 'signal', 'counter binary tg0/tg1/tg2 cascaded', function(h, session) {
   const { interp } = session.run(`
 1wire p : 0
 1wire tg0 : 0
@@ -3275,24 +3275,24 @@ tg2 = MUX(tg1, tg2, NOT(tg2))`);
   h.assert('603 apasare 4: tg2=1', session.getWire(interp, 'tg2'), '1');
 }, { propagation: 'wave' });
 
-reg(604, 'signal', 'propagare se opreste daca valoarea nu s-a schimbat', function(h, session) {
+reg(604, 'signal', 'propagation stops when value unchanged', function(h, session) {
   const { interp } = session.run(`
 1wire a = 0
 1wire b = NOT(a)`);
   const bBefore = session.getWire(interp, 'b');
   session.setWire(interp, 'a', '0');
-  h.assert('604 b ramane acelasi cand a nu se schimba', session.getWire(interp, 'b'), bBefore);
+  h.assert('604 b unchanged when a does not change', session.getWire(interp, 'b'), bBefore);
 }, { propagation: 'wave' });
 
-reg(605, 'signal', 'auto-referinta a = NOT(a) — executata o singura data per cascada', function(h, session) {
+reg(605, 'signal', 'self-reference a = NOT(a) — executed once per cascade', function(h, session) {
   const { interp } = session.run(`
 1wire a : 0
 a = NOT(a)`);
   session.setWire(interp, 'a', '0');
-  h.assert('605 a = NOT(0) = 1 dupa o singura evaluare', session.getWire(interp, 'a'), '1');
+  h.assert('605 a = NOT(0) = 1 after single evaluation', session.getWire(interp, 'a'), '1');
 }, { propagation: 'wave' });
 
-reg(606, 'signal', 'wire multi-decl — propagare individuala per wire', function(h, session) {
+reg(606, 'signal', 'multi-decl wire — individual propagation per wire', function(h, session) {
   const { interp } = session.run(`
 2wire src = 00
 1wire x = src.1/1
@@ -3300,13 +3300,13 @@ reg(606, 'signal', 'wire multi-decl — propagare individuala per wire', functio
 1wire cx = NOT(x)
 1wire cy = NOT(y)`);
   session.setWire(interp, 'src', '10');
-  h.assert('606 x=src.1/1=0 dupa src=10', session.getWire(interp, 'x'), '0');
-  h.assert('606 y=src.0/1=1 dupa src=10', session.getWire(interp, 'y'), '1');
-  h.assert('606 cx=NOT(x)=1 cascadat', session.getWire(interp, 'cx'), '1');
-  h.assert('606 cy=NOT(y)=0 cascadat', session.getWire(interp, 'cy'), '0');
+  h.assert('606 x=src.1/1=0 after src=10', session.getWire(interp, 'x'), '0');
+  h.assert('606 y=src.0/1=1 after src=10', session.getWire(interp, 'y'), '1');
+  h.assert('606 cx=NOT(x)=1 cascaded', session.getWire(interp, 'cx'), '1');
+  h.assert('606 cy=NOT(y)=0 cascaded', session.getWire(interp, 'cy'), '0');
 }, { propagation: 'wave' });
 
-reg(607, 'signal', 'paralelism ramuri — ordinea sursei nu conteaza', function(h, session) {
+reg(607, 'signal', 'branch parallelism — source order does not matter', function(h, session) {
   const { interp } = session.run(`
 1wire A : 1
 1wire B : 0
@@ -3320,7 +3320,7 @@ reg(607, 'signal', 'paralelism ramuri — ordinea sursei nu conteaza', function(
   h.assert('607 T=AND(Z,B)=0', session.getWire(interp, 'T'), '0');
 }, { propagation: 'wave' });
 
-reg(608, 'signal', 'switch → wire → cascadat NOT (wave)', function(h, session) {
+reg(608, 'signal', 'switch → wire → cascaded NOT (wave)', function(h, session) {
   const { interp } = session.run(`
 comp [switch] .sw::
 
@@ -3328,8 +3328,8 @@ comp [switch] .sw::
 1wire b = NOT(a)`);
   h.assert('608 initial b=NOT(0)=1', session.getWire(interp, 'b'), '1');
   session.setComp(interp, '.sw', '1');
-  h.assert('608 a=1 dupa switch', session.getWire(interp, 'a'), '1');
-  h.assert('608 b=0 dupa switch', session.getWire(interp, 'b'), '0');
+  h.assert('608 a=1 after switch', session.getWire(interp, 'a'), '1');
+  h.assert('608 b=0 after switch', session.getWire(interp, 'b'), '0');
 }, { propagation: 'wave' });
 
 reg(609, 'signal', 'key press → wire (wave)', function(h, session) {
@@ -3339,9 +3339,9 @@ comp [key] .k::
 1wire a = .k:get`);
   h.assert('609 initial a=0', session.getWire(interp, 'a'), '0');
   session.setComp(interp, '.k', '1');
-  h.assert('609 a=1 dupa key press', session.getWire(interp, 'a'), '1');
+  h.assert('609 a=1 after key press', session.getWire(interp, 'a'), '1');
   session.setComp(interp, '.k', '0');
-  h.assert('609 a=0 dupa key release', session.getWire(interp, 'a'), '0');
+  h.assert('609 a=0 after key release', session.getWire(interp, 'a'), '0');
 }, { propagation: 'wave' });
 
 reg(610, 'signal', 'dip → wire multi-bit (wave)', function(h, session) {
@@ -3353,7 +3353,7 @@ comp [dip] .d:
 4wire a = .d:get`);
   h.assert('610 initial a=0000', session.getWire(interp, 'a'), '0000');
   session.setComp(interp, '.d', '1010');
-  h.assert('610 a=1010 dupa dip', session.getWire(interp, 'a'), '1010');
+  h.assert('610 a=1010 after dip', session.getWire(interp, 'a'), '1010');
 }, { propagation: 'wave' });
 
 reg(611, 'signal', 'osc output → wire (wave, manual tick)', function(h, session) {
@@ -3363,9 +3363,9 @@ comp [osc] .o .freq=10 .duration1=1 .duration0=1::
 1wire a = .o:get`);
   h.assert('611 initial a=0', session.getWire(interp, 'a'), '0');
   session.setComp(interp, '.o', '1');
-  h.assert('611 a=1 dupa osc high', session.getWire(interp, 'a'), '1');
+  h.assert('611 a=1 after osc high', session.getWire(interp, 'a'), '1');
   session.setComp(interp, '.o', '0');
-  h.assert('611 a=0 dupa osc low', session.getWire(interp, 'a'), '0');
+  h.assert('611 a=0 after osc low', session.getWire(interp, 'a'), '0');
 }, { propagation: 'wave' });
 
 function runReg700FallingEdge(h, session, prefix) {
@@ -3395,7 +3395,7 @@ function runReg700FallingEdge(h, session, prefix) {
   h.assert(prefix + ' falling edge data=0 → read=0', session.getWire(interp, 'read'), '0');
 }
 
-reg(700, 'reg', 'REG cu wire clock — falling edge', function(h, session) {
+reg(700, 'reg', 'REG with wire clock — falling edge', function(h, session) {
   runReg700FallingEdge(h, session, '700');
 });
 
@@ -3405,16 +3405,16 @@ function runReg701NextBased(h, session) {
 1wire read = REG(data, ~, 0)`);
   h.assert('701 initial read=0', session.getWire(interp, 'read'), '0');
   session.execNext(interp, 1);
-  h.assert('701 dupa NEXT(1) read=1 (latchat data=1)', session.getWire(interp, 'read'), '1');
+  h.assert('701 after NEXT(1) read=1 (latched data=1)', session.getWire(interp, 'read'), '1');
   session.setWire(interp, 'data', '0');
-  h.assert('701 data=0 fara NEXT → read=1 (hold)', session.getWire(interp, 'read'), '1');
+  h.assert('701 data=0 without NEXT → read=1 (hold)', session.getWire(interp, 'read'), '1');
   session.execNext(interp, 1);
-  h.assert('701 dupa NEXT(2) read=0 (latchat data=0)', session.getWire(interp, 'read'), '0');
+  h.assert('701 after NEXT(2) read=0 (latched data=0)', session.getWire(interp, 'read'), '0');
 }
 
-reg(701, 'reg', 'REG cu clock ~ — NEXT-based', runReg701NextBased);
+reg(701, 'reg', 'REG with clock ~ — NEXT-based', runReg701NextBased);
 
-reg(704, 'reg', 'REG cu clock ~ — NEXT-based (wave)', runReg701NextBased, { propagation: 'wave' });
+reg(704, 'reg', 'REG with clock ~ — NEXT-based (wave)', runReg701NextBased, { propagation: 'wave' });
 
 function runReg702ClearOverride(h, session, prefix) {
   const { interp } = session.run(`
@@ -3463,7 +3463,7 @@ reg(703, 'reg', 'REG multi-bit (4bit)', function(h, session) {
   runReg703MultiBit(h, session, '703');
 });
 
-reg(705, 'reg', 'REG falling edge — cascadă downstream (wave)', function(h, session) {
+reg(705, 'reg', 'REG falling edge — downstream cascade (wave)', function(h, session) {
   const { interp } = session.run(`
 1wire data = 0
 1wire clk = 0
@@ -3475,18 +3475,18 @@ reg(705, 'reg', 'REG falling edge — cascadă downstream (wave)', function(h, s
   session.setWire(interp, 'data', '1');
   session.setWire(interp, 'clk', '1');
   h.assert('705 clk=1 data=1 → read=0 (hold)', session.getWire(interp, 'read'), '0');
-  h.assert('705 inv=1 inainte de falling edge', session.getWire(interp, 'inv'), '1');
+  h.assert('705 inv=1 before falling edge', session.getWire(interp, 'inv'), '1');
   session.setWire(interp, 'clk', '0');
   h.assert('705 falling edge → read=1', session.getWire(interp, 'read'), '1');
-  h.assert('705 inv=0 dupa propagate', session.getWire(interp, 'inv'), '0');
+  h.assert('705 inv=0 after propagate', session.getWire(interp, 'inv'), '0');
   session.setWire(interp, 'data', '0');
   session.setWire(interp, 'clk', '1');
   session.setWire(interp, 'clk', '0');
   h.assert('705 falling edge data=0 → read=0', session.getWire(interp, 'read'), '0');
-  h.assert('705 inv=1 dupa al doilea falling edge', session.getWire(interp, 'inv'), '1');
+  h.assert('705 inv=1 after second falling edge', session.getWire(interp, 'inv'), '1');
 }, { propagation: 'wave' });
 
-reg(706, 'reg', 'REG clear — cascadă multi-bit falling edge (wave)', function(h, session) {
+reg(706, 'reg', 'REG clear — multi-bit falling edge cascade (wave)', function(h, session) {
   const { interp } = session.run(`
 4wire data = 1010
 1wire clk = 1
@@ -3499,15 +3499,15 @@ reg(706, 'reg', 'REG clear — cascadă multi-bit falling edge (wave)', function
   h.assert('706 bus=1010', session.getWire(interp, 'bus'), '1010');
   session.setWire(interp, 'clr', '1');
   h.assert('706 clr=1 → read=0000', session.getWire(interp, 'read'), '0000');
-  h.assert('706 bus=0000 dupa clear propagate', session.getWire(interp, 'bus'), '0000');
+  h.assert('706 bus=0000 after clear propagate', session.getWire(interp, 'bus'), '0000');
   session.setWire(interp, 'clr', '0');
   session.setWire(interp, 'clk', '1');
   session.setWire(interp, 'clk', '0');
-  h.assert('706 falling edge dupa clear → read=1010', session.getWire(interp, 'read'), '1010');
-  h.assert('706 bus=1010 dupa re-latch', session.getWire(interp, 'bus'), '1010');
+  h.assert('706 falling edge after clear → read=1010', session.getWire(interp, 'read'), '1010');
+  h.assert('706 bus=1010 after re-latch', session.getWire(interp, 'bus'), '1010');
 }, { propagation: 'wave' });
 
-reg(707, 'reg', 'REG falling edge — data ignorat pana la clk 1→0 (wave)', function(h, session) {
+reg(707, 'reg', 'REG falling edge — data ignored until clk 1→0 (wave)', function(h, session) {
   const { interp } = session.run(`
 4wire data = 0000
 1wire clk = 0
@@ -3547,24 +3547,24 @@ const CHIP_HALFADD = `chip +[halfAdd]:
   carry = .add:carry
   :4bit sum`;
 
-reg(428, 'doc-comp', 'doc(chip) cu chip definit contine chip.halfAdd', function(h, session) {
+reg(428, 'doc-comp', 'doc(chip) with chip defined contains chip.halfAdd', function(h, session) {
   const out = session.runDoc(CHIP_HALFADD + '\ndoc(chip)');
-  h.assert('doc(chip) contine chip.halfAdd', String(out.some(l => l === 'chip.halfAdd')), 'true');
+  h.assert('doc(chip) contains chip.halfAdd', String(out.some(l => l === 'chip.halfAdd')), 'true');
 });
 
-reg(429, 'doc-comp', 'doc(chip.halfAdd) prima linie', function(h, session) {
+reg(429, 'doc-comp', 'doc(chip.halfAdd) first line', function(h, session) {
   const out = session.runDoc(CHIP_HALFADD + '\ndoc(chip.halfAdd)');
-  h.assert('chip.halfAdd prima linie', out[0], 'chip [halfAdd] .name:');
+  h.assert('chip.halfAdd first line', out[0], 'chip [halfAdd] .name:');
 });
 
-reg(430, 'doc-comp', 'doc(chip.halfAdd) contine 4pin a', function(h, session) {
+reg(430, 'doc-comp', 'doc(chip.halfAdd) contains 4pin a', function(h, session) {
   const out = session.runDoc(CHIP_HALFADD + '\ndoc(chip.halfAdd)');
-  h.assert('chip.halfAdd contine 4pin a', String(out.some(l => l.includes('4pin a'))), 'true');
+  h.assert('chip.halfAdd contains 4pin a', String(out.some(l => l.includes('4pin a'))), 'true');
 });
 
-reg(431, 'doc-comp', 'doc(chip.xyz) tip nedefinit', function(h, session) {
+reg(431, 'doc-comp', 'doc(chip.xyz) undefined type', function(h, session) {
   const out = session.runDoc('doc(chip.xyz)');
-  h.assert('chip.xyz nedefinit', out[0], 'chip.xyz: tip chip nedefinit');
+  h.assert('chip.xyz undefined', out[0], 'chip.xyz: undefined chip type');
 });
 
 const CHIP_U1_INIT = `.u1:{
@@ -3583,9 +3583,9 @@ chip [halfAdd] .u1::
   h.assert('chip inst sum', session.getWire(interp, 'r'), '1000');
 }
 
-reg(540, 'chip', 'chip instanțiere și acces pout', runChipInstTest);
+reg(540, 'chip', 'chip instantiation and pout access', runChipInstTest);
 
-reg(541, 'chip', 'chip +[inner] în body — eroare parse', function(h, session) {
+reg(541, 'chip', 'chip +[inner] in body — parse error', function(h, session) {
   let err = '';
   try {
     session.parse(`chip +[outer]:
@@ -3596,7 +3596,7 @@ reg(541, 'chip', 'chip +[inner] în body — eroare parse', function(h, session)
   } catch (e) {
     err = String(e.message || e);
   }
-  h.assert('eroare chip nested def', String(err.includes('cannot define new chip')), 'true');
+  h.assert('chip nested def error', String(err.includes('cannot define new chip')), 'true');
 });
 
 reg(542, 'chip', 'chip body interzice comp switch', function(h, session) {
@@ -3608,7 +3608,7 @@ reg(542, 'chip', 'chip body interzice comp switch', function(h, session) {
   } catch (e) {
     err = String(e.message || e);
   }
-  h.assert('eroare switch in chip', String(err.includes('switch')), 'true');
+  h.assert('switch in chip error', String(err.includes('switch')), 'true');
 });
 
 reg(543, 'chip', 'chip property block on:1 exec', function(h, session) {
@@ -3627,7 +3627,7 @@ chip [halfAdd] .u1::
 function regChipWave(id, title, run) {
   reg(id, 'chip', title + ' (wave)', run, { propagation: 'wave' });
 }
-regChipWave(556, 'chip instanțiere și acces pout', runChipInstTest);
+regChipWave(556, 'chip instantiation and pout access', runChipInstTest);
 regChipWave(557, 'chip property block on:1 exec', function(h, session) {
   const src = CHIP_HALFADD + `
 chip [halfAdd] .u1::
@@ -3652,12 +3652,12 @@ probe(a)`);
   h.assert('probe changed', String(out.some(l => l.includes('# a = 1') && l.includes('changed'))), 'true');
 }
 
-reg(800, 'probe', 'probe wire initialised și changed', runProbeBasic);
-reg(801, 'probe', 'probe wire initialised și changed (wave)', runProbeBasic, { propagation: 'wave' });
+reg(800, 'probe', 'probe wire initialised and changed', runProbeBasic);
+reg(801, 'probe', 'probe wire initialised and changed (wave)', runProbeBasic, { propagation: 'wave' });
 
-reg(802, 'probe', 'Parser — probe este KEYWORD', function(h, session) {
+reg(802, 'probe', 'Parser — probe is KEYWORD', function(h, session) {
   const { tokens } = session.tokenize('probe(a)');
-  h.assert('probe tokenizat', tokens[0].value, 'probe');
+  h.assert('probe tokenized', tokens[0].value, 'probe');
 });
 
 reg(803, 'probe', 'Parser — probe(a) produce nod AST', function(h, session) {
@@ -3675,8 +3675,8 @@ function runShowSimple(h, session) {
   h.assert('show c=0', String(out.some(l => l.includes('c') && l.includes('= 0'))), 'true');
 }
 
-reg(804, 'debug', 'show combinational fără NEXT (legacy)', runShowSimple);
-reg(805, 'debug', 'show combinational fără NEXT (wave)', runShowSimple, { propagation: 'wave' });
+reg(804, 'debug', 'show combinational without NEXT (legacy)', runShowSimple);
+reg(805, 'debug', 'show combinational without NEXT (wave)', runShowSimple, { propagation: 'wave' });
 
 const MID_CHANGE = `1wire a : 0
 1wire b = NOT(a)
@@ -3692,9 +3692,9 @@ function debugOutLines(out) {
 function runMidChangeLegacy(h, session) {
   const { out, interp } = session.run(MID_CHANGE);
   const lines = debugOutLines(out);
-  h.assert('3 linii show/peek', String(lines.length === 3), 'true');
+  h.assert('3 show/peek lines', String(lines.length === 3), 'true');
   h.assert('show initial b=1', String(/b \(1wire\) = 1/.test(lines[0])), 'true');
-  h.assert('peek după a=1 b=0', String(/b \(1wire\) = 0/.test(lines[1])), 'true');
+  h.assert('peek after a=1 b=0', String(/b \(1wire\) = 0/.test(lines[1])), 'true');
   h.assert('show final b=0', String(/b \(1wire\) = 0/.test(lines[2])), 'true');
   h.assert('wire b=0', session.getWire(interp, 'b'), '0');
 }
@@ -3702,14 +3702,14 @@ function runMidChangeLegacy(h, session) {
 function runMidChangeWave(h, session) {
   const { out, interp } = session.run(MID_CHANGE);
   const lines = debugOutLines(out);
-  h.assert('3 linii show/peek', String(lines.length === 3), 'true');
-  h.assert('peek după a=1 b=1 (înainte de settle)', String(/b \(1wire\) = 1/.test(lines[1])), 'true');
-  h.assert('toate liniile b=1 pe wave', String(lines.every(l => /b \(1wire\) = 1/.test(l))), 'true');
-  h.assert('wire b=1 la final RUN wave', session.getWire(interp, 'b'), '1');
+  h.assert('3 show/peek lines', String(lines.length === 3), 'true');
+  h.assert('peek after a=1 b=1 (before settle)', String(/b \(1wire\) = 1/.test(lines[1])), 'true');
+  h.assert('all lines b=1 on wave', String(lines.every(l => /b \(1wire\) = 1/.test(l))), 'true');
+  h.assert('wire b=1 at end RUN wave', session.getWire(interp, 'b'), '1');
 }
 
-reg(806, 'debug', 'show/peek la schimbare wire — legacy cascade', runMidChangeLegacy);
-reg(807, 'debug', 'show/peek la schimbare wire — wave amână show', runMidChangeWave, { propagation: 'wave' });
+reg(806, 'debug', 'show/peek on wire change — legacy cascade', runMidChangeLegacy);
+reg(807, 'debug', 'show/peek on wire change — wave defers show', runMidChangeWave, { propagation: 'wave' });
 
 const REG_SHOW_ONLY = `1wire data = 1
 1wire q = REG(data, ~, 0)
@@ -3717,12 +3717,12 @@ show(q)`;
 
 function runRegShowOnly(h, session) {
   const { out, interp } = session.run(REG_SHOW_ONLY);
-  h.assert('show q=0 fără NEXT', String(out.some(l => l.includes('q') && l.includes('= 0'))), 'true');
+  h.assert('show q=0 without NEXT', String(out.some(l => l.includes('q') && l.includes('= 0'))), 'true');
   h.assert('q=0', session.getWire(interp, 'q'), '0');
 }
 
-reg(808, 'debug', 'show REG(~) fără NEXT în script — legacy', runRegShowOnly);
-reg(809, 'debug', 'show REG(~) fără NEXT în script — wave', runRegShowOnly, { propagation: 'wave' });
+reg(808, 'debug', 'show REG(~) without NEXT in script — legacy', runRegShowOnly);
+reg(809, 'debug', 'show REG(~) without NEXT in script — wave', runRegShowOnly, { propagation: 'wave' });
 
 const REG_WITH_NEXT = `1wire data = 1
 1wire q = REG(data, ~, 0)
@@ -3734,19 +3734,19 @@ function runRegNextLegacy(h, session) {
   const lines = debugOutLines(session.run(REG_WITH_NEXT).out);
   h.assert('2 show', String(lines.length === 2), 'true');
   h.assert('primul q=0', String(/q \(1wire\) = 0/.test(lines[0])), 'true');
-  h.assert('după NEXT q=1', String(/q \(1wire\) = 1/.test(lines[1])), 'true');
+  h.assert('after NEXT q=1', String(/q \(1wire\) = 1/.test(lines[1])), 'true');
 }
 
 function runRegNextWave(h, session) {
   const { out, interp } = session.run(REG_WITH_NEXT);
   const lines = debugOutLines(out);
-  h.assert('2 show amânate', String(lines.length === 2), 'true');
-  h.assert('ambele q=1 după flush', String(lines.every(l => /q \(1wire\) = 1/.test(l))), 'true');
+  h.assert('2 deferred show', String(lines.length === 2), 'true');
+  h.assert('both q=1 after flush', String(lines.every(l => /q \(1wire\) = 1/.test(l))), 'true');
   h.assert('q=1', session.getWire(interp, 'q'), '1');
 }
 
-reg(810, 'debug', 'show înainte/după NEXT(~) în script — legacy', runRegNextLegacy);
-reg(811, 'debug', 'show înainte/după NEXT(~) în script — wave', runRegNextWave, { propagation: 'wave' });
+reg(810, 'debug', 'show before/after NEXT(~) in script — legacy', runRegNextLegacy);
+reg(811, 'debug', 'show before/after NEXT(~) in script — wave', runRegNextWave, { propagation: 'wave' });
 
 const MULTI_SHOW = `1wire a : 0
 1wire b = NOT(a)
@@ -3764,11 +3764,11 @@ function runMultiShowLegacy(h, session) {
 function runMultiShowWave(h, session) {
   const lines = debugOutLines(session.run(MULTI_SHOW).out);
   h.assert('2 show', String(lines.length === 2), 'true');
-  h.assert('ambele b=1 pe wave', String(lines.every(l => /b \(1wire\) = 1/.test(l))), 'true');
+  h.assert('both b=1 on wave', String(lines.every(l => /b \(1wire\) = 1/.test(l))), 'true');
 }
 
-reg(812, 'debug', 'două show(b) după schimbare a — legacy', runMultiShowLegacy);
-reg(813, 'debug', 'două show(b) după schimbare a — wave', runMultiShowWave, { propagation: 'wave' });
+reg(812, 'debug', 'two show(b) after a change — legacy', runMultiShowLegacy);
+reg(813, 'debug', 'two show(b) after a change — wave', runMultiShowWave, { propagation: 'wave' });
 
 const PROBE_AND_SETTLE = `1wire a : 0
 1wire b : 1
@@ -3777,7 +3777,7 @@ probe(a)`;
 
 function runProbeInitThenChangedLegacy(h, session) {
   const { out } = session.run(PROBE_AND_SETTLE);
-  h.assert('legacy o singură linie', String(out.filter(l => l.startsWith('# a =')).length === 1), 'true');
+  h.assert('legacy single line', String(out.filter(l => l.startsWith('# a =')).length === 1), 'true');
   h.assert('legacy a=1 initialised', String(out.some(l => l.includes('# a = 1') && l.includes('initialised'))), 'true');
 }
 
@@ -3785,7 +3785,7 @@ function runProbeInitThenChangedWave(h, session) {
   const { out } = session.run(PROBE_AND_SETTLE);
   h.assert('wave a=0 initialised', String(out.some(l => l.includes('# a = 0') && l.includes('initialised'))), 'true');
   h.assert('wave a=1 changed', String(out.some(l => l.includes('# a = 1') && l.includes('changed'))), 'true');
-  h.assert('wave fără al doilea initialised', String(!out.some(l => l.includes('# a = 1') && l.includes('initialised'))), 'true');
+  h.assert('wave without second initialised', String(!out.some(l => l.includes('# a = 1') && l.includes('initialised'))), 'true');
 }
 
 reg(814, 'debug', 'probe settle RUN — legacy o linie', runProbeInitThenChangedLegacy);
@@ -3822,14 +3822,14 @@ function runProbeKeyReg(h, session) {
   const { out, interp } = session.run(PROBE_KEY_REG);
   h.assert('probe q=0 initialised', String(out.some(l => l.includes('# q = 0') && l.includes('initialised'))), 'true');
   session.setComp(interp, '.clk', '1');
-  h.assert('press — q încă 0', String(session.getWire(interp, 'q')), '0');
+  h.assert('press — q still 0', String(session.getWire(interp, 'q')), '0');
   session.setComp(interp, '.clk', '0');
   h.assert('release — q=1', String(session.getWire(interp, 'q')), '1');
   h.assert('probe q=1 edge committed', String(out.some(l => l.includes('# q = 1') && l.includes('edge committed'))), 'true');
 }
 
-reg(818, 'debug', 'probe key + REG — edge committed la release', runProbeKeyReg);
-reg(819, 'debug', 'probe key + REG — edge committed la release (wave)', runProbeKeyReg, { propagation: 'wave' });
+reg(818, 'debug', 'probe key + REG — edge committed at release', runProbeKeyReg);
+reg(819, 'debug', 'probe key + REG — edge committed at release (wave)', runProbeKeyReg, { propagation: 'wave' });
 
 reg(820, 'probe', 'Parser — probe(.sw) produce nod AST', function(h, session) {
   const stmts = session.parse('probe(.sw)');
@@ -3849,8 +3849,8 @@ function runProbeComponentSwitch(h, session) {
   h.assert('probe .sw:get changed', String(out.some(l => l.includes('# .sw:get = 1') && l.includes('changed'))), 'true');
 }
 
-reg(821, 'probe', 'probe(.sw) — initialised și changed', runProbeComponentSwitch);
-reg(822, 'probe', 'probe(.sw) — initialised și changed (wave)', runProbeComponentSwitch, { propagation: 'wave' });
+reg(821, 'probe', 'probe(.sw) — initialised and changed', runProbeComponentSwitch);
+reg(822, 'probe', 'probe(.sw) — initialised and changed (wave)', runProbeComponentSwitch, { propagation: 'wave' });
 
 const PROBE_KEY_DIRECT = `comp [key] .clk:
     label:'A'
@@ -3871,7 +3871,7 @@ function runProbeKeyDirect(h, session) {
 reg(823, 'probe', 'probe(.clk:get) — press/release', runProbeKeyDirect);
 reg(824, 'probe', 'probe(.clk:get) — press/release (wave)', runProbeKeyDirect, { propagation: 'wave' });
 
-reg(825, 'probe', 'probe(.div:mod) — initialised la RUN fără pulse', function(h, session) {
+reg(825, 'probe', 'probe(.div:mod) — initialised at RUN without pulse', function(h, session) {
   const script = `comp [divider] .div:
     depth:4
     :
@@ -3903,8 +3903,8 @@ probe(.u1:sum)
   h.assert('probe changed', String(out.some(l => l.includes('# .u1:sum = 0000') && l.includes('changed'))), 'true');
 }
 
-reg(827, 'probe', 'probe(.u1:sum) chip pout — initialised și changed', runProbeChipPout);
-reg(828, 'probe', 'probe(.u1:sum) chip pout — initialised și changed (wave)', runProbeChipPout, { propagation: 'wave' });
+reg(827, 'probe', 'probe(.u1:sum) chip pout — initialised and changed', runProbeChipPout);
+reg(828, 'probe', 'probe(.u1:sum) chip pout — initialised and changed (wave)', runProbeChipPout, { propagation: 'wave' });
 
 const PROBE_PCB_POUT = `pcb +[passthrough]:
   4pin data
@@ -3934,8 +3934,8 @@ function runProbePcbPout(h, session) {
   h.assert('probe changed', String(out.some(l => l.includes('# .q:result = 0000') && l.includes('changed'))), 'true');
 }
 
-reg(829, 'probe', 'probe(.q:result) PCB pout — initialised și changed', runProbePcbPout);
-reg(830, 'probe', 'probe(.q:result) PCB pout — initialised și changed (wave)', runProbePcbPout, { propagation: 'wave' });
+reg(829, 'probe', 'probe(.q:result) PCB pout — initialised and changed', runProbePcbPout);
+reg(830, 'probe', 'probe(.q:result) PCB pout — initialised and changed (wave)', runProbePcbPout, { propagation: 'wave' });
 
 reg(831, 'probe', 'Parser — probe(.u1.tmp) produce nod AST', function(h, session) {
   const stmts = session.parse('probe(.u1.tmp)');
@@ -4036,8 +4036,8 @@ function runProbeDivMod(h, session) {
   h.assert('mod changed', String(out.some(l => l.includes('# .div:mod = 0001') && l.includes('changed'))), 'true');
 }
 
-reg(836, 'probe', 'probe(.div:mod) — initialised și changed', runProbeDivMod);
-reg(837, 'probe', 'probe(.div:mod) — initialised și changed (wave)', runProbeDivMod, { propagation: 'wave' });
+reg(836, 'probe', 'probe(.div:mod) — initialised and changed', runProbeDivMod);
+reg(837, 'probe', 'probe(.div:mod) — initialised and changed (wave)', runProbeDivMod, { propagation: 'wave' });
 
 const PROBE_ADD_CARRY = `comp [adder] .add:
   depth:4
@@ -4050,7 +4050,7 @@ probe(.add:carry)
   set = 1
 }`;
 
-reg(838, 'probe', 'probe(.add:carry) — carry la overflow', function(h, session) {
+reg(838, 'probe', 'probe(.add:carry) — carry at overflow', function(h, session) {
   const { out, interp } = session.run(PROBE_ADD_CARRY);
   h.assert('carry initialised 0', String(out.some(l => l.includes('# .add:carry = 0') && l.includes('initialised'))), 'true');
   session.execStmts(interp, `.add:{
@@ -4069,10 +4069,10 @@ probe(.u1.sum)
 ` + CHIP_U1_INIT;
   const { out } = session.run(src);
   h.assert('colon sum probe', String(out.some(l => l.includes('# .u1:sum = 1000'))), 'true');
-  h.assert('dot sum fără linie', String(!out.some(l => l.includes('# .u1.sum'))), 'true');
+  h.assert('dot sum no line', String(!out.some(l => l.includes('# .u1.sum'))), 'true');
 }
 
-reg(839, 'probe', 'probe(.u1:sum) vs probe(.u1.sum) — dot nu urmărește pout', runProbePoutVsInternalDot);
+reg(839, 'probe', 'probe(.u1:sum) vs probe(.u1.sum) — dot does not track pout', runProbePoutVsInternalDot);
 
 const BOARD_HALFADD = `board +[halfAdd]:
   4pin a
@@ -4108,9 +4108,9 @@ board [halfAdd] .u1::
   h.assert('board inst sum', session.getWire(interp, 'r'), '1000');
 }
 
-reg(840, 'board', 'board instanțiere și acces pout', runBoardInstTest);
+reg(840, 'board', 'board instantiation and pout access', runBoardInstTest);
 
-reg(841, 'board', 'board +[inner] în body — eroare parse', function(h, session) {
+reg(841, 'board', 'board +[inner] in body — parse error', function(h, session) {
   let err = '';
   try {
     session.parse(`board +[outer]:
@@ -4121,10 +4121,10 @@ reg(841, 'board', 'board +[inner] în body — eroare parse', function(h, sessio
   } catch (e) {
     err = String(e.message || e);
   }
-  h.assert('eroare board nested def', String(err.includes('cannot define new board')), 'true');
+  h.assert('board nested def error', String(err.includes('cannot define new board')), 'true');
 });
 
-reg(842, 'board', 'def în body board — eroare parse', function(h, session) {
+reg(842, 'board', 'def in board body — parse error', function(h, session) {
   let err = '';
   try {
     session.parse(`board +[bad]:
@@ -4134,10 +4134,10 @@ reg(842, 'board', 'def în body board — eroare parse', function(h, session) {
   } catch (e) {
     err = String(e.message || e);
   }
-  h.assert('eroare def in board', String(err.includes("'def'")), 'true');
+  h.assert('def in board error', String(err.includes("'def'")), 'true');
 });
 
-reg(843, 'board', 'pcb instanță în body board — eroare parse', function(h, session) {
+reg(843, 'board', 'pcb instance in board body — parse error', function(h, session) {
   let err = '';
   try {
     session.parse(`pcb +[p]:
@@ -4153,10 +4153,10 @@ board +[b]:
   } catch (e) {
     err = String(e.message || e);
   }
-  h.assert('eroare pcb in board', String(err.includes('PCB')), 'true');
+  h.assert('pcb in board error', String(err.includes('PCB')), 'true');
 });
 
-reg(844, 'board', 'comp switch permis în body board', function(h, session) {
+reg(844, 'board', 'comp switch allowed in board body', function(h, session) {
   const src = `board +[sw]:
   1pin set
   1pout out
@@ -4188,7 +4188,7 @@ board [halfAdd] .u1::
 function regBoardWave(id, title, run) {
   reg(id, 'board', title + ' (wave)', run, { propagation: 'wave' });
 }
-regBoardWave(846, 'board instanțiere și acces pout', runBoardInstTest);
+regBoardWave(846, 'board instantiation and pout access', runBoardInstTest);
 regBoardWave(847, 'board property block on:1 exec', function(h, session) {
   const src = BOARD_HALFADD + `
 board [halfAdd] .u1::
@@ -4202,19 +4202,19 @@ board [halfAdd] .u1::
   h.assert('board property block sum wave', session.getWire(interp, 'r'), '0011');
 });
 
-reg(848, 'doc-comp', 'doc(board) cu board definit contine board.halfAdd', function(h, session) {
+reg(848, 'doc-comp', 'doc(board) with board defined contains board.halfAdd', function(h, session) {
   const out = session.runDoc(BOARD_HALFADD + '\ndoc(board)');
-  h.assert('doc(board) contine board.halfAdd', String(out.some(l => l === 'board.halfAdd')), 'true');
+  h.assert('doc(board) contains board.halfAdd', String(out.some(l => l === 'board.halfAdd')), 'true');
 });
 
-reg(849, 'doc-comp', 'doc(board.halfAdd) prima linie', function(h, session) {
+reg(849, 'doc-comp', 'doc(board.halfAdd) first line', function(h, session) {
   const out = session.runDoc(BOARD_HALFADD + '\ndoc(board.halfAdd)');
-  h.assert('board.halfAdd prima linie', out[0], 'board [halfAdd] .name:');
+  h.assert('board.halfAdd first line', out[0], 'board [halfAdd] .name:');
 });
 
-reg(850, 'doc-comp', 'doc(board.xyz) tip nedefinit', function(h, session) {
+reg(850, 'doc-comp', 'doc(board.xyz) undefined type', function(h, session) {
   const out = session.runDoc('doc(board.xyz)');
-  h.assert('board.xyz nedefinit', out[0], 'board.xyz: tip board nedefinit');
+  h.assert('board.xyz undefined', out[0], 'board.xyz: undefined board type');
 });
 
 function runProbeBoardPout(h, session) {
@@ -4260,7 +4260,7 @@ probe(.u1.partial)
 reg(853, 'probe', 'probe(.u1.partial) board wire intern', runProbeBoardInternal);
 reg(854, 'probe', 'probe(.u1.partial) board wire intern (wave)', runProbeBoardInternal, { propagation: 'wave' });
 
-reg(855, 'board', 'nested chip în board', function(h, session) {
+reg(855, 'board', 'nested chip in board', function(h, session) {
   const src = CHIP_HALFADD + `
 board +[wrap]:
   4pin a
@@ -4286,7 +4286,7 @@ board [wrap] .w::
   h.assert('chip nested in board', session.getWire(interp, 'r'), '1000');
 });
 
-reg(856, 'board', 'nested board în board', function(h, session) {
+reg(856, 'board', 'nested board in board', function(h, session) {
   const src = BOARD_HALFADD + `
 board +[wrap]:
   4pin a
@@ -4312,7 +4312,7 @@ board [wrap] .w::
   h.assert('board nested in board', session.getWire(interp, 'r'), '1000');
 });
 
-reg(857, 'chip', 'board +[inner] în body chip — eroare parse', function(h, session) {
+reg(857, 'chip', 'board +[inner] in chip body — parse error', function(h, session) {
   let err = '';
   try {
     session.parse(`chip +[outer]:
@@ -4323,10 +4323,10 @@ reg(857, 'chip', 'board +[inner] în body chip — eroare parse', function(h, se
   } catch (e) {
     err = String(e.message || e);
   }
-  h.assert('eroare board def in chip', String(err.includes('cannot define new board')), 'true');
+  h.assert('board def in chip error', String(err.includes('cannot define new board')), 'true');
 });
 
-reg(858, 'chip', 'board instanță în body chip — permis', function(h, session) {
+reg(858, 'chip', 'board instance in chip body — allowed', function(h, session) {
   const src = BOARD_HALFADD + `
 chip +[wrap]:
   4pin a
@@ -4522,7 +4522,7 @@ chip [alu4] .u::
   h.assert('alu4 sub', session.getWire(interp, 'r'), '0010');
 });
 
-reg(861, 'board', 'cpu4 stare inițială acc=0 pc=0', function(h, session) {
+reg(861, 'board', 'cpu4 initial state acc=0 pc=0', function(h, session) {
   const { interp } = session.run(CHIP_ALU4 + '\n' + BOARD_CPU4 + '\nboard [cpu4] .cpu::\n');
   h.assert('cpu acc init', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
   h.assert('cpu pc init', session.getPcbPout(interp, '.cpu', 'pc'), '0000');
@@ -4531,8 +4531,8 @@ reg(861, 'board', 'cpu4 stare inițială acc=0 pc=0', function(h, session) {
 reg(862, 'board', 'cpu4 un pas LOAD 0 → acc=7 pc=1', function(h, session) {
   const { interp } = session.run(CHIP_ALU4 + '\n' + BOARD_CPU4 + '\nboard [cpu4] .cpu::\n');
   cpuStep(session, interp, 1);
-  h.assert('cpu acc după LOAD', session.getPcbPout(interp, '.cpu', 'acc'), '0111');
-  h.assert('cpu pc după LOAD', session.getPcbPout(interp, '.cpu', 'pc'), '0001');
+  h.assert('cpu acc after LOAD', session.getPcbPout(interp, '.cpu', 'acc'), '0111');
+  h.assert('cpu pc after LOAD', session.getPcbPout(interp, '.cpu', 'pc'), '0001');
 });
 
 reg(863, 'board', 'cpu4 program demo complet', function(h, session) {
@@ -4549,7 +4549,7 @@ probe(.cpu:acc)`;
   const { out, interp } = session.run(src);
   h.assert('probe acc initialised', String(out.some(l => l.includes('# .cpu:acc = 0000') && l.includes('initialised'))), 'true');
   cpuStep(session, interp, 1);
-  h.assert('cpu acc după step', session.getPcbPout(interp, '.cpu', 'acc'), '0111');
+  h.assert('cpu acc after step', session.getPcbPout(interp, '.cpu', 'acc'), '0111');
 });
 
 reg(865, 'board', 'cpu4 clock pulse .cpu:{ set = wire }', function(h, session) {
@@ -4562,8 +4562,8 @@ board [cpu4] .cpu::
     session.setWire(interp, 'clk', '1');
     session.setWire(interp, 'clk', '0');
   }
-  h.assert('cpu acc după 4 pulse', session.getPcbPout(interp, '.cpu', 'acc'), '1000');
-  h.assert('cpu pc după 4 pulse', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+  h.assert('cpu acc after 4 pulse', session.getPcbPout(interp, '.cpu', 'acc'), '1000');
+  h.assert('cpu pc after 4 pulse', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
 });
 
 reg(866, 'board', 'cpu4 NEXT(~) step', function(h, session) {
@@ -4572,8 +4572,8 @@ board [cpu4] .cpu::
 .cpu:{ set = ~ }
 `);
   for (let i = 0; i < 4; i++) session.execNext(interp, 1);
-  h.assert('cpu acc după 4 NEXT', session.getPcbPout(interp, '.cpu', 'acc'), '1000');
-  h.assert('cpu pc după 4 NEXT', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+  h.assert('cpu acc after 4 NEXT', session.getPcbPout(interp, '.cpu', 'acc'), '1000');
+  h.assert('cpu pc after 4 NEXT', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
 });
 
 const LUT_BASIC = `comp [lut] .lut:
@@ -4608,7 +4608,7 @@ reg(868, 'lut', 'LUT fillwith — slot 6-9 = 0110', function(h, session) {
   h.assert('slot 6 fillwith', session.getWire(interp, 'y'), '0110');
 });
 
-reg(869, 'lut', 'LUT adresă binară 010 → slot 2', function(h, session) {
+reg(869, 'lut', 'LUT binary address 010 → slot 2', function(h, session) {
   const src = `comp [lut] .lut:
   depth: 4
   length: 16
@@ -4622,7 +4622,7 @@ reg(869, 'lut', 'LUT adresă binară 010 → slot 2', function(h, session) {
   h.assert('slot 2', session.getWire(interp, 'y'), '1000');
 });
 
-reg(870, 'lut', 'LUT adresă zecimală \\\\50', function(h, session) {
+reg(870, 'lut', 'LUT decimal address \\\\50', function(h, session) {
   const src = `comp [lut] .lut:
   depth: 4
   length: 64
@@ -4675,7 +4675,7 @@ function runLutMethodB(h, session) {
   const comp = interp.components.get('.lut');
   const handler = interp.componentRegistry.get('lut');
   const got = handler.evalGetProperty(comp, 'get', { var: '.lut', property: 'get' }, interp).value;
-  h.assert('method B slot 0 după schimbare addr', got, '0001');
+  h.assert('method B slot 0 after addr change', got, '0001');
 }
 
 reg(873, 'lut', 'LUT metoda B — .lut:in + .lut:get', runLutMethodB);
@@ -4699,17 +4699,17 @@ function runProbeLut(h, session) {
   h.assert('probe changed', String(out.some(l => l.includes('# .lut:get = 0010') && l.includes('changed'))), 'true');
 }
 
-reg(876, 'lut', 'probe(.lut:get) — initialised și changed', runProbeLut);
+reg(876, 'lut', 'probe(.lut:get) — initialised and changed', runProbeLut);
 reg(877, 'lut', 'probe(.lut:get) — wave', runProbeLut, { propagation: 'wave' });
 
-reg(878, 'lut', 'doc(comp.lut) — sintaxă tip', function(h, session) {
+reg(878, 'lut', 'doc(comp.lut) — type syntax', function(h, session) {
   const out = session.runDoc('doc(comp.lut)');
   h.assert('data block', String(out.some(l => l.includes('data {'))), 'true');
   h.assert('fillwith attr', String(out.some(l => l.includes('fillwith'))), 'true');
   h.assert('Xpout get', String(out.some(l => l.includes('Xpout get'))), 'true');
 });
 
-reg(879, 'lut', 'doc(.decoder) — instanță map + fill', function(h, session) {
+reg(879, 'lut', 'doc(.decoder) — instance map + fill', function(h, session) {
   const out = session.runDoc(`comp [lut] .decoder:
   depth: 4
   length: 16
@@ -4727,7 +4727,7 @@ doc(.decoder)`);
   h.assert('fillwith slots', String(out.some(l => l.includes('fillwith'))), 'true');
 });
 
-reg(880, 'lut', 'LUT eroare — adresă >= length', function(h, session) {
+reg(880, 'lut', 'LUT error — address >= length', function(h, session) {
   let err = '';
   try {
     session.parse(`comp [lut] .x:
@@ -4741,7 +4741,7 @@ reg(880, 'lut', 'LUT eroare — adresă >= length', function(h, session) {
   h.assert('addr too large', String(err.includes('>= length')), 'true');
 });
 
-reg(881, 'lut', 'LUT eroare — valoare prea lată', function(h, session) {
+reg(881, 'lut', 'LUT error — value too wide', function(h, session) {
   let err = '';
   try {
     session.parse(`comp [lut] .x:
@@ -4755,7 +4755,7 @@ reg(881, 'lut', 'LUT eroare — valoare prea lată', function(h, session) {
   h.assert('value width', String(err.includes('exactly 4 bits')), 'true');
 });
 
-reg(882, 'lut', 'LUT eroare — fillwith prea lat', function(h, session) {
+reg(882, 'lut', 'LUT error — fillwith too wide', function(h, session) {
   let err = '';
   try {
     session.run(`comp [lut] .x:
@@ -4803,17 +4803,17 @@ reg(884, 'asm', 'wordWidth uniform; mnemonic duplicat', function(h, session) {
   h.assert('duplicate mnemonic', String(errD.includes('Duplicate')), 'true');
 });
 
-reg(885, 'asm', 'NOP singur → biți așteptați', function(h, session) {
+reg(885, 'asm', 'NOP alone → expected bits', function(h, session) {
   const { interp } = session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { NOP }');
   h.assert('NOP 8b', session.getWire(interp, 'x'), '00000000');
 });
 
-reg(886, 'asm', 'LOAD R1 A3 fără virgulă', function(h, session) {
+reg(886, 'asm', 'LOAD R1 A3 without comma', function(h, session) {
   const { interp } = session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { LOAD R1 A3 }');
   h.assert('LOAD enc', session.getWire(interp, 'x'), '00010111');
 });
 
-reg(887, 'asm', 'program multi-line în { }', function(h, session) {
+reg(887, 'asm', 'program multi-line in { }', function(h, session) {
   const { interp } = session.run(INLINE_ASM_ISA + `
 16wire x = .myisa {
   NOP
@@ -4887,12 +4887,12 @@ reg(892, 'asm', 'BEQ loop_start offset -3 → 1101', function(h, session) {
   h.assert('BEQ S4b', session.getWire(interp, 'x').slice(16), '01001101');
 });
 
-reg(893, 'asm', 'literal \\\\-3 în S4b', function(h, session) {
+reg(893, 'asm', 'literal \\\\-3 in S4b', function(h, session) {
   const { interp } = session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { BEQ \\-3 }');
   h.assert('literal -3', session.getWire(interp, 'x'), '01001101');
 });
 
-reg(894, 'asm', 'offset -21 pe S4b → eroare bounds', function(h, session) {
+reg(894, 'asm', 'offset -21 on S4b → bounds error', function(h, session) {
   let err = '';
   try {
     session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { BEQ \\-21 }');
@@ -4900,7 +4900,7 @@ reg(894, 'asm', 'offset -21 pe S4b → eroare bounds', function(h, session) {
   h.assert('bounds', String(err.includes('out of bounds')), 'true');
 });
 
-reg(895, 'asm', 'prefix greșit ADD \\\\2 R1', function(h, session) {
+reg(895, 'asm', 'wrong prefix ADD \\\\2 R1', function(h, session) {
   let err = '';
   try {
     session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { ADD \\2 R1 \\5 }');
@@ -4908,7 +4908,7 @@ reg(895, 'asm', 'prefix greșit ADD \\\\2 R1', function(h, session) {
   h.assert('Register prefix', String(err.includes('Register prefix')), 'true');
 });
 
-reg(896, 'asm', 'overflow \\\\18 pe 4b', function(h, session) {
+reg(896, 'asm', 'overflow \\\\18 on 4b', function(h, session) {
   let err = '';
   try {
     session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { MOVI \\18 }');
@@ -4916,7 +4916,7 @@ reg(896, 'asm', 'overflow \\\\18 pe 4b', function(h, session) {
   h.assert('max 15', String(err.includes('max 15')), 'true');
 });
 
-reg(897, 'asm', 'label nedefinit JMP nowhere', function(h, session) {
+reg(897, 'asm', 'undefined label JMP nowhere', function(h, session) {
   let err = '';
   try {
     session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { JMP nowhere }');
@@ -5010,7 +5010,7 @@ comp [mem] .m:
   h.assert('length', String(err.includes('mem length')), 'true');
 });
 
-reg(904, 'asm', 'doc(inline) listează instanțe', function(h, session) {
+reg(904, 'asm', 'doc(inline) lists instances', function(h, session) {
   const out = session.runDoc(INLINE_ASM_ISA + '\ndoc(inline)');
   h.assert('instance', String(out.some(l => l.includes('.myisa (inline [asm])'))), 'true');
   h.assert('kind', String(out.some(l => l.includes('inline.asm'))), 'true');
@@ -5025,7 +5025,7 @@ reg(905, 'asm', 'doc(.myisa) opcodes definite', function(h, session) {
   h.assert('S4b', String(out.some(l => l.includes('S4b'))), 'true');
 });
 
-reg(907, 'asm', 'myisa { } fără punct → eroare', function(h, session) {
+reg(907, 'asm', 'myisa { } without dot → error', function(h, session) {
   let err1 = '';
   try {
     session.parse(INLINE_ASM_ISA + '\n8wire x = myisa { NOP }');
@@ -5059,7 +5059,7 @@ reg(908, 'lut', 'inline [lut] — .decoder(in = addr)', function(h, session) {
   h.assert('inline method A slot 1', session.getWire(interp, 'y'), '0010');
 });
 
-reg(909, 'lut', 'inline [lut] — .decoder(0011) pozițional', function(h, session) {
+reg(909, 'lut', 'inline [lut] — .decoder(0011) positional', function(h, session) {
   const { interp } = session.run(INLINE_LUT_BASIC + `
 4wire y = .decoder(0011)`);
   h.assert('inline positional slot 3', session.getWire(interp, 'y'), '0010');
@@ -5080,7 +5080,7 @@ reg(910, 'lut', 'inline [lut] — fillwith slot nemapat', function(h, session) {
   h.assert('inline slot 6 fillwith', session.getWire(interp, 'y'), '0110');
 });
 
-reg(911, 'lut', 'decoder(in=...) fără punct → eroare', function(h, session) {
+reg(911, 'lut', 'decoder(in=...) without dot → error', function(h, session) {
   let err = '';
   try {
     session.parse(INLINE_LUT_BASIC + '\n4wire y = decoder(in = 0001)');
@@ -5088,14 +5088,14 @@ reg(911, 'lut', 'decoder(in=...) fără punct → eroare', function(h, session) 
   h.assert('bare invoke parse error', String(err.length > 0), 'true');
 });
 
-reg(912, 'lut', 'doc(inline.lut) — sintaxă tip', function(h, session) {
+reg(912, 'lut', 'doc(inline.lut) — type syntax', function(h, session) {
   const out = session.runDoc('doc(inline.lut)');
   h.assert('inline header', String(out.some(l => l.includes('inline [lut]'))), 'true');
   h.assert('data block', String(out.some(l => l.includes('data {'))), 'true');
   h.assert('invoke named', String(out.some(l => l.includes('.name(in = addr)'))), 'true');
 });
 
-reg(913, 'lut', 'doc(.decoder) — instanță inline map + fill', function(h, session) {
+reg(913, 'lut', 'doc(.decoder) — inline instance map + fill', function(h, session) {
   const out = session.runDoc(`inline [lut] .decoder:
   depth: 4
   length: 16
@@ -5213,12 +5213,12 @@ reg(915, 'protocol', 'reverse — .revtest', function(h, session) {
   h.assert('reversed', session.getWire(interp, 'out'), '10000010');
 });
 
-reg(916, 'protocol', 'parityEven — par (4 biți setați)', function(h, session) {
+reg(916, 'protocol', 'parityEven — even (4 bits set)', function(h, session) {
   const { interp } = session.run(INLINE_PAR_EVEN + '\n1wire p = .pareven { data = 01100110 }');
   h.assert('even parity', session.getWire(interp, 'p'), '0');
 });
 
-reg(917, 'protocol', 'parityEven — impar (5 biți setați)', function(h, session) {
+reg(917, 'protocol', 'parityEven — odd (5 bits set)', function(h, session) {
   const { interp } = session.run(INLINE_PAR_EVEN + '\n1wire p = .pareven { data = 01100111 }');
   h.assert('odd data even parity', session.getWire(interp, 'p'), '1');
 });
@@ -5294,7 +5294,7 @@ reg(928, 'protocol', 'I2C multi-output — sda + scl', function(h, session) {
   h.assert('scl', session.getWire(interp, 'scl'), '01010101010101010101');
 });
 
-reg(929, 'protocol', 'eroare — parametru width mismatch la declarație', function(h, session) {
+reg(929, 'protocol', 'error — parameter width mismatch at declaration', function(h, session) {
   let err = '';
   try {
     parseProtocolBody('tx:\n  data 8b\n  reverse(data 7b)\n');
@@ -5302,7 +5302,7 @@ reg(929, 'protocol', 'eroare — parametru width mismatch la declarație', funct
   h.assert('width mismatch', String(err.includes('previously declared')), 'true');
 });
 
-reg(930, 'protocol', 'eroare — parametru lipsă la invocare', function(h, session) {
+reg(930, 'protocol', 'error — missing parameter at invocation', function(h, session) {
   let err = '';
   try {
     session.run(INLINE_UART8N1 + '\n10wire tx = .uart8n1 { }');
@@ -5310,7 +5310,7 @@ reg(930, 'protocol', 'eroare — parametru lipsă la invocare', function(h, sess
   h.assert('missing param', String(err.includes("Unknown parameter 'data'")), 'true');
 });
 
-reg(931, 'protocol', 'eroare — output width mismatch', function(h, session) {
+reg(931, 'protocol', 'error — output width mismatch', function(h, session) {
   let err = '';
   try {
     session.run(INLINE_UART8N1 + '\n12wire tx = .uart8n1 { data = ^41 }');
@@ -5318,7 +5318,7 @@ reg(931, 'protocol', 'eroare — output width mismatch', function(h, session) {
   h.assert('width mismatch', String(err.includes('Protocol output width mismatch') || err.includes('Expected 12 bits')), 'true');
 });
 
-reg(932, 'protocol', 'uart8n1 { } fără punct → eroare', function(h, session) {
+reg(932, 'protocol', 'uart8n1 { } without dot → error', function(h, session) {
   let err = '';
   try {
     session.parse(INLINE_UART8N1 + '\n10wire tx = uart8n1 { data = ^41 }');
@@ -5333,14 +5333,14 @@ reg(933, 'protocol', 'doc(inline.protocol) — template', function(h, session) {
   h.assert('clockType', String(out.some(l => l.includes('clockType'))), 'true');
 });
 
-reg(934, 'protocol', 'doc(.uart8n1) — instanță', function(h, session) {
+reg(934, 'protocol', 'doc(.uart8n1) — instance', function(h, session) {
   const out = session.runDoc(INLINE_UART8N1 + '\ndoc(.uart8n1)');
   h.assert('header', String(out.some(l => l.includes('.uart8n1 (inline [protocol])'))), 'true');
   h.assert('outputs tx', String(out.some(l => l.includes('tx'))), 'true');
   h.assert('param data', String(out.some(l => l.includes('data 8b'))), 'true');
 });
 
-reg(935, 'protocol', 'doc(inline) listează instanță protocol', function(h, session) {
+reg(935, 'protocol', 'doc(inline) lists protocol instance', function(h, session) {
   const out = session.runDoc(INLINE_UART8N1 + '\ndoc(inline)');
   h.assert('instance', String(out.some(l => l.includes('.uart8n1 (inline [protocol])'))), 'true');
   h.assert('kind', String(out.some(l => l.includes('inline.protocol'))), 'true');
@@ -5391,7 +5391,7 @@ reg(937, 'lut-labels', 'expresie OR — .ctrl:LOAD', function(h, session) {
   h.assert('load', session.getWire(interp, 'x'), '00000011');
 });
 
-reg(938, 'lut-labels', 'expresie lanț | și paranteze', function(h, session) {
+reg(938, 'lut-labels', 'chain expression | and parentheses', function(h, session) {
   const src = `inline [lut] .mask:
     depth: 4
     A = 0001
@@ -5409,17 +5409,17 @@ reg(938, 'lut-labels', 'expresie lanț | și paranteze', function(h, session) {
   h.assert('and', session.getWire(interp, 'r'), '1010');
 });
 
-reg(939, 'lut-isvalid', 'tranziție validă RED -> GREEN', function(h, session) {
+reg(939, 'lut-isvalid', 'valid transition RED -> GREEN', function(h, session) {
   const { interp } = session.run(INLINE_LUT_TRAFFIC + '\n1wire ok = .traffic:isValid(RED, GREEN)');
   h.assert('valid', session.getWire(interp, 'ok'), '1');
 });
 
-reg(940, 'lut-isvalid', 'tranziție invalidă RED -> YELLOW', function(h, session) {
+reg(940, 'lut-isvalid', 'invalid transition RED -> YELLOW', function(h, session) {
   const { interp } = session.run(INLINE_LUT_TRAFFIC + '\n1wire ok = .traffic:isValid(RED, YELLOW)');
   h.assert('invalid', session.getWire(interp, 'ok'), '0');
 });
 
-reg(941, 'lut-decode', 'reverse lookup unic', function(h, session) {
+reg(941, 'lut-decode', 'reverse lookup single', function(h, session) {
   const { interp } = session.run(INLINE_LUT_DECODER + '\n4wire x = .decoder:decode(0010)');
   h.assert('key', session.getWire(interp, 'x'), '0001');
 });
@@ -5439,7 +5439,7 @@ reg(942, 'lut-decode', 'reverse lookup ambiguu index 0', function(h, session) {
   h.assert('first', session.getWire(interp, 'x'), '0000');
 });
 
-reg(943, 'lut-decode', 'reverse lookup cu matchIndex 2', function(h, session) {
+reg(943, 'lut-decode', 'reverse lookup with matchIndex 2', function(h, session) {
   const src = `inline [lut] .amb:
     depth: 4
     length: 16
@@ -5454,7 +5454,7 @@ reg(943, 'lut-decode', 'reverse lookup cu matchIndex 2', function(h, session) {
   h.assert('third', session.getWire(interp, 'x'), '0010');
 });
 
-reg(944, 'lut-decode', 'decode cu label GREEN -> RED', function(h, session) {
+reg(944, 'lut-decode', 'decode with label GREEN -> RED', function(h, session) {
   const { interp } = session.run(INLINE_LUT_TRAFFIC + '\n4wire x = .traffic:decode(GREEN)');
   h.assert('red key addr', session.getWire(interp, 'x'), '0000');
 });
@@ -5464,7 +5464,7 @@ reg(945, 'protocol-decode', 'uart8n1 decode single channel', function(h, session
   h.assert('data', session.getWire(interp, 'data'), '01000001');
 });
 
-reg(946, 'protocol-decode', 'eroare start bit', function(h, session) {
+reg(946, 'protocol-decode', 'start bit error', function(h, session) {
   let err = '';
   try {
     session.run(INLINE_UART8N1 + '\n8wire data = .uart8n1:decode(1100000101)');
@@ -5490,7 +5490,7 @@ reg(948, 'asm-decode', 'assignment interzis', function(h, session) {
   h.assert('no assign', String(err.includes('ASM decode produces text')), 'true');
 });
 
-reg(949, 'lut-show', 'show label cu expresie |', function(h, session) {
+reg(949, 'lut-show', 'show label with expresie |', function(h, session) {
   const { out } = session.run(INLINE_LUT_CTRL + '\nshow(.ctrl:LOAD)');
   h.assert('expr', String(out.some(l => l.includes('ACCLOAD | MEMREAD'))), 'true');
   h.assert('not or fn', String(!out.some(l => l.includes('OR('))), 'true');
@@ -5501,7 +5501,7 @@ reg(950, 'lut-probe', 'probe label constant', function(h, session) {
   h.assert('probe line', String(out.some(l => l.includes('.flags:ZERO') && l.includes('0001'))), 'true');
 });
 
-reg(951, 'lut-probe', 'probe label cu expresie', function(h, session) {
+reg(951, 'lut-probe', 'probe label with expresie', function(h, session) {
   const { out } = session.run(INLINE_LUT_CTRL + '\nprobe(.ctrl:LOAD)');
   h.assert('expr probe', String(out.some(l => l.includes('ACCLOAD | MEMREAD'))), 'true');
 });
@@ -6575,7 +6575,7 @@ reg(1054, 'queue-stack', 'forbid direct assign queue', function(h, session) {
   }, 'Cannot assign a value to a queue component');
 });
 
-reg(1055, 'queue-stack', 'show după front>= size>= free>= — wave', function(h, session) {
+reg(1055, 'queue-stack', 'show after front>= size>= free>= — wave', function(h, session) {
   const { out } = session.run(QUEUE_BASE + `.q:{ push = ^41
   set = 1 }
 .q:{ push = ^42
@@ -6775,7 +6775,7 @@ function cpuV2Step(session, interp, n) {
 
 const CPU4V2_STEPS_FULL = 9;
 
-reg(1056, 'mini-cpu-v2', 'cpu4v2 stare inițială acc=0 pc=0', function(h, session) {
+reg(1056, 'mini-cpu-v2', 'cpu4v2 initial state acc=0 pc=0', function(h, session) {
   const { interp } = session.run(CPU4V2_BASE + '\nboard [cpu4v2] .cpu::\n');
   h.assert('cpu acc init', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
   h.assert('cpu pc init', session.getPcbPout(interp, '.cpu', 'pc'), '0000');
@@ -6784,8 +6784,8 @@ reg(1056, 'mini-cpu-v2', 'cpu4v2 stare inițială acc=0 pc=0', function(h, sessi
 reg(1057, 'mini-cpu-v2', 'cpu4v2 un pas LOAD 0 → acc=3 pc=1', function(h, session) {
   const { interp } = session.run(CPU4V2_BASE + '\nboard [cpu4v2] .cpu::\n');
   cpuV2Step(session, interp, 1);
-  h.assert('cpu acc după LOAD', session.getPcbPout(interp, '.cpu', 'acc'), '0011');
-  h.assert('cpu pc după LOAD', session.getPcbPout(interp, '.cpu', 'pc'), '0001');
+  h.assert('cpu acc after LOAD', session.getPcbPout(interp, '.cpu', 'acc'), '0011');
+  h.assert('cpu pc after LOAD', session.getPcbPout(interp, '.cpu', 'pc'), '0001');
 });
 
 reg(1058, 'mini-cpu-v2', 'cpu4v2 countdown complet', function(h, session) {
@@ -6795,15 +6795,15 @@ reg(1058, 'mini-cpu-v2', 'cpu4v2 countdown complet', function(h, session) {
   h.assert('cpu pc final', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
 });
 
-reg(1059, 'mini-cpu-v2', 'cpu4v2 BEQ sare la done', function(h, session) {
+reg(1059, 'mini-cpu-v2', 'cpu4v2 BEQ jumps to done', function(h, session) {
   const { interp } = session.run(CPU4V2_BASE + '\nboard [cpu4v2] .cpu::\n');
   cpuV2Step(session, interp, 7);
-  h.assert('acc zero înainte de BEQ', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
+  h.assert('acc zero before BEQ', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
   const pcBefore = session.getPcbPout(interp, '.cpu', 'pc');
-  h.assert('pc la BEQ sau done', String(pcBefore === '0010' || pcBefore === '0100'), 'true');
+  h.assert('pc at BEQ or done', String(pcBefore === '0010' || pcBefore === '0100'), 'true');
   if (pcBefore === '0010') {
     cpuV2Step(session, interp, 1);
-    h.assert('pc după BEQ la done', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+    h.assert('pc after BEQ at done', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
   }
 });
 
@@ -6814,7 +6814,7 @@ probe(.cpu:acc)`;
   const { out, interp } = session.run(src);
   h.assert('probe acc initialised', String(out.some(l => l.includes('# .cpu:acc = 0000') && l.includes('initialised'))), 'true');
   cpuV2Step(session, interp, 1);
-  h.assert('cpu acc după step', session.getPcbPout(interp, '.cpu', 'acc'), '0011');
+  h.assert('cpu acc after step', session.getPcbPout(interp, '.cpu', 'acc'), '0011');
 });
 
 reg(1061, 'mini-cpu-v2', 'cpu4v2 clock pulse', function(h, session) {
@@ -6827,8 +6827,8 @@ board [cpu4v2] .cpu::
     session.setWire(interp, 'clk', '1');
     session.setWire(interp, 'clk', '0');
   }
-  h.assert('cpu acc după pulse', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
-  h.assert('cpu pc după pulse', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+  h.assert('cpu acc after pulse', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
+  h.assert('cpu pc after pulse', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
 });
 
 reg(1062, 'mini-cpu-v2', 'cpu4v2 NEXT(~) step', function(h, session) {
@@ -6837,14 +6837,14 @@ board [cpu4v2] .cpu::
 .cpu:{ set = ~ }
 `);
   for (let i = 0; i < CPU4V2_STEPS_FULL; i++) session.execNext(interp, 1);
-  h.assert('cpu acc după NEXT', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
-  h.assert('cpu pc după NEXT', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
+  h.assert('cpu acc after NEXT', session.getPcbPout(interp, '.cpu', 'acc'), '0000');
+  h.assert('cpu pc after NEXT', session.getPcbPout(interp, '.cpu', 'pc'), '0100');
 });
 
-reg(1063, 'mini-cpu-v2', 'cpu4v2 terminal trace la HALT', function(h, session) {
+reg(1063, 'mini-cpu-v2', 'cpu4v2 terminal trace at HALT', function(h, session) {
   const { interp } = session.run(CPU4V2_BASE + '\nboard [cpu4v2] .cpu::\n');
   cpuV2Step(session, interp, CPU4V2_STEPS_FULL);
-  h.assert('terminal la HALT', String(getTerminalText(_termId(interp, '._cpu_trace')).includes('A')), 'true');
+  h.assert('terminal at HALT', String(getTerminalText(_termId(interp, '._cpu_trace')).includes('A')), 'true');
 });
 
 const INLINE_OPCTL = `inline [lut] .opctl:
@@ -6982,7 +6982,7 @@ inline [protocol] .huffRecover:
     collapse(withLength(data, 8b), .huff, 2b)
   :`;
 
-reg(1067, 'lut-ext', 'variableDepth — valori de lățimi diferite', function(h, session) {
+reg(1067, 'lut-ext', 'variableDepth — different width values', function(h, session) {
   const { interp } = session.run(INLINE_LUT_VD + `
 1wire a = .vd(00)
 3wire b = .vd(01)
@@ -6992,7 +6992,7 @@ reg(1067, 'lut-ext', 'variableDepth — valori de lățimi diferite', function(h
   h.assert('addr 10', session.getWire(interp, 'c'), '11');
 });
 
-reg(1068, 'lut-ext', 'variableDepth + depth: → eroare', function(h, session) {
+reg(1068, 'lut-ext', 'variableDepth + depth: → error', function(h, session) {
   let err = '';
   try {
     session.run(`inline [lut] .bad:
@@ -7023,7 +7023,7 @@ reg(1070, 'lut-ext', 'prefixFree — violare prefix', function(h, session) {
   h.assert('prefix violation', String(err.includes('prefixFree violation')), 'true');
 });
 
-reg(1071, 'lut-ext', 'prefixFree + depth: → eroare', function(h, session) {
+reg(1071, 'lut-ext', 'prefixFree + depth: → error', function(h, session) {
   let err = '';
   try {
     session.run(`inline [lut] .bad:
@@ -7035,7 +7035,7 @@ reg(1071, 'lut-ext', 'prefixFree + depth: → eroare', function(h, session) {
   h.assert('conflict', String(err.includes('prefixFree cannot be combined with depth')), 'true');
 });
 
-reg(1072, 'lut-ext', 'prefixFree implică variableDepth', function(h, session) {
+reg(1072, 'lut-ext', 'prefixFree implies variableDepth', function(h, session) {
   session.run(INLINE_HUFF);
   const inst = session.interp.inlineInstances.get('.huff');
   h.assert('variableDepth', String(!!inst.attributes.variableDepth), 'true');
@@ -7054,7 +7054,7 @@ reg(1074, 'lut-ext', '.huff(in=01) → 10', function(h, session) {
   h.assert('value', session.getWire(interp, 'y'), '10');
 });
 
-reg(1075, 'protocol-ext', 'def — length(data) 8b + data în payload', function(h, session) {
+reg(1075, 'protocol-ext', 'def — length(data) 8b + data in payload', function(h, session) {
   const src = `inline [protocol] .pkt:
   def payload:
     length(data) 8b
@@ -7130,7 +7130,7 @@ inline [protocol] .exp:
   h.assert('expanded', session.getWire(interp, 'out'), '010110');
 });
 
-reg(1081, 'protocol-ext', 'expand — input nu e multiplu de keyWidth → eroare', function(h, session) {
+reg(1081, 'protocol-ext', 'expand — input not multiple of keyWidth → error', function(h, session) {
   let err = '';
   try {
     session.run(INLINE_MAP2 + `
@@ -7206,7 +7206,7 @@ inline [protocol] .huffRecover:
   h.assert('recovered', session.getWire(interp, 'recovered'), '0001');
 });
 
-reg(1087, 'protocol-ext', 'lățime STATIC — expand + LUT depth:4, tokens 8b → 16 biți', function(h, session) {
+reg(1087, 'protocol-ext', 'width STATIC — expand + LUT depth:4, tokens 8b → 16 bits', function(h, session) {
   session.run(INLINE_TABLE4 + `
 inline [protocol] .enc:
   out:
@@ -7217,7 +7217,7 @@ inline [protocol] .enc:
   h.assert('width 16', String(inst.widthInfo.width), '16');
 });
 
-reg(1088, 'protocol-ext', 'lățime DYNAMIC — .huffPacket marcat dynamic', function(h, session) {
+reg(1088, 'protocol-ext', 'width DYNAMIC — .huffPacket marked dynamic', function(h, session) {
   session.run(INLINE_HUFF_PACKET);
   const inst = session.interp.inlineInstances.get('.huffPacket');
   h.assert('dynamic', inst.widthInfo.kind, 'dynamic');
@@ -7341,13 +7341,13 @@ reg(1094, 'bool-lut', 'lutOf short-notation backtick', function(h, session) {
   h.assert('header', out[1], '  description: A 1b, B 1b -> out 1b');
 });
 
-reg(1095, 'bool-lut', 'lutOf(LSHIFT(...)) — eroare', function(h, session) {
+reg(1095, 'bool-lut', 'lutOf(LSHIFT(...)) — error', function(h, session) {
   const { out } = session.run('lutOf(LSHIFT(A, B))');
   const err = out.find(l => l.startsWith('Error:')) || '';
   h.assert('non-boolean', String(err.includes('not a boolean') || err.includes('LSHIFT')), 'true');
 });
 
-reg(1096, 'bool-lut', 'exprOfLut(.or2, A, B) — două linii', function(h, session) {
+reg(1096, 'bool-lut', 'exprOfLut(.or2, A, B) — two lines', function(h, session) {
   const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
   h.assert('lines', String(out.length), '2');
   h.assert('short', String(out[0].includes('`')), 'true');
@@ -7415,14 +7415,14 @@ lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
   h.assert('std with parens runs', String(!!interpParens), 'true');
 });
 
-reg(1100, 'bool-lut', 'copy-paste linie standard rulabilă', function(h, session) {
+reg(1100, 'bool-lut', 'copy-paste standard line runnable', function(h, session) {
   const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
   const line = out[1];
   const { interp } = session.run('1wire A\n1wire B\n1wire R\n' + line.replace('out', 'R'));
   h.assert('runs', String(!!interp), 'true');
 });
 
-reg(1101, 'bool-lut', 'copy-paste linie short rulabilă', function(h, session) {
+reg(1101, 'bool-lut', 'copy-paste short line runnable', function(h, session) {
   const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
   const line = out[0];
   const { interp } = session.run('1wire A\n1wire B\n1wire R\n' + line.replace('out', 'R'));
@@ -7451,19 +7451,19 @@ exprOfLut(.xor2, A, B)`;
   h.assert('lines', String(out.length), '2');
 });
 
-reg(1104, 'bool-lut', 'exprOfLut pe prefixFree — respinge', function(h, session) {
+reg(1104, 'bool-lut', 'exprOfLut on prefixFree — respinge', function(h, session) {
   let err = '';
   const { out } = session.run(INLINE_HUFF + '\nexprOfLut(.huff, A, B)');
   err = out.find(l => l.startsWith('Error:')) || '';
   h.assert('reject', String(err.includes('prefixFree')), 'true');
 });
 
-reg(1105, 'bool-lut', 'QM — formă minimizată A', function(h, session) {
+reg(1105, 'bool-lut', 'QM — minimized form A', function(h, session) {
   const { out } = session.run(INLINE_IDA + '\nexprOfLut(.ida, A, B)');
   h.assert('minimized', out[1], '1wire out = A');
 });
 
-reg(1106, 'bool-lut', 'lutOf în chip body — parse', function(h, session) {
+reg(1106, 'bool-lut', 'lutOf in chip body — parse', function(h, session) {
   session.parse(`chip +[blut]:
 1pin set
 exec: set
@@ -7472,7 +7472,7 @@ lutOf(OR(A, B))
   h.assert('ok', 'true', 'true');
 });
 
-reg(1107, 'bool-lut', 'lutOf adresă > 8 biți — eroare', function(h, session) {
+reg(1107, 'bool-lut', 'lutOf address > 8 bits — error', function(h, session) {
   const { out } = session.run(`4wire A
 8wire B
 7wire C
@@ -7490,7 +7490,7 @@ lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))`);
   h.assert('length', String(out.some(l => l.trim() === 'length: 16')), 'true');
 });
 
-reg(1109, 'bool-lut-mb', 'lutOf(C) pe 7wire — depth 7', function(h, session) {
+reg(1109, 'bool-lut-mb', 'lutOf(C) on 7wire — depth 7', function(h, session) {
   const { out } = session.run('7wire C\nlutOf(C)');
   h.assert('header', out[1], '  description: C 7b -> out 7b');
   h.assert('length', String(out.some(l => l.trim() === 'length: 128')), 'true');
@@ -7511,7 +7511,7 @@ lutOf(OR(AND(A.2, B.1/3), C))`);
   h.assert('length 64', String(out.some(l => l.trim() === 'length: 64')), 'true');
 });
 
-reg(1112, 'bool-lut-mb', 'lutOf mixt 18b — eroare', function(h, session) {
+reg(1112, 'bool-lut-mb', 'lutOf mixed 18b — error', function(h, session) {
   const { out } = session.run(`4wire A
 8wire B
 7wire C
@@ -7526,7 +7526,7 @@ reg(1113, 'bool-lut-mb', 'exprOfLut(.lut5, A 2b, B 3b)', function(h, session) {
   h.assert('lines', String(out.length), '2');
 });
 
-reg(1114, 'bool-lut-mb', 'exprOfLut(.or2, A, B) fără prelude', function(h, session) {
+reg(1114, 'bool-lut-mb', 'exprOfLut(.or2, A, B) without prelude', function(h, session) {
   const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
   h.assert('lines', String(out.length), '2');
 });
@@ -7546,7 +7546,7 @@ reg(1116, 'bool-lut-mb', 'exprOfLut ordine B, A vs A, B', function(h, session) {
   h.assert('may differ', String(o1[1] !== o2[1] || o1[1] === o2[1]), 'true');
 });
 
-reg(1117, 'bool-lut-mb', 'exprOfLut output 1b cu slice refs', function(h, session) {
+reg(1117, 'bool-lut-mb', 'exprOfLut output 1b with slice refs', function(h, session) {
   const { out } = session.run(INLINE_LUT5 + '\nexprOfLut(.lut5, A 2b, B 3b)');
   h.assert('short', String(out[0].includes('`')), 'true');
   h.assert('std', String(out[1].length > 0), 'true');
@@ -7565,19 +7565,19 @@ lutOf(OR(AND(A.1, B.0), AND(A.0, B.2)))`).out.join('\n');
   h.assert('two lines', String(out.length), '2');
 });
 
-reg(1120, 'bool-lut-mb', 'exprOfLut LUT inexistent — eroare', function(h, session) {
+reg(1120, 'bool-lut-mb', 'exprOfLut nonexistent LUT — error', function(h, session) {
   const { out } = session.run('exprOfLut(.missing, A, B)');
   const err = out.find(l => l.startsWith('Error:')) || '';
   h.assert('not found', String(err.includes('not found')), 'true');
 });
 
-reg(1121, 'bool-lut-mb', 'exprOfLut(.lut5, A 2b) — sumă biți ≠ adresă', function(h, session) {
+reg(1121, 'bool-lut-mb', 'exprOfLut(.lut5, A 2b) — bit sum ≠ address', function(h, session) {
   const { out } = session.run(INLINE_LUT5 + '\nexprOfLut(.lut5, A 2b)');
   const err = out.find(l => l.startsWith('Error:')) || '';
   h.assert('mismatch', String(err.includes('expects 5 input bits but received 2')), 'true');
 });
 
-reg(1122, 'bool-lut', 'exprOfLut emite exact 2 linii', function(h, session) {
+reg(1122, 'bool-lut', 'exprOfLut emits exactly 2 lines', function(h, session) {
   const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
   h.assert('count', String(out.length), '2');
 });
@@ -7614,7 +7614,7 @@ exprOfLut(.l, A.2, B.1, A.0, B.0)`;
   h.assert('or', String(out[1].includes('OR(')), 'true');
 });
 
-reg(1124, 'bool-lut-mb', 'exprOfLut coloane slice cu 1b explicit', function(h, session) {
+reg(1124, 'bool-lut-mb', 'exprOfLut coloane slice with 1b explicit', function(h, session) {
   const gen = session.run(`4wire A
 3wire B
 lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))`).out.join('\n');
@@ -7623,7 +7623,7 @@ lutOf(OR(AND(A.2, B.1), AND(A.0, B.0)))`).out.join('\n');
   h.assert('slice refs', String(out[1].includes('A.2') && out[1].includes('A.0')), 'true');
 });
 
-reg(1125, 'bool-analysis', 'truthTableOf(OR(A,B)) — header + 4 rânduri', function(h, session) {
+reg(1125, 'bool-analysis', 'truthTableOf(OR(A,B)) — header + 4 rows', function(h, session) {
   const { out } = session.run('truthTableOf(OR(A, B))');
   h.assert('header', out[0], 'A B | OUT');
   h.assert('sep', out[1], '--------------');
@@ -7638,7 +7638,7 @@ reg(1126, 'bool-analysis', 'truthTableOf multi-bit A.1 & B', function(h, session
   h.assert('rows', String(out.length), '6');
 });
 
-reg(1127, 'bool-analysis', 'truthTableOf 9wire — eroare table size', function(h, session) {
+reg(1127, 'bool-analysis', 'truthTableOf 9wire — table size error', function(h, session) {
   const { out } = session.run('9wire A\ntruthTableOf(A)');
   const err = out.find(l => l.startsWith('Error:')) || '';
   h.assert('too big', String(err.includes('table size (256 rows)')), 'true');
@@ -7668,7 +7668,7 @@ reg(1131, 'bool-analysis', 'equivalent false', function(h, session) {
   h.assert('result', out[0], 'false');
 });
 
-reg(1132, 'bool-analysis', 'inputsOf — linii aliniate', function(h, session) {
+reg(1132, 'bool-analysis', 'inputsOf — aligned lines', function(h, session) {
   const { out } = session.run(`4wire A
 8wire B
 7wire C
@@ -7694,12 +7694,12 @@ reg(1134, 'bool-analysis-mb', 'costOf 4wire A & B → 4', function(h, session) {
   h.assert('cost', out[0], 'Expression cost: 4');
 });
 
-reg(1135, 'bool-analysis-mb', 'costOf (A&B)|A pe 4wire → 8', function(h, session) {
+reg(1135, 'bool-analysis-mb', 'costOf (A&B)|A on 4wire → 8', function(h, session) {
   const { out } = session.run('4wire A\n4wire B\ncostOf(OR(AND(A, B), A))');
   h.assert('cost', out[0], 'Expression cost: 8');
 });
 
-reg(1136, 'bool-lut', 'lutOf 9wire — eroare table size', function(h, session) {
+reg(1136, 'bool-lut', 'lutOf 9wire — table size error', function(h, session) {
   const { out } = session.run('9wire A\nlutOf(A)');
   const err = out.find(l => l.startsWith('Error:')) || '';
   h.assert('too big', String(err.includes('table size (256 rows)')), 'true');
@@ -7711,7 +7711,7 @@ reg(1137, 'bool-analysis', 'truthTableOf short-notation', function(h, session) {
   h.assert('rows', String(out.length), '6');
 });
 
-reg(1138, 'bool-analysis', 'truthTableOf filtre — 32 rânduri', function(h, session) {
+reg(1138, 'bool-analysis', 'truthTableOf filters — 32 rows', function(h, session) {
   const { out } = session.run(`5wire A
 1wire B
 5wire C
@@ -7720,20 +7720,20 @@ truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
   h.assert('rows', String(out.length), '34');
 });
 
-reg(1139, 'bool-analysis', 'truthTableOf filtre parțiale', function(h, session) {
+reg(1139, 'bool-analysis', 'truthTableOf partial filters', function(h, session) {
   const { out } = session.run('truthTableOf(OR(A, B), A=0)');
   h.assert('rows', String(out.length), '4');
   h.assert('only A0', out[2], '0 0 | 0');
   h.assert('only A0 B1', out[3], '0 1 | 1');
 });
 
-reg(1140, 'bool-analysis', 'filtre produs > 256 — eroare', function(h, session) {
+reg(1140, 'bool-analysis', 'filter product > 256 — error', function(h, session) {
   const { out } = session.run('9wire A\ntruthTableOf(A, A=xxxxxxxxx)');
   const err = out.find(l => l.startsWith('Error:')) || '';
   h.assert('too big', String(err.includes('table size (256 rows)')), 'true');
 });
 
-reg(1141, 'bool-analysis-mb', 'truthTableOf >8 biți + filtre OK', function(h, session) {
+reg(1141, 'bool-analysis-mb', 'truthTableOf >8 bits + filters OK', function(h, session) {
   const { out } = session.run(`5wire A
 1wire B
 5wire C
@@ -7742,13 +7742,13 @@ truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
   h.assert('rows', String(out.length), '34');
 });
 
-reg(1142, 'bool-analysis', 'pattern invalid — eroare', function(h, session) {
+reg(1142, 'bool-analysis', 'pattern invalid — error', function(h, session) {
   const { out } = session.run('truthTableOf(OR(A, B), A=01?1)');
   const err = out.find(l => l.startsWith('Error:')) || '';
   h.assert('invalid', String(err.includes('pattern length mismatch') || err.includes('invalid pattern')), 'true');
 });
 
-reg(1143, 'bool-lut', 'lutOf cu filtre — length 32 + attributes', function(h, session) {
+reg(1143, 'bool-lut', 'lutOf with filters — length 32 + attributes', function(h, session) {
   const { out } = session.run(`5wire A
 1wire B
 5wire C
@@ -7760,14 +7760,14 @@ lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
   h.assert('data count', String(dataLines.length), '32');
 });
 
-reg(1144, 'bool-lut', 'lutOf fără filtre — description fără filters', function(h, session) {
+reg(1144, 'bool-lut', 'lutOf without filters — description without filters', function(h, session) {
   const { out } = session.run('lutOf(OR(A, B))');
   h.assert('description', String(out.some(l => l.includes('description: A 1b, B 1b -> out 1b'))), 'true');
   h.assert('no filters attr', String(!out.some(l => l.trim().startsWith('filters:'))), 'true');
   h.assert('length', String(out.some(l => l.trim() === 'length: 4')), 'true');
 });
 
-reg(1145, 'bool-lut-mb', 'lutOf filtre >8 biți intrare OK', function(h, session) {
+reg(1145, 'bool-lut-mb', 'lutOf filters >8 bit input OK', function(h, session) {
   const { out } = session.run(`5wire A
 1wire B
 5wire C
@@ -7776,7 +7776,7 @@ lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
   h.assert('length 32', String(out.some(l => l.trim() === 'length: 32')), 'true');
 });
 
-reg(1147, 'bool-analysis', 'filtre fără virgulă — eroare parse', function(h, session) {
+reg(1147, 'bool-analysis', 'filters without comma — parse error', function(h, session) {
   let err = '';
   try {
     session.parse('lutOf(OR(A, B), A=01x1x B=x)');
@@ -7784,7 +7784,7 @@ reg(1147, 'bool-analysis', 'filtre fără virgulă — eroare parse', function(h
   h.assert('comma required', String(err.includes("Expected ',' between filter assignments")), 'true');
 });
 
-reg(1148, 'bool-lut', 'exprOfLut auto din filters — 2 linii', function(h, session) {
+reg(1148, 'bool-lut', 'exprOfLut auto from filters — 2 lines', function(h, session) {
   const gen = session.run(`5wire A
 1wire B
 5wire C
@@ -7794,7 +7794,7 @@ lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
   h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
 });
 
-reg(1149, 'bool-lut-mb', 'exprOfLut auto — slice refs din filtre', function(h, session) {
+reg(1149, 'bool-lut-mb', 'exprOfLut auto — slice refs from filtre', function(h, session) {
   const gen = session.run(`5wire A
 1wire B
 5wire C
@@ -7807,7 +7807,7 @@ lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
   h.assert('not whole A', String(!/OR\(A,/.test(std) && !/AND\(A,/.test(std)), 'true');
 });
 
-reg(1150, 'bool-lut-mb', 'exprOfLut manual = auto cu filtre', function(h, session) {
+reg(1150, 'bool-lut-mb', 'exprOfLut manual = auto with filtre', function(h, session) {
   const gen = session.run(`5wire A
 1wire B
 5wire C
@@ -7817,12 +7817,12 @@ lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
   h.assert('same std', manual[1], auto[1]);
 });
 
-reg(1151, 'bool-lut', 'exprOfLut fără variabile și fără filters — eroare', function(h, session) {
+reg(1151, 'bool-lut', 'exprOfLut without variables and without filters — error', function(h, session) {
   const { out } = session.run(INLINE_OR2 + '\nexprOfLut(.or2)');
   h.assert('err', String(out.some(l => l.includes('supply variables') || l.includes('filters:'))), 'true');
 });
 
-reg(1152, 'bool-lut-mb', 'exprOfLut variabile incompatibile cu filters', function(h, session) {
+reg(1152, 'bool-lut-mb', 'exprOfLut variabile incompatibile with filters', function(h, session) {
   const gen = session.run(`5wire A
 1wire B
 5wire C
@@ -7831,7 +7831,7 @@ lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
   h.assert('mismatch', String(out.some(l => l.includes('do not match LUT filters') || l.includes('expects'))), 'true');
 });
 
-reg(1153, 'bool-lut-mb', 'exprOfLut ignoră # — folosește filters:', function(h, session) {
+reg(1153, 'bool-lut-mb', 'exprOfLut ignores # — uses filters:', function(h, session) {
   const gen = session.run(`5wire A
 1wire B
 5wire C
@@ -7842,7 +7842,7 @@ lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
   h.assert('slice', String((out[1] || '').includes('A.4')), 'true');
 });
 
-reg(1154, 'bool-analysis', 'simplify cu filtre — match exprOfLut', function(h, session) {
+reg(1154, 'bool-analysis', 'simplify with filters — match exprOfLut', function(h, session) {
   const prelude = `5wire A
 1wire B
 5wire C`;
@@ -7855,13 +7855,13 @@ reg(1154, 'bool-analysis', 'simplify cu filtre — match exprOfLut', function(h,
   h.assert('same std', simpOut[1], exprOut[1]);
 });
 
-reg(1155, 'bool-analysis', 'simplify filtre parțiale A=0', function(h, session) {
+reg(1155, 'bool-analysis', 'simplify partial filters A=0', function(h, session) {
   const { out } = session.run('simplify(OR(A, B), A=0)');
   h.assert('lines', String(out.length), '2');
   h.assert('std B', out[1], '1wire out = B');
 });
 
-reg(1156, 'bool-analysis', 'simplify filtre fără virgulă — eroare parse', function(h, session) {
+reg(1156, 'bool-analysis', 'simplify filters without comma — parse error', function(h, session) {
   let err = '';
   try {
     session.parse('simplify(OR(A, B) A=0)');
@@ -8079,7 +8079,7 @@ probe(.P0:out)`);
   h.assert('probe out init', String(out.some(l => l.includes('.P0:out') && l.includes('initialised'))), 'true');
 });
 
-reg(1167, 'ioport', 'propagare dip → wire via :in wave', function(h, session) {
+reg(1167, 'ioport', 'dip propagation → wire via :in wave', function(h, session) {
   const { interp } = session.run(`comp [dip] .d:
   length: 4
   :
@@ -8091,7 +8091,7 @@ comp [ioport] .p:
 4wire a = .p:in`);
   h.assert('initial', session.getWire(interp, 'a'), '0000');
   session.setComp(interp, '.d', '1010');
-  h.assert('dupa dip', session.getWire(interp, 'a'), '1010');
+  h.assert('after dip', session.getWire(interp, 'a'), '1010');
 }, { propagation: 'wave' });
 
 reg(1176, 'debug', 'Parser — watch(clk) AST and watches[]', function(h, session) {

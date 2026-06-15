@@ -28,7 +28,7 @@
     subtitleEl.textContent = suiteCount + ' / ' + manifestCount + ' tests';
     if (suiteCount !== manifestCount) {
       subtitleEl.style.color = '#f96';
-      subtitleEl.title = 'test_suite și manifest nu sunt sincronizate — rulează node _gen_manifest.js';
+      subtitleEl.title = 'test_suite and manifest are out of sync — run node _gen_manifest.js';
     }
   }
 
@@ -188,12 +188,12 @@
     const detail = entry.detail || { scripts: [], steps: [], assertions: [] };
     if (tab === 'script') {
       if (!detail.scripts || !detail.scripts.length) {
-        return '<p class="test-info-empty">Niciun script LogTScript extras. Vezi tab-ul Pași sau Sursă JS.</p>';
+        return '<p class="test-info-empty">No LogTScript script extracted. See Steps or JS Source tab.</p>';
       }
       return detail.scripts.map((s, i) => {
         const label = detail.scripts.length > 1 ? 'Script ' + (i + 1) : 'Script';
         return '<div style="margin-bottom:8px"><div style="color:#888;font-size:10px;margin-bottom:4px">' +
-          label + ' (' + s.split('\n').length + ' linii)</div><pre class="test-info-pre test-info-pre--script">' + escapeHtml(s) + '</pre></div>';
+          label + ' (' + s.split('\n').length + ' lines)</div><pre class="test-info-pre test-info-pre--script">' + escapeHtml(s) + '</pre></div>';
       }).join('');
     }
     if (tab === 'steps') {
@@ -206,7 +206,7 @@
     }
     if (tab === 'checks') {
       if (!detail.assertions || !detail.assertions.length) {
-        return '<p class="test-info-empty">Nicio verificare extrasă din h.assert / h.assertThrows.</p>';
+        return '<p class="test-info-empty">No checks extracted from h.assert / h.assertThrows.</p>';
       }
       return '<ul class="test-info-list">' +
         detail.assertions.map(a => '<li>' + escapeHtml(a) + '</li>').join('') +
@@ -214,7 +214,7 @@
     }
     const source = getTestSource(entry.id);
     if (!source) {
-      return '<p class="test-info-empty">Sursă indisponibilă.</p>';
+      return '<p class="test-info-empty">Source unavailable.</p>';
     }
     return '<pre class="test-info-pre test-info-pre--source">' + escapeHtml(source) + '</pre>';
   }
@@ -483,9 +483,9 @@
 
     const tabDefs = [
       { id: 'script', label: 'Script' },
-      { id: 'steps', label: 'Pași' },
-      { id: 'checks', label: 'Verificări' },
-      { id: 'source', label: 'Sursă JS' }
+      { id: 'steps', label: 'Steps' },
+      { id: 'checks', label: 'Checks' },
+      { id: 'source', label: 'JS Source' }
     ];
 
     for (const def of tabDefs) {
@@ -517,7 +517,7 @@
     const title = row.querySelector('.test-title');
     if (title) {
       title.classList.toggle('is-open', opening);
-      title.title = opening ? 'Ascunde detalii' : 'Arată detalii test';
+      title.title = opening ? 'Hide details' : 'Show test details';
     }
     if (opening) {
       const entry = manifestById.get(Number(row.dataset.id));
@@ -719,7 +719,7 @@
         const titleSpan = document.createElement('span');
         titleSpan.className = 'test-title';
         titleSpan.textContent = 'Test ' + test.id + ': ' + test.title;
-        titleSpan.title = 'Arată detalii test';
+        titleSpan.title = 'Show test details';
         titleSpan.addEventListener('click', (e) => {
           e.stopPropagation();
           toggleTestInfo(row);

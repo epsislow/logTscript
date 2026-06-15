@@ -628,7 +628,7 @@ chip [halfAdd] .name:
 ```
 doc(chip.xyz)
 # displays:
-chip.xyz: tip chip nedefinit
+chip.xyz: undefined chip type
 ```
 
 ### doc(.inst) and doc(.inst.sub)

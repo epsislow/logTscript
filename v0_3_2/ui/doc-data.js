@@ -2371,7 +2371,7 @@ Instant built-in functions (\`ADD\`, \`SUBTRACT\`, …) without \`comp\`: [arith
 |-------|------|
 | Built-in functions (\`MUX\`, \`REG\`, gates, …) | [builtin-functions.md](builtin-functions.md) |
 | \`doc()\` signatures | [doc-function.md](doc-function.md) |
-| \`show\` / \`peek\` / \`probe\` | [debug.md](debug.md) |
+| \`show\` / \`peek\` / \`probe\` / \`watch\` | [debug.md](debug.md) |
 | Signal propagation (Wave / Legacy) | [signal-propagation.md](signal-propagation.md) |
 `,
     'counter.md': `# Counter component
@@ -2442,9 +2442,9 @@ Use multiple property blocks or sequential triggers to step the counter.
 - [shifter.md](shifter.md)
 - [components.md](components.md)
 `,
-    'debug.md': `# Debug output — \`show\`, \`peek\`, \`probe\`, and boolean LUT utilities
+    'debug.md': `# Debug output — \`show\`, \`peek\`, \`probe\`, \`watch\`, and boolean LUT utilities
 
-Statements in this group write text to the **Output** panel. The first three inspect live values; **\`lutOf\`** and **\`exprOfLut\`** generate copy-pasteable boolean logic (LUT definitions or expressions) for analysis only — they do not change the circuit.
+Statements in this group write text to the **Output** panel (or the **Timeline** panel for \`watch\`). The first three inspect live values; **\`lutOf\`** and **\`exprOfLut\`** generate copy-pasteable boolean logic (LUT definitions or expressions) for analysis only — they do not change the circuit.
 
 All are **statements** (like \`doc\`) — they cannot appear on the right side of \`=\`.
 
@@ -2454,15 +2454,15 @@ For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md]
 
 ## Quick comparison
 
-| | \`show\` | \`peek\` | \`probe\` | \`lutOf\` / \`exprOfLut\` |
-|---|--------|--------|---------|------------------------|
-| **Purpose** | Display settled values | Instant snapshot | Monitor every value commit | Generate or reverse boolean LUT text |
-| **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change | Immediately at statement |
-| **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) | Matters |
-| **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression | See below |
-| **Output format** | \`name (type) = value\` | same | \`# name = value (ref) - reason\` | LUT block or \`Nwire out = …\` lines |
-| **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Immediate (no propagation) |
-| **Runtime effect** | None (read-only) | None | None (logging only) | **None** — text for copy-paste |
+| | \`show\` | \`peek\` | \`probe\` | \`watch\` | \`lutOf\` / \`exprOfLut\` |
+|---|--------|--------|---------|---------|------------------------|
+| **Purpose** | Display settled values | Instant snapshot | Monitor every value commit | Waveform trace per signal | Generate or reverse boolean LUT text |
+| **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change | On every **committed** change | Immediately at statement |
+| **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) | **Does not matter** (registered at elaboration) | Matters |
+| **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression | **Exactly one** expression (same as \`probe\`) | See below |
+| **Output format** | \`name (type) = value\` | same | \`# name = value (ref) - reason\` | Timeline canvas (one column per bit or property slice) | LUT block or \`Nwire out = …\` lines |
+| **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Same commit hooks in both modes | Immediate (no propagation) |
+| **Runtime effect** | None (read-only) | None | None (logging only) | None (UI trace only) | **None** — text for copy-paste |
 
 For when wires update in the circuit, see [signal-propagation.md](signal-propagation.md).
 
@@ -3178,6 +3178,108 @@ probe(a)
 \`\`\`text
 # a = 1 (&0) - initialised
 \`\`\`
+
+---
+
+## \`watch\`
+
+### Syntax
+
+Same as \`probe\` — **one expression** per statement:
+
+\`\`\`
+watch(clk)
+watch(o)
+watch(o.1-3)
+watch(.sw)
+watch(.o:counter)
+watch(.u1:sum)
+\`\`\`
+
+Collected during **elaboration** (end of **Run**), like \`probe\`. Does **not** write to **Output**; samples appear in the editor **Timeline** panel (above Output). Toggle the panel from **Panels → Timeline**.
+
+### What \`watch\` accepts
+
+Uses the same expression forms as \`probe\` (wires, \`.comp\`, \`.comp:prop\`, chip/PCB \`:pout\`, internal \`.inst.wire\`, \`&ref\`, bit slices). See the **\`probe\`** section above for the full table.
+
+**Multi-bit expansion** — the Timeline shows **one column per bit** (or per single-bit slice), not one collapsed bus:
+
+| Expression | Columns created |
+|------------|-----------------|
+| \`watch(clk)\` on \`1wire clk\` | \`clk\` |
+| \`watch(o)\` on \`4wire o\` | \`o.0\`, \`o.1\`, \`o.2\`, \`o.3\` |
+| \`watch(o.2)\` | \`o.2\` |
+| \`watch(o.1-3)\` | \`o.1\`, \`o.2\`, \`o.3\` |
+| \`watch(.o:counter)\` on \`osc\` with \`length: 4\` | \`.o:counter.0\` … \`.o:counter.3\` |
+| \`watch(.sw)\` on \`4bit\` DIP | \`.sw\` (single channel; component \`:get\` as one trace) |
+
+**Wire vs component property** — important for oscillators and gated logic:
+
+| Expression | What you see |
+|------------|--------------|
+| \`watch(o)\` | The **wire** \`o\` after assignments and propagation (e.g. after \`AND\` with a switch). |
+| \`watch(.o:counter)\` | The **internal counter** of component \`.o\` (\`osc\` \`:counter\`), independent of wires that read it. |
+
+Example: with \`4wire o = AND(.o:counter, .p + .p + .p + .p)\`, \`watch(.o:counter)\` keeps counting when \`.p\` is off; \`watch(o)\` stays LOW until \`.p\` is on.
+
+### Timeline display
+
+- **Layout:** vertical trace — newest events at the **top**; time axis is **event order** (sample index + cycle), not simulated milliseconds.
+- **Columns:** labels are drawn **inside the canvas header** (e.g. \`o.0\`, \`.o:counter.2\`). All channels on a row are **synchronized** (same timestep).
+- **Levels:** **green** wide bar = logic \`1\` (HIGH); **narrow dark** bar = logic \`0\` (LOW). A thin highlight marks an edge on that bit.
+- **Controls:** **Pause** / **Resume** freezes auto-scroll; **Live** jumps back to the latest samples. **Drag** on the canvas to scroll history.
+- **History:** up to ~1500 rows; marker lines every 25 events (\`#seq\` on the right margin).
+
+### Example — wires
+
+\`\`\`logts-play
+1wire clk = 0
+1wire en = 0
+
+watch(clk)
+watch(en)
+
+clk = 1
+en = 1
+\`\`\`
+
+After **Run**, the Timeline shows two columns toggling when \`clk\` and \`en\` change.
+
+### Example — multi-bit wire and oscillator counter
+
+\`\`\`logts-play
+comp [~] .o:
+    duration1: 4
+    duration0: 4
+    length: 4
+    freq: 10
+    freqIsSec: 0
+    eachCycle: 1
+    :
+
+comp [switch] .p:
+    text: 'Pwr'
+    :
+
+4wire o = AND(.o:counter, .p + .p + .p + .p)
+1wire c = AND(.o, .p)
+
+watch(.o:counter)
+watch(o)
+watch(c)
+\`\`\`
+
+- \`.o:counter.*\` — four columns; counter ticks in real time (osc timers).
+- \`o.*\` — gated by \`.p\`; flat until the switch is on.
+- \`c\` — 1-bit gated copy of the osc \`:get\` output.
+
+### Rules
+
+- Same elaboration rules as \`probe\` (position in script does not matter; registered at end of **Run**).
+- **Duplicate** \`watch()\` on the same expanded target (e.g. \`watch(o.0-3)\` then \`watch(o.0)\`) creates **one** column — first occurrence wins.
+- Computed component properties (\`:counter\`, \`:mod\`, \`:carry\`, …) emit samples when the component recalculates (including \`osc\` timer ticks).
+- **Editor only** — available in \`script_editor_v0_3_2.html\`, not in \`run_tests.html\`.
+- Complements **\`probe\`**: use \`probe\` for a text log in Output; use \`watch\` for a visual trace over time.
 
 ---
 
@@ -4105,7 +4207,7 @@ chip [halfAdd] .name:
 \`\`\`
 doc(chip.xyz)
 # displays:
-chip.xyz: tip chip nedefinit
+chip.xyz: undefined chip type
 \`\`\`
 
 ### doc(.inst) and doc(.inst.sub)
@@ -4296,7 +4398,7 @@ Executes the full program from the editor:
 1. Clears the devices panel and output (fresh run).
 2. Parses and runs all statements.
 3. Creates a new interpreter using the **propagation mode** selected in the pill toggle (see below).
-4. Shows \`show\` / \`peek\` / \`probe\` output and updates the Variables panel (see [debug.md](debug.md)).
+4. Shows \`show\` / \`peek\` / \`probe\` output, **\`watch\` traces** in the Timeline panel, and updates the Variables panel (see [debug.md](debug.md)).
 
 Use **Run** after changing code or after switching Wave / Legacy so the new mode takes effect.
 
@@ -4341,6 +4443,19 @@ If you run a command from the Command panel before any **Run**, the lazy-started
 
 ---
 
+## Panels
+
+| Panel | Purpose |
+|-------|---------|
+| **Output** | Text from \`show\`, \`peek\`, \`probe\`, errors |
+| **Timeline** | Waveform trace from \`watch()\` — enable via **Panels → Timeline** |
+| **Variables** | Live wire / component values after **Run** |
+| **AST** | Parsed program structure |
+
+The **Timeline** sits above **Output**. It opens automatically when the script contains \`watch()\` and you press **Run**. Use **Pause** to inspect history; **Live** to follow new events.
+
+---
+
 ## Quick reference
 
 | Control | Action |
@@ -4353,7 +4468,7 @@ If you run a command from the Command panel before any **Run**, the lazy-started
 
 ## Related documentation
 
-- [Debug output](debug.md) — \`show\`, \`peek\`, \`probe\`
+- [Debug output](debug.md) — \`show\`, \`peek\`, \`probe\`, **\`watch\`** (Timeline)
 - [Signal propagation](signal-propagation.md) — Wave vs Legacy behaviour
 - [REG](reg.md) — registers and \`NEXT\`
 - [Interactive components](interactive-components.md) — panel inputs and wire updates
@@ -4697,13 +4812,13 @@ Implemented as \`comp [queue]\` / \`comp [fifo]\` — see [queue.md](queue.md). 
 
 ---
 
-### E2. Logic analyzer / timeline
+### E2. Logic analyzer / timeline — done (editor)
 
-**What it does:** UI that plots selected wires (\`clk\`, \`pc\`, \`acc\`) vs time — like \`probe\` history or a saleae-style trace, not a single snapshot in Output.
+**What it does:** UI that plots selected signals vs time — vertical logic trace in the **Timeline** panel, driven by \`watch()\` in the script.
 
-**How I see it used:** Debug why CPU missed a latch; compare Wave vs Legacy timing; export trace for assignments. Complements \`probe\`, \`show\`, \`peek\` in [debug.md](debug.md).
+**How I see it used:** Debug counter bits on an \`osc\`, compare gated vs ungated wires, scroll history while paused. Complements \`probe\` (text log in Output).
 
-**Today:** Output panel shows discrete \`#\` lines; no built-in waveform viewer for arbitrary wires. Mostly editor/UI work; \`osc\` already has real-time toggling.
+**Done:** [debug.md](debug.md) — \`watch()\` section; panel in \`script_editor_v0_3_2.html\` (**Panels → Timeline**). Supports multi-bit wire expansion (\`watch(o)\` → \`o.0\`…), bit ranges (\`watch(o.1-3)\`), and component properties (\`watch(.o:counter)\`). Editor-only; not in \`run_tests.html\`.
 
 ---
 
@@ -7898,11 +8013,11 @@ After the full countdown, the terminal shows \`A\` (hex \`^41\`). See [terminal.
 
 ---
 
-## Exemplu rulabil complet
+## Runnable complete example
 
 ### mini-cpu-v2-full
 
-Prelude: ISA + ROM + \`chip [alu4]\` + \`board +[cpu4v2]\` (doar definiții).
+Prelude: ISA + ROM + \`chip [alu4]\` + \`board +[cpu4v2]\` (definitions only).
 
 \`\`\`logts-play
 inline [asm] .cpuisa:
@@ -8106,7 +8221,7 @@ board +[cpu4v2]:
 
 ### mini-cpu-v2-demo
 
-Același prelude + instanțiere \`.cpu\` + countdown complet (9 pași clock) + \`probe\`.
+Same prelude + \`.cpu\` instance + full countdown (9 clock steps) + \`probe\`.
 
 \`\`\`logts-play
 inline [asm] .cpuisa:
@@ -8316,9 +8431,9 @@ probe(.cpu:acc)
 probe(.cpu:pc)
 \`\`\`
 
-**Rezultat** după **Load & Run**: ACC = \`0000\`, PC = \`0100\` (HALT). 7-seg: \`0\`. Terminal: \`A\` (\`^41\`). În Output: \`# .cpu:acc = 0000\`, \`# .cpu:pc = 0100\`.
+**Result** after **Load & Run**: ACC = \`0000\`, PC = \`0100\` (HALT). 7-seg: \`0\`. Terminal: \`A\` (\`^41\`). In Output: \`# .cpu:acc = 0000\`, \`# .cpu:pc = 0100\`.
 
-După **un singur** pas clock: ACC = \`0011\` (încarcă \`^3\` din memoria de date), PC = \`0001\`.
+After **one** clock step: ACC = \`0011\` (loads \`^3\` from data memory), PC = \`0001\`.
 
 ---
 
@@ -8350,7 +8465,7 @@ Push/pop return addresses on \`comp [queue]\` — see [queue.md](queue.md). Not 
 
 \`test_suite_ported.js\` — group \`mini-cpu-v2\`, IDs **1056–1063** (init, LOAD, full countdown, BEQ, probe, clock, NEXT, terminal).
 
-În **run_tests.html**, tab-ul **Script** al fiecărui test arată **scriptul LogTScript complet** rulat (constante precum \`CPU4V2_BASE\` / \`BOARD_HALFADD\` sunt expandate automat din sursă).
+In **run_tests.html**, each test's **Script** tab shows the **full LogTScript** run (constants such as \`CPU4V2_BASE\` / \`BOARD_HALFADD\` are expanded automatically from source).
 
 ---
 
@@ -9199,6 +9314,24 @@ comp [~] .osc1:
 
 show(osc1, osc1b, counter1)
 \`\`\`
+
+### Watching on the Timeline
+
+In the script editor, \`watch()\` records samples into the **Timeline** panel (see [debug.md](debug.md)):
+
+\`\`\`logts
+comp [~] .o:
+    length: 4
+    freq: 10
+    :
+
+4wire gated = AND(.o:counter, .p + .p + .p + .p)
+
+watch(.o:counter)   # internal counter — always ticks
+watch(gated)        # gated bus — o.0 … o.3 after AND
+\`\`\`
+
+Use \`watch(.o:counter)\` for the raw \`:counter\` bits; use \`watch(gated)\` (or a wire assigned from \`.o:get\`) to see the signal after your logic.
 
 ---
 
@@ -11503,9 +11636,9 @@ Changing \`a\` or \`b\` eventually updates \`sum\`.
 
 ---
 
-## Debug output (\`show\`, \`peek\`, \`probe\`)
+## Debug output (\`show\`, \`peek\`, \`probe\`, \`watch\`)
 
-How values appear in the Output panel — syntax, timing, and runnable examples:
+How values appear in **Output** or the **Timeline** panel — syntax, timing, and runnable examples:
 
 **[debug.md](debug.md)**
 

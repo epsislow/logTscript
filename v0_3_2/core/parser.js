@@ -2126,7 +2126,7 @@ assignment() {
 
     return p;
   }
-  // Parsează paddingul `;p` care urmează după un literal sau variabilă (opțional după bitrange).
+  // Parse optional `;p` padding after a literal or variable (optional after bitrange).
   parsePadding() {
     this.eat('SYM', ';');
     if (this.c.type !== 'BIN' && this.c.type !== 'DEC') {
@@ -2137,7 +2137,7 @@ assignment() {
     return pad;
   }
 
-  // Parsează un bitrange care urmează direct după un literal BIN sau HEX.
+  // Parse a bitrange that immediately follows a BIN or HEX literal.
   // Formele acceptate: .start-end, .start/len, ./len (shorthand .0/len), .bit
   parseLiteralBitRange() {
     this.eat('SYM', '.');

@@ -2319,7 +2319,7 @@ class Interpreter {
       let type = null;
       
       if(wire){
-        // Wave: citește și valorile pending din aceeași propagare (ordine program).
+        // Wave: read pending values from the same propagation batch (program order).
         val = this.getWireEffectiveValue(a.var);
         if (val === null) val = this.getValueFromRef(wire.ref);
         ref = wire.ref;
@@ -2572,20 +2572,20 @@ const idx = parseInt(
     const clockIsTilde = args[1] && args[1].length === 1 && args[1][0].var === '~';
 
     if (clockIsTilde) {
-      // --- comportament NEXT-based cu cycle number ---
-      // Pending stochează: { value, cycle, output }
-      // Dacă cycle s-a schimbat față de ultima evaluare → suntem într-un NEXT nou → latchăm
-      // Dacă cycle e același → suntem într-o re-evaluare în aceeași cascadă → ținem output-ul
+      // --- NEXT-based behaviour with cycle number ---
+      // Pending holds: { value, cycle, output }
+      // If cycle changed since last eval → new NEXT step → latch pending value
+      // If cycle is the same → re-eval in the same cascade → keep previous output
       const pending = this.regPendingMap.get(this.currentStmt);
       let output;
 
       if (!pending) {
         output = '0'.repeat(width);
       } else if (pending.cycle !== this.cycle) {
-        // Ciclu nou (NEXT a fost apelat) → latchăm valoarea pending
+        // New cycle (NEXT was called) → latch pending value
         output = pending.value;
       } else {
-        // Același ciclu (re-eval din cascadă wire) → ținem output-ul anterior
+        // Same cycle (wire cascade re-eval) → keep previous output
         output = pending.output;
       }
 
@@ -9544,7 +9544,7 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
       if (shortnames[typeName]) canonicalType = shortnames[typeName];
     }
     const handler = registry.get(canonicalType);
-    if (!handler) return [`${name}: tip de componentă nedefinit`];
+    if (!handler) return [`${name}: undefined component type`];
     let compInst = null;
     if (alias && alias.startsWith('.') && compDefs && compDefs.has(alias)) {
       compInst = compDefs.get(alias);
@@ -9578,7 +9578,7 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
   // ---- doc(pcb.type) ----
   if (name.startsWith('pcb.')) {
     const pcbName = name.slice(4);
-    if (!pcbDefinitions || !pcbDefinitions.has(pcbName)) return [`${name}: tip PCB nedefinit`];
+    if (!pcbDefinitions || !pcbDefinitions.has(pcbName)) return [`${name}: undefined PCB type`];
     const def = pcbDefinitions.get(pcbName);
     return Interpreter.formatPcbDef(alias, pcbName, def, pcbCompNames);
   }
@@ -9602,7 +9602,7 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
   // ---- doc(chip.type) ----
   if (name.startsWith('chip.')) {
     const chipName = name.slice(5);
-    if (!chipDefinitions || !chipDefinitions.has(chipName)) return [`${name}: tip chip nedefinit`];
+    if (!chipDefinitions || !chipDefinitions.has(chipName)) return [`${name}: undefined chip type`];
     const def = chipDefinitions.get(chipName);
     return Interpreter.formatChipDef(alias, chipName, def, pcbCompNames);
   }
@@ -9626,7 +9626,7 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
   // ---- doc(board.type) ----
   if (name.startsWith('board.')) {
     const boardName = name.slice(6);
-    if (!boardDefinitions || !boardDefinitions.has(boardName)) return [`${name}: tip board nedefinit`];
+    if (!boardDefinitions || !boardDefinitions.has(boardName)) return [`${name}: undefined board type`];
     const def = boardDefinitions.get(boardName);
     return Interpreter.formatBoardDef(alias, boardName, def, pcbCompNames);
   }
@@ -9727,7 +9727,7 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     return [sig];
   }
 
-  return [`${name}: funcție nedefinită`];
+  return [`${name}: undefined function`];
 };
 
 Interpreter.formatCompDef = function(alias, type, def) {
