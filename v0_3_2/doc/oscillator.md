@@ -270,6 +270,24 @@ comp [~] .osc1:
 show(osc1, osc1b, counter1)
 ```
 
+### Watching on the Timeline
+
+In the script editor, `watch()` records samples into the **Timeline** panel (see [debug.md](debug.md)):
+
+```logts
+comp [~] .o:
+    length: 4
+    freq: 10
+    :
+
+4wire gated = AND(.o:counter, .p + .p + .p + .p)
+
+watch(.o:counter)   # internal counter — always ticks
+watch(gated)        # gated bus — o.0 … o.3 after AND
+```
+
+Use `watch(.o:counter)` for the raw `:counter` bits; use `watch(gated)` (or a wire assigned from `.o:get`) to see the signal after your logic.
+
 ---
 
 ## Restrictions

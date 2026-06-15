@@ -86,5 +86,5 @@ Instant built-in functions (`ADD`, `SUBTRACT`, …) without `comp`: [arithmetic.
 |-------|------|
 | Built-in functions (`MUX`, `REG`, gates, …) | [builtin-functions.md](builtin-functions.md) |
 | `doc()` signatures | [doc-function.md](doc-function.md) |
-| `show` / `peek` / `probe` | [debug.md](debug.md) |
+| `show` / `peek` / `probe` / `watch` | [debug.md](debug.md) |
 | Signal propagation (Wave / Legacy) | [signal-propagation.md](signal-propagation.md) |

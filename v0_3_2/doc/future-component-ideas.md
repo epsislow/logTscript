@@ -337,13 +337,13 @@ Implemented as `comp [queue]` / `comp [fifo]` — see [queue.md](queue.md). Ring
 
 ---
 
-### E2. Logic analyzer / timeline
+### E2. Logic analyzer / timeline — done (editor)
 
-**What it does:** UI that plots selected wires (`clk`, `pc`, `acc`) vs time — like `probe` history or a saleae-style trace, not a single snapshot in Output.
+**What it does:** UI that plots selected signals vs time — vertical logic trace in the **Timeline** panel, driven by `watch()` in the script.
 
-**How I see it used:** Debug why CPU missed a latch; compare Wave vs Legacy timing; export trace for assignments. Complements `probe`, `show`, `peek` in [debug.md](debug.md).
+**How I see it used:** Debug counter bits on an `osc`, compare gated vs ungated wires, scroll history while paused. Complements `probe` (text log in Output).
 
-**Today:** Output panel shows discrete `#` lines; no built-in waveform viewer for arbitrary wires. Mostly editor/UI work; `osc` already has real-time toggling.
+**Done:** [debug.md](debug.md) — `watch()` section; panel in `script_editor_v0_3_2.html` (**Panels → Timeline**). Supports multi-bit wire expansion (`watch(o)` → `o.0`…), bit ranges (`watch(o.1-3)`), and component properties (`watch(.o:counter)`). Editor-only; not in `run_tests.html`.
 
 ---
 

@@ -15,7 +15,7 @@ Executes the full program from the editor:
 1. Clears the devices panel and output (fresh run).
 2. Parses and runs all statements.
 3. Creates a new interpreter using the **propagation mode** selected in the pill toggle (see below).
-4. Shows `show` / `peek` / `probe` output and updates the Variables panel (see [debug.md](debug.md)).
+4. Shows `show` / `peek` / `probe` output, **`watch` traces** in the Timeline panel, and updates the Variables panel (see [debug.md](debug.md)).
 
 Use **Run** after changing code or after switching Wave / Legacy so the new mode takes effect.
 
@@ -60,6 +60,19 @@ If you run a command from the Command panel before any **Run**, the lazy-started
 
 ---
 
+## Panels
+
+| Panel | Purpose |
+|-------|---------|
+| **Output** | Text from `show`, `peek`, `probe`, errors |
+| **Timeline** | Waveform trace from `watch()` — enable via **Panels → Timeline** |
+| **Variables** | Live wire / component values after **Run** |
+| **AST** | Parsed program structure |
+
+The **Timeline** sits above **Output**. It opens automatically when the script contains `watch()` and you press **Run**. Use **Pause** to inspect history; **Live** to follow new events.
+
+---
+
 ## Quick reference
 
 | Control | Action |
@@ -72,7 +85,7 @@ If you run a command from the Command panel before any **Run**, the lazy-started
 
 ## Related documentation
 
-- [Debug output](debug.md) — `show`, `peek`, `probe`
+- [Debug output](debug.md) — `show`, `peek`, `probe`, **`watch`** (Timeline)
 - [Signal propagation](signal-propagation.md) — Wave vs Legacy behaviour
 - [REG](reg.md) — registers and `NEXT`
 - [Interactive components](interactive-components.md) — panel inputs and wire updates

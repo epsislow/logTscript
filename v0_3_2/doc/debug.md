@@ -16,7 +16,7 @@ For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md]
 | **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change | On every **committed** change | Immediately at statement |
 | **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) | **Does not matter** (registered at elaboration) | Matters |
 | **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression | **Exactly one** expression (same as `probe`) | See below |
-| **Output format** | `name (type) = value` | same | `# name = value (ref) - reason` | Timeline canvas (per channel) | LUT block or `Nwire out = …` lines |
+| **Output format** | `name (type) = value` | same | `# name = value (ref) - reason` | Timeline canvas (one column per bit or property slice) | LUT block or `Nwire out = …` lines |
 | **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Same commit hooks in both modes | Immediate (no propagation) |
 | **Runtime effect** | None (read-only) | None | None (logging only) | None (UI trace only) | **None** — text for copy-paste |
 
@@ -741,26 +741,52 @@ probe(a)
 
 ### Syntax
 
-Same as `probe` — one expression per statement:
+Same as `probe` — **one expression** per statement:
 
 ```
 watch(clk)
+watch(o)
+watch(o.1-3)
 watch(.sw)
+watch(.o:counter)
 watch(.u1:sum)
-watch(.P0:in)
 ```
 
-Collected during **elaboration** (end of RUN), like `probe`. Does not write to **Output**; samples appear in the editor **Timeline** panel above Output.
+Collected during **elaboration** (end of **Run**), like `probe`. Does **not** write to **Output**; samples appear in the editor **Timeline** panel (above Output). Toggle the panel from **Panels → Timeline**.
+
+### What `watch` accepts
+
+Uses the same expression forms as `probe` (wires, `.comp`, `.comp:prop`, chip/PCB `:pout`, internal `.inst.wire`, `&ref`, bit slices). See the **`probe`** section above for the full table.
+
+**Multi-bit expansion** — the Timeline shows **one column per bit** (or per single-bit slice), not one collapsed bus:
+
+| Expression | Columns created |
+|------------|-----------------|
+| `watch(clk)` on `1wire clk` | `clk` |
+| `watch(o)` on `4wire o` | `o.0`, `o.1`, `o.2`, `o.3` |
+| `watch(o.2)` | `o.2` |
+| `watch(o.1-3)` | `o.1`, `o.2`, `o.3` |
+| `watch(.o:counter)` on `osc` with `length: 4` | `.o:counter.0` … `.o:counter.3` |
+| `watch(.sw)` on `4bit` DIP | `.sw` (single channel; component `:get` as one trace) |
+
+**Wire vs component property** — important for oscillators and gated logic:
+
+| Expression | What you see |
+|------------|--------------|
+| `watch(o)` | The **wire** `o` after assignments and propagation (e.g. after `AND` with a switch). |
+| `watch(.o:counter)` | The **internal counter** of component `.o` (`osc` `:counter`), independent of wires that read it. |
+
+Example: with `4wire o = AND(.o:counter, .p + .p + .p + .p)`, `watch(.o:counter)` keeps counting when `.p` is off; `watch(o)` stays LOW until `.p` is on.
 
 ### Timeline display
 
-- One **channel** per `watch()` call (order = order in script).
-- Multi-bit values are shown as a **single digital trace**: HIGH when any bit is `1`, LOW when all bits are `0`.
-- **RISE** / **FALL** edges are drawn when that collapsed level changes; the formatted value is shown on edges.
-- Time axis = **event order** (monotonic sample index + cycle), not simulated milliseconds.
-- **Pause** / **Live** on the panel freeze or resume auto-scroll; drag on the canvas to scroll history.
+- **Layout:** vertical trace — newest events at the **top**; time axis is **event order** (sample index + cycle), not simulated milliseconds.
+- **Columns:** labels are drawn **inside the canvas header** (e.g. `o.0`, `.o:counter.2`). All channels on a row are **synchronized** (same timestep).
+- **Levels:** **green** wide bar = logic `1` (HIGH); **narrow dark** bar = logic `0` (LOW). A thin highlight marks an edge on that bit.
+- **Controls:** **Pause** / **Resume** freezes auto-scroll; **Live** jumps back to the latest samples. **Drag** on the canvas to scroll history.
+- **History:** up to ~1500 rows; marker lines every 25 events (`#seq` on the right margin).
 
-### Example
+### Example — wires
 
 ```logts-play
 1wire clk = 0
@@ -773,13 +799,43 @@ clk = 1
 en = 1
 ```
 
-After **Run**, open the Timeline panel to see both channels toggle.
+After **Run**, the Timeline shows two columns toggling when `clk` and `en` change.
+
+### Example — multi-bit wire and oscillator counter
+
+```logts-play
+comp [~] .o:
+    duration1: 4
+    duration0: 4
+    length: 4
+    freq: 10
+    freqIsSec: 0
+    eachCycle: 1
+    :
+
+comp [switch] .p:
+    text: 'Pwr'
+    :
+
+4wire o = AND(.o:counter, .p + .p + .p + .p)
+1wire c = AND(.o, .p)
+
+watch(.o:counter)
+watch(o)
+watch(c)
+```
+
+- `.o:counter.*` — four columns; counter ticks in real time (osc timers).
+- `o.*` — gated by `.p`; flat until the switch is on.
+- `c` — 1-bit gated copy of the osc `:get` output.
 
 ### Rules
 
-- Same target rules and limitations as `probe` (wires, `.comp:prop`, chip pout `:name`, internal `.inst.wire`).
-- Duplicate `watch` on the same signal creates duplicate channels.
-- Editor-only (not in `run_tests.html`).
+- Same elaboration rules as `probe` (position in script does not matter; registered at end of **Run**).
+- **Duplicate** `watch()` on the same expanded target (e.g. `watch(o.0-3)` then `watch(o.0)`) creates **one** column — first occurrence wins.
+- Computed component properties (`:counter`, `:mod`, `:carry`, …) emit samples when the component recalculates (including `osc` timer ticks).
+- **Editor only** — available in `script_editor_v0_3_2.html`, not in `run_tests.html`.
+- Complements **`probe`**: use `probe` for a text log in Output; use `watch` for a visual trace over time.
 
 ---
 

@@ -92,9 +92,9 @@ Changing `a` or `b` eventually updates `sum`.
 
 ---
 
-## Debug output (`show`, `peek`, `probe`)
+## Debug output (`show`, `peek`, `probe`, `watch`)
 
-How values appear in the Output panel — syntax, timing, and runnable examples:
+How values appear in **Output** or the **Timeline** panel — syntax, timing, and runnable examples:
 
 **[debug.md](debug.md)**
 
