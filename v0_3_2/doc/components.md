@@ -43,6 +43,7 @@ Overview (panel callbacks, common patterns): [interactive-components.md](interac
 | `7seg` | `7` | [seven-seg.md](seven-seg.md) |
 | `14seg` | `14` | [14seg.md](14seg.md) |
 | `lcd` | — | [lcd.md](lcd.md) |
+| `clcd` | — | [clcd.md](clcd.md) |
 | `terminal` | — | [terminal.md](terminal.md) |
 | `dots` (clock colon) | `:` | [dots.md](dots.md) |
 

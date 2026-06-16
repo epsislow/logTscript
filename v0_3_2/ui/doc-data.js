@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md
+ * Files: 14seg.md, adder.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md
  */
 (function () {
   'use strict';
@@ -2367,6 +2367,243 @@ PCBs are for complete interactive circuits; chips are building blocks. A typical
 
 Interactive circuits: [board.md](board.md). Component catalog: [components.md](components.md).
 `,
+    'clcd.md': `# CLCD component (\`clcd\`)
+
+\`comp [clcd]\` is a **canvas-based custom LCD** — predefined symbols at \`(x, y)\`, each driven by one bit or a bit range. ON uses \`color\`, OFF uses \`bgColor\` (per symbol or component defaults).
+
+Signature: \`doc(comp.clcd)\`.
+
+Distinct from [\`lcd\`](lcd.md) (pixel matrix + HD44780 font).
+
+---
+
+## Syntax
+
+\`\`\`logts
+comp [clcd] .name:
+  width: 200
+  height: 100
+  color: ^00ff00
+  bgColor: ^000000
+  nl
+  = {
+    symbolName:
+      x: 10
+      y: 20
+      bit: 0
+      color: ^ffaa00
+      bgColor: ^332200
+    :
+  }
+  :
+\`\`\`
+
+Minimal:
+
+\`\`\`logts
+comp [clcd] .panel::
+\`\`\`
+
+---
+
+## Attributes (component)
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| \`width\` | 200 | Canvas width (px) |
+| \`height\` | 100 | Canvas height (px) |
+| \`color\` | \`^00ff00\` | Default ON color for symbols |
+| \`bgColor\` | \`^000000\` | Default OFF color for symbols |
+| \`nl\` | off | Newline after display |
+
+## Symbol fields (\`= { … }\`)
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| \`x\`, \`y\` | yes | Position on canvas |
+| \`bit\` | one of | Single control bit |
+| \`bits\` | one of | Inclusive range \`N-M\` (e.g. \`digit7\`) |
+| \`color\` | no | Override ON color for this symbol |
+| \`bgColor\` | no | Override OFF color for this symbol |
+
+The **same symbol name may appear multiple times** — each entry is independent (its own \`x\`, \`y\`, and \`bit\` / \`bits\`). Example: two \`digit7\` displays at different positions, each driven by its own bit range.
+
+**Bit mapping** must be **contiguous from 0** with no gaps across *all* entries (union of every bit used). Using bit \`0\` and bit \`2\` without bit \`1\` is an error.
+
+Bus width = \`max(bit index) + 1\` over all symbols.
+
+---
+
+## Supported symbols
+
+\`battery\`, \`power\`, \`warning\`, \`error\`, \`check\`, \`cross\`, \`wifi\`, \`bluetooth\`, \`usb\`, \`ethernet\`, \`antenna\`, \`chip\`, \`memory\`, \`clock\`, \`arrowUp\`, \`arrowDown\`, \`arrowLeft\`, \`arrowRight\`, \`play\`, \`stop\`, \`pause\`, \`record\`, \`digit7\`, \`digit14\`, \`dp\`, \`colon\`, \`charging\`, \`uart\`
+
+Icons use Font Awesome 5 (see \`res/fontawesome/\`). \`digit7\`, \`digit14\`, \`dp\`, \`colon\` are drawn on canvas.
+
+---
+
+## Running examples (Load / Load & Run)
+
+Runnable blocks on this page use the \`logts-play\` format. Each block shows two buttons:
+
+| Button | What it does |
+|--------|----------------|
+| **Load** | Copies the script into the editor **without** running it. Use this to inspect or edit the example, then press toolbar **RUN** when ready. |
+| **Load & Run** | Copies the script **and** runs it immediately. The **CLCD** canvas appears in the **Devices** panel with the values from the script. |
+
+For static examples (fixed \`Nwire\` values), **Load & Run** is enough — you see the symbol states right away.
+
+For the **interactive status panel** below, use **Load & Run**, then flip the **DIP** switches in the panel; the CLCD updates as the wire changes.
+
+---
+
+## Input
+
+### Static drive (Load & Run)
+
+**Load & Run** the example below — \`power\` ON, \`wifi\` OFF, \`warning\` ON (\`flags = 101\`).
+
+\`\`\`logts-play
+comp [clcd] .status:
+  = {
+    power: x:10 y:10 bit:0 :
+    wifi: x:50 y:10 bit:1 :
+    warning: x:90 y:10 bit:2 :
+  }
+  :
+
+3wire flags = 101
+.status = flags
+\`\`\`
+
+Property block (\`value\` + \`set\`, not \`data\`):
+
+\`\`\`logts
+.status:{
+  value = flags
+  set = 1
+}
+\`\`\`
+
+---
+
+## Debug
+
+\`\`\`logts
+show(.status)
+peek(.status)
+probe(.status:get)
+\`\`\`
+
+\`:get\` returns the current bit vector driving the display.
+
+---
+
+## Examples
+
+### Interactive status panel (DIP + CLCD)
+
+**Load** if you want to change symbol positions first; **Load & Run** to see the panel, then flip the **Flags** DIP (\`000\` … \`111\`) — icons follow the 3-bit pattern.
+
+\`\`\`logts-play
+comp [dip] .flags:
+  length: 3
+  text: 'Flags'
+  visual: 1
+  = 101
+  :
+
+comp [clcd] .status:
+  width: 200
+  height: 60
+  color: ^00ff00
+  bgColor: ^001000
+  = {
+    power: x:10 y:10 bit:0 :
+    wifi: x:50 y:10 bit:1 :
+    warning: x:90 y:10 bit:2 color:^ffaa00 bgColor:^332200 :
+  }
+  :
+
+3wire bus = .flags:get
+.status = bus
+\`\`\`
+
+### Battery panel
+
+**Load & Run** — both \`battery\` and \`charging\` icons ON (\`state = 11\`).
+
+\`\`\`logts-play
+comp [clcd] .battery:
+  width: 120
+  height: 50
+  = {
+    battery: x:10 y:10 bit:0 :
+    charging: x:60 y:10 bit:1 :
+  }
+  :
+
+2wire state = 11
+.battery = state
+\`\`\`
+
+### Seven-segment digit + decimal point
+
+**Load & Run** — all segments ON, decimal point OFF (\`value = 11111100\`).
+
+\`\`\`logts-play
+comp [clcd] .digit:
+  = {
+    digit7: x:10 y:10 bits:0-6 :
+    dp: x:60 y:10 bit:7 :
+  }
+  :
+
+8wire value = 11111100
+.digit = value
+\`\`\`
+
+### Multiple seven-segment digits (same symbol, different bits)
+
+**Load & Run** — three \`digit7\` glyphs at different \`x\` positions; each uses its own 7-bit slice (bus width 21).
+
+\`\`\`logts-play
+comp [clcd] .display:
+  width: 160
+  height: 80
+  = {
+    digit7:
+      x: 10
+      y: 10
+      bits: 0-6
+    :
+    digit7:
+      x: 50
+      y: 10
+      bits: 7-13
+    :
+    digit7:
+      x: 90
+      y: 10
+      bits: 14-20
+    :
+  }
+  :
+
+21wire val = 1111111000000111111100000
+.display = val
+\`\`\`
+
+Each \`digit7\` listens to its own 7-bit slice; bus width is 21 bits (\`0\`…\`20\`).
+
+---
+
+## Related
+
+- [lcd.md](lcd.md) — pixel matrix display
+- [seven-seg.md](seven-seg.md) — 7-segment component
+- [components.md](components.md)
+`,
     'components.md': `# Component index
 
 LogTscript includes built-in **components** (\`comp\`), **inline** declarations (\`inline [asm]\`, \`inline [lut]\`), reusable **board** blocks (\`board\`), lightweight **chip** blocks (\`chip\`), and legacy **PCB** (\`pcb\`). Use \`doc(comp)\`, \`doc(inline)\`, \`doc(board)\`, \`doc(chip)\`, or \`doc(pcb)\` in the editor for live signatures.
@@ -2412,6 +2649,7 @@ Overview (panel callbacks, common patterns): [interactive-components.md](interac
 | \`7seg\` | \`7\` | [seven-seg.md](seven-seg.md) |
 | \`14seg\` | \`14\` | [14seg.md](14seg.md) |
 | \`lcd\` | — | [lcd.md](lcd.md) |
+| \`clcd\` | — | [clcd.md](clcd.md) |
 | \`terminal\` | — | [terminal.md](terminal.md) |
 | \`dots\` (clock colon) | \`:\` | [dots.md](dots.md) |
 

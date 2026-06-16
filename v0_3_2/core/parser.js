@@ -2101,6 +2101,16 @@ assignment() {
               continue;
             }
             throw Error(`Expected '{' after '= ${isaRef}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+          } else if (this.c.type === 'SYM' && this.c.value === '{') {
+            if (compType === 'clcd') {
+              const bracePos = this.t.i - 1;
+              initialValue = this.parseClcdSymbolsRaw(bracePos);
+              if (initialValue && initialValue.kind === 'clcdSymbols') {
+                attributes.clcdSymbols = initialValue.symbols;
+              }
+              continue;
+            }
+            throw Error(`Expected binary or decimal value after '=' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
           } else {
             throw Error(`Expected binary or decimal value after '=' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
           }
@@ -3078,6 +3088,156 @@ isBuiltinFunction(name) {
     pos++;
     this._syncTokenizerAt(pos);
     return { kind: 'lutData', entries, rawEntries };
+  }
+
+  parseClcdSymbolsRaw(bracePos) {
+    const src = this.t.src;
+    let pos = bracePos + 1;
+    const symbols = [];
+    const known = (typeof ClcdComponent !== 'undefined' && ClcdComponent.knownSymbols)
+      ? ClcdComponent.knownSymbols
+      : (typeof CLCD_KNOWN_SYMBOLS !== 'undefined' ? CLCD_KNOWN_SYMBOLS : []);
+
+    const skipWS = () => {
+      while (pos < src.length) {
+        if (src[pos] === ' ' || src[pos] === '\t' || src[pos] === '\r' || src[pos] === '\n') {
+          pos++;
+          continue;
+        }
+        if (src[pos] === '#') {
+          while (pos < src.length && src[pos] !== '\n') pos++;
+          continue;
+        }
+        break;
+      }
+    };
+
+    const readIdent = () => {
+      skipWS();
+      const start = pos;
+      if (pos >= src.length || !/[A-Za-z_]/.test(src[pos])) {
+        throw Error(`Expected symbol name at ${this.c.line}:${this.c.col}`);
+      }
+      pos++;
+      while (pos < src.length && /[A-Za-z0-9_]/.test(src[pos])) pos++;
+      return src.substring(start, pos);
+    };
+
+    const readInt = () => {
+      skipWS();
+      let num = '';
+      while (pos < src.length && /[0-9]/.test(src[pos])) {
+        num += src[pos];
+        pos++;
+      }
+      if (!num) throw Error(`Expected integer at ${this.c.line}:${this.c.col}`);
+      return parseInt(num, 10);
+    };
+
+    const readHexColor = () => {
+      skipWS();
+      if (pos < src.length && src[pos] === '^') {
+        pos++;
+        let hex = '';
+        while (pos < src.length && /[0-9a-fA-F]/.test(src[pos])) {
+          hex += src[pos];
+          pos++;
+        }
+        if (!hex) throw Error(`Expected hex color at ${this.c.line}:${this.c.col}`);
+        return '#' + hex;
+      }
+      if (pos < src.length && src[pos] === '#') {
+        pos++;
+        let hex = '';
+        while (pos < src.length && /[0-9a-fA-F]/.test(src[pos])) {
+          hex += src[pos];
+          pos++;
+        }
+        return '#' + hex;
+      }
+      throw Error(`Expected color at ${this.c.line}:${this.c.col}`);
+    };
+
+    skipWS();
+    while (pos < src.length && src[pos] !== '}') {
+      const symName = readIdent();
+      if (!known.includes(symName)) {
+        throw Error(`Unknown CLCD symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+      }
+      skipWS();
+      if (pos >= src.length || src[pos] !== ':') {
+        throw Error(`Expected ':' after symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+      }
+      pos++;
+
+      const sym = { name: symName };
+      let hasBit = false;
+      let hasBits = false;
+
+      while (pos < src.length) {
+        skipWS();
+        if (src[pos] === '}') break;
+        if (src[pos] === ':') {
+          pos++;
+          break;
+        }
+        const key = readIdent();
+        skipWS();
+        if (pos >= src.length || src[pos] !== ':') {
+          throw Error(`Expected ':' after '${key}' in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+        }
+        pos++;
+        skipWS();
+
+        if (key === 'x') sym.x = readInt();
+        else if (key === 'y') sym.y = readInt();
+        else if (key === 'bit') {
+          sym.bit = readInt();
+          hasBit = true;
+        } else if (key === 'bits') {
+          const startBit = readInt();
+          skipWS();
+          if (pos >= src.length || src[pos] !== '-') {
+            throw Error(`Expected '-' in bits range at ${this.c.line}:${this.c.col}`);
+          }
+          pos++;
+          const endBit = readInt();
+          if (endBit < startBit) {
+            throw Error(`CLCD bits range inverted (${startBit}-${endBit}) at ${this.c.line}:${this.c.col}`);
+          }
+          sym.bitsStart = startBit;
+          sym.bitsEnd = endBit;
+          hasBits = true;
+        } else if (key === 'color') sym.color = readHexColor();
+        else if (key === 'bgColor') sym.bgColor = readHexColor();
+        else {
+          throw Error(`Unknown attribute '${key}' in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+        }
+      }
+
+      if (sym.x === undefined || sym.y === undefined) {
+        throw Error(`Symbol '${symName}' requires x and y at ${this.c.line}:${this.c.col}`);
+      }
+      if (hasBit && hasBits) {
+        throw Error(`Symbol '${symName}' cannot have both bit and bits at ${this.c.line}:${this.c.col}`);
+      }
+      if (!hasBit && !hasBits) {
+        throw Error(`Symbol '${symName}' requires bit or bits at ${this.c.line}:${this.c.col}`);
+      }
+      symbols.push(sym);
+      skipWS();
+    }
+
+    if (pos >= src.length || src[pos] !== '}') {
+      throw Error(`Unclosed CLCD symbols block — expected '}' at ${this.c.line}:${this.c.col}`);
+    }
+    pos++;
+    this._syncTokenizerAt(pos);
+
+    if (typeof ClcdComponent !== 'undefined') {
+      ClcdComponent.validateContiguousBits(symbols);
+    }
+    return { kind: 'clcdSymbols', symbols };
   }
 
   parseCompInvoke(compName, globalRef) {

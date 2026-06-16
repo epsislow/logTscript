@@ -5,6 +5,7 @@
 <title>Bit Language Interpreter for LogTScript v0.3.2</title>
 <link rel="stylesheet" href="codemirror.min.css">
 <link rel="stylesheet" href="cm.show-hint.min.css">
+<link rel="stylesheet" href="res/fontawesome/css/all.min.css">
 <style>
 body { font-family: monospace; background:#111; color:#eee; padding:20px }
 textarea { width:100%; height:340px; background:#000; color:#0f0; font-size: 20px; }
@@ -872,6 +873,17 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   min-width: 3ch;
 }
 
+.clcd-wrapper {
+  display: inline-block;
+  margin: 4px 8px 4px 0;
+  vertical-align: middle;
+}
+
+.clcd-wrapper canvas {
+  display: block;
+  border: 1px solid #333;
+}
+
 /*==== dropdown panels ==== */
 
 .panel-dropdown {
@@ -1571,11 +1583,11 @@ const _logtsKeywords = [
 const _logtsComponents = [
   'led','key','dip','switch','rotary','slider','bar','osc',
   'adder','subtract','divider','multiplier','counter','shifter','mem','reg',
-  'lcd','terminal','dots','14seg','7seg',
+  'lcd','terminal','dots','14seg','7seg','clcd',
   '+','-','/','*','=','>','~','7','14',':'
 ];
 const _logtsAttributes = [
-  "depth","length","nl", "on", "text","label","color","rows","columns","fontSize","wordWrap","lineNumbers","cursorStyle"
+  "depth","length","nl", "on", "text","label","color","bgColor","rows","columns","fontSize","wordWrap","lineNumbers","cursorStyle"
 ]
 const _logtsProperties = [
   "out","in","on","off","at","depth","length",
@@ -2020,6 +2032,7 @@ show(a,b,c)
         <button class="dropdown-item" onclick="insertComp('shifter')">shifter</button>
         <button class="dropdown-item" onclick="insertComp('mem')">mem</button>
         <button class="dropdown-item" onclick="insertComp('lcd')">lcd</button>
+        <button class="dropdown-item" onclick="insertComp('clcd')">clcd</button>
         <button class="dropdown-item" onclick="insertComp('terminal')">terminal</button>
         <button class="dropdown-item" onclick="insertComp('7seg')">7seg</button>
         <button class="dropdown-item" onclick="insertComp('osc')">osc</button>
@@ -2147,6 +2160,7 @@ show(a,b,c)
 <script src="core/components/osc.js"></script>
 <script src="core/components/rotary.js"></script>
 <script src="core/components/slider.js"></script>
+<script src="core/components/clcd.js"></script>
 <script src="core/components/pcb-component.js"></script>
 <script src="core/components/index.js"></script>
 
@@ -2180,6 +2194,7 @@ show(a,b,c)
 <script src="devices/panel-key.js"></script>
 <script src="devices/rotary-knob.js"></script>
 <script src="devices/slider-widget.js"></script>
+<script src="devices/clcd-widget.js"></script>
 
 <!-- UI: editor, file browser, app init -->
 <script src="ui/editor.js"></script>

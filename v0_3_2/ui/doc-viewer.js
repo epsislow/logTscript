@@ -52,6 +52,7 @@ const DOC_SECTIONS = [
       { file: 'seven-seg.md', label: '7seg' },
       { file: '14seg.md', label: '14seg' },
       { file: 'lcd.md', label: 'lcd' },
+      { file: 'clcd.md', label: 'clcd' },
       { file: 'terminal.md', label: 'terminal' },
       { file: 'dots.md', label: 'dots' }
     ],
