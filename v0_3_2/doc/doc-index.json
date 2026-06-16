@@ -52,6 +52,7 @@
         { "file": "14seg.md", "label": "14seg" },
         { "file": "lcd.md", "label": "lcd" },
         { "file": "clcd.md", "label": "clcd" },
+        { "file": "alu.md", "label": "alu" },
         { "file": "terminal.md", "label": "terminal" },
         { "file": "dots.md", "label": "dots" }
       ]

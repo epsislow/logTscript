@@ -596,7 +596,11 @@ board [a] .b::`,
    out = 0
    :1bit out
 
-chip [a] .b::`
+chip [a] .b::`,
+  'alu': `comp [alu] .|:
+    length: 4
+    on: 1
+    :`
 };
 
 function insertComp(name) {

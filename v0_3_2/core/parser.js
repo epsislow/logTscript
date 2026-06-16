@@ -1694,12 +1694,45 @@ assignment() {
         this.eat('ID');
 
         let bindingAttrs = [];
+        let listAttrs = [];
         if (this.componentRegistry) {
           const bindHandler = this.componentRegistry.get(compType);
           if (bindHandler && bindHandler.getSpecialParseAttributes) {
             const special = bindHandler.getSpecialParseAttributes();
             if (special && special.bindingAttrs) bindingAttrs = special.bindingAttrs;
+            if (special && special.listAttrs) listAttrs = special.listAttrs;
           }
+        }
+        if (listAttrs.includes(attrName) && this.c.value === ':') {
+          this.eat('SYM', ':');
+          this.t.skip();
+          const ids = [];
+          while (this.c.type !== 'EOF' && this.c.value !== '\n' && this.c.value !== ':') {
+            if (this.c.type === 'ID') {
+              ids.push(this.c.value);
+              this.eat('ID');
+              this.t.skip();
+              if (this.c.type === 'SYM' && this.c.value === ',') {
+                this.eat('SYM', ',');
+                this.t.skip();
+                continue;
+              }
+              break;
+            }
+            if (this.c.type === 'SYM' && this.c.value === ',') {
+              this.eat('SYM', ',');
+              this.t.skip();
+              continue;
+            }
+            break;
+          }
+          if (isArray) {
+            if (!attributes[attrName]) attributes[attrName] = {};
+            attributes[attrName][stateNum] = ids;
+          } else {
+            attributes[attrName] = ids;
+          }
+          continue;
         }
         if (bindingAttrs.includes(attrName) && this.c.value === '=') {
           this.eat('SYM', '=');

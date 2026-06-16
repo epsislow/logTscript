@@ -1761,7 +1761,7 @@
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider'];
+    const expectedTypes = ['led', 'switch', 'key', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -8890,6 +8890,496 @@ reg(1352, 'clcd', 'duplicate symbol names — two digit7 at different bits', fun
 14wire val = 11111111111100
 .display = val`);
   h.assert('value stored', interp.components.get('.display').lastValue, '11111111111100');
+});
+
+reg(1353, 'alu', 'parse minimal comp [alu] .a::', function(h, session) {
+  const stmts = session.parse('comp [alu] .a:\n  length: 4\n  :');
+  h.assert('type alu', stmts[0].comp.type, 'alu');
+  h.assert('name .a', stmts[0].comp.name, '.a');
+  h.assert('length 4', String(stmts[0].comp.attributes.length), '4');
+});
+
+reg(1354, 'alu', 'ADD — carry + zero', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+.alu:{ a = 1111
+  b = 0001
+  op = 00
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)\npeek(.alu:carry)\npeek(.alu:zero)');
+  const lines = session.out.slice(ob).join('\n');
+  h.assert('result 0000', String(lines.includes('0000')), 'true');
+  h.assert('carry 1', String(lines.includes('carry') && /carry[^\n]*=\s*1/.test(lines)), 'true');
+  h.assert('zero 1', String(/zero[^\n]*=\s*1/.test(lines)), 'true');
+});
+
+reg(1355, 'alu', 'SUB — borrow', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+.alu:{ a = 0000
+  b = 0001
+  op = 01
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)\npeek(.alu:carry)');
+  const lines = session.out.slice(ob).join('\n');
+  h.assert('result 1111', String(lines.includes('1111')), 'true');
+  h.assert('borrow/carry 1', String(/carry[^\n]*1/.test(lines)), 'true');
+});
+
+reg(1356, 'alu', 'AND / OR', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+.alu:{ a = 1100
+  b = 1010
+  op = 10
+  set = 1 }`);
+  let ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('AND 1000', String(session.out.slice(ob).join('\n').includes('1000')), 'true');
+  session.execStmts(interp, `.alu:{ a = 1100
+  b = 1010
+  op = 11
+  set = 1 }`);
+  ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('OR 1110', String(session.out.slice(ob).join('\n').includes('1110')), 'true');
+});
+
+reg(1357, 'alu', 'op=00 ADD mini-cpu style', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+2wire aluop = 00
+4wire acc = 0101
+4wire opd = 0011
+.alu:{ a = acc
+  b = opd
+  op = aluop
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('sum 1000', String(session.out.slice(ob).join('\n').includes('1000')), 'true');
+});
+
+reg(1358, 'alu', 'result / :get / wire assign', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+.alu:{ a = 0011
+  b = 0001
+  op = 00
+  set = 1 }
+4wire r = .alu:result
+4wire g = .alu:get`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(r)\npeek(g)');
+  const lines = session.out.slice(ob).join('\n');
+  h.assert('result wire 0100', String(lines.includes('0100')), 'true');
+  h.assert('get wire 0100', String((lines.match(/0100/g) || []).length >= 2), 'true');
+});
+
+reg(1359, 'alu', 'extraOp XOR — op code 4', function(h, session) {
+  const stmts = session.parse('comp [alu] .alu:\n  length: 4\n  extraOp: XOR\n  :');
+  h.assert('extraOp array', String(Array.isArray(stmts[0].comp.attributes.extraOp)), 'true');
+  h.assert('XOR listed', stmts[0].comp.attributes.extraOp[0], 'XOR');
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  extraOp: XOR
+  on: 1
+  :
+
+.alu:{ a = 1010
+  b = 0110
+  op = 100
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('xor 1100', String(session.out.slice(ob).join('\n').includes('1100')), 'true');
+});
+
+reg(1360, 'alu', 'extraOp MUL — result + over', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  extraOp: MUL
+  on: 1
+  :
+
+.alu:{ a = 1101
+  b = 0011
+  op = 100
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)\npeek(.alu:over)');
+  const lines = session.out.slice(ob).join('\n');
+  h.assert('low 0111', String(lines.includes('0111')), 'true');
+  h.assert('high 0010', String(lines.includes('0010')), 'true');
+});
+
+reg(1361, 'alu', 'extraOp DIV — result + mod; div-by-zero', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  extraOp: DIV
+  on: 1
+  :
+
+.alu:{ a = 1101
+  b = 0011
+  op = 100
+  set = 1 }`);
+  let ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)\npeek(.alu:mod)');
+  let lines = session.out.slice(ob).join('\n');
+  h.assert('quotient 0100', String(lines.includes('0100')), 'true');
+  h.assert('mod 0001', String(lines.includes('0001')), 'true');
+  session.execStmts(interp, `.alu:{ a = 1101
+  b = 0000
+  op = 100
+  set = 1 }`);
+  ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)\npeek(.alu:mod)');
+  lines = session.out.slice(ob).join('\n');
+  h.assert('div0 result 0', String(/result[^\n]*0000/.test(lines)), 'true');
+});
+
+reg(1362, 'alu', 'extraOp CMP + flags less/equal', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  extraOp: CMP
+  extraFlags: less, equal
+  on: 1
+  :
+
+.alu:{ a = 0100
+  b = 0101
+  op = 100
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:less)\npeek(.alu:equal)');
+  const lines = session.out.slice(ob).join('\n');
+  h.assert('less 1', String(/less[^\n]*1/.test(lines)), 'true');
+  h.assert('equal 0', String(/equal[^\n]*0/.test(lines)), 'true');
+});
+
+reg(1363, 'alu', 'extraOp ASHR vs RSHIFT', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 8
+  extraOp: RSHIFT, ASHR
+  on: 1
+  :
+
+.alu:{ a = 10000000
+  b = 00000001
+  op = 100
+  set = 1 }`);
+  let ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('RSHIFT 01000000', String(session.out.slice(ob).join('\n').includes('01000000')), 'true');
+  session.execStmts(interp, `.alu:{ a = 10000000
+  b = 00000001
+  op = 101
+  set = 1 }`);
+  ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('ASHR 11000000', String(session.out.slice(ob).join('\n').includes('11000000')), 'true');
+});
+
+reg(1364, 'alu', 'extraFlags overflow on ADD', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 8
+  extraFlags: overflow
+  on: 1
+  :
+
+.alu:{ a = 01111111
+  b = 00000001
+  op = 00
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:overflow)');
+  h.assert('overflow 1', String(/overflow[^\n]*1/.test(session.out.slice(ob).join('\n'))), 'true');
+});
+
+reg(1365, 'alu', 'registry has alu + getWidthBits', function(h, session) {
+  const registry = session._ensureRegistry();
+  h.assert('has alu', String(registry.has('alu')), 'true');
+  h.assert('length 4', String(registry.get('alu').getWidthBits({ length: '4' })), '4');
+  h.assert('default 4', String(registry.get('alu').getWidthBits({})), '4');
+});
+
+reg(1366, 'alu', 'parse extraOp comma list', function(h, session) {
+  const stmts = session.parse('comp [alu] .alu:\n  length: 4\n  extraOp: XOR, MUL, DIV\n  :');
+  const eo = stmts[0].comp.attributes.extraOp;
+  h.assert('three ops', String(eo.length), '3');
+  h.assert('xor', eo[0], 'XOR');
+  h.assert('mul', eo[1], 'MUL');
+});
+
+reg(1367, 'alu', 'parse extraFlags + dynamic op pin width', function(h, session) {
+  const stmts = session.parse('comp [alu] .alu:\n  length: 4\n  extraOp: XOR\n  extraFlags: less, equal\n  :');
+  h.assert('flags', String(stmts[0].comp.attributes.extraFlags.length), '2');
+  const def = session._ensureRegistry().get('alu').getDef(stmts[0].comp.attributes);
+  h.assert('op 3 bits', String(def.pins.some(p => p.name === 'op' && p.bits === '3')), 'true');
+});
+
+reg(1368, 'alu', 'extraOp NOT unary', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  extraOp: NOT
+  on: 1
+  :
+
+.alu:{ a = 1010
+  b = 0000
+  op = 100
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('not 0101', String(session.out.slice(ob).join('\n').includes('0101')), 'true');
+});
+
+reg(1369, 'alu', 'extraOp PASS', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  extraOp: PASS
+  on: 1
+  :
+
+.alu:{ a = 1100
+  b = 0011
+  op = 100
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('pass a', String(session.out.slice(ob).join('\n').includes('1100')), 'true');
+});
+
+reg(1370, 'alu', 'extraOp LSHIFT', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  extraOp: LSHIFT
+  on: 1
+  :
+
+.alu:{ a = 0001
+  b = 0010
+  op = 100
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('lshift 0100', String(session.out.slice(ob).join('\n').includes('0100')), 'true');
+});
+
+reg(1371, 'alu', 'doc(comp.alu) attrs', function(h, session) {
+  const out = session.runDoc('doc(comp.alu)');
+  h.assert('length', String(out.some(l => l.includes('length: integer'))), 'true');
+  h.assert('extraOp', String(out.some(l => l.includes('extraOp'))), 'true');
+  h.assert('result pout', String(out.some(l => l.includes('result'))), 'true');
+});
+
+reg(1372, 'alu', 'doc(comp) lists comp.alu', function(h, session) {
+  const out = session.runDoc('doc(comp)');
+  h.assert('has alu', String(out.some(l => l.includes('comp.alu'))), 'true');
+});
+
+reg(1373, 'alu', 'supportsProperty dynamic over/mod', function(h, session) {
+  const registry = session._ensureRegistry();
+  h.assert('over with MUL', String(registry.supportsProperty('alu', 'over', { extraOp: ['MUL'] })), 'true');
+  h.assert('no over default', String(registry.supportsProperty('alu', 'over', {})), 'false');
+  h.assert('mod with DIV', String(registry.supportsProperty('alu', 'mod', { extraOp: ['DIV'] })), 'true');
+});
+
+reg(1374, 'alu', 'property block set triggers eval', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+4wire aa = 0000
+4wire bb = 0001
+2wire op = 00
+
+.alu:{
+  a = aa
+  b = bb
+  op = op
+  set = 1
+}`);
+  session.setWire(interp, 'aa', '1111');
+  session.execStmts(interp, `.alu:{ a = aa
+  b = bb
+  op = op
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('updated', String(session.out.slice(ob).join('\n').includes('0000')), 'true');
+});
+
+reg(1375, 'alu', 'show(.alu:result)', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+.alu:{ a = 0010
+  b = 0010
+  op = 10
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'show(.alu:result)');
+  h.assert('show and', String(session.out.slice(ob).join('\n').includes('0010')), 'true');
+});
+
+reg(1376, 'alu', 'length 8 ADD', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 8
+  on: 1
+  :
+
+.alu:{ a = 00000001
+  b = 00000001
+  op = 00
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('sum 2', String(session.out.slice(ob).join('\n').includes('00000010')), 'true');
+});
+
+reg(1377, 'alu', 'LUT adapter custom extraOp', function(h, session) {
+  const { interp } = session.run(`comp [lut] .fn:
+  length: 32
+  depth: 1
+  = data {
+    10001 : 1
+  }
+  :
+
+comp [alu] .alu:
+  length: 1
+  extraOp: CUSTOM
+  lut = .fn
+  on: 1
+  :
+
+.alu:{ a = 0
+  b = 1
+  op = 100
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:result)');
+  h.assert('lut result 1', String(/result \(1bit\) = 1/.test(session.out.slice(ob).join('\n'))), 'true');
+});
+
+reg(1378, 'alu', 'extraFlags negative/sign', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  extraFlags: negative
+  on: 1
+  :
+
+.alu:{ a = 1000
+  b = 0001
+  op = 01
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:negative)');
+  h.assert('negative 1', String(/negative[^\n]*1/.test(session.out.slice(ob).join('\n'))), 'true');
+});
+
+reg(1379, 'alu', 'wave propagation wire to alu result', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+4wire aa = 0000
+4wire bb = 0000
+2wire op = 00
+4wire out = .alu:result
+
+.alu:{ a = aa
+  b = bb
+  op = op
+  set = 1 }`);
+  session.setWire(interp, 'aa', '1111');
+  session.setWire(interp, 'bb', '0001');
+  session.execStmts(interp, `.alu:{ a = aa
+  b = bb
+  op = op
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(out)');
+  h.assert('propagated 0000', String(session.out.slice(ob).join('\n').includes('0000')), 'true');
+}, { propagation: 'wave' });
+
+reg(1380, 'alu', 'legacy propagation wire to alu result', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+4wire aa = 1100
+4wire bb = 1010
+2wire op = 10
+4wire out = .alu:result
+
+.alu:{ a = aa
+  b = bb
+  op = op
+  set = 1 }`);
+  session.setWire(interp, 'bb', '1111');
+  session.execStmts(interp, `.alu:{ a = aa
+  b = bb
+  op = op
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(out)');
+  h.assert('and 1100', String(session.out.slice(ob).join('\n').includes('1100')), 'true');
+}, { propagation: 'legacy' });
+
+reg(1381, 'alu', 'extraFlags borrow alias on SUB', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  extraFlags: borrow
+  on: 1
+  :
+
+.alu:{ a = 0000
+  b = 0001
+  op = 01
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:borrow)');
+  h.assert('borrow 1', String(/borrow[^\n]*1/.test(session.out.slice(ob).join('\n'))), 'true');
+});
+
+reg(1382, 'alu', 'zero flag on nonzero result', function(h, session) {
+  const { interp } = session.run(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+.alu:{ a = 0010
+  b = 0010
+  op = 10
+  set = 1 }`);
+  const ob = session.out.length;
+  session.execStmts(interp, 'peek(.alu:zero)');
+  h.assert('zero 0', String(/zero[^\n]*0/.test(session.out.slice(ob).join('\n'))), 'true');
 });
 
 

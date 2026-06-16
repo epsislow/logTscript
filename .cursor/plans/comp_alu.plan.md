@@ -4,22 +4,22 @@ overview: "comp [alu] — unitate aritmetico-logică configurabilă (length, ext
 todos:
   - id: alu-spec
     content: "Finalizează tabel opcode standard + mapare extraOp/extraFlags + semantica lățimi pin op"
-    status: pending
+    status: completed
   - id: alu-core
     content: "core/components/alu.js — eval op, flags, supportsPropertyName dinamic; devices/alu-devices.js"
-    status: pending
+    status: completed
   - id: alu-lut-adapter
     content: "Atribut lut: .ref + adresare op||a||b pentru extraOp custom (length mic)"
-    status: pending
+    status: completed
   - id: alu-ui
     content: "Panel ALU (op, a, b, result, flags) + script_editor CSS/insert"
-    status: pending
+    status: completed
   - id: alu-tests
-    content: "test_suite.js grup alu 1291–1320 + mini-cpu-v2 exemplu cu comp [alu]"
-    status: pending
+    content: "test_suite.js grup alu 1353–1382 + mini-cpu-v2 exemplu cu comp [alu]"
+    status: completed
   - id: alu-doc
     content: "doc/alu.md, components.md, future-component-ideas A1, _gen_doc_data.js"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -470,10 +470,10 @@ flowchart TB
 
 | Fază | Conținut | Zile | Teste |
 |------|----------|------|-------|
-| **MVP** | length, ADD/SUB/AND/OR, carry, zero, result/get, panel minimal | 3–4 | 1291–1305 |
-| **extraOp** | XOR, NOT, PASS, CMP, LSHIFT, RSHIFT, ASHR, **MUL, DIV**, opBits dinamic | 2–3 | 1306–1315 |
-| **extraFlags** | overflow, less, equal, pout dinamic | 1–2 | 1313–1317 |
-| **LUT adapter** | `lut: .ref`, length≤4 full addr | 2–3 | 1318–1320 |
+| **MVP** | length, ADD/SUB/AND/OR, carry, zero, result/get, panel minimal | 3–4 | 1353–1367 |
+| **extraOp** | XOR, NOT, PASS, CMP, LSHIFT, RSHIFT, ASHR, **MUL, DIV**, opBits dinamic | 2–3 | 1368–1377 |
+| **extraFlags** | overflow, less, equal, pout dinamic | 1–2 | 1375–1379 |
+| **LUT adapter** | `lut: .ref`, length≤4 full addr | 2–3 | 1380–1382 |
 | **Doc + mini-cpu** | alu.md, exemplu board | 1–2 | — |
 | **Total** | | **~9–14 zile** | **~30** |
 
@@ -481,25 +481,28 @@ MVP singur înlocuiește `chip +[alu4]` — livrabil util la ~4 zile.
 
 ---
 
-## Teste planificate (1291+)
+## Teste planificate (1353+)
 
-Rezervat în [tristate_bus_buffer.plan.md](tristate_bus_buffer.plan.md) până la 1290 — ALU începe la **1291**.
+**Notă ID-uri:** intervalul vechi **1291–1320** nu mai e disponibil — suprapunere cu rezervări din [tristate_bus_buffer.plan.md](tristate_bus_buffer.plan.md) (1222–1290) și cu grupuri deja livrate (`short-notation` 1334–1336, `clcd` 1337–1352). ALU folosește **1353–1382** (după ultimul test CLCD).
 
 | ID | Scop |
 |----|------|
-| 1291 | parse minimal `comp [alu] .a::` length 4 |
-| 1292 | ADD — carry + zero |
-| 1293 | SUB — borrow |
-| 1294 | AND / OR |
-| 1295 | op=ADD echivalent mini-cpu aluop `00` |
-| 1296 | `result` / `:get` / `get>=` redirect |
-| 1297 | `extraOp: XOR` — op code 4 |
-| 1298 | `extraOp: MUL` — result + over |
-| 1299 | `extraOp: DIV` — result + mod; div-by-zero |
-| 1300 | `extraOp: CMP` + flags less/equal |
-| 1301 | `extraOp: ASHR` vs RSHIFT |
-| 1302 | `extraFlags: overflow` |
-| 1306+ | LUT adapter, mini-cpu-v2 integration |
+| 1353 | parse minimal `comp [alu] .a::` length 4 |
+| 1354 | ADD — carry + zero |
+| 1355 | SUB — borrow |
+| 1356 | AND / OR |
+| 1357 | op=ADD echivalent mini-cpu aluop `00` |
+| 1358 | `result` / `:get` / `get>=` redirect |
+| 1359 | `extraOp: XOR` — op code 4 |
+| 1360 | `extraOp: MUL` — result + over |
+| 1361 | `extraOp: DIV` — result + mod; div-by-zero |
+| 1362 | `extraOp: CMP` + flags less/equal |
+| 1363 | `extraOp: ASHR` vs RSHIFT |
+| 1364 | `extraFlags: overflow` |
+| 1365–1367 | MVP suplimentar (panel, on:1, length 8) |
+| 1368–1377 | extraOp NOT, PASS, LSHIFT, RSHIFT, opBits dinamic |
+| 1375–1379 | extraFlags less, equal, negative |
+| 1380–1382 | LUT adapter, mini-cpu-v2 integration |
 
 ---
 
@@ -522,4 +525,4 @@ Rezervat în [tristate_bus_buffer.plan.md](tristate_bus_buffer.plan.md) până l
 
 ## ID test
 
-- **1291–1320** (rezervat ALU)
+- **1353–1382** (grup `alu`; vechi 1291–1320 indisponibil)

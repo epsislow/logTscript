@@ -25,6 +25,7 @@ var OscComponent = (typeof require !== 'undefined') ? require('./osc') : OscComp
 var RotaryComponent = (typeof require !== 'undefined') ? require('./rotary') : RotaryComponent;
 var SliderComponent = (typeof require !== 'undefined') ? require('./slider') : SliderComponent;
 var ClcdComponent = (typeof require !== 'undefined') ? require('./clcd') : ClcdComponent;
+var AluComponent = (typeof require !== 'undefined') ? require('./alu') : AluComponent;
 var PcbComponent = (typeof require !== 'undefined') ? require('./pcb-component') : PcbComponent;
 
 function createComponentRegistry() {
@@ -54,6 +55,7 @@ function createComponentRegistry() {
   registry.register(RotaryComponent);
   registry.register(SliderComponent);
   registry.register(ClcdComponent);
+  registry.register(AluComponent);
   registry.register(ClockDotsComponent);
   return registry;
 }
