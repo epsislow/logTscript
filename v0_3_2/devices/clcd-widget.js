@@ -159,9 +159,9 @@ class ClcdDisplay {
       const color = on ? fg : bg;
 
       if (sym.name === 'digit7') {
-        this._drawDigit7(ctx, sym.x, sym.y, this._segmentBits(sym), color, bg, 7);
+        this._drawDigit7(ctx, sym.x, sym.y, this._segmentBits(sym), fg, bg, 7);
       } else if (sym.name === 'digit14') {
-        this._drawDigit7(ctx, sym.x, sym.y, this._segmentBits(sym).substring(0, 7), color, bg, 7);
+        this._drawDigit7(ctx, sym.x, sym.y, this._segmentBits(sym).substring(0, 7), fg, bg, 7);
       } else if (sym.name === 'dp') {
         this._drawDot(ctx, sym.x + 4, sym.y + 28, on ? fg : bg, 4);
       } else if (sym.name === 'colon') {
@@ -205,7 +205,10 @@ class ClcdDisplay {
     const h = 44;
     const t = 3;
     const pad = segBits.padEnd(segCount, '0').substring(0, segCount);
-    const seg = (i) => (pad[i] === '1' ? onColor : offColor);
+    const seg = function (i) {
+      return pad[i] === '1' ? onColor : offColor
+    };
+    console.log(pad, seg(1), seg(2), seg(3));
     const drawH = (sx, sy, len, ci) => {
       ctx.fillStyle = seg(ci);
       ctx.fillRect(sx, sy, len, t);
