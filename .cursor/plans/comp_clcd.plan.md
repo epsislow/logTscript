@@ -620,22 +620,7 @@ Editor: buton `insertComp('clcd')` în dropdown Displays; adaugă `'clcd'` în l
 
 | ID | Test |
 |----|------|
-| 1221 | Registry: `has('clcd')`, `getWidthBits` cu/fără simboluri |
-| 1222 | Parser: `comp [clcd] .status::` minimal |
-| 1223 | Parser: bloc simboluri `= { power: x:10 y:10 bit:0 : }` |
-| 1224 | Parser: `bits: 0-6` multi-bit |
-| 1224b | Eroare: simbol necunoscut / `bit` + `bits` simultan |
-| 1224c | Eroare: gol în biți — `bit: 0` + `bit: 2` fără `bit: 1` |
-| 1225 | `doc(comp.clcd)` — attrs + `= { symbol...` |
-| 1226 | `doc(comp)` conține `comp.clcd` |
-| 1227 | Functional: status panel `3wire flags = 101` → `show(.status)` |
-| 1228 | Property block `value` + `set` |
-| 1229 | `probe(.status:get)` la schimbare valoare |
-| 1230 | `peek(.status)` instant |
-| 1231 | Digit example: `digit7` + `dp`, 8 biți |
-| 1234 | Parser + draw: `color` / `bgColor` per simbol (warning cu override) |
-| 1232 | Wave propagation |
-| 1233 | Legacy propagation |
+| 1337–1352 | Grup `clcd` (16 teste; ID-uri 1337–1352, după `bool-lut-use` 1221) |
 
 Actualizare test **200** (`expectedTypes`) — adaugă `'clcd'`.
 

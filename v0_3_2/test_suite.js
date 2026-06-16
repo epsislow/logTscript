@@ -8666,7 +8666,7 @@ reg(1220, 'slider', 'parse size attribute', function(h, session) {
   h.assert('doc size attr', String(out.some(l => l.includes('size: integer'))), 'true');
 });
 
-reg(1221, 'clcd', 'registry has clcd + getWidthBits', function(h, session) {
+reg(1337, 'clcd', 'registry has clcd + getWidthBits', function(h, session) {
   const registry = session._ensureRegistry();
   h.assert('has clcd', String(registry.has('clcd')), 'true');
   h.assert('default 1 bit', String(registry.get('clcd').getWidthBits({})), '1');
@@ -8675,13 +8675,13 @@ reg(1221, 'clcd', 'registry has clcd + getWidthBits', function(h, session) {
   })), '3');
 });
 
-reg(1222, 'clcd', 'parse minimal comp [clcd] .status::', function(h, session) {
+reg(1338, 'clcd', 'parse minimal comp [clcd] .status::', function(h, session) {
   const stmts = session.parse('comp [clcd] .status::');
   h.assert('type clcd', stmts[0].comp.type, 'clcd');
   h.assert('name .status', stmts[0].comp.name, '.status');
 });
 
-reg(1223, 'clcd', 'parse symbol block single bit', function(h, session) {
+reg(1339, 'clcd', 'parse symbol block single bit', function(h, session) {
   const stmts = session.parse(`comp [clcd] .status:
   = {
     power:
@@ -8698,7 +8698,7 @@ reg(1223, 'clcd', 'parse symbol block single bit', function(h, session) {
   h.assert('bit 0', String(iv.symbols[0].bit), '0');
 });
 
-reg(1224, 'clcd', 'parse bits 0-6 multi-bit', function(h, session) {
+reg(1340, 'clcd', 'parse bits 0-6 multi-bit', function(h, session) {
   const stmts = session.parse(`comp [clcd] .digit:
   = {
     digit7:
@@ -8719,7 +8719,7 @@ reg(1224, 'clcd', 'parse bits 0-6 multi-bit', function(h, session) {
   h.assert('dp bit 7', String(sym[1].bit), '7');
 });
 
-reg(1225, 'clcd', 'parse error — unknown symbol', function(h, session) {
+reg(1341, 'clcd', 'parse error — unknown symbol', function(h, session) {
   h.assertThrows('unknown symbol', function() {
     session.parse(`comp [clcd] .x:
   = { notasymbol: x:1 y:1 bit:0 : }
@@ -8727,7 +8727,7 @@ reg(1225, 'clcd', 'parse error — unknown symbol', function(h, session) {
   }, 'Unknown CLCD symbol');
 });
 
-reg(1226, 'clcd', 'parse error — bit gap', function(h, session) {
+reg(1342, 'clcd', 'parse error — bit gap', function(h, session) {
   h.assertThrows('gap bit 1', function() {
     session.parse(`comp [clcd] .bad:
   = {
@@ -8738,7 +8738,7 @@ reg(1226, 'clcd', 'parse error — bit gap', function(h, session) {
   }, 'unused bit 1');
 });
 
-reg(1227, 'clcd', 'doc(comp.clcd) attrs and init block', function(h, session) {
+reg(1343, 'clcd', 'doc(comp.clcd) attrs and init block', function(h, session) {
   const out = session.runDoc('doc(comp.clcd)');
   h.assert('width attr', String(out.some(l => l.includes('width: integer'))), 'true');
   h.assert('color attr', String(out.some(l => l.includes('color: color'))), 'true');
@@ -8746,12 +8746,12 @@ reg(1227, 'clcd', 'doc(comp.clcd) attrs and init block', function(h, session) {
   h.assert('symbol init', String(out.some(l => l.includes('= { symbol:'))), 'true');
 });
 
-reg(1228, 'clcd', 'doc(comp) lists comp.clcd', function(h, session) {
+reg(1344, 'clcd', 'doc(comp) lists comp.clcd', function(h, session) {
   const out = session.runDoc('doc(comp)');
   h.assert('has clcd', String(out.some(l => l.includes('comp.clcd'))), 'true');
 });
 
-reg(1229, 'clcd', 'status panel wire drive + show', function(h, session) {
+reg(1345, 'clcd', 'status panel wire drive + show', function(h, session) {
   const { interp } = session.run(`comp [clcd] .status:
   = {
     power: x:10 y:10 bit:0 :
@@ -8771,7 +8771,7 @@ reg(1229, 'clcd', 'status panel wire drive + show', function(h, session) {
   h.assert('show contains 101', String(showLines.some(l => l.includes('101'))), 'true');
 });
 
-reg(1230, 'clcd', 'property block value + set', function(h, session) {
+reg(1346, 'clcd', 'property block value + set', function(h, session) {
   const { interp } = session.run(`comp [clcd] .status:
   = { power: x:10 y:10 bit:0 : }
   on: 1
@@ -8787,7 +8787,7 @@ reg(1230, 'clcd', 'property block value + set', function(h, session) {
   h.assert('value applied', interp.components.get('.status').lastValue, '1');
 });
 
-reg(1231, 'clcd', 'peek(.status)', function(h, session) {
+reg(1347, 'clcd', 'peek(.status)', function(h, session) {
   const { interp } = session.run(`comp [clcd] .status:
   = { power: x:10 y:10 bit:0 : wifi: x:50 y:10 bit:1 : }
   :
@@ -8800,7 +8800,7 @@ reg(1231, 'clcd', 'peek(.status)', function(h, session) {
   h.assert('peek 10', String(lines.some(l => l.includes('10'))), 'true');
 });
 
-reg(1232, 'clcd', 'digit7 + dp eight bits', function(h, session) {
+reg(1348, 'clcd', 'digit7 + dp eight bits', function(h, session) {
   const { interp } = session.run(`comp [clcd] .digit:
   = {
     digit7: x:10 y:10 bits:0-6 :
@@ -8814,7 +8814,7 @@ reg(1232, 'clcd', 'digit7 + dp eight bits', function(h, session) {
   h.assert('stored value', interp.components.get('.digit').lastValue, '11111100');
 });
 
-reg(1233, 'clcd', 'per-symbol color parse', function(h, session) {
+reg(1349, 'clcd', 'per-symbol color parse', function(h, session) {
   const stmts = session.parse(`comp [clcd] .status:
   color: ^00ff00
   bgColor: ^001000
@@ -8835,7 +8835,7 @@ reg(1233, 'clcd', 'per-symbol color parse', function(h, session) {
   h.assert('warning bgColor', w.bgColor, '#332200');
 });
 
-reg(1234, 'clcd', 'wave propagation wire to clcd', function(h, session) {
+reg(1350, 'clcd', 'wave propagation wire to clcd', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   = { power: x:10 y:10 bit:0 : }
   :
@@ -8846,7 +8846,7 @@ reg(1234, 'clcd', 'wave propagation wire to clcd', function(h, session) {
   h.assert('updated', interp.components.get('.panel').lastValue, '1');
 }, { propagation: 'wave' });
 
-reg(1235, 'clcd', 'legacy propagation wire to clcd', function(h, session) {
+reg(1351, 'clcd', 'legacy propagation wire to clcd', function(h, session) {
   const { interp } = session.run(`comp [clcd] .panel:
   = { power: x:10 y:10 bit:0 : }
   :
@@ -8857,7 +8857,7 @@ reg(1235, 'clcd', 'legacy propagation wire to clcd', function(h, session) {
   h.assert('updated', interp.components.get('.panel').lastValue, '1');
 }, { propagation: 'legacy' });
 
-reg(1236, 'clcd', 'duplicate symbol names — two digit7 at different bits', function(h, session) {
+reg(1352, 'clcd', 'duplicate symbol names — two digit7 at different bits', function(h, session) {
   const stmts = session.parse(`comp [clcd] .display:
   = {
     digit7:

@@ -51,6 +51,8 @@ const GROUP_META = [
   { id: 'signal', label: 'Wire cascade propagation' },
   { id: 'ioport', label: 'I/O port (ioport)' },
   { id: 'reg', label: 'REG builtin' },
+  { id: 'slider', label: 'Slider component' },
+  { id: 'clcd', label: 'CLCD component' },
   { id: 'other', label: 'Other' }
 ];
 
