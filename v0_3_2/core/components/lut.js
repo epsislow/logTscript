@@ -213,7 +213,7 @@ var LutComponent = class LutComponent extends BuiltinComponent {
       for (let i = 0; i < raw.length; i++) {
         const r = raw[i];
         const e = entries[i];
-        const fromLabel = r.fromRaw;
+        const fromLabel = r.fromRaw ?? r.from;
         const toLabel = (e && e.to !== e.from) ? (r.toRaw || r.fromRaw) : null;
         const rangeLabel = toLabel ? `${fromLabel}-${toLabel}` : fromLabel;
         const valShow = r.valueRaw || (e ? e.value : r.value);
