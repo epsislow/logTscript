@@ -20,6 +20,10 @@
 
   const statusById = new Map();
   const manifestById = new Map(manifest.entries.map(e => [e.id, e]));
+  const groups = [...manifest.groups].sort((a, b) => {
+    const cmp = (a.label || a.id).localeCompare(b.label || b.id, undefined, { sensitivity: 'base' });
+    return cmp !== 0 ? cmp : a.id.localeCompare(b.id);
+  });
   let running = false;
 
   const suiteCount = suite.runMap ? suite.runMap.size : suite.tests.length;
@@ -138,7 +142,7 @@
       'Passed: ' + passed + ' | Failed: ' + failed + ' | Pending: ' + pending;
     // +' | Not ported: ' + notPorted;
 
-    for (const group of manifest.groups) {
+    for (const group of groups) {
       const el = document.querySelector(
         '.test-group[data-group="' + group.id + '"] .group-summary'
       );
@@ -232,7 +236,7 @@
 
   function buildTestSearchIndex() {
     const index = [];
-    for (const group of manifest.groups) {
+    for (const group of groups) {
       index.push({
         kind: 'group',
         groupId: group.id,
@@ -622,7 +626,7 @@
     }
     updateSummary();
 
-    for (const group of manifest.groups) {
+    for (const group of groups) {
       const groupTests = testsForGroup(group);
       const groupPropMode = groupPropagationMode(groupTests);
 

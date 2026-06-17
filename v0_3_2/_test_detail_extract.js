@@ -233,7 +233,9 @@ function extractNamedFunctionBody(suiteSource, name) {
 
 function resolveDelegateBody(body, suiteSource) {
   const trimmed = body.trim();
-  const delegate = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\(h,\s*session[^)]*\);\s*$/);
+  // Multiline test bodies are never a single-line delegate call.
+  if (trimmed.includes('\n')) return body;
+  const delegate = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\(h,\s*session[^)]*\)\s*;\s*$/);
   if (!delegate || !suiteSource) return body;
   const helperBody = extractNamedFunctionBody(suiteSource, delegate[1]);
   return helperBody || body;
@@ -525,11 +527,276 @@ function extractAssertions(body) {
   return assertions;
 }
 
-function extractTestDetail(runFn, sharedConsts, suiteSource) {
+function readBalanced(s, i, openCh, closeCh) {
+  if (s[i] !== openCh) return null;
+  let depth = 0;
+  const start = i;
+  while (i < s.length) {
+    const quoted = readQuotedString(s, i);
+    if (quoted) {
+      i = quoted.end;
+      continue;
+    }
+    if (s[i] === openCh) depth++;
+    else if (s[i] === closeCh) {
+      depth--;
+      if (depth === 0) return { text: s.slice(start, i + 1), end: i + 1 };
+    }
+    i++;
+  }
+  return null;
+}
+
+function splitTopLevelCommaList(inner) {
+  const parts = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < inner.length; i++) {
+    const quoted = readQuotedString(inner, i);
+    if (quoted) {
+      i = quoted.end - 1;
+      continue;
+    }
+    const c = inner[i];
+    if (c === '{' || c === '[' || c === '(') depth++;
+    else if (c === '}' || c === ']' || c === ')') depth--;
+    else if (c === ',' && depth === 0) {
+      const part = inner.slice(start, i).trim();
+      if (part) parts.push(part);
+      start = i + 1;
+    }
+  }
+  const tail = inner.slice(start).trim();
+  if (tail) parts.push(tail);
+  return parts;
+}
+
+function parseObjectProperty(prop) {
+  const colon = prop.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*([\s\S]+)$/);
+  if (colon) return { key: colon[1], valueExpr: colon[2].trim() };
+  const shorthand = prop.match(/^([a-zA-Z_][a-zA-Z0-9_]*)$/);
+  if (shorthand) return { key: shorthand[1], valueExpr: shorthand[1], shorthand: true };
+  return null;
+}
+
+function resolveLiteralValue(expr, localConsts, sharedConsts) {
+  const trimmed = expr.trim();
+  if (!trimmed) return null;
+
+  const quoted = readQuotedString(trimmed, 0);
+  if (quoted && quoted.end === trimmed.length) return quoted.text;
+
+  if (/^-?\d+$/.test(trimmed)) return parseInt(trimmed, 10);
+  if (trimmed === 'true') return true;
+  if (trimmed === 'false') return false;
+
+  if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmed)) {
+    const v = resolveExpr(trimmed, localConsts, sharedConsts);
+    if (v != null) return v;
+  }
+
+  return null;
+}
+
+function parseObjectFields(objExpr, localConsts, sharedConsts) {
+  const trimmed = objExpr.trim();
+  if (!trimmed.startsWith('{')) return {};
+  const inner = trimmed.slice(1, -1);
+  const out = {};
+  for (const prop of splitTopLevelCommaList(inner)) {
+    const parsed = parseObjectProperty(prop);
+    if (!parsed) continue;
+    if (parsed.valueExpr.startsWith('{')) {
+      out[parsed.key] = parseObjectFields(parsed.valueExpr, localConsts, sharedConsts);
+      continue;
+    }
+    const val = resolveLiteralValue(parsed.valueExpr, localConsts, sharedConsts);
+    if (val != null) {
+      out[parsed.key] = val;
+      continue;
+    }
+    if (parsed.shorthand || parsed.key === parsed.valueExpr) {
+      const v = resolveExpr(parsed.valueExpr, localConsts, sharedConsts);
+      if (v != null) out[parsed.key] = v;
+    }
+  }
+  return out;
+}
+
+const ERROR_DISPLAY_EXPECT_LABELS = {
+  message: 'error message',
+  scriptLocLine: 'scriptLoc.line',
+  line: 'editor line',
+  col: 'editor col',
+  spanLen: 'caret span',
+  sourceLine: 'output source line',
+  caretLine: 'output caret',
+  isMissing: 'missing token'
+};
+
+const ERROR_DISPLAY_EXPECT_ORDER = [
+  'message', 'scriptLocLine', 'line', 'col', 'spanLen', 'sourceLine', 'caretLine', 'isMissing'
+];
+
+function formatCheckValue(value) {
+  if (typeof value === 'string') {
+    if (value.length > 72) return JSON.stringify(value.slice(0, 69) + '…');
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+function formatErrorDisplayChecks(spec) {
+  const checks = [];
+  const prefix = spec.name ? spec.name + ': ' : '';
+  const action = spec.action || 'run';
+  pushUnique(checks, prefix + 'action ' + action + ' (must throw)');
+
+  const exp = spec.expect || {};
+  for (const key of ERROR_DISPLAY_EXPECT_ORDER) {
+    if (exp[key] == null) continue;
+    const label = ERROR_DISPLAY_EXPECT_LABELS[key] || key;
+    pushUnique(checks, prefix + label + ' = ' + formatCheckValue(exp[key]));
+  }
+
+  if (exp.sourceLine && exp.caretLine && exp.message && !exp.outputLines) {
+    pushUnique(checks, prefix + 'implicit: caret count, hook line/col, output[0..2]');
+  }
+  return checks;
+}
+
+function formatErrorDisplaySteps(spec, meta) {
+  const steps = [];
+  const action = spec.action || 'run';
+  pushUnique(steps, 'assertErrorDisplay(action: ' + action + ')');
+  pushUnique(steps, 'session.' + action + '(source) inside assertErrorDisplay');
+
+  if (meta && meta.propagation && meta.propagation !== 'legacy') {
+    pushUnique(steps, 'propagation: ' + meta.propagation);
+  }
+
+  if (spec.editorSource && spec.source && spec.editorSource !== spec.source) {
+    const edLines = spec.editorSource.split('\n').length;
+    const runLines = spec.source.split('\n').length;
+    pushUnique(steps, 'editorSource differs (' + edLines + ' lines, run source ' + runLines + ' lines)');
+    const preview = compactExpr(spec.editorSource, 100);
+    if (preview) {
+      pushUnique(steps, 'editorSource preview: ' + preview);
+    } else if (spec.editorSource.startsWith('\n')) {
+      pushUnique(steps, 'editorSource preview: (leading blank line)');
+    }
+  }
+
+  pushUnique(steps, 'resolveErrorDisplay → alignErrorDisplayToSource → output + editor hook');
+  return steps;
+}
+
+function extractAssertErrorDisplaySpecs(body, localConsts, sharedConsts) {
+  const specs = [];
+  const needle = 'assertErrorDisplay(';
+  let idx = 0;
+  while ((idx = body.indexOf(needle, idx)) !== -1) {
+    const openParen = idx + needle.length - 1;
+    let i = skipWs(body, openParen + 1);
+    let arg = readExpression(body, i);
+    if (!arg) {
+      idx += needle.length;
+      continue;
+    }
+    i = skipWs(body, arg.end);
+    if (body[i] === ',') i++;
+    arg = readExpression(body, skipWs(body, i));
+    if (!arg) {
+      idx += needle.length;
+      continue;
+    }
+    i = skipWs(body, arg.end);
+    if (body[i] === ',') i++;
+    const specArg = readExpression(body, skipWs(body, i));
+    if (!specArg || !specArg.text.trim().startsWith('{')) {
+      idx += needle.length;
+      continue;
+    }
+    const specObj = parseObjectFields(specArg.text, localConsts, sharedConsts);
+    if (specObj && (specObj.source || specObj.expect)) specs.push(specObj);
+    idx = Math.max(specArg.end, idx + 1);
+  }
+  return specs;
+}
+
+function detailFromAssertErrorDisplay(spec, meta) {
+  const scripts = [];
+  if (spec.source) pushUnique(scripts, spec.source);
+  return {
+    scripts: finalizeScripts(scripts),
+    steps: formatErrorDisplaySteps(spec, meta),
+    assertions: formatErrorDisplayChecks(spec)
+  };
+}
+
+function extractBuildErrorPresentationDetail(body, localConsts, sharedConsts, meta) {
+  const scripts = [];
+  const steps = [];
+  const assertions = extractAssertions(body);
+
+  const srcDecl = body.match(/const\s+src\s*=\s*([\s\S]*?);/);
+  if (srcDecl) {
+    const resolved = resolveLiteralValue(srcDecl[1], localConsts, sharedConsts);
+    if (resolved != null) pushUnique(scripts, resolved);
+  }
+
+  const presCall = body.match(/buildErrorPresentation\(\s*err\s*,\s*([^,]+)\s*,\s*([^)]+)\)/);
+  if (presCall) {
+    pushUnique(steps, 'buildErrorPresentation(err, ' + compactExpr(presCall[1].trim(), 40) +
+      ', ' + compactExpr(presCall[2].trim(), 40) + ')');
+  }
+
+  const scriptErr = body.match(/scriptError\(\s*'((?:\\'|[^'])*)'\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*(\d+))?\s*\)/);
+  if (scriptErr) {
+    pushUnique(steps, 'scriptError(' + JSON.stringify(unescapeJsString(scriptErr[1], "'")) +
+      ', line ' + scriptErr[2] + ', col ' + scriptErr[3] +
+      (scriptErr[4] ? ', len ' + scriptErr[4] : '') + ')');
+  }
+
+  pushUnique(steps, 'resolveErrorDisplay → alignErrorDisplayToSource → output + editor hook');
+  if (meta && meta.propagation && meta.propagation !== 'legacy') {
+    pushUnique(steps, 'propagation: ' + meta.propagation);
+  }
+
+  if (!assertions.length) {
+    pushUnique(assertions, 'message');
+    pushUnique(assertions, 'hook line / hook col');
+    pushUnique(assertions, 'output lines + output[0]');
+  }
+
+  return {
+    scripts: finalizeScripts(scripts),
+    steps,
+    assertions
+  };
+}
+
+function extractErrorDisplayDetail(body, localConsts, sharedConsts, meta) {
+  const specs = extractAssertErrorDisplaySpecs(body, localConsts, sharedConsts);
+  if (specs.length) return detailFromAssertErrorDisplay(specs[0], meta);
+  if (/buildErrorPresentation\(/.test(body)) {
+    return extractBuildErrorPresentationDetail(body, localConsts, sharedConsts, meta);
+  }
+  return null;
+}
+
+function extractTestDetail(runFn, sharedConsts, suiteSource, meta) {
   if (typeof runFn !== 'function') {
     return { scripts: [], steps: [], assertions: [] };
   }
   let body = functionBody(runFn.toString());
+  const localConsts = extractLocalConsts(body, sharedConsts);
+  const errorDisplay = extractErrorDisplayDetail(body, localConsts, sharedConsts, meta || {});
+
+  if (errorDisplay) {
+    return errorDisplay;
+  }
+
   body = resolveDelegateBody(body, suiteSource);
   const scripts = extractScripts(body, sharedConsts);
   const steps = extractSteps(body, sharedConsts, scripts);

@@ -54,6 +54,7 @@ const GROUP_META = [
   { id: 'slider', label: 'Slider component' },
   { id: 'clcd', label: 'CLCD component' },
   { id: 'alu', label: 'ALU component' },
+  { id: 'error-display', label: 'Error display (caret + editor)' },
   { id: 'other', label: 'Other' }
 ];
 
@@ -103,7 +104,9 @@ const entries = tests.map(t => ({
   id: t.id,
   group: t.group || 'other',
   title: t.title,
-  detail: extractTestDetail(t.run, sharedConsts, suiteSource)
+  detail: extractTestDetail(t.run, sharedConsts, suiteSource, {
+    propagation: t.propagation || 'legacy'
+  })
 }));
 
 const byGroup = new Map();
@@ -113,7 +116,6 @@ for (const e of entries) {
 }
 
 const labelById = new Map(GROUP_META.map(g => [g.id, g.label]));
-const orderById = new Map(GROUP_META.map((g, i) => [g.id, i]));
 
 const knownGroups = GROUP_META.filter(g => byGroup.has(g.id)).map(g => ({
   id: g.id,
@@ -136,10 +138,9 @@ for (const id of extraGroupIds) {
 }
 
 knownGroups.sort((a, b) => {
-  const oa = orderById.has(a.id) ? orderById.get(a.id) : 999;
-  const ob = orderById.has(b.id) ? orderById.get(b.id) : 999;
-  if (oa !== ob) return oa - ob;
-  return Math.min(...a.testIds) - Math.min(...b.testIds);
+  const cmp = (a.label || a.id).localeCompare(b.label || b.id, undefined, { sensitivity: 'base' });
+  if (cmp !== 0) return cmp;
+  return a.id.localeCompare(b.id);
 });
 
 const esc = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");

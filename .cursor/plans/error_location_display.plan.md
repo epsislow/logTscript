@@ -1,260 +1,264 @@
 ---
 name: Error location display
-overview: "Îmbunătățirea afișării erorilor cu locație: caret `^` în Output (text roșu, monospace), markere vizuale în CodeMirror (gutter roșu + underline), cu tratament special pentru token lipsă/spațiu."
+overview: "Afișare erori cu locație: mesaj roșu + linie sursă + caret ^ în Output; markere CodeMirror (gutter roșu, underline token); scriptLoc + aliniere editor; suite test error-display 1388–1395."
 todos:
   - id: error-format-util
-    content: "Creare v0_3_2/core/error-format.js: parseErrorLocation, inferSpanLength, buildCaretLine, formatErrorSnippet; refactor formatAsmError"
-    status: pending
+    content: "v0_3_2/core/error-format.js — parseErrorLocation, snapCaretToToken, resolveErrorDisplay, alignErrorDisplayToSource; refactor formatAsmError"
+    status: completed
   - id: output-panel-dom
-    content: Înlocuire pre#out cu div.output-panel + CSS; refactor render() și renderError() în app.js
-    status: pending
+    content: "script_editor_v0_3_2.html — div.output-panel + CSS; app.js appendErrorOutput / render cu lastReportedError"
+    status: completed
   - id: wire-run-errors
-    content: "Integrare în run()/sendCmd()/reportRuntimeError: processedCode, snippet + highlight editor"
-    status: pending
+    content: "Integrare run()/sendCmd()/reportRuntimeError; processedCode; parser stmtLine/stmtCol; interpreter scriptLoc"
+    status: completed
   - id: editor-markers
-    content: highlightEditorError / clearErrorMarkers în CodeMirror (gutter roșu, token vs missing-col roz)
-    status: pending
-  - id: tests-adapt
-    content: Adaptare test_suite.js pentru noul DOM output; verificare manuală cazuri token/spațiu/ASM
-    status: pending
+    content: "highlightEditorError / clearErrorMarkers în app.js; gutter roșu, token vs missing-col"
+    status: completed
+  - id: caret-alignment
+    content: "Fix caret: token end-exclusive, bit-mismatch RHS span, ignore scriptLoc.len când = got bits, editor align blank line"
+    status: completed
+  - id: tests-error-display
+    content: "Grup error-display 1388–1395; assertErrorDisplay + buildErrorPresentation; titluri/etichete în engleză"
+    status: completed
 isProject: false
 ---
 
-# Afișare erori cu locație — recomandare și plan
+# Afișare erori cu locație — plan (implementat)
 
-## Starea actuală
+## Scop
 
-- Editor: **CodeMirror 5** în [`v0_3_2/ui/app.js`](v0_3_2/ui/app.js) — doar numere de linie (`#555`), **fără** markere de eroare.
-- Output: `<pre id="out">` + `render(lines)` cu `textContent` — text plain, fără culori.
-- Locațiile sunt în mesaj (`35:5`, `at : 35:5`) dar **nu** sunt folosite vizual.
-- Singurul precedent pentru caret: [`formatAsmError`](v0_3_2/core/asm-assembler.js) (ASM), cu `^^^` fix (3 caractere).
+Îmbunătățirea feedback-ului la erori în editorul v0_3_2:
+
+- **Output:** `Error: …` (roșu) + linia sursă + rând caret `^`×N (monospace)
+- **Editor:** număr linie roșu în gutter + underline pe token (sau coloană roz la token lipsă)
+- **Mesajele de eroare** rămân neschimbate (engleză, text existent)
+- **Teste:** grup `error-display` (1388–1395), validare fără DOM
+
+---
+
+## Starea inițială (înainte)
+
+| Zonă | Problemă |
+|------|----------|
+| Output | `<pre id="out">` plain text, fără culori |
+| Editor | CodeMirror fără markere de eroare |
+| Locație | `line:col` doar în mesaj, nefolosit vizual |
+| ASM | Singur precedent: `formatAsmError` cu `^^^` fix |
+
+---
+
+## Arhitectură (implementată)
 
 ```mermaid
-flowchart LR
-  run["run()"] --> preprocess["preprocessRepeat(code)"]
-  preprocess --> parse["Parser + Tokenizer"]
-  parse -->|success| outPlain["render(out)"]
-  parse -->|throw| catchErr["catch → reportRuntimeError"]
-  catchErr --> outPlain
-  outPlain --> preEl["pre#out textContent"]
+flowchart TD
+  run["run() / sendCmd()"] --> preprocess["preprocessRepeat → processedCode"]
+  preprocess --> parse["Parser + Interpreter"]
+  parse -->|throw| err["Error + scriptLoc?"]
+  err --> report["reportRuntimeError → lastReportedError"]
+  report --> render["render(out)"]
+  render --> append["appendErrorOutput(err, processedSource)"]
+  append --> resolve["resolveErrorDisplay(err, processed)"]
+  resolve --> align["alignErrorDisplayToSource(display, editor, processed)"]
+  align --> outDOM["Output: Error + source + caret"]
+  align --> editor["highlightEditorError(line, col, spanLen)"]
 ```
 
-## Recomandarea mea (sinteză)
+### Sursa de adevăr pentru snippet
 
-| Zonă | Recomandare | De ce |
-|------|-------------|-------|
-| **Output** | Mesaj `Error:` roșu + linie sursă + rând caret `^`×N | Aliniere perfectă în monospace; pattern deja validat la ASM |
-| **Output container** | Înlocuire `<pre>` → `<div class="output-panel">` cu rânduri `<div class="output-line">` | Permite HTML/stiluri ulterior, păstrează `white-space: pre` per rând |
-| **Editor** | Număr linie roșu în gutter + underline roșu pe token | Standard IDE, mai clar decât `^` în editor editabil |
-| **Token lipsă / spațiu** | Coloană 1-char evidențiată (roz) + opțional tokenul anterior în roz deschis | `^` singur sub spațiu e corect în Output; în editor un underline pe „nimic” nu se vede |
-
-**Nu** schimbăm textul mesajelor de eroare existente — doar adăugăm context vizual dedesubt.
+- **Output caret:** din `processedCode` (codul efectiv parsat)
+- **Editor highlight:** aceeași `line:col` după `alignErrorDisplayToSource` (mapare editor ↔ processed când diferă, ex. linie goală la început)
 
 ---
 
-## Partea 1 — Utilitar comun de formatare
+## Fișiere
 
-Fișier nou: [`v0_3_2/core/error-format.js`](v0_3_2/core/error-format.js)
-
-### 1.1 Extragere locație din mesaj (regex, fără refactor masiv parser)
-
-```javascript
-// Ultima apariție line:col (evită false positive din "00:0" din data {})
-const LOC_RE = /(?:at\s+)?(?:\S*:\s*)?(\d+):(\d+)/g;
-```
-
-Funcții exportate:
-- `parseErrorLocation(message)` → `{ line, col } | null`
-- `inferSpanLength(message, lineText, col)` → număr de `^`
-  - `got ID=foo` / `got SYM==` → lungimea valorii după `=`
-  - `'token'` între ghilimele în mesaj → `token.length`
-  - pe linia sursă la `col` (1-based): token `\S+` sau `1` dacă e spațiu/EOL
-- `buildCaretLine(col, spanLen)` → `' '.repeat(col-1) + '^'.repeat(spanLen)`
-- `formatErrorSnippet(source, line, col, spanLen)` → `{ sourceLine, caretLine }`
-
-Refactor minor: [`formatAsmError`](v0_3_2/core/asm-assembler.js) să apeleze `buildCaretLine(col, 3)` sau `inferSpanLength` — un singur algoritm.
-
-### 1.2 Sursa pentru linia afișată
-
-În `run()` se folosește deja:
-
-```212:214:v0_3_2/ui/app.js
-  const processedCode = preprocessRepeat(code.value);
-  const _registry = ...
-  const p = new Parser(new Tokenizer(processedCode), _registry);
-```
-
-**Snippet-ul din Output trebuie luat din `processedCode`**, nu din editor — altfel caret-ul nu se aliniază.
-
-**Limitare de documentat:** dacă `repeat` expandează blocuri, numărul liniei din eroare poate să nu coincidă cu editorul; snippet-ul rămâne corect pentru codul efectiv parsat.
+| Fișier | Rol |
+|--------|-----|
+| [`v0_3_2/core/error-format.js`](v0_3_2/core/error-format.js) | Utilitar central: locație, span, caret, `resolveErrorDisplay`, `alignErrorDisplayToSource`, `scriptError` |
+| [`v0_3_2/core/asm-assembler.js`](v0_3_2/core/asm-assembler.js) | `formatAsmError` → `buildCaretLine` / utilitar comun |
+| [`v0_3_2/core/parser.js`](v0_3_2/core/parser.js) | `tokenStartCol()`; `var()` salvează `stmtLine`/`stmtCol` la începutul statement-ului; declarații cu `line`/`col` |
+| [`v0_3_2/core/interpreter.js`](v0_3_2/core/interpreter.js) | `_throwRuntime` / `reportRuntimeError` + `scriptLoc`; `lastReportedError` pentru re-render |
+| [`v0_3_2/ui/app.js`](v0_3_2/ui/app.js) | `appendErrorOutput`, `finalizeErrorDisplay`, `highlightEditorError`, `clearErrorMarkers`, `getEditorSource`, wire în `run`/`sendCmd`/`onRuntimeError` |
+| [`v0_3_2/ui/script_editor_v0_3_2.html`](v0_3_2/ui/script_editor_v0_3_2.html) | `<div id="out" class="output-panel">`, CSS output + editor errors, script `error-format.js` |
+| [`v0_3_2/test_suite.js`](v0_3_2/test_suite.js) | `buildErrorPresentation`, `assertErrorDisplay`, teste 1388–1395 |
 
 ---
 
-## Partea 2 — Output panel (cerința ta)
+## `error-format.js` — API principal
 
-### 2.1 HTML/CSS — [`script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html)
+### Locație
 
-Înlocuire:
-```html
-<pre id="out"></pre>
-```
-cu:
+- `parseErrorLocation(message)` — ultima apariție `line:col` din mesaj (regex)
+- `err.scriptLoc` — preferat față de regex când există (`{ line, col, len? }`)
+- `scriptError(message, line, col, len)` — factory pentru erori cu locație
+
+### Span și caret
+
+- `inferSpanLength(message, lineText, col)` — din mesaj (`got ID=…`, token între `'…'`) sau token de pe linie
+- `buildCaretLine(col, spanLen)` — spații + `^`×N
+- `snapCaretToToken(message, sourceLine, reportedCol, spanLen)` — tokenizer col adesea **end-exclusive**; detectează start / mijloc / end of token
+- `findTokenSpanOnLine(lineText, tokenText, reportedCol)` — candidați pe linie, alege după proximitate față de col raportat
+
+### Cazuri speciale
+
+| Caz | Tratament |
+|-----|-----------|
+| Bit mismatch (`Expected N bits, got M`) | `findWireAssignNearLine` + `findAssignRhsSpan` pe RHS; **ignoră** `scriptLoc.len` când egal cu `got` bit count (era confuzie 12 biți vs span caret) |
+| Token din mesaj (`'aaaaasd'`, `Undefined foo`) | `parseErrorAnchor` + `findSymbolInSource` |
+| ASM embedded `\n` + caret | `splitEmbeddedErrorMessage` — normalizează la același format DOM |
+| Editor ≠ processed (linie goală leading) | `alignErrorDisplayToSource` — `lineNumberForText` după conținut linie |
+| Token lipsă / spațiu | `isMissingTokenError` → coloană 1-char roz + token anterior context |
+
+### Export
+
+`resolveErrorDisplay(err, processedSource, context?)` → `{ message, loc, sourceLine, caretLine, spanLen, isMissing }`
+
+---
+
+## UI — Output panel
+
+### HTML/CSS
+
 ```html
 <div id="out" class="output-panel"></div>
 ```
 
-CSS nou (păstrează aspectul actual):
 ```css
-.output-panel {
-  background: #000;
-  padding: 10px;
-  max-height: 260px;
-  overflow: auto;
-  font-family: monospace;
-  font-size: inherit;
-}
-.output-line { white-space: pre; min-height: 1em; }
-.output-line--error { color: #f55; }
+.output-line--error  { color: #f55; }
 .output-line--source { color: #ccc; }
-.output-line--caret { color: #f55; }
+.output-line--caret  { color: #f55; }
 ```
 
-### 2.2 Refactor `render()` — [`v0_3_2/ui/app.js`](v0_3_2/ui/app.js)
+### `appendErrorOutput(err, processedSource)`
 
-- `render(lines)` construiește DOM: fiecare string → `<div class="output-line">` (escape HTML).
-- `renderError(err, processedSource)` (nou):
-  1. Prima linie: `Error: ` + mesaj (clasă `--error`) — **text neschimbat**
-  2. Dacă `parseErrorLocation` reușește: două rânduri `--source` + `--caret`
-  3. Dacă mesajul ASM conține deja `\n` + caret (legacy), normalizăm la același format DOM
+1. `resolveErrorDisplay(err, processed)`
+2. `finalizeErrorDisplay` → aliniere la `getEditorSource()`
+3. Trei rânduri DOM: mesaj, sursă, caret
+4. `applyErrorEditorHighlight(display)`
 
-Apeluri de actualizat:
-- `catch` din `run()` / `sendCmd()` — pasează `processedCode` (salvat în variabilă în scope-ul `try`)
-- `reportRuntimeError` — callback `onRuntimeError(err, out, meta)` sau apel `highlightEditorError` din `app.js` (UI rămâne în app, nu în core)
+### `render(out)` + `lastReportedError`
 
-### 2.3 Exemplu vizual țintă
-
-```
-Error: Syntax error at : 35:5, expected ..., got ID=222     ← roșu
-5wire e = AND(OR(1,  222 ))                                 ← gri
-                                   ^^^                       ← roșu
-```
-
-Pentru spațiu/lipsă token (ex. virgulă lipsă la col 18):
-```
-Error: ... at 35:18 ...
-5wire e = AND(OR(1, 222))
-                 ^
-```
-(un singur `^` când `spanLen === 1` la poziție fără token)
+După `showVars()` / re-render output, eroarea nu se pierde: dacă `globalInterp.lastReportedError` există, se reapelează `appendErrorOutput` cu sursa procesată.
 
 ---
 
-## Partea 3 — Editor CodeMirror
+## UI — Editor CodeMirror
 
-Fișier nou sau secțiune în [`v0_3_2/ui/app.js`](v0_3_2/ui/app.js): `error-markers.js` (logică mică).
+### `highlightEditorError(line, col, spanLen, lineText, isMissing)`
 
-### 3.1 La eroare (după `run` catch / `onRuntimeError`)
+- Gutter: `cm-error-linenumber` (roșu, bold)
+- Token valid: `cm-error-token` (underline + fundal roșu translucid)
+- Lipsă: `cm-error-missing-col` + opțional `cm-error-context-token` pe tokenul anterior
+
+### Curățare markere
+
+| Moment | Motiv |
+|--------|-------|
+| Început `run()` | Run reușit după eroare — fără highlight vechi |
+| `cmEditor.on('change')` | Editare după eroare — markere înșelătoare |
+| Înainte de markere noi | `clearErrorMarkers()` în `highlightEditorError` |
+
+`clearErrorMarkers()` este separat de golirea `#out` — straturi UI diferite.
+
+---
+
+## Parser / interpreter — `scriptLoc`
+
+### Parser (`var()` și declarații)
+
+- La începutul statement-ului: `stmtLine = this.c.line`, `stmtCol = tokenStartCol(this.c)`
+- Erorile de assign folosesc poziția statement-ului, nu poziția după expresie (fix: eroare pe linia următoare)
+
+### Interpreter
+
+- `_throwRuntime(msg, scriptLoc?)` atașează `err.scriptLoc`
+- `reportRuntimeError` salvează în `lastReportedError`
+
+---
+
+## Exemplu vizual țintă
+
+```
+Error: Expected 8 bits, got 12 bits.
+8wire value = 11111100 + ^F
+              ^^^^^^^^^^^^^
+```
+
+Editor: linia wire, underline pe `11111100 + ^F`, gutter roșu.
+
+Parse invalid token:
+
+```
+Error: Invalid statement starting with 'aaaaasd' (ID) at : 1:8
+aaaaasd
+^^^^^^^
+```
+
+---
+
+## Teste — grup `error-display` (1388–1395)
+
+**Convenție:** titluri test, etichete `h.assert` și mesaje așteptate — **doar engleză**.
+
+### Helperi (`test_suite.js`)
 
 ```javascript
-function highlightEditorError(line, col, spanLen, lineText, isMissing) {
-  clearErrorMarkers();
-  const l = line - 1, ch = col - 1;
-  cmEditor.addLineClass(l, 'gutter', 'cm-error-linenumber');
-  if (isMissing) {
-    // coloană 1-char (chiar spațiu)
-    cmEditor.markText({line:l, ch}, {line:l, ch:ch+1}, {className: 'cm-error-missing-col'});
-    // token anterior pentru context
-    const prev = findPrevTokenRange(lineText, col);
-    if (prev) cmEditor.markText(prev.from, prev.to, {className: 'cm-error-context-token'});
-  } else {
-    cmEditor.markText({line:l, ch}, {line:l, ch:ch+spanLen}, {className: 'cm-error-token'});
-  }
-  cmEditor.scrollIntoView({line:l, ch}, 100);
-}
+buildErrorPresentation(err, runSource, editorSource)
+// → { display, editor: { line, col, spanLen }, outputLines }
+
+assertErrorDisplay(h, session, {
+  name: 'wave propagation',   // prefix: "wave propagation: message"
+  source: '...',
+  editorSource: '...',          // optional — align test
+  action: 'run' | 'parse',
+  expect: { message, line, col, spanLen, sourceLine, caretLine, scriptLocLine?, outputLines? }
+})
 ```
 
-`isMissing` heuristici: mesaj conține `expected` + (`got EOF` / lipsește `got TYPE=`), sau la `col` nu există token `\S+`.
+### Teste
 
-### 3.2 CSS editor — [`script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html)
+| ID | Titlu | Ce verifică |
+|----|-------|-------------|
+| 1388 | bit mismatch - wire + hex RHS (wave) | mesaj, caret RHS 13 chars, wave propagation |
+| 1389 | bit mismatch - wire + hex RHS (legacy) | idem, legacy propagation |
+| 1390 | invalid statement - token caret snap | `aaaaasd` — caret sub token, nu la EOL |
+| 1391 | strict assign - short literal | `3wire q = 1` |
+| 1392 | strict assign - binary literal too long | `4wire q = 11111` |
+| 1393 | editor align - leading blank line | editor cu `\n` înainte — linia editor corectă |
+| 1394 | multiline script - bit mismatch on wire line | script CLCD + wire — linia 8 |
+| 1395 | scriptError - hook and output bundle | `scriptError()` direct, hook line/col, 3 output lines |
 
-```css
-.CodeMirror .cm-error-linenumber { color: #f55 !important; font-weight: bold; }
-.CodeMirror .cm-error-token {
-  background: rgba(255, 60, 60, 0.25);
-  border-bottom: 2px solid #f55;
-}
-.CodeMirror .cm-error-missing-col {
-  background: rgba(255, 120, 150, 0.45);
-  outline: 1px solid #f88;
-}
-.CodeMirror .cm-error-context-token {
-  background: rgba(255, 160, 180, 0.2);
-}
-```
+Rulare: `node _run_suite_node.js` — **838/838** pass.
 
-### 3.3 Curățare markere — de ce e separat de golirea Output-ului
-
-`run()` golește doar **panoul Output** (`#out`). Markerele din **editor** (CodeMirror `markText`, `addLineClass` pe gutter) sunt un strat UI complet diferit — nu sunt copii ale textului din Output și **nu se șterg** când golim `#out`.
-
-| Acțiune | Ce curăță |
-|---------|-----------|
-| `out.textContent = ''` / `render([])` | Textul din panoul de jos |
-| `clearErrorMarkers()` | Underline roșu, număr linie roșu, markText în CodeMirror |
-
-**De ce la începutul `run()`:** scenariul „Run cu eroare → corectez codul → Run cu succes”. Fără `clearErrorMarkers()`, highlight-ul roșu din editor rămâne vizibil chiar dacă Output-ul arată doar rezultatul OK.
-
-**De ce la `cmEditor.on('change')`:** utilizatorul editează după eroare — markerele vechi devin înșelătoare înainte de următorul Run.
-
-**Notă:** `highlightEditorError` apelează deja `clearErrorMarkers()` înainte de markere noi; apelul de la începutul `run()` e pentru cazul **fără** eroare nouă (run reușit) și pentru a curăța markerele **înainte** de execuție.
-
-### 3.4 Notă despre mapare editor ↔ processedCode
-
-Highlight în editor folosește **aceeași linie:col** (best-effort). Funcționează corect când `preprocessRepeat` nu schimbă numărul de linii (cazul obișnuit fără `repeat` masiv). Pentru scripturi cu `repeat`, snippet-ul din Output e sursa de adevăr; editorul poate evidenția linia greșită — acceptabil ca fază 1, mapare inversă = fază viitoare.
+Manifest: `node _gen_manifest.js` → grup `error-display`, range `1388–1395`.
 
 ---
 
-## Partea 4 — Îmbunătățire opțională (fază 2, nu obligatorie acum)
+## Limitări cunoscute
 
-Pentru span și `isMissing` mai precise, fără a schimba mesajele:
-
-- La throw în parser/tokenizer, atașare opțională pe `Error`:
-  ```javascript
-  const e = new Error(`Syntax error at ...`);
-  e.scriptLoc = { line: this.c.line, col: this.c.col, len: this.c.value?.length ?? 0 };
-  throw e;
-  ```
-- `renderError` preferă `err.scriptLoc` față de regex.
-
-Modificări punctuale în [`parser.js`](v0_3_2/core/parser.js) / [`tokenizer.js`](v0_3_2/core/tokenizer.js) — doar în `eat()` și locurile frecvente, nu toate sutele de throw-uri dintr-o dată.
+1. **`repeat` masiv** — numărul liniei din editor poate să nu coincidă cu processed; snippet Output rămâne corect pentru codul parsat.
+2. **`scriptLoc.len`** — uneori bit count, nu span caret; ignorat la bit-mismatch când `len === got`.
+3. **Duplicare logică** — `buildErrorPresentation` în teste mirror-uiește fluxul din `app.js` (opțional: extract modul comun).
+4. **Fază viitoare** — `scriptLoc` pe mai multe throw-uri parser/tokenizer pentru acuratețe maximă.
 
 ---
 
-## Fișiere atinse (rezumat)
+## Verificare manuală
 
-| Fișier | Schimbare |
-|--------|-----------|
-| [`v0_3_2/core/error-format.js`](v0_3_2/core/error-format.js) | **nou** — parse locație, caret, snippet |
-| [`v0_3_2/core/asm-assembler.js`](v0_3_2/core/asm-assembler.js) | refactor `formatAsmError` → utilitar comun |
-| [`v0_3_2/ui/app.js`](v0_3_2/ui/app.js) | `render` DOM, `renderError`, `highlightEditorError`, wire în `run` |
-| [`v0_3_2/script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html) | `<div#out>`, CSS output + editor errors |
-| [`v0_3_2/core/interpreter.js`](v0_3_2/core/interpreter.js) | minimal: callback extins (opțional) |
-
----
-
-## Testare
-
-- Eroare sintaxă cu token invalid (`222`) → 3 caret-uri, underline 3 chars în editor
-- Eroare la spațiu / token lipsă → 1 caret, coloană roz în editor
-- Eroare runtime cu `at 12:3` (wire duplicate) → snippet + gutter
-- Eroare ASM existentă → același aspect, caret dinamic dacă refactorizăm `formatAsmError`
-- Run reușit → markere editor șterse, output normal fără stil error
-- [`test_suite.js`](v0_3_2/test_suite.js): assert pe `out.find(l => l.startsWith('Error:'))` — adaptare dacă Output nu mai e textContent direct (citire `.textContent` pe `#out` sau helper `getOutputText()`)
+- [ ] Eroare sintaxă token invalid → caret sub token, underline în editor
+- [ ] Eroare la spațiu / virgulă lipsă → 1 caret, coloană roz
+- [ ] `8wire value = 11111100 + ^F` → linia corectă, caret pe RHS
+- [ ] Run reușit după eroare → markere șterse
+- [ ] `showVars()` după eroare runtime → output păstrează snippet + caret
+- [ ] Eroare ASM → același format DOM (caret din `formatAsmError`)
 
 ---
 
-## Ordine implementare recomandată
+## Ordine implementare (istoric)
 
-1. `error-format.js` + teste unitare mici pe parse/caret
-2. Output panel (`div` + `renderError`) — valoare imediată
+1. `error-format.js` + refactor ASM
+2. Output panel DOM + `appendErrorOutput`
 3. Editor markers + CSS
-4. (Opțional) `err.scriptLoc` în parser pentru cazuri ambigue
+4. `scriptLoc` parser/interpreter + fix caret alignment
+5. `lastReportedError` + `alignErrorDisplayToSource`
+6. Grup test `error-display` + manifest + engleză titluri/etichete
