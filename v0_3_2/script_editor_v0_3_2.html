@@ -28,6 +28,30 @@ textarea {
 .CodeMirror-cursor { border-left: 2px solid #0f0; }
 .CodeMirror-linenumbers { background: #111; }
 .CodeMirror-linenumber { color: #555; }
+.CodeMirror-linenumber.cm-error-linenumber { color: #f55 !important; font-weight: bold; }
+.CodeMirror .cm-error-token {
+  background: rgba(255, 60, 60, 0.25);
+  border-bottom: 2px solid #f55;
+}
+.CodeMirror .cm-error-missing-col {
+  background: rgba(255, 120, 150, 0.45);
+  outline: 1px solid #f88;
+}
+.CodeMirror .cm-error-context-token {
+  background: rgba(255, 160, 180, 0.2);
+}
+.output-panel {
+  background: #000;
+  padding: 10px;
+  max-height: 260px;
+  overflow: auto;
+  font-family: monospace;
+  font-size: inherit;
+}
+.output-line { white-space: pre; min-height: 1em; }
+.output-line--error { color: #f55; }
+.output-line--source { color: #ccc; }
+.output-line--caret { color: #f55; }
 .CodeMirror-focused .CodeMirror-selected { background: rgba(0, 255, 0, 0.2); }
 .CodeMirror-selected { background: rgba(0, 255, 0, 0.12); }
 /* LogTScript syntax colors */
@@ -2256,7 +2280,7 @@ show(a,b,c)
     </div>
     <div class="panel" id="outputPanel" style="flex:1; min-height:100px;">
       <h3>Output</h3>
-      <pre id="out"></pre>
+      <div id="out" class="output-panel"></div>
     </div>
   </div>
 
@@ -2342,6 +2366,7 @@ show(a,b,c)
 <script src="core/components/pcb-component.js"></script>
 <script src="core/components/index.js"></script>
 
+<script src="core/error-format.js"></script>
 <script src="core/asm-assembler.js"></script>
 <script src="core/protocol-assembler.js"></script>
 <script src="core/lut-labels.js"></script>

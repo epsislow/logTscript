@@ -2357,7 +2357,14 @@ class Interpreter {
         }
       } else {
         const varInfo = this.vars.get(a.var);
-        if(!varInfo) throw Error('Undefined '+a.var);
+        if(!varInfo) {
+          if (a.line && a.col) {
+            const e = new Error(`Undefined ${a.var} at ${a.line}:${a.col}`);
+            e.scriptLoc = { line: a.line, col: a.col, len: a.var.length };
+            throw e;
+          }
+          throw Error('Undefined '+a.var);
+        }
         val = varInfo.value;
         ref = varInfo.ref;
         type = varInfo.type;
@@ -3038,7 +3045,12 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (!funcs.has(name)) {
-    throw Error(`Function ${name} is not local; use ${name}@alias(...)`);
+    const EF = typeof LogTScriptErrorFormat !== 'undefined' ? LogTScriptErrorFormat : null;
+    const msg = `Function ${name} is not local; use ${name}@alias(...)`;
+    if (EF && fn.line != null && fn.col != null) {
+      throw EF.scriptError(msg, fn.line, fn.col, name.length);
+    }
+    throw Error(msg);
   }
 
   const f = funcs.get(name);

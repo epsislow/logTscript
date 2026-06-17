@@ -26,7 +26,10 @@ function segmentWidth(seg) {
 }
 
 function formatAsmError(lineText, col, message) {
-  const pointer = ' '.repeat(Math.max(0, col)) + '^^^';
+  const spanLen = Math.max(1, (lineText && col >= 0)
+    ? inferSpanLength(message, lineText, col + 1)
+    : 3);
+  const pointer = buildCaretLine(col + 1, spanLen);
   return `${message}\n${lineText}\n${pointer}`;
 }
 

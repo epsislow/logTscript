@@ -3,6 +3,112 @@
 let prog=null, pc=0;
 let globalInterp = null;
 let timelineAnalyzer = null;
+let lastProcessedSource = '';
+let errorMarks = [];
+let errorGutterMarker = null;
+
+function clearErrorMarkers() {
+  if (!cmEditor) return;
+  for (const m of errorMarks) m.clear();
+  errorMarks = [];
+  if (errorGutterMarker != null) {
+    cmEditor.setGutterMarker(errorGutterMarker.line, 'CodeMirror-linenumbers', null);
+    errorGutterMarker = null;
+  }
+}
+
+function makeErrorLineNumberGutter(lineNum) {
+  const el = document.createElement('div');
+  el.className = 'CodeMirror-linenumber cm-error-linenumber';
+  el.textContent = String(lineNum);
+  return el;
+}
+
+function highlightEditorError(line, col, spanLen, lineText, isMissing) {
+  if (!cmEditor || !line || !col) return;
+  clearErrorMarkers();
+  const l = line - 1;
+  const ch = col - 1;
+  const cmLine = cmEditor.getLine(l) || lineText || '';
+  cmEditor.setGutterMarker(l, 'CodeMirror-linenumbers', makeErrorLineNumberGutter(line));
+  errorGutterMarker = { line: l };
+
+  if (isMissing) {
+    const endCh = Math.min(ch + 1, cmLine.length);
+    errorMarks.push(cmEditor.markText(
+      { line: l, ch },
+      { line: l, ch: endCh },
+      { className: 'cm-error-missing-col' }
+    ));
+    const EF = window.LogTScriptErrorFormat;
+    const prev = EF ? EF.findPrevTokenRangeInLine(cmLine, col) : null;
+    if (prev) {
+      errorMarks.push(cmEditor.markText(
+        { line: l, ch: prev.from },
+        { line: l, ch: prev.to },
+        { className: 'cm-error-context-token' }
+      ));
+    }
+  } else {
+    const endCh = Math.min(ch + Math.max(1, spanLen || 1), cmLine.length);
+    errorMarks.push(cmEditor.markText(
+      { line: l, ch },
+      { line: l, ch: endCh },
+      { className: 'cm-error-token' }
+    ));
+  }
+  cmEditor.scrollIntoView({ line: l, ch }, 100);
+}
+
+function applyErrorEditorHighlight(err, processedSource) {
+  const EF = window.LogTScriptErrorFormat;
+  if (!EF) return;
+  const display = EF.resolveErrorDisplay(err, processedSource || lastProcessedSource);
+  if (!display.loc) return;
+  highlightEditorError(
+    display.loc.line,
+    display.loc.col,
+    display.spanLen,
+    display.sourceLine,
+    display.isMissing
+  );
+}
+
+function clearOutput() {
+  const el = document.getElementById('out');
+  if (el) el.innerHTML = '';
+}
+
+function appendOutputLine(text, className) {
+  const el = document.getElementById('out');
+  if (!el) return null;
+  const div = document.createElement('div');
+  div.className = 'output-line' + (className ? ' ' + className : '');
+  div.textContent = text;
+  el.appendChild(div);
+  return div;
+}
+
+function appendErrorOutput(err, processedSource) {
+  const EF = window.LogTScriptErrorFormat;
+  const rawMsg = (err && err.message) ? err.message : String(err);
+  const display = EF
+    ? EF.resolveErrorDisplay(err, processedSource || lastProcessedSource)
+    : { message: rawMsg, sourceLine: null, caretLine: null, loc: null };
+
+  appendOutputLine('Error: ' + display.message, 'output-line--error');
+  if (display.sourceLine != null && display.caretLine != null) {
+    appendOutputLine(display.sourceLine, 'output-line--source');
+    appendOutputLine(display.caretLine, 'output-line--caret');
+  }
+  applyErrorEditorHighlight(err, processedSource);
+}
+
+function getOutputLines() {
+  const el = document.getElementById('out');
+  if (!el) return [];
+  return Array.from(el.querySelectorAll('.output-line')).map((n) => n.textContent);
+}
 
 function watchLabelsFromExprs(exprs, wireWidths, compPropWidths) {
   const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
@@ -113,7 +219,15 @@ function updatePropagationToggleUI() {
 function bindInterpErrorHandler(interp) {
   if (!interp) return;
   interp.onRuntimeError = function(err, out) {
-    render(out);
+    clearOutput();
+    for (const line of (out || [])) {
+      if (!line.startsWith('Error:')) {
+        appendOutputLine(line);
+      }
+    }
+    if (err) {
+      appendErrorOutput(err, lastProcessedSource);
+    }
     if (typeof showVars === 'function') showVars();
   };
 }
@@ -168,6 +282,7 @@ async function init() {
   fShowTabs();
 
   cmEditor.on("change", function() {
+    clearErrorMarkers();
     if (!codeCheckDisabled) {
       onCodeChange();
     }
@@ -183,8 +298,11 @@ async function init() {
 }
 
 function run(){
+  let processedCode = '';
+  let runInterpAssigned = false;
   try{
-  document.getElementById('out').textContent='';
+  clearOutput();
+  clearErrorMarkers();
   
   const devicesContainer = document.getElementById('devices');
   if(devicesContainer){
@@ -209,7 +327,8 @@ function run(){
   tabSave();
   syncLegacyLastKeys();
   persistTabs();
-  const processedCode = preprocessRepeat(code.value);
+  processedCode = preprocessRepeat(code.value);
+  lastProcessedSource = processedCode;
   const _registry = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
   const p = new Parser(new Tokenizer(processedCode), _registry);
   const stmts = p.parse();
@@ -219,6 +338,7 @@ function run(){
 
   globalInterp = createInterpreter(p.funcs, p.pcbs, _registry, p.chips, p.boards, p.probes, p.watches);
   globalInterp.aliases = p.aliases;
+  runInterpAssigned = true;
   bindWatchRecorder(globalInterp);
 
   for (const s of stmts) {
@@ -243,10 +363,17 @@ function run(){
     markTabHasRun();
   }
   }catch(e){
-    if (globalInterp && typeof globalInterp.reportRuntimeError === 'function') {
+    if (!lastProcessedSource) {
+      try { lastProcessedSource = preprocessRepeat(code.value); } catch (_) { /* keep */ }
+    }
+    const src = processedCode || lastProcessedSource;
+    if (runInterpAssigned && globalInterp && typeof globalInterp.reportRuntimeError === 'function') {
       globalInterp.reportRuntimeError(e);
     } else {
-      render(['Error: ' + e.message]);
+      appendErrorOutput(e, src);
+      if (globalInterp) {
+        globalInterp.out = [];
+      }
     }
     if(globalInterp) showVars();
     if (typeof clearTabHasRun === 'function') {
@@ -261,10 +388,13 @@ function sendCmd(){
   
   if(!cmdText) return;
   
+  let cmdProcessed = '';
   try{
     if(!globalInterp){
+      const srcProcessed = preprocessRepeat(code.value);
+      lastProcessedSource = srcProcessed;
       const _reg = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
-      const p = new Parser(new Tokenizer(preprocessRepeat(code.value)), _reg);
+      const p = new Parser(new Tokenizer(srcProcessed), _reg);
       const stmts = p.parse();
       globalInterp = createInterpreter(p.funcs, p.pcbs, _reg, p.chips, p.boards, p.probes, p.watches);
       bindWatchRecorder(globalInterp);
@@ -282,7 +412,9 @@ function sendCmd(){
     }
     
     const _cmdReg = globalInterp.componentRegistry;
-    const p = new Parser(new Tokenizer(preprocessRepeat(cmdText)), _cmdReg);
+    cmdProcessed = preprocessRepeat(cmdText);
+    lastProcessedSource = cmdProcessed;
+    const p = new Parser(new Tokenizer(cmdProcessed), _cmdReg);
   const stmts = p.parse();
 
     for(const [name, fn] of p.funcs.entries()){
@@ -299,10 +431,14 @@ function sendCmd(){
     
     cmdInput.value = '';
   } catch(e){
+    if (!lastProcessedSource) {
+      try { lastProcessedSource = preprocessRepeat(cmdText); } catch (_) { /* keep */ }
+    }
     if (globalInterp && typeof globalInterp.reportRuntimeError === 'function') {
       globalInterp.reportRuntimeError(e);
     } else {
-      render([`Error: ${e.message}`]);
+      clearOutput();
+      appendErrorOutput(e, cmdProcessed || lastProcessedSource);
     }
     if(globalInterp) showVars();
   }
@@ -321,7 +457,15 @@ function sendCmd(){
 })();
 
 function render(lines){
-  document.getElementById('out').textContent=lines.join('\n');
+  clearOutput();
+  if (!lines || !lines.length) return;
+  for (const line of lines) {
+    if (line.startsWith('Error:')) {
+      appendErrorOutput({ message: line.slice(6).trimStart() }, lastProcessedSource);
+    } else {
+      appendOutputLine(line);
+    }
+  }
 }
 
 function serializeArray(arr) {
@@ -391,7 +535,7 @@ function showVars(){
     t += `Storage: ${globalInterp.storage.length} entries\n`;
   }
   document.getElementById('vars').textContent=t;
-  if (globalInterp && globalInterp.out) {
+  if (globalInterp && globalInterp.out && globalInterp.out.length) {
     render(globalInterp.out);
   }
 }
@@ -459,7 +603,8 @@ function doNext(count = 1) {
     if (globalInterp && typeof globalInterp.reportRuntimeError === 'function') {
       globalInterp.reportRuntimeError(e);
     } else {
-      render([`Error: ${e.message}`]);
+      clearOutput();
+      appendErrorOutput(e, lastProcessedSource);
     }
   }
   showVars();

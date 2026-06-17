@@ -45,6 +45,7 @@ const files = [
   'devices/queue-storage.js',
   'devices/lut-devices.js',
   'devices/terminal.js',
+  'core/error-format.js',
   'core/asm-assembler.js',
   'core/protocol-assembler.js',
   'core/lut-labels.js',

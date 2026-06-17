@@ -2509,11 +2509,12 @@ assignment() {
   }
 
   if (this.c.type === 'REG' || this.c.type === 'MUX' || this.c.type === 'DEMUX') {
+    const atomLine = this.c.line;
+    const atomCol = this.c.col;
     const n = this.c.value;
     this.eat(this.c.type);
     if (this.c.type === 'SYM' && this.c.value === '(') {
-      //console.log({name: n, alias: null });
-      return addNot(this.call({ name: n, alias: null }));
+      return addNot(this.call({ name: n, alias: null, line: atomLine, col: atomCol }));
     }
     throw Error(`${n} must be called as a function at ${this.c.line}:${this.c.col}`);
   }
@@ -2680,6 +2681,13 @@ assignment() {
   }
   
   if (this.c.type === 'ID') {
+    const atomLine = this.c.line;
+    const atomCol = this.c.col;
+    const withAtomLoc = (obj) => {
+      obj.line = atomLine;
+      obj.col = atomCol;
+      return obj;
+    };
     const name = this.parseBareNameRef();
 
     if (this.c.type === 'SYM' && this.c.value === '{') {
@@ -2700,11 +2708,11 @@ assignment() {
         throw Error(`Expected '(' after ${name}@${alias} at ${this.c.line}:${this.c.col}`);
       }
       
-      return addNot(this.call({ name, alias }));
+      return addNot(this.call({ name, alias, line: atomLine, col: atomCol }));
     }
     
     if (this.c.type === 'SYM' && this.c.value === '(') {
-      return addNot(this.call({ name, alias: null }));
+      return addNot(this.call({ name, alias: null, line: atomLine, col: atomCol }));
     }
     
     if (this.c.type === 'SYM' && this.c.value === '.') {
@@ -2739,11 +2747,11 @@ assignment() {
           throw Error(`Expected bit number or '(' after '-' at ${this.c.line}:${this.c.col}`);
         }
         if (!isDynamic) {
-          const idAtom1 = { var: name, bitRange: { start, end } };
+          const idAtom1 = withAtomLoc({ var: name, bitRange: { start, end } });
           if (this.c.type === 'SYM' && this.c.value === ';') idAtom1.pad = this.parsePadding();
           return addNot(idAtom1);
         }
-        const idAtom2 = { var: name, bitRange: { start, startExpr, end, endExpr, isDynamic } };
+        const idAtom2 = withAtomLoc({ var: name, bitRange: { start, startExpr, end, endExpr, isDynamic } });
         if (this.c.type === 'SYM' && this.c.value === ';') idAtom2.pad = this.parsePadding();
         return addNot(idAtom2);
       }
@@ -2764,26 +2772,26 @@ assignment() {
           throw Error(`Expected length or '(' after '/' at ${this.c.line}:${this.c.col}`);
         }
         if (!isDynamic) {
-          const idAtom3 = { var: name, bitRange: { start, end: start + len - 1 } };
+          const idAtom3 = withAtomLoc({ var: name, bitRange: { start, end: start + len - 1 } });
           if (this.c.type === 'SYM' && this.c.value === ';') idAtom3.pad = this.parsePadding();
           return addNot(idAtom3);
         }
-        const idAtom4 = { var: name, bitRange: { start, startExpr, len, lenExpr, isDynamic, isLength: true } };
+        const idAtom4 = withAtomLoc({ var: name, bitRange: { start, startExpr, len, lenExpr, isDynamic, isLength: true } });
         if (this.c.type === 'SYM' && this.c.value === ';') idAtom4.pad = this.parsePadding();
         return addNot(idAtom4);
       }
 
       if (!isDynamic) {
-        const idAtom5 = { var: name, bitRange: { start, end: start } };
+        const idAtom5 = withAtomLoc({ var: name, bitRange: { start, end: start } });
         if (this.c.type === 'SYM' && this.c.value === ';') idAtom5.pad = this.parsePadding();
         return addNot(idAtom5);
       }
-      const idAtom6 = { var: name, bitRange: { start, startExpr, isDynamic } };
+      const idAtom6 = withAtomLoc({ var: name, bitRange: { start, startExpr, isDynamic } });
       if (this.c.type === 'SYM' && this.c.value === ';') idAtom6.pad = this.parsePadding();
       return addNot(idAtom6);
     }
     
-    const idAtom0 = { var: name };
+    const idAtom0 = withAtomLoc({ var: name });
     if (this.c.type === 'SYM' && this.c.value === ';') idAtom0.pad = this.parsePadding();
     return addNot(idAtom0);
   }
@@ -2820,7 +2828,12 @@ isBuiltinFunction(name) {
 
   this.eat('SYM',')');
 
-  return { call: fn, args };
+  const atom = { call: fn, args };
+  if (fn.line != null && fn.col != null) {
+    atom.line = fn.line;
+    atom.col = fn.col;
+  }
+  return atom;
  }
 
   _syncTokenizerAt(pos) {
