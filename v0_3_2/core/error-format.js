@@ -37,6 +37,9 @@ const ERROR_ANCHOR_RULES = [
   [/^Property (\S+) cannot be used/, 1],
   [/^Unknown component (\S+)$/, 1],
   [/^Wire (\S+) not found/, 1],
+  [/^Invalid statement starting with '([^']+)'/, 1],
+  [/^Unexpected char '([^']*)'/, 1],
+  [/^Invalid numeric token '([^']*)'/, 1],
 ];
 
 function parseErrorLocation(message) {
@@ -104,6 +107,7 @@ function inferSpanLength(message, lineText, col) {
 
 function isMissingTokenError(message, lineText, col) {
   if (!message) return false;
+  if (/^Expected \d+ bits, got/.test(message)) return false;
   if (/expected\b/i.test(message) && (/got\s+EOF\b/i.test(message) || !/got\s+\w+=/.test(message))) {
     return true;
   }
@@ -144,6 +148,106 @@ function findPrevTokenRangeInLine(lineText, col) {
   let start = end;
   while (start >= 0 && /\S/.test(lineText[start])) start--;
   return { from: start + 1, to: end + 1 };
+}
+
+function extractQuotedToken(message) {
+  if (!message) return null;
+  const m = message.match(/'([^']*)'/);
+  return m ? m[1] : null;
+}
+
+/** Tokenizer col is often past the last char (end-exclusive). Snap to token span on line. */
+function findTokenSpanOnLine(lineText, tokenText, reportedCol) {
+  if (!lineText || !tokenText) return null;
+  const len = tokenText.length;
+  const candidates = [];
+  let idx = 0;
+  while (idx < lineText.length) {
+    const found = lineText.indexOf(tokenText, idx);
+    if (found < 0) break;
+    const before = found > 0 ? lineText[found - 1] : '';
+    const after = found + len < lineText.length ? lineText[found + len] : '';
+    if (!/[A-Za-z0-9_]/.test(before) && !/[A-Za-z0-9_]/.test(after)) {
+      const startCol = found + 1;
+      candidates.push({ col: startCol, len });
+    }
+    idx = found + 1;
+  }
+  if (!candidates.length) return null;
+
+  const endMatch = candidates.find((c) => reportedCol === c.col + c.len);
+  if (endMatch) return endMatch;
+
+  const insideMatch = candidates.find((c) => reportedCol >= c.col && reportedCol < c.col + c.len);
+  if (insideMatch) return insideMatch;
+
+  const startMatch = candidates.find((c) => reportedCol === c.col);
+  if (startMatch) return startMatch;
+
+  candidates.sort((a, b) => {
+    const da = Math.min(
+      Math.abs(reportedCol - a.col),
+      Math.abs(reportedCol - (a.col + a.len)),
+      Math.abs(reportedCol - (a.col + a.len - 1))
+    );
+    const db = Math.min(
+      Math.abs(reportedCol - b.col),
+      Math.abs(reportedCol - (b.col + b.len)),
+      Math.abs(reportedCol - (b.col + b.len - 1))
+    );
+    return da - db;
+  });
+  return candidates[0];
+}
+
+function snapColToNearbyToken(lineText, reportedCol) {
+  if (!lineText || reportedCol == null) return { col: reportedCol, len: 1 };
+  const idx = reportedCol - 1;
+  if (idx >= lineText.length || (idx >= 0 && /\s/.test(lineText[idx]))) {
+    const prev = findPrevTokenRangeInLine(lineText, reportedCol);
+    if (prev) return { col: prev.from + 1, len: prev.to - prev.from };
+    return { col: reportedCol, len: 1 };
+  }
+  let start = idx;
+  while (start > 0 && /\S/.test(lineText[start - 1])) start--;
+  const m = lineText.slice(start).match(/^\S+/);
+  const len = m ? m[0].length : 1;
+  return { col: start + 1, len };
+}
+
+function snapCaretToToken(message, sourceLine, reportedCol, spanLen) {
+  if (!sourceLine || reportedCol == null) {
+    return { col: reportedCol, spanLen: spanLen || 1 };
+  }
+
+  const quoted = extractQuotedToken(message);
+  if (quoted) {
+    const snapped = findTokenSpanOnLine(sourceLine, quoted, reportedCol);
+    if (snapped) return { col: snapped.col, spanLen: snapped.len };
+  }
+
+  const anchor = parseErrorAnchor(message);
+  if (anchor) {
+    const snapped = findTokenSpanOnLine(sourceLine, anchor.name, reportedCol);
+    if (snapped) return { col: snapped.col, spanLen: snapped.len };
+  }
+
+  const got = message && message.match(/got \w+=(\S+)/);
+  if (got) {
+    const snapped = findTokenSpanOnLine(sourceLine, got[1], reportedCol);
+    if (snapped) return { col: snapped.col, spanLen: snapped.len };
+  }
+
+  const nearby = snapColToNearbyToken(sourceLine, reportedCol);
+  if (spanLen != null && spanLen > 1) {
+    const snapped = findTokenSpanOnLine(
+      sourceLine,
+      sourceLine.slice(nearby.col - 1, nearby.col - 1 + spanLen),
+      reportedCol
+    );
+    if (snapped) return { col: snapped.col, spanLen: snapped.len };
+  }
+  return { col: nearby.col, spanLen: nearby.len };
 }
 
 function findSymbolOnLine(line, name) {
@@ -198,7 +302,144 @@ function scriptError(message, line, col, len) {
   return e;
 }
 
+function parseBitMismatchGot(message) {
+  if (!message) return null;
+  const m = message.match(/^Expected \d+ bits, got (\d+) bits?\.$/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function findBinaryLiteralAtLength(source, bitLen, hintLine) {
+  if (!source || !bitLen || bitLen < 1) return null;
+  const lines = source.split('\n');
+  const searchOne = (li) => {
+    const line = lines[li];
+    if (!line) return null;
+    const re = new RegExp(`[01]{${bitLen}}`, 'g');
+    let m;
+    while ((m = re.exec(line)) !== null) {
+      const before = m.index > 0 ? line[m.index - 1] : '';
+      const after = m.index + bitLen < line.length ? line[m.index + bitLen] : '';
+      if (!/[01]/.test(before) && !/[01]/.test(after)) {
+        return {
+          line: li + 1,
+          col: m.index + 1,
+          sourceLine: line,
+          len: bitLen
+        };
+      }
+    }
+    return null;
+  };
+  if (hintLine != null && hintLine >= 1 && hintLine <= lines.length) {
+    const onHint = searchOne(hintLine - 1);
+    if (onHint) return onHint;
+  }
+  for (let li = lines.length - 1; li >= 0; li--) {
+    const found = searchOne(li);
+    if (found) return found;
+  }
+  return null;
+}
+
+function findAssignRhsSpan(lineText) {
+  if (!lineText) return null;
+  const eq = lineText.indexOf('=');
+  if (eq < 0) return null;
+  let start = eq + 1;
+  while (start < lineText.length && /\s/.test(lineText[start])) start++;
+  let end = lineText.length;
+  while (end > start && /\s/.test(lineText[end - 1])) end--;
+  if (end <= start) return null;
+  return { col: start + 1, len: end - start };
+}
+
+function isWireDeclAssignLine(lineText) {
+  return /\d+\s*wire\b/i.test(lineText) && lineText.includes('=');
+}
+
+function findWireAssignNearLine(source, hintLine) {
+  if (!source || hintLine == null) return null;
+  const lines = source.split('\n');
+  const tryLine = (li) => {
+    if (li < 1 || li > lines.length) return null;
+    const sourceLine = lines[li - 1];
+    if (!isWireDeclAssignLine(sourceLine)) return null;
+    const span = findAssignRhsSpan(sourceLine);
+    if (!span) return null;
+    return { line: li, sourceLine, col: span.col, len: span.len };
+  };
+  if (hintLine >= 1 && hintLine <= lines.length && !isWireDeclAssignLine(lines[hintLine - 1])) {
+    for (let li = hintLine - 1; li >= 1; li--) {
+      const hit = tryLine(li);
+      if (hit) return hit;
+    }
+    for (let li = hintLine + 1; li <= lines.length; li++) {
+      const hit = tryLine(li);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  for (let d = 0; d < lines.length; d++) {
+    const candidates = d === 0 ? [hintLine] : [hintLine - d, hintLine + d];
+    for (const li of candidates) {
+      const hit = tryLine(li);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+function lineNumberForText(source, lineText, preferredLine) {
+  if (!source || lineText == null) return preferredLine;
+  const lines = source.split('\n');
+  const norm = (s) => String(s).trimEnd();
+  const want = norm(lineText);
+  if (preferredLine >= 1 && preferredLine <= lines.length && norm(lines[preferredLine - 1]) === want) {
+    return preferredLine;
+  }
+  for (let i = 0; i < lines.length; i++) {
+    if (norm(lines[i]) === want) return i + 1;
+  }
+  return preferredLine;
+}
+
+function alignErrorDisplayToSource(display, targetSource, runSource) {
+  if (!display || !targetSource || !display.sourceLine || !display.loc) return display;
+  const line = lineNumberForText(targetSource, display.sourceLine, display.loc.line);
+  const lines = targetSource.split('\n');
+  const sourceLine = lines[line - 1] != null ? lines[line - 1] : display.sourceLine;
+  let caretLine = display.caretLine;
+  if (display.loc.col != null && display.spanLen != null) {
+    caretLine = buildCaretLine(display.loc.col, display.spanLen);
+  }
+  return {
+    ...display,
+    loc: { line, col: display.loc.col },
+    sourceLine,
+    caretLine
+  };
+}
+
 function refineLocFromAnchor(message, processedSource, loc, scriptLocLen) {
+  const gotBits = parseBitMismatchGot(message);
+  if (gotBits && processedSource) {
+    const hintLine = loc ? loc.line : null;
+    const wireAssign = findWireAssignNearLine(processedSource, hintLine);
+    if (wireAssign) {
+      return {
+        loc: { line: wireAssign.line, col: wireAssign.col },
+        scriptLocLen: wireAssign.len
+      };
+    }
+    const lit = findBinaryLiteralAtLength(processedSource, gotBits, hintLine);
+    if (lit) {
+      return {
+        loc: { line: lit.line, col: lit.col },
+        scriptLocLen: lit.len
+      };
+    }
+  }
+
   const anchor = parseErrorAnchor(message);
   if (!anchor || !processedSource) return { loc, scriptLocLen };
 
@@ -219,6 +460,10 @@ function resolveErrorDisplay(err, processedSource, context) {
     ? { line: err.scriptLoc.line, col: err.scriptLoc.col }
     : parseErrorLocation(message);
   let scriptLocLen = (err && err.scriptLoc && err.scriptLoc.len != null) ? err.scriptLoc.len : null;
+  const bitMismatchGot = parseBitMismatchGot(message);
+  if (bitMismatchGot != null && scriptLocLen === bitMismatchGot) {
+    scriptLocLen = null;
+  }
 
   if (!loc && context && context.stmtLine) {
     loc = { line: context.stmtLine, col: context.stmtCol || 1 };
@@ -230,6 +475,8 @@ function resolveErrorDisplay(err, processedSource, context) {
     loc = refined.loc || loc;
     if (refined.scriptLocLen != null) scriptLocLen = refined.scriptLocLen;
   }
+
+  const bitMismatchRhs = bitMismatchGot != null && scriptLocLen != null && loc != null;
 
   if (embedded) {
     const spanLen = (embedded.caretLine.match(/\^/g) || []).length || 1;
@@ -243,16 +490,23 @@ function resolveErrorDisplay(err, processedSource, context) {
     };
   }
 
-  if (!loc || !processedSource) {
+  if (!loc || processedSource == null || processedSource === '') {
     return { message, loc: null, sourceLine: null, caretLine: null, spanLen: 1, isMissing: false };
   }
 
   const { sourceLine } = formatErrorSnippet(processedSource, loc.line, loc.col, null);
-  const spanLen = scriptLocLen != null
+  let spanLen = scriptLocLen != null
     ? Math.max(1, scriptLocLen)
     : inferSpanLength(message, sourceLine, loc.col);
-  const caretLine = buildCaretLine(loc.col, spanLen);
-  const isMissing = isMissingTokenError(message, sourceLine, loc.col);
+  let caretCol = loc.col;
+  if (!bitMismatchRhs) {
+    const snapped = snapCaretToToken(message, sourceLine, loc.col, spanLen);
+    caretCol = snapped.col;
+    spanLen = snapped.spanLen;
+  }
+  if (loc) loc = { line: loc.line, col: caretCol };
+  const caretLine = buildCaretLine(caretCol, spanLen);
+  const isMissing = isMissingTokenError(message, sourceLine, caretCol);
   return { message, loc, sourceLine, caretLine, spanLen, isMissing };
 }
 
@@ -265,9 +519,17 @@ window.LogTScriptErrorFormat = {
   formatErrorSnippet,
   splitEmbeddedErrorMessage,
   findPrevTokenRangeInLine,
+  parseBitMismatchGot,
+  findBinaryLiteralAtLength,
+  findWireAssignNearLine,
+  findAssignRhsSpan,
+  lineNumberForText,
+  alignErrorDisplayToSource,
   parseUndefinedSymbol,
   parseFunctionNameFromError,
   findSymbolInSource,
+  snapCaretToToken,
+  findTokenSpanOnLine,
   scriptError,
   resolveErrorDisplay
 };

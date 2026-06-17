@@ -62,10 +62,15 @@ function applyWirePadding(value, bits, assignPad) {
 }
 
 /** Fit raw expression bits to wire width; strict checks full length before any truncation. */
-function fitWireAssignBits(value, bits, assignPad, truncSide) {
+function fitWireAssignBits(value, bits, assignPad, truncSide, interp) {
   const v = value == null ? '' : String(value);
   if (assignPad === 'strict') {
-    if (v.length !== bits) throw Error(wireBitsMismatchError(bits, v.length));
+    if (v.length !== bits) {
+      if (interp && typeof interp._throwRuntime === 'function') {
+        interp._throwRuntime(wireBitsMismatchError(bits, v.length), interp.currentStmt, v.length);
+      }
+      throw Error(wireBitsMismatchError(bits, v.length));
+    }
     return v;
   }
   if (v.length < bits) return padWireBits(v, bits, assignPad);
@@ -108,7 +113,11 @@ function enforceStrictWireDeclTotal(interp, decls, totalValue, assignPad) {
   if (assignPad !== 'strict') return;
   const expectedTotal = expectedWireDeclBitTotal(interp, decls);
   if (expectedTotal > 0 && totalValue.length !== expectedTotal) {
-    throw Error(wireBitsMismatchError(expectedTotal, totalValue.length));
+    interp._throwRuntime(
+      wireBitsMismatchError(expectedTotal, totalValue.length),
+      interp.currentStmt,
+      totalValue.length
+    );
   }
 }
 
@@ -334,7 +343,7 @@ class Interpreter {
             }
           }
           const assignPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'strict';
-          wireValue = fitWireAssignBits(wireValue, bits, assignPad, 'msb');
+          wireValue = fitWireAssignBits(wireValue, bits, assignPad, 'msb', this);
           const refMatch = wire.ref.match(/^&(\d+)/);
           if (refMatch) {
             const storageIdx = parseInt(refMatch[1], 10);
@@ -380,7 +389,7 @@ class Interpreter {
               }
             }
             const assignPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'strict';
-            wireValue = fitWireAssignBits(wireValue, bits, assignPad, 'msb');
+            wireValue = fitWireAssignBits(wireValue, bits, assignPad, 'msb', this);
             if (wire.ref) {
               const old = this.getValueFromRef(wire.ref);
               if (old !== wireValue) {
@@ -1531,6 +1540,7 @@ class Interpreter {
         len: 1
       };
     }
+    this.lastReportedError = err;
     const line = 'Error: ' + msg;
     if (!this.out) this.out = [];
     this.out.push(line);
@@ -3842,7 +3852,7 @@ if (this.isBuiltinDEMUX(name)) {
               }
               
               const assignPad = stmtAssignPad(ws);
-              wireValue = fitWireAssignBits(wireValue, bits, assignPad, 'msb');
+              wireValue = fitWireAssignBits(wireValue, bits, assignPad, 'msb', this);
               
               // Reuse existing storage or create new one
               let storageIdx;
@@ -4574,7 +4584,7 @@ if (s.assignment) {
   if (isWire && !range) {
     if (wireAssignPad === 'strict') {
       if (rhs.length !== bitWidth) {
-        throw Error(wireBitsMismatchError(bitWidth, rhs.length));
+        this._throwRuntime(wireBitsMismatchError(bitWidth, rhs.length), s, rhs.length);
       }
     } else if (rhs.length < bitWidth) {
       rhs = padWireBits(rhs, bitWidth, wireAssignPad);
@@ -4943,7 +4953,7 @@ if (s.assignment) {
               throw Error(`Bit-width mismatch: ${d.name} is ${bits}bit but expression provides ${wireValue.length} bits`);
             }
             if (declAssignPad === 'strict') {
-              throw Error(wireBitsMismatchError(bits, wireValue.length));
+              this._throwRuntime(wireBitsMismatchError(bits, wireValue.length), s, wireValue.length);
             }
             if(wireValue.length < bits){
               wireValue = padWireBits(wireValue, bits, declAssignPad);
@@ -5098,7 +5108,7 @@ if (s.assignment) {
           }
         }
         const assignPad = stmtAssignPad(s);
-        const wireValue = fitWireAssignBits(totalValue, bits, assignPad, 'msb');
+        const wireValue = fitWireAssignBits(totalValue, bits, assignPad, 'msb', this);
         if (toPending) {
           outputs.push([wireName, wireValue]);
         } else {
@@ -5197,7 +5207,7 @@ if (s.assignment) {
       const valueBits = totalValue.substring(bitOffset, bitOffset + bits);
       let wireValue = declPad === 'strict'
         ? valueBits
-        : fitWireAssignBits(valueBits, bits, declPad, 'lsb');
+        : fitWireAssignBits(valueBits, bits, declPad, 'lsb', this);
       
       if (toPending) {
         outputs.push([d.name, wireValue || '0'.repeat(bits)]);

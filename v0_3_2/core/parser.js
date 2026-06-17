@@ -1,5 +1,12 @@
 /* ================= PARSER ================= */
 
+function tokenStartCol(tok) {
+  if (!tok || tok.col == null) return 1;
+  const v = tok.value;
+  const len = (typeof v === 'string') ? v.length : 0;
+  return Math.max(1, tok.col - len);
+}
+
 class Parser {
   constructor(t, componentRegistry){
     this.t=t; this.c=t.get(); this.funcs=new Map();
@@ -1102,8 +1109,12 @@ assignment() {
 
   var(){
   const decls = [];
+  const stmtLine = this.c.line;
+  const stmtCol = tokenStartCol(this.c);
 
   do {
+    const declLine = this.c.line;
+    const declCol = tokenStartCol(this.c);
     const type = this.c.value;
     this.eat('TYPE');
 
@@ -1115,7 +1126,7 @@ assignment() {
         throw Error(`Expected variable name at ${this.c.line}:${this.c.col}`);
     }
 
-    decls.push({ type, name });
+    decls.push({ type, name, line: declLine, col: declCol });
 
     if (this.c.value === ',') {
       this.eat('SYM', ',');
@@ -1137,8 +1148,8 @@ assignment() {
         decls,
         expr: this.expr(),
         assignPad: 'left',
-        line: this.c.line,
-        col: this.c.col
+        line: stmtLine,
+        col: stmtCol
       };
     } else if (this.c.value === '=:') {
       this.eat('SYM', '=:');
@@ -1146,8 +1157,8 @@ assignment() {
         decls,
         expr: this.expr(),
         assignPad: 'right',
-        line: this.c.line,
-        col: this.c.col
+        line: stmtLine,
+        col: stmtCol
       };
     } else if (this.c.value === '=') {
       this.eat('SYM', '=');
@@ -1155,8 +1166,8 @@ assignment() {
         decls,
         expr: this.expr(),
         assignPad: 'strict',
-        line: this.c.line,
-        col: this.c.col
+        line: stmtLine,
+        col: stmtCol
       };
     } else if (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
@@ -1165,15 +1176,15 @@ assignment() {
         decls,
         expr: null,
         initExpr,
-        line: this.c.line,
-        col: this.c.col
+        line: stmtLine,
+        col: stmtCol
       };
     } else {
       return {
         decls,
         expr: null,
-        line: this.c.line,
-        col: this.c.col
+        line: stmtLine,
+        col: stmtCol
       };
     }
   }

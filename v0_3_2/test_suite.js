@@ -225,6 +225,97 @@
     tests.push({ id, group, title, run, propagation: options.propagation || 'legacy' });
   }
 
+  /** Build the same presentation object the editor UI consumes (output + CodeMirror hook). */
+  function buildErrorPresentation(err, runSource, editorSource) {
+    const EF = typeof LogTScriptErrorFormat !== 'undefined' ? LogTScriptErrorFormat : null;
+    if (!EF) throw new Error('LogTScriptErrorFormat not loaded');
+    const processed = typeof preprocessRepeat === 'function' ? preprocessRepeat(runSource) : runSource;
+    let display = EF.resolveErrorDisplay(err, processed);
+    if (editorSource != null && EF.alignErrorDisplayToSource) {
+      display = EF.alignErrorDisplayToSource(display, editorSource, processed);
+    }
+    const editor = display.loc ? {
+      line: display.loc.line,
+      col: display.loc.col,
+      spanLen: display.spanLen != null ? display.spanLen : 1,
+      isMissing: !!display.isMissing
+    } : null;
+    const outputLines = ['Error: ' + display.message];
+    if (display.sourceLine != null && display.caretLine != null) {
+      outputLines.push(display.sourceLine);
+      outputLines.push(display.caretLine);
+    }
+    return { display, editor, outputLines };
+  }
+
+  /**
+   * Validate error message, caret output, and editor X/Y hook data.
+   * spec: { name?, source, editorSource?, action: 'run'|'parse', expect: { message, line, col, spanLen, sourceLine, caretLine, isMissing?, scriptLocLine?, outputLines? } }
+   */
+  function assertErrorDisplay(h, session, spec) {
+    const prefix = spec.name ? spec.name + ': ' : '';
+    const runSource = spec.source;
+    const editorSource = spec.editorSource != null ? spec.editorSource : runSource;
+    let err;
+    try {
+      if (spec.action === 'parse') session.parse(runSource);
+      else if (spec.action === 'run') session.run(runSource);
+      else if (typeof spec.throwFn === 'function') spec.throwFn(session);
+      else throw new Error('assertErrorDisplay: action must be run or parse');
+      h.fail(prefix + 'expected error');
+      return;
+    } catch (e) {
+      err = e;
+    }
+
+    const pres = buildErrorPresentation(err, runSource, editorSource);
+    const exp = spec.expect || {};
+    const d = pres.display;
+    const EF = LogTScriptErrorFormat;
+
+    if (exp.message != null) {
+      h.assert(prefix + 'message', err.message, exp.message);
+    }
+    if (exp.scriptLocLine != null) {
+      const sl = err.scriptLoc ? err.scriptLoc.line : null;
+      h.assert(prefix + 'scriptLoc.line', String(sl), String(exp.scriptLocLine));
+    }
+    if (!d.loc) {
+      h.fail(prefix + 'display.loc is null');
+      return;
+    }
+    if (exp.line != null) h.assert(prefix + 'editor line', String(d.loc.line), String(exp.line));
+    if (exp.col != null) h.assert(prefix + 'editor col', String(d.loc.col), String(exp.col));
+    if (exp.spanLen != null) h.assert(prefix + 'spanLen', String(d.spanLen), String(exp.spanLen));
+    if (exp.sourceLine != null) h.assert(prefix + 'sourceLine', d.sourceLine, exp.sourceLine);
+    if (exp.caretLine != null) h.assert(prefix + 'caretLine', d.caretLine, exp.caretLine);
+    if (exp.isMissing != null) {
+      h.assert(prefix + 'isMissing', String(!!d.isMissing), String(!!exp.isMissing));
+    }
+
+    if (d.caretLine && d.spanLen != null) {
+      const caretCount = (d.caretLine.match(/\^/g) || []).length;
+      h.assert(prefix + 'caret count', String(caretCount), String(d.spanLen));
+      if (EF && d.loc.col != null) {
+        h.assert(prefix + 'caret built', d.caretLine, EF.buildCaretLine(d.loc.col, d.spanLen));
+      }
+    }
+
+    if (pres.editor) {
+      h.assert(prefix + 'hook line', String(pres.editor.line), String(d.loc.line));
+      h.assert(prefix + 'hook col', String(pres.editor.col), String(d.loc.col));
+      h.assert(prefix + 'hook span', String(pres.editor.spanLen), String(d.spanLen));
+    }
+
+    if (exp.outputLines != null) {
+      h.assert(prefix + 'outputLines', pres.outputLines.join('\n'), exp.outputLines.join('\n'));
+    } else if (exp.message != null && exp.sourceLine != null && exp.caretLine != null) {
+      h.assert(prefix + 'output[0]', pres.outputLines[0], 'Error: ' + exp.message);
+      h.assert(prefix + 'output[1]', pres.outputLines[1], exp.sourceLine);
+      h.assert(prefix + 'output[2]', pres.outputLines[2], exp.caretLine);
+    }
+  }
+
   reg(6, 'repeat', 'Max 256 iterations (EXCEEDED)', function(h, session) {
     {
       h.assertThrows('16x17 = 272 throws error',
@@ -2057,20 +2148,20 @@ reg(300, 'doc', 'Tokenizer — doc is KEYWORD', function(h, session) {
 reg(301, 'doc', 'Parser — doc(OR) produces correct AST node', function(h, session) {
   const stmts = session.parse('doc(OR)');
   h.assert('1 statement', String(stmts.length), '1');
-  h.assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
-  h.assert('doc.name este OR', stmts[0].doc, 'OR');
+  h.assert('stmt has doc field', String(stmts[0].doc !== undefined), 'true');
+  h.assert('doc.name is OR', stmts[0].doc, 'OR');
 });
 
-reg(302, 'doc', 'Parser — doc(MUX) accepta token MUX', function(h, session) {
+reg(302, 'doc', 'Parser — doc(MUX) accepts MUX token', function(h, session) {
   const stmts = session.parse('doc(MUX)');
-  h.assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
-  h.assert('doc.name este MUX', stmts[0].doc, 'MUX');
+  h.assert('stmt has doc field', String(stmts[0].doc !== undefined), 'true');
+  h.assert('doc.name is MUX', stmts[0].doc, 'MUX');
 });
 
 reg(303, 'doc', 'Parser — doc(REG) produces correct AST node', function(h, session) {
   const stmts = session.parse('doc(REG)');
-  h.assert('stmt are camp doc', String(stmts[0].doc !== undefined), 'true');
-  h.assert('doc.name este REG', stmts[0].doc, 'REG');
+  h.assert('stmt has doc field', String(stmts[0].doc !== undefined), 'true');
+  h.assert('doc.name is REG', stmts[0].doc, 'REG');
 });
 
 reg(304, 'doc', 'BUILTIN_DOC — NOT', function(h, session) {
@@ -2078,9 +2169,9 @@ reg(304, 'doc', 'BUILTIN_DOC — NOT', function(h, session) {
   h.assert('NOT signature', lines[0], 'NOT(Xbit) -> Xbit');
 });
 
-reg(305, 'doc', 'BUILTIN_DOC — OR are 2 semnaturi', function(h, session) {
+reg(305, 'doc', 'BUILTIN_DOC — OR has 2 signatures', function(h, session) {
   const lines = Interpreter.getDocLines('OR', new Map());
-  h.assert('OR 2 semnaturi', String(lines.length), '2');
+  h.assert('OR 2 signatures', String(lines.length), '2');
   h.assert('OR signature 1', lines[0], 'OR(Xbit) -> 1bit');
   h.assert('OR signature 2', lines[1], 'OR(Xbit, Xbit) -> Xbit');
 });
@@ -2120,16 +2211,16 @@ reg(311, 'doc', 'BUILTIN_DOC — REG has single row', function(h, session) {
   h.assert('REG 1 row', String(lines.length), '1');
 });
 
-reg(312, 'doc', 'BUILTIN_DOC — LSHIFT are 2 semnaturi', function(h, session) {
+reg(312, 'doc', 'BUILTIN_DOC — LSHIFT has 2 signatures', function(h, session) {
   const lines = Interpreter.getDocLines('LSHIFT', new Map());
-  h.assert('LSHIFT 2 semnaturi', String(lines.length), '2');
+  h.assert('LSHIFT 2 signatures', String(lines.length), '2');
   h.assert('LSHIFT signature 1', lines[0], 'LSHIFT(Xbit data, Nbit n) -> Xbit');
   h.assert('LSHIFT signature 2', lines[1], 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit');
 });
 
-reg(313, 'doc', 'BUILTIN_DOC — RSHIFT are 2 semnaturi', function(h, session) {
+reg(313, 'doc', 'BUILTIN_DOC — RSHIFT has 2 signatures', function(h, session) {
   const lines = Interpreter.getDocLines('RSHIFT', new Map());
-  h.assert('RSHIFT 2 semnaturi', String(lines.length), '2');
+  h.assert('RSHIFT 2 signatures', String(lines.length), '2');
 });
 
 reg(314, 'doc', 'BUILTIN_DOC — LATCH', function(h, session) {
@@ -2212,10 +2303,10 @@ reg(326, 'doc', 'Interpreter end-to-end — doc(Unknown)', function(h, session) 
   h.assert('Unknown undefined', out[0], 'Unknown: undefined function');
 });
 
-reg(327, 'doc', 'Toate portile AND NAND NOR NXOR XOR', function(h, session) {
+reg(327, 'doc', 'All gates AND NAND NOR NXOR XOR', function(h, session) {
   for (const gate of ['AND', 'NAND', 'NOR', 'NXOR', 'XOR']) {
     const lines = Interpreter.getDocLines(gate, new Map());
-    h.assert(gate + ' are 2 semnaturi', String(lines.length), '2');
+    h.assert(gate + ' has 2 signatures', String(lines.length), '2');
     h.assert(gate + ' signature 1 bit', lines[0], gate + '(Xbit) -> 1bit');
     h.assert(gate + ' signature 2 bits', lines[1], gate + '(Xbit, Xbit) -> Xbit');
   }
@@ -2457,17 +2548,17 @@ reg(362, 'doc', 'isBuiltinFunction — new bit builtins recognized', function(h,
 
 reg(400, 'doc-comp', 'Parser — doc(comp) produces correct AST node', function(h, session) {
   const stmts = session.parse('doc(comp)');
-  h.assert('doc camp este comp', stmts[0].doc, 'comp');
+  h.assert('doc field is comp', stmts[0].doc, 'comp');
 });
 
 reg(401, 'doc-comp', 'Parser — doc(comp.adder) produces correct AST node', function(h, session) {
   const stmts = session.parse('doc(comp.adder)');
-  h.assert('doc camp este comp.adder', stmts[0].doc, 'comp.adder');
+  h.assert('doc field is comp.adder', stmts[0].doc, 'comp.adder');
 });
 
 reg(402, 'doc-comp', 'Parser — doc(pcb.bcd) produces correct AST node', function(h, session) {
   const stmts = session.parse('doc(pcb.bcd)');
-  h.assert('doc camp este pcb.bcd', stmts[0].doc, 'pcb.bcd');
+  h.assert('doc field is pcb.bcd', stmts[0].doc, 'pcb.bcd');
 });
 
 reg(403, 'doc-comp', 'doc(comp) contains comp.adder', function(h, session) {
@@ -3739,7 +3830,7 @@ show(q)`;
 function runRegNextLegacy(h, session) {
   const lines = debugOutLines(session.run(REG_WITH_NEXT).out);
   h.assert('2 show', String(lines.length === 2), 'true');
-  h.assert('primul q=0', String(/q \(1wire\) = 0/.test(lines[0])), 'true');
+  h.assert('first q=0', String(/q \(1wire\) = 0/.test(lines[0])), 'true');
   h.assert('after NEXT q=1', String(/q \(1wire\) = 1/.test(lines[1])), 'true');
 }
 
@@ -3763,8 +3854,8 @@ show(b)`;
 function runMultiShowLegacy(h, session) {
   const lines = debugOutLines(session.run(MULTI_SHOW).out);
   h.assert('2 show', String(lines.length === 2), 'true');
-  h.assert('primul b=1', String(/b \(1wire\) = 1/.test(lines[0])), 'true');
-  h.assert('al doilea b=0', String(/b \(1wire\) = 0/.test(lines[1])), 'true');
+  h.assert('first b=1', String(/b \(1wire\) = 1/.test(lines[0])), 'true');
+  h.assert('second b=0', String(/b \(1wire\) = 0/.test(lines[1])), 'true');
 }
 
 function runMultiShowWave(h, session) {
@@ -3794,7 +3885,7 @@ function runProbeInitThenChangedWave(h, session) {
   h.assert('wave without second initialised', String(!out.some(l => l.includes('# a = 1') && l.includes('initialised'))), 'true');
 }
 
-reg(814, 'debug', 'probe settle RUN — legacy o linie', runProbeInitThenChangedLegacy);
+reg(814, 'debug', 'probe settle RUN — legacy single line', runProbeInitThenChangedLegacy);
 reg(815, 'debug', 'probe settle RUN — wave initialised apoi changed', runProbeInitThenChangedWave, { propagation: 'wave' });
 
 const PROBE_REG_EDGE = `1wire data : 0
@@ -8542,7 +8633,7 @@ reg(1210, 'slider', 'orientation 1 vertical — parse', function(h, session) {
   h.assert('orientation 1', String(stmts[0].comp.attributes.orientation), '1');
 });
 
-reg(1211, 'slider', 'reversed — valori inversate, poziție fizică separată', function(h, session) {
+reg(1211, 'slider', 'reversed — inverted values, separate physical position', function(h, session) {
   const slider = session._ensureRegistry().get('slider');
   const C = slider.constructor;
   h.assert('ratio 0 normal → state 0', String(C.ratioToState(0, 3, false)), '0');
@@ -8557,7 +8648,7 @@ reg(1211, 'slider', 'reversed — valori inversate, poziție fizică separată',
   h.assert('reversed attr', String(stmts[0].comp.attributes.reversed === true), 'true');
 });
 
-reg(1212, 'slider', 'for labels — formatDisplay decimal sau etichetă', function(h, session) {
+reg(1212, 'slider', 'for labels — formatDisplay decimal or label', function(h, session) {
   const slider = session._ensureRegistry().get('slider');
   h.assert('decimal 5', slider.constructor.formatDisplay(5, {}), '5');
   h.assert('for label', slider.constructor.formatDisplay(2, {2: 'MID'}), 'MID');
@@ -8607,7 +8698,7 @@ reg(1215, 'slider', 'propagare legacy', function(h, session) {
   h.assert('legacy a=1001', session.getWire(interp, 'a'), '1001');
 });
 
-reg(1216, 'slider', 'show(.slider) — bin în output', function(h, session) {
+reg(1216, 'slider', 'show(.slider) — bin in output', function(h, session) {
   const { interp } = session.run(`comp [slider] .s:
   length: 4
   on: 1
@@ -9448,6 +9539,147 @@ reg(1387, 'clcd', 'known symbols count includes catalog', function(h, session) {
   h.assert('at least 500', String(known.length >= 500), 'true');
   h.assert('has wifi', String(known.includes('wifi')), 'true');
   h.assert('has digit7', String(known.includes('digit7')), 'true');
+});
+
+reg(1388, 'error-display', 'bit mismatch - wire + hex RHS (wave)', function(h, session) {
+  assertErrorDisplay(h, session, {
+    name: 'wave propagation',
+    source: '8wire value = 11111100 + ^F\n',
+    action: 'run',
+    expect: {
+      message: 'Expected 8 bits, got 12 bits.',
+      scriptLocLine: 1,
+      line: 1,
+      col: 15,
+      spanLen: 13,
+      sourceLine: '8wire value = 11111100 + ^F',
+      caretLine: '              ^^^^^^^^^^^^^'
+    }
+  });
+}, { propagation: 'wave' });
+
+reg(1389, 'error-display', 'bit mismatch - wire + hex RHS (legacy)', function(h, session) {
+  assertErrorDisplay(h, session, {
+    name: 'legacy propagation',
+    source: '8wire value = 11111100 + ^F\n',
+    action: 'run',
+    expect: {
+      message: 'Expected 8 bits, got 12 bits.',
+      scriptLocLine: 1,
+      line: 1,
+      col: 15,
+      spanLen: 13,
+      sourceLine: '8wire value = 11111100 + ^F',
+      caretLine: '              ^^^^^^^^^^^^^'
+    }
+  });
+}, { propagation: 'legacy' });
+
+reg(1390, 'error-display', 'invalid statement - token caret snap', function(h, session) {
+  assertErrorDisplay(h, session, {
+    name: 'invalid ID token',
+    source: 'aaaaasd',
+    action: 'parse',
+    expect: {
+      message: "Invalid statement starting with 'aaaaasd' (ID) at : 1:8",
+      line: 1,
+      col: 1,
+      spanLen: 7,
+      sourceLine: 'aaaaasd',
+      caretLine: '^^^^^^^'
+    }
+  });
+});
+
+reg(1391, 'error-display', 'strict assign - short literal', function(h, session) {
+  assertErrorDisplay(h, session, {
+    name: '3wire strict',
+    source: '3wire q = 1\n',
+    action: 'run',
+    expect: {
+      message: 'Expected 3 bits, got 1 bit.',
+      scriptLocLine: 1,
+      line: 1,
+      col: 11,
+      spanLen: 1,
+      sourceLine: '3wire q = 1',
+      caretLine: '          ^'
+    }
+  });
+});
+
+reg(1392, 'error-display', 'strict assign - binary literal too long', function(h, session) {
+  assertErrorDisplay(h, session, {
+    name: '4wire strict',
+    source: '4wire q = 11111\n',
+    action: 'run',
+    expect: {
+      message: 'Expected 4 bits, got 5 bits.',
+      scriptLocLine: 1,
+      line: 1,
+      col: 11,
+      spanLen: 5,
+      sourceLine: '4wire q = 11111',
+      caretLine: '          ^^^^^'
+    }
+  });
+});
+
+reg(1393, 'error-display', 'editor align - leading blank line', function(h, session) {
+  const runSource = '8wire value = 11111100 + ^F\n';
+  const editorSource = '\n' + runSource;
+  assertErrorDisplay(h, session, {
+    name: 'editor line offset',
+    source: runSource,
+    editorSource,
+    action: 'run',
+    expect: {
+      message: 'Expected 8 bits, got 12 bits.',
+      line: 2,
+      col: 15,
+      spanLen: 13,
+      sourceLine: '8wire value = 11111100 + ^F',
+      caretLine: '              ^^^^^^^^^^^^^'
+    }
+  });
+}, { propagation: 'wave' });
+
+reg(1394, 'error-display', 'multiline script - bit mismatch on wire line', function(h, session) {
+  const source = `comp [clcd] .digit:
+  = {
+    digit7: x:10 y:10 bits:0-6 :
+    dp: x:60 y:10 bit:7 :
+  }
+  :
+
+8wire value = 11111100 + ^F
+`;
+  assertErrorDisplay(h, session, {
+    name: 'clcd multiline',
+    source,
+    action: 'run',
+    expect: {
+      message: 'Expected 8 bits, got 12 bits.',
+      scriptLocLine: 8,
+      line: 8,
+      col: 15,
+      spanLen: 13,
+      sourceLine: '8wire value = 11111100 + ^F',
+      caretLine: '              ^^^^^^^^^^^^^'
+    }
+  });
+}, { propagation: 'wave' });
+
+reg(1395, 'error-display', 'scriptError - hook and output bundle', function(h) {
+  const EF = LogTScriptErrorFormat;
+  const src = '2wire x = 01\n';
+  const err = EF.scriptError('Expected 2 bits, got 3 bits.', 1, 1, 3);
+  const pres = buildErrorPresentation(err, src, src);
+  h.assert('message', pres.display.message, 'Expected 2 bits, got 3 bits.');
+  h.assert('hook line', String(pres.editor.line), '1');
+  h.assert('hook col', String(pres.editor.col), '11');
+  h.assert('output lines', pres.outputLines.length, 3);
+  h.assert('output[0]', pres.outputLines[0], 'Error: Expected 2 bits, got 3 bits.');
 });
 
 

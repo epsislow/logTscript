@@ -60,11 +60,29 @@ function highlightEditorError(line, col, spanLen, lineText, isMissing) {
   cmEditor.scrollIntoView({ line: l, ch }, 100);
 }
 
-function applyErrorEditorHighlight(err, processedSource) {
+function getEditorSource() {
+  if (typeof code !== 'undefined' && code && code.value != null) {
+    return code.value;
+  }
+  if (typeof cmEditor !== 'undefined' && cmEditor) {
+    return cmEditor.getValue();
+  }
+  const el = document.getElementById('code');
+  return el ? el.value : '';
+}
+
+function finalizeErrorDisplay(display, runSource) {
   const EF = window.LogTScriptErrorFormat;
-  if (!EF) return;
-  const display = EF.resolveErrorDisplay(err, processedSource || lastProcessedSource);
-  if (!display.loc) return;
+  if (!EF || !display) return display;
+  const editorSource = getEditorSource();
+  if (editorSource && EF.alignErrorDisplayToSource) {
+    return EF.alignErrorDisplayToSource(display, editorSource, runSource);
+  }
+  return display;
+}
+
+function applyErrorEditorHighlight(display) {
+  if (!display || !display.loc) return;
   highlightEditorError(
     display.loc.line,
     display.loc.col,
@@ -90,25 +108,24 @@ function appendOutputLine(text, className) {
 }
 
 function errorDisplayContext() {
-  if (!globalInterp || !globalInterp.currentStmt || !globalInterp.currentStmt.line) return null;
-  const s = globalInterp.currentStmt;
-  return { stmtLine: s.line, stmtCol: s.col || 1, spanLen: 1 };
+  return null;
 }
 
 function appendErrorOutput(err, processedSource) {
   const EF = window.LogTScriptErrorFormat;
   const rawMsg = (err && err.message) ? err.message : String(err);
-  const ctx = errorDisplayContext();
-  const display = EF
-    ? EF.resolveErrorDisplay(err, processedSource || lastProcessedSource, ctx)
+  const runSource = processedSource || lastProcessedSource;
+  let display = EF
+    ? EF.resolveErrorDisplay(err, runSource)
     : { message: rawMsg, sourceLine: null, caretLine: null, loc: null };
+  display = finalizeErrorDisplay(display, runSource);
 
   appendOutputLine('Error: ' + display.message, 'output-line--error');
   if (display.sourceLine != null && display.caretLine != null) {
     appendOutputLine(display.sourceLine, 'output-line--source');
     appendOutputLine(display.caretLine, 'output-line--caret');
   }
-  applyErrorEditorHighlight(err, processedSource);
+  applyErrorEditorHighlight(display);
 }
 
 function getOutputLines() {
@@ -225,16 +242,7 @@ function updatePropagationToggleUI() {
 
 function bindInterpErrorHandler(interp) {
   if (!interp) return;
-  interp.onRuntimeError = function(err, out) {
-    clearOutput();
-    for (const line of (out || [])) {
-      if (!line.startsWith('Error:')) {
-        appendOutputLine(line);
-      }
-    }
-    if (err) {
-      appendErrorOutput(err, lastProcessedSource);
-    }
+  interp.onRuntimeError = function() {
     if (typeof showVars === 'function') showVars();
   };
 }
@@ -468,7 +476,14 @@ function render(lines){
   if (!lines || !lines.length) return;
   for (const line of lines) {
     if (line.startsWith('Error:')) {
-      appendErrorOutput({ message: line.slice(6).trimStart() }, lastProcessedSource);
+      const msg = line.slice(6).trimStart();
+      let err = { message: msg };
+      if (globalInterp && globalInterp.lastReportedError) {
+        const re = globalInterp.lastReportedError;
+        const reMsg = (re && re.message) ? re.message : String(re);
+        if (reMsg === msg) err = re;
+      }
+      appendErrorOutput(err, lastProcessedSource);
     } else {
       appendOutputLine(line);
     }
