@@ -2,6 +2,43 @@
 
 const LOC_RE = /(?:at\s+)?(?:\S*:\s*)?(\d+):(\d+)/g;
 
+const ERROR_ANCHOR_RULES = [
+  [/^Undefined (\w+)$/, 1],
+  [/^Undefined variable\/wire (\S+)$/, 1],
+  [/^Undefined reference (\S+)$/, 1],
+  [/^Undefined variable '([^']+)'/, 1],
+  [/^Undefined inline instance '([^']+)'/, 1],
+  [/^Function (\w+) is not local/, 1],
+  [/^Bad arity for (\w+)$/, 1],
+  [/^Unknown alias (\w+)$/, 1],
+  [/^Unknown component (\S+) in invocation/, 1],
+  [/^Component '([^']+)' already belongs/, 1],
+  [/^Component (\S+) does not support/, 1],
+  [/^Component (\S+) has no readable/, 1],
+  [/^Component (\S+) has return type/, 1],
+  [/^Cannot reassign wire (\S+)/, 1],
+  [/^Cannot reassign immutable variable (\S+)/, 1],
+  [/^Error testing (\S+)/, 1],
+  [/^(\w+) expects \d+ arguments?$/, 1],
+  [/^(\w+) expects at least \d+ arguments/, 1],
+  [/^(\w+) expects 2 or 3 arguments/, 1],
+  [/^Unknown property '([^']+)'/, 1],
+  [/^Unknown component type: (\S+)$/, 1],
+  [/^Invalid type (\S+)/, 1],
+  [/^Immutable (\S+)$/, 1],
+  [/^Bit-width mismatch: (\S+)/, 1],
+  [/^Wire (\S+) already declared/, 1],
+  [/^Wire (\S+) already assigned/, 1],
+  [/^PCB '([^']+)' is not defined/, 1],
+  [/^Chip '([^']+)' is not defined/, 1],
+  [/^Board '([^']+)' is not defined/, 1],
+  [/^LUT invocation ([^\s(]+)/, 1],
+  [/^Invalid bit range .+ for ([^\s:(]+)/, 1],
+  [/^Property (\S+) cannot be used/, 1],
+  [/^Unknown component (\S+)$/, 1],
+  [/^Wire (\S+) not found/, 1],
+];
+
 function parseErrorLocation(message) {
   if (!message) return null;
   let match;
@@ -11,6 +48,28 @@ function parseErrorLocation(message) {
     last = { line: parseInt(match[1], 10), col: parseInt(match[2], 10) };
   }
   return last;
+}
+
+function parseErrorAnchor(message) {
+  if (!message) return null;
+  for (const [re, group] of ERROR_ANCHOR_RULES) {
+    const m = message.match(re);
+    if (m && m[group]) {
+      const name = m[group].replace(/^'|'$/g, '');
+      if (name) return { name, len: name.length };
+    }
+  }
+  return null;
+}
+
+function parseUndefinedSymbol(message) {
+  return parseErrorAnchor(message);
+}
+
+function parseFunctionNameFromError(message) {
+  if (!message) return null;
+  const m = message.match(/^Function (\w+) is not local/);
+  return m ? m[1] : null;
 }
 
 function buildCaretLine(col, spanLen) {
@@ -31,6 +90,8 @@ function tokenAtCol(lineText, col) {
 
 function inferSpanLength(message, lineText, col) {
   if (!message) return 1;
+  const anchor = parseErrorAnchor(message);
+  if (anchor) return anchor.len;
   const got = message.match(/got \w+=(\S+)/);
   if (got) return got[1].length;
   const quoted = message.match(/'([^']*)'/);
@@ -85,6 +146,50 @@ function findPrevTokenRangeInLine(lineText, col) {
   return { from: start + 1, to: end + 1 };
 }
 
+function findSymbolOnLine(line, name) {
+  let last = null;
+  let idx = 0;
+  while (idx < line.length) {
+    const found = line.indexOf(name, idx);
+    if (found < 0) break;
+    const before = found > 0 ? line[found - 1] : '';
+    const after = found + name.length < line.length ? line[found + name.length] : '';
+    if (!/[A-Za-z0-9_]/.test(before) && !/[A-Za-z0-9_]/.test(after)) {
+      last = { col: found + 1, len: name.length };
+    }
+    idx = found + 1;
+  }
+  return last;
+}
+
+function findSymbolInSource(source, name, hintLine) {
+  if (!source || !name) return null;
+  const lines = source.split('\n');
+  if (hintLine != null && hintLine >= 1 && hintLine <= lines.length) {
+    const onLine = findSymbolOnLine(lines[hintLine - 1], name);
+    if (onLine) {
+      return {
+        line: hintLine,
+        col: onLine.col,
+        sourceLine: lines[hintLine - 1],
+        len: onLine.len
+      };
+    }
+  }
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const onLine = findSymbolOnLine(lines[i], name);
+    if (onLine) {
+      return {
+        line: i + 1,
+        col: onLine.col,
+        sourceLine: lines[i],
+        len: onLine.len
+      };
+    }
+  }
+  return null;
+}
+
 function scriptError(message, line, col, len) {
   const e = new Error(message);
   if (line != null && col != null) {
@@ -93,46 +198,21 @@ function scriptError(message, line, col, len) {
   return e;
 }
 
-function parseFunctionNameFromError(message) {
-  if (!message) return null;
-  const m = message.match(/^Function (\w+) is not local/);
-  return m ? m[1] : null;
+function refineLocFromAnchor(message, processedSource, loc, scriptLocLen) {
+  const anchor = parseErrorAnchor(message);
+  if (!anchor || !processedSource) return { loc, scriptLocLen };
+
+  const hintLine = loc ? loc.line : null;
+  const found = findSymbolInSource(processedSource, anchor.name, hintLine);
+  if (!found) return { loc, scriptLocLen };
+
+  return {
+    loc: { line: found.line, col: found.col },
+    scriptLocLen: found.len
+  };
 }
 
-function parseUndefinedSymbol(message) {
-  if (!message) return null;
-  let m = message.match(/^Undefined (\w+)$/);
-  if (m) return m[1];
-  m = message.match(/^Undefined variable\/wire (\S+)$/);
-  if (m) return m[1];
-  m = message.match(/^Undefined reference (\S+)$/);
-  if (m) return m[1];
-  m = message.match(/^Undefined variable '([^']+)'/);
-  if (m) return m[1];
-  return null;
-}
-
-function findSymbolInSource(source, name) {
-  if (!source || !name) return null;
-  const lines = source.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    let idx = 0;
-    while (idx < line.length) {
-      const found = line.indexOf(name, idx);
-      if (found < 0) break;
-      const before = found > 0 ? line[found - 1] : '';
-      const after = found + name.length < line.length ? line[found + name.length] : '';
-      if (!/[A-Za-z0-9_]/.test(before) && !/[A-Za-z0-9_]/.test(after)) {
-        return { line: i + 1, col: found + 1, sourceLine: line, len: name.length };
-      }
-      idx = found + 1;
-    }
-  }
-  return null;
-}
-
-function resolveErrorDisplay(err, processedSource) {
+function resolveErrorDisplay(err, processedSource, context) {
   const rawMsg = (err && err.message) ? err.message : String(err);
   const { message, embedded } = splitEmbeddedErrorMessage(rawMsg);
   let loc = (err && err.scriptLoc)
@@ -140,15 +220,15 @@ function resolveErrorDisplay(err, processedSource) {
     : parseErrorLocation(message);
   let scriptLocLen = (err && err.scriptLoc && err.scriptLoc.len != null) ? err.scriptLoc.len : null;
 
-  if (!loc && processedSource) {
-    const sym = parseUndefinedSymbol(message) || parseFunctionNameFromError(message);
-    if (sym) {
-      const found = findSymbolInSource(processedSource, sym);
-      if (found) {
-        loc = { line: found.line, col: found.col };
-        scriptLocLen = found.len;
-      }
-    }
+  if (!loc && context && context.stmtLine) {
+    loc = { line: context.stmtLine, col: context.stmtCol || 1 };
+    scriptLocLen = context.spanLen || 1;
+  }
+
+  if (processedSource) {
+    const refined = refineLocFromAnchor(message, processedSource, loc, scriptLocLen);
+    loc = refined.loc || loc;
+    if (refined.scriptLocLen != null) scriptLocLen = refined.scriptLocLen;
   }
 
   if (embedded) {
@@ -178,6 +258,7 @@ function resolveErrorDisplay(err, processedSource) {
 
 window.LogTScriptErrorFormat = {
   parseErrorLocation,
+  parseErrorAnchor,
   buildCaretLine,
   inferSpanLength,
   isMissingTokenError,

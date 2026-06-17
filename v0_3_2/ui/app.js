@@ -89,11 +89,18 @@ function appendOutputLine(text, className) {
   return div;
 }
 
+function errorDisplayContext() {
+  if (!globalInterp || !globalInterp.currentStmt || !globalInterp.currentStmt.line) return null;
+  const s = globalInterp.currentStmt;
+  return { stmtLine: s.line, stmtCol: s.col || 1, spanLen: 1 };
+}
+
 function appendErrorOutput(err, processedSource) {
   const EF = window.LogTScriptErrorFormat;
   const rawMsg = (err && err.message) ? err.message : String(err);
+  const ctx = errorDisplayContext();
   const display = EF
-    ? EF.resolveErrorDisplay(err, processedSource || lastProcessedSource)
+    ? EF.resolveErrorDisplay(err, processedSource || lastProcessedSource, ctx)
     : { message: rawMsg, sourceLine: null, caretLine: null, loc: null };
 
   appendOutputLine('Error: ' + display.message, 'output-line--error');

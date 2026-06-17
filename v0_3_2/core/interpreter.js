@@ -1524,6 +1524,13 @@ class Interpreter {
 
   reportRuntimeError(err) {
     const msg = (err && err.message) ? err.message : String(err);
+    if (err && !err.scriptLoc && this.currentStmt && this.currentStmt.line) {
+      err.scriptLoc = {
+        line: this.currentStmt.line,
+        col: this.currentStmt.col || 1,
+        len: 1
+      };
+    }
     const line = 'Error: ' + msg;
     if (!this.out) this.out = [];
     this.out.push(line);
@@ -2358,12 +2365,7 @@ class Interpreter {
       } else {
         const varInfo = this.vars.get(a.var);
         if(!varInfo) {
-          if (a.line && a.col) {
-            const e = new Error(`Undefined ${a.var} at ${a.line}:${a.col}`);
-            e.scriptLoc = { line: a.line, col: a.col, len: a.var.length };
-            throw e;
-          }
-          throw Error('Undefined '+a.var);
+          this._throwRuntime('Undefined '+a.var, a, a.var.length);
         }
         val = varInfo.value;
         ref = varInfo.ref;
@@ -2412,7 +2414,7 @@ class Interpreter {
       if(varInfo){
         return {value: null, ref: varInfo.ref, isRef: true, varName: a.ref};
       }
-      throw Error('Undefined reference '+a.ref);
+      this._throwRuntime('Undefined reference '+a.ref, a, (a.ref || '').length);
     }
 /*
 if (a.refLiteral) {
@@ -2504,6 +2506,7 @@ const idx = parseInt(
   }
   call(fn, args, computeRefs = false) {
   const { name, alias } = fn;
+  const fail = (msg, len) => this._throwRuntime(msg, fn, len != null ? len : name.length);
 
   const b = x => x === '1';
 
@@ -2589,7 +2592,7 @@ const idx = parseInt(
   // ================= BUILTIN: REG =================
   if (this.isBuiltinREG(name)) {
     if (argValues.length !== 3) {
-      throw Error(`REG expects 3 arguments`);
+      fail(`REG expects 3 arguments`);
     }
 
     const data  = argValues[0];
@@ -2740,7 +2743,7 @@ if (this.isBuiltinMUX(name)) {
     }
   }
   else {
-    throw Error(`MUX expects at least 2 arguments`);
+    fail(`MUX expects at least 2 arguments`);
   }
 
   const sel = parseInt(argValues[0], 2);
@@ -2786,7 +2789,7 @@ if (this.isBuiltinDEMUX(name)) {
   const outputs = 1 << selectorBitWidth; // 2^selectorBitWidth
 
   if (argValues.length !== 2) {
-    throw Error(`DEMUX expects 2 arguments (selector, data), but got ${argValues.length}`);
+    fail(`DEMUX expects 2 arguments (selector, data), but got ${argValues.length}`);
   }
 
   const sel = parseInt(argValues[0], 2);
@@ -2806,7 +2809,7 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: LSHIFT / RSHIFT =================
   if (name === 'LSHIFT' || name === 'RSHIFT') {
     if (argValues.length < 2 || argValues.length > 3) {
-      throw Error(`${name} expects 2 or 3 arguments`);
+      fail(`${name} expects 2 or 3 arguments`);
     }
     const data = argValues[0];
     const n = parseInt(argValues[1], 2);
@@ -2833,7 +2836,7 @@ if (this.isBuiltinDEMUX(name)) {
 
   // ================= BUILTIN: BIT SELECTION =================
   if (name === 'HIGH') {
-    if (argValues.length !== 1) throw Error('HIGH expects 1 argument');
+    if (argValues.length !== 1) fail('HIGH expects 1 argument');
     const v = highBitMask(argValues[0]);
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
@@ -2841,7 +2844,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'LOW') {
-    if (argValues.length !== 1) throw Error('LOW expects 1 argument');
+    if (argValues.length !== 1) fail('LOW expects 1 argument');
     const v = lowBitMask(argValues[0]);
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
@@ -2849,7 +2852,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'ANY') {
-    if (argValues.length !== 1) throw Error('ANY expects 1 argument');
+    if (argValues.length !== 1) fail('ANY expects 1 argument');
     const bits = argValues[0].split('');
     let acc = bits[0] === '1';
     for (let i = 1; i < bits.length; i++) acc = acc || bits[i] === '1';
@@ -2860,7 +2863,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'ZERO') {
-    if (argValues.length !== 1) throw Error('ZERO expects 1 argument');
+    if (argValues.length !== 1) fail('ZERO expects 1 argument');
     const bits = argValues[0].split('');
     let any = bits[0] === '1';
     for (let i = 1; i < bits.length; i++) any = any || bits[i] === '1';
@@ -2871,7 +2874,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'BITINDEX') {
-    if (argValues.length !== 1) throw Error('BITINDEX expects 1 argument');
+    if (argValues.length !== 1) fail('BITINDEX expects 1 argument');
     const { index, isInvalid } = bitIndexFromValue(argValues[0]);
     const idxWidth = index.length;
     return [
@@ -2885,7 +2888,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'ONEHOT') {
-    if (argValues.length !== 1) throw Error('ONEHOT expects 1 argument');
+    if (argValues.length !== 1) fail('ONEHOT expects 1 argument');
     const v = oneHotFromIndex(argValues[0]);
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
@@ -2894,7 +2897,7 @@ if (this.isBuiltinDEMUX(name)) {
 
   // ================= BUILTIN: BIT ANALYSIS =================
   if (name === 'PARITY') {
-    if (argValues.length !== 1) throw Error('PARITY expects 1 argument');
+    if (argValues.length !== 1) fail('PARITY expects 1 argument');
     const bits = argValues[0].split('');
     let acc = bits[0] === '1';
     for (let i = 1; i < bits.length; i++) acc = acc !== (bits[i] === '1');
@@ -2905,7 +2908,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'CNTONE') {
-    if (argValues.length !== 1) throw Error('CNTONE expects 1 argument');
+    if (argValues.length !== 1) fail('CNTONE expects 1 argument');
     const v = countOnesBin(argValues[0]).toString(2);
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
@@ -2913,7 +2916,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'CNTZERO') {
-    if (argValues.length !== 1) throw Error('CNTZERO expects 1 argument');
+    if (argValues.length !== 1) fail('CNTZERO expects 1 argument');
     const s = argValues[0];
     const v = (s.length - countOnesBin(s)).toString(2);
     return computeRefs
@@ -2922,7 +2925,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'BITSIZE') {
-    if (argValues.length !== 1) throw Error('BITSIZE expects 1 argument');
+    if (argValues.length !== 1) fail('BITSIZE expects 1 argument');
     const len = argValues[0].length;
     const w = bitIndexWidth(len);
     const v = binPadInt(len, w);
@@ -2933,7 +2936,7 @@ if (this.isBuiltinDEMUX(name)) {
 
   // ================= BUILTIN: BIT TRANSFORM (rotate / reverse) =================
   if (name === 'REVERSE') {
-    if (argValues.length !== 1) throw Error('REVERSE expects 1 argument');
+    if (argValues.length !== 1) fail('REVERSE expects 1 argument');
     const v = argValues[0].split('').reverse().join('');
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
@@ -2941,7 +2944,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'LROTATE' || name === 'RROTATE') {
-    if (argValues.length !== 2) throw Error(`${name} expects 2 arguments`);
+    if (argValues.length !== 2) fail(`${name} expects 2 arguments`);
     const data = argValues[0];
     const len = data.length;
     let n = len === 0 ? 0 : parseInt(argValues[1], 2) % len;
@@ -2958,7 +2961,7 @@ if (this.isBuiltinDEMUX(name)) {
 
   // ================= BUILTIN: ADD =================
   if (name === 'ADD') {
-    if (argValues.length !== 2) throw Error('ADD expects 2 arguments');
+    if (argValues.length !== 2) fail('ADD expects 2 arguments');
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
@@ -2975,7 +2978,7 @@ if (this.isBuiltinDEMUX(name)) {
 
   // ================= BUILTIN: SUBTRACT =================
   if (name === 'SUBTRACT') {
-    if (argValues.length !== 2) throw Error('SUBTRACT expects 2 arguments');
+    if (argValues.length !== 2) fail('SUBTRACT expects 2 arguments');
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
@@ -2994,7 +2997,7 @@ if (this.isBuiltinDEMUX(name)) {
 
   // ================= BUILTIN: MULTIPLY =================
   if (name === 'MULTIPLY') {
-    if (argValues.length !== 2) throw Error('MULTIPLY expects 2 arguments');
+    if (argValues.length !== 2) fail('MULTIPLY expects 2 arguments');
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
@@ -3011,7 +3014,7 @@ if (this.isBuiltinDEMUX(name)) {
 
   // ================= BUILTIN: DIVIDE =================
   if (name === 'DIVIDE') {
-    if (argValues.length !== 2) throw Error('DIVIDE expects 2 arguments');
+    if (argValues.length !== 2) fail('DIVIDE expects 2 arguments');
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
@@ -3039,24 +3042,19 @@ if (this.isBuiltinDEMUX(name)) {
   // Alias resolution
   if (alias) {
     if (!this.aliases || !this.aliases.has(alias)) {
-      throw Error(`Unknown alias ${alias}`);
+      fail(`Unknown alias ${alias}`, alias.length);
     }
     funcs = this.aliases.get(alias);
   }
 
   if (!funcs.has(name)) {
-    const EF = typeof LogTScriptErrorFormat !== 'undefined' ? LogTScriptErrorFormat : null;
-    const msg = `Function ${name} is not local; use ${name}@alias(...)`;
-    if (EF && fn.line != null && fn.col != null) {
-      throw EF.scriptError(msg, fn.line, fn.col, name.length);
-    }
-    throw Error(msg);
+    fail(`Function ${name} is not local; use ${name}@alias(...)`);
   }
 
   const f = funcs.get(name);
 
   if (argValues.length !== f.params.length) {
-    throw Error(`Bad arity for ${name}`);
+    fail(`Bad arity for ${name}`);
   }
 
   const local = new Interpreter(this.funcs, this.out, this.pcbDefinitions, this.componentRegistry, this.signalPropagationStrategy);
@@ -3103,6 +3101,22 @@ if (this.isBuiltinDEMUX(name)) {
     if(d && d.line && d.col) return `${d.line}:${d.col}`;
     // Fallback
     return 'unknown location';
+  }
+
+  _throwRuntime(msg, locHint, len) {
+    const EF = typeof LogTScriptErrorFormat !== 'undefined' ? LogTScriptErrorFormat : null;
+    let line, col, span;
+    if (locHint && locHint.line != null && locHint.col != null) {
+      line = locHint.line;
+      col = locHint.col;
+      span = len != null ? len : 1;
+    } else if (this.currentStmt && this.currentStmt.line) {
+      line = this.currentStmt.line;
+      col = this.currentStmt.col || 1;
+      span = len != null ? len : 1;
+    }
+    if (EF && line != null) throw EF.scriptError(msg, line, col, span);
+    throw new Error(msg);
   }
   
   postExecBody() {
@@ -4496,7 +4510,7 @@ if (s.assignment) {
   } else if (this.vars.has(name)) {
     entry = this.vars.get(name);
   } else {
-    throw Error(`Undefined ${name}`);
+    this._throwRuntime(`Undefined ${name}`, s, name.length);
   }
 
   const bitWidth = this.getBitWidth(entry.type);
@@ -4583,7 +4597,7 @@ if (s.assignment) {
   if (isWire) {
     // STRICT check — skip if this wire was initialized with : (first real assignment is allowed)
     if (this.mode === 'STRICT' && entry.ref !== null && entry.ref !== '&-' && !entry.initOnly) {
-      throw Error(`Cannot reassign wire ${name} in STRICT mode`);
+      this._throwRuntime(`Cannot reassign wire ${name} in STRICT mode`, s, name.length);
     }
     // Clear initOnly flag after first real assignment
     if(entry.initOnly) entry.initOnly = false;
@@ -4637,7 +4651,7 @@ if (s.assignment) {
       if(wire){
         // Wire assignment - check mode only if wire was already assigned (ref is not null and not '&-')
         if(this.mode === 'STRICT' && wire.ref !== null && wire.ref !== '&-'){
-          throw Error(`Cannot reassign wire ${name} in STRICT mode`);
+          this._throwRuntime(`Cannot reassign wire ${name} in STRICT mode`, s, name.length);
         }
         // Wire assignment
         const exprResult = this.evalExpr(expr, computeRefs);
@@ -4716,10 +4730,10 @@ if (s.assignment) {
       
       // Check if it's a variable (bits are immutable, so this should error)
       if(this.vars.has(name)){
-        throw Error(`Cannot reassign immutable variable ${name}`);
+        this._throwRuntime(`Cannot reassign immutable variable ${name}`, s, name.length);
       }
       
-      throw Error(`Undefined variable/wire ${name}`);
+      this._throwRuntime(`Undefined variable/wire ${name}`, s, name.length);
     }*/
 
     // Variable/wire declaration
