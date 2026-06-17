@@ -502,6 +502,14 @@ function clcdFaStyleClass(styleNum) {
   return 'fas';
 }
 
+function clcdSymbolMenuIconEl(sym) {
+  if (!sym || sym.kind !== 'fa') return null;
+  const icon = document.createElement('i');
+  icon.className = clcdFaStyleClass(sym.defaultStyle) + ' ' + clcdScriptNameToFaClass(sym.name) + ' clcd-symbol-menu-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  return icon;
+}
+
 function filterClcdSymbolSearch(query) {
   const q = (query || '').trim().toLowerCase();
   if (!q) return [];
@@ -646,7 +654,12 @@ function mountClcdSymbolSearch(host) {
       if (i === activeIndex) li.className = 'clcd-symbol-search-active';
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = sym.name + (sym.kind === 'canvas' ? ' (canvas)' : '');
+      const labelEl = document.createElement('span');
+      labelEl.className = 'clcd-symbol-menu-label';
+      labelEl.textContent = sym.name + (sym.kind === 'canvas' ? ' (canvas)' : '');
+      btn.appendChild(labelEl);
+      const menuIcon = clcdSymbolMenuIconEl(sym);
+      if (menuIcon) btn.appendChild(menuIcon);
       btn.addEventListener('click', function () {
         input.value = sym.name;
         closeMenu();

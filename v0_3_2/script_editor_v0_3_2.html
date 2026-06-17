@@ -1387,7 +1387,10 @@ body.doc-mode #docView {
   overflow-y: auto;
 }
 .clcd-symbol-search-menu li button {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   width: 100%;
   text-align: left;
   padding: 8px 12px;
@@ -1396,6 +1399,18 @@ body.doc-mode #docView {
   color: #ddd;
   font-size: 13px;
   cursor: pointer;
+}
+.clcd-symbol-menu-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.clcd-symbol-menu-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  color: #6fdc6f;
+  line-height: 1;
 }
 .clcd-symbol-search-menu li button:hover,
 .clcd-symbol-search-menu li.clcd-symbol-search-active button {
