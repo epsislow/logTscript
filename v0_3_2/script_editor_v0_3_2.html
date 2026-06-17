@@ -53,6 +53,34 @@ textarea {
 .output-line--error { color: #f55; }
 .output-line--source { color: #ccc; }
 .output-line--caret { color: #f55; }
+.output-copy-block {
+  margin: 3px 0 5px;
+  border: 1px solid #444;
+  background: #000;
+  padding: 3px 3px;
+}
+.output-copy-block__text {
+  margin: 0;
+  white-space: pre;
+  color: #0f0;
+  font-family: monospace;
+  font-size: inherit;
+  padding: 1px;
+  max-height: none;
+  overflow: visible;
+}
+.output-copy-block__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.output-copy-block__btn {
+  font-size: 11px;
+  padding: 2px 7px;
+  margin: 0;
+  font-weight: bold;
+  background-color: #048;
+}
 .CodeMirror-focused .CodeMirror-selected { background: rgba(0, 255, 0, 0.2); }
 .CodeMirror-selected { background: rgba(0, 255, 0, 0.12); }
 /* LogTScript syntax colors */

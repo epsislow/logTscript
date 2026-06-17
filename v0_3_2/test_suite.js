@@ -9683,6 +9683,27 @@ reg(1395, 'error-display', 'scriptError - hook and output bundle', function(h) {
 });
 
 
+reg(1396, 'bool-lut', 'outBlocks - lutOf span matches out join', function(h, session) {
+  const { out, interp } = session.run('lutOf(OR(A, B))');
+  h.assert('wrapper', out[0], 'inline [lut] .generated:');
+  const b = interp.outBlocks.find(x => x.kind === 'lutOf');
+  h.assert('outBlocks present', String(!!b), 'true');
+  h.assert('block start', String(b.start), '0');
+  h.assert('block end', String(b.end), String(out.length));
+  h.assert('join matches slice', out.slice(b.start, b.end).join('\n'), out.join('\n'));
+});
+
+reg(1397, 'bool-lut', 'outBlocks - exprOfLut two-line span', function(h, session) {
+  const { out, interp } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
+  h.assert('two lines', String(out.length), '2');
+  const b = interp.outBlocks.find(x => x.kind === 'exprOfLut');
+  h.assert('outBlocks present', String(!!b), 'true');
+  h.assert('span len', String(b.end - b.start), '2');
+  h.assert('short line', out[b.start], out[0]);
+  h.assert('std line', out[b.start + 1], out[1]);
+});
+
+
   window.LogTScriptTestSuite = {
     tests,
     runMap: null,

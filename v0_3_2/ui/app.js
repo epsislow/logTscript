@@ -121,6 +121,54 @@ function appendOutputLine(text, className) {
   return div;
 }
 
+function copyTextToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return Promise.reject(new Error('clipboard unavailable'));
+}
+
+function appendOutputCopyBlock(text) {
+  const el = document.getElementById('out');
+  if (!el || text == null) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'output-copy-block';
+
+  const pre = document.createElement('pre');
+  pre.className = 'output-copy-block__text';
+  pre.textContent = text;
+
+  const actions = document.createElement('div');
+  actions.className = 'output-copy-block__actions';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn output-copy-block__btn';
+  btn.textContent = '\u2FCB';
+  btn.title = 'Copy';
+  btn.addEventListener('click', function () {
+    copyTextToClipboard(text).then(function () {
+      const prev = btn.title;
+      btn.title = 'Copied!';
+      setTimeout(function () { btn.title = prev; }, 1000);
+    }).catch(function () {});
+  });
+
+  actions.appendChild(btn);
+  wrap.appendChild(pre);
+  wrap.appendChild(actions);
+  el.appendChild(wrap);
+  return wrap;
+}
+
+function findOutputBlockAt(blocks, index) {
+  if (!blocks || !blocks.length) return null;
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].start === index) return blocks[i];
+  }
+  return null;
+}
+
 function errorDisplayContext() {
   return null;
 }
@@ -390,7 +438,7 @@ function run(){
     globalInterp.seedWatchTimeline();
   }
 
-  render(globalInterp.out);
+  render(globalInterp.out, globalInterp.outBlocks);
   showVars();
   if (typeof markTabHasRun === 'function') {
     markTabHasRun();
@@ -459,7 +507,7 @@ function sendCmd(){
     }
     globalInterp.postExecSrc();
     
-  render(globalInterp.out);
+  render(globalInterp.out, globalInterp.outBlocks);
   showVars();
     
     cmdInput.value = '';
@@ -489,10 +537,30 @@ function sendCmd(){
   }
 })();
 
-function render(lines){
+function render(lines, blocks) {
   clearOutput();
   if (!lines || !lines.length) return;
-  for (const line of lines) {
+  if (blocks == null && globalInterp) blocks = globalInterp.outBlocks || [];
+  blocks = blocks || [];
+
+  let i = 0;
+  while (i < lines.length) {
+    const block = findOutputBlockAt(blocks, i);
+    if (block && block.kind === 'lutOf' && block.end > block.start) {
+      appendOutputCopyBlock(lines.slice(block.start, block.end).join('\n'));
+      i = block.end;
+      continue;
+    }
+    if (block && block.kind === 'exprOfLut' && block.end > block.start) {
+      appendOutputCopyBlock(lines[block.start]);
+      if (block.end > block.start + 1) {
+        appendOutputCopyBlock(lines[block.start + 1]);
+      }
+      i = block.end;
+      continue;
+    }
+
+    const line = lines[i];
     if (line.startsWith('Error:')) {
       const msg = line.slice(6).trimStart();
       let err = { message: msg };
@@ -505,6 +573,7 @@ function render(lines){
     } else {
       appendOutputLine(line);
     }
+    i++;
   }
 }
 
@@ -576,7 +645,7 @@ function showVars(){
   }
   document.getElementById('vars').textContent=t;
   if (globalInterp && globalInterp.out && globalInterp.out.length) {
-    render(globalInterp.out);
+    render(globalInterp.out, globalInterp.outBlocks);
   }
 }
 

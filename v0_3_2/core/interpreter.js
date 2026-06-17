@@ -171,6 +171,7 @@ class Interpreter {
   constructor(funcs,out,pcbs=null,componentRegistry=null, signalPropagationStrategy=null, chips=null, boards=null){
     this.funcs=funcs;
     this.out=out;
+    this.outBlocks = [];
     this.signalPropagationStrategy = signalPropagationStrategy
       ?? (typeof createSignalPropagationStrategy === 'function'
         ? createSignalPropagationStrategy('wave')
@@ -3352,9 +3353,13 @@ if (this.isBuiltinDEMUX(name)) {
     const gen = typeof lutOfGenerate === 'function' ? lutOfGenerate : null;
     if (!gen) throw new Error('boolean-lut.js is not loaded');
     try {
+      const start = this.out.length;
       const text = gen(s.lutOf.expr, this._makeWidthResolver(), s.lutOf.filters);
       for (const line of text.split('\n')) {
         this.out.push(line);
+      }
+      if (this.out.length > start) {
+        this.outBlocks.push({ kind: 'lutOf', start, end: this.out.length });
       }
     } catch (e) {
       this.reportRuntimeError(e);
@@ -3420,10 +3425,14 @@ if (this.isBuiltinDEMUX(name)) {
     const gen = typeof exprOfLutGenerate === 'function' ? exprOfLutGenerate : null;
     if (!gen) throw new Error('boolean-lut.js is not loaded');
     try {
+      const start = this.out.length;
       const lutInst = this._resolveLutInstance(s.exprOfLut.lutRef);
       const lines = gen(lutInst, s.exprOfLut.varSpecs, this._makeWidthResolver());
       for (const line of lines) {
         this.out.push(line);
+      }
+      if (lines.length >= 2) {
+        this.outBlocks.push({ kind: 'exprOfLut', start, end: start + lines.length });
       }
     } catch (e) {
       this.reportRuntimeError(e);
