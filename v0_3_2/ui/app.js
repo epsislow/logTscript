@@ -551,7 +551,7 @@ function render(lines, blocks) {
       i = block.end;
       continue;
     }
-    if (block && block.kind === 'exprOfLut' && block.end > block.start) {
+    if (block && block.kind === 'assignPair' && block.end > block.start) {
       appendOutputCopyBlock(lines[block.start]);
       if (block.end > block.start + 1) {
         appendOutputCopyBlock(lines[block.start + 1]);

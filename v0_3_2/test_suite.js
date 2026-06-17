@@ -9693,10 +9693,21 @@ reg(1396, 'bool-lut', 'outBlocks - lutOf span matches out join', function(h, ses
   h.assert('join matches slice', out.slice(b.start, b.end).join('\n'), out.join('\n'));
 });
 
-reg(1397, 'bool-lut', 'outBlocks - exprOfLut two-line span', function(h, session) {
+reg(1397, 'bool-lut', 'outBlocks - exprOfLut assignPair span', function(h, session) {
   const { out, interp } = session.run(INLINE_OR2 + '\nexprOfLut(.or2, A, B)');
   h.assert('two lines', String(out.length), '2');
-  const b = interp.outBlocks.find(x => x.kind === 'exprOfLut');
+  const b = interp.outBlocks.find(x => x.kind === 'assignPair');
+  h.assert('outBlocks present', String(!!b), 'true');
+  h.assert('span len', String(b.end - b.start), '2');
+  h.assert('short line', out[b.start], out[0]);
+  h.assert('std line', out[b.start + 1], out[1]);
+});
+
+reg(1398, 'bool-analysis', 'outBlocks - simplify assignPair span', function(h, session) {
+  const { out, interp } = session.run('simplify(OR(AND(NOT(A), B), AND(A, B)))');
+  h.assert('short', out[0], '1wire out = `B`');
+  h.assert('std', out[1], '1wire out = B');
+  const b = interp.outBlocks.find(x => x.kind === 'assignPair');
   h.assert('outBlocks present', String(!!b), 'true');
   h.assert('span len', String(b.end - b.start), '2');
   h.assert('short line', out[b.start], out[0]);

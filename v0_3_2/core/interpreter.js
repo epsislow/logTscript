@@ -3381,8 +3381,14 @@ if (this.isBuiltinDEMUX(name)) {
     const gen = typeof simplifyGenerate === 'function' ? simplifyGenerate : null;
     if (!gen) throw new Error('boolean-analysis.js is not loaded');
     try {
+      const start = this.out.length;
       const lines = gen(s.simplify.expr, this._makeWidthResolver(), s.simplify.filters);
-      for (const line of lines) this.out.push(line);
+      for (const line of lines) {
+        this.out.push(line);
+      }
+      if (lines.length >= 2) {
+        this.outBlocks.push({ kind: 'assignPair', start, end: start + lines.length });
+      }
     } catch (e) {
       this.reportRuntimeError(e);
     }
@@ -3432,7 +3438,7 @@ if (this.isBuiltinDEMUX(name)) {
         this.out.push(line);
       }
       if (lines.length >= 2) {
-        this.outBlocks.push({ kind: 'exprOfLut', start, end: start + lines.length });
+        this.outBlocks.push({ kind: 'assignPair', start, end: start + lines.length });
       }
     } catch (e) {
       this.reportRuntimeError(e);
