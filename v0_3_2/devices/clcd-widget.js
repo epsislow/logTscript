@@ -212,11 +212,11 @@ class ClcdDisplay {
       ctx.fillRect(sx, sy, t, len);
     };
     drawH(x + t, y, w - 2 * t, 0);
-    drawV(x, y + t, h / 2 - t, 1);
-    drawV(x + w - t, y + t, h / 2 - t, 2);
-    drawH(x + t, y + h / 2 - t / 2, w - 2 * t, 3);
+    drawV(x, y + t, h / 2 - t, 5);
+    drawV(x + w - t, y + t, h / 2 - t, 1);
+    drawH(x + t, y + h / 2 - t / 2, w - 2 * t, 6);
     drawV(x, y + h / 2 + t / 2, h / 2 - t, 4);
-    drawV(x + w - t, y + h / 2 + t / 2, h / 2 - t, 5);
-    drawH(x + t, y + h - t, w - 2 * t, 6);
+    drawV(x + w - t, y + h / 2 + t / 2, h / 2 - t, 2);
+    drawH(x + t, y + h - t, w - 2 * t, 3);
   }
 }
