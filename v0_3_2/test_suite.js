@@ -9539,6 +9539,7 @@ reg(1387, 'clcd', 'known symbols count includes catalog', function(h, session) {
   h.assert('at least 500', String(known.length >= 500), 'true');
   h.assert('has wifi', String(known.includes('wifi')), 'true');
   h.assert('has digit7', String(known.includes('digit7')), 'true');
+  h.assert('has label', String(known.includes('label')), 'true');
 });
 
 reg(1388, 'error-display', 'bit mismatch - wire + hex RHS (wave)', function(h, session) {
@@ -9712,6 +9713,180 @@ reg(1398, 'bool-analysis', 'outBlocks - simplify assignPair span', function(h, s
   h.assert('span len', String(b.end - b.start), '2');
   h.assert('short line', out[b.start], out[0]);
   h.assert('std line', out[b.start + 1], out[1]);
+});
+
+reg(1399, 'clcd', 'parse label with text', function(h, session) {
+  const stmts = session.parse(`comp [clcd] .ui:
+  = {
+    label:
+      x: 10
+      y: 8
+      bit: 0
+      text: "Load"
+    :
+  }
+  :`);
+  const sym = stmts[0].comp.initialValue.symbols[0];
+  h.assert('name label', sym.name, 'label');
+  h.assert('label text', sym.text, 'Load');
+  h.assert('x', String(sym.x), '10');
+  h.assert('y', String(sym.y), '8');
+  h.assert('bit 0', String(sym.bit), '0');
+});
+
+reg(1400, 'clcd', 'parse label font options', function(h, session) {
+  const stmts = session.parse(`comp [clcd] .ui:
+  = {
+    label:
+      x: 0
+      y: 0
+      bit: 0
+      text: "Hi"
+      family: sans
+      size: 18
+      weight: bold
+    :
+  }
+  :`);
+  const sym = stmts[0].comp.initialValue.symbols[0];
+  h.assert('family sans', sym.family, 'sans');
+  h.assert('size 18', String(sym.size), '18');
+  h.assert('weight bold', sym.weight, 'bold');
+});
+
+reg(1401, 'clcd', 'parse error label missing text', function(h, session) {
+  h.assertThrows('label missing text', function() {
+    session.parse(`comp [clcd] .x:
+  = {
+    label:
+      x: 0
+      y: 0
+      bit: 0
+    :
+  }
+  :`);
+  });
+});
+
+reg(1402, 'clcd', 'parse error text on fa symbol', function(h, session) {
+  h.assertThrows('wifi text', function() {
+    session.parse(`comp [clcd] .x:
+  = {
+    wifi:
+      x: 0
+      y: 0
+      bit: 0
+      text: "x"
+    :
+  }
+  :`);
+  });
+});
+
+reg(1403, 'clcd', 'parse error label with bits range', function(h, session) {
+  h.assertThrows('label bits', function() {
+    session.parse(`comp [clcd] .x:
+  = {
+    label:
+      x: 0
+      y: 0
+      bits: 0-3
+      text: "x"
+    :
+  }
+  :`);
+  });
+});
+
+reg(1404, 'clcd', 'parse error label with style', function(h, session) {
+  h.assertThrows('label style', function() {
+    session.parse(`comp [clcd] .x:
+  = {
+    label:
+      x: 0
+      y: 0
+      bit: 0
+      text: "x"
+      style: 1
+    :
+  }
+  :`);
+  });
+});
+
+reg(1405, 'clcd', 'parse error unknown family', function(h, session) {
+  h.assertThrows('unknown family', function() {
+    session.parse(`comp [clcd] .x:
+  = {
+    label:
+      x: 0
+      y: 0
+      bit: 0
+      text: "x"
+      family: comic
+    :
+  }
+  :`);
+  });
+});
+
+reg(1406, 'clcd', 'registry has label kind text', function(h, session) {
+  const def = (typeof getClcdSymbolDef === 'function') ? getClcdSymbolDef('label') : null;
+  h.assert('label def', String(!!def), 'true');
+  h.assert('kind text', def.kind, 'text');
+  const font = (typeof resolveClcdLabelFont === 'function') ? resolveClcdLabelFont({}) : null;
+  h.assert('default size', String(font.fontSize), '14');
+  h.assert('default mono', String(font.fontFamily.indexOf('monospace') >= 0), 'true');
+});
+
+reg(1407, 'clcd', 'bgColorSym applies to all symbols', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .ui:
+  bgColor: ^002200
+  bgColorSym: ^ff0
+  = {
+    power: x:10 y:10 bit:0 :
+    wifi: x:50 y:10 bit:1 :
+  }
+  :
+
+1wire x = 0
+.ui = x`);
+  const syms = interp.components.get('.ui').clcdSymbols;
+  h.assert('power bgColor', syms[0].bgColor, '#ff0');
+  h.assert('wifi bgColor', syms[1].bgColor, '#ff0');
+});
+
+reg(1408, 'clcd', 'bgColorSym per-symbol override', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .ui:
+  bgColor: ^002200
+  bgColorSym: ^ff0
+  = {
+    power: x:10 y:10 bit:0 :
+    warning: x:50 y:10 bit:1 bgColor: ^332200 :
+  }
+  :
+
+1wire x = 0
+.ui = x`);
+  const syms = interp.components.get('.ui').clcdSymbols;
+  h.assert('power uses bgColorSym', syms[0].bgColor, '#ff0');
+  h.assert('warning override', syms[1].bgColor, '#332200');
+});
+
+reg(1409, 'clcd', 'bgColorSym omitted uses bgColor for symbols', function(h, session) {
+  const Clcd = session._ensureRegistry().get('clcd').constructor;
+  const resolved = Clcd.resolveSymbols(
+    [{ name: 'power', bit: 0 }],
+    '^00ff00',
+    Clcd.defaultSymbolBgColor({ bgColor: '^001100' })
+  );
+  h.assert('symbol bgColor', resolved[0].bgColor, '#001100');
+});
+
+reg(1410, 'clcd', 'doc lists bgColorSym attr', function(h, session) {
+  const out = session.runDoc('doc(comp.clcd)');
+  const text = out.join('\n');
+  h.assert('bgColorSym attr', String(text.includes('bgColorSym: color')), 'true');
 });
 
 

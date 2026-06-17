@@ -531,6 +531,14 @@ function clcdSymbolSnippet(sym, styleNum) {
     '  y: 10',
     '  bit: 0',
   ];
+  if (sym.kind === 'text') {
+    lines.push('  text: "Label"');
+    lines.push('  family: mono');
+    lines.push('  size: 14');
+    lines.push('  weight: normal');
+    lines.push(':');
+    return lines.join('\n');
+  }
   const defStyle = styleNum !== undefined ? styleNum : sym.defaultStyle;
   if (sym.kind === 'fa' && defStyle !== sym.defaultStyle) {
     lines.push('  style: ' + defStyle);
@@ -576,17 +584,19 @@ function mountClcdSymbolSearch(host) {
   const canvasSection = document.createElement('div');
   canvasSection.className = 'clcd-symbol-canvas-section';
   const canvasTitle = document.createElement('h4');
-  canvasTitle.textContent = 'Canvas symbols';
+  canvasTitle.textContent = 'Canvas & text symbols';
   canvasSection.appendChild(canvasTitle);
   const canvasGrid = document.createElement('div');
   canvasGrid.className = 'clcd-symbol-preview-grid';
 
-  CLCD_SYMBOL_REGISTRY.filter(function (s) { return s.kind === 'canvas'; }).forEach(function (sym) {
+  CLCD_SYMBOL_REGISTRY.filter(function (s) { return s.kind === 'canvas' || s.kind === 'text'; }).forEach(function (sym) {
     const cell = document.createElement('div');
     cell.className = 'clcd-symbol-preview-cell clcd-symbol-preview-cell--canvas';
-    cell.innerHTML = '<span class="clcd-symbol-preview-icon clcd-symbol-preview-icon--canvas">' + sym.name + '</span>'
+    const previewText = sym.kind === 'text' ? 'Aa' : sym.name;
+    const kindLabel = sym.kind === 'text' ? 'text' : 'canvas';
+    cell.innerHTML = '<span class="clcd-symbol-preview-icon clcd-symbol-preview-icon--canvas">' + previewText + '</span>'
       + '<span class="clcd-symbol-preview-name">' + sym.name + '</span>'
-      + '<span class="clcd-symbol-preview-style">canvas</span>';
+      + '<span class="clcd-symbol-preview-style">' + kindLabel + '</span>';
     canvasGrid.appendChild(cell);
   });
   canvasSection.appendChild(canvasGrid);
@@ -627,6 +637,14 @@ function mountClcdSymbolSearch(host) {
         grid.appendChild(cell);
       });
       snippet.textContent = clcdSymbolSnippet(sym, sym.defaultStyle);
+    } else if (sym.kind === 'text') {
+      const cell = document.createElement('div');
+      cell.className = 'clcd-symbol-preview-cell clcd-symbol-preview-cell--canvas';
+      cell.innerHTML = '<span class="clcd-symbol-preview-icon clcd-symbol-preview-icon--canvas">Aa</span>'
+        + '<span class="clcd-symbol-preview-name">' + sym.name + '</span>'
+        + '<span class="clcd-symbol-preview-style">text</span>';
+      grid.appendChild(cell);
+      snippet.textContent = clcdSymbolSnippet(sym);
     } else {
       const cell = document.createElement('div');
       cell.className = 'clcd-symbol-preview-cell clcd-symbol-preview-cell--canvas';
@@ -656,7 +674,7 @@ function mountClcdSymbolSearch(host) {
       btn.type = 'button';
       const labelEl = document.createElement('span');
       labelEl.className = 'clcd-symbol-menu-label';
-      labelEl.textContent = sym.name + (sym.kind === 'canvas' ? ' (canvas)' : '');
+      labelEl.textContent = sym.name + (sym.kind === 'canvas' ? ' (canvas)' : sym.kind === 'text' ? ' (text)' : '');
       btn.appendChild(labelEl);
       const menuIcon = clcdSymbolMenuIconEl(sym);
       if (menuIcon) btn.appendChild(menuIcon);

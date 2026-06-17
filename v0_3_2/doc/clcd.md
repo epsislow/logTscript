@@ -1,6 +1,6 @@
 # CLCD component (`clcd`)
 
-`comp [clcd]` is a **canvas-based custom LCD** — predefined symbols at `(x, y)`, each driven by one bit or a bit range. ON uses `color`, OFF uses `bgColor` (per symbol or component defaults).
+`comp [clcd]` is a **canvas-based custom LCD** — predefined symbols at `(x, y)`, each driven by one bit or a bit range. ON uses `color`, OFF uses `bgColor` (per symbol, or `bgColorSym` / `bgColor` defaults at component level).
 
 Signature: `doc(comp.clcd)`.
 
@@ -16,6 +16,7 @@ comp [clcd] .name:
   height: 100
   color: ^00ff00
   bgColor: ^000000
+  bgColorSym: ^ffff00
   nl
   = {
     symbolName:
@@ -44,7 +45,8 @@ comp [clcd] .panel::
 | `width` | 200 | Canvas width (px) |
 | `height` | 100 | Canvas height (px) |
 | `color` | `^00ff00` | Default ON color for symbols |
-| `bgColor` | `^000000` | Default OFF color for symbols |
+| `bgColor` | `^000000` | Canvas background fill |
+| `bgColorSym` | (same as `bgColor`) | Default OFF color for all symbols — equivalent to setting `bgColor` on every symbol entry; per-symbol `bgColor` still overrides |
 | `nl` | off | Newline after display |
 
 ## Symbol fields (`= { … }`)
@@ -56,7 +58,36 @@ comp [clcd] .panel::
 | `bits` | one of | Inclusive range `N-M` (e.g. `digit7`) |
 | `color` | no | Override ON color for this symbol |
 | `bgColor` | no | Override OFF color for this symbol |
-| `style` | no | FA icon style: `1` solid (default), `2` regular, `3` brands — only on FA symbols; not on `digit7` / `digit14` / `dp` / `colon` |
+| `style` | no | FA icon style: `1` solid (default), `2` regular, `3` brands — only on FA symbols; not on canvas or `label` |
+
+### `label` (text on canvas)
+
+Use the **`label`** symbol for bit-driven text. The symbol name is always `label`; use multiple `label:` entries for several strings (same pattern as duplicate `digit7`).
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `text` | yes | Quoted string, e.g. `text: "Load"` |
+| `bit` | yes | Single control bit (`bits` range not supported) |
+| `family` | no | `mono` (default), `sans`, or `serif` |
+| `size` | no | Font size in px, 6–48 (default `14`) |
+| `weight` | no | `normal` (default), `bold`, `italic`, `boldItalic` |
+
+When the control bit is **ON**, text uses `color`; when **OFF**, text uses `bgColor` (same as FA icons).
+
+| `family` | Font stack |
+|----------|------------|
+| `mono` | Consolas, Courier New, monospace |
+| `sans` | system-ui, Segoe UI, sans-serif |
+| `serif` | Georgia, Times New Roman, serif |
+
+| `weight` | Appearance |
+|----------|------------|
+| `normal` | regular |
+| `bold` | bold |
+| `italic` | italic |
+| `boldItalic` | bold italic |
+
+`style` is not allowed on `label`.
 
 The **same symbol name may appear multiple times** — each entry is independent (its own `x`, `y`, and `bit` / `bits`). Example: two `digit7` displays at different positions, each driven by its own bit range.
 
@@ -68,7 +99,7 @@ Bus width = `max(bit index) + 1` over all symbols.
 
 ## Supported symbols
 
-The catalog includes **~500** Font Awesome icons (plus four canvas symbols). Use the searchable catalog for the full list:
+The catalog includes **~500** Font Awesome icons (plus four canvas symbols and the `label` text symbol). Use the searchable catalog for the full list:
 
 **[Symbol catalog → clcd-symbols.md](clcd-symbols.md)**
 
@@ -83,6 +114,8 @@ The catalog includes **~500** Font Awesome icons (plus four canvas symbols). Use
 Not every symbol supports every style. Brands icons use `3` by default. Specifying an unsupported `style` is a parse error.
 
 Canvas symbols (`digit7`, `digit14`, `dp`, `colon`) are drawn on the display canvas — they do not use `style`.
+
+The **`label`** symbol draws text on the canvas (see **Symbol fields** above).
 
 Icons use Font Awesome 5 Free (`res/fontawesome/`).
 
@@ -191,6 +224,45 @@ comp [clcd] .battery:
 
 2wire state = 11
 .battery = state
+```
+
+### Text labels
+
+**Load & Run** — two labels driven by bits 0 and 1; icons use overlapping bits in this minimal demo (use separate bits in real panels).
+
+```logts-play
+comp [clcd] .ui:
+  width: 220
+  height: 50
+  color: ^00ff00
+  bgColor: ^002200
+  = {
+    label:
+      x: 8
+      y: 6
+      bit: 0
+      text: "Load"
+      family: mono
+      size: 16
+      weight: bold
+    :
+    label:
+      x: 8
+      y: 28
+      bit: 1
+      text: "Save"
+      weight: normal
+    :
+    power:
+      x: 120
+      y: 12
+      bit: 0
+    :
+  }
+  :
+
+2wire flags = 11
+.ui = flags
 ```
 
 ### Seven-segment digit + decimal point

@@ -3215,6 +3215,38 @@ isBuiltinFunction(name) {
       throw Error(`Expected color at ${this.c.line}:${this.c.col}`);
     };
 
+    const readQuotedString = () => {
+      skipWS();
+      if (pos >= src.length || (src[pos] !== '"' && src[pos] !== "'")) {
+        throw Error(`Expected quoted string at ${this.c.line}:${this.c.col}`);
+      }
+      const quote = src[pos];
+      pos++;
+      let str = '';
+      while (pos < src.length) {
+        const char = src[pos];
+        if (char === '\n') {
+          throw Error(`Unclosed string in symbol at ${this.c.line}:${this.c.col}`);
+        }
+        if (char === '\\' && pos + 1 < src.length) {
+          const next = src[pos + 1];
+          if (next === 'n') { str += '\n'; pos += 2; continue; }
+          if (next === quote) { str += quote; pos += 2; continue; }
+          if (next === '\\') { str += '\\'; pos += 2; continue; }
+        }
+        if (char === quote) {
+          pos++;
+          break;
+        }
+        str += char;
+        pos++;
+      }
+      return str;
+    };
+
+    const VALID_LABEL_FAMILIES = ['mono', 'sans', 'serif'];
+    const VALID_LABEL_WEIGHTS = ['normal', 'bold', 'italic', 'boldItalic'];
+
     skipWS();
     while (pos < src.length && src[pos] !== '}') {
       const symName = readIdent();
@@ -3273,6 +3305,26 @@ isBuiltinFunction(name) {
             throw Error(`CLCD style must be 1, 2, or 3 in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
           }
           sym.style = styleNum;
+        } else if (key === 'text') {
+          sym.text = readQuotedString();
+        } else if (key === 'family') {
+          const fam = readIdent();
+          if (!VALID_LABEL_FAMILIES.includes(fam)) {
+            throw Error(`Unknown font family '${fam}' in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+          }
+          sym.family = fam;
+        } else if (key === 'size') {
+          const sz = readInt();
+          if (sz < 6 || sz > 48) {
+            throw Error(`CLCD label size must be 6-48 in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+          }
+          sym.size = sz;
+        } else if (key === 'weight') {
+          const w = readIdent();
+          if (!VALID_LABEL_WEIGHTS.includes(w)) {
+            throw Error(`Unknown font weight '${w}' in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+          }
+          sym.weight = w;
         } else {
           throw Error(`Unknown attribute '${key}' in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
         }
@@ -3291,6 +3343,31 @@ isBuiltinFunction(name) {
       const symDef = (typeof getClcdSymbolDef === 'function')
         ? getClcdSymbolDef(symName)
         : null;
+      if (symDef && symDef.kind === 'text') {
+        if (sym.text === undefined) {
+          throw Error(`CLCD symbol 'label' requires text at ${this.c.line}:${this.c.col}`);
+        }
+        if (hasBits) {
+          throw Error(`CLCD symbol 'label' does not support bits at ${this.c.line}:${this.c.col}`);
+        }
+        if (sym.style !== undefined) {
+          throw Error(`CLCD symbol 'label' does not support style at ${this.c.line}:${this.c.col}`);
+        }
+      }
+      if (symDef && symDef.kind !== 'text') {
+        if (sym.text !== undefined) {
+          throw Error(`CLCD symbol '${symName}' does not support text at ${this.c.line}:${this.c.col}`);
+        }
+        if (sym.family !== undefined) {
+          throw Error(`CLCD symbol '${symName}' does not support family at ${this.c.line}:${this.c.col}`);
+        }
+        if (sym.size !== undefined) {
+          throw Error(`CLCD symbol '${symName}' does not support size at ${this.c.line}:${this.c.col}`);
+        }
+        if (sym.weight !== undefined) {
+          throw Error(`CLCD symbol '${symName}' does not support weight at ${this.c.line}:${this.c.col}`);
+        }
+      }
       if (symDef && symDef.kind === 'canvas' && sym.style !== undefined) {
         throw Error(`CLCD symbol '${symName}' does not support style at ${this.c.line}:${this.c.col}`);
       }

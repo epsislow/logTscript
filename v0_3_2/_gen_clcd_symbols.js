@@ -44,6 +44,10 @@ const CANVAS_SYMBOLS = [
   { name: 'colon', kind: 'canvas', renderer: 'colon' },
 ];
 
+const TEXT_SYMBOLS = [
+  { name: 'label', kind: 'text' },
+];
+
 const BRANDS_USEFUL = new Set([
   'bluetooth', 'usb', 'android', 'apple', 'raspberry-pi', 'windows', 'linux',
   'github', 'gitlab', 'docker', 'node-js', 'python', 'java', 'js', 'html5',
@@ -216,6 +220,9 @@ function main() {
   for (const c of CANVAS_SYMBOLS) {
     lines.push(`  { name: '${c.name}', kind: 'canvas', renderer: '${c.renderer}' },`);
   }
+  for (const t of TEXT_SYMBOLS) {
+    lines.push(`  { name: '${t.name}', kind: 'text' },`);
+  }
   lines.push('];');
   lines.push('');
   lines.push('var CLCD_SYMBOL_BY_NAME = Object.create(null);');
@@ -244,15 +251,43 @@ function main() {
   lines.push('  };');
   lines.push('}');
   lines.push('');
+  lines.push('var CLCD_LABEL_FAMILIES = {');
+  lines.push('  mono: \'Consolas, "Courier New", monospace\',');
+  lines.push('  sans: \'system-ui, -apple-system, Segoe UI, sans-serif\',');
+  lines.push('  serif: \'Georgia, "Times New Roman", serif\',');
+  lines.push('};');
+  lines.push('');
+  lines.push('var CLCD_LABEL_WEIGHTS = {');
+  lines.push('  normal: { fontWeight: \'400\', fontStyle: \'normal\' },');
+  lines.push('  bold: { fontWeight: \'700\', fontStyle: \'normal\' },');
+  lines.push('  italic: { fontWeight: \'400\', fontStyle: \'italic\' },');
+  lines.push('  boldItalic: { fontWeight: \'700\', fontStyle: \'italic\' },');
+  lines.push('};');
+  lines.push('');
+  lines.push('function resolveClcdLabelFont(sym) {');
+  lines.push('  var family = (sym && sym.family) || \'mono\';');
+  lines.push('  var size = (sym && sym.size) || 14;');
+  lines.push('  var weightKey = (sym && sym.weight) || \'normal\';');
+  lines.push('  var stack = CLCD_LABEL_FAMILIES[family] || CLCD_LABEL_FAMILIES.mono;');
+  lines.push('  var w = CLCD_LABEL_WEIGHTS[weightKey] || CLCD_LABEL_WEIGHTS.normal;');
+  lines.push('  return {');
+  lines.push('    fontFamily: stack,');
+  lines.push('    fontWeight: w.fontWeight,');
+  lines.push('    fontStyle: w.fontStyle,');
+  lines.push('    fontSize: size,');
+  lines.push('  };');
+  lines.push('}');
+  lines.push('');
   lines.push('if (typeof module !== \'undefined\' && module.exports) {');
   lines.push('  module.exports.CLCD_SYMBOL_REGISTRY = CLCD_SYMBOL_REGISTRY;');
   lines.push('  module.exports.CLCD_KNOWN_SYMBOLS = CLCD_KNOWN_SYMBOLS;');
   lines.push('  module.exports.getClcdSymbolDef = getClcdSymbolDef;');
   lines.push('  module.exports.resolveClcdFaStyle = resolveClcdFaStyle;');
+  lines.push('  module.exports.resolveClcdLabelFont = resolveClcdLabelFont;');
   lines.push('}');
 
   fs.writeFileSync(OUT_PATH, lines.join('\n') + '\n');
-  console.log('Wrote', faEntries.length, 'FA +', CANVAS_SYMBOLS.length, 'canvas →', OUT_PATH);
+  console.log('Wrote', faEntries.length, 'FA +', CANVAS_SYMBOLS.length, 'canvas +', TEXT_SYMBOLS.length, 'text →', OUT_PATH);
 }
 
 main();

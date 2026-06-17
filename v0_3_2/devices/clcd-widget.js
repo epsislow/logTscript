@@ -144,10 +144,29 @@ class ClcdDisplay {
           this._drawDot(ctx, sym.x, sym.y + 10, on ? fg : bg, 3);
           this._drawDot(ctx, sym.x, sym.y + 22, on ? fg : bg, 3);
         }
+      } else if (symDef && symDef.kind === 'text') {
+        this._drawLabel(ctx, sym, color);
       } else {
         this._drawFaIcon(ctx, sym, color);
       }
     }
+  }
+
+  _drawLabel(ctx, sym, color) {
+    const resolved = (typeof resolveClcdLabelFont === 'function')
+      ? resolveClcdLabelFont(sym)
+      : null;
+    if (!resolved || !sym.text) return;
+    ctx.save();
+    ctx.font = `${resolved.fontStyle} ${resolved.fontWeight} ${resolved.fontSize}px ${resolved.fontFamily}`;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'top';
+    const lines = String(sym.text).split('\n');
+    const lineHeight = resolved.fontSize * 1.2;
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], sym.x, sym.y + i * lineHeight);
+    }
+    ctx.restore();
   }
 
   _drawFaIcon(ctx, sym, color) {

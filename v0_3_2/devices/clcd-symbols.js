@@ -505,6 +505,7 @@ var CLCD_SYMBOL_REGISTRY = [
   { name: 'digit14', kind: 'canvas', renderer: 'digit14' },
   { name: 'dp', kind: 'canvas', renderer: 'dp' },
   { name: 'colon', kind: 'canvas', renderer: 'colon' },
+  { name: 'label', kind: 'text' },
 ];
 
 var CLCD_SYMBOL_BY_NAME = Object.create(null);
@@ -533,9 +534,37 @@ function resolveClcdFaStyle(symDef, styleNum) {
   };
 }
 
+var CLCD_LABEL_FAMILIES = {
+  mono: 'Consolas, "Courier New", monospace',
+  sans: 'system-ui, -apple-system, Segoe UI, sans-serif',
+  serif: 'Georgia, "Times New Roman", serif',
+};
+
+var CLCD_LABEL_WEIGHTS = {
+  normal: { fontWeight: '400', fontStyle: 'normal' },
+  bold: { fontWeight: '700', fontStyle: 'normal' },
+  italic: { fontWeight: '400', fontStyle: 'italic' },
+  boldItalic: { fontWeight: '700', fontStyle: 'italic' },
+};
+
+function resolveClcdLabelFont(sym) {
+  var family = (sym && sym.family) || 'mono';
+  var size = (sym && sym.size) || 14;
+  var weightKey = (sym && sym.weight) || 'normal';
+  var stack = CLCD_LABEL_FAMILIES[family] || CLCD_LABEL_FAMILIES.mono;
+  var w = CLCD_LABEL_WEIGHTS[weightKey] || CLCD_LABEL_WEIGHTS.normal;
+  return {
+    fontFamily: stack,
+    fontWeight: w.fontWeight,
+    fontStyle: w.fontStyle,
+    fontSize: size,
+  };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports.CLCD_SYMBOL_REGISTRY = CLCD_SYMBOL_REGISTRY;
   module.exports.CLCD_KNOWN_SYMBOLS = CLCD_KNOWN_SYMBOLS;
   module.exports.getClcdSymbolDef = getClcdSymbolDef;
   module.exports.resolveClcdFaStyle = resolveClcdFaStyle;
+  module.exports.resolveClcdLabelFont = resolveClcdLabelFont;
 }

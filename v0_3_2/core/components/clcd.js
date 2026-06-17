@@ -13,7 +13,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
     let s = String(val);
     if (s.charAt(0) === '^') s = '#' + s.slice(1);
     else if (s.charAt(0) !== '#') s = '#' + s;
-    return s;
+    return s.toLowerCase();
   }
 
   static validateContiguousBits(symbols) {
@@ -44,9 +44,16 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
     return max + 1;
   }
 
-  static resolveSymbols(symbols, defaultColor, defaultBgColor) {
+  static defaultSymbolBgColor(attributes) {
+    if (attributes && attributes.bgColorSym !== undefined && attributes.bgColorSym !== null && attributes.bgColorSym !== '') {
+      return attributes.bgColorSym;
+    }
+    return attributes ? attributes.bgColor : undefined;
+  }
+
+  static resolveSymbols(symbols, defaultColor, defaultSymBgColor) {
     const fg = ClcdComponent.normalizeColor(defaultColor, '#00ff00');
-    const bg = ClcdComponent.normalizeColor(defaultBgColor, '#000000');
+    const bg = ClcdComponent.normalizeColor(defaultSymBgColor, '#000000');
     return (symbols || []).map((sym) => ({
       ...sym,
       color: ClcdComponent.normalizeColor(sym.color, fg),
@@ -68,9 +75,10 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
         { name: 'height', value: 'integer' },
         { name: 'color', value: 'color' },
         { name: 'bgColor', value: 'color' },
+        { name: 'bgColorSym', value: 'color' },
         { name: 'nl', value: null },
       ],
-      initValue: '{ symbol: x: integer y: integer bit: N bits: N-M color: color bgColor: color : }',
+      initValue: '{ symbol: x: integer y: integer bit: N bits: N-M color: color bgColor: color text: string family: mono|sans|serif size: integer weight: normal|bold|italic|boldItalic : }',
       pins: [],
       pouts: [],
       returns: null,
@@ -100,8 +108,8 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
       ? initialValue.symbols
       : (attributes.clcdSymbols || []);
     const defaultColor = attributes.color;
-    const defaultBgColor = attributes.bgColor;
-    const symbols = ClcdComponent.resolveSymbols(rawSymbols, defaultColor, defaultBgColor);
+    const defaultSymBgColor = ClcdComponent.defaultSymbolBgColor(attributes);
+    const symbols = ClcdComponent.resolveSymbols(rawSymbols, defaultColor, defaultSymBgColor);
     ClcdComponent.validateContiguousBits(symbols);
     compInfo.clcdSymbols = symbols;
     compInfo.lastValue = '0'.repeat(bits);
@@ -129,7 +137,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
     const rawSymbols = (initialValue && initialValue.kind === 'clcdSymbols')
       ? initialValue.symbols
       : (attributes.clcdSymbols || []);
-    const symbols = ClcdComponent.resolveSymbols(rawSymbols, defaultColor, defaultBgColor);
+    const symbols = ClcdComponent.resolveSymbols(rawSymbols, defaultColor, ClcdComponent.defaultSymbolBgColor(attributes));
     const initialBits = '0'.repeat(bits);
     const storageIdx = ctx.storeValue(initialBits);
     const clcdRef = `&${storageIdx}`;
