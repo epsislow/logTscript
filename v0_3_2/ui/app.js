@@ -6,15 +6,27 @@ let timelineAnalyzer = null;
 let lastProcessedSource = '';
 let errorMarks = [];
 let errorGutterMarker = null;
+let editorErrorDismissed = false;
 
 function clearErrorMarkers() {
   if (!cmEditor) return;
-  for (const m of errorMarks) m.clear();
-  errorMarks = [];
-  if (errorGutterMarker != null) {
-    cmEditor.setGutterMarker(errorGutterMarker.line, 'CodeMirror-linenumbers', null);
-    errorGutterMarker = null;
+  for (const m of errorMarks) {
+    try { m.clear(); } catch (_) {}
   }
+  errorMarks = [];
+  cmEditor.operation(function () {
+    const lineCount = cmEditor.lineCount();
+    for (let i = 0; i < lineCount; i++) {
+      cmEditor.setGutterMarker(i, 'CodeMirror-linenumbers', null);
+      cmEditor.removeLineClass(i, 'gutter', 'cm-error-linenumber-gutter');
+    }
+  });
+  errorGutterMarker = null;
+}
+
+function dismissEditorErrorHighlight() {
+  editorErrorDismissed = true;
+  clearErrorMarkers();
 }
 
 function makeErrorLineNumberGutter(lineNum) {
@@ -27,10 +39,12 @@ function makeErrorLineNumberGutter(lineNum) {
 function highlightEditorError(line, col, spanLen, lineText, isMissing) {
   if (!cmEditor || !line || !col) return;
   clearErrorMarkers();
+  editorErrorDismissed = false;
   const l = line - 1;
   const ch = col - 1;
   const cmLine = cmEditor.getLine(l) || lineText || '';
   cmEditor.setGutterMarker(l, 'CodeMirror-linenumbers', makeErrorLineNumberGutter(line));
+  cmEditor.addLineClass(l, 'gutter', 'cm-error-linenumber-gutter');
   errorGutterMarker = { line: l };
 
   if (isMissing) {
@@ -82,7 +96,7 @@ function finalizeErrorDisplay(display, runSource) {
 }
 
 function applyErrorEditorHighlight(display) {
-  if (!display || !display.loc) return;
+  if (editorErrorDismissed || !display || !display.loc) return;
   highlightEditorError(
     display.loc.line,
     display.loc.col,
@@ -296,8 +310,11 @@ async function init() {
   tabShowCurrent();
   fShowTabs();
 
+  cmEditor.on('beforeChange', function () {
+    dismissEditorErrorHighlight();
+  });
+
   cmEditor.on("change", function() {
-    clearErrorMarkers();
     if (!codeCheckDisabled) {
       onCodeChange();
     }
@@ -318,6 +335,7 @@ function run(){
   try{
   clearOutput();
   clearErrorMarkers();
+  editorErrorDismissed = false;
   
   const devicesContainer = document.getElementById('devices');
   if(devicesContainer){
