@@ -35,6 +35,7 @@ const files = [
   'core/components/osc.js',
   'core/components/rotary.js',
   'core/components/slider.js',
+  'devices/clcd-symbols.js',
   'core/components/clcd.js',
   'core/components/alu.js',
   'core/components/pcb-component.js',

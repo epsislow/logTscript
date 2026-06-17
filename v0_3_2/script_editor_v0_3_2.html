@@ -1345,6 +1345,124 @@ body.doc-mode #docView {
   color: #888;
   font-size: 12px;
 }
+.clcd-symbol-gallery-host {
+  margin: 16px 0 24px;
+}
+.clcd-symbol-search-label {
+  display: block;
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 6px;
+}
+.clcd-symbol-search-input-wrap {
+  position: relative;
+  max-width: 420px;
+}
+.clcd-symbol-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e1e;
+  color: #ddd;
+}
+.clcd-symbol-search-input:focus {
+  outline: none;
+  border-color: #6a9f6a;
+}
+.clcd-symbol-search-menu {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.clcd-symbol-search-menu li button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: #ddd;
+  font-size: 13px;
+  cursor: pointer;
+}
+.clcd-symbol-search-menu li button:hover,
+.clcd-symbol-search-menu li.clcd-symbol-search-active button {
+  background: #3d5c3d;
+  color: #fff;
+}
+.clcd-symbol-preview {
+  margin-top: 16px;
+}
+.clcd-symbol-preview-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.clcd-symbol-preview-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 88px;
+  padding: 12px 10px;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  background: #111;
+}
+.clcd-symbol-preview-icon {
+  font-size: 28px;
+  color: #6fdc6f;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.clcd-symbol-preview-icon--canvas {
+  font-family: monospace;
+  font-size: 12px;
+  color: #8cf;
+}
+.clcd-symbol-preview-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ccc;
+}
+.clcd-symbol-preview-style {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+}
+.clcd-symbol-snippet {
+  margin-top: 12px;
+  padding: 10px 12px;
+  font-size: 12px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #9fdf9f;
+  max-width: 28em;
+  overflow-x: auto;
+}
+.clcd-symbol-canvas-section {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid #333;
+}
+.clcd-symbol-canvas-section h4 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #aaa;
+  font-weight: 600;
+}
 #docView .doc-layout {
   flex: 1;
   display: flex;
@@ -2203,6 +2321,7 @@ show(a,b,c)
 <script src="core/components/osc.js"></script>
 <script src="core/components/rotary.js"></script>
 <script src="core/components/slider.js"></script>
+<script src="devices/clcd-symbols.js"></script>
 <script src="core/components/clcd.js"></script>
 <script src="core/components/alu.js"></script>
 <script src="core/components/pcb-component.js"></script>

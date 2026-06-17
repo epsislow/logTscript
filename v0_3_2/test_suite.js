@@ -9382,6 +9382,74 @@ reg(1382, 'alu', 'zero flag on nonzero result', function(h, session) {
   h.assert('zero 0', String(/zero[^\n]*0/.test(session.out.slice(ob).join('\n'))), 'true');
 });
 
+reg(1383, 'clcd', 'parse style 2 on bell', function(h, session) {
+  const stmts = session.parse(`comp [clcd] .status:
+  = {
+    bell:
+      x: 10
+      y: 10
+      bit: 0
+      style: 2
+    :
+  }
+  :`);
+  const sym = stmts[0].comp.initialValue.symbols[0];
+  h.assert('style 2', String(sym.style), '2');
+  h.assert('name bell', sym.name, 'bell');
+});
+
+reg(1384, 'clcd', 'parse error bluetooth style 1', function(h, session) {
+  h.assertThrows('bluetooth style 1', function() {
+    session.parse(`comp [clcd] .x:
+  = {
+    bluetooth:
+      x: 0
+      y: 0
+      bit: 0
+      style: 1
+    :
+  }
+  :`);
+  });
+});
+
+reg(1385, 'clcd', 'parse error digit7 style 1', function(h, session) {
+  h.assertThrows('digit7 style', function() {
+    session.parse(`comp [clcd] .x:
+  = {
+    digit7:
+      x: 0
+      y: 0
+      bits: 0-6
+      style: 1
+    :
+  }
+  :`);
+  });
+});
+
+reg(1386, 'clcd', 'parse error style 4', function(h, session) {
+  h.assertThrows('style 4', function() {
+    session.parse(`comp [clcd] .x:
+  = {
+    wifi:
+      x: 0
+      y: 0
+      bit: 0
+      style: 4
+    :
+  }
+  :`);
+  });
+});
+
+reg(1387, 'clcd', 'known symbols count includes catalog', function(h, session) {
+  const known = session._ensureRegistry().get('clcd').constructor.knownSymbols;
+  h.assert('at least 500', String(known.length >= 500), 'true');
+  h.assert('has wifi', String(known.includes('wifi')), 'true');
+  h.assert('has digit7', String(known.includes('digit7')), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

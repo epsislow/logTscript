@@ -2,36 +2,6 @@
 
 const clcdDisplays = new Map();
 
-const CLCD_FA_SOLID = {
-  power: '\uf011',
-  warning: '\uf071',
-  error: '\uf057',
-  check: '\uf00c',
-  cross: '\uf00d',
-  wifi: '\uf1eb',
-  ethernet: '\uf6ff',
-  antenna: '\uf519',
-  chip: '\uf2db',
-  memory: '\uf538',
-  clock: '\uf017',
-  arrowUp: '\uf062',
-  arrowDown: '\uf063',
-  arrowLeft: '\uf060',
-  arrowRight: '\uf061',
-  play: '\uf04b',
-  stop: '\uf04d',
-  pause: '\uf04c',
-  record: '\uf111',
-  battery: '\uf240',
-  charging: '\uf0e7',
-  uart: '\uf1e6',
-};
-
-const CLCD_FA_BRANDS = {
-  bluetooth: '\uf293',
-  usb: '\uf287',
-};
-
 const CLCD_ICON_SIZE = 22;
 
 function addClcd(options) {
@@ -98,6 +68,7 @@ class ClcdDisplay {
     }
     Promise.all([
       document.fonts.load('900 24px "Font Awesome 5 Free"'),
+      document.fonts.load('400 24px "Font Awesome 5 Free"'),
       document.fonts.load('400 24px "Font Awesome 5 Brands"'),
     ]).then(() => {
       this._fontsReady = true;
@@ -158,36 +129,40 @@ class ClcdDisplay {
       const bg = sym.bgColor || this.defaultBgColor;
       const color = on ? fg : bg;
 
-      if (sym.name === 'digit7') {
-        this._drawDigit7(ctx, sym.x, sym.y, this._segmentBits(sym), color, bg, 7);
-      } else if (sym.name === 'digit14') {
-        this._drawDigit7(ctx, sym.x, sym.y, this._segmentBits(sym).substring(0, 7), color, bg, 7);
-      } else if (sym.name === 'dp') {
-        this._drawDot(ctx, sym.x + 4, sym.y + 28, on ? fg : bg, 4);
-      } else if (sym.name === 'colon') {
-        this._drawDot(ctx, sym.x, sym.y + 10, on ? fg : bg, 3);
-        this._drawDot(ctx, sym.x, sym.y + 22, on ? fg : bg, 3);
+      const symDef = (typeof getClcdSymbolDef === 'function')
+        ? getClcdSymbolDef(sym.name)
+        : null;
+
+      if (symDef && symDef.kind === 'canvas') {
+        if (sym.name === 'digit7') {
+          this._drawDigit7(ctx, sym.x, sym.y, this._segmentBits(sym), color, bg, 7);
+        } else if (sym.name === 'digit14') {
+          this._drawDigit7(ctx, sym.x, sym.y, this._segmentBits(sym).substring(0, 7), color, bg, 7);
+        } else if (sym.name === 'dp') {
+          this._drawDot(ctx, sym.x + 4, sym.y + 28, on ? fg : bg, 4);
+        } else if (sym.name === 'colon') {
+          this._drawDot(ctx, sym.x, sym.y + 10, on ? fg : bg, 3);
+          this._drawDot(ctx, sym.x, sym.y + 22, on ? fg : bg, 3);
+        }
       } else {
-        this._drawFaIcon(ctx, sym.name, sym.x, sym.y, color);
+        this._drawFaIcon(ctx, sym, color);
       }
     }
   }
 
-  _drawFaIcon(ctx, name, x, y, color) {
-    let ch = CLCD_FA_SOLID[name];
-    let fontFamily = '"Font Awesome 5 Free"';
-    let weight = '900';
-    if (!ch && CLCD_FA_BRANDS[name]) {
-      ch = CLCD_FA_BRANDS[name];
-      fontFamily = '"Font Awesome 5 Brands"';
-      weight = '400';
-    }
-    if (!ch) return;
+  _drawFaIcon(ctx, sym, color) {
+    const symDef = (typeof getClcdSymbolDef === 'function')
+      ? getClcdSymbolDef(sym.name)
+      : null;
+    const resolved = (typeof resolveClcdFaStyle === 'function')
+      ? resolveClcdFaStyle(symDef, sym.style)
+      : null;
+    if (!resolved) return;
     ctx.save();
-    ctx.font = `${weight} ${CLCD_ICON_SIZE}px ${fontFamily}`;
+    ctx.font = `${resolved.weight} ${CLCD_ICON_SIZE}px ${resolved.fontFamily}`;
     ctx.fillStyle = color;
     ctx.textBaseline = 'top';
-    ctx.fillText(ch, x, y);
+    ctx.fillText(resolved.glyph, sym.x, sym.y);
     ctx.restore();
   }
 

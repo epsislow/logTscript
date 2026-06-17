@@ -1,19 +1,12 @@
 var BuiltinComponent = (typeof require !== 'undefined') ? require('./builtin-component') : BuiltinComponent;
 
-var CLCD_KNOWN_SYMBOLS = [
-  'battery', 'power', 'warning', 'error', 'check', 'cross',
-  'wifi', 'bluetooth', 'usb', 'ethernet', 'antenna', 'chip', 'memory', 'clock',
-  'arrowUp', 'arrowDown', 'arrowLeft', 'arrowRight',
-  'play', 'stop', 'pause', 'record',
-  'digit7', 'digit14', 'dp', 'colon',
-  'charging', 'uart',
-];
-
 var ClcdComponent = class ClcdComponent extends BuiltinComponent {
   static get type() { return 'clcd'; }
   static get shortnames() { return {}; }
   static get isReservedName() { return true; }
-  static get knownSymbols() { return CLCD_KNOWN_SYMBOLS; }
+  static get knownSymbols() {
+    return (typeof CLCD_KNOWN_SYMBOLS !== 'undefined') ? CLCD_KNOWN_SYMBOLS : [];
+  }
 
   static normalizeColor(val, fallback) {
     if (val === undefined || val === null || val === '') return fallback;
@@ -189,5 +182,4 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = ClcdComponent;
-  module.exports.CLCD_KNOWN_SYMBOLS = CLCD_KNOWN_SYMBOLS;
 }

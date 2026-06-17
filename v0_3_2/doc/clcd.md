@@ -56,6 +56,7 @@ comp [clcd] .panel::
 | `bits` | one of | Inclusive range `N-M` (e.g. `digit7`) |
 | `color` | no | Override ON color for this symbol |
 | `bgColor` | no | Override OFF color for this symbol |
+| `style` | no | FA icon style: `1` solid (default), `2` regular, `3` brands — only on FA symbols; not on `digit7` / `digit14` / `dp` / `colon` |
 
 The **same symbol name may appear multiple times** — each entry is independent (its own `x`, `y`, and `bit` / `bits`). Example: two `digit7` displays at different positions, each driven by its own bit range.
 
@@ -67,9 +68,23 @@ Bus width = `max(bit index) + 1` over all symbols.
 
 ## Supported symbols
 
-`battery`, `power`, `warning`, `error`, `check`, `cross`, `wifi`, `bluetooth`, `usb`, `ethernet`, `antenna`, `chip`, `memory`, `clock`, `arrowUp`, `arrowDown`, `arrowLeft`, `arrowRight`, `play`, `stop`, `pause`, `record`, `digit7`, `digit14`, `dp`, `colon`, `charging`, `uart`
+The catalog includes **~500** Font Awesome icons (plus four canvas symbols). Use the searchable catalog for the full list:
 
-Icons use Font Awesome 5 (see `res/fontawesome/`). `digit7`, `digit14`, `dp`, `colon` are drawn on canvas.
+**[Symbol catalog → clcd-symbols.md](clcd-symbols.md)**
+
+### `style` (FA icons only)
+
+| `style` | Appearance |
+|---------|------------|
+| `1` | Solid (default) |
+| `2` | Regular / outline — only when listed for that symbol in the catalog |
+| `3` | Brands — e.g. `bluetooth`, `usb`, `android` |
+
+Not every symbol supports every style. Brands icons use `3` by default. Specifying an unsupported `style` is a parse error.
+
+Canvas symbols (`digit7`, `digit14`, `dp`, `colon`) are drawn on the display canvas — they do not use `style`.
+
+Icons use Font Awesome 5 Free (`res/fontawesome/`).
 
 ---
 

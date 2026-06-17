@@ -3243,7 +3243,13 @@ isBuiltinFunction(name) {
           hasBits = true;
         } else if (key === 'color') sym.color = readHexColor();
         else if (key === 'bgColor') sym.bgColor = readHexColor();
-        else {
+        else if (key === 'style') {
+          const styleNum = readInt();
+          if (styleNum !== 1 && styleNum !== 2 && styleNum !== 3) {
+            throw Error(`CLCD style must be 1, 2, or 3 in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+          }
+          sym.style = styleNum;
+        } else {
           throw Error(`Unknown attribute '${key}' in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
         }
       }
@@ -3257,6 +3263,19 @@ isBuiltinFunction(name) {
       if (!hasBit && !hasBits) {
         throw Error(`Symbol '${symName}' requires bit or bits at ${this.c.line}:${this.c.col}`);
       }
+
+      const symDef = (typeof getClcdSymbolDef === 'function')
+        ? getClcdSymbolDef(symName)
+        : null;
+      if (symDef && symDef.kind === 'canvas' && sym.style !== undefined) {
+        throw Error(`CLCD symbol '${symName}' does not support style at ${this.c.line}:${this.c.col}`);
+      }
+      if (sym.style !== undefined) {
+        if (!symDef || symDef.kind !== 'fa' || !symDef.glyphs[sym.style]) {
+          throw Error(`CLCD symbol '${symName}' does not support style ${sym.style} at ${this.c.line}:${this.c.col}`);
+        }
+      }
+
       symbols.push(sym);
       skipWS();
     }
