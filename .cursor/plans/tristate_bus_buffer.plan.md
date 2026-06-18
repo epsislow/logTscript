@@ -308,6 +308,61 @@ sequenceDiagram
 - `script_editor_v0_3_2.html` — autocomplete MODE ZSTATE, Z(
 - Regresie: **779+** teste existente verzi (fără MODE ZSTATE în ele)
 
+### Faza 6 — Filtre analiză booleană `*` / `A` / `X` / `Z` (~3–4 zile)
+
+Plan detaliat: [filtre_boolean_xz.plan.md](filtre_boolean_xz.plan.md).
+
+**Scop:** `truthTableOf`, `lutOf`, `exprOfLut`, `simplify` — alfabet pattern extins, eval IEEE în analiză.
+
+| Simbol | Rol |
+|--------|-----|
+| `*` | don't-care binar (0 sau 1) — înlocuiește vechiul `x`; **singurul** simbol care devine variabilă la `exprOfLut` |
+| `A` | don't-care toate valorile (0, 1, X, Z) — enumerate în LUT, nu variabile QM |
+| `X`, `Z` | valori fixe în pattern (ex. `A=01X11`) |
+| `0`, `1` | fix binar |
+
+**exprOfLut + `filters:`:** trebuie actualizat `varyingBitLabels`, `buildFilteredOutputsByMinterm`, `enumerateFilteredEnvs` (partajat cu `lutOf`) — vezi plan detaliat secțiunea 3.
+
+**Dependență:** Faza 1 (`logic-value.js` — tabele IEEE 1164).
+
+**Fișiere:** [boolean-lut.js](v0_3_2/core/boolean-lut.js), [boolean-analysis.js](v0_3_2/core/boolean-analysis.js), doc + teste 1291–1300.
+
+**Nu afectează** runtime ZSTATE / fire. `simplify`/`exprOfLut`: literal X/Z dacă ieșire uniformă, altfel eroare.
+
+---
+
+## Ordine livrare (relația între cele două planuri)
+
+| Document | Rol |
+|----------|-----|
+| [tristate_bus_buffer.plan.md](tristate_bus_buffer.plan.md) | Plan **principal** — faze 1–6 |
+| [filtre_boolean_xz.plan.md](filtre_boolean_xz.plan.md) | Plan **detaliu** doar pentru Faza 6 (nu se livrează separat după ZSTATE) |
+
+**Nu e:** tot ZSTATE → apoi un al doilea proiect independent.
+
+**Este:**
+
+```mermaid
+flowchart LR
+  F1[Faza 1 logic-value + MODE ZSTATE]
+  F2[Faza 2 resolver wire]
+  F3[Faza 3 afișaj]
+  F4[Faza 4 wave]
+  F5[Faza 5 doc ZSTATE]
+  F6[Faza 6 filtre bool * A X Z]
+  F1 --> F2 --> F3 --> F4 --> F5
+  F1 --> F6
+  F6 -.->|doc cross-link| F5
+```
+
+| Ordine recomandată | Motiv |
+|--------------------|-------|
+| **1 → 2 → 3 → 4 → 5 → 6** | Linear, ZSTATE complet apoi analiză booleană |
+| **1 → 6** (apoi 2–5) | Valid dacă vrei rapid `lutOf`/`exprOfLut` cu `*`/`X`/`Z` — Faza 6 depinde **doar** de `logic-value.js` (Faza 1), nu de resolver/timeline |
+| **1 → 2 … 5** fără 6 | MVP ZSTATE fără extensia filtrelor (scripturile actuale cu `x` rămân până la Faza 6) |
+
+**Dependență hard:** Faza 6 **după** Faza 1 (IEEE în `logic-value.js`). Fazele 2–5 și 6 sunt independente între ele.
+
 ---
 
 ## Efort estimat
@@ -319,8 +374,9 @@ sequenceDiagram
 | 3 afișaj / timeline | 4–5 | 1266–1280 |
 | 4 wave + devices | 3–4 | 1281–1290 |
 | 5 doc + regresie | 2–3 | — |
+| 6 filtre bool `*`/`A`/`X`/`Z` | 3–4 | 1291–1300 |
 | Buffer fix regresie | 2–3 | — |
-| **Total** | **~18–26 zile** | **~70 teste** |
+| **Total** | **~21–30 zile** | **~80 teste** |
 
 Mai mic decât planul vechi cu `comp [bus]`/`[buffer]` (~4–5 zile economisești la componente/devices), dar tot **mare** — în special timeline și regresia.
 
@@ -332,7 +388,7 @@ Mai mic decât planul vechi cu `comp [bus]`/`[buffer]` (~4–5 zile economiseșt
 
 1. Interacțiune `MODE ZSTATE` + `MODE WIREWRITE` + `MODE STRICT` — combinații de documentat și testat
 2. Fire cu Z/X în `ADD`/`MUX`/`parseInt` — erori clare sau restricții
-3. `boolean-lut.js` — `x` don't-care ≠ wire Z; fără amestec
+3. ~~`boolean-lut.js` — `x` don't-care ≠ wire Z~~ — **rezolvat în Faza 6:** `*` (binar), `A` (toate), `X`/`Z` (fixe); fără `toLowerCase` pe pattern
 4. Propagare cascade: ordinea contribuțiilor în același pas nu trebuie să schimbe rezultatul resolverului
 5. Regresie suite — ZSTATE strict opt-in
 
