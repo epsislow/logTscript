@@ -1639,6 +1639,24 @@ class Interpreter {
     });
   }
 
+  scheduleTouchOutChange(compName) {
+    this.runSafely(() => {
+      if (this.deferWirePropagation() && this.signalPropagationStrategy) {
+        const executed = new Set();
+        if (this.signalPropagationStrategy._scheduleWiresDependingOnComponent(compName, executed)) {
+          this.signalPropagationStrategy.propagate();
+        } else {
+          this.updateComponentConnections(compName);
+        }
+        this._emitComputedComponentProbes(compName);
+        return;
+      }
+      this.updateComponentConnections(compName);
+      this._emitComputedComponentProbes(compName);
+      if (typeof showVars === 'function') showVars();
+    });
+  }
+
   advanceRegTildeLatchesForWave() {
     if (!this.regPendingMap) return;
     for (const pending of this.regPendingMap.values()) {
@@ -5303,12 +5321,19 @@ if (s.assignment) {
         const compInfo = {
           type: type,
           componentType: null,
+          name: name,
           attributes: attributes,
           initialValue: result.initialValueAddr0 !== undefined ? result.initialValueAddr0 : initialValue,
           returnType: returnType,
           ref: result.ref || null,
           deviceIds: result.deviceIds
         };
+        if (result.touchOutRef) compInfo.touchOutRef = result.touchOutRef;
+        if (result.touchOutValue !== undefined) compInfo.touchOutValue = result.touchOutValue;
+        if (result.touchLatchState !== undefined) compInfo.touchLatchState = result.touchLatchState;
+        if (result.activeTouchPress) compInfo.activeTouchPress = result.activeTouchPress;
+        if (result.clcdSymbols) compInfo.clcdSymbols = result.clcdSymbols;
+        if (result.touchHandler) compInfo.touchHandler = result.touchHandler;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;
@@ -6591,6 +6616,17 @@ if (s.assignment) {
           } else if(part.ref && part.ref !== '&-'){
             const val = this.getValueFromRef(part.ref);
             if(val) value += val;
+          }
+        }
+      }
+
+      const compForImm = this.components.get(component);
+      if(compForImm && this.componentRegistry){
+        const immHandler = this.componentRegistry.get(compForImm.type);
+        if(immHandler && immHandler.handleImmediateAssignment){
+          if(immHandler.handleImmediateAssignment(compForImm, property, value, this)){
+            this._emitComputedComponentProbes(component);
+            continue;
           }
         }
       }

@@ -1,6 +1,6 @@
 # Interactive components
 
-Per-component pages: [switch.md](switch.md), [key.md](key.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md). Full catalog: [components.md](components.md).
+Per-component pages: [switch.md](switch.md), [key.md](key.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md), [clcd.md](clcd.md). Full catalog: [components.md](components.md).
 
 **Switch**, **key**, **dip**, **rotary**, and **slider** are input components you control from the devices panel while the program is running. Their values feed into wires and logic — when you flip a switch, press a key, change a DIP position, turn a rotary knob, or drag a slider, connected wires update automatically.
 
@@ -18,12 +18,13 @@ Inside the engine, each panel control uses a small callback when you interact wi
 |-----------|-------------|--------------|
 | `key` | **`onPress`** | Mouse/touch down — output becomes `1` |
 | `key` | **`onRelease`** | Mouse/touch up — output returns to `0` |
+| `clcd` | **`onPress`** / **`onRelease`** | When `touch: 1`, pointer down/up on a symbol hit box updates `:out` per `touchType` |
 | `switch` | `onChange` | Each time you toggle the control |
 | `dip` | `onChange` | Each time you flip one DIP position (`index`, `checked`) |
 | `rotary` | `onChange` | When the selected **state** changes (drag or step the knob) |
 | `slider` | `onChange` | When the scalar **value** changes (drag thumb or click track) |
 
-**Only `key` uses `onPress` / `onRelease`.** All other panel inputs above use `onChange` (or, for the oscillator, automatic HIGH/LOW transitions — not user clicks).
+**`key` and `clcd` (with `touch: 1`) use `onPress` / `onRelease`.** All other panel inputs above use `onChange` (or, for the oscillator, automatic HIGH/LOW transitions — not user clicks).
 
 From your script’s point of view, the effect is the same: wires that read `.name:get` (or `.name` where supported) are updated through signal propagation after the interaction.
 
@@ -473,6 +474,7 @@ comp [slider] .op:
 |-----------|------|-------------|----------------|------------------|
 | `switch`  | 1    | Toggle      | `onChange`     | Stays `0` or `1` |
 | `key`     | 1    | Press/release | **`onPress` / `onRelease`** | `0` |
+| `clcd`    | `:out` width | Tap symbols (`touch: 1`) | **`onPress` / `onRelease`** | `:out` per `touchType` |
 | `dip`     | N    | Flip each position | `onChange` | Holds last pattern |
 | `rotary`  | `ceil(log₂(states))` | Drag / step knob | `onChange` | Holds last state |
 | `slider`  | `length` | Drag / click track | `onChange` | Holds last value |
@@ -488,6 +490,7 @@ doc(comp.key)
 doc(comp.dip)
 doc(comp.rotary)
 doc(comp.slider)
+doc(comp.clcd)
 ```
 
 ---

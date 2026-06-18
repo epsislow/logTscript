@@ -9889,6 +9889,239 @@ reg(1410, 'clcd', 'doc lists bgColorSym attr', function(h, session) {
   h.assert('bgColorSym attr', String(text.includes('bgColorSym: color')), 'true');
 });
 
+reg(1411, 'clcd', 'Parse touch:1, touchColor, symbol bitOut + touchType', function(h, session) {
+  const stmts = session.parse(`comp [clcd] .panel:
+  touch: 1
+  touchColor: ^ff00ff
+  = {
+    wifi:
+      x: 10  y: 10
+      bit: 0
+      bitOut: 0
+      touchType: 1
+      width: 22  height: 22
+    :
+  }
+  :
+`);
+  const iv = stmts[0].comp.initialValue;
+  h.assert('touch attr', String(stmts[0].comp.attributes.touch), '1');
+  h.assert('touchColor', String(stmts[0].comp.attributes.touchColor).toLowerCase().replace(/^\^/, '#'), '#ff00ff');
+  h.assert('bitOut', String(iv.symbols[0].bitOut), '0');
+  h.assert('touchType', String(iv.symbols[0].touchType), '1');
+});
+
+reg(1412, 'clcd', 'Parse error — bitOut gap (0 and 2 without 1)', function(h, session) {
+  h.assertThrows('bitOut gap', function() {
+    session.parse(`comp [clcd] .bad:
+  touch: 1
+  = {
+    power: x: 0 y: 0 bit: 0 bitOut: 0 :
+    warning: x: 10 y: 10 bit: 1 bitOut: 2 :
+  }
+  :`);
+  }, 'unused bitOut 1');
+});
+
+reg(1413, 'clcd', 'computeTouchRect — padding and width/height', function(h, session) {
+  const Clcd = session._ensureRegistry().get('clcd').constructor;
+  const rect = Clcd.computeTouchRect(
+    { name: 'wifi', x: 10, y: 20, width: 22, height: 22, padding: 4, bitOut: 0 },
+    { touchPadding: 0 }
+  );
+  h.assert('left edge', String(rect.x1), '6');
+  h.assert('top edge', String(rect.y1), '16');
+  h.assert('right edge', String(rect.x2), '36');
+  h.assert('bottom edge', String(rect.y2), '46');
+});
+
+reg(1414, 'clcd', 'hitTestAt — point inside / outside rect', function(h, session) {
+  const Clcd = session._ensureRegistry().get('clcd').constructor;
+  const syms = [{ name: 'wifi', x: 10, y: 10, bit: 0, bitOut: 0, width: 22, height: 22 }];
+  const defs = { touchPadding: 0 };
+  h.assert('inside', String(Clcd.hitTestAt(syms, 15, 15, defs, true).length), '1');
+  h.assert('outside', String(Clcd.hitTestAt(syms, 200, 200, defs, true).length), '0');
+});
+
+reg(1415, 'clcd', 'hitTestAt — two overlapping symbols both hit', function(h, session) {
+  const Clcd = session._ensureRegistry().get('clcd').constructor;
+  const syms = [
+    { name: 'wifi', x: 10, y: 10, bit: 0, bitOut: 0, width: 22, height: 22 },
+    { name: 'bell', x: 10, y: 10, bit: 1, bitOut: 1, width: 22, height: 22 },
+  ];
+  h.assert('both hit', String(Clcd.hitTestAt(syms, 15, 15, { touchPadding: 0 }, true).length), '2');
+});
+
+reg(1416, 'clcd', 'touchOutWidthFromSymbols — bitOut 0,1,2 → width 3', function(h, session) {
+  const Clcd = session._ensureRegistry().get('clcd').constructor;
+  const w = Clcd.touchOutWidthFromSymbols([
+    { bit: 0, bitOut: 0 },
+    { bit: 1, bitOut: 1 },
+    { bit: 2, bitOut: 2 },
+  ]);
+  h.assert('width 3', String(w), '3');
+});
+
+reg(1417, 'clcd', 'Symbol without bitOut excluded from out width', function(h, session) {
+  const Clcd = session._ensureRegistry().get('clcd').constructor;
+  const w = Clcd.touchOutWidthFromSymbols([
+    { bit: 0, bitOut: 0 },
+    { bit: 1 },
+  ]);
+  h.assert('width 1', String(w), '1');
+});
+
+reg(1418, 'clcd', 'touchType 1 — press/release via triggerClcdTouch', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .panel:
+  touch: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
+  }
+  :
+1wire t = .panel:out`);
+  h.assert('initial out 0', session.getCompProperty(interp, '.panel', 'out'), '0');
+  session.triggerClcdTouch(interp, '.panel', { x: 15, y: 15, phase: 'press' });
+  h.assert('press out 1', session.getCompProperty(interp, '.panel', 'out'), '1');
+  session.triggerClcdTouch(interp, '.panel', { x: 15, y: 15, phase: 'release' });
+  h.assert('release out 0', session.getCompProperty(interp, '.panel', 'out'), '0');
+});
+
+reg(1419, 'clcd', 'touchType 2 — pulse returns out to 0 after propagate', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .panel:
+  touch: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 2 width: 22 height: 22 :
+  }
+  :
+`);
+  session.triggerClcdTouch(interp, '.panel', { x: 15, y: 15, phase: 'press' });
+  h.assert('pulse out 0', session.getCompProperty(interp, '.panel', 'out'), '0');
+});
+
+reg(1420, 'clcd', 'touchType 3 — latch toggle on second press', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .panel:
+  touch: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 width: 22 height: 22 :
+  }
+  :
+`);
+  session.triggerClcdTouch(interp, '.panel', { x: 15, y: 15, phase: 'press' });
+  h.assert('first press 1', session.getCompProperty(interp, '.panel', 'out'), '1');
+  session.triggerClcdTouch(interp, '.panel', { x: 15, y: 15, phase: 'press' });
+  h.assert('second press 0', session.getCompProperty(interp, '.panel', 'out'), '0');
+});
+
+reg(1421, 'clcd', 'touchReset mask clears bitOut 2 and 3', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .panel:
+  touch: 1
+  = {
+    power: x: 0 y: 0 bit: 0 bitOut: 0 touchType: 3 width: 20 height: 20 :
+    wifi: x: 25 y: 0 bit: 1 bitOut: 1 touchType: 3 width: 20 height: 20 :
+    bell: x: 50 y: 0 bit: 2 bitOut: 2 touchType: 3 width: 20 height: 20 :
+    warning: x: 75 y: 0 bit: 3 bitOut: 3 touchType: 3 width: 20 height: 20 :
+  }
+  :
+`);
+  session.triggerClcdTouch(interp, '.panel', { x: 10, y: 10, phase: 'press' });
+  session.triggerClcdTouch(interp, '.panel', { x: 35, y: 10, phase: 'press' });
+  session.triggerClcdTouch(interp, '.panel', { x: 60, y: 10, phase: 'press' });
+  session.triggerClcdTouch(interp, '.panel', { x: 85, y: 10, phase: 'press' });
+  h.assert('all latched', session.getCompProperty(interp, '.panel', 'out'), '1111');
+  session.execStmts(interp, `.panel:touchReset = 0011`);
+  h.assert('reset bitOut 2 and 3', session.getCompProperty(interp, '.panel', 'out'), '1100');
+});
+
+reg(1422, 'clcd', 'Wire t = .panel:out updates on press', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .panel:
+  touch: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
+  }
+  :
+1wire t = .panel:out`);
+  h.assert('wire initial 0', session.getWire(interp, 't'), '0');
+  session.triggerClcdTouch(interp, '.panel', { x: 15, y: 15, phase: 'press' });
+  h.assert('wire after press 1', session.getWire(interp, 't'), '1');
+});
+
+reg(1423, 'clcd', 'Property block out> touchWire', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .panel:
+  touch: 1
+  on: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 3 width: 22 height: 22 :
+  }
+  :
+1wire touchWire = 0`);
+  session.triggerClcdTouch(interp, '.panel', { x: 15, y: 15, phase: 'press' });
+  session.execStmts(interp, `.panel:{
+  set = 1
+  out> touchWire
+  }`);
+  h.assert('out> wire', session.getWire(interp, 'touchWire'), '1');
+});
+
+reg(1424, 'clcd', 'touch:0 — triggerClcdTouch is no-op', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .panel:
+  touch: 0
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
+  }
+  :
+1wire t = .panel:out`);
+  session.triggerClcdTouch(interp, '.panel', { x: 15, y: 15, phase: 'press' });
+  h.assert('out unchanged', session.getCompProperty(interp, '.panel', 'out'), '0');
+});
+
+reg(1425, 'clcd', 'Parse error — touchType without bitOut', function(h, session) {
+  h.assertThrows('touchType without bitOut', function() {
+    session.parse(`comp [clcd] .bad:
+  = {
+    wifi: x: 0 y: 0 bit: 0 touchType: 1 :
+  }
+  :`);
+  }, 'touchType requires bitOut');
+});
+
+reg(1426, 'clcd', 'doc(comp.clcd) lists touch, touchColor, out, touchReset', function(h, session) {
+  const out = session.runDoc('doc(comp.clcd)');
+  const text = out.join('\n');
+  h.assert('touch attr', String(text.includes('touch: integer')), 'true');
+  h.assert('touchColor attr', String(text.includes('touchColor: color')), 'true');
+  h.assert('bitOut in init', String(text.includes('bitOut:')), 'true');
+});
+
+reg(1427, 'clcd', 'touchType 1 press/release (wave propagation)', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .panel:
+  touch: 1
+  = {
+    wifi: x: 10 y: 10 bit: 0 bitOut: 0 touchType: 1 width: 22 height: 22 :
+  }
+  :
+1wire t = .panel:out`);
+  session.triggerClcdTouch(interp, '.panel', { x: 15, y: 15, phase: 'press' });
+  h.assert('wave press wire 1', session.getWire(interp, 't'), '1');
+  session.triggerClcdTouch(interp, '.panel', { x: 15, y: 15, phase: 'release' });
+  h.assert('wave release wire 0', session.getWire(interp, 't'), '0');
+}, { propagation: 'wave' });
+
+reg(1428, 'clcd', 'touchReset + wire out (wave propagation)', function(h, session) {
+  const { interp } = session.run(`comp [clcd] .panel:
+  touch: 1
+  = {
+    power: x: 0 y: 0 bit: 0 bitOut: 0 touchType: 3 width: 20 height: 20 :
+    wifi: x: 25 y: 0 bit: 1 bitOut: 1 touchType: 3 width: 20 height: 20 :
+  }
+  :
+2wire t = .panel:out`);
+  session.triggerClcdTouch(interp, '.panel', { x: 10, y: 10, phase: 'press' });
+  session.triggerClcdTouch(interp, '.panel', { x: 35, y: 10, phase: 'press' });
+  h.assert('both latched', session.getWire(interp, 't'), '11');
+  session.execStmts(interp, `.panel:touchReset = 01`);
+  h.assert('reset wire', session.getWire(interp, 't'), '10');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

@@ -28,6 +28,11 @@ class ClcdDisplay {
     symbols = [],
     nl = false,
     initialBits = '0',
+    touch = false,
+    touchColor = null,
+    touchDefaults = { touchPadding: 0 },
+    onPress = null,
+    onRelease = null,
   }) {
     this.id = id;
     this.width = width;
@@ -37,6 +42,11 @@ class ClcdDisplay {
     this.symbols = symbols;
     this.nl = nl;
     this.bits = initialBits;
+    this.touch = touch;
+    this.touchColor = touchColor;
+    this.touchDefaults = touchDefaults;
+    this.onPress = onPress;
+    this.onRelease = onRelease;
     this._dirty = false;
     this._rafId = null;
     this._fontsReady = false;
@@ -46,6 +56,47 @@ class ClcdDisplay {
     this.canvas.height = height;
     this.ctx = this.canvas.getContext('2d');
     this._loadFonts();
+    this._bindTouch();
+  }
+
+  _bindTouch() {
+    if (!this.touch) return;
+    this.canvas.style.cursor = 'pointer';
+
+    const toLocal = (clientX, clientY) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY,
+      };
+    };
+
+    this.canvas.addEventListener('mousedown', (e) => {
+      const p = toLocal(e.clientX, e.clientY);
+      if (typeof this.onPress === 'function') this.onPress(p.x, p.y);
+    });
+
+    this.canvas.addEventListener('mouseup', (e) => {
+      const p = toLocal(e.clientX, e.clientY);
+      if (typeof this.onRelease === 'function') this.onRelease(p.x, p.y);
+    });
+
+    this.canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (!e.touches[0]) return;
+      const p = toLocal(e.touches[0].clientX, e.touches[0].clientY);
+      if (typeof this.onPress === 'function') this.onPress(p.x, p.y);
+    }, { passive: false });
+
+    this.canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const p = toLocal(t.clientX, t.clientY);
+      if (typeof this.onRelease === 'function') this.onRelease(p.x, p.y);
+    }, { passive: false });
   }
 
   mount(parent) {
@@ -118,6 +169,24 @@ class ClcdDisplay {
     return segs.join('');
   }
 
+  _drawTouchDebug(ctx) {
+    if (!this.touch || !this.touchColor) return;
+    const Clcd = (typeof ClcdComponent !== 'undefined') ? ClcdComponent : null;
+    if (!Clcd) return;
+    ctx.save();
+    ctx.strokeStyle = this.touchColor;
+    ctx.lineWidth = 1;
+    for (const sym of this.symbols) {
+      if (sym.bitOut === undefined) continue;
+      const rect = Clcd.computeTouchRect(sym, this.touchDefaults);
+      if (!rect) continue;
+      const w = rect.x2 - rect.x1;
+      const h = rect.y2 - rect.y1;
+      ctx.strokeRect(rect.x1, rect.y1, w, h);
+    }
+    ctx.restore();
+  }
+
   draw() {
     const ctx = this.ctx;
     ctx.fillStyle = this.defaultBgColor;
@@ -150,6 +219,8 @@ class ClcdDisplay {
         this._drawFaIcon(ctx, sym, color);
       }
     }
+
+    this._drawTouchDebug(ctx);
   }
 
   _drawLabel(ctx, sym, color) {
@@ -200,9 +271,8 @@ class ClcdDisplay {
     const t = 3;
     const pad = segBits.padEnd(segCount, '0').substring(0, segCount);
     const seg = function (i) {
-      return pad[i] === '1' ? onColor : offColor
+      return pad[i] === '1' ? onColor : offColor;
     };
-    console.log(pad, seg(1), seg(2), seg(3));
     const drawH = (sx, sy, len, ci) => {
       ctx.fillStyle = seg(ci);
       ctx.fillRect(sx, sy, len, t);

@@ -3325,6 +3325,20 @@ isBuiltinFunction(name) {
             throw Error(`Unknown font weight '${w}' in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
           }
           sym.weight = w;
+        } else if (key === 'bitOut') {
+          sym.bitOut = readInt();
+        } else if (key === 'width') {
+          sym.width = readInt();
+        } else if (key === 'height') {
+          sym.height = readInt();
+        } else if (key === 'padding') {
+          sym.padding = readInt();
+        } else if (key === 'touchType') {
+          const tt = readInt();
+          if (tt !== 1 && tt !== 2 && tt !== 3) {
+            throw Error(`CLCD touchType must be 1, 2, or 3 in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+          }
+          sym.touchType = tt;
         } else {
           throw Error(`Unknown attribute '${key}' in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
         }
@@ -3376,6 +3390,9 @@ isBuiltinFunction(name) {
           throw Error(`CLCD symbol '${symName}' does not support style ${sym.style} at ${this.c.line}:${this.c.col}`);
         }
       }
+      if (sym.touchType !== undefined && sym.bitOut === undefined) {
+        throw Error(`CLCD symbol '${symName}' touchType requires bitOut at ${this.c.line}:${this.c.col}`);
+      }
 
       symbols.push(sym);
       skipWS();
@@ -3389,6 +3406,7 @@ isBuiltinFunction(name) {
 
     if (typeof ClcdComponent !== 'undefined') {
       ClcdComponent.validateContiguousBits(symbols);
+      ClcdComponent.validateContiguousBitOut(symbols);
     }
     return { kind: 'clcdSymbols', symbols };
   }

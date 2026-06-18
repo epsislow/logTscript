@@ -103,6 +103,41 @@
         }
       },
 
+      getComp(interp, name) {
+        const i = interp || this.interp;
+        if (!i) return null;
+        const comp = i.components.get(name);
+        if (!comp) return null;
+        if (comp.ref && comp.ref !== '&-') return i.getValueFromRef(comp.ref);
+        return comp.lastValue || null;
+      },
+
+      getCompProperty(interp, compName, property) {
+        const i = interp || this.interp;
+        if (!i || !i.componentRegistry) return null;
+        const comp = i.components.get(compName);
+        if (!comp) return null;
+        const handler = i.componentRegistry.get(comp.type);
+        if (!handler || !handler.evalGetProperty) return null;
+        const result = handler.evalGetProperty(comp, property, { var: compName, property }, i);
+        return result ? result.value : null;
+      },
+
+      triggerClcdTouch(interp, compName, opts) {
+        const i = interp || this.interp;
+        if (!i) return;
+        const comp = i.components.get(compName);
+        if (!comp || !comp.touchHandler) return;
+        const phase = (opts && opts.phase) || 'press';
+        const x = opts && opts.x !== undefined ? opts.x : 0;
+        const y = opts && opts.y !== undefined ? opts.y : 0;
+        if (phase === 'press' && typeof comp.touchHandler.onPress === 'function') {
+          comp.touchHandler.onPress(x, y);
+        } else if (phase === 'release' && typeof comp.touchHandler.onRelease === 'function') {
+          comp.touchHandler.onRelease(x, y);
+        }
+      },
+
       setComp(interp, name, val) {
         const i = interp || this.interp;
         if (!i) return;

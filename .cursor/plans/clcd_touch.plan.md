@@ -4,22 +4,25 @@ overview: "Extend `comp [clcd]` with touch screen support: `touch` attribute, sy
 todos:
   - id: clcd-core-touch-api
     content: "clcd.js — validateContiguousBitOut, computeTouchRect, hitTestAt, touchOut state, evalGetProperty out/touchReset, createDevice handlers"
-    status: pending
+    status: completed
+  - id: mode-blocker
+    content: "BLOCKED — Plan mode prevents .js edits; switch to Agent mode and re-run implement"
+    status: cancelled
   - id: clcd-parser-touch
     content: "parser.js — parse touch/touchColor/touchPadding + symbol bitOut/width/height/padding/touchType + validation"
-    status: pending
+    status: completed
   - id: clcd-widget-touch
     content: "clcd-widget.js — pointer events, touchColor debug borders, onPress/onRelease callbacks"
-    status: pending
+    status: completed
   - id: clcd-interpreter-propagate
     content: "interpreter.js — touchReset assignment, scheduleTouchOutChange / :out propagation"
-    status: pending
+    status: completed
   - id: clcd-tests-1411
     content: "test_suite.js (English titles/assertions) + test_session triggerClcdTouch; reg 1411–1428; node _gen_manifest.js"
-    status: pending
+    status: completed
   - id: clcd-doc-touch
     content: "doc/clcd.md + interactive-components.md (English); node _gen_doc_data.js"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -281,3 +284,35 @@ comp [clcd] .panel:
 3. Widget hit-testing + `touchColor` debug
 4. Tests 1411–1428 in `test_suite.js` + `triggerClcdTouch` in `test_session.js` + `node _gen_manifest.js`
 5. English docs + `node _gen_doc_data.js`
+
+---
+
+## Interpreter addition (scheduleTouchOutChange)
+
+Add to [`interpreter.js`](v0_3_2/core/interpreter.js) after `scheduleComponentOutputChange`:
+
+```javascript
+scheduleTouchOutChange(compName) {
+  this.runSafely(() => {
+    if (this.deferWirePropagation() && this.signalPropagationStrategy) {
+      this.signalPropagationStrategy.propagate();
+    } else {
+      this.updateComponentConnections(compName);
+    }
+    this._emitComputedComponentProbes(compName);
+    if (typeof showVars === 'function') showVars();
+  });
+}
+```
+
+Does **not** update `comp.ref` (display) — only re-runs wire statements referencing the component (legacy line ~818, wave via `_scheduleWiresDependingOnComponent`).
+
+---
+
+## Registry note
+
+`component-registry.js` `supportsProperty` already calls `supportsPropertyName(attributes)` when defined on handler — `ClcdComponent.supportsPropertyName` gates `out` / `touchReset` on `touchOutWidth > 0`.
+
+`getSupportedProperties(attributes)` signature differs from base — registry uses `supportsPropertyName` path; keep `getSupportedProperties()` no-arg for backward compat returning `['get']` or delegate with attributes from call sites.
+
+**Fix:** implement `supportsPropertyName` only; leave `getSupportedProperties()` returning dynamic list is optional — existing registry checks `supportsPropertyName` first.
