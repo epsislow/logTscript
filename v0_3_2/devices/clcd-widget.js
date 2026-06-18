@@ -61,7 +61,6 @@ class ClcdDisplay {
 
   _bindTouch() {
     if (!this.touch) return;
-    this.canvas.style.cursor = 'pointer';
 
     const toLocal = (clientX, clientY) => {
       const rect = this.canvas.getBoundingClientRect();
@@ -72,6 +71,19 @@ class ClcdDisplay {
         y: (clientY - rect.top) * scaleY,
       };
     };
+
+    const updateCursor = (clientX, clientY) => {
+      const p = toLocal(clientX, clientY);
+      this.canvas.style.cursor = this._touchCursorAt(p.x, p.y);
+    };
+
+    this.canvas.addEventListener('mousemove', (e) => {
+      updateCursor(e.clientX, e.clientY);
+    });
+
+    this.canvas.addEventListener('mouseleave', () => {
+      this.canvas.style.cursor = 'default';
+    });
 
     this.canvas.addEventListener('mousedown', (e) => {
       const p = toLocal(e.clientX, e.clientY);
@@ -97,6 +109,21 @@ class ClcdDisplay {
       const p = toLocal(t.clientX, t.clientY);
       if (typeof this.onRelease === 'function') this.onRelease(p.x, p.y);
     }, { passive: false });
+  }
+
+  _touchHitsAt(px, py) {
+    const Clcd = (typeof ClcdComponent !== 'undefined') ? ClcdComponent : null;
+    if (!Clcd) return [];
+    return Clcd.hitTestAt(this.symbols, px, py, this.touchDefaults, true);
+  }
+
+  _touchCursorAt(px, py) {
+    const hits = this._touchHitsAt(px, py);
+    if (!hits.length) return 'default';
+    for (const sym of hits) {
+      if (Number(sym.touchType) === 3) return 'grab';
+    }
+    return 'pointer';
   }
 
   mount(parent) {

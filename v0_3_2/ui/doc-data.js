@@ -2932,7 +2932,7 @@ Display bits (\`bit\` / \`bits\` → \`:get\`) and touch bits (\`bitOut\` → \`
 
 Default sizes when \`width\` / \`height\` are omitted depend on symbol kind (e.g. FA icons 22×22, \`digit7\` 28×44). Default \`pad\` is the symbol's \`padding\`, else \`touchPadding\`, else \`0\`.
 
-Set component attribute \`touch: 1\` to enable hit-testing. Optional \`touchColor\` draws debug borders around hit boxes.
+Set component attribute \`touch: 1\` to enable hit-testing. Optional \`touchColor\` draws debug borders around hit boxes. With a mouse, the cursor is \`pointer\` over touch zones (\`touchType\` 1 or 2) and \`grab\` over latch zones (\`touchType\` 3); elsewhere it stays the default arrow.
 
 **\`touchType\`** (per symbol with \`bitOut\`):
 
