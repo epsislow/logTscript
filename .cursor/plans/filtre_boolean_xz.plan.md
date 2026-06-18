@@ -21,7 +21,7 @@ todos:
     content: "simplify/exprOfLut: literal X/Z uniform, eroare conflict minterm"
     status: pending
   - id: tests-docs-migrate
-    content: Migrează teste x→*, teste exprOfLut 1297b–d, doc
+    content: Migrează teste x→*, teste exprOfLut 1505–1508, doc
     status: pending
 isProject: false
 ---
@@ -66,4 +66,4 @@ Plan complet (detaliu implementare): `filtre_boolean_xz_155954f9.plan.md` în `.
 - Fără `*` (doar fix X/Z): `numVars=0`, literal ieșire
 - Doar `A` fără `*`: eroare minimizare (sau literal dacă toate ieșirile identice)
 
-Teste noi: 1297 (round-trip `*`), 1297b (`01X11` fix), 1297c (`A` fără `*`), 1297d (conflict minterm).
+Teste noi: **1498–1511** (round-trip `*` 1505, fix X/Z 1499/1506, conflict 1508).

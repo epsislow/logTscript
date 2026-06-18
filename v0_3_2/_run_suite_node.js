@@ -51,6 +51,7 @@ const files = [
   'core/lut-labels.js',
   'core/lut-decode.js',
   'core/boolean-minimize.js',
+  'core/logic-value.js',
   'core/boolean-lut.js',
   'core/boolean-analysis.js',
   'core/watch-expand.js',

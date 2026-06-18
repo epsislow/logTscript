@@ -24,7 +24,11 @@ class SignalPropagationStrategy {
 
   scheduleWireChange(name, value) {
     if (value === null || value === undefined) return false;
-    const stable = this.interp.getWireStableValue(name);
+    const interp = this.interp;
+    if (interp && interp.zstate && interp.deferWirePropagation()) {
+      return interp.queueWireContribution(name, value);
+    }
+    const stable = interp.getWireStableValue(name);
     if (stable === value) return false;
     this.wirePendingStates.set(name, value);
     return true;
@@ -41,7 +45,8 @@ class SignalPropagationStrategy {
   hasPendingChanges() {
     return this.wirePendingStates.size > 0
       || this.componentPendingStates.size > 0
-      || this._recomputeAllWires;
+      || this._recomputeAllWires
+      || (this.interp && this.interp.zstate && this.interp.wireContributionQueue.size > 0);
   }
 
   commitComponentOutputs() {
@@ -58,6 +63,10 @@ class SignalPropagationStrategy {
   }
 
   commitPendingWires() {
+    const interp = this.interp;
+    if (interp && interp.zstate && interp.deferWirePropagation()) {
+      return interp.commitWireResolves();
+    }
     const changed = new Set();
     for (const [name, value] of this.wirePendingStates.entries()) {
       const stable = this.interp.getWireStableValue(name);

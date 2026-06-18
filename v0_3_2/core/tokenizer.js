@@ -113,6 +113,19 @@ pushSource({ src, alias }) {
     return this.token('SYM', '=');
   }
 
+  // Logic literal prefix ?X1X (MODE ZSTATE) — before generic symbols
+  if (c === '?') {
+    this.next();
+    let v = '';
+    while (!this.eof() && /[01XZ]/i.test(this.peek())) {
+      v += this.next();
+    }
+    if (v === '') {
+      throw Error(`Expected logic literal after '?' at ${this.file}: ${this.line}:${this.col}`);
+    }
+    return this.token('LOGIC', v.toUpperCase());
+  }
+
   // Symbols (including { and } for property blocks, ! for NOT prefix, * for multiplier shortname)
     if ('=,+():-./@[]\"\'{}>!*;'.includes(c)) return this.token('SYM', this.next());
 
@@ -182,6 +195,11 @@ pushSource({ src, alias }) {
     if (/^[01]+$/.test(v)) {
       return this.token('BIN', v);
     }
+
+      // Logic literal starting with digit (e.g. 10Z) — MODE ZSTATE
+      if (/^[01][01XZ]*$/i.test(v)) {
+        return this.token('LOGIC', v.toUpperCase());
+      }
 
       // Plain decimal number (fallback for any other digit string)
       if (/^\d+$/.test(v)) {
@@ -283,7 +301,7 @@ pushSource({ src, alias }) {
   }
 
   tokenizeIdentifier(v) {
-    if (['def', 'show', 'peek', 'probe', 'lutOf', 'exprOfLut', 'useLutAs', 'useExpr', 'truthTableOf', 'simplify', 'equivalent', 'inputsOf', 'costOf', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'comp', 'pcb', 'chip', 'board', 'inline', 'doc', 'watch'].includes(v)) {
+    if (['def', 'show', 'peek', 'probe', 'lutOf', 'exprOfLut', 'useLutAs', 'useExpr', 'truthTableOf', 'simplify', 'equivalent', 'inputsOf', 'costOf', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'ZSTATE', 'Z', 'comp', 'pcb', 'chip', 'board', 'inline', 'doc', 'watch'].includes(v)) {
       return this.token('KEYWORD', v);
     }
     if (/^REG$/.test(v)) {

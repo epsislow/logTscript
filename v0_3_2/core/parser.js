@@ -1199,6 +1199,9 @@ assignment() {
     if(this.c.type === 'BIN'){
       atom = {bin: this.c.value};
       this.eat('BIN');
+    } else if(this.c.type === 'LOGIC'){
+      atom = {logic: this.c.value};
+      this.eat('LOGIC');
     } else if(this.c.type === 'HEX'){
       atom = {hex: this.c.value};
       this.eat('HEX');
@@ -1495,12 +1498,24 @@ assignment() {
 
   mode(){
     this.eat('KEYWORD', 'MODE');
-    if(this.c.type !== 'KEYWORD' || (this.c.value !== 'STRICT' && this.c.value !== 'WIREWRITE')){
-      throw Error(`Expected STRICT or WIREWRITE after MODE at ${this.c.line}:${this.c.col}`);
+    if(this.c.type !== 'KEYWORD' || (this.c.value !== 'STRICT' && this.c.value !== 'WIREWRITE' && this.c.value !== 'ZSTATE')){
+      throw Error(`Expected STRICT, WIREWRITE, or ZSTATE after MODE at ${this.c.line}:${this.c.col}`);
     }
     const modeValue = this.c.value;
     this.eat('KEYWORD');
     return {mode: modeValue};
+  }
+
+  zRelease(){
+    this.eat('KEYWORD', 'Z');
+    this.eat('SYM', '(');
+    if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+      throw Error(`Expected wire name in Z() at ${this.c.line}:${this.c.col}`);
+    }
+    const wireName = this.c.value;
+    this.eat(this.c.type);
+    this.eat('SYM', ')');
+    return { zRelease: wireName };
   }
 
   parseComp() {
@@ -2438,6 +2453,20 @@ assignment() {
       atomBin.pad = this.parsePadding();
     }
     return addNot(atomBin);
+  }
+
+  if (this.c.type === 'LOGIC') {
+    const v = this.c.value;
+    this.eat('LOGIC');
+    let br = null;
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      br = this.parseLiteralBitRange();
+    }
+    const atomLogic = br ? { logic: v, bitRange: br } : { logic: v };
+    if (this.c.type === 'SYM' && this.c.value === ';') {
+      atomLogic.pad = this.parsePadding();
+    }
+    return addNot(atomLogic);
   }
   
   if (this.c.type === 'HEX') {
@@ -3469,6 +3498,7 @@ Parser.KEYWORD_HANDLERS = {
   NEXT: 'next',
   TEST: 'test',
   MODE: 'mode',
+  Z: 'zRelease',
   comp: 'parseComp',
   pcb: 'parsePcbInstance',
   chip: 'parseChipInstance',

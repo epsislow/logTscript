@@ -192,6 +192,9 @@ class Interpreter {
     this.regOutputMap=new Map();  // Map from statement to REG current output value (for wire clock)
     this.wireStorageMap=new Map(); // Map from wire name to storage index (for reuse during NEXT)
     this.mode='STRICT'; // Default mode: STRICT (wires immutable)
+    this.zstate = false;
+    this.zReleasedWires = new Set();
+    this.wireContributionQueue = new Map();
     this.aliases = new Map();
     this.components=new Map(); // Component name -> {type, componentType, attributes, initialValue, returnType, ref, deviceIds}
     this.componentConnections=new Map(); // Component name -> {source: ref or expr, bitRange}
@@ -269,6 +272,20 @@ class Interpreter {
   }
 
   getWireEffectiveValue(name) {
+    if (this.zstate) {
+      const q = this.wireContributionQueue.get(name);
+      if (q && q.length) {
+        const wire = this.wires.get(name);
+        const bits = wire ? this.getBitWidth(wire.type) : null;
+        if (q.length === 1 && bits) {
+          return this._fitWireContributionValue(q[0], bits);
+        }
+        if (bits && typeof LogicValue !== 'undefined' && LogicValue.resolveWireVector) {
+          return LogicValue.resolveWireVector(q, bits);
+        }
+        return q[q.length - 1];
+      }
+    }
     if (this.deferWirePropagation() && this.signalPropagationStrategy) {
       const pending = this.signalPropagationStrategy.wirePendingStates;
       if (pending && pending.has(name)) {
@@ -284,7 +301,8 @@ class Interpreter {
     const bits = this.getBitWidth(wire.type);
     let v = value;
     if (bits) {
-      if (v.length < bits) v = v.padStart(bits, '0');
+      const padChar = /[XZ]/.test(String(v)) ? 'Z' : '0';
+      if (v.length < bits) v = v.padStart(bits, padChar);
       else if (v.length > bits) v = v.substring(v.length - bits);
     }
     let storageIdx;
@@ -1514,7 +1532,9 @@ class Interpreter {
   ensureWireSlot(name, type, defaultValue = null) {
     const bits = this.getBitWidth(type);
     if (!bits) return;
-    const init = defaultValue != null ? defaultValue : '0'.repeat(bits);
+    const init = defaultValue != null
+      ? defaultValue
+      : (this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits));
     if (!this.wires.has(name)) {
       const storageIdx = this.storeValue(init);
       this.wireStorageMap.set(name, storageIdx);
@@ -1524,6 +1544,70 @@ class Interpreter {
       this.wireStorageMap.set(name, storageIdx);
       this.wires.get(name).ref = `&${storageIdx}`;
     }
+  }
+
+  beginWireResolvePhase() {
+    this.wireContributionQueue.clear();
+  }
+
+  _fitWireContributionValue(value, bits) {
+    let v = String(value);
+    const padChar = /[XZ]/.test(v) ? 'Z' : '0';
+    if (bits) {
+      if (v.length < bits) v = v.padStart(bits, padChar);
+      else if (v.length > bits) v = v.substring(v.length - bits);
+    }
+    return v;
+  }
+
+  queueWireContribution(name, value, replace = false) {
+    if (value === null || value === undefined) return false;
+    const wire = this.wires.get(name);
+    if (!wire) return false;
+    const bits = this.getBitWidth(wire.type);
+    const v = this._fitWireContributionValue(value, bits);
+    if (replace || !this.wireContributionQueue.has(name)) {
+      this.wireContributionQueue.set(name, [v]);
+    } else {
+      this.wireContributionQueue.get(name).push(v);
+    }
+    return true;
+  }
+
+  commitWireResolves() {
+    const changed = new Set();
+    for (const [name, contribs] of this.wireContributionQueue.entries()) {
+      const wire = this.wires.get(name);
+      if (!wire) continue;
+      const bits = this.getBitWidth(wire.type);
+      const resolved = contribs.length === 1
+        ? this._fitWireContributionValue(contribs[0], bits)
+        : (typeof LogicValue !== 'undefined' && LogicValue.resolveWireVector
+          ? LogicValue.resolveWireVector(contribs, bits)
+          : this._fitWireContributionValue(contribs[contribs.length - 1], bits));
+      const stable = this.getWireStableValue(name);
+      if (stable !== resolved) {
+        this.writeWireStable(name, resolved);
+        changed.add(name);
+      }
+    }
+    this.wireContributionQueue.clear();
+    return changed;
+  }
+
+  _componentSetEnabled(compName) {
+    const pending = this.componentPendingProperties.get(compName);
+    if (!pending || pending.set === undefined) return true;
+    let setValue = pending.set.value;
+    if (setValue === undefined || setValue === null || setValue === '') return false;
+    return setValue === '1' || setValue.slice(-1) === '1';
+  }
+
+  _zstateScheduleWire(targetName, value) {
+    if (this.zstate && this.deferWirePropagation()) {
+      return this.queueWireContribution(targetName, value);
+    }
+    return this.scheduleWireChange(targetName, value);
   }
 
   trackWireStatement(s) {
@@ -1562,7 +1646,39 @@ class Interpreter {
     }
   }
 
+  execZRelease(wireName) {
+    if (!this.zstate) {
+      throw Error('Z() requires MODE ZSTATE');
+    }
+    const wire = this.wires.get(wireName);
+    if (!wire) throw Error(`Unknown wire '${wireName}' in Z()`);
+    const bits = this.getBitWidth(wire.type);
+    if (!bits) throw Error(`Z() target '${wireName}' is not a wire`);
+    const val = 'Z'.repeat(bits);
+    this.zReleasedWires.add(wireName);
+    if (this.signalPropagationStrategy) {
+      this.signalPropagationStrategy.wirePendingStates.delete(wireName);
+    }
+    this.queueWireContribution(wireName, val, true);
+    if (this.deferWirePropagation()) {
+      const changed = this.commitWireResolves();
+      for (const n of changed) {
+        this.updateConnectedComponents(n, this.getWireStableValue(n));
+      }
+      if (!changed.has(wireName)) {
+        this.writeWireStable(wireName, val);
+        this.updateConnectedComponents(wireName, val);
+      }
+    } else {
+      this.writeWireStable(wireName, val);
+      this.updateConnectedComponents(wireName, val);
+    }
+  }
+
   scheduleWireChange(name, value) {
+    if (this.zstate && this.deferWirePropagation()) {
+      return this.queueWireContribution(name, value);
+    }
     if (this.signalPropagationStrategy) {
       return this.signalPropagationStrategy.scheduleWireChange(name, value);
     }
@@ -2215,6 +2331,28 @@ class Interpreter {
       }
       return {value: binStr, ref: null, varName: null};
     }
+    if(a.logic){
+      if (!this.zstate) {
+        throw Error('Logic literals (Z/X) require MODE ZSTATE');
+      }
+      let logicStr = a.logic;
+      if(a.bitRange){
+        const {start, end} = a.bitRange;
+        logicStr = logicStr.substring(start, end + 1);
+      }
+      if (typeof LogicValue !== 'undefined' && LogicValue.validateLogicLiteral) {
+        logicStr = LogicValue.validateLogicLiteral(logicStr, null, 'logic literal');
+      }
+      if(a.pad) logicStr = this.applyPad(logicStr, a.pad);
+      if(a.bitRange || a.pad){
+        return {value: logicStr, ref: null, varName: null, bitWidth: logicStr.length};
+      }
+      if(computeRefs){
+        const idx = this.storeValue(logicStr);
+        return {value: logicStr, ref: `&${idx}`, varName: null};
+      }
+      return {value: logicStr, ref: null, varName: null};
+    }
     if(a.hex){
       // Convert hex to binary
       const hexStr = a.hex;
@@ -2555,9 +2693,17 @@ const idx = parseInt(
   });
 
   // ================= BUILTIN: LOGIC GATES =================
+  const useIeeeGates = typeof LogicValue !== 'undefined'
+    && argValues.some(v => LogicValue.stringHasLogicXZ(v));
+
   // NOT(a): bitwise NOT each bit → same number of bits as input
-  // NOT(111) = 000, NOT(101) = 010, NOT(1) = 0, NOT(0) = 1
   if (name === 'NOT') {
+    if (useIeeeGates) {
+      const v = LogicValue.evalLogicGateCall('NOT', argValues);
+      return computeRefs
+        ? { value: v, ref: `&${this.storeValue(v)}` }
+        : { value: v, ref: null };
+    }
     const a = argValues[0];
     const v = a.split('').map(c => c === '1' ? '0' : '1').join('');
     return computeRefs
@@ -2566,10 +2712,14 @@ const idx = parseInt(
   }
 
   // AND/OR/XOR/NXOR/NAND/NOR: dual-mode
-  //   1 arg  → fold/reduce all bits left-to-right → 1 bit result
-  //   2 args → bitwise operation between matching bits → N bits result
-  // EQ: always 2 args → bitwise EQ → 1 bit reduce
   if (['AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR', 'EQ'].includes(name)) {
+    if (useIeeeGates) {
+      const v = LogicValue.evalLogicGateCall(name, argValues);
+      return computeRefs
+        ? { value: v, ref: `&${this.storeValue(v)}` }
+        : { value: v, ref: null };
+    }
+
     const applyOp = (ai, bi) => {
       switch (name) {
         case 'AND':  return ai && bi;
@@ -3601,8 +3751,26 @@ if (this.isBuiltinDEMUX(name)) {
     }
 
     if(s.mode !== undefined){
-      // MODE statement: change the mode
-      this.mode = s.mode;
+      if (s.mode === 'ZSTATE') {
+        if (!this.deferWirePropagation()) {
+          this.reportRuntimeError(new Error('ZSTATE requires wave signal propagation'));
+          return;
+        }
+        this.zstate = true;
+        this.zReleasedWires.clear();
+        this.wireContributionQueue.clear();
+        this.mode = 'WIREWRITE';
+      } else {
+        this.zstate = false;
+        this.zReleasedWires.clear();
+        this.wireContributionQueue.clear();
+        this.mode = s.mode;
+      }
+      return;
+    }
+
+    if (s.zRelease) {
+      this.runSafely(() => this.execZRelease(s.zRelease));
       return;
     }
 
@@ -4821,7 +4989,10 @@ if (s.assignment) {
           if (this.insideBoardBody || this.insideChipBody) continue;
           throw Error(`Wire ${d.name} already declared at ${loc}`);
         }
-        this.wires.set(d.name, {type: d.type, ref: null});
+        const initVal = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
+        const storageIdx = this.storeValue(initVal);
+        this.wireStorageMap.set(d.name, storageIdx);
+        this.wires.set(d.name, { type: d.type, ref: `&${storageIdx}`, initOnly: true });
       }
       return;
     }
@@ -4872,7 +5043,13 @@ if (s.assignment) {
       }
     }
 
-    const exprResult = this.evalExpr(s.expr, computeRefs);
+    let exprResult;
+    try {
+      exprResult = this.evalExpr(s.expr, computeRefs);
+    } catch (e) {
+      this.reportRuntimeError(e);
+      return;
+    }
     
     // Compute total value from expression
     let totalValue = '';
@@ -5118,6 +5295,21 @@ if (s.assignment) {
     const prevStmt = this.currentStmt;
     this.currentStmt = s;
     const outputs = [];
+
+    if (s.assignment) {
+      const wireName = s.assignment.target.var;
+      if (this.zReleasedWires.has(wireName)) {
+        this.currentStmt = prevStmt;
+        return outputs;
+      }
+    } else if (s.decls) {
+      for (const d of s.decls) {
+        if (d.name !== '_' && this.zReleasedWires.has(d.name)) {
+          this.currentStmt = prevStmt;
+          return outputs;
+        }
+      }
+    }
 
     // Handle pure assignment statements: name = expr  (no type declaration)
     if(s.assignment){
@@ -6742,6 +6934,12 @@ if (s.assignment) {
         getValue = getValue.substring(0, bits);
       }
 
+      if (this.zstate && this.deferWirePropagation()) {
+        if (!this._componentSetEnabled(component)) continue;
+        this._zstateScheduleWire(targetName, getValue);
+        continue;
+      }
+
       let storageIdx = null;
       if(wire.ref){
         const refMatch = wire.ref.match(/^&(\d+)/);
@@ -6797,6 +6995,12 @@ if (s.assignment) {
         redirectValue = redirectValue.padEnd(bits, '0');
       } else if(redirectValue.length > bits){
         redirectValue = redirectValue.substring(0, bits);
+      }
+
+      if (this.zstate && this.deferWirePropagation()) {
+        if (!this._componentSetEnabled(component)) continue;
+        this._zstateScheduleWire(targetName, redirectValue);
+        continue;
       }
 
       let storageIdx = null;

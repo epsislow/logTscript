@@ -3,25 +3,25 @@ name: Tristate ZSTATE Engine
 overview: "B4 tristate integrat în engine (fără comp bus/buffer): MODE ZSTATE, fire nedeclarate fără `=` → Z, multi-driver cu rezolvare IEEE 1164 per pas, conflict → X fără eroare, built-in Z(wire), porți multi-valoare. Fără varianta MUX."
 todos:
   - id: zstate-mode-parser
-    content: "MODE ZSTATE în tokenizer/parser + flag interpreter (opt-in, ca WIREWRITE)"
-    status: pending
+    content: "MODE ZSTATE în tokenizer/parser + flag interpreter (opt-in, wave obligatoriu)"
+    status: completed
   - id: logic-value
-    content: "core/logic-value.js — alfabet 0/1/Z/X, resolveWireBit, porți IEEE 1164 + teste 1222–1235"
-    status: pending
+    content: "core/logic-value.js — alfabet 0/1/Z/X, resolveWireBit, porți IEEE 1164 + teste 1429–1442"
+    status: completed
   - id: z-builtin
-    content: "Built-in Z(wireName) + literal ?X1X (prefix LOGIC în ZSTATE); tokenizer/parser + teste 1236–1245"
-    status: pending
+    content: "Built-in Z(wireName) + literal ?X1X (prefix LOGIC în ZSTATE); tokenizer/parser + teste 1443–1448"
+    status: completed
   - id: wire-init-resolver
-    content: "Init wire fără `=` → Z în ZSTATE; coadă contribuții + commitWireResolves per pas propagare + teste 1241–1265"
-    status: pending
+    content: "Init wire fără `=` → Z în ZSTATE; coadă contribuții + commitWireResolves per pas propagare + teste 1449–1473"
+    status: completed
   - id: multi-driver-paths
     content: "get>= / out>= + re-assign în același pas; conflict bit → X, acord → 0/1, zero driveri → Z"
     status: pending
   - id: storage-display
-    content: "formatValue, show/peek/probe/watch, timeline Z/X + teste 1266–1280"
+    content: "formatValue, show/peek/probe/watch, timeline Z/X + teste 1473–1487"
     status: pending
   - id: wave-propagation
-    content: "signal-propagation edge semantics Z/X, LED/7seg la Z + teste 1281–1290"
+    content: "signal-propagation edge semantics Z/X, LED/7seg la Z + teste 1488–1497"
     status: pending
   - id: doc-regression
     content: "doc/zstate.md, actualizări builtin/debug/signal-propagation, regresie full suite"
@@ -242,17 +242,24 @@ sequenceDiagram
 - În ZSTATE, re-assign-urile multiple din același pas **nu** suprascriu silențios — intră în coadă și se rezolvă.
 - Fără ZSTATE: comportament actual (ultimul câștigă, binar).
 
+### Relație `MODE ZSTATE` ↔ propagare **wave**
+
+- **`MODE ZSTATE` necesită propagare wave** (`deferWirePropagation()` activ). În legacy → eroare: `ZSTATE requires wave signal propagation`.
+- Motiv: multi-driver, `Z(wire)` și `commitWireResolves` (Faza 2) se integrează în bucla wave din `signal-propagation.js`; legacy are `propagate()` fără commit pe coadă.
+- Editorul folosește wave ca default; testele runtime ZSTATE rulează cu `{ propagation: 'wave' }`.
+- **Faza 1 (interim):** `Z(wire)` marchează fire în `zReleasedWires` și sare re-execuția statement-urilor wire pe acel nume la `postExecSrc` — până la resolver multi-driver (Faza 2).
+
 ---
 
 ## Faze de implementare
 
-### Faza 1 — `logic-value.js` + `MODE ZSTATE` + `Z()` (~4–5 zile)
+### Faza 1 — `logic-value.js` + `MODE ZSTATE` + `Z()` (~4–5 zile) ✅
 
 **Fișiere:**
 - [core/logic-value.js](v0_3_2/core/logic-value.js) — **nou**
 - [core/tokenizer.js](v0_3_2/core/tokenizer.js) — keyword `ZSTATE`
 - [core/parser.js](v0_3_2/core/parser.js) — `MODE ZSTATE` (alături de STRICT/WIREWRITE)
-- [core/interpreter.js](v0_3_2/core/interpreter.js) — `this.mode` / flag `zstate`, built-in `Z(wire)`
+- [core/interpreter.js](v0_3_2/core/interpreter.js) — `this.mode` / flag `zstate`, built-in `Z(wire)`, guard wave-only
 
 **Porți IEEE 1164** (activ când operanzii au Z/X):
 
@@ -263,20 +270,18 @@ sequenceDiagram
 | NOT | `0`↔`1`; `Z`→`X`; `X`→`X` |
 | XOR | `X` dacă operand necunoscut și nu e caz trivial |
 
-**Teste:** 1222–1240 (mode flag, Z(), porți 1-bit și vectoriale).
+**Teste:** 1429–1448 (mode flag, Z(), porți, literal logic, eroare legacy fără wave). Runtime ZSTATE: `{ propagation: 'wave' }`.
 
-### Faza 2 — Init Z + coadă contribuții + commit (~5–6 zile)
+### Faza 2 — Init Z + coadă contribuții + commit ✅ COMPLETĂ
 
 **Fișiere:**
 - [core/interpreter.js](v0_3_2/core/interpreter.js) — `ensureWireSlot` init Z în ZSTATE; `queueWireContribution`, `commitWireResolves`; hook în `scheduleWireChange` / redirect `get>=`
-- [core/signal-propagation.js](v0_3_2/core/signal-propagation.js) — `beginWireResolvePhase` / `commitWireResolves` în `_finishPropagate` și bucla Wave (model `beginAllMemWritePhases`)
+- [core/signal-propagation.js](v0_3_2/core/signal-propagation.js) — `commitWireResolves` în bucla Wave
+- [core/logic-value.js](v0_3_2/core/logic-value.js) — `resolveWireVector` (multi-driver per-bit + dedup contribuții identice)
 
-**Puncte de intrare multi-driver:**
-- Redirect `get>=` / `out>=` / `top>=` etc.
-- Re-assign `wire = expr` în același pas
-- Apel `Z(wireName)`
+**Regresie:** 916/916 teste (inclusiv fix `initOnly` la declarație wire fără `=` pentru STRICT/board).
 
-**Teste:** 1241–1265 (~25): init Z, un driver, dual agree, dual conflict→X, triple, zero driveri→Z, tranziție en on/off, wave ordering.
+**Teste:** 1449–1473 (~25): init Z, un driver, dual agree, dual conflict→X, triple, zero driveri→Z, tranziție en on/off, get>= enable/disable.
 
 ### Faza 3 — Storage, afișaj, timeline (~4–5 zile)
 
@@ -288,7 +293,7 @@ sequenceDiagram
 | timeline | [ui/timeline-analyzer.js](v0_3_2/ui/timeline-analyzer.js) | stiluri Z (gri?), X (roșu?) |
 | app | [ui/app.js](v0_3_2/ui/app.js) | `showVars` |
 
-**Teste:** 1266–1280.
+**Teste:** 1473–1487.
 
 ### Faza 4 — Wave + device fallback (~3–4 zile)
 
@@ -296,7 +301,7 @@ sequenceDiagram
 - LED / 7seg: Z/X → off sau caracter special
 - `parseInt(_,2)` pe fire cu Z/X → eroare clară la arithmetic (nu în porți)
 
-**Teste:** 1281–1290.
+**Teste:** 1488–1497.
 
 ### Faza 5 — Documentație + regresie (~2–3 zile)
 
@@ -325,7 +330,7 @@ Plan detaliat: [filtre_boolean_xz.plan.md](filtre_boolean_xz.plan.md).
 
 **Dependență:** Faza 1 (`logic-value.js` — tabele IEEE 1164).
 
-**Fișiere:** [boolean-lut.js](v0_3_2/core/boolean-lut.js), [boolean-analysis.js](v0_3_2/core/boolean-analysis.js), doc + teste 1291–1300.
+**Fișiere:** [boolean-lut.js](v0_3_2/core/boolean-lut.js), [boolean-analysis.js](v0_3_2/core/boolean-analysis.js), doc + teste 1498–1511.
 
 **Nu afectează** runtime ZSTATE / fire. `simplify`/`exprOfLut`: literal X/Z dacă ieșire uniformă, altfel eroare.
 
@@ -369,14 +374,14 @@ flowchart LR
 
 | Fază | Zile (dev) | Teste |
 |------|------------|-------|
-| 1 logic + MODE + Z() | 4–5 | 1222–1240 |
-| 2 resolver engine | 5–6 | 1241–1265 |
-| 3 afișaj / timeline | 4–5 | 1266–1280 |
-| 4 wave + devices | 3–4 | 1281–1290 |
+| 1 logic + MODE + Z() | 4–5 | 1429–1448 |
+| 2 resolver engine | 5–6 | 1449–1473 |
+| 3 afișaj / timeline | 4–5 | 1473–1487 |
+| 4 wave + devices | 3–4 | 1488–1497 |
 | 5 doc + regresie | 2–3 | — |
-| 6 filtre bool `*`/`A`/`X`/`Z` | 3–4 | 1291–1300 |
+| 6 filtre bool `*`/`A`/`X`/`Z` | 3–4 | 1498–1511 |
 | Buffer fix regresie | 2–3 | — |
-| **Total** | **~21–30 zile** | **~80 teste** |
+| **Total** | **~21–30 zile** | **~83 teste** |
 
 Mai mic decât planul vechi cu `comp [bus]`/`[buffer]` (~4–5 zile economisești la componente/devices), dar tot **mare** — în special timeline și regresia.
 
@@ -407,4 +412,14 @@ Mai mic decât planul vechi cu `comp [bus]`/`[buffer]` (~4–5 zile economiseșt
 
 ## ID test alocate
 
-- **1222–1290** (rezervat; ajustat la implementare)
+Ultimul ID în suite (la planificare): **1428** (`clcd`). ZSTATE + filtre boolean — **1429–1511**.
+
+| Interval | Fază | Nr. teste |
+|----------|------|-----------|
+| **1429–1448** | 1 logic + MODE + Z() (wave obligatoriu) | 20 |
+| **1449–1473** | 2 resolver engine | 25 |
+| **1473–1487** | 3 afișaj / timeline | 15 |
+| **1488–1497** | 4 wave + devices | 10 |
+| **1498–1511** | 6 filtre bool `*`/`A`/`X`/`Z` | 14 |
+
+**Notă:** intervalul vechi 1222–1333 rămâne liber (salt 1221→1334); nu se reutilizează pentru a evita confuzia cu planurile vechi.
