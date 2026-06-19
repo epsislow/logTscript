@@ -10884,6 +10884,18 @@ reg(1533, 'error-display', 'compact filter pattern length caret', function(h, se
   });
 });
 
+reg(1534, 'bool-filt', 'simplify non-binary error uses simplify prefix', function(h, session) {
+  const { out } = session.run('2wire B\nsimplify(XOR(B.0-1, B.1), B=AA)');
+  h.assert('simplify prefix', String(out.some(l => l.includes('simplify: conflicting non-binary'))), 'true');
+  h.assert('not exprOfLut prefix', String(!out.some(l => l.includes('exprOfLut: conflicting non-binary'))), 'true');
+});
+
+reg(1535, 'bit-ops', 'unequal width left pad MSB', function(h, session) {
+  h.assert('AND(111,10000) pads to 00111', session.gate('AND', '111', '10000'), '00000');
+  h.assert('AND(11100,10000) no pad', session.gate('AND', '11100', '10000'), '10000');
+  h.assert('OR(111,10000) pads shorter', session.gate('OR', '111', '10000'), '10111');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

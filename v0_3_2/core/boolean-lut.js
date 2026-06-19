@@ -487,7 +487,7 @@ function outputBitIsTrue(ch) {
   return ch === '1';
 }
 
-function classifyOutputColumn(chars) {
+function classifyOutputColumn(chars, contextName = 'exprOfLut') {
   const set = new Set(chars);
   if (set.size === 1) {
     const only = chars[0];
@@ -498,7 +498,9 @@ function classifyOutputColumn(chars) {
   if ([...set].every(c => c === '0' || c === '1')) {
     return { kind: 'binary', bools: chars.map(outputBitIsTrue) };
   }
-  throw new Error('exprOfLut: conflicting non-binary outputs for the same varying assignment');
+  throw new Error(
+    `${contextName}: conflicting non-binary outputs for the same varying assignment`
+  );
 }
 
 function buildFilteredOutputsByMinterm(lutInst, columns, filterMap) {
@@ -518,7 +520,7 @@ function buildFilteredOutputsByMinterm(lutInst, columns, filterMap) {
     const cols = [];
     for (let b = 0; b < depth; b++) {
       const chars = outputsByBit[b].map(v => (v ? '1' : '0'));
-      cols.push(classifyOutputColumn(chars));
+      cols.push(classifyOutputColumn(chars, 'exprOfLut'));
     }
     return { labels, outputCols: cols, depth, numVars };
   }
@@ -546,7 +548,7 @@ function buildFilteredOutputsByMinterm(lutInst, columns, filterMap) {
   const outputCols = [];
   for (let b = 0; b < depth; b++) {
     const chars = assigned[b].map(v => (v === null ? '0' : (v ? '1' : '0')));
-    outputCols.push(classifyOutputColumn(chars));
+    outputCols.push(classifyOutputColumn(chars, 'exprOfLut'));
   }
 
   const outputsByBitQm = outputCols.map(col => (

@@ -97,7 +97,15 @@ Same `column=pattern` syntax as `truthTableOf` / `lutOf` (comma between assignme
 simplify(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 ```
 
-Minimization uses only the **varying** bits (`x` positions) as QM inputs — same rules as `exprOfLut(.generated)` with `filters:`.
+Minimization uses only the **varying** bits (`*` positions) as QM inputs — same rules as `exprOfLut(.generated)` with `filters:`.
+
+**`A` vs `*` for `simplify`:** `*` marks a binary don't-care that becomes a Quine–McCluskey variable. `A` expands rows (0/1/X/Z) but does **not** add QM variables. If filters use only `A` (no `*`), IEEE evaluation may produce mixed `0`/`1`/`X`/`Z` outputs that cannot be minimized to a single boolean expression — error:
+
+```text
+simplify: conflicting non-binary outputs for the same varying assignment
+```
+
+Use `*` when you want minimization over binary inputs; use `truthTableOf` / `lutOf` to inspect full IEEE tables with `A`. The same classification runs inside `exprOfLut` with prefix `exprOfLut:` when rebuilding from a filtered LUT.
 
 Multi-bit output uses ` + ` between segments (grouped constants when possible).
 

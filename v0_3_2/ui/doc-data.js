@@ -1648,6 +1648,7 @@ truthTableOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)
 \`\`\`
 
 - Pattern length must match column width.
+- **Compact wire filter:** \`Wire=pattern\` on a declared wire maps substrings to every slice used in the expression (\`B.0\`, \`B.0-2\`, \`B.1/3\`, …). Pattern length = wire width; bit index \`i\` uses pattern character \`i\`. Example: \`4wire B\` + \`truthTableOf(XOR(B.0-2, B.1/3), B=AA*0)\`.
 - Partial filters OK — unlisted columns enumerate all combinations.
 - Rows follow \`enumerateFilteredEnvs\` order.
 
@@ -1679,7 +1680,15 @@ Same \`column=pattern\` syntax as \`truthTableOf\` / \`lutOf\` (comma between as
 simplify(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 \`\`\`
 
-Minimization uses only the **varying** bits (\`x\` positions) as QM inputs — same rules as \`exprOfLut(.generated)\` with \`filters:\`.
+Minimization uses only the **varying** bits (\`*\` positions) as QM inputs — same rules as \`exprOfLut(.generated)\` with \`filters:\`.
+
+**\`A\` vs \`*\` for \`simplify\`:** \`*\` marks a binary don't-care that becomes a Quine–McCluskey variable. \`A\` expands rows (0/1/X/Z) but does **not** add QM variables. If filters use only \`A\` (no \`*\`), IEEE evaluation may produce mixed \`0\`/\`1\`/\`X\`/\`Z\` outputs that cannot be minimized to a single boolean expression — error:
+
+\`\`\`text
+simplify: conflicting non-binary outputs for the same varying assignment
+\`\`\`
+
+Use \`*\` when you want minimization over binary inputs; use \`truthTableOf\` / \`lutOf\` to inspect full IEEE tables with \`A\`. The same classification runs inside \`exprOfLut\` with prefix \`exprOfLut:\` when rebuilding from a filtered LUT.
 
 Multi-bit output uses \` + \` between segments (grouped constants when possible).
 
@@ -1814,9 +1823,19 @@ Instance name is always **\`.generated\`**. Paste the block into a script, then 
 - **With filters:** \`length\` = number of rows emitted (≤ 256); \`filters:\` documents which input combinations are included.
 - **Without filters:** \`length = 2^(sum column widths)\` (≤ 256).
 - **\`description:\`** lists column widths; **\`filters:\`** uses \`0\`, \`1\`, \`*\` (binary don't-care), \`A\` (all values), \`X\`, \`Z\` per bit (index \`0\` = leftmost, same as \`bitRange\`). Lowercase \`x\` is rejected — use \`*\`.
+- **Compact wire filter:** when the expression uses bit slices (\`B.0\`, \`B.0-2\`, \`B.1/3\`, …), you can filter the whole declared wire in one assignment instead of per slice. Pattern length = wire width; each discovered column takes the matching substring (bit \`i\` → pattern character at index \`i\`).
+
+\`\`\`logts
+4wire B
+lutOf(XOR(B.0-2, B.1/3), B=AA*0)
+\`\`\`
+
+Equivalent to \`B.0-2=AA*, B.1/3=A*0\` but shorter. Works for \`lutOf\`, \`truthTableOf\`, \`simplify\`, and round-trips through \`exprOfLut\` when the LUT has \`filters: B=AA*0\`.
+
 - Undeclared atomic variables (\`A\`, \`B\` in gates) default to **1 bit**.
 - Whole wires (\`lutOf(C)\` on \`7wire C\`) use the declared wire width.
 - Non-boolean ops (\`LSHIFT\`, etc.) → error.
+- **Logic gates** with unequal-width operands: shorter operand is **left-padded** with \`0\` (see [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md#unequal-operand-widths-left-pad)).
 
 ---
 
@@ -1841,7 +1860,7 @@ exprOfLut(.generated)
 
 \`exprOfLut\` reads the \`description:\` and \`filters:\` attributes. Only bit positions marked \`*\` in the filter patterns become variables — for \`A=01*1*, B=*, C=1001*\` that is \`A.2\`, \`A.4\`, \`B\`, \`C.4\`.
 
-When operands contain \`X\` or \`Z\`, boolean analysis uses **IEEE 1164** gate tables (see [zstate.md](zstate.md)). Uniform \`X\`/\`Z\` outputs simplify to literals.
+When operands contain \`X\` or \`Z\`, boolean analysis uses **IEEE 1164** gate tables (see [zstate.md](zstate.md)). Uniform \`X\`/\`Z\` outputs simplify to literals. If filtered rows yield mixed non-binary outputs for the same QM assignment, \`exprOfLut\` reports \`exprOfLut: conflicting non-binary outputs for the same varying assignment\` (the same check in \`simplify\` uses the \`simplify:\` prefix).
 
 You can pass variables explicitly; they must match those varying bits in the same order.
 
@@ -2548,7 +2567,29 @@ Index: [builtin-functions.md](builtin-functions.md) · Short notation (\`&\`, \`
 
 **1-argument mode (fold):** \`OR(a)\` folds across all bits of \`a\` → **1 bit**.
 
-**2-argument mode (bitwise):** \`OR(a, b)\` applies the gate bit-by-bit → **N bits** (width of operands).
+**2-argument mode (bitwise):** \`OR(a, b)\` applies the gate bit-by-bit → **N bits** (\`N = max(width(a), width(b))\`).
+
+### Unequal operand widths (left pad)
+
+When the two operands have different lengths, the **shorter** one is extended with \`0\` on the **left** (MSB side) until both match. Index \`0\` is the leftmost bit — same convention as \`wire.0\` and \`bitRange\`.
+
+\`\`\`
+AND(111, 10000)
+  → AND(00111, 10000)
+  → 00000
+
+AND(11100, 10000)
+  → 10000   (operands already same width; no padding)
+\`\`\`
+
+| Shorter operand | Padded to 5 bits |
+|-----------------|------------------|
+| \`111\` | \`00111\` (not \`11100\`) |
+| \`11\` | \`00011\` |
+
+Applies to \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, and \`EQ\` (bitwise compare before folding to 1 bit). Boolean analysis (\`lutOf\`, \`truthTableOf\`, \`simplify\`, …) uses the same rules.
+
+**1-argument fold** is unrelated: \`AND(111)\` folds all bits of one operand to a single \`1bit\` result.
 
 ---
 
@@ -2575,6 +2616,15 @@ show(y)
 Dual-mode gates (fold or bitwise). Example with OR:
 
 ### Runnable example
+
+\`\`\`logts-play
+5wire a = 111
+5wire b = 10000
+5wire y = AND(a, b)
+show(y)
+\`\`\`
+
+\`a\` is only 3 bits; \`AND\` pads it to \`00111\` before combining with \`b\`.
 
 \`\`\`logts-play
 4wire a = 1100

@@ -46,7 +46,7 @@ function minimizeExprOutputs(exprAst, columns, widthResolver, filters) {
       const cols = [];
       for (let b = 0; b < outWidth; b++) {
         const chars = rows.map(row => row.output.padStart(outWidth, '0')[b]);
-        cols.push(classifyOutputColumn(chars));
+        cols.push(classifyOutputColumn(chars, 'simplify'));
       }
       outputCols = cols;
     } else {
@@ -74,7 +74,7 @@ function minimizeExprOutputs(exprAst, columns, widthResolver, filters) {
       outputCols = [];
       for (let b = 0; b < outWidth; b++) {
         const chars = assigned[b].map(v => (v === null ? '0' : v));
-        outputCols.push(classifyOutputColumn(chars));
+        outputCols.push(classifyOutputColumn(chars, 'simplify'));
       }
     }
   } else {
@@ -82,7 +82,7 @@ function minimizeExprOutputs(exprAst, columns, widthResolver, filters) {
     outputCols = [];
     for (let b = 0; b < outWidth; b++) {
       const chars = rows.map(row => row.output.padStart(outWidth, '0')[b]);
-      outputCols.push(classifyOutputColumn(chars));
+      outputCols.push(classifyOutputColumn(chars, 'simplify'));
     }
   }
 
