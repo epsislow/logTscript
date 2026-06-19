@@ -179,6 +179,41 @@ function bitSpanForAtom(atom) {
   return { start: br.start, width };
 }
 
+function parentWireWidthFromFilterSpec(f) {
+  const pattern = String(f.pattern);
+  if (!f.bitRange) return pattern.length;
+  const span = bitSpanForAtom({ bitRange: f.bitRange });
+  if (!span) return pattern.length;
+  return Math.max(span.start + span.width, pattern.length);
+}
+
+function buildFilterWidthMap(filters) {
+  const map = new Map();
+  if (!filters || !filters.length) return map;
+  for (const f of filters) {
+    const w = parentWireWidthFromFilterSpec(f);
+    const prev = map.get(f.name);
+    map.set(f.name, prev != null ? Math.max(prev, w) : w);
+  }
+  return map;
+}
+
+function makeAnalysisWidthResolver(baseResolver, filterWidthMap) {
+  const base = baseResolver || (() => null);
+  const map = filterWidthMap || new Map();
+  return function (name) {
+    const declared = base(name);
+    if (declared != null && declared >= 1) return declared;
+    if (map.has(name)) return map.get(name);
+    return null;
+  };
+}
+
+function discoverColumnsForAnalysis(exprAst, widthResolver, filters) {
+  const enhanced = makeAnalysisWidthResolver(widthResolver, buildFilterWidthMap(filters));
+  return discoverLutOfInputs(exprAst, enhanced);
+}
+
 function patternSubstringForColumn(parentPattern, atom) {
   const span = bitSpanForAtom(atom);
   if (!span) return parentPattern;
@@ -187,6 +222,20 @@ function patternSubstringForColumn(parentPattern, atom) {
 
 function validatePatternChars(contextName, key, pattern, f) {
   for (const ch of pattern) {
+    if (contextName === 'simplify' && ch === 'A') {
+      throwFilterError(
+        `${contextName}: cannot use A in filters, please use * instead`,
+        f,
+        'pattern'
+      );
+    }
+    if (contextName === 'exprOfLut' && ch === 'A') {
+      throwFilterError(
+        `${contextName}: cannot accept a lut with A in filters attribute`,
+        f,
+        'pattern'
+      );
+    }
     if (ch === 'x') {
       throwFilterError(
         `${contextName}: use '*' instead of 'x' for binary don't-care in '${key}=${pattern}'`,
@@ -860,9 +909,10 @@ function formatMultiBitStandard(segments) {
 const LUT_OF_INLINE_NAME = '.generated';
 
 function lutOfBuild(exprAst, widthResolver, filters) {
-  const columns = discoverLutOfInputs(exprAst, widthResolver);
-  const filterMap = validateAndBuildFilterMap(columns, filters, 'lutOf', widthResolver);
-  const { rows, addrWidth, outWidth } = collectFilteredRows(exprAst, columns, widthResolver, filterMap);
+  const enhanced = makeAnalysisWidthResolver(widthResolver, buildFilterWidthMap(filters));
+  const columns = discoverLutOfInputs(exprAst, enhanced);
+  const filterMap = validateAndBuildFilterMap(columns, filters, 'lutOf', enhanced);
+  const { rows, addrWidth, outWidth } = collectFilteredRows(exprAst, columns, enhanced, filterMap);
 
   const description = `${columns.map(c => c.header).join(', ')} -> out ${outWidth}b`;
   const attributes = { description };
@@ -1039,7 +1089,8 @@ function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
   if (varSpecs.length > 0 && attrs.filters && attrs.description) {
     const columns = parseLutDescriptionString(attrs.description);
     const filters = parseFiltersAttributeString(attrs.filters);
-    const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut', widthResolver);
+    const enhanced = makeAnalysisWidthResolver(widthResolver, buildFilterWidthMap(filters));
+    const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut', enhanced);
     const autoLabels = varyingBitLabels(columns, filterMap);
     const expanded = expandExprOfLutVars(varSpecs, widthResolver);
     if (!labelsMatch(expanded.labels, autoLabels)) {
@@ -1066,7 +1117,8 @@ function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
     }
     const columns = parseLutDescriptionString(attrs.description);
     const filters = parseFiltersAttributeString(attrs.filters);
-    const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut', widthResolver);
+    const enhanced = makeAnalysisWidthResolver(widthResolver, buildFilterWidthMap(filters));
+    const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut', enhanced);
     const built = buildFilteredOutputsByMinterm(lutInst, columns, filterMap);
     labels = built.labels;
     outputCols = built.outputCols || built.outputsByBit.map(bools => ({ kind: 'binary', bools }));
@@ -1123,6 +1175,9 @@ if (typeof module !== 'undefined' && module.exports) {
     bitIndexWidth,
     lutAddrBits,
     discoverLutOfInputs,
+    discoverColumnsForAnalysis,
+    buildFilterWidthMap,
+    makeAnalysisWidthResolver,
     mergeDiscoveredColumns,
     countFullTableRows,
     assertTableRowsWithinLimit,

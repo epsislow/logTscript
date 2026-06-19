@@ -75,7 +75,7 @@ lutOf(XOR(B.0-2, B.1/3), B=AA*0)
 
 Equivalent to `B.0-2=AA*, B.1/3=A*0` but shorter. Works for `lutOf`, `truthTableOf`, `simplify`, and round-trips through `exprOfLut` when the LUT has `filters: B=AA*0`.
 
-- Undeclared atomic variables (`A`, `B` in gates) default to **1 bit**.
+- Undeclared atomic variables default to **1 bit**, unless a filter on that name sets the width (`C=01` → 2b). Declared `Nwire` always wins. See [boolean-analysis.md](boolean-analysis.md#with-filters--a--x--z).
 - Whole wires (`lutOf(C)` on `7wire C`) use the declared wire width.
 - Non-boolean ops (`LSHIFT`, etc.) → error.
 - **Logic gates** with unequal-width operands: shorter operand is **left-padded** with `0` (see [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md#unequal-operand-widths-left-pad)).
@@ -103,7 +103,7 @@ exprOfLut(.generated)
 
 `exprOfLut` reads the `description:` and `filters:` attributes. Only bit positions marked `*` in the filter patterns become variables — for `A=01*1*, B=*, C=1001*` that is `A.2`, `A.4`, `B`, `C.4`.
 
-When operands contain `X` or `Z`, boolean analysis uses **IEEE 1164** gate tables (see [zstate.md](zstate.md)). Uniform `X`/`Z` outputs simplify to literals. If filtered rows yield mixed non-binary outputs for the same QM assignment, `exprOfLut` reports `exprOfLut: conflicting non-binary outputs for the same varying assignment` (the same check in `simplify` uses the `simplify:` prefix).
+**`A` is not allowed when rebuilding from a LUT** — `exprOfLut` reads the LUT `filters:` attribute; if it contains `A`, error: `exprOfLut: cannot accept a lut with A in filters attribute`. Use `*` on bits that should become QM variables. IEEE tables with `A` remain valid via `lutOf` / `truthTableOf`.
 
 You can pass variables explicitly; they must match those varying bits in the same order.
 

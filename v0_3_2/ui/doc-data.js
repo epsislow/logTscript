@@ -1650,6 +1650,23 @@ truthTableOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)
 \`\`\`
 
 - Pattern length must match column width.
+- **Undeclared wires and filter width** (for \`simplify\`, \`truthTableOf\`, \`lutOf\` only — not \`inputsOf\`):
+
+| Situation | Width used |
+|-----------|------------|
+| \`Nwire X\` declared in script | declaration (wins over filter) |
+| Undeclared, filter \`X=pattern\` (no bit range in filter) | \`pattern.length\` |
+| Undeclared, filter \`X.start-end=pattern\` / \`X.start/len=pattern\` | covers bits through \`end\` (parent wire width) |
+| Undeclared, no filter for \`X\` | **1b** default |
+| Expression uses \`X.i\` / \`X.0-1\` / \`X.1/3\` | slice width from expression (unchanged) |
+
+\`\`\`logts-play
+2wire B
+simplify(XOR(B, C), B=**, C=01)
+\`\`\`
+
+\`C\` is not declared; filter \`C=01\` gives **2b**. No \`2wire C\` line required.
+
 - **Compact wire filter:** \`Wire=pattern\` on a declared wire maps substrings to every slice used in the expression (\`B.0\`, \`B.0-2\`, \`B.1/3\`, …). Pattern length = wire width; bit index \`i\` uses pattern character \`i\`. Example: \`4wire B\` + \`truthTableOf(XOR(B.0-2, B.1/3), B=AA*0)\`.
 - Partial filters OK — unlisted columns enumerate all combinations.
 - Rows follow \`enumerateFilteredEnvs\` order.
@@ -1684,13 +1701,16 @@ simplify(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 
 Minimization uses only the **varying** bits (\`*\` positions) as QM inputs — same rules as \`exprOfLut(.generated)\` with \`filters:\`.
 
-**\`A\` vs \`*\` for \`simplify\`:** \`*\` marks a binary don't-care that becomes a Quine–McCluskey variable. \`A\` expands rows (0/1/X/Z) but does **not** add QM variables. If filters use only \`A\` (no \`*\`), IEEE evaluation may produce mixed \`0\`/\`1\`/\`X\`/\`Z\` outputs that cannot be minimized to a single boolean expression — error:
+**\`A\` in \`simplify\` / \`exprOfLut\` filters:** \`A\` is not allowed — use \`*\` for binary don't-care. Error:
 
 \`\`\`text
-simplify: conflicting non-binary outputs for the same varying assignment
+simplify: cannot use A in filters, please use * instead
+exprOfLut: cannot accept a lut with A in filters attribute
 \`\`\`
 
-Use \`*\` when you want minimization over binary inputs; use \`truthTableOf\` / \`lutOf\` to inspect full IEEE tables with \`A\`. The same classification runs inside \`exprOfLut\` with prefix \`exprOfLut:\` when rebuilding from a filtered LUT.
+For IEEE expansion with \`A\`, use \`truthTableOf\` / \`lutOf\` (runtime LUT). Round-trip \`lutOf\` → \`exprOfLut\` requires \`*\` only on varying bits, not \`A\`.
+
+**\`A\` vs \`*\` in \`lutOf\` / \`truthTableOf\`:** \`*\` marks a binary don't-care; \`A\` expands rows (0/1/X/Z). \`exprOfLut\` rebuilds using only \`*\` positions as QM variables.
 
 Multi-bit output uses \` + \` between segments (grouped constants when possible).
 
@@ -1834,7 +1854,7 @@ lutOf(XOR(B.0-2, B.1/3), B=AA*0)
 
 Equivalent to \`B.0-2=AA*, B.1/3=A*0\` but shorter. Works for \`lutOf\`, \`truthTableOf\`, \`simplify\`, and round-trips through \`exprOfLut\` when the LUT has \`filters: B=AA*0\`.
 
-- Undeclared atomic variables (\`A\`, \`B\` in gates) default to **1 bit**.
+- Undeclared atomic variables default to **1 bit**, unless a filter on that name sets the width (\`C=01\` → 2b). Declared \`Nwire\` always wins. See [boolean-analysis.md](boolean-analysis.md#with-filters--a--x--z).
 - Whole wires (\`lutOf(C)\` on \`7wire C\`) use the declared wire width.
 - Non-boolean ops (\`LSHIFT\`, etc.) → error.
 - **Logic gates** with unequal-width operands: shorter operand is **left-padded** with \`0\` (see [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md#unequal-operand-widths-left-pad)).
@@ -1862,7 +1882,7 @@ exprOfLut(.generated)
 
 \`exprOfLut\` reads the \`description:\` and \`filters:\` attributes. Only bit positions marked \`*\` in the filter patterns become variables — for \`A=01*1*, B=*, C=1001*\` that is \`A.2\`, \`A.4\`, \`B\`, \`C.4\`.
 
-When operands contain \`X\` or \`Z\`, boolean analysis uses **IEEE 1164** gate tables (see [zstate.md](zstate.md)). Uniform \`X\`/\`Z\` outputs simplify to literals. If filtered rows yield mixed non-binary outputs for the same QM assignment, \`exprOfLut\` reports \`exprOfLut: conflicting non-binary outputs for the same varying assignment\` (the same check in \`simplify\` uses the \`simplify:\` prefix).
+**\`A\` is not allowed when rebuilding from a LUT** — \`exprOfLut\` reads the LUT \`filters:\` attribute; if it contains \`A\`, error: \`exprOfLut: cannot accept a lut with A in filters attribute\`. Use \`*\` on bits that should become QM variables. IEEE tables with \`A\` remain valid via \`lutOf\` / \`truthTableOf\`.
 
 You can pass variables explicitly; they must match those varying bits in the same order.
 

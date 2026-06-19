@@ -10884,10 +10884,10 @@ reg(1533, 'error-display', 'compact filter pattern length caret', function(h, se
   });
 });
 
-reg(1534, 'bool-filt', 'simplify non-binary error uses simplify prefix', function(h, session) {
+reg(1534, 'bool-filt', 'simplify rejects A in filter patterns', function(h, session) {
   const { out } = session.run('2wire B\nsimplify(XOR(B.0-1, B.1), B=AA)');
-  h.assert('simplify prefix', String(out.some(l => l.includes('simplify: conflicting non-binary'))), 'true');
-  h.assert('not exprOfLut prefix', String(!out.some(l => l.includes('exprOfLut: conflicting non-binary'))), 'true');
+  h.assert('message', String(out.some(l => l.includes('simplify: cannot use A in filters, please use * instead'))), 'true');
+  h.assert('not non-binary', String(!out.some(l => l.includes('conflicting non-binary'))), 'true');
 });
 
 reg(1535, 'bit-ops', 'unequal width left pad MSB', function(h, session) {
@@ -10906,6 +10906,55 @@ ZRELEASE(z)`);
   h.assert('Z value', session.getWire(interp, 'Z'), '0');
   h.assert('ZZZ value', session.getWire(interp, 'ZZZ'), '1');
 }, { propagation: 'wave' });
+
+reg(1537, 'bool-filt', 'undeclared wire width from filter pattern', function(h, session) {
+  const { out } = session.run('2wire B\nsimplify(XOR(B, C), B=**, C=01)');
+  h.assert('short', out[0], '2wire out = `(B.0) + (!B.1)`');
+  h.assert('std', out[1], '2wire out = B.0 + NOT(B.1)');
+});
+
+reg(1538, 'bool-filt', 'undeclared wire width 3 from filter', function(h, session) {
+  const { out } = session.run('2wire B\nsimplify(XOR(B, C), B=**, C=***)');
+  h.assert('3b out', out[0].startsWith('3wire out'), 'true');
+});
+
+reg(1539, 'bool-filt', 'undeclared wire default 1b without filter', function(h, session) {
+  const { out } = session.run('2wire B\nsimplify(XOR(B, C), B=**)');
+  h.assert('has C', String(out[1].includes('C')), 'true');
+  h.assert('2b out', out[0].startsWith('2wire out'), 'true');
+});
+
+reg(1540, 'bool-filt', 'truthTableOf undeclared C from filter width', function(h, session) {
+  const { out } = session.run('2wire B\ntruthTableOf(XOR(B, C), B=**, C=01)');
+  h.assert('header', out[0], 'B C | OUT');
+  h.assert('row', out[2], '00 01 | 01');
+});
+
+reg(1541, 'bool-filt', 'lutOf undeclared C from filter width', function(h, session) {
+  const { out } = session.run('2wire B\nlutOf(XOR(B, C), B=**, C=01)');
+  const text = out.join('\n');
+  h.assert('description', String(text.includes('C 2b')), 'true');
+  h.assert('no mismatch', String(!text.includes('pattern length mismatch')), 'true');
+});
+
+reg(1542, 'bool-filt', 'declared wire width beats filter inference', function(h, session) {
+  const { out } = session.run('2wire B\n2wire C\nsimplify(XOR(B, C), B=**, C=***)');
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('mismatch', String(err.includes('pattern length mismatch')), 'true');
+});
+
+reg(1543, 'bool-filt', 'slice in expr without filter on parent', function(h, session) {
+  const { out } = session.run('2wire B\nsimplify(XOR(B, C.1-2), B=**)');
+  h.assert('uses C.1', String(out[1].includes('C.1')), 'true');
+  h.assert('uses C.2', String(out[1].includes('C.2')), 'true');
+});
+
+reg(1544, 'bool-filt', 'exprOfLut rejects A in LUT filters attribute', function(h, session) {
+  const { out } = session.run(`useLutAs(lutOf(AND(B, C), B=*, C=A), .b)
+exprOfLut(.b)`);
+  h.assert('message', String(out.some(l => l.includes('exprOfLut: cannot accept a lut with A in filters attribute'))), 'true');
+  h.assert('not minterm conflict', String(!out.some(l => l.includes('conflicting output at minterm'))), 'true');
+});
 
 
   window.LogTScriptTestSuite = {

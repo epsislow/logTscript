@@ -1,8 +1,9 @@
 /* ================= BOOLEAN ANALYSIS — truthTableOf / simplify / equivalent / inputsOf / costOf ================= */
 
 function truthTableOfGenerate(exprAst, widthResolver, filters) {
-  const columns = discoverLutOfInputs(exprAst, widthResolver);
-  const filterMap = validateAndBuildFilterMap(columns, filters, 'truthTableOf', widthResolver);
+  const enhanced = makeAnalysisWidthResolver(widthResolver, buildFilterWidthMap(filters));
+  const columns = discoverLutOfInputs(exprAst, enhanced);
+  const filterMap = validateAndBuildFilterMap(columns, filters, 'truthTableOf', enhanced);
   const envs = enumerateFilteredEnvs(columns, filterMap);
   assertTableRowsWithinLimit(envs.length);
 
@@ -11,7 +12,7 @@ function truthTableOfGenerate(exprAst, widthResolver, filters) {
   lines.push('--------------');
 
   for (const env of envs) {
-    const result = evalBooleanParts(exprAst, env, widthResolver);
+    const result = evalBooleanParts(exprAst, env, enhanced);
     const cells = columns.map(c => env[c.key]);
     lines.push(cells.join(' ') + ' | ' + result);
   }
@@ -98,11 +99,12 @@ function minimizeExprOutputs(exprAst, columns, widthResolver, filters) {
 }
 
 function simplifyGenerate(exprAst, widthResolver, filters) {
-  const columns = discoverLutOfInputs(exprAst, widthResolver);
+  const enhanced = makeAnalysisWidthResolver(widthResolver, buildFilterWidthMap(filters));
+  const columns = discoverLutOfInputs(exprAst, enhanced);
   if (!filters || filters.length === 0) {
     assertInputWidthWithinLimit(columns);
   }
-  const { mins, outWidth } = minimizeExprOutputs(exprAst, columns, widthResolver, filters);
+  const { mins, outWidth } = minimizeExprOutputs(exprAst, columns, enhanced, filters);
 
   const segmentsShort = mins.map(formatMinimizedShort);
   const segmentsStd = mins.map(formatMinimizedStandard);
