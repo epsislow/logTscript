@@ -28,7 +28,7 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 
 ### `ZRELEASE(wireName)` — tristate release
 
-Statement available only after `MODE ZSTATE`. Releases every bit of the wire to high-impedance (`Z`) in the current propagation step. Wire names `z`, `Z`, and `ZZZ` are allowed — only the keyword `ZRELEASE` is reserved.
+Statement available only after `MODE ZSTATE` — see [script modes](modes.md) and [zstate.md](zstate.md). Releases every bit of the wire to high-impedance (`Z`) in the current propagation step. Wire names `z`, `Z`, and `ZZZ` are allowed — only the keyword `ZRELEASE` is reserved.
 
 ```logts-play wave
 MODE ZSTATE

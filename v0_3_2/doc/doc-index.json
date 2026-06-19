@@ -15,6 +15,7 @@
         { "file": "components.md", "label": "Component catalog" },
         { "file": "short-notation.md", "label": "Short notation" },
         { "file": "assignment-operators.md", "label": "Assignment operators (=, =:, :=)", "searchExtra": "right pad left pad wire assignment initial" },
+        { "file": "modes.md", "label": "Script modes (MODE)", "searchExtra": "MODE STRICT WIREWRITE ZSTATE default wirewrite tristate" },
         { "file": "arithmetic.md", "label": "Arithmetic (built-in)" },
         { "file": "debug.md", "label": "Debug (show / peek / probe / lutOf)", "searchExtra": "show peek probe lutOf exprOfLut truthTableOf output panel" },
         { "file": "signal-propagation.md", "label": "Signal propagation" },

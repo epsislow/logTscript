@@ -2,7 +2,7 @@
 
 LogTScript supports multiple assignment operators with different width-handling behaviors for **wires**.
 
-See also: [signal propagation](signal-propagation.md), [ASM](asm.md).
+See also: [script modes](modes.md) (`MODE STRICT`, `MODE WIREWRITE`, `MODE ZSTATE`), [signal propagation](signal-propagation.md), [ASM](asm.md).
 
 ---
 
@@ -241,6 +241,8 @@ Use exact wire width with `=` when the assembled program matches, e.g. `8wire pr
 
 Allows **re-assignment** to the same wire name after initialization (in addition to `MODE STRICT` rules). In default binary mode, multiple writes in one step still behave as **last wins** during propagation.
 
+Overview of all modes: **[modes.md](modes.md)**.
+
 ```logts-play
 MODE WIREWRITE
 4wire q : 1
@@ -262,7 +264,7 @@ Result: `1100`
 | Undeclared wire | Zeros | `Z` (high-impedance) |
 | Conflict | Silent overwrite | `X` on conflicting bits |
 
-Full semantics: **[zstate.md](zstate.md)**.
+Full semantics: **[zstate.md](zstate.md)**. All `MODE` options: **[modes.md](modes.md)**.
 
 ```logts-play wave
 MODE ZSTATE

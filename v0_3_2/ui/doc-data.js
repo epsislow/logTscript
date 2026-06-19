@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
  */
 (function () {
   'use strict';
@@ -1175,7 +1175,7 @@ Assembler errors include the source line and \`^^^\` under the problematic token
 
 LogTScript supports multiple assignment operators with different width-handling behaviors for **wires**.
 
-See also: [signal propagation](signal-propagation.md), [ASM](asm.md).
+See also: [script modes](modes.md) (\`MODE STRICT\`, \`MODE WIREWRITE\`, \`MODE ZSTATE\`), [signal propagation](signal-propagation.md), [ASM](asm.md).
 
 ---
 
@@ -1414,6 +1414,8 @@ Use exact wire width with \`=\` when the assembled program matches, e.g. \`8wire
 
 Allows **re-assignment** to the same wire name after initialization (in addition to \`MODE STRICT\` rules). In default binary mode, multiple writes in one step still behave as **last wins** during propagation.
 
+Overview of all modes: **[modes.md](modes.md)**.
+
 \`\`\`logts-play
 MODE WIREWRITE
 4wire q : 1
@@ -1435,7 +1437,7 @@ Result: \`1100\`
 | Undeclared wire | Zeros | \`Z\` (high-impedance) |
 | Conflict | Silent overwrite | \`X\` on conflicting bits |
 
-Full semantics: **[zstate.md](zstate.md)**.
+Full semantics: **[zstate.md](zstate.md)**. All \`MODE\` options: **[modes.md](modes.md)**.
 
 \`\`\`logts-play wave
 MODE ZSTATE
@@ -2521,7 +2523,7 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 
 ### \`ZRELEASE(wireName)\` — tristate release
 
-Statement available only after \`MODE ZSTATE\`. Releases every bit of the wire to high-impedance (\`Z\`) in the current propagation step. Wire names \`z\`, \`Z\`, and \`ZZZ\` are allowed — only the keyword \`ZRELEASE\` is reserved.
+Statement available only after \`MODE ZSTATE\` — see [script modes](modes.md) and [zstate.md](zstate.md). Releases every bit of the wire to high-impedance (\`Z\`) in the current propagation step. Wire names \`z\`, \`Z\`, and \`ZZZ\` are allowed — only the keyword \`ZRELEASE\` is reserved.
 
 \`\`\`logts-play wave
 MODE ZSTATE
@@ -10396,6 +10398,139 @@ With an interactive panel: \`comp [key]\` on the instance \`.cpu\` \`set\` pin (
 - Automated tests: \`test_suite_ported.js\` (859–866)
 - Test constants: \`CHIP_ALU4\`, \`BOARD_CPU4\`
 `,
+    'modes.md': `# Script modes (\`MODE\`)
+
+Top-level statements that change how **wire assignments** and **propagation** behave for the rest of the script (until another \`MODE\` line).
+
+\`\`\`logts
+MODE STRICT
+MODE WIREWRITE
+MODE ZSTATE
+\`\`\`
+
+See also: [assignment operators](assignment-operators.md), [signal propagation](signal-propagation.md).
+
+---
+
+## Quick reference
+
+| Mode | How to activate | Wire re-assignment | Same wire, same step (binary) | Values |
+|------|-----------------|--------------------|------------------------------|--------|
+| **STRICT** (default) | start of script, or \`MODE STRICT\` | No — after first real \`=\` / \`:=\` / \`=:\` | Last write wins | \`0\` / \`1\` only |
+| **WIREWRITE** | \`MODE WIREWRITE\` | Yes | Last write wins | \`0\` / \`1\` only |
+| **ZSTATE** | \`MODE ZSTATE\` | Yes (enables WIREWRITE internally) | **Merged** per bit → \`X\` on conflict | \`0\` / \`1\` / \`X\` / \`Z\` |
+
+---
+
+## Syntax
+
+\`\`\`logts
+MODE STRICT
+MODE WIREWRITE
+MODE ZSTATE
+\`\`\`
+
+- One keyword per \`MODE\` statement.
+- A later \`MODE\` replaces the active flags. \`MODE STRICT\` or \`MODE WIREWRITE\` turns **off** ZSTATE semantics (\`zstate\` flag cleared).
+- \`MODE ZSTATE\` also sets wire-write behaviour (you do not need a separate \`MODE WIREWRITE\` line).
+
+Place \`MODE\` lines near the top of the script, before wires that depend on the rules.
+
+---
+
+## \`MODE STRICT\` (default)
+
+If you never write \`MODE\`, the interpreter starts in **STRICT**.
+
+| Rule | Behaviour |
+|------|-----------|
+| First assignment | Allowed (\`wire = …\`, \`:=\`, \`=:\`) |
+| \`wire : literal\` | Initial value only; first real assignment after \`:\` is still allowed |
+| Re-assignment | **Error** — \`Cannot reassign wire … in STRICT mode\` |
+| Width | Same as assignment operators (\`=\` exact width, etc.) — [assignment-operators.md](assignment-operators.md) |
+
+\`\`\`logts-play
+3wire q = 101
+show(q)
+\`\`\`
+
+Re-assigning \`q\` without \`MODE WIREWRITE\` would error.
+
+---
+
+## \`MODE WIREWRITE\`
+
+Allows **changing a wire again** after it already holds a value.
+
+| Rule | Behaviour |
+|------|-----------|
+| Re-assignment | Allowed |
+| Multiple writes, same propagation step | **Last write wins** (binary mode) |
+| Propagation | Works in **legacy** and **wave** |
+
+\`\`\`logts-play
+MODE WIREWRITE
+4wire q : 1
+q =: 11
+show(q)
+\`\`\`
+
+Result: \`1100\`
+
+Detail on operators: [assignment-operators.md](assignment-operators.md#mode-wirewrite).
+
+---
+
+## \`MODE ZSTATE\`
+
+Tristate / multi-driver mode: wires can be **\`Z\`** (high-impedance), **\`X\`** (conflict), logic gates use **IEEE 1164**, and several drivers on the same bus in one step are **resolved per bit** instead of last-wins.
+
+| Requirement | Detail |
+|-------------|--------|
+| Propagation | **Wave only** — error in legacy mode |
+| Undeclared init | \`8wire bus\` without \`=\` → \`ZZZZZZZZ\` |
+| Explicit release | \`ZRELEASE(wire)\` statement |
+| With WIREWRITE | Always on when ZSTATE is active |
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+2wire bus
+2wire a = 10
+2wire b = 11
+bus = a
+bus = b
+show(bus)
+\`\`\`
+
+Result: \`1X\` (conflict on bit 1), not \`11\`.
+
+**Full documentation:** **[MODE ZSTATE — tristate wires and multi-driver buses](zstate.md)**
+
+Topics covered there: \`get>=\` / \`out>=\`, \`ZRELEASE\`, logic literals \`?X\` / \`?Z\`, timeline colours, errors on arithmetic with \`X\`/\`Z\`, and comparison with default binary mode.
+
+---
+
+## Choosing a mode
+
+| Goal | Mode |
+|------|------|
+| Immutable wires (teaching, one-shot programs) | Default **STRICT** |
+| Counters, registers, feedback without extra variables | **WIREWRITE** |
+| Shared buses, tristate, multiple drivers, \`Z\`/\`X\` | **ZSTATE** (+ wave) |
+
+---
+
+## Related
+
+| Topic | Page |
+|-------|------|
+| Tristate & multi-driver (ZSTATE) | [zstate.md](zstate.md) |
+| \`=\`, \`:=\`, \`=:\` width rules | [assignment-operators.md](assignment-operators.md) |
+| Wave vs legacy propagation | [signal-propagation.md](signal-propagation.md) |
+| \`ZRELEASE(wire)\` | [builtin-functions.md](builtin-functions.md) |
+| Editor propagation pill | [editorUI.md](editorUI.md) |
+`,
     'multiplier.md': `# Multiplier component
 
 \`comp [multiplier]\` (shortname \`comp [*]\`) multiplies two **N-bit** operands. Returns low \`depth\` bits on \`get\` and high \`depth\` bits on \`over\`.
@@ -13015,7 +13150,7 @@ After **RUN**, \`a\` is \`0\` and \`b\` is \`1\`. When you flip the switch in th
 
 ### MODE ZSTATE — multi-driver commit
 
-When \`MODE ZSTATE\` is active (wave only), wire updates use an extra **commit** phase inside each propagation wave:
+When \`MODE ZSTATE\` is active (wave only), wire updates use an extra **commit** phase inside each propagation wave. See **[modes.md](modes.md)** for all script modes and **[zstate.md](zstate.md)** for ZSTATE details.
 
 1. All contributors are queued (\`bus = a\`, \`get>= bus\`, \`out>= bus\`, \`ZRELEASE(bus)\`, …).
 2. **\`commitWireResolves\`** merges contributions **per bit** → \`0\`, \`1\`, \`Z\`, or \`X\`.
@@ -13757,6 +13892,8 @@ Use **lcd** when text must be written to specific screen positions.
 - [future-component-ideas.md](future-component-ideas.md) — C6 Text terminal
 `,
     'zstate.md': `# MODE ZSTATE — tristate wires and multi-driver buses
+
+Part of **[script modes](modes.md)** (\`MODE STRICT\`, \`MODE WIREWRITE\`, \`MODE ZSTATE\`). This page is the full reference for **ZSTATE** only.
 
 LogTScript’s default mode treats every wire as a single **binary** value (\`0\` or \`1\`). **\`MODE ZSTATE\`** adds **high-impedance (\`Z\`)** and **conflict (\`X\`)** states per bit, IEEE-1164-style logic gates, and a **multi-driver resolver** so several sources can drive the same bus in one propagation step.
 

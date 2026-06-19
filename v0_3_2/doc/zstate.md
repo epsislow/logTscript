@@ -1,5 +1,7 @@
 # MODE ZSTATE — tristate wires and multi-driver buses
 
+Part of **[script modes](modes.md)** (`MODE STRICT`, `MODE WIREWRITE`, `MODE ZSTATE`). This page is the full reference for **ZSTATE** only.
+
 LogTScript’s default mode treats every wire as a single **binary** value (`0` or `1`). **`MODE ZSTATE`** adds **high-impedance (`Z`)** and **conflict (`X`)** states per bit, IEEE-1164-style logic gates, and a **multi-driver resolver** so several sources can drive the same bus in one propagation step.
 
 Requires **wave** signal propagation (editor default). Legacy mode → error: `ZSTATE requires wave signal propagation`.
