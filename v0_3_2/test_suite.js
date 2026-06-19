@@ -10801,6 +10801,89 @@ reg(1525, 'bool-filt', 'simplify uniform Z output', function(h, session) {
   h.assert('short Z', String(out.some(l => l.includes('`Z`') || l.includes('= `Z`'))), 'true');
 });
 
+reg(1526, 'bool-filt', 'compact wire filter on single-bit slices', function(h, session) {
+  const { out } = session.run('2wire B\nlutOf(XOR(B.0, B.1), B=*A)');
+  h.assert('length 8', String(out.some(l => l.trim() === 'length: 8')), 'true');
+  h.assert('filters attr', String(out.some(l => l.includes('filters: B=*A'))), 'true');
+});
+
+reg(1527, 'bool-filt', 'compact wire filter truthTableOf', function(h, session) {
+  const { out } = session.run('2wire B\ntruthTableOf(XOR(B.0, B.1), B=*A)');
+  const rows = out.filter(l => /^[01XZ] [01XZ] \|/.test(l));
+  h.assert('eight rows', String(rows.length), '8');
+});
+
+reg(1528, 'bool-filt', 'compact wire filter multi-bit ranges', function(h, session) {
+  const compact = session.run('4wire B\nlutOf(XOR(B.0-2, B.1/3), B=AA*0)').out.join('\n');
+  const explicit = session.run('4wire B\nlutOf(XOR(B.0-2, B.1/3), B.0-2=AA*, B.1/3=A*0)').out.join('\n');
+  const lenC = (compact.match(/^  length: (\d+)/m) || [])[1];
+  const lenE = (explicit.match(/^  length: (\d+)/m) || [])[1];
+  h.assert('same length', lenC, lenE);
+  h.assert('256 rows', lenC, '256');
+});
+
+reg(1529, 'bool-filt', 'compact filter exprOfLut round-trip', function(h, session) {
+  const gen = session.run('2wire B\nlutOf(XOR(B.0, B.1), B=**)').out.join('\n');
+  h.assert('has compact filters', String(gen.includes('filters: B=**')), 'true');
+  const auto = session.run(gen + '\nexprOfLut(.generated)').out;
+  h.assert('no err', String(!auto.some(l => l.startsWith('Error:'))), 'true');
+  h.assert('has expr', String(auto.length >= 2), 'true');
+});
+
+reg(1530, 'bool-filt', 'compact filter partial bit usage', function(h, session) {
+  const { out } = session.run('4wire B\nlutOf(B.0, B=AA*0)');
+  h.assert('length 4', String(out.some(l => l.trim() === 'length: 4')), 'true');
+});
+
+reg(1531, 'bool-filt', 'compact filter duplicate explicit slice', function(h, session) {
+  const { out } = session.run('2wire B\nlutOf(XOR(B.0, B.1), B=*A, B.0=0)');
+  h.assert('duplicate err', String(out.some(l => l.includes('duplicate filter'))), 'true');
+});
+
+reg(1532, 'error-display', 'compact filter unknown column caret', function(h, session) {
+  assertErrorDisplay(h, session, {
+    name: 'unknown filter column',
+    source: '2wire B\nlutOf(XOR(B.0, B.1), C=*)',
+    throwFn: (s) => {
+      s.run('2wire B\nlutOf(XOR(B.0, B.1), C=*)');
+      const err = s.interp && s.interp.lastReportedError;
+      if (!err) throw new Error('expected runtime error');
+      throw err;
+    },
+    expect: {
+      message: "lutOf: unknown filter column 'C'",
+      scriptLocLine: 2,
+      line: 2,
+      col: 22,
+      spanLen: 1,
+      sourceLine: 'lutOf(XOR(B.0, B.1), C=*)',
+      caretLine: '                     ^'
+    }
+  });
+});
+
+reg(1533, 'error-display', 'compact filter pattern length caret', function(h, session) {
+  assertErrorDisplay(h, session, {
+    name: 'pattern too short',
+    source: '2wire B\nlutOf(XOR(B.0, B.1), B=*)',
+    throwFn: (s) => {
+      s.run('2wire B\nlutOf(XOR(B.0, B.1), B=*)');
+      const err = s.interp && s.interp.lastReportedError;
+      if (!err) throw new Error('expected runtime error');
+      throw err;
+    },
+    expect: {
+      message: "lutOf: pattern length mismatch for 'B' (expected 2)",
+      scriptLocLine: 2,
+      line: 2,
+      col: 22,
+      spanLen: 1,
+      sourceLine: 'lutOf(XOR(B.0, B.1), B=*)',
+      caretLine: '                     ^'
+    }
+  });
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

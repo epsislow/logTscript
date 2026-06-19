@@ -2,7 +2,7 @@
 
 function truthTableOfGenerate(exprAst, widthResolver, filters) {
   const columns = discoverLutOfInputs(exprAst, widthResolver);
-  const filterMap = validateAndBuildFilterMap(columns, filters, 'truthTableOf');
+  const filterMap = validateAndBuildFilterMap(columns, filters, 'truthTableOf', widthResolver);
   const envs = enumerateFilteredEnvs(columns, filterMap);
   assertTableRowsWithinLimit(envs.length);
 
@@ -26,7 +26,7 @@ function inputsOfGenerate(exprAst, widthResolver) {
 
 function minimizeExprOutputs(exprAst, columns, widthResolver, filters) {
   const filterMap = filters && filters.length > 0
-    ? validateAndBuildFilterMap(columns, filters, 'simplify')
+    ? validateAndBuildFilterMap(columns, filters, 'simplify', widthResolver)
     : null;
   const { rows, outWidth } = collectFilteredRows(exprAst, columns, widthResolver, filterMap);
   const minimizeFn = typeof minimizeBoolean === 'function' ? minimizeBoolean : null;

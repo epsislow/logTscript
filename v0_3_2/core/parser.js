@@ -1274,6 +1274,8 @@ assignment() {
   }
 
   parseLutOfCallInner() {
+    const stmtLine = this.c.line;
+    const stmtCol = this.c.col;
     this.eat('KEYWORD', 'lutOf');
     this.eat('SYM', '(');
     const expr = this.expr();
@@ -1283,12 +1285,12 @@ assignment() {
       filters = this.parseBooleanAnalysisFilters();
     }
     this.eat('SYM', ')');
-    return { expr, filters };
+    return { expr, filters, line: stmtLine, col: stmtCol };
   }
 
   lutOf(){
     const lutOfData = this.parseLutOfCallInner();
-    return { lutOf: lutOfData };
+    return { lutOf: lutOfData, line: lutOfData.line, col: lutOfData.col };
   }
 
   parseExprOfLutArgs() {
@@ -1306,11 +1308,13 @@ assignment() {
   }
 
   parseExprOfLutCallInner() {
+    const stmtLine = this.c.line;
+    const stmtCol = this.c.col;
     this.eat('KEYWORD', 'exprOfLut');
     this.eat('SYM', '(');
     const data = this.parseExprOfLutArgs();
     this.eat('SYM', ')');
-    return data;
+    return { ...data, line: stmtLine, col: stmtCol };
   }
 
   useLutAs() {
@@ -1324,6 +1328,8 @@ assignment() {
   }
 
   truthTableOf(){
+    const stmtLine = this.c.line;
+    const stmtCol = this.c.col;
     this.eat('KEYWORD', 'truthTableOf');
     this.eat('SYM', '(');
     const expr = this.expr();
@@ -1333,10 +1339,12 @@ assignment() {
       filters = this.parseBooleanAnalysisFilters();
     }
     this.eat('SYM', ')');
-    return { truthTableOf: { expr, filters } };
+    return { truthTableOf: { expr, filters }, line: stmtLine, col: stmtCol };
   }
 
   simplify(){
+    const stmtLine = this.c.line;
+    const stmtCol = this.c.col;
     this.eat('KEYWORD', 'simplify');
     this.eat('SYM', '(');
     const expr = this.expr();
@@ -1346,7 +1354,7 @@ assignment() {
       filters = this.parseBooleanAnalysisFilters();
     }
     this.eat('SYM', ')');
-    return { simplify: { expr, filters } };
+    return { simplify: { expr, filters }, line: stmtLine, col: stmtCol };
   }
 
   equivalent(){
@@ -1375,9 +1383,29 @@ assignment() {
     return { costOf: { expr } };
   }
 
-  parseTruthPattern() {
+  _offsetToLineCol(pos) {
     const src = this.t.src;
-    let pos = this.t.i;
+    let line = 1;
+    let col = 1;
+    for (let i = 0; i < pos; i++) {
+      if (src[i] === '\n') { line++; col = 1; }
+      else col++;
+    }
+    return { line, col };
+  }
+
+  static filterColumnKey(spec) {
+    if (!spec.bitRange) return spec.name;
+    const br = spec.bitRange;
+    const end = br.end !== undefined && br.end !== null ? br.end : br.start;
+    if (br.start === end) return `${spec.name}.${br.start}`;
+    if (br.isLength && br.len !== undefined) return `${spec.name}.${br.start}/${br.len}`;
+    return `${spec.name}.${br.start}-${end}`;
+  }
+
+  parseTruthPatternRaw(startPos) {
+    const src = this.t.src;
+    let pos = startPos;
     while (pos < src.length && /\s/.test(src[pos])) pos++;
     const start = pos;
     while (pos < src.length && !/\s/.test(src[pos]) && src[pos] !== ')' && src[pos] !== ',') pos++;
@@ -1385,8 +1413,9 @@ assignment() {
       throw Error(`Expected filter pattern at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     const pattern = src.slice(start, pos);
+    const { line: patternLine, col: patternCol } = this._offsetToLineCol(start);
     this._syncTokenizerAt(pos);
-    return pattern;
+    return { pattern, patternLine, patternCol, patternLen: pattern.length };
   }
 
   parseBooleanAnalysisFilters() {
@@ -1396,12 +1425,26 @@ assignment() {
         this.c = this.t.get();
         continue;
       }
+      const colLine = this.c.line;
+      const colCol = this.c.col;
       const spec = this.parseExprOfLutColumnSpec();
       if (!(this.c.type === 'SYM' && this.c.value === '=')) {
         throw Error(`Expected = after filter column at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
-      const pattern = this.parseTruthPattern();
-      filters.push({ name: spec.name, bitRange: spec.bitRange, width: spec.width, pattern });
+      const pat = this.parseTruthPatternRaw(this.t.i);
+      const nameLen = Parser.filterColumnKey(spec).length;
+      filters.push({
+        name: spec.name,
+        bitRange: spec.bitRange,
+        width: spec.width,
+        pattern: pat.pattern,
+        line: colLine,
+        col: colCol,
+        nameLen,
+        patternLine: pat.patternLine,
+        patternCol: pat.patternCol,
+        patternLen: pat.patternLen
+      });
       if (this.c.type === 'SYM' && this.c.value === ')') break;
       if (!(this.c.type === 'SYM' && this.c.value === ',')) {
         throw Error(`Expected ',' between filter assignments at ${this.c.file}: ${this.c.line}:${this.c.col}`);
@@ -1413,7 +1456,7 @@ assignment() {
 
   exprOfLut(){
     const data = this.parseExprOfLutCallInner();
-    return { exprOfLut: data };
+    return { exprOfLut: data, line: data.line, col: data.col };
   }
 
   peek(){

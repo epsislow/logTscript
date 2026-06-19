@@ -66,6 +66,15 @@ Instance name is always **`.generated`**. Paste the block into a script, then us
 - **With filters:** `length` = number of rows emitted (≤ 256); `filters:` documents which input combinations are included.
 - **Without filters:** `length = 2^(sum column widths)` (≤ 256).
 - **`description:`** lists column widths; **`filters:`** uses `0`, `1`, `*` (binary don't-care), `A` (all values), `X`, `Z` per bit (index `0` = leftmost, same as `bitRange`). Lowercase `x` is rejected — use `*`.
+- **Compact wire filter:** when the expression uses bit slices (`B.0`, `B.0-2`, `B.1/3`, …), you can filter the whole declared wire in one assignment instead of per slice. Pattern length = wire width; each discovered column takes the matching substring (bit `i` → pattern character at index `i`).
+
+```logts
+4wire B
+lutOf(XOR(B.0-2, B.1/3), B=AA*0)
+```
+
+Equivalent to `B.0-2=AA*, B.1/3=A*0` but shorter. Works for `lutOf`, `truthTableOf`, `simplify`, and round-trips through `exprOfLut` when the LUT has `filters: B=AA*0`.
+
 - Undeclared atomic variables (`A`, `B` in gates) default to **1 bit**.
 - Whole wires (`lutOf(C)` on `7wire C`) use the declared wire width.
 - Non-boolean ops (`LSHIFT`, etc.) → error.

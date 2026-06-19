@@ -55,3 +55,9 @@ Plan părinte: [tristate_bus_buffer.plan.md](tristate_bus_buffer.plan.md) — **
 
 - Migrare `x` → `*` în teste bool-lut existente (1143–1154, etc.)
 - Noi **1512–1525** (14): reject `x`, `*` row count, IEEE X/Z, `A` expand, simplify literal X/Z, round-trip `*`, …
+
+---
+
+## Plan următor (neimplementat)
+
+→ [filtre_wire_compacte.plan.md](filtre_wire_compacte.plan.md) — ✅ **implementat** (968/968)

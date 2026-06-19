@@ -41,6 +41,26 @@ function filterSpecKey(spec) {
   return columnKey({ var: spec.name, bitRange: spec.bitRange || null });
 }
 
+function filterSpecLookupKeys(spec) {
+  const keys = [filterSpecKey(spec)];
+  const br = spec.bitRange;
+  if (!br) return keys;
+  const end = br.end !== undefined && br.end !== null ? br.end : br.start;
+  if (br.isLength && br.len !== undefined) {
+    const slash = `${spec.name}.${br.start}/${br.len}`;
+    const dash = `${spec.name}.${br.start}-${end}`;
+    if (!keys.includes(slash)) keys.push(slash);
+    if (!keys.includes(dash)) keys.push(dash);
+  } else if (end !== br.start) {
+    const len = end - br.start + 1;
+    const slash = `${spec.name}.${br.start}/${len}`;
+    const dash = `${spec.name}.${br.start}-${end}`;
+    if (!keys.includes(slash)) keys.push(slash);
+    if (!keys.includes(dash)) keys.push(dash);
+  }
+  return keys;
+}
+
 function columnWidth(atom, widthResolver) {
   if (atom.bin !== undefined || atom.hex !== undefined) {
     throw new Error('lutOf: literals not allowed in expression');
@@ -131,32 +151,129 @@ function assertInputWidthWithinLimit(columns) {
   }
 }
 
-function validateAndBuildFilterMap(columns, filters, contextName) {
+function throwFilterError(msg, f, highlight = 'column') {
+  const err = new Error(msg);
+  if (f && f.line != null) {
+    if (highlight === 'pattern' && f.patternCol != null) {
+      err.scriptLoc = {
+        line: f.patternLine != null ? f.patternLine : f.line,
+        col: f.patternCol,
+        len: f.patternLen != null ? f.patternLen : 1
+      };
+    } else {
+      err.scriptLoc = {
+        line: f.line,
+        col: f.col,
+        len: f.nameLen != null ? f.nameLen : (f.name ? f.name.length : 1)
+      };
+    }
+  }
+  throw err;
+}
+
+function bitSpanForAtom(atom) {
+  if (!atom.bitRange) return null;
+  const br = atom.bitRange;
+  const end = br.end !== undefined && br.end !== null ? br.end : br.start;
+  const width = br.isLength && br.len !== undefined ? br.len : end - br.start + 1;
+  return { start: br.start, width };
+}
+
+function patternSubstringForColumn(parentPattern, atom) {
+  const span = bitSpanForAtom(atom);
+  if (!span) return parentPattern;
+  return parentPattern.slice(span.start, span.start + span.width);
+}
+
+function validatePatternChars(contextName, key, pattern, f) {
+  for (const ch of pattern) {
+    if (ch === 'x') {
+      throwFilterError(
+        `${contextName}: use '*' instead of 'x' for binary don't-care in '${key}=${pattern}'`,
+        f,
+        'pattern'
+      );
+    }
+    if (!FILTER_PATTERN_CHARS.has(ch)) {
+      throwFilterError(
+        `${contextName}: invalid pattern character in '${key}=${pattern}'`,
+        f,
+        'pattern'
+      );
+    }
+  }
+}
+
+function validateAndBuildFilterMap(columns, filters, contextName, widthResolver) {
   if (!filters || filters.length === 0) return null;
   const colByKey = new Map(columns.map(c => [c.key, c]));
   const map = new Map();
-  for (const f of filters) {
-    const key = filterSpecKey(f);
-    if (!colByKey.has(key)) {
-      throw new Error(`${contextName}: unknown filter column '${key}'`);
-    }
+
+  function setFilter(key, pattern, f) {
     if (map.has(key)) {
-      throw new Error(`${contextName}: duplicate filter for '${key}'`);
+      throwFilterError(`${contextName}: duplicate filter for '${key}'`, f);
     }
     const col = colByKey.get(key);
-    const pattern = String(f.pattern);
+    if (!col) {
+      throwFilterError(`${contextName}: unknown filter column '${key}'`, f);
+    }
     if (pattern.length !== col.width) {
-      throw new Error(`${contextName}: pattern length mismatch for '${key}'`);
+      throwFilterError(`${contextName}: pattern length mismatch for '${key}'`, f, 'pattern');
     }
-    for (const ch of pattern) {
-      if (ch === 'x') {
-        throw new Error(`${contextName}: use '*' instead of 'x' for binary don't-care in '${key}=${f.pattern}'`);
-      }
-      if (!FILTER_PATTERN_CHARS.has(ch)) {
-        throw new Error(`${contextName}: invalid pattern character in '${key}=${f.pattern}'`);
-      }
-    }
+    validatePatternChars(contextName, key, pattern, f);
     map.set(key, pattern);
+  }
+
+  for (const f of filters) {
+    const lookupKeys = filterSpecLookupKeys(f);
+    const directKey = lookupKeys.find(k => colByKey.has(k));
+    if (directKey) {
+      setFilter(directKey, String(f.pattern), f);
+      continue;
+    }
+
+    if (!f.bitRange && widthResolver) {
+      const matching = columns.filter(c => c.atom.var === f.name);
+      if (matching.length > 0) {
+        const pattern = String(f.pattern);
+        let wireW = widthResolver(f.name);
+        if (wireW == null || wireW < 1) {
+          let maxBit = -1;
+          for (const col of matching) {
+            const span = bitSpanForAtom(col.atom);
+            if (span) maxBit = Math.max(maxBit, span.start + span.width - 1);
+            else maxBit = Math.max(maxBit, col.width - 1);
+          }
+          wireW = Math.max(pattern.length, maxBit + 1);
+        }
+        if (wireW < 1) {
+          throwFilterError(`${contextName}: unknown wire '${f.name}' in filter`, f);
+        }
+        if (pattern.length !== wireW) {
+          throwFilterError(
+            `${contextName}: pattern length mismatch for '${f.name}' (expected ${wireW})`,
+            f,
+            'pattern'
+          );
+        }
+        validatePatternChars(contextName, f.name, pattern, f);
+        for (const col of matching) {
+          if (map.has(col.key)) {
+            throwFilterError(`${contextName}: duplicate filter for '${col.key}'`, f);
+          }
+          const sub = patternSubstringForColumn(pattern, col.atom);
+          if (sub.length !== col.width) {
+            throwFilterError(`${contextName}: pattern length mismatch for '${col.key}'`, f, 'pattern');
+          }
+          map.set(col.key, sub);
+        }
+        continue;
+      }
+    }
+
+    const related = columns.filter(c => c.atom.var === f.name).map(c => c.key);
+    const hint = related.length > 0 ? ` (discovered: ${related.join(', ')})` : '';
+    throwFilterError(`${contextName}: unknown filter column '${filterSpecKey(f)}'${hint}`, f);
   }
   return map;
 }
@@ -742,7 +859,7 @@ const LUT_OF_INLINE_NAME = '.generated';
 
 function lutOfBuild(exprAst, widthResolver, filters) {
   const columns = discoverLutOfInputs(exprAst, widthResolver);
-  const filterMap = validateAndBuildFilterMap(columns, filters, 'lutOf');
+  const filterMap = validateAndBuildFilterMap(columns, filters, 'lutOf', widthResolver);
   const { rows, addrWidth, outWidth } = collectFilteredRows(exprAst, columns, widthResolver, filterMap);
 
   const description = `${columns.map(c => c.header).join(', ')} -> out ${outWidth}b`;
@@ -920,7 +1037,7 @@ function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
   if (varSpecs.length > 0 && attrs.filters && attrs.description) {
     const columns = parseLutDescriptionString(attrs.description);
     const filters = parseFiltersAttributeString(attrs.filters);
-    const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut');
+    const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut', widthResolver);
     const autoLabels = varyingBitLabels(columns, filterMap);
     const expanded = expandExprOfLutVars(varSpecs, widthResolver);
     if (!labelsMatch(expanded.labels, autoLabels)) {
@@ -947,7 +1064,7 @@ function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
     }
     const columns = parseLutDescriptionString(attrs.description);
     const filters = parseFiltersAttributeString(attrs.filters);
-    const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut');
+    const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut', widthResolver);
     const built = buildFilteredOutputsByMinterm(lutInst, columns, filterMap);
     labels = built.labels;
     outputCols = built.outputCols || built.outputsByBit.map(bools => ({ kind: 'binary', bools }));

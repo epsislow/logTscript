@@ -65,6 +65,7 @@ truthTableOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)
 ```
 
 - Pattern length must match column width.
+- **Compact wire filter:** `Wire=pattern` on a declared wire maps substrings to every slice used in the expression (`B.0`, `B.0-2`, `B.1/3`, …). Pattern length = wire width; bit index `i` uses pattern character `i`. Example: `4wire B` + `truthTableOf(XOR(B.0-2, B.1/3), B=AA*0)`.
 - Partial filters OK — unlisted columns enumerate all combinations.
 - Rows follow `enumerateFilteredEnvs` order.
 
