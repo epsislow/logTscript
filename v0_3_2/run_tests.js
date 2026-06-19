@@ -20,6 +20,14 @@
 
   const statusById = new Map();
   const manifestById = new Map(manifest.entries.map(e => [e.id, e]));
+  const testMetaById = new Map();
+  if (suite.tests) {
+    for (const t of suite.tests) testMetaById.set(t.id, t);
+  }
+  const rowUiById = new Map();
+  const groupSummaryById = new Map();
+  const groupHeaderById = new Map();
+  const GROUP_RUN_CLASSES = ['tests-running', 'tests-success', 'tests-error'];
   const groups = [...manifest.groups].sort((a, b) => {
     const cmp = (a.label || a.id).localeCompare(b.label || b.id, undefined, { sensitivity: 'base' });
     return cmp !== 0 ? cmp : a.id.localeCompare(b.id);
@@ -143,9 +151,7 @@
     // +' | Not ported: ' + notPorted;
 
     for (const group of groups) {
-      const el = document.querySelector(
-        '.test-group[data-group="' + group.id + '"] .group-summary'
-      );
+      const el = groupSummaryById.get(group.id);
       if (el) {
         el.textContent = formatStatusCounts(countStatuses(group.testIds));
       }
@@ -158,26 +164,64 @@
     document.querySelectorAll('.btn--run, .btn--group').forEach(b => { b.disabled = isRunning; });
   }
 
-  function setTestStatus(id, status, failures) {
-    statusById.set(id, status);
-    const row = document.querySelector('.test-row[data-id="' + id + '"]');
-    if (!row) return;
-    const dot = row.querySelector('.dot');
-    dot.className = 'dot ' + (status === 'pending' ? '' : status);
-    row.classList.toggle('fail-open', status === 'fail');
-    const failDetail = row.querySelector('.test-fail-detail');
-    if (failDetail) {
-      if (status === 'fail' && failures && failures.length) {
-        failDetail.textContent = formatFailures(failures);
-      } else {
-        failDetail.textContent = '';
+  function yieldToBrowser() {
+    return new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  function setGroupHeaderState(groupId, state) {
+    const header = groupHeaderById.get(groupId);
+    if (!header) return;
+    header.classList.remove(...GROUP_RUN_CLASSES);
+    if (state === 'running') header.classList.add('tests-running');
+    else if (state === 'success') header.classList.add('tests-success');
+    else if (state === 'error') header.classList.add('tests-error');
+  }
+
+  function clearGroupHeaderStatesForTests(tests) {
+    const seen = new Set();
+    for (const test of tests) {
+      if (test.group && !seen.has(test.group)) {
+        seen.add(test.group);
+        setGroupHeaderState(test.group, null);
       }
     }
-    updateSummary();
+  }
+
+  function outcomeForGroupTests(groupTests) {
+    let anyFail = false;
+    let anyRan = false;
+    for (const test of groupTests) {
+      if (!test.run) continue;
+      const s = statusById.get(test.id);
+      if (s === 'fail') anyFail = true;
+      if (s === 'pass' || s === 'fail') anyRan = true;
+    }
+    if (!anyRan) return null;
+    return anyFail ? 'error' : 'success';
+  }
+
+  function paintTestRow(id, status, failures) {
+    const ui = rowUiById.get(id);
+    if (!ui) return;
+    ui.dot.className = 'dot ' + (status === 'pending' ? '' : status);
+    ui.row.classList.toggle('fail-open', status === 'fail');
+    if (status === 'fail' && failures && failures.length) {
+      ui.failDetail.textContent = formatFailures(failures);
+    } else {
+      ui.failDetail.textContent = '';
+    }
+  }
+
+  function setTestStatus(id, status, failures, opts) {
+    statusById.set(id, status);
+    paintTestRow(id, status, failures);
+    if (!opts || !opts.deferSummary) {
+      updateSummary();
+    }
   }
 
   function getTestSource(id) {
-    const meta = suite.getTest(id);
+    const meta = testMetaById.get(id);
     if (!meta || typeof meta.run !== 'function') return '';
     return meta.run.toString();
   }
@@ -533,22 +577,43 @@
   }
 
   function entryForTest(entry) {
-    const meta = suite.getTest(entry.id);
+    const meta = testMetaById.get(entry.id);
     return {
       id: entry.id,
       title: entry.title,
       group: entry.group,
       detail: entry.detail || { scripts: [], steps: [], assertions: [] },
-      run: suite.getRun(entry.id),
+      run: meta ? meta.run : null,
       propagation: meta ? meta.propagation : 'legacy'
     };
   }
 
-  async function runOneTest(test) {
+  const testsByGroupId = new Map();
+  let cachedAllTests = null;
+
+  function testsForGroup(group) {
+    if (!testsByGroupId.has(group.id)) {
+      const idSet = new Set(group.testIds);
+      testsByGroupId.set(
+        group.id,
+        manifest.entries.filter(e => idSet.has(e.id)).map(entryForTest)
+      );
+    }
+    return testsByGroupId.get(group.id);
+  }
+
+  function allTests() {
+    if (!cachedAllTests) {
+      cachedAllTests = manifest.entries.map(entryForTest);
+    }
+    return cachedAllTests;
+  }
+
+  async function runOneTest(test, opts) {
     if (!test.run) return null;
 
-    const row = document.querySelector('.test-row[data-id="' + test.id + '"]');
-    if (row) row.querySelector('.dot').className = 'dot running';
+    const ui = rowUiById.get(test.id);
+    if (ui) ui.dot.className = 'dot running';
 
     const session = suite.createSession({ propagation: test.propagation || 'legacy' });
     const h = createHarness();
@@ -561,31 +626,76 @@
     }
 
     const ok = h.ok();
-    setTestStatus(test.id, ok ? 'pass' : 'fail', h.failures());
+    setTestStatus(test.id, ok ? 'pass' : 'fail', h.failures(), opts);
     return ok;
   }
 
+  const RESET_UI_CHUNK = 50;
+
   async function resetStatus(tests) {
-    for (const test of tests) {
-      setTestStatus(test.id, 'pending', null);
+    clearGroupHeaderStatesForTests(tests);
+    for (let i = 0; i < tests.length; i++) {
+      const test = tests[i];
+      statusById.set(test.id, 'pending');
+      paintTestRow(test.id, 'pending', null);
+      if (i > 0 && i % RESET_UI_CHUNK === 0) {
+        await yieldToBrowser();
+      }
     }
+    updateSummary();
   }
 
-  async function runTests(tests) {
+  async function runTests(tests, opts) {
+    const byGroup = opts && opts.byGroup;
+    const idSet = new Set(tests.map(t => t.id));
+
     await resetStatus(tests);
-    await new Promise(resolve => setTimeout(resolve, 300));
 
-    for (const test of tests) {
-      await runOneTest(test);
-      await new Promise(r => setTimeout(r, 0));
+    if (tests.length === 1) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+    } else {
+      await yieldToBrowser();
     }
-  }
 
-  function testsForGroup(group) {
-    const idSet = new Set(group.testIds);
-    return manifest.entries
-      .filter(e => idSet.has(e.id))
-      .map(entryForTest);
+    if (byGroup) {
+      for (const group of groups) {
+        const groupTests = testsForGroup(group).filter(t => idSet.has(t.id) && t.run);
+        if (!groupTests.length) continue;
+        setGroupHeaderState(group.id, 'running');
+        await yieldToBrowser();
+        for (let i = 0; i < groupTests.length; i++) {
+          await runOneTest(groupTests[i], { deferSummary: true });
+          if (i > 0 && i % 20 === 0) {
+            await yieldToBrowser();
+          }
+        }
+        const outcome = outcomeForGroupTests(groupTests);
+        if (outcome) setGroupHeaderState(group.id, outcome);
+        updateSummary();
+        await yieldToBrowser();
+      }
+      return;
+    }
+
+    const groupId = opts && opts.groupId;
+    if (groupId) {
+      setGroupHeaderState(groupId, 'running');
+      await yieldToBrowser();
+    }
+
+    for (let i = 0; i < tests.length; i++) {
+      await runOneTest(tests[i], { deferSummary: true });
+      if (i > 0 && i % 20 === 0) {
+        updateSummary();
+        await yieldToBrowser();
+      }
+    }
+    if (groupId) {
+      const runnable = tests.filter(t => t.run);
+      const outcome = outcomeForGroupTests(runnable);
+      if (outcome) setGroupHeaderState(groupId, outcome);
+    }
+    updateSummary();
   }
 
   /** legacy | wave | mixed | null (empty group) */
@@ -616,10 +726,6 @@
     return propBadge;
   }
 
-  function allTests() {
-    return manifest.entries.map(entryForTest);
-  }
-
   function buildUI() {
     for (const entry of manifest.entries) {
       statusById.set(entry.id, 'pending');
@@ -636,6 +742,7 @@
 
       const header = document.createElement('div');
       header.className = 'group-header';
+      groupHeaderById.set(group.id, header);
 
       const main = document.createElement('div');
       main.className = 'group-header-main';
@@ -664,6 +771,7 @@
       const groupSummary = document.createElement('div');
       groupSummary.className = 'group-summary';
       groupSummary.textContent = formatStatusCounts(countStatuses(group.testIds));
+      groupSummaryById.set(group.id, groupSummary);
 
       main.appendChild(titleLine);
       main.appendChild(groupSummary);
@@ -677,7 +785,7 @@
         if (running) return;
         setRunningUI(true);
         try {
-          await runTests(testsForGroup(group));
+          await runTests(testsForGroup(group), { groupId: group.id });
         } finally {
           setRunningUI(false);
         }
@@ -764,6 +872,7 @@
         row.appendChild(dot);
         row.appendChild(idSpan);
         row.appendChild(body);
+        rowUiById.set(test.id, { row, dot, failDetail });
         section.appendChild(row);
       }
 
@@ -774,8 +883,9 @@
   btnRunAll.addEventListener('click', async () => {
     if (running) return;
     setRunningUI(true);
+    await yieldToBrowser();
     try {
-      await runTests(allTests());
+      await runTests(allTests(), { byGroup: true });
     } finally {
       setRunningUI(false);
     }
