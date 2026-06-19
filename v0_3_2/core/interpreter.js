@@ -1111,10 +1111,28 @@ class Interpreter {
   }
 
   _watchCollapsedBit(valueStr, bitWidth) {
+    if (typeof LogicValue !== 'undefined' && LogicValue.classifyWatchState) {
+      const st = LogicValue.classifyWatchState(valueStr, bitWidth);
+      return st === 2;
+    }
     if (valueStr == null || valueStr === '-' || valueStr === '') return false;
     const s = String(valueStr);
     if (bitWidth === 1) return s === '1';
     return /1/.test(s);
+  }
+
+  _watchLogicState(valueStr, bitWidth) {
+    if (typeof LogicValue !== 'undefined' && LogicValue.classifyWatchState) {
+      return LogicValue.classifyWatchState(valueStr, bitWidth);
+    }
+    return this._watchCollapsedBit(valueStr, bitWidth) ? 2 : 0;
+  }
+
+  _zstateRequireBinary(argValues, opName, labels) {
+    if (!this.zstate) return;
+    if (typeof LogicValue !== 'undefined' && LogicValue.requireBinaryForEval) {
+      LogicValue.requireBinaryForEval(argValues, opName, labels);
+    }
   }
 
   _readWatchTargetValue(target) {
@@ -1163,7 +1181,7 @@ class Interpreter {
       }
       if (target.lastWatchValue === valueStr) continue;
       const collapsed = this._watchCollapsedBit(valueStr, sliceBits);
-      const state = collapsed ? 2 : 0;
+      const state = this._watchLogicState(valueStr, sliceBits);
       target.lastWatchValue = valueStr;
       target.lastCollapsed = collapsed;
       channels.push({
@@ -1845,13 +1863,20 @@ class Interpreter {
   // Format binary string as hex/binary display
   formatValue(binStr, bitWidth, truncateAt80=false){
     if(!binStr || binStr === '-') return binStr;
-    
-    // Truncate for display if > 80 bits (for variables panel)
+
     let displayStr = binStr;
     if(truncateAt80 && binStr.length > 80){
       displayStr = binStr.substring(0, 80);
     }
-    
+
+    const hasXZ = typeof LogicValue !== 'undefined' && LogicValue.stringHasLogicXZ(displayStr);
+    if (hasXZ) {
+      const grouped = typeof LogicValue.groupBinaryDisplay === 'function'
+        ? LogicValue.groupBinaryDisplay(displayStr, 8)
+        : displayStr.match(/.{1,8}/g).join(' ');
+      return grouped + (truncateAt80 && binStr.length > 80 ? ' ..' : '');
+    }
+
     // If 8 bits or less, show as binary
     if(bitWidth <= 16){
       let preFormat = displayStr + (truncateAt80 && binStr.length > 80 ? ' ..' : '');
@@ -2774,6 +2799,8 @@ const idx = parseInt(
       fail(`REG expects 3 arguments`);
     }
 
+    this._zstateRequireBinary(argValues, 'REG', ['data', 'clock', 'clear']);
+
     const data  = argValues[0];
     const clock = argValues[1];
     const clear = argValues[2];
@@ -2925,6 +2952,8 @@ if (this.isBuiltinMUX(name)) {
     fail(`MUX expects at least 2 arguments`);
   }
 
+  this._zstateRequireBinary([argValues[0], ...inputs], 'MUX', ['selector', 'data']);
+
   const sel = parseInt(argValues[0], 2);
   const value = inputs[sel];
 
@@ -2971,6 +3000,8 @@ if (this.isBuiltinDEMUX(name)) {
     fail(`DEMUX expects 2 arguments (selector, data), but got ${argValues.length}`);
   }
 
+  this._zstateRequireBinary(argValues, 'DEMUX', ['selector', 'data']);
+
   const sel = parseInt(argValues[0], 2);
   const data = argValues[1];
 
@@ -2990,6 +3021,7 @@ if (this.isBuiltinDEMUX(name)) {
     if (argValues.length < 2 || argValues.length > 3) {
       fail(`${name} expects 2 or 3 arguments`);
     }
+    this._zstateRequireBinary(argValues.slice(0, argValues.length === 3 ? 3 : 2), name, ['data', 'count', 'fill']);
     const data = argValues[0];
     const n = parseInt(argValues[1], 2);
     const fill = argValues.length === 3 ? argValues[2][0] : '0';
@@ -3124,6 +3156,7 @@ if (this.isBuiltinDEMUX(name)) {
 
   if (name === 'LROTATE' || name === 'RROTATE') {
     if (argValues.length !== 2) fail(`${name} expects 2 arguments`);
+    this._zstateRequireBinary(argValues, name, ['data', 'count']);
     const data = argValues[0];
     const len = data.length;
     let n = len === 0 ? 0 : parseInt(argValues[1], 2) % len;
@@ -3141,6 +3174,7 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: ADD =================
   if (name === 'ADD') {
     if (argValues.length !== 2) fail('ADD expects 2 arguments');
+    this._zstateRequireBinary(argValues, 'ADD', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
@@ -3158,6 +3192,7 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: SUBTRACT =================
   if (name === 'SUBTRACT') {
     if (argValues.length !== 2) fail('SUBTRACT expects 2 arguments');
+    this._zstateRequireBinary(argValues, 'SUBTRACT', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
@@ -3177,6 +3212,7 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: MULTIPLY =================
   if (name === 'MULTIPLY') {
     if (argValues.length !== 2) fail('MULTIPLY expects 2 arguments');
+    this._zstateRequireBinary(argValues, 'MULTIPLY', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
@@ -3194,6 +3230,7 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: DIVIDE =================
   if (name === 'DIVIDE') {
     if (argValues.length !== 2) fail('DIVIDE expects 2 arguments');
+    this._zstateRequireBinary(argValues, 'DIVIDE', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
@@ -4229,21 +4266,24 @@ if (this.isBuiltinDEMUX(name)) {
             let shouldExecute = false;
             const onMode = block.onMode || 'raise';
             
-            if(onMode === 'raise' || onMode === 'rising'){
-              // Rising edge: 0 -> 1
-              shouldExecute = (prevBit === '0' && newBit === '1');
-            } else if(onMode === 'edge' || onMode === 'falling'){
-              // Falling edge: 1 -> 0
-              shouldExecute = (prevBit === '1' && newBit === '0');
+            if(onMode === 'raise' || onMode === 'rising' || onMode === 'edge' || onMode === 'falling'){
+              shouldExecute = (typeof LogicValue !== 'undefined' && LogicValue.logicEdgeTriggered)
+                ? LogicValue.logicEdgeTriggered(prevBit, newBit, onMode)
+                : ((onMode === 'raise' || onMode === 'rising')
+                  ? (prevBit === '0' && newBit === '1')
+                  : (prevBit === '1' && newBit === '0'));
             } else if(onMode === '1' || onMode === 'level'){
               // Level triggered: execute when set is 1
               // If set depends on ~ (like set = k where k = MUX1(clr, 1, ~)),
               // execute every NEXT() when set is 1 (no value change check)
               if(setDependsOnTilde){
-                shouldExecute = (newBit === '1');
+                shouldExecute = (typeof LogicValue !== 'undefined' && LogicValue.logicLevelTriggered)
+                  ? LogicValue.logicLevelTriggered(newBit, newSetValue, prevSetValue, true)
+                  : (newBit === '1');
               } else {
-                // Otherwise, only execute when value has changed
-                shouldExecute = (newBit === '1') && (newSetValue !== prevSetValue);
+                shouldExecute = (typeof LogicValue !== 'undefined' && LogicValue.logicLevelTriggered)
+                  ? LogicValue.logicLevelTriggered(newBit, newSetValue, prevSetValue, false)
+                  : ((newBit === '1') && (newSetValue !== prevSetValue));
               }
             }
             
@@ -5361,7 +5401,11 @@ if (s.assignment) {
           this._emitProbeForWire(wireName, wireValue);
         }
       } catch(e){
-        console.log(`[DEBUG execWireStmt] ERROR in assignment '${wireName}':`, e.message);
+        if (!s._runtimeErrorReported) {
+          s._runtimeErrorReported = true;
+          this.reportRuntimeError(e);
+          throw e;
+        }
       } finally {
         this.currentStmt = prevStmt;
       }
@@ -5459,6 +5503,12 @@ if (s.assignment) {
       
       bitOffset += bits;
     }
+    } catch (e) {
+      if (!s._runtimeErrorReported) {
+        s._runtimeErrorReported = true;
+        this.reportRuntimeError(e);
+        throw e;
+      }
     } finally {
       this.currentStmt = prevStmt;
     }
@@ -7302,29 +7352,31 @@ if (s.assignment) {
         outValue = outValue.substring(0, bits);
       }
       
-      // Update wire storage
-      let storageIdx = null;
-      if(wire.ref){
-        const refMatch = wire.ref.match(/^&(\d+)/);
-        if(refMatch){
-          storageIdx = parseInt(refMatch[1]);
-          const stored = this.storage.find(s => s.index === storageIdx);
-          if(stored){
-            stored.value = outValue;
-            // Update connected components
-            this.updateConnectedComponents(targetName, outValue);
-          }
+      if (this.zstate && this.deferWirePropagation()) {
+        if (this._componentSetEnabled(component)) {
+          this._zstateScheduleWire(targetName, outValue);
         }
       } else {
-        // Wire has no ref yet - create storage and set ref
-        storageIdx = this.storeValue(outValue);
-        wire.ref = `&${storageIdx}`;
-        // Also update wireStorageMap for NEXT support
-        if(!this.wireStorageMap.has(targetName)){
-          this.wireStorageMap.set(targetName, storageIdx);
+        // Update wire storage
+        let storageIdx = null;
+        if(wire.ref){
+          const refMatch = wire.ref.match(/^&(\d+)/);
+          if(refMatch){
+            storageIdx = parseInt(refMatch[1]);
+            const stored = this.storage.find(s => s.index === storageIdx);
+            if(stored){
+              stored.value = outValue;
+              this.updateConnectedComponents(targetName, outValue);
+            }
+          }
+        } else {
+          storageIdx = this.storeValue(outValue);
+          wire.ref = `&${storageIdx}`;
+          if(!this.wireStorageMap.has(targetName)){
+            this.wireStorageMap.set(targetName, storageIdx);
+          }
+          this.updateConnectedComponents(targetName, outValue);
         }
-        // Update connected components
-        this.updateConnectedComponents(targetName, outValue);
       }
     }
     } finally {

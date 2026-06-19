@@ -10406,6 +10406,311 @@ reg(1473, 'zstate', 'bus init Z then single assign', function(h, session) {
   h.assert('bus', session.getWire(interp, 'bus'), '010');
 }, ZSTATE_WAVE);
 
+// --- ZSTATE phase 3 display (1474–1487) ---
+
+reg(1474, 'zstate', 'formatValue 1bit Z literal', function(h, session) {
+  const { interp } = session.run('MODE ZSTATE\n1wire z = ?Z');
+  h.assert('raw', session.getWire(interp, 'z'), 'Z');
+  h.assert('fmt', interp.formatValue('Z', 1), 'Z');
+}, ZSTATE_WAVE);
+
+reg(1475, 'zstate', 'formatValue 8bit with X/Z — binary groups', function(h, session) {
+  const { interp } = session.run('MODE ZSTATE\n8wire w = ?101X01ZZ');
+  h.assert('fmt', interp.formatValue('101X01ZZ', 8), '101X01ZZ');
+  h.assert('stored', session.getWire(interp, 'w'), '101X01ZZ');
+}, ZSTATE_WAVE);
+
+reg(1476, 'zstate', 'formatValue 32bit pure binary — hex', function(h, session) {
+  const { interp } = session.run('MODE ZSTATE\n32wire w = 11110000111100001111000011110000');
+  const v = session.getWire(interp, 'w');
+  const fmt = interp.formatValue(v, 32);
+  h.assert('has hex', String(fmt.includes('^F0F0')), 'true');
+  h.assert('no XZ', String(!/[XZ]/.test(fmt)), 'true');
+}, ZSTATE_WAVE);
+
+reg(1477, 'zstate', 'formatValue 32bit with X — no hex', function(h, session) {
+  const { interp } = session.run('MODE ZSTATE');
+  const bits = '11110000'.repeat(4);
+  const withX = bits.substring(0, 16) + 'X' + bits.substring(17);
+  h.assert('fmt', String(!interp.formatValue(withX, 32).includes('^')), 'true');
+  h.assert('grouped', String(interp.formatValue(withX, 32).includes(' ')), 'true');
+}, ZSTATE_WAVE);
+
+reg(1478, 'zstate', 'show conflict bus displays X', function(h, session) {
+  const { out } = session.run(`MODE ZSTATE
+3wire a = 101
+3wire b = 010
+3wire bus
+bus = a
+bus = b
+show(bus)`);
+  h.assert('line', String(out.some(l => /bus.*XXX/.test(l))), 'true');
+}, ZSTATE_WAVE);
+
+reg(1479, 'zstate', 'probe conflict bus displays X', function(h, session) {
+  const { out } = session.run(`MODE ZSTATE
+3wire a = 101
+3wire b = 010
+3wire bus
+bus = a
+bus = b
+probe(bus)`);
+  h.assert('probe', String(out.some(l => l.includes('# bus = XXX'))), 'true');
+}, ZSTATE_WAVE);
+
+reg(1480, 'zstate', 'peek init Z wire', function(h, session) {
+  const { out } = session.run(`MODE ZSTATE
+3wire bus
+peek(bus)`);
+  h.assert('peek', String(out.some(l => /bus.*ZZZ/.test(l))), 'true');
+}, ZSTATE_WAVE);
+
+reg(1481, 'zstate', 'watch 1bit Z state level 4', function(h, session) {
+  const samples = [];
+  const { interp } = session.run('MODE ZSTATE\n1wire z = 1\nwatch(z)');
+  interp.watchRecorder = (s) => samples.push(s);
+  session.setWire(interp, 'z', 'Z');
+  const ch = samples.flatMap(s => s.channels || [s]).find(c => c.channelIndex === 0);
+  h.assert('state Z', String(ch && ch.state === 4), 'true');
+  h.assert('value Z', String(ch && ch.valueStr === 'Z'), 'true');
+}, ZSTATE_WAVE);
+
+reg(1482, 'zstate', 'watch 1bit X state level 5', function(h, session) {
+  const samples = [];
+  const { interp } = session.run('MODE ZSTATE\n1wire x = 0\nwatch(x)');
+  interp.watchRecorder = (s) => samples.push(s);
+  session.setWire(interp, 'x', 'X');
+  const ch = samples.flatMap(s => s.channels || [s]).find(c => c.channelIndex === 0);
+  h.assert('state X', String(ch && ch.state === 5), 'true');
+}, ZSTATE_WAVE);
+
+reg(1483, 'zstate', 'watch binary 0/1 states unchanged', function(h, session) {
+  const samples = [];
+  const { interp } = session.run('MODE ZSTATE\n1wire a = 0\nwatch(a)');
+  interp.watchRecorder = (s) => samples.push(s);
+  session.setWire(interp, 'a', '1');
+  const ch = samples.flatMap(s => s.channels || [s]).find(c => c.channelIndex === 0);
+  h.assert('state high', String(ch && ch.state === 2), 'true');
+}, ZSTATE_WAVE);
+
+reg(1484, 'zstate', 'classifyWatchState multi-bit priority X over Z', function(h) {
+  h.assert('X wins', String(LogicValue.classifyWatchState('10X', 3)), '5');
+  h.assert('all Z', String(LogicValue.classifyWatchState('ZZZ', 3)), '4');
+  h.assert('binary high', String(LogicValue.classifyWatchState('1010', 4)), '2');
+  h.assert('binary low', String(LogicValue.classifyWatchState('0000', 4)), '0');
+});
+
+reg(1485, 'zstate', 'groupBinaryDisplay 16 chars', function(h) {
+  h.assert('groups', LogicValue.groupBinaryDisplay('1010101010101010', 8), '10101010 10101010');
+});
+
+reg(1486, 'zstate', 'show literal ?X1X wire', function(h, session) {
+  const { out } = session.run('MODE ZSTATE\n3wire w = ?X1X\nshow(w)');
+  h.assert('show X1X', String(out.some(l => /w.*X1X/.test(l))), 'true');
+}, ZSTATE_WAVE);
+
+reg(1487, 'zstate', 'watch conflict bus records X state', function(h, session) {
+  const samples = [];
+  const { interp } = session.run(`MODE ZSTATE
+3wire a = 101
+3wire b = 010
+3wire bus
+watch(bus)`);
+  interp.watchRecorder = (s) => samples.push(s);
+  session.execStmts(interp, 'bus = a\nbus = b');
+  interp.postExecSrc();
+  const last = samples[samples.length - 1];
+  const channels = last && last.channels ? last.channels : [];
+  h.assert('three bits', String(channels.length === 3), 'true');
+  h.assert('all X state', String(channels.every(c => c.state === 5)), 'true');
+  h.assert('bits XXX', String(channels.map(c => c.valueStr).join('')), 'XXX');
+}, ZSTATE_WAVE);
+
+// --- ZSTATE phase 4 wave + devices (1488–1497) ---
+
+reg(1488, 'zstate', 'ADD with Z operand — error', function(h, session) {
+  h.assertThrows('ADD Z', function() {
+    session.run('MODE ZSTATE\n1wire a = ?Z\n1wire b = 1\n1wire r = ADD(a, b)');
+  }, 'Z');
+}, ZSTATE_WAVE);
+
+reg(1489, 'zstate', 'ADD pure binary in ZSTATE', function(h, session) {
+  const { interp, out } = session.run('MODE ZSTATE\n4wire a = 0011\n4wire b = 0001\n4wire r, 1wire c = ADD(a, b)');
+  h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
+  h.assert('sum', session.getWire(interp, 'r'), '0100');
+  h.assert('carry', session.getWire(interp, 'c'), '0');
+}, ZSTATE_WAVE);
+
+reg(1490, 'zstate', 'MUX selector with X — error', function(h, session) {
+  h.assertThrows('MUX X', function() {
+    session.run('MODE ZSTATE\n1wire sel = ?X\n2wire d0 = 00\n2wire d1 = 11\n2wire r = MUX(sel, d0, d1)');
+  }, 'X');
+}, ZSTATE_WAVE);
+
+reg(1491, 'zstate', 'REG data with X — error', function(h, session) {
+  h.assertThrows('REG X', function() {
+    session.run('MODE ZSTATE\n4wire d = ?X1XX\n1wire clk = 0\n1wire clr = 0\n4wire q = REG(d, clk, clr)');
+  }, 'X');
+}, ZSTATE_WAVE);
+
+reg(1492, 'zstate', 'logicEdgeTriggered Z→1 no edge', function(h) {
+  h.assert('Z to 1', String(LogicValue.logicEdgeTriggered('Z', '1', 'raise')), 'false');
+  h.assert('X to 1', String(LogicValue.logicEdgeTriggered('X', '1', 'raise')), 'false');
+  h.assert('Z to 0', String(LogicValue.logicEdgeTriggered('Z', '0', 'falling')), 'false');
+});
+
+reg(1493, 'zstate', 'logicEdgeTriggered 0↔1 edges', function(h) {
+  h.assert('rise', String(LogicValue.logicEdgeTriggered('0', '1', 'raise')), 'true');
+  h.assert('no rise repeat', String(LogicValue.logicEdgeTriggered('1', '1', 'raise')), 'false');
+  h.assert('fall', String(LogicValue.logicEdgeTriggered('1', '0', 'falling')), 'true');
+  h.assert('no fall from Z', String(LogicValue.logicEdgeTriggered('Z', '0', 'falling')), 'false');
+});
+
+reg(1494, 'zstate', 'deviceBitIsOn Z/X off', function(h) {
+  h.assert('1 on', String(LogicValue.deviceBitIsOn('1')), 'true');
+  h.assert('0 off', String(LogicValue.deviceBitIsOn('0')), 'false');
+  h.assert('Z off', String(LogicValue.deviceBitIsOn('Z')), 'false');
+  h.assert('X off', String(LogicValue.deviceBitIsOn('X')), 'false');
+});
+
+reg(1495, 'zstate', 'normalizeDeviceDisplayBits maps X/Z to 0', function(h) {
+  h.assert('mixed', LogicValue.normalizeDeviceDisplayBits('1Z0X', 4), '1000');
+  h.assert('all Z', LogicValue.normalizeDeviceDisplayBits('ZZZ', 3), '000');
+});
+
+reg(1496, 'zstate', 'LSHIFT with Z count — error', function(h, session) {
+  h.assertThrows('LSHIFT Z', function() {
+    session.run('MODE ZSTATE\n4wire d = 1010\n1wire n = ?Z\n4wire r = LSHIFT(d, n)');
+  }, 'Z');
+}, ZSTATE_WAVE);
+
+reg(1497, 'zstate', 'logicLevelTriggered ignores Z set', function(h) {
+  h.assert('Z inactive', String(LogicValue.logicLevelTriggered('Z', 'Z', '0', false)), 'false');
+  h.assert('1 active changed', String(LogicValue.logicLevelTriggered('1', '1', '0', false)), 'true');
+  h.assert('1 same no change', String(LogicValue.logicLevelTriggered('1', '1', '1', false)), 'false');
+});
+
+const ZSTATE_SH = `comp [shifter] .sh:
+  depth: 4
+  on: 1
+  :`;
+
+reg(1498, 'zstate', 'out>= shifter single driver', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+1wire bus
+${ZSTATE_SH}`);
+  session.execStmts(interp, `.sh:{
+  value = 1011
+  dir = 1
+  in = 0
+  set = 1
+  out>= bus }`);
+  interp.postExecSrc();
+  h.assert('bus', session.getWire(interp, 'bus'), '1');
+}, ZSTATE_WAVE);
+
+reg(1499, 'zstate', 'out>= gated set=0', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+1wire bus
+${ZSTATE_SH}`);
+  session.execStmts(interp, `.sh:{
+  value = 1011
+  dir = 1
+  in = 0
+  set = 0
+  out>= bus }`);
+  interp.postExecSrc();
+  h.assert('bus', session.getWire(interp, 'bus'), 'Z');
+}, ZSTATE_WAVE);
+
+reg(1500, 'zstate', 'dual out>= agree on bus', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+1wire bus
+comp [shifter] .s1:
+  depth: 4
+  on: 1
+  :
+comp [shifter] .s2:
+  depth: 4
+  on: 1
+  :`);
+  session.execStmts(interp, `.s1:{
+  value = 1011
+  dir = 1
+  in = 0
+  set = 1
+  out>= bus }`);
+  session.execStmts(interp, `.s2:{
+  value = 0111
+  dir = 1
+  in = 0
+  set = 1
+  out>= bus }`);
+  interp.postExecSrc();
+  h.assert('bus', session.getWire(interp, 'bus'), '1');
+}, ZSTATE_WAVE);
+
+reg(1501, 'zstate', 'dual out>= conflict on bus', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+1wire bus
+comp [shifter] .s1:
+  depth: 4
+  on: 1
+  :
+comp [shifter] .s2:
+  depth: 4
+  on: 1
+  :`);
+  session.execStmts(interp, `.s1:{
+  value = 1010
+  dir = 1
+  in = 0
+  set = 1
+  out>= bus }`);
+  session.execStmts(interp, `.s2:{
+  value = 1011
+  dir = 1
+  in = 0
+  set = 1
+  out>= bus }`);
+  interp.postExecSrc();
+  h.assert('bus', session.getWire(interp, 'bus'), 'X');
+}, ZSTATE_WAVE);
+
+reg(1502, 'zstate', 'out>= + assign conflict', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+1wire bus
+1wire direct = 1
+${ZSTATE_SH}`);
+  session.execStmts(interp, 'bus = direct');
+  session.execStmts(interp, `.sh:{
+  value = 1010
+  dir = 1
+  in = 0
+  set = 1
+  out>= bus }`);
+  interp.postExecSrc();
+  h.assert('bus', session.getWire(interp, 'bus'), 'X');
+}, ZSTATE_WAVE);
+
+reg(1503, 'zstate', 'get>= + out>= mixed drivers', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+1wire bus
+${ZSTATE_SW}
+${ZSTATE_SH}`);
+  session.setComp(interp, '.sw', '1');
+  session.execStmts(interp, `.sw:{ get >= bus
+  set = 1 }`);
+  session.execStmts(interp, `.sh:{
+  value = 1010
+  dir = 1
+  in = 0
+  set = 1
+  out>= bus }`);
+  interp.postExecSrc();
+  h.assert('bus', session.getWire(interp, 'bus'), 'X');
+}, ZSTATE_WAVE);
+
 
   window.LogTScriptTestSuite = {
     tests,

@@ -86,8 +86,12 @@ var LedBarComponent = class LedBarComponent extends BuiltinComponent {
             const barId = comp.deviceIds[0];
             
             let v = bitsToUse;
-            if (v.length < len) v = v.padEnd(len, '0');
-            else if (v.length > len) v = v.substring(0, len);
+            if (typeof LogicValue !== 'undefined' && LogicValue.normalizeDeviceDisplayBits) {
+              v = LogicValue.normalizeDeviceDisplayBits(bitsToUse, len);
+            } else {
+              if (v.length < len) v = v.padEnd(len, '0');
+              else if (v.length > len) v = v.substring(0, len);
+            }
             
             if (typeof setBarState === 'function') {
             //    if(barId =='bar2') {

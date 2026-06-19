@@ -8,12 +8,16 @@
   const STATE_RISE = 1;
   const STATE_HIGH = 2;
   const STATE_FALL = 3;
+  const STATE_Z = 4;
+  const STATE_X = 5;
 
   const COLORS = {
     [STATE_LOW]: '#3d2020',
     [STATE_HIGH]: '#22c55e',
     [STATE_RISE]: '#22c55e',
-    [STATE_FALL]: '#3d2020'
+    [STATE_FALL]: '#3d2020',
+    [STATE_Z]: '#6b7280',
+    [STATE_X]: '#dc2626'
   };
 
   const MAX_HISTORY = 1500;
@@ -21,7 +25,25 @@
   const LABEL_BAND = 18;
 
   function steadyLevel(state) {
+    if (state === STATE_Z || state === STATE_X) return state;
     return (state === STATE_RISE || state === STATE_HIGH) ? STATE_HIGH : STATE_LOW;
+  }
+
+  function logicLevelFromValueStr(valueStr, bitWidth) {
+    if (typeof LogicValue !== 'undefined' && LogicValue.classifyWatchState) {
+      return LogicValue.classifyWatchState(valueStr, bitWidth);
+    }
+    if (valueStr == null || valueStr === '-' || valueStr === '') return STATE_LOW;
+    const s = String(valueStr);
+    if (bitWidth === 1) {
+      if (s === '1') return STATE_HIGH;
+      if (s === 'Z') return STATE_Z;
+      if (s === 'X') return STATE_X;
+      return STATE_LOW;
+    }
+    if (/X/.test(s)) return STATE_X;
+    if (/Z/.test(s)) return STATE_Z;
+    return /1/.test(s) ? STATE_HIGH : STATE_LOW;
   }
 
   function TimelineAnalyzer(canvas) {
@@ -140,7 +162,7 @@
 
     for (const ch of updates) {
       if (ch.channelIndex == null || ch.channelIndex < 0 || ch.channelIndex >= this.channelCount) continue;
-      const level = steadyLevel(ch.state);
+      const level = steadyLevel(ch.state != null ? ch.state : logicLevelFromValueStr(ch.valueStr, 1));
       const prevLevel = this.holdStates[ch.channelIndex].level;
       this.holdStates[ch.channelIndex] = {
         level,
@@ -247,11 +269,22 @@
           const xStart = col * columnWidth;
           const lowWidth = columnWidth * 0.18;
           const highWidth = columnWidth * 0.72;
+          const midWidth = columnWidth * 0.55;
           const lowX = xStart + (columnWidth - lowWidth) / 2;
           const highX = xStart + (columnWidth - highWidth) / 2;
+          const midX = xStart + (columnWidth - midWidth) / 2;
           const isHigh = node.level === STATE_HIGH;
-          const barX = isHigh ? highX : lowX;
-          const barW = isHigh ? highWidth : lowWidth;
+          const isZ = node.level === STATE_Z;
+          const isX = node.level === STATE_X;
+          let barX = lowX;
+          let barW = lowWidth;
+          if (isHigh) {
+            barX = highX;
+            barW = highWidth;
+          } else if (isZ || isX) {
+            barX = midX;
+            barW = midWidth;
+          }
 
           const clipTop = LABEL_BAND;
           const drawTop = Math.max(targetY, clipTop);
@@ -259,11 +292,11 @@
           const drawH = drawBottom - drawTop;
           if (drawH <= 0) continue;
 
-          ctx.fillStyle = COLORS[node.level];
+          ctx.fillStyle = COLORS[node.level] || COLORS[STATE_LOW];
           ctx.fillRect(barX, drawTop, barW, drawH);
 
           if (node.edge && targetY >= clipTop) {
-            ctx.strokeStyle = isHigh ? 'rgba(255,255,255,0.55)' : 'rgba(168,85,247,0.7)';
+            ctx.strokeStyle = isX ? 'rgba(255,255,255,0.45)' : (isHigh ? 'rgba(255,255,255,0.55)' : (isZ ? 'rgba(200,200,200,0.35)' : 'rgba(168,85,247,0.7)'));
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(barX, targetY);
@@ -296,4 +329,12 @@
   };
 
   window.TimelineAnalyzer = TimelineAnalyzer;
+  window.TimelineLogic = {
+    STATE_LOW,
+    STATE_HIGH,
+    STATE_Z,
+    STATE_X,
+    logicLevelFromValueStr,
+    colorForLevel(level) { return COLORS[level] || COLORS[STATE_LOW]; }
+  };
 })();

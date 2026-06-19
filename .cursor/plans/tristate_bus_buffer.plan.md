@@ -16,13 +16,13 @@ todos:
     status: completed
   - id: multi-driver-paths
     content: "get>= / out>= + re-assign în același pas; conflict bit → X, acord → 0/1, zero driveri → Z"
-    status: pending
+    status: completed
   - id: storage-display
     content: "formatValue, show/peek/probe/watch, timeline Z/X + teste 1473–1487"
-    status: pending
+    status: completed
   - id: wave-propagation
     content: "signal-propagation edge semantics Z/X, LED/7seg la Z + teste 1488–1497"
-    status: pending
+    status: completed
   - id: doc-regression
     content: "doc/zstate.md, actualizări builtin/debug/signal-propagation, regresie full suite"
     status: pending
@@ -281,27 +281,31 @@ sequenceDiagram
 
 **Regresie:** 916/916 teste (inclusiv fix `initOnly` la declarație wire fără `=` pentru STRICT/board).
 
-**Teste:** 1449–1473 (~25): init Z, un driver, dual agree, dual conflict→X, triple, zero driveri→Z, tranziție en on/off, get>= enable/disable.
+**Teste:** 1449–1473 (~25): init Z, un driver, dual agree, dual conflict→X, triple, zero driveri→Z, tranziție en on/off, get>= enable/disable. **out>=** (shifter): 1498–1503 — single driver, gated set=0, dual agree/conflict, mixed cu assign și get>=.
 
-### Faza 3 — Storage, afișaj, timeline (~4–5 zile)
+### Faza 3 — Storage, afișaj, timeline ✅ COMPLETĂ
 
 | Zonă | Fișier | Schimbare |
 |------|--------|-----------|
-| formatValue / hex | `interpreter.js` | Z/X literal; hex doar pe biți 0/1 |
-| show / peek / probe | `interpreter.js` | Afișează `101X01ZZ` |
-| watch | `interpreter.js` | `_watchCollapsedBit`: 0, 1, Z, X |
-| timeline | [ui/timeline-analyzer.js](v0_3_2/ui/timeline-analyzer.js) | stiluri Z (gri?), X (roșu?) |
-| app | [ui/app.js](v0_3_2/ui/app.js) | `showVars` |
+| formatValue / hex | `logic-value.js`, `interpreter.js` | Z/X literal; hex doar pe biți 0/1 |
+| show / peek / probe | `interpreter.js` | Afișează `101X01ZZ` / `XXX` conflict |
+| watch | `interpreter.js`, `logic-value.js` | `classifyWatchState`: 0, 2, 4=Z, 5=X |
+| timeline | `ui/timeline-analyzer.js` | Z gri `#6b7280`, X roșu `#dc2626` |
+| app | `ui/app.js` | `showVars` citește `getWireEffectiveValue` în ZSTATE |
 
-**Teste:** 1473–1487.
+**Regresie:** 930/930 teste.
 
-### Faza 4 — Wave + device fallback (~3–4 zile)
+**Teste:** 1473–1487 (15): formatValue, show/probe/peek, watch Z/X, classifyWatchState, conflict bus.
 
-- Edge detect: tranziții implică doar 0↔1; Z/X documentate
-- LED / 7seg: Z/X → off sau caracter special
-- `parseInt(_,2)` pe fire cu Z/X → eroare clară la arithmetic (nu în porți)
+### Faza 4 — Wave + device fallback ✅ COMPLETĂ
 
-**Teste:** 1488–1497.
+- **Edge detect:** `logicEdgeTriggered` / `logicLevelTriggered` — doar tranziții 0↔1; Z/X nu declanșează
+- **LED / 7seg / bar:** `deviceBitIsOn` / `normalizeDeviceDisplayBits` — Z/X → off
+- **Arithmetic:** `requireBinaryForEval` pe ADD/SUBTRACT/MULTIPLY/DIVIDE/MUX/DEMUX/REG/LSHIFT/RSHIFT/LROTATE/RROTATE în ZSTATE
+
+**Regresie:** 940/940 teste.
+
+**Teste:** 1488–1497 (10).
 
 ### Faza 5 — Documentație + regresie (~2–3 zile)
 
@@ -330,7 +334,7 @@ Plan detaliat: [filtre_boolean_xz.plan.md](filtre_boolean_xz.plan.md).
 
 **Dependență:** Faza 1 (`logic-value.js` — tabele IEEE 1164).
 
-**Fișiere:** [boolean-lut.js](v0_3_2/core/boolean-lut.js), [boolean-analysis.js](v0_3_2/core/boolean-analysis.js), doc + teste 1498–1511.
+**Fișiere:** [boolean-lut.js](v0_3_2/core/boolean-lut.js), [boolean-analysis.js](v0_3_2/core/boolean-analysis.js), doc + teste 1512–1525.
 
 **Nu afectează** runtime ZSTATE / fire. `simplify`/`exprOfLut`: literal X/Z dacă ieșire uniformă, altfel eroare.
 
@@ -379,7 +383,7 @@ flowchart LR
 | 3 afișaj / timeline | 4–5 | 1473–1487 |
 | 4 wave + devices | 3–4 | 1488–1497 |
 | 5 doc + regresie | 2–3 | — |
-| 6 filtre bool `*`/`A`/`X`/`Z` | 3–4 | 1498–1511 |
+| 6 filtre bool `*`/`A`/`X`/`Z` | 3–4 | 1512–1525 |
 | Buffer fix regresie | 2–3 | — |
 | **Total** | **~21–30 zile** | **~83 teste** |
 
@@ -412,7 +416,7 @@ Mai mic decât planul vechi cu `comp [bus]`/`[buffer]` (~4–5 zile economiseșt
 
 ## ID test alocate
 
-Ultimul ID în suite (la planificare): **1428** (`clcd`). ZSTATE + filtre boolean — **1429–1511**.
+Ultimul ID în suite (la planificare): **1428** (`clcd`). ZSTATE + filtre boolean — **1429–1525**.
 
 | Interval | Fază | Nr. teste |
 |----------|------|-----------|
@@ -420,6 +424,7 @@ Ultimul ID în suite (la planificare): **1428** (`clcd`). ZSTATE + filtre boolea
 | **1449–1473** | 2 resolver engine | 25 |
 | **1473–1487** | 3 afișaj / timeline | 15 |
 | **1488–1497** | 4 wave + devices | 10 |
-| **1498–1511** | 6 filtre bool `*`/`A`/`X`/`Z` | 14 |
+| **1498–1503** | 2b out>= multi-driver (shifter) | 6 |
+| **1512–1525** | 6 filtre bool `*`/`A`/`X`/`Z` | 14 |
 
 **Notă:** intervalul vechi 1222–1333 rămâne liber (salt 1221→1334); nu se reutilizează pentru a evita confuzia cu planurile vechi.

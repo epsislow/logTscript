@@ -1024,13 +1024,17 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
       let shouldExecute = false;
       const onMode = block.onMode || 'raise';
       
-      if(onMode === 'raise' || onMode === 'rising'){
-        shouldExecute = (prevBit === '0' && newBit === '1');
-      } else if(onMode === 'edge' || onMode === 'falling'){
-        shouldExecute = (prevBit === '1' && newBit === '0');
+      if(onMode === 'raise' || onMode === 'rising' || onMode === 'edge' || onMode === 'falling'){
+        shouldExecute = (typeof LogicValue !== 'undefined' && LogicValue.logicEdgeTriggered)
+          ? LogicValue.logicEdgeTriggered(prevBit, newBit, onMode)
+          : ((onMode === 'raise' || onMode === 'rising')
+            ? (prevBit === '0' && newBit === '1')
+            : (prevBit === '1' && newBit === '0'));
       } else if(onMode === '1' || onMode === 'level'){
         // Level triggered: execute when set is 1 AND value has changed
-        shouldExecute = (newBit === '1') && (newSetValue !== prevSetValue);
+        shouldExecute = (typeof LogicValue !== 'undefined' && LogicValue.logicLevelTriggered)
+          ? LogicValue.logicLevelTriggered(newBit, newSetValue, prevSetValue, false)
+          : ((newBit === '1') && (newSetValue !== prevSetValue));
       }
 
       if(shouldExecute){

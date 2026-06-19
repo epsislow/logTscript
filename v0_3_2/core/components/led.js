@@ -36,7 +36,9 @@ var LedComponent = class LedComponent extends BuiltinComponent {
 
     for (let i = 0; i < bits; i++) {
       const ledId = bits === 1 ? baseId : `${baseId}.${i + 1}`;
-      const ledValue = value[i] === '1';
+      const ledValue = (typeof LogicValue !== 'undefined' && LogicValue.deviceBitIsOn)
+        ? LogicValue.deviceBitIsOn(value[i])
+        : (value[i] === '1');
       const isLast = (i === bits - 1);
       const ledText = (i === 0) ? text : '';
       const ledNl = (isLast && nl) ? true : false;
@@ -76,8 +78,10 @@ var LedComponent = class LedComponent extends BuiltinComponent {
           }
           for (let i = 0; i < comp.deviceIds.length && i < ledValue.length; i++) {
             const ledId = comp.deviceIds[i];
-            const bitValue = ledValue[i] === '1';
-            if (typeof setLed === 'function') { setLed(ledId, bitValue); }
+            const bitOn = (typeof LogicValue !== 'undefined' && LogicValue.deviceBitIsOn)
+              ? LogicValue.deviceBitIsOn(ledValue[i])
+              : (ledValue[i] === '1');
+            if (typeof setLed === 'function') { setLed(ledId, bitOn); }
           }
         }
       }
@@ -103,7 +107,9 @@ var LedComponent = class LedComponent extends BuiltinComponent {
     }
     for (let i = 0; i < comp.deviceIds.length && i < bitsToUse.length; i++) {
       const ledId = comp.deviceIds[i];
-      const ledValue = bitsToUse[i] === '1';
+      const ledValue = (typeof LogicValue !== 'undefined' && LogicValue.deviceBitIsOn)
+        ? LogicValue.deviceBitIsOn(bitsToUse[i])
+        : (bitsToUse[i] === '1');
       if (typeof setLed === 'function') { setLed(ledId, ledValue); }
     }
   }

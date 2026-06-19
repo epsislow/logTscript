@@ -921,7 +921,37 @@
       {"id":1470,"group":"zstate","title":"enable pattern cpuEn only","detail":{"scripts":["MODE ZSTATE\n3wire bus\n3wire cpuData = 101\n1wire cpuEn = 1\n1wire ramEn = 0\n3wire ramData = 110\nbus = cpuData\nbus = ramData"],"steps":[],"assertions":["last assign wins resolve"]}},
       {"id":1471,"group":"zstate","title":"Z on subset width wire","detail":{"scripts":["MODE ZSTATE\n1wire en = 1\nZ(en)"],"steps":[],"assertions":["en"]}},
       {"id":1472,"group":"zstate","title":"resolveWireVector all Z contribs","detail":{"scripts":[],"steps":[],"assertions":["allZ"]}},
-      {"id":1473,"group":"zstate","title":"bus init Z then single assign","detail":{"scripts":["MODE ZSTATE\n3wire bus\n3wire val = 010\nbus = val"],"steps":[],"assertions":["bus"]}}
+      {"id":1473,"group":"zstate","title":"bus init Z then single assign","detail":{"scripts":["MODE ZSTATE\n3wire bus\n3wire val = 010\nbus = val"],"steps":[],"assertions":["bus"]}},
+      {"id":1474,"group":"zstate","title":"formatValue 1bit Z literal","detail":{"scripts":["MODE ZSTATE\n1wire z = ?Z"],"steps":[],"assertions":["raw","fmt"]}},
+      {"id":1475,"group":"zstate","title":"formatValue 8bit with X/Z — binary groups","detail":{"scripts":["MODE ZSTATE\n8wire w = ?101X01ZZ"],"steps":[],"assertions":["fmt","stored"]}},
+      {"id":1476,"group":"zstate","title":"formatValue 32bit pure binary — hex","detail":{"scripts":["MODE ZSTATE\n32wire w = 11110000111100001111000011110000"],"steps":[],"assertions":["has hex","no XZ"]}},
+      {"id":1477,"group":"zstate","title":"formatValue 32bit with X — no hex","detail":{"scripts":["MODE ZSTATE"],"steps":[],"assertions":["fmt","grouped"]}},
+      {"id":1478,"group":"zstate","title":"show conflict bus displays X","detail":{"scripts":["MODE ZSTATE\n3wire a = 101\n3wire b = 010\n3wire bus\nbus = a\nbus = b\nshow(bus)"],"steps":[],"assertions":["line"]}},
+      {"id":1479,"group":"zstate","title":"probe conflict bus displays X","detail":{"scripts":["MODE ZSTATE\n3wire a = 101\n3wire b = 010\n3wire bus\nbus = a\nbus = b\nprobe(bus)"],"steps":[],"assertions":["probe"]}},
+      {"id":1480,"group":"zstate","title":"peek init Z wire","detail":{"scripts":["MODE ZSTATE\n3wire bus\npeek(bus)"],"steps":[],"assertions":["peek"]}},
+      {"id":1481,"group":"zstate","title":"watch 1bit Z state level 4","detail":{"scripts":["MODE ZSTATE\n1wire z = 1\nwatch(z)"],"steps":[],"assertions":["state Z","value Z"]}},
+      {"id":1482,"group":"zstate","title":"watch 1bit X state level 5","detail":{"scripts":["MODE ZSTATE\n1wire x = 0\nwatch(x)"],"steps":[],"assertions":["state X"]}},
+      {"id":1483,"group":"zstate","title":"watch binary 0/1 states unchanged","detail":{"scripts":["MODE ZSTATE\n1wire a = 0\nwatch(a)"],"steps":[],"assertions":["state high"]}},
+      {"id":1484,"group":"zstate","title":"classifyWatchState multi-bit priority X over Z","detail":{"scripts":[],"steps":[],"assertions":["X wins","all Z","binary high","binary low"]}},
+      {"id":1485,"group":"zstate","title":"groupBinaryDisplay 16 chars","detail":{"scripts":[],"steps":[],"assertions":["groups"]}},
+      {"id":1486,"group":"zstate","title":"show literal ?X1X wire","detail":{"scripts":["MODE ZSTATE\n3wire w = ?X1X\nshow(w)"],"steps":[],"assertions":["show X1X"]}},
+      {"id":1487,"group":"zstate","title":"watch conflict bus records X state","detail":{"scripts":["MODE ZSTATE\n3wire a = 101\n3wire b = 010\n3wire bus\nwatch(bus)"],"steps":[],"assertions":["three bits","all X state","bits XXX"]}},
+      {"id":1488,"group":"zstate","title":"ADD with Z operand — error","detail":{"scripts":["MODE ZSTATE\n1wire a = ?Z\n1wire b = 1\n1wire r = ADD(a, b)"],"steps":[],"assertions":["ADD Z"]}},
+      {"id":1489,"group":"zstate","title":"ADD pure binary in ZSTATE","detail":{"scripts":["MODE ZSTATE\n4wire a = 0011\n4wire b = 0001\n4wire r, 1wire c = ADD(a, b)"],"steps":[],"assertions":["no err","sum","carry"]}},
+      {"id":1490,"group":"zstate","title":"MUX selector with X — error","detail":{"scripts":["MODE ZSTATE\n1wire sel = ?X\n2wire d0 = 00\n2wire d1 = 11\n2wire r = MUX(sel, d0, d1)"],"steps":[],"assertions":["MUX X"]}},
+      {"id":1491,"group":"zstate","title":"REG data with X — error","detail":{"scripts":["MODE ZSTATE\n4wire d = ?X1XX\n1wire clk = 0\n1wire clr = 0\n4wire q = REG(d, clk, clr)"],"steps":[],"assertions":["REG X"]}},
+      {"id":1492,"group":"zstate","title":"logicEdgeTriggered Z→1 no edge","detail":{"scripts":[],"steps":[],"assertions":["Z to 1","X to 1","Z to 0"]}},
+      {"id":1493,"group":"zstate","title":"logicEdgeTriggered 0↔1 edges","detail":{"scripts":[],"steps":[],"assertions":["rise","no rise repeat","fall","no fall from Z"]}},
+      {"id":1494,"group":"zstate","title":"deviceBitIsOn Z/X off","detail":{"scripts":[],"steps":[],"assertions":["1 on","0 off","Z off","X off"]}},
+      {"id":1495,"group":"zstate","title":"normalizeDeviceDisplayBits maps X/Z to 0","detail":{"scripts":[],"steps":[],"assertions":["mixed","all Z"]}},
+      {"id":1496,"group":"zstate","title":"LSHIFT with Z count — error","detail":{"scripts":["MODE ZSTATE\n4wire d = 1010\n1wire n = ?Z\n4wire r = LSHIFT(d, n)"],"steps":[],"assertions":["LSHIFT Z"]}},
+      {"id":1497,"group":"zstate","title":"logicLevelTriggered ignores Z set","detail":{"scripts":[],"steps":[],"assertions":["Z inactive","1 active changed","1 same no change"]}},
+      {"id":1498,"group":"zstate","title":"out>= shifter single driver","detail":{"scripts":["MODE ZSTATE\n1wire bus\n${ZSTATE_SH}"],"steps":[],"assertions":["bus"]}},
+      {"id":1499,"group":"zstate","title":"out>= gated set=0","detail":{"scripts":["MODE ZSTATE\n1wire bus\n${ZSTATE_SH}"],"steps":[],"assertions":["bus"]}},
+      {"id":1500,"group":"zstate","title":"dual out>= agree on bus","detail":{"scripts":["MODE ZSTATE\n1wire bus\ncomp [shifter] .s1:\n  depth: 4\n  on: 1\n  :\ncomp [shifter] .s2:\n  depth: 4\n  on: 1\n  :"],"steps":[],"assertions":["bus"]}},
+      {"id":1501,"group":"zstate","title":"dual out>= conflict on bus","detail":{"scripts":["MODE ZSTATE\n1wire bus\ncomp [shifter] .s1:\n  depth: 4\n  on: 1\n  :\ncomp [shifter] .s2:\n  depth: 4\n  on: 1\n  :"],"steps":[],"assertions":["bus"]}},
+      {"id":1502,"group":"zstate","title":"out>= + assign conflict","detail":{"scripts":["MODE ZSTATE\n1wire bus\n1wire direct = 1\n${ZSTATE_SH}"],"steps":[],"assertions":["bus"]}},
+      {"id":1503,"group":"zstate","title":"get>= + out>= mixed drivers","detail":{"scripts":["MODE ZSTATE\n1wire bus\n${ZSTATE_SW}\n${ZSTATE_SH}"],"steps":[],"assertions":["bus"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -976,7 +1006,7 @@
       { id: 'slider', label: 'Slider component', rangeLabel: '1206–1220', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611] },
-      { id: 'zstate', label: 'zstate', rangeLabel: '1429–1473', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473] }
+      { id: 'zstate', label: 'zstate', rangeLabel: '1429–1503', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503] }
     ]
   };
 })();

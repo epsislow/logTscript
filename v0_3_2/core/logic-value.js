@@ -10,6 +10,97 @@ function stringHasLogicXZ(s) {
   return /[XZ]/.test(String(s || ''));
 }
 
+/** Watch/timeline state: 0=low, 2=high, 4=Z, 5=X (matches timeline-analyzer STATE_*) */
+function classifyWatchState(valueStr, bitWidth) {
+  const WATCH_LOW = 0;
+  const WATCH_HIGH = 2;
+  const WATCH_Z = 4;
+  const WATCH_X = 5;
+  if (valueStr == null || valueStr === '-' || valueStr === '') return WATCH_LOW;
+  const s = String(valueStr);
+  if (bitWidth === 1) {
+    if (s === '1') return WATCH_HIGH;
+    if (s === 'Z') return WATCH_Z;
+    if (s === 'X') return WATCH_X;
+    return WATCH_LOW;
+  }
+  if (/X/.test(s)) return WATCH_X;
+  if (/Z/.test(s)) return WATCH_Z;
+  return /1/.test(s) ? WATCH_HIGH : WATCH_LOW;
+}
+
+function groupBinaryDisplay(s, groupSize) {
+  const g = groupSize || 8;
+  const parts = [];
+  for (let i = 0; i < s.length; i += g) {
+    parts.push(s.substring(i, i + g));
+  }
+  return parts.join(' ');
+}
+
+function isBinaryBit(ch) {
+  return ch === '0' || ch === '1';
+}
+
+function isBinaryLogicValue(s) {
+  const v = String(s || '');
+  if (!v.length) return true;
+  for (const ch of v) {
+    if (!isBinaryBit(ch)) return false;
+  }
+  return true;
+}
+
+/** Device display: only strict 1 is ON; 0/Z/X → off */
+function deviceBitIsOn(ch) {
+  return ch === '1';
+}
+
+function normalizeDeviceDisplayBits(value, len) {
+  let v = String(value == null ? '' : value);
+  if (len) {
+    if (v.length < len) v = v.padEnd(len, '0');
+    else if (v.length > len) v = v.substring(0, len);
+  }
+  return v.split('').map(ch => (deviceBitIsOn(ch) ? '1' : '0')).join('');
+}
+
+function findLogicXZBit(value) {
+  const v = String(value || '');
+  for (let i = 0; i < v.length; i++) {
+    const ch = v[i];
+    if (ch === 'X' || ch === 'Z') return { ch, index: i };
+  }
+  return null;
+}
+
+function requireBinaryForEval(values, opName, labels) {
+  const list = values || [];
+  for (let i = 0; i < list.length; i++) {
+    const hit = findLogicXZBit(list[i]);
+    if (hit) {
+      const label = labels && labels[i] ? labels[i] : `argument ${i + 1}`;
+      throw new Error(`Cannot use wire with ${hit.ch} in ${opName} (${label} bit ${hit.index})`);
+    }
+  }
+}
+
+/** Edge modes: only strict 0↔1 transitions; Z/X never trigger */
+function logicEdgeTriggered(prevBit, newBit, onMode) {
+  if (!isBinaryBit(prevBit) || !isBinaryBit(newBit)) return false;
+  const mode = onMode || 'raise';
+  if (mode === 'raise' || mode === 'rising') return prevBit === '0' && newBit === '1';
+  if (mode === 'edge' || mode === 'falling') return prevBit === '1' && newBit === '0';
+  return false;
+}
+
+/** Level mode: set active only when last bit is strict 1 */
+function logicLevelTriggered(newBit, newValue, prevValue, setDependsOnTilde) {
+  if (!isBinaryBit(newBit) || newBit !== '1') return false;
+  if (setDependsOnTilde) return true;
+  return String(newValue) !== String(prevValue);
+}
+
 function resolveWireBit(contributors) {
   const active = [];
   for (const c of contributors || []) {
@@ -153,6 +244,15 @@ function validateLogicLiteral(s, width, contextName) {
 const LogicValue = {
   isLogicChar,
   stringHasLogicXZ,
+  classifyWatchState,
+  groupBinaryDisplay,
+  isBinaryBit,
+  isBinaryLogicValue,
+  deviceBitIsOn,
+  normalizeDeviceDisplayBits,
+  requireBinaryForEval,
+  logicEdgeTriggered,
+  logicLevelTriggered,
   resolveWireBit,
   resolveWireVector,
   evalGate1bit,

@@ -630,7 +630,10 @@ function showVars(){
       }
     });
     globalInterp.wires.forEach((w,k)=>{
-      const wireValue = globalInterp.getValueFromRef(w.ref);
+      let wireValue = globalInterp.zstate && typeof globalInterp.getWireEffectiveValue === 'function'
+        ? globalInterp.getWireEffectiveValue(k)
+        : globalInterp.getValueFromRef(w.ref);
+      if (wireValue == null) wireValue = globalInterp.getValueFromRef(w.ref);
       let valueStr = wireValue !== null ? wireValue : '-';
       if(w.type && valueStr && valueStr !== '-'){
         const bitWidth = globalInterp.getBitWidth(w.type);

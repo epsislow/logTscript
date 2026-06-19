@@ -212,9 +212,14 @@ var SevenSegComponent = class SevenSegComponent extends BuiltinComponent {
       const segId = comp.deviceIds[0];
       const segments = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
       for (let i = 0; i < segments.length && i < bitsToUse.length; i++) {
-        if (typeof setSegment === 'function') setSegment(segId, segments[i], bitsToUse[i] === '1');
+        const segOn = (typeof LogicValue !== 'undefined' && LogicValue.deviceBitIsOn)
+          ? LogicValue.deviceBitIsOn(bitsToUse[i])
+          : (bitsToUse[i] === '1');
+        if (typeof setSegment === 'function') setSegment(segId, segments[i], segOn);
       }
-      let segmentValue = bitsToUse;
+      let segmentValue = (typeof LogicValue !== 'undefined' && LogicValue.normalizeDeviceDisplayBits)
+        ? LogicValue.normalizeDeviceDisplayBits(bitsToUse, 8)
+        : bitsToUse;
       if (segmentValue.length < 8) segmentValue = segmentValue.padEnd(8, '0');
       else if (segmentValue.length > 8) segmentValue = segmentValue.substring(0, 8);
       comp.lastSegmentValue = segmentValue;
