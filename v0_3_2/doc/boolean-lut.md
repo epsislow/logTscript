@@ -11,11 +11,67 @@ See also: [lut.md](lut.md) (LUT runtime and `^.name(in=…)` invoke), [boolean-a
 
 ---
 
+## Running examples (Load / Load & Run)
+
+Runnable blocks on this page use the `logts-play` format. Each block shows two buttons:
+
+| Button | What it does |
+|--------|----------------|
+| **Load** | Copies the script into the editor **without** running it. Edit the expression or paste a generated `inline [lut]` block, then press toolbar **RUN**. |
+| **Load & Run** | Copies the script **and** runs it immediately. **`lutOf` / `exprOfLut`** write copy-pasteable text to **Output**; **`useLutAs` / `useExpr`** run logic and update wires (no analysis lines). |
+
+For **`lutOf`** and **`exprOfLut`**, **Load & Run** is enough — copy the **Output** block into your script or run **`exprOfLut`** on the next line in the same example.
+
+Use **Load** for two-step workflows: run **`lutOf`**, paste **Output** into the editor, add **`exprOfLut(.generated)`**, then **RUN** again.
+
+### Quick walkthrough
+
+**Load & Run** — generate a 1-bit OR LUT (`.generated` in **Output**):
+
+```logts-play
+lutOf(OR(A, B))
+```
+
+**Load & Run** — filtered LUT + rebuild expression (two analysis steps in one run):
+
+```logts-play
+5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
+exprOfLut(.generated)
+```
+
+**Load & Run** — multi-bit `AND` with filters, lifted to `AND(B, C)` on rebuild:
+
+```logts-play
+useLutAs(lutOf(AND(B, C), B=**, C=**), .b)
+2wire B
+2wire C
+exprOfLut(.b)
+```
+
+**Load & Run** — runtime LUT from expression (no **Output** block; check `show(y)`):
+
+```logts-play
+useLutAs(lutOf(OR(A, B)), .gen)
+1wire A := 1
+1wire B := 0
+1wire y = .gen(10)
+show(y)
+```
+
+**Load** the runtime example, change `A` / `B` assignments or the address literal, then **RUN** to try other inputs.
+
+---
+
 ## `lutOf(expression [, filters])`
 
 Boolean expression using built-ins `NOT`, `AND`, `OR`, `XOR`, `NXOR`, `NAND`, `NOR`, or short-notation in backticks.
 
 Optional filters (same syntax as `truthTableOf`): comma-separated `column=pattern` assignments.
+
+**Load & Run** — copy the `inline [lut] .generated:` block from **Output**:
 
 ```logts-play
 lutOf(OR(A, B))
@@ -39,6 +95,8 @@ inline [lut] .generated:
 ```
 
 With filters, `lutOf` adds a `filters:` attribute:
+
+**Load & Run** — `filters:` line included in **Output**:
 
 ```logts-play
 5wire A
@@ -93,6 +151,8 @@ Rebuild logic from an **`inline [lut]`** instance. **Always emits two lines:**
 
 When the LUT has `description:` and `filters:` (as emitted by `lutOf` with filters), omit the variable list:
 
+**Load & Run** — `exprOfLut` infers `*` columns from `filters:`:
+
 ```logts-play
 5wire A
 1wire B
@@ -108,6 +168,8 @@ exprOfLut(.generated)
 You can pass variables explicitly; they must match those varying bits in the same order.
 
 ### Manual variables (no `filters:`)
+
+**Load & Run** — explicit `A`, `B` for a hand-written LUT:
 
 ```logts-play
 inline [lut] .or2:
@@ -142,6 +204,8 @@ exprOfLut(.or2, A, B)
 
 Round-trip with explicit columns (LUT without `filters:`):
 
+**Load & Run** — multi-bit columns in discovery order:
+
 ```logts-play
 4wire A
 3wire B
@@ -165,6 +229,8 @@ Validation: `sum(widths) === lutAddrBits(length)`. Mismatch → `exprOfLut expec
 ## Multi-bit inputs
 
 `lutOf` discovers columns in **first-appearance order** in the expression:
+
+**Load & Run** — check `description:` in **Output**:
 
 ```logts-play
 4wire A
@@ -190,15 +256,13 @@ Address bit order for `exprOfLut(.example, A 2b, B 3b)`:
 
 ## Round-trip examples
 
-**Simple:**
+**Simple** — **Load & Run**, then paste **Output** and add `exprOfLut(.generated, A, B)` (or **Load** and edit):
 
 ```logts-play
 lutOf(XOR(A, B))
 ```
 
-Paste Output, then `exprOfLut(.generated, A, B)`.
-
-**With filters:**
+**With filters** — **Load & Run** (same as [Quick walkthrough](#quick-walkthrough)):
 
 ```logts-play
 5wire A
@@ -237,6 +301,8 @@ These forms apply the same generators **at runtime** in one script (no copy-past
 
 ### `useLutAs(lutOf(…), .name)`
 
+**Load & Run** — wire literal address `10` (= `A=1`, `B=0`):
+
 ```logts-play
 useLutAs(lutOf(OR(A, B)), .gen)
 1wire A := 1
@@ -246,6 +312,8 @@ show(y)
 ```
 
 Address may be a **binary literal** (`10`, `01`) or a **wire** (`C`, `addr`):
+
+**Load & Run** — address from wire `C`:
 
 ```logts-play
 useLutAs(lutOf(OR(A, B)), .gen)
@@ -258,6 +326,8 @@ show(y)
 ```
 
 ### Inline body `lutOf`
+
+**Load & Run** — declarative LUT body:
 
 ```logts-play
 inline [lut] .gen:
@@ -272,6 +342,8 @@ show(y)
 
 Only valid as the **right-hand side** of a wire assignment (including `Nw u = …` or `u = …` after a declaration).
 
+**Load & Run** — first run lowers to `OR(A, B)`; later propagations skip QM:
+
 ```logts-play
 inline [lut] .or2:
   depth: 1
@@ -285,7 +357,7 @@ inline [lut] .or2:
 show(u)
 ```
 
-Split declaration:
+Split declaration — **Load** to edit widths, then **RUN**:
 
 ```logts-play
 1wire A := 0
