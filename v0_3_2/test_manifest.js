@@ -887,8 +887,8 @@
       {"id":1436,"group":"zstate","title":"IEEE NOT(Z) = X","detail":{"scripts":["MODE ZSTATE\n1wire z = ?Z\n1wire r = NOT(z)"],"steps":[],"assertions":["r"]}},
       {"id":1437,"group":"zstate","title":"IEEE vector AND 2-bit","detail":{"scripts":["MODE ZSTATE\n2wire a = 1X\n2wire r = AND(a, 10)"],"steps":[],"assertions":["r"]}},
       {"id":1438,"group":"zstate","title":"binary gates unchanged without X/Z","detail":{"scripts":["1wire r = AND(1, 0)"],"steps":[],"assertions":["r","no zstate"]}},
-      {"id":1439,"group":"zstate","title":"Z() releases wire to ZZZ","detail":{"scripts":["MODE ZSTATE\n3wire bus = 101\nZ(bus)"],"steps":[],"assertions":["bus"]}},
-      {"id":1440,"group":"zstate","title":"Z() without MODE ZSTATE — error","detail":{"scripts":["3wire bus = 101\nZ(bus)"],"steps":[],"assertions":["err"]}},
+      {"id":1439,"group":"zstate","title":"ZRELEASE releases wire to ZZZ","detail":{"scripts":["MODE ZSTATE\n3wire bus = 101\nZRELEASE(bus)"],"steps":[],"assertions":["bus"]}},
+      {"id":1440,"group":"zstate","title":"ZRELEASE without MODE ZSTATE — error","detail":{"scripts":["3wire bus = 101\nZRELEASE(bus)"],"steps":[],"assertions":["err"]}},
       {"id":1441,"group":"zstate","title":"logic literal ?X1X init","detail":{"scripts":["MODE ZSTATE\n3wire w = ?X1X"],"steps":[],"assertions":["w"]}},
       {"id":1442,"group":"zstate","title":"logic literal 10Z without ?","detail":{"scripts":["MODE ZSTATE\n3wire w = 10Z"],"steps":[],"assertions":["w"]}},
       {"id":1443,"group":"zstate","title":"logic literal ?ZZZ init","detail":{"scripts":["MODE ZSTATE\n3wire bus = ?ZZZ"],"steps":[],"assertions":["bus"]}},
@@ -905,21 +905,21 @@
       {"id":1454,"group":"zstate","title":"dual assign agree","detail":{"scripts":["MODE ZSTATE\n3wire bus\n3wire a = 101\n3wire b = 101\nbus = a\nbus = b"],"steps":[],"assertions":["bus"]}},
       {"id":1455,"group":"zstate","title":"no driver — bus stays Z","detail":{"scripts":["MODE ZSTATE\n4wire bus"],"steps":[],"assertions":["bus"]}},
       {"id":1456,"group":"zstate","title":"triple assign two conflicts","detail":{"scripts":["MODE ZSTATE\n3wire bus\nbus = 101\nbus = 110\nbus = 001"],"steps":[],"assertions":["bus"]}},
-      {"id":1457,"group":"zstate","title":"Z() after assign — bus released","detail":{"scripts":["MODE ZSTATE\n3wire bus = 101\nZ(bus)"],"steps":[],"assertions":["bus"]}},
+      {"id":1457,"group":"zstate","title":"ZRELEASE after assign — bus released","detail":{"scripts":["MODE ZSTATE\n3wire bus = 101\nZRELEASE(bus)"],"steps":[],"assertions":["bus"]}},
       {"id":1458,"group":"zstate","title":"2wire partial conflict","detail":{"scripts":["MODE ZSTATE\n2wire bus\n2wire a = 10\n2wire b = 11\nbus = a\nbus = b"],"steps":[],"assertions":["bus"]}},
       {"id":1459,"group":"zstate","title":"get>= with set=1 drives bus","detail":{"scripts":["MODE ZSTATE\n1wire bus\n${ZSTATE_SW}"],"steps":[],"assertions":["bus"]}},
       {"id":1460,"group":"zstate","title":"get>= with set=0 — no drive","detail":{"scripts":["MODE ZSTATE\n1wire bus\n1wire en = 0\n${ZSTATE_SW}"],"steps":[],"assertions":["bus"]}},
       {"id":1461,"group":"zstate","title":"get>= enabled after en 0→1","detail":{"scripts":["MODE ZSTATE\n1wire bus\n1wire en = 0\n${ZSTATE_SW}"],"steps":[],"assertions":["bus Z while en=0","bus driven"]}},
       {"id":1462,"group":"zstate","title":"1wire undeclared init Z","detail":{"scripts":["MODE ZSTATE\n1wire x"],"steps":[],"assertions":["x"]}},
       {"id":1463,"group":"zstate","title":"resolveWireVector — empty contributors","detail":{"scripts":[],"steps":[],"assertions":["empty"]}},
-      {"id":1464,"group":"zstate","title":"assign then Z then no re-drive on propagate","detail":{"scripts":["MODE ZSTATE\n3wire bus = 101\nZ(bus)\n3wire src = 111"],"steps":[],"assertions":["bus released"]}},
+      {"id":1464,"group":"zstate","title":"assign then ZRELEASE then no re-drive on propagate","detail":{"scripts":["MODE ZSTATE\n3wire bus = 101\nZRELEASE(bus)\n3wire src = 111"],"steps":[],"assertions":["bus released"]}},
       {"id":1465,"group":"zstate","title":"dual get>= agree on bus","detail":{"scripts":["MODE ZSTATE\n2wire bus\ncomp [switch] .s1:\non: 1\n:\ncomp [switch] .s2:\non: 1\n:"],"steps":[],"assertions":["bus"]}},
       {"id":1466,"group":"zstate","title":"dual get>= conflict on bus","detail":{"scripts":["MODE ZSTATE\n2wire bus\ncomp [switch] .s1:\non: 1\n:\ncomp [switch] .s2:\non: 1\n:"],"steps":[],"assertions":["bus"]}},
       {"id":1467,"group":"zstate","title":"wire assign + get>= conflict","detail":{"scripts":["MODE ZSTATE\n3wire bus\n3wire direct = 101\n${ZSTATE_SW}"],"steps":[],"assertions":["bus"]}},
       {"id":1468,"group":"zstate","title":"4wire bus multi-bit agree","detail":{"scripts":["MODE ZSTATE\n4wire bus\n4wire a = 1100\n4wire b = 1100\nbus = a\nbus = b"],"steps":[],"assertions":["bus"]}},
       {"id":1469,"group":"zstate","title":"4wire bus multi-bit conflict","detail":{"scripts":["MODE ZSTATE\n4wire bus\n4wire a = 1100\n4wire b = 1010\nbus = a\nbus = b"],"steps":[],"assertions":["bus"]}},
       {"id":1470,"group":"zstate","title":"enable pattern cpuEn only","detail":{"scripts":["MODE ZSTATE\n3wire bus\n3wire cpuData = 101\n1wire cpuEn = 1\n1wire ramEn = 0\n3wire ramData = 110\nbus = cpuData\nbus = ramData"],"steps":[],"assertions":["last assign wins resolve"]}},
-      {"id":1471,"group":"zstate","title":"Z on subset width wire","detail":{"scripts":["MODE ZSTATE\n1wire en = 1\nZ(en)"],"steps":[],"assertions":["en"]}},
+      {"id":1471,"group":"zstate","title":"ZRELEASE on subset width wire","detail":{"scripts":["MODE ZSTATE\n1wire en = 1\nZRELEASE(en)"],"steps":[],"assertions":["en"]}},
       {"id":1472,"group":"zstate","title":"resolveWireVector all Z contribs","detail":{"scripts":[],"steps":[],"assertions":["allZ"]}},
       {"id":1473,"group":"zstate","title":"bus init Z then single assign","detail":{"scripts":["MODE ZSTATE\n3wire bus\n3wire val = 010\nbus = val"],"steps":[],"assertions":["bus"]}},
       {"id":1474,"group":"zstate","title":"formatValue 1bit Z literal","detail":{"scripts":["MODE ZSTATE\n1wire z = ?Z"],"steps":[],"assertions":["raw","fmt"]}},
@@ -975,7 +975,8 @@
       {"id":1532,"group":"error-display","title":"compact filter unknown column caret","detail":{"scripts":["2wire B\nlutOf(XOR(B.0, B.1), C=*)"],"steps":["assertErrorDisplay(action: run)","session.run(source) inside assertErrorDisplay","resolveErrorDisplay → alignErrorDisplayToSource → output + editor hook"],"assertions":["unknown filter column: action run (must throw)","unknown filter column: error message = \"lutOf: unknown filter column 'C'\"","unknown filter column: scriptLoc.line = 2","unknown filter column: editor line = 2","unknown filter column: editor col = 22","unknown filter column: caret span = 1","unknown filter column: output source line = \"lutOf(XOR(B.0, B.1), C=*)\"","unknown filter column: output caret = \"                     ^\"","unknown filter column: implicit: caret count, hook line/col, output[0..2]"]}},
       {"id":1533,"group":"error-display","title":"compact filter pattern length caret","detail":{"scripts":["2wire B\nlutOf(XOR(B.0, B.1), B=*)"],"steps":["assertErrorDisplay(action: run)","session.run(source) inside assertErrorDisplay","resolveErrorDisplay → alignErrorDisplayToSource → output + editor hook"],"assertions":["pattern too short: action run (must throw)","pattern too short: error message = \"lutOf: pattern length mismatch for 'B' (expected 2)\"","pattern too short: scriptLoc.line = 2","pattern too short: editor line = 2","pattern too short: editor col = 22","pattern too short: caret span = 1","pattern too short: output source line = \"lutOf(XOR(B.0, B.1), B=*)\"","pattern too short: output caret = \"                     ^\"","pattern too short: implicit: caret count, hook line/col, output[0..2]"]}},
       {"id":1534,"group":"bool-filt","title":"simplify non-binary error uses simplify prefix","detail":{"scripts":["2wire B\nsimplify(XOR(B.0-1, B.1), B=AA)"],"steps":[],"assertions":["simplify prefix","not exprOfLut prefix"]}},
-      {"id":1535,"group":"bit-ops","title":"unequal width left pad MSB","detail":{"scripts":[],"steps":["gate(AND, 111, 10000)","gate(AND, 11100, 10000)","gate(OR, 111, 10000)"],"assertions":["AND(111,10000) pads to 00111","AND(11100,10000) no pad","OR(111,10000) pads shorter"]}}
+      {"id":1535,"group":"bit-ops","title":"unequal width left pad MSB","detail":{"scripts":[],"steps":["gate(AND, 111, 10000)","gate(AND, 11100, 10000)","gate(OR, 111, 10000)"],"assertions":["AND(111,10000) pads to 00111","AND(11100,10000) no pad","OR(111,10000) pads shorter"]}},
+      {"id":1536,"group":"zstate","title":"z Z ZZZ valid wire names with ZRELEASE","detail":{"scripts":["MODE ZSTATE\n1wire z = 1\n1wire Z = 0\n1wire ZZZ = 1\nZRELEASE(z)"],"steps":[],"assertions":["z released","Z value","ZZZ value"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1031,7 +1032,7 @@
       { id: 'slider', label: 'Slider component', rangeLabel: '1206–1220', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611] },
-      { id: 'zstate', label: 'zstate', rangeLabel: '1429–1503', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503] }
+      { id: 'zstate', label: 'zstate', rangeLabel: '1429–1503, 1536', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503, 1536] }
     ]
   };
 })();

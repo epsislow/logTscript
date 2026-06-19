@@ -10158,13 +10158,13 @@ reg(1438, 'zstate', 'binary gates unchanged without X/Z', function(h, session) {
   h.assert('no zstate', String(!!interp.zstate), 'false');
 });
 
-reg(1439, 'zstate', 'Z() releases wire to ZZZ', function(h, session) {
-  const { interp } = session.run('MODE ZSTATE\n3wire bus = 101\nZ(bus)');
+reg(1439, 'zstate', 'ZRELEASE releases wire to ZZZ', function(h, session) {
+  const { interp } = session.run('MODE ZSTATE\n3wire bus = 101\nZRELEASE(bus)');
   h.assert('bus', session.getWire(interp, 'bus'), 'ZZZ');
 }, { propagation: 'wave' });
 
-reg(1440, 'zstate', 'Z() without MODE ZSTATE — error', function(h, session) {
-  const { out } = session.run('3wire bus = 101\nZ(bus)');
+reg(1440, 'zstate', 'ZRELEASE without MODE ZSTATE — error', function(h, session) {
+  const { out } = session.run('3wire bus = 101\nZRELEASE(bus)');
   h.assert('err', String(out.some(l => l.startsWith('Error:') && l.includes('ZSTATE'))), 'true');
 });
 
@@ -10251,8 +10251,8 @@ reg(1456, 'zstate', 'triple assign two conflicts', function(h, session) {
   h.assert('bus', session.getWire(interp, 'bus'), 'XXX');
 }, ZSTATE_WAVE);
 
-reg(1457, 'zstate', 'Z() after assign — bus released', function(h, session) {
-  const { interp } = session.run('MODE ZSTATE\n3wire bus = 101\nZ(bus)');
+reg(1457, 'zstate', 'ZRELEASE after assign — bus released', function(h, session) {
+  const { interp } = session.run('MODE ZSTATE\n3wire bus = 101\nZRELEASE(bus)');
   h.assert('bus', session.getWire(interp, 'bus'), 'ZZZ');
 }, ZSTATE_WAVE);
 
@@ -10314,8 +10314,8 @@ reg(1463, 'zstate', 'resolveWireVector — empty contributors', function(h) {
   h.assert('empty', LogicValue.resolveWireVector([], 4), 'ZZZZ');
 });
 
-reg(1464, 'zstate', 'assign then Z then no re-drive on propagate', function(h, session) {
-  const { interp } = session.run('MODE ZSTATE\n3wire bus = 101\nZ(bus)\n3wire src = 111');
+reg(1464, 'zstate', 'assign then ZRELEASE then no re-drive on propagate', function(h, session) {
+  const { interp } = session.run('MODE ZSTATE\n3wire bus = 101\nZRELEASE(bus)\n3wire src = 111');
   h.assert('bus released', session.getWire(interp, 'bus'), 'ZZZ');
 }, ZSTATE_WAVE);
 
@@ -10392,8 +10392,8 @@ bus = ramData`);
   h.assert('last assign wins resolve', session.getWire(interp, 'bus'), '1XX');
 }, ZSTATE_WAVE);
 
-reg(1471, 'zstate', 'Z on subset width wire', function(h, session) {
-  const { interp } = session.run('MODE ZSTATE\n1wire en = 1\nZ(en)');
+reg(1471, 'zstate', 'ZRELEASE on subset width wire', function(h, session) {
+  const { interp } = session.run('MODE ZSTATE\n1wire en = 1\nZRELEASE(en)');
   h.assert('en', session.getWire(interp, 'en'), 'Z');
 }, ZSTATE_WAVE);
 
@@ -10895,6 +10895,17 @@ reg(1535, 'bit-ops', 'unequal width left pad MSB', function(h, session) {
   h.assert('AND(11100,10000) no pad', session.gate('AND', '11100', '10000'), '10000');
   h.assert('OR(111,10000) pads shorter', session.gate('OR', '111', '10000'), '10111');
 });
+
+reg(1536, 'zstate', 'z Z ZZZ valid wire names with ZRELEASE', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+1wire z = 1
+1wire Z = 0
+1wire ZZZ = 1
+ZRELEASE(z)`);
+  h.assert('z released', session.getWire(interp, 'z'), 'Z');
+  h.assert('Z value', session.getWire(interp, 'Z'), '0');
+  h.assert('ZZZ value', session.getWire(interp, 'ZZZ'), '1');
+}, { propagation: 'wave' });
 
 
   window.LogTScriptTestSuite = {

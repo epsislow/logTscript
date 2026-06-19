@@ -159,7 +159,7 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 **How I see it used:** Shared data bus between CPU, RAM, and I/O; teaching why you cannot tie two outputs together without control.
 
-**Shipped design (2025):** No separate `comp [bus]` / `comp [buffer]`. Use **`MODE ZSTATE`** with `get>=` / `out>=`, enable gating (`set = en`), and built-in **`Z(wire)`** for explicit release. Requires **wave** propagation.
+**Shipped design (2025):** No separate `comp [bus]` / `comp [buffer]`. Use **`MODE ZSTATE`** with `get>=` / `out>=`, enable gating (`set = en`), and built-in **`ZRELEASE(wire)`** for explicit release. Requires **wave** propagation.
 
 **Docs:** [zstate.md](zstate.md) — plan: [tristate_bus_buffer.plan.md](../../.cursor/plans/tristate_bus_buffer.plan.md)
 

@@ -1550,10 +1550,10 @@ assignment() {
   }
 
   zRelease(){
-    this.eat('KEYWORD', 'Z');
+    this.eat('KEYWORD', 'ZRELEASE');
     this.eat('SYM', '(');
     if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
-      throw Error(`Expected wire name in Z() at ${this.c.line}:${this.c.col}`);
+      throw Error(`Expected wire name in ZRELEASE() at ${this.c.line}:${this.c.col}`);
     }
     const wireName = this.c.value;
     this.eat(this.c.type);
@@ -3541,7 +3541,7 @@ Parser.KEYWORD_HANDLERS = {
   NEXT: 'next',
   TEST: 'test',
   MODE: 'mode',
-  Z: 'zRelease',
+  ZRELEASE: 'zRelease',
   comp: 'parseComp',
   pcb: 'parsePcbInstance',
   chip: 'parseChipInstance',

@@ -2515,18 +2515,18 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
-| **Tristate (ZSTATE)** | \`Z(wire)\` — release wire | [zstate.md](zstate.md) |
+| **Tristate (ZSTATE)** | \`ZRELEASE(wire)\` — release wire | [zstate.md](zstate.md) |
 
 > **Adding new built-ins:** extend \`Interpreter.BUILTIN_DOC\` in \`core/interpreter.js\`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.
 
-### \`Z(wireName)\` — tristate release
+### \`ZRELEASE(wireName)\` — tristate release
 
-Statement available only after \`MODE ZSTATE\`. Releases every bit of the wire to high-impedance (\`Z\`) in the current propagation step.
+Statement available only after \`MODE ZSTATE\`. Releases every bit of the wire to high-impedance (\`Z\`) in the current propagation step. Wire names \`z\`, \`Z\`, and \`ZZZ\` are allowed — only the keyword \`ZRELEASE\` is reserved.
 
 \`\`\`logts-play wave
 MODE ZSTATE
 1wire en = 1
-Z(en)
+ZRELEASE(en)
 show(en)
 \`\`\`
 
@@ -5852,7 +5852,7 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 **How I see it used:** Shared data bus between CPU, RAM, and I/O; teaching why you cannot tie two outputs together without control.
 
-**Shipped design (2025):** No separate \`comp [bus]\` / \`comp [buffer]\`. Use **\`MODE ZSTATE\`** with \`get>=\` / \`out>=\`, enable gating (\`set = en\`), and built-in **\`Z(wire)\`** for explicit release. Requires **wave** propagation.
+**Shipped design (2025):** No separate \`comp [bus]\` / \`comp [buffer]\`. Use **\`MODE ZSTATE\`** with \`get>=\` / \`out>=\`, enable gating (\`set = en\`), and built-in **\`ZRELEASE(wire)\`** for explicit release. Requires **wave** propagation.
 
 **Docs:** [zstate.md](zstate.md) — plan: [tristate_bus_buffer.plan.md](../../.cursor/plans/tristate_bus_buffer.plan.md)
 
@@ -13017,7 +13017,7 @@ After **RUN**, \`a\` is \`0\` and \`b\` is \`1\`. When you flip the switch in th
 
 When \`MODE ZSTATE\` is active (wave only), wire updates use an extra **commit** phase inside each propagation wave:
 
-1. All contributors are queued (\`bus = a\`, \`get>= bus\`, \`out>= bus\`, \`Z(bus)\`, …).
+1. All contributors are queued (\`bus = a\`, \`get>= bus\`, \`out>= bus\`, \`ZRELEASE(bus)\`, …).
 2. **\`commitWireResolves\`** merges contributions **per bit** → \`0\`, \`1\`, \`Z\`, or \`X\`.
 3. Connected components and displays refresh from the resolved value.
 
@@ -13833,7 +13833,7 @@ Literals with \`Z\` or \`X\` require prefix **\`?\`** when the token would start
 
 ## Multi-driver resolution
 
-Within one **wave** propagation step, every write to a wire (assignment, \`get>=\`, \`out>=\`, \`Z(wire)\`, component redirect) becomes a **contribution**. At commit time the engine resolves **per bit**:
+Within one **wave** propagation step, every write to a wire (assignment, \`get>=\`, \`out>=\`, \`ZRELEASE(wire)\`, component redirect) becomes a **contribution**. At commit time the engine resolves **per bit**:
 
 | Contributors (0/1 only) | Result |
 |-------------------------|--------|
@@ -13896,15 +13896,15 @@ Result: \`1XX0\` (per-bit resolve, not last-wins).
 
 ---
 
-## \`Z(wireName)\` — explicit release
+## \`ZRELEASE(wireName)\` — explicit release
 
 Statement (not an expression):
 
 \`\`\`logts
-Z(databus)
+ZRELEASE(databus)
 \`\`\`
 
-Sets **every bit** of \`databus\` to \`Z\` for the current step (equivalent to releasing the bus). Requires \`MODE ZSTATE\`.
+Sets **every bit** of \`databus\` to \`Z\` for the current step (equivalent to releasing the bus). Requires \`MODE ZSTATE\`. Names \`z\`, \`Z\`, \`ZZZ\`, etc. remain valid as wire identifiers.
 
 ---
 
@@ -13972,7 +13972,7 @@ Historical note: [future component ideas — B4](future-component-ideas.md#b4-tr
 |-------|------|
 | Assignment + \`MODE WIREWRITE\` | [assignment-operators.md](assignment-operators.md#mode-zstate-and-wirewrite) |
 | Wave commit phase | [signal-propagation.md](signal-propagation.md#mode-zstate-multi-driver-commit) |
-| Built-in \`Z()\` | [builtin-functions.md](builtin-functions.md) |
+| Built-in \`ZRELEASE()\` | [builtin-functions.md](builtin-functions.md) |
 | Switch \`get>=\` | [switch.md](switch.md) |
 | Shifter \`out>=\` | [shifter.md](shifter.md) |
 `

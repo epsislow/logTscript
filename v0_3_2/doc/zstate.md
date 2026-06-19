@@ -75,7 +75,7 @@ Literals with `Z` or `X` require prefix **`?`** when the token would start with 
 
 ## Multi-driver resolution
 
-Within one **wave** propagation step, every write to a wire (assignment, `get>=`, `out>=`, `Z(wire)`, component redirect) becomes a **contribution**. At commit time the engine resolves **per bit**:
+Within one **wave** propagation step, every write to a wire (assignment, `get>=`, `out>=`, `ZRELEASE(wire)`, component redirect) becomes a **contribution**. At commit time the engine resolves **per bit**:
 
 | Contributors (0/1 only) | Result |
 |-------------------------|--------|
@@ -138,15 +138,15 @@ Result: `1XX0` (per-bit resolve, not last-wins).
 
 ---
 
-## `Z(wireName)` — explicit release
+## `ZRELEASE(wireName)` — explicit release
 
 Statement (not an expression):
 
 ```logts
-Z(databus)
+ZRELEASE(databus)
 ```
 
-Sets **every bit** of `databus` to `Z` for the current step (equivalent to releasing the bus). Requires `MODE ZSTATE`.
+Sets **every bit** of `databus` to `Z` for the current step (equivalent to releasing the bus). Requires `MODE ZSTATE`. Names `z`, `Z`, `ZZZ`, etc. remain valid as wire identifiers.
 
 ---
 
@@ -214,6 +214,6 @@ Historical note: [future component ideas — B4](future-component-ideas.md#b4-tr
 |-------|------|
 | Assignment + `MODE WIREWRITE` | [assignment-operators.md](assignment-operators.md#mode-zstate-and-wirewrite) |
 | Wave commit phase | [signal-propagation.md](signal-propagation.md#mode-zstate-multi-driver-commit) |
-| Built-in `Z()` | [builtin-functions.md](builtin-functions.md) |
+| Built-in `ZRELEASE()` | [builtin-functions.md](builtin-functions.md) |
 | Switch `get>=` | [switch.md](switch.md) |
 | Shifter `out>=` | [shifter.md](shifter.md) |

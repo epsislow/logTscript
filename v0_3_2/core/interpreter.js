@@ -1666,12 +1666,12 @@ class Interpreter {
 
   execZRelease(wireName) {
     if (!this.zstate) {
-      throw Error('Z() requires MODE ZSTATE');
+      throw Error('ZRELEASE() requires MODE ZSTATE');
     }
     const wire = this.wires.get(wireName);
-    if (!wire) throw Error(`Unknown wire '${wireName}' in Z()`);
+    if (!wire) throw Error(`Unknown wire '${wireName}' in ZRELEASE()`);
     const bits = this.getBitWidth(wire.type);
-    if (!bits) throw Error(`Z() target '${wireName}' is not a wire`);
+    if (!bits) throw Error(`ZRELEASE() target '${wireName}' is not a wire`);
     const val = 'Z'.repeat(bits);
     this.zReleasedWires.add(wireName);
     if (this.signalPropagationStrategy) {
@@ -9940,7 +9940,7 @@ Interpreter.BUILTIN_DOC = {
   REVERSE:  ['REVERSE(Xbit) -> Xbit'],
   LROTATE:  ['LROTATE(Xbit data, Ybit count) -> Xbit'],
   RROTATE:  ['RROTATE(Xbit data, Ybit count) -> Xbit'],
-  Z:       ['Z(wireName) — release wire to high-Z (MODE ZSTATE statement)'],
+  ZRELEASE: ['ZRELEASE(wireName) — release wire to high-Z (MODE ZSTATE statement)'],
 };
 
 Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions, boardInstNames, boardDefinitions, inlineInstances) {
