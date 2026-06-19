@@ -3387,8 +3387,8 @@ isBuiltinFunction(name) {
           sym.family = fam;
         } else if (key === 'size') {
           const sz = readInt();
-          if (sz < 6 || sz > 48) {
-            throw Error(`CLCD label size must be 6-48 in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+          if (sz < 1) {
+            throw Error(`CLCD size must be a positive integer in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
           }
           sym.size = sz;
         } else if (key === 'weight') {
@@ -3447,11 +3447,23 @@ isBuiltinFunction(name) {
         if (sym.family !== undefined) {
           throw Error(`CLCD symbol '${symName}' does not support family at ${this.c.line}:${this.c.col}`);
         }
-        if (sym.size !== undefined) {
-          throw Error(`CLCD symbol '${symName}' does not support size at ${this.c.line}:${this.c.col}`);
-        }
         if (sym.weight !== undefined) {
           throw Error(`CLCD symbol '${symName}' does not support weight at ${this.c.line}:${this.c.col}`);
+        }
+      }
+      if (sym.size !== undefined && symDef) {
+        if (symDef.kind === 'fa') {
+          if (sym.size < 8 || sym.size > 64) {
+            throw Error(`CLCD FA icon size must be 8-64 in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+          }
+        } else if (symDef.kind === 'canvas') {
+          if (sym.size < 8 || sym.size > 120) {
+            throw Error(`CLCD canvas symbol size must be 8-120 in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+          }
+        } else if (symDef.kind === 'text') {
+          if (sym.size < 6 || sym.size > 48) {
+            throw Error(`CLCD label size must be 6-48 in symbol '${symName}' at ${this.c.line}:${this.c.col}`);
+          }
         }
       }
       if (symDef && symDef.kind === 'canvas' && sym.style !== undefined) {

@@ -61,11 +61,12 @@ comp [clcd] .panel::
 | `bits` | one of | Inclusive range `N-M` (e.g. `digit7`) |
 | `bitOut` | no | Touch output bit index (optional; symbol omitted from `:out` if absent) |
 | `touchType` | with `bitOut` | `1` momentary (default), `2` pulse, `3` latch/toggle |
-| `width`, `height` | no | Touch hit box size (px); defaults per symbol kind (FA 22×22, `digit7` 28×44, …) |
+| `width`, `height` | no | Touch hit box size (px); defaults from `size` or per kind (FA 22×22, `digit7` 28×44, …) |
 | `padding` | no | Extra margin (px) around hit box; defaults to `touchPadding` or `0` |
 | `color` | no | Override ON color for this symbol |
 | `bgColor` | no | Override OFF color for this symbol |
 | `style` | no | FA icon style: `1` solid (default), `2` regular, `3` brands — only on FA symbols; not on canvas or `label` |
+| `size` | no | Display size in px (target height). **FA** icons: font size, default **22**, range 8–64. **Canvas** (`digit7`, `dp`, …): uniform scale to target height, defaults **44** / **8** / **32**, range 8–120. **`label`**: font size, default **14**, range 6–48. Touch hit box follows `size` when `width`/`height` are omitted |
 
 ### `label` (text on canvas)
 
@@ -118,7 +119,7 @@ Display bits (`bit` / `bits` → `:get`) and touch bits (`bitOut` → `:out`) ar
 - Left: `x - pad`, top: `y - pad`
 - Right: `x + width + pad`, bottom: `y + height + pad`
 
-Default sizes when `width` / `height` are omitted depend on symbol kind (e.g. FA icons 22×22, `digit7` 28×44). Default `pad` is the symbol's `padding`, else `touchPadding`, else `0`.
+Default sizes when `width` / `height` are omitted follow each symbol's `size` (see above), or the native defaults (FA 22×22, `digit7` 28×44, `dp` 12×8, `colon` 8×32). Default `pad` is the symbol's `padding`, else `touchPadding`, else `0`.
 
 Set component attribute `touch: 1` to enable hit-testing. Optional `touchColor` draws debug borders around hit boxes. With a mouse, the cursor is `pointer` over touch zones (`touchType` 1 or 2) and `grab` over latch zones (`touchType` 3); elsewhere it stays the default arrow.
 

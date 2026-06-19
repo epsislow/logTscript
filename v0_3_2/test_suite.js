@@ -10979,6 +10979,112 @@ reg(1548, 'bool-filt', 'lift AND mid-wire slice B.1-2', function(h, session) {
   h.assert('short', out[0], '2wire out = `B.1-2 & C.1-2`');
 });
 
+reg(1549, 'clcd', 'parse FA power with size 30', function(h, session) {
+  const stmts = session.parse(`comp [clcd] .status:
+  = {
+    power:
+      x: 120
+      y: 12
+      bit: 0
+      size: 30
+    :
+  }
+  :`);
+  const sym = stmts[0].comp.initialValue.symbols[0];
+  h.assert('size 30', String(sym.size), '30');
+  h.assert('name power', sym.name, 'power');
+});
+
+reg(1550, 'clcd', 'parse canvas digit7 with size 60', function(h, session) {
+  const stmts = session.parse(`comp [clcd] .digit:
+  = {
+    digit7:
+      x: 10
+      y: 10
+      bits: 0-6
+      size: 60
+    :
+  }
+  :`);
+  const sym = stmts[0].comp.initialValue.symbols[0];
+  h.assert('size 60', String(sym.size), '60');
+});
+
+reg(1551, 'clcd', 'parse error FA size 7 and canvas size 4', function(h, session) {
+  h.assertThrows('FA size 7', function() {
+    session.parse(`comp [clcd] .x:
+  = {
+    power:
+      x: 0
+      y: 0
+      bit: 0
+      size: 7
+    :
+  }
+  :`);
+  });
+  h.assertThrows('canvas size 4', function() {
+    session.parse(`comp [clcd] .x:
+  = {
+    digit7:
+      x: 0
+      y: 0
+      bits: 0-6
+      size: 4
+    :
+  }
+  :`);
+  });
+});
+
+reg(1552, 'clcd', 'resolveClcdFaIconSize default 22', function(h, session) {
+  const sz = (typeof resolveClcdFaIconSize === 'function') ? resolveClcdFaIconSize({}) : null;
+  h.assert('default 22', String(sz), '22');
+});
+
+reg(1553, 'clcd', 'resolveClcdCanvasScale for digit7', function(h, session) {
+  const scale = (typeof resolveClcdCanvasScale === 'function') ? resolveClcdCanvasScale : null;
+  h.assert('omit size', String(scale({}, 'digit7')), '1');
+  h.assert('size 44', String(scale({ size: 44 }, 'digit7')), '1');
+  h.assert('size 88', String(scale({ size: 88 }, 'digit7')), '2');
+});
+
+reg(1554, 'clcd', 'computeTouchRect FA size 30', function(h, session) {
+  const Clcd = session._ensureRegistry().get('clcd').constructor;
+  const rect = Clcd.computeTouchRect(
+    { name: 'power', x: 10, y: 20, size: 30, bitOut: 0 },
+    { touchPadding: 0 }
+  );
+  h.assert('width 30', String(rect.x2 - rect.x1), '30');
+  h.assert('height 30', String(rect.y2 - rect.y1), '30');
+});
+
+reg(1555, 'clcd', 'computeTouchRect digit7 size 88', function(h, session) {
+  const Clcd = session._ensureRegistry().get('clcd').constructor;
+  const rect = Clcd.computeTouchRect(
+    { name: 'digit7', x: 10, y: 10, size: 88, bitOut: 0 },
+    { touchPadding: 0 }
+  );
+  h.assert('width 56', String(rect.x2 - rect.x1), '56');
+  h.assert('height 88', String(rect.y2 - rect.y1), '88');
+});
+
+reg(1556, 'clcd', 'parse error label size 5', function(h, session) {
+  h.assertThrows('label size 5', function() {
+    session.parse(`comp [clcd] .ui:
+  = {
+    label:
+      x: 0
+      y: 0
+      bit: 0
+      text: "Hi"
+      size: 5
+    :
+  }
+  :`);
+  });
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

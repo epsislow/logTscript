@@ -519,6 +519,27 @@ function getClcdSymbolDef(name) {
   return CLCD_SYMBOL_BY_NAME[name] || null;
 }
 
+var CLCD_FA_ICON_SIZE_DEFAULT = 22;
+
+var CLCD_CANVAS_NATIVE = {
+  digit7: { w: 28, h: 44 },
+  digit14: { w: 28, h: 44 },
+  dp: { w: 12, h: 8 },
+  colon: { w: 8, h: 32 },
+};
+
+function resolveClcdFaIconSize(sym) {
+  var sz = sym && sym.size;
+  return (sz !== undefined && sz !== null) ? sz : CLCD_FA_ICON_SIZE_DEFAULT;
+}
+
+function resolveClcdCanvasScale(sym, renderer) {
+  var nat = CLCD_CANVAS_NATIVE[renderer];
+  if (!nat) return 1;
+  var targetH = (sym && sym.size !== undefined) ? sym.size : nat.h;
+  return targetH / nat.h;
+}
+
 function resolveClcdFaStyle(symDef, styleNum) {
   if (!symDef || symDef.kind !== 'fa') return null;
   var s = styleNum !== undefined && styleNum !== null ? styleNum : symDef.defaultStyle;
@@ -564,7 +585,10 @@ function resolveClcdLabelFont(sym) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports.CLCD_SYMBOL_REGISTRY = CLCD_SYMBOL_REGISTRY;
   module.exports.CLCD_KNOWN_SYMBOLS = CLCD_KNOWN_SYMBOLS;
+  module.exports.CLCD_CANVAS_NATIVE = CLCD_CANVAS_NATIVE;
   module.exports.getClcdSymbolDef = getClcdSymbolDef;
+  module.exports.resolveClcdFaIconSize = resolveClcdFaIconSize;
+  module.exports.resolveClcdCanvasScale = resolveClcdCanvasScale;
   module.exports.resolveClcdFaStyle = resolveClcdFaStyle;
   module.exports.resolveClcdLabelFont = resolveClcdLabelFont;
 }

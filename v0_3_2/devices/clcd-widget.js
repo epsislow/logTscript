@@ -2,8 +2,6 @@
 
 const clcdDisplays = new Map();
 
-const CLCD_ICON_SIZE = 22;
-
 function addClcd(options) {
   const container = document.getElementById('devices');
   if (!container || !options.id) return;
@@ -230,16 +228,7 @@ class ClcdDisplay {
         : null;
 
       if (symDef && symDef.kind === 'canvas') {
-        if (sym.name === 'digit7') {
-          this._drawDigit7(ctx, sym.x, sym.y, this._segmentBits(sym), fg, bg, 7);
-        } else if (sym.name === 'digit14') {
-          this._drawDigit7(ctx, sym.x, sym.y, this._segmentBits(sym).substring(0, 7), fg, bg, 7);
-        } else if (sym.name === 'dp') {
-          this._drawDot(ctx, sym.x + 4, sym.y + 28, on ? fg : bg, 4);
-        } else if (sym.name === 'colon') {
-          this._drawDot(ctx, sym.x, sym.y + 10, on ? fg : bg, 3);
-          this._drawDot(ctx, sym.x, sym.y + 22, on ? fg : bg, 3);
-        }
+        this._drawCanvasSymbol(ctx, sym, on, fg, bg);
       } else if (symDef && symDef.kind === 'text') {
         this._drawLabel(ctx, sym, color);
       } else {
@@ -248,6 +237,27 @@ class ClcdDisplay {
     }
 
     this._drawTouchDebug(ctx);
+  }
+
+  _drawCanvasSymbol(ctx, sym, on, fg, bg) {
+    const scale = (typeof resolveClcdCanvasScale === 'function')
+      ? resolveClcdCanvasScale(sym, sym.name)
+      : 1;
+    const dotColor = on ? fg : bg;
+    ctx.save();
+    ctx.translate(sym.x, sym.y);
+    ctx.scale(scale, scale);
+    if (sym.name === 'digit7') {
+      this._drawDigit7(ctx, 0, 0, this._segmentBits(sym), fg, bg, 7);
+    } else if (sym.name === 'digit14') {
+      this._drawDigit7(ctx, 0, 0, this._segmentBits(sym).substring(0, 7), fg, bg, 7);
+    } else if (sym.name === 'dp') {
+      this._drawDot(ctx, 4, 28, dotColor, 4);
+    } else if (sym.name === 'colon') {
+      this._drawDot(ctx, 0, 10, dotColor, 3);
+      this._drawDot(ctx, 0, 22, dotColor, 3);
+    }
+    ctx.restore();
   }
 
   _drawLabel(ctx, sym, color) {
@@ -275,8 +285,11 @@ class ClcdDisplay {
       ? resolveClcdFaStyle(symDef, sym.style)
       : null;
     if (!resolved) return;
+    const px = (typeof resolveClcdFaIconSize === 'function')
+      ? resolveClcdFaIconSize(sym)
+      : 22;
     ctx.save();
-    ctx.font = `${resolved.weight} ${CLCD_ICON_SIZE}px ${resolved.fontFamily}`;
+    ctx.font = `${resolved.weight} ${px}px ${resolved.fontFamily}`;
     ctx.fillStyle = color;
     ctx.textBaseline = 'top';
     ctx.fillText(resolved.glyph, sym.x, sym.y);

@@ -547,6 +547,17 @@ function clcdSymbolSnippet(sym, styleNum) {
   } else if (sym.kind === 'fa' && sym.glyphs[2] && defStyle === 2) {
     lines.push('  style: 2');
   }
+  if (sym.kind === 'fa') {
+    lines.push('  size: 22');
+  } else if (sym.kind === 'canvas') {
+    if (sym.name === 'digit7' || sym.name === 'digit14') {
+      lines.push('  size: 44');
+    } else if (sym.name === 'dp') {
+      lines.push('  size: 8');
+    } else if (sym.name === 'colon') {
+      lines.push('  size: 32');
+    }
+  }
   lines.push(':');
   return lines.join('\n');
 }

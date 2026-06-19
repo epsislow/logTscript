@@ -81,17 +81,21 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
     return max + 1;
   }
 
-  static defaultTouchSize(symName, symDef) {
-    if (symDef && symDef.kind === 'canvas') {
-      if (symName === 'digit7' || symName === 'digit14') {
-        return { width: ClcdComponent.DIGIT7_TOUCH_W, height: ClcdComponent.DIGIT7_TOUCH_H };
+  static defaultTouchSize(sym, symDef) {
+    if (symDef && symDef.kind === 'canvas' && typeof CLCD_CANVAS_NATIVE !== 'undefined'
+        && typeof resolveClcdCanvasScale === 'function') {
+      const nat = CLCD_CANVAS_NATIVE[sym.name];
+      if (nat) {
+        const scale = resolveClcdCanvasScale(sym, sym.name);
+        return {
+          width: Math.round(nat.w * scale),
+          height: Math.round(nat.h * scale),
+        };
       }
-      if (symName === 'dp') {
-        return { width: ClcdComponent.DP_TOUCH_W, height: ClcdComponent.DP_TOUCH_H };
-      }
-      if (symName === 'colon') {
-        return { width: ClcdComponent.COLON_TOUCH_W, height: ClcdComponent.COLON_TOUCH_H };
-      }
+    }
+    if (symDef && symDef.kind === 'fa' && typeof resolveClcdFaIconSize === 'function') {
+      const sz = resolveClcdFaIconSize(sym);
+      return { width: sz, height: sz };
     }
     if (symDef && symDef.kind === 'text') {
       return { width: ClcdComponent.LABEL_TOUCH_W, height: ClcdComponent.LABEL_TOUCH_H };
@@ -103,7 +107,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
     const symDef = (typeof getClcdSymbolDef === 'function')
       ? getClcdSymbolDef(sym.name)
       : null;
-    const base = ClcdComponent.defaultTouchSize(sym.name, symDef);
+    const base = ClcdComponent.defaultTouchSize(sym, symDef);
     return {
       width: sym.width !== undefined ? sym.width : base.width,
       height: sym.height !== undefined ? sym.height : base.height,
