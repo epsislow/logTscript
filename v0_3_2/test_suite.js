@@ -8818,7 +8818,11 @@ reg(1343, 'clcd', 'doc(comp.clcd) attrs and init block', function(h, session) {
   h.assert('width attr', String(out.some(l => l.includes('width: integer'))), 'true');
   h.assert('color attr', String(out.some(l => l.includes('color: color'))), 'true');
   h.assert('bgColor attr', String(out.some(l => l.includes('bgColor: color'))), 'true');
-  h.assert('symbol init', String(out.some(l => l.includes('= { symbol:'))), 'true');
+  h.assert('icon section', String(out.some(l => l.trim() === 'icon:')), 'true');
+  h.assert('canvas section', String(out.some(l => l.trim() === 'canvas:')), 'true');
+  h.assert('label section', String(out.some(l => l.trim() === 'label:')), 'true');
+  h.assert('multiline init', String(out.some(l => l.includes('= {'))), 'true');
+  h.assert('no single-line schema', String(out.some(l => l.includes('symbol: x: integer y: integer'))), 'false');
 });
 
 reg(1344, 'clcd', 'doc(comp) lists comp.clcd', function(h, session) {
@@ -11083,6 +11087,57 @@ reg(1556, 'clcd', 'parse error label size 5', function(h, session) {
   }
   :`);
   });
+});
+
+reg(1557, 'clcd', 'doc(.ui) instance multiline with defaults', function(h, session) {
+  const out = session.runDoc(`comp [clcd] .ui:
+  width: 220
+  height: 50
+  color: ^00ff00
+  bgColor: ^220
+  bgColorSym: ^440
+  nl
+  = {
+    label:
+      x: 8
+      y: 6
+      bit: 1
+      text: "Load"
+      family: mono
+      size: 16
+      weight: bold
+    :
+    label:
+      x: 8
+      y: 28
+      bit: 2
+      text: "Save"
+      weight: normal
+    :
+    power:
+      x: 120
+      y: 12
+      bit: 0
+    :
+  }
+  :
+doc(.ui)`);
+  const text = out.join('\n');
+  h.assert('header', String(text.includes('comp [clcd] .ui:')), 'true');
+  h.assert('width 220', String(text.includes('width: 220')), 'true');
+  h.assert('power size default', String(text.includes('size: 22')), 'true');
+  h.assert('save label defaults', String(text.includes('family: mono') && text.includes('size: 14')), 'true');
+  h.assert('multiline label', String(out.some(l => l.trim() === 'label:')), 'true');
+});
+
+reg(1558, 'clcd', 'doc(comp.clcd) touch attrs in icon section', function(h, session) {
+  const out = session.runDoc('doc(comp.clcd)');
+  const text = out.join('\n');
+  h.assert('touch attr', String(text.includes('touch: integer')), 'true');
+  h.assert('touchColor attr', String(text.includes('touchColor: color')), 'true');
+  h.assert('bitOut in icon', String(text.includes('bitOut: N')), 'true');
+  h.assert('style in icon', String(text.includes('style: 1|2|3')), 'true');
+  h.assert('text in label', String(text.includes('text: string')), 'true');
 });
 
 

@@ -208,6 +208,201 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
   getSupportedProperties() { return ['get', 'out', 'touchReset']; }
   getRedirectProperties() { return ['get', 'out']; }
 
+  static formatDocColor(val) {
+    if (val === undefined || val === null || val === '') return null;
+    let s = String(val);
+    if (s.charAt(0) === '#') return '^' + s.slice(1);
+    if (s.charAt(0) !== '^') return '^' + s;
+    return s;
+  }
+
+  static formatDocString(val) {
+    const s = String(val);
+    return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n') + '"';
+  }
+
+  static _docSymbolKind(sym) {
+    const symDef = (typeof getClcdSymbolDef === 'function')
+      ? getClcdSymbolDef(sym.name)
+      : null;
+    if (symDef && symDef.kind === 'text') return 'label';
+    if (symDef && symDef.kind === 'canvas') return 'canvas';
+    return 'icon';
+  }
+
+  static _docDefaultCanvasSize(sym) {
+    if (typeof CLCD_CANVAS_NATIVE !== 'undefined' && CLCD_CANVAS_NATIVE[sym.name]) {
+      return CLCD_CANVAS_NATIVE[sym.name].h;
+    }
+    return 44;
+  }
+
+  static _pushTypeDocSymbolSection(lines, section, exampleName, fields) {
+    lines.push(`    ${section}:`);
+    lines.push(`      ${exampleName}:`);
+    for (const field of fields) {
+      lines.push(`        ${field}`);
+    }
+    lines.push('      :');
+  }
+
+  static formatTypeDoc(alias, type) {
+    const def = (new ClcdComponent()).getDef();
+    const lines = [];
+    lines.push(`comp [${type}] ${alias}:`);
+    for (const attr of def.attrs) {
+      if (attr.value === null) {
+        lines.push(`  ${attr.name}`);
+      } else {
+        lines.push(`  ${attr.name}: ${attr.value}`);
+      }
+    }
+    lines.push('  = {');
+    ClcdComponent._pushTypeDocSymbolSection(lines, 'icon', '<name>', [
+      'x: integer',
+      'y: integer',
+      'bit: N',
+      'bits: N-M',
+      'bitOut: N',
+      'touchType: 1|2|3',
+      'width: integer',
+      'height: integer',
+      'padding: integer',
+      'color: color',
+      'bgColor: color',
+      'style: 1|2|3',
+      'size: integer',
+    ]);
+    ClcdComponent._pushTypeDocSymbolSection(lines, 'canvas', 'digit7|digit14|dp|colon', [
+      'x: integer',
+      'y: integer',
+      'bit: N',
+      'bits: N-M',
+      'bitOut: N',
+      'touchType: 1|2|3',
+      'width: integer',
+      'height: integer',
+      'padding: integer',
+      'color: color',
+      'bgColor: color',
+      'size: integer',
+    ]);
+    ClcdComponent._pushTypeDocSymbolSection(lines, 'label', 'label', [
+      'x: integer',
+      'y: integer',
+      'bit: N',
+      'text: string',
+      'family: mono|sans|serif',
+      'size: integer',
+      'weight: normal|bold|italic|boldItalic',
+      'bitOut: N',
+      'touchType: 1|2|3',
+      'width: integer',
+      'height: integer',
+      'padding: integer',
+      'color: color',
+      'bgColor: color',
+    ]);
+    lines.push('  }');
+    lines.push('  :{');
+    lines.push('  }');
+    return lines;
+  }
+
+  static _pushInstanceSymbolLines(lines, sym, attributes) {
+    const symDef = (typeof getClcdSymbolDef === 'function')
+      ? getClcdSymbolDef(sym.name)
+      : null;
+    const kind = ClcdComponent._docSymbolKind(sym);
+    const touchPadding = attributes && attributes.touchPadding !== undefined
+      ? parseInt(attributes.touchPadding, 10)
+      : 0;
+
+    lines.push(`    ${sym.name}:`);
+    lines.push(`      x: ${sym.x}`);
+    lines.push(`      y: ${sym.y}`);
+    if (sym.bitsStart !== undefined) {
+      lines.push(`      bits: ${sym.bitsStart}-${sym.bitsEnd}`);
+    } else {
+      lines.push(`      bit: ${sym.bit}`);
+    }
+
+    if (kind === 'label') {
+      lines.push(`      text: ${ClcdComponent.formatDocString(sym.text)}`);
+      lines.push(`      family: ${sym.family !== undefined ? sym.family : 'mono'}`);
+      const labelSize = (sym.size !== undefined && sym.size !== null)
+        ? sym.size
+        : 14;
+      lines.push(`      size: ${labelSize}`);
+      lines.push(`      weight: ${sym.weight !== undefined ? sym.weight : 'normal'}`);
+    }
+
+    if (sym.bitOut !== undefined) {
+      lines.push(`      bitOut: ${sym.bitOut}`);
+      lines.push(`      touchType: ${sym.touchType !== undefined ? sym.touchType : 1}`);
+    }
+
+    if (kind === 'icon') {
+      if (sym.style !== undefined) {
+        lines.push(`      style: ${sym.style}`);
+      } else if (symDef && symDef.defaultStyle !== undefined) {
+        lines.push(`      style: ${symDef.defaultStyle}`);
+      }
+      const faSize = (typeof resolveClcdFaIconSize === 'function')
+        ? resolveClcdFaIconSize(sym)
+        : (sym.size !== undefined ? sym.size : 22);
+      lines.push(`      size: ${faSize}`);
+    } else if (kind === 'canvas') {
+      const canvasSize = (sym.size !== undefined && sym.size !== null)
+        ? sym.size
+        : ClcdComponent._docDefaultCanvasSize(sym);
+      lines.push(`      size: ${canvasSize}`);
+    }
+
+    if (sym.width !== undefined) lines.push(`      width: ${sym.width}`);
+    if (sym.height !== undefined) lines.push(`      height: ${sym.height}`);
+    if (sym.padding !== undefined) {
+      lines.push(`      padding: ${sym.padding}`);
+    } else if (sym.bitOut !== undefined && touchPadding !== 0) {
+      lines.push(`      padding: ${touchPadding}`);
+    }
+
+    const colorDoc = ClcdComponent.formatDocColor(sym.color);
+    if (colorDoc) lines.push(`      color: ${colorDoc}`);
+    const bgDoc = ClcdComponent.formatDocColor(sym.bgColor);
+    if (bgDoc) lines.push(`      bgColor: ${bgDoc}`);
+
+    lines.push('    :');
+  }
+
+  static formatInstanceDoc(alias, comp) {
+    const attributes = comp.attributes || {};
+    const symbols = attributes.clcdSymbols || comp.clcdSymbols || [];
+    const lines = [];
+    lines.push(`comp [clcd] ${alias}:`);
+
+    const attrOrder = ['width', 'height', 'color', 'bgColor', 'bgColorSym', 'touch', 'touchColor', 'touchPadding'];
+    for (const key of attrOrder) {
+      if (attributes[key] === undefined || attributes[key] === null || attributes[key] === '') continue;
+      if (key === 'color' || key === 'bgColor' || key === 'bgColorSym' || key === 'touchColor') {
+        lines.push(`  ${key}: ${ClcdComponent.formatDocColor(attributes[key])}`);
+      } else {
+        lines.push(`  ${key}: ${attributes[key]}`);
+      }
+    }
+    if (attributes.nl) {
+      lines.push('    nl');
+    }
+
+    lines.push('  = {');
+    for (const sym of symbols) {
+      ClcdComponent._pushInstanceSymbolLines(lines, sym, attributes);
+    }
+    lines.push('  }');
+    lines.push('  :');
+    return lines;
+  }
+
   getDef() {
     return {
       attrs: [
@@ -221,7 +416,7 @@ var ClcdComponent = class ClcdComponent extends BuiltinComponent {
         { name: 'touchPadding', value: 'integer' },
         { name: 'nl', value: null },
       ],
-      initValue: '{ symbol: x: integer y: integer bit: N bits: N-M bitOut: N touchType: 1|2|3 width: integer height: integer padding: integer color: color bgColor: color text: string family: mono|sans|serif size: integer weight: normal|bold|italic|boldItalic : }',
+      initValue: null,
       pins: [],
       pouts: [],
       returns: null,

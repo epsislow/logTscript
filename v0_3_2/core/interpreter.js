@@ -10019,6 +10019,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
         return handler.constructor.formatInstanceDoc(alias, compInst);
       }
     }
+    if (!compInst && handler.constructor && handler.constructor.formatTypeDoc) {
+      return handler.constructor.formatTypeDoc(alias, canonicalType);
+    }
     const def = handler.getDef ? handler.getDef(compInst && compInst.attributes ? compInst.attributes : null) : null;
     if (!def) return [`comp.${canonicalType}: (no doc available)`];
     return Interpreter.formatCompDef(alias, canonicalType, def);
