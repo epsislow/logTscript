@@ -3,18 +3,14 @@
 function truthTableOfGenerate(exprAst, widthResolver, filters) {
   const columns = discoverLutOfInputs(exprAst, widthResolver);
   const filterMap = validateAndBuildFilterMap(columns, filters, 'truthTableOf');
-  const addrWidth = columns.reduce((s, c) => s + c.width, 0);
-  const rowsToGenerate = countRowsToGenerate(columns, filterMap);
-  assertTableRowsWithinLimit(rowsToGenerate);
+  const envs = enumerateFilteredEnvs(columns, filterMap);
+  assertTableRowsWithinLimit(envs.length);
 
   const lines = [];
   lines.push(columns.map(c => c.key).join(' ') + ' | OUT');
   lines.push('--------------');
 
-  const fullLength = 1 << addrWidth;
-  for (let addr = 0; addr < fullLength; addr++) {
-    const env = addrBitsToColumns(columns, addr);
-    if (!rowMatchesFilters(columns, env, filterMap)) continue;
+  for (const env of envs) {
     const result = evalBooleanParts(exprAst, env, widthResolver);
     const cells = columns.map(c => env[c.key]);
     lines.push(cells.join(' ') + ' | ' + result);
@@ -37,7 +33,7 @@ function minimizeExprOutputs(exprAst, columns, widthResolver, filters) {
   if (!minimizeFn) throw new Error('boolean-minimize.js is not loaded');
 
   let labels;
-  let outputsByBit;
+  let outputCols;
 
   if (filterMap) {
     labels = varyingBitLabels(columns, filterMap);
@@ -45,41 +41,59 @@ function minimizeExprOutputs(exprAst, columns, widthResolver, filters) {
     if (numVars > BOOLEAN_ANALYSIS_MAX_INPUT_BITS) {
       throw new Error(BOOLEAN_ANALYSIS_TOO_WIDE_ERR);
     }
-    const tableSize = 1 << numVars;
-    if (rows.length !== tableSize) {
-      throw new Error(
-        `simplify: expected ${tableSize} rows for ${numVars} varying bit(s), got ${rows.length}`
-      );
-    }
-    outputsByBit = [];
-    for (let b = 0; b < outWidth; b++) outputsByBit.push(new Array(tableSize).fill(false));
-    for (const row of rows) {
-      const varyingBits = extractVaryingBitsFromEnv(row.env, columns, filterMap);
-      const mintermIdx = parseInt(varyingBits, 2);
-      if (isNaN(mintermIdx) || mintermIdx < 0 || mintermIdx >= tableSize) {
-        throw new Error(`simplify: invalid varying bits '${varyingBits}'`);
-      }
-      const padded = row.output.padStart(outWidth, '0');
+
+    if (numVars === 0) {
+      const cols = [];
       for (let b = 0; b < outWidth; b++) {
-        outputsByBit[b][mintermIdx] = padded[b] === '1';
+        const chars = rows.map(row => row.output.padStart(outWidth, '0')[b]);
+        cols.push(classifyOutputColumn(chars));
+      }
+      outputCols = cols;
+    } else {
+      const tableSize = 1 << numVars;
+      const assigned = [];
+      for (let b = 0; b < outWidth; b++) assigned.push(new Array(tableSize).fill(null));
+
+      for (const row of rows) {
+        const varyingBits = extractVaryingBitsFromEnv(row.env, columns, filterMap);
+        const mintermIdx = parseInt(varyingBits, 2);
+        if (isNaN(mintermIdx) || mintermIdx < 0 || mintermIdx >= tableSize) {
+          throw new Error(`simplify: invalid varying bits '${varyingBits}'`);
+        }
+        const padded = row.output.padStart(outWidth, '0');
+        for (let b = 0; b < outWidth; b++) {
+          const ch = padded[b];
+          const prev = assigned[b][mintermIdx];
+          if (prev !== null && prev !== ch) {
+            throw new Error(`simplify: conflicting output at minterm ${varyingBits}`);
+          }
+          assigned[b][mintermIdx] = ch;
+        }
+      }
+
+      outputCols = [];
+      for (let b = 0; b < outWidth; b++) {
+        const chars = assigned[b].map(v => (v === null ? '0' : v));
+        outputCols.push(classifyOutputColumn(chars));
       }
     }
   } else {
     labels = columnsToInputLabels(columns);
-    outputsByBit = [];
-    for (let b = 0; b < outWidth; b++) outputsByBit.push([]);
-    for (const row of rows) {
-      const padded = row.output.padStart(outWidth, '0');
-      for (let b = 0; b < outWidth; b++) {
-        outputsByBit[b].push(padded[b] === '1');
-      }
+    outputCols = [];
+    for (let b = 0; b < outWidth; b++) {
+      const chars = rows.map(row => row.output.padStart(outWidth, '0')[b]);
+      outputCols.push(classifyOutputColumn(chars));
     }
   }
 
-  const mins = [];
-  for (let b = 0; b < outWidth; b++) {
-    mins.push(minimizeFn(labels, outputsByBit[b]));
-  }
+  const mins = outputCols.map(col => {
+    if (col.kind === 'uniform') {
+      const v = col.value;
+      if (v === 'X' || v === 'Z') return { constant: v };
+      return { constant: v === '1' };
+    }
+    return minimizeFn(labels, col.bools);
+  });
   return { mins, outWidth };
 }
 

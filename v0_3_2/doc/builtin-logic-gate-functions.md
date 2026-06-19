@@ -71,3 +71,22 @@ Compares two operands bit-by-bit; returns `1` only if every bit pair matches.
 1wire same = EQ(a, b)
 probe(same)
 ```
+
+---
+
+## `Z` and `X` in MODE ZSTATE
+
+When `MODE ZSTATE` is active, gate operands may contain **`Z`** (undriven) or **`X`** (multi-driver conflict). Gates use **IEEE 1164** tables instead of pure binary:
+
+```logts-play wave
+MODE ZSTATE
+
+1wire a = ?X
+1wire b = 1
+1wire y = OR(a, b)
+show(y)
+```
+
+Result: `y = 1` (OR with any `1`).
+
+`NOT(?Z)` on a 1-bit wire → `X`. Full bus semantics, resolver, and error rules: **[zstate.md](zstate.md)**.

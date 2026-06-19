@@ -153,13 +153,15 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 ---
 
-### B4. Tristate / bus buffer
+### B4. Tristate / bus buffer — **implemented in engine (`MODE ZSTATE`)**
 
-**What it does:** Output drivers that can be **high**, **low**, or **high-impedance (off)** when `enable` is false. Lets multiple sources share one bus wire without fighting — only one enabled at a time.
+**What it does:** Output drivers that can be **high**, **low**, or **high-impedance (off)** when `enable` is false. Lets multiple sources share one bus wire without fighting — only one enabled at a time (or resolve conflicts as `X` when more than one drives).
 
-**How I see it used:** Shared data bus between CPU, RAM, and I/O; teaching why you cannot tie two outputs together without control. Multiple `buffer` comps on one bus wire with mutually exclusive `en` signals.
+**How I see it used:** Shared data bus between CPU, RAM, and I/O; teaching why you cannot tie two outputs together without control.
 
-**Today:** LogTScript wires are a single driven value — no real Z state in simulation. A buffer comp would model enable/disable semantics (e.g. only propagate when `en=1`, else bus holds previous or floats as `Z` in display). Some engine/display decisions needed.
+**Shipped design (2025):** No separate `comp [bus]` / `comp [buffer]`. Use **`MODE ZSTATE`** with `get>=` / `out>=`, enable gating (`set = en`), and built-in **`Z(wire)`** for explicit release. Requires **wave** propagation.
+
+**Docs:** [zstate.md](zstate.md) — plan: [tristate_bus_buffer.plan.md](../../.cursor/plans/tristate_bus_buffer.plan.md)
 
 ---
 

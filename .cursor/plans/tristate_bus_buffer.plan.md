@@ -25,7 +25,7 @@ todos:
     status: completed
   - id: doc-regression
     content: "doc/zstate.md, actualizări builtin/debug/signal-propagation, regresie full suite"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -307,17 +307,20 @@ sequenceDiagram
 
 **Teste:** 1488–1497 (10).
 
-### Faza 5 — Documentație + regresie (~2–3 zile)
+### Faza 5 — Documentație + regresie (~2–3 zile) ✅ COMPLETĂ
 
 - [doc/zstate.md](v0_3_2/doc/zstate.md) — **nou**: MODE, Z(), multi-driver, conflicte, vs mod binar
 - [doc/assignment-operators.md](v0_3_2/doc/assignment-operators.md) — ZSTATE + WIREWRITE
 - [doc/builtin-functions.md](v0_3_2/doc/builtin-functions.md) — Z(), logic multi-valoare
+- [doc/builtin-logic-gate-functions.md](v0_3_2/doc/builtin-logic-gate-functions.md) — IEEE 1164 în ZSTATE
 - [doc/signal-propagation.md](v0_3_2/doc/signal-propagation.md) — fază commit wire
+- [doc/debug.md](v0_3_2/doc/debug.md) — afișaj Z/X în show/watch
 - [doc/future-component-ideas.md](v0_3_2/doc/future-component-ideas.md) — B4 → engine ZSTATE
-- `script_editor_v0_3_2.html` — autocomplete MODE ZSTATE, Z(
-- Regresie: **779+** teste existente verzi (fără MODE ZSTATE în ele)
+- `script_editor_v0_3_2.html` — autocomplete `MODE ZSTATE`, `Z`
+- `Interpreter.BUILTIN_DOC` — `doc(Z)`
+- Regresie: **946/946** teste verzi
 
-### Faza 6 — Filtre analiză booleană `*` / `A` / `X` / `Z` (~3–4 zile)
+### Faza 6 — Filtre analiză booleană `*` / `A` / `X` / `Z` (~3–4 zile) ✅ COMPLETĂ
 
 Plan detaliat: [filtre_boolean_xz.plan.md](filtre_boolean_xz.plan.md).
 
@@ -330,13 +333,9 @@ Plan detaliat: [filtre_boolean_xz.plan.md](filtre_boolean_xz.plan.md).
 | `X`, `Z` | valori fixe în pattern (ex. `A=01X11`) |
 | `0`, `1` | fix binar |
 
-**exprOfLut + `filters:`:** trebuie actualizat `varyingBitLabels`, `buildFilteredOutputsByMinterm`, `enumerateFilteredEnvs` (partajat cu `lutOf`) — vezi plan detaliat secțiunea 3.
-
-**Dependență:** Faza 1 (`logic-value.js` — tabele IEEE 1164).
-
 **Fișiere:** [boolean-lut.js](v0_3_2/core/boolean-lut.js), [boolean-analysis.js](v0_3_2/core/boolean-analysis.js), doc + teste 1512–1525.
 
-**Nu afectează** runtime ZSTATE / fire. `simplify`/`exprOfLut`: literal X/Z dacă ieșire uniformă, altfel eroare.
+**Regresie:** 960/960 teste verzi (migrare `x`→`*` în teste existente + 14 teste noi).
 
 ---
 

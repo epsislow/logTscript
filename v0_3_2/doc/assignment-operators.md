@@ -234,3 +234,46 @@ After `:` init, the first real assignment (`=`, `:=`, or `=:`) is allowed in STR
 | `Nwire x =: .isa { ... }` | Right-pad |
 
 Use exact wire width with `=` when the assembled program matches, e.g. `8wire prog = .myisa { LOAD R1 A2 }`.
+
+---
+
+## `MODE WIREWRITE`
+
+Allows **re-assignment** to the same wire name after initialization (in addition to `MODE STRICT` rules). In default binary mode, multiple writes in one step still behave as **last wins** during propagation.
+
+```logts-play
+MODE WIREWRITE
+4wire q : 1
+q =: 11
+show(q)
+```
+
+Result: `1100`
+
+---
+
+## `MODE ZSTATE` and `WIREWRITE`
+
+`MODE ZSTATE` can be combined with `MODE WIREWRITE`. The difference from plain WIREWRITE:
+
+| | `MODE WIREWRITE` (binary) | `MODE ZSTATE` |
+|--|---------------------------|---------------|
+| Multiple writes same step | Last value wins | Contributions **merged** per bit |
+| Undeclared wire | Zeros | `Z` (high-impedance) |
+| Conflict | Silent overwrite | `X` on conflicting bits |
+
+Full semantics: **[zstate.md](zstate.md)**.
+
+```logts-play wave
+MODE ZSTATE
+
+2wire bus
+2wire a = 10
+2wire b = 11
+bus = a
+bus = b
+show(bus)
+```
+
+Result: `1X` (not `11`).
+

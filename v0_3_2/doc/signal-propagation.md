@@ -58,6 +58,16 @@ show(a, b)
 
 After **RUN**, `a` is `0` and `b` is `1`. When you flip the switch in the panel, `a` becomes `1` and `b` becomes `0` without running the script again.
 
+### MODE ZSTATE — multi-driver commit
+
+When `MODE ZSTATE` is active (wave only), wire updates use an extra **commit** phase inside each propagation wave:
+
+1. All contributors are queued (`bus = a`, `get>= bus`, `out>= bus`, `Z(bus)`, …).
+2. **`commitWireResolves`** merges contributions **per bit** → `0`, `1`, `Z`, or `X`.
+3. Connected components and displays refresh from the resolved value.
+
+This is why multiple drivers in the **same step** can coexist on one bus without silent overwrite. Full rules: **[zstate.md](zstate.md)**.
+
 ---
 
 ## Legacy
@@ -153,6 +163,7 @@ See chip tests **540–543** (legacy) and **556–557** (wave) in the test runne
 ## Related documentation
 
 - [Debug output](debug.md) — `show`, `peek`, `probe`
+- [MODE ZSTATE](zstate.md) — tristate wires and multi-driver buses
 - [Editor run controls](editorUI.md) — Run, Next, Wave / Legacy toggle
 - [Interactive components](interactive-components.md) — switch, key, dip, rotary inputs
 - [REG](reg.md) — wire-clock falling edge and `NEXT` clock (`~`)

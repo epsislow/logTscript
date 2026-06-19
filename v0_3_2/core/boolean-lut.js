@@ -2,6 +2,8 @@
 
 const BOOLEAN_OPS = new Set(['NOT', 'AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR']);
 
+const FILTER_PATTERN_CHARS = new Set(['0', '1', '*', 'A', 'X', 'Z']);
+
 const BOOLEAN_ANALYSIS_MAX_TABLE_ROWS = 256;
 const BOOLEAN_ANALYSIS_TABLE_TOO_BIG_ERR =
   'Boolean analysis exceeds maximum supported table size (256 rows)';
@@ -142,12 +144,15 @@ function validateAndBuildFilterMap(columns, filters, contextName) {
       throw new Error(`${contextName}: duplicate filter for '${key}'`);
     }
     const col = colByKey.get(key);
-    const pattern = String(f.pattern).toLowerCase();
+    const pattern = String(f.pattern);
     if (pattern.length !== col.width) {
       throw new Error(`${contextName}: pattern length mismatch for '${key}'`);
     }
     for (const ch of pattern) {
-      if (ch !== '0' && ch !== '1' && ch !== 'x') {
+      if (ch === 'x') {
+        throw new Error(`${contextName}: use '*' instead of 'x' for binary don't-care in '${key}=${f.pattern}'`);
+      }
+      if (!FILTER_PATTERN_CHARS.has(ch)) {
         throw new Error(`${contextName}: invalid pattern character in '${key}=${f.pattern}'`);
       }
     }
@@ -156,14 +161,84 @@ function validateAndBuildFilterMap(columns, filters, contextName) {
   return map;
 }
 
+function optionsForPatternChar(ch) {
+  switch (ch) {
+    case '0': return ['0'];
+    case '1': return ['1'];
+    case 'X': return ['X'];
+    case 'Z': return ['Z'];
+    case '*': return ['0', '1'];
+    case 'A': return ['0', '1', 'X', 'Z'];
+    default: return [];
+  }
+}
+
+function enumeratePatternValues(pattern) {
+  const perBit = [...pattern].map(optionsForPatternChar);
+  const out = [];
+  function rec(i, acc) {
+    if (i === perBit.length) {
+      out.push(acc);
+      return;
+    }
+    for (const c of perBit[i]) rec(i + 1, acc + c);
+  }
+  rec(0, '');
+  return out;
+}
+
+function countPatternCombos(pattern) {
+  let product = 1;
+  for (const ch of pattern) {
+    if (ch === '*') product *= 2;
+    else if (ch === 'A') product *= 4;
+  }
+  return product;
+}
+
+function enumerateFilteredEnvs(columns, filterMap) {
+  if (!filterMap) {
+    const addrWidth = columns.reduce((s, c) => s + c.width, 0);
+    const envs = [];
+    for (let addr = 0; addr < (1 << addrWidth); addr++) {
+      envs.push(addrBitsToColumns(columns, addr));
+    }
+    return envs;
+  }
+
+  const colValueLists = columns.map(col => {
+    const pattern = filterMap.get(col.key);
+    if (!pattern) {
+      const list = [];
+      for (let v = 0; v < (1 << col.width); v++) {
+        list.push(v.toString(2).padStart(col.width, '0'));
+      }
+      return list;
+    }
+    return enumeratePatternValues(pattern);
+  });
+
+  const envs = [];
+  function cart(colIdx, partial) {
+    if (colIdx === columns.length) {
+      const env = {};
+      columns.forEach((col, i) => { env[col.key] = partial[i]; });
+      envs.push(env);
+      return;
+    }
+    for (const val of colValueLists[colIdx]) {
+      cart(colIdx + 1, partial.concat(val));
+    }
+  }
+  cart(0, []);
+  return envs;
+}
+
 function countRowsToGenerate(columns, filterMap) {
   let product = 1;
   for (const col of columns) {
     if (filterMap && filterMap.has(col.key)) {
-      const p = filterMap.get(col.key);
-      let combos = 1;
-      for (const ch of p) if (ch === 'x') combos *= 2;
-      product *= combos;
+      product *= countPatternCombos(filterMap.get(col.key));
     } else {
       product *= (1 << col.width);
     }
@@ -178,8 +253,9 @@ function rowMatchesFilters(columns, env, filterMap) {
     if (!p) continue;
     const val = env[col.key];
     for (let i = 0; i < p.length; i++) {
-      if (p[i] === 'x') continue;
-      if (val[i] !== p[i]) return false;
+      const sym = p[i];
+      if (sym === '*' || sym === 'A') continue;
+      if (val[i] !== sym) return false;
     }
   }
   return true;
@@ -263,7 +339,7 @@ function varyingBitLabels(columns, filterMap) {
       labels.push(...bitLabels);
     } else {
       for (let i = 0; i < pattern.length; i++) {
-        if (pattern[i] === 'x') labels.push(bitLabels[i]);
+        if (pattern[i] === '*') labels.push(bitLabels[i]);
       }
     }
   }
@@ -271,15 +347,7 @@ function varyingBitLabels(columns, filterMap) {
 }
 
 function replayFilteredEnvs(columns, filterMap) {
-  const addrWidth = columns.reduce((s, c) => s + c.width, 0);
-  const fullLength = 1 << addrWidth;
-  const envs = [];
-  for (let addr = 0; addr < fullLength; addr++) {
-    const env = addrBitsToColumns(columns, addr);
-    if (!rowMatchesFilters(columns, env, filterMap)) continue;
-    envs.push(env);
-  }
-  return envs;
+  return enumerateFilteredEnvs(columns, filterMap);
 }
 
 function extractVaryingBitsFromEnv(env, columns, filterMap) {
@@ -291,11 +359,29 @@ function extractVaryingBitsFromEnv(env, columns, filterMap) {
       bits += val;
     } else {
       for (let i = 0; i < pattern.length; i++) {
-        if (pattern[i] === 'x') bits += val[i];
+        if (pattern[i] === '*') bits += val[i];
       }
     }
   }
   return bits;
+}
+
+function outputBitIsTrue(ch) {
+  return ch === '1';
+}
+
+function classifyOutputColumn(chars) {
+  const set = new Set(chars);
+  if (set.size === 1) {
+    const only = chars[0];
+    if (only === '0' || only === '1' || only === 'X' || only === 'Z') {
+      return { kind: 'uniform', value: only };
+    }
+  }
+  if ([...set].every(c => c === '0' || c === '1')) {
+    return { kind: 'binary', bools: chars.map(outputBitIsTrue) };
+  }
+  throw new Error('exprOfLut: conflicting non-binary outputs for the same varying assignment');
 }
 
 function buildFilteredOutputsByMinterm(lutInst, columns, filterMap) {
@@ -311,13 +397,18 @@ function buildFilteredOutputsByMinterm(lutInst, columns, filterMap) {
     throw new Error(BOOLEAN_ANALYSIS_TOO_WIDE_ERR);
   }
 
-  const tableSize = 1 << numVars;
-  if (length !== tableSize) {
-    throw new Error(`exprOfLut expects ${lutAddrBits(length)} input bits but received ${numVars}`);
+  if (numVars === 0) {
+    const cols = [];
+    for (let b = 0; b < depth; b++) {
+      const chars = outputsByBit[b].map(v => (v ? '1' : '0'));
+      cols.push(classifyOutputColumn(chars));
+    }
+    return { labels, outputCols: cols, depth, numVars };
   }
 
-  const reindexed = [];
-  for (let b = 0; b < depth; b++) reindexed.push(new Array(tableSize).fill(false));
+  const tableSize = 1 << numVars;
+  const assigned = [];
+  for (let b = 0; b < depth; b++) assigned.push(new Array(tableSize).fill(null));
 
   for (let rowIdx = 0; rowIdx < length; rowIdx++) {
     const varyingBits = extractVaryingBitsFromEnv(envs[rowIdx], columns, filterMap);
@@ -326,11 +417,26 @@ function buildFilteredOutputsByMinterm(lutInst, columns, filterMap) {
       throw new Error(`exprOfLut: invalid varying bits '${varyingBits}' at row ${rowIdx}`);
     }
     for (let b = 0; b < depth; b++) {
-      reindexed[b][mintermIdx] = outputsByBit[b][rowIdx];
+      const outVal = outputsByBit[b][rowIdx];
+      const prev = assigned[b][mintermIdx];
+      if (prev !== null && prev !== outVal) {
+        throw new Error(`exprOfLut: conflicting output at minterm ${varyingBits} for output bit ${b}`);
+      }
+      assigned[b][mintermIdx] = outVal;
     }
   }
 
-  return { labels, outputsByBit: reindexed, depth, numVars };
+  const outputCols = [];
+  for (let b = 0; b < depth; b++) {
+    const chars = assigned[b].map(v => (v === null ? '0' : (v ? '1' : '0')));
+    outputCols.push(classifyOutputColumn(chars));
+  }
+
+  const outputsByBitQm = outputCols.map(col => (
+    col.kind === 'binary' ? col.bools : new Array(tableSize).fill(col.value === '1')
+  ));
+
+  return { labels, outputsByBit: outputsByBitQm, outputCols, depth, numVars };
 }
 
 function labelsMatch(a, b) {
@@ -389,17 +495,13 @@ function columnsToInputLabels(columns) {
 }
 
 function collectFilteredRows(exprAst, columns, widthResolver, filterMap) {
-  const addrWidth = columns.reduce((s, c) => s + c.width, 0);
-  const rowsToGenerate = countRowsToGenerate(columns, filterMap);
-  assertTableRowsWithinLimit(rowsToGenerate);
+  const envs = enumerateFilteredEnvs(columns, filterMap);
+  assertTableRowsWithinLimit(envs.length);
 
-  const fullLength = 1 << addrWidth;
   const rows = [];
   let outWidth = 1;
 
-  for (let addr = 0; addr < fullLength; addr++) {
-    const env = addrBitsToColumns(columns, addr);
-    if (!rowMatchesFilters(columns, env, filterMap)) continue;
+  for (const env of envs) {
     const result = evalBooleanParts(exprAst, env, widthResolver);
     if (rows.length === 0) outWidth = result.length;
     else if (result.length !== outWidth) {
@@ -407,6 +509,7 @@ function collectFilteredRows(exprAst, columns, widthResolver, filterMap) {
     }
     rows.push({ env, output: result });
   }
+  const addrWidth = columns.reduce((s, c) => s + c.width, 0);
   return { rows, addrWidth, outWidth };
 }
 
@@ -418,7 +521,11 @@ function evalAtomBoolean(atom, env, widthResolver) {
   if (key && env[key] !== undefined) {
     let v = env[key];
     if (atom.not) {
-      v = v.split('').map(b => b === '1' ? '0' : '1').join('');
+      if (typeof LogicValue !== 'undefined' && LogicValue.evalLogicGateVector && /[XZ]/.test(v)) {
+        v = LogicValue.evalLogicGateVector('NOT', v, null);
+      } else {
+        v = v.split('').map(b => b === '1' ? '0' : '1').join('');
+      }
     }
     return v;
   }
@@ -443,6 +550,13 @@ function evalBooleanCall(part, env, widthResolver) {
     throw new Error(`lutOf: '${name}' is not a boolean operation`);
   }
   const argValues = part.args.map(a => evalBooleanParts(a, env, widthResolver));
+
+  if (typeof LogicValue !== 'undefined' && LogicValue.evalLogicGateCall) {
+    const hasXZ = argValues.some(v => /[XZ]/.test(v));
+    if (hasXZ || name === 'EQ') {
+      return LogicValue.evalLogicGateCall(name, argValues);
+    }
+  }
 
   if (name === 'NOT') {
     const a = argValues[0];
@@ -548,6 +662,7 @@ function formatTermStandard(literals) {
 function formatMinimizedShort(min) {
   if (min.constant === false) return '0';
   if (min.constant === true) return '1';
+  if (min.constant === 'X' || min.constant === 'Z') return min.constant;
   if (min.terms.length === 0) return '0';
   if (min.terms.length === 1) return formatTermShort(min.terms[0]);
   return min.terms.map(t => `(${formatTermShort(t)})`).join(' | ');
@@ -556,10 +671,24 @@ function formatMinimizedShort(min) {
 function formatMinimizedStandard(min) {
   if (min.constant === false) return '0';
   if (min.constant === true) return '1';
+  if (min.constant === 'X' || min.constant === 'Z') return min.constant;
   if (min.terms.length === 0) return '0';
   if (min.terms.length === 1) return formatTermStandard(min.terms[0]);
   const inner = min.terms.map(t => formatTermStandard(t)).join(', ');
   return `OR(${inner})`;
+}
+
+function segmentsFromOutputColumn(labels, col, minimizeFn) {
+  if (col.kind === 'uniform') {
+    const v = col.value;
+    if (v === '0' || v === '1') {
+      const min = { constant: v === '1' };
+      return { short: formatMinimizedShort(min), std: formatMinimizedStandard(min) };
+    }
+    return { short: v, std: v };
+  }
+  const min = minimizeFn(labels, col.bools);
+  return { short: formatMinimizedShort(min), std: formatMinimizedStandard(min) };
 }
 
 function isConstBitSegment(s) {
@@ -782,8 +911,11 @@ function extractLutOutputs(lutInst) {
 function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
   const attrs = lutInst.attributes || {};
   let labels;
-  let outputsByBit;
+  let outputCols;
   let depth;
+
+  const minimizeFn = typeof minimizeBoolean === 'function' ? minimizeBoolean : null;
+  if (!minimizeFn) throw new Error('boolean-minimize.js is not loaded');
 
   if (varSpecs.length > 0 && attrs.filters && attrs.description) {
     const columns = parseLutDescriptionString(attrs.description);
@@ -796,7 +928,7 @@ function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
     }
     const built = buildFilteredOutputsByMinterm(lutInst, columns, filterMap);
     labels = built.labels;
-    outputsByBit = built.outputsByBit;
+    outputCols = built.outputCols || built.outputsByBit.map(bools => ({ kind: 'binary', bools }));
     depth = built.depth;
   } else if (varSpecs.length > 0) {
     const expanded = expandExprOfLutVars(varSpecs, widthResolver);
@@ -804,11 +936,11 @@ function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
     const sumWidth = expanded.resolved.reduce((s, r) => s + r.width, 0);
     const extracted = extractLutOutputs(lutInst);
     depth = extracted.depth;
-    outputsByBit = extracted.outputsByBit;
     const expected = lutAddrBits(extracted.length);
     if (sumWidth !== expected) {
       throw new Error(`exprOfLut expects ${expected} input bits but received ${sumWidth}`);
     }
+    outputCols = extracted.outputsByBit.map(bools => ({ kind: 'binary', bools }));
   } else if (attrs.filters) {
     if (!attrs.description) {
       throw new Error('exprOfLut: LUT has filters: but no description: attribute');
@@ -818,22 +950,19 @@ function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
     const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut');
     const built = buildFilteredOutputsByMinterm(lutInst, columns, filterMap);
     labels = built.labels;
-    outputsByBit = built.outputsByBit;
+    outputCols = built.outputCols || built.outputsByBit.map(bools => ({ kind: 'binary', bools }));
     depth = built.depth;
   } else {
     throw new Error('exprOfLut: supply variables or use a LUT with filters: attribute');
   }
 
-  const minimizeFn = typeof minimizeBoolean === 'function' ? minimizeBoolean : null;
-  if (!minimizeFn) throw new Error('boolean-minimize.js is not loaded');
-
   const segmentsShort = [];
   const segmentsStd = [];
 
   for (let b = 0; b < depth; b++) {
-    const min = minimizeFn(labels, outputsByBit[b]);
-    segmentsShort.push(formatMinimizedShort(min));
-    segmentsStd.push(formatMinimizedStandard(min));
+    const seg = segmentsFromOutputColumn(labels, outputCols[b], minimizeFn);
+    segmentsShort.push(seg.short);
+    segmentsStd.push(seg.std);
   }
 
   return { depth, segmentsShort, segmentsStd };
@@ -882,6 +1011,7 @@ if (typeof module !== 'undefined' && module.exports) {
     validateAndBuildFilterMap,
     countRowsToGenerate,
     rowMatchesFilters,
+    enumerateFilteredEnvs,
     collectFilteredRows,
     columnsToInputLabels,
     evalBooleanParts,

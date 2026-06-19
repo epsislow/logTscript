@@ -44,13 +44,13 @@ With filters, `lutOf` adds a `filters:` attribute:
 5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)
 ```
 
 ```text
 inline [lut] .generated:
   description: A 5b, B 1b, C 5b -> out 5b
-  filters: A=01x1x, B=x, C=000xx
+  filters: A=01*1*, B=*, C=000**
 
   depth: 5
   length: 32
@@ -65,7 +65,7 @@ Instance name is always **`.generated`**. Paste the block into a script, then us
 - **Row limit:** max **256 rows** in `data { }`. Error: `Boolean analysis exceeds maximum supported table size (256 rows)`.
 - **With filters:** `length` = number of rows emitted (≤ 256); `filters:` documents which input combinations are included.
 - **Without filters:** `length = 2^(sum column widths)` (≤ 256).
-- **`description:`** lists column widths; **`filters:`** uses `0`, `1`, `x` per bit (index `0` = leftmost, same as `bitRange`).
+- **`description:`** lists column widths; **`filters:`** uses `0`, `1`, `*` (binary don't-care), `A` (all values), `X`, `Z` per bit (index `0` = leftmost, same as `bitRange`). Lowercase `x` is rejected — use `*`.
 - Undeclared atomic variables (`A`, `B` in gates) default to **1 bit**.
 - Whole wires (`lutOf(C)` on `7wire C`) use the declared wire width.
 - Non-boolean ops (`LSHIFT`, etc.) → error.
@@ -87,11 +87,13 @@ When the LUT has `description:` and `filters:` (as emitted by `lutOf` with filte
 5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 exprOfLut(.generated)
 ```
 
-`exprOfLut` reads the `description:` and `filters:` attributes. Only bit positions marked `x` in the filter patterns become variables — for `A=01x1x, B=x, C=1001x` that is `A.2`, `A.4`, `B`, `C.4`.
+`exprOfLut` reads the `description:` and `filters:` attributes. Only bit positions marked `*` in the filter patterns become variables — for `A=01*1*, B=*, C=1001*` that is `A.2`, `A.4`, `B`, `C.4`.
+
+When operands contain `X` or `Z`, boolean analysis uses **IEEE 1164** gate tables (see [zstate.md](zstate.md)). Uniform `X`/`Z` outputs simplify to literals.
 
 You can pass variables explicitly; they must match those varying bits in the same order.
 
@@ -192,7 +194,7 @@ Paste Output, then `exprOfLut(.generated, A, B)`.
 5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 exprOfLut(.generated)
 ```
 

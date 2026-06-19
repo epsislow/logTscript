@@ -20,7 +20,27 @@ For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md]
 | **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Same commit hooks in both modes | Immediate (no propagation) |
 | **Runtime effect** | None (read-only) | None | None (logging only) | None (UI trace only) | **None** — text for copy-paste |
 
-For when wires update in the circuit, see [signal-propagation.md](signal-propagation.md).
+For when wires update in the circuit, see [signal-propagation.md](signal-propagation.md). In **`MODE ZSTATE`**, see [zstate.md](zstate.md) for `Z`/`X` display rules.
+
+---
+
+## `Z` and `X` values (MODE ZSTATE)
+
+In tristate mode, wire values may include **`Z`** (high-impedance) and **`X`** (conflict). Debug statements show them literally:
+
+```text
+bus (4bit) = 10X0
+```
+
+| Tool | Z / X behaviour |
+|------|-----------------|
+| `show` | Full string with `Z` and `X` |
+| `peek` / `probe` | Same; every commit logged |
+| `watch` (Timeline) | `Z` → grey bar; `X` → red bar (conflict) |
+
+`show` / `watch` never error on `X` — use them to **see** bus conflicts. Arithmetic (`ADD`, …) and `MUX`/`REG` error on `Z`/`X` operands.
+
+Full reference: **[zstate.md](zstate.md)**.
 
 ---
 
@@ -853,7 +873,7 @@ Build an `inline [lut]` block from a boolean expression.
 
 ```
 lutOf(expr)
-lutOf(expr, A=01x1x, B=x, C=000xx)
+lutOf(expr, A=01*1*, B=*, C=000**)
 ```
 
 - Built-ins `NOT`, `AND`, `OR`, `XOR`, … or short-notation in backticks: `` lutOf(`A | B`) ``
@@ -901,7 +921,7 @@ exprOfLut(.name, A.2, B.1, A.0, B.0)
 5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 exprOfLut(.generated)
 ```
 
@@ -937,7 +957,7 @@ Allowed wherever `show` works: main script, **chip** body, **board** body. No se
 1. `lutOf(OR(A, B))` → paste Output (`inline [lut] .generated:` …)
 2. `exprOfLut(.generated, A, B)` → paste the two assignment lines
 
-With filters: `lutOf(…, A=01x1x, B=x, C=1001x)` then `exprOfLut(.generated)` (no variable list).
+With filters: `lutOf(…, A=01*1*, B=*, C=1001*)` then `exprOfLut(.generated)` (no variable list).
 
 Details: [boolean-lut.md](boolean-lut.md). LUT invoke syntax: [lut.md](lut.md).
 

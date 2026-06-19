@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
  */
 (function () {
   'use strict';
@@ -1407,6 +1407,49 @@ After \`:\` init, the first real assignment (\`=\`, \`:=\`, or \`=:\`) is allowe
 | \`Nwire x =: .isa { ... }\` | Right-pad |
 
 Use exact wire width with \`=\` when the assembled program matches, e.g. \`8wire prog = .myisa { LOAD R1 A2 }\`.
+
+---
+
+## \`MODE WIREWRITE\`
+
+Allows **re-assignment** to the same wire name after initialization (in addition to \`MODE STRICT\` rules). In default binary mode, multiple writes in one step still behave as **last wins** during propagation.
+
+\`\`\`logts-play
+MODE WIREWRITE
+4wire q : 1
+q =: 11
+show(q)
+\`\`\`
+
+Result: \`1100\`
+
+---
+
+## \`MODE ZSTATE\` and \`WIREWRITE\`
+
+\`MODE ZSTATE\` can be combined with \`MODE WIREWRITE\`. The difference from plain WIREWRITE:
+
+| | \`MODE WIREWRITE\` (binary) | \`MODE ZSTATE\` |
+|--|---------------------------|---------------|
+| Multiple writes same step | Last value wins | Contributions **merged** per bit |
+| Undeclared wire | Zeros | \`Z\` (high-impedance) |
+| Conflict | Silent overwrite | \`X\` on conflicting bits |
+
+Full semantics: **[zstate.md](zstate.md)**.
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+2wire bus
+2wire a = 10
+2wire b = 11
+bus = a
+bus = b
+show(bus)
+\`\`\`
+
+Result: \`1X\` (not \`11\`).
+
 `,
     'board.md': `# Board components
 
@@ -1586,23 +1629,27 @@ A B | OUT
 1 1 | 1
 \`\`\`
 
-### With filters (\`x\` = don't-care)
+### With filters (\`*\` / \`A\` / \`X\` / \`Z\`)
 
 Optional second argument: \`column=pattern\` assignments, separated by commas.
+
+| Symbol | Meaning |
+|--------|---------|
+| \`*\` | Binary don't-care (0 or 1) — becomes a variable in \`exprOfLut\` / \`simplify\` |
+| \`A\` | Don't-care all values (0, 1, X, Z) — expands LUT rows, not a QM variable |
+| \`X\`, \`Z\` | Fixed logic values (IEEE analysis) |
+| \`0\`, \`1\` | Fixed binary |
 
 \`\`\`logts-play
 5wire A
 1wire B
 5wire C
-truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)
+truthTableOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)
 \`\`\`
 
-- Pattern index \`i\` maps to bit \`.i\` (left to right), same as \`bitRange\` in the language.
-
 - Pattern length must match column width.
-- Characters: \`0\`, \`1\`, \`x\` (case insensitive).
 - Partial filters OK — unlisted columns enumerate all combinations.
-- Rows are emitted in full-address scan order; only matching combinations appear.
+- Rows follow \`enumerateFilteredEnvs\` order.
 
 ---
 
@@ -1629,7 +1676,7 @@ Same \`column=pattern\` syntax as \`truthTableOf\` / \`lutOf\` (comma between as
 5wire A
 1wire B
 5wire C
-simplify(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+simplify(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 \`\`\`
 
 Minimization uses only the **varying** bits (\`x\` positions) as QM inputs — same rules as \`exprOfLut(.generated)\` with \`filters:\`.
@@ -1745,13 +1792,13 @@ With filters, \`lutOf\` adds a \`filters:\` attribute:
 5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)
 \`\`\`
 
 \`\`\`text
 inline [lut] .generated:
   description: A 5b, B 1b, C 5b -> out 5b
-  filters: A=01x1x, B=x, C=000xx
+  filters: A=01*1*, B=*, C=000**
 
   depth: 5
   length: 32
@@ -1766,7 +1813,7 @@ Instance name is always **\`.generated\`**. Paste the block into a script, then 
 - **Row limit:** max **256 rows** in \`data { }\`. Error: \`Boolean analysis exceeds maximum supported table size (256 rows)\`.
 - **With filters:** \`length\` = number of rows emitted (≤ 256); \`filters:\` documents which input combinations are included.
 - **Without filters:** \`length = 2^(sum column widths)\` (≤ 256).
-- **\`description:\`** lists column widths; **\`filters:\`** uses \`0\`, \`1\`, \`x\` per bit (index \`0\` = leftmost, same as \`bitRange\`).
+- **\`description:\`** lists column widths; **\`filters:\`** uses \`0\`, \`1\`, \`*\` (binary don't-care), \`A\` (all values), \`X\`, \`Z\` per bit (index \`0\` = leftmost, same as \`bitRange\`). Lowercase \`x\` is rejected — use \`*\`.
 - Undeclared atomic variables (\`A\`, \`B\` in gates) default to **1 bit**.
 - Whole wires (\`lutOf(C)\` on \`7wire C\`) use the declared wire width.
 - Non-boolean ops (\`LSHIFT\`, etc.) → error.
@@ -1788,11 +1835,13 @@ When the LUT has \`description:\` and \`filters:\` (as emitted by \`lutOf\` with
 5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 exprOfLut(.generated)
 \`\`\`
 
-\`exprOfLut\` reads the \`description:\` and \`filters:\` attributes. Only bit positions marked \`x\` in the filter patterns become variables — for \`A=01x1x, B=x, C=1001x\` that is \`A.2\`, \`A.4\`, \`B\`, \`C.4\`.
+\`exprOfLut\` reads the \`description:\` and \`filters:\` attributes. Only bit positions marked \`*\` in the filter patterns become variables — for \`A=01*1*, B=*, C=1001*\` that is \`A.2\`, \`A.4\`, \`B\`, \`C.4\`.
+
+When operands contain \`X\` or \`Z\`, boolean analysis uses **IEEE 1164** gate tables (see [zstate.md](zstate.md)). Uniform \`X\`/\`Z\` outputs simplify to literals.
 
 You can pass variables explicitly; they must match those varying bits in the same order.
 
@@ -1893,7 +1942,7 @@ Paste Output, then \`exprOfLut(.generated, A, B)\`.
 5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 exprOfLut(.generated)
 \`\`\`
 
@@ -2447,8 +2496,27 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
+| **Tristate (ZSTATE)** | \`Z(wire)\` — release wire | [zstate.md](zstate.md) |
 
 > **Adding new built-ins:** extend \`Interpreter.BUILTIN_DOC\` in \`core/interpreter.js\`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.
+
+### \`Z(wireName)\` — tristate release
+
+Statement available only after \`MODE ZSTATE\`. Releases every bit of the wire to high-impedance (\`Z\`) in the current propagation step.
+
+\`\`\`logts-play wave
+MODE ZSTATE
+1wire en = 1
+Z(en)
+show(en)
+\`\`\`
+
+See **[zstate.md](zstate.md)** for multi-driver buses, conflict \`X\`, and IEEE logic gates.
+
+### Logic gates with \`Z\` / \`X\`
+
+In \`MODE ZSTATE\`, gate functions (\`AND\`, \`OR\`, \`NOT\`, …) use IEEE 1164 when operands contain \`Z\` or \`X\`. Arithmetic and routing (\`ADD\`, \`MUX\`, \`REG\`, …) still require binary \`0\`/\`1\`. Details: [zstate.md](zstate.md), [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md#z-and-x-in-mode-zstate).
+
 
 ---
 
@@ -2457,6 +2525,7 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | Topic | Page |
 |-------|------|
 | \`doc()\` syntax | [doc-function.md](doc-function.md) |
+| Tristate / multi-driver | [zstate.md](zstate.md) |
 | Short notation (\`&\`, \`\\|\`, \`<\`, \`>\`) | [short-notation.md](short-notation.md) |
 | Panel devices (\`comp\`) | [components.md](components.md) |
 | User \`def\` functions | [doc-function.md](doc-function.md#user-defined-functions) |
@@ -2534,6 +2603,25 @@ Compares two operands bit-by-bit; returns \`1\` only if every bit pair matches.
 1wire same = EQ(a, b)
 probe(same)
 \`\`\`
+
+---
+
+## \`Z\` and \`X\` in MODE ZSTATE
+
+When \`MODE ZSTATE\` is active, gate operands may contain **\`Z\`** (undriven) or **\`X\`** (multi-driver conflict). Gates use **IEEE 1164** tables instead of pure binary:
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+1wire a = ?X
+1wire b = 1
+1wire y = OR(a, b)
+show(y)
+\`\`\`
+
+Result: \`y = 1\` (OR with any \`1\`).
+
+\`NOT(?Z)\` on a 1-bit wire → \`X\`. Full bus semantics, resolver, and error rules: **[zstate.md](zstate.md)**.
 `,
     'builtin-routing-functions.md': `# Built-in routing functions (MUX / DEMUX)
 
@@ -3523,7 +3611,27 @@ For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md]
 | **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Same commit hooks in both modes | Immediate (no propagation) |
 | **Runtime effect** | None (read-only) | None | None (logging only) | None (UI trace only) | **None** — text for copy-paste |
 
-For when wires update in the circuit, see [signal-propagation.md](signal-propagation.md).
+For when wires update in the circuit, see [signal-propagation.md](signal-propagation.md). In **\`MODE ZSTATE\`**, see [zstate.md](zstate.md) for \`Z\`/\`X\` display rules.
+
+---
+
+## \`Z\` and \`X\` values (MODE ZSTATE)
+
+In tristate mode, wire values may include **\`Z\`** (high-impedance) and **\`X\`** (conflict). Debug statements show them literally:
+
+\`\`\`text
+bus (4bit) = 10X0
+\`\`\`
+
+| Tool | Z / X behaviour |
+|------|-----------------|
+| \`show\` | Full string with \`Z\` and \`X\` |
+| \`peek\` / \`probe\` | Same; every commit logged |
+| \`watch\` (Timeline) | \`Z\` → grey bar; \`X\` → red bar (conflict) |
+
+\`show\` / \`watch\` never error on \`X\` — use them to **see** bus conflicts. Arithmetic (\`ADD\`, …) and \`MUX\`/\`REG\` error on \`Z\`/\`X\` operands.
+
+Full reference: **[zstate.md](zstate.md)**.
 
 ---
 
@@ -4356,7 +4464,7 @@ Build an \`inline [lut]\` block from a boolean expression.
 
 \`\`\`
 lutOf(expr)
-lutOf(expr, A=01x1x, B=x, C=000xx)
+lutOf(expr, A=01*1*, B=*, C=000**)
 \`\`\`
 
 - Built-ins \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, … or short-notation in backticks: \`\` lutOf(\`A | B\`) \`\`
@@ -4404,7 +4512,7 @@ exprOfLut(.name, A.2, B.1, A.0, B.0)
 5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 exprOfLut(.generated)
 \`\`\`
 
@@ -4440,7 +4548,7 @@ Allowed wherever \`show\` works: main script, **chip** body, **board** body. No 
 1. \`lutOf(OR(A, B))\` → paste Output (\`inline [lut] .generated:\` …)
 2. \`exprOfLut(.generated, A, B)\` → paste the two assignment lines
 
-With filters: \`lutOf(…, A=01x1x, B=x, C=1001x)\` then \`exprOfLut(.generated)\` (no variable list).
+With filters: \`lutOf(…, A=01*1*, B=*, C=1001*)\` then \`exprOfLut(.generated)\` (no variable list).
 
 Details: [boolean-lut.md](boolean-lut.md). LUT invoke syntax: [lut.md](lut.md).
 
@@ -5688,13 +5796,15 @@ Already exist as built-in functions; as **components** they would show up unifor
 
 ---
 
-### B4. Tristate / bus buffer
+### B4. Tristate / bus buffer — **implemented in engine (\`MODE ZSTATE\`)**
 
-**What it does:** Output drivers that can be **high**, **low**, or **high-impedance (off)** when \`enable\` is false. Lets multiple sources share one bus wire without fighting — only one enabled at a time.
+**What it does:** Output drivers that can be **high**, **low**, or **high-impedance (off)** when \`enable\` is false. Lets multiple sources share one bus wire without fighting — only one enabled at a time (or resolve conflicts as \`X\` when more than one drives).
 
-**How I see it used:** Shared data bus between CPU, RAM, and I/O; teaching why you cannot tie two outputs together without control. Multiple \`buffer\` comps on one bus wire with mutually exclusive \`en\` signals.
+**How I see it used:** Shared data bus between CPU, RAM, and I/O; teaching why you cannot tie two outputs together without control.
 
-**Today:** LogTScript wires are a single driven value — no real Z state in simulation. A buffer comp would model enable/disable semantics (e.g. only propagate when \`en=1\`, else bus holds previous or floats as \`Z\` in display). Some engine/display decisions needed.
+**Shipped design (2025):** No separate \`comp [bus]\` / \`comp [buffer]\`. Use **\`MODE ZSTATE\`** with \`get>=\` / \`out>=\`, enable gating (\`set = en\`), and built-in **\`Z(wire)\`** for explicit release. Requires **wave** propagation.
+
+**Docs:** [zstate.md](zstate.md) — plan: [tristate_bus_buffer.plan.md](../../.cursor/plans/tristate_bus_buffer.plan.md)
 
 ---
 
@@ -12853,6 +12963,16 @@ show(a, b)
 
 After **RUN**, \`a\` is \`0\` and \`b\` is \`1\`. When you flip the switch in the panel, \`a\` becomes \`1\` and \`b\` becomes \`0\` without running the script again.
 
+### MODE ZSTATE — multi-driver commit
+
+When \`MODE ZSTATE\` is active (wave only), wire updates use an extra **commit** phase inside each propagation wave:
+
+1. All contributors are queued (\`bus = a\`, \`get>= bus\`, \`out>= bus\`, \`Z(bus)\`, …).
+2. **\`commitWireResolves\`** merges contributions **per bit** → \`0\`, \`1\`, \`Z\`, or \`X\`.
+3. Connected components and displays refresh from the resolved value.
+
+This is why multiple drivers in the **same step** can coexist on one bus without silent overwrite. Full rules: **[zstate.md](zstate.md)**.
+
 ---
 
 ## Legacy
@@ -12948,6 +13068,7 @@ See chip tests **540–543** (legacy) and **556–557** (wave) in the test runne
 ## Related documentation
 
 - [Debug output](debug.md) — \`show\`, \`peek\`, \`probe\`
+- [MODE ZSTATE](zstate.md) — tristate wires and multi-driver buses
 - [Editor run controls](editorUI.md) — Run, Next, Wave / Legacy toggle
 - [Interactive components](interactive-components.md) — switch, key, dip, rotary inputs
 - [REG](reg.md) — wire-clock falling edge and \`NEXT\` clock (\`~\`)
@@ -13584,6 +13705,226 @@ Use **lcd** when text must be written to specific screen positions.
 - [lcd.md](lcd.md) — pixel matrix at fixed coordinates
 - [debug.md](debug.md) — \`probe\` / \`show\`
 - [future-component-ideas.md](future-component-ideas.md) — C6 Text terminal
+`,
+    'zstate.md': `# MODE ZSTATE — tristate wires and multi-driver buses
+
+LogTScript’s default mode treats every wire as a single **binary** value (\`0\` or \`1\`). **\`MODE ZSTATE\`** adds **high-impedance (\`Z\`)** and **conflict (\`X\`)** states per bit, IEEE-1164-style logic gates, and a **multi-driver resolver** so several sources can drive the same bus in one propagation step.
+
+Requires **wave** signal propagation (editor default). Legacy mode → error: \`ZSTATE requires wave signal propagation\`.
+
+See also: [signal propagation](signal-propagation.md), [assignment operators](assignment-operators.md), [built-in functions](builtin-functions.md), [debug output](debug.md).
+
+---
+
+## Quick start
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+8wire databus
+8wire cpuData = 10101010
+8wire ramData = 11001100
+1wire cpuEn = 0
+1wire ramEn = 0
+
+comp [switch] .cpu:
+  on: 1
+  :
+comp [switch] .ram:
+  on: 1
+  :
+
+.cpu:{ get >= databus
+  set = cpuEn }
+.ram:{ get >= databus
+  set = ramEn }
+
+show(databus)
+\`\`\`
+
+With both enables \`0\`, \`databus\` is \`ZZZZZZZZ\` (no driver). Enable one source to drive the bus; enable two with different values → conflicting bits become \`X\`.
+
+---
+
+## Activating ZSTATE
+
+\`\`\`logts
+MODE ZSTATE
+\`\`\`
+
+| Rule | Detail |
+|------|--------|
+| Opt-in | Scripts without \`MODE ZSTATE\` behave exactly as before |
+| Wave only | Use the editor’s **wave** pill (orange) or tests with wave propagation |
+| Combines with \`MODE WIREWRITE\` | Multiple assignments to the same wire in one step are **resolved**, not “last wins” |
+| Combines with \`MODE STRICT\` | Width rules unchanged; ZSTATE only affects value alphabet and multi-driver |
+
+---
+
+## Wire values: \`0\`, \`1\`, \`Z\`, \`X\`
+
+| Symbol | Meaning |
+|--------|---------|
+| \`0\`, \`1\` | Normal binary |
+| \`Z\` | High-impedance — no active driver on that bit in the current step |
+| \`X\` | Conflict — two or more drivers disagreed on that bit in the same step |
+
+### Initial value
+
+| Declaration | Result in ZSTATE |
+|-------------|------------------|
+| \`8wire bus\` (no \`=\`) | \`ZZZZZZZZ\` |
+| \`8wire bus = ?ZZZZZZZZ\` | same (explicit literal) |
+| \`3wire t = ?X1X\` | \`X\`, \`1\`, \`X\` (pedagogical seed; resolver overwrites on next multi-driver step) |
+
+Literals with \`Z\` or \`X\` require prefix **\`?\`** when the token would start with \`Z\` or \`X\`. Digit-started literals can embed \`Z\`/\`X\` in the middle: \`3wire m = 10Z\`.
+
+---
+
+## Multi-driver resolution
+
+Within one **wave** propagation step, every write to a wire (assignment, \`get>=\`, \`out>=\`, \`Z(wire)\`, component redirect) becomes a **contribution**. At commit time the engine resolves **per bit**:
+
+| Contributors (0/1 only) | Result |
+|-------------------------|--------|
+| none (only \`Z\` or absent) | \`Z\` |
+| one value | that value |
+| 2+ with same value | \`0\` or \`1\` |
+| 2+ with different values | \`X\` |
+
+\`X\` is **not sticky**. On the next step, if only one driver remains, the bit becomes \`0\` or \`1\` again.
+
+### Driving a shared bus
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+2wire bus
+comp [switch] .s1:
+  on: 1
+  :
+comp [switch] .s2:
+  on: 1
+  :
+
+.s1:{ get >= bus
+  set = 1 }
+.s2:{ get >= bus
+  set = 1 }
+\`\`\`
+
+Both switches on \`1\` → \`bus = 10\`. If \`.s1\` is \`1\` and \`.s2\` is \`0\` → \`bus = X0\`.
+
+### Enable gating
+
+When \`set = 0\` on a property block, that component **does not contribute** in the current step. If nobody else drives the wire → \`Z\`.
+
+\`\`\`logts
+.sw:{ get >= bus
+  set = en }   // en=0 → no drive
+\`\`\`
+
+### Re-assignment in the same step
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+4wire bus
+4wire a = 1100
+4wire b = 1010
+
+bus = a
+bus = b
+show(bus)
+\`\`\`
+
+Result: \`1XX0\` (per-bit resolve, not last-wins).
+
+### \`out>=\` (shifter and similar)
+
+\`out>= target\` (or \`out> target\`) routes the component’s \`:out\` bit through the same resolver. See [shifter.md](shifter.md).
+
+---
+
+## \`Z(wireName)\` — explicit release
+
+Statement (not an expression):
+
+\`\`\`logts
+Z(databus)
+\`\`\`
+
+Sets **every bit** of \`databus\` to \`Z\` for the current step (equivalent to releasing the bus). Requires \`MODE ZSTATE\`.
+
+---
+
+## Logic gates with \`Z\` / \`X\`
+
+In ZSTATE, \`AND\`, \`OR\`, \`NOT\`, \`XOR\`, … use **IEEE 1164** when operands contain \`Z\` or \`X\`:
+
+| Gate | Rule (simplified) |
+|------|-------------------|
+| \`AND\` | any \`0\` → \`0\`; all \`1\` → \`1\`; else \`X\` |
+| \`OR\` | any \`1\` → \`1\`; all \`0\` → \`0\`; else \`X\` |
+| \`NOT\` | \`0\`↔\`1\`; \`Z\`→\`X\`; \`X\`→\`X\` |
+
+No runtime error — you can probe conflicts through combinational logic.
+
+Detail: [built-in logic gate functions](builtin-logic-gate-functions.md#z-and-x-in-mode-zstate).
+
+---
+
+## Where \`Z\` / \`X\` cause errors
+
+Operations that require **pure binary** operands error if a wire bit is \`Z\` or \`X\`:
+
+| Category | Examples |
+|----------|----------|
+| Arithmetic | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\` |
+| Routing | \`MUX\`, \`DEMUX\` |
+| Sequential | \`REG\`, memory address |
+| Shifts | \`LSHIFT\`, \`RSHIFT\`, \`LROTATE\`, \`RROTATE\` |
+
+Message pattern: \`Cannot use wire with Z in ADD\` or \`Cannot use wire with X in MUX\`.
+
+**Always OK:** \`show\`, \`peek\`, \`probe\`, \`watch\` — display \`101X01ZZ\` as-is.
+
+---
+
+## Display and timeline
+
+| Output | ZSTATE behaviour |
+|--------|------------------|
+| \`show\` / Variables panel | Literal \`Z\` and \`X\` in strings |
+| \`watch\` | \`Z\` → grey level; \`X\` → red (conflict) |
+| LEDs / 7-seg | \`Z\` and \`X\` treated as off |
+
+See [debug.md](debug.md#z-and-x-values-mode-zstate).
+
+---
+
+## Comparison with default binary mode
+
+| Topic | Default | \`MODE ZSTATE\` |
+|-------|---------|---------------|
+| Undeclared init (\`8wire bus\`) | \`00000000\` | \`ZZZZZZZZ\` |
+| Two drivers same step | Last write wins (or error in STRICT) | Per-bit resolve → \`X\` on conflict |
+| Shared bus teaching | Not modeled | Native \`get>=\` / \`out>=\` + enable |
+| Tristate component | N/A | Engine-level, no \`comp [bus]\` needed |
+
+Historical note: [future component ideas — B4](future-component-ideas.md#b4-tristate--bus-buffer) originally proposed a buffer component; the shipped design is **engine ZSTATE** instead.
+
+---
+
+## Related documentation
+
+| Topic | Page |
+|-------|------|
+| Assignment + \`MODE WIREWRITE\` | [assignment-operators.md](assignment-operators.md#mode-zstate-and-wirewrite) |
+| Wave commit phase | [signal-propagation.md](signal-propagation.md#mode-zstate-multi-driver-commit) |
+| Built-in \`Z()\` | [builtin-functions.md](builtin-functions.md) |
+| Switch \`get>=\` | [switch.md](switch.md) |
+| Shifter \`out>=\` | [shifter.md](shifter.md) |
 `
   };
 })();

@@ -46,23 +46,27 @@ A B | OUT
 1 1 | 1
 ```
 
-### With filters (`x` = don't-care)
+### With filters (`*` / `A` / `X` / `Z`)
 
 Optional second argument: `column=pattern` assignments, separated by commas.
+
+| Symbol | Meaning |
+|--------|---------|
+| `*` | Binary don't-care (0 or 1) — becomes a variable in `exprOfLut` / `simplify` |
+| `A` | Don't-care all values (0, 1, X, Z) — expands LUT rows, not a QM variable |
+| `X`, `Z` | Fixed logic values (IEEE analysis) |
+| `0`, `1` | Fixed binary |
 
 ```logts-play
 5wire A
 1wire B
 5wire C
-truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)
+truthTableOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)
 ```
 
-- Pattern index `i` maps to bit `.i` (left to right), same as `bitRange` in the language.
-
 - Pattern length must match column width.
-- Characters: `0`, `1`, `x` (case insensitive).
 - Partial filters OK — unlisted columns enumerate all combinations.
-- Rows are emitted in full-address scan order; only matching combinations appear.
+- Rows follow `enumerateFilteredEnvs` order.
 
 ---
 
@@ -89,7 +93,7 @@ Same `column=pattern` syntax as `truthTableOf` / `lutOf` (comma between assignme
 5wire A
 1wire B
 5wire C
-simplify(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)
+simplify(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)
 ```
 
 Minimization uses only the **varying** bits (`x` positions) as QM inputs — same rules as `exprOfLut(.generated)` with `filters:`.

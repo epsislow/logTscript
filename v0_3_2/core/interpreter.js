@@ -9940,6 +9940,7 @@ Interpreter.BUILTIN_DOC = {
   REVERSE:  ['REVERSE(Xbit) -> Xbit'],
   LROTATE:  ['LROTATE(Xbit data, Ybit count) -> Xbit'],
   RROTATE:  ['RROTATE(Xbit data, Ybit count) -> Xbit'],
+  Z:       ['Z(wireName) — release wire to high-Z (MODE ZSTATE statement)'],
 };
 
 Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions, boardInstNames, boardDefinitions, inlineInstances) {

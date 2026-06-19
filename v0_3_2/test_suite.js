@@ -7566,7 +7566,7 @@ reg(1099.6, 'bool-lut', 'exprOfLut filtered — short + concat rulabil', functio
   const gen = session.run(`5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)`).out.join('\n');
   const { out } = session.run(gen + '\nexprOfLut(.generated)');
   h.assert('grouped constants', String(out[0].includes('`(0110) +')), 'true');
   const prelude = '5wire A\n1wire B\n5wire C\n5wire R\n';
@@ -7879,7 +7879,7 @@ reg(1138, 'bool-analysis', 'truthTableOf filters — 32 rows', function(h, sessi
   const { out } = session.run(`5wire A
 1wire B
 5wire C
-truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
+truthTableOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)`);
   h.assert('header', out[0], 'A B C | OUT');
   h.assert('rows', String(out.length), '34');
 });
@@ -7892,7 +7892,7 @@ reg(1139, 'bool-analysis', 'truthTableOf partial filters', function(h, session) 
 });
 
 reg(1140, 'bool-analysis', 'filter product > 256 — error', function(h, session) {
-  const { out } = session.run('9wire A\ntruthTableOf(A, A=xxxxxxxxx)');
+  const { out } = session.run('9wire A\ntruthTableOf(A, A=*********)');
   const err = out.find(l => l.startsWith('Error:')) || '';
   h.assert('too big', String(err.includes('table size (256 rows)')), 'true');
 });
@@ -7901,7 +7901,7 @@ reg(1141, 'bool-analysis-mb', 'truthTableOf >8 bits + filters OK', function(h, s
   const { out } = session.run(`5wire A
 1wire B
 5wire C
-truthTableOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
+truthTableOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)`);
   h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
   h.assert('rows', String(out.length), '34');
 });
@@ -7916,9 +7916,9 @@ reg(1143, 'bool-lut', 'lutOf with filters — length 32 + attributes', function(
   const { out } = session.run(`5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)`);
   h.assert('description', String(out.some(l => l.includes('description: A 5b, B 1b, C 5b -> out'))), 'true');
-  h.assert('filters attr', String(out.some(l => l.includes('filters: A=01x1x, B=x, C=000xx'))), 'true');
+  h.assert('filters attr', String(out.some(l => l.includes('filters: A=01*1*, B=*, C=000**'))), 'true');
   h.assert('length', String(out.some(l => l.trim() === 'length: 32')), 'true');
   const dataLines = out.filter(l => /^\s+[01]+ : [01]+$/.test(l));
   h.assert('data count', String(dataLines.length), '32');
@@ -7935,7 +7935,7 @@ reg(1145, 'bool-lut-mb', 'lutOf filters >8 bit input OK', function(h, session) {
   const { out } = session.run(`5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)`);
   h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
   h.assert('length 32', String(out.some(l => l.trim() === 'length: 32')), 'true');
 });
@@ -7943,7 +7943,7 @@ lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=000xx)`);
 reg(1147, 'bool-analysis', 'filters without comma — parse error', function(h, session) {
   let err = '';
   try {
-    session.parse('lutOf(OR(A, B), A=01x1x B=x)');
+    session.parse('lutOf(OR(A, B), A=01*1* B=*)');
   } catch (e) { err = String(e.message || e); }
   h.assert('comma required', String(err.includes("Expected ',' between filter assignments")), 'true');
 });
@@ -7952,7 +7952,7 @@ reg(1148, 'bool-lut', 'exprOfLut auto from filters — 2 lines', function(h, ses
   const gen = session.run(`5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)`).out.join('\n');
   const { out } = session.run(gen + '\nexprOfLut(.generated)');
   h.assert('lines', String(out.length), '2');
   h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
@@ -7962,7 +7962,7 @@ reg(1149, 'bool-lut-mb', 'exprOfLut auto — slice refs from filtre', function(h
   const gen = session.run(`5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)`).out.join('\n');
   const { out } = session.run(gen + '\nexprOfLut(.generated)');
   const std = out[1] || '';
   h.assert('A.4', String(std.includes('A.4')), 'true');
@@ -7975,7 +7975,7 @@ reg(1150, 'bool-lut-mb', 'exprOfLut manual = auto with filtre', function(h, sess
   const gen = session.run(`5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)`).out.join('\n');
   const auto = session.run(gen + '\nexprOfLut(.generated)').out;
   const manual = session.run(gen + '\nexprOfLut(.generated, A.2, A.4, B, C.4)').out;
   h.assert('same std', manual[1], auto[1]);
@@ -7990,7 +7990,7 @@ reg(1152, 'bool-lut-mb', 'exprOfLut variabile incompatibile with filters', funct
   const gen = session.run(`5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)`).out.join('\n');
   const { out } = session.run(gen + '\nexprOfLut(.generated, A, B, C)');
   h.assert('mismatch', String(out.some(l => l.includes('do not match LUT filters') || l.includes('expects'))), 'true');
 });
@@ -7999,7 +7999,7 @@ reg(1153, 'bool-lut-mb', 'exprOfLut ignores # — uses filters:', function(h, se
   const gen = session.run(`5wire A
 1wire B
 5wire C
-lutOf(OR(AND(A, B), NOT(C)), A=01x1x, B=x, C=1001x)`).out.join('\n');
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)`).out.join('\n');
   const tampered = gen.replace('filters:', '# filters: fake\n  filters:');
   const { out } = session.run(tampered + '\nexprOfLut(.generated)');
   h.assert('lines', String(out.length), '2');
@@ -8010,7 +8010,7 @@ reg(1154, 'bool-analysis', 'simplify with filters — match exprOfLut', function
   const prelude = `5wire A
 1wire B
 5wire C`;
-  const filters = 'A=01x1x, B=x, C=1001x';
+  const filters = 'A=01*1*, B=*, C=1001*';
   const gen = session.run(prelude + `\nlutOf(OR(AND(A, B), NOT(C)), ${filters})`).out.join('\n');
   const exprOut = session.run(gen + '\nexprOfLut(.generated)').out;
   const simpOut = session.run(prelude + `\nsimplify(OR(AND(A, B), NOT(C)), ${filters})`).out;
@@ -8448,7 +8448,7 @@ reg(1192, 'bool-lut-use', 'useLutAs(lutOf(OR(A,B)), .gen) — invoke', function(
 });
 
 reg(1193, 'bool-lut-use', 'useLutAs with filters — LUT has filters attribute', function(h, session) {
-  const { interp } = session.run(`useLutAs(lutOf(OR(A, B), A=x, B=x), .f)
+  const { interp } = session.run(`useLutAs(lutOf(OR(A, B), A=*, B=*), .f)
 1wire A := 0
 1wire B := 1`);
   const lut = interp.inlineInstances.get('.f');
@@ -8488,7 +8488,7 @@ reg(1197, 'bool-lut-use', 'useExpr multi-bit depth 2', function(h, session) {
 });
 
 reg(1198, 'bool-lut-use', 'useExpr(exprOfLut(.lut)) with filters auto', function(h, session) {
-  const { interp } = session.run(`useLutAs(lutOf(OR(A, B), A=x, B=x), .f)
+  const { interp } = session.run(`useLutAs(lutOf(OR(A, B), A=*, B=*), .f)
 1wire A := 0
 1wire B := 1
 1wire u = useExpr(exprOfLut(.f))`);
@@ -10710,6 +10710,96 @@ ${ZSTATE_SH}`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), 'X');
 }, ZSTATE_WAVE);
+
+reg(1512, 'bool-filt', 'reject lowercase x in filter pattern', function(h, session) {
+  const { out } = session.run('lutOf(OR(A, B), A=x, B=*)');
+  h.assert('err', String(out.some(l => l.includes("use '*' instead of 'x'"))), 'true');
+});
+
+reg(1513, 'bool-filt', 'lutOf * filter row count unchanged', function(h, session) {
+  const { out } = session.run(`5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=000**)`);
+  h.assert('filters attr', String(out.some(l => l.includes('filters: A=01*1*, B=*, C=000**'))), 'true');
+  h.assert('length 32', String(out.some(l => l.trim() === 'length: 32')), 'true');
+});
+
+reg(1514, 'bool-filt', 'truthTableOf fixed X input — IEEE OR', function(h, session) {
+  const { out } = session.run(`1wire A
+1wire one = 1
+truthTableOf(OR(A, one), A=X)`);
+  h.assert('row', String(out.some(l => /X.*\| 1/.test(l))), 'true');
+});
+
+reg(1515, 'bool-filt', 'truthTableOf fixed Z input — IEEE OR', function(h, session) {
+  const { out } = session.run(`1wire A
+1wire one = 1
+truthTableOf(OR(A, one), A=Z)`);
+  h.assert('row', String(out.some(l => /Z.*\| 1/.test(l))), 'true');
+});
+
+reg(1516, 'bool-filt', 'A pattern enumerates four values', function(h, session) {
+  const { out } = session.run('1wire A\ntruthTableOf(A, A=A)');
+  const rows = out.filter(l => /^[01XZ] \|/.test(l));
+  h.assert('four rows', String(rows.length), '4');
+});
+
+reg(1517, 'bool-filt', 'truthTableOf NOT(X) = X', function(h, session) {
+  const { out } = session.run('1wire A\ntruthTableOf(NOT(A), A=X)');
+  h.assert('row', String(out.some(l => l.includes('X | X'))), 'true');
+});
+
+reg(1518, 'bool-filt', 'simplify uniform X output', function(h, session) {
+  const { out } = session.run('1wire A\nsimplify(NOT(A), A=X)');
+  h.assert('short X', String(out.some(l => l.includes('`X`') || l.includes('= `X`'))), 'true');
+  h.assert('std X', String(out.some(l => l.includes('= X') && !l.includes('= XOR'))), 'true');
+});
+
+reg(1519, 'bool-filt', 'A pattern expands lutOf row count', function(h, session) {
+  const { out } = session.run('2wire A\nlutOf(A, A=A*)');
+  h.assert('length 8', String(out.some(l => l.trim() === 'length: 8')), 'true');
+});
+
+reg(1520, 'bool-filt', 'exprOfLut round-trip * filters', function(h, session) {
+  const gen = session.run(`5wire A
+1wire B
+5wire C
+lutOf(OR(AND(A, B), NOT(C)), A=01*1*, B=*, C=1001*)`).out.join('\n');
+  const auto = session.run(gen + '\nexprOfLut(.generated)').out;
+  const manual = session.run(gen + '\nexprOfLut(.generated, A.2, A.4, B, C.4)').out;
+  h.assert('same std', manual[1], auto[1]);
+});
+
+reg(1521, 'bool-filt', 'countRows A doubles per A bit', function(h, session) {
+  h.assert('combo', String(countRowsToGenerate(
+    [{ key: 'A', width: 2 }],
+    new Map([['A', 'AA']])
+  )), '16');
+});
+
+reg(1522, 'bool-filt', 'mixed * and A in one column', function(h, session) {
+  const { out } = session.run('2wire A\ntruthTableOf(A, A=0A)');
+  const rows = out.filter(l => /^0[01XZ] \|/.test(l));
+  h.assert('four rows', String(rows.length), '4');
+});
+
+reg(1523, 'bool-filt', 'invalid filter character rejected', function(h, session) {
+  const { out } = session.run('1wire A\nlutOf(A, A=?)');
+  h.assert('err', String(out.some(l => l.includes('invalid pattern character'))), 'true');
+});
+
+reg(1524, 'bool-filt', 'lutOf fixed X column in env', function(h, session) {
+  const { out } = session.run(`1wire A
+lutOf(A, A=X)`);
+  h.assert('one row', String(out.some(l => l.trim() === 'length: 1')), 'true');
+  h.assert('no err', String(!out.some(l => l.startsWith('Error:'))), 'true');
+});
+
+reg(1525, 'bool-filt', 'simplify uniform Z output', function(h, session) {
+  const { out } = session.run('1wire A\nsimplify(A, A=Z)');
+  h.assert('short Z', String(out.some(l => l.includes('`Z`') || l.includes('= `Z`'))), 'true');
+});
 
 
   window.LogTScriptTestSuite = {

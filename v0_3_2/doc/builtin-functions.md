@@ -22,8 +22,27 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 | **Bit selection** | `HIGH`, `LOW`, `ANY`, `ZERO`, `BITINDEX`, `ONEHOT` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | `PARITY`, `CNTONE`, `CNTZERO`, `BITSIZE` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | `LSHIFT`, `RSHIFT`, `REVERSE`, `LROTATE`, `RROTATE` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
+| **Tristate (ZSTATE)** | `Z(wire)` — release wire | [zstate.md](zstate.md) |
 
 > **Adding new built-ins:** extend `Interpreter.BUILTIN_DOC` in `core/interpreter.js`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.
+
+### `Z(wireName)` — tristate release
+
+Statement available only after `MODE ZSTATE`. Releases every bit of the wire to high-impedance (`Z`) in the current propagation step.
+
+```logts-play wave
+MODE ZSTATE
+1wire en = 1
+Z(en)
+show(en)
+```
+
+See **[zstate.md](zstate.md)** for multi-driver buses, conflict `X`, and IEEE logic gates.
+
+### Logic gates with `Z` / `X`
+
+In `MODE ZSTATE`, gate functions (`AND`, `OR`, `NOT`, …) use IEEE 1164 when operands contain `Z` or `X`. Arithmetic and routing (`ADD`, `MUX`, `REG`, …) still require binary `0`/`1`. Details: [zstate.md](zstate.md), [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md#z-and-x-in-mode-zstate).
+
 
 ---
 
@@ -32,6 +51,7 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 | Topic | Page |
 |-------|------|
 | `doc()` syntax | [doc-function.md](doc-function.md) |
+| Tristate / multi-driver | [zstate.md](zstate.md) |
 | Short notation (`&`, `\|`, `<`, `>`) | [short-notation.md](short-notation.md) |
 | Panel devices (`comp`) | [components.md](components.md) |
 | User `def` functions | [doc-function.md](doc-function.md#user-defined-functions) |
