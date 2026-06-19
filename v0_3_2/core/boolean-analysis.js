@@ -108,6 +108,7 @@ function simplifyGenerate(exprAst, widthResolver, filters) {
 
   const segmentsShort = mins.map(formatMinimizedShort);
   const segmentsStd = mins.map(formatMinimizedStandard);
+  const wireWidths = buildWireWidthMap(columns, enhanced);
   const outType = `${outWidth}wire`;
   let shortExpr;
   let stdExpr;
@@ -115,8 +116,9 @@ function simplifyGenerate(exprAst, widthResolver, filters) {
     shortExpr = segmentsShort[0];
     stdExpr = segmentsStd[0];
   } else {
-    shortExpr = formatMultiBitShort(segmentsShort);
-    stdExpr = formatMultiBitStandard(segmentsStd);
+    const fin = finalizeMultiBitExpressions(segmentsStd, segmentsShort, wireWidths);
+    shortExpr = fin.short;
+    stdExpr = fin.std;
   }
   return [
     `${outType} out = \`${shortExpr}\``,

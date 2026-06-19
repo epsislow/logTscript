@@ -984,7 +984,11 @@
       {"id":1541,"group":"bool-filt","title":"lutOf undeclared C from filter width","detail":{"scripts":["2wire B\nlutOf(XOR(B, C), B=**, C=01)"],"steps":[],"assertions":["description","no mismatch"]}},
       {"id":1542,"group":"bool-filt","title":"declared wire width beats filter inference","detail":{"scripts":["2wire B\n2wire C\nsimplify(XOR(B, C), B=**, C=***)"],"steps":[],"assertions":["mismatch"]}},
       {"id":1543,"group":"bool-filt","title":"slice in expr without filter on parent","detail":{"scripts":["2wire B\nsimplify(XOR(B, C.1-2), B=**)"],"steps":[],"assertions":["uses C.1","uses C.2"]}},
-      {"id":1544,"group":"bool-filt","title":"exprOfLut rejects A in LUT filters attribute","detail":{"scripts":["useLutAs(lutOf(AND(B, C), B=*, C=A), .b)\nexprOfLut(.b)"],"steps":[],"assertions":["message","not minterm conflict"]}}
+      {"id":1544,"group":"bool-filt","title":"exprOfLut rejects A in LUT filters attribute","detail":{"scripts":["useLutAs(lutOf(AND(B, C), B=*, C=A), .b)\nexprOfLut(.b)"],"steps":[],"assertions":["message","not minterm conflict"]}},
+      {"id":1545,"group":"bool-filt","title":"lift per-bit AND to AND(B, C)","detail":{"scripts":["2wire B\n2wire C\nsimplify(AND(B, C), B=**, C=**)"],"steps":[],"assertions":["std","short"]}},
+      {"id":1546,"group":"bool-filt","title":"lift exprOfLut AND round-trip","detail":{"scripts":["useLutAs(lutOf(AND(B, C), B=**, C=**), .b)\n2wire B\n2wire C\nexprOfLut(.b)"],"steps":[],"assertions":["std"]}},
+      {"id":1547,"group":"bool-filt","title":"lift XOR slice to bitRange","detail":{"scripts":["4wire B\n4wire C\nsimplify(XOR(B.0-1, C.0-1), B=****, C=****)"],"steps":[],"assertions":["std","short"]}},
+      {"id":1548,"group":"bool-filt","title":"lift AND mid-wire slice B.1-2","detail":{"scripts":["4wire B\n4wire C\nsimplify(AND(B.1-2, C.1-2), B=****, C=****)"],"steps":[],"assertions":["std","short"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1000,7 +1004,7 @@
       { id: 'board', label: 'Board component', rangeLabel: '840–847, 855–856, 861–863, 865–866', testIds: [840, 841, 842, 843, 844, 845, 846, 847, 855, 856, 861, 862, 863, 865, 866] },
       { id: 'bool-analysis', label: 'bool-analysis', rangeLabel: '1125–1133, 1137–1140, 1142, 1147, 1154–1156, 1398', testIds: [1125, 1126, 1127, 1128, 1129, 1130, 1131, 1132, 1133, 1137, 1138, 1139, 1140, 1142, 1147, 1154, 1155, 1156, 1398] },
       { id: 'bool-analysis-mb', label: 'bool-analysis-mb', rangeLabel: '1134–1135, 1141', testIds: [1134, 1135, 1141] },
-      { id: 'bool-filt', label: 'bool-filt', rangeLabel: '1512–1531, 1534, 1537–1544', testIds: [1512, 1513, 1514, 1515, 1516, 1517, 1518, 1519, 1520, 1521, 1522, 1523, 1524, 1525, 1526, 1527, 1528, 1529, 1530, 1531, 1534, 1537, 1538, 1539, 1540, 1541, 1542, 1543, 1544] },
+      { id: 'bool-filt', label: 'bool-filt', rangeLabel: '1512–1531, 1534, 1537–1548', testIds: [1512, 1513, 1514, 1515, 1516, 1517, 1518, 1519, 1520, 1521, 1522, 1523, 1524, 1525, 1526, 1527, 1528, 1529, 1530, 1531, 1534, 1537, 1538, 1539, 1540, 1541, 1542, 1543, 1544, 1545, 1546, 1547, 1548] },
       { id: 'bool-lut', label: 'bool-lut', rangeLabel: '1091–1099, 1099.5, 1099.6, 1100–1107, 1122, 1136, 1143–1144, 1148, 1151, 1396–1397', testIds: [1091, 1092, 1093, 1094, 1095, 1096, 1097, 1098, 1099, 1099.5, 1099.6, 1100, 1101, 1102, 1103, 1104, 1105, 1106, 1107, 1122, 1136, 1143, 1144, 1148, 1151, 1396, 1397] },
       { id: 'bool-lut-mb', label: 'bool-lut-mb', rangeLabel: '1108–1121, 1123–1124, 1145, 1149–1150, 1152–1153', testIds: [1108, 1109, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121, 1123, 1124, 1145, 1149, 1150, 1152, 1153] },
       { id: 'bool-lut-use', label: 'bool-lut-use', rangeLabel: '1192–1205, 1221', testIds: [1192, 1193, 1194, 1195, 1196, 1197, 1198, 1199, 1200, 1201, 1202, 1203, 1204, 1205, 1221] },

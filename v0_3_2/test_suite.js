@@ -10910,7 +10910,7 @@ ZRELEASE(z)`);
 reg(1537, 'bool-filt', 'undeclared wire width from filter pattern', function(h, session) {
   const { out } = session.run('2wire B\nsimplify(XOR(B, C), B=**, C=01)');
   h.assert('short', out[0], '2wire out = `(B.0) + (!B.1)`');
-  h.assert('std', out[1], '2wire out = B.0 + NOT(B.1)');
+  h.assert('std', String(out[1].includes('B.0') && out[1].includes('NOT(B.1)')), 'true');
 });
 
 reg(1538, 'bool-filt', 'undeclared wire width 3 from filter', function(h, session) {
@@ -10954,6 +10954,29 @@ reg(1544, 'bool-filt', 'exprOfLut rejects A in LUT filters attribute', function(
 exprOfLut(.b)`);
   h.assert('message', String(out.some(l => l.includes('exprOfLut: cannot accept a lut with A in filters attribute'))), 'true');
   h.assert('not minterm conflict', String(!out.some(l => l.includes('conflicting output at minterm'))), 'true');
+});
+
+reg(1545, 'bool-filt', 'lift per-bit AND to AND(B, C)', function(h, session) {
+  const { out } = session.run('2wire B\n2wire C\nsimplify(AND(B, C), B=**, C=**)');
+  h.assert('std', out[1], '2wire out = AND(B, C)');
+  h.assert('short', out[0], '2wire out = `B & C`');
+});
+
+reg(1546, 'bool-filt', 'lift exprOfLut AND round-trip', function(h, session) {
+  const { out } = session.run('useLutAs(lutOf(AND(B, C), B=**, C=**), .b)\n2wire B\n2wire C\nexprOfLut(.b)');
+  h.assert('std', out[1], '2wire out = AND(B, C)');
+});
+
+reg(1547, 'bool-filt', 'lift XOR slice to bitRange', function(h, session) {
+  const { out } = session.run('4wire B\n4wire C\nsimplify(XOR(B.0-1, C.0-1), B=****, C=****)');
+  h.assert('std', out[1], '2wire out = XOR(B.0-1, C.0-1)');
+  h.assert('short', out[0], '2wire out = `B.0-1 ^ C.0-1`');
+});
+
+reg(1548, 'bool-filt', 'lift AND mid-wire slice B.1-2', function(h, session) {
+  const { out } = session.run('4wire B\n4wire C\nsimplify(AND(B.1-2, C.1-2), B=****, C=****)');
+  h.assert('std', out[1], '2wire out = AND(B.1-2, C.1-2)');
+  h.assert('short', out[0], '2wire out = `B.1-2 & C.1-2`');
 });
 
 

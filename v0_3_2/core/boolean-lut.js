@@ -906,6 +906,219 @@ function formatMultiBitStandard(segments) {
   )).join(' + ');
 }
 
+const LIFT_BINARY_GATES = new Set(['AND', 'OR', 'XOR', 'NAND', 'NOR', 'NXOR']);
+const LIFT_SHORT_BINOP = {
+  AND: '&',
+  OR: '|',
+  XOR: '^',
+  NAND: '-&',
+  NOR: '-|',
+  NXOR: '-^'
+};
+
+function liftAtomSingleBitRef(part) {
+  if (!part) return null;
+  if (part.call && part.call.name === 'NOT') {
+    const inner = liftAtomSingleBitRef(part.args[0][0]);
+    if (!inner || inner.negated) return null;
+    return { wire: inner.wire, bit: inner.bit, negated: true };
+  }
+  if (part.var && !part.property && !part.not) {
+    if (!part.bitRange) return { wire: part.var, bit: 0, negated: false };
+    const br = part.bitRange;
+    const end = br.end !== undefined && br.end !== null ? br.end : br.start;
+    if (br.start !== end) return null;
+    return { wire: part.var, bit: br.start, negated: false };
+  }
+  return null;
+}
+
+function liftParseAndTerm(part) {
+  if (!part || !part.call || part.call.name !== 'AND' || part.args.length !== 2) return null;
+  const a0 = liftAtomSingleBitRef(part.args[0][0]);
+  const a1 = liftAtomSingleBitRef(part.args[1][0]);
+  if (!a0 || !a1) return null;
+  return { a0, a1 };
+}
+
+function liftParseXorAsOr(part) {
+  if (!part || !part.call || part.call.name !== 'OR' || part.args.length !== 2) return null;
+  const t0 = liftParseAndTerm(part.args[0][0]);
+  const t1 = liftParseAndTerm(part.args[1][0]);
+  if (!t0 || !t1) return null;
+  const pairs = [
+    [t0.a0, t0.a1, t1.a0, t1.a1],
+    [t0.a0, t0.a1, t1.a1, t1.a0],
+    [t0.a1, t0.a0, t1.a0, t1.a1],
+    [t0.a1, t0.a0, t1.a1, t1.a0]
+  ];
+  for (const [n0, p0, p1, n1] of pairs) {
+    if (!n0.negated || p0.negated || p1.negated || !n1.negated) continue;
+    if (n0.wire !== p1.wire || p0.wire !== n1.wire) continue;
+    if (n0.bit !== p1.bit || p0.bit !== n1.bit || n0.bit !== p0.bit) continue;
+    return { gate: 'XOR', args: [{ wire: n0.wire, bit: n0.bit }, { wire: p0.wire, bit: p0.bit }] };
+  }
+  return null;
+}
+
+function liftAnalyzeStdSegment(std) {
+  const s = String(std).trim();
+  if (s === '0' || s === '1' || s === 'X' || s === 'Z') return { gate: 'CONST', value: s };
+  if (typeof parseStdExprToAst !== 'function') return null;
+  try {
+    const ast = parseStdExprToAst(s);
+    if (!ast || ast.length !== 1) return null;
+    const part = ast[0];
+    if (!part.call) return null;
+    const name = part.call.name;
+    if (name === 'NOT' && part.args.length === 1) {
+      const r = liftAtomSingleBitRef(part.args[0][0]);
+      if (!r) return null;
+      return { gate: 'NOT', args: [{ wire: r.wire, bit: r.bit }] };
+    }
+    if (name === 'OR' && part.args.length === 2) {
+      const xor = liftParseXorAsOr(part);
+      if (xor) return xor;
+    }
+    if (LIFT_BINARY_GATES.has(name) && part.args.length === 2) {
+      const a0 = liftAtomSingleBitRef(part.args[0][0]);
+      const a1 = liftAtomSingleBitRef(part.args[1][0]);
+      if (!a0 || !a1 || a0.negated || a1.negated) return null;
+      return { gate: name, args: [a0, a1] };
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+function isLiftablePattern(pattern) {
+  if (!pattern || pattern.gate === 'CONST') return false;
+  if (pattern.gate === 'NOT') return pattern.args[0].bit != null;
+  if (pattern.args && pattern.args.length === 2) {
+    return pattern.args[0].bit != null && pattern.args[1].bit != null
+      && pattern.args[0].bit === pattern.args[1].bit;
+  }
+  return false;
+}
+
+function liftPatternsCompatible(p0, pi, gate, bitOffset) {
+  if (!pi || pi.gate !== gate) return false;
+  const expectedBit = p0.args[0].bit + bitOffset;
+  if (gate === 'NOT') {
+    return pi.args[0].wire === p0.args[0].wire && pi.args[0].bit === expectedBit;
+  }
+  return pi.args[0].wire === p0.args[0].wire && pi.args[1].wire === p0.args[1].wire
+    && pi.args[0].bit === expectedBit && pi.args[1].bit === expectedBit;
+}
+
+function buildWireWidthMap(columns, widthResolver) {
+  const map = new Map();
+  for (const col of columns) {
+    const v = col.atom.var;
+    if (!v) continue;
+    const dw = widthResolver(v);
+    if (dw != null && dw >= 1) {
+      map.set(v, Math.max(map.get(v) || 0, dw));
+    }
+    if (!col.atom.bitRange) {
+      map.set(v, Math.max(map.get(v) || 0, col.width));
+    } else {
+      const span = bitSpanForAtom(col.atom);
+      if (span) map.set(v, Math.max(map.get(v) || 0, span.start + span.width));
+    }
+  }
+  return map;
+}
+
+function liftFormatWireArg(wire, outStart, outEnd, totalOutputBits, wireWidths) {
+  const runLen = outEnd - outStart + 1;
+  const declared = wireWidths && wireWidths.get(wire);
+  const useFullWire = declared != null && runLen === declared && outStart === 0 && runLen === totalOutputBits;
+  if (useFullWire) return wire;
+  if (outStart === outEnd) return `${wire}.${outStart}`;
+  return `${wire}.${outStart}-${outEnd}`;
+}
+
+function liftBuildStd(run, totalBits, wireWidths) {
+  if (run.gate === 'NOT') {
+    const w = liftFormatWireArg(run.wires[0], run.outStart, run.outEnd, totalBits, wireWidths);
+    return `NOT(${w})`;
+  }
+  const ws = run.wires.map(w => liftFormatWireArg(w, run.outStart, run.outEnd, totalBits, wireWidths));
+  return `${run.gate}(${ws.join(', ')})`;
+}
+
+function liftBuildShort(run, totalBits, wireWidths) {
+  if (run.gate === 'NOT') {
+    const w = liftFormatWireArg(run.wires[0], run.outStart, run.outEnd, totalBits, wireWidths);
+    return `!${w}`;
+  }
+  const ws = run.wires.map(w => liftFormatWireArg(w, run.outStart, run.outEnd, totalBits, wireWidths));
+  const op = LIFT_SHORT_BINOP[run.gate] || '&';
+  return `${ws[0]} ${op} ${ws[1]}`;
+}
+
+function tryLiftBitwiseGateSegments(segmentsStd, segmentsShort, wireWidths) {
+  if (!segmentsStd || segmentsStd.length <= 1) return null;
+  const patterns = segmentsStd.map(liftAnalyzeStdSegment);
+  const groups = [];
+  let liftedAny = false;
+  let i = 0;
+  while (i < segmentsStd.length) {
+    const p0 = patterns[i];
+    if (!p0 || !isLiftablePattern(p0)) {
+      groups.push({ kind: 'raw', std: segmentsStd[i], short: segmentsShort ? segmentsShort[i] : segmentsStd[i] });
+      i++;
+      continue;
+    }
+    const gate = p0.gate;
+    const wires = gate === 'NOT' ? [p0.args[0].wire] : [p0.args[0].wire, p0.args[1].wire];
+    let len = 1;
+    while (i + len < segmentsStd.length && liftPatternsCompatible(p0, patterns[i + len], gate, len)) {
+      len++;
+    }
+    if ((LIFT_BINARY_GATES.has(gate) || gate === 'NOT') && len >= 1) {
+      const wireBitStart = p0.args[0].bit;
+      const run = { gate, wires, outStart: wireBitStart, outEnd: wireBitStart + len - 1, len };
+      groups.push({
+        kind: 'lifted',
+        std: liftBuildStd(run, segmentsStd.length, wireWidths),
+        short: liftBuildShort(run, segmentsStd.length, wireWidths)
+      });
+      liftedAny = true;
+      i += len;
+      continue;
+    }
+    groups.push({ kind: 'raw', std: segmentsStd[i], short: segmentsShort ? segmentsShort[i] : segmentsStd[i] });
+    i++;
+  }
+  if (!liftedAny) return null;
+  const joinGroups = (key) => {
+    if (groups.length === 1) return groups[0][key];
+    return groups.map(g => {
+      const text = g[key];
+      if (g.kind === 'lifted') return `(${text})`;
+      if (g.kind === 'raw' && !isConstBitSegment(text)) return `(${text})`;
+      return text;
+    }).join(' + ');
+  };
+  return { std: joinGroups('std'), short: joinGroups('short') };
+}
+
+function finalizeMultiBitExpressions(segmentsStd, segmentsShort, wireWidths) {
+  if (!segmentsStd || segmentsStd.length === 0) return { std: '', short: '' };
+  if (segmentsStd.length === 1) {
+    return { std: segmentsStd[0], short: segmentsShort[0] };
+  }
+  const lifted = tryLiftBitwiseGateSegments(segmentsStd, segmentsShort, wireWidths);
+  if (lifted) return lifted;
+  return {
+    std: formatMultiBitStandard(segmentsStd),
+    short: formatMultiBitShort(segmentsShort)
+  };
+}
+
 const LUT_OF_INLINE_NAME = '.generated';
 
 function lutOfBuild(exprAst, widthResolver, filters) {
@@ -1082,12 +1295,13 @@ function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
   let labels;
   let outputCols;
   let depth;
+  let columns = null;
 
   const minimizeFn = typeof minimizeBoolean === 'function' ? minimizeBoolean : null;
   if (!minimizeFn) throw new Error('boolean-minimize.js is not loaded');
 
   if (varSpecs.length > 0 && attrs.filters && attrs.description) {
-    const columns = parseLutDescriptionString(attrs.description);
+    columns = parseLutDescriptionString(attrs.description);
     const filters = parseFiltersAttributeString(attrs.filters);
     const enhanced = makeAnalysisWidthResolver(widthResolver, buildFilterWidthMap(filters));
     const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut', enhanced);
@@ -1115,7 +1329,7 @@ function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
     if (!attrs.description) {
       throw new Error('exprOfLut: LUT has filters: but no description: attribute');
     }
-    const columns = parseLutDescriptionString(attrs.description);
+    columns = parseLutDescriptionString(attrs.description);
     const filters = parseFiltersAttributeString(attrs.filters);
     const enhanced = makeAnalysisWidthResolver(widthResolver, buildFilterWidthMap(filters));
     const filterMap = validateAndBuildFilterMap(columns, filters, 'exprOfLut', enhanced);
@@ -1136,7 +1350,7 @@ function exprOfLutBuildCore(lutInst, varSpecs, widthResolver) {
     segmentsStd.push(seg.std);
   }
 
-  return { depth, segmentsShort, segmentsStd };
+  return { depth, segmentsShort, segmentsStd, columns, widthResolver };
 }
 
 function exprOfLutBuild(lutInst, varSpecs, widthResolver) {
@@ -1151,7 +1365,8 @@ function exprOfLutBuild(lutInst, varSpecs, widthResolver) {
 }
 
 function exprOfLutGenerate(lutInst, varSpecs, widthResolver) {
-  const { depth, segmentsShort, segmentsStd } = exprOfLutBuildCore(lutInst, varSpecs, widthResolver);
+  const { depth, segmentsShort, segmentsStd, columns, widthResolver: wr } = exprOfLutBuildCore(lutInst, varSpecs, widthResolver);
+  const wireWidths = columns ? buildWireWidthMap(columns, wr || widthResolver) : null;
 
   const outType = `${depth}wire`;
   let shortExpr;
@@ -1160,8 +1375,9 @@ function exprOfLutGenerate(lutInst, varSpecs, widthResolver) {
     shortExpr = segmentsShort[0];
     stdExpr = segmentsStd[0];
   } else {
-    shortExpr = formatMultiBitShort(segmentsShort);
-    stdExpr = formatMultiBitStandard(segmentsStd);
+    const fin = finalizeMultiBitExpressions(segmentsStd, segmentsShort, wireWidths);
+    shortExpr = fin.short;
+    stdExpr = fin.std;
   }
 
   return [
