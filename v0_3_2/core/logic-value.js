@@ -85,6 +85,20 @@ function requireBinaryForEval(values, opName, labels) {
   }
 }
 
+/** Reject X only; Z is allowed (tristate MUX / partial drive). */
+function requireNoXForEval(values, opName, labels) {
+  const list = values || [];
+  for (let i = 0; i < list.length; i++) {
+    const v = String(list[i] || '');
+    for (let j = 0; j < v.length; j++) {
+      if (v[j] === 'X') {
+        const label = labels && labels[i] ? labels[i] : `argument ${i + 1}`;
+        throw new Error(`Cannot use wire with X in ${opName} (${label} bit ${j})`);
+      }
+    }
+  }
+}
+
 /** Edge modes: only strict 0↔1 transitions; Z/X never trigger */
 function logicEdgeTriggered(prevBit, newBit, onMode) {
   if (!isBinaryBit(prevBit) || !isBinaryBit(newBit)) return false;
@@ -251,6 +265,7 @@ const LogicValue = {
   deviceBitIsOn,
   normalizeDeviceDisplayBits,
   requireBinaryForEval,
+  requireNoXForEval,
   logicEdgeTriggered,
   logicLevelTriggered,
   resolveWireBit,

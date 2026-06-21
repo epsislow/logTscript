@@ -1135,6 +1135,29 @@ class Interpreter {
     }
   }
 
+  _zstateRequireNoX(argValues, opName, labels) {
+    if (!this.zstate) return;
+    if (typeof LogicValue !== 'undefined' && LogicValue.requireNoXForEval) {
+      LogicValue.requireNoXForEval(argValues, opName, labels);
+    }
+  }
+
+  _evalExprToBitString(expr) {
+    const exprResult = this.evalExpr(expr, false);
+    let total = '';
+    for (const part of exprResult) {
+      if (part.value !== undefined && part.value !== null && part.value !== '-') {
+        total += part.value;
+        continue;
+      }
+      if (part.ref && part.ref !== '&-') {
+        const val = this.getValueFromRef(part.ref);
+        if (val) total += val;
+      }
+    }
+    return total;
+  }
+
   _readWatchTargetValue(target) {
     if (!target) return null;
     let value = null;
@@ -1691,6 +1714,30 @@ class Interpreter {
       this.writeWireStable(wireName, val);
       this.updateConnectedComponents(wireName, val);
     }
+  }
+
+  execZConnect(busName, enExpr, dataExpr) {
+    if (!this.zstate) {
+      throw Error('ZCONNECT() requires MODE ZSTATE');
+    }
+    const wire = this.wires.get(busName);
+    if (!wire) throw Error(`Unknown wire '${busName}' in ZCONNECT()`);
+    const bits = this.getBitWidth(wire.type);
+    if (!bits) throw Error(`ZCONNECT() target '${busName}' is not a wire`);
+
+    const enVal = this._evalExprToBitString(enExpr);
+    const enBit = enVal.length ? enVal.slice(-1) : '0';
+    if (enBit !== '1') return;
+
+    const dataVal = this._evalExprToBitString(dataExpr);
+    if (!dataVal.length) {
+      throw Error(`ZCONNECT() data expression is empty for bus '${busName}'`);
+    }
+    const fitted = this._fitWireContributionValue(dataVal, bits);
+    if (fitted.length !== bits) {
+      throw Error(`ZCONNECT() data width mismatch for bus '${busName}' (expected ${bits}, got ${dataVal.length})`);
+    }
+    this.queueWireContribution(busName, fitted);
   }
 
   scheduleWireChange(name, value) {
@@ -2952,9 +2999,17 @@ if (this.isBuiltinMUX(name)) {
     fail(`MUX expects at least 2 arguments`);
   }
 
-  this._zstateRequireBinary([argValues[0], ...inputs], 'MUX', ['selector', 'data']);
+  this._zstateRequireBinary([argValues[0]], 'MUX', ['selector']);
 
   const sel = parseInt(argValues[0], 2);
+  if (Number.isNaN(sel) || sel < 0 || sel >= inputs.length) {
+    throw Error(`MUX selector value out of range`);
+  }
+
+  if (this.zstate) {
+    this._zstateRequireNoX([inputs[sel]], 'MUX', ['selected data']);
+  }
+
   const value = inputs[sel];
 
   return computeRefs
@@ -3808,6 +3863,11 @@ if (this.isBuiltinDEMUX(name)) {
 
     if (s.zRelease) {
       this.runSafely(() => this.execZRelease(s.zRelease));
+      return;
+    }
+
+    if (s.zConnect) {
+      this.runSafely(() => this.execZConnect(s.zConnect.bus, s.zConnect.en, s.zConnect.data));
       return;
     }
 
@@ -9941,6 +10001,8 @@ Interpreter.BUILTIN_DOC = {
   LROTATE:  ['LROTATE(Xbit data, Ybit count) -> Xbit'],
   RROTATE:  ['RROTATE(Xbit data, Ybit count) -> Xbit'],
   ZRELEASE: ['ZRELEASE(wireName) — release wire to high-Z (MODE ZSTATE statement)'],
+  ZCONNECT: ['ZCONNECT(bus, en, data) — enable-gated bus drive (MODE ZSTATE); ZCONN alias'],
+  ZCONN: ['ZCONNECT(bus, en, data) — alias for ZCONNECT'],
 };
 
 Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions, boardInstNames, boardDefinitions, inlineInstances) {

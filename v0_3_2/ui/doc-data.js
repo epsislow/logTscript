@@ -2684,7 +2684,7 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
-| **Tristate (ZSTATE)** | \`ZRELEASE(wire)\` — release wire | [zstate.md](zstate.md) |
+| **Tristate (ZSTATE)** | \`ZRELEASE(wire)\`, \`ZCONNECT(bus, en, data)\` | [zstate.md](zstate.md) |
 
 > **Adding new built-ins:** extend \`Interpreter.BUILTIN_DOC\` in \`core/interpreter.js\`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.
 
@@ -2699,11 +2699,26 @@ ZRELEASE(en)
 show(en)
 \`\`\`
 
-See **[zstate.md](zstate.md)** for multi-driver buses, conflict \`X\`, and IEEE logic gates.
+See **[zstate.md](zstate.md)** for multi-driver buses, \`ZCONNECT\`, conflict \`X\`, and IEEE logic gates.
+
+### \`ZCONNECT(bus, en, data)\` — enable-gated bus drive
+
+Statement only (alias **\`ZCONN\`**). Requires \`MODE ZSTATE\` + wave. When \`en\` is strict \`1\`, queues \`data\` onto \`bus\`; when \`en\` is \`0\`/\`Z\`/\`X\`, no-op. Not valid as \`bus = ZCONNECT(…)\`.
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+8wire databus
+8wire cpuData = 10101010
+1wire cpuEn = 1
+
+ZCONNECT(databus, cpuEn, cpuData)
+show(databus)
+\`\`\`
 
 ### Logic gates with \`Z\` / \`X\`
 
-In \`MODE ZSTATE\`, gate functions (\`AND\`, \`OR\`, \`NOT\`, …) use IEEE 1164 when operands contain \`Z\` or \`X\`. Arithmetic and routing (\`ADD\`, \`MUX\`, \`REG\`, …) still require binary \`0\`/\`1\`. Details: [zstate.md](zstate.md), [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md#z-and-x-in-mode-zstate).
+In \`MODE ZSTATE\`, gate functions (\`AND\`, \`OR\`, \`NOT\`, …) use IEEE 1164 when operands contain \`Z\` or \`X\`. Arithmetic requires binary \`0\`/\`1\`. **\`MUX\`**: selector strict binary; **selected** data allows \`Z\`, errors on \`X\`; unselected inputs not checked. Details: [zstate.md](zstate.md), [builtin-routing-functions.md](builtin-routing-functions.md#mux-in-mode-zstate).
 
 
 ---
@@ -2897,6 +2912,32 @@ Returns **\`2^N\` values**: the selected output carries \`data\`, all others are
 4wire out0, 4wire out1 = DEMUX(sel, data)
 probe(out0)
 probe(out1)
+\`\`\`
+
+---
+
+## MUX in MODE ZSTATE
+
+With \`MODE ZSTATE\` active:
+
+| Operand | Validation |
+|---------|------------|
+| \`sel\` | Strict \`0\`/\`1\` — error on \`Z\` or \`X\` |
+| Selected \`dataK\` | Error on **\`X\` only**; **\`Z\` allowed** (passed through to output) |
+| Unselected \`data\` | Not validated |
+
+When MUX output is assigned to a shared bus in the same wave step, bits \`Z\` in the contribution do not drive at merge (same rules as \`ZCONNECT\`). For enable-gated multi-bit drive, prefer **\`ZCONNECT(bus, en, data)\`** — [zstate.md](zstate.md).
+
+**Load & Run** — \`Z\` in selected input:
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+1wire sel = 0
+4wire d0 = ?Z01Z
+4wire d1 = ?XXXX
+4wire r = MUX(sel, d0, d1)
+show(r)
 \`\`\`
 
 ---
@@ -3180,11 +3221,12 @@ comp [clcd] .panel::
 | \`bits\` | one of | Inclusive range \`N-M\` (e.g. \`digit7\`) |
 | \`bitOut\` | no | Touch output bit index (optional; symbol omitted from \`:out\` if absent) |
 | \`touchType\` | with \`bitOut\` | \`1\` momentary (default), \`2\` pulse, \`3\` latch/toggle |
-| \`width\`, \`height\` | no | Touch hit box size (px); defaults per symbol kind (FA 22×22, \`digit7\` 28×44, …) |
+| \`width\`, \`height\` | no | Touch hit box size (px); defaults from \`size\` or per kind (FA 22×22, \`digit7\` 28×44, …) |
 | \`padding\` | no | Extra margin (px) around hit box; defaults to \`touchPadding\` or \`0\` |
 | \`color\` | no | Override ON color for this symbol |
 | \`bgColor\` | no | Override OFF color for this symbol |
 | \`style\` | no | FA icon style: \`1\` solid (default), \`2\` regular, \`3\` brands — only on FA symbols; not on canvas or \`label\` |
+| \`size\` | no | Display size in px (target height). **FA** icons: font size, default **22**, range 8–64. **Canvas** (\`digit7\`, \`dp\`, …): uniform scale to target height, defaults **44** / **8** / **32**, range 8–120. **\`label\`**: font size, default **14**, range 6–48. Touch hit box follows \`size\` when \`width\`/\`height\` are omitted |
 
 ### \`label\` (text on canvas)
 
@@ -3237,7 +3279,7 @@ Display bits (\`bit\` / \`bits\` → \`:get\`) and touch bits (\`bitOut\` → \`
 - Left: \`x - pad\`, top: \`y - pad\`
 - Right: \`x + width + pad\`, bottom: \`y + height + pad\`
 
-Default sizes when \`width\` / \`height\` are omitted depend on symbol kind (e.g. FA icons 22×22, \`digit7\` 28×44). Default \`pad\` is the symbol's \`padding\`, else \`touchPadding\`, else \`0\`.
+Default sizes when \`width\` / \`height\` are omitted follow each symbol's \`size\` (see above), or the native defaults (FA 22×22, \`digit7\` 28×44, \`dp\` 12×8, \`colon\` 8×32). Default \`pad\` is the symbol's \`padding\`, else \`touchPadding\`, else \`0\`.
 
 Set component attribute \`touch: 1\` to enable hit-testing. Optional \`touchColor\` draws debug borders around hit boxes. With a mouse, the cursor is \`pointer\` over touch zones (\`touchType\` 1 or 2) and \`grab\` over latch zones (\`touchType\` 3); elsewhere it stays the default arrow.
 
@@ -10674,7 +10716,7 @@ Result: \`1X\` (conflict on bit 1), not \`11\`.
 
 **Full documentation:** **[MODE ZSTATE — tristate wires and multi-driver buses](zstate.md)**
 
-Topics covered there: \`get>=\` / \`out>=\`, \`ZRELEASE\`, logic literals \`?X\` / \`?Z\`, timeline colours, errors on arithmetic with \`X\`/\`Z\`, and comparison with default binary mode.
+Topics covered there: \`ZCONNECT\`, \`get>=\` / \`out>=\`, \`ZRELEASE\`, logic literals \`?X\` / \`?Z\`, timeline colours, MUX with \`Z\`, errors on arithmetic with \`X\`/\`Z\`, and comparison with default binary mode.
 
 ---
 
@@ -13319,7 +13361,7 @@ After **RUN**, \`a\` is \`0\` and \`b\` is \`1\`. When you flip the switch in th
 
 When \`MODE ZSTATE\` is active (wave only), wire updates use an extra **commit** phase inside each propagation wave. See **[modes.md](modes.md)** for all script modes and **[zstate.md](zstate.md)** for ZSTATE details.
 
-1. All contributors are queued (\`bus = a\`, \`get>= bus\`, \`out>= bus\`, \`ZRELEASE(bus)\`, …).
+1. All contributors are queued (\`bus = a\`, \`ZCONNECT(bus, en, data)\`, \`get>= bus\`, \`out>= bus\`, \`ZRELEASE(bus)\`, …).
 2. **\`commitWireResolves\`** merges contributions **per bit** → \`0\`, \`1\`, \`Z\`, or \`X\`.
 3. Connected components and displays refresh from the resolved value.
 
@@ -13774,6 +13816,7 @@ After **RUN**, toggle the switch in the panel — the LED updates without re-run
 
 - Input only — you cannot assign \`.name = 1\` from code.
 - Use **switch** for latched on/off; use [key.md](key.md) for momentary press.
+- **1 bit only** — not a multi-bit databus source. For \`8wire\` magistrale with enable, use **\`ZCONNECT(bus, en, data)\`** ([zstate.md](zstate.md)) or wire assignment + merge; \`get>=\` from switch pads to bus width with \`0\`.
 - Panel updates propagate through wires — [signal-propagation.md](signal-propagation.md).
 - Debug: \`probe(.pwr)\` or \`probe(.pwr:get)\` — [debug.md](debug.md).
 `,
@@ -14072,31 +14115,38 @@ See also: [signal propagation](signal-propagation.md), [assignment operators](as
 
 ## Quick start
 
+**Load & Run** — enable-gated databus with \`ZCONNECT\` (CPU drives, RAM off):
+
 \`\`\`logts-play wave
 MODE ZSTATE
 
 8wire databus
 8wire cpuData = 10101010
 8wire ramData = 11001100
-1wire cpuEn = 0
+1wire cpuEn = 1
 1wire ramEn = 0
 
-comp [switch] .cpu:
-  on: 1
-  :
-comp [switch] .ram:
-  on: 1
-  :
-
-.cpu:{ get >= databus
-  set = cpuEn }
-.ram:{ get >= databus
-  set = ramEn }
-
+ZCONNECT(databus, cpuEn, cpuData)
+ZCONNECT(databus, ramEn, ramData)
 show(databus)
 \`\`\`
 
-With both enables \`0\`, \`databus\` is \`ZZZZZZZZ\` (no driver). Enable one source to drive the bus; enable two with different values → conflicting bits become \`X\`.
+Result: \`10101010\`. With both enables \`0\`, \`databus\` stays \`ZZZZZZZZ\` (no contribution). With both \`1\` and different data → conflicting bits become \`X\`.
+
+Alias: \`ZCONN(bus, en, data)\` — same statement.
+
+---
+
+## Running examples (Load / Load & Run)
+
+Blocks use \`logts-play wave\` (orange **Wave** pill). Each shows **Load** and **Load & Run**:
+
+| Button | Use |
+|--------|-----|
+| **Load** | Copy into editor; edit enables/data, then **RUN** |
+| **Load & Run** | Run immediately; read **Output** and Variables panel |
+
+ZSTATE examples need **wave** propagation — not Legacy.
 
 ---
 
@@ -14137,7 +14187,7 @@ Literals with \`Z\` or \`X\` require prefix **\`?\`** when the token would start
 
 ## Multi-driver resolution
 
-Within one **wave** propagation step, every write to a wire (assignment, \`get>=\`, \`out>=\`, \`ZRELEASE(wire)\`, component redirect) becomes a **contribution**. At commit time the engine resolves **per bit**:
+Within one **wave** propagation step, every write to a wire (assignment, \`ZCONNECT\`, \`get>=\`, \`out>=\`, \`ZRELEASE(wire)\`, component redirect) becomes a **contribution**. At commit time the engine resolves **per bit**:
 
 | Contributors (0/1 only) | Result |
 |-------------------------|--------|
@@ -14146,9 +14196,49 @@ Within one **wave** propagation step, every write to a wire (assignment, \`get>=
 | 2+ with same value | \`0\` or \`1\` |
 | 2+ with different values | \`X\` |
 
+Biții **\`Z\` într-o contribuție nu contează ca driver activ** — la merge, doar \`0\`/\`1\` concurează pe acel bit. The same applies to \`Z\` in **MUX** selected data when the result is assigned to a shared bus.
+
 \`X\` is **not sticky**. On the next step, if only one driver remains, the bit becomes \`0\` or \`1\` again.
 
-### Driving a shared bus
+### \`ZCONNECT(bus, en, data)\` — enable-gated drive
+
+Statement (not an expression). Requires \`MODE ZSTATE\` + wave.
+
+\`\`\`logts
+ZCONNECT(databus, cpuEn, cpuData)
+ZCONN(databus, ramEn, ramData)   // alias
+\`\`\`
+
+| \`en\` | Effect |
+|------|--------|
+| strict \`1\` | Queue \`data\` as a bus contribution (\`Z\` bits in \`data\` do not drive) |
+| \`0\`, \`Z\`, \`X\` | **No-op** — bus unchanged (no contribution) |
+
+\`data\` width must match \`bus\`. Not valid as \`bus = ZCONNECT(…)\` — use the statement form only.
+
+**Load & Run** — dual enable conflict:
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+4wire bus
+4wire a = 1010
+4wire b = 0110
+1wire enA = 1
+1wire enB = 1
+
+ZCONNECT(bus, enA, a)
+ZCONNECT(bus, enB, b)
+show(bus)
+\`\`\`
+
+Result: \`XX10\`.
+
+### Driving a shared bus (1-bit switches)
+
+\`comp [switch]\` is **1 bit** — suitable for tiny demos with \`get>=\`, not for driving an \`8wire\` data value. Toggle switches in the panel after **Load & Run**.
+
+**Load & Run** — two switches, one bit each on \`2wire bus\`:
 
 \`\`\`logts-play wave
 MODE ZSTATE
@@ -14179,6 +14269,8 @@ When \`set = 0\` on a property block, that component **does not contribute** in 
 \`\`\`
 
 ### Re-assignment in the same step
+
+**Load & Run** — per-bit resolve (not last-wins):
 
 \`\`\`logts-play wave
 MODE ZSTATE
@@ -14230,16 +14322,18 @@ Detail: [built-in logic gate functions](builtin-logic-gate-functions.md#z-and-x-
 
 ## Where \`Z\` / \`X\` cause errors
 
-Operations that require **pure binary** operands error if a wire bit is \`Z\` or \`X\`:
+Operations that require **pure binary** operands error on \`Z\` or \`X\` (depending on operation):
 
-| Category | Examples |
-|----------|----------|
-| Arithmetic | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\` |
-| Routing | \`MUX\`, \`DEMUX\` |
-| Sequential | \`REG\`, memory address |
-| Shifts | \`LSHIFT\`, \`RSHIFT\`, \`LROTATE\`, \`RROTATE\` |
+| Category | Examples | ZSTATE notes |
+|----------|----------|--------------|
+| Arithmetic | \`ADD\`, \`SUBTRACT\`, … | \`Z\` and \`X\` → error |
+| Routing | \`MUX\`, \`DEMUX\` | **\`MUX\` selector** must be strict \`0\`/\`1\`. **Selected** data: error on \`X\` only; \`Z\` allowed. Unselected MUX inputs are not checked. **\`DEMUX\`**: strict binary |
+| Sequential | \`REG\`, memory address | \`Z\` / \`X\` → error |
+| Shifts | \`LSHIFT\`, … | \`Z\` / \`X\` → error |
 
-Message pattern: \`Cannot use wire with Z in ADD\` or \`Cannot use wire with X in MUX\`.
+Message pattern: \`Cannot use wire with Z in ADD\` or \`Cannot use wire with X in MUX (selected data bit N)\`.
+
+**Always OK:** \`show\`, \`peek\`, \`probe\`, \`watch\`, \`ZCONNECT\`, \`ZRELEASE\`, logic gates (IEEE).
 
 **Always OK:** \`show\`, \`peek\`, \`probe\`, \`watch\` — display \`101X01ZZ\` as-is.
 
@@ -14263,7 +14357,7 @@ See [debug.md](debug.md#z-and-x-values-mode-zstate).
 |-------|---------|---------------|
 | Undeclared init (\`8wire bus\`) | \`00000000\` | \`ZZZZZZZZ\` |
 | Two drivers same step | Last write wins (or error in STRICT) | Per-bit resolve → \`X\` on conflict |
-| Shared bus teaching | Not modeled | Native \`get>=\` / \`out>=\` + enable |
+| Shared bus teaching | Not modeled | \`ZCONNECT\` + \`get>=\` / \`out>=\` + merge |
 | Tristate component | N/A | Engine-level, no \`comp [bus]\` needed |
 
 Historical note: [future component ideas — B4](future-component-ideas.md#b4-tristate--bus-buffer) originally proposed a buffer component; the shipped design is **engine ZSTATE** instead.
@@ -14276,7 +14370,7 @@ Historical note: [future component ideas — B4](future-component-ideas.md#b4-tr
 |-------|------|
 | Assignment + \`MODE WIREWRITE\` | [assignment-operators.md](assignment-operators.md#mode-zstate-and-wirewrite) |
 | Wave commit phase | [signal-propagation.md](signal-propagation.md#mode-zstate-multi-driver-commit) |
-| Built-in \`ZRELEASE()\` | [builtin-functions.md](builtin-functions.md) |
+| Built-in \`ZRELEASE()\` / \`ZCONNECT()\` | [builtin-functions.md](builtin-functions.md) |
 | Switch \`get>=\` | [switch.md](switch.md) |
 | Shifter \`out>=\` | [shifter.md](shifter.md) |
 `

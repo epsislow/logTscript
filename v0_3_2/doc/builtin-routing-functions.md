@@ -57,6 +57,32 @@ probe(out1)
 
 ---
 
+## MUX in MODE ZSTATE
+
+With `MODE ZSTATE` active:
+
+| Operand | Validation |
+|---------|------------|
+| `sel` | Strict `0`/`1` — error on `Z` or `X` |
+| Selected `dataK` | Error on **`X` only**; **`Z` allowed** (passed through to output) |
+| Unselected `data` | Not validated |
+
+When MUX output is assigned to a shared bus in the same wave step, bits `Z` in the contribution do not drive at merge (same rules as `ZCONNECT`). For enable-gated multi-bit drive, prefer **`ZCONNECT(bus, en, data)`** — [zstate.md](zstate.md).
+
+**Load & Run** — `Z` in selected input:
+
+```logts-play wave
+MODE ZSTATE
+
+1wire sel = 0
+4wire d0 = ?Z01Z
+4wire d1 = ?XXXX
+4wire r = MUX(sel, d0, d1)
+show(r)
+```
+
+---
+
 ## Typical uses
 
 ```

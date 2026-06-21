@@ -64,5 +64,6 @@ After **RUN**, toggle the switch in the panel — the LED updates without re-run
 
 - Input only — you cannot assign `.name = 1` from code.
 - Use **switch** for latched on/off; use [key.md](key.md) for momentary press.
+- **1 bit only** — not a multi-bit databus source. For `8wire` magistrale with enable, use **`ZCONNECT(bus, en, data)`** ([zstate.md](zstate.md)) or wire assignment + merge; `get>=` from switch pads to bus width with `0`.
 - Panel updates propagate through wires — [signal-propagation.md](signal-propagation.md).
 - Debug: `probe(.pwr)` or `probe(.pwr:get)` — [debug.md](debug.md).

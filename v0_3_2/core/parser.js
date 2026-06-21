@@ -1561,6 +1561,25 @@ assignment() {
     return { zRelease: wireName };
   }
 
+  zConnect(){
+    if (this.c.value !== 'ZCONNECT' && this.c.value !== 'ZCONN') {
+      throw Error(`Expected ZCONNECT or ZCONN at ${this.c.line}:${this.c.col}`);
+    }
+    this.eat('KEYWORD');
+    this.eat('SYM', '(');
+    if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+      throw Error(`Expected bus wire name in ZCONNECT() at ${this.c.line}:${this.c.col}`);
+    }
+    const busName = this.c.value;
+    this.eat(this.c.type);
+    this.eat('SYM', ',');
+    const enExpr = this.expr();
+    this.eat('SYM', ',');
+    const dataExpr = this.expr();
+    this.eat('SYM', ')');
+    return { zConnect: { bus: busName, en: enExpr, data: dataExpr } };
+  }
+
   parseComp() {
     this.eat('KEYWORD', 'comp');
     this.eat('SYM', '[');
@@ -3554,6 +3573,8 @@ Parser.KEYWORD_HANDLERS = {
   TEST: 'test',
   MODE: 'mode',
   ZRELEASE: 'zRelease',
+  ZCONNECT: 'zConnect',
+  ZCONN: 'zConnect',
   comp: 'parseComp',
   pcb: 'parsePcbInstance',
   chip: 'parseChipInstance',

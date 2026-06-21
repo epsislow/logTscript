@@ -62,7 +62,7 @@ After **RUN**, `a` is `0` and `b` is `1`. When you flip the switch in the panel,
 
 When `MODE ZSTATE` is active (wave only), wire updates use an extra **commit** phase inside each propagation wave. See **[modes.md](modes.md)** for all script modes and **[zstate.md](zstate.md)** for ZSTATE details.
 
-1. All contributors are queued (`bus = a`, `get>= bus`, `out>= bus`, `ZRELEASE(bus)`, …).
+1. All contributors are queued (`bus = a`, `ZCONNECT(bus, en, data)`, `get>= bus`, `out>= bus`, `ZRELEASE(bus)`, …).
 2. **`commitWireResolves`** merges contributions **per bit** → `0`, `1`, `Z`, or `X`.
 3. Connected components and displays refresh from the resolved value.
 

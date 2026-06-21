@@ -22,7 +22,7 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 | **Bit selection** | `HIGH`, `LOW`, `ANY`, `ZERO`, `BITINDEX`, `ONEHOT` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | `PARITY`, `CNTONE`, `CNTZERO`, `BITSIZE` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | `LSHIFT`, `RSHIFT`, `REVERSE`, `LROTATE`, `RROTATE` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
-| **Tristate (ZSTATE)** | `ZRELEASE(wire)` — release wire | [zstate.md](zstate.md) |
+| **Tristate (ZSTATE)** | `ZRELEASE(wire)`, `ZCONNECT(bus, en, data)` | [zstate.md](zstate.md) |
 
 > **Adding new built-ins:** extend `Interpreter.BUILTIN_DOC` in `core/interpreter.js`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.
 
@@ -37,11 +37,26 @@ ZRELEASE(en)
 show(en)
 ```
 
-See **[zstate.md](zstate.md)** for multi-driver buses, conflict `X`, and IEEE logic gates.
+See **[zstate.md](zstate.md)** for multi-driver buses, `ZCONNECT`, conflict `X`, and IEEE logic gates.
+
+### `ZCONNECT(bus, en, data)` — enable-gated bus drive
+
+Statement only (alias **`ZCONN`**). Requires `MODE ZSTATE` + wave. When `en` is strict `1`, queues `data` onto `bus`; when `en` is `0`/`Z`/`X`, no-op. Not valid as `bus = ZCONNECT(…)`.
+
+```logts-play wave
+MODE ZSTATE
+
+8wire databus
+8wire cpuData = 10101010
+1wire cpuEn = 1
+
+ZCONNECT(databus, cpuEn, cpuData)
+show(databus)
+```
 
 ### Logic gates with `Z` / `X`
 
-In `MODE ZSTATE`, gate functions (`AND`, `OR`, `NOT`, …) use IEEE 1164 when operands contain `Z` or `X`. Arithmetic and routing (`ADD`, `MUX`, `REG`, …) still require binary `0`/`1`. Details: [zstate.md](zstate.md), [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md#z-and-x-in-mode-zstate).
+In `MODE ZSTATE`, gate functions (`AND`, `OR`, `NOT`, …) use IEEE 1164 when operands contain `Z` or `X`. Arithmetic requires binary `0`/`1`. **`MUX`**: selector strict binary; **selected** data allows `Z`, errors on `X`; unselected inputs not checked. Details: [zstate.md](zstate.md), [builtin-routing-functions.md](builtin-routing-functions.md#mux-in-mode-zstate).
 
 
 ---

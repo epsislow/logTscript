@@ -11140,6 +11140,104 @@ reg(1558, 'clcd', 'doc(comp.clcd) touch attrs in icon section', function(h, sess
   h.assert('text in label', String(text.includes('text: string')), 'true');
 });
 
+reg(1559, 'zstate', 'ZCONNECT without MODE ZSTATE — error', function(h, session) {
+  const { out } = session.run('4wire bus\n1wire en = 1\n4wire d = 1010\nZCONNECT(bus, en, d)');
+  h.assert('err', String(out.some(l => l.includes('ZCONNECT() requires MODE ZSTATE'))), 'true');
+});
+
+reg(1560, 'zstate', 'ZCONNECT en=0 — bus stays Z', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+4wire bus
+4wire cpuData = 1010
+1wire cpuEn = 0
+ZCONNECT(bus, cpuEn, cpuData)`);
+  h.assert('bus', session.getWire(interp, 'bus'), 'ZZZZ');
+}, ZSTATE_WAVE);
+
+reg(1561, 'zstate', 'ZCONNECT en=1 drives bus', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+8wire databus
+8wire cpuData = 10101010
+1wire cpuEn = 1
+ZCONNECT(databus, cpuEn, cpuData)`);
+  h.assert('bus', session.getWire(interp, 'databus'), '10101010');
+}, ZSTATE_WAVE);
+
+reg(1562, 'zstate', 'dual ZCONNECT one enable', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+8wire databus
+8wire cpuData = 10101010
+8wire ramData = 11001100
+1wire cpuEn = 1
+1wire ramEn = 0
+ZCONNECT(databus, cpuEn, cpuData)
+ZCONNECT(databus, ramEn, ramData)`);
+  h.assert('bus', session.getWire(interp, 'databus'), '10101010');
+}, ZSTATE_WAVE);
+
+reg(1563, 'zstate', 'dual ZCONNECT both enable conflict', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+4wire bus
+4wire a = 1010
+4wire b = 0110
+1wire enA = 1
+1wire enB = 1
+ZCONNECT(bus, enA, a)
+ZCONNECT(bus, enB, b)`);
+  h.assert('bus', session.getWire(interp, 'bus'), 'XX10');
+}, ZSTATE_WAVE);
+
+reg(1564, 'zstate', 'ZCONNECT partial Z merges with other driver', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+4wire bus
+4wire fill = 1Z1Z
+1wire en = 1
+4wire src = ?Z11Z
+ZCONNECT(bus, en, src)
+bus = fill`);
+  h.assert('bus', session.getWire(interp, 'bus'), '111Z');
+}, ZSTATE_WAVE);
+
+reg(1565, 'zstate', 'ZCONN alias drives bus', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+2wire bus
+2wire d = 10
+1wire en = 1
+ZCONN(bus, en, d)`);
+  h.assert('bus', session.getWire(interp, 'bus'), '10');
+}, ZSTATE_WAVE);
+
+reg(1566, 'zstate', 'MUX Z in selected data OK', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+1wire sel = 0
+4wire d0 = ?Z01Z
+4wire d1 = ?XXXX
+4wire r = MUX(sel, d0, d1)`);
+  h.assert('r', session.getWire(interp, 'r'), 'Z01Z');
+}, ZSTATE_WAVE);
+
+reg(1567, 'zstate', 'MUX X in selected data — error', function(h, session) {
+  h.assertThrows('MUX X selected', function() {
+    session.run(`MODE ZSTATE
+1wire sel = 1
+4wire d0 = 0000
+4wire d1 = ?X111
+4wire r = MUX(sel, d0, d1)`);
+  }, 'X');
+}, ZSTATE_WAVE);
+
+reg(1568, 'zstate', 'MUX Z output merges on shared bus', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+4wire bus
+4wire fill = 1111
+1wire sel = 0
+4wire d0 = ?Z11Z
+4wire d1 = 0000
+bus = MUX(sel, d0, d1)
+bus = fill`);
+  h.assert('bus', session.getWire(interp, 'bus'), '1111');
+}, ZSTATE_WAVE);
+
 
   window.LogTScriptTestSuite = {
     tests,

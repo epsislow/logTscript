@@ -107,7 +107,7 @@ Result: `1X` (conflict on bit 1), not `11`.
 
 **Full documentation:** **[MODE ZSTATE — tristate wires and multi-driver buses](zstate.md)**
 
-Topics covered there: `get>=` / `out>=`, `ZRELEASE`, logic literals `?X` / `?Z`, timeline colours, errors on arithmetic with `X`/`Z`, and comparison with default binary mode.
+Topics covered there: `ZCONNECT`, `get>=` / `out>=`, `ZRELEASE`, logic literals `?X` / `?Z`, timeline colours, MUX with `Z`, errors on arithmetic with `X`/`Z`, and comparison with default binary mode.
 
 ---
 
