@@ -65,6 +65,19 @@ class SignalPropagationStrategy {
   commitPendingWires() {
     const interp = this.interp;
     if (interp && interp.zstate && interp.deferWirePropagation()) {
+      if (interp.hasZConnectWireAssignments && interp.hasZConnectWireAssignments()) {
+        const busTargets = interp.getZConnectTargetBuses();
+        for (const bus of busTargets) {
+          interp.wireContributionQueue.delete(bus);
+        }
+        const changed = new Set();
+        const changedFirst = interp.commitWireResolves();
+        for (const n of changedFirst) changed.add(n);
+        interp.refreshZConnectBuses();
+        const changedBus = interp.commitWireResolves();
+        for (const n of changedBus) changed.add(n);
+        return changed;
+      }
       return interp.commitWireResolves();
     }
     const changed = new Set();

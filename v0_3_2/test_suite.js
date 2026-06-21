@@ -11238,6 +11238,32 @@ bus = fill`);
   h.assert('bus', session.getWire(interp, 'bus'), '1111');
 }, ZSTATE_WAVE);
 
+reg(1569, 'zstate', 'ZCONNECT assignment form en=1 drives bus', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+8wire databus
+8wire cpuData = 10101010
+1wire cpuEn = 1
+databus = ZCONNECT(cpuEn, cpuData)`);
+  h.assert('bus', session.getWire(interp, 'databus'), '10101010');
+}, ZSTATE_WAVE);
+
+reg(1570, 'zstate', 'ZCONNECT key enables drive (wave)', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+comp [key] .cpuEn::
+8wire databus
+8wire cpuData = 10101010
+8wire ramData = 11001100
+1wire enCpu = .cpuEn:get
+1wire enRam = 0
+databus = ZCONNECT(enCpu, cpuData)
+databus = ZCONNECT(enRam, ramData)`);
+  h.assert('initial bus Z', session.getWire(interp, 'databus'), 'ZZZZZZZZ');
+  session.setComp(interp, '.cpuEn', '1');
+  h.assert('cpu drives after key', session.getWire(interp, 'databus'), '10101010');
+  session.setComp(interp, '.cpuEn', '0');
+  h.assert('bus Z after release', session.getWire(interp, 'databus'), 'ZZZZZZZZ');
+}, ZSTATE_WAVE);
+
 
   window.LogTScriptTestSuite = {
     tests,

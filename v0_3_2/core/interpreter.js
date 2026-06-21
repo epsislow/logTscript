@@ -1657,6 +1657,97 @@ class Interpreter {
     }
   }
 
+  assignmentExprIsZConnect(expr) {
+    if (!expr || expr.length !== 1 || !expr[0].call) return false;
+    const n = expr[0].call.name;
+    return n === 'ZCONNECT' || n === 'ZCONN';
+  }
+
+  getZConnectTargetBuses() {
+    const buses = new Set();
+    for (const ws of this.wireStatements) {
+      if (ws.assignment && this.assignmentExprIsZConnect(ws.assignment.expr)) {
+        buses.add(ws.assignment.target.var);
+      }
+    }
+    return buses;
+  }
+
+  hasZConnectWireAssignments() {
+    return this.getZConnectTargetBuses().size > 0;
+  }
+
+  getWireContributionAwareValue(wireName) {
+    const wire = this.wires.get(wireName);
+    if (!wire) return null;
+    const bits = this.getBitWidth(wire.type);
+    if (!bits) return null;
+    const q = this.zstate ? this.wireContributionQueue.get(wireName) : null;
+    if (q && q.length) {
+      const raw = q.length === 1
+        ? q[0]
+        : (typeof LogicValue !== 'undefined' && LogicValue.resolveWireVector
+          ? LogicValue.resolveWireVector(q, bits)
+          : q[q.length - 1]);
+      return this._fitWireContributionValue(raw, bits);
+    }
+    return this.getWireStableValue(wireName);
+  }
+
+  _evalCallArgValue(argExpr) {
+    if (argExpr && argExpr.length === 1) {
+      const atom = argExpr[0];
+      if (atom.var && !atom.var.startsWith('.') && atom.var !== '~' && atom.var !== '%' && atom.var !== '$') {
+        const v = this.getWireContributionAwareValue(atom.var);
+        if (v != null) return v;
+      }
+      if (atom.var && atom.var.startsWith('.')) {
+        const compName = atom.var.split(':')[0];
+        const comp = this.components.get(compName);
+        if (comp) {
+          const prop = atom.property || 'get';
+          const getAtom = { var: compName, property: prop };
+          const r = this.evalAtom(getAtom, false);
+          if (r && r.value != null) return r.value;
+        }
+      }
+    }
+    const r = this.evalExpr(argExpr, false);
+    let total = '';
+    for (const part of r) {
+      if (part.value !== undefined && part.value !== null && part.value !== '-') {
+        total += part.value;
+        continue;
+      }
+      if (part.ref && part.ref !== '&-') {
+        const val = this.getValueFromRef(part.ref);
+        if (val) total += val;
+      }
+    }
+    return total;
+  }
+
+  refreshZConnectBuses() {
+    if (!this.zstate || !this.hasZConnectWireAssignments()) return;
+    const busTargets = this.getZConnectTargetBuses();
+    for (const busName of busTargets) {
+      let anyDrive = false;
+      for (const ws of this.wireStatements) {
+        if (!ws.assignment || ws.assignment.target.var !== busName) continue;
+        const outputs = this.execWireStatement(ws, true);
+        for (const [name, val] of outputs) {
+          this.queueWireContribution(name, val);
+          anyDrive = true;
+        }
+      }
+      if (!anyDrive) {
+        const wire = this.wires.get(busName);
+        const bits = wire && this.getBitWidth(wire.type);
+        if (bits) this.queueWireContribution(busName, 'Z'.repeat(bits));
+      }
+    }
+  }
+
   reportRuntimeError(err) {
     const msg = (err && err.message) ? err.message : String(err);
     if (err && !err.scriptLoc && this.currentStmt && this.currentStmt.line) {
@@ -1714,30 +1805,6 @@ class Interpreter {
       this.writeWireStable(wireName, val);
       this.updateConnectedComponents(wireName, val);
     }
-  }
-
-  execZConnect(busName, enExpr, dataExpr) {
-    if (!this.zstate) {
-      throw Error('ZCONNECT() requires MODE ZSTATE');
-    }
-    const wire = this.wires.get(busName);
-    if (!wire) throw Error(`Unknown wire '${busName}' in ZCONNECT()`);
-    const bits = this.getBitWidth(wire.type);
-    if (!bits) throw Error(`ZCONNECT() target '${busName}' is not a wire`);
-
-    const enVal = this._evalExprToBitString(enExpr);
-    const enBit = enVal.length ? enVal.slice(-1) : '0';
-    if (enBit !== '1') return;
-
-    const dataVal = this._evalExprToBitString(dataExpr);
-    if (!dataVal.length) {
-      throw Error(`ZCONNECT() data expression is empty for bus '${busName}'`);
-    }
-    const fitted = this._fitWireContributionValue(dataVal, bits);
-    if (fitted.length !== bits) {
-      throw Error(`ZCONNECT() data width mismatch for bus '${busName}' (expected ${bits}, got ${dataVal.length})`);
-    }
-    this.queueWireContribution(busName, fitted);
   }
 
   scheduleWireChange(name, value) {
@@ -2746,6 +2813,29 @@ const idx = parseInt(
   call(fn, args, computeRefs = false) {
   const { name, alias } = fn;
   const fail = (msg, len) => this._throwRuntime(msg, fn, len != null ? len : name.length);
+
+  if (name === 'ZCONNECT' || name === 'ZCONN') {
+    if (!this.zstate) {
+      const err = new Error('ZCONNECT() requires MODE ZSTATE');
+      this.reportRuntimeError(err);
+      return { value: '', zConnectNoDrive: true, ref: null };
+    }
+    if (args.length !== 2) {
+      fail(`ZCONNECT expects 2 arguments (en, data), but got ${args.length}`);
+    }
+    const enVal = this._evalCallArgValue(args[0]);
+    const enBit = enVal.length ? enVal.slice(-1) : '0';
+    if (enBit !== '1') {
+      return { value: '', zConnectNoDrive: true, ref: null };
+    }
+    const dataVal = this._evalCallArgValue(args[1]);
+    if (!dataVal.length) {
+      fail('ZCONNECT() data expression is empty');
+    }
+    return computeRefs
+      ? { value: dataVal, ref: `&${this.storeValue(dataVal)}` }
+      : { value: dataVal, ref: null };
+  }
 
   const b = x => x === '1';
 
@@ -3866,11 +3956,6 @@ if (this.isBuiltinDEMUX(name)) {
       return;
     }
 
-    if (s.zConnect) {
-      this.runSafely(() => this.execZConnect(s.zConnect.bus, s.zConnect.en, s.zConnect.data));
-      return;
-    }
-
     if(s.comp){
       // Component declaration: comp [led] .power: ...
       // Inside a PCB body, skip re-declaration if the component already exists
@@ -4858,6 +4943,9 @@ if (s.assignment) {
 
   // Evaluate RHS
   const exprResult = this.evalExpr(expr, computeRefs);
+  if (isWire && !range && exprResult.some(part => part.zConnectNoDrive)) {
+    return;
+  }
   let rhs = '';
 
   for (const part of exprResult) {
@@ -5421,6 +5509,10 @@ if (s.assignment) {
       try {
         this.lowerUseExprInStatement(s, bits);
         const exprResult = this.evalExpr(s.assignment.expr, false);
+        if (exprResult.some(part => part.zConnectNoDrive)) {
+          this.currentStmt = prevStmt;
+          return outputs;
+        }
         let totalValue = '';
         for(const part of exprResult){
           if(part.value !== undefined && part.value !== null && part.value !== '-'){
@@ -10001,8 +10093,8 @@ Interpreter.BUILTIN_DOC = {
   LROTATE:  ['LROTATE(Xbit data, Ybit count) -> Xbit'],
   RROTATE:  ['RROTATE(Xbit data, Ybit count) -> Xbit'],
   ZRELEASE: ['ZRELEASE(wireName) — release wire to high-Z (MODE ZSTATE statement)'],
-  ZCONNECT: ['ZCONNECT(bus, en, data) — enable-gated bus drive (MODE ZSTATE); ZCONN alias'],
-  ZCONN: ['ZCONNECT(bus, en, data) — alias for ZCONNECT'],
+  ZCONNECT: ['ZCONNECT(en, data) — enable-gated drive value (MODE ZSTATE); bus = ZCONNECT(en, data)'],
+  ZCONN: ['ZCONNECT(en, data) — alias for ZCONNECT'],
 };
 
 Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions, boardInstNames, boardDefinitions, inlineInstances) {

@@ -12,7 +12,7 @@ See also: [signal propagation](signal-propagation.md), [assignment operators](as
 
 ## Quick start
 
-**Load & Run** — enable-gated databus with `ZCONNECT` (CPU drives, RAM off):
+**Load & Run** — enable-gated databus (`bus = ZCONNECT(en, data)`):
 
 ```logts-play wave
 MODE ZSTATE
@@ -23,14 +23,14 @@ MODE ZSTATE
 1wire cpuEn = 1
 1wire ramEn = 0
 
-ZCONNECT(databus, cpuEn, cpuData)
-ZCONNECT(databus, ramEn, ramData)
+databus = ZCONNECT(cpuEn, cpuData)
+databus = ZCONNECT(ramEn, ramData)
 show(databus)
 ```
 
 Result: `10101010`. With both enables `0`, `databus` stays `ZZZZZZZZ` (no contribution). With both `1` and different data → conflicting bits become `X`.
 
-Alias: `ZCONN(bus, en, data)` — same statement.
+**Statement sugar** (same semantics): `ZCONNECT(bus, en, data)` or `ZCONN(bus, en, data)` desugars to `bus = ZCONNECT(en, data)`.
 
 ---
 
@@ -97,9 +97,16 @@ Biții **`Z` într-o contribuție nu contează ca driver activ** — la merge, d
 
 `X` is **not sticky**. On the next step, if only one driver remains, the bit becomes `0` or `1` again.
 
-### `ZCONNECT(bus, en, data)` — enable-gated drive
+### `ZCONNECT(en, data)` — enable-gated drive
 
-Statement (not an expression). Requires `MODE ZSTATE` + wave.
+Expression used in wire assignment. Requires `MODE ZSTATE` + wave.
+
+```logts
+databus = ZCONNECT(cpuEn, cpuData)
+databus = ZCONNECT(ramEn, ramData)
+```
+
+Statement sugar (equivalent):
 
 ```logts
 ZCONNECT(databus, cpuEn, cpuData)
@@ -109,9 +116,9 @@ ZCONN(databus, ramEn, ramData)   // alias
 | `en` | Effect |
 |------|--------|
 | strict `1` | Queue `data` as a bus contribution (`Z` bits in `data` do not drive) |
-| `0`, `Z`, `X` | **No-op** — bus unchanged (no contribution) |
+| `0`, `Z`, `X` | **No-op** — no contribution from this assignment |
 
-`data` width must match `bus`. Not valid as `bus = ZCONNECT(…)` — use the statement form only.
+`data` width must match the target bus. Multiple `bus = ZCONNECT(…)` on the same wire are re-evaluated on each wave commit (after enable wires update).
 
 **Load & Run** — dual enable conflict:
 

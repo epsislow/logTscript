@@ -1008,7 +1008,9 @@
       {"id":1565,"group":"zstate","title":"ZCONN alias drives bus","detail":{"scripts":["MODE ZSTATE\n2wire bus\n2wire d = 10\n1wire en = 1\nZCONN(bus, en, d)"],"steps":[],"assertions":["bus"]}},
       {"id":1566,"group":"zstate","title":"MUX Z in selected data OK","detail":{"scripts":["MODE ZSTATE\n1wire sel = 0\n4wire d0 = ?Z01Z\n4wire d1 = ?XXXX\n4wire r = MUX(sel, d0, d1)"],"steps":[],"assertions":["r"]}},
       {"id":1567,"group":"zstate","title":"MUX X in selected data — error","detail":{"scripts":["MODE ZSTATE\n1wire sel = 1\n4wire d0 = 0000\n4wire d1 = ?X111\n4wire r = MUX(sel, d0, d1)"],"steps":[],"assertions":["MUX X selected"]}},
-      {"id":1568,"group":"zstate","title":"MUX Z output merges on shared bus","detail":{"scripts":["MODE ZSTATE\n4wire bus\n4wire fill = 1111\n1wire sel = 0\n4wire d0 = ?Z11Z\n4wire d1 = 0000\nbus = MUX(sel, d0, d1)\nbus = fill"],"steps":[],"assertions":["bus"]}}
+      {"id":1568,"group":"zstate","title":"MUX Z output merges on shared bus","detail":{"scripts":["MODE ZSTATE\n4wire bus\n4wire fill = 1111\n1wire sel = 0\n4wire d0 = ?Z11Z\n4wire d1 = 0000\nbus = MUX(sel, d0, d1)\nbus = fill"],"steps":[],"assertions":["bus"]}},
+      {"id":1569,"group":"zstate","title":"ZCONNECT assignment form en=1 drives bus","detail":{"scripts":["MODE ZSTATE\n8wire databus\n8wire cpuData = 10101010\n1wire cpuEn = 1\ndatabus = ZCONNECT(cpuEn, cpuData)"],"steps":[],"assertions":["bus"]}},
+      {"id":1570,"group":"zstate","title":"ZCONNECT key enables drive (wave)","detail":{"scripts":["MODE ZSTATE\ncomp [key] .cpuEn::\n8wire databus\n8wire cpuData = 10101010\n8wire ramData = 11001100\n1wire enCpu = .cpuEn:get\n1wire enRam = 0\ndatabus = ZCONNECT(enCpu, cpuData)\ndatabus = ZCONNECT(enRam, ramData)"],"steps":[],"assertions":["initial bus Z","cpu drives after key","bus Z after release"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1064,7 +1066,7 @@
       { id: 'slider', label: 'Slider component', rangeLabel: '1206–1220', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611] },
-      { id: 'zstate', label: 'zstate', rangeLabel: '1429–1503, 1536, 1559–1568', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503, 1536, 1559, 1560, 1561, 1562, 1563, 1564, 1565, 1566, 1567, 1568] }
+      { id: 'zstate', label: 'zstate', rangeLabel: '1429–1503, 1536, 1559–1570', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503, 1536, 1559, 1560, 1561, 1562, 1563, 1564, 1565, 1566, 1567, 1568, 1569, 1570] }
     ]
   };
 })();

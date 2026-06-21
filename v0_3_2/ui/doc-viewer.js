@@ -20,7 +20,7 @@ const DOC_SECTIONS = [
       { file: 'arithmetic.md', label: 'Arithmetic (built-in)' },
       { file: 'debug.md', label: 'Debug (show / peek / probe / lutOf)', searchExtra: 'show peek probe lutOf exprOfLut truthTableOf output panel' },
       { file: 'signal-propagation.md', label: 'Signal propagation' },
-      { file: 'zstate.md', label: 'MODE ZSTATE (tristate / multi-driver)', searchExtra: 'Z X high impedance bus buffer tristate conflict get>= out>= ZRELEASE() ZCONNECT ZCONN' },
+      { file: 'zstate.md', label: 'MODE ZSTATE (tristate / multi-driver)', searchExtra: 'Z X high impedance bus buffer tristate conflict get>= out>= ZRELEASE()' },
       { file: 'editorUI.md', label: 'Editor UI' }
     ],
   },

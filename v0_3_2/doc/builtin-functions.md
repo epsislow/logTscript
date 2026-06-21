@@ -22,7 +22,7 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 | **Bit selection** | `HIGH`, `LOW`, `ANY`, `ZERO`, `BITINDEX`, `ONEHOT` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | `PARITY`, `CNTONE`, `CNTZERO`, `BITSIZE` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | `LSHIFT`, `RSHIFT`, `REVERSE`, `LROTATE`, `RROTATE` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
-| **Tristate (ZSTATE)** | `ZRELEASE(wire)`, `ZCONNECT(bus, en, data)` | [zstate.md](zstate.md) |
+| **Tristate (ZSTATE)** | `ZRELEASE(wire)`, `bus = ZCONNECT(en, data)` | [zstate.md](zstate.md) |
 
 > **Adding new built-ins:** extend `Interpreter.BUILTIN_DOC` in `core/interpreter.js`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.
 
@@ -39,9 +39,9 @@ show(en)
 
 See **[zstate.md](zstate.md)** for multi-driver buses, `ZCONNECT`, conflict `X`, and IEEE logic gates.
 
-### `ZCONNECT(bus, en, data)` — enable-gated bus drive
+### `ZCONNECT(en, data)` — enable-gated bus drive
 
-Statement only (alias **`ZCONN`**). Requires `MODE ZSTATE` + wave. When `en` is strict `1`, queues `data` onto `bus`; when `en` is `0`/`Z`/`X`, no-op. Not valid as `bus = ZCONNECT(…)`.
+Wire assignment expression (alias **`ZCONN`**). Requires `MODE ZSTATE` + wave. When `en` is strict `1`, queues `data` onto the target bus; when `en` is `0`/`Z`/`X`, no contribution. Statement `ZCONNECT(bus, en, data)` is sugar for `bus = ZCONNECT(en, data)`.
 
 ```logts-play wave
 MODE ZSTATE
@@ -50,7 +50,7 @@ MODE ZSTATE
 8wire cpuData = 10101010
 1wire cpuEn = 1
 
-ZCONNECT(databus, cpuEn, cpuData)
+databus = ZCONNECT(cpuEn, cpuData)
 show(databus)
 ```
 

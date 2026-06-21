@@ -796,6 +796,14 @@ parseBoardInstance() {
       if (handler) return this[handler]();
     }
 
+    if (this.c.type === 'ID' && (this.c.value === 'ZCONNECT' || this.c.value === 'ZCONN')) {
+      let i = this.t.i;
+      while (i < this.t.src.length && /\s/.test(this.t.src[i])) i++;
+      if (i < this.t.src.length && this.t.src[i] === '(') {
+        return this.zConnect();
+      }
+    }
+
     if (this.c.type === 'GREF') {
       return this.assignment();
     }
@@ -1562,13 +1570,14 @@ assignment() {
   }
 
   zConnect(){
-    if (this.c.value !== 'ZCONNECT' && this.c.value !== 'ZCONN') {
+    const fnName = this.c.value;
+    if (fnName !== 'ZCONNECT' && fnName !== 'ZCONN') {
       throw Error(`Expected ZCONNECT or ZCONN at ${this.c.line}:${this.c.col}`);
     }
-    this.eat('KEYWORD');
+    this.eat('ID');
     this.eat('SYM', '(');
     if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
-      throw Error(`Expected bus wire name in ZCONNECT() at ${this.c.line}:${this.c.col}`);
+      throw Error(`Expected bus wire name in ${fnName}() at ${this.c.line}:${this.c.col}`);
     }
     const busName = this.c.value;
     this.eat(this.c.type);
@@ -1577,7 +1586,12 @@ assignment() {
     this.eat('SYM', ',');
     const dataExpr = this.expr();
     this.eat('SYM', ')');
-    return { zConnect: { bus: busName, en: enExpr, data: dataExpr } };
+    return {
+      assignment: {
+        target: { var: busName },
+        expr: [{ call: { name: 'ZCONNECT', alias: null }, args: [enExpr, dataExpr] }]
+      }
+    };
   }
 
   parseComp() {
@@ -3573,8 +3587,6 @@ Parser.KEYWORD_HANDLERS = {
   TEST: 'test',
   MODE: 'mode',
   ZRELEASE: 'zRelease',
-  ZCONNECT: 'zConnect',
-  ZCONN: 'zConnect',
   comp: 'parseComp',
   pcb: 'parsePcbInstance',
   chip: 'parseChipInstance',
