@@ -255,6 +255,70 @@ function validateLogicLiteral(s, width, contextName) {
   return v;
 }
 
+const BIT_PREDICATE_ALIASES = {
+  ANY10: 'ANY01',
+  ANYZ: 'ANYZX',
+  ALL10: 'ALL01',
+  ALLXZ: 'ALLZX',
+};
+
+const BIT_PREDICATE_TESTS = {
+  Z: (b) => b === 'Z',
+  X: (b) => b === 'X',
+  '1': (b) => b === '1',
+  '0': (b) => b === '0',
+  '01': (b) => b === '0' || b === '1',
+  ZX: (b) => b === 'Z' || b === 'X',
+};
+
+const BIT_PREDICATE_CANONICAL = [
+  'ANYX', 'ANY1', 'ANY0', 'ANY01', 'ANYZX',
+  'ALLZ', 'ALLX', 'ALL1', 'ALL0', 'ALL01', 'ALLZX',
+];
+
+const BIT_PREDICATE_DOC_NAMES = new Set([
+  ...BIT_PREDICATE_CANONICAL,
+  ...Object.keys(BIT_PREDICATE_ALIASES),
+]);
+
+function resolveBitPredicateName(name) {
+  return BIT_PREDICATE_ALIASES[name] || name;
+}
+
+function isBitPredicateBuiltin(name) {
+  const resolved = resolveBitPredicateName(name);
+  return /^(ANY|ALL)(Z|X|1|0|01|ZX)$/.test(resolved);
+}
+
+function evalBitPredicate(name, valueStr) {
+  const resolved = resolveBitPredicateName(name);
+  const m = /^(ANY|ALL)(Z|X|1|0|01|ZX)$/.exec(resolved);
+  if (!m) return null;
+  const mode = m[1];
+  const test = BIT_PREDICATE_TESTS[m[2]];
+  const bits = String(valueStr || '').split('');
+  if (!bits.length) return mode === 'ALL' ? '1' : '0';
+  if (mode === 'ANY') {
+    for (const b of bits) if (test(b)) return '1';
+    return '0';
+  }
+  for (const b of bits) if (!test(b)) return '0';
+  return '1';
+}
+
+function buildBitPredicateBuiltinDoc() {
+  const doc = {};
+  const sig = (n) => `${n}(Xbit) -> 1bit`;
+  for (const name of BIT_PREDICATE_CANONICAL) {
+    doc[name] = [sig(name)];
+  }
+  doc.ANY10 = [`${sig('ANY10')} (alias ANY01)`];
+  doc.ANYZ = [`${sig('ANYZ')} (alias ANYZX)`];
+  doc.ALL10 = [`${sig('ALL10')} (alias ALL01)`];
+  doc.ALLXZ = [`${sig('ALLXZ')} (alias ALLZX)`];
+  return doc;
+}
+
 const LogicValue = {
   isLogicChar,
   stringHasLogicXZ,
@@ -274,6 +338,10 @@ const LogicValue = {
   evalLogicGateVector,
   evalLogicGateCall,
   validateLogicLiteral,
+  BIT_PREDICATE_DOC_NAMES,
+  isBitPredicateBuiltin,
+  evalBitPredicate,
+  buildBitPredicateBuiltinDoc,
 };
 
 if (typeof module !== 'undefined' && module.exports) {

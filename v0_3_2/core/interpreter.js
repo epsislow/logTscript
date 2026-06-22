@@ -2288,6 +2288,10 @@ class Interpreter {
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE'].includes(name)) {
       return true;
     }
+
+    if (typeof LogicValue !== 'undefined' && LogicValue.isBitPredicateBuiltin(name)) {
+      return true;
+    }
   
   return this.isBuiltinREG(name) 
     || this.isBuiltinMUX(name) 
@@ -3544,6 +3548,14 @@ if (this.isBuiltinDEMUX(name)) {
     let any = bits[0] === '1';
     for (let i = 1; i < bits.length; i++) any = any || bits[i] === '1';
     const v = any ? '0' : '1';
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (typeof LogicValue !== 'undefined' && LogicValue.isBitPredicateBuiltin(name)) {
+    if (argValues.length !== 1) fail(`${name} expects 1 argument`);
+    const v = LogicValue.evalBitPredicate(name, argValues[0]);
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -10217,15 +10229,33 @@ Interpreter.BUILTIN_DOC = {
   ZCONN: ['ZCONNECT(en, data) — alias for ZCONNECT'],
 };
 
+if (typeof LogicValue !== 'undefined' && LogicValue.buildBitPredicateBuiltinDoc) {
+  Object.assign(Interpreter.BUILTIN_DOC, LogicValue.buildBitPredicateBuiltinDoc());
+}
+
 Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions, boardInstNames, boardDefinitions, inlineInstances) {
   // ---- doc(def) — list all built-in functions and user-defined functions ----
   if (name === 'def') {
-    const builtinNames = Object.keys(Interpreter.BUILTIN_DOC);
+    const bitPredExclude = (typeof LogicValue !== 'undefined' && LogicValue.BIT_PREDICATE_DOC_NAMES)
+      ? LogicValue.BIT_PREDICATE_DOC_NAMES
+      : new Set();
+    const builtinNames = [];
+    for (const n of Object.keys(Interpreter.BUILTIN_DOC)) {
+      if (bitPredExclude.has(n)) continue;
+      builtinNames.push(n);
+      if (n === 'ZERO') {
+        builtinNames.push('ANY*, ALL*');
+      }
+    }
     const lines = ['built-in:'];
     
     for (let i = 0; i < builtinNames.length; i += 4) {
       chunk = builtinNames.slice(i, i + 4);
       lines.push(chunk.join(', '));
+    }
+
+    if (builtinNames.includes('ANY*, ALL*')) {
+      lines.push('(* = 0/1/01/10/Z/X/ZX/XZ)');
     }
 
     lines.push('');

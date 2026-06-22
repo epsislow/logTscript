@@ -2441,6 +2441,47 @@ show(empty)
 
 ---
 
+## ANY* and ALL* (ZSTATE-aware bit predicates)
+
+Test whether **any** (\`ANY*\`) or **all** (\`ALL*\`) bits in a value match a given logic state. Accepts \`wire\`, literal, or bit-range (\`wire.i-j\`). Works in normal binary mode and in \`MODE ZSTATE\` (with \`Z\` / \`X\`).
+
+| Function | True (\`1\`) when |
+|----------|-----------------|
+| \`ANYZ\` / \`ANYZX\` | at least one bit is \`Z\` or \`X\` (\`ANYZ\` is alias for \`ANYZX\`) |
+| \`ANYX\` | at least one bit is \`X\` |
+| \`ANY1\` | at least one bit is \`1\` |
+| \`ANY0\` | at least one bit is \`0\` |
+| \`ANY01\` / \`ANY10\` | at least one bit is \`0\` or \`1\` |
+| \`ALLZ\` | every bit is \`Z\` |
+| \`ALLX\` | every bit is \`X\` |
+| \`ALL1\` | every bit is \`1\` |
+| \`ALL0\` | every bit is \`0\` |
+| \`ALL01\` / \`ALL10\` | every bit is \`0\` or \`1\` |
+| \`ALLZX\` / \`ALLXZ\` | every bit is \`Z\` or \`X\` |
+
+\`\`\`
+ANYZ(Xbit) -> 1bit     # alias ANYZX
+ANYZX(Xbit) -> 1bit
+ALLZX(Xbit) -> 1bit    # alias ALLXZ
+\`\`\`
+
+Empty input: \`ANY* → 0\`, \`ALL* → 1\` (vacuous).
+
+### Runnable example (ZSTATE)
+
+\`\`\`logts-play
+MODE ZSTATE
+4wire bus = ?ZZ10
+1wire hasZ = ANYZX(bus)
+1wire allHighZ = ALLZ(bus.0-1)
+probe(hasZ)
+probe(allHighZ)
+\`\`\`
+
+\`doc(def)\` lists \`ANY*, ALL*\` on the built-in line and \`(* = 0/1/01/10/Z/X/ZX/XZ)\` on the next. Per-function signatures: \`doc(ANY0)\`, \`doc(ALLZX)\`, etc.
+
+---
+
 ## BITINDEX
 
 Returns the index of the active bit (LSB = bit \`0\`). Input is **typically** one-hot; when zero or multiple bits are set, \`isInvalid = 1\` and \`index\` is all zeros.
@@ -2681,7 +2722,7 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
 | **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\` | [arithmetic.md](arithmetic.md) |
-| **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
+| **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
 | **Tristate (ZSTATE)** | \`ZRELEASE(wire)\`, \`bus = ZCONNECT(en, data)\` | [zstate.md](zstate.md) |
@@ -5178,6 +5219,8 @@ Full behaviour, short notation (\`<\`, \`>\`), and examples: [builtin-bit-transf
 | \`doc(LOW)\` | \`LOW(Xbit) -> Xbit\` |
 | \`doc(ANY)\` | \`ANY(Xbit) -> 1bit\` |
 | \`doc(ZERO)\` | \`ZERO(Xbit) -> 1bit\` |
+| \`doc(ANY0)\` | \`ANY0(Xbit) -> 1bit\` |
+| \`doc(ALLZX)\` | \`ALLZX(Xbit) -> 1bit\` |
 | \`doc(BITINDEX)\` | \`BITINDEX(Xbit) -> Ybit index, 1bit isInvalid\` |
 | \`doc(ONEHOT)\` | \`ONEHOT(Xbit index) -> 2^X bits\` |
 

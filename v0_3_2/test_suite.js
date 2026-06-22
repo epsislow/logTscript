@@ -2350,6 +2350,9 @@ reg(332, 'doc', 'doc(def) — lists built-in and user-defined separately', funct
   h.assert('built-in list contains NOT', String(builtinBlock.includes('NOT')), 'true');
   h.assert('built-in list contains AND', String(builtinBlock.includes('AND')), 'true');
   h.assert('built-in list contains REG', String(builtinBlock.includes('REG')), 'true');
+  h.assert('built-in list contains ANY* family', String(builtinBlock.includes('ANY*, ALL*')), 'true');
+  h.assert('ANY* footnote line', String(lines.includes('(* = 0/1/01/10/Z/X/ZX/XZ)')), 'true');
+  h.assert('built-in list omits ANYZ detail', String(!/\bANYZ\b/.test(builtinBlock)), 'true');
   h.assert('built-in list does not list REG<N> pattern', String(!/\bREG\d+\b/.test(builtinBlock)), 'true');
   const userLabelIdx = lines.indexOf('user defined:');
   h.assert('user defined: label present', lines[userLabelIdx], 'user defined:');
@@ -11555,6 +11558,66 @@ reg(1587, 'zstate', 'Zlist requires MODE ZSTATE', function(h, session) {
   const { out } = session.run('4wire bus\nZlist(bus)');
   h.assert('err', String(out.some(l => l.includes('Zlist() requires MODE ZSTATE'))), 'true');
 }, ZSTATE_WAVE);
+
+reg(1588, 'bit-selection', 'ANYZX / ALLZ — ZSTATE literals', function(h, session) {
+  const { interp } = session.run(
+    'MODE ZSTATE\n4wire bus = ?ZZ10\n1wire az = ANYZX(bus)\n1wire alz = ALLZ(bus.0-1)'
+  );
+  h.assert('ANYZX(bus)', session.getWire(interp, 'az'), '1');
+  h.assert('ALLZ(bus.0-1)', session.getWire(interp, 'alz'), '1');
+}, ZSTATE_WAVE);
+
+reg(1589, 'bit-selection', 'ANY1 ALL1 ANY0 ALL0 — binary', function(h, session) {
+  const { interp } = session.run(
+    '4wire v = 1010\n' +
+    '1wire a1 = ANY1(v)\n1wire l1 = ALL1(v)\n' +
+    '1wire a0 = ANY0(v)\n1wire l0 = ALL0(v)'
+  );
+  h.assert('ANY1', session.getWire(interp, 'a1'), '1');
+  h.assert('ALL1', session.getWire(interp, 'l1'), '0');
+  h.assert('ANY0', session.getWire(interp, 'a0'), '1');
+  h.assert('ALL0', session.getWire(interp, 'l0'), '0');
+});
+
+reg(1590, 'bit-selection', 'ANY01 ALL01 — binary only bits', function(h, session) {
+  const { interp } = session.run(
+    'MODE ZSTATE\n4wire v = ?101Z\n' +
+    '1wire a01 = ANY01(v)\n1wire l01 = ALL01(v)'
+  );
+  h.assert('ANY01', session.getWire(interp, 'a01'), '1');
+  h.assert('ALL01', session.getWire(interp, 'l01'), '0');
+}, ZSTATE_WAVE);
+
+reg(1591, 'bit-selection', 'ANYX ALLX ALLZX — X and Z/X', function(h, session) {
+  const { interp } = session.run(
+    'MODE ZSTATE\n4wire v = ?X0Z1\n' +
+    '1wire ax = ANYX(v)\n1wire lx = ALLX(v)\n1wire azx = ALLZX(v)'
+  );
+  h.assert('ANYX', session.getWire(interp, 'ax'), '1');
+  h.assert('ALLX', session.getWire(interp, 'lx'), '0');
+  h.assert('ALLZX', session.getWire(interp, 'azx'), '0');
+}, ZSTATE_WAVE);
+
+reg(1592, 'bit-selection', 'ANY10 ANYZ ALL10 ALLXZ — aliases', function(h, session) {
+  const { interp } = session.run(
+    'MODE ZSTATE\n4wire v = ?10ZX\n' +
+    '1wire a10 = ANY10(v)\n1wire az = ANYZ(v)\n' +
+    '1wire l10 = ALL10(v)\n1wire lxz = ALLXZ(v)'
+  );
+  h.assert('ANY10=ANY01', session.getWire(interp, 'a10'), '1');
+  h.assert('ANYZ=ANYZX', session.getWire(interp, 'az'), '1');
+  h.assert('ALL10=ALL01', session.getWire(interp, 'l10'), '0');
+  h.assert('ALLXZ=ALLZX', session.getWire(interp, 'lxz'), '0');
+}, ZSTATE_WAVE);
+
+reg(1593, 'doc', 'doc(ANY0) and doc(ALLZX)', function(h, session) {
+  const out0 = session.runDoc('doc(ANY0)');
+  h.assert('ANY0 sig', out0[0], 'ANY0(Xbit) -> 1bit');
+  const outZ = session.runDoc('doc(ALLZX)');
+  h.assert('ALLZX sig', outZ[0], 'ALLZX(Xbit) -> 1bit');
+  const outAlias = session.runDoc('doc(ALLXZ)');
+  h.assert('ALLXZ alias', outAlias[0], 'ALLXZ(Xbit) -> 1bit (alias ALLZX)');
+});
 
 
   window.LogTScriptTestSuite = {

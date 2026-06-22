@@ -85,6 +85,8 @@ Full behaviour, short notation (`<`, `>`), and examples: [builtin-bit-transform-
 | `doc(LOW)` | `LOW(Xbit) -> Xbit` |
 | `doc(ANY)` | `ANY(Xbit) -> 1bit` |
 | `doc(ZERO)` | `ZERO(Xbit) -> 1bit` |
+| `doc(ANY0)` | `ANY0(Xbit) -> 1bit` |
+| `doc(ALLZX)` | `ALLZX(Xbit) -> 1bit` |
 | `doc(BITINDEX)` | `BITINDEX(Xbit) -> Ybit index, 1bit isInvalid` |
 | `doc(ONEHOT)` | `ONEHOT(Xbit index) -> 2^X bits` |
 
