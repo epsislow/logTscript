@@ -125,8 +125,8 @@ ZCONN(databus, ramEn, ramData)   // alias
 Assignment shorthand (tests **1575**–**1577**):
 
 ```logts
-databus = cpuData w1 cpuEn    @ same as databus = ZCONNECT(cpuEn, cpuData)
-bus = d w0 en                 @ drive when en is strict 0 (not NOT(en))
+databus = cpuData w1 cpuEn    # same as databus = ZCONNECT(cpuEn, cpuData)
+bus = d w0 en                 # drive when en is strict 0 (not NOT(en))
 ```
 
 | Suffix | Drive when |
@@ -296,7 +296,7 @@ Message pattern: `Cannot use wire with Z in ADD` or `Cannot use wire with X in M
 | Output | ZSTATE behaviour |
 |--------|------------------|
 | `show` / Variables panel | Literal `Z` and `X` in strings |
-| `probe` (shared bus) | Suffix ` — drove:` / ` — conflict:` on each commit — see [debug.md](debug.md#zlist-mode-zstate) |
+| `probe` (shared bus) | Suffix ` — driver:` / ` — conflict:` on each commit — see [debug.md](debug.md#zlist-mode-zstate) |
 | `Zlist` | Full driver inventory at **RUN** (`->` / `-> (active)` + `(resolved) =`) |
 | `watch` | `Z` → grey level; `X` → red (conflict) |
 | LEDs / 7-seg | `Z` and `X` treated as off |

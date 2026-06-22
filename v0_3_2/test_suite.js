@@ -11529,7 +11529,7 @@ on: 1
   set = 1 }
 probe(bus)`);
   session.setComp(interp, '.s1', '1');
-  h.assert('drove', String(out.some(l => l.includes('# bus =') && l.includes('drove:'))), 'true');
+  h.assert('driver', String(out.some(l => l.includes('# bus =') && l.includes('driver:'))), 'true');
 }, ZSTATE_WAVE);
 
 reg(1585, 'zstate', 'probe bus conflict suffix', function(h, session) {
@@ -11548,7 +11548,7 @@ reg(1586, 'zstate', 'probe single wire no driver suffix', function(h, session) {
   session.setWire(interp, 'a', '1');
   const line = out.find(l => l.includes('# a = 1') && l.includes('changed'));
   h.assert('changed line', String(!!line), 'true');
-  h.assert('no drove', String(line && !line.includes('drove:') && !line.includes('conflict:')), 'true');
+  h.assert('no driver', String(line && !line.includes('driver:') && !line.includes('conflict:')), 'true');
 }, ZSTATE_WAVE);
 
 reg(1587, 'zstate', 'Zlist requires MODE ZSTATE', function(h, session) {

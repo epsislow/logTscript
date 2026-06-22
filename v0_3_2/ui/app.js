@@ -111,6 +111,21 @@ function clearOutput() {
   if (el) el.innerHTML = '';
 }
 
+function scrollOutputToBottom(preservePage) {
+  const el = document.getElementById('out');
+  if (!el) return;
+  const pageX = preservePage ? preservePage.x : (window.scrollX || 0);
+  const pageY = preservePage ? preservePage.y : (window.scrollY || 0);
+  const apply = () => {
+    el.scrollTop = el.scrollHeight;
+    window.scrollTo(pageX, pageY);
+  };
+  apply();
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(apply);
+  }
+}
+
 function appendOutputLine(text, className) {
   const el = document.getElementById('out');
   if (!el) return null;
@@ -187,6 +202,7 @@ function appendErrorOutput(err, processedSource) {
     appendOutputLine(display.sourceLine, 'output-line--source');
     appendOutputLine(display.caretLine, 'output-line--caret');
   }
+  scrollOutputToBottom();
   applyErrorEditorHighlight(display);
 }
 
@@ -538,6 +554,7 @@ function sendCmd(){
 })();
 
 function render(lines, blocks) {
+  const preservePage = { x: window.scrollX || 0, y: window.scrollY || 0 };
   clearOutput();
   if (!lines || !lines.length) return;
   if (blocks == null && globalInterp) blocks = globalInterp.outBlocks || [];
@@ -575,6 +592,7 @@ function render(lines, blocks) {
     }
     i++;
   }
+  scrollOutputToBottom(preservePage);
 }
 
 function serializeArray(arr) {

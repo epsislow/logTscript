@@ -3888,7 +3888,7 @@ bus (4bit) = 10X0
 |------|-----------------|
 | \`show\` | Full string with \`Z\` and \`X\` |
 | \`peek\` / \`probe\` | Same; every commit logged |
-| \`probe\` (shared bus) | In **ZSTATE**, when the wire has multiple or enable-gated drivers, each line adds a suffix: \` — drove: …\`, \` — conflict: …\`, or \` — no active drivers\` |
+| \`probe\` (shared bus) | In **ZSTATE**, when the wire has multiple or enable-gated drivers, each line adds a suffix: \` — driver: …\`, \` — conflict: …\`, or \` — no active drivers\` |
 | \`Zlist\` | Lists every registered contributor; \`(resolved) =\` shows merged value |
 | \`watch\` (Timeline) | \`Z\` → grey bar; \`X\` → red bar (conflict) |
 
@@ -3962,11 +3962,11 @@ comp [switch] .s1:
 .s1:{ get >= bus w1 .s1
   set = 1 }
 
-probe(bus)
-Zlist(bus)
+probe(bus)   # live — logs each commit (toggle in panel)
+Zlist(bus)   # snapshot — full driver list at RUN only
 \`\`\`
 
-After **RUN**, toggle \`.s1\` in the panel — **\`probe\`** logs each change with \` — drove: .s1:get w1 .s1\`. Press **RUN** again to refresh **\`Zlist\`**.
+After **RUN**, toggle \`.s1\` in the panel — **\`probe\`** logs each change with \` — driver: .s1:get w1 .s1\`. Press **RUN** again to refresh **\`Zlist\`**.
 
 ---
 
@@ -4095,6 +4095,18 @@ probe(expr)
 | Computed component | \`probe(.div:mod)\`, \`probe(.add:carry)\` |
 | Storage reference | \`probe(&1)\` |
 | Bit / slice | \`probe(&1.0)\`, \`probe(&1.2-4)\` |
+
+### MODE ZSTATE — driver suffix (shared bus)
+
+On wires with multiple or enable-gated contributors, each commit appends a suffix after the reason:
+
+\`\`\`text
+# bus = 10 (&0) - changed — driver: .s1:get w1 .s1
+# bus = X0 (&0) - changed — conflict: bus = a, bus = b
+# bus = ZZ (&0) - changed — no active drivers
+\`\`\`
+
+Single-driver wires (no \`w1\` / \`ZCONNECT\` / redirects) keep the classic \`# name = value - changed\` line. For a full driver list at **RUN**, use [\`Zlist\`](#zlist-mode-zstate).
 
 ### Syntax \`:\` vs \`.\` (chip / PCB / component)
 
@@ -14554,8 +14566,8 @@ ZCONN(databus, ramEn, ramData)   // alias
 Assignment shorthand (tests **1575**–**1577**):
 
 \`\`\`logts
-databus = cpuData w1 cpuEn    @ same as databus = ZCONNECT(cpuEn, cpuData)
-bus = d w0 en                 @ drive when en is strict 0 (not NOT(en))
+databus = cpuData w1 cpuEn    # same as databus = ZCONNECT(cpuEn, cpuData)
+bus = d w0 en                 # drive when en is strict 0 (not NOT(en))
 \`\`\`
 
 | Suffix | Drive when |
@@ -14725,7 +14737,7 @@ Message pattern: \`Cannot use wire with Z in ADD\` or \`Cannot use wire with X i
 | Output | ZSTATE behaviour |
 |--------|------------------|
 | \`show\` / Variables panel | Literal \`Z\` and \`X\` in strings |
-| \`probe\` (shared bus) | Suffix \` — drove:\` / \` — conflict:\` on each commit — see [debug.md](debug.md#zlist-mode-zstate) |
+| \`probe\` (shared bus) | Suffix \` — driver:\` / \` — conflict:\` on each commit — see [debug.md](debug.md#zlist-mode-zstate) |
 | \`Zlist\` | Full driver inventory at **RUN** (\`->\` / \`-> (active)\` + \`(resolved) =\`) |
 | \`watch\` | \`Z\` → grey level; \`X\` → red (conflict) |
 | LEDs / 7-seg | \`Z\` and \`X\` treated as off |

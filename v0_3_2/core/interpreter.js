@@ -2025,14 +2025,14 @@ class Interpreter {
         suffix = ` — conflict: ${active.map(d => d.label).join(', ')}`;
       } else if (prevMap) {
         const changed = active.filter(d => prevMap.get(d.id) !== d.value);
-        if (changed.length === 1) suffix = ` — drove: ${changed[0].label}`;
+        if (changed.length === 1) suffix = ` — driver: ${changed[0].label}`;
         else if (changed.length > 1) suffix = ` — conflict: ${changed.map(d => d.label).join(', ')}`;
-        else suffix = ` — drove: ${active[0].label}`;
+        else suffix = ` — driver: ${active[0].label}`;
       } else {
-        suffix = ` — drove: ${active[0].label}`;
+        suffix = ` — driver: ${active[0].label}`;
       }
     } else {
-      suffix = ` — drove: ${active[0].label}`;
+      suffix = ` — driver: ${active[0].label}`;
     }
 
     const snap = new Map();
