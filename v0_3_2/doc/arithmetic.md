@@ -232,6 +232,8 @@ These built-in functions are **combinational** — they produce their result imm
 Use the **built-in functions** when you need a quick one-off calculation.
 Use the **components** when you need a named, persistent device with pins that other parts of the circuit can wire to (e.g. in a PCB definition).
 
+For **decimal digit packing** (display, terminals, calculators), see [decimal-conversion.md](decimal-conversion.md) (`CNTN10S`, `N2N10S`, `N10S2N`).
+
 ---
 
 ## doc() support

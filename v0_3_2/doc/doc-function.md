@@ -221,6 +221,33 @@ The bit width of both inputs is taken as `max(len(a), len(b))`. The result is al
 - `mod` = remainder (`a % b`)
 - Division by zero returns `0` for both outputs
 
+### Decimal conversion (CNTN10S / N2N10S / N10S2N)
+
+Unsigned binary ↔ packed decimal digits (4 bits per digit). Full reference: [decimal-conversion.md](decimal-conversion.md).
+
+```
+doc(CNTN10S)
+doc(N2N10S)
+doc(N10S2N)
+```
+
+| Call | Signature |
+|------|-----------|
+| `doc(CNTN10S)` | `CNTN10S(Xbit value) -> Ybit` |
+| `doc(N2N10S)` | `N2N10S(Xbit value) -> Zbit packed` |
+| `doc(N10S2N)` | `N10S2N(Xbit packed) -> Wbit value` |
+
+```
+8wire n = 11110101
+2wire cnt = CNTN10S(n)
+12wire num10s = N2N10S(n)
+8wire back := N10S2N(num10s)
+```
+
+- `CNTN10S(0)` → `1` digit
+- `N2N10S` output width = `maxCifre × 4` (from input width)
+- `N10S2N` returns minimal-width binary; invalid nibble (>9) is an error
+
 #### ADD examples
 
 ```

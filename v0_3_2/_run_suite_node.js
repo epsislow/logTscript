@@ -98,7 +98,9 @@ function createHarness() {
     },
     fail() { assertions.push({ name: 'fail', pass: false }); },
     setUnexpected(e) { unexpected = e; },
-    ok() { return !unexpected && assertions.every(a => a.pass); }
+    getUnexpected() { return unexpected; },
+    ok() { return !unexpected && assertions.every(a => a.pass); },
+    getAssertions() { return assertions; }
   };
 }
 
@@ -118,6 +120,13 @@ for (const test of suite.tests) {
   else {
     failed++;
     failures.push(test.id + ': ' + test.title);
+    if (test.id === 1609) {
+      const err = h.getUnexpected();
+      if (err) console.log('  1609 THROW', err.message);
+      for (const a of h.getAssertions()) {
+        if (!a.pass) console.log('  1609', a.name);
+      }
+    }
   }
 }
 

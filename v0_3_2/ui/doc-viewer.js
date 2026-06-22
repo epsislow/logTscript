@@ -18,6 +18,7 @@ const DOC_SECTIONS = [
       { file: 'assignment-operators.md', label: 'Assignment operators (=, =:, :=)', searchExtra: 'right pad left pad wire assignment initial' },
       { file: 'modes.md', label: 'Script modes (MODE)', searchExtra: 'MODE STRICT WIREWRITE ZSTATE default wirewrite tristate' },
       { file: 'arithmetic.md', label: 'Arithmetic (built-in)' },
+      { file: 'decimal-conversion.md', label: 'Decimal conversion (CNTN10S, N2N10S, N10S2N)', searchExtra: 'decimal BCD digits packed N2N10S N10S2N CNTN10S' },
       { file: 'debug.md', label: 'Debug (show / peek / probe / lutOf)', searchExtra: 'show peek probe lutOf exprOfLut truthTableOf output panel' },
       { file: 'signal-propagation.md', label: 'Signal propagation' },
       { file: 'zstate.md', label: 'MODE ZSTATE (tristate / multi-driver)', searchExtra: 'Z X high impedance bus buffer tristate conflict get>= out>= ZRELEASE()' },

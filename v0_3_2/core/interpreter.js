@@ -49,6 +49,58 @@ function binPadInt(n, width) {
   return n.toString(2).padStart(width, '0');
 }
 
+function unsignedBinToBigInt(binStr) {
+  const s = binStr == null ? '' : String(binStr);
+  if (!s.length) return BigInt(0);
+  return BigInt('0b' + s);
+}
+
+/** Max decimal digits representable in an unsigned wire of bitLen bits. */
+function maxDecimalDigitsForBitWidth(bitLen) {
+  if (bitLen <= 0) return 1;
+  const maxVal = (BigInt(1) << BigInt(bitLen)) - BigInt(1);
+  return maxVal.toString(10).length;
+}
+
+function decimalDigitCountBigInt(n) {
+  if (n === 0n) return 1;
+  return n.toString(10).length;
+}
+
+function n2n10sPacked(binStr) {
+  const len = binStr.length;
+  const n = unsignedBinToBigInt(binStr);
+  const maxDigits = maxDecimalDigitsForBitWidth(len);
+  const decStr = n.toString(10).padStart(maxDigits, '0');
+  let packed = '';
+  for (let i = 0; i < decStr.length; i++) {
+    const d = decStr.charCodeAt(i) - 48;
+    packed += d.toString(2).padStart(4, '0');
+  }
+  return packed;
+}
+
+function n10s2nPacked(packed) {
+  const s = packed == null ? '' : String(packed);
+  if (s.length === 0) {
+    throw new Error('N10S2N packed length must be a multiple of 4');
+  }
+  if (s.length % 4 !== 0) {
+    throw new Error(`N10S2N packed length must be a multiple of 4, got ${s.length}`);
+  }
+  let num = 0n;
+  for (let i = 0; i < s.length; i += 4) {
+    const nib = s.slice(i, i + 4);
+    const d = parseInt(nib, 2);
+    if (Number.isNaN(d) || d > 9) {
+      throw new Error(`N10S2N invalid decimal digit ${nib}`);
+    }
+    num = num * 10n + BigInt(d);
+  }
+  if (num === 0n) return '0';
+  return num.toString(2);
+}
+
 function padWireBits(value, bits, assignPad) {
   if (!value) return '0'.repeat(bits);
   if (value.length >= bits) return value;
@@ -2285,7 +2337,8 @@ class Interpreter {
          'HIGH', 'LOW', 'ANY', 'ZERO', 'BITINDEX', 'ONEHOT',
          'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE',
          'REVERSE', 'LROTATE', 'RROTATE',
-         'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE'].includes(name)) {
+         'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE',
+         'CNTN10S', 'N2N10S', 'N10S2N'].includes(name)) {
       return true;
     }
 
@@ -3727,6 +3780,40 @@ if (this.isBuiltinDEMUX(name)) {
       computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
       computeRefs ? { value: mod,    ref: `&${this.storeValue(mod)}`    } : { value: mod,    ref: null },
     ];
+  }
+
+  // ================= BUILTIN: DECIMAL CONVERSION =================
+  if (name === 'CNTN10S') {
+    if (argValues.length !== 1) fail('CNTN10S expects 1 argument');
+    this._zstateRequireBinary(argValues, 'CNTN10S', ['value']);
+    const cnt = decimalDigitCountBigInt(unsignedBinToBigInt(argValues[0]));
+    const v = cnt.toString(2);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'N2N10S') {
+    if (argValues.length !== 1) fail('N2N10S expects 1 argument');
+    this._zstateRequireBinary(argValues, 'N2N10S', ['value']);
+    const v = n2n10sPacked(argValues[0]);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'N10S2N') {
+    if (argValues.length !== 1) fail('N10S2N expects 1 argument');
+    this._zstateRequireBinary(argValues, 'N10S2N', ['packed']);
+    let v;
+    try {
+      v = n10s2nPacked(argValues[0]);
+    } catch (e) {
+      fail(e.message);
+    }
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
   }
 
   // ================= USER FUNCTIONS =================
@@ -10243,6 +10330,9 @@ Interpreter.BUILTIN_DOC = {
   SUBTRACT: ['SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
   MULTIPLY: ['MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over'],
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
+  CNTN10S:  ['CNTN10S(Xbit value) -> Ybit'],
+  N2N10S:   ['N2N10S(Xbit value) -> Zbit packed'],
+  N10S2N:   ['N10S2N(Xbit packed) -> Wbit value'],
   HIGH:     ['HIGH(Xbit) -> Xbit'],
   LOW:      ['LOW(Xbit) -> Xbit'],
   ANY:      ['ANY(Xbit) -> 1bit'],

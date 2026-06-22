@@ -11802,6 +11802,304 @@ comp [terminal] .term:
   h.assert('terminal A', getTerminalText(_termId(interp, '.term')), 'A');
 }, { propagation: 'wave' });
 
+const CALC_POCKET = `comp [keyboard] .kbd:
+  label: 'Digits'
+  focusColor: ^00ff00
+  on: 1
+  :
+
+comp [key] .plus:
+  label: '+'
+  type: 0
+  on: 1
+  :
+
+comp [key] .minus:
+  label: '-'
+  type: 0
+  on: 1
+  :
+
+comp [key] .eq:
+  label: '='
+  type: 0
+  on: 1
+  :
+
+comp [key] .reset:
+  label: 'R'
+  type: 0
+  on: 1
+  nl
+  :
+
+comp [lut] .fromAscii:
+  depth: 4
+  length: 128
+  fillwith: 1111
+  = data {
+    ^30: 0000
+    ^31: 0001
+    ^32: 0010
+    ^33: 0011
+    ^34: 0100
+    ^35: 0101
+    ^36: 0110
+    ^37: 0111
+    ^38: 1000
+    ^39: 1001
+  }
+  on: 1
+  :
+
+comp [lut] .toAscii:
+  depth: 8
+  length: 16
+  fillwith: 00110000
+  = data {
+    ^0: 00110000
+    ^1: 00110001
+    ^2: 00110010
+    ^3: 00110011
+    ^4: 00110100
+    ^5: 00110101
+    ^6: 00110110
+    ^7: 00110111
+    ^8: 00111000
+    ^9: 00111001
+  }
+  on: 1
+  :
+
+comp [reg] .acc:
+  depth: 8
+  on: 1
+  :
+
+comp [reg] .entry:
+  depth: 8
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 8
+  columns: 24
+  color: ^0f0
+  on: 1
+  nl
+  :
+
+8wire zero = 00000000
+8wire ten = 00001010
+8wire key = .kbd
+4wire dig = .fromAscii(in = key)
+8wire entryCur = .entry:get
+8wire entryMul, 8wire ov1 = MULTIPLY(entryCur, ten)
+8wire entryNew, 1wire c1 = ADD(entryMul, dig)
+1wire bad = EQ(dig, 1111)
+
+.entry:{
+  data = MUX(bad, entryNew, entryCur)
+  set = .kbd:valid
+}
+
+8wire accCur = .acc:get
+8wire sum, 1wire c2 = ADD(accCur, entryCur)
+8wire diff, 1wire borrow = SUBTRACT(accCur, entryCur)
+8wire diffSat = MUX(borrow, diff, zero)
+
+.acc:{
+  data = sum
+  set = .plus
+}
+.entry:{
+  data = zero
+  set = .plus
+}
+
+8wire showP = sum
+8wire qP, 8wire modP = DIVIDE(showP, ten)
+8wire asciiTP = .toAscii(in = qP)
+8wire asciiOP = .toAscii(in = modP)
+
+.term:{
+  append = asciiTP
+  set = .plus
+}
+.term:{
+  append = asciiOP
+  newline = 1
+  set = .plus
+}
+
+.acc:{
+  data = diffSat
+  set = .minus
+}
+.entry:{
+  data = zero
+  set = .minus
+}
+
+8wire showM = diffSat
+8wire qM, 8wire modM = DIVIDE(showM, ten)
+8wire asciiTM = .toAscii(in = qM)
+8wire asciiOM = .toAscii(in = modM)
+
+.term:{
+  append = asciiTM
+  set = .minus
+}
+.term:{
+  append = asciiOM
+  newline = 1
+  set = .minus
+}
+
+.acc:{
+  data = sum
+  set = .eq
+}
+.entry:{
+  data = zero
+  set = .eq
+}
+
+8wire showE = sum
+8wire qE, 8wire modE = DIVIDE(showE, ten)
+8wire asciiTE = .toAscii(in = qE)
+8wire asciiOE = .toAscii(in = modE)
+
+.term:{
+  append = asciiTE
+  set = .eq
+}
+.term:{
+  append = asciiOE
+  newline = 1
+  set = .eq
+}
+
+.acc:{
+  data = zero
+  set = .reset
+}
+.entry:{
+  data = zero
+  set = .reset
+}
+.term:{
+  clear = 1
+  set = .reset
+}
+`;
+
+function _pressKey(session, interp, name) {
+  session.triggerKeyPress(interp, name, { phase: 'press' });
+  session.triggerKeyPress(interp, name, { phase: 'release' });
+}
+
+reg(1609, 'keyboard', 'pocket calc — LUT ascii digits, +/−/=, R (wave)', function(h, session) {
+  const { interp } = session.run(CALC_POCKET);
+  session.triggerKeyboardKey(interp, '.kbd', { key: '1' });
+  h.assert('lut digit 1', session.getWire(interp, 'dig'), '0001');
+  session.triggerKeyboardKey(interp, '.kbd', { key: '2' });
+  h.assert('entry 12', session.getCompProperty(interp, '.entry', 'get'), '00001100');
+  _pressKey(session, interp, '.plus');
+  h.assert('acc 12', session.getCompProperty(interp, '.acc', 'get'), '00001100');
+  h.assert('line 12', getTerminalText(_termId(interp, '.term')), '12');
+  session.triggerKeyboardKey(interp, '.kbd', { key: '3' });
+  _pressKey(session, interp, '.plus');
+  h.assert('acc 15', session.getCompProperty(interp, '.acc', 'get'), '00001111');
+  h.assert('two lines', getTerminalText(_termId(interp, '.term')), '12\n15');
+  _pressKey(session, interp, '.reset');
+  h.assert('acc cleared', session.getCompProperty(interp, '.acc', 'get'), '00000000');
+  h.assert('term cleared', getTerminalText(_termId(interp, '.term')), '');
+  session.triggerKeyboardKey(interp, '.kbd', { key: '9' });
+  _pressKey(session, interp, '.plus');
+  session.triggerKeyboardKey(interp, '.kbd', { key: '1' });
+  _pressKey(session, interp, '.minus');
+  h.assert('9-1=8', session.getCompProperty(interp, '.acc', 'get'), '00001000');
+  session.triggerKeyboardKey(interp, '.kbd', { key: '5' });
+  _pressKey(session, interp, '.minus');
+  h.assert('8-5=3', session.getCompProperty(interp, '.acc', 'get'), '00000011');
+  _pressKey(session, interp, '.reset');
+  session.triggerKeyboardKey(interp, '.kbd', { key: '3' });
+  _pressKey(session, interp, '.plus');
+  session.triggerKeyboardKey(interp, '.kbd', { key: '8' });
+  _pressKey(session, interp, '.minus');
+  h.assert('3-8 clamps 0', session.getCompProperty(interp, '.acc', 'get'), '00000000');
+}, { propagation: 'wave' });
+
+reg(1610, 'decimal', 'CNTN10S — digit count', function(h, session) {
+  const interp = session.runArith(
+    '8wire n245 = 11110101\n' +
+    '8wire n5 = 00000101\n' +
+    '8wire n0 = 00000000\n' +
+    '8wire n255 = 11111111\n' +
+    '2wire c245 := CNTN10S(n245)\n' +
+    '2wire c5 := CNTN10S(n5)\n' +
+    '2wire c0 := CNTN10S(n0)\n' +
+    '2wire c255 := CNTN10S(n255)'
+  );
+  h.assert('245 has 3 digits', session.getWire(interp, 'c245'), '11');
+  h.assert('5 has 1 digit', session.getWire(interp, 'c5'), '01');
+  h.assert('0 has 1 digit', session.getWire(interp, 'c0'), '01');
+  h.assert('255 has 3 digits', session.getWire(interp, 'c255'), '11');
+});
+
+reg(1611, 'decimal', 'N2N10S — packed BCD', function(h, session) {
+  const interp = session.runArith(
+    '8wire n245 = 11110101\n' +
+    '8wire n5 = 00000101\n' +
+    '8wire n0 = 00000000\n' +
+    '12wire p245 = N2N10S(n245)\n' +
+    '12wire p5 = N2N10S(n5)\n' +
+    '12wire p0 = N2N10S(n0)'
+  );
+  h.assert('245 packed', session.getWire(interp, 'p245'), '001001000101');
+  h.assert('5 packed', session.getWire(interp, 'p5'), '000000000101');
+  h.assert('0 packed', session.getWire(interp, 'p0'), '000000000000');
+});
+
+reg(1612, 'decimal', 'N10S2N — unpack and round-trip', function(h, session) {
+  const interp = session.runArith(
+    '12wire packed = 001001000101\n' +
+    '8wire n = 11110101\n' +
+    '12wire num10s = N2N10S(n)\n' +
+    '8wire back := N10S2N(num10s)\n' +
+    '8wire fromPacked := N10S2N(packed)'
+  );
+  h.assert('245 from packed', session.getWire(interp, 'fromPacked'), '11110101');
+  h.assert('round-trip', session.getWire(interp, 'back'), '11110101');
+});
+
+reg(1613, 'decimal', 'N10S2N — invalid digit errors', function(h, session) {
+  const r1 = session.run('8wire bad = N10S2N(1010)');
+  const err1 = r1.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('nibble 10', String(err1.includes('invalid decimal digit')), 'true');
+  const r2 = session.run('4wire bad = N10S2N(101)');
+  const err2 = r2.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('length not multiple of 4', String(err2.includes('multiple of 4')), 'true');
+});
+
+reg(1614, 'doc', 'BUILTIN_DOC — decimal conversion signatures', function(h, session) {
+  h.assert('CNTN10S', Interpreter.getDocLines('CNTN10S', new Map())[0], 'CNTN10S(Xbit value) -> Ybit');
+  h.assert('N2N10S', Interpreter.getDocLines('N2N10S', new Map())[0], 'N2N10S(Xbit value) -> Zbit packed');
+  h.assert('N10S2N', Interpreter.getDocLines('N10S2N', new Map())[0], 'N10S2N(Xbit packed) -> Wbit value');
+});
+
+reg(1615, 'decimal', 'N2N10S / N10S2N E2E show round-trip', function(h, session) {
+  const { interp, out } = session.run(
+    '8wire number = 11110101\n' +
+    '12wire num10s = N2N10S(number)\n' +
+    '8wire back := N10S2N(num10s)\n' +
+    'show(back)'
+  );
+  h.assert('back wire', session.getWire(interp, 'back'), '11110101');
+  h.assert('show output', out.some(l => l.includes('11110101')), true);
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

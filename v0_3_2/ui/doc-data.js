@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, decimal-conversion.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
  */
 (function () {
   'use strict';
@@ -822,6 +822,8 @@ These built-in functions are **combinational** — they produce their result imm
 
 Use the **built-in functions** when you need a quick one-off calculation.
 Use the **components** when you need a named, persistent device with pins that other parts of the circuit can wire to (e.g. in a PCB definition).
+
+For **decimal digit packing** (display, terminals, calculators), see [decimal-conversion.md](decimal-conversion.md) (\`CNTN10S\`, \`N2N10S\`, \`N10S2N\`).
 
 ---
 
@@ -2722,6 +2724,7 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
 | **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\` | [arithmetic.md](arithmetic.md) |
+| **Decimal conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\` | [decimal-conversion.md](decimal-conversion.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
@@ -4984,6 +4987,130 @@ Details: [boolean-lut.md](boolean-lut.md). LUT invoke syntax: [lut.md](lut.md).
 - [LUT component](lut.md) — runtime \`inline [lut]\` invoke (\`^.name(in=…)\`)
 - [REG](reg.md) — \`NEXT(~)\` and wire-clock behaviour with \`show\`
 `,
+    'decimal-conversion.md': `# Decimal conversion (CNTN10S, N2N10S, N10S2N)
+
+Unsigned binary numbers ↔ packed decimal digits (4 bits per digit, BCD 0–9).
+
+Index: [builtin-functions.md](builtin-functions.md)
+
+---
+
+## Overview
+
+| Function | Direction | Output |
+|----------|-----------|--------|
+| \`CNTN10S\` | count decimal digits | \`Ybit\` (minimal width, unpadded) |
+| \`N2N10S\` | number → packed digits | \`maxCifre × 4\` bits |
+| \`N10S2N\` | packed digits → number | minimal-width binary (use \`:=\` / \`=:\` to pad) |
+
+All three operate on **unsigned** values only.
+
+\`maxCifre\` for an \`N\`-bit input is the number of decimal digits in \`2^N − 1\` (e.g. 8 bit → 3 digits, 0…255).
+
+---
+
+## CNTN10S
+
+\`\`\`
+CNTN10S(Xbit value) -> Ybit
+\`\`\`
+
+Returns how many **significant** decimal digits \`value\` has.
+
+- \`CNTN10S(0)\` → \`1\` (displays as \`"0"\`)
+- \`CNTN10S(245)\` on 8 bit → \`11\` (3 digits)
+- \`CNTN10S(5)\` → \`1\`
+
+\`Y\` is minimal width (unpadded), same style as \`CNTONE\`. Declare a wide enough wire or use \`:=\`.
+
+### Example
+
+\`\`\`logts-play
+8wire n = 11110101
+2wire cnt = CNTN10S(n)
+show(cnt)
+\`\`\`
+
+Result: \`11\` (3 decimal digits)
+
+---
+
+## N2N10S
+
+\`\`\`
+N2N10S(Xbit value) -> Zbit packed
+\`\`\`
+
+Converts unsigned \`value\` to packed BCD: each decimal digit is **4 bits** (0–9), MSB-first.
+
+Output width \`Z = maxCifre × 4\` where \`maxCifre\` follows input width (see above). Digits are **left-padded with zero nibbles** inside the field.
+
+| Input (8 bit) | Decimal | Packed (12 bit) |
+|---------------|---------|-----------------|
+| \`11110101\` | 245 | \`0010_0100_0101\` |
+| \`00000101\` | 5 | \`0000_0000_0101\` |
+| \`00000000\` | 0 | \`0000_0000_0000\` |
+
+### Example
+
+\`\`\`logts-play
+8wire n = 11110101
+12wire packed = N2N10S(n)
+show(packed)
+\`\`\`
+
+---
+
+## N10S2N
+
+\`\`\`
+N10S2N(Xbit packed) -> Wbit value
+\`\`\`
+
+Inverse of \`N2N10S\`: reads packed BCD MSB-first and returns the unsigned binary value.
+
+- Packed length must be a **multiple of 4**.
+- Each nibble must be 0–9; otherwise **runtime error**.
+- Result width is **minimal** (no padding). Use \`:=\` or \`=:\` when assigning to a wider wire.
+
+### Example
+
+\`\`\`logts-play
+8wire n = 11110101
+12wire packed = N2N10S(n)
+8wire back := N10S2N(packed)
+show(back)
+\`\`\`
+
+Result: \`11110101\`
+
+### Round-trip
+
+\`\`\`logts-play
+8wire number = 11110101
+12wire num10s = N2N10S(number)
+8wire back := N10S2N(num10s)
+show(back)
+\`\`\`
+
+---
+
+## doc()
+
+\`\`\`
+doc(CNTN10S)
+doc(N2N10S)
+doc(N10S2N)
+\`\`\`
+
+---
+
+## See also
+
+- [arithmetic.md](arithmetic.md) — \`ADD\`, \`SUBTRACT\`, …
+- [assignment-operators.md](assignment-operators.md) — \`:=\`, \`=:\`
+- [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) — \`CNTONE\`
+`,
     'dip.md': `# DIP switch component
 
 \`comp [dip]\` is a **group of toggle switches** on one panel control. Each position is one bit; width is set by \`length\` (default \`4\`).
@@ -5355,6 +5482,33 @@ The bit width of both inputs is taken as \`max(len(a), len(b))\`. The result is 
 - \`result\` = quotient (\`a / b\`, truncated)
 - \`mod\` = remainder (\`a % b\`)
 - Division by zero returns \`0\` for both outputs
+
+### Decimal conversion (CNTN10S / N2N10S / N10S2N)
+
+Unsigned binary ↔ packed decimal digits (4 bits per digit). Full reference: [decimal-conversion.md](decimal-conversion.md).
+
+\`\`\`
+doc(CNTN10S)
+doc(N2N10S)
+doc(N10S2N)
+\`\`\`
+
+| Call | Signature |
+|------|-----------|
+| \`doc(CNTN10S)\` | \`CNTN10S(Xbit value) -> Ybit\` |
+| \`doc(N2N10S)\` | \`N2N10S(Xbit value) -> Zbit packed\` |
+| \`doc(N10S2N)\` | \`N10S2N(Xbit packed) -> Wbit value\` |
+
+\`\`\`
+8wire n = 11110101
+2wire cnt = CNTN10S(n)
+12wire num10s = N2N10S(n)
+8wire back := N10S2N(num10s)
+\`\`\`
+
+- \`CNTN10S(0)\` → \`1\` digit
+- \`N2N10S\` output width = \`maxCifre × 4\` (from input width)
+- \`N10S2N\` returns minimal-width binary; invalid nibble (>9) is an error
 
 #### ADD examples
 
@@ -8072,6 +8226,181 @@ comp [queue] .q:
   set = .digits:valid
 }
 \`\`\`
+
+---
+
+## Example — pocket calculator (LUT + keys + terminal, wave)
+
+Focus **Digits**, type \`0\`–\`9\` on the keyboard. **\`+\`** / **\`-\`** / **\`=\`** add or subtract the typed number to the accumulator and print the result on the terminal (two digits, \`00\`–\`99\`). **\`R\`** clears accumulator, entry, and terminal.
+
+Arithmetic is **unsigned 8-bit**. There are no negative numbers: if subtraction would go below zero, the result is **clamped to 0** (\`SUBTRACT\` \`carry\` = borrow → \`MUX\` picks \`0\`).
+
+\`fromAscii\` uses **\`length: 128\`** with only **\`^30\`–\`^39\`** mapped (ASCII \`'0'\`…\`'9'\`); **\`fillwith: 1111\`** for non-digits. \`toAscii\` maps digit values **\`^0\`–\`^9\`** to ASCII for \`append\`.
+
+\`\`\`logts-play wave
+comp [keyboard] .kbd:
+  label: 'Digits'
+  focusColor: ^00ff00
+  on: 1
+  :
+
+comp [key] .plus:
+  label: '+'
+  type: 0
+  on: 1
+  :
+
+comp [key] .minus:
+  label: '-'
+  type: 0
+  on: 1
+  :
+
+comp [key] .eq:
+  label: '='
+  type: 0
+  on: 1
+  :
+
+comp [key] .reset:
+  label: 'R'
+  type: 0
+  on: 1
+  nl
+  :
+
+comp [lut] .fromAscii:
+  depth: 4
+  length: 128
+  fillwith: 1111
+  = data {
+    ^30: 0000
+    ^31: 0001
+    ^32: 0010
+    ^33: 0011
+    ^34: 0100
+    ^35: 0101
+    ^36: 0110
+    ^37: 0111
+    ^38: 1000
+    ^39: 1001
+  }
+  on: 1
+  :
+
+comp [lut] .toAscii:
+  depth: 8
+  length: 16
+  fillwith: 00110000
+  = data {
+    ^0: 00110000
+    ^1: 00110001
+    ^2: 00110010
+    ^3: 00110011
+    ^4: 00110100
+    ^5: 00110101
+    ^6: 00110110
+    ^7: 00110111
+    ^8: 00111000
+    ^9: 00111001
+  }
+  on: 1
+  :
+
+comp [reg] .acc:
+  depth: 8
+  on: 1
+  :
+
+comp [reg] .entry:
+  depth: 8
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 8
+  columns: 24
+  color: ^0f0
+  on: 1
+  nl
+  :
+
+8wire zero = 00000000
+8wire ten = 00001010
+8wire key = .kbd
+4wire dig = .fromAscii(in = key)
+8wire entryCur = .entry:get
+8wire entryMul, 8wire ov1 = MULTIPLY(entryCur, ten)
+8wire entryNew, 1wire c1 = ADD(entryMul, dig)
+1wire bad = EQ(dig, 1111)
+
+.entry:{
+  data = MUX(bad, entryNew, entryCur)
+  set = .kbd:valid
+}
+
+8wire accCur = .acc:get
+8wire sum, 1wire c2 = ADD(accCur, entryCur)
+8wire diff, 1wire borrow = SUBTRACT(accCur, entryCur)
+8wire diffSat = MUX(borrow, diff, zero)
+
+.acc:{ data = sum
+  set = .plus }
+.entry:{ data = zero
+  set = .plus }
+
+8wire showP = sum
+8wire qP, 8wire modP = DIVIDE(showP, ten)
+8wire asciiTP = .toAscii(in = qP)
+8wire asciiOP = .toAscii(in = modP)
+
+.term:{ append = asciiTP
+  set = .plus }
+.term:{ append = asciiOP
+  newline = 1
+  set = .plus }
+
+.acc:{ data = diffSat
+  set = .minus }
+.entry:{ data = zero
+  set = .minus }
+
+8wire showM = diffSat
+8wire qM, 8wire modM = DIVIDE(showM, ten)
+8wire asciiTM = .toAscii(in = qM)
+8wire asciiOM = .toAscii(in = modM)
+
+.term:{ append = asciiTM
+  set = .minus }
+.term:{ append = asciiOM
+  newline = 1
+  set = .minus }
+
+.acc:{ data = sum
+  set = .eq }
+.entry:{ data = zero
+  set = .eq }
+
+8wire showE = sum
+8wire qE, 8wire modE = DIVIDE(showE, ten)
+8wire asciiTE = .toAscii(in = qE)
+8wire asciiOE = .toAscii(in = modE)
+
+.term:{ append = asciiTE
+  set = .eq }
+.term:{ append = asciiOE
+  newline = 1
+  set = .eq }
+
+.acc:{ data = zero
+  set = .reset }
+.entry:{ data = zero
+  set = .reset }
+.term:{ clear = 1
+  set = .reset }
+\`\`\`
+
+Try: \`12\` **+** → \`12\`; \`3\` **+** → \`15\`; **R** clears; \`9\` **+** then \`1\` **-** → \`8\`; \`3\` **+** then \`8\` **-** → \`0\` (saturate).
 
 ---
 
