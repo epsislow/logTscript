@@ -4136,7 +4136,14 @@ if (this.isBuiltinDEMUX(name)) {
     if(s.watch){
       return;
     }
-    if(s.doc){
+    if(s.doc !== undefined && s.doc !== null){
+      if (s.doc === '') {
+        const indexLines = Interpreter.getDocIndexLines();
+        for (const line of indexLines) {
+          this.out.push(line);
+        }
+        return;
+      }
       let name = s.doc;
       let alias = '.name';
       const comp = this.components.get(name);
@@ -6082,6 +6089,7 @@ if (s.assignment) {
         if (result.activeTouchPress) compInfo.activeTouchPress = result.activeTouchPress;
         if (result.clcdSymbols) compInfo.clcdSymbols = result.clcdSymbols;
         if (result.touchHandler) compInfo.touchHandler = result.touchHandler;
+        if (result.keyHandler) compInfo.keyHandler = result.keyHandler;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;
@@ -6242,26 +6250,43 @@ if (s.assignment) {
       const label = attributes.label !== undefined ? String(attributes.label) : '';
       const size = attributes.size !== undefined ? parseInt(attributes.size, 10) : 36;
       const nl = attributes.nl || false;
-      
+      const keyType = attributes.type !== undefined ? parseInt(attributes.type, 10) : 0;
+
       // Create storage for key output (1 bit) - keys start unpressed
       const keyInitialValue = '0';
       const storageIdx = this.storeValue(keyInitialValue);
       keyRef = `&${storageIdx}`;
-      
+
       const keyId = baseId;
-      
-      // Create onPress handler (sets to 1 immediately)
-      // Capture keyRef directly in closure
-      const onPress = (pressedLabel) => {
-        this.scheduleComponentOutputChange(name, '1');
-      };
-      
-      // Create onRelease handler (sets to 0 after pressDuration)
-      // Capture keyRef directly in closure
-      const onRelease = () => {
-        this.scheduleComponentOutputChange(name, '0');
-      };
-      
+
+      const KeyHandler = (typeof KeyComponent !== 'undefined' && KeyComponent.buildHandlers)
+        ? KeyComponent
+        : null;
+      let onPress;
+      let onRelease;
+      let keyHandler;
+
+      if (KeyHandler) {
+        const built = KeyHandler.buildHandlers(name, keyId, keyRef, keyType, this);
+        onPress = built.onPress;
+        onRelease = built.onRelease;
+        keyHandler = { onPress, onRelease };
+      } else if (keyType === 2) {
+        onPress = () => {
+          const idx = parseInt(keyRef.substring(1), 10);
+          const stored = this.storage.find(s => s.index === idx);
+          const cur = stored && stored.value === '1';
+          const next = cur ? '0' : '1';
+          this.scheduleComponentOutputChange(name, next);
+        };
+        onRelease = () => {};
+        keyHandler = { onPress, onRelease };
+      } else {
+        onPress = () => { this.scheduleComponentOutputChange(name, '1'); };
+        onRelease = () => { this.scheduleComponentOutputChange(name, '0'); };
+        keyHandler = { onPress, onRelease };
+      }
+
       if(typeof addKey === 'function'){
         addKey({
           id: keyId,
@@ -6269,11 +6294,13 @@ if (s.assignment) {
           size: size,
           nl: nl,
           onPress: onPress,
-          onRelease: onRelease
+          onRelease: onRelease,
+          type: keyType,
         });
       }
-      
+
       deviceIds.push(keyId);
+      this._pendingKeyHandler = keyHandler;
       // keyRef will be assigned to compInfo.ref later
     } else if(type === '7seg'){
       // Create 7-segment display
@@ -6802,6 +6829,10 @@ if (s.assignment) {
     } else if(type === 'key'){
       // Key ref was set in the key block above
       compInfo.ref = keyRef;
+      if (this._pendingKeyHandler) {
+        compInfo.keyHandler = this._pendingKeyHandler;
+        this._pendingKeyHandler = null;
+      }
     } else if(initialValue){
       // For other components (LEDs, 7seg), create storage only if initial value is set
       const storageIdx = this.storeValue(initialValue);
@@ -10224,9 +10255,33 @@ Interpreter.BUILTIN_DOC = {
   LROTATE:  ['LROTATE(Xbit data, Ybit count) -> Xbit'],
   RROTATE:  ['RROTATE(Xbit data, Ybit count) -> Xbit'],
   ZRELEASE: ['ZRELEASE(wireName) — release wire to high-Z (MODE ZSTATE statement)'],
-  Zlist: ['Zlist(wireName) — list registered bus drivers (MODE ZSTATE)'],
   ZCONNECT: ['ZCONNECT(en, data) — enable-gated drive value (MODE ZSTATE); bus = ZCONNECT(en, data)'],
   ZCONN: ['ZCONNECT(en, data) — alias for ZCONNECT'],
+};
+
+Interpreter.DEBUG_DOC = {
+  show:  ['show(expr, ...) — print formatted values to Output panel'],
+  peek:  ['peek(expr, ...) — like show, compact wire lines (no ref suffix)'],
+  probe: ['probe(expr) — log value changes (wire, .comp, .inst:pin, &ref, bit slice)'],
+  watch: ['watch(expr) — record timeline trace for watch panel'],
+  Zlist: ['Zlist(wireName) — list registered bus drivers (MODE ZSTATE, at RUN/NEXT)'],
+};
+
+Interpreter.DEBUG_DOC_NAMES = new Set(Object.keys(Interpreter.DEBUG_DOC));
+
+Interpreter.getDocIndexLines = function() {
+  return [
+    'doc() — call with one argument:',
+    '  def — built-in, debug, and user-defined function names',
+    '  comp — component types; comp.type — syntax (e.g. comp.led, comp.+)',
+    '  pcb — PCB types; pcb.name — syntax',
+    '  chip — chip types; chip.name — syntax',
+    '  board — board types; board.name — syntax',
+    '  inline — inline instances; inline.kind — template (asm, lut, protocol)',
+    '  .inst — inline instance (e.g. .myisa)',
+    '  Name — builtin or user function (OR, ADD, myFunc, …)',
+    '  show, peek, probe, watch, Zlist — debug statements',
+  ];
 };
 
 if (typeof LogicValue !== 'undefined' && LogicValue.buildBitPredicateBuiltinDoc) {
@@ -10239,9 +10294,10 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     const bitPredExclude = (typeof LogicValue !== 'undefined' && LogicValue.BIT_PREDICATE_DOC_NAMES)
       ? LogicValue.BIT_PREDICATE_DOC_NAMES
       : new Set();
+    const debugExclude = Interpreter.DEBUG_DOC_NAMES || new Set();
     const builtinNames = [];
     for (const n of Object.keys(Interpreter.BUILTIN_DOC)) {
-      if (bitPredExclude.has(n)) continue;
+      if (bitPredExclude.has(n) || debugExclude.has(n)) continue;
       builtinNames.push(n);
       if (n === 'ZERO') {
         builtinNames.push('ANY*, ALL*');
@@ -10256,6 +10312,14 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
 
     if (builtinNames.includes('ANY*, ALL*')) {
       lines.push('(* = 0/1/01/10/Z/X/ZX/XZ)');
+    }
+
+    lines.push('');
+    lines.push('debug:');
+    const debugNames = Object.keys(Interpreter.DEBUG_DOC);
+    for (let i = 0; i < debugNames.length; i += 4) {
+      chunk = debugNames.slice(i, i + 4);
+      lines.push(chunk.join(', '));
     }
 
     lines.push('');
@@ -10482,6 +10546,11 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
         return formatProtocolInstanceDoc(name, inst);
       }
     }
+  }
+
+  // ---- Static debug keyword table ----
+  if (Interpreter.DEBUG_DOC[name]) {
+    return Interpreter.DEBUG_DOC[name];
   }
 
   // ---- Static builtin function table ----

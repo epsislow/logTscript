@@ -3,6 +3,7 @@
 The `doc` instruction displays the syntax (signature) of a built-in or user-defined function, internal component type, or PCB component directly in the output panel.
 
 ```
+doc()              # index of all doc() forms
 doc(FunctionName)
 doc(comp)
 doc(comp.type)
@@ -10,11 +11,22 @@ doc(board)
 doc(board.type)
 doc(pcb)
 doc(pcb.type)
+doc(show)          # debug keywords: show, peek, probe, watch, Zlist
 ```
 
 ---
 
 ## Usage
+
+### `doc()` — index
+
+`doc()` with no argument prints a short guide to what you can pass to `doc(...)`:
+
+- `def` — built-in, debug, and user-defined function names
+- `comp`, `comp.type` — components
+- `pcb`, `chip`, `board`, `inline`, `.inst` — hierarchical types
+- function name — e.g. `OR`, `ADD`, `myFunc`
+- `show`, `peek`, `probe`, `watch`, `Zlist` — debug statements
 
 ### Syntax
 
@@ -271,7 +283,7 @@ The bit width of both inputs is taken as `max(len(a), len(b))`. The result is al
 
 ## Listing all functions: doc(def)
 
-`doc(def)` displays all available built-in functions and all user-defined functions, separated into two sections:
+`doc(def)` displays built-in functions, **debug** statements, and user-defined functions in three sections:
 
 ```
 doc(def)
@@ -281,18 +293,27 @@ Output:
 
 ```
 built-in:
-NOT, AND, OR, … HIGH, LOW, BITINDEX, ONEHOT, PARITY, BITSIZE, LROTATE, …
-```
+NOT, AND, OR, … HIGH, LOW, ANY*, ALL*, BITINDEX, …
+
+(* = 0/1/01/10/Z/X/ZX/XZ)
+
+debug:
+show, peek, probe, watch, Zlist
 
 user defined:
 myFunc, helper, ...
 ```
 
+Per-keyword signatures: `doc(show)`, `doc(peek)`, `doc(probe)`, `doc(watch)`, `doc(Zlist)`.
+
 If no user-defined functions exist:
 
 ```
 built-in:
-NOT, AND, OR, ...
+NOT, AND, OR, …
+
+debug:
+show, peek, probe, watch, Zlist
 
 user defined:
 (none)

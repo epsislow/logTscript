@@ -2342,7 +2342,10 @@ reg(332, 'doc', 'doc(def) — lists built-in and user-defined separately', funct
   funcs.set('helper', { params: [], returns: [] });
   const lines = Interpreter.getDocLines('def', null, funcs);
   h.assert('first line is built-in:', lines[0], 'built-in:');
-  const builtinBlock = lines.slice(1).join(' ');
+  const debugIdx = lines.indexOf('debug:');
+  const userLabelIdx = lines.indexOf('user defined:');
+  const builtinEnd = debugIdx >= 0 ? debugIdx : userLabelIdx;
+  const builtinBlock = lines.slice(1, builtinEnd).join(' ');
   h.assert('built-in list contains ADD', String(builtinBlock.includes('ADD')), 'true');
   h.assert('built-in list contains SUBTRACT', String(builtinBlock.includes('SUBTRACT')), 'true');
   h.assert('built-in list contains MULTIPLY', String(builtinBlock.includes('MULTIPLY')), 'true');
@@ -2352,9 +2355,12 @@ reg(332, 'doc', 'doc(def) — lists built-in and user-defined separately', funct
   h.assert('built-in list contains REG', String(builtinBlock.includes('REG')), 'true');
   h.assert('built-in list contains ANY* family', String(builtinBlock.includes('ANY*, ALL*')), 'true');
   h.assert('ANY* footnote line', String(lines.includes('(* = 0/1/01/10/Z/X/ZX/XZ)')), 'true');
+  h.assert('built-in list omits Zlist', String(!/\bZlist\b/.test(builtinBlock)), 'true');
+  h.assert('debug section present', String(lines.includes('debug:')), 'true');
+  h.assert('debug lists show', String(lines[debugIdx + 1].includes('show')), 'true');
+  h.assert('debug lists Zlist', String(lines.slice(debugIdx).join(' ').includes('Zlist')), 'true');
   h.assert('built-in list omits ANYZ detail', String(!/\bANYZ\b/.test(builtinBlock)), 'true');
   h.assert('built-in list does not list REG<N> pattern', String(!/\bREG\d+\b/.test(builtinBlock)), 'true');
-  const userLabelIdx = lines.indexOf('user defined:');
   h.assert('user defined: label present', lines[userLabelIdx], 'user defined:');
   h.assert('user functions listed', String(lines[userLabelIdx + 1].includes('myFunc')), 'true');
   h.assert('user functions listed helper', String(lines[userLabelIdx + 1].includes('helper')), 'true');
@@ -11617,6 +11623,59 @@ reg(1593, 'doc', 'doc(ANY0) and doc(ALLZX)', function(h, session) {
   h.assert('ALLZX sig', outZ[0], 'ALLZX(Xbit) -> 1bit');
   const outAlias = session.runDoc('doc(ALLXZ)');
   h.assert('ALLXZ alias', outAlias[0], 'ALLXZ(Xbit) -> 1bit (alias ALLZX)');
+});
+
+reg(1594, 'key', 'type 2 — toggle latch on each press', function(h, session) {
+  const { interp } = session.run(`comp [key] .k:
+  type: 2
+  on: 1
+  :
+1wire t = .k`);
+  h.assert('initial 0', session.getWire(interp, 't'), '0');
+  session.triggerKeyPress(interp, '.k', { phase: 'press' });
+  h.assert('first press 1', session.getWire(interp, 't'), '1');
+  session.triggerKeyPress(interp, '.k', { phase: 'press' });
+  h.assert('second press 0', session.getWire(interp, 't'), '0');
+  session.triggerKeyPress(interp, '.k', { phase: 'release' });
+  h.assert('release unchanged', session.getWire(interp, 't'), '0');
+});
+
+reg(1595, 'key', 'type 1 — hold press/release', function(h, session) {
+  const { interp } = session.run(`comp [key] .k:
+  type: 1
+  on: 1
+  :
+1wire t = .k`);
+  session.triggerKeyPress(interp, '.k', { phase: 'press' });
+  h.assert('press 1', session.getWire(interp, 't'), '1');
+  session.triggerKeyPress(interp, '.k', { phase: 'release' });
+  h.assert('release 0', session.getWire(interp, 't'), '0');
+});
+
+reg(1596, 'key', 'keyHandler stored on compInfo', function(h, session) {
+  const { interp } = session.run('comp [key] .k:\n  on: 1\n  :\n');
+  const comp = interp.components.get('.k');
+  h.assert('has keyHandler', String(!!(comp && comp.keyHandler)), 'true');
+  h.assert('onPress fn', String(typeof comp.keyHandler.onPress === 'function'), 'true');
+});
+
+reg(1597, 'doc', 'doc() — index of available forms', function(h, session) {
+  const out = session.runDoc('doc()');
+  h.assert('header', out[0], 'doc() — call with one argument:');
+  h.assert('def line', String(out.some(l => l.includes('def'))), 'true');
+  h.assert('comp line', String(out.some(l => l.includes('comp'))), 'true');
+  h.assert('debug keywords', String(out.some(l => l.includes('show, peek, probe'))), 'true');
+});
+
+reg(1598, 'doc', 'doc(show) doc(peek) doc(probe) — debug signatures', function(h, session) {
+  const show = session.runDoc('doc(show)');
+  h.assert('show sig', show[0], 'show(expr, ...) — print formatted values to Output panel');
+  const peek = session.runDoc('doc(peek)');
+  h.assert('peek sig', peek[0], 'peek(expr, ...) — like show, compact wire lines (no ref suffix)');
+  const probe = session.runDoc('doc(probe)');
+  h.assert('probe sig', probe[0], 'probe(expr) — log value changes (wire, .comp, .inst:pin, &ref, bit slice)');
+  const zlist = session.runDoc('doc(Zlist)');
+  h.assert('Zlist sig', zlist[0], 'Zlist(wireName) — list registered bus drivers (MODE ZSTATE, at RUN/NEXT)');
 });
 
 

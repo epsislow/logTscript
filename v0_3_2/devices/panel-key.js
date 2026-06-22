@@ -15,6 +15,7 @@ class PanelKey {
     this.onRelease = onRelease;
     this.pressDuration = pressDuration;
     this.pressed = false;
+    this.outputOn = false;
     this.type = type;
     this._releaseTimer = null;
 
@@ -28,14 +29,14 @@ class PanelKey {
       e.preventDefault();
       this.press();
     });
-    
-   if(this.type == 1) {
-    this.canvas.addEventListener("mouseup", () => this.release());
-    this.canvas.addEventListener("touchend", e => {
-      e.preventDefault();
-      this.release();
-    });
-   }
+
+    if (this.type == 1) {
+      this.canvas.addEventListener("mouseup", () => this.release());
+      this.canvas.addEventListener("touchend", e => {
+        e.preventDefault();
+        this.release();
+      });
+    }
 
     this.draw();
   }
@@ -44,27 +45,43 @@ class PanelKey {
     parent.appendChild(this.canvas);
   }
 
+  setOutputOn(on) {
+    if (this.type !== 2) return;
+    this.outputOn = !!on;
+    this.draw();
+  }
+
+  isActive() {
+    return this.type === 2 ? this.outputOn : this.pressed;
+  }
+
   press() {
+    if (this.type === 2) {
+      this.onPress(this.label);
+      return;
+    }
+
     if (this.pressed) return;
 
     this.pressed = true;
     this.draw();
 
     this.onPress(this.label);
-    
-   if(this.type == 0) {
-    clearTimeout(this._releaseTimer);
-    this._releaseTimer = setTimeout(() => {
-      this.release();
-    }, this.pressDuration);
-   }
+
+    if (this.type == 0) {
+      clearTimeout(this._releaseTimer);
+      this._releaseTimer = setTimeout(() => {
+        this.release();
+      }, this.pressDuration);
+    }
   }
 
   release() {
+    if (this.type === 2) return;
     if (!this.pressed) return;
     this.pressed = false;
     this.draw();
-    if(typeof this.onRelease === 'function'){
+    if (typeof this.onRelease === 'function') {
       this.onRelease();
     }
   }
@@ -72,25 +89,26 @@ class PanelKey {
   draw() {
     const ctx = this.ctx;
     const s = this.size;
+    const active = this.isActive();
 
     ctx.clearRect(0, 0, s, s);
 
-    ctx.fillStyle = this.pressed ? "#000" : "#1c1c1c";
-    ctx.strokeStyle = this.pressed ? "#6dff9c" : "#2a2a2a";
+    ctx.fillStyle = active ? "#000" : "#1c1c1c";
+    ctx.strokeStyle = active ? "#6dff9c" : "#2a2a2a";
     ctx.lineWidth = 2;
 
     ctx.beginPath();
     ctx.roundRect(
-      this.pressed ? 3 : 2,
-      this.pressed ? 3 : 2,
-      s - (this.pressed ? 6 : 4),
-      s - (this.pressed ? 6 : 4),
+      active ? 3 : 2,
+      active ? 3 : 2,
+      s - (active ? 6 : 4),
+      s - (active ? 6 : 4),
       6
     );
     ctx.fill();
     ctx.stroke();
 
-    if (this.pressed) {
+    if (active) {
       ctx.shadowColor = "#6dff9c";
       ctx.shadowBlur = 18;
       ctx.strokeStyle = "#6dff9c";
@@ -102,14 +120,14 @@ class PanelKey {
       ctx.shadowBlur = 0;
     }
 
-    ctx.fillStyle = this.pressed ? "#e6fff0" : "#b0ffcc";
+    ctx.fillStyle = active ? "#e6fff0" : "#b0ffcc";
     ctx.font = "16px monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(
       this.label,
       s / 2,
-      s / 2 + (this.pressed ? 3 : 1)
+      s / 2 + (active ? 3 : 1)
     );
   }
 }
@@ -140,11 +158,11 @@ function addKey({
     br.className = 'break';
     container.appendChild(br);
   }
-  
+
   if (!window.panelKeys) {
     window.panelKeys = new Map();
   }
-  if(id){
+  if (id) {
     window.panelKeys.set(id, key);
   }
 }

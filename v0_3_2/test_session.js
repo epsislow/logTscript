@@ -138,6 +138,19 @@
         }
       },
 
+      triggerKeyPress(interp, compName, opts) {
+        const i = interp || this.interp;
+        if (!i) return;
+        const comp = i.components.get(compName);
+        if (!comp || !comp.keyHandler) return;
+        const phase = (opts && opts.phase) || 'press';
+        if (phase === 'press' && typeof comp.keyHandler.onPress === 'function') {
+          comp.keyHandler.onPress();
+        } else if (phase === 'release' && typeof comp.keyHandler.onRelease === 'function') {
+          comp.keyHandler.onRelease();
+        }
+      },
+
       setComp(interp, name, val) {
         const i = interp || this.interp;
         if (!i) return;

@@ -801,15 +801,15 @@ Use code with caution.By simply looking for that S modifier in your definition (
      NPN PNP(base, emit, coll)
   [ x ] Add switch mecanical 
   [  ] functia doc() fara argument sa intoarca ce argumente poate avea cele simple adica def, comp, chip, keywords
-        sa includa si functiile keyword precum probe, show, peek ..
+  [  ] functia doc(def) sa includa si functiile keyword precum probe, show, peek intr-o categorie: debug. Zlist trebuie sa stea in aceasta categorie debug
 		
 1 [ v ] Add back button in docViewer   
-2 [  ] Add type 2 to key for pressed and release when released and type 3 for toggle 
+2 [ v ] Add type 2 to key for pressed and release when released and type 3 for toggle 
 3 [ v ] Example terminal with queue and button append 
 [v] Example mode zstate cpudata ramdata not working switch doesn't work like that
 4 [  ] LOAD file doc
 5 [  ] Functie TOGGLE 0 -> 1   is 1bit 
-[  ] Functie ZWHO shows Z connections ZLIST 
+[ v ] Functie ZWHO shows Z connections ZLIST 
 [  ] MASK returns only those bits as pointer
    4wire a= MASK(b, start, len)
 6 [ v ] Functii ISZ ANYZ ISX ANYZ ALL01 ALLZ ANYZX IS01 ALL0 ALL1
@@ -821,7 +821,7 @@ Use code with caution.By simply looking for that S modifier in your definition (
    a <= b 
    a <= b w en
 7[ v ] get >= should not connect drivers, instead zconn(en, b) should 
-8[ v  ] add sintax for zconn(en, b) as:  b w en
+8[ v ] add sintax for zconn(en, b) as:  b w en
 
 9[  ] Sub UI Editor sa afisam bara cu cuvinte autocomplete pt functii componente nume variabile "(" ")" numele functiei tb sa contina si ( exemplu scrii togg si iti arata optiune "TOGGLE("
 10[  ] switch and dip with zconn instead of 0 .. actualy it behaves like: zconn(en, .dip) for each bit 

@@ -16,8 +16,8 @@ Inside the engine, each panel control uses a small callback when you interact wi
 
 | Component | UI callback | When it runs |
 |-----------|-------------|--------------|
-| `key` | **`onPress`** | Mouse/touch down — output becomes `1` |
-| `key` | **`onRelease`** | Mouse/touch up — output returns to `0` |
+| `key` | **`onPress`** | Mouse/touch down — output becomes `1` (or toggles when `type: 2`) |
+| `key` | **`onRelease`** | Mouse/touch up — output returns to `0` (`type: 0`/`1`; no-op for `type: 2`) |
 | `clcd` | **`onPress`** / **`onRelease`** | When `touch: 1`, pointer down/up on a symbol hit box updates `:out` per `touchType` |
 | `switch` | `onChange` | Each time you toggle the control |
 | `dip` | `onChange` | Each time you flip one DIP position (`index`, `checked`) |
@@ -473,7 +473,7 @@ comp [slider] .op:
 | Component | Bits | User action | Panel callback | Value while idle |
 |-----------|------|-------------|----------------|------------------|
 | `switch`  | 1    | Toggle      | `onChange`     | Stays `0` or `1` |
-| `key`     | 1    | Press/release | **`onPress` / `onRelease`** | `0` |
+| `key`     | 1    | Press/release (`type: 0`/`1`) or toggle (`type: 2`) | **`onPress` / `onRelease`** | `0` (or latched with `type: 2`) |
 | `clcd`    | `:out` width | Tap symbols (`touch: 1`) | **`onPress` / `onRelease`** | `:out` per `touchType` |
 | `dip`     | N    | Flip each position | `onChange` | Holds last pattern |
 | `rotary`  | `ceil(log₂(states))` | Drag / step knob | `onChange` | Holds last state |

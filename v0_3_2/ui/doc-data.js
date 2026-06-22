@@ -5137,6 +5137,7 @@ Probe component properties: \`probe(.div:mod)\` — [debug.md](debug.md).
 The \`doc\` instruction displays the syntax (signature) of a built-in or user-defined function, internal component type, or PCB component directly in the output panel.
 
 \`\`\`
+doc()              # index of all doc() forms
 doc(FunctionName)
 doc(comp)
 doc(comp.type)
@@ -5144,11 +5145,22 @@ doc(board)
 doc(board.type)
 doc(pcb)
 doc(pcb.type)
+doc(show)          # debug keywords: show, peek, probe, watch, Zlist
 \`\`\`
 
 ---
 
 ## Usage
+
+### \`doc()\` — index
+
+\`doc()\` with no argument prints a short guide to what you can pass to \`doc(...)\`:
+
+- \`def\` — built-in, debug, and user-defined function names
+- \`comp\`, \`comp.type\` — components
+- \`pcb\`, \`chip\`, \`board\`, \`inline\`, \`.inst\` — hierarchical types
+- function name — e.g. \`OR\`, \`ADD\`, \`myFunc\`
+- \`show\`, \`peek\`, \`probe\`, \`watch\`, \`Zlist\` — debug statements
 
 ### Syntax
 
@@ -5405,7 +5417,7 @@ The bit width of both inputs is taken as \`max(len(a), len(b))\`. The result is 
 
 ## Listing all functions: doc(def)
 
-\`doc(def)\` displays all available built-in functions and all user-defined functions, separated into two sections:
+\`doc(def)\` displays built-in functions, **debug** statements, and user-defined functions in three sections:
 
 \`\`\`
 doc(def)
@@ -5415,18 +5427,27 @@ Output:
 
 \`\`\`
 built-in:
-NOT, AND, OR, … HIGH, LOW, BITINDEX, ONEHOT, PARITY, BITSIZE, LROTATE, …
-\`\`\`
+NOT, AND, OR, … HIGH, LOW, ANY*, ALL*, BITINDEX, …
+
+(* = 0/1/01/10/Z/X/ZX/XZ)
+
+debug:
+show, peek, probe, watch, Zlist
 
 user defined:
 myFunc, helper, ...
 \`\`\`
 
+Per-keyword signatures: \`doc(show)\`, \`doc(peek)\`, \`doc(probe)\`, \`doc(watch)\`, \`doc(Zlist)\`.
+
 If no user-defined functions exist:
 
 \`\`\`
 built-in:
-NOT, AND, OR, ...
+NOT, AND, OR, …
+
+debug:
+show, peek, probe, watch, Zlist
 
 user defined:
 (none)
@@ -6836,8 +6857,8 @@ Inside the engine, each panel control uses a small callback when you interact wi
 
 | Component | UI callback | When it runs |
 |-----------|-------------|--------------|
-| \`key\` | **\`onPress\`** | Mouse/touch down — output becomes \`1\` |
-| \`key\` | **\`onRelease\`** | Mouse/touch up — output returns to \`0\` |
+| \`key\` | **\`onPress\`** | Mouse/touch down — output becomes \`1\` (or toggles when \`type: 2\`) |
+| \`key\` | **\`onRelease\`** | Mouse/touch up — output returns to \`0\` (\`type: 0\`/\`1\`; no-op for \`type: 2\`) |
 | \`clcd\` | **\`onPress\`** / **\`onRelease\`** | When \`touch: 1\`, pointer down/up on a symbol hit box updates \`:out\` per \`touchType\` |
 | \`switch\` | \`onChange\` | Each time you toggle the control |
 | \`dip\` | \`onChange\` | Each time you flip one DIP position (\`index\`, \`checked\`) |
@@ -7293,7 +7314,7 @@ comp [slider] .op:
 | Component | Bits | User action | Panel callback | Value while idle |
 |-----------|------|-------------|----------------|------------------|
 | \`switch\`  | 1    | Toggle      | \`onChange\`     | Stays \`0\` or \`1\` |
-| \`key\`     | 1    | Press/release | **\`onPress\` / \`onRelease\`** | \`0\` |
+| \`key\`     | 1    | Press/release (\`type: 0\`/\`1\`) or toggle (\`type: 2\`) | **\`onPress\` / \`onRelease\`** | \`0\` (or latched with \`type: 2\`) |
 | \`clcd\`    | \`:out\` width | Tap symbols (\`touch: 1\`) | **\`onPress\` / \`onRelease\`** | \`:out\` per \`touchType\` |
 | \`dip\`     | N    | Flip each position | \`onChange\` | Holds last pattern |
 | \`rotary\`  | \`ceil(log₂(states))\` | Drag / step knob | \`onChange\` | Holds last state |
@@ -7804,7 +7825,7 @@ show(value, .portA:in, .portB:out)
 `,
     'key.md': `# Key component
 
-\`comp [key]\` is a **momentary button**: output is \`1\` while pressed and \`0\` when released. Uses \`onPress\` / \`onRelease\` in the engine (unlike switch/dip which use \`onChange\`).
+\`comp [key]\` is an interactive panel button. Output is **1 bit** on property \`:get\`. Uses \`onPress\` / \`onRelease\` in the engine (unlike switch/dip which use \`onChange\`).
 
 Signature: \`doc(comp.key)\` — see also [interactive-components.md](interactive-components.md).
 
@@ -7816,6 +7837,7 @@ Signature: \`doc(comp.key)\` — see also [interactive-components.md](interactiv
 comp [key] .name:
   label: 'A'
   size: 36
+  type: 1
   nl
   :
 \`\`\`
@@ -7834,22 +7856,31 @@ comp [key] .name::
 |-----------|---------|---------|-------------|
 | \`label\`   | string  | \`''\`    | Text on the button |
 | \`size\`    | integer | \`36\`    | Button size (pixels) |
-| \`type\`    | integer | \`0\`     | Visual style variant |
+| \`type\`    | \`0\`/\`1\`/\`2\` | \`0\` | Interaction mode (see below) |
 | \`nl\`      | flag    | (no)    | Newline after the button |
+
+### \`type\` interaction modes
+
+| \`type\` | Panel behaviour | \`:get\` output |
+|--------|-----------------|---------------|
+| \`0\` | Short click (auto-release ~150ms) | \`1\` while active, then \`0\` |
+| \`1\` | Hold until mouse/touch up | \`1\` while held, \`0\` on release |
+| \`2\` | Toggle/latch (like \`clcd\` \`touchType: 3\`) | \`0\` ↔ \`1\` on each press; release does not change output. Button stays visually on while output is \`1\`. |
 
 ---
 
 ## Output
 
-- **1 bit**: \`0\` (released) or \`1\` (pressed)
+- **1 bit**: \`0\` or \`1\` (depends on \`type\` and press state)
 
 ---
 
-## Example — level-sensitive property block
+## Example — level-sensitive property block (type 1 hold)
 
 \`\`\`logts-play
 comp [key] .btn:
   label: 'Go'
+  type: 1
   on: 1
   :
 
@@ -7872,9 +7903,33 @@ Hold the button to drive the LED block while \`set\` is \`1\`.
 
 ---
 
+## Example — toggle (type 2)
+
+\`\`\`logts-play
+comp [key] .pwr:
+  label: 'P'
+  type: 2
+  on: 1
+  :
+
+comp [led] .on:
+  length: 1
+  color: ^0f9
+  on: 1
+  :
+
+1wire led = .pwr
+
+.on = led
+\`\`\`
+
+Tap once to latch \`1\` (LED on); tap again for \`0\`.
+
+---
+
 ## Notes
 
-- Use **key** for pulses; use [switch.md](switch.md) for a latched state.
+- Use **type 0** for short pulses; **type 1** for hold-while-pressed; **type 2** for latched toggle (similar to [switch.md](switch.md) but on a key widget).
 - \`probe(.btn)\` tracks press/release in the Output panel — [debug.md](debug.md).
 `,
     'lcd.md': `# LCD matrix component

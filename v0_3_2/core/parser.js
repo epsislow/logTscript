@@ -1249,6 +1249,10 @@ assignment() {
   doc(){
     this.eat('KEYWORD');
     this.eat('SYM', '(');
+    if (this.c.type === 'SYM' && this.c.value === ')') {
+      this.eat('SYM', ')');
+      return { doc: '' };
+    }
     if (this.c.type === 'GREF') {
       const name = this.c.value;
       this.eat('GREF');
