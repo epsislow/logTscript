@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, oscillator.md, pcb.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
  */
 (function () {
   'use strict';
@@ -3756,6 +3756,7 @@ LogTscript includes built-in **components** (\`comp\`), **inline** declarations 
 |-----------|-----------|------|
 | \`switch\` | — | [switch.md](switch.md) |
 | \`key\` | — | [key.md](key.md) |
+| \`keyboard\` | — | [keyboard.md](keyboard.md) |
 | \`dip\` | — | [dip.md](dip.md) |
 | \`ioport\` | — | [ioport.md](ioport.md) |
 | \`rotary\` | — | [rotary.md](rotary.md) |
@@ -6841,9 +6842,9 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 `,
     'interactive-components.md': `# Interactive components
 
-Per-component pages: [switch.md](switch.md), [key.md](key.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md), [clcd.md](clcd.md). Full catalog: [components.md](components.md).
+Per-component pages: [switch.md](switch.md), [key.md](key.md), [keyboard.md](keyboard.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md), [clcd.md](clcd.md). Full catalog: [components.md](components.md).
 
-**Switch**, **key**, **dip**, **rotary**, and **slider** are input components you control from the devices panel while the program is running. Their values feed into wires and logic — when you flip a switch, press a key, change a DIP position, turn a rotary knob, or drag a slider, connected wires update automatically.
+**Switch**, **key**, **keyboard**, **dip**, **rotary**, and **slider** are input components you control from the devices panel while the program is running.
 
 See [signal-propagation.md](signal-propagation.md) for how those updates spread through your circuit.
 
@@ -6859,6 +6860,7 @@ Inside the engine, each panel control uses a small callback when you interact wi
 |-----------|-------------|--------------|
 | \`key\` | **\`onPress\`** | Mouse/touch down — output becomes \`1\` (or toggles when \`type: 2\`) |
 | \`key\` | **\`onRelease\`** | Mouse/touch up — output returns to \`0\` (\`type: 0\`/\`1\`; no-op for \`type: 2\`) |
+| \`keyboard\` | **\`onKey\`** | While focused — emits \`:get\` code + \`:valid\` pulse per accepted key |
 | \`clcd\` | **\`onPress\`** / **\`onRelease\`** | When \`touch: 1\`, pointer down/up on a symbol hit box updates \`:out\` per \`touchType\` |
 | \`switch\` | \`onChange\` | Each time you toggle the control |
 | \`dip\` | \`onChange\` | Each time you flip one DIP position (\`index\`, \`checked\`) |
@@ -7315,6 +7317,7 @@ comp [slider] .op:
 |-----------|------|-------------|----------------|------------------|
 | \`switch\`  | 1    | Toggle      | \`onChange\`     | Stays \`0\` or \`1\` |
 | \`key\`     | 1    | Press/release (\`type: 0\`/\`1\`) or toggle (\`type: 2\`) | **\`onPress\` / \`onRelease\`** | \`0\` (or latched with \`type: 2\`) |
+| \`keyboard\` | 8 / 4 | Type while focused | **\`onKey\`** | \`get\` holds last code; \`valid\` idle \`0\` |
 | \`clcd\`    | \`:out\` width | Tap symbols (\`touch: 1\`) | **\`onPress\` / \`onRelease\`** | \`:out\` per \`touchType\` |
 | \`dip\`     | N    | Flip each position | \`onChange\` | Holds last pattern |
 | \`rotary\`  | \`ceil(log₂(states))\` | Drag / step knob | \`onChange\` | Holds last state |
@@ -7931,6 +7934,152 @@ Tap once to latch \`1\` (LED on); tap again for \`0\`.
 
 - Use **type 0** for short pulses; **type 1** for hold-while-pressed; **type 2** for latched toggle (similar to [switch.md](switch.md) but on a key widget).
 - \`probe(.btn)\` tracks press/release in the Output panel — [debug.md](debug.md).
+`,
+    'keyboard.md': `# KEYBOARD
+
+A keyboard is an interactive input component that captures key presses from the browser and emits values into the simulation.
+
+Unlike a terminal, a keyboard does not display typed characters.
+
+Its purpose is to generate input events that can be connected to queues, stacks, terminals, CPUs, UARTs, or other components.
+
+Index: [interactive-components.md](interactive-components.md) · Signature: \`doc(comp.keyboard)\`
+
+---
+
+## Syntax
+
+\`\`\`logts
+comp [keyboard] .name:
+  label: 'Keyboard'
+  color: ^808080
+  bgColor: ^101010
+  focusColor: ^2ecc71
+  focusBgColor: ^181818
+  onlyNumbers
+  nl
+  :
+\`\`\`
+
+Minimal form:
+
+\`\`\`logts
+comp [keyboard] .name::
+\`\`\`
+
+---
+
+## Behavior
+
+A keyboard captures key presses only while **focused**.
+
+| Action | Result |
+|--------|--------|
+| Click component | focused (fast blinking cursor after label) |
+| Click elsewhere | unfocused |
+
+When focused, key presses are emitted into the simulation. The component does not display the characters that were typed.
+
+---
+
+## Outputs
+
+| Pout | Width | Description |
+|------|-------|-------------|
+| \`get\` | 8 (ASCII) / 4 (\`onlyNumbers\`) | Last emitted code |
+| \`valid\` | 1 | Pulse \`1\` for one propagation cycle when a key is accepted, then \`0\` |
+
+Wire property blocks use \`set = .kbd:valid\` to trigger \`push\` / \`append\` on each key.
+
+---
+
+## Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| \`label\` | string | \`Keyboard\` | Display label |
+| \`color\` | color | \`^808080\` | Border when unfocused |
+| \`bgColor\` | color | \`^101010\` | Background when unfocused |
+| \`focusColor\` | color | \`^2ecc71\` | Border when focused |
+| \`focusBgColor\` | color | \`^181818\` | Background when focused |
+| \`onlyNumbers\` | flag | (no) | Accept only \`0\`–\`9\` |
+| \`nl\` | flag | (no) | New line after component |
+
+---
+
+## ASCII mode (default)
+
+| Key | Decimal | Binary (8 bit) |
+|-----|---------|----------------|
+| \`A\` | 65 | \`01000001\` |
+| \`5\` | 53 | \`00110101\` |
+| Enter | 10 | \`00001010\` |
+
+---
+
+## \`onlyNumbers\` mode
+
+Only \`0\`–\`9\` are accepted. \`get\` is **4 bits** with decimal value (\`5\` → \`0101\`). Enter and letters are ignored.
+
+---
+
+## Example — keyboard → terminal
+
+Click the keyboard, type characters; each accepted key appends to the terminal when \`valid\` pulses.
+
+\`\`\`logts-play
+comp [keyboard] .kbd:
+  label: 'Console'
+  focusColor: ^00ff00
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 10
+  columns: 40
+  color: ^0f0
+  on: 1
+  nl
+  :
+
+.term:{
+  append = .kbd
+  set = .kbd:valid
+}
+\`\`\`
+
+---
+
+## Example — keyboard → queue (BCD)
+
+\`\`\`logts-play
+comp [keyboard] .digits:
+  label: 'BCD'
+  onlyNumbers
+  focusColor: ^00aaff
+  on: 1
+  :
+
+comp [queue] .q:
+  width: 4
+  length: 16
+  on: 1
+  nl
+  :
+
+.q:{
+  push = .digits
+  set = .digits:valid
+}
+\`\`\`
+
+---
+
+## Notes
+
+- Only one focused keyboard receives keys at a time.
+- Typed characters are not shown on the keyboard widget (use [terminal.md](terminal.md) for display).
+- Future versions may support custom key mappings through LUTs.
 `,
     'lcd.md': `# LCD matrix component
 

@@ -1852,7 +1852,7 @@
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider'];
+    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -11677,6 +11677,130 @@ reg(1598, 'doc', 'doc(show) doc(peek) doc(probe) — debug signatures', function
   const zlist = session.runDoc('doc(Zlist)');
   h.assert('Zlist sig', zlist[0], 'Zlist(wireName) — list registered bus drivers (MODE ZSTATE, at RUN/NEXT)');
 });
+
+reg(1599, 'keyboard', 'Parser — attrs onlyNumbers + label', function(h, session) {
+  const stmts = session.parse(`comp [keyboard] .kbd:
+  label: 'UART RX'
+  onlyNumbers
+  focusColor: ^00ff00
+  nl
+  :`);
+  h.assert('keyboard type', stmts[0].comp.type, 'keyboard');
+  h.assert('label', stmts[0].comp.attributes.label, 'UART RX');
+  h.assert('onlyNumbers', String(!!stmts[0].comp.attributes.onlyNumbers), 'true');
+  h.assert('focusColor', String(stmts[0].comp.attributes.focusColor).toLowerCase(), '#00ff00');
+  h.assert('nl', String(!!stmts[0].comp.attributes.nl), 'true');
+});
+
+reg(1600, 'keyboard', 'ASCII A — get 01000001', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  on: 1
+  :
+8wire code = .kbd`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+  h.assert('get A', session.getWire(interp, 'code'), '01000001');
+  h.assert('valid idle', session.getCompProperty(interp, '.kbd', 'valid'), '0');
+});
+
+reg(1601, 'keyboard', 'Enter — get 00001010', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  on: 1
+  :
+8wire code = .kbd`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' });
+  h.assert('get LF', session.getWire(interp, 'code'), '00001010');
+});
+
+reg(1602, 'keyboard', 'onlyNumbers 5 — get 0101', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  onlyNumbers
+  on: 1
+  :
+4wire code = .kbd`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: '5' });
+  h.assert('get 5', session.getWire(interp, 'code'), '0101');
+});
+
+reg(1603, 'keyboard', 'onlyNumbers ignores A and Enter', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  onlyNumbers
+  on: 1
+  :
+4wire code = .kbd`);
+  h.assert('reject A', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'A' })), 'false');
+  h.assert('still 0', session.getWire(interp, 'code'), '0000');
+  h.assert('reject Enter', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' })), 'false');
+  h.assert('still 0b', session.getWire(interp, 'code'), '0000');
+});
+
+reg(1604, 'keyboard', 'keyboard → queue push via valid', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  onlyNumbers
+  on: 1
+  :
+comp [queue] .q:
+  width: 4
+  length: 8
+  on: 1
+  :
+.q:{
+  push = .kbd
+  set = .kbd:valid
+}`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: '5' });
+  session.triggerKeyboardKey(interp, '.kbd', { key: '9' });
+  session.execStmts(interp, '4wire n = .q:size');
+  h.assert('size 2', session.getWire(interp, 'n'), '0010');
+});
+
+reg(1605, 'keyboard', 'keyboard → terminal append A', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 3
+  columns: 20
+  on: 1
+  :
+.term:{
+  append = .kbd
+  set = .kbd:valid
+}`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+  h.assert('terminal A', getTerminalText(_termId(interp, '.term')), 'A');
+});
+
+reg(1606, 'keyboard', 'keyboardHandler on compInfo', function(h, session) {
+  const { interp } = session.run('comp [keyboard] .kbd:\n  on: 1\n  :\n');
+  const comp = interp.components.get('.kbd');
+  h.assert('has handler', String(!!(comp && comp.keyboardHandler)), 'true');
+  h.assert('onKey fn', String(typeof comp.keyboardHandler.onKey === 'function'), 'true');
+  h.assert('validRef', String(!!comp.validRef), 'true');
+});
+
+reg(1607, 'keyboard', 'doc(comp.keyboard) signature', function(h, session) {
+  const out = session.runDoc('doc(comp.keyboard)');
+  h.assert('type line', out[0], 'comp [keyboard] .name:');
+  h.assert('has valid pout', String(out.some(l => l.includes('valid'))), 'true');
+  h.assert('onlyNumbers attr', String(out.some(l => l.includes('onlyNumbers'))), 'true');
+});
+
+reg(1608, 'keyboard', 'keyboard → terminal append A (wave)', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 3
+  columns: 20
+  on: 1
+  :
+.term:{
+  append = .kbd
+  set = .kbd:valid
+}`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+  h.assert('terminal A', getTerminalText(_termId(interp, '.term')), 'A');
+}, { propagation: 'wave' });
 
 
   window.LogTScriptTestSuite = {

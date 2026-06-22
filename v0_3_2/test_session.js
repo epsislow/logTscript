@@ -151,6 +151,23 @@
         }
       },
 
+      triggerKeyboardKey(interp, compName, opts) {
+        const i = interp || this.interp;
+        if (!i) return false;
+        const comp = i.components.get(compName);
+        if (!comp || !comp.keyboardHandler || typeof comp.keyboardHandler.onKey !== 'function') {
+          return false;
+        }
+        const o = Object.assign({ force: true }, opts || {});
+        if (o.charCode !== undefined && o.key === undefined) {
+          return comp.keyboardHandler.onKey(o.charCode, o);
+        }
+        if (o.key !== undefined) {
+          return comp.keyboardHandler.onKey(o.key, o);
+        }
+        return false;
+      },
+
       setComp(interp, name, val) {
         const i = interp || this.interp;
         if (!i) return;

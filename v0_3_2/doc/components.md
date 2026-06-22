@@ -25,6 +25,7 @@ LogTscript includes built-in **components** (`comp`), **inline** declarations (`
 |-----------|-----------|------|
 | `switch` | — | [switch.md](switch.md) |
 | `key` | — | [key.md](key.md) |
+| `keyboard` | — | [keyboard.md](keyboard.md) |
 | `dip` | — | [dip.md](dip.md) |
 | `ioport` | — | [ioport.md](ioport.md) |
 | `rotary` | — | [rotary.md](rotary.md) |

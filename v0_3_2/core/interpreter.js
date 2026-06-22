@@ -6090,6 +6090,8 @@ if (s.assignment) {
         if (result.clcdSymbols) compInfo.clcdSymbols = result.clcdSymbols;
         if (result.touchHandler) compInfo.touchHandler = result.touchHandler;
         if (result.keyHandler) compInfo.keyHandler = result.keyHandler;
+        if (result.validRef) compInfo.validRef = result.validRef;
+        if (result.keyboardHandler) compInfo.keyboardHandler = result.keyboardHandler;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;

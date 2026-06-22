@@ -1,8 +1,8 @@
 # Interactive components
 
-Per-component pages: [switch.md](switch.md), [key.md](key.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md), [clcd.md](clcd.md). Full catalog: [components.md](components.md).
+Per-component pages: [switch.md](switch.md), [key.md](key.md), [keyboard.md](keyboard.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md), [clcd.md](clcd.md). Full catalog: [components.md](components.md).
 
-**Switch**, **key**, **dip**, **rotary**, and **slider** are input components you control from the devices panel while the program is running. Their values feed into wires and logic — when you flip a switch, press a key, change a DIP position, turn a rotary knob, or drag a slider, connected wires update automatically.
+**Switch**, **key**, **keyboard**, **dip**, **rotary**, and **slider** are input components you control from the devices panel while the program is running.
 
 See [signal-propagation.md](signal-propagation.md) for how those updates spread through your circuit.
 
@@ -18,6 +18,7 @@ Inside the engine, each panel control uses a small callback when you interact wi
 |-----------|-------------|--------------|
 | `key` | **`onPress`** | Mouse/touch down — output becomes `1` (or toggles when `type: 2`) |
 | `key` | **`onRelease`** | Mouse/touch up — output returns to `0` (`type: 0`/`1`; no-op for `type: 2`) |
+| `keyboard` | **`onKey`** | While focused — emits `:get` code + `:valid` pulse per accepted key |
 | `clcd` | **`onPress`** / **`onRelease`** | When `touch: 1`, pointer down/up on a symbol hit box updates `:out` per `touchType` |
 | `switch` | `onChange` | Each time you toggle the control |
 | `dip` | `onChange` | Each time you flip one DIP position (`index`, `checked`) |
@@ -474,6 +475,7 @@ comp [slider] .op:
 |-----------|------|-------------|----------------|------------------|
 | `switch`  | 1    | Toggle      | `onChange`     | Stays `0` or `1` |
 | `key`     | 1    | Press/release (`type: 0`/`1`) or toggle (`type: 2`) | **`onPress` / `onRelease`** | `0` (or latched with `type: 2`) |
+| `keyboard` | 8 / 4 | Type while focused | **`onKey`** | `get` holds last code; `valid` idle `0` |
 | `clcd`    | `:out` width | Tap symbols (`touch: 1`) | **`onPress` / `onRelease`** | `:out` per `touchType` |
 | `dip`     | N    | Flip each position | `onChange` | Holds last pattern |
 | `rotary`  | `ceil(log₂(states))` | Drag / step knob | `onChange` | Holds last state |
