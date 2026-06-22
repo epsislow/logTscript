@@ -795,3 +795,28 @@ Use code with caution.When the compiler hits line 3 (BEQ loop_start at Address 2
 }
 # ^^^ ERROR: Relative jump offset (-21) is out of bounds for a signed 4b field (Must be between -8 and +7).
 Use code with caution.By simply looking for that S modifier in your definition (S4b), the LogTScript assembler completely automates this tedious binary math for the student!
+
+====
+[  ] Add transistor switch electrical
+     NPN PNP(base, emit, coll)
+[  ] Add switch mecanical 
+[  ] Add back button in docViewer
+[  ] Add type 2 to key for pressed and release when released and type 3 for toggle 
+[  ] Example terminal with queue and button append 
+[v] Example mode zstate cpudata ramdata not working switch doesn't work like that
+[  ] LOAD file doc
+[  ] Functie TOGGLE 0 -> 1   is 1bit 
+[  ] Functie ZWHO shows Z connections ZLIST 
+[  ] MASK returns only those bits as pointer
+   4wire a= MASK(b, start, len)
+[  ] Functii ISZ ANYZ ISX ANYZ ALL01 ALLZ ANYZX IS01 ALL0 ALL1
+[v] Functie ZCONNECT short zconn
+     a = ZCONN(en, b)
+     adauga driver b cu asignare la a daca este enabled (1) en
+   daca b contine Z atunci driverul se va uita doar la bitii cu valori 1, 0 sa asigneze la a
+   shortcut
+   a <= b 
+   a <= b w en
+
+
+[  ] Sub UI Editor sa afisam bara cu cuvinte autocomplete pt functii componente nume variabile "(" ")" numele functiei tb sa contina si ( exemplu scrii togg si iti arata optiune "TOGGLE("
