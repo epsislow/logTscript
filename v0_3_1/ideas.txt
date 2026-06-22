@@ -802,7 +802,7 @@ Use code with caution.By simply looking for that S modifier in your definition (
 [  ] Add switch mecanical 
 1 [ v ] Add back button in docViewer   
 2 [  ] Add type 2 to key for pressed and release when released and type 3 for toggle 
-3 [  ] Example terminal with queue and button append 
+3 [ v ] Example terminal with queue and button append 
 [v] Example mode zstate cpudata ramdata not working switch doesn't work like that
 4 [  ] LOAD file doc
 5 [  ] Functie TOGGLE 0 -> 1   is 1bit 

@@ -10,6 +10,16 @@ function isGenericPoutRedirectProperty(property) {
   return ['front', 'top', 'empty', 'full', 'size', 'capacity', 'free'].includes(base);
 }
 
+function isOutRedirectProperty(property) {
+  return property === 'out>';
+}
+
+function isBusRedirectProperty(property) {
+  return isGetRedirectProperty(property)
+    || isGenericPoutRedirectProperty(property)
+    || isOutRedirectProperty(property);
+}
+
 function memPortFromAdrPin(pinName) {
   if (pinName === 'adr') return 1;
   const m = /^([2-4])adr$/.exec(pinName);
@@ -195,6 +205,7 @@ class Interpreter {
     this.zstate = false;
     this.zReleasedWires = new Set();
     this.wireContributionQueue = new Map();
+    this.zconnRedirectRegistrations = new Map();
     this.aliases = new Map();
     this.components=new Map(); // Component name -> {type, componentType, attributes, initialValue, returnType, ref, deviceIds}
     this.componentConnections=new Map(); // Component name -> {source: ref or expr, bitRange}
@@ -1636,19 +1647,138 @@ class Interpreter {
     return changed;
   }
 
-  _componentSetEnabled(compName) {
-    const pending = this.componentPendingProperties.get(compName);
-    if (!pending || pending.set === undefined) return true;
-    let setValue = pending.set.value;
-    if (setValue === undefined || setValue === null || setValue === '') return false;
-    return setValue === '1' || setValue.slice(-1) === '1';
+  _zConnectShouldDrive(enVal, polarity) {
+    const enBit = enVal && enVal.length ? enVal.slice(-1) : '0';
+    if (polarity === 'w1') return enBit === '1';
+    if (polarity === 'w0') return enBit === '0';
+    return false;
   }
 
-  _zstateScheduleWire(targetName, value) {
-    if (this.zstate && this.deferWirePropagation()) {
-      return this.queueWireContribution(targetName, value);
+  _registerZconnRedirect(busName, entry) {
+    if (!this.zconnRedirectRegistrations.has(busName)) {
+      this.zconnRedirectRegistrations.set(busName, []);
     }
-    return this.scheduleWireChange(targetName, value);
+    const arr = this.zconnRedirectRegistrations.get(busName);
+    const key = entry.kind === 'pcb' || entry.kind === 'chip' || entry.kind === 'board'
+      ? `${entry.kind}:${entry.instance}:${entry.poutName}`
+      : `${entry.kind}:${entry.instance}:${entry.sourceProp}`;
+    const idx = arr.findIndex(e => {
+      const k = e.kind === 'pcb' || e.kind === 'chip' || e.kind === 'board'
+        ? `${e.kind}:${e.instance}:${e.poutName}`
+        : `${e.kind}:${e.instance}:${e.sourceProp}`;
+      return k === key;
+    });
+    if (idx >= 0) arr[idx] = entry;
+    else arr.push(entry);
+  }
+
+  _evalZconnRedirectValue(entry) {
+    if (entry.kind === 'component') {
+      const r = this.evalAtom({ var: entry.instance, property: entry.sourceProp }, false);
+      return r && r.value != null ? r.value : null;
+    }
+    const instMap = entry.kind === 'pcb' ? this.pcbInstances
+      : entry.kind === 'chip' ? this.chipInstances
+      : this.boardInstances;
+    const instance = instMap.get(entry.instance);
+    if (!instance) return null;
+    const poutInfo = instance.poutStorage.get(entry.poutName);
+    if (!poutInfo) return null;
+    return this.getValueFromRef(poutInfo.ref);
+  }
+
+  _fitRedirectValue(value, bits) {
+    let v = value || '0'.repeat(bits);
+    if (v.length < bits) v = v.padEnd(bits, '0');
+    else if (v.length > bits) v = v.substring(0, bits);
+    return v;
+  }
+
+  _writeWireRedirectDirect(targetName, value) {
+    const wire = this.wires.get(targetName);
+    if (!wire) return;
+    const bits = this.getBitWidth(wire.type);
+    const v = this._fitRedirectValue(value, bits);
+    const old = this.getWireStableValue(targetName);
+    this.writeWireStable(targetName, v);
+    if (old !== v) this.updateConnectedComponents(targetName, v);
+  }
+
+  _applyBusEnableRedirect(busName, value, prop, registerEntry) {
+    if (prop.busEnable && this.zstate && this.deferWirePropagation()) {
+      this._registerZconnRedirect(busName, registerEntry);
+      const enVal = this._evalCallArgValue(prop.busEnableExpr);
+      if (this._zConnectShouldDrive(enVal, prop.busEnable)) {
+        const wire = this.wires.get(busName);
+        const bits = wire ? this.getBitWidth(wire.type) : null;
+        this.queueWireContribution(busName, this._fitRedirectValue(value, bits));
+      }
+      return true;
+    }
+    return false;
+  }
+
+  _applyComponentWireRedirect(component, prop, sourceProp) {
+    const comp = this.components.get(component);
+    if (!comp) return;
+
+    const supports = sourceProp === 'get'
+      ? (this.componentRegistry
+        ? this.componentRegistry.supportsProperty(comp.type, sourceProp, comp.attributes)
+        : true)
+      : (this.componentRegistry && this.componentRegistry.supportsRedirect(comp.type, sourceProp));
+    if (!supports) {
+      throw Error(`Component ${component} (type: ${comp.type}) does not support :${sourceProp} property`);
+    }
+
+    const targetName = prop.target.var;
+    const wire = this.wires.get(targetName);
+    if (!wire) {
+      throw Error(`Wire ${targetName} not found for ${prop.property} assignment`);
+    }
+
+    const bits = this.getBitWidth(wire.type);
+    const redirectResult = this.evalAtom({ var: component, property: sourceProp }, false);
+    const value = this._fitRedirectValue(redirectResult.value, bits);
+
+    if (this._applyBusEnableRedirect(targetName, value, prop, {
+      kind: 'component',
+      instance: component,
+      sourceProp,
+      busEnable: prop.busEnable,
+      busEnableExpr: prop.busEnableExpr
+    })) {
+      return;
+    }
+
+    this._writeWireRedirectDirect(targetName, value);
+  }
+
+  _refreshZconnRedirectsForBus(busName) {
+    const entries = this.zconnRedirectRegistrations.get(busName);
+    if (!entries || !entries.length) return false;
+    let anyDrive = false;
+    const wire = this.wires.get(busName);
+    const bits = wire ? this.getBitWidth(wire.type) : null;
+    for (const entry of entries) {
+      const enVal = this._evalCallArgValue(entry.busEnableExpr);
+      if (!this._zConnectShouldDrive(enVal, entry.busEnable)) continue;
+      const raw = this._evalZconnRedirectValue(entry);
+      if (raw == null) continue;
+      this.queueWireContribution(busName, this._fitRedirectValue(raw, bits));
+      anyDrive = true;
+    }
+    return anyDrive;
+  }
+
+  _flushZstateWireContributions() {
+    if (!this.zstate || !this.deferWirePropagation() || !this.signalPropagationStrategy) return;
+    if (!this.hasZConnectWireAssignments() && !this.wireContributionQueue.size) return;
+    const changed = this.signalPropagationStrategy.commitPendingWires();
+    for (const n of changed) {
+      const v = this.getWireStableValue(n);
+      if (v != null) this.updateConnectedComponents(n, v);
+    }
   }
 
   trackWireStatement(s) {
@@ -1666,9 +1796,12 @@ class Interpreter {
   getZConnectTargetBuses() {
     const buses = new Set();
     for (const ws of this.wireStatements) {
-      if (ws.assignment && this.assignmentExprIsZConnect(ws.assignment.expr)) {
+      if (ws.assignment && (this.assignmentExprIsZConnect(ws.assignment.expr) || ws.assignment.busEnable)) {
         buses.add(ws.assignment.target.var);
       }
+    }
+    for (const busName of this.zconnRedirectRegistrations.keys()) {
+      buses.add(busName);
     }
     return buses;
   }
@@ -1728,8 +1861,9 @@ class Interpreter {
   }
 
   refreshZConnectBuses() {
-    if (!this.zstate || !this.hasZConnectWireAssignments()) return;
+    if (!this.zstate) return;
     const busTargets = this.getZConnectTargetBuses();
+    if (!busTargets.size) return;
     for (const busName of busTargets) {
       let anyDrive = false;
       for (const ws of this.wireStatements) {
@@ -1739,6 +1873,9 @@ class Interpreter {
           this.queueWireContribution(name, val);
           anyDrive = true;
         }
+      }
+      if (this._refreshZconnRedirectsForBus(busName)) {
+        anyDrive = true;
       }
       if (!anyDrive) {
         const wire = this.wires.get(busName);
@@ -3941,11 +4078,13 @@ if (this.isBuiltinDEMUX(name)) {
         this.zstate = true;
         this.zReleasedWires.clear();
         this.wireContributionQueue.clear();
+        this.zconnRedirectRegistrations.clear();
         this.mode = 'WIREWRITE';
       } else {
         this.zstate = false;
         this.zReleasedWires.clear();
         this.wireContributionQueue.clear();
+        this.zconnRedirectRegistrations.clear();
         this.mode = s.mode;
       }
       return;
@@ -5487,8 +5626,12 @@ if (s.assignment) {
     if (s.assignment) {
       const wireName = s.assignment.target.var;
       if (this.zReleasedWires.has(wireName)) {
-        this.currentStmt = prevStmt;
-        return outputs;
+        const isReconnect = this.assignmentExprIsZConnect(s.assignment.expr) || s.assignment.busEnable;
+        if (!isReconnect) {
+          this.currentStmt = prevStmt;
+          return outputs;
+        }
+        this.zReleasedWires.delete(wireName);
       }
     } else if (s.decls) {
       for (const d of s.decls) {
@@ -5508,6 +5651,13 @@ if (s.assignment) {
       if(!bits){ this.currentStmt = prevStmt; return outputs; }
       try {
         this.lowerUseExprInStatement(s, bits);
+        if (s.assignment.busEnable) {
+          const enVal = this._evalCallArgValue(s.assignment.busEnableExpr);
+          if (!this._zConnectShouldDrive(enVal, s.assignment.busEnable)) {
+            this.currentStmt = prevStmt;
+            return outputs;
+          }
+        }
         const exprResult = this.evalExpr(s.assignment.expr, false);
         if (exprResult.some(part => part.zConnectNoDrive)) {
           this.currentStmt = prevStmt;
@@ -5528,6 +5678,8 @@ if (s.assignment) {
         const wireValue = fitWireAssignBits(totalValue, bits, assignPad, 'msb', this);
         if (toPending) {
           outputs.push([wireName, wireValue]);
+        } else if (s.assignment.busEnable && this.zstate && this.deferWirePropagation()) {
+          this.queueWireContribution(wireName, wireValue);
         } else {
           let storageIdx;
           if(this.wireStorageMap.has(wireName)){
@@ -7100,134 +7252,14 @@ if (s.assignment) {
       }
     }
     
-    // Process get>/2get>/… redirects after all properties are applied
-    for(const prop of properties){
-      if(!isGetRedirectProperty(prop.property)) continue;
-
-      const getProp = prop.property.slice(0, -1);
-      const comp = this.components.get(component);
-      if(!comp) continue;
-
-      const supportsGet = this.componentRegistry
-        ? this.componentRegistry.supportsProperty(comp.type, getProp, comp.attributes)
-        : (getProp === 'get');
-      if(!supportsGet){
-        throw Error(`Component ${component} (type: ${comp.type}) does not support :${getProp} property`);
-      }
-
-      const getAtom = {
-        var: component,
-        property: getProp
-      };
-      const getResult = this.evalAtom(getAtom, false);
-
-      const targetName = prop.target.var;
-      const wire = this.wires.get(targetName);
-      if(!wire){
-        throw Error(`Wire ${targetName} not found for ${prop.property} assignment`);
-      }
-
-      const bits = this.getBitWidth(wire.type);
-      let getValue = getResult.value || '0'.repeat(bits);
-
-      if(getValue.length < bits){
-        getValue = getValue.padEnd(bits, '0');
-      } else if(getValue.length > bits){
-        getValue = getValue.substring(0, bits);
-      }
-
-      if (this.zstate && this.deferWirePropagation()) {
-        if (!this._componentSetEnabled(component)) continue;
-        this._zstateScheduleWire(targetName, getValue);
-        continue;
-      }
-
-      let storageIdx = null;
-      if(wire.ref){
-        const refMatch = wire.ref.match(/^&(\d+)/);
-        if(refMatch){
-          storageIdx = parseInt(refMatch[1]);
-          const stored = this.storage.find(s => s.index === storageIdx);
-          if(stored){
-            const oldValue = stored.value;
-            if(oldValue !== getValue){
-              stored.value = getValue;
-              this.updateConnectedComponents(targetName, getValue);
-            }
-          }
-        }
-      } else {
-        storageIdx = this.storeValue(getValue);
-        wire.ref = `&${storageIdx}`;
-        if(!this.wireStorageMap.has(targetName)){
-          this.wireStorageMap.set(targetName, storageIdx);
-        }
-        this.updateConnectedComponents(targetName, getValue);
-      }
+    // Process bus redirects: get>, front>, top>, out>, etc.
+    for (const prop of properties) {
+      if (!isBusRedirectProperty(prop.property)) continue;
+      const sourceProp = prop.property.slice(0, -1);
+      this._applyComponentWireRedirect(component, prop, sourceProp);
     }
     
-    // Process generic pout redirects (front>, top>, size>, etc.)
-    for(const prop of properties){
-      if(!isGenericPoutRedirectProperty(prop.property)) continue;
-
-      const baseProp = prop.property.slice(0, -1);
-      const comp = this.components.get(component);
-      if(!comp) continue;
-
-      if(!this.componentRegistry || !this.componentRegistry.supportsRedirect(comp.type, baseProp)){
-        throw Error(`Component ${component} (type: ${comp.type}) does not support :${baseProp} property`);
-      }
-
-      const redirectAtom = {
-        var: component,
-        property: baseProp
-      };
-      const redirectResult = this.evalAtom(redirectAtom, false);
-
-      const targetName = prop.target.var;
-      const wire = this.wires.get(targetName);
-      if(!wire){
-        throw Error(`Wire ${targetName} not found for ${prop.property} assignment`);
-      }
-
-      const bits = this.getBitWidth(wire.type);
-      let redirectValue = redirectResult.value || '0'.repeat(bits);
-
-      if(redirectValue.length < bits){
-        redirectValue = redirectValue.padEnd(bits, '0');
-      } else if(redirectValue.length > bits){
-        redirectValue = redirectValue.substring(0, bits);
-      }
-
-      if (this.zstate && this.deferWirePropagation()) {
-        if (!this._componentSetEnabled(component)) continue;
-        this._zstateScheduleWire(targetName, redirectValue);
-        continue;
-      }
-
-      let storageIdx = null;
-      if(wire.ref){
-        const refMatch = wire.ref.match(/^&(\d+)/);
-        if(refMatch){
-          storageIdx = parseInt(refMatch[1]);
-          const stored = this.storage.find(s => s.index === storageIdx);
-          if(stored){
-            const oldValue = stored.value;
-            if(oldValue !== redirectValue){
-              stored.value = redirectValue;
-              this.updateConnectedComponents(targetName, redirectValue);
-            }
-          }
-        }
-      } else {
-        storageIdx = this.storeValue(redirectValue);
-        wire.ref = `&${storageIdx}`;
-        if(!this.wireStorageMap.has(targetName)){
-          this.wireStorageMap.set(targetName, storageIdx);
-        }
-        this.updateConnectedComponents(targetName, redirectValue);
-      }
-    }
+    this._flushZstateWireContributions();
     
     // Process mod> property if present (for divider)
     let modTarget = null;
@@ -7456,81 +7488,6 @@ if (s.assignment) {
         this.updateConnectedComponents(targetName, overValue);
       }
     }
-    
-    // Process out> property if present (for shifter)
-    let outTarget = null;
-    for(const prop of properties){
-      if(prop.property === 'out>'){
-        if(outTarget){
-          throw Error(`Only one out> property allowed per block`);
-        }
-        outTarget = prop.target;
-      }
-    }
-    
-    if(outTarget){
-      // Validate component supports :out
-      const comp = this.components.get(component);
-      if(!comp){
-        return;
-      }
-      
-      if(!this.componentRegistry || !this.componentRegistry.supportsRedirect(comp.type, 'out')){
-        throw Error(`Component ${component} (type: ${comp.type}) does not support :out property`);
-      }
-      
-      // Evaluate component:out
-      const outAtom = {
-        var: component,
-        property: 'out'
-      };
-      const outResult = this.evalAtom(outAtom, false);
-      
-      // Assign result to target wire
-      const targetName = outTarget.var;
-      const wire = this.wires.get(targetName);
-      if(!wire){
-        throw Error(`Wire ${targetName} not found for out> assignment`);
-      }
-      
-      // Get bit width for target wire
-      const bits = this.getBitWidth(wire.type);
-      let outValue = outResult.value || '0'.repeat(bits);
-      
-      // Ensure value has correct length (out is always 1 bit, but wire might be wider)
-      if(outValue.length < bits){
-        outValue = outValue.padEnd(bits, '0');
-      } else if(outValue.length > bits){
-        outValue = outValue.substring(0, bits);
-      }
-      
-      if (this.zstate && this.deferWirePropagation()) {
-        if (this._componentSetEnabled(component)) {
-          this._zstateScheduleWire(targetName, outValue);
-        }
-      } else {
-        // Update wire storage
-        let storageIdx = null;
-        if(wire.ref){
-          const refMatch = wire.ref.match(/^&(\d+)/);
-          if(refMatch){
-            storageIdx = parseInt(refMatch[1]);
-            const stored = this.storage.find(s => s.index === storageIdx);
-            if(stored){
-              stored.value = outValue;
-              this.updateConnectedComponents(targetName, outValue);
-            }
-          }
-        } else {
-          storageIdx = this.storeValue(outValue);
-          wire.ref = `&${storageIdx}`;
-          if(!this.wireStorageMap.has(targetName)){
-            this.wireStorageMap.set(targetName, storageIdx);
-          }
-          this.updateConnectedComponents(targetName, outValue);
-        }
-      }
-    }
     } finally {
       if (useEdgeProbe) this.probeReasonContext = 'normal';
     }
@@ -7667,38 +7624,36 @@ if (s.assignment) {
     // Process pout> properties (after all pin assignments and exec)
     for(const prop of properties){
       if(prop.property === 'pout>'){
-        const poutName = prop.poutName;
-        const target = prop.target;
-
-        // Get pout value
-        const poutInfo = instance.poutStorage.get(poutName);
-        if(!poutInfo){
-          throw Error(`Unknown pout '${poutName}' for PCB instance ${instanceName}. Available pouts: ${[...instance.poutStorage.keys()].join(', ')}`);
-        }
-
-        const poutValue = this.getValueFromRef(poutInfo.ref) || '0'.repeat(poutInfo.bits);
-
-        // Assign to target wire
-        const targetName = target.var;
-        const wire = this.wires.get(targetName);
-        if(!wire){
-          throw Error(`Wire ${targetName} not found for ${poutName}>= assignment`);
-        }
-
-        // Get bit width for target wire
-        const bits = this.getBitWidth(wire.type);
-        let getValue = poutValue;
-
-        // Ensure value has correct length
-        if(getValue.length < bits){
-          getValue = getValue.padStart(bits, '0');
-        } else if(getValue.length > bits){
-          getValue = getValue.substring(getValue.length - bits);
-        }
-
-        this.publishWireValue(targetName, getValue);
+        this._applyInstancePoutRedirect(instanceName, instance, prop, 'pcb');
       }
     }
+    this._flushZstateWireContributions();
+  }
+
+  _applyInstancePoutRedirect(instanceName, instance, prop, kind) {
+    const poutName = prop.poutName;
+    const poutInfo = instance.poutStorage.get(poutName);
+    if (!poutInfo) {
+      throw Error(`Unknown pout '${poutName}' for ${kind} instance ${instanceName}`);
+    }
+    const poutValue = this.getValueFromRef(poutInfo.ref) || '0'.repeat(poutInfo.bits);
+    const targetName = prop.target.var;
+    const wire = this.wires.get(targetName);
+    if (!wire) {
+      throw Error(`Wire ${targetName} not found for ${poutName}>= assignment`);
+    }
+    const bits = this.getBitWidth(wire.type);
+    const value = this._fitRedirectValue(poutValue, bits);
+    if (this._applyBusEnableRedirect(targetName, value, prop, {
+      kind,
+      instance: instanceName,
+      poutName,
+      busEnable: prop.busEnable,
+      busEnableExpr: prop.busEnableExpr
+    })) {
+      return;
+    }
+    this._writeWireRedirectDirect(targetName, value);
   }
 
   // Re-evaluate all wire statements that reference a PCB instance by name
@@ -8035,23 +7990,10 @@ if (s.assignment) {
 
     for (const prop of properties) {
       if (prop.property === 'pout>') {
-        const poutName = prop.poutName;
-        const target = prop.target;
-        const poutInfo = instance.poutStorage.get(poutName);
-        if (!poutInfo) {
-          throw Error(`Unknown pout '${poutName}' for chip instance ${instanceName}`);
-        }
-        const poutValue = this.getValueFromRef(poutInfo.ref) || '0'.repeat(poutInfo.bits);
-        const targetName = target.var;
-        const wire = this.wires.get(targetName);
-        if (!wire) throw Error(`Wire ${targetName} not found for ${poutName}>= assignment`);
-        const bits = this.getBitWidth(wire.type);
-        let getValue = poutValue;
-        if (getValue.length < bits) getValue = getValue.padStart(bits, '0');
-        else if (getValue.length > bits) getValue = getValue.substring(getValue.length - bits);
-        this.publishWireValue(targetName, getValue);
+        this._applyInstancePoutRedirect(instanceName, instance, prop, 'chip');
       }
     }
+    this._flushZstateWireContributions();
   }
 
   reEvalWiresDependingOnBoard(instanceName) {
@@ -8301,23 +8243,10 @@ if (s.assignment) {
 
     for (const prop of properties) {
       if (prop.property === 'pout>') {
-        const poutName = prop.poutName;
-        const target = prop.target;
-        const poutInfo = instance.poutStorage.get(poutName);
-        if (!poutInfo) {
-          throw Error(`Unknown pout '${poutName}' for board instance ${instanceName}`);
-        }
-        const poutValue = this.getValueFromRef(poutInfo.ref) || '0'.repeat(poutInfo.bits);
-        const targetName = target.var;
-        const wire = this.wires.get(targetName);
-        if (!wire) throw Error(`Wire ${targetName} not found for ${poutName}>= assignment`);
-        const bits = this.getBitWidth(wire.type);
-        let getValue = poutValue;
-        if (getValue.length < bits) getValue = getValue.padStart(bits, '0');
-        else if (getValue.length > bits) getValue = getValue.substring(getValue.length - bits);
-        this.publishWireValue(targetName, getValue);
+        this._applyInstancePoutRedirect(instanceName, instance, prop, 'board');
       }
     }
+    this._flushZstateWireContributions();
   }
 
   // Apply pending properties to a component

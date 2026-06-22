@@ -860,6 +860,16 @@ parseBoardInstance() {
     return /[0-9]/.test(this.t.src[i]);
   }
 
+  parseOptionalBusEnableSuffix() {
+    if (this.c.type === 'ID' && (this.c.value === 'w0' || this.c.value === 'w1')) {
+      const busEnable = this.c.value;
+      this.eat('ID');
+      const busEnableExpr = this.expr();
+      return { busEnable, busEnableExpr };
+    }
+    return {};
+  }
+
   parsePropertyBlock(componentName) {
     this.eat('SYM', '{');
     
@@ -918,7 +928,8 @@ parseBoardInstance() {
           throw Error(`Invalid target for ${propName}> property at ${this.c.line}:${this.c.col}`);
         }
 
-        properties.push({ property: propName + '>', target: targetAtom, expr: null });
+        const enableSuffix = this.parseOptionalBusEnableSuffix();
+        properties.push({ property: propName + '>', target: targetAtom, expr: null, ...enableSuffix });
         continue;
       }
       
@@ -940,7 +951,8 @@ parseBoardInstance() {
           throw Error(`Invalid target for ${propName}>= property at ${this.c.line}:${this.c.col}`);
         }
 
-        properties.push({ property: 'pout>', poutName: propName, target: targetAtom, expr: null });
+        const enableSuffix = this.parseOptionalBusEnableSuffix();
+        properties.push({ property: 'pout>', poutName: propName, target: targetAtom, expr: null, ...enableSuffix });
         continue;
       }
 
@@ -1050,12 +1062,14 @@ assignment() {
   }
 
   const expr = this.expr();
+  const enableSuffix = this.parseOptionalBusEnableSuffix();
 
   return {
     assignment: {
       target: targetAtom,
       expr,
-      assignPad
+      assignPad,
+      ...enableSuffix
     }
   };
 }

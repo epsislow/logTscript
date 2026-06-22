@@ -84,7 +84,7 @@ Literals with `Z` or `X` require prefix **`?`** when the token would start with 
 
 ## Multi-driver resolution
 
-Within one **wave** propagation step, every write to a wire (assignment, `ZCONNECT`, `get>=`, `out>=`, `ZRELEASE(wire)`, component redirect) becomes a **contribution**. At commit time the engine resolves **per bit**:
+Within one **wave** propagation step, contributions come from **`ZCONNECT` / `w1` / `w0` sugar**, **`ZRELEASE`**, and wire assignments `bus = expr` (multi-driver merge). Component redirects **`get>=` / `out>=` / `front>=` …** without `w1`/`w0` are **direct assigns** (STRICT-style), not bus contributions.
 
 | Contributors (0/1 only) | Result |
 |-------------------------|--------|
@@ -120,6 +120,35 @@ ZCONN(databus, ramEn, ramData)   // alias
 
 `data` width must match the target bus. Multiple `bus = ZCONNECT(…)` on the same wire are re-evaluated on each wave commit (after enable wires update).
 
+### Sugar: `data w1 en` / `data w0 en`
+
+Assignment shorthand (tests **1575**–**1577**):
+
+```logts
+databus = cpuData w1 cpuEn    @ same as databus = ZCONNECT(cpuEn, cpuData)
+bus = d w0 en                 @ drive when en is strict 0 (not NOT(en))
+```
+
+| Suffix | Drive when |
+|--------|------------|
+| `w1 en` | `en` bit is strict `1` |
+| `w0 en` | `en` bit is strict `0` |
+| (neither) | normal assignment / merge |
+
+On component redirects, append the same suffix after the target wire:
+
+```logts
+.sw:{ get >= bus w1 cpuEn
+  set = 1 }
+.sh:{ out>= bus w1 1
+  set = 1 }
+```
+
+- **`set`** = when the property block runs (trigger only).
+- **`w1` / `w0`** = whether this output contributes to a shared bus (ZCONN semantics).
+
+Without `w1`/`w0`, `get>= bus` writes the wire directly (one driver), even in `MODE ZSTATE`.
+
 **Load & Run** — dual enable conflict:
 
 ```logts-play wave
@@ -140,9 +169,9 @@ Result: `XX10`.
 
 ### Driving a shared bus (1-bit switches)
 
-`comp [switch]` is **1 bit** — suitable for tiny demos with `get>=`, not for driving an `8wire` data value. Toggle switches in the panel after **Load & Run**.
+`comp [switch]` is **1 bit** — use **`get >= bus w1 1`** (or `w1 en`) for multi-driver demos on a shared bus.
 
-**Load & Run** — two switches, one bit each on `2wire bus`:
+**Load & Run** — two switches on `2wire bus` (tests **1465** / **1466**):
 
 ```logts-play wave
 MODE ZSTATE
@@ -155,22 +184,24 @@ comp [switch] .s2:
   on: 1
   :
 
-.s1:{ get >= bus
+.s1:{ get >= bus w1 1
   set = 1 }
-.s2:{ get >= bus
+.s2:{ get >= bus w1 1
   set = 1 }
 ```
 
 Both switches on `1` → `bus = 10`. If `.s1` is `1` and `.s2` is `0` → `bus = X0`.
 
-### Enable gating
+### `set` vs bus enable
 
-When `set = 0` on a property block, that component **does not contribute** in the current step. If nobody else drives the wire → `Z`.
+`set` controls **when the property block runs**, not bus drive. Use **`w1` / `w0`** on the redirect for enable-gated bus contribution:
 
 ```logts
-.sw:{ get >= bus
-  set = en }   // en=0 → no drive
+.sw:{ get >= bus w1 en
+  set = 1 }
 ```
+
+When `en` goes `0→1`, registered `w1` redirects refresh on the next wave (test **1461**).
 
 ### Re-assignment in the same step
 
@@ -192,11 +223,11 @@ Result: `1XX0` (per-bit resolve, not last-wins).
 
 ### `out>=` (shifter and similar)
 
-`out>= target` (or `out> target`) routes the component’s `:out` bit through the same resolver. See [shifter.md](shifter.md).
+Use **`out>= bus w1 en`** for shared-bus drive; without suffix, direct assign. See [shifter.md](shifter.md). Tests **1498**–**1503**.
 
 ---
 
-## `ZRELEASE(wireName)` — explicit release
+## `ZRELEASE(wireName)` — withdraw all drivers
 
 Statement (not an expression):
 
@@ -204,7 +235,9 @@ Statement (not an expression):
 ZRELEASE(databus)
 ```
 
-Sets **every bit** of `databus` to `Z` for the current step (equivalent to releasing the bus). Requires `MODE ZSTATE`. Names `z`, `Z`, `ZZZ`, etc. remain valid as wire identifiers.
+**Withdraws every driver** on `databus` for the current wave step. The resolved value becomes **`Z`** because no active driver remains — `ZRELEASE` does not “assign `ZZZ`” as a stored literal; it clears contributions so the resolver yields high-impedance.
+
+Requires `MODE ZSTATE`. Names `z`, `Z`, `ZZZ`, etc. remain valid as wire identifiers.
 
 ---
 

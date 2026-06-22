@@ -28,7 +28,7 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 
 ### `ZRELEASE(wireName)` — tristate release
 
-Statement available only after `MODE ZSTATE` — see [script modes](modes.md) and [zstate.md](zstate.md). Releases every bit of the wire to high-impedance (`Z`) in the current propagation step. Wire names `z`, `Z`, and `ZZZ` are allowed — only the keyword `ZRELEASE` is reserved.
+Statement available only after `MODE ZSTATE` — see [script modes](modes.md) and [zstate.md](zstate.md). **Withdraws all drivers** on the wire for the current step; resolved value is `Z`. A following **`ZCONNECT`** or **`bus = data w1 en`** in the same run may drive again. Wire names `z`, `Z`, and `ZZZ` are allowed — only the keyword `ZRELEASE` is reserved.
 
 ```logts-play wave
 MODE ZSTATE
@@ -41,7 +41,7 @@ See **[zstate.md](zstate.md)** for multi-driver buses, `ZCONNECT`, conflict `X`,
 
 ### `ZCONNECT(en, data)` — enable-gated bus drive
 
-Wire assignment expression (alias **`ZCONN`**). Requires `MODE ZSTATE` + wave. When `en` is strict `1`, queues `data` onto the target bus; when `en` is `0`/`Z`/`X`, no contribution. Statement `ZCONNECT(bus, en, data)` is sugar for `bus = ZCONNECT(en, data)`.
+Wire assignment expression (alias **`ZCONN`**). Requires `MODE ZSTATE` + wave. When `en` is strict `1`, queues `data` onto the target bus; when `en` is `0`/`Z`/`X`, no contribution. Sugar: **`bus = data w1 en`** / **`bus = data w0 en`** (see [zstate.md](zstate.md)). Statement `ZCONNECT(bus, en, data)` is sugar for `bus = ZCONNECT(en, data)`.
 
 ```logts-play wave
 MODE ZSTATE

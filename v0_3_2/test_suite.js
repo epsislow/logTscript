@@ -10376,7 +10376,7 @@ reg(1459, 'zstate', 'get>= with set=1 drives bus', function(h, session) {
 1wire bus
 ${ZSTATE_SW}`);
   session.setComp(interp, '.sw', '1');
-  session.execStmts(interp, `.sw:{ get >= bus
+  session.execStmts(interp, `.sw:{ get >= bus w1 1
   set = 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), '1');
@@ -10388,8 +10388,8 @@ reg(1460, 'zstate', 'get>= with set=0 — no drive', function(h, session) {
 1wire en = 0
 ${ZSTATE_SW}`);
   session.setComp(interp, '.sw', '1');
-  session.execStmts(interp, `.sw:{ get >= bus
-  set = en }`);
+  session.execStmts(interp, `.sw:{ get >= bus w1 en
+  set = 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), 'Z');
 }, ZSTATE_WAVE);
@@ -10400,15 +10400,12 @@ reg(1461, 'zstate', 'get>= enabled after en 0→1', function(h, session) {
 1wire en = 0
 ${ZSTATE_SW}`);
   session.setComp(interp, '.sw', '1');
-  session.execStmts(interp, `.sw:{ get >= bus
-  set = en }`);
+  session.execStmts(interp, `.sw:{ get >= bus w1 en
+  set = 1 }`);
   interp.postExecSrc();
   h.assert('bus Z while en=0', session.getWire(interp, 'bus'), 'Z');
   session.setWire(interp, 'en', '1');
-  session.execStmts(interp, `.sw:{ get >= bus
-  set = en }`);
-  interp.postExecSrc();
-  h.assert('bus driven', session.getWire(interp, 'bus'), '1');
+  h.assert('bus driven after en 0→1', session.getWire(interp, 'bus'), '1');
 }, ZSTATE_WAVE);
 
 reg(1462, 'zstate', '1wire undeclared init Z', function(h, session) {
@@ -10436,9 +10433,9 @@ on: 1
 :`);
   session.setComp(interp, '.s1', '1');
   session.setComp(interp, '.s2', '1');
-  session.execStmts(interp, `.s1:{ get >= bus
+  session.execStmts(interp, `.s1:{ get >= bus w1 1
   set = 1 }`);
-  session.execStmts(interp, `.s2:{ get >= bus
+  session.execStmts(interp, `.s2:{ get >= bus w1 1
   set = 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), '10');
@@ -10455,9 +10452,9 @@ on: 1
 :`);
   session.setComp(interp, '.s1', '1');
   session.setComp(interp, '.s2', '0');
-  session.execStmts(interp, `.s1:{ get >= bus
+  session.execStmts(interp, `.s1:{ get >= bus w1 1
   set = 1 }`);
-  session.execStmts(interp, `.s2:{ get >= bus
+  session.execStmts(interp, `.s2:{ get >= bus w1 1
   set = 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), 'X0');
@@ -10470,7 +10467,7 @@ reg(1467, 'zstate', 'wire assign + get>= conflict', function(h, session) {
 ${ZSTATE_SW}`);
   session.setComp(interp, '.sw', '0');
   session.execStmts(interp, 'bus = direct');
-  session.execStmts(interp, `.sw:{ get >= bus
+  session.execStmts(interp, `.sw:{ get >= bus w1 1
   set = 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), 'X0X');
@@ -10710,7 +10707,7 @@ ${ZSTATE_SH}`);
   dir = 1
   in = 0
   set = 1
-  out>= bus }`);
+  out>= bus w1 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), '1');
 }, ZSTATE_WAVE);
@@ -10724,7 +10721,7 @@ ${ZSTATE_SH}`);
   dir = 1
   in = 0
   set = 0
-  out>= bus }`);
+  out>= bus w1 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), 'Z');
 }, ZSTATE_WAVE);
@@ -10745,13 +10742,13 @@ comp [shifter] .s2:
   dir = 1
   in = 0
   set = 1
-  out>= bus }`);
+  out>= bus w1 1 }`);
   session.execStmts(interp, `.s2:{
   value = 0111
   dir = 1
   in = 0
   set = 1
-  out>= bus }`);
+  out>= bus w1 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), '1');
 }, ZSTATE_WAVE);
@@ -10772,13 +10769,13 @@ comp [shifter] .s2:
   dir = 1
   in = 0
   set = 1
-  out>= bus }`);
+  out>= bus w1 1 }`);
   session.execStmts(interp, `.s2:{
   value = 1011
   dir = 1
   in = 0
   set = 1
-  out>= bus }`);
+  out>= bus w1 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), 'X');
 }, ZSTATE_WAVE);
@@ -10794,7 +10791,7 @@ ${ZSTATE_SH}`);
   dir = 1
   in = 0
   set = 1
-  out>= bus }`);
+  out>= bus w1 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), 'X');
 }, ZSTATE_WAVE);
@@ -10805,14 +10802,14 @@ reg(1503, 'zstate', 'get>= + out>= mixed drivers', function(h, session) {
 ${ZSTATE_SW}
 ${ZSTATE_SH}`);
   session.setComp(interp, '.sw', '1');
-  session.execStmts(interp, `.sw:{ get >= bus
+  session.execStmts(interp, `.sw:{ get >= bus w1 1
   set = 1 }`);
   session.execStmts(interp, `.sh:{
   value = 1010
   dir = 1
   in = 0
   set = 1
-  out>= bus }`);
+  out>= bus w1 1 }`);
   interp.postExecSrc();
   h.assert('bus', session.getWire(interp, 'bus'), 'X');
 }, ZSTATE_WAVE);
@@ -11413,6 +11410,53 @@ function runTerminalStackKeyDrain(h, session) {
 }
 
 reg(1574, 'terminal', 'stack LIFO — key drain CBA (wave)', runTerminalStackKeyDrain, { propagation: 'wave' });
+
+reg(1575, 'zstate', 'assignment sugar data w1 en drives bus', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+8wire databus
+8wire cpuData = 10101010
+1wire cpuEn = 1
+databus = cpuData w1 cpuEn`);
+  h.assert('bus', session.getWire(interp, 'databus'), '10101010');
+}, ZSTATE_WAVE);
+
+reg(1576, 'zstate', 'assignment sugar data w0 en — drive when en=0', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+4wire bus
+4wire d = 1010
+1wire en = 0
+bus = d w0 en`);
+  h.assert('bus', session.getWire(interp, 'bus'), '1010');
+}, ZSTATE_WAVE);
+
+reg(1577, 'zstate', 'assignment sugar w0 en=1 — no drive', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+4wire bus
+4wire d = 1010
+1wire en = 1
+bus = d w0 en`);
+  h.assert('bus', session.getWire(interp, 'bus'), 'ZZZZ');
+}, ZSTATE_WAVE);
+
+reg(1578, 'zstate', 'get>= without w1 — direct assign not multi-driver', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+1wire bus
+${ZSTATE_SW}`);
+  session.setComp(interp, '.sw', '1');
+  session.execStmts(interp, `.sw:{ get >= bus
+  set = 1 }`);
+  h.assert('bus direct', session.getWire(interp, 'bus'), '1');
+}, ZSTATE_WAVE);
+
+reg(1579, 'zstate', 'ZRELEASE then ZCONNECT same step', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+4wire bus
+4wire d = 1010
+1wire en = 1
+ZRELEASE(bus)
+ZCONNECT(bus, en, d)`);
+  h.assert('bus', session.getWire(interp, 'bus'), '1010');
+}, ZSTATE_WAVE);
 
 
   window.LogTScriptTestSuite = {
