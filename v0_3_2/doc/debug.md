@@ -10,15 +10,15 @@ For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md]
 
 ## Quick comparison
 
-| | `show` | `peek` | `probe` | `watch` | `lutOf` / `exprOfLut` |
-|---|--------|--------|---------|---------|------------------------|
-| **Purpose** | Display settled values | Instant snapshot | Monitor every value commit | Waveform trace per signal | Generate or reverse boolean LUT text |
-| **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change | On every **committed** change | Immediately at statement |
-| **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) | **Does not matter** (registered at elaboration) | Matters |
-| **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression | **Exactly one** expression (same as `probe`) | See below |
-| **Output format** | `name (type) = value` | same | `# name = value (ref) - reason` | Timeline canvas (one column per bit or property slice) | LUT block or `Nwire out = …` lines |
-| **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Same commit hooks in both modes | Immediate (no propagation) |
-| **Runtime effect** | None (read-only) | None | None (logging only) | None (UI trace only) | **None** — text for copy-paste |
+| | `show` | `peek` | `probe` | `watch` | `Zlist` | `lutOf` / `exprOfLut` |
+|---|--------|--------|---------|---------|---------|------------------------|
+| **Purpose** | Display settled values | Instant snapshot | Monitor every value commit | Waveform trace per signal | List all bus drivers (snapshot) | Generate or reverse boolean LUT text |
+| **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change | On every **committed** change | At statement position in **RUN** / **NEXT** only | Immediately at statement |
+| **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) | **Does not matter** (registered at elaboration) | Matters | Matters |
+| **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression | **Exactly one** expression (same as `probe`) | **Exactly one** wire name | See below |
+| **Output format** | `name (type) = value` | same | `# name = value (ref) - reason` | Timeline canvas (one column per bit or property slice) | `->` / `-> (active)` lines + `(resolved) =` | LUT block or `Nwire out = …` lines |
+| **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Same commit hooks in both modes | Immediate (like `peek`) | Immediate (no propagation) |
+| **Runtime effect** | None (read-only) | None | None (logging only) | None (UI trace only) | None (read-only) | **None** — text for copy-paste |
 
 For when wires update in the circuit, see [signal-propagation.md](signal-propagation.md). In **`MODE ZSTATE`**, see [zstate.md](zstate.md) for `Z`/`X` display rules.
 
@@ -36,11 +36,85 @@ bus (4bit) = 10X0
 |------|-----------------|
 | `show` | Full string with `Z` and `X` |
 | `peek` / `probe` | Same; every commit logged |
+| `probe` (shared bus) | In **ZSTATE**, when the wire has multiple or enable-gated drivers, each line adds a suffix: ` — drove: …`, ` — conflict: …`, or ` — no active drivers` |
+| `Zlist` | Lists every registered contributor; `(resolved) =` shows merged value |
 | `watch` (Timeline) | `Z` → grey bar; `X` → red bar (conflict) |
 
-`show` / `watch` never error on `X` — use them to **see** bus conflicts. Arithmetic (`ADD`, …) and `MUX`/`REG` error on `Z`/`X` operands.
+`show` / `watch` never error on `X` — use them to **see** bus conflicts. Use **`probe(bus)`** live while toggling switches; use **`Zlist(bus)`** at **RUN** for a full driver inventory.
 
 Full reference: **[zstate.md](zstate.md)**.
+
+---
+
+## `Zlist` (MODE ZSTATE)
+
+### Syntax
+
+```
+Zlist(wireName)
+```
+
+Requires **`MODE ZSTATE`** and **wave** propagation. One wire identifier only (not an expression).
+
+### When it emits
+
+Only when execution reaches `Zlist(…)` during **RUN** or **NEXT** — like **`peek`**, not like **`probe`**. Toggling a switch in the panel does **not** re-run `Zlist`; use **`probe(bus)`** for live driver attribution.
+
+### Output format
+
+```text
+bus (4bit):
+-> bus = ramData w1 ramEn
+  -> (active) bus = cpuData w1 cpuEn = 1010
+(resolved) = 1010
+```
+
+| Line | Meaning |
+|------|---------|
+| `-> <label>` | Registered contributor, currently **inactive** (enable off) |
+| `  -> (active) <label> = <value>` | Contributor driving this step |
+| `(resolved) = <value>` | Merged wire value (same as `show(bus)` after settle) |
+
+| Empty case | Message |
+|------------|---------|
+| No assignments / redirects on this wire | `bus (Nbit) — (no contributors)` |
+
+`get>= bus` **without** `w1`/`w0` is a direct assign, not a bus contributor — it does not appear in `Zlist`.
+
+### Example — dual enable
+
+```logts-play wave
+MODE ZSTATE
+
+4wire bus
+4wire cpuData = 1010
+4wire ramData = 0110
+1wire cpuEn = 1
+1wire ramEn = 0
+
+bus = cpuData w1 cpuEn
+bus = ramData w1 ramEn
+Zlist(bus)
+```
+
+### Example — interactive bus (probe + Zlist)
+
+```logts-play wave
+MODE ZSTATE
+
+2wire bus
+comp [switch] .s1:
+  on: 1
+  :
+
+.s1:{ get >= bus w1 .s1
+  set = 1 }
+
+probe(bus)
+Zlist(bus)
+```
+
+After **RUN**, toggle `.s1` in the panel — **`probe`** logs each change with ` — drove: .s1:get w1 .s1`. Press **RUN** again to refresh **`Zlist`**.
 
 ---
 

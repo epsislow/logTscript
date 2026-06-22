@@ -11458,6 +11458,104 @@ ZCONNECT(bus, en, d)`);
   h.assert('bus', session.getWire(interp, 'bus'), '1010');
 }, ZSTATE_WAVE);
 
+reg(1580, 'zstate', 'switch get>= w1 self-enable interactive', function(h, session) {
+  const { interp } = session.run(`MODE ZSTATE
+2wire bus
+comp [switch] .s1:
+on: 1
+:
+comp [switch] .s2:
+on: 1
+:
+.s1:{ get >= bus w1 .s1
+  set = 1 }
+.s2:{ get >= bus w1 .s2
+  set = 1 }`);
+  h.assert('bus init', session.getWire(interp, 'bus'), 'ZZ');
+  session.setComp(interp, '.s1', '1');
+  h.assert('s1 on', session.getWire(interp, 'bus'), '10');
+  session.setComp(interp, '.s1', '0');
+  h.assert('both off', session.getWire(interp, 'bus'), 'ZZ');
+  session.setComp(interp, '.s2', '1');
+  h.assert('s2 on', session.getWire(interp, 'bus'), '10');
+  session.setComp(interp, '.s1', '1');
+  h.assert('both on', session.getWire(interp, 'bus'), '10');
+}, ZSTATE_WAVE);
+
+reg(1581, 'zstate', 'Parser — Zlist(bus) AST', function(h, session) {
+  const stmts = session.parse('MODE ZSTATE\n4wire bus\nZlist(bus)');
+  h.assert('zlist node', String(stmts.some(s => s.zlist === 'bus')), 'true');
+}, ZSTATE_WAVE);
+
+reg(1582, 'zstate', 'Zlist dual ZCONNECT format', function(h, session) {
+  const { out } = session.run(`MODE ZSTATE
+4wire bus
+4wire cpuData = 1010
+4wire ramData = 0101
+1wire cpuEn = 1
+1wire ramEn = 0
+bus = cpuData w1 cpuEn
+bus = ramData w1 ramEn
+Zlist(bus)`);
+  h.assert('header', String(out.some(l => l.includes('bus (4bit):'))), 'true');
+  h.assert('inactive', String(out.some(l => l.startsWith('-> bus = ramData'))), 'true');
+  h.assert('active', String(out.some(l => l.includes('-> (active)') && l.includes('cpuData'))), 'true');
+  h.assert('resolved', String(out.some(l => l.includes('(resolved) = 1010'))), 'true');
+}, ZSTATE_WAVE);
+
+reg(1583, 'zstate', 'Zlist only at RUN not on setComp', function(h, session) {
+  const { interp, out } = session.run(`MODE ZSTATE
+2wire bus
+comp [switch] .s1:
+on: 1
+:
+.s1:{ get >= bus w1 .s1
+  set = 1 }
+Zlist(bus)`);
+  const zlistLines = out.filter(l => l.includes('(resolved)') || l.startsWith('->')).length;
+  h.assert('zlist at run', String(zlistLines > 0), 'true');
+  session.setComp(interp, '.s1', '1');
+  const zlistAfter = out.filter(l => l.includes('(resolved)')).length;
+  h.assert('no second resolved', String(zlistAfter), '1');
+}, ZSTATE_WAVE);
+
+reg(1584, 'zstate', 'probe bus drove suffix on switch', function(h, session) {
+  const { interp, out } = session.run(`MODE ZSTATE
+2wire bus
+comp [switch] .s1:
+on: 1
+:
+.s1:{ get >= bus w1 .s1
+  set = 1 }
+probe(bus)`);
+  session.setComp(interp, '.s1', '1');
+  h.assert('drove', String(out.some(l => l.includes('# bus =') && l.includes('drove:'))), 'true');
+}, ZSTATE_WAVE);
+
+reg(1585, 'zstate', 'probe bus conflict suffix', function(h, session) {
+  const { out } = session.run(`MODE ZSTATE
+3wire a = 101
+3wire b = 010
+3wire bus
+bus = a
+bus = b
+probe(bus)`);
+  h.assert('conflict', String(out.some(l => l.includes('# bus =') && l.includes('conflict:'))), 'true');
+}, ZSTATE_WAVE);
+
+reg(1586, 'zstate', 'probe single wire no driver suffix', function(h, session) {
+  const { interp, out } = session.run('MODE ZSTATE\n1wire a = 0\nprobe(a)');
+  session.setWire(interp, 'a', '1');
+  const line = out.find(l => l.includes('# a = 1') && l.includes('changed'));
+  h.assert('changed line', String(!!line), 'true');
+  h.assert('no drove', String(line && !line.includes('drove:') && !line.includes('conflict:')), 'true');
+}, ZSTATE_WAVE);
+
+reg(1587, 'zstate', 'Zlist requires MODE ZSTATE', function(h, session) {
+  const { out } = session.run('4wire bus\nZlist(bus)');
+  h.assert('err', String(out.some(l => l.includes('Zlist() requires MODE ZSTATE'))), 'true');
+}, ZSTATE_WAVE);
+
 
   window.LogTScriptTestSuite = {
     tests,

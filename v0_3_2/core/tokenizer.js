@@ -301,7 +301,7 @@ pushSource({ src, alias }) {
   }
 
   tokenizeIdentifier(v) {
-    if (['def', 'show', 'peek', 'probe', 'lutOf', 'exprOfLut', 'useLutAs', 'useExpr', 'truthTableOf', 'simplify', 'equivalent', 'inputsOf', 'costOf', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'ZSTATE', 'ZRELEASE', 'comp', 'pcb', 'chip', 'board', 'inline', 'doc', 'watch'].includes(v)) {
+    if (['def', 'show', 'peek', 'probe', 'lutOf', 'exprOfLut', 'useLutAs', 'useExpr', 'truthTableOf', 'simplify', 'equivalent', 'inputsOf', 'costOf', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'ZSTATE', 'ZRELEASE', 'Zlist', 'comp', 'pcb', 'chip', 'board', 'inline', 'doc', 'watch'].includes(v)) {
       return this.token('KEYWORD', v);
     }
     if (/^REG$/.test(v)) {

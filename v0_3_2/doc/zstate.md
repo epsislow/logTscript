@@ -169,9 +169,11 @@ Result: `XX10`.
 
 ### Driving a shared bus (1-bit switches)
 
-`comp [switch]` is **1 bit** — use **`get >= bus w1 1`** (or `w1 en`) for multi-driver demos on a shared bus.
+`comp [switch]` is **1 bit**. On a shared bus use **`get >= bus w1 enable`** — the enable gates whether this redirect contributes (ZCONNECT semantics).
 
-**Load & Run** — two switches on `2wire bus` (tests **1465** / **1466**):
+With **`on: 1`**, property blocks run on **every** linked switch change (level-triggered). **`w1 1`** means “always contribute when the block runs”. If both switches use `w1 1`, **both blocks run on each toggle** — the OFF switch still drives `get = 0`, so a lone ON switch produces **`X`** on the bus (not a clean `10`). For an **interactive panel** demo, gate each driver with **its own switch**:
+
+**Load & Run** — two switches on `2wire bus` (test **1580**):
 
 ```logts-play wave
 MODE ZSTATE
@@ -184,13 +186,26 @@ comp [switch] .s2:
   on: 1
   :
 
+.s1:{ get >= bus w1 .s1
+  set = 1 }
+.s2:{ get >= bus w1 .s2
+  set = 1 }
+```
+
+| Panel state | `bus` |
+|-------------|-------|
+| both OFF | `ZZ` |
+| `.s1` or `.s2` ON alone | `10` |
+| both ON | `10` |
+
+**Static multi-driver demo** (tests **1465** / **1466**) — **`w1 1`** with blocks executed **once** after setting switch states (not panel toggle). Both switches `1` → `bus = 10` (agree). `.s1 = 1`, `.s2 = 0` but **both blocks run** → `bus = X0` (one drives `1`, one drives `0`). This documents conflict resolution, not interactive panel behaviour.
+
+```logts
 .s1:{ get >= bus w1 1
   set = 1 }
 .s2:{ get >= bus w1 1
   set = 1 }
 ```
-
-Both switches on `1` → `bus = 10`. If `.s1` is `1` and `.s2` is `0` → `bus = X0`.
 
 ### `set` vs bus enable
 
@@ -281,6 +296,8 @@ Message pattern: `Cannot use wire with Z in ADD` or `Cannot use wire with X in M
 | Output | ZSTATE behaviour |
 |--------|------------------|
 | `show` / Variables panel | Literal `Z` and `X` in strings |
+| `probe` (shared bus) | Suffix ` — drove:` / ` — conflict:` on each commit — see [debug.md](debug.md#zlist-mode-zstate) |
+| `Zlist` | Full driver inventory at **RUN** (`->` / `-> (active)` + `(resolved) =`) |
 | `watch` | `Z` → grey level; `X` → red (conflict) |
 | LEDs / 7-seg | `Z` and `X` treated as off |
 

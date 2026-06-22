@@ -3862,15 +3862,15 @@ For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md]
 
 ## Quick comparison
 
-| | \`show\` | \`peek\` | \`probe\` | \`watch\` | \`lutOf\` / \`exprOfLut\` |
-|---|--------|--------|---------|---------|------------------------|
-| **Purpose** | Display settled values | Instant snapshot | Monitor every value commit | Waveform trace per signal | Generate or reverse boolean LUT text |
-| **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change | On every **committed** change | Immediately at statement |
-| **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) | **Does not matter** (registered at elaboration) | Matters |
-| **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression | **Exactly one** expression (same as \`probe\`) | See below |
-| **Output format** | \`name (type) = value\` | same | \`# name = value (ref) - reason\` | Timeline canvas (one column per bit or property slice) | LUT block or \`Nwire out = …\` lines |
-| **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Same commit hooks in both modes | Immediate (no propagation) |
-| **Runtime effect** | None (read-only) | None | None (logging only) | None (UI trace only) | **None** — text for copy-paste |
+| | \`show\` | \`peek\` | \`probe\` | \`watch\` | \`Zlist\` | \`lutOf\` / \`exprOfLut\` |
+|---|--------|--------|---------|---------|---------|------------------------|
+| **Purpose** | Display settled values | Instant snapshot | Monitor every value commit | Waveform trace per signal | List all bus drivers (snapshot) | Generate or reverse boolean LUT text |
+| **When it emits** | End of **RUN** / **NEXT** (after propagation on Wave) | Immediately at statement position | On every **committed** change | On every **committed** change | At statement position in **RUN** / **NEXT** only | Immediately at statement |
+| **Position in script** | Matters | Matters | **Does not matter** (registered at elaboration) | **Does not matter** (registered at elaboration) | Matters | Matters |
+| **Arguments** | One or more expressions | One or more expressions | **Exactly one** expression | **Exactly one** expression (same as \`probe\`) | **Exactly one** wire name | See below |
+| **Output format** | \`name (type) = value\` | same | \`# name = value (ref) - reason\` | Timeline canvas (one column per bit or property slice) | \`->\` / \`-> (active)\` lines + \`(resolved) =\` | LUT block or \`Nwire out = …\` lines |
+| **Wave vs Legacy** | Deferred on Wave until settle | Immediate | Same commit hooks in both modes | Same commit hooks in both modes | Immediate (like \`peek\`) | Immediate (no propagation) |
+| **Runtime effect** | None (read-only) | None | None (logging only) | None (UI trace only) | None (read-only) | **None** — text for copy-paste |
 
 For when wires update in the circuit, see [signal-propagation.md](signal-propagation.md). In **\`MODE ZSTATE\`**, see [zstate.md](zstate.md) for \`Z\`/\`X\` display rules.
 
@@ -3888,11 +3888,85 @@ bus (4bit) = 10X0
 |------|-----------------|
 | \`show\` | Full string with \`Z\` and \`X\` |
 | \`peek\` / \`probe\` | Same; every commit logged |
+| \`probe\` (shared bus) | In **ZSTATE**, when the wire has multiple or enable-gated drivers, each line adds a suffix: \` — drove: …\`, \` — conflict: …\`, or \` — no active drivers\` |
+| \`Zlist\` | Lists every registered contributor; \`(resolved) =\` shows merged value |
 | \`watch\` (Timeline) | \`Z\` → grey bar; \`X\` → red bar (conflict) |
 
-\`show\` / \`watch\` never error on \`X\` — use them to **see** bus conflicts. Arithmetic (\`ADD\`, …) and \`MUX\`/\`REG\` error on \`Z\`/\`X\` operands.
+\`show\` / \`watch\` never error on \`X\` — use them to **see** bus conflicts. Use **\`probe(bus)\`** live while toggling switches; use **\`Zlist(bus)\`** at **RUN** for a full driver inventory.
 
 Full reference: **[zstate.md](zstate.md)**.
+
+---
+
+## \`Zlist\` (MODE ZSTATE)
+
+### Syntax
+
+\`\`\`
+Zlist(wireName)
+\`\`\`
+
+Requires **\`MODE ZSTATE\`** and **wave** propagation. One wire identifier only (not an expression).
+
+### When it emits
+
+Only when execution reaches \`Zlist(…)\` during **RUN** or **NEXT** — like **\`peek\`**, not like **\`probe\`**. Toggling a switch in the panel does **not** re-run \`Zlist\`; use **\`probe(bus)\`** for live driver attribution.
+
+### Output format
+
+\`\`\`text
+bus (4bit):
+-> bus = ramData w1 ramEn
+  -> (active) bus = cpuData w1 cpuEn = 1010
+(resolved) = 1010
+\`\`\`
+
+| Line | Meaning |
+|------|---------|
+| \`-> <label>\` | Registered contributor, currently **inactive** (enable off) |
+| \`  -> (active) <label> = <value>\` | Contributor driving this step |
+| \`(resolved) = <value>\` | Merged wire value (same as \`show(bus)\` after settle) |
+
+| Empty case | Message |
+|------------|---------|
+| No assignments / redirects on this wire | \`bus (Nbit) — (no contributors)\` |
+
+\`get>= bus\` **without** \`w1\`/\`w0\` is a direct assign, not a bus contributor — it does not appear in \`Zlist\`.
+
+### Example — dual enable
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+4wire bus
+4wire cpuData = 1010
+4wire ramData = 0110
+1wire cpuEn = 1
+1wire ramEn = 0
+
+bus = cpuData w1 cpuEn
+bus = ramData w1 ramEn
+Zlist(bus)
+\`\`\`
+
+### Example — interactive bus (probe + Zlist)
+
+\`\`\`logts-play wave
+MODE ZSTATE
+
+2wire bus
+comp [switch] .s1:
+  on: 1
+  :
+
+.s1:{ get >= bus w1 .s1
+  set = 1 }
+
+probe(bus)
+Zlist(bus)
+\`\`\`
+
+After **RUN**, toggle \`.s1\` in the panel — **\`probe\`** logs each change with \` — drove: .s1:get w1 .s1\`. Press **RUN** again to refresh **\`Zlist\`**.
 
 ---
 
@@ -14524,9 +14598,11 @@ Result: \`XX10\`.
 
 ### Driving a shared bus (1-bit switches)
 
-\`comp [switch]\` is **1 bit** — use **\`get >= bus w1 1\`** (or \`w1 en\`) for multi-driver demos on a shared bus.
+\`comp [switch]\` is **1 bit**. On a shared bus use **\`get >= bus w1 enable\`** — the enable gates whether this redirect contributes (ZCONNECT semantics).
 
-**Load & Run** — two switches on \`2wire bus\` (tests **1465** / **1466**):
+With **\`on: 1\`**, property blocks run on **every** linked switch change (level-triggered). **\`w1 1\`** means “always contribute when the block runs”. If both switches use \`w1 1\`, **both blocks run on each toggle** — the OFF switch still drives \`get = 0\`, so a lone ON switch produces **\`X\`** on the bus (not a clean \`10\`). For an **interactive panel** demo, gate each driver with **its own switch**:
+
+**Load & Run** — two switches on \`2wire bus\` (test **1580**):
 
 \`\`\`logts-play wave
 MODE ZSTATE
@@ -14539,13 +14615,26 @@ comp [switch] .s2:
   on: 1
   :
 
+.s1:{ get >= bus w1 .s1
+  set = 1 }
+.s2:{ get >= bus w1 .s2
+  set = 1 }
+\`\`\`
+
+| Panel state | \`bus\` |
+|-------------|-------|
+| both OFF | \`ZZ\` |
+| \`.s1\` or \`.s2\` ON alone | \`10\` |
+| both ON | \`10\` |
+
+**Static multi-driver demo** (tests **1465** / **1466**) — **\`w1 1\`** with blocks executed **once** after setting switch states (not panel toggle). Both switches \`1\` → \`bus = 10\` (agree). \`.s1 = 1\`, \`.s2 = 0\` but **both blocks run** → \`bus = X0\` (one drives \`1\`, one drives \`0\`). This documents conflict resolution, not interactive panel behaviour.
+
+\`\`\`logts
 .s1:{ get >= bus w1 1
   set = 1 }
 .s2:{ get >= bus w1 1
   set = 1 }
 \`\`\`
-
-Both switches on \`1\` → \`bus = 10\`. If \`.s1\` is \`1\` and \`.s2\` is \`0\` → \`bus = X0\`.
 
 ### \`set\` vs bus enable
 
@@ -14636,6 +14725,8 @@ Message pattern: \`Cannot use wire with Z in ADD\` or \`Cannot use wire with X i
 | Output | ZSTATE behaviour |
 |--------|------------------|
 | \`show\` / Variables panel | Literal \`Z\` and \`X\` in strings |
+| \`probe\` (shared bus) | Suffix \` — drove:\` / \` — conflict:\` on each commit — see [debug.md](debug.md#zlist-mode-zstate) |
+| \`Zlist\` | Full driver inventory at **RUN** (\`->\` / \`-> (active)\` + \`(resolved) =\`) |
 | \`watch\` | \`Z\` → grey level; \`X\` → red (conflict) |
 | LEDs / 7-seg | \`Z\` and \`X\` treated as off |
 

@@ -206,6 +206,7 @@ class Interpreter {
     this.zReleasedWires = new Set();
     this.wireContributionQueue = new Map();
     this.zconnRedirectRegistrations = new Map();
+    this._probeDriverSnapshots = new Map();
     this.aliases = new Map();
     this.components=new Map(); // Component name -> {type, componentType, attributes, initialValue, returnType, ref, deviceIds}
     this.componentConnections=new Map(); // Component name -> {source: ref or expr, bitRange}
@@ -1456,7 +1457,7 @@ class Interpreter {
     return '';
   }
 
-  _emitProbeTarget(target, value, reasonOverride) {
+  _emitProbeTarget(target, value, reasonOverride, driverSuffix = '') {
     if (!target) return;
     let valueStr = value == null ? '-' : String(value);
     if (target.bitWidth && valueStr !== '-' && !target.isText) {
@@ -1479,7 +1480,7 @@ class Interpreter {
     const refPart = ref ? ` (${ref})` : '';
     const symPart = this._probeSymbolicSuffix(target, valueStr);
     const name = target.label || target.wireName || target.ref || '?';
-    this.out.push(`# ${name} = ${valueStr}${refPart}${symPart} - ${reason}`);
+    this.out.push(`# ${name} = ${valueStr}${refPart}${symPart} - ${reason}${driverSuffix}`);
   }
 
   _emitProbeForWire(name, value) {
@@ -1488,7 +1489,11 @@ class Interpreter {
     if (target) {
       const wire = this.wires.get(name);
       if (wire) target.ref = wire.ref;
-      this._emitProbeTarget(target, value);
+      let driverSuffix = '';
+      if (this.zstate && this._wireHasSharedContributors(name)) {
+        driverSuffix = this._probeDriverSuffix(name, value == null ? '' : String(value));
+      }
+      this._emitProbeTarget(target, value, null, driverSuffix);
     }
     this._emitWatchRowForWire(name, value);
   }
@@ -1883,6 +1888,184 @@ class Interpreter {
         if (bits) this.queueWireContribution(busName, 'Z'.repeat(bits));
       }
     }
+  }
+
+  _atomToDriverSource(atom) {
+    if (!atom) return '';
+    if (atom.not) return '!' + this._atomToDriverSource({ ...atom, not: false });
+    if (atom.group) return '(' + this._exprToDriverSource(atom.group) + ')';
+    if (atom.call) {
+      const args = (atom.args || []).map(e => this._exprToDriverSource(e)).join(', ');
+      return `${atom.call.name}(${args})`;
+    }
+    if (atom.bin !== undefined && atom.bin !== null) return String(atom.bin);
+    if (atom.hex !== undefined && atom.hex !== null) return String(atom.hex);
+    if (atom.dec !== undefined && atom.dec !== null) return String(atom.dec);
+    if (atom.ref) return atom.ref;
+    if (atom.refLiteral != null) {
+      let s = '&' + atom.refLiteral;
+      if (atom.bitRange) {
+        const { start, end } = atom.bitRange;
+        const actualEnd = end != null ? end : start;
+        s += start === actualEnd ? `.${start}` : `.${start}-${actualEnd}`;
+      }
+      return s;
+    }
+    if (atom.var) {
+      let s = atom.var;
+      if (atom.property) s += ':' + atom.property;
+      if (atom.bitRange) {
+        const { start, end } = atom.bitRange;
+        const actualEnd = end != null ? end : start;
+        s += start === actualEnd ? `.${start}` : `.${start}-${actualEnd}`;
+      }
+      return s;
+    }
+    if (atom.value != null) return String(atom.value);
+    return '?';
+  }
+
+  _exprToDriverSource(expr) {
+    if (!expr || !expr.length) return '?';
+    return expr.map(a => this._atomToDriverSource(a)).join('');
+  }
+
+  _formatWireDriverLabel(ws) {
+    const asg = ws.assignment;
+    if (!asg) return '?';
+    const target = asg.target.var;
+    const exprStr = this._exprToDriverSource(asg.expr);
+    if (asg.busEnable) {
+      const enStr = this._exprToDriverSource(asg.busEnableExpr);
+      return `${target} = ${exprStr} ${asg.busEnable} ${enStr}`;
+    }
+    return `${target} = ${exprStr}`;
+  }
+
+  _formatZconnRedirectLabel(entry) {
+    const enStr = this._exprToDriverSource(entry.busEnableExpr);
+    const polarity = entry.busEnable || 'w1';
+    if (entry.kind === 'component') {
+      return `${entry.instance}:${entry.sourceProp} ${polarity} ${enStr}`;
+    }
+    return `${entry.instance}:${entry.poutName} ${polarity} ${enStr}`;
+  }
+
+  _wireHasSharedContributors(wireName) {
+    const redirects = this.zconnRedirectRegistrations.get(wireName);
+    if (redirects && redirects.length) return true;
+    let count = 0;
+    let hasGated = false;
+    for (const ws of this.wireStatements) {
+      if (!ws.assignment || ws.assignment.target.var !== wireName) continue;
+      count++;
+      if (ws.assignment.busEnable || this.assignmentExprIsZConnect(ws.assignment.expr)) {
+        hasGated = true;
+      }
+    }
+    return count > 1 || hasGated;
+  }
+
+  _evalWireDriverContribution(ws, bits) {
+    if (ws.assignment.busEnable) {
+      const enVal = this._evalCallArgValue(ws.assignment.busEnableExpr);
+      if (!this._zConnectShouldDrive(enVal, ws.assignment.busEnable)) {
+        return { active: false, value: null };
+      }
+    }
+    const outputs = this.execWireStatement(ws, true);
+    if (!outputs.length) return { active: false, value: null };
+    const val = outputs.find(o => o[0] === ws.assignment.target.var);
+    return { active: true, value: val ? val[1] : outputs[0][1] };
+  }
+
+  _gatherWireDrivers(wireName) {
+    const wire = this.wires.get(wireName);
+    if (!wire) return null;
+    const bits = this.getBitWidth(wire.type);
+    const drivers = [];
+
+    for (const ws of this.wireStatements) {
+      if (!ws.assignment || ws.assignment.target.var !== wireName) continue;
+      const label = this._formatWireDriverLabel(ws);
+      const { active, value } = this._evalWireDriverContribution(ws, bits);
+      drivers.push({ id: label, label, active, value });
+    }
+
+    for (const entry of this.zconnRedirectRegistrations.get(wireName) || []) {
+      const label = this._formatZconnRedirectLabel(entry);
+      const enVal = this._evalCallArgValue(entry.busEnableExpr);
+      const active = this._zConnectShouldDrive(enVal, entry.busEnable);
+      let value = null;
+      if (active) {
+        const raw = this._evalZconnRedirectValue(entry);
+        if (raw != null) value = this._fitRedirectValue(raw, bits);
+      }
+      drivers.push({ id: label, label, active, value });
+    }
+
+    return {
+      drivers,
+      resolved: this.getWireContributionAwareValue(wireName) ?? this.getWireStableValue(wireName)
+    };
+  }
+
+  _probeDriverSuffix(wireName, newResolved) {
+    const gathered = this._gatherWireDrivers(wireName);
+    if (!gathered) return '';
+    const active = gathered.drivers.filter(d => d.active);
+    const prevMap = this._probeDriverSnapshots.get(wireName);
+
+    let suffix = '';
+    if (active.length === 0) {
+      suffix = ' — no active drivers';
+    } else if (active.length >= 2) {
+      const values = new Set(active.map(d => d.value).filter(v => v != null));
+      if (values.size > 1 || (newResolved && newResolved.includes('X'))) {
+        suffix = ` — conflict: ${active.map(d => d.label).join(', ')}`;
+      } else if (prevMap) {
+        const changed = active.filter(d => prevMap.get(d.id) !== d.value);
+        if (changed.length === 1) suffix = ` — drove: ${changed[0].label}`;
+        else if (changed.length > 1) suffix = ` — conflict: ${changed.map(d => d.label).join(', ')}`;
+        else suffix = ` — drove: ${active[0].label}`;
+      } else {
+        suffix = ` — drove: ${active[0].label}`;
+      }
+    } else {
+      suffix = ` — drove: ${active[0].label}`;
+    }
+
+    const snap = new Map();
+    for (const d of gathered.drivers) {
+      if (d.active) snap.set(d.id, d.value);
+    }
+    this._probeDriverSnapshots.set(wireName, snap);
+    return suffix;
+  }
+
+  _execZlist(stmt) {
+    if (!this.zstate) {
+      throw Error('Zlist() requires MODE ZSTATE');
+    }
+    const wireName = stmt.zlist;
+    const wire = this.wires.get(wireName);
+    if (!wire) throw Error(`Unknown wire '${wireName}' in Zlist()`);
+    const bits = this.getBitWidth(wire.type);
+    const gathered = this._gatherWireDrivers(wireName);
+    if (!gathered.drivers.length) {
+      this.out.push(`${wireName} (${bits}bit) — (no contributors)`);
+      return;
+    }
+    this.out.push(`${wireName} (${bits}bit):`);
+    for (const d of gathered.drivers) {
+      if (d.active) {
+        this.out.push(`  -> (active) ${d.label} = ${d.value}`);
+      } else {
+        this.out.push(`-> ${d.label}`);
+      }
+    }
+    const resolved = gathered.resolved != null ? gathered.resolved : 'Z'.repeat(bits);
+    this.out.push(`(resolved) = ${resolved}`);
   }
 
   reportRuntimeError(err) {
@@ -4029,6 +4212,11 @@ if (this.isBuiltinDEMUX(name)) {
       return;
     }
 
+    if (s.zlist) {
+      this.runSafely(() => this._execZlist(s));
+      return;
+    }
+
     if (s.lutOf) {
       this._execLutOf(s);
       return;
@@ -4079,12 +4267,14 @@ if (this.isBuiltinDEMUX(name)) {
         this.zReleasedWires.clear();
         this.wireContributionQueue.clear();
         this.zconnRedirectRegistrations.clear();
+        this._probeDriverSnapshots.clear();
         this.mode = 'WIREWRITE';
       } else {
         this.zstate = false;
         this.zReleasedWires.clear();
         this.wireContributionQueue.clear();
         this.zconnRedirectRegistrations.clear();
+        this._probeDriverSnapshots.clear();
         this.mode = s.mode;
       }
       return;
@@ -10022,6 +10212,7 @@ Interpreter.BUILTIN_DOC = {
   LROTATE:  ['LROTATE(Xbit data, Ybit count) -> Xbit'],
   RROTATE:  ['RROTATE(Xbit data, Ybit count) -> Xbit'],
   ZRELEASE: ['ZRELEASE(wireName) — release wire to high-Z (MODE ZSTATE statement)'],
+  Zlist: ['Zlist(wireName) — list registered bus drivers (MODE ZSTATE)'],
   ZCONNECT: ['ZCONNECT(en, data) — enable-gated drive value (MODE ZSTATE); bus = ZCONNECT(en, data)'],
   ZCONN: ['ZCONNECT(en, data) — alias for ZCONNECT'],
 };

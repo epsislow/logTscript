@@ -1583,6 +1583,18 @@ assignment() {
     return { zRelease: wireName };
   }
 
+  zList(){
+    this.eat('KEYWORD', 'Zlist');
+    this.eat('SYM', '(');
+    if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+      throw Error(`Expected wire name in Zlist() at ${this.c.line}:${this.c.col}`);
+    }
+    const wireName = this.c.value;
+    this.eat(this.c.type);
+    this.eat('SYM', ')');
+    return { zlist: wireName };
+  }
+
   zConnect(){
     const fnName = this.c.value;
     if (fnName !== 'ZCONNECT' && fnName !== 'ZCONN') {
@@ -3601,6 +3613,7 @@ Parser.KEYWORD_HANDLERS = {
   TEST: 'test',
   MODE: 'mode',
   ZRELEASE: 'zRelease',
+  Zlist: 'zList',
   comp: 'parseComp',
   pcb: 'parsePcbInstance',
   chip: 'parseChipInstance',

@@ -799,7 +799,10 @@ Use code with caution.By simply looking for that S modifier in your definition (
 ====
 [  ] Add transistor switch electrical
      NPN PNP(base, emit, coll)
-[  ] Add switch mecanical 
+  [ x ] Add switch mecanical 
+  [  ] functia doc() fara argument sa intoarca ce argumente poate avea cele simple adica def, comp, chip, keywords
+        sa includa si functiile keyword precum probe, show, peek ..
+		
 1 [ v ] Add back button in docViewer   
 2 [  ] Add type 2 to key for pressed and release when released and type 3 for toggle 
 3 [ v ] Example terminal with queue and button append 
