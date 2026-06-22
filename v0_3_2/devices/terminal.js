@@ -138,6 +138,7 @@ class TextTerminal {
     this.nl = nl;
     this.buffer = new TerminalBuffer({ rows, columns, wordWrap });
     this.wrapper = null;
+    this.scrollEl = null;
     this.gutterEl = null;
     this.screenEl = null;
     this._blinkTimer = null;
@@ -149,14 +150,30 @@ class TextTerminal {
     return line.padEnd(this.columns, ' ');
   }
 
+  _allBufferLines() {
+    if (this.buffer.lines.length === 1 && this.buffer.lines[0] === '') {
+      return [''];
+    }
+    return this.buffer.lines.slice();
+  }
+
+  _getCursorPos() {
+    if (this.cursorStyle === 0) return null;
+    const row = this.buffer.cursorLine;
+    if (row < 0) return null;
+    return { row, col: Math.min(this.buffer.cursorCol, this.columns) };
+  }
+
   _buildDisplayLines() {
-    const visible = this.buffer.getVisibleLines();
-    const padded = visible.map(function (line) {
+    const source = this._allBufferLines();
+    const padded = source.map(function (line) {
       return this._padLine(line);
     }, this);
 
-    const cursor = this.buffer.getVisibleCursor();
-    if (!cursor || this.cursorStyle === 0) return { lines: padded, html: null };
+    const cursor = this._getCursorPos();
+    if (!cursor || cursor.row >= padded.length) {
+      return { lines: padded, html: null };
+    }
 
     if (this.cursorStyle === 2) {
       const lines = padded.slice();
@@ -189,6 +206,10 @@ class TextTerminal {
     const frame = document.createElement('div');
     frame.className = 'terminal-frame';
 
+    const scroll = document.createElement('div');
+    scroll.className = 'terminal-scroll';
+    scroll.style.height = (this.rows * rowPx) + 'px';
+
     const body = document.createElement('div');
     body.className = 'terminal-body';
 
@@ -200,27 +221,25 @@ class TextTerminal {
       const gutterCols = Math.max(3, String(this.rows).length + 3);
       gutter.style.width = gutterCols + 'ch';
       gutter.style.minWidth = gutterCols + 'ch';
-      gutter.style.height = (this.rows * rowPx) + 'px';
       gutter.style.fontSize = this.fontSize + 'px';
       gutter.style.lineHeight = String(lineHeight);
       gutter.style.color = this.color;
     }
 
-    const screen = document.createElement('pre');
+    const screen = document.createElement('div');
     screen.className = 'terminal-screen';
     screen.style.fontSize = this.fontSize + 'px';
     screen.style.lineHeight = String(lineHeight);
     screen.style.width = this.columns + 'ch';
     screen.style.minWidth = this.columns + 'ch';
     screen.style.maxWidth = this.columns + 'ch';
-    screen.style.height = (this.rows * rowPx) + 'px';
-    screen.style.minHeight = (this.rows * rowPx) + 'px';
-    screen.style.maxHeight = (this.rows * rowPx) + 'px';
     screen.style.color = this.color;
+    screen.style.overflow = 'hidden';
 
     body.appendChild(gutter);
     body.appendChild(screen);
-    frame.appendChild(body);
+    scroll.appendChild(body);
+    frame.appendChild(scroll);
     wrapper.appendChild(frame);
     parent.appendChild(wrapper);
 
@@ -231,10 +250,24 @@ class TextTerminal {
     }
 
     this.wrapper = wrapper;
+    this.scrollEl = scroll;
     this.gutterEl = gutter;
     this.screenEl = screen;
     this._startBlink();
-    this.draw();
+    this.draw(true);
+  }
+
+  _scrollToBottom() {
+    if (!this.scrollEl) return;
+    const el = this.scrollEl;
+    const scroll = () => {
+      el.scrollTop = el.scrollHeight;
+    };
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(scroll);
+    } else {
+      scroll();
+    }
   }
 
   _startBlink() {
@@ -243,7 +276,7 @@ class TextTerminal {
     this._blinkOn = true;
     this._blinkTimer = setInterval(() => {
       this._blinkOn = !this._blinkOn;
-      this.draw();
+      this.draw(false);
     }, 530);
   }
 
@@ -254,7 +287,7 @@ class TextTerminal {
     }
   }
 
-  draw() {
+  draw(scrollToBottom) {
     const display = this._buildDisplayLines();
 
     if (this.screenEl) {
@@ -265,14 +298,16 @@ class TextTerminal {
       }
     }
     if (this.gutterEl && this.lineNumbers) {
-      const nums = this.buffer.getVisibleLineNumbers();
-      const pad = Math.max(1, String(this.buffer.lines.length).length);
+      const lineCount = this.buffer.lines.length;
+      const pad = Math.max(1, String(lineCount).length);
       const gutterLines = [];
-      for (let i = 0; i < this.rows; i++) {
-        const n = nums[i] !== undefined ? nums[i] : '';
-        gutterLines.push(n === '' ? ' '.repeat(pad + 2) : String(n).padStart(pad, ' ') + ' |');
+      for (let i = 0; i < lineCount; i++) {
+        gutterLines.push(String(i + 1).padStart(pad, ' ') + ' |');
       }
       this.gutterEl.textContent = gutterLines.join('\n');
+    }
+    if (scrollToBottom) {
+      this._scrollToBottom();
     }
   }
 
@@ -282,17 +317,17 @@ class TextTerminal {
 
   appendBinary(binaryValue) {
     this.buffer.appendBinary(binaryValue);
-    this.draw();
+    this.draw(true);
   }
 
   newline() {
     this.buffer.newline();
-    this.draw();
+    this.draw(true);
   }
 
   clear() {
     this.buffer.clear();
-    this.draw();
+    this.draw(true);
   }
 
   destroy() {
