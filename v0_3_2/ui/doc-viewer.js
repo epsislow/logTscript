@@ -138,6 +138,279 @@ let docViewerReady = false;
 let docSearchActiveIndex = -1;
 let docSearchResults = [];
 
+const DOC_HISTORY_MAX = 200;
+const DOC_PAGE_HISTORY = '__history__';
+let docBackStack = [];
+let docNavLog = [];
+let docNavSuppressPush = false;
+
+function isDocHistoryPage() {
+  return currentDocFile === DOC_PAGE_HISTORY;
+}
+
+function isDocIndexPage() {
+  return currentDocFile === '';
+}
+
+function docLabelForFile(file) {
+  if (file === DOC_PAGE_HISTORY) return 'History';
+  if (!file) return 'Index';
+  const doc = DOCS.find(function (d) { return d.file === file; });
+  if (doc) return doc.label;
+  const extra = DOC_SEARCH_ONLY.find(function (d) { return d.file === file; });
+  if (extra) return extra.label;
+  return file.replace(/\.md$/, '');
+}
+
+function docCaptureCurrentPlace() {
+  return {
+    file: currentDocFile,
+    scrollTop: captureDocScroll(),
+    label: docLabelForFile(currentDocFile),
+  };
+}
+
+function trimDocBackStack() {
+  while (docBackStack.length > DOC_HISTORY_MAX) {
+    docBackStack.shift();
+  }
+}
+
+function trimDocNavLog() {
+  while (docNavLog.length > DOC_HISTORY_MAX) {
+    docNavLog.shift();
+  }
+}
+
+function appendDocNavLog(entry) {
+  docNavLog.push({
+    file: entry.file,
+    scrollTop: entry.scrollTop != null ? entry.scrollTop : 0,
+    label: entry.label || docLabelForFile(entry.file),
+    kind: entry.kind || 'nav',
+    at: Date.now(),
+  });
+  trimDocNavLog();
+  if (isDocHistoryPage()) {
+    renderDocHistoryPage({ scrollTop: captureDocScroll() });
+  }
+}
+
+function updateDocNavButtons() {
+  const btnBack = document.getElementById('btnDocBack');
+  if (btnBack) {
+    btnBack.disabled = docBackStack.length === 0;
+  }
+}
+
+function formatDocHistoryKind(entry) {
+  if (entry.kind === 'back') return '\u2190 ';
+  if (entry.kind === 'search') return '';
+  if (entry.kind === 'history') return '\u21bb ';
+  return '';
+}
+
+function formatDocHistoryMeta(entry) {
+  if (entry.kind === 'search') return 'search';
+  if (entry.kind === 'index') return 'index';
+  if (entry.kind === 'back') return 'back';
+  if (entry.kind === 'history') return 'history';
+  if (entry.kind === 'init') return 'open';
+  return '';
+}
+
+function renderDocHistoryHtml() {
+  const currentIdx = docNavLog.length - 1;
+  let listHtml;
+  if (!docNavLog.length) {
+    listHtml = '<p class="doc-history-page-empty">No pages visited yet. Browse documentation or use Search — visits appear here.</p>';
+  } else {
+    listHtml = '<ol class="doc-history-page-list">' + docNavLog.map(function (entry, i) {
+      const active = i === currentIdx ? ' doc-history-page-active' : '';
+      const prefix = formatDocHistoryKind(entry);
+      const meta = formatDocHistoryMeta(entry);
+      const scrollHint = entry.scrollTop > 0
+        ? ' <span class="doc-history-page-scroll">@' + entry.scrollTop + 'px</span>'
+        : '';
+      return (
+        '<li class="doc-history-page-item' + active + '">' +
+        '<button type="button" class="doc-history-page-link" data-history-index="' + i + '">' +
+        '<span class="doc-history-page-label">' + escapeHtml(prefix + entry.label) + '</span>' +
+        scrollHint +
+        (meta ? '<span class="doc-history-page-kind">' + escapeHtml(meta) + '</span>' : '') +
+        '</button></li>'
+      );
+    }).join('') + '</ol>';
+  }
+
+  const resetDisabled = !docNavLog.length && !docBackStack.length;
+
+  return (
+    '<div class="doc-history-page">' +
+    '<h1>Navigation history</h1>' +
+    '<p class="doc-index-lead">Chronological trail of pages visited in this session (max ' + DOC_HISTORY_MAX + '). ' +
+    'Click a row to jump to that page and scroll position. Use <strong>Back</strong> in the toolbar for step-by-step return.</p>' +
+    '<div class="doc-history-page-actions">' +
+    '<button type="button" class="btn" id="btnDocHistoryReset"' +
+    (resetDisabled ? ' disabled' : '') + '>Reset history</button>' +
+    '</div>' +
+    listHtml +
+    '</div>'
+  );
+}
+
+function bindDocHistoryPageEvents() {
+  const el = document.getElementById('docContent');
+  if (!el) return;
+
+  const btnReset = el.querySelector('#btnDocHistoryReset');
+  if (btnReset) {
+    btnReset.addEventListener('click', function () {
+      resetDocHistory();
+    });
+  }
+
+  el.querySelectorAll('[data-history-index]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      gotoDocHistoryEntry(parseInt(btn.getAttribute('data-history-index'), 10));
+    });
+  });
+}
+
+function renderDocHistoryPage(options) {
+  options = options || {};
+  const scrollTop = options.scrollTop != null ? options.scrollTop : 0;
+
+  currentDocFile = DOC_PAGE_HISTORY;
+  lastDocScrollTop = scrollTop;
+  const el = document.getElementById('docContent');
+  if (!el) return;
+
+  el.innerHTML = renderDocHistoryHtml();
+  bindDocHistoryPageEvents();
+  updateDocToolbar();
+  syncDocSearchInput();
+  closeDocSearchMenu();
+
+  if (location.hash !== '#history') {
+    history.replaceState(null, '', '#history');
+  }
+
+  if (scrollTop > 0) {
+    requestAnimationFrame(function () {
+      applyDocScroll(scrollTop);
+    });
+  } else {
+    el.scrollTop = 0;
+    const main = document.getElementById('docMain');
+    if (main) main.scrollTop = 0;
+    if (options.mobileScroll && main && window.matchMedia('(max-width: 768px)').matches) {
+      main.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+}
+
+function loadDocHistory() {
+  if (isDocHistoryPage()) return;
+  navigateDoc(DOC_PAGE_HISTORY, { kind: 'nav', scrollTop: 0, label: 'History' });
+}
+
+function resetDocHistory() {
+  docBackStack = [];
+  docNavLog = [];
+  if (isDocHistoryPage()) {
+    renderDocHistoryPage({ scrollTop: 0 });
+  }
+  updateDocNavButtons();
+}
+
+function navigateDoc(targetFile, options) {
+  options = options || {};
+  const kind = options.kind || 'nav';
+  const scrollTop = options.scrollTop != null ? options.scrollTop : 0;
+  const skipPush = options.skipPush === true || docNavSuppressPush;
+  const skipLog = options.skipLog === true;
+
+  if (!skipPush && document.body.classList.contains('doc-mode')) {
+    const current = docCaptureCurrentPlace();
+    const sameTarget = current.file === targetFile && Math.abs(current.scrollTop - scrollTop) < 2;
+    if (!sameTarget) {
+      docBackStack.push(current);
+      trimDocBackStack();
+    }
+  }
+
+  if (!skipLog) {
+    appendDocNavLog({
+      file: targetFile,
+      scrollTop: scrollTop,
+      label: options.label || docLabelForFile(targetFile),
+      kind: kind,
+    });
+  }
+
+  docNavSuppressPush = true;
+  try {
+    if (targetFile === DOC_PAGE_HISTORY) {
+      renderDocHistoryPage({ scrollTop: scrollTop, mobileScroll: scrollTop === 0 });
+    } else if (!targetFile) {
+      renderDocIndexPage({ scrollTop: scrollTop, mobileScroll: scrollTop === 0 });
+    } else {
+      renderDocPage(targetFile, { scrollTop: scrollTop, mobileScroll: scrollTop === 0 });
+    }
+  } finally {
+    docNavSuppressPush = false;
+  }
+
+  updateDocNavButtons();
+}
+
+function docGoBack() {
+  if (!docBackStack.length) return;
+  const prev = docBackStack.pop();
+  closeDocSearchMenu();
+
+  docNavSuppressPush = true;
+  try {
+    appendDocNavLog({
+      file: prev.file,
+      scrollTop: prev.scrollTop,
+      label: prev.label,
+      kind: 'back',
+    });
+    if (prev.file === DOC_PAGE_HISTORY) {
+      renderDocHistoryPage({ scrollTop: prev.scrollTop, mobileScroll: false });
+    } else if (!prev.file) {
+      renderDocIndexPage({ scrollTop: prev.scrollTop, mobileScroll: false });
+    } else {
+      renderDocPage(prev.file, { scrollTop: prev.scrollTop, mobileScroll: false });
+    }
+  } finally {
+    docNavSuppressPush = false;
+  }
+
+  updateDocNavButtons();
+}
+
+function gotoDocHistoryEntry(index) {
+  const entry = docNavLog[index];
+  if (!entry) return;
+  navigateDoc(entry.file, {
+    scrollTop: entry.scrollTop,
+    kind: 'history',
+    label: entry.label,
+  });
+}
+
+function logDocInitialLanding(file, scrollTop) {
+  appendDocNavLog({
+    file: file,
+    scrollTop: scrollTop != null ? scrollTop : 0,
+    label: docLabelForFile(file),
+    kind: file ? 'init' : 'index',
+  });
+}
+
 function initDocViewer() {
   if (docViewerReady) return;
   docViewerReady = true;
@@ -147,6 +420,15 @@ function initDocViewer() {
     content.addEventListener('click', onDocContentClick);
   }
   initDocSearch();
+  initDocHistory();
+}
+
+function initDocHistory() {
+  const btnBack = document.getElementById('btnDocBack');
+  if (btnBack) {
+    btnBack.addEventListener('click', docGoBack);
+  }
+  updateDocNavButtons();
 }
 
 function initDocSearch() {
@@ -228,7 +510,7 @@ function selectDocSearchResult(index) {
     input.value = '';
     input.blur();
   }
-  loadDoc(entry.file);
+  loadDoc(entry.file, { kind: 'search' });
 }
 
 function renderDocSearchMenu(query) {
@@ -322,8 +604,9 @@ function syncDocSearchInput() {
 function updateDocToolbar() {
   const btn = document.getElementById('btnDocIndex');
   if (btn) {
-    btn.style.display = currentDocFile ? '' : 'none';
+    btn.style.display = isDocIndexPage() ? 'none' : '';
   }
+  updateDocNavButtons();
 }
 
 function captureDocScroll() {
@@ -342,27 +625,73 @@ function showDocView() {
   document.body.classList.add('doc-mode');
   initDocViewer();
   const hash = location.hash.replace(/^#/, '');
-  if (hash && hash !== 'index' && window.DOC_CONTENT && window.DOC_CONTENT[hash]) {
+  if (hash === 'history') {
     try {
-      loadDoc(hash);
+      if (isDocHistoryPage()) {
+        renderDocHistoryPage({ scrollTop: lastDocScrollTop });
+      } else {
+        docNavSuppressPush = true;
+        try {
+          renderDocHistoryPage({ scrollTop: 0 });
+          if (!docNavLog.length) {
+            logDocInitialLanding(DOC_PAGE_HISTORY, 0);
+          }
+        } finally {
+          docNavSuppressPush = false;
+        }
+      }
+    } catch (e) {
+      console.error('loadDocHistory failed', e);
+      showDocError('', 'Failed to render history: ' + e.message);
+    }
+  } else if (hash && hash !== 'index' && window.DOC_CONTENT && window.DOC_CONTENT[hash]) {
+    try {
+      if (currentDocFile === hash) {
+        renderDocPage(hash, { scrollTop: lastDocScrollTop });
+      } else {
+        docNavSuppressPush = true;
+        try {
+          renderDocPage(hash, { scrollTop: 0 });
+          if (!docNavLog.length) {
+            logDocInitialLanding(hash, 0);
+          }
+        } finally {
+          docNavSuppressPush = false;
+        }
+      }
     } catch (e) {
       console.error('loadDoc failed', e);
       showDocError(hash, 'Failed to render doc: ' + e.message);
     }
+  } else if (isDocHistoryPage()) {
+    try {
+      renderDocHistoryPage({ scrollTop: lastDocScrollTop });
+    } catch (e) {
+      console.error('loadDocHistory failed', e);
+      showDocError('', 'Failed to render history: ' + e.message);
+    }
   } else if (currentDocFile && window.DOC_CONTENT && window.DOC_CONTENT[currentDocFile]) {
     try {
-      loadDoc(currentDocFile, { restoreScroll: true });
+      renderDocPage(currentDocFile, { scrollTop: lastDocScrollTop });
     } catch (e) {
       console.error('loadDoc failed', e);
       showDocError(currentDocFile, 'Failed to render doc: ' + e.message);
     }
   } else {
-    loadDocIndex();
+    docNavSuppressPush = true;
+    try {
+      renderDocIndexPage({ scrollTop: 0 });
+      if (!docNavLog.length) {
+        logDocInitialLanding('', 0);
+      }
+    } finally {
+      docNavSuppressPush = false;
+    }
   }
 }
 
 function showEditorView() {
-  if (document.body.classList.contains('doc-mode') && currentDocFile) {
+  if (document.body.classList.contains('doc-mode')) {
     lastDocScrollTop = captureDocScroll();
   }
   document.body.classList.remove('doc-mode');
@@ -393,7 +722,7 @@ function renderDocIndexHtml() {
   return (
     '<div class="doc-index">' +
     '<h1>LogTScript documentation</h1>' +
-    '<p class="doc-index-lead">Choose a topic below, or use <strong>Search</strong> in the toolbar to jump by title. Use <strong>Index</strong> to return here from any page.</p>' +
+    '<p class="doc-index-lead">Choose a topic below, or use <strong>Search</strong> in the toolbar to jump by title. Use <strong>Index</strong> to return here from any page, or <strong>History</strong> for the navigation trail.</p>' +
     sections +
     '</div>'
   );
@@ -408,8 +737,15 @@ function escapeHtml(str) {
 }
 
 function loadDocIndex() {
+  navigateDoc('', { kind: 'index', scrollTop: 0 });
+}
+
+function renderDocIndexPage(options) {
+  options = options || {};
+  const scrollTop = options.scrollTop != null ? options.scrollTop : 0;
+
   currentDocFile = '';
-  lastDocScrollTop = 0;
+  lastDocScrollTop = scrollTop;
   const el = document.getElementById('docContent');
   if (!el) return;
 
@@ -421,9 +757,18 @@ function loadDocIndex() {
     history.replaceState(null, '', '#index');
   }
 
-  el.scrollTop = 0;
-  const main = document.getElementById('docMain');
-  if (main) main.scrollTop = 0;
+  if (scrollTop > 0) {
+    requestAnimationFrame(function () {
+      applyDocScroll(scrollTop);
+    });
+  } else {
+    el.scrollTop = 0;
+    const main = document.getElementById('docMain');
+    if (main) main.scrollTop = 0;
+    if (options.mobileScroll && main && window.matchMedia('(max-width: 768px)').matches) {
+      main.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
 }
 
 function showDocError(filename, message) {
@@ -810,6 +1155,24 @@ function enhancePlayBlocks(container) {
 }
 
 function loadDoc(filename, options) {
+  options = options || {};
+  if (docNavSuppressPush) {
+    renderDocPage(filename, {
+      scrollTop: options.scrollTop != null ? options.scrollTop : (options.restoreScroll ? lastDocScrollTop : 0),
+    });
+    return;
+  }
+  navigateDoc(filename, {
+    kind: options.kind || 'nav',
+    scrollTop: options.scrollTop != null ? options.scrollTop : 0,
+    label: options.label,
+  });
+}
+
+function renderDocPage(filename, options) {
+  options = options || {};
+  const scrollTop = options.scrollTop != null ? options.scrollTop : 0;
+
   const content = window.DOC_CONTENT && window.DOC_CONTENT[filename];
   if (!content) {
     showDocError(
@@ -819,11 +1182,7 @@ function loadDoc(filename, options) {
     return;
   }
 
-  const restoreScroll = options && options.restoreScroll;
-  if (!restoreScroll) {
-    lastDocScrollTop = 0;
-  }
-
+  lastDocScrollTop = scrollTop;
   currentDocFile = filename;
   const el = document.getElementById('docContent');
   if (typeof marked === 'undefined') {
@@ -843,19 +1202,17 @@ function loadDoc(filename, options) {
   }
 
   const main = document.getElementById('docMain');
-  const savedScroll = restoreScroll ? lastDocScrollTop : 0;
 
-  if (savedScroll > 0) {
+  if (scrollTop > 0) {
     requestAnimationFrame(function () {
-      applyDocScroll(savedScroll);
+      applyDocScroll(scrollTop);
     });
   } else {
     el.scrollTop = 0;
     if (main) main.scrollTop = 0;
-  }
-
-  if (!restoreScroll && window.matchMedia('(max-width: 768px)').matches && main) {
-    main.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (options.mobileScroll && main && window.matchMedia('(max-width: 768px)').matches) {
+      main.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
   }
 }
 
@@ -881,22 +1238,40 @@ function onDocContentClick(e) {
   if (!window.DOC_CONTENT || !window.DOC_CONTENT[filename]) return;
 
   e.preventDefault();
-  loadDoc(filename);
+  loadDoc(filename, { kind: 'link' });
 }
 
 function openDocViewFromHash() {
   const hash = location.hash.replace(/^#/, '');
-  if (hash === 'index') {
-    initDocViewer();
-    loadDocIndex();
-    document.body.classList.add('doc-mode');
-    return true;
-  }
-  if (hash && window.DOC_CONTENT && window.DOC_CONTENT[hash]) {
-    initDocViewer();
-    loadDoc(hash);
-    document.body.classList.add('doc-mode');
-    return true;
+  initDocViewer();
+  docNavSuppressPush = true;
+  try {
+    if (hash === 'history') {
+      renderDocHistoryPage({ scrollTop: 0 });
+      if (!docNavLog.length) {
+        logDocInitialLanding(DOC_PAGE_HISTORY, 0);
+      }
+      document.body.classList.add('doc-mode');
+      return true;
+    }
+    if (hash === 'index') {
+      renderDocIndexPage({ scrollTop: 0 });
+      if (!docNavLog.length) {
+        logDocInitialLanding('', 0);
+      }
+      document.body.classList.add('doc-mode');
+      return true;
+    }
+    if (hash && window.DOC_CONTENT && window.DOC_CONTENT[hash]) {
+      renderDocPage(hash, { scrollTop: 0 });
+      if (!docNavLog.length) {
+        logDocInitialLanding(hash, 0);
+      }
+      document.body.classList.add('doc-mode');
+      return true;
+    }
+  } finally {
+    docNavSuppressPush = false;
   }
   return false;
 }

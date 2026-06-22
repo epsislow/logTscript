@@ -800,16 +800,16 @@ Use code with caution.By simply looking for that S modifier in your definition (
 [  ] Add transistor switch electrical
      NPN PNP(base, emit, coll)
 [  ] Add switch mecanical 
-[  ] Add back button in docViewer
-[  ] Add type 2 to key for pressed and release when released and type 3 for toggle 
-[  ] Example terminal with queue and button append 
+1 [ v ] Add back button in docViewer   
+2 [  ] Add type 2 to key for pressed and release when released and type 3 for toggle 
+3 [  ] Example terminal with queue and button append 
 [v] Example mode zstate cpudata ramdata not working switch doesn't work like that
-[  ] LOAD file doc
-[  ] Functie TOGGLE 0 -> 1   is 1bit 
+4 [  ] LOAD file doc
+5 [  ] Functie TOGGLE 0 -> 1   is 1bit 
 [  ] Functie ZWHO shows Z connections ZLIST 
 [  ] MASK returns only those bits as pointer
    4wire a= MASK(b, start, len)
-[  ] Functii ISZ ANYZ ISX ANYZ ALL01 ALLZ ANYZX IS01 ALL0 ALL1
+6 [  ] Functii ISZ ANYZ ISX ANYZ ALL01 ALLZ ANYZX IS01 ALL0 ALL1
 [v] Functie ZCONNECT short zconn
      a = ZCONN(en, b)
      adauga driver b cu asignare la a daca este enabled (1) en
@@ -817,6 +817,8 @@ Use code with caution.By simply looking for that S modifier in your definition (
    shortcut
    a <= b 
    a <= b w en
+7[  ] get >= should not connect drivers, instead zconn(en, b) should 
+8[  ] add sintax for zconn(en, b) as:  b w en
 
-
-[  ] Sub UI Editor sa afisam bara cu cuvinte autocomplete pt functii componente nume variabile "(" ")" numele functiei tb sa contina si ( exemplu scrii togg si iti arata optiune "TOGGLE("
+9[  ] Sub UI Editor sa afisam bara cu cuvinte autocomplete pt functii componente nume variabile "(" ")" numele functiei tb sa contina si ( exemplu scrii togg si iti arata optiune "TOGGLE("
+10[  ] switch and dip with zconn instead of 0 .. actualy it behaves like: zconn(en, .dip) for each bit 

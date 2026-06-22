@@ -1398,6 +1398,75 @@ body.doc-mode #docView {
   color: #888;
   font-size: 12px;
 }
+.doc-history-page h1 {
+  font-size: 1.5rem;
+  margin: 0 0 12px;
+  color: #f0f0f0;
+}
+.doc-history-page-actions {
+  margin: 0 0 20px;
+}
+.doc-history-page-actions .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.doc-history-page-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #333;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.doc-history-page-item {
+  border-bottom: 1px solid #2a2a2a;
+}
+.doc-history-page-item:last-child {
+  border-bottom: none;
+}
+.doc-history-page-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: #ddd;
+  font-family: monospace;
+  font-size: 13px;
+  cursor: pointer;
+  line-height: 1.35;
+}
+.doc-history-page-link:hover,
+.doc-history-page-item.doc-history-page-active .doc-history-page-link {
+  background: #252525;
+  color: #fff;
+}
+.doc-history-page-label {
+  flex: 1;
+  min-width: 0;
+}
+.doc-history-page-scroll {
+  color: #777;
+  font-size: 11px;
+}
+.doc-history-page-kind {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+}
+.doc-history-page-empty {
+  color: #888;
+  font-size: 13px;
+  margin: 0;
+}
+#btnDocBack:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .clcd-symbol-gallery-host {
   margin: 16px 0 24px;
 }
@@ -1772,7 +1841,9 @@ body.doc-mode #docView {
 <div id="docView">
   <div class="doc-toolbar">
     <button type="button" class="btn" onclick="showEditorView()">&larr; Editor</button>
+    <button type="button" class="btn" id="btnDocBack" disabled>&larr; Back</button>
     <button type="button" class="btn" id="btnDocIndex" onclick="loadDocIndex()" style="display:none">Index</button>
+    <button type="button" class="btn" id="btnDocHistory" onclick="loadDocHistory()">History</button>
     <div class="doc-search" id="docSearch">
       <label class="doc-search-label" for="docSearchInput">Search:</label>
       <input type="search" id="docSearchInput" class="doc-search-input" placeholder="title…" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="docSearchMenu" aria-expanded="false" />
