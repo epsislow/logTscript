@@ -5695,6 +5695,108 @@ const TERMINAL_BASE = `comp [terminal] .term:
   on: 1
   :`;
 
+const TERMINAL_QUEUE_STREAM = `comp [queue] .q:
+  width: 8
+  length: 8
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  on: 1
+  :
+.q:{ push = ^48
+  set = 1 }
+.q:{ push = ^65
+  set = 1 }
+8wire c
+.q:{ get >= c
+  set = 1 }
+.term:{ append = c
+  set = 1 }
+.q:{ pop = 1
+  set = 1 }`;
+
+const TERMINAL_QUEUE_KEY_STREAM = `comp [queue] .q:
+  width: 8
+  length: 8
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  :
+comp [key] .next:
+  label: 'Next'
+  :
+.q:{ push = ^48
+  set = 1 }
+.q:{ push = ^65
+  set = 1 }
+.q:{ push = ^6C
+  set = 1 }
+.q:{ push = ^6C
+  set = 1 }
+.q:{ push = ^6F
+  set = 1 }
+8wire c
+.q:{ get >= c
+  set = .next }
+.term:{ append = c
+  set = .next }
+.q:{ pop = 1
+  set = .next }`;
+
+const TERMINAL_STACK_KEY_STREAM = `comp [stack] .s:
+  width: 8
+  length: 8
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  :
+comp [key] .next:
+  label: 'Next'
+  :
+.s:{ push = ^41
+  set = 1 }
+.s:{ push = ^42
+  set = 1 }
+.s:{ push = ^43
+  set = 1 }
+8wire c
+.s:{ top >= c
+  set = .next }
+.term:{ append = c
+  set = .next }
+.s:{ pop = 1
+  set = .next }`;
+
+const TERMINAL_STACK_STREAM = `comp [stack] .s:
+  width: 8
+  length: 8
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  on: 1
+  :
+.s:{ push = ^41
+  set = 1 }
+.s:{ push = ^42
+  set = 1 }
+.s:{ push = ^43
+  set = 1 }
+8wire c
+.s:{ top >= c
+  set = 1 }
+.term:{ append = c
+  set = 1 }
+.s:{ pop = 1
+  set = 1 }`;
+
 reg(960, 'terminal', 'registry has terminal', function(h, session) {
   const registry = session._ensureRegistry();
   h.assert('has terminal', String(registry.has('terminal')), 'true');
@@ -11263,6 +11365,54 @@ databus = ZCONNECT(enRam, ramData)`);
   session.setComp(interp, '.cpuEn', '0');
   h.assert('bus Z after release', session.getWire(interp, 'databus'), 'ZZZZZZZZ');
 }, ZSTATE_WAVE);
+
+reg(1571, 'terminal', 'queue FIFO — one byte to terminal (H)', function(h, session) {
+  const { interp } = session.run(TERMINAL_QUEUE_STREAM);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'H');
+});
+
+reg(1572, 'terminal', 'stack LIFO — one byte to terminal (C)', function(h, session) {
+  const { interp } = session.run(TERMINAL_STACK_STREAM);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'C');
+});
+
+function runTerminalQueueKeyDrain(h, session) {
+  const { interp } = session.run(TERMINAL_QUEUE_KEY_STREAM);
+  h.assert('empty after RUN', getTerminalText(_termId(interp, '.term')), '');
+  session.setComp(interp, '.next', '1');
+  session.setComp(interp, '.next', '0');
+  h.assert('press 1', getTerminalText(_termId(interp, '.term')), 'H');
+  session.setComp(interp, '.next', '1');
+  session.setComp(interp, '.next', '0');
+  h.assert('press 2', getTerminalText(_termId(interp, '.term')), 'He');
+  session.setComp(interp, '.next', '1');
+  session.setComp(interp, '.next', '0');
+  h.assert('press 3', getTerminalText(_termId(interp, '.term')), 'Hel');
+  session.setComp(interp, '.next', '1');
+  session.setComp(interp, '.next', '0');
+  h.assert('press 4', getTerminalText(_termId(interp, '.term')), 'Hell');
+  session.setComp(interp, '.next', '1');
+  session.setComp(interp, '.next', '0');
+  h.assert('press 5', getTerminalText(_termId(interp, '.term')), 'Hello');
+}
+
+reg(1573, 'terminal', 'queue FIFO — key drain Hello (wave)', runTerminalQueueKeyDrain, { propagation: 'wave' });
+
+function runTerminalStackKeyDrain(h, session) {
+  const { interp } = session.run(TERMINAL_STACK_KEY_STREAM);
+  h.assert('empty after RUN', getTerminalText(_termId(interp, '.term')), '');
+  session.setComp(interp, '.next', '1');
+  session.setComp(interp, '.next', '0');
+  h.assert('press 1', getTerminalText(_termId(interp, '.term')), 'C');
+  session.setComp(interp, '.next', '1');
+  session.setComp(interp, '.next', '0');
+  h.assert('press 2', getTerminalText(_termId(interp, '.term')), 'CB');
+  session.setComp(interp, '.next', '1');
+  session.setComp(interp, '.next', '0');
+  h.assert('press 3', getTerminalText(_termId(interp, '.term')), 'CBA');
+}
+
+reg(1574, 'terminal', 'stack LIFO — key drain CBA (wave)', runTerminalStackKeyDrain, { propagation: 'wave' });
 
 
   window.LogTScriptTestSuite = {

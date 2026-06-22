@@ -12276,6 +12276,48 @@ show(x)
 
 ---
 
+## Example — queue → terminal (key, wave)
+
+Canonical pattern: **Load & Run** fills the queue; press **Next** once per character. Full script: [terminal.md — FIFO queue → terminal (key, wave)](terminal.md#runnable--fifo-queue--terminal-key-wave). Tests **1573**.
+
+\`\`\`logts-play wave
+comp [queue] .q:
+  width: 8
+  length: 8
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  :
+
+comp [key] .next:
+  label: 'Next'
+  :
+
+.q:{ push = ^48
+  set = 1 }
+.q:{ push = ^65
+  set = 1 }
+.q:{ push = ^6C
+  set = 1 }
+.q:{ push = ^6C
+  set = 1 }
+.q:{ push = ^6F
+  set = 1 }
+
+8wire c
+.q:{ get >= c
+  set = .next }
+.term:{ append = c
+  set = .next }
+.q:{ pop = 1
+  set = .next }
+\`\`\`
+
+---
+
 ## Example — \`front >=\`, \`size >=\`, \`free >=\`
 
 \`\`\`logts-play
@@ -13686,10 +13728,48 @@ show(data)
 
 ---
 
+## Example — stack → terminal (key, wave)
+
+**Load & Run**, then press **Next** — LIFO order on [terminal](terminal.md). Full script: [terminal.md — LIFO stack → terminal (key, wave)](terminal.md#runnable--lifo-stack--terminal-key-wave). Tests **1574**.
+
+\`\`\`logts-play wave
+comp [stack] .s:
+  width: 8
+  length: 8
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  :
+
+comp [key] .next:
+  label: 'Next'
+  :
+
+.s:{ push = ^41
+  set = 1 }
+.s:{ push = ^42
+  set = 1 }
+.s:{ push = ^43
+  set = 1 }
+
+8wire c
+.s:{ top >= c
+  set = .next }
+.term:{ append = c
+  set = .next }
+.s:{ pop = 1
+  set = .next }
+\`\`\`
+
+---
+
 ## Related
 
+- [terminal.md](terminal.md) — drain stack bytes to a text console (LIFO example)
 - [queue.md](queue.md) — FIFO counterpart
-- [counter.md](counter.md) — alternative for manual SP + mem
 - [components.md](components.md)
 `,
     'subtract.md': `# Subtract component
@@ -13971,6 +14051,24 @@ comp [terminal] .term:
 
 Result: \`ABC\`
 
+### Byte literals (\`^hex\`) — ASCII reference
+
+\`append\` takes **8-bit values** (one or more bytes in a single \`^…\` literal). Each pair of hex digits is one byte. Common printable ASCII:
+
+| \`^hex\` | Character | Notes |
+|--------|-----------|--------|
+| \`^20\` | (space) | |
+| \`^21\` | \`!\` | |
+| \`^30\` … \`^39\` | \`0\` … \`9\` | digits |
+| \`^41\` … \`^5A\` | \`A\` … \`Z\` | uppercase |
+| \`^61\` … \`^7A\` | \`a\` … \`z\` | lowercase |
+| \`^0A\` | LF | line feed — prefer \`newline = 1\` for new lines |
+| \`^0D\` | CR | carriage return |
+
+Examples: \`^41\` → \`A\`, \`^48\` → \`H\`, \`^48656C6C6F\` → \`Hello\` (five bytes).
+
+Wider literals append **consecutive bytes** left to right: \`^414243\` → \`ABC\`.
+
 ---
 
 ## New line and clear
@@ -14024,6 +14122,160 @@ ABC
 When content exceeds \`rows\`, the display shows the **last** \`rows\` lines (scroll up).
 
 Example: \`rows: 3\` with lines \`Line1\` … \`Line4\` visible as \`Line2\`, \`Line3\`, \`Line4\`.
+
+---
+
+## Queue / stack → terminal (wave)
+
+LogTScript is a **digital logic simulator**, not a top-to-bottom script. After **Load & Run**, bytes stay in the queue/stack until **you** trigger the next step — typically with \`comp [key]\` on the panel. Use **wave** propagation (editor default); see [signal-propagation.md](signal-propagation.md).
+
+**Pattern**
+
+1. **Load & Run** — push bytes into the queue/stack (\`on: 1\` + \`set = 1\` blocks run once).
+2. **One drain cycle** in source — three property blocks, all with \`set = .next\` (rising edge on the key):
+   - \`get >= c\` / \`top >= c\` (peek)
+   - \`append = c\` on the terminal (**no** \`on: 1\` on \`.term\` — default is edge-triggered)
+   - \`pop = 1\`
+3. Each **button press** (\`0→1\` on \`.next\`) runs that cycle once → one new character on the terminal.
+
+\`MODE ZSTATE\` is **not required** here — it is for tristate multi-driver buses ([zstate.md](zstate.md)). User control comes from the **key** + wave edges, not from ZSTATE.
+
+Verified in tests **1573** (queue → \`Hello\`) and **1574** (stack → \`CBA\`).
+
+---
+
+## Runnable — FIFO queue → terminal (key, wave)
+
+**Load & Run**, then press **Next** once per character.
+
+\`\`\`logts-play wave
+comp [queue] .q:
+  width: 8
+  length: 8
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  :
+
+comp [key] .next:
+  label: 'Next'
+  :
+
+.q:{ push = ^48
+  set = 1 }
+.q:{ push = ^65
+  set = 1 }
+.q:{ push = ^6C
+  set = 1 }
+.q:{ push = ^6C
+  set = 1 }
+.q:{ push = ^6F
+  set = 1 }
+
+8wire c
+.q:{ get >= c
+  set = .next }
+.term:{ append = c
+  set = .next }
+.q:{ pop = 1
+  set = .next }
+\`\`\`
+
+After five presses: \`Hello\`. Pressing again on an empty queue errors (\`Queue is empty\`).
+
+---
+
+## Runnable — LIFO stack → terminal (key, wave)
+
+\`\`\`logts-play wave
+comp [stack] .s:
+  width: 8
+  length: 8
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  :
+
+comp [key] .next:
+  label: 'Next'
+  :
+
+.s:{ push = ^41
+  set = 1 }
+.s:{ push = ^42
+  set = 1 }
+.s:{ push = ^43
+  set = 1 }
+
+8wire c
+.s:{ top >= c
+  set = .next }
+.term:{ append = c
+  set = .next }
+.s:{ pop = 1
+  set = .next }
+\`\`\`
+
+Three presses: \`C\`, then \`CB\`, then \`CBA\`.
+
+Use \`top >=\` / \`get >=\` in a **separate** block **before** \`pop\` — never peek + \`pop\` in the same block.
+
+---
+
+## Runnable — one byte at Load & Run (legacy-style)
+
+For a quick demo without pressing a key: same drain blocks with \`set = 1\` and \`on: 1\` on the terminal — only **one** drain cycle. Tests **1571** / **1572**.
+
+\`\`\`logts-play
+comp [queue] .q:
+  width: 8
+  length: 8
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  on: 1
+  :
+
+.q:{ push = ^48
+  set = 1 }
+.q:{ push = ^65
+  set = 1 }
+
+8wire c
+.q:{ get >= c
+  set = 1 }
+.term:{ append = c
+  set = 1 }
+.q:{ pop = 1
+  set = 1 }
+\`\`\`
+
+Display: \`H\` only.
+
+---
+
+## Why not copy several drain blocks with \`on: 1\`?
+
+If you paste the drain cycle **multiple times** and use \`on: 1\` + \`set = 1\` on the terminal (all at **Load & Run**), you get wrong text (\`Heellllooooo\` instead of \`Hello\`).
+
+**Cause:** \`on: 1\` means *level-triggered* — whenever the queue changes, wave propagation **re-evaluates every** block whose \`set\` is still \`1\`. After the second \`pop\`, the first \`.term:{ append = c }\` block is still “active” and runs again.
+
+**What “do not re-run consumed terminal blocks” would mean (engine idea, not implemented):** mark a drain/append block as *done* after it has fired for the current queue front, so a later \`pop\` does not wake old append blocks. Today the fix is **one drain in source + rising edge per press** (key), not many level-triggered copies.
+
+| Anti-pattern | Use instead |
+|--------------|-------------|
+| Several drain copies + \`on: 1\` at RUN | One drain + \`set = .next\` (key) |
+| \`get >=\` + \`pop\` in one block | Separate blocks: peek, append, pop |
+| Re-assign \`8wire c = .q:get\` each step | One \`8wire c\` + \`get >= c\` |
 
 ---
 

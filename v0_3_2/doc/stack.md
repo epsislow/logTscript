@@ -89,8 +89,46 @@ show(data)
 
 ---
 
+## Example — stack → terminal (key, wave)
+
+**Load & Run**, then press **Next** — LIFO order on [terminal](terminal.md). Full script: [terminal.md — LIFO stack → terminal (key, wave)](terminal.md#runnable--lifo-stack--terminal-key-wave). Tests **1574**.
+
+```logts-play wave
+comp [stack] .s:
+  width: 8
+  length: 8
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  :
+
+comp [key] .next:
+  label: 'Next'
+  :
+
+.s:{ push = ^41
+  set = 1 }
+.s:{ push = ^42
+  set = 1 }
+.s:{ push = ^43
+  set = 1 }
+
+8wire c
+.s:{ top >= c
+  set = .next }
+.term:{ append = c
+  set = .next }
+.s:{ pop = 1
+  set = .next }
+```
+
+---
+
 ## Related
 
+- [terminal.md](terminal.md) — drain stack bytes to a text console (LIFO example)
 - [queue.md](queue.md) — FIFO counterpart
-- [counter.md](counter.md) — alternative for manual SP + mem
 - [components.md](components.md)

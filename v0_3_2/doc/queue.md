@@ -65,6 +65,48 @@ show(x)
 
 ---
 
+## Example — queue → terminal (key, wave)
+
+Canonical pattern: **Load & Run** fills the queue; press **Next** once per character. Full script: [terminal.md — FIFO queue → terminal (key, wave)](terminal.md#runnable--fifo-queue--terminal-key-wave). Tests **1573**.
+
+```logts-play wave
+comp [queue] .q:
+  width: 8
+  length: 8
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 3
+  columns: 40
+  :
+
+comp [key] .next:
+  label: 'Next'
+  :
+
+.q:{ push = ^48
+  set = 1 }
+.q:{ push = ^65
+  set = 1 }
+.q:{ push = ^6C
+  set = 1 }
+.q:{ push = ^6C
+  set = 1 }
+.q:{ push = ^6F
+  set = 1 }
+
+8wire c
+.q:{ get >= c
+  set = .next }
+.term:{ append = c
+  set = .next }
+.q:{ pop = 1
+  set = .next }
+```
+
+---
+
 ## Example — `front >=`, `size >=`, `free >=`
 
 ```logts-play
