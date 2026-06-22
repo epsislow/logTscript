@@ -83,7 +83,8 @@ function createHarness() {
   const norm = s => String(s).split('\n').map(l => l.trimEnd()).join('\n').trim();
   return {
     assert(testName, actual, expected) {
-      assertions.push({ name: testName, pass: norm(actual) === norm(expected) });
+      const pass = norm(actual) === norm(expected);
+      assertions.push({ name: testName, pass, actual, expected });
     },
     assertThrows(testName, fn, expectedMsg) {
       try {
@@ -124,7 +125,7 @@ for (const test of suite.tests) {
       const err = h.getUnexpected();
       if (err) console.log('  1609 THROW', err.message);
       for (const a of h.getAssertions()) {
-        if (!a.pass) console.log('  1609', a.name);
+        if (!a.pass) console.log('  1609 FAIL', a.name, 'got', a.actual, 'exp', a.expected);
       }
     }
   }

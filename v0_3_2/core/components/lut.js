@@ -146,7 +146,9 @@ var LutComponent = class LutComponent extends BuiltinComponent {
     const lutId = comp.deviceIds[0];
     const length = comp.attributes['length'] !== undefined ? parseInt(comp.attributes['length'], 10) : 16;
     const addrBits = this._addrBits(length);
-    const binValue = this.padOrTruncate(value, addrBits);
+    let binValue = value == null ? '' : String(value);
+    if (binValue.length < addrBits) binValue = binValue.padStart(addrBits, '0');
+    else if (binValue.length > addrBits) binValue = binValue.substring(binValue.length - addrBits);
     comp._lutInValue = binValue;
     if (typeof setLutIn === 'function') setLutIn(lutId, binValue);
     return true;

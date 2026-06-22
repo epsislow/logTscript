@@ -31,6 +31,7 @@
         { "file": "chip.md", "label": "Chip" },
         { "file": "mini-cpu.md", "label": "Mini CPU demo", "searchExtra": "harvard alu cpu4 step" },
         { "file": "mini-cpu-v2.md", "label": "Mini CPU v2 demo", "searchExtra": "asm beq lut terminal cpu4v2" },
+        { "file": "pocket-calc.md", "label": "Pocket calculator demo", "searchExtra": "keyboard calc terminal divider toAscii onlyNumbers" },
         { "file": "mini-cpu-plan.md", "label": "Mini CPU plan", "searchExtra": "feasibility variant harvard" },
         { "file": "pcb.md", "label": "PCB (deprecated)" }
       ]

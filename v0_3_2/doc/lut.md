@@ -63,7 +63,39 @@ Apply to both `inline [lut]` and `comp [lut]`:
 | `length` | `16` | Number of table slots (addresses `0 .. length-1`) |
 | `fillwith` | `000…0` (`depth` zeros) | Value for slots **not** listed in `data { }` |
 
-Address width on pin `in` (comp only): `max(1, ceil(log2(length)))` bits.
+Address width on pin `in` (comp only): `max(1, ceil(log2(length)))` bits — call this **`addrBits`**.
+
+#### Wide `in` values (narrowing)
+
+If `in` is driven by a wire **wider** than `addrBits` (common with `8wire` arithmetic or `:get` from an 8-bit `reg`), the table index is the **least significant `addrBits` bits** of the value. Values shorter than `addrBits` are **zero-padded on the left**.
+
+This matches device-layer `setLutIn` and applies to both `comp [lut]` pin `in` and invoke `.name(in = expr)`.
+
+| `length` | `addrBits` | `in` (example) | Index used | Slot |
+|----------|------------|----------------|------------|------|
+| 16 | 4 | `00000011` | `0011` | 3 |
+| 16 | 4 | `00001010` | `1010` | 10 |
+
+Use an explicit bit slice (e.g. `val.4/4`) only when you need non-LSB bits; for numeric digit/opcode indices the low bits are the address.
+
+```logts-play
+comp [lut] .toAscii:
+  depth: 8
+  length: 16
+  fillwith: 00110000
+  = data {
+    ^0: 00110000
+    ^3: 00110011
+  }
+  on: 1
+  :
+
+8wire digit = 00000011
+8wire ch = .toAscii(in = digit)
+show(ch)
+```
+
+`digit` is 8 bits; address **`0011`** → ASCII `'3'` (`00110011`), not slot 0 from the high nibble.
 
 ### `variableDepth`
 

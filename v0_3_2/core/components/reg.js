@@ -66,6 +66,14 @@ var RegComponent = class RegComponent extends BuiltinComponent {
         }
         if (typeof setReg === 'function') setReg(regId, dataValue);
         if (!reEvaluate && pending.write !== undefined) delete pending.write;
+        if (ctx.deferWirePropagation && ctx.deferWirePropagation() && ctx.signalPropagationStrategy) {
+          const executed = new Set();
+          if (ctx.signalPropagationStrategy._scheduleWiresDependingOnComponent(compName, executed)) {
+            ctx.signalPropagationStrategy.propagate();
+          }
+        } else {
+          ctx.updateComponentConnections(compName);
+        }
       } else {
         throw Error(`Register :set = 1 requires :data to be set`);
       }

@@ -119,6 +119,7 @@ Programs that use **PCB** instances and property blocks (`.instance:{ data=… s
 | **External wires** (`4wire q = .e`, `4wire out = .p:pout`) | Updated through wave propagation after the PCB runs or after a trigger (`setWire`, switch, key). |
 | **PCB pins** (`setWire` on an input pin) | Can fire property blocks with `on:1` / `set = …`; dependent external wires settle in the same propagation step. |
 | **PCB pouts** | Output pins publish to external wires via wave scheduling (not a direct storage write). |
+| **`comp [reg]` `:get`** | After a property block writes `:data` with `:set = 1`, wires that read `.name:get` are re-scheduled in the same wave step. |
 | **Inside the PCB body** | Still runs in the older immediate model (`insidePcbBody`). Internal wires are not wave-deferred. |
 
 **What this means for you:**

@@ -11805,6 +11805,7 @@ comp [terminal] .term:
 const CALC_POCKET = `comp [keyboard] .kbd:
   label: 'Digits'
   focusColor: ^00ff00
+  onlyNumbers
   on: 1
   :
 
@@ -11831,25 +11832,6 @@ comp [key] .reset:
   type: 0
   on: 1
   nl
-  :
-
-comp [lut] .fromAscii:
-  depth: 4
-  length: 128
-  fillwith: 1111
-  = data {
-    ^30: 0000
-    ^31: 0001
-    ^32: 0010
-    ^33: 0011
-    ^34: 0100
-    ^35: 0101
-    ^36: 0110
-    ^37: 0111
-    ^38: 1000
-    ^39: 1001
-  }
-  on: 1
   :
 
 comp [lut] .toAscii:
@@ -11881,6 +11863,11 @@ comp [reg] .entry:
   on: 1
   :
 
+comp [divider] .disp:
+  depth: 8
+  on: 1
+  :
+
 comp [terminal] .term:
   rows: 8
   columns: 24
@@ -11891,22 +11878,37 @@ comp [terminal] .term:
 
 8wire zero = 00000000
 8wire ten = 00001010
-8wire key = .kbd
-4wire dig = .fromAscii(in = key)
 8wire entryCur = .entry:get
 8wire entryMul, 8wire ov1 = MULTIPLY(entryCur, ten)
-8wire entryNew, 1wire c1 = ADD(entryMul, dig)
-1wire bad = EQ(dig, 1111)
+8wire entryNew, 1wire c1 = ADD(entryMul, .kbd)
+8wire accCur = .acc:get
+8wire sum, 1wire cSum = ADD(accCur, entryCur)
+8wire diff, 1wire borrow = SUBTRACT(accCur, entryCur)
+8wire diffSat = MUX(borrow, diff, zero)
 
 .entry:{
-  data = MUX(bad, entryNew, entryCur)
+  data = entryNew
   set = .kbd:valid
 }
 
-8wire accCur = .acc:get
-8wire sum, 1wire c2 = ADD(accCur, entryCur)
-8wire diff, 1wire borrow = SUBTRACT(accCur, entryCur)
-8wire diffSat = MUX(borrow, diff, zero)
+.disp:{
+  a = sum
+  b = ten
+  set = .plus
+}
+
+.term:{
+  append = .toAscii(in = .disp:get)
+  set = .plus
+}
+.term:{
+  append = .toAscii(in = .disp:mod)
+  set = .plus
+}
+.term:{
+  newline = 1
+  set = .plus
+}
 
 .acc:{
   data = sum
@@ -11917,19 +11919,23 @@ comp [terminal] .term:
   set = .plus
 }
 
-8wire showP = sum
-8wire qP, 8wire modP = DIVIDE(showP, ten)
-8wire asciiTP = .toAscii(in = qP)
-8wire asciiOP = .toAscii(in = modP)
+.disp:{
+  a = diffSat
+  b = ten
+  set = .minus
+}
 
 .term:{
-  append = asciiTP
-  set = .plus
+  append = .toAscii(in = .disp:get)
+  set = .minus
 }
 .term:{
-  append = asciiOP
+  append = .toAscii(in = .disp:mod)
+  set = .minus
+}
+.term:{
   newline = 1
-  set = .plus
+  set = .minus
 }
 
 .acc:{
@@ -11941,19 +11947,23 @@ comp [terminal] .term:
   set = .minus
 }
 
-8wire showM = diffSat
-8wire qM, 8wire modM = DIVIDE(showM, ten)
-8wire asciiTM = .toAscii(in = qM)
-8wire asciiOM = .toAscii(in = modM)
+.disp:{
+  a = sum
+  b = ten
+  set = .eq
+}
 
 .term:{
-  append = asciiTM
-  set = .minus
+  append = .toAscii(in = .disp:get)
+  set = .eq
 }
 .term:{
-  append = asciiOM
+  append = .toAscii(in = .disp:mod)
+  set = .eq
+}
+.term:{
   newline = 1
-  set = .minus
+  set = .eq
 }
 
 .acc:{
@@ -11962,21 +11972,6 @@ comp [terminal] .term:
 }
 .entry:{
   data = zero
-  set = .eq
-}
-
-8wire showE = sum
-8wire qE, 8wire modE = DIVIDE(showE, ten)
-8wire asciiTE = .toAscii(in = qE)
-8wire asciiOE = .toAscii(in = modE)
-
-.term:{
-  append = asciiTE
-  set = .eq
-}
-.term:{
-  append = asciiOE
-  newline = 1
   set = .eq
 }
 
@@ -11999,10 +11994,10 @@ function _pressKey(session, interp, name) {
   session.triggerKeyPress(interp, name, { phase: 'release' });
 }
 
-reg(1609, 'keyboard', 'pocket calc — LUT ascii digits, +/−/=, R (wave)', function(h, session) {
+reg(1609, 'keyboard', 'pocket calc — keyboard + keys +/−/=, R', function(h, session) {
   const { interp } = session.run(CALC_POCKET);
   session.triggerKeyboardKey(interp, '.kbd', { key: '1' });
-  h.assert('lut digit 1', session.getWire(interp, 'dig'), '0001');
+  h.assert('digit 1', session.getCompProperty(interp, '.kbd', 'get'), '0001');
   session.triggerKeyboardKey(interp, '.kbd', { key: '2' });
   h.assert('entry 12', session.getCompProperty(interp, '.entry', 'get'), '00001100');
   _pressKey(session, interp, '.plus');

@@ -14,9 +14,9 @@ function propagateKeyboardOutput(ctx, compName) {
     const scheduled = ctx.signalPropagationStrategy._scheduleWiresDependingOnComponent(compName, executed);
     if (scheduled) {
       ctx.signalPropagationStrategy.propagate();
-    } else {
-      ctx.updateComponentConnections(compName);
     }
+    // Always run :valid / set= blocks — propagate() alone skips ucc when wires were scheduled.
+    ctx.updateComponentConnections(compName);
     ctx._notifyIoportMemberChange(compName);
   } else {
     ctx.updateComponentConnections(compName);
