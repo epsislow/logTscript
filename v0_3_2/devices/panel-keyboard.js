@@ -7,6 +7,7 @@ class PanelKeyboard {
     bgColor = '#101010',
     focusColor = '#2ecc71',
     focusBgColor = '#181818',
+    onlyNumbers = false,
     onKey = () => false,
   }) {
     this.label = label;
@@ -14,16 +15,17 @@ class PanelKeyboard {
     this.bgColor = bgColor;
     this.focusColor = focusColor;
     this.focusBgColor = focusBgColor;
+    this.onlyNumbers = onlyNumbers;
     this.onKey = onKey;
     this.focused = false;
     this.cursorVisible = true;
     this._cursorTimer = null;
-    this._boundDocMouseDown = (e) => this._onDocumentMouseDown(e);
-    this._boundKeyDown = (e) => this._onKeyDown(e);
+    this._boundDocPointerDown = (e) => this._onDocumentPointerDown(e);
+    this._boundInputKeyDown = (e) => this._onInputKeyDown(e);
+    this._boundInput = (e) => this._onInput(e);
 
     this.el = document.createElement('div');
     this.el.className = 'keyboard-panel';
-    this.el.tabIndex = 0;
 
     this.labelEl = document.createElement('span');
     this.labelEl.className = 'keyboard-label';
@@ -33,13 +35,29 @@ class PanelKeyboard {
     this.cursorEl.className = 'keyboard-cursor';
     this.cursorEl.textContent = '|';
 
+    this.inputEl = document.createElement('input');
+    this.inputEl.type = 'text';
+    this.inputEl.className = 'keyboard-input';
+    this.inputEl.setAttribute('autocomplete', 'off');
+    this.inputEl.setAttribute('autocapitalize', 'off');
+    this.inputEl.setAttribute('autocorrect', 'off');
+    this.inputEl.setAttribute('spellcheck', 'false');
+    this.inputEl.setAttribute('enterkeyhint', 'done');
+    this.inputEl.setAttribute('inputmode', onlyNumbers ? 'numeric' : 'text');
+    this.inputEl.setAttribute('aria-label', label);
+
     this.el.appendChild(this.labelEl);
     this.el.appendChild(this.cursorEl);
+    this.el.appendChild(this.inputEl);
 
-    this.el.addEventListener('mousedown', (e) => {
-      e.preventDefault();
+    this.el.addEventListener('click', (e) => {
+      e.stopPropagation();
       this.focus();
     });
+
+    this.inputEl.addEventListener('keydown', this._boundInputKeyDown);
+    this.inputEl.addEventListener('input', this._boundInput);
+    this.inputEl.addEventListener('focus', () => this._activateFocus(false));
 
     this._applyColors();
     this._stopCursorBlink();
@@ -50,14 +68,27 @@ class PanelKeyboard {
   }
 
   focus() {
+    this._activateFocus(true);
+  }
+
+  _activateFocus(focusInput) {
     if (typeof window !== 'undefined') {
       window.focusedKeyboardId = this._id;
     }
+    const wasFocused = this.focused;
     this.focused = true;
     this._applyColors();
     this._startCursorBlink();
-    document.addEventListener('mousedown', this._boundDocMouseDown);
-    window.addEventListener('keydown', this._boundKeyDown);
+    if (!wasFocused) {
+      document.addEventListener('mousedown', this._boundDocPointerDown);
+      document.addEventListener('touchstart', this._boundDocPointerDown, { passive: true });
+    }
+    if (!focusInput) return;
+    try {
+      this.inputEl.focus({ preventScroll: true });
+    } catch (_e) {
+      this.inputEl.focus();
+    }
   }
 
   unfocus() {
@@ -65,32 +96,52 @@ class PanelKeyboard {
       window.focusedKeyboardId = null;
     }
     this.focused = false;
+    this.inputEl.value = '';
     this._applyColors();
     this._stopCursorBlink();
-    document.removeEventListener('mousedown', this._boundDocMouseDown);
-    window.removeEventListener('keydown', this._boundKeyDown);
+    document.removeEventListener('mousedown', this._boundDocPointerDown);
+    document.removeEventListener('touchstart', this._boundDocPointerDown);
+    if (document.activeElement === this.inputEl) {
+      this.inputEl.blur();
+    }
   }
 
   setId(id) {
     this._id = id;
   }
 
-  _onDocumentMouseDown(e) {
+  _onDocumentPointerDown(e) {
     if (!this.el.contains(e.target)) {
       this.unfocus();
     }
   }
 
-  _onKeyDown(e) {
+  _onInput(e) {
+    if (!this.focused) return;
+    const val = this.inputEl.value;
+    if (!val) return;
+    for (const ch of val) {
+      this.onKey(ch, { force: true });
+    }
+    this.inputEl.value = '';
+    e.preventDefault();
+  }
+
+  _onInputKeyDown(e) {
     if (!this.focused) return;
     if (e.repeat) return;
     const key = e.key;
     if (key === 'Tab' || key.startsWith('Arrow') || key === 'Escape' || key === 'Meta' || key === 'Control' || key === 'Alt') {
       return;
     }
-    const accepted = this.onKey(key, { force: true });
-    if (accepted) {
-      e.preventDefault();
+    if (key === 'Enter') {
+      const accepted = this.onKey('Enter', { force: true });
+      if (accepted) e.preventDefault();
+      this.inputEl.value = '';
+      return;
+    }
+    if (key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      return;
     }
   }
 
@@ -134,6 +185,7 @@ function addKeyboard({
   bgColor,
   focusColor,
   focusBgColor,
+  onlyNumbers,
   nl,
   onKey,
 }) {
@@ -150,6 +202,7 @@ function addKeyboard({
     bgColor,
     focusColor,
     focusBgColor,
+    onlyNumbers: !!onlyNumbers,
     onKey: (key) => onKey(key, { force: true }),
   });
   kb.setId(id);

@@ -862,6 +862,7 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 }
 
 .keyboard-panel {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -875,6 +876,22 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   cursor: pointer;
   user-select: none;
   box-sizing: border-box;
+}
+
+.keyboard-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  font-size: 16px;
+  cursor: pointer;
 }
 
 .keyboard-label {

@@ -184,6 +184,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         bgColor,
         focusColor,
         focusBgColor,
+        onlyNumbers,
         nl,
         onKey,
       });

@@ -43,6 +43,8 @@ A keyboard captures key presses only while **focused**.
 
 When focused, key presses are emitted into the simulation. The component does not display the characters that were typed.
 
+On **mobile**, focus uses a hidden `<input>` so the OS virtual keyboard opens; with `onlyNumbers`, `inputmode="numeric"` is set. On desktop, the same input receives physical key presses while focused.
+
 ---
 
 ## Outputs
