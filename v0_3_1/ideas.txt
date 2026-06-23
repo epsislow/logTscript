@@ -825,3 +825,8 @@ Use code with caution.By simply looking for that S modifier in your definition (
 
 9[  ] Sub UI Editor sa afisam bara cu cuvinte autocomplete pt functii componente nume variabile "(" ")" numele functiei tb sa contina si ( exemplu scrii togg si iti arata optiune "TOGGLE("
 10[  ] switch and dip with zconn instead of 0 .. actualy it behaves like: zconn(en, .dip) for each bit 
+
+
+[ ] terminal sa poata afisa un simbol specific pentru caracterele ascii care nu sunt vizibile 
+[ ] keyboard sa poata primii o lista lut cu codurile caracterelor pe care le permite de la keyboard
+[ ] terminal flag atribut sa proceseze caracterele de genul backspace, delete stergand caracterul anterior + de stiut daca poate sa stearga newLine sau nu

@@ -5762,46 +5762,31 @@ if (s.assignment) {
         
         // Compute the actual value from the reference
         let wireValue = this.getValueFromRef(wireRef);
-        
-        // Bit-width enforcement: pad literals, reject wire-to-wire mismatch
-        if(wireValue && wireValue.length !== bits){
-          const hasAsmBlob = exprResult.some(p => p.asmBlob);
-          const hasProtocolBlob = exprResult.some(p => p.protocolBlob);
-          const declAssignPad = stmtAssignPad(s);
-          if (hasAsmBlob) {
-            if (wireValue.length < bits && (declAssignPad === 'left' || declAssignPad === 'right')) {
-              wireValue = padWireBits(wireValue, bits, declAssignPad);
-            } else {
-              throw Error(`Bit-width mismatch: ${d.name} is ${bits}bit but assembled program provides ${wireValue.length} bits`);
-            }
-          } else if (hasProtocolBlob) {
-            if (wireValue.length < bits && (declAssignPad === 'left' || declAssignPad === 'right')) {
-              wireValue = padWireBits(wireValue, bits, declAssignPad);
-            } else {
-              throw Error(`Protocol output width mismatch: ${d.name} is ${bits}bit but protocol provides ${wireValue.length} bits`);
-            }
-          } else {
-            const hasWireRef = exprResult.some(p => p.varName && this.wires.has(p.varName));
-            if(hasWireRef){
-              throw Error(`Bit-width mismatch: ${d.name} is ${bits}bit but expression provides ${wireValue.length} bits`);
-            }
-            if (declAssignPad === 'strict') {
-              this._throwRuntime(wireBitsMismatchError(bits, wireValue.length), s, wireValue.length);
-            }
-            if(wireValue.length < bits){
-              wireValue = padWireBits(wireValue, bits, declAssignPad);
-            } else {
-              wireValue = wireValue.substring(wireValue.length - bits);
-            }
+        if (wireValue == null || wireValue === '') {
+          wireValue = totalValue.substring(bitOffset, bitOffset + bits);
+        }
+
+        const hasAsmBlob = exprResult.some(p => p.asmBlob);
+        const hasProtocolBlob = exprResult.some(p => p.protocolBlob);
+        const declAssignPad = stmtAssignPad(s);
+        if (hasAsmBlob) {
+          if (wireValue.length < bits && (declAssignPad === 'left' || declAssignPad === 'right')) {
+            wireValue = padWireBits(wireValue, bits, declAssignPad);
+          } else if (wireValue.length !== bits) {
+            throw Error(`Bit-width mismatch: ${d.name} is ${bits}bit but assembled program provides ${wireValue.length} bits`);
           }
-          // Update storage with padded/truncated value
-          if(wireRef && wireRef.startsWith('&')){
-            const refMatch = wireRef.match(/^&(\d+)/);
-            if(refMatch){
-              const stored = this.storage.find(st => st.index === parseInt(refMatch[1]));
-              if(stored) stored.value = wireValue;
-            }
+        } else if (hasProtocolBlob) {
+          if (wireValue.length < bits && (declAssignPad === 'left' || declAssignPad === 'right')) {
+            wireValue = padWireBits(wireValue, bits, declAssignPad);
+          } else if (wireValue.length !== bits) {
+            throw Error(`Protocol output width mismatch: ${d.name} is ${bits}bit but protocol provides ${wireValue.length} bits`);
           }
+        } else {
+          const hasWireRef = exprResult.some(p => p.varName && this.wires.has(p.varName));
+          if (hasWireRef && wireValue.length !== bits) {
+            throw Error(`Bit-width mismatch: ${d.name} is ${bits}bit but expression provides ${wireValue.length} bits`);
+          }
+          wireValue = fitWireAssignBits(wireValue, bits, declAssignPad, 'msb', this);
         }
         
         // In WIREWRITE mode, if wire already has storage, update it instead of creating new reference

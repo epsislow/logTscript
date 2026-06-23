@@ -7,7 +7,7 @@ class PanelKeyboard {
     bgColor = '#101010',
     focusColor = '#2ecc71',
     focusBgColor = '#181818',
-    onlyNumbers = false,
+    onlyDigits = false,
     allowEnter = false,
     onKey = () => false,
   }) {
@@ -16,7 +16,7 @@ class PanelKeyboard {
     this.bgColor = bgColor;
     this.focusColor = focusColor;
     this.focusBgColor = focusBgColor;
-    this.onlyNumbers = onlyNumbers;
+    this.onlyDigits = onlyDigits;
     this.allowEnter = allowEnter;
     this.onKey = onKey;
     this.focused = false;
@@ -51,7 +51,7 @@ class PanelKeyboard {
     this.inputEl.setAttribute('autocapitalize', 'off');
     this.inputEl.setAttribute('autocorrect', 'off');
     this.inputEl.setAttribute('spellcheck', 'false');
-    if (onlyNumbers) {
+    if (onlyDigits) {
       this.inputEl.setAttribute('inputmode', 'numeric');
     } else {
       this.inputEl.setAttribute('inputmode', 'text');
@@ -206,7 +206,7 @@ function addKeyboard({
   bgColor,
   focusColor,
   focusBgColor,
-  onlyNumbers,
+  onlyDigits,
   allowEnter,
   nl,
   onKey,
@@ -224,7 +224,7 @@ function addKeyboard({
     bgColor,
     focusColor,
     focusBgColor,
-    onlyNumbers: !!onlyNumbers,
+    onlyDigits: !!onlyDigits,
     allowEnter: !!allowEnter,
     onKey: (key) => onKey(key, { force: true }),
   });

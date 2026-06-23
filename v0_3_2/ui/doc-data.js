@@ -7472,7 +7472,7 @@ comp [slider] .op:
 |-----------|------|-------------|----------------|------------------|
 | \`switch\`  | 1    | Toggle      | \`onChange\`     | Stays \`0\` or \`1\` |
 | \`key\`     | 1    | Press/release (\`type: 0\`/\`1\`) or toggle (\`type: 2\`) | **\`onPress\` / \`onRelease\`** | \`0\` (or latched with \`type: 2\`) |
-| \`keyboard\` | 8 / 4 | Type while focused | **\`onKey\`** | \`get\` holds last code; \`valid\` idle \`0\` |
+| \`keyboard\` | 8 | Type while focused | **\`onKey\`** | \`get\` holds last ASCII code; \`valid\` idle \`0\` |
 | \`clcd\`    | \`:out\` width | Tap symbols (\`touch: 1\`) | **\`onPress\` / \`onRelease\`** | \`:out\` per \`touchType\` |
 | \`dip\`     | N    | Flip each position | \`onChange\` | Holds last pattern |
 | \`rotary\`  | \`ceil(log₂(states))\` | Drag / step knob | \`onChange\` | Holds last state |
@@ -8111,7 +8111,7 @@ comp [keyboard] .name:
   bgColor: ^101010
   focusColor: ^2ecc71
   focusBgColor: ^181818
-  onlyNumbers
+  onlyDigits
   allowEnter
   nl
   :
@@ -8143,7 +8143,7 @@ On **mobile**, focus uses a hidden field so the OS virtual keyboard opens:
 | default | \`<input>\` | **Done** (no Enter in simulation) |
 | \`allowEnter\` | \`<textarea>\` | **Enter** / return (emits LF, code 10) |
 
-With \`onlyNumbers\`, \`inputmode="numeric"\` is set (reliable on \`<input>\`; on \`<textarea>\` the OS may still show a full keyboard). On desktop, the same field receives physical key presses while focused.
+With \`onlyDigits\`, \`inputmode="numeric"\` is set (reliable on \`<input>\`; on \`<textarea>\` the OS may still show a full keyboard). On desktop, the same field receives physical key presses while focused.
 
 ---
 
@@ -8151,7 +8151,7 @@ With \`onlyNumbers\`, \`inputmode="numeric"\` is set (reliable on \`<input>\`; o
 
 | Pout | Width | Description |
 |------|-------|-------------|
-| \`get\` | 8 (ASCII) / 4 (\`onlyNumbers\`) | Last emitted code |
+| \`get\` | 8 | Last emitted **ASCII** code (8 bit) |
 | \`valid\` | 1 | Pulse \`1\` for one propagation cycle when a key is accepted, then \`0\` |
 
 Wire property blocks use \`set = .kbd:valid\` to trigger \`push\` / \`append\` on each key.
@@ -8169,13 +8169,13 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | \`bgColor\` | color | \`^101010\` | Background when unfocused |
 | \`focusColor\` | color | \`^2ecc71\` | Border when focused |
 | \`focusBgColor\` | color | \`^181818\` | Background when focused |
-| \`onlyNumbers\` | flag | (no) | Accept only \`0\`–\`9\` |
+| \`onlyDigits\` | flag | (no) | Accept only \`0\`–\`9\` (still emits 8-bit ASCII) |
 | \`allowEnter\` | flag | (no) | Accept Enter (LF, code 10); mobile uses \`<textarea>\` with return key |
 | \`nl\` | flag | (no) | New line after component |
 
 ---
 
-## ASCII mode (default)
+## Key codes (8-bit ASCII)
 
 | Key | Decimal | Binary (8 bit) | Notes |
 |-----|---------|----------------|-------|
@@ -8185,9 +8185,18 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 
 ---
 
-## \`onlyNumbers\` mode
+## \`onlyDigits\` — filter, not encoding
 
-Only \`0\`–\`9\` are accepted. \`get\` is **4 bits** with decimal value (\`5\` → \`0101\`). Enter and letters are ignored.
+\`onlyDigits\` accepts only keys \`0\`–\`9\` (and Enter when \`allowEnter\` is also set). **\`:get\` is always 8-bit ASCII** — e.g. \`5\` → \`00110101\` (character \`'5'\`), not \`0101\`.
+
+For the numeric value \`0\`–\`9\` in logic (queue, reg, ALU), use the low nibble:
+
+\`\`\`logts
+4wire digit = .kbd.4/4
+@ same as .kbd.4-7 or .kbd:get.4/4
+\`\`\`
+
+For digits \`0\`–\`9\`, \`.4/4\` equals the decimal digit value.
 
 ---
 
@@ -8226,7 +8235,7 @@ With \`allowEnter\`, pressing Enter on the keyboard emits LF and you can wire \`
 \`\`\`logts-play
 comp [keyboard] .digits:
   label: 'BCD'
-  onlyNumbers
+  onlyDigits
   focusColor: ^00aaff
   on: 1
   :
@@ -8239,7 +8248,7 @@ comp [queue] .q:
   :
 
 .q:{
-  push = .digits
+  push = .digits.4/4
   set = .digits:valid
 }
 \`\`\`
@@ -11832,7 +11841,7 @@ Automated test: **1609** (\`keyboard\` group).
 
 | Block | Role |
 |-------|------|
-| \`comp [keyboard] .kbd\` | Digits \`0\`–\`9\` (\`onlyNumbers\`); \`:get\` = 4-bit digit, \`:valid\` pulse per accepted key |
+| \`comp [keyboard] .kbd\` | Digits \`0\`–\`9\` (\`onlyDigits\`); \`:get\` = 8-bit ASCII; \`.kbd.4/4\` = digit value; \`:valid\` pulse per accepted key |
 | \`comp [key] .plus\` / \`.minus\` / \`.eq\` / \`.reset\` | Momentary keys \`+\`, \`-\`, \`=\`, \`R\` |
 | \`comp [reg] .entry\` | Multi-digit number being typed (\`entry × 10 + digit\`) |
 | \`comp [reg] .acc\` | Accumulator (running result) |
@@ -11886,7 +11895,7 @@ Use **Load** or **Load & Run** in the script editor. Focus **Digits**, type on t
 comp [keyboard] .kbd:
   label: 'Digits'
   focusColor: ^00ff00
-  onlyNumbers
+  onlyDigits
   on: 1
   :
 
@@ -11961,7 +11970,7 @@ comp [terminal] .term:
 8wire ten = 00001010
 8wire entryCur = .entry:get
 8wire entryMul, 8wire ov1 = MULTIPLY(entryCur, ten)
-8wire entryNew, 1wire c1 = ADD(entryMul, .kbd)
+8wire entryNew, 1wire c1 = ADD(entryMul, .kbd.4/4)
 8wire accCur = .acc:get
 8wire sum, 1wire cSum = ADD(accCur, entryCur)
 8wire diff, 1wire borrow = SUBTRACT(accCur, entryCur)
@@ -12088,7 +12097,7 @@ After **Load & Run**: focus **Digits**, type \`12\`, click **\`+\`** — termina
 
 ## Related
 
-- [keyboard.md](keyboard.md) — focus, \`onlyNumbers\`, \`:valid\`
+- [keyboard.md](keyboard.md) — focus, \`onlyDigits\`, \`:valid\`
 - [key.md](key.md) — panel keys
 - [terminal.md](terminal.md) — \`append\`, \`newline\`, \`clear\`
 - [divider.md](divider.md) — \`comp [divider]\`

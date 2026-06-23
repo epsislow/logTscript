@@ -913,12 +913,10 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                 const wireRef = this.buildRefFromParts(exprResult, bits, bitOffset);
                 
                 // Compute the actual value from the reference
-                // For component properties like .mem:get, wireRef might be null but part.value contains the value
                 let wireValue = '';
                 if(wireRef && wireRef !== '&-'){
-                  wireValue = this.getValueFromRef(wireRef) || '0'.repeat(bits);
+                  wireValue = this.getValueFromRef(wireRef) || '';
                 } else {
-                  // No ref - get value directly from expression parts
                   for(const part of exprResult){
                     if(part.value && part.value !== '-'){
                       wireValue += part.value;
@@ -927,9 +925,9 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
                       if(val) wireValue += val;
                     }
                   }
-                  const declPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'strict';
-                  wireValue = fitWireAssignBits(wireValue, bits, declPad, 'msb');
                 }
+                const declPad = typeof stmtAssignPad === 'function' ? stmtAssignPad(ws) : 'strict';
+                wireValue = fitWireAssignBits(wireValue, bits, declPad, 'msb');
                 
                 // Update wire storage
                 if(wire.ref){

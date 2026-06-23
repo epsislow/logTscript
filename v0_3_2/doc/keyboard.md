@@ -19,7 +19,7 @@ comp [keyboard] .name:
   bgColor: ^101010
   focusColor: ^2ecc71
   focusBgColor: ^181818
-  onlyNumbers
+  onlyDigits
   allowEnter
   nl
   :
@@ -51,7 +51,7 @@ On **mobile**, focus uses a hidden field so the OS virtual keyboard opens:
 | default | `<input>` | **Done** (no Enter in simulation) |
 | `allowEnter` | `<textarea>` | **Enter** / return (emits LF, code 10) |
 
-With `onlyNumbers`, `inputmode="numeric"` is set (reliable on `<input>`; on `<textarea>` the OS may still show a full keyboard). On desktop, the same field receives physical key presses while focused.
+With `onlyDigits`, `inputmode="numeric"` is set (reliable on `<input>`; on `<textarea>` the OS may still show a full keyboard). On desktop, the same field receives physical key presses while focused.
 
 ---
 
@@ -59,7 +59,7 @@ With `onlyNumbers`, `inputmode="numeric"` is set (reliable on `<input>`; on `<te
 
 | Pout | Width | Description |
 |------|-------|-------------|
-| `get` | 8 (ASCII) / 4 (`onlyNumbers`) | Last emitted code |
+| `get` | 8 | Last emitted **ASCII** code (8 bit) |
 | `valid` | 1 | Pulse `1` for one propagation cycle when a key is accepted, then `0` |
 
 Wire property blocks use `set = .kbd:valid` to trigger `push` / `append` on each key.
@@ -77,13 +77,13 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | `bgColor` | color | `^101010` | Background when unfocused |
 | `focusColor` | color | `^2ecc71` | Border when focused |
 | `focusBgColor` | color | `^181818` | Background when focused |
-| `onlyNumbers` | flag | (no) | Accept only `0`–`9` |
+| `onlyDigits` | flag | (no) | Accept only `0`–`9` (still emits 8-bit ASCII) |
 | `allowEnter` | flag | (no) | Accept Enter (LF, code 10); mobile uses `<textarea>` with return key |
 | `nl` | flag | (no) | New line after component |
 
 ---
 
-## ASCII mode (default)
+## Key codes (8-bit ASCII)
 
 | Key | Decimal | Binary (8 bit) | Notes |
 |-----|---------|----------------|-------|
@@ -93,9 +93,18 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 
 ---
 
-## `onlyNumbers` mode
+## `onlyDigits` — filter, not encoding
 
-Only `0`–`9` are accepted. `get` is **4 bits** with decimal value (`5` → `0101`). Enter and letters are ignored.
+`onlyDigits` accepts only keys `0`–`9` (and Enter when `allowEnter` is also set). **`:get` is always 8-bit ASCII** — e.g. `5` → `00110101` (character `'5'`), not `0101`.
+
+For the numeric value `0`–`9` in logic (queue, reg, ALU), use the low nibble:
+
+```logts
+4wire digit = .kbd.4/4
+@ same as .kbd.4-7 or .kbd:get.4/4
+```
+
+For digits `0`–`9`, `.4/4` equals the decimal digit value.
 
 ---
 
@@ -134,7 +143,7 @@ With `allowEnter`, pressing Enter on the keyboard emits LF and you can wire `new
 ```logts-play
 comp [keyboard] .digits:
   label: 'BCD'
-  onlyNumbers
+  onlyDigits
   focusColor: ^00aaff
   on: 1
   :
@@ -147,7 +156,7 @@ comp [queue] .q:
   :
 
 .q:{
-  push = .digits
+  push = .digits.4/4
   set = .digits:valid
 }
 ```

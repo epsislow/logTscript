@@ -32,7 +32,7 @@ const DOC_SECTIONS = [
       { file: 'chip.md', label: 'Chip' },
       { file: 'mini-cpu.md', label: 'Mini CPU demo', searchExtra: 'harvard alu cpu4 step' },
       { file: 'mini-cpu-v2.md', label: 'Mini CPU v2 demo', searchExtra: 'asm beq lut terminal cpu4v2' },
-      { file: 'pocket-calc.md', label: 'Pocket calculator demo', searchExtra: 'keyboard calc terminal divider toAscii onlyNumbers' },
+      { file: 'pocket-calc.md', label: 'Pocket calculator demo', searchExtra: 'keyboard calc terminal divider toAscii onlyDigits' },
       { file: 'mini-cpu-plan.md', label: 'Mini CPU plan', searchExtra: 'feasibility variant harvard' },
       { file: 'pcb.md', label: 'PCB (deprecated)' }
     ],
@@ -43,7 +43,7 @@ const DOC_SECTIONS = [
       { file: 'interactive-components.md', label: 'Overview' },
       { file: 'switch.md', label: 'switch' },
       { file: 'key.md', label: 'key' },
-      { file: 'keyboard.md', label: 'keyboard', searchExtra: 'input ASCII onlyNumbers allowEnter valid focus UART RX' },
+      { file: 'keyboard.md', label: 'keyboard', searchExtra: 'input ASCII onlyDigits allowEnter valid focus UART RX' },
       { file: 'dip.md', label: 'dip' },
       { file: 'ioport.md', label: 'ioport', searchExtra: 'I/O port gpio port aggregation in out bus' },
       { file: 'rotary.md', label: 'rotary' }

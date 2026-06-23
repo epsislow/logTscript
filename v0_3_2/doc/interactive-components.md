@@ -475,7 +475,7 @@ comp [slider] .op:
 |-----------|------|-------------|----------------|------------------|
 | `switch`  | 1    | Toggle      | `onChange`     | Stays `0` or `1` |
 | `key`     | 1    | Press/release (`type: 0`/`1`) or toggle (`type: 2`) | **`onPress` / `onRelease`** | `0` (or latched with `type: 2`) |
-| `keyboard` | 8 / 4 | Type while focused | **`onKey`** | `get` holds last code; `valid` idle `0` |
+| `keyboard` | 8 | Type while focused | **`onKey`** | `get` holds last ASCII code; `valid` idle `0` |
 | `clcd`    | `:out` width | Tap symbols (`touch: 1`) | **`onPress` / `onRelease`** | `:out` per `touchType` |
 | `dip`     | N    | Flip each position | `onChange` | Holds last pattern |
 | `rotary`  | `ceil(log₂(states))` | Drag / step knob | `onChange` | Holds last state |

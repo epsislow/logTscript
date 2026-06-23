@@ -11678,16 +11678,16 @@ reg(1598, 'doc', 'doc(show) doc(peek) doc(probe) — debug signatures', function
   h.assert('Zlist sig', zlist[0], 'Zlist(wireName) — list registered bus drivers (MODE ZSTATE, at RUN/NEXT)');
 });
 
-reg(1599, 'keyboard', 'Parser — attrs onlyNumbers + label', function(h, session) {
+reg(1599, 'keyboard', 'Parser — attrs onlyDigits + label', function(h, session) {
   const stmts = session.parse(`comp [keyboard] .kbd:
   label: 'UART RX'
-  onlyNumbers
+  onlyDigits
   focusColor: ^00ff00
   nl
   :`);
   h.assert('keyboard type', stmts[0].comp.type, 'keyboard');
   h.assert('label', stmts[0].comp.attributes.label, 'UART RX');
-  h.assert('onlyNumbers', String(!!stmts[0].comp.attributes.onlyNumbers), 'true');
+  h.assert('onlyDigits', String(!!stmts[0].comp.attributes.onlyDigits), 'true');
   h.assert('focusColor', String(stmts[0].comp.attributes.focusColor).toLowerCase(), '#00ff00');
   h.assert('nl', String(!!stmts[0].comp.attributes.nl), 'true');
 });
@@ -11712,31 +11712,41 @@ reg(1601, 'keyboard', 'Enter — get 00001010', function(h, session) {
   h.assert('get LF', session.getWire(interp, 'code'), '00001010');
 });
 
-reg(1602, 'keyboard', 'onlyNumbers 5 — get 0101', function(h, session) {
+reg(1602, 'keyboard', 'onlyDigits 5 — ASCII 00110101', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
-  onlyNumbers
+  onlyDigits
   on: 1
   :
-4wire code = .kbd`);
+8wire code = .kbd`);
   session.triggerKeyboardKey(interp, '.kbd', { key: '5' });
-  h.assert('get 5', session.getWire(interp, 'code'), '0101');
+  h.assert('get ASCII 5', session.getWire(interp, 'code'), '00110101');
 });
 
-reg(1603, 'keyboard', 'onlyNumbers ignores A and Enter', function(h, session) {
+reg(1602.1, 'keyboard', 'onlyDigits 5 — digit slice .4/4', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
-  onlyNumbers
+  onlyDigits
   on: 1
   :
-4wire code = .kbd`);
+4wire digit = .kbd.4/4`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: '5' });
+  h.assert('digit 5', session.getWire(interp, 'digit'), '0101');
+});
+
+reg(1603, 'keyboard', 'onlyDigits ignores A and Enter without allowEnter', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  onlyDigits
+  on: 1
+  :
+8wire code = .kbd`);
   h.assert('reject A', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'A' })), 'false');
-  h.assert('still 0', session.getWire(interp, 'code'), '0000');
+  h.assert('still 0', session.getWire(interp, 'code'), '00000000');
   h.assert('reject Enter', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' })), 'false');
-  h.assert('still 0b', session.getWire(interp, 'code'), '0000');
+  h.assert('still 0b', session.getWire(interp, 'code'), '00000000');
 });
 
 reg(1604, 'keyboard', 'keyboard → queue push via valid', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
-  onlyNumbers
+  onlyDigits
   on: 1
   :
 comp [queue] .q:
@@ -11745,7 +11755,7 @@ comp [queue] .q:
   on: 1
   :
 .q:{
-  push = .kbd
+  push = .kbd.4/4
   set = .kbd:valid
 }`);
   session.triggerKeyboardKey(interp, '.kbd', { key: '5' });
@@ -11783,7 +11793,7 @@ reg(1607, 'keyboard', 'doc(comp.keyboard) signature', function(h, session) {
   const out = session.runDoc('doc(comp.keyboard)');
   h.assert('type line', out[0], 'comp [keyboard] .name:');
   h.assert('has valid pout', String(out.some(l => l.includes('valid'))), 'true');
-  h.assert('onlyNumbers attr', String(out.some(l => l.includes('onlyNumbers'))), 'true');
+  h.assert('onlyDigits attr', String(out.some(l => l.includes('onlyDigits'))), 'true');
   h.assert('allowEnter attr', String(out.some(l => l.includes('allowEnter'))), 'true');
 });
 
@@ -11807,7 +11817,7 @@ comp [terminal] .term:
 const CALC_POCKET = `comp [keyboard] .kbd:
   label: 'Digits'
   focusColor: ^00ff00
-  onlyNumbers
+  onlyDigits
   on: 1
   :
 
@@ -11882,7 +11892,7 @@ comp [terminal] .term:
 8wire ten = 00001010
 8wire entryCur = .entry:get
 8wire entryMul, 8wire ov1 = MULTIPLY(entryCur, ten)
-8wire entryNew, 1wire c1 = ADD(entryMul, .kbd)
+8wire entryNew, 1wire c1 = ADD(entryMul, .kbd.4/4)
 8wire accCur = .acc:get
 8wire sum, 1wire cSum = ADD(accCur, entryCur)
 8wire diff, 1wire borrow = SUBTRACT(accCur, entryCur)
@@ -11999,7 +12009,7 @@ function _pressKey(session, interp, name) {
 reg(1609, 'keyboard', 'pocket calc — keyboard + keys +/−/=, R', function(h, session) {
   const { interp } = session.run(CALC_POCKET);
   session.triggerKeyboardKey(interp, '.kbd', { key: '1' });
-  h.assert('digit 1', session.getCompProperty(interp, '.kbd', 'get'), '0001');
+  h.assert('digit 1', session.getCompProperty(interp, '.kbd', 'get'), '00110001');
   session.triggerKeyboardKey(interp, '.kbd', { key: '2' });
   h.assert('entry 12', session.getCompProperty(interp, '.entry', 'get'), '00001100');
   _pressKey(session, interp, '.plus');
@@ -12121,10 +12131,33 @@ reg(1617, 'keyboard', 'no allowEnter — Enter rejected', function(h, session) {
 reg(1618, 'keyboard', 'Parser — allowEnter attr', function(h, session) {
   const stmts = session.parse(`comp [keyboard] .kbd:
   allowEnter
-  onlyNumbers
+  onlyDigits
   :`);
   h.assert('allowEnter', String(!!stmts[0].comp.attributes.allowEnter), 'true');
-  h.assert('onlyNumbers', String(!!stmts[0].comp.attributes.onlyNumbers), 'true');
+  h.assert('onlyDigits', String(!!stmts[0].comp.attributes.onlyDigits), 'true');
+});
+
+reg(1619, 'keyboard', 'onlyDigits + allowEnter — Enter accepted', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  onlyDigits
+  allowEnter
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('accept Enter', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' })), 'true');
+  h.assert('get LF', session.getWire(interp, 'code'), '00001010');
+});
+
+reg(1620, 'keyboard', 'onlyDigits — digit via .4/4 slice', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  onlyDigits
+  on: 1
+  :
+4wire digit = .kbd.4/4
+8wire ascii = .kbd`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: '5' });
+  h.assert('ascii 5', session.getWire(interp, 'ascii'), '00110101');
+  h.assert('digit 5', session.getWire(interp, 'digit'), '0101');
 });
 
 

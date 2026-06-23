@@ -10,7 +10,7 @@ Automated test: **1609** (`keyboard` group).
 
 | Block | Role |
 |-------|------|
-| `comp [keyboard] .kbd` | Digits `0`–`9` (`onlyNumbers`); `:get` = 4-bit digit, `:valid` pulse per accepted key |
+| `comp [keyboard] .kbd` | Digits `0`–`9` (`onlyDigits`); `:get` = 8-bit ASCII; `.kbd.4/4` = digit value; `:valid` pulse per accepted key |
 | `comp [key] .plus` / `.minus` / `.eq` / `.reset` | Momentary keys `+`, `-`, `=`, `R` |
 | `comp [reg] .entry` | Multi-digit number being typed (`entry × 10 + digit`) |
 | `comp [reg] .acc` | Accumulator (running result) |
@@ -64,7 +64,7 @@ Use **Load** or **Load & Run** in the script editor. Focus **Digits**, type on t
 comp [keyboard] .kbd:
   label: 'Digits'
   focusColor: ^00ff00
-  onlyNumbers
+  onlyDigits
   on: 1
   :
 
@@ -139,7 +139,7 @@ comp [terminal] .term:
 8wire ten = 00001010
 8wire entryCur = .entry:get
 8wire entryMul, 8wire ov1 = MULTIPLY(entryCur, ten)
-8wire entryNew, 1wire c1 = ADD(entryMul, .kbd)
+8wire entryNew, 1wire c1 = ADD(entryMul, .kbd.4/4)
 8wire accCur = .acc:get
 8wire sum, 1wire cSum = ADD(accCur, entryCur)
 8wire diff, 1wire borrow = SUBTRACT(accCur, entryCur)
@@ -266,7 +266,7 @@ After **Load & Run**: focus **Digits**, type `12`, click **`+`** — terminal sh
 
 ## Related
 
-- [keyboard.md](keyboard.md) — focus, `onlyNumbers`, `:valid`
+- [keyboard.md](keyboard.md) — focus, `onlyDigits`, `:valid`
 - [key.md](key.md) — panel keys
 - [terminal.md](terminal.md) — `append`, `newline`, `clear`
 - [divider.md](divider.md) — `comp [divider]`
