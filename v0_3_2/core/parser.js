@@ -1879,7 +1879,7 @@ assignment() {
           continue;
         }
 
-        const attributesWithNoValues = ['square', 'nl', 'circular', 'glow', 'rgb', 'noLabels', 'noTrans', 'readonly', 'reversed', 'onlyDigits', 'allowEnter'];
+        const attributesWithNoValues = ['square', 'nl', 'circular', 'glow', 'rgb', 'noLabels', 'noTrans', 'readonly', 'reversed', 'onlyDigits', 'allowEnter', 'allowBackspace'];
         
         
         if (attrNamesArray.includes(attrName) && this.c.type === 'SYM' && this.c.value === '.') {
@@ -2212,6 +2212,8 @@ assignment() {
           attributes.onlyDigits = true;
         } else if (attrName === 'allowEnter') {
           attributes.allowEnter = true;
+        } else if (attrName === 'allowBackspace') {
+          attributes.allowBackspace = true;
         } else {
           continue;
         }

@@ -45,12 +45,13 @@ function normalizeKeyToAscii(input) {
 
   const key = String(input);
   if (key === 'Enter') return 10;
+  if (key === 'Backspace') return 8;
   if (key === ' ') return 32;
   if (key.length === 1) return key.charCodeAt(0);
   return null;
 }
 
-function resolveKeyInput(input, onlyDigits, allowEnter) {
+function resolveKeyInput(input, onlyDigits, allowEnter, allowBackspace) {
   if (input === null || input === undefined) return null;
 
   if (typeof input === 'number') {
@@ -59,9 +60,11 @@ function resolveKeyInput(input, onlyDigits, allowEnter) {
       if (code >= 48 && code <= 57) return code;
       if (code >= 0 && code <= 9) return 48 + code;
       if (code === 10 && allowEnter) return 10;
+      if (code === 8 && allowBackspace) return 8;
       return null;
     }
     if (code === 10 && !allowEnter) return null;
+    if (code === 8 && !allowBackspace) return null;
     if (code >= 0 && code <= 255) return code;
     return null;
   }
@@ -70,6 +73,10 @@ function resolveKeyInput(input, onlyDigits, allowEnter) {
   if (key === 'Enter') {
     if (!allowEnter) return null;
     return 10;
+  }
+  if (key === 'Backspace') {
+    if (!allowBackspace) return null;
+    return 8;
   }
   if (onlyDigits) {
     if (key.length === 1 && key >= '0' && key <= '9') {
@@ -220,6 +227,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         { name: 'focusBgColor', value: 'string' },
         { name: 'onlyDigits', value: null },
         { name: 'allowEnter', value: null },
+        { name: 'allowBackspace', value: null },
         { name: 'codesAccepted', value: '.component (lut)' },
         { name: 'showCode', value: 'integer' },
         { name: 'pulseColor', value: 'string' },
@@ -267,7 +275,9 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         if (code === null) return false;
         if (!isCodeAllowedByLut(code, filterState)) return false;
       } else {
-        code = resolveKeyInput(raw, filterState.onlyDigits, filterState.allowEnter);
+        code = resolveKeyInput(
+          raw, filterState.onlyDigits, filterState.allowEnter, filterState.allowBackspace
+        );
         if (code === null) return false;
       }
 
@@ -298,6 +308,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
     const label = attributes.label !== undefined ? String(attributes.label) : 'Keyboard';
     const onlyDigits = !!attributes.onlyDigits;
     const allowEnter = !!attributes.allowEnter;
+    const allowBackspace = !!attributes.allowBackspace;
     const nl = !!attributes.nl;
     const color = normalizeColor(attributes.color, '#808080');
     const bgColor = normalizeColor(attributes.bgColor, '#101010');
@@ -314,6 +325,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
     const filterState = {
       onlyDigits,
       allowEnter,
+      allowBackspace,
       lutName,
       lutComp: null,
       mode: null,
@@ -348,6 +360,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         focusBgColor,
         onlyDigits,
         allowEnter,
+        allowBackspace,
         showCode,
         pulseColor,
         nl,

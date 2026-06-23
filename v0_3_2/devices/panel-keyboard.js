@@ -17,6 +17,7 @@ class PanelKeyboard {
     focusBgColor = '#181818',
     onlyDigits = false,
     allowEnter = false,
+    allowBackspace = false,
     showCode = 0,
     pulseColor = null,
     onKey = () => false,
@@ -28,6 +29,7 @@ class PanelKeyboard {
     this.focusBgColor = focusBgColor;
     this.onlyDigits = onlyDigits;
     this.allowEnter = allowEnter;
+    this.allowBackspace = allowBackspace;
     this.showCode = showCode;
     this.pulseColor = pulseColor;
     this.onKey = onKey;
@@ -218,6 +220,13 @@ class PanelKeyboard {
       this.inputEl.value = '';
       return;
     }
+    if (key === 'Backspace') {
+      if (!this.allowBackspace) return;
+      const accepted = this.onKey('Backspace', { force: true });
+      if (accepted) e.preventDefault();
+      this.inputEl.value = '';
+      return;
+    }
     if (key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
       return;
     }
@@ -276,6 +285,7 @@ function addKeyboard({
   focusBgColor,
   onlyDigits,
   allowEnter,
+  allowBackspace,
   showCode,
   pulseColor,
   nl,
@@ -296,6 +306,7 @@ function addKeyboard({
     focusBgColor,
     onlyDigits: !!onlyDigits,
     allowEnter: !!allowEnter,
+    allowBackspace: !!allowBackspace,
     showCode: showCode || 0,
     pulseColor: pulseColor || null,
     onKey: (key) => onKey(key, { force: true }),

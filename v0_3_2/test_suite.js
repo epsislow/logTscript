@@ -11795,6 +11795,7 @@ reg(1607, 'keyboard', 'doc(comp.keyboard) signature', function(h, session) {
   h.assert('has valid pout', String(out.some(l => l.includes('valid'))), 'true');
   h.assert('onlyDigits attr', String(out.some(l => l.includes('onlyDigits'))), 'true');
   h.assert('allowEnter attr', String(out.some(l => l.includes('allowEnter'))), 'true');
+  h.assert('allowBackspace attr', String(out.some(l => l.includes('allowBackspace'))), 'true');
   h.assert('codesAccepted attr', String(out.some(l => l.includes('codesAccepted'))), 'true');
   h.assert('showCode attr', String(out.some(l => l.includes('showCode'))), 'true');
   h.assert('pulseColor attr', String(out.some(l => l.includes('pulseColor'))), 'true');
@@ -12486,6 +12487,74 @@ reg(1637, 'keyboard', 'doc(comp.keyboard) — showCode + pulseColor', function(h
   const out = session.runDoc('doc(comp.keyboard)');
   h.assert('showCode in doc', String(out.some(l => l.includes('showCode'))), 'true');
   h.assert('pulseColor in doc', String(out.some(l => l.includes('pulseColor'))), 'true');
+});
+
+reg(1638, 'keyboard', 'Parser — allowBackspace attr', function(h, session) {
+  const stmts = session.parse(`comp [keyboard] .kbd:
+  allowBackspace
+  onlyDigits
+  :`);
+  h.assert('allowBackspace', String(!!stmts[0].comp.attributes.allowBackspace), 'true');
+  h.assert('onlyDigits', String(!!stmts[0].comp.attributes.onlyDigits), 'true');
+});
+
+reg(1639, 'keyboard', 'allowBackspace — BS accepted get 00001000', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  allowBackspace
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('accept BS', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Backspace' })), 'true');
+  h.assert('get BS', session.getWire(interp, 'code'), '00001000');
+});
+
+reg(1640, 'keyboard', 'no allowBackspace — BS rejected', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  on: 1
+  :
+8wire code = .kbd`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+  h.assert('reject BS', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Backspace' })), 'false');
+  h.assert('still A', session.getWire(interp, 'code'), '01000001');
+});
+
+reg(1641, 'keyboard', 'codesAccepted bitmap — BS via LUT ^08', function(h, session) {
+  const { interp } = session.run(`comp [lut] .allowed:
+  depth: 1
+  length: 256
+  fillwith: 0
+  = data {
+    ^30 - ^39: 1
+    ^08: 1
+  }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .allowed
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('accept BS', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Backspace' })), 'true');
+  h.assert('get BS', session.getWire(interp, 'code'), '00001000');
+});
+
+reg(1642, 'keyboard', 'codesAccepted bitmap — BS rejected without ^08', function(h, session) {
+  const { interp } = session.run(`comp [lut] .allowed:
+  depth: 1
+  length: 256
+  fillwith: 0
+  = data {
+    ^30 - ^39: 1
+  }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .allowed
+  allowBackspace
+  on: 1
+  :
+8wire code = .kbd`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: '5' });
+  h.assert('reject BS', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Backspace' })), 'false');
+  h.assert('still 5', session.getWire(interp, 'code'), '00110101');
 });
 
 

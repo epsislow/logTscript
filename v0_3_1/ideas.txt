@@ -829,6 +829,7 @@ Use code with caution.By simply looking for that S modifier in your definition (
 
 
 1 [ v ] keyboard sa poata primii o lista lut cu codurile caracterelor pe care le permite de la keyboard
+
 [ ] terminal flag atribut sa proceseze caracterele de genul backspace, delete stergand caracterul anterior + de stiut daca poate sa stearga newLine sau nu
     atribut noNewLine    nu proceseaza caracterul newLine adica nu duce pe un rand nou, este afisat ca un caracter normal, daca este invizibil atunci e afisat ca un spatiu, daca este activat inbisibileShow atunci este afisat caracterul ales pentru simboluri speciale
 	
@@ -837,6 +838,7 @@ Use code with caution.By simply looking for that S modifier in your definition (
     atribut processEnterAsNewLine: 0/1 (0: nu, 1: da)
 	
 	
+
 	
 	terminal  proprietate process pe biti de genul: 
 	skipProcess: 0/1 folosita impreuna cu append nu va procesa caracterul primit ci il va afisa 

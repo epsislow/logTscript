@@ -21,6 +21,7 @@ comp [keyboard] .name:
   focusBgColor: ^181818
   onlyDigits
   allowEnter
+  allowBackspace
   codesAccepted = .lutRef
   showCode: 0
   pulseColor: ^ff0
@@ -82,6 +83,7 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | `focusBgColor` | color | `^181818` | Background when focused |
 | `onlyDigits` | flag | (no) | Accept only `0`–`9` (still emits 8-bit ASCII); mobile `inputmode=numeric` |
 | `allowEnter` | flag | (no) | Accept Enter (LF, code 10); mobile uses `<textarea>` with return key |
+| `allowBackspace` | flag | (no) | Accept Backspace (BS, code 8) |
 | `codesAccepted` | LUT ref | (no) | Whitelist of allowed keys via `comp [lut]` (`codesAccepted = .lut`) |
 | `showCode` | integer | `0` | Display last `:get` code next to label (`0` off, `1` hex, `2` decimal) |
 | `pulseColor` | color | (no) | Brief color flash on border/label after each accepted key |
@@ -95,13 +97,14 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 |-----|---------|----------------|-------|
 | `A` | 65 | `01000001` | |
 | `5` | 53 | `00110101` | |
+| Backspace | 8 | `00001000` | Requires `allowBackspace` (or `^08` in `codesAccepted` LUT) |
 | Enter | 10 | `00001010` | Requires `allowEnter` |
 
 ---
 
 ## `onlyDigits` — filter, not encoding
 
-`onlyDigits` accepts only keys `0`–`9` (and Enter when `allowEnter` is also set). **`:get` is always 8-bit ASCII** — e.g. `5` → `00110101` (character `'5'`), not `0101`.
+`onlyDigits` accepts only keys `0`–`9` (and Enter when `allowEnter` is also set, Backspace when `allowBackspace` is set). **`:get` is always 8-bit ASCII** — e.g. `5` → `00110101` (character `'5'`), not `0101`.
 
 For the numeric value `0`–`9` in logic (queue, reg, ALU), use the low nibble:
 
@@ -122,7 +125,7 @@ Syntax (binding, like ALU `lut = .ref`):
 codesAccepted = .lutName
 ```
 
-When `codesAccepted` is set, **only the LUT** decides which keys are accepted (including Enter). `onlyDigits` and `allowEnter` are ignored for filtering; `onlyDigits` still sets mobile `inputmode=numeric`.
+When `codesAccepted` is set, **only the LUT** decides which keys are accepted (including Enter and Backspace). `onlyDigits`, `allowEnter`, and `allowBackspace` are ignored for filtering; `onlyDigits` still sets mobile `inputmode=numeric`. `allowEnter` / `allowBackspace` are still needed on the panel widget so the browser forwards those keys to the simulation.
 
 The referenced `comp [lut]` must have **`depth: 1`** or **`depth: 8`**; any other depth errors at elaboration:
 
@@ -152,7 +155,7 @@ comp [keyboard] .kbd:
   :
 ```
 
-Enter is accepted only if `^0a: 1` is in the LUT — `allowEnter` does not add LF automatically when `codesAccepted` is active.
+Enter is accepted only if `^0a: 1` is in the LUT — `allowEnter` does not add LF automatically when `codesAccepted` is active. Backspace is accepted only if `^08: 1` (bitmap) or `00001000` (values depth 8) is in the LUT.
 
 ### Values (`depth: 8`) — explicit code list
 
