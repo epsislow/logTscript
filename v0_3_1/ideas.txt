@@ -851,3 +851,349 @@ Use code with caution.By simply looking for that S modifier in your definition (
 	atribut processArrowLeftRight: 0/1 (0: nu, 1: da pana la un newLine, 2: da trece si de newLine) muta cursorul stanga dreapta
 	atribut processArrowTopBottom: 0/1 (0: nu, 1: da) muta cursorul sus jos
 	atribut processDelete: 0/1/2    (0: nu, 1: da, 2: da dar nu lasa sa stergi un newLine)
+	
+	
+	====
+	Network component (packet communication)
+
+"comp [network]" provides packet-based communication between simulation instances running in the same browser page.
+
+A network component behaves like a packet endpoint. Packets can be transmitted to other network components attached to the same channel and received packets are stored in an internal FIFO queue until consumed.
+
+The component is intended for:
+
+• UART simulations
+• CPU ↔ peripheral communication
+• Distributed examples
+• Multi-instance projects
+• Message passing between simulations
+
+───
+
+Overview
+
+Each network component contains:
+
+TX (send)
+RX FIFO queue
+
+When a packet is sent:
+
+Instance 1
+│
+▼
+channel: "wifi"
+│
+▼
+Instance 2
+
+all network components listening on the same channel receive a copy of the packet in their RX queue.
+
+Packets remain available until explicitly consumed.
+
+───
+
+Syntax
+
+comp [network] .net:
+width: 128
+length: 64
+
+channel: 'wifi'
+
+on: 1
+:
+
+Minimal form:
+
+comp [network] .net::
+
+───
+
+Attributes
+
+Attribute| Default| Description
+width| 128| Packet width in bits
+length| 64| RX queue capacity (packets)
+channel| 'default'| Communication channel
+on| raise| Trigger mode
+
+───
+
+Communication model
+
+Network components communicate only with other network components attached to the same channel.
+
+Example:
+
+comp [network] .a:
+channel: 'wifi'
+:
+
+comp [network] .b:
+channel: 'wifi'
+:
+
+".a" and ".b" can exchange packets.
+
+───
+
+Different channels are isolated:
+
+comp [network] .wifi:
+channel: 'wifi'
+:
+
+comp [network] .uart:
+channel: 'uart'
+:
+
+Packets sent on "wifi" never appear on "uart".
+
+───
+
+Internal transport
+
+Communication is local to the browser page.
+
+Network components do not use:
+
+TCP
+UDP
+HTTP
+WebSocket
+
+Instead, packets are exchanged through the LogTScript runtime between simulation instances running inside the same browser page.
+
+Example:
+
+Browser Page
+│
+├─ Instance 1
+├─ Instance 2
+├─ Instance 3
+└─ Instance 4
+
+All instances may communicate through shared channels.
+
+No external server is required.
+
+Closing the page removes all communication state.
+
+───
+
+Pins
+
+Pin| Width| Description
+set| 1| Trigger
+send| width| Transmit packet
+pop| 1| Consume current received packet
+clear| 1| Clear RX queue
+
+───
+
+Pouts
+
+Pout| Width| Description
+get| width| Front packet (same as front)
+front| width| Front packet without removing it
+empty| 1| RX queue empty
+full| 1| RX queue full
+size| sizeWidth| Number of queued packets
+capacity| sizeWidth| Maximum queue capacity
+free| sizeWidth| Remaining RX queue slots
+
+"sizeWidth" is large enough to represent values from "0" to "length".
+
+Example:
+
+length: 16
+
+requires:
+
+5 bits
+
+to represent:
+
+0..16
+
+───
+
+Sending packets
+
+comp [network] .wifi:
+channel: 'wifi'
+:
+
+128wire packet = ...
+
+.wifi:{
+send = packet
+set = 1
+}
+
+The packet is transmitted to every network component attached to channel "wifi".
+
+───
+
+Receiving packets
+
+Read the current packet:
+
+128wire packet = .wifi:get
+
+or:
+
+128wire packet = .wifi:front
+
+Both return the packet currently at the front of the RX queue.
+
+───
+
+Check for available packets:
+
+1wire hasData = !.wifi:empty
+
+or:
+
+8wire count = .wifi:size
+
+───
+
+Consuming packets
+
+Received packets remain available until removed.
+
+Example:
+
+RX queue
+
+[A][B][C]
+↑
+front
+
+Current packet:
+
+128wire packet = .wifi:get
+
+The queue remains unchanged.
+
+To advance to the next packet:
+
+.wifi:{
+pop = 1
+set = packetProcessed
+}
+
+Queue becomes:
+
+[B][C]
+↑
+front
+
+───
+
+Queue semantics
+
+Incoming packets are stored in FIFO order.
+
+Example:
+
+packet A arrives
+packet B arrives
+packet C arrives
+
+RX queue:
+
+[A][B][C]
+
+The front packet remains available indefinitely until consumed with "pop".
+
+This allows packet processing to take any number of simulation cycles without losing incoming packets.
+
+───
+
+Example — Simple link
+
+Instance 1:
+
+comp [network] .wifi:
+channel: 'wifi'
+:
+
+8wire msg = 01010101
+
+.wifi:{
+send = msg
+set = 1
+}
+
+───
+
+Instance 2:
+
+comp [network] .wifi:
+channel: 'wifi'
+:
+
+8wire packet = .wifi:get
+show(packet)
+
+Output:
+
+01010101
+
+───
+
+Example — Producer / Consumer
+
+Producer:
+
+.net:{
+send = packet
+set = produce
+}
+
+Consumer:
+
+if(!.net:empty)
+{
+...
+}
+
+After processing:
+
+.net:{
+pop = 1
+set = done
+}
+
+───
+
+Example — Multiple isolated networks
+
+comp [network] .wifi:
+channel: 'wifi'
+:
+
+comp [network] .debug:
+channel: 'debug'
+:
+
+Traffic on "wifi" never reaches "debug".
+
+───
+
+Notes
+
+• Network communication is packet-based.
+• Components communicate through named channels.
+• Communication occurs only between simulation instances running in the same browser page.
+• No external networking or server is involved.
+• Incoming packets are stored in an internal FIFO queue.
+• Packets remain available until consumed using "pop".
+• Use "empty" or "size" to determine whether packets are available.
+• The receive side behaves similarly to a queue component.
+
+
+===
