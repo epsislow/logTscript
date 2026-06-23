@@ -11795,6 +11795,9 @@ reg(1607, 'keyboard', 'doc(comp.keyboard) signature', function(h, session) {
   h.assert('has valid pout', String(out.some(l => l.includes('valid'))), 'true');
   h.assert('onlyDigits attr', String(out.some(l => l.includes('onlyDigits'))), 'true');
   h.assert('allowEnter attr', String(out.some(l => l.includes('allowEnter'))), 'true');
+  h.assert('codesAccepted attr', String(out.some(l => l.includes('codesAccepted'))), 'true');
+  h.assert('showCode attr', String(out.some(l => l.includes('showCode'))), 'true');
+  h.assert('pulseColor attr', String(out.some(l => l.includes('pulseColor'))), 'true');
 });
 
 reg(1608, 'keyboard', 'keyboard → terminal append A (wave)', function(h, session) {
@@ -12158,6 +12161,331 @@ reg(1620, 'keyboard', 'onlyDigits — digit via .4/4 slice', function(h, session
   session.triggerKeyboardKey(interp, '.kbd', { key: '5' });
   h.assert('ascii 5', session.getWire(interp, 'ascii'), '00110101');
   h.assert('digit 5', session.getWire(interp, 'digit'), '0101');
+});
+
+reg(1621, 'keyboard', 'Parser — codesAccepted = .lut', function(h, session) {
+  const stmts = session.parse(`comp [lut] .allowed:
+  depth: 1
+  length: 256
+  fillwith: 0
+  = data { ^30: 1 }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .allowed
+  on: 1
+  :`);
+  const attrs = stmts[1].comp.attributes;
+  h.assert('codesAcceptedMembers', JSON.stringify(attrs.codesAcceptedMembers), '[".allowed"]');
+});
+
+reg(1622, 'keyboard', 'codesAccepted bitmap — digits only', function(h, session) {
+  const { interp } = session.run(`comp [lut] .allowed:
+  depth: 1
+  length: 256
+  fillwith: 0
+  = data {
+    ^30 - ^39: 1
+  }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .allowed
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('accept 5', String(session.triggerKeyboardKey(interp, '.kbd', { key: '5' })), 'true');
+  h.assert('get 5', session.getWire(interp, 'code'), '00110101');
+  h.assert('reject A', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'A' })), 'false');
+  h.assert('get still 5', session.getWire(interp, 'code'), '00110101');
+});
+
+reg(1623, 'keyboard', 'codesAccepted values depth 8 — 0 and 1 only', function(h, session) {
+  const { interp } = session.run(`comp [lut] .digitKeys:
+  depth: 8
+  length: 10
+  fillwith: 00000000
+  = data {
+    0: 00110000
+    1: 00110001
+  }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .digitKeys
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('accept 0', String(session.triggerKeyboardKey(interp, '.kbd', { key: '0' })), 'true');
+  h.assert('get 0', session.getWire(interp, 'code'), '00110000');
+  h.assert('accept 1', String(session.triggerKeyboardKey(interp, '.kbd', { key: '1' })), 'true');
+  h.assert('get 1', session.getWire(interp, 'code'), '00110001');
+  h.assert('reject 2', String(session.triggerKeyboardKey(interp, '.kbd', { key: '2' })), 'false');
+  h.assert('get still 1', session.getWire(interp, 'code'), '00110001');
+});
+
+reg(1624, 'keyboard', 'codesAccepted — LUT depth 4 throws', function(h, session) {
+  h.assertThrows('depth 4', function() {
+    session.run(`comp [lut] .bad:
+  depth: 4
+  length: 16
+  = data { 0: 0001 }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .bad
+  on: 1
+  :`);
+  }, 'codesAccepted requires lut with depth 1 or 8');
+});
+
+reg(1625, 'keyboard', 'codesAccepted — LUT depth 16 throws', function(h, session) {
+  h.assertThrows('depth 16', function() {
+    session.run(`comp [lut] .bad:
+  depth: 16
+  length: 4
+  = data { 0: 0000000000000001 }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .bad
+  on: 1
+  :`);
+  }, 'codesAccepted requires lut with depth 1 or 8');
+});
+
+reg(1626, 'keyboard', 'codesAccepted bitmap — Enter when ^0a in LUT', function(h, session) {
+  const { interp } = session.run(`comp [lut] .allowed:
+  depth: 1
+  length: 256
+  fillwith: 0
+  = data {
+    ^30 - ^39: 1
+    ^0a: 1
+  }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .allowed
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('accept Enter', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' })), 'true');
+  h.assert('get LF', session.getWire(interp, 'code'), '00001010');
+});
+
+reg(1627, 'keyboard', 'codesAccepted bitmap — Enter rejected despite allowEnter', function(h, session) {
+  const { interp } = session.run(`comp [lut] .allowed:
+  depth: 1
+  length: 256
+  fillwith: 0
+  = data {
+    ^30 - ^39: 1
+  }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .allowed
+  allowEnter
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('reject Enter', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' })), 'false');
+  h.assert('get zero', session.getWire(interp, 'code'), '00000000');
+});
+
+reg(1628, 'keyboard', 'codesAccepted bitmap — terminal append digit', function(h, session) {
+  const { interp } = session.run(`comp [lut] .allowed:
+  depth: 1
+  length: 256
+  fillwith: 0
+  = data {
+    ^30 - ^39: 1
+  }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .allowed
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 3
+  columns: 20
+  on: 1
+  :
+.term:{
+  append = .kbd
+  set = .kbd:valid
+}`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: '7' });
+  h.assert('terminal 7', getTerminalText(_termId(interp, '.term')), '7');
+});
+
+function _keyboardTestGlobal() {
+  if (typeof globalThis !== 'undefined') return globalThis;
+  if (typeof window !== 'undefined') return window;
+  return Function('return this')();
+}
+
+reg(1629, 'keyboard', 'Parser — showCode + pulseColor', function(h, session) {
+  const stmts = session.parse(`comp [keyboard] .kbd:
+  showCode: 2
+  pulseColor: ^ff0
+  on: 1
+  :`);
+  h.assert('showCode', stmts[0].comp.attributes.showCode, '2');
+  h.assert('pulseColor', String(stmts[0].comp.attributes.pulseColor).toLowerCase(), '#ff0');
+});
+
+reg(1630, 'keyboard', 'showCode 1 — onKeyboardShowCode hook', function(h, session) {
+  const g = _keyboardTestGlobal();
+  const showCalls = [];
+  const prevShow = g.onKeyboardShowCode;
+  const prevPulse = g.onKeyboardPulseColor;
+  g.onKeyboardShowCode = function(id, code, mode) { showCalls.push({ id, code, mode }); };
+  g.onKeyboardPulseColor = function() {};
+  try {
+    const { interp } = session.run(`comp [keyboard] .kbd:
+  showCode: 1
+  on: 1
+  :
+8wire code = .kbd`);
+    session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+    h.assert('hook called', String(showCalls.length), '1');
+    h.assert('id', showCalls[0].id, 'kbd');
+    h.assert('code', String(showCalls[0].code), '65');
+    h.assert('mode', String(showCalls[0].mode), '1');
+  } finally {
+    if (prevShow) g.onKeyboardShowCode = prevShow;
+    else delete g.onKeyboardShowCode;
+    if (prevPulse) g.onKeyboardPulseColor = prevPulse;
+    else delete g.onKeyboardPulseColor;
+  }
+});
+
+reg(1631, 'keyboard', 'showCode 2 — onKeyboardShowCode hook decimal', function(h, session) {
+  const g = _keyboardTestGlobal();
+  const showCalls = [];
+  const prevShow = g.onKeyboardShowCode;
+  g.onKeyboardShowCode = function(id, code, mode) { showCalls.push({ id, code, mode }); };
+  try {
+    const { interp } = session.run(`comp [keyboard] .kbd:
+  showCode: 2
+  on: 1
+  :
+8wire code = .kbd`);
+    session.triggerKeyboardKey(interp, '.kbd', { key: '9' });
+    h.assert('hook called', String(showCalls.length), '1');
+    h.assert('code', String(showCalls[0].code), '57');
+    h.assert('mode', String(showCalls[0].mode), '2');
+  } finally {
+    if (prevShow) g.onKeyboardShowCode = prevShow;
+    else delete g.onKeyboardShowCode;
+  }
+});
+
+reg(1632, 'keyboard', 'pulseColor — onKeyboardPulseColor hook', function(h, session) {
+  const g = _keyboardTestGlobal();
+  const pulseCalls = [];
+  const prevPulse = g.onKeyboardPulseColor;
+  g.onKeyboardPulseColor = function(id, color) { pulseCalls.push({ id, color }); };
+  try {
+    const { interp } = session.run(`comp [keyboard] .kbd:
+  pulseColor: ^ff0
+  on: 1
+  :
+8wire code = .kbd`);
+    session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+    h.assert('pulse hook', String(pulseCalls.length), '1');
+    h.assert('id', pulseCalls[0].id, 'kbd');
+    h.assert('color', String(pulseCalls[0].color).toLowerCase(), '#ff0');
+  } finally {
+    if (prevPulse) g.onKeyboardPulseColor = prevPulse;
+    else delete g.onKeyboardPulseColor;
+  }
+});
+
+reg(1633, 'keyboard', 'showCode 0 — onKeyboardShowCode not called', function(h, session) {
+  const g = _keyboardTestGlobal();
+  const showCalls = [];
+  const prevShow = g.onKeyboardShowCode;
+  g.onKeyboardShowCode = function() { showCalls.push(1); };
+  try {
+    const { interp } = session.run(`comp [keyboard] .kbd:
+  on: 1
+  :
+8wire code = .kbd`);
+    session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+    h.assert('no hook', String(showCalls.length), '0');
+  } finally {
+    if (prevShow) g.onKeyboardShowCode = prevShow;
+    else delete g.onKeyboardShowCode;
+  }
+});
+
+reg(1634, 'keyboard', 'no pulseColor — onKeyboardPulseColor not called', function(h, session) {
+  const g = _keyboardTestGlobal();
+  const pulseCalls = [];
+  const prevPulse = g.onKeyboardPulseColor;
+  g.onKeyboardPulseColor = function() { pulseCalls.push(1); };
+  try {
+    const { interp } = session.run(`comp [keyboard] .kbd:
+  on: 1
+  :
+8wire code = .kbd`);
+    session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+    h.assert('no pulse hook', String(pulseCalls.length), '0');
+  } finally {
+    if (prevPulse) g.onKeyboardPulseColor = prevPulse;
+    else delete g.onKeyboardPulseColor;
+  }
+});
+
+reg(1635, 'keyboard', 'rejected key — no UI hooks', function(h, session) {
+  const g = _keyboardTestGlobal();
+  const showCalls = [];
+  const pulseCalls = [];
+  const prevShow = g.onKeyboardShowCode;
+  const prevPulse = g.onKeyboardPulseColor;
+  g.onKeyboardShowCode = function() { showCalls.push(1); };
+  g.onKeyboardPulseColor = function() { pulseCalls.push(1); };
+  try {
+    const { interp } = session.run(`comp [keyboard] .kbd:
+  showCode: 1
+  pulseColor: ^ff0
+  onlyDigits
+  on: 1
+  :
+8wire code = .kbd`);
+    session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+    h.assert('no show hook', String(showCalls.length), '0');
+    h.assert('no pulse hook', String(pulseCalls.length), '0');
+  } finally {
+    if (prevShow) g.onKeyboardShowCode = prevShow;
+    else delete g.onKeyboardShowCode;
+    if (prevPulse) g.onKeyboardPulseColor = prevPulse;
+    else delete g.onKeyboardPulseColor;
+  }
+});
+
+reg(1636, 'keyboard', 'showCode 1 — Enter LF hook', function(h, session) {
+  const g = _keyboardTestGlobal();
+  const showCalls = [];
+  const prevShow = g.onKeyboardShowCode;
+  g.onKeyboardShowCode = function(id, code, mode) { showCalls.push({ id, code, mode }); };
+  try {
+    const { interp } = session.run(`comp [keyboard] .kbd:
+  showCode: 1
+  allowEnter
+  on: 1
+  :
+8wire code = .kbd`);
+    session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' });
+    h.assert('hook called', String(showCalls.length), '1');
+    h.assert('code LF', String(showCalls[0].code), '10');
+    h.assert('mode', String(showCalls[0].mode), '1');
+  } finally {
+    if (prevShow) g.onKeyboardShowCode = prevShow;
+    else delete g.onKeyboardShowCode;
+  }
+});
+
+reg(1637, 'keyboard', 'doc(comp.keyboard) — showCode + pulseColor', function(h, session) {
+  const out = session.runDoc('doc(comp.keyboard)');
+  h.assert('showCode in doc', String(out.some(l => l.includes('showCode'))), 'true');
+  h.assert('pulseColor in doc', String(out.some(l => l.includes('pulseColor'))), 'true');
 });
 
 

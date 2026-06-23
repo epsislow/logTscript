@@ -827,6 +827,25 @@ Use code with caution.By simply looking for that S modifier in your definition (
 10[  ] switch and dip with zconn instead of 0 .. actualy it behaves like: zconn(en, .dip) for each bit 
 
 
-[ ] terminal sa poata afisa un simbol specific pentru caracterele ascii care nu sunt vizibile 
-[ ] keyboard sa poata primii o lista lut cu codurile caracterelor pe care le permite de la keyboard
+
+1 [ v ] keyboard sa poata primii o lista lut cu codurile caracterelor pe care le permite de la keyboard
 [ ] terminal flag atribut sa proceseze caracterele de genul backspace, delete stergand caracterul anterior + de stiut daca poate sa stearga newLine sau nu
+    atribut noNewLine    nu proceseaza caracterul newLine adica nu duce pe un rand nou, este afisat ca un caracter normal, daca este invizibil atunci e afisat ca un spatiu, daca este activat inbisibileShow atunci este afisat caracterul ales pentru simboluri speciale
+	
+	
+    atribut processBackspace: 0/1/2   (0: nu, 1: da, 2: da dar nu lasa sa stergi un newLine)
+    atribut processEnterAsNewLine: 0/1 (0: nu, 1: da)
+	
+	
+	
+	terminal  proprietate process pe biti de genul: 
+	skipProcess: 0/1 folosita impreuna cu append nu va procesa caracterul primit ci il va afisa 
+	
+    terminal sa poata afisa un simbol specific pentru caracterele ascii care nu sunt vizibile
+    atribut invisibleShow 
+	as vrea ca Backspace si Enter daca nu sunt procesate (vezi skipProcess sau atributele cu process*) sa fie afiasat ca un caracter diferit pt fiecare, iar celelate caractere ascii sa aiba un singur caracter. spre exemplu backspace sa aibe o sageata stanga, delete sa aibe o sageta dreapta,  enter sa aibe o sa sageata in jos, iar restul de caractere sa aibe un cerculet, ar fi util ca aceste caractere sa nu fie cele ascii vizibile, ca sa nu le confuzam cu atunci cand apare acel caracter ascii si sa nu intelegem daca e afisat caracterul ascii vizibil sau caracterul ascii invizibil.
+	
+	
+	atribut processArrowLeftRight: 0/1 (0: nu, 1: da pana la un newLine, 2: da trece si de newLine) muta cursorul stanga dreapta
+	atribut processArrowTopBottom: 0/1 (0: nu, 1: da) muta cursorul sus jos
+	atribut processDelete: 0/1/2    (0: nu, 1: da, 2: da dar nu lasa sa stergi un newLine)

@@ -3909,6 +3909,12 @@ if (this.isBuiltinDEMUX(name)) {
   }
   
   postExecSrc() {
+    if (this.componentRegistry) {
+      const keyboardHandler = this.componentRegistry.get('keyboard');
+      if (keyboardHandler && typeof keyboardHandler.finalizeAllCodesAccepted === 'function') {
+        keyboardHandler.finalizeAllCodesAccepted(this);
+      }
+    }
     if (this.pendingProbeExprs && this.pendingProbeExprs.length) {
       this.activateProbes(this.pendingProbeExprs);
     }
@@ -6164,6 +6170,7 @@ if (s.assignment) {
         if (result.keyHandler) compInfo.keyHandler = result.keyHandler;
         if (result.validRef) compInfo.validRef = result.validRef;
         if (result.keyboardHandler) compInfo.keyboardHandler = result.keyboardHandler;
+        if (result.codesAcceptedFilter) compInfo.codesAcceptedFilter = result.codesAcceptedFilter;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;

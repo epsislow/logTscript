@@ -1,6 +1,7 @@
 var BuiltinComponent = (typeof require !== 'undefined') ? require('./builtin-component') : BuiltinComponent;
 
 const KEYBOARD_WIDTH = 8;
+const CODES_ACCEPTED_DEPTH_ERR = 'codesAccepted requires lut with depth 1 or 8';
 
 function normalizeColor(value, fallback) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -30,6 +31,23 @@ function propagateKeyboardOutput(ctx, compName) {
 
 function codeToBinary(code, width) {
   return code.toString(2).padStart(width, '0');
+}
+
+function normalizeKeyToAscii(input) {
+  if (input === null || input === undefined) return null;
+
+  if (typeof input === 'number') {
+    const code = input;
+    if (code >= 0 && code <= 255) return code;
+    if (code >= 0 && code <= 9) return 48 + code;
+    return null;
+  }
+
+  const key = String(input);
+  if (key === 'Enter') return 10;
+  if (key === ' ') return 32;
+  if (key.length === 1) return key.charCodeAt(0);
+  return null;
 }
 
 function resolveKeyInput(input, onlyDigits, allowEnter) {
@@ -64,10 +82,101 @@ function resolveKeyInput(input, onlyDigits, allowEnter) {
   return null;
 }
 
+function buildValuesWhitelist(lutComp) {
+  const fill = lutComp.fillwithValue != null ? String(lutComp.fillwithValue) : '0'.repeat(8);
+  const allowed = new Set();
+  const table = lutComp.lutTable;
+  if (!table) return allowed;
+  for (const v of table) {
+    if (v !== fill) allowed.add(v);
+  }
+  return allowed;
+}
+
+function setupCodesAcceptedFilter(filterState, lutComp) {
+  if (!lutComp || lutComp.type !== 'lut') {
+    throw Error(`codesAccepted must reference a comp [lut] component`);
+  }
+  const depth = lutComp.attributes && lutComp.attributes.depth !== undefined
+    ? parseInt(lutComp.attributes.depth, 10)
+    : 4;
+  if (depth !== 1 && depth !== 8) {
+    throw Error(CODES_ACCEPTED_DEPTH_ERR);
+  }
+  if (!lutComp.lutTable || !lutComp.lutTable.length) {
+    throw Error(`codesAccepted lut ${filterState.lutName} has no table data`);
+  }
+  filterState.lutComp = lutComp;
+  if (depth === 1) {
+    filterState.mode = 'bitmap';
+    filterState.allowedCodes = null;
+  } else {
+    filterState.mode = 'values';
+    filterState.allowedCodes = buildValuesWhitelist(lutComp);
+  }
+  filterState.ready = true;
+}
+
+function ensureCodesAcceptedFilter(filterState, ctx) {
+  if (!filterState.lutName) return;
+  if (filterState.ready) return;
+  if (!ctx || !ctx.components) {
+    throw Error(`codesAccepted lut ${filterState.lutName} is not available`);
+  }
+  const lutComp = ctx.components.get(filterState.lutName);
+  if (!lutComp) {
+    throw Error(`codesAccepted lut ${filterState.lutName} not found`);
+  }
+  setupCodesAcceptedFilter(filterState, lutComp);
+}
+
+function isCodeAllowedByLut(code, filterState) {
+  if (filterState.mode === 'bitmap') {
+    const table = filterState.lutComp.lutTable;
+    if (code < 0 || code >= table.length) return false;
+    return table[code] === '1';
+  }
+  if (filterState.mode === 'values') {
+    return filterState.allowedCodes.has(codeToBinary(code, KEYBOARD_WIDTH));
+  }
+  return false;
+}
+
+function parseShowCode(attributes) {
+  if (attributes.showCode === undefined || attributes.showCode === null || attributes.showCode === '') {
+    return 0;
+  }
+  const mode = parseInt(attributes.showCode, 10);
+  if (mode !== 0 && mode !== 1 && mode !== 2) {
+    throw Error('showCode must be 0, 1, or 2');
+  }
+  return mode;
+}
+
+function notifyKeyboardUi(keyboardId, asciiCode, ui) {
+  if (ui.showCode && typeof onKeyboardShowCode === 'function') {
+    onKeyboardShowCode(keyboardId, asciiCode, ui.showCode);
+  }
+  if (ui.pulseColor && typeof onKeyboardPulseColor === 'function') {
+    onKeyboardPulseColor(keyboardId, ui.pulseColor);
+  }
+  if (typeof window !== 'undefined' && window.panelKeyboards) {
+    const kb = window.panelKeyboards.get(keyboardId);
+    if (kb) {
+      if (ui.showCode) kb.setCodeDisplay(asciiCode);
+      if (ui.pulseColor) kb.pulseFeedback(ui.pulseColor);
+    }
+  }
+}
+
 var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
   static get type() { return 'keyboard'; }
   static get shortnames() { return {}; }
   static get isReservedName() { return true; }
+
+  getSpecialParseAttributes() {
+    return { bindingAttrs: ['codesAccepted'] };
+  }
 
   getWidthBits(_attributes) {
     return KEYBOARD_WIDTH;
@@ -111,6 +220,9 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         { name: 'focusBgColor', value: 'string' },
         { name: 'onlyDigits', value: null },
         { name: 'allowEnter', value: null },
+        { name: 'codesAccepted', value: '.component (lut)' },
+        { name: 'showCode', value: 'integer' },
+        { name: 'pulseColor', value: 'string' },
         { name: 'nl', value: null },
       ],
       initValue: '8bit',
@@ -123,21 +235,41 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
     };
   }
 
-  static buildHandler(name, keyboardId, getRef, validRef, onlyDigits, allowEnter, ctx) {
+  static finalizeAllCodesAccepted(ctx) {
+    if (!ctx || !ctx.components) return;
+    for (const comp of ctx.components.values()) {
+      if (comp.type !== 'keyboard' || !comp.codesAcceptedFilter) continue;
+      const filterState = comp.codesAcceptedFilter;
+      if (filterState.ready || !filterState.lutName) continue;
+      const lutComp = ctx.components.get(filterState.lutName);
+      if (!lutComp) {
+        throw Error(`codesAccepted lut ${filterState.lutName} not found`);
+      }
+      setupCodesAcceptedFilter(filterState, lutComp);
+    }
+  }
+
+  static buildHandler(name, keyboardId, getRef, validRef, filterState, ui, ctx) {
     const onKey = (input, opts) => {
       const force = opts && opts.force;
       if (!force && typeof window !== 'undefined' && window.focusedKeyboardId !== keyboardId) {
         return false;
       }
 
-      const code = resolveKeyInput(
-        input !== undefined && input !== null && typeof input !== 'object'
-          ? input
-          : (opts && opts.charCode !== undefined ? opts.charCode : (opts && opts.key)),
-        onlyDigits,
-        allowEnter
-      );
-      if (code === null) return false;
+      const raw = input !== undefined && input !== null && typeof input !== 'object'
+        ? input
+        : (opts && opts.charCode !== undefined ? opts.charCode : (opts && opts.key));
+
+      let code;
+      if (filterState.lutName) {
+        ensureCodesAcceptedFilter(filterState, ctx);
+        code = normalizeKeyToAscii(raw);
+        if (code === null) return false;
+        if (!isCodeAllowedByLut(code, filterState)) return false;
+      } else {
+        code = resolveKeyInput(raw, filterState.onlyDigits, filterState.allowEnter);
+        if (code === null) return false;
+      }
 
       const codeBin = codeToBinary(code, KEYBOARD_WIDTH);
       ctx.clog('onKey');
@@ -155,6 +287,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         });
       });
       ctx.showlog(1);
+      notifyKeyboardUi(keyboardId, code, ui);
       return true;
     };
 
@@ -170,6 +303,30 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
     const bgColor = normalizeColor(attributes.bgColor, '#101010');
     const focusColor = normalizeColor(attributes.focusColor, '#2ecc71');
     const focusBgColor = normalizeColor(attributes.focusBgColor, '#181818');
+    const showCode = parseShowCode(attributes);
+    const pulseColor = attributes.pulseColor !== undefined && attributes.pulseColor !== null && attributes.pulseColor !== ''
+      ? normalizeColor(attributes.pulseColor, null)
+      : null;
+    const ui = { showCode, pulseColor };
+
+    const members = attributes.codesAcceptedMembers || [];
+    const lutName = members.length ? members[0] : null;
+    const filterState = {
+      onlyDigits,
+      allowEnter,
+      lutName,
+      lutComp: null,
+      mode: null,
+      allowedCodes: null,
+      ready: false,
+    };
+
+    if (lutName) {
+      const lutComp = ctx.components && ctx.components.get(lutName);
+      if (lutComp) {
+        setupCodesAcceptedFilter(filterState, lutComp);
+      }
+    }
 
     const getIdx = ctx.storeValue('0'.repeat(KEYBOARD_WIDTH));
     const validIdx = ctx.storeValue('0');
@@ -178,7 +335,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
     const keyboardId = baseId;
 
     const { onKey } = KeyboardComponent.buildHandler(
-      name, keyboardId, getRef, validRef, onlyDigits, allowEnter, ctx
+      name, keyboardId, getRef, validRef, filterState, ui, ctx
     );
 
     if (typeof addKeyboard === 'function') {
@@ -191,6 +348,8 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         focusBgColor,
         onlyDigits,
         allowEnter,
+        showCode,
+        pulseColor,
         nl,
         onKey,
       });
@@ -201,6 +360,8 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
       ref: getRef,
       validRef,
       keyboardHandler: { onKey },
+      codesAcceptedFilter: filterState,
+      keyboardUi: ui,
     };
   }
 };

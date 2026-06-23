@@ -1,5 +1,13 @@
 /* ================= PANEL KEYBOARD ================= */
 
+const KEYBOARD_PULSE_MS = 150;
+
+function formatShowCodeText(asciiCode, showCode) {
+  if (!showCode || asciiCode === 0) return '';
+  if (showCode === 1) return '^' + asciiCode.toString(16);
+  return String(asciiCode);
+}
+
 class PanelKeyboard {
   constructor({
     label = 'Keyboard',
@@ -9,6 +17,8 @@ class PanelKeyboard {
     focusBgColor = '#181818',
     onlyDigits = false,
     allowEnter = false,
+    showCode = 0,
+    pulseColor = null,
     onKey = () => false,
   }) {
     this.label = label;
@@ -18,10 +28,14 @@ class PanelKeyboard {
     this.focusBgColor = focusBgColor;
     this.onlyDigits = onlyDigits;
     this.allowEnter = allowEnter;
+    this.showCode = showCode;
+    this.pulseColor = pulseColor;
     this.onKey = onKey;
     this.focused = false;
     this.cursorVisible = true;
+    this._asciiCode = 0;
     this._cursorTimer = null;
+    this._pulseTimer = null;
     this._boundDocPointerDown = (e) => this._onDocumentPointerDown(e);
     this._boundInputKeyDown = (e) => this._onInputKeyDown(e);
     this._boundInput = (e) => this._onInput(e);
@@ -32,6 +46,9 @@ class PanelKeyboard {
     this.labelEl = document.createElement('span');
     this.labelEl.className = 'keyboard-label';
     this.labelEl.textContent = label;
+
+    this.codeEl = document.createElement('span');
+    this.codeEl.className = 'keyboard-code';
 
     this.cursorEl = document.createElement('span');
     this.cursorEl.className = 'keyboard-cursor';
@@ -59,6 +76,7 @@ class PanelKeyboard {
     this.inputEl.setAttribute('aria-label', label);
 
     this.el.appendChild(this.labelEl);
+    this.el.appendChild(this.codeEl);
     this.el.appendChild(this.cursorEl);
     this.el.appendChild(this.inputEl);
 
@@ -73,6 +91,7 @@ class PanelKeyboard {
 
     this._applyColors();
     this._stopCursorBlink();
+    this._refreshCodeDisplay();
   }
 
   mount(parent) {
@@ -83,6 +102,42 @@ class PanelKeyboard {
     this._activateFocus(true);
   }
 
+  setShowCode(mode) {
+    this.showCode = mode;
+    this._refreshCodeDisplay();
+  }
+
+  setCodeDisplay(asciiCode) {
+    this._asciiCode = asciiCode;
+    this._refreshCodeDisplay();
+  }
+
+  _refreshCodeDisplay() {
+    const text = formatShowCodeText(this._asciiCode, this.showCode);
+    this.codeEl.textContent = text;
+    if (this.focused) {
+      this.cursorEl.style.visibility = this.cursorVisible ? 'visible' : 'hidden';
+    } else {
+      this.cursorEl.style.visibility = 'hidden';
+    }
+  }
+
+  pulseFeedback(color) {
+    if (!color) return;
+    if (this._pulseTimer) {
+      clearTimeout(this._pulseTimer);
+      this._pulseTimer = null;
+    }
+    this.el.style.borderColor = color;
+    this.labelEl.style.color = color;
+    this.codeEl.style.color = color;
+    this.cursorEl.style.color = color;
+    this._pulseTimer = setTimeout(() => {
+      this._pulseTimer = null;
+      this._applyColors();
+    }, KEYBOARD_PULSE_MS);
+  }
+
   _activateFocus(focusInput) {
     if (typeof window !== 'undefined') {
       window.focusedKeyboardId = this._id;
@@ -90,6 +145,7 @@ class PanelKeyboard {
     const wasFocused = this.focused;
     this.focused = true;
     this._applyColors();
+    this._refreshCodeDisplay();
     this._startCursorBlink();
     if (!wasFocused) {
       document.addEventListener('mousedown', this._boundDocPointerDown);
@@ -111,6 +167,7 @@ class PanelKeyboard {
     this.inputEl.value = '';
     this._applyColors();
     this._stopCursorBlink();
+    this._refreshCodeDisplay();
     document.removeEventListener('mousedown', this._boundDocPointerDown);
     document.removeEventListener('touchstart', this._boundDocPointerDown);
     if (document.activeElement === this.inputEl) {
@@ -185,18 +242,29 @@ class PanelKeyboard {
   }
 
   _applyColors() {
-    if (this.focused) {
-      this.el.style.borderColor = this.focusColor;
-      this.el.style.backgroundColor = this.focusBgColor;
-      this.labelEl.style.color = this.focusColor;
-      this.cursorEl.style.color = this.focusColor;
-    } else {
-      this.el.style.borderColor = this.color;
-      this.el.style.backgroundColor = this.bgColor;
-      this.labelEl.style.color = this.color;
-      this.cursorEl.style.color = this.color;
-    }
+    const accent = this.focused ? this.focusColor : this.color;
+    const bg = this.focused ? this.focusBgColor : this.bgColor;
+    this.el.style.borderColor = accent;
+    this.el.style.backgroundColor = bg;
+    this.labelEl.style.color = accent;
+    this.codeEl.style.color = accent;
+    this.cursorEl.style.color = accent;
   }
+}
+
+function onKeyboardShowCode(keyboardId, asciiCode, showCodeMode) {
+  if (typeof window === 'undefined' || !window.panelKeyboards) return;
+  const kb = window.panelKeyboards.get(keyboardId);
+  if (!kb) return;
+  kb.setShowCode(showCodeMode);
+  kb.setCodeDisplay(asciiCode);
+}
+
+function onKeyboardPulseColor(keyboardId, color) {
+  if (typeof window === 'undefined' || !window.panelKeyboards) return;
+  const kb = window.panelKeyboards.get(keyboardId);
+  if (!kb) return;
+  kb.pulseFeedback(color);
 }
 
 function addKeyboard({
@@ -208,6 +276,8 @@ function addKeyboard({
   focusBgColor,
   onlyDigits,
   allowEnter,
+  showCode,
+  pulseColor,
   nl,
   onKey,
 }) {
@@ -226,6 +296,8 @@ function addKeyboard({
     focusBgColor,
     onlyDigits: !!onlyDigits,
     allowEnter: !!allowEnter,
+    showCode: showCode || 0,
+    pulseColor: pulseColor || null,
     onKey: (key) => onKey(key, { force: true }),
   });
   kb.setId(id);
