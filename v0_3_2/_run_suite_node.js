@@ -123,9 +123,9 @@ for (const test of suite.tests) {
     failures.push(test.id + ': ' + test.title);
     if (test.id === 1609) {
       const err = h.getUnexpected();
-      if (err) console.log('  1609 THROW', err.message);
+      if (err) console.log('  ' + test.id + ' THROW', err.message);
       for (const a of h.getAssertions()) {
-        if (!a.pass) console.log('  1609 FAIL', a.name, 'got', a.actual, 'exp', a.expected);
+        if (!a.pass) console.log('  ' + test.id + ' FAIL', a.name, 'got', JSON.stringify(a.actual), 'exp', JSON.stringify(a.expected));
       }
     }
   }

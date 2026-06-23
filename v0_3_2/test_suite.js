@@ -5943,6 +5943,10 @@ reg(973, 'terminal', 'doc(comp.terminal) signature', function(h, session) {
   const out = session.runDoc('doc(comp.terminal)');
   h.assert('first line', out[0], 'comp [terminal] .name:');
   h.assert('has append pin', String(out.some(function(l) { return l.includes('append'); })), 'true');
+  h.assert('has insert pin', String(out.some(l => l.includes('insert'))), 'true');
+  h.assert('has backDelete pin', String(out.some(l => l.includes('backDelete'))), 'true');
+  h.assert('has frontDelete pin', String(out.some(l => l.includes('frontDelete'))), 'true');
+  h.assert('has moveCursor pin', String(out.some(l => l.includes('moveCursor'))), 'true');
 });
 
 reg(974, 'terminal', 'Hello World runnable', function(h, session) {
@@ -12555,6 +12559,197 @@ comp [keyboard] .kbd:
   session.triggerKeyboardKey(interp, '.kbd', { key: '5' });
   h.assert('reject BS', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Backspace' })), 'false');
   h.assert('still 5', session.getWire(interp, 'code'), '00110101');
+});
+
+function _termCursor(interp, name) {
+  const id = _termId(interp, name);
+  if (!id || typeof getTerminalCursor !== 'function') return null;
+  return getTerminalCursor(id);
+}
+
+reg(1643, 'terminal', 'backDelete 1 — delete char before cursor', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^48656C6C6F
+  set = 1 }
+.term:{ backDelete = 1
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'Hell');
+  const cur = _termCursor(interp, '.term');
+  h.assert('cursor col', String(cur && cur.col), '4');
+});
+
+reg(1644, 'terminal', 'backDelete 1 at col 0 — noop', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^48
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ backDelete = 1
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'H');
+  h.assert('cursor col', String(_termCursor(interp, '.term').col), '0');
+});
+
+reg(1645, 'terminal', 'backDelete 2 at col 0 — join lines', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^48656C6C6F
+  set = 1 }
+.term:{ newline = 1
+  set = 1 }
+.term:{ append = ^576F726C64
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ backDelete = 2
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'HelloWorld');
+  h.assert('cursor col', String(_termCursor(interp, '.term').col), '5');
+});
+
+reg(1646, 'terminal', 'backDelete 3 — kill line left', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^48656C6C6F
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ backDelete = 3
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'lo');
+  h.assert('cursor col', String(_termCursor(interp, '.term').col), '0');
+});
+
+reg(1647, 'terminal', 'frontDelete 1 — delete char at cursor', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^48656C6C6F
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ frontDelete = 1
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'ello');
+});
+
+reg(1648, 'terminal', 'frontDelete 3 — kill line right', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^48656C6C6F
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ frontDelete = 3
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'Hel');
+  h.assert('cursor col', String(_termCursor(interp, '.term').col), '3');
+});
+
+reg(1649, 'terminal', 'moveCursor left and right', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^414243
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 2
+  set = 1 }`);
+  h.assert('cursor col', String(_termCursor(interp, '.term').col), '2');
+});
+
+reg(1650, 'terminal', 'moveCursor up and down', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^414141
+  set = 1 }
+.term:{ newline = 1
+  set = 1 }
+.term:{ append = ^424242
+  set = 1 }
+.term:{ moveCursor = 3
+  set = 1 }
+.term:{ moveCursor = 4
+  set = 1 }`);
+  h.assert('line down', String(_termCursor(interp, '.term').line), '1');
+  h.assert('col clamp', String(_termCursor(interp, '.term').col), '3');
+});
+
+reg(1651, 'terminal', 'append mid-line — cursor advances', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^48656C6C6F
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ append = ^58
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'HelXlo');
+  h.assert('cursor col', String(_termCursor(interp, '.term').col), '4');
+});
+
+reg(1652, 'terminal', 'insert mid-line — cursor stays', function(h, session) {
+  const { interp } = session.run(TERMINAL_BASE + `
+.term:{ append = ^48656C6C6F
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ moveCursor = 1
+  set = 1 }
+.term:{ insert = ^58
+  set = 1 }`);
+  h.assert('text', getTerminalText(_termId(interp, '.term')), 'HelXlo');
+  h.assert('cursor col', String(_termCursor(interp, '.term').col), '3');
+});
+
+reg(1653, 'terminal', 'keyboard BS + backDelete mini-shell', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  allowBackspace
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 5
+  columns: 20
+  on: 1
+  :
+8wire code = .kbd
+1wire isBS = EQ(code, 00001000)
+1wire isLF = EQ(code, 00001010)
+.term:{
+  backDelete = MUX(isBS, 0, 1)
+  append = MUX(OR(isBS, isLF), .kbd, 00000000)
+  newline = isLF
+  set = .kbd:valid
+}`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'B' });
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'Backspace' });
+  h.assert('text AB', getTerminalText(_termId(interp, '.term')), 'A');
+}, { propagation: 'wave' });
+
+reg(1654, 'signal', 'MUX(sel,11,10) — sel=0→11 sel=1→10', function(h, session) {
+  const r0 = session.run(`1wire sel = 0
+2wire r = MUX(sel, 11, 10)`);
+  h.assert('sel=0', session.getWire(r0.interp, 'r'), '11');
+  const r1 = session.run(`1wire sel = 1
+2wire r = MUX(sel, 11, 10)`);
+  h.assert('sel=1', session.getWire(r1.interp, 'r'), '10');
 });
 
 

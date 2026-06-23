@@ -14958,9 +14958,71 @@ Use \`cursorStyle: 1\` for a blinking underscore cursor.
 | Pin | Role |
 |-----|------|
 | \`set\` | Trigger block (rising edge by default; use \`on: 1\` for level) |
-| \`append\` | Append one or more bytes (8+ bits; wider values = consecutive bytes) |
+| \`append\` | Insert bytes at cursor; cursor moves forward after each character |
+| \`insert\` | Insert bytes at cursor; cursor stays on the same column |
 | \`newline\` | Move cursor to next line |
 | \`clear\` | Erase all contents |
+| \`backDelete\` | 2-bit mode: delete backward relative to cursor (see below) |
+| \`frontDelete\` | 2-bit mode: delete forward relative to cursor |
+| \`moveCursor\` | 3-bit direction: \`1\` left · \`2\` right · \`3\` up · \`4\` down |
+
+---
+
+## Line editing (mini-shell)
+
+The terminal keeps an internal cursor (\`cursorLine\`, \`cursorCol\`). Use \`cursorStyle: 1\` or \`2\` to show it.
+
+### \`append\` vs \`insert\`
+
+Both insert at the cursor and push existing text to the right.
+
+| Pin | After each character | Example: \`Hel|lo\` + \`X\` |
+|-----|-------------------|-------------------------|
+| \`append\` | \`cursorCol++\` | \`HelX|lo\` |
+| \`insert\` | column unchanged | \`Hel|Xlo\` |
+
+### \`backDelete\` / \`frontDelete\` (modes 0–3)
+
+| Mode | \`backDelete\` | \`frontDelete\` |
+|------|--------------|---------------|
+| \`0\` | noop | noop |
+| \`1\` | one char left (not past line start) | one char at cursor |
+| \`2\` | one char left, or join with previous line at col 0 | one char at cursor, or join with next line at EOL |
+| \`3\` | delete from line start to cursor | delete from cursor to line end |
+
+### \`moveCursor\` (0–4)
+
+\`0\` noop · \`1\` left · \`2\` right · \`3\` up · \`4\` down (column clamped to target line length).
+
+### Example — keyboard + backspace
+
+\`MUX(sel, dataFor0, dataFor1)\` — \`sel=0\` → \`dataFor0\`, \`sel=1\` → \`dataFor1\`.  
+Ex.: \`MUX(isBS, 1, 0)\` cu \`isBS=1\` returnează \`0\`.
+
+\`\`\`logts-play wave
+comp [keyboard] .kbd:
+  allowBackspace
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 8
+  columns: 40
+  cursorStyle: 2
+  on: 1
+  :
+
+8wire code = .kbd
+1wire isBS = EQ(code, 00001000)
+1wire isLF = EQ(code, 00001010)
+
+.term:{
+  backDelete = MUX(isBS, 0, 1)
+  append = MUX(OR(isBS, isLF), .kbd, 00000000)
+  newline = isLF
+  set = .kbd:valid
+}
+\`\`\`
 
 ---
 

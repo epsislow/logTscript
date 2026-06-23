@@ -2567,6 +2567,20 @@ assignment() {
     return addNot(atomBin);
   }
 
+  if (this.c.type === 'DEC') {
+    const v = this.c.value;
+    this.eat('DEC');
+    let br = null;
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      br = this.parseLiteralBitRange();
+    }
+    const atomDec = br ? { dec: v, bitRange: br } : { dec: v };
+    if (this.c.type === 'SYM' && this.c.value === ';') {
+      atomDec.pad = this.parsePadding();
+    }
+    return addNot(atomDec);
+  }
+
   if (this.c.type === 'LOGIC') {
     const v = this.c.value;
     this.eat('LOGIC');

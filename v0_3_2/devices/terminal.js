@@ -51,7 +51,30 @@ class TerminalBuffer {
     }
   }
 
+  insertBinary(binaryValue) {
+    if (!binaryValue || binaryValue.length < 8) {
+      throw Error('insert expects at least 8 bits');
+    }
+    const padded = binaryValue.length % 8 === 0
+      ? binaryValue
+      : binaryValue.padStart(Math.ceil(binaryValue.length / 8) * 8, '0');
+    for (let i = 0; i < padded.length; i += 8) {
+      const byte = padded.substring(i, i + 8);
+      const code = parseInt(byte, 2);
+      if (isNaN(code)) continue;
+      this.insertChar(String.fromCharCode(code));
+    }
+  }
+
   appendChar(ch) {
+    this._insertCharAtCursor(ch, true);
+  }
+
+  insertChar(ch) {
+    this._insertCharAtCursor(ch, false);
+  }
+
+  _insertCharAtCursor(ch, advanceCursor) {
     let line = this._currentLine();
     if (this.cursorCol > line.length) {
       line = line + ' '.repeat(this.cursorCol - line.length);
@@ -59,8 +82,104 @@ class TerminalBuffer {
     const before = line.substring(0, this.cursorCol);
     const after = line.substring(this.cursorCol);
     this._setCurrentLine(before + ch + after);
-    this.cursorCol += 1;
-    this._wrapIfNeeded();
+    if (advanceCursor) {
+      this.cursorCol += 1;
+      this._wrapIfNeeded();
+    }
+  }
+
+  backDelete(mode) {
+    const m = mode | 0;
+    if (m <= 0 || m > 3) return;
+    if (m === 1) {
+      if (this.cursorCol > 0) {
+        const line = this._currentLine();
+        this._setCurrentLine(line.substring(0, this.cursorCol - 1) + line.substring(this.cursorCol));
+        this.cursorCol -= 1;
+      }
+      return;
+    }
+    if (m === 2) {
+      if (this.cursorCol > 0) {
+        const line = this._currentLine();
+        this._setCurrentLine(line.substring(0, this.cursorCol - 1) + line.substring(this.cursorCol));
+        this.cursorCol -= 1;
+        return;
+      }
+      if (this.cursorLine > 0) {
+        const prevIdx = this.cursorLine - 1;
+        const prev = this.lines[prevIdx];
+        const cur = this._currentLine();
+        this.lines[prevIdx] = prev + cur;
+        this.lines.splice(this.cursorLine, 1);
+        this.cursorLine = prevIdx;
+        this.cursorCol = prev.length;
+      }
+      return;
+    }
+    if (m === 3) {
+      const line = this._currentLine();
+      this._setCurrentLine(line.substring(this.cursorCol));
+      this.cursorCol = 0;
+    }
+  }
+
+  frontDelete(mode) {
+    const m = mode | 0;
+    if (m <= 0 || m > 3) return;
+    let line = this._currentLine();
+    if (m === 1) {
+      if (this.cursorCol < line.length) {
+        this._setCurrentLine(line.substring(0, this.cursorCol) + line.substring(this.cursorCol + 1));
+      }
+      return;
+    }
+    if (m === 2) {
+      if (this.cursorCol < line.length) {
+        this._setCurrentLine(line.substring(0, this.cursorCol) + line.substring(this.cursorCol + 1));
+        return;
+      }
+      if (this.cursorLine < this.lines.length - 1) {
+        const next = this.lines[this.cursorLine + 1];
+        this._setCurrentLine(line + next);
+        this.lines.splice(this.cursorLine + 1, 1);
+      }
+      return;
+    }
+    if (m === 3) {
+      this._setCurrentLine(line.substring(0, this.cursorCol));
+    }
+  }
+
+  moveCursor(dir) {
+    const d = dir | 0;
+    if (d <= 0 || d > 4) return;
+    const line = this._currentLine();
+    if (d === 1) {
+      if (this.cursorCol > 0) this.cursorCol -= 1;
+      return;
+    }
+    if (d === 2) {
+      if (this.cursorCol < line.length) this.cursorCol += 1;
+      return;
+    }
+    if (d === 3) {
+      if (this.cursorLine > 0) {
+        this.cursorLine -= 1;
+        this.cursorCol = Math.min(this.cursorCol, this._currentLine().length);
+      }
+      return;
+    }
+    if (d === 4) {
+      if (this.cursorLine < this.lines.length - 1) {
+        this.cursorLine += 1;
+        this.cursorCol = Math.min(this.cursorCol, this._currentLine().length);
+      }
+    }
+  }
+
+  getCursor() {
+    return { line: this.cursorLine, col: this.cursorCol };
   }
 
   newline() {
@@ -320,6 +439,26 @@ class TextTerminal {
     this.draw(true);
   }
 
+  insertBinary(binaryValue) {
+    this.buffer.insertBinary(binaryValue);
+    this.draw(true);
+  }
+
+  backDelete(mode) {
+    this.buffer.backDelete(mode);
+    this.draw(true);
+  }
+
+  frontDelete(mode) {
+    this.buffer.frontDelete(mode);
+    this.draw(true);
+  }
+
+  moveCursor(dir) {
+    this.buffer.moveCursor(dir);
+    this.draw(true);
+  }
+
   newline() {
     this.buffer.newline();
     this.draw(true);
@@ -389,6 +528,12 @@ function getTerminalBuffer(id) {
   const term = terminalDisplays.get(id);
   if (!term) return null;
   return term.buffer;
+}
+
+function getTerminalCursor(id) {
+  const buf = getTerminalBuffer(id);
+  if (!buf || typeof buf.getCursor !== 'function') return null;
+  return buf.getCursor();
 }
 
 function getTerminalDevice(id) {

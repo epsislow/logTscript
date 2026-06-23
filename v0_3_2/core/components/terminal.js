@@ -1,6 +1,6 @@
 var BuiltinComponent = (typeof require !== 'undefined') ? require('./builtin-component') : BuiltinComponent;
 
-var TERMINAL_PINS = ['set', 'append', 'newline', 'clear'];
+var TERMINAL_PINS = ['set', 'append', 'insert', 'newline', 'clear', 'backDelete', 'frontDelete', 'moveCursor'];
 
 var TerminalComponent = class TerminalComponent extends BuiltinComponent {
   static get type() { return 'terminal'; }
@@ -31,8 +31,12 @@ var TerminalComponent = class TerminalComponent extends BuiltinComponent {
       pins: [
         { bits: '1', name: 'set' },
         { bits: 'X', name: 'append' },
+        { bits: 'X', name: 'insert' },
         { bits: '1', name: 'newline' },
-        { bits: '1', name: 'clear' }
+        { bits: '1', name: 'clear' },
+        { bits: '2', name: 'backDelete' },
+        { bits: '2', name: 'frontDelete' },
+        { bits: '3', name: 'moveCursor' }
       ],
       pouts: [],
       returns: null,
@@ -46,6 +50,26 @@ var TerminalComponent = class TerminalComponent extends BuiltinComponent {
     const n = parseInt(val, 10);
     if (n === 0 || n === 1) return n;
     return defaultOne ? 1 : 0;
+  }
+
+  _parseSmallInt(value, maxVal) {
+    if (value === undefined || value === null || value === '') return 0;
+    const n = parseInt(String(value), 2);
+    if (isNaN(n) || n < 0) return 0;
+    if (n > maxVal) return maxVal;
+    return n;
+  }
+
+  _isAllZeroBytes(binaryValue) {
+    if (!binaryValue || binaryValue.length < 8) return false;
+    const padded = binaryValue.length % 8 === 0
+      ? binaryValue
+      : binaryValue.padStart(Math.ceil(binaryValue.length / 8) * 8, '0');
+    for (let i = 0; i < padded.length; i += 8) {
+      const code = parseInt(padded.substring(i, i + 8), 2);
+      if (!isNaN(code) && code !== 0) return false;
+    }
+    return true;
   }
 
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
@@ -88,6 +112,13 @@ var TerminalComponent = class TerminalComponent extends BuiltinComponent {
     return value === '1' || (value && value.length > 0 && value[value.length - 1] === '1');
   }
 
+  _termAndBuffer(comp) {
+    const termId = comp.deviceIds[0];
+    const term = typeof terminalDisplays !== 'undefined' ? terminalDisplays.get(termId) : null;
+    const buffer = term ? term.buffer : (typeof getTerminalBuffer === 'function' ? getTerminalBuffer(termId) : null);
+    return { term, buffer };
+  }
+
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {
     if (!pending) return;
     if (pending.set === undefined) return;
@@ -97,9 +128,7 @@ var TerminalComponent = class TerminalComponent extends BuiltinComponent {
 
     this._validatePending(pending);
 
-    const termId = comp.deviceIds[0];
-    const term = typeof terminalDisplays !== 'undefined' ? terminalDisplays.get(termId) : null;
-    const buffer = term ? term.buffer : (typeof getTerminalBuffer === 'function' ? getTerminalBuffer(termId) : null);
+    const { term, buffer } = this._termAndBuffer(comp);
 
     if (pending.clear !== undefined) {
       const clearValue = this.reEvalPendingValue(pending, 'clear', reEvaluate, ctx);
@@ -109,10 +138,28 @@ var TerminalComponent = class TerminalComponent extends BuiltinComponent {
       }
     }
 
-    if (pending.append !== undefined) {
-      const appendValue = this.reEvalPendingValue(pending, 'append', reEvaluate, ctx);
-      if (term) term.appendBinary(appendValue);
-      else if (buffer) buffer.appendBinary(appendValue);
+    if (pending.backDelete !== undefined) {
+      const mode = this._parseSmallInt(this.reEvalPendingValue(pending, 'backDelete', reEvaluate, ctx), 3);
+      if (mode > 0) {
+        if (term) term.backDelete(mode);
+        else if (buffer) buffer.backDelete(mode);
+      }
+    }
+
+    if (pending.frontDelete !== undefined) {
+      const mode = this._parseSmallInt(this.reEvalPendingValue(pending, 'frontDelete', reEvaluate, ctx), 3);
+      if (mode > 0) {
+        if (term) term.frontDelete(mode);
+        else if (buffer) buffer.frontDelete(mode);
+      }
+    }
+
+    if (pending.moveCursor !== undefined) {
+      const dir = this._parseSmallInt(this.reEvalPendingValue(pending, 'moveCursor', reEvaluate, ctx), 4);
+      if (dir > 0) {
+        if (term) term.moveCursor(dir);
+        else if (buffer) buffer.moveCursor(dir);
+      }
     }
 
     if (pending.newline !== undefined) {
@@ -121,6 +168,22 @@ var TerminalComponent = class TerminalComponent extends BuiltinComponent {
         if (term) term.newline();
         else if (buffer) buffer.newline();
       }
+    }
+
+    if (pending.insert !== undefined) {
+      const insertValue = this.reEvalPendingValue(pending, 'insert', reEvaluate, ctx);
+      if (this._isAllZeroBytes(insertValue)) {
+        // MUX disable branch (all-zero, ≥8 bits) — skip silently
+      } else if (term) term.insertBinary(insertValue);
+      else if (buffer) buffer.insertBinary(insertValue);
+    }
+
+    if (pending.append !== undefined) {
+      const appendValue = this.reEvalPendingValue(pending, 'append', reEvaluate, ctx);
+      if (this._isAllZeroBytes(appendValue)) {
+        // MUX disable branch (all-zero, ≥8 bits) — skip silently
+      } else if (term) term.appendBinary(appendValue);
+      else if (buffer) buffer.appendBinary(appendValue);
     }
   }
 };
