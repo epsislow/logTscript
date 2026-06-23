@@ -12608,7 +12608,7 @@ reg(1645, 'terminal', 'backDelete 2 at col 0 — join lines', function(h, sessio
   set = 1 }
 .term:{ moveCursor = 1
   set = 1 }
-.term:{ backDelete = 2
+.term:{ backDelete = \\2
   set = 1 }`);
   h.assert('text', getTerminalText(_termId(interp, '.term')), 'HelloWorld');
   h.assert('cursor col', String(_termCursor(interp, '.term').col), '5');
@@ -12622,7 +12622,7 @@ reg(1646, 'terminal', 'backDelete 3 — kill line left', function(h, session) {
   set = 1 }
 .term:{ moveCursor = 1
   set = 1 }
-.term:{ backDelete = 3
+.term:{ backDelete = \\3
   set = 1 }`);
   h.assert('text', getTerminalText(_termId(interp, '.term')), 'lo');
   h.assert('cursor col', String(_termCursor(interp, '.term').col), '0');
@@ -12655,7 +12655,7 @@ reg(1648, 'terminal', 'frontDelete 3 — kill line right', function(h, session) 
   set = 1 }
 .term:{ moveCursor = 1
   set = 1 }
-.term:{ frontDelete = 3
+.term:{ frontDelete = \\3
   set = 1 }`);
   h.assert('text', getTerminalText(_termId(interp, '.term')), 'Hel');
   h.assert('cursor col', String(_termCursor(interp, '.term').col), '3');
@@ -12669,7 +12669,7 @@ reg(1649, 'terminal', 'moveCursor left and right', function(h, session) {
   set = 1 }
 .term:{ moveCursor = 1
   set = 1 }
-.term:{ moveCursor = 2
+.term:{ moveCursor = \\2
   set = 1 }`);
   h.assert('cursor col', String(_termCursor(interp, '.term').col), '2');
 });
@@ -12682,9 +12682,9 @@ reg(1650, 'terminal', 'moveCursor up and down', function(h, session) {
   set = 1 }
 .term:{ append = ^424242
   set = 1 }
-.term:{ moveCursor = 3
+.term:{ moveCursor = \\3
   set = 1 }
-.term:{ moveCursor = 4
+.term:{ moveCursor = \\4
   set = 1 }`);
   h.assert('line down', String(_termCursor(interp, '.term').line), '1');
   h.assert('col clamp', String(_termCursor(interp, '.term').col), '3');
@@ -12732,7 +12732,7 @@ comp [terminal] .term:
 1wire isBS = EQ(code, 00001000)
 1wire isLF = EQ(code, 00001010)
 .term:{
-  backDelete = MUX(isBS, 0, 1)
+  backDelete = MUX(isBS, 0, \\1)
   append = MUX(OR(isBS, isLF), .kbd, 00000000)
   newline = isLF
   set = .kbd:valid
@@ -12750,6 +12750,17 @@ reg(1654, 'signal', 'MUX(sel,11,10) — sel=0→11 sel=1→10', function(h, sess
   const r1 = session.run(`1wire sel = 1
 2wire r = MUX(sel, 11, 10)`);
   h.assert('sel=1', session.getWire(r1.interp, 'r'), '10');
+});
+
+reg(1655, 'parser', 'property block — bare decimal 2 is invalid', function(h, session) {
+  h.assertThrows('backDelete = 2', function() {
+    session.parse(TERMINAL_BASE + '\n.term:{ backDelete = 2\n  set = 1 }');
+  }, 'Bad expression');
+  h.assertThrows('MUX arg 2', function() {
+    session.parse(TERMINAL_BASE + '\n.term:{ backDelete = MUX(isBS, 0, 2)\n  set = 1 }');
+  }, 'Bad expression');
+  const ok = session.parse(TERMINAL_BASE + '\n.term:{ backDelete = MUX(isBS, 0, \\2)\n  set = 1 }');
+  h.assert('backslash decimal ok', String(ok.some(s => s.componentPropertyBlock)), 'true');
 });
 
 

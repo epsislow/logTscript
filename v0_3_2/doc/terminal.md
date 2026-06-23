@@ -145,6 +145,9 @@ Both insert at the cursor and push existing text to the right.
 
 `0` noop · `1` left · `2` right · `3` up · `4` down (column clamped to target line length).
 
+În **script** (property blocks, fire), valorile numerice >1 se scriu ca literal zecimal cu backslash (`\2`, `\3`) sau binar (`10`, `11`, `100`).  
+`2`, `3`, `4` fără `\` nu sunt literali valizi în expresii. În **atributele** componentei (`rows: 8`, `cursorStyle: 2`) zecimalul simplu este permis.
+
 ### Example — keyboard + backspace
 
 `MUX(sel, dataFor0, dataFor1)` — `sel=0` → `dataFor0`, `sel=1` → `dataFor1`.  
@@ -168,7 +171,7 @@ comp [terminal] .term:
 1wire isLF = EQ(code, 00001010)
 
 .term:{
-  backDelete = MUX(isBS, 0, 1)
+  backDelete = MUX(isBS, 0, \1)
   append = MUX(OR(isBS, isLF), .kbd, 00000000)
   newline = isLF
   set = .kbd:valid
