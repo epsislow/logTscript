@@ -43,7 +43,7 @@ const DOC_SECTIONS = [
       { file: 'interactive-components.md', label: 'Overview' },
       { file: 'switch.md', label: 'switch' },
       { file: 'key.md', label: 'key' },
-      { file: 'keyboard.md', label: 'keyboard', searchExtra: 'input ASCII onlyNumbers valid focus UART RX' },
+      { file: 'keyboard.md', label: 'keyboard', searchExtra: 'input ASCII onlyNumbers allowEnter valid focus UART RX' },
       { file: 'dip.md', label: 'dip' },
       { file: 'ioport.md', label: 'ioport', searchExtra: 'I/O port gpio port aggregation in out bus' },
       { file: 'rotary.md', label: 'rotary' }

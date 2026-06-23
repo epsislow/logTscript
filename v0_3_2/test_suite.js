@@ -11704,6 +11704,7 @@ reg(1600, 'keyboard', 'ASCII A — get 01000001', function(h, session) {
 
 reg(1601, 'keyboard', 'Enter — get 00001010', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
+  allowEnter
   on: 1
   :
 8wire code = .kbd`);
@@ -11783,6 +11784,7 @@ reg(1607, 'keyboard', 'doc(comp.keyboard) signature', function(h, session) {
   h.assert('type line', out[0], 'comp [keyboard] .name:');
   h.assert('has valid pout', String(out.some(l => l.includes('valid'))), 'true');
   h.assert('onlyNumbers attr', String(out.some(l => l.includes('onlyNumbers'))), 'true');
+  h.assert('allowEnter attr', String(out.some(l => l.includes('allowEnter'))), 'true');
 });
 
 reg(1608, 'keyboard', 'keyboard → terminal append A (wave)', function(h, session) {
@@ -12093,6 +12095,36 @@ reg(1615, 'decimal', 'N2N10S / N10S2N E2E show round-trip', function(h, session)
   );
   h.assert('back wire', session.getWire(interp, 'back'), '11110101');
   h.assert('show output', out.some(l => l.includes('11110101')), true);
+});
+
+reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  allowEnter
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('accept Enter', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' })), 'true');
+  h.assert('get LF', session.getWire(interp, 'code'), '00001010');
+});
+
+reg(1617, 'keyboard', 'no allowEnter — Enter rejected', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  on: 1
+  :
+8wire code = .kbd`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+  h.assert('accept A', session.getWire(interp, 'code'), '01000001');
+  h.assert('reject Enter', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Enter' })), 'false');
+  h.assert('still A', session.getWire(interp, 'code'), '01000001');
+});
+
+reg(1618, 'keyboard', 'Parser — allowEnter attr', function(h, session) {
+  const stmts = session.parse(`comp [keyboard] .kbd:
+  allowEnter
+  onlyNumbers
+  :`);
+  h.assert('allowEnter', String(!!stmts[0].comp.attributes.allowEnter), 'true');
+  h.assert('onlyNumbers', String(!!stmts[0].comp.attributes.onlyNumbers), 'true');
 });
 
 

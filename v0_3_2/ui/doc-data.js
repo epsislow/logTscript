@@ -8112,6 +8112,7 @@ comp [keyboard] .name:
   focusColor: ^2ecc71
   focusBgColor: ^181818
   onlyNumbers
+  allowEnter
   nl
   :
 \`\`\`
@@ -8134,6 +8135,15 @@ A keyboard captures key presses only while **focused**.
 | Click elsewhere | unfocused |
 
 When focused, key presses are emitted into the simulation. The component does not display the characters that were typed.
+
+On **mobile**, focus uses a hidden field so the OS virtual keyboard opens:
+
+| Mode | Element | Mobile action key |
+|------|---------|-------------------|
+| default | \`<input>\` | **Done** (no Enter in simulation) |
+| \`allowEnter\` | \`<textarea>\` | **Enter** / return (emits LF, code 10) |
+
+With \`onlyNumbers\`, \`inputmode="numeric"\` is set (reliable on \`<input>\`; on \`<textarea>\` the OS may still show a full keyboard). On desktop, the same field receives physical key presses while focused.
 
 ---
 
@@ -8160,17 +8170,18 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | \`focusColor\` | color | \`^2ecc71\` | Border when focused |
 | \`focusBgColor\` | color | \`^181818\` | Background when focused |
 | \`onlyNumbers\` | flag | (no) | Accept only \`0\`–\`9\` |
+| \`allowEnter\` | flag | (no) | Accept Enter (LF, code 10); mobile uses \`<textarea>\` with return key |
 | \`nl\` | flag | (no) | New line after component |
 
 ---
 
 ## ASCII mode (default)
 
-| Key | Decimal | Binary (8 bit) |
-|-----|---------|----------------|
-| \`A\` | 65 | \`01000001\` |
-| \`5\` | 53 | \`00110101\` |
-| Enter | 10 | \`00001010\` |
+| Key | Decimal | Binary (8 bit) | Notes |
+|-----|---------|----------------|-------|
+| \`A\` | 65 | \`01000001\` | |
+| \`5\` | 53 | \`00110101\` | |
+| Enter | 10 | \`00001010\` | Requires \`allowEnter\` |
 
 ---
 
@@ -8188,6 +8199,7 @@ Click the keyboard, type characters; each accepted key appends to the terminal w
 comp [keyboard] .kbd:
   label: 'Console'
   focusColor: ^00ff00
+  allowEnter
   on: 1
   :
 
@@ -8204,6 +8216,8 @@ comp [terminal] .term:
   set = .kbd:valid
 }
 \`\`\`
+
+With \`allowEnter\`, pressing Enter on the keyboard emits LF and you can wire \`newline\` on the terminal from \`:get\` if needed.
 
 ---
 

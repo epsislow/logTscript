@@ -31,7 +31,7 @@ function codeToBinary(code, width) {
   return code.toString(2).padStart(width, '0');
 }
 
-function resolveKeyInput(input, onlyNumbers) {
+function resolveKeyInput(input, onlyNumbers, allowEnter) {
   if (input === null || input === undefined) return null;
 
   if (typeof input === 'number') {
@@ -40,13 +40,15 @@ function resolveKeyInput(input, onlyNumbers) {
       if (code >= 0 && code <= 9) return code;
       return null;
     }
+    if (code === 10 && !allowEnter) return null;
     if (code >= 0 && code <= 255) return code;
     return null;
   }
 
   const key = String(input);
   if (key === 'Enter') {
-    return onlyNumbers ? null : 10;
+    if (onlyNumbers || !allowEnter) return null;
+    return 10;
   }
   if (onlyNumbers) {
     if (key.length === 1 && key >= '0' && key <= '9') {
@@ -105,6 +107,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         { name: 'focusColor', value: 'string' },
         { name: 'focusBgColor', value: 'string' },
         { name: 'onlyNumbers', value: null },
+        { name: 'allowEnter', value: null },
         { name: 'nl', value: null },
       ],
       initValue: '8bit',
@@ -117,7 +120,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
     };
   }
 
-  static buildHandler(name, keyboardId, getRef, validRef, onlyNumbers, ctx) {
+  static buildHandler(name, keyboardId, getRef, validRef, onlyNumbers, allowEnter, ctx) {
     const width = onlyNumbers ? 4 : 8;
 
     const onKey = (input, opts) => {
@@ -130,7 +133,8 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         input !== undefined && input !== null && typeof input !== 'object'
           ? input
           : (opts && opts.charCode !== undefined ? opts.charCode : (opts && opts.key)),
-        onlyNumbers
+        onlyNumbers,
+        allowEnter
       );
       if (code === null) return false;
 
@@ -159,6 +163,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const label = attributes.label !== undefined ? String(attributes.label) : 'Keyboard';
     const onlyNumbers = !!attributes.onlyNumbers;
+    const allowEnter = !!attributes.allowEnter;
     const width = onlyNumbers ? 4 : 8;
     const nl = !!attributes.nl;
     const color = normalizeColor(attributes.color, '#808080');
@@ -173,7 +178,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
     const keyboardId = baseId;
 
     const { onKey } = KeyboardComponent.buildHandler(
-      name, keyboardId, getRef, validRef, onlyNumbers, ctx
+      name, keyboardId, getRef, validRef, onlyNumbers, allowEnter, ctx
     );
 
     if (typeof addKeyboard === 'function') {
@@ -185,6 +190,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         focusColor,
         focusBgColor,
         onlyNumbers,
+        allowEnter,
         nl,
         onKey,
       });

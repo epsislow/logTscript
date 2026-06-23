@@ -8,6 +8,7 @@ class PanelKeyboard {
     focusColor = '#2ecc71',
     focusBgColor = '#181818',
     onlyNumbers = false,
+    allowEnter = false,
     onKey = () => false,
   }) {
     this.label = label;
@@ -16,6 +17,7 @@ class PanelKeyboard {
     this.focusColor = focusColor;
     this.focusBgColor = focusBgColor;
     this.onlyNumbers = onlyNumbers;
+    this.allowEnter = allowEnter;
     this.onKey = onKey;
     this.focused = false;
     this.cursorVisible = true;
@@ -35,15 +37,25 @@ class PanelKeyboard {
     this.cursorEl.className = 'keyboard-cursor';
     this.cursorEl.textContent = '|';
 
-    this.inputEl = document.createElement('input');
-    this.inputEl.type = 'text';
+    if (allowEnter) {
+      this.inputEl = document.createElement('textarea');
+      this.inputEl.setAttribute('rows', '1');
+      this.inputEl.setAttribute('enterkeyhint', 'enter');
+    } else {
+      this.inputEl = document.createElement('input');
+      this.inputEl.type = 'text';
+      this.inputEl.setAttribute('enterkeyhint', 'done');
+    }
     this.inputEl.className = 'keyboard-input';
     this.inputEl.setAttribute('autocomplete', 'off');
     this.inputEl.setAttribute('autocapitalize', 'off');
     this.inputEl.setAttribute('autocorrect', 'off');
     this.inputEl.setAttribute('spellcheck', 'false');
-    this.inputEl.setAttribute('enterkeyhint', 'done');
-    this.inputEl.setAttribute('inputmode', onlyNumbers ? 'numeric' : 'text');
+    if (onlyNumbers) {
+      this.inputEl.setAttribute('inputmode', 'numeric');
+    } else {
+      this.inputEl.setAttribute('inputmode', 'text');
+    }
     this.inputEl.setAttribute('aria-label', label);
 
     this.el.appendChild(this.labelEl);
@@ -116,12 +128,20 @@ class PanelKeyboard {
     }
   }
 
+  _emitChar(ch) {
+    if (ch === '\n' || ch === '\r') {
+      this.onKey('Enter', { force: true });
+    } else {
+      this.onKey(ch, { force: true });
+    }
+  }
+
   _onInput(e) {
     if (!this.focused) return;
     const val = this.inputEl.value;
     if (!val) return;
     for (const ch of val) {
-      this.onKey(ch, { force: true });
+      this._emitChar(ch);
     }
     this.inputEl.value = '';
     e.preventDefault();
@@ -135,6 +155,7 @@ class PanelKeyboard {
       return;
     }
     if (key === 'Enter') {
+      if (!this.allowEnter) return;
       const accepted = this.onKey('Enter', { force: true });
       if (accepted) e.preventDefault();
       this.inputEl.value = '';
@@ -186,6 +207,7 @@ function addKeyboard({
   focusColor,
   focusBgColor,
   onlyNumbers,
+  allowEnter,
   nl,
   onKey,
 }) {
@@ -203,6 +225,7 @@ function addKeyboard({
     focusColor,
     focusBgColor,
     onlyNumbers: !!onlyNumbers,
+    allowEnter: !!allowEnter,
     onKey: (key) => onKey(key, { force: true }),
   });
   kb.setId(id);
