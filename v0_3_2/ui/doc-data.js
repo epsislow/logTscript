@@ -8176,6 +8176,8 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | \`onlyDigits\` | flag | (no) | Accept only \`0\`–\`9\` (still emits 8-bit ASCII); mobile \`inputmode=numeric\` |
 | \`allowEnter\` | flag | (no) | Accept Enter (LF, code 10); mobile uses \`<textarea>\` with return key |
 | \`allowBackspace\` | flag | (no) | Accept Backspace (BS, code 8) |
+| \`allowArrows\` | flag | (no) | Accept arrow keys (codes 128–131 on \`:get\`) |
+| \`allowDelete\` | flag | (no) | Accept forward Delete (code 132 on \`:get\`) |
 | \`codesAccepted\` | LUT ref | (no) | Whitelist of allowed keys via \`comp [lut]\` (\`codesAccepted = .lut\`) |
 | \`showCode\` | integer | \`0\` | Display last \`:get\` code next to label (\`0\` off, \`1\` hex, \`2\` decimal) |
 | \`pulseColor\` | color | (no) | Brief color flash on border/label after each accepted key |
@@ -8183,7 +8185,11 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 
 ---
 
-## Key codes (8-bit ASCII)
+## Key codes (8-bit)
+
+\`:get\` emits an 8-bit key code. Printable ASCII uses standard values (\`A\` → 65). Special keys use reserved codes below 32 or in the extended range 128–132.
+
+### Printable ASCII (excerpt)
 
 | Key | Decimal | Binary (8 bit) | Notes |
 |-----|---------|----------------|-------|
@@ -8191,6 +8197,20 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | \`5\` | 53 | \`00110101\` | |
 | Backspace | 8 | \`00001000\` | Requires \`allowBackspace\` (or \`^08\` in \`codesAccepted\` LUT) |
 | Enter | 10 | \`00001010\` | Requires \`allowEnter\` |
+
+### Extended keyboard codes (128–132)
+
+Non-printable navigation keys mapped from browser \`e.key\` names. Requires \`allowArrows\` or \`allowDelete\` (and panel forwarding). Safe to compare with \`EQ(code, ^80)\` — no collision with letters or digits.
+
+| Browser key | Attribute | Decimal | Hex | Binary (8 bit) |
+|-------------|-----------|---------|-----|----------------|
+| \`ArrowLeft\` | \`allowArrows\` | 128 | \`^80\` | \`10000000\` |
+| \`ArrowRight\` | \`allowArrows\` | 129 | \`^81\` | \`10000001\` |
+| \`ArrowUp\` | \`allowArrows\` | 130 | \`^82\` | \`10000010\` |
+| \`ArrowDown\` | \`allowArrows\` | 131 | \`^83\` | \`10000011\` |
+| \`Delete\` (forward) | \`allowDelete\` | 132 | \`^84\` | \`10000100\` |
+
+When \`codesAccepted\` is set, include \`^80\`–\`^84\` in the LUT if you want these keys whitelisted.
 
 ---
 
@@ -8202,7 +8222,7 @@ For the numeric value \`0\`–\`9\` in logic (queue, reg, ALU), use the low nibb
 
 \`\`\`logts
 4wire digit = .kbd.4/4
-@ same as .kbd.4-7 or .kbd:get.4/4
+# same as .kbd.4-7 or .kbd:get.4/4
 \`\`\`
 
 For digits \`0\`–\`9\`, \`.4/4\` equals the decimal digit value.
@@ -8217,7 +8237,7 @@ Syntax (binding, like ALU \`lut = .ref\`):
 codesAccepted = .lutName
 \`\`\`
 
-When \`codesAccepted\` is set, **only the LUT** decides which keys are accepted (including Enter and Backspace). \`onlyDigits\`, \`allowEnter\`, and \`allowBackspace\` are ignored for filtering; \`onlyDigits\` still sets mobile \`inputmode=numeric\`. \`allowEnter\` / \`allowBackspace\` are still needed on the panel widget so the browser forwards those keys to the simulation.
+When \`codesAccepted\` is set, **only the LUT** decides which keys are accepted (including Enter, Backspace, arrows, and Delete). \`onlyDigits\`, \`allowEnter\`, and \`allowBackspace\` are ignored for filtering; \`onlyDigits\` still sets mobile \`inputmode=numeric\`. \`allowEnter\` / \`allowBackspace\` / \`allowArrows\` / \`allowDelete\` are still needed on the panel widget so the browser forwards those keys to the simulation.
 
 The referenced \`comp [lut]\` must have **\`depth: 1\`** or **\`depth: 8\`**; any other depth errors at elaboration:
 
@@ -15002,6 +15022,15 @@ Both insert at the cursor and push existing text to the right.
 \`MUX(sel, dataFor0, dataFor1)\` — \`sel=0\` → \`dataFor0\`, \`sel=1\` → \`dataFor1\`.  
 Ex.: \`MUX(isBS, 1, 0)\` cu \`isBS=1\` returnează \`0\`.
 
+**Atenție la \`moveCursor\` cu \`MUX\`:** \`MUX(sel, a, b)\` returnează \`b\` când \`sel=1\`. Pentru lanț „dacă \`isL\` → stânga, altfel dacă \`isR\` → dreapta…”, direcțiile se pun pe ramura \`sel=1\`, imbricate spre stânga (vezi exemplul line editor mai jos). O ordine inversată (\`MUX(isL, \\1, MUX(isR, \\2, …))\`) inversează săgețile și, la taste normale, forțează \`moveCursor\` stânga înainte de fiecare \`append\` — cursorul vizual pare blocat.
+
+| Intenție | Expresie \`moveCursor\` (un singur rând) |
+|----------|----------------------------------------|
+| Corect | \`MUX(isL, MUX(isR, MUX(isU, MUX(isD, 0, \\4), \\3), \\2), \\1)\` |
+| Greșit (săgeți inversate) | \`MUX(isL, \\1, MUX(isR, \\2, MUX(isU, \\3, MUX(isD, \\4, 0))))\` |
+
+La varianta greșită, fiecare caracter tipărit execută \`moveCursor\` stânga *înainte* de \`append\` (ordinea pinilor în terminal), deci cursorul vizual pare blocat după prima tastă.
+
 \`\`\`logts-play wave
 comp [keyboard] .kbd:
   allowBackspace
@@ -15021,11 +15050,55 @@ comp [terminal] .term:
 
 .term:{
   backDelete = MUX(isBS, 0, \\1)
-  append = MUX(OR(isBS, isLF), .kbd, 00000000)
+  append = MUX(OR(isBS + isLF), .kbd, 00000000)
   newline = isLF
   set = .kbd:valid
 }
 \`\`\`
+
+### Example — keyboard + arrows + Delete (line editor)
+
+\`\`\`logts-play wave
+comp [keyboard] .kbd:
+  allowBackspace
+  allowArrows
+  allowDelete
+  allowEnter
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 8
+  columns: 40
+  cursorStyle: 2
+  on: 1
+  :
+
+8wire code = .kbd
+1wire isBS = EQ(code, 00001000)
+1wire isLF = EQ(code, 00001010)
+1wire isDel = EQ(code, 10000100)
+1wire isL = EQ(code, 10000000)
+1wire isR = EQ(code, 10000001)
+1wire isU = EQ(code, 10000010)
+1wire isD = EQ(code, 10000011)
+
+.term:{
+  backDelete  = MUX(isBS, 0, \\2)
+  frontDelete = MUX(isDel, 0, \\1)
+  # MUX: isL=1→\\1 left, isR=1→\\2 right, isU=1→\\3 up, isD=1→\\4 down
+  moveCursor  = MUX(isL, MUX(isR, MUX(isU, MUX(isD, 0, \\4), \\3), \\2), \\1)
+  append      = MUX(OR(isBS + isLF + isDel + isL + isR + isU + isD), .kbd, 00000000)
+  newline     = isLF
+  set         = .kbd:valid
+}
+\`\`\`
+
+Cu \`newline = isLF\`, terminalul folosește linii separate în buffer. \`backDelete\` mod \`\\1\` se oprește la începutul liniei; mod \`\\2\` unește linia curentă cu cea anterioară la \`col 0\` (comportament așteptat pentru editor multi-linie). Fără \`newline\` (doar \`append = .kbd\`), Enter inserează caracterul LF în text și \`backDelete\` mod \`\\1\` îl șterge ca orice alt byte.
+
+Pentru mai multe semnale 1-bit în \`OR\`, concatenează cu \`+\` într-un singur argument: \`OR(isBS + isLF + isDel + …)\` — \`+\` alătură biții, iar \`OR\` cu un operand reduce la 1 dacă vreun bit e \`1\`.
+
+Arrow codes on \`:get\` are \`^80\`–\`^83\`; forward Delete is \`^84\`. See [keyboard.md](keyboard.md#extended-keyboard-codes-128132).
 
 ---
 

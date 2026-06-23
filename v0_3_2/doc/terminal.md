@@ -153,6 +153,15 @@ Both insert at the cursor and push existing text to the right.
 `MUX(sel, dataFor0, dataFor1)` — `sel=0` → `dataFor0`, `sel=1` → `dataFor1`.  
 Ex.: `MUX(isBS, 1, 0)` cu `isBS=1` returnează `0`.
 
+**Atenție la `moveCursor` cu `MUX`:** `MUX(sel, a, b)` returnează `b` când `sel=1`. Pentru lanț „dacă `isL` → stânga, altfel dacă `isR` → dreapta…”, direcțiile se pun pe ramura `sel=1`, imbricate spre stânga (vezi exemplul line editor mai jos). O ordine inversată (`MUX(isL, \1, MUX(isR, \2, …))`) inversează săgețile și, la taste normale, forțează `moveCursor` stânga înainte de fiecare `append` — cursorul vizual pare blocat.
+
+| Intenție | Expresie `moveCursor` (un singur rând) |
+|----------|----------------------------------------|
+| Corect | `MUX(isL, MUX(isR, MUX(isU, MUX(isD, 0, \4), \3), \2), \1)` |
+| Greșit (săgeți inversate) | `MUX(isL, \1, MUX(isR, \2, MUX(isU, \3, MUX(isD, \4, 0))))` |
+
+La varianta greșită, fiecare caracter tipărit execută `moveCursor` stânga *înainte* de `append` (ordinea pinilor în terminal), deci cursorul vizual pare blocat după prima tastă.
+
 ```logts-play wave
 comp [keyboard] .kbd:
   allowBackspace
@@ -172,11 +181,55 @@ comp [terminal] .term:
 
 .term:{
   backDelete = MUX(isBS, 0, \1)
-  append = MUX(OR(isBS, isLF), .kbd, 00000000)
+  append = MUX(OR(isBS + isLF), .kbd, 00000000)
   newline = isLF
   set = .kbd:valid
 }
 ```
+
+### Example — keyboard + arrows + Delete (line editor)
+
+```logts-play wave
+comp [keyboard] .kbd:
+  allowBackspace
+  allowArrows
+  allowDelete
+  allowEnter
+  on: 1
+  :
+
+comp [terminal] .term:
+  rows: 8
+  columns: 40
+  cursorStyle: 2
+  on: 1
+  :
+
+8wire code = .kbd
+1wire isBS = EQ(code, 00001000)
+1wire isLF = EQ(code, 00001010)
+1wire isDel = EQ(code, 10000100)
+1wire isL = EQ(code, 10000000)
+1wire isR = EQ(code, 10000001)
+1wire isU = EQ(code, 10000010)
+1wire isD = EQ(code, 10000011)
+
+.term:{
+  backDelete  = MUX(isBS, 0, \2)
+  frontDelete = MUX(isDel, 0, \1)
+  # MUX: isL=1→\1 left, isR=1→\2 right, isU=1→\3 up, isD=1→\4 down
+  moveCursor  = MUX(isL, MUX(isR, MUX(isU, MUX(isD, 0, \4), \3), \2), \1)
+  append      = MUX(OR(isBS + isLF + isDel + isL + isR + isU + isD), .kbd, 00000000)
+  newline     = isLF
+  set         = .kbd:valid
+}
+```
+
+Cu `newline = isLF`, terminalul folosește linii separate în buffer. `backDelete` mod `\1` se oprește la începutul liniei; mod `\2` unește linia curentă cu cea anterioară la `col 0` (comportament așteptat pentru editor multi-linie). Fără `newline` (doar `append = .kbd`), Enter inserează caracterul LF în text și `backDelete` mod `\1` îl șterge ca orice alt byte.
+
+Pentru mai multe semnale 1-bit în `OR`, concatenează cu `+` într-un singur argument: `OR(isBS + isLF + isDel + …)` — `+` alătură biții, iar `OR` cu un operand reduce la 1 dacă vreun bit e `1`.
+
+Arrow codes on `:get` are `^80`–`^83`; forward Delete is `^84`. See [keyboard.md](keyboard.md#extended-keyboard-codes-128132).
 
 ---
 

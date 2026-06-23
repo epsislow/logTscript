@@ -3,6 +3,22 @@ var BuiltinComponent = (typeof require !== 'undefined') ? require('./builtin-com
 const KEYBOARD_WIDTH = 8;
 const CODES_ACCEPTED_DEPTH_ERR = 'codesAccepted requires lut with depth 1 or 8';
 
+const KEY_ARROW_LEFT = 128;
+const KEY_ARROW_RIGHT = 129;
+const KEY_ARROW_UP = 130;
+const KEY_ARROW_DOWN = 131;
+const KEY_DELETE = 132;
+
+const NAMED_KEY_CODES = {
+  Enter: 10,
+  Backspace: 8,
+  ArrowLeft: KEY_ARROW_LEFT,
+  ArrowRight: KEY_ARROW_RIGHT,
+  ArrowUp: KEY_ARROW_UP,
+  ArrowDown: KEY_ARROW_DOWN,
+  Delete: KEY_DELETE,
+};
+
 function normalizeColor(value, fallback) {
   if (value === undefined || value === null || value === '') return fallback;
   const s = String(value).trim();
@@ -33,7 +49,21 @@ function codeToBinary(code, width) {
   return code.toString(2).padStart(width, '0');
 }
 
-function normalizeKeyToAscii(input) {
+function isArrowCode(code) {
+  return code >= KEY_ARROW_LEFT && code <= KEY_ARROW_DOWN;
+}
+
+function resolveNamedKeyCode(key, filterState) {
+  if (!Object.prototype.hasOwnProperty.call(NAMED_KEY_CODES, key)) return null;
+  const code = NAMED_KEY_CODES[key];
+  if (code === 10 && !filterState.allowEnter) return null;
+  if (code === 8 && !filterState.allowBackspace) return null;
+  if (isArrowCode(code) && !filterState.allowArrows) return null;
+  if (code === KEY_DELETE && !filterState.allowDelete) return null;
+  return code;
+}
+
+function normalizeKeyToAsciiForLut(input) {
   if (input === null || input === undefined) return null;
 
   if (typeof input === 'number') {
@@ -44,15 +74,42 @@ function normalizeKeyToAscii(input) {
   }
 
   const key = String(input);
-  if (key === 'Enter') return 10;
-  if (key === 'Backspace') return 8;
   if (key === ' ') return 32;
+  if (Object.prototype.hasOwnProperty.call(NAMED_KEY_CODES, key)) {
+    return NAMED_KEY_CODES[key];
+  }
   if (key.length === 1) return key.charCodeAt(0);
   return null;
 }
 
-function resolveKeyInput(input, onlyDigits, allowEnter, allowBackspace) {
+function normalizeKeyToAscii(input, filterState) {
   if (input === null || input === undefined) return null;
+
+  if (typeof input === 'number') {
+    const code = input;
+    if (code >= 0 && code <= 255) return code;
+    if (code >= 0 && code <= 9) return 48 + code;
+    return null;
+  }
+
+  const key = String(input);
+  if (key === ' ') return 32;
+  const named = resolveNamedKeyCode(key, filterState || {});
+  if (named !== null) return named;
+  if (key.length === 1) return key.charCodeAt(0);
+  return null;
+}
+
+function resolveKeyInput(input, filterState) {
+  if (input === null || input === undefined) return null;
+
+  const {
+    onlyDigits,
+    allowEnter,
+    allowBackspace,
+    allowArrows,
+    allowDelete,
+  } = filterState;
 
   if (typeof input === 'number') {
     const code = input;
@@ -61,23 +118,22 @@ function resolveKeyInput(input, onlyDigits, allowEnter, allowBackspace) {
       if (code >= 0 && code <= 9) return 48 + code;
       if (code === 10 && allowEnter) return 10;
       if (code === 8 && allowBackspace) return 8;
+      if (isArrowCode(code) && allowArrows) return code;
+      if (code === KEY_DELETE && allowDelete) return KEY_DELETE;
       return null;
     }
     if (code === 10 && !allowEnter) return null;
     if (code === 8 && !allowBackspace) return null;
+    if (isArrowCode(code) && !allowArrows) return null;
+    if (code === KEY_DELETE && !allowDelete) return null;
     if (code >= 0 && code <= 255) return code;
     return null;
   }
 
   const key = String(input);
-  if (key === 'Enter') {
-    if (!allowEnter) return null;
-    return 10;
-  }
-  if (key === 'Backspace') {
-    if (!allowBackspace) return null;
-    return 8;
-  }
+  const named = resolveNamedKeyCode(key, filterState);
+  if (named !== null) return named;
+
   if (onlyDigits) {
     if (key.length === 1 && key >= '0' && key <= '9') {
       return key.charCodeAt(0);
@@ -228,6 +284,8 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         { name: 'onlyDigits', value: null },
         { name: 'allowEnter', value: null },
         { name: 'allowBackspace', value: null },
+        { name: 'allowArrows', value: null },
+        { name: 'allowDelete', value: null },
         { name: 'codesAccepted', value: '.component (lut)' },
         { name: 'showCode', value: 'integer' },
         { name: 'pulseColor', value: 'string' },
@@ -271,13 +329,11 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
       let code;
       if (filterState.lutName) {
         ensureCodesAcceptedFilter(filterState, ctx);
-        code = normalizeKeyToAscii(raw);
+        code = normalizeKeyToAsciiForLut(raw);
         if (code === null) return false;
         if (!isCodeAllowedByLut(code, filterState)) return false;
       } else {
-        code = resolveKeyInput(
-          raw, filterState.onlyDigits, filterState.allowEnter, filterState.allowBackspace
-        );
+        code = resolveKeyInput(raw, filterState);
         if (code === null) return false;
       }
 
@@ -309,6 +365,8 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
     const onlyDigits = !!attributes.onlyDigits;
     const allowEnter = !!attributes.allowEnter;
     const allowBackspace = !!attributes.allowBackspace;
+    const allowArrows = !!attributes.allowArrows;
+    const allowDelete = !!attributes.allowDelete;
     const nl = !!attributes.nl;
     const color = normalizeColor(attributes.color, '#808080');
     const bgColor = normalizeColor(attributes.bgColor, '#101010');
@@ -326,6 +384,8 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
       onlyDigits,
       allowEnter,
       allowBackspace,
+      allowArrows,
+      allowDelete,
       lutName,
       lutComp: null,
       mode: null,
@@ -361,6 +421,8 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         onlyDigits,
         allowEnter,
         allowBackspace,
+        allowArrows,
+        allowDelete,
         showCode,
         pulseColor,
         nl,

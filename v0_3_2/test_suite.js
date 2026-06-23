@@ -11800,6 +11800,8 @@ reg(1607, 'keyboard', 'doc(comp.keyboard) signature', function(h, session) {
   h.assert('onlyDigits attr', String(out.some(l => l.includes('onlyDigits'))), 'true');
   h.assert('allowEnter attr', String(out.some(l => l.includes('allowEnter'))), 'true');
   h.assert('allowBackspace attr', String(out.some(l => l.includes('allowBackspace'))), 'true');
+  h.assert('allowArrows attr', String(out.some(l => l.includes('allowArrows'))), 'true');
+  h.assert('allowDelete attr', String(out.some(l => l.includes('allowDelete'))), 'true');
   h.assert('codesAccepted attr', String(out.some(l => l.includes('codesAccepted'))), 'true');
   h.assert('showCode attr', String(out.some(l => l.includes('showCode'))), 'true');
   h.assert('pulseColor attr', String(out.some(l => l.includes('pulseColor'))), 'true');
@@ -12733,7 +12735,7 @@ comp [terminal] .term:
 1wire isLF = EQ(code, 00001010)
 .term:{
   backDelete = MUX(isBS, 0, \\1)
-  append = MUX(OR(isBS, isLF), .kbd, 00000000)
+  append = MUX(OR(isBS + isLF), .kbd, 00000000)
   newline = isLF
   set = .kbd:valid
 }`);
@@ -12761,6 +12763,119 @@ reg(1655, 'parser', 'property block — bare decimal 2 is invalid', function(h, 
   }, 'Bad expression');
   const ok = session.parse(TERMINAL_BASE + '\n.term:{ backDelete = MUX(isBS, 0, \\2)\n  set = 1 }');
   h.assert('backslash decimal ok', String(ok.some(s => s.componentPropertyBlock)), 'true');
+});
+
+reg(1656, 'keyboard', 'Parser — allowArrows + allowDelete attrs', function(h, session) {
+  const stmts = session.parse(`comp [keyboard] .kbd:
+  allowArrows
+  allowDelete
+  allowBackspace
+  :`);
+  h.assert('allowArrows', String(!!stmts[0].comp.attributes.allowArrows), 'true');
+  h.assert('allowDelete', String(!!stmts[0].comp.attributes.allowDelete), 'true');
+  h.assert('allowBackspace', String(!!stmts[0].comp.attributes.allowBackspace), 'true');
+});
+
+reg(1657, 'keyboard', 'allowArrows — ArrowLeft get 10000000', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  allowArrows
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('accept left', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'ArrowLeft' })), 'true');
+  h.assert('get ^80', session.getWire(interp, 'code'), '10000000');
+});
+
+reg(1658, 'keyboard', 'allowArrows — ArrowLeft rejected without flag', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('reject left', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'ArrowLeft' })), 'false');
+});
+
+reg(1659, 'keyboard', 'allowDelete — Delete get 10000100', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  allowDelete
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('accept del', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Delete' })), 'true');
+  h.assert('get ^84', session.getWire(interp, 'code'), '10000100');
+});
+
+reg(1660, 'keyboard', 'codesAccepted bitmap — arrows ^80-^84', function(h, session) {
+  const { interp } = session.run(`comp [lut] .nav:
+  depth: 1
+  length: 256
+  fillwith: 0
+  = data {
+    ^80 - ^84: 1
+  }
+  :
+comp [keyboard] .kbd:
+  codesAccepted = .nav
+  allowArrows
+  allowDelete
+  on: 1
+  :
+8wire code = .kbd`);
+  h.assert('accept left', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'ArrowLeft' })), 'true');
+  h.assert('get ^80', session.getWire(interp, 'code'), '10000000');
+  h.assert('accept down', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'ArrowDown' })), 'true');
+  h.assert('get ^83', session.getWire(interp, 'code'), '10000011');
+  h.assert('accept del', String(session.triggerKeyboardKey(interp, '.kbd', { key: 'Delete' })), 'true');
+  h.assert('get ^84', session.getWire(interp, 'code'), '10000100');
+});
+
+reg(1661, 'terminal', 'keyboard arrows + frontDelete mini-shell', function(h, session) {
+  const { interp } = session.run(`comp [keyboard] .kbd:
+  allowArrows
+  allowDelete
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 5
+  columns: 20
+  on: 1
+  :
+8wire code = .kbd
+1wire isDel = EQ(code, 10000100)
+1wire isL = EQ(code, 10000000)
+1wire isR = EQ(code, 10000001)
+1wire isU = EQ(code, 10000010)
+1wire isD = EQ(code, 10000011)
+.term:{
+  frontDelete = MUX(isDel, 0, \\1)
+  moveCursor = MUX(isL, MUX(isR, MUX(isU, MUX(isD, 0, \\4), \\3), \\2), \\1)
+  append = MUX(OR(isDel + isL + isR + isU + isD), .kbd, 00000000)
+  set = .kbd:valid
+}`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'B' });
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'C' });
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'ArrowLeft' });
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'ArrowLeft' });
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'Delete' });
+  h.assert('text AC', getTerminalText(_termId(interp, '.term')), 'AC');
+}, { propagation: 'wave' });
+
+reg(1662, 'gates', 'OR(isBS + isLF + isL) — concat + fold', function(h, session) {
+  const r0 = session.run(`1wire isBS = 0
+1wire isLF = 0
+1wire isL = 0
+1wire any = OR(isBS + isLF + isL)`);
+  h.assert('all 0', session.getWire(r0.interp, 'any'), '0');
+  const r1 = session.run(`1wire isBS = 0
+1wire isLF = 0
+1wire isL = 1
+1wire any = OR(isBS + isLF + isL)`);
+  h.assert('isL', session.getWire(r1.interp, 'any'), '1');
+  const r2 = session.run(`1wire isBS = 1
+1wire isLF = 1
+1wire isL = 0
+1wire any = OR(isBS + isLF + isL)`);
+  h.assert('isBS+isLF', session.getWire(r2.interp, 'any'), '1');
 });
 
 

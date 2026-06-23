@@ -3284,6 +3284,49 @@ const idx = parseInt(
         : { value: v, ref: null };
     }
 
+    const foldVectors = (values) => {
+      let acc = values[0];
+      for (let i = 1; i < values.length; i++) {
+        const a = acc;
+        const bv = values[i];
+        const len = Math.max(a.length, bv.length);
+        const ap = a.padStart(len, '0');
+        const bp = bv.padStart(len, '0');
+        const resultBits = [];
+        for (let j = 0; j < len; j++) {
+          resultBits.push(applyOp(ap[j] === '1', bp[j] === '1') ? '1' : '0');
+        }
+        acc = resultBits.join('');
+      }
+      return acc;
+    };
+
+    if (name === 'EQ' && argValues.length > 2) {
+      for (let i = 1; i < argValues.length; i++) {
+        const pair = foldVectors([argValues[0], argValues[i]]);
+        if (pair.includes('0')) {
+          const v = '0';
+          return computeRefs
+            ? { value: v, ref: `&${this.storeValue(v)}` }
+            : { value: v, ref: null };
+        }
+      }
+      const v = '1';
+      return computeRefs
+        ? { value: v, ref: `&${this.storeValue(v)}` }
+        : { value: v, ref: null };
+    }
+
+    if (argValues.length > 2) {
+      const folded = foldVectors(argValues);
+      const v = name === 'EQ'
+        ? (folded.includes('0') ? '0' : '1')
+        : folded;
+      return computeRefs
+        ? { value: v, ref: `&${this.storeValue(v)}` }
+        : { value: v, ref: null };
+    }
+
     // 2 args: bitwise operation → N bits
     const a = argValues[0];
     const bv = argValues[1];

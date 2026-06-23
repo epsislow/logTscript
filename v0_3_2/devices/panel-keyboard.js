@@ -18,6 +18,8 @@ class PanelKeyboard {
     onlyDigits = false,
     allowEnter = false,
     allowBackspace = false,
+    allowArrows = false,
+    allowDelete = false,
     showCode = 0,
     pulseColor = null,
     onKey = () => false,
@@ -30,6 +32,8 @@ class PanelKeyboard {
     this.onlyDigits = onlyDigits;
     this.allowEnter = allowEnter;
     this.allowBackspace = allowBackspace;
+    this.allowArrows = allowArrows;
+    this.allowDelete = allowDelete;
     this.showCode = showCode;
     this.pulseColor = pulseColor;
     this.onKey = onKey;
@@ -210,7 +214,21 @@ class PanelKeyboard {
     if (!this.focused) return;
     if (e.repeat) return;
     const key = e.key;
-    if (key === 'Tab' || key.startsWith('Arrow') || key === 'Escape' || key === 'Meta' || key === 'Control' || key === 'Alt') {
+    if (key === 'Tab' || key === 'Escape' || key === 'Meta' || key === 'Control' || key === 'Alt') {
+      return;
+    }
+    if (key.startsWith('Arrow')) {
+      if (!this.allowArrows) return;
+      const accepted = this.onKey(key, { force: true });
+      if (accepted) e.preventDefault();
+      this.inputEl.value = '';
+      return;
+    }
+    if (key === 'Delete') {
+      if (!this.allowDelete) return;
+      const accepted = this.onKey('Delete', { force: true });
+      if (accepted) e.preventDefault();
+      this.inputEl.value = '';
       return;
     }
     if (key === 'Enter') {
@@ -286,6 +304,8 @@ function addKeyboard({
   onlyDigits,
   allowEnter,
   allowBackspace,
+  allowArrows,
+  allowDelete,
   showCode,
   pulseColor,
   nl,
@@ -307,6 +327,8 @@ function addKeyboard({
     onlyDigits: !!onlyDigits,
     allowEnter: !!allowEnter,
     allowBackspace: !!allowBackspace,
+    allowArrows: !!allowArrows,
+    allowDelete: !!allowDelete,
     showCode: showCode || 0,
     pulseColor: pulseColor || null,
     onKey: (key) => onKey(key, { force: true }),

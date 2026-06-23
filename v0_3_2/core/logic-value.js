@@ -230,15 +230,25 @@ function evalLogicGateCall(name, argValues) {
   }
 
   if (name === 'EQ') {
-    const v = evalLogicGateVector('NXOR', argValues[0], argValues[1]);
-    return v.includes('0') ? '0' : '1';
+    if (argValues.length === 1) {
+      return foldLogicGate('NXOR', argValues[0]);
+    }
+    for (let i = 1; i < argValues.length; i++) {
+      const v = evalLogicGateVector('NXOR', argValues[0], argValues[i]);
+      if (v.includes('0')) return '0';
+    }
+    return '1';
   }
 
   if (argValues.length === 1) {
     return foldLogicGate(name, argValues[0]);
   }
 
-  return evalLogicGateVector(name, argValues[0], argValues[1]);
+  let acc = argValues[0];
+  for (let i = 1; i < argValues.length; i++) {
+    acc = evalLogicGateVector(name, acc, argValues[i]);
+  }
+  return acc;
 }
 
 function validateLogicLiteral(s, width, contextName) {

@@ -84,6 +84,8 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | `onlyDigits` | flag | (no) | Accept only `0`–`9` (still emits 8-bit ASCII); mobile `inputmode=numeric` |
 | `allowEnter` | flag | (no) | Accept Enter (LF, code 10); mobile uses `<textarea>` with return key |
 | `allowBackspace` | flag | (no) | Accept Backspace (BS, code 8) |
+| `allowArrows` | flag | (no) | Accept arrow keys (codes 128–131 on `:get`) |
+| `allowDelete` | flag | (no) | Accept forward Delete (code 132 on `:get`) |
 | `codesAccepted` | LUT ref | (no) | Whitelist of allowed keys via `comp [lut]` (`codesAccepted = .lut`) |
 | `showCode` | integer | `0` | Display last `:get` code next to label (`0` off, `1` hex, `2` decimal) |
 | `pulseColor` | color | (no) | Brief color flash on border/label after each accepted key |
@@ -91,7 +93,11 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 
 ---
 
-## Key codes (8-bit ASCII)
+## Key codes (8-bit)
+
+`:get` emits an 8-bit key code. Printable ASCII uses standard values (`A` → 65). Special keys use reserved codes below 32 or in the extended range 128–132.
+
+### Printable ASCII (excerpt)
 
 | Key | Decimal | Binary (8 bit) | Notes |
 |-----|---------|----------------|-------|
@@ -99,6 +105,20 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | `5` | 53 | `00110101` | |
 | Backspace | 8 | `00001000` | Requires `allowBackspace` (or `^08` in `codesAccepted` LUT) |
 | Enter | 10 | `00001010` | Requires `allowEnter` |
+
+### Extended keyboard codes (128–132)
+
+Non-printable navigation keys mapped from browser `e.key` names. Requires `allowArrows` or `allowDelete` (and panel forwarding). Safe to compare with `EQ(code, ^80)` — no collision with letters or digits.
+
+| Browser key | Attribute | Decimal | Hex | Binary (8 bit) |
+|-------------|-----------|---------|-----|----------------|
+| `ArrowLeft` | `allowArrows` | 128 | `^80` | `10000000` |
+| `ArrowRight` | `allowArrows` | 129 | `^81` | `10000001` |
+| `ArrowUp` | `allowArrows` | 130 | `^82` | `10000010` |
+| `ArrowDown` | `allowArrows` | 131 | `^83` | `10000011` |
+| `Delete` (forward) | `allowDelete` | 132 | `^84` | `10000100` |
+
+When `codesAccepted` is set, include `^80`–`^84` in the LUT if you want these keys whitelisted.
 
 ---
 
@@ -110,7 +130,7 @@ For the numeric value `0`–`9` in logic (queue, reg, ALU), use the low nibble:
 
 ```logts
 4wire digit = .kbd.4/4
-@ same as .kbd.4-7 or .kbd:get.4/4
+# same as .kbd.4-7 or .kbd:get.4/4
 ```
 
 For digits `0`–`9`, `.4/4` equals the decimal digit value.
@@ -125,7 +145,7 @@ Syntax (binding, like ALU `lut = .ref`):
 codesAccepted = .lutName
 ```
 
-When `codesAccepted` is set, **only the LUT** decides which keys are accepted (including Enter and Backspace). `onlyDigits`, `allowEnter`, and `allowBackspace` are ignored for filtering; `onlyDigits` still sets mobile `inputmode=numeric`. `allowEnter` / `allowBackspace` are still needed on the panel widget so the browser forwards those keys to the simulation.
+When `codesAccepted` is set, **only the LUT** decides which keys are accepted (including Enter, Backspace, arrows, and Delete). `onlyDigits`, `allowEnter`, and `allowBackspace` are ignored for filtering; `onlyDigits` still sets mobile `inputmode=numeric`. `allowEnter` / `allowBackspace` / `allowArrows` / `allowDelete` are still needed on the panel widget so the browser forwards those keys to the simulation.
 
 The referenced `comp [lut]` must have **`depth: 1`** or **`depth: 8`**; any other depth errors at elaboration:
 
