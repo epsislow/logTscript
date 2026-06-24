@@ -98,7 +98,11 @@ function networkSend({ fromInstanceId, fromDeviceId, channel, packet }) {
     const ep = _endpoints.get(epId);
     if (!ep) continue;
     if (packet.length !== ep.width) throw Error('Network send value width mismatch');
-    if (!_fifoPush(ep.rx, packet)) {
+    if (_fifoPush(ep.rx, packet)) {
+      if (typeof notifyRunContextInstanceEvent === 'function') {
+        notifyRunContextInstanceEvent(ep.instanceId, 'network-rx');
+      }
+    } else {
       ep.dropCount++;
     }
   }

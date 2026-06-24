@@ -1455,6 +1455,50 @@ class Interpreter {
     return null;
   }
 
+  _readProbeTargetValue(target) {
+    if (!target) return null;
+    let value = null;
+    if (target.kind === 'wire' && target.wireName) {
+      value = this.getWireStableValue(target.wireName);
+      const wire = this.wires.get(target.wireName);
+      if (wire) target.ref = wire.ref;
+    } else if (target.kind === 'ref' && target.ref) {
+      value = this.getValueFromRef(target.ref);
+    } else if (target.kind === 'component') {
+      const comp = this.components.get(target.compName);
+      if (comp) target.ref = comp.ref;
+      value = this._readComponentProbeValue(target);
+    } else if (target.kind === 'composite') {
+      value = this._readCompositeProbeValue(target);
+    } else if (target.kind === 'compositeInternal') {
+      this._syncInternalProbeTarget(target);
+      if (target.ref) value = this.getValueFromRef(target.ref);
+    } else if (target.kind === 'componentComputed') {
+      value = this._readComputedComponentProbeValue(target);
+      if (value != null && target.compName && typeof formatLutSymbolic === 'function') {
+        const comp = this.components.get(target.compName);
+        if (comp && comp.type === 'lut') target.lutInst = comp;
+      }
+    } else if (target.kind === 'lutLabel') {
+      value = target.constantValue;
+    }
+    return value;
+  }
+
+  refreshProbeOutputs(opts) {
+    if (!this.probeTargets || !this.probeTargets.length) return false;
+    const reason = (opts && opts.reason) || 'changed';
+    let updated = false;
+    for (const target of this.probeTargets) {
+      const value = this._readProbeTargetValue(target);
+      if (value === null || value === undefined) continue;
+      const prevLen = this.out ? this.out.length : 0;
+      this._emitProbeTarget(target, value, reason);
+      if (this.out && this.out.length > prevLen) updated = true;
+    }
+    return updated;
+  }
+
   activateProbes(exprs) {
     if (!exprs || !exprs.length) return;
     for (const expr of exprs) {
@@ -1462,31 +1506,7 @@ class Interpreter {
       if (target) this._registerProbeTarget(target);
     }
     for (const target of this.probeTargets) {
-      let value = null;
-      if (target.kind === 'wire' && target.wireName) {
-        value = this.getWireStableValue(target.wireName);
-        const wire = this.wires.get(target.wireName);
-        if (wire) target.ref = wire.ref;
-      } else if (target.kind === 'ref' && target.ref) {
-        value = this.getValueFromRef(target.ref);
-      } else if (target.kind === 'component') {
-        const comp = this.components.get(target.compName);
-        if (comp) target.ref = comp.ref;
-        value = this._readComponentProbeValue(target);
-      } else if (target.kind === 'composite') {
-        value = this._readCompositeProbeValue(target);
-      } else if (target.kind === 'compositeInternal') {
-        this._syncInternalProbeTarget(target);
-        if (target.ref) value = this.getValueFromRef(target.ref);
-      } else if (target.kind === 'componentComputed') {
-        value = this._readComputedComponentProbeValue(target);
-        if (value != null && target.compName && typeof formatLutSymbolic === 'function') {
-          const comp = this.components.get(target.compName);
-          if (comp && comp.type === 'lut') target.lutInst = comp;
-        }
-      } else if (target.kind === 'lutLabel') {
-        value = target.constantValue;
-      }
+      const value = this._readProbeTargetValue(target);
       if (value !== null && value !== undefined) {
         this._emitProbeTarget(target, value, 'initialised');
       }

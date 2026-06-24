@@ -167,6 +167,61 @@ function clearPanelDom() {
   }
 }
 
+function isRunContextPanelVisible(ctx) {
+  if (!ctx || ctx.ownerTabId == null) return false;
+  if (typeof currentTab === 'undefined') return false;
+  if (ctx.ownerTabId !== currentTab) return false;
+  return typeof isTabLiveOwner === 'function' && isTabLiveOwner(currentTab);
+}
+
+/**
+ * Copy interp.out → ctx.out; optionally refresh probes. Paints the Output panel only if
+ * this instance's owner tab is the active live tab (unless paintPanel: true).
+ */
+function syncRunContextOutputFromInterp(instanceId, opts) {
+  const ctx = getRunContext(instanceId);
+  if (!ctx || !ctx.interp) return false;
+  const o = opts || {};
+  if (o.refreshProbes && typeof ctx.interp.refreshProbeOutputs === 'function'
+      && ctx.interp.probeTargets && ctx.interp.probeTargets.length) {
+    ctx.interp.refreshProbeOutputs({ force: true, reason: o.probeReason || 'changed' });
+  }
+  captureRunContextDom(ctx);
+  const paint = o.paintPanel === true || (o.paintPanel !== false && isRunContextPanelVisible(ctx));
+  if (paint && typeof render === 'function') {
+    render(ctx.out, ctx.outBlocks, ctx);
+  }
+  return true;
+}
+
+/** Append one line to an instance output buffer (interp.out + ctx.out). */
+function appendRunContextOutputLine(instanceId, line, opts) {
+  const ctx = getRunContext(instanceId);
+  if (!ctx) return false;
+  const o = opts || {};
+  const text = line == null ? '' : String(line);
+  if (ctx.interp) {
+    if (!ctx.interp.out) ctx.interp.out = [];
+    ctx.interp.out.push(text);
+    captureRunContextDom(ctx);
+  } else {
+    if (!ctx.out) ctx.out = [];
+    ctx.out.push(text);
+  }
+  const paint = o.paintPanel === true || (o.paintPanel !== false && isRunContextPanelVisible(ctx));
+  if (paint && typeof render === 'function') {
+    render(ctx.out, ctx.outBlocks, ctx);
+  }
+  return true;
+}
+
+function notifyRunContextInstanceEvent(instanceId, kind) {
+  const id = clampInstance(instanceId);
+  if (kind === 'network-rx') {
+    syncRunContextOutputFromInterp(id, { refreshProbes: true, probeReason: 'changed' });
+  }
+}
+
 function syncActiveInstanceRuntime(ctx) {
   if (!ctx) return;
   if (typeof setDeviceOperationInstanceId === 'function') {
@@ -186,6 +241,7 @@ function activateRunContextLive(ctx, tabInfo) {
     return;
   }
   syncActiveInstanceRuntime(ctx);
+  syncRunContextOutputFromInterp(ctx.id, { refreshProbes: true, probeReason: 'changed', paintPanel: false });
   if (typeof render === 'function') {
     render(ctx.out, ctx.outBlocks, ctx);
   }
