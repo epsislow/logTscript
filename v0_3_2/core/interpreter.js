@@ -4006,6 +4006,11 @@ if (this.isBuiltinDEMUX(name)) {
     this.signalPropagationStrategy.initializeFromElaboration();
     this.startProc();
     this._probeInitialising = false;
+    this.clearNetworkSendDedup();
+  }
+
+  clearNetworkSendDedup() {
+    if (this._networkSendDedup) this._networkSendDedup.clear();
   }
   
   startProc() {

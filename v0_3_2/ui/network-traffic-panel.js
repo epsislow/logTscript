@@ -15,12 +15,47 @@ const _trafficPanelState = {
   expandedId: null,
   activeFilterCol: null,
   initialized: false,
+  live: true,
+  pendingRefresh: false,
+  lastRenderedMaxId: 0,
+  suppressNewRowFlash: true,
 };
 
-function notifyNetworkTrafficPanel() {
-  if (typeof renderNetworkTrafficPanel === 'function') {
-    renderNetworkTrafficPanel();
+function _updateLiveButton() {
+  const btn = document.getElementById('networkTrafficLiveBtn');
+  const title = document.getElementById('networkTrafficTitle');
+  if (title) {
+    title.textContent = _trafficPanelState.live ? 'Network Traffic' : 'Network Traffic (paused)';
   }
+  if (!btn) return;
+  if (_trafficPanelState.live) {
+    btn.textContent = 'Pause';
+    btn.title = 'Pause live updates';
+    btn.classList.remove('network-traffic-live-pending');
+  } else {
+    btn.textContent = 'Live';
+    btn.title = _trafficPanelState.pendingRefresh
+      ? 'Resume live updates (new packets waiting)'
+      : 'Resume live updates';
+    if (_trafficPanelState.pendingRefresh) {
+      btn.classList.add('network-traffic-live-pending');
+    } else {
+      btn.classList.remove('network-traffic-live-pending');
+    }
+  }
+}
+
+function notifyNetworkTrafficPanel() {
+  if (typeof renderNetworkTrafficPanel !== 'function') return;
+  const panel = document.getElementById('networkTrafficPanel');
+  if (!panel || panel.style.display === 'none') return;
+  if (!_trafficPanelState.live) {
+    _trafficPanelState.pendingRefresh = true;
+    _updateLiveButton();
+    return;
+  }
+  _trafficPanelState.pendingRefresh = false;
+  renderNetworkTrafficPanel();
 }
 
 function _trafficFormatValue(packetBits, size) {
@@ -148,6 +183,12 @@ function renderNetworkTrafficPanel() {
   _renderTrafficHeaders();
   _syncFilterBarControls();
 
+  const prevMaxId = _trafficPanelState.lastRenderedMaxId || 0;
+  let logMaxId = prevMaxId;
+  for (let i = 0; i < log.length; i++) {
+    if (log[i].id > logMaxId) logMaxId = log[i].id;
+  }
+
   tbody.innerHTML = '';
   if (!page.total) {
     const tr = document.createElement('tr');
@@ -157,6 +198,8 @@ function renderNetworkTrafficPanel() {
     td.textContent = log.length ? 'No matching traffic' : 'No network traffic yet';
     tr.appendChild(td);
     tbody.appendChild(tr);
+    _trafficPanelState.lastRenderedMaxId = logMaxId;
+    _trafficPanelState.suppressNewRowFlash = false;
     return;
   }
 
@@ -165,6 +208,11 @@ function renderNetworkTrafficPanel() {
     tr.className = 'network-traffic-row';
     if (_trafficPanelState.expandedId === entry.id) {
       tr.classList.add('network-traffic-row--selected');
+    }
+    if (entry.id > prevMaxId && !_trafficPanelState.suppressNewRowFlash) {
+      tr.classList.add(entry.status === 'Dropped'
+        ? 'network-traffic-row--flash-dropped'
+        : 'network-traffic-row--flash-received');
     }
     tr.dataset.trafficId = String(entry.id);
 
@@ -183,8 +231,12 @@ function renderNetworkTrafficPanel() {
       if (NETWORK_TRAFFIC_COLUMNS[i].key === 'channel') {
         td.title = String(cells[i]);
       }
-      if (entry.status === 'Dropped' && NETWORK_TRAFFIC_COLUMNS[i].key === 'status') {
-        td.classList.add('network-traffic-status-dropped');
+      if (NETWORK_TRAFFIC_COLUMNS[i].key === 'status') {
+        if (entry.status === 'Dropped') {
+          td.classList.add('network-traffic-status-dropped');
+        } else if (entry.status === 'Received') {
+          td.classList.add('network-traffic-status-received');
+        }
       }
       tr.appendChild(td);
     }
@@ -206,6 +258,9 @@ function renderNetworkTrafficPanel() {
       tbody.appendChild(expTr);
     }
   }
+
+  _trafficPanelState.lastRenderedMaxId = logMaxId;
+  _trafficPanelState.suppressNewRowFlash = false;
 }
 
 function _renderTrafficHeaders() {
@@ -235,6 +290,7 @@ function initNetworkTrafficPanel() {
   const prevBtn = document.getElementById('networkTrafficPrev');
   const nextBtn = document.getElementById('networkTrafficNext');
   const clearBtn = document.getElementById('networkTrafficClear');
+  const liveBtn = document.getElementById('networkTrafficLiveBtn');
   const filterApply = document.getElementById('networkTrafficFilterApply');
   const filterClear = document.getElementById('networkTrafficFilterClear');
   const filterInput = document.getElementById('networkTrafficFilterInput');
@@ -312,6 +368,24 @@ function initNetworkTrafficPanel() {
       }
       _trafficPanelState.pageIndex = 0;
       _trafficPanelState.expandedId = null;
+      _trafficPanelState.pendingRefresh = false;
+      _trafficPanelState.lastRenderedMaxId = 0;
+      _trafficPanelState.suppressNewRowFlash = true;
+      renderNetworkTrafficPanel();
+      _updateLiveButton();
+    });
+  }
+
+  if (liveBtn) {
+    liveBtn.addEventListener('click', () => {
+      if (_trafficPanelState.live) {
+        _trafficPanelState.live = false;
+        _updateLiveButton();
+        return;
+      }
+      _trafficPanelState.live = true;
+      _trafficPanelState.pendingRefresh = false;
+      _updateLiveButton();
       renderNetworkTrafficPanel();
     });
   }
@@ -326,6 +400,7 @@ function initNetworkTrafficPanel() {
     });
   }
 
+  _updateLiveButton();
   renderNetworkTrafficPanel();
 }
 
@@ -335,6 +410,7 @@ function toggleNetworkTraffic() {
   if (panel.style.display === 'none') {
     panel.style.display = 'block';
     initNetworkTrafficPanel();
+    _trafficPanelState.suppressNewRowFlash = true;
     renderNetworkTrafficPanel();
   } else {
     panel.style.display = 'none';

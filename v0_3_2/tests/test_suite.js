@@ -2189,6 +2189,39 @@ probe(.n:get)`;
     h.assert('size range', applyTrafficFilters(log, { size: '8 - 16' }).map((e) => e.id).join(','), '1,10,23');
   });
 
+  reg(1270, 'network-traffic', 'send — static pkg resends on set edge', function(h, session) {
+    const { interp } = session.run(`comp [network] .wifi:
+  width: 8
+  length: 16
+  channel: 'demo'
+  on: 1
+  :
+1wire sig = 0
+8wire pkg := ^41
+.wifi:{
+  send = pkg
+  set = sig
+}`);
+    clearNetworkTrafficLog();
+    session.setWire(interp, 'sig', '1');
+    session.setWire(interp, 'sig', '0');
+    session.setWire(interp, 'sig', '1');
+    const log = getNetworkTrafficLog();
+    h.assert('two sends', String(log.length), '2');
+    h.assert('packet ids', log.map((e) => String(e.packetId)).join(','), '1,2');
+  }, { propagation: 'wave' });
+
+  reg(1271, 'network', 'sendId — last packet id after send', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const { interp } = s1.run(netDef('demo'));
+    sendNet(s1, interp, '^41');
+    h.assert('sendId after first', s1.getCompProperty(interp, '.n', 'sendId'), '1');
+    h.assert('log packetId', String(getNetworkTrafficLog()[0].packetId), '1');
+    sendNet(s1, interp, '^42');
+    h.assert('sendId after second', s1.getCompProperty(interp, '.n', 'sendId'), '10');
+    h.assert('log packetId 2', String(getNetworkTrafficLog()[1].packetId), '2');
+  });
+
   reg(134, 'osc', 'Parser — comp [osc] .o1: with attributes', function(h, session) {
     const stmts = session.parse(`comp [osc] .o1:
   duration1: 2

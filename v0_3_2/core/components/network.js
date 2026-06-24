@@ -39,11 +39,11 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
   }
 
   getSupportedProperties() {
-    return ['get', 'front', 'empty', 'full', 'size', 'capacity', 'free', 'drops'];
+    return ['get', 'front', 'empty', 'full', 'size', 'capacity', 'free', 'drops', 'sendId'];
   }
 
   getRedirectProperties() {
-    return ['get', 'front', 'empty', 'full', 'size', 'capacity', 'free', 'drops'];
+    return ['get', 'front', 'empty', 'full', 'size', 'capacity', 'free', 'drops', 'sendId'];
   }
 
   getDef() {
@@ -70,9 +70,16 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
         { bits: 'X', name: 'capacity' },
         { bits: 'X', name: 'free' },
         { bits: 'X', name: 'drops' },
+        { bits: 'X', name: 'sendId' },
       ],
       returns: 'Xbit',
     };
+  }
+
+  _packetIdBitWidth(packetId) {
+    if (packetId <= 0) return 1;
+    const s = packetId.toString(2);
+    return s.length < 1 ? 1 : s.length;
   }
 
   evalGetProperty(comp, property, a, ctx) {
@@ -117,6 +124,14 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
         const n = typeof networkGetDrops === 'function' ? networkGetDrops(inst, id) : 0;
         val = n.toString(2);
         bitWidth = this._dropsBitWidth(n);
+        break;
+      }
+      case 'sendId': {
+        const n = typeof networkGetLastSendPacketId === 'function'
+          ? networkGetLastSendPacketId(inst, id)
+          : 0;
+        val = n > 0 ? n.toString(2) : '0';
+        bitWidth = this._packetIdBitWidth(n);
         break;
       }
       default:

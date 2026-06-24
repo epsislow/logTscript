@@ -107,6 +107,8 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .network-traffic-panel { flex-shrink:0; padding:8px 10px; min-width:0; max-width:100%; }
 .network-traffic-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
 .network-traffic-head h3 { margin:0; font-size:14px; }
+.network-traffic-toolbar { display:flex; align-items:center; gap:6px; }
+.network-traffic-live-pending { opacity:0.85; }
 .network-traffic-table-wrap { overflow-x:auto; overflow-y:auto; max-height:220px; }
 .network-traffic-table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:12px; }
 .network-traffic-table th,
@@ -125,6 +127,23 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .network-traffic-row { cursor:pointer; }
 .network-traffic-row:hover { background:#222; }
 .network-traffic-row--selected { background:#2a2a35; }
+.network-traffic-row--flash-received,
+.network-traffic-row--flash-dropped {
+  animation-duration: 0.5s;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+.network-traffic-row--flash-received { animation-name: network-traffic-flash-received; }
+.network-traffic-row--flash-dropped { animation-name: network-traffic-flash-dropped; }
+@keyframes network-traffic-flash-received {
+  from { background-color: #0f3050; }
+  to { background-color: #000; }
+}
+@keyframes network-traffic-flash-dropped {
+  from { background-color: #5c2418; }
+  to { background-color: #000; }
+}
+.network-traffic-status-received { color:#8cb8e0; }
 .network-traffic-status-dropped { color:#c88; }
 .network-traffic-packet { margin:4px 0; padding:6px 8px; background:#0d0d0f; border:1px solid #2d2d34; border-radius:4px; font-family:monospace; font-size:11px; white-space:pre-wrap; overflow-x:auto; }
 .network-traffic-empty { text-align:center; color:#888; font-style:italic; padding:12px !important; }
@@ -2615,8 +2634,11 @@ show(a,b,c)
     </div>
     <div class="panel network-traffic-panel" id="networkTrafficPanel" style="display:none">
       <div class="network-traffic-head">
-        <h3>Network Traffic</h3>
-        <button type="button" id="networkTrafficClear" class="btn" title="Clear log">Clear</button>
+        <h3 id="networkTrafficTitle">Network Traffic</h3>
+        <div class="network-traffic-toolbar">
+          <button type="button" id="networkTrafficLiveBtn" class="btn" title="Pause live updates">Pause</button>
+          <button type="button" id="networkTrafficClear" class="btn" title="Clear log">Clear</button>
+        </div>
       </div>
       <div class="network-traffic-table-wrap">
         <table class="network-traffic-table" id="networkTrafficTable">

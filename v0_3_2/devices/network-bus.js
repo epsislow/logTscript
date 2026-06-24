@@ -109,10 +109,21 @@ function _ensureTrafficLogCapacity() {
   }
 }
 
-function _logNetworkSendEntry({ fromInstanceId, channel, packet, targetInstanceId, deliveredCount }) {
+function _packetIdBitWidth(packetId) {
+  if (packetId <= 0) return 1;
+  const s = packetId.toString(2);
+  return s.length < 1 ? 1 : s.length;
+}
+
+function allocNetworkPacketId() {
+  return ++_trafficId;
+}
+
+function _logNetworkSendEntry({ packetId, fromInstanceId, channel, packet, targetInstanceId, deliveredCount }) {
   const status = deliveredCount > 0 ? 'Received' : 'Dropped';
   const entry = {
-    id: ++_trafficId,
+    id: packetId,
+    packetId,
     source: _clampInstance(fromInstanceId),
     target: targetInstanceId != null ? targetInstanceId : '*',
     channel: String(channel != null && channel !== '' ? channel : 'default'),
@@ -147,11 +158,15 @@ function _networkWidthMismatchError(receiverInstanceId, receiverWidth, packetBit
 }
 
 function networkSend({ fromInstanceId, fromDeviceId, channel, packet, targetInstanceId }) {
+  const packetId = allocNetworkPacketId();
   const fromEpId = networkEndpointId(fromInstanceId, fromDeviceId);
   const ch = String(channel != null && channel !== '' ? channel : 'default');
   const ids = _channelIndex.get(ch);
   const target = targetInstanceId != null ? _validateTargetInstanceId(targetInstanceId) : null;
   let deliveredCount = 0;
+
+  const fromEp = _endpoints.get(fromEpId);
+  if (fromEp) fromEp.lastSendPacketId = packetId;
 
   if (ids) {
     for (const epId of ids) {
@@ -174,12 +189,20 @@ function networkSend({ fromInstanceId, fromDeviceId, channel, packet, targetInst
   }
 
   _logNetworkSendEntry({
+    packetId,
     fromInstanceId,
     channel: ch,
     packet,
     targetInstanceId: target,
     deliveredCount,
   });
+  return { packetId, deliveredCount };
+}
+
+function networkGetLastSendPacketId(instanceId, deviceId) {
+  const epId = networkEndpointId(instanceId, deviceId);
+  const ep = _endpoints.get(epId);
+  return ep && ep.lastSendPacketId != null ? ep.lastSendPacketId : 0;
 }
 
 function networkRxPeek(instanceId, deviceId) {
@@ -235,6 +258,8 @@ if (typeof module !== 'undefined' && module.exports) {
     registerNetworkEndpoint,
     unregisterNetworkEndpoints,
     networkSend,
+    allocNetworkPacketId,
+    networkGetLastSendPacketId,
     networkRxPeek,
     networkRxPop,
     networkRxClear,

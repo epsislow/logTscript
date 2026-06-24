@@ -204,7 +204,12 @@ class SignalPropagationStrategy {
   _finishPropagate(allChanged) {
     this._syncComponentsAfterPropagate(allChanged);
     this.flushDeferredShows();
-    if (this.interp) this.interp._probeInitialising = false;
+    if (this.interp) {
+      if (typeof this.interp.clearNetworkSendDedup === 'function') {
+        this.interp.clearNetworkSendDedup();
+      }
+      this.interp._probeInitialising = false;
+    }
   }
 }
 
@@ -2178,6 +2183,9 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
 
       // Clear justExecutedBlocks synchronously so next event loop tick starts fresh
       this.justExecutedBlocks = null;
+      if (typeof this.clearNetworkSendDedup === 'function') {
+        this.clearNetworkSendDedup();
+      }
 
       if(typeof showVars === 'function') showVars();
     }
