@@ -19,7 +19,20 @@ const _trafficPanelState = {
   pendingRefresh: false,
   lastRenderedMaxId: 0,
   suppressNewRowFlash: true,
+  pausedLogSnapshot: null,
 };
+
+function _snapshotTrafficLog() {
+  const log = typeof getNetworkTrafficLog === 'function' ? getNetworkTrafficLog() : [];
+  return log.map((entry) => ({ ...entry }));
+}
+
+function _getDisplayLog() {
+  if (!_trafficPanelState.live && _trafficPanelState.pausedLogSnapshot != null) {
+    return _trafficPanelState.pausedLogSnapshot;
+  }
+  return typeof getNetworkTrafficLog === 'function' ? getNetworkTrafficLog() : [];
+}
 
 function _updateLiveButton() {
   const btn = document.getElementById('networkTrafficLiveBtn');
@@ -159,7 +172,7 @@ function renderNetworkTrafficPanel() {
   const nextBtn = document.getElementById('networkTrafficNext');
   if (!tbody || !summary) return;
 
-  const log = typeof getNetworkTrafficLog === 'function' ? getNetworkTrafficLog() : [];
+  const log = _getDisplayLog();
   const filtered = typeof getFilteredTrafficLog === 'function'
     ? getFilteredTrafficLog(log, _trafficPanelState.filters)
     : log;
@@ -371,6 +384,7 @@ function initNetworkTrafficPanel() {
       _trafficPanelState.pendingRefresh = false;
       _trafficPanelState.lastRenderedMaxId = 0;
       _trafficPanelState.suppressNewRowFlash = true;
+      _trafficPanelState.pausedLogSnapshot = [];
       renderNetworkTrafficPanel();
       _updateLiveButton();
     });
@@ -380,10 +394,13 @@ function initNetworkTrafficPanel() {
     liveBtn.addEventListener('click', () => {
       if (_trafficPanelState.live) {
         _trafficPanelState.live = false;
+        _trafficPanelState.pausedLogSnapshot = _snapshotTrafficLog();
         _updateLiveButton();
+        renderNetworkTrafficPanel();
         return;
       }
       _trafficPanelState.live = true;
+      _trafficPanelState.pausedLogSnapshot = null;
       _trafficPanelState.pendingRefresh = false;
       _updateLiveButton();
       renderNetworkTrafficPanel();
