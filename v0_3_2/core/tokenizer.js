@@ -113,6 +113,24 @@ pushSource({ src, alias }) {
     return this.token('SYM', '=');
   }
 
+  // Meta constant /name/ (wire init only at parse time)
+  if (c === '/') {
+    let j = this.i + 1;
+    if (j < this.src.length && /[a-zA-Z_]/.test(this.src[j])) {
+      let name = '';
+      while (j < this.src.length && /[a-zA-Z0-9_]/.test(this.src[j])) {
+        name += this.src[j++];
+      }
+      if (j < this.src.length && this.src[j] === '/') {
+        this.next();
+        for (let k = 0; k < name.length; k++) this.next();
+        this.next();
+        return this.token('META', name);
+      }
+    }
+    return this.token('SYM', this.next());
+  }
+
   // Logic literal prefix ?X1X (MODE ZSTATE) — before generic symbols
   if (c === '?') {
     this.next();
@@ -127,7 +145,7 @@ pushSource({ src, alias }) {
   }
 
   // Symbols (including { and } for property blocks, ! for NOT prefix, * for multiplier shortname)
-    if ('=,+():-./@[]\"\'{}>!*;'.includes(c)) return this.token('SYM', this.next());
+    if ('=,+():-.@[]\"\'{}>!*;'.includes(c)) return this.token('SYM', this.next());
 
   // Lone _ is unpack wildcard; _foo is a normal identifier
   if (c === '_') {

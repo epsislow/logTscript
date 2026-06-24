@@ -18,6 +18,45 @@ class Parser {
     this.probes = [];
     this.watches = [];
     this.componentRegistry = componentRegistry || null;
+    this.metaConstantsScope = 'top';
+  }
+
+  metaConstantScopeLabel() {
+    const s = this.metaConstantsScope;
+    if (s === 'top') return 'top-level';
+    return s;
+  }
+
+  throwMetaConstantNotAllowedInExpr(name) {
+    throw Error(
+      `Meta constant /${name}/ is only allowed in top-level wire initialization (Nwire name : /${name}/) at ${this.c.file}: ${this.c.line}:${this.c.col}`
+    );
+  }
+
+  throwMetaConstantNotAllowedInScope(name) {
+    const scope = this.metaConstantsScope;
+    const where = scope === 'chip' ? 'chip body'
+      : scope === 'pcb' ? 'pcb body'
+      : scope === 'board' ? 'board body'
+      : this.metaConstantScopeLabel();
+    throw Error(
+      `Meta constant /${name}/ is not allowed inside ${where} at ${this.c.file}: ${this.c.line}:${this.c.col}`
+    );
+  }
+
+  eatMetaConstantAtom() {
+    if (this.c.type !== 'META') {
+      throw Error(`Expected meta constant at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const name = this.c.value;
+    this.eat('META');
+    if (this.metaConstantsScope !== 'top') {
+      this.throwMetaConstantNotAllowedInScope(name);
+    }
+    if (typeof KNOWN_META_CONSTANTS !== 'undefined' && !KNOWN_META_CONSTANTS.includes(name)) {
+      throw Error(`Unknown meta constant /${name}/ at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    return { meta: name };
   }
   eat(type,val){
   //  console.log(type + ': ' + val);
@@ -275,6 +314,9 @@ parsePcbDefinition() {
   this.eat('KEYWORD', 'pcb');
   this.eat('SYM', '+');
   this.eat('SYM', '[');
+
+  const prevMetaScope = this.metaConstantsScope;
+  this.metaConstantsScope = 'pcb';
   
   const name = this.c.value;
   this.eat('ID');
@@ -406,6 +448,7 @@ parsePcbDefinition() {
     nextSection,
     returnSpec
   });
+  this.metaConstantsScope = prevMetaScope;
 }
 
 parsePcbInstance() {
@@ -473,6 +516,9 @@ parseChipDefinition() {
   this.eat('KEYWORD', 'chip');
   this.eat('SYM', '+');
   this.eat('SYM', '[');
+
+  const prevMetaScope = this.metaConstantsScope;
+  this.metaConstantsScope = 'chip';
 
   const name = this.c.value;
   this.eat('ID');
@@ -602,6 +648,7 @@ parseChipDefinition() {
     body,
     returnSpec
   });
+  this.metaConstantsScope = prevMetaScope;
 }
 
 parseChipInstance() {
@@ -630,6 +677,9 @@ parseBoardDefinition() {
   this.eat('KEYWORD', 'board');
   this.eat('SYM', '+');
   this.eat('SYM', '[');
+
+  const prevMetaScope = this.metaConstantsScope;
+  this.metaConstantsScope = 'board';
 
   const name = this.c.value;
   this.eat('ID');
@@ -763,6 +813,7 @@ parseBoardDefinition() {
     body,
     returnSpec
   });
+  this.metaConstantsScope = prevMetaScope;
 }
 
 parseBoardInstance() {
@@ -1230,8 +1281,10 @@ assignment() {
     } else if(this.c.type === 'DEC'){
       atom = {dec: this.c.value};
       this.eat('DEC');
+    } else if (this.c.type === 'META') {
+      atom = this.eatMetaConstantAtom();
     } else {
-      throw Error(`Expected a literal value (binary, hex ^, or decimal \\) after : at ${this.c.line}:${this.c.col}`);
+      throw Error(`Expected a literal value (binary, hex ^, decimal \\, or meta constant /name/) after : at ${this.c.line}:${this.c.col}`);
     }
     if(notPrefix) atom.not = true;
     return atom;
@@ -2427,6 +2480,10 @@ assignment() {
       }
       return result;
     };
+
+    if (this.c.type === 'META') {
+      this.throwMetaConstantNotAllowedInExpr(this.c.value);
+    }
 
     if (this.c.type === 'SYM' && this.c.value === '(') {
       this.eat('SYM', '(');

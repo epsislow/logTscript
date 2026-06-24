@@ -1,7 +1,7 @@
 /**
  * Documentation bundle from doc/*.md (auto-generated).
  * Regenerate: node _gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, decimal-conversion.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, decimal-conversion.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
  */
 (function () {
   'use strict';
@@ -11299,6 +11299,82 @@ With an interactive panel: \`comp [key]\` on the instance \`.cpu\` \`set\` pin (
 - [mini-cpu-v2.md](mini-cpu-v2.md) — v2 demo (ASM, BEQ, LUT, terminal)
 - Automated tests: \`test_suite_ported.js\` (859–866)
 - Test constants: \`CHIP_ALU4\`, \`BOARD_CPU4\`
+`,
+    'meta-constants.md': `# Meta constants
+
+Meta constants are **run-time literals** resolved when you press **Run**. They are not wires and not expression operands like \`~\`, \`%\`, or \`$\`.
+
+Syntax: \`/name/\` (slashes required).
+
+See also: [assignment operators — \`:\` init](assignment-operators.md#-initial-assignment), [editor UI — instances](editorUI.md).
+
+---
+
+## Summary
+
+| | Special vars (\`~\` \`%\` \`$\`) | Meta constants (\`/instance/\`) |
+|--|--|--|
+| Where | expressions, \`show\`, \`probe\` | **only** \`Nwire name : /name/\` at **top level** |
+| When value is fixed | changes during run (\`%\`, \`$\`) | fixed for the whole run |
+| Scope | general | top-level script only (not chip/pcb/board) |
+
+---
+
+## \`/instance/\`
+
+Returns the **editor run instance** (1–5) as a **4-bit binary** value:
+
+| Instance | Value |
+|----------|-------|
+| 1 | \`0001\` |
+| 2 | \`0010\` |
+| 3 | \`0011\` |
+| 4 | \`0100\` |
+| 5 | \`0101\` |
+
+The instance number comes from the toolbar **Inst** selector on the tab that runs the script (see [editorUI.md](editorUI.md)).
+
+### Syntax
+
+\`\`\`logts
+4wire instance : /instance/
+\`\`\`
+
+After init, \`instance\` is a normal wire — use \`show(instance)\`, \`probe(instance)\`, etc.
+
+### Width rules
+
+The canonical value is **4 bits**. Wire width uses the same pad/truncate rules as other \`:\` literals:
+
+- **shorter wire** → left-pad with \`0\` (e.g. \`8wire\` on inst 1 → \`00000001\`)
+- **longer value than wire** → keep the **least significant** bits (e.g. \`3wire\` on inst 1 → \`001\`)
+
+### Multi-tab example
+
+Same script on two tabs, different instances:
+
+\`\`\`logts
+4wire inst : /instance/
+show(inst)
+\`\`\`
+
+- Tab A, **Run** on instance **1** → \`inst = 0001\`
+- Tab B, **Run** on instance **2** → \`inst = 0010\`
+
+### Not allowed
+
+| Construct | Result |
+|-----------|--------|
+| \`4wire x = /instance/\` | parse error |
+| \`show(/instance/)\` | parse error |
+| \`probe(/instance/)\` | parse error |
+| inside \`chip\` / \`pcb\` / \`board\` body | parse error |
+
+---
+
+## Future
+
+\`/signalStrategy/\` (planned): \`legacy\` → \`0001\`, \`wave\` → \`0010\` from the tab propagation mode.
 `,
     'modes.md': `# Script modes (\`MODE\`)
 

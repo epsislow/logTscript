@@ -6,8 +6,10 @@
 
   function createSession(options = {}) {
     const propagation = options.propagation || 'legacy';
+    const instanceId = options.instanceId != null ? options.instanceId : 1;
     const session = {
       propagation,
+      instanceId,
       registry: null,
       signalPropagationStrategy: null,
       interp: null,
@@ -55,6 +57,7 @@
         const stmts = p.parse();
         this.out = [];
         this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry, signalPropagationStrategy, p.chips, p.boards);
+        this.interp._instanceId = instanceId;
         this.interp.pendingProbeExprs = p.probes || [];
         this.interp.pendingWatchExprs = p.watches || [];
         this.interp.aliases = p.aliases;

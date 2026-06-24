@@ -1678,6 +1678,81 @@
     h.assert('nq initExpr.bin = 0', stmts[3].initExpr.bin, '0');
   });
 
+  reg(1230, 'meta-constants', 'Parser — 4wire x : /instance/ produces initExpr {meta:instance}', function(h, session) {
+    const stmts = session.parse('4wire x : /instance/');
+    const s = stmts[0];
+    h.assert('initExpr.meta is instance', s.initExpr.meta, 'instance');
+    h.assert('expr is null', String(s.expr), 'null');
+  });
+
+  reg(1231, 'meta-constants', 'Run — instance 1 → 0001 on 4wire', function(h, session) {
+    session.run('4wire inst : /instance/');
+    h.assert('wire value', session.getWire(null, 'inst'), '0001');
+  });
+
+  reg(1232, 'meta-constants', 'Run — instance 2 → 0010 on 4wire', function(h) {
+    const s = createSession({ instanceId: 2 });
+    s.run('4wire inst : /instance/');
+    h.assert('wire value', s.getWire(null, 'inst'), '0010');
+  });
+
+  reg(1233, 'meta-constants', 'Run — instance 1 pads to 8wire', function(h, session) {
+    session.run('8wire inst : /instance/');
+    h.assert('padded value', session.getWire(null, 'inst'), '00000001');
+  });
+
+  reg(1234, 'meta-constants', 'Run — instance 1 truncates to 3wire', function(h, session) {
+    session.run('3wire inst : /instance/');
+    h.assert('truncated value', session.getWire(null, 'inst'), '001');
+  });
+
+  reg(1235, 'meta-constants', 'Parser — chip body rejects /instance/', function(h, session) {
+    h.assertThrows(
+      'chip body meta constant',
+      () => session.parse(`chip +[t] t:
+4pin a
+4pout b
+  4wire x : /instance/
+  b = a
+:`),
+      'not allowed inside chip body'
+    );
+  });
+
+  reg(1236, 'meta-constants', 'Parser — pcb body rejects /instance/', function(h, session) {
+    h.assertThrows(
+      'pcb body meta constant',
+      () => session.parse(`pcb +[p] p:
+4pin a
+4pout b
+  4wire x : /instance/
+  b = a
+:`),
+      'not allowed inside pcb body'
+    );
+  });
+
+  reg(1237, 'meta-constants', 'Parser — show(/instance/) rejected', function(h, session) {
+    h.assertThrows(
+      'show meta constant',
+      () => session.parse('show(/instance/)'),
+      'only allowed in top-level wire initialization'
+    );
+  });
+
+  reg(1238, 'meta-constants', 'Parser — 4wire x = /instance/ rejected', function(h, session) {
+    h.assertThrows(
+      'assign meta constant',
+      () => session.parse('4wire x = /instance/'),
+      'only allowed in top-level wire initialization'
+    );
+  });
+
+  reg(1239, 'meta-constants', 'Run — show(wire) after init works', function(h, session) {
+    const out = session.runDoc('4wire inst : /instance/\nshow(inst)');
+    h.assert('show output', String(out.some(l => l.includes('inst = 0001'))), 'true');
+  });
+
   reg(134, 'osc', 'Parser — comp [osc] .o1: with attributes', function(h, session) {
     const stmts = session.parse(`comp [osc] .o1:
   duration1: 2

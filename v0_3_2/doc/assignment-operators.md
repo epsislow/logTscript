@@ -183,7 +183,9 @@ Result: `1100`
 
 ## `:` — Initial assignment
 
-Assigns the initial value of a wire at declaration. **Literal only** (binary, hex `^`, decimal `\`, `!`).
+Assigns the initial value of a wire at declaration. **Literal only** (binary, hex `^`, decimal `\`, `!`, or meta constant `/name/`).
+
+Meta constants such as `/instance/` are documented in **[meta-constants.md](meta-constants.md)** (top-level `:` init only).
 
 ### Syntax
 

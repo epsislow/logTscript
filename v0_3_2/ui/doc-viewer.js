@@ -16,6 +16,7 @@ const DOC_SECTIONS = [
       { file: 'components.md', label: 'Component catalog' },
       { file: 'short-notation.md', label: 'Short notation' },
       { file: 'assignment-operators.md', label: 'Assignment operators (=, =:, :=)', searchExtra: 'right pad left pad wire assignment initial' },
+      { file: 'meta-constants.md', label: 'Meta constants (/instance/)', searchExtra: 'meta constant instance run instance top level wire init' },
       { file: 'modes.md', label: 'Script modes (MODE)', searchExtra: 'MODE STRICT WIREWRITE ZSTATE default wirewrite tristate' },
       { file: 'arithmetic.md', label: 'Arithmetic (built-in)' },
       { file: 'decimal-conversion.md', label: 'Decimal conversion (CNTN10S, N2N10S, N10S2N)', searchExtra: 'decimal BCD digits packed N2N10S N10S2N CNTN10S' },

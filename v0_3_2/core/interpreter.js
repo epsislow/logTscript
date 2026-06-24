@@ -2829,6 +2829,20 @@ class Interpreter {
       return this.evalAsmProgramAtom(a.asmProgram, computeRefs);
     }
 
+    if (a.meta) {
+      const value = typeof resolveMetaConstant === 'function'
+        ? resolveMetaConstant(a.meta, this, null)
+        : null;
+      if (value == null) {
+        throw Error(`Unknown meta constant /${a.meta}/`);
+      }
+      if (computeRefs) {
+        const idx = this.storeValue(value);
+        return { value, ref: `&${idx}`, varName: null };
+      }
+      return { value, ref: null, varName: null };
+    }
+
     if (a.protocolInvoke) {
       return this.evalProtocolInvokeAtom(a.protocolInvoke, computeRefs);
     }
