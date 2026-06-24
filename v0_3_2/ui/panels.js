@@ -1,15 +1,5 @@
 /* ================= PANEL TOGGLES ================= */
 
-function toggleCmd(){
-  const panel = document.getElementById('cmdPanel');
-  if(panel.style.display === 'none'){
-    panel.style.display = 'block';
-    document.getElementById('cmdInput').focus();
-  } else {
-    panel.style.display = 'none';
-  }
-}
-
 function toggleTabs() {
   const panel = document.getElementById('tabsPanel');
   if (panel.style.display === 'none') {

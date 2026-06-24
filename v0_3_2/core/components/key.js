@@ -1,8 +1,12 @@
 var BuiltinComponent = (typeof require !== 'undefined') ? require('./builtin-component') : BuiltinComponent;
 
-function syncKeyPanel(keyId, on) {
-  if (typeof window === 'undefined' || !window.panelKeys) return;
-  const pk = window.panelKeys.get(keyId);
+function syncKeyPanel(keyId, on, interpCtx) {
+  const maps = typeof getDeviceMapsForInterp === 'function'
+    ? getDeviceMapsForInterp(interpCtx)
+    : null;
+  const panelKeys = maps ? maps.panelKeys : (typeof window !== 'undefined' ? window.panelKeys : null);
+  if (!panelKeys) return;
+  const pk = panelKeys.get(keyId);
   if (pk && typeof pk.setOutputOn === 'function') {
     pk.setOutputOn(on);
   }
@@ -66,7 +70,7 @@ var KeyComponent = class KeyComponent extends BuiltinComponent {
         const cur = readKeyOutput(ctx, name, keyRef);
         const next = cur ? '0' : '1';
         ctx.scheduleComponentOutputChange(name, next);
-        syncKeyPanel(keyId, next === '1');
+        syncKeyPanel(keyId, next === '1', ctx);
         ctx.showlog(1);
       };
       const onRelease = () => {};

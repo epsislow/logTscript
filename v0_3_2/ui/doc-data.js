@@ -6153,9 +6153,15 @@ The auto-step buttons (\`S\` / interval) call the same **Next** logic on a timer
 
 ---
 
+## Toolbar layout
+
+Left to right: **Run** and **wave / legacy** (run configuration), then **Next**, **S**, and interval **1** (step controls). A visual separator divides the two groups.
+
+---
+
 ## Propagation toggle (Wave / Legacy)
 
-**Control:** pill button between **Next** and **S** — label shows the active mode.
+**Control:** pill button next to **Run** — label shows the active mode.
 
 | Mode | Colour | Meaning (short) |
 |------|--------|-----------------|
@@ -6171,10 +6177,6 @@ The auto-step buttons (\`S\` / interval) call the same **Next** logic on a timer
 - **Next** always uses whatever mode was active at the last **Run**.
 
 Your choice is saved in browser storage (\`prog/propagation\`) and restored when you reopen the editor.
-
-### Command line
-
-If you run a command from the Command panel before any **Run**, the lazy-started interpreter also uses the current toggle setting.
 
 ---
 

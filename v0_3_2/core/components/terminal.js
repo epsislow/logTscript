@@ -112,9 +112,13 @@ var TerminalComponent = class TerminalComponent extends BuiltinComponent {
     return value === '1' || (value && value.length > 0 && value[value.length - 1] === '1');
   }
 
-  _termAndBuffer(comp) {
+  _termAndBuffer(comp, interpCtx) {
     const termId = comp.deviceIds[0];
-    const term = typeof terminalDisplays !== 'undefined' ? terminalDisplays.get(termId) : null;
+    const maps = typeof getDeviceMapsForInterp === 'function'
+      ? getDeviceMapsForInterp(interpCtx)
+      : null;
+    const termDisplays = maps ? maps.terminalDisplays : (typeof terminalDisplays !== 'undefined' ? terminalDisplays : null);
+    const term = termDisplays ? termDisplays.get(termId) : null;
     const buffer = term ? term.buffer : (typeof getTerminalBuffer === 'function' ? getTerminalBuffer(termId) : null);
     return { term, buffer };
   }
@@ -128,7 +132,7 @@ var TerminalComponent = class TerminalComponent extends BuiltinComponent {
 
     this._validatePending(pending);
 
-    const { term, buffer } = this._termAndBuffer(comp);
+    const { term, buffer } = this._termAndBuffer(comp, ctx);
 
     if (pending.clear !== undefined) {
       const clearValue = this.reEvalPendingValue(pending, 'clear', reEvaluate, ctx);

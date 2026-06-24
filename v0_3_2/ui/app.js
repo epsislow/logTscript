@@ -321,6 +321,7 @@ function updatePropagationToggleUI() {
 function bindInterpErrorHandler(interp) {
   if (!interp) return;
   interp.onRuntimeError = function() {
+    globalInterp = interp;
     if (typeof showVars === 'function') showVars();
   };
 }
@@ -331,6 +332,23 @@ function createInterpreter(funcs, pcbs, registry, chips, boards, probes, watches
   interp.pendingWatchExprs = watches || [];
   bindInterpErrorHandler(interp);
   return interp;
+}
+
+function getActiveInterp() {
+  const ctx = typeof getActiveRunContext === 'function' ? getActiveRunContext() : null;
+  if (ctx && ctx.interp) return ctx.interp;
+  return globalInterp;
+}
+
+function updateStepControlsUI() {
+  const interp = typeof getActiveRunContext === 'function' ? getActiveRunContext() : null;
+  const enabled = !!(interp && interp.interp);
+  ['nextBtn', 'sec', 'secint'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.disabled = !enabled;
+    el.classList.toggle('btn--disabled', !enabled);
+  });
 }
 
 async function init() {
@@ -391,174 +409,113 @@ async function init() {
   }
 
   initTimelineAnalyzer();
+  updateInstSelectorUI();
+  updateStepControlsUI();
 }
 
 function run(){
   let processedCode = '';
   let runInterpAssigned = false;
+  const tabInfo = typeof tabs !== 'undefined' ? tabs.get(currentTab) : null;
+  const instanceId = tabInfo ? clampInstance(tabInfo.instance) : 1;
+  const ctx = getOrCreateRunContext(instanceId);
+  setDeviceOperationInstanceId(instanceId);
+
   try{
   clearOutput();
   clearErrorMarkers();
   editorErrorDismissed = false;
-  
-  const devicesContainer = document.getElementById('devices');
-  if(devicesContainer){
-    devicesContainer.innerHTML = '';
-  }
-  
-  if(typeof leds !== 'undefined' && leds instanceof Map){
-    leds.clear();
-  }
-  
-  if(globalInterp && globalInterp.oscTimers){
-    for(const tid of globalInterp.oscTimers){
-      clearTimeout(tid);
-    }
-    globalInterp.oscTimers = [];
-  }
 
-  if (typeof clearTabHasRun === 'function') {
-    clearTabHasRun();
+  preemptInstanceForRun(instanceId, currentTab);
+  if (typeof mountDevicesPanelForContext === 'function') {
+    mountDevicesPanelForContext(ctx);
   }
 
   tabSave();
   syncLegacyLastKeys();
   persistTabs();
   processedCode = preprocessRepeat(code.value);
+  ctx.lastProcessedSource = processedCode;
   lastProcessedSource = processedCode;
   const _registry = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
   const p = new Parser(new Tokenizer(processedCode), _registry);
   const stmts = p.parse();
-  document.getElementById('ast').textContent=JSON.stringify(stmts,null,2);
+  const astText = JSON.stringify(stmts, null, 2);
+  document.getElementById('ast').textContent = astText;
+  if (tabInfo) {
+    tabInfo.astText = astText;
+    tabInfo.panelSnapshot = null;
+  }
 
   prepareTimelineForRun(p.watches, stmts, _registry);
 
-  globalInterp = createInterpreter(p.funcs, p.pcbs, _registry, p.chips, p.boards, p.probes, p.watches);
-  globalInterp.aliases = p.aliases;
+  const interp = createInterpreter(p.funcs, p.pcbs, _registry, p.chips, p.boards, p.probes, p.watches);
+  interp.aliases = p.aliases;
+  bindInterpToRunContext(interp, ctx);
   runInterpAssigned = true;
-  bindWatchRecorder(globalInterp);
+  globalInterp = interp;
+  bindWatchRecorder(interp);
 
   for (const s of stmts) {
       const isShow = s.show !== undefined;
-    globalInterp.exec(s, !isShow);
+    interp.exec(s, !isShow);
   }
   
-  if(globalInterp.firstRun){
-    globalInterp.firstRun = false;
-    globalInterp.vars.set('%', {type: '1bit', value: '0', ref: null});
+  if(interp.firstRun){
+    interp.firstRun = false;
+    interp.vars.set('%', {type: '1bit', value: '0', ref: null});
   }
-  globalInterp.postExecSrc();
+  interp.postExecSrc();
 
-  if (timelineAnalyzer && globalInterp.watchTargets && globalInterp.watchTargets.length) {
-    timelineAnalyzer.reset(globalInterp.watchTargets.map((t) => t.label));
-    globalInterp.seedWatchTimeline();
+  if (timelineAnalyzer && interp.watchTargets && interp.watchTargets.length) {
+    const labels = interp.watchTargets.map((t) => t.label);
+    ctx.timelineLabels = labels.slice();
+    timelineAnalyzer.reset(labels);
+    interp.seedWatchTimeline();
   }
 
-  render(globalInterp.out, globalInterp.outBlocks);
-  showVars();
+  captureRunContextDom(ctx);
+  render(ctx.out, ctx.outBlocks, ctx);
+  buildVarsSnapshot(interp, ctx);
+  showVarsDomFromContext(ctx);
+  if (typeof publishWindowDeviceAliases === 'function' && ctx.deviceMaps) {
+    publishWindowDeviceAliases(ctx.deviceMaps);
+  }
   if (typeof markTabHasRun === 'function') {
     markTabHasRun();
   }
+  updateStepControlsUI();
   }catch(e){
     if (!lastProcessedSource) {
       try { lastProcessedSource = preprocessRepeat(code.value); } catch (_) { /* keep */ }
     }
     const src = processedCode || lastProcessedSource;
-    if (runInterpAssigned && globalInterp && typeof globalInterp.reportRuntimeError === 'function') {
-      globalInterp.reportRuntimeError(e);
+    const activeInterp = ctx.interp || globalInterp;
+    if (runInterpAssigned && activeInterp && typeof activeInterp.reportRuntimeError === 'function') {
+      activeInterp.reportRuntimeError(e);
     } else {
       appendErrorOutput(e, src);
-      if (globalInterp) {
-        globalInterp.out = [];
+      if (activeInterp) {
+        activeInterp.out = [];
       }
     }
-    if(globalInterp) showVars();
-    if (typeof clearTabHasRun === 'function') {
-      clearTabHasRun();
-    }
+    if (activeInterp) showVars(activeInterp);
+    if (tabInfo) tabInfo.hasRun = false;
+    syncHasRunFromOwners();
+    updateRunButtonUI();
+    fShowTabs();
   }
 }
 
-function sendCmd(){
-  const cmdInput = document.getElementById('cmdInput');
-  const cmdText = cmdInput.value.trim();
-  
-  if(!cmdText) return;
-  
-  let cmdProcessed = '';
-  try{
-    if(!globalInterp){
-      const srcProcessed = preprocessRepeat(code.value);
-      lastProcessedSource = srcProcessed;
-      const _reg = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
-      const p = new Parser(new Tokenizer(srcProcessed), _reg);
-      const stmts = p.parse();
-      globalInterp = createInterpreter(p.funcs, p.pcbs, _reg, p.chips, p.boards, p.probes, p.watches);
-      bindWatchRecorder(globalInterp);
-      
-      for(const s of stmts){
-        globalInterp.exec(s, true);
-      }
-      
-      if(globalInterp.firstRun){
-        globalInterp.firstRun = false;
-        globalInterp.vars.set('%', {type: '1bit', value: '0', ref: null});
-      }
-      //postExec must be called after interpretting both the code and the cmd
-      
-    }
-    
-    const _cmdReg = globalInterp.componentRegistry;
-    cmdProcessed = preprocessRepeat(cmdText);
-    lastProcessedSource = cmdProcessed;
-    const p = new Parser(new Tokenizer(cmdProcessed), _cmdReg);
-  const stmts = p.parse();
-
-    for(const [name, fn] of p.funcs.entries()){
-    globalInterp.funcs.set(name, fn);
-  }
-
-    for(const s of stmts){
-      globalInterp.exec(s, true);
-    }
-    globalInterp.postExecSrc();
-    
-  render(globalInterp.out, globalInterp.outBlocks);
-  showVars();
-    
-    cmdInput.value = '';
-  } catch(e){
-    if (!lastProcessedSource) {
-      try { lastProcessedSource = preprocessRepeat(cmdText); } catch (_) { /* keep */ }
-    }
-    if (globalInterp && typeof globalInterp.reportRuntimeError === 'function') {
-      globalInterp.reportRuntimeError(e);
-    } else {
-      clearOutput();
-      appendErrorOutput(e, cmdProcessed || lastProcessedSource);
-    }
-    if(globalInterp) showVars();
-  }
-}
-
-(function(){
-  const cmdInput = document.getElementById('cmdInput');
-  if(cmdInput){
-    cmdInput.addEventListener('keydown', function(e){
-      if(e.key === 'Enter' && (e.ctrlKey || e.shiftKey)){
-        e.preventDefault();
-        sendCmd();
-      }
-    });
-  }
-})();
-
-function render(lines, blocks) {
+function render(lines, blocks, ctxOptional) {
   const preservePage = { x: window.scrollX || 0, y: window.scrollY || 0 };
   clearOutput();
   if (!lines || !lines.length) return;
-  if (blocks == null && globalInterp) blocks = globalInterp.outBlocks || [];
+  const ctx = ctxOptional || null;
+  const interp = ctx && ctx.interp ? ctx.interp : globalInterp;
+  if (blocks == null && interp) blocks = interp.outBlocks || [];
   blocks = blocks || [];
+  const src = (ctx && ctx.lastProcessedSource) ? ctx.lastProcessedSource : lastProcessedSource;
 
   let i = 0;
   while (i < lines.length) {
@@ -581,12 +538,12 @@ function render(lines, blocks) {
     if (line.startsWith('Error:')) {
       const msg = line.slice(6).trimStart();
       let err = { message: msg };
-      if (globalInterp && globalInterp.lastReportedError) {
-        const re = globalInterp.lastReportedError;
+      if (interp && interp.lastReportedError) {
+        const re = interp.lastReportedError;
         const reMsg = (re && re.message) ? re.message : String(re);
         if (reMsg === msg) err = re;
       }
-      appendErrorOutput(err, lastProcessedSource);
+      appendErrorOutput(err, src);
     } else {
       appendOutputLine(line);
     }
@@ -610,63 +567,103 @@ function unserializeMap(str) {
 }
 
 function importVars(datas) {
-  if(!globalInterp) {
+  const interp = getActiveInterp();
+  if(!interp) {
     return 0;
   }
   const data = JSON.parse(datas);
-  globalInterp.vars = unserializeMap(data.vars);
-  globalInterp.storage = unserializeArray(data.storage);
-  globalInterp.cycle = data.cycle;
+  interp.vars = unserializeMap(data.vars);
+  interp.storage = unserializeArray(data.storage);
+  interp.cycle = data.cycle;
 }
 
 function exportVars() {
-  if(!globalInterp) {
+  const interp = getActiveInterp();
+  if(!interp) {
     return null;
   }
-  let data = {vars: [], storage: [], cycle: globalInterp.cycle};
-  data.vars = serializeMap(globalInterp.vars);
-  data.storage = serializeArray(globalInterp.storage);
+  let data = {vars: [], storage: [], cycle: interp.cycle};
+  data.vars = serializeMap(interp.vars);
+  data.storage = serializeArray(interp.storage);
   return JSON.stringify(data);
 }
 
-function showVars(){
-  let t='';
-  if(globalInterp){
-    globalInterp.vars.forEach((v,k)=>{
-      if(k === '~'){
-        t += `~ = 1\n`;
-      } else {
-        const typeStr = v.type ? ` (${v.type})` : '';
-        let valueStr = v.value;
-        if(v.type && valueStr && valueStr !== '-'){
-          const bitWidth = globalInterp.getBitWidth(v.type);
-          if(bitWidth){
-            valueStr = globalInterp.formatValue(valueStr, bitWidth, true);
-          }
-        }
-        t += `${k}${typeStr} = ${valueStr} (ref: ${v.ref || 'null'})\n`;
-      }
-    });
-    globalInterp.wires.forEach((w,k)=>{
-      let wireValue = globalInterp.zstate && typeof globalInterp.getWireEffectiveValue === 'function'
-        ? globalInterp.getWireEffectiveValue(k)
-        : globalInterp.getValueFromRef(w.ref);
-      if (wireValue == null) wireValue = globalInterp.getValueFromRef(w.ref);
-      let valueStr = wireValue !== null ? wireValue : '-';
-      if(w.type && valueStr && valueStr !== '-'){
-        const bitWidth = globalInterp.getBitWidth(w.type);
-        if(bitWidth){
-          valueStr = globalInterp.formatValue(valueStr, bitWidth, true);
+function buildVarsSnapshot(interp, ctx) {
+  if (!interp) return '';
+  let t = '';
+  interp.vars.forEach((v, k) => {
+    if (k === '~') {
+      t += '~ = 1\n';
+    } else {
+      const typeStr = v.type ? ` (${v.type})` : '';
+      let valueStr = v.value;
+      if (v.type && valueStr && valueStr !== '-') {
+        const bitWidth = interp.getBitWidth(v.type);
+        if (bitWidth) {
+          valueStr = interp.formatValue(valueStr, bitWidth, true);
         }
       }
-      t += `${k} (${w.type}) = ${valueStr} (ref: ${w.ref || 'null'})\n`;
-    });
-    t += `\nCycle: ${globalInterp.cycle}\n`;
-    t += `Storage: ${globalInterp.storage.length} entries\n`;
+      t += `${k}${typeStr} = ${valueStr} (ref: ${v.ref || 'null'})\n`;
+    }
+  });
+  interp.wires.forEach((w, k) => {
+    let wireValue = interp.zstate && typeof interp.getWireEffectiveValue === 'function'
+      ? interp.getWireEffectiveValue(k)
+      : interp.getValueFromRef(w.ref);
+    if (wireValue == null) wireValue = interp.getValueFromRef(w.ref);
+    let valueStr = wireValue !== null ? wireValue : '-';
+    if (w.type && valueStr && valueStr !== '-') {
+      const bitWidth = interp.getBitWidth(w.type);
+      if (bitWidth) {
+        valueStr = interp.formatValue(valueStr, bitWidth, true);
+      }
+    }
+    t += `${k} (${w.type}) = ${valueStr} (ref: ${w.ref || 'null'})\n`;
+  });
+  t += `\nCycle: ${interp.cycle}\n`;
+  t += `Storage: ${interp.storage.length} entries\n`;
+  if (ctx) {
+    ctx.varsSnapshot = t;
+    if (interp.out) {
+      ctx.out = interp.out.slice();
+      ctx.outBlocks = interp.outBlocks ? interp.outBlocks.slice() : [];
+    }
+    captureRunContextDom(ctx);
   }
-  document.getElementById('vars').textContent=t;
-  if (globalInterp && globalInterp.out && globalInterp.out.length) {
-    render(globalInterp.out, globalInterp.outBlocks);
+  return t;
+}
+
+function showVarsDomFromContext(ctx) {
+  if (!ctx) return;
+  const varsEl = document.getElementById('vars');
+  if (varsEl) varsEl.textContent = ctx.varsSnapshot || '';
+  if (ctx.out && ctx.out.length) {
+    render(ctx.out, ctx.outBlocks, ctx);
+  }
+}
+
+function showVars(interpOptional){
+  const interp = interpOptional
+    || (typeof getExecInterp === 'function' ? getExecInterp() : null)
+    || globalInterp;
+  if (!interp) return;
+  const ctx = interp._instanceId != null ? getRunContext(interp._instanceId) : null;
+  buildVarsSnapshot(interp, ctx);
+  if (ctx && interp.out) {
+    ctx.out = interp.out.slice();
+    ctx.outBlocks = interp.outBlocks ? interp.outBlocks.slice() : [];
+  }
+  if (typeof shouldRefreshRunDom === 'function' && !shouldRefreshRunDom(interp)) {
+    return;
+  }
+  if (ctx) {
+    showVarsDomFromContext(ctx);
+  } else {
+    const varsEl = document.getElementById('vars');
+    if (varsEl) varsEl.textContent = buildVarsSnapshot(interp, null);
+    if (interp.out && interp.out.length) {
+      render(interp.out, interp.outBlocks);
+    }
   }
 }
 
@@ -689,54 +686,62 @@ function btnClr()  {
   updateFileNameDisplay('new');
 }
 
-let timerId = null;
-let currentInterval = 1000;
-let currentIdx = 0;
+
 const secInterval = [1000, 500, 200, 100, 50, 25];
 
+function getSecContext() {
+  return typeof getActiveRunContext === 'function' ? getActiveRunContext() : null;
+}
+
 function toggleSEC() {
+  const ctx = getSecContext();
+  if (!ctx || !ctx.interp) return;
   const sec = document.getElementById('sec');
-    if (timerId === null) {
-        timerId = setInterval(doNext, currentInterval);
-        sec.classList.toggle('btn--primary');
-        console.log("Started at " + currentInterval + "ms");
-    } else {
-        clearInterval(timerId);
-        timerId = null;
-        sec.classList.remove('btn--primary');
-        console.log("Stopped");
-    }
+  if (ctx.secTimerId === null) {
+    ctx.secTimerId = setInterval(function () { doNext(1); }, ctx.currentInterval);
+    if (sec) sec.classList.add('btn--primary');
+  } else {
+    clearInterval(ctx.secTimerId);
+    ctx.secTimerId = null;
+    if (sec) sec.classList.remove('btn--primary');
+  }
+  if (typeof fShowTabs === 'function') fShowTabs();
 }
 
 function changeSECINT() {
-    currentIdx++;
-    currentIdx = (currentIdx in secInterval) ? currentIdx :0;
-    currentInterval = secInterval[currentIdx];
-    const el = document.getElementById('secint');
-    el.innerHTML = 1000 / currentInterval;
-    console.log("Interval changed to: " + currentInterval + "ms");
+  const ctx = getSecContext();
+  if (!ctx || !ctx.interp) return;
+  ctx.currentIdx++;
+  ctx.currentIdx = (ctx.currentIdx in secInterval) ? ctx.currentIdx : 0;
+  ctx.currentInterval = secInterval[ctx.currentIdx];
+  const el = document.getElementById('secint');
+  if (el) el.textContent = String(1000 / ctx.currentInterval);
 
-    if (timerId !== null) {
-        clearInterval(timerId);
-        timerId = setInterval(doNext, currentInterval);
-    }
+  if (ctx.secTimerId !== null) {
+    clearInterval(ctx.secTimerId);
+    ctx.secTimerId = setInterval(function () { doNext(1); }, ctx.currentInterval);
+  }
+  if (typeof fShowTabs === 'function') fShowTabs();
 }
 
 function doNext(count = 1) {
-  if (!globalInterp) {
-    throw Error("Program not running");
+  const interp = getActiveInterp();
+  if (!interp) {
+    return;
   }
+  const ctx = interp._instanceId != null ? getRunContext(interp._instanceId) : null;
   try {
-    globalInterp.exec({ next: count }, false);
-    globalInterp.postExecNext();
+    interp.exec({ next: count }, false);
+    interp.postExecNext();
   } catch(e) {
-    if (globalInterp && typeof globalInterp.reportRuntimeError === 'function') {
-      globalInterp.reportRuntimeError(e);
+    if (typeof interp.reportRuntimeError === 'function') {
+      interp.reportRuntimeError(e);
     } else {
       clearOutput();
-      appendErrorOutput(e, lastProcessedSource);
+      appendErrorOutput(e, ctx ? ctx.lastProcessedSource : lastProcessedSource);
     }
   }
+  globalInterp = interp;
   showVars();
 }
 
@@ -789,8 +794,6 @@ items.forEach(item => {
         toggleTabs();
     } else if (panelName === 'devices') {
         toggleDevices();
-    } else if (panelName === 'command') {
-        toggleCmd();
     } else if (panelName === 'ast') {
         toggleAST();
     }

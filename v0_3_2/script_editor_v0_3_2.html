@@ -174,6 +174,54 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   color: #fff;
 }
 
+.btn[disabled],
+.btn.btn--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.inst-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.inst-dropdown .inst-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  min-width: 120px;
+  margin-top: 4px;
+}
+
+.inst-dropdown.open .inst-menu {
+  display: block;
+}
+
+.inst-btn {
+  gap: 6px;
+}
+
+.inst-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.inst-swatch-1 { background: #3daf5c; }
+.inst-swatch-2 { background: #2f80ff; }
+.inst-swatch-3 { background: #e67e22; }
+.inst-swatch-4 { background: #5b6ee8; }
+.inst-swatch-5 { background: #17a2b8; }
+
+.inst-menu .dropdown-item.active {
+  font-weight: 600;
+}
+
 .btn[disabled="1"] {
   color: #333;
 }
@@ -222,6 +270,30 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   border-color: #fa0;
 }
 
+#editorToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 0;
+}
+
+.toolbar-run-group,
+.toolbar-step-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.toolbar-sep {
+  display: inline-block;
+  width: 1px;
+  height: 22px;
+  margin: 6px 10px;
+  background: #3a3a3a;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
 #tabsActive .tab {
   display: inline-flex;
   align-items: center;
@@ -255,6 +327,50 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   background: linear-gradient(180deg, #2f80ff, #1f66e0);
   border-color: #2f80ff;
   color: #fff;
+}
+
+#runBtn.btn-run-active.btn-run-inst-1,
+#tabsActive .tab-run-inst-1.tab-run-current {
+  background: linear-gradient(180deg, #3daf5c, #2d9448) !important;
+  border-color: #5fdc8c !important;
+  color: #fff !important;
+}
+#runBtn.btn-run-active.btn-run-inst-2,
+#tabsActive .tab-run-inst-2.tab-run-current {
+  background: linear-gradient(180deg, #2f80ff, #1f66e0) !important;
+  border-color: #5a9fff !important;
+  color: #fff !important;
+}
+#runBtn.btn-run-active.btn-run-inst-3,
+#tabsActive .tab-run-inst-3.tab-run-current {
+  background: linear-gradient(180deg, #e67e22, #d35400) !important;
+  border-color: #f0a050 !important;
+  color: #fff !important;
+}
+#runBtn.btn-run-active.btn-run-inst-4,
+#tabsActive .tab-run-inst-4.tab-run-current {
+  background: linear-gradient(180deg, #5b6ee8, #434fad) !important;
+  border-color: #8898f0 !important;
+  color: #fff !important;
+}
+#runBtn.btn-run-active.btn-run-inst-5,
+#tabsActive .tab-run-inst-5.tab-run-current {
+  background: linear-gradient(180deg, #17a2b8, #128a9e) !important;
+  border-color: #4cc4d8 !important;
+  color: #fff !important;
+}
+
+#tabsActive .tab-run-inst-1.tab-run-other { background: #1a3324; border-color: #2a6b3a; color: #9fdf9f; }
+#tabsActive .tab-run-inst-2.tab-run-other { background: #1a2840; border-color: #2a4a7a; color: #9fc0ff; }
+#tabsActive .tab-run-inst-3.tab-run-other { background: #3a2a18; border-color: #6b4a20; color: #f0c090; }
+#tabsActive .tab-run-inst-4.tab-run-other { background: #282a45; border-color: #454a7a; color: #b0b8f0; }
+#tabsActive .tab-run-inst-5.tab-run-other { background: #1a3035; border-color: #2a5a65; color: #90d8e8; }
+
+#tabsActive .tab.tab-sec-active::after {
+  content: '▸';
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.85;
 }
 
 #tabsActive .tab-run-other {
@@ -2364,13 +2480,31 @@ NEXT(~)
 show(a,b,c)
 </textarea>
 <div id="fName">Filename:<span id="fileName"></span></div>
-<div>
-  <button onclick="run()" id="runBtn" class="btn">Run</button>
-  <button onclick="doNext(1)" class="btn">Next</button>
-  <button type="button" id="propMode" class="btn prop-toggle prop-toggle--wave" onclick="togglePropagationMode()" title="Signal propagation: wave (applies on next Run)">wave</button>
-  <button onclick="toggleSEC()" id="sec" class="btn">S</button>
-  <button onclick="changeSECINT()" id="secint" class="btn">1</button>
-  
+<div id="editorToolbar">
+  <div class="toolbar-run-group">
+    <button onclick="run()" id="runBtn" class="btn">Run</button>
+    <div class="inst-dropdown" id="inst-dropdown">
+      <button type="button" id="instBtn" class="btn inst-btn" onclick="toggleInstMenu()" aria-expanded="false" aria-haspopup="true">
+        <span class="inst-swatch inst-swatch-1" id="instSwatch" aria-hidden="true"></span>
+        <span id="instLabel">Inst: 1</span>
+      </button>
+      <div id="instMenu" class="inst-menu dropdown-menu" role="menu">
+        <button type="button" class="dropdown-item" data-inst="1" onclick="selectInstance(1)" role="menuitem"><span class="inst-swatch inst-swatch-1"></span> Inst: 1</button>
+        <button type="button" class="dropdown-item" data-inst="2" onclick="selectInstance(2)" role="menuitem"><span class="inst-swatch inst-swatch-2"></span> Inst: 2</button>
+        <button type="button" class="dropdown-item" data-inst="3" onclick="selectInstance(3)" role="menuitem"><span class="inst-swatch inst-swatch-3"></span> Inst: 3</button>
+        <button type="button" class="dropdown-item" data-inst="4" onclick="selectInstance(4)" role="menuitem"><span class="inst-swatch inst-swatch-4"></span> Inst: 4</button>
+        <button type="button" class="dropdown-item" data-inst="5" onclick="selectInstance(5)" role="menuitem"><span class="inst-swatch inst-swatch-5"></span> Inst: 5</button>
+      </div>
+    </div>
+    <button type="button" id="propMode" class="btn prop-toggle prop-toggle--wave" onclick="togglePropagationMode()" title="Signal propagation: wave (applies on next Run)">wave</button>
+  </div>
+  <span class="toolbar-sep" aria-hidden="true"></span>
+  <div class="toolbar-step-group">
+    <button onclick="doNext(1)" id="nextBtn" class="btn btn--disabled" disabled>Next</button>
+    <button onclick="toggleSEC()" id="sec" class="btn btn--disabled" disabled>S</button>
+    <button onclick="changeSECINT()" id="secint" class="btn btn--disabled" disabled>1</button>
+  </div>
+  <span class="toolbar-sep" aria-hidden="true"></span>
     <div class="panel-dropdown" id="panel-dropdown">
       <button class="btn dropdown-trigger" aria-expanded="false">
         Win ▾
@@ -2384,7 +2518,6 @@ show(a,b,c)
         <button class="dropdown-item" data-panel="files">Files</button>
         <button class="dropdown-item" data-panel="devices">Devices</button>
         <button class="dropdown-item" data-panel="ast">AST</button>
-        <button class="dropdown-item" data-panel="command">Command</button>
       </div>
     </div>  
   
@@ -2434,13 +2567,6 @@ show(a,b,c)
   <button class="btn" onclick="closeTab()">-close</button>
   
   <div id="tabsActive"></div>
-</div>
-
-<div id="cmdPanel" style="display:none; margin:10px 0;">
-  <div style="display:flex; align-items:center; gap:10px;">
-    <textarea id="cmdInput" style="flex:1; min-height:60px; font-family:monospace; background:#222; color:#eee; border:1px solid #444; padding:8px;" placeholder="Enter commands here..."></textarea>
-    <button onclick="sendCmd()" style="padding:8px 16px;">Send</button>
-  </div>
 </div>
 
 <div class="flex">
@@ -2563,6 +2689,8 @@ show(a,b,c)
 <script src="files/fs.js"></script>
 
 <!-- UI: panel toggles (defines showDevices, needed by devices) -->
+<script src="ui/run-context.js"></script>
+<script src="devices/device-maps.js"></script>
 <script src="ui/panels.js"></script>
 
 <!-- Devices: hardware component renderers -->

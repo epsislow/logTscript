@@ -1,6 +1,5 @@
 /* ================= TEXT TERMINAL ================= */
 
-const terminalDisplays = new Map();
 const TERMINAL_BLOCK_CURSOR = '\u2588';
 
 class TerminalBuffer {
@@ -496,36 +495,36 @@ function addTerminal(options) {
   opts.color = normalizeTerminalColor(opts.color);
   const term = new TextTerminal(opts);
   if (typeof document !== 'undefined') {
-    const container = document.getElementById('devices');
+    const container = getDevicesContainer();
     if (container) {
       if (typeof showDevices === 'function') showDevices();
       term.mount(container);
     }
   }
-  terminalDisplays.set(options.id, term);
+  dm().terminalDisplays.set(options.id, term);
   return term;
 }
 
 function getTerminalText(id) {
-  const term = terminalDisplays.get(id);
+  const term = dm().terminalDisplays.get(id);
   if (!term) return '';
   return term.buffer.getText();
 }
 
 function getTerminalVisibleLines(id) {
-  const term = terminalDisplays.get(id);
+  const term = dm().terminalDisplays.get(id);
   if (!term) return [];
   return term.buffer.getVisibleLines();
 }
 
 function getTerminalRenderedLines(id) {
-  const term = terminalDisplays.get(id);
+  const term = dm().terminalDisplays.get(id);
   if (!term) return [];
   return term.getRenderedLines();
 }
 
 function getTerminalBuffer(id) {
-  const term = terminalDisplays.get(id);
+  const term = dm().terminalDisplays.get(id);
   if (!term) return null;
   return term.buffer;
 }
@@ -537,5 +536,5 @@ function getTerminalCursor(id) {
 }
 
 function getTerminalDevice(id) {
-  return terminalDisplays.get(id) || null;
+  return dm().terminalDisplays.get(id) || null;
 }

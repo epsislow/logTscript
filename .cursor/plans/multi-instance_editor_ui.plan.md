@@ -1,30 +1,36 @@
 ---
 name: multi-instance editor UI
-overview: Instanțe paralele 1–5 în script editor (selector Inst: N), panouri per instanță, culori pe tab/Run, NEXT/SEC/timeline/AST per context, toolbar reordonat; eliminare panou Command.
+overview: "Execuție per instanță (1–5), UI panouri per tab: Run verde doar pe tab-ul owner; switch pe alt tab = panouri goale sau snapshot înghețat; Run pe același nr. de instanță = preempție."
 todos:
+  - id: toolbar-phase0
+    content: "Faza 0: ștergere Command + reordonare toolbar (Run/Inst/wave|Next/S/1) + separator CSS"
+    status: completed
   - id: remove-command
     content: "Ștergere panou Command: HTML, sendCmd, toggleCmd, dropdown Win"
-    status: pending
+    status: completed
   - id: run-context-module
-    content: Creare ui/run-context.js — RunContext registry, activate, snapshot output/vars/devices/timeline
-    status: pending
+    content: RunContext per instanță + instanceOwnerTabId + interp._instanceId
+    status: completed
+  - id: tab-panel-snapshots
+    content: tab.panelSnapshot la preempție; mountTabPanels (live / snapshot / gol)
+    status: completed
   - id: tab-instance-ui
-    content: "Selector Inst: N (1–5) + culori instanță pe tab Run și buton Run"
-    status: pending
-  - id: instance-colors-css
-    content: "CSS 5 palete instanță (verde/albastru/portocaliu/indigo/cyan) — tab + Run"
-    status: pending
-  - id: refactor-run
-    content: Refactor run()/showVars()/render()/doNext/SEC să folosească RunContext activ
-    status: pending
+    content: "Selector Inst: N (1–5), swatch, instanță subtilă în titlu tab"
+    status: completed
   - id: devices-per-instance
-    content: "Device maps + #devices subtree per instanță; patch devices/*.js"
-    status: pending
+    content: Device maps per instanță via getDeviceMaps(); patch devices/*.js
+    status: completed
+  - id: instance-colors-css
+    content: "CSS 5 palete; Run/tab verde doar când tab.isLiveOwner"
+    status: completed
   - id: tab-switch-mount
-    content: tabShowCurrent → activateRunContext + AST per tab + SEC UI restore
-    status: pending
+    content: tabShowCurrent → mountTabPanels + SEC UI + indicator SEC pe tab owner
+    status: completed
+  - id: tab-close-release
+    content: Închidere tab owner sau ultim tab pe instanță → oprește + eliberează
+    status: completed
   - id: manual-qa
-    content: Testare manuală scenarii paralel / shared instance / tab switch
+    content: Testare switch gol / preempție / snapshot / paralel inst 1+2
     status: pending
 isProject: true
 ---
@@ -33,202 +39,190 @@ isProject: true
 
 ## Obiectiv
 
-Permite rularea a 2+ scripturi **în paralel** în aceeași pagină, fiecare pe o **instanță** numerică (default **1**). Fiecare **tab** editor are propriul număr de instanță; tab-uri cu același număr **împart** același runtime (comportament ca azi). La schimbarea tab-ului, UI-ul afișează starea instanței legate de acel tab.
+Două straturi distincte:
+
+| Strat | Rol |
+|-------|-----|
+| **Instanță (1–5)** | Slot de **execuție** — un singur `RunContext` live per număr; poate rula în background când tab-ul owner nu e vizibil |
+| **Tab** | **Afișare UI** — panouri (Output, Variables, Devices, Timeline, AST) și Run verde legate de tab, nu de instanță la switch |
+
+Tab-urile aleg **pe ce instanță** rulează (`Inst: N`), dar **nu** împart panourile live la switch. Comportament azi păstrat: Run verde = **acest tab** rulează acum.
 
 ```mermaid
 flowchart TB
-  subgraph tabs [Tab editor]
-    TabA["Tab A — instance 1"]
-    TabB["Tab B — instance 2"]
-    TabC["Tab C — instance 1"]
+  subgraph exec [Execuție per instanță]
+    I1["RunContext inst 1"]
+    I2["RunContext inst 2"]
   end
-  subgraph ctx [RunContext registry]
-    I1["Instance 1: interp + devices + output"]
-    I2["Instance 2: interp + devices + output"]
+  subgraph tabs [UI per tab]
+    TabA["Tab A owner inst1"]
+    TabB["Tab B inst1 fără run"]
+    TabC["Tab C owner inst2"]
   end
-  TabA --> I1
-  TabC --> I1
-  TabB --> I2
-  ActiveTab["Tab activ"] -->|mount UI| I1
+  TabA -->|live| I1
+  TabB -.->|panouri goale| TabB
+  TabC -->|live| I2
+  TabB -->|Run preemptează| I1
 ```
+
+## Model mental (confirmat)
+
+1. **Tab A** Run pe inst 1 → Run **verde** pe A, panouri live, A = **owner** inst 1.
+2. **Switch Tab B** (inst 1, fără Run) → panouri **goale**, Run **nu** e verde; inst 1 poate continua în **background** (owner rămâne A).
+3. **Revenire Tab A** (încă owner, B n-a făcut Run) → panouri **live** (starea a evoluat în background).
+4. **Run Tab B** pe inst 1 → **preempție**: oprește context inst 1, salvează **snapshot înghețat** pe A, A pierde verde (și pe tab strip), B devine owner, panouri live pe B.
+5. **Revenire Tab A** după preempție → panouri = **snapshot înghețat** de la ultimul Run al lui A (nu live).
+
+**Instanțe diferite** (A inst 1, C inst 2): execuție paralelă; fiecare tab owner pe instanța lui.
+
+## Ordine implementare
+
+**Faza 0** — Command + toolbar + separator (fără RunContext)
+
+**Faza 1** — `run-context.js`, owner registry, `hasRun`/`isLiveOwner`, selector Inst
+
+**Faza 2** — `tab.panelSnapshot`, `mountTabPanels`, device maps, preempție la Run
+
+**Faza 3** — culori, swatch, Next/S disabled, SEC indicator, titlu tab
 
 ## Model de date
 
 ### Per tab ([`ui/editor.js`](v0_3_2/ui/editor.js))
 
-Extindere obiect tab (persistat în `localStorage` `prog/tabs`, `version: 2`):
+Persistat `prog/tabs` `version: 2`:
 
-- `instance: number` — default `1`, range **1–5** (maxim 5 instanțe paralele)
-- `astText: string | null` — ultimul AST de la Run pe acest tab (sau parse la cerere)
-- (existent) `propagation`, `hasRun`, `code`, etc.
+- `instance: number` — default `1`, range **1–5**
+- `astText: string | null` — AST la ultimul Run **pe acest tab**
+- `panelSnapshot: null | { out, outBlocks, varsSnapshot, timelineSamples, devicesHtml?, astText }` — stare **înghețată** (la preempție)
+- (existent) `propagation`, `code`, …
 
-**Selector instanță** în toolbar (lângă Run): dropdown cu opțiuni 1–5; butonul/triggerul afișează **`Inst: N`** (ex. `Inst: 1`). La schimbare → salvează `tab.instance`; la `tabShowCurrent()` restaurează textul și selecția.
+**Nu** persistăm snapshot în localStorage v1 (prea mare) — doar în sesiune; la refresh snapshot dispare.
 
-### Per instanță — `RunContext` nou în [`ui/app.js`](v0_3_2/ui/app.js)
+**Propagation per tab** — la Run se folosește modul tab-ului care preemptează.
+
+**`isLiveOwner(tab)`** = `instanceOwners.get(tab.instance) === tab.id`
+
+**`hasRun` / Run verde / culoare tab** = `isLiveOwner` (comportament ca azi: verde doar pe tab-ul care **rulează acum** pe instanța lui).
+
+### Registry instanță ([`ui/run-context.js`](v0_3_2/ui/run-context.js))
 
 ```javascript
+// Care tab deține execuția live pe instanța N
+const instanceOwners = new Map(); // instanceId → tabId
+
 {
   id: 1,
+  ownerTabId: number | null,
   interp: Interpreter | null,
-  out: string[],
-  outBlocks: [],
-  varsSnapshot: string,      // text pentru #vars
-  devicesRoot: HTMLElement,  // subarbore DOM dedicat
-  timelineSamples: [...],    // date pentru TimelineAnalyzer
-  timelinePaused: boolean,
-  lastProcessedSource: string,
-  // SEC / NEXT (per instanță — auto-next poate rula în paralel)
-  secTimerId: null,
-  currentInterval: 1000,
-  currentIdx: 0,
+  out, outBlocks, varsSnapshot,
+  devicesRoot, deviceMaps,
+  timelineSamples, timelinePaused,
+  lastProcessedSource,
+  secTimerId, currentInterval, currentIdx,
 }
 ```
 
-Registry: `Map<number, RunContext>`, `activeContext` pointer pentru tab-ul curent.
+La `createInterpreter`: `interp._instanceId = ctx.id`.
 
-`globalInterp` devine proxy sau înlocuit cu `getActiveInterp()` → `activeContext.interp` (păstrăm alias temporar pentru compatibilitate minimă în core).
+### showVars / render (background)
+
+- Actualizează mereu `RunContext` al `interp._instanceId`.
+- Refresh DOM **doar** dacă tab-ul activ este `instanceOwners.get(id)` (owner vizibil).
+- Altfel execuția avansează în background fără a umple panourile tab-ului curent.
 
 ## Comportament la acțiuni
 
 | Acțiune | Comportament |
 |---------|----------------|
-| **Run** | Rulează pe `tab.instance`; creează/reînlocuiește `RunContext` pentru acea instanță; **nu** oprește alte instanțe |
-| **Tab switch** | Salvează snapshot UI curent → încarcă `RunContext` al `tab.instance` în `#out`, `#vars`, `#devices`, timeline, AST, butoane S/1 |
-| **NEXT** | `doNext()` pe interp-ul instanței tab-ului activ |
-| **S / 1** (`toggleSEC`, `changeSECINT`) | Timer auto-`doNext` **per instanță**; la switch tab, butonul S reflectă starea instanței vizate |
-| **Aceeași instanță, 2 tab-uri** | Același interp, devices, output; AST **per tab** (cod diferit) |
-| **Instanțe diferite** | Rulare paralelă; oscilatoare/timere independente |
+| **Run** | Pe `tab.instance`; dacă alt tab era owner pe aceeași instanță → **preempție** (stop SEC/osc, snapshot pe vechiul owner, `hasRun=false` acolo) |
+| **Run** | Creează/reînlocuiește `RunContext`; tab curent devine owner; `hasRun=true` doar pe el |
+| **Run** | **Nu** oprește instanțe cu alt număr |
+| **Tab switch** | `mountTabPanels(tab)`: owner → live ctx; snapshot → înghețat; altfel → **gol** |
+| **NEXT / S / 1** | Doar dacă tab activ `isLiveOwner` și `ctx.interp`; altfel **disabled+gri** |
+| **SEC în background** | Pe instanța owner absent din vedere — timer rulează; indicator discret pe tab owner în strip |
+| **Închidere tab** | Dacă era owner → oprește instanța; dacă ultimul tab cu `instance===N` → `registry.delete(N)` |
 
-## Panouri legate de context
+### Preempție (detaliu)
 
-La `activateRunContext(ctx)`:
+La Run pe tab B, instanța `N` deținută de tab A:
 
-1. **Output** — `render(ctx.out, ctx.outBlocks)` în `#out` (sau swap innerHTML salvat)
-2. **Variables** — `#vars.textContent = ctx.varsSnapshot`
-3. **Devices** — montează `ctx.devicesRoot` în `#devices` (subarbore per instanță, nu un singur `innerHTML = ''` global la Run)
-4. **Timeline** — `timelineAnalyzer.reset(ctx.timelineSamples)` + stare pause ([`ui/timeline-analyzer.js`](v0_3_2/ui/timeline-analyzer.js))
-5. **AST** — `#ast` din `tab.astText` (salvat la Run); parse live doar dacă există acțiune explicită
-6. **Run button** — `hasRun` per tab; culoare după **instanța tab-ului** (vezi mai jos)
+1. `freezePanelSnapshot(A)` din `RunContext` curent
+2. Oprește `secTimerId`, oscilatoare, curăță `RunContext` N
+3. `A.hasRun = false` (via clear owner), `fShowTabs()`
+4. Rulează programul lui B pe inst N; B devine owner
+
+### mountTabPanels(tab)
+
+```
+if isLiveOwner(tab)     → activateRunContext live + astText tab
+else if tab.panelSnapshot → render snapshot (read-only vizual)
+else                     → clearOutput, clear vars/devices/timeline/ast
+```
+
+## Panouri — per tab (nu per instanță la switch)
+
+| Vizualizare tab | Output / Vars / Devices / Timeline | AST |
+|-----------------|-----------------------------------|-----|
+| Owner live | `RunContext` live | `tab.astText` |
+| După preempție | `tab.panelSnapshot` înghețat | din snapshot sau `tab.astText` |
+| Niciodată rulat / alt tab activ | **Gol** (ca „nu rulează”) | gol sau `astText` dacă a rulat în trecut în sesiune |
 
 ## Culori per instanță (UI)
 
-Înlocuim verdele unic de azi (`btn-run-active`, `tab-run-current`) cu **5 palete** legate de numărul instanței. Verde rămâne instanța **1** — compatibil cu comportamentul actual.
+| Inst | Culoare |
+|------|---------|
+| 1 | Verde `#3daf5c` / `#2d9448` |
+| 2 | Albastru `#2f80ff` / `#1f66e0` |
+| 3 | Portocaliu `#e67e22` / `#d35400` |
+| 4 | Indigo `#5b6ee8` / `#434fad` |
+| 5 | Cyan `#17a2b8` / `#128a9e` |
 
-| Instanță | Rol vizual | Culoare (orientativ) |
-|----------|------------|----------------------|
-| **1** | Verde (existent) | gradient `#3daf5c` / `#2d9448`, border `#5fdc8c` |
-| **2** | Albastru | gradient albastru (ex. `#2f80ff` / `#1f66e0`) |
-| **3** | Portocaliu | gradient portocaliu (ex. `#e67e22` / `#d35400`) |
-| **4** | Indigo | gradient indigo (ex. `#5b6ee8` / `#434fad`) |
-| **5** | Cyan | gradient cyan (ex. `#17a2b8` / `#128a9e`) |
+- Run verde + `btn-run-inst-N` **doar** când `isLiveOwner`
+- Tab strip colorat **doar** pe tab-uri `isLiveOwner` (nu pe tab-uri cu doar snapshot)
+- Swatch pe selector `Inst: N`; contrast inst 4/5
+- SEC: indicator pe tab owner când `secTimerId` activ
 
-**Buton Run** ([`script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html) + [`ui/editor.js`](v0_3_2/ui/editor.js)):
+## Refactor device-uri
 
-- Fără Run pe tab: stil normal (`.btn`)
-- După Run reușit (`hasRun`): clasă `btn-run-active btn-run-inst-N` → **background = culoarea instanței** `tab.instance` (nu mereu verde)
-- La schimbare instanță pe tab (înainte/după Run): `updateRunButtonUI()` aplică paleta corectă
+`getDeviceMaps()` / `getDevicesContainer()` din contextul instanței **owner** la Run și la refresh DOM live.
 
-**Tab-uri** (`fShowTabs()` în [`ui/editor.js`](v0_3_2/ui/editor.js)):
+Snapshot devices: serializare HTML subarbore sau re-render static la mount snapshot (preferat: clone `devicesRoot` la freeze).
 
-- Tab cu `hasRun` pe **alt** tab: `tab-run tab-run-other tab-run-inst-N` — variantă **muted** a culorii instanței N a acelui tab
-- Tab activ cu `hasRun`: `tab-run tab-run-current tab-run-inst-N` — variantă **saturată** (gradient) a instanței N
-- Tab fără Run: stil neutru (ca azi, fără `tab-run`)
+## UI HTML — toolbar
 
-CSS nou în HTML: `.btn-run-inst-1` … `.btn-run-inst-5`, `.tab-run-inst-1` … `.tab-run-inst-5` (+ variante `-current` / `-other` sau modificatori pe același prefix). Constantă partajată în `ui/run-context.js` sau `ui/instance-colors.js`: `INSTANCE_COLORS = { 1: {...}, ... }`.
-
-**Selector `Inst: N`**: la schimbarea instanței, actualizăm și preview-ul culorii pe Run dacă tab-ul are deja `hasRun` (instant feedback).
-
-## Refactor device-uri (punct critic)
-
-Azi toate widget-urile folosesc Map-uri globale + `document.getElementById('devices')` ([`devices/renderers.js`](v0_3_2/devices/renderers.js), `terminal.js`, `panel-keyboard.js`, `alu-devices.js`, etc.).
-
-**Abordare:** introducem [`ui/run-context.js`](v0_3_2/ui/run-context.js) (nou):
-
-- `getActiveRunContext()` / `setActiveRunContext(id)`
-- `createDeviceMaps()` → `{ leds, terminalDisplays, panelKeyboards, panelKeys, clcdDisplays, alus, ... }` per instanță
-- Wrapper-e sau patch la funcțiile `addLed`, `addTerminal`, `setLed`, `showDevices` să citească maps din contextul activ
-
-La Run pe instanță: curățăm doar contextul acelei instanțe (nu `leds.clear()` global).
-
-`showVars()` / `render()` din [`ui/app.js`](v0_3_2/ui/app.js) folosesc interp + output din contextul activ.
-
-Core (`interpreter.js`, `signal-propagation.js`, `keyboard.js`) apelează `showVars()` global — rămâne OK dacă `showVars` scrie în contextul activ și doar când instanța respectivă e activă **sau** actualizează snapshot-ul instanței chiar dacă tab-ul e în background (preferat: **actualizează snapshot**, refresh DOM doar dacă e instanța activă).
-
-## UI HTML — toolbar (ordine butoane)
-
-În [`script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html), bara de control (stânga → dreapta):
-
-1. **Run**
-2. **Inst: N** (selector instanță 1–5)
-3. **wave / legacy** (`#propMode`, `togglePropagationMode`)
-4. **Next** (`doNext(1)`) — **mutat imediat în dreapta** toggle-ului propagation (azi e înainte de el)
-5. **S** / **1** (auto-next SEC)
-6. Win ▾, Comp ▾, …
-
-```html
-<button onclick="run()" id="runBtn" class="btn">Run</button>
-<!-- inst dropdown Inst: N -->
-<button type="button" id="propMode" class="btn prop-toggle …" onclick="togglePropagationMode()">wave</button>
-<button onclick="doNext(1)" class="btn">Next</button>
-<button onclick="toggleSEC()" id="sec" class="btn">S</button>
-<button onclick="changeSECINT()" id="secint" class="btn">1</button>
+```
+[ Run ] [ Inst: N ] [ wave ]  |  [ Next ] [ S ] [ 1 ]  |  Win ▾ …
 ```
 
-Selector instanță (după Run):
-
-```html
-<div class="inst-dropdown">
-  <button type="button" id="instBtn" class="btn" onclick="toggleInstMenu()">Inst: 1</button>
-  <div id="instMenu" class="inst-menu">
-    <button type="button" data-inst="1">Inst: 1</button>
-    … <!-- până la 5 -->
-  </div>
-</div>
-```
-
-Alternativ: `<select id="runInstance">` stilizat, dar labelul vizibil trebuie să fie mereu **`Inst: N`**. `onInstanceChange()` → `tab.instance = N`, `instBtn.textContent = 'Inst: ' + N`, `updateRunButtonUI()`, `fShowTabs()`.
+`updateStepControlsUI()`: enabled doar când `isLiveOwner(currentTab)`.
 
 ## Eliminare panou Command
 
-Scoatem complet:
+Ca în plan anterior — HTML, `app.js`, `panels.js`, doc.
 
-| Fișier | Ce se șterge |
-|--------|----------------|
-| [`script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html) | `#cmdPanel`, `#cmdInput`, buton Send, item Win ▾ → Command |
-| [`ui/app.js`](v0_3_2/ui/app.js) | `sendCmd()`, listener `cmdInput`, ramura `panelName === 'command'` |
-| [`ui/panels.js`](v0_3_2/ui/panels.js) | `toggleCmd()` |
-| Doc (dacă există referințe) | mențiune Command panel în [`doc/`](v0_3_2/doc/) — actualizare minimă |
+## Fișiere principale
 
-Nu mai planificăm migrare `sendCmd` la instanțe — panoul dispare.
-
-## Fișiere principale de modificat
-
-1. [`ui/run-context.js`](v0_3_2/ui/run-context.js) — **nou**: registry, activate, snapshot, device maps
-2. [`ui/app.js`](v0_3_2/ui/app.js) — `run()`, `doNext`, SEC, `showVars`, `render`, `getActiveInterp`
-3. [`ui/editor.js`](v0_3_2/ui/editor.js) — `instance` pe tab, persist v2, `tabShowCurrent` → `activateRunContext`
-4. [`script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html) — selector `Inst: N` (1–5), CSS culori instanță, toolbar reordonat, ștergere Command
-5. [`devices/*.js`](v0_3_2/devices/) — routing prin context activ (batch update fișiere cu `getElementById('devices')`)
-6. [`ui/timeline-analyzer.js`](v0_3_2/ui/timeline-analyzer.js) — export/import samples pentru swap instanță (dacă lipsește API)
-
-## Migrare localStorage
-
-- `prog/tabs` `version: 1` → `version: 2`: la restore, `instance: 1` pentru tab-uri vechi
-- Opțional: cheie `prog/instances` pentru rehidratare interp (out of scope v1 — instanțele mor la refresh pagină, ca azi)
+1. [`ui/run-context.js`](v0_3_2/ui/run-context.js) — nou
+2. [`ui/app.js`](v0_3_2/ui/app.js) — run, preempție, mountTabPanels
+3. [`ui/editor.js`](v0_3_2/ui/editor.js) — instance, owner, snapshots, tab close
+4. [`script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html)
+5. [`devices/*.js`](v0_3_2/devices/)
+6. [`ui/timeline-analyzer.js`](v0_3_2/ui/timeline-analyzer.js)
 
 ## Testare manuală
 
-1. Tab A inst 1: Run LED; Tab B inst 2: Run terminal — ambele vizibile după switch
-2. Tab C inst 1: același LED state ca Tab A
-3. Auto-next (S) pe inst 2 în background; switch la inst 2 — timeline/vars actualizate
-4. AST diferit per tab după Run
-5. Command panel absent; Win ▾ fără intrare Command
-6. Refresh pagină — tab-uri + instance number persistate; runtime gol până la Run
-7. Tab inst 2 Run → tab albastru; Run albastru; tab inst 1 rămâne verde
-8. Două tab-uri aceeași instanță → aceeași culoare pe ambele (dacă hasRun)
-9. Toolbar: ordinea Run → Inst → wave → Next → S → 1
+1. A inst1 Run → verde; switch B inst1 fără run → panouri goale, Run normal
+2. Revenire A (B n-a rulat) → live, verde, state actualizat în background
+3. B Run inst1 → A fără verde; A la revenire → snapshot înghețat
+4. C inst2 paralel cu B inst1 — ambele owner, switch corect
+5. Next/S disabled pe B înainte de Run; enabled pe B după Run owner
+6. Preempție oprește SEC pe vechiul owner
+7. Închidere tab owner → instanță eliberată
+8. Faza 0 toolbar + fără Command
 
-## Ce NU facem în această fază
+## Ce NU facem
 
-- Persistență interp între refresh-uri browser
-- Instanțe > 5 sau UI dinamic add/remove
-- Modificări la `run_tests.html` / `test_session.js` (rămân izolate fără DOM)
+- Persistență runtime/snapshot la refresh
+- Instanțe > 5
+- `run_tests.html` / `test_session.js`
+- Sync hasRun pe toate tab-urile aceleiași instanțe (model vechi „opțiunea 2” — **respins**)

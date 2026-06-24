@@ -1,15 +1,13 @@
 /* ================= CHARACTER LCD ================= */
 
-  const lcdDisplays = new Map();
-
 function addCharacterLCD(options) {
-  const container = document.getElementById("devices");
+  const container = getDevicesContainer();
   if (!container || !options.id) return;
   showDevices();
 
   const lcd = new CharacterLCD(options);
   lcd.mount(container);
-  lcdDisplays.set(options.id, lcd);
+  dm().lcdDisplays.set(options.id, lcd);
 }
 
 class CharacterLCD {

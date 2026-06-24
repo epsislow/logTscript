@@ -203,7 +203,7 @@ function addSlider({
   nl = false,
   initialBin = null,
 }) {
-  const container = document.getElementById('devices');
+  const container = getDevicesContainer();
   if (!container) return;
   if (typeof showDevices === 'function') showDevices();
 
@@ -259,20 +259,14 @@ function addSlider({
     container.appendChild(br);
   }
 
-  if (!window.sliders) {
-    window.sliders = new Map();
-  }
-  window.sliders.set(id, slider);
-
-  if (!window.sliderValues) {
-    window.sliderValues = new Map();
-  }
-  window.sliderValues.set(id, { value, forLabels });
+  dm().sliders.set(id, slider);
+  dm().sliderValues.set(id, { value, forLabels });
 }
 
 function setSlider(id, binaryValue) {
-  if (!window.sliders) return;
-  const slider = window.sliders.get(id);
+  const maps = typeof getDeviceMaps === 'function' ? getDeviceMaps() : null;
+  if (!maps || !maps.sliders) return;
+  const slider = maps.sliders.get(id);
   if (!slider) return;
 
   const state = parseInt(binaryValue, 2);
@@ -285,8 +279,8 @@ function setSlider(id, binaryValue) {
 
   if (slider._valueElement) {
     slider._valueElement.textContent = displayLabel;
-  } else if (window.sliderValues) {
-    const data = window.sliderValues.get(id);
+  } else if (maps.sliderValues) {
+    const data = maps.sliderValues.get(id);
     if (data && data.value) {
       const fl = data.forLabels || {};
       data.value.textContent = formatSliderDisplay(clamped, fl);

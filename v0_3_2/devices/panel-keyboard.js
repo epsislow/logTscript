@@ -280,16 +280,18 @@ class PanelKeyboard {
 }
 
 function onKeyboardShowCode(keyboardId, asciiCode, showCodeMode) {
-  if (typeof window === 'undefined' || !window.panelKeyboards) return;
-  const kb = window.panelKeyboards.get(keyboardId);
+  const maps = typeof getDeviceMaps === 'function' ? getDeviceMaps() : null;
+  if (!maps || !maps.panelKeyboards) return;
+  const kb = maps.panelKeyboards.get(keyboardId);
   if (!kb) return;
   kb.setShowCode(showCodeMode);
   kb.setCodeDisplay(asciiCode);
 }
 
 function onKeyboardPulseColor(keyboardId, color) {
-  if (typeof window === 'undefined' || !window.panelKeyboards) return;
-  const kb = window.panelKeyboards.get(keyboardId);
+  const maps = typeof getDeviceMaps === 'function' ? getDeviceMaps() : null;
+  if (!maps || !maps.panelKeyboards) return;
+  const kb = maps.panelKeyboards.get(keyboardId);
   if (!kb) return;
   kb.pulseFeedback(color);
 }
@@ -311,7 +313,7 @@ function addKeyboard({
   nl,
   onKey,
 }) {
-  const container = document.getElementById('devices');
+  const container = getDevicesContainer();
   if (!container) return;
   if (typeof showDevices === 'function') showDevices();
 
@@ -343,10 +345,7 @@ function addKeyboard({
     container.appendChild(br);
   }
 
-  if (!window.panelKeyboards) {
-    window.panelKeyboards = new Map();
-  }
   if (id) {
-    window.panelKeyboards.set(id, kb);
+    dm().panelKeyboards.set(id, kb);
   }
 }

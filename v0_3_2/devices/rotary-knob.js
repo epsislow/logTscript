@@ -260,7 +260,7 @@ function addRotaryKnob({
                           nl = false,
                         }) {
     const analog = true;
-  const container = document.getElementById("devices");
+  const container = getDevicesContainer();
   if (!container) return;
   showDevices();
 
@@ -322,23 +322,15 @@ function addRotaryKnob({
     container.appendChild(br);
   }
   
-  if (!window.rotaryKnobs) {
-    window.rotaryKnobs = new Map();
-  }
-  window.rotaryKnobs.set(id, knob);
-  
-  if (!window.rotaryKnobValues) {
-    window.rotaryKnobValues = new Map();
-  }
-  window.rotaryKnobValues.set(id, { value: value, forLabels: forLabels });
+  dm().rotaryKnobs.set(id, knob);
+  dm().rotaryKnobValues.set(id, { value: value, forLabels: forLabels });
 }
 
 function setRotaryKnob(id, binaryValue) {
-  if (!window.rotaryKnobs) {
-    return;
-  }
-  
-  const knob = window.rotaryKnobs.get(id);
+  const maps = typeof getDeviceMaps === 'function' ? getDeviceMaps() : null;
+  if (!maps || !maps.rotaryKnobs) return;
+
+  const knob = maps.rotaryKnobs.get(id);
   if (!knob) {
     return;
   }
@@ -352,8 +344,8 @@ function setRotaryKnob(id, binaryValue) {
   if (knob._valueElement && knob._forLabels) {
     const displayLabel = (knob._forLabels[clampedState] !== undefined) ? knob._forLabels[clampedState] : clampedState.toString();
     knob._valueElement.textContent = displayLabel;
-  } else if (window.rotaryKnobValues) {
-    const knobData = window.rotaryKnobValues.get(id);
+  } else if (maps.rotaryKnobValues) {
+    const knobData = maps.rotaryKnobValues.get(id);
     if (knobData && knobData.value) {
       const forLabels = knobData.forLabels || {};
       const displayLabel = forLabels[clampedState] !== undefined ? forLabels[clampedState] : clampedState.toString();

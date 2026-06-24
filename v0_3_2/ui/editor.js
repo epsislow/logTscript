@@ -31,12 +31,12 @@ function serializeTabsSession() {
       hash: t.hash,
       isChanged: t.isChanged,
       propagation: t.propagation === 'legacy' ? 'legacy' : 'wave',
-      hasRun: !!t.hasRun
+      instance: typeof clampInstance === 'function' ? clampInstance(t.instance) : 1
     });
   }
   tabList.sort((a, b) => a.id - b.id);
   return {
-    version: 1,
+    version: 2,
     currentTab,
     lastTab,
     tabs: tabList
@@ -59,7 +59,8 @@ function restoreTabs(defaultCode) {
   if (db.has(TABS_STORAGE_KEY)) {
     try {
       const session = JSON.parse(db.get(TABS_STORAGE_KEY));
-      if (session && session.version === 1 && Array.isArray(session.tabs) && session.tabs.length) {
+      if (session && Array.isArray(session.tabs) && session.tabs.length) {
+        const ver = session.version === 2 ? 2 : 1;
         for (const t of session.tabs) {
           tabs.set(t.id, {
             filename: t.filename || ('tab ' + t.id),
@@ -67,7 +68,10 @@ function restoreTabs(defaultCode) {
             hash: typeof t.hash === 'number' ? t.hash : getHashForStr(t.code || ''),
             isChanged: !!t.isChanged,
             propagation: t.propagation === 'legacy' ? 'legacy' : 'wave',
-            hasRun: !!t.hasRun
+            hasRun: false,
+            instance: ver === 2 && t.instance != null ? clampInstance(t.instance) : 1,
+            astText: null,
+            panelSnapshot: null
           });
         }
         currentTab = session.currentTab;
@@ -108,7 +112,8 @@ function restoreTabs(defaultCode) {
   lastTab = 0;
   tabUpdate(0, lastName, last, lastHash, isChanged, {
     propagation: typeof getPropagationMode === 'function' ? getPropagationMode() : 'wave',
-    hasRun: false
+    hasRun: false,
+    instance: 1
   });
   persistTabs();
 }
@@ -236,31 +241,95 @@ function tabMetaDefaults(meta) {
   const m = meta || {};
   return {
     propagation: m.propagation === 'legacy' ? 'legacy' : 'wave',
-    hasRun: !!m.hasRun
+    hasRun: !!m.hasRun,
+    instance: typeof clampInstance === 'function' ? clampInstance(m.instance) : 1,
+    astText: m.astText != null ? m.astText : null,
+    panelSnapshot: null
   };
+}
+
+function syncHasRunFromOwners() {
+  for (const id of tabs.keys()) {
+    tabs.get(id).hasRun = isTabLiveOwner(id);
+  }
+}
+
+function getCurrentTabInstance() {
+  const tabInfo = tabs.get(currentTab);
+  return tabInfo ? clampInstance(tabInfo.instance) : 1;
+}
+
+function updateInstSelectorUI() {
+  const btn = document.getElementById('instBtn');
+  const label = document.getElementById('instLabel');
+  const swatch = document.getElementById('instSwatch');
+  if (!btn || !label) return;
+  const inst = getCurrentTabInstance();
+  label.textContent = 'Inst: ' + inst;
+  if (swatch) {
+    swatch.className = 'inst-swatch inst-swatch-' + inst;
+  }
+  const menu = document.getElementById('instMenu');
+  if (menu) {
+    menu.querySelectorAll('[data-inst]').forEach(function (el) {
+      el.classList.toggle('active', parseInt(el.dataset.inst, 10) === inst);
+    });
+  }
+}
+
+function toggleInstMenu() {
+  const dd = document.getElementById('inst-dropdown');
+  if (!dd) return;
+  dd.classList.toggle('open');
+  const btn = document.getElementById('instBtn');
+  if (btn) {
+    btn.setAttribute('aria-expanded', dd.classList.contains('open') ? 'true' : 'false');
+  }
+}
+
+function closeInstMenu() {
+  const dd = document.getElementById('inst-dropdown');
+  if (!dd) return;
+  dd.classList.remove('open');
+  const btn = document.getElementById('instBtn');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function selectInstance(n) {
+  const tabInfo = tabs.get(currentTab);
+  if (!tabInfo) return;
+  tabInfo.instance = clampInstance(n);
+  closeInstMenu();
+  updateInstSelectorUI();
+  persistTabs();
 }
 
 function updateRunButtonUI() {
   const btn = document.getElementById('runBtn');
   if (!btn) return;
-  const tabInfo = tabs.get(currentTab);
-  btn.classList.toggle('btn-run-active', !!(tabInfo && tabInfo.hasRun));
+  const isOwner = isTabLiveOwner(currentTab);
+  btn.classList.toggle('btn-run-active', isOwner);
+  for (let n = 1; n <= 5; n++) btn.classList.remove('btn-run-inst-' + n);
+  if (isOwner) {
+    const runningInst = getTabRunningInstanceId(currentTab);
+    if (runningInst) btn.classList.add('btn-run-inst-' + runningInst);
+  }
 }
 
-function clearTabHasRun() {
-  for (const id of tabs.keys()) {
-    tabs.get(id).hasRun = false;
+function clearTabHasRunForInstance(instanceId) {
+  const inst = clampInstance(instanceId);
+  const owner = getOwnerTabId(inst);
+  if (owner != null) {
+    const t = tabs.get(owner);
+    if (t) t.hasRun = false;
   }
-  updateRunButtonUI();
-  fShowTabs();
-  persistTabs();
 }
 
 function markTabHasRun() {
-  for (const id of tabs.keys()) {
-    const t = tabs.get(id);
-    t.hasRun = id === currentTab;
-  }
+  const tabInfo = tabs.get(currentTab);
+  if (!tabInfo) return;
+  setInstanceOwner(clampInstance(tabInfo.instance), currentTab);
+  syncHasRunFromOwners();
   updateRunButtonUI();
   fShowTabs();
   persistTabs();
@@ -296,6 +365,9 @@ function tabClose() {
   if(Array.from(tabs.keys()).length <= 1) {
     return;
   }
+  if (typeof releaseInstanceIfTabClosed === 'function') {
+    releaseInstanceIfTabClosed(currentTab);
+  }
   tabs.delete(currentTab);
   let updateLastTab = false;
   if(currentTab===lastTab) {
@@ -320,7 +392,9 @@ function tabShowCurrent() {
   if (typeof setPropagationMode === 'function') {
     setPropagationMode(tabInfo.propagation || 'wave');
   }
-  updateRunButtonUI();
+  updateInstSelectorUI();
+  if (typeof mountTabPanels === 'function') mountTabPanels();
+  else updateRunButtonUI();
 }
 
 function tabSave(isLoad = false) {
@@ -369,6 +443,12 @@ function tabUpdate(idx, filename, code, hash = false, isChanged = false, meta) {
   if (meta && meta.hasRun !== undefined) {
     tabInfo.hasRun = !!meta.hasRun;
   }
+  if (meta && meta.instance !== undefined) {
+    tabInfo.instance = clampInstance(meta.instance);
+  }
+  if (meta && meta.astText !== undefined) {
+    tabInfo.astText = meta.astText;
+  }
   tabs.set(idx, tabInfo);
 }
 
@@ -389,15 +469,23 @@ function fShowTabs() {
     const tab= tabs.get(k);
     const isActive = k === currentTab;
     let tabClass = 'tab';
-    if (isActive && tab.hasRun) {
+    const runningInst = getTabRunningInstanceId(k);
+    if (isActive && isTabLiveOwner(k)) {
       tabClass += ' tab-run tab-run-current';
+      if (runningInst) tabClass += ' tab-run-inst-' + runningInst;
     } else if (isActive) {
       tabClass += ' tab-active';
-    } else if (tab.hasRun) {
+    } else if (isTabLiveOwner(k)) {
       tabClass += ' tab-run tab-run-other';
+      if (runningInst) tabClass += ' tab-run-inst-' + runningInst;
+    }
+    if (runningInst != null) {
+      const ctx = typeof getRunContext === 'function' ? getRunContext(runningInst) : null;
+      if (ctx && ctx.secTimerId != null) tabClass += ' tab-sec-active';
     }
     const isChangedText = tab.isChanged? ' ✎': '';
-    tabsActiveEl.innerHTML += '<div class="'+tabClass+'" data-key="'+k+'" onClick="tabClick(this)">'+tab.filename+isChangedText+'</div>';
+    const instSuffix = runningInst != null ? ' ·' + runningInst : '';
+    tabsActiveEl.innerHTML += '<div class="'+tabClass+'" data-key="'+k+'" onClick="tabClick(this)">'+tab.filename+instSuffix+isChangedText+'</div>';
   }
 }
 
@@ -618,4 +706,9 @@ function closeCompDropdown() {
 
 window.addEventListener('beforeunload', function() {
   persistTabs();
+});
+
+document.addEventListener('click', function (e) {
+  const dd = document.getElementById('inst-dropdown');
+  if (dd && !dd.contains(e.target)) closeInstMenu();
 });

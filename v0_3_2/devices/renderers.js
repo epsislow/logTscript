@@ -1,11 +1,7 @@
 /* ================= DEVICE RENDERERS ================= */
 
-const leds = new Map();
-const sevenSegDisplays = new Map();
-const dipSwitches = new Map();
-
 function addSwitch({ text, value = false, nl = false, onChange }) {
-  const container = document.getElementById("devices");
+  const container = getDevicesContainer();
   if (!container) return;
   showDevices();
 
@@ -43,7 +39,7 @@ function addSwitch({ text, value = false, nl = false, onChange }) {
 }
 
 function addLed({ id, text = "", color = "#ff0000", value = false, round, nl = false}) {
-  const container = document.getElementById("devices");
+  const container = getDevicesContainer();
   if (!container || !id) return;
   showDevices();
   
@@ -83,11 +79,11 @@ function addLed({ id, text = "", color = "#ff0000", value = false, round, nl = f
     container.appendChild(br);
   }
 
-  leds.set(id, input);
+  dm().leds.set(id, input);
 }
 
 function setLed(id, state) {
-  const led = leds.get(id);
+  const led = dm().leds.get(id);
   if (led) {
     led.checked = Boolean(state);
   }
@@ -111,7 +107,7 @@ function addSevenSegment({
             initial[key] = !(value !== "1");
         });
     }
-  const container = document.getElementById("devices");
+  const container = getDevicesContainer();
   if (!container || !id) return;
   showDevices();
 
@@ -182,11 +178,11 @@ function addSevenSegment({
       container.appendChild(br);
   }
     
-  sevenSegDisplays.set(id, segments);
+  dm().sevenSegDisplays.set(id, segments);
 }
 
 function setSegment(displayId, segment, state) {
-  const display = sevenSegDisplays.get(displayId);
+  const display = dm().sevenSegDisplays.get(displayId);
   if (display && display[segment]) {
     display[segment].checked = Boolean(state);
   }
@@ -194,11 +190,11 @@ function setSegment(displayId, segment, state) {
 
 function getSegmentStates(displayId, asString = true) {
   if(!displayId) {
-    const keys = Array.from(sevenSegDisplays.entries());
+    const keys = Array.from(dm().sevenSegDisplays.entries());
     displayId = keys[0][0];
   }
 
-const display = sevenSegDisplays.get(displayId);
+const display = dm().sevenSegDisplays.get(displayId);
   if (!display) {
     return -1;
   }
@@ -238,7 +234,7 @@ function addDipSwitch({
       return count;
   }
 
-  const container = document.getElementById("devices");
+  const container = getDevicesContainer();
   if (!container || !id) return;
   showDevices();
 
@@ -312,18 +308,18 @@ function addDipSwitch({
     container.appendChild(br);
   }
 
-  dipSwitches.set(id, inputs);
+  dm().dipSwitches.set(id, inputs);
 }
 
 function setDip(id, index, state) {
-  const dips = dipSwitches.get(id);
+  const dips = dm().dipSwitches.get(id);
   if (dips && dips[index]) {
     dips[index].checked = Boolean(state);
   }
 }
 
 function getDipState(id) {
-  const dips = dipSwitches.get(id);
+  const dips = dm().dipSwitches.get(id);
   return dips ? dips.map(d => d.checked) : [];
 }
 
@@ -338,7 +334,7 @@ function addFourteenSegment({
     tranSec = 2,
     scale = .75
 }) {
-  const container = document.getElementById("devices");
+  const container = getDevicesContainer();
   if (!container) return;
 
   const wrapper = document.createElement("div");
@@ -394,15 +390,15 @@ function addFourteenSegment({
     container.appendChild(br);
   }
 
-  // Store in your global map (assuming sevenSegDisplays exists)
-  if (typeof sevenSegDisplays !== 'undefined') {
-    sevenSegDisplays.set(id, segmentMap);
+  // Store in your global map (assuming dm().sevenSegDisplays exists)
+  if (typeof dm().sevenSegDisplays !== 'undefined') {
+    dm().sevenSegDisplays.set(id, segmentMap);
   }
 }
 
 function setSegment14(id, seg, state) {
   // We look into the global Map where we stored the input references
-  const segments = sevenSegDisplays.get(id);
+  const segments = dm().sevenSegDisplays.get(id);
 
   if (!segments) {
     // Fallback: If not in Map, try to find it via DOM
@@ -430,7 +426,7 @@ function addClockDots({
     tranSec = 2,
     scale = .75
 }) {
-  const container = document.getElementById("devices");
+  const container = getDevicesContainer();
   if (!container || !id) return;
 
   const wrapper = document.createElement("div");
@@ -475,15 +471,15 @@ function addClockDots({
     container.appendChild(br);
   }
 
-  if (typeof sevenSegDisplays !== 'undefined') {
-    sevenSegDisplays.set(id, segmentMap);
+  if (typeof dm().sevenSegDisplays !== 'undefined') {
+    dm().sevenSegDisplays.set(id, segmentMap);
   }
 }
 
 
 function setClockDots(id, dot, state) {
   // dot should be 'up' or 'down'
-  const segments = sevenSegDisplays.get(id);
+  const segments = dm().sevenSegDisplays.get(id);
 
   if (!segments) {
     // Fallback: search DOM if map lookup fails
@@ -503,7 +499,7 @@ function setClockDots(id, dot, state) {
 }
 
 function addBarDevice({ id, length, width = 10, barWidth = 20, gap = 2, color = "#6dff9c", values = "", orientation = 0 }) {
-  const container = document.getElementById("devices");
+  const container = getDevicesContainer();
   if (!container || !id) return;
 
   const wrapper = document.createElement("div");
@@ -545,13 +541,13 @@ function addBarDevice({ id, length, width = 10, barWidth = 20, gap = 2, color = 
   wrapper.appendChild(bar);
   container.appendChild(wrapper);
 
-  if (typeof sevenSegDisplays !== 'undefined') {
-    sevenSegDisplays.set(id, segmentMap);
+  if (typeof dm().sevenSegDisplays !== 'undefined') {
+    dm().sevenSegDisplays.set(id, segmentMap);
   }
 }
 
 function setBarState(barId, stateBits) {
-  const segments = sevenSegDisplays.get(barId);
+  const segments = dm().sevenSegDisplays.get(barId);
   if (!segments) return;
 
   // Loop through the bits and update the corresponding LED
@@ -563,10 +559,9 @@ function setBarState(barId, stateBits) {
   }
 }
 
-const ioportContainers = new Map();
 
 function addIoportContainer({ id, label = '', nl = false }) {
-  const container = document.getElementById('devices');
+  const container = getDevicesContainer();
   if (!container || !id) return;
   showDevices();
 
@@ -595,11 +590,11 @@ function addIoportContainer({ id, label = '', nl = false }) {
     container.appendChild(br);
   }
 
-  ioportContainers.set(id, body);
+  dm().ioportContainers.set(id, body);
 }
 
 function mountIoportMember(containerId, memberCompName, kind) {
-  const body = ioportContainers.get(containerId);
+  const body = dm().ioportContainers.get(containerId);
   if (!body) return;
 
   const baseId = memberCompName.startsWith('.') ? memberCompName.slice(1) : memberCompName;
@@ -616,7 +611,7 @@ function mountIoportMember(containerId, memberCompName, kind) {
   row.appendChild(slot);
 
   if (kind === 'in') {
-    const dips = dipSwitches.get(baseId);
+    const dips = dm().dipSwitches.get(baseId);
     if (dips && dips[0]) {
       let el = dips[0];
       while (el && !el.classList?.contains('dip-wrapper')) el = el.parentElement;
@@ -625,13 +620,13 @@ function mountIoportMember(containerId, memberCompName, kind) {
   } else {
     const group = document.createElement('div');
     group.className = 'ioport-led-group';
-    let ledInput = leds.get(baseId);
+    let ledInput = dm().leds.get(baseId);
     if (ledInput) {
       const w = ledInput.closest('.led-wrapper');
       if (w) group.appendChild(w);
     } else {
-      for (let i = 1; leds.has(baseId + '.' + i); i++) {
-        const inp = leds.get(baseId + '.' + i);
+      for (let i = 1; dm().leds.has(baseId + '.' + i); i++) {
+        const inp = dm().leds.get(baseId + '.' + i);
         if (inp) {
           const w = inp.closest('.led-wrapper');
           if (w) group.appendChild(w);

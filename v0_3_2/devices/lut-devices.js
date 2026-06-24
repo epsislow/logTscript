@@ -1,7 +1,5 @@
 /* ================= LUT (lookup table) DEVICES ================= */
 
-const luts = new Map();
-
 function lutAddrBits(length) {
   if (length <= 1) return 1;
   return Math.ceil(Math.log2(length));
@@ -20,7 +18,7 @@ function addLut({ id, length = 16, depth = 4, table = null, default: defaultValu
     tbl = new Array(length);
     for (let i = 0; i < length; i++) tbl[i] = fill;
   }
-  luts.set(id, {
+  dm().luts.set(id, {
     length,
     depth,
     table: tbl.slice(),
@@ -30,7 +28,7 @@ function addLut({ id, length = 16, depth = 4, table = null, default: defaultValu
 }
 
 function setLutIn(id, addressBin) {
-  const lut = luts.get(id);
+  const lut = dm().luts.get(id);
   if (!lut) return;
   const addrBits = lutAddrBits(lut.length);
   let bin = addressBin == null ? '' : String(addressBin);
@@ -40,7 +38,7 @@ function setLutIn(id, addressBin) {
 }
 
 function getLutOut(id) {
-  const lut = luts.get(id);
+  const lut = dm().luts.get(id);
   if (!lut) return null;
   const addr = parseInt(lut.inValue, 2);
   if (isNaN(addr) || addr < 0 || addr >= lut.length) return lut.default;
@@ -48,7 +46,7 @@ function getLutOut(id) {
 }
 
 function getLutTable(id) {
-  const lut = luts.get(id);
+  const lut = dm().luts.get(id);
   return lut ? lut.table.slice() : null;
 }
 

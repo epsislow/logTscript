@@ -141,7 +141,7 @@ function addKey({
   nl = false,
   type,
 }) {
-  const container = document.getElementById("devices");
+  const container = getDevicesContainer();
   if (!container) return;
   showDevices();
 
@@ -159,10 +159,7 @@ function addKey({
     container.appendChild(br);
   }
 
-  if (!window.panelKeys) {
-    window.panelKeys = new Map();
-  }
   if (id) {
-    window.panelKeys.set(id, key);
+    dm().panelKeys.set(id, key);
   }
 }

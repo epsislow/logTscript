@@ -2142,11 +2142,14 @@ class Interpreter {
   }
 
   runSafely(fn) {
+    if (typeof pushExecInterp === 'function') pushExecInterp(this);
     try {
       return fn();
     } catch (err) {
       this.reportRuntimeError(err);
       return undefined;
+    } finally {
+      if (typeof popExecInterp === 'function') popExecInterp(this);
     }
   }
 

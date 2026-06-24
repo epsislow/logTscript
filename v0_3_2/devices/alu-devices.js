@@ -1,7 +1,5 @@
 /* ================= ALU DEVICES ================= */
 
-const alus = new Map();
-
 const BUILTIN_EXTRA_OPS = new Set([
   'XOR', 'NOT', 'PASS', 'CMP', 'LSHIFT', 'RSHIFT', 'ASHR', 'MUL', 'DIV',
 ]);
@@ -234,7 +232,7 @@ function addAlu({
       // custom op without LUT — allowed at runtime (returns zero) until LUT wired
     }
   }
-  alus.set(id, {
+  dm().alus.set(id, {
     length,
     extraOp: extra,
     extraFlags: flags,
@@ -254,7 +252,7 @@ function addAlu({
   });
 
   if (typeof document !== 'undefined') {
-    const container = document.getElementById('devices');
+    const container = getDevicesContainer();
     if (container) {
       if (typeof showDevices === 'function') showDevices();
       const wrap = document.createElement('div');
@@ -279,7 +277,7 @@ function addAlu({
 
 function refreshAluPanel(id) {
   if (typeof document === 'undefined') return;
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   if (!alu) return;
   const panel = document.querySelector(`.alu-panel[data-alu-id="${id}"]`);
   if (!panel) return;
@@ -295,63 +293,63 @@ function refreshAluPanel(id) {
 }
 
 function setAluA(id, value) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   if (!alu) return;
   alu.a = aluPad(value, alu.length);
 }
 
 function setAluB(id, value) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   if (!alu) return;
   alu.b = aluPad(value, alu.length);
 }
 
 function setAluOp(id, value) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   if (!alu) return;
   alu.op = aluPad(value, alu.opBits);
 }
 
 function setAluLutId(id, lutId) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   if (!alu) return;
   alu.lutId = lutId || null;
 }
 
 function executeAlu(id) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   if (!alu) return;
   aluExecuteOp(alu);
   refreshAluPanel(id);
 }
 
 function getAluResult(id) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   return alu ? alu.result : null;
 }
 
 function getAluCarry(id) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   return alu ? alu.carry : null;
 }
 
 function getAluZero(id) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   return alu ? alu.zero : null;
 }
 
 function getAluOver(id) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   return alu ? alu.over : null;
 }
 
 function getAluMod(id) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   return alu ? alu.mod : null;
 }
 
 function getAluFlag(id, name) {
-  const alu = alus.get(id);
+  const alu = dm().alus.get(id);
   if (!alu) return null;
   const key = String(name).toLowerCase();
   if (alu.flags[key] !== undefined) return alu.flags[key];

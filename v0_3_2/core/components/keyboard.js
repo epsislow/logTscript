@@ -38,7 +38,7 @@ function propagateKeyboardOutput(ctx, compName) {
     ctx._notifyIoportMemberChange(compName);
   } else {
     ctx.updateComponentConnections(compName);
-    if (typeof showVars === 'function') showVars();
+    if (typeof showVars === 'function') showVars(ctx);
   }
   if (typeof ctx._emitComputedComponentProbes === 'function') {
     ctx._emitComputedComponentProbes(compName);
@@ -216,15 +216,19 @@ function parseShowCode(attributes) {
   return mode;
 }
 
-function notifyKeyboardUi(keyboardId, asciiCode, ui) {
+function notifyKeyboardUi(keyboardId, asciiCode, ui, interpCtx) {
   if (ui.showCode && typeof onKeyboardShowCode === 'function') {
     onKeyboardShowCode(keyboardId, asciiCode, ui.showCode);
   }
   if (ui.pulseColor && typeof onKeyboardPulseColor === 'function') {
     onKeyboardPulseColor(keyboardId, ui.pulseColor);
   }
-  if (typeof window !== 'undefined' && window.panelKeyboards) {
-    const kb = window.panelKeyboards.get(keyboardId);
+  const maps = typeof getDeviceMapsForInterp === 'function'
+    ? getDeviceMapsForInterp(interpCtx)
+    : null;
+  const panelKeyboards = maps ? maps.panelKeyboards : (typeof window !== 'undefined' ? window.panelKeyboards : null);
+  if (panelKeyboards) {
+    const kb = panelKeyboards.get(keyboardId);
     if (kb) {
       if (ui.showCode) kb.setCodeDisplay(asciiCode);
       if (ui.pulseColor) kb.pulseFeedback(ui.pulseColor);
@@ -353,7 +357,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         });
       });
       ctx.showlog(1);
-      notifyKeyboardUi(keyboardId, code, ui);
+      notifyKeyboardUi(keyboardId, code, ui, ctx);
       return true;
     };
 

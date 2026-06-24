@@ -1,18 +1,16 @@
 /* ================= CLCD WIDGET ================= */
 
-const clcdDisplays = new Map();
-
 function addClcd(options) {
-  const container = document.getElementById('devices');
+  const container = getDevicesContainer();
   if (!container || !options.id) return;
   if (typeof showDevices === 'function') showDevices();
   const display = new ClcdDisplay(options);
   display.mount(container);
-  clcdDisplays.set(options.id, display);
+  dm().clcdDisplays.set(options.id, display);
 }
 
 function setClcdBits(id, bitString) {
-  const display = clcdDisplays.get(id);
+  const display = dm().clcdDisplays.get(id);
   if (display) display.setBits(bitString);
 }
 

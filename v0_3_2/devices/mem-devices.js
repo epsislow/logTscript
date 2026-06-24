@@ -1,7 +1,5 @@
 /* ================= MEMORY & MATH DEVICES ================= */
 
-const memories = new Map();
-
 function addMem({ id, length = 3, depth = 4, default: defaultValue = null, ports = 1, readonly = false }) {
   if (!id) return;
   
@@ -16,7 +14,7 @@ function addMem({ id, length = 3, depth = 4, default: defaultValue = null, ports
 
   const portCount = Math.min(4, Math.max(1, ports));
   
-  memories.set(id, {
+  dm().memories.set(id, {
     length: length,
     depth: depth,
     default: defaultBin,
@@ -28,18 +26,18 @@ function addMem({ id, length = 3, depth = 4, default: defaultValue = null, ports
 }
 
 function beginMemWritePhase(id) {
-  const mem = memories.get(id);
+  const mem = dm().memories.get(id);
   if (mem) mem.writeQueue = new Map();
 }
 
 function beginAllMemWritePhases() {
-  for (const [id] of memories) {
+  for (const [id] of dm().memories) {
     beginMemWritePhase(id);
   }
 }
 
 function queueMemWrite(id, port, startAddress, words) {
-  const mem = memories.get(id);
+  const mem = dm().memories.get(id);
   if (!mem) return;
   for (let i = 0; i < words.length; i++) {
     const address = startAddress + i;
@@ -55,7 +53,7 @@ function queueMemWrite(id, port, startAddress, words) {
 }
 
 function commitMemWrites(id) {
-  const mem = memories.get(id);
+  const mem = dm().memories.get(id);
   if (!mem || mem.writeQueue.size === 0) return;
   for (const [address, entry] of mem.writeQueue.entries()) {
     setMem(id, address, entry.value);
@@ -64,13 +62,13 @@ function commitMemWrites(id) {
 }
 
 function commitAllMemWrites() {
-  for (const [id] of memories) {
+  for (const [id] of dm().memories) {
     commitMemWrites(id);
   }
 }
 
 function setMem(id, address, value) {
-  const mem = memories.get(id);
+  const mem = dm().memories.get(id);
   if (!mem) return;
   
   if (address < 0 || address >= mem.length) {
@@ -88,7 +86,7 @@ function setMem(id, address, value) {
 }
 
 function getMem(id, address) {
-  const mem = memories.get(id);
+  const mem = dm().memories.get(id);
   if (!mem) return null;
   
   if (address < 0 || address >= mem.length) {
@@ -102,7 +100,6 @@ function getMem(id, address) {
   return mem.default;
 }
 
-const registers = new Map();
 
 function addReg({ id, depth = 4, default: defaultValue = null }) {
   if (!id) return;
@@ -116,7 +113,7 @@ function addReg({ id, depth = 4, default: defaultValue = null }) {
     defaultBin = defaultBin.padStart(depth, '0').substring(0, depth);
   }
   
-  registers.set(id, {
+  dm().registers.set(id, {
     depth: depth,
     default: defaultBin,
     value: defaultBin
@@ -124,7 +121,7 @@ function addReg({ id, depth = 4, default: defaultValue = null }) {
 }
 
 function setReg(id, value) {
-  const reg = registers.get(id);
+  const reg = dm().registers.get(id);
   if (!reg) return;
   
   let binValue = value;
@@ -138,13 +135,12 @@ function setReg(id, value) {
 }
 
 function getReg(id) {
-  const reg = registers.get(id);
+  const reg = dm().registers.get(id);
   if (!reg) return null;
   
   return reg.value || reg.default;
 }
 
-const counters = new Map();
 
 function addCounter({ id, depth = 4, default: defaultValue = null }) {
   if (!id) return;
@@ -158,7 +154,7 @@ function addCounter({ id, depth = 4, default: defaultValue = null }) {
     defaultBin = defaultBin.padStart(depth, '0').substring(0, depth);
   }
   
-  counters.set(id, {
+  dm().counters.set(id, {
     depth: depth,
     default: defaultBin,
     value: defaultBin
@@ -166,7 +162,7 @@ function addCounter({ id, depth = 4, default: defaultValue = null }) {
 }
 
 function setCounter(id, value) {
-  const counter = counters.get(id);
+  const counter = dm().counters.get(id);
   if (!counter) return;
   
   let binValue = value;
@@ -180,18 +176,17 @@ function setCounter(id, value) {
 }
 
 function getCounter(id) {
-  const counter = counters.get(id);
+  const counter = dm().counters.get(id);
   if (!counter) return null;
   
   return counter.value || counter.default;
 }
 
-const adders = new Map();
 
 function addAdder({ id, depth = 4 }) {
   if (!id) return;
   
-  adders.set(id, {
+  dm().adders.set(id, {
     depth: depth,
     a: '0'.repeat(depth),
     b: '0'.repeat(depth)
@@ -199,7 +194,7 @@ function addAdder({ id, depth = 4 }) {
 }
 
 function setAdderA(id, value) {
-  const adder = adders.get(id);
+  const adder = dm().adders.get(id);
   if (!adder) return;
   
   let binValue = value;
@@ -213,7 +208,7 @@ function setAdderA(id, value) {
 }
 
 function setAdderB(id, value) {
-  const adder = adders.get(id);
+  const adder = dm().adders.get(id);
   if (!adder) return;
   
   let binValue = value;
@@ -227,7 +222,7 @@ function setAdderB(id, value) {
 }
 
 function getAdder(id) {
-  const adder = adders.get(id);
+  const adder = dm().adders.get(id);
   if (!adder) return null;
   
   const aNum = BigInt('0b' + adder.a);
@@ -247,7 +242,7 @@ function getAdder(id) {
 }
 
 function getAdderCarry(id) {
-  const adder = adders.get(id);
+  const adder = dm().adders.get(id);
   if (!adder) return null;
   
   const aNum = BigInt('0b' + adder.a);
@@ -260,12 +255,11 @@ function getAdderCarry(id) {
   return hasCarry ? '1' : '0';
 }
 
-const subtracts = new Map();
 
 function addSubtract({ id, depth = 4 }) {
   if (!id) return;
   
-  subtracts.set(id, {
+  dm().subtracts.set(id, {
     depth: depth,
     a: '0'.repeat(depth),
     b: '0'.repeat(depth)
@@ -273,7 +267,7 @@ function addSubtract({ id, depth = 4 }) {
 }
 
 function setSubtractA(id, value) {
-  const subtract = subtracts.get(id);
+  const subtract = dm().subtracts.get(id);
   if (!subtract) return;
   
   let binValue = value;
@@ -287,7 +281,7 @@ function setSubtractA(id, value) {
 }
 
 function setSubtractB(id, value) {
-  const subtract = subtracts.get(id);
+  const subtract = dm().subtracts.get(id);
   if (!subtract) return;
   
   let binValue = value;
@@ -301,7 +295,7 @@ function setSubtractB(id, value) {
 }
 
 function getSubtract(id) {
-  const subtract = subtracts.get(id);
+  const subtract = dm().subtracts.get(id);
   if (!subtract) return null;
   
   const aNum = BigInt('0b' + subtract.a);
@@ -326,7 +320,7 @@ function getSubtract(id) {
 }
 
 function getSubtractCarry(id) {
-  const subtract = subtracts.get(id);
+  const subtract = dm().subtracts.get(id);
   if (!subtract) return null;
   
   const aNum = BigInt('0b' + subtract.a);
@@ -338,12 +332,11 @@ function getSubtractCarry(id) {
   return hasBorrow ? '1' : '0';
 }
 
-const dividers = new Map();
 
 function addDivider({ id, depth = 4 }) {
   if (!id) return;
   
-  dividers.set(id, {
+  dm().dividers.set(id, {
     depth: depth,
     a: '0'.repeat(depth),
     b: '0'.repeat(depth)
@@ -351,7 +344,7 @@ function addDivider({ id, depth = 4 }) {
 }
 
 function setDividerA(id, value) {
-  const divider = dividers.get(id);
+  const divider = dm().dividers.get(id);
   if (!divider) return;
   
   let binValue = value;
@@ -365,7 +358,7 @@ function setDividerA(id, value) {
 }
 
 function setDividerB(id, value) {
-  const divider = dividers.get(id);
+  const divider = dm().dividers.get(id);
   if (!divider) return;
   
   let binValue = value;
@@ -379,7 +372,7 @@ function setDividerB(id, value) {
 }
 
 function getDivider(id) {
-  const divider = dividers.get(id);
+  const divider = dm().dividers.get(id);
   if (!divider) return null;
   
   const aNum = BigInt('0b' + divider.a);
@@ -404,7 +397,7 @@ function getDivider(id) {
 }
 
 function getDividerMod(id) {
-  const divider = dividers.get(id);
+  const divider = dm().dividers.get(id);
   if (!divider) return null;
   
   const aNum = BigInt('0b' + divider.a);
@@ -428,12 +421,11 @@ function getDividerMod(id) {
   return binStr;
 }
 
-const multipliers = new Map();
 
 function addMultiplier({ id, depth = 4 }) {
   if (!id) return;
   
-  multipliers.set(id, {
+  dm().multipliers.set(id, {
     depth: depth,
     a: '0'.repeat(depth),
     b: '0'.repeat(depth)
@@ -441,7 +433,7 @@ function addMultiplier({ id, depth = 4 }) {
 }
 
 function setMultiplierA(id, value) {
-  const multiplier = multipliers.get(id);
+  const multiplier = dm().multipliers.get(id);
   if (!multiplier) return;
   
   let binValue = value;
@@ -455,7 +447,7 @@ function setMultiplierA(id, value) {
 }
 
 function setMultiplierB(id, value) {
-  const multiplier = multipliers.get(id);
+  const multiplier = dm().multipliers.get(id);
   if (!multiplier) return;
   
   let binValue = value;
@@ -469,7 +461,7 @@ function setMultiplierB(id, value) {
 }
 
 function getMultiplier(id) {
-  const multiplier = multipliers.get(id);
+  const multiplier = dm().multipliers.get(id);
   if (!multiplier) return null;
   
   const aNum = BigInt('0b' + multiplier.a);
@@ -489,7 +481,7 @@ function getMultiplier(id) {
 }
 
 function getMultiplierOver(id) {
-  const multiplier = multipliers.get(id);
+  const multiplier = dm().multipliers.get(id);
   if (!multiplier) return null;
   
   const aNum = BigInt('0b' + multiplier.a);
@@ -510,12 +502,11 @@ function getMultiplierOver(id) {
   return binStr;
 }
 
-const shifters = new Map();
 
 function addShifter({ id, depth = 4, circular = false }) {
   if (!id) return;
   
-  shifters.set(id, {
+  dm().shifters.set(id, {
     depth: depth,
     circular: circular,
     value: '0'.repeat(depth),
@@ -526,7 +517,7 @@ function addShifter({ id, depth = 4, circular = false }) {
 }
 
 function setShifterValue(id, value) {
-  const shifter = shifters.get(id);
+  const shifter = dm().shifters.get(id);
   if (!shifter) return;
   
   let binValue = value;
@@ -540,21 +531,21 @@ function setShifterValue(id, value) {
 }
 
 function setShifterDir(id, direction) {
-  const shifter = shifters.get(id);
+  const shifter = dm().shifters.get(id);
   if (!shifter) return;
   
   shifter.direction = direction === 1 ? 1 : 0;
 }
 
 function setShifterIn(id, inBit) {
-  const shifter = shifters.get(id);
+  const shifter = dm().shifters.get(id);
   if (!shifter) return;
   
   shifter.in = inBit === '1' ? '1' : '0';
 }
 
 function shiftShifter(id) {
-  const shifter = shifters.get(id);
+  const shifter = dm().shifters.get(id);
   if (!shifter) return;
   
   const currentValue = shifter.value;
@@ -582,14 +573,14 @@ function shiftShifter(id) {
 }
 
 function getShifter(id) {
-  const shifter = shifters.get(id);
+  const shifter = dm().shifters.get(id);
   if (!shifter) return null;
   
   return shifter.value;
 }
 
 function getShifterOut(id) {
-  const shifter = shifters.get(id);
+  const shifter = dm().shifters.get(id);
   if (!shifter) return null;
   
   return shifter.out;

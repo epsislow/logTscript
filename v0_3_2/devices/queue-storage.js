@@ -1,7 +1,5 @@
 /* ================= QUEUE / STACK STORAGE ================= */
 
-const stores = new Map();
-
 function bitIndexWidth(len) {
   return len <= 1 ? 1 : 32 - Math.clz32(len - 1);
 }
@@ -10,7 +8,7 @@ function addQueueStorage({ id, width, length, mode }) {
   if (width <= 0) throw Error('Queue storage width must be positive');
   if (length <= 0) throw Error('Queue storage length must be positive');
   if (mode !== 'fifo' && mode !== 'lifo') throw Error('Queue storage mode must be fifo or lifo');
-  stores.set(id, {
+  dm().stores.set(id, {
     width,
     length,
     mode,
@@ -21,7 +19,7 @@ function addQueueStorage({ id, width, length, mode }) {
 }
 
 function _getStore(id) {
-  const s = stores.get(id);
+  const s = dm().stores.get(id);
   if (!s) throw Error('Queue storage not found: ' + id);
   return s;
 }
