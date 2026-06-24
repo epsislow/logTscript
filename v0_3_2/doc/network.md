@@ -44,10 +44,50 @@ comp [network] .wifi:
 | `capacity` | `sizeWidth` | `length` in binary |
 | `free` | `sizeWidth` | `length - size` |
 | `drops` | variable | RX overflow counter (`count.toString(2)`; `0`→`0`, `4`→`100`) |
+| `sendId` | variable | Last packet id sent from this endpoint (`id.toString(2)`; `0` before any send) |
 
 When RX is full, incoming packets are **dropped silently** (`drops` increments); other receivers on the channel are unaffected.
 
 `sizeWidth` = enough bits for `0 .. length` (same as [queue](queue.md)).
+
+---
+
+## Packet ids and `:sendId`
+
+Every `send` on the bus gets a **global monotonic packet id** (integer 1, 2, 3, …). The counter is shared across all instances and channels on the page; it is **not** reset when you **Clear** the Network Traffic log or re-**Run** a script. It resets only on full page refresh.
+
+| Where | Name | Meaning |
+|-------|------|---------|
+| Network Traffic panel | **Id** column | Same packet id for that send |
+| Sender `comp [network]` | `:sendId` pout | Last packet id sent from **this** endpoint |
+
+**`:sendId`** (read-only pout):
+
+- Binary string, **dynamic width** (same encoding style as `:drops` — e.g. id `4` → `100`, id `2` → `10`).
+- `0` before this endpoint has sent any packet.
+- Updates on each successful `send` from that component (including sends with zero deliveries when `target` points at a missing endpoint).
+- Matches the **Id** column for that send in **Win → Network Traffic**.
+
+```logts-play
+comp [network] .wifi:
+  width: 8
+  length: 8
+  channel: 'demo'
+  on: 1
+  :
+
+4wire lastId
+
+.wifi:{ send = ^41
+  set = 1 }
+
+lastId = .wifi:sendId
+show(lastId)
+```
+
+After the send above, `lastId` is `1` and the traffic log row shows **Id** `1`. A second send from the same endpoint yields `sendId` `10` (binary for decimal 2) and log **Id** `2`.
+
+Packet ids are for tracing and UI only — they are **not** inserted into the RX FIFO and receivers cannot read them from `:get` / `:front`.
 
 ---
 
@@ -123,6 +163,46 @@ comp [network] .wifi:
 
 ---
 
+## Example — oscillator send every 2 seconds
+
+**Load & Run** the example below, then open **Win → Network Traffic** (keep **Live** on). Every **2 seconds** (one full oscillator cycle) the rising `set` edge sends a packet on channel `demo`. The payload is `^FF` concatenated with the 4-bit **`:counter`** from `.o`. **Output** shows your Run **Inst** id from `/instance/`.
+
+For a receiver on another tab, register the same `channel: 'demo'` on **Inst 2**, then watch **Network Traffic** or `probe(.wifi:get)` on that tab. See [editorUI.md — probe: propagation vs network](editorUI.md#probe--propagation-vs-network).
+
+```logts-play
+4wire inst : /instance/
+show(inst)
+
+comp [network] .wifi:
+  width: 20
+  length: 16
+  channel: 'demo'
+  on: 1
+  :
+
+comp [~] .o:
+  duration1: 4
+  duration0: 4
+  length: 4
+  freq: 2
+  freqIsSec: 1
+  eachCycle: 1
+  :
+
+1wire o = .o
+
+20wire pkg := ^FF + .o:counter
+
+.wifi:{
+  send = pkg
+  set = o
+  }
+```
+
+Oscillator timing: `freq: 2` with `freqIsSec: 1` → **2 s** per cycle; `eachCycle: 1` → `:counter` increments once per cycle. See [oscillator.md](oscillator.md).
+
+---
+
 ## Restrictions
 
 - `comp [network]` only at **top level** (parse error in chip / pcb / board).
@@ -133,19 +213,9 @@ comp [network] .wifi:
 
 ## Network Traffic panel
 
-Every `send` is logged globally (all instances). Open **Win → Network Traffic**.
+Every `send` is logged globally (all instances). Open **Win → Network Traffic**. The **Id** column uses the same global packet ids as `:sendId` on the sender (see [Packet ids and `:sendId`](#packet-ids-and-sendid)).
 
-| Column | Meaning |
-|--------|---------|
-| Id | Unique packet id (monotonic; not reset on Clear) |
-| Source / Target | Run instance 1–5; Target `*` = broadcast |
-| Channel | Bus channel name |
-| Size | Packet width in bits |
-| Status | `Received` (≥1 delivery) or `Dropped` (none) |
-
-Click a row to expand the payload (same format as `show()`). Filters on Source, Target, Channel, Size; paginate with `[ < ] [ > ]`.
-
-See [editorUI.md — Network Traffic](editorUI.md#panels).
+Full panel documentation: [network-traffic-panel.md](network-traffic-panel.md).
 
 ---
 
@@ -161,4 +231,5 @@ See [editorUI.md — probe: propagation vs network](editorUI.md#probe--propagati
 
 - [queue.md](queue.md) — local FIFO (same pin/pout pattern, `push` instead of `send`)
 - [meta-constants.md](meta-constants.md) — `/instance/`
+- [network-traffic-panel.md](network-traffic-panel.md) — traffic log UI
 - [editorUI.md](editorUI.md) — Inst slots, output per instance, probe vs network

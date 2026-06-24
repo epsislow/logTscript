@@ -2,13 +2,19 @@
 
 This document describes toolbar controls in the script editor that affect **how a program runs**. It does not cover tabs, files, AST, or other panels.
 
+For the built-in **Doc** browser (index, search, **Load** / **Load & Run** examples), see [doc-viewer.md](doc-viewer.md).
+
 For what Wave and Legacy mean internally, see [signal-propagation.md](signal-propagation.md).
 
 ---
 
-## Run
+## Run / Stop
 
-**Button:** `Run`
+**Button:** `Run` while idle · `Stop` while a simulation is active on this tab.
+
+The button has a **fixed width** (it does not resize when the label changes). While running, it uses the **green** instance colour for the active Inst slot (1–5). When idle, it returns to the default button style.
+
+### Run
 
 Executes the full program from the editor:
 
@@ -18,6 +24,27 @@ Executes the full program from the editor:
 4. Shows `show` / `peek` / `probe` output, **`watch` traces** in the Timeline panel, and updates the Variables panel (see [debug.md](debug.md)).
 
 Use **Run** after changing code or after switching Wave / Legacy so the new mode takes effect.
+
+If another tab already owns the same **Inst** slot, that tab is stopped and frozen (same as pressing **Stop** there): its output becomes a snapshot and the slot is released for the new run.
+
+### Stop
+
+**Click Stop** to end the simulation on this tab without closing it.
+
+| What stops | What is kept |
+|------------|--------------|
+| Oscillator timers, **S** auto-step, wire propagation | Output, Variables, Devices — frozen as a **snapshot** on this tab |
+| Network endpoints for this Inst slot | Editor text and tab Inst dropdown |
+| **Next** / **S** (disabled until the next Run) | Probe / watch history already in Output |
+
+After **Stop**:
+
+- The button shows **Run** again (no green highlight).
+- The tab label loses the live **·N** running marker.
+- The Inst slot is **free** — another tab can **Run** on the same number.
+- Panels show the last captured state until you **Run** again (or switch tabs).
+
+**Stop** does not clear the **Network Traffic** log (global; see [network-traffic-panel.md](network-traffic-panel.md)).
 
 ---
 
@@ -37,7 +64,7 @@ The auto-step buttons (`S` / interval) call the same **Next** logic on a timer.
 
 ## Toolbar layout
 
-Left to right: **Run**, **Inst: N** (1–5), **wave / legacy**, then **Next**, **S**, and interval **1** (step controls). A visual separator divides run config from step controls.
+Left to right: **Run** / **Stop**, **Inst: N** (1–5), **wave / legacy**, then **Next**, **S**, and interval **1** (step controls). A visual separator divides run config from step controls.
 
 ---
 
@@ -121,13 +148,17 @@ The sender never sees its own packet on `:get` (by design). See [network.md](net
 |-------|---------|
 | **Output** | Text from `show`, `peek`, `probe`, errors — per instance when switching tabs |
 | **Timeline** | Waveform trace from `watch()` — enable via **Win → Timeline** |
-| **Network Traffic** | Log of every `send` on `comp [network]` — **Win → Network Traffic** |
+| **Network Traffic** | Log of every `send` on `comp [network]` — **Win → Network Traffic** (see [network-traffic-panel.md](network-traffic-panel.md)) |
 | **Variables** | Live wire / component values after **Run** |
 | **AST** | Parsed program structure |
 
 The **Timeline** sits above **Output**. Use **Pause** to inspect history; **Live** to follow new events.
 
-**Network Traffic** sits between Timeline and Output (same column width). It lists the latest `send` operations across all Run instances (global, not per tab): Id, Source, Target (`*` = broadcast), Channel, Size, Status (`Received` / `Dropped`). Click a row to expand the packet (`show()` formatting). Column filters (substring), **Clear** to empty the log (Id counter continues). Pagination: `[ < ] [ > ]` with `Rows: X - Y . Shown N of Total` (row positions in the filtered list). Backend keeps up to 200 entries.
+---
+
+## Network Traffic panel
+
+**Win → Network Traffic** shows a global log of every `send` on `comp [network]` (all Inst slots). Columns, filters, Pause/Live, pagination, row flash, and packet ids are documented in **[network-traffic-panel.md](network-traffic-panel.md)**.
 
 ---
 
@@ -136,17 +167,20 @@ The **Timeline** sits above **Output**. Use **Pause** to inspect history; **Live
 | Control | Action |
 |---------|--------|
 | **Run** | Full execute; applies current Inst slot and Wave / Legacy mode |
+| **Stop** | End simulation on this tab; freeze panels; release Inst slot |
 | **Inst: N** | Instance slot (1–5) for the next Run on this tab |
-| **Next** | `NEXT(~)` on last Run’s interpreter |
+| **Next** | `NEXT(~)` on last Run’s interpreter (requires active run) |
 | **wave / legacy** | Select propagation for next Run (orange = wave, green = legacy) |
 
 ---
 
 ## Related documentation
 
+- [Documentation viewer](doc-viewer.md) — **Doc** button, search, runnable examples
 - [Debug output](debug.md) — `show`, `peek`, `probe`, **`watch`** (Timeline)
 - [Meta constants](meta-constants.md) — `/instance/`
 - [Network](network.md) — packets between instances
+- [Network Traffic panel](network-traffic-panel.md) — send log UI
 - [Signal propagation](signal-propagation.md) — Wave vs Legacy behaviour
 - [REG](reg.md) — registers and `NEXT`
 - [Interactive components](interactive-components.md) — panel inputs and wire updates

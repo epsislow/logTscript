@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, decimal-conversion.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, decimal-conversion.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
  */
 (function () {
   'use strict';
@@ -6059,6 +6059,80 @@ Built-in display statements for the Output panel. Full reference with runnable e
 - \`doc(comp.shortname)\` is equivalent to \`doc(comp.canonicalType)\` — e.g. \`doc(comp.+)\` = \`doc(comp.adder)\`.
 - \`doc(def)\` lists **all** built-in functions on one line and all user-defined functions on another. It is useful for quick reference when working in the script editor.
 `,
+    'doc-viewer.md': `# Documentation viewer
+
+The script editor includes a built-in documentation browser for all \`doc/*.md\` pages bundled with v0.3.2.
+
+Open it with the toolbar **Doc** button (or a URL hash such as \`#network.md\`). Use **Editor** (or the editor tab) to return to your script.
+
+---
+
+## Index and navigation
+
+The landing page lists topics grouped by section (**Reference**, **Composite blocks**, **Displays**, and so on). Click a title to open that page.
+
+| Control | Action |
+|---------|--------|
+| **← Back** | Return to the previous page in your session (disabled on the first page) |
+| **History** | List of pages you opened this session — click to jump back |
+| **Search** | Filter topics by title and keywords (type-ahead menu; **Enter** to open selection) |
+
+Internal links (\`[label](other-page.md)\` or \`[label](other-page.md#anchor)\`) stay inside the viewer. External \`http(s)\` links open normally.
+
+The address bar hash updates to \`#filename.md\` while you read (e.g. \`#editorUI.md\`). Refreshing the page with that hash reopens the same document.
+
+---
+
+## Runnable examples (\`logts-play\`)
+
+Many pages include example scripts in fenced blocks marked \`logts-play\`. After the page renders, each block shows two buttons above the code:
+
+| Button | Action |
+|--------|--------|
+| **Load** | Copy the script into a **new editor tab** without running it. Inspect or edit, then press toolbar **Run** when ready. |
+| **Load & Run** | Copy the script into a new tab **and** run it immediately (same as **Load** followed by **Run**). |
+
+Details:
+
+- A new tab is created named \`ex: <page title>\` (or \`ex: <page title> #2\` for the second block on the same page).
+- The tab uses the editor’s current **Wave / Legacy** pill **unless** the block specifies a mode (see below).
+- If the tab limit is reached, you are asked to close a tab first.
+- **Load & Run** is appropriate for static demos, device panels, oscillators, and anything that needs timers or live updates without an extra click.
+- **Load** is useful when you want to change **Inst**, propagation mode, or code before running — or when the example expects you to press **Next** step by step.
+
+### Propagation mode on examples
+
+Optional language tag on the fence:
+
+\`\`\`\`markdown
+\`\`\`logts-play wave
+...
+\`\`\`
+\`\`\`\`
+
+| Tag | Meaning |
+|-----|---------|
+| \`logts-play\` | Use whatever Wave / Legacy mode the editor pill shows |
+| \`logts-play wave\` | Force **wave** for the new tab (orange badge on the block) |
+| \`logts-play legacy\` | Force **legacy** for the new tab (green badge) |
+
+See [editorUI.md](editorUI.md) for **Run** / **Stop**, **Inst**, and propagation controls.
+
+---
+
+## Other embedded content
+
+Some pages (for example [clcd.md](clcd.md)) add interactive galleries (\`clcd-symbol-gallery\` blocks) inside the viewer. Those are page-specific; runnable scripts still use **Load** / **Load & Run** as above.
+
+Programmatic help from scripts uses the \`doc()\` function — see [doc-function.md](doc-function.md).
+
+---
+
+## Related
+
+- [editorUI.md](editorUI.md) — toolbar **Run**, **Stop**, **Inst**, panels
+- [doc-function.md](doc-function.md) — \`doc()\` from LogTScript code
+`,
     'dots.md': `# Clock dots component (\`dots\`)
 
 \`comp [dots]\` (shortname \`comp [:]\`) renders a **two-dot colon** (clock separator). Output is **2 bits** (\`up\`, \`down\`).
@@ -6123,13 +6197,19 @@ Character \`:\` lights both dots.
 
 This document describes toolbar controls in the script editor that affect **how a program runs**. It does not cover tabs, files, AST, or other panels.
 
+For the built-in **Doc** browser (index, search, **Load** / **Load & Run** examples), see [doc-viewer.md](doc-viewer.md).
+
 For what Wave and Legacy mean internally, see [signal-propagation.md](signal-propagation.md).
 
 ---
 
-## Run
+## Run / Stop
 
-**Button:** \`Run\`
+**Button:** \`Run\` while idle · \`Stop\` while a simulation is active on this tab.
+
+The button has a **fixed width** (it does not resize when the label changes). While running, it uses the **green** instance colour for the active Inst slot (1–5). When idle, it returns to the default button style.
+
+### Run
 
 Executes the full program from the editor:
 
@@ -6139,6 +6219,27 @@ Executes the full program from the editor:
 4. Shows \`show\` / \`peek\` / \`probe\` output, **\`watch\` traces** in the Timeline panel, and updates the Variables panel (see [debug.md](debug.md)).
 
 Use **Run** after changing code or after switching Wave / Legacy so the new mode takes effect.
+
+If another tab already owns the same **Inst** slot, that tab is stopped and frozen (same as pressing **Stop** there): its output becomes a snapshot and the slot is released for the new run.
+
+### Stop
+
+**Click Stop** to end the simulation on this tab without closing it.
+
+| What stops | What is kept |
+|------------|--------------|
+| Oscillator timers, **S** auto-step, wire propagation | Output, Variables, Devices — frozen as a **snapshot** on this tab |
+| Network endpoints for this Inst slot | Editor text and tab Inst dropdown |
+| **Next** / **S** (disabled until the next Run) | Probe / watch history already in Output |
+
+After **Stop**:
+
+- The button shows **Run** again (no green highlight).
+- The tab label loses the live **·N** running marker.
+- The Inst slot is **free** — another tab can **Run** on the same number.
+- Panels show the last captured state until you **Run** again (or switch tabs).
+
+**Stop** does not clear the **Network Traffic** log (global; see [network-traffic-panel.md](network-traffic-panel.md)).
 
 ---
 
@@ -6158,7 +6259,7 @@ The auto-step buttons (\`S\` / interval) call the same **Next** logic on a timer
 
 ## Toolbar layout
 
-Left to right: **Run**, **Inst: N** (1–5), **wave / legacy**, then **Next**, **S**, and interval **1** (step controls). A visual separator divides run config from step controls.
+Left to right: **Run** / **Stop**, **Inst: N** (1–5), **wave / legacy**, then **Next**, **S**, and interval **1** (step controls). A visual separator divides run config from step controls.
 
 ---
 
@@ -6241,11 +6342,18 @@ The sender never sees its own packet on \`:get\` (by design). See [network.md](n
 | Panel | Purpose |
 |-------|---------|
 | **Output** | Text from \`show\`, \`peek\`, \`probe\`, errors — per instance when switching tabs |
-| **Timeline** | Waveform trace from \`watch()\` — enable via **Panels → Timeline** |
+| **Timeline** | Waveform trace from \`watch()\` — enable via **Win → Timeline** |
+| **Network Traffic** | Log of every \`send\` on \`comp [network]\` — **Win → Network Traffic** (see [network-traffic-panel.md](network-traffic-panel.md)) |
 | **Variables** | Live wire / component values after **Run** |
 | **AST** | Parsed program structure |
 
-The **Timeline** sits above **Output**. It opens automatically when the script contains \`watch()\` and you press **Run**. Use **Pause** to inspect history; **Live** to follow new events.
+The **Timeline** sits above **Output**. Use **Pause** to inspect history; **Live** to follow new events.
+
+---
+
+## Network Traffic panel
+
+**Win → Network Traffic** shows a global log of every \`send\` on \`comp [network]\` (all Inst slots). Columns, filters, Pause/Live, pagination, row flash, and packet ids are documented in **[network-traffic-panel.md](network-traffic-panel.md)**.
 
 ---
 
@@ -6254,17 +6362,20 @@ The **Timeline** sits above **Output**. It opens automatically when the script c
 | Control | Action |
 |---------|--------|
 | **Run** | Full execute; applies current Inst slot and Wave / Legacy mode |
+| **Stop** | End simulation on this tab; freeze panels; release Inst slot |
 | **Inst: N** | Instance slot (1–5) for the next Run on this tab |
-| **Next** | \`NEXT(~)\` on last Run’s interpreter |
+| **Next** | \`NEXT(~)\` on last Run’s interpreter (requires active run) |
 | **wave / legacy** | Select propagation for next Run (orange = wave, green = legacy) |
 
 ---
 
 ## Related documentation
 
+- [Documentation viewer](doc-viewer.md) — **Doc** button, search, runnable examples
 - [Debug output](debug.md) — \`show\`, \`peek\`, \`probe\`, **\`watch\`** (Timeline)
 - [Meta constants](meta-constants.md) — \`/instance/\`
 - [Network](network.md) — packets between instances
+- [Network Traffic panel](network-traffic-panel.md) — send log UI
 - [Signal propagation](signal-propagation.md) — Wave vs Legacy behaviour
 - [REG](reg.md) — registers and \`NEXT\`
 - [Interactive components](interactive-components.md) — panel inputs and wire updates
@@ -11626,6 +11737,86 @@ show(lo, hi)
 - [divider.md](divider.md)
 - [components.md](components.md)
 `,
+    'network-traffic-panel.md': `# Network Traffic panel
+
+Open with **Win → Network Traffic**. The panel sits between **Timeline** and **Output** (same column as Output / Variables).
+
+The log is **global** — every \`send\` from all Run instances (1–5) in the page, not per tab. Backend keeps up to **200** entries; when full, the oldest **50** are trimmed. **Clear** empties the log; the **Id** counter does **not** reset.
+
+Each send gets a monotonic **packet id** (shown in the **Id** column). On the sender, \`.wifi:sendId\` returns the last id sent from that network component (binary). See [network.md — Packet ids and \`:sendId\`](network.md#packet-ids-and-sendid).
+
+Bus semantics (\`comp [network]\`, channels, broadcast/unicast): [network.md](network.md). Editor run controls (**Run** / **Stop**, Inst slots): [editorUI.md](editorUI.md).
+
+---
+
+## Table columns
+
+| Column | Meaning |
+|--------|---------|
+| **Id** | Unique packet id (monotonic across the page) |
+| **Source** | Run instance 1–5 that sent |
+| **Target** | Instance 1–5, or \`*\` for broadcast |
+| **Channel** | Bus channel name |
+| **Size** | Packet width in bits |
+| **Status** | \`Received\` (blue) if ≥1 receiver got it; \`Dropped\` (red) if none |
+
+New rows briefly **flash** (blue tint for Received, dark red for Dropped) when they appear in **Live** mode.
+
+**Click a row** to expand the payload — same formatting as \`show()\` for that wire width (wide values wrap).
+
+---
+
+## Toolbar
+
+| Control | Action |
+|---------|--------|
+| **Pause** / **Live** | Toggle live updates. In **Pause**, the title shows **Network Traffic (paused)**; new packets are still logged but the table does not redraw until **Live**. |
+| **Clear** | Empty the log (Ids keep counting) |
+
+While **paused**, pagination and filters use a **frozen snapshot** of the log at pause time — page numbers do not shift when new packets arrive in the background. **Live** refreshes to the current log.
+
+---
+
+## Pagination
+
+- **5 rows** per page, newest first (Id descending).
+- \`[ < ]\` \`[ > ]\` — previous / next page.
+- Summary: \`Rows: X - Y . Shown N of Total\` (positions in the **filtered** list).
+
+---
+
+## Column filters
+
+Click a column header to open the filter bar (\`>\` apply, \`x\` clear, **Esc** close). A column with an active filter has a **blue** header (the filter value is not shown in the header).
+
+| Column | Filter type | Examples |
+|--------|-------------|----------|
+| **Id** | Single id or range | \`23\` · \`1 - 20\` |
+| **Source** | Single or range | \`2\` · \`1 - 5\` |
+| **Target** | Single, range, or broadcast | \`*\` · \`2\` · \`1 - 3\` |
+| **Size** | Single or range | \`8\` · \`128 - 200\` |
+| **Channel** | Substring (case-insensitive) | \`demo\` |
+| **Status** | Dropdown | \`Received\` · \`Dropped\` |
+
+Numeric filters accept \`23\` or \`1 - 20\` (spaces around \`-\` optional; reversed ranges work). Invalid text matches nothing.
+
+Filters combine (AND). One active filter per column.
+
+---
+
+## Related behaviour
+
+- **Stop** on a Run instance unregisters its network endpoints; no new deliveries to that slot until **Run** again. **Stop** does not clear the traffic log.
+- Traffic is logged on every \`send\` attempt, including **Dropped** (no receiver, RX full, or unicast to a missing instance).
+- \`probe\` on a receiving instance is refreshed when a packet arrives — see [editorUI.md — probe: propagation vs network](editorUI.md#probe--propagation-vs-network).
+
+---
+
+## Related
+
+- [network.md](network.md) — \`comp [network]\` component
+- [editorUI.md](editorUI.md) — Run / Stop, panels overview, Inst slots
+`,
     'network.md': `# Network component
 
 \`comp [network]\` is a **packet bus** between Run instances (1–5) in the same browser page. Each instance registers an RX FIFO on a named **channel**; \`send\` fan-outs to all other endpoints on that channel (the sender never receives its own packet).
@@ -11672,10 +11863,50 @@ comp [network] .wifi:
 | \`capacity\` | \`sizeWidth\` | \`length\` in binary |
 | \`free\` | \`sizeWidth\` | \`length - size\` |
 | \`drops\` | variable | RX overflow counter (\`count.toString(2)\`; \`0\`→\`0\`, \`4\`→\`100\`) |
+| \`sendId\` | variable | Last packet id sent from this endpoint (\`id.toString(2)\`; \`0\` before any send) |
 
 When RX is full, incoming packets are **dropped silently** (\`drops\` increments); other receivers on the channel are unaffected.
 
 \`sizeWidth\` = enough bits for \`0 .. length\` (same as [queue](queue.md)).
+
+---
+
+## Packet ids and \`:sendId\`
+
+Every \`send\` on the bus gets a **global monotonic packet id** (integer 1, 2, 3, …). The counter is shared across all instances and channels on the page; it is **not** reset when you **Clear** the Network Traffic log or re-**Run** a script. It resets only on full page refresh.
+
+| Where | Name | Meaning |
+|-------|------|---------|
+| Network Traffic panel | **Id** column | Same packet id for that send |
+| Sender \`comp [network]\` | \`:sendId\` pout | Last packet id sent from **this** endpoint |
+
+**\`:sendId\`** (read-only pout):
+
+- Binary string, **dynamic width** (same encoding style as \`:drops\` — e.g. id \`4\` → \`100\`, id \`2\` → \`10\`).
+- \`0\` before this endpoint has sent any packet.
+- Updates on each successful \`send\` from that component (including sends with zero deliveries when \`target\` points at a missing endpoint).
+- Matches the **Id** column for that send in **Win → Network Traffic**.
+
+\`\`\`logts-play
+comp [network] .wifi:
+  width: 8
+  length: 8
+  channel: 'demo'
+  on: 1
+  :
+
+4wire lastId
+
+.wifi:{ send = ^41
+  set = 1 }
+
+lastId = .wifi:sendId
+show(lastId)
+\`\`\`
+
+After the send above, \`lastId\` is \`1\` and the traffic log row shows **Id** \`1\`. A second send from the same endpoint yields \`sendId\` \`10\` (binary for decimal 2) and log **Id** \`2\`.
+
+Packet ids are for tracing and UI only — they are **not** inserted into the RX FIFO and receivers cannot read them from \`:get\` / \`:front\`.
 
 ---
 
@@ -11751,11 +11982,59 @@ comp [network] .wifi:
 
 ---
 
+## Example — oscillator send every 2 seconds
+
+**Load & Run** the example below, then open **Win → Network Traffic** (keep **Live** on). Every **2 seconds** (one full oscillator cycle) the rising \`set\` edge sends a packet on channel \`demo\`. The payload is \`^FF\` concatenated with the 4-bit **\`:counter\`** from \`.o\`. **Output** shows your Run **Inst** id from \`/instance/\`.
+
+For a receiver on another tab, register the same \`channel: 'demo'\` on **Inst 2**, then watch **Network Traffic** or \`probe(.wifi:get)\` on that tab. See [editorUI.md — probe: propagation vs network](editorUI.md#probe--propagation-vs-network).
+
+\`\`\`logts-play
+4wire inst : /instance/
+show(inst)
+
+comp [network] .wifi:
+  width: 20
+  length: 16
+  channel: 'demo'
+  on: 1
+  :
+
+comp [~] .o:
+  duration1: 4
+  duration0: 4
+  length: 4
+  freq: 2
+  freqIsSec: 1
+  eachCycle: 1
+  :
+
+1wire o = .o
+
+20wire pkg := ^FF + .o:counter
+
+.wifi:{
+  send = pkg
+  set = o
+  }
+\`\`\`
+
+Oscillator timing: \`freq: 2\` with \`freqIsSec: 1\` → **2 s** per cycle; \`eachCycle: 1\` → \`:counter\` increments once per cycle. See [oscillator.md](oscillator.md).
+
+---
+
 ## Restrictions
 
 - \`comp [network]\` only at **top level** (parse error in chip / pcb / board).
 - Cannot assign directly to \`.net\`; use \`:send\`, \`:pop\`, \`:clear\`, \`:set\`.
 - \`send\` + \`pop\` in the same property block → conflict (like queue \`push\` + \`pop\`).
+
+---
+
+## Network Traffic panel
+
+Every \`send\` is logged globally (all instances). Open **Win → Network Traffic**. The **Id** column uses the same global packet ids as \`:sendId\` on the sender (see [Packet ids and \`:sendId\`](#packet-ids-and-sendid)).
+
+Full panel documentation: [network-traffic-panel.md](network-traffic-panel.md).
 
 ---
 
@@ -11771,6 +12050,7 @@ See [editorUI.md — probe: propagation vs network](editorUI.md#probe--propagati
 
 - [queue.md](queue.md) — local FIFO (same pin/pout pattern, \`push\` instead of \`send\`)
 - [meta-constants.md](meta-constants.md) — \`/instance/\`
+- [network-traffic-panel.md](network-traffic-panel.md) — traffic log UI
 - [editorUI.md](editorUI.md) — Inst slots, output per instance, probe vs network
 `,
     'oscillator.md': `# Oscillator
