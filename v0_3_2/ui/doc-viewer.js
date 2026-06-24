@@ -88,6 +88,7 @@ const DOC_SECTIONS = [
       { file: 'huffman.md', label: 'Huffman example', searchExtra: 'prefixFree expand collapse huffPacket huffRecover variable length coding codebook packet round-trip greedy decode' },
       { file: 'reg.md', label: 'reg' },
       { file: 'queue.md', label: 'queue', searchExtra: 'fifo buffer push pop front empty full size capacity free' },
+      { file: 'network.md', label: 'network', searchExtra: 'packet bus channel send cross instance multi drops fifo wifi' },
       { file: 'stack.md', label: 'stack', searchExtra: 'lifo push pop top call stack subroutine' },
       { file: 'oscillator.md', label: 'oscillator' }
     ],

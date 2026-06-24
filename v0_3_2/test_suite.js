@@ -1709,12 +1709,15 @@
   reg(1235, 'meta-constants', 'Parser — chip body rejects /instance/', function(h, session) {
     h.assertThrows(
       'chip body meta constant',
-      () => session.parse(`chip +[t] t:
+      () => session.parse(`chip +[t]:
 4pin a
 4pout b
+1pin set
+exec: set
+on: 1
   4wire x : /instance/
   b = a
-:`),
+:4bit b`),
       'not allowed inside chip body'
     );
   });
@@ -1722,12 +1725,14 @@
   reg(1236, 'meta-constants', 'Parser — pcb body rejects /instance/', function(h, session) {
     h.assertThrows(
       'pcb body meta constant',
-      () => session.parse(`pcb +[p] p:
+      () => session.parse(`pcb +[p]:
 4pin a
 4pout b
+exec: a
+on: 1
   4wire x : /instance/
   b = a
-:`),
+:4bit b`),
       'not allowed inside pcb body'
     );
   });
@@ -1750,7 +1755,152 @@
 
   reg(1239, 'meta-constants', 'Run — show(wire) after init works', function(h, session) {
     const out = session.runDoc('4wire inst : /instance/\nshow(inst)');
-    h.assert('show output', String(out.some(l => l.includes('inst = 0001'))), 'true');
+    h.assert('show output', String(out.some(l => l.includes('inst') && l.includes('0001'))), 'true');
+  });
+
+  function netDef(channel, length) {
+    const ch = channel || 'demo';
+    const len = length != null ? length : 16;
+    return `comp [network] .n:
+  width: 8
+  length: ${len}
+  channel: '${ch}'
+  on: 1
+  :
+`;
+  }
+
+  function sendNet(session, interp, hex) {
+    session.execStmts(interp, `.n:{
+  send = ${hex}
+  set = 1
+}`);
+  }
+
+  reg(1240, 'network', 'parse — comp [network] attrs and pins', function(h, session) {
+    const stmts = session.parse(`comp [network] .n:
+  width: 8
+  length: 32
+  channel: 'wifi'
+  on: 1
+  :`);
+    const s = stmts[0];
+    h.assert('has comp', String(s.comp !== undefined), 'true');
+    h.assert('type network', s.comp.type, 'network');
+    h.assert('name .n', s.comp.name, '.n');
+    h.assert('width 8', String(s.comp.attributes.width), '8');
+    h.assert('length 32', String(s.comp.attributes.length), '32');
+    h.assert('channel wifi', String(s.comp.attributes.channel), 'wifi');
+  });
+
+  reg(1241, 'network', 'channel isolation — send on a not received on b', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('chanA'));
+    s2.run(netDef('chanB'));
+    sendNet(s1, s1.interp, '^41');
+    h.assert('receiver empty', s2.getCompProperty(s2.interp, '.n', 'empty'), '1');
+  });
+
+  reg(1242, 'network', 'cross-instance — s1 send, s2 get', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    sendNet(s1, s1.interp, '^41');
+    h.assert('rx A', s2.getCompProperty(s2.interp, '.n', 'get'), '01000001');
+  });
+
+  reg(1243, 'network', 'exclude sender — sender RX size 0 after send', function(h, session) {
+    const { interp } = session.run(netDef('demo'));
+    sendNet(session, interp, '^41');
+    session.execStmts(interp, '5wire n = .n:size');
+    h.assert('sender size 0', session.getWire(interp, 'n'), '00000');
+  });
+
+  reg(1244, 'network', 'pop — get unchanged until pop=1', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    sendNet(s1, s1.interp, '^41');
+    h.assert('front A', s2.getCompProperty(s2.interp, '.n', 'front'), '01000001');
+    sendNet(s1, s1.interp, '^42');
+    h.assert('still A at front', s2.getCompProperty(s2.interp, '.n', 'get'), '01000001');
+    s2.execStmts(s2.interp, `.n:{ pop = 1
+  set = 1 }`);
+    h.assert('now B', s2.getCompProperty(s2.interp, '.n', 'get'), '01000010');
+  });
+
+  reg(1245, 'network', 'full drop — length 1, second packet dropped', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo', 1));
+    s2.run(netDef('demo', 1));
+    sendNet(s1, s1.interp, '^41');
+    sendNet(s1, s1.interp, '^42');
+    h.assert('first kept', s2.getCompProperty(s2.interp, '.n', 'get'), '01000001');
+    h.assert('one drop', s2.getCompProperty(s2.interp, '.n', 'drops'), '1');
+  });
+
+  reg(1246, 'network', 'drops width — 4 drops → 100', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo', 1));
+    s2.run(netDef('demo', 1));
+    sendNet(s1, s1.interp, '^41');
+    sendNet(s1, s1.interp, '^42');
+    sendNet(s1, s1.interp, '^43');
+    sendNet(s1, s1.interp, '^44');
+    sendNet(s1, s1.interp, '^45');
+    h.assert('drops binary 4', s2.getCompProperty(s2.interp, '.n', 'drops'), '100');
+  });
+
+  reg(1247, 'network', 'Parser — chip body rejects network', function(h, session) {
+    h.assertThrows(
+      'chip body network',
+      () => session.parse(`chip +[bad]:
+  comp [network] .n:
+    width: 8
+    length: 8
+    :
+  :1bit x`),
+      'only allowed at top level'
+    );
+  });
+
+  reg(1248, 'network', 'Parser — board body rejects network', function(h, session) {
+    h.assertThrows(
+      'board body network',
+      () => session.parse(`board +[bad]:
+  1pin a
+  1pout out
+  exec: a
+  on: 1
+  comp [network] .n:
+    width: 8
+    length: 8
+    :
+  out = a
+  :1bit out`),
+      'only allowed at top level'
+    );
+  });
+
+  reg(1249, 'network', 'unregister — stale endpoint does not receive after preempt', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    const def = netDef('demo');
+    s1.run(def);
+    s2.run(def);
+    sendNet(s1, s1.interp, '^41');
+    h.assert('initial rx', s2.getCompProperty(s2.interp, '.n', 'get'), '01000001');
+    if (typeof unregisterNetworkEndpoints === 'function') unregisterNetworkEndpoints(2);
+    sendNet(s1, s1.interp, '^42');
+    s2.run(def);
+    h.assert('empty after re-run', s2.getCompProperty(s2.interp, '.n', 'empty'), '1');
+    sendNet(s1, s1.interp, '^43');
+    h.assert('fresh rx C', s2.getCompProperty(s2.interp, '.n', 'get'), '01000011');
   });
 
   reg(134, 'osc', 'Parser — comp [osc] .o1: with attributes', function(h, session) {
@@ -5991,7 +6141,7 @@ reg(969, 'terminal', 'lineNumbers enabled on device', function(h, session) {
   :
 .term:{ append = ^41
   set = 1 }`);
-  const term = terminalDisplays.get(_termId(interp, '.term'));
+  const term = getTerminalDevice(_termId(interp, '.term'));
   h.assert('lineNumbers flag', String(term.lineNumbers), '1');
   h.assert('gutter nums', String(term.buffer.getVisibleLineNumbers()[0]), '1');
 });

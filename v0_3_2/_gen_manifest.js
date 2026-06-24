@@ -30,6 +30,8 @@ const GROUP_META = [
   { id: 'mem-ports', label: 'Memory multi-port' },
   { id: 'queue-storage', label: 'Queue storage engine' },
   { id: 'queue-stack', label: 'Queue & Stack components' },
+  { id: 'meta-constants', label: 'Meta constants (/instance/)' },
+  { id: 'network', label: 'Network component' },
   { id: 'doc', label: 'doc() tests' },
   { id: 'doc-comp', label: 'Doc for body comps' },
   { id: 'chip', label: 'Chip component' },

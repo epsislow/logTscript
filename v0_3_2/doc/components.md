@@ -77,6 +77,7 @@ Instant built-in functions (`ADD`, `SUBTRACT`, …) without `comp`: [arithmetic.
 | `protocol` | — | [protocol.md](protocol.md) — declare `inline [protocol]`; generate with `.name { params }` |
 | `reg` | — | [reg.md](reg.md) |
 | `queue` | `fifo` | [queue.md](queue.md) |
+| `network` | — | [network.md](network.md) |
 | `stack` | `lifo` | [stack.md](stack.md) |
 | `counter` | `=` | [counter.md](counter.md) |
 | `osc` | `~` | [oscillator.md](oscillator.md) |

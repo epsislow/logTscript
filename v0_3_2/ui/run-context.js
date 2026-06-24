@@ -315,6 +315,9 @@ function preemptInstanceForRun(instanceId, newOwnerTabId) {
   } else if (typeof createDeviceMaps === 'function') {
     ctx.deviceMaps = createDeviceMaps();
   }
+  if (typeof unregisterNetworkEndpoints === 'function') {
+    unregisterNetworkEndpoints(id);
+  }
   if (ctx.devicesRoot) ctx.devicesRoot.innerHTML = '';
 
   ctx.interp = null;
@@ -328,6 +331,9 @@ function preemptInstanceForRun(instanceId, newOwnerTabId) {
 
 function releaseRunContext(instanceId) {
   const id = clampInstance(instanceId);
+  if (typeof unregisterNetworkEndpoints === 'function') {
+    unregisterNetworkEndpoints(id);
+  }
   const ctx = getRunContext(id);
   if (ctx) stopRunContextTimers(ctx);
   instanceOwners.delete(id);

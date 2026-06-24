@@ -4,19 +4,19 @@ overview: Componentă `comp [network]` — bus de pachete între instanțe Run (
 todos:
   - id: network-bus
     content: devices/network-bus.js — registry canale, FIFO RX, send fan-out, drops, unregister per instanță
-    status: pending
+    status: completed
   - id: network-component
     content: core/components/network.js — pins send/pop/clear, pouts + drops, applyProperties, evalGetProperty
-    status: pending
+    status: completed
   - id: registry-html
     content: index.js register + script_editor/run_tests includes + run-context unregister hooks
-    status: pending
+    status: completed
   - id: network-docs
     content: doc/network.md + doc-data + doc-viewer + components catalog
-    status: pending
+    status: completed
   - id: network-tests
     content: "test_suite + manifest: cross-instance, channels, drop, exclude sender, preempt"
-    status: pending
+    status: completed
   - id: network-plan-file
     content: Salvare .cursor/plans/network_component.plan.md
     status: completed

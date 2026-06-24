@@ -22,6 +22,7 @@ var RegComponent = (typeof require !== 'undefined') ? require('./reg') : RegComp
 var CounterComponent = (typeof require !== 'undefined') ? require('./counter') : CounterComponent;
 var QueueComponent = (typeof require !== 'undefined') ? require('./queue') : QueueComponent;
 var StackComponent = (typeof require !== 'undefined') ? require('./stack') : StackComponent;
+var NetworkComponent = (typeof require !== 'undefined') ? require('./network') : NetworkComponent;
 var OscComponent = (typeof require !== 'undefined') ? require('./osc') : OscComponent;
 var RotaryComponent = (typeof require !== 'undefined') ? require('./rotary') : RotaryComponent;
 var SliderComponent = (typeof require !== 'undefined') ? require('./slider') : SliderComponent;
@@ -53,6 +54,7 @@ function createComponentRegistry() {
   registry.register(CounterComponent);
   registry.register(QueueComponent);
   registry.register(StackComponent);
+  registry.register(NetworkComponent);
   registry.register(OscComponent);
   registry.register(RotaryComponent);
   registry.register(SliderComponent);

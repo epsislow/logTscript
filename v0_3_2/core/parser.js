@@ -420,7 +420,10 @@ parsePcbDefinition() {
       this.c.type === 'SPECIAL' ||
       (this.c.type === 'SYM' && this.c.value === '.')
     ) {
+      const stmtLine = this.c.line;
+      const stmtCol = this.c.col;
       const stmt = this.stmt();
+      this.validateTopLevelOnlyComponent(stmt, 'pcb body', this.c.file, stmtLine, stmtCol);
       if (inNextSection) {
         nextSection.push(stmt);
       } else {
@@ -479,6 +482,15 @@ static CHIP_FORBIDDEN_TYPES = [
   'led', '7seg', '14seg', 'lcd', 'terminal', 'dots', 'ledBar'
 ];
 
+static TOP_LEVEL_ONLY_COMPONENT_TYPES = ['network'];
+
+validateTopLevelOnlyComponent(stmt, scopeLabel, file, line, col) {
+  if (!stmt || !stmt.comp) return;
+  if (Parser.TOP_LEVEL_ONLY_COMPONENT_TYPES.includes(stmt.comp.type)) {
+    throw Error(`Component '${stmt.comp.type}' is only allowed at top level, not in ${scopeLabel} at ${file}: ${line}:${col}`);
+  }
+}
+
 validateChipBodyStatement(stmt, file, line, col) {
   if (!stmt) return;
   if (stmt.def) {
@@ -490,6 +502,7 @@ validateChipBodyStatement(stmt, file, line, col) {
   if (stmt.comp && Parser.CHIP_FORBIDDEN_TYPES.includes(stmt.comp.type)) {
     throw Error(`Chip body cannot contain component '${stmt.comp.type}' at ${file}: ${line}:${col}`);
   }
+  this.validateTopLevelOnlyComponent(stmt, 'chip body', file, line, col);
 }
 
 peekChipIsDefinition() {
@@ -510,6 +523,7 @@ validateBoardBodyStatement(stmt, file, line, col) {
   if (stmt.pcbInstance) {
     throw Error(`Board body cannot contain PCB instances at ${file}: ${line}:${col}`);
   }
+  this.validateTopLevelOnlyComponent(stmt, 'board body', file, line, col);
 }
 
 parseChipDefinition() {
