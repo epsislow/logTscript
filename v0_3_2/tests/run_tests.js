@@ -40,7 +40,7 @@
     subtitleEl.textContent = suiteCount + ' / ' + manifestCount + ' tests';
     if (suiteCount !== manifestCount) {
       subtitleEl.style.color = '#f96';
-      subtitleEl.title = 'test_suite and manifest are out of sync — run node _gen_manifest.js';
+      subtitleEl.title = 'test_suite and manifest are out of sync — run node node/_gen_test_manifest.js';
     }
   }
 

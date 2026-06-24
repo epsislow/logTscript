@@ -1,19 +1,25 @@
 /**
- * Bundle doc/*.md into ui/doc-data.js and refresh DOC_SECTIONS in ui/doc-viewer.js.
- * Run: node _gen_doc_data.js
- *
- * Navigation layout: doc/doc-index.json (edit labels / sections there).
- * New *.md files not listed in doc-index.json are auto-added to the "Other" section.
+ * Bundle doc/*.md into ui/doc-data_generated.js and refresh DOC_SECTIONS in ui/doc-viewer.js.
+ * Run: node node/_gen_doc_data.js
  */
 const fs = require('fs');
 const path = require('path');
+const { ROOT, DOC } = require('./js/paths');
 
-const DOC_DIR = path.join(__dirname, 'doc');
+function toLf(text) {
+  return String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+function writeLf(filePath, content) {
+  fs.writeFileSync(filePath, toLf(content), 'utf8');
+}
+
+const DOC_DIR = DOC;
 const INDEX_PATH = path.join(DOC_DIR, 'doc-index.json');
-const OUT_DATA = path.join(__dirname, 'ui', 'doc-data.js');
-const OUT_VIEWER = path.join(__dirname, 'ui', 'doc-viewer.js');
+const OUT_DATA = path.join(ROOT, 'ui', 'doc-data_generated.js');
+const OUT_VIEWER = path.join(ROOT, 'ui', 'doc-viewer.js');
 
-const GEN_BEGIN = '// BEGIN GENERATED DOC_SECTIONS (_gen_doc_data.js)';
+const GEN_BEGIN = '// BEGIN GENERATED DOC_SECTIONS (node/_gen_doc_data.js)';
 const GEN_END = '// END GENERATED DOC_SECTIONS';
 
 function listDocMarkdownFiles() {
@@ -155,7 +161,7 @@ function patchDocViewer(generatedBlock) {
   }
   const endLineEnd = endIdx + GEN_END.length;
   const updated = viewer.slice(0, beginIdx) + generatedBlock + viewer.slice(endLineEnd);
-  fs.writeFileSync(OUT_VIEWER, updated, 'utf8');
+  writeLf(OUT_VIEWER, updated);
 }
 
 const DOC_FILES = listDocMarkdownFiles();
@@ -170,13 +176,13 @@ const mergedIndex = mergeAutoSection(rawIndex, DOC_FILES);
 const entries = [];
 for (const file of DOC_FILES) {
   const full = path.join(DOC_DIR, file);
-  const content = fs.readFileSync(full, 'utf8');
+  const content = fs.readFileSync(full, 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   entries.push({ file, content });
 }
 
 const outData = `/**
- * Documentation bundle from doc/*.md (auto-generated).
- * Regenerate: node _gen_doc_data.js
+ * AUTO-GENERATED — do not edit.
+ * Regenerate: node node/_gen_doc_data.js
  * Files: ${DOC_FILES.join(', ')}
  */
 (function () {
@@ -187,7 +193,7 @@ ${entries.map(e => `    '${e.file}': \`${escForJs(e.content)}\``).join(',\n')}
 })();
 `;
 
-fs.writeFileSync(OUT_DATA, outData, 'utf8');
+writeLf(OUT_DATA, outData);
 console.log('Wrote', OUT_DATA, entries.length, 'files');
 
 const sectionsBlock = buildDocSectionsBlock(mergedIndex);

@@ -174,7 +174,7 @@ Canvas symbols (`digit7`, `digit14`, `dp`, `colon`) are drawn on the display can
 
 The **`label`** symbol draws text on the canvas (see **Symbol fields** above).
 
-Icons use Font Awesome 5 Free (`res/fontawesome/`).
+Icons use Font Awesome 5 Free (`res/css/fontawesome/` + `res/fonts/fontawesome/webfonts/`).
 
 ---
 

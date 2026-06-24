@@ -1,15 +1,14 @@
-/** Quick validation: load core + test_suite, run all tests with isolated sessions. */
+/** Run all tests in Node (same suite as run_tests.html). */
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
-
-const dir = __dirname;
-const { TEST_RUNTIME_SCRIPTS } = require('./test_runtime_bundle.js');
-const { createTestNodeSandbox } = require('./test_node_sandbox.js');
+const { ROOT } = require('./js/paths');
+const { TEST_RUNTIME_SCRIPTS } = require(path.join(ROOT, 'tests', 'test_runtime_bundle_generated.js'));
+const { createTestNodeSandbox } = require('./js/test_node_sandbox');
 
 let src = '';
 for (const f of TEST_RUNTIME_SCRIPTS) {
-  src += fs.readFileSync(path.join(dir, f), 'utf8') + '\n';
+  src += fs.readFileSync(path.join(ROOT, f), 'utf8') + '\n';
 }
 
 const sandbox = createTestNodeSandbox();
@@ -70,7 +69,7 @@ for (const test of suite.tests) {
 
 console.log('Passed:', passed, 'Failed:', failed, 'Total:', suite.tests.length);
 if (dmErrors.length) {
-  console.log('dm is not defined:', dmErrors.length, 'tests — run node _gen_manifest.js and check test_scripts.json');
+  console.log('dm is not defined:', dmErrors.length, 'tests — run node node/_gen_test_manifest.js');
 }
 if (failures.length) {
   console.log('Failures:', failures.slice(0, 40).join('\n'));

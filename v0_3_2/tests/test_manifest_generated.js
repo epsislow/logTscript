@@ -1,6 +1,6 @@
 /**
- * Test manifest from LogTScriptTestSuite (auto-generated).
- * Regenerate: node _gen_manifest.js
+ * AUTO-GENERATED — do not edit.
+ * Regenerate: node node/_gen_test_manifest.js
  */
 (function () {
   'use strict';

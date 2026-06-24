@@ -1,6 +1,6 @@
 /* ================= DOC VIEWER ================= */
 
-// BEGIN GENERATED DOC_SECTIONS (_gen_doc_data.js)
+// BEGIN GENERATED DOC_SECTIONS (node/_gen_doc_data.js)
 const DOC_SECTIONS = [
   {
     title: 'Reference',
@@ -22,7 +22,7 @@ const DOC_SECTIONS = [
       { file: 'debug.md', label: 'Debug (show / peek / probe / lutOf)', searchExtra: 'show peek probe lutOf exprOfLut truthTableOf output panel' },
       { file: 'signal-propagation.md', label: 'Signal propagation' },
       { file: 'zstate.md', label: 'MODE ZSTATE (tristate / multi-driver)', searchExtra: 'Z X high impedance bus buffer tristate conflict get>= out>= ZRELEASE()' },
-      { file: 'editorUI.md', label: 'Editor UI', searchExtra: 'Run Next Inst instance multi tab probe network propagation output /instance/' },
+      { file: 'editorUI.md', label: 'Editor UI' }
     ],
   },
   {
@@ -840,26 +840,41 @@ function enhanceClcdSymbolGallery(container) {
   });
 }
 
-function clcdScriptNameToFaClass(scriptName) {
-  const kebab = scriptName
-    .replace(/([a-z])([A-Z])/g, '$1-$2')
-    .replace(/_/g, '-')
-    .toLowerCase();
-  return 'fa-' + kebab;
+function clcdEnsureFaFontsLoaded() {
+  if (clcdEnsureFaFontsLoaded._promise) return clcdEnsureFaFontsLoaded._promise;
+  if (!document.fonts) {
+    clcdEnsureFaFontsLoaded._promise = Promise.resolve();
+    return clcdEnsureFaFontsLoaded._promise;
+  }
+  clcdEnsureFaFontsLoaded._promise = Promise.all([
+    document.fonts.load('900 24px "Font Awesome 5 Free"'),
+    document.fonts.load('400 24px "Font Awesome 5 Free"'),
+    document.fonts.load('400 24px "Font Awesome 5 Brands"'),
+  ]).catch(function () {});
+  return clcdEnsureFaFontsLoaded._promise;
 }
 
-function clcdFaStyleClass(styleNum) {
-  if (styleNum === 3) return 'fab';
-  if (styleNum === 2) return 'far';
-  return 'fas';
+/** FA preview via registry glyph (script name battery → unicode, not fa-battery CSS). */
+function clcdSymbolFaIconEl(sym, styleNum, extraClass) {
+  if (!sym || sym.kind !== 'fa' || typeof resolveClcdFaStyle !== 'function') return null;
+  const st = styleNum !== undefined && styleNum !== null ? styleNum : sym.defaultStyle;
+  const resolved = resolveClcdFaStyle(sym, st);
+  if (!resolved) return null;
+  const el = document.createElement('span');
+  el.className = (extraClass || 'clcd-symbol-menu-icon').trim();
+  el.setAttribute('aria-hidden', 'true');
+  el.textContent = resolved.glyph;
+  const px = typeof resolveClcdFaIconSize === 'function' ? resolveClcdFaIconSize(sym) : 22;
+  el.style.fontFamily = resolved.fontFamily;
+  el.style.fontWeight = resolved.weight;
+  el.style.fontSize = px + 'px';
+  el.style.lineHeight = '1';
+  el.style.display = 'inline-block';
+  return el;
 }
 
 function clcdSymbolMenuIconEl(sym) {
-  if (!sym || sym.kind !== 'fa') return null;
-  const icon = document.createElement('i');
-  icon.className = clcdFaStyleClass(sym.defaultStyle) + ' ' + clcdScriptNameToFaClass(sym.name) + ' clcd-symbol-menu-icon';
-  icon.setAttribute('aria-hidden', 'true');
-  return icon;
+  return clcdSymbolFaIconEl(sym, sym.defaultStyle, 'clcd-symbol-menu-icon');
 }
 
 function filterClcdSymbolSearch(query) {
@@ -913,6 +928,7 @@ function clcdSymbolSnippet(sym, styleNum) {
 }
 
 function mountClcdSymbolSearch(host) {
+  clcdEnsureFaFontsLoaded();
   const wrap = document.createElement('div');
   wrap.className = 'clcd-symbol-search';
 
@@ -985,18 +1001,16 @@ function mountClcdSymbolSearch(host) {
       styles.forEach(function (st) {
         const cell = document.createElement('div');
         cell.className = 'clcd-symbol-preview-cell';
-        const icon = document.createElement('i');
-        icon.className = clcdFaStyleClass(st) + ' ' + clcdScriptNameToFaClass(sym.name) + ' clcd-symbol-preview-icon';
-        icon.setAttribute('aria-hidden', 'true');
+        const icon = clcdSymbolFaIconEl(sym, st, 'clcd-symbol-preview-icon');
         const nameEl = document.createElement('span');
         nameEl.className = 'clcd-symbol-preview-name';
         nameEl.textContent = sym.name;
         const styleEl = document.createElement('span');
         styleEl.className = 'clcd-symbol-preview-style';
         styleEl.textContent = 'style ' + st;
-        cell.appendChild(icon);
         cell.appendChild(nameEl);
         cell.appendChild(styleEl);
+        if (icon) cell.insertBefore(icon, nameEl);
         grid.appendChild(cell);
       });
       snippet.textContent = clcdSymbolSnippet(sym, sym.defaultStyle);

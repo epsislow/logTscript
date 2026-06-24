@@ -33,7 +33,7 @@
     "core/components/osc.js",
     "core/components/rotary.js",
     "core/components/slider.js",
-    "devices/clcd-symbols.js",
+    "devices/clcd-symbols_generated.js",
     "core/components/clcd.js",
     "core/components/alu.js",
     "core/components/pcb-component.js",
@@ -58,16 +58,16 @@
     "core/parser.js",
     "core/interpreter.js",
     "core/signal-propagation.js",
-    "test_session.js"
+    "tests/test_session.js"
   ],
   "afterRuntime": {
     "browser": [
-      "test_manifest.js",
-      "test_suite.js",
-      "run_tests.js"
+      "tests/test_manifest_generated.js",
+      "tests/test_suite.js",
+      "tests/run_tests.js"
     ],
     "node": [
-      "test_suite.js"
+      "tests/test_suite.js"
     ]
   }
 }

@@ -1,6 +1,6 @@
 /**
- * LogTScript test suite — browser + node (_run_suite_node.js).
- * Manifest: node _gen_manifest.js
+ * LogTScript test suite — browser + node (node/_run_test_suite_node.js).
+ * Manifest: node node/_gen_test_manifest.js
  */
 (function () {
   'use strict';

@@ -1,14 +1,20 @@
+/** Quick validation: load core + test_suite, run all tests with isolated sessions. */
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
-const { loadTestScripts } = require('./test_scripts');
-const { createTestNodeSandbox } = require('./test_node_sandbox');
-const dir = __dirname;
+const { ROOT } = require('./js/paths');
+const { loadTestScripts } = require('./js/test_scripts');
+const { createTestNodeSandbox } = require('./js/test_node_sandbox');
+
 const files = loadTestScripts().nodeAll();
 let src = '';
-files.forEach(f => { src += fs.readFileSync(path.join(dir, f), 'utf8') + '\n'; });
+for (const f of files) {
+  src += fs.readFileSync(path.join(ROOT, f), 'utf8') + '\n';
+}
+
 const sb = createTestNodeSandbox();
 vm.runInNewContext(src, sb);
+
 const s = sb.LogTScriptTestSuite.createSession();
 const INLINE_DECODER2 = `inline [lut] .decoder:
   depth: 2

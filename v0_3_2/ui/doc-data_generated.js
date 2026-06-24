@@ -1,6 +1,6 @@
 /**
- * Documentation bundle from doc/*.md (auto-generated).
- * Regenerate: node _gen_doc_data.js
+ * AUTO-GENERATED — do not edit.
+ * Regenerate: node node/_gen_doc_data.js
  * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, decimal-conversion.md, dip.md, divider.md, doc-function.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
  */
 (function () {
@@ -3380,7 +3380,7 @@ Canvas symbols (\`digit7\`, \`digit14\`, \`dp\`, \`colon\`) are drawn on the dis
 
 The **\`label\`** symbol draws text on the canvas (see **Symbol fields** above).
 
-Icons use Font Awesome 5 Free (\`res/fontawesome/\`).
+Icons use Font Awesome 5 Free (\`res/css/fontawesome/\` + \`res/fonts/fontawesome/webfonts/\`).
 
 ---
 

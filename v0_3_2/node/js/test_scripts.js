@@ -1,10 +1,11 @@
 /**
- * Load test script lists from test_scripts.json (single source of truth).
+ * Load test script lists from tests/test_scripts.json (single source of truth).
  */
 const fs = require('fs');
 const path = require('path');
+const { TESTS } = require('./paths');
 
-const CONFIG_PATH = path.join(__dirname, 'test_scripts.json');
+const CONFIG_PATH = path.join(TESTS, 'test_scripts.json');
 
 function loadTestScripts() {
   const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));

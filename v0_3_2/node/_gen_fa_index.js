@@ -1,15 +1,15 @@
 /**
- * Local dev: parse Font Awesome all.min.css → _fa_index.json
- * Not loaded by editor or doc viewer.
+ * Parse Font Awesome CSS → res/fonts/fa_index_generated.json
+ * Run: node node/_gen_fa_index.js
  */
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { RES_CSS, RES_FONTS } = require('./js/paths');
 
-const ROOT = __dirname;
-const CSS_PATH = path.join(ROOT, 'res/fontawesome/css/all.min.css');
-const OUT_PATH = path.join(ROOT, '_fa_index.json');
-const META_CACHE = path.join(ROOT, '_fa_icons_meta.json');
+const CSS_PATH = path.join(RES_CSS, 'fontawesome', 'all.min.css');
+const OUT_PATH = path.join(RES_FONTS, 'fa_index_generated.json');
+const META_CACHE = path.join(RES_FONTS, 'fa_icons_meta_generated.json');
 const META_URL = 'https://raw.githubusercontent.com/FortAwesome/Font-Awesome/5.15.4/metadata/icons.json';
 
 function parseCssIcons(css) {

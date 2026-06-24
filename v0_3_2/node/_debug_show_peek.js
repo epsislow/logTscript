@@ -1,15 +1,19 @@
-const fs = require('fs'), vm = require('vm'), path = require('path');
-const dir = __dirname;
-const files = [
-  'core/tokenizer.js','core/preprocessor.js','core/components/component-base.js',
-  'core/components/builtin-component.js','core/components/component-registry.js',
-  'core/components/adder.js','core/components/index.js','devices/mem-devices.js',
-  'core/parser.js','core/interpreter.js','core/signal-propagation.js','test_session.js'
-];
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
+const { ROOT } = require('./js/paths');
+const { loadTestScripts } = require('./js/test_scripts');
+const { createTestNodeSandbox } = require('./js/test_node_sandbox');
+
+const files = loadTestScripts().nodeAll().filter(f =>
+  f.startsWith('core/') || f.startsWith('devices/device-maps') || f === 'tests/test_session.js'
+);
 let src = '';
-for (const f of files) src += fs.readFileSync(path.join(dir, f), 'utf8') + '\n';
-const sb = { Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, JSON, Number, isNaN, clearTimeout, setTimeout, window: {} };
-sb.window = sb;
+for (const f of files) {
+  src += fs.readFileSync(path.join(ROOT, f), 'utf8') + '\n';
+}
+
+const sb = createTestNodeSandbox();
 vm.runInNewContext(src, sb);
 
 const SCRIPTS = {
