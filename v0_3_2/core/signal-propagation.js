@@ -322,6 +322,44 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
 
 /* Extracted from interpreter.js — dependency analysis and signal propagation logic */
 
+function collectSetExprComponentRefs(expr, interp) {
+  const refs = new Set();
+  if (!expr || !Array.isArray(expr)) return refs;
+  const visit = (e) => {
+    for (const atom of e) {
+      if (atom.var && atom.var.startsWith('.')) {
+        refs.add(atom.var.split(':')[0]);
+      }
+      if (interp) interp.forEachSubExprInAtom(atom, visit);
+    }
+  };
+  visit(expr);
+  return refs;
+}
+
+function setExprIsConstantOne(expr) {
+  if (!expr || expr.length !== 1) return false;
+  const a = expr[0];
+  return a.bin === '1' || a.hex === '1' || a.dec === '1';
+}
+
+/** set references only component pouts (e.g. OR(.kbd:valid, .Left)), no bare wires */
+function setExprUsesOnlyComponentTriggers(expr, interp) {
+  if (!expr || !Array.isArray(expr)) return false;
+  let hasComponent = false;
+  let hasWire = false;
+  const visit = (e) => {
+    for (const atom of e) {
+      if (atom.var === '~' || atom.var === '%' || atom.var === '$') return;
+      if (atom.var && atom.var.startsWith('.')) hasComponent = true;
+      else if (atom.var) hasWire = true;
+      if (interp) interp.forEachSubExprInAtom(atom, visit);
+    }
+  };
+  visit(expr);
+  return hasComponent && !hasWire;
+}
+
 Interpreter.prototype.forEachSubExprInAtom = function(atom, visit) {
   if (!atom || typeof visit !== 'function') return;
   const nested = [];
@@ -741,9 +779,15 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
           // BUT: Skip if this component has a property block with a setExpr that directly references
           // the changed component - those are handled separately by the componentPropertyBlocks loop
           // to properly handle on: mode (raise/edge/1)
-          const hasPropertyBlockWithSetExpr = this.componentPropertyBlocks.some(
-            block => block.component === propCompName && block.setExpr && block.setExprDirectRef
-          );
+          // Skip immediate apply when a registered property block owns :set (component, wire,
+          // compound OR(...), etc.). Constant set=1 blocks with only data-wire deps still
+          // use the immediate path below.
+          const hasPropertyBlockWithSetExpr = this.componentPropertyBlocks.some((block) => {
+            if (block.component !== propCompName || !block.setExpr) return false;
+            if (block.setExprDirectRef) return true;
+            if (block.setExprComponentTriggersOnly) return true;
+            return !setExprIsConstantOne(block.setExpr);
+          });
 
           // Check if the property that's changing (propName) comes from a constant set=1 block with no dependencies
           // These blocks should only execute during initial RUN(), not when components change
@@ -970,7 +1014,8 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
   // Note: Blocks executed in updateConnectedComponents are tracked there, not here
   // So we need to be careful not to execute them again
   for(const block of this.componentPropertyBlocks){
-    if(block.setExpr && block.setExprDirectRef){
+    const hasComponentSetTrigger = block.setExpr && block.setExprComponentRefs && block.setExprComponentRefs.size > 0;
+    if(block.setExpr && (block.setExprDirectRef || hasComponentSetTrigger)){
       // Skip if set expression is ~ (handled separately)
       if(block.setExpr.length === 1 && block.setExpr[0] && block.setExpr[0].var === '~'){
         continue;
@@ -988,15 +1033,17 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
       let shouldCheckBlock = false;
       
       // Check if this block's setExpr directly references the changed component
-      if(block.setExprDirectRef.type === 'component'){
+      if(block.setExprDirectRef && block.setExprDirectRef.type === 'component'){
         // Direct component match
         if(block.setExprDirectRef.name === compName){
           shouldCheckBlock = true;
         }
-      } else if(block.setExprDirectRef.type === 'wire'){
+      } else if(block.setExprDirectRef && block.setExprDirectRef.type === 'wire'){
         // SKIP: Wire-triggered blocks will be handled in updateConnectedComponents
         // when the wire itself changes. This avoids double execution.
         continue;
+      } else if(block.setExprComponentRefs && block.setExprComponentRefs.has(compName)){
+        shouldCheckBlock = true;
       }
       
       if(!shouldCheckBlock){
@@ -1051,7 +1098,10 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
       if(shouldExecute){
         const blockKey = `${block.component}:${block.blockIndex}`;
         executedBlocks.add(blockKey);
-        
+        // Commit before execute/nested cascade — otherwise updateComponentConnections(.term)
+        // can re-enter this block while :set still reads 1 and lastSetValue is stale.
+        block.lastSetValue = newSetValue;
+
         this.executePropertyBlock(block.component, block.properties, true, block);
         
         // After executing property block, update connections for the component itself
@@ -1072,8 +1122,11 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
   // Check property blocks that have dependencies on the changed component
   // This handles cases where a block has dependencies (like a = .as) but setExprDirectRef is null or constant
   for(const block of this.componentPropertyBlocks){
-    // Skip blocks that were already checked above (they have setExprDirectRef)
+    // Skip blocks that were already checked above (component / compound component set triggers)
     if(block.setExpr && block.setExprDirectRef){
+      continue;
+    }
+    if(block.setExprComponentTriggersOnly){
       continue;
     }
     
@@ -1161,7 +1214,8 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
         
         if(!executedBlocks.has(blockKey)){
           executedBlocks.add(blockKey);
-          
+          block.lastSetValue = setValue;
+
           // If a top-level updateConnectedComponents is active, defer to pending
           // so all blocks execute together in blockIndex (program) order.
           if(this._uccPendingBlocks){
@@ -1203,8 +1257,6 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
         const blockKey = `${block.component}:${block.blockIndex}`;
         if(!executedBlockKeys.has(blockKey)){
           executedBlockKeys.add(blockKey);
-          this.executePropertyBlock(block.component, block.properties, true, block);
-          // Update lastSetValue after execution so next trigger sees correct previous state
           if(block.setExpr){
             const res = this.evalExpr(block.setExpr, false);
             let sv = '';
@@ -1214,6 +1266,7 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
             }
             block.lastSetValue = sv || '0';
           }
+          this.executePropertyBlock(block.component, block.properties, true, block);
           if(!seenComponents.has(block.component)){
             seenComponents.add(block.component);
             executedComponents.push(block.component);
@@ -1582,7 +1635,14 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
             const newBit = (value && value.length > 0) ? value[value.length - 1] : '0';
             
             if(oldBit === '0' && newBit === '1'){
-              this.applyComponentProperties(propCompName, 'immediate', true);
+              const blockOwnsSetTrigger = this.componentPropertyBlocks.some((block) =>
+                block.component === propCompName &&
+                block.setExpr &&
+                this.exprReferencesWire(block.setExpr, varName)
+              );
+              if(!blockOwnsSetTrigger){
+                this.applyComponentProperties(propCompName, 'immediate', true);
+              }
             }
           } else {
             const propComp = this.components.get(propCompName);
@@ -1776,8 +1836,11 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
   // componentPropertyBlocks is already in program order, so we maintain that order
   const blocksByComponent = new Map();
   for(const block of this.componentPropertyBlocks){
-    // Skip blocks that were already checked in updateComponentConnections (they have setExprDirectRef pointing to components)
+    // Skip blocks handled via component set triggers in updateComponentConnections
     if(block.setExpr && block.setExprDirectRef && block.setExprDirectRef.type === 'component'){
+      continue;
+    }
+    if(block.setExprComponentTriggersOnly){
       continue;
     }
     
@@ -1809,8 +1872,11 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
     // First, check if any block for this component should execute based on wire dependencies
     let hasAnyWireDependentBlock = false;
     for(const block of sortedBlocks){
-      // Skip blocks that were already checked in updateComponentConnections (they have setExprDirectRef pointing to components)
+      // Skip blocks handled via component set triggers in updateComponentConnections
       if(block.setExpr && block.setExprDirectRef && block.setExprDirectRef.type === 'component'){
+        continue;
+      }
+      if(block.setExprComponentTriggersOnly){
         continue;
       }
       
@@ -1867,8 +1933,11 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
     // This ensures constant blocks execute before wire-dependent blocks
     if(hasAnyWireDependentBlock){
       for(const block of sortedBlocks){
-        // Skip blocks that were already checked in updateComponentConnections
+        // Skip blocks handled via component set triggers in updateComponentConnections
         if(block.setExpr && block.setExprDirectRef && block.setExprDirectRef.type === 'component'){
+          continue;
+        }
+        if(block.setExprComponentTriggersOnly){
           continue;
         }
         
@@ -1999,16 +2068,18 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
           //   when set stays 1 because a data dependency changed), OR
           // - this was triggered by a non-set wire AND set is still 1 AND the triggering
           //   wire is an actual data dependency of the block (not just any wire change)
+          // Re-execute on data-wire change only for set=1 (level) blocks — not pulse/compound set triggers
           const triggeredByDataWire = !isSetWireTrigger &&
+            setExprIsConstantOne(block.setExpr) &&
             block.wireDependencies && block.wireDependencies.has(varName);
           if(setBit === '1' && (valueChanged || triggeredByDataWire)){
+            block.lastSetValue = setValue;
             // Add to shared pending map (keyed by blockIndex for deduplication)
             // Top-level call will execute all pending in program order
             this._uccPendingBlocks.set(block.blockIndex, block);
+          } else {
+            block.lastSetValue = setValue;
           }
-
-          // Always update lastSetValue
-          block.lastSetValue = setValue;
         } else if(onMode === 'raise' || onMode === 'rising'){
           // For edge-triggered blocks, check if value changed from 0 to 1
           if(newValue && newValue.length > 0 && newValue[newValue.length - 1] === '1'){
@@ -2067,8 +2138,6 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         const blockKey = `${block.component}:${block.blockIndex}`;
         if(!executedBlockKeys.has(blockKey)){
           executedBlockKeys.add(blockKey);
-          this.executePropertyBlock(block.component, block.properties, true, block);
-          // Update lastSetValue after execution so next trigger sees correct previous state
           if(block.setExpr){
             const res = this.evalExpr(block.setExpr, false);
             let sv = '';
@@ -2078,6 +2147,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
             }
             block.lastSetValue = sv || '0';
           }
+          this.executePropertyBlock(block.component, block.properties, true, block);
           if(!seenComponents.has(block.component)){
             seenComponents.add(block.component);
             executedComponents.push(block.component);

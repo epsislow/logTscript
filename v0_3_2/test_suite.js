@@ -12860,6 +12860,68 @@ comp [terminal] .term:
   h.assert('text AC', getTerminalText(_termId(interp, '.term')), 'AC');
 }, { propagation: 'wave' });
 
+reg(1663, 'terminal', 'keyboard + key Left — OR set trigger no triple fire', function(h, session) {
+  const { interp } = session.run(`comp [key] .Left:
+  label:'<-'
+  size: 35
+  on:1
+  :
+comp [keyboard] .kbd:
+  allowBackspace
+  allowArrows
+  allowDelete
+  allowEnter
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 8
+  columns: 40
+  cursorStyle: 2
+  on: 1
+  :
+8wire code = .kbd
+1wire isBS = EQ(code, 00001000)
+1wire isLF = EQ(code, 00001010)
+1wire isDel = EQ(code, 10000100)
+1wire isL = OR(EQ(code, 10000000), .Left)
+1wire isR = EQ(code, 10000001)
+1wire isU = EQ(code, 10000010)
+1wire isD = EQ(code, 10000011)
+1wire termSet = OR(.kbd:valid, .Left)
+.term:{
+  backDelete = MUX(isBS, 0, \\2)
+  frontDelete = MUX(isDel, 0, \\1)
+  moveCursor  = MUX(isL, MUX(isR, MUX(isU, MUX(isD, 0, \\4), \\3), \\2), \\1)
+  append      = MUX(OR(isBS + isLF + isDel + isL + isR + isU + isD), .kbd, 00000000)
+  newline     = isLF
+  set         = OR(.kbd:valid, .Left)
+}`);
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'A' });
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'B' });
+  session.triggerKeyboardKey(interp, '.kbd', { key: 'C' });
+  h.assert('text ABC', getTerminalText(_termId(interp, '.term')), 'ABC');
+  const colBefore = _termCursor(interp, '.term').col;
+  session.triggerKeyPress(interp, '.Left', { phase: 'press' });
+  session.triggerKeyPress(interp, '.Left', { phase: 'release' });
+  h.assert('Left once', String(_termCursor(interp, '.term').col), String(colBefore - 1));
+  const { interp: i2 } = session.run(`comp [keyboard] .kbd:
+  on: 1
+  :
+comp [terminal] .term:
+  rows: 3
+  columns: 20
+  on: 1
+  :
+1wire termSet = .kbd:valid
+.term:{
+  append = .kbd
+  set = termSet
+}`);
+  session.triggerKeyboardKey(i2, '.kbd', { key: 'A' });
+  session.triggerKeyboardKey(i2, '.kbd', { key: 'B' });
+  h.assert('wire set alias AB', getTerminalText(_termId(i2, '.term')), 'AB');
+}, { propagation: 'wave' });
+
 reg(1662, 'gates', 'OR(isBS + isLF + isL) — concat + fold', function(h, session) {
   const r0 = session.run(`1wire isBS = 0
 1wire isLF = 0

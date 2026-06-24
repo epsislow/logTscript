@@ -4560,6 +4560,12 @@ if (this.isBuiltinDEMUX(name)) {
       // BUT NOT when we're inside a PCB/chip/body body (internal blocks are executed inline)
       if(!this.insidePcbBody && !this.insideChipBody && !this.insideBoardBody){
         const blockIndex = this.componentPropertyBlocks.length; // Unique index for this block
+        const setExprComponentRefs = (typeof collectSetExprComponentRefs === 'function')
+          ? collectSetExprComponentRefs(setExpr, this)
+          : new Set();
+        const setExprComponentTriggersOnly = (typeof setExprUsesOnlyComponentTriggers === 'function')
+          ? setExprUsesOnlyComponentTriggers(setExpr, this)
+          : false;
         this.componentPropertyBlocks.push({
           component,
           properties,
@@ -4567,6 +4573,8 @@ if (this.isBuiltinDEMUX(name)) {
           wireDependencies: allWireDependencies,
           setExpr: setExpr,
           setExprDirectRef: setExprDirectRef, // What directly triggers this block
+          setExprComponentRefs: setExprComponentRefs,
+          setExprComponentTriggersOnly: setExprComponentTriggersOnly,
           lastSetValue: initialSetValue,
           onMode: onMode,
           getTarget: getTargetAtom,  // Store get> target if present
