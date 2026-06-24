@@ -120,11 +120,14 @@ The sender never sees its own packet on `:get` (by design). See [network.md](net
 | Panel | Purpose |
 |-------|---------|
 | **Output** | Text from `show`, `peek`, `probe`, errors — per instance when switching tabs |
-| **Timeline** | Waveform trace from `watch()` — enable via **Panels → Timeline** |
+| **Timeline** | Waveform trace from `watch()` — enable via **Win → Timeline** |
+| **Network Traffic** | Log of every `send` on `comp [network]` — **Win → Network Traffic** |
 | **Variables** | Live wire / component values after **Run** |
 | **AST** | Parsed program structure |
 
-The **Timeline** sits above **Output**. It opens automatically when the script contains `watch()` and you press **Run**. Use **Pause** to inspect history; **Live** to follow new events.
+The **Timeline** sits above **Output**. Use **Pause** to inspect history; **Live** to follow new events.
+
+**Network Traffic** sits between Timeline and Output (same column width). It lists the latest `send` operations across all Run instances (global, not per tab): Id, Source, Target (`*` = broadcast), Channel, Size, Status (`Received` / `Dropped`). Click a row to expand the packet (`show()` formatting). Column filters (substring), **Clear** to empty the log (Id counter continues). Pagination: `[ < ] [ > ]` with `Rows: X - Y . Shown N of Total` (row positions in the filtered list). Backend keeps up to 200 entries.
 
 ---
 

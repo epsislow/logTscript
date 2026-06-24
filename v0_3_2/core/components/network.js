@@ -161,6 +161,28 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
     return id;
   }
 
+  _sendDedupKey(instanceId, id) {
+    return instanceId + ':' + id;
+  }
+
+  _shouldSkipDuplicateSend(ctx, instanceId, id, sendValue, target, reEvaluate) {
+    if (!reEvaluate) return false;
+    if (!ctx || !ctx._networkSendDedup) return false;
+    const prev = ctx._networkSendDedup.get(this._sendDedupKey(instanceId, id));
+    if (!prev) return false;
+    const targetKey = target !== undefined ? String(target) : '*';
+    return prev.packet === sendValue && prev.target === targetKey;
+  }
+
+  _recordSendDedup(ctx, instanceId, id, sendValue, target) {
+    if (!ctx) return;
+    if (!ctx._networkSendDedup) ctx._networkSendDedup = new Map();
+    ctx._networkSendDedup.set(this._sendDedupKey(instanceId, id), {
+      packet: sendValue,
+      target: target !== undefined ? String(target) : '*',
+    });
+  }
+
   _doNetworkSend(instanceId, id, channel, sendValue, pending, reEvaluate, ctx) {
     if (typeof networkSend !== 'function') return;
     const opts = {
@@ -192,7 +214,13 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
       if (typeof networkRxClear === 'function') networkRxClear(instanceId, id);
       const sendValue = this.reEvalPendingValue(pending, 'send', reEvaluate, ctx);
       if (sendValue.length !== width) throw Error('send value width mismatch');
-      this._doNetworkSend(instanceId, id, channel, sendValue, pending, reEvaluate, ctx);
+      const target = pending.target !== undefined
+        ? this._resolveSendTarget(pending, reEvaluate, ctx)
+        : undefined;
+      if (!this._shouldSkipDuplicateSend(ctx, instanceId, id, sendValue, target, reEvaluate)) {
+        this._doNetworkSend(instanceId, id, channel, sendValue, pending, reEvaluate, ctx);
+        this._recordSendDedup(ctx, instanceId, id, sendValue, target);
+      }
     } else if (clearActive) {
       if (typeof networkRxClear === 'function') networkRxClear(instanceId, id);
     } else if (popActive) {
@@ -200,7 +228,13 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
     } else if (sendInBlock) {
       const sendValue = this.reEvalPendingValue(pending, 'send', reEvaluate, ctx);
       if (sendValue.length !== width) throw Error('send value width mismatch');
-      this._doNetworkSend(instanceId, id, channel, sendValue, pending, reEvaluate, ctx);
+      const target = pending.target !== undefined
+        ? this._resolveSendTarget(pending, reEvaluate, ctx)
+        : undefined;
+      if (!this._shouldSkipDuplicateSend(ctx, instanceId, id, sendValue, target, reEvaluate)) {
+        this._doNetworkSend(instanceId, id, channel, sendValue, pending, reEvaluate, ctx);
+        this._recordSendDedup(ctx, instanceId, id, sendValue, target);
+      }
     }
   }
 

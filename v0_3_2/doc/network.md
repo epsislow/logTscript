@@ -131,6 +131,24 @@ comp [network] .wifi:
 
 ---
 
+## Network Traffic panel
+
+Every `send` is logged globally (all instances). Open **Win → Network Traffic**.
+
+| Column | Meaning |
+|--------|---------|
+| Id | Unique packet id (monotonic; not reset on Clear) |
+| Source / Target | Run instance 1–5; Target `*` = broadcast |
+| Channel | Bus channel name |
+| Size | Packet width in bits |
+| Status | `Received` (≥1 delivery) or `Dropped` (none) |
+
+Click a row to expand the payload (same format as `show()`). Filters on Source, Target, Channel, Size; paginate with `[ < ] [ > ]`.
+
+See [editorUI.md — Network Traffic](editorUI.md#panels).
+
+---
+
 ## `probe` on another instance
 
 `probe(.wifi:get)` on the **receiving** instance does not update from wire propagation when a packet arrives from another tab — the bus is outside the simulation graph. The editor **re-reads** probes when a packet is delivered (and when you switch to that tab). Probe history keeps earlier lines (`initialised`) and appends `changed` when the value updates.

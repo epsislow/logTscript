@@ -47,6 +47,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "devices/alu-devices.js",
   "devices/queue-storage.js",
   "devices/network-bus.js",
+  "ui/network-traffic-display.js",
   "devices/lut-devices.js",
   "devices/terminal.js",
   "core/error-format.js",

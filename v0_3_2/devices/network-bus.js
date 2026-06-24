@@ -96,26 +96,90 @@ function _validateTargetInstanceId(n) {
   return id;
 }
 
+/* ================= NETWORK TRAFFIC LOG ================= */
+
+let _trafficId = 0;
+const _trafficLog = [];
+const TRAFFIC_LOG_MAX = 200;
+const TRAFFIC_LOG_TRIM = 50;
+
+function _ensureTrafficLogCapacity() {
+  if (_trafficLog.length >= TRAFFIC_LOG_MAX) {
+    _trafficLog.splice(0, TRAFFIC_LOG_TRIM);
+  }
+}
+
+function _logNetworkSendEntry({ fromInstanceId, channel, packet, targetInstanceId, deliveredCount }) {
+  const status = deliveredCount > 0 ? 'Received' : 'Dropped';
+  const entry = {
+    id: ++_trafficId,
+    source: _clampInstance(fromInstanceId),
+    target: targetInstanceId != null ? targetInstanceId : '*',
+    channel: String(channel != null && channel !== '' ? channel : 'default'),
+    size: packet.length,
+    status,
+    packet,
+    ts: Date.now(),
+  };
+  _ensureTrafficLogCapacity();
+  _trafficLog.push(entry);
+  if (typeof notifyNetworkTrafficPanel === 'function') {
+    notifyNetworkTrafficPanel();
+  }
+  return entry;
+}
+
+function getNetworkTrafficLog() {
+  return _trafficLog.slice();
+}
+
+function clearNetworkTrafficLog() {
+  _trafficLog.length = 0;
+}
+
+function _resetNetworkTrafficForTests() {
+  _trafficId = 0;
+  _trafficLog.length = 0;
+}
+
+function _networkWidthMismatchError(receiverInstanceId, receiverWidth, packetBits) {
+  return `Network send: receiver instance ${receiverInstanceId} (${receiverWidth}bits) cannot accept package ${packetBits}bits. Width mismatch.`;
+}
+
 function networkSend({ fromInstanceId, fromDeviceId, channel, packet, targetInstanceId }) {
   const fromEpId = networkEndpointId(fromInstanceId, fromDeviceId);
   const ch = String(channel != null && channel !== '' ? channel : 'default');
   const ids = _channelIndex.get(ch);
-  if (!ids) return;
   const target = targetInstanceId != null ? _validateTargetInstanceId(targetInstanceId) : null;
-  for (const epId of ids) {
-    if (epId === fromEpId) continue;
-    const ep = _endpoints.get(epId);
-    if (!ep) continue;
-    if (target != null && ep.instanceId !== target) continue;
-    if (packet.length !== ep.width) throw Error('Network send value width mismatch');
-    if (_fifoPush(ep.rx, packet)) {
-      if (typeof notifyRunContextInstanceEvent === 'function') {
-        notifyRunContextInstanceEvent(ep.instanceId, 'network-rx');
+  let deliveredCount = 0;
+
+  if (ids) {
+    for (const epId of ids) {
+      if (epId === fromEpId) continue;
+      const ep = _endpoints.get(epId);
+      if (!ep) continue;
+      if (target != null && ep.instanceId !== target) continue;
+      if (packet.length !== ep.width) {
+        throw Error(_networkWidthMismatchError(ep.instanceId, ep.width, packet.length));
       }
-    } else {
-      ep.dropCount++;
+      if (_fifoPush(ep.rx, packet)) {
+        deliveredCount++;
+        if (typeof notifyRunContextInstanceEvent === 'function') {
+          notifyRunContextInstanceEvent(ep.instanceId, 'network-rx');
+        }
+      } else {
+        ep.dropCount++;
+      }
     }
   }
+
+  _logNetworkSendEntry({
+    fromInstanceId,
+    channel: ch,
+    packet,
+    targetInstanceId: target,
+    deliveredCount,
+  });
 }
 
 function networkRxPeek(instanceId, deviceId) {
@@ -162,6 +226,7 @@ function networkGetDrops(instanceId, deviceId) {
 function _resetNetworkBusForTests() {
   _endpoints.clear();
   _channelIndex.clear();
+  _resetNetworkTrafficForTests();
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -178,6 +243,11 @@ if (typeof module !== 'undefined' && module.exports) {
     networkIsEmpty,
     networkIsFull,
     networkGetDrops,
+    getNetworkTrafficLog,
+    clearNetworkTrafficLog,
+    TRAFFIC_LOG_MAX,
+    TRAFFIC_LOG_TRIM,
     _resetNetworkBusForTests,
+    _resetNetworkTrafficForTests,
   };
 }

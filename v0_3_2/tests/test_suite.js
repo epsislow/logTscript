@@ -2010,6 +2010,185 @@ probe(.n:get)`;
     h.assert('s2 empty', s2.getCompProperty(s2.interp, '.n', 'empty'), '1');
   });
 
+  reg(1258, 'network-traffic', 'log — unicast Received target 2', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    sendNetTarget(s1, s1.interp, '^41', '0010');
+    const log = getNetworkTrafficLog();
+    h.assert('one entry', String(log.length), '1');
+    h.assert('status Received', log[0].status, 'Received');
+    h.assert('target 2', String(log[0].target), '2');
+    h.assert('source 1', String(log[0].source), '1');
+  });
+
+  reg(1259, 'network-traffic', 'log — broadcast target star Received', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    sendNet(s1, s1.interp, '^41');
+    const log = getNetworkTrafficLog();
+    h.assert('target star', String(log[0].target), '*');
+    h.assert('status Received', log[0].status, 'Received');
+  });
+
+  reg(1260, 'network-traffic', 'log — RX full second send Dropped', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo', 1));
+    s2.run(netDef('demo', 1));
+    sendNet(s1, s1.interp, '^41');
+    sendNet(s1, s1.interp, '^42');
+    const log = getNetworkTrafficLog();
+    h.assert('two entries', String(log.length), '2');
+    h.assert('first Received', log[0].status, 'Received');
+    h.assert('second Dropped', log[1].status, 'Dropped');
+  });
+
+  reg(1261, 'network-traffic', 'log — unicast no endpoint Dropped', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    sendNetTarget(s1, s1.interp, '^41', '0011');
+    const log = getNetworkTrafficLog();
+    h.assert('status Dropped', log[0].status, 'Dropped');
+    h.assert('target 3', String(log[0].target), '3');
+  });
+
+  reg(1262, 'network-traffic', 'log — Clear keeps id counter', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    for (let i = 0; i < 4; i++) sendNet(s1, s1.interp, '^41');
+    clearNetworkTrafficLog();
+    h.assert('log empty', String(getNetworkTrafficLog().length), '0');
+    sendNet(s1, s1.interp, '^41');
+    sendNet(s1, s1.interp, '^42');
+    const filtered = getFilteredTrafficLog(getNetworkTrafficLog(), {});
+    const page = getDisplayPage(filtered, 0);
+    h.assert('ids 6,5', page.entries.map(e => e.id).join(','), '6,5');
+  });
+
+  reg(1263, 'network-traffic', 'wrapFormattedPacket — wide value multi-line', function(h, session) {
+    const { interp } = session.run('1wire x = 0');
+    const bits = '1'.repeat(136);
+    const formatted = interp.formatValue(bits, 136);
+    const lines = wrapFormattedPacket(formatted);
+    h.assert('multi line', String(lines.length > 1), 'true');
+    for (let i = 0; i < lines.length; i++) {
+      h.assert('line ' + i + ' width', String(lines[i].length <= 40), 'true');
+    }
+  });
+
+  reg(1264, 'network-traffic', 'getDisplayPage — page 0 rows 1-5', function(h) {
+    const entries = [];
+    for (let i = 1; i <= 8; i++) {
+      entries.push({
+        id: i, source: 1, target: '*', channel: 'c', size: 8, status: 'Received', packet: '01000001',
+      });
+    }
+    const filtered = entries.sort((a, b) => b.id - a.id);
+    const page = getDisplayPage(filtered, 0);
+    h.assert('entry ids', page.entries.map(e => e.id).join(','), '8,7,6,5,4');
+    h.assert('row start', String(page.rowStart), '1');
+    h.assert('row end', String(page.rowEnd), '5');
+    h.assert('shown', String(page.shown), '5');
+    h.assert('total', String(page.total), '8');
+  });
+
+  reg(1265, 'network-traffic', 'getDisplayPage — page 1 rows 6-8', function(h) {
+    const entries = [];
+    for (let i = 1; i <= 8; i++) {
+      entries.push({
+        id: i, source: 1, target: '*', channel: 'c', size: 8, status: 'Received', packet: '01000001',
+      });
+    }
+    const filtered = entries.sort((a, b) => b.id - a.id);
+    const page = getDisplayPage(filtered, 1);
+    h.assert('entry ids', page.entries.map(e => e.id).join(','), '3,2,1');
+    h.assert('row start', String(page.rowStart), '6');
+    h.assert('row end', String(page.rowEnd), '8');
+    h.assert('shown', String(page.shown), '3');
+  });
+
+  reg(1266, 'network-traffic', 'log — trim batch at 200 entries', function(h) {
+    registerNetworkEndpoint({ instanceId: 1, deviceId: 'a', channel: 'trim', width: 8, length: 16 });
+    registerNetworkEndpoint({ instanceId: 2, deviceId: 'b', channel: 'trim', width: 8, length: 16 });
+    const pkt = '01000001';
+    for (let i = 0; i < 200; i++) {
+      networkSend({ fromInstanceId: 1, fromDeviceId: 'a', channel: 'trim', packet: pkt });
+    }
+    let log = getNetworkTrafficLog();
+    h.assert('len 200', String(log.length), '200');
+    h.assert('first id 1', String(log[0].id), '1');
+    networkSend({ fromInstanceId: 1, fromDeviceId: 'a', channel: 'trim', packet: '01000010' });
+    log = getNetworkTrafficLog();
+    h.assert('len 151', String(log.length), '151');
+    h.assert('no id 1', String(log.some(e => e.id === 1)), 'false');
+    h.assert('has id 201', String(log.some(e => e.id === 201)), 'true');
+  });
+
+  reg(1267, 'network-traffic', 'send — receiver width mismatch error message', function(h) {
+    registerNetworkEndpoint({ instanceId: 1, deviceId: 'a', channel: 'wm', width: 200, length: 8 });
+    registerNetworkEndpoint({ instanceId: 2, deviceId: 'b', channel: 'wm', width: 128, length: 8 });
+    const pkt = '0'.repeat(200);
+    h.assertThrows(
+      'width mismatch',
+      () => networkSend({
+        fromInstanceId: 1,
+        fromDeviceId: 'a',
+        channel: 'wm',
+        packet: pkt,
+        targetInstanceId: 2,
+      }),
+      'Network send: receiver instance 2 (128bits) cannot accept package 200bits. Width mismatch.'
+    );
+  });
+
+  reg(1268, 'network-traffic', 'send — one log entry per Run on:1 block', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    s1.run(`comp [network] .n:
+  width: 8
+  length: 16
+  channel: 'demo'
+  on: 1
+  :
+8wire pkg := ^41
+.n:{
+  send = pkg
+  target = 0010
+  set = 1
+}`);
+    h.assert('one send', String(getNetworkTrafficLog().length), '1');
+  });
+
+  reg(1269, 'network-traffic', 'applyTrafficFilters — numeric single and range', function(h) {
+    const log = [
+      { id: 1, source: 1, target: 2, channel: 'c', size: 8, status: 'Received' },
+      { id: 10, source: 2, target: '*', channel: 'c', size: 16, status: 'Received' },
+      { id: 23, source: 1, target: 3, channel: 'c', size: 8, status: 'Dropped' },
+      { id: 30, source: 3, target: 2, channel: 'c', size: 200, status: 'Received' },
+    ];
+    const single = applyTrafficFilters(log, { id: '23' });
+    h.assert('single id', single.map((e) => e.id).join(','), '23');
+    const range = applyTrafficFilters(log, { id: '1 - 20' });
+    h.assert('range ids', range.map((e) => e.id).join(','), '1,10');
+    const reversed = applyTrafficFilters(log, { id: '20-1' });
+    h.assert('reversed range', reversed.map((e) => e.id).join(','), '1,10');
+    const invalid = applyTrafficFilters(log, { id: 'abc' });
+    h.assert('invalid empty', String(invalid.length), '0');
+    h.assert('source single', applyTrafficFilters(log, { source: '2' }).map((e) => e.id).join(','), '10');
+    h.assert('source range', applyTrafficFilters(log, { source: '1 - 2' }).map((e) => e.id).join(','), '1,10,23');
+    h.assert('target single', applyTrafficFilters(log, { target: '3' }).map((e) => e.id).join(','), '23');
+    h.assert('target star', applyTrafficFilters(log, { target: '*' }).map((e) => e.id).join(','), '10');
+    h.assert('target skips star', String(applyTrafficFilters(log, { target: '2' }).length), '2');
+    h.assert('size range', applyTrafficFilters(log, { size: '8 - 16' }).map((e) => e.id).join(','), '1,10,23');
+  });
+
   reg(134, 'osc', 'Parser — comp [osc] .o1: with attributes', function(h, session) {
     const stmts = session.parse(`comp [osc] .o1:
   duration1: 2

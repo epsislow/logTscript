@@ -784,6 +784,8 @@ items.forEach(item => {
 
     if (panelName === 'timeline') {
         toggleTimeline();
+    } else if (panelName === 'networkTraffic') {
+        toggleNetworkTraffic();
     } else if (panelName === 'output') {
         toggleOutput();
     } else if (panelName === 'variables') {
