@@ -313,6 +313,11 @@ function updateRunButtonUI() {
   if (isOwner) {
     const runningInst = getTabRunningInstanceId(currentTab);
     if (runningInst) btn.classList.add('btn-run-inst-' + runningInst);
+    btn.textContent = 'Stop';
+    btn.title = 'Stop simulation (instance ' + runningInst + ')';
+  } else {
+    btn.textContent = 'Run';
+    btn.title = 'Run script';
   }
 }
 

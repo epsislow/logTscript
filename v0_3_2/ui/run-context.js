@@ -406,6 +406,51 @@ function releaseInstanceIfTabClosed(tabId) {
   releaseRunContext(inst);
 }
 
+function stopSimulationForTab(tabId) {
+  if (typeof tabs === 'undefined' || tabId == null) return false;
+  const inst = getTabRunningInstanceId(tabId);
+  if (inst == null) return false;
+
+  const ctx = getRunContext(inst);
+  stopRunContextTimers(ctx);
+  stopInstanceSecUI(ctx);
+
+  if (ctx && ctx.interp) {
+    ctx.interp._simulationStopped = true;
+    if (typeof buildVarsSnapshot === 'function') {
+      buildVarsSnapshot(ctx.interp, ctx);
+    }
+    captureRunContextDom(ctx);
+  }
+
+  freezePanelSnapshot(tabId);
+  const tabInfo = tabs.get(tabId);
+  if (tabInfo) tabInfo.hasRun = false;
+
+  if (typeof unregisterNetworkEndpoints === 'function') {
+    unregisterNetworkEndpoints(inst);
+  }
+
+  instanceOwners.delete(inst);
+  if (ctx) ctx.ownerTabId = null;
+
+  if (typeof syncHasRunFromOwners === 'function') syncHasRunFromOwners();
+  if (typeof updateRunButtonUI === 'function') updateRunButtonUI();
+  if (typeof updateStepControlsUI === 'function') updateStepControlsUI();
+  if (typeof fShowTabs === 'function') fShowTabs();
+  if (typeof persistTabs === 'function') persistTabs();
+
+  if (typeof currentTab !== 'undefined' && tabId === currentTab && tabInfo && tabInfo.panelSnapshot) {
+    mountPanelSnapshot(tabInfo.panelSnapshot);
+  }
+  return true;
+}
+
+function stopSimulation() {
+  if (typeof currentTab === 'undefined') return false;
+  return stopSimulationForTab(currentTab);
+}
+
 function bindInterpToRunContext(interp, ctx) {
   if (!interp || !ctx) return;
   interp._instanceId = ctx.id;

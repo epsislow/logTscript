@@ -289,6 +289,15 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   background: linear-gradient(180deg, #28a055, #1f8540) !important;
 }
 
+#runBtn {
+  width: 54px;
+  min-width: 54px;
+  max-width: 54px;
+  padding-left: 0;
+  padding-right: 0;
+  box-sizing: border-box;
+}
+
 .prop-toggle {
   font-size: 11px;
   font-weight: 600;
@@ -2532,7 +2541,7 @@ show(a,b,c)
 <div id="fName">Filename:<span id="fileName"></span></div>
 <div id="editorToolbar">
   <div class="toolbar-run-group">
-    <button onclick="run()" id="runBtn" class="btn">Run</button>
+    <button onclick="toggleRunStop()" id="runBtn" class="btn">Run</button>
     <div class="inst-dropdown" id="inst-dropdown">
       <button type="button" id="instBtn" class="btn inst-btn" onclick="toggleInstMenu()" aria-expanded="false" aria-haspopup="true">
         <span class="inst-swatch inst-swatch-1" id="instSwatch" aria-hidden="true"></span>

@@ -413,6 +413,14 @@ async function init() {
   updateStepControlsUI();
 }
 
+function toggleRunStop() {
+  if (typeof isTabLiveOwner === 'function' && isTabLiveOwner(currentTab)) {
+    if (typeof stopSimulation === 'function') stopSimulation();
+  } else {
+    run();
+  }
+}
+
 function run(){
   let processedCode = '';
   let runInterpAssigned = false;

@@ -2264,6 +2264,7 @@ class Interpreter {
   }
 
   scheduleComponentOutputChange(compName, value) {
+    if (this._simulationStopped) return;
     this.runSafely(() => {
       if (this.deferWirePropagation() && this.signalPropagationStrategy) {
         const scheduled = this.signalPropagationStrategy.scheduleComponentChange(compName, value);
@@ -4014,6 +4015,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
   
   startProc() {
+    if (this._simulationStopped) return;
     if (this.signalPropagationStrategy) {
       this.runSafely(() => this.signalPropagationStrategy.propagate());
     }
