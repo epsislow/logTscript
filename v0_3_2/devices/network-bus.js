@@ -88,15 +88,25 @@ function _fifoPeek(fifo) {
   return fifo.data[fifo.head];
 }
 
-function networkSend({ fromInstanceId, fromDeviceId, channel, packet }) {
+function _validateTargetInstanceId(n) {
+  const id = typeof n === 'number' ? n : parseInt(n, 10);
+  if (isNaN(id) || id < 1 || id > 5) {
+    throw Error('Invalid network target instance');
+  }
+  return id;
+}
+
+function networkSend({ fromInstanceId, fromDeviceId, channel, packet, targetInstanceId }) {
   const fromEpId = networkEndpointId(fromInstanceId, fromDeviceId);
   const ch = String(channel != null && channel !== '' ? channel : 'default');
   const ids = _channelIndex.get(ch);
   if (!ids) return;
+  const target = targetInstanceId != null ? _validateTargetInstanceId(targetInstanceId) : null;
   for (const epId of ids) {
     if (epId === fromEpId) continue;
     const ep = _endpoints.get(epId);
     if (!ep) continue;
+    if (target != null && ep.instanceId !== target) continue;
     if (packet.length !== ep.width) throw Error('Network send value width mismatch');
     if (_fifoPush(ep.rx, packet)) {
       if (typeof notifyRunContextInstanceEvent === 'function') {

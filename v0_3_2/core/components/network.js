@@ -57,6 +57,7 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
       pins: [
         { bits: '1', name: 'set' },
         { bits: 'X', name: 'send' },
+        { bits: '4', name: 'target' },
         { bits: '1', name: 'pop' },
         { bits: '1', name: 'clear' },
       ],
@@ -150,6 +151,29 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
     return 'Cannot assign a value to a network component. Use :send, :pop, :clear, and :set properties instead.';
   }
 
+  _resolveSendTarget(pending, reEvaluate, ctx) {
+    if (pending.target === undefined) return undefined;
+    const raw = this.reEvalPendingValue(pending, 'target', reEvaluate, ctx);
+    const id = parseInt(raw, 2);
+    if (isNaN(id) || id < 1 || id > 5) {
+      throw Error('Invalid network target instance');
+    }
+    return id;
+  }
+
+  _doNetworkSend(instanceId, id, channel, sendValue, pending, reEvaluate, ctx) {
+    if (typeof networkSend !== 'function') return;
+    const opts = {
+      fromInstanceId: instanceId,
+      fromDeviceId: id,
+      channel,
+      packet: sendValue,
+    };
+    const target = this._resolveSendTarget(pending, reEvaluate, ctx);
+    if (target !== undefined) opts.targetInstanceId = target;
+    networkSend(opts);
+  }
+
   _applyNetworkOps(id, instanceId, channel, width, pending, reEvaluate, ctx) {
     const sendInBlock = pending.send !== undefined;
     const popActive = pending.pop !== undefined
@@ -168,9 +192,7 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
       if (typeof networkRxClear === 'function') networkRxClear(instanceId, id);
       const sendValue = this.reEvalPendingValue(pending, 'send', reEvaluate, ctx);
       if (sendValue.length !== width) throw Error('send value width mismatch');
-      if (typeof networkSend === 'function') {
-        networkSend({ fromInstanceId: instanceId, fromDeviceId: id, channel, packet: sendValue });
-      }
+      this._doNetworkSend(instanceId, id, channel, sendValue, pending, reEvaluate, ctx);
     } else if (clearActive) {
       if (typeof networkRxClear === 'function') networkRxClear(instanceId, id);
     } else if (popActive) {
@@ -178,9 +200,7 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
     } else if (sendInBlock) {
       const sendValue = this.reEvalPendingValue(pending, 'send', reEvaluate, ctx);
       if (sendValue.length !== width) throw Error('send value width mismatch');
-      if (typeof networkSend === 'function') {
-        networkSend({ fromInstanceId: instanceId, fromDeviceId: id, channel, packet: sendValue });
-      }
+      this._doNetworkSend(instanceId, id, channel, sendValue, pending, reEvaluate, ctx);
     }
   }
 
@@ -198,6 +218,7 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
 
     if (!reEvaluate) {
       delete pending.send;
+      delete pending.target;
       delete pending.pop;
       delete pending.clear;
     }

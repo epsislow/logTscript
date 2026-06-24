@@ -11660,7 +11660,8 @@ comp [network] .wifi:
 | Port | Width | Role |
 |------|-------|------|
 | \`set\` | 1 | Trigger (last bit \`1\` applies other pins in the block) |
-| \`send\` | \`width\` | Packet to broadcast on \`channel\` |
+| \`send\` | \`width\` | Packet to send on \`channel\` |
+| \`target\` | 4 | Optional Run instance id (1–5) for unicast; omitted = broadcast to all others on \`channel\` |
 | \`pop\` | 1 | Remove front RX packet when \`1\` |
 | \`clear\` | 1 | Empty local RX FIFO when \`1\` |
 | \`get\` | \`width\` | Peek at front RX packet (same as \`front\`) |
@@ -11686,11 +11687,30 @@ When RX is full, incoming packets are **dropped silently** (\`drops\` increments
 - On re-Run or instance release, endpoints for that instance are removed (no stale delivery).
 - No persistence across page refresh. No TCP/WebSocket — same page only.
 
-### v1 addressing
+### Addressing — broadcast vs unicast
 
-Runtime does **not** filter by destination. Put \`dest\` / \`src\` in the payload and handle at the receiver (e.g. with \`/instance/\`).
+- **\`target\` omitted** — fan-out to every endpoint on the same \`channel\`, except the sender (v1 behaviour).
+- **\`target\` set** (4 bits, instance 1–5, same encoding as \`/instance/\`) — deliver only to that Run instance on the channel. Sender is still excluded. If no endpoint exists for that instance on the channel, the send is silent (no error).
+- **\`target\` = 0 or > 5** — runtime error.
 
----
+You can still put \`dest\` / \`src\` in the payload for application-level filtering when using broadcast.
+
+\`\`\`logts-play
+comp [network] .net:
+  width: 8
+  length: 8
+  channel: 'demo'
+  on: 1
+  :
+
+.net:{ send = ^41
+  target = 0010
+  set = 1 }
+\`\`\`
+
+Delivers only to Run instance **2** on \`demo\`.
+
+### v1 payload addressing (optional)
 
 ## Example — send and peek
 

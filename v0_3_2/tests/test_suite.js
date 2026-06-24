@@ -1777,6 +1777,14 @@ on: 1
 }`);
   }
 
+  function sendNetTarget(session, interp, hex, targetBits) {
+    session.execStmts(interp, `.n:{
+  send = ${hex}
+  target = ${targetBits}
+  set = 1
+}`);
+  }
+
   reg(1240, 'network', 'parse — comp [network] attrs and pins', function(h, session) {
     const stmts = session.parse(`comp [network] .n:
   width: 8
@@ -1933,6 +1941,73 @@ probe(.n:get)`;
     h.assert('still initialised', String(s2.outIncludes(s2.interp, 'initialised')), 'true');
     h.assert('has changed', String(s2.outIncludes(s2.interp, 'changed')), 'true');
     h.assert('rx value', String(s2.outIncludes(s2.interp, '.n:get = 01000001')), 'true');
+  });
+
+  reg(1252, 'network', 'unicast — s1 to s2, s3 empty', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    const s3 = createSession({ instanceId: 3 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    s3.run(netDef('demo'));
+    sendNetTarget(s1, s1.interp, '^41', '0010');
+    h.assert('s2 rx', s2.getCompProperty(s2.interp, '.n', 'get'), '01000001');
+    h.assert('s3 empty', s3.getCompProperty(s3.interp, '.n', 'empty'), '1');
+  });
+
+  reg(1253, 'network', 'broadcast — target omitted, s2 and s3 receive', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    const s3 = createSession({ instanceId: 3 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    s3.run(netDef('demo'));
+    sendNet(s1, s1.interp, '^41');
+    h.assert('s2 rx', s2.getCompProperty(s2.interp, '.n', 'get'), '01000001');
+    h.assert('s3 rx', s3.getCompProperty(s3.interp, '.n', 'get'), '01000001');
+  });
+
+  reg(1254, 'network', 'target 0 — runtime error', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    h.assertThrows(
+      'target zero',
+      () => sendNetTarget(s1, s1.interp, '^41', '0000'),
+      'Invalid network target instance'
+    );
+  });
+
+  reg(1255, 'network', 'target >5 — runtime error', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    h.assertThrows(
+      'target six',
+      () => sendNetTarget(s1, s1.interp, '^41', '0110'),
+      'Invalid network target instance'
+    );
+  });
+
+  reg(1256, 'network', 'unicast — valid target without endpoint is silent', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    sendNetTarget(s1, s1.interp, '^41', '0011');
+    h.assert('s2 empty', s2.getCompProperty(s2.interp, '.n', 'empty'), '1');
+  });
+
+  reg(1257, 'network', 'unicast — sender excluded', function(h) {
+    const s1 = createSession({ instanceId: 1 });
+    const s2 = createSession({ instanceId: 2 });
+    s1.run(netDef('demo'));
+    s2.run(netDef('demo'));
+    sendNetTarget(s2, s2.interp, '^41', '0001');
+    h.assert('s1 rx', s1.getCompProperty(s1.interp, '.n', 'get'), '01000001');
+    h.assert('s2 empty', s2.getCompProperty(s2.interp, '.n', 'empty'), '1');
   });
 
   reg(134, 'osc', 'Parser — comp [osc] .o1: with attributes', function(h, session) {

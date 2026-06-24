@@ -84,7 +84,7 @@ flowchart LR
 **La send**, bus-ul livrează copia pachetului la **toate** endpoint-urile pe același `channel`, **exceptând expeditorul**. Runtime-ul **nu** interpretează destinația din pachet.
 
 **Nu implementăm în v1:**
-- pin / câmp `targetInstance` în block-ul de send
+- pin / câmp `target` în block-ul de send
 - filtrare runtime după destinatie sau sursă
 - format de pachet impus (header dest/src)
 
@@ -97,17 +97,17 @@ flowchart LR
 # receptor: logică proprie (dest, src, pop dacă nu e pentru mine)
 ```
 
-### v2 (planificat) — `targetInstance` în block send
+### v2 — `target` în block send
 
 ```logts
 .net:{
   send = packet
-  targetInstance = 0010
+  target = 0010
   set = 1
 }
 ```
 
-Bus livrare selectivă la instanța țintă. Detalii la v2.
+Bus livrare selectivă la instanța țintă. Implementat.
 
 ---
 
@@ -249,13 +249,13 @@ Bazată pe [ideas.txt (857–1198)](../v0_3_1/ideas.txt), actualizată cu:
 - UI vizual network (LED/link status) — **confirmat: fără**
 - `comp [network]` în chip/pcb/board — **confirmat: top-level only, parse error în corp composite**
 - Persistență după refresh pagină — **confirmat: fără**
-- **`targetInstance` (sau orice adresare în runtime)** — v2; v1: fan-out pe canal (minus sender), protocol în payload + logică script
+- **`target`** — implementat: unicast 1–5 în block send; omis = broadcast v1
 - Network în board body — v2+
 
-## Roadmap v2 (notă, neimplementat)
+## Roadmap v2 (notă)
 
-- Pin `targetInstance` în property block la send (ex. `targetInstance = 0010`)
-- Livrare selectivă la instanța țintă pe canal
+- ~~Pin `target` în property block la send~~ — **implementat**
+- Livrare selectivă la instanța țintă pe canal — **implementat**
 - Opțional: `comp [network]` în board cu lifecycle clar
 
 ## Estimare efort
