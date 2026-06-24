@@ -111,8 +111,16 @@ comp [network] .wifi:
 
 ---
 
+## `probe` on another instance
+
+`probe(.wifi:get)` on the **receiving** instance does not update from wire propagation when a packet arrives from another tab — the bus is outside the simulation graph. The editor **re-reads** probes when a packet is delivered (and when you switch to that tab). Probe history keeps earlier lines (`initialised`) and appends `changed` when the value updates.
+
+See [editorUI.md — probe: propagation vs network](editorUI.md#probe--propagation-vs-network) for a comparison table and a two-tab walkthrough.
+
+---
+
 ## Related
 
 - [queue.md](queue.md) — local FIFO (same pin/pout pattern, `push` instead of `send`)
 - [meta-constants.md](meta-constants.md) — `/instance/`
-- [editorUI.md](editorUI.md) — multi-instance tabs
+- [editorUI.md](editorUI.md) — Inst slots, output per instance, probe vs network

@@ -16,14 +16,13 @@ const DOC_SECTIONS = [
       { file: 'components.md', label: 'Component catalog' },
       { file: 'short-notation.md', label: 'Short notation' },
       { file: 'assignment-operators.md', label: 'Assignment operators (=, =:, :=)', searchExtra: 'right pad left pad wire assignment initial' },
-      { file: 'meta-constants.md', label: 'Meta constants (/instance/)', searchExtra: 'meta constant instance run instance top level wire init' },
       { file: 'modes.md', label: 'Script modes (MODE)', searchExtra: 'MODE STRICT WIREWRITE ZSTATE default wirewrite tristate' },
       { file: 'arithmetic.md', label: 'Arithmetic (built-in)' },
       { file: 'decimal-conversion.md', label: 'Decimal conversion (CNTN10S, N2N10S, N10S2N)', searchExtra: 'decimal BCD digits packed N2N10S N10S2N CNTN10S' },
       { file: 'debug.md', label: 'Debug (show / peek / probe / lutOf)', searchExtra: 'show peek probe lutOf exprOfLut truthTableOf output panel' },
       { file: 'signal-propagation.md', label: 'Signal propagation' },
       { file: 'zstate.md', label: 'MODE ZSTATE (tristate / multi-driver)', searchExtra: 'Z X high impedance bus buffer tristate conflict get>= out>= ZRELEASE()' },
-      { file: 'editorUI.md', label: 'Editor UI' }
+      { file: 'editorUI.md', label: 'Editor UI', searchExtra: 'Run Next Inst instance multi tab probe network propagation output /instance/' },
     ],
   },
   {
@@ -88,7 +87,6 @@ const DOC_SECTIONS = [
       { file: 'huffman.md', label: 'Huffman example', searchExtra: 'prefixFree expand collapse huffPacket huffRecover variable length coding codebook packet round-trip greedy decode' },
       { file: 'reg.md', label: 'reg' },
       { file: 'queue.md', label: 'queue', searchExtra: 'fifo buffer push pop front empty full size capacity free' },
-      { file: 'network.md', label: 'network', searchExtra: 'packet bus channel send cross instance multi drops fifo wifi' },
       { file: 'stack.md', label: 'stack', searchExtra: 'lifo push pop top call stack subroutine' },
       { file: 'oscillator.md', label: 'oscillator' }
     ],
@@ -96,6 +94,8 @@ const DOC_SECTIONS = [
   {
     title: 'Other',
     items: [
+      { file: 'meta-constants.md', label: 'Meta constants' },
+      { file: 'network.md', label: 'Network component' },
       { file: 'slider.md', label: 'Slider component' }
     ],
   }

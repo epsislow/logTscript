@@ -1903,6 +1903,38 @@ on: 1
     h.assert('fresh rx C', s2.getCompProperty(s2.interp, '.n', 'get'), '01000011');
   });
 
+  const NET_PROBE_RECV = `comp [network] .n:
+  width: 8
+  length: 16
+  channel: 'demo'
+  on: 1
+  :
+probe(.n:get)`;
+
+  reg(1250, 'network', 'probe — cross-instance RX after refreshProbes', function(h) {
+    const s2 = createSession({ instanceId: 2 });
+    s2.run(NET_PROBE_RECV);
+    const s1 = createSession({ instanceId: 1 });
+    s1.run(netDef('demo'));
+    sendNet(s1, s1.interp, '^41');
+    s2.refreshProbes(s2.interp);
+    h.assert('receiver probe A', String(s2.outIncludes(s2.interp, '.n:get = 01000001')), 'true');
+    h.assert('sender no rx probe', String(s1.outIncludes(s1.interp, '.n:get = 01000001')), 'false');
+  });
+
+  reg(1251, 'network', 'probe — initialised kept after RX refresh', function(h) {
+    const s2 = createSession({ instanceId: 2 });
+    s2.run(NET_PROBE_RECV);
+    h.assert('has initialised', String(s2.outIncludes(s2.interp, 'initialised')), 'true');
+    const s1 = createSession({ instanceId: 1 });
+    s1.run(netDef('demo'));
+    sendNet(s1, s1.interp, '^41');
+    s2.refreshProbes(s2.interp);
+    h.assert('still initialised', String(s2.outIncludes(s2.interp, 'initialised')), 'true');
+    h.assert('has changed', String(s2.outIncludes(s2.interp, 'changed')), 'true');
+    h.assert('rx value', String(s2.outIncludes(s2.interp, '.n:get = 01000001')), 'true');
+  });
+
   reg(134, 'osc', 'Parser — comp [osc] .o1: with attributes', function(h, session) {
     const stmts = session.parse(`comp [osc] .o1:
   duration1: 2

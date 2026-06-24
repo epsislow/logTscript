@@ -58,6 +58,9 @@
         this.out = [];
         this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry, signalPropagationStrategy, p.chips, p.boards);
         this.interp._instanceId = instanceId;
+        if (typeof setDeviceOperationInstanceId === 'function') {
+          setDeviceOperationInstanceId(instanceId);
+        }
         this.interp.pendingProbeExprs = p.probes || [];
         this.interp.pendingWatchExprs = p.watches || [];
         this.interp.aliases = p.aliases;
@@ -204,12 +207,40 @@
         }
       },
 
+      /** Output lines from interpreter (same buffer the editor copies to ctx.out). */
+      outLines(interp) {
+        const i = interp || this.interp;
+        return i && i.out ? i.out.slice() : [];
+      },
+
+      outIncludes(interp, needle) {
+        const n = String(needle);
+        return this.outLines(interp).some(line => String(line).includes(n));
+      },
+
+      /** Mirrors editor notify on network RX — re-read probes after external bus change. */
+      refreshProbes(interp, reason) {
+        const i = interp || this.interp;
+        if (i && typeof i.refreshProbeOutputs === 'function') {
+          i.refreshProbeOutputs({ reason: reason || 'changed' });
+        }
+      },
+
       cleanup() {
         if (this.interp && this.interp.oscTimers) {
           for (const tid of this.interp.oscTimers) {
             clearTimeout(tid);
           }
           this.interp.oscTimers = [];
+        }
+        if (typeof resetFallbackDeviceMapsForTests === 'function') {
+          resetFallbackDeviceMapsForTests();
+        }
+        if (typeof _resetNetworkBusForTests === 'function') {
+          _resetNetworkBusForTests();
+        }
+        if (typeof setDeviceOperationInstanceId === 'function') {
+          setDeviceOperationInstanceId(null);
         }
         this.interp = null;
         this.out = [];

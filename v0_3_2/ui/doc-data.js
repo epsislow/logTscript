@@ -1358,7 +1358,9 @@ Result: \`1100\`
 
 ## \`:\` — Initial assignment
 
-Assigns the initial value of a wire at declaration. **Literal only** (binary, hex \`^\`, decimal \`\\\`, \`!\`).
+Assigns the initial value of a wire at declaration. **Literal only** (binary, hex \`^\`, decimal \`\\\`, \`!\`, or meta constant \`/name/\`).
+
+Meta constants such as \`/instance/\` are documented in **[meta-constants.md](meta-constants.md)** (top-level \`:\` init only).
 
 ### Syntax
 
@@ -6156,7 +6158,35 @@ The auto-step buttons (\`S\` / interval) call the same **Next** logic on a timer
 
 ## Toolbar layout
 
-Left to right: **Run** and **wave / legacy** (run configuration), then **Next**, **S**, and interval **1** (step controls). A visual separator divides the two groups.
+Left to right: **Run**, **Inst: N** (1–5), **wave / legacy**, then **Next**, **S**, and interval **1** (step controls). A visual separator divides run config from step controls.
+
+---
+
+## Instance (Inst 1–5)
+
+**Control:** **Inst: N** dropdown next to **Run**.
+
+You can run up to **five simulations in parallel** in the same browser page. Each number is an **instance slot** (1–5), not a CPU core — think of it as five independent “Run sessions” that can talk to each other (for example via [network](network.md)).
+
+| What | Behaviour |
+|------|-----------|
+| **Inst dropdown** | Chooses which slot the **next Run** on this tab will use. |
+| **Tab label ·N** | After Run, the tab shows **·N** — the slot that is actually running (may differ from the dropdown until you Run again). |
+| **Per tab** | Each editor tab remembers its own Inst selection. |
+| **Output panel** | One visible panel, but each instance keeps its **own output history** while you switch tabs. |
+
+### Meta constant \`/instance/\`
+
+At **Run** time you can read the slot number in a wire:
+
+\`\`\`logts
+4wire inst : /instance/
+show(inst)
+\`\`\`
+
+On **Inst 1** → \`0001\`; on **Inst 2** → \`0010\`, and so on. Details: [meta-constants.md](meta-constants.md).
+
+Use this to put “who am I” in a network packet, UART frame, or local logic. \`/instance/\` is fixed for the whole run on that tab.
 
 ---
 
@@ -6181,11 +6211,36 @@ Your choice is saved in browser storage (\`prog/propagation\`) and restored when
 
 ---
 
+## \`probe\` — propagation vs network
+
+Most of the time, **\`probe\` updates by itself** while the program runs: when wires change during **Run**, **Next**, or **wave / legacy** propagation, new probe lines are added to that instance’s output.
+
+**Network** is different: a packet can arrive on another instance **without** running that instance’s script again. Nothing in the wire graph changes, so \`probe(.wifi:get)\` is not notified the same way.
+
+| | Wires & normal components | \`comp [network]\` RX |
+|--|---------------------------|---------------------|
+| **What changes** | Values in the running simulation | Packet queue on a shared bus |
+| **When probe updates** | During Run / Next / propagation | When a packet is **delivered** to that instance (or when you open that instance’s tab) |
+| **Needs a separate refresh?** | No | Yes — editor re-reads probes for that instance |
+| **History** | New lines appended (\`initialised\`, then \`changed\`) | Same — old probe lines are kept |
+
+So: propagation and \`probe\` go together; **network uses an extra refresh** so the receiving tab’s output can show \`- changed\` even if that tab is in the background.
+
+Typical two-tab test:
+
+1. Tab B (Inst 2): \`comp [network]\` + \`probe(.wifi:get)\` — **Run** (registers receiver).
+2. Tab A (Inst 1): **send** on the same channel — **Run**.
+3. Tab B: switch back — output should show both \`initialised\` and \`changed\` for \`.wifi:get\`.
+
+The sender never sees its own packet on \`:get\` (by design). See [network.md](network.md).
+
+---
+
 ## Panels
 
 | Panel | Purpose |
 |-------|---------|
-| **Output** | Text from \`show\`, \`peek\`, \`probe\`, errors |
+| **Output** | Text from \`show\`, \`peek\`, \`probe\`, errors — per instance when switching tabs |
 | **Timeline** | Waveform trace from \`watch()\` — enable via **Panels → Timeline** |
 | **Variables** | Live wire / component values after **Run** |
 | **AST** | Parsed program structure |
@@ -6198,7 +6253,8 @@ The **Timeline** sits above **Output**. It opens automatically when the script c
 
 | Control | Action |
 |---------|--------|
-| **Run** | Full execute; applies current Wave / Legacy mode |
+| **Run** | Full execute; applies current Inst slot and Wave / Legacy mode |
+| **Inst: N** | Instance slot (1–5) for the next Run on this tab |
 | **Next** | \`NEXT(~)\` on last Run’s interpreter |
 | **wave / legacy** | Select propagation for next Run (orange = wave, green = legacy) |
 
@@ -6207,6 +6263,8 @@ The **Timeline** sits above **Output**. It opens automatically when the script c
 ## Related documentation
 
 - [Debug output](debug.md) — \`show\`, \`peek\`, \`probe\`, **\`watch\`** (Timeline)
+- [Meta constants](meta-constants.md) — \`/instance/\`
+- [Network](network.md) — packets between instances
 - [Signal propagation](signal-propagation.md) — Wave vs Legacy behaviour
 - [REG](reg.md) — registers and \`NEXT\`
 - [Interactive components](interactive-components.md) — panel inputs and wire updates
@@ -10026,6 +10084,82 @@ Dual writes in one block (different addresses, no collision): set \`write\`/\`da
 - [mini-cpu.md](mini-cpu.md) — teaching CPU using \`comp [mem]\` for program and data
 - [mini-cpu-v2.md](mini-cpu-v2.md) — full CPU demo with ASM ROM and \`BEQ\`
 `,
+    'meta-constants.md': `# Meta constants
+
+Meta constants are **run-time literals** resolved when you press **Run**. They are not wires and not expression operands like \`~\`, \`%\`, or \`$\`.
+
+Syntax: \`/name/\` (slashes required).
+
+See also: [assignment operators — \`:\` init](assignment-operators.md#-initial-assignment), [editor UI — instances](editorUI.md).
+
+---
+
+## Summary
+
+| | Special vars (\`~\` \`%\` \`$\`) | Meta constants (\`/instance/\`) |
+|--|--|--|
+| Where | expressions, \`show\`, \`probe\` | **only** \`Nwire name : /name/\` at **top level** |
+| When value is fixed | changes during run (\`%\`, \`$\`) | fixed for the whole run |
+| Scope | general | top-level script only (not chip/pcb/board) |
+
+---
+
+## \`/instance/\`
+
+Returns the **editor run instance** (1–5) as a **4-bit binary** value:
+
+| Instance | Value |
+|----------|-------|
+| 1 | \`0001\` |
+| 2 | \`0010\` |
+| 3 | \`0011\` |
+| 4 | \`0100\` |
+| 5 | \`0101\` |
+
+The instance number comes from the toolbar **Inst** selector on the tab that runs the script (see [editorUI.md](editorUI.md)).
+
+### Syntax
+
+\`\`\`logts
+4wire instance : /instance/
+\`\`\`
+
+After init, \`instance\` is a normal wire — use \`show(instance)\`, \`probe(instance)\`, etc.
+
+### Width rules
+
+The canonical value is **4 bits**. Wire width uses the same pad/truncate rules as other \`:\` literals:
+
+- **shorter wire** → left-pad with \`0\` (e.g. \`8wire\` on inst 1 → \`00000001\`)
+- **longer value than wire** → keep the **least significant** bits (e.g. \`3wire\` on inst 1 → \`001\`)
+
+### Multi-tab example
+
+Same script on two tabs, different instances:
+
+\`\`\`logts
+4wire inst : /instance/
+show(inst)
+\`\`\`
+
+- Tab A, **Run** on instance **1** → \`inst = 0001\`
+- Tab B, **Run** on instance **2** → \`inst = 0010\`
+
+### Not allowed
+
+| Construct | Result |
+|-----------|--------|
+| \`4wire x = /instance/\` | parse error |
+| \`show(/instance/)\` | parse error |
+| \`probe(/instance/)\` | parse error |
+| inside \`chip\` / \`pcb\` / \`board\` body | parse error |
+
+---
+
+## Future
+
+\`/signalStrategy/\` (planned): \`legacy\` → \`0001\`, \`wave\` → \`0010\` from the tab propagation mode.
+`,
     'mini-cpu-plan.md': `# Mini CPU / ALU with memory — feasibility
 
 ## Short answer
@@ -11301,82 +11435,6 @@ With an interactive panel: \`comp [key]\` on the instance \`.cpu\` \`set\` pin (
 - Automated tests: \`test_suite_ported.js\` (859–866)
 - Test constants: \`CHIP_ALU4\`, \`BOARD_CPU4\`
 `,
-    'meta-constants.md': `# Meta constants
-
-Meta constants are **run-time literals** resolved when you press **Run**. They are not wires and not expression operands like \`~\`, \`%\`, or \`$\`.
-
-Syntax: \`/name/\` (slashes required).
-
-See also: [assignment operators — \`:\` init](assignment-operators.md#-initial-assignment), [editor UI — instances](editorUI.md).
-
----
-
-## Summary
-
-| | Special vars (\`~\` \`%\` \`$\`) | Meta constants (\`/instance/\`) |
-|--|--|--|
-| Where | expressions, \`show\`, \`probe\` | **only** \`Nwire name : /name/\` at **top level** |
-| When value is fixed | changes during run (\`%\`, \`$\`) | fixed for the whole run |
-| Scope | general | top-level script only (not chip/pcb/board) |
-
----
-
-## \`/instance/\`
-
-Returns the **editor run instance** (1–5) as a **4-bit binary** value:
-
-| Instance | Value |
-|----------|-------|
-| 1 | \`0001\` |
-| 2 | \`0010\` |
-| 3 | \`0011\` |
-| 4 | \`0100\` |
-| 5 | \`0101\` |
-
-The instance number comes from the toolbar **Inst** selector on the tab that runs the script (see [editorUI.md](editorUI.md)).
-
-### Syntax
-
-\`\`\`logts
-4wire instance : /instance/
-\`\`\`
-
-After init, \`instance\` is a normal wire — use \`show(instance)\`, \`probe(instance)\`, etc.
-
-### Width rules
-
-The canonical value is **4 bits**. Wire width uses the same pad/truncate rules as other \`:\` literals:
-
-- **shorter wire** → left-pad with \`0\` (e.g. \`8wire\` on inst 1 → \`00000001\`)
-- **longer value than wire** → keep the **least significant** bits (e.g. \`3wire\` on inst 1 → \`001\`)
-
-### Multi-tab example
-
-Same script on two tabs, different instances:
-
-\`\`\`logts
-4wire inst : /instance/
-show(inst)
-\`\`\`
-
-- Tab A, **Run** on instance **1** → \`inst = 0001\`
-- Tab B, **Run** on instance **2** → \`inst = 0010\`
-
-### Not allowed
-
-| Construct | Result |
-|-----------|--------|
-| \`4wire x = /instance/\` | parse error |
-| \`show(/instance/)\` | parse error |
-| \`probe(/instance/)\` | parse error |
-| inside \`chip\` / \`pcb\` / \`board\` body | parse error |
-
----
-
-## Future
-
-\`/signalStrategy/\` (planned): \`legacy\` → \`0001\`, \`wave\` → \`0010\` from the tab propagation mode.
-`,
     'modes.md': `# Script modes (\`MODE\`)
 
 Top-level statements that change how **wire assignments** and **propagation** behave for the rest of the script (until another \`MODE\` line).
@@ -11681,11 +11739,19 @@ comp [network] .wifi:
 
 ---
 
+## \`probe\` on another instance
+
+\`probe(.wifi:get)\` on the **receiving** instance does not update from wire propagation when a packet arrives from another tab — the bus is outside the simulation graph. The editor **re-reads** probes when a packet is delivered (and when you switch to that tab). Probe history keeps earlier lines (\`initialised\`) and appends \`changed\` when the value updates.
+
+See [editorUI.md — probe: propagation vs network](editorUI.md#probe--propagation-vs-network) for a comparison table and a two-tab walkthrough.
+
+---
+
 ## Related
 
 - [queue.md](queue.md) — local FIFO (same pin/pout pattern, \`push\` instead of \`send\`)
 - [meta-constants.md](meta-constants.md) — \`/instance/\`
-- [editorUI.md](editorUI.md) — multi-instance tabs
+- [editorUI.md](editorUI.md) — Inst slots, output per instance, probe vs network
 `,
     'oscillator.md': `# Oscillator
 

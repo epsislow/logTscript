@@ -4,77 +4,15 @@ const vm = require('vm');
 const path = require('path');
 
 const dir = __dirname;
-const files = [
-  'core/tokenizer.js',
-  'core/preprocessor.js',
-  'core/components/component-base.js',
-  'core/components/builtin-component.js',
-  'core/components/component-registry.js',
-  'core/components/led.js',
-  'core/components/ledBar.js',
-  'core/components/switch.js',
-  'core/components/key.js',
-  'core/components/keyboard.js',
-  'core/components/dip.js',
-  'core/components/ioport.js',
-  'core/components/seven-seg.js',
-  'core/components/14seg.js',
-  'core/components/dots.js',
-  'core/components/lcd.js',
-  'core/components/terminal.js',
-  'core/components/adder.js',
-  'core/components/subtract.js',
-  'core/components/multiplier.js',
-  'core/components/divider.js',
-  'core/components/lut.js',
-  'core/components/shifter.js',
-  'core/components/mem.js',
-  'core/components/reg.js',
-  'core/components/counter.js',
-  'core/components/queue.js',
-  'core/components/stack.js',
-  'core/components/network.js',
-  'core/components/osc.js',
-  'core/components/rotary.js',
-  'core/components/slider.js',
-  'devices/clcd-symbols.js',
-  'core/components/clcd.js',
-  'core/components/alu.js',
-  'core/components/pcb-component.js',
-  'core/components/index.js',
-  'devices/mem-devices.js',
-  'devices/alu-devices.js',
-  'devices/queue-storage.js',
-  'devices/network-bus.js',
-  'devices/lut-devices.js',
-  'devices/terminal.js',
-  'core/error-format.js',
-  'core/asm-assembler.js',
-  'core/protocol-assembler.js',
-  'core/lut-labels.js',
-  'core/lut-decode.js',
-  'core/boolean-minimize.js',
-  'core/logic-value.js',
-  'core/boolean-lut.js',
-  'core/boolean-analysis.js',
-  'core/watch-expand.js',
-  'core/parser.js',
-  'core/interpreter.js',
-  'core/signal-propagation.js',
-  'test_session.js',
-  'test_suite.js'
-];
+const { TEST_RUNTIME_SCRIPTS } = require('./test_runtime_bundle.js');
+const { createTestNodeSandbox } = require('./test_node_sandbox.js');
 
 let src = '';
-for (const f of files) {
+for (const f of TEST_RUNTIME_SCRIPTS) {
   src += fs.readFileSync(path.join(dir, f), 'utf8') + '\n';
 }
 
-const sandbox = {
-  Error, parseInt, parseFloat, String, Array, Set, Map, RegExp, console, Object, Math, JSON, Number, isNaN,
-  clearTimeout, setTimeout, window: {}
-};
-sandbox.window = sandbox;
+const sandbox = createTestNodeSandbox();
 vm.runInNewContext(src, sandbox);
 
 const suite = sandbox.LogTScriptTestSuite;
@@ -109,6 +47,7 @@ function createHarness() {
 
 let passed = 0, failed = 0;
 const failures = [];
+const dmErrors = [];
 for (const test of suite.tests) {
   const session = suite.createSession({ propagation: test.propagation || 'legacy' });
   const h = createHarness();
@@ -116,6 +55,9 @@ for (const test of suite.tests) {
     test.run(h, session);
   } catch (e) {
     h.setUnexpected(e);
+    if (e && String(e.message || e).includes('dm is not defined')) {
+      dmErrors.push(test.id);
+    }
   } finally {
     session.cleanup();
   }
@@ -123,18 +65,15 @@ for (const test of suite.tests) {
   else {
     failed++;
     failures.push(test.id + ': ' + test.title);
-    if (test.id === 1609) {
-      const err = h.getUnexpected();
-      if (err) console.log('  ' + test.id + ' THROW', err.message);
-      for (const a of h.getAssertions()) {
-        if (!a.pass) console.log('  ' + test.id + ' FAIL', a.name, 'got', JSON.stringify(a.actual), 'exp', JSON.stringify(a.expected));
-      }
-    }
   }
 }
 
 console.log('Passed:', passed, 'Failed:', failed, 'Total:', suite.tests.length);
+if (dmErrors.length) {
+  console.log('dm is not defined:', dmErrors.length, 'tests — run node _gen_manifest.js and check test_scripts.json');
+}
 if (failures.length) {
-  console.log('Failures:', failures.join('\n'));
+  console.log('Failures:', failures.slice(0, 40).join('\n'));
+  if (failures.length > 40) console.log('... and', failures.length - 40, 'more');
   process.exit(1);
 }

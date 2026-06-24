@@ -175,3 +175,9 @@ function mountDevicesPanelForContext(ctx) {
 function dm() {
   return getDeviceMaps();
 }
+
+function resetFallbackDeviceMapsForTests() {
+  _fallbackDeviceMaps = null;
+  _deviceOpInstanceId = null;
+  _execInterpStack.length = 0;
+}

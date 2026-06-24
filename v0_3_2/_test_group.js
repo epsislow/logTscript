@@ -1,12 +1,13 @@
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
+const { loadTestScripts } = require('./test_scripts');
+const { createTestNodeSandbox } = require('./test_node_sandbox');
 const dir = __dirname;
-const files = fs.readFileSync('_run_suite_node.js', 'utf8').match(/'[^']+\.js'/g).map(s => s.slice(1, -1));
+const files = loadTestScripts().nodeAll();
 let src = '';
 files.forEach(f => { src += fs.readFileSync(path.join(dir, f), 'utf8') + '\n'; });
-const sb = { Error, parseInt, String, Array, Set, Map, RegExp, console, Object, Math, JSON, Number, isNaN, clearTimeout, setTimeout, window: {} };
-sb.window = sb;
+const sb = createTestNodeSandbox();
 vm.runInNewContext(src, sb);
 const s = sb.LogTScriptTestSuite.createSession();
 const INLINE_DECODER2 = `inline [lut] .decoder:
