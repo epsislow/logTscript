@@ -2290,7 +2290,7 @@ CodeMirror.defineMode("logts", function() {
         return "logts-number";
       }
 
-      if (stream.match(/\d+(?:wire|bit|w|b)\b/)) {
+      if (stream.match(/\d+(?:wire|bit|w|b)(?:\[\d+\])?\b/)) {
         return "logts-type";
       }
 
@@ -2808,6 +2808,7 @@ show(a,b,c)
 <script src="core/logic-value.js"></script>
 <script src="core/boolean-lut.js"></script>
 <script src="core/boolean-analysis.js"></script>
+<script src="core/vector-slice.js"></script>
 <script src="core/watch-expand.js"></script>
 <script src="core/parser.js"></script>
 <script src="core/interpreter.js"></script>

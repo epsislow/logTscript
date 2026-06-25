@@ -212,10 +212,10 @@ function getOutputLines() {
   return Array.from(el.querySelectorAll('.output-line')).map((n) => n.textContent);
 }
 
-function watchLabelsFromExprs(exprs, wireWidths, compPropWidths) {
+function watchLabelsFromExprs(exprs, wireWidths, compPropWidths, vectorMetas) {
   const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
-  if (WE && (wireWidths || compPropWidths)) {
-    return WE.watchLabelsFromExprs(exprs, wireWidths, null, compPropWidths);
+  if (WE && (wireWidths || compPropWidths || vectorMetas)) {
+    return WE.watchLabelsFromExprs(exprs, wireWidths, null, compPropWidths, vectorMetas);
   }
   return (exprs || []).map((expr, i) => {
     const a = expr && expr[0];
@@ -223,6 +223,15 @@ function watchLabelsFromExprs(exprs, wireWidths, compPropWidths) {
     if (a.var) {
       if (a.property) return a.var + ':' + a.property;
       if (a.internalWire) return a.var + '.' + a.internalWire;
+      if (a.vectorIndex !== undefined && a.vectorIndex !== null) {
+        const base = `${a.var}:${a.vectorIndex}`;
+        if (a.bitRange) {
+          const start = a.bitRange.start;
+          const end = a.bitRange.end != null ? a.bitRange.end : start;
+          return start === end ? `${base}.${start}` : `${base}.${start}-${end}`;
+        }
+        return base;
+      }
       if (a.bitRange) {
         const start = a.bitRange.start;
         const end = a.bitRange.end != null ? a.bitRange.end : start;
@@ -240,7 +249,8 @@ function prepareTimelineForRun(watches, stmts, registry) {
     const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
     const wireWidths = WE ? WE.buildWireWidthMapFromStmts(stmts) : null;
     const compPropWidths = WE && registry ? WE.buildComponentPropertyWidthMap(stmts, registry) : null;
-    timelineAnalyzer.reset(watchLabelsFromExprs(watches, wireWidths, compPropWidths));
+    const vectorMetas = WE ? WE.buildVectorMetaMapFromStmts(stmts) : null;
+    timelineAnalyzer.reset(watchLabelsFromExprs(watches, wireWidths, compPropWidths, vectorMetas));
   }
 }
 
@@ -626,7 +636,8 @@ function buildVarsSnapshot(interp, ctx) {
         valueStr = interp.formatValue(valueStr, bitWidth, true);
       }
     }
-    t += `${k} (${w.type}) = ${valueStr} (ref: ${w.ref || 'null'})\n`;
+    const typeLabel = typeof interp.getWireTypeLabel === 'function' ? interp.getWireTypeLabel(w) : w.type;
+    t += `${k} (${typeLabel}) = ${valueStr} (ref: ${w.ref || 'null'})\n`;
   });
   t += `\nCycle: ${interp.cycle}\n`;
   t += `Storage: ${interp.storage.length} entries\n`;

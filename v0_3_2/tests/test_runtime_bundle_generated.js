@@ -59,6 +59,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/logic-value.js",
   "core/boolean-lut.js",
   "core/boolean-analysis.js",
+  "core/vector-slice.js",
   "core/watch-expand.js",
   "core/parser.js",
   "core/interpreter.js",

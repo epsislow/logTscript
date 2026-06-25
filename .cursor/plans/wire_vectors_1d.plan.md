@@ -4,31 +4,31 @@ overview: Adăugarea vectorilor 1D cu sintaxa `4wire[3] a` — stocare internă 
 todos:
   - id: parser-vector
     content: "parser.js: decl Nwire[count], atom vectorIndex (:i / :(wire)), peekNextIsAssign pentru :index ="
-    status: pending
+    status: completed
   - id: interp-core
     content: "interpreter.js: wire.vector metadata, resolveVectorIndex, vectorIndexToBitRange, evalAtom + assignment splice, getBitWidthFromDecl"
-    status: pending
+    status: completed
   - id: show-peek-format
     content: "interpreter.js: _formatVectorShow partajat show+peek; multi-line out.push; element + length lines"
-    status: pending
+    status: completed
   - id: probe-wireslice
     content: "interpreter.js: fix probe wireSlice — _readProbeTargetValue, _emitProbeForWire slice emit; _resolveProbeExpr + vectorIndex; aliniat cu _emitWatchRowForWire"
-    status: pending
+    status: completed
   - id: probe-zlist
     content: "interpreter.js: Zlist type label + driver labels + splice contribution eval în _evalWireDriverContribution"
-    status: pending
+    status: completed
   - id: ui-vars-cm
     content: app.js getWireTypeLabel în buildVarsSnapshot; CodeMirror highlight 4wire[3] în script_editor_v0_3_2.html
-    status: pending
+    status: completed
   - id: tests-vectors
     content: test_suite.js grup wire-vectors ID 1684–1701; gen manifest + run suite
-    status: pending
+    status: completed
   - id: tests-probe-slice
     content: test_suite.js grup probe ID 1702–1703 — probe(data.4/4) pe wire plat (legacy + wave)
-    status: pending
+    status: completed
   - id: docs-vectors
     content: wire-vectors.md + cross-links; debug.md probe wireSlice/bit-range; gen doc-data
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -436,11 +436,11 @@ Suite: `node v0_3_2/node/_run_test_suite_node.js`
 
 | Subiect | Decizie |
 |---------|---------|
-| Short notation | Amânăm `` `vectorA:0` ``; documentăm ca future |
+| Short notation | Amânăm `` `vectorA:0` `` → **V1.5** [v1.5_shortnotation_watch.plan.md](v1.5_shortnotation_watch.plan.md) |
 | BOOL filt / simplify | Nu extinde în V1; vectorii = wire-uri la analiză booleană |
 | Chip/board pins | `4wire[3]` ca pin pe chip/board — out of scope V1 |
 | Multidim | `4wire[3,3]`, `matrix:1:2` — doar în doc ca extensie viitoare |
-| `watch(vectorA:0)` | Opțional; `_resolveProbeExpr` partajat ar permite expand |
+| `watch(vectorA:0)` | **V1.5** [v1.5_shortnotation_watch.plan.md](v1.5_shortnotation_watch.plan.md) — expand via `vectorIndex` + bitRange element |
 | `Zlist(vectorA:1)` | Nu — doar wire întreg |
 | **ZCONN / ZCONNECT pe element** (`vectorA:1 = ZCONNECT(en, data)`) | **Nu în V1** — vezi secțiunea 10 |
 | **ZCONN pe vector întreg** (`vectorA = ZCONNECT(en, data12)`) | **Da** — vector = wire de 12 biți |

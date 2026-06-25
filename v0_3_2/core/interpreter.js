@@ -262,6 +262,15 @@ function stmtAssignPad(s) {
   return 'strict';
 }
 
+function getBitWidthFromDecl(interp, decl) {
+  if (!decl || !decl.type) return null;
+  if (decl.vectorCount != null && interp.isWire(decl.type)) {
+    const ew = interp.getBitWidth(decl.type);
+    return ew ? ew * decl.vectorCount : null;
+  }
+  return interp.getBitWidth(decl.type);
+}
+
 function expectedWireDeclBitTotal(interp, decls) {
   let total = 0;
   for (const d of decls) {
@@ -276,8 +285,10 @@ function expectedWireDeclBitTotal(interp, decls) {
     }
     if (!actualType) continue;
     if (d.name === '_' || d.name === '~' || d.name === '%' || d.name === '$') continue;
-    if (!interp.isWire(actualType)) continue;
-    total += interp.getBitWidth(actualType);
+    if (!interp.isWire(actualType) && !(d.type && interp.isWire(d.type))) continue;
+    const bits = (d.existing ? interp.getBitWidth(actualType) : getBitWidthFromDecl(interp, d))
+      || interp.getBitWidth(actualType);
+    if (bits) total += bits;
   }
   return total;
 }
@@ -1427,9 +1438,12 @@ class Interpreter {
       wireWidths.set(name, this.getBitWidth(wire.type));
     }
     const compPropWidths = this._buildComponentPropertyWidthMap();
+    const vectorMetas = typeof LogTScriptWatchExpand !== 'undefined'
+      ? LogTScriptWatchExpand.buildVectorMetaMapFromWires(this.wires)
+      : new Map();
     const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
     const expanded = WE
-      ? WE.expandWatchExprs(exprs, wireWidths, (br) => this.resolveBitRange(br), compPropWidths)
+      ? WE.expandWatchExprs(exprs, wireWidths, (br) => this.resolveBitRange(br), compPropWidths, vectorMetas)
       : exprs;
     for (const expr of expanded) {
       const target = this._resolveProbeExpr(expr);
@@ -1519,6 +1533,27 @@ class Interpreter {
       }
       const wire = this.wires.get(atom.var);
       if (!wire) return null;
+      if (atom.vectorIndex !== undefined || atom.vectorIndexExpr) {
+        if (!wire.vector) return null;
+        const slice = this.resolveAtomWireSlice(atom, wire);
+        const label = this._formatVectorAtomLabel(atom, slice);
+        const keySuffix = slice.relStart != null
+          ? `:v:${slice.vectorElementIndex}:${slice.relStart}-${slice.relEnd}`
+          : `:v:${slice.vectorElementIndex}`;
+        return {
+          kind: 'wireSlice',
+          key: 'w:' + atom.var + keySuffix,
+          label: label || this._vectorElementLabel(atom.var, slice.vectorElementIndex),
+          ref: wire.ref,
+          wireName: atom.var,
+          bitRange: { start: slice.start, end: slice.end },
+          sliceStart: slice.start,
+          sliceEnd: slice.end,
+          bitWidth: slice.end - slice.start + 1,
+          seen: false,
+          lastValue: null
+        };
+      }
       if (atom.bitRange) {
         const { start, end } = this.resolveBitRange(atom.bitRange);
         const label = this._wireSliceLabel(atom.var, start, end);
@@ -1569,7 +1604,11 @@ class Interpreter {
   _readProbeTargetValue(target) {
     if (!target) return null;
     let value = null;
-    if (target.kind === 'wire' && target.wireName) {
+    if (target.kind === 'wireSlice' && target.wireName) {
+      const wire = this.wires.get(target.wireName);
+      if (wire) target.ref = wire.ref;
+      value = this._readWireSliceValue(target);
+    } else if (target.kind === 'wire' && target.wireName) {
       value = this.getWireStableValue(target.wireName);
       const wire = this.wires.get(target.wireName);
       if (wire) target.ref = wire.ref;
@@ -1644,7 +1683,11 @@ class Interpreter {
     if (!target) return;
     let valueStr = value == null ? '-' : String(value);
     if (target.bitWidth && valueStr !== '-' && !target.isText) {
-      valueStr = this.formatValue(valueStr, target.bitWidth);
+      const wire = target.wireName ? this.wires.get(target.wireName) : null;
+      const skipGroup = wire && wire.vector && target.kind === 'wire';
+      if (!skipGroup) {
+        valueStr = this.formatValue(valueStr, target.bitWidth);
+      }
     }
     const displayKey = valueStr + (target.symbolicMeta ? JSON.stringify(target.symbolicMeta) : '');
     if (target.lastValue === displayKey) return;
@@ -1677,6 +1720,15 @@ class Interpreter {
         driverSuffix = this._probeDriverSuffix(name, value == null ? '' : String(value));
       }
       this._emitProbeTarget(target, value, null, driverSuffix);
+    }
+    for (const sliceTarget of this.probeTargets) {
+      if (sliceTarget.kind !== 'wireSlice' || sliceTarget.wireName !== name) continue;
+      const wire = this.wires.get(name);
+      if (wire) sliceTarget.ref = wire.ref;
+      const sliceVal = this._readWireSliceValue(sliceTarget, value);
+      if (sliceVal !== null) {
+        this._emitProbeTarget(sliceTarget, sliceVal);
+      }
     }
     this._emitWatchRowForWire(name, value);
   }
@@ -1786,6 +1838,31 @@ class Interpreter {
     }
   }
 
+  ensureWireSlotFromDecl(decl, defaultValue = null) {
+    if (!decl || !decl.name || !decl.type) return;
+    const bits = getBitWidthFromDecl(this, decl) || this.getBitWidth(decl.type);
+    if (!bits) return;
+    const init = defaultValue != null
+      ? defaultValue
+      : (this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits));
+    if (!this.wires.has(decl.name)) {
+      const storageIdx = this.storeValue(init);
+      this.wireStorageMap.set(decl.name, storageIdx);
+      const wireEntry = { type: decl.type, ref: `&${storageIdx}`, initOnly: true };
+      this._applyDeclVectorMeta(wireEntry, decl);
+      this.wires.set(decl.name, wireEntry);
+    } else {
+      const existing = this.wires.get(decl.name);
+      if (!existing.ref || existing.ref === '&-') {
+        const storageIdx = this.storeValue(init);
+        this.wireStorageMap.set(decl.name, storageIdx);
+        existing.ref = `&${storageIdx}`;
+      }
+      existing.type = decl.type;
+      this._applyDeclVectorMeta(existing, decl);
+    }
+  }
+
   beginWireResolvePhase() {
     this.wireContributionQueue.clear();
   }
@@ -1820,11 +1897,17 @@ class Interpreter {
       const wire = this.wires.get(name);
       if (!wire) continue;
       const bits = this.getBitWidth(wire.type);
-      const resolved = contribs.length === 1
-        ? this._fitWireContributionValue(contribs[0], bits)
-        : (typeof LogicValue !== 'undefined' && LogicValue.resolveWireVector
-          ? LogicValue.resolveWireVector(contribs, bits)
-          : this._fitWireContributionValue(contribs[contribs.length - 1], bits));
+      let resolved;
+      if (contribs.length === 1) {
+        resolved = this._fitWireContributionValue(contribs[0], bits);
+      } else if (this._wireHasSliceDriver(name) && !this._wireHasGatedDrivers(name)) {
+        resolved = this._fitWireContributionValue(contribs[contribs.length - 1], bits);
+      } else if (this._wireHasSharedContributors(name)
+        && typeof LogicValue !== 'undefined' && LogicValue.resolveWireVector) {
+        resolved = LogicValue.resolveWireVector(contribs, bits);
+      } else {
+        resolved = this._fitWireContributionValue(contribs[contribs.length - 1], bits);
+      }
       const stable = this.getWireStableValue(name);
       if (stable !== resolved) {
         this.writeWireStable(name, resolved);
@@ -2005,11 +2088,16 @@ class Interpreter {
     if (!bits) return null;
     const q = this.zstate ? this.wireContributionQueue.get(wireName) : null;
     if (q && q.length) {
-      const raw = q.length === 1
-        ? q[0]
-        : (typeof LogicValue !== 'undefined' && LogicValue.resolveWireVector
-          ? LogicValue.resolveWireVector(q, bits)
-          : q[q.length - 1]);
+      let raw;
+      if (q.length === 1) {
+        raw = q[0];
+      } else if (this._wireHasSliceDriver(wireName) && !this._wireHasGatedDrivers(wireName)) {
+        raw = q[q.length - 1];
+      } else if (typeof LogicValue !== 'undefined' && LogicValue.resolveWireVector) {
+        raw = LogicValue.resolveWireVector(q, bits);
+      } else {
+        raw = q[q.length - 1];
+      }
       return this._fitWireContributionValue(raw, bits);
     }
     return this.getWireStableValue(wireName);
@@ -2116,7 +2204,7 @@ class Interpreter {
   _formatWireDriverLabel(ws) {
     const asg = ws.assignment;
     if (!asg) return '?';
-    const target = asg.target.var;
+    const target = this._formatAssignmentTargetLabel(asg.target);
     const exprStr = this._exprToDriverSource(asg.expr);
     if (asg.busEnable) {
       const enStr = this._exprToDriverSource(asg.busEnableExpr);
@@ -2134,6 +2222,16 @@ class Interpreter {
     return `${entry.instance}:${entry.poutName} ${polarity} ${enStr}`;
   }
 
+  _wireHasGatedDrivers(wireName) {
+    for (const ws of this.wireStatements) {
+      if (!ws.assignment || ws.assignment.target.var !== wireName) continue;
+      if (ws.assignment.busEnable || this.assignmentExprIsZConnect(ws.assignment.expr)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   _wireHasSharedContributors(wireName) {
     const redirects = this.zconnRedirectRegistrations.get(wireName);
     if (redirects && redirects.length) return true;
@@ -2149,12 +2247,55 @@ class Interpreter {
     return count > 1 || hasGated;
   }
 
+  _assignmentTargetIsSlice(target) {
+    return !!(target && (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange));
+  }
+
+  _wireHasSliceDriver(wireName) {
+    for (const ws of this.wireStatements) {
+      if (!ws.assignment || ws.assignment.target.var !== wireName) continue;
+      if (this._assignmentTargetIsSlice(ws.assignment.target)) return true;
+    }
+    return false;
+  }
+
   _evalWireDriverContribution(ws, bits) {
     if (ws.assignment.busEnable) {
       const enVal = this._evalCallArgValue(ws.assignment.busEnableExpr);
       if (!this._zConnectShouldDrive(enVal, ws.assignment.busEnable)) {
         return { active: false, value: null };
       }
+    }
+    const target = ws.assignment.target;
+    const sliceRange = (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange)
+      ? this._assignmentTargetSliceRange(target, target.var)
+      : null;
+    if (sliceRange) {
+      const wire = this.wires.get(target.var);
+      if (!wire) return { active: false, value: null };
+      let currentValue = this.getWireContributionAwareValue(target.var);
+      if (!currentValue) currentValue = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
+      const exprResult = this.evalExpr(ws.assignment.expr, false);
+      if (exprResult.some(part => part.zConnectNoDrive)) {
+        return { active: false, value: null };
+      }
+      let rhs = '';
+      for (const part of exprResult) {
+        if (part.ref) {
+          const v = this.getValueFromRef(part.ref);
+          if (v) rhs += v;
+        } else if (part.value) {
+          rhs += part.value;
+        }
+      }
+      const sliceWidth = sliceRange.end - sliceRange.start + 1;
+      if (rhs.length !== sliceWidth) {
+        return { active: false, value: null };
+      }
+      const merged = currentValue.substring(0, sliceRange.start)
+        + rhs
+        + currentValue.substring(sliceRange.end + 1);
+      return { active: true, value: merged };
     }
     const outputs = this.execWireStatement(ws, true);
     if (!outputs.length) return { active: false, value: null };
@@ -2189,8 +2330,63 @@ class Interpreter {
 
     return {
       drivers,
-      resolved: this.getWireContributionAwareValue(wireName) ?? this.getWireStableValue(wireName)
+      resolved: this._resolveZlistResolvedValue(wireName, bits)
     };
+  }
+
+  _resolveZlistResolvedValue(wireName, bits) {
+    if (this._wireHasSliceDriver(wireName) && !this._wireHasGatedDrivers(wireName)) {
+      let acc = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
+      for (const ws of this.wireStatements) {
+        const assign = ws.assignment;
+        const targetsWire = assign && assign.target.var === wireName;
+        const declaresWire = ws.decls && ws.decls.some(d => d.name === wireName);
+        if (!targetsWire && !declaresWire) continue;
+
+        if (assign && targetsWire) {
+          const target = assign.target;
+          let sliceRange = null;
+          try {
+            if (this._assignmentTargetIsSlice(target)) {
+              sliceRange = this._assignmentTargetSliceRange(target, wireName);
+            }
+          } catch (e) {
+            continue;
+          }
+          if (sliceRange) {
+            const exprResult = this.evalExpr(assign.expr, false);
+            if (exprResult.some(part => part.zConnectNoDrive)) continue;
+            let rhs = '';
+            for (const part of exprResult) {
+              if (part.ref) {
+                const v = this.getValueFromRef(part.ref);
+                if (v) rhs += v;
+              } else if (part.value) {
+                rhs += part.value;
+              }
+            }
+            const sliceWidth = sliceRange.end - sliceRange.start + 1;
+            if (rhs.length !== sliceWidth) continue;
+            acc = acc.substring(0, sliceRange.start)
+              + rhs
+              + acc.substring(sliceRange.end + 1);
+          } else {
+            const { active, value } = this._evalWireDriverContribution(ws, bits);
+            if (active && value != null) acc = value;
+          }
+        } else if (declaresWire) {
+          const outputs = this.execWireStatement(ws, true);
+          const hit = outputs.find(o => o[0] === wireName);
+          if (hit && hit[1] != null) acc = hit[1];
+        }
+      }
+      return acc;
+    }
+    const stable = this.getWireStableValue(wireName);
+    if (stable != null && (!this.zstate || !/^Z+$/.test(stable))) {
+      return stable;
+    }
+    return this.getWireContributionAwareValue(wireName) ?? stable;
   }
 
   _probeDriverSuffix(wireName, newResolved) {
@@ -2234,12 +2430,13 @@ class Interpreter {
     const wire = this.wires.get(wireName);
     if (!wire) throw Error(`Unknown wire '${wireName}' in Zlist()`);
     const bits = this.getBitWidth(wire.type);
+    const typeLabel = this._zlistTypeLabel(wire);
     const gathered = this._gatherWireDrivers(wireName);
     if (!gathered.drivers.length) {
-      this.out.push(`${wireName} (${bits}bit) — (no contributors)`);
+      this.out.push(`${wireName} (${typeLabel}) — (no contributors)`);
       return;
     }
-    this.out.push(`${wireName} (${bits}bit):`);
+    this.out.push(`${wireName} (${typeLabel}):`);
     for (const d of gathered.drivers) {
       if (d.active) {
         this.out.push(`  -> (active) ${d.label} = ${d.value}`);
@@ -2438,6 +2635,177 @@ class Interpreter {
     if(!type) return null;
     const m = type.match(/^(\d+)(bit|wire)$/);
     return m ? parseInt(m[1]) : null;
+  }
+
+  getWireVectorMeta(wire) {
+    return wire && wire.vector ? wire.vector : null;
+  }
+
+  getWireTypeLabel(wire) {
+    if (!wire) return '';
+    const v = wire.vector;
+    if (v && v.elementWidth && v.elementCount) {
+      return `${v.elementWidth}wire[${v.elementCount}]`;
+    }
+    return wire.type || '';
+  }
+
+  _zlistTypeLabel(wire) {
+    if (!wire) return '';
+    if (wire.vector) return this.getWireTypeLabel(wire);
+    const bits = this.getBitWidth(wire.type);
+    return bits ? `${bits}bit` : (wire.type || '');
+  }
+
+  _applyDeclVectorMeta(wireEntry, decl) {
+    if (!decl || decl.vectorCount == null || !decl.type || !this.isWire(decl.type)) return;
+    const ew = this.getBitWidth(decl.type);
+    if (!ew) return;
+    wireEntry.vector = { elementWidth: ew, elementCount: decl.vectorCount };
+    wireEntry.type = `${ew * decl.vectorCount}wire`;
+  }
+
+  _vectorElementLabel(varName, index) {
+    return `${varName}:${index}`;
+  }
+
+  _resolveVectorIndexValue(atom) {
+    if (atom.vectorIndex !== undefined && atom.vectorIndex !== null) {
+      return atom.vectorIndex;
+    }
+    if (atom.vectorIndexExpr) {
+      const parts = this.evalExpr(atom.vectorIndexExpr, false);
+      const v = parts.map(p => p.value || '0').join('');
+      return parseInt(v, 2);
+    }
+    return null;
+  }
+
+  resolveVectorIndex(wire, atom) {
+    const meta = this.getWireVectorMeta(wire);
+    if (!meta) {
+      throw Error(`${atom.var} is not a vector`);
+    }
+    const idx = this._resolveVectorIndexValue(atom);
+    if (idx == null || !Number.isFinite(idx)) {
+      throw Error(`Invalid vector index for ${atom.var}`);
+    }
+    if (idx < 0 || idx >= meta.elementCount) {
+      throw Error(`Vector index ${idx} out of range for ${atom.var} (length ${meta.elementCount})`);
+    }
+    const start = idx * meta.elementWidth;
+    const end = start + meta.elementWidth - 1;
+    return { start, end, vectorIndex: idx, elementWidth: meta.elementWidth };
+  }
+
+  vectorIndexToBitRange(wire, atom) {
+    const slice = this.resolveAtomWireSlice(atom, wire);
+    if (!slice) {
+      const { start, end, vectorIndex } = this.resolveVectorIndex(wire, atom);
+      return { start, end, vectorElementIndex: vectorIndex };
+    }
+    return {
+      start: slice.start,
+      end: slice.end,
+      vectorElementIndex: slice.vectorElementIndex,
+      relStart: slice.relStart,
+      relEnd: slice.relEnd
+    };
+  }
+
+  resolveAtomWireSlice(atom, wire) {
+    const hasVector = atom && (atom.vectorIndex !== undefined || atom.vectorIndexExpr);
+    if (hasVector) {
+      if (!wire || !wire.vector) {
+        throw Error(`${atom.var} is not a vector`);
+      }
+      const { start: elemStart, end: elemEnd, vectorIndex } = this.resolveVectorIndex(wire, atom);
+      if (atom.bitRange) {
+        const { start: relStart, end: relEnd } = this.resolveBitRange(atom.bitRange);
+        const elemWidth = elemEnd - elemStart + 1;
+        if (relStart < 0 || relEnd >= elemWidth || relStart > relEnd) {
+          throw Error(
+            `Invalid bit range ${relStart}-${relEnd} within ${atom.var}:${vectorIndex} (${elemWidth}bit)`
+          );
+        }
+        return {
+          start: elemStart + relStart,
+          end: elemStart + relEnd,
+          vectorElementIndex: vectorIndex,
+          relStart,
+          relEnd
+        };
+      }
+      return {
+        start: elemStart,
+        end: elemEnd,
+        vectorElementIndex: vectorIndex,
+        relStart: null,
+        relEnd: null
+      };
+    }
+    if (atom && atom.bitRange) {
+      const { start, end } = this.resolveBitRange(atom.bitRange);
+      return { start, end, vectorElementIndex: null, relStart: null, relEnd: null };
+    }
+    return null;
+  }
+
+  _formatVectorAtomLabel(atom, slice) {
+    if (!atom || slice == null || slice.vectorElementIndex == null) return null;
+    let base;
+    if (atom.vectorIndex !== undefined && atom.vectorIndex !== null) {
+      base = this._vectorElementLabel(atom.var, atom.vectorIndex);
+    } else if (atom.vectorIndexExpr && atom.vectorIndexExpr.length === 1 && atom.vectorIndexExpr[0].var) {
+      base = `${atom.var}:(${atom.vectorIndexExpr[0].var})`;
+    } else {
+      base = `${atom.var}:${slice.vectorElementIndex}`;
+    }
+    if (slice.relStart != null && slice.relEnd != null) {
+      const suffix = slice.relStart === slice.relEnd
+        ? `${slice.relStart}`
+        : `${slice.relStart}-${slice.relEnd}`;
+      return `${base}.${suffix}`;
+    }
+    return base;
+  }
+
+  _assignmentTargetSliceRange(target, wireName) {
+    const wire = this.wires.get(wireName);
+    const slice = this.resolveAtomWireSlice(target, wire);
+    if (!slice) return null;
+    return { start: slice.start, end: slice.end };
+  }
+
+  _formatAssignmentTargetLabel(target) {
+    if (!target || !target.var) return '?';
+    if (target.vectorIndex !== undefined || target.vectorIndexExpr) {
+      const wire = this.wires.get(target.var);
+      if (wire && wire.vector) {
+        try {
+          const slice = this.resolveAtomWireSlice(target, wire);
+          const label = this._formatVectorAtomLabel(target, slice);
+          if (label) return label;
+        } catch (e) {
+          // fall through to element-only label
+        }
+      }
+      if (target.vectorIndex !== undefined && target.vectorIndex !== null) {
+        return this._vectorElementLabel(target.var, target.vectorIndex);
+      }
+      if (target.vectorIndexExpr && target.vectorIndexExpr.length === 1 && target.vectorIndexExpr[0].var) {
+        return `${target.var}:(${target.vectorIndexExpr[0].var})`;
+      }
+    }
+    if (target.bitRange) {
+      try {
+        const { start, end } = this.resolveBitRange(target.bitRange);
+        return this._wireSliceLabel(target.var, start, end);
+      } catch (e) {
+        return target.var;
+      }
+    }
+    return target.var;
   }
 
   getComponentBits(compType, attributes){
@@ -3180,6 +3548,21 @@ class Interpreter {
       let val = null;
       let ref = null;
       let type = null;
+      let bitRange = a.bitRange || null;
+      let vectorElementIndex = null;
+      let vectorSlice = null;
+
+      if (a.vectorIndex !== undefined || a.vectorIndexExpr) {
+        if (!wire || !wire.vector) {
+          this._throwRuntime(`${a.var} is not a vector`, a, a.var.length);
+        }
+        vectorSlice = this.resolveAtomWireSlice(a, wire);
+        vectorElementIndex = vectorSlice.vectorElementIndex;
+        bitRange = { start: vectorSlice.start, end: vectorSlice.end };
+      } else if (bitRange) {
+        const slice = this.resolveAtomWireSlice(a, wire);
+        if (slice) bitRange = { start: slice.start, end: slice.end };
+      }
       
       if(wire){
         // Wave: read pending values from the same propagation batch (program order).
@@ -3207,14 +3590,16 @@ class Interpreter {
       }
       
       // Handle bit range if specified
-      if(a.bitRange){
-        const {start, end: actualEnd} = this.resolveBitRange(a.bitRange);
+      if(bitRange){
+        const {start, end: actualEnd} = this.resolveBitRange(bitRange);
         if(val === null || val === '-'){
           // Return zeros for undefined value bit range
           const bitWidth = actualEnd - start + 1;
           const zeros = '0'.repeat(bitWidth);
-          const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
-          return {value: zeros, ref: null, varName: `${a.var}.${varNameSuffix}`, bitWidth: bitWidth};
+          const displayName = vectorSlice
+            ? (this._formatVectorAtomLabel(a, vectorSlice) || `${a.var}:${vectorElementIndex}`)
+            : (start === actualEnd ? `${a.var}.${start}` : `${a.var}.${start}-${actualEnd}`);
+          return {value: zeros, ref: null, varName: displayName, bitWidth: bitWidth};
         }
         if(start < 0 || actualEnd >= val.length || start > actualEnd){
           throw Error(`Invalid bit range ${start}-${actualEnd} for ${a.var} (length: ${val.length})`);
@@ -3222,11 +3607,13 @@ class Interpreter {
         // Extract bits (bits are indexed from left to right, 0 is MSB)
         const extracted = val.substring(start, actualEnd + 1);
         const bitWidth = actualEnd - start + 1;
-        // Format varName: use single bit notation if start === actualEnd, otherwise range notation
         const varNameSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
         const refSuffix = start === actualEnd ? `${start}` : `${start}-${actualEnd}`;
         const extractedPadded = a.pad ? this.applyPad(extracted, a.pad) : extracted;
-        return {value: extractedPadded, ref: a.pad ? null : (ref ? `${ref}.${refSuffix}` : null), varName: `${a.var}.${varNameSuffix}`, bitWidth: extractedPadded.length};
+        const displayName = vectorSlice
+          ? (this._formatVectorAtomLabel(a, vectorSlice) || `${a.var}:${vectorElementIndex}`)
+          : `${a.var}.${varNameSuffix}`;
+        return {value: extractedPadded, ref: a.pad ? null : (ref ? `${ref}.${refSuffix}` : null), varName: displayName, bitWidth: extractedPadded.length};
       }
       
       if(a.pad && val && val !== '-'){
@@ -4266,14 +4653,77 @@ if (this.isBuiltinDEMUX(name)) {
     return valueStr;
   }
 
+  _formatVectorElementLine(index, valueStr, elementWidth) {
+    const formatted = valueStr !== '-' ? this.formatValue(valueStr, elementWidth) : valueStr;
+    return `:${index} = ${formatted} (${elementWidth}bit)`;
+  }
+
+  _formatVectorShowLines(wireName, valueStr) {
+    const wire = this.wires.get(wireName);
+    if (!wire || !wire.vector) return null;
+    const { elementWidth, elementCount } = wire.vector;
+    const lines = [];
+    lines.push(`${wireName} = ${valueStr} (${valueStr.length}bit)`);
+    if (elementCount <= 5) {
+      for (let i = 0; i < elementCount; i++) {
+        const start = i * elementWidth;
+        lines.push(this._formatVectorElementLine(i, valueStr.substring(start, start + elementWidth), elementWidth));
+      }
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const start = i * elementWidth;
+        lines.push(this._formatVectorElementLine(i, valueStr.substring(start, start + elementWidth), elementWidth));
+      }
+      lines.push('..');
+      const last = elementCount - 1;
+      const start = last * elementWidth;
+      lines.push(this._formatVectorElementLine(last, valueStr.substring(start, start + elementWidth), elementWidth));
+    }
+    lines.push(`${wireName} has length [${elementCount}]`);
+    return lines;
+  }
+
   _execShowImmediate(s, computeRefs = false) {
     const args = s.show || s.peek;
     if (!args) return;
     const prevCtx = this.evalContext;
     this.evalContext = 'show';
     const results = [];
+    const vectorLines = [];
     try {
     for (const e of args) {
+      if (e && e.length === 1 && e[0].var) {
+        const atom = e[0];
+        const wire = this.wires.get(atom.var);
+        if ((atom.vectorIndex !== undefined || atom.vectorIndexExpr) && wire && wire.vector) {
+          const r = this.evalExpr(e, computeRefs);
+          const part = r[0];
+          if (part) {
+            let valueStr = part.value != null ? part.value : '-';
+            if (valueStr !== '-' && part.bitWidth) valueStr = this.formatValue(valueStr, part.bitWidth);
+            const displayName = part.varName || atom.var;
+            const sliceWidth = part.bitWidth || wire.vector.elementWidth;
+            vectorLines.push(`${displayName} = ${valueStr} (${sliceWidth}bit)`);
+            if (!atom.bitRange) {
+              vectorLines.push(`${atom.var} has length [${wire.vector.elementCount}]`);
+            }
+          }
+          continue;
+        }
+        if (!atom.bitRange && atom.vectorIndex === undefined && !atom.vectorIndexExpr && wire && wire.vector) {
+          const r = this.evalExpr(e, computeRefs);
+          const part = r[0];
+          if (part) {
+            let valueStr = part.value != null ? part.value : '-';
+            if (valueStr === '-' && part.ref) valueStr = this.getValueFromRef(part.ref) || '-';
+            const vlines = this._formatVectorShowLines(atom.var, valueStr);
+            if (vlines) {
+              vectorLines.push(...vlines);
+              continue;
+            }
+          }
+        }
+      }
       let varName = null;
       let varType = null;
       let bitRange = null;
@@ -4281,7 +4731,7 @@ if (this.isBuiltinDEMUX(name)) {
         varName = e[0].var;
         bitRange = e[0].bitRange;
         const wire = this.wires.get(varName);
-        if (wire) varType = wire.type;
+        if (wire) varType = this.getWireTypeLabel(wire) || wire.type;
         else {
           const varInfo = this.vars.get(varName);
           if (varInfo) varType = varInfo.type;
@@ -4349,7 +4799,8 @@ if (this.isBuiltinDEMUX(name)) {
         }
       }
     }
-    this.out.push(results.join(', '));
+    for (const line of vectorLines) this.out.push(line);
+    if (results.length) this.out.push(results.join(', '));
     } finally {
       this.evalContext = prevCtx;
     }
@@ -5312,7 +5763,15 @@ if (s.assignment) {
   const { target, expr: assignmentExpr, assignPad: assignmentPad } = s.assignment;
   let expr = assignmentExpr;
   const name = target.var;
-  const range = target.bitRange || null;
+  let range = null;
+  if (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange) {
+    try {
+      range = this._assignmentTargetSliceRange(target, name);
+    } catch (e) {
+      this.reportRuntimeError(e);
+      return;
+    }
+  }
   const property = target.property || null;
 
   // Check if it's a PCB instance first
@@ -5763,7 +6222,8 @@ if (s.assignment) {
   // Store result
   if (isWire) {
     // STRICT check — skip if this wire was initialized with : (first real assignment is allowed)
-    if (this.mode === 'STRICT' && entry.ref !== null && entry.ref !== '&-' && !entry.initOnly) {
+    // Slice / vector-element writes are allowed (not a full-wire reassignment).
+    if (this.mode === 'STRICT' && !range && entry.ref !== null && entry.ref !== '&-' && !entry.initOnly) {
       this._throwRuntime(`Cannot reassign wire ${name} in STRICT mode`, s, name.length);
     }
     // Clear initOnly flag after first real assignment
@@ -5791,6 +6251,7 @@ if (s.assignment) {
       this.scheduleWireChange(name, newValue);
     } else {
       this.updateConnectedComponents(name, newValue);
+      this._emitProbeForWire(name, newValue);
     }
   } else {
     // Variable (immutable unless slice)
@@ -5908,7 +6369,7 @@ if (s.assignment) {
       // Declaration with : (wire initialization literal, e.g. 1wire q : 1)
       if(s.initExpr){
         for(const d of s.decls){
-          const bits = this.getBitWidth(d.type);
+          const bits = getBitWidthFromDecl(this, d) || this.getBitWidth(d.type);
           const loc = this.getLocation(s, d);
           if(!bits) throw Error(`Invalid type ${d.type} at ${loc}`);
           if(!this.isWire(d.type)) throw Error(`Wire initialization : only allowed for wire types at ${loc}`);
@@ -5926,7 +6387,9 @@ if (s.assignment) {
           // Store initial value and set ref — mark initOnly so first := assignment is allowed
           const storageIdx = this.storeValue(initValue);
           this.wireStorageMap.set(d.name, storageIdx);
-          this.wires.set(d.name, {type: d.type, ref: `&${storageIdx}`, initOnly: true});
+          const wireEntry = { type: d.type, ref: `&${storageIdx}`, initOnly: true };
+          this._applyDeclVectorMeta(wireEntry, d);
+          this.wires.set(d.name, wireEntry);
           if (this.deferWirePropagation()) {
             this.scheduleWireChange(d.name, initValue);
           }
@@ -5936,7 +6399,7 @@ if (s.assignment) {
       }
       // Declaration without assignment (only wires)
       for(const d of s.decls){
-        const bits = this.getBitWidth(d.type);
+        const bits = getBitWidthFromDecl(this, d) || this.getBitWidth(d.type);
         const loc = this.getLocation(s, d);
         if(!bits) throw Error(`Invalid type ${d.type} at ${loc}`);
         if(!this.isWire(d.type)) throw Error(`Only wires can be declared without assignment at ${loc} (found ${d.type} for ${d.name})`);
@@ -5948,7 +6411,9 @@ if (s.assignment) {
         const initVal = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
         const storageIdx = this.storeValue(initVal);
         this.wireStorageMap.set(d.name, storageIdx);
-        this.wires.set(d.name, { type: d.type, ref: `&${storageIdx}`, initOnly: true });
+        const wireEntry = { type: d.type, ref: `&${storageIdx}`, initOnly: true };
+        this._applyDeclVectorMeta(wireEntry, d);
+        this.wires.set(d.name, wireEntry);
       }
       return;
     }
@@ -5967,15 +6432,15 @@ if (s.assignment) {
           }
         }
         if (d.name === '~' || d.name === '%' || d.name === '$' || d.name === '_') {
-          bitOffsetDefer += this.getBitWidth(actualType) || 0;
+          bitOffsetDefer += getBitWidthFromDecl(this, d) || this.getBitWidth(actualType) || 0;
           continue;
         }
         if (!this.isWire(actualType)) {
           allWires = false;
           break;
         }
-        this.ensureWireSlot(d.name, actualType);
-        bitOffsetDefer += this.getBitWidth(actualType);
+        this.ensureWireSlotFromDecl(d);
+        bitOffsetDefer += getBitWidthFromDecl(this, d) || this.getBitWidth(actualType);
       }
       if (allWires) {
         this.trackWireStatement(s);
@@ -6044,7 +6509,7 @@ if (s.assignment) {
         }
       }
       
-      const bits = this.getBitWidth(actualType);
+      const bits = getBitWidthFromDecl(this, d) || this.getBitWidth(actualType);
       if(!bits) throw Error(`Invalid type ${actualType || d.type}`);
 
       if(d.name === '~'){
@@ -6197,10 +6662,16 @@ if (s.assignment) {
         
         // Set wire reference to the storage index
         const simpleRef = `&${storageIdx}`;
+        const wireEntry = { type: actualType, ref: simpleRef };
+        this._applyDeclVectorMeta(wireEntry, d);
         if(!this.wires.has(d.name)){
-          this.wires.set(d.name, {type: actualType, ref: simpleRef});
+          this.wires.set(d.name, wireEntry);
         } else {
-          this.wires.get(d.name).ref = simpleRef;
+          const existing = this.wires.get(d.name);
+          existing.type = wireEntry.type;
+          existing.ref = simpleRef;
+          if (wireEntry.vector) existing.vector = wireEntry.vector;
+          else delete existing.vector;
         }
         
         // Track wire statement for NEXT (not inside PCB body)
@@ -6263,8 +6734,22 @@ if (s.assignment) {
       if(!wire){ this.currentStmt = prevStmt; return outputs; }
       const bits = this.getBitWidth(wire.type);
       if(!bits){ this.currentStmt = prevStmt; return outputs; }
+      const target = s.assignment.target;
+      let sliceRange = null;
       try {
-        this.lowerUseExprInStatement(s, bits);
+        if (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange) {
+          sliceRange = this._assignmentTargetSliceRange(target, wireName);
+        }
+      } catch (e) {
+        if (!s._runtimeErrorReported) {
+          s._runtimeErrorReported = true;
+          this.reportRuntimeError(e);
+        }
+        this.currentStmt = prevStmt;
+        return outputs;
+      }
+      try {
+        this.lowerUseExprInStatement(s, sliceRange ? (sliceRange.end - sliceRange.start + 1) : bits);
         if (s.assignment.busEnable) {
           const enVal = this._evalCallArgValue(s.assignment.busEnableExpr);
           if (!this._zConnectShouldDrive(enVal, s.assignment.busEnable)) {
@@ -6289,7 +6774,18 @@ if (s.assignment) {
           }
         }
         const assignPad = stmtAssignPad(s);
-        const wireValue = fitWireAssignBits(totalValue, bits, assignPad, 'msb', this);
+        let wireValue;
+        if (sliceRange) {
+          const sliceWidth = sliceRange.end - sliceRange.start + 1;
+          const rhs = fitWireAssignBits(totalValue, sliceWidth, assignPad, 'msb', this);
+          let currentValue = this.getWireContributionAwareValue(wireName);
+          if (!currentValue) currentValue = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
+          wireValue = currentValue.substring(0, sliceRange.start)
+            + rhs
+            + currentValue.substring(sliceRange.end + 1);
+        } else {
+          wireValue = fitWireAssignBits(totalValue, bits, assignPad, 'msb', this);
+        }
         if (toPending) {
           outputs.push([wireName, wireValue]);
         } else if (s.assignment.busEnable && this.zstate && this.deferWirePropagation()) {
@@ -6384,11 +6880,11 @@ if (s.assignment) {
         continue;
       }
       if(!this.isWire(actualType)) {
-        bitOffset += this.getBitWidth(actualType);
+        bitOffset += this.getBitWidth(actualType) || 0;
         continue;
       }
       
-      const bits = this.getBitWidth(actualType);
+      const bits = getBitWidthFromDecl(this, d) || this.getBitWidth(actualType);
       
       // Extract value directly from expression parts (no need to build ref and then get value)
       const valueBits = totalValue.substring(bitOffset, bitOffset + bits);
@@ -6413,8 +6909,16 @@ if (s.assignment) {
           this.wireStorageMap.set(d.name, storageIdx);
         }
         const simpleRef = `&${storageIdx}`;
+        const wireEntry = { type: actualType, ref: simpleRef };
+        this._applyDeclVectorMeta(wireEntry, d);
         if(this.wires.has(d.name)){
-          this.wires.get(d.name).ref = simpleRef;
+          const existing = this.wires.get(d.name);
+          existing.type = wireEntry.type;
+          existing.ref = simpleRef;
+          if (wireEntry.vector) existing.vector = wireEntry.vector;
+          else delete existing.vector;
+        } else {
+          this.wires.set(d.name, wireEntry);
         }
         this._emitProbeForWire(d.name, wireValue || '0'.repeat(bits));
       }

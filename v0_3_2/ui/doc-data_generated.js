@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -1297,7 +1297,7 @@ Assembler errors include the source line and \`^^^\` under the problematic token
 
 LogTScript supports multiple assignment operators with different width-handling behaviors for **wires**.
 
-See also: [script modes](modes.md) (\`MODE STRICT\`, \`MODE WIREWRITE\`, \`MODE ZSTATE\`), [signal propagation](signal-propagation.md), [ASM](asm.md).
+See also: [script modes](modes.md) (\`MODE STRICT\`, \`MODE WIREWRITE\`, \`MODE ZSTATE\`), [signal propagation](signal-propagation.md), [wire vectors](wire-vectors.md), [ASM](asm.md).
 
 ---
 
@@ -4264,6 +4264,9 @@ probe(expr)
 | Computed component | \`probe(.div:mod)\`, \`probe(.add:carry)\` |
 | Storage reference | \`probe(&1)\` |
 | Bit / slice | \`probe(&1.0)\`, \`probe(&1.2-4)\` |
+| Wire bit-range | \`probe(data.4/4)\` → \`# data.4-7 = …\` |
+| Vector element | \`probe(vectorA:1)\` → \`# vectorA:1 = …\` |
+| Whole vector | \`probe(vectorA)\` |
 
 ### MODE ZSTATE — driver suffix (shared bus)
 
@@ -16224,6 +16227,154 @@ Use **lcd** when text must be written to specific screen positions.
 - [lcd.md](lcd.md) — pixel matrix at fixed coordinates
 - [debug.md](debug.md) — \`probe\` / \`show\`
 - [future-component-ideas.md](future-component-ideas.md) — C6 Text terminal
+`,
+    'wire-vectors.md': `# 1D wire vectors (\`4wire[3]\`)
+
+A **vector** is a single contiguous wire with element metadata. Syntax: \`Nwire[count] name\` declares one wire of \`N × count\` bits. Element **0** is the **MSB** group (same bit-0 = MSB convention as bit-range).
+
+See also: [assignment operators](assignment-operators.md), [debug output](debug.md), [MODE ZSTATE](zstate.md).
+
+---
+
+## Declaration
+
+\`\`\`logts
+4wire[3] vectorA
+8wire[16] memoryRow
+1wire[32] flags
+\`\`\`
+
+| Concept | Meaning |
+|---------|---------|
+| \`4wire[3]\` | 3 elements × 4 bits = **12-bit** wire |
+| Internal storage | One wire; \`wire.vector = { elementWidth: 4, elementCount: 3 }\` |
+| \`getBitWidth\` | Returns **12** (total bits) |
+| Display type | \`4wire[3]\` in Variables, show, peek, Zlist — not \`12wire\` |
+
+Multidimensional forms such as \`4wire[3,3]\` are **not** supported in V1 (parse error).
+
+---
+
+## Initialization
+
+Total width must match \`elementWidth × elementCount\`. All assignment operators (\`=\`, \`:=\`, \`=:\`, \`:\`) follow the same rules as a plain wire of that total width.
+
+\`\`\`logts-play
+4wire[3] vectorA = 1111 + 0011 + 0101
+show(vectorA)
+\`\`\`
+
+Concatenation with \`+\` places the **first** operand at the MSB end (element 0).
+
+---
+
+## Element access
+
+| Syntax | Equivalent bit-range | Notes |
+|--------|---------------------|-------|
+| \`vectorA:0\` | \`vectorA.0/4\` | Static index (decimal or binary literal) |
+| \`vectorA:1\` | \`vectorA.4/4\` | Element 1 |
+| \`vectorA:1.1/2\` | \`vectorA.5/2\` | Bits 1–2 within element 1 (element bit 0 = MSB) |
+| \`vectorA:(index)\` | \`vectorA.(index×4)/4\` | Dynamic index — **wire name only** inside \`(...)\` |
+
+\`\`\`logts-play
+4wire[3] vectorA = 1111 + 0011 + 0101
+4wire a = vectorA:0
+4wire b = vectorA:1
+show(a)
+show(b)
+\`\`\`
+
+Index out of range (\`index < 0\` or \`index ≥ elementCount\`) is a runtime error. Indexing a non-vector wire (\`plain:0\`) is an error.
+
+### Bit-range within an element
+
+After the element index, use the same \`.start/len\` or \`.start-end\` syntax as on a plain wire. Ranges are **relative to the element** (bit 0 = MSB of that element):
+
+\`\`\`logts
+2wire slice = vectorA:1.1/2
+vectorA:1.1/2 = 10
+\`\`\`
+
+\`vectorA:1.1/2\` is equivalent to \`vectorA.5/2\` on the underlying 12-bit wire when elements are 4 bits wide.
+
+---
+
+## Assignment to an element
+
+Element assignment is a **slice write** (read-modify-write on the underlying wire). It is allowed in \`MODE STRICT\` even after the vector was initialized (unlike a full-wire reassignment).
+
+\`\`\`logts
+4wire[3] vectorA = 111111110000
+vectorA:1 = 0011
+\`\`\`
+
+Result: \`111100110000\` — only element 1 changes.
+
+---
+
+## show / peek
+
+For a whole vector, output is **multi-line**:
+
+\`\`\`text
+vectorA = 111100110101 (12bit)
+:0 = 1111 (4bit)
+:1 = 0011 (4bit)
+:2 = 0101 (4bit)
+vectorA has length [3]
+\`\`\`
+
+| Case | Behaviour |
+|------|-----------|
+| \`show(vectorA)\` | Header + all elements if ≤ 5 elements |
+| More than 5 elements | First three elements, \`..\`, last element |
+| \`show(vectorA:1)\` | Single element line + length line |
+| \`peek(vectorA)\` | Same layout as \`show\` (emitted at statement position) |
+
+---
+
+## probe / watch
+
+| Form | Example |
+|------|---------|
+| Whole vector | \`probe(vectorA)\` |
+| Element | \`probe(vectorA:1)\` |
+| Bit-range (plain wire) | \`probe(data.4/4)\` → label \`data.4-7\` |
+
+Slice probes emit on every committed wire change (including element splice). See [debug.md — probe](debug.md#probe).
+
+---
+
+## Zlist (MODE ZSTATE)
+
+Only the **whole wire** name is valid:
+
+\`\`\`logts
+Zlist(vectorA)
+\`\`\`
+
+Header uses vector type: \`vectorA (4wire[3]):\`. Driver labels use element syntax, e.g. \`vectorA:1 = 0011\`. Requires wave propagation — see [zstate.md](zstate.md).
+
+\`Zlist(vectorA:1)\` is **not** supported.
+
+---
+
+## ZCONNECT (V1 limits)
+
+| Form | V1 |
+|------|-----|
+| \`vectorA = ZCONNECT(en, data12)\` | Yes — 12-bit bus |
+| \`lane = ZCONNECT(en, vectorA:1)\` | Yes — element as 4-bit source |
+| \`vectorA:1 = ZCONNECT(en, data)\` | **No** — tristate driver on element slice |
+
+Details: plan section 10 in the repo plan file.
+
+---
+
+## Variables panel
+
+The Variables panel shows one row per vector with type \`4wire[3]\` and the usual value truncation (\`...\` for long values).
 `,
     'zstate.md': `# MODE ZSTATE — tristate wires and multi-driver buses
 

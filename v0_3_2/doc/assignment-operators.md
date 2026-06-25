@@ -2,7 +2,7 @@
 
 LogTScript supports multiple assignment operators with different width-handling behaviors for **wires**.
 
-See also: [script modes](modes.md) (`MODE STRICT`, `MODE WIREWRITE`, `MODE ZSTATE`), [signal propagation](signal-propagation.md), [ASM](asm.md).
+See also: [script modes](modes.md) (`MODE STRICT`, `MODE WIREWRITE`, `MODE ZSTATE`), [signal propagation](signal-propagation.md), [wire vectors](wire-vectors.md), [ASM](asm.md).
 
 ---
 

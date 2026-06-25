@@ -243,6 +243,10 @@ probe(expr)
 | Computed component | `probe(.div:mod)`, `probe(.add:carry)` |
 | Storage reference | `probe(&1)` |
 | Bit / slice | `probe(&1.0)`, `probe(&1.2-4)` |
+| Wire bit-range | `probe(data.4/4)` → `# data.4-7 = …` |
+| Vector element | `probe(vectorA:1)` → `# vectorA:1 = …` |
+| Vector element slice | `probe(vectorA:1.0/2)` → `# vectorA:1.0-1 = …` |
+| Whole vector | `probe(vectorA)` |
 
 ### MODE ZSTATE — driver suffix (shared bus)
 
@@ -874,6 +878,11 @@ Uses the same expression forms as `probe` (wires, `.comp`, `.comp:prop`, chip/PC
 | `watch(o.1-3)` | `o.1`, `o.2`, `o.3` |
 | `watch(.o:counter)` on `osc` with `length: 4` | `.o:counter.0` … `.o:counter.3` |
 | `watch(.sw)` on `4bit` DIP | `.sw` (single channel; component `:get` as one trace) |
+| `watch(vectorA)` on `4wire[3]` | `vectorA.0` … `vectorA.11` (flat 12-bit wire) |
+| `watch(vectorA:0)` | `vectorA:0.0` … `vectorA:0.3` (one element) |
+| `watch(vectorA:1.0/2)` | `vectorA:1.0`, `vectorA:1.1` (sub-range within element) |
+
+See also [wire-vectors.md — probe / watch](wire-vectors.md#probe--watch) for vector-specific behaviour.
 
 **Wire vs component property** — important for oscillators and gated logic:
 

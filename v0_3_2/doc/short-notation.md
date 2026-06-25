@@ -571,9 +571,29 @@ The language's special variables (`~`, `%`, `$`, `_`) work as operands in short 
 
 ---
 
+## Vector element access
+
+Vector element syntax passes through unchanged inside backticks (same as plain wire bit ranges):
+
+```
+4wire y = `vectorA:0 & vectorA:1`
+4wire z = `vectorA:1.0/2 | 11`
+```
+
+| In backticks | Expands to |
+|--------------|------------|
+| `` `vectorA:0` `` | `vectorA:0` |
+| `` `vectorA:1.0/2` `` | `vectorA:1.0/2` |
+| `` `vectorA:0 \| vectorA:1` `` | `OR(vectorA:0,vectorA:1)` |
+
+Requires the vector to be declared in normal script (`4wire[3] vectorA`). Dynamic index `` `vectorA:(idx)` `` is not supported in short notation.
+
+---
+
 ## Limitations
 
 - `^` inside backticks is always **XOR**. For hex literals, use `[^FF]`.
 - `()` inside backticks are for **grouping**, not dynamic bit ranges. Expressions like `a.(expr)/4` are not supported in short notation.
+- Dynamic vector index `` `vectorA:(wire)` `` is not supported in short notation (static `:0`, `:1`, … only).
 - Backticks cannot be nested (a backtick closes the zone opened by the previous one).
 - Backticks inside comments (`#` or `#> ... #<`) are ignored.

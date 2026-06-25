@@ -12876,6 +12876,295 @@ reg(1683, 'arithmetic', 'MAC — full BigInt 650', function(h, session) {
   h.assert('full 650', String(full), '650');
 });
 
+// --- wire-vectors (1684+) ---
+
+reg(1684, 'wire-vectors', '4wire[3] decl — 12 bits + vector metadata', function(h, session) {
+  const { interp } = session.run('4wire[3] vectorA');
+  const w = interp.wires.get('vectorA');
+  h.assert('has wire', String(!!w), 'true');
+  h.assert('total width', String(interp.getBitWidth(w.type)), '12');
+  h.assert('vector meta', String(w.vector && w.vector.elementWidth === 4 && w.vector.elementCount === 3), 'true');
+  h.assert('type label', String(interp.getWireTypeLabel(w)), '4wire[3]');
+});
+
+reg(1685, 'wire-vectors', 'init = ^FF0 on vector', function(h, session) {
+  const { interp } = session.run('4wire[3] vectorA = ^FF0');
+  h.assert('value', session.getWire(interp, 'vectorA'), '111111110000');
+});
+
+reg(1686, 'wire-vectors', 'static element access MSB order', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0011 + 0101\n' +
+    '4wire a = vectorA:0\n' +
+    '4wire b = vectorA:1\n' +
+    '4wire c = vectorA:2'
+  );
+  h.assert(':0 MSB', session.getWire(interp, 'a'), '1111');
+  h.assert(':1', session.getWire(interp, 'b'), '0011');
+  h.assert(':2', session.getWire(interp, 'c'), '0101');
+});
+
+reg(1687, 'wire-vectors', 'element assign splice', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 111111110000\n' +
+    'vectorA:1 = 0011'
+  );
+  h.assert('only element 1 changed', session.getWire(interp, 'vectorA'), '111100110000');
+});
+
+reg(1688, 'wire-vectors', 'dynamic index vectorA:(index)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0011 + 0101\n' +
+    '2wire index = 01\n' +
+    '4wire value = vectorA:(index)'
+  );
+  h.assert('index 1', session.getWire(interp, 'value'), '0011');
+});
+
+reg(1689, 'wire-vectors', 'bit-range cross element boundary', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0011 + 0101\n' +
+    '6wire y = vectorA.3/6'
+  );
+  h.assert('cross boundary', session.getWire(interp, 'y'), '100110');
+});
+
+reg(1690, 'wire-vectors', 'show(vectorA) format <=5 elements', function(h, session) {
+  const { out } = session.run(
+    '4wire[3] vectorA = 1111 + 1111 + 0000\n' +
+    'show(vectorA)'
+  );
+  h.assert('header', String(out.some(l => l.includes('vectorA = 111111110000'))), 'true');
+  h.assert(':0', String(out.some(l => l.includes(':0 = 1111'))), 'true');
+  h.assert(':1', String(out.some(l => l.includes(':1 = 1111'))), 'true');
+  h.assert(':2', String(out.some(l => l.includes(':2 = 0000'))), 'true');
+  h.assert('length line', String(out.some(l => l.includes('vectorA has length [3]'))), 'true');
+});
+
+reg(1691, 'wire-vectors', 'show(vectorA) truncate >5 elements', function(h, session) {
+  const { out } = session.run(
+    '1wire[8] bits = 1 + 0 + 1 + 0 + 1 + 0 + 1 + 0\n' +
+    'show(bits)'
+  );
+  h.assert('ellipsis', String(out.some(l => l.trim() === '..')), 'true');
+  h.assert('first :0', String(out.some(l => l.includes(':0 = 1'))), 'true');
+  h.assert('last :7', String(out.some(l => l.includes(':7 = 0'))), 'true');
+  h.assert('length 8', String(out.some(l => l.includes('bits has length [8]'))), 'true');
+});
+
+reg(1692, 'wire-vectors', 'show(vectorA:1) + length', function(h, session) {
+  const { out } = session.run(
+    '4wire[3] vectorA = 1111 + 0011 + 0101\n' +
+    'show(vectorA:1)'
+  );
+  h.assert('element line', String(out.some(l => l.includes('vectorA:1 = 0011'))), 'true');
+  h.assert('length line', String(out.some(l => l.includes('vectorA has length [3]'))), 'true');
+});
+
+reg(1693, 'wire-vectors', 'error index out of bounds', function(h, session) {
+  const { out } = session.run('4wire[3] vectorA\n4wire x = vectorA:3');
+  h.assert('error', String(out.some(l => l.startsWith('Error:'))), 'true');
+});
+
+reg(1694, 'wire-vectors', 'error plainWire:0 not vector', function(h, session) {
+  const { out } = session.run('4wire plain\n4wire x = plain:0');
+  h.assert('error', String(out.some(l => l.startsWith('Error:'))), 'true');
+});
+
+reg(1695, 'wire-vectors', 'parse error 4wire[3,3]', function(h, session) {
+  try {
+    session.parse('4wire[3,3] matrix');
+    h.assert('should throw', 'false', 'true');
+  } catch (e) {
+    h.assert('multidim error', String(/multidimensional/i.test(e.message)), 'true');
+  }
+});
+
+reg(1696, 'wire-vectors', '4wire[3] vs 12wire equivalence', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 111111110000\n' +
+    '12wire flat = vectorA\n' +
+    '4wire slice = vectorA:1'
+  );
+  h.assert('flat copy', session.getWire(interp, 'flat'), '111111110000');
+  h.assert('slice', session.getWire(interp, 'slice'), '1111');
+});
+
+reg(1697, 'wire-vectors', 'peek(vectorA) same format as show', function(h, session) {
+  const { out } = session.run(
+    '4wire[3] vectorA = 1111 + 1111 + 0000\n' +
+    'peek(vectorA)'
+  );
+  h.assert('peek header', String(out.some(l => l.includes('vectorA = 111111110000'))), 'true');
+  h.assert('peek length', String(out.some(l => l.includes('vectorA has length [3]'))), 'true');
+});
+
+reg(1698, 'wire-vectors', 'probe(vectorA:1) initialised + changed', function(h, session) {
+  const { out, interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0011 + 0101\n' +
+    'probe(vectorA:1)'
+  );
+  h.assert('initialised', String(out.some(l => l.includes('# vectorA:1 = 0011') && l.includes('initialised'))), 'true');
+  session.execStmts(interp, 'vectorA:1 = 0000');
+  h.assert('changed', String(out.some(l => l.includes('# vectorA:1 = 0000') && l.includes('changed'))), 'true');
+});
+
+reg(1699, 'wire-vectors', 'probe(vectorA) whole wire changed', function(h, session) {
+  const { out, interp } = session.run(
+    '4wire[3] vectorA = 0000 + 0000 + 0000\n' +
+    'probe(vectorA)'
+  );
+  h.assert('initialised', String(out.some(l => l.includes('# vectorA = 000000000000') && l.includes('initialised'))), 'true');
+  session.setWire(interp, 'vectorA', '111111111111');
+  h.assert('changed', String(out.some(l => l.includes('# vectorA = 111111111111') && l.includes('changed'))), 'true');
+});
+
+reg(1700, 'wire-vectors', 'Zlist vector header and element driver label', function(h, session) {
+  const { out } = session.run(
+    'MODE ZSTATE\n' +
+    '4wire[3] vectorA\n' +
+    'vectorA:1 = 0011'
+  );
+  h.assert('no zlist yet', String(!out.some(l => l.includes('(4wire[3])'))), 'true');
+  const { out: out2 } = session.run(
+    'MODE ZSTATE\n' +
+    '4wire[3] vectorA\n' +
+    'vectorA:1 = 0011\n' +
+    'Zlist(vectorA)'
+  );
+  h.assert('header', String(out2.some(l => l.includes('vectorA (4wire[3])'))), 'true');
+  h.assert('driver label', String(out2.some(l => l.includes('vectorA:1 = 0011'))), 'true');
+}, ZSTATE_WAVE);
+
+reg(1701, 'wire-vectors', 'Zlist resolved after element splice', function(h, session) {
+  const { out } = session.run(
+    'MODE ZSTATE\n' +
+    '4wire[3] vectorA = 111111110000\n' +
+    'vectorA:1 = 0011\n' +
+    'Zlist(vectorA)'
+  );
+  h.assert('resolved', String(out.some(l => l.includes('(resolved) = 111100110000'))), 'true');
+}, ZSTATE_WAVE);
+
+const PROBE_BITRANGE = `8wire data = 11110000
+probe(data.4/4)`;
+
+function runProbeBitRangeLegacy(h, session) {
+  const { out, interp } = session.run(PROBE_BITRANGE);
+  h.assert('initialised', String(out.some(l => l.includes('# data.4-7 = 0000') && l.includes('initialised'))), 'true');
+  session.setWire(interp, 'data', '11111111');
+  h.assert('changed', String(out.some(l => l.includes('# data.4-7 = 1111') && l.includes('changed'))), 'true');
+}
+
+function runProbeBitRangeWave(h, session) {
+  const { out, interp } = session.run(PROBE_BITRANGE);
+  h.assert('initialised', String(out.some(l => l.includes('# data.4-7 = 0000') && l.includes('initialised'))), 'true');
+  session.setWire(interp, 'data', '11111111');
+  h.assert('changed', String(out.some(l => l.includes('# data.4-7 = 1111') && l.includes('changed'))), 'true');
+}
+
+reg(1702, 'probe', 'probe(data.4/4) — initialised + changed (legacy)', runProbeBitRangeLegacy);
+reg(1703, 'probe', 'probe(data.4/4) — initialised + changed (wave)', runProbeBitRangeWave, { propagation: 'wave' });
+
+reg(1704, 'wire-vectors', 'element sub-range vectorA:1.1/2 read', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0011 + 0101\n' +
+    '2wire slice = vectorA:1.1/2'
+  );
+  h.assert('element bits 1-2 of :1', session.getWire(interp, 'slice'), '01');
+});
+
+reg(1705, 'wire-vectors', 'element sub-range assign vectorA:1.1/2', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 111111110000\n' +
+    'vectorA:1.1/2 = 10'
+  );
+  h.assert('splice within element', session.getWire(interp, 'vectorA'), '111111010000');
+});
+
+reg(1706, 'wire-vectors', 'element sub-range vs wire bit-range equivalence', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0011 + 0101\n' +
+    '2wire a = vectorA:1.1/2\n' +
+    '2wire b = vectorA.5/2'
+  );
+  h.assert('same slice', session.getWire(interp, 'a'), session.getWire(interp, 'b'));
+  h.assert('value', session.getWire(interp, 'a'), '01');
+});
+
+reg(1707, 'short-notation', 'Short notation — vector element passthrough', function(h, session) {
+  h.assert('`vectorA:0`', session.preprocessShortNotation('`vectorA:0`'), 'vectorA:0');
+});
+
+reg(1708, 'short-notation', 'Short notation — vector element bit-range passthrough', function(h, session) {
+  h.assert('`vectorA:1.0/2`', session.preprocessShortNotation('`vectorA:1.0/2`'), 'vectorA:1.0/2');
+});
+
+reg(1709, 'short-notation', 'Short notation — vector OR infix', function(h, session) {
+  h.assert('`vectorA:0 | vectorA:1`', session.preprocessShortNotation('`vectorA:0 | vectorA:1`'), 'OR(vectorA:0,vectorA:1)');
+});
+
+reg(1710, 'short-notation', 'Short notation — vector AND runnable', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0011 + 0101\n' +
+    '4wire y = `vectorA:0 & vectorA:1`'
+  );
+  h.assert('AND elements', session.getWire(interp, 'y'), '0011');
+});
+
+reg(1711, 'debug', 'Parser — watch(vectorA:0) AST and watches[]', function(h, session) {
+  const processed = preprocessRepeat('4wire[3] vectorA\nwatch(vectorA:0)');
+  const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
+  const stmts = p.parse();
+  h.assert('watch stmt', String(!!stmts[1].watch), 'true');
+  h.assert('watches collected', String(p.watches.length), '1');
+  const w = stmts[1].watch[0];
+  h.assert('var', w.var, 'vectorA');
+  h.assert('vectorIndex', String(w.vectorIndex), '0');
+});
+
+reg(1712, 'debug', 'watch-expand vectorA:0 — four columns', function(h, session) {
+  const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
+  const processed = preprocessRepeat('4wire[3] vectorA\nwatch(vectorA:0)');
+  const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
+  const stmts = p.parse();
+  const widths = WE.buildWireWidthMapFromStmts(stmts);
+  const metas = WE.buildVectorMetaMapFromStmts(stmts);
+  h.assert('vectorA is 12wire', String(widths.get('vectorA')), '12');
+  h.assert('meta elementWidth 4', String(metas.get('vectorA').elementWidth), '4');
+  const labels = WE.watchLabelsFromExprs(p.watches, widths, null, null, metas);
+  h.assert('four columns', String(labels.length), '4');
+  h.assert('labels', labels.join(','), 'vectorA:0.0,vectorA:0.1,vectorA:0.2,vectorA:0.3');
+});
+
+reg(1713, 'debug', 'watch-expand vectorA:1.0/2 — two columns', function(h, session) {
+  const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
+  const processed = preprocessRepeat('4wire[3] vectorA\nwatch(vectorA:1.0/2)');
+  const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
+  const stmts = p.parse();
+  const widths = WE.buildWireWidthMapFromStmts(stmts);
+  const metas = WE.buildVectorMetaMapFromStmts(stmts);
+  const labels = WE.watchLabelsFromExprs(p.watches, widths, null, null, metas);
+  h.assert('two columns', String(labels.length), '2');
+  h.assert('labels', labels.join(','), 'vectorA:1.0,vectorA:1.1');
+});
+
+reg(1714, 'debug', 'watch(vectorA:1) samples on element assign', function(h, session) {
+  const samples = [];
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0011 + 0101\n' +
+    'watch(vectorA:1)'
+  );
+  h.assert('four watch targets', String(interp.watchTargets.length), '4');
+  const keys = interp.watchTargets.map(t => t.key).sort().join(',');
+  h.assert('vector slice keys', String(keys.includes('w:vectorA:v:1:0-0') && keys.includes('w:vectorA:v:1:3-3')), 'true');
+  interp.watchRecorder = (s) => samples.push(s);
+  session.execStmts(interp, 'vectorA:1 = 0000');
+  h.assert('samples recorded', String(samples.length >= 1), 'true');
+  const batched = samples.filter(s => s.channels && s.channels.length >= 2);
+  h.assert('batched multi-slice row', String(batched.length >= 1), 'true');
+});
+
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
   allowEnter

@@ -92,10 +92,121 @@ class Parser {
     while (i < src.length && /\s/.test(src[i])) i++;
   }
 
+  // Allow a:index or a:(wire) before '='
+    if (src[i] === ':') {
+    i++;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (i < src.length && src[i] === '(') {
+      i++;
+      while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
+      if (i < src.length && src[i] === ')') i++;
+    } else {
+      while (i < src.length && /[0-9]/.test(src[i])) i++;
+    }
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (src[i] === '.') {
+      i++;
+      while (i < src.length && /[0-9]/.test(src[i])) i++;
+      if (src[i] === '-') {
+        i++;
+        while (i < src.length && /[0-9]/.test(src[i])) i++;
+      }
+      if (src[i] === '/') {
+        i++;
+        while (i < src.length && /[0-9]/.test(src[i])) i++;
+      }
+      while (i < src.length && /\s/.test(src[i])) i++;
+    }
+  }
+
   if (src[i] === '=') return true;
   if (src[i] === ':' && src[i + 1] === '=') return true;
   return false;
 }
+
+  parseBitRangeSuffix() {
+    if (this.c.type !== 'SYM' || this.c.value !== '.') return null;
+    this.eat('SYM', '.');
+
+    let start = null, startExpr = null, isDynamic = false;
+
+    if (this.c.type === 'SYM' && this.c.value === '(') {
+      this.eat('SYM', '(');
+      startExpr = this.expr();
+      this.eat('SYM', ')');
+      isDynamic = true;
+    } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
+      start = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+    } else {
+      throw Error(`Expected bit number or '(' after '.' at ${this.c.line}:${this.c.col}`);
+    }
+
+    if (this.c.type === 'SYM' && this.c.value === '-') {
+      this.eat('SYM', '-');
+      let end = null, endExpr = null;
+      if (this.c.type === 'SYM' && this.c.value === '(') {
+        this.eat('SYM', '(');
+        endExpr = this.expr();
+        this.eat('SYM', ')');
+        isDynamic = true;
+      } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
+        end = parseInt(this.c.value, 10);
+        this.eat(this.c.type);
+      } else {
+        throw Error(`Expected bit number or '(' after '-' at ${this.c.line}:${this.c.col}`);
+      }
+      if (!isDynamic) {
+        return { start, end };
+      }
+      return { start, startExpr, end, endExpr, isDynamic };
+    }
+
+    if (this.c.type === 'SYM' && this.c.value === '/') {
+      this.eat('SYM', '/');
+      let len = null, lenExpr = null;
+      if (this.c.type === 'SYM' && this.c.value === '(') {
+        this.eat('SYM', '(');
+        lenExpr = this.expr();
+        this.eat('SYM', ')');
+        isDynamic = true;
+      } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
+        len = parseInt(this.c.value, 10);
+        if (len < 1) throw Error(`Length must be >= 1 at ${this.c.line}:${this.c.col}`);
+        this.eat(this.c.type);
+      } else {
+        throw Error(`Expected length or '(' after '/' at ${this.c.line}:${this.c.col}`);
+      }
+      if (!isDynamic) {
+        return { start, end: start + len - 1 };
+      }
+      return { start, startExpr, len, lenExpr, isDynamic, isLength: true };
+    }
+
+    if (!isDynamic) {
+      return { start, end: start };
+    }
+    return { start, startExpr, isDynamic };
+  }
+
+  parseVectorCountSuffix(wireType) {
+    if (!wireType || !wireType.endsWith('wire')) return null;
+    if (this.c.type !== 'SYM' || this.c.value !== '[') return null;
+    this.eat('SYM', '[');
+    if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+      throw Error(`Expected vector element count after '[' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const count = parseInt(this.c.value, this.c.type === 'BIN' ? 2 : 10);
+    this.eat(this.c.type);
+    if (this.c.type === 'SYM' && this.c.value === ',') {
+      throw Error(`Multidimensional wire vectors are not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    this.eat('SYM', ']');
+    if (!Number.isFinite(count) || count < 1) {
+      throw Error(`Vector element count must be >= 1 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    return count;
+  }
 
 parse() {
   const stmts = [];
@@ -1167,7 +1278,8 @@ assignment() {
     while(this.c.type === 'TYPE'){
       const type = this.c.value;
       this.eat('TYPE');
-      
+      const vectorCount = this.parseVectorCountSuffix(type);
+
       let name;
       if(this.c.type === 'ID' || this.c.type === 'SPECIAL'){
         name = this.c.value;
@@ -1175,8 +1287,10 @@ assignment() {
       } else {
         throw Error(`Expected variable name at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
-      
-      decls.push({ type, name, line: this.c.line, col: this.c.col });
+
+      const decl = { type, name, line: this.c.line, col: this.c.col };
+      if (vectorCount != null) decl.vectorCount = vectorCount;
+      decls.push(decl);
       
       if(this.c.value === ','){
         this.eat('SYM', ',');
@@ -1204,6 +1318,7 @@ assignment() {
     const declCol = tokenStartCol(this.c);
     const type = this.c.value;
     this.eat('TYPE');
+    const vectorCount = this.parseVectorCountSuffix(type);
 
     let name;
     if (this.c.type === 'ID' || this.c.type === 'SPECIAL') {
@@ -1213,7 +1328,9 @@ assignment() {
         throw Error(`Expected variable name at ${this.c.line}:${this.c.col}`);
     }
 
-    decls.push({ type, name, line: declLine, col: declCol });
+    const decl = { type, name, line: declLine, col: declCol };
+    if (vectorCount != null) decl.vectorCount = vectorCount;
+    decls.push(decl);
 
     if (this.c.value === ',') {
       this.eat('SYM', ',');
@@ -2941,81 +3058,40 @@ assignment() {
     if (this.c.type === 'SYM' && this.c.value === '(') {
       return addNot(this.call({ name, alias: null, line: atomLine, col: atomCol }));
     }
-    
-    if (this.c.type === 'SYM' && this.c.value === '.') {
-      this.eat('SYM', '.');
 
-      let start = null, startExpr = null, isDynamic = false;
-
+    if (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+      if (this.c.type === 'BIN' || this.c.type === 'DEC') {
+        const vectorIndex = parseInt(this.c.value, this.c.type === 'BIN' ? 2 : 10);
+        this.eat(this.c.type);
+        const idAtomV = withAtomLoc({ var: name, vectorIndex });
+        const brV = this.parseBitRangeSuffix();
+        if (brV) idAtomV.bitRange = brV;
+        if (this.c.type === 'SYM' && this.c.value === ';') idAtomV.pad = this.parsePadding();
+        return addNot(idAtomV);
+      }
       if (this.c.type === 'SYM' && this.c.value === '(') {
         this.eat('SYM', '(');
-        startExpr = this.expr();
-        this.eat('SYM', ')');
-        isDynamic = true;
-      } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
-        start = parseInt(this.c.value, 10);
+        if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+          throw Error(`Only wire names supported in vector index (...) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        const indexWire = this.c.value;
         this.eat(this.c.type);
-      } else {
-        throw Error(`Expected bit number or '(' after '.' at ${this.c.line}:${this.c.col}`);
+        this.eat('SYM', ')');
+        const idAtomVD = withAtomLoc({ var: name, vectorIndexExpr: [{ var: indexWire }] });
+        const brVD = this.parseBitRangeSuffix();
+        if (brVD) idAtomVD.bitRange = brVD;
+        if (this.c.type === 'SYM' && this.c.value === ';') idAtomVD.pad = this.parsePadding();
+        return addNot(idAtomVD);
       }
-
-      if (this.c.type === 'SYM' && this.c.value === '-') {
-        this.eat('SYM', '-');
-        let end = null, endExpr = null;
-        if (this.c.type === 'SYM' && this.c.value === '(') {
-          this.eat('SYM', '(');
-          endExpr = this.expr();
-          this.eat('SYM', ')');
-          isDynamic = true;
-        } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
-          end = parseInt(this.c.value, 10);
-          this.eat(this.c.type);
-        } else {
-          throw Error(`Expected bit number or '(' after '-' at ${this.c.line}:${this.c.col}`);
-        }
-        if (!isDynamic) {
-          const idAtom1 = withAtomLoc({ var: name, bitRange: { start, end } });
-          if (this.c.type === 'SYM' && this.c.value === ';') idAtom1.pad = this.parsePadding();
-          return addNot(idAtom1);
-        }
-        const idAtom2 = withAtomLoc({ var: name, bitRange: { start, startExpr, end, endExpr, isDynamic } });
-        if (this.c.type === 'SYM' && this.c.value === ';') idAtom2.pad = this.parsePadding();
-        return addNot(idAtom2);
-      }
-
-      if (this.c.type === 'SYM' && this.c.value === '/') {
-        this.eat('SYM', '/');
-        let len = null, lenExpr = null;
-        if (this.c.type === 'SYM' && this.c.value === '(') {
-          this.eat('SYM', '(');
-          lenExpr = this.expr();
-          this.eat('SYM', ')');
-          isDynamic = true;
-        } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
-          len = parseInt(this.c.value, 10);
-          if (len < 1) throw Error(`Length must be >= 1 at ${this.c.line}:${this.c.col}`);
-          this.eat(this.c.type);
-        } else {
-          throw Error(`Expected length or '(' after '/' at ${this.c.line}:${this.c.col}`);
-        }
-        if (!isDynamic) {
-          const idAtom3 = withAtomLoc({ var: name, bitRange: { start, end: start + len - 1 } });
-          if (this.c.type === 'SYM' && this.c.value === ';') idAtom3.pad = this.parsePadding();
-          return addNot(idAtom3);
-        }
-        const idAtom4 = withAtomLoc({ var: name, bitRange: { start, startExpr, len, lenExpr, isDynamic, isLength: true } });
-        if (this.c.type === 'SYM' && this.c.value === ';') idAtom4.pad = this.parsePadding();
-        return addNot(idAtom4);
-      }
-
-      if (!isDynamic) {
-        const idAtom5 = withAtomLoc({ var: name, bitRange: { start, end: start } });
-        if (this.c.type === 'SYM' && this.c.value === ';') idAtom5.pad = this.parsePadding();
-        return addNot(idAtom5);
-      }
-      const idAtom6 = withAtomLoc({ var: name, bitRange: { start, startExpr, isDynamic } });
-      if (this.c.type === 'SYM' && this.c.value === ';') idAtom6.pad = this.parsePadding();
-      return addNot(idAtom6);
+      throw Error(`Expected element index after ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    
+    const brWire = this.parseBitRangeSuffix();
+    if (brWire) {
+      const idAtomBr = withAtomLoc({ var: name, bitRange: brWire });
+      if (this.c.type === 'SYM' && this.c.value === ';') idAtomBr.pad = this.parsePadding();
+      return addNot(idAtomBr);
     }
     
     const idAtom0 = withAtomLoc({ var: name });
