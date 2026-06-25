@@ -13,12 +13,12 @@
       {"id":10,"group":"repeat","title":"Tokenizer accepts preprocessed output","detail":{"scripts":["repeat 1..3[\n    4wire w?\n    ]"],"steps":[],"assertions":["tokenizer: 3 TYPE tokens from repeat"]}},
       {"id":13,"group":"repeat","title":"Nested 3 levels","detail":{"scripts":["repeat 1..2[\n    repeat 1..2[\n    repeat 1..2[\n    4wire x?0?1?2\n    ]\n    ]\n    ]"],"steps":[],"assertions":["3-level nesting: 8 lines","3-level first line","3-level last line"]}},
       {"id":14,"group":"repeat","title":"Unmatched bracket error","detail":{"scripts":["repeat 1..3[\n    4wire a?"],"steps":[],"assertions":["unmatched bracket"]}},
-      {"id":15,"group":"repeat","title":"Decimal literal \\\\N tokenized as BIN","detail":{"scripts":["4wire c = \\15"],"steps":[],"assertions":["\\15 produces BIN token","\\15 value is 1111"]}},
-      {"id":16,"group":"repeat","title":"Decimal literal \\\\0","detail":{"scripts":["4wire c = \\0"],"steps":[],"assertions":["\\0 produces BIN with value 0"]}},
-      {"id":17,"group":"repeat","title":"Decimal literal \\\\255","detail":{"scripts":["4wire c = \\255"],"steps":[],"assertions":["\\255 value is 11111111"]}},
-      {"id":19,"group":"repeat","title":"Decimal \\\\2 produces binary 10 (padding is interpreter-level)","detail":{"scripts":["8wire q2 = \\2"],"steps":[],"assertions":["\\2 tokenized as BIN 10"]}},
+      {"id":15,"group":"repeat","title":"Decimal literal \\\\N tokenized as SDEC","detail":{"scripts":["4wire c = \\15"],"steps":[],"assertions":["\\15 produces SDEC token","\\15 value is 15"]}},
+      {"id":16,"group":"repeat","title":"Decimal literal \\\\0","detail":{"scripts":["4wire c = \\0"],"steps":[],"assertions":["\\0 produces SDEC with value 0"]}},
+      {"id":17,"group":"repeat","title":"Decimal literal \\\\255","detail":{"scripts":["4wire c = \\255"],"steps":[],"assertions":["\\255 value is 255"]}},
+      {"id":19,"group":"repeat","title":"Decimal \\\\2 produces binary 10 (padding is interpreter-level)","detail":{"scripts":["8wire q2 = \\2"],"steps":[],"assertions":["\\2 tokenized as SDEC 2"]}},
       {"id":20,"group":"repeat","title":"HEX ^F produces 4-bit binary","detail":{"scripts":["8wire q3 = ^F"],"steps":[],"assertions":["^F tokenized as HEX F"]}},
-      {"id":21,"group":"repeat","title":"Large decimal \\\\1024","detail":{"scripts":["16wire q = \\1024"],"steps":[],"assertions":["\\1024 value is 10000000000"]}},
+      {"id":21,"group":"repeat","title":"Large decimal \\\\1024","detail":{"scripts":["16wire q = \\1024"],"steps":[],"assertions":["\\1024 value is 1024"]}},
       {"id":22,"group":"gates-reduce","title":"AND reduce - bitwise 11011 AND 11100 = 11000 → OR-reduce = 1","detail":{"scripts":[],"steps":["gateReduce(AND, 11011, 11100)"],"assertions":["AND(11011, 11100)"]}},
       {"id":23,"group":"gates-reduce","title":"AND reduce - no overlap → 0","detail":{"scripts":[],"steps":["gateReduce(AND, 1010, 0101)"],"assertions":["AND(1010, 0101)"]}},
       {"id":24,"group":"gates-reduce","title":"OR reduce","detail":{"scripts":[],"steps":["gateReduce(OR, 0000, 0000)","gateReduce(OR, 0000, 0001)"],"assertions":["OR(0000, 0000)","OR(0000, 0001)"]}},
@@ -84,7 +84,7 @@
       {"id":84,"group":"wire-init","title":":: still produces two SYM(:) tokens","detail":{"scripts":["comp [switch] .s ::"],"steps":[],"assertions":[":: gives two SYM(:)",":: gives no SYM(:=)"]}},
       {"id":85,"group":"wire-init","title":"full tokenizedion of \"1wire s : 1\"","detail":{"scripts":["1wire s : 1"],"steps":[],"assertions":["TYPE token present","ID token present",": SYM present","BIN token present"]}},
       {"id":86,"group":"wire-init","title":": init with hex literal \"4wire s : ^FF\"","detail":{"scripts":["4wire s : ^FF"],"steps":[],"assertions":["^FF hex token present after :","^FF value is FF"]}},
-      {"id":87,"group":"wire-init","title":": init with decimal \\\\N (tokenized as BIN)","detail":{"scripts":["4wire s : \\5"],"steps":[],"assertions":["\\5 after : gives BIN","\\5 BIN value is 101"]}},
+      {"id":87,"group":"wire-init","title":": init with decimal \\\\N (tokenized as SDEC)","detail":{"scripts":["4wire s : \\5"],"steps":[],"assertions":["\\5 after : gives SDEC","\\5 SDEC value is 5"]}},
       {"id":88,"group":"wire-init","title":": init with NOT prefix \"1wire s : !1\"","detail":{"scripts":["1wire s : !1"],"steps":[],"assertions":["! token present after :","BIN follows !"]}},
       {"id":89,"group":"wire-init","title":":= does not interfere with .var:get syntax","detail":{"scripts":["1wire s = .sw:get"],"steps":[],"assertions":[":= not produced for :get syntax",": produced for :get syntax"]}},
       {"id":90,"group":"wire-init","title":"Parser — 1wire s : 1 produces initExpr {bin}","detail":{"scripts":["1wire s : 1"],"steps":[],"assertions":["stmt has decls","decls[0].name is s","decls[0].type is 1wire","expr is null","initExpr exists","initExpr.bin is 1"]}},
@@ -1220,7 +1220,8 @@
       {"id":1734,"group":"vector-reduction","title":"SUM vector sub-range same width","detail":{"scripts":["4wire[3] vectorA = 1010 + 0101 + 1100"],"steps":[],"assertions":["sum sub-ranges","over"]}},
       {"id":1735,"group":"wire-vectors","title":"10wire[10] — count in [] is decimal","detail":{"scripts":["10wire[10] a"],"steps":[],"assertions":["element count","type label","total width"]}},
       {"id":1736,"group":"wire-vectors","title":"vectorA:10 — index after : is decimal","detail":{"scripts":["10wire[21] a\nwatch(a:10)"],"steps":["Tokenizer(processed)","Parser(…)","session._ensureRegistry()"],"assertions":["vectorIndex 10","element 10 value"]}},
-      {"id":1737,"group":"wire-vectors","title":"16wire[100] — bracket count hundred not binary four","detail":{"scripts":["16wire[100] v"],"steps":[],"assertions":["element count","type label"]}}
+      {"id":1737,"group":"wire-vectors","title":"16wire[100] — bracket count hundred not binary four","detail":{"scripts":["16wire[100] v"],"steps":[],"assertions":["element count","type label"]}},
+      {"id":1738,"group":"wire-vectors","title":"vector index rejects \\\\N and ^N literals","detail":{"scripts":["10wire[10] a"],"steps":[],"assertions":[]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1289,7 +1290,7 @@
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983, 1571–1574, 1643–1653, 1661, 1663', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 1571, 1572, 1573, 1574, 1643, 1644, 1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1661, 1663] },
       { id: 'vector-reduction', label: 'vector-reduction', rangeLabel: '1715–1734', testIds: [1715, 1716, 1717, 1718, 1719, 1720, 1721, 1722, 1723, 1724, 1725, 1726, 1727, 1728, 1729, 1730, 1731, 1732, 1733, 1734] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611, 1654', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 1654] },
-      { id: 'wire-vectors', label: 'wire-vectors', rangeLabel: '1684–1701, 1704–1706, 1735–1737', testIds: [1684, 1685, 1686, 1687, 1688, 1689, 1690, 1691, 1692, 1693, 1694, 1695, 1696, 1697, 1698, 1699, 1700, 1701, 1704, 1705, 1706, 1735, 1736, 1737] },
+      { id: 'wire-vectors', label: 'wire-vectors', rangeLabel: '1684–1701, 1704–1706, 1735–1738', testIds: [1684, 1685, 1686, 1687, 1688, 1689, 1690, 1691, 1692, 1693, 1694, 1695, 1696, 1697, 1698, 1699, 1700, 1701, 1704, 1705, 1706, 1735, 1736, 1737, 1738] },
       { id: 'zstate', label: 'zstate', rangeLabel: '1429–1503, 1536, 1559–1570, 1575–1587', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503, 1536, 1559, 1560, 1561, 1562, 1563, 1564, 1565, 1566, 1567, 1568, 1569, 1570, 1575, 1576, 1577, 1578, 1579, 1580, 1581, 1582, 1583, 1584, 1585, 1586, 1587] }
     ]
   };

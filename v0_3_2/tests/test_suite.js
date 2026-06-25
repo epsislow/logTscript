@@ -403,36 +403,36 @@
     }
   });
 
-  reg(15, 'repeat', 'Decimal literal \\\\N tokenized as BIN', function(h, session) {
+  reg(15, 'repeat', 'Decimal literal \\\\N tokenized as SDEC', function(h, session) {
     {
       const { tokens } = session.tokenize('4wire c = \\15');
-      const binTokens = tokens.filter(t => t.type === 'BIN');
-      h.assert('\\15 produces BIN token', String(binTokens.length >= 1), 'true');
-      h.assert('\\15 value is 1111', binTokens[binTokens.length - 1].value, '1111');
+      const sdecTokens = tokens.filter(t => t.type === 'SDEC');
+      h.assert('\\15 produces SDEC token', String(sdecTokens.length >= 1), 'true');
+      h.assert('\\15 value is 15', sdecTokens[sdecTokens.length - 1].value, '15');
     }
   });
 
   reg(16, 'repeat', 'Decimal literal \\\\0', function(h, session) {
     {
       const { tokens } = session.tokenize('4wire c = \\0');
-      const binTokens = tokens.filter(t => t.type === 'BIN');
-      h.assert('\\0 produces BIN with value 0', binTokens[binTokens.length - 1].value, '0');
+      const sdecTokens = tokens.filter(t => t.type === 'SDEC');
+      h.assert('\\0 produces SDEC with value 0', sdecTokens[sdecTokens.length - 1].value, '0');
     }
   });
 
   reg(17, 'repeat', 'Decimal literal \\\\255', function(h, session) {
     {
       const { tokens } = session.tokenize('4wire c = \\255');
-      const binTokens = tokens.filter(t => t.type === 'BIN');
-      h.assert('\\255 value is 11111111', binTokens[binTokens.length - 1].value, '11111111');
+      const sdecTokens = tokens.filter(t => t.type === 'SDEC');
+      h.assert('\\255 value is 255', sdecTokens[sdecTokens.length - 1].value, '255');
     }
   });
 
   reg(19, 'repeat', 'Decimal \\\\2 produces binary 10 (padding is interpreter-level)', function(h, session) {
     {
       const { tokens } = session.tokenize('8wire q2 = \\2');
-      const binTokens = tokens.filter(t => t.type === 'BIN');
-      h.assert('\\2 tokenized as BIN 10', binTokens[binTokens.length - 1].value, '10');
+      const sdecTokens = tokens.filter(t => t.type === 'SDEC');
+      h.assert('\\2 tokenized as SDEC 2', sdecTokens[sdecTokens.length - 1].value, '2');
     }
   });
 
@@ -447,8 +447,8 @@
   reg(21, 'repeat', 'Large decimal \\\\1024', function(h, session) {
     {
       const { tokens } = session.tokenize('16wire q = \\1024');
-      const binTokens = tokens.filter(t => t.type === 'BIN');
-      h.assert('\\1024 value is 10000000000', binTokens[binTokens.length - 1].value, '10000000000');
+      const sdecTokens = tokens.filter(t => t.type === 'SDEC');
+      h.assert('\\1024 value is 1024', sdecTokens[sdecTokens.length - 1].value, '1024');
     }
   });
 
@@ -1184,12 +1184,12 @@
     }
   });
 
-  reg(87, 'wire-init', ': init with decimal \\\\N (tokenized as BIN)', function(h, session) {
+  reg(87, 'wire-init', ': init with decimal \\\\N (tokenized as SDEC)', function(h, session) {
     {
       const { tokens } = session.tokenize('4wire s : \\5');
-      const binTok = tokens.filter(t => t.type === 'BIN');
-      h.assert('\\5 after : gives BIN', String(binTok.length >= 1), 'true');
-      h.assert('\\5 BIN value is 101', binTok[binTok.length - 1].value, '101');
+      const sdecTok = tokens.filter(t => t.type === 'SDEC');
+      h.assert('\\5 after : gives SDEC', String(sdecTok.length >= 1), 'true');
+      h.assert('\\5 SDEC value is 5', sdecTok[sdecTok.length - 1].value, '5');
     }
   });
 
@@ -13399,6 +13399,21 @@ reg(1737, 'wire-vectors', '16wire[100] — bracket count hundred not binary four
   const w = interp.wires.get('v');
   h.assert('element count', String(w.vector.elementCount), '100');
   h.assert('type label', String(interp.getWireTypeLabel(w)), '16wire[100]');
+});
+
+reg(1738, 'wire-vectors', 'vector index rejects \\\\N and ^N literals', function(h, session) {
+  const cases = [
+    'show(a:\\0)',
+    'show(a:\\10)',
+    'show(a:^0)',
+  ];
+  for (const expr of cases) {
+    h.assertThrows(
+      expr,
+      () => session.parse('10wire[10] a\n' + expr),
+      'Expected element index after'
+    );
+  }
 });
 
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {

@@ -291,7 +291,7 @@ pushSource({ src, alias }) {
       return this.token('HEX', hex.toUpperCase());
     }
 
-    // Decimal literal: \ followed by decimal digits -> converted to binary
+    // Decimal literal: \ followed by decimal digits (wire values only, not vector indices)
     if (c === '\\') {
       this.next();
       let dec = '';
@@ -301,9 +301,7 @@ pushSource({ src, alias }) {
       if (dec === '') {
         throw Error(`Invalid decimal literal at ${this.file}: ${this.line}:${this.col}`);
       }
-      const num = parseInt(dec, 10);
-      const bin = num.toString(2);
-      return this.token('BIN', bin);
+      return this.token('SDEC', dec);
     }
 
     // Starts with letter a-z ID or keyword

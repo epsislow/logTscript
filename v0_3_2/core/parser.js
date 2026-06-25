@@ -7,6 +7,10 @@ function tokenStartCol(tok) {
   return Math.max(1, tok.col - len);
 }
 
+function slashDecToBin(value) {
+  return parseInt(value, 10).toString(2);
+}
+
 class Parser {
   constructor(t, componentRegistry){
     this.t=t; this.c=t.get(); this.funcs=new Map();
@@ -1403,6 +1407,9 @@ assignment() {
     if(this.c.type === 'BIN'){
       atom = {bin: this.c.value};
       this.eat('BIN');
+    } else if(this.c.type === 'SDEC'){
+      atom = {bin: slashDecToBin(this.c.value)};
+      this.eat('SDEC');
     } else if(this.c.type === 'LOGIC'){
       atom = {logic: this.c.value};
       this.eat('LOGIC');
@@ -2421,6 +2428,9 @@ assignment() {
           if (this.c.type === 'BIN') {
             initialValue = this.c.value;
             this.eat('BIN');
+          } else if (this.c.type === 'SDEC') {
+            initialValue = slashDecToBin(this.c.value);
+            this.eat('SDEC');
           } else if (this.c.type === 'HEX') {
             // Convert hex to binary string
             const hexStr = this.c.value;
@@ -2745,6 +2755,20 @@ assignment() {
     return addNot({ refLiteral: v });
   }
   
+  if (this.c.type === 'SDEC') {
+    const v = slashDecToBin(this.c.value);
+    this.eat('SDEC');
+    let br = null;
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      br = this.parseLiteralBitRange();
+    }
+    const atomSdec = br ? { bin: v, bitRange: br } : { bin: v };
+    if (this.c.type === 'SYM' && this.c.value === ';') {
+      atomSdec.pad = this.parsePadding();
+    }
+    return addNot(atomSdec);
+  }
+
   if (this.c.type === 'BIN') {
     const v = this.c.value;
     this.eat('BIN');
