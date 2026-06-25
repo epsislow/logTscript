@@ -12661,6 +12661,221 @@ reg(1615, 'decimal', 'N2N10S / N10S2N E2E show round-trip', function(h, session)
   h.assert('show output', out.some(l => l.includes('11110101')), true);
 });
 
+reg(1664, 'number-conversion', 'CNTN16S — hex digit count', function(h, session) {
+  const interp = session.runArith(
+    '8wire n245 = 11110101\n' +
+    '8wire n5 = 00000101\n' +
+    '8wire n0 = 00000000\n' +
+    '8wire n255 = 11111111\n' +
+    '2wire c245 := CNTN16S(n245)\n' +
+    '2wire c5 := CNTN16S(n5)\n' +
+    '2wire c0 := CNTN16S(n0)\n' +
+    '2wire c255 := CNTN16S(n255)'
+  );
+  h.assert('245 has 2 digits', session.getWire(interp, 'c245'), '10');
+  h.assert('5 has 1 digit', session.getWire(interp, 'c5'), '01');
+  h.assert('0 has 1 digit', session.getWire(interp, 'c0'), '01');
+  h.assert('255 has 2 digits', session.getWire(interp, 'c255'), '10');
+});
+
+reg(1665, 'number-conversion', 'N2N16S — packed hex', function(h, session) {
+  const interp = session.runArith(
+    '8wire n245 = 11110101\n' +
+    '8wire n5 = 00000101\n' +
+    '8wire n0 = 00000000\n' +
+    '8wire p245 = N2N16S(n245)\n' +
+    '8wire p5 = N2N16S(n5)\n' +
+    '8wire p0 = N2N16S(n0)'
+  );
+  h.assert('245 packed F5', session.getWire(interp, 'p245'), '11110101');
+  h.assert('5 packed 05', session.getWire(interp, 'p5'), '00000101');
+  h.assert('0 packed 00', session.getWire(interp, 'p0'), '00000000');
+});
+
+reg(1666, 'number-conversion', 'N16S2N — unpack and round-trip', function(h, session) {
+  const interp = session.runArith(
+    '8wire packed = 11110101\n' +
+    '8wire n = 11110101\n' +
+    '8wire num16s = N2N16S(n)\n' +
+    '8wire back := N16S2N(num16s)\n' +
+    '8wire fromPacked := N16S2N(packed)'
+  );
+  h.assert('245 from packed', session.getWire(interp, 'fromPacked'), '11110101');
+  h.assert('round-trip', session.getWire(interp, 'back'), '11110101');
+});
+
+reg(1667, 'number-conversion', 'N16S2N — length not multiple of 4', function(h, session) {
+  const r = session.run('4wire bad = N16S2N(101)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('length error', String(err.includes('multiple of 4')), 'true');
+});
+
+reg(1668, 'doc', 'BUILTIN_DOC — hex conversion signatures', function(h, session) {
+  h.assert('CNTN16S', Interpreter.getDocLines('CNTN16S', new Map())[0], 'CNTN16S(Xbit value) -> Ybit');
+  h.assert('N2N16S', Interpreter.getDocLines('N2N16S', new Map())[0], 'N2N16S(Xbit value) -> Zbit packed');
+  h.assert('N16S2N', Interpreter.getDocLines('N16S2N', new Map())[0], 'N16S2N(Xbit packed) -> Wbit value');
+});
+
+reg(1669, 'number-conversion', 'N2N16S / N16S2N E2E show round-trip', function(h, session) {
+  const { interp, out } = session.run(
+    '8wire number = 11110101\n' +
+    '8wire num16s = N2N16S(number)\n' +
+    '8wire back := N16S2N(num16s)\n' +
+    'show(back)'
+  );
+  h.assert('back wire', session.getWire(interp, 'back'), '11110101');
+  h.assert('show output', out.some(l => l.includes('11110101')), true);
+});
+
+reg(1670, 'compare', 'GT — unsigned greater', function(h, session) {
+  const interp = session.runArith(
+    '4wire a = 0101\n' +
+    '4wire b = 0011\n' +
+    '1wire g = GT(a, b)'
+  );
+  h.assert('5 > 3', session.getWire(interp, 'g'), '1');
+});
+
+reg(1671, 'compare', 'LT — unsigned less', function(h, session) {
+  const interp = session.runArith(
+    '4wire a = 0011\n' +
+    '4wire b = 0101\n' +
+    '1wire l = LT(a, b)'
+  );
+  h.assert('3 < 5', session.getWire(interp, 'l'), '1');
+});
+
+reg(1672, 'compare', 'GT/LT — equal both 0', function(h, session) {
+  const interp = session.runArith(
+    '4wire a = 0101\n' +
+    '4wire b = 0101\n' +
+    '1wire g = GT(a, b)\n' +
+    '1wire l = LT(a, b)'
+  );
+  h.assert('not gt', session.getWire(interp, 'g'), '0');
+  h.assert('not lt', session.getWire(interp, 'l'), '0');
+});
+
+reg(1673, 'select', 'MIN / MAX — variadic same width', function(h, session) {
+  const interp = session.runArith(
+    '4wire a = 0101\n' +
+    '4wire b = 0011\n' +
+    '4wire c = 1000\n' +
+    '4wire lo = MIN(a, b, c)\n' +
+    '4wire hi = MAX(a, b, c)'
+  );
+  h.assert('min 3', session.getWire(interp, 'lo'), '0011');
+  h.assert('max 8', session.getWire(interp, 'hi'), '1000');
+});
+
+reg(1674, 'select', 'MIN — width mismatch error', function(h, session) {
+  const r = session.run('4wire a = 0101\n8wire b = 00000011\n4wire lo = MIN(a, b)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('width error', String(err.includes('same bit width')), 'true');
+});
+
+reg(1675, 'select', 'CLAMP — 300 to 255 and 120 pass', function(h, session) {
+  const interp = session.runArith(
+    '16wire x300 = 0000000100101100\n' +
+    '16wire x120 = 0000000001111000\n' +
+    '8wire zero = 00000000\n' +
+    '8wire max255 = 11111111\n' +
+    '8wire y300 = CLAMP(x300, zero, max255)\n' +
+    '8wire y120 = CLAMP(x120, zero, max255)'
+  );
+  h.assert('300 clamps 255', session.getWire(interp, 'y300'), '11111111');
+  h.assert('120 stays', session.getWire(interp, 'y120'), '01111000');
+});
+
+reg(1676, 'select', 'CLAMP — min max width mismatch', function(h, session) {
+  const r = session.run(
+    '8wire x = 00001010\n' +
+    '4wire lo = 0000\n' +
+    '8wire hi = 11111111\n' +
+    '8wire y = CLAMP(x, lo, hi)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('clamp width', String(err.includes('same bit width')), 'true');
+});
+
+reg(1677, 'number-conversion', 'ISDIGIT — 0..9 yes 10+ no', function(h, session) {
+  const interp = session.runArith(
+    '4wire d9 = 1001\n' +
+    '4wire d10 = 1010\n' +
+    '1wire y9 = ISDIGIT(d9)\n' +
+    '1wire y10 = ISDIGIT(d10)'
+  );
+  h.assert('9 is digit', session.getWire(interp, 'y9'), '1');
+  h.assert('10 not digit', session.getWire(interp, 'y10'), '0');
+});
+
+reg(1678, 'doc', 'BUILTIN_DOC — compare select MAC signatures', function(h, session) {
+  h.assert('GT', Interpreter.getDocLines('GT', new Map())[0], 'GT(Xbit a, Xbit b) -> 1bit');
+  h.assert('LT', Interpreter.getDocLines('LT', new Map())[0], 'LT(Xbit a, Xbit b) -> 1bit');
+  h.assert('MIN', Interpreter.getDocLines('MIN', new Map())[0], 'MIN(Xbit a, Xbit b, ...) -> Xbit');
+  h.assert('MAX', Interpreter.getDocLines('MAX', new Map())[0], 'MAX(Xbit a, Xbit b, ...) -> Xbit');
+  h.assert('CLAMP', Interpreter.getDocLines('CLAMP', new Map())[0], 'CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit');
+  h.assert('ISDIGIT', Interpreter.getDocLines('ISDIGIT', new Map())[0], 'ISDIGIT(Xbit value) -> 1bit');
+  h.assert('MAC', Interpreter.getDocLines('MAC', new Map())[0], 'MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over');
+});
+
+reg(1679, 'compare', 'GT/LT — unequal arg widths pad', function(h, session) {
+  const interp = session.runArith(
+    '8wire a = 00000001\n' +
+    '4wire b = 0000\n' +
+    '1wire g = GT(a, b)\n' +
+    '1wire l = LT(b, a)'
+  );
+  h.assert('1 > 0', session.getWire(interp, 'g'), '1');
+  h.assert('0 < 1', session.getWire(interp, 'l'), '1');
+});
+
+reg(1680, 'arithmetic', 'MAC — 250+20x20 split', function(h, session) {
+  const interp = session.runArith(
+    '8wire acc = 11111010\n' +
+    '8wire a = 00010100\n' +
+    '8wire b = 00010100\n' +
+    '8wire result, 9wire over = MAC(acc, a, b)'
+  );
+  h.assert('result low', session.getWire(interp, 'result'), '10001010');
+  h.assert('over high', session.getWire(interp, 'over'), '000000010');
+});
+
+reg(1681, 'arithmetic', 'MAC — digit acc over zero', function(h, session) {
+  const interp = session.runArith(
+    '8wire acc = 00001100\n' +
+    '8wire digit = 00000101\n' +
+    '8wire ten = 00001010\n' +
+    '8wire low, 9wire hi = MAC(acc, digit, ten)'
+  );
+  h.assert('62 low', session.getWire(interp, 'low'), '00111110');
+  h.assert('over zero', session.getWire(interp, 'hi'), '000000000');
+});
+
+reg(1682, 'arithmetic', 'MAC — width mismatch error', function(h, session) {
+  const r = session.run(
+    '8wire acc = 00000001\n' +
+    '4wire a = 0001\n' +
+    '8wire b = 00000010\n' +
+    '8wire r, 9wire o = MAC(acc, a, b)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('mac width', String(err.includes('same bit width')), 'true');
+});
+
+reg(1683, 'arithmetic', 'MAC — full BigInt 650', function(h, session) {
+  const interp = session.runArith(
+    '8wire acc = 11111010\n' +
+    '8wire a = 00010100\n' +
+    '8wire b = 00010100\n' +
+    '8wire result, 9wire over = MAC(acc, a, b)'
+  );
+  const low = session.getWire(interp, 'result');
+  const hi = session.getWire(interp, 'over');
+  const full = (BigInt('0b' + hi) << 8n) + BigInt('0b' + low);
+  h.assert('full 650', String(full), '650');
+});
+
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
   allowEnter

@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, decimal-conversion.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, zstate.md
  */
 (function () {
   'use strict';
@@ -591,13 +591,14 @@ peek(.alu:zero)
 `,
     'arithmetic.md': `# Arithmetic Built-in Functions
 
-LogTscript provides four built-in arithmetic functions that compute results **instantly** — no clock cycle or component declaration is needed. Each function takes two bit-string operands of any width and returns **two values**: the primary result and a secondary output (carry, borrow, overflow, or remainder).
+LogTscript provides built-in arithmetic functions that compute results **instantly**. Core four-ops return **two values** (result + carry/overflow/mod); \`MAC\` also returns two (\`result\` + \`over\`).
 
 \`\`\`
 ADD(Xbit a, Xbit b)      -> Xbit result, 1bit carry
 SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
 MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
 DIVIDE(Xbit a, Xbit b)   -> Xbit result, Xbit mod
+MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 \`\`\`
 
 
@@ -809,6 +810,116 @@ DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
 
 ---
 
+## MAC (multiply-accumulate)
+
+Performs **\`acc + (a × b)\`** (unsigned). Mathematically equivalent to **\`ADD(acc, MULTIPLY(a, b))\`**; the runtime may fuse the steps.
+
+\`\`\`
+MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
+\`\`\`
+
+**All three operands must have the same bit width \`X\`.**
+
+| Output | Width | Description |
+|--------|-------|-------------|
+| \`result\` | \`X\` | Low \`X\` bits of \`acc + a*b\` |
+| \`over\` | \`X + 1\` | Upper bits (zero-padded) |
+
+Reconstruct the full integer by concatenating **\`over\` then \`result\`** (MSB → LSB).
+
+### Example
+
+\`\`\`logts-play
+8wire acc = 11111010
+8wire a = 00010100
+8wire b = 00010100
+8wire result, 9wire over = MAC(acc, a, b)
+show(result)
+show(over)
+\`\`\`
+
+Math: \`250 + 20×20 = 650\` → \`result = 10001010\`, \`over = 000000010\`.
+
+Digit accumulator when the value fits in \`X\` bits (\`over\` all zeros):
+
+\`\`\`logts-play
+8wire acc = 00001100
+8wire digit = 00000101
+8wire ten = 00001010
+8wire low, 9wire hi = MAC(acc, digit, ten)
+show(low)
+show(hi)
+\`\`\`
+
+\`12 + 5×10 = 62\`.
+
+---
+
+## GT / LT
+
+Unsigned **numeric** ordering (not bitwise \`EQ\` — see [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md)).
+
+\`\`\`
+GT(Xbit a, Xbit b) -> 1bit
+LT(Xbit a, Xbit b) -> 1bit
+\`\`\`
+
+Operands are padded to \`max(len(a), len(b))\` with leading \`0\`. \`GT\` → \`1\` if \`a > b\`; \`LT\` → \`1\` if \`a < b\`; equal → both \`0\`.
+
+\`\`\`logts-play
+4wire a = 0101
+4wire b = 0011
+1wire g = GT(a, b)
+1wire l = LT(b, a)
+show(g)
+show(l)
+\`\`\`
+
+---
+
+## MIN / MAX
+
+\`\`\`
+MIN(Xbit a, Xbit b, ...) -> Xbit
+MAX(Xbit a, Xbit b, ...) -> Xbit
+\`\`\`
+
+Variadic (≥ 2 args). **All arguments must have the same width.** Returns the original bit string of the winning value.
+
+\`\`\`logts-play
+4wire a = 0101
+4wire b = 0011
+4wire c = 1000
+4wire lo = MIN(a, b, c)
+4wire hi = MAX(a, b, c)
+show(lo)
+show(hi)
+\`\`\`
+
+---
+
+## CLAMP
+
+\`\`\`
+CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit
+\`\`\`
+
+- \`min\` and \`max\` must have equal width \`Y\`.
+- \`x\` may be any width; compare at **\`len(x)\`** with \`min\`/\`max\` zero-extended.
+- Result converted to **\`Y\` bits**.
+
+\`\`\`logts-play
+16wire x = 0000000100101100
+8wire zero = 00000000
+8wire max255 = 11111111
+8wire y = CLAMP(x, zero, max255)
+show(y)
+\`\`\`
+
+\`300\` clamped to \`255\`.
+
+---
+
 ## Comparison with component equivalents
 
 These built-in functions are **combinational** — they produce their result immediately when evaluated, without state or clock:
@@ -823,7 +934,7 @@ These built-in functions are **combinational** — they produce their result imm
 Use the **built-in functions** when you need a quick one-off calculation.
 Use the **components** when you need a named, persistent device with pins that other parts of the circuit can wire to (e.g. in a PCB definition).
 
-For **decimal digit packing** (display, terminals, calculators), see [decimal-conversion.md](decimal-conversion.md) (\`CNTN10S\`, \`N2N10S\`, \`N10S2N\`).
+For **digit packing** (decimal / hex), see [number-conversion.md](number-conversion.md).
 
 ---
 
@@ -841,6 +952,15 @@ doc(MULTIPLY)
 
 doc(DIVIDE)
 # DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
+
+doc(MAC)
+# MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
+
+doc(GT)
+doc(LT)
+doc(MIN)
+doc(MAX)
+doc(CLAMP)
 \`\`\`
 
 Use \`doc(def)\` to list all built-in functions (including ADD, SUBTRACT, MULTIPLY, DIVIDE) alongside any user-defined functions:
@@ -2725,8 +2845,8 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Logic gates** | \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, \`EQ\` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) |
 | **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
-| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\` | [arithmetic.md](arithmetic.md) |
-| **Decimal conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\` | [decimal-conversion.md](decimal-conversion.md) |
+| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) |
+| **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
@@ -2873,7 +2993,7 @@ show(any)
 EQ(Xbit, Xbit) -> 1bit
 \`\`\`
 
-Compares two operands bit-by-bit; returns \`1\` only if every bit pair matches.
+Compares two operands bit-by-bit; returns \`1\` only if every bit pair matches. For **unsigned numeric** ordering use \`GT\` / \`LT\` in [arithmetic.md](arithmetic.md).
 
 ### Runnable example
 
@@ -4991,130 +5111,6 @@ Details: [boolean-lut.md](boolean-lut.md). LUT invoke syntax: [lut.md](lut.md).
 - [LUT component](lut.md) — runtime \`inline [lut]\` invoke (\`^.name(in=…)\`)
 - [REG](reg.md) — \`NEXT(~)\` and wire-clock behaviour with \`show\`
 `,
-    'decimal-conversion.md': `# Decimal conversion (CNTN10S, N2N10S, N10S2N)
-
-Unsigned binary numbers ↔ packed decimal digits (4 bits per digit, BCD 0–9).
-
-Index: [builtin-functions.md](builtin-functions.md)
-
----
-
-## Overview
-
-| Function | Direction | Output |
-|----------|-----------|--------|
-| \`CNTN10S\` | count decimal digits | \`Ybit\` (minimal width, unpadded) |
-| \`N2N10S\` | number → packed digits | \`maxCifre × 4\` bits |
-| \`N10S2N\` | packed digits → number | minimal-width binary (use \`:=\` / \`=:\` to pad) |
-
-All three operate on **unsigned** values only.
-
-\`maxCifre\` for an \`N\`-bit input is the number of decimal digits in \`2^N − 1\` (e.g. 8 bit → 3 digits, 0…255).
-
----
-
-## CNTN10S
-
-\`\`\`
-CNTN10S(Xbit value) -> Ybit
-\`\`\`
-
-Returns how many **significant** decimal digits \`value\` has.
-
-- \`CNTN10S(0)\` → \`1\` (displays as \`"0"\`)
-- \`CNTN10S(245)\` on 8 bit → \`11\` (3 digits)
-- \`CNTN10S(5)\` → \`1\`
-
-\`Y\` is minimal width (unpadded), same style as \`CNTONE\`. Declare a wide enough wire or use \`:=\`.
-
-### Example
-
-\`\`\`logts-play
-8wire n = 11110101
-2wire cnt = CNTN10S(n)
-show(cnt)
-\`\`\`
-
-Result: \`11\` (3 decimal digits)
-
----
-
-## N2N10S
-
-\`\`\`
-N2N10S(Xbit value) -> Zbit packed
-\`\`\`
-
-Converts unsigned \`value\` to packed BCD: each decimal digit is **4 bits** (0–9), MSB-first.
-
-Output width \`Z = maxCifre × 4\` where \`maxCifre\` follows input width (see above). Digits are **left-padded with zero nibbles** inside the field.
-
-| Input (8 bit) | Decimal | Packed (12 bit) |
-|---------------|---------|-----------------|
-| \`11110101\` | 245 | \`0010_0100_0101\` |
-| \`00000101\` | 5 | \`0000_0000_0101\` |
-| \`00000000\` | 0 | \`0000_0000_0000\` |
-
-### Example
-
-\`\`\`logts-play
-8wire n = 11110101
-12wire packed = N2N10S(n)
-show(packed)
-\`\`\`
-
----
-
-## N10S2N
-
-\`\`\`
-N10S2N(Xbit packed) -> Wbit value
-\`\`\`
-
-Inverse of \`N2N10S\`: reads packed BCD MSB-first and returns the unsigned binary value.
-
-- Packed length must be a **multiple of 4**.
-- Each nibble must be 0–9; otherwise **runtime error**.
-- Result width is **minimal** (no padding). Use \`:=\` or \`=:\` when assigning to a wider wire.
-
-### Example
-
-\`\`\`logts-play
-8wire n = 11110101
-12wire packed = N2N10S(n)
-8wire back := N10S2N(packed)
-show(back)
-\`\`\`
-
-Result: \`11110101\`
-
-### Round-trip
-
-\`\`\`logts-play
-8wire number = 11110101
-12wire num10s = N2N10S(number)
-8wire back := N10S2N(num10s)
-show(back)
-\`\`\`
-
----
-
-## doc()
-
-\`\`\`
-doc(CNTN10S)
-doc(N2N10S)
-doc(N10S2N)
-\`\`\`
-
----
-
-## See also
-
-- [arithmetic.md](arithmetic.md) — \`ADD\`, \`SUBTRACT\`, …
-- [assignment-operators.md](assignment-operators.md) — \`:=\`, \`=:\`
-- [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) — \`CNTONE\`
-`,
     'dip.md': `# DIP switch component
 
 \`comp [dip]\` is a **group of toggle switches** on one panel control. Each position is one bit; width is set by \`length\` (default \`4\`).
@@ -5487,15 +5483,44 @@ The bit width of both inputs is taken as \`max(len(a), len(b))\`. The result is 
 - \`mod\` = remainder (\`a % b\`)
 - Division by zero returns \`0\` for both outputs
 
-### Decimal conversion (CNTN10S / N2N10S / N10S2N)
+### Number conversion
 
-Unsigned binary ↔ packed decimal digits (4 bits per digit). Full reference: [decimal-conversion.md](decimal-conversion.md).
+Decimal and hex packed digits. Full reference: [number-conversion.md](number-conversion.md).
 
 \`\`\`
 doc(CNTN10S)
 doc(N2N10S)
 doc(N10S2N)
+doc(CNTN16S)
+doc(N2N16S)
+doc(N16S2N)
+doc(ISDIGIT)
 \`\`\`
+
+### Compare / select / MAC
+
+See [arithmetic.md](arithmetic.md).
+
+\`\`\`
+doc(GT)
+doc(LT)
+doc(MIN)
+doc(MAX)
+doc(CLAMP)
+doc(MAC)
+\`\`\`
+
+| Call | Signature |
+|------|-----------|
+| \`doc(GT)\` | \`GT(Xbit a, Xbit b) -> 1bit\` |
+| \`doc(LT)\` | \`LT(Xbit a, Xbit b) -> 1bit\` |
+| \`doc(MIN)\` | \`MIN(Xbit a, Xbit b, ...) -> Xbit\` |
+| \`doc(MAX)\` | \`MAX(Xbit a, Xbit b, ...) -> Xbit\` |
+| \`doc(CLAMP)\` | \`CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit\` |
+| \`doc(ISDIGIT)\` | \`ISDIGIT(Xbit value) -> 1bit\` |
+| \`doc(MAC)\` | \`MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over\` |
+
+### Decimal conversion (summary)
 
 | Call | Signature |
 |------|-----------|
@@ -12053,6 +12078,204 @@ See [editorUI.md — probe: propagation vs network](editorUI.md#probe--propagati
 - [network-traffic-panel.md](network-traffic-panel.md) — traffic log UI
 - [editorUI.md](editorUI.md) — Inst slots, output per instance, probe vs network
 `,
+    'number-conversion.md': `# Number conversion
+
+Unsigned binary numbers ↔ packed digit strings (4 bits per digit). **Decimal** nibbles hold 0–9; **hex** nibbles hold 0–F.
+
+Index: [builtin-functions.md](builtin-functions.md)
+
+Ordering and selection (\`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\`, \`MAC\`): [arithmetic.md](arithmetic.md).
+
+---
+
+## Overview
+
+### Decimal (BCD)
+
+| Function | Direction | Output |
+|----------|-----------|--------|
+| \`CNTN10S\` | count decimal digits | \`Ybit\` (minimal width, unpadded) |
+| \`N2N10S\` | number → packed digits | \`maxDecDigits × 4\` bits |
+| \`N10S2N\` | packed digits → number | minimal-width binary (use \`:=\` / \`=:\` to pad) |
+
+\`maxDecDigits\` for an \`N\`-bit input is the number of decimal digits in \`2^N − 1\` (e.g. 8 bit → 3 digits, 0…255).
+
+### Hexadecimal (packed nibbles)
+
+| Function | Direction | Output |
+|----------|-----------|--------|
+| \`CNTN16S\` | count hex digits | \`Ybit\` (minimal width, unpadded) |
+| \`N2N16S\` | number → packed hex | \`maxHexDigits × 4\` bits |
+| \`N16S2N\` | packed hex → number | minimal-width binary |
+
+\`maxHexDigits\` for an \`N\`-bit input is the number of hex digits in \`2^N − 1\` (e.g. 8 bit → 2 digits, 0…255 → \`FF\`).
+
+### BCD helper
+
+| Function | Output |
+|----------|--------|
+| \`ISDIGIT\` | \`1bit\` — \`1\` if unsigned value is 0…9 |
+
+All functions above are **unsigned** only and require binary operands (runtime error on \`Z\` / \`X\` in \`MODE ZSTATE\`).
+
+---
+
+## CNTN10S
+
+\`\`\`
+CNTN10S(Xbit value) -> Ybit
+\`\`\`
+
+Returns how many **significant** decimal digits \`value\` has.
+
+- \`CNTN10S(0)\` → \`1\` (displays as \`"0"\`)
+- \`CNTN10S(245)\` on 8 bit → \`11\` (3 digits)
+- \`CNTN10S(5)\` → \`1\`
+
+### Example
+
+\`\`\`logts-play
+8wire n = 11110101
+2wire cnt = CNTN10S(n)
+show(cnt)
+\`\`\`
+
+---
+
+## N2N10S
+
+\`\`\`
+N2N10S(Xbit value) -> Zbit packed
+\`\`\`
+
+Packed BCD: each decimal digit is **4 bits** (0–9), MSB-first. Output width \`Z = maxDecDigits × 4\`.
+
+| Input (8 bit) | Decimal | Packed (12 bit) |
+|---------------|---------|-----------------|
+| \`11110101\` | 245 | \`0010_0100_0101\` |
+| \`00000101\` | 5 | \`0000_0000_0101\` |
+
+\`\`\`logts-play
+8wire n = 11110101
+12wire packed = N2N10S(n)
+show(packed)
+\`\`\`
+
+---
+
+## N10S2N
+
+\`\`\`
+N10S2N(Xbit packed) -> Wbit value
+\`\`\`
+
+Inverse of \`N2N10S\`. Packed length must be a **multiple of 4**; each nibble must be 0–9 or **runtime error**.
+
+\`\`\`logts-play
+8wire number = 11110101
+12wire num10s = N2N10S(number)
+8wire back := N10S2N(num10s)
+show(back)
+\`\`\`
+
+---
+
+## CNTN16S
+
+\`\`\`
+CNTN16S(Xbit value) -> Ybit
+\`\`\`
+
+Significant **hex** digit count (same rules as \`CNTN10S\`, base 16).
+
+- \`CNTN16S(0)\` → \`1\`
+- \`CNTN16S(245)\` on 8 bit → \`10\` (2 digits, \`F5\`)
+- \`CNTN16S(5)\` → \`1\`
+
+\`\`\`logts-play
+8wire n = 11110101
+2wire cnt = CNTN16S(n)
+show(cnt)
+\`\`\`
+
+---
+
+## N2N16S
+
+\`\`\`
+N2N16S(Xbit value) -> Zbit packed
+\`\`\`
+
+Packed hex: each digit is **4 bits** (0–F), MSB-first. Output width \`Z = maxHexDigits × 4\`.
+
+| Input (8 bit) | Hex | Packed (8 bit) |
+|---------------|-----|----------------|
+| \`11110101\` | F5 | \`1111_0101\` |
+| \`00000101\` | 05 | \`0000_0101\` |
+
+\`\`\`logts-play
+8wire n = 11110101
+8wire packed = N2N16S(n)
+show(packed)
+\`\`\`
+
+---
+
+## N16S2N
+
+\`\`\`
+N16S2N(Xbit packed) -> Wbit value
+\`\`\`
+
+Inverse of \`N2N16S\`. Any nibble 0–15 is valid. Length must be a **multiple of 4**.
+
+\`\`\`logts-play
+8wire packed = 11110101
+8wire back := N16S2N(packed)
+show(back)
+\`\`\`
+
+---
+
+## ISDIGIT
+
+\`\`\`
+ISDIGIT(Xbit value) -> 1bit
+\`\`\`
+
+Returns \`1\` if the unsigned value is a valid **decimal digit** (0…9); otherwise \`0\`. Useful before manual BCD handling; \`N10S2N\` still errors on invalid nibbles.
+
+\`\`\`logts-play
+4wire d9 = 1001
+4wire d10 = 1010
+1wire y9 = ISDIGIT(d9)
+1wire y10 = ISDIGIT(d10)
+show(y9)
+show(y10)
+\`\`\`
+
+---
+
+## doc()
+
+\`\`\`
+doc(CNTN10S)
+doc(N2N10S)
+doc(N10S2N)
+doc(CNTN16S)
+doc(N2N16S)
+doc(N16S2N)
+doc(ISDIGIT)
+\`\`\`
+
+---
+
+## See also
+
+- [arithmetic.md](arithmetic.md) — \`ADD\`, \`MAC\`, \`GT\`, \`CLAMP\`, …
+- [assignment-operators.md](assignment-operators.md) — \`:=\`, \`=:\`
+- [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) — \`CNTONE\`
+`,
     'oscillator.md': `# Oscillator
 
 The \`osc\` component generates a periodic 1-bit digital signal with configurable frequency and duty cycle. It includes an internal counter that counts cycles.
@@ -12587,7 +12810,7 @@ flowchart LR
 
 ## Optional: \`N2N10S\` display (didactic)
 
-For packed decimal teaching, see [decimal-conversion.md](decimal-conversion.md). A variant can print via \`N2N10S\` + per-nibble ASCII; the demo below uses **divider + toAscii** for clarity and fewer moving parts.
+For packed decimal teaching, see [number-conversion.md](number-conversion.md).
 
 ---
 
@@ -12805,7 +13028,7 @@ After **Load & Run**: focus **Digits**, type \`12\`, click **\`+\`** — termina
 - [key.md](key.md) — panel keys
 - [terminal.md](terminal.md) — \`append\`, \`newline\`, \`clear\`
 - [divider.md](divider.md) — \`comp [divider]\`
-- [decimal-conversion.md](decimal-conversion.md) — \`N2N10S\` / \`N10S2N\` alternative display
+- [number-conversion.md](number-conversion.md) — \`N2N10S\` / \`N10S2N\` alternative display
 - [mini-cpu-v2.md](mini-cpu-v2.md) — similar doc layout with **Load & Run** runnable block
 `,
     'protocol.md': `# PROTOCOL

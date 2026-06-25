@@ -52,7 +52,7 @@ flowchart LR
 
 ## Optional: `N2N10S` display (didactic)
 
-For packed decimal teaching, see [decimal-conversion.md](decimal-conversion.md). A variant can print via `N2N10S` + per-nibble ASCII; the demo below uses **divider + toAscii** for clarity and fewer moving parts.
+For packed decimal teaching, see [number-conversion.md](number-conversion.md).
 
 ---
 
@@ -270,5 +270,5 @@ After **Load & Run**: focus **Digits**, type `12`, click **`+`** — terminal sh
 - [key.md](key.md) — panel keys
 - [terminal.md](terminal.md) — `append`, `newline`, `clear`
 - [divider.md](divider.md) — `comp [divider]`
-- [decimal-conversion.md](decimal-conversion.md) — `N2N10S` / `N10S2N` alternative display
+- [number-conversion.md](number-conversion.md) — `N2N10S` / `N10S2N` alternative display
 - [mini-cpu-v2.md](mini-cpu-v2.md) — similar doc layout with **Load & Run** runnable block

@@ -1,12 +1,13 @@
 # Arithmetic Built-in Functions
 
-LogTscript provides four built-in arithmetic functions that compute results **instantly** — no clock cycle or component declaration is needed. Each function takes two bit-string operands of any width and returns **two values**: the primary result and a secondary output (carry, borrow, overflow, or remainder).
+LogTscript provides built-in arithmetic functions that compute results **instantly**. Core four-ops return **two values** (result + carry/overflow/mod); `MAC` also returns two (`result` + `over`).
 
 ```
 ADD(Xbit a, Xbit b)      -> Xbit result, 1bit carry
 SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
 MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
 DIVIDE(Xbit a, Xbit b)   -> Xbit result, Xbit mod
+MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 ```
 
 
@@ -218,6 +219,116 @@ DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
 
 ---
 
+## MAC (multiply-accumulate)
+
+Performs **`acc + (a × b)`** (unsigned). Mathematically equivalent to **`ADD(acc, MULTIPLY(a, b))`**; the runtime may fuse the steps.
+
+```
+MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
+```
+
+**All three operands must have the same bit width `X`.**
+
+| Output | Width | Description |
+|--------|-------|-------------|
+| `result` | `X` | Low `X` bits of `acc + a*b` |
+| `over` | `X + 1` | Upper bits (zero-padded) |
+
+Reconstruct the full integer by concatenating **`over` then `result`** (MSB → LSB).
+
+### Example
+
+```logts-play
+8wire acc = 11111010
+8wire a = 00010100
+8wire b = 00010100
+8wire result, 9wire over = MAC(acc, a, b)
+show(result)
+show(over)
+```
+
+Math: `250 + 20×20 = 650` → `result = 10001010`, `over = 000000010`.
+
+Digit accumulator when the value fits in `X` bits (`over` all zeros):
+
+```logts-play
+8wire acc = 00001100
+8wire digit = 00000101
+8wire ten = 00001010
+8wire low, 9wire hi = MAC(acc, digit, ten)
+show(low)
+show(hi)
+```
+
+`12 + 5×10 = 62`.
+
+---
+
+## GT / LT
+
+Unsigned **numeric** ordering (not bitwise `EQ` — see [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md)).
+
+```
+GT(Xbit a, Xbit b) -> 1bit
+LT(Xbit a, Xbit b) -> 1bit
+```
+
+Operands are padded to `max(len(a), len(b))` with leading `0`. `GT` → `1` if `a > b`; `LT` → `1` if `a < b`; equal → both `0`.
+
+```logts-play
+4wire a = 0101
+4wire b = 0011
+1wire g = GT(a, b)
+1wire l = LT(b, a)
+show(g)
+show(l)
+```
+
+---
+
+## MIN / MAX
+
+```
+MIN(Xbit a, Xbit b, ...) -> Xbit
+MAX(Xbit a, Xbit b, ...) -> Xbit
+```
+
+Variadic (≥ 2 args). **All arguments must have the same width.** Returns the original bit string of the winning value.
+
+```logts-play
+4wire a = 0101
+4wire b = 0011
+4wire c = 1000
+4wire lo = MIN(a, b, c)
+4wire hi = MAX(a, b, c)
+show(lo)
+show(hi)
+```
+
+---
+
+## CLAMP
+
+```
+CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit
+```
+
+- `min` and `max` must have equal width `Y`.
+- `x` may be any width; compare at **`len(x)`** with `min`/`max` zero-extended.
+- Result converted to **`Y` bits**.
+
+```logts-play
+16wire x = 0000000100101100
+8wire zero = 00000000
+8wire max255 = 11111111
+8wire y = CLAMP(x, zero, max255)
+show(y)
+```
+
+`300` clamped to `255`.
+
+---
+
 ## Comparison with component equivalents
 
 These built-in functions are **combinational** — they produce their result immediately when evaluated, without state or clock:
@@ -232,7 +343,7 @@ These built-in functions are **combinational** — they produce their result imm
 Use the **built-in functions** when you need a quick one-off calculation.
 Use the **components** when you need a named, persistent device with pins that other parts of the circuit can wire to (e.g. in a PCB definition).
 
-For **decimal digit packing** (display, terminals, calculators), see [decimal-conversion.md](decimal-conversion.md) (`CNTN10S`, `N2N10S`, `N10S2N`).
+For **digit packing** (decimal / hex), see [number-conversion.md](number-conversion.md).
 
 ---
 
@@ -250,6 +361,15 @@ doc(MULTIPLY)
 
 doc(DIVIDE)
 # DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
+
+doc(MAC)
+# MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
+
+doc(GT)
+doc(LT)
+doc(MIN)
+doc(MAX)
+doc(CLAMP)
 ```
 
 Use `doc(def)` to list all built-in functions (including ADD, SUBTRACT, MULTIPLY, DIVIDE) alongside any user-defined functions:

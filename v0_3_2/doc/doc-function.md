@@ -221,15 +221,44 @@ The bit width of both inputs is taken as `max(len(a), len(b))`. The result is al
 - `mod` = remainder (`a % b`)
 - Division by zero returns `0` for both outputs
 
-### Decimal conversion (CNTN10S / N2N10S / N10S2N)
+### Number conversion
 
-Unsigned binary ↔ packed decimal digits (4 bits per digit). Full reference: [decimal-conversion.md](decimal-conversion.md).
+Decimal and hex packed digits. Full reference: [number-conversion.md](number-conversion.md).
 
 ```
 doc(CNTN10S)
 doc(N2N10S)
 doc(N10S2N)
+doc(CNTN16S)
+doc(N2N16S)
+doc(N16S2N)
+doc(ISDIGIT)
 ```
+
+### Compare / select / MAC
+
+See [arithmetic.md](arithmetic.md).
+
+```
+doc(GT)
+doc(LT)
+doc(MIN)
+doc(MAX)
+doc(CLAMP)
+doc(MAC)
+```
+
+| Call | Signature |
+|------|-----------|
+| `doc(GT)` | `GT(Xbit a, Xbit b) -> 1bit` |
+| `doc(LT)` | `LT(Xbit a, Xbit b) -> 1bit` |
+| `doc(MIN)` | `MIN(Xbit a, Xbit b, ...) -> Xbit` |
+| `doc(MAX)` | `MAX(Xbit a, Xbit b, ...) -> Xbit` |
+| `doc(CLAMP)` | `CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit` |
+| `doc(ISDIGIT)` | `ISDIGIT(Xbit value) -> 1bit` |
+| `doc(MAC)` | `MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over` |
+
+### Decimal conversion (summary)
 
 | Call | Signature |
 |------|-----------|

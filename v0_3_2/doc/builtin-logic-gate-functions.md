@@ -92,7 +92,7 @@ show(any)
 EQ(Xbit, Xbit) -> 1bit
 ```
 
-Compares two operands bit-by-bit; returns `1` only if every bit pair matches.
+Compares two operands bit-by-bit; returns `1` only if every bit pair matches. For **unsigned numeric** ordering use `GT` / `LT` in [arithmetic.md](arithmetic.md).
 
 ### Runnable example
 

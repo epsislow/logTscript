@@ -101,6 +101,117 @@ function n10s2nPacked(packed) {
   return num.toString(2);
 }
 
+/** Max hex digits representable in an unsigned wire of bitLen bits. */
+function maxHexDigitsForBitWidth(bitLen) {
+  if (bitLen <= 0) return 1;
+  const maxVal = (BigInt(1) << BigInt(bitLen)) - BigInt(1);
+  return maxVal.toString(16).length;
+}
+
+function hexDigitCountBigInt(n) {
+  if (n === 0n) return 1;
+  return n.toString(16).length;
+}
+
+function n2n16sPacked(binStr) {
+  const len = binStr.length;
+  const n = unsignedBinToBigInt(binStr);
+  const maxDigits = maxHexDigitsForBitWidth(len);
+  const hexStr = n.toString(16).padStart(maxDigits, '0');
+  let packed = '';
+  for (let i = 0; i < hexStr.length; i++) {
+    const d = parseInt(hexStr[i], 16);
+    packed += d.toString(2).padStart(4, '0');
+  }
+  return packed;
+}
+
+function n16s2nPacked(packed) {
+  const s = packed == null ? '' : String(packed);
+  if (s.length === 0) {
+    throw new Error('N16S2N packed length must be a multiple of 4');
+  }
+  if (s.length % 4 !== 0) {
+    throw new Error(`N16S2N packed length must be a multiple of 4, got ${s.length}`);
+  }
+  let num = 0n;
+  for (let i = 0; i < s.length; i += 4) {
+    const nib = s.slice(i, i + 4);
+    const d = parseInt(nib, 2);
+    if (Number.isNaN(d) || d > 15) {
+      throw new Error(`N16S2N invalid hex digit ${nib}`);
+    }
+    num = num * 16n + BigInt(d);
+  }
+  if (num === 0n) return '0';
+  return num.toString(2);
+}
+
+function unsignedCompareBigInt(a, b) {
+  const w = Math.max(a.length, b.length);
+  const ai = unsignedBinToBigInt(a.padStart(w, '0'));
+  const bi = unsignedBinToBigInt(b.padStart(w, '0'));
+  if (ai === bi) return 0;
+  return ai > bi ? 1 : -1;
+}
+
+function requireSameBitWidth(values, opName) {
+  const w = values[0].length;
+  for (let i = 1; i < values.length; i++) {
+    if (values[i].length !== w) {
+      throw new Error(`${opName}: all arguments must have the same bit width`);
+    }
+  }
+  return w;
+}
+
+function pickMinMaxUnsigned(values, pickMin) {
+  const op = pickMin ? 'MIN' : 'MAX';
+  requireSameBitWidth(values, op);
+  let best = values[0];
+  let bestN = unsignedBinToBigInt(best);
+  for (let i = 1; i < values.length; i++) {
+    const n = unsignedBinToBigInt(values[i]);
+    if (pickMin ? n < bestN : n > bestN) {
+      bestN = n;
+      best = values[i];
+    }
+  }
+  return best;
+}
+
+function clampUnsigned(x, lo, hi) {
+  if (lo.length !== hi.length) {
+    throw new Error('CLAMP: min and max must have the same bit width');
+  }
+  const Y = lo.length;
+  const X = x.length;
+  const xn = unsignedBinToBigInt(x);
+  const lon = unsignedBinToBigInt(lo.padStart(X, '0'));
+  const hin = unsignedBinToBigInt(hi.padStart(X, '0'));
+  let chosen = xn;
+  if (xn < lon) chosen = lon;
+  else if (xn > hin) chosen = hin;
+  return chosen.toString(2).padStart(Y, '0');
+}
+
+function isDecimalDigitBin(binStr) {
+  const n = unsignedBinToBigInt(binStr);
+  return n >= 0n && n <= 9n ? '1' : '0';
+}
+
+function macUnsigned(acc, a, b) {
+  const N = acc.length;
+  if (a.length !== N || b.length !== N) {
+    throw new Error('MAC: all arguments must have the same bit width');
+  }
+  const full = unsignedBinToBigInt(acc) + unsignedBinToBigInt(a) * unsignedBinToBigInt(b);
+  const maskN = (BigInt(1) << BigInt(N)) - BigInt(1);
+  const result = (full & maskN).toString(2).padStart(N, '0');
+  const over = (full >> BigInt(N)).toString(2).padStart(N + 1, '0');
+  return { result, over };
+}
+
 function padWireBits(value, bits, assignPad) {
   if (!value) return '0'.repeat(bits);
   if (value.length >= bits) return value;
@@ -2361,8 +2472,10 @@ class Interpreter {
          'HIGH', 'LOW', 'ANY', 'ZERO', 'BITINDEX', 'ONEHOT',
          'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE',
          'REVERSE', 'LROTATE', 'RROTATE',
-         'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE',
-         'CNTN10S', 'N2N10S', 'N10S2N'].includes(name)) {
+         'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC',
+         'GT', 'LT', 'MIN', 'MAX', 'CLAMP', 'ISDIGIT',
+         'CNTN10S', 'N2N10S', 'N10S2N',
+         'CNTN16S', 'N2N16S', 'N16S2N'].includes(name)) {
       return true;
     }
 
@@ -3863,7 +3976,23 @@ if (this.isBuiltinDEMUX(name)) {
     ];
   }
 
-  // ================= BUILTIN: DECIMAL CONVERSION =================
+  // ================= BUILTIN: MAC =================
+  if (name === 'MAC') {
+    if (argValues.length !== 3) fail('MAC expects 3 arguments');
+    this._zstateRequireBinary(argValues, 'MAC', ['acc', 'a', 'b']);
+    let mac;
+    try {
+      mac = macUnsigned(argValues[0], argValues[1], argValues[2]);
+    } catch (e) {
+      fail(e.message);
+    }
+    return [
+      computeRefs ? { value: mac.result, ref: `&${this.storeValue(mac.result)}` } : { value: mac.result, ref: null },
+      computeRefs ? { value: mac.over,   ref: `&${this.storeValue(mac.over)}`   } : { value: mac.over,   ref: null },
+    ];
+  }
+
+  // ================= BUILTIN: DECIMAL / HEX CONVERSION =================
   if (name === 'CNTN10S') {
     if (argValues.length !== 1) fail('CNTN10S expects 1 argument');
     this._zstateRequireBinary(argValues, 'CNTN10S', ['value']);
@@ -3892,6 +4021,109 @@ if (this.isBuiltinDEMUX(name)) {
     } catch (e) {
       fail(e.message);
     }
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'CNTN16S') {
+    if (argValues.length !== 1) fail('CNTN16S expects 1 argument');
+    this._zstateRequireBinary(argValues, 'CNTN16S', ['value']);
+    const cnt = hexDigitCountBigInt(unsignedBinToBigInt(argValues[0]));
+    const v = cnt.toString(2);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'N2N16S') {
+    if (argValues.length !== 1) fail('N2N16S expects 1 argument');
+    this._zstateRequireBinary(argValues, 'N2N16S', ['value']);
+    const v = n2n16sPacked(argValues[0]);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'N16S2N') {
+    if (argValues.length !== 1) fail('N16S2N expects 1 argument');
+    this._zstateRequireBinary(argValues, 'N16S2N', ['packed']);
+    let v;
+    try {
+      v = n16s2nPacked(argValues[0]);
+    } catch (e) {
+      fail(e.message);
+    }
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  // ================= BUILTIN: COMPARE / SELECT =================
+  if (name === 'GT') {
+    if (argValues.length !== 2) fail('GT expects 2 arguments');
+    this._zstateRequireBinary(argValues, 'GT', ['a', 'b']);
+    const v = unsignedCompareBigInt(argValues[0], argValues[1]) > 0 ? '1' : '0';
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'LT') {
+    if (argValues.length !== 2) fail('LT expects 2 arguments');
+    this._zstateRequireBinary(argValues, 'LT', ['a', 'b']);
+    const v = unsignedCompareBigInt(argValues[0], argValues[1]) < 0 ? '1' : '0';
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'MIN') {
+    if (argValues.length < 2) fail('MIN expects at least 2 arguments');
+    this._zstateRequireBinary(argValues, 'MIN', argValues.map((_, i) => `arg${i}`));
+    let v;
+    try {
+      v = pickMinMaxUnsigned(argValues, true);
+    } catch (e) {
+      fail(e.message);
+    }
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'MAX') {
+    if (argValues.length < 2) fail('MAX expects at least 2 arguments');
+    this._zstateRequireBinary(argValues, 'MAX', argValues.map((_, i) => `arg${i}`));
+    let v;
+    try {
+      v = pickMinMaxUnsigned(argValues, false);
+    } catch (e) {
+      fail(e.message);
+    }
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'CLAMP') {
+    if (argValues.length !== 3) fail('CLAMP expects 3 arguments');
+    this._zstateRequireBinary(argValues, 'CLAMP', ['x', 'min', 'max']);
+    let v;
+    try {
+      v = clampUnsigned(argValues[0], argValues[1], argValues[2]);
+    } catch (e) {
+      fail(e.message);
+    }
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'ISDIGIT') {
+    if (argValues.length !== 1) fail('ISDIGIT expects 1 argument');
+    this._zstateRequireBinary(argValues, 'ISDIGIT', ['value']);
+    const v = isDecimalDigitBin(argValues[0]);
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -10417,9 +10649,19 @@ Interpreter.BUILTIN_DOC = {
   SUBTRACT: ['SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
   MULTIPLY: ['MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over'],
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
+  MAC:      ['MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over'],
   CNTN10S:  ['CNTN10S(Xbit value) -> Ybit'],
   N2N10S:   ['N2N10S(Xbit value) -> Zbit packed'],
   N10S2N:   ['N10S2N(Xbit packed) -> Wbit value'],
+  CNTN16S:  ['CNTN16S(Xbit value) -> Ybit'],
+  N2N16S:   ['N2N16S(Xbit value) -> Zbit packed'],
+  N16S2N:   ['N16S2N(Xbit packed) -> Wbit value'],
+  GT:       ['GT(Xbit a, Xbit b) -> 1bit'],
+  LT:       ['LT(Xbit a, Xbit b) -> 1bit'],
+  MIN:      ['MIN(Xbit a, Xbit b, ...) -> Xbit'],
+  MAX:      ['MAX(Xbit a, Xbit b, ...) -> Xbit'],
+  CLAMP:    ['CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit'],
+  ISDIGIT:  ['ISDIGIT(Xbit value) -> 1bit'],
   HIGH:     ['HIGH(Xbit) -> Xbit'],
   LOW:      ['LOW(Xbit) -> Xbit'],
   ANY:      ['ANY(Xbit) -> 1bit'],
