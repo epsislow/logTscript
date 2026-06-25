@@ -1,4 +1,38 @@
 window.lib_files = {
+  
+ex_perceptron : `
+4wire[4] weights = 0010 + 0011 + 1100 + 0001   # w0..w3
+4wir4wire[4] weights = 0010 + 0011 + 1100 + 0001   # w0..w3
+4wire[4] inputs  = 0001 + 0010 + 0011 + 0100   # x0..x3
+12wire bias  = 0000 +  0001 + 0000              # +16 offset example
+
+4wire dotLo, 8wire dotHi = DOT(weights, inputs)
+
+# acc = dot + bias  (V2 doc: compose with ADD or MAC pattern)
+12wire accLo, 12wire accOver = SUM(dotHi + dotLo, bias)   # or wider wiring per actual dotLo width
+
+# Activation threshold — V2: GT(accLo, threshold) → 1bit out
+1wire threshold = 1
+1wire out = GT(accLo, threshold)
+
+show(out)
+show(dotLo + dotHi, accLo + accOver)
+e[4] inputs  = 0001 + 0010 + 0011 + 0100   # x0..x3
+12wire bias  = 0000 +  0001 + 0000              # +16 offset example
+
+4wire dotLo, 8wire dotHi = DOT(weights, inputs)
+
+# acc = dot + bias  (V2 doc: compose with ADD or MAC pattern)
+12wire accLo, 12wire accOver = SUM(dotHi + dotLo, bias)   # or wider wiring per actual dotLo width
+
+# Activation threshold — V2: GT(accLo, threshold) → 1bit out
+1wire threshold = 1
+1wire out = GT(accLo, threshold)
+
+show(out)
+show(dotLo + dotHi, accLo + accOver)
+
+`,
   ex_clcd1 : `
   
 comp [clcd] .status:
