@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, vector-reduction.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -880,11 +880,13 @@ show(l)
 ## MIN / MAX
 
 \`\`\`
-MIN(Xbit a, Xbit b, ...) -> Xbit
-MAX(Xbit a, Xbit b, ...) -> Xbit
+MIN(Wbit ...) -> Wbit
+MAX(Wbit ...) -> Wbit
 \`\`\`
 
-Variadic (≥ 2 args). **All arguments must have the same width.** Returns the original bit string of the winning value.
+Variadic (≥ 2 args after expansion). **All arguments must have the same width.** Returns the original bit string of the winning value.
+
+Whole vectors expand to elements: \`MIN(vectorA)\` ≡ \`MIN(vectorA:0, vectorA:1, …)\`. See [vector-reduction.md](vector-reduction.md).
 
 \`\`\`logts-play
 4wire a = 0101
@@ -894,6 +896,25 @@ Variadic (≥ 2 args). **All arguments must have the same width.** Returns the o
 4wire hi = MAX(a, b, c)
 show(lo)
 show(hi)
+\`\`\`
+
+---
+
+## SUM / DOT (vector reduction)
+
+\`\`\`
+SUM(Wbit ...) -> Wbit result, Wbit over
+DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
+\`\`\`
+
+**SUM** adds all operands (unsigned); **DOT** is the dot product of two whole vectors of the same shape. Output packing and vector operand rules: [vector-reduction.md](vector-reduction.md).
+
+**DOT** is conceptually a chain of **MAC** calls with \`acc = 0\`:
+
+\`\`\`text
+acc = MAC(acc, vectorA:0, vectorB:0)
+acc = MAC(acc, vectorA:1, vectorB:1)
+...
 \`\`\`
 
 ---
@@ -4266,6 +4287,7 @@ probe(expr)
 | Bit / slice | \`probe(&1.0)\`, \`probe(&1.2-4)\` |
 | Wire bit-range | \`probe(data.4/4)\` → \`# data.4-7 = …\` |
 | Vector element | \`probe(vectorA:1)\` → \`# vectorA:1 = …\` |
+| Vector element slice | \`probe(vectorA:1.0/2)\` → \`# vectorA:1.0-1 = …\` |
 | Whole vector | \`probe(vectorA)\` |
 
 ### MODE ZSTATE — driver suffix (shared bus)
@@ -4898,6 +4920,11 @@ Uses the same expression forms as \`probe\` (wires, \`.comp\`, \`.comp:prop\`, c
 | \`watch(o.1-3)\` | \`o.1\`, \`o.2\`, \`o.3\` |
 | \`watch(.o:counter)\` on \`osc\` with \`length: 4\` | \`.o:counter.0\` … \`.o:counter.3\` |
 | \`watch(.sw)\` on \`4bit\` DIP | \`.sw\` (single channel; component \`:get\` as one trace) |
+| \`watch(vectorA)\` on \`4wire[3]\` | \`vectorA.0\` … \`vectorA.11\` (flat 12-bit wire) |
+| \`watch(vectorA:0)\` | \`vectorA:0.0\` … \`vectorA:0.3\` (one element) |
+| \`watch(vectorA:1.0/2)\` | \`vectorA:1.0\`, \`vectorA:1.1\` (sub-range within element) |
+
+See also [wire-vectors.md — probe / watch](wire-vectors.md#probe--watch) for vector-specific behaviour.
 
 **Wire vs component property** — important for oscillators and gated logic:
 
@@ -15088,10 +15115,30 @@ The language's special variables (\`~\`, \`%\`, \`$\`, \`_\`) work as operands i
 
 ---
 
+## Vector element access
+
+Vector element syntax passes through unchanged inside backticks (same as plain wire bit ranges):
+
+\`\`\`
+4wire y = \`vectorA:0 & vectorA:1\`
+4wire z = \`vectorA:1.0/2 | 11\`
+\`\`\`
+
+| In backticks | Expands to |
+|--------------|------------|
+| \`\` \`vectorA:0\` \`\` | \`vectorA:0\` |
+| \`\` \`vectorA:1.0/2\` \`\` | \`vectorA:1.0/2\` |
+| \`\` \`vectorA:0 \\| vectorA:1\` \`\` | \`OR(vectorA:0,vectorA:1)\` |
+
+Requires the vector to be declared in normal script (\`4wire[3] vectorA\`). Dynamic index \`\` \`vectorA:(idx)\` \`\` is not supported in short notation.
+
+---
+
 ## Limitations
 
 - \`^\` inside backticks is always **XOR**. For hex literals, use \`[^FF]\`.
 - \`()\` inside backticks are for **grouping**, not dynamic bit ranges. Expressions like \`a.(expr)/4\` are not supported in short notation.
+- Dynamic vector index \`\` \`vectorA:(wire)\` \`\` is not supported in short notation (static \`:0\`, \`:1\`, … only).
 - Backticks cannot be nested (a backtick closes the zone opened by the previous one).
 - Backticks inside comments (\`#\` or \`#> ... #<\`) are ignored.
 `,
@@ -16228,6 +16275,113 @@ Use **lcd** when text must be written to specific screen positions.
 - [debug.md](debug.md) — \`probe\` / \`show\`
 - [future-component-ideas.md](future-component-ideas.md) — C6 Text terminal
 `,
+    'vector-reduction.md': `# Vector reduction functions
+
+Reduction builtins operate on individual wires, whole **1D vectors**, or a mix. When a whole vector is passed, each element participates as a separate operand.
+
+See also: [1D wire vectors](wire-vectors.md), [arithmetic](arithmetic.md) (MAC, ADD).
+
+---
+
+## Operand expansion
+
+| Argument | Behaviour |
+|----------|-----------|
+| Plain wire \`a\` or slice \`a.1/3\` | One operand |
+| Whole vector \`vectorA\` | Expands to \`vectorA:0\`, \`vectorA:1\`, … |
+| Element \`vectorA:0\` | One operand (full element) |
+| Element sub-range \`vectorA:0.1/2\` | One operand (bits within element) |
+| Mix \`SUM(vectorA, x, vectorB)\` | Expand each whole vector; leave others as-is |
+
+All expanded operands must have the **same bit width** (runtime error otherwise).
+
+---
+
+## SUM
+
+\`\`\`
+SUM(Wbit ...) -> Wbit result, Wbit over
+\`\`\`
+
+Returns the unsigned sum of all operands. Output is **2W bits** total: low **W** bits in \`result\`, next **W** bits in \`over\`. Full value = concatenate \`over\` then \`result\` (MSB → LSB), same convention as [MAC](arithmetic.md#mac-multiply-accumulate).
+
+Overflow (sum needs more than **2W** bits) is a **runtime error**.
+
+\`\`\`logts-play
+4wire a = 0011
+4wire b = 0101
+4wire result, 4wire over = SUM(a, b)
+show(result)
+show(over)
+\`\`\`
+
+Single vector (sum of elements):
+
+\`\`\`logts-play
+4wire[3] vectorA = 0001 + 0010 + 0011
+4wire result, 4wire over = SUM(vectorA)
+show(result)
+\`\`\`
+
+---
+
+## MIN / MAX
+
+\`\`\`
+MIN(Wbit ...) -> Wbit
+MAX(Wbit ...) -> Wbit
+\`\`\`
+
+Variadic (≥ 2 operands after expansion). Unsigned compare; returns the winning operand bit string.
+
+\`\`\`logts-play
+4wire[3] vectorA = 0100 + 0010 + 0110
+4wire m = MIN(vectorA)
+show(m)
+\`\`\`
+
+---
+
+## DOT
+
+\`\`\`
+DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
+\`\`\`
+
+Dot product of two **whole vectors** of the same shape (\`elementWidth\` × \`elementCount\`). Output is **3W bits**: low **W** in \`result\`, next **2W** in \`over\`.
+
+\`\`\`logts-play
+4wire[3] vectorA = 0001 + 0010 + 0011
+4wire[3] vectorB = 0100 + 0101 + 0110
+4wire result, 8wire over = DOT(vectorA, vectorB)
+show(result)
+show(over)
+\`\`\`
+
+Equivalent to accumulating \`MAC(acc, vectorA:i, vectorB:i)\` with \`acc = 0\` over each index \`i\` (implementation may fuse in one pass).
+
+Slice arguments (\`DOT(vectorA:0, vectorB:0)\`) are **not** supported — use \`MULTIPLY\` / \`MAC\` for a single product.
+
+---
+
+## Capacity notes
+
+| Function | Bits needed (worst case) | Output width |
+|----------|--------------------------|--------------|
+| SUM | \`W + ceil(log2(k))\` | **2W** |
+| DOT | \`2W + ceil(log2(n))\` | **3W** |
+
+\`k\` = operand count after expansion; \`n\` = element count; \`W\` = element width.
+
+For typical perceptron sizes (\`16wire[50]\`, \`32wire[50]\`, \`64wire[50]\`), built-in **BigInt** evaluation is sufficient. Very large \`n\` (10⁴+) may be slow in the simulator — see plan V2 for full perceptron examples.
+
+---
+
+## Related
+
+- [wire-vectors.md — reduction](wire-vectors.md#reduction-functions)
+- [arithmetic.md — MAC](arithmetic.md#mac-multiply-accumulate)
+`,
     'wire-vectors.md': `# 1D wire vectors (\`4wire[3]\`)
 
 A **vector** is a single contiguous wire with element metadata. Syntax: \`Nwire[count] name\` declares one wire of \`N × count\` bits. Element **0** is the **MSB** group (same bit-0 = MSB convention as bit-range).
@@ -16340,9 +16494,20 @@ vectorA has length [3]
 |------|---------|
 | Whole vector | \`probe(vectorA)\` |
 | Element | \`probe(vectorA:1)\` |
+| Element bit-range | \`probe(vectorA:1.0/2)\` → label \`vectorA:1.0-1\` |
 | Bit-range (plain wire) | \`probe(data.4/4)\` → label \`data.4-7\` |
 
+**watch** uses the same slice forms. \`watch(vectorA)\` on \`4wire[3]\` expands to **12 flat columns** (\`vectorA.0\` … \`vectorA.11\`); use \`watch(vectorA:0)\` for a single element. See [debug.md — watch](debug.md#watch).
+
 Slice probes emit on every committed wire change (including element splice). See [debug.md — probe](debug.md#probe).
+
+---
+
+## Reduction functions
+
+Built-ins **SUM**, **MIN**, **MAX**, and **DOT** accept whole vectors (elements expand automatically), element slices (\`vectorA:0\`, \`vectorA:0.1/2\`), and plain wires.
+
+See [vector-reduction.md](vector-reduction.md) for syntax, output widths (SUM **2W**, DOT **3W**), and examples.
 
 ---
 

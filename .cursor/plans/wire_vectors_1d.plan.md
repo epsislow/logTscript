@@ -441,6 +441,7 @@ Suite: `node v0_3_2/node/_run_test_suite_node.js`
 | Chip/board pins | `4wire[3]` ca pin pe chip/board — out of scope V1 |
 | Multidim | `4wire[3,3]`, `matrix:1:2` — doar în doc ca extensie viitoare |
 | `watch(vectorA:0)` | **V1.5** [v1.5_shortnotation_watch.plan.md](v1.5_shortnotation_watch.plan.md) — expand via `vectorIndex` + bitRange element |
+| **Vector reduction (SUM, DOT, MIN/MAX expand)** | [vector_reduction_functions.plan.md](vector_reduction_functions.plan.md) — livrat |
 | `Zlist(vectorA:1)` | Nu — doar wire întreg |
 | **ZCONN / ZCONNECT pe element** (`vectorA:1 = ZCONNECT(en, data)`) | **Nu în V1** — vezi secțiunea 10 |
 | **ZCONN pe vector întreg** (`vectorA = ZCONNECT(en, data12)`) | **Da** — vector = wire de 12 biți |

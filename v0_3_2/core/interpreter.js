@@ -2103,6 +2103,38 @@ class Interpreter {
     return this.getWireStableValue(wireName);
   }
 
+  _evalReductionAtomValue(atom) {
+    const r = this.evalAtom(atom, false);
+    if (r && r.value != null && r.value !== '-') return r.value;
+    if (r && r.ref && r.ref !== '&-') {
+      const v = this.getValueFromRef(r.ref);
+      if (v != null) return v;
+    }
+    const wire = this.wires.get(atom.var);
+    const w = wire ? this.getBitWidth(wire.type) : (r && r.bitWidth) || 1;
+    return '0'.repeat(w);
+  }
+
+  _expandReductionArgValues(args) {
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const getWire = (name) => this.wires.get(name);
+    const out = [];
+    for (const argExpr of args || []) {
+      if (VR && VR.isWholeVectorWireArg(argExpr, getWire)) {
+        const wire = getWire(argExpr[0].var);
+        const n = wire.vector.elementCount;
+        for (let i = 0; i < n; i++) {
+          out.push(this._evalReductionAtomValue({ var: argExpr[0].var, vectorIndex: i }));
+        }
+      } else if (VR && VR.isVectorSliceArg(argExpr)) {
+        out.push(this._evalReductionAtomValue(argExpr[0]));
+      } else {
+        out.push(this._evalCallArgValue(argExpr));
+      }
+    }
+    return out;
+  }
+
   _evalCallArgValue(argExpr) {
     if (argExpr && argExpr.length === 1) {
       const atom = argExpr[0];
@@ -2840,7 +2872,7 @@ class Interpreter {
          'HIGH', 'LOW', 'ANY', 'ZERO', 'BITINDEX', 'ONEHOT',
          'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE',
          'REVERSE', 'LROTATE', 'RROTATE',
-         'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC',
+         'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
          'GT', 'LT', 'MIN', 'MAX', 'CLAMP', 'ISDIGIT',
          'CNTN10S', 'N2N10S', 'N10S2N',
          'CNTN16S', 'N2N16S', 'N16S2N'].includes(name)) {
@@ -3752,6 +3784,61 @@ const idx = parseInt(
       : { value: dataVal, ref: null };
   }
 
+  if (name === 'SUM') {
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const expanded = this._expandReductionArgValues(args);
+    if (expanded.length < 1) fail('SUM expects at least 1 argument');
+    this._zstateRequireBinary(expanded, 'SUM', expanded.map((_, i) => `arg${i}`));
+    let sum;
+    try {
+      if (!VR) fail('SUM: internal error (vector-reduce not loaded)');
+      const X = VR.requireSameBitWidth(expanded, 'SUM');
+      sum = VR.sumUnsignedExpanded(expanded, X);
+    } catch (e) {
+      fail(e.message);
+    }
+    return [
+      computeRefs ? { value: sum.result, ref: `&${this.storeValue(sum.result)}` } : { value: sum.result, ref: null },
+      computeRefs ? { value: sum.over, ref: `&${this.storeValue(sum.over)}` } : { value: sum.over, ref: null },
+    ];
+  }
+
+  if (name === 'DOT') {
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (args.length !== 2) fail('DOT expects 2 arguments');
+    const getWire = (n) => this.wires.get(n);
+    if (!VR || !VR.isWholeVectorWireArg(args[0], getWire) || !VR.isWholeVectorWireArg(args[1], getWire)) {
+      fail('DOT expects two whole vector arguments');
+    }
+    const metaA = getWire(args[0][0].var).vector;
+    const metaB = getWire(args[1][0].var).vector;
+    if (metaA.elementWidth !== metaB.elementWidth || metaA.elementCount !== metaB.elementCount) {
+      fail('DOT: vectors must have the same shape');
+    }
+    const aVals = [];
+    const bVals = [];
+    const n = metaA.elementCount;
+    const varA = args[0][0].var;
+    const varB = args[1][0].var;
+    for (let i = 0; i < n; i++) {
+      aVals.push(this._evalReductionAtomValue({ var: varA, vectorIndex: i }));
+      bVals.push(this._evalReductionAtomValue({ var: varB, vectorIndex: i }));
+    }
+    this._zstateRequireBinary(aVals, 'DOT', aVals.map((_, i) => `a${i}`));
+    this._zstateRequireBinary(bVals, 'DOT', bVals.map((_, i) => `b${i}`));
+    let dot;
+    try {
+      const X = metaA.elementWidth;
+      dot = VR.dotUnsignedExpanded(aVals, bVals, X);
+    } catch (e) {
+      fail(e.message);
+    }
+    return [
+      computeRefs ? { value: dot.result, ref: `&${this.storeValue(dot.result)}` } : { value: dot.result, ref: null },
+      computeRefs ? { value: dot.over, ref: `&${this.storeValue(dot.over)}` } : { value: dot.over, ref: null },
+    ];
+  }
+
   const b = x => x === '1';
 
   // ================= Evaluate arguments =================
@@ -4466,11 +4553,12 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'MIN') {
-    if (argValues.length < 2) fail('MIN expects at least 2 arguments');
-    this._zstateRequireBinary(argValues, 'MIN', argValues.map((_, i) => `arg${i}`));
+    const expanded = this._expandReductionArgValues(args);
+    if (expanded.length < 2) fail('MIN expects at least 2 arguments');
+    this._zstateRequireBinary(expanded, 'MIN', expanded.map((_, i) => `arg${i}`));
     let v;
     try {
-      v = pickMinMaxUnsigned(argValues, true);
+      v = pickMinMaxUnsigned(expanded, true);
     } catch (e) {
       fail(e.message);
     }
@@ -4480,11 +4568,12 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'MAX') {
-    if (argValues.length < 2) fail('MAX expects at least 2 arguments');
-    this._zstateRequireBinary(argValues, 'MAX', argValues.map((_, i) => `arg${i}`));
+    const expanded = this._expandReductionArgValues(args);
+    if (expanded.length < 2) fail('MAX expects at least 2 arguments');
+    this._zstateRequireBinary(expanded, 'MAX', expanded.map((_, i) => `arg${i}`));
     let v;
     try {
-      v = pickMinMaxUnsigned(argValues, false);
+      v = pickMinMaxUnsigned(expanded, false);
     } catch (e) {
       fail(e.message);
     }
@@ -11154,6 +11243,8 @@ Interpreter.BUILTIN_DOC = {
   MULTIPLY: ['MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over'],
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
   MAC:      ['MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over'],
+  SUM:      ['SUM(Wbit ...) -> Wbit result, Wbit over'],
+  DOT:      ['DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over'],
   CNTN10S:  ['CNTN10S(Xbit value) -> Ybit'],
   N2N10S:   ['N2N10S(Xbit value) -> Zbit packed'],
   N10S2N:   ['N10S2N(Xbit packed) -> Wbit value'],
@@ -11162,8 +11253,8 @@ Interpreter.BUILTIN_DOC = {
   N16S2N:   ['N16S2N(Xbit packed) -> Wbit value'],
   GT:       ['GT(Xbit a, Xbit b) -> 1bit'],
   LT:       ['LT(Xbit a, Xbit b) -> 1bit'],
-  MIN:      ['MIN(Xbit a, Xbit b, ...) -> Xbit'],
-  MAX:      ['MAX(Xbit a, Xbit b, ...) -> Xbit'],
+  MIN:      ['MIN(Wbit ...) -> Wbit'],
+  MAX:      ['MAX(Wbit ...) -> Wbit'],
   CLAMP:    ['CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit'],
   ISDIGIT:  ['ISDIGIT(Xbit value) -> 1bit'],
   HIGH:     ['HIGH(Xbit) -> Xbit'],

@@ -1197,7 +1197,30 @@
       {"id":1711,"group":"debug","title":"Parser — watch(vectorA:0) AST and watches[]","detail":{"scripts":["4wire[3] vectorA\nwatch(vectorA:0)"],"steps":["Tokenizer(processed)","Parser(…)","session._ensureRegistry()"],"assertions":["watch stmt","watches collected","var","vectorIndex"]}},
       {"id":1712,"group":"debug","title":"watch-expand vectorA:0 — four columns","detail":{"scripts":["4wire[3] vectorA\nwatch(vectorA:0)"],"steps":["Tokenizer(processed)","Parser(…)","session._ensureRegistry()"],"assertions":["vectorA is 12wire","meta elementWidth 4","four columns","labels"]}},
       {"id":1713,"group":"debug","title":"watch-expand vectorA:1.0/2 — two columns","detail":{"scripts":["4wire[3] vectorA\nwatch(vectorA:1.0/2)"],"steps":["Tokenizer(processed)","Parser(…)","session._ensureRegistry()"],"assertions":["two columns","labels"]}},
-      {"id":1714,"group":"debug","title":"watch(vectorA:1) samples on element assign","detail":{"scripts":["4wire[3] vectorA = 1111 + 0011 + 0101"],"steps":[],"assertions":["four watch targets","vector slice keys","samples recorded","batched multi-slice row"]}}
+      {"id":1714,"group":"debug","title":"watch(vectorA:1) samples on element assign","detail":{"scripts":["4wire[3] vectorA = 1111 + 0011 + 0101"],"steps":[],"assertions":["four watch targets","vector slice keys","samples recorded","batched multi-slice row"]}},
+      {"id":1715,"group":"vector-reduction","title":"SUM(a, b) — two 4wire","detail":{"scripts":["4wire a = 0011"],"steps":[],"assertions":["result low","over high"]}},
+      {"id":1716,"group":"vector-reduction","title":"SUM(vectorA) — three elements","detail":{"scripts":["4wire[3] vectorA = 0001 + 0010 + 0011"],"steps":[],"assertions":["sum 1+2+3=6","over zero"]}},
+      {"id":1717,"group":"vector-reduction","title":"SUM(vectorA, vectorB) multi-vector","detail":{"scripts":["4wire[2] vectorA = 0001 + 0010"],"steps":[],"assertions":["1+2+3+4=10","over"]}},
+      {"id":1718,"group":"vector-reduction","title":"SUM(vectorA, x, vectorB) mixed","detail":{"scripts":["4wire[2] vectorA = 0001 + 0001"],"steps":[],"assertions":["1+1+2+3+0=7","over"]}},
+      {"id":1719,"group":"vector-reduction","title":"SUM overflow beyond 2X","detail":{"scripts":["4wire[3] v1 = 1111 + 1111 + 1111"],"steps":[],"assertions":["overflow msg"]}},
+      {"id":1720,"group":"vector-reduction","title":"MIN(vectorA) minimum element","detail":{"scripts":["4wire[3] vectorA = 0100 + 0010 + 0110"],"steps":[],"assertions":["min is 2"]}},
+      {"id":1721,"group":"vector-reduction","title":"MAX(vectorA, vectorB) multi-vector","detail":{"scripts":["4wire[2] vectorA = 0100 + 0010"],"steps":[],"assertions":["max is 8"]}},
+      {"id":1722,"group":"vector-reduction","title":"MIN width mismatch after expand","detail":{"scripts":["4wire[3] vectorA = 1111 + 0011 + 0101"],"steps":[],"assertions":["width msg"]}},
+      {"id":1723,"group":"vector-reduction","title":"DOT(vectorA, vectorB) 4wire[3]","detail":{"scripts":["4wire[3] vectorA = 0001 + 0010 + 0011"],"steps":[],"assertions":["dot low","dot high"]}},
+      {"id":1724,"group":"vector-reduction","title":"DOT shape mismatch error","detail":{"scripts":["4wire[3] vectorA"],"steps":[],"assertions":["shape msg"]}},
+      {"id":1725,"group":"vector-reduction","title":"DOT numeric total (MAC-equivalent sum)","detail":{"scripts":["4wire[3] vectorA = 0001 + 0010 + 0011"],"steps":[],"assertions":["1*4+2*5+3*6=32"]}},
+      {"id":1726,"group":"vector-reduction","title":"MIN(4wire[1]) single operand error","detail":{"scripts":["4wire[1] v = 0101\n4wire m = MIN(v)"],"steps":[],"assertions":["at least 2"]}},
+      {"id":1727,"group":"vector-reduction","title":"SUM(vectorA:0, vectorA:1) explicit elements","detail":{"scripts":["4wire[3] vectorA = 0001 + 0010 + 0011"],"steps":[],"assertions":["1+2=3","over"]}},
+      {"id":1728,"group":"vector-reduction","title":"doc(SUM) signature","detail":{"scripts":[],"steps":["getDocLines(SUM)"],"assertions":["doc line"]}},
+      {"id":1729,"group":"vector-reduction","title":"MIN/MAX plain wires regression","detail":{"scripts":["4wire a = 0101\n4wire b = 0011\n4wire c = 1000"],"steps":[],"assertions":["min","max"]}},
+      {"id":1730,"group":"vector-reduction","title":"SUM plain wire not vector expand","detail":{"scripts":["4wire plain = 0011"],"steps":[],"assertions":["3+3=6","over"]}},
+      {"id":1731,"group":"vector-reduction","title":"DOT 16wire[50] scale","detail":{"scripts":["16wire[50] vectorA ="],"steps":[],"assertions":["dotLo width","dotHi width","50 terms of 2"]}},
+      {"id":1732,"group":"vector-reduction","title":"DOT 32wire[50] scale","detail":{"scripts":["32wire[50] vectorA ="],"steps":[],"assertions":["50*1*2=100","dotHi zero"]}},
+      {"id":1733,"group":"vector-reduction","title":"DOT 64wire[50] smoke","detail":{"scripts":["64wire[50] vectorA ="],"steps":[],"assertions":["dotLo width","dotHi width","50 ones squared"]}},
+      {"id":1734,"group":"vector-reduction","title":"SUM vector sub-range same width","detail":{"scripts":["4wire[3] vectorA = 1010 + 0101 + 1100"],"steps":[],"assertions":["sum sub-ranges","over"]}},
+      {"id":1735,"group":"wire-vectors","title":"10wire[10] — count in [] is decimal","detail":{"scripts":["10wire[10] a"],"steps":[],"assertions":["element count","type label","total width"]}},
+      {"id":1736,"group":"wire-vectors","title":"vectorA:10 — index after : is decimal","detail":{"scripts":["10wire[21] a\nwatch(a:10)"],"steps":["Tokenizer(processed)","Parser(…)","session._ensureRegistry()"],"assertions":["vectorIndex 10","element 10 value"]}},
+      {"id":1737,"group":"wire-vectors","title":"16wire[100] — bracket count hundred not binary four","detail":{"scripts":["16wire[100] v"],"steps":[],"assertions":["element count","type label"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1264,8 +1287,9 @@
       { id: 'debug', label: 'show / peek / probe', rangeLabel: '804–819, 1176–1187, 1711–1714', testIds: [804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 1176, 1177, 1178, 1179, 1180, 1181, 1182, 1183, 1184, 1185, 1186, 1187, 1711, 1712, 1713, 1714] },
       { id: 'slider', label: 'Slider component', rangeLabel: '1206–1220', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983, 1571–1574, 1643–1653, 1661, 1663', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 1571, 1572, 1573, 1574, 1643, 1644, 1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1661, 1663] },
+      { id: 'vector-reduction', label: 'vector-reduction', rangeLabel: '1715–1734', testIds: [1715, 1716, 1717, 1718, 1719, 1720, 1721, 1722, 1723, 1724, 1725, 1726, 1727, 1728, 1729, 1730, 1731, 1732, 1733, 1734] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611, 1654', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 1654] },
-      { id: 'wire-vectors', label: 'wire-vectors', rangeLabel: '1684–1701, 1704–1706', testIds: [1684, 1685, 1686, 1687, 1688, 1689, 1690, 1691, 1692, 1693, 1694, 1695, 1696, 1697, 1698, 1699, 1700, 1701, 1704, 1705, 1706] },
+      { id: 'wire-vectors', label: 'wire-vectors', rangeLabel: '1684–1701, 1704–1706, 1735–1737', testIds: [1684, 1685, 1686, 1687, 1688, 1689, 1690, 1691, 1692, 1693, 1694, 1695, 1696, 1697, 1698, 1699, 1700, 1701, 1704, 1705, 1706, 1735, 1736, 1737] },
       { id: 'zstate', label: 'zstate', rangeLabel: '1429–1503, 1536, 1559–1570, 1575–1587', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503, 1536, 1559, 1560, 1561, 1562, 1563, 1564, 1565, 1566, 1567, 1568, 1569, 1570, 1575, 1576, 1577, 1578, 1579, 1580, 1581, 1582, 1583, 1584, 1585, 1586, 1587] }
     ]
   };

@@ -196,7 +196,7 @@ class Parser {
     if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
       throw Error(`Expected vector element count after '[' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    const count = parseInt(this.c.value, this.c.type === 'BIN' ? 2 : 10);
+    const count = parseInt(this.c.value, 10);
     this.eat(this.c.type);
     if (this.c.type === 'SYM' && this.c.value === ',') {
       throw Error(`Multidimensional wire vectors are not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
@@ -3062,7 +3062,7 @@ assignment() {
     if (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
       if (this.c.type === 'BIN' || this.c.type === 'DEC') {
-        const vectorIndex = parseInt(this.c.value, this.c.type === 'BIN' ? 2 : 10);
+        const vectorIndex = parseInt(this.c.value, 10);
         this.eat(this.c.type);
         const idAtomV = withAtomLoc({ var: name, vectorIndex });
         const brV = this.parseBitRangeSuffix();

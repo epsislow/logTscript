@@ -289,11 +289,13 @@ show(l)
 ## MIN / MAX
 
 ```
-MIN(Xbit a, Xbit b, ...) -> Xbit
-MAX(Xbit a, Xbit b, ...) -> Xbit
+MIN(Wbit ...) -> Wbit
+MAX(Wbit ...) -> Wbit
 ```
 
-Variadic (≥ 2 args). **All arguments must have the same width.** Returns the original bit string of the winning value.
+Variadic (≥ 2 args after expansion). **All arguments must have the same width.** Returns the original bit string of the winning value.
+
+Whole vectors expand to elements: `MIN(vectorA)` ≡ `MIN(vectorA:0, vectorA:1, …)`. See [vector-reduction.md](vector-reduction.md).
 
 ```logts-play
 4wire a = 0101
@@ -303,6 +305,25 @@ Variadic (≥ 2 args). **All arguments must have the same width.** Returns the o
 4wire hi = MAX(a, b, c)
 show(lo)
 show(hi)
+```
+
+---
+
+## SUM / DOT (vector reduction)
+
+```
+SUM(Wbit ...) -> Wbit result, Wbit over
+DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
+```
+
+**SUM** adds all operands (unsigned); **DOT** is the dot product of two whole vectors of the same shape. Output packing and vector operand rules: [vector-reduction.md](vector-reduction.md).
+
+**DOT** is conceptually a chain of **MAC** calls with `acc = 0`:
+
+```text
+acc = MAC(acc, vectorA:0, vectorB:0)
+acc = MAC(acc, vectorA:1, vectorB:1)
+...
 ```
 
 ---

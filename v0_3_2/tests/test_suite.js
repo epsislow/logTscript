@@ -12812,8 +12812,8 @@ reg(1677, 'number-conversion', 'ISDIGIT — 0..9 yes 10+ no', function(h, sessio
 reg(1678, 'doc', 'BUILTIN_DOC — compare select MAC signatures', function(h, session) {
   h.assert('GT', Interpreter.getDocLines('GT', new Map())[0], 'GT(Xbit a, Xbit b) -> 1bit');
   h.assert('LT', Interpreter.getDocLines('LT', new Map())[0], 'LT(Xbit a, Xbit b) -> 1bit');
-  h.assert('MIN', Interpreter.getDocLines('MIN', new Map())[0], 'MIN(Xbit a, Xbit b, ...) -> Xbit');
-  h.assert('MAX', Interpreter.getDocLines('MAX', new Map())[0], 'MAX(Xbit a, Xbit b, ...) -> Xbit');
+  h.assert('MIN', Interpreter.getDocLines('MIN', new Map())[0], 'MIN(Wbit ...) -> Wbit');
+  h.assert('MAX', Interpreter.getDocLines('MAX', new Map())[0], 'MAX(Wbit ...) -> Wbit');
   h.assert('CLAMP', Interpreter.getDocLines('CLAMP', new Map())[0], 'CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit');
   h.assert('ISDIGIT', Interpreter.getDocLines('ISDIGIT', new Map())[0], 'ISDIGIT(Xbit value) -> 1bit');
   h.assert('MAC', Interpreter.getDocLines('MAC', new Map())[0], 'MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over');
@@ -13163,6 +13163,242 @@ reg(1714, 'debug', 'watch(vectorA:1) samples on element assign', function(h, ses
   h.assert('samples recorded', String(samples.length >= 1), 'true');
   const batched = samples.filter(s => s.channels && s.channels.length >= 2);
   h.assert('batched multi-slice row', String(batched.length >= 1), 'true');
+});
+
+reg(1715, 'vector-reduction', 'SUM(a, b) — two 4wire', function(h, session) {
+  const { interp } = session.run(
+    '4wire a = 0011\n' +
+    '4wire b = 0101\n' +
+    '4wire result, 4wire over = SUM(a, b)'
+  );
+  h.assert('result low', session.getWire(interp, 'result'), '1000');
+  h.assert('over high', session.getWire(interp, 'over'), '0000');
+});
+
+reg(1716, 'vector-reduction', 'SUM(vectorA) — three elements', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0001 + 0010 + 0011\n' +
+    '4wire result, 4wire over = SUM(vectorA)'
+  );
+  h.assert('sum 1+2+3=6', session.getWire(interp, 'result'), '0110');
+  h.assert('over zero', session.getWire(interp, 'over'), '0000');
+});
+
+reg(1717, 'vector-reduction', 'SUM(vectorA, vectorB) multi-vector', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 0001 + 0010\n' +
+    '4wire[2] vectorB = 0011 + 0100\n' +
+    '4wire result, 4wire over = SUM(vectorA, vectorB)'
+  );
+  h.assert('1+2+3+4=10', session.getWire(interp, 'result'), '1010');
+  h.assert('over', session.getWire(interp, 'over'), '0000');
+});
+
+reg(1718, 'vector-reduction', 'SUM(vectorA, x, vectorB) mixed', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 0001 + 0001\n' +
+    '4wire x = 0010\n' +
+    '4wire[2] vectorB = 0011 + 0000\n' +
+    '4wire result, 4wire over = SUM(vectorA, x, vectorB)'
+  );
+  h.assert('1+1+2+3+0=7', session.getWire(interp, 'result'), '0111');
+  h.assert('over', session.getWire(interp, 'over'), '0000');
+});
+
+reg(1719, 'vector-reduction', 'SUM overflow beyond 2X', function(h, session) {
+  const r = session.run(
+    '4wire[3] v1 = 1111 + 1111 + 1111\n' +
+    '4wire[3] v2 = 1111 + 1111 + 1111\n' +
+    '4wire[3] v3 = 1111 + 1111 + 1111\n' +
+    '4wire[3] v4 = 1111 + 1111 + 1111\n' +
+    '4wire[3] v5 = 1111 + 1111 + 1111\n' +
+    '4wire[3] v6 = 1111 + 1111 + 1111\n' +
+    '4wire r, 4wire o = SUM(v1, v2, v3, v4, v5, v6)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('overflow msg', String(/SUM: result requires/.test(err)), 'true');
+});
+
+reg(1720, 'vector-reduction', 'MIN(vectorA) minimum element', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0100 + 0010 + 0110\n' +
+    '4wire m = MIN(vectorA)'
+  );
+  h.assert('min is 2', session.getWire(interp, 'm'), '0010');
+});
+
+reg(1721, 'vector-reduction', 'MAX(vectorA, vectorB) multi-vector', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 0100 + 0010\n' +
+    '4wire[2] vectorB = 0011 + 1000\n' +
+    '4wire m = MAX(vectorA, vectorB)'
+  );
+  h.assert('max is 8', session.getWire(interp, 'm'), '1000');
+});
+
+reg(1722, 'vector-reduction', 'MIN width mismatch after expand', function(h, session) {
+  const r = session.run(
+    '4wire[3] vectorA = 1111 + 0011 + 0101\n' +
+    '4wire m = MIN(vectorA:0, vectorA:1.0/2)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('width msg', String(/same bit width/.test(err)), 'true');
+});
+
+reg(1723, 'vector-reduction', 'DOT(vectorA, vectorB) 4wire[3]', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0001 + 0010 + 0011\n' +
+    '4wire[3] vectorB = 0100 + 0101 + 0110\n' +
+    '4wire result, 8wire over = DOT(vectorA, vectorB)'
+  );
+  h.assert('dot low', session.getWire(interp, 'result'), '0000');
+  h.assert('dot high', session.getWire(interp, 'over'), '00000010');
+});
+
+reg(1724, 'vector-reduction', 'DOT shape mismatch error', function(h, session) {
+  const r = session.run(
+    '4wire[3] vectorA\n' +
+    '4wire[2] vectorB\n' +
+    '4wire r, 8wire o = DOT(vectorA, vectorB)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('shape msg', String(/same shape/.test(err)), 'true');
+});
+
+reg(1725, 'vector-reduction', 'DOT numeric total (MAC-equivalent sum)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0001 + 0010 + 0011\n' +
+    '4wire[3] vectorB = 0100 + 0101 + 0110\n' +
+    '4wire dotLo, 8wire dotHi = DOT(vectorA, vectorB)'
+  );
+  const lo = session.getWire(interp, 'dotLo');
+  const hi = session.getWire(interp, 'dotHi');
+  const total = (BigInt('0b' + hi) << 4n) + BigInt('0b' + lo);
+  h.assert('1*4+2*5+3*6=32', String(total), '32');
+});
+
+reg(1726, 'vector-reduction', 'MIN(4wire[1]) single operand error', function(h, session) {
+  const r = session.run('4wire[1] v = 0101\n4wire m = MIN(v)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('at least 2', String(/at least 2/.test(err)), 'true');
+});
+
+reg(1727, 'vector-reduction', 'SUM(vectorA:0, vectorA:1) explicit elements', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0001 + 0010 + 0011\n' +
+    '4wire result, 4wire over = SUM(vectorA:0, vectorA:1)'
+  );
+  h.assert('1+2=3', session.getWire(interp, 'result'), '0011');
+  h.assert('over', session.getWire(interp, 'over'), '0000');
+});
+
+reg(1734, 'vector-reduction', 'SUM vector sub-range same width', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1010 + 0101 + 1100\n' +
+    '2wire result, 2wire over = SUM(vectorA:0.1/2, vectorA:1.1/2)'
+  );
+  h.assert('sum sub-ranges', session.getWire(interp, 'result'), '11');
+  h.assert('over', session.getWire(interp, 'over'), '00');
+});
+
+reg(1728, 'vector-reduction', 'doc(SUM) signature', function(h, session) {
+  const line = Interpreter.getDocLines('SUM', new Map())[0];
+  h.assert('doc line', line, 'SUM(Wbit ...) -> Wbit result, Wbit over');
+});
+
+reg(1729, 'vector-reduction', 'MIN/MAX plain wires regression', function(h, session) {
+  const { interp } = session.run(
+    '4wire a = 0101\n4wire b = 0011\n4wire c = 1000\n' +
+    '4wire lo = MIN(a, b, c)\n4wire hi = MAX(a, b, c)'
+  );
+  h.assert('min', session.getWire(interp, 'lo'), '0011');
+  h.assert('max', session.getWire(interp, 'hi'), '1000');
+});
+
+reg(1730, 'vector-reduction', 'SUM plain wire not vector expand', function(h, session) {
+  const { interp } = session.run(
+    '4wire plain = 0011\n' +
+    '4wire result, 4wire over = SUM(plain, plain)'
+  );
+  h.assert('3+3=6', session.getWire(interp, 'result'), '0110');
+  h.assert('over', session.getWire(interp, 'over'), '0000');
+});
+
+reg(1731, 'vector-reduction', 'DOT 16wire[50] scale', function(h, session) {
+  const ones = '0000000000000001';
+  const twos = '0000000000000010';
+  const initA = Array.from({ length: 50 }, (_, i) => (i % 2 === 0 ? ones : twos)).join(' + ');
+  const initB = Array.from({ length: 50 }, (_, i) => (i % 2 === 0 ? twos : ones)).join(' + ');
+  const { interp } = session.run(
+    '16wire[50] vectorA = ' + initA + '\n' +
+    '16wire[50] vectorB = ' + initB + '\n' +
+    '16wire dotLo, 32wire dotHi = DOT(vectorA, vectorB)'
+  );
+  h.assert('dotLo width', String(session.getWire(interp, 'dotLo').length), '16');
+  h.assert('dotHi width', String(session.getWire(interp, 'dotHi').length), '32');
+  const lo = session.getWire(interp, 'dotLo');
+  const hi = session.getWire(interp, 'dotHi');
+  const total = (BigInt('0b' + hi) << 16n) + BigInt('0b' + lo);
+  h.assert('50 terms of 2', String(total), '100');
+});
+
+reg(1732, 'vector-reduction', 'DOT 32wire[50] scale', function(h, session) {
+  const one = '00000000000000000000000000000001';
+  const two = '00000000000000000000000000000010';
+  const initA = Array.from({ length: 50 }, () => one).join(' + ');
+  const initB = Array.from({ length: 50 }, () => two).join(' + ');
+  const { interp } = session.run(
+    '32wire[50] vectorA = ' + initA + '\n' +
+    '32wire[50] vectorB = ' + initB + '\n' +
+    '32wire dotLo, 64wire dotHi = DOT(vectorA, vectorB)'
+  );
+  h.assert('50*1*2=100', session.getWire(interp, 'dotLo'), '00000000000000000000000001100100');
+  h.assert('dotHi zero', session.getWire(interp, 'dotHi'), '0'.repeat(64));
+});
+
+reg(1733, 'vector-reduction', 'DOT 64wire[50] smoke', function(h, session) {
+  const one = '0'.repeat(63) + '1';
+  const init = Array.from({ length: 50 }, () => one).join(' + ');
+  const { interp } = session.run(
+    '64wire[50] vectorA = ' + init + '\n' +
+    '64wire[50] vectorB = ' + init + '\n' +
+    '64wire dotLo, 128wire dotHi = DOT(vectorA, vectorB)'
+  );
+  h.assert('dotLo width', String(session.getWire(interp, 'dotLo').length), '64');
+  h.assert('dotHi width', String(session.getWire(interp, 'dotHi').length), '128');
+  const lo = session.getWire(interp, 'dotLo');
+  const hi = session.getWire(interp, 'dotHi');
+  const total = (BigInt('0b' + hi) << 64n) + BigInt('0b' + lo);
+  h.assert('50 ones squared', String(total), '50');
+});
+
+reg(1735, 'wire-vectors', '10wire[10] — count in [] is decimal', function(h, session) {
+  const { interp } = session.run('10wire[10] a');
+  const w = interp.wires.get('a');
+  h.assert('element count', String(w.vector.elementCount), '10');
+  h.assert('type label', String(interp.getWireTypeLabel(w)), '10wire[10]');
+  h.assert('total width', String(interp.getBitWidth(w.type)), '100');
+});
+
+reg(1736, 'wire-vectors', 'vectorA:10 — index after : is decimal', function(h, session) {
+  const processed = preprocessRepeat('10wire[21] a\nwatch(a:10)');
+  const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
+  const stmts = p.parse();
+  const w = stmts[1].watch[0];
+  h.assert('vectorIndex 10', String(w.vectorIndex), '10');
+  const { interp } = session.run(
+    '10wire[21] a\n' +
+    'a:10 = 1111111111\n' +
+    '10wire x = a:10'
+  );
+  h.assert('element 10 value', session.getWire(interp, 'x'), '1111111111');
+});
+
+reg(1737, 'wire-vectors', '16wire[100] — bracket count hundred not binary four', function(h, session) {
+  const { interp } = session.run('16wire[100] v');
+  const w = interp.wires.get('v');
+  h.assert('element count', String(w.vector.elementCount), '100');
+  h.assert('type label', String(interp.getWireTypeLabel(w)), '16wire[100]');
 });
 
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {

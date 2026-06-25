@@ -119,6 +119,14 @@ Slice probes emit on every committed wire change (including element splice). See
 
 ---
 
+## Reduction functions
+
+Built-ins **SUM**, **MIN**, **MAX**, and **DOT** accept whole vectors (elements expand automatically), element slices (`vectorA:0`, `vectorA:0.1/2`), and plain wires.
+
+See [vector-reduction.md](vector-reduction.md) for syntax, output widths (SUM **2W**, DOT **3W**), and examples.
+
+---
+
 ## Zlist (MODE ZSTATE)
 
 Only the **whole wire** name is valid:
