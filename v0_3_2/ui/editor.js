@@ -156,6 +156,60 @@ function btncopy() {
     });
 }
 
+let tabRenameEscCancel = false;
+
+function beginRenameTab() {
+  tabSave();
+  const tabInfo = tabs.get(currentTab);
+  const wrap = document.getElementById('tabRenameWrap');
+  const input = document.getElementById('tabRenameInput');
+  if (!tabInfo || !wrap || !input) return;
+  tabRenameEscCancel = false;
+  input.value = tabInfo.filename;
+  wrap.hidden = false;
+  input.focus();
+  input.select();
+}
+
+function tabRenameKeydown(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    commitRenameTab();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    cancelRenameTab();
+  }
+}
+
+function cancelRenameTab() {
+  tabRenameEscCancel = true;
+  const wrap = document.getElementById('tabRenameWrap');
+  const input = document.getElementById('tabRenameInput');
+  if (wrap) wrap.hidden = true;
+  if (input) input.blur();
+}
+
+function commitRenameTab() {
+  if (tabRenameEscCancel) {
+    tabRenameEscCancel = false;
+    return;
+  }
+  const wrap = document.getElementById('tabRenameWrap');
+  const input = document.getElementById('tabRenameInput');
+  if (!wrap || !input || wrap.hidden) return;
+  const name = input.value.trim();
+  wrap.hidden = true;
+  if (!name) return;
+  tabSave();
+  const tabInfo = tabs.get(currentTab);
+  if (!tabInfo) return;
+  tabUpdate(currentTab, name, tabInfo.code, tabInfo.hash, tabInfo.isChanged);
+  updateFileNameDisplay(name);
+  fShowTabs();
+  syncLegacyLastKeys();
+  persistTabs();
+}
+
 function onCodeChange() {
     checkForTabChanged();
     schedulePersistTabs();
