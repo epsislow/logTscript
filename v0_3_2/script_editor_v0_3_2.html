@@ -102,6 +102,7 @@ button { margin:4px; padding:5px 9px; cursor: pointer; }
 pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .panel { border:1px solid #444; padding:10px; margin-top:10px }
 .flex { display:flex; gap:10px }
+.panels-row { min-width: 0; }
 .panel-stack { display:flex; flex-direction:column; gap:10px; min-height:0; min-width:0; }
 .timeline-panel { flex-shrink:0; padding:8px 10px; }
 .network-traffic-panel { flex-shrink:0; padding:8px 10px; min-width:0; max-width:100%; }
@@ -2033,6 +2034,28 @@ body.doc-mode #docView {
   background: linear-gradient(180deg, #3a8cff, #2a72eb);
 }
 
+/* Editor panels: stack vertically on portrait / narrow viewports */
+@media (max-aspect-ratio: 1/1), (max-width: 640px) {
+  #editorView .panels-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #editorView .panels-row > .panel-stack,
+  #editorView .panels-row > #variablesPanel {
+    flex: 0 0 auto !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  #timelineCanvas {
+    max-width: 100%;
+    height: auto;
+  }
+  #variablesPanel pre#vars {
+    max-height: 40vh;
+  }
+}
+
 @media (max-width: 768px) {
   #docView .doc-toolbar {
     padding: 10px 12px;
@@ -2629,7 +2652,7 @@ show(a,b,c)
   <div id="tabsActive"></div>
 </div>
 
-<div class="flex">
+<div class="flex panels-row">
   <div class="panel-stack" id="outputStack" style="flex:1">
     <div class="panel timeline-panel" id="timelinePanel" style="display:none">
       <div class="timeline-head">
