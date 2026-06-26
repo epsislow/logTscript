@@ -1197,3 +1197,33 @@ Notes
 
 
 ===
+[  ] Allow
+2wire t1
+2wire t2
+t1, t2 = 1111
+
+[  ] DC da eroare:
+prg (16wire) = 00000000 00000000 (ref: &1)
+Error: Cannot disassemble instruction — no matching opcode
+
+inline [asm] .myisa:
+TT : 0000 + 4b
+LD : 0001 + R2b + A2b
+RQ : 0101 + A4b
+JM : 0100 + S4b
+:
+
+8wire nop = .myisa { TT }
+16wire prg = .myisa {
+TT
+TT
+}
+show(prg)
+show(.myisa:decode(prg))
+
+
+
+[  ] Nu functioneaza corect
+80wire[10] a := ^Ff
+801wire q = (ADD(a, 10)
+show(q)
