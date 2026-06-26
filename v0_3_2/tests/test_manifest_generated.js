@@ -1221,7 +1221,11 @@
       {"id":1735,"group":"wire-vectors","title":"10wire[10] — count in [] is decimal","detail":{"scripts":["10wire[10] a"],"steps":[],"assertions":["element count","type label","total width"]}},
       {"id":1736,"group":"wire-vectors","title":"vectorA:10 — index after : is decimal","detail":{"scripts":["10wire[21] a\nwatch(a:10)"],"steps":["Tokenizer(processed)","Parser(…)","session._ensureRegistry()"],"assertions":["vectorIndex 10","element 10 value"]}},
       {"id":1737,"group":"wire-vectors","title":"16wire[100] — bracket count hundred not binary four","detail":{"scripts":["16wire[100] v"],"steps":[],"assertions":["element count","type label"]}},
-      {"id":1738,"group":"wire-vectors","title":"vector index rejects \\\\N and ^N literals","detail":{"scripts":["10wire[10] a"],"steps":[],"assertions":[]}}
+      {"id":1738,"group":"wire-vectors","title":"vector index rejects \\\\N and ^N literals","detail":{"scripts":["10wire[10] a"],"steps":[],"assertions":[]}},
+      {"id":1739,"group":"wire-vectors","title":"multi-assign existing wires t1, t2 =","detail":{"scripts":["2wire t1"],"steps":[],"assertions":["t1","t2"]}},
+      {"id":1740,"group":"asm-decode","title":"disassemble multi-word program blob","detail":{"scripts":["inline [asm] .myisa:"],"steps":[],"assertions":["contains TT 0","two instructions"]}},
+      {"id":1741,"group":"wire-vectors","title":"ADD vector broadcast + NOT prefix","detail":{"scripts":["4wire[3] a = 0001 + 0010 + 0011"],"steps":[],"assertions":["q width","elem0 sum NOT","carry NOT"]}},
+      {"id":1742,"group":"wire-vectors","title":"ADD 80wire[10] broadcast scalar","detail":{"scripts":["80wire[10] a := ^Ff"],"steps":[],"assertions":["q width","carry NOT all ones"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1230,7 +1234,7 @@
       { id: 'right-pad-assign', label: '=: right-pad assignment', rangeLabel: '235–245, 1000–1007, 1009–1010', testIds: [235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1009, 1010] },
       { id: 'alu', label: 'ALU component', rangeLabel: '1353–1382', testIds: [1353, 1354, 1355, 1356, 1357, 1358, 1359, 1360, 1361, 1362, 1363, 1364, 1365, 1366, 1367, 1368, 1369, 1370, 1371, 1372, 1373, 1374, 1375, 1376, 1377, 1378, 1379, 1380, 1381, 1382] },
       { id: 'arithmetic', label: 'arithmetic', rangeLabel: '1680–1683', testIds: [1680, 1681, 1682, 1683] },
-      { id: 'asm-decode', label: 'ASM disassemble / decode', rangeLabel: '947–948', testIds: [947, 948] },
+      { id: 'asm-decode', label: 'ASM disassemble / decode', rangeLabel: '947–948, 1740', testIds: [947, 948, 1740] },
       { id: 'bit-analysis', label: 'Bit analysis built-ins', rangeLabel: '232–234', testIds: [232, 233, 234] },
       { id: 'bit-ops', label: 'Bit operations', rangeLabel: '61–81, 1535', testIds: [61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 1535] },
       { id: 'bit-selection', label: 'Bit selection built-ins', rangeLabel: '224–231, 1588–1592', testIds: [224, 225, 226, 227, 228, 229, 230, 231, 1588, 1589, 1590, 1591, 1592] },
@@ -1290,7 +1294,7 @@
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983, 1571–1574, 1643–1653, 1661, 1663', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 1571, 1572, 1573, 1574, 1643, 1644, 1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1661, 1663] },
       { id: 'vector-reduction', label: 'vector-reduction', rangeLabel: '1715–1734', testIds: [1715, 1716, 1717, 1718, 1719, 1720, 1721, 1722, 1723, 1724, 1725, 1726, 1727, 1728, 1729, 1730, 1731, 1732, 1733, 1734] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611, 1654', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 1654] },
-      { id: 'wire-vectors', label: 'wire-vectors', rangeLabel: '1684–1701, 1704–1706, 1735–1738', testIds: [1684, 1685, 1686, 1687, 1688, 1689, 1690, 1691, 1692, 1693, 1694, 1695, 1696, 1697, 1698, 1699, 1700, 1701, 1704, 1705, 1706, 1735, 1736, 1737, 1738] },
+      { id: 'wire-vectors', label: 'wire-vectors', rangeLabel: '1684–1701, 1704–1706, 1735–1739, 1741–1742', testIds: [1684, 1685, 1686, 1687, 1688, 1689, 1690, 1691, 1692, 1693, 1694, 1695, 1696, 1697, 1698, 1699, 1700, 1701, 1704, 1705, 1706, 1735, 1736, 1737, 1738, 1739, 1741, 1742] },
       { id: 'zstate', label: 'zstate', rangeLabel: '1429–1503, 1536, 1559–1570, 1575–1587', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503, 1536, 1559, 1560, 1561, 1562, 1563, 1564, 1565, 1566, 1567, 1568, 1569, 1570, 1575, 1576, 1577, 1578, 1579, 1580, 1581, 1582, 1583, 1584, 1585, 1586, 1587] }
     ]
   };

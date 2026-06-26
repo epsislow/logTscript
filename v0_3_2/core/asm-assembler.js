@@ -314,6 +314,25 @@ function disassembleInstruction(isa, bitsStr) {
   throw new Error('Cannot disassemble instruction — no matching opcode');
 }
 
+function disassembleProgram(isa, bitsStr) {
+  const bits = String(bitsStr);
+  const w = isa.wordWidth;
+  if (!w || w < 1) throw new Error('Invalid ISA wordWidth');
+  if (bits.length % w !== 0) {
+    throw new Error(
+      `Cannot disassemble program — ${bits.length} bits is not a multiple of wordWidth ${w}`
+    );
+  }
+  if (bits.length === w) {
+    return disassembleInstruction(isa, bits);
+  }
+  const lines = [];
+  for (let i = 0; i < bits.length; i += w) {
+    lines.push(disassembleInstruction(isa, bits.substr(i, w)));
+  }
+  return lines.join('\n');
+}
+
 function assembleProgram(isa, programRaw, options = {}) {
   const entries = parseProgramLines(programRaw);
   const labels = pass1CollectLabels(entries);
@@ -381,6 +400,7 @@ const asmAssemblerExports = {
   parseProgramLines,
   assembleProgram,
   disassembleInstruction,
+  disassembleProgram,
   formatAsmError,
   formatInstanceDoc,
   formatAsmTypeDoc,

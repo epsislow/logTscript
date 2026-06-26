@@ -94,6 +94,37 @@
     return { result, over };
   }
 
+  /** One vector + one scalar, or two vectors of the same shape → element-wise pairing. */
+  function getVectorBroadcastPair(args, getWire) {
+    if (!args || args.length !== 2) return null;
+    const v0 = isWholeVectorWireArg(args[0], getWire);
+    const v1 = isWholeVectorWireArg(args[1], getWire);
+    if (v0 && !v1) {
+      return { mode: 'vectorScalar', vectorArg: 0, scalarArg: 1, meta: getWire(args[0][0].var).vector };
+    }
+    if (!v0 && v1) {
+      return { mode: 'vectorScalar', vectorArg: 1, scalarArg: 0, meta: getWire(args[1][0].var).vector };
+    }
+    if (v0 && v1) {
+      const m0 = getWire(args[0][0].var).vector;
+      const m1 = getWire(args[1][0].var).vector;
+      if (m0.elementWidth !== m1.elementWidth || m0.elementCount !== m1.elementCount) return null;
+      return { mode: 'vectorVector', meta: m0 };
+    }
+    return null;
+  }
+
+  function addUnsignedAtWidth(a, b, width) {
+    const depth = width;
+    const aNum = unsignedBinToBigInt(String(a).padStart(depth, '0'));
+    const bNum = unsignedBinToBigInt(String(b).padStart(depth, '0'));
+    const sum = aNum + bNum;
+    const mask = (BigInt(1) << BigInt(depth)) - BigInt(1);
+    const carry = sum > mask ? '1' : '0';
+    const result = (sum & mask).toString(2).padStart(depth, '0');
+    return { result, carry };
+  }
+
   const api = {
     unsignedBinToBigInt,
     isReductionWireAtom,
@@ -102,7 +133,9 @@
     getWholeVectorMeta,
     requireSameBitWidth,
     sumUnsignedExpanded,
-    dotUnsignedExpanded
+    dotUnsignedExpanded,
+    getVectorBroadcastPair,
+    addUnsignedAtWidth,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

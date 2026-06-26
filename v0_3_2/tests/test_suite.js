@@ -13416,6 +13416,53 @@ reg(1738, 'wire-vectors', 'vector index rejects \\\\N and ^N literals', function
   }
 });
 
+reg(1739, 'wire-vectors', 'multi-assign existing wires t1, t2 =', function(h, session) {
+  const { interp } = session.run(
+    '2wire t1\n' +
+    '2wire t2\n' +
+    't1, t2 = 1111'
+  );
+  h.assert('t1', session.getWire(interp, 't1'), '11');
+  h.assert('t2', session.getWire(interp, 't2'), '11');
+});
+
+reg(1740, 'asm-decode', 'disassemble multi-word program blob', function(h, session) {
+  const { out } = session.run(
+    'inline [asm] .myisa:\n' +
+    'TT : 0000 + 4b\n' +
+    'LD : 0001 + R2b + A2b\n' +
+    ':\n' +
+    '16wire prg = .myisa {\n' +
+    'TT\n' +
+    'TT\n' +
+    '}\n' +
+    'show(.myisa:decode(prg))'
+  );
+  const text = out.join('\n');
+  h.assert('contains TT 0', String(/TT 0/.test(text)), 'true');
+  h.assert('two instructions', String((text.match(/TT 0/g) || []).length), '2');
+});
+
+reg(1741, 'wire-vectors', 'ADD vector broadcast + NOT prefix', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] a = 0001 + 0010 + 0011\n' +
+    '15wire q = !(ADD(a, 1))'
+  );
+  h.assert('q width', String(session.getWire(interp, 'q').length), '15');
+  h.assert('elem0 sum NOT', session.getWire(interp, 'q').substring(0, 4), '1101');
+  h.assert('carry NOT', session.getWire(interp, 'q').substring(12, 15), '111');
+});
+
+reg(1742, 'wire-vectors', 'ADD 80wire[10] broadcast scalar', function(h, session) {
+  const { interp } = session.run(
+    '80wire[10] a := ^Ff\n' +
+    '810wire q = !(ADD(a, 10))'
+  );
+  h.assert('q width', String(session.getWire(interp, 'q').length), '810');
+  const q = session.getWire(interp, 'q');
+  h.assert('carry NOT all ones', q.substring(800), '1111111111');
+});
+
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
   allowEnter

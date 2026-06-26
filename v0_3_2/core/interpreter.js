@@ -999,7 +999,9 @@ class Interpreter {
 
   evalAsmDecode(inst, argExpr) {
     const bits = this._evalExprToBits(argExpr);
-    const disFn = typeof disassembleInstruction === 'function' ? disassembleInstruction : null;
+    const disFn = typeof disassembleProgram === 'function'
+      ? disassembleProgram
+      : (typeof disassembleInstruction === 'function' ? disassembleInstruction : null);
     if (!disFn) throw new Error('ASM disassembler is not loaded');
     const isa = { opcodes: inst.opcodes, wordWidth: inst.wordWidth, opcodeOrder: inst.opcodeOrder };
     const text = disFn(isa, bits);
@@ -3328,23 +3330,26 @@ class Interpreter {
       delete atomWithoutNot.not;
       const result = this.evalAtom(atomWithoutNot, computeRefs, varName);
 
-      // Apply NOT to the result value (invert all bits)
-      if(result.value && result.value !== '-'){
-        const invertedValue = result.value.split('').map(bit =>
+      const invertPart = (part) => {
+        if (!part || !part.value || part.value === '-') return part;
+        const invertedValue = part.value.split('').map(bit =>
           bit === '0' ? '1' : bit === '1' ? '0' : bit
         ).join('');
-        result.value = invertedValue;
-
-        // For NOT results, the original ref is no longer valid
-        // Store the new value and create a new ref if computeRefs is true
-        if(computeRefs){
+        const out = { ...part, value: invertedValue };
+        if (computeRefs) {
           const idx = this.storeValue(invertedValue);
-          result.ref = `&${idx}`;
+          out.ref = `&${idx}`;
         } else {
-          result.ref = null;
+          out.ref = null;
         }
+        return out;
+      };
+
+      if (Array.isArray(result)) {
+        return result.map(invertPart);
       }
-      return result;
+
+      return invertPart(result);
     }
 
     if (a.group) {
@@ -4372,6 +4377,44 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: ADD =================
   if (name === 'ADD') {
     if (argValues.length !== 2) fail('ADD expects 2 arguments');
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const getWire = (n) => this.wires.get(n);
+    const pair = VR ? VR.getVectorBroadcastPair(args, getWire) : null;
+    if (pair) {
+      const X = pair.meta.elementWidth;
+      const n = pair.meta.elementCount;
+      const results = [];
+      const carries = [];
+      if (pair.mode === 'vectorScalar') {
+        const scalarRaw = this._evalCallArgValue(args[pair.scalarArg]);
+        const scalar = String(scalarRaw).padStart(X, '0');
+        const varName = args[pair.vectorArg][0].var;
+        for (let i = 0; i < n; i++) {
+          const a = this._evalReductionAtomValue({ var: varName, vectorIndex: i });
+          this._zstateRequireBinary([a, scalar], 'ADD', ['a', 'b']);
+          const { result, carry } = VR.addUnsignedAtWidth(a, scalar, X);
+          results.push(result);
+          carries.push(carry);
+        }
+      } else {
+        const varA = args[0][0].var;
+        const varB = args[1][0].var;
+        for (let i = 0; i < n; i++) {
+          const a = this._evalReductionAtomValue({ var: varA, vectorIndex: i });
+          const b = this._evalReductionAtomValue({ var: varB, vectorIndex: i });
+          this._zstateRequireBinary([a, b], 'ADD', ['a', 'b']);
+          const { result, carry } = VR.addUnsignedAtWidth(a, b, X);
+          results.push(result);
+          carries.push(carry);
+        }
+      }
+      const resultBlob = results.join('');
+      const carryBlob = carries.join('');
+      return [
+        computeRefs ? { value: resultBlob, ref: `&${this.storeValue(resultBlob)}` } : { value: resultBlob, ref: null },
+        computeRefs ? { value: carryBlob, ref: `&${this.storeValue(carryBlob)}` } : { value: carryBlob, ref: null },
+      ];
+    }
     this._zstateRequireBinary(argValues, 'ADD', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);

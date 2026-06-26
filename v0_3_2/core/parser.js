@@ -1037,7 +1037,8 @@ parseBoardInstance() {
     i++;
     while(i < this.t.src.length && /\s/.test(this.t.src[i])) i++;
     if(i >= this.t.src.length) return false;
-    return /[0-9]/.test(this.t.src[i]);
+    if (/[0-9]/.test(this.t.src[i])) return true;
+    return /[a-zA-Z_]/.test(this.t.src[i]);
   }
 
   parseOptionalBusEnableSuffix() {
@@ -1268,17 +1269,21 @@ assignment() {
 
   mixedVar(){
     const decls = [];
-    
-    if(this.c.type === 'ID' || this.c.type === 'SPECIAL'){
+
+    while (this.c.type === 'ID' || this.c.type === 'SPECIAL') {
       const name = this.c.value;
+      const declLine = this.c.line;
+      const declCol = tokenStartCol(this.c);
       this.eat(this.c.type);
-      decls.push({ type: null, name, existing: true, line: this.c.line, col: this.c.col });
-      
-      if(this.c.value === ','){
+      decls.push({ type: null, name, existing: true, line: declLine, col: declCol });
+      if (this.c.type === 'SYM' && this.c.value === ',') {
         this.eat('SYM', ',');
+        if (this.c.type === 'TYPE') break;
+        continue;
       }
+      break;
     }
-    
+
     while(this.c.type === 'TYPE'){
       const type = this.c.value;
       this.eat('TYPE');
