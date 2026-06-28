@@ -334,7 +334,7 @@ parseLoad() {
     throw Error(`LOAD failed: ${path} not found`);
   }
 
-  const processedContent = preprocessRepeat(content);
+  const processedContent = preprocessLoop(content);
   const subParser = new Parser(new Tokenizer(processedContent, path), this.componentRegistry);
   subParser.parse();
 

@@ -1194,7 +1194,7 @@ function parseLutOfFromSource(src, componentRegistry) {
   if (typeof Parser === 'undefined' || typeof Tokenizer === 'undefined') {
     throw new Error('Parser is not loaded');
   }
-  const processed = typeof preprocessRepeat === 'function' ? preprocessRepeat(src.trim()) : src.trim();
+  const processed = typeof preprocessLoop === 'function' ? preprocessLoop(src.trim()) : src.trim();
   const p = new Parser(new Tokenizer(processed), componentRegistry || null);
   return p.parseLutOfCallInner();
 }
@@ -1203,7 +1203,7 @@ function parseStdExprToAst(stdExpr, componentRegistry) {
   if (typeof Parser === 'undefined' || typeof Tokenizer === 'undefined') {
     throw new Error('Parser is not loaded');
   }
-  const processed = typeof preprocessRepeat === 'function' ? preprocessRepeat(stdExpr) : stdExpr;
+  const processed = typeof preprocessLoop === 'function' ? preprocessLoop(stdExpr) : stdExpr;
   const p = new Parser(new Tokenizer(processed), componentRegistry || null);
   return p.expr();
 }

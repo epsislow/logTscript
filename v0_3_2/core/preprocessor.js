@@ -186,72 +186,62 @@ function expandShortNotation(content) {
 }
 
 
-/* ================= REPEAT PREPROCESSOR ================= */
+/* ================= LOOP PREPROCESSOR ================= */
 
 /**
- * Preprocess `repeat N..M[ body ]` blocks in source text.
+ * Preprocess `loop N..M[ body ]` blocks in source text.
  * Operates on raw text before tokenization.
- * Supports nested repeats. Placeholders:
- *   ?N  = value of repeat level N (0 = outermost)
+ * Supports nested loops. Placeholders:
+ *   ?N  = value of loop level N (0 = outermost)
  *   ?   = sequential counter starting from 1 (triggers all levels)
  * Lines whose referenced levels haven't changed are deduplicated.
  * Max total iterations per nesting group: 256.
  */
-function preprocessRepeat(source) {
+function preprocessLoop(source) {
   source = preprocessShortNotation(source);
-  const tree = parseRepeatTree(source, 0);
+  const tree = parseLoopTree(source, 0);
   return expandTree(tree, [], {});
 }
 
 /* ---------- Parse ---------- */
 
-function parseRepeatTree(source, depth) {
+function parseLoopTree(source, depth) {
   const nodes = [];
   let i = 0;
 
   while (i < source.length) {
-    // Skip inside comments
-    const repeatIdx = findRepeatKeyword(source, i);
-    if (repeatIdx === -1) {
-      // No more repeats - rest is plain text
+    const loopIdx = findLoopKeyword(source, i);
+    if (loopIdx === -1) {
       nodes.push({ type: 'text', content: source.slice(i) });
       break;
     }
 
-    // Text before this repeat
-    if (repeatIdx > i) {
-      nodes.push({ type: 'text', content: source.slice(i, repeatIdx) });
+    if (loopIdx > i) {
+      nodes.push({ type: 'text', content: source.slice(i, loopIdx) });
     }
 
-    // Parse header: repeat N..M[
-    let j = repeatIdx + 'repeat'.length;
+    // Parse header: loop N..M[
+    let j = loopIdx + 'loop'.length;
 
-    // skip whitespace (not newline)
     while (j < source.length && (source[j] === ' ' || source[j] === '\t')) j++;
 
-    // parse start number
     let startStr = '';
     while (j < source.length && /[0-9]/.test(source[j])) { startStr += source[j]; j++; }
-    if (startStr === '') throw Error(`repeat: expected start number at position ${j}`);
+    if (startStr === '') throw Error(`loop: expected start number at position ${j}`);
 
-    // expect ..
     if (source[j] !== '.' || source[j + 1] !== '.')
-      throw Error(`repeat: expected '..' at position ${j}`);
+      throw Error(`loop: expected '..' at position ${j}`);
     j += 2;
 
-    // parse end number
     let endStr = '';
     while (j < source.length && /[0-9]/.test(source[j])) { endStr += source[j]; j++; }
-    if (endStr === '') throw Error(`repeat: expected end number at position ${j}`);
+    if (endStr === '') throw Error(`loop: expected end number at position ${j}`);
 
-    // skip whitespace
     while (j < source.length && (source[j] === ' ' || source[j] === '\t')) j++;
 
-    // expect [
-    if (source[j] !== '[') throw Error(`repeat: expected '[' at position ${j}`);
-    j++; // skip [
+    if (source[j] !== '[') throw Error(`loop: expected '[' at position ${j}`);
+    j++;
 
-    // Find matching ]
     let bracketDepth = 1;
     let bodyStart = j;
     while (j < source.length && bracketDepth > 0) {
@@ -259,19 +249,18 @@ function parseRepeatTree(source, depth) {
       else if (source[j] === ']') bracketDepth--;
       if (bracketDepth > 0) j++;
     }
-    if (bracketDepth !== 0) throw Error(`repeat: unmatched '[' starting at position ${bodyStart - 1}`);
+    if (bracketDepth !== 0) throw Error(`loop: unmatched '[' starting at position ${bodyStart - 1}`);
 
     const body = source.slice(bodyStart, j);
-    j++; // skip ]
+    j++;
 
     const start = parseInt(startStr, 10);
     const end = parseInt(endStr, 10);
-    if (end < start) throw Error(`repeat: end (${end}) must be >= start (${start})`);
+    if (end < start) throw Error(`loop: end (${end}) must be >= start (${start})`);
 
-    // Recursively parse body
-    const children = parseRepeatTree(body, depth + 1);
+    const children = parseLoopTree(body, depth + 1);
 
-    nodes.push({ type: 'repeat', start, end, level: depth, children });
+    nodes.push({ type: 'loop', start, end, level: depth, children });
 
     i = j;
   }
@@ -280,18 +269,16 @@ function parseRepeatTree(source, depth) {
 }
 
 /**
- * Find the index of the next `repeat` keyword that is NOT inside a comment.
+ * Find the index of the next `loop N..M[` directive that is NOT inside a comment.
  * Returns -1 if not found.
  */
-function findRepeatKeyword(source, from) {
+function findLoopKeyword(source, from) {
   let i = from;
   while (i < source.length) {
-    // Line comment: skip to end of line
     if (source[i] === '#' && source[i + 1] !== '>') {
       while (i < source.length && source[i] !== '\n') i++;
       continue;
     }
-    // Block comment #> ... #<
     if (source[i] === '#' && source[i + 1] === '>') {
       i += 2;
       while (i < source.length) {
@@ -300,9 +287,8 @@ function findRepeatKeyword(source, from) {
       }
       continue;
     }
-    // Check for `repeat N..M[` directive (not protocol `repeat bit Nb` segments)
-    if (source.startsWith('repeat', i)) {
-      const after = i + 'repeat'.length;
+    if (source.startsWith('loop', i)) {
+      const after = i + 'loop'.length;
       if (i === 0 || /[\s]/.test(source[i - 1])) {
         if (after < source.length && (source[after] === ' ' || source[after] === '\t')) {
           let j = after;
@@ -325,7 +311,7 @@ function findRepeatKeyword(source, from) {
 function assignLevelsAndValidate(nodes, baseLevel) {
   let maxLevel = baseLevel;
   for (const node of nodes) {
-    if (node.type === 'repeat') {
+    if (node.type === 'loop') {
       node.level = baseLevel;
       const childMax = assignLevelsAndValidate(node.children, baseLevel + 1);
       if (childMax > maxLevel) maxLevel = childMax;
@@ -338,7 +324,7 @@ function computeTotalIterations(node) {
   const count = node.end - node.start + 1;
   let childProduct = 1;
   for (const child of node.children) {
-    if (child.type === 'repeat') {
+    if (child.type === 'loop') {
       childProduct *= computeTotalIterations(child);
     }
   }
@@ -347,40 +333,37 @@ function computeTotalIterations(node) {
 
 function expandTree(nodes, levelValues, seenMap) {
   let result = '';
-  // First pass: assign levels and validate for each top-level repeat
   for (const node of nodes) {
-    if (node.type === 'repeat') {
+    if (node.type === 'loop') {
       assignLevelsAndValidate([node], levelValues.length);
       const total = computeTotalIterations(node);
       if (total > 256) {
-        throw Error(`number of iterations in nested repeats passed the maximum of 256 (got ${total})`);
+        throw Error(`number of iterations in nested loops passed the maximum of 256 (got ${total})`);
       }
     }
   }
 
-  // Second pass: expand
   for (const node of nodes) {
     if (node.type === 'text') {
       result += expandTextNode(node.content, levelValues, seenMap);
-    } else if (node.type === 'repeat') {
-      result += expandRepeatNode(node, levelValues, seenMap);
+    } else if (node.type === 'loop') {
+      result += expandLoopNode(node, levelValues, seenMap);
     }
   }
   return result;
 }
 
-function expandRepeatNode(node, levelValues, seenMap) {
+function expandLoopNode(node, levelValues, seenMap) {
   let result = '';
   for (let val = node.start; val <= node.end; val++) {
-    // Build level values array for this iteration
     const newLevels = levelValues.slice();
     newLevels[node.level] = val;
 
     for (const child of node.children) {
       if (child.type === 'text') {
         result += expandTextNode(child.content, newLevels, seenMap);
-      } else if (child.type === 'repeat') {
-        result += expandRepeatNode(child, newLevels, seenMap);
+      } else if (child.type === 'loop') {
+        result += expandLoopNode(child, newLevels, seenMap);
       }
     }
   }

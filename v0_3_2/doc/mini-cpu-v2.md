@@ -609,7 +609,7 @@ board +[cpu4v2]:
   :4bit acc
 board [cpu4v2] .cpu::
 
-repeat 1..9[
+loop 1..9[
 .cpu:{ set = 1 }
 ]
 

@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, vector-reduction.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, vector-reduction.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -9046,6 +9046,85 @@ comp [led] .name:
 - The \`color\` attribute applies to all LEDs in the group. Individual LED colors are not supported within a single component — declare separate \`led\` components for different colors.
 - \`nl\` places a line break after the **last** LED in the group.
 `,
+    'loop.md': `# Loop preprocessor (\`loop N..M[\`)
+
+Before tokenization, the preprocessor expands **loop blocks** that duplicate lines of source text.
+
+## Syntax
+
+\`\`\`
+loop START..END[
+  ... body ...
+]
+\`\`\`
+
+- \`START\` and \`END\` are decimal integers; \`END\` must be ≥ \`START\`.
+- Brackets \`[\` \`]\` delimit the body; nested \`[\` \`]\` inside the body are balanced.
+- Nested \`loop\` blocks are supported.
+- Maximum **256** total iterations per nesting group (product of all loop counts in that tree).
+
+## Placeholders
+
+Inside the body, these placeholders are replaced on expansion:
+
+| Placeholder | Meaning |
+|-------------|---------|
+| \`?\` | Sequential counter from 1 upward (all active levels) |
+| \`?0\` | Value of the outermost loop (level 0) |
+| \`?1\`, \`?2\`, … | Value of nested loop at that level |
+
+Lines that reference only specific \`?N\` levels are **deduplicated** when those level values did not change since the previous emitted line.
+
+## Example
+
+\`\`\`
+loop 1..3[
+  4wire w?
+]
+\`\`\`
+
+Expands to:
+
+\`\`\`
+  4wire w1
+  4wire w2
+  4wire w3
+\`\`\`
+
+Nested example:
+
+\`\`\`
+loop 1..2[
+  loop 1..2[
+    4wire x?0?1
+  ]
+]
+\`\`\`
+
+→ four lines: \`x11\`, \`x12\`, \`x21\`, \`x22\`.
+
+## Pipeline order
+
+1. **Short notation** (backtick expressions) is expanded first.
+2. **Loop blocks** are expanded second.
+3. The tokenizer and parser see only the flattened source.
+
+## Not confused with
+
+- **Protocol** inline segments: \`repeat 0 4b\` inside \`[protocol]\` — bit repetition in packet layout; not a loop block.
+- **ASM** labels and jumps: \`loop:\` / \`JMP loop\` in \`[asm]\` ISA definitions — assembler mnemonics; not expanded by this preprocessor.
+
+## Comments
+
+A line starting with \`#\` is a comment. \`loop\` inside a comment is ignored:
+
+\`\`\`
+# loop 1..5[
+4wire a = ^FF
+\`\`\`
+
+The second line is not expanded.
+`,
     'lut.md': `# LUT
 
 A **combinational lookup table**: address in → value out in the **same propagation step** (like \`ADD()\` / \`MUX()\`, not like clocked \`mem\`).
@@ -11039,7 +11118,7 @@ board +[cpu4v2]:
   :4bit acc
 board [cpu4v2] .cpu::
 
-repeat 1..9[
+loop 1..9[
 .cpu:{ set = 1 }
 ]
 
@@ -15084,12 +15163,12 @@ Expands to:
 AND(a,b) + OR(c,d)
 \`\`\`
 
-### Combination with repeat
+### Combination with loop
 
-Short notation works together with \`repeat\` blocks. The \`?\` placeholder is expanded by repeat after short notation has been processed:
+Short notation works together with \`loop\` blocks. The \`?\` placeholder is expanded by the loop preprocessor after short notation has been processed:
 
 \`\`\`
-repeat 1..3[
+loop 1..3[
    :1bit \`a.? | b.?\`
 ]
 \`\`\`

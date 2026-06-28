@@ -657,7 +657,7 @@ comp [rotary] .aa:
 
   `,
   
-  ex_repeat_reg_rot: `
+  ex_loop_reg_rot: `
   
   
 
@@ -686,7 +686,7 @@ comp [key] .set:
     : 
 
     
-repeat 1..4[
+loop 1..4[
     comp [reg] .rg?:
         depth: 2
         on:1
@@ -3583,7 +3583,7 @@ ex_clock: `
 
 
 
-repeat 1..5[
+loop 1..5[
   comp [7seg] .s?:
     on:1
     :
@@ -3594,7 +3594,7 @@ comp [7seg] .s6:
    :
 
 
-repeat 1..3[
+loop 1..3[
   comp [key] .k?:
      label: ?
      on:1
@@ -3974,7 +3974,7 @@ ex_gm_7seg2: `
 
 8wire a = \\127
 4wire b = a.4/4
-repeat 1..5[
+loop 1..5[
   comp [7seg] .s?:
     on:1
     :
@@ -3984,7 +3984,7 @@ comp [7seg] .s6:
    nl
    :
 
-repeat 1..3[
+loop 1..3[
   comp [key] .k?:
      label: ?
      on:1
@@ -4092,7 +4092,7 @@ comp [mem] .pos:
   set=~
 }
 
-repeat 1..6[
+loop 1..6[
    8wire ss? = .s?:get
 ]
 `,
@@ -4100,7 +4100,7 @@ repeat 1..6[
 ex_gm_7seg: `
 8wire a = \\127
 4wire b = a.4/4
-repeat 1..5[
+loop 1..5[
   8wire s?
   comp [7seg] .s?:
     on:1
@@ -4115,7 +4115,7 @@ comp [7seg] .s6:
 8wire s6 = .s6
 
 
-repeat 1..3[
+loop 1..3[
   comp [key] .k?:
      label: ?
      on:1

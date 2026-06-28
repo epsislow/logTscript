@@ -452,7 +452,7 @@ function run(){
   tabSave();
   syncLegacyLastKeys();
   persistTabs();
-  processedCode = preprocessRepeat(code.value);
+  processedCode = preprocessLoop(code.value);
   ctx.lastProcessedSource = processedCode;
   lastProcessedSource = processedCode;
   const _registry = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
@@ -505,7 +505,7 @@ function run(){
   updateStepControlsUI();
   }catch(e){
     if (!lastProcessedSource) {
-      try { lastProcessedSource = preprocessRepeat(code.value); } catch (_) { /* keep */ }
+      try { lastProcessedSource = preprocessLoop(code.value); } catch (_) { /* keep */ }
     }
     const src = processedCode || lastProcessedSource;
     const activeInterp = ctx.interp || globalInterp;
@@ -688,7 +688,7 @@ function showVars(interpOptional){
 
 function toggleAST(){
   const _reg = (typeof createComponentRegistry === 'function') ? createComponentRegistry() : null;
-  const p=new Parser(new Tokenizer(preprocessRepeat(code.value)), _reg);
+  const p=new Parser(new Tokenizer(preprocessLoop(code.value)), _reg);
   const ast=p.parse();
   const panel=document.getElementById('astPanel');
   panel.style.display=panel.style.display==='none'?'block':'none';

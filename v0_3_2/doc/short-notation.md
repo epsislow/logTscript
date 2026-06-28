@@ -540,12 +540,12 @@ Expands to:
 AND(a,b) + OR(c,d)
 ```
 
-### Combination with repeat
+### Combination with loop
 
-Short notation works together with `repeat` blocks. The `?` placeholder is expanded by repeat after short notation has been processed:
+Short notation works together with `loop` blocks. The `?` placeholder is expanded by the loop preprocessor after short notation has been processed:
 
 ```
-repeat 1..3[
+loop 1..3[
    :1bit `a.? | b.?`
 ]
 ```

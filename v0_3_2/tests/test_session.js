@@ -34,7 +34,7 @@
       },
 
       tokenize(src) {
-        const processed = preprocessRepeat(src);
+        const processed = preprocessLoop(src);
         const t = new Tokenizer(processed);
         const tokens = [];
         let tok;
@@ -43,14 +43,14 @@
       },
 
       parse(src) {
-        const processed = preprocessRepeat(src);
+        const processed = preprocessLoop(src);
         const registry = this._ensureRegistry();
         const p = new Parser(new Tokenizer(processed), registry);
         return p.parse();
       },
 
       run(src) {
-        const processed = preprocessRepeat(src);
+        const processed = preprocessLoop(src);
         const registry = this._ensureRegistry();
         const signalPropagationStrategy = this._ensureSignalPropagationStrategy();
         const p = new Parser(new Tokenizer(processed), registry);
@@ -200,7 +200,7 @@
       execStmts(interp, src) {
         const i = interp || this.interp;
         if (!i) return;
-        const processed = preprocessRepeat(src);
+        const processed = preprocessLoop(src);
         const p = new Parser(new Tokenizer(processed), this._ensureRegistry());
         for (const s of p.parse()) {
           i.exec(s);

@@ -17,7 +17,8 @@ const SCRIPT_MARKER_START = '<!-- @generated test-scripts start -->';
 const SCRIPT_MARKER_END = '<!-- @generated test-scripts end -->';
 
 const GROUP_META = [
-  { id: 'repeat', label: 'Repeat preprocessor' },
+  { id: 'loop', label: 'Loop preprocessor' },
+  { id: 'literals', label: 'Decimal \\\\N literals' },
   { id: 'gates-reduce', label: 'Logic gate reduce / expand' },
   { id: 'bit-transform', label: 'Bit transform built-ins' },
   { id: 'bit-selection', label: 'Bit selection built-ins' },

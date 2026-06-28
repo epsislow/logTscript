@@ -14,6 +14,7 @@
         { "file": "builtin-bit-transform-functions.md", "label": "Built-in bit transform", "searchExtra": "LSHIFT RSHIFT REVERSE LROTATE RROTATE rotate shift" },
         { "file": "components.md", "label": "Component catalog" },
         { "file": "short-notation.md", "label": "Short notation" },
+        { "file": "loop.md", "label": "Loop preprocessor (loop N..M[)", "searchExtra": "repeat placeholder ?N deduplicate nested expand preprocessor" },
         { "file": "assignment-operators.md", "label": "Assignment operators (=, =:, :=)", "searchExtra": "right pad left pad wire assignment initial vector element slice" },
         { "file": "wire-vectors.md", "label": "Wire vectors (4wire[3])", "searchExtra": "vector element index slice 1D array Nwire count show peek probe Zlist SUM DOT MIN MAX reduction" },
         { "file": "vector-reduction.md", "label": "Vector reduction (SUM, DOT, MIN, MAX)", "searchExtra": "SUM DOT MIN MAX vector expand dot product perceptron reduction over result" },

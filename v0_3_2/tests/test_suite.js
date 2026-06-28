@@ -197,7 +197,7 @@
 
   function createSession(opts) {
     const session = LogTScriptSession.createSession(opts || {});
-    session.preprocessRepeat = preprocessRepeat;
+    session.preprocessLoop = preprocessLoop;
     session.preprocessShortNotation = preprocessShortNotation;
     session.gateReduce = gateReduce;
     session.gateExpand = gateExpand;
@@ -229,7 +229,7 @@
   function buildErrorPresentation(err, runSource, editorSource) {
     const EF = typeof LogTScriptErrorFormat !== 'undefined' ? LogTScriptErrorFormat : null;
     if (!EF) throw new Error('LogTScriptErrorFormat not loaded');
-    const processed = typeof preprocessRepeat === 'function' ? preprocessRepeat(runSource) : runSource;
+    const processed = typeof preprocessLoop === 'function' ? preprocessLoop(runSource) : runSource;
     let display = EF.resolveErrorDisplay(err, processed);
     if (editorSource != null && EF.alignErrorDisplayToSource) {
       display = EF.alignErrorDisplayToSource(display, editorSource, processed);
@@ -316,11 +316,11 @@
     }
   }
 
-  reg(6, 'repeat', 'Max 256 iterations (EXCEEDED)', function(h, session) {
+  reg(6, 'loop', 'Max 256 iterations (EXCEEDED)', function(h, session) {
     {
       h.assertThrows('16x17 = 272 throws error',
-        () => preprocessRepeat(`repeat 1..16[
-    repeat 1..17[
+        () => preprocessLoop(`loop 1..16[
+    loop 1..17[
     4wire x?0?1
     ]
     ]`),
@@ -329,62 +329,62 @@
     }
   });
 
-  reg(7, 'repeat', 'Separate repeat groups (independent limits)', function(h, session) {
+  reg(7, 'loop', 'Separate loop groups (independent limits)', function(h, session) {
     {
-      const src = `repeat 1..16[
-    repeat 1..16[
+      const src = `loop 1..16[
+    loop 1..16[
     4wire x?0?1
     ]
     ]
     
-    repeat 1..2[
+    loop 1..2[
     4wire y?
     ]`;
-      const result = preprocessRepeat(src);
+      const result = preprocessLoop(src);
         const lines = result.trim().split('\n').filter(l => l.trim() !== '');
         h.assert('separate groups: total lines', String(lines.length), '258');
     }
   });
 
-  reg(8, 'repeat', 'No repeat – passthrough', function(h, session) {
+  reg(8, 'loop', 'No loop – passthrough', function(h, session) {
     {
       const src = `4wire a = ^FF
     4wire b = ^00`;
-      const result = preprocessRepeat(src);
-      h.assert('no repeat passthrough', result, src);
+      const result = preprocessLoop(src);
+      h.assert('no loop passthrough', result, src);
     }
   });
 
-  reg(9, 'repeat', 'Repeat inside comment is ignored', function(h, session) {
+  reg(9, 'loop', 'Loop inside comment is ignored', function(h, session) {
     {
-      const src = `# repeat 1..5[
+      const src = `# loop 1..5[
     4wire a = ^FF`;
-      const result = preprocessRepeat(src);
-      h.assert('repeat in comment ignored', result, src);
+      const result = preprocessLoop(src);
+      h.assert('loop in comment ignored', result, src);
     }
   });
 
-  reg(10, 'repeat', 'Tokenizer accepts preprocessed output', function(h, session) {
+  reg(10, 'loop', 'Tokenizer accepts preprocessed output', function(h, session) {
     {
-      const src = `repeat 1..3[
+      const src = `loop 1..3[
     4wire w?
     ]`;
       const { processed, tokens } = session.tokenize(src);
       const typeTokens = tokens.filter(t => t.type === 'TYPE');
-      h.assert('tokenizer: 3 TYPE tokens from repeat', String(typeTokens.length), '3');
+      h.assert('tokenizer: 3 TYPE tokens from loop', String(typeTokens.length), '3');
     }
   });
 
-  reg(13, 'repeat', 'Nested 3 levels', function(h, session) {
+  reg(13, 'loop', 'Nested 3 levels', function(h, session) {
     {
-      const src = `repeat 1..2[
-    repeat 1..2[
-    repeat 1..2[
+      const src = `loop 1..2[
+    loop 1..2[
+    loop 1..2[
     4wire x?0?1?2
     ]
     ]
     ]`;
-      const result = preprocessRepeat(src);
+      const result = preprocessLoop(src);
       const lines = result.trim().split('\n').filter(l => l.trim() !== '');
       h.assert('3-level nesting: 8 lines', String(lines.length), '8');
       h.assert('3-level first line', lines[0].trim(), '4wire x111');
@@ -392,10 +392,10 @@
     }
   });
 
-  reg(14, 'repeat', 'Unmatched bracket error', function(h, session) {
+  reg(14, 'loop', 'Unmatched bracket error', function(h, session) {
     {
       h.assertThrows('unmatched bracket',
-        () => preprocessRepeat(`repeat 1..3[
+        () => preprocessLoop(`loop 1..3[
     4wire a?
     `),
         'unmatched'
@@ -403,7 +403,7 @@
     }
   });
 
-  reg(15, 'repeat', 'Decimal literal \\\\N tokenized as SDEC', function(h, session) {
+  reg(15, 'literals', 'Decimal literal \\\\N tokenized as SDEC', function(h, session) {
     {
       const { tokens } = session.tokenize('4wire c = \\15');
       const sdecTokens = tokens.filter(t => t.type === 'SDEC');
@@ -412,7 +412,7 @@
     }
   });
 
-  reg(16, 'repeat', 'Decimal literal \\\\0', function(h, session) {
+  reg(16, 'literals', 'Decimal literal \\\\0', function(h, session) {
     {
       const { tokens } = session.tokenize('4wire c = \\0');
       const sdecTokens = tokens.filter(t => t.type === 'SDEC');
@@ -420,7 +420,7 @@
     }
   });
 
-  reg(17, 'repeat', 'Decimal literal \\\\255', function(h, session) {
+  reg(17, 'literals', 'Decimal literal \\\\255', function(h, session) {
     {
       const { tokens } = session.tokenize('4wire c = \\255');
       const sdecTokens = tokens.filter(t => t.type === 'SDEC');
@@ -428,7 +428,7 @@
     }
   });
 
-  reg(19, 'repeat', 'Decimal \\\\2 produces binary 10 (padding is interpreter-level)', function(h, session) {
+  reg(19, 'literals', 'Decimal \\\\2 produces binary 10 (padding is interpreter-level)', function(h, session) {
     {
       const { tokens } = session.tokenize('8wire q2 = \\2');
       const sdecTokens = tokens.filter(t => t.type === 'SDEC');
@@ -436,7 +436,7 @@
     }
   });
 
-  reg(20, 'repeat', 'HEX ^F produces 4-bit binary', function(h, session) {
+  reg(20, 'literals', 'HEX ^F produces 4-bit binary', function(h, session) {
     {
       const { tokens } = session.tokenize('8wire q3 = ^F');
       const hexTokens = tokens.filter(t => t.type === 'HEX');
@@ -444,7 +444,7 @@
     }
   });
 
-  reg(21, 'repeat', 'Large decimal \\\\1024', function(h, session) {
+  reg(21, 'literals', 'Large decimal \\\\1024', function(h, session) {
     {
       const { tokens } = session.tokenize('16wire q = \\1024');
       const sdecTokens = tokens.filter(t => t.type === 'SDEC');
@@ -626,7 +626,7 @@
   reg(52, 'bit-transform', 'LSHIFT w1 fill via operator - preprocessed text', function(h, session) {
     {
       const src = '4wire x = 10 < 1 w1';
-      const result = preprocessRepeat(src);
+      const result = preprocessLoop(src);
       h.assert('< w1 operator passes through preprocessor', result, src);
     }
   });
@@ -684,7 +684,7 @@
   reg(56, 'bitrange', 'Tokenizer - preprocessor passes through dynamic bit range syntax', function(h, session) {
     {
       const src = '4bit sub = data.(start)/(l)';
-      const result = preprocessRepeat(src);
+      const result = preprocessLoop(src);
       h.assert('dynamic bit range passes through preprocessor', result, src);
     }
   });
@@ -1408,22 +1408,22 @@
     }
   });
 
-  reg(129, 'short-notation', 'Short notation — via preprocessRepeat pipeline', function(h, session) {
+  reg(129, 'short-notation', 'Short notation — via preprocessLoop pipeline', function(h, session) {
     {
-      const result = preprocessRepeat('8wire c = `& (a | b)`');
-      h.assert('preprocessRepeat expands short notation', result, '8wire c = AND(OR(a,b))');
+      const result = preprocessLoop('8wire c = `& (a | b)`');
+      h.assert('preprocessLoop expands short notation', result, '8wire c = AND(OR(a,b))');
     }
   });
 
-  reg(130, 'short-notation', 'Short notation — with repeat', function(h, session) {
+  reg(130, 'short-notation', 'Short notation — with loop', function(h, session) {
     {
-      const src = 'repeat 1..3[\n:1bit `a.? | b.?`\n]';
-      const result = preprocessRepeat(src);
+      const src = 'loop 1..3[\n:1bit `a.? | b.?`\n]';
+      const result = preprocessLoop(src);
       const lines = result.trim().split('\n').filter(l => l.trim() !== '');
-      h.assert('repeat + short notation line count', String(lines.length), '3');
-      h.assert('repeat + short line 1', lines[0].trim(), ':1bit OR(a.1,b.1)');
-      h.assert('repeat + short line 2', lines[1].trim(), ':1bit OR(a.2,b.2)');
-      h.assert('repeat + short line 3', lines[2].trim(), ':1bit OR(a.3,b.3)');
+      h.assert('loop + short notation line count', String(lines.length), '3');
+      h.assert('loop + short line 1', lines[0].trim(), ':1bit OR(a.1,b.1)');
+      h.assert('loop + short line 2', lines[1].trim(), ':1bit OR(a.2,b.2)');
+      h.assert('loop + short line 3', lines[2].trim(), ':1bit OR(a.3,b.3)');
     }
   });
 
@@ -5512,7 +5512,7 @@ const INLINE_ASM_ISA = `inline [asm] .myisa:
   :`;
 
 reg(883, 'asm', 'parse inline [asm] — mnemonici + segmente', function(h, session) {
-  const p = new Parser(new Tokenizer(preprocessRepeat(INLINE_ASM_ISA)), session._ensureRegistry());
+  const p = new Parser(new Tokenizer(preprocessLoop(INLINE_ASM_ISA)), session._ensureRegistry());
   const stmts = p.parse();
   h.assert('inline stmt', String(!!stmts[0].inline), 'true');
   h.assert('instance name', stmts[0].inline.name, '.myisa');
@@ -8919,7 +8919,7 @@ comp [ioport] .p:
 
 reg(1176, 'debug', 'Parser — watch(clk) AST and watches[]', function(h, session) {
   const registry = session._ensureRegistry();
-  const processed = preprocessRepeat('1wire clk = 0\nwatch(clk)');
+  const processed = preprocessLoop('1wire clk = 0\nwatch(clk)');
   const p = new Parser(new Tokenizer(processed), registry);
   const stmts = p.parse();
   h.assert('watch stmt', String(!!stmts[1].watch), 'true');
@@ -9010,7 +9010,7 @@ watch(o.1-3)`);
 reg(1182, 'debug', 'watch-expand labels from stmts', function(h, session) {
   const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
   h.assert('module loaded', String(!!WE), 'true');
-  const processed = preprocessRepeat('4wire o = 0\nwatch(o)\nwatch(o.1-3)');
+  const processed = preprocessLoop('4wire o = 0\nwatch(o)\nwatch(o.1-3)');
   const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
   const stmts = p.parse();
   const widths = WE.buildWireWidthMapFromStmts(stmts);
@@ -9032,7 +9032,7 @@ watch(o.3)
 watch(c)`;
   const { interp } = session.run(script);
   h.assert('five targets', String(interp.watchTargets.length), '5');
-  const processed = preprocessRepeat(script);
+  const processed = preprocessLoop(script);
   const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
   const stmts = p.parse();
   const widths = WE.buildWireWidthMapFromStmts(stmts);
@@ -9053,7 +9053,7 @@ reg(1184, 'debug', 'seedWatchTimeline records row after label reset', function(h
 });
 
 reg(1185, 'debug', 'Parser — watch(.o:counter) property syntax', function(h, session) {
-  const processed = preprocessRepeat('comp [~] .o:\n  length: 4\n  :\n4wire o = .o:counter\nwatch(.o:counter)');
+  const processed = preprocessLoop('comp [~] .o:\n  length: 4\n  :\n4wire o = .o:counter\nwatch(.o:counter)');
   const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
   const stmts = p.parse();
   h.assert('watch stmt', String(!!stmts[2].watch), 'true');
@@ -13113,7 +13113,7 @@ reg(1710, 'short-notation', 'Short notation — vector AND runnable', function(h
 });
 
 reg(1711, 'debug', 'Parser — watch(vectorA:0) AST and watches[]', function(h, session) {
-  const processed = preprocessRepeat('4wire[3] vectorA\nwatch(vectorA:0)');
+  const processed = preprocessLoop('4wire[3] vectorA\nwatch(vectorA:0)');
   const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
   const stmts = p.parse();
   h.assert('watch stmt', String(!!stmts[1].watch), 'true');
@@ -13125,7 +13125,7 @@ reg(1711, 'debug', 'Parser — watch(vectorA:0) AST and watches[]', function(h, 
 
 reg(1712, 'debug', 'watch-expand vectorA:0 — four columns', function(h, session) {
   const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
-  const processed = preprocessRepeat('4wire[3] vectorA\nwatch(vectorA:0)');
+  const processed = preprocessLoop('4wire[3] vectorA\nwatch(vectorA:0)');
   const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
   const stmts = p.parse();
   const widths = WE.buildWireWidthMapFromStmts(stmts);
@@ -13139,7 +13139,7 @@ reg(1712, 'debug', 'watch-expand vectorA:0 — four columns', function(h, sessio
 
 reg(1713, 'debug', 'watch-expand vectorA:1.0/2 — two columns', function(h, session) {
   const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
-  const processed = preprocessRepeat('4wire[3] vectorA\nwatch(vectorA:1.0/2)');
+  const processed = preprocessLoop('4wire[3] vectorA\nwatch(vectorA:1.0/2)');
   const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
   const stmts = p.parse();
   const widths = WE.buildWireWidthMapFromStmts(stmts);
@@ -13381,7 +13381,7 @@ reg(1735, 'wire-vectors', '10wire[10] — count in [] is decimal', function(h, s
 });
 
 reg(1736, 'wire-vectors', 'vectorA:10 — index after : is decimal', function(h, session) {
-  const processed = preprocessRepeat('10wire[21] a\nwatch(a:10)');
+  const processed = preprocessLoop('10wire[21] a\nwatch(a:10)');
   const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
   const stmts = p.parse();
   const w = stmts[1].watch[0];
@@ -13461,6 +13461,25 @@ reg(1742, 'wire-vectors', 'ADD 80wire[10] broadcast scalar', function(h, session
   h.assert('q width', String(session.getWire(interp, 'q').length), '810');
   const q = session.getWire(interp, 'q');
   h.assert('carry NOT all ones', q.substring(800), '1111111111');
+});
+
+reg(1743, 'loop', 'block repeat N..M[ is not expanded (passthrough)', function(h, session) {
+  const src = 'repeat 1..3[\n    4wire w?\n    ]';
+  const result = preprocessLoop(src);
+  h.assert('repeat block unchanged', result, src);
+});
+
+reg(1744, 'loop', 'ASM loop: label unchanged by preprocessor', function(h, session) {
+  const src = 'inline [asm] .t:\n  loop: NOP : 0000 + 4b\n  JMP loop : 0101 + A4b\n  :';
+  const result = preprocessLoop(src);
+  h.assert('asm loop label preserved', String(/loop:/.test(result)), 'true');
+  h.assert('JMP loop preserved', String(/JMP loop/.test(result)), 'true');
+});
+
+reg(1745, 'loop', 'protocol repeat segment unchanged by preprocessor', function(h, session) {
+  const src = 'inline [protocol] .p:\n  repeat 0 4b\n  :';
+  const result = preprocessLoop(src);
+  h.assert('protocol repeat preserved', String(/repeat 0 4b/.test(result)), 'true');
 });
 
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {

@@ -11,7 +11,7 @@ const SCRIPT_CALLEES = [
   'session.tokenize',
   'session.parse',
   'session.preprocessShortNotation',
-  'preprocessRepeat',
+  'preprocessLoop',
   'parseIsaBody',
   'parseProtocolBody'
 ];
@@ -342,7 +342,7 @@ function extractScripts(body, sharedConsts) {
 
   for (const [name, value] of localConsts) {
     const used = new RegExp(
-      '(?:session\\.(?:run|runDoc|runArith|tokenize|parse|preprocessShortNotation)|preprocessRepeat)\\(\\s*' +
+      '(?:session\\.(?:run|runDoc|runArith|tokenize|parse|preprocessShortNotation)|preprocessLoop)\\(\\s*' +
       name + '\\b'
     );
     if (used.test(body) && value && !scripts.includes(value)) {
