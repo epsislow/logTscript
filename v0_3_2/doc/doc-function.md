@@ -258,6 +258,48 @@ doc(MAC)
 | `doc(ISDIGIT)` | `ISDIGIT(Xbit value) -> 1bit` |
 | `doc(MAC)` | `MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over` |
 
+### Vector reduction (SUM / DOT)
+
+See [vector-reduction.md](vector-reduction.md) and [arithmetic.md — SUM / DOT](arithmetic.md#sum--dot-vector-reduction).
+
+```
+doc(SUM)
+doc(DOT)
+```
+
+| Call | Signature |
+|------|-----------|
+| `doc(SUM)` | `SUM(Wbit ...) -> Wbit result, Wbit over` |
+| `doc(DOT)` | `DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over` |
+
+**SUM** is variadic: plain wires, whole vectors (elements expand), or a mix. Output is **2W** bits (`result` low, `over` high).
+
+**DOT** takes two **whole vectors** of the same shape. Output is **3W** bits (`result` low **W**, `over` next **2W**). Slice arguments are not supported.
+
+```
+4wire result, 4wire over = SUM(a, b)
+4wire result, 4wire over = SUM(vectorA)
+4wire result, 8wire over = DOT(vectorA, vectorB)
+```
+
+### Tristate (MODE ZSTATE)
+
+Requires `MODE ZSTATE` and wave propagation. Full behaviour: [zstate.md](zstate.md) and [builtin-functions.md](builtin-functions.md).
+
+```
+doc(ZRELEASE)
+doc(ZCONNECT)
+doc(ZCONN)
+```
+
+| Call | Signature |
+|------|-----------|
+| `doc(ZRELEASE)` | `ZRELEASE(wireName) — release wire to high-Z (MODE ZSTATE statement)` |
+| `doc(ZCONNECT)` | `ZCONNECT(en, data) — enable-gated drive value (MODE ZSTATE); bus = ZCONNECT(en, data)` |
+| `doc(ZCONN)` | `ZCONNECT(en, data) — alias for ZCONNECT` |
+
+`ZRELEASE` is a **statement** (not an expression). `ZCONNECT` / `ZCONN` are used in wire assignments (`bus = ZCONNECT(en, data)`) or as statement sugar (`ZCONNECT(bus, en, data)`).
+
 ### Decimal conversion (summary)
 
 | Call | Signature |

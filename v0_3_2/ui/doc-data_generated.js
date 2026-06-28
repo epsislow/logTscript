@@ -982,19 +982,33 @@ doc(LT)
 doc(MIN)
 doc(MAX)
 doc(CLAMP)
+
+doc(SUM)
+# SUM(Wbit ...) -> Wbit result, Wbit over
+
+doc(DOT)
+# DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
 \`\`\`
 
-Use \`doc(def)\` to list all built-in functions (including ADD, SUBTRACT, MULTIPLY, DIVIDE) alongside any user-defined functions:
+Vector operand rules and examples: [vector-reduction.md](vector-reduction.md).
+
+Use \`doc(def)\` to list all built-in functions alongside any user-defined functions:
 
 \`\`\`
 doc(def)
 \`\`\`
 
-Output:
+Output (abbreviated — full list is longer):
 
 \`\`\`
 built-in:
-NOT, AND, OR, XOR, NXOR, NAND, NOR, EQ, LATCH, LSHIFT, RSHIFT, MUX, DEMUX, ADD, SUBTRACT, MULTIPLY, DIVIDE, REG
+NOT, AND, OR, XOR, … ADD, SUBTRACT, MULTIPLY, DIVIDE, MAC, SUM, DOT, …
+HIGH, LOW, ANY*, ALL*, BITINDEX, … ZRELEASE, ZCONNECT, ZCONN, REG
+
+(* = 0/1/01/10/Z/X/ZX/XZ)
+
+debug:
+show, peek, probe, watch, Zlist
 
 user defined:
 (none)
@@ -2867,6 +2881,7 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
 | **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) |
+| **Vector reduction** | \`SUM\`, \`DOT\` | [vector-reduction.md](vector-reduction.md) · summary in [arithmetic.md](arithmetic.md#sum--dot-vector-reduction) |
 | **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
@@ -2915,6 +2930,7 @@ In \`MODE ZSTATE\`, gate functions (\`AND\`, \`OR\`, \`NOT\`, …) use IEEE 1164
 | Topic | Page |
 |-------|------|
 | \`doc()\` syntax | [doc-function.md](doc-function.md) |
+| Vector reduction (SUM, DOT) | [vector-reduction.md](vector-reduction.md) |
 | Tristate / multi-driver | [zstate.md](zstate.md) |
 | Short notation (\`&\`, \`\\|\`, \`<\`, \`>\`) | [short-notation.md](short-notation.md) |
 | Panel devices (\`comp\`) | [components.md](components.md) |
@@ -5549,6 +5565,48 @@ doc(MAC)
 | \`doc(CLAMP)\` | \`CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit\` |
 | \`doc(ISDIGIT)\` | \`ISDIGIT(Xbit value) -> 1bit\` |
 | \`doc(MAC)\` | \`MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over\` |
+
+### Vector reduction (SUM / DOT)
+
+See [vector-reduction.md](vector-reduction.md) and [arithmetic.md — SUM / DOT](arithmetic.md#sum--dot-vector-reduction).
+
+\`\`\`
+doc(SUM)
+doc(DOT)
+\`\`\`
+
+| Call | Signature |
+|------|-----------|
+| \`doc(SUM)\` | \`SUM(Wbit ...) -> Wbit result, Wbit over\` |
+| \`doc(DOT)\` | \`DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over\` |
+
+**SUM** is variadic: plain wires, whole vectors (elements expand), or a mix. Output is **2W** bits (\`result\` low, \`over\` high).
+
+**DOT** takes two **whole vectors** of the same shape. Output is **3W** bits (\`result\` low **W**, \`over\` next **2W**). Slice arguments are not supported.
+
+\`\`\`
+4wire result, 4wire over = SUM(a, b)
+4wire result, 4wire over = SUM(vectorA)
+4wire result, 8wire over = DOT(vectorA, vectorB)
+\`\`\`
+
+### Tristate (MODE ZSTATE)
+
+Requires \`MODE ZSTATE\` and wave propagation. Full behaviour: [zstate.md](zstate.md) and [builtin-functions.md](builtin-functions.md).
+
+\`\`\`
+doc(ZRELEASE)
+doc(ZCONNECT)
+doc(ZCONN)
+\`\`\`
+
+| Call | Signature |
+|------|-----------|
+| \`doc(ZRELEASE)\` | \`ZRELEASE(wireName) — release wire to high-Z (MODE ZSTATE statement)\` |
+| \`doc(ZCONNECT)\` | \`ZCONNECT(en, data) — enable-gated drive value (MODE ZSTATE); bus = ZCONNECT(en, data)\` |
+| \`doc(ZCONN)\` | \`ZCONNECT(en, data) — alias for ZCONNECT\` |
+
+\`ZRELEASE\` is a **statement** (not an expression). \`ZCONNECT\` / \`ZCONN\` are used in wire assignments (\`bus = ZCONNECT(en, data)\`) or as statement sugar (\`ZCONNECT(bus, en, data)\`).
 
 ### Decimal conversion (summary)
 

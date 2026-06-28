@@ -391,19 +391,33 @@ doc(LT)
 doc(MIN)
 doc(MAX)
 doc(CLAMP)
+
+doc(SUM)
+# SUM(Wbit ...) -> Wbit result, Wbit over
+
+doc(DOT)
+# DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
 ```
 
-Use `doc(def)` to list all built-in functions (including ADD, SUBTRACT, MULTIPLY, DIVIDE) alongside any user-defined functions:
+Vector operand rules and examples: [vector-reduction.md](vector-reduction.md).
+
+Use `doc(def)` to list all built-in functions alongside any user-defined functions:
 
 ```
 doc(def)
 ```
 
-Output:
+Output (abbreviated — full list is longer):
 
 ```
 built-in:
-NOT, AND, OR, XOR, NXOR, NAND, NOR, EQ, LATCH, LSHIFT, RSHIFT, MUX, DEMUX, ADD, SUBTRACT, MULTIPLY, DIVIDE, REG
+NOT, AND, OR, XOR, … ADD, SUBTRACT, MULTIPLY, DIVIDE, MAC, SUM, DOT, …
+HIGH, LOW, ANY*, ALL*, BITINDEX, … ZRELEASE, ZCONNECT, ZCONN, REG
+
+(* = 0/1/01/10/Z/X/ZX/XZ)
+
+debug:
+show, peek, probe, watch, Zlist
 
 user defined:
 (none)
