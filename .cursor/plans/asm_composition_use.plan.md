@@ -70,6 +70,43 @@ flowchart TB
 
 ---
 
+## Decode azi (ASM v1) — ce există pe wire
+
+**Pe wire nu există metadate de instrucțiuni.** La asamblare se păstrează doar:
+
+- **blob** — șirul de biți în `storage`
+- **`asmBlob: true`** — flag tranzitoriu la evaluare (pentru assign strict width / padding)
+- **`bitWidth`** — lățimea totală în biți
+
+Nu există `asmModuleId`, listă de mnemonice, etichete sau segmente ISA pe fire.
+
+**`:decode` reconstituie totul la cerere**, din biți + ISA-ul apelant:
+
+```1000:1008:d:\wamp64\www\logic\library\logTscript\v0_3_2\core\interpreter.js
+  evalAsmDecode(inst, argExpr) {
+    const bits = this._evalExprToBits(argExpr);
+    // ...
+    const isa = { opcodes: inst.opcodes, wordWidth: inst.wordWidth, opcodeOrder: inst.opcodeOrder };
+    const text = disFn(isa, bits);
+```
+
+`disassembleProgram` taie blob-ul în cuvinte de `wordWidth` și pentru fiecare cuvânt **ghicește** mnemonic-ul potrivit prin pattern-matching pe opcode-uri (`disassembleInstruction`).
+
+| Aspect | Comportament v1 |
+|--------|-----------------|
+| **Asamblare** (`BEQ loop`, `JMP loop`) | Funcționează — pass1 colectează `labels`, pass2 encodează offset/adresă (ex. [asm.md — signed branch](v0_3_2/doc/asm.md)) |
+| Sursă la **`:decode`** | Doar biții + ISA apelant — **fără** tabel etichete salvat pe wire |
+| Etichete în **output `:decode`** | Nu se round-trip-uiesc: sursă `BEQ loop` → decode arată `BEQ -3` / `BEQ A0`, nu `BEQ loop` |
+| `show(wire)` | Doar biți — exemplul doc `show(x)` după `BEQ loop` nu afișează mnemonice |
+| Multi-ISA pe același wire | La decode, un singur ISA decodează tot blob-ul |
+| Blob fără proveniență ASM (`= ^hex`) | Decode cu ISA ales; poate eșua sau fi ambiguu |
+
+**Clarificare:** „lipsește `loop`” = în **textul `:decode`**, nu în sintaxa sursă. `24wire x = .myisa { loop: … BEQ loop }` asamblează corect; `show(x)` arată blob-ul encodat.
+
+Analogie: azi e ca un **hex dump + dezasamblor extern**; planul propune și un **symbol table** salvat la assemble.
+
+---
+
 ## Model: `AsmModule`
 
 Obiect imutabil produs la asamblare, stocat alături de blob:
@@ -101,6 +138,39 @@ Obiect imutabil produs la asamblare, stocat alături de blob:
 - La assign `boot = .cpuA { ... }` sau `firmware = boot` — propagare `asmModuleId` (metadata copy by reference, blob copy by value)
 
 Fișiere: [`interpreter.js`](v0_3_2/core/interpreter.js), eventual [`asm-assembler.js`](v0_3_2/core/asm-assembler.js) export `composeAsmModules`.
+
+### Strategie `:decode` cu `AsmModule`
+
+```mermaid
+flowchart TD
+  decodeCall["show(.isa:decode(wire))"]
+  hasMeta{wire are asmModuleId?}
+  metaPath["format instructions[] per index"]
+  fallback["disassembleProgram(isa, bits) ca azi"]
+  decodeCall --> hasMeta
+  hasMeta -->|da| metaPath
+  hasMeta -->|nu| fallback
+```
+
+| Caz | Comportament recomandat |
+|-----|-------------------------|
+| Wire cu `asmModuleId` | Afișează `instructions[i].mnemonic args` (sursă assemble, fără re-guess opcode) |
+| Multi-ISA (`segments[]`) | Decode **fără** ISA apelant obligatoriu: iterare pe `segments`, fiecare cu `isaRef` propriu; sau `show(firmware:decode)` unde metoda citește modulul |
+| `boot = ^deadbeef` | Fără metadata → fallback `disassembleProgram` cu ISA-ul din apel |
+| `firmware = boot` | Copiază `asmModuleId` by reference (blob by value) |
+
+**API păstrat:** `show(.cpuA:decode(firmware))` — dacă `firmware` are modul, `.cpuA` poate fi ignorat pentru afișare (sau validare că segmentele includ `.cpuA`). Varianta minimă: decode citește modulul operandului, nu ISA-ul apelantului, când există `asmModuleId`.
+
+### Recomandări (model & implementare)
+
+1. **`instructions[]` e esențial pentru multi-ISA** — fără el, `disassembleProgram` cu un singur ISA decodează greșit segmentele `use dsp` (alt ISA).
+2. **`segments[]` e minimul pentru decode multi-ISA fără `instructions[]` complete** — alternativă mai slabă: decode per segment cu `disassembleProgram(isaSegment, slice)`; pierzi etichete sursă și linii sursă.
+3. **Nu duplica blob în `AsmModule`** — modulul ține metadata; blob rămâne în `storage` (ca `symbolicMeta` la LUT: metadata pe wire, valoare separat).
+4. **`labels` în `AsmModule`** — opțional pentru decode mai lizibil (`BEQ loop` în loc de `BEQ -3`); **nu** necesar pentru asamblare (deja funcționează fără metadata persistentă)
+5. **`sourceMap` — opțional (faza 2+)** — nice pentru debug; nu blochează MVP.
+6. **Propagare metadata** (confirmat în plan): `x = boot` → copiază `asmModuleId`; `x = ^hex` → șterge; `x = .cpu { }` → modul nou.
+7. **Pattern existent:** `symbolicMeta` pe LUT labels — `asmModuleId` pe `wireEntry` urmează același model.
+8. **MVP Faza 3:** `AsmModule` cu `blob` ref, `wordWidth`, `segments[]`, `instructions[]` (mnemonic + args text); Faza 4 extinde la compoziție `use`.
 
 ---
 
@@ -164,11 +234,14 @@ Refactor [`assembleProgram`](v0_3_2/core/asm-assembler.js) → returnează `AsmM
 - Înregistrează modulul în `asmModules`
 - Propagă `asmModuleId` pe wire la declarație și assign
 
-`:decode` — [`evalAsmDecode`](v0_3_2/core/interpreter.js): dacă operandul are `asmModuleId`, folosește `instructions[]` din modul (multi-ISA: segment potrivit); fallback la disasamblare ISA unică ca azi.
+`:decode` — [`evalAsmDecode`](v0_3_2/core/interpreter.js):
+
+- Dacă operandul (wire) are `asmModuleId` → formatare din `instructions[]` (și `segments[]` pentru multi-ISA); **nu** re-disassemble
+- Altfel → `disassembleProgram(isa, bits)` ca azi (fallback)
 
 **`show()` — fără schimbare** (confirmat).
 
-Teste 1419–1420 (metadata round-trip, decode din modul).
+Teste 1423–1424 (metadata pe wire, decode din modul). *(Notă: mapare anterioară 1419–1420 era pentru `use`; aliniat cu tabelul Faza 6.)*
 
 ---
 
@@ -200,7 +273,7 @@ use driver:
 
 Asamblează/relochează `driver` cu base-ul furnizat, nu `basePreferred` al modulului.
 
-Teste 1421–1428 (use simplu, multi-ISA, override base, unresolved external).
+Teste 1419–1426 (use, multi-ISA, override base — vezi tabel Faza 6).
 
 ---
 
@@ -273,6 +346,10 @@ Helper ISAs în teste: extinde `INLINE_ASM_ISA` sau definește `.cpuA` / `.cpuB`
 
 1. **Conflict `repeat`** — în protocol există `repeat`; în ASM e în corp `{ }` cu alt parser de linii — fără ambiguitate dacă `parseProgramEntry` recunoaște `repeat N {`.
 2. **`>` în alte contexte** — property redirects (`get>`); în ASM doar ca sufix pe argument label.
-3. **Assign strict width** — compoziția poate produce blob mai lung; `=` strict rămâne; documentăm `:=` / `=:` unde e cazul.
+3. **Assign strict width** — la `use`, blob-ul compus poate avea altă lungime decât fire declarate cu `=`:
+   - **`=`** — lățime **exactă**; eroare dacă programul asamblat are mai multe sau mai puține biți decât `Nwire` (comportament existent ASM v1)
+   - **`:=`** / **`=:`** — permit **doar padding** când blob-ul e **mai scurt** decât wire (zerouri stânga/dreapta); dacă blob-ul compus e **mai lung**, tot eroare
+   - Exemplu: `24wire x = .cpu { use boot; use dsp; NOP }` eșuează dacă `boot`+`dsp`+`NOP` ≠ 24 biți; fie calculezi lățimea (`32wire`), fie folosești `:=` într-un slot mai mare (ex. mem) când blob-ul e mai scurt
+   - Doc: [asm.md — Wire width](v0_3_2/doc/asm.md), [assignment-operators.md](v0_3_2/doc/assignment-operators.md)
 4. **Re-assign pierde metadata?** — trebuie definit: `x = boot` copiază `asmModuleId`; `x = ^hex` șterge metadata.
 5. **Efort estimat:** ~5–8 zile (model + directive + use + multi-ISA + doc + 16 teste).
