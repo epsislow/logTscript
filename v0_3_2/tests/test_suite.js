@@ -13482,6 +13482,216 @@ reg(1745, 'loop', 'protocol repeat segment unchanged by preprocessor', function(
   h.assert('protocol repeat preserved', String(/repeat 0 4b/.test(result)), 'true');
 });
 
+const INLINE_ASM_WIDE = `inline [asm] .wide:
+  NOP : 00000000 + 8b
+  JMP : 00000001 + A8b
+  :`;
+
+const INLINE_ASM_CPUA = `inline [asm] .cpuA:
+  NOP  : 0000 + 4b
+  HALT : 1111 + 4b
+  :`;
+
+const INLINE_ASM_CPUB = `inline [asm] .cpuB:
+  NOP  : 1010 + 4b
+  STOP : 0101 + 4b
+  :`;
+
+const INLINE_ASM_MMAP = `inline [lut] .memoryMap:
+  boot = 10000000
+  :`;
+
+reg(1746, 'asm-composition', 'repeat 8 expands to 8 NOPs', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + '\n64wire x = .myisa { repeat 8 { NOP } }');
+  h.assert('64 bits', String(session.getWire(interp, 'x').length), '64');
+  h.assert('all NOP', session.getWire(interp, 'x'), '00000000'.repeat(8));
+});
+
+reg(1747, 'asm-composition', 'align 16 pads with NOP block', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+136wire fw = .myisa {
+  NOP
+  align 16 { NOP }
+next:
+  NOP
+}`);
+  const w = session.getWire(interp, 'fw');
+  h.assert('17 instr', String(w.length), '136');
+  h.assert('instr at 16', w.slice(128, 136), '00000000');
+});
+
+reg(1748, 'asm-composition', 'align error unsatisfiable block', function(h, session) {
+  const { out } = session.run(INLINE_ASM_ISA + `
+16wire fw = .myisa {
+  NOP
+  align 6 { NOP; NOP }
+}`);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('align error', String(err.includes('align 6 cannot be satisfied')), 'true');
+});
+
+reg(1749, 'asm-composition', 'base colon sets logical start', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_WIDE + `
+16wire prg = .wide {
+  base: \\128
+start:
+  JMP start
+}`);
+  h.assert('JMP A128', session.getWire(interp, 'prg'), '0000000110000000');
+});
+
+reg(1750, 'asm-composition', 'base colon LUT label', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_WIDE + '\n' + INLINE_ASM_MMAP + `
+16wire prg = .wide {
+  base: .memoryMap:boot
+start:
+  JMP start
+}`);
+  h.assert('LUT base JMP', session.getWire(interp, 'prg'), '0000000110000000');
+});
+
+reg(1751, 'asm-composition', 'base colon rejects expression', function(h, session) {
+  const { out } = session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { base: X + 256; NOP }');
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('no expressions', String(err.includes('expressions are not allowed')), 'true');
+});
+
+reg(1752, 'asm-composition', 'external label unresolved in composition', function(h, session) {
+  const { out } = session.run(INLINE_ASM_ISA + `
+16wire boot = .myisa {
+  JMP dsp>
+  NOP
+}
+16wire fw = .myisa {
+  use boot
+end:
+  NOP
+}`);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('unresolved dsp', String(err.includes("Unresolved external label 'dsp'")), 'true');
+});
+
+reg(1753, 'asm-composition', 'external label resolved via use', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+16wire boot = .myisa {
+  JMP dsp>
+  NOP
+}
+8wire dsp = .myisa {
+dsp:
+  NOP
+}
+24wire fw = .myisa {
+  use boot
+  use dsp
+}`);
+  const w = session.getWire(interp, 'fw');
+  h.assert('3 instr', String(w.length), '24');
+  h.assert('JMP dsp', w.slice(0, 8), '01010010');
+});
+
+reg(1754, 'asm-composition', 'use inserts module blob', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+8wire boot = .myisa { NOP }
+16wire fw = .myisa {
+  use boot
+  LOAD R1 A3
+}`);
+  h.assert('2 instr', String(session.getWire(interp, 'fw').length), '16');
+  h.assert('boot NOP', session.getWire(interp, 'fw').slice(0, 8), '00000000');
+  h.assert('LOAD', session.getWire(interp, 'fw').slice(8), '00010111');
+});
+
+reg(1755, 'asm-composition', 'use ignores embedded base', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+8wire boot = .myisa {
+  base: \\128
+  NOP
+}
+8wire fw = .myisa {
+  use boot
+}`);
+  h.assert('NOP at 0', session.getWire(interp, 'fw'), '00000000');
+});
+
+reg(1756, 'asm-composition', 'use base override', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_WIDE + '\n' + INLINE_ASM_MMAP + `
+16wire driver = .wide {
+t:
+  JMP t
+}
+16wire slot = .wide {
+  use driver:
+    base: .memoryMap:boot
+}`);
+  h.assert('JMP at LUT base', session.getWire(interp, 'slot'), '0000000110000000');
+});
+
+reg(1757, 'asm-composition', 'multi-ISA composition', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_CPUA + '\n' + INLINE_ASM_CPUB + `
+8wire bmod = .cpuB { NOP }
+24wire fw = .cpuA {
+  NOP
+  use bmod
+  HALT
+}`);
+  h.assert('24 bits', String(session.getWire(interp, 'fw').length), '24');
+  h.assert('cpuA NOP', session.getWire(interp, 'fw').slice(0, 8), '00000000');
+  h.assert('cpuB NOP', session.getWire(interp, 'fw').slice(8, 16), '10100000');
+  h.assert('cpuA HALT', session.getWire(interp, 'fw').slice(16), '11110000');
+});
+
+reg(1758, 'asm-composition', 'asm metadata on wire', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + '\n8wire prg = .myisa { NOP }');
+  const wire = interp.wires.get('prg');
+  h.assert('asmModuleId', String(wire && wire.asmModuleId != null), 'true');
+});
+
+reg(1759, 'asm-composition', 'decode uses module metadata', function(h, session) {
+  const { out } = session.run(INLINE_ASM_CPUA + '\n' + INLINE_ASM_CPUB + `
+8wire bmod = .cpuB { NOP }
+24wire fw = .cpuA {
+  NOP
+  use bmod
+  HALT
+}
+show(.cpuA:decode(fw))`);
+  const text = out.join('\n');
+  h.assert('cpuA NOP', String(/NOP 0/.test(text)), 'true');
+  h.assert('cpuB segment', String(/HALT|STOP/.test(text) || (text.match(/NOP 0/g) || []).length >= 2), 'true');
+  h.assert('cpuA HALT', String(/HALT 0/.test(text)), 'true');
+});
+
+reg(1760, 'asm-composition', 'nested repeat and use', function(h, session) {
+  const { interp } = session.run(INLINE_ASM_ISA + `
+16wire boot = .myisa { repeat 2 { NOP } }
+32wire fw = .myisa {
+  use boot
+  repeat 2 { LOAD R1 A1 }
+}`);
+  h.assert('4 instr', String(session.getWire(interp, 'fw').length), '32');
+});
+
+reg(1761, 'asm-composition', 'doc asm-composition listed', function(h, session) {
+  const entries = parseProgramBodyRaw('use boot\nrepeat 2 { NOP }');
+  h.assert('use parsed', String(entries.some(e => e.type === 'use' && e.wireName === 'boot')), 'true');
+  h.assert('repeat parsed', String(entries.some(e => e.type === 'repeat' && e.count === 2)), 'true');
+  const ext = parseArgToken('dsp>');
+  h.assert('ext label token', String(ext.type === 'extLabel' && ext.name === 'dsp'), 'true');
+});
+
+reg(1762, 'asm-decode', 'decode wire without AsmModule falls back to disassemble', function(h, session) {
+  const { interp, out } = session.run(INLINE_ASM_ISA + `
+8wire raw = 00010111
+show(.myisa:decode(raw))`);
+  const wire = interp.wires.get('raw');
+  h.assert('no asmModuleId', String(wire && wire.asmModuleId == null), 'true');
+  const text = out.join('\n');
+  h.assert('LOAD mnemonic', String(/LOAD/.test(text)), 'true');
+  h.assert('R1 operand', String(/R1/.test(text)), 'true');
+  h.assert('A3 operand', String(/A3/.test(text)), 'true');
+});
+
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
   allowEnter

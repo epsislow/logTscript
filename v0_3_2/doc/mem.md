@@ -2,6 +2,8 @@
 
 The `mem` component implements a RAM memory with configurable number of addresses (`length`) and bits per address (`depth`). Each address stores one binary word of `depth` bits.
 
+Program **composition** (`use`, `align`, `base:`, …) is handled when assembling ASM wires; mem receives the final blob unchanged. See [asm-composition.md](asm-composition.md).
+
 ---
 
 ## Syntax

@@ -85,6 +85,7 @@ const DOC_SECTIONS = [
     items: [
       { file: 'mem.md', label: 'mem' },
       { file: 'asm.md', label: 'asm', searchExtra: 'inline assembler isa mnemonic program blob myisa decode disassemble disassembly' },
+      { file: 'asm-composition.md', label: 'ASM composition', searchExtra: 'use repeat align base external label multi-isa firmware boot dsp metadata asmModuleId' },
       { file: 'lut.md', label: 'lut', searchExtra: 'inline lookup table decoder comp variableDepth prefixFree Huffman decode isValid' },
       { file: 'boolean-lut.md', label: 'Boolean LUT (lutOf / exprOfLut)', searchExtra: 'lutOf exprOfLut description filters inline truth table minimize Quine' },
       { file: 'boolean-analysis.md', label: 'Boolean analysis helpers', searchExtra: 'truthTableOf simplify equivalent inputsOf costOf filters comma x' },

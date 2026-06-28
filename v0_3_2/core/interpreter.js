@@ -412,6 +412,10 @@ class Interpreter {
     // Inline definitions (e.g. inline [asm] .myisa:)
     this.inlineInstances = new Map();
 
+    // ASM composition modules (blob metadata for use / decode)
+    this.asmModules = new Map();
+    this.nextAsmModuleId = 1;
+
     // Probe debug
     this.probeTargets = [];
     this.probeByKey = new Map();
@@ -837,21 +841,108 @@ class Interpreter {
     return getResult;
   }
 
+  _resolveAsmBase(valueRaw) {
+    const raw = String(valueRaw).trim();
+    if (raw.startsWith('\\')) {
+      const n = parseInt(raw.slice(1), 10);
+      if (Number.isNaN(n)) throw new Error(`Invalid base literal '${raw}'`);
+      return n;
+    }
+    if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(raw)) {
+      if (!this.wires.has(raw)) throw new Error(`Unknown base symbol '${raw}'`);
+      const val = this.getWireEffectiveValue(raw);
+      if (val == null || val === '') throw new Error(`Base symbol '${raw}' has no value`);
+      return parseInt(val, 2);
+    }
+    if (raw.startsWith('.')) {
+      const m = /^\.([^:]+):([A-Za-z][A-Za-z0-9]*)$/.exec(raw);
+      if (m) {
+        const instName = '.' + m[1];
+        const label = m[2];
+        const inst = this.inlineInstances.get(instName);
+        if (inst && inst.labelMap && inst.labelMap[label]) {
+          return parseInt(inst.labelMap[label].bits, 2);
+        }
+      }
+      throw new Error(`Cannot resolve base '${raw}'`);
+    }
+    if (/[+\-*/|&]/.test(raw)) {
+      throw new Error('base: expressions are not allowed');
+    }
+    throw new Error(`Invalid base value '${raw}'`);
+  }
+
+  _makeAsmCtx(isaRef) {
+    const self = this;
+    return {
+      startAddr: 0,
+      allowUnresolvedExternal: true,
+      resolveBase(raw) {
+        return self._resolveAsmBase(raw);
+      },
+      getWireModule(name) {
+        const wire = self.wires.get(name);
+        if (!wire || wire.asmModuleId == null) {
+          throw new Error(`Wire '${name}' has no assembled program for use`);
+        }
+        const mod = self.asmModules.get(wire.asmModuleId);
+        if (!mod) throw new Error(`Missing asm module for wire '${name}'`);
+        return mod;
+      },
+    };
+  }
+
+  _registerAsmModule(module, isa, isaRef) {
+    const id = this.nextAsmModuleId++;
+    const stored = {
+      ...module,
+      isa,
+      isaRef,
+    };
+    this.asmModules.set(id, stored);
+    return id;
+  }
+
+  _getAsmModuleFromExpr(atom) {
+    if (!atom || !atom.var) return null;
+    const wire = this.wires.get(atom.var);
+    if (!wire || wire.asmModuleId == null) return null;
+    return this.asmModules.get(wire.asmModuleId) || null;
+  }
+
   evalAsmProgram(prog, memAttributes) {
     const isaRef = prog.isaRef;
     const inst = this.inlineInstances.get(isaRef);
     if (!inst) throw Error(`Undefined inline instance '${isaRef}'`);
     if (inst.kind !== 'asm') throw Error(`Inline instance '${isaRef}' is not an asm ISA`);
-    const isa = { opcodes: inst.opcodes, wordWidth: inst.wordWidth };
+    const isa = { opcodes: inst.opcodes, wordWidth: inst.wordWidth, opcodeOrder: inst.opcodeOrder };
     const opts = {};
     if (memAttributes) {
       if (memAttributes.depth !== undefined) opts.depth = parseInt(memAttributes.depth, 10);
       if (memAttributes.length !== undefined) opts.length = parseInt(memAttributes.length, 10);
     }
-    const assembleFn = typeof assembleProgram === 'function' ? assembleProgram : null;
+    const assembleFn = typeof assembleProgramModule === 'function'
+      ? assembleProgramModule
+      : (typeof assembleProgram === 'function' ? assembleProgram : null);
     if (!assembleFn) throw Error('ASM assembler is not loaded');
-    const result = assembleFn(isa, prog.raw, opts);
-    return { value: result.blob, bitWidth: result.wordWidth, instructionCount: result.instructionCount };
+    const ctx = this._makeAsmCtx(isaRef);
+    const module = typeof assembleProgramModule === 'function'
+      ? assembleProgramModule(isa, isaRef, prog.raw, ctx)
+      : assembleProgram(isa, prog.raw, { asmCtx: ctx, isaRef }).module;
+    if (opts.depth !== undefined && module.wordWidth !== opts.depth) {
+      throw new Error(`ISA encodes ${module.wordWidth} bits per instruction but mem depth is ${opts.depth}`);
+    }
+    if (opts.length !== undefined && module.instructionCount > opts.length) {
+      throw new Error(`Program has ${module.instructionCount} instructions but mem length is only ${opts.length}`);
+    }
+    const moduleId = this._registerAsmModule(module, isa, isaRef);
+    return {
+      value: module.blob,
+      bitWidth: module.wordWidth,
+      instructionCount: module.instructionCount,
+      asmModuleId: moduleId,
+    };
   }
 
   evalAsmProgramAtom(prog, computeRefs) {
@@ -859,9 +950,21 @@ class Interpreter {
     const totalBits = result.value.length;
     if (computeRefs) {
       const idx = this.storeValue(result.value);
-      return { value: result.value, ref: `&${idx}`, bitWidth: totalBits, asmBlob: true };
+      return {
+        value: result.value,
+        ref: `&${idx}`,
+        bitWidth: totalBits,
+        asmBlob: true,
+        asmModuleId: result.asmModuleId,
+      };
     }
-    return { value: result.value, ref: null, bitWidth: totalBits, asmBlob: true };
+    return {
+      value: result.value,
+      ref: null,
+      bitWidth: totalBits,
+      asmBlob: true,
+      asmModuleId: result.asmModuleId,
+    };
   }
 
   _exprToBinary(exprResult) {
@@ -999,6 +1102,14 @@ class Interpreter {
 
   evalAsmDecode(inst, argExpr) {
     const bits = this._evalExprToBits(argExpr);
+    const argAtom = Array.isArray(argExpr) && argExpr.length === 1 ? argExpr[0] : null;
+    const mod = argAtom ? this._getAsmModuleFromExpr(argAtom) : null;
+    if (mod && mod.instructions && mod.instructions.length && typeof formatModuleDecode === 'function') {
+      const text = formatModuleDecode(mod);
+      if (text) {
+        return { value: text, isText: true, varName: `${inst.name}:decode` };
+      }
+    }
     const disFn = typeof disassembleProgram === 'function'
       ? disassembleProgram
       : (typeof disassembleInstruction === 'function' ? disassembleInstruction : null);
@@ -3657,7 +3768,12 @@ class Interpreter {
         const paddedVal = this.applyPad(val, a.pad);
         return {value: paddedVal, ref: null, varName: a.var, bitWidth: paddedVal.length};
       }
-      return {value: val, ref: ref, varName: a.var};
+      const wireMeta = {};
+      if (wire && wire.asmModuleId != null) {
+        wireMeta.asmModuleId = wire.asmModuleId;
+        wireMeta.asmBlob = true;
+      }
+      return {value: val, ref: ref, varName: a.var, ...wireMeta};
     }
     if(a.ref){
       // Reference expression like &variable
@@ -6796,6 +6912,16 @@ if (s.assignment) {
         const simpleRef = `&${storageIdx}`;
         const wireEntry = { type: actualType, ref: simpleRef };
         this._applyDeclVectorMeta(wireEntry, d);
+        const modPart = exprResult.find(p => p.asmModuleId != null);
+        let asmModuleId = modPart ? modPart.asmModuleId : null;
+        if (asmModuleId == null) {
+          const srcPart = exprResult.find(p => p.varName && this.wires.has(p.varName));
+          if (srcPart) {
+            const sw = this.wires.get(srcPart.varName);
+            if (sw && sw.asmModuleId != null) asmModuleId = sw.asmModuleId;
+          }
+        }
+        if (asmModuleId != null) wireEntry.asmModuleId = asmModuleId;
         if(!this.wires.has(d.name)){
           this.wires.set(d.name, wireEntry);
         } else {
@@ -6804,6 +6930,8 @@ if (s.assignment) {
           existing.ref = simpleRef;
           if (wireEntry.vector) existing.vector = wireEntry.vector;
           else delete existing.vector;
+          if (asmModuleId != null) existing.asmModuleId = asmModuleId;
+          else if (!hasAsmBlob) delete existing.asmModuleId;
         }
         
         // Track wire statement for NEXT (not inside PCB body)

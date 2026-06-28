@@ -6,6 +6,8 @@ Memory (`comp [mem]`) receives the assembled blob unchanged.
 
 There is **no panel UI** in v1 — logic only.
 
+For **composition** (`use`, `repeat`, `align`, `base:`, external labels), see [asm-composition.md](asm-composition.md). Wires assembled from programs carry metadata used by `:decode`; `show(wire)` remains bits-only.
+
 ---
 
 ## Naming rules
@@ -307,6 +309,7 @@ Assembler errors include the source line and `^^^` under the problematic token w
 
 ## Related
 
+- [asm-composition.md](asm-composition.md) — `use`, `repeat`, `align`, `base:`, external labels, multi-ISA
 - [mem.md](mem.md) — store assembled blob
 - [mini-cpu-v2.md](mini-cpu-v2.md) — end-to-end CPU with ASM program and `BEQ`
 - [lut.md](lut.md) — lookup tables
