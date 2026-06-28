@@ -911,6 +911,18 @@ class Interpreter {
     return this.asmModules.get(wire.asmModuleId) || null;
   }
 
+  _syncAsmModuleMeta(wireOrName, exprResult) {
+    const wire = typeof wireOrName === 'string' ? this.wires.get(wireOrName) : wireOrName;
+    if (!wire || !exprResult) return;
+    const hasAsmBlob = exprResult.some(p => p.asmBlob);
+    const modPart = exprResult.find(p => p.asmModuleId != null);
+    if (modPart && modPart.asmModuleId != null) {
+      wire.asmModuleId = modPart.asmModuleId;
+    } else if (!hasAsmBlob) {
+      delete wire.asmModuleId;
+    }
+  }
+
   evalAsmProgram(prog, memAttributes) {
     const isaRef = prog.isaRef;
     const inst = this.inlineInstances.get(isaRef);
@@ -7048,6 +7060,7 @@ if (s.assignment) {
         }
         if (toPending) {
           outputs.push([wireName, wireValue]);
+          this._syncAsmModuleMeta(wire, exprResult);
         } else if (s.assignment.busEnable && this.zstate && this.deferWirePropagation()) {
           this.queueWireContribution(wireName, wireValue);
         } else {
@@ -7072,6 +7085,7 @@ if (s.assignment) {
             this.wireStorageMap.set(wireName, storageIdx);
           }
           wire.ref = `&${storageIdx}`;
+          this._syncAsmModuleMeta(wire, exprResult);
           this._emitProbeForWire(wireName, wireValue);
         }
       } catch(e){
@@ -7154,6 +7168,7 @@ if (s.assignment) {
       
       if (toPending) {
         outputs.push([d.name, wireValue || '0'.repeat(bits)]);
+        this._syncAsmModuleMeta(d.name, exprResult);
       } else {
         let storageIdx;
         if(this.wireStorageMap.has(d.name)){
@@ -7177,7 +7192,9 @@ if (s.assignment) {
           existing.ref = simpleRef;
           if (wireEntry.vector) existing.vector = wireEntry.vector;
           else delete existing.vector;
+          this._syncAsmModuleMeta(existing, exprResult);
         } else {
+          this._syncAsmModuleMeta(wireEntry, exprResult);
           this.wires.set(d.name, wireEntry);
         }
         this._emitProbeForWire(d.name, wireValue || '0'.repeat(bits));

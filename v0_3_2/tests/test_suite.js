@@ -13692,6 +13692,33 @@ show(.myisa:decode(raw))`);
   h.assert('A3 operand', String(/A3/.test(text)), 'true');
 });
 
+reg(1763, 'asm-composition', 'doc use example works in wave mode', function(h, session) {
+  const { interp, out } = session.run(`inline [asm] .myisa:
+  NOP : 0000 + 4b
+  JMP : 0101 + A4b
+  :
+16wire boot = .myisa {
+  JMP dsp>
+  NOP
+}
+8wire dsp = .myisa {
+dsp:
+  NOP
+}
+24wire firmware = .myisa {
+  use boot
+  use dsp
+}
+show(firmware)
+show(.myisa:decode(firmware))`);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('no error', String(err.length === 0), 'true');
+  h.assert('boot asmModuleId', String(interp.wires.get('boot') && interp.wires.get('boot').asmModuleId != null), 'true');
+  h.assert('firmware 24 bits', String(session.getWire(interp, 'firmware').length), '24');
+  const text = out.join('\n');
+  h.assert('decode JMP', String(/JMP/.test(text)), 'true');
+}, { propagation: 'wave' });
+
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
   allowEnter
