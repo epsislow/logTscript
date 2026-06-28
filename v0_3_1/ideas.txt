@@ -1227,3 +1227,392 @@ show(.myisa:decode(prg))
 80wire[10] a := ^Ff
 801wire q = (ADD(a, 10)
 show(q)
+
+=====
+
+Assembly Composition with "use"
+
+Programs assembled with "inline [asm]" preserve their assembly metadata in addition to the generated binary.
+
+This allows multiple assembled programs—even from different ISAs—to be composed into a single binary without requiring a traditional linker.
+
+Reusing a program
+
+Create a reusable program:
+
+32wire boot = .cpuA {
+
+start:
+LOAD R0 A0
+JMP dsp>
+
+}
+
+The program may later be reused inside another assembly block:
+
+160wire firmware = .cpuA {
+
+use boot
+
+end:
+NOP
+
+}
+
+"use" inserts the referenced assembly program into the current assembly stream.
+
+───
+
+External labels
+
+By default, labels are local to the program in which they are defined.
+
+JMP loop
+
+must resolve to a label inside the same assembled program.
+
+To reference a label that will be provided by another program, append ">" to the label name:
+
+JMP dsp>
+
+External labels are resolved only after all "use" statements have been expanded.
+
+If no matching label exists in the final composed program, assembly fails.
+
+Example:
+
+Unresolved external label 'dsp'
+
+───
+
+Multiple ISAs
+
+Programs assembled with different ISAs may be composed together.
+
+32wire boot = .cpuA {
+
+LOAD R0 A0
+JMP dsp>
+
+}
+
+64wire dsp = .cpuB {
+
+dsp:
+MUL R1 R2
+JMP end>
+
+}
+
+160wire firmware = .cpuA {
+
+use boot
+use dsp
+
+end:
+NOP
+
+}
+
+Each assembler encodes only its own instruction set.
+
+".cpuA" never interprets ".cpuB" instructions, and vice versa.
+
+The composition phase simply concatenates the assembled instruction streams and resolves external labels.
+
+───
+
+"repeat"
+
+"repeat" duplicates a sequence of assembly statements.
+
+.cpu {
+
+repeat 8 {
+
+NOP
+
+}
+
+}
+
+is equivalent to:
+
+.cpu {
+
+NOP
+NOP
+NOP
+NOP
+NOP
+NOP
+NOP
+NOP
+
+}
+
+The repeated block may contain any valid assembly statements, including labels, "use", nested "repeat", and even assembly blocks for other ISAs.
+
+───
+
+"align"
+
+"align" pads the current program until the next instruction begins at the requested logical instruction address.
+
+Padding instructions are supplied by the user.
+
+.cpu {
+
+start:
+NOP
+
+align 16 {
+NOP
+}
+
+next:
+LOAD R0 A0
+
+}
+
+If "start" occupies instruction address "0", the assembler inserts enough "NOP" instructions so that "next" begins at address "16".
+
+The padding block may contain any valid instruction sequence.
+
+align 64 {
+
+JMP reset
+
+}
+
+The block is repeated until the requested alignment is reached.
+
+If the padding block cannot exactly satisfy the requested alignment, assembly fails.
+
+Example:
+
+align 64 cannot be satisfied using a padding block of 3 instructions.
+
+───
+
+"base"
+
+"base" changes the logical instruction address used by the assembler.
+
+It does not generate padding or modify the generated binary.
+
+.cpu {
+
+base 128
+
+start:
+LOAD R0 A0
+JMP start
+
+}
+
+The first generated instruction is considered to be located at logical instruction address "128".
+
+Absolute address fields are encoded using this logical address.
+
+───
+
+"base" and "use"
+
+"base" applies only when a program is assembled as a standalone program.
+
+When a program is inserted using "use", any "base" directive contained in the reused program is ignored.
+
+32wire boot = .cpu {
+
+base 128
+
+start:
+LOAD R0 A0
+JMP start
+
+}
+
+256wire firmware = .cpu {
+
+use boot
+
+}
+
+In the final program, "boot" is automatically relocated to the position where it is inserted.
+
+If a specific placement is required, the final program must control it:
+
+.cpu {
+
+align 128 {
+NOP
+}
+
+use boot
+
+}
+
+This makes every reusable assembly program automatically relocatable.
+
+───
+
+Local vs external labels
+
+Labels without ">" are local.
+
+loop:
+NOP
+JMP loop
+
+Labels referenced with ">" may resolve anywhere in the final composed program.
+
+JMP boot>
+
+The matching label may exist:
+
+• in the current assembly block;
+• in another program inserted with "use";
+• after the current program.
+
+───
+
+Assembly phases
+
+Assembly composition occurs in three stages:
+
+1. Each assembly program is assembled independently using its own ISA.
+2. Every "use" inserts the assembled program into the final instruction stream.
+3. External label references ("label>") are resolved across the complete composed program.
+
+Each ISA remains completely independent during assembly.
+
+───
+
+Metadata preservation
+
+An assembled program stored in a wire preserves:
+
+• generated binary;
+• instruction boundaries;
+• mnemonic information;
+• label table;
+• external label references;
+• ISA information;
+• optional source mapping.
+
+This metadata is already used by "show()" to display disassembly and is also used internally by "use".
+
+───
+
+Not a traditional linker
+
+Assembly composition is intentionally lightweight.
+
+There are:
+
+• no object files;
+• no import/export directives;
+• no relocation tables;
+• no libraries.
+
+Instead, LogTScript stores assembly metadata together with the generated binary, allowing assembled programs to be composed directly while keeping the programming model simple.
+
+
+
+=== extending base ===
+base
+base defines the preferred logical start address of an assembly program.
+It affects only address calculation performed by the assembler. It does not generate padding or modify the generated binary.
+The value may be either:
+• a literal address;
+• a named symbol;
+• a LUT label.
+Examples:
+logts
+.cpu:
+    base: 0
+:
+
+logts
+.cpu:
+    base: BOOT_BASE
+:
+
+logts
+.cpu:
+    base: .memoryMap:boot
+:
+
+The value is resolved before assembly begins.
+
+───
+
+Memory maps
+A common pattern is to define memory regions using a LUT.
+logts
+inline [lut] .memoryMap:
+  data {
+    boot:     \0000
+    kernel:   \2000
+    drivers:  \4000
+    user:     \8000
+  }
+:
+
+Programs can then reference these symbolic locations instead of hard-coded addresses.
+logts
+.cpu:
+    base: .memoryMap:kernel
+
+start:
+    ...
+:
+
+Changing the memory map requires updating only the LUT, without modifying the assembly source.
+
+───
+
+base and use
+When a program is reused with use, its own base acts as the program's preferred standalone location.
+The composing program may override it.
+logts
+use driver:
+    base: .memoryMap:drivers
+
+The assembler assembles driver using the supplied base instead of the program's preferred base.
+If no override is provided, the program's own base is used.
+
+───
+
+Typical uses
+base is useful for:
+• standalone debugging;
+• loading programs into memory from the debugger;
+• board-specific memory layouts;
+• symbolic memory maps shared by multiple programs.
+Because base is symbolic, the same assembly program can be reused across different boards simply by providing a different memory map.
+
+───
+
+Restrictions
+base is an address reference, not a general expression.
+Valid:
+logts
+base: 0
+
+logts
+base: BOOT_BASE
+
+logts
+base: .memoryMap:boot
+
+Invalid:
+logts
+base: BOOT_BASE + 256
+
+logts
+base: max(...)
+
+This keeps memory placement explicit and easy to understand.
+===
