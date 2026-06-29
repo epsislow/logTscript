@@ -1,6 +1,6 @@
 # RSHIFT (logical right shift)
 
-Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix `; matrix`](matrix-reduction.md)
 
 Shift bits toward LSB. Vacated MSBs use **`fill`** (logical) or the sign bit (`; signed` = ASHR).
 
@@ -12,6 +12,8 @@ RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
 RSHIFT(Xbit data, Nbit n; signed) -> Xbit
 RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector signed) -> Wbit[n]
+RSHIFT(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
+RSHIFT(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix signed) -> Wbit[n,m]
 ```
 
 - **`fill`** — MSB padding for logical shift (default `0`). **Ignored** when `; signed` is set.
@@ -29,6 +31,7 @@ Sugar: `data > n` and `data > n w1` — [short-notation.md](short-notation.md).
 |-----|-----------|
 | `signed` | Arithmetic shift (ASHR): MSB replicated; `fill` ignored. |
 | `vector` | Per-element shift. |
+| `matrix` | Per-cell shift on 2D tensors; `count` scalar or matrix/row/col broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -124,6 +127,26 @@ show(out)
 ```
 
 ASHR per element (`1111`→`1111`, `0111`→`0011`, `0001`→`0000`).
+
+### `RSHIFT(Wbit[n,m] data, … ; matrix)`
+
+```logts-play
+4wire[2,2] m = 1010 + 0100 + 0001 + 1111
+4wire[2,2] out = RSHIFT(m, 0001; matrix)
+show(out)
+```
+
+Per-cell logical shift right by 1.
+
+### `RSHIFT(Wbit[n,m] data, … ; matrix signed)`
+
+```logts-play
+4wire[2,2] m = 1111 + 0111 + 0001 + 1000
+4wire[2,2] out = RSHIFT(m, 0001; matrix signed)
+show(out)
+```
+
+Per-cell ASHR by 1 (`1111`→`1111`, `0111`→`0011`, …).
 
 ## See also
 

@@ -1,6 +1,6 @@
 # MIN
 
-Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Matrix `; matrix`](matrix-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
 
 ## Signatures
 
@@ -9,6 +9,8 @@ MIN(Wbit ...) -> Wbit
 MIN(Wbit ...; signed) -> Wbit
 MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
 MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
+MIN(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar ... ; matrix) -> Wbit[n,m]
+MIN(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]
 ```
 
 Variadic (≥ 2 operands after expansion). Whole vectors expand to elements.
@@ -23,6 +25,7 @@ Variadic (≥ 2 operands after expansion). Whole vectors expand to elements.
 |-----|-----------|
 | `signed` | Signed minimum. |
 | `vector` | Element-wise min. |
+| `matrix` | Per-cell min on 2D tensors → `Wbit[N,M]`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -71,6 +74,24 @@ show(out)
 4wire[2] vectorA = 1111 + 0010
 4wire[2] vectorB = 0001 + 1111
 4wire[2] out = MIN(vectorA, vectorB; vector signed)
+show(out)
+```
+
+### `MIN(Wbit[n,m] … ; matrix)`
+
+```logts-play
+4wire[2,2] a = 0001 + 0010 + 0100 + 1000
+4wire[2,2] b = 0010 + 0001 + 1000 + 0100
+4wire[2,2] out = MIN(a, b; matrix)
+show(out)
+```
+
+### `MIN(Wbit[n,m] … ; matrix signed)`
+
+```logts-play
+4wire[2,2] a = 1111 + 0010 + 1000 + 0100
+4wire[2,2] b = 0001 + 1111 + 0100 + 0010
+4wire[2,2] out = MIN(a, b; matrix signed)
 show(out)
 ```
 

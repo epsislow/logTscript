@@ -1,6 +1,6 @@
 # LT (less than)
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise `; vector`](vector-reduction.md#element-wise-mode-vector)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise `; vector`](vector-reduction.md#element-wise-mode-vector) · [Matrix `; matrix`](matrix-reduction.md)
 
 ## Signatures
 
@@ -9,6 +9,8 @@ LT(Xbit a, Xbit b) -> 1bit result
 LT(Xbit a, Xbit b; signed) -> 1bit result
 LT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
+LT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> 1wire[n×m]
+LT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> 1wire[n×m]
 ```
 
 ## Scalar (default)
@@ -21,6 +23,7 @@ LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
 |-----|-----------|
 | `signed` | Two's complement comparison. |
 | `vector` | Per-index `1wire[n]`. |
+| `matrix` | Per-cell compare → **`1wire[N×M]`**. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -63,6 +66,24 @@ show(flags)
 4wire[2] vectorA = 1111 + 0100
 4wire scalar = 0010
 1wire[2] flags = LT(vectorA, scalar; vector signed)
+show(flags)
+```
+
+### `LT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)`
+
+```logts-play
+4wire[2,2] a = 0001 + 0100 + 0111 + 0010
+4wire[2,2] b = 0010 + 0011 + 0100 + 0100
+1wire[4] flags = LT(a, b; matrix)
+show(flags)
+```
+
+### `LT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)`
+
+```logts-play
+4wire[2,2] a = 1111 + 0100 + 0111 + 0010
+4wire[2,2] b = 0010 + 1111 + 0100 + 0100
+1wire[4] flags = LT(a, b; matrix signed)
 show(flags)
 ```
 

@@ -1,6 +1,6 @@
 # MAX
 
-Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Matrix `; matrix`](matrix-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
 
 ## Signatures
 
@@ -9,6 +9,8 @@ MAX(Wbit ...) -> Wbit
 MAX(Wbit ...; signed) -> Wbit
 MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
 MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
+MAX(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar ... ; matrix) -> Wbit[n,m]
+MAX(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]
 ```
 
 Variadic (≥ 2 operands after expansion).
@@ -23,6 +25,7 @@ Variadic (≥ 2 operands after expansion).
 |-----|-----------|
 | `signed` | Signed maximum. |
 | `vector` | Element-wise max. |
+| `matrix` | Per-cell max on 2D tensors → `Wbit[N,M]`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -64,6 +67,24 @@ show(out)
 4wire[4] vectorA = 0001 + 0010 + 0100 + 1000
 4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
 4wire[4] out = MAX(vectorA, vectorB; vector signed)
+show(out)
+```
+
+### `MAX(Wbit[n,m] … ; matrix)`
+
+```logts-play
+4wire[2,2] a = 0001 + 0010 + 0100 + 1000
+4wire[2,2] b = 0010 + 0011 + 0100 + 1001
+4wire[2,2] out = MAX(a, b; matrix)
+show(out)
+```
+
+### `MAX(Wbit[n,m] … ; matrix signed)`
+
+```logts-play
+4wire[2,2] a = 1111 + 0010 + 1000 + 0100
+4wire[2,2] b = 0001 + 1111 + 0100 + 0010
+4wire[2,2] out = MAX(a, b; matrix signed)
 show(out)
 ```
 

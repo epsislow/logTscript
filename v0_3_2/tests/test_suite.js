@@ -2747,10 +2747,11 @@ reg(305, 'doc', 'BUILTIN_DOC — OR has 2 signatures', function(h, session) {
 
 reg(306, 'doc', 'BUILTIN_DOC — EQ signatures', function(h, session) {
   const lines = Interpreter.getDocLines('EQ', new Map());
-  h.assert('EQ 3 signatures', String(lines.length), '3');
+  h.assert('EQ 4 signatures', String(lines.length), '4');
   h.assert('EQ signature', lines[0], 'EQ(Xbit, Xbit) -> 1bit');
   h.assert('EQ variadic', lines[1], 'EQ(Xbit, Xbit, Xbit, ...) -> 1bit');
   h.assert('EQ vector', lines[2], 'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
+  h.assert('EQ matrix', lines[3], 'EQ(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> 1wire[n×m]');
 });
 
 reg(307, 'doc', 'BUILTIN_DOC — MUX', function(h, session) {
@@ -2784,17 +2785,19 @@ reg(311, 'doc', 'BUILTIN_DOC — REG has single row', function(h, session) {
 
 reg(312, 'doc', 'BUILTIN_DOC — LSHIFT signatures', function(h, session) {
   const lines = Interpreter.getDocLines('LSHIFT', new Map());
-  h.assert('LSHIFT 3 signatures', String(lines.length), '3');
+  h.assert('LSHIFT 4 signatures', String(lines.length), '4');
   h.assert('LSHIFT signature 1', lines[0], 'LSHIFT(Xbit data, Nbit n) -> Xbit');
   h.assert('LSHIFT signature 2', lines[1], 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit');
   h.assert('LSHIFT vector', lines[2], 'LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]');
+  h.assert('LSHIFT matrix', lines[3], 'LSHIFT(Wbit[n,m] data, Nbit count ; matrix) -> Wbit[n,m]');
 });
 
 reg(313, 'doc', 'BUILTIN_DOC — RSHIFT signatures', function(h, session) {
   const lines = Interpreter.getDocLines('RSHIFT', new Map());
-  h.assert('RSHIFT 5 signatures', String(lines.length), '5');
+  h.assert('RSHIFT 7 signatures', String(lines.length), '7');
   h.assert('RSHIFT signed', lines[2], 'RSHIFT(Xbit data, Nbit n; signed) -> Xbit');
   h.assert('RSHIFT vector', lines[3], 'RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]');
+  h.assert('RSHIFT matrix', lines[5], 'RSHIFT(Wbit[n,m] data, Nbit/Kbit[n,m] count ; matrix) -> Wbit[n,m]');
 });
 
 reg(314, 'doc', 'BUILTIN_DOC — LATCH', function(h, session) {
@@ -2888,34 +2891,38 @@ reg(327, 'doc', 'All gates AND NAND NOR NXOR XOR', function(h, session) {
 
 reg(328, 'doc', 'BUILTIN_DOC — ADD signature', function(h, session) {
   const lines = Interpreter.getDocLines('ADD', new Map());
-  h.assert('ADD 4 signatures', String(lines.length), '4');
+  h.assert('ADD 6 signatures', String(lines.length), '6');
   h.assert('ADD unsigned', lines[0], 'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry');
   h.assert('ADD signed', lines[1], 'ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
   h.assert('ADD vector', lines[2], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('ADD matrix', lines[4], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(329, 'doc', 'BUILTIN_DOC — SUBTRACT signature', function(h, session) {
   const lines = Interpreter.getDocLines('SUBTRACT', new Map());
-  h.assert('SUBTRACT 4 signatures', String(lines.length), '4');
+  h.assert('SUBTRACT 6 signatures', String(lines.length), '6');
   h.assert('SUBTRACT unsigned', lines[0], 'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry');
   h.assert('SUBTRACT signed', lines[1], 'SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
   h.assert('SUBTRACT vector', lines[2], 'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('SUBTRACT matrix', lines[4], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(330, 'doc', 'BUILTIN_DOC — MULTIPLY signature', function(h, session) {
   const lines = Interpreter.getDocLines('MULTIPLY', new Map());
-  h.assert('MULTIPLY 4 signatures', String(lines.length), '4');
+  h.assert('MULTIPLY 6 signatures', String(lines.length), '6');
   h.assert('MULTIPLY unsigned', lines[0], 'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over');
   h.assert('MULTIPLY signed', lines[1], 'MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over');
   h.assert('MULTIPLY vector', lines[2], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('MULTIPLY matrix', lines[4], 'MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(331, 'doc', 'BUILTIN_DOC — DIVIDE signature', function(h, session) {
   const lines = Interpreter.getDocLines('DIVIDE', new Map());
-  h.assert('DIVIDE 4 signatures', String(lines.length), '4');
+  h.assert('DIVIDE 6 signatures', String(lines.length), '6');
   h.assert('DIVIDE unsigned', lines[0], 'DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod');
   h.assert('DIVIDE signed', lines[1], 'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod');
   h.assert('DIVIDE vector', lines[2], 'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('DIVIDE matrix', lines[4], 'DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(332, 'doc', 'doc(def) — lists built-in and user-defined separately', function(h, session) {
@@ -13343,11 +13350,13 @@ reg(1734, 'vector-reduction', 'SUM vector sub-range same width', function(h, ses
 
 reg(1728, 'vector-reduction', 'doc(SUM) signature', function(h, session) {
   const lines = Interpreter.getDocLines('SUM', new Map());
-  h.assert('SUM 4 signatures', String(lines.length), '4');
+  h.assert('SUM 6 signatures', String(lines.length), '6');
   h.assert('SUM unsigned', lines[0], 'SUM(Wbit ...) -> Wbit result, Wbit over');
   h.assert('SUM signed', lines[1], 'SUM(Wbit ...; signed) -> Wbit result, Wbit over');
   h.assert('SUM vector', lines[2], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]');
   h.assert('SUM signed vector', lines[3], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]');
+  h.assert('SUM matrix', lines[4], 'SUM(Wbit[n,m] ... ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUM signed matrix', lines[5], 'SUM(Wbit[n,m] ... ; signed matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(1729, 'vector-reduction', 'MIN/MAX plain wires regression', function(h, session) {
@@ -14691,10 +14700,12 @@ reg(1811, 'builtin-vector', 'SUM(vectorA, vectorB; vector) — wave mode', funct
 reg(1812, 'builtin-vector', 'doc(MIN/MAX) vector signatures', function(h, session) {
   const minLines = Interpreter.getDocLines('MIN', new Map());
   const maxLines = Interpreter.getDocLines('MAX', new Map());
-  h.assert('MIN 4 signatures', String(minLines.length), '4');
-  h.assert('MAX 4 signatures', String(maxLines.length), '4');
+  h.assert('MIN 6 signatures', String(minLines.length), '6');
+  h.assert('MAX 6 signatures', String(maxLines.length), '6');
   h.assert('MIN vector', minLines[2], 'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]');
   h.assert('MAX vector signed', maxLines[3], 'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]');
+  h.assert('MIN matrix', minLines[4], 'MIN(Wbit[n,m] ... ; matrix) -> Wbit[n,m]');
+  h.assert('MAX matrix signed', maxLines[5], 'MAX(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]');
 });
 
 reg(1813, 'builtin-vector', 'ADD implicit vs explicit ; vector', function(h, session) {
@@ -14783,11 +14794,13 @@ reg(1822, 'builtin-vector', 'doc(ADD/SUBTRACT/CLAMP) vector signatures', functio
   const addLines = Interpreter.getDocLines('ADD', new Map());
   const subLines = Interpreter.getDocLines('SUBTRACT', new Map());
   const clampLines = Interpreter.getDocLines('CLAMP', new Map());
-  h.assert('ADD 4 signatures', String(addLines.length), '4');
-  h.assert('SUBTRACT 4 signatures', String(subLines.length), '4');
-  h.assert('CLAMP 4 signatures', String(clampLines.length), '4');
+  h.assert('ADD 6 signatures', String(addLines.length), '6');
+  h.assert('SUBTRACT 6 signatures', String(subLines.length), '6');
+  h.assert('CLAMP 6 signatures', String(clampLines.length), '6');
   h.assert('ADD vector', addLines[2], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
   h.assert('CLAMP vector signed', clampLines[3], 'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]');
+  h.assert('ADD matrix', addLines[4], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUBTRACT matrix signed', subLines[5], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(1823, 'builtin-vector', 'MULTIPLY(vectorA, vectorB; vector) per index', function(h, session) {

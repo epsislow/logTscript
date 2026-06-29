@@ -1,6 +1,6 @@
 # REVERSE (bit order)
 
-Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix `; matrix`](matrix-reduction.md)
 
 Reverse bit order within each operand (MSB ↔ LSB).
 
@@ -9,6 +9,7 @@ Reverse bit order within each operand (MSB ↔ LSB).
 ```
 REVERSE(Xbit value) -> Xbit
 REVERSE(Wbit[n] data ; vector) -> Wbit[n]
+REVERSE(Wbit[n,m] data ; matrix) -> Wbit[n,m]
 ```
 
 Unary — one data argument (whole vector in vector mode).
@@ -22,6 +23,7 @@ Unary — one data argument (whole vector in vector mode).
 | Tag | Behaviour |
 |-----|-----------|
 | `vector` | Reverse bits **within each element** (not reverse element order). |
+| `matrix` | Reverse bits within each matrix cell. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -70,6 +72,16 @@ show(r)
 ```
 
 Per element: `1100`, `0101`, `1111`.
+
+### `REVERSE(Wbit[n,m] data ; matrix)`
+
+```logts-play
+4wire[2,2] m = 0011 + 1010 + 1111 + 0000
+4wire[2,2] out = REVERSE(m; matrix)
+show(out)
+```
+
+Per cell: MSB ↔ LSB within each **W**-bit cell.
 
 ## See also
 

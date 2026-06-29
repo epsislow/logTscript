@@ -1,6 +1,6 @@
 # LSHIFT (left shift)
 
-Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix `; matrix`](matrix-reduction.md)
 
 Shift bits toward MSB; vacated LSBs filled with **`0`** by default, or with optional **`fill`** (1 bit).
 
@@ -10,6 +10,7 @@ Shift bits toward MSB; vacated LSBs filled with **`0`** by default, or with opti
 LSHIFT(Xbit data, Nbit n) -> Xbit
 LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
 LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]
+LSHIFT(Wbit[n,m] data, Nbit/scalar count ; matrix) -> Wbit[n,m]
 ```
 
 - Scalar: result width = **`len(data) + n`** (bits appended on the right).
@@ -27,6 +28,7 @@ Sugar: `data < n` and `data < n w1` — [short-notation.md](short-notation.md).
 | Tag | Behaviour |
 |-----|-----------|
 | `vector` | Per-element shift; output element width **(W + n)** where `n = len(scalar count)`. |
+| `matrix` | Per-cell shift; output shape matches input matrix (**W** bits per cell). See [matrix-reduction.md](matrix-reduction.md). |
 
 **No `; signed` tag** — left shift is identical for signed/unsigned bit patterns.
 
@@ -88,6 +90,16 @@ Optional **`fill`** in vector mode:
 5wire[2] r = LSHIFT(v, 0001, 1; vector)
 show(r)
 ```
+
+### `LSHIFT(Wbit[n,m] data, Nbit count ; matrix)`
+
+```logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] out = LSHIFT(m, 0001; matrix)
+show(out)
+```
+
+Per-cell left shift by 1 (within each **W**-bit cell; assign to `4wire[N,M]`).
 
 ## See also
 

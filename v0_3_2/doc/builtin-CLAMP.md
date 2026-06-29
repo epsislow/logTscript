@@ -1,6 +1,6 @@
 # CLAMP
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix `; matrix`](matrix-reduction.md)
 
 Clamp value to `[min, max]`.
 
@@ -11,6 +11,8 @@ CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit
 CLAMP(Xbit x, Ybit min, Ybit max; signed) -> Ybit
 CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector) -> Wbit[n]
 CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]
+CLAMP(Wbit[n,m] x, Wbit/Wbit[n,m]/scalar min, Wbit/Wbit[n,m]/scalar max ; matrix) -> Wbit[n,m]
+CLAMP(Wbit[n,m] x, … ; matrix signed) -> Wbit[n,m]
 ```
 
 `min` and `max` must have equal width **Y**; `x` may be wider (compare at `len(x)` with bounds zero-extended).
@@ -25,6 +27,7 @@ CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]
 |-----|-----------|
 | `signed` | Signed bounds. |
 | `vector` | Per-index clamp; bounds broadcast if scalar. |
+| `matrix` | Per-cell clamp → `Wbit[N,M]`; bounds broadcast as row/col/scalar. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -83,6 +86,26 @@ show(y)
 4wire lo = 0000
 4wire hi = 0010
 4wire[2] y = CLAMP(vectorX, lo, hi; vector signed)
+show(y)
+```
+
+### `CLAMP(Wbit[n,m] x, … ; matrix)`
+
+```logts-play
+4wire[2,2] x = 1111 + 0100 + 0010 + 1000
+4wire lo = 0001
+4wire hi = 1000
+4wire[2,2] y = CLAMP(x, lo, hi; matrix)
+show(y)
+```
+
+### `CLAMP(Wbit[n,m] x, … ; matrix signed)`
+
+```logts-play
+4wire[2,2] x = 1111 + 0100 + 0010 + 1000
+4wire lo = 0000
+4wire hi = 0010
+4wire[2,2] y = CLAMP(x, lo, hi; matrix signed)
 show(y)
 ```
 

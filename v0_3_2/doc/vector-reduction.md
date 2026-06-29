@@ -4,7 +4,7 @@ Reduction builtins operate on individual wires, whole **1D vectors**, or a mix. 
 
 Per-function pages: **[builtin-tagged-index.md](builtin-tagged-index.md)**.
 
-See also: [1D wire vectors](wire-vectors.md), [arithmetic](arithmetic.md) (MAC, ADD).
+See also: [1D wire vectors](wire-vectors.md), [2D `; matrix` mode](matrix-reduction.md), [arithmetic](arithmetic.md) (MAC, ADD).
 
 ---
 
@@ -12,10 +12,10 @@ See also: [1D wire vectors](wire-vectors.md), [arithmetic](arithmetic.md) (MAC, 
 
 | Function | Page | Tags |
 |----------|------|------|
-| SUM | [builtin-SUM.md](builtin-SUM.md) | `signed`, `vector` |
+| SUM | [builtin-SUM.md](builtin-SUM.md) | `signed`, `vector`, `matrix` |
 | DOT | [builtin-DOT.md](builtin-DOT.md) | `signed` |
-| MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `vector` |
-| MAX | [builtin-MAX.md](builtin-MAX.md) | `signed`, `vector` |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `vector`, `matrix` |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | `signed`, `vector`, `matrix` |
 | ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | `signed`, `index` |
 | ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | `signed`, `index` |
 
@@ -65,6 +65,24 @@ With **`; vector`**, operands are combined **per index** and the result is a **v
 
 ---
 
+## Element-wise mode (`; matrix`) {#element-wise-mode-matrix}
+
+On **2D tensors** (`4wire[N,M]` with **N>1** and **M>1**), use **`; matrix`** for per-cell operations. Same built-ins as **`; vector`**, except **DOT**, **ARGMAX**, and **ARGMIN** (shape rules instead).
+
+**`; vector`** and **`; matrix`** are **mutually exclusive**.
+
+| Call | Behaviour |
+|------|-----------|
+| `SUM(a, b; matrix)` | Per cell sum → `Wbit[N,M]` + `Wbit[N,M] over` |
+| `MIN(a, b; matrix)` | Per cell min → `Wbit[N,M]` |
+| `ADD(m, row; matrix)` | Matrix + row vector broadcast → `Wbit[N,M]` |
+
+Broadcast at cell `(r,c)`: matrix cell, scalar, row `[1,M]`, or column `[N,1]`. Compares (`GT`, `LT`, `EQ`) return **`1wire[N×M]`** (one bit per cell).
+
+Semantics: **[matrix-reduction.md](matrix-reduction.md)**. Examples: **[builtin-SUM.md](builtin-SUM.md)**, **[builtin-ADD.md](builtin-ADD.md)**, **[builtin-MIN.md](builtin-MIN.md)**, … — [builtin-tagged-index.md](builtin-tagged-index.md).
+
+---
+
 ## Capacity notes
 
 | Function | Bits needed (worst case) | Output width |
@@ -83,6 +101,7 @@ For typical perceptron sizes (`16wire[50]`, `32wire[50]`, `64wire[50]`), built-i
 
 ## Related
 
-- [wire-vectors.md — reduction](wire-vectors.md#reduction-functions)
+- [wire-vectors.md — 2D tensors & `; matrix`](wire-vectors.md#2d-tensors-4wirenm)
+- [matrix-reduction.md](matrix-reduction.md)
 - [arithmetic.md](arithmetic.md)
 - [builtin-MAC.md](builtin-MAC.md)

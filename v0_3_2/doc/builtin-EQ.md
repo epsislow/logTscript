@@ -1,6 +1,6 @@
 # EQ (equality)
 
-Index: [Logic gates](builtin-logic-gate-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise `; vector`](vector-reduction.md#element-wise-mode-vector)
+Index: [Logic gates](builtin-logic-gate-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise `; vector`](vector-reduction.md#element-wise-mode-vector) · [Matrix `; matrix`](matrix-reduction.md)
 
 Bitwise equality (all bits of each operand must match).
 
@@ -10,11 +10,13 @@ Bitwise equality (all bits of each operand must match).
 EQ(Xbit a, Xbit b) -> 1bit result
 EQ(Xbit a, Xbit b, Xbit c, ...) -> 1bit result
 EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
+EQ(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> 1wire[n×m]
 ```
 
 - **Two operands:** `1` if every bit pair matches (bitwise).
 - **Three or more operands (no tag):** `1` only if **all** operands are bitwise equal pairwise.
 - **`; vector`:** exactly **two** arguments; compare per index → `1wire[n]`.
+- **`; matrix`:** exactly **two** arguments; compare per cell → **`1wire[N×M]`** (bitwise equality of each cell).
 
 ## Scalar (default)
 
@@ -25,6 +27,7 @@ EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 | Tag | Behaviour |
 |-----|-----------|
 | `vector` | Per-index equality `a[i] == b[i]` → `1wire[n]`. |
+| `matrix` | Per-cell equality → **`1wire[N×M]`**. See [matrix-reduction.md](matrix-reduction.md). |
 
 **No `; signed` tag** — equality is bitwise.
 
@@ -89,6 +92,17 @@ show(flags)
 ```
 
 → `11`.
+
+### `EQ(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)`
+
+```logts-play
+4wire[2,2] a = 0001 + 0010 + 0100 + 1000
+4wire[2,2] b = 0001 + 0010 + 0100 + 1000
+1wire[4] eqv = EQ(a, b; matrix)
+show(eqv)
+```
+
+→ `1111` (all four cells equal).
 
 ## See also
 

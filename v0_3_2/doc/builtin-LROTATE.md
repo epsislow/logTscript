@@ -1,6 +1,6 @@
 # LROTATE (left rotate)
 
-Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix `; matrix`](matrix-reduction.md)
 
 Rotate bits left; MSBs wrap to LSBs. Width unchanged.
 
@@ -9,6 +9,7 @@ Rotate bits left; MSBs wrap to LSBs. Width unchanged.
 ```
 LROTATE(Xbit data, Ybit count) -> Xbit
 LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
+LROTATE(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
 ```
 
 - **`count`** is taken **modulo** element width.
@@ -23,6 +24,7 @@ LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 | Tag | Behaviour |
 |-----|-----------|
 | `vector` | Per-element rotate. |
+| `matrix` | Per-cell rotate; `count` scalar or matrix/row/col broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -70,6 +72,14 @@ Per-index count vector:
 4wire[3] data = 1011 + 0101 + 1100
 2wire[3] counts = 01 + 10 + 01
 4wire[3] out = LROTATE(data, counts; vector)
+show(out)
+```
+
+### `LROTATE(Wbit[n,m] data, … ; matrix)`
+
+```logts-play
+4wire[2,2] m = 1011 + 0101 + 1100 + 0011
+4wire[2,2] out = LROTATE(m, 0001; matrix)
 show(out)
 ```
 

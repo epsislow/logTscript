@@ -1,6 +1,6 @@
 # SUBTRACT
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise `; vector`](vector-reduction.md#element-wise-mode-vector)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise `; vector`](vector-reduction.md#element-wise-mode-vector) · [Matrix `; matrix`](matrix-reduction.md)
 
 Binary subtraction with wrap-around (two's complement style borrow).
 
@@ -11,6 +11,8 @@ SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
 SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
 SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
+SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], Wbit[n,m]
 ```
 
 ## Scalar (default)
@@ -24,6 +26,7 @@ SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 |-----|-----------|
 | `signed` | Same `result` bits; second return is signed **overflow**. |
 | `vector` | Per-index subtract. **No** implicit vector broadcast without the tag (unlike ADD). |
+| `matrix` | Per-cell subtract on 2D tensors. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -80,6 +83,26 @@ Scalar subtrahend broadcast per index:
 ```logts-play
 4wire[3] vectorA = 0100 + 0010 + 0001
 4wire[3] r, 4wire[3] f = SUBTRACT(vectorA, 0001; vector signed)
+show(r)
+show(f)
+```
+
+### `SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)`
+
+```logts-play
+4wire[2,2] a = 0100 + 0010 + 0001 + 0011
+4wire[2,2] b = 0001 + 0001 + 0001 + 0001
+4wire[2,2] r, 4wire[2,2] f = SUBTRACT(a, b; matrix)
+show(r)
+show(f)
+```
+
+### `SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)`
+
+```logts-play
+4wire[2,2] a = 1000 + 0111 + 0001 + 0011
+4wire[2,2] b = 0001 + 0001 + 0001 + 0001
+4wire[2,2] r, 4wire[2,2] f = SUBTRACT(a, b; matrix signed)
 show(r)
 show(f)
 ```

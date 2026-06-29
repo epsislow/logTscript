@@ -18,18 +18,18 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 
 | Function | Page | Tags |
 |----------|------|------|
-| ADD | [builtin-ADD.md](builtin-ADD.md) | `signed`, `vector` |
-| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | `signed`, `vector` |
-| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | `signed`, `vector` |
-| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | `signed`, `vector` |
-| MAC | [builtin-MAC.md](builtin-MAC.md) | `signed`, `vector` |
-| GT | [builtin-GT.md](builtin-GT.md) | `signed`, `vector` |
-| LT | [builtin-LT.md](builtin-LT.md) | `signed`, `vector` |
-| MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `vector` |
-| MAX | [builtin-MAX.md](builtin-MAX.md) | `signed`, `vector` |
-| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | `signed`, `vector` |
+| ADD | [builtin-ADD.md](builtin-ADD.md) | `signed`, `vector`, `matrix` |
+| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | `signed`, `vector`, `matrix` |
+| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | `signed`, `vector`, `matrix` |
+| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | `signed`, `vector`, `matrix` |
+| MAC | [builtin-MAC.md](builtin-MAC.md) | `signed`, `vector`, `matrix` |
+| GT | [builtin-GT.md](builtin-GT.md) | `signed`, `vector`, `matrix` |
+| LT | [builtin-LT.md](builtin-LT.md) | `signed`, `vector`, `matrix` |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `vector`, `matrix` |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | `signed`, `vector`, `matrix` |
+| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | `signed`, `vector`, `matrix` |
 
-Vector reduction (`SUM`, `DOT`, `ARGMAX`, `ARGMIN`): [vector-reduction.md](vector-reduction.md). Bitwise equality: [builtin-EQ.md](builtin-EQ.md).
+Vector reduction (`SUM`, `DOT`, `ARGMAX`, `ARGMIN`): [vector-reduction.md](vector-reduction.md). **2D element-wise:** [matrix-reduction.md](matrix-reduction.md). Bitwise equality: [builtin-EQ.md](builtin-EQ.md).
 
 ---
 
@@ -51,19 +51,19 @@ Bit width `N` = `max(len(a), len(b))` for binary ops; short inputs are zero-padd
 
 ## Tag overview {#tag-overview}
 
-Optional **bool tags** after `;` in the call (`signed`, `vector`, or both). Operand expansion vs element-wise mode: [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector).
+Optional **bool tags** after `;` in the call (`signed`, `vector`, `matrix`, or combinations except **`vector` + `matrix`**). Operand expansion vs element-wise mode: [vector-reduction.md](vector-reduction.md#element-wise-mode-vector), [matrix-reduction.md](matrix-reduction.md).
 
-| Built-in | Unsigned (default) | `; signed` | `; vector` |
-|----------|-------------------|------------|------------|
-| ADD | result + **carry** | result + **overflow** | `Wbit[n]` per index |
-| SUBTRACT | result + **carry** (borrow) | result + **overflow** | `Wbit[n]` per index |
-| MULTIPLY | low/high product split | signed product | `Wbit[n]` per index |
-| DIVIDE | quotient + mod | signed `/` `%` | `Wbit[n]` per index |
-| MAC | `acc + a×b` | signed accumulate | `Wbit[n]`, `(W+1)bit[n]` |
-| GT / LT | unsigned order | signed order | `1wire[n]` |
-| MIN / MAX | unsigned min/max | signed | `Wbit[n]` |
-| CLAMP | unsigned bounds | signed bounds | `Wbit[n]` |
-| SUM / DOT | see [vector-reduction](vector-reduction.md) | signed | SUM only |
+| Built-in | Unsigned (default) | `; signed` | `; vector` | `; matrix` |
+|----------|-------------------|------------|------------|------------|
+| ADD | result + **carry** | result + **overflow** | `Wbit[n]` per index | `Wbit[N,M]` per cell |
+| SUBTRACT | result + **carry** (borrow) | result + **overflow** | `Wbit[n]` per index | `Wbit[N,M]` per cell |
+| MULTIPLY | low/high product split | signed product | `Wbit[n]` per index | `Wbit[N,M]` per cell |
+| DIVIDE | quotient + mod | signed `/` `%` | `Wbit[n]` per index | `Wbit[N,M]` per cell |
+| MAC | `acc + a×b` | signed accumulate | `Wbit[n]`, `(W+1)bit[n]` | `Wbit[N,M]` per cell |
+| GT / LT | unsigned order | signed order | `1wire[n]` | `1wire[N×M]` |
+| MIN / MAX | unsigned min/max | signed | `Wbit[n]` | `Wbit[N,M]` |
+| CLAMP | unsigned bounds | signed bounds | `Wbit[n]` | `Wbit[N,M]` |
+| SUM / DOT | see [vector-reduction](vector-reduction.md) | signed | SUM only | SUM only |
 
 `LSHIFT`, rotates, and `REVERSE` do **not** support `; signed`. `RSHIFT` with `; signed` is **ASHR** — [builtin-RSHIFT.md](builtin-RSHIFT.md).
 

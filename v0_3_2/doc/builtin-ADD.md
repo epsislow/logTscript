@@ -1,6 +1,6 @@
 # ADD
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise `; vector`](vector-reduction.md#element-wise-mode-vector)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise `; vector`](vector-reduction.md#element-wise-mode-vector) · [Matrix `; matrix`](matrix-reduction.md)
 
 Binary addition with wrap-around.
 
@@ -11,6 +11,8 @@ ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
 ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
 ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
+ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], Wbit[n,m]
 ```
 
 ## Scalar (default)
@@ -25,6 +27,7 @@ ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 |-----|-----------|
 | `signed` | Same `result` bits; second return is **signed overflow** (not unsigned carry). |
 | `vector` | Element-wise add; `result` and flag blobs are `Wbit[n]`. |
+| `matrix` | Per-cell add on 2D tensors → `Wbit[N,M]` + flags. Mutually exclusive with `vector`. See [matrix-reduction.md](matrix-reduction.md). |
 
 **Implicit vector broadcast:** `ADD(vectorA, scalar)` without `; vector` also produces element-wise `Wbit[n]` (legacy). Explicit `; vector` documents the same semantics.
 
@@ -89,6 +92,34 @@ Signed element-wise add (overflow per index):
 4wire[2] r, 4wire[2] ovf = ADD(vectorA, vectorB; vector signed)
 show(r)
 show(ovf)
+```
+
+### `ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)`
+
+```logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] r, 4wire[2,2] f = ADD(m, 0001; matrix)
+show(r)
+show(f)
+```
+
+Row broadcast:
+
+```logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2] row = 0001 + 0010
+4wire[2,2] r, 4wire[2,2] f = ADD(m, row; matrix)
+show(r)
+```
+
+### `ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)`
+
+```logts-play
+4wire[2,2] a = 1111 + 0111 + 0001 + 1000
+4wire[2,2] b = 0001 + 0001 + 0001 + 0001
+4wire[2,2] r, 4wire[2,2] f = ADD(a, b; matrix signed)
+show(r)
+show(f)
 ```
 
 ## See also

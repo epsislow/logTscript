@@ -1,6 +1,6 @@
 # DIVIDE
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix `; matrix`](matrix-reduction.md)
 
 Integer quotient and remainder (no floating-point).
 
@@ -11,6 +11,8 @@ DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
 DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod
 DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
+DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], Wbit[n,m]
 ```
 
 ## Scalar (default)
@@ -25,6 +27,7 @@ DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 |-----|-----------|
 | `signed` | Operands as two's complement; integer `/` and `%`. |
 | `vector` | Quotient and remainder per index. |
+| `matrix` | Quotient and remainder per cell → `Wbit[N,M]`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -88,6 +91,26 @@ show(m)
 4wire[2] vectorA = 1111 + 1101
 4wire[2] vectorB = 0010 + 0010
 4wire[2] q, 4wire[2] m = DIVIDE(vectorA, vectorB; vector signed)
+show(q)
+show(m)
+```
+
+### `DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)`
+
+```logts-play
+4wire[2,2] a = 0110 + 0111 + 0100 + 1000
+4wire[2,2] b = 0010 + 0010 + 0010 + 0010
+4wire[2,2] q, 4wire[2,2] m = DIVIDE(a, b; matrix)
+show(q)
+show(m)
+```
+
+### `DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)`
+
+```logts-play
+4wire[2,2] a = 1111 + 1101 + 0100 + 1000
+4wire[2,2] b = 0010 + 0010 + 0010 + 0010
+4wire[2,2] q, 4wire[2,2] m = DIVIDE(a, b; matrix signed)
 show(q)
 show(m)
 ```

@@ -1,6 +1,6 @@
 # MAC (multiply-accumulate)
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix `; matrix`](matrix-reduction.md)
 
 Computes **`acc + (a × b)`**. Equivalent to `ADD(acc, MULTIPLY(a, b))`; may be fused internally.
 
@@ -11,6 +11,8 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
 MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]
 MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], (W+1)bit[n]
+MAC(Wbit[n,m] acc, Wbit/Wbit[n,m]/row/col/scalar a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], (W+1)bit[n,m]
+MAC(Wbit[n,m] acc, … ; matrix signed) -> Wbit[n,m], (W+1)bit[n,m]
 ```
 
 All three operands must have the same width **X** (per element in vector mode).
@@ -28,6 +30,7 @@ Full integer: concatenate **`over` then `result`** (MSB → LSB).
 |-----|-----------|
 | `signed` | Signed accumulate; same packing. |
 | `vector` | Per index; `over[i]` is **(W+1)** bits — assign e.g. `4wire[n] r, 5wire[n] o`. |
+| `matrix` | Per cell; assign e.g. `4wire[N,M] r, 5wire[N,M] o`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -88,6 +91,28 @@ show(o)
 4wire[2] a = 1111 + 0010
 4wire[2] b = 0001 + 0001
 4wire[2] r, 5wire[2] o = MAC(acc, a, b; vector signed)
+show(r)
+show(o)
+```
+
+### `MAC(Wbit[n,m] acc, … ; matrix)`
+
+```logts-play
+4wire[2,2] acc = 0001 + 0010 + 0000 + 0000
+4wire[2,2] a = 0010 + 0001 + 0011 + 0100
+4wire[2,2] b = 0011 + 0100 + 0001 + 0001
+4wire[2,2] r, 5wire[2,2] o = MAC(acc, a, b; matrix)
+show(r)
+show(o)
+```
+
+### `MAC(Wbit[n,m] acc, … ; matrix signed)`
+
+```logts-play
+4wire[2,2] acc = 1111 + 0000 + 0000 + 0000
+4wire[2,2] a = 1111 + 0010 + 0011 + 0100
+4wire[2,2] b = 0001 + 0001 + 0001 + 0001
+4wire[2,2] r, 5wire[2,2] o = MAC(acc, a, b; matrix signed)
 show(r)
 show(o)
 ```

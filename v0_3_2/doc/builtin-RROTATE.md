@@ -1,6 +1,6 @@
 # RROTATE (right rotate)
 
-Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix `; matrix`](matrix-reduction.md)
 
 Rotate bits right; LSBs wrap to MSBs. Width unchanged.
 
@@ -9,6 +9,7 @@ Rotate bits right; LSBs wrap to MSBs. Width unchanged.
 ```
 RROTATE(Xbit data, Ybit count) -> Xbit
 RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
+RROTATE(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
 ```
 
 - **`count`** is taken **modulo** element width.
@@ -23,6 +24,7 @@ RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 | Tag | Behaviour |
 |-----|-----------|
 | `vector` | Per-element rotate. |
+| `matrix` | Per-cell rotate. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -67,6 +69,14 @@ show(out)
 ```
 
 → `110101010110` (from regression test).
+
+### `RROTATE(Wbit[n,m] data, … ; matrix)`
+
+```logts-play
+4wire[2,2] m = 1011 + 0101 + 1100 + 0011
+4wire[2,2] out = RROTATE(m, 0001; matrix)
+show(out)
+```
 
 ## See also
 

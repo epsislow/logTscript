@@ -74,13 +74,11 @@ show(col)
 
 ### Tag `; matrix` (element-wise on 2D tensors)
 
+Full reference: **[matrix-reduction.md](matrix-reduction.md)**.
+
 Use `; matrix` on the same built-ins as `; vector` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with `; vector`. Operands broadcast per cell: whole matrix, scalar, horizontal row `[1,N]`, or vertical column `[N,1]`.
 
-```logts-play
-4wire[2,2] m = 0001 + 0010 + 0100 + 1000
-4wire[2,2] r, 4wire[2,2] f = ADD(m, 0001; matrix)
-show(r)
-```
+Example **`ADD(… ; matrix)`**: [builtin-ADD.md](builtin-ADD.md). Full list: [builtin-tagged-index.md](builtin-tagged-index.md).
 
 Dual-output ops (`ADD`, `SUM`, `MULTIPLY`, …) return **per-cell** result and flag/over blobs shaped like the matrix.
 

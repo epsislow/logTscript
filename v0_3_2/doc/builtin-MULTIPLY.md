@@ -1,6 +1,6 @@
 # MULTIPLY
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix `; matrix`](matrix-reduction.md)
 
 Binary multiplication with overflow capture.
 
@@ -11,6 +11,8 @@ MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
 MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
 MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
+MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], Wbit[n,m]
 ```
 
 ## Scalar (default)
@@ -24,6 +26,7 @@ MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 |-----|-----------|
 | `signed` | Product as two's complement; same wire packing. |
 | `vector` | Multiply per index; `over[i]` = high **W** bits of the **2W**-bit product. |
+| `matrix` | Per-cell multiply → `Wbit[N,M]` + `Wbit[N,M] over`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -81,6 +84,26 @@ show(o)
 ```
 
 `(−1)×(−1)=1` at index 0; `2×(−1)=−2` at index 1.
+
+### `MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)`
+
+```logts-play
+4wire[2,2] a = 0001 + 0010 + 0011 + 0100
+4wire[2,2] b = 0001 + 0000 + 0000 + 0001
+4wire[2,2] r, 4wire[2,2] o = MULTIPLY(a, b; matrix)
+show(r)
+show(o)
+```
+
+### `MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)`
+
+```logts-play
+4wire[2,2] a = 1111 + 0010 + 0011 + 0100
+4wire[2,2] b = 1111 + 0001 + 0001 + 0001
+4wire[2,2] r, 4wire[2,2] o = MULTIPLY(a, b; matrix signed)
+show(r)
+show(o)
+```
 
 ## See also
 
