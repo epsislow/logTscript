@@ -7,9 +7,12 @@ Rotate bits right; LSBs wrap to MSBs. Width unchanged.
 ## Signatures
 
 ```
-RROTATE(Xbit val, Xbit count) -> Xbit result
-RROTATE(Wbit[n] val, Wbit count ; vector) -> Wbit[n]
+RROTATE(Xbit data, Ybit count) -> Xbit
+RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 ```
+
+- **`count`** is taken **modulo** element width.
+- **`; vector`**: `count` may be scalar (broadcast) or **`Kbit[n]`** (per index).
 
 ## Scalar (default)
 
@@ -19,11 +22,11 @@ RROTATE(Wbit[n] val, Wbit count ; vector) -> Wbit[n]
 
 | Tag | Behaviour |
 |-----|-----------|
-| `vector` | Per-element rotate; **same scalar `count`**. |
+| `vector` | Per-element rotate. |
 
 ## Examples
 
-### `RROTATE(Xbit val, Xbit count)`
+### `RROTATE(Xbit data, Ybit count)`
 
 ```logts-play
 4wire x = 1011
@@ -42,14 +45,28 @@ show(r)
 
 → `1100`.
 
-### `RROTATE(Wbit[n] val, Wbit count ; vector)`
+### `RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector)`
+
+Scalar count (broadcast):
 
 ```logts-play
-4wire[2] v = 1011 + 1001
-4wire cnt = 0001
-4wire[2] r = RROTATE(v, cnt; vector)
+4wire[2] vector = 1011 + 0101
+4wire[2] r = RROTATE(vector, 0001; vector)
 show(r)
 ```
+
+→ `1101` + `1010` → blob `11011010`.
+
+Per-index count vector:
+
+```logts-play
+4wire[3] data = 1011 + 0101 + 1100
+2wire[3] counts = 01 + 10 + 01
+4wire[3] out = RROTATE(data, counts; vector)
+show(out)
+```
+
+→ `110101010110` (from regression test).
 
 ## See also
 

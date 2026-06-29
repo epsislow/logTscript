@@ -2855,9 +2855,9 @@ Index: [builtin-functions.md](builtin-functions.md) · [Tagged built-ins](builti
 
 ## Quick reference
 
-**LSHIFT** — logical left; width may grow (\`(W+n)bit[n]\` in vector mode). Optional third arg \`fill\` (default \`0\`). Sugar: \`data < n\`.
+**LSHIFT** — logical left; optional third arg **\`fill\`** (default \`0\`); width grows. Vector: scalar count only. Sugar: \`data < n\`.
 
-**RSHIFT** — logical right; same width; optional \`fill\`. With **\`; signed\`**, arithmetic shift (ASHR) — MSB replicated; see [alu.md](alu.md#arithmetic-shift-right-vs-logical-ashr--rshift). Sugar: \`data > n\`.
+**RSHIFT** — logical right; optional **\`fill\`**; same width. With **\`; signed\`**, ASHR (\`fill\` ignored). Vector: scalar or **\`Kbit[n]\`** count. Sugar: \`data > n\`.
 
 **REVERSE** — MSB ↔ LSB within each operand.
 
@@ -3141,14 +3141,17 @@ Bitwise equality (all bits of each operand must match).
 
 \`\`\`
 EQ(Xbit a, Xbit b) -> 1bit result
+EQ(Xbit a, Xbit b, Xbit c, ...) -> 1bit result
 EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 \`\`\`
 
-Variadic \`EQ(a, b, c, …)\` without tags: all operands equal → \`1\`.
+- **Two operands:** \`1\` if every bit pair matches (bitwise).
+- **Three or more operands (no tag):** \`1\` only if **all** operands are bitwise equal pairwise.
+- **\`; vector\`:** exactly **two** arguments; compare per index → \`1wire[n]\`.
 
 ## Scalar (default)
 
-- \`result = 1\` if every bit of \`a\` equals \`b\`; else \`0\`
+- Bitwise compare; width mismatch uses left zero-padding (same as other logic gates).
 
 ## Call tags
 
@@ -3170,20 +3173,33 @@ show(eq)
 \`\`\`
 
 \`\`\`logts-play
-4wire a2 = 0011
-4wire b2 = 0011
-1wire same = EQ(a2, b2)
-probe(same)
-\`\`\`
-
-Mismatch:
-
-\`\`\`logts-play
 4wire x = 1010
 4wire y = 1011
 1wire diff = EQ(x, y)
 show(diff)
 \`\`\`
+
+### \`EQ(Xbit a, Xbit b, Xbit c, ...)\`
+
+All operands must match:
+
+\`\`\`logts-play
+4wire a = 0011
+4wire b = 0011
+4wire c = 0011
+1wire allEq = EQ(a, b, c)
+show(allEq)
+\`\`\`
+
+\`\`\`logts-play
+4wire p = 0101
+4wire q = 0101
+4wire r = 0111
+1wire notAll = EQ(p, q, r)
+show(notAll)
+\`\`\`
+
+→ \`allEq=1\`, \`notAll=0\`.
 
 ### \`EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
 
@@ -3199,11 +3215,13 @@ show(eqv)
 Scalar broadcast:
 
 \`\`\`logts-play
-4wire[3] vectorA = 0100 + 0100 + 0111
-4wire scalar = 0100
-1wire[3] flags = EQ(vectorA, scalar; vector)
+4wire[2] vectorA = 0010 + 0010
+4wire scalar = 0010
+1wire[2] flags = EQ(vectorA, scalar; vector)
 show(flags)
 \`\`\`
+
+→ \`11\`.
 
 ## See also
 
@@ -3458,10 +3476,11 @@ show(any)
 
 \`\`\`
 EQ(Xbit, Xbit) -> 1bit
+EQ(Xbit, Xbit, Xbit, ...) -> 1bit
 EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 \`\`\`
 
-Bitwise equality (all bits must match). For **unsigned numeric** ordering use \`GT\` / \`LT\` in [arithmetic.md](arithmetic.md). Full reference: **[builtin-EQ.md](builtin-EQ.md)** (\`; vector\` for per-index compare).
+Bitwise equality. **Two operands:** all bits match → \`1\`. **Three or more:** all operands equal → \`1\`. Full reference: **[builtin-EQ.md](builtin-EQ.md)** (\`; vector\` for per-index compare).
 
 ### Runnable example
 
@@ -3500,9 +3519,12 @@ Rotate bits left; MSBs wrap to LSBs. Width unchanged.
 ## Signatures
 
 \`\`\`
-LROTATE(Xbit val, Xbit count) -> Xbit result
-LROTATE(Wbit[n] val, Wbit count ; vector) -> Wbit[n]
+LROTATE(Xbit data, Ybit count) -> Xbit
+LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 \`\`\`
+
+- **\`count\`** is taken **modulo** element width.
+- **\`; vector\`**: \`count\` may be scalar (broadcast) or **\`Kbit[n]\`** (per index).
 
 ## Scalar (default)
 
@@ -3512,11 +3534,11 @@ LROTATE(Wbit[n] val, Wbit count ; vector) -> Wbit[n]
 
 | Tag | Behaviour |
 |-----|-----------|
-| \`vector\` | Per-element rotate; **same scalar \`count\`**. |
+| \`vector\` | Per-element rotate. |
 
 ## Examples
 
-### \`LROTATE(Xbit val, Xbit count)\`
+### \`LROTATE(Xbit data, Ybit count)\`
 
 \`\`\`logts-play
 4wire x = 1011
@@ -3534,13 +3556,33 @@ probe(y2)
 
 \`count=2\` (mod 4) → \`1110\`.
 
-### \`LROTATE(Wbit[n] val, Wbit count ; vector)\`
+\`\`\`logts-play
+4wire x3 = 1011
+4wire y3 = LROTATE(x3, 100)
+show(y3)
+\`\`\`
+
+\`count=4\` (mod 4 = 0) → unchanged \`1011\`.
+
+### \`LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector)\`
+
+Scalar count (broadcast):
 
 \`\`\`logts-play
-4wire[2] v = 1011 + 1001
-4wire cnt = 0001
-4wire[2] r = LROTATE(v, cnt; vector)
-show(r)
+4wire[2] vector = 1011 + 0101
+4wire[2] l = LROTATE(vector, 0001; vector)
+show(l)
+\`\`\`
+
+→ \`0111\` + \`1010\` → blob \`01111010\`.
+
+Per-index count vector:
+
+\`\`\`logts-play
+4wire[3] data = 1011 + 0101 + 1100
+2wire[3] counts = 01 + 10 + 01
+4wire[3] out = LROTATE(data, counts; vector)
+show(out)
 \`\`\`
 
 ## See also
@@ -3551,29 +3593,33 @@ show(r)
 
 Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
 
-Shift bits toward MSB; vacated LSBs filled with **0** (optional third arg \`fill\`).
+Shift bits toward MSB; vacated LSBs filled with **\`0\`** by default, or with optional **\`fill\`** (1 bit).
 
 ## Signatures
 
 \`\`\`
 LSHIFT(Xbit data, Nbit n) -> Xbit
 LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
-LSHIFT(Wbit[n] val, Wbit count ; vector) -> (W+n)bit[n]
+LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]
 \`\`\`
+
+- Scalar: result width = **\`len(data) + n\`** (bits appended on the right).
+- **\`fill\`** — only the LSB of the third argument is used (\`0\` or \`1\`). Default \`0\`.
+- **\`; vector\`**: count must be a **scalar** (broadcast to every index). Optional third arg **\`fill\`** applies per element. Per-index count vectors are **not** supported.
+
+Sugar: \`data < n\` and \`data < n w1\` — [short-notation.md](short-notation.md).
 
 ## Scalar (default)
 
-- Left shift; scalar result width follows \`doc(LSHIFT)\` (may grow when no truncation)
+- Left shift by \`n\`; width grows by \`n\` bits unless you assign to a narrower wire (truncation).
 
 ## Call tags
 
 | Tag | Behaviour |
 |-----|-----------|
-| \`vector\` | Per-element shift; each output element is **(W+n)** bits where \`n = len(count)\`; **same scalar \`count\`**. |
+| \`vector\` | Per-element shift; output element width **(W + n)** where \`n = len(scalar count)\`. |
 
-**No \`; signed\` tag** — left shift is the same for signed/unsigned bit pattern.
-
-Sugar: \`data < n\` — [short-notation.md](short-notation.md).
+**No \`; signed\` tag** — left shift is identical for signed/unsigned bit patterns.
 
 ## Examples
 
@@ -3585,27 +3631,54 @@ Sugar: \`data < n\` — [short-notation.md](short-notation.md).
 show(y)
 \`\`\`
 
-\`1011 << 1\` → \`10110\`.
+\`1011 << 1\` → \`10110\` (5 bits).
 
 \`\`\`logts-play
 4wire val = 0001
 4wire cnt = 0010
-4wire r = LSHIFT(val, cnt)
+5wire r = LSHIFT(val, cnt)
 show(r)
 \`\`\`
 
-\`1 << 2\` → \`0100\` (within 4-bit assignment).
+\`1 << 2\` → \`00100\`.
 
-### \`LSHIFT(Wbit[n] val, Wbit count ; vector)\`
+### \`LSHIFT(Xbit data, Nbit n, 1bit fill)\`
+
+\`\`\`logts-play
+4wire x = 0001
+5wire y0 = LSHIFT(x, 1, 0)
+5wire y1 = LSHIFT(x, 1, 1)
+show(y0)
+show(y1)
+\`\`\`
+
+\`fill=0\` → \`00010\`; \`fill=1\` → \`00011\`.
+
+\`\`\`logts-play
+4wire x2 = 0001
+8wire wide = LSHIFT(x2, 11, 1)
+show(wide)
+\`\`\`
+
+Shift by 3 with fill \`1\` → \`0001111\`.
+
+### \`LSHIFT(Wbit[n] data, Nbit count ; vector)\`
+
+\`\`\`logts-play
+4wire[3] vector = 1011 + 0101 + 0001
+5wire[3] out = LSHIFT(vector, 0001; vector)
+show(out)
+\`\`\`
+
+Each 4-bit element shifted left by 1 → **5**-bit elements (\`10110\`, \`10100\`, \`00010\`).
+
+Optional **\`fill\`** in vector mode:
 
 \`\`\`logts-play
 4wire[2] v = 0001 + 0010
-4wire cnt = 0001
-5wire[2] r = LSHIFT(v, cnt; vector)
+5wire[2] r = LSHIFT(v, 0001, 1; vector)
 show(r)
 \`\`\`
-
-Each element shifted left by 1 → **5**-bit elements.
 
 ## See also
 
@@ -4031,9 +4104,11 @@ Reverse bit order within each operand (MSB ↔ LSB).
 ## Signatures
 
 \`\`\`
-REVERSE(Xbit val) -> Xbit result
-REVERSE(Wbit[n] val ; vector) -> Wbit[n]
+REVERSE(Xbit value) -> Xbit
+REVERSE(Wbit[n] data ; vector) -> Wbit[n]
 \`\`\`
+
+Unary — one data argument (whole vector in vector mode).
 
 ## Scalar (default)
 
@@ -4047,7 +4122,7 @@ REVERSE(Wbit[n] val ; vector) -> Wbit[n]
 
 ## Examples
 
-### \`REVERSE(Xbit val)\`
+### \`REVERSE(Xbit value)\`
 
 \`\`\`logts-play
 4wire x = 0011
@@ -4075,7 +4150,15 @@ show(r)
 
 → \`1001\`.
 
-### \`REVERSE(Wbit[n] val ; vector)\`
+### \`REVERSE(Wbit[n] data ; vector)\`
+
+\`\`\`logts-play
+4wire[2] vector = 0011 + 1100
+4wire[2] out = REVERSE(vector; vector)
+show(out)
+\`\`\`
+
+→ \`1100\` + \`0011\` → blob \`11000011\`.
 
 \`\`\`logts-play
 4wire[3] v = 0011 + 1010 + 1111
@@ -4193,9 +4276,12 @@ Rotate bits right; LSBs wrap to MSBs. Width unchanged.
 ## Signatures
 
 \`\`\`
-RROTATE(Xbit val, Xbit count) -> Xbit result
-RROTATE(Wbit[n] val, Wbit count ; vector) -> Wbit[n]
+RROTATE(Xbit data, Ybit count) -> Xbit
+RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 \`\`\`
+
+- **\`count\`** is taken **modulo** element width.
+- **\`; vector\`**: \`count\` may be scalar (broadcast) or **\`Kbit[n]\`** (per index).
 
 ## Scalar (default)
 
@@ -4205,11 +4291,11 @@ RROTATE(Wbit[n] val, Wbit count ; vector) -> Wbit[n]
 
 | Tag | Behaviour |
 |-----|-----------|
-| \`vector\` | Per-element rotate; **same scalar \`count\`**. |
+| \`vector\` | Per-element rotate. |
 
 ## Examples
 
-### \`RROTATE(Xbit val, Xbit count)\`
+### \`RROTATE(Xbit data, Ybit count)\`
 
 \`\`\`logts-play
 4wire x = 1011
@@ -4228,14 +4314,28 @@ show(r)
 
 → \`1100\`.
 
-### \`RROTATE(Wbit[n] val, Wbit count ; vector)\`
+### \`RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector)\`
+
+Scalar count (broadcast):
 
 \`\`\`logts-play
-4wire[2] v = 1011 + 1001
-4wire cnt = 0001
-4wire[2] r = RROTATE(v, cnt; vector)
+4wire[2] vector = 1011 + 0101
+4wire[2] r = RROTATE(vector, 0001; vector)
 show(r)
 \`\`\`
+
+→ \`1101\` + \`1010\` → blob \`11011010\`.
+
+Per-index count vector:
+
+\`\`\`logts-play
+4wire[3] data = 1011 + 0101 + 1100
+2wire[3] counts = 01 + 10 + 01
+4wire[3] out = RROTATE(data, counts; vector)
+show(out)
+\`\`\`
+
+→ \`110101010110\` (from regression test).
 
 ## See also
 
@@ -4245,33 +4345,37 @@ show(r)
 
 Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
 
-Shift bits toward LSB; vacated MSBs filled with **0** (logical) or sign bit (\`; signed\`).
+Shift bits toward LSB. Vacated MSBs use **\`fill\`** (logical) or the sign bit (\`; signed\` = ASHR).
 
 ## Signatures
 
 \`\`\`
-RSHIFT(Xbit val, Xbit count) -> Xbit result
-RSHIFT(Xbit val, Xbit count; signed) -> Xbit result
-RSHIFT(Wbit[n] val, Wbit count ; vector) -> Wbit[n]
-RSHIFT(Wbit[n] val, Wbit count ; vector signed) -> Wbit[n]
+RSHIFT(Xbit data, Nbit n) -> Xbit
+RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
+RSHIFT(Xbit data, Nbit n; signed) -> Xbit
+RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
+RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector signed) -> Wbit[n]
 \`\`\`
 
-Optional third argument \`fill\` (1 bit) for logical shift — ignored when \`; signed\` is set. See \`doc(RSHIFT)\`.
+- **\`fill\`** — MSB padding for logical shift (default \`0\`). **Ignored** when \`; signed\` is set.
+- **\`; vector\`**: \`count\` may be a scalar (broadcast) or a **\`Kbit[n]\`** vector (one shift amount per index). Optional third arg **\`fill\`** applies in logical vector mode.
+
+Sugar: \`data > n\` and \`data > n w1\` — [short-notation.md](short-notation.md).
 
 ## Scalar (default)
 
-- Logical shift right by \`count\` (masked to operand width)
+- Logical shift right; **same width** as \`data\`.
 
 ## Call tags
 
 | Tag | Behaviour |
 |-----|-----------|
-| \`signed\` | Arithmetic shift (ASHR): MSB replicated. |
-| \`vector\` | Per-element shift; count scalar broadcast or per-index (see \`doc(RSHIFT)\`). |
+| \`signed\` | Arithmetic shift (ASHR): MSB replicated; \`fill\` ignored. |
+| \`vector\` | Per-element shift. |
 
 ## Examples
 
-### \`RSHIFT(Xbit val, Xbit count)\`
+### \`RSHIFT(Xbit data, Nbit n)\`
 
 \`\`\`logts-play
 4wire x = 1010
@@ -4290,7 +4394,27 @@ show(r)
 
 → \`0100\`.
 
-### \`RSHIFT(Xbit val, Xbit count; signed)\`
+### \`RSHIFT(Xbit data, Nbit n, 1bit fill)\`
+
+\`\`\`logts-play
+4wire x = 1010
+4wire y0 = RSHIFT(x, 1, 0)
+4wire y1 = RSHIFT(x, 1, 1)
+show(y0)
+show(y1)
+\`\`\`
+
+\`fill=0\` → \`0101\`; \`fill=1\` → \`1101\`.
+
+\`\`\`logts-play
+4wire x2 = 10
+4wire y2 = RSHIFT(x2, 11, 1)
+show(y2)
+\`\`\`
+
+Shift by 3 with fill \`1\` on 2-bit \`10\` → \`11\`.
+
+### \`RSHIFT(Xbit data, Nbit n; signed)\`
 
 \`\`\`logts-play
 4wire neg = 1111
@@ -4305,23 +4429,44 @@ show(arithPos)
 
 \`1111\` logical → \`0111\`; arithmetic → \`1111\`. \`0111\` (=7) arithmetic → \`0011\` (=3).
 
-### \`RSHIFT(Wbit[n] val, Wbit count ; vector)\`
+\`fill\` is ignored with \`; signed\`:
 
 \`\`\`logts-play
-4wire[3] v = 1000 + 0100 + 0010
-4wire cnt = 0001
-4wire[3] r = RSHIFT(v, cnt; vector)
-show(r)
+4wire x = 1111
+4wire y = RSHIFT(x, 1, 0; signed)
+show(y)
 \`\`\`
 
-### \`RSHIFT(Wbit[n] val, Wbit count ; vector signed)\`
+→ \`1111\` (still −1).
+
+### \`RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector)\`
+
+Scalar count (broadcast):
 
 \`\`\`logts-play
-4wire[2] v = 1111 + 0111
-4wire cnt = 0001
-4wire[2] r = RSHIFT(v, cnt; vector signed)
-show(r)
+4wire[3] vector = 1010 + 0100 + 0001
+4wire[3] out = RSHIFT(vector, 0001; vector)
+show(out)
 \`\`\`
+
+Per-index **\`Kbit[n]\`** count:
+
+\`\`\`logts-play
+4wire[3] data = 1010 + 0100 + 0001
+2wire[3] counts = 01 + 10 + 01
+4wire[3] out = RSHIFT(data, counts; vector)
+show(out)
+\`\`\`
+
+### \`RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector signed)\`
+
+\`\`\`logts-play
+4wire[3] vector = 1111 + 0111 + 0001
+4wire[3] out = RSHIFT(vector, 0001; vector signed)
+show(out)
+\`\`\`
+
+ASHR per element (\`1111\`→\`1111\`, \`0111\`→\`0011\`, \`0001\`→\`0000\`).
 
 ## See also
 

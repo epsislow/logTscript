@@ -8,14 +8,17 @@ Bitwise equality (all bits of each operand must match).
 
 ```
 EQ(Xbit a, Xbit b) -> 1bit result
+EQ(Xbit a, Xbit b, Xbit c, ...) -> 1bit result
 EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 ```
 
-Variadic `EQ(a, b, c, …)` without tags: all operands equal → `1`.
+- **Two operands:** `1` if every bit pair matches (bitwise).
+- **Three or more operands (no tag):** `1` only if **all** operands are bitwise equal pairwise.
+- **`; vector`:** exactly **two** arguments; compare per index → `1wire[n]`.
 
 ## Scalar (default)
 
-- `result = 1` if every bit of `a` equals `b`; else `0`
+- Bitwise compare; width mismatch uses left zero-padding (same as other logic gates).
 
 ## Call tags
 
@@ -37,20 +40,33 @@ show(eq)
 ```
 
 ```logts-play
-4wire a2 = 0011
-4wire b2 = 0011
-1wire same = EQ(a2, b2)
-probe(same)
-```
-
-Mismatch:
-
-```logts-play
 4wire x = 1010
 4wire y = 1011
 1wire diff = EQ(x, y)
 show(diff)
 ```
+
+### `EQ(Xbit a, Xbit b, Xbit c, ...)`
+
+All operands must match:
+
+```logts-play
+4wire a = 0011
+4wire b = 0011
+4wire c = 0011
+1wire allEq = EQ(a, b, c)
+show(allEq)
+```
+
+```logts-play
+4wire p = 0101
+4wire q = 0101
+4wire r = 0111
+1wire notAll = EQ(p, q, r)
+show(notAll)
+```
+
+→ `allEq=1`, `notAll=0`.
 
 ### `EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector)`
 
@@ -66,11 +82,13 @@ show(eqv)
 Scalar broadcast:
 
 ```logts-play
-4wire[3] vectorA = 0100 + 0100 + 0111
-4wire scalar = 0100
-1wire[3] flags = EQ(vectorA, scalar; vector)
+4wire[2] vectorA = 0010 + 0010
+4wire scalar = 0010
+1wire[2] flags = EQ(vectorA, scalar; vector)
 show(flags)
 ```
+
+→ `11`.
 
 ## See also
 

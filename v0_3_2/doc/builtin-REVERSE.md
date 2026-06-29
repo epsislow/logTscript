@@ -7,9 +7,11 @@ Reverse bit order within each operand (MSB ↔ LSB).
 ## Signatures
 
 ```
-REVERSE(Xbit val) -> Xbit result
-REVERSE(Wbit[n] val ; vector) -> Wbit[n]
+REVERSE(Xbit value) -> Xbit
+REVERSE(Wbit[n] data ; vector) -> Wbit[n]
 ```
+
+Unary — one data argument (whole vector in vector mode).
 
 ## Scalar (default)
 
@@ -23,7 +25,7 @@ REVERSE(Wbit[n] val ; vector) -> Wbit[n]
 
 ## Examples
 
-### `REVERSE(Xbit val)`
+### `REVERSE(Xbit value)`
 
 ```logts-play
 4wire x = 0011
@@ -51,7 +53,15 @@ show(r)
 
 → `1001`.
 
-### `REVERSE(Wbit[n] val ; vector)`
+### `REVERSE(Wbit[n] data ; vector)`
+
+```logts-play
+4wire[2] vector = 0011 + 1100
+4wire[2] out = REVERSE(vector; vector)
+show(out)
+```
+
+→ `1100` + `0011` → blob `11000011`.
 
 ```logts-play
 4wire[3] v = 0011 + 1010 + 1111

@@ -90,10 +90,11 @@ show(any)
 
 ```
 EQ(Xbit, Xbit) -> 1bit
+EQ(Xbit, Xbit, Xbit, ...) -> 1bit
 EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 ```
 
-Bitwise equality (all bits must match). For **unsigned numeric** ordering use `GT` / `LT` in [arithmetic.md](arithmetic.md). Full reference: **[builtin-EQ.md](builtin-EQ.md)** (`; vector` for per-index compare).
+Bitwise equality. **Two operands:** all bits match → `1`. **Three or more:** all operands equal → `1`. Full reference: **[builtin-EQ.md](builtin-EQ.md)** (`; vector` for per-index compare).
 
 ### Runnable example
 

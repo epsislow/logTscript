@@ -20,9 +20,9 @@ Index: [builtin-functions.md](builtin-functions.md) · [Tagged built-ins](builti
 
 ## Quick reference
 
-**LSHIFT** — logical left; width may grow (`(W+n)bit[n]` in vector mode). Optional third arg `fill` (default `0`). Sugar: `data < n`.
+**LSHIFT** — logical left; optional third arg **`fill`** (default `0`); width grows. Vector: scalar count only. Sugar: `data < n`.
 
-**RSHIFT** — logical right; same width; optional `fill`. With **`; signed`**, arithmetic shift (ASHR) — MSB replicated; see [alu.md](alu.md#arithmetic-shift-right-vs-logical-ashr--rshift). Sugar: `data > n`.
+**RSHIFT** — logical right; optional **`fill`**; same width. With **`; signed`**, ASHR (`fill` ignored). Vector: scalar or **`Kbit[n]`** count. Sugar: `data > n`.
 
 **REVERSE** — MSB ↔ LSB within each operand.
 
