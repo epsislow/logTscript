@@ -4,40 +4,40 @@ overview: "Faza 1: MIN/MAX/SUM cu `; vector` (+ `; signed`). Faza 2: ADD/SUBTRAC
 todos:
   - id: refactor-call-tags
     content: Refactor parseBuiltinCallTags (signed + vector) în signed-arithmetic.js; BUILTIN_VECTOR_TAG_FUNCS pentru MIN/MAX/SUM
-    status: pending
+    status: completed
   - id: vector-reduce-helpers
     content: Adaugă classifyVectorTaggedOperands, minMaxVectorTagged, sumVectorTagged în vector-reduce.js
-    status: pending
+    status: completed
   - id: interpreter-branches
     content: Ramuri vectorMode în call() pentru SUM, MIN, MAX; păstrează fluxul expand fără tag
-    status: pending
+    status: completed
   - id: builtin-doc
     content: Extinde Interpreter.BUILTIN_DOC cu semnături ; vector și ; signed vector
-    status: pending
+    status: completed
   - id: tests-builtin-vector
     content: Grup test_suite builtin-vector ~1802–1812 + manifest; regresie SUM/MIN/MAX fără tag
-    status: pending
+    status: completed
   - id: docs-vector-tag
     content: Actualizează vector-reduction.md, arithmetic.md; regenerează doc-data_generated.js
-    status: pending
+    status: completed
   - id: phase2-add-subtract-vector
     content: "Faza 2: ADD/SUBTRACT cu ; vector — element-wise, result+flag ca vector; migrare logică din getVectorBroadcastPair"
-    status: pending
+    status: completed
   - id: phase2-clamp-vector
     content: "Faza 2: CLAMP(x, lo, hi; vector) — clamp per index, operanzi vector/scalar W"
-    status: pending
+    status: completed
   - id: phase2-tests-doc
     content: "Faza 2: teste ~1813+, doc arithmetic.md, BUILTIN_DOC pentru ADD/SUBTRACT/CLAMP vector"
-    status: pending
+    status: completed
   - id: phase3-multiply-mac-vector
     content: "Faza 3: MULTIPLY ; vector (Wbit[n], Wbit[n]); MAC ; vector (Wbit[n], (W+1)bit[n] over)"
-    status: pending
+    status: completed
   - id: phase3-divide-signed-vector
     content: "Faza 3: DIVIDE ; signed + ; vector — result+mod Wbit[n], împărțire întreagă ca scalar (fără truncare/rotunjire nouă)"
-    status: pending
+    status: completed
   - id: phase3-tests-doc
     content: "Faza 3: teste ~1823+, BUILTIN_DOC + arithmetic.md pentru MULTIPLY/MAC/DIVIDE"
-    status: pending
+    status: completed
 isProject: false
 ---
 

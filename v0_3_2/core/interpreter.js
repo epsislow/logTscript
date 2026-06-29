@@ -3894,18 +3894,45 @@ const idx = parseInt(
     
     if(a.call) return this.call(a.call, a.args, computeRefs, a.callTags);
   }
+  _vectorTaggedEvalFns() {
+    return {
+      evalElement: (varName, index) =>
+        this._evalReductionAtomValue({ var: varName, vectorIndex: index }),
+      evalScalar: (argExpr) => this._evalCallArgValue(argExpr),
+    };
+  }
+
+  _returnBuiltinVectorPair(resultBlob, flagBlob, computeRefs) {
+    return [
+      computeRefs
+        ? { value: resultBlob, ref: `&${this.storeValue(resultBlob)}` }
+        : { value: resultBlob, ref: null },
+      computeRefs
+        ? { value: flagBlob, ref: `&${this.storeValue(flagBlob)}` }
+        : { value: flagBlob, ref: null },
+    ];
+  }
+
   call(fn, args, computeRefs = false, callTags = null) {
   const { name, alias } = fn;
   const fail = (msg, len) => this._throwRuntime(msg, fn, len != null ? len : name.length);
 
   const SA = typeof LogTScriptSignedArithmetic !== 'undefined' ? LogTScriptSignedArithmetic : null;
   let signedMode = false;
+  let vectorMode = false;
   if (callTags && callTags.length) {
-    if (Interpreter.BUILTIN_DOC[name] && (!SA || !SA.BUILTIN_SIGNED_TAG_FUNCS.has(name))) {
+    const isBuiltin = !!Interpreter.BUILTIN_DOC[name];
+    const acceptsSigned = SA && SA.BUILTIN_SIGNED_TAG_FUNCS.has(name);
+    const acceptsVector = SA && SA.BUILTIN_VECTOR_TAG_FUNCS.has(name);
+    if (isBuiltin && !acceptsSigned && !acceptsVector) {
       fail(`${name}: does not accept call tags`);
     }
-    if (SA && SA.BUILTIN_SIGNED_TAG_FUNCS.has(name)) {
-      signedMode = SA.parseBuiltinSignedCallTags(callTags, name, (msg) => fail(msg));
+    if (acceptsSigned || acceptsVector) {
+      const tags = SA.parseBuiltinCallTags(
+        callTags, name, (msg) => fail(msg), acceptsSigned, acceptsVector
+      );
+      signedMode = tags.signed;
+      vectorMode = tags.vector;
     }
   }
 
@@ -3934,6 +3961,26 @@ const idx = parseInt(
 
   if (name === 'SUM') {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail('SUM: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let sumVec;
+      try {
+        sumVec = VR.sumVectorTagged(
+          args, getWire, 'SUM', signedMode, this._vectorTaggedEvalFns()
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return [
+        computeRefs
+          ? { value: sumVec.resultBlob, ref: `&${this.storeValue(sumVec.resultBlob)}` }
+          : { value: sumVec.resultBlob, ref: null },
+        computeRefs
+          ? { value: sumVec.overBlob, ref: `&${this.storeValue(sumVec.overBlob)}` }
+          : { value: sumVec.overBlob, ref: null },
+      ];
+    }
     const expanded = this._expandReductionArgValues(args);
     if (expanded.length < 1) fail('SUM expects at least 1 argument');
     this._zstateRequireBinary(expanded, 'SUM', expanded.map((_, i) => `arg${i}`));
@@ -4523,53 +4570,28 @@ if (this.isBuiltinDEMUX(name)) {
     if (argValues.length !== 2) fail('ADD expects 2 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
     const getWire = (n) => this.wires.get(n);
-    const pair = VR ? VR.getVectorBroadcastPair(args, getWire) : null;
-    if (pair) {
-      const X = pair.meta.elementWidth;
-      const n = pair.meta.elementCount;
-      const results = [];
-      const flags = [];
-      if (pair.mode === 'vectorScalar') {
-        const scalarRaw = this._evalCallArgValue(args[pair.scalarArg]);
-        const scalar = String(scalarRaw).padStart(X, '0');
-        const varName = args[pair.vectorArg][0].var;
-        for (let i = 0; i < n; i++) {
-          const a = this._evalReductionAtomValue({ var: varName, vectorIndex: i });
-          this._zstateRequireBinary([a, scalar], 'ADD', ['a', 'b']);
-          let step;
-          if (SA) {
-            step = SA.addAtWidth(a, scalar, X, signedMode);
-          } else {
-            const u = VR.addUnsignedAtWidth(a, scalar, X);
-            step = { result: u.result, flag: u.carry };
-          }
-          results.push(step.result);
-          flags.push(step.flag);
-        }
-      } else {
-        const varA = args[0][0].var;
-        const varB = args[1][0].var;
-        for (let i = 0; i < n; i++) {
-          const a = this._evalReductionAtomValue({ var: varA, vectorIndex: i });
-          const b = this._evalReductionAtomValue({ var: varB, vectorIndex: i });
-          this._zstateRequireBinary([a, b], 'ADD', ['a', 'b']);
-          let step;
-          if (SA) {
-            step = SA.addAtWidth(a, b, X, signedMode);
-          } else {
-            const u = VR.addUnsignedAtWidth(a, b, X);
-            step = { result: u.result, flag: u.carry };
-          }
-          results.push(step.result);
-          flags.push(step.flag);
+    const evalFns = this._vectorTaggedEvalFns();
+    const applyAdd = (a, b, W) => {
+      if (SA) return SA.addAtWidth(a, b, W, signedMode);
+      const u = VR.addUnsignedAtWidth(a, b, W);
+      return { result: u.result, flag: u.carry };
+    };
+    let addVec = null;
+    try {
+      if (vectorMode) {
+        if (!VR) fail('ADD: internal error (vector-reduce not loaded)');
+        addVec = VR.addSubtractVectorTagged(args, getWire, 'ADD', evalFns, applyAdd);
+      } else if (VR) {
+        const pair = VR.getVectorBroadcastPair(args, getWire);
+        if (pair) {
+          addVec = VR.addSubtractVectorBroadcastPair(pair, args, 'ADD', evalFns, applyAdd);
         }
       }
-      const resultBlob = results.join('');
-      const flagBlob = flags.join('');
-      return [
-        computeRefs ? { value: resultBlob, ref: `&${this.storeValue(resultBlob)}` } : { value: resultBlob, ref: null },
-        computeRefs ? { value: flagBlob, ref: `&${this.storeValue(flagBlob)}` } : { value: flagBlob, ref: null },
-      ];
+    } catch (e) {
+      fail(e.message);
+    }
+    if (addVec) {
+      return this._returnBuiltinVectorPair(addVec.resultBlob, addVec.flagBlob, computeRefs);
     }
     this._zstateRequireBinary(argValues, 'ADD', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
@@ -4596,6 +4618,23 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: SUBTRACT =================
   if (name === 'SUBTRACT') {
     if (argValues.length !== 2) fail('SUBTRACT expects 2 arguments');
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail('SUBTRACT: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      const evalFns = this._vectorTaggedEvalFns();
+      const applySub = (a, b, W) => {
+        if (SA) return SA.subtractAtWidth(a, b, W, signedMode);
+        return VR.subtractUnsignedAtWidth(a, b, W);
+      };
+      let subVec;
+      try {
+        subVec = VR.addSubtractVectorTagged(args, getWire, 'SUBTRACT', evalFns, applySub);
+      } catch (e) {
+        fail(e.message);
+      }
+      return this._returnBuiltinVectorPair(subVec.resultBlob, subVec.flagBlob, computeRefs);
+    }
     this._zstateRequireBinary(argValues, 'SUBTRACT', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
@@ -4623,6 +4662,25 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: MULTIPLY =================
   if (name === 'MULTIPLY') {
     if (argValues.length !== 2) fail('MULTIPLY expects 2 arguments');
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail('MULTIPLY: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      const evalFns = this._vectorTaggedEvalFns();
+      const multiplyFn = (a, b, W, signed) => {
+        if (SA) return SA.multiplyAtWidth(a, b, W, signed);
+        return VR.multiplyUnsignedAtWidth(a, b, W);
+      };
+      let mulVec;
+      try {
+        mulVec = VR.multiplyVectorTagged(
+          args, getWire, 'MULTIPLY', signedMode, evalFns, multiplyFn
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return this._returnBuiltinVectorPair(mulVec.resultBlob, mulVec.overBlob, computeRefs);
+    }
     this._zstateRequireBinary(argValues, 'MULTIPLY', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
@@ -4648,31 +4706,80 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: DIVIDE =================
   if (name === 'DIVIDE') {
     if (argValues.length !== 2) fail('DIVIDE expects 2 arguments');
-    this._zstateRequireBinary(argValues, 'DIVIDE', ['a', 'b']);
-    const a = argValues[0], b = argValues[1];
-    const depth = Math.max(a.length, b.length);
-    const aNum = BigInt('0b' + a.padStart(depth, '0'));
-    const bNum = BigInt('0b' + b.padStart(depth, '0'));
-    const mask = (BigInt(1) << BigInt(depth)) - BigInt(1);
-    let quotient, remainder;
-    if (bNum === BigInt(0)) {
-      quotient  = BigInt(0);
-      remainder = BigInt(0);
-    } else {
-      quotient  = aNum / bNum;
-      remainder = aNum % bNum;
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const divideFn = (a, b, W, signed) => {
+      if (SA) return SA.divideAtWidth(a, b, W, signed);
+      const ap = String(a).padStart(W, '0');
+      const bp = String(b).padStart(W, '0');
+      const mask = (BigInt(1) << BigInt(W)) - BigInt(1);
+      const aNum = BigInt('0b' + ap);
+      const bNum = BigInt('0b' + bp);
+      let quotient;
+      let remainder;
+      if (bNum === 0n) {
+        quotient = 0n;
+        remainder = 0n;
+      } else {
+        quotient = aNum / bNum;
+        remainder = aNum % bNum;
+      }
+      return {
+        result: (quotient & mask).toString(2).padStart(W, '0'),
+        mod: (remainder & mask).toString(2).padStart(W, '0'),
+      };
+    };
+    if (vectorMode) {
+      if (!VR) fail('DIVIDE: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      const evalFns = this._vectorTaggedEvalFns();
+      let divVec;
+      try {
+        divVec = VR.divideVectorTagged(
+          args, getWire, 'DIVIDE', signedMode, evalFns, divideFn
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return this._returnBuiltinVectorPair(divVec.resultBlob, divVec.modBlob, computeRefs);
     }
-    const result = (quotient  & mask).toString(2).padStart(depth, '0');
-    const mod    = (remainder & mask).toString(2).padStart(depth, '0');
+    this._zstateRequireBinary(argValues, 'DIVIDE', ['a', 'b']);
+    const a = argValues[0];
+    const b = argValues[1];
+    const depth = Math.max(a.length, b.length);
+    let div;
+    try {
+      div = divideFn(a, b, depth, signedMode);
+    } catch (e) {
+      fail(e.message);
+    }
     return [
-      computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
-      computeRefs ? { value: mod,    ref: `&${this.storeValue(mod)}`    } : { value: mod,    ref: null },
+      computeRefs ? { value: div.result, ref: `&${this.storeValue(div.result)}` } : { value: div.result, ref: null },
+      computeRefs ? { value: div.mod, ref: `&${this.storeValue(div.mod)}` } : { value: div.mod, ref: null },
     ];
   }
 
   // ================= BUILTIN: MAC =================
   if (name === 'MAC') {
     if (argValues.length !== 3) fail('MAC expects 3 arguments');
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail('MAC: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      const evalFns = this._vectorTaggedEvalFns();
+      const macFn = (acc, a, b, signed) => {
+        if (SA) return SA.macAtWidth(acc, a, b, signed);
+        return macUnsigned(acc, a, b);
+      };
+      let macVec;
+      try {
+        macVec = VR.macVectorTagged(
+          args, getWire, 'MAC', signedMode, evalFns, macFn
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return this._returnBuiltinVectorPair(macVec.resultBlob, macVec.overBlob, computeRefs);
+    }
     this._zstateRequireBinary(argValues, 'MAC', ['acc', 'a', 'b']);
     let mac;
     try {
@@ -4783,6 +4890,23 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'MIN') {
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail('MIN: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let blob;
+      try {
+        blob = VR.minMaxVectorTagged(
+          args, getWire, 'MIN', true, signedMode, this._vectorTaggedEvalFns(),
+          SA ? SA.pickMinMaxSigned : null
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     const expanded = this._expandReductionArgValues(args);
     if (expanded.length < 2) fail('MIN expects at least 2 arguments');
     this._zstateRequireBinary(expanded, 'MIN', expanded.map((_, i) => `arg${i}`));
@@ -4800,6 +4924,23 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'MAX') {
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail('MAX: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let blob;
+      try {
+        blob = VR.minMaxVectorTagged(
+          args, getWire, 'MAX', false, signedMode, this._vectorTaggedEvalFns(),
+          SA ? SA.pickMinMaxSigned : null
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     const expanded = this._expandReductionArgValues(args);
     if (expanded.length < 2) fail('MAX expects at least 2 arguments');
     this._zstateRequireBinary(expanded, 'MAX', expanded.map((_, i) => `arg${i}`));
@@ -4818,6 +4959,25 @@ if (this.isBuiltinDEMUX(name)) {
 
   if (name === 'CLAMP') {
     if (argValues.length !== 3) fail('CLAMP expects 3 arguments');
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail('CLAMP: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      const evalFns = this._vectorTaggedEvalFns();
+      const clampAtWidth = (x, lo, hi) => {
+        if (signedMode && SA) return SA.clampSigned(x, lo, hi);
+        return clampUnsigned(x, lo, hi);
+      };
+      let blob;
+      try {
+        blob = VR.clampVectorTagged(args, getWire, 'CLAMP', evalFns, clampAtWidth);
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     this._zstateRequireBinary(argValues, 'CLAMP', ['x', 'min', 'max']);
     let v;
     try {
@@ -11511,23 +11671,38 @@ Interpreter.BUILTIN_DOC = {
   ADD:      [
     'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry',
     'ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow',
+    'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
+    'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
   ],
   SUBTRACT: [
     'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry',
     'SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow',
+    'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
+    'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
   ],
   MULTIPLY: [
     'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over',
     'MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over',
+    'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
+    'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
   ],
-  DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
+  DIVIDE:   [
+    'DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod',
+    'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod',
+    'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
+    'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
+  ],
   MAC:      [
     'MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over',
     'MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over',
+    'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]',
+    'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], (W+1)bit[n]',
   ],
   SUM:      [
     'SUM(Wbit ...) -> Wbit result, Wbit over',
     'SUM(Wbit ...; signed) -> Wbit result, Wbit over',
+    'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]',
+    'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]',
   ],
   DOT:      [
     'DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over',
@@ -11550,14 +11725,20 @@ Interpreter.BUILTIN_DOC = {
   MIN:      [
     'MIN(Wbit ...) -> Wbit',
     'MIN(Wbit ...; signed) -> Wbit',
+    'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]',
+    'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]',
   ],
   MAX:      [
     'MAX(Wbit ...) -> Wbit',
     'MAX(Wbit ...; signed) -> Wbit',
+    'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]',
+    'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]',
   ],
   CLAMP:    [
     'CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit',
     'CLAMP(Xbit x, Ybit min, Ybit max; signed) -> Ybit',
+    'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector) -> Wbit[n]',
+    'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]',
   ],
   ISDIGIT:  ['ISDIGIT(Xbit value) -> 1bit'],
   HIGH:     ['HIGH(Xbit) -> Xbit'],

@@ -6,7 +6,12 @@
 
   const BUILTIN_SIGNED_TAG_FUNCS = new Set([
     'ADD', 'SUBTRACT', 'GT', 'LT', 'MIN', 'MAX', 'CLAMP',
-    'MULTIPLY', 'MAC', 'RSHIFT', 'SUM', 'DOT',
+    'MULTIPLY', 'MAC', 'RSHIFT', 'SUM', 'DOT', 'DIVIDE',
+  ]);
+
+  const BUILTIN_VECTOR_TAG_FUNCS = new Set([
+    'MIN', 'MAX', 'SUM', 'ADD', 'SUBTRACT', 'CLAMP',
+    'MULTIPLY', 'MAC', 'DIVIDE',
   ]);
 
   function signedBinToBigInt(binStr) {
@@ -152,6 +157,30 @@
     return { result, over };
   }
 
+  function divideAtWidth(a, b, width, signed) {
+    const ap = String(a).padStart(width, '0');
+    const bp = String(b).padStart(width, '0');
+    const mask = (BigInt(1) << BigInt(width)) - BigInt(1);
+    const aNum = signed ? signedBinToBigInt(ap) : BigInt('0b' + ap);
+    const bNum = signed ? signedBinToBigInt(bp) : BigInt('0b' + bp);
+    let quotient;
+    let remainder;
+    if (bNum === 0n) {
+      quotient = 0n;
+      remainder = 0n;
+    } else {
+      quotient = aNum / bNum;
+      remainder = aNum % bNum;
+    }
+    const result = signed
+      ? signedBigIntToBin(quotient, width)
+      : (quotient & mask).toString(2).padStart(width, '0');
+    const mod = signed
+      ? signedBigIntToBin(remainder, width)
+      : (remainder & mask).toString(2).padStart(width, '0');
+    return { result, mod };
+  }
+
   /** Arithmetic shift right (ASHR): MSB replicated as fill. */
   function arithmeticRshift(data, n) {
     const len = data.length;
@@ -161,23 +190,46 @@
     return fill.repeat(amount) + data.slice(0, len - amount);
   }
 
+  function parseBuiltinCallTags(callTags, fnName, fail, acceptsSigned, acceptsVector) {
+    let signed = false;
+    let vector = false;
+    if (!callTags || !callTags.length) {
+      return { signed, vector };
+    }
+    for (const t of callTags) {
+      if (t.name === 'signed') {
+        if (!acceptsSigned) {
+          fail(`${fnName}: does not accept tag 'signed'`);
+        }
+        if (t.value !== 1) {
+          fail(`${fnName}: tag 'signed' must be enabled (use '; signed' or '; signed=1')`);
+        }
+        signed = true;
+      } else if (t.name === 'vector') {
+        if (!acceptsVector) {
+          fail(`${fnName}: does not accept tag 'vector'`);
+        }
+        if (t.value !== 1) {
+          fail(`${fnName}: tag 'vector' must be enabled (use '; vector' or '; vector=1')`);
+        }
+        vector = true;
+      } else {
+        fail(`${fnName}: unknown tag '${t.name}'`);
+      }
+    }
+    return { signed, vector };
+  }
+
+  /** @deprecated use parseBuiltinCallTags */
   function parseBuiltinSignedCallTags(callTags, fnName, fail) {
-    if (!callTags || !callTags.length) return false;
-    if (callTags.length !== 1) {
-      fail(`${fnName}: expected only tag 'signed' after ';'`);
-    }
-    const t = callTags[0];
-    if (t.name !== 'signed') {
-      fail(`${fnName}: unknown tag '${t.name}'`);
-    }
-    if (t.value !== 1) {
-      fail(`${fnName}: tag 'signed' must be enabled (use '; signed' or '; signed=1')`);
-    }
-    return true;
+    const tags = parseBuiltinCallTags(callTags, fnName, fail, true, false);
+    return tags.signed;
   }
 
   const api = {
     BUILTIN_SIGNED_TAG_FUNCS,
+    BUILTIN_VECTOR_TAG_FUNCS,
+    parseBuiltinCallTags,
     parseBuiltinSignedCallTags,
     signedBinToBigInt,
     signedCompareBigInt,
@@ -189,6 +241,7 @@
     subtractAtWidth,
     multiplyAtWidth,
     macAtWidth,
+    divideAtWidth,
     arithmeticRshift,
   };
 

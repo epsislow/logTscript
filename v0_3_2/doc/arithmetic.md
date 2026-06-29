@@ -10,7 +10,9 @@ DIVIDE(Xbit a, Xbit b)   -> Xbit result, Xbit mod
 MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 ```
 
-**Signed overload** (two's complement on width `W`, MSB = sign): append `; signed` after the argument list on `ADD`, `SUBTRACT`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP`, `MULTIPLY`, `MAC`, `SUM`, `DOT`, and `RSHIFT`. Without the tag, behaviour stays **unsigned** / logical (fully compatible with existing scripts). See [Signed arithmetic (`; signed`)](#signed-arithmetic-signed) below.
+**Signed overload** (two's complement on width `W`, MSB = sign): append `; signed` after the argument list on `ADD`, `SUBTRACT`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP`, `MULTIPLY`, `MAC`, `SUM`, `DOT`, `DIVIDE`, and `RSHIFT`. Without the tag, behaviour stays **unsigned** / logical (fully compatible with existing scripts). See [Signed arithmetic (`; signed`)](#signed-arithmetic-signed) below.
+
+**Element-wise vectors:** `MULTIPLY`, `MAC`, and `DIVIDE` also accept **`; vector`** (combinable with `; signed`) — see [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector).
 
 
 ---
@@ -36,10 +38,13 @@ The bit width `N` of both inputs is `max(len(a), len(b))`. Short inputs are zero
 
 ```
 ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
+ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 ```
 
 - `result` = `(a + b) mod 2^N` (N-bit sum, wraps at overflow)
 - `carry` = `1` if `a + b > 2^N - 1`; `0` otherwise
+
+**Vector broadcast (no tag):** `ADD(vectorA, scalar)` or `ADD(vectorA, vectorB)` adds element-wise; result and flag are `Wbit[n]` blobs. Same with explicit **`; vector`** — see [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector).
 
 ### Examples
 
@@ -81,10 +86,13 @@ ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
 
 ```
 SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
+SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 ```
 
 - `result` = `(a - b) mod 2^N` (wraps on underflow)
 - `carry` = `1` if `a < b` (borrow occurred); `0` otherwise
+
+With **`; vector`**, subtraction is per index (at least one whole vector operand). Unlike `ADD`, there is no implicit vector broadcast without the tag.
 
 ### Examples
 
@@ -125,7 +133,10 @@ SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
 
 ```
 MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
+MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 ```
+
+With **`; vector`**, multiply per index; `over[i]` holds the high **W** bits of the **2W**-bit product (same packing as scalar).
 
 - `result` = low `N` bits of `a * b`
 - `over` = high `N` bits of `a * b` (the overflow portion, shifted right by `N`)
@@ -173,7 +184,11 @@ The full product is `(over << N) | result`.
 
 ```
 DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
+DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod
+DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 ```
+
+Integer **quotient** and **remainder** only (no floating-point). With **`; signed`**, operands are two's complement. With **`; vector`**, divide per index. Divide-by-zero → `0` for both outputs (per element in vector mode).
 
 - `result` = integer quotient `floor(a / b)`, masked to `N` bits
 - `mod` = remainder `a % b`, masked to `N` bits
@@ -227,7 +242,10 @@ Performs **`acc + (a × b)`** (unsigned). Mathematically equivalent to **`ADD(ac
 
 ```
 MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
+MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]
 ```
+
+With **`; vector`**, `acc + a×b` per index; `over[i]` is **(W+1)** bits (same as scalar MAC). Assign with e.g. `4wire[n] r, 5wire[n] o`.
 
 **All three operands must have the same bit width `X`.**
 
@@ -297,7 +315,7 @@ MAX(Wbit ...) -> Wbit
 
 Variadic (≥ 2 args after expansion). **All arguments must have the same width.** Returns the original bit string of the winning value.
 
-Whole vectors expand to elements: `MIN(vectorA)` ≡ `MIN(vectorA:0, vectorA:1, …)`. See [vector-reduction.md](vector-reduction.md).
+Whole vectors expand to elements: `MIN(vectorA)` ≡ `MIN(vectorA:0, vectorA:1, …)`. With **`; vector`**, min/max is computed **per index** and returns `Wbit[n]`. See [vector-reduction.md](vector-reduction.md).
 
 ```logts-play
 4wire a = 0101
@@ -318,7 +336,7 @@ SUM(Wbit ...) -> Wbit result, Wbit over
 DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
 ```
 
-**SUM** adds all operands (unsigned); **DOT** is the dot product of two whole vectors of the same shape. Output packing and vector operand rules: [vector-reduction.md](vector-reduction.md).
+**SUM** adds all operands (unsigned); **DOT** is the dot product of two whole vectors of the same shape. With **`; vector`**, **SUM** / **MIN** / **MAX** operate per index (see [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector)). Output packing and operand rules: [vector-reduction.md](vector-reduction.md).
 
 **DOT** is conceptually a chain of **MAC** calls with `acc = 0`:
 
@@ -334,11 +352,14 @@ acc = MAC(acc, vectorA:1, vectorB:1)
 
 ```
 CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit
+CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector) -> Wbit[n]
 ```
 
 - `min` and `max` must have equal width `Y`.
 - `x` may be any width; compare at **`len(x)`** with `min`/`max` zero-extended.
 - Result converted to **`Y` bits**.
+
+With **`; vector`**, `x`, `min`, and `max` may each be a vector `(N,W)` or scalar `W` (broadcast); at least one must be a whole vector.
 
 ```logts-play
 16wire x = 0000000100101100
@@ -358,17 +379,18 @@ Several arithmetic built-ins accept an optional **bool tag** `signed` after `;` 
 
 | Built-in | Unsigned (default) | With `; signed` |
 |----------|-------------------|-----------------|
-| `ADD` | `result`, **carry** | same `result` bits, **overflow** (signed) |
-| `SUBTRACT` | `result`, **carry** (borrow) | same `result` bits, **overflow** (signed) |
+| `ADD` | `result`, **carry** | same `result` bits, **overflow** (signed); **`; vector`** → `Wbit[n]` |
+| `SUBTRACT` | `result`, **carry** (borrow) | same `result` bits, **overflow** (signed); **`; vector`** → `Wbit[n]` |
 | `GT` / `LT` | unsigned numeric order | signed numeric order |
 | `MIN` / `MAX` | unsigned min/max | signed min/max |
-| `CLAMP` | unsigned bounds | signed bounds |
-| `MULTIPLY` | unsigned product, low/high split | signed product, same split |
-| `MAC` | unsigned `acc + a×b` | signed `acc + a×b` |
+| `CLAMP` | unsigned bounds | signed bounds; **`; vector`** → `Wbit[n]` |
+| `MULTIPLY` | unsigned product, low/high split | signed product; **`; vector`** → `Wbit[n]` |
+| `MAC` | unsigned `acc + a×b` | signed accumulate; **`; vector`** → `Wbit[n]`, `(W+1)bit[n]` |
 | `DOT` | unsigned dot product | signed dot product |
 | `SUM` | unsigned sum | signed sum |
+| `DIVIDE` | unsigned quotient/mod | signed quotient/mod; **`; vector`** → `Wbit[n]` |
 
-`DIVIDE`, `LSHIFT`, rotates, and `REVERSE` do **not** support `; signed`. `RSHIFT` with `; signed` is **arithmetic** shift (ASHR) — see [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md#rshift-signed).
+`LSHIFT`, rotates, and `REVERSE` do **not** support `; signed`. `RSHIFT` with `; signed` is **arithmetic** shift (ASHR) — see [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md#rshift-signed).
 
 ### ADD / SUBTRACT signed
 
@@ -514,6 +536,7 @@ doc(CLAMP)
 doc(SUM)
 # SUM(Wbit ...) -> Wbit result, Wbit over
 # SUM(Wbit ...; signed) -> Wbit result, Wbit over
+# SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]
 
 doc(DOT)
 # DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over

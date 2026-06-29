@@ -2884,29 +2884,34 @@ reg(327, 'doc', 'All gates AND NAND NOR NXOR XOR', function(h, session) {
 
 reg(328, 'doc', 'BUILTIN_DOC — ADD signature', function(h, session) {
   const lines = Interpreter.getDocLines('ADD', new Map());
-  h.assert('ADD 2 signatures', String(lines.length), '2');
+  h.assert('ADD 4 signatures', String(lines.length), '4');
   h.assert('ADD unsigned', lines[0], 'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry');
   h.assert('ADD signed', lines[1], 'ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
+  h.assert('ADD vector', lines[2], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
 });
 
 reg(329, 'doc', 'BUILTIN_DOC — SUBTRACT signature', function(h, session) {
   const lines = Interpreter.getDocLines('SUBTRACT', new Map());
-  h.assert('SUBTRACT 2 signatures', String(lines.length), '2');
+  h.assert('SUBTRACT 4 signatures', String(lines.length), '4');
   h.assert('SUBTRACT unsigned', lines[0], 'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry');
   h.assert('SUBTRACT signed', lines[1], 'SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
+  h.assert('SUBTRACT vector', lines[2], 'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
 });
 
 reg(330, 'doc', 'BUILTIN_DOC — MULTIPLY signature', function(h, session) {
   const lines = Interpreter.getDocLines('MULTIPLY', new Map());
-  h.assert('MULTIPLY 2 signatures', String(lines.length), '2');
+  h.assert('MULTIPLY 4 signatures', String(lines.length), '4');
   h.assert('MULTIPLY unsigned', lines[0], 'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over');
   h.assert('MULTIPLY signed', lines[1], 'MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over');
+  h.assert('MULTIPLY vector', lines[2], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
 });
 
 reg(331, 'doc', 'BUILTIN_DOC — DIVIDE signature', function(h, session) {
   const lines = Interpreter.getDocLines('DIVIDE', new Map());
-  h.assert('DIVIDE 1 signature', String(lines.length), '1');
-  h.assert('DIVIDE signature', lines[0], 'DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod');
+  h.assert('DIVIDE 4 signatures', String(lines.length), '4');
+  h.assert('DIVIDE unsigned', lines[0], 'DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod');
+  h.assert('DIVIDE signed', lines[1], 'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod');
+  h.assert('DIVIDE vector', lines[2], 'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
 });
 
 reg(332, 'doc', 'doc(def) — lists built-in and user-defined separately', function(h, session) {
@@ -13334,9 +13339,11 @@ reg(1734, 'vector-reduction', 'SUM vector sub-range same width', function(h, ses
 
 reg(1728, 'vector-reduction', 'doc(SUM) signature', function(h, session) {
   const lines = Interpreter.getDocLines('SUM', new Map());
-  h.assert('SUM 2 signatures', String(lines.length), '2');
+  h.assert('SUM 4 signatures', String(lines.length), '4');
   h.assert('SUM unsigned', lines[0], 'SUM(Wbit ...) -> Wbit result, Wbit over');
   h.assert('SUM signed', lines[1], 'SUM(Wbit ...; signed) -> Wbit result, Wbit over');
+  h.assert('SUM vector', lines[2], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('SUM signed vector', lines[3], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]');
 });
 
 reg(1729, 'vector-reduction', 'MIN/MAX plain wires regression', function(h, session) {
@@ -13479,21 +13486,21 @@ reg(1740, 'asm-decode', 'disassemble multi-word program blob', function(h, sessi
 reg(1741, 'wire-vectors', 'ADD vector broadcast + NOT prefix', function(h, session) {
   const { interp } = session.run(
     '4wire[3] a = 0001 + 0010 + 0011\n' +
-    '15wire q = !(ADD(a, 1))'
+    '24wire q = !(ADD(a, 1))'
   );
-  h.assert('q width', String(session.getWire(interp, 'q').length), '15');
+  h.assert('q width', String(session.getWire(interp, 'q').length), '24');
   h.assert('elem0 sum NOT', session.getWire(interp, 'q').substring(0, 4), '1101');
-  h.assert('carry NOT', session.getWire(interp, 'q').substring(12, 15), '111');
+  h.assert('flag0 NOT', session.getWire(interp, 'q').substring(12, 16), '1111');
 });
 
 reg(1742, 'wire-vectors', 'ADD 80wire[10] broadcast scalar', function(h, session) {
   const { interp } = session.run(
     '80wire[10] a := ^Ff\n' +
-    '810wire q = !(ADD(a, 10))'
+    '1600wire q = !(ADD(a, 10))'
   );
-  h.assert('q width', String(session.getWire(interp, 'q').length), '810');
+  h.assert('q width', String(session.getWire(interp, 'q').length), '1600');
   const q = session.getWire(interp, 'q');
-  h.assert('carry NOT all ones', q.substring(800), '1111111111');
+  h.assert('flag NOT all ones per elem', q.substring(800, 880), '1'.repeat(80));
 });
 
 reg(1743, 'loop', 'block repeat N..M[ is not expanded (passthrough)', function(h, session) {
@@ -14217,6 +14224,315 @@ reg(1801, 'builtin-signed', 'SUM(vector) — signed elements', function(h, sessi
   h.assert('signed zero', session.getWire(interp, 'rS'), '0000');
   h.assert('signed over zero', session.getWire(interp, 'oS'), '0000');
 }, { propagation: 'wave' });
+
+reg(1802, 'builtin-vector', 'MAX(vector, scalar; vector signed) per index', function(h, session) {
+  const { interp } = session.run(
+    '4wire[4] vectorA = 1111 + 0010 + 0100 + 0111\n' +
+    '4wire[4] out = MAX(vectorA, 0001; vector signed)'
+  );
+  h.assert('i0 max(-1,1)', session.getWire(interp, 'out').slice(0, 4), '0001');
+  h.assert('i1 max(2,1)', session.getWire(interp, 'out').slice(4, 8), '0010');
+  h.assert('i2 max(4,1)', session.getWire(interp, 'out').slice(8, 12), '0100');
+  h.assert('i3 max(7,1)', session.getWire(interp, 'out').slice(12, 16), '0111');
+});
+
+reg(1803, 'builtin-vector', 'MIN(vectorA, vectorB; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[4] vectorA = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[4] vectorB = 0010 + 0011 + 0100 + 1001\n' +
+    '4wire[4] out = MIN(vectorA, vectorB; vector)'
+  );
+  h.assert('min per index', session.getWire(interp, 'out'), '0001001001001000');
+});
+
+reg(1804, 'builtin-vector', 'SUM(vectorA, vectorB, vectorC; vector) per index', function(h, session) {
+  const { interp } = session.run(
+    '4wire[4] vectorA = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[4] vectorB = 0010 + 0011 + 0100 + 1001\n' +
+    '4wire[4] vectorC = 0001 + 0001 + 0001 + 0001\n' +
+    '4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB, vectorC; vector)'
+  );
+  h.assert('result', session.getWire(interp, 'r'), '0100011010010010');
+  h.assert('over', session.getWire(interp, 'o'), '0000000000000001');
+});
+
+reg(1805, 'builtin-vector', 'SUM(scalars + vector; signed vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[4] vectorA = 1111 + 1111 + 1111 + 0010\n' +
+    '4wire[4] r, 4wire[4] o = SUM(vectorA, 1111, 0010, 0001; signed vector)'
+  );
+  h.assert('signed sum low', session.getWire(interp, 'r'), '0001000100010100');
+  h.assert('signed over zero', session.getWire(interp, 'o'), '0000000000000000');
+});
+
+reg(1806, 'builtin-vector', 'MIN(vectorA, 1111, vectorB; vector) variadic', function(h, session) {
+  const { interp } = session.run(
+    '4wire[4] vectorA = 0100 + 0010 + 0110 + 1000\n' +
+    '4wire[4] vectorB = 0011 + 0100 + 0101 + 1001\n' +
+    '4wire[4] out = MIN(vectorA, 1111, vectorB; vector)'
+  );
+  h.assert('variadic min', session.getWire(interp, 'out'), '0011001001011000');
+});
+
+reg(1807, 'builtin-vector', 'SUM(vectorA; vector) — single arg error', function(h, session) {
+  const r = session.run('4wire[3] vectorA = 0001 + 0010 + 0011\n4wire r, 4wire o = SUM(vectorA; vector)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('at least 2 args', String(err.includes("expects at least 2 arguments")), 'true');
+});
+
+reg(1808, 'builtin-vector', 'MAX(a, b; vector) — no whole vector error', function(h, session) {
+  const r = session.run('4wire a = 0101\n4wire b = 0011\n4wire m = MAX(a, b; vector)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('remove vector tag', String(err.includes("remove '; vector'")), 'true');
+});
+
+reg(1809, 'builtin-vector', 'DOT — rejects vector tag', function(h, session) {
+  const r = session.run(
+    '4wire[2] vectorA = 0001 + 0010\n' +
+    '4wire[2] vectorB = 0011 + 0100\n' +
+    '4wire r, 8wire o = DOT(vectorA, vectorB; vector)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('no vector on DOT', String(err.includes("does not accept tag 'vector'")), 'true');
+});
+
+reg(1810, 'builtin-vector', 'SUM/MIN without tag — expand regression', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0001 + 0010 + 0011\n' +
+    '4wire sumR, 4wire sumO = SUM(vectorA)\n' +
+    '4wire m = MIN(vectorA)'
+  );
+  h.assert('sum low 6', session.getWire(interp, 'sumR'), '0110');
+  h.assert('sum over 0', session.getWire(interp, 'sumO'), '0000');
+  h.assert('min element 1', session.getWire(interp, 'm'), '0001');
+});
+
+reg(1811, 'builtin-vector', 'SUM(vectorA, vectorB; vector) — wave mode', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 0001 + 0010\n' +
+    '4wire[2] vectorB = 0011 + 0100\n' +
+    '4wire[2] r, 4wire[2] o = SUM(vectorA, vectorB; vector)'
+  );
+  h.assert('r0 1+3=4', session.getWire(interp, 'r').slice(0, 4), '0100');
+  h.assert('r1 2+4=6', session.getWire(interp, 'r').slice(4, 8), '0110');
+  h.assert('over zero', session.getWire(interp, 'o'), '00000000');
+}, { propagation: 'wave' });
+
+reg(1812, 'builtin-vector', 'doc(MIN/MAX) vector signatures', function(h, session) {
+  const minLines = Interpreter.getDocLines('MIN', new Map());
+  const maxLines = Interpreter.getDocLines('MAX', new Map());
+  h.assert('MIN 4 signatures', String(minLines.length), '4');
+  h.assert('MAX 4 signatures', String(maxLines.length), '4');
+  h.assert('MIN vector', minLines[2], 'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]');
+  h.assert('MAX vector signed', maxLines[3], 'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]');
+});
+
+reg(1813, 'builtin-vector', 'ADD implicit vs explicit ; vector', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0001 + 0010 + 0100\n' +
+    '4wire[3] rImp, 4wire[3] fImp = ADD(vectorA, 0001)\n' +
+    '4wire[3] rTag, 4wire[3] fTag = ADD(vectorA, 0001; vector)'
+  );
+  h.assert('result match', session.getWire(interp, 'rImp'), session.getWire(interp, 'rTag'));
+  h.assert('flag match', session.getWire(interp, 'fImp'), session.getWire(interp, 'fTag'));
+  h.assert('r0 1+1=2', session.getWire(interp, 'rTag').slice(0, 4), '0010');
+});
+
+reg(1814, 'builtin-vector', 'SUBTRACT(vectorA, vectorB; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0100 + 0010 + 0001\n' +
+    '4wire[3] vectorB = 0001 + 0001 + 0001\n' +
+    '4wire[3] r, 4wire[3] f = SUBTRACT(vectorA, vectorB; vector)'
+  );
+  h.assert('diff 3,1,0', session.getWire(interp, 'r'), '001100010000');
+  h.assert('no borrow', session.getWire(interp, 'f'), '000000000000');
+});
+
+reg(1815, 'builtin-vector', 'SUBTRACT(vector, scalar; vector signed)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0100 + 0010 + 0001\n' +
+    '4wire[3] r, 4wire[3] f = SUBTRACT(vectorA, 0001; vector signed)'
+  );
+  h.assert('4-1,2-1,1-1', session.getWire(interp, 'r'), '001100010000');
+  h.assert('flags zero', session.getWire(interp, 'f'), '000000000000');
+});
+
+reg(1816, 'builtin-vector', 'CLAMP(vectorA, lo, hi; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[4] vectorA = 1100 + 0100 + 0010 + 0001\n' +
+    '4wire[4] out = CLAMP(vectorA, 0010, 1000; vector)'
+  );
+  h.assert('clamped', session.getWire(interp, 'out'), '1000010000100010');
+});
+
+reg(1817, 'builtin-vector', 'CLAMP(vector, loVec, hiVec; vector signed)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 1111 + 0100\n' +
+    '4wire[2] loVec = 1101 + 0000\n' +
+    '4wire[2] hiVec = 1110 + 0111\n' +
+    '4wire[2] out = CLAMP(vectorA, loVec, hiVec; vector signed)'
+  );
+  h.assert('i0 -1 clamped to -2', session.getWire(interp, 'out').slice(0, 4), '1110');
+  h.assert('i1 4 clamped to 4', session.getWire(interp, 'out').slice(4, 8), '0100');
+});
+
+reg(1818, 'builtin-vector', 'ADD(a, b; vector) — no whole vector error', function(h, session) {
+  const r = session.run('4wire a = 0001\n4wire b = 0010\n4wire r, 1wire f = ADD(a, b; vector)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('remove vector tag', String(err.includes("remove '; vector'")), 'true');
+});
+
+reg(1819, 'builtin-vector', 'SUBTRACT(a, b; vector) — no whole vector error', function(h, session) {
+  const r = session.run('4wire a = 0100\n4wire b = 0001\n4wire r, 1wire f = SUBTRACT(a, b; vector)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('remove vector tag', String(err.includes("remove '; vector'")), 'true');
+});
+
+reg(1820, 'builtin-vector', 'ADD(vector, scalar) — implicit broadcast regression', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 1111 + 0001\n' +
+    '4wire[2] r, 4wire[2] f = ADD(vectorA, 0001)'
+  );
+  h.assert('r0 wrap', session.getWire(interp, 'r').slice(0, 4), '0000');
+  h.assert('f0 carry', session.getWire(interp, 'f').slice(0, 4), '0001');
+  h.assert('f1 no carry', session.getWire(interp, 'f').slice(4, 8), '0000');
+  h.assert('r1 2', session.getWire(interp, 'r').slice(4, 8), '0010');
+});
+
+reg(1821, 'builtin-vector', 'ADD(vectorA, vectorB; vector) — wave mode', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 0011 + 0101\n' +
+    '4wire[2] vectorB = 0001 + 0011\n' +
+    '4wire[2] r, 4wire[2] f = ADD(vectorA, vectorB; vector)'
+  );
+  h.assert('3+1=4', session.getWire(interp, 'r').slice(0, 4), '0100');
+  h.assert('5+3=8', session.getWire(interp, 'r').slice(4, 8), '1000');
+}, { propagation: 'wave' });
+
+reg(1822, 'builtin-vector', 'doc(ADD/SUBTRACT/CLAMP) vector signatures', function(h, session) {
+  const addLines = Interpreter.getDocLines('ADD', new Map());
+  const subLines = Interpreter.getDocLines('SUBTRACT', new Map());
+  const clampLines = Interpreter.getDocLines('CLAMP', new Map());
+  h.assert('ADD 4 signatures', String(addLines.length), '4');
+  h.assert('SUBTRACT 4 signatures', String(subLines.length), '4');
+  h.assert('CLAMP 4 signatures', String(clampLines.length), '4');
+  h.assert('ADD vector', addLines[2], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('CLAMP vector signed', clampLines[3], 'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]');
+});
+
+reg(1823, 'builtin-vector', 'MULTIPLY(vectorA, vectorB; vector) per index', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0010 + 0011 + 0100\n' +
+    '4wire[3] vectorB = 0010 + 0001 + 0010\n' +
+    '4wire[3] r, 4wire[3] o = MULTIPLY(vectorA, vectorB; vector)'
+  );
+  h.assert('products', session.getWire(interp, 'r'), '010000111000');
+  h.assert('over zero', session.getWire(interp, 'o'), '000000000000');
+});
+
+reg(1824, 'builtin-vector', 'MULTIPLY(vector, scalar; vector signed)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 1111 + 0010\n' +
+    '4wire[2] r, 4wire[2] o = MULTIPLY(vectorA, 1111; vector signed)'
+  );
+  h.assert('(-1)*(-1)=1', session.getWire(interp, 'r').slice(0, 4), '0001');
+  h.assert('2*(-1)=-2', session.getWire(interp, 'r').slice(4, 8), '1110');
+  h.assert('over[0] zero', session.getWire(interp, 'o').slice(0, 4), '0000');
+  h.assert('over[1] sign ext', session.getWire(interp, 'o').slice(4, 8), '1111');
+});
+
+reg(1825, 'builtin-vector', 'MAC(acc, a, b; vector) — (W+1)bit over', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] acc = 0001 + 0000 + 0000\n' +
+    '4wire[3] a = 0010 + 0011 + 0100\n' +
+    '4wire[3] b = 0001 + 0001 + 0010\n' +
+    '4wire[3] r, 5wire[3] o = MAC(acc, a, b; vector)'
+  );
+  h.assert('mac results', session.getWire(interp, 'r'), '001100111000');
+  h.assert('over width 5 each', String(session.getWire(interp, 'o').length), '15');
+  h.assert('over zero', session.getWire(interp, 'o'), '000000000000000');
+});
+
+reg(1826, 'builtin-vector', 'DIVIDE(vectorA, vectorB; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1100 + 0100 + 0001\n' +
+    '4wire[3] vectorB = 0010 + 0010 + 0001\n' +
+    '4wire[3] q, 4wire[3] m = DIVIDE(vectorA, vectorB; vector)'
+  );
+  h.assert('quotients 6,2,1', session.getWire(interp, 'q'), '011000100001');
+  h.assert('mods zero', session.getWire(interp, 'm'), '000000000000');
+});
+
+reg(1827, 'builtin-vector', 'DIVIDE(vector, scalar; vector signed)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 1100 + 0100\n' +
+    '4wire[2] q, 4wire[2] m = DIVIDE(vectorA, 0001; vector signed)'
+  );
+  h.assert('q -4, 4', session.getWire(interp, 'q'), '11000100');
+  h.assert('m 0, 0', session.getWire(interp, 'm'), '00000000');
+});
+
+reg(1828, 'builtin-vector', 'DIVIDE(a, b; signed) scalar', function(h, session) {
+  const { interp } = session.runArith(
+    '4wire a = 1111\n' +
+    '4wire b = 0010\n' +
+    '4wire q, 4wire m = DIVIDE(a, b; signed)'
+  );
+  h.assert('q -1/2 trunc 0', session.getWire(interp, 'q'), '0000');
+  h.assert('m -1', session.getWire(interp, 'm'), '1111');
+});
+
+reg(1829, 'builtin-vector', 'DIVIDE(vector; vector) divide-by-zero per element', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 0100 + 0000\n' +
+    '4wire[2] vectorB = 0010 + 0000\n' +
+    '4wire[2] q, 4wire[2] m = DIVIDE(vectorA, vectorB; vector)'
+  );
+  h.assert('q 2,0', session.getWire(interp, 'q'), '00100000');
+  h.assert('m 0,0', session.getWire(interp, 'm'), '00000000');
+});
+
+reg(1830, 'builtin-vector', 'MULTIPLY(a, b; vector) — no whole vector error', function(h, session) {
+  const r = session.run('4wire a = 0010\n4wire b = 0011\n4wire r, 4wire o = MULTIPLY(a, b; vector)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('remove vector tag', String(err.includes("remove '; vector'")), 'true');
+});
+
+reg(1831, 'builtin-vector', 'MULTIPLY/MAC/DIVIDE scalar — no tag regression', function(h, session) {
+  const interp = session.runArith(
+    '4wire a = 0011\n' +
+    '4wire b = 0101\n' +
+    '4wire acc = 0001\n' +
+    '4wire mr, 4wire mo = MULTIPLY(a, b)\n' +
+    '4wire dq, 4wire dm = DIVIDE(a, b)\n' +
+    '4wire macR, 5wire macO = MAC(acc, a, b)'
+  );
+  h.assert('mult', session.getWire(interp, 'mr'), '1111');
+  h.assert('div q', session.getWire(interp, 'dq'), '0000');
+  h.assert('div m', session.getWire(interp, 'dm'), '0011');
+  h.assert('mac r', session.getWire(interp, 'macR'), '0000');
+  h.assert('mac over', session.getWire(interp, 'macO'), '00001');
+});
+
+reg(1832, 'builtin-vector', 'MAC(vector; vector) — wave mode', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] acc = 0001 + 0000\n' +
+    '4wire[2] a = 0010 + 0001\n' +
+    '4wire[2] b = 0001 + 0010\n' +
+    '4wire[2] r, 5wire[2] o = MAC(acc, a, b; vector)'
+  );
+  h.assert('r0 1+2=3', session.getWire(interp, 'r').slice(0, 4), '0011');
+  h.assert('r1 0+2=2', session.getWire(interp, 'r').slice(4, 8), '0010');
+}, { propagation: 'wave' });
+
+reg(1833, 'builtin-vector', 'doc(MULTIPLY/MAC/DIVIDE) vector signatures', function(h, session) {
+  const mulLines = Interpreter.getDocLines('MULTIPLY', new Map());
+  const macLines = Interpreter.getDocLines('MAC', new Map());
+  const divLines = Interpreter.getDocLines('DIVIDE', new Map());
+  h.assert('MAC vector over', macLines[2], 'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]');
+  h.assert('DIVIDE signed', divLines[1], 'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod');
+  h.assert('MULTIPLY vector signed', mulLines[3], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]');
+});
 
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:

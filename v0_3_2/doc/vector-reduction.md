@@ -1,12 +1,12 @@
 # Vector reduction functions
 
-Reduction builtins operate on individual wires, whole **1D vectors**, or a mix. When a whole vector is passed, each element participates as a separate operand.
+Reduction builtins operate on individual wires, whole **1D vectors**, or a mix. When a whole vector is passed without `; vector`, each element participates as a separate operand (scalar reduction).
 
 See also: [1D wire vectors](wire-vectors.md), [arithmetic](arithmetic.md) (MAC, ADD).
 
 ---
 
-## Operand expansion
+## Operand expansion (default, without `; vector`)
 
 | Argument | Behaviour |
 |----------|-----------|
@@ -20,16 +20,42 @@ All expanded operands must have the **same bit width** (runtime error otherwise)
 
 ---
 
+## Element-wise mode (`; vector`)
+
+With **`; vector`**, operands are combined **per index** and the result is a **vector**. At least **two** arguments and at least one **whole vector** are required. Other operands may be another vector of the same shape `(N, W)` or a scalar / plain wire of width **W** (broadcast to every index).
+
+| Call | Behaviour |
+|------|-----------|
+| `SUM(vectorA, vectorB)` | Expand → one scalar sum over all elements |
+| `SUM(vectorA, vectorB; vector)` | Per index sum → `Wbit[n]` + `Wbit[n] over` |
+| `MIN(vectorA, 0001; vector)` | Per index min → `Wbit[n]` |
+| `MAX(vectorA, vectorB; signed vector)` | Per index max (signed) → `Wbit[n]` |
+
+`signed` and `vector` may appear in any order (`; signed vector` ≡ `; vector signed`).
+
+```logts-play
+4wire[4] vectorA = 0001 + 0010 + 0100 + 1000
+4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
+4wire[4] out = MAX(vectorA, 0001; vector signed)
+4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB; vector)
+```
+
+---
+
 ## SUM
 
 ```
 SUM(Wbit ...) -> Wbit result, Wbit over
 SUM(Wbit ...; signed) -> Wbit result, Wbit over
+SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]
+SUM(Wbit[n] ... ; signed vector) -> Wbit[n], Wbit[n]
 ```
 
 Returns the sum of all operands (unsigned by default). With `; signed`, each operand is **two's complement** on width **W**. Output is **2W bits** total: low **W** bits in `result`, next **W** bits in `over`. Full value = concatenate `over` then `result` (MSB → LSB), same convention as [MAC](arithmetic.md#mac-multiply-accumulate).
 
-Overflow (sum needs more than **2W** bits) is a **runtime error**.
+With `; vector`, each index has its own `result[i]` and `over[i]` (same 2W packing per element).
+
+Overflow (more than **2W** bits needed per sum) is a **runtime error**.
 
 ```logts-play
 4wire a = 0011
@@ -39,7 +65,7 @@ show(result)
 show(over)
 ```
 
-Single vector (sum of elements):
+Single vector (sum of elements, scalar reduction):
 
 ```logts-play
 4wire[3] vectorA = 0001 + 0010 + 0011
@@ -54,9 +80,11 @@ show(result)
 ```
 MIN(Wbit ...) -> Wbit
 MAX(Wbit ...) -> Wbit
+MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
+MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
 ```
 
-Variadic (≥ 2 operands after expansion). Unsigned compare; returns the winning operand bit string.
+Variadic (≥ 2 operands after expansion, or ≥ 2 arguments with `; vector`). Unsigned compare by default; `; signed` uses two's complement. With `; vector`, returns one **vector** blob (`Wbit[n]`).
 
 ```logts-play
 4wire[3] vectorA = 0100 + 0010 + 0110
@@ -95,7 +123,8 @@ Slice arguments (`DOT(vectorA:0, vectorB:0)`) are **not** supported — use `MUL
 
 | Function | Bits needed (worst case) | Output width |
 |----------|--------------------------|--------------|
-| SUM | `W + ceil(log2(k))` | **2W** |
+| SUM (scalar) | `W + ceil(log2(k))` | **2W** |
+| SUM (`; vector`) | `2W` per index | **2W** per element |
 | DOT | `2W + ceil(log2(n))` | **3W** |
 
 `k` = operand count after expansion; `n` = element count; `W` = element width.
