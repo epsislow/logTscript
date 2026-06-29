@@ -13595,6 +13595,146 @@ reg(1873, 'wire-tensor', 'Zlist matrix header', function(h, session) {
   h.assert('driver', String(out.some(l => l.includes('matrixA:1:0 = 0011'))), 'true');
 }, ZSTATE_WAVE);
 
+reg(1874, 'wire-tensor', 'PIVOT transpose 3x2', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3,2] a = 1111 + 0011 + 0101 + 0000 + 1110 + 1001\n' +
+    '4wire[2,3] b = PIVOT(a)\n' +
+    '4wire c = b:0:0'
+  );
+  h.assert('pivot label', String(interp.getWireTypeLabel(interp.wires.get('b'))), '4wire[2,3]');
+  h.assert('cell 0,0', session.getWire(interp, 'c'), '1111');
+});
+
+reg(1875, 'wire-tensor', 'PIVOT horizontal to vertical', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] row = 1111 + 0011 + 0101\n' +
+    '4wire[3,1] col = PIVOT(row)\n' +
+    '4wire x = col:1'
+  );
+  const w = interp.wires.get('col');
+  h.assert('label', String(interp.getWireTypeLabel(w)), '4wire[3,1]');
+  h.assert('elem 1', session.getWire(interp, 'x'), '0011');
+});
+
+reg(1876, 'wire-tensor', 'double PIVOT identity', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,3] a = 1111 + 0011 + 0101 + 0000 + 1110 + 1001\n' +
+    '4wire[3,2] t = PIVOT(a)\n' +
+    '4wire[2,3] b = PIVOT(t)'
+  );
+  h.assert('identity', session.getWire(interp, 'b'), session.getWire(interp, 'a'));
+});
+
+// --- builtin-matrix / oriented vector (1877+) ---
+
+reg(1877, 'builtin-matrix', 'ADD(matrix, scalar; matrix) broadcast', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2,2] r, 4wire[2,2] f = ADD(m, 0001; matrix)'
+  );
+  h.assert('cell-wise add', session.getWire(interp, 'r'), '0010001101011001');
+});
+
+reg(1878, 'builtin-matrix', 'ADD(matrix, row; matrix) row broadcast', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2] row = 0001 + 0010\n' +
+    '4wire[2,2] r, 4wire[2,2] f = ADD(m, row; matrix)'
+  );
+  h.assert('row broadcast', session.getWire(interp, 'r'), '0010010001011010');
+});
+
+reg(1879, 'builtin-matrix', 'matrix and vector tags mutually exclusive', function(h, session) {
+  const r = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2,2] out = ADD(m, 0001; matrix vector)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('exclusive tags', String(err.includes("mutually exclusive")), 'true');
+});
+
+reg(1880, 'builtin-vector', 'SUM(horiz, vert; vector) oriented [1,N]+[N,1]', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] horiz = 0001 + 0010 + 0100\n' +
+    '4wire[3,1] vert = 0001 + 0001 + 0001\n' +
+    '4wire[3] r, 4wire[3] o = SUM(horiz, vert; vector)'
+  );
+  h.assert('oriented sum', session.getWire(interp, 'r'), '010001010111');
+  h.assert('over zero', session.getWire(interp, 'o'), '000000000000');
+});
+
+reg(1881, 'builtin-vector', 'ADD(horiz, vert; vector) oriented broadcast', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] horiz = 0001 + 0010 + 0100\n' +
+    '4wire[3,1] vert = 0001 + 0001 + 0001\n' +
+    '4wire[3] r, 4wire[3] f = ADD(horiz, vert; vector)'
+  );
+  h.assert('oriented add', session.getWire(interp, 'r'), '010001010111');
+});
+
+reg(1882, 'builtin-matrix', 'MULTIPLY(matrix, matrix; matrix)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] a = 0001 + 0010 + 0011 + 0100\n' +
+    '4wire[2,2] b = 0001 + 0000 + 0000 + 0001\n' +
+    '4wire[2,2] r, 4wire[2,2] o = MULTIPLY(a, b; matrix)'
+  );
+  h.assert('element-wise multiply', session.getWire(interp, 'r'), '0001000000000100');
+  h.assert('over zero', session.getWire(interp, 'o'), '0000000000000000');
+});
+
+reg(1883, 'builtin-matrix', 'GT(matrix, scalar; matrix)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '1wire[4] out = GT(m, 0010; matrix)'
+  );
+  h.assert('gt scalar 2', session.getWire(interp, 'out'), '0011');
+});
+
+reg(1884, 'builtin-matrix', 'MIN(matrix, matrix; matrix)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] a = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2,2] b = 0010 + 0001 + 1000 + 0100\n' +
+    '4wire[2,2] out = MIN(a, b; matrix)'
+  );
+  h.assert('min per cell', session.getWire(interp, 'out'), '0001000101000100');
+});
+
+reg(1885, 'builtin-matrix', 'EQ(matrix, matrix; matrix)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] a = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2,2] b = 0001 + 0010 + 0100 + 1000\n' +
+    '1wire[4] out = EQ(a, b; matrix)'
+  );
+  h.assert('all equal', session.getWire(interp, 'out'), '1111');
+});
+
+reg(1886, 'builtin-matrix', 'DOT 2x2 matrix multiply', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] a = 0001 + 0010 + 0011 + 0100\n' +
+    '4wire[2,2] b = 0101 + 0110 + 0111 + 1000\n' +
+    '4wire[2,2] r, 8wire[2,2] o = DOT(a, b)'
+  );
+  h.assert('matmul', session.getWire(interp, 'r'), '0011011010110010');
+  h.assert('over width', String(session.getWire(interp, 'o').length), '32');
+});
+
+reg(1887, 'builtin-matrix', 'ARGMAX(matrix) one-hot', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '1wire[4] idx = ARGMAX(m)'
+  );
+  h.assert('one-hot max at (1,1)', session.getWire(interp, 'idx'), '0001');
+});
+
+reg(1888, 'builtin-matrix', 'ARGMAX(matrix; index) row and col', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '1wire row, 1wire col = ARGMAX(m; index)'
+  );
+  h.assert('best row', session.getWire(interp, 'row'), '1');
+  h.assert('best col', session.getWire(interp, 'col'), '1');
+});
+
 reg(1743, 'loop', 'block repeat N..M[ is not expanded (passthrough)', function(h, session) {
   const src = 'repeat 1..3[\n    4wire w?\n    ]';
   const result = preprocessLoop(src);

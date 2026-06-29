@@ -62,6 +62,57 @@ show(a)
 show(b)
 ```
 
+### PIVOT
+
+`PIVOT(tensor)` swaps rows and columns (transpose). Vectors change orientation: `4wire[3]` ↔ `4wire[3,1]`.
+
+```logts-play
+4wire[3] row = 1111 + 0011 + 0101
+4wire[3,1] col = PIVOT(row)
+show(col)
+```
+
+### Tag `; matrix` (element-wise on 2D tensors)
+
+Use `; matrix` on the same built-ins as `; vector` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with `; vector`. Operands broadcast per cell: whole matrix, scalar, horizontal row `[1,N]`, or vertical column `[N,1]`.
+
+```logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] r, 4wire[2,2] f = ADD(m, 0001; matrix)
+show(r)
+```
+
+Dual-output ops (`ADD`, `SUM`, `MULTIPLY`, …) return **per-cell** result and flag/over blobs shaped like the matrix.
+
+### Oriented `; vector` (rank-1 broadcast)
+
+For `4wire[N]` + `4wire[N,1]` (or the reverse), `; vector` on **SUM** / **ADD** broadcasts the horizontal vector against the vertical one: each output index `i` combines `horiz[i]` with **all** vertical elements.
+
+```logts-play
+4wire[3] horiz = 0001 + 0010 + 0100
+4wire[3,1] vert = 0001 + 0001 + 0001
+4wire[3] r, 4wire[3] o = SUM(horiz, vert; vector)
+show(r)
+```
+
+### DOT and ARGMAX / ARGMIN on tensors
+
+**DOT** has no `; matrix` tag — shape rules apply automatically:
+
+| A | B | Result |
+|---|---|--------|
+| `[1,N]` | `[1,N]` | scalar `Wbit` (+ `2W` over) |
+| `[N,1]` | `[1,N]` | scalar |
+| `[N,K]` | `[K,M]` | matrix `[N,M]` — result `W` bits/cell, over `2W` bits/cell |
+
+**ARGMAX** / **ARGMIN** on a matrix return a **one-hot** over `rows×cols` bits, or with `; index` return `(row, col)` index wires.
+
+```logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+1wire[4] hot = ARGMAX(m)
+show(hot)
+```
+
 ---
 
 ## Initialization

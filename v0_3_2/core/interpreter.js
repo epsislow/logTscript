@@ -3294,7 +3294,8 @@ class Interpreter {
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
          'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ISDIGIT',
          'CNTN10S', 'N2N10S', 'N10S2N',
-         'CNTN16S', 'N2N16S', 'N16S2N'].includes(name)) {
+         'CNTN16S', 'N2N16S', 'N16S2N',
+         'PIVOT'].includes(name)) {
       return true;
     }
 
@@ -4213,6 +4214,24 @@ const idx = parseInt(
     
     if(a.call) return this.call(a.call, a.args, computeRefs, a.callTags);
   }
+  _matrixTaggedEvalFns() {
+    return {
+      evalCell: (varName, row, col) =>
+        this._evalReductionAtomValue({
+          var: varName, tensorSlice: 'cell', tensorRowIndex: row, tensorColIndex: col
+        }),
+      evalElement: (varName, index) =>
+        this._evalReductionAtomValue({ var: varName, vectorIndex: index }),
+      evalScalar: (argExpr) => this._evalCallArgValue(argExpr),
+    };
+  }
+
+  _returnMatrixTaggedBlob(blob, computeRefs) {
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
   _vectorTaggedEvalFns() {
     return {
       evalElement: (varName, index) =>
@@ -4239,21 +4258,24 @@ const idx = parseInt(
   const SA = typeof LogTScriptSignedArithmetic !== 'undefined' ? LogTScriptSignedArithmetic : null;
   let signedMode = false;
   let vectorMode = false;
+  let matrixMode = false;
   let indexMode = false;
   if (callTags && callTags.length) {
     const isBuiltin = !!Interpreter.BUILTIN_DOC[name];
     const acceptsSigned = SA && SA.BUILTIN_SIGNED_TAG_FUNCS.has(name);
     const acceptsVector = SA && SA.BUILTIN_VECTOR_TAG_FUNCS.has(name);
+    const acceptsMatrix = SA && SA.BUILTIN_MATRIX_TAG_FUNCS.has(name);
     const acceptsIndex = SA && SA.BUILTIN_INDEX_TAG_FUNCS.has(name);
-    if (isBuiltin && !acceptsSigned && !acceptsVector && !acceptsIndex) {
+    if (isBuiltin && !acceptsSigned && !acceptsVector && !acceptsMatrix && !acceptsIndex) {
       fail(`${name}: does not accept call tags`);
     }
-    if (acceptsSigned || acceptsVector || acceptsIndex) {
+    if (acceptsSigned || acceptsVector || acceptsMatrix || acceptsIndex) {
       const tags = SA.parseBuiltinCallTags(
-        callTags, name, (msg) => fail(msg), acceptsSigned, acceptsVector, acceptsIndex
+        callTags, name, (msg) => fail(msg), acceptsSigned, acceptsVector, acceptsIndex, acceptsMatrix
       );
       signedMode = tags.signed;
       vectorMode = tags.vector;
+      matrixMode = tags.matrix;
       indexMode = tags.index;
     }
   }
@@ -4281,16 +4303,62 @@ const idx = parseInt(
       : { value: dataVal, ref: null };
   }
 
+  if (name === 'PIVOT') {
+    if (args.length !== 1) fail('PIVOT expects 1 argument');
+    const a = args[0] && args[0][0];
+    if (!a || !a.var) fail('PIVOT expects one whole tensor argument');
+    if (a.vectorIndex !== undefined || a.vectorIndexExpr || a.bitRange
+        || a.tensorSlice || a.tensorRowIndex !== undefined || a.tensorColIndex !== undefined
+        || a.tensorRowIndexExpr || a.tensorColIndexExpr) {
+      fail('PIVOT expects one whole tensor argument');
+    }
+    const wire = this.wires.get(a.var);
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const meta = TS ? TS.getWireTensorMeta(wire) : null;
+    if (!meta || meta.elementCount < 1) fail('PIVOT expects one whole tensor argument');
+    const val = this._evalCallArgValue(args[0]);
+    if (!val || val === '-') fail('PIVOT: empty tensor value');
+    const pivoted = TS.pivotBlob(val, meta.elementWidth, meta.rows, meta.cols);
+    return computeRefs
+      ? { value: pivoted, ref: `&${this.storeValue(pivoted)}` }
+      : { value: pivoted, ref: null };
+  }
+
   if (name === 'SUM') {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+    const getWire = (n) => this.wires.get(n);
+    if (matrixMode) {
+      if (!MR) fail('SUM: internal error (matrix-reduce not loaded)');
+      let sumMat;
+      try {
+        sumMat = MR.sumMatrixTagged(
+          args, getWire, 'SUM', signedMode, this._matrixTaggedEvalFns()
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return [
+        computeRefs
+          ? { value: sumMat.resultBlob, ref: `&${this.storeValue(sumMat.resultBlob)}` }
+          : { value: sumMat.resultBlob, ref: null },
+        computeRefs
+          ? { value: sumMat.overBlob, ref: `&${this.storeValue(sumMat.overBlob)}` }
+          : { value: sumMat.overBlob, ref: null },
+      ];
+    }
     if (vectorMode) {
       if (!VR) fail('SUM: internal error (vector-reduce not loaded)');
-      const getWire = (n) => this.wires.get(n);
       let sumVec;
       try {
-        sumVec = VR.sumVectorTagged(
-          args, getWire, 'SUM', signedMode, this._vectorTaggedEvalFns()
-        );
+        const pair = VR.detectOrientedVectorPair(args, getWire);
+        if (pair) {
+          sumVec = VR.sumVectorOrientedTagged(args, pair, 'SUM', signedMode, this._vectorTaggedEvalFns());
+        } else {
+          sumVec = VR.sumVectorTagged(
+            args, getWire, 'SUM', signedMode, this._vectorTaggedEvalFns()
+          );
+        }
       } catch (e) {
         fail(e.message);
       }
@@ -4322,8 +4390,31 @@ const idx = parseInt(
 
   if (name === 'DOT') {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
     if (args.length !== 2) fail('DOT expects 2 arguments');
     const getWire = (n) => this.wires.get(n);
+    if (MR && TS && MR.isWholeTensorWireArg(args[0], getWire) && MR.isWholeTensorWireArg(args[1], getWire)) {
+      const metaA = TS.getWireTensorMeta(getWire(args[0][0].var));
+      const metaB = TS.getWireTensorMeta(getWire(args[1][0].var));
+      const simpleVec = metaA.rows === 1 && metaB.rows === 1 && metaA.cols === metaB.cols;
+      if (!simpleVec && MR.resolveDotMatrixShape(metaA, metaB)) {
+        let dotMat;
+        try {
+          dotMat = MR.dotMatrixMultiply(args, getWire, signedMode, this._matrixTaggedEvalFns());
+        } catch (e) {
+          fail(e.message);
+        }
+        return [
+          computeRefs
+            ? { value: dotMat.resultBlob, ref: `&${this.storeValue(dotMat.resultBlob)}` }
+            : { value: dotMat.resultBlob, ref: null },
+          computeRefs
+            ? { value: dotMat.overBlob, ref: `&${this.storeValue(dotMat.overBlob)}` }
+            : { value: dotMat.overBlob, ref: null },
+        ];
+      }
+    }
     if (!VR || !VR.isWholeVectorWireArg(args[0], getWire) || !VR.isWholeVectorWireArg(args[1], getWire)) {
       fail('DOT expects two whole vector arguments');
     }
@@ -4359,12 +4450,38 @@ const idx = parseInt(
   if (name === 'ARGMAX' || name === 'ARGMIN') {
     if (args.length !== 1) fail(`${name} expects 1 argument`);
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
-    if (!VR) fail(`${name}: internal error (vector-reduce not loaded)`);
+    const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
     const getWire = (n) => this.wires.get(n);
     const compareFns = {
       unsigned: unsignedCompareBigInt,
       signed: SA ? SA.signedCompareBigInt : null,
     };
+    if (MR) {
+      let matStep = null;
+      try {
+        matStep = MR.argExtremumFromWholeMatrix(
+          args, getWire, name, name === 'ARGMAX', signedMode,
+          this._matrixTaggedEvalFns(), compareFns
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      if (matStep) {
+        if (indexMode) {
+          const rowV = binPadInt(matStep.bestRow, bitIndexWidth(matStep.rows));
+          const colV = binPadInt(matStep.bestCol, bitIndexWidth(matStep.cols));
+          return [
+            computeRefs ? { value: rowV, ref: `&${this.storeValue(rowV)}` } : { value: rowV, ref: null },
+            computeRefs ? { value: colV, ref: `&${this.storeValue(colV)}` } : { value: colV, ref: null },
+          ];
+        }
+        const v = matStep.oneHot;
+        return computeRefs
+          ? { value: v, ref: `&${this.storeValue(v)}` }
+          : { value: v, ref: null };
+      }
+    }
+    if (!VR) fail(`${name}: internal error (vector-reduce not loaded)`);
     let step;
     try {
       step = VR.argExtremumFromWholeVector(
@@ -4418,6 +4535,21 @@ const idx = parseInt(
   }
 
   // EQ element-wise vector (before logic-gate fold)
+  if (name === 'EQ' && matrixMode) {
+    const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+    if (!MR) fail('EQ: internal error (matrix-reduce not loaded)');
+    const getWire = (n) => this.wires.get(n);
+    let blob;
+    try {
+      blob = MR.compareMatrixTagged(
+        args, getWire, 'EQ', 'EQ', false, this._matrixTaggedEvalFns(),
+        { unsigned: unsignedCompareBigInt, signed: null }
+      );
+    } catch (e) {
+      fail(e.message);
+    }
+    return this._returnMatrixTaggedBlob(blob, computeRefs);
+  }
   if (name === 'EQ' && vectorMode) {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
     if (!VR) fail('EQ: internal error (vector-reduce not loaded)');
@@ -4773,8 +4905,9 @@ if (this.isBuiltinDEMUX(name)) {
       fail(`${name} expects 2 or 3 arguments`);
     }
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
-    if (vectorMode) {
-      if (!VR) fail(`${name}: internal error (vector-reduce not loaded)`);
+    if (vectorMode || matrixMode) {
+      const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+      if (!VR && !MR) fail(`${name}: internal error (reduce not loaded)`);
       const getWire = (n) => this.wires.get(n);
       const shiftFns = {
         lshift: VR.logicalLshift,
@@ -4783,9 +4916,16 @@ if (this.isBuiltinDEMUX(name)) {
       };
       let blob;
       try {
-        blob = VR.shiftVectorTagged(
-          args, getWire, name, name, signedMode, this._vectorTaggedEvalFns(), shiftFns
-        );
+        if (matrixMode) {
+          if (!MR) fail(`${name}: internal error (matrix-reduce not loaded)`);
+          blob = MR.shiftMatrixTagged(
+            args, getWire, name, name, signedMode, this._matrixTaggedEvalFns(), shiftFns
+          );
+        } else {
+          blob = VR.shiftVectorTagged(
+            args, getWire, name, name, signedMode, this._vectorTaggedEvalFns(), shiftFns
+          );
+        }
       } catch (e) {
         fail(e.message);
       }
@@ -4931,14 +5071,22 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'REVERSE') {
     if (argValues.length !== 1) fail('REVERSE expects 1 argument');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
-    if (vectorMode) {
-      if (!VR) fail('REVERSE: internal error (vector-reduce not loaded)');
+    const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+    if (vectorMode || matrixMode) {
+      if (!VR && !MR) fail('REVERSE: internal error (reduce not loaded)');
       const getWire = (n) => this.wires.get(n);
       let blob;
       try {
-        blob = VR.reverseVectorTagged(
-          args, getWire, 'REVERSE', this._vectorTaggedEvalFns()
-        );
+        if (matrixMode) {
+          if (!MR) fail('REVERSE: internal error (matrix-reduce not loaded)');
+          blob = MR.reverseMatrixTagged(
+            args, getWire, 'REVERSE', this._matrixTaggedEvalFns()
+          );
+        } else {
+          blob = VR.reverseVectorTagged(
+            args, getWire, 'REVERSE', this._vectorTaggedEvalFns()
+          );
+        }
       } catch (e) {
         fail(e.message);
       }
@@ -4955,14 +5103,22 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'LROTATE' || name === 'RROTATE') {
     if (argValues.length !== 2) fail(`${name} expects 2 arguments`);
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
-    if (vectorMode) {
-      if (!VR) fail(`${name}: internal error (vector-reduce not loaded)`);
+    const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+    if (vectorMode || matrixMode) {
+      if (!VR && !MR) fail(`${name}: internal error (reduce not loaded)`);
       const getWire = (n) => this.wires.get(n);
       let blob;
       try {
-        blob = VR.rotateVectorTagged(
-          args, getWire, name, name, this._vectorTaggedEvalFns()
-        );
+        if (matrixMode) {
+          if (!MR) fail(`${name}: internal error (matrix-reduce not loaded)`);
+          blob = MR.rotateMatrixTagged(
+            args, getWire, name, name, this._matrixTaggedEvalFns()
+          );
+        } else {
+          blob = VR.rotateVectorTagged(
+            args, getWire, name, name, this._vectorTaggedEvalFns()
+          );
+        }
       } catch (e) {
         fail(e.message);
       }
@@ -4998,9 +5154,18 @@ if (this.isBuiltinDEMUX(name)) {
     };
     let addVec = null;
     try {
-      if (vectorMode) {
+      if (matrixMode) {
+        const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+        if (!MR) fail('ADD: internal error (matrix-reduce not loaded)');
+        addVec = MR.addSubtractMatrixTagged(args, getWire, 'ADD', this._matrixTaggedEvalFns(), applyAdd);
+      } else if (vectorMode) {
         if (!VR) fail('ADD: internal error (vector-reduce not loaded)');
-        addVec = VR.addSubtractVectorTagged(args, getWire, 'ADD', evalFns, applyAdd);
+        const pair = VR.detectOrientedVectorPair(args, getWire);
+        if (pair) {
+          addVec = VR.addSubtractVectorOrientedTagged(args, pair, 'ADD', evalFns, applyAdd);
+        } else {
+          addVec = VR.addSubtractVectorTagged(args, getWire, 'ADD', evalFns, applyAdd);
+        }
       } else if (VR) {
         const pair = VR.getVectorBroadcastPair(args, getWire);
         if (pair) {
@@ -5039,17 +5204,33 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'SUBTRACT') {
     if (argValues.length !== 2) fail('SUBTRACT expects 2 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+    const getWire = (n) => this.wires.get(n);
+    const evalFns = this._vectorTaggedEvalFns();
+    const applySub = (a, b, W) => {
+      if (SA) return SA.subtractAtWidth(a, b, W, signedMode);
+      return VR.subtractUnsignedAtWidth(a, b, W);
+    };
+    if (matrixMode) {
+      if (!MR) fail('SUBTRACT: internal error (matrix-reduce not loaded)');
+      let subMat;
+      try {
+        subMat = MR.addSubtractMatrixTagged(args, getWire, 'SUBTRACT', this._matrixTaggedEvalFns(), applySub);
+      } catch (e) {
+        fail(e.message);
+      }
+      return this._returnBuiltinVectorPair(subMat.resultBlob, subMat.flagBlob, computeRefs);
+    }
     if (vectorMode) {
       if (!VR) fail('SUBTRACT: internal error (vector-reduce not loaded)');
-      const getWire = (n) => this.wires.get(n);
-      const evalFns = this._vectorTaggedEvalFns();
-      const applySub = (a, b, W) => {
-        if (SA) return SA.subtractAtWidth(a, b, W, signedMode);
-        return VR.subtractUnsignedAtWidth(a, b, W);
-      };
       let subVec;
       try {
-        subVec = VR.addSubtractVectorTagged(args, getWire, 'SUBTRACT', evalFns, applySub);
+        const pair = VR.detectOrientedVectorPair(args, getWire);
+        if (pair) {
+          subVec = VR.addSubtractVectorOrientedTagged(args, pair, 'SUBTRACT', evalFns, applySub);
+        } else {
+          subVec = VR.addSubtractVectorTagged(args, getWire, 'SUBTRACT', evalFns, applySub);
+        }
       } catch (e) {
         fail(e.message);
       }
@@ -5083,14 +5264,27 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'MULTIPLY') {
     if (argValues.length !== 2) fail('MULTIPLY expects 2 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+    const getWire = (n) => this.wires.get(n);
+    const evalFns = this._vectorTaggedEvalFns();
+    const multiplyFn = (a, b, W, signed) => {
+      if (SA) return SA.multiplyAtWidth(a, b, W, signed);
+      return VR.multiplyUnsignedAtWidth(a, b, W);
+    };
+    if (matrixMode) {
+      if (!MR) fail('MULTIPLY: internal error (matrix-reduce not loaded)');
+      let mulMat;
+      try {
+        mulMat = MR.multiplyMatrixTagged(
+          args, getWire, 'MULTIPLY', signedMode, this._matrixTaggedEvalFns(), multiplyFn
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return this._returnBuiltinVectorPair(mulMat.resultBlob, mulMat.overBlob, computeRefs);
+    }
     if (vectorMode) {
       if (!VR) fail('MULTIPLY: internal error (vector-reduce not loaded)');
-      const getWire = (n) => this.wires.get(n);
-      const evalFns = this._vectorTaggedEvalFns();
-      const multiplyFn = (a, b, W, signed) => {
-        if (SA) return SA.multiplyAtWidth(a, b, W, signed);
-        return VR.multiplyUnsignedAtWidth(a, b, W);
-      };
       let mulVec;
       try {
         mulVec = VR.multiplyVectorTagged(
@@ -5148,6 +5342,20 @@ if (this.isBuiltinDEMUX(name)) {
         mod: (remainder & mask).toString(2).padStart(W, '0'),
       };
     };
+    if (matrixMode) {
+      const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+      if (!MR) fail('DIVIDE: internal error (matrix-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let divMat;
+      try {
+        divMat = MR.divideMatrixTagged(
+          args, getWire, 'DIVIDE', signedMode, this._matrixTaggedEvalFns(), divideFn
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return this._returnBuiltinVectorPair(divMat.resultBlob, divMat.modBlob, computeRefs);
+    }
     if (vectorMode) {
       if (!VR) fail('DIVIDE: internal error (vector-reduce not loaded)');
       const getWire = (n) => this.wires.get(n);
@@ -5182,14 +5390,28 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'MAC') {
     if (argValues.length !== 3) fail('MAC expects 3 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+    const macFn = (acc, a, b, signed) => {
+      if (SA) return SA.macAtWidth(acc, a, b, signed);
+      return macUnsigned(acc, a, b);
+    };
+    if (matrixMode) {
+      if (!MR) fail('MAC: internal error (matrix-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let macMat;
+      try {
+        macMat = MR.macMatrixTagged(
+          args, getWire, 'MAC', signedMode, this._matrixTaggedEvalFns(), macFn
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return this._returnBuiltinVectorPair(macMat.resultBlob, macMat.overBlob, computeRefs);
+    }
     if (vectorMode) {
       if (!VR) fail('MAC: internal error (vector-reduce not loaded)');
       const getWire = (n) => this.wires.get(n);
       const evalFns = this._vectorTaggedEvalFns();
-      const macFn = (acc, a, b, signed) => {
-        if (SA) return SA.macAtWidth(acc, a, b, signed);
-        return macUnsigned(acc, a, b);
-      };
       let macVec;
       try {
         macVec = VR.macVectorTagged(
@@ -5288,6 +5510,26 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'GT') {
     if (argValues.length !== 2) fail('GT expects 2 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (matrixMode) {
+      const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+      if (!MR) fail('GT: internal error (matrix-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      const compareFns = {
+        unsigned: unsignedCompareBigInt,
+        signed: SA ? SA.signedCompareBigInt : null,
+      };
+      let blob;
+      try {
+        blob = MR.compareMatrixTagged(
+          args, getWire, 'GT', 'GT', signedMode, this._matrixTaggedEvalFns(), compareFns
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     if (vectorMode) {
       if (!VR) fail('GT: internal error (vector-reduce not loaded)');
       const getWire = (n) => this.wires.get(n);
@@ -5320,6 +5562,26 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'LT') {
     if (argValues.length !== 2) fail('LT expects 2 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (matrixMode) {
+      const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+      if (!MR) fail('LT: internal error (matrix-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      const compareFns = {
+        unsigned: unsignedCompareBigInt,
+        signed: SA ? SA.signedCompareBigInt : null,
+      };
+      let blob;
+      try {
+        blob = MR.compareMatrixTagged(
+          args, getWire, 'LT', 'LT', signedMode, this._matrixTaggedEvalFns(), compareFns
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     if (vectorMode) {
       if (!VR) fail('LT: internal error (vector-reduce not loaded)');
       const getWire = (n) => this.wires.get(n);
@@ -5351,6 +5613,23 @@ if (this.isBuiltinDEMUX(name)) {
 
   if (name === 'MIN') {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (matrixMode) {
+      const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+      if (!MR) fail('MIN: internal error (matrix-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let blob;
+      try {
+        blob = MR.minMaxMatrixTagged(
+          args, getWire, 'MIN', true, signedMode, this._matrixTaggedEvalFns(),
+          SA ? SA.pickMinMaxSigned : null
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     if (vectorMode) {
       if (!VR) fail('MIN: internal error (vector-reduce not loaded)');
       const getWire = (n) => this.wires.get(n);
@@ -5385,6 +5664,23 @@ if (this.isBuiltinDEMUX(name)) {
 
   if (name === 'MAX') {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (matrixMode) {
+      const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+      if (!MR) fail('MAX: internal error (matrix-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let blob;
+      try {
+        blob = MR.minMaxMatrixTagged(
+          args, getWire, 'MAX', false, signedMode, this._matrixTaggedEvalFns(),
+          SA ? SA.pickMinMaxSigned : null
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     if (vectorMode) {
       if (!VR) fail('MAX: internal error (vector-reduce not loaded)');
       const getWire = (n) => this.wires.get(n);
@@ -5420,14 +5716,30 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'CLAMP') {
     if (argValues.length !== 3) fail('CLAMP expects 3 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const clampAtWidth = (x, lo, hi) => {
+      if (signedMode && SA) return SA.clampSigned(x, lo, hi);
+      return clampUnsigned(x, lo, hi);
+    };
+    if (matrixMode) {
+      const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+      if (!MR) fail('CLAMP: internal error (matrix-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let blob;
+      try {
+        blob = MR.clampMatrixTagged(
+          args, getWire, 'CLAMP', this._matrixTaggedEvalFns(), clampAtWidth
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     if (vectorMode) {
       if (!VR) fail('CLAMP: internal error (vector-reduce not loaded)');
       const getWire = (n) => this.wires.get(n);
       const evalFns = this._vectorTaggedEvalFns();
-      const clampAtWidth = (x, lo, hi) => {
-        if (signedMode && SA) return SA.clampSigned(x, lo, hi);
-        return clampUnsigned(x, lo, hi);
-      };
       let blob;
       try {
         blob = VR.clampVectorTagged(args, getWire, 'CLAMP', evalFns, clampAtWidth);
@@ -12287,6 +12599,7 @@ Interpreter.BUILTIN_DOC = {
     'REVERSE(Xbit) -> Xbit',
     'REVERSE(Wbit[n] data ; vector) -> Wbit[n]',
   ],
+  PIVOT:    ['PIVOT(Wwire tensor) -> Wwire tensor'],
   LROTATE:  [
     'LROTATE(Xbit data, Ybit count) -> Xbit',
     'LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]',

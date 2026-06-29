@@ -702,6 +702,82 @@
     return findVectorExtremumIndex(values, W, pickMax, signed, compareFns, fnName);
   }
 
+  function getTensorShapeMeta(argExpr, getWire) {
+    if (!isWholeVectorWireArg(argExpr, getWire)) return null;
+    const wire = getWire(argExpr[0].var);
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (TS) return TS.getWireTensorMeta(wire);
+    return wire && wire.vector
+      ? { elementWidth: wire.vector.elementWidth, rows: 1, cols: wire.vector.elementCount }
+      : null;
+  }
+
+  function detectOrientedVectorPair(args, getWire) {
+    if (!args || args.length !== 2) return null;
+    const m0 = getTensorShapeMeta(args[0], getWire);
+    const m1 = getTensorShapeMeta(args[1], getWire);
+    if (!m0 || !m1) return null;
+    if (m0.rows === 1 && m0.cols > 1 && m1.rows > 1 && m1.cols === 1 && m0.cols === m1.rows) {
+      return { horizArg: 0, vertArg: 1, N: m0.cols, W: m0.elementWidth };
+    }
+    if (m1.rows === 1 && m1.cols > 1 && m0.rows > 1 && m0.cols === 1 && m1.cols === m0.rows) {
+      return { horizArg: 1, vertArg: 0, N: m1.cols, W: m1.elementWidth };
+    }
+    return null;
+  }
+
+  function orientedEvalCell(evalFns, varName, row, col) {
+    if (evalFns.evalCell) return evalFns.evalCell(varName, row, col);
+    const idx = row * 1 + col;
+    return evalFns.evalElement(varName, row > 0 ? row : idx);
+  }
+
+  function sumVectorOrientedTagged(args, pair, fnName, signed, evalFns) {
+    const W = pair.W;
+    const N = pair.N;
+    const horizVar = args[pair.horizArg][0].var;
+    const vertVar = args[pair.vertArg][0].var;
+    const vertVals = [];
+    for (let k = 0; k < N; k++) {
+      vertVals.push(String(orientedEvalCell(evalFns, vertVar, k, 0)).padStart(W, '0'));
+    }
+    const results = [];
+    const overs = [];
+    for (let i = 0; i < N; i++) {
+      const horizVal = String(orientedEvalCell(evalFns, horizVar, 0, i)).padStart(W, '0');
+      const vals = [horizVal, ...vertVals];
+      const step = sumExpanded(vals, W, signed);
+      results.push(step.result);
+      overs.push(step.over);
+    }
+    return { resultBlob: results.join(''), overBlob: overs.join('') };
+  }
+
+  function addSubtractVectorOrientedTagged(args, pair, fnName, evalFns, applyAtWidth) {
+    const W = pair.W;
+    const N = pair.N;
+    const horizVar = args[pair.horizArg][0].var;
+    const vertVar = args[pair.vertArg][0].var;
+    const vertVals = [];
+    for (let k = 0; k < N; k++) {
+      vertVals.push(String(orientedEvalCell(evalFns, vertVar, k, 0)).padStart(W, '0'));
+    }
+    const results = [];
+    const flags = [];
+    for (let i = 0; i < N; i++) {
+      let acc = String(orientedEvalCell(evalFns, horizVar, 0, i)).padStart(W, '0');
+      let flag = '0'.repeat(W);
+      for (const vv of vertVals) {
+        const step = applyAtWidth(acc, vv, W);
+        acc = step.result;
+        flag = String(step.flag).padStart(W, '0');
+      }
+      results.push(acc);
+      flags.push(flag);
+    }
+    return { resultBlob: results.join(''), flagBlob: flags.join('') };
+  }
+
   const api = {
     unsignedBinToBigInt,
     isReductionWireAtom,
@@ -739,6 +815,9 @@
     shiftVectorTagged,
     rotateVectorTagged,
     reverseVectorTagged,
+    detectOrientedVectorPair,
+    sumVectorOrientedTagged,
+    addSubtractVectorOrientedTagged,
     findVectorExtremumIndex,
     argExtremumFromWholeVector,
   };

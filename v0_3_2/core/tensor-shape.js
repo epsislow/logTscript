@@ -91,6 +91,25 @@
     return ew * dims.rows * dims.cols;
   }
 
+  /** Transpose blob: [rows,cols] -> [cols,rows], row-major both ways. */
+  function pivotBlob(val, ew, rows, cols) {
+    const s = val == null ? '' : String(val);
+    let out = '';
+    for (let dr = 0; dr < cols; dr++) {
+      for (let dc = 0; dc < rows; dc++) {
+        const sr = dc;
+        const sc = dr;
+        const start = linearIndex(sr, sc, cols) * ew;
+        out += s.substring(start, start + ew);
+      }
+    }
+    return out;
+  }
+
+  function pivotedDims(rows, cols) {
+    return { rows: cols, cols: rows };
+  }
+
   const api = {
     normalizeDeclTensor,
     isScalarTensor,
@@ -102,7 +121,9 @@
     gatherColumnBits,
     scatterColumnBits,
     formatTensorTypeLabel,
-    declBitTotal
+    declBitTotal,
+    pivotBlob,
+    pivotedDims
   };
 
   if (typeof module !== 'undefined' && module.exports) {

@@ -7,22 +7,22 @@ todos:
     status: completed
   - id: f2-pivot
     content: "Faza 2: builtin PIVOT + permutare blob + teste transpose și vector vertical"
-    status: pending
+    status: completed
   - id: f3-matrix-tag-infra
     content: "Faza 3: BUILTIN_MATRIX_TAG_FUNCS, matrix-reduce.js, broadcast matrix/scalar/row/col"
-    status: pending
+    status: completed
   - id: f4-vector-oriented
     content: "Faza 4: ; vector extins pentru perechi [1,N]+[N,1] (SUM/ADD rank-1)"
-    status: pending
+    status: completed
   - id: f5-matrix-builtins
     content: "Faza 5: ; matrix pe built-in-uri (fără DOT/ARGMAX/ARGMIN) — loturi A–D"
-    status: pending
+    status: completed
   - id: f5b-dot-arg
     content: "Faza 5b: DOT înmulțire matricială + ARGMAX/ARGMIN matrice (index i,j) — fără ; matrix"
-    status: pending
+    status: completed
   - id: f6-doc-matrix
     content: "Faza 6: wire-vectors.md, matrix-reduction, builtin-tagged-index, semnături doc"
-    status: pending
+    status: completed
 isProject: false
 ---
 

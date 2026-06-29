@@ -18,6 +18,12 @@
     'GT', 'LT', 'EQ', 'RSHIFT', 'LSHIFT', 'LROTATE', 'RROTATE', 'REVERSE',
   ]);
 
+  const BUILTIN_MATRIX_TAG_FUNCS = new Set([
+    'MIN', 'MAX', 'SUM', 'ADD', 'SUBTRACT', 'CLAMP',
+    'MULTIPLY', 'MAC', 'DIVIDE',
+    'GT', 'LT', 'EQ', 'RSHIFT', 'LSHIFT', 'LROTATE', 'RROTATE', 'REVERSE',
+  ]);
+
   function signedBinToBigInt(binStr) {
     const s = binStr == null ? '' : String(binStr);
     if (!s.length) return 0n;
@@ -194,12 +200,13 @@
     return fill.repeat(amount) + data.slice(0, len - amount);
   }
 
-  function parseBuiltinCallTags(callTags, fnName, fail, acceptsSigned, acceptsVector, acceptsIndex) {
+  function parseBuiltinCallTags(callTags, fnName, fail, acceptsSigned, acceptsVector, acceptsIndex, acceptsMatrix) {
     let signed = false;
     let vector = false;
     let index = false;
+    let matrix = false;
     if (!callTags || !callTags.length) {
-      return { signed, vector, index };
+      return { signed, vector, index, matrix };
     }
     for (const t of callTags) {
       if (t.name === 'signed') {
@@ -218,6 +225,14 @@
           fail(`${fnName}: tag 'vector' must be enabled (use '; vector' or '; vector=1')`);
         }
         vector = true;
+      } else if (t.name === 'matrix') {
+        if (!acceptsMatrix) {
+          fail(`${fnName}: does not accept tag 'matrix'`);
+        }
+        if (t.value !== 1) {
+          fail(`${fnName}: tag 'matrix' must be enabled (use '; matrix' or '; matrix=1')`);
+        }
+        matrix = true;
       } else if (t.name === 'index') {
         if (!acceptsIndex) {
           fail(`${fnName}: does not accept tag 'index'`);
@@ -230,7 +245,10 @@
         fail(`${fnName}: unknown tag '${t.name}'`);
       }
     }
-    return { signed, vector, index };
+    if (vector && matrix) {
+      fail(`${fnName}: '; vector' and '; matrix' are mutually exclusive`);
+    }
+    return { signed, vector, index, matrix };
   }
 
   /** @deprecated use parseBuiltinCallTags */
@@ -242,6 +260,7 @@
   const api = {
     BUILTIN_SIGNED_TAG_FUNCS,
     BUILTIN_VECTOR_TAG_FUNCS,
+    BUILTIN_MATRIX_TAG_FUNCS,
     BUILTIN_INDEX_TAG_FUNCS,
     parseBuiltinCallTags,
     parseBuiltinSignedCallTags,
