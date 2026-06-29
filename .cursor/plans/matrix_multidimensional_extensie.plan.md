@@ -95,6 +95,8 @@ Builtin nou (fără tag): `PIVOT(Xtensor) -> Xtensor` — doar swap `dims[0] ↔
 7. **watch-expand**: limită afișare ca la vectori.
 8. **Teste** grup `wire-tensor`.
 
+> **Checklist după fiecare fază:** module noi în `tests/test_scripts.json` → `node node/_gen_test_manifest.js` → toate cele 1351+ teste verzi în Node și `run_tests.html`.
+
 ### Faza 2 — Builtin PIVOT
 
 ### Faza 3 — Infrastructură `; matrix`
