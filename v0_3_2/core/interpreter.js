@@ -3888,9 +3888,9 @@ const idx = parseInt(
 }    
     
     
-    if(a.call) return this.call(a.call, a.args, computeRefs);
+    if(a.call) return this.call(a.call, a.args, computeRefs, a.callTags);
   }
-  call(fn, args, computeRefs = false) {
+  call(fn, args, computeRefs = false, callTags = null) {
   const { name, alias } = fn;
   const fail = (msg, len) => this._throwRuntime(msg, fn, len != null ? len : name.length);
 
@@ -4791,10 +4791,23 @@ if (this.isBuiltinDEMUX(name)) {
     fail(`Function ${name} is not local; use ${name}@alias(...)`);
   }
 
-  const f = funcs.get(name);
+  const groupEntry = funcs.get(name);
+  const ufo = typeof UserFuncOverloads !== 'undefined' ? UserFuncOverloads : null;
+  const group = ufo ? ufo.ensureGroup(groupEntry) : groupEntry;
 
-  if (argValues.length !== f.params.length) {
+  if (argValues.length !== group.params.length) {
     fail(`Bad arity for ${name}`);
+  }
+
+  let f;
+  if (ufo && group.overloads) {
+    const resolved = ufo.resolveUserFuncOverload(group, callTags);
+    if (!resolved) {
+      fail(ufo.formatNoUserFuncMatch(name, callTags));
+    }
+    f = resolved.overload;
+  } else {
+    f = groupEntry;
   }
 
   const local = new Interpreter(this.funcs, this.out, this.pcbDefinitions, this.componentRegistry, this.signalPropagationStrategy);
@@ -4803,7 +4816,7 @@ if (this.isBuiltinDEMUX(name)) {
   local.nextIndex = this.nextIndex;
   local.pcbInstances = this.pcbInstances;
 
-  f.params.forEach((p, i) => {
+  group.params.forEach((p, i) => {
     local.vars.set(p.id, {
       type: p.type,
       value: argValues[i],
@@ -11764,6 +11777,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
 
   // ---- User-defined functions ----
   if (funcs && funcs.has(name)) {
+    if (typeof UserFuncOverloads !== 'undefined') {
+      return UserFuncOverloads.getUserFuncDocLines(name, funcs.get(name));
+    }
     const f = funcs.get(name);
     const paramStr = f.params.map(p => `${p.type} ${p.id}`).join(', ');
     const sig = `${name}(${paramStr})`;

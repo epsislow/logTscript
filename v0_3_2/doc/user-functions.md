@@ -176,6 +176,101 @@ Without `@alias`, call `helper(x)` directly. If the function exists only in a lo
 
 ---
 
+## Tag overloads (`; tag=…`)
+
+Multiple `def` entries may share the **same name and parameter list** and differ only by **tags** after a semicolon in the signature. Tags are part of the signature only — they never appear in the function body.
+
+### Definition syntax
+
+```logts
+def name(Type p1, Type p2; tag1=1 tag2=2 tag3):
+  :ReturnType expr
+```
+
+Parameters and tags are both inside `( … )`, separated by `;`.
+
+| Form | Meaning |
+|------|---------|
+| `tag1=1` | Integer tag (decimal literal) |
+| `tag3` | Boolean tag — presence means `tag3=1` |
+| (no `;` section) | Base overload with no tags |
+
+Rules:
+
+- All overloads under one name must have the **same** parameter list (`Type id` pairs).
+- A tag name cannot match a parameter name.
+- Once a tag is **bool** in any overload, it cannot take an integer value in another (`tag3` then `tag3=2` → parse error).
+- Duplicate tag signatures for the same name are rejected.
+
+### Call syntax
+
+```logts
+1wire x = myFunc(a, b; tag2=2 tag1)
+1wire y = myFunc(a, b; tag3)
+```
+
+- Tag order at the call site does **not** matter.
+- Resolution requires an **exact** tag-set match (not a subset).
+- Unmatched tags → `no user function defined \`name\` and: tag2=2`
+
+### Exact matching — worked example (`test`)
+
+Seven overloads can share the name `test` with the same parameters. Each overload is identified **only** by its full tag set.
+
+| Overload | Definition tags | Example call | Result |
+|----------|-----------------|--------------|--------|
+| #1 | *(none)* | `test(a, b)` | base |
+| #2 | `tag1=1` | `test(a, b; tag1=1)` | #2 |
+| #3 | `tag1=0` | `test(a, b; tag1=0)` | #3 |
+| #4 | `tag1=2` | `test(a, b; tag1=2)` | #4 |
+| #5 | `tag1=2 tag2=2` | `test(a, b; tag1=2 tag2=2)` | #5 |
+| #6 | `tag1=1 tag2=3 tag3` | `test(a, b; tag1=1 tag2=3 tag3)` | #6 |
+| #7 | `tag2=1` | `test(a, b; tag2=1)` | #7 |
+
+**Overload #5 in detail.** The definition must declare **both** tags with **both** values:
+
+```logts
+def test(4bit p1, 4bit p2; tag1=2 tag2=2):
+  :4bit ...
+```
+
+The call must supply the **same** set — order irrelevant:
+
+```logts
+test(a, b; tag1=2 tag2=2)   // matches #5
+test(a, b; tag2=2 tag1=2)   // still #5
+```
+
+These do **not** match #5:
+
+```logts
+test(a, b; tag1=2)              // only one tag → #4, not #5
+test(a, b; tag2=2)              // error — no overload with only tag2=2
+test(a, b; tag1=1 tag2=2)       // tag1 is 1, not 2 — no such overload
+test(a, b; tag1=2 tag2=2 tag3)  // extra tag — no overload with three tags
+```
+
+Partial overlap is not enough: `tag1=1` matches #2, but `tag1=1 tag3` matches nothing because no definition has exactly `{ tag1: 1, tag3: 1 }`.
+
+See also the design plan: [.cursor/plans/user_def_tag_overloads.plan.md](../../.cursor/plans/user_def_tag_overloads.plan.md) (overload #5 and full `test` table).
+
+### Example — version-style overloads
+
+```logts
+def myHash(10bit data; version=1):
+  :10bit data
+
+def myHash(10bit data; version=2):
+  :10bit data
+
+10wire d = 1010101010
+10wire h = myHash(d; version=2)
+```
+
+Use `doc(myHash)` to list every overload signature.
+
+---
+
 ## Documentation helpers
 
 | Call | Output |

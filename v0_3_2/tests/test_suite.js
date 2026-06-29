@@ -13887,6 +13887,126 @@ reg(1775, 'user-def', 'def @alias — unknown alias error', function(h, session)
   h.assert('unknown alias', String(err.includes('Unknown alias nolib')), 'true');
 });
 
+const USER_DEF_TAG_TEST1 = `def test(4bit param1, 4bit param2):
+  :4bit 0001
+
+def test(4bit param1, 4bit param2; tag1=1):
+  :4bit 0010
+
+def test(4bit param1, 4bit param2; tag1=0):
+  :4bit 0011
+
+def test(4bit param1, 4bit param2; tag1=2):
+  :4bit 0100
+
+def test(4bit param1, 4bit param2; tag1=2 tag2=2):
+  :4bit 0101
+
+def test(4bit param1, 4bit param2; tag1=1 tag2=3 tag3):
+  :4bit 0110
+
+def test(4bit param1, 4bit param2; tag2=1):
+  :4bit 0111
+`;
+
+function runTaggedTest(session, callSuffix, expected) {
+  const src = USER_DEF_TAG_TEST1 + `
+4wire a = 0000
+4wire b = 0000
+4wire r = test(a, b${callSuffix})`;
+  const { interp, out } = session.run(src);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  if (expected === 'error') {
+    return { err, out };
+  }
+  return { value: session.getWire(interp, 'r'), err };
+}
+
+reg(1776, 'user-def-tags', 'tag overload resolution — positive cases', function(h, session) {
+  const cases = [
+    ['', '0001'],
+    ['; tag1=1', '0010'],
+    ['; tag1=0', '0011'],
+    ['; tag1=2', '0100'],
+    ['; tag1=2 tag2=2', '0101'],
+    ['; tag2=2    tag1=2', '0101'],
+    ['; tag2=1', '0111'],
+    ['; tag1=1 tag2=3 tag3', '0110'],
+    ['; tag3 tag2=3 tag1=1', '0110'],
+  ];
+  for (const [suffix, exp] of cases) {
+    const { value, err } = runTaggedTest(session, suffix, exp);
+    h.assert('test' + suffix + ' no err', String(!err), 'true');
+    h.assert('test' + suffix, value, exp);
+  }
+});
+
+reg(1777, 'user-def-tags', 'tag overload resolution — no match errors', function(h, session) {
+  const cases = [
+    ['; tag2=2', 'tag2=2'],
+    ['; tag3', 'tag3'],
+    ['; tag1=1 tag3', 'tag1=1 tag3'],
+  ];
+  for (const [suffix, needle] of cases) {
+    const { err } = runTaggedTest(session, suffix, 'error');
+    h.assert('err ' + suffix, String(err.includes('no user function defined `test`') && err.includes(needle)), 'true');
+  }
+});
+
+reg(1778, 'user-def-tags', 'def bool tag then int value — parse error', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`def fn(4bit a, 4bit b):
+  :4bit a
+
+def fn(4bit a, 4bit b; tag3):
+  :4bit a
+
+def fn(4bit a, 4bit b; tag3=2):
+  :4bit a`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('bool then int', String(err.includes('tag3 already used as bool tag')), 'true');
+});
+
+reg(1779, 'user-def-tags', 'def duplicate tag signature — parse error', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`def dup(4bit a; tag1=1):
+  :4bit a
+
+def dup(4bit a; tag1=1):
+  :4bit 0010`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('duplicate signature', String(err.includes('Duplicate tag signature')), 'true');
+});
+
+reg(1780, 'user-def-tags', 'def parameter list mismatch — parse error', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`def mix(4bit a, 4bit b):
+  :4bit a
+
+def mix(8bit a):
+  :8bit a`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('param mismatch', String(err.includes('Parameter list mismatch')), 'true');
+});
+
+reg(1781, 'user-def-tags', 'doc(test) — all tag overload signatures', function(h, session) {
+  const out = session.runDoc(USER_DEF_TAG_TEST1 + '\ndoc(test)');
+  h.assert('overload count', String(out.length), '7');
+  h.assert('base sig', String(out.some(l => l.startsWith('test(4bit param1, 4bit param2) ->'))), 'true');
+  h.assert('tag1=1 sig', String(out.some(l => l.includes('; tag1=1)'))), 'true');
+  h.assert('tag1=2 tag2=2 sig', String(out.some(l => l.includes('; tag1=2 tag2=2)'))), 'true');
+  h.assert('bool tag3 sig', String(out.some(l => l.includes('tag2=3 tag3)'))), 'true');
+});
+
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
   allowEnter

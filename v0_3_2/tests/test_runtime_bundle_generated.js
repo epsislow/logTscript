@@ -63,6 +63,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/vector-reduce.js",
   "core/watch-expand.js",
   "files/storage.js",
+  "core/user-func-overloads.js",
   "core/parser.js",
   "core/interpreter.js",
   "core/signal-propagation.js",

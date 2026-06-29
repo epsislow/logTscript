@@ -331,6 +331,15 @@ pushSource({ src, alias }) {
     }
     return this.token('ID', v);
   }
+
+  peekToken() {
+    const mark = { i: this.i, line: this.line, col: this.col };
+    const tok = this.get();
+    this.i = mark.i;
+    this.line = mark.line;
+    this.col = mark.col;
+    return tok;
+  }
 }
 
 function consoleLog(...args) {

@@ -339,7 +339,11 @@ parseLoad() {
   subParser.parse();
 
   for (const [fname, fdef] of subParser.funcs.entries()) {
-    this.funcs.set(fname, fdef);
+    if (typeof UserFuncOverloads !== 'undefined') {
+      UserFuncOverloads.mergeUserFuncMaps(this.funcs, new Map([[fname, fdef]]));
+    } else {
+      this.funcs.set(fname, fdef);
+    }
   }
 
   if (alias) {
@@ -356,7 +360,7 @@ parseDef() {
   this.eat('SYM', '(');
   
   const params = [];
-  while (this.c.type !== 'SYM' || this.c.value !== ')') {
+  while (!(this.c.type === 'SYM' && (this.c.value === ')' || this.c.value === ';'))) {
     const type = this.c.value;
     this.eat('TYPE');
     
@@ -369,8 +373,14 @@ parseDef() {
       this.eat('SYM', ',');
     }
   }
-  
+
+  let tagList = [];
+  if (this.c.type === 'SYM' && this.c.value === ';') {
+    tagList = this.parseFuncTags();
+  }
+
   this.eat('SYM', ')');
+
   this.eat('SYM', ':');
   
   const body = [];
@@ -421,8 +431,51 @@ parseDef() {
   
   const alias = this.t.alias;
   const key = alias ? `${alias}::${name}` : name;
-  
-  this.funcs.set(key, { params, body, returns });
+
+  if (typeof UserFuncOverloads === 'undefined') {
+    this.funcs.set(key, { params, body, returns });
+  } else {
+    UserFuncOverloads.registerUserFuncOverload(this.funcs, key, {
+      params,
+      tagList,
+      body,
+      returns
+    });
+  }
+}
+
+parseFuncTags() {
+  this.eat('SYM', ';');
+  const tags = [];
+  const seen = new Set();
+
+  while (this.c.type === 'ID') {
+    const tagName = this.c.value;
+    this.eat('ID');
+
+    if (seen.has(tagName)) {
+      throw Error(`Duplicate tag '${tagName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    seen.add(tagName);
+
+    if (this.c.type === 'SYM' && this.c.value === '=') {
+      this.eat('SYM', '=');
+      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+        throw Error(`Expected integer tag value after '=' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const value = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      tags.push({ name: tagName, value });
+    } else {
+      tags.push({ name: tagName, bool: true, value: 1 });
+    }
+  }
+
+  if (!tags.length) {
+    throw Error(`Expected tag name after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  return tags;
 }
 
 parsePcbDefinition() {
@@ -2538,6 +2591,13 @@ assignment() {
     return p;
   }
   // Parse optional `;p` padding after a literal or variable (optional after bitrange).
+  maybeParsePadding() {
+    if (this.c.type !== 'SYM' || this.c.value !== ';') return null;
+    const next = this.t.peekToken();
+    if (next.type !== 'BIN' && next.type !== 'DEC') return null;
+    return this.parsePadding();
+  }
+
   parsePadding() {
     this.eat('SYM', ';');
     if (this.c.type !== 'BIN' && this.c.type !== 'DEC') {
@@ -2843,7 +2903,7 @@ assignment() {
         this.eat(this.c.type);
         
         const specialAtom1 = { var: v, bitRange: { start, end } };
-        if (this.c.type === 'SYM' && this.c.value === ';') specialAtom1.pad = this.parsePadding();
+        { const _p = this.maybeParsePadding(); if (_p != null) specialAtom1.pad = _p; }
         return addNot(specialAtom1);
       }
       
@@ -2859,17 +2919,17 @@ assignment() {
         end = start + len - 1;
         
         const specialAtom2 = { var: v, bitRange: { start, end } };
-        if (this.c.type === 'SYM' && this.c.value === ';') specialAtom2.pad = this.parsePadding();
+        { const _p = this.maybeParsePadding(); if (_p != null) specialAtom2.pad = _p; }
         return addNot(specialAtom2);
       }
       
       const specialAtom3 = { var: v, bitRange: { start, end } };
-      if (this.c.type === 'SYM' && this.c.value === ';') specialAtom3.pad = this.parsePadding();
+      { const _p = this.maybeParsePadding(); if (_p != null) specialAtom3.pad = _p; }
       return addNot(specialAtom3);
     }
     
     const specialAtom0 = { var: v };
-    if (this.c.type === 'SYM' && this.c.value === ';') specialAtom0.pad = this.parsePadding();
+    { const _p = this.maybeParsePadding(); if (_p != null) specialAtom0.pad = _p; }
     return addNot(specialAtom0);
   }
   
@@ -2955,7 +3015,7 @@ assignment() {
           this.eat(this.c.type);
 
           { const _a = { var: compName, property: property, bitRange: { start, end } };
-            if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+            { const _p = this.maybeParsePadding(); if (_p != null) _a.pad = _p; }
             return tagGlobal(_a); }
         }
 
@@ -2971,12 +3031,12 @@ assignment() {
           end = start + len - 1;
 
           { const _a = { var: compName, property: property, bitRange: { start, end } };
-            if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+            { const _p = this.maybeParsePadding(); if (_p != null) _a.pad = _p; }
             return tagGlobal(_a); }
         }
 
         { const _a = { var: compName, property: property, bitRange: { start, end } };
-          if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+          { const _p = this.maybeParsePadding(); if (_p != null) _a.pad = _p; }
           return tagGlobal(_a); }
       }
 
@@ -2999,7 +3059,7 @@ assignment() {
       }
 
       { const _a = { var: compName, property: property };
-        if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+        { const _p = this.maybeParsePadding(); if (_p != null) _a.pad = _p; }
         return tagGlobal(_a); }
     }
     
@@ -3010,7 +3070,7 @@ assignment() {
         const internalWire = this.c.value;
         this.eat('ID');
         { const _a = { var: compName, internalWire };
-          if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+          { const _p = this.maybeParsePadding(); if (_p != null) _a.pad = _p; }
           return tagGlobal(_a); }
       }
 
@@ -3040,7 +3100,7 @@ assignment() {
       }
       
       { const _a = { var: compName, bitRange: { start, end } };
-        if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+        { const _p = this.maybeParsePadding(); if (_p != null) _a.pad = _p; }
         return tagGlobal(_a); }
     }
     
@@ -3049,7 +3109,7 @@ assignment() {
     }
 
     { const _a = { var: compName };
-      if (this.c.type === 'SYM' && this.c.value === ';') _a.pad = this.parsePadding();
+      { const _p = this.maybeParsePadding(); if (_p != null) _a.pad = _p; }
       return tagGlobal(_a); }
   }
   
@@ -3096,7 +3156,7 @@ assignment() {
         const idAtomV = withAtomLoc({ var: name, vectorIndex });
         const brV = this.parseBitRangeSuffix();
         if (brV) idAtomV.bitRange = brV;
-        if (this.c.type === 'SYM' && this.c.value === ';') idAtomV.pad = this.parsePadding();
+        { const _p = this.maybeParsePadding(); if (_p != null) idAtomV.pad = _p; }
         return addNot(idAtomV);
       }
       if (this.c.type === 'SYM' && this.c.value === '(') {
@@ -3110,7 +3170,7 @@ assignment() {
         const idAtomVD = withAtomLoc({ var: name, vectorIndexExpr: [{ var: indexWire }] });
         const brVD = this.parseBitRangeSuffix();
         if (brVD) idAtomVD.bitRange = brVD;
-        if (this.c.type === 'SYM' && this.c.value === ';') idAtomVD.pad = this.parsePadding();
+        { const _p = this.maybeParsePadding(); if (_p != null) idAtomVD.pad = _p; }
         return addNot(idAtomVD);
       }
       throw Error(`Expected element index after ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
@@ -3119,12 +3179,12 @@ assignment() {
     const brWire = this.parseBitRangeSuffix();
     if (brWire) {
       const idAtomBr = withAtomLoc({ var: name, bitRange: brWire });
-      if (this.c.type === 'SYM' && this.c.value === ';') idAtomBr.pad = this.parsePadding();
+      { const _p = this.maybeParsePadding(); if (_p != null) idAtomBr.pad = _p; }
       return addNot(idAtomBr);
     }
     
     const idAtom0 = withAtomLoc({ var: name });
-    if (this.c.type === 'SYM' && this.c.value === ';') idAtom0.pad = this.parsePadding();
+    { const _p = this.maybeParsePadding(); if (_p != null) idAtom0.pad = _p; }
     return addNot(idAtom0);
   }
   
@@ -3150,17 +3210,23 @@ isBuiltinFunction(name) {
   this.eat('SYM','(');
 
   const args=[];
-  if(this.c.value!==')'){
-    do{
+  if (this.c.value !== ')' && this.c.value !== ';') {
+    do {
       args.push(this.expr());
-      if(this.c.value===',') this.eat('SYM',',');
+      if (this.c.value === ',') this.eat('SYM', ',');
       else break;
-    }while(true);
+    } while (true);
+  }
+
+  let callTags = null;
+  if (this.c.type === 'SYM' && this.c.value === ';') {
+    callTags = this.parseFuncTags();
   }
 
   this.eat('SYM',')');
 
   const atom = { call: fn, args };
+  if (callTags) atom.callTags = callTags;
   if (fn.line != null && fn.col != null) {
     atom.line = fn.line;
     atom.col = fn.col;
