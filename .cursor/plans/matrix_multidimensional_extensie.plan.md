@@ -4,7 +4,7 @@ overview: Extindere progresivă de la vectori 1D la tensori 2D (`4wire[N,M]`), c
 todos:
   - id: f1-tensor-type
     content: "Faza 1: parser [N,M], wire.tensor, indexare :r / ::c, show/peek/Zlist, teste wire-tensor"
-    status: in_progress
+    status: completed
   - id: f2-pivot
     content: "Faza 2: builtin PIVOT + permutare blob + teste transpose și vector vertical"
     status: pending

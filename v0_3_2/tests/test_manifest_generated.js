@@ -1178,7 +1178,7 @@
       {"id":1692,"group":"wire-vectors","title":"show(vectorA:1) + length","detail":{"scripts":["4wire[3] vectorA = 1111 + 0011 + 0101"],"steps":[],"assertions":["element line","length line"]}},
       {"id":1693,"group":"wire-vectors","title":"error index out of bounds","detail":{"scripts":["4wire[3] vectorA\n4wire x = vectorA:3"],"steps":[],"assertions":["error"]}},
       {"id":1694,"group":"wire-vectors","title":"error plainWire:0 not vector","detail":{"scripts":["4wire plain\n4wire x = plain:0"],"steps":[],"assertions":["error"]}},
-      {"id":1695,"group":"wire-vectors","title":"parse error 4wire[3,3]","detail":{"scripts":["4wire[3,3] matrix"],"steps":[],"assertions":["should throw","multidim error"]}},
+      {"id":1695,"group":"wire-vectors","title":"parse error 4wire[2,3,4] 3D tensor","detail":{"scripts":["4wire[2,3,4] matrix"],"steps":[],"assertions":["should throw","3d error"]}},
       {"id":1696,"group":"wire-vectors","title":"4wire[3] vs 12wire equivalence","detail":{"scripts":["4wire[3] vectorA = 111111110000"],"steps":[],"assertions":["flat copy","slice"]}},
       {"id":1697,"group":"wire-vectors","title":"peek(vectorA) same format as show","detail":{"scripts":["4wire[3] vectorA = 1111 + 1111 + 0000"],"steps":[],"assertions":["peek header","peek length"]}},
       {"id":1698,"group":"wire-vectors","title":"probe(vectorA:1) initialised + changed","detail":{"scripts":["4wire[3] vectorA = 1111 + 0011 + 0101"],"steps":[],"assertions":["initialised","changed"]}},
@@ -1343,10 +1343,20 @@
       {"id":1857,"group":"builtin-vector","title":"ARGMAX(vector; signed) — one-hot","detail":{"scripts":["4wire[3] vectorA = 1111 + 0010 + 0001"],"steps":[],"assertions":["max 2 at index 1"]}},
       {"id":1858,"group":"builtin-vector","title":"ARGMIN(vector; index signed)","detail":{"scripts":["4wire[3] vectorA = 1111 + 0010 + 0001"],"steps":[],"assertions":["min -1 at index 0"]}},
       {"id":1859,"group":"builtin-vector","title":"ARGMAX — tie first index wins","detail":{"scripts":["4wire[3] vectorA = 0100 + 0011 + 0100"],"steps":[],"assertions":["one-hot index 0","index 0"]}},
-      {"id":1860,"group":"builtin-vector","title":"ARGMAX — single element vector","detail":{"scripts":["4wire[1] vectorA = 1010"],"steps":[],"assertions":["only element","index 0"]}},
+      {"id":1860,"group":"builtin-vector","title":"ARGMAX — rejects scalar 4wire[1]","detail":{"scripts":["4wire[1] vectorA = 1010\n1wire f = ARGMAX(vectorA)"],"steps":[],"assertions":["not whole vector"]}},
       {"id":1861,"group":"builtin-vector","title":"ARGMAX — not whole vector error","detail":{"scripts":["4wire a = 0010\n1wire f = ARGMAX(a)"],"steps":[],"assertions":["whole vector required"]}},
       {"id":1862,"group":"builtin-vector","title":"ARGMAX — rejects vector tag","detail":{"scripts":["4wire[2] v = 0010 + 0011\n1wire f = ARGMAX(v; vector)"],"steps":[],"assertions":["no vector tag"]}},
-      {"id":1863,"group":"builtin-vector","title":"doc(ARGMAX/ARGMIN) signatures","detail":{"scripts":[],"steps":["getDocLines(ARGMAX)","getDocLines(ARGMIN)"],"assertions":["ARGMAX one-hot","ARGMAX index signed","ARGMIN index"]}}
+      {"id":1863,"group":"builtin-vector","title":"doc(ARGMAX/ARGMIN) signatures","detail":{"scripts":[],"steps":["getDocLines(ARGMAX)","getDocLines(ARGMIN)"],"assertions":["ARGMAX one-hot","ARGMAX index signed","ARGMIN index"]}},
+      {"id":1864,"group":"wire-tensor","title":"4wire[3,2] decl — 24 bits + tensor metadata","detail":{"scripts":["4wire[3,2] matrixA"],"steps":[],"assertions":["has wire","total width","tensor dims","type label"]}},
+      {"id":1865,"group":"wire-tensor","title":"4wire[3,3] matrix parses as 3x3","detail":{"scripts":["4wire[3,3] matrixA"],"steps":[],"assertions":["width 36","label"]}},
+      {"id":1866,"group":"wire-tensor","title":"matrix cell access :r:c","detail":{"scripts":["4wire[3,2] matrixA = 1111 + 0011 + 0101 + 0000 + 1110 + 1001"],"steps":[],"assertions":[":0:0",":1:1"]}},
+      {"id":1867,"group":"wire-tensor","title":"matrix row slice :r","detail":{"scripts":["4wire[3,2] matrixA = 1111 + 0011 + 0101 + 0000 + 1110 + 1001"],"steps":[],"assertions":["row 1"]}},
+      {"id":1868,"group":"wire-tensor","title":"matrix column slice ::c","detail":{"scripts":["4wire[3,2] matrixA = 1111 + 0011 + 0101 + 0000 + 1110 + 1001"],"steps":[],"assertions":["col 1"]}},
+      {"id":1869,"group":"wire-tensor","title":"vertical vector 4wire[3,1] label","detail":{"scripts":["4wire[3,1] colVec = 1111 + 0011 + 0101"],"steps":[],"assertions":["label",":1 element"]}},
+      {"id":1870,"group":"wire-tensor","title":"4wire[1] scalar equivalent","detail":{"scripts":["4wire[1] scalarA = 1010"],"steps":[],"assertions":["width 4","no tensor meta","label"]}},
+      {"id":1871,"group":"wire-tensor","title":"show(matrixA) shape and cells","detail":{"scripts":["4wire[2,2] matrixA = 1111 + 0011 + 0101 + 0000"],"steps":[],"assertions":["shape line","cell :0:0","cell :1:1"]}},
+      {"id":1872,"group":"wire-tensor","title":"cell assign splice","detail":{"scripts":["4wire[2,2] matrixA = 1111 + 0011 + 0101 + 0000"],"steps":[],"assertions":["spliced"]}},
+      {"id":1873,"group":"wire-tensor","title":"Zlist matrix header","detail":{"scripts":["MODE ZSTATE"],"steps":[],"assertions":["header","driver"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1421,6 +1431,7 @@
       { id: 'user-def-tags', label: 'user-def-tags', rangeLabel: '1776–1781', testIds: [1776, 1777, 1778, 1779, 1780, 1781] },
       { id: 'vector-reduction', label: 'vector-reduction', rangeLabel: '1715–1734, 1797', testIds: [1715, 1716, 1717, 1718, 1719, 1720, 1721, 1722, 1723, 1724, 1725, 1726, 1727, 1728, 1729, 1730, 1731, 1732, 1733, 1734, 1797] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611, 1654', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 1654] },
+      { id: 'wire-tensor', label: 'wire-tensor', rangeLabel: '1864–1873', testIds: [1864, 1865, 1866, 1867, 1868, 1869, 1870, 1871, 1872, 1873] },
       { id: 'wire-vectors', label: 'wire-vectors', rangeLabel: '1684–1701, 1704–1706, 1735–1739, 1741–1742', testIds: [1684, 1685, 1686, 1687, 1688, 1689, 1690, 1691, 1692, 1693, 1694, 1695, 1696, 1697, 1698, 1699, 1700, 1701, 1704, 1705, 1706, 1735, 1736, 1737, 1738, 1739, 1741, 1742] },
       { id: 'zstate', label: 'zstate', rangeLabel: '1429–1503, 1536, 1559–1570, 1575–1587', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503, 1536, 1559, 1560, 1561, 1562, 1563, 1564, 1565, 1566, 1567, 1568, 1569, 1570, 1575, 1576, 1577, 1578, 1579, 1580, 1581, 1582, 1583, 1584, 1585, 1586, 1587] }
     ]

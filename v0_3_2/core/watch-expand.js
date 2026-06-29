@@ -14,6 +14,10 @@
 
   function getDeclBitWidth(d) {
     const ew = parseWireTypeBits(d.type);
+    if (d.tensorRows != null && d.tensorCols != null) {
+      if (d.tensorRows === 1 && d.tensorCols === 1) return ew;
+      return ew * d.tensorRows * d.tensorCols;
+    }
     if (d.vectorCount != null) return ew * d.vectorCount;
     return ew;
   }
@@ -36,10 +40,14 @@
     for (const s of stmts) {
       if (!s.decls) continue;
       for (const d of s.decls) {
-        if (d.name && d.type && d.vectorCount != null) {
+        if (d.name && d.type && (d.vectorCount != null || (d.tensorRows != null && d.tensorCols != null))) {
+          const rows = d.tensorRows != null ? d.tensorRows : 1;
+          const cols = d.tensorCols != null ? d.tensorCols : d.vectorCount;
           map.set(d.name, {
             elementWidth: parseWireTypeBits(d.type),
-            elementCount: d.vectorCount
+            elementCount: rows * cols,
+            tensorRows: rows,
+            tensorCols: cols
           });
         }
       }
@@ -52,10 +60,12 @@
     if (!wires) return map;
     for (const [name, wire] of wires) {
       if (wire && wire.vector) {
-        map.set(name, {
-          elementWidth: wire.vector.elementWidth,
-          elementCount: wire.vector.elementCount
-        });
+        const meta = wire.tensor
+          ? { elementWidth: wire.tensor.elementWidth, elementCount: wire.vector.elementCount,
+              tensorRows: wire.tensor.dims[0], tensorCols: wire.tensor.dims[1] }
+          : { elementWidth: wire.vector.elementWidth, elementCount: wire.vector.elementCount,
+              tensorRows: 1, tensorCols: wire.vector.elementCount };
+        map.set(name, meta);
       }
     }
     return map;

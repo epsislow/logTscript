@@ -75,56 +75,55 @@ class Parser {
   let i = this.t.i;
   let src = this.t.src;
 
-  // Skip whitespace
-  while (i < src.length && /\s/.test(src[i])) i++;
-
-  // Allow a(.slice)* before '='
-  if (src[i] === '.') {
-    i++; // skip '.'
-    while (i < src.length && /[0-9]/.test(src[i])) i++;
-
-    if (src[i] === '-') {
-      i++;
-      while (i < src.length && /[0-9]/.test(src[i])) i++;
-    }
-
-    if (src[i] === '/') {
-      i++;
-      while (i < src.length && /[0-9]/.test(src[i])) i++;
-    }
-
-    while (i < src.length && /\s/.test(src[i])) i++;
-  }
-
-  // Allow a:index or a:(wire) before '='
-    if (src[i] === ':') {
-    i++;
-    while (i < src.length && /\s/.test(src[i])) i++;
+  const skipWs = () => { while (i < src.length && /\s/.test(src[i])) i++; };
+  const consumeIndex = () => {
+    skipWs();
     if (i < src.length && src[i] === '(') {
       i++;
       while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
       if (i < src.length && src[i] === ')') i++;
-    } else {
-      while (i < src.length && /[0-9]/.test(src[i])) i++;
+      return;
     }
-    while (i < src.length && /\s/.test(src[i])) i++;
-    if (src[i] === '.') {
+    while (i < src.length && /[0-9]/.test(src[i])) i++;
+  };
+  const consumeBitRange = () => {
+    if (i >= src.length || src[i] !== '.') return;
+    i++;
+    while (i < src.length && /[0-9]/.test(src[i])) i++;
+    if (i < src.length && src[i] === '-') {
       i++;
       while (i < src.length && /[0-9]/.test(src[i])) i++;
-      if (src[i] === '-') {
-        i++;
-        while (i < src.length && /[0-9]/.test(src[i])) i++;
-      }
-      if (src[i] === '/') {
-        i++;
-        while (i < src.length && /[0-9]/.test(src[i])) i++;
-      }
-      while (i < src.length && /\s/.test(src[i])) i++;
     }
+    if (i < src.length && src[i] === '/') {
+      i++;
+      while (i < src.length && /[0-9]/.test(src[i])) i++;
+    }
+  };
+
+  skipWs();
+  consumeBitRange();
+  skipWs();
+
+  while (i < src.length && src[i] === ':') {
+    if (src[i + 1] === ':') {
+      i += 2;
+      consumeIndex();
+    } else {
+      i++;
+      consumeIndex();
+      skipWs();
+      if (i < src.length && src[i] === ':' && src[i + 1] !== ':') {
+        i++;
+        consumeIndex();
+      }
+    }
+    skipWs();
+    consumeBitRange();
+    skipWs();
   }
 
-  if (src[i] === '=') return true;
-  if (src[i] === ':' && src[i + 1] === '=') return true;
+  if (i < src.length && src[i] === '=') return true;
+  if (i + 1 < src.length && src[i] === ':' && src[i + 1] === '=') return true;
   return false;
 }
 
@@ -193,23 +192,106 @@ class Parser {
     return { start, startExpr, isDynamic };
   }
 
-  parseVectorCountSuffix(wireType) {
+  parseTensorShapeSuffix(wireType) {
     if (!wireType || !wireType.endsWith('wire')) return null;
     if (this.c.type !== 'SYM' || this.c.value !== '[') return null;
     this.eat('SYM', '[');
     if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
-      throw Error(`Expected vector element count after '[' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      throw Error(`Expected tensor dimension after '[' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    const count = parseInt(this.c.value, 10);
+    const first = parseInt(this.c.value, 10);
     this.eat(this.c.type);
+    let rows = 1;
+    let cols = first;
     if (this.c.type === 'SYM' && this.c.value === ',') {
-      throw Error(`Multidimensional wire vectors are not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      this.eat('SYM', ',');
+      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+        throw Error(`Expected second tensor dimension after ',' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const second = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      rows = first;
+      cols = second;
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        throw Error(`Tensor dimensions beyond 2D are not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
     }
     this.eat('SYM', ']');
-    if (!Number.isFinite(count) || count < 1) {
-      throw Error(`Vector element count must be >= 1 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    if (!Number.isFinite(first) || first < 1 || !Number.isFinite(cols) || cols < 1) {
+      throw Error(`Tensor dimensions must be >= 1 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    return count;
+    return { rows, cols };
+  }
+
+  parseVectorCountSuffix(wireType) {
+    const shape = this.parseTensorShapeSuffix(wireType);
+    if (!shape) return null;
+    if (shape.rows === 1 && shape.cols === 1) return null;
+    return shape.rows * shape.cols;
+  }
+
+  _applyTensorShapeToDecl(decl, shape) {
+    if (!shape) return;
+    decl.tensorRows = shape.rows;
+    decl.tensorCols = shape.cols;
+    if (!(shape.rows === 1 && shape.cols === 1)) {
+      decl.vectorCount = shape.rows * shape.cols;
+    }
+  }
+
+  parseWireIndexValue() {
+    if (this.c.type === 'BIN' || this.c.type === 'DEC') {
+      const index = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      return { index };
+    }
+    if (this.c.type === 'SYM' && this.c.value === '(') {
+      this.eat('SYM', '(');
+      if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+        throw Error(`Only wire names supported in index (...) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const indexWire = this.c.value;
+      this.eat(this.c.type);
+      this.eat('SYM', ')');
+      return { indexExpr: [{ var: indexWire }] };
+    }
+    throw Error(`Expected element index after ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  parseWireIndexSuffix(name, withAtomLoc) {
+    this.eat('SYM', ':');
+    if (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+      const colPart = this.parseWireIndexValue();
+      const idAtom = withAtomLoc({ var: name, tensorSlice: 'col' });
+      if (colPart.index !== undefined) idAtom.tensorColIndex = colPart.index;
+      else idAtom.tensorColIndexExpr = colPart.indexExpr;
+      const br = this.parseBitRangeSuffix();
+      if (br) idAtom.bitRange = br;
+      { const _p = this.maybeParsePadding(); if (_p != null) idAtom.pad = _p; }
+      return idAtom;
+    }
+    const firstPart = this.parseWireIndexValue();
+    if (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+      const secondPart = this.parseWireIndexValue();
+      const idAtom = withAtomLoc({ var: name, tensorSlice: 'cell' });
+      if (firstPart.index !== undefined) idAtom.tensorRowIndex = firstPart.index;
+      else idAtom.tensorRowIndexExpr = firstPart.indexExpr;
+      if (secondPart.index !== undefined) idAtom.tensorColIndex = secondPart.index;
+      else idAtom.tensorColIndexExpr = secondPart.indexExpr;
+      const br = this.parseBitRangeSuffix();
+      if (br) idAtom.bitRange = br;
+      { const _p = this.maybeParsePadding(); if (_p != null) idAtom.pad = _p; }
+      return idAtom;
+    }
+    const idAtom = withAtomLoc({ var: name });
+    if (firstPart.index !== undefined) idAtom.vectorIndex = firstPart.index;
+    else idAtom.vectorIndexExpr = firstPart.indexExpr;
+    const br = this.parseBitRangeSuffix();
+    if (br) idAtom.bitRange = br;
+    { const _p = this.maybeParsePadding(); if (_p != null) idAtom.pad = _p; }
+    return idAtom;
   }
 
 parse() {
@@ -1340,7 +1422,7 @@ assignment() {
     while(this.c.type === 'TYPE'){
       const type = this.c.value;
       this.eat('TYPE');
-      const vectorCount = this.parseVectorCountSuffix(type);
+      const tensorShape = this.parseTensorShapeSuffix(type);
 
       let name;
       if(this.c.type === 'ID' || this.c.type === 'SPECIAL'){
@@ -1351,7 +1433,7 @@ assignment() {
       }
 
       const decl = { type, name, line: this.c.line, col: this.c.col };
-      if (vectorCount != null) decl.vectorCount = vectorCount;
+      this._applyTensorShapeToDecl(decl, tensorShape);
       decls.push(decl);
       
       if(this.c.value === ','){
@@ -1380,7 +1462,7 @@ assignment() {
     const declCol = tokenStartCol(this.c);
     const type = this.c.value;
     this.eat('TYPE');
-    const vectorCount = this.parseVectorCountSuffix(type);
+    const tensorShape = this.parseTensorShapeSuffix(type);
 
     let name;
     if (this.c.type === 'ID' || this.c.type === 'SPECIAL') {
@@ -1391,7 +1473,7 @@ assignment() {
     }
 
     const decl = { type, name, line: declLine, col: declCol };
-    if (vectorCount != null) decl.vectorCount = vectorCount;
+    this._applyTensorShapeToDecl(decl, tensorShape);
     decls.push(decl);
 
     if (this.c.value === ',') {
@@ -3141,31 +3223,7 @@ assignment() {
     }
 
     if (this.c.type === 'SYM' && this.c.value === ':') {
-      this.eat('SYM', ':');
-      if (this.c.type === 'BIN' || this.c.type === 'DEC') {
-        const vectorIndex = parseInt(this.c.value, 10);
-        this.eat(this.c.type);
-        const idAtomV = withAtomLoc({ var: name, vectorIndex });
-        const brV = this.parseBitRangeSuffix();
-        if (brV) idAtomV.bitRange = brV;
-        { const _p = this.maybeParsePadding(); if (_p != null) idAtomV.pad = _p; }
-        return addNot(idAtomV);
-      }
-      if (this.c.type === 'SYM' && this.c.value === '(') {
-        this.eat('SYM', '(');
-        if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
-          throw Error(`Only wire names supported in vector index (...) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-        }
-        const indexWire = this.c.value;
-        this.eat(this.c.type);
-        this.eat('SYM', ')');
-        const idAtomVD = withAtomLoc({ var: name, vectorIndexExpr: [{ var: indexWire }] });
-        const brVD = this.parseBitRangeSuffix();
-        if (brVD) idAtomVD.bitRange = brVD;
-        { const _p = this.maybeParsePadding(); if (_p != null) idAtomVD.pad = _p; }
-        return addNot(idAtomVD);
-      }
-      throw Error(`Expected element index after ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      return addNot(this.parseWireIndexSuffix(name, withAtomLoc));
     }
     
     const brWire = this.parseBitRangeSuffix();

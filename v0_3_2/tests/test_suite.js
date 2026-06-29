@@ -13011,12 +13011,12 @@ reg(1694, 'wire-vectors', 'error plainWire:0 not vector', function(h, session) {
   h.assert('error', String(out.some(l => l.startsWith('Error:'))), 'true');
 });
 
-reg(1695, 'wire-vectors', 'parse error 4wire[3,3]', function(h, session) {
+reg(1695, 'wire-vectors', 'parse error 4wire[2,3,4] 3D tensor', function(h, session) {
   try {
-    session.parse('4wire[3,3] matrix');
+    session.parse('4wire[2,3,4] matrix');
     h.assert('should throw', 'false', 'true');
   } catch (e) {
-    h.assert('multidim error', String(/multidimensional/i.test(e.message)), 'true');
+    h.assert('3d error', String(/beyond 2D|2D/i.test(e.message)), 'true');
   }
 });
 
@@ -13506,6 +13506,94 @@ reg(1742, 'wire-vectors', 'ADD 80wire[10] broadcast scalar', function(h, session
   const q = session.getWire(interp, 'q');
   h.assert('flag NOT all ones per elem', q.substring(800, 880), '1'.repeat(80));
 });
+
+// --- wire-tensor (1864+) ---
+
+reg(1864, 'wire-tensor', '4wire[3,2] decl — 24 bits + tensor metadata', function(h, session) {
+  const { interp } = session.run('4wire[3,2] matrixA');
+  const w = interp.wires.get('matrixA');
+  h.assert('has wire', String(!!w), 'true');
+  h.assert('total width', String(interp.getBitWidth(w.type)), '24');
+  h.assert('tensor dims', String(w.tensor && w.tensor.dims.join(',')), '3,2');
+  h.assert('type label', String(interp.getWireTypeLabel(w)), '4wire[3,2]');
+});
+
+reg(1865, 'wire-tensor', '4wire[3,3] matrix parses as 3x3', function(h, session) {
+  const { interp } = session.run('4wire[3,3] matrixA');
+  const w = interp.wires.get('matrixA');
+  h.assert('width 36', String(interp.getBitWidth(w.type)), '36');
+  h.assert('label', String(interp.getWireTypeLabel(w)), '4wire[3,3]');
+});
+
+reg(1866, 'wire-tensor', 'matrix cell access :r:c', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3,2] matrixA = 1111 + 0011 + 0101 + 0000 + 1110 + 1001\n' +
+    '4wire c00 = matrixA:0:0\n' +
+    '4wire c11 = matrixA:1:1'
+  );
+  h.assert(':0:0', session.getWire(interp, 'c00'), '1111');
+  h.assert(':1:1', session.getWire(interp, 'c11'), '0000');
+});
+
+reg(1867, 'wire-tensor', 'matrix row slice :r', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3,2] matrixA = 1111 + 0011 + 0101 + 0000 + 1110 + 1001\n' +
+    '8wire row1 = matrixA:1'
+  );
+  h.assert('row 1', session.getWire(interp, 'row1'), '01010000');
+});
+
+reg(1868, 'wire-tensor', 'matrix column slice ::c', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3,2] matrixA = 1111 + 0011 + 0101 + 0000 + 1110 + 1001\n' +
+    '12wire col1 = matrixA::1'
+  );
+  h.assert('col 1', session.getWire(interp, 'col1'), '001100001001');
+});
+
+reg(1869, 'wire-tensor', 'vertical vector 4wire[3,1] label', function(h, session) {
+  const { interp } = session.run('4wire[3,1] colVec = 1111 + 0011 + 0101');
+  const w = interp.wires.get('colVec');
+  h.assert('label', String(interp.getWireTypeLabel(w)), '4wire[3,1]');
+  h.assert(':1 element', session.getWire(interp, 'colVec').substring(4, 8), '0011');
+});
+
+reg(1870, 'wire-tensor', '4wire[1] scalar equivalent', function(h, session) {
+  const { interp } = session.run('4wire[1] scalarA = 1010');
+  const w = interp.wires.get('scalarA');
+  h.assert('width 4', String(session.getWire(interp, 'scalarA').length), '4');
+  h.assert('no tensor meta', String(!w.tensor), 'true');
+  h.assert('label', String(interp.getWireTypeLabel(w)), '4wire');
+});
+
+reg(1871, 'wire-tensor', 'show(matrixA) shape and cells', function(h, session) {
+  const { out } = session.run(
+    '4wire[2,2] matrixA = 1111 + 0011 + 0101 + 0000\n' +
+    'show(matrixA)'
+  );
+  h.assert('shape line', String(out.some(l => l.includes('matrixA has shape [2,2]'))), 'true');
+  h.assert('cell :0:0', String(out.some(l => l.includes(':0:0 = 1111'))), 'true');
+  h.assert('cell :1:1', String(out.some(l => l.includes(':1:1 = 0000'))), 'true');
+});
+
+reg(1872, 'wire-tensor', 'cell assign splice', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] matrixA = 1111 + 0011 + 0101 + 0000\n' +
+    'matrixA:0:1 = 0101'
+  );
+  h.assert('spliced', session.getWire(interp, 'matrixA'), '1111010101010000');
+});
+
+reg(1873, 'wire-tensor', 'Zlist matrix header', function(h, session) {
+  const { out } = session.run(
+    'MODE ZSTATE\n' +
+    '4wire[2,2] matrixA\n' +
+    'matrixA:1:0 = 0011\n' +
+    'Zlist(matrixA)'
+  );
+  h.assert('header', String(out.some(l => l.includes('matrixA (4wire[2,2])'))), 'true');
+  h.assert('driver', String(out.some(l => l.includes('matrixA:1:0 = 0011'))), 'true');
+}, ZSTATE_WAVE);
 
 reg(1743, 'loop', 'block repeat N..M[ is not expanded (passthrough)', function(h, session) {
   const src = 'repeat 1..3[\n    4wire w?\n    ]';
@@ -14775,14 +14863,10 @@ reg(1859, 'builtin-vector', 'ARGMAX — tie first index wins', function(h, sessi
   h.assert('index 0', session.getWire(interp, 'idx'), '00');
 });
 
-reg(1860, 'builtin-vector', 'ARGMAX — single element vector', function(h, session) {
-  const { interp } = session.run(
-    '4wire[1] vectorA = 1010\n' +
-    '1wire[1] flags = ARGMAX(vectorA)\n' +
-    '1wire idx = ARGMAX(vectorA; index)'
-  );
-  h.assert('only element', session.getWire(interp, 'flags'), '1');
-  h.assert('index 0', session.getWire(interp, 'idx'), '0');
+reg(1860, 'builtin-vector', 'ARGMAX — rejects scalar 4wire[1]', function(h, session) {
+  const r = session.run('4wire[1] vectorA = 1010\n1wire f = ARGMAX(vectorA)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('not whole vector', String(err.includes('whole vector')), 'true');
 });
 
 reg(1861, 'builtin-vector', 'ARGMAX — not whole vector error', function(h, session) {

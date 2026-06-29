@@ -21,7 +21,46 @@ See also: [assignment operators](assignment-operators.md), [debug output](debug.
 | `getBitWidth` | Returns **12** (total bits) |
 | Display type | `4wire[3]` in Variables, show, peek, Zlist — not `12wire` |
 
-Multidimensional forms such as `4wire[3,3]` are **not** supported in V1 (parse error).
+Multidimensional forms `4wire[N,M]` (2D tensors) are supported — see [2D tensors](#2d-tensors-4wirenm) below. Three or more dimensions (`4wire[2,3,4]`) are a **parse error**.
+
+---
+
+## 2D tensors (`4wire[N,M]`)
+
+A **matrix** is a contiguous wire with two-dimensional metadata. Syntax: `Nwire[rows,cols] name` declares one wire of `N × rows × cols` bits, stored **row-major** (same MSB-first convention as 1D vectors).
+
+```logts
+4wire[3,2] matrixA
+4wire[3,1] colVec    # vertical vector
+4wire[1,N] rowVec    # same as 4wire[N]
+4wire[1] scalarA     # equivalent to plain 4wire (no tensor indexing)
+```
+
+| Concept | Meaning |
+|---------|---------|
+| `4wire[3,2]` | 3×2 cells × 4 bits = **24-bit** wire |
+| Internal storage | `wire.tensor = { elementWidth: 4, dims: [3, 2] }` plus `wire.vector` for compat |
+| Display type | `4wire[3,2]` — not `24wire` |
+| `4wire[3,1]` | vertical vector, displayed as `4wire[3,1]` |
+
+### Indexing (2D)
+
+| Syntax | Result |
+|--------|--------|
+| `matrixA:r:c` | cell `(r,c)` — scalar `Nwire` |
+| `matrixA:r` | row `r` — vector of width `cols × N` |
+| `matrixA::c` | column `c` — vector of width `rows × N` |
+| `vectorB:i` | linear element `i` on rank-1 tensors (`[1,N]` or `[N,1]`) |
+
+On a **matrix** (both dimensions > 1), a single `:r` indexes a **row slice**, not a linear cell. Use `:r:c` for individual cells.
+
+```logts-play
+4wire[2,2] matrixA = 1111 + 0011 + 0101 + 0000
+4wire a = matrixA:0:0
+4wire b = matrixA:1:1
+show(a)
+show(b)
+```
 
 ---
 

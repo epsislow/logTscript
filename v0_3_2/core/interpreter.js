@@ -264,6 +264,15 @@ function stmtAssignPad(s) {
 
 function getBitWidthFromDecl(interp, decl) {
   if (!decl || !decl.type) return null;
+  const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+  if (TS && interp.isWire(decl.type)) {
+    const ew = interp.getBitWidth(decl.type);
+    if (!ew) return null;
+    const total = TS.declBitTotal(ew, decl);
+    if (total > ew) return total;
+    if (decl.vectorCount != null) return ew * decl.vectorCount;
+    return ew;
+  }
   if (decl.vectorCount != null && interp.isWire(decl.type)) {
     const ew = interp.getBitWidth(decl.type);
     return ew ? ew * decl.vectorCount : null;
@@ -2409,7 +2418,13 @@ class Interpreter {
   }
 
   _assignmentTargetIsSlice(target) {
-    return !!(target && (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange));
+    return this._assignmentTargetHasSlice(target);
+  }
+
+  _sliceRangeWidth(sliceRange) {
+    if (!sliceRange) return null;
+    if (sliceRange.nonContiguous === 'col') return sliceRange.sliceWidth;
+    return sliceRange.end - sliceRange.start + 1;
   }
 
   _wireHasSliceDriver(wireName) {
@@ -2428,7 +2443,7 @@ class Interpreter {
       }
     }
     const target = ws.assignment.target;
-    const sliceRange = (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange)
+    const sliceRange = this._assignmentTargetHasSlice(target)
       ? this._assignmentTargetSliceRange(target, target.var)
       : null;
     if (sliceRange) {
@@ -2449,13 +2464,11 @@ class Interpreter {
           rhs += part.value;
         }
       }
-      const sliceWidth = sliceRange.end - sliceRange.start + 1;
+      const sliceWidth = this._sliceRangeWidth(sliceRange);
       if (rhs.length !== sliceWidth) {
         return { active: false, value: null };
       }
-      const merged = currentValue.substring(0, sliceRange.start)
-        + rhs
-        + currentValue.substring(sliceRange.end + 1);
+      const merged = this._applySliceWrite(target.var, wire, bits, sliceRange, rhs, 'strict');
       return { active: true, value: merged };
     }
     const outputs = this.execWireStatement(ws, true);
@@ -2526,11 +2539,19 @@ class Interpreter {
                 rhs += part.value;
               }
             }
-            const sliceWidth = sliceRange.end - sliceRange.start + 1;
+            const sliceWidth = this._sliceRangeWidth(sliceRange);
             if (rhs.length !== sliceWidth) continue;
-            acc = acc.substring(0, sliceRange.start)
-              + rhs
-              + acc.substring(sliceRange.end + 1);
+            if (sliceRange.nonContiguous === 'col') {
+              const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+              const meta = this.getWireTensorMeta(wire);
+              if (TS && meta) {
+                acc = TS.scatterColumnBits(acc, sliceRange.col, meta.elementWidth, meta.rows, meta.cols, rhs);
+              }
+            } else {
+              acc = acc.substring(0, sliceRange.start)
+                + rhs
+                + acc.substring(sliceRange.end + 1);
+            }
           } else {
             const { active, value } = this._evalWireDriverContribution(ws, bits);
             if (active && value != null) acc = value;
@@ -2802,8 +2823,21 @@ class Interpreter {
     return wire && wire.vector ? wire.vector : null;
   }
 
+  getWireTensorMeta(wire) {
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (TS) return TS.getWireTensorMeta(wire);
+    const v = this.getWireVectorMeta(wire);
+    if (!v) return null;
+    return { elementWidth: v.elementWidth, rows: 1, cols: v.elementCount, elementCount: v.elementCount };
+  }
+
   getWireTypeLabel(wire) {
     if (!wire) return '';
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const meta = TS ? TS.getWireTensorMeta(wire) : null;
+    if (meta && TS) {
+      return TS.formatTensorTypeLabel(meta.elementWidth, meta.rows, meta.cols);
+    }
     const v = wire.vector;
     if (v && v.elementWidth && v.elementCount) {
       return `${v.elementWidth}wire[${v.elementCount}]`;
@@ -2818,16 +2852,43 @@ class Interpreter {
     return bits ? `${bits}bit` : (wire.type || '');
   }
 
-  _applyDeclVectorMeta(wireEntry, decl) {
-    if (!decl || decl.vectorCount == null || !decl.type || !this.isWire(decl.type)) return;
+  _applyDeclTensorMeta(wireEntry, decl) {
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const dims = TS ? TS.normalizeDeclTensor(decl) : null;
+    if (!dims && decl && decl.vectorCount != null) {
+      const ew = decl.type && this.isWire(decl.type) ? this.getBitWidth(decl.type) : null;
+      if (ew) {
+        wireEntry.vector = { elementWidth: ew, elementCount: decl.vectorCount };
+        wireEntry.type = `${ew * decl.vectorCount}wire`;
+      }
+      return;
+    }
+    if (!dims || !decl || !decl.type || !this.isWire(decl.type)) return;
+    if (TS && TS.isScalarTensor(dims)) return;
     const ew = this.getBitWidth(decl.type);
     if (!ew) return;
-    wireEntry.vector = { elementWidth: ew, elementCount: decl.vectorCount };
-    wireEntry.type = `${ew * decl.vectorCount}wire`;
+    const { rows, cols } = dims;
+    wireEntry.tensor = { elementWidth: ew, dims: [rows, cols] };
+    wireEntry.vector = { elementWidth: ew, elementCount: rows * cols };
+    wireEntry.type = `${ew * rows * cols}wire`;
+  }
+
+  _applyDeclVectorMeta(wireEntry, decl) {
+    this._applyDeclTensorMeta(wireEntry, decl);
   }
 
   _vectorElementLabel(varName, index) {
     return `${varName}:${index}`;
+  }
+
+  _resolveTensorIndexValue(index, indexExpr, label) {
+    if (index !== undefined && index !== null) return index;
+    if (indexExpr) {
+      const parts = this.evalExpr(indexExpr, false);
+      const v = parts.map(p => p.value || '0').join('');
+      return parseInt(v, 2);
+    }
+    throw Error(`Invalid tensor index for ${label}`);
   }
 
   _resolveVectorIndexValue(atom) {
@@ -2843,13 +2904,17 @@ class Interpreter {
   }
 
   resolveVectorIndex(wire, atom) {
-    const meta = this.getWireVectorMeta(wire);
+    const meta = this.getWireTensorMeta(wire);
     if (!meta) {
       throw Error(`${atom.var} is not a vector`);
     }
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
     const idx = this._resolveVectorIndexValue(atom);
     if (idx == null || !Number.isFinite(idx)) {
       throw Error(`Invalid vector index for ${atom.var}`);
+    }
+    if (TS && TS.isMatrix(meta)) {
+      throw Error(`Use :row:col for matrix cell access on ${atom.var}`);
     }
     if (idx < 0 || idx >= meta.elementCount) {
       throw Error(`Vector index ${idx} out of range for ${atom.var} (length ${meta.elementCount})`);
@@ -2859,26 +2924,142 @@ class Interpreter {
     return { start, end, vectorIndex: idx, elementWidth: meta.elementWidth };
   }
 
-  vectorIndexToBitRange(wire, atom) {
-    const slice = this.resolveAtomWireSlice(atom, wire);
-    if (!slice) {
-      const { start, end, vectorIndex } = this.resolveVectorIndex(wire, atom);
-      return { start, end, vectorElementIndex: vectorIndex };
+  _resolveTensorSlice(atom, wire) {
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const meta = this.getWireTensorMeta(wire);
+    if (!meta || !TS) return null;
+    const { elementWidth: ew, rows, cols } = meta;
+    const varName = atom.var;
+
+    if (atom.tensorSlice === 'col') {
+      const col = this._resolveTensorIndexValue(atom.tensorColIndex, atom.tensorColIndexExpr, `${varName}::col`);
+      if (!Number.isFinite(col) || col < 0 || col >= cols) {
+        throw Error(`Column index ${col} out of range for ${varName} (cols ${cols})`);
+      }
+      return {
+        nonContiguous: 'col',
+        col,
+        rows,
+        cols,
+        elementWidth: ew,
+        sliceWidth: rows * ew,
+        tensorSlice: 'col'
+      };
     }
+
+    if (atom.tensorSlice === 'cell') {
+      const row = this._resolveTensorIndexValue(atom.tensorRowIndex, atom.tensorRowIndexExpr, `${varName}:row`);
+      const col = this._resolveTensorIndexValue(atom.tensorColIndex, atom.tensorColIndexExpr, `${varName}:col`);
+      if (!Number.isFinite(row) || row < 0 || row >= rows) {
+        throw Error(`Row index ${row} out of range for ${varName} (rows ${rows})`);
+      }
+      if (!Number.isFinite(col) || col < 0 || col >= cols) {
+        throw Error(`Column index ${col} out of range for ${varName} (cols ${cols})`);
+      }
+      const range = TS.cellBitRange(row, col, ew, cols);
+      return {
+        start: range.start,
+        end: range.end,
+        tensorSlice: 'cell',
+        tensorRowIndex: row,
+        tensorColIndex: col,
+        vectorElementIndex: TS.linearIndex(row, col, cols),
+        elementWidth: ew,
+        relStart: null,
+        relEnd: null
+      };
+    }
+
+    const hasLinear = atom.vectorIndex !== undefined || atom.vectorIndexExpr;
+    if (!hasLinear) return null;
+
+    if (TS.isMatrix(meta)) {
+      const row = this._resolveVectorIndexValue(atom);
+      if (row == null || !Number.isFinite(row)) {
+        throw Error(`Invalid row index for ${varName}`);
+      }
+      if (row < 0 || row >= rows) {
+        throw Error(`Row index ${row} out of range for ${varName} (rows ${rows})`);
+      }
+      const range = TS.rowBitRange(row, ew, cols);
+      return {
+        start: range.start,
+        end: range.end,
+        tensorSlice: 'row',
+        tensorRowIndex: row,
+        sliceWidth: cols * ew,
+        relStart: null,
+        relEnd: null
+      };
+    }
+
+    const { start, end, vectorIndex } = this.resolveVectorIndex(wire, atom);
     return {
-      start: slice.start,
-      end: slice.end,
-      vectorElementIndex: slice.vectorElementIndex,
-      relStart: slice.relStart,
-      relEnd: slice.relEnd
+      start,
+      end,
+      vectorElementIndex: vectorIndex,
+      elementWidth: ew,
+      relStart: null,
+      relEnd: null
     };
   }
 
   resolveAtomWireSlice(atom, wire) {
+    const hasTensor = atom && (atom.tensorSlice || atom.tensorRowIndex !== undefined || atom.tensorColIndex !== undefined
+      || atom.tensorRowIndexExpr || atom.tensorColIndexExpr);
+    if (hasTensor) {
+      if (!wire || !wire.vector) {
+        throw Error(`${atom.var} is not a tensor`);
+      }
+      const slice = this._resolveTensorSlice(atom, wire);
+      if (!slice) return null;
+      if (slice.nonContiguous) return slice;
+      if (atom.bitRange) {
+        const { start: relStart, end: relEnd } = this.resolveBitRange(atom.bitRange);
+        const elemWidth = slice.end - slice.start + 1;
+        if (relStart < 0 || relEnd >= elemWidth || relStart > relEnd) {
+          const label = this._formatTensorAtomLabel(atom, slice) || atom.var;
+          throw Error(`Invalid bit range ${relStart}-${relEnd} within ${label} (${elemWidth}bit)`);
+        }
+        return {
+          ...slice,
+          start: slice.start + relStart,
+          end: slice.start + relEnd,
+          relStart,
+          relEnd
+        };
+      }
+      return slice;
+    }
+
     const hasVector = atom && (atom.vectorIndex !== undefined || atom.vectorIndexExpr);
     if (hasVector) {
       if (!wire || !wire.vector) {
         throw Error(`${atom.var} is not a vector`);
+      }
+      const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+      const meta = this.getWireTensorMeta(wire);
+      if (TS && meta && TS.isMatrix(meta)) {
+        const slice = this._resolveTensorSlice(atom, wire);
+        if (slice && !slice.nonContiguous) {
+          if (atom.bitRange) {
+            const { start: relStart, end: relEnd } = this.resolveBitRange(atom.bitRange);
+            const elemWidth = slice.end - slice.start + 1;
+            if (relStart < 0 || relEnd >= elemWidth || relStart > relEnd) {
+              throw Error(
+                `Invalid bit range ${relStart}-${relEnd} within ${atom.var}:${slice.tensorRowIndex} (${elemWidth}bit)`
+              );
+            }
+            return {
+              ...slice,
+              start: slice.start + relStart,
+              end: slice.start + relEnd,
+              relStart,
+              relEnd
+            };
+          }
+          return slice;
+        }
       }
       const { start: elemStart, end: elemEnd, vectorIndex } = this.resolveVectorIndex(wire, atom);
       if (atom.bitRange) {
@@ -2912,7 +3093,59 @@ class Interpreter {
     return null;
   }
 
+  vectorIndexToBitRange(wire, atom) {
+    const slice = this.resolveAtomWireSlice(atom, wire);
+    if (!slice) {
+      const { start, end, vectorIndex } = this.resolveVectorIndex(wire, atom);
+      return { start, end, vectorElementIndex: vectorIndex };
+    }
+    if (slice.nonContiguous) {
+      throw Error(`Cannot use bit-range on non-contiguous tensor slice for ${atom.var}`);
+    }
+    return {
+      start: slice.start,
+      end: slice.end,
+      vectorElementIndex: slice.vectorElementIndex,
+      relStart: slice.relStart,
+      relEnd: slice.relEnd
+    };
+  }
+
+  _formatTensorAtomLabel(atom, slice) {
+    if (!atom || !slice) return null;
+    if (slice.tensorSlice === 'col') {
+      const col = atom.tensorColIndex != null ? atom.tensorColIndex : slice.col;
+      if (atom.tensorColIndexExpr && atom.tensorColIndexExpr.length === 1 && atom.tensorColIndexExpr[0].var) {
+        return `${atom.var}::(${atom.tensorColIndexExpr[0].var})`;
+      }
+      return `${atom.var}::${col}`;
+    }
+    if (slice.tensorSlice === 'cell') {
+      const row = slice.tensorRowIndex != null ? slice.tensorRowIndex : atom.tensorRowIndex;
+      const col = slice.tensorColIndex != null ? slice.tensorColIndex : atom.tensorColIndex;
+      return `${atom.var}:${row}:${col}`;
+    }
+    if (slice.tensorSlice === 'row') {
+      const row = slice.tensorRowIndex != null ? slice.tensorRowIndex : atom.vectorIndex;
+      if (atom.vectorIndexExpr && atom.vectorIndexExpr.length === 1 && atom.vectorIndexExpr[0].var) {
+        return `${atom.var}:(${atom.vectorIndexExpr[0].var})`;
+      }
+      return `${atom.var}:${row}`;
+    }
+    return null;
+  }
+
   _formatVectorAtomLabel(atom, slice) {
+    const tensorLabel = this._formatTensorAtomLabel(atom, slice);
+    if (tensorLabel) {
+      if (slice.relStart != null && slice.relEnd != null) {
+        const suffix = slice.relStart === slice.relEnd
+          ? `${slice.relStart}`
+          : `${slice.relStart}-${slice.relEnd}`;
+        return `${tensorLabel}.${suffix}`;
+      }
+      return tensorLabel;
+    }
     if (!atom || slice == null || slice.vectorElementIndex == null) return null;
     let base;
     if (atom.vectorIndex !== undefined && atom.vectorIndex !== null) {
@@ -2931,15 +3164,72 @@ class Interpreter {
     return base;
   }
 
+  _assignmentTargetHasSlice(target) {
+    return !!(target && (
+      target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange
+      || target.tensorSlice || target.tensorRowIndex !== undefined || target.tensorColIndex !== undefined
+      || target.tensorRowIndexExpr || target.tensorColIndexExpr
+    ));
+  }
+
+  _applySliceWrite(wireName, wire, bits, sliceRange, totalValue, assignPad) {
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (sliceRange && sliceRange.nonContiguous === 'col' && TS) {
+      const meta = this.getWireTensorMeta(wire);
+      const sliceWidth = sliceRange.sliceWidth;
+      const rhs = fitWireAssignBits(totalValue, sliceWidth, assignPad, 'msb', this);
+      let currentValue = this.getWireContributionAwareValue(wireName);
+      if (!currentValue) currentValue = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
+      return TS.scatterColumnBits(
+        currentValue, sliceRange.col, meta.elementWidth, meta.rows, meta.cols, rhs
+      );
+    }
+    if (sliceRange) {
+      const sliceWidth = sliceRange.end - sliceRange.start + 1;
+      const rhs = fitWireAssignBits(totalValue, sliceWidth, assignPad, 'msb', this);
+      let currentValue = this.getWireContributionAwareValue(wireName);
+      if (!currentValue) currentValue = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
+      return currentValue.substring(0, sliceRange.start)
+        + rhs
+        + currentValue.substring(sliceRange.end + 1);
+    }
+    return fitWireAssignBits(totalValue, bits, assignPad, 'msb', this);
+  }
+
   _assignmentTargetSliceRange(target, wireName) {
     const wire = this.wires.get(wireName);
     const slice = this.resolveAtomWireSlice(target, wire);
     if (!slice) return null;
+    if (slice.nonContiguous) return slice;
     return { start: slice.start, end: slice.end };
   }
 
   _formatAssignmentTargetLabel(target) {
     if (!target || !target.var) return '?';
+    if (target.tensorSlice || target.tensorRowIndex !== undefined || target.tensorColIndex !== undefined
+        || target.tensorRowIndexExpr || target.tensorColIndexExpr) {
+      const wire = this.wires.get(target.var);
+      if (wire && wire.vector) {
+        try {
+          const slice = this.resolveAtomWireSlice(target, wire);
+          const label = this._formatVectorAtomLabel(target, slice);
+          if (label) return label;
+        } catch (e) {
+          // fall through
+        }
+      }
+      if (target.tensorSlice === 'col') {
+        if (target.tensorColIndex !== undefined && target.tensorColIndex !== null) {
+          return `${target.var}::${target.tensorColIndex}`;
+        }
+        if (target.tensorColIndexExpr && target.tensorColIndexExpr.length === 1 && target.tensorColIndexExpr[0].var) {
+          return `${target.var}::(${target.tensorColIndexExpr[0].var})`;
+        }
+      }
+      if (target.tensorSlice === 'cell') {
+        return `${target.var}:${target.tensorRowIndex}:${target.tensorColIndex}`;
+      }
+    }
     if (target.vectorIndex !== undefined || target.vectorIndexExpr) {
       const wire = this.wires.get(target.var);
       if (wire && wire.vector) {
@@ -3716,13 +4006,21 @@ class Interpreter {
       let vectorElementIndex = null;
       let vectorSlice = null;
 
-      if (a.vectorIndex !== undefined || a.vectorIndexExpr) {
+      if (a.vectorIndex !== undefined || a.vectorIndexExpr || a.tensorSlice) {
         if (!wire || !wire.vector) {
           this._throwRuntime(`${a.var} is not a vector`, a, a.var.length);
         }
         vectorSlice = this.resolveAtomWireSlice(a, wire);
-        vectorElementIndex = vectorSlice.vectorElementIndex;
-        bitRange = { start: vectorSlice.start, end: vectorSlice.end };
+        if (vectorSlice && vectorSlice.nonContiguous === 'col') {
+          vectorElementIndex = null;
+        } else {
+          vectorElementIndex = vectorSlice ? vectorSlice.vectorElementIndex : null;
+        }
+        if (vectorSlice && !vectorSlice.nonContiguous) {
+          bitRange = { start: vectorSlice.start, end: vectorSlice.end };
+        } else {
+          bitRange = null;
+        }
       } else if (bitRange) {
         const slice = this.resolveAtomWireSlice(a, wire);
         if (slice) bitRange = { start: slice.start, end: slice.end };
@@ -3754,6 +4052,27 @@ class Interpreter {
       }
       
       // Handle bit range if specified
+      if (vectorSlice && vectorSlice.nonContiguous === 'col') {
+        const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+        const meta = this.getWireTensorMeta(wire);
+        if (val === null || val === '-' || !TS || !meta) {
+          const bitWidth = vectorSlice.sliceWidth;
+          const zeros = '0'.repeat(bitWidth);
+          const displayName = this._formatTensorAtomLabel(a, vectorSlice) || a.var;
+          return { value: zeros, ref: null, varName: displayName, bitWidth };
+        }
+        const extracted = TS.gatherColumnBits(
+          val, vectorSlice.col, meta.elementWidth, meta.rows, meta.cols
+        );
+        const displayName = this._formatTensorAtomLabel(a, vectorSlice) || a.var;
+        const extractedPadded = a.pad ? this.applyPad(extracted, a.pad) : extracted;
+        return {
+          value: extractedPadded,
+          ref: null,
+          varName: displayName,
+          bitWidth: extractedPadded.length
+        };
+      }
       if(bitRange){
         const {start, end: actualEnd} = this.resolveBitRange(bitRange);
         if(val === null || val === '-'){
@@ -5300,9 +5619,35 @@ if (this.isBuiltinDEMUX(name)) {
   _formatVectorShowLines(wireName, valueStr) {
     const wire = this.wires.get(wireName);
     if (!wire || !wire.vector) return null;
-    const { elementWidth, elementCount } = wire.vector;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const meta = TS ? TS.getWireTensorMeta(wire) : null;
+    if (!meta) return null;
+    const { elementWidth, rows, cols, elementCount } = meta;
     const lines = [];
     lines.push(`${wireName} = ${valueStr} (${valueStr.length}bit)`);
+
+    if (TS && TS.isMatrix(meta)) {
+      const showRows = rows <= 5 ? rows : (rows > 5 ? 4 : rows);
+      for (let r = 0; r < showRows; r++) {
+        if (rows > 5 && r === 3) {
+          lines.push('..');
+          r = rows - 1;
+        }
+        const rowStart = r * cols * elementWidth;
+        const rowBits = valueStr.substring(rowStart, rowStart + cols * elementWidth);
+        for (let c = 0; c < cols; c++) {
+          const cellStart = c * elementWidth;
+          lines.push(this._formatVectorElementLine(
+            `${r}:${c}`,
+            rowBits.substring(cellStart, cellStart + elementWidth),
+            elementWidth
+          ));
+        }
+      }
+      lines.push(`${wireName} has shape [${rows},${cols}]`);
+      return lines;
+    }
+
     if (elementCount <= 5) {
       for (let i = 0; i < elementCount; i++) {
         const start = i * elementWidth;
@@ -5318,7 +5663,11 @@ if (this.isBuiltinDEMUX(name)) {
       const start = last * elementWidth;
       lines.push(this._formatVectorElementLine(last, valueStr.substring(start, start + elementWidth), elementWidth));
     }
-    lines.push(`${wireName} has length [${elementCount}]`);
+    if (rows > 1 && cols === 1) {
+      lines.push(`${wireName} has shape [${rows},1]`);
+    } else {
+      lines.push(`${wireName} has length [${elementCount}]`);
+    }
     return lines;
   }
 
@@ -5334,7 +5683,7 @@ if (this.isBuiltinDEMUX(name)) {
       if (e && e.length === 1 && e[0].var) {
         const atom = e[0];
         const wire = this.wires.get(atom.var);
-        if ((atom.vectorIndex !== undefined || atom.vectorIndexExpr) && wire && wire.vector) {
+        if ((atom.vectorIndex !== undefined || atom.vectorIndexExpr || atom.tensorSlice) && wire && wire.vector) {
           const r = this.evalExpr(e, computeRefs);
           const part = r[0];
           if (part) {
@@ -5344,12 +5693,21 @@ if (this.isBuiltinDEMUX(name)) {
             const sliceWidth = part.bitWidth || wire.vector.elementWidth;
             vectorLines.push(`${displayName} = ${valueStr} (${sliceWidth}bit)`);
             if (!atom.bitRange) {
-              vectorLines.push(`${atom.var} has length [${wire.vector.elementCount}]`);
+              const meta = this.getWireTensorMeta(wire);
+              const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+              if (meta && TS && TS.isMatrix(meta)) {
+                vectorLines.push(`${atom.var} has shape [${meta.rows},${meta.cols}]`);
+              } else if (meta && meta.rows > 1 && meta.cols === 1) {
+                vectorLines.push(`${atom.var} has shape [${meta.rows},1]`);
+              } else {
+                vectorLines.push(`${atom.var} has length [${wire.vector.elementCount}]`);
+              }
             }
           }
           continue;
         }
-        if (!atom.bitRange && atom.vectorIndex === undefined && !atom.vectorIndexExpr && wire && wire.vector) {
+        if (!atom.bitRange && atom.vectorIndex === undefined && !atom.vectorIndexExpr && !atom.tensorSlice
+            && wire && wire.vector) {
           const r = this.evalExpr(e, computeRefs);
           const part = r[0];
           if (part) {
@@ -6403,7 +6761,9 @@ if (s.assignment) {
   let expr = assignmentExpr;
   const name = target.var;
   let range = null;
-  if (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange) {
+  if (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange
+      || target.tensorSlice || target.tensorRowIndex !== undefined || target.tensorColIndex !== undefined
+      || target.tensorRowIndexExpr || target.tensorColIndexExpr) {
     try {
       range = this._assignmentTargetSliceRange(target, name);
     } catch (e) {
@@ -6825,15 +7185,22 @@ if (s.assignment) {
 
   // Determine slice
   let start, end;
+  let sliceWidth;
   if (range) {
-    start = range.start;
-    end = range.end ?? range.start;
+    if (range.nonContiguous === 'col') {
+      sliceWidth = range.sliceWidth;
+      start = null;
+      end = null;
+    } else {
+      start = range.start;
+      end = range.end ?? range.start;
+      sliceWidth = end - start + 1;
+    }
   } else {
     start = 0;
     end = bitWidth - 1;
+    sliceWidth = end - start + 1;
   }
-
-  const sliceWidth = end - start + 1;
 
   const wireAssignPad = assignmentPad || 'strict';
   if (isWire && !range) {
@@ -6847,16 +7214,20 @@ if (s.assignment) {
   }
 
   if (rhs.length !== sliceWidth) {
+    const sliceLabel = range && range.nonContiguous === 'col'
+      ? `${name}::${range.col}`
+      : `${name}.${start}-${end}`;
     throw Error(
-      `Bit-width mismatch: assigning ${rhs.length} bits to ${sliceWidth}-bit slice ${name}.${start}-${end}`
+      `Bit-width mismatch: assigning ${rhs.length} bits to ${sliceWidth}-bit slice ${sliceLabel}`
     );
   }
 
   // Construct new value
-  const newValue =
-    currentValue.substring(0, start) +
-    rhs +
-    currentValue.substring(end + 1);
+  const newValue = range && range.nonContiguous === 'col'
+    ? this._applySliceWrite(name, entry, bitWidth, range, rhs, wireAssignPad)
+    : currentValue.substring(0, start) +
+      rhs +
+      currentValue.substring(end + 1);
 
   // Store result
   if (isWire) {
@@ -7388,7 +7759,7 @@ if (s.assignment) {
       const target = s.assignment.target;
       let sliceRange = null;
       try {
-        if (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange) {
+        if (this._assignmentTargetHasSlice(target)) {
           sliceRange = this._assignmentTargetSliceRange(target, wireName);
         }
       } catch (e) {
@@ -7400,7 +7771,7 @@ if (s.assignment) {
         return outputs;
       }
       try {
-        this.lowerUseExprInStatement(s, sliceRange ? (sliceRange.end - sliceRange.start + 1) : bits);
+        this.lowerUseExprInStatement(s, sliceRange ? this._sliceRangeWidth(sliceRange) : bits);
         if (s.assignment.busEnable) {
           const enVal = this._evalCallArgValue(s.assignment.busEnableExpr);
           if (!this._zConnectShouldDrive(enVal, s.assignment.busEnable)) {
@@ -7427,13 +7798,7 @@ if (s.assignment) {
         const assignPad = stmtAssignPad(s);
         let wireValue;
         if (sliceRange) {
-          const sliceWidth = sliceRange.end - sliceRange.start + 1;
-          const rhs = fitWireAssignBits(totalValue, sliceWidth, assignPad, 'msb', this);
-          let currentValue = this.getWireContributionAwareValue(wireName);
-          if (!currentValue) currentValue = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
-          wireValue = currentValue.substring(0, sliceRange.start)
-            + rhs
-            + currentValue.substring(sliceRange.end + 1);
+          wireValue = this._applySliceWrite(wireName, wire, bits, sliceRange, totalValue, assignPad);
         } else {
           wireValue = fitWireAssignBits(totalValue, bits, assignPad, 'msb', this);
         }
