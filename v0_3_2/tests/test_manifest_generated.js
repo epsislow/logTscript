@@ -216,7 +216,7 @@
       {"id":303,"group":"doc","title":"Parser — doc(REG) produces correct AST node","detail":{"scripts":["doc(REG)"],"steps":[],"assertions":["stmt has doc field","doc.name is REG"]}},
       {"id":304,"group":"doc","title":"BUILTIN_DOC — NOT","detail":{"scripts":[],"steps":["getDocLines(NOT)"],"assertions":["NOT signature"]}},
       {"id":305,"group":"doc","title":"BUILTIN_DOC — OR has 2 signatures","detail":{"scripts":[],"steps":["getDocLines(OR)"],"assertions":["OR 2 signatures","OR signature 1","OR signature 2"]}},
-      {"id":306,"group":"doc","title":"BUILTIN_DOC — EQ signatures","detail":{"scripts":[],"steps":["getDocLines(EQ)"],"assertions":["EQ 2 signatures","EQ signature","EQ vector"]}},
+      {"id":306,"group":"doc","title":"BUILTIN_DOC — EQ signatures","detail":{"scripts":[],"steps":["getDocLines(EQ)"],"assertions":["EQ 3 signatures","EQ signature","EQ variadic","EQ vector"]}},
       {"id":307,"group":"doc","title":"BUILTIN_DOC — MUX","detail":{"scripts":[],"steps":["getDocLines(MUX)"],"assertions":["MUX signature"]}},
       {"id":308,"group":"doc","title":"BUILTIN_DOC — DEMUX","detail":{"scripts":[],"steps":["getDocLines(DEMUX)"],"assertions":["DEMUX signature"]}},
       {"id":309,"group":"doc","title":"BUILTIN_DOC — REG","detail":{"scripts":[],"steps":["getDocLines(REG)"],"assertions":["REG signature"]}},

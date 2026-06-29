@@ -11800,6 +11800,7 @@ Interpreter.BUILTIN_DOC = {
   NOR:   ['NOR(Xbit) -> 1bit',  'NOR(Xbit, Xbit) -> Xbit'],
   EQ:    [
     'EQ(Xbit, Xbit) -> 1bit',
+    'EQ(Xbit, Xbit, Xbit, ...) -> 1bit',
     'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]',
   ],
   LATCH: ['LATCH(Xbit data, 1bit clock) -> Xbit'],

@@ -12,7 +12,7 @@ Index: [builtin-functions.md](builtin-functions.md) · Short notation (`&`, `|`,
 |------|-----------|
 | `doc(NOT)` | `NOT(Xbit) -> Xbit` |
 | `doc(AND)` … `doc(NOR)` | `Gate(Xbit) -> 1bit` **or** `Gate(Xbit, Xbit) -> Xbit` |
-| `doc(EQ)` | `EQ(Xbit, Xbit) -> 1bit` |
+| `doc(EQ)` | `EQ(Xbit, Xbit) -> 1bit` / `EQ(Xbit, Xbit, Xbit, ...) -> 1bit` |
 
 **1-argument mode (fold):** `OR(a)` folds across all bits of `a` → **1 bit**.
 

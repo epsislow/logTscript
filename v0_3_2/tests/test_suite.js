@@ -2747,9 +2747,10 @@ reg(305, 'doc', 'BUILTIN_DOC — OR has 2 signatures', function(h, session) {
 
 reg(306, 'doc', 'BUILTIN_DOC — EQ signatures', function(h, session) {
   const lines = Interpreter.getDocLines('EQ', new Map());
-  h.assert('EQ 2 signatures', String(lines.length), '2');
+  h.assert('EQ 3 signatures', String(lines.length), '3');
   h.assert('EQ signature', lines[0], 'EQ(Xbit, Xbit) -> 1bit');
-  h.assert('EQ vector', lines[1], 'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
+  h.assert('EQ variadic', lines[1], 'EQ(Xbit, Xbit, Xbit, ...) -> 1bit');
+  h.assert('EQ vector', lines[2], 'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
 });
 
 reg(307, 'doc', 'BUILTIN_DOC — MUX', function(h, session) {
@@ -14692,7 +14693,7 @@ reg(1850, 'builtin-vector', 'doc(GT/LT/EQ/LSHIFT) vector signatures', function(h
   const lsLines = Interpreter.getDocLines('LSHIFT', new Map());
   h.assert('GT vector', gtLines[2], 'GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
   h.assert('LT vector signed', ltLines[3], 'LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]');
-  h.assert('EQ vector', eqLines[1], 'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
+  h.assert('EQ vector', eqLines[2], 'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
   h.assert('LSHIFT vector', lsLines[2], 'LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]');
 });
 
