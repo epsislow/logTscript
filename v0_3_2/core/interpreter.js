@@ -2306,6 +2306,71 @@ class Interpreter {
     return total;
   }
 
+  _evalCallArgDecimalInt(argExpr, fnName) {
+    if (!argExpr || argExpr.length !== 1) {
+      this._throwRuntime(
+        `${fnName}: expects one decimal literal argument (e.g. \\3)`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    const atom = argExpr[0];
+    if (atom.dec == null || atom.dec === '') {
+      this._throwRuntime(
+        `${fnName}: expects one decimal literal argument (e.g. \\3)`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    const n = parseInt(atom.dec, 10);
+    if (!Number.isFinite(n) || n < 1) {
+      this._throwRuntime(
+        `${fnName}: dimension must be a positive integer`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    return n;
+  }
+
+  _resolveIdentityAssignContext() {
+    const s = this.currentStmt;
+    if (!s) return null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    let wireType = null;
+    let rows = null;
+    let cols = null;
+
+    if (s.decls) {
+      for (const d of s.decls) {
+        if (!d.type || !this.isWire(d.type)) continue;
+        if (d.name === '_' || d.name === '~' || d.name === '%' || d.name === '$') continue;
+        wireType = d.type;
+        const dims = TS ? TS.normalizeDeclTensor(d) : null;
+        if (dims) {
+          rows = dims.rows;
+          cols = dims.cols;
+        }
+        break;
+      }
+    }
+    if ((rows == null || cols == null) && s.assignment && s.assignment.target) {
+      const wire = this.wires.get(s.assignment.target.var);
+      if (wire) {
+        wireType = wire.type;
+        const meta = this.getWireTensorMeta(wire);
+        if (meta) {
+          rows = meta.rows;
+          cols = meta.cols;
+        }
+      }
+    }
+    if (!wireType || rows == null || cols == null) return null;
+    const ew = this.getBitWidth(wireType);
+    if (!ew || rows !== cols) return null;
+    return { n: rows, ew };
+  }
+
   refreshZConnectBuses() {
     if (!this.zstate) return;
     const busTargets = this.getZConnectTargetBuses();
@@ -3295,7 +3360,7 @@ class Interpreter {
          'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ISDIGIT',
          'CNTN10S', 'N2N10S', 'N10S2N',
          'CNTN16S', 'N2N16S', 'N16S2N',
-         'PIVOT'].includes(name)) {
+         'PIVOT', 'IDENTITY'].includes(name)) {
       return true;
     }
 
@@ -4322,6 +4387,24 @@ const idx = parseInt(
     return computeRefs
       ? { value: pivoted, ref: `&${this.storeValue(pivoted)}` }
       : { value: pivoted, ref: null };
+  }
+
+  if (name === 'IDENTITY') {
+    if (args.length !== 1) fail('IDENTITY expects 1 argument');
+    const n = this._evalCallArgDecimalInt(args[0], 'IDENTITY');
+    const ctx = this._resolveIdentityAssignContext();
+    if (!ctx) {
+      fail('IDENTITY: assign to a square N×N tensor wire (e.g. 4wire[N,N] name = IDENTITY(\\N))');
+    }
+    if (ctx.n !== n) {
+      fail(`IDENTITY: argument \\${n} does not match wire shape ${ctx.n}×${ctx.n}`);
+    }
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (!TS) fail('IDENTITY: internal error (tensor-shape not loaded)');
+    const blob = TS.identityBlob(n, ctx.ew);
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
   }
 
   if (name === 'SUM') {
@@ -12600,6 +12683,7 @@ Interpreter.BUILTIN_DOC = {
     'REVERSE(Wbit[n] data ; vector) -> Wbit[n]',
   ],
   PIVOT:    ['PIVOT(Wwire tensor) -> Wwire tensor'],
+  IDENTITY: ['IDENTITY(\\N) -> Wwire[N,N] — square identity; W from target wire, N decimal'],
   LROTATE:  [
     'LROTATE(Xbit data, Ybit count) -> Xbit',
     'LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]',

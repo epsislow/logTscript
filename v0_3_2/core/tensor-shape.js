@@ -110,6 +110,22 @@
     return { rows: cols, cols: rows };
   }
 
+  /** N×N identity matrix blob: diagonal = 1 (W bits), off-diagonal = 0. */
+  function identityBlob(n, ew) {
+    const N = n | 0;
+    const W = ew | 0;
+    if (N < 1 || W < 1) return '';
+    const one = '0'.repeat(Math.max(0, W - 1)) + '1';
+    const zero = '0'.repeat(W);
+    let out = '';
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        out += r === c ? one : zero;
+      }
+    }
+    return out;
+  }
+
   const api = {
     normalizeDeclTensor,
     isScalarTensor,
@@ -123,7 +139,8 @@
     formatTensorTypeLabel,
     declBitTotal,
     pivotBlob,
-    pivotedDims
+    pivotedDims,
+    identityBlob
   };
 
   if (typeof module !== 'undefined' && module.exports) {

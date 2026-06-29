@@ -13735,6 +13735,41 @@ reg(1888, 'builtin-matrix', 'ARGMAX(matrix; index) row and col', function(h, ses
   h.assert('best col', session.getWire(interp, 'col'), '1');
 });
 
+reg(1889, 'wire-tensor', 'IDENTITY(\\3) 4wire[3,3]', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3,3] I = IDENTITY(\\3)\n' +
+    '4wire c00 = I:0:0\n' +
+    '4wire c01 = I:0:1\n' +
+    '4wire c11 = I:1:1\n' +
+    '4wire c20 = I:2:0'
+  );
+  h.assert('diagonal 1', session.getWire(interp, 'c00'), '0001');
+  h.assert('off-diagonal 0', session.getWire(interp, 'c01'), '0000');
+  h.assert('diagonal 2', session.getWire(interp, 'c11'), '0001');
+  h.assert('corner 0', session.getWire(interp, 'c20'), '0000');
+});
+
+reg(1890, 'wire-tensor', 'DOT(A, IDENTITY) preserves A', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] a = 0001 + 0010 + 0011 + 0100\n' +
+    '4wire[2,2] eye = IDENTITY(\\2)\n' +
+    '4wire[2,2] r, 8wire[2,2] o = DOT(a, eye)'
+  );
+  h.assert('A unchanged', session.getWire(interp, 'r'), session.getWire(interp, 'a'));
+});
+
+reg(1891, 'wire-tensor', 'IDENTITY dimension mismatch error', function(h, session) {
+  const r = session.run('4wire[2,2] I = IDENTITY(\\3)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('shape mismatch', String(/does not match wire shape/.test(err)), 'true');
+});
+
+reg(1892, 'wire-tensor', 'IDENTITY rejects non-decimal argument', function(h, session) {
+  const r = session.run('4wire[2,2] I = IDENTITY(10)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('decimal required', String(/decimal literal/.test(err)), 'true');
+});
+
 reg(1743, 'loop', 'block repeat N..M[ is not expanded (passthrough)', function(h, session) {
   const src = 'repeat 1..3[\n    4wire w?\n    ]';
   const result = preprocessLoop(src);

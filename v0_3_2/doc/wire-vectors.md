@@ -113,6 +113,20 @@ show(r)
 show(hot)
 ```
 
+### IDENTITY
+
+`IDENTITY(\N)` builds an **N×N** identity matrix. Element width **W** comes from the target wire (`4wire[N,N]` → 4 bits per cell). The decimal argument must match **N**.
+
+```logts-play
+4wire[3,3] I = IDENTITY(\3)
+4wire[2,2] a = 0001 + 0010 + 0011 + 0100
+4wire[2,2] eye = IDENTITY(\2)
+4wire[2,2] r, 8wire[2,2] o = DOT(a, eye)
+show(r)
+```
+
+Useful for matrix multiply baselines (`DOT(A, I)` ≡ `A`) and neural-net / linear-algebra sketches without hand-building diagonal tensors.
+
 ---
 
 ## Initialization

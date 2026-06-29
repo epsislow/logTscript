@@ -1548,7 +1548,8 @@ assignment() {
       atom = {bin: this.c.value};
       this.eat('BIN');
     } else if(this.c.type === 'SDEC'){
-      atom = {bin: slashDecToBin(this.c.value)};
+      const decVal = this.c.value;
+      atom = {bin: slashDecToBin(decVal), dec: decVal};
       this.eat('SDEC');
     } else if(this.c.type === 'LOGIC'){
       atom = {logic: this.c.value};
@@ -2903,13 +2904,14 @@ assignment() {
   }
   
   if (this.c.type === 'SDEC') {
-    const v = slashDecToBin(this.c.value);
+    const decVal = this.c.value;
+    const v = slashDecToBin(decVal);
     this.eat('SDEC');
     let br = null;
     if (this.c.type === 'SYM' && this.c.value === '.') {
       br = this.parseLiteralBitRange();
     }
-    const atomSdec = br ? { bin: v, bitRange: br } : { bin: v };
+    const atomSdec = br ? { bin: v, dec: decVal, bitRange: br } : { bin: v, dec: decVal };
     { const _p = this.maybeParsePadding(); if (_p != null) atomSdec.pad = _p; }
     return addNot(atomSdec);
   }
