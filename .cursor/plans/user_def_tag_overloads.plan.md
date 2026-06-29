@@ -1,6 +1,6 @@
 ---
 name: User def tag overloads
-overview: Tag-uri în semnătura funcțiilor user `def` și la apel (`name(args; tag1=1 tag3)`), cu overload-uri multiple sub același nume, rezolvare prin potrivire exactă a setului de tag-uri. Implementat în v0_3_2. Faza 2 (built-in tags) rămâne viitoare.
+overview: "Faza 1 (implementată): tag-uri user `def` cu overload exact. Faza 2 (planificată): tag bool `signed` pe built-in-uri aritmetice pentru scripturi — ADD/SUBTRACT/GT/LT/MIN/MAX/CLAMP; apoi MULTIPLY/MAC/RSHIFT aritmetic."
 todos:
   - id: overload-module
     content: "core/user-func-overloads.js — normalizare, match exact, erori, validare def"
@@ -20,6 +20,21 @@ todos:
   - id: tests-tags
     content: "Teste user-def-tags 1776–1781 + regresie user-def 1764–1775"
     status: completed
+  - id: builtin-signed-helpers
+    content: "Helperi two's complement: interpretare signed, compare signed, overflow (reutilizare aluSignedOverflowAdd/Sub)"
+    status: pending
+  - id: builtin-signed-dispatch
+    content: "interpreter.call() — după parse callTags, ramură signed pe ADD/SUBTRACT/GT/LT/MIN/MAX/CLAMP"
+    status: pending
+  - id: builtin-signed-doc
+    content: "arithmetic.md + builtin doc + exemple logts-play ADD(acc,delta; signed), GT/LT signed vs unsigned"
+    status: pending
+  - id: builtin-signed-tests
+    content: "Teste builtin-signed — overflow, compare 1111 vs 0010, regresie unsigned fără tag"
+    status: pending
+  - id: builtin-signed-phase2b
+    content: "Iteratie urmatoare: MULTIPLY, MAC, RSHIFT/ASHR cu signed (daca se confirma semantica)"
+    status: pending
 isProject: false
 ---
 
@@ -136,8 +151,135 @@ Dacă vrei comportamentul „def cu `tag1=1 tag2=2`”, apelul corect este `test
 | `test(a, b; tag1=1 tag3)` | **eroare** — niciun def cu `{ tag1:1, tag3:1 }` (lipsește `tag2=3` din #6) |
 | `test(a, b; tag3)` | **eroare** — niciun def cu doar `{ tag3:1 }` |
 
-## Faza 2 (neimplementat)
+## Faza 2 — built-in `signed` (planificat, neimplementat)
 
-- Tag-uri pe built-ins (`ADD`, `SUM`, …)
-- Overload-uri cu arity diferită sub același nume
-- Valori tag ca expresii runtime (nu doar literali)
+### Scop confirmat
+
+- **Nu** extindem `comp [alu]` ca produs principal — scopul e **built-in în script** pentru orice utilizare.
+- Apel tip doc: `ADD(acc, delta; signed)`, `GT(a, b; signed)`, fără PCB/chip.
+- **Fără tag** = comportament **unsigned actual** (compatibilitate totală cu scripturile existente).
+- **Cu tag bool `signed`** = interpretare **two's complement** pe lățimea operandului `W` (MSB = semn).
+
+Parserul și `callTags` din faza 1 sunt deja pregătite; faza 2 adaugă ramificare în `interpreter.call()` **înainte** sau **după** rezolvarea built-in-ului, pe baza prezenței tag-ului `signed`.
+
+### Scope iteratie 2a (prima implementare)
+
+| Built-in | Comportament cu `; signed` |
+|----------|----------------------------|
+| **ADD** | Același `result` pe biți (mod 2^W); al 2-lea return = **overflow signed** (nu carry unsigned) — reutilizare `aluSignedOverflowAdd` din [`alu-devices.js`](../v0_3_2/devices/alu-devices.js) |
+| **SUBTRACT** | Același `result` pe biți; al 2-lea return = **overflow signed** la scădere — `aluSignedOverflowSub` |
+| **GT**, **LT** | Comparare numerică **signed** (ex. `1111` pe 4 biți = −1, nu 15) |
+| **MIN**, **MAX** | Min/max după ordinea **signed** |
+| **CLAMP** | Clamp în interval interpretat **signed** |
+
+`doc(ADD)` listează ambele variante, ex.:
+
+```text
+ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
+ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
+```
+
+### Scope iteratie 2b (următoarea fază)
+
+| Built-in | Motiv amânare |
+|----------|----------------|
+| **MULTIPLY**, **MAC** | Semantica `over`/lățime la produs signed e mai ambiguă |
+| **RSHIFT** (sau **ASHR**) | **Nu** e doar interpretare — e **altă operație pe biți** (vezi mai jos) |
+
+### De ce RSHIFT e diferit (nu e „signed ca la ADD”)
+
+- **ADD / GT cu `signed`:** aceiași biți la intrare/ieșire; se schimbă doar **cum numerotăm** (15 vs −1) și ce înseamnă flag-ul.
+- **RSHIFT fără `signed` (azi):** shift **logic** la dreapta — se bagă **0** în stânga.
+
+  ```text
+  4bit 1111  RSHIFT(..., 1)  →  0111   (bit de semn pierdut)
+  ```
+
+- **RSHIFT / shift aritmetic cu `signed`:** se **replică MSB** (bitul de semn), ca la −1 să rămână −1 după shift:
+
+  ```text
+  4bit 1111  (=-1)  ASHR(..., 1)  →  1111   (tot -1 pe 4 biți)
+  4bit 0111  (= 7)  ASHR(..., 1)  →  0011   (= 3)
+  ```
+
+De aceea RSHIFT nu intră în prima iteratie cu ADD/GT: `RSHIFT(x, n; signed)` = **shift aritmetic la dreapta** (echivalent `ASHR` din ALU — vezi [`alu.md`](../v0_3_2/doc/alu.md#arithmetic-shift-right-vs-logical-ashr--rshift)).
+
+### LSHIFT — **nu** primește `signed` (2a / 2b)
+
+Shift **stânga** logic și aritmetic sunt **aceeași operație pe biți**: se mută la stânga, se completează cu **0** la dreapta.
+
+```text
+4bit 1111  LSHIFT(..., 1)  →  1110   (identic indiferent de interpretare signed/unsigned)
+4bit 0111  LSHIFT(..., 1)  →  1110   (= 14 unsigned sau -2 signed pe 4 biți — aceiași biți)
+```
+
+- **Fără tag** și **cu `signed`** → același rezultat pe wire.
+- Ce *poate* diferi la signed e doar **detecția de overflow** („înmulțire cu 2” depășește intervalul signed) — asta e problemă de flag/documentație, nu o a doua variantă de shift. Dacă e nevoie mai târziu: `ADD(x, x; signed)` sau flag separat, nu `LSHIFT(...; signed)`.
+
+**Concluzie plan:** `LSHIFT` rămâne **în afara** scope-ului tag `signed`.
+
+### LROTATE și RROTATE — **nu** primește `signed`
+
+Rotațiile sunt **circulare pe biți** — niciun bit nu „iese”; nu există umplere cu 0 sau cu MSB.
+
+```text
+4bit 1111  RROTATE(..., 1)  →  1111
+4bit 1010  LROTATE(..., 1)  →  0101
+```
+
+Rezultatul depinde doar de pattern-ul de biți, **nu** de interpretarea numerică signed/unsigned. În CPU-uri reale, rotate nu are variantă signed.
+
+**Concluzie plan:** `LROTATE` / `RROTATE` rămân **în afara** scope-ului tag `signed` (la fel ca porțile logice).
+
+### Rezumat familie shift / rotate
+
+| Built-in | `signed` în 2a | `signed` în 2b | Motiv |
+|----------|----------------|----------------|-------|
+| **LSHIFT** | nu | nu | Operație identică signed/unsigned |
+| **RSHIFT** | nu | **da** (`; signed` = ASHR) | Logic vs aritmetic diferă la dreapta |
+| **LROTATE** | nu | nu | Rotație pur bitwise |
+| **RROTATE** | nu | nu | Rotație pur bitwise |
+| **REVERSE** | nu | nu | Inversare ordine biți, fără sens signed |
+
+### Explicit **fără** `signed`
+
+Porți logice (`AND`, `OR`, `XOR`, `EQ` bitwise, …), `MUX`/`DEMUX`/`REG`, analiză biți (`HIGH`, `PARITY`, …), **LSHIFT**, **LROTATE**, **RROTATE**, **REVERSE**, conversii `N2N10S`/`N10S2N`, `SUM`/`DOT`, `ZCONNECT` — rămân neschimbate.
+
+### Exemple doc / script țintă (2a)
+
+```logts-play
+4wire acc = 0111
+4wire delta = 0001
+4wire nextU, 1wire carry = ADD(acc, delta)
+4wire nextS, 1wire ovf = ADD(acc, delta; signed)
+show(nextU)
+show(carry)
+show(nextS)
+show(ovf)
+```
+
+```logts-play
+4wire a = 1111
+4wire b = 0010
+1wire gtU = GT(a, b)
+1wire gtS = GT(a, b; signed)
+show(gtU)
+show(gtS)
+```
+
+### Fișiere estimate (2a)
+
+| Fișier | Schimbare |
+|--------|-----------|
+| [`interpreter.js`](../v0_3_2/core/interpreter.js) | Ramuri signed; extindere `BUILTIN_DOC` cu overload tag |
+| [`alu-devices.js`](../v0_3_2/devices/alu-devices.js) sau modul nou | Export helperi overflow / compare signed reutilizabili |
+| [`arithmetic.md`](../v0_3_2/doc/arithmetic.md) | Secțiune `signed`; exemple `logts-play` |
+| [`builtin-functions.md`](../v0_3_2/doc/builtin-functions.md) | Index către signed |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | Grup `builtin-signed` |
+
+### În afara scope-ului faza 2
+
+- Tag-uri pe funcții user în afara celor deja implementate (faza 1 e completă)
+- Overload arity diferit pe același nume built-in
+- `DIVIDE` signed
+- Înlocuirea `comp [alu]` — rămâne opțional pentru design hardware
