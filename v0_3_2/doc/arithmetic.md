@@ -10,7 +10,7 @@ DIVIDE(Xbit a, Xbit b)   -> Xbit result, Xbit mod
 MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 ```
 
-**Signed overload** (two's complement on width `W`, MSB = sign): append `; signed` after the argument list on `ADD`, `SUBTRACT`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP`, `MULTIPLY`, `MAC`, and `RSHIFT`. Without the tag, behaviour stays **unsigned** / logical (fully compatible with existing scripts). See [Signed arithmetic (`; signed`)](#signed-arithmetic-signed) below.
+**Signed overload** (two's complement on width `W`, MSB = sign): append `; signed` after the argument list on `ADD`, `SUBTRACT`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP`, `MULTIPLY`, `MAC`, `SUM`, `DOT`, and `RSHIFT`. Without the tag, behaviour stays **unsigned** / logical (fully compatible with existing scripts). See [Signed arithmetic (`; signed`)](#signed-arithmetic-signed) below.
 
 
 ---
@@ -365,6 +365,8 @@ Several arithmetic built-ins accept an optional **bool tag** `signed` after `;` 
 | `CLAMP` | unsigned bounds | signed bounds |
 | `MULTIPLY` | unsigned product, low/high split | signed product, same split |
 | `MAC` | unsigned `acc + a×b` | signed `acc + a×b` |
+| `DOT` | unsigned dot product | signed dot product |
+| `SUM` | unsigned sum | signed sum |
 
 `DIVIDE`, `LSHIFT`, rotates, and `REVERSE` do **not** support `; signed`. `RSHIFT` with `; signed` is **arithmetic** shift (ASHR) — see [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md#rshift-signed).
 
@@ -511,9 +513,11 @@ doc(CLAMP)
 
 doc(SUM)
 # SUM(Wbit ...) -> Wbit result, Wbit over
+# SUM(Wbit ...; signed) -> Wbit result, Wbit over
 
 doc(DOT)
 # DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
+# DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
 ```
 
 Vector operand rules and examples: [vector-reduction.md](vector-reduction.md).

@@ -24,9 +24,10 @@ All expanded operands must have the **same bit width** (runtime error otherwise)
 
 ```
 SUM(Wbit ...) -> Wbit result, Wbit over
+SUM(Wbit ...; signed) -> Wbit result, Wbit over
 ```
 
-Returns the unsigned sum of all operands. Output is **2W bits** total: low **W** bits in `result`, next **W** bits in `over`. Full value = concatenate `over` then `result` (MSB → LSB), same convention as [MAC](arithmetic.md#mac-multiply-accumulate).
+Returns the sum of all operands (unsigned by default). With `; signed`, each operand is **two's complement** on width **W**. Output is **2W bits** total: low **W** bits in `result`, next **W** bits in `over`. Full value = concatenate `over` then `result` (MSB → LSB), same convention as [MAC](arithmetic.md#mac-multiply-accumulate).
 
 Overflow (sum needs more than **2W** bits) is a **runtime error**.
 
@@ -69,7 +70,10 @@ show(m)
 
 ```
 DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
+DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
 ```
+
+Dot product of two whole vectors (same shape). With `; signed`, each element is interpreted as **two's complement** before multiply-accumulate; output packing (`result` low **W**, `over` next **2W**) is unchanged.
 
 Dot product of two **whole vectors** of the same shape (`elementWidth` × `elementCount`). Output is **3W bits**: low **W** in `result`, next **2W** in `over`.
 

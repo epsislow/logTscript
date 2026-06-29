@@ -6,7 +6,7 @@
 
   const BUILTIN_SIGNED_TAG_FUNCS = new Set([
     'ADD', 'SUBTRACT', 'GT', 'LT', 'MIN', 'MAX', 'CLAMP',
-    'MULTIPLY', 'MAC', 'RSHIFT',
+    'MULTIPLY', 'MAC', 'RSHIFT', 'SUM', 'DOT',
   ]);
 
   function signedBinToBigInt(binStr) {

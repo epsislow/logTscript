@@ -2264,6 +2264,10 @@ class Interpreter {
     if (argExpr && argExpr.length === 1) {
       const atom = argExpr[0];
       if (atom.var && !atom.var.startsWith('.') && atom.var !== '~' && atom.var !== '%' && atom.var !== '$') {
+        if (this.wires.has(atom.var)) {
+          const v = this.getWireEffectiveValue(atom.var);
+          if (v != null) return v;
+        }
         const v = this.getWireContributionAwareValue(atom.var);
         if (v != null) return v;
       }
@@ -3894,6 +3898,17 @@ const idx = parseInt(
   const { name, alias } = fn;
   const fail = (msg, len) => this._throwRuntime(msg, fn, len != null ? len : name.length);
 
+  const SA = typeof LogTScriptSignedArithmetic !== 'undefined' ? LogTScriptSignedArithmetic : null;
+  let signedMode = false;
+  if (callTags && callTags.length) {
+    if (Interpreter.BUILTIN_DOC[name] && (!SA || !SA.BUILTIN_SIGNED_TAG_FUNCS.has(name))) {
+      fail(`${name}: does not accept call tags`);
+    }
+    if (SA && SA.BUILTIN_SIGNED_TAG_FUNCS.has(name)) {
+      signedMode = SA.parseBuiltinSignedCallTags(callTags, name, (msg) => fail(msg));
+    }
+  }
+
   if (name === 'ZCONNECT' || name === 'ZCONN') {
     if (!this.zstate) {
       const err = new Error('ZCONNECT() requires MODE ZSTATE');
@@ -3926,7 +3941,7 @@ const idx = parseInt(
     try {
       if (!VR) fail('SUM: internal error (vector-reduce not loaded)');
       const X = VR.requireSameBitWidth(expanded, 'SUM');
-      sum = VR.sumUnsignedExpanded(expanded, X);
+      sum = VR.sumExpanded(expanded, X, signedMode);
     } catch (e) {
       fail(e.message);
     }
@@ -3962,7 +3977,7 @@ const idx = parseInt(
     let dot;
     try {
       const X = metaA.elementWidth;
-      dot = VR.dotUnsignedExpanded(aVals, bVals, X);
+      dot = VR.dotExpanded(aVals, bVals, X, signedMode);
     } catch (e) {
       fail(e.message);
     }
@@ -3989,18 +4004,6 @@ const idx = parseInt(
     }).join('');
   });
 
-  const SA = typeof LogTScriptSignedArithmetic !== 'undefined' ? LogTScriptSignedArithmetic : null;
-  let signedMode = false;
-  if (callTags && callTags.length) {
-    if (Interpreter.BUILTIN_DOC[name] && (!SA || !SA.BUILTIN_SIGNED_TAG_FUNCS.has(name))) {
-      fail(`${name}: does not accept call tags`);
-    }
-    if (SA && SA.BUILTIN_SIGNED_TAG_FUNCS.has(name)) {
-      signedMode = SA.parseBuiltinSignedCallTags(callTags, name, (msg) => fail(msg));
-    }
-  }
-
-  // ================= BUILTIN: LOGIC GATES =================
   const useIeeeGates = typeof LogicValue !== 'undefined'
     && argValues.some(v => LogicValue.stringHasLogicXZ(v));
 
@@ -11522,8 +11525,14 @@ Interpreter.BUILTIN_DOC = {
     'MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over',
     'MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over',
   ],
-  SUM:      ['SUM(Wbit ...) -> Wbit result, Wbit over'],
-  DOT:      ['DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over'],
+  SUM:      [
+    'SUM(Wbit ...) -> Wbit result, Wbit over',
+    'SUM(Wbit ...; signed) -> Wbit result, Wbit over',
+  ],
+  DOT:      [
+    'DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over',
+    'DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over',
+  ],
   CNTN10S:  ['CNTN10S(Xbit value) -> Ybit'],
   N2N10S:   ['N2N10S(Xbit value) -> Zbit packed'],
   N10S2N:   ['N10S2N(Xbit packed) -> Wbit value'],

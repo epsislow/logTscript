@@ -51,47 +51,90 @@
     return w;
   }
 
-  function sumUnsignedExpanded(values, X) {
+  function signedBinToBigInt(binStr) {
+    const s = binStr == null ? '' : String(binStr);
+    if (!s.length) return 0n;
+    const w = s.length;
+    if (s[0] === '1') {
+      const unsigned = BigInt('0b' + s);
+      return unsigned - (BigInt(1) << BigInt(w));
+    }
+    return BigInt('0b' + s);
+  }
+
+  function sumExpanded(values, X, signed) {
     let acc = 0n;
     for (const v of values) {
-      acc += unsignedBinToBigInt(String(v).padStart(X, '0'));
+      const s = String(v).padStart(X, '0');
+      acc += signed ? signedBinToBigInt(s) : unsignedBinToBigInt(s);
     }
     const totalBits = 2 * X;
-    const maxVal = (BigInt(1) << BigInt(totalBits)) - BigInt(1);
-    if (acc > maxVal) {
-      const need = acc.toString(2).length;
-      throw new Error(
-        `SUM: result requires ${totalBits} bits (X=${X}); value needs ${need} bits`
-      );
+    if (!signed) {
+      const maxVal = (BigInt(1) << BigInt(totalBits)) - BigInt(1);
+      if (acc > maxVal) {
+        const need = acc.toString(2).length;
+        throw new Error(
+          `SUM: result requires ${totalBits} bits (X=${X}); value needs ${need} bits`
+        );
+      }
+    } else {
+      const minVal = -(BigInt(1) << BigInt(totalBits - 1));
+      const maxSigned = (BigInt(1) << BigInt(totalBits - 1)) - BigInt(1);
+      if (acc < minVal || acc > maxSigned) {
+        throw new Error(
+          `SUM: signed result requires ${totalBits} bits (X=${X}); value out of range`
+        );
+      }
     }
     const maskX = (BigInt(1) << BigInt(X)) - BigInt(1);
     const result = (acc & maskX).toString(2).padStart(X, '0');
-    const over = (acc >> BigInt(X)).toString(2).padStart(X, '0');
+    const over = ((acc >> BigInt(X)) & maskX).toString(2).padStart(X, '0');
     return { result, over };
   }
 
-  function dotUnsignedExpanded(aVals, bVals, X) {
+  function sumUnsignedExpanded(values, X) {
+    return sumExpanded(values, X, false);
+  }
+
+  function dotExpanded(aVals, bVals, X, signed) {
     if (aVals.length !== bVals.length) {
       throw new Error('DOT: vectors must have the same number of elements');
     }
     let acc = 0n;
     for (let i = 0; i < aVals.length; i++) {
-      const a = unsignedBinToBigInt(String(aVals[i]).padStart(X, '0'));
-      const b = unsignedBinToBigInt(String(bVals[i]).padStart(X, '0'));
+      const ap = String(aVals[i]).padStart(X, '0');
+      const bp = String(bVals[i]).padStart(X, '0');
+      const a = signed ? signedBinToBigInt(ap) : unsignedBinToBigInt(ap);
+      const b = signed ? signedBinToBigInt(bp) : unsignedBinToBigInt(bp);
       acc += a * b;
     }
     const totalBits = 3 * X;
-    const maxVal = (BigInt(1) << BigInt(totalBits)) - BigInt(1);
-    if (acc > maxVal) {
-      const need = acc.toString(2).length;
-      throw new Error(
-        `DOT: result requires ${totalBits} bits (X=${X}); value needs ${need} bits`
-      );
+    if (!signed) {
+      const maxVal = (BigInt(1) << BigInt(totalBits)) - BigInt(1);
+      if (acc > maxVal) {
+        const need = acc.toString(2).length;
+        throw new Error(
+          `DOT: result requires ${totalBits} bits (X=${X}); value needs ${need} bits`
+        );
+      }
+    } else {
+      const minVal = -(BigInt(1) << BigInt(totalBits - 1));
+      const maxSigned = (BigInt(1) << BigInt(totalBits - 1)) - BigInt(1);
+      if (acc < minVal || acc > maxSigned) {
+        throw new Error(
+          `DOT: signed result requires ${totalBits} bits (X=${X}); value out of range`
+        );
+      }
     }
     const maskX = (BigInt(1) << BigInt(X)) - BigInt(1);
+    const maskOver = (BigInt(1) << BigInt(2 * X)) - BigInt(1);
     const result = (acc & maskX).toString(2).padStart(X, '0');
-    const over = (acc >> BigInt(X)).toString(2).padStart(2 * X, '0');
+    const over = ((acc >> BigInt(X)) & maskOver).toString(2).padStart(2 * X, '0');
     return { result, over };
+  }
+
+  function dotUnsignedExpanded(aVals, bVals, X) {
+    return dotExpanded(aVals, bVals, X, false);
   }
 
   /** One vector + one scalar, or two vectors of the same shape → element-wise pairing. */
@@ -133,7 +176,9 @@
     getWholeVectorMeta,
     requireSameBitWidth,
     sumUnsignedExpanded,
+    sumExpanded,
     dotUnsignedExpanded,
+    dotExpanded,
     getVectorBroadcastPair,
     addUnsignedAtWidth,
   };

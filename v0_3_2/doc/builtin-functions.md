@@ -19,7 +19,7 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 | **Sequential** | `LATCH`, `REG` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · `REG` → [reg.md](reg.md) |
 | **Routing** | `MUX`, `DEMUX` | [builtin-routing-functions.md](builtin-routing-functions.md) |
 | **Arithmetic** | `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `MAC`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP` (+ optional `; signed` on all except `DIVIDE`) | [arithmetic.md](arithmetic.md) |
-| **Vector reduction** | `SUM`, `DOT` | [vector-reduction.md](vector-reduction.md) · summary in [arithmetic.md](arithmetic.md#sum--dot-vector-reduction) |
+| **Vector reduction** | `SUM`, `DOT` (+ optional `; signed`) | [vector-reduction.md](vector-reduction.md) · summary in [arithmetic.md](arithmetic.md#sum--dot-vector-reduction) |
 | **Number conversion** | `CNTN10S`, `N2N10S`, `N10S2N`, `CNTN16S`, `N2N16S`, `N16S2N`, `ISDIGIT` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | `HIGH`, `LOW`, `ANY`, `ZERO`, `ANY*`, `ALL*`, `BITINDEX`, `ONEHOT` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | `PARITY`, `CNTONE`, `CNTZERO`, `BITSIZE` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |

@@ -13333,8 +13333,10 @@ reg(1734, 'vector-reduction', 'SUM vector sub-range same width', function(h, ses
 });
 
 reg(1728, 'vector-reduction', 'doc(SUM) signature', function(h, session) {
-  const line = Interpreter.getDocLines('SUM', new Map())[0];
-  h.assert('doc line', line, 'SUM(Wbit ...) -> Wbit result, Wbit over');
+  const lines = Interpreter.getDocLines('SUM', new Map());
+  h.assert('SUM 2 signatures', String(lines.length), '2');
+  h.assert('SUM unsigned', lines[0], 'SUM(Wbit ...) -> Wbit result, Wbit over');
+  h.assert('SUM signed', lines[1], 'SUM(Wbit ...; signed) -> Wbit result, Wbit over');
 });
 
 reg(1729, 'vector-reduction', 'MIN/MAX plain wires regression', function(h, session) {
@@ -14161,6 +14163,60 @@ reg(1796, 'builtin-signed', 'MULTIPLY unsigned — regression', function(h, sess
   h.assert('2*3=6', session.getWire(interp, 'r'), '0110');
   h.assert('no over', session.getWire(interp, 'o'), '0000');
 });
+
+reg(1797, 'vector-reduction', 'SUM(a, b) — wave propagation', function(h, session) {
+  const { interp } = session.run(
+    '4wire a = 0001\n' +
+    '4wire b = 0101\n' +
+    '4wire result, 4wire over = SUM(a, b)'
+  );
+  h.assert('1+5=6', session.getWire(interp, 'result'), '0110');
+  h.assert('over zero', session.getWire(interp, 'over'), '0000');
+}, { propagation: 'wave' });
+
+reg(1798, 'builtin-signed', 'DOT — signed vs unsigned', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 1111 + 0010\n' +
+    '4wire[2] vectorB = 1111 + 0001\n' +
+    '4wire rU, 8wire oU = DOT(vectorA, vectorB)\n' +
+    '4wire rS, 8wire oS = DOT(vectorA, vectorB; signed)'
+  );
+  h.assert('unsigned low', session.getWire(interp, 'rU'), '0011');
+  h.assert('unsigned over', session.getWire(interp, 'oU'), '00001110');
+  h.assert('signed low', session.getWire(interp, 'rS'), '0011');
+  h.assert('signed over', session.getWire(interp, 'oS'), '00000000');
+});
+
+reg(1799, 'doc', 'BUILTIN_DOC — DOT signed signature', function(h, session) {
+  const lines = Interpreter.getDocLines('DOT', new Map());
+  h.assert('DOT 2 signatures', String(lines.length), '2');
+  h.assert('DOT signed', lines[1], 'DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over');
+});
+
+reg(1800, 'builtin-signed', 'SUM — signed vs unsigned', function(h, session) {
+  const { interp } = session.run(
+    '4wire a = 0001\n' +
+    '4wire b = 1111\n' +
+    '4wire rU, 4wire oU = SUM(a, b)\n' +
+    '4wire rS, 4wire oS = SUM(a, b; signed)'
+  );
+  h.assert('unsigned 1+15=16', session.getWire(interp, 'rU'), '0000');
+  h.assert('unsigned over 1', session.getWire(interp, 'oU'), '0001');
+  h.assert('signed 1+(-1)=0', session.getWire(interp, 'rS'), '0000');
+  h.assert('signed over 0', session.getWire(interp, 'oS'), '0000');
+});
+
+reg(1801, 'builtin-signed', 'SUM(vector) — signed elements', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 1111 + 0010\n' +
+    '4wire rU, 4wire oU = SUM(vectorA)\n' +
+    '4wire rS, 4wire oS = SUM(vectorA; signed)'
+  );
+  h.assert('unsigned low', session.getWire(interp, 'rU'), '0000');
+  h.assert('unsigned over', session.getWire(interp, 'oU'), '0010');
+  h.assert('signed zero', session.getWire(interp, 'rS'), '0000');
+  h.assert('signed over zero', session.getWire(interp, 'oS'), '0000');
+}, { propagation: 'wave' });
 
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:

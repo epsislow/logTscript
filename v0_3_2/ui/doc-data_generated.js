@@ -601,7 +601,7 @@ DIVIDE(Xbit a, Xbit b)   -> Xbit result, Xbit mod
 MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 \`\`\`
 
-**Signed overload** (two's complement on width \`W\`, MSB = sign): append \`; signed\` after the argument list on \`ADD\`, \`SUBTRACT\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, and \`CLAMP\`. Without the tag, behaviour stays **unsigned** (fully compatible with existing scripts). See [Signed arithmetic (\`; signed\`)](#signed-arithmetic-signed) below.
+**Signed overload** (two's complement on width \`W\`, MSB = sign): append \`; signed\` after the argument list on \`ADD\`, \`SUBTRACT\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\`, \`MULTIPLY\`, \`MAC\`, \`SUM\`, \`DOT\`, and \`RSHIFT\`. Without the tag, behaviour stays **unsigned** / logical (fully compatible with existing scripts). See [Signed arithmetic (\`; signed\`)](#signed-arithmetic-signed) below.
 
 
 ---
@@ -954,8 +954,12 @@ Several arithmetic built-ins accept an optional **bool tag** \`signed\` after \`
 | \`GT\` / \`LT\` | unsigned numeric order | signed numeric order |
 | \`MIN\` / \`MAX\` | unsigned min/max | signed min/max |
 | \`CLAMP\` | unsigned bounds | signed bounds |
+| \`MULTIPLY\` | unsigned product, low/high split | signed product, same split |
+| \`MAC\` | unsigned \`acc + a×b\` | signed \`acc + a×b\` |
+| \`DOT\` | unsigned dot product | signed dot product |
+| \`SUM\` | unsigned sum | signed sum |
 
-\`MULTIPLY\`, \`MAC\`, \`DIVIDE\`, shifts, and rotates do **not** support \`; signed\` in this release.
+\`DIVIDE\`, \`LSHIFT\`, rotates, and \`REVERSE\` do **not** support \`; signed\`. \`RSHIFT\` with \`; signed\` is **arithmetic** shift (ASHR) — see [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md#rshift-signed).
 
 ### ADD / SUBTRACT signed
 
@@ -1017,6 +1021,39 @@ show(yS)
 
 Unsigned: \`1111\` = 15 → clamped to \`0010\`. Signed: \`1111\` = −1 → clamped to \`0000\`.
 
+### MULTIPLY / MAC signed
+
+Operands are multiplied (and accumulated for \`MAC\`) as **signed** integers. Output packing is unchanged: \`result\` = low \`W\` bits, \`over\` = next \`W\` bits (or \`W+1\` for \`MAC\`) of the full product/sum — same wire layout as unsigned, different numeric interpretation.
+
+\`\`\`
+MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
+MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
+\`\`\`
+
+\`\`\`logts-play
+4wire a = 1111
+4wire b = 1111
+4wire rU, 4wire oU = MULTIPLY(a, b)
+4wire rS, 4wire oS = MULTIPLY(a, b; signed)
+show(rU)
+show(oU)
+show(rS)
+show(oS)
+\`\`\`
+
+Unsigned: \`15×15 = 225\` → \`rU=0001\`, \`oU=1110\`. Signed: \`(−1)×(−1) = 1\` → \`rS=0001\`, \`oS=0000\`.
+
+\`\`\`logts-play
+4wire acc = 1000
+4wire a = 0010
+4wire b = 0001
+4wire r, 5wire over = MAC(acc, a, b; signed)
+show(r)
+show(over)
+\`\`\`
+
+Signed: \`−8 + 2×1 = −6\` on 4 bits → \`r=1010\`, \`over\` carries high extension bits.
+
 ---
 
 ## Comparison with component equivalents
@@ -1050,12 +1087,14 @@ doc(SUBTRACT)
 
 doc(MULTIPLY)
 # MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
+# MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
 
 doc(DIVIDE)
 # DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
 
 doc(MAC)
 # MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
+# MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
 
 doc(GT)
 doc(LT)
@@ -1065,9 +1104,11 @@ doc(CLAMP)
 
 doc(SUM)
 # SUM(Wbit ...) -> Wbit result, Wbit over
+# SUM(Wbit ...; signed) -> Wbit result, Wbit over
 
 doc(DOT)
 # DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
+# DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
 \`\`\`
 
 Vector operand rules and examples: [vector-reduction.md](vector-reduction.md).
@@ -3029,6 +3070,29 @@ probe(y)
 
 Sugar: \`data > n\` and \`data > n w1\`.
 
+### RSHIFT signed (ASHR)
+
+With \`; signed\`, shift **arithmetic** right: MSB (sign bit) is replicated instead of \`fill\`. Equivalent to \`ASHR\` in [alu.md](alu.md#arithmetic-shift-right-vs-logical-ashr--rshift). Optional \`fill\` is ignored when \`signed\` is set.
+
+\`\`\`
+RSHIFT(Xbit data, Nbit n; signed) -> Xbit
+\`\`\`
+
+\`\`\`logts-play
+4wire neg = 1111
+4wire pos = 0111
+4wire log = RSHIFT(neg, 1)
+4wire arithNeg = RSHIFT(neg, 1; signed)
+4wire arithPos = RSHIFT(pos, 1; signed)
+show(log)
+show(arithNeg)
+show(arithPos)
+\`\`\`
+
+\`1111\` logical → \`0111\`; arithmetic → \`1111\` (still −1). \`0111\` (=7) arithmetic → \`0011\` (=3).
+
+\`LSHIFT\` does **not** accept \`; signed\` (left shift is identical for signed/unsigned).
+
 ---
 
 ## REVERSE
@@ -3118,12 +3182,12 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Logic gates** | \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, \`EQ\` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) |
 | **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
-| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` (+ optional \`; signed\` on the first seven) | [arithmetic.md](arithmetic.md) |
-| **Vector reduction** | \`SUM\`, \`DOT\` | [vector-reduction.md](vector-reduction.md) · summary in [arithmetic.md](arithmetic.md#sum--dot-vector-reduction) |
+| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` (+ optional \`; signed\` on all except \`DIVIDE\`) | [arithmetic.md](arithmetic.md) |
+| **Vector reduction** | \`SUM\`, \`DOT\` (+ optional \`; signed\`) | [vector-reduction.md](vector-reduction.md) · summary in [arithmetic.md](arithmetic.md#sum--dot-vector-reduction) |
 | **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
-| **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
+| **Bit transform** | \`LSHIFT\`, \`RSHIFT\` (+ optional \`; signed\` = ASHR), \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
 | **Tristate (ZSTATE)** | \`ZRELEASE(wire)\`, \`bus = ZCONNECT(en, data)\` | [zstate.md](zstate.md) |
 
 > **Adding new built-ins:** extend \`Interpreter.BUILTIN_DOC\` in \`core/interpreter.js\`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.
@@ -16991,9 +17055,10 @@ All expanded operands must have the **same bit width** (runtime error otherwise)
 
 \`\`\`
 SUM(Wbit ...) -> Wbit result, Wbit over
+SUM(Wbit ...; signed) -> Wbit result, Wbit over
 \`\`\`
 
-Returns the unsigned sum of all operands. Output is **2W bits** total: low **W** bits in \`result\`, next **W** bits in \`over\`. Full value = concatenate \`over\` then \`result\` (MSB → LSB), same convention as [MAC](arithmetic.md#mac-multiply-accumulate).
+Returns the sum of all operands (unsigned by default). With \`; signed\`, each operand is **two's complement** on width **W**. Output is **2W bits** total: low **W** bits in \`result\`, next **W** bits in \`over\`. Full value = concatenate \`over\` then \`result\` (MSB → LSB), same convention as [MAC](arithmetic.md#mac-multiply-accumulate).
 
 Overflow (sum needs more than **2W** bits) is a **runtime error**.
 
@@ -17036,7 +17101,10 @@ show(m)
 
 \`\`\`
 DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
+DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
 \`\`\`
+
+Dot product of two whole vectors (same shape). With \`; signed\`, each element is interpreted as **two's complement** before multiply-accumulate; output packing (\`result\` low **W**, \`over\` next **2W**) is unchanged.
 
 Dot product of two **whole vectors** of the same shape (\`elementWidth\` × \`elementCount\`). Output is **3W bits**: low **W** in \`result\`, next **2W** in \`over\`.
 
