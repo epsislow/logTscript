@@ -22,7 +22,7 @@ doc(show)          # debug keywords: show, peek, probe, watch, Zlist
 
 `doc()` with no argument prints a short guide to what you can pass to `doc(...)`:
 
-- `def` — built-in, debug, and user-defined function names
+- `def` — built-in, debug, and user-defined function names (see [user-functions.md](user-functions.md))
 - `comp`, `comp.type` — components
 - `pcb`, `chip`, `board`, `inline`, `.inst` — hierarchical types
 - function name — e.g. `OR`, `ADD`, `myFunc`
@@ -420,6 +420,8 @@ user defined:
 ---
 
 ## User-defined functions
+
+Full guide: **[user-functions.md](user-functions.md)** — define with `def`, call, multiple returns, `LOAD`, restrictions.
 
 `doc` also works for functions defined with `def`:
 

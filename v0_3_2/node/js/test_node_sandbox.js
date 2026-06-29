@@ -50,6 +50,19 @@ function createTestNodeSandbox() {
     activeElement: null,
   };
 
+  const localStore = new Map();
+  const localStorage = {
+    getItem(key) {
+      return localStore.has(key) ? localStore.get(key) : null;
+    },
+    setItem(key, value) {
+      localStore.set(key, String(value));
+    },
+    removeItem(key) {
+      localStore.delete(key);
+    },
+  };
+
   const sandbox = {
     Error,
     parseInt,
@@ -67,10 +80,12 @@ function createTestNodeSandbox() {
     isNaN,
     clearTimeout,
     setTimeout,
+    localStorage,
     window: {},
     document,
   };
   sandbox.window = sandbox;
+  sandbox.globalThis = sandbox;
   return sandbox;
 }
 

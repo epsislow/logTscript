@@ -217,7 +217,32 @@
     session.reverseBits = reverseBits;
     session.lrotate = lrotate;
     session.rrotate = rrotate;
+    session.seedLoadFile = seedLoadFile;
     return session;
+  }
+
+  function ensureTestFss() {
+    if (typeof fss !== 'undefined') return fss;
+    if (typeof FileStorageSystem === 'undefined') {
+      throw new Error('FileStorageSystem not loaded — add files/storage.js to test runtime');
+    }
+    const db = typeof DbLocalStorage !== 'undefined' ? new DbLocalStorage() : null;
+    const inst = new FileStorageSystem(db);
+    if (typeof globalThis !== 'undefined') globalThis.fss = inst;
+    else if (typeof window !== 'undefined') window.fss = inst;
+    return inst;
+  }
+
+  function seedLoadFile(loadPath, content) {
+    const fs = ensureTestFss();
+    const parts = String(loadPath).split('/');
+    const name = parts.pop();
+    const location = parts.length ? parts.join('>') + '>' : '>';
+    if (fs.existsName(name, location)) {
+      fs.updateFile(name, location, content);
+    } else {
+      fs.addFile(name, location, content);
+    }
   }
 
   const tests = [];
@@ -13718,6 +13743,149 @@ show(.myisa:decode(firmware))`);
   const text = out.join('\n');
   h.assert('decode JMP', String(/JMP/.test(text)), 'true');
 }, { propagation: 'wave' });
+
+reg(1764, 'user-def', 'def isZero — doc runnable example', function(h, session) {
+  const { interp } = session.run(`def isZero(4bit n):
+  :1bit !OR(n)
+
+4wire x = 0010
+1wire z = isZero(x)
+show(z)`);
+  h.assert('isZero(0010)', session.getWire(interp, 'z'), '0');
+  const r2 = session.run(`def isZero(4bit n):
+  :1bit !OR(n)
+
+4wire x = 0000
+1wire z = isZero(x)`);
+  h.assert('isZero(0000)', session.getWire(r2.interp, 'z'), '1');
+});
+
+reg(1765, 'user-def', 'def eq4 — body wires then return', function(h, session) {
+  const { interp } = session.run(`def eq4(4bit a, 4bit b):
+  1bit r0 = !XOR(a.0, b.0)
+  1bit r1 = !XOR(a.1, b.1)
+  1bit r2 = !XOR(a.2, b.2)
+  1bit r3 = !XOR(a.3, b.3)
+  :1bit AND(AND(r0, r1), AND(r2, r3))
+
+4wire p = 1010
+4wire q = 1010
+1wire same = eq4(p, q)
+show(same)`);
+  h.assert('eq4 equal', session.getWire(interp, 'same'), '1');
+  const r2 = session.run(`def eq4(4bit a, 4bit b):
+  1bit r0 = !XOR(a.0, b.0)
+  1bit r1 = !XOR(a.1, b.1)
+  1bit r2 = !XOR(a.2, b.2)
+  1bit r3 = !XOR(a.3, b.3)
+  :1bit AND(AND(r0, r1), AND(r2, r3))
+
+4wire p = 1010
+4wire q = 0101
+1wire same = eq4(p, q)`);
+  h.assert('eq4 unequal', session.getWire(r2.interp, 'same'), '0');
+});
+
+reg(1766, 'user-def', 'doc(add4) — multiple return types', function(h, session) {
+  const out = session.runDoc(`def add4(4bit a, 4bit b):
+  :4bit a
+  :1bit 0
+
+doc(add4)`);
+  h.assert('add4 signature', out[0], 'add4(4bit a, 4bit b) -> 4bit, 1bit');
+});
+
+reg(1767, 'user-def', 'def pair — multiple return values', function(h, session) {
+  const { interp } = session.run(`def pair(1bit a, 1bit b):
+  :1bit OR(a, b)
+  :2bit a + a
+
+1wire a = 1
+1wire b = 0
+1wire flag, 2wire bits = pair(a, b)`);
+  h.assert('pair flag', session.getWire(interp, 'flag'), '1');
+  h.assert('pair bits', session.getWire(interp, 'bits'), '11');
+});
+
+reg(1768, 'user-def', 'def call — bad arity error', function(h, session) {
+  const { out } = session.run(`def myFunc(1bit a, 1bit b):
+  :1bit OR(a, b)
+
+1wire x = myFunc(1)`);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('bad arity', String(err.includes('Bad arity for myFunc')), 'true');
+});
+
+reg(1769, 'user-def', 'def OR does not shadow built-in OR', function(h, session) {
+  const { interp } = session.run(`def OR(1bit a, 1bit b):
+  :1bit AND(a, b)
+
+1wire a = 1
+1wire b = 0
+1wire x = OR(a, b)`);
+  h.assert('built-in OR wins', session.getWire(interp, 'x'), '1');
+});
+
+reg(1770, 'user-def', 'def call — prefix ! negates first return', function(h, session) {
+  const { interp } = session.run(`def flag(1bit x):
+  :1bit x
+
+1wire v = 1
+1wire y = !flag(v)`);
+  h.assert('negated', session.getWire(interp, 'y'), '0');
+});
+
+reg(1771, 'user-def', 'def in chip body — parse error', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`chip +[bad]:
+  def foo(1bit x):
+    :1bit x
+  :1bit x`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('def in chip error', String(err.includes("'def'")), 'true');
+});
+
+reg(1772, 'user-def', 'def with no return — doc signature', function(h, session) {
+  const out = session.runDoc(`def bump(4wire counter):
+  4wire next, 1wire carry = ADD(counter, 1)
+
+doc(bump)`);
+  h.assert('bump signature', out[0], 'bump(4wire counter)');
+});
+
+reg(1773, 'user-def', 'LOAD merges library defs — direct call', function(h, session) {
+  session.seedLoadFile('mylib', `def helper(4bit a):
+  :4bit a
+
+`);
+  const { interp } = session.run(`<mylib
+4wire x = 1010
+4wire y = helper(x)`);
+  h.assert('loaded helper', session.getWire(interp, 'y'), '1010');
+});
+
+reg(1774, 'user-def', 'LOAD @alias — call helper@lib', function(h, session) {
+  session.seedLoadFile('utils/helper', `def helper(4bit a):
+  :4bit a
+
+`);
+  const { interp } = session.run(`<utils/helper @lib
+4wire x = 0101
+4wire y = helper@lib(x)`);
+  h.assert('aliased helper', session.getWire(interp, 'y'), '0101');
+});
+
+reg(1775, 'user-def', 'def @alias — unknown alias error', function(h, session) {
+  const { out } = session.run(`def helper(4bit a):
+  :4bit a
+
+4wire y = helper@nolib(1010)`);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('unknown alias', String(err.includes('Unknown alias nolib')), 'true');
+});
 
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:

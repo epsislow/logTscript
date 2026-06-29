@@ -72,4 +72,4 @@ In `MODE ZSTATE`, gate functions (`AND`, `OR`, `NOT`, …) use IEEE 1164 when op
 | Tristate / multi-driver | [zstate.md](zstate.md) |
 | Short notation (`&`, `\|`, `<`, `>`) | [short-notation.md](short-notation.md) |
 | Panel devices (`comp`) | [components.md](components.md) |
-| User `def` functions | [doc-function.md](doc-function.md#user-defined-functions) |
+| User `def` functions | [user-functions.md](user-functions.md) |

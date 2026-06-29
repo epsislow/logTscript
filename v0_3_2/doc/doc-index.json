@@ -5,6 +5,7 @@
       "title": "Reference",
       "items": [
         { "file": "doc-function.md", "label": "doc() function" },
+        { "file": "user-functions.md", "label": "User functions (def)", "searchExtra": "def define call return LOAD alias library user-defined function arity body" },
         { "file": "builtin-functions.md", "label": "Built-in functions", "searchExtra": "internal MUX DEMUX REG LATCH NOT AND OR shift arithmetic builtin HIGH BITINDEX ONEHOT" },
         { "file": "builtin-logic-gate-functions.md", "label": "Built-in logic gates" },
         { "file": "builtin-sequential-functions.md", "label": "Built-in sequential (LATCH, REG)" },
