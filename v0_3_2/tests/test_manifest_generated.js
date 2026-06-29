@@ -1335,7 +1335,18 @@
       {"id":1849,"group":"builtin-vector","title":"GT/LT/EQ/shift/rotate/REVERSE scalar — no tag regression","detail":{"scripts":["4wire a = 0100"],"steps":[],"assertions":["gt","lt","eq","lt signed","rshift","lshift","lrotate","rrotate","reverse"]}},
       {"id":1850,"group":"builtin-vector","title":"doc(GT/LT/EQ/LSHIFT) vector signatures","detail":{"scripts":[],"steps":["getDocLines(GT)","getDocLines(LT)","getDocLines(EQ)","getDocLines(LSHIFT)"],"assertions":["GT vector","LT vector signed","EQ vector","LSHIFT vector"]}},
       {"id":1851,"group":"builtin-vector","title":"GT(vector; vector) — wave mode","detail":{"scripts":["4wire[2] a = 0100 + 0010"],"steps":[],"assertions":["f0","f1"]}},
-      {"id":1852,"group":"builtin-vector","title":"EQ(vector; vector) — wave mode","detail":{"scripts":["4wire[2] a = 0010 + 0101"],"steps":[],"assertions":["f0","f1"]}}
+      {"id":1852,"group":"builtin-vector","title":"EQ(vector; vector) — wave mode","detail":{"scripts":["4wire[2] a = 0010 + 0101"],"steps":[],"assertions":["f0","f1"]}},
+      {"id":1853,"group":"builtin-vector","title":"ARGMAX(vector) — one-hot unsigned","detail":{"scripts":["4wire[3] vectorA = 1111 + 0010 + 0001"],"steps":[],"assertions":["one-hot max at 0"]}},
+      {"id":1854,"group":"builtin-vector","title":"ARGMIN(vector) — one-hot unsigned","detail":{"scripts":["4wire[3] vectorA = 1111 + 0010 + 0001"],"steps":[],"assertions":["one-hot min at 2"]}},
+      {"id":1855,"group":"builtin-vector","title":"ARGMAX(vector; index)","detail":{"scripts":["4wire[3] vectorA = 1111 + 0010 + 0001"],"steps":[],"assertions":["index 0"]}},
+      {"id":1856,"group":"builtin-vector","title":"ARGMIN(vector; index)","detail":{"scripts":["4wire[3] vectorA = 1111 + 0010 + 0001"],"steps":[],"assertions":["index 2"]}},
+      {"id":1857,"group":"builtin-vector","title":"ARGMAX(vector; signed) — one-hot","detail":{"scripts":["4wire[3] vectorA = 1111 + 0010 + 0001"],"steps":[],"assertions":["max 2 at index 1"]}},
+      {"id":1858,"group":"builtin-vector","title":"ARGMIN(vector; index signed)","detail":{"scripts":["4wire[3] vectorA = 1111 + 0010 + 0001"],"steps":[],"assertions":["min -1 at index 0"]}},
+      {"id":1859,"group":"builtin-vector","title":"ARGMAX — tie first index wins","detail":{"scripts":["4wire[3] vectorA = 0100 + 0011 + 0100"],"steps":[],"assertions":["one-hot index 0","index 0"]}},
+      {"id":1860,"group":"builtin-vector","title":"ARGMAX — single element vector","detail":{"scripts":["4wire[1] vectorA = 1010"],"steps":[],"assertions":["only element","index 0"]}},
+      {"id":1861,"group":"builtin-vector","title":"ARGMAX — not whole vector error","detail":{"scripts":["4wire a = 0010\n1wire f = ARGMAX(a)"],"steps":[],"assertions":["whole vector required"]}},
+      {"id":1862,"group":"builtin-vector","title":"ARGMAX — rejects vector tag","detail":{"scripts":["4wire[2] v = 0010 + 0011\n1wire f = ARGMAX(v; vector)"],"steps":[],"assertions":["no vector tag"]}},
+      {"id":1863,"group":"builtin-vector","title":"doc(ARGMAX/ARGMIN) signatures","detail":{"scripts":[],"steps":["getDocLines(ARGMAX)","getDocLines(ARGMIN)"],"assertions":["ARGMAX one-hot","ARGMAX index signed","ARGMIN index"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1358,7 +1369,7 @@
       { id: 'bool-lut-mb', label: 'bool-lut-mb', rangeLabel: '1108–1121, 1123–1124, 1145, 1149–1150, 1152–1153', testIds: [1108, 1109, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121, 1123, 1124, 1145, 1149, 1150, 1152, 1153] },
       { id: 'bool-lut-use', label: 'bool-lut-use', rangeLabel: '1192–1205, 1221', testIds: [1192, 1193, 1194, 1195, 1196, 1197, 1198, 1199, 1200, 1201, 1202, 1203, 1204, 1205, 1221] },
       { id: 'builtin-signed', label: 'builtin-signed', rangeLabel: '1782–1796, 1798, 1800–1801', testIds: [1782, 1783, 1784, 1785, 1786, 1787, 1788, 1789, 1790, 1791, 1792, 1793, 1794, 1795, 1796, 1798, 1800, 1801] },
-      { id: 'builtin-vector', label: 'builtin-vector', rangeLabel: '1802–1852', testIds: [1802, 1803, 1804, 1805, 1806, 1807, 1808, 1809, 1810, 1811, 1812, 1813, 1814, 1815, 1816, 1817, 1818, 1819, 1820, 1821, 1822, 1823, 1824, 1825, 1826, 1827, 1828, 1829, 1830, 1831, 1832, 1833, 1834, 1835, 1836, 1837, 1838, 1839, 1840, 1841, 1842, 1843, 1844, 1845, 1846, 1847, 1848, 1849, 1850, 1851, 1852] },
+      { id: 'builtin-vector', label: 'builtin-vector', rangeLabel: '1802–1863', testIds: [1802, 1803, 1804, 1805, 1806, 1807, 1808, 1809, 1810, 1811, 1812, 1813, 1814, 1815, 1816, 1817, 1818, 1819, 1820, 1821, 1822, 1823, 1824, 1825, 1826, 1827, 1828, 1829, 1830, 1831, 1832, 1833, 1834, 1835, 1836, 1837, 1838, 1839, 1840, 1841, 1842, 1843, 1844, 1845, 1846, 1847, 1848, 1849, 1850, 1851, 1852, 1853, 1854, 1855, 1856, 1857, 1858, 1859, 1860, 1861, 1862, 1863] },
       { id: 'chip', label: 'Chip component', rangeLabel: '540–543, 556–557, 857–860', testIds: [540, 541, 542, 543, 556, 557, 857, 858, 859, 860] },
       { id: 'clcd', label: 'CLCD component', rangeLabel: '1337–1352, 1383–1387, 1399–1428, 1549–1558', testIds: [1337, 1338, 1339, 1340, 1341, 1342, 1343, 1344, 1345, 1346, 1347, 1348, 1349, 1350, 1351, 1352, 1383, 1384, 1385, 1386, 1387, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 1413, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1549, 1550, 1551, 1552, 1553, 1554, 1555, 1556, 1557, 1558] },
       { id: 'compare', label: 'compare', rangeLabel: '1670–1672, 1679', testIds: [1670, 1671, 1672, 1679] },

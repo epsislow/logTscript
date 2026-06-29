@@ -3002,7 +3002,7 @@ class Interpreter {
          'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE',
          'REVERSE', 'LROTATE', 'RROTATE',
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
-         'GT', 'LT', 'MIN', 'MAX', 'CLAMP', 'ISDIGIT',
+         'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ISDIGIT',
          'CNTN10S', 'N2N10S', 'N10S2N',
          'CNTN16S', 'N2N16S', 'N16S2N'].includes(name)) {
       return true;
@@ -3920,19 +3920,22 @@ const idx = parseInt(
   const SA = typeof LogTScriptSignedArithmetic !== 'undefined' ? LogTScriptSignedArithmetic : null;
   let signedMode = false;
   let vectorMode = false;
+  let indexMode = false;
   if (callTags && callTags.length) {
     const isBuiltin = !!Interpreter.BUILTIN_DOC[name];
     const acceptsSigned = SA && SA.BUILTIN_SIGNED_TAG_FUNCS.has(name);
     const acceptsVector = SA && SA.BUILTIN_VECTOR_TAG_FUNCS.has(name);
-    if (isBuiltin && !acceptsSigned && !acceptsVector) {
+    const acceptsIndex = SA && SA.BUILTIN_INDEX_TAG_FUNCS.has(name);
+    if (isBuiltin && !acceptsSigned && !acceptsVector && !acceptsIndex) {
       fail(`${name}: does not accept call tags`);
     }
-    if (acceptsSigned || acceptsVector) {
+    if (acceptsSigned || acceptsVector || acceptsIndex) {
       const tags = SA.parseBuiltinCallTags(
-        callTags, name, (msg) => fail(msg), acceptsSigned, acceptsVector
+        callTags, name, (msg) => fail(msg), acceptsSigned, acceptsVector, acceptsIndex
       );
       signedMode = tags.signed;
       vectorMode = tags.vector;
+      indexMode = tags.index;
     }
   }
 
@@ -4032,6 +4035,32 @@ const idx = parseInt(
       computeRefs ? { value: dot.result, ref: `&${this.storeValue(dot.result)}` } : { value: dot.result, ref: null },
       computeRefs ? { value: dot.over, ref: `&${this.storeValue(dot.over)}` } : { value: dot.over, ref: null },
     ];
+  }
+
+  if (name === 'ARGMAX' || name === 'ARGMIN') {
+    if (args.length !== 1) fail(`${name} expects 1 argument`);
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (!VR) fail(`${name}: internal error (vector-reduce not loaded)`);
+    const getWire = (n) => this.wires.get(n);
+    const compareFns = {
+      unsigned: unsignedCompareBigInt,
+      signed: SA ? SA.signedCompareBigInt : null,
+    };
+    let step;
+    try {
+      step = VR.argExtremumFromWholeVector(
+        args, getWire, name, name === 'ARGMAX', signedMode,
+        this._vectorTaggedEvalFns(), compareFns
+      );
+    } catch (e) {
+      fail(e.message);
+    }
+    const v = indexMode
+      ? binPadInt(step.bestIdx, bitIndexWidth(step.elementCount))
+      : step.oneHot;
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
   }
 
   const b = x => x === '1';
@@ -11858,6 +11887,18 @@ Interpreter.BUILTIN_DOC = {
     'MAX(Wbit ...; signed) -> Wbit',
     'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]',
     'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]',
+  ],
+  ARGMAX:   [
+    'ARGMAX(Wbit[n] vector) -> 1wire[n]',
+    'ARGMAX(Wbit[n] vector; index) -> bitIndexWidth(n) bit',
+    'ARGMAX(Wbit[n] vector; signed) -> 1wire[n]',
+    'ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit',
+  ],
+  ARGMIN:   [
+    'ARGMIN(Wbit[n] vector) -> 1wire[n]',
+    'ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit',
+    'ARGMIN(Wbit[n] vector; signed) -> 1wire[n]',
+    'ARGMIN(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit',
   ],
   CLAMP:    [
     'CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit',

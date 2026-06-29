@@ -7,7 +7,10 @@
   const BUILTIN_SIGNED_TAG_FUNCS = new Set([
     'ADD', 'SUBTRACT', 'GT', 'LT', 'MIN', 'MAX', 'CLAMP',
     'MULTIPLY', 'MAC', 'RSHIFT', 'SUM', 'DOT', 'DIVIDE',
+    'ARGMAX', 'ARGMIN',
   ]);
+
+  const BUILTIN_INDEX_TAG_FUNCS = new Set(['ARGMAX', 'ARGMIN']);
 
   const BUILTIN_VECTOR_TAG_FUNCS = new Set([
     'MIN', 'MAX', 'SUM', 'ADD', 'SUBTRACT', 'CLAMP',
@@ -191,11 +194,12 @@
     return fill.repeat(amount) + data.slice(0, len - amount);
   }
 
-  function parseBuiltinCallTags(callTags, fnName, fail, acceptsSigned, acceptsVector) {
+  function parseBuiltinCallTags(callTags, fnName, fail, acceptsSigned, acceptsVector, acceptsIndex) {
     let signed = false;
     let vector = false;
+    let index = false;
     if (!callTags || !callTags.length) {
-      return { signed, vector };
+      return { signed, vector, index };
     }
     for (const t of callTags) {
       if (t.name === 'signed') {
@@ -214,11 +218,19 @@
           fail(`${fnName}: tag 'vector' must be enabled (use '; vector' or '; vector=1')`);
         }
         vector = true;
+      } else if (t.name === 'index') {
+        if (!acceptsIndex) {
+          fail(`${fnName}: does not accept tag 'index'`);
+        }
+        if (t.value !== 1) {
+          fail(`${fnName}: tag 'index' must be enabled (use '; index' or '; index=1')`);
+        }
+        index = true;
       } else {
         fail(`${fnName}: unknown tag '${t.name}'`);
       }
     }
-    return { signed, vector };
+    return { signed, vector, index };
   }
 
   /** @deprecated use parseBuiltinCallTags */
@@ -230,6 +242,7 @@
   const api = {
     BUILTIN_SIGNED_TAG_FUNCS,
     BUILTIN_VECTOR_TAG_FUNCS,
+    BUILTIN_INDEX_TAG_FUNCS,
     parseBuiltinCallTags,
     parseBuiltinSignedCallTags,
     signedBinToBigInt,

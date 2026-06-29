@@ -14716,6 +14716,94 @@ reg(1852, 'builtin-vector', 'EQ(vector; vector) — wave mode', function(h, sess
   h.assert('f1', session.getWire(interp, 'f').slice(1, 2), '0');
 }, { propagation: 'wave' });
 
+reg(1853, 'builtin-vector', 'ARGMAX(vector) — one-hot unsigned', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0010 + 0001\n' +
+    '1wire[3] vectorRes = ARGMAX(vectorA)'
+  );
+  h.assert('one-hot max at 0', session.getWire(interp, 'vectorRes'), '100');
+});
+
+reg(1854, 'builtin-vector', 'ARGMIN(vector) — one-hot unsigned', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0010 + 0001\n' +
+    '1wire[3] vectorRes = ARGMIN(vectorA)'
+  );
+  h.assert('one-hot min at 2', session.getWire(interp, 'vectorRes'), '001');
+});
+
+reg(1855, 'builtin-vector', 'ARGMAX(vector; index)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0010 + 0001\n' +
+    '2wire maxIdx = ARGMAX(vectorA; index)'
+  );
+  h.assert('index 0', session.getWire(interp, 'maxIdx'), '00');
+});
+
+reg(1856, 'builtin-vector', 'ARGMIN(vector; index)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0010 + 0001\n' +
+    '2wire minIdx = ARGMIN(vectorA; index)'
+  );
+  h.assert('index 2', session.getWire(interp, 'minIdx'), '10');
+});
+
+reg(1857, 'builtin-vector', 'ARGMAX(vector; signed) — one-hot', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0010 + 0001\n' +
+    '1wire[3] flags = ARGMAX(vectorA; signed)'
+  );
+  h.assert('max 2 at index 1', session.getWire(interp, 'flags'), '010');
+});
+
+reg(1858, 'builtin-vector', 'ARGMIN(vector; index signed)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 1111 + 0010 + 0001\n' +
+    '2wire minIdx = ARGMIN(vectorA; index signed)'
+  );
+  h.assert('min -1 at index 0', session.getWire(interp, 'minIdx'), '00');
+});
+
+reg(1859, 'builtin-vector', 'ARGMAX — tie first index wins', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0100 + 0011 + 0100\n' +
+    '1wire[3] flags = ARGMAX(vectorA)\n' +
+    '2wire idx = ARGMAX(vectorA; index)'
+  );
+  h.assert('one-hot index 0', session.getWire(interp, 'flags'), '100');
+  h.assert('index 0', session.getWire(interp, 'idx'), '00');
+});
+
+reg(1860, 'builtin-vector', 'ARGMAX — single element vector', function(h, session) {
+  const { interp } = session.run(
+    '4wire[1] vectorA = 1010\n' +
+    '1wire[1] flags = ARGMAX(vectorA)\n' +
+    '1wire idx = ARGMAX(vectorA; index)'
+  );
+  h.assert('only element', session.getWire(interp, 'flags'), '1');
+  h.assert('index 0', session.getWire(interp, 'idx'), '0');
+});
+
+reg(1861, 'builtin-vector', 'ARGMAX — not whole vector error', function(h, session) {
+  const r = session.run('4wire a = 0010\n1wire f = ARGMAX(a)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('whole vector required', String(err.includes('whole vector')), 'true');
+});
+
+reg(1862, 'builtin-vector', 'ARGMAX — rejects vector tag', function(h, session) {
+  const r = session.run('4wire[2] v = 0010 + 0011\n1wire f = ARGMAX(v; vector)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('no vector tag', String(err.includes("does not accept tag 'vector'")), 'true');
+});
+
+reg(1863, 'builtin-vector', 'doc(ARGMAX/ARGMIN) signatures', function(h, session) {
+  const maxLines = Interpreter.getDocLines('ARGMAX', new Map());
+  const minLines = Interpreter.getDocLines('ARGMIN', new Map());
+  h.assert('ARGMAX one-hot', maxLines[0], 'ARGMAX(Wbit[n] vector) -> 1wire[n]');
+  h.assert('ARGMAX index signed', maxLines[3], 'ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit');
+  h.assert('ARGMIN index', minLines[1], 'ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit');
+});
+
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:
   allowEnter

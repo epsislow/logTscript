@@ -657,6 +657,51 @@
     return results.join('');
   }
 
+  function findVectorExtremumIndex(values, W, pickMax, signed, compareFns, fnName) {
+    const N = values.length;
+    if (N === 0) {
+      throw new Error(`${fnName}: vector has zero elements`);
+    }
+    let bestIdx = 0;
+    let best = String(values[0]).padStart(W, '0');
+    if (best.length !== W) {
+      throw new Error(`${fnName}: ${SHAPE_ERR}`);
+    }
+    for (let i = 1; i < N; i++) {
+      const v = String(values[i]).padStart(W, '0');
+      if (v.length !== W) {
+        throw new Error(`${fnName}: ${SHAPE_ERR}`);
+      }
+      const cmp = signed && compareFns.signed
+        ? compareFns.signed(v, best)
+        : compareFns.unsigned(v, best);
+      if (pickMax ? cmp > 0 : cmp < 0) {
+        bestIdx = i;
+        best = v;
+      }
+    }
+    const oneHot = '0'.repeat(bestIdx) + '1' + '0'.repeat(N - bestIdx - 1);
+    return { bestIdx, oneHot, elementCount: N };
+  }
+
+  function argExtremumFromWholeVector(args, getWire, fnName, pickMax, signed, evalFns, compareFns) {
+    if (!args || args.length !== 1) {
+      throw new Error(`${fnName}: expects 1 argument`);
+    }
+    if (!isWholeVectorWireArg(args[0], getWire)) {
+      throw new Error(`${fnName}: expects one whole vector argument`);
+    }
+    const meta = getWholeVectorMeta(args[0], getWire);
+    const N = meta.elementCount;
+    const W = meta.elementWidth;
+    const varName = args[0][0].var;
+    const values = [];
+    for (let i = 0; i < N; i++) {
+      values.push(evalFns.evalElement(varName, i));
+    }
+    return findVectorExtremumIndex(values, W, pickMax, signed, compareFns, fnName);
+  }
+
   const api = {
     unsignedBinToBigInt,
     isReductionWireAtom,
@@ -694,6 +739,8 @@
     shiftVectorTagged,
     rotateVectorTagged,
     reverseVectorTagged,
+    findVectorExtremumIndex,
+    argExtremumFromWholeVector,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

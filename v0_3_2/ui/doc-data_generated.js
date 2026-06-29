@@ -17163,6 +17163,33 @@ show(m)
 
 ---
 
+## ARGMAX / ARGMIN
+
+Position of the maximum or minimum element in one **whole vector** (not the value — use \`MAX\` / \`MIN\` for that).
+
+\`\`\`
+ARGMAX(Wbit[n] vector) -> 1wire[n]
+ARGMAX(Wbit[n] vector; index) -> bitIndexWidth(n) bit
+ARGMIN(Wbit[n] vector) -> 1wire[n]
+ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit
+\`\`\`
+
+Without \`; index\`, returns a **one-hot** \`1wire[n]\` mask (\`1\` at the winning index). With **\`; index\`**, returns the winning index as an unsigned integer (\`bitIndexWidth(n)\` bits — same formula as \`BITINDEX\` / queue indices: \`32 - Math.clz32(n - 1)\` for \`n > 1\`). Assign a wider wire with \`=:\` or \`:=\` if you need left padding.
+
+**\`; signed\`** compares elements as two's complement (combinable with \`; index\`). On ties, the **smallest index** wins (same rule as \`MIN\` / \`MAX\` reduction).
+
+Does **not** accept \`; vector\` (the argument is already a whole vector). Slice-only operands are not supported.
+
+\`\`\`logts-play
+4wire[3] vectorA = 1111 + 0010 + 0001
+1wire[3] hot = ARGMAX(vectorA)
+2wire idx = ARGMIN(vectorA; index)
+show(hot)
+show(idx)
+\`\`\`
+
+---
+
 ## DOT
 
 \`\`\`
