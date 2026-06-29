@@ -115,17 +115,32 @@ show(hot)
 
 ### IDENTITY
 
-`IDENTITY(\N)` builds an **N×N** identity matrix. Element width **W** comes from the target wire (`4wire[N,N]` → 4 bits per cell). The decimal argument must match **N**.
+`IDENTITY(\N)` builds an **N×N** identity matrix. See [builtin-IDENTITY.md](builtin-IDENTITY.md).
+
+### Tensor generators and transforms
+
+| Function | Role | Doc |
+|----------|------|-----|
+| `ZEROS(\N)` | zero N×N matrix | [builtin-ZEROS.md](builtin-ZEROS.md) |
+| `FILL(\N, scalar)` | constant fill | [builtin-FILL.md](builtin-FILL.md) |
+| `DIAG(vector)` | diagonal from vector | [builtin-DIAG.md](builtin-DIAG.md) |
+| `IOTA(\N)` | index vector 0..N−1 | [builtin-IOTA.md](builtin-IOTA.md) |
+| `OUTER(col, row)` | outer product [N,M] | [builtin-OUTER.md](builtin-OUTER.md) |
+| `TRACE(matrix)` | sum of diagonal | [builtin-TRACE.md](builtin-TRACE.md) |
+| `NORM(v)` / `L2(v)` | L2² = DOT(v,v) | [builtin-NORM.md](builtin-NORM.md) · [builtin-L2.md](builtin-L2.md) |
+| `TRIL` / `TRIU` | lower / upper triangle | [builtin-TRIL.md](builtin-TRIL.md) · [builtin-TRIU.md](builtin-TRIU.md) |
+| `FLIPUD` / `FLIPLR` | flip rows / columns | [builtin-FLIPUD.md](builtin-FLIPUD.md) · [builtin-FLIPLR.md](builtin-FLIPLR.md) |
+| `MCAT(A,B)` | concat matrices | [builtin-MCAT.md](builtin-MCAT.md) |
+| `MSLICE(m,\r,\c,\h,\w)` | submatrix window | [builtin-MSLICE.md](builtin-MSLICE.md) |
 
 ```logts-play
 4wire[3,3] I = IDENTITY(\3)
-4wire[2,2] a = 0001 + 0010 + 0011 + 0100
-4wire[2,2] eye = IDENTITY(\2)
-4wire[2,2] r, 8wire[2,2] o = DOT(a, eye)
-show(r)
+4wire[3,3] z = ZEROS(\3)
+4wire[3] idx = IOTA(\3)
+show(idx)
 ```
 
-Useful for matrix multiply baselines (`DOT(A, I)` ≡ `A`) and neural-net / linear-algebra sketches without hand-building diagonal tensors.
+Useful for matrix multiply baselines (`DOT(A, I)` ≡ `A`) and linear-algebra sketches.
 
 ---
 

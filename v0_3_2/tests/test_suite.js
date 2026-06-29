@@ -13770,6 +13770,109 @@ reg(1892, 'wire-tensor', 'IDENTITY rejects non-decimal argument', function(h, se
   h.assert('decimal required', String(/decimal literal/.test(err)), 'true');
 });
 
+reg(1893, 'wire-tensor', 'ZEROS(\\2)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] z = ZEROS(\\2)\n' +
+    '4wire a = z:0:0\n' +
+    '4wire b = z:1:1'
+  );
+  h.assert('zero', session.getWire(interp, 'a'), '0000');
+  h.assert('zero diag', session.getWire(interp, 'b'), '0000');
+});
+
+reg(1894, 'wire-tensor', 'FILL(\\2, scalar)', function(h, session) {
+  const { interp } = session.run('4wire[2,2] m = FILL(\\2, 0011)');
+  h.assert('all cells', session.getWire(interp, 'm'), '0011001100110011');
+});
+
+reg(1895, 'wire-tensor', 'DIAG(vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] v = 0001 + 0010 + 0100\n' +
+    '4wire[3,3] d = DIAG(v)\n' +
+    '4wire a = d:1:1'
+  );
+  h.assert('diag val', session.getWire(interp, 'a'), '0010');
+  h.assert('blob len', String(session.getWire(interp, 'd').length), '36');
+});
+
+reg(1896, 'wire-tensor', 'IOTA(\\3)', function(h, session) {
+  const { interp } = session.run('4wire[3] idx = IOTA(\\3)');
+  h.assert('iota', session.getWire(interp, 'idx'), '000000010010');
+});
+
+reg(1897, 'wire-tensor', 'OUTER col × row', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,1] col = 0001 + 0010\n' +
+    '4wire[1,2] row = 0011 + 0100\n' +
+    '4wire[2,2] m, 4wire[2,2] o = OUTER(col, row)'
+  );
+  h.assert('outer', session.getWire(interp, 'm'), '0011010001101000');
+});
+
+reg(1898, 'wire-tensor', 'TRACE identity', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] eye = IDENTITY(\\2)\n' +
+    '4wire t, 4wire over = TRACE(eye)'
+  );
+  h.assert('trace', session.getWire(interp, 't'), '0010');
+});
+
+reg(1899, 'wire-tensor', 'NORM equals DOT(v,v)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] v = 0001 + 0010\n' +
+    '4wire n, 8wire no = NORM(v)\n' +
+    '4wire d, 8wire do = DOT(v, v)'
+  );
+  h.assert('norm r', session.getWire(interp, 'n'), session.getWire(interp, 'd'));
+  h.assert('norm o', session.getWire(interp, 'no'), session.getWire(interp, 'do'));
+});
+
+reg(1900, 'wire-tensor', 'L2 alias of NORM', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] v = 0011 + 0100\n' +
+    '4wire a, 8wire ao = L2(v)\n' +
+    '4wire b, 8wire bo = NORM(v)'
+  );
+  h.assert('L2 r', session.getWire(interp, 'a'), session.getWire(interp, 'b'));
+});
+
+reg(1901, 'wire-tensor', 'TRIL and TRIU', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2,2] lo = TRIL(m)\n' +
+    '4wire[2,2] up = TRIU(m)'
+  );
+  h.assert('tril', session.getWire(interp, 'lo'), '0001000001001000');
+  h.assert('triu', session.getWire(interp, 'up'), '0001001000001000');
+});
+
+reg(1902, 'wire-tensor', 'FLIPUD and FLIPLR', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2,2] ud = FLIPUD(m)\n' +
+    '4wire[2,2] lr = FLIPLR(m)'
+  );
+  h.assert('flipud', session.getWire(interp, 'ud'), '0100100000010010');
+  h.assert('fliplr', session.getWire(interp, 'lr'), '0010000110000100');
+});
+
+reg(1903, 'wire-tensor', 'MCAT horizontal', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,1] a = 0001 + 0010\n' +
+    '4wire[2,1] b = 0100 + 1000\n' +
+    '4wire[2,2] c = MCAT(a, b)'
+  );
+  h.assert('hcat', session.getWire(interp, 'c'), '0001010000101000');
+});
+
+reg(1904, 'wire-tensor', 'MSLICE 2×2 window', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3,3] m = 0001 + 0010 + 0100 + 1000 + 0001 + 0010 + 0100 + 1000 + 0001\n' +
+    '4wire[2,2] s = MSLICE(m, \\1, \\1, \\2, \\2)'
+  );
+  h.assert('slice', session.getWire(interp, 's'), '0001001010000001');
+});
+
 reg(1743, 'loop', 'block repeat N..M[ is not expanded (passthrough)', function(h, session) {
   const src = 'repeat 1..3[\n    4wire w?\n    ]';
   const result = preprocessLoop(src);

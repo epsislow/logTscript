@@ -63,6 +63,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/tensor-shape.js",
   "core/vector-reduce.js",
   "core/matrix-reduce.js",
+  "core/tensor-builtins.js",
   "core/watch-expand.js",
   "files/storage.js",
   "core/user-func-overloads.js",

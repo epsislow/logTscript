@@ -2333,42 +2333,47 @@ class Interpreter {
     return n;
   }
 
-  _resolveIdentityAssignContext() {
-    const s = this.currentStmt;
-    if (!s) return null;
-    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
-    let wireType = null;
-    let rows = null;
-    let cols = null;
+  _evalCallArgDecimalNonNegInt(argExpr, fnName) {
+    if (!argExpr || argExpr.length !== 1) {
+      this._throwRuntime(
+        `${fnName}: expects a decimal literal argument`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    const atom = argExpr[0];
+    if (atom.dec == null || atom.dec === '') {
+      this._throwRuntime(
+        `${fnName}: expects a decimal literal argument (e.g. \\0)`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    const n = parseInt(atom.dec, 10);
+    if (!Number.isFinite(n) || n < 0) {
+      this._throwRuntime(
+        `${fnName}: expects a non-negative decimal integer`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    return n;
+  }
 
-    if (s.decls) {
-      for (const d of s.decls) {
-        if (!d.type || !this.isWire(d.type)) continue;
-        if (d.name === '_' || d.name === '~' || d.name === '%' || d.name === '$') continue;
-        wireType = d.type;
-        const dims = TS ? TS.normalizeDeclTensor(d) : null;
-        if (dims) {
-          rows = dims.rows;
-          cols = dims.cols;
-        }
-        break;
-      }
-    }
-    if ((rows == null || cols == null) && s.assignment && s.assignment.target) {
-      const wire = this.wires.get(s.assignment.target.var);
-      if (wire) {
-        wireType = wire.type;
-        const meta = this.getWireTensorMeta(wire);
-        if (meta) {
-          rows = meta.rows;
-          cols = meta.cols;
-        }
-      }
-    }
-    if (!wireType || rows == null || cols == null) return null;
-    const ew = this.getBitWidth(wireType);
-    if (!ew || rows !== cols) return null;
-    return { n: rows, ew };
+  _tensorBuiltinEvalFns() {
+    return {
+      evalCell: (varName, row, col) =>
+        this._evalReductionAtomValue({
+          var: varName, tensorSlice: 'cell', tensorRowIndex: row, tensorColIndex: col
+        }),
+      evalElement: (varName, index) =>
+        this._evalReductionAtomValue({ var: varName, vectorIndex: index }),
+    };
+  }
+
+  _resolveIdentityAssignContext() {
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    return TB ? TB.resolveSquareContext(this) : null;
   }
 
   refreshZConnectBuses() {
@@ -3360,7 +3365,9 @@ class Interpreter {
          'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ISDIGIT',
          'CNTN10S', 'N2N10S', 'N10S2N',
          'CNTN16S', 'N2N16S', 'N16S2N',
-         'PIVOT', 'IDENTITY'].includes(name)) {
+         'PIVOT', 'IDENTITY', 'ZEROS', 'FILL', 'DIAG', 'IOTA',
+         'OUTER', 'TRACE', 'NORM', 'L2', 'TRIL', 'TRIU',
+         'FLIPUD', 'FLIPLR', 'MCAT', 'MSLICE'].includes(name)) {
       return true;
     }
 
@@ -4402,6 +4409,251 @@ const idx = parseInt(
     const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
     if (!TS) fail('IDENTITY: internal error (tensor-shape not loaded)');
     const blob = TS.identityBlob(n, ctx.ew);
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
+  if (name === 'ZEROS') {
+    if (args.length !== 1) fail('ZEROS expects 1 argument');
+    const n = this._evalCallArgDecimalInt(args[0], 'ZEROS');
+    const ctx = this._resolveIdentityAssignContext();
+    if (!ctx) fail('ZEROS: assign to a square N×N tensor wire (e.g. 4wire[N,N] = ZEROS(\\N))');
+    if (ctx.n !== n) fail(`ZEROS: argument \\${n} does not match wire shape ${ctx.n}×${ctx.n}`);
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (!TS) fail('ZEROS: internal error (tensor-shape not loaded)');
+    const blob = TS.zerosBlob(n, ctx.ew);
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
+  if (name === 'FILL') {
+    if (args.length !== 2) fail('FILL expects 2 arguments');
+    const n = this._evalCallArgDecimalInt(args[0], 'FILL');
+    const ctx = this._resolveIdentityAssignContext();
+    if (!ctx) fail('FILL: assign to a square N×N tensor wire');
+    if (ctx.n !== n) fail(`FILL: argument \\${n} does not match wire shape ${ctx.n}×${ctx.n}`);
+    const cellVal = this._evalCallArgValue(args[1]);
+    if (!cellVal || cellVal === '-') fail('FILL: scalar value required');
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (!TS) fail('FILL: internal error (tensor-shape not loaded)');
+    const blob = TS.fillBlob(n, ctx.ew, cellVal);
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
+  if (name === 'DIAG') {
+    if (args.length !== 1) fail('DIAG expects 1 argument');
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const getWire = (wn) => this.wires.get(wn);
+    const evalFns = this._tensorBuiltinEvalFns();
+    if (!TB || !TS) fail('DIAG: internal error (tensor modules not loaded)');
+    const ctx = TB.resolveSquareContext(this);
+    if (!ctx) fail('DIAG: assign to a square N×N tensor wire');
+    const vec = TB.readWholeVectorValues(args[0], getWire, evalFns.evalElement);
+    if (!vec) fail('DIAG: expects one whole vector argument');
+    if (vec.n !== ctx.n) fail(`DIAG: vector length ${vec.n} does not match ${ctx.n}×${ctx.n} target`);
+    if (vec.ew !== ctx.ew) fail('DIAG: vector element width must match target wire');
+    const blob = TS.diagonalBlob(vec.vals, ctx.ew, ctx.n);
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
+  if (name === 'IOTA') {
+    if (args.length !== 1) fail('IOTA expects 1 argument');
+    const n = this._evalCallArgDecimalInt(args[0], 'IOTA');
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (!TB || !TS) fail('IOTA: internal error (tensor modules not loaded)');
+    const ctx = TB.resolveVectorContext(this);
+    if (!ctx) fail('IOTA: assign to a rank-1 vector wire (e.g. 4wire[N])');
+    if (ctx.n !== n) fail(`IOTA: argument \\${n} does not match vector length ${ctx.n}`);
+    const blob = TS.iotaBlob(n, ctx.ew);
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
+  if (name === 'OUTER') {
+    if (args.length !== 2) fail('OUTER expects 2 arguments');
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const getWire = (wn) => this.wires.get(wn);
+    const evalFns = this._tensorBuiltinEvalFns();
+    if (!TB || !VR) fail('OUTER: internal error (tensor modules not loaded)');
+    const metaA = TB.getTensorMetaFromArg(args[0], getWire);
+    const metaB = TB.getTensorMetaFromArg(args[1], getWire);
+    if (!metaA || !metaB) fail('OUTER: expects two whole tensor arguments');
+    if (metaA.elementWidth !== metaB.elementWidth) fail('OUTER: operand element widths must match');
+    const shape = TB.resolveOuterShapes(metaA, metaB);
+    if (!shape) fail('OUTER: expects [N,1] and [1,M] oriented vectors');
+    const tgt = TB.resolveAssignTargetMeta(this);
+    if (!tgt) fail('OUTER: assign to a tensor wire');
+    if (tgt.rows !== shape.outRows || tgt.cols !== shape.outCols) {
+      fail(`OUTER: result shape [${shape.outRows},${shape.outCols}] does not match target [${tgt.rows},${tgt.cols}]`);
+    }
+    const W = metaA.elementWidth;
+    const vert = shape.vertMeta === metaA
+      ? TB.readVerticalVectorValues(args[0], getWire, evalFns.evalCell)
+      : TB.readVerticalVectorValues(args[1], getWire, evalFns.evalCell);
+    const horiz = shape.horizMeta === metaA
+      ? TB.readHorizontalVectorValues(args[0], getWire, evalFns.evalCell)
+      : TB.readHorizontalVectorValues(args[1], getWire, evalFns.evalCell);
+    const results = [];
+    const overs = [];
+    const multiplyFn = (a, b, width, signed) => {
+      if (SA) return SA.multiplyAtWidth(a, b, width, signed);
+      return VR.multiplyUnsignedAtWidth(a, b, width);
+    };
+    for (let r = 0; r < vert.n; r++) {
+      for (let c = 0; c < horiz.n; c++) {
+        const step = multiplyFn(vert.vals[r], horiz.vals[c], W, signedMode);
+        results.push(step.result);
+        overs.push(step.over);
+      }
+    }
+    return this._returnBuiltinVectorPair(results.join(''), overs.join(''), computeRefs);
+  }
+
+  if (name === 'TRACE') {
+    if (args.length !== 1) fail('TRACE expects 1 argument');
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const getWire = (wn) => this.wires.get(wn);
+    if (!TB || !TS || !VR) fail('TRACE: internal error (tensor modules not loaded)');
+    const meta = TB.getTensorMetaFromArg(args[0], getWire);
+    if (!meta) fail('TRACE: expects one whole tensor argument');
+    if (meta.rows !== meta.cols) fail('TRACE: expects a square matrix');
+    const val = this._evalCallArgValue(args[0]);
+    if (!val || val === '-') fail('TRACE: empty tensor value');
+    const diag = TS.diagonalValues(val, meta.elementWidth, meta.rows, meta.cols);
+    const step = VR.sumExpanded(diag, meta.elementWidth, signedMode);
+    return [
+      computeRefs ? { value: step.result, ref: `&${this.storeValue(step.result)}` } : { value: step.result, ref: null },
+      computeRefs ? { value: step.over, ref: `&${this.storeValue(step.over)}` } : { value: step.over, ref: null },
+    ];
+  }
+
+  if (name === 'NORM' || name === 'L2') {
+    if (args.length !== 1) fail(`${name} expects 1 argument`);
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const getWire = (wn) => this.wires.get(wn);
+    if (!VR) fail(`${name}: internal error (vector-reduce not loaded)`);
+    if (!VR.isWholeVectorWireArg(args[0], getWire)) fail(`${name}: expects one whole vector argument`);
+    const wire = getWire(args[0][0].var);
+    const meta = this.getWireTensorMeta(wire);
+    if (!meta) fail(`${name}: expects one whole vector argument`);
+    const varName = args[0][0].var;
+    const vals = [];
+    for (let i = 0; i < meta.elementCount; i++) {
+      vals.push(this._evalReductionAtomValue({ var: varName, vectorIndex: i }));
+    }
+    const step = VR.dotExpanded(vals, vals, meta.elementWidth, signedMode);
+    return [
+      computeRefs ? { value: step.result, ref: `&${this.storeValue(step.result)}` } : { value: step.result, ref: null },
+      computeRefs ? { value: step.over, ref: `&${this.storeValue(step.over)}` } : { value: step.over, ref: null },
+    ];
+  }
+
+  if (name === 'TRIL' || name === 'TRIU') {
+    if (args.length !== 1) fail(`${name} expects 1 argument`);
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const getWire = (wn) => this.wires.get(wn);
+    if (!TB || !TS) fail(`${name}: internal error (tensor modules not loaded)`);
+    const meta = TB.getTensorMetaFromArg(args[0], getWire);
+    if (!meta) fail(`${name}: expects one whole tensor argument`);
+    if (meta.rows !== meta.cols) fail(`${name}: expects a square matrix`);
+    const tgt = TB.resolveAssignTargetMeta(this);
+    if (!tgt || tgt.rows !== meta.rows || tgt.cols !== meta.cols) {
+      fail(`${name}: target wire shape must match input`);
+    }
+    const val = this._evalCallArgValue(args[0]);
+    if (!val || val === '-') fail(`${name}: empty tensor value`);
+    const blob = name === 'TRIL'
+      ? TS.trilBlob(val, meta.elementWidth, meta.rows, meta.cols)
+      : TS.triuBlob(val, meta.elementWidth, meta.rows, meta.cols);
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
+  if (name === 'FLIPUD' || name === 'FLIPLR') {
+    if (args.length !== 1) fail(`${name} expects 1 argument`);
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const getWire = (wn) => this.wires.get(wn);
+    if (!TB || !TS) fail(`${name}: internal error (tensor modules not loaded)`);
+    const meta = TB.getTensorMetaFromArg(args[0], getWire);
+    if (!meta) fail(`${name}: expects one whole tensor argument`);
+    const tgt = TB.resolveAssignTargetMeta(this);
+    if (!tgt || tgt.rows !== meta.rows || tgt.cols !== meta.cols) {
+      fail(`${name}: target wire shape must match input`);
+    }
+    const val = this._evalCallArgValue(args[0]);
+    if (!val || val === '-') fail(`${name}: empty tensor value`);
+    const blob = name === 'FLIPUD'
+      ? TS.flipUdBlob(val, meta.elementWidth, meta.rows, meta.cols)
+      : TS.flipLrBlob(val, meta.elementWidth, meta.rows, meta.cols);
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
+  if (name === 'MCAT') {
+    if (args.length !== 2) fail('MCAT expects 2 arguments');
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const getWire = (wn) => this.wires.get(wn);
+    if (!TB || !TS) fail('MCAT: internal error (tensor modules not loaded)');
+    const metaA = TB.getTensorMetaFromArg(args[0], getWire);
+    const metaB = TB.getTensorMetaFromArg(args[1], getWire);
+    if (!metaA || !metaB) fail('MCAT: expects two whole tensor arguments');
+    if (metaA.elementWidth !== metaB.elementWidth) fail('MCAT: operand element widths must match');
+    const cat = TB.resolveCatShapes(metaA, metaB);
+    if (!cat) fail('MCAT: shapes must share a row count (horizontal) or column count (vertical)');
+    const tgt = TB.resolveAssignTargetMeta(this);
+    if (!tgt || tgt.rows !== cat.outRows || tgt.cols !== cat.outCols) {
+      fail(`MCAT: target [${tgt ? tgt.rows : '?' },${tgt ? tgt.cols : '?'}] does not match [${cat.outRows},${cat.outCols}]`);
+    }
+    const valA = this._evalCallArgValue(args[0]);
+    const valB = this._evalCallArgValue(args[1]);
+    const W = metaA.elementWidth;
+    const blob = cat.mode === 'horizontal'
+      ? TS.catHorizontalBlob(valA, valB, W, metaA.rows, metaA.cols, metaB.cols)
+      : TS.catVerticalBlob(valA, valB, W, metaA.rows, metaB.rows, metaA.cols);
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
+  if (name === 'MSLICE') {
+    if (args.length !== 5) fail('MSLICE expects 5 arguments (matrix, row, col, height, width)');
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const getWire = (wn) => this.wires.get(wn);
+    if (!TB || !TS) fail('MSLICE: internal error (tensor modules not loaded)');
+    const meta = TB.getTensorMetaFromArg(args[0], getWire);
+    if (!meta) fail('MSLICE: expects one whole tensor argument');
+    const r0 = this._evalCallArgDecimalNonNegInt(args[1], 'MSLICE');
+    const c0 = this._evalCallArgDecimalNonNegInt(args[2], 'MSLICE');
+    const h = this._evalCallArgDecimalInt(args[3], 'MSLICE');
+    const w = this._evalCallArgDecimalInt(args[4], 'MSLICE');
+    if (r0 + h > meta.rows || c0 + w > meta.cols) {
+      fail(`MSLICE: window [${r0},${c0}]+[${h},${w}] exceeds [${meta.rows},${meta.cols}]`);
+    }
+    const tgt = TB.resolveAssignTargetMeta(this);
+    if (!tgt || tgt.rows !== h || tgt.cols !== w) {
+      fail(`MSLICE: target must be [${h},${w}]`);
+    }
+    const val = this._evalCallArgValue(args[0]);
+    if (!val || val === '-') fail('MSLICE: empty tensor value');
+    const blob = TS.sliceBlob(val, meta.elementWidth, meta.rows, meta.cols, r0, c0, h, w);
     return computeRefs
       ? { value: blob, ref: `&${this.storeValue(blob)}` }
       : { value: blob, ref: null };
@@ -12684,6 +12936,20 @@ Interpreter.BUILTIN_DOC = {
   ],
   PIVOT:    ['PIVOT(Wwire tensor) -> Wwire tensor'],
   IDENTITY: ['IDENTITY(\\N) -> Wwire[N,N] — square identity; W from target wire, N decimal'],
+  ZEROS:    ['ZEROS(\\N) -> Wwire[N,N] — square zero matrix'],
+  FILL:     ['FILL(\\N, Wbit scalar) -> Wwire[N,N] — constant fill'],
+  DIAG:     ['DIAG(Wwire[n] vector) -> Wwire[n,n] — diagonal matrix'],
+  IOTA:     ['IOTA(\\N) -> Wwire[N] — vector 0..N-1'],
+  OUTER:    ['OUTER(Wwire[N,1] col, Wwire[1,M] row) -> Wwire[N,M], (2W) over — outer product'],
+  TRACE:    ['TRACE(Wwire[n,n] matrix) -> Wbit result, Wbit over'],
+  NORM:     ['NORM(Wwire[n] vector) -> Wbit result, (2W)bit over — L2² = DOT(v,v)'],
+  L2:       ['L2(Wwire[n] vector) -> Wbit result, (2W)bit over — alias of NORM'],
+  TRIL:     ['TRIL(Wwire[n,n] matrix) -> Wwire[n,n] — lower triangle'],
+  TRIU:     ['TRIU(Wwire[n,n] matrix) -> Wwire[n,n] — upper triangle'],
+  FLIPUD:   ['FLIPUD(Wwire tensor) -> Wwire tensor — flip rows'],
+  FLIPLR:   ['FLIPLR(Wwire tensor) -> Wwire tensor — flip columns'],
+  MCAT:     ['MCAT(Wwire tensor A, Wwire tensor B) -> Wwire tensor — concat rows or cols'],
+  MSLICE:   ['MSLICE(matrix, \\r0, \\c0, \\h, \\w) -> Wwire[h,w] — submatrix window'],
   LROTATE:  [
     'LROTATE(Xbit data, Ybit count) -> Xbit',
     'LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]',

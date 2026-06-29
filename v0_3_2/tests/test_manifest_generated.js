@@ -1375,7 +1375,19 @@
       {"id":1889,"group":"wire-tensor","title":"IDENTITY(\\3) 4wire[3,3]","detail":{"scripts":["4wire[3,3] I = IDENTITY(\\3)"],"steps":[],"assertions":["diagonal 1","off-diagonal 0","diagonal 2","corner 0"]}},
       {"id":1890,"group":"wire-tensor","title":"DOT(A, IDENTITY) preserves A","detail":{"scripts":["4wire[2,2] a = 0001 + 0010 + 0011 + 0100"],"steps":[],"assertions":["A unchanged"]}},
       {"id":1891,"group":"wire-tensor","title":"IDENTITY dimension mismatch error","detail":{"scripts":["4wire[2,2] I = IDENTITY(\\3)"],"steps":[],"assertions":["shape mismatch"]}},
-      {"id":1892,"group":"wire-tensor","title":"IDENTITY rejects non-decimal argument","detail":{"scripts":["4wire[2,2] I = IDENTITY(10)"],"steps":[],"assertions":["decimal required"]}}
+      {"id":1892,"group":"wire-tensor","title":"IDENTITY rejects non-decimal argument","detail":{"scripts":["4wire[2,2] I = IDENTITY(10)"],"steps":[],"assertions":["decimal required"]}},
+      {"id":1893,"group":"wire-tensor","title":"ZEROS(\\2)","detail":{"scripts":["4wire[2,2] z = ZEROS(\\2)"],"steps":[],"assertions":["zero","zero diag"]}},
+      {"id":1894,"group":"wire-tensor","title":"FILL(\\2, scalar)","detail":{"scripts":["4wire[2,2] m = FILL(\\2, 0011)"],"steps":[],"assertions":["all cells"]}},
+      {"id":1895,"group":"wire-tensor","title":"DIAG(vector)","detail":{"scripts":["4wire[3] v = 0001 + 0010 + 0100"],"steps":[],"assertions":["diag val","blob len"]}},
+      {"id":1896,"group":"wire-tensor","title":"IOTA(\\3)","detail":{"scripts":["4wire[3] idx = IOTA(\\3)"],"steps":[],"assertions":["iota"]}},
+      {"id":1897,"group":"wire-tensor","title":"OUTER col × row","detail":{"scripts":["4wire[2,1] col = 0001 + 0010"],"steps":[],"assertions":["outer"]}},
+      {"id":1898,"group":"wire-tensor","title":"TRACE identity","detail":{"scripts":["4wire[2,2] eye = IDENTITY(\\2)"],"steps":[],"assertions":["trace"]}},
+      {"id":1899,"group":"wire-tensor","title":"NORM equals DOT(v,v)","detail":{"scripts":["4wire[2] v = 0001 + 0010"],"steps":[],"assertions":["norm r","norm o"]}},
+      {"id":1900,"group":"wire-tensor","title":"L2 alias of NORM","detail":{"scripts":["4wire[2] v = 0011 + 0100"],"steps":[],"assertions":["L2 r"]}},
+      {"id":1901,"group":"wire-tensor","title":"TRIL and TRIU","detail":{"scripts":["4wire[2,2] m = 0001 + 0010 + 0100 + 1000"],"steps":[],"assertions":["tril","triu"]}},
+      {"id":1902,"group":"wire-tensor","title":"FLIPUD and FLIPLR","detail":{"scripts":["4wire[2,2] m = 0001 + 0010 + 0100 + 1000"],"steps":[],"assertions":["flipud","fliplr"]}},
+      {"id":1903,"group":"wire-tensor","title":"MCAT horizontal","detail":{"scripts":["4wire[2,1] a = 0001 + 0010"],"steps":[],"assertions":["hcat"]}},
+      {"id":1904,"group":"wire-tensor","title":"MSLICE 2×2 window","detail":{"scripts":["4wire[3,3] m = 0001 + 0010 + 0100 + 1000 + 0001 + 0010 + 0100 + 1000 + 0001"],"steps":[],"assertions":["slice"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1451,7 +1463,7 @@
       { id: 'user-def-tags', label: 'user-def-tags', rangeLabel: '1776–1781', testIds: [1776, 1777, 1778, 1779, 1780, 1781] },
       { id: 'vector-reduction', label: 'vector-reduction', rangeLabel: '1715–1734, 1797', testIds: [1715, 1716, 1717, 1718, 1719, 1720, 1721, 1722, 1723, 1724, 1725, 1726, 1727, 1728, 1729, 1730, 1731, 1732, 1733, 1734, 1797] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611, 1654', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 1654] },
-      { id: 'wire-tensor', label: 'wire-tensor', rangeLabel: '1864–1876, 1889–1892', testIds: [1864, 1865, 1866, 1867, 1868, 1869, 1870, 1871, 1872, 1873, 1874, 1875, 1876, 1889, 1890, 1891, 1892] },
+      { id: 'wire-tensor', label: 'wire-tensor', rangeLabel: '1864–1876, 1889–1904', testIds: [1864, 1865, 1866, 1867, 1868, 1869, 1870, 1871, 1872, 1873, 1874, 1875, 1876, 1889, 1890, 1891, 1892, 1893, 1894, 1895, 1896, 1897, 1898, 1899, 1900, 1901, 1902, 1903, 1904] },
       { id: 'wire-vectors', label: 'wire-vectors', rangeLabel: '1684–1701, 1704–1706, 1735–1739, 1741–1742', testIds: [1684, 1685, 1686, 1687, 1688, 1689, 1690, 1691, 1692, 1693, 1694, 1695, 1696, 1697, 1698, 1699, 1700, 1701, 1704, 1705, 1706, 1735, 1736, 1737, 1738, 1739, 1741, 1742] },
       { id: 'zstate', label: 'zstate', rangeLabel: '1429–1503, 1536, 1559–1570, 1575–1587', testIds: [1429, 1430, 1431, 1432, 1433, 1434, 1435, 1436, 1437, 1438, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446, 1447, 1448, 1449, 1450, 1451, 1452, 1453, 1454, 1455, 1456, 1457, 1458, 1459, 1460, 1461, 1462, 1463, 1464, 1465, 1466, 1467, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475, 1476, 1477, 1478, 1479, 1480, 1481, 1482, 1483, 1484, 1485, 1486, 1487, 1488, 1489, 1490, 1491, 1492, 1493, 1494, 1495, 1496, 1497, 1498, 1499, 1500, 1501, 1502, 1503, 1536, 1559, 1560, 1561, 1562, 1563, 1564, 1565, 1566, 1567, 1568, 1569, 1570, 1575, 1576, 1577, 1578, 1579, 1580, 1581, 1582, 1583, 1584, 1585, 1586, 1587] }
     ]

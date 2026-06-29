@@ -115,8 +115,8 @@
     const N = n | 0;
     const W = ew | 0;
     if (N < 1 || W < 1) return '';
-    const one = '0'.repeat(Math.max(0, W - 1)) + '1';
-    const zero = '0'.repeat(W);
+    const one = cellOne(W);
+    const zero = cellZero(W);
     let out = '';
     for (let r = 0; r < N; r++) {
       for (let c = 0; c < N; c++) {
@@ -124,6 +124,148 @@
       }
     }
     return out;
+  }
+
+  function cellZero(ew) {
+    return '0'.repeat(ew | 0);
+  }
+
+  function cellOne(ew) {
+    const W = ew | 0;
+    return W < 1 ? '' : '0'.repeat(Math.max(0, W - 1)) + '1';
+  }
+
+  function padCell(val, ew) {
+    return String(val).padStart(ew | 0, '0').slice(-(ew | 0));
+  }
+
+  function zerosBlob(n, ew) {
+    const N = n | 0;
+    const W = ew | 0;
+    if (N < 1 || W < 1) return '';
+    return cellZero(W).repeat(N * N);
+  }
+
+  function fillBlob(n, ew, cellVal) {
+    const N = n | 0;
+    const W = ew | 0;
+    if (N < 1 || W < 1) return '';
+    return padCell(cellVal, W).repeat(N * N);
+  }
+
+  function diagonalBlob(values, ew, n) {
+    const N = n | 0;
+    const W = ew | 0;
+    const zero = cellZero(W);
+    let out = '';
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        out += r === c ? padCell(values[r], W) : zero;
+      }
+    }
+    return out;
+  }
+
+  function iotaBlob(n, ew) {
+    const N = n | 0;
+    const W = ew | 0;
+    let out = '';
+    for (let i = 0; i < N; i++) {
+      out += i.toString(2).padStart(W, '0').slice(-W);
+    }
+    return out;
+  }
+
+  function flipUdBlob(val, ew, rows, cols) {
+    const W = ew | 0;
+    const s = val == null ? '' : String(val);
+    let out = '';
+    for (let r = rows - 1; r >= 0; r--) {
+      out += s.substring(r * cols * W, (r + 1) * cols * W);
+    }
+    return out;
+  }
+
+  function flipLrBlob(val, ew, rows, cols) {
+    const W = ew | 0;
+    const s = val == null ? '' : String(val);
+    let out = '';
+    for (let r = 0; r < rows; r++) {
+      for (let c = cols - 1; c >= 0; c--) {
+        const start = linearIndex(r, c, cols) * W;
+        out += s.substring(start, start + W);
+      }
+    }
+    return out;
+  }
+
+  function trilBlob(val, ew, rows, cols) {
+    const W = ew | 0;
+    const s = val == null ? '' : String(val);
+    const zero = cellZero(W);
+    let out = '';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const start = linearIndex(r, c, cols) * W;
+        out += c <= r ? s.substring(start, start + W) : zero;
+      }
+    }
+    return out;
+  }
+
+  function triuBlob(val, ew, rows, cols) {
+    const W = ew | 0;
+    const s = val == null ? '' : String(val);
+    const zero = cellZero(W);
+    let out = '';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const start = linearIndex(r, c, cols) * W;
+        out += c >= r ? s.substring(start, start + W) : zero;
+      }
+    }
+    return out;
+  }
+
+  function catHorizontalBlob(valA, valB, ew, rows, colsA, colsB) {
+    const W = ew | 0;
+    const a = valA == null ? '' : String(valA);
+    const b = valB == null ? '' : String(valB);
+    let out = '';
+    for (let r = 0; r < rows; r++) {
+      out += a.substring(r * colsA * W, (r + 1) * colsA * W);
+      out += b.substring(r * colsB * W, (r + 1) * colsB * W);
+    }
+    return out;
+  }
+
+  function catVerticalBlob(valA, valB, ew, rowsA, rowsB, cols) {
+    return String(valA) + String(valB);
+  }
+
+  function sliceBlob(val, ew, rows, cols, r0, c0, h, w) {
+    const W = ew | 0;
+    const s = val == null ? '' : String(val);
+    let out = '';
+    for (let r = r0; r < r0 + h; r++) {
+      for (let c = c0; c < c0 + w; c++) {
+        const start = linearIndex(r, c, cols) * W;
+        out += s.substring(start, start + W);
+      }
+    }
+    return out;
+  }
+
+  function diagonalValues(val, ew, rows, cols) {
+    const W = ew | 0;
+    const s = val == null ? '' : String(val);
+    const n = Math.min(rows, cols);
+    const vals = [];
+    for (let i = 0; i < n; i++) {
+      const start = linearIndex(i, i, cols) * W;
+      vals.push(s.substring(start, start + W));
+    }
+    return vals;
   }
 
   const api = {
@@ -140,7 +282,22 @@
     declBitTotal,
     pivotBlob,
     pivotedDims,
-    identityBlob
+    identityBlob,
+    cellZero,
+    cellOne,
+    padCell,
+    zerosBlob,
+    fillBlob,
+    diagonalBlob,
+    iotaBlob,
+    flipUdBlob,
+    flipLrBlob,
+    trilBlob,
+    triuBlob,
+    catHorizontalBlob,
+    catVerticalBlob,
+    sliceBlob,
+    diagonalValues,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
