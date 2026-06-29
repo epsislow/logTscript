@@ -3989,6 +3989,17 @@ const idx = parseInt(
     }).join('');
   });
 
+  const SA = typeof LogTScriptSignedArithmetic !== 'undefined' ? LogTScriptSignedArithmetic : null;
+  let signedMode = false;
+  if (callTags && callTags.length) {
+    if (Interpreter.BUILTIN_DOC[name] && (!SA || !SA.BUILTIN_SIGNED_TAG_FUNCS.has(name))) {
+      fail(`${name}: does not accept call tags`);
+    }
+    if (SA && SA.BUILTIN_SIGNED_TAG_FUNCS.has(name)) {
+      signedMode = SA.parseBuiltinSignedCallTags(callTags, name, (msg) => fail(msg));
+    }
+  }
+
   // ================= BUILTIN: LOGIC GATES =================
   const useIeeeGates = typeof LogicValue !== 'undefined'
     && argValues.some(v => LogicValue.stringHasLogicXZ(v));
@@ -4354,6 +4365,8 @@ if (this.isBuiltinDEMUX(name)) {
     if (name === 'LSHIFT') {
       // Append n fill bits on the right → data.length + n bits
       v = data + fill.repeat(n);
+    } else if (signedMode && SA) {
+      v = SA.arithmeticRshift(data, n);
     } else {
       // RSHIFT: same width, shift right (MSBs filled with fill, LSBs discarded)
       if (n >= len) {
@@ -4512,7 +4525,7 @@ if (this.isBuiltinDEMUX(name)) {
       const X = pair.meta.elementWidth;
       const n = pair.meta.elementCount;
       const results = [];
-      const carries = [];
+      const flags = [];
       if (pair.mode === 'vectorScalar') {
         const scalarRaw = this._evalCallArgValue(args[pair.scalarArg]);
         const scalar = String(scalarRaw).padStart(X, '0');
@@ -4520,9 +4533,15 @@ if (this.isBuiltinDEMUX(name)) {
         for (let i = 0; i < n; i++) {
           const a = this._evalReductionAtomValue({ var: varName, vectorIndex: i });
           this._zstateRequireBinary([a, scalar], 'ADD', ['a', 'b']);
-          const { result, carry } = VR.addUnsignedAtWidth(a, scalar, X);
-          results.push(result);
-          carries.push(carry);
+          let step;
+          if (SA) {
+            step = SA.addAtWidth(a, scalar, X, signedMode);
+          } else {
+            const u = VR.addUnsignedAtWidth(a, scalar, X);
+            step = { result: u.result, flag: u.carry };
+          }
+          results.push(step.result);
+          flags.push(step.flag);
         }
       } else {
         const varA = args[0][0].var;
@@ -4531,21 +4550,34 @@ if (this.isBuiltinDEMUX(name)) {
           const a = this._evalReductionAtomValue({ var: varA, vectorIndex: i });
           const b = this._evalReductionAtomValue({ var: varB, vectorIndex: i });
           this._zstateRequireBinary([a, b], 'ADD', ['a', 'b']);
-          const { result, carry } = VR.addUnsignedAtWidth(a, b, X);
-          results.push(result);
-          carries.push(carry);
+          let step;
+          if (SA) {
+            step = SA.addAtWidth(a, b, X, signedMode);
+          } else {
+            const u = VR.addUnsignedAtWidth(a, b, X);
+            step = { result: u.result, flag: u.carry };
+          }
+          results.push(step.result);
+          flags.push(step.flag);
         }
       }
       const resultBlob = results.join('');
-      const carryBlob = carries.join('');
+      const flagBlob = flags.join('');
       return [
         computeRefs ? { value: resultBlob, ref: `&${this.storeValue(resultBlob)}` } : { value: resultBlob, ref: null },
-        computeRefs ? { value: carryBlob, ref: `&${this.storeValue(carryBlob)}` } : { value: carryBlob, ref: null },
+        computeRefs ? { value: flagBlob, ref: `&${this.storeValue(flagBlob)}` } : { value: flagBlob, ref: null },
       ];
     }
     this._zstateRequireBinary(argValues, 'ADD', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
+    if (SA) {
+      const { result, flag } = SA.addAtWidth(a, b, depth, signedMode);
+      return [
+        computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+        computeRefs ? { value: flag,  ref: `&${this.storeValue(flag)}`  } : { value: flag,  ref: null },
+      ];
+    }
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
     const bNum = BigInt('0b' + b.padStart(depth, '0'));
     const sum  = aNum + bNum;
@@ -4564,6 +4596,13 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'SUBTRACT', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
+    if (SA) {
+      const { result, flag } = SA.subtractAtWidth(a, b, depth, signedMode);
+      return [
+        computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+        computeRefs ? { value: flag,  ref: `&${this.storeValue(flag)}`  } : { value: flag,  ref: null },
+      ];
+    }
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
     const bNum = BigInt('0b' + b.padStart(depth, '0'));
     let diff = aNum - bNum;
@@ -4584,6 +4623,13 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'MULTIPLY', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
+    if (SA) {
+      const { result, over } = SA.multiplyAtWidth(a, b, depth, signedMode);
+      return [
+        computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+        computeRefs ? { value: over,   ref: `&${this.storeValue(over)}`   } : { value: over,   ref: null },
+      ];
+    }
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
     const bNum = BigInt('0b' + b.padStart(depth, '0'));
     const product = aNum * bNum;
@@ -4627,7 +4673,11 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'MAC', ['acc', 'a', 'b']);
     let mac;
     try {
-      mac = macUnsigned(argValues[0], argValues[1], argValues[2]);
+      if (SA && signedMode) {
+        mac = SA.macAtWidth(argValues[0], argValues[1], argValues[2], true);
+      } else {
+        mac = macUnsigned(argValues[0], argValues[1], argValues[2]);
+      }
     } catch (e) {
       fail(e.message);
     }
@@ -4708,7 +4758,10 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'GT') {
     if (argValues.length !== 2) fail('GT expects 2 arguments');
     this._zstateRequireBinary(argValues, 'GT', ['a', 'b']);
-    const v = unsignedCompareBigInt(argValues[0], argValues[1]) > 0 ? '1' : '0';
+    const cmp = signedMode && SA
+      ? SA.signedCompareBigInt(argValues[0], argValues[1])
+      : unsignedCompareBigInt(argValues[0], argValues[1]);
+    const v = cmp > 0 ? '1' : '0';
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -4717,7 +4770,10 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'LT') {
     if (argValues.length !== 2) fail('LT expects 2 arguments');
     this._zstateRequireBinary(argValues, 'LT', ['a', 'b']);
-    const v = unsignedCompareBigInt(argValues[0], argValues[1]) < 0 ? '1' : '0';
+    const cmp = signedMode && SA
+      ? SA.signedCompareBigInt(argValues[0], argValues[1])
+      : unsignedCompareBigInt(argValues[0], argValues[1]);
+    const v = cmp < 0 ? '1' : '0';
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -4729,7 +4785,9 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(expanded, 'MIN', expanded.map((_, i) => `arg${i}`));
     let v;
     try {
-      v = pickMinMaxUnsigned(expanded, true);
+      v = signedMode && SA
+        ? SA.pickMinMaxSigned(expanded, true)
+        : pickMinMaxUnsigned(expanded, true);
     } catch (e) {
       fail(e.message);
     }
@@ -4744,7 +4802,9 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(expanded, 'MAX', expanded.map((_, i) => `arg${i}`));
     let v;
     try {
-      v = pickMinMaxUnsigned(expanded, false);
+      v = signedMode && SA
+        ? SA.pickMinMaxSigned(expanded, false)
+        : pickMinMaxUnsigned(expanded, false);
     } catch (e) {
       fail(e.message);
     }
@@ -4758,7 +4818,9 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'CLAMP', ['x', 'min', 'max']);
     let v;
     try {
-      v = clampUnsigned(argValues[0], argValues[1], argValues[2]);
+      v = signedMode && SA
+        ? SA.clampSigned(argValues[0], argValues[1], argValues[2])
+        : clampUnsigned(argValues[0], argValues[1], argValues[2]);
     } catch (e) {
       fail(e.message);
     }
@@ -11435,15 +11497,31 @@ Interpreter.BUILTIN_DOC = {
   EQ:    ['EQ(Xbit, Xbit) -> 1bit'],
   LATCH: ['LATCH(Xbit data, 1bit clock) -> Xbit'],
   LSHIFT:['LSHIFT(Xbit data, Nbit n) -> Xbit', 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit'],
-  RSHIFT:['RSHIFT(Xbit data, Nbit n) -> Xbit', 'RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit'],
+  RSHIFT:[
+    'RSHIFT(Xbit data, Nbit n) -> Xbit',
+    'RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit',
+    'RSHIFT(Xbit data, Nbit n; signed) -> Xbit',
+  ],
   REG:  ['REG(Xbit data, 1bit clock, 1bit clear) -> Xbit'],
   MUX:  ['MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit'],
   DEMUX:['DEMUX(Nbit sel, Xbit data) -> Xbit, Xbit, ..'],
-  ADD:      ['ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
-  SUBTRACT: ['SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry'],
-  MULTIPLY: ['MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over'],
+  ADD:      [
+    'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry',
+    'ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow',
+  ],
+  SUBTRACT: [
+    'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry',
+    'SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow',
+  ],
+  MULTIPLY: [
+    'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over',
+    'MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over',
+  ],
   DIVIDE:   ['DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod'],
-  MAC:      ['MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over'],
+  MAC:      [
+    'MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over',
+    'MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over',
+  ],
   SUM:      ['SUM(Wbit ...) -> Wbit result, Wbit over'],
   DOT:      ['DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over'],
   CNTN10S:  ['CNTN10S(Xbit value) -> Ybit'],
@@ -11452,11 +11530,26 @@ Interpreter.BUILTIN_DOC = {
   CNTN16S:  ['CNTN16S(Xbit value) -> Ybit'],
   N2N16S:   ['N2N16S(Xbit value) -> Zbit packed'],
   N16S2N:   ['N16S2N(Xbit packed) -> Wbit value'],
-  GT:       ['GT(Xbit a, Xbit b) -> 1bit'],
-  LT:       ['LT(Xbit a, Xbit b) -> 1bit'],
-  MIN:      ['MIN(Wbit ...) -> Wbit'],
-  MAX:      ['MAX(Wbit ...) -> Wbit'],
-  CLAMP:    ['CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit'],
+  GT:       [
+    'GT(Xbit a, Xbit b) -> 1bit',
+    'GT(Xbit a, Xbit b; signed) -> 1bit',
+  ],
+  LT:       [
+    'LT(Xbit a, Xbit b) -> 1bit',
+    'LT(Xbit a, Xbit b; signed) -> 1bit',
+  ],
+  MIN:      [
+    'MIN(Wbit ...) -> Wbit',
+    'MIN(Wbit ...; signed) -> Wbit',
+  ],
+  MAX:      [
+    'MAX(Wbit ...) -> Wbit',
+    'MAX(Wbit ...; signed) -> Wbit',
+  ],
+  CLAMP:    [
+    'CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit',
+    'CLAMP(Xbit x, Ybit min, Ybit max; signed) -> Ybit',
+  ],
   ISDIGIT:  ['ISDIGIT(Xbit value) -> 1bit'],
   HIGH:     ['HIGH(Xbit) -> Xbit'],
   LOW:      ['LOW(Xbit) -> Xbit'],

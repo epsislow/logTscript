@@ -18,12 +18,12 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 | **Logic gates** | `NOT`, `AND`, `OR`, `XOR`, `NXOR`, `NAND`, `NOR`, `EQ` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) |
 | **Sequential** | `LATCH`, `REG` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · `REG` → [reg.md](reg.md) |
 | **Routing** | `MUX`, `DEMUX` | [builtin-routing-functions.md](builtin-routing-functions.md) |
-| **Arithmetic** | `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `MAC`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP` | [arithmetic.md](arithmetic.md) |
+| **Arithmetic** | `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `MAC`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP` (+ optional `; signed` on all except `DIVIDE`) | [arithmetic.md](arithmetic.md) |
 | **Vector reduction** | `SUM`, `DOT` | [vector-reduction.md](vector-reduction.md) · summary in [arithmetic.md](arithmetic.md#sum--dot-vector-reduction) |
 | **Number conversion** | `CNTN10S`, `N2N10S`, `N10S2N`, `CNTN16S`, `N2N16S`, `N16S2N`, `ISDIGIT` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | `HIGH`, `LOW`, `ANY`, `ZERO`, `ANY*`, `ALL*`, `BITINDEX`, `ONEHOT` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | `PARITY`, `CNTONE`, `CNTZERO`, `BITSIZE` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
-| **Bit transform** | `LSHIFT`, `RSHIFT`, `REVERSE`, `LROTATE`, `RROTATE` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
+| **Bit transform** | `LSHIFT`, `RSHIFT` (+ optional `; signed` = ASHR), `REVERSE`, `LROTATE`, `RROTATE` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
 | **Tristate (ZSTATE)** | `ZRELEASE(wire)`, `bus = ZCONNECT(en, data)` | [zstate.md](zstate.md) |
 
 > **Adding new built-ins:** extend `Interpreter.BUILTIN_DOC` in `core/interpreter.js`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.

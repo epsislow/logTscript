@@ -64,6 +64,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/watch-expand.js",
   "files/storage.js",
   "core/user-func-overloads.js",
+  "core/signed-arithmetic.js",
   "core/parser.js",
   "core/interpreter.js",
   "core/signal-propagation.js",

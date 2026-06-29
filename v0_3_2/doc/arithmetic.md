@@ -10,6 +10,8 @@ DIVIDE(Xbit a, Xbit b)   -> Xbit result, Xbit mod
 MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 ```
 
+**Signed overload** (two's complement on width `W`, MSB = sign): append `; signed` after the argument list on `ADD`, `SUBTRACT`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP`, `MULTIPLY`, `MAC`, and `RSHIFT`. Without the tag, behaviour stays **unsigned** / logical (fully compatible with existing scripts). See [Signed arithmetic (`; signed`)](#signed-arithmetic-signed) below.
+
 
 ---
 
@@ -350,6 +352,117 @@ show(y)
 
 ---
 
+## Signed arithmetic (`; signed`)
+
+Several arithmetic built-ins accept an optional **bool tag** `signed` after `;` in the call. Operands are interpreted as **two's complement** on their bit width `W` (MSB = sign). **Without** `; signed`, behaviour is unchanged (unsigned).
+
+| Built-in | Unsigned (default) | With `; signed` |
+|----------|-------------------|-----------------|
+| `ADD` | `result`, **carry** | same `result` bits, **overflow** (signed) |
+| `SUBTRACT` | `result`, **carry** (borrow) | same `result` bits, **overflow** (signed) |
+| `GT` / `LT` | unsigned numeric order | signed numeric order |
+| `MIN` / `MAX` | unsigned min/max | signed min/max |
+| `CLAMP` | unsigned bounds | signed bounds |
+| `MULTIPLY` | unsigned product, low/high split | signed product, same split |
+| `MAC` | unsigned `acc + a×b` | signed `acc + a×b` |
+
+`DIVIDE`, `LSHIFT`, rotates, and `REVERSE` do **not** support `; signed`. `RSHIFT` with `; signed` is **arithmetic** shift (ASHR) — see [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md#rshift-signed).
+
+### ADD / SUBTRACT signed
+
+```
+ADD(Xbit a, Xbit b; signed)      -> Xbit result, 1bit overflow
+SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
+```
+
+The **result bit pattern** is identical to the unsigned call; only the second return changes meaning (signed overflow instead of unsigned carry/borrow).
+
+```logts-play
+4wire acc = 0111
+4wire delta = 0001
+4wire nextU, 1wire carry = ADD(acc, delta)
+4wire nextS, 1wire ovf = ADD(acc, delta; signed)
+show(nextU)
+show(carry)
+show(nextS)
+show(ovf)
+```
+
+`7 + 1` on 4 bits: `result = 1000`, unsigned **carry** `0`, signed **overflow** `1` (exceeds `+7`).
+
+### GT / LT signed
+
+```logts-play
+4wire a = 1111
+4wire b = 0010
+1wire gtU = GT(a, b)
+1wire gtS = GT(a, b; signed)
+show(gtU)
+show(gtS)
+```
+
+Unsigned: `1111` = 15 → `gtU = 1`. Signed: `1111` = −1 → `gtS = 0`.
+
+### MIN / MAX / CLAMP signed
+
+Bounds and operands use the same signed interpretation at `len(x)` (with `min`/`max` zero-extended for `CLAMP`).
+
+```logts-play
+4wire neg = 1111
+4wire pos = 0010
+4wire lo = MIN(neg, pos; signed)
+4wire hi = MAX(neg, pos; signed)
+show(lo)
+show(hi)
+```
+
+```logts-play
+4wire x = 1111
+4wire lo = 0000
+4wire hi = 0010
+4wire yU = CLAMP(x, lo, hi)
+4wire yS = CLAMP(x, lo, hi; signed)
+show(yU)
+show(yS)
+```
+
+Unsigned: `1111` = 15 → clamped to `0010`. Signed: `1111` = −1 → clamped to `0000`.
+
+### MULTIPLY / MAC signed
+
+Operands are multiplied (and accumulated for `MAC`) as **signed** integers. Output packing is unchanged: `result` = low `W` bits, `over` = next `W` bits (or `W+1` for `MAC`) of the full product/sum — same wire layout as unsigned, different numeric interpretation.
+
+```
+MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
+MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
+```
+
+```logts-play
+4wire a = 1111
+4wire b = 1111
+4wire rU, 4wire oU = MULTIPLY(a, b)
+4wire rS, 4wire oS = MULTIPLY(a, b; signed)
+show(rU)
+show(oU)
+show(rS)
+show(oS)
+```
+
+Unsigned: `15×15 = 225` → `rU=0001`, `oU=1110`. Signed: `(−1)×(−1) = 1` → `rS=0001`, `oS=0000`.
+
+```logts-play
+4wire acc = 1000
+4wire a = 0010
+4wire b = 0001
+4wire r, 5wire over = MAC(acc, a, b; signed)
+show(r)
+show(over)
+```
+
+Signed: `−8 + 2×1 = −6` on 4 bits → `r=1010`, `over` carries high extension bits.
+
+---
+
 ## Comparison with component equivalents
 
 These built-in functions are **combinational** — they produce their result immediately when evaluated, without state or clock:
@@ -373,18 +486,22 @@ For **digit packing** (decimal / hex), see [number-conversion.md](number-convers
 ```
 doc(ADD)
 # ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
+# ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
 
 doc(SUBTRACT)
 # SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
+# SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
 
 doc(MULTIPLY)
 # MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
+# MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
 
 doc(DIVIDE)
 # DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
 
 doc(MAC)
 # MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
+# MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
 
 doc(GT)
 doc(LT)

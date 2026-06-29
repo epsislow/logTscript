@@ -50,6 +50,29 @@ probe(y)
 
 Sugar: `data > n` and `data > n w1`.
 
+### RSHIFT signed (ASHR)
+
+With `; signed`, shift **arithmetic** right: MSB (sign bit) is replicated instead of `fill`. Equivalent to `ASHR` in [alu.md](alu.md#arithmetic-shift-right-vs-logical-ashr--rshift). Optional `fill` is ignored when `signed` is set.
+
+```
+RSHIFT(Xbit data, Nbit n; signed) -> Xbit
+```
+
+```logts-play
+4wire neg = 1111
+4wire pos = 0111
+4wire log = RSHIFT(neg, 1)
+4wire arithNeg = RSHIFT(neg, 1; signed)
+4wire arithPos = RSHIFT(pos, 1; signed)
+show(log)
+show(arithNeg)
+show(arithPos)
+```
+
+`1111` logical → `0111`; arithmetic → `1111` (still −1). `0111` (=7) arithmetic → `0011` (=3).
+
+`LSHIFT` does **not** accept `; signed` (left shift is identical for signed/unsigned).
+
 ---
 
 ## REVERSE

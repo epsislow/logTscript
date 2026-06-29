@@ -1,6 +1,6 @@
 ---
 name: User def tag overloads
-overview: "Faza 1 (implementată): tag-uri user `def` cu overload exact. Faza 2 (planificată): tag bool `signed` pe built-in-uri aritmetice pentru scripturi — ADD/SUBTRACT/GT/LT/MIN/MAX/CLAMP; apoi MULTIPLY/MAC/RSHIFT aritmetic."
+overview: "Faza 1 (implementată): tag-uri user `def` cu overload exact. Faza 2a (implementată): tag bool `signed` pe ADD/SUBTRACT/GT/LT/MIN/MAX/CLAMP. Faza 2b (planificată): MULTIPLY/MAC/RSHIFT aritmetic."
 todos:
   - id: overload-module
     content: "core/user-func-overloads.js — normalizare, match exact, erori, validare def"
@@ -22,19 +22,19 @@ todos:
     status: completed
   - id: builtin-signed-helpers
     content: "Helperi two's complement: interpretare signed, compare signed, overflow (reutilizare aluSignedOverflowAdd/Sub)"
-    status: pending
+    status: completed
   - id: builtin-signed-dispatch
     content: "interpreter.call() — după parse callTags, ramură signed pe ADD/SUBTRACT/GT/LT/MIN/MAX/CLAMP"
-    status: pending
+    status: completed
   - id: builtin-signed-doc
     content: "arithmetic.md + builtin doc + exemple logts-play ADD(acc,delta; signed), GT/LT signed vs unsigned"
-    status: pending
+    status: completed
   - id: builtin-signed-tests
     content: "Teste builtin-signed — overflow, compare 1111 vs 0010, regresie unsigned fără tag"
-    status: pending
+    status: completed
   - id: builtin-signed-phase2b
     content: "Iteratie urmatoare: MULTIPLY, MAC, RSHIFT/ASHR cu signed (daca se confirma semantica)"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -151,7 +151,7 @@ Dacă vrei comportamentul „def cu `tag1=1 tag2=2`”, apelul corect este `test
 | `test(a, b; tag1=1 tag3)` | **eroare** — niciun def cu `{ tag1:1, tag3:1 }` (lipsește `tag2=3` din #6) |
 | `test(a, b; tag3)` | **eroare** — niciun def cu doar `{ tag3:1 }` |
 
-## Faza 2 — built-in `signed` (planificat, neimplementat)
+## Faza 2a — built-in `signed` (implementat)
 
 ### Scop confirmat
 

@@ -2828,9 +2828,7 @@ assignment() {
       br = this.parseLiteralBitRange();
     }
     const atomSdec = br ? { bin: v, bitRange: br } : { bin: v };
-    if (this.c.type === 'SYM' && this.c.value === ';') {
-      atomSdec.pad = this.parsePadding();
-    }
+    { const _p = this.maybeParsePadding(); if (_p != null) atomSdec.pad = _p; }
     return addNot(atomSdec);
   }
 
@@ -2842,9 +2840,7 @@ assignment() {
       br = this.parseLiteralBitRange();
     }
     const atomBin = br ? { bin: v, bitRange: br } : { bin: v };
-    if (this.c.type === 'SYM' && this.c.value === ';') {
-      atomBin.pad = this.parsePadding();
-    }
+    { const _p = this.maybeParsePadding(); if (_p != null) atomBin.pad = _p; }
     return addNot(atomBin);
   }
 
@@ -2856,9 +2852,7 @@ assignment() {
       br = this.parseLiteralBitRange();
     }
     const atomLogic = br ? { logic: v, bitRange: br } : { logic: v };
-    if (this.c.type === 'SYM' && this.c.value === ';') {
-      atomLogic.pad = this.parsePadding();
-    }
+    { const _p = this.maybeParsePadding(); if (_p != null) atomLogic.pad = _p; }
     return addNot(atomLogic);
   }
   
@@ -2870,9 +2864,7 @@ assignment() {
       br = this.parseLiteralBitRange();
     }
     const atomHex = br ? { hex: v, bitRange: br } : { hex: v };
-    if (this.c.type === 'SYM' && this.c.value === ';') {
-      atomHex.pad = this.parsePadding();
-    }
+    { const _p = this.maybeParsePadding(); if (_p != null) atomHex.pad = _p; }
     return addNot(atomHex);
   }
   

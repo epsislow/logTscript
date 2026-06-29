@@ -2787,9 +2787,10 @@ reg(312, 'doc', 'BUILTIN_DOC — LSHIFT has 2 signatures', function(h, session) 
   h.assert('LSHIFT signature 2', lines[1], 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit');
 });
 
-reg(313, 'doc', 'BUILTIN_DOC — RSHIFT has 2 signatures', function(h, session) {
+reg(313, 'doc', 'BUILTIN_DOC — RSHIFT has 3 signatures', function(h, session) {
   const lines = Interpreter.getDocLines('RSHIFT', new Map());
-  h.assert('RSHIFT 2 signatures', String(lines.length), '2');
+  h.assert('RSHIFT 3 signatures', String(lines.length), '3');
+  h.assert('RSHIFT signed', lines[2], 'RSHIFT(Xbit data, Nbit n; signed) -> Xbit');
 });
 
 reg(314, 'doc', 'BUILTIN_DOC — LATCH', function(h, session) {
@@ -2883,20 +2884,23 @@ reg(327, 'doc', 'All gates AND NAND NOR NXOR XOR', function(h, session) {
 
 reg(328, 'doc', 'BUILTIN_DOC — ADD signature', function(h, session) {
   const lines = Interpreter.getDocLines('ADD', new Map());
-  h.assert('ADD 1 signature', String(lines.length), '1');
-  h.assert('ADD signature', lines[0], 'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry');
+  h.assert('ADD 2 signatures', String(lines.length), '2');
+  h.assert('ADD unsigned', lines[0], 'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry');
+  h.assert('ADD signed', lines[1], 'ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
 });
 
 reg(329, 'doc', 'BUILTIN_DOC — SUBTRACT signature', function(h, session) {
   const lines = Interpreter.getDocLines('SUBTRACT', new Map());
-  h.assert('SUBTRACT 1 signature', String(lines.length), '1');
-  h.assert('SUBTRACT signature', lines[0], 'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry');
+  h.assert('SUBTRACT 2 signatures', String(lines.length), '2');
+  h.assert('SUBTRACT unsigned', lines[0], 'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry');
+  h.assert('SUBTRACT signed', lines[1], 'SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
 });
 
 reg(330, 'doc', 'BUILTIN_DOC — MULTIPLY signature', function(h, session) {
   const lines = Interpreter.getDocLines('MULTIPLY', new Map());
-  h.assert('MULTIPLY 1 signature', String(lines.length), '1');
-  h.assert('MULTIPLY signature', lines[0], 'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over');
+  h.assert('MULTIPLY 2 signatures', String(lines.length), '2');
+  h.assert('MULTIPLY unsigned', lines[0], 'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over');
+  h.assert('MULTIPLY signed', lines[1], 'MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over');
 });
 
 reg(331, 'doc', 'BUILTIN_DOC — DIVIDE signature', function(h, session) {
@@ -12835,13 +12839,15 @@ reg(1677, 'number-conversion', 'ISDIGIT — 0..9 yes 10+ no', function(h, sessio
 });
 
 reg(1678, 'doc', 'BUILTIN_DOC — compare select MAC signatures', function(h, session) {
-  h.assert('GT', Interpreter.getDocLines('GT', new Map())[0], 'GT(Xbit a, Xbit b) -> 1bit');
-  h.assert('LT', Interpreter.getDocLines('LT', new Map())[0], 'LT(Xbit a, Xbit b) -> 1bit');
-  h.assert('MIN', Interpreter.getDocLines('MIN', new Map())[0], 'MIN(Wbit ...) -> Wbit');
-  h.assert('MAX', Interpreter.getDocLines('MAX', new Map())[0], 'MAX(Wbit ...) -> Wbit');
-  h.assert('CLAMP', Interpreter.getDocLines('CLAMP', new Map())[0], 'CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit');
+  h.assert('GT unsigned', Interpreter.getDocLines('GT', new Map())[0], 'GT(Xbit a, Xbit b) -> 1bit');
+  h.assert('GT signed', Interpreter.getDocLines('GT', new Map())[1], 'GT(Xbit a, Xbit b; signed) -> 1bit');
+  h.assert('LT unsigned', Interpreter.getDocLines('LT', new Map())[0], 'LT(Xbit a, Xbit b) -> 1bit');
+  h.assert('MIN unsigned', Interpreter.getDocLines('MIN', new Map())[0], 'MIN(Wbit ...) -> Wbit');
+  h.assert('MAX unsigned', Interpreter.getDocLines('MAX', new Map())[0], 'MAX(Wbit ...) -> Wbit');
+  h.assert('CLAMP unsigned', Interpreter.getDocLines('CLAMP', new Map())[0], 'CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit');
   h.assert('ISDIGIT', Interpreter.getDocLines('ISDIGIT', new Map())[0], 'ISDIGIT(Xbit value) -> 1bit');
   h.assert('MAC', Interpreter.getDocLines('MAC', new Map())[0], 'MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over');
+  h.assert('MAC signed', Interpreter.getDocLines('MAC', new Map())[1], 'MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over');
 });
 
 reg(1679, 'compare', 'GT/LT — unequal arg widths pad', function(h, session) {
@@ -14005,6 +14011,155 @@ reg(1781, 'user-def-tags', 'doc(test) — all tag overload signatures', function
   h.assert('tag1=1 sig', String(out.some(l => l.includes('; tag1=1)'))), 'true');
   h.assert('tag1=2 tag2=2 sig', String(out.some(l => l.includes('; tag1=2 tag2=2)'))), 'true');
   h.assert('bool tag3 sig', String(out.some(l => l.includes('tag2=3 tag3)'))), 'true');
+});
+
+reg(1782, 'builtin-signed', 'ADD — signed overflow vs unsigned carry', function(h, session) {
+  const interp = session.runArith(
+    '4wire acc = 0111\n' +
+    '4wire delta = 0001\n' +
+    '4wire nextU, 1wire carry = ADD(acc, delta)\n' +
+    '4wire nextS, 1wire ovf = ADD(acc, delta; signed)'
+  );
+  h.assert('same result bits', session.getWire(interp, 'nextU'), '1000');
+  h.assert('signed result', session.getWire(interp, 'nextS'), '1000');
+  h.assert('unsigned carry 0', session.getWire(interp, 'carry'), '0');
+  h.assert('signed overflow 1', session.getWire(interp, 'ovf'), '1');
+});
+
+reg(1783, 'builtin-signed', 'GT — signed vs unsigned on 1111 vs 0010', function(h, session) {
+  const interp = session.runArith(
+    '4wire a = 1111\n' +
+    '4wire b = 0010\n' +
+    '1wire gtU = GT(a, b)\n' +
+    '1wire gtS = GT(a, b; signed)'
+  );
+  h.assert('unsigned 15 > 2', session.getWire(interp, 'gtU'), '1');
+  h.assert('signed -1 not > 2', session.getWire(interp, 'gtS'), '0');
+});
+
+reg(1784, 'builtin-signed', 'LT — signed negative less than positive', function(h, session) {
+  const interp = session.runArith(
+    '4wire neg = 1111\n' +
+    '4wire pos = 0010\n' +
+    '1wire ltS = LT(neg, pos; signed)'
+  );
+  h.assert('-1 < 2', session.getWire(interp, 'ltS'), '1');
+});
+
+reg(1785, 'builtin-signed', 'SUBTRACT — signed overflow flag', function(h, session) {
+  const interp = session.runArith(
+    '4wire a = 1000\n' +
+    '4wire b = 0001\n' +
+    '4wire r, 1wire ovf = SUBTRACT(a, b; signed)'
+  );
+  h.assert('result wraps', session.getWire(interp, 'r'), '0111');
+  h.assert('signed overflow', session.getWire(interp, 'ovf'), '1');
+});
+
+reg(1786, 'builtin-signed', 'MIN / MAX — signed ordering', function(h, session) {
+  const interp = session.runArith(
+    '4wire neg = 1111\n' +
+    '4wire pos = 0010\n' +
+    '4wire lo = MIN(neg, pos; signed)\n' +
+    '4wire hi = MAX(neg, pos; signed)'
+  );
+  h.assert('min -1', session.getWire(interp, 'lo'), '1111');
+  h.assert('max 2', session.getWire(interp, 'hi'), '0010');
+});
+
+reg(1787, 'builtin-signed', 'CLAMP — signed vs unsigned on 1111', function(h, session) {
+  const interp = session.runArith(
+    '4wire x = 1111\n' +
+    '4wire lo = 0000\n' +
+    '4wire hi = 0010\n' +
+    '4wire yU = CLAMP(x, lo, hi)\n' +
+    '4wire yS = CLAMP(x, lo, hi; signed)'
+  );
+  h.assert('unsigned 15 clamps to 2', session.getWire(interp, 'yU'), '0010');
+  h.assert('signed -1 clamps to 0', session.getWire(interp, 'yS'), '0000');
+});
+
+reg(1788, 'builtin-signed', 'OR — rejects call tags', function(h, session) {
+  const r = session.run('4wire a = 0001\n4wire b = 0000\n4wire c = OR(a, b; signed)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('no tags on OR', String(err.includes('does not accept call tags')), 'true');
+});
+
+reg(1789, 'builtin-signed', 'ADD — unknown tag error', function(h, session) {
+  const r = session.run('4wire a = 0001\n4wire b = 0010\n4wire r, 1wire f = ADD(a, b; foo=1)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('unknown tag', String(err.includes("unknown tag 'foo'")), 'true');
+});
+
+reg(1790, 'builtin-signed', 'ADD unsigned — no tag regression', function(h, session) {
+  const interp = session.runArith(
+    '4wire idx2 = 1111\n' +
+    '4wire inc2 = 0001\n' +
+    '4wire nextIdx2, 1wire carry2 = ADD(idx2, inc2)'
+  );
+  h.assert('wrap result', session.getWire(interp, 'nextIdx2'), '0000');
+  h.assert('unsigned carry', session.getWire(interp, 'carry2'), '1');
+});
+
+reg(1791, 'builtin-signed', 'MULTIPLY — signed vs unsigned on 1111×1111', function(h, session) {
+  const interp = session.runArith(
+    '4wire a = 1111\n' +
+    '4wire b = 1111\n' +
+    '4wire rU, 4wire oU = MULTIPLY(a, b)\n' +
+    '4wire rS, 4wire oS = MULTIPLY(a, b; signed)'
+  );
+  h.assert('unsigned result', session.getWire(interp, 'rU'), '0001');
+  h.assert('unsigned over', session.getWire(interp, 'oU'), '1110');
+  h.assert('signed result', session.getWire(interp, 'rS'), '0001');
+  h.assert('signed over', session.getWire(interp, 'oS'), '0000');
+});
+
+reg(1792, 'builtin-signed', 'MAC — signed accumulate', function(h, session) {
+  const interp = session.runArith(
+    '4wire acc = 1000\n' +
+    '4wire a = 0010\n' +
+    '4wire b = 0001\n' +
+    '4wire r, 5wire over = MAC(acc, a, b; signed)'
+  );
+  h.assert('result -6 low', session.getWire(interp, 'r'), '1010');
+  h.assert('over sign ext', session.getWire(interp, 'over'), '11111');
+});
+
+reg(1793, 'builtin-signed', 'RSHIFT — logical vs arithmetic', function(h, session) {
+  const interp = session.runArith(
+    '4wire neg = 1111\n' +
+    '4wire pos = 0111\n' +
+    '4wire log = RSHIFT(neg, 1)\n' +
+    '4wire arithNeg = RSHIFT(neg, 1 ; signed)\n' +
+    '4wire arithPos = RSHIFT(pos, 1; signed)'
+  );
+  h.assert('logical 1111>>1', session.getWire(interp, 'log'), '0111');
+  h.assert('arith -1 stays', session.getWire(interp, 'arithNeg'), '1111');
+  h.assert('arith 7 to 3', session.getWire(interp, 'arithPos'), '0011');
+});
+
+reg(1794, 'builtin-signed', 'RSHIFT signed — ignores fill arg', function(h, session) {
+  const interp = session.runArith(
+    '4wire x = 1111\n' +
+    '4wire y = RSHIFT(x, 1, 0; signed)'
+  );
+  h.assert('MSB fill not zero', session.getWire(interp, 'y'), '1111');
+});
+
+reg(1795, 'builtin-signed', 'LSHIFT — rejects call tags', function(h, session) {
+  const r = session.run('4wire x = 1010\n5wire y = LSHIFT(x, 1; signed)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('no signed on LSHIFT', String(err.includes('does not accept call tags')), 'true');
+});
+
+reg(1796, 'builtin-signed', 'MULTIPLY unsigned — regression', function(h, session) {
+  const interp = session.runArith(
+    '4wire a = 0010\n' +
+    '4wire b = 0011\n' +
+    '4wire r, 4wire o = MULTIPLY(a, b)'
+  );
+  h.assert('2*3=6', session.getWire(interp, 'r'), '0110');
+  h.assert('no over', session.getWire(interp, 'o'), '0000');
 });
 
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {

@@ -601,6 +601,8 @@ DIVIDE(Xbit a, Xbit b)   -> Xbit result, Xbit mod
 MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 \`\`\`
 
+**Signed overload** (two's complement on width \`W\`, MSB = sign): append \`; signed\` after the argument list on \`ADD\`, \`SUBTRACT\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, and \`CLAMP\`. Without the tag, behaviour stays **unsigned** (fully compatible with existing scripts). See [Signed arithmetic (\`; signed\`)](#signed-arithmetic-signed) below.
+
 
 ---
 
@@ -941,6 +943,82 @@ show(y)
 
 ---
 
+## Signed arithmetic (\`; signed\`)
+
+Several arithmetic built-ins accept an optional **bool tag** \`signed\` after \`;\` in the call. Operands are interpreted as **two's complement** on their bit width \`W\` (MSB = sign). **Without** \`; signed\`, behaviour is unchanged (unsigned).
+
+| Built-in | Unsigned (default) | With \`; signed\` |
+|----------|-------------------|-----------------|
+| \`ADD\` | \`result\`, **carry** | same \`result\` bits, **overflow** (signed) |
+| \`SUBTRACT\` | \`result\`, **carry** (borrow) | same \`result\` bits, **overflow** (signed) |
+| \`GT\` / \`LT\` | unsigned numeric order | signed numeric order |
+| \`MIN\` / \`MAX\` | unsigned min/max | signed min/max |
+| \`CLAMP\` | unsigned bounds | signed bounds |
+
+\`MULTIPLY\`, \`MAC\`, \`DIVIDE\`, shifts, and rotates do **not** support \`; signed\` in this release.
+
+### ADD / SUBTRACT signed
+
+\`\`\`
+ADD(Xbit a, Xbit b; signed)      -> Xbit result, 1bit overflow
+SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
+\`\`\`
+
+The **result bit pattern** is identical to the unsigned call; only the second return changes meaning (signed overflow instead of unsigned carry/borrow).
+
+\`\`\`logts-play
+4wire acc = 0111
+4wire delta = 0001
+4wire nextU, 1wire carry = ADD(acc, delta)
+4wire nextS, 1wire ovf = ADD(acc, delta; signed)
+show(nextU)
+show(carry)
+show(nextS)
+show(ovf)
+\`\`\`
+
+\`7 + 1\` on 4 bits: \`result = 1000\`, unsigned **carry** \`0\`, signed **overflow** \`1\` (exceeds \`+7\`).
+
+### GT / LT signed
+
+\`\`\`logts-play
+4wire a = 1111
+4wire b = 0010
+1wire gtU = GT(a, b)
+1wire gtS = GT(a, b; signed)
+show(gtU)
+show(gtS)
+\`\`\`
+
+Unsigned: \`1111\` = 15 → \`gtU = 1\`. Signed: \`1111\` = −1 → \`gtS = 0\`.
+
+### MIN / MAX / CLAMP signed
+
+Bounds and operands use the same signed interpretation at \`len(x)\` (with \`min\`/\`max\` zero-extended for \`CLAMP\`).
+
+\`\`\`logts-play
+4wire neg = 1111
+4wire pos = 0010
+4wire lo = MIN(neg, pos; signed)
+4wire hi = MAX(neg, pos; signed)
+show(lo)
+show(hi)
+\`\`\`
+
+\`\`\`logts-play
+4wire x = 1111
+4wire lo = 0000
+4wire hi = 0010
+4wire yU = CLAMP(x, lo, hi)
+4wire yS = CLAMP(x, lo, hi; signed)
+show(yU)
+show(yS)
+\`\`\`
+
+Unsigned: \`1111\` = 15 → clamped to \`0010\`. Signed: \`1111\` = −1 → clamped to \`0000\`.
+
+---
+
 ## Comparison with component equivalents
 
 These built-in functions are **combinational** — they produce their result immediately when evaluated, without state or clock:
@@ -964,9 +1042,11 @@ For **digit packing** (decimal / hex), see [number-conversion.md](number-convers
 \`\`\`
 doc(ADD)
 # ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
+# ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
 
 doc(SUBTRACT)
 # SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
+# SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
 
 doc(MULTIPLY)
 # MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
@@ -3038,7 +3118,7 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Logic gates** | \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, \`EQ\` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) |
 | **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
-| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) |
+| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` (+ optional \`; signed\` on the first seven) | [arithmetic.md](arithmetic.md) |
 | **Vector reduction** | \`SUM\`, \`DOT\` | [vector-reduction.md](vector-reduction.md) · summary in [arithmetic.md](arithmetic.md#sum--dot-vector-reduction) |
 | **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
