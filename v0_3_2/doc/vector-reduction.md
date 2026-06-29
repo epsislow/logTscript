@@ -30,6 +30,8 @@ With **`; vector`**, operands are combined **per index** and the result is a **v
 | `SUM(vectorA, vectorB; vector)` | Per index sum → `Wbit[n]` + `Wbit[n] over` |
 | `MIN(vectorA, 0001; vector)` | Per index min → `Wbit[n]` |
 | `MAX(vectorA, vectorB; signed vector)` | Per index max (signed) → `Wbit[n]` |
+| `GT(vectorA, vectorB; vector)` | Per index compare → `1wire[n]` |
+| `EQ(vectorA, vectorB; vector)` | Per index bitwise equal → `1wire[n]` |
 
 `signed` and `vector` may appear in any order (`; signed vector` ≡ `; vector signed`).
 

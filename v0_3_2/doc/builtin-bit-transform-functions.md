@@ -13,7 +13,10 @@ Logical shift left — appends `n` fill bits on the right; **width increases**.
 ```
 LSHIFT(Xbit data, Nbit n) -> Xbit
 LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
+LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]
 ```
+
+With **`; vector`**, shift each element left; assign `(W+n)wire[n]` when count is scalar `n` (broadcast). Shift count must be scalar in vector mode.
 
 - `data` — value to shift
 - `n` — positions (binary)
@@ -38,7 +41,10 @@ Logical shift right — same width; MSBs filled with `fill`.
 ```
 RSHIFT(Xbit data, Nbit n) -> Xbit
 RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
+RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 ```
+
+With **`; vector`**, shift right per index; `count` may be scalar (broadcast) or `Kbit[n]`. Combinable with **`; signed`** (ASHR per element).
 
 ### Runnable example
 
@@ -81,7 +87,10 @@ Reverses bit order (MSB ↔ LSB).
 
 ```
 REVERSE(Xbit value) -> Xbit
+REVERSE(Wbit[n] data ; vector) -> Wbit[n]
 ```
+
+With **`; vector`**, reverse bits **per element** (unary — one whole vector argument).
 
 ### Examples
 
@@ -106,6 +115,7 @@ Circular rotate left — width unchanged; `count` is taken modulo width.
 
 ```
 LROTATE(Xbit data, Ybit count) -> Xbit
+LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 ```
 
 ### Examples
@@ -132,6 +142,7 @@ Circular rotate right — width unchanged; `count` modulo width.
 
 ```
 RROTATE(Xbit data, Ybit count) -> Xbit
+RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 ```
 
 ### Runnable example

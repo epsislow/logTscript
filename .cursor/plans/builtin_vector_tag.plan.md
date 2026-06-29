@@ -421,14 +421,39 @@ DIVIDE(Wbit a, Wbit b ; signed) -> Wbit, Wbit
 
 ---
 
-## Faza 4+ (recomandări, neimplementat)
+## Faza 4 — GT / LT / EQ / shift / rotate / REVERSE cu `; vector`
+
+> Plan detaliat: [faza_4_vector_tag.plan.md](faza_4_vector_tag.plan.md)
+
+Extinde `BUILTIN_VECTOR_TAG_FUNCS` cu **GT, LT, EQ, RSHIFT, LSHIFT, LROTATE, RROTATE, REVERSE**.
+
+| Funcție | Rezultat vector | `; signed` |
+|---------|-----------------|------------|
+| GT / LT | `1wire[n]` | DA (combinabil cu `; vector`) |
+| EQ | `1wire[n]` (bitwise) | NU |
+| RSHIFT | `Wbit[n]` | DA (ASHR per element) |
+| LSHIFT | `(W+n)bit[n]` | NU |
+| LROTATE / RROTATE | `Wbit[n]` | NU |
+| REVERSE | `Wbit[n]` (unar) | NU |
+
+Teste **1834–1852** livrate. LT are deja `; signed` scalar; Faza 4 adaugă `; vector signed`.
+
+---
+
+## Faza 5+ (recomandări, neimplementat)
 
 1. **Operanzi slice** cu `; vector` (`vectorA:0` ca operand sau broadcast parțial).
 2. **Integrare** cu [user_def_tag_overloads.plan.md](user_def_tag_overloads.plan.md) pentru funcții user cu `; vector`.
 3. **Optimizare wave** — propagare per-element fără re-evaluare completă a vectorului.
-4. **GT / LT / RSHIFT** element-wise cu `; vector` (dacă cerință).
+4. EQ variadic (≥3 operanzi) cu `; vector`.
+5. Alte predicate (ANY, ZERO, …) element-wise.
 
 ---
+
+## Faza 4+ (înlocuit de Faza 4 și Faza 5+ de mai sus)
+
+~~1. Operanzi slice…~~ → mutat în Faza 5+
+
 
 ## Efort estimativ (Faza 1)
 

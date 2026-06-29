@@ -12,7 +12,7 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 
 **Signed overload** (two's complement on width `W`, MSB = sign): append `; signed` after the argument list on `ADD`, `SUBTRACT`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP`, `MULTIPLY`, `MAC`, `SUM`, `DOT`, `DIVIDE`, and `RSHIFT`. Without the tag, behaviour stays **unsigned** / logical (fully compatible with existing scripts). See [Signed arithmetic (`; signed`)](#signed-arithmetic-signed) below.
 
-**Element-wise vectors:** `MULTIPLY`, `MAC`, and `DIVIDE` also accept **`; vector`** (combinable with `; signed`) — see [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector).
+**Element-wise vectors:** `MULTIPLY`, `MAC`, `DIVIDE`, `GT`, `LT`, and bit transforms (`RSHIFT`, `LSHIFT`, `LROTATE`, `RROTATE`, `REVERSE`) accept **`; vector`** — see [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector) and [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md).
 
 
 ---
@@ -291,9 +291,11 @@ Unsigned **numeric** ordering (not bitwise `EQ` — see [builtin-logic-gate-func
 ```
 GT(Xbit a, Xbit b) -> 1bit
 LT(Xbit a, Xbit b) -> 1bit
+GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
+LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
 ```
 
-Operands are padded to `max(len(a), len(b))` with leading `0`. `GT` → `1` if `a > b`; `LT` → `1` if `a < b`; equal → both `0`.
+With **`; vector`**, compare per index; result is **`1wire[n]`** (one flag bit per element). Combinable with **`; signed`**. Bitwise equality uses **`EQ`** — see [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md).
 
 ```logts-play
 4wire a = 0101

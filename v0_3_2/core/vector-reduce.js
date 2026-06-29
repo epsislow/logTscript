@@ -456,6 +456,207 @@
     return { resultBlob: results.join(''), modBlob: mods.join('') };
   }
 
+  function requireVectorTaggedUnaryOperand(args, getWire, fnName) {
+    if (!args || args.length !== 1) {
+      throw new Error(`${fnName}: expects 1 argument`);
+    }
+    const info = classifyVectorTaggedOperands(args, getWire);
+    if (!info.hasWholeVector) {
+      throw new Error(`${fnName}: remove '; vector' — no argument is a whole vector`);
+    }
+    if (!info.meta) {
+      throw new Error(`${fnName}: internal error (vector meta missing)`);
+    }
+    return { classified: info.classified, meta: info.meta };
+  }
+
+  function requireVectorTaggedSameCount(args, getWire, fnName, minArgs, maxArgs) {
+    if (!args || args.length < minArgs || args.length > maxArgs) {
+      const range = minArgs === maxArgs ? String(minArgs) : `${minArgs} to ${maxArgs}`;
+      throw new Error(`${fnName}: expects ${range} arguments`);
+    }
+    const info = classifyVectorTaggedOperands(args, getWire);
+    if (!info.hasWholeVector) {
+      throw new Error(`${fnName}: remove '; vector' — no argument is a whole vector`);
+    }
+    let elementCount = null;
+    for (const c of info.classified) {
+      if (!c.wholeVector) continue;
+      const m = getWholeVectorMeta(args[c.argIndex], getWire);
+      if (elementCount == null) elementCount = m.elementCount;
+      else if (elementCount !== m.elementCount) {
+        throw new Error(`${fnName}: vector arguments must have the same element count`);
+      }
+    }
+    if (elementCount == null) {
+      throw new Error(`${fnName}: internal error (vector meta missing)`);
+    }
+    return { classified: info.classified, elementCount };
+  }
+
+  function resolveValueAtIndex(args, classified, argIndex, index, evalFns) {
+    const c = classified[argIndex];
+    if (c.wholeVector) {
+      const atom = args[argIndex][0];
+      return evalFns.evalElement(atom.var, index);
+    }
+    return evalFns.evalScalar(args[argIndex]);
+  }
+
+  function parseShiftCount(countVal) {
+    return Math.max(0, parseInt(String(countVal), 2) || 0);
+  }
+
+  function logicalLshift(data, n, fill) {
+    const fillBit = fill == null || fill === '' ? '0' : String(fill)[0];
+    const amount = Math.max(0, parseInt(String(n), 2) || 0);
+    return String(data) + fillBit.repeat(amount);
+  }
+
+  function logicalRshift(data, n, fill) {
+    const d = String(data);
+    const len = d.length;
+    const fillBit = fill == null || fill === '' ? '0' : String(fill)[0];
+    const amount = Math.max(0, parseInt(String(n), 2) || 0);
+    if (amount >= len) return fillBit.repeat(len);
+    return fillBit.repeat(amount) + d.slice(0, len - amount);
+  }
+
+  function rotateLeft(data, count) {
+    const d = String(data);
+    const len = d.length;
+    if (len === 0) return '';
+    const n = parseInt(String(count), 2) % len;
+    return d.slice(n) + d.slice(0, n);
+  }
+
+  function rotateRight(data, count) {
+    const d = String(data);
+    const len = d.length;
+    if (len === 0) return '';
+    const n = parseInt(String(count), 2) % len;
+    return d.slice(len - n) + d.slice(0, len - n);
+  }
+
+  function reverseBitsString(data) {
+    return String(data).split('').reverse().join('');
+  }
+
+  function resolveDataWidth(args, classified, evalFns) {
+    if (classified[0].wholeVector) {
+      const atom = args[0][0];
+      const sample = evalFns.evalElement(atom.var, 0);
+      return String(sample).length;
+    }
+    const scalar = String(evalFns.evalScalar(args[0]));
+    return scalar.length;
+  }
+
+  function compareVectorTagged(args, getWire, fnName, op, signed, evalFns, compareFns) {
+    if (args.length !== 2) {
+      throw new Error(`${fnName}: expects 2 arguments`);
+    }
+    const { classified, meta } = requireVectorTaggedOperands(args, getWire, fnName);
+    const W = meta.elementWidth;
+    const N = meta.elementCount;
+    const bits = [];
+    for (let i = 0; i < N; i++) {
+      const vals = elementValuesAtIndex(
+        args, classified, i, evalFns.evalElement, evalFns.evalScalar
+      );
+      requireValuesElementWidth(vals, W, fnName);
+      const a = String(vals[0]).padStart(W, '0');
+      const b = String(vals[1]).padStart(W, '0');
+      if (op === 'EQ') {
+        bits.push(a === b ? '1' : '0');
+      } else {
+        const cmp = signed && compareFns.signed
+          ? compareFns.signed(a, b)
+          : compareFns.unsigned(a, b);
+        if (op === 'GT') bits.push(cmp > 0 ? '1' : '0');
+        else if (op === 'LT') bits.push(cmp < 0 ? '1' : '0');
+      }
+    }
+    return bits.join('');
+  }
+
+  function shiftVectorTagged(args, getWire, fnName, op, signed, evalFns, shiftFns) {
+    const { classified, elementCount } = requireVectorTaggedSameCount(
+      args, getWire, fnName, 2, 3
+    );
+    const N = elementCount;
+    const W = resolveDataWidth(args, classified, evalFns);
+    if (op === 'LSHIFT' && classified[1].wholeVector) {
+      throw new Error(`${fnName}: with '; vector', shift count must be a scalar (broadcast)`);
+    }
+    const scalarCount = !classified[1].wholeVector
+      ? parseShiftCount(evalFns.evalScalar(args[1]))
+      : null;
+    const fill = args.length === 3
+      ? String(evalFns.evalScalar(args[2]))[0] || '0'
+      : '0';
+    const results = [];
+    for (let i = 0; i < N; i++) {
+      const dataVal = String(resolveValueAtIndex(args, classified, 0, i, evalFns)).padStart(W, '0');
+      if (dataVal.length !== W) {
+        throw new Error(`${fnName}: ${SHAPE_ERR}`);
+      }
+      const countVal = classified[1].wholeVector
+        ? resolveValueAtIndex(args, classified, 1, i, evalFns)
+        : args[1];
+      const n = classified[1].wholeVector
+        ? parseShiftCount(countVal)
+        : scalarCount;
+      let out;
+      if (op === 'LSHIFT') {
+        out = shiftFns.lshift(dataVal, n, fill);
+      } else if (signed && shiftFns.arithmeticRshift) {
+        out = shiftFns.arithmeticRshift(dataVal, n);
+      } else {
+        out = shiftFns.rshift(dataVal, n, fill);
+      }
+      results.push(out);
+    }
+    return results.join('');
+  }
+
+  function rotateVectorTagged(args, getWire, fnName, op, evalFns) {
+    const { classified, elementCount } = requireVectorTaggedSameCount(
+      args, getWire, fnName, 2, 2
+    );
+    const N = elementCount;
+    const W = resolveDataWidth(args, classified, evalFns);
+    const results = [];
+    for (let i = 0; i < N; i++) {
+      const dataVal = String(resolveValueAtIndex(args, classified, 0, i, evalFns)).padStart(W, '0');
+      if (dataVal.length !== W) {
+        throw new Error(`${fnName}: ${SHAPE_ERR}`);
+      }
+      const countVal = resolveValueAtIndex(args, classified, 1, i, evalFns);
+      const out = op === 'LROTATE'
+        ? rotateLeft(dataVal, countVal)
+        : rotateRight(dataVal, countVal);
+      results.push(out);
+    }
+    return results.join('');
+  }
+
+  function reverseVectorTagged(args, getWire, fnName, evalFns) {
+    const { meta } = requireVectorTaggedUnaryOperand(args, getWire, fnName);
+    const W = meta.elementWidth;
+    const N = meta.elementCount;
+    const atom = args[0][0];
+    const results = [];
+    for (let i = 0; i < N; i++) {
+      const dataVal = String(evalFns.evalElement(atom.var, i)).padStart(W, '0');
+      if (dataVal.length !== W) {
+        throw new Error(`${fnName}: ${SHAPE_ERR}`);
+      }
+      results.push(reverseBitsString(dataVal));
+    }
+    return results.join('');
+  }
+
   const api = {
     unsignedBinToBigInt,
     isReductionWireAtom,
@@ -482,6 +683,17 @@
     multiplyVectorTagged,
     macVectorTagged,
     divideVectorTagged,
+    requireVectorTaggedUnaryOperand,
+    requireVectorTaggedSameCount,
+    logicalLshift,
+    logicalRshift,
+    rotateLeft,
+    rotateRight,
+    reverseBitsString,
+    compareVectorTagged,
+    shiftVectorTagged,
+    rotateVectorTagged,
+    reverseVectorTagged,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

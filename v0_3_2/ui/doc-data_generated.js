@@ -603,7 +603,7 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 
 **Signed overload** (two's complement on width \`W\`, MSB = sign): append \`; signed\` after the argument list on \`ADD\`, \`SUBTRACT\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\`, \`MULTIPLY\`, \`MAC\`, \`SUM\`, \`DOT\`, \`DIVIDE\`, and \`RSHIFT\`. Without the tag, behaviour stays **unsigned** / logical (fully compatible with existing scripts). See [Signed arithmetic (\`; signed\`)](#signed-arithmetic-signed) below.
 
-**Element-wise vectors:** \`MULTIPLY\`, \`MAC\`, and \`DIVIDE\` also accept **\`; vector\`** (combinable with \`; signed\`) — see [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector).
+**Element-wise vectors:** \`MULTIPLY\`, \`MAC\`, \`DIVIDE\`, \`GT\`, \`LT\`, and bit transforms (\`RSHIFT\`, \`LSHIFT\`, \`LROTATE\`, \`RROTATE\`, \`REVERSE\`) accept **\`; vector\`** — see [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector) and [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md).
 
 
 ---
@@ -882,9 +882,11 @@ Unsigned **numeric** ordering (not bitwise \`EQ\` — see [builtin-logic-gate-fu
 \`\`\`
 GT(Xbit a, Xbit b) -> 1bit
 LT(Xbit a, Xbit b) -> 1bit
+GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
+LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
 \`\`\`
 
-Operands are padded to \`max(len(a), len(b))\` with leading \`0\`. \`GT\` → \`1\` if \`a > b\`; \`LT\` → \`1\` if \`a < b\`; equal → both \`0\`.
+With **\`; vector\`**, compare per index; result is **\`1wire[n]\`** (one flag bit per element). Combinable with **\`; signed\`**. Bitwise equality uses **\`EQ\`** — see [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md).
 
 \`\`\`logts-play
 4wire a = 0101
@@ -3056,7 +3058,10 @@ Logical shift left — appends \`n\` fill bits on the right; **width increases**
 \`\`\`
 LSHIFT(Xbit data, Nbit n) -> Xbit
 LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
+LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]
 \`\`\`
+
+With **\`; vector\`**, shift each element left; assign \`(W+n)wire[n]\` when count is scalar \`n\` (broadcast). Shift count must be scalar in vector mode.
 
 - \`data\` — value to shift
 - \`n\` — positions (binary)
@@ -3081,7 +3086,10 @@ Logical shift right — same width; MSBs filled with \`fill\`.
 \`\`\`
 RSHIFT(Xbit data, Nbit n) -> Xbit
 RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
+RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 \`\`\`
+
+With **\`; vector\`**, shift right per index; \`count\` may be scalar (broadcast) or \`Kbit[n]\`. Combinable with **\`; signed\`** (ASHR per element).
 
 ### Runnable example
 
@@ -3124,7 +3132,10 @@ Reverses bit order (MSB ↔ LSB).
 
 \`\`\`
 REVERSE(Xbit value) -> Xbit
+REVERSE(Wbit[n] data ; vector) -> Wbit[n]
 \`\`\`
+
+With **\`; vector\`**, reverse bits **per element** (unary — one whole vector argument).
 
 ### Examples
 
@@ -3149,6 +3160,7 @@ Circular rotate left — width unchanged; \`count\` is taken modulo width.
 
 \`\`\`
 LROTATE(Xbit data, Ybit count) -> Xbit
+LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 \`\`\`
 
 ### Examples
@@ -3175,6 +3187,7 @@ Circular rotate right — width unchanged; \`count\` modulo width.
 
 \`\`\`
 RROTATE(Xbit data, Ybit count) -> Xbit
+RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 \`\`\`
 
 ### Runnable example
@@ -17084,6 +17097,8 @@ With **\`; vector\`**, operands are combined **per index** and the result is a *
 | \`SUM(vectorA, vectorB; vector)\` | Per index sum → \`Wbit[n]\` + \`Wbit[n] over\` |
 | \`MIN(vectorA, 0001; vector)\` | Per index min → \`Wbit[n]\` |
 | \`MAX(vectorA, vectorB; signed vector)\` | Per index max (signed) → \`Wbit[n]\` |
+| \`GT(vectorA, vectorB; vector)\` | Per index compare → \`1wire[n]\` |
+| \`EQ(vectorA, vectorB; vector)\` | Per index bitwise equal → \`1wire[n]\` |
 
 \`signed\` and \`vector\` may appear in any order (\`; signed vector\` ≡ \`; vector signed\`).
 

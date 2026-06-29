@@ -2745,10 +2745,11 @@ reg(305, 'doc', 'BUILTIN_DOC — OR has 2 signatures', function(h, session) {
   h.assert('OR signature 2', lines[1], 'OR(Xbit, Xbit) -> Xbit');
 });
 
-reg(306, 'doc', 'BUILTIN_DOC — EQ are 1 signature', function(h, session) {
+reg(306, 'doc', 'BUILTIN_DOC — EQ signatures', function(h, session) {
   const lines = Interpreter.getDocLines('EQ', new Map());
-  h.assert('EQ 1 signature', String(lines.length), '1');
+  h.assert('EQ 2 signatures', String(lines.length), '2');
   h.assert('EQ signature', lines[0], 'EQ(Xbit, Xbit) -> 1bit');
+  h.assert('EQ vector', lines[1], 'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
 });
 
 reg(307, 'doc', 'BUILTIN_DOC — MUX', function(h, session) {
@@ -2780,17 +2781,19 @@ reg(311, 'doc', 'BUILTIN_DOC — REG has single row', function(h, session) {
   h.assert('REG 1 row', String(lines.length), '1');
 });
 
-reg(312, 'doc', 'BUILTIN_DOC — LSHIFT has 2 signatures', function(h, session) {
+reg(312, 'doc', 'BUILTIN_DOC — LSHIFT signatures', function(h, session) {
   const lines = Interpreter.getDocLines('LSHIFT', new Map());
-  h.assert('LSHIFT 2 signatures', String(lines.length), '2');
+  h.assert('LSHIFT 3 signatures', String(lines.length), '3');
   h.assert('LSHIFT signature 1', lines[0], 'LSHIFT(Xbit data, Nbit n) -> Xbit');
   h.assert('LSHIFT signature 2', lines[1], 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit');
+  h.assert('LSHIFT vector', lines[2], 'LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]');
 });
 
-reg(313, 'doc', 'BUILTIN_DOC — RSHIFT has 3 signatures', function(h, session) {
+reg(313, 'doc', 'BUILTIN_DOC — RSHIFT signatures', function(h, session) {
   const lines = Interpreter.getDocLines('RSHIFT', new Map());
-  h.assert('RSHIFT 3 signatures', String(lines.length), '3');
+  h.assert('RSHIFT 5 signatures', String(lines.length), '5');
   h.assert('RSHIFT signed', lines[2], 'RSHIFT(Xbit data, Nbit n; signed) -> Xbit');
+  h.assert('RSHIFT vector', lines[3], 'RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]');
 });
 
 reg(314, 'doc', 'BUILTIN_DOC — LATCH', function(h, session) {
@@ -14155,10 +14158,10 @@ reg(1794, 'builtin-signed', 'RSHIFT signed — ignores fill arg', function(h, se
   h.assert('MSB fill not zero', session.getWire(interp, 'y'), '1111');
 });
 
-reg(1795, 'builtin-signed', 'LSHIFT — rejects call tags', function(h, session) {
+reg(1795, 'builtin-signed', 'LSHIFT — rejects signed tag', function(h, session) {
   const r = session.run('4wire x = 1010\n5wire y = LSHIFT(x, 1; signed)');
   const err = r.out.find(l => l.startsWith('Error:')) || '';
-  h.assert('no signed on LSHIFT', String(err.includes('does not accept call tags')), 'true');
+  h.assert('no signed on LSHIFT', String(err.includes("does not accept tag 'signed'")), 'true');
 });
 
 reg(1796, 'builtin-signed', 'MULTIPLY unsigned — regression', function(h, session) {
@@ -14533,6 +14536,185 @@ reg(1833, 'builtin-vector', 'doc(MULTIPLY/MAC/DIVIDE) vector signatures', functi
   h.assert('DIVIDE signed', divLines[1], 'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod');
   h.assert('MULTIPLY vector signed', mulLines[3], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]');
 });
+
+reg(1834, 'builtin-vector', 'GT(vectorA, vectorB; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0100 + 0010 + 0110\n' +
+    '4wire[3] vectorB = 0010 + 0011 + 0101\n' +
+    '1wire[3] flags = GT(vectorA, vectorB; vector)'
+  );
+  h.assert('gt per index', session.getWire(interp, 'flags'), '101');
+});
+
+reg(1835, 'builtin-vector', 'GT(vectorA, scalar; vector signed)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 1111 + 0010\n' +
+    '1wire[2] flags = GT(vectorA, 1111; vector signed)'
+  );
+  h.assert('2 > -1', session.getWire(interp, 'flags'), '01');
+});
+
+reg(1836, 'builtin-vector', 'LT(vectorA, vectorB; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0100 + 0010 + 0110\n' +
+    '4wire[3] vectorB = 0010 + 0011 + 0101\n' +
+    '1wire[3] flags = LT(vectorA, vectorB; vector)'
+  );
+  h.assert('lt per index', session.getWire(interp, 'flags'), '010');
+});
+
+reg(1837, 'builtin-vector', 'LT(vectorA, scalar; vector signed)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 1111 + 0010\n' +
+    '1wire[2] flags = LT(vectorA, 0010; vector signed)'
+  );
+  h.assert('-1 < 2', session.getWire(interp, 'flags'), '10');
+});
+
+reg(1838, 'builtin-vector', 'EQ(vectorA, vectorB; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vectorA = 0010 + 0101 + 1111\n' +
+    '4wire[3] vectorB = 0010 + 0100 + 1111\n' +
+    '1wire[3] flags = EQ(vectorA, vectorB; vector)'
+  );
+  h.assert('eq per index', session.getWire(interp, 'flags'), '101');
+});
+
+reg(1839, 'builtin-vector', 'EQ(vectorA, scalar; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vectorA = 0010 + 0010\n' +
+    '1wire[2] flags = EQ(vectorA, 0010; vector)'
+  );
+  h.assert('both equal', session.getWire(interp, 'flags'), '11');
+});
+
+reg(1840, 'builtin-vector', 'RSHIFT(vector; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vector = 1010 + 0100 + 0001\n' +
+    '4wire[3] out = RSHIFT(vector, 0001; vector)'
+  );
+  h.assert('rshift per element', session.getWire(interp, 'out'), '010100100000');
+});
+
+reg(1841, 'builtin-vector', 'RSHIFT(vector; vector signed) — ASHR', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vector = 1111 + 0111 + 0001\n' +
+    '4wire[3] out = RSHIFT(vector, 0001; vector signed)'
+  );
+  h.assert('ashr per element', session.getWire(interp, 'out'), '111100110000');
+});
+
+reg(1842, 'builtin-vector', 'LSHIFT(4wire[n]; vector) — (W+n)bit[n]', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] vector = 1011 + 0101 + 0001\n' +
+    '5wire[3] out = LSHIFT(vector, 0001; vector)'
+  );
+  h.assert('widened blob', session.getWire(interp, 'out'), '101100101000010');
+  h.assert('length 15', String(session.getWire(interp, 'out').length), '15');
+});
+
+reg(1843, 'builtin-vector', 'LROTATE / RROTATE(vector; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vector = 1011 + 0101\n' +
+    '4wire[2] l = LROTATE(vector, 0001; vector)\n' +
+    '4wire[2] r = RROTATE(vector, 0001; vector)'
+  );
+  h.assert('lrotate', session.getWire(interp, 'l'), '01111010');
+  h.assert('rrotate', session.getWire(interp, 'r'), '11011010');
+});
+
+reg(1844, 'builtin-vector', 'RROTATE(vector, countVec; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] data = 1011 + 0101 + 1100\n' +
+    '2wire[3] counts = 01 + 10 + 01\n' +
+    '4wire[3] out = RROTATE(data, counts; vector)'
+  );
+  h.assert('per-index count', session.getWire(interp, 'out'), '110101010110');
+});
+
+reg(1845, 'builtin-vector', 'REVERSE(vector; vector)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] vector = 0011 + 1100\n' +
+    '4wire[2] out = REVERSE(vector; vector)'
+  );
+  h.assert('reversed elements', session.getWire(interp, 'out'), '11000011');
+});
+
+reg(1846, 'builtin-vector', 'GT(a, b; vector) — no whole vector error', function(h, session) {
+  const r = session.run('4wire a = 0010\n4wire b = 0011\n1wire f = GT(a, b; vector)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('remove vector tag', String(err.includes("remove '; vector'")), 'true');
+});
+
+reg(1847, 'builtin-vector', 'EQ(a, b; vector) — no whole vector error', function(h, session) {
+  const r = session.run('4wire a = 0010\n4wire b = 0010\n1wire f = EQ(a, b; vector)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('remove vector tag', String(err.includes("remove '; vector'")), 'true');
+});
+
+reg(1848, 'builtin-vector', 'REVERSE(scalar; vector) — no whole vector error', function(h, session) {
+  const r = session.run('4wire x = 0011\n4wire y = REVERSE(x; vector)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('remove vector tag', String(err.includes("remove '; vector'")), 'true');
+});
+
+reg(1849, 'builtin-vector', 'GT/LT/EQ/shift/rotate/REVERSE scalar — no tag regression', function(h, session) {
+  const interp = session.runArith(
+    '4wire a = 0100\n' +
+    '4wire b = 0010\n' +
+    '4wire neg = 1111\n' +
+    '4wire pos = 0010\n' +
+    '1wire gt = GT(a, b)\n' +
+    '1wire lt = LT(b, a)\n' +
+    '1wire eq = EQ(a, a)\n' +
+    '1wire ltS = LT(neg, pos; signed)\n' +
+    '4wire rs = RSHIFT(a, 0001)\n' +
+    '5wire ls = LSHIFT(b, 0001)\n' +
+    '4wire lr = LROTATE(a, 0001)\n' +
+    '4wire rr = RROTATE(a, 0001)\n' +
+    '4wire rev = REVERSE(b)'
+  );
+  h.assert('gt', session.getWire(interp, 'gt'), '1');
+  h.assert('lt', session.getWire(interp, 'lt'), '1');
+  h.assert('eq', session.getWire(interp, 'eq'), '1');
+  h.assert('lt signed', session.getWire(interp, 'ltS'), '1');
+  h.assert('rshift', session.getWire(interp, 'rs'), '0010');
+  h.assert('lshift', session.getWire(interp, 'ls'), '00100');
+  h.assert('lrotate', session.getWire(interp, 'lr'), '1000');
+  h.assert('rrotate', session.getWire(interp, 'rr'), '0010');
+  h.assert('reverse', session.getWire(interp, 'rev'), '0100');
+});
+
+reg(1850, 'builtin-vector', 'doc(GT/LT/EQ/LSHIFT) vector signatures', function(h, session) {
+  const gtLines = Interpreter.getDocLines('GT', new Map());
+  const ltLines = Interpreter.getDocLines('LT', new Map());
+  const eqLines = Interpreter.getDocLines('EQ', new Map());
+  const lsLines = Interpreter.getDocLines('LSHIFT', new Map());
+  h.assert('GT vector', gtLines[2], 'GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
+  h.assert('LT vector signed', ltLines[3], 'LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]');
+  h.assert('EQ vector', eqLines[1], 'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
+  h.assert('LSHIFT vector', lsLines[2], 'LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]');
+});
+
+reg(1851, 'builtin-vector', 'GT(vector; vector) — wave mode', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] a = 0100 + 0010\n' +
+    '4wire[2] b = 0010 + 0011\n' +
+    '1wire[2] f = GT(a, b; vector)'
+  );
+  h.assert('f0', session.getWire(interp, 'f').slice(0, 1), '1');
+  h.assert('f1', session.getWire(interp, 'f').slice(1, 2), '0');
+}, { propagation: 'wave' });
+
+reg(1852, 'builtin-vector', 'EQ(vector; vector) — wave mode', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2] a = 0010 + 0101\n' +
+    '4wire[2] b = 0010 + 0100\n' +
+    '1wire[2] f = EQ(a, b; vector)'
+  );
+  h.assert('f0', session.getWire(interp, 'f').slice(0, 1), '1');
+  h.assert('f1', session.getWire(interp, 'f').slice(1, 2), '0');
+}, { propagation: 'wave' });
 
 reg(1616, 'keyboard', 'allowEnter — Enter accepted', function(h, session) {
   const { interp } = session.run(`comp [keyboard] .kbd:

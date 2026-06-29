@@ -4069,6 +4069,25 @@ const idx = parseInt(
       : { value: v, ref: null };
   }
 
+  // EQ element-wise vector (before logic-gate fold)
+  if (name === 'EQ' && vectorMode) {
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (!VR) fail('EQ: internal error (vector-reduce not loaded)');
+    const getWire = (n) => this.wires.get(n);
+    let blob;
+    try {
+      blob = VR.compareVectorTagged(
+        args, getWire, 'EQ', 'EQ', false, this._vectorTaggedEvalFns(),
+        { unsigned: unsignedCompareBigInt, signed: null }
+      );
+    } catch (e) {
+      fail(e.message);
+    }
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
   // AND/OR/XOR/NXOR/NAND/NOR: dual-mode
   if (['AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR', 'EQ'].includes(name)) {
     if (useIeeeGates) {
@@ -4405,6 +4424,27 @@ if (this.isBuiltinDEMUX(name)) {
     if (argValues.length < 2 || argValues.length > 3) {
       fail(`${name} expects 2 or 3 arguments`);
     }
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail(`${name}: internal error (vector-reduce not loaded)`);
+      const getWire = (n) => this.wires.get(n);
+      const shiftFns = {
+        lshift: VR.logicalLshift,
+        rshift: VR.logicalRshift,
+        arithmeticRshift: SA ? (data, n) => SA.arithmeticRshift(data, n) : null,
+      };
+      let blob;
+      try {
+        blob = VR.shiftVectorTagged(
+          args, getWire, name, name, signedMode, this._vectorTaggedEvalFns(), shiftFns
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     this._zstateRequireBinary(argValues.slice(0, argValues.length === 3 ? 3 : 2), name, ['data', 'count', 'fill']);
     const data = argValues[0];
     const n = parseInt(argValues[1], 2);
@@ -4542,6 +4582,22 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: BIT TRANSFORM (rotate / reverse) =================
   if (name === 'REVERSE') {
     if (argValues.length !== 1) fail('REVERSE expects 1 argument');
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail('REVERSE: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let blob;
+      try {
+        blob = VR.reverseVectorTagged(
+          args, getWire, 'REVERSE', this._vectorTaggedEvalFns()
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     const v = argValues[0].split('').reverse().join('');
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
@@ -4550,6 +4606,22 @@ if (this.isBuiltinDEMUX(name)) {
 
   if (name === 'LROTATE' || name === 'RROTATE') {
     if (argValues.length !== 2) fail(`${name} expects 2 arguments`);
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail(`${name}: internal error (vector-reduce not loaded)`);
+      const getWire = (n) => this.wires.get(n);
+      let blob;
+      try {
+        blob = VR.rotateVectorTagged(
+          args, getWire, name, name, this._vectorTaggedEvalFns()
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     this._zstateRequireBinary(argValues, name, ['data', 'count']);
     const data = argValues[0];
     const len = data.length;
@@ -4867,6 +4939,26 @@ if (this.isBuiltinDEMUX(name)) {
   // ================= BUILTIN: COMPARE / SELECT =================
   if (name === 'GT') {
     if (argValues.length !== 2) fail('GT expects 2 arguments');
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail('GT: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      const compareFns = {
+        unsigned: unsignedCompareBigInt,
+        signed: SA ? SA.signedCompareBigInt : null,
+      };
+      let blob;
+      try {
+        blob = VR.compareVectorTagged(
+          args, getWire, 'GT', 'GT', signedMode, this._vectorTaggedEvalFns(), compareFns
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     this._zstateRequireBinary(argValues, 'GT', ['a', 'b']);
     const cmp = signedMode && SA
       ? SA.signedCompareBigInt(argValues[0], argValues[1])
@@ -4879,6 +4971,26 @@ if (this.isBuiltinDEMUX(name)) {
 
   if (name === 'LT') {
     if (argValues.length !== 2) fail('LT expects 2 arguments');
+    const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    if (vectorMode) {
+      if (!VR) fail('LT: internal error (vector-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      const compareFns = {
+        unsigned: unsignedCompareBigInt,
+        signed: SA ? SA.signedCompareBigInt : null,
+      };
+      let blob;
+      try {
+        blob = VR.compareVectorTagged(
+          args, getWire, 'LT', 'LT', signedMode, this._vectorTaggedEvalFns(), compareFns
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     this._zstateRequireBinary(argValues, 'LT', ['a', 'b']);
     const cmp = signedMode && SA
       ? SA.signedCompareBigInt(argValues[0], argValues[1])
@@ -11657,13 +11769,22 @@ Interpreter.BUILTIN_DOC = {
   NXOR:  ['NXOR(Xbit) -> 1bit', 'NXOR(Xbit, Xbit) -> Xbit'],
   NAND:  ['NAND(Xbit) -> 1bit', 'NAND(Xbit, Xbit) -> Xbit'],
   NOR:   ['NOR(Xbit) -> 1bit',  'NOR(Xbit, Xbit) -> Xbit'],
-  EQ:    ['EQ(Xbit, Xbit) -> 1bit'],
+  EQ:    [
+    'EQ(Xbit, Xbit) -> 1bit',
+    'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]',
+  ],
   LATCH: ['LATCH(Xbit data, 1bit clock) -> Xbit'],
-  LSHIFT:['LSHIFT(Xbit data, Nbit n) -> Xbit', 'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit'],
+  LSHIFT:[
+    'LSHIFT(Xbit data, Nbit n) -> Xbit',
+    'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit',
+    'LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]',
+  ],
   RSHIFT:[
     'RSHIFT(Xbit data, Nbit n) -> Xbit',
     'RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit',
     'RSHIFT(Xbit data, Nbit n; signed) -> Xbit',
+    'RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]',
+    'RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector signed) -> Wbit[n]',
   ],
   REG:  ['REG(Xbit data, 1bit clock, 1bit clear) -> Xbit'],
   MUX:  ['MUX(Nbit sel, Xbit data0, Xbit data1, ..) -> Xbit'],
@@ -11717,10 +11838,14 @@ Interpreter.BUILTIN_DOC = {
   GT:       [
     'GT(Xbit a, Xbit b) -> 1bit',
     'GT(Xbit a, Xbit b; signed) -> 1bit',
+    'GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]',
+    'GT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]',
   ],
   LT:       [
     'LT(Xbit a, Xbit b) -> 1bit',
     'LT(Xbit a, Xbit b; signed) -> 1bit',
+    'LT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]',
+    'LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]',
   ],
   MIN:      [
     'MIN(Wbit ...) -> Wbit',
@@ -11751,9 +11876,18 @@ Interpreter.BUILTIN_DOC = {
   CNTONE:   ['CNTONE(Xbit) -> Ybit'],
   CNTZERO:  ['CNTZERO(Xbit) -> Ybit'],
   BITSIZE:  ['BITSIZE(Xbit) -> Ybit'],
-  REVERSE:  ['REVERSE(Xbit) -> Xbit'],
-  LROTATE:  ['LROTATE(Xbit data, Ybit count) -> Xbit'],
-  RROTATE:  ['RROTATE(Xbit data, Ybit count) -> Xbit'],
+  REVERSE:  [
+    'REVERSE(Xbit) -> Xbit',
+    'REVERSE(Wbit[n] data ; vector) -> Wbit[n]',
+  ],
+  LROTATE:  [
+    'LROTATE(Xbit data, Ybit count) -> Xbit',
+    'LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]',
+  ],
+  RROTATE:  [
+    'RROTATE(Xbit data, Ybit count) -> Xbit',
+    'RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]',
+  ],
   ZRELEASE: ['ZRELEASE(wireName) — release wire to high-Z (MODE ZSTATE statement)'],
   ZCONNECT: ['ZCONNECT(en, data) — enable-gated drive value (MODE ZSTATE); bus = ZCONNECT(en, data)'],
   ZCONN: ['ZCONNECT(en, data) — alias for ZCONNECT'],

@@ -12,6 +12,7 @@
   const BUILTIN_VECTOR_TAG_FUNCS = new Set([
     'MIN', 'MAX', 'SUM', 'ADD', 'SUBTRACT', 'CLAMP',
     'MULTIPLY', 'MAC', 'DIVIDE',
+    'GT', 'LT', 'EQ', 'RSHIFT', 'LSHIFT', 'LROTATE', 'RROTATE', 'REVERSE',
   ]);
 
   function signedBinToBigInt(binStr) {
