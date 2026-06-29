@@ -2,153 +2,42 @@
 
 Shift, rotate, and reverse operations on bit strings.
 
-Index: [builtin-functions.md](builtin-functions.md) · Short notation (`<`, `>`): [short-notation.md](short-notation.md)
+Index: [builtin-functions.md](builtin-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · Short notation (`<`, `>`): [short-notation.md](short-notation.md)
 
 ---
 
-## LSHIFT
+## Functions in this hub
 
-Logical shift left — appends `n` fill bits on the right; **width increases**.
-
-```
-LSHIFT(Xbit data, Nbit n) -> Xbit
-LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
-LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]
-```
-
-With **`; vector`**, shift each element left; assign `(W+n)wire[n]` when count is scalar `n` (broadcast). Shift count must be scalar in vector mode.
-
-- `data` — value to shift
-- `n` — positions (binary)
-- `fill` *(optional)* — fill bit (default `0`)
-
-### Runnable example
-
-```logts-play
-4wire x = 1011
-5wire y = LSHIFT(x, 1)
-show(y)
-```
-
-Sugar: `data < n` and `data < n w1` (see [short-notation.md](short-notation.md)).
+| Function | Page | Tags |
+|----------|------|------|
+| LSHIFT | [builtin-LSHIFT.md](builtin-LSHIFT.md) | `vector` |
+| RSHIFT | [builtin-RSHIFT.md](builtin-RSHIFT.md) | `signed`, `vector` |
+| LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | `vector` |
+| RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | `vector` |
+| REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | `vector` |
 
 ---
 
-## RSHIFT
+## Quick reference
 
-Logical shift right — same width; MSBs filled with `fill`.
+**LSHIFT** — logical left; width may grow (`(W+n)bit[n]` in vector mode). Optional third arg `fill` (default `0`). Sugar: `data < n`.
 
-```
-RSHIFT(Xbit data, Nbit n) -> Xbit
-RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
-RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
-```
+**RSHIFT** — logical right; same width; optional `fill`. With **`; signed`**, arithmetic shift (ASHR) — MSB replicated; see [alu.md](alu.md#arithmetic-shift-right-vs-logical-ashr--rshift). Sugar: `data > n`.
 
-With **`; vector`**, shift right per index; `count` may be scalar (broadcast) or `Kbit[n]`. Combinable with **`; signed`** (ASHR per element).
+**REVERSE** — MSB ↔ LSB within each operand.
 
-### Runnable example
+**LROTATE** / **RROTATE** — circular rotate; `count` taken modulo width.
 
-```logts-play
-4wire x = 1010
-4wire y = RSHIFT(x, 1)
-probe(y)
-```
-
-Sugar: `data > n` and `data > n w1`.
-
-### RSHIFT signed (ASHR)
-
-With `; signed`, shift **arithmetic** right: MSB (sign bit) is replicated instead of `fill`. Equivalent to `ASHR` in [alu.md](alu.md#arithmetic-shift-right-vs-logical-ashr--rshift). Optional `fill` is ignored when `signed` is set.
-
-```
-RSHIFT(Xbit data, Nbit n; signed) -> Xbit
-```
+Vector mode: per-element operation; shift/rotate **count** is usually a scalar broadcast (see each page). `RSHIFT` may use per-index `Kbit[n]` counts.
 
 ```logts-play
 4wire neg = 1111
-4wire pos = 0111
 4wire log = RSHIFT(neg, 1)
-4wire arithNeg = RSHIFT(neg, 1; signed)
-4wire arithPos = RSHIFT(pos, 1; signed)
+4wire arith = RSHIFT(neg, 1; signed)
 show(log)
-show(arithNeg)
-show(arithPos)
+show(arith)
 ```
 
-`1111` logical → `0111`; arithmetic → `1111` (still −1). `0111` (=7) arithmetic → `0011` (=3).
+`1111` logical → `0111`; arithmetic → `1111`.
 
-`LSHIFT` does **not** accept `; signed` (left shift is identical for signed/unsigned).
-
----
-
-## REVERSE
-
-Reverses bit order (MSB ↔ LSB).
-
-```
-REVERSE(Xbit value) -> Xbit
-REVERSE(Wbit[n] data ; vector) -> Wbit[n]
-```
-
-With **`; vector`**, reverse bits **per element** (unary — one whole vector argument).
-
-### Examples
-
-| Input | Result |
-|-------|--------|
-| `REVERSE(0011)` | `1100` |
-| `REVERSE(001)` | `100` |
-
-### Runnable example
-
-```logts-play
-4wire x = 0011
-4wire y = REVERSE(x)
-show(y)
-```
-
----
-
-## LROTATE
-
-Circular rotate left — width unchanged; `count` is taken modulo width.
-
-```
-LROTATE(Xbit data, Ybit count) -> Xbit
-LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
-```
-
-### Examples
-
-| Call | Result |
-|------|--------|
-| `LROTATE(1011, 1)` | `0111` |
-| `LROTATE(1011, 01)` | `0111` |
-| `LROTATE(1011, 10)` | `1110` |
-
-### Runnable example
-
-```logts-play
-4wire x = 1011
-4wire y = LROTATE(x, 10)
-probe(y)
-```
-
----
-
-## RROTATE
-
-Circular rotate right — width unchanged; `count` modulo width.
-
-```
-RROTATE(Xbit data, Ybit count) -> Xbit
-RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
-```
-
-### Runnable example
-
-```logts-play
-4wire x = 1011
-4wire y = RROTATE(x, 1)
-show(y)
-```
+Use `doc(LSHIFT)` … `doc(RROTATE)` for live signatures from `Interpreter.BUILTIN_DOC`.

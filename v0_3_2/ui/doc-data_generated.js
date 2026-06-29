@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-functions.md, builtin-logic-gate-functions.md, builtin-routing-functions.md, builtin-sequential-functions.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-functions.md, builtin-GT.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MIN.md, builtin-MULTIPLY.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -593,6 +593,8 @@ peek(.alu:zero)
 
 LogTscript provides built-in arithmetic functions that compute results **instantly**. Core four-ops return **two values** (result + carry/overflow/mod); \`MAC\` also returns two (\`result\` + \`over\`).
 
+Per-function reference (signatures, examples, tags): **[builtin-tagged-index.md](builtin-tagged-index.md)**.
+
 \`\`\`
 ADD(Xbit a, Xbit b)      -> Xbit result, 1bit carry
 SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
@@ -601,398 +603,62 @@ DIVIDE(Xbit a, Xbit b)   -> Xbit result, Xbit mod
 MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 \`\`\`
 
-**Signed overload** (two's complement on width \`W\`, MSB = sign): append \`; signed\` after the argument list on \`ADD\`, \`SUBTRACT\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\`, \`MULTIPLY\`, \`MAC\`, \`SUM\`, \`DOT\`, \`DIVIDE\`, and \`RSHIFT\`. Without the tag, behaviour stays **unsigned** / logical (fully compatible with existing scripts). See [Signed arithmetic (\`; signed\`)](#signed-arithmetic-signed) below.
+---
 
-**Element-wise vectors:** \`MULTIPLY\`, \`MAC\`, \`DIVIDE\`, \`GT\`, \`LT\`, and bit transforms (\`RSHIFT\`, \`LSHIFT\`, \`LROTATE\`, \`RROTATE\`, \`REVERSE\`) accept **\`; vector\`** — see [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector) and [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md).
+## Functions in this hub
 
+| Function | Page | Tags |
+|----------|------|------|
+| ADD | [builtin-ADD.md](builtin-ADD.md) | \`signed\`, \`vector\` |
+| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | \`signed\`, \`vector\` |
+| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | \`signed\`, \`vector\` |
+| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | \`signed\`, \`vector\` |
+| MAC | [builtin-MAC.md](builtin-MAC.md) | \`signed\`, \`vector\` |
+| GT | [builtin-GT.md](builtin-GT.md) | \`signed\`, \`vector\` |
+| LT | [builtin-LT.md](builtin-LT.md) | \`signed\`, \`vector\` |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | \`signed\`, \`vector\` |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | \`signed\`, \`vector\` |
+| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | \`signed\`, \`vector\` |
+
+Vector reduction (\`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\`): [vector-reduction.md](vector-reduction.md). Bitwise equality: [builtin-EQ.md](builtin-EQ.md).
 
 ---
 
 ## Syntax
 
-Since all four functions return **two values**, they must always be assigned to two variables:
+Since the core four-ops and \`MAC\` return **two values**, assign both:
 
 \`\`\`
 Nwire result, 1wire carry = ADD(a, b)
 Nwire result, 1wire carry = SUBTRACT(a, b)
 Nwire result, Nwire over  = MULTIPLY(a, b)
 Nwire result, Nwire mod   = DIVIDE(a, b)
+Nwire result, (N+1)wire over = MAC(acc, a, b)
 \`\`\`
 
-The bit width \`N\` of both inputs is \`max(len(a), len(b))\`. Short inputs are zero-padded on the left. The \`result\` output always has the same width \`N\`.
+Bit width \`N\` = \`max(len(a), len(b))\` for binary ops; short inputs are zero-padded on the left.
 
 ---
 
-## ADD
-
-**Binary addition with wrap-around.**
-
-\`\`\`
-ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
-ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
-\`\`\`
-
-- \`result\` = \`(a + b) mod 2^N\` (N-bit sum, wraps at overflow)
-- \`carry\` = \`1\` if \`a + b > 2^N - 1\`; \`0\` otherwise
-
-**Vector broadcast (no tag):** \`ADD(vectorA, scalar)\` or \`ADD(vectorA, vectorB)\` adds element-wise; result and flag are \`Wbit[n]\` blobs. Same with explicit **\`; vector\`** — see [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector).
-
-### Examples
-
-\`\`\`
-4wire idx = 0011
-4wire inc = 0001
-4wire nextIdx, 1wire carry = ADD(idx, inc)
-# nextIdx = 0100  (3 + 1 = 4)
-# carry   = 0
-\`\`\`
-
-\`\`\`
-4wire idx2 = 1111
-4wire inc2 = 0001
-4wire nextIdx2, 1wire carry2 = ADD(idx2, inc2)
-# nextIdx2 = 0000  (15 + 1 = 16 → wraps to 0)
-# carry2   = 1
-\`\`\`
-
-\`\`\`
-8wire a = 11111111
-8wire b = 00000001
-8wire r, 1wire c = ADD(a, b)
-# r = 00000000  (255 + 1 → wraps)
-# c = 1
-\`\`\`
-
-### Use cases
-
-- Incrementing a counter or pointer
-- Implementing ripple-carry adders in logic scripts
-- Building ALU-like circuits without using \`comp.adder\`
-
----
-
-## SUBTRACT
-
-**Binary subtraction with wrap-around (two's complement style).**
-
-\`\`\`
-SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
-SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
-\`\`\`
-
-- \`result\` = \`(a - b) mod 2^N\` (wraps on underflow)
-- \`carry\` = \`1\` if \`a < b\` (borrow occurred); \`0\` otherwise
-
-With **\`; vector\`**, subtraction is per index (at least one whole vector operand). Unlike \`ADD\`, there is no implicit vector broadcast without the tag.
-
-### Examples
-
-\`\`\`
-4wire idx = 0011
-4wire dec = 0001
-4wire prevIdx, 1wire carry = SUBTRACT(idx, dec)
-# prevIdx = 0010  (3 - 1 = 2)
-# carry   = 0
-\`\`\`
-
-\`\`\`
-4wire idx2 = 0000
-4wire dec2 = 0001
-4wire prevIdx2, 1wire carry2 = SUBTRACT(idx2, dec2)
-# prevIdx2 = 1111  (0 - 1 → wraps to 15)
-# carry2   = 1
-\`\`\`
-
-\`\`\`
-4wire a = 1010
-4wire b = 1010
-4wire r, 1wire c = SUBTRACT(a, b)
-# r = 0000  (10 - 10 = 0)
-# c = 0
-\`\`\`
-
-### Use cases
-
-- Decrementing a counter or pointer
-- Checking whether \`a >= b\` via the carry bit
-
----
-
-## MULTIPLY
-
-**Binary multiplication with overflow capture.**
-
-\`\`\`
-MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
-MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
-\`\`\`
-
-With **\`; vector\`**, multiply per index; \`over[i]\` holds the high **W** bits of the **2W**-bit product (same packing as scalar).
-
-- \`result\` = low \`N\` bits of \`a * b\`
-- \`over\` = high \`N\` bits of \`a * b\` (the overflow portion, shifted right by \`N\`)
-
-The full product is \`(over << N) | result\`.
-
-### Examples
-
-\`\`\`
-4wire a = 0010
-4wire b = 0011
-4wire result, 4wire over = MULTIPLY(a, b)
-# result = 0110  (2 * 3 = 6)
-# over   = 0000  (no overflow)
-\`\`\`
-
-\`\`\`
-4wire a2 = 1111
-4wire b2 = 1111
-4wire result2, 4wire over2 = MULTIPLY(a2, b2)
-# 15 * 15 = 225 = 0b11100001
-# result2 = 0001  (225 & 0xF  = low 4 bits)
-# over2   = 1110  (225 >> 4   = high 4 bits)
-\`\`\`
-
-\`\`\`
-4wire a3 = 1111
-4wire b3 = 0000
-4wire result3, 4wire over3 = MULTIPLY(a3, b3)
-# result3 = 0000
-# over3   = 0000
-\`\`\`
-
-### Use cases
-
-- Scaling values
-- Computing addresses (base + stride * index)
-- Detecting numeric overflow via the \`over\` output
-
----
-
-## DIVIDE
-
-**Binary integer division with remainder.**
-
-\`\`\`
-DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
-DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod
-DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
-\`\`\`
-
-Integer **quotient** and **remainder** only (no floating-point). With **\`; signed\`**, operands are two's complement. With **\`; vector\`**, divide per index. Divide-by-zero → \`0\` for both outputs (per element in vector mode).
-
-- \`result\` = integer quotient \`floor(a / b)\`, masked to \`N\` bits
-- \`mod\` = remainder \`a % b\`, masked to \`N\` bits
-- If \`b = 0\`, both \`result\` and \`mod\` are \`0\` (no error thrown)
-
-### Examples
-
-\`\`\`
-4wire a = 0110
-4wire b = 0010
-4wire result, 4wire mod = DIVIDE(a, b)
-# result = 0011  (6 / 2 = 3)
-# mod    = 0000  (6 % 2 = 0)
-\`\`\`
-
-\`\`\`
-4wire a2 = 0111
-4wire b2 = 0010
-4wire result2, 4wire mod2 = DIVIDE(a2, b2)
-# result2 = 0011  (7 / 2 = 3)
-# mod2    = 0001  (7 % 2 = 1)
-\`\`\`
-
-\`\`\`
-4wire a3 = 0001
-4wire b3 = 0011
-4wire result3, 4wire mod3 = DIVIDE(a3, b3)
-# result3 = 0000  (1 / 3 = 0)
-# mod3    = 0001  (1 % 3 = 1)
-\`\`\`
-
-\`\`\`
-4wire a4 = 0110
-4wire b4 = 0000
-4wire result4, 4wire mod4 = DIVIDE(a4, b4)
-# result4 = 0000  (division by zero → 0)
-# mod4    = 0000
-\`\`\`
-
-### Use cases
-
-- Computing modular indices (e.g. circular buffers)
-- Checking divisibility via the \`mod\` output
-- Fixed-point scaling
-
----
-
-## MAC (multiply-accumulate)
-
-Performs **\`acc + (a × b)\`** (unsigned). Mathematically equivalent to **\`ADD(acc, MULTIPLY(a, b))\`**; the runtime may fuse the steps.
-
-\`\`\`
-MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
-MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]
-\`\`\`
-
-With **\`; vector\`**, \`acc + a×b\` per index; \`over[i]\` is **(W+1)** bits (same as scalar MAC). Assign with e.g. \`4wire[n] r, 5wire[n] o\`.
-
-**All three operands must have the same bit width \`X\`.**
-
-| Output | Width | Description |
-|--------|-------|-------------|
-| \`result\` | \`X\` | Low \`X\` bits of \`acc + a*b\` |
-| \`over\` | \`X + 1\` | Upper bits (zero-padded) |
-
-Reconstruct the full integer by concatenating **\`over\` then \`result\`** (MSB → LSB).
-
-### Example
-
-\`\`\`logts-play
-8wire acc = 11111010
-8wire a = 00010100
-8wire b = 00010100
-8wire result, 9wire over = MAC(acc, a, b)
-show(result)
-show(over)
-\`\`\`
-
-Math: \`250 + 20×20 = 650\` → \`result = 10001010\`, \`over = 000000010\`.
-
-Digit accumulator when the value fits in \`X\` bits (\`over\` all zeros):
-
-\`\`\`logts-play
-8wire acc = 00001100
-8wire digit = 00000101
-8wire ten = 00001010
-8wire low, 9wire hi = MAC(acc, digit, ten)
-show(low)
-show(hi)
-\`\`\`
-
-\`12 + 5×10 = 62\`.
-
----
-
-## GT / LT
-
-Unsigned **numeric** ordering (not bitwise \`EQ\` — see [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md)).
-
-\`\`\`
-GT(Xbit a, Xbit b) -> 1bit
-LT(Xbit a, Xbit b) -> 1bit
-GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
-LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
-\`\`\`
-
-With **\`; vector\`**, compare per index; result is **\`1wire[n]\`** (one flag bit per element). Combinable with **\`; signed\`**. Bitwise equality uses **\`EQ\`** — see [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md).
-
-\`\`\`logts-play
-4wire a = 0101
-4wire b = 0011
-1wire g = GT(a, b)
-1wire l = LT(b, a)
-show(g)
-show(l)
-\`\`\`
-
----
-
-## MIN / MAX
-
-\`\`\`
-MIN(Wbit ...) -> Wbit
-MAX(Wbit ...) -> Wbit
-\`\`\`
-
-Variadic (≥ 2 args after expansion). **All arguments must have the same width.** Returns the original bit string of the winning value.
-
-Whole vectors expand to elements: \`MIN(vectorA)\` ≡ \`MIN(vectorA:0, vectorA:1, …)\`. With **\`; vector\`**, min/max is computed **per index** and returns \`Wbit[n]\`. See [vector-reduction.md](vector-reduction.md).
-
-\`\`\`logts-play
-4wire a = 0101
-4wire b = 0011
-4wire c = 1000
-4wire lo = MIN(a, b, c)
-4wire hi = MAX(a, b, c)
-show(lo)
-show(hi)
-\`\`\`
-
----
-
-## SUM / DOT (vector reduction)
-
-\`\`\`
-SUM(Wbit ...) -> Wbit result, Wbit over
-DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
-\`\`\`
-
-**SUM** adds all operands (unsigned); **DOT** is the dot product of two whole vectors of the same shape. With **\`; vector\`**, **SUM** / **MIN** / **MAX** operate per index (see [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector)). Output packing and operand rules: [vector-reduction.md](vector-reduction.md).
-
-**DOT** is conceptually a chain of **MAC** calls with \`acc = 0\`:
-
-\`\`\`text
-acc = MAC(acc, vectorA:0, vectorB:0)
-acc = MAC(acc, vectorA:1, vectorB:1)
-...
-\`\`\`
-
----
-
-## CLAMP
-
-\`\`\`
-CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit
-CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector) -> Wbit[n]
-\`\`\`
-
-- \`min\` and \`max\` must have equal width \`Y\`.
-- \`x\` may be any width; compare at **\`len(x)\`** with \`min\`/\`max\` zero-extended.
-- Result converted to **\`Y\` bits**.
-
-With **\`; vector\`**, \`x\`, \`min\`, and \`max\` may each be a vector \`(N,W)\` or scalar \`W\` (broadcast); at least one must be a whole vector.
-
-\`\`\`logts-play
-16wire x = 0000000100101100
-8wire zero = 00000000
-8wire max255 = 11111111
-8wire y = CLAMP(x, zero, max255)
-show(y)
-\`\`\`
-
-\`300\` clamped to \`255\`.
-
----
-
-## Signed arithmetic (\`; signed\`)
-
-Several arithmetic built-ins accept an optional **bool tag** \`signed\` after \`;\` in the call. Operands are interpreted as **two's complement** on their bit width \`W\` (MSB = sign). **Without** \`; signed\`, behaviour is unchanged (unsigned).
-
-| Built-in | Unsigned (default) | With \`; signed\` |
-|----------|-------------------|-----------------|
-| \`ADD\` | \`result\`, **carry** | same \`result\` bits, **overflow** (signed); **\`; vector\`** → \`Wbit[n]\` |
-| \`SUBTRACT\` | \`result\`, **carry** (borrow) | same \`result\` bits, **overflow** (signed); **\`; vector\`** → \`Wbit[n]\` |
-| \`GT\` / \`LT\` | unsigned numeric order | signed numeric order |
-| \`MIN\` / \`MAX\` | unsigned min/max | signed min/max |
-| \`CLAMP\` | unsigned bounds | signed bounds; **\`; vector\`** → \`Wbit[n]\` |
-| \`MULTIPLY\` | unsigned product, low/high split | signed product; **\`; vector\`** → \`Wbit[n]\` |
-| \`MAC\` | unsigned \`acc + a×b\` | signed accumulate; **\`; vector\`** → \`Wbit[n]\`, \`(W+1)bit[n]\` |
-| \`DOT\` | unsigned dot product | signed dot product |
-| \`SUM\` | unsigned sum | signed sum |
-| \`DIVIDE\` | unsigned quotient/mod | signed quotient/mod; **\`; vector\`** → \`Wbit[n]\` |
-
-\`LSHIFT\`, rotates, and \`REVERSE\` do **not** support \`; signed\`. \`RSHIFT\` with \`; signed\` is **arithmetic** shift (ASHR) — see [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md#rshift-signed).
-
-### ADD / SUBTRACT signed
-
-\`\`\`
-ADD(Xbit a, Xbit b; signed)      -> Xbit result, 1bit overflow
-SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
-\`\`\`
-
-The **result bit pattern** is identical to the unsigned call; only the second return changes meaning (signed overflow instead of unsigned carry/borrow).
+## Tag overview {#tag-overview}
+
+Optional **bool tags** after \`;\` in the call (\`signed\`, \`vector\`, or both). Operand expansion vs element-wise mode: [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector).
+
+| Built-in | Unsigned (default) | \`; signed\` | \`; vector\` |
+|----------|-------------------|------------|------------|
+| ADD | result + **carry** | result + **overflow** | \`Wbit[n]\` per index |
+| SUBTRACT | result + **carry** (borrow) | result + **overflow** | \`Wbit[n]\` per index |
+| MULTIPLY | low/high product split | signed product | \`Wbit[n]\` per index |
+| DIVIDE | quotient + mod | signed \`/\` \`%\` | \`Wbit[n]\` per index |
+| MAC | \`acc + a×b\` | signed accumulate | \`Wbit[n]\`, \`(W+1)bit[n]\` |
+| GT / LT | unsigned order | signed order | \`1wire[n]\` |
+| MIN / MAX | unsigned min/max | signed | \`Wbit[n]\` |
+| CLAMP | unsigned bounds | signed bounds | \`Wbit[n]\` |
+| SUM / DOT | see [vector-reduction](vector-reduction.md) | signed | SUM only |
+
+\`LSHIFT\`, rotates, and \`REVERSE\` do **not** support \`; signed\`. \`RSHIFT\` with \`; signed\` is **ASHR** — [builtin-RSHIFT.md](builtin-RSHIFT.md).
+
+**Result bits** for \`ADD\` / \`SUBTRACT\` are identical with or without \`; signed\`; only the second return changes meaning.
 
 \`\`\`logts-play
 4wire acc = 0111
@@ -1005,96 +671,22 @@ show(nextS)
 show(ovf)
 \`\`\`
 
-\`7 + 1\` on 4 bits: \`result = 1000\`, unsigned **carry** \`0\`, signed **overflow** \`1\` (exceeds \`+7\`).
-
-### GT / LT signed
-
-\`\`\`logts-play
-4wire a = 1111
-4wire b = 0010
-1wire gtU = GT(a, b)
-1wire gtS = GT(a, b; signed)
-show(gtU)
-show(gtS)
-\`\`\`
-
-Unsigned: \`1111\` = 15 → \`gtU = 1\`. Signed: \`1111\` = −1 → \`gtS = 0\`.
-
-### MIN / MAX / CLAMP signed
-
-Bounds and operands use the same signed interpretation at \`len(x)\` (with \`min\`/\`max\` zero-extended for \`CLAMP\`).
-
-\`\`\`logts-play
-4wire neg = 1111
-4wire pos = 0010
-4wire lo = MIN(neg, pos; signed)
-4wire hi = MAX(neg, pos; signed)
-show(lo)
-show(hi)
-\`\`\`
-
-\`\`\`logts-play
-4wire x = 1111
-4wire lo = 0000
-4wire hi = 0010
-4wire yU = CLAMP(x, lo, hi)
-4wire yS = CLAMP(x, lo, hi; signed)
-show(yU)
-show(yS)
-\`\`\`
-
-Unsigned: \`1111\` = 15 → clamped to \`0010\`. Signed: \`1111\` = −1 → clamped to \`0000\`.
-
-### MULTIPLY / MAC signed
-
-Operands are multiplied (and accumulated for \`MAC\`) as **signed** integers. Output packing is unchanged: \`result\` = low \`W\` bits, \`over\` = next \`W\` bits (or \`W+1\` for \`MAC\`) of the full product/sum — same wire layout as unsigned, different numeric interpretation.
-
-\`\`\`
-MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
-MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
-\`\`\`
-
-\`\`\`logts-play
-4wire a = 1111
-4wire b = 1111
-4wire rU, 4wire oU = MULTIPLY(a, b)
-4wire rS, 4wire oS = MULTIPLY(a, b; signed)
-show(rU)
-show(oU)
-show(rS)
-show(oS)
-\`\`\`
-
-Unsigned: \`15×15 = 225\` → \`rU=0001\`, \`oU=1110\`. Signed: \`(−1)×(−1) = 1\` → \`rS=0001\`, \`oS=0000\`.
-
-\`\`\`logts-play
-4wire acc = 1000
-4wire a = 0010
-4wire b = 0001
-4wire r, 5wire over = MAC(acc, a, b; signed)
-show(r)
-show(over)
-\`\`\`
-
-Signed: \`−8 + 2×1 = −6\` on 4 bits → \`r=1010\`, \`over\` carries high extension bits.
+\`7 + 1\` on 4 bits: \`result = 1000\`, unsigned carry \`0\`, signed overflow \`1\`.
 
 ---
 
 ## Comparison with component equivalents
 
-These built-in functions are **combinational** — they produce their result immediately when evaluated, without state or clock:
-
-| Built-in | Component equivalent | Difference |
-|----------|----------------------|------------|
+| Built-in | Component | Difference |
+|----------|-----------|------------|
 | \`ADD(a, b)\` | \`comp [adder]\` | No declaration, instant result |
 | \`SUBTRACT(a, b)\` | \`comp [subtract]\` | No declaration, instant result |
 | \`MULTIPLY(a, b)\` | \`comp [multiplier]\` | No declaration, instant result |
 | \`DIVIDE(a, b)\` | \`comp [divider]\` | No declaration, instant result |
 
-Use the **built-in functions** when you need a quick one-off calculation.
-Use the **components** when you need a named, persistent device with pins that other parts of the circuit can wire to (e.g. in a PCB definition).
+Use **built-ins** for one-off calculations; use **components** for named devices with pins (e.g. in a PCB).
 
-For **digit packing** (decimal / hex), see [number-conversion.md](number-conversion.md).
+Digit packing: [number-conversion.md](number-conversion.md).
 
 ---
 
@@ -1102,63 +694,20 @@ For **digit packing** (decimal / hex), see [number-conversion.md](number-convers
 
 \`\`\`
 doc(ADD)
-# ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
-# ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
-
 doc(SUBTRACT)
-# SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
-# SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
-
 doc(MULTIPLY)
-# MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
-# MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
-
 doc(DIVIDE)
-# DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
-
 doc(MAC)
-# MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
-# MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
-
 doc(GT)
 doc(LT)
 doc(MIN)
 doc(MAX)
 doc(CLAMP)
-
 doc(SUM)
-# SUM(Wbit ...) -> Wbit result, Wbit over
-# SUM(Wbit ...; signed) -> Wbit result, Wbit over
-# SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]
-
 doc(DOT)
-# DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
-# DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
 \`\`\`
 
-Vector operand rules and examples: [vector-reduction.md](vector-reduction.md).
-
-Use \`doc(def)\` to list all built-in functions alongside any user-defined functions:
-
-\`\`\`
-doc(def)
-\`\`\`
-
-Output (abbreviated — full list is longer):
-
-\`\`\`
-built-in:
-NOT, AND, OR, XOR, … ADD, SUBTRACT, MULTIPLY, DIVIDE, MAC, SUM, DOT, …
-HIGH, LOW, ANY*, ALL*, BITINDEX, … ZRELEASE, ZCONNECT, ZCONN, REG
-
-(* = 0/1/01/10/Z/X/ZX/XZ)
-
-debug:
-show, peek, probe, watch, Zlist
-
-user defined:
-(none)
-\`\`\`
+Live signatures come from \`Interpreter.BUILTIN_DOC\`. List all: \`doc(def)\`.
 `,
     'asm-composition.md': `# ASM composition (v2)
 
@@ -2695,6 +2244,247 @@ Wire width on the left must match LUT \`depth\`; mismatch → \`useExpr: wire wi
 
 \`useExpr(…)\` as a standalone statement is a **parse error**.
 `,
+    'builtin-ADD.md': `# ADD
+
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector)
+
+Binary addition with wrap-around.
+
+## Signatures
+
+\`\`\`
+ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
+ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
+ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
+ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+\`\`\`
+
+## Scalar (default)
+
+- \`result\` = \`(a + b) mod 2^N\`
+- \`carry\` = \`1\` if \`a + b > 2^N - 1\`; else \`0\`
+- Width \`N\` = \`max(len(a), len(b))\`; inputs zero-padded on the left.
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Same \`result\` bits; second return is **signed overflow** (not unsigned carry). |
+| \`vector\` | Element-wise add; \`result\` and flag blobs are \`Wbit[n]\`. |
+
+**Implicit vector broadcast:** \`ADD(vectorA, scalar)\` without \`; vector\` also produces element-wise \`Wbit[n]\` (legacy). Explicit \`; vector\` documents the same semantics.
+
+## Examples
+
+### \`ADD(Xbit a, Xbit b)\`
+
+Increment and wrap at overflow:
+
+\`\`\`logts-play
+4wire idx = 0011
+4wire inc = 0001
+4wire nextIdx, 1wire carry = ADD(idx, inc)
+show(nextIdx)
+show(carry)
+\`\`\`
+
+\`\`\`logts-play
+4wire idx2 = 1111
+4wire inc2 = 0001
+4wire nextIdx2, 1wire carry2 = ADD(idx2, inc2)
+show(nextIdx2)
+show(carry2)
+\`\`\`
+
+\`3+1=4\` → \`nextIdx=0100\`, \`carry=0\`. \`15+1\` wraps → \`nextIdx2=0000\`, \`carry2=1\`.
+
+### \`ADD(Xbit a, Xbit b; signed)\`
+
+\`7+1\` on 4 bits: same result bits; overflow flag differs from unsigned carry.
+
+\`\`\`logts-play
+4wire acc = 0111
+4wire delta = 0001
+4wire nextU, 1wire carry = ADD(acc, delta)
+4wire nextS, 1wire ovf = ADD(acc, delta; signed)
+show(nextU)
+show(carry)
+show(nextS)
+show(ovf)
+\`\`\`
+
+### \`ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
+
+Per-index sum and carry flags:
+
+\`\`\`logts-play
+4wire[2] vectorA = 0011 + 0101
+4wire[2] vectorB = 0001 + 0011
+4wire[2] r, 4wire[2] f = ADD(vectorA, vectorB; vector)
+show(r)
+show(f)
+\`\`\`
+
+### \`ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed)\`
+
+Signed element-wise add (overflow per index):
+
+\`\`\`logts-play
+4wire[2] vectorA = 1111 + 0111
+4wire[2] vectorB = 0001 + 0001
+4wire[2] r, 4wire[2] ovf = ADD(vectorA, vectorB; vector signed)
+show(r)
+show(ovf)
+\`\`\`
+
+## See also
+
+[SUBTRACT](builtin-SUBTRACT.md) · [MAC](builtin-MAC.md) · \`comp [adder]\`
+`,
+    'builtin-ARGMAX.md': `# ARGMAX
+
+Index: [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Position of the maximum element in a wire vector (one-hot or index).
+
+## Signatures
+
+\`\`\`
+ARGMAX(Wbit[n] vector) -> 1wire[n]
+ARGMAX(Wbit[n] vector; index) -> bitIndexWidth(n) bit
+ARGMAX(Wbit[n] vector; signed) -> 1wire[n]
+ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit
+\`\`\`
+
+**No \`; vector\` tag** — the argument is already a whole vector.
+
+| Mode | Output | Description |
+|------|--------|-------------|
+| default | \`1wire[n]\` | **One-hot** mask (\`1\` at winning index) |
+| \`index\` | \`bitIndexWidth(n)\` | Unsigned index of maximal element |
+| \`signed\` | \`1wire[n]\` | Signed compare → one-hot |
+| \`signed index\` | \`bitIndexWidth(n)\` | Signed compare → index |
+
+**Ties:** lowest index wins. For the **value** at max, use [MAX](builtin-MAX.md).
+
+## Examples
+
+### \`ARGMAX(Wbit[n] vector)\`
+
+\`\`\`logts-play
+4wire[4] v = 0010 + 1000 + 1000 + 0001
+1wire[4] hot = ARGMAX(v)
+show(hot)
+\`\`\`
+
+Max \`8\` at indices 1 and 2 → one-hot \`0100\` (index 1 wins).
+
+### \`ARGMAX(Wbit[n] vector; index)\`
+
+\`\`\`logts-play
+4wire[4] v = 0010 + 1000 + 1000 + 0001
+2wire idx = ARGMAX(v; index)
+show(idx)
+\`\`\`
+
+→ \`idx=01\`.
+
+### \`ARGMAX(Wbit[n] vector; signed)\`
+
+\`\`\`logts-play
+4wire[3] v = 1111 + 0010 + 0100
+1wire[3] hot = ARGMAX(v; signed)
+show(hot)
+\`\`\`
+
+Signed max is \`0100\` at index 2 → \`hot=001\`.
+
+### \`ARGMAX(Wbit[n] vector; index signed)\`
+
+\`\`\`logts-play
+4wire[3] v = 1111 + 0010 + 0100
+2wire idx = ARGMAX(v; index signed)
+show(idx)
+\`\`\`
+
+→ \`idx=10\` (index 2).
+
+## See also
+
+[ARGMIN](builtin-ARGMIN.md) · [MAX](builtin-MAX.md)
+`,
+    'builtin-ARGMIN.md': `# ARGMIN
+
+Index: [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Position of the minimum element in a wire vector (one-hot or index).
+
+## Signatures
+
+\`\`\`
+ARGMIN(Wbit[n] vector) -> 1wire[n]
+ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit
+ARGMIN(Wbit[n] vector; signed) -> 1wire[n]
+ARGMIN(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit
+\`\`\`
+
+**No \`; vector\` tag** — the argument is already a whole vector.
+
+| Mode | Output | Description |
+|------|--------|-------------|
+| default | \`1wire[n]\` | One-hot at minimal index |
+| \`index\` | \`bitIndexWidth(n)\` | Index of minimal element |
+| \`signed\` | \`1wire[n]\` | Signed compare → one-hot |
+| \`signed index\` | \`bitIndexWidth(n)\` | Signed compare → index |
+
+**Ties:** lowest index wins.
+
+## Examples
+
+### \`ARGMIN(Wbit[n] vector)\`
+
+\`\`\`logts-play
+4wire[3] v = 0100 + 0001 + 0001
+1wire[3] hot = ARGMIN(v)
+show(hot)
+\`\`\`
+
+Min \`1\` at indices 1 and 2 → one-hot \`010\`.
+
+### \`ARGMIN(Wbit[n] vector; index)\`
+
+\`\`\`logts-play
+4wire[3] v = 0100 + 0001 + 0001
+2wire idx = ARGMIN(v; index)
+show(idx)
+\`\`\`
+
+→ \`idx=01\`.
+
+### \`ARGMIN(Wbit[n] vector; signed)\`
+
+\`\`\`logts-play
+4wire[3] v = 1111 + 0010 + 1100
+1wire[3] hot = ARGMIN(v; signed)
+show(hot)
+\`\`\`
+
+Signed min \`1100\` (−4) at index 2 → \`hot=010\`.
+
+### \`ARGMIN(Wbit[n] vector; index signed)\`
+
+\`\`\`logts-play
+4wire[3] v = 1111 + 0010 + 1100
+2wire idx = ARGMIN(v; index signed)
+show(idx)
+\`\`\`
+
+→ \`idx=10\`.
+
+## See also
+
+[ARGMAX](builtin-ARGMAX.md) · [MIN](builtin-MIN.md)
+`,
     'builtin-bit-analysis-functions.md': `# Built-in bit analysis functions
 
 Counting, parity, and size helpers on arbitrary-width bit strings.
@@ -3047,156 +2837,377 @@ probe(bad)
 
 Shift, rotate, and reverse operations on bit strings.
 
-Index: [builtin-functions.md](builtin-functions.md) · Short notation (\`<\`, \`>\`): [short-notation.md](short-notation.md)
+Index: [builtin-functions.md](builtin-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · Short notation (\`<\`, \`>\`): [short-notation.md](short-notation.md)
 
 ---
 
-## LSHIFT
+## Functions in this hub
 
-Logical shift left — appends \`n\` fill bits on the right; **width increases**.
-
-\`\`\`
-LSHIFT(Xbit data, Nbit n) -> Xbit
-LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
-LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]
-\`\`\`
-
-With **\`; vector\`**, shift each element left; assign \`(W+n)wire[n]\` when count is scalar \`n\` (broadcast). Shift count must be scalar in vector mode.
-
-- \`data\` — value to shift
-- \`n\` — positions (binary)
-- \`fill\` *(optional)* — fill bit (default \`0\`)
-
-### Runnable example
-
-\`\`\`logts-play
-4wire x = 1011
-5wire y = LSHIFT(x, 1)
-show(y)
-\`\`\`
-
-Sugar: \`data < n\` and \`data < n w1\` (see [short-notation.md](short-notation.md)).
+| Function | Page | Tags |
+|----------|------|------|
+| LSHIFT | [builtin-LSHIFT.md](builtin-LSHIFT.md) | \`vector\` |
+| RSHIFT | [builtin-RSHIFT.md](builtin-RSHIFT.md) | \`signed\`, \`vector\` |
+| LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | \`vector\` |
+| RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | \`vector\` |
+| REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | \`vector\` |
 
 ---
 
-## RSHIFT
+## Quick reference
 
-Logical shift right — same width; MSBs filled with \`fill\`.
+**LSHIFT** — logical left; width may grow (\`(W+n)bit[n]\` in vector mode). Optional third arg \`fill\` (default \`0\`). Sugar: \`data < n\`.
 
-\`\`\`
-RSHIFT(Xbit data, Nbit n) -> Xbit
-RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
-RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
-\`\`\`
+**RSHIFT** — logical right; same width; optional \`fill\`. With **\`; signed\`**, arithmetic shift (ASHR) — MSB replicated; see [alu.md](alu.md#arithmetic-shift-right-vs-logical-ashr--rshift). Sugar: \`data > n\`.
 
-With **\`; vector\`**, shift right per index; \`count\` may be scalar (broadcast) or \`Kbit[n]\`. Combinable with **\`; signed\`** (ASHR per element).
+**REVERSE** — MSB ↔ LSB within each operand.
 
-### Runnable example
+**LROTATE** / **RROTATE** — circular rotate; \`count\` taken modulo width.
 
-\`\`\`logts-play
-4wire x = 1010
-4wire y = RSHIFT(x, 1)
-probe(y)
-\`\`\`
-
-Sugar: \`data > n\` and \`data > n w1\`.
-
-### RSHIFT signed (ASHR)
-
-With \`; signed\`, shift **arithmetic** right: MSB (sign bit) is replicated instead of \`fill\`. Equivalent to \`ASHR\` in [alu.md](alu.md#arithmetic-shift-right-vs-logical-ashr--rshift). Optional \`fill\` is ignored when \`signed\` is set.
-
-\`\`\`
-RSHIFT(Xbit data, Nbit n; signed) -> Xbit
-\`\`\`
+Vector mode: per-element operation; shift/rotate **count** is usually a scalar broadcast (see each page). \`RSHIFT\` may use per-index \`Kbit[n]\` counts.
 
 \`\`\`logts-play
 4wire neg = 1111
-4wire pos = 0111
 4wire log = RSHIFT(neg, 1)
-4wire arithNeg = RSHIFT(neg, 1; signed)
-4wire arithPos = RSHIFT(pos, 1; signed)
+4wire arith = RSHIFT(neg, 1; signed)
 show(log)
-show(arithNeg)
-show(arithPos)
+show(arith)
 \`\`\`
 
-\`1111\` logical → \`0111\`; arithmetic → \`1111\` (still −1). \`0111\` (=7) arithmetic → \`0011\` (=3).
+\`1111\` logical → \`0111\`; arithmetic → \`1111\`.
 
-\`LSHIFT\` does **not** accept \`; signed\` (left shift is identical for signed/unsigned).
+Use \`doc(LSHIFT)\` … \`doc(RROTATE)\` for live signatures from \`Interpreter.BUILTIN_DOC\`.
+`,
+    'builtin-CLAMP.md': `# CLAMP
 
----
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
 
-## REVERSE
+Clamp value to \`[min, max]\`.
 
-Reverses bit order (MSB ↔ LSB).
+## Signatures
 
 \`\`\`
-REVERSE(Xbit value) -> Xbit
-REVERSE(Wbit[n] data ; vector) -> Wbit[n]
+CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit
+CLAMP(Xbit x, Ybit min, Ybit max; signed) -> Ybit
+CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector) -> Wbit[n]
+CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]
 \`\`\`
 
-With **\`; vector\`**, reverse bits **per element** (unary — one whole vector argument).
+\`min\` and \`max\` must have equal width **Y**; \`x\` may be wider (compare at \`len(x)\` with bounds zero-extended).
 
-### Examples
+## Scalar (default)
 
-| Input | Result |
-|-------|--------|
-| \`REVERSE(0011)\` | \`1100\` |
-| \`REVERSE(001)\` | \`100\` |
+- If \`x < min\` → \`min\`; if \`x > max\` → \`max\`; else \`x\` (unsigned), result width **Y**
 
-### Runnable example
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Signed bounds. |
+| \`vector\` | Per-index clamp; bounds broadcast if scalar. |
+
+## Examples
+
+### \`CLAMP(Xbit x, Ybit min, Ybit max)\`
 
 \`\`\`logts-play
-4wire x = 0011
-4wire y = REVERSE(x)
+4wire val = 1111
+4wire lo = 0001
+4wire hi = 1000
+4wire c = CLAMP(val, lo, hi)
+show(c)
+\`\`\`
+
+\`15\` clamped to \`8\` → \`1000\`.
+
+Wider value narrowed to 8 bits:
+
+\`\`\`logts-play
+16wire x = 0000000100101100
+8wire zero = 00000000
+8wire max255 = 11111111
+8wire y = CLAMP(x, zero, max255)
 show(y)
 \`\`\`
 
----
+\`300\` → \`255\`.
 
-## LROTATE
-
-Circular rotate left — width unchanged; \`count\` is taken modulo width.
-
-\`\`\`
-LROTATE(Xbit data, Ybit count) -> Xbit
-LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
-\`\`\`
-
-### Examples
-
-| Call | Result |
-|------|--------|
-| \`LROTATE(1011, 1)\` | \`0111\` |
-| \`LROTATE(1011, 01)\` | \`0111\` |
-| \`LROTATE(1011, 10)\` | \`1110\` |
-
-### Runnable example
+### \`CLAMP(Xbit x, Ybit min, Ybit max; signed)\`
 
 \`\`\`logts-play
-4wire x = 1011
-4wire y = LROTATE(x, 10)
-probe(y)
+4wire x = 1111
+4wire lo = 0000
+4wire hi = 0010
+4wire yU = CLAMP(x, lo, hi)
+4wire yS = CLAMP(x, lo, hi; signed)
+show(yU)
+show(yS)
 \`\`\`
 
----
+Unsigned: \`15\` → \`2\`. Signed: \`−1\` → \`0\`.
 
-## RROTATE
-
-Circular rotate right — width unchanged; \`count\` modulo width.
-
-\`\`\`
-RROTATE(Xbit data, Ybit count) -> Xbit
-RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
-\`\`\`
-
-### Runnable example
+### \`CLAMP(Wbit[n] x, … ; vector)\`
 
 \`\`\`logts-play
-4wire x = 1011
-4wire y = RROTATE(x, 1)
+4wire[3] vectorX = 1111 + 0100 + 0010
+4wire lo = 0001
+4wire hi = 1000
+4wire[3] y = CLAMP(vectorX, lo, hi; vector)
 show(y)
 \`\`\`
+
+### \`CLAMP(Wbit[n] x, … ; vector signed)\`
+
+\`\`\`logts-play
+4wire[2] vectorX = 1111 + 0100
+4wire lo = 0000
+4wire hi = 0010
+4wire[2] y = CLAMP(vectorX, lo, hi; vector signed)
+show(y)
+\`\`\`
+
+## See also
+
+[MIN](builtin-MIN.md) · [MAX](builtin-MAX.md)
+`,
+    'builtin-DIVIDE.md': `# DIVIDE
+
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Integer quotient and remainder (no floating-point).
+
+## Signatures
+
+\`\`\`
+DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
+DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod
+DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
+DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+\`\`\`
+
+## Scalar (default)
+
+- \`result\` = \`floor(a / b)\` masked to \`N\` bits
+- \`mod\` = \`a % b\` masked to \`N\` bits
+- If \`b = 0\`, both outputs are \`0\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Operands as two's complement; integer \`/\` and \`%\`. |
+| \`vector\` | Quotient and remainder per index. |
+
+## Examples
+
+### \`DIVIDE(Xbit a, Xbit b)\`
+
+\`\`\`logts-play
+4wire a = 0110
+4wire b = 0010
+4wire q, 4wire m = DIVIDE(a, b)
+show(q)
+show(m)
+\`\`\`
+
+\`6/2=3\`, remainder \`0\`.
+
+\`\`\`logts-play
+4wire a2 = 0111
+4wire b2 = 0010
+4wire q2, 4wire m2 = DIVIDE(a2, b2)
+show(q2)
+show(m2)
+\`\`\`
+
+\`7/2=3\`, remainder \`1\`.
+
+\`\`\`logts-play
+4wire a3 = 0110
+4wire b3 = 0000
+4wire q3, 4wire m3 = DIVIDE(a3, b3)
+show(q3)
+show(m3)
+\`\`\`
+
+Divide by zero → both \`0\`.
+
+### \`DIVIDE(Xbit a, Xbit b; signed)\`
+
+\`\`\`logts-play
+4wire a = 1111
+4wire b = 0010
+4wire q, 4wire m = DIVIDE(a, b; signed)
+show(q)
+show(m)
+\`\`\`
+
+Signed \`−1 / 2 = 0\`, remainder \`−1\` (\`1111\`).
+
+### \`DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
+
+\`\`\`logts-play
+4wire[3] vectorA = 0110 + 0111 + 0001
+4wire[3] vectorB = 0010 + 0010 + 0011
+4wire[3] q, 4wire[3] m = DIVIDE(vectorA, vectorB; vector)
+show(q)
+show(m)
+\`\`\`
+
+### \`DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed)\`
+
+\`\`\`logts-play
+4wire[2] vectorA = 1111 + 1101
+4wire[2] vectorB = 0010 + 0010
+4wire[2] q, 4wire[2] m = DIVIDE(vectorA, vectorB; vector signed)
+show(q)
+show(m)
+\`\`\`
+
+## See also
+
+[MULTIPLY](builtin-MULTIPLY.md) · \`comp [divider]\`
+`,
+    'builtin-DOT.md': `# DOT (dot product)
+
+Index: [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Pairwise multiply and sum: **\`Σ a[i] × b[i]\`**.
+
+## Signatures
+
+\`\`\`
+DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
+DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
+\`\`\`
+
+**No \`; vector\` tag** — operands are always vectors; output is always scalar.
+
+## Scalar (default)
+
+- \`result\` = low **W** bits of dot product
+- \`over\` = next **2W** bits; full value = \`over\` ‖ \`result\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Signed multiply per pair, signed accumulate. |
+
+## Examples
+
+### \`DOT(Wbit[n] a, Wbit[n] b)\`
+
+\`\`\`logts-play
+4wire[2] a = 0001 + 0010
+4wire[2] b = 0011 + 0100
+4wire r, 8wire o = DOT(a, b)
+show(r)
+show(o)
+\`\`\`
+
+\`1×3 + 2×4 = 11\` → \`r=1011\`.
+
+\`\`\`logts-play
+4wire[3] vectorA = 0001 + 0010 + 0011
+4wire[3] vectorB = 0100 + 0101 + 0110
+4wire result, 8wire over = DOT(vectorA, vectorB)
+show(result)
+show(over)
+\`\`\`
+
+### \`DOT(Wbit[n] a, Wbit[n] b; signed)\`
+
+\`\`\`logts-play
+4wire[2] a = 1111 + 0010
+4wire[2] b = 1111 + 0001
+4wire r, 8wire o = DOT(a, b; signed)
+show(r)
+show(o)
+\`\`\`
+
+Signed \`(−1)×(−1) + 2×1 = 3\`.
+
+## See also
+
+[MAC](builtin-MAC.md) · [SUM](builtin-SUM.md) · [MULTIPLY](builtin-MULTIPLY.md)
+`,
+    'builtin-EQ.md': `# EQ (equality)
+
+Index: [Logic gates](builtin-logic-gate-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector)
+
+Bitwise equality (all bits of each operand must match).
+
+## Signatures
+
+\`\`\`
+EQ(Xbit a, Xbit b) -> 1bit result
+EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
+\`\`\`
+
+Variadic \`EQ(a, b, c, …)\` without tags: all operands equal → \`1\`.
+
+## Scalar (default)
+
+- \`result = 1\` if every bit of \`a\` equals \`b\`; else \`0\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`vector\` | Per-index equality \`a[i] == b[i]\` → \`1wire[n]\`. |
+
+**No \`; signed\` tag** — equality is bitwise.
+
+## Examples
+
+### \`EQ(Xbit a, Xbit b)\`
+
+\`\`\`logts-play
+4wire a = 1010
+4wire b = 1010
+1wire eq = EQ(a, b)
+show(eq)
+\`\`\`
+
+\`\`\`logts-play
+4wire a2 = 0011
+4wire b2 = 0011
+1wire same = EQ(a2, b2)
+probe(same)
+\`\`\`
+
+Mismatch:
+
+\`\`\`logts-play
+4wire x = 1010
+4wire y = 1011
+1wire diff = EQ(x, y)
+show(diff)
+\`\`\`
+
+### \`EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
+
+\`\`\`logts-play
+4wire[3] a = 0001 + 0010 + 0011
+4wire[3] b = 0001 + 0011 + 0011
+1wire[3] eqv = EQ(a, b; vector)
+show(eqv)
+\`\`\`
+
+→ \`1,0,1\` per index.
+
+Scalar broadcast:
+
+\`\`\`logts-play
+4wire[3] vectorA = 0100 + 0100 + 0111
+4wire scalar = 0100
+1wire[3] flags = EQ(vectorA, scalar; vector)
+show(flags)
+\`\`\`
+
+## See also
+
+[GT](builtin-GT.md) · [LT](builtin-LT.md) · [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md)
 `,
     'builtin-functions.md': `# Built-in functions (internal)
 
@@ -3215,15 +3226,15 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 
 | Category | Functions | Detail |
 |----------|-----------|--------|
-| **Logic gates** | \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, \`EQ\` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) |
+| **Logic gates** | \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, \`EQ\` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) · \`EQ\` tags: [builtin-EQ.md](builtin-EQ.md) |
 | **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
-| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` (+ optional \`; signed\` on all except \`DIVIDE\`) | [arithmetic.md](arithmetic.md) |
-| **Vector reduction** | \`SUM\`, \`DOT\` (+ optional \`; signed\`) | [vector-reduction.md](vector-reduction.md) · summary in [arithmetic.md](arithmetic.md#sum--dot-vector-reduction) |
+| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) · per-function: [builtin-tagged-index.md](builtin-tagged-index.md) |
+| **Vector reduction** | \`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\` | [vector-reduction.md](vector-reduction.md) · index: [builtin-tagged-index.md](builtin-tagged-index.md) |
 | **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
-| **Bit transform** | \`LSHIFT\`, \`RSHIFT\` (+ optional \`; signed\` = ASHR), \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) |
+| **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) · \`RSHIFT\` \`; signed\` = ASHR · index: [builtin-tagged-index.md](builtin-tagged-index.md) |
 | **Tristate (ZSTATE)** | \`ZRELEASE(wire)\`, \`bus = ZCONNECT(en, data)\` | [zstate.md](zstate.md) |
 
 > **Adding new built-ins:** extend \`Interpreter.BUILTIN_DOC\` in \`core/interpreter.js\`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.
@@ -3273,6 +3284,87 @@ In \`MODE ZSTATE\`, gate functions (\`AND\`, \`OR\`, \`NOT\`, …) use IEEE 1164
 | Short notation (\`&\`, \`\\|\`, \`<\`, \`>\`) | [short-notation.md](short-notation.md) |
 | Panel devices (\`comp\`) | [components.md](components.md) |
 | User \`def\` functions | [user-functions.md](user-functions.md) |
+`,
+    'builtin-GT.md': `# GT (greater than)
+
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector)
+
+## Signatures
+
+\`\`\`
+GT(Xbit a, Xbit b) -> 1bit result
+GT(Xbit a, Xbit b; signed) -> 1bit result
+GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
+GT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
+\`\`\`
+
+## Scalar (default)
+
+- \`result = 1\` if \`a > b\` (unsigned); else \`0\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Two's complement comparison. |
+| \`vector\` | Per-index \`1wire[n]\`; scalar operand broadcast. |
+
+## Examples
+
+### \`GT(Xbit a, Xbit b)\`
+
+\`\`\`logts-play
+4wire a = 1000
+4wire b = 0111
+1wire gt = GT(a, b)
+show(gt)
+\`\`\`
+
+Unsigned \`8 > 7\` → \`gt=1\`.
+
+\`\`\`logts-play
+4wire a2 = 0101
+4wire b2 = 0011
+1wire g = GT(a2, b2)
+1wire l = LT(b2, a2)
+show(g)
+show(l)
+\`\`\`
+
+### \`GT(Xbit a, Xbit b; signed)\`
+
+\`\`\`logts-play
+4wire a = 1111
+4wire b = 0010
+1wire gtU = GT(a, b)
+1wire gtS = GT(a, b; signed)
+show(gtU)
+show(gtS)
+\`\`\`
+
+Unsigned: \`15 > 2\` → \`gtU=1\`. Signed: \`−1 > 2\` → \`gtS=0\`.
+
+### \`GT(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
+
+\`\`\`logts-play
+4wire[3] vectorA = 0100 + 0010 + 0111
+4wire[3] vectorB = 0011 + 0011 + 0100
+1wire[3] flags = GT(vectorA, vectorB; vector)
+show(flags)
+\`\`\`
+
+### \`GT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed)\`
+
+\`\`\`logts-play
+4wire[2] vectorA = 1111 + 0010
+4wire[2] vectorB = 0010 + 1111
+1wire[2] flags = GT(vectorA, vectorB; vector signed)
+show(flags)
+\`\`\`
+
+## See also
+
+[LT](builtin-LT.md) · [EQ](builtin-EQ.md) · [MIN](builtin-MIN.md)
 `,
     'builtin-logic-gate-functions.md': `# Built-in logic gate functions
 
@@ -3366,9 +3458,10 @@ show(any)
 
 \`\`\`
 EQ(Xbit, Xbit) -> 1bit
+EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 \`\`\`
 
-Compares two operands bit-by-bit; returns \`1\` only if every bit pair matches. For **unsigned numeric** ordering use \`GT\` / \`LT\` in [arithmetic.md](arithmetic.md).
+Bitwise equality (all bits must match). For **unsigned numeric** ordering use \`GT\` / \`LT\` in [arithmetic.md](arithmetic.md). Full reference: **[builtin-EQ.md](builtin-EQ.md)** (\`; vector\` for per-index compare).
 
 ### Runnable example
 
@@ -3397,6 +3490,604 @@ show(y)
 Result: \`y = 1\` (OR with any \`1\`).
 
 \`NOT(?Z)\` on a 1-bit wire → \`X\`. Full bus semantics, resolver, and error rules: **[zstate.md](zstate.md)**.
+`,
+    'builtin-LROTATE.md': `# LROTATE (left rotate)
+
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Rotate bits left; MSBs wrap to LSBs. Width unchanged.
+
+## Signatures
+
+\`\`\`
+LROTATE(Xbit val, Xbit count) -> Xbit result
+LROTATE(Wbit[n] val, Wbit count ; vector) -> Wbit[n]
+\`\`\`
+
+## Scalar (default)
+
+- Rotate left by \`count mod width\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`vector\` | Per-element rotate; **same scalar \`count\`**. |
+
+## Examples
+
+### \`LROTATE(Xbit val, Xbit count)\`
+
+\`\`\`logts-play
+4wire x = 1011
+4wire y = LROTATE(x, 1)
+show(y)
+\`\`\`
+
+\`1011\` rotl 1 → \`0111\`.
+
+\`\`\`logts-play
+4wire x2 = 1011
+4wire y2 = LROTATE(x2, 10)
+probe(y2)
+\`\`\`
+
+\`count=2\` (mod 4) → \`1110\`.
+
+### \`LROTATE(Wbit[n] val, Wbit count ; vector)\`
+
+\`\`\`logts-play
+4wire[2] v = 1011 + 1001
+4wire cnt = 0001
+4wire[2] r = LROTATE(v, cnt; vector)
+show(r)
+\`\`\`
+
+## See also
+
+[RROTATE](builtin-RROTATE.md) · [REVERSE](builtin-REVERSE.md)
+`,
+    'builtin-LSHIFT.md': `# LSHIFT (left shift)
+
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Shift bits toward MSB; vacated LSBs filled with **0** (optional third arg \`fill\`).
+
+## Signatures
+
+\`\`\`
+LSHIFT(Xbit data, Nbit n) -> Xbit
+LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
+LSHIFT(Wbit[n] val, Wbit count ; vector) -> (W+n)bit[n]
+\`\`\`
+
+## Scalar (default)
+
+- Left shift; scalar result width follows \`doc(LSHIFT)\` (may grow when no truncation)
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`vector\` | Per-element shift; each output element is **(W+n)** bits where \`n = len(count)\`; **same scalar \`count\`**. |
+
+**No \`; signed\` tag** — left shift is the same for signed/unsigned bit pattern.
+
+Sugar: \`data < n\` — [short-notation.md](short-notation.md).
+
+## Examples
+
+### \`LSHIFT(Xbit data, Nbit n)\`
+
+\`\`\`logts-play
+4wire x = 1011
+5wire y = LSHIFT(x, 1)
+show(y)
+\`\`\`
+
+\`1011 << 1\` → \`10110\`.
+
+\`\`\`logts-play
+4wire val = 0001
+4wire cnt = 0010
+4wire r = LSHIFT(val, cnt)
+show(r)
+\`\`\`
+
+\`1 << 2\` → \`0100\` (within 4-bit assignment).
+
+### \`LSHIFT(Wbit[n] val, Wbit count ; vector)\`
+
+\`\`\`logts-play
+4wire[2] v = 0001 + 0010
+4wire cnt = 0001
+5wire[2] r = LSHIFT(v, cnt; vector)
+show(r)
+\`\`\`
+
+Each element shifted left by 1 → **5**-bit elements.
+
+## See also
+
+[RSHIFT](builtin-RSHIFT.md) · [LROTATE](builtin-LROTATE.md)
+`,
+    'builtin-LT.md': `# LT (less than)
+
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector)
+
+## Signatures
+
+\`\`\`
+LT(Xbit a, Xbit b) -> 1bit result
+LT(Xbit a, Xbit b; signed) -> 1bit result
+LT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
+LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
+\`\`\`
+
+## Scalar (default)
+
+- \`result = 1\` if \`a < b\` (unsigned); else \`0\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Two's complement comparison. |
+| \`vector\` | Per-index \`1wire[n]\`. |
+
+## Examples
+
+### \`LT(Xbit a, Xbit b)\`
+
+\`\`\`logts-play
+4wire a = 0011
+4wire b = 0111
+1wire lt = LT(a, b)
+show(lt)
+\`\`\`
+
+\`3 < 7\` → \`lt=1\`.
+
+### \`LT(Xbit a, Xbit b; signed)\`
+
+\`\`\`logts-play
+4wire a = 1111
+4wire b = 0010
+1wire ltU = LT(a, b)
+1wire ltS = LT(a, b; signed)
+show(ltU)
+show(ltS)
+\`\`\`
+
+Unsigned: \`15 < 2\` → \`ltU=0\`. Signed: \`−1 < 2\` → \`ltS=1\`.
+
+### \`LT(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
+
+\`\`\`logts-play
+4wire[3] vectorA = 0001 + 0100 + 0111
+4wire[3] vectorB = 0010 + 0011 + 0100
+1wire[3] flags = LT(vectorA, vectorB; vector)
+show(flags)
+\`\`\`
+
+### \`LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed)\`
+
+\`\`\`logts-play
+4wire[2] vectorA = 1111 + 0100
+4wire scalar = 0010
+1wire[2] flags = LT(vectorA, scalar; vector signed)
+show(flags)
+\`\`\`
+
+## See also
+
+[GT](builtin-GT.md) · [EQ](builtin-EQ.md)
+`,
+    'builtin-MAC.md': `# MAC (multiply-accumulate)
+
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Computes **\`acc + (a × b)\`**. Equivalent to \`ADD(acc, MULTIPLY(a, b))\`; may be fused internally.
+
+## Signatures
+
+\`\`\`
+MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
+MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
+MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]
+MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], (W+1)bit[n]
+\`\`\`
+
+All three operands must have the same width **X** (per element in vector mode).
+
+| Output | Width | Description |
+|--------|-------|-------------|
+| \`result\` | \`X\` | Low \`X\` bits of \`acc + a*b\` |
+| \`over\` | \`X + 1\` | Upper bits (zero-padded) |
+
+Full integer: concatenate **\`over\` then \`result\`** (MSB → LSB).
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Signed accumulate; same packing. |
+| \`vector\` | Per index; \`over[i]\` is **(W+1)** bits — assign e.g. \`4wire[n] r, 5wire[n] o\`. |
+
+## Examples
+
+### \`MAC(Xbit acc, Xbit a, Xbit b)\`
+
+\`\`\`logts-play
+8wire acc = 11111010
+8wire a = 00010100
+8wire b = 00010100
+8wire result, 9wire over = MAC(acc, a, b)
+show(result)
+show(over)
+\`\`\`
+
+\`250 + 20×20 = 650\`.
+
+Digit accumulator when the value fits in \`X\` bits:
+
+\`\`\`logts-play
+8wire acc = 00001100
+8wire digit = 00000101
+8wire ten = 00001010
+8wire low, 9wire hi = MAC(acc, digit, ten)
+show(low)
+show(hi)
+\`\`\`
+
+\`12 + 5×10 = 62\`.
+
+### \`MAC(Xbit acc, Xbit a, Xbit b; signed)\`
+
+\`\`\`logts-play
+4wire acc = 1000
+4wire a = 0010
+4wire b = 0001
+4wire r, 5wire over = MAC(acc, a, b; signed)
+show(r)
+show(over)
+\`\`\`
+
+Signed \`−8 + 2×1 = −6\` → \`r=1010\`.
+
+### \`MAC(Wbit[n] acc, … ; vector)\`
+
+\`\`\`logts-play
+4wire[2] acc = 0001 + 0010
+4wire[2] a = 0010 + 0001
+4wire[2] b = 0011 + 0100
+4wire[2] r, 5wire[2] o = MAC(acc, a, b; vector)
+show(r)
+show(o)
+\`\`\`
+
+### \`MAC(Wbit[n] acc, … ; vector signed)\`
+
+\`\`\`logts-play
+4wire[2] acc = 1111 + 0000
+4wire[2] a = 1111 + 0010
+4wire[2] b = 0001 + 0001
+4wire[2] r, 5wire[2] o = MAC(acc, a, b; vector signed)
+show(r)
+show(o)
+\`\`\`
+
+## See also
+
+[MULTIPLY](builtin-MULTIPLY.md) · [DOT](builtin-DOT.md)
+`,
+    'builtin-MAX.md': `# MAX
+
+Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+## Signatures
+
+\`\`\`
+MAX(Wbit ...) -> Wbit
+MAX(Wbit ...; signed) -> Wbit
+MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
+MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
+\`\`\`
+
+Variadic (≥ 2 operands after expansion).
+
+## Scalar (default)
+
+- Returns the **bit pattern** of the winning value (unsigned max)
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Signed maximum. |
+| \`vector\` | Element-wise max. |
+
+## Examples
+
+### \`MAX(Wbit ...)\`
+
+\`\`\`logts-play
+4wire a = 0101
+4wire b = 0011
+4wire c = 1000
+4wire hi = MAX(a, b, c)
+show(hi)
+\`\`\`
+
+\`MAX(5,3,8)=8\` → \`1000\`.
+
+### \`MAX(Wbit ...; signed)\`
+
+\`\`\`logts-play
+4wire neg = 1111
+4wire pos = 0010
+4wire hi = MAX(neg, pos; signed)
+show(hi)
+\`\`\`
+
+Signed \`MAX(−1, 2)=2\` → \`0010\`.
+
+### \`MAX(Wbit[n] a, … ; vector)\`
+
+\`\`\`logts-play
+4wire[4] vectorA = 0001 + 0010 + 0100 + 1000
+4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
+4wire[4] out = MAX(vectorA, 0001; vector)
+show(out)
+\`\`\`
+
+### \`MAX(Wbit[n] a, … ; vector signed)\`
+
+\`\`\`logts-play
+4wire[4] vectorA = 0001 + 0010 + 0100 + 1000
+4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
+4wire[4] out = MAX(vectorA, vectorB; vector signed)
+show(out)
+\`\`\`
+
+## See also
+
+[MIN](builtin-MIN.md) · [CLAMP](builtin-CLAMP.md) · [ARGMAX](builtin-ARGMAX.md)
+`,
+    'builtin-MIN.md': `# MIN
+
+Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+## Signatures
+
+\`\`\`
+MIN(Wbit ...) -> Wbit
+MIN(Wbit ...; signed) -> Wbit
+MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
+MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
+\`\`\`
+
+Variadic (≥ 2 operands after expansion). Whole vectors expand to elements.
+
+## Scalar (default)
+
+- Returns the **bit pattern** of the winning value (unsigned min)
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Signed minimum. |
+| \`vector\` | Element-wise min. |
+
+## Examples
+
+### \`MIN(Wbit ...)\`
+
+\`\`\`logts-play
+4wire a = 1000
+4wire b = 0111
+4wire c = 1000
+4wire lo = MIN(a, b, c)
+show(lo)
+\`\`\`
+
+\`MIN(8,7,8)=7\` → \`0111\`.
+
+Whole-vector reduction:
+
+\`\`\`logts-play
+4wire[3] vectorA = 0100 + 0010 + 0110
+4wire m = MIN(vectorA)
+show(m)
+\`\`\`
+
+### \`MIN(Wbit ...; signed)\`
+
+\`\`\`logts-play
+4wire neg = 1111
+4wire pos = 0010
+4wire lo = MIN(neg, pos; signed)
+show(lo)
+\`\`\`
+
+Signed \`MIN(−1, 2)=−1\` → \`1111\`.
+
+### \`MIN(Wbit[n] a, … ; vector)\`
+
+\`\`\`logts-play
+4wire[3] vectorA = 0100 + 0010 + 0110
+4wire[3] out = MIN(vectorA, 0001; vector)
+show(out)
+\`\`\`
+
+### \`MIN(Wbit[n] a, … ; vector signed)\`
+
+\`\`\`logts-play
+4wire[2] vectorA = 1111 + 0010
+4wire[2] vectorB = 0001 + 1111
+4wire[2] out = MIN(vectorA, vectorB; vector signed)
+show(out)
+\`\`\`
+
+## See also
+
+[MAX](builtin-MAX.md) · [CLAMP](builtin-CLAMP.md) · [ARGMIN](builtin-ARGMIN.md)
+`,
+    'builtin-MULTIPLY.md': `# MULTIPLY
+
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Binary multiplication with overflow capture.
+
+## Signatures
+
+\`\`\`
+MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
+MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
+MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
+MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+\`\`\`
+
+## Scalar (default)
+
+- \`result\` = low \`N\` bits of \`a * b\`
+- \`over\` = high \`N\` bits; full product = \`(over << N) | result\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Product as two's complement; same wire packing. |
+| \`vector\` | Multiply per index; \`over[i]\` = high **W** bits of the **2W**-bit product. |
+
+## Examples
+
+### \`MULTIPLY(Xbit a, Xbit b)\`
+
+\`\`\`logts-play
+4wire a = 0010
+4wire b = 0011
+4wire r, 4wire o = MULTIPLY(a, b)
+show(r)
+show(o)
+\`\`\`
+
+\`2×3=6\` → \`r=0110\`, \`o=0000\`.
+
+\`\`\`logts-play
+4wire a2 = 1111
+4wire b2 = 1111
+4wire r2, 4wire o2 = MULTIPLY(a2, b2)
+show(r2)
+show(o2)
+\`\`\`
+
+Unsigned \`15×15=225\` → \`r2=0001\`, \`o2=1110\`.
+
+### \`MULTIPLY(Xbit a, Xbit b; signed)\`
+
+\`\`\`logts-play
+4wire a = 1111
+4wire b = 1111
+4wire rS, 4wire oS = MULTIPLY(a, b; signed)
+show(rS)
+show(oS)
+\`\`\`
+
+Signed \`(−1)×(−1)=1\` → \`rS=0001\`, \`oS=0000\`.
+
+### \`MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
+
+\`\`\`logts-play
+4wire[3] vectorA = 0010 + 0011 + 0100
+4wire[3] vectorB = 0010 + 0010 + 0001
+4wire[3] r, 4wire[3] o = MULTIPLY(vectorA, vectorB; vector)
+show(r)
+show(o)
+\`\`\`
+
+### \`MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed)\`
+
+\`\`\`logts-play
+4wire[2] vectorA = 1111 + 0010
+4wire[2] r, 4wire[2] o = MULTIPLY(vectorA, 1111; vector signed)
+show(r)
+show(o)
+\`\`\`
+
+\`(−1)×(−1)=1\` at index 0; \`2×(−1)=−2\` at index 1.
+
+## See also
+
+[MAC](builtin-MAC.md) · [DIVIDE](builtin-DIVIDE.md)
+`,
+    'builtin-REVERSE.md': `# REVERSE (bit order)
+
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Reverse bit order within each operand (MSB ↔ LSB).
+
+## Signatures
+
+\`\`\`
+REVERSE(Xbit val) -> Xbit result
+REVERSE(Wbit[n] val ; vector) -> Wbit[n]
+\`\`\`
+
+## Scalar (default)
+
+- \`result[i]\` = \`val[width-1-i]\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`vector\` | Reverse bits **within each element** (not reverse element order). |
+
+## Examples
+
+### \`REVERSE(Xbit val)\`
+
+\`\`\`logts-play
+4wire x = 0011
+4wire y = REVERSE(x)
+show(y)
+\`\`\`
+
+\`0011\` → \`1100\`.
+
+\`\`\`logts-play
+4wire a = 1010
+4wire b = REVERSE(a)
+show(b)
+\`\`\`
+
+\`1010\` → \`0101\`.
+
+Palindrome unchanged:
+
+\`\`\`logts-play
+4wire val = 1001
+4wire r = REVERSE(val)
+show(r)
+\`\`\`
+
+→ \`1001\`.
+
+### \`REVERSE(Wbit[n] val ; vector)\`
+
+\`\`\`logts-play
+4wire[3] v = 0011 + 1010 + 1111
+4wire[3] r = REVERSE(v; vector)
+show(r)
+\`\`\`
+
+Per element: \`1100\`, \`0101\`, \`1111\`.
+
+## See also
+
+[LROTATE](builtin-LROTATE.md) · [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md)
 `,
     'builtin-routing-functions.md': `# Built-in routing functions (MUX / DEMUX)
 
@@ -3493,6 +4184,149 @@ show(r)
 tg0 = MUX(p, tg0, NOT(tg0))
 \`\`\`
 `,
+    'builtin-RROTATE.md': `# RROTATE (right rotate)
+
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Rotate bits right; LSBs wrap to MSBs. Width unchanged.
+
+## Signatures
+
+\`\`\`
+RROTATE(Xbit val, Xbit count) -> Xbit result
+RROTATE(Wbit[n] val, Wbit count ; vector) -> Wbit[n]
+\`\`\`
+
+## Scalar (default)
+
+- Rotate right by \`count mod width\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`vector\` | Per-element rotate; **same scalar \`count\`**. |
+
+## Examples
+
+### \`RROTATE(Xbit val, Xbit count)\`
+
+\`\`\`logts-play
+4wire x = 1011
+4wire y = RROTATE(x, 1)
+show(y)
+\`\`\`
+
+\`1011\` rotr 1 → \`1101\`.
+
+\`\`\`logts-play
+4wire val = 1001
+4wire cnt = 0001
+4wire r = RROTATE(val, cnt)
+show(r)
+\`\`\`
+
+→ \`1100\`.
+
+### \`RROTATE(Wbit[n] val, Wbit count ; vector)\`
+
+\`\`\`logts-play
+4wire[2] v = 1011 + 1001
+4wire cnt = 0001
+4wire[2] r = RROTATE(v, cnt; vector)
+show(r)
+\`\`\`
+
+## See also
+
+[LROTATE](builtin-LROTATE.md) · [RSHIFT](builtin-RSHIFT.md)
+`,
+    'builtin-RSHIFT.md': `# RSHIFT (logical right shift)
+
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Shift bits toward LSB; vacated MSBs filled with **0** (logical) or sign bit (\`; signed\`).
+
+## Signatures
+
+\`\`\`
+RSHIFT(Xbit val, Xbit count) -> Xbit result
+RSHIFT(Xbit val, Xbit count; signed) -> Xbit result
+RSHIFT(Wbit[n] val, Wbit count ; vector) -> Wbit[n]
+RSHIFT(Wbit[n] val, Wbit count ; vector signed) -> Wbit[n]
+\`\`\`
+
+Optional third argument \`fill\` (1 bit) for logical shift — ignored when \`; signed\` is set. See \`doc(RSHIFT)\`.
+
+## Scalar (default)
+
+- Logical shift right by \`count\` (masked to operand width)
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Arithmetic shift (ASHR): MSB replicated. |
+| \`vector\` | Per-element shift; count scalar broadcast or per-index (see \`doc(RSHIFT)\`). |
+
+## Examples
+
+### \`RSHIFT(Xbit val, Xbit count)\`
+
+\`\`\`logts-play
+4wire x = 1010
+4wire y = RSHIFT(x, 1)
+probe(y)
+\`\`\`
+
+\`1010 >> 1\` → \`0101\`.
+
+\`\`\`logts-play
+4wire val = 1000
+4wire cnt = 0001
+4wire r = RSHIFT(val, cnt)
+show(r)
+\`\`\`
+
+→ \`0100\`.
+
+### \`RSHIFT(Xbit val, Xbit count; signed)\`
+
+\`\`\`logts-play
+4wire neg = 1111
+4wire pos = 0111
+4wire log = RSHIFT(neg, 1)
+4wire arithNeg = RSHIFT(neg, 1; signed)
+4wire arithPos = RSHIFT(pos, 1; signed)
+show(log)
+show(arithNeg)
+show(arithPos)
+\`\`\`
+
+\`1111\` logical → \`0111\`; arithmetic → \`1111\`. \`0111\` (=7) arithmetic → \`0011\` (=3).
+
+### \`RSHIFT(Wbit[n] val, Wbit count ; vector)\`
+
+\`\`\`logts-play
+4wire[3] v = 1000 + 0100 + 0010
+4wire cnt = 0001
+4wire[3] r = RSHIFT(v, cnt; vector)
+show(r)
+\`\`\`
+
+### \`RSHIFT(Wbit[n] val, Wbit count ; vector signed)\`
+
+\`\`\`logts-play
+4wire[2] v = 1111 + 0111
+4wire cnt = 0001
+4wire[2] r = RSHIFT(v, cnt; vector signed)
+show(r)
+\`\`\`
+
+## See also
+
+[LSHIFT](builtin-LSHIFT.md) · [LROTATE](builtin-LROTATE.md)
+`,
     'builtin-sequential-functions.md': `# Built-in sequential functions
 
 Stateful built-ins (no panel device). Index: [builtin-functions.md](builtin-functions.md)
@@ -3537,6 +4371,229 @@ Full behaviour, examples, and \`comp [reg]\` comparison: **[reg.md](reg.md)**.
 4wire out = REG(data, clk, clr)
 probe(out)
 \`\`\`
+`,
+    'builtin-SUBTRACT.md': `# SUBTRACT
+
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector)
+
+Binary subtraction with wrap-around (two's complement style borrow).
+
+## Signatures
+
+\`\`\`
+SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
+SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
+SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
+SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+\`\`\`
+
+## Scalar (default)
+
+- \`result\` = \`(a - b) mod 2^N\`
+- \`carry\` = \`1\` if \`a < b\` (borrow); else \`0\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Same \`result\` bits; second return is signed **overflow**. |
+| \`vector\` | Per-index subtract. **No** implicit vector broadcast without the tag (unlike ADD). |
+
+## Examples
+
+### \`SUBTRACT(Xbit a, Xbit b)\`
+
+Decrement and borrow on underflow:
+
+\`\`\`logts-play
+4wire idx = 0011
+4wire dec = 0001
+4wire prevIdx, 1wire carry = SUBTRACT(idx, dec)
+show(prevIdx)
+show(carry)
+\`\`\`
+
+\`\`\`logts-play
+4wire idx2 = 0000
+4wire dec2 = 0001
+4wire prevIdx2, 1wire carry2 = SUBTRACT(idx2, dec2)
+show(prevIdx2)
+show(carry2)
+\`\`\`
+
+\`3-1=2\`. \`0-1\` wraps to \`1111\`, \`carry2=1\`.
+
+### \`SUBTRACT(Xbit a, Xbit b; signed)\`
+
+Signed overflow on underflow past representable range:
+
+\`\`\`logts-play
+4wire a = 1000
+4wire b = 0001
+4wire r, 1wire ovf = SUBTRACT(a, b; signed)
+show(r)
+show(ovf)
+\`\`\`
+
+Signed \`−8 − 1\` on 4 bits → \`r=0111\`, overflow \`1\`.
+
+### \`SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
+
+\`\`\`logts-play
+4wire[3] vectorA = 0100 + 0010 + 0001
+4wire[3] vectorB = 0001 + 0001 + 0001
+4wire[3] r, 4wire[3] f = SUBTRACT(vectorA, vectorB; vector)
+show(r)
+show(f)
+\`\`\`
+
+### \`SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed)\`
+
+Scalar subtrahend broadcast per index:
+
+\`\`\`logts-play
+4wire[3] vectorA = 0100 + 0010 + 0001
+4wire[3] r, 4wire[3] f = SUBTRACT(vectorA, 0001; vector signed)
+show(r)
+show(f)
+\`\`\`
+
+## See also
+
+[ADD](builtin-ADD.md) · \`comp [subtract]\`
+`,
+    'builtin-SUM.md': `# SUM
+
+Index: [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Reduce operands to a scalar sum, or per-index with \`; vector\`.
+
+## Signatures
+
+\`\`\`
+SUM(Wbit ...) -> Wbit result, Wbit over
+SUM(Wbit ...; signed) -> Wbit result, Wbit over
+SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]
+SUM(Wbit[n] ... ; signed vector) -> Wbit[n], Wbit[n]
+\`\`\`
+
+Variadic: whole vectors expand to elements (see [vector-reduction.md](vector-reduction.md)).
+
+## Scalar (default)
+
+- Output is **2W** bits: low **W** in \`result\`, next **W** in \`over\`
+- Full value = concatenate \`over\` then \`result\` (MSB → LSB)
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Signed two's complement sum; same 2W packing. |
+| \`vector\` | Per-index sum → \`Wbit[n]\` + \`Wbit[n] over\`. |
+
+## Examples
+
+### \`SUM(Wbit ...)\`
+
+Two scalars:
+
+\`\`\`logts-play
+4wire a = 0011
+4wire b = 0101
+4wire result, 4wire over = SUM(a, b)
+show(result)
+show(over)
+\`\`\`
+
+\`3+5=8\` → \`result=1000\`, \`over=0000\`.
+
+Whole vector (sum of elements):
+
+\`\`\`logts-play
+4wire[3] vectorA = 0001 + 0010 + 0011
+4wire result, 4wire over = SUM(vectorA)
+show(result)
+show(over)
+\`\`\`
+
+\`1+2+3=6\` → \`result=0110\`, \`over=0000\`.
+
+### \`SUM(Wbit ...; signed)\`
+
+\`\`\`logts-play
+4wire a = 1111
+4wire b = 0001
+4wire r, 4wire o = SUM(a, b; signed)
+show(r)
+show(o)
+\`\`\`
+
+Signed \`−1 + 1 = 0\`.
+
+### \`SUM(Wbit[n] a, … ; vector)\`
+
+\`\`\`logts-play
+4wire[4] vectorA = 0001 + 0010 + 0100 + 1000
+4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
+4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB; vector)
+show(r)
+show(o)
+\`\`\`
+
+### \`SUM(Wbit[n] … ; signed vector)\`
+
+\`\`\`logts-play
+4wire[2] vectorA = 1111 + 0111
+4wire[2] vectorB = 0001 + 0001
+4wire[2] r, 4wire[2] o = SUM(vectorA, vectorB; signed vector)
+show(r)
+show(o)
+\`\`\`
+
+## See also
+
+[DOT](builtin-DOT.md) · [ADD](builtin-ADD.md)
+`,
+    'builtin-tagged-index.md': `# Built-in functions with call tags
+
+Canonical reference for built-ins that accept **\`; signed\`**, **\`; vector\`**, and/or **\`; index\`**. Scalar behaviour and tag semantics live on each function page — not duplicated here.
+
+Index: [Arithmetic overview](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Bit transform](builtin-bit-transform-functions.md) · [Built-in functions](builtin-functions.md)
+
+Cross-cutting topics:
+
+- Operand expansion vs **\`; vector\`**: [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector)
+- Signed two's complement overview: [arithmetic.md — tag overview](arithmetic.md#tag-overview)
+- Wire vectors: [wire-vectors.md](wire-vectors.md)
+
+---
+
+## Index by function
+
+| Function | Page | \`signed\` | \`vector\` | \`index\` | Hub |
+|----------|------|----------|----------|---------|-----|
+| ADD | [builtin-ADD.md](builtin-ADD.md) | yes | yes | — | arithmetic |
+| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | yes | yes | — | arithmetic |
+| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | yes | yes | — | arithmetic |
+| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | yes | yes | — | arithmetic |
+| MAC | [builtin-MAC.md](builtin-MAC.md) | yes | yes | — | arithmetic |
+| GT | [builtin-GT.md](builtin-GT.md) | yes | yes | — | arithmetic |
+| LT | [builtin-LT.md](builtin-LT.md) | yes | yes | — | arithmetic |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | yes | yes | — | arithmetic / vector |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | yes | yes | — | arithmetic / vector |
+| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | yes | yes | — | arithmetic |
+| SUM | [builtin-SUM.md](builtin-SUM.md) | yes | yes | — | vector |
+| DOT | [builtin-DOT.md](builtin-DOT.md) | yes | — | — | vector |
+| ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | yes | — | yes | vector |
+| ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | yes | — | yes | vector |
+| EQ | [builtin-EQ.md](builtin-EQ.md) | — | yes | — | logic gates |
+| RSHIFT | [builtin-RSHIFT.md](builtin-RSHIFT.md) | yes | yes | — | bit transform |
+| LSHIFT | [builtin-LSHIFT.md](builtin-LSHIFT.md) | — | yes | — | bit transform |
+| LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | — | yes | — | bit transform |
+| RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | — | yes | — | bit transform |
+| REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | — | yes | — | bit transform |
+
+Use \`doc(NAME)\` in scripts for live signatures from \`Interpreter.BUILTIN_DOC\`.
 `,
     'chip.md': `# Chip components
 
@@ -17069,7 +18126,24 @@ doc(add4)
 
 Reduction builtins operate on individual wires, whole **1D vectors**, or a mix. When a whole vector is passed without \`; vector\`, each element participates as a separate operand (scalar reduction).
 
+Per-function pages: **[builtin-tagged-index.md](builtin-tagged-index.md)**.
+
 See also: [1D wire vectors](wire-vectors.md), [arithmetic](arithmetic.md) (MAC, ADD).
+
+---
+
+## Functions in this hub
+
+| Function | Page | Tags |
+|----------|------|------|
+| SUM | [builtin-SUM.md](builtin-SUM.md) | \`signed\`, \`vector\` |
+| DOT | [builtin-DOT.md](builtin-DOT.md) | \`signed\` |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | \`signed\`, \`vector\` |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | \`signed\`, \`vector\` |
+| ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | \`signed\`, \`index\` |
+| ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | \`signed\`, \`index\` |
+
+Element-wise \`EQ\`: [builtin-EQ.md](builtin-EQ.md).
 
 ---
 
@@ -17087,7 +18161,7 @@ All expanded operands must have the **same bit width** (runtime error otherwise)
 
 ---
 
-## Element-wise mode (\`; vector\`)
+## Element-wise mode (\`; vector\`) {#element-wise-mode-vector}
 
 With **\`; vector\`**, operands are combined **per index** and the result is a **vector**. At least **two** arguments and at least one **whole vector** are required. Other operands may be another vector of the same shape \`(N, W)\` or a scalar / plain wire of width **W** (broadcast to every index).
 
@@ -17109,109 +18183,9 @@ With **\`; vector\`**, operands are combined **per index** and the result is a *
 4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB; vector)
 \`\`\`
 
----
+**ARGMAX** / **ARGMIN** do not accept \`; vector\` (argument is already a whole vector). Details: [builtin-ARGMAX.md](builtin-ARGMAX.md), [builtin-ARGMIN.md](builtin-ARGMIN.md).
 
-## SUM
-
-\`\`\`
-SUM(Wbit ...) -> Wbit result, Wbit over
-SUM(Wbit ...; signed) -> Wbit result, Wbit over
-SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]
-SUM(Wbit[n] ... ; signed vector) -> Wbit[n], Wbit[n]
-\`\`\`
-
-Returns the sum of all operands (unsigned by default). With \`; signed\`, each operand is **two's complement** on width **W**. Output is **2W bits** total: low **W** bits in \`result\`, next **W** bits in \`over\`. Full value = concatenate \`over\` then \`result\` (MSB → LSB), same convention as [MAC](arithmetic.md#mac-multiply-accumulate).
-
-With \`; vector\`, each index has its own \`result[i]\` and \`over[i]\` (same 2W packing per element).
-
-Overflow (more than **2W** bits needed per sum) is a **runtime error**.
-
-\`\`\`logts-play
-4wire a = 0011
-4wire b = 0101
-4wire result, 4wire over = SUM(a, b)
-show(result)
-show(over)
-\`\`\`
-
-Single vector (sum of elements, scalar reduction):
-
-\`\`\`logts-play
-4wire[3] vectorA = 0001 + 0010 + 0011
-4wire result, 4wire over = SUM(vectorA)
-show(result)
-\`\`\`
-
----
-
-## MIN / MAX
-
-\`\`\`
-MIN(Wbit ...) -> Wbit
-MAX(Wbit ...) -> Wbit
-MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
-MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
-\`\`\`
-
-Variadic (≥ 2 operands after expansion, or ≥ 2 arguments with \`; vector\`). Unsigned compare by default; \`; signed\` uses two's complement. With \`; vector\`, returns one **vector** blob (\`Wbit[n]\`).
-
-\`\`\`logts-play
-4wire[3] vectorA = 0100 + 0010 + 0110
-4wire m = MIN(vectorA)
-show(m)
-\`\`\`
-
----
-
-## ARGMAX / ARGMIN
-
-Position of the maximum or minimum element in one **whole vector** (not the value — use \`MAX\` / \`MIN\` for that).
-
-\`\`\`
-ARGMAX(Wbit[n] vector) -> 1wire[n]
-ARGMAX(Wbit[n] vector; index) -> bitIndexWidth(n) bit
-ARGMIN(Wbit[n] vector) -> 1wire[n]
-ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit
-\`\`\`
-
-Without \`; index\`, returns a **one-hot** \`1wire[n]\` mask (\`1\` at the winning index). With **\`; index\`**, returns the winning index as an unsigned integer (\`bitIndexWidth(n)\` bits — same formula as \`BITINDEX\` / queue indices: \`32 - Math.clz32(n - 1)\` for \`n > 1\`). Assign a wider wire with \`=:\` or \`:=\` if you need left padding.
-
-**\`; signed\`** compares elements as two's complement (combinable with \`; index\`). On ties, the **smallest index** wins (same rule as \`MIN\` / \`MAX\` reduction).
-
-Does **not** accept \`; vector\` (the argument is already a whole vector). Slice-only operands are not supported.
-
-\`\`\`logts-play
-4wire[3] vectorA = 1111 + 0010 + 0001
-1wire[3] hot = ARGMAX(vectorA)
-2wire idx = ARGMIN(vectorA; index)
-show(hot)
-show(idx)
-\`\`\`
-
----
-
-## DOT
-
-\`\`\`
-DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
-DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
-\`\`\`
-
-Dot product of two whole vectors (same shape). With \`; signed\`, each element is interpreted as **two's complement** before multiply-accumulate; output packing (\`result\` low **W**, \`over\` next **2W**) is unchanged.
-
-Dot product of two **whole vectors** of the same shape (\`elementWidth\` × \`elementCount\`). Output is **3W bits**: low **W** in \`result\`, next **2W** in \`over\`.
-
-\`\`\`logts-play
-4wire[3] vectorA = 0001 + 0010 + 0011
-4wire[3] vectorB = 0100 + 0101 + 0110
-4wire result, 8wire over = DOT(vectorA, vectorB)
-show(result)
-show(over)
-\`\`\`
-
-Equivalent to accumulating \`MAC(acc, vectorA:i, vectorB:i)\` with \`acc = 0\` over each index \`i\` (implementation may fuse in one pass).
-
-Slice arguments (\`DOT(vectorA:0, vectorB:0)\`) are **not** supported — use \`MULTIPLY\` / \`MAC\` for a single product.
+**DOT** requires two whole vectors of the same shape; no \`; vector\` tag. Equivalent to \`MAC(acc, a:i, b:i)\` with \`acc = 0\` over each index — [builtin-DOT.md](builtin-DOT.md).
 
 ---
 
@@ -17219,20 +18193,23 @@ Slice arguments (\`DOT(vectorA:0, vectorB:0)\`) are **not** supported — use \`
 
 | Function | Bits needed (worst case) | Output width |
 |----------|--------------------------|--------------|
-| SUM (scalar) | \`W + ceil(log2(k))\` | **2W** |
+| SUM (scalar) | \`W + ceil(log2(k))\` | **2W** (\`result\` + \`over\`) |
 | SUM (\`; vector\`) | \`2W\` per index | **2W** per element |
-| DOT | \`2W + ceil(log2(n))\` | **3W** |
+| DOT | \`2W + ceil(log2(n))\` | **W** + **(2W)** over |
 
 \`k\` = operand count after expansion; \`n\` = element count; \`W\` = element width.
 
-For typical perceptron sizes (\`16wire[50]\`, \`32wire[50]\`, \`64wire[50]\`), built-in **BigInt** evaluation is sufficient. Very large \`n\` (10⁴+) may be slow in the simulator — see plan V2 for full perceptron examples.
+Overflow beyond the documented output width is a **runtime error**.
+
+For typical perceptron sizes (\`16wire[50]\`, \`32wire[50]\`, \`64wire[50]\`), built-in **BigInt** evaluation is sufficient.
 
 ---
 
 ## Related
 
 - [wire-vectors.md — reduction](wire-vectors.md#reduction-functions)
-- [arithmetic.md — MAC](arithmetic.md#mac-multiply-accumulate)
+- [arithmetic.md](arithmetic.md)
+- [builtin-MAC.md](builtin-MAC.md)
 `,
     'wire-vectors.md': `# 1D wire vectors (\`4wire[3]\`)
 

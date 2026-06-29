@@ -2,7 +2,24 @@
 
 Reduction builtins operate on individual wires, whole **1D vectors**, or a mix. When a whole vector is passed without `; vector`, each element participates as a separate operand (scalar reduction).
 
+Per-function pages: **[builtin-tagged-index.md](builtin-tagged-index.md)**.
+
 See also: [1D wire vectors](wire-vectors.md), [arithmetic](arithmetic.md) (MAC, ADD).
+
+---
+
+## Functions in this hub
+
+| Function | Page | Tags |
+|----------|------|------|
+| SUM | [builtin-SUM.md](builtin-SUM.md) | `signed`, `vector` |
+| DOT | [builtin-DOT.md](builtin-DOT.md) | `signed` |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `vector` |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | `signed`, `vector` |
+| ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | `signed`, `index` |
+| ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | `signed`, `index` |
+
+Element-wise `EQ`: [builtin-EQ.md](builtin-EQ.md).
 
 ---
 
@@ -20,7 +37,7 @@ All expanded operands must have the **same bit width** (runtime error otherwise)
 
 ---
 
-## Element-wise mode (`; vector`)
+## Element-wise mode (`; vector`) {#element-wise-mode-vector}
 
 With **`; vector`**, operands are combined **per index** and the result is a **vector**. At least **two** arguments and at least one **whole vector** are required. Other operands may be another vector of the same shape `(N, W)` or a scalar / plain wire of width **W** (broadcast to every index).
 
@@ -42,109 +59,9 @@ With **`; vector`**, operands are combined **per index** and the result is a **v
 4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB; vector)
 ```
 
----
+**ARGMAX** / **ARGMIN** do not accept `; vector` (argument is already a whole vector). Details: [builtin-ARGMAX.md](builtin-ARGMAX.md), [builtin-ARGMIN.md](builtin-ARGMIN.md).
 
-## SUM
-
-```
-SUM(Wbit ...) -> Wbit result, Wbit over
-SUM(Wbit ...; signed) -> Wbit result, Wbit over
-SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]
-SUM(Wbit[n] ... ; signed vector) -> Wbit[n], Wbit[n]
-```
-
-Returns the sum of all operands (unsigned by default). With `; signed`, each operand is **two's complement** on width **W**. Output is **2W bits** total: low **W** bits in `result`, next **W** bits in `over`. Full value = concatenate `over` then `result` (MSB → LSB), same convention as [MAC](arithmetic.md#mac-multiply-accumulate).
-
-With `; vector`, each index has its own `result[i]` and `over[i]` (same 2W packing per element).
-
-Overflow (more than **2W** bits needed per sum) is a **runtime error**.
-
-```logts-play
-4wire a = 0011
-4wire b = 0101
-4wire result, 4wire over = SUM(a, b)
-show(result)
-show(over)
-```
-
-Single vector (sum of elements, scalar reduction):
-
-```logts-play
-4wire[3] vectorA = 0001 + 0010 + 0011
-4wire result, 4wire over = SUM(vectorA)
-show(result)
-```
-
----
-
-## MIN / MAX
-
-```
-MIN(Wbit ...) -> Wbit
-MAX(Wbit ...) -> Wbit
-MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
-MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
-```
-
-Variadic (≥ 2 operands after expansion, or ≥ 2 arguments with `; vector`). Unsigned compare by default; `; signed` uses two's complement. With `; vector`, returns one **vector** blob (`Wbit[n]`).
-
-```logts-play
-4wire[3] vectorA = 0100 + 0010 + 0110
-4wire m = MIN(vectorA)
-show(m)
-```
-
----
-
-## ARGMAX / ARGMIN
-
-Position of the maximum or minimum element in one **whole vector** (not the value — use `MAX` / `MIN` for that).
-
-```
-ARGMAX(Wbit[n] vector) -> 1wire[n]
-ARGMAX(Wbit[n] vector; index) -> bitIndexWidth(n) bit
-ARGMIN(Wbit[n] vector) -> 1wire[n]
-ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit
-```
-
-Without `; index`, returns a **one-hot** `1wire[n]` mask (`1` at the winning index). With **`; index`**, returns the winning index as an unsigned integer (`bitIndexWidth(n)` bits — same formula as `BITINDEX` / queue indices: `32 - Math.clz32(n - 1)` for `n > 1`). Assign a wider wire with `=:` or `:=` if you need left padding.
-
-**`; signed`** compares elements as two's complement (combinable with `; index`). On ties, the **smallest index** wins (same rule as `MIN` / `MAX` reduction).
-
-Does **not** accept `; vector` (the argument is already a whole vector). Slice-only operands are not supported.
-
-```logts-play
-4wire[3] vectorA = 1111 + 0010 + 0001
-1wire[3] hot = ARGMAX(vectorA)
-2wire idx = ARGMIN(vectorA; index)
-show(hot)
-show(idx)
-```
-
----
-
-## DOT
-
-```
-DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
-DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
-```
-
-Dot product of two whole vectors (same shape). With `; signed`, each element is interpreted as **two's complement** before multiply-accumulate; output packing (`result` low **W**, `over` next **2W**) is unchanged.
-
-Dot product of two **whole vectors** of the same shape (`elementWidth` × `elementCount`). Output is **3W bits**: low **W** in `result`, next **2W** in `over`.
-
-```logts-play
-4wire[3] vectorA = 0001 + 0010 + 0011
-4wire[3] vectorB = 0100 + 0101 + 0110
-4wire result, 8wire over = DOT(vectorA, vectorB)
-show(result)
-show(over)
-```
-
-Equivalent to accumulating `MAC(acc, vectorA:i, vectorB:i)` with `acc = 0` over each index `i` (implementation may fuse in one pass).
-
-Slice arguments (`DOT(vectorA:0, vectorB:0)`) are **not** supported — use `MULTIPLY` / `MAC` for a single product.
+**DOT** requires two whole vectors of the same shape; no `; vector` tag. Equivalent to `MAC(acc, a:i, b:i)` with `acc = 0` over each index — [builtin-DOT.md](builtin-DOT.md).
 
 ---
 
@@ -152,17 +69,20 @@ Slice arguments (`DOT(vectorA:0, vectorB:0)`) are **not** supported — use `MUL
 
 | Function | Bits needed (worst case) | Output width |
 |----------|--------------------------|--------------|
-| SUM (scalar) | `W + ceil(log2(k))` | **2W** |
+| SUM (scalar) | `W + ceil(log2(k))` | **2W** (`result` + `over`) |
 | SUM (`; vector`) | `2W` per index | **2W** per element |
-| DOT | `2W + ceil(log2(n))` | **3W** |
+| DOT | `2W + ceil(log2(n))` | **W** + **(2W)** over |
 
 `k` = operand count after expansion; `n` = element count; `W` = element width.
 
-For typical perceptron sizes (`16wire[50]`, `32wire[50]`, `64wire[50]`), built-in **BigInt** evaluation is sufficient. Very large `n` (10⁴+) may be slow in the simulator — see plan V2 for full perceptron examples.
+Overflow beyond the documented output width is a **runtime error**.
+
+For typical perceptron sizes (`16wire[50]`, `32wire[50]`, `64wire[50]`), built-in **BigInt** evaluation is sufficient.
 
 ---
 
 ## Related
 
 - [wire-vectors.md — reduction](wire-vectors.md#reduction-functions)
-- [arithmetic.md — MAC](arithmetic.md#mac-multiply-accumulate)
+- [arithmetic.md](arithmetic.md)
+- [builtin-MAC.md](builtin-MAC.md)

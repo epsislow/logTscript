@@ -90,9 +90,10 @@ show(any)
 
 ```
 EQ(Xbit, Xbit) -> 1bit
+EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 ```
 
-Compares two operands bit-by-bit; returns `1` only if every bit pair matches. For **unsigned numeric** ordering use `GT` / `LT` in [arithmetic.md](arithmetic.md).
+Bitwise equality (all bits must match). For **unsigned numeric** ordering use `GT` / `LT` in [arithmetic.md](arithmetic.md). Full reference: **[builtin-EQ.md](builtin-EQ.md)** (`; vector` for per-index compare).
 
 ### Runnable example
 

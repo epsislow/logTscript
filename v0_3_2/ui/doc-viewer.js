@@ -7,7 +7,8 @@ const DOC_SECTIONS = [
     items: [
       { file: 'doc-function.md', label: 'doc() function' },
       { file: 'user-functions.md', label: 'User functions (def)', searchExtra: 'def define call return LOAD alias library user-defined function arity body' },
-      { file: 'builtin-functions.md', label: 'Built-in functions', searchExtra: 'internal MUX DEMUX REG LATCH NOT AND OR shift arithmetic builtin HIGH BITINDEX ONEHOT' },
+      { file: 'builtin-functions.md', label: 'Built-in functions', searchExtra: 'internal MUX DEMUX REG LATCH NOT AND OR shift arithmetic builtin HIGH BITINDEX ONEHOT ADD SUBTRACT vector signed tag' },
+      { file: 'builtin-tagged-index.md', label: 'Tagged built-ins (signed / vector / index)', searchExtra: 'ADD SUBTRACT MULTIPLY DIVIDE MAC GT LT MIN MAX CLAMP SUM DOT ARGMAX ARGMIN EQ RSHIFT LSHIFT signed vector index call tag' },
       { file: 'builtin-logic-gate-functions.md', label: 'Built-in logic gates' },
       { file: 'builtin-sequential-functions.md', label: 'Built-in sequential (LATCH, REG)' },
       { file: 'builtin-routing-functions.md', label: 'Built-in routing (MUX, DEMUX)' },
@@ -112,7 +113,67 @@ const DOC_SECTIONS = [
 const DOC_SEARCH_ONLY = [
     { file: 'future-component-ideas.md', label: 'Future component ideas', section: 'Backlog',
       searchExtra:
-        'planning roadmap backlog alu dpram lut mux demux decoder rom stack fifo uart gpio slider irq dma eeprom' }
+        'planning roadmap backlog alu dpram lut mux demux decoder rom stack fifo uart gpio slider irq dma eeprom' },
+    { file: 'builtin-ADD.md', label: 'ADD', section: 'Arithmetic',
+      searchExtra:
+        'signed vector carry overflow add' },
+    { file: 'builtin-SUBTRACT.md', label: 'SUBTRACT', section: 'Arithmetic',
+      searchExtra:
+        'signed vector borrow subtract' },
+    { file: 'builtin-MULTIPLY.md', label: 'MULTIPLY', section: 'Arithmetic',
+      searchExtra:
+        'signed vector multiply over' },
+    { file: 'builtin-DIVIDE.md', label: 'DIVIDE', section: 'Arithmetic',
+      searchExtra:
+        'signed vector quotient mod divide' },
+    { file: 'builtin-MAC.md', label: 'MAC', section: 'Arithmetic',
+      searchExtra:
+        'signed vector multiply accumulate' },
+    { file: 'builtin-GT.md', label: 'GT', section: 'Arithmetic',
+      searchExtra:
+        'signed vector greater than compare' },
+    { file: 'builtin-LT.md', label: 'LT', section: 'Arithmetic',
+      searchExtra:
+        'signed vector less than compare' },
+    { file: 'builtin-MIN.md', label: 'MIN', section: 'Arithmetic',
+      searchExtra:
+        'signed vector minimum' },
+    { file: 'builtin-MAX.md', label: 'MAX', section: 'Arithmetic',
+      searchExtra:
+        'signed vector maximum' },
+    { file: 'builtin-CLAMP.md', label: 'CLAMP', section: 'Arithmetic',
+      searchExtra:
+        'signed vector bounds clamp' },
+    { file: 'builtin-SUM.md', label: 'SUM', section: 'Vector reduction',
+      searchExtra:
+        'signed vector sum reduction over' },
+    { file: 'builtin-DOT.md', label: 'DOT', section: 'Vector reduction',
+      searchExtra:
+        'signed dot product vector' },
+    { file: 'builtin-ARGMAX.md', label: 'ARGMAX', section: 'Vector reduction',
+      searchExtra:
+        'signed index one-hot argmax maximum position' },
+    { file: 'builtin-ARGMIN.md', label: 'ARGMIN', section: 'Vector reduction',
+      searchExtra:
+        'signed index one-hot argmin minimum position' },
+    { file: 'builtin-EQ.md', label: 'EQ', section: 'Logic gates',
+      searchExtra:
+        'vector equality bitwise equal' },
+    { file: 'builtin-RSHIFT.md', label: 'RSHIFT', section: 'Bit transform',
+      searchExtra:
+        'signed vector shift right ASHR logical' },
+    { file: 'builtin-LSHIFT.md', label: 'LSHIFT', section: 'Bit transform',
+      searchExtra:
+        'vector shift left' },
+    { file: 'builtin-LROTATE.md', label: 'LROTATE', section: 'Bit transform',
+      searchExtra:
+        'vector rotate left' },
+    { file: 'builtin-RROTATE.md', label: 'RROTATE', section: 'Bit transform',
+      searchExtra:
+        'vector rotate right' },
+    { file: 'builtin-REVERSE.md', label: 'REVERSE', section: 'Bit transform',
+      searchExtra:
+        'vector reverse bits' }
 ];
 // END GENERATED DOC_SECTIONS
 
