@@ -2,6 +2,8 @@
 
 Short notation allows writing logical expressions in a compact way, using symbolic operators instead of explicit function calls.
 
+For a full catalog of literal forms (`\N`, `\-N;W`, `^HEX`, `^-HEX;W`, `"..."`, binary, padding, bit range), see **[wire-literals.md](wire-literals.md)**.
+
 The short notation zone is delimited by **backticks** (`` ` ``). Everything between two backticks is automatically expanded into standard function calls before tokenization.
 
 ```

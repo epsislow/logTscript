@@ -6,6 +6,8 @@ All are **statements** (like `doc`) — they cannot appear on the right side of 
 
 For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md](boolean-lut.md)** and **[boolean-analysis.md](boolean-analysis.md)**.
 
+For **source literals** in assignments (`\255`, `\-3;8`, `"Hello"`), see **[wire-literals.md](wire-literals.md)**. Display tag `ascii` formats wire values as quoted text in the Output panel (see [show — display tags](#show)).
+
 ---
 
 ## Quick comparison
