@@ -26,8 +26,10 @@ ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], 
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Same `result` bits; second return is **signed overflow** (not unsigned carry). |
-| `vector` | Element-wise add; `result` and flag blobs are `Wbit[n]`. |
-| `matrix` | Per-cell add on 2D tensors → `Wbit[N,M]` + flags. Mutually exclusive with `vector`. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per index on **rank-1** tensors (`Wwire[N]`, `Wwire[1,N]`, `Wwire[N,1]`); matching `elementCount`. |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]` (`N>1`, `M>1`); rank-1 operands broadcast. Mutually exclusive with `vector`. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** rank-1 vs matrix — [wire-vectors.md](wire-vectors.md#rank-1-vs-matrix).
 
 **Implicit vector broadcast:** `ADD(vectorA, scalar)` without `; vector` also produces element-wise `Wbit[n]` (legacy). Explicit `; vector` documents the same semantics.
 
@@ -107,7 +109,7 @@ Row broadcast:
 
 ```logts-play
 4wire[2,2] m = 0001 + 0010 + 0100 + 1000
-4wire[2] row = 0001 + 0010
+4wire[1,2] row = 0001 + 0010
 4wire[2,2] r, 4wire[2,2] f = ADD(m, row; matrix)
 show(r)
 ```

@@ -1,6 +1,6 @@
 # Matrix element-wise mode (`; matrix`)
 
-Built-ins that support **`; vector`** also support **`; matrix`** for **2D tensors** (`4wire[N,M]` with **N>1** and **M>1**, or broadcast with row/column vectors).
+Built-ins that support **`; vector`** also support **`; matrix`** for **true 2D matrices** (`4wire[N,M]` with **N>1** and **M>1**), with optional **rank-1 vector** operands that broadcast (see table below).
 
 Index: [2D tensors](wire-vectors.md) · [Tagged built-ins](builtin-tagged-index.md) · [Vector element-wise mode](vector-reduction.md#element-wise-mode-vector)
 
@@ -11,21 +11,23 @@ Index: [2D tensors](wire-vectors.md) · [Tagged built-ins](builtin-tagged-index.
 | Mode | Operands | Result |
 |------|----------|--------|
 | (default) | scalars, expanded vectors | scalar or reduction |
-| **`; vector`** | rank-1 tensors `[1,N]` / `[N,1]` | vector `[1,N]` per index |
-| **`; matrix`** | at least one **matrix** `[N,M]` | matrix `[N,M]` per cell |
+| **`; vector`** | rank-1 tensors `[N]`, `[1,N]`, `[N,1]` (same `elementCount`) | vector per index `:i` |
+| **`; matrix`** | at least one **matrix** `[N,M]` with **N>1, M>1** | matrix `[N,M]` per cell |
 
 **`; vector`** and **`; matrix`** are **mutually exclusive** in one call.
+
+Rank-1 shapes are **vectors**, not matrices — use **`; vector`** for element-wise ops on them, or pair them with a matrix under **`; matrix`** for broadcast.
 
 ---
 
 ## Operand broadcast (per cell `(r,c)`)
 
-| Operand shape | At cell `(r,c)` uses |
-|---------------|----------------------|
-| Matrix `[N,M]` | `M[r,c]` |
-| Scalar / plain `Wbit` | same scalar |
-| Row vector `[1,M]` | `row[c]` |
-| Column vector `[N,1]` | `col[r]` |
+| Operand shape | Kind | At cell `(r,c)` uses |
+|---------------|------|----------------------|
+| Matrix `[N,M]` | matrix | `M[r,c]` |
+| Scalar / plain `Wbit` | scalar | same scalar |
+| `[1,M]` or `4wire[M]` | rank-1 (row) | element `c` |
+| `[N,1]` | rank-1 (column) | element `r` |
 
 All operands must agree on **element width W**. Matrix operands must share the same **`[N,M]`** (or one side broadcasts as row/column/scalar).
 
@@ -68,7 +70,7 @@ Per-function pages: [builtin-tagged-index.md](builtin-tagged-index.md).
 | GT, LT, EQ | `1wire[rows×cols]` (one bit per cell, row-major) |
 | Shifts / rotates / REVERSE | same shape as input matrix |
 
-Declare the target wire as **`4wire[N,M]`** (or matching rank-1 shape for `; vector`).
+Declare the target wire as **`4wire[N,M]`** for **`; matrix`**, or **`4wire[N]`** / **`4wire[N,1]`** / **`4wire[1,N]`** for **`; vector`** (matching `elementCount`).
 
 ---
 

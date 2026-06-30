@@ -26,8 +26,10 @@ CLAMP(Wbit[n,m] x, … ; matrix signed) -> Wbit[n,m]
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed bounds. |
-| `vector` | Per-index clamp; bounds broadcast if scalar. |
-| `matrix` | Per-cell clamp → `Wbit[N,M]`; bounds broadcast as row/col/scalar. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per index on **rank-1** tensors; bounds broadcast if scalar. |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]`; bounds broadcast as rank-1 row/col/scalar. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 

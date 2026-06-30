@@ -27,21 +27,36 @@ Multidimensional forms `4wire[N,M]` (2D tensors) are supported — see [2D tenso
 
 ## 2D tensors (`4wire[N,M]`)
 
-A **matrix** is a contiguous wire with two-dimensional metadata. Syntax: `Nwire[rows,cols] name` declares one wire of `N × rows × cols` bits, stored **row-major** (same MSB-first convention as 1D vectors).
+Contiguous wires with two-dimensional **metadata**. Syntax: `Nwire[rows,cols] name` stores `N × rows × cols` bits **row-major** (MSB-first, same as 1D vectors).
+
+### Rank-1 vs matrix
+
+| Shape | Role | `; vector` | `; matrix` (needs a true matrix operand) |
+|-------|------|------------|------------------------------------------|
+| `4wire[N]` | rank-1 vector | per index `:i` | broadcasts as row `[1,N]` when paired with a matrix |
+| `4wire[1,N]` | rank-1 (horizontal) | per index `:i` | broadcasts across columns when paired with a matrix |
+| `4wire[N,1]` | rank-1 (vertical) | per index `:i` | broadcasts across rows when paired with a matrix |
+| `4wire[R,C]` **R>1 and C>1** | **matrix** | — (use `; matrix`) | per cell `(r,c)` |
+
+**Rank-1** tensors (`[N]`, `[1,N]`, `[N,1]`) are **vectors**, not matrices. Built-ins compare **`elementCount`** and **`elementWidth`**, not whether the declaration used a comma. **`DOT`** on two rank-1 operands with the same length is a **scalar** dot product (`[3,1]`×`[3,1]` ≡ `[3]`×`[3]`).
+
+Only **`R>1` and `C>1`** is a **matrix** for `; matrix`, **REPEAT** (rejected), and matrix-style indexing (`m:r` = row slice).
 
 ```logts
-4wire[3,2] matrixA
-4wire[3,1] colVec    # vertical vector
-4wire[1,N] rowVec    # same as 4wire[N]
-4wire[1] scalarA     # equivalent to plain 4wire (no tensor indexing)
+4wire[3,2] matrixA      # matrix
+4wire[3,1] colVec       # rank-1 vertical vector
+4wire[1,3] rowVec       # rank-1 horizontal vector (same bits as 4wire[3] for show/index)
+4wire[3] vec            # rank-1 (single-dim syntax)
 ```
 
 | Concept | Meaning |
 |---------|---------|
-| `4wire[3,2]` | 3×2 cells × 4 bits = **24-bit** wire |
+| `4wire[3,2]` | 3×2 cells × 4 bits = **24-bit** wire — **matrix** |
 | Internal storage | `wire.tensor = { elementWidth: 4, dims: [3, 2] }` plus `wire.vector` for compat |
 | Display type | `4wire[3,2]` — not `24wire` |
-| `4wire[3,1]` | vertical vector, displayed as `4wire[3,1]` |
+| `4wire[3,1]` / `4wire[1,3]` | rank-1; type label may show `4wire[3,1]` or normalize to `4wire[3]` for `[1,N]` |
+| `show` footer (rank-1) | `has length [N]` for all rank-1 shapes (including `[N,1]`) |
+| `show` footer (matrix) | `has shape [R,C]` |
 
 ### Indexing (2D)
 
@@ -50,7 +65,7 @@ A **matrix** is a contiguous wire with two-dimensional metadata. Syntax: `Nwire[
 | `matrixA:r:c` | cell `(r,c)` — scalar `Nwire` |
 | `matrixA:r` | row `r` — vector of width `cols × N` |
 | `matrixA::c` | column `c` — vector of width `rows × N` |
-| `vectorB:i` | linear element `i` on rank-1 tensors (`[1,N]` or `[N,1]`) |
+| `vectorB:i` | linear element `i` on rank-1 tensors (`[N]`, `[1,N]`, `[N,1]`) |
 
 On a **matrix** (both dimensions > 1), a single `:r` indexes a **row slice**, not a linear cell. Use `:r:c` for individual cells.
 
@@ -87,7 +102,7 @@ show(a)
 
 Full reference: **[matrix-reduction.md](matrix-reduction.md)**.
 
-Use `; matrix` on the same built-ins as `; vector` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with `; vector`. Operands broadcast per cell: whole matrix, scalar, horizontal row `[1,N]`, or vertical column `[N,1]`.
+Use `; matrix` on the same built-ins as `; vector` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with `; vector`. Requires at least one **matrix** operand (`R>1`, `C>1`). Other operands may be scalars or **rank-1 vectors** (`[1,M]` row or `[N,1]` column) that broadcast per cell.
 
 Example **`ADD(… ; matrix)`**: [builtin-ADD.md](builtin-ADD.md). Full list: [builtin-tagged-index.md](builtin-tagged-index.md).
 
@@ -95,7 +110,9 @@ Dual-output ops (`ADD`, `SUM`, `MULTIPLY`, …) return **per-cell** result and f
 
 ### Oriented `; vector` (rank-1 broadcast)
 
-For `4wire[N]` + `4wire[N,1]` (or the reverse), `; vector` on **SUM** / **ADD** broadcasts the horizontal vector against the vertical one: each output index `i` combines `horiz[i]` with **all** vertical elements.
+For **`4wire[N]`** + **`4wire[N,1]`** (horizontal + vertical rank-1), **`; vector`** on **SUM** / **ADD** uses **oriented** broadcast: each output index `i` combines `horiz[i]` with **all** vertical elements. This is **not** the same as element-wise `ADD(a, b; vector)` on two `[N,1]` operands.
+
+For element-wise ops on matching rank-1 shapes, use two tensors with the same **`elementCount`** (e.g. both `4wire[3,1]`).
 
 ```logts-play
 4wire[3] horiz = 0001 + 0010 + 0100
@@ -110,8 +127,8 @@ show(r)
 
 | A | B | Result |
 |---|---|--------|
-| `[1,N]` | `[1,N]` | scalar `Wbit` (+ `2W` over) |
-| `[N,1]` | `[1,N]` | scalar |
+| rank-1, same **N** elements (`[N]`, `[1,N]`, `[N,1]`) | rank-1, same **N** | scalar `Wbit` (+ `2W` over) |
+| `[N,1]` | `[1,N]` (or `[N]` / `[1,N]`) | scalar |
 | `[N,K]` | `[K,M]` | matrix `[N,M]` — result `W` bits/cell, over `2W` bits/cell |
 
 **ARGMAX** / **ARGMIN** on a matrix return a **one-hot** over `rows×cols` bits, or with `; index` return `(row, col)` index wires.
@@ -214,7 +231,7 @@ Result: `111100110000` — only element 1 changes.
 
 ## show / peek
 
-For a whole vector, output is **multi-line**:
+For a whole **rank-1** tensor, output is **multi-line**:
 
 ```text
 vectorA = 111100110101 (12bit)
@@ -224,11 +241,15 @@ vectorA = 111100110101 (12bit)
 vectorA has length [3]
 ```
 
+(`4wire[3,1]` and `4wire[1,3]` use the same `:i` layout and `has length [N]`.)
+
 | Case | Behaviour |
 |------|-----------|
 | `show(vectorA)` | Header + all elements if ≤ 5 elements |
 | More than 5 elements | First three elements, `..`, last element |
-| `show(vectorA:1)` | Single element line + length line |
+| `show(vectorA:1)` | Single element line + `has length [N]` |
+| `show(matrixA)` (matrix) | Per-cell `:r:c` lines + `has shape [R,C]` |
+| `show(matrixA:0)` (row slice) | Flat row header + `:0:0`…`:0:(C-1)` cell lines + parent `has shape [R,C]` |
 | `peek(vectorA)` | Same layout as `show` (emitted at statement position) |
 | `show(vectorA; elAll dec)` | All cells in decimal; tags at end — see [debug.md — show](debug.md#show) |
 

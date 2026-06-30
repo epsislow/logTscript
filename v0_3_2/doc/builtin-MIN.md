@@ -24,8 +24,10 @@ Variadic (≥ 2 operands after expansion). Whole vectors expand to elements.
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed minimum. |
-| `vector` | Element-wise min. |
-| `matrix` | Per-cell min on 2D tensors → `Wbit[N,M]`. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per index on **rank-1** tensors. |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 

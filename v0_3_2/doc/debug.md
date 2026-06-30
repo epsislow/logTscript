@@ -149,7 +149,7 @@ Exactly **one** of `dec`, `hex`, `bin`, or `ascii` per statement. `signed` combi
 
 | Tag | Effect |
 |-----|--------|
-| `compact` | Vector/matrix: header + `has length` / `has shape` only — no `:i` lines |
+| `compact` | Rank-1: header + `has length [N]` only; matrix: header + `has shape [R,C]` — no `:i` lines |
 | `elAll` | List every vector/matrix cell (no `..` truncation) |
 | `elNonZero` | List only non-zero cells |
 | `elRange=0-3` | Vector: elements `:0`…`:3`; matrix: rows `0`…`3` (all columns). Matrix 2D: `elRange=0-1,2-4` |
@@ -172,6 +172,14 @@ show(w; signed)            # w (4wire) = \-1;4
 show(code; ascii)          # code (8wire) = "A"
 40wire msg := "Hello"
 show(msg; ascii)           # msg (40wire) = "Hello"
+```
+
+Rank-1 tensors (`4wire[3]`, `4wire[3,1]`) use `has length [N]` in `show` output. Matrix row slices (`show(m:0)`) print a flat row header plus `:0:0`…`:0:(C-1)` cell lines and the parent `has shape [R,C]`:
+
+```logts
+4wire[1,3] row = 0001 + 0010 + 0100
+4wire[2,3] m = REPEAT(row, \2)
+show(m:0; dec)
 ```
 
 Each argument is an expression atom: wire name, component reference (`.comp:get`), bit slice (`a.0`, `a.2-4`), storage ref (`&3`), literal (`\255`, `^-A;8`, `"text"`), etc.

@@ -13,7 +13,7 @@ ARGMAX(Wbit[n] vector; signed) -> 1wire[n]
 ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit
 ```
 
-**No `; vector` tag** — the argument is already a whole vector.
+**No `; vector` tag** — the argument is already a whole vector. Applies to any **rank-1** tensor (`Wwire[N]`, `Wwire[1,N]`, `Wwire[N,1]`); see [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 | Mode | Output | Description |
 |------|--------|-------------|

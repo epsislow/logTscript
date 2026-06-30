@@ -2,7 +2,7 @@
 
 Index: [Vector reduction](vector-reduction.md) · [Matrix `; matrix`](matrix-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
 
-Reduce operands to a scalar sum, or per-index with `; vector`, or per-cell on 2D tensors with `; matrix`.
+Reduce operands to a scalar sum, or per-index with `; vector` on rank-1 tensors, or per-cell with `; matrix` on true matrices (`R>1`, `C>1`).
 
 ## Signatures
 
@@ -27,8 +27,10 @@ Variadic: whole vectors expand to elements (see [vector-reduction.md](vector-red
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed two's complement sum; same 2W packing. |
-| `vector` | Per-index sum → `Wbit[n]` + `Wbit[n] over`. |
-| `matrix` | Per-cell sum on 2D tensors → `Wbit[N,M]` + `Wbit[N,M] over`. Mutually exclusive with `vector`. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per index on **rank-1** tensors → `Wbit[n]` + `Wbit[n] over`. |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. Mutually exclusive with `vector`. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 

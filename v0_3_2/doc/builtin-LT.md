@@ -22,8 +22,10 @@ LT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> 1wire[n×m]
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Two's complement comparison. |
-| `vector` | Per-index `1wire[n]`. |
-| `matrix` | Per-cell compare → **`1wire[N×M]`**. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per index on **rank-1** tensors → `1wire[n]`. |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]` → `1wire[N×M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 

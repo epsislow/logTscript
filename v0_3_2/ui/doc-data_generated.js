@@ -2318,8 +2318,10 @@ ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], 
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Same \`result\` bits; second return is **signed overflow** (not unsigned carry). |
-| \`vector\` | Element-wise add; \`result\` and flag blobs are \`Wbit[n]\`. |
-| \`matrix\` | Per-cell add on 2D tensors → \`Wbit[N,M]\` + flags. Mutually exclusive with \`vector\`. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors (\`Wwire[N]\`, \`Wwire[1,N]\`, \`Wwire[N,1]\`); matching \`elementCount\`. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\` (\`N>1\`, \`M>1\`); rank-1 operands broadcast. Mutually exclusive with \`vector\`. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** rank-1 vs matrix — [wire-vectors.md](wire-vectors.md#rank-1-vs-matrix).
 
 **Implicit vector broadcast:** \`ADD(vectorA, scalar)\` without \`; vector\` also produces element-wise \`Wbit[n]\` (legacy). Explicit \`; vector\` documents the same semantics.
 
@@ -2399,7 +2401,7 @@ Row broadcast:
 
 \`\`\`logts-play
 4wire[2,2] m = 0001 + 0010 + 0100 + 1000
-4wire[2] row = 0001 + 0010
+4wire[1,2] row = 0001 + 0010
 4wire[2,2] r, 4wire[2,2] f = ADD(m, row; matrix)
 show(r)
 \`\`\`
@@ -2433,7 +2435,7 @@ ARGMAX(Wbit[n] vector; signed) -> 1wire[n]
 ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit
 \`\`\`
 
-**No \`; vector\` tag** — the argument is already a whole vector.
+**No \`; vector\` tag** — the argument is already a whole vector. Applies to any **rank-1** tensor (\`Wwire[N]\`, \`Wwire[1,N]\`, \`Wwire[N,1]\`); see [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 | Mode | Output | Description |
 |------|--------|-------------|
@@ -2505,7 +2507,7 @@ ARGMIN(Wbit[n] vector; signed) -> 1wire[n]
 ARGMIN(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit
 \`\`\`
 
-**No \`; vector\` tag** — the argument is already a whole vector.
+**No \`; vector\` tag** — the argument is already a whole vector. Applies to any **rank-1** tensor (\`Wwire[N]\`, \`Wwire[1,N]\`, \`Wwire[N,1]\`); see [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 | Mode | Output | Description |
 |------|--------|-------------|
@@ -2982,8 +2984,10 @@ CLAMP(Wbit[n,m] x, … ; matrix signed) -> Wbit[n,m]
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed bounds. |
-| \`vector\` | Per-index clamp; bounds broadcast if scalar. |
-| \`matrix\` | Per-cell clamp → \`Wbit[N,M]\`; bounds broadcast as row/col/scalar. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors; bounds broadcast if scalar. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; bounds broadcast as rank-1 row/col/scalar. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -3124,8 +3128,10 @@ DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Operands as two's complement; integer \`/\` and \`%\`. |
-| \`vector\` | Quotient and remainder per index. |
-| \`matrix\` | Quotient and remainder per cell → \`Wbit[N,M]\`. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Quotient and remainder per index on **rank-1** tensors. |
+| \`matrix\` | Quotient and remainder per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -3234,14 +3240,14 @@ DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over
 DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over
 \`\`\`
 
-Rank-1 operands must have the same shape \`[1,N]\` / \`[N]\` / \`[N,1]\` (see table). Matrix multiply requires **\`A.cols == B.rows\`**.
+Rank-1 operands with the same **element count** (\`[N]\`, \`[1,N]\`, \`[N,1]\`) use the scalar dot path. Matrix multiply requires **\`A.cols == B.rows\`** (true 2D shapes).
 
 ## Tensor shape rules
 
 | A | B | Result | Inner dim K |
 |---|---|--------|-------------|
-| \`[1,N]\` | \`[1,N]\` | scalar \`Wbit\` + \`(2W)bit over\` | N |
-| \`[N,1]\` | \`[1,N]\` | scalar | N |
+| rank-1, **N** elements | rank-1, **N** elements | scalar \`Wbit\` + \`(2W)bit over\` | N |
+| \`[N,1]\` | \`[1,N]\` or \`[N]\` | scalar | N |
 | \`[1,N]\` | \`[N,1]\` | scalar | N |
 | \`[N,K]\` | \`[K,M]\` | matrix \`[N,M]\` — \`W\` result/cell, \`2W\` over/cell | K |
 | \`[N,1]\` | \`[N,M]\` | matrix \`[N,M]\` (column × matrix) | N |
@@ -3282,6 +3288,8 @@ show(o)
 show(result)
 show(over)
 \`\`\`
+
+Same result for \`4wire[3,1]\`×\`4wire[3,1]\` or mixed rank-1 shapes with three elements.
 
 ### \`DOT(Wbit[n] a, Wbit[n] b; signed)\`
 
@@ -3372,8 +3380,10 @@ EQ(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> 1wire[n×m]
 
 | Tag | Behaviour |
 |-----|-----------|
-| \`vector\` | Per-index equality \`a[i] == b[i]\` → \`1wire[n]\`. |
-| \`matrix\` | Per-cell equality → **\`1wire[N×M]\`**. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors: \`a[i] == b[i]\` → \`1wire[n]\`. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\` → \`1wire[N×M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 **No \`; signed\` tag** — equality is bitwise.
 
@@ -3629,8 +3639,10 @@ GT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> 1wire[n×m]
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Two's complement comparison. |
-| \`vector\` | Per-index \`1wire[n]\`; scalar operand broadcast. |
-| \`matrix\` | Per-cell compare → **\`1wire[N×M]\`** (one bit per cell, row-major). See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors → \`1wire[n]\`; scalar operand broadcast. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\` → \`1wire[N×M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -3754,7 +3766,7 @@ Rank-1 vector **\`[0, 1, …, N−1]\`**, each index stored in **W** bits (binar
 IOTA(\\N) -> Wwire[N]
 \`\`\`
 
-Assign to **\`4wire[N]\`** or **\`4wire[1,N]\`**. **\`\\N\`** must match vector length.
+Assign to **\`4wire[N]\`**, **\`4wire[1,N]\`**, or **\`4wire[N,1]\`**. **\`\\N\`** must match vector length (element count).
 
 ## Examples
 
@@ -3945,8 +3957,10 @@ LROTATE(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
 
 | Tag | Behaviour |
 |-----|-----------|
-| \`vector\` | Per-element rotate. |
-| \`matrix\` | Per-cell rotate; \`count\` scalar or matrix/row/col broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per element on **rank-1** tensors. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; \`count\` scalar or rank-1 broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -4038,8 +4052,10 @@ Sugar: \`data < n\` and \`data < n w1\` — [short-notation.md](short-notation.m
 
 | Tag | Behaviour |
 |-----|-----------|
-| \`vector\` | Per-element shift; output element width **(W + n)** where \`n = len(scalar count)\`. |
-| \`matrix\` | Per-cell shift; output shape matches input matrix (**W** bits per cell). See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per element on **rank-1** tensors; output element width **(W + n)** where \`n = len(scalar count)\`. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 \`count\` broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 **No \`; signed\` tag** — left shift is identical for signed/unsigned bit patterns.
 
@@ -4140,8 +4156,10 @@ LT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> 1wire[n×m]
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Two's complement comparison. |
-| \`vector\` | Per-index \`1wire[n]\`. |
-| \`matrix\` | Per-cell compare → **\`1wire[N×M]\`**. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors → \`1wire[n]\`. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\` → \`1wire[N×M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -4240,8 +4258,10 @@ Full integer: concatenate **\`over\` then \`result\`** (MSB → LSB).
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed accumulate; same packing. |
-| \`vector\` | Per index; \`over[i]\` is **(W+1)** bits — assign e.g. \`4wire[n] r, 5wire[n] o\`. |
-| \`matrix\` | Per cell; assign e.g. \`4wire[N,M] r, 5wire[N,M] o\`. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors; \`over[i]\` is **(W+1)** bits — assign e.g. \`4wire[n] r, 5wire[n] o\`. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. Assign e.g. \`4wire[N,M] r, 5wire[N,M] o\`. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -4358,8 +4378,10 @@ Variadic (≥ 2 operands after expansion).
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed maximum. |
-| \`vector\` | Element-wise max. |
-| \`matrix\` | Per-cell max on 2D tensors → \`Wbit[N,M]\`. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -4486,8 +4508,10 @@ Variadic (≥ 2 operands after expansion). Whole vectors expand to elements.
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed minimum. |
-| \`vector\` | Element-wise min. |
-| \`matrix\` | Per-cell min on 2D tensors → \`Wbit[N,M]\`. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -4616,8 +4640,10 @@ MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Product as two's complement; same wire packing. |
-| \`vector\` | Multiply per index; \`over[i]\` = high **W** bits of the **2W**-bit product. |
-| \`matrix\` | Per-cell multiply → \`Wbit[N,M]\` + \`Wbit[N,M] over\`. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors; \`over[i]\` = high **W** bits of the **2W**-bit product. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -4858,8 +4884,10 @@ Unary — one data argument (whole vector in vector mode).
 
 | Tag | Behaviour |
 |-----|-----------|
-| \`vector\` | Reverse bits **within each element** (not reverse element order). |
-| \`matrix\` | Reverse bits within each matrix cell. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Reverse bits **within each element** on **rank-1** tensors (not reverse element order). |
+| \`matrix\` | Reverse bits within each cell on **matrix** \`Wwire[N,M]\`. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -5043,8 +5071,10 @@ RROTATE(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
 
 | Tag | Behaviour |
 |-----|-----------|
-| \`vector\` | Per-element rotate. |
-| \`matrix\` | Per-cell rotate. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per element on **rank-1** tensors. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -5134,8 +5164,10 @@ Sugar: \`data > n\` and \`data > n w1\` — [short-notation.md](short-notation.m
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Arithmetic shift (ASHR): MSB replicated; \`fill\` ignored. |
-| \`vector\` | Per-element shift. |
-| \`matrix\` | Per-cell shift on 2D tensors; \`count\` scalar or matrix/row/col broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per element on **rank-1** tensors. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; \`count\` scalar or rank-1 broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -5328,8 +5360,10 @@ SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Same \`result\` bits; second return is signed **overflow**. |
-| \`vector\` | Per-index subtract. **No** implicit vector broadcast without the tag (unlike ADD). |
-| \`matrix\` | Per-cell subtract on 2D tensors. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors; matching \`elementCount\`. **No** implicit broadcast without the tag (unlike ADD). |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -5418,7 +5452,7 @@ show(f)
 
 Index: [Vector reduction](vector-reduction.md) · [Matrix \`; matrix\`](matrix-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
 
-Reduce operands to a scalar sum, or per-index with \`; vector\`, or per-cell on 2D tensors with \`; matrix\`.
+Reduce operands to a scalar sum, or per-index with \`; vector\` on rank-1 tensors, or per-cell with \`; matrix\` on true matrices (\`R>1\`, \`C>1\`).
 
 ## Signatures
 
@@ -5443,8 +5477,10 @@ Variadic: whole vectors expand to elements (see [vector-reduction.md](vector-red
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed two's complement sum; same 2W packing. |
-| \`vector\` | Per-index sum → \`Wbit[n]\` + \`Wbit[n] over\`. |
-| \`matrix\` | Per-cell sum on 2D tensors → \`Wbit[N,M]\` + \`Wbit[N,M] over\`. Mutually exclusive with \`vector\`. See [matrix-reduction.md](matrix-reduction.md). |
+| \`vector\` | Per index on **rank-1** tensors → \`Wbit[n]\` + \`Wbit[n] over\`. |
+| \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. Mutually exclusive with \`vector\`. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
@@ -5573,6 +5609,8 @@ Cross-cutting topics:
 Use \`doc(NAME)\` in scripts for live signatures from \`Interpreter.BUILTIN_DOC\`.
 
 **Note:** **\`; vector\`** and **\`; matrix\`** cannot appear together. **DOT**, **ARGMAX**, and **ARGMIN** do not use **\`; matrix\`** (behaviour follows tensor shape instead).
+
+**Rank-1** (\`[N]\`, \`[1,N]\`, \`[N,1]\`) = vector for **\`; vector\`**; only **\`[R,C]\` with R>1 and C>1** is a matrix for **\`; matrix\`**. See [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 `,
     'builtin-TRACE.md': `# TRACE (matrix trace)
 
@@ -6691,7 +6729,7 @@ Exactly **one** of \`dec\`, \`hex\`, \`bin\`, or \`ascii\` per statement. \`sign
 
 | Tag | Effect |
 |-----|--------|
-| \`compact\` | Vector/matrix: header + \`has length\` / \`has shape\` only — no \`:i\` lines |
+| \`compact\` | Rank-1: header + \`has length [N]\` only; matrix: header + \`has shape [R,C]\` — no \`:i\` lines |
 | \`elAll\` | List every vector/matrix cell (no \`..\` truncation) |
 | \`elNonZero\` | List only non-zero cells |
 | \`elRange=0-3\` | Vector: elements \`:0\`…\`:3\`; matrix: rows \`0\`…\`3\` (all columns). Matrix 2D: \`elRange=0-1,2-4\` |
@@ -6714,6 +6752,14 @@ show(w; signed)            # w (4wire) = \\-1;4
 show(code; ascii)          # code (8wire) = "A"
 40wire msg := "Hello"
 show(msg; ascii)           # msg (40wire) = "Hello"
+\`\`\`
+
+Rank-1 tensors (\`4wire[3]\`, \`4wire[3,1]\`) use \`has length [N]\` in \`show\` output. Matrix row slices (\`show(m:0)\`) print a flat row header plus \`:0:0\`…\`:0:(C-1)\` cell lines and the parent \`has shape [R,C]\`:
+
+\`\`\`logts
+4wire[1,3] row = 0001 + 0010 + 0100
+4wire[2,3] m = REPEAT(row, \\2)
+show(m:0; dec)
 \`\`\`
 
 Each argument is an expression atom: wire name, component reference (\`.comp:get\`), bit slice (\`a.0\`, \`a.2-4\`), storage ref (\`&3\`), literal (\`\\255\`, \`^-A;8\`, \`"text"\`), etc.
@@ -12534,7 +12580,7 @@ On [14seg](14seg.md), pin \`data\` (15 bits) accepts the full LUT output in one 
 `,
     'matrix-reduction.md': `# Matrix element-wise mode (\`; matrix\`)
 
-Built-ins that support **\`; vector\`** also support **\`; matrix\`** for **2D tensors** (\`4wire[N,M]\` with **N>1** and **M>1**, or broadcast with row/column vectors).
+Built-ins that support **\`; vector\`** also support **\`; matrix\`** for **true 2D matrices** (\`4wire[N,M]\` with **N>1** and **M>1**), with optional **rank-1 vector** operands that broadcast (see table below).
 
 Index: [2D tensors](wire-vectors.md) · [Tagged built-ins](builtin-tagged-index.md) · [Vector element-wise mode](vector-reduction.md#element-wise-mode-vector)
 
@@ -12545,21 +12591,23 @@ Index: [2D tensors](wire-vectors.md) · [Tagged built-ins](builtin-tagged-index.
 | Mode | Operands | Result |
 |------|----------|--------|
 | (default) | scalars, expanded vectors | scalar or reduction |
-| **\`; vector\`** | rank-1 tensors \`[1,N]\` / \`[N,1]\` | vector \`[1,N]\` per index |
-| **\`; matrix\`** | at least one **matrix** \`[N,M]\` | matrix \`[N,M]\` per cell |
+| **\`; vector\`** | rank-1 tensors \`[N]\`, \`[1,N]\`, \`[N,1]\` (same \`elementCount\`) | vector per index \`:i\` |
+| **\`; matrix\`** | at least one **matrix** \`[N,M]\` with **N>1, M>1** | matrix \`[N,M]\` per cell |
 
 **\`; vector\`** and **\`; matrix\`** are **mutually exclusive** in one call.
+
+Rank-1 shapes are **vectors**, not matrices — use **\`; vector\`** for element-wise ops on them, or pair them with a matrix under **\`; matrix\`** for broadcast.
 
 ---
 
 ## Operand broadcast (per cell \`(r,c)\`)
 
-| Operand shape | At cell \`(r,c)\` uses |
-|---------------|----------------------|
-| Matrix \`[N,M]\` | \`M[r,c]\` |
-| Scalar / plain \`Wbit\` | same scalar |
-| Row vector \`[1,M]\` | \`row[c]\` |
-| Column vector \`[N,1]\` | \`col[r]\` |
+| Operand shape | Kind | At cell \`(r,c)\` uses |
+|---------------|------|----------------------|
+| Matrix \`[N,M]\` | matrix | \`M[r,c]\` |
+| Scalar / plain \`Wbit\` | scalar | same scalar |
+| \`[1,M]\` or \`4wire[M]\` | rank-1 (row) | element \`c\` |
+| \`[N,1]\` | rank-1 (column) | element \`r\` |
 
 All operands must agree on **element width W**. Matrix operands must share the same **\`[N,M]\`** (or one side broadcasts as row/column/scalar).
 
@@ -12602,7 +12650,7 @@ Per-function pages: [builtin-tagged-index.md](builtin-tagged-index.md).
 | GT, LT, EQ | \`1wire[rows×cols]\` (one bit per cell, row-major) |
 | Shifts / rotates / REVERSE | same shape as input matrix |
 
-Declare the target wire as **\`4wire[N,M]\`** (or matching rank-1 shape for \`; vector\`).
+Declare the target wire as **\`4wire[N,M]\`** for **\`; matrix\`**, or **\`4wire[N]\`** / **\`4wire[N,1]\`** / **\`4wire[1,N]\`** for **\`; vector\`** (matching \`elementCount\`).
 
 ---
 
@@ -19449,12 +19497,15 @@ All expanded operands must have the **same bit width** (runtime error otherwise)
 
 ## Element-wise mode (\`; vector\`) {#element-wise-mode-vector}
 
-With **\`; vector\`**, operands are combined **per index** and the result is a **vector**. At least **two** arguments and at least one **whole vector** are required. Other operands may be another vector of the same shape \`(N, W)\` or a scalar / plain wire of width **W** (broadcast to every index).
+With **\`; vector\`**, operands are combined **per index** and the result is a **vector**. Applies to all **rank-1** tensors: \`4wire[N]\`, \`4wire[1,N]\`, \`4wire[N,1]\` — matching **\`elementCount\`** and **\`elementWidth\`**.
+
+At least **two** arguments and at least one **whole vector** are required. Other operands may be another vector of the same length or a scalar / plain wire of width **W** (broadcast to every index).
 
 | Call | Behaviour |
 |------|-----------|
 | \`SUM(vectorA, vectorB)\` | Expand → one scalar sum over all elements |
 | \`SUM(vectorA, vectorB; vector)\` | Per index sum → \`Wbit[n]\` + \`Wbit[n] over\` |
+| \`SUM(colA, colB; vector)\` | Same on \`4wire[N,1]\` — linear indices \`:0\`…\`:N-1\` |
 | \`MIN(vectorA, 0001; vector)\` | Per index min → \`Wbit[n]\` |
 | \`MAX(vectorA, vectorB; signed vector)\` | Per index max (signed) → \`Wbit[n]\` |
 | \`GT(vectorA, vectorB; vector)\` | Per index compare → \`1wire[n]\` |
@@ -19469,9 +19520,16 @@ With **\`; vector\`**, operands are combined **per index** and the result is a *
 4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB; vector)
 \`\`\`
 
+\`\`\`logts-play
+4wire[3,1] a = 0001 + 0010 + 0100
+4wire[3,1] b = 0001 + 0010 + 0100
+4wire[3] r, 4wire[3] f = ADD(a, b; vector)
+show(r)
+\`\`\`
+
 **ARGMAX** / **ARGMIN** do not accept \`; vector\` (argument is already a whole vector). Details: [builtin-ARGMAX.md](builtin-ARGMAX.md), [builtin-ARGMIN.md](builtin-ARGMIN.md).
 
-**DOT** requires two whole vectors of the same shape; no \`; vector\` tag. Equivalent to \`MAC(acc, a:i, b:i)\` with \`acc = 0\` over each index — [builtin-DOT.md](builtin-DOT.md).
+**DOT** requires two whole rank-1 tensors with the same **element count**; no \`; vector\` tag — [builtin-DOT.md](builtin-DOT.md).
 
 ---
 
@@ -19487,7 +19545,7 @@ On **2D tensors** (\`4wire[N,M]\` with **N>1** and **M>1**), use **\`; matrix\`*
 | \`MIN(a, b; matrix)\` | Per cell min → \`Wbit[N,M]\` |
 | \`ADD(m, row; matrix)\` | Matrix + row vector broadcast → \`Wbit[N,M]\` |
 
-Broadcast at cell \`(r,c)\`: matrix cell, scalar, row \`[1,M]\`, or column \`[N,1]\`. Compares (\`GT\`, \`LT\`, \`EQ\`) return **\`1wire[N×M]\`** (one bit per cell).
+Broadcast at cell \`(r,c)\`: matrix cell, scalar, or rank-1 vector (\`[1,M]\` across columns, \`[N,1]\` across rows). Compares (\`GT\`, \`LT\`, \`EQ\`) return **\`1wire[N×M]\`** (one bit per cell).
 
 Semantics: **[matrix-reduction.md](matrix-reduction.md)**. Examples: **[builtin-SUM.md](builtin-SUM.md)**, **[builtin-ADD.md](builtin-ADD.md)**, **[builtin-MIN.md](builtin-MIN.md)**, … — [builtin-tagged-index.md](builtin-tagged-index.md).
 
@@ -19923,21 +19981,36 @@ Multidimensional forms \`4wire[N,M]\` (2D tensors) are supported — see [2D ten
 
 ## 2D tensors (\`4wire[N,M]\`)
 
-A **matrix** is a contiguous wire with two-dimensional metadata. Syntax: \`Nwire[rows,cols] name\` declares one wire of \`N × rows × cols\` bits, stored **row-major** (same MSB-first convention as 1D vectors).
+Contiguous wires with two-dimensional **metadata**. Syntax: \`Nwire[rows,cols] name\` stores \`N × rows × cols\` bits **row-major** (MSB-first, same as 1D vectors).
+
+### Rank-1 vs matrix
+
+| Shape | Role | \`; vector\` | \`; matrix\` (needs a true matrix operand) |
+|-------|------|------------|------------------------------------------|
+| \`4wire[N]\` | rank-1 vector | per index \`:i\` | broadcasts as row \`[1,N]\` when paired with a matrix |
+| \`4wire[1,N]\` | rank-1 (horizontal) | per index \`:i\` | broadcasts across columns when paired with a matrix |
+| \`4wire[N,1]\` | rank-1 (vertical) | per index \`:i\` | broadcasts across rows when paired with a matrix |
+| \`4wire[R,C]\` **R>1 and C>1** | **matrix** | — (use \`; matrix\`) | per cell \`(r,c)\` |
+
+**Rank-1** tensors (\`[N]\`, \`[1,N]\`, \`[N,1]\`) are **vectors**, not matrices. Built-ins compare **\`elementCount\`** and **\`elementWidth\`**, not whether the declaration used a comma. **\`DOT\`** on two rank-1 operands with the same length is a **scalar** dot product (\`[3,1]\`×\`[3,1]\` ≡ \`[3]\`×\`[3]\`).
+
+Only **\`R>1\` and \`C>1\`** is a **matrix** for \`; matrix\`, **REPEAT** (rejected), and matrix-style indexing (\`m:r\` = row slice).
 
 \`\`\`logts
-4wire[3,2] matrixA
-4wire[3,1] colVec    # vertical vector
-4wire[1,N] rowVec    # same as 4wire[N]
-4wire[1] scalarA     # equivalent to plain 4wire (no tensor indexing)
+4wire[3,2] matrixA      # matrix
+4wire[3,1] colVec       # rank-1 vertical vector
+4wire[1,3] rowVec       # rank-1 horizontal vector (same bits as 4wire[3] for show/index)
+4wire[3] vec            # rank-1 (single-dim syntax)
 \`\`\`
 
 | Concept | Meaning |
 |---------|---------|
-| \`4wire[3,2]\` | 3×2 cells × 4 bits = **24-bit** wire |
+| \`4wire[3,2]\` | 3×2 cells × 4 bits = **24-bit** wire — **matrix** |
 | Internal storage | \`wire.tensor = { elementWidth: 4, dims: [3, 2] }\` plus \`wire.vector\` for compat |
 | Display type | \`4wire[3,2]\` — not \`24wire\` |
-| \`4wire[3,1]\` | vertical vector, displayed as \`4wire[3,1]\` |
+| \`4wire[3,1]\` / \`4wire[1,3]\` | rank-1; type label may show \`4wire[3,1]\` or normalize to \`4wire[3]\` for \`[1,N]\` |
+| \`show\` footer (rank-1) | \`has length [N]\` for all rank-1 shapes (including \`[N,1]\`) |
+| \`show\` footer (matrix) | \`has shape [R,C]\` |
 
 ### Indexing (2D)
 
@@ -19946,7 +20019,7 @@ A **matrix** is a contiguous wire with two-dimensional metadata. Syntax: \`Nwire
 | \`matrixA:r:c\` | cell \`(r,c)\` — scalar \`Nwire\` |
 | \`matrixA:r\` | row \`r\` — vector of width \`cols × N\` |
 | \`matrixA::c\` | column \`c\` — vector of width \`rows × N\` |
-| \`vectorB:i\` | linear element \`i\` on rank-1 tensors (\`[1,N]\` or \`[N,1]\`) |
+| \`vectorB:i\` | linear element \`i\` on rank-1 tensors (\`[N]\`, \`[1,N]\`, \`[N,1]\`) |
 
 On a **matrix** (both dimensions > 1), a single \`:r\` indexes a **row slice**, not a linear cell. Use \`:r:c\` for individual cells.
 
@@ -19983,7 +20056,7 @@ show(a)
 
 Full reference: **[matrix-reduction.md](matrix-reduction.md)**.
 
-Use \`; matrix\` on the same built-ins as \`; vector\` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with \`; vector\`. Operands broadcast per cell: whole matrix, scalar, horizontal row \`[1,N]\`, or vertical column \`[N,1]\`.
+Use \`; matrix\` on the same built-ins as \`; vector\` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with \`; vector\`. Requires at least one **matrix** operand (\`R>1\`, \`C>1\`). Other operands may be scalars or **rank-1 vectors** (\`[1,M]\` row or \`[N,1]\` column) that broadcast per cell.
 
 Example **\`ADD(… ; matrix)\`**: [builtin-ADD.md](builtin-ADD.md). Full list: [builtin-tagged-index.md](builtin-tagged-index.md).
 
@@ -19991,7 +20064,9 @@ Dual-output ops (\`ADD\`, \`SUM\`, \`MULTIPLY\`, …) return **per-cell** result
 
 ### Oriented \`; vector\` (rank-1 broadcast)
 
-For \`4wire[N]\` + \`4wire[N,1]\` (or the reverse), \`; vector\` on **SUM** / **ADD** broadcasts the horizontal vector against the vertical one: each output index \`i\` combines \`horiz[i]\` with **all** vertical elements.
+For **\`4wire[N]\`** + **\`4wire[N,1]\`** (horizontal + vertical rank-1), **\`; vector\`** on **SUM** / **ADD** uses **oriented** broadcast: each output index \`i\` combines \`horiz[i]\` with **all** vertical elements. This is **not** the same as element-wise \`ADD(a, b; vector)\` on two \`[N,1]\` operands.
+
+For element-wise ops on matching rank-1 shapes, use two tensors with the same **\`elementCount\`** (e.g. both \`4wire[3,1]\`).
 
 \`\`\`logts-play
 4wire[3] horiz = 0001 + 0010 + 0100
@@ -20006,8 +20081,8 @@ show(r)
 
 | A | B | Result |
 |---|---|--------|
-| \`[1,N]\` | \`[1,N]\` | scalar \`Wbit\` (+ \`2W\` over) |
-| \`[N,1]\` | \`[1,N]\` | scalar |
+| rank-1, same **N** elements (\`[N]\`, \`[1,N]\`, \`[N,1]\`) | rank-1, same **N** | scalar \`Wbit\` (+ \`2W\` over) |
+| \`[N,1]\` | \`[1,N]\` (or \`[N]\` / \`[1,N]\`) | scalar |
 | \`[N,K]\` | \`[K,M]\` | matrix \`[N,M]\` — result \`W\` bits/cell, over \`2W\` bits/cell |
 
 **ARGMAX** / **ARGMIN** on a matrix return a **one-hot** over \`rows×cols\` bits, or with \`; index\` return \`(row, col)\` index wires.
@@ -20110,7 +20185,7 @@ Result: \`111100110000\` — only element 1 changes.
 
 ## show / peek
 
-For a whole vector, output is **multi-line**:
+For a whole **rank-1** tensor, output is **multi-line**:
 
 \`\`\`text
 vectorA = 111100110101 (12bit)
@@ -20120,11 +20195,15 @@ vectorA = 111100110101 (12bit)
 vectorA has length [3]
 \`\`\`
 
+(\`4wire[3,1]\` and \`4wire[1,3]\` use the same \`:i\` layout and \`has length [N]\`.)
+
 | Case | Behaviour |
 |------|-----------|
 | \`show(vectorA)\` | Header + all elements if ≤ 5 elements |
 | More than 5 elements | First three elements, \`..\`, last element |
-| \`show(vectorA:1)\` | Single element line + length line |
+| \`show(vectorA:1)\` | Single element line + \`has length [N]\` |
+| \`show(matrixA)\` (matrix) | Per-cell \`:r:c\` lines + \`has shape [R,C]\` |
+| \`show(matrixA:0)\` (row slice) | Flat row header + \`:0:0\`…\`:0:(C-1)\` cell lines + parent \`has shape [R,C]\` |
 | \`peek(vectorA)\` | Same layout as \`show\` (emitted at statement position) |
 | \`show(vectorA; elAll dec)\` | All cells in decimal; tags at end — see [debug.md — show](debug.md#show) |
 

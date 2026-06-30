@@ -27,8 +27,10 @@ Sugar: `data < n` and `data < n w1` — [short-notation.md](short-notation.md).
 
 | Tag | Behaviour |
 |-----|-----------|
-| `vector` | Per-element shift; output element width **(W + n)** where `n = len(scalar count)`. |
-| `matrix` | Per-cell shift; output shape matches input matrix (**W** bits per cell). See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per element on **rank-1** tensors; output element width **(W + n)** where `n = len(scalar count)`. |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 `count` broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 **No `; signed` tag** — left shift is identical for signed/unsigned bit patterns.
 

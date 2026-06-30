@@ -42,3 +42,5 @@ Cross-cutting topics:
 Use `doc(NAME)` in scripts for live signatures from `Interpreter.BUILTIN_DOC`.
 
 **Note:** **`; vector`** and **`; matrix`** cannot appear together. **DOT**, **ARGMAX**, and **ARGMIN** do not use **`; matrix`** (behaviour follows tensor shape instead).
+
+**Rank-1** (`[N]`, `[1,N]`, `[N,1]`) = vector for **`; vector`**; only **`[R,C]` with R>1 and C>1** is a matrix for **`; matrix`**. See [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).

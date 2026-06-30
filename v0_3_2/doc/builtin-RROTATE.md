@@ -23,8 +23,10 @@ RROTATE(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
 
 | Tag | Behaviour |
 |-----|-----------|
-| `vector` | Per-element rotate. |
-| `matrix` | Per-cell rotate. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per element on **rank-1** tensors. |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 

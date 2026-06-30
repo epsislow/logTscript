@@ -39,12 +39,15 @@ All expanded operands must have the **same bit width** (runtime error otherwise)
 
 ## Element-wise mode (`; vector`) {#element-wise-mode-vector}
 
-With **`; vector`**, operands are combined **per index** and the result is a **vector**. At least **two** arguments and at least one **whole vector** are required. Other operands may be another vector of the same shape `(N, W)` or a scalar / plain wire of width **W** (broadcast to every index).
+With **`; vector`**, operands are combined **per index** and the result is a **vector**. Applies to all **rank-1** tensors: `4wire[N]`, `4wire[1,N]`, `4wire[N,1]` — matching **`elementCount`** and **`elementWidth`**.
+
+At least **two** arguments and at least one **whole vector** are required. Other operands may be another vector of the same length or a scalar / plain wire of width **W** (broadcast to every index).
 
 | Call | Behaviour |
 |------|-----------|
 | `SUM(vectorA, vectorB)` | Expand → one scalar sum over all elements |
 | `SUM(vectorA, vectorB; vector)` | Per index sum → `Wbit[n]` + `Wbit[n] over` |
+| `SUM(colA, colB; vector)` | Same on `4wire[N,1]` — linear indices `:0`…`:N-1` |
 | `MIN(vectorA, 0001; vector)` | Per index min → `Wbit[n]` |
 | `MAX(vectorA, vectorB; signed vector)` | Per index max (signed) → `Wbit[n]` |
 | `GT(vectorA, vectorB; vector)` | Per index compare → `1wire[n]` |
@@ -59,9 +62,16 @@ With **`; vector`**, operands are combined **per index** and the result is a **v
 4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB; vector)
 ```
 
+```logts-play
+4wire[3,1] a = 0001 + 0010 + 0100
+4wire[3,1] b = 0001 + 0010 + 0100
+4wire[3] r, 4wire[3] f = ADD(a, b; vector)
+show(r)
+```
+
 **ARGMAX** / **ARGMIN** do not accept `; vector` (argument is already a whole vector). Details: [builtin-ARGMAX.md](builtin-ARGMAX.md), [builtin-ARGMIN.md](builtin-ARGMIN.md).
 
-**DOT** requires two whole vectors of the same shape; no `; vector` tag. Equivalent to `MAC(acc, a:i, b:i)` with `acc = 0` over each index — [builtin-DOT.md](builtin-DOT.md).
+**DOT** requires two whole rank-1 tensors with the same **element count**; no `; vector` tag — [builtin-DOT.md](builtin-DOT.md).
 
 ---
 
@@ -77,7 +87,7 @@ On **2D tensors** (`4wire[N,M]` with **N>1** and **M>1**), use **`; matrix`** fo
 | `MIN(a, b; matrix)` | Per cell min → `Wbit[N,M]` |
 | `ADD(m, row; matrix)` | Matrix + row vector broadcast → `Wbit[N,M]` |
 
-Broadcast at cell `(r,c)`: matrix cell, scalar, row `[1,M]`, or column `[N,1]`. Compares (`GT`, `LT`, `EQ`) return **`1wire[N×M]`** (one bit per cell).
+Broadcast at cell `(r,c)`: matrix cell, scalar, or rank-1 vector (`[1,M]` across columns, `[N,1]` across rows). Compares (`GT`, `LT`, `EQ`) return **`1wire[N×M]`** (one bit per cell).
 
 Semantics: **[matrix-reduction.md](matrix-reduction.md)**. Examples: **[builtin-SUM.md](builtin-SUM.md)**, **[builtin-ADD.md](builtin-ADD.md)**, **[builtin-MIN.md](builtin-MIN.md)**, … — [builtin-tagged-index.md](builtin-tagged-index.md).
 

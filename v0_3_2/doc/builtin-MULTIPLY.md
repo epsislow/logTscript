@@ -25,8 +25,10 @@ MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Product as two's complement; same wire packing. |
-| `vector` | Multiply per index; `over[i]` = high **W** bits of the **2W**-bit product. |
-| `matrix` | Per-cell multiply → `Wbit[N,M]` + `Wbit[N,M] over`. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per index on **rank-1** tensors; `over[i]` = high **W** bits of the **2W**-bit product. |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 

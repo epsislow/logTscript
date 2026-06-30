@@ -15,14 +15,14 @@ DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over
 DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over
 ```
 
-Rank-1 operands must have the same shape `[1,N]` / `[N]` / `[N,1]` (see table). Matrix multiply requires **`A.cols == B.rows`**.
+Rank-1 operands with the same **element count** (`[N]`, `[1,N]`, `[N,1]`) use the scalar dot path. Matrix multiply requires **`A.cols == B.rows`** (true 2D shapes).
 
 ## Tensor shape rules
 
 | A | B | Result | Inner dim K |
 |---|---|--------|-------------|
-| `[1,N]` | `[1,N]` | scalar `Wbit` + `(2W)bit over` | N |
-| `[N,1]` | `[1,N]` | scalar | N |
+| rank-1, **N** elements | rank-1, **N** elements | scalar `Wbit` + `(2W)bit over` | N |
+| `[N,1]` | `[1,N]` or `[N]` | scalar | N |
 | `[1,N]` | `[N,1]` | scalar | N |
 | `[N,K]` | `[K,M]` | matrix `[N,M]` — `W` result/cell, `2W` over/cell | K |
 | `[N,1]` | `[N,M]` | matrix `[N,M]` (column × matrix) | N |
@@ -63,6 +63,8 @@ show(o)
 show(result)
 show(over)
 ```
+
+Same result for `4wire[3,1]`×`4wire[3,1]` or mixed rank-1 shapes with three elements.
 
 ### `DOT(Wbit[n] a, Wbit[n] b; signed)`
 

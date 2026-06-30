@@ -10,7 +10,7 @@ Rank-1 vector **`[0, 1, …, N−1]`**, each index stored in **W** bits (binary,
 IOTA(\N) -> Wwire[N]
 ```
 
-Assign to **`4wire[N]`** or **`4wire[1,N]`**. **`\N`** must match vector length.
+Assign to **`4wire[N]`**, **`4wire[1,N]`**, or **`4wire[N,1]`**. **`\N`** must match vector length (element count).
 
 ## Examples
 

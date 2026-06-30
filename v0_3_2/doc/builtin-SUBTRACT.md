@@ -25,8 +25,10 @@ SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Same `result` bits; second return is signed **overflow**. |
-| `vector` | Per-index subtract. **No** implicit vector broadcast without the tag (unlike ADD). |
-| `matrix` | Per-cell subtract on 2D tensors. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per index on **rank-1** tensors; matching `elementCount`. **No** implicit broadcast without the tag (unlike ADD). |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 

@@ -29,8 +29,10 @@ Full integer: concatenate **`over` then `result`** (MSB → LSB).
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed accumulate; same packing. |
-| `vector` | Per index; `over[i]` is **(W+1)** bits — assign e.g. `4wire[n] r, 5wire[n] o`. |
-| `matrix` | Per cell; assign e.g. `4wire[N,M] r, 5wire[N,M] o`. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per index on **rank-1** tensors; `over[i]` is **(W+1)** bits — assign e.g. `4wire[n] r, 5wire[n] o`. |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. Assign e.g. `4wire[N,M] r, 5wire[N,M] o`. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 

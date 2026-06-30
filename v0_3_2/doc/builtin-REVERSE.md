@@ -22,8 +22,10 @@ Unary — one data argument (whole vector in vector mode).
 
 | Tag | Behaviour |
 |-----|-----------|
-| `vector` | Reverse bits **within each element** (not reverse element order). |
-| `matrix` | Reverse bits within each matrix cell. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Reverse bits **within each element** on **rank-1** tensors (not reverse element order). |
+| `matrix` | Reverse bits within each cell on **matrix** `Wwire[N,M]`. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 

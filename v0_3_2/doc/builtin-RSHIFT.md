@@ -30,8 +30,10 @@ Sugar: `data > n` and `data > n w1` — [short-notation.md](short-notation.md).
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Arithmetic shift (ASHR): MSB replicated; `fill` ignored. |
-| `vector` | Per-element shift. |
-| `matrix` | Per-cell shift on 2D tensors; `count` scalar or matrix/row/col broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+| `vector` | Per element on **rank-1** tensors. |
+| `matrix` | Per cell on **matrix** `Wwire[N,M]`; `count` scalar or rank-1 broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 
 ## Examples
 
