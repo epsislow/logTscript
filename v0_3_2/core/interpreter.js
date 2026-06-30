@@ -2268,6 +2268,26 @@ class Interpreter {
     return '0'.repeat(w);
   }
 
+  _atomResolvesToElementValue(atom) {
+    if (!atom || !atom.var) return false;
+    if (atom.bitRange) return true;
+    if (atom.tensorSlice === 'cell') return true;
+    if (atom.tensorRowIndex !== undefined && atom.tensorColIndex !== undefined) return true;
+    if (atom.tensorRowIndexExpr && atom.tensorColIndexExpr) return true;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const wire = this.wires.get(atom.var);
+    if (!wire || !TS) {
+      return atom.vectorIndex !== undefined || !!atom.vectorIndexExpr;
+    }
+    const meta = TS.getWireTensorMeta(wire);
+    if (!meta) {
+      return atom.vectorIndex !== undefined || !!atom.vectorIndexExpr;
+    }
+    if (atom.tensorSlice === 'col' || atom.tensorSlice === 'row') return false;
+    if (TS.isRank1Tensor(meta) && (atom.vectorIndex !== undefined || atom.vectorIndexExpr)) return true;
+    return false;
+  }
+
   _expandReductionArgValues(args) {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
     const getWire = (name) => this.wires.get(name);
@@ -2293,6 +2313,9 @@ class Interpreter {
       const atom = argExpr[0];
       if (atom.var && !atom.var.startsWith('.') && atom.var !== '~' && atom.var !== '%' && atom.var !== '$') {
         if (this.wires.has(atom.var)) {
+          if (this._atomResolvesToElementValue(atom)) {
+            return this._evalReductionAtomValue(atom);
+          }
           const v = this.getWireEffectiveValue(atom.var);
           if (v != null) return v;
         }
@@ -4395,6 +4418,15 @@ const idx = parseInt(
       evalElement: (varName, index) =>
         this._evalReductionAtomValue({ var: varName, vectorIndex: index }),
       evalScalar: (argExpr) => this._evalCallArgValue(argExpr),
+      resolveRowIndex: (atom) => {
+        const row = this._resolveMatrixRowSliceIndex(atom);
+        if (row == null || !Number.isFinite(row)) {
+          throw new Error(`Invalid row index for ${atom.var}`);
+        }
+        return row;
+      },
+      resolveColIndex: (atom) =>
+        this._resolveTensorIndexValue(atom.tensorColIndex, atom.tensorColIndexExpr, `${atom.var}:col`),
     };
   }
 

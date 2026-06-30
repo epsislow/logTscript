@@ -27,7 +27,7 @@ Variadic: whole vectors expand to elements (see [vector-reduction.md](vector-red
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed two's complement sum; same 2W packing. |
-| `vector` | Per index on **rank-1** tensors → `Wbit[n]` + `Wbit[n] over`. |
+| `vector` | Per index on **rank-1** tensors → `Wbit[n]` + `Wbit[n] over`. Element slices (`vectorB:i`) and plain **W**-bit scalars broadcast. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. Mutually exclusive with `vector`. See [matrix-reduction.md](matrix-reduction.md). |
 
 **Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
@@ -77,6 +77,16 @@ Signed `−1 + 1 = 0`.
 4wire[4] vectorA = 0001 + 0010 + 0100 + 1000
 4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
 4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB; vector)
+show(r)
+show(o)
+```
+
+Element slice broadcast (add `vectorB:1` at every index):
+
+```logts-play
+4wire[4] vectorA = 0001 + 0010 + 0100 + 1000
+4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
+4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB:1; vector)
 show(r)
 show(o)
 ```

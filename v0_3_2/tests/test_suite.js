@@ -16480,6 +16480,27 @@ reg(1969, 'wire-tensor', 'DOT rank-1 [3,1]×[3,1] as vector dot', function(h, se
   h.assert('dot scalar', session.getWire(interp, 'r'), '0101');
 });
 
+reg(1970, 'builtin-vector', 'SUM(vectorA, vectorB:1; vector) — element slice broadcast', function(h, session) {
+  const { interp } = session.run(
+    '4wire[4] vectorA = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[4] vectorB = 0010 + 0011 + 0100 + 1001\n' +
+    '4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB:1; vector)'
+  );
+  h.assert('r0 1+3=4', session.getWire(interp, 'r').substring(0, 4), '0100');
+  h.assert('r1 2+3=5', session.getWire(interp, 'r').substring(4, 8), '0101');
+  h.assert('r2 4+3=7', session.getWire(interp, 'r').substring(8, 12), '0111');
+  h.assert('r3 8+3=11', session.getWire(interp, 'r').substring(12, 16), '1011');
+  h.assert('over zero', session.getWire(interp, 'o'), '0000000000000000');
+});
+
+reg(1971, 'builtin-matrix', 'ADD(matrix, matrix:0; matrix) — row slice broadcast', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2,2] r, 4wire[2,2] f = ADD(m, m:0; matrix)'
+  );
+  h.assert('row slice broadcast', session.getWire(interp, 'r'), '0010010001011010');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

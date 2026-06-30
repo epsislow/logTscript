@@ -34,6 +34,15 @@
     return !!a.vectorIndexExpr;
   }
 
+  function isRank1ElementSliceArg(argExpr, getWire) {
+    if (!isVectorSliceArg(argExpr)) return false;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (!TS || !getWire) return true;
+    const wire = getWire(argExpr[0].var);
+    const meta = wire ? TS.getWireTensorMeta(wire) : null;
+    return !!(meta && TS.isRank1Tensor(meta));
+  }
+
   function getWholeVectorMeta(argExpr, getWire) {
     if (!isWholeVectorWireArg(argExpr, getWire)) return null;
     const wire = getWire(argExpr[0].var);
@@ -790,6 +799,7 @@
     isReductionWireAtom,
     isWholeVectorWireArg,
     isVectorSliceArg,
+    isRank1ElementSliceArg,
     getWholeVectorMeta,
     requireSameBitWidth,
     sumUnsignedExpanded,

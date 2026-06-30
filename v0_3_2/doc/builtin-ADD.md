@@ -114,6 +114,14 @@ Row broadcast:
 show(r)
 ```
 
+Same via row slice (`m:0` ≡ row `0`):
+
+```logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] r, 4wire[2,2] f = ADD(m, m:0; matrix)
+show(r)
+```
+
 ### `ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)`
 
 ```logts-play

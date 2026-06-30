@@ -41,12 +41,17 @@ All expanded operands must have the **same bit width** (runtime error otherwise)
 
 With **`; vector`**, operands are combined **per index** and the result is a **vector**. Applies to all **rank-1** tensors: `4wire[N]`, `4wire[1,N]`, `4wire[N,1]` — matching **`elementCount`** and **`elementWidth`**.
 
-At least **two** arguments and at least one **whole vector** are required. Other operands may be another vector of the same length or a scalar / plain wire of width **W** (broadcast to every index).
+At least **two** arguments and at least one **whole vector** are required. Other operands may be:
+
+- another **whole** rank-1 vector of the same `elementCount`;
+- a **scalar** / plain `Wbit` wire (broadcast to every index);
+- an **element slice** `vectorA:i` or sub-range `vectorA:i.j/k` — evaluated as **W** bits (same as `show(vectorA:i)`), then broadcast.
 
 | Call | Behaviour |
 |------|-----------|
 | `SUM(vectorA, vectorB)` | Expand → one scalar sum over all elements |
 | `SUM(vectorA, vectorB; vector)` | Per index sum → `Wbit[n]` + `Wbit[n] over` |
+| `SUM(vectorA, vectorB:1; vector)` | Per index sum; second operand is element `1` broadcast (equivalent to `SUM(vectorA, 0011; vector)` when `vectorB:1` = `0011`) |
 | `SUM(colA, colB; vector)` | Same on `4wire[N,1]` — linear indices `:0`…`:N-1` |
 | `MIN(vectorA, 0001; vector)` | Per index min → `Wbit[n]` |
 | `MAX(vectorA, vectorB; signed vector)` | Per index max (signed) → `Wbit[n]` |
@@ -60,7 +65,11 @@ At least **two** arguments and at least one **whole vector** are required. Other
 4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
 4wire[4] out = MAX(vectorA, 0001; vector signed)
 4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB; vector)
+4wire[4] r2, 4wire[4] o2 = SUM(vectorA, vectorB:1; vector)
+show(r2)
 ```
+
+Element slice `vectorB:1` adds the value at index `1` to every index of `vectorA` (same width **W** as one cell).
 
 ```logts-play
 4wire[3,1] a = 0001 + 0010 + 0100

@@ -2406,6 +2406,14 @@ Row broadcast:
 show(r)
 \`\`\`
 
+Same via row slice (\`m:0\` ≡ row \`0\`):
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] r, 4wire[2,2] f = ADD(m, m:0; matrix)
+show(r)
+\`\`\`
+
 ### \`ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)\`
 
 \`\`\`logts-play
@@ -5477,7 +5485,7 @@ Variadic: whole vectors expand to elements (see [vector-reduction.md](vector-red
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed two's complement sum; same 2W packing. |
-| \`vector\` | Per index on **rank-1** tensors → \`Wbit[n]\` + \`Wbit[n] over\`. |
+| \`vector\` | Per index on **rank-1** tensors → \`Wbit[n]\` + \`Wbit[n] over\`. Element slices (\`vectorB:i\`) and plain **W**-bit scalars broadcast. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. Mutually exclusive with \`vector\`. See [matrix-reduction.md](matrix-reduction.md). |
 
 **Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
@@ -5527,6 +5535,16 @@ Signed \`−1 + 1 = 0\`.
 4wire[4] vectorA = 0001 + 0010 + 0100 + 1000
 4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
 4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB; vector)
+show(r)
+show(o)
+\`\`\`
+
+Element slice broadcast (add \`vectorB:1\` at every index):
+
+\`\`\`logts-play
+4wire[4] vectorA = 0001 + 0010 + 0100 + 1000
+4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
+4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB:1; vector)
 show(r)
 show(o)
 \`\`\`
@@ -12606,10 +12624,23 @@ Rank-1 shapes are **vectors**, not matrices — use **\`; vector\`** for element
 |---------------|------|----------------------|
 | Matrix \`[N,M]\` | matrix | \`M[r,c]\` |
 | Scalar / plain \`Wbit\` | scalar | same scalar |
+| Cell slice \`matrixA:r:c\` | scalar | \`M[r,c]\` (one **W**-bit element) |
+| Row slice \`matrixA:r\` | rank-1 row | \`M[r,c]\` — same as \`[1,M]\` broadcast across columns |
+| Column slice \`matrixA::c\` | rank-1 column | \`M[r,c]\` — same as \`[N,1]\` broadcast across rows |
 | \`[1,M]\` or \`4wire[M]\` | rank-1 (row) | element \`c\` |
 | \`[N,1]\` | rank-1 (column) | element \`r\` |
 
-All operands must agree on **element width W**. Matrix operands must share the same **\`[N,M]\`** (or one side broadcasts as row/column/scalar).
+Slice operands use the same bit ranges as **\`show\`** / assignment (\`vectorB:1\` → **W** bits; \`m:0\` → row \`0\` with **M** cells). See [wire-vectors.md — indexing](wire-vectors.md#indexing-2d).
+
+All operands must agree on **element width W**. Matrix operands must share the same **\`[N,M]\`** (or one side broadcasts as row/column/scalar/slice).
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] r, 4wire[2,2] f = ADD(m, m:0; matrix)
+show(r)
+\`\`\`
+
+\`m:0\` is row \`0\` (\`0001\`, \`0010\`) broadcast to every matrix row — equivalent to \`ADD(m, 4wire[1,2] row; matrix)\` with \`row = 0001 + 0010\`.
 
 ---
 
@@ -19499,12 +19530,17 @@ All expanded operands must have the **same bit width** (runtime error otherwise)
 
 With **\`; vector\`**, operands are combined **per index** and the result is a **vector**. Applies to all **rank-1** tensors: \`4wire[N]\`, \`4wire[1,N]\`, \`4wire[N,1]\` — matching **\`elementCount\`** and **\`elementWidth\`**.
 
-At least **two** arguments and at least one **whole vector** are required. Other operands may be another vector of the same length or a scalar / plain wire of width **W** (broadcast to every index).
+At least **two** arguments and at least one **whole vector** are required. Other operands may be:
+
+- another **whole** rank-1 vector of the same \`elementCount\`;
+- a **scalar** / plain \`Wbit\` wire (broadcast to every index);
+- an **element slice** \`vectorA:i\` or sub-range \`vectorA:i.j/k\` — evaluated as **W** bits (same as \`show(vectorA:i)\`), then broadcast.
 
 | Call | Behaviour |
 |------|-----------|
 | \`SUM(vectorA, vectorB)\` | Expand → one scalar sum over all elements |
 | \`SUM(vectorA, vectorB; vector)\` | Per index sum → \`Wbit[n]\` + \`Wbit[n] over\` |
+| \`SUM(vectorA, vectorB:1; vector)\` | Per index sum; second operand is element \`1\` broadcast (equivalent to \`SUM(vectorA, 0011; vector)\` when \`vectorB:1\` = \`0011\`) |
 | \`SUM(colA, colB; vector)\` | Same on \`4wire[N,1]\` — linear indices \`:0\`…\`:N-1\` |
 | \`MIN(vectorA, 0001; vector)\` | Per index min → \`Wbit[n]\` |
 | \`MAX(vectorA, vectorB; signed vector)\` | Per index max (signed) → \`Wbit[n]\` |
@@ -19518,7 +19554,11 @@ At least **two** arguments and at least one **whole vector** are required. Other
 4wire[4] vectorB = 0010 + 0011 + 0100 + 1001
 4wire[4] out = MAX(vectorA, 0001; vector signed)
 4wire[4] r, 4wire[4] o = SUM(vectorA, vectorB; vector)
+4wire[4] r2, 4wire[4] o2 = SUM(vectorA, vectorB:1; vector)
+show(r2)
 \`\`\`
+
+Element slice \`vectorB:1\` adds the value at index \`1\` to every index of \`vectorA\` (same width **W** as one cell).
 
 \`\`\`logts-play
 4wire[3,1] a = 0001 + 0010 + 0100
@@ -20012,7 +20052,7 @@ Only **\`R>1\` and \`C>1\`** is a **matrix** for \`; matrix\`, **REPEAT** (rejec
 | \`show\` footer (rank-1) | \`has length [N]\` for all rank-1 shapes (including \`[N,1]\`) |
 | \`show\` footer (matrix) | \`has shape [R,C]\` |
 
-### Indexing (2D)
+### Indexing (2D) {#indexing-2d}
 
 | Syntax | Result |
 |--------|--------|
@@ -20022,6 +20062,8 @@ Only **\`R>1\` and \`C>1\`** is a **matrix** for \`; matrix\`, **REPEAT** (rejec
 | \`vectorB:i\` | linear element \`i\` on rank-1 tensors (\`[N]\`, \`[1,N]\`, \`[N,1]\`) |
 
 On a **matrix** (both dimensions > 1), a single \`:r\` indexes a **row slice**, not a linear cell. Use \`:r:c\` for individual cells.
+
+In **\`; vector\`** / **\`; matrix\`** built-ins, these slices broadcast like scalars or rank-1 vectors: \`vectorB:i\` → **W** bits at every index; \`matrixA:r\` → row \`r\` across columns; \`matrixA::c\` → column \`c\` across rows. Details: [vector-reduction.md](vector-reduction.md#element-wise-mode-vector), [matrix-reduction.md](matrix-reduction.md#operand-broadcast-per-cell-rc).
 
 \`\`\`logts-play
 4wire[2,2] matrixA = 1111 + 0011 + 0101 + 0000
@@ -20056,7 +20098,7 @@ show(a)
 
 Full reference: **[matrix-reduction.md](matrix-reduction.md)**.
 
-Use \`; matrix\` on the same built-ins as \`; vector\` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with \`; vector\`. Requires at least one **matrix** operand (\`R>1\`, \`C>1\`). Other operands may be scalars or **rank-1 vectors** (\`[1,M]\` row or \`[N,1]\` column) that broadcast per cell.
+Use \`; matrix\` on the same built-ins as \`; vector\` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with \`; vector\`. Requires at least one **matrix** operand (\`R>1\`, \`C>1\`). Other operands may be scalars, **rank-1 vectors** (\`[1,M]\` row or \`[N,1]\` column), or **tensor slices** (\`m:r\`, \`m::c\`, \`m:r:c\`) that broadcast the same way — see [matrix-reduction.md](matrix-reduction.md).
 
 Example **\`ADD(… ; matrix)\`**: [builtin-ADD.md](builtin-ADD.md). Full list: [builtin-tagged-index.md](builtin-tagged-index.md).
 
@@ -20226,7 +20268,7 @@ Slice probes emit on every committed wire change (including element splice). See
 
 ## Reduction functions
 
-Built-ins **SUM**, **MIN**, **MAX**, and **DOT** accept whole vectors (elements expand automatically), element slices (\`vectorA:0\`, \`vectorA:0.1/2\`), and plain wires.
+Built-ins **SUM**, **MIN**, **MAX**, and **DOT** accept whole vectors (elements expand automatically), element slices (\`vectorA:0\`, \`vectorA:0.1/2\`), and plain wires. With **\`; vector\`**, an element slice such as \`vectorA:1\` is one **W**-bit value broadcast to every index (same evaluation as \`show(vectorA:1)\`).
 
 See [vector-reduction.md](vector-reduction.md) for syntax, output widths (SUM **2W**, DOT **3W**), and examples.
 

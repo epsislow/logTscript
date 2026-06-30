@@ -26,10 +26,23 @@ Rank-1 shapes are **vectors**, not matrices — use **`; vector`** for element-w
 |---------------|------|----------------------|
 | Matrix `[N,M]` | matrix | `M[r,c]` |
 | Scalar / plain `Wbit` | scalar | same scalar |
+| Cell slice `matrixA:r:c` | scalar | `M[r,c]` (one **W**-bit element) |
+| Row slice `matrixA:r` | rank-1 row | `M[r,c]` — same as `[1,M]` broadcast across columns |
+| Column slice `matrixA::c` | rank-1 column | `M[r,c]` — same as `[N,1]` broadcast across rows |
 | `[1,M]` or `4wire[M]` | rank-1 (row) | element `c` |
 | `[N,1]` | rank-1 (column) | element `r` |
 
-All operands must agree on **element width W**. Matrix operands must share the same **`[N,M]`** (or one side broadcasts as row/column/scalar).
+Slice operands use the same bit ranges as **`show`** / assignment (`vectorB:1` → **W** bits; `m:0` → row `0` with **M** cells). See [wire-vectors.md — indexing](wire-vectors.md#indexing-2d).
+
+All operands must agree on **element width W**. Matrix operands must share the same **`[N,M]`** (or one side broadcasts as row/column/scalar/slice).
+
+```logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] r, 4wire[2,2] f = ADD(m, m:0; matrix)
+show(r)
+```
+
+`m:0` is row `0` (`0001`, `0010`) broadcast to every matrix row — equivalent to `ADD(m, 4wire[1,2] row; matrix)` with `row = 0001 + 0010`.
 
 ---
 

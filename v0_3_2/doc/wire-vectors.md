@@ -58,7 +58,7 @@ Only **`R>1` and `C>1`** is a **matrix** for `; matrix`, **REPEAT** (rejected), 
 | `show` footer (rank-1) | `has length [N]` for all rank-1 shapes (including `[N,1]`) |
 | `show` footer (matrix) | `has shape [R,C]` |
 
-### Indexing (2D)
+### Indexing (2D) {#indexing-2d}
 
 | Syntax | Result |
 |--------|--------|
@@ -68,6 +68,8 @@ Only **`R>1` and `C>1`** is a **matrix** for `; matrix`, **REPEAT** (rejected), 
 | `vectorB:i` | linear element `i` on rank-1 tensors (`[N]`, `[1,N]`, `[N,1]`) |
 
 On a **matrix** (both dimensions > 1), a single `:r` indexes a **row slice**, not a linear cell. Use `:r:c` for individual cells.
+
+In **`; vector`** / **`; matrix`** built-ins, these slices broadcast like scalars or rank-1 vectors: `vectorB:i` → **W** bits at every index; `matrixA:r` → row `r` across columns; `matrixA::c` → column `c` across rows. Details: [vector-reduction.md](vector-reduction.md#element-wise-mode-vector), [matrix-reduction.md](matrix-reduction.md#operand-broadcast-per-cell-rc).
 
 ```logts-play
 4wire[2,2] matrixA = 1111 + 0011 + 0101 + 0000
@@ -102,7 +104,7 @@ show(a)
 
 Full reference: **[matrix-reduction.md](matrix-reduction.md)**.
 
-Use `; matrix` on the same built-ins as `; vector` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with `; vector`. Requires at least one **matrix** operand (`R>1`, `C>1`). Other operands may be scalars or **rank-1 vectors** (`[1,M]` row or `[N,1]` column) that broadcast per cell.
+Use `; matrix` on the same built-ins as `; vector` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with `; vector`. Requires at least one **matrix** operand (`R>1`, `C>1`). Other operands may be scalars, **rank-1 vectors** (`[1,M]` row or `[N,1]` column), or **tensor slices** (`m:r`, `m::c`, `m:r:c`) that broadcast the same way — see [matrix-reduction.md](matrix-reduction.md).
 
 Example **`ADD(… ; matrix)`**: [builtin-ADD.md](builtin-ADD.md). Full list: [builtin-tagged-index.md](builtin-tagged-index.md).
 
@@ -272,7 +274,7 @@ Slice probes emit on every committed wire change (including element splice). See
 
 ## Reduction functions
 
-Built-ins **SUM**, **MIN**, **MAX**, and **DOT** accept whole vectors (elements expand automatically), element slices (`vectorA:0`, `vectorA:0.1/2`), and plain wires.
+Built-ins **SUM**, **MIN**, **MAX**, and **DOT** accept whole vectors (elements expand automatically), element slices (`vectorA:0`, `vectorA:0.1/2`), and plain wires. With **`; vector`**, an element slice such as `vectorA:1` is one **W**-bit value broadcast to every index (same evaluation as `show(vectorA:1)`).
 
 See [vector-reduction.md](vector-reduction.md) for syntax, output widths (SUM **2W**, DOT **3W**), and examples.
 

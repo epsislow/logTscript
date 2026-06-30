@@ -34,13 +34,70 @@
     return TS.getWireTensorMeta(getWire(argExpr[0].var));
   }
 
+  function isTensorCellSliceArg(argExpr) {
+    if (!argExpr || argExpr.length !== 1) return false;
+    const a = argExpr[0];
+    if (!isReductionWireAtom(a)) return false;
+    if (a.tensorSlice === 'cell') return true;
+    if (a.tensorRowIndex !== undefined && a.tensorColIndex !== undefined) return true;
+    if (a.tensorRowIndexExpr && a.tensorColIndexExpr) return true;
+    return false;
+  }
+
+  function isTensorRowSliceArg(argExpr, getWire) {
+    if (!argExpr || argExpr.length !== 1) return false;
+    const a = argExpr[0];
+    if (!isReductionWireAtom(a)) return false;
+    if (isTensorCellSliceArg(argExpr)) return false;
+    if (a.tensorSlice === 'col') return false;
+    if (a.bitRange) return false;
+    const wire = getWire ? getWire(a.var) : null;
+    if (!wire || !wire.vector) return false;
+    const meta = TS ? TS.getWireTensorMeta(wire) : null;
+    if (!meta || !TS.isMatrix(meta)) return false;
+    if (a.tensorSlice === 'row') return true;
+    if (a.tensorRowIndex !== undefined || a.tensorRowIndexExpr) {
+      if (a.tensorColIndex === undefined && !a.tensorColIndexExpr) return true;
+    }
+    if (a.vectorIndex !== undefined || a.vectorIndexExpr) return true;
+    return false;
+  }
+
+  function isTensorColSliceArg(argExpr, getWire) {
+    if (!argExpr || argExpr.length !== 1) return false;
+    const a = argExpr[0];
+    if (!isReductionWireAtom(a)) return false;
+    if (a.tensorSlice === 'col') return true;
+    const wire = getWire ? getWire(a.var) : null;
+    if (!wire || !wire.vector) return false;
+    const meta = TS ? TS.getWireTensorMeta(wire) : null;
+    return !!(meta && TS.isMatrix(meta));
+  }
+
   function classifyTensorOperand(argExpr, getWire) {
-    if (!isWholeTensorWireArg(argExpr, getWire)) {
+    if (isWholeTensorWireArg(argExpr, getWire)) {
+      const meta = TS.getWireTensorMeta(getWire(argExpr[0].var));
+      if (TS.isMatrix(meta)) return { kind: 'matrix', meta };
+      return { kind: 'vector', meta };
+    }
+    if (isTensorRowSliceArg(argExpr, getWire)) {
+      const meta = TS.getWireTensorMeta(getWire(argExpr[0].var));
+      return {
+        kind: 'rowSlice',
+        meta: { rows: 1, cols: meta.cols, elementWidth: meta.elementWidth },
+      };
+    }
+    if (isTensorColSliceArg(argExpr, getWire)) {
+      const meta = TS.getWireTensorMeta(getWire(argExpr[0].var));
+      return {
+        kind: 'colSlice',
+        meta: { rows: meta.rows, cols: 1, elementWidth: meta.elementWidth },
+      };
+    }
+    if (isTensorCellSliceArg(argExpr) || (VR && VR.isRank1ElementSliceArg(argExpr, getWire))) {
       return { kind: 'scalar' };
     }
-    const meta = TS.getWireTensorMeta(getWire(argExpr[0].var));
-    if (TS.isMatrix(meta)) return { kind: 'matrix', meta };
-    return { kind: 'vector', meta };
+    return { kind: 'scalar' };
   }
 
   function requireMatrixTaggedOperands(args, getWire, fnName, minArgs) {
@@ -65,6 +122,19 @@
     }
     if (!hasMatrix) {
       throw new Error(`${fnName}: remove '; matrix' — no argument is a matrix`);
+    }
+    for (const c of classified) {
+      if (!c.meta) continue;
+      if (c.kind === 'rowSlice' || (c.kind === 'vector' && c.meta.rows === 1)) {
+        if (c.meta.cols !== matrixMeta.cols || c.meta.elementWidth !== matrixMeta.elementWidth) {
+          throw new Error(`${fnName}: ${SHAPE_ERR}`);
+        }
+      }
+      if (c.kind === 'colSlice' || (c.kind === 'vector' && c.meta.cols === 1 && c.meta.rows > 1)) {
+        if (c.meta.rows !== matrixMeta.rows || c.meta.elementWidth !== matrixMeta.elementWidth) {
+          throw new Error(`${fnName}: ${SHAPE_ERR}`);
+        }
+      }
     }
     return { classified, meta: matrixMeta };
   }
@@ -94,6 +164,14 @@
       return evalFns.evalScalar(argExpr);
     }
     const varName = argExpr[0].var;
+    if (kind === 'rowSlice') {
+      const sliceRow = evalFns.resolveRowIndex(argExpr[0]);
+      return evalFns.evalCell(varName, sliceRow, col);
+    }
+    if (kind === 'colSlice') {
+      const sliceCol = evalFns.resolveColIndex(argExpr[0]);
+      return evalFns.evalCell(varName, row, sliceCol);
+    }
     if (kind === 'matrix') {
       return evalFns.evalCell(varName, row, col);
     }
