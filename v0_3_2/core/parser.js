@@ -12,13 +12,13 @@ function slashDecToBin(value) {
 }
 
 const SHOW_PEEK_DISPLAY_TAGS = new Set([
-  'dec', 'decSigned', 'hex', 'bin', 'signed', 'hexWide',
+  'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide',
   'elAll', 'elNonZero', 'compact', 'elRange', 'elLast', 'maxWidth', 'multiline',
 ]);
 const PROBE_DISPLAY_TAGS = new Set([
-  'dec', 'decSigned', 'hex', 'bin', 'signed', 'hexWide', 'maxWidth', 'multiline',
+  'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide', 'maxWidth', 'multiline',
 ]);
-const DISPLAY_FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'signed']);
+const DISPLAY_FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed']);
 const DISPLAY_ELEMENT_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
 const DISPLAY_VALUED_TAGS = new Set(['elRange', 'elLast', 'maxWidth']);
 
@@ -633,15 +633,20 @@ parseDebugDisplayTags(allowedTags) {
   const hasFormatDec = tags.includes('dec') || tags.includes('decSigned');
   const hasFormatHex = tags.includes('hex');
   const hasFormatBin = tags.includes('bin');
+  const hasFormatAscii = tags.includes('ascii');
   let formatCount = 0;
   if (hasFormatDec) formatCount++;
   if (hasFormatHex) formatCount++;
   if (hasFormatBin) formatCount++;
+  if (hasFormatAscii) formatCount++;
   if (formatCount > 1) {
-    throw Error(`Display format tags (dec, hex, bin) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    throw Error(`Display format tags (dec, hex, bin, ascii) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   if (tags.includes('signed') && tags.includes('bin')) {
     throw Error(`Display tags signed and bin are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  if (tags.includes('signed') && tags.includes('ascii')) {
+    throw Error(`Display tags signed and ascii are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   if (tags.includes('hexWide') && !tags.includes('hex')) {
     throw Error(`Display tag hexWide requires hex at ${this.c.file}: ${this.c.line}:${this.c.col}`);

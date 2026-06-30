@@ -9,7 +9,7 @@
   const SHOW_HEX_NIBBLE_BITS = 4;
   const SHOW_HEX_GROUP_HEX_CHARS = 4;
 
-  const FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'signed']);
+  const FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed']);
   const ELEMENT_MODE_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
   const MODIFIER_TAGS = new Set(['signed', 'hexWide', 'multiline']);
 
@@ -226,6 +226,47 @@
     return parts.join(' ');
   }
 
+  const ASCII_NUL = '\u25A1';
+  const ASCII_LF = '\u21B5';
+
+  function byteBinToAsciiGlyph(byteBin) {
+    if (byteBin.length !== 8) return '.';
+    if (hasLogicXZ(byteBin)) return '.';
+    const val = parseInt(byteBin, 2);
+    if (Number.isNaN(val)) return '.';
+    if (val === 0) return ASCII_NUL;
+    if (val === 0x0A) return ASCII_LF;
+    if (val >= 32 && val <= 126) return String.fromCharCode(val);
+    return '.';
+  }
+
+  function formatAsciiQuotedChars(bits, bitWidth, isElement) {
+    const w = bitWidth || bits.length;
+    let chars = '';
+
+    if (isElement && w <= 8) {
+      const padded = w < 8 ? normalizeBits(bits, 8) : bits;
+      chars = byteBinToAsciiGlyph(padded);
+      return '"' + chars + '"';
+    }
+
+    const fullBytes = Math.floor(w / 8);
+    for (let i = 0; i < fullBytes * 8; i += 8) {
+      chars += byteBinToAsciiGlyph(bits.substring(i, i + 8));
+    }
+    if (w % 8 !== 0) chars += '.';
+    return '"' + chars + '"';
+  }
+
+  function formatAsciiDisplay(binStr, bitWidth, isElement) {
+    const w = bitWidth || String(binStr).length;
+    if (hasLogicXZ(binStr) && w <= 8 && isElement) {
+      return '"."';
+    }
+    const bits = normalizeBits(binStr, w);
+    return formatAsciiQuotedChars(bits, w, !!isElement);
+  }
+
   function formatBinDisplay(binStr, bitWidth, isElement) {
     const w = bitWidth || String(binStr).length;
     if (hasLogicXZ(binStr)) return formatXZBinary(binStr);
@@ -320,8 +361,9 @@
     let hasDec = tags.includes('dec');
     const hasHex = tags.includes('hex');
     const hasBin = tags.includes('bin');
+    const hasAscii = tags.includes('ascii');
 
-    if (hasSigned && !hasDec && !hasHex) {
+    if (hasSigned && !hasDec && !hasHex && !hasAscii) {
       tags.push('dec');
       hasDec = true;
     }
@@ -329,11 +371,12 @@
     const signedLiteral = hasSigned && (hasDec || hasHex);
 
     return {
-      dec: hasDec && !hasBin,
+      dec: hasDec && !hasBin && !hasAscii,
       signed: hasSigned,
       signedLiteral,
-      hex: hasHex && !hasBin,
-      bin: hasBin,
+      hex: hasHex && !hasBin && !hasAscii,
+      bin: hasBin && !hasAscii,
+      ascii: hasAscii,
       hexWide: tags.includes('hexWide'),
       compact: tags.includes('compact'),
       elAll: tags.includes('elAll'),
@@ -349,7 +392,9 @@
   function formatDebugDisplayValue(binStr, bitWidth, opts, isElement) {
     if (!opts || binStr == null || binStr === '-') return binStr;
     let formatted;
-    if (opts.bin) {
+    if (opts.ascii) {
+      formatted = formatAsciiDisplay(binStr, bitWidth, !!isElement);
+    } else if (opts.bin) {
       formatted = formatBinDisplay(binStr, bitWidth, !!isElement);
     } else if (opts.hex) {
       if (opts.signed) {
@@ -414,6 +459,7 @@
     formatHexTagDisplay,
     formatHexGroupedDisplay,
     formatBinDisplay,
+    formatAsciiDisplay,
     formatSignedDecLiteral,
     formatSignedHexLiteral,
     parseElRangeSpec,

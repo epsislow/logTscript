@@ -1822,7 +1822,7 @@ class Interpreter {
     if (!target) return;
     let valueStr = value == null ? '-' : String(value);
     const opts = this._normalizeShowDisplayOpts(target.displayTags);
-    const useTagFormat = opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed);
+    const useTagFormat = opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii);
     if (target.bitWidth && valueStr !== '-' && !target.isText) {
       const wire = target.wireName ? this.wires.get(target.wireName) : null;
       const skipGroup = wire && wire.vector && target.kind === 'wire' && !useTagFormat;
@@ -6286,20 +6286,20 @@ if (this.isBuiltinDEMUX(name)) {
   _formatDebugDisplayValue(binStr, bitWidth, opts, isElement) {
     const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
     if (!DF || !opts) return binStr;
-    if (!(opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed)) return binStr;
+    if (!(opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii)) return binStr;
     return DF.formatDebugDisplayValue(binStr, bitWidth, opts, isElement);
   }
 
   _formatShowWireValue(valueStr, bitWidth, opts, isElement) {
     if (valueStr === '-' || valueStr == null) return valueStr;
-    if (opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed)) {
+    if (opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii)) {
       return this._formatDebugDisplayValue(valueStr, bitWidth, opts, isElement);
     }
     return this.formatValue(valueStr, bitWidth);
   }
 
   _hasShowFormatOpts(opts) {
-    return opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed);
+    return opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii);
   }
 
   _elementIsNonZero(valueStr, elementWidth) {
@@ -13219,15 +13219,15 @@ Interpreter.BUILTIN_DOC = {
 Interpreter.DEBUG_DOC = {
   show:  [
     'show(expr, …) — print formatted values to Output panel',
-    'show(expr, … ; dec signed hex bin hexWide compact elAll elNonZero elRange= elLast= maxWidth= multiline) — display tags after all args',
+    'show(expr, … ; dec signed hex bin ascii hexWide compact elAll elNonZero elRange= elLast= maxWidth= multiline) — display tags after all args',
   ],
   peek:  [
     'peek(expr, …) — like show, compact wire lines (no ref suffix)',
-    'peek(expr, … ; dec signed hex bin …) — same display tags as show',
+    'peek(expr, … ; dec signed hex bin ascii …) — same display tags as show',
   ],
   probe: [
     'probe(expr) — log value changes (wire, .comp, .inst:pin, &ref, bit slice)',
-    'probe(expr ; dec signed hex bin hexWide maxWidth= multiline) — flat blob; no el* tags',
+    'probe(expr ; dec signed hex bin ascii hexWide maxWidth= multiline) — flat blob; no el* tags',
   ],
   watch: ['watch(expr) — record timeline trace for watch panel'],
   Zlist: ['Zlist(wireName) — list registered bus drivers (MODE ZSTATE, at RUN/NEXT)'],

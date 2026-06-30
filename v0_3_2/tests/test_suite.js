@@ -16166,6 +16166,65 @@ reg(1925, 'show-tags', '128wire signed all-ones — chunk display', function(h, 
   h.assert('two chunks', String(line && (line.match(/\\-1;64/g) || []).length === 2), 'true');
 });
 
+reg(1926, 'show-tags', 'Parser — show(w; ascii) displayTags AST', function(h, session) {
+  const stmts = session.parse('show(w; ascii)');
+  h.assert('ascii tag', stmts[0].show.displayTags.tags[0], 'ascii');
+});
+
+reg(1927, 'show-tags', 'show(8wire; ascii) — printable char', function(h, session) {
+  const { out } = session.run('8wire code := 01000001\nshow(code; ascii)');
+  h.assert('quoted A', String(out.some(l => /code \(8wire\) = "A"/.test(l))), 'true');
+});
+
+reg(1928, 'show-tags', 'show(8wire; ascii) — NUL placeholder', function(h, session) {
+  const { out } = session.run('8wire nul := 00000000\nshow(nul; ascii)');
+  h.assert('nul square', String(out.some(l => /nul \(8wire\) = "\u25A1"/.test(l))), 'true');
+});
+
+reg(1929, 'show-tags', 'show(40wire; ascii) — LF glyph', function(h, session) {
+  const bits = '0100100001101001000010100100100001101111';
+  const { out } = session.run(`40wire line := ${bits}\nshow(line; ascii)`);
+  h.assert('lf glyph', String(out.some(l => /line \(40wire\) = "Hi\u21B5Ho"/.test(l))), 'true');
+});
+
+reg(1930, 'show-tags', 'show(8wire; ascii) — TAB as dot', function(h, session) {
+  const { out } = session.run('8wire tab := 00001001\nshow(tab; ascii)');
+  h.assert('tab dot', String(out.some(l => /tab \(8wire\) = "\."/.test(l))), 'true');
+});
+
+reg(1931, 'show-tags', 'show(40wire; ascii) — multi-byte string', function(h, session) {
+  const hello = '0100100001100101011011000110110001101111';
+  const { out } = session.run(`40wire msg := ${hello}\nshow(msg; ascii)`);
+  h.assert('hello', String(out.some(l => /msg \(40wire\) = "Hello"/.test(l))), 'true');
+});
+
+reg(1932, 'show-tags', 'show(vec; ascii) — per-element quoted', function(h, session) {
+  const { out } = session.run(
+    '8wire[2] vec = 01000001 + 00000000\nshow(vec; ascii)'
+  );
+  h.assert(':0 A', String(out.some(l => /:0 = "A"/.test(l))), 'true');
+  h.assert(':1 nul', String(out.some(l => /:1 = "\u25A1"/.test(l))), 'true');
+});
+
+reg(1933, 'show-tags', 'probe(v; ascii) — flat quoted blob', function(h, session) {
+  const { out } = session.run('8wire v := 01000001\nprobe(v; ascii)');
+  const probeLine = out.find(l => l.startsWith('# v ='));
+  h.assert('probe ascii', String(probeLine && probeLine.includes('"A"')), 'true');
+});
+
+reg(1934, 'show-tags', 'peek(w; ascii) — quoted value', function(h, session) {
+  const { out } = session.run('8wire w := 01000001\npeek(w; ascii)');
+  h.assert('peek ascii', String(out.some(l => /w \(8wire\) = "A"/.test(l))), 'true');
+});
+
+reg(1935, 'show-tags', 'show(w; ascii dec) — parse error', function(h, session) {
+  h.assertThrows('mutually exclusive', () => session.parse('show(w; ascii dec)'));
+});
+
+reg(1936, 'show-tags', 'show(w; signed ascii) — parse error', function(h, session) {
+  h.assertThrows('mutually exclusive', () => session.parse('show(w; signed ascii)'));
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

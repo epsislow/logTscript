@@ -1408,7 +1408,18 @@
       {"id":1922,"group":"show-tags","title":"show(vec; compact) — header only","detail":{"scripts":["4wire[3] v = 1111 + 0000 + 1010\nshow(v; compact)"],"steps":[],"assertions":["header","length","no cells"]}},
       {"id":1923,"group":"show-tags","title":"show(vec; dec elRange=1-2) — slice elements","detail":{"scripts":["4wire[4] v = 1111 + 0000 + 1010 + 0101\nshow(v; dec elRange=1-2)"],"steps":[],"assertions":[":1",":2","no :0"]}},
       {"id":1924,"group":"show-tags","title":"show(w; signed bin) — parse error","detail":{"scripts":["show(w; signed bin)"],"steps":[],"assertions":["mutually exclusive"]}},
-      {"id":1925,"group":"show-tags","title":"128wire signed all-ones — chunk display","detail":{"scripts":["128wire w := ${ones}\nshow(w; signed)"],"steps":[],"assertions":["chunk -1","two chunks"]}}
+      {"id":1925,"group":"show-tags","title":"128wire signed all-ones — chunk display","detail":{"scripts":["128wire w := ${ones}\nshow(w; signed)"],"steps":[],"assertions":["chunk -1","two chunks"]}},
+      {"id":1926,"group":"show-tags","title":"Parser — show(w; ascii) displayTags AST","detail":{"scripts":["show(w; ascii)"],"steps":[],"assertions":["ascii tag"]}},
+      {"id":1927,"group":"show-tags","title":"show(8wire; ascii) — printable char","detail":{"scripts":["8wire code := 01000001\nshow(code; ascii)"],"steps":[],"assertions":["quoted A"]}},
+      {"id":1928,"group":"show-tags","title":"show(8wire; ascii) — NUL placeholder","detail":{"scripts":["8wire nul := 00000000\nshow(nul; ascii)"],"steps":[],"assertions":["nul square"]}},
+      {"id":1929,"group":"show-tags","title":"show(40wire; ascii) — LF glyph","detail":{"scripts":["40wire line := ${bits}\nshow(line; ascii)"],"steps":[],"assertions":["lf glyph"]}},
+      {"id":1930,"group":"show-tags","title":"show(8wire; ascii) — TAB as dot","detail":{"scripts":["8wire tab := 00001001\nshow(tab; ascii)"],"steps":[],"assertions":["tab dot"]}},
+      {"id":1931,"group":"show-tags","title":"show(40wire; ascii) — multi-byte string","detail":{"scripts":["40wire msg := ${hello}\nshow(msg; ascii)"],"steps":[],"assertions":["hello"]}},
+      {"id":1932,"group":"show-tags","title":"show(vec; ascii) — per-element quoted","detail":{"scripts":["8wire[2] vec = 01000001 + 00000000\nshow(vec; ascii)"],"steps":[],"assertions":[":0 A",":1 nul"]}},
+      {"id":1933,"group":"show-tags","title":"probe(v; ascii) — flat quoted blob","detail":{"scripts":["8wire v := 01000001\nprobe(v; ascii)"],"steps":[],"assertions":["probe ascii"]}},
+      {"id":1934,"group":"show-tags","title":"peek(w; ascii) — quoted value","detail":{"scripts":["8wire w := 01000001\npeek(w; ascii)"],"steps":[],"assertions":["peek ascii"]}},
+      {"id":1935,"group":"show-tags","title":"show(w; ascii dec) — parse error","detail":{"scripts":["show(w; ascii dec)"],"steps":[],"assertions":["mutually exclusive"]}},
+      {"id":1936,"group":"show-tags","title":"show(w; signed ascii) — parse error","detail":{"scripts":["show(w; signed ascii)"],"steps":[],"assertions":["mutually exclusive"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1478,7 +1489,7 @@
       { id: 'select', label: 'select', rangeLabel: '1673–1676', testIds: [1673, 1674, 1675, 1676] },
       { id: 'short-notation', label: 'Short notation preprocessor', rangeLabel: '102–133, 1334–1336, 1707–1710', testIds: [102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 1334, 1335, 1336, 1707, 1708, 1709, 1710] },
       { id: 'debug', label: 'show / peek / probe', rangeLabel: '804–819, 1176–1187, 1711–1714', testIds: [804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 1176, 1177, 1178, 1179, 1180, 1181, 1182, 1183, 1184, 1185, 1186, 1187, 1711, 1712, 1713, 1714] },
-      { id: 'show-tags', label: 'show-tags', rangeLabel: '1905–1925', testIds: [1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925] },
+      { id: 'show-tags', label: 'show-tags', rangeLabel: '1905–1936', testIds: [1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936] },
       { id: 'slider', label: 'Slider component', rangeLabel: '1206–1220', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983, 1571–1574, 1643–1653, 1661, 1663', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 1571, 1572, 1573, 1574, 1643, 1644, 1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1661, 1663] },
       { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775] },
