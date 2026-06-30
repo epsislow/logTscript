@@ -103,6 +103,22 @@ const DOC_SECTIONS = [
   {
     title: 'Other',
     items: [
+      { file: 'builtin-DIAG.md', label: 'DIAG (diagonal matrix)' },
+      { file: 'builtin-FILL.md', label: 'FILL (constant matrix)' },
+      { file: 'builtin-FLIPLR.md', label: 'FLIPLR (flip columns)' },
+      { file: 'builtin-FLIPUD.md', label: 'FLIPUD (flip rows)' },
+      { file: 'builtin-IDENTITY.md', label: 'IDENTITY (identity matrix)' },
+      { file: 'builtin-IOTA.md', label: 'IOTA (index vector)' },
+      { file: 'builtin-L2.md', label: 'L2 (L2² norm)' },
+      { file: 'builtin-MCAT.md', label: 'MCAT (matrix concat)' },
+      { file: 'builtin-MSLICE.md', label: 'MSLICE (matrix slice)' },
+      { file: 'builtin-NORM.md', label: 'NORM (L2² norm)' },
+      { file: 'builtin-OUTER.md', label: 'OUTER (outer product)' },
+      { file: 'builtin-TRACE.md', label: 'TRACE (matrix trace)' },
+      { file: 'builtin-TRIL.md', label: 'TRIL (lower triangle)' },
+      { file: 'builtin-TRIU.md', label: 'TRIU (upper triangle)' },
+      { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)' },
+      { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
       { file: 'slider.md', label: 'Slider component' }
     ],

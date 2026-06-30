@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-functions.md, builtin-GT.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MIN.md, builtin-MULTIPLY.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NORM.md, builtin-OUTER.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -609,18 +609,18 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 
 | Function | Page | Tags |
 |----------|------|------|
-| ADD | [builtin-ADD.md](builtin-ADD.md) | \`signed\`, \`vector\` |
-| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | \`signed\`, \`vector\` |
-| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | \`signed\`, \`vector\` |
-| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | \`signed\`, \`vector\` |
-| MAC | [builtin-MAC.md](builtin-MAC.md) | \`signed\`, \`vector\` |
-| GT | [builtin-GT.md](builtin-GT.md) | \`signed\`, \`vector\` |
-| LT | [builtin-LT.md](builtin-LT.md) | \`signed\`, \`vector\` |
-| MIN | [builtin-MIN.md](builtin-MIN.md) | \`signed\`, \`vector\` |
-| MAX | [builtin-MAX.md](builtin-MAX.md) | \`signed\`, \`vector\` |
-| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | \`signed\`, \`vector\` |
+| ADD | [builtin-ADD.md](builtin-ADD.md) | \`signed\`, \`vector\`, \`matrix\` |
+| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | \`signed\`, \`vector\`, \`matrix\` |
+| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | \`signed\`, \`vector\`, \`matrix\` |
+| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | \`signed\`, \`vector\`, \`matrix\` |
+| MAC | [builtin-MAC.md](builtin-MAC.md) | \`signed\`, \`vector\`, \`matrix\` |
+| GT | [builtin-GT.md](builtin-GT.md) | \`signed\`, \`vector\`, \`matrix\` |
+| LT | [builtin-LT.md](builtin-LT.md) | \`signed\`, \`vector\`, \`matrix\` |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | \`signed\`, \`vector\`, \`matrix\` |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | \`signed\`, \`vector\`, \`matrix\` |
+| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | \`signed\`, \`vector\`, \`matrix\` |
 
-Vector reduction (\`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\`): [vector-reduction.md](vector-reduction.md). Bitwise equality: [builtin-EQ.md](builtin-EQ.md).
+Vector reduction (\`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\`): [vector-reduction.md](vector-reduction.md). **2D element-wise:** [matrix-reduction.md](matrix-reduction.md). Bitwise equality: [builtin-EQ.md](builtin-EQ.md).
 
 ---
 
@@ -642,19 +642,19 @@ Bit width \`N\` = \`max(len(a), len(b))\` for binary ops; short inputs are zero-
 
 ## Tag overview {#tag-overview}
 
-Optional **bool tags** after \`;\` in the call (\`signed\`, \`vector\`, or both). Operand expansion vs element-wise mode: [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector).
+Optional **bool tags** after \`;\` in the call (\`signed\`, \`vector\`, \`matrix\`, or combinations except **\`vector\` + \`matrix\`**). Operand expansion vs element-wise mode: [vector-reduction.md](vector-reduction.md#element-wise-mode-vector), [matrix-reduction.md](matrix-reduction.md).
 
-| Built-in | Unsigned (default) | \`; signed\` | \`; vector\` |
-|----------|-------------------|------------|------------|
-| ADD | result + **carry** | result + **overflow** | \`Wbit[n]\` per index |
-| SUBTRACT | result + **carry** (borrow) | result + **overflow** | \`Wbit[n]\` per index |
-| MULTIPLY | low/high product split | signed product | \`Wbit[n]\` per index |
-| DIVIDE | quotient + mod | signed \`/\` \`%\` | \`Wbit[n]\` per index |
-| MAC | \`acc + a×b\` | signed accumulate | \`Wbit[n]\`, \`(W+1)bit[n]\` |
-| GT / LT | unsigned order | signed order | \`1wire[n]\` |
-| MIN / MAX | unsigned min/max | signed | \`Wbit[n]\` |
-| CLAMP | unsigned bounds | signed bounds | \`Wbit[n]\` |
-| SUM / DOT | see [vector-reduction](vector-reduction.md) | signed | SUM only |
+| Built-in | Unsigned (default) | \`; signed\` | \`; vector\` | \`; matrix\` |
+|----------|-------------------|------------|------------|------------|
+| ADD | result + **carry** | result + **overflow** | \`Wbit[n]\` per index | \`Wbit[N,M]\` per cell |
+| SUBTRACT | result + **carry** (borrow) | result + **overflow** | \`Wbit[n]\` per index | \`Wbit[N,M]\` per cell |
+| MULTIPLY | low/high product split | signed product | \`Wbit[n]\` per index | \`Wbit[N,M]\` per cell |
+| DIVIDE | quotient + mod | signed \`/\` \`%\` | \`Wbit[n]\` per index | \`Wbit[N,M]\` per cell |
+| MAC | \`acc + a×b\` | signed accumulate | \`Wbit[n]\`, \`(W+1)bit[n]\` | \`Wbit[N,M]\` per cell |
+| GT / LT | unsigned order | signed order | \`1wire[n]\` | \`1wire[N×M]\` |
+| MIN / MAX | unsigned min/max | signed | \`Wbit[n]\` | \`Wbit[N,M]\` |
+| CLAMP | unsigned bounds | signed bounds | \`Wbit[n]\` | \`Wbit[N,M]\` |
+| SUM / DOT | see [vector-reduction](vector-reduction.md) | signed | SUM only | SUM only |
 
 \`LSHIFT\`, rotates, and \`REVERSE\` do **not** support \`; signed\`. \`RSHIFT\` with \`; signed\` is **ASHR** — [builtin-RSHIFT.md](builtin-RSHIFT.md).
 
@@ -2246,7 +2246,7 @@ Wire width on the left must match LUT \`depth\`; mismatch → \`useExpr: wire wi
 `,
     'builtin-ADD.md': `# ADD
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Binary addition with wrap-around.
 
@@ -2257,6 +2257,8 @@ ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
 ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
 ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
+ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], Wbit[n,m]
 \`\`\`
 
 ## Scalar (default)
@@ -2271,6 +2273,7 @@ ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 |-----|-----------|
 | \`signed\` | Same \`result\` bits; second return is **signed overflow** (not unsigned carry). |
 | \`vector\` | Element-wise add; \`result\` and flag blobs are \`Wbit[n]\`. |
+| \`matrix\` | Per-cell add on 2D tensors → \`Wbit[N,M]\` + flags. Mutually exclusive with \`vector\`. See [matrix-reduction.md](matrix-reduction.md). |
 
 **Implicit vector broadcast:** \`ADD(vectorA, scalar)\` without \`; vector\` also produces element-wise \`Wbit[n]\` (legacy). Explicit \`; vector\` documents the same semantics.
 
@@ -2335,6 +2338,34 @@ Signed element-wise add (overflow per index):
 4wire[2] r, 4wire[2] ovf = ADD(vectorA, vectorB; vector signed)
 show(r)
 show(ovf)
+\`\`\`
+
+### \`ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] r, 4wire[2,2] f = ADD(m, 0001; matrix)
+show(r)
+show(f)
+\`\`\`
+
+Row broadcast:
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2] row = 0001 + 0010
+4wire[2,2] r, 4wire[2,2] f = ADD(m, row; matrix)
+show(r)
+\`\`\`
+
+### \`ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 1111 + 0111 + 0001 + 1000
+4wire[2,2] b = 0001 + 0001 + 0001 + 0001
+4wire[2,2] r, 4wire[2,2] f = ADD(a, b; matrix signed)
+show(r)
+show(f)
 \`\`\`
 
 ## See also
@@ -2837,7 +2868,7 @@ probe(bad)
 
 Shift, rotate, and reverse operations on bit strings.
 
-Index: [builtin-functions.md](builtin-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · Short notation (\`<\`, \`>\`): [short-notation.md](short-notation.md)
+Index: [builtin-functions.md](builtin-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md) · Short notation (\`<\`, \`>\`): [short-notation.md](short-notation.md)
 
 ---
 
@@ -2845,11 +2876,11 @@ Index: [builtin-functions.md](builtin-functions.md) · [Tagged built-ins](builti
 
 | Function | Page | Tags |
 |----------|------|------|
-| LSHIFT | [builtin-LSHIFT.md](builtin-LSHIFT.md) | \`vector\` |
-| RSHIFT | [builtin-RSHIFT.md](builtin-RSHIFT.md) | \`signed\`, \`vector\` |
-| LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | \`vector\` |
-| RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | \`vector\` |
-| REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | \`vector\` |
+| LSHIFT | [builtin-LSHIFT.md](builtin-LSHIFT.md) | \`vector\`, \`matrix\` |
+| RSHIFT | [builtin-RSHIFT.md](builtin-RSHIFT.md) | \`signed\`, \`vector\`, \`matrix\` |
+| LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | \`vector\`, \`matrix\` |
+| RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | \`vector\`, \`matrix\` |
+| REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | \`vector\`, \`matrix\` |
 
 ---
 
@@ -2863,7 +2894,7 @@ Index: [builtin-functions.md](builtin-functions.md) · [Tagged built-ins](builti
 
 **LROTATE** / **RROTATE** — circular rotate; \`count\` taken modulo width.
 
-Vector mode: per-element operation; shift/rotate **count** is usually a scalar broadcast (see each page). \`RSHIFT\` may use per-index \`Kbit[n]\` counts.
+Vector mode: per-element operation; shift/rotate **count** is usually a scalar broadcast (see each page). \`RSHIFT\` may use per-index \`Kbit[n]\` counts. **\`; matrix\`**: same ops per cell on \`4wire[N,M]\` — [matrix-reduction.md](matrix-reduction.md).
 
 \`\`\`logts-play
 4wire neg = 1111
@@ -2879,7 +2910,7 @@ Use \`doc(LSHIFT)\` … \`doc(RROTATE)\` for live signatures from \`Interpreter.
 `,
     'builtin-CLAMP.md': `# CLAMP
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Clamp value to \`[min, max]\`.
 
@@ -2890,6 +2921,8 @@ CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit
 CLAMP(Xbit x, Ybit min, Ybit max; signed) -> Ybit
 CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector) -> Wbit[n]
 CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]
+CLAMP(Wbit[n,m] x, Wbit/Wbit[n,m]/scalar min, Wbit/Wbit[n,m]/scalar max ; matrix) -> Wbit[n,m]
+CLAMP(Wbit[n,m] x, … ; matrix signed) -> Wbit[n,m]
 \`\`\`
 
 \`min\` and \`max\` must have equal width **Y**; \`x\` may be wider (compare at \`len(x)\` with bounds zero-extended).
@@ -2904,6 +2937,7 @@ CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]
 |-----|-----------|
 | \`signed\` | Signed bounds. |
 | \`vector\` | Per-index clamp; bounds broadcast if scalar. |
+| \`matrix\` | Per-cell clamp → \`Wbit[N,M]\`; bounds broadcast as row/col/scalar. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -2965,13 +2999,60 @@ show(y)
 show(y)
 \`\`\`
 
+### \`CLAMP(Wbit[n,m] x, … ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] x = 1111 + 0100 + 0010 + 1000
+4wire lo = 0001
+4wire hi = 1000
+4wire[2,2] y = CLAMP(x, lo, hi; matrix)
+show(y)
+\`\`\`
+
+### \`CLAMP(Wbit[n,m] x, … ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] x = 1111 + 0100 + 0010 + 1000
+4wire lo = 0000
+4wire hi = 0010
+4wire[2,2] y = CLAMP(x, lo, hi; matrix signed)
+show(y)
+\`\`\`
+
 ## See also
 
 [MIN](builtin-MIN.md) · [MAX](builtin-MAX.md)
 `,
+    'builtin-DIAG.md': `# DIAG (diagonal matrix)
+
+Index: [2D tensors](wire-vectors.md)
+
+Build a square matrix from a vector on the **diagonal**; off-diagonal cells are **0**.
+
+## Signatures
+
+\`\`\`
+DIAG(Wwire[n] vector) -> Wwire[n,n]
+\`\`\`
+
+Vector length **n** must match target **n×n**. Element width **W** must match.
+
+## Examples
+
+\`\`\`logts-play
+4wire[3] v = 0001 + 0010 + 0100
+4wire[3,3] d = DIAG(v)
+4wire x = d:1:1
+show(x)
+\`\`\`
+
+## See also
+
+[IDENTITY](builtin-IDENTITY.md) · [TRACE](builtin-TRACE.md)
+`,
     'builtin-DIVIDE.md': `# DIVIDE
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Integer quotient and remainder (no floating-point).
 
@@ -2982,6 +3063,8 @@ DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
 DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod
 DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
+DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], Wbit[n,m]
 \`\`\`
 
 ## Scalar (default)
@@ -2996,6 +3079,7 @@ DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 |-----|-----------|
 | \`signed\` | Operands as two's complement; integer \`/\` and \`%\`. |
 | \`vector\` | Quotient and remainder per index. |
+| \`matrix\` | Quotient and remainder per cell → \`Wbit[N,M]\`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -3059,6 +3143,26 @@ show(m)
 4wire[2] vectorA = 1111 + 1101
 4wire[2] vectorB = 0010 + 0010
 4wire[2] q, 4wire[2] m = DIVIDE(vectorA, vectorB; vector signed)
+show(q)
+show(m)
+\`\`\`
+
+### \`DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 0110 + 0111 + 0100 + 1000
+4wire[2,2] b = 0010 + 0010 + 0010 + 0010
+4wire[2,2] q, 4wire[2,2] m = DIVIDE(a, b; matrix)
+show(q)
+show(m)
+\`\`\`
+
+### \`DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 1111 + 1101 + 0100 + 1000
+4wire[2,2] b = 0010 + 0010 + 0010 + 0010
+4wire[2,2] q, 4wire[2,2] m = DIVIDE(a, b; matrix signed)
 show(q)
 show(m)
 \`\`\`
@@ -3133,7 +3237,7 @@ Signed \`(−1)×(−1) + 2×1 = 3\`.
 `,
     'builtin-EQ.md': `# EQ (equality)
 
-Index: [Logic gates](builtin-logic-gate-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector)
+Index: [Logic gates](builtin-logic-gate-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Bitwise equality (all bits of each operand must match).
 
@@ -3143,11 +3247,13 @@ Bitwise equality (all bits of each operand must match).
 EQ(Xbit a, Xbit b) -> 1bit result
 EQ(Xbit a, Xbit b, Xbit c, ...) -> 1bit result
 EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
+EQ(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> 1wire[n×m]
 \`\`\`
 
 - **Two operands:** \`1\` if every bit pair matches (bitwise).
 - **Three or more operands (no tag):** \`1\` only if **all** operands are bitwise equal pairwise.
 - **\`; vector\`:** exactly **two** arguments; compare per index → \`1wire[n]\`.
+- **\`; matrix\`:** exactly **two** arguments; compare per cell → **\`1wire[N×M]\`** (bitwise equality of each cell).
 
 ## Scalar (default)
 
@@ -3158,6 +3264,7 @@ EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 | Tag | Behaviour |
 |-----|-----------|
 | \`vector\` | Per-index equality \`a[i] == b[i]\` → \`1wire[n]\`. |
+| \`matrix\` | Per-cell equality → **\`1wire[N×M]\`**. See [matrix-reduction.md](matrix-reduction.md). |
 
 **No \`; signed\` tag** — equality is bitwise.
 
@@ -3223,9 +3330,94 @@ show(flags)
 
 → \`11\`.
 
+### \`EQ(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 0001 + 0010 + 0100 + 1000
+4wire[2,2] b = 0001 + 0010 + 0100 + 1000
+1wire[4] eqv = EQ(a, b; matrix)
+show(eqv)
+\`\`\`
+
+→ \`1111\` (all four cells equal).
+
 ## See also
 
 [GT](builtin-GT.md) · [LT](builtin-LT.md) · [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md)
+`,
+    'builtin-FILL.md': `# FILL (constant matrix)
+
+Index: [2D tensors](wire-vectors.md)
+
+Fill every cell of an **N×N** matrix with the same scalar value.
+
+## Signatures
+
+\`\`\`
+FILL(\\N, Wbit scalar) -> Wwire[N,N]
+\`\`\`
+
+- **\`\\N\`** — matrix dimension (must match target).
+- **scalar** — any **W**-bit expression (literal, wire, or slice).
+
+## Examples
+
+\`\`\`logts-play
+4wire[2,2] m = FILL(\\2, 0011)
+show(m)
+\`\`\`
+
+## See also
+
+[ZEROS](builtin-ZEROS.md) · [IDENTITY](builtin-IDENTITY.md)
+`,
+    'builtin-FLIPLR.md': `# FLIPLR (flip columns)
+
+Index: [2D tensors](wire-vectors.md)
+
+Reverse **column** order within each row (horizontal mirror).
+
+## Signatures
+
+\`\`\`
+FLIPLR(Wwire tensor) -> Wwire tensor
+\`\`\`
+
+## Examples
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] lr = FLIPLR(m)
+show(lr)
+\`\`\`
+
+## See also
+
+[FLIPUD](builtin-FLIPUD.md)
+`,
+    'builtin-FLIPUD.md': `# FLIPUD (flip rows)
+
+Index: [2D tensors](wire-vectors.md)
+
+Reverse **row** order (vertical flip). Same shape as input.
+
+## Signatures
+
+\`\`\`
+FLIPUD(Wwire tensor) -> Wwire tensor
+\`\`\`
+
+## Examples
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] ud = FLIPUD(m)
+show(ud)
+\`\`\`
+
+## See also
+
+[FLIPLR](builtin-FLIPLR.md) · [PIVOT](wire-vectors.md#pivot)
 `,
     'builtin-functions.md': `# Built-in functions (internal)
 
@@ -3247,12 +3439,13 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Logic gates** | \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, \`EQ\` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) · \`EQ\` tags: [builtin-EQ.md](builtin-EQ.md) |
 | **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
-| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) · per-function: [builtin-tagged-index.md](builtin-tagged-index.md) |
-| **Vector reduction** | \`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\` | [vector-reduction.md](vector-reduction.md) · index: [builtin-tagged-index.md](builtin-tagged-index.md) |
+| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) · tags \`; vector\` / **\`; matrix\`**: [builtin-tagged-index.md](builtin-tagged-index.md) |
+| **Vector reduction** | \`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\` | [vector-reduction.md](vector-reduction.md) · **\`; matrix\`** (element-wise 2D): [matrix-reduction.md](matrix-reduction.md) |
+| **Tensor / matrix** | \`PIVOT\`, \`IDENTITY\`, \`ZEROS\`, \`FILL\`, \`DIAG\`, \`IOTA\`, \`OUTER\`, \`TRACE\`, \`NORM\`, \`L2\`, \`TRIL\`, \`TRIU\`, \`FLIPUD\`, \`FLIPLR\`, \`MCAT\`, \`MSLICE\` | [wire-vectors.md](wire-vectors.md) · [builtin-IDENTITY.md](builtin-IDENTITY.md) |
 | **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
-| **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) · \`RSHIFT\` \`; signed\` = ASHR · index: [builtin-tagged-index.md](builtin-tagged-index.md) |
+| **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) · \`RSHIFT\` \`; signed\` = ASHR · **\`; matrix\`**: [matrix-reduction.md](matrix-reduction.md) |
 | **Tristate (ZSTATE)** | \`ZRELEASE(wire)\`, \`bus = ZCONNECT(en, data)\` | [zstate.md](zstate.md) |
 
 > **Adding new built-ins:** extend \`Interpreter.BUILTIN_DOC\` in \`core/interpreter.js\`, implement evaluation in the same file, add a row to the table above, and document behaviour in the matching category file.
@@ -3305,7 +3498,7 @@ In \`MODE ZSTATE\`, gate functions (\`AND\`, \`OR\`, \`NOT\`, …) use IEEE 1164
 `,
     'builtin-GT.md': `# GT (greater than)
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 ## Signatures
 
@@ -3314,6 +3507,8 @@ GT(Xbit a, Xbit b) -> 1bit result
 GT(Xbit a, Xbit b; signed) -> 1bit result
 GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 GT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
+GT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> 1wire[n×m]
+GT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> 1wire[n×m]
 \`\`\`
 
 ## Scalar (default)
@@ -3326,6 +3521,7 @@ GT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
 |-----|-----------|
 | \`signed\` | Two's complement comparison. |
 | \`vector\` | Per-index \`1wire[n]\`; scalar operand broadcast. |
+| \`matrix\` | Per-cell compare → **\`1wire[N×M]\`** (one bit per cell, row-major). See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -3380,9 +3576,114 @@ show(flags)
 show(flags)
 \`\`\`
 
+### \`GT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+1wire[4] out = GT(m, 0010; matrix)
+show(out)
+\`\`\`
+
+Compare vs scalar \`2\` → cells \`1,0,1,1\` packed as \`0011\`.
+
+### \`GT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 1111 + 0010 + 1000 + 0100
+4wire[2,2] b = 0010 + 1111 + 0100 + 0010
+1wire[4] out = GT(a, b; matrix signed)
+show(out)
+\`\`\`
+
 ## See also
 
 [LT](builtin-LT.md) · [EQ](builtin-EQ.md) · [MIN](builtin-MIN.md)
+`,
+    'builtin-IDENTITY.md': `# IDENTITY (identity matrix)
+
+Index: [2D tensors](wire-vectors.md) · [DOT](builtin-DOT.md)
+
+Square **N×N** matrix with **1** on the diagonal and **0** elsewhere.
+
+## Signatures
+
+\`\`\`
+IDENTITY(\\N) -> Wwire[N,N]
+\`\`\`
+
+- **\`\\N\`** — decimal dimension (must match target \`N×N\`).
+- **W** — element width from the target wire (\`4wire[N,N]\` → 4 bits per cell).
+
+## Examples
+
+\`\`\`logts-play
+4wire[3,3] I = IDENTITY(\\3)
+4wire c = I:0:0
+show(c)
+\`\`\`
+
+\`\`\`logts-play
+4wire[2,2] a = 0001 + 0010 + 0011 + 0100
+4wire[2,2] eye = IDENTITY(\\2)
+4wire[2,2] r, 8wire[2,2] o = DOT(a, eye)
+show(r)
+\`\`\`
+
+## See also
+
+[ZEROS](builtin-ZEROS.md) · [DIAG](builtin-DIAG.md) · [DOT](builtin-DOT.md)
+`,
+    'builtin-IOTA.md': `# IOTA (index vector)
+
+Index: [2D tensors](wire-vectors.md)
+
+Rank-1 vector **\`[0, 1, …, N−1]\`**, each index stored in **W** bits (binary, zero-padded).
+
+## Signatures
+
+\`\`\`
+IOTA(\\N) -> Wwire[N]
+\`\`\`
+
+Assign to **\`4wire[N]\`** or **\`4wire[1,N]\`**. **\`\\N\`** must match vector length.
+
+## Examples
+
+\`\`\`logts-play
+4wire[3] idx = IOTA(\\3)
+show(idx)
+\`\`\`
+
+Values: \`0\` → \`0000\`, \`1\` → \`0001\`, \`2\` → \`0010\` (for \`4wire\`).
+
+## See also
+
+[DIAG](builtin-DIAG.md) · [Vector reduction](vector-reduction.md)
+`,
+    'builtin-L2.md': `# L2 (L2² norm)
+
+Index: [NORM](builtin-NORM.md) · [DOT](builtin-DOT.md)
+
+**Alias of [NORM](builtin-NORM.md)** — squared L2 norm via **\`DOT(v, v)\`**.
+
+## Signatures
+
+\`\`\`
+L2(Wwire[n] vector) -> Wbit result, (2W)bit over
+L2(Wwire[n] vector; signed) -> Wbit result, (2W)bit over
+\`\`\`
+
+## Examples
+
+\`\`\`logts-play
+4wire[2] v = 0011 + 0100
+4wire a, 8wire ao = L2(v)
+show(a)
+\`\`\`
+
+## See also
+
+[NORM](builtin-NORM.md) · [DOT](builtin-DOT.md)
 `,
     'builtin-logic-gate-functions.md': `# Built-in logic gate functions
 
@@ -3512,7 +3813,7 @@ Result: \`y = 1\` (OR with any \`1\`).
 `,
     'builtin-LROTATE.md': `# LROTATE (left rotate)
 
-Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Rotate bits left; MSBs wrap to LSBs. Width unchanged.
 
@@ -3521,6 +3822,7 @@ Rotate bits left; MSBs wrap to LSBs. Width unchanged.
 \`\`\`
 LROTATE(Xbit data, Ybit count) -> Xbit
 LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
+LROTATE(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
 \`\`\`
 
 - **\`count\`** is taken **modulo** element width.
@@ -3535,6 +3837,7 @@ LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 | Tag | Behaviour |
 |-----|-----------|
 | \`vector\` | Per-element rotate. |
+| \`matrix\` | Per-cell rotate; \`count\` scalar or matrix/row/col broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -3585,13 +3888,21 @@ Per-index count vector:
 show(out)
 \`\`\`
 
+### \`LROTATE(Wbit[n,m] data, … ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] m = 1011 + 0101 + 1100 + 0011
+4wire[2,2] out = LROTATE(m, 0001; matrix)
+show(out)
+\`\`\`
+
 ## See also
 
 [RROTATE](builtin-RROTATE.md) · [REVERSE](builtin-REVERSE.md)
 `,
     'builtin-LSHIFT.md': `# LSHIFT (left shift)
 
-Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Shift bits toward MSB; vacated LSBs filled with **\`0\`** by default, or with optional **\`fill\`** (1 bit).
 
@@ -3601,6 +3912,7 @@ Shift bits toward MSB; vacated LSBs filled with **\`0\`** by default, or with op
 LSHIFT(Xbit data, Nbit n) -> Xbit
 LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
 LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]
+LSHIFT(Wbit[n,m] data, Nbit/scalar count ; matrix) -> Wbit[n,m]
 \`\`\`
 
 - Scalar: result width = **\`len(data) + n\`** (bits appended on the right).
@@ -3618,6 +3930,7 @@ Sugar: \`data < n\` and \`data < n w1\` — [short-notation.md](short-notation.m
 | Tag | Behaviour |
 |-----|-----------|
 | \`vector\` | Per-element shift; output element width **(W + n)** where \`n = len(scalar count)\`. |
+| \`matrix\` | Per-cell shift; output shape matches input matrix (**W** bits per cell). See [matrix-reduction.md](matrix-reduction.md). |
 
 **No \`; signed\` tag** — left shift is identical for signed/unsigned bit patterns.
 
@@ -3680,13 +3993,23 @@ Optional **\`fill\`** in vector mode:
 show(r)
 \`\`\`
 
+### \`LSHIFT(Wbit[n,m] data, Nbit count ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] out = LSHIFT(m, 0001; matrix)
+show(out)
+\`\`\`
+
+Per-cell left shift by 1 (within each **W**-bit cell; assign to \`4wire[N,M]\`).
+
 ## See also
 
 [RSHIFT](builtin-RSHIFT.md) · [LROTATE](builtin-LROTATE.md)
 `,
     'builtin-LT.md': `# LT (less than)
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 ## Signatures
 
@@ -3695,6 +4018,8 @@ LT(Xbit a, Xbit b) -> 1bit result
 LT(Xbit a, Xbit b; signed) -> 1bit result
 LT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
+LT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> 1wire[n×m]
+LT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> 1wire[n×m]
 \`\`\`
 
 ## Scalar (default)
@@ -3707,6 +4032,7 @@ LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
 |-----|-----------|
 | \`signed\` | Two's complement comparison. |
 | \`vector\` | Per-index \`1wire[n]\`. |
+| \`matrix\` | Per-cell compare → **\`1wire[N×M]\`**. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -3752,13 +4078,31 @@ show(flags)
 show(flags)
 \`\`\`
 
+### \`LT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 0001 + 0100 + 0111 + 0010
+4wire[2,2] b = 0010 + 0011 + 0100 + 0100
+1wire[4] flags = LT(a, b; matrix)
+show(flags)
+\`\`\`
+
+### \`LT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 1111 + 0100 + 0111 + 0010
+4wire[2,2] b = 0010 + 1111 + 0100 + 0100
+1wire[4] flags = LT(a, b; matrix signed)
+show(flags)
+\`\`\`
+
 ## See also
 
 [GT](builtin-GT.md) · [EQ](builtin-EQ.md)
 `,
     'builtin-MAC.md': `# MAC (multiply-accumulate)
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Computes **\`acc + (a × b)\`**. Equivalent to \`ADD(acc, MULTIPLY(a, b))\`; may be fused internally.
 
@@ -3769,6 +4113,8 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
 MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]
 MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], (W+1)bit[n]
+MAC(Wbit[n,m] acc, Wbit/Wbit[n,m]/row/col/scalar a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], (W+1)bit[n,m]
+MAC(Wbit[n,m] acc, … ; matrix signed) -> Wbit[n,m], (W+1)bit[n,m]
 \`\`\`
 
 All three operands must have the same width **X** (per element in vector mode).
@@ -3786,6 +4132,7 @@ Full integer: concatenate **\`over\` then \`result\`** (MSB → LSB).
 |-----|-----------|
 | \`signed\` | Signed accumulate; same packing. |
 | \`vector\` | Per index; \`over[i]\` is **(W+1)** bits — assign e.g. \`4wire[n] r, 5wire[n] o\`. |
+| \`matrix\` | Per cell; assign e.g. \`4wire[N,M] r, 5wire[N,M] o\`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -3850,13 +4197,35 @@ show(r)
 show(o)
 \`\`\`
 
+### \`MAC(Wbit[n,m] acc, … ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] acc = 0001 + 0010 + 0000 + 0000
+4wire[2,2] a = 0010 + 0001 + 0011 + 0100
+4wire[2,2] b = 0011 + 0100 + 0001 + 0001
+4wire[2,2] r, 5wire[2,2] o = MAC(acc, a, b; matrix)
+show(r)
+show(o)
+\`\`\`
+
+### \`MAC(Wbit[n,m] acc, … ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] acc = 1111 + 0000 + 0000 + 0000
+4wire[2,2] a = 1111 + 0010 + 0011 + 0100
+4wire[2,2] b = 0001 + 0001 + 0001 + 0001
+4wire[2,2] r, 5wire[2,2] o = MAC(acc, a, b; matrix signed)
+show(r)
+show(o)
+\`\`\`
+
 ## See also
 
 [MULTIPLY](builtin-MULTIPLY.md) · [DOT](builtin-DOT.md)
 `,
     'builtin-MAX.md': `# MAX
 
-Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Matrix \`; matrix\`](matrix-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
 
 ## Signatures
 
@@ -3865,6 +4234,8 @@ MAX(Wbit ...) -> Wbit
 MAX(Wbit ...; signed) -> Wbit
 MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
 MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
+MAX(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar ... ; matrix) -> Wbit[n,m]
+MAX(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]
 \`\`\`
 
 Variadic (≥ 2 operands after expansion).
@@ -3879,6 +4250,7 @@ Variadic (≥ 2 operands after expansion).
 |-----|-----------|
 | \`signed\` | Signed maximum. |
 | \`vector\` | Element-wise max. |
+| \`matrix\` | Per-cell max on 2D tensors → \`Wbit[N,M]\`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -3923,13 +4295,65 @@ show(out)
 show(out)
 \`\`\`
 
+### \`MAX(Wbit[n,m] … ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 0001 + 0010 + 0100 + 1000
+4wire[2,2] b = 0010 + 0011 + 0100 + 1001
+4wire[2,2] out = MAX(a, b; matrix)
+show(out)
+\`\`\`
+
+### \`MAX(Wbit[n,m] … ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 1111 + 0010 + 1000 + 0100
+4wire[2,2] b = 0001 + 1111 + 0100 + 0010
+4wire[2,2] out = MAX(a, b; matrix signed)
+show(out)
+\`\`\`
+
 ## See also
 
 [MIN](builtin-MIN.md) · [CLAMP](builtin-CLAMP.md) · [ARGMAX](builtin-ARGMAX.md)
 `,
+    'builtin-MCAT.md': `# MCAT (matrix concat)
+
+Index: [2D tensors](wire-vectors.md)
+
+Concatenate two tensors along the shared dimension:
+
+| Condition | Result shape |
+|-----------|----------------|
+| Same **row** count | Horizontal **\`[R, C1+C2]\`** |
+| Same **column** count | Vertical **\`[R1+R2, C]\`** |
+
+## Signatures
+
+\`\`\`
+MCAT(Wwire tensor A, Wwire tensor B) -> Wwire tensor
+\`\`\`
+
+Target wire must match the computed output shape.
+
+## Examples
+
+### Horizontal (same rows)
+
+\`\`\`logts-play
+4wire[2,1] a = 0001 + 0010
+4wire[2,1] b = 0100 + 1000
+4wire[2,2] c = MCAT(a, b)
+show(c)
+\`\`\`
+
+## See also
+
+[MSLICE](builtin-MSLICE.md) · [PIVOT](wire-vectors.md#pivot)
+`,
     'builtin-MIN.md': `# MIN
 
-Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Matrix \`; matrix\`](matrix-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
 
 ## Signatures
 
@@ -3938,6 +4362,8 @@ MIN(Wbit ...) -> Wbit
 MIN(Wbit ...; signed) -> Wbit
 MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
 MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
+MIN(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar ... ; matrix) -> Wbit[n,m]
+MIN(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]
 \`\`\`
 
 Variadic (≥ 2 operands after expansion). Whole vectors expand to elements.
@@ -3952,6 +4378,7 @@ Variadic (≥ 2 operands after expansion). Whole vectors expand to elements.
 |-----|-----------|
 | \`signed\` | Signed minimum. |
 | \`vector\` | Element-wise min. |
+| \`matrix\` | Per-cell min on 2D tensors → \`Wbit[N,M]\`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -4003,13 +4430,59 @@ show(out)
 show(out)
 \`\`\`
 
+### \`MIN(Wbit[n,m] … ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 0001 + 0010 + 0100 + 1000
+4wire[2,2] b = 0010 + 0001 + 1000 + 0100
+4wire[2,2] out = MIN(a, b; matrix)
+show(out)
+\`\`\`
+
+### \`MIN(Wbit[n,m] … ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 1111 + 0010 + 1000 + 0100
+4wire[2,2] b = 0001 + 1111 + 0100 + 0010
+4wire[2,2] out = MIN(a, b; matrix signed)
+show(out)
+\`\`\`
+
 ## See also
 
 [MAX](builtin-MAX.md) · [CLAMP](builtin-CLAMP.md) · [ARGMIN](builtin-ARGMIN.md)
 `,
+    'builtin-MSLICE.md': `# MSLICE (matrix slice)
+
+Index: [2D tensors](wire-vectors.md)
+
+Extract a **rectangular window** from a matrix. All index/size arguments are **decimal literals** (\`\\0\`, \`\\2\`, …).
+
+## Signatures
+
+\`\`\`
+MSLICE(Wwire matrix, \\r0, \\c0, \\h, \\w) -> Wwire[h,w]
+\`\`\`
+
+- **\`(r0, c0)\`** — top-left corner (0-based).
+- **\`(h, w)\`** — window height and width.
+- Window must fit inside the source matrix.
+
+## Examples
+
+\`\`\`logts-play
+4wire[3,3] m = 0001 + 0010 + 0100 + 1000 + 0001 + 0010 + 0100 + 1000 + 0001
+4wire[2,2] s = MSLICE(m, \\1, \\1, \\2, \\2)
+show(s)
+\`\`\`
+
+## See also
+
+[MCAT](builtin-MCAT.md) · [Indexing](wire-vectors.md#indexing-2d)
+`,
     'builtin-MULTIPLY.md': `# MULTIPLY
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Binary multiplication with overflow capture.
 
@@ -4020,6 +4493,8 @@ MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
 MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
 MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
+MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], Wbit[n,m]
 \`\`\`
 
 ## Scalar (default)
@@ -4033,6 +4508,7 @@ MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 |-----|-----------|
 | \`signed\` | Product as two's complement; same wire packing. |
 | \`vector\` | Multiply per index; \`over[i]\` = high **W** bits of the **2W**-bit product. |
+| \`matrix\` | Per-cell multiply → \`Wbit[N,M]\` + \`Wbit[N,M] over\`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -4091,13 +4567,99 @@ show(o)
 
 \`(−1)×(−1)=1\` at index 0; \`2×(−1)=−2\` at index 1.
 
+### \`MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 0001 + 0010 + 0011 + 0100
+4wire[2,2] b = 0001 + 0000 + 0000 + 0001
+4wire[2,2] r, 4wire[2,2] o = MULTIPLY(a, b; matrix)
+show(r)
+show(o)
+\`\`\`
+
+### \`MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 1111 + 0010 + 0011 + 0100
+4wire[2,2] b = 1111 + 0001 + 0001 + 0001
+4wire[2,2] r, 4wire[2,2] o = MULTIPLY(a, b; matrix signed)
+show(r)
+show(o)
+\`\`\`
+
 ## See also
 
 [MAC](builtin-MAC.md) · [DIVIDE](builtin-DIVIDE.md)
 `,
+    'builtin-NORM.md': `# NORM (L2² norm)
+
+Index: [Vector reduction](vector-reduction.md) · [DOT](builtin-DOT.md)
+
+**Squared Euclidean norm** of a vector: **\`DOT(v, v)\`** — sum of squares.
+
+## Signatures
+
+\`\`\`
+NORM(Wwire[n] vector) -> Wbit result, (2W)bit over
+NORM(Wwire[n] vector; signed) -> Wbit result, (2W)bit over
+\`\`\`
+
+No square root — hardware-friendly **L2²**.
+
+## Examples
+
+\`\`\`logts-play
+4wire[2] v = 0001 + 0010
+4wire n, 8wire no = NORM(v)
+4wire d, 8wire do = DOT(v, v)
+show(n)
+show(d)
+\`\`\`
+
+\`NORM(v)\` and \`DOT(v,v)\` produce identical results.
+
+## See also
+
+[L2](builtin-L2.md) · [DOT](builtin-DOT.md)
+`,
+    'builtin-OUTER.md': `# OUTER (outer product)
+
+Index: [2D tensors](wire-vectors.md) · [DOT](builtin-DOT.md)
+
+**Outer product** of a column vector **\`[N,1]\`** and a row vector **\`[1,M]\`**:
+
+**\`C[i,j] = A[i] × B[j]\`** (unsigned/signed per call tags on multiply).
+
+## Signatures
+
+\`\`\`
+OUTER(Wwire[N,1] col, Wwire[1,M] row) -> Wwire[N,M], (2W)bit over
+\`\`\`
+
+Target wire must be **\`[N,M]\`**. Operand order may be swapped if one is row and one is column.
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Signed multiply per cell (same as [MULTIPLY](builtin-MULTIPLY.md)). |
+
+## Examples
+
+\`\`\`logts-play
+4wire[2,1] col = 0001 + 0010
+4wire[1,2] row = 0011 + 0100
+4wire[2,2] m, 4wire[2,2] o = OUTER(col, row)
+show(m)
+\`\`\`
+
+## See also
+
+[DOT](builtin-DOT.md) · [MULTIPLY](builtin-MULTIPLY.md)
+`,
     'builtin-REVERSE.md': `# REVERSE (bit order)
 
-Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Reverse bit order within each operand (MSB ↔ LSB).
 
@@ -4106,6 +4668,7 @@ Reverse bit order within each operand (MSB ↔ LSB).
 \`\`\`
 REVERSE(Xbit value) -> Xbit
 REVERSE(Wbit[n] data ; vector) -> Wbit[n]
+REVERSE(Wbit[n,m] data ; matrix) -> Wbit[n,m]
 \`\`\`
 
 Unary — one data argument (whole vector in vector mode).
@@ -4119,6 +4682,7 @@ Unary — one data argument (whole vector in vector mode).
 | Tag | Behaviour |
 |-----|-----------|
 | \`vector\` | Reverse bits **within each element** (not reverse element order). |
+| \`matrix\` | Reverse bits within each matrix cell. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -4167,6 +4731,16 @@ show(r)
 \`\`\`
 
 Per element: \`1100\`, \`0101\`, \`1111\`.
+
+### \`REVERSE(Wbit[n,m] data ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] m = 0011 + 1010 + 1111 + 0000
+4wire[2,2] out = REVERSE(m; matrix)
+show(out)
+\`\`\`
+
+Per cell: MSB ↔ LSB within each **W**-bit cell.
 
 ## See also
 
@@ -4269,7 +4843,7 @@ tg0 = MUX(p, tg0, NOT(tg0))
 `,
     'builtin-RROTATE.md': `# RROTATE (right rotate)
 
-Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Rotate bits right; LSBs wrap to MSBs. Width unchanged.
 
@@ -4278,6 +4852,7 @@ Rotate bits right; LSBs wrap to MSBs. Width unchanged.
 \`\`\`
 RROTATE(Xbit data, Ybit count) -> Xbit
 RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
+RROTATE(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
 \`\`\`
 
 - **\`count\`** is taken **modulo** element width.
@@ -4292,6 +4867,7 @@ RROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 | Tag | Behaviour |
 |-----|-----------|
 | \`vector\` | Per-element rotate. |
+| \`matrix\` | Per-cell rotate. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -4337,13 +4913,21 @@ show(out)
 
 → \`110101010110\` (from regression test).
 
+### \`RROTATE(Wbit[n,m] data, … ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] m = 1011 + 0101 + 1100 + 0011
+4wire[2,2] out = RROTATE(m, 0001; matrix)
+show(out)
+\`\`\`
+
 ## See also
 
 [LROTATE](builtin-LROTATE.md) · [RSHIFT](builtin-RSHIFT.md)
 `,
     'builtin-RSHIFT.md': `# RSHIFT (logical right shift)
 
-Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Shift bits toward LSB. Vacated MSBs use **\`fill\`** (logical) or the sign bit (\`; signed\` = ASHR).
 
@@ -4355,6 +4939,8 @@ RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
 RSHIFT(Xbit data, Nbit n; signed) -> Xbit
 RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector signed) -> Wbit[n]
+RSHIFT(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
+RSHIFT(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix signed) -> Wbit[n,m]
 \`\`\`
 
 - **\`fill\`** — MSB padding for logical shift (default \`0\`). **Ignored** when \`; signed\` is set.
@@ -4372,6 +4958,7 @@ Sugar: \`data > n\` and \`data > n w1\` — [short-notation.md](short-notation.m
 |-----|-----------|
 | \`signed\` | Arithmetic shift (ASHR): MSB replicated; \`fill\` ignored. |
 | \`vector\` | Per-element shift. |
+| \`matrix\` | Per-cell shift on 2D tensors; \`count\` scalar or matrix/row/col broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -4468,6 +5055,26 @@ show(out)
 
 ASHR per element (\`1111\`→\`1111\`, \`0111\`→\`0011\`, \`0001\`→\`0000\`).
 
+### \`RSHIFT(Wbit[n,m] data, … ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] m = 1010 + 0100 + 0001 + 1111
+4wire[2,2] out = RSHIFT(m, 0001; matrix)
+show(out)
+\`\`\`
+
+Per-cell logical shift right by 1.
+
+### \`RSHIFT(Wbit[n,m] data, … ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] m = 1111 + 0111 + 0001 + 1000
+4wire[2,2] out = RSHIFT(m, 0001; matrix signed)
+show(out)
+\`\`\`
+
+Per-cell ASHR by 1 (\`1111\`→\`1111\`, \`0111\`→\`0011\`, …).
+
 ## See also
 
 [LSHIFT](builtin-LSHIFT.md) · [LROTATE](builtin-LROTATE.md)
@@ -4519,7 +5126,7 @@ probe(out)
 `,
     'builtin-SUBTRACT.md': `# SUBTRACT
 
-Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector)
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector) · [Matrix \`; matrix\`](matrix-reduction.md)
 
 Binary subtraction with wrap-around (two's complement style borrow).
 
@@ -4530,6 +5137,8 @@ SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
 SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
 SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
+SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
+SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], Wbit[n,m]
 \`\`\`
 
 ## Scalar (default)
@@ -4543,6 +5152,7 @@ SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 |-----|-----------|
 | \`signed\` | Same \`result\` bits; second return is signed **overflow**. |
 | \`vector\` | Per-index subtract. **No** implicit vector broadcast without the tag (unlike ADD). |
+| \`matrix\` | Per-cell subtract on 2D tensors. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -4603,15 +5213,35 @@ show(r)
 show(f)
 \`\`\`
 
+### \`SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 0100 + 0010 + 0001 + 0011
+4wire[2,2] b = 0001 + 0001 + 0001 + 0001
+4wire[2,2] r, 4wire[2,2] f = SUBTRACT(a, b; matrix)
+show(r)
+show(f)
+\`\`\`
+
+### \`SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 1000 + 0111 + 0001 + 0011
+4wire[2,2] b = 0001 + 0001 + 0001 + 0001
+4wire[2,2] r, 4wire[2,2] f = SUBTRACT(a, b; matrix signed)
+show(r)
+show(f)
+\`\`\`
+
 ## See also
 
 [ADD](builtin-ADD.md) · \`comp [subtract]\`
 `,
     'builtin-SUM.md': `# SUM
 
-Index: [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Vector reduction](vector-reduction.md) · [Matrix \`; matrix\`](matrix-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
 
-Reduce operands to a scalar sum, or per-index with \`; vector\`.
+Reduce operands to a scalar sum, or per-index with \`; vector\`, or per-cell on 2D tensors with \`; matrix\`.
 
 ## Signatures
 
@@ -4620,6 +5250,8 @@ SUM(Wbit ...) -> Wbit result, Wbit over
 SUM(Wbit ...; signed) -> Wbit result, Wbit over
 SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]
 SUM(Wbit[n] ... ; signed vector) -> Wbit[n], Wbit[n]
+SUM(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b, ... ; matrix) -> Wbit[n,m], Wbit[n,m]
+SUM(Wbit[n,m] ... ; signed matrix) -> Wbit[n,m], Wbit[n,m]
 \`\`\`
 
 Variadic: whole vectors expand to elements (see [vector-reduction.md](vector-reduction.md)).
@@ -4635,6 +5267,7 @@ Variadic: whole vectors expand to elements (see [vector-reduction.md](vector-red
 |-----|-----------|
 | \`signed\` | Signed two's complement sum; same 2W packing. |
 | \`vector\` | Per-index sum → \`Wbit[n]\` + \`Wbit[n] over\`. |
+| \`matrix\` | Per-cell sum on 2D tensors → \`Wbit[N,M]\` + \`Wbit[N,M] over\`. Mutually exclusive with \`vector\`. See [matrix-reduction.md](matrix-reduction.md). |
 
 ## Examples
 
@@ -4695,50 +5328,183 @@ show(r)
 show(o)
 \`\`\`
 
+### \`SUM(Wbit[n,m] … ; matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 0001 + 0010 + 0100 + 1000
+4wire[2,2] b = 0010 + 0010 + 0010 + 0010
+4wire[2,2] r, 4wire[2,2] o = SUM(a, b; matrix)
+show(r)
+show(o)
+\`\`\`
+
+### \`SUM(Wbit[n,m] … ; signed matrix)\`
+
+\`\`\`logts-play
+4wire[2,2] a = 1111 + 0111 + 0001 + 1000
+4wire[2,2] b = 0001 + 0001 + 0001 + 0001
+4wire[2,2] r, 4wire[2,2] o = SUM(a, b; signed matrix)
+show(r)
+show(o)
+\`\`\`
+
 ## See also
 
 [DOT](builtin-DOT.md) · [ADD](builtin-ADD.md)
 `,
     'builtin-tagged-index.md': `# Built-in functions with call tags
 
-Canonical reference for built-ins that accept **\`; signed\`**, **\`; vector\`**, and/or **\`; index\`**. Scalar behaviour and tag semantics live on each function page — not duplicated here.
+Canonical reference for built-ins that accept **\`; signed\`**, **\`; vector\`**, **\`; matrix\`**, and/or **\`; index\`**. Scalar behaviour and tag semantics live on each function page — not duplicated here.
 
-Index: [Arithmetic overview](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Bit transform](builtin-bit-transform-functions.md) · [Built-in functions](builtin-functions.md)
+Index: [Arithmetic overview](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Matrix element-wise (\`; matrix\`)](matrix-reduction.md) · [Bit transform](builtin-bit-transform-functions.md) · [Built-in functions](builtin-functions.md)
 
 Cross-cutting topics:
 
 - Operand expansion vs **\`; vector\`**: [vector-reduction.md — element-wise mode](vector-reduction.md#element-wise-mode-vector)
+- **\`; matrix\`** on 2D tensors: [matrix-reduction.md](matrix-reduction.md)
 - Signed two's complement overview: [arithmetic.md — tag overview](arithmetic.md#tag-overview)
-- Wire vectors: [wire-vectors.md](wire-vectors.md)
+- Wire vectors & matrices: [wire-vectors.md](wire-vectors.md)
 
 ---
 
 ## Index by function
 
-| Function | Page | \`signed\` | \`vector\` | \`index\` | Hub |
-|----------|------|----------|----------|---------|-----|
-| ADD | [builtin-ADD.md](builtin-ADD.md) | yes | yes | — | arithmetic |
-| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | yes | yes | — | arithmetic |
-| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | yes | yes | — | arithmetic |
-| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | yes | yes | — | arithmetic |
-| MAC | [builtin-MAC.md](builtin-MAC.md) | yes | yes | — | arithmetic |
-| GT | [builtin-GT.md](builtin-GT.md) | yes | yes | — | arithmetic |
-| LT | [builtin-LT.md](builtin-LT.md) | yes | yes | — | arithmetic |
-| MIN | [builtin-MIN.md](builtin-MIN.md) | yes | yes | — | arithmetic / vector |
-| MAX | [builtin-MAX.md](builtin-MAX.md) | yes | yes | — | arithmetic / vector |
-| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | yes | yes | — | arithmetic |
-| SUM | [builtin-SUM.md](builtin-SUM.md) | yes | yes | — | vector |
-| DOT | [builtin-DOT.md](builtin-DOT.md) | yes | — | — | vector |
-| ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | yes | — | yes | vector |
-| ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | yes | — | yes | vector |
-| EQ | [builtin-EQ.md](builtin-EQ.md) | — | yes | — | logic gates |
-| RSHIFT | [builtin-RSHIFT.md](builtin-RSHIFT.md) | yes | yes | — | bit transform |
-| LSHIFT | [builtin-LSHIFT.md](builtin-LSHIFT.md) | — | yes | — | bit transform |
-| LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | — | yes | — | bit transform |
-| RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | — | yes | — | bit transform |
-| REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | — | yes | — | bit transform |
+| Function | Page | \`signed\` | \`vector\` | \`matrix\` | \`index\` | Hub |
+|----------|------|----------|----------|----------|---------|-----|
+| ADD | [builtin-ADD.md](builtin-ADD.md) | yes | yes | yes | — | arithmetic |
+| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | yes | yes | yes | — | arithmetic |
+| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | yes | yes | yes | — | arithmetic |
+| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | yes | yes | yes | — | arithmetic |
+| MAC | [builtin-MAC.md](builtin-MAC.md) | yes | yes | yes | — | arithmetic |
+| GT | [builtin-GT.md](builtin-GT.md) | yes | yes | yes | — | arithmetic |
+| LT | [builtin-LT.md](builtin-LT.md) | yes | yes | yes | — | arithmetic |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | yes | yes | yes | — | arithmetic / vector |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | yes | yes | yes | — | arithmetic / vector |
+| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | yes | yes | yes | — | arithmetic |
+| SUM | [builtin-SUM.md](builtin-SUM.md) | yes | yes | yes | — | vector |
+| DOT | [builtin-DOT.md](builtin-DOT.md) | yes | — | — | — | vector |
+| ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | yes | — | — | yes | vector |
+| ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | yes | — | — | yes | vector |
+| EQ | [builtin-EQ.md](builtin-EQ.md) | — | yes | yes | — | logic gates |
+| RSHIFT | [builtin-RSHIFT.md](builtin-RSHIFT.md) | yes | yes | yes | — | bit transform |
+| LSHIFT | [builtin-LSHIFT.md](builtin-LSHIFT.md) | — | yes | yes | — | bit transform |
+| LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | — | yes | yes | — | bit transform |
+| RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | — | yes | yes | — | bit transform |
+| REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | — | yes | yes | — | bit transform |
 
 Use \`doc(NAME)\` in scripts for live signatures from \`Interpreter.BUILTIN_DOC\`.
+
+**Note:** **\`; vector\`** and **\`; matrix\`** cannot appear together. **DOT**, **ARGMAX**, and **ARGMIN** do not use **\`; matrix\`** (behaviour follows tensor shape instead).
+`,
+    'builtin-TRACE.md': `# TRACE (matrix trace)
+
+Index: [2D tensors](wire-vectors.md) · [SUM](builtin-SUM.md)
+
+Sum of **diagonal** elements of a square matrix (same accumulation semantics as **SUM**).
+
+## Signatures
+
+\`\`\`
+TRACE(Wwire[n,n] matrix) -> Wbit result, Wbit over
+\`\`\`
+
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Signed sum along diagonal. |
+
+## Examples
+
+\`\`\`logts-play
+4wire[2,2] eye = IDENTITY(\\2)
+4wire t, 4wire over = TRACE(eye)
+show(t)
+\`\`\`
+
+For \`IDENTITY(2)\`: trace = \`1 + 1 = 2\` → \`0010\`.
+
+## See also
+
+[SUM](builtin-SUM.md) · [DIAG](builtin-DIAG.md)
+`,
+    'builtin-TRIL.md': `# TRIL (lower triangle)
+
+Index: [2D tensors](wire-vectors.md)
+
+Keep the **lower triangle** (including diagonal); zero above.
+
+## Signatures
+
+\`\`\`
+TRIL(Wwire[n,n] matrix) -> Wwire[n,n]
+\`\`\`
+
+Cell **\`(r,c)\`** kept when **\`c ≤ r\`**.
+
+## Examples
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] lo = TRIL(m)
+show(lo)
+\`\`\`
+
+## See also
+
+[TRIU](builtin-TRIU.md) · [PIVOT](wire-vectors.md#pivot)
+`,
+    'builtin-TRIU.md': `# TRIU (upper triangle)
+
+Index: [2D tensors](wire-vectors.md)
+
+Keep the **upper triangle** (including diagonal); zero below.
+
+## Signatures
+
+\`\`\`
+TRIU(Wwire[n,n] matrix) -> Wwire[n,n]
+\`\`\`
+
+Cell **\`(r,c)\`** kept when **\`c ≥ r\`**.
+
+## Examples
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2,2] up = TRIU(m)
+show(up)
+\`\`\`
+
+## See also
+
+[TRIL](builtin-TRIL.md)
+`,
+    'builtin-ZEROS.md': `# ZEROS (zero matrix)
+
+Index: [2D tensors](wire-vectors.md) · [IDENTITY](builtin-IDENTITY.md)
+
+Square **N×N** matrix with all elements **0**.
+
+## Signatures
+
+\`\`\`
+ZEROS(\\N) -> Wwire[N,N]
+\`\`\`
+
+Same rules as [IDENTITY](builtin-IDENTITY.md): \`\\N\` decimal, **W** from target wire.
+
+## Examples
+
+\`\`\`logts-play
+4wire[2,2] z = ZEROS(\\2)
+4wire a = z:0:1
+show(a)
+\`\`\`
+
+## See also
+
+[IDENTITY](builtin-IDENTITY.md) · [FILL](builtin-FILL.md)
 `,
     'chip.md': `# Chip components
 
@@ -11528,6 +12294,105 @@ On [14seg](14seg.md), pin \`data\` (15 bits) accepts the full LUT output in one 
 - [asm.md](asm.md) — inline assembler (blob into \`mem\`)
 - [debug.md](debug.md) — \`probe\`, \`show\`, \`peek\`, \`lutOf\`, \`exprOfLut\`
 `,
+    'matrix-reduction.md': `# Matrix element-wise mode (\`; matrix\`)
+
+Built-ins that support **\`; vector\`** also support **\`; matrix\`** for **2D tensors** (\`4wire[N,M]\` with **N>1** and **M>1**, or broadcast with row/column vectors).
+
+Index: [2D tensors](wire-vectors.md) · [Tagged built-ins](builtin-tagged-index.md) · [Vector element-wise mode](vector-reduction.md#element-wise-mode-vector)
+
+---
+
+## When to use
+
+| Mode | Operands | Result |
+|------|----------|--------|
+| (default) | scalars, expanded vectors | scalar or reduction |
+| **\`; vector\`** | rank-1 tensors \`[1,N]\` / \`[N,1]\` | vector \`[1,N]\` per index |
+| **\`; matrix\`** | at least one **matrix** \`[N,M]\` | matrix \`[N,M]\` per cell |
+
+**\`; vector\`** and **\`; matrix\`** are **mutually exclusive** in one call.
+
+---
+
+## Operand broadcast (per cell \`(r,c)\`)
+
+| Operand shape | At cell \`(r,c)\` uses |
+|---------------|----------------------|
+| Matrix \`[N,M]\` | \`M[r,c]\` |
+| Scalar / plain \`Wbit\` | same scalar |
+| Row vector \`[1,M]\` | \`row[c]\` |
+| Column vector \`[N,1]\` | \`col[r]\` |
+
+All operands must agree on **element width W**. Matrix operands must share the same **\`[N,M]\`** (or one side broadcasts as row/column/scalar).
+
+---
+
+## Functions with \`; matrix\`
+
+Same set as **\`; vector\`**, **except**:
+
+| Function | \`; matrix\` | Notes |
+|----------|------------|--------|
+| SUM, ADD, SUBTRACT, MULTIPLY, DIVIDE, MAC | yes | dual returns per cell where scalar form has two outputs |
+| MIN, MAX, CLAMP | yes | one matrix output |
+| GT, LT, EQ | yes | \`1wire[rows×cols]\` — one bit per cell (packed) |
+| LSHIFT, RSHIFT, LROTATE, RROTATE, REVERSE | yes | per-cell transform |
+| **DOT** | **no** | shape-based only — [builtin-DOT.md](builtin-DOT.md) |
+| **ARGMAX**, **ARGMIN** | **no** | shape-based + optional \`; index\` — [builtin-ARGMAX.md](builtin-ARGMAX.md) |
+
+Per-function pages: [builtin-tagged-index.md](builtin-tagged-index.md).
+
+---
+
+## Tags combined with \`; matrix\`
+
+| Tag | With \`; matrix\` |
+|-----|-----------------|
+| \`signed\` | Signed ops per cell (\`; signed matrix\` ≡ \`; matrix signed\`) |
+| \`vector\` | **Error** — mutually exclusive |
+| \`index\` | Only on ARGMAX/ARGMIN (not with \`; matrix\`) |
+
+---
+
+## Output width
+
+| Built-in | Matrix output |
+|----------|----------------|
+| SUM, ADD, SUBTRACT, MULTIPLY, MAC | \`Wbit[N,M]\` result + \`Wbit[N,M]\` flag/over |
+| DIVIDE | \`Wbit[N,M]\` quotient + \`Wbit[N,M]\` mod |
+| MIN, MAX, CLAMP | \`Wbit[N,M]\` |
+| GT, LT, EQ | \`1wire[rows×cols]\` (one bit per cell, row-major) |
+| Shifts / rotates / REVERSE | same shape as input matrix |
+
+Declare the target wire as **\`4wire[N,M]\`** (or matching rank-1 shape for \`; vector\`).
+
+---
+
+## Examples (per function)
+
+Worked examples with **\`; matrix\`** are on each built-in page — not duplicated here:
+
+| Function | Page |
+|----------|------|
+| SUM, MIN, MAX | [builtin-SUM.md](builtin-SUM.md) · [builtin-MIN.md](builtin-MIN.md) · [builtin-MAX.md](builtin-MAX.md) |
+| ADD, SUBTRACT, MULTIPLY, DIVIDE, MAC | [builtin-ADD.md](builtin-ADD.md) · … · [builtin-MAC.md](builtin-MAC.md) |
+| GT, LT, EQ, CLAMP | [builtin-GT.md](builtin-GT.md) · … · [builtin-CLAMP.md](builtin-CLAMP.md) |
+| LSHIFT, RSHIFT, LROTATE, RROTATE, REVERSE | [builtin-LSHIFT.md](builtin-LSHIFT.md) · … · [builtin-REVERSE.md](builtin-REVERSE.md) |
+
+Full index: [builtin-tagged-index.md](builtin-tagged-index.md).
+
+---
+
+## Oriented vectors (\`; vector\`, not \`; matrix\`)
+
+Pair **\`4wire[N]\`** + **\`4wire[N,1]\`** with **\`; vector\`** on SUM/ADD uses rank-1 broadcast (different from matrix mode). See [wire-vectors.md — oriented vector](wire-vectors.md#oriented-vector-rank-1-broadcast).
+
+---
+
+## See also
+
+[wire-vectors.md](wire-vectors.md) · [vector-reduction.md](vector-reduction.md) · [builtin-tagged-index.md](builtin-tagged-index.md)
+`,
     'mem.md': `# Memory Component (mem)
 
 The \`mem\` component implements a RAM memory with configurable number of addresses (\`length\`) and bits per address (\`depth\`). Each address stores one binary word of \`depth\` bits.
@@ -18273,7 +19138,7 @@ Reduction builtins operate on individual wires, whole **1D vectors**, or a mix. 
 
 Per-function pages: **[builtin-tagged-index.md](builtin-tagged-index.md)**.
 
-See also: [1D wire vectors](wire-vectors.md), [arithmetic](arithmetic.md) (MAC, ADD).
+See also: [1D wire vectors](wire-vectors.md), [2D \`; matrix\` mode](matrix-reduction.md), [arithmetic](arithmetic.md) (MAC, ADD).
 
 ---
 
@@ -18281,10 +19146,10 @@ See also: [1D wire vectors](wire-vectors.md), [arithmetic](arithmetic.md) (MAC, 
 
 | Function | Page | Tags |
 |----------|------|------|
-| SUM | [builtin-SUM.md](builtin-SUM.md) | \`signed\`, \`vector\` |
+| SUM | [builtin-SUM.md](builtin-SUM.md) | \`signed\`, \`vector\`, \`matrix\` |
 | DOT | [builtin-DOT.md](builtin-DOT.md) | \`signed\` |
-| MIN | [builtin-MIN.md](builtin-MIN.md) | \`signed\`, \`vector\` |
-| MAX | [builtin-MAX.md](builtin-MAX.md) | \`signed\`, \`vector\` |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | \`signed\`, \`vector\`, \`matrix\` |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | \`signed\`, \`vector\`, \`matrix\` |
 | ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | \`signed\`, \`index\` |
 | ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | \`signed\`, \`index\` |
 
@@ -18334,6 +19199,24 @@ With **\`; vector\`**, operands are combined **per index** and the result is a *
 
 ---
 
+## Element-wise mode (\`; matrix\`) {#element-wise-mode-matrix}
+
+On **2D tensors** (\`4wire[N,M]\` with **N>1** and **M>1**), use **\`; matrix\`** for per-cell operations. Same built-ins as **\`; vector\`**, except **DOT**, **ARGMAX**, and **ARGMIN** (shape rules instead).
+
+**\`; vector\`** and **\`; matrix\`** are **mutually exclusive**.
+
+| Call | Behaviour |
+|------|-----------|
+| \`SUM(a, b; matrix)\` | Per cell sum → \`Wbit[N,M]\` + \`Wbit[N,M] over\` |
+| \`MIN(a, b; matrix)\` | Per cell min → \`Wbit[N,M]\` |
+| \`ADD(m, row; matrix)\` | Matrix + row vector broadcast → \`Wbit[N,M]\` |
+
+Broadcast at cell \`(r,c)\`: matrix cell, scalar, row \`[1,M]\`, or column \`[N,1]\`. Compares (\`GT\`, \`LT\`, \`EQ\`) return **\`1wire[N×M]\`** (one bit per cell).
+
+Semantics: **[matrix-reduction.md](matrix-reduction.md)**. Examples: **[builtin-SUM.md](builtin-SUM.md)**, **[builtin-ADD.md](builtin-ADD.md)**, **[builtin-MIN.md](builtin-MIN.md)**, … — [builtin-tagged-index.md](builtin-tagged-index.md).
+
+---
+
 ## Capacity notes
 
 | Function | Bits needed (worst case) | Output width |
@@ -18352,7 +19235,8 @@ For typical perceptron sizes (\`16wire[50]\`, \`32wire[50]\`, \`64wire[50]\`), b
 
 ## Related
 
-- [wire-vectors.md — reduction](wire-vectors.md#reduction-functions)
+- [wire-vectors.md — 2D tensors & \`; matrix\`](wire-vectors.md#2d-tensors-4wirenm)
+- [matrix-reduction.md](matrix-reduction.md)
 - [arithmetic.md](arithmetic.md)
 - [builtin-MAC.md](builtin-MAC.md)
 `,
@@ -18379,7 +19263,124 @@ See also: [assignment operators](assignment-operators.md), [debug output](debug.
 | \`getBitWidth\` | Returns **12** (total bits) |
 | Display type | \`4wire[3]\` in Variables, show, peek, Zlist — not \`12wire\` |
 
-Multidimensional forms such as \`4wire[3,3]\` are **not** supported in V1 (parse error).
+Multidimensional forms \`4wire[N,M]\` (2D tensors) are supported — see [2D tensors](#2d-tensors-4wirenm) below. Three or more dimensions (\`4wire[2,3,4]\`) are a **parse error**.
+
+---
+
+## 2D tensors (\`4wire[N,M]\`)
+
+A **matrix** is a contiguous wire with two-dimensional metadata. Syntax: \`Nwire[rows,cols] name\` declares one wire of \`N × rows × cols\` bits, stored **row-major** (same MSB-first convention as 1D vectors).
+
+\`\`\`logts
+4wire[3,2] matrixA
+4wire[3,1] colVec    # vertical vector
+4wire[1,N] rowVec    # same as 4wire[N]
+4wire[1] scalarA     # equivalent to plain 4wire (no tensor indexing)
+\`\`\`
+
+| Concept | Meaning |
+|---------|---------|
+| \`4wire[3,2]\` | 3×2 cells × 4 bits = **24-bit** wire |
+| Internal storage | \`wire.tensor = { elementWidth: 4, dims: [3, 2] }\` plus \`wire.vector\` for compat |
+| Display type | \`4wire[3,2]\` — not \`24wire\` |
+| \`4wire[3,1]\` | vertical vector, displayed as \`4wire[3,1]\` |
+
+### Indexing (2D)
+
+| Syntax | Result |
+|--------|--------|
+| \`matrixA:r:c\` | cell \`(r,c)\` — scalar \`Nwire\` |
+| \`matrixA:r\` | row \`r\` — vector of width \`cols × N\` |
+| \`matrixA::c\` | column \`c\` — vector of width \`rows × N\` |
+| \`vectorB:i\` | linear element \`i\` on rank-1 tensors (\`[1,N]\` or \`[N,1]\`) |
+
+On a **matrix** (both dimensions > 1), a single \`:r\` indexes a **row slice**, not a linear cell. Use \`:r:c\` for individual cells.
+
+\`\`\`logts-play
+4wire[2,2] matrixA = 1111 + 0011 + 0101 + 0000
+4wire a = matrixA:0:0
+4wire b = matrixA:1:1
+show(a)
+show(b)
+\`\`\`
+
+### PIVOT
+
+\`PIVOT(tensor)\` swaps rows and columns (transpose). Vectors change orientation: \`4wire[3]\` ↔ \`4wire[3,1]\`.
+
+\`\`\`logts-play
+4wire[3] row = 1111 + 0011 + 0101
+4wire[3,1] col = PIVOT(row)
+show(col)
+\`\`\`
+
+### Tag \`; matrix\` (element-wise on 2D tensors)
+
+Full reference: **[matrix-reduction.md](matrix-reduction.md)**.
+
+Use \`; matrix\` on the same built-ins as \`; vector\` (SUM, ADD, MIN, MAX, MULTIPLY, compares, shifts, etc.). **Mutually exclusive** with \`; vector\`. Operands broadcast per cell: whole matrix, scalar, horizontal row \`[1,N]\`, or vertical column \`[N,1]\`.
+
+Example **\`ADD(… ; matrix)\`**: [builtin-ADD.md](builtin-ADD.md). Full list: [builtin-tagged-index.md](builtin-tagged-index.md).
+
+Dual-output ops (\`ADD\`, \`SUM\`, \`MULTIPLY\`, …) return **per-cell** result and flag/over blobs shaped like the matrix.
+
+### Oriented \`; vector\` (rank-1 broadcast)
+
+For \`4wire[N]\` + \`4wire[N,1]\` (or the reverse), \`; vector\` on **SUM** / **ADD** broadcasts the horizontal vector against the vertical one: each output index \`i\` combines \`horiz[i]\` with **all** vertical elements.
+
+\`\`\`logts-play
+4wire[3] horiz = 0001 + 0010 + 0100
+4wire[3,1] vert = 0001 + 0001 + 0001
+4wire[3] r, 4wire[3] o = SUM(horiz, vert; vector)
+show(r)
+\`\`\`
+
+### DOT and ARGMAX / ARGMIN on tensors
+
+**DOT** has no \`; matrix\` tag — shape rules apply automatically:
+
+| A | B | Result |
+|---|---|--------|
+| \`[1,N]\` | \`[1,N]\` | scalar \`Wbit\` (+ \`2W\` over) |
+| \`[N,1]\` | \`[1,N]\` | scalar |
+| \`[N,K]\` | \`[K,M]\` | matrix \`[N,M]\` — result \`W\` bits/cell, over \`2W\` bits/cell |
+
+**ARGMAX** / **ARGMIN** on a matrix return a **one-hot** over \`rows×cols\` bits, or with \`; index\` return \`(row, col)\` index wires.
+
+\`\`\`logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+1wire[4] hot = ARGMAX(m)
+show(hot)
+\`\`\`
+
+### IDENTITY
+
+\`IDENTITY(\\N)\` builds an **N×N** identity matrix. See [builtin-IDENTITY.md](builtin-IDENTITY.md).
+
+### Tensor generators and transforms
+
+| Function | Role | Doc |
+|----------|------|-----|
+| \`ZEROS(\\N)\` | zero N×N matrix | [builtin-ZEROS.md](builtin-ZEROS.md) |
+| \`FILL(\\N, scalar)\` | constant fill | [builtin-FILL.md](builtin-FILL.md) |
+| \`DIAG(vector)\` | diagonal from vector | [builtin-DIAG.md](builtin-DIAG.md) |
+| \`IOTA(\\N)\` | index vector 0..N−1 | [builtin-IOTA.md](builtin-IOTA.md) |
+| \`OUTER(col, row)\` | outer product [N,M] | [builtin-OUTER.md](builtin-OUTER.md) |
+| \`TRACE(matrix)\` | sum of diagonal | [builtin-TRACE.md](builtin-TRACE.md) |
+| \`NORM(v)\` / \`L2(v)\` | L2² = DOT(v,v) | [builtin-NORM.md](builtin-NORM.md) · [builtin-L2.md](builtin-L2.md) |
+| \`TRIL\` / \`TRIU\` | lower / upper triangle | [builtin-TRIL.md](builtin-TRIL.md) · [builtin-TRIU.md](builtin-TRIU.md) |
+| \`FLIPUD\` / \`FLIPLR\` | flip rows / columns | [builtin-FLIPUD.md](builtin-FLIPUD.md) · [builtin-FLIPLR.md](builtin-FLIPLR.md) |
+| \`MCAT(A,B)\` | concat matrices | [builtin-MCAT.md](builtin-MCAT.md) |
+| \`MSLICE(m,\\r,\\c,\\h,\\w)\` | submatrix window | [builtin-MSLICE.md](builtin-MSLICE.md) |
+
+\`\`\`logts-play
+4wire[3,3] I = IDENTITY(\\3)
+4wire[3,3] z = ZEROS(\\3)
+4wire[3] idx = IOTA(\\3)
+show(idx)
+\`\`\`
+
+Useful for matrix multiply baselines (\`DOT(A, I)\` ≡ \`A\`) and linear-algebra sketches.
 
 ---
 
