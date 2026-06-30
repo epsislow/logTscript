@@ -40,8 +40,6 @@
     }
     const meta = TS.getWireTensorMeta(getWire(argExpr[0].var));
     if (TS.isMatrix(meta)) return { kind: 'matrix', meta };
-    if (meta.rows === 1 && meta.cols > 1) return { kind: 'row', meta };
-    if (meta.cols === 1 && meta.rows > 1) return { kind: 'col', meta };
     return { kind: 'vector', meta };
   }
 
@@ -80,7 +78,18 @@
     }
   }
 
-  function valueAtCell(kind, argExpr, row, col, matrixMeta, evalFns) {
+  function valueAtRank1InMatrix(operandMeta, varName, row, col, matrixMeta, evalFns) {
+    if (operandMeta.rows === 1 && operandMeta.cols > 1) {
+      return evalFns.evalCell(varName, 0, col);
+    }
+    if (operandMeta.cols === 1 && operandMeta.rows > 1) {
+      return evalFns.evalCell(varName, row, 0);
+    }
+    const idx = row * matrixMeta.cols + col;
+    return evalFns.evalElement(varName, idx);
+  }
+
+  function valueAtCell(kind, argExpr, row, col, matrixMeta, evalFns, operandMeta) {
     if (kind === 'scalar') {
       return evalFns.evalScalar(argExpr);
     }
@@ -88,11 +97,8 @@
     if (kind === 'matrix') {
       return evalFns.evalCell(varName, row, col);
     }
-    if (kind === 'row') {
-      return evalFns.evalCell(varName, 0, col);
-    }
-    if (kind === 'col') {
-      return evalFns.evalCell(varName, row, 0);
+    if (kind === 'vector' && operandMeta && matrixMeta) {
+      return valueAtRank1InMatrix(operandMeta, varName, row, col, matrixMeta, evalFns);
     }
     const idx = row * matrixMeta.cols + col;
     return evalFns.evalElement(varName, idx);
@@ -101,7 +107,7 @@
   function cellValuesAt(args, classified, row, col, matrixMeta, evalFns) {
     const values = [];
     for (const c of classified) {
-      values.push(valueAtCell(c.kind, args[c.argIndex], row, col, matrixMeta, evalFns));
+      values.push(valueAtCell(c.kind, args[c.argIndex], row, col, matrixMeta, evalFns, c.meta));
     }
     return values;
   }
@@ -299,12 +305,12 @@
       : '0';
     forEachMatrixCell(meta, (r, c) => {
       const dataVal = String(valueAtCell(
-        classified[0].kind, args[0], r, c, meta, evalFns
+        classified[0].kind, args[0], r, c, meta, evalFns, classified[0].meta
       )).padStart(W, '0');
       if (dataVal.length !== W) throw new Error(`${fnName}: ${SHAPE_ERR}`);
       let n = scalarCount;
       if (classified[1].kind !== 'scalar') {
-        const countVal = valueAtCell(classified[1].kind, args[1], r, c, meta, evalFns);
+        const countVal = valueAtCell(classified[1].kind, args[1], r, c, meta, evalFns, classified[1].meta);
         n = parseInt(String(countVal), 2) || 0;
       }
       let out;
@@ -326,9 +332,9 @@
     const results = [];
     forEachMatrixCell(meta, (r, c) => {
       const dataVal = String(valueAtCell(
-        classified[0].kind, args[0], r, c, meta, evalFns
+        classified[0].kind, args[0], r, c, meta, evalFns, classified[0].meta
       )).padStart(W, '0');
-      const countVal = valueAtCell(classified[1].kind, args[1], r, c, meta, evalFns);
+      const countVal = valueAtCell(classified[1].kind, args[1], r, c, meta, evalFns, classified[1].meta);
       const out = op === 'LROTATE'
         ? VR.rotateLeft(dataVal, countVal)
         : VR.rotateRight(dataVal, countVal);

@@ -16471,6 +16471,15 @@ reg(1968, 'show-tags', 'show(matrix row; dec) — flat header + cell lines', fun
   h.assert('hex :0:1', String(out.some(l => /:0:1 = \^2 \(4bit\)/.test(l))), 'true');
 });
 
+reg(1969, 'wire-tensor', 'DOT rank-1 [3,1]×[3,1] as vector dot', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3,1] a = 0001 + 0010 + 0100\n' +
+    '4wire[3,1] b = 0001 + 0010 + 0100\n' +
+    '4wire r, 8wire o = DOT(a, b)'
+  );
+  h.assert('dot scalar', session.getWire(interp, 'r'), '0101');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

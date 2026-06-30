@@ -23,6 +23,12 @@
     return !!(dims && dims.rows > 1 && dims.cols > 1);
   }
 
+  /** Rank-1 tensor: 1×N, N×1, or plain Nwire[N] — not a 2D matrix. */
+  function isRank1Tensor(meta) {
+    if (!meta) return false;
+    return !isMatrix(meta);
+  }
+
   function getWireTensorMeta(wire) {
     if (!wire) return null;
     if (wire.tensor && wire.tensor.dims) {
@@ -331,6 +337,7 @@
     normalizeDeclTensor,
     isScalarTensor,
     isMatrix,
+    isRank1Tensor,
     getWireTensorMeta,
     linearIndex,
     cellBitRange,

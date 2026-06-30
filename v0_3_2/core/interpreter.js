@@ -4887,8 +4887,10 @@ const idx = parseInt(
     if (MR && TS && MR.isWholeTensorWireArg(args[0], getWire) && MR.isWholeTensorWireArg(args[1], getWire)) {
       const metaA = TS.getWireTensorMeta(getWire(args[0][0].var));
       const metaB = TS.getWireTensorMeta(getWire(args[1][0].var));
-      const simpleVec = metaA.rows === 1 && metaB.rows === 1 && metaA.cols === metaB.cols;
-      if (!simpleVec && MR.resolveDotMatrixShape(metaA, metaB)) {
+      const rank1Dot = TS.isRank1Tensor(metaA) && TS.isRank1Tensor(metaB)
+        && metaA.elementCount === metaB.elementCount
+        && metaA.elementWidth === metaB.elementWidth;
+      if (!rank1Dot && MR.resolveDotMatrixShape(metaA, metaB)) {
         let dotMat;
         try {
           dotMat = MR.dotMatrixMultiply(args, getWire, signedMode, this._matrixTaggedEvalFns());
@@ -6604,8 +6606,6 @@ if (this.isBuiltinDEMUX(name)) {
     if (opts && opts.compact) {
       if (TS && TS.isMatrix(meta)) {
         lines.push(`${wireName} has shape [${rows},${cols}]`);
-      } else if (rows > 1 && cols === 1) {
-        lines.push(`${wireName} has shape [${rows},1]`);
       } else {
         lines.push(`${wireName} has length [${elementCount}]`);
       }
@@ -6645,11 +6645,7 @@ if (this.isBuiltinDEMUX(name)) {
       const start = i * elementWidth;
       emitCell(i, valueStr.substring(start, start + elementWidth));
     }
-    if (rows > 1 && cols === 1) {
-      lines.push(`${wireName} has shape [${rows},1]`);
-    } else {
-      lines.push(`${wireName} has length [${elementCount}]`);
-    }
+    lines.push(`${wireName} has length [${elementCount}]`);
     return lines;
   }
 
@@ -6706,8 +6702,6 @@ if (this.isBuiltinDEMUX(name)) {
               const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
               if (meta && TS && TS.isMatrix(meta)) {
                 vectorLines.push(`${atom.var} has shape [${meta.rows},${meta.cols}]`);
-              } else if (meta && meta.rows > 1 && meta.cols === 1) {
-                vectorLines.push(`${atom.var} has shape [${meta.rows},1]`);
               } else {
                 vectorLines.push(`${atom.var} has length [${wire.vector.elementCount}]`);
               }

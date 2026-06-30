@@ -37,6 +37,13 @@
   function getWholeVectorMeta(argExpr, getWire) {
     if (!isWholeVectorWireArg(argExpr, getWire)) return null;
     const wire = getWire(argExpr[0].var);
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (TS) {
+      const meta = TS.getWireTensorMeta(wire);
+      if (meta && TS.isRank1Tensor(meta)) {
+        return { elementWidth: meta.elementWidth, elementCount: meta.elementCount };
+      }
+    }
     return wire ? wire.vector : null;
   }
 
