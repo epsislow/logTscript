@@ -336,6 +336,33 @@ Use `:=` or `=:` when you intentionally pad or truncate; see [assignment-operato
 
 ---
 
+## Large decimals and `show(…; dec)` round-trip
+
+Decimal literals use **BigInt** internally (not JavaScript `Number` / `parseInt`), so values far above `Number.MAX_SAFE_INTEGER` (~9×10¹⁵) are exact — for example `\5216694956355245935;64`.
+
+Wide wires in **`show(w; dec)`** / **`show(w; dec signed)`** are split into **64-bit chunks** (MSB first), then a remainder:
+
+```text
+199wire msg =: "Hello\sWorld"
+show(msg; dec signed)
+→ \5216694956355245935 \8245074968971313152 \0 + \0
+  └ 64 bit              └ 64 bit              └ 64 + 7 bit rest
+```
+
+You can rebuild the same bits from that output (unsigned chunk values with `;64` padding):
+
+```logts
+199wire test = \5216694956355245935;64 + \8245074968971313152;64 + \0;64 + \0;7
+```
+
+Each `\N;64` pads the BigInt-derived binary to **at least 64 bits** (left zero-fill). Show chunk values are always below 2⁶⁴, so this matches the displayed unsigned chunk.
+
+**Why 64-bit chunks (not 32)?** Chunk size is only a **display** convention. With BigInt literals, 64-bit chunk values round-trip correctly; 32-bit chunks would mean more tokens on wide buses without fixing the underlying precision issue (`parseInt` / `Number` still break above 2⁵³−1).
+
+For copy-paste of arbitrary wide values without decimal, prefer **`"…"`** wire strings, binary concat, or `probe` / hex display.
+
+---
+
 ## Module loading (editor)
 
 Signed decimal, signed hex, and wire strings are implemented in `core/wire-literals.js`. The script editor loads it **before** `parser.js`. If you embed the runtime manually, include the same script order as `run_tests.html`.

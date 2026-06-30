@@ -3901,7 +3901,10 @@ class Interpreter {
         const {start, end} = a.bitRange;
         binStr = binStr.substring(start, end + 1);
       }
-      if(a.pad) binStr = this.applyPad(binStr, a.pad);
+      const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+      if (a.pad) {
+        binStr = this.applyPad(binStr, a.pad);
+      }
       if(a.bitRange || a.pad){
         return {value: binStr, ref: null, varName: null, bitWidth: binStr.length};
       }
@@ -3958,9 +3961,11 @@ class Interpreter {
       return {value: binStr, ref: null, varName: null};
     }
     if(a.dec){
-      // Convert decimal number to binary
-      const num = parseInt(a.dec, 10);
-      const binStr = num.toString(2);
+      const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+      let binStr = WL ? WL.slashDecToBin(a.dec) : parseInt(a.dec, 10).toString(2);
+      if (a.pad) {
+        binStr = this.applyPad(binStr, a.pad);
+      }
       if(computeRefs){
         const idx = this.storeValue(binStr);
         return {value: binStr, ref: `&${idx}`, varName: null};

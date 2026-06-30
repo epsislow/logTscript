@@ -16305,6 +16305,27 @@ reg(1950, 'literals', 'User examples — signed dec, signed hex, wire string', f
   h.assert('hello', session.getWire(r3.interp, 'msg'), hello);
 });
 
+reg(1951, 'literals', 'Large decimal \\N;64 — BigInt round-trip', function(h, session) {
+  const dec = '5216694956355245935';
+  const r = session.run(`64wire a = \\${dec};64`);
+  const w = session.getWire(r.interp, 'a');
+  h.assert('64 bits', String(w.length === 64), 'true');
+  const r2 = session.run(`199wire msg =: "Hello\\sWorld"
+199wire test = \\${dec};64 + \\8245074968971313152;64 + \\0;64 + \\0;7
+show(test; ascii)`);
+  const msg = session.getWire(r2.interp, 'msg');
+  const test = session.getWire(r2.interp, 'test');
+  h.assert('rebuild ascii', String(r2.out.some(l => l.includes('"Hello World'))), 'true');
+  h.assert('rebuild bits', String(msg === test), 'true');
+});
+
+reg(1952, 'literals', 'Decimal above Number.MAX_SAFE_INTEGER token exact', function(h, session) {
+  const dec = '9007199254740993';
+  const { tokens } = session.tokenize(`64wire x = \\${dec};64`);
+  const sdec = tokens.filter(t => t.type === 'SDEC').pop();
+  h.assert('token exact', sdec.value, dec);
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

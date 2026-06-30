@@ -4,6 +4,22 @@
 (function (global) {
   'use strict';
 
+  function parseDecimalBigInt(decStr) {
+    const s = decStr == null ? '' : String(decStr).trim();
+    if (!s.length || !/^\d+$/.test(s)) {
+      throw new Error(`Invalid decimal literal: ${decStr}`);
+    }
+    return BigInt(s);
+  }
+
+  function parseHexBigInt(hexStr) {
+    const s = hexStr == null ? '' : String(hexStr).trim();
+    if (!s.length || !/^[0-9A-Fa-f]+$/.test(s)) {
+      throw new Error(`Invalid hex literal: ${hexStr}`);
+    }
+    return BigInt('0x' + s);
+  }
+
   function signedIntToTcBin(n, width) {
     const w = width | 0;
     if (w <= 0) throw new Error('signed literal width must be positive');
@@ -16,7 +32,18 @@
   }
 
   function slashDecToBin(value) {
-    return parseInt(value, 10).toString(2);
+    const n = parseDecimalBigInt(value);
+    if (n === 0n) return '0';
+    return n.toString(2);
+  }
+
+  /** Unsigned decimal as exactly W bits (value mod 2^W). For ;p padding / chunk round-trip. */
+  function unsignedDecToWidthBin(value, width) {
+    const w = width | 0;
+    if (w <= 0) throw new Error('unsigned decimal width must be positive');
+    const n = parseDecimalBigInt(value);
+    const mask = (BigInt(1) << BigInt(w)) - BigInt(1);
+    return (n & mask).toString(2).padStart(w, '0');
   }
 
   function hexDigitsToBin(hexStr) {
@@ -30,7 +57,7 @@
 
   function parseSdecToken(raw) {
     if (raw && typeof raw === 'object' && raw.signed) {
-      const n = -parseInt(raw.dec, 10);
+      const n = -parseDecimalBigInt(raw.dec);
       const w = raw.width;
       return {
         bin: signedIntToTcBin(n, w),
@@ -46,7 +73,7 @@
   function parseShexToken(raw) {
     const hex = String(raw.hex).toUpperCase();
     const w = raw.width;
-    const n = -parseInt(hex, 16);
+    const n = -parseHexBigInt(hex);
     return {
       bin: signedIntToTcBin(n, w),
       hex: '-' + hex,
@@ -86,6 +113,8 @@
   const api = {
     signedIntToTcBin,
     slashDecToBin,
+    unsignedDecToWidthBin,
+    parseDecimalBigInt,
     hexDigitsToBin,
     parseSdecToken,
     parseShexToken,
