@@ -12264,12 +12264,12 @@ reg(1597, 'doc', 'doc() — index of available forms', function(h, session) {
 reg(1598, 'doc', 'doc(show) doc(peek) doc(probe) — debug signatures', function(h, session) {
   const show = session.runDoc('doc(show)');
   h.assert('show sig', show[0], 'show(expr, …) — print formatted values to Output panel');
-  h.assert('show tags', String(show.some(l => l.includes('decSigned') && l.includes('elAll'))), 'true');
+  h.assert('show tags', String(show.some(l => l.includes('signed') && l.includes('elAll'))), 'true');
   const peek = session.runDoc('doc(peek)');
   h.assert('peek sig', peek[0], 'peek(expr, …) — like show, compact wire lines (no ref suffix)');
   const probe = session.runDoc('doc(probe)');
   h.assert('probe sig', probe[0], 'probe(expr) — log value changes (wire, .comp, .inst:pin, &ref, bit slice)');
-  h.assert('probe tags', String(probe.some(l => l.includes('decSigned') && l.includes('multiline'))), 'true');
+  h.assert('probe tags', String(probe.some(l => l.includes('signed') && l.includes('multiline'))), 'true');
   const zlist = session.runDoc('doc(Zlist)');
   h.assert('Zlist sig', zlist[0], 'Zlist(wireName) — list registered bus drivers (MODE ZSTATE, at RUN/NEXT)');
 });
@@ -16011,7 +16011,7 @@ reg(1662, 'gates', 'OR(isBS + isLF + isL) — concat + fold', function(h, sessio
 reg(1905, 'show-tags', 'Parser — show(a; dec) displayTags AST', function(h, session) {
   const stmts = session.parse('show(a; dec)');
   h.assert('show args', String(Array.isArray(stmts[0].show.args)), 'true');
-  h.assert('dec tag', stmts[0].show.displayTags[0], 'dec');
+  h.assert('dec tag', stmts[0].show.displayTags.tags[0], 'dec');
 });
 
 reg(1906, 'show-tags', 'show(vectorA; dec) — decimal per element', function(h, session) {
@@ -16023,7 +16023,7 @@ reg(1906, 'show-tags', 'show(vectorA; dec) — decimal per element', function(h,
 
 reg(1907, 'show-tags', 'show(w; decSigned) — signed scalar', function(h, session) {
   const { out } = session.run('4wire w := 1111\nshow(w; decSigned)');
-  h.assert('signed -1', String(out.some(l => /w \(4wire\) = \\-1/.test(l))), 'true');
+  h.assert('signed -1', String(out.some(l => /w \(4wire\) = \\-1;4/.test(l))), 'true');
 });
 
 reg(1908, 'show-tags', 'show(24wire; dec) — single decimal', function(h, session) {
@@ -16100,6 +16100,70 @@ reg(1918, 'show-tags', 'show(408wire; hex) — grouped hex like default', functi
   h.assert('tag hex grouped', String(hexLine && hexLine.includes('^0000')), 'true');
   h.assert('tag matches default value', String(hexLine && hexLine.includes('7B')), 'true');
   h.assert('no per-nibble spam', String(hexLine && !/\^0 \^0/.test(hexLine)), 'true');
+});
+
+reg(1919, 'show-tags', 'probe network dec after refreshProbes', function(h) {
+  const NET_PROBE_RECV_DEC = `comp [network] .n:
+  width: 8
+  length: 16
+  channel: 'demo'
+  on: 1
+  :
+probe(.n:get; dec)`;
+  const s2 = createSession({ instanceId: 2 });
+  s2.run(NET_PROBE_RECV_DEC);
+  const s1 = createSession({ instanceId: 1 });
+  s1.run(`comp [network] .n:
+  width: 8
+  length: 16
+  channel: 'demo'
+  on: 1
+  :
+`);
+  s1.execStmts(s1.interp, `.n:{
+  send = ^41
+  set = 1
+}`);
+  s2.refreshProbes(s2.interp);
+  h.assert('probe dec after rx', String(s2.outIncludes(s2.interp, '.n:get = \\65')), 'true');
+  h.assert('has changed', String(s2.outIncludes(s2.interp, 'changed')), 'true');
+  h.assert('not raw binary', String(!s2.outIncludes(s2.interp, '.n:get = 01000001')), 'true');
+});
+
+reg(1920, 'show-tags', 'show(w; signed) — shorthand dec signed', function(h, session) {
+  const { out } = session.run('4wire w := 1111\nshow(w; signed)');
+  h.assert('signed literal', String(out.some(l => /w \(4wire\) = \\-1;4/.test(l))), 'true');
+});
+
+reg(1921, 'show-tags', 'show(16wire; bin) — grouped binary', function(h, session) {
+  const { out } = session.run('16wire w := 1111000011110000\nshow(w; bin)');
+  h.assert('bin groups', String(out.some(l => /w \(16wire\) = 11110000 11110000/.test(l))), 'true');
+});
+
+reg(1922, 'show-tags', 'show(vec; compact) — header only', function(h, session) {
+  const { out } = session.run('4wire[3] v = 1111 + 0000 + 1010\nshow(v; compact)');
+  h.assert('header', String(out.some(l => l.includes('v =') && l.includes('bit'))), 'true');
+  h.assert('length', String(out.some(l => l.includes('has length'))), 'true');
+  h.assert('no cells', String(!out.some(l => /:0 =/.test(l))), 'true');
+});
+
+reg(1923, 'show-tags', 'show(vec; dec elRange=1-2) — slice elements', function(h, session) {
+  const { out } = session.run('4wire[4] v = 1111 + 0000 + 1010 + 0101\nshow(v; dec elRange=1-2)');
+  h.assert(':1', String(out.some(l => l.includes(':1 = \\0'))), 'true');
+  h.assert(':2', String(out.some(l => l.includes(':2 = \\10'))), 'true');
+  h.assert('no :0', String(!out.some(l => l.includes(':0 ='))), 'true');
+});
+
+reg(1924, 'show-tags', 'show(w; signed bin) — parse error', function(h, session) {
+  h.assertThrows('mutually exclusive', () => session.parse('show(w; signed bin)'));
+});
+
+reg(1925, 'show-tags', '128wire signed all-ones — chunk display', function(h, session) {
+  const ones = '1'.repeat(128);
+  const { out } = session.run(`128wire w := ${ones}\nshow(w; signed)`);
+  const line = out.find(l => l.includes('w (128wire)'));
+  h.assert('chunk -1', String(line && line.includes('\\-1;64')), 'true');
+  h.assert('two chunks', String(line && (line.match(/\\-1;64/g) || []).length === 2), 'true');
 });
 
 

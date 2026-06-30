@@ -1,5 +1,5 @@
 /**
- * Decimal / hex formatting for show / peek / probe display tags.
+ * Decimal / hex / bin / ascii formatting for show / peek / probe display tags.
  */
 (function (global) {
   'use strict';
@@ -8,6 +8,10 @@
   const SHOW_DEC_CHUNK_BITS = 64;
   const SHOW_HEX_NIBBLE_BITS = 4;
   const SHOW_HEX_GROUP_HEX_CHARS = 4;
+
+  const FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'signed']);
+  const ELEMENT_MODE_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
+  const MODIFIER_TAGS = new Set(['signed', 'hexWide', 'multiline']);
 
   function unsignedBinToBigInt(binStr) {
     const s = binStr == null ? '' : String(binStr);
@@ -27,6 +31,22 @@
 
   function formatDecimalLiteral(n) {
     return '\\' + n.toString();
+  }
+
+  function formatSignedDecLiteral(n, w) {
+    const num = typeof n === 'bigint' ? n : BigInt(n);
+    if (num < 0n) return '\\' + num.toString() + ';' + w;
+    return formatDecimalLiteral(num);
+  }
+
+  function formatSignedHexLiteral(n, w) {
+    const num = typeof n === 'bigint' ? n : BigInt(n);
+    if (num < 0n) {
+      const absHex = (-num).toString(16).toUpperCase();
+      return '^-' + absHex + ';' + w;
+    }
+    const hex = num.toString(16).toUpperCase();
+    return '^' + hex;
   }
 
   function hasLogicXZ(binStr) {
@@ -50,15 +70,17 @@
     return s.padStart(w, '0');
   }
 
-  function formatDecimalChunk(binStr, width, signed) {
+  function formatDecimalChunk(binStr, width, signed, signedLiteral) {
     const padded = normalizeBits(binStr, width);
     const n = signed ? signedBinToBigInt(padded) : unsignedBinToBigInt(padded);
+    if (signed && signedLiteral) return formatSignedDecLiteral(n, width);
     return formatDecimalLiteral(n);
   }
 
-  function formatHexTagDisplay(binStr, bitWidth) {
+  function formatHexTagDisplay(binStr, bitWidth, hexWide) {
     const w = bitWidth || String(binStr).length;
     if (hasLogicXZ(binStr)) return formatXZBinary(binStr);
+    if (hexWide && w >= 32) return formatHexGroupedDisplay(binStr, bitWidth);
     let remaining = normalizeBits(binStr, w);
     const parts = [];
     while (remaining.length >= SHOW_HEX_NIBBLE_BITS) {
@@ -74,7 +96,6 @@
     return parts.join(' ');
   }
 
-  /** Plain wire / scalar hex — same grouping as formatValue (4 hex chars per block). */
   function formatHexGroupedDisplay(binStr, bitWidth) {
     const w = bitWidth || String(binStr).length;
     if (hasLogicXZ(binStr)) return formatXZBinary(binStr);
@@ -127,65 +148,227 @@
     return '^' + hexStr;
   }
 
-  function formatDecimalDisplay(binStr, bitWidth, signed, isElement) {
+  function formatSignedHexChunk(binStr, width) {
+    const padded = normalizeBits(binStr, width);
+    const n = signedBinToBigInt(padded);
+    return formatSignedHexLiteral(n, width);
+  }
+
+  function formatSignedHexDisplay(binStr, bitWidth, isElement) {
     const w = bitWidth || String(binStr).length;
     if (hasLogicXZ(binStr)) return formatXZBinary(binStr);
 
     if (isElement) {
       if (w > SHOW_DEC_SCALAR_MAX_BITS) return formatWideElementHex(binStr, w);
-      return formatDecimalChunk(binStr, w, signed);
+      return formatSignedHexChunk(binStr, w);
     }
 
     const bits = normalizeBits(binStr, w);
     if (w <= SHOW_DEC_SCALAR_MAX_BITS) {
-      return formatDecimalChunk(bits, w, signed);
+      return formatSignedHexChunk(bits, w);
     }
 
     const parts = [];
     let remaining = bits;
     while (remaining.length > SHOW_DEC_CHUNK_BITS) {
-      parts.push(formatDecimalChunk(remaining.substring(0, SHOW_DEC_CHUNK_BITS), SHOW_DEC_CHUNK_BITS, signed));
+      parts.push(formatSignedHexChunk(remaining.substring(0, SHOW_DEC_CHUNK_BITS), SHOW_DEC_CHUNK_BITS));
       remaining = remaining.substring(SHOW_DEC_CHUNK_BITS);
     }
     if (remaining.length === SHOW_DEC_CHUNK_BITS) {
-      parts.push(formatDecimalChunk(remaining, SHOW_DEC_CHUNK_BITS, signed));
+      parts.push(formatSignedHexChunk(remaining, SHOW_DEC_CHUNK_BITS));
       return parts.join(' ');
     }
     if (remaining.length > 0) {
-      const restVal = formatDecimalChunk(remaining, remaining.length, signed);
+      const restVal = formatSignedHexChunk(remaining, remaining.length);
       const head = parts.join(' ');
+      return head ? `${head} + ${restVal}` : restVal;
+    }
+    return parts.join(' ');
+  }
+
+  function formatDecimalDisplay(binStr, bitWidth, signed, isElement, signedLiteral) {
+    const w = bitWidth || String(binStr).length;
+    if (hasLogicXZ(binStr)) return formatXZBinary(binStr);
+
+    if (isElement) {
+      if (w > SHOW_DEC_SCALAR_MAX_BITS) return formatWideElementHex(binStr, w);
+      return formatDecimalChunk(binStr, w, signed, signedLiteral);
+    }
+
+    const bits = normalizeBits(binStr, w);
+    if (w <= SHOW_DEC_SCALAR_MAX_BITS) {
+      return formatDecimalChunk(bits, w, signed, signedLiteral);
+    }
+
+    const parts = [];
+    let remaining = bits;
+    while (remaining.length > SHOW_DEC_CHUNK_BITS) {
+      parts.push(formatDecimalChunk(
+        remaining.substring(0, SHOW_DEC_CHUNK_BITS),
+        SHOW_DEC_CHUNK_BITS,
+        signed,
+        signedLiteral
+      ));
+      remaining = remaining.substring(SHOW_DEC_CHUNK_BITS);
+    }
+    if (remaining.length === SHOW_DEC_CHUNK_BITS) {
+      parts.push(formatDecimalChunk(remaining, SHOW_DEC_CHUNK_BITS, signed, signedLiteral));
+      return parts.join(' ');
+    }
+    if (remaining.length > 0) {
+      const restVal = formatDecimalChunk(remaining, remaining.length, signed, signedLiteral);
+      const head = parts.join(' ');
+      if (signed && signedLiteral) {
+        return head ? `${head} + ${restVal}` : restVal;
+      }
       return head ? `${head} + ${restVal} (${remaining.length}bit)` : `${restVal} (${remaining.length}bit)`;
     }
     return parts.join(' ');
   }
 
-  function normalizeShowDisplayTags(tags) {
-    if (!tags || !tags.length) return null;
+  function formatBinDisplay(binStr, bitWidth, isElement) {
+    const w = bitWidth || String(binStr).length;
+    if (hasLogicXZ(binStr)) return formatXZBinary(binStr);
+    const bits = normalizeBits(binStr, w);
+
+    if (isElement) {
+      if (w <= 16) {
+        const groups = bits.match(/.{1,8}/g);
+        return groups ? groups.join(' ') : bits;
+      }
+      return formatXZBinary(bits);
+    }
+
+    if (w <= 16) {
+      const groups = bits.match(/.{1,8}/g);
+      return groups ? groups.join(' ') : bits;
+    }
+    if (w >= 32) {
+      return bits.match(/.{1,8}/g).join(' ');
+    }
+    const parts = [];
+    let i = 0;
+    while (i + 8 <= bits.length) {
+      parts.push(bits.substring(i, i + 8));
+      i += 8;
+    }
+    if (i < bits.length) parts.push(bits.substring(i));
+    return parts.join(' ');
+  }
+
+  function tagListIncludes(tags, name) {
+    if (!tags) return false;
+    if (Array.isArray(tags)) return tags.includes(name);
+    if (tags.tags) return tags.tags.includes(name);
+    return false;
+  }
+
+  function parseElRangeSpec(spec) {
+    if (!spec || typeof spec !== 'string') return null;
+    const s = spec.trim();
+    if (!s.length) return null;
+    const comma = s.indexOf(',');
+    if (comma >= 0) {
+      const rowPart = s.substring(0, comma).trim();
+      const colPart = s.substring(comma + 1).trim();
+      const parseRange = (part) => {
+        const dash = part.indexOf('-');
+        if (dash < 0) {
+          const n = parseInt(part, 10);
+          return { start: n, end: n };
+        }
+        return { start: parseInt(part.substring(0, dash), 10), end: parseInt(part.substring(dash + 1), 10) };
+      };
+      return { matrix: { rows: parseRange(rowPart), cols: parseRange(colPart) } };
+    }
+    const dash = s.indexOf('-');
+    if (dash < 0) {
+      const n = parseInt(s, 10);
+      return { vector: { start: n, end: n } };
+    }
+    return { vector: { start: parseInt(s.substring(0, dash), 10), end: parseInt(s.substring(dash + 1), 10) } };
+  }
+
+  function normalizeShowDisplayTags(displayTags) {
+    if (!displayTags) return null;
+
+    let tags = [];
+    let elRangeSpec = null;
+    let elLast = null;
+    let maxWidth = null;
+
+    if (Array.isArray(displayTags)) {
+      tags = displayTags.slice();
+    } else if (typeof displayTags === 'object') {
+      tags = displayTags.tags ? displayTags.tags.slice() : [];
+      elRangeSpec = displayTags.elRange != null ? String(displayTags.elRange) : null;
+      elLast = displayTags.elLast != null ? displayTags.elLast : null;
+      maxWidth = displayTags.maxWidth != null ? displayTags.maxWidth : null;
+    } else {
+      return null;
+    }
+
+    if (!tags.length && elRangeSpec == null && elLast == null && maxWidth == null) return null;
+
+    if (tags.includes('decSigned')) {
+      if (!tags.includes('signed')) tags.push('signed');
+      if (!tags.includes('dec')) tags.push('dec');
+      tags = tags.filter((t) => t !== 'decSigned');
+    }
+
+    const hasSigned = tags.includes('signed');
+    let hasDec = tags.includes('dec');
+    const hasHex = tags.includes('hex');
+    const hasBin = tags.includes('bin');
+
+    if (hasSigned && !hasDec && !hasHex) {
+      tags.push('dec');
+      hasDec = true;
+    }
+
+    const signedLiteral = hasSigned && (hasDec || hasHex);
+
     return {
-      dec: tags.includes('dec'),
-      decSigned: tags.includes('decSigned'),
-      hex: tags.includes('hex'),
+      dec: hasDec && !hasBin,
+      signed: hasSigned,
+      signedLiteral,
+      hex: hasHex && !hasBin,
+      bin: hasBin,
+      hexWide: tags.includes('hexWide'),
+      compact: tags.includes('compact'),
       elAll: tags.includes('elAll'),
       elNonZero: tags.includes('elNonZero'),
+      elRange: parseElRangeSpec(elRangeSpec),
+      elLast: elLast != null ? elLast : null,
       multiline: tags.includes('multiline'),
+      maxWidth: maxWidth != null ? maxWidth : null,
+      decSigned: hasSigned && hasDec,
     };
   }
 
   function formatDebugDisplayValue(binStr, bitWidth, opts, isElement) {
     if (!opts || binStr == null || binStr === '-') return binStr;
     let formatted;
-    if (opts.hex) {
-      if (isElement && bitWidth > SHOW_DEC_SCALAR_MAX_BITS) {
+    if (opts.bin) {
+      formatted = formatBinDisplay(binStr, bitWidth, !!isElement);
+    } else if (opts.hex) {
+      if (opts.signed) {
+        formatted = formatSignedHexDisplay(binStr, bitWidth, !!isElement);
+      } else if (isElement && bitWidth > SHOW_DEC_SCALAR_MAX_BITS) {
         formatted = formatWideElementHex(binStr, bitWidth);
       } else if (isElement) {
-        formatted = formatHexTagDisplay(binStr, bitWidth);
+        formatted = formatHexTagDisplay(binStr, bitWidth, opts.hexWide);
       } else {
         formatted = formatHexGroupedDisplay(binStr, bitWidth);
       }
-    } else if (opts.decSigned) {
-      formatted = formatDecimalDisplay(binStr, bitWidth, true, !!isElement);
-    } else if (opts.dec) {
-      formatted = formatDecimalDisplay(binStr, bitWidth, false, !!isElement);
+    } else if (opts.dec || opts.signed) {
+      formatted = formatDecimalDisplay(
+        binStr,
+        bitWidth,
+        !!opts.signed,
+        !!isElement,
+        !!opts.signedLiteral
+      );
     } else {
       return binStr;
     }
@@ -193,12 +376,25 @@
   }
 
   function maybeWrapLines(formatted, opts) {
-    if (!opts || !opts.multiline || formatted == null) return [String(formatted)];
+    if (formatted == null) return [String(formatted)];
     const wrap = typeof LogTScriptDebugDisplayWrap !== 'undefined'
       ? LogTScriptDebugDisplayWrap.wrapDebugDisplayValue
       : null;
-    if (!wrap) return [String(formatted)];
-    return wrap(String(formatted));
+
+    if (opts && opts.multiline && wrap) {
+      const max = opts.maxWidth != null ? opts.maxWidth : undefined;
+      return wrap(String(formatted), max);
+    }
+
+    if (opts && opts.maxWidth != null && !opts.multiline) {
+      const s = String(formatted);
+      if (s.length > opts.maxWidth) {
+        return [s.substring(0, opts.maxWidth) + ' ..'];
+      }
+      return [s];
+    }
+
+    return [String(formatted)];
   }
 
   function pushDisplayLines(out, formatted, opts) {
@@ -210,11 +406,17 @@
     SHOW_DEC_SCALAR_MAX_BITS,
     SHOW_DEC_CHUNK_BITS,
     SHOW_HEX_NIBBLE_BITS,
+    FORMAT_TAGS,
+    ELEMENT_MODE_TAGS,
     normalizeShowDisplayTags,
     formatDebugDisplayValue,
     formatDecimalDisplay,
     formatHexTagDisplay,
     formatHexGroupedDisplay,
+    formatBinDisplay,
+    formatSignedDecLiteral,
+    formatSignedHexLiteral,
+    parseElRangeSpec,
     maybeWrapLines,
     pushDisplayLines,
   };

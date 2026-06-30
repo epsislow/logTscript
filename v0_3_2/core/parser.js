@@ -11,8 +11,16 @@ function slashDecToBin(value) {
   return parseInt(value, 10).toString(2);
 }
 
-const SHOW_PEEK_DISPLAY_TAGS = new Set(['dec', 'decSigned', 'hex', 'elAll', 'elNonZero', 'multiline']);
-const PROBE_DISPLAY_TAGS = new Set(['dec', 'decSigned', 'hex', 'multiline']);
+const SHOW_PEEK_DISPLAY_TAGS = new Set([
+  'dec', 'decSigned', 'hex', 'bin', 'signed', 'hexWide',
+  'elAll', 'elNonZero', 'compact', 'elRange', 'elLast', 'maxWidth', 'multiline',
+]);
+const PROBE_DISPLAY_TAGS = new Set([
+  'dec', 'decSigned', 'hex', 'bin', 'signed', 'hexWide', 'maxWidth', 'multiline',
+]);
+const DISPLAY_FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'signed']);
+const DISPLAY_ELEMENT_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
+const DISPLAY_VALUED_TAGS = new Set(['elRange', 'elLast', 'maxWidth']);
 
 class Parser {
   constructor(t, componentRegistry){
@@ -563,10 +571,35 @@ parseFuncTags() {
   return tags;
 }
 
+_parseDisplayTagValue(tagName) {
+  if (tagName === 'elRange') {
+    let spec = '';
+    while (this.c.type === 'DEC' || this.c.type === 'BIN'
+        || (this.c.type === 'SYM' && (this.c.value === '-' || this.c.value === ','))) {
+      spec += this.c.value;
+      this.eat(this.c.type);
+    }
+    if (!spec.length) {
+      throw Error(`Expected elRange value (e.g. elRange=0-3) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    return spec;
+  }
+  if (tagName === 'elLast' || tagName === 'maxWidth') {
+    if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+      throw Error(`Expected integer after '${tagName}=' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const value = parseInt(this.c.value, 10);
+    this.eat(this.c.type);
+    return value;
+  }
+  return null;
+}
+
 parseDebugDisplayTags(allowedTags) {
   this.eat('SYM', ';');
   const tags = [];
   const seen = new Set();
+  const result = { tags, elRange: null, elLast: null, maxWidth: null };
 
   while (this.c.type === 'ID') {
     const tagName = this.c.value;
@@ -578,22 +611,73 @@ parseDebugDisplayTags(allowedTags) {
     }
     seen.add(tagName);
     this.eat('ID');
-    tags.push(tagName);
+
+    if (DISPLAY_VALUED_TAGS.has(tagName)) {
+      if (this.c.type !== 'SYM' || this.c.value !== '=') {
+        throw Error(`Display tag '${tagName}' requires '=value' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', '=');
+      const val = this._parseDisplayTagValue(tagName);
+      if (tagName === 'elRange') result.elRange = val;
+      else if (tagName === 'elLast') result.elLast = val;
+      else if (tagName === 'maxWidth') result.maxWidth = val;
+    } else {
+      tags.push(tagName);
+    }
   }
 
-  if (!tags.length) {
+  if (!tags.length && result.elRange == null && result.elLast == null && result.maxWidth == null) {
     throw Error(`Expected display tag after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
 
-  const numeric = tags.filter((t) => t === 'dec' || t === 'decSigned' || t === 'hex');
-  if (numeric.length > 1) {
-    throw Error(`Display tags dec, decSigned, and hex are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  const hasFormatDec = tags.includes('dec') || tags.includes('decSigned');
+  const hasFormatHex = tags.includes('hex');
+  const hasFormatBin = tags.includes('bin');
+  let formatCount = 0;
+  if (hasFormatDec) formatCount++;
+  if (hasFormatHex) formatCount++;
+  if (hasFormatBin) formatCount++;
+  if (formatCount > 1) {
+    throw Error(`Display format tags (dec, hex, bin) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
+  if (tags.includes('signed') && tags.includes('bin')) {
+    throw Error(`Display tags signed and bin are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  if (tags.includes('hexWide') && !tags.includes('hex')) {
+    throw Error(`Display tag hexWide requires hex at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  const elModes = tags.filter((t) => DISPLAY_ELEMENT_TAGS.has(t));
+  const elModeCount = elModes.filter((t) => t !== 'elRange' && t !== 'elLast').length
+    + (result.elRange != null ? 1 : 0)
+    + (result.elLast != null ? 1 : 0);
+  let elExclusive = 0;
+  if (tags.includes('elAll')) elExclusive++;
+  if (tags.includes('elNonZero')) elExclusive++;
+  if (tags.includes('compact')) elExclusive++;
+  if (result.elRange != null) elExclusive++;
+  if (result.elLast != null) elExclusive++;
+  if (elExclusive > 1) {
+    throw Error(`Display element tags (elAll, elNonZero, compact, elRange, elLast) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
   if (tags.includes('elAll') && tags.includes('elNonZero')) {
     throw Error(`Display tags elAll and elNonZero are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
 
-  return tags;
+  for (const probeForbidden of ['elAll', 'elNonZero', 'compact']) {
+    if (!allowedTags.has(probeForbidden) && tags.includes(probeForbidden)) {
+      throw Error(`Display tag '${probeForbidden}' is not allowed on probe at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+  }
+  if (!allowedTags.has('elRange') && result.elRange != null) {
+    throw Error(`Display tag 'elRange' is not allowed on probe at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  if (!allowedTags.has('elLast') && result.elLast != null) {
+    throw Error(`Display tag 'elLast' is not allowed on probe at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  return result;
 }
 
 parsePcbDefinition() {

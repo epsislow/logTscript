@@ -1401,7 +1401,14 @@
       {"id":1915,"group":"show-tags","title":"probe(v; dec) — flat blob decimal","detail":{"scripts":["4wire[3] v = 1111 + 0000 + 1010\nprobe(v; dec)"],"steps":[],"assertions":["probe decimal","no cell index"]}},
       {"id":1916,"group":"show-tags","title":"probe(v; elAll) — parse error","detail":{"scripts":["probe(v; elAll)"],"steps":[],"assertions":["unknown tag"]}},
       {"id":1917,"group":"show-tags","title":"65wire[2] dec — hex fallback per element","detail":{"scripts":["65wire[2] wide = ${z65} + ${'0'.repeat(65)}\nshow(wide; dec)"],"steps":[],"assertions":["hex element"]}},
-      {"id":1918,"group":"show-tags","title":"show(408wire; hex) — grouped hex like default","detail":{"scripts":["408wire a := \\123\nshow(a; hex)"],"steps":[],"assertions":["default hex","tag hex grouped","tag matches default value","no per-nibble spam"]}}
+      {"id":1918,"group":"show-tags","title":"show(408wire; hex) — grouped hex like default","detail":{"scripts":["408wire a := \\123\nshow(a; hex)"],"steps":[],"assertions":["default hex","tag hex grouped","tag matches default value","no per-nibble spam"]}},
+      {"id":1919,"group":"show-tags","title":"probe network dec after refreshProbes","detail":{"scripts":[],"steps":[],"assertions":["probe dec after rx","has changed","not raw binary"]}},
+      {"id":1920,"group":"show-tags","title":"show(w; signed) — shorthand dec signed","detail":{"scripts":["4wire w := 1111\nshow(w; signed)"],"steps":[],"assertions":["signed literal"]}},
+      {"id":1921,"group":"show-tags","title":"show(16wire; bin) — grouped binary","detail":{"scripts":["16wire w := 1111000011110000\nshow(w; bin)"],"steps":[],"assertions":["bin groups"]}},
+      {"id":1922,"group":"show-tags","title":"show(vec; compact) — header only","detail":{"scripts":["4wire[3] v = 1111 + 0000 + 1010\nshow(v; compact)"],"steps":[],"assertions":["header","length","no cells"]}},
+      {"id":1923,"group":"show-tags","title":"show(vec; dec elRange=1-2) — slice elements","detail":{"scripts":["4wire[4] v = 1111 + 0000 + 1010 + 0101\nshow(v; dec elRange=1-2)"],"steps":[],"assertions":[":1",":2","no :0"]}},
+      {"id":1924,"group":"show-tags","title":"show(w; signed bin) — parse error","detail":{"scripts":["show(w; signed bin)"],"steps":[],"assertions":["mutually exclusive"]}},
+      {"id":1925,"group":"show-tags","title":"128wire signed all-ones — chunk display","detail":{"scripts":["128wire w := ${ones}\nshow(w; signed)"],"steps":[],"assertions":["chunk -1","two chunks"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1471,7 +1478,7 @@
       { id: 'select', label: 'select', rangeLabel: '1673–1676', testIds: [1673, 1674, 1675, 1676] },
       { id: 'short-notation', label: 'Short notation preprocessor', rangeLabel: '102–133, 1334–1336, 1707–1710', testIds: [102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 1334, 1335, 1336, 1707, 1708, 1709, 1710] },
       { id: 'debug', label: 'show / peek / probe', rangeLabel: '804–819, 1176–1187, 1711–1714', testIds: [804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 1176, 1177, 1178, 1179, 1180, 1181, 1182, 1183, 1184, 1185, 1186, 1187, 1711, 1712, 1713, 1714] },
-      { id: 'show-tags', label: 'show-tags', rangeLabel: '1905–1918', testIds: [1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918] },
+      { id: 'show-tags', label: 'show-tags', rangeLabel: '1905–1925', testIds: [1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925] },
       { id: 'slider', label: 'Slider component', rangeLabel: '1206–1220', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983, 1571–1574, 1643–1653, 1661, 1663', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 1571, 1572, 1573, 1574, 1643, 1644, 1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1661, 1663] },
       { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775] },
