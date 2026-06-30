@@ -11,6 +11,9 @@ function slashDecToBin(value) {
   return parseInt(value, 10).toString(2);
 }
 
+const SHOW_PEEK_DISPLAY_TAGS = new Set(['dec', 'decSigned', 'hex', 'elAll', 'elNonZero', 'multiline']);
+const PROBE_DISPLAY_TAGS = new Set(['dec', 'decSigned', 'hex', 'multiline']);
+
 class Parser {
   constructor(t, componentRegistry){
     this.t=t; this.c=t.get(); this.funcs=new Map();
@@ -555,6 +558,39 @@ parseFuncTags() {
 
   if (!tags.length) {
     throw Error(`Expected tag name after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  return tags;
+}
+
+parseDebugDisplayTags(allowedTags) {
+  this.eat('SYM', ';');
+  const tags = [];
+  const seen = new Set();
+
+  while (this.c.type === 'ID') {
+    const tagName = this.c.value;
+    if (!allowedTags.has(tagName)) {
+      throw Error(`Unknown display tag '${tagName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    if (seen.has(tagName)) {
+      throw Error(`Duplicate display tag '${tagName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    seen.add(tagName);
+    this.eat('ID');
+    tags.push(tagName);
+  }
+
+  if (!tags.length) {
+    throw Error(`Expected display tag after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  const numeric = tags.filter((t) => t === 'dec' || t === 'decSigned' || t === 'hex');
+  if (numeric.length > 1) {
+    throw Error(`Display tags dec, decSigned, and hex are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  if (tags.includes('elAll') && tags.includes('elNonZero')) {
+    throw Error(`Display tags elAll and elNonZero are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
 
   return tags;
@@ -1620,15 +1656,19 @@ assignment() {
   show(){
     this.eat('KEYWORD'); this.eat('SYM','(');
     const args=[];
-    if(this.c.value!==')'){
+    if(this.c.value!==')' && this.c.value!==';'){
       do{
         args.push(this.expr());
         if(this.c.value===',') this.eat('SYM',',');
         else break;
       }while(true);
     }
+    let displayTags = null;
+    if (this.c.type === 'SYM' && this.c.value === ';') {
+      displayTags = this.parseDebugDisplayTags(SHOW_PEEK_DISPLAY_TAGS);
+    }
     this.eat('SYM',')');
-    return {show:args};
+    return { show: { args, displayTags: displayTags || undefined } };
   }
 
   parseLutOfCallInner() {
@@ -1820,24 +1860,33 @@ assignment() {
   peek(){
     this.eat('KEYWORD'); this.eat('SYM','(');
     const args=[];
-    if(this.c.value!==')'){
+    if(this.c.value!==')' && this.c.value!==';'){
       do{
         args.push(this.expr());
         if(this.c.value===',') this.eat('SYM',',');
         else break;
       }while(true);
     }
+    let displayTags = null;
+    if (this.c.type === 'SYM' && this.c.value === ';') {
+      displayTags = this.parseDebugDisplayTags(SHOW_PEEK_DISPLAY_TAGS);
+    }
     this.eat('SYM',')');
-    return {peek:args};
+    return { peek: { args, displayTags: displayTags || undefined } };
   }
 
   probe(){
     this.eat('KEYWORD');
     this.eat('SYM', '(');
     const expr = this.expr();
+    let displayTags = null;
+    if (this.c.type === 'SYM' && this.c.value === ';') {
+      displayTags = this.parseDebugDisplayTags(PROBE_DISPLAY_TAGS);
+    }
     this.eat('SYM', ')');
-    this.probes.push(expr);
-    return { probe: expr };
+    const probeNode = { expr, displayTags: displayTags || undefined };
+    this.probes.push(probeNode);
+    return { probe: probeNode };
   }
 
   next(){

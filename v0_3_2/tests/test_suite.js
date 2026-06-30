@@ -4358,6 +4358,7 @@ reg(802, 'probe', 'Parser — probe is KEYWORD', function(h, session) {
 reg(803, 'probe', 'Parser — probe(a) produce nod AST', function(h, session) {
   const stmts = session.parse('probe(a)');
   h.assert('stmt probe', String(stmts[0].probe !== undefined), 'true');
+  h.assert('probe expr', String(stmts[0].probe.expr !== undefined), 'true');
 });
 
 const SHOW_SIMPLE = `1wire a = 0
@@ -4381,7 +4382,7 @@ peek(a, b)
 show(a, b)`;
 
 function debugOutLines(out) {
-  return out.filter(l => l.includes('(ref:'));
+  return out.filter(l => /\(1wire\) = /.test(l));
 }
 
 function runMidChangeLegacy(h, session) {
@@ -4529,7 +4530,7 @@ reg(819, 'debug', 'probe key + REG — edge committed at release (wave)', runPro
 reg(820, 'probe', 'Parser — probe(.sw) produce nod AST', function(h, session) {
   const stmts = session.parse('probe(.sw)');
   h.assert('stmt probe', String(stmts[0].probe !== undefined), 'true');
-  h.assert('atom component', stmts[0].probe[0].var, '.sw');
+  h.assert('atom component', stmts[0].probe.expr[0].var, '.sw');
 });
 
 const PROBE_COMP_SWITCH = `comp [switch] .sw:
@@ -4578,8 +4579,8 @@ probe(.div:mod)`;
 reg(826, 'probe', 'Parser — probe(.u1:sum) produce nod AST', function(h, session) {
   const stmts = session.parse('probe(.u1:sum)');
   h.assert('stmt probe', String(stmts[0].probe !== undefined), 'true');
-  h.assert('chip inst atom', stmts[0].probe[0].var, '.u1');
-  h.assert('pout name', stmts[0].probe[0].property, 'sum');
+  h.assert('chip inst atom', stmts[0].probe.expr[0].var, '.u1');
+  h.assert('pout name', stmts[0].probe.expr[0].property, 'sum');
 });
 
 function runProbeChipPout(h, session) {
@@ -4635,8 +4636,8 @@ reg(830, 'probe', 'probe(.q:result) PCB pout — initialised and changed (wave)'
 reg(831, 'probe', 'Parser — probe(.u1.tmp) produce nod AST', function(h, session) {
   const stmts = session.parse('probe(.u1.tmp)');
   h.assert('stmt probe', String(stmts[0].probe !== undefined), 'true');
-  h.assert('inst atom', stmts[0].probe[0].var, '.u1');
-  h.assert('internalWire', stmts[0].probe[0].internalWire, 'tmp');
+  h.assert('inst atom', stmts[0].probe.expr[0].var, '.u1');
+  h.assert('internalWire', stmts[0].probe.expr[0].internalWire, 'tmp');
 });
 
 const CHIP_HALFADD_DBG = `chip +[halfAddDbg]:
@@ -12262,11 +12263,13 @@ reg(1597, 'doc', 'doc() — index of available forms', function(h, session) {
 
 reg(1598, 'doc', 'doc(show) doc(peek) doc(probe) — debug signatures', function(h, session) {
   const show = session.runDoc('doc(show)');
-  h.assert('show sig', show[0], 'show(expr, ...) — print formatted values to Output panel');
+  h.assert('show sig', show[0], 'show(expr, …) — print formatted values to Output panel');
+  h.assert('show tags', String(show.some(l => l.includes('decSigned') && l.includes('elAll'))), 'true');
   const peek = session.runDoc('doc(peek)');
-  h.assert('peek sig', peek[0], 'peek(expr, ...) — like show, compact wire lines (no ref suffix)');
+  h.assert('peek sig', peek[0], 'peek(expr, …) — like show, compact wire lines (no ref suffix)');
   const probe = session.runDoc('doc(probe)');
   h.assert('probe sig', probe[0], 'probe(expr) — log value changes (wire, .comp, .inst:pin, &ref, bit slice)');
+  h.assert('probe tags', String(probe.some(l => l.includes('decSigned') && l.includes('multiline'))), 'true');
   const zlist = session.runDoc('doc(Zlist)');
   h.assert('Zlist sig', zlist[0], 'Zlist(wireName) — list registered bus drivers (MODE ZSTATE, at RUN/NEXT)');
 });
@@ -16003,6 +16006,100 @@ reg(1662, 'gates', 'OR(isBS + isLF + isL) — concat + fold', function(h, sessio
 1wire isL = 0
 1wire any = OR(isBS + isLF + isL)`);
   h.assert('isBS+isLF', session.getWire(r2.interp, 'any'), '1');
+});
+
+reg(1905, 'show-tags', 'Parser — show(a; dec) displayTags AST', function(h, session) {
+  const stmts = session.parse('show(a; dec)');
+  h.assert('show args', String(Array.isArray(stmts[0].show.args)), 'true');
+  h.assert('dec tag', stmts[0].show.displayTags[0], 'dec');
+});
+
+reg(1906, 'show-tags', 'show(vectorA; dec) — decimal per element', function(h, session) {
+  const { out } = session.run('4wire[3] vectorA = 1111 + 0000 + 1010\nshow(vectorA; dec)');
+  h.assert(':0 dec', String(out.some(l => l.includes(':0 = \\15'))), 'true');
+  h.assert(':1 dec', String(out.some(l => l.includes(':1 = \\0'))), 'true');
+  h.assert(':2 dec', String(out.some(l => l.includes(':2 = \\10'))), 'true');
+});
+
+reg(1907, 'show-tags', 'show(w; decSigned) — signed scalar', function(h, session) {
+  const { out } = session.run('4wire w := 1111\nshow(w; decSigned)');
+  h.assert('signed -1', String(out.some(l => /w \(4wire\) = \\-1/.test(l))), 'true');
+});
+
+reg(1908, 'show-tags', 'show(24wire; dec) — single decimal', function(h, session) {
+  const { out } = session.run('24wire w := \\255\nshow(w; dec)');
+  h.assert('one decimal', String(out.some(l => /w \(24wire\) = \\255/.test(l))), 'true');
+  h.assert('no plus', String(!out.some(l => /w \(24wire\).*\+/.test(l))), 'true');
+});
+
+reg(1909, 'show-tags', 'show(408wire; dec) — 64-bit chunks + rest', function(h, session) {
+  const { out } = session.run('408wire a := \\123\nshow(a; dec)');
+  const line = out.find(l => l.includes('a (408wire)'));
+  h.assert('has line', String(!!line), 'true');
+  h.assert('has backslash dec', String(line.includes('\\')), 'true');
+  h.assert('rest 24bit', String(line.includes('(24bit)')), 'true');
+  h.assert('no hex caret', String(!line.includes('^')), 'true');
+});
+
+reg(1910, 'show-tags', 'show(128wire; dec) — exact 64 chunks, no +', function(h, session) {
+  const { out } = session.run('128wire w := 1\nshow(w; dec)');
+  const line = out.find(l => l.includes('w (128wire)'));
+  h.assert('two chunks', String((line.match(/\\/g) || []).length === 2), 'true');
+  h.assert('no plus', String(!line.includes('+')), 'true');
+});
+
+reg(1911, 'show-tags', 'show(a; dec hex) — parse error', function(h, session) {
+  h.assertThrows('mutual exclusive', () => session.parse('show(a; dec hex)'));
+});
+
+reg(1912, 'show-tags', 'show(a, b; dec) — both arguments', function(h, session) {
+  const { out } = session.run('4wire a := 1111\n4wire b := 0010\nshow(a, b; dec)');
+  const line = out.find(l => l.includes('(4wire)'));
+  h.assert('a dec', String(/a \(4wire\) = \\15/.test(line)), 'true');
+  h.assert('b dec', String(/b \(4wire\) = \\2/.test(line)), 'true');
+});
+
+reg(1913, 'show-tags', 'show(408wire) without tag — default hex', function(h, session) {
+  const { out } = session.run('408wire a := \\123\nshow(a)');
+  const line = out.find(l => l.includes('a (408wire)'));
+  h.assert('hex format', String(line.includes('^')), 'true');
+});
+
+reg(1914, 'show-tags', 'show(vec; elAll dec) — all elements', function(h, session) {
+  const { out } = session.run(
+    '4wire[8] vec = 1111 + 0000 + 0001 + 0010 + 0011 + 0100 + 0101 + 0110\n' +
+    'show(vec; elAll dec)'
+  );
+  h.assert('no ellipsis', String(!out.some(l => l.trim() === '..')), 'true');
+  h.assert('8 cells', String(out.filter(l => /^:\d+ = \\/.test(l)).length === 8), 'true');
+});
+
+reg(1915, 'show-tags', 'probe(v; dec) — flat blob decimal', function(h, session) {
+  const { out } = session.run('4wire[3] v = 1111 + 0000 + 1010\nprobe(v; dec)');
+  const probeLine = out.find(l => l.startsWith('# v ='));
+  h.assert('probe decimal', String(probeLine && probeLine.includes('\\')), 'true');
+  h.assert('no cell index', String(probeLine && !probeLine.includes(':0 =')), 'true');
+});
+
+reg(1916, 'show-tags', 'probe(v; elAll) — parse error', function(h, session) {
+  h.assertThrows('unknown tag', () => session.parse('probe(v; elAll)'));
+});
+
+reg(1917, 'show-tags', '65wire[2] dec — hex fallback per element', function(h, session) {
+  const z65 = '0'.repeat(64) + '1';
+  const { out } = session.run(`65wire[2] wide = ${z65} + ${'0'.repeat(65)}\nshow(wide; dec)`);
+  h.assert('hex element', String(out.some(l => /:\d+ = \^/.test(l))), 'true');
+});
+
+reg(1918, 'show-tags', 'show(408wire; hex) — grouped hex like default', function(h, session) {
+  const { out: outDefault } = session.run('408wire a := \\123\nshow(a)');
+  const { out: outHex } = session.run('408wire a := \\123\nshow(a; hex)');
+  const defLine = outDefault.find(l => l.includes('a (408wire)'));
+  const hexLine = outHex.find(l => l.includes('a (408wire)'));
+  h.assert('default hex', String(defLine && defLine.includes('^0000')), 'true');
+  h.assert('tag hex grouped', String(hexLine && hexLine.includes('^0000')), 'true');
+  h.assert('tag matches default value', String(hexLine && hexLine.includes('7B')), 'true');
+  h.assert('no per-nibble spam', String(hexLine && !/\^0 \^0/.test(hexLine)), 'true');
 });
 
 

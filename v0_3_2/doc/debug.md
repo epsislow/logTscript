@@ -123,7 +123,29 @@ After **RUN**, toggle `.s1` in the panel — **`probe`** logs each change with `
 ### Syntax
 
 ```
-show(expr1, expr2, ...)
+show(expr1, expr2, …)
+show(expr1, expr2, … ; tag tag …)
+```
+
+Display tags are **optional**, appear **once after all arguments** (after `;`), and are **only** valid on `show`, `peek`, and `probe`:
+
+| Tag | Effect |
+|-----|--------|
+| `dec` | Unsigned decimal — scalar/element ≤64 bit → `\N`; wire &gt;64 bit → 64-bit chunks + `+ \N (Rbit)` rest |
+| `decSigned` | Signed two's complement — same layout as `dec` |
+| `hex` | Nibbles `^…` (4 bit) on **vector/matrix cells**; plain wire uses grouped hex (`^0000 0000 …`, 4 hex chars per block) like default `show` |
+| `elAll` | List every vector/matrix cell (no `..` truncation) |
+| `elNonZero` | List only non-zero cells |
+| `multiline` | Wrap formatted value at 40 characters |
+
+Exactly **one** of `dec`, `decSigned`, or `hex` per statement. Mixed formats on different values → separate `show` calls.
+
+Without tags, wide wires keep the default hex grouping (`^0000 … 7B`).
+
+```logts-play
+408wire a := \123
+show(a)           # default hex
+show(a; dec)      # decimal chunks
 ```
 
 Each argument is an expression atom: wire name, component reference (`.comp:get`), bit slice (`a.0`, `a.2-4`), storage ref (`&3`), literal, etc.
@@ -179,8 +201,11 @@ After **RUN**, flip the switch in the panel — wires update; run `show` again o
 ### Syntax
 
 ```
-peek(expr1, expr2, ...)
+peek(expr1, expr2, …)
+peek(expr1, expr2, … ; tag tag …)
 ```
+
+Same display tags as `show` (see [show — display tags](#syntax)).
 
 Same argument forms as `show`.
 

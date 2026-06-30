@@ -218,6 +218,7 @@ vectorA has length [3]
 | More than 5 elements | First three elements, `..`, last element |
 | `show(vectorA:1)` | Single element line + length line |
 | `peek(vectorA)` | Same layout as `show` (emitted at statement position) |
+| `show(vectorA; elAll dec)` | All cells in decimal; tags at end — see [debug.md — show](debug.md#show) |
 
 ---
 

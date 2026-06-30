@@ -1783,11 +1783,16 @@ class Interpreter {
     return updated;
   }
 
-  activateProbes(exprs) {
-    if (!exprs || !exprs.length) return;
-    for (const expr of exprs) {
+  activateProbes(probes) {
+    if (!probes || !probes.length) return;
+    for (const item of probes) {
+      const expr = item && item.expr ? item.expr : item;
+      const displayTags = item && item.displayTags ? item.displayTags : null;
       const target = this._resolveProbeExpr(expr);
-      if (target) this._registerProbeTarget(target);
+      if (target) {
+        if (displayTags) target.displayTags = displayTags;
+        this._registerProbeTarget(target);
+      }
     }
     for (const target of this.probeTargets) {
       const value = this._readProbeTargetValue(target);
@@ -1816,11 +1821,17 @@ class Interpreter {
   _emitProbeTarget(target, value, reasonOverride, driverSuffix = '') {
     if (!target) return;
     let valueStr = value == null ? '-' : String(value);
+    const opts = this._normalizeShowDisplayOpts(target.displayTags);
+    const useTagFormat = opts && (opts.dec || opts.decSigned || opts.hex);
     if (target.bitWidth && valueStr !== '-' && !target.isText) {
       const wire = target.wireName ? this.wires.get(target.wireName) : null;
-      const skipGroup = wire && wire.vector && target.kind === 'wire';
+      const skipGroup = wire && wire.vector && target.kind === 'wire' && !useTagFormat;
       if (!skipGroup) {
-        valueStr = this.formatValue(valueStr, target.bitWidth);
+        if (useTagFormat) {
+          valueStr = this._formatShowWireValue(valueStr, target.bitWidth, opts, false);
+        } else {
+          valueStr = this.formatValue(valueStr, target.bitWidth);
+        }
       }
     }
     const displayKey = valueStr + (target.symbolicMeta ? JSON.stringify(target.symbolicMeta) : '');
@@ -1840,6 +1851,14 @@ class Interpreter {
     const refPart = ref ? ` (${ref})` : '';
     const symPart = this._probeSymbolicSuffix(target, valueStr);
     const name = target.label || target.wireName || target.ref || '?';
+    const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
+    if (opts && opts.multiline && DF) {
+      const wrapped = DF.maybeWrapLines(valueStr, opts);
+      for (const wl of wrapped) {
+        this.out.push(`# ${name} = ${wl}${refPart}${symPart} - ${reason}${driverSuffix}`);
+      }
+      return;
+    }
     this.out.push(`# ${name} = ${valueStr}${refPart}${symPart} - ${reason}${driverSuffix}`);
   }
 
@@ -6258,12 +6277,51 @@ if (this.isBuiltinDEMUX(name)) {
     return valueStr;
   }
 
-  _formatVectorElementLine(index, valueStr, elementWidth) {
-    const formatted = valueStr !== '-' ? this.formatValue(valueStr, elementWidth) : valueStr;
+  _normalizeShowDisplayOpts(displayTags) {
+    const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
+    if (!DF || !displayTags || !displayTags.length) return null;
+    return DF.normalizeShowDisplayTags(displayTags);
+  }
+
+  _formatDebugDisplayValue(binStr, bitWidth, opts, isElement) {
+    const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
+    if (!DF || !opts) return binStr;
+    if (!(opts.dec || opts.decSigned || opts.hex)) return binStr;
+    return DF.formatDebugDisplayValue(binStr, bitWidth, opts, isElement);
+  }
+
+  _formatShowWireValue(valueStr, bitWidth, opts, isElement) {
+    if (valueStr === '-' || valueStr == null) return valueStr;
+    if (opts && (opts.dec || opts.decSigned || opts.hex)) {
+      return this._formatDebugDisplayValue(valueStr, bitWidth, opts, isElement);
+    }
+    return this.formatValue(valueStr, bitWidth);
+  }
+
+  _pushDisplayOutput(lines, formatted, opts) {
+    const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
+    if (DF && opts && opts.multiline) {
+      DF.pushDisplayLines(lines, formatted, opts);
+    } else {
+      lines.push(formatted);
+    }
+  }
+
+  _elementIsNonZero(valueStr, elementWidth) {
+    if (!valueStr || valueStr === '-') return false;
+    const w = elementWidth || valueStr.length;
+    const padded = valueStr.length >= w ? valueStr.substring(valueStr.length - w) : valueStr.padStart(w, '0');
+    return !/^0+$/.test(padded);
+  }
+
+  _formatVectorElementLine(index, valueStr, elementWidth, opts) {
+    const formatted = valueStr !== '-'
+      ? this._formatShowWireValue(valueStr, elementWidth, opts, true)
+      : valueStr;
     return `:${index} = ${formatted} (${elementWidth}bit)`;
   }
 
-  _formatVectorShowLines(wireName, valueStr) {
+  _formatVectorShowLines(wireName, valueStr, opts) {
     const wire = this.wires.get(wireName);
     if (!wire || !wire.vector) return null;
     const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
@@ -6271,12 +6329,21 @@ if (this.isBuiltinDEMUX(name)) {
     if (!meta) return null;
     const { elementWidth, rows, cols, elementCount } = meta;
     const lines = [];
-    lines.push(`${wireName} = ${valueStr} (${valueStr.length}bit)`);
+    const headerValue = opts && (opts.dec || opts.decSigned || opts.hex)
+      ? this._formatShowWireValue(valueStr, valueStr.length, opts, false)
+      : valueStr;
+    this._pushDisplayOutput(lines, `${wireName} = ${headerValue} (${valueStr.length}bit)`, opts);
+
+    const emitCell = (index, bits) => {
+      if (opts && opts.elNonZero && !this._elementIsNonZero(bits, elementWidth)) return;
+      lines.push(this._formatVectorElementLine(index, bits, elementWidth, opts));
+    };
 
     if (TS && TS.isMatrix(meta)) {
-      const showRows = rows <= 5 ? rows : (rows > 5 ? 4 : rows);
+      const showAll = opts && opts.elAll;
+      const showRows = showAll ? rows : (rows <= 5 ? rows : (rows > 5 ? 4 : rows));
       for (let r = 0; r < showRows; r++) {
-        if (rows > 5 && r === 3) {
+        if (!showAll && rows > 5 && r === 3) {
           lines.push('..');
           r = rows - 1;
         }
@@ -6284,31 +6351,28 @@ if (this.isBuiltinDEMUX(name)) {
         const rowBits = valueStr.substring(rowStart, rowStart + cols * elementWidth);
         for (let c = 0; c < cols; c++) {
           const cellStart = c * elementWidth;
-          lines.push(this._formatVectorElementLine(
-            `${r}:${c}`,
-            rowBits.substring(cellStart, cellStart + elementWidth),
-            elementWidth
-          ));
+          emitCell(`${r}:${c}`, rowBits.substring(cellStart, cellStart + elementWidth));
         }
       }
       lines.push(`${wireName} has shape [${rows},${cols}]`);
       return lines;
     }
 
-    if (elementCount <= 5) {
+    const showAll = opts && opts.elAll;
+    if (showAll || elementCount <= 5) {
       for (let i = 0; i < elementCount; i++) {
         const start = i * elementWidth;
-        lines.push(this._formatVectorElementLine(i, valueStr.substring(start, start + elementWidth), elementWidth));
+        emitCell(i, valueStr.substring(start, start + elementWidth));
       }
     } else {
       for (let i = 0; i < 3; i++) {
         const start = i * elementWidth;
-        lines.push(this._formatVectorElementLine(i, valueStr.substring(start, start + elementWidth), elementWidth));
+        emitCell(i, valueStr.substring(start, start + elementWidth));
       }
       lines.push('..');
       const last = elementCount - 1;
       const start = last * elementWidth;
-      lines.push(this._formatVectorElementLine(last, valueStr.substring(start, start + elementWidth), elementWidth));
+      emitCell(last, valueStr.substring(start, start + elementWidth));
     }
     if (rows > 1 && cols === 1) {
       lines.push(`${wireName} has shape [${rows},1]`);
@@ -6319,8 +6383,12 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   _execShowImmediate(s, computeRefs = false) {
-    const args = s.show || s.peek;
-    if (!args) return;
+    const payload = s.show || s.peek;
+    if (!payload) return;
+    const args = payload.args || payload;
+    const displayTags = payload.displayTags || null;
+    const opts = this._normalizeShowDisplayOpts(displayTags);
+    const isPeek = !!s.peek;
     const prevCtx = this.evalContext;
     this.evalContext = 'show';
     const results = [];
@@ -6335,10 +6403,12 @@ if (this.isBuiltinDEMUX(name)) {
           const part = r[0];
           if (part) {
             let valueStr = part.value != null ? part.value : '-';
-            if (valueStr !== '-' && part.bitWidth) valueStr = this.formatValue(valueStr, part.bitWidth);
+            if (valueStr !== '-' && part.bitWidth) {
+              valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, true);
+            }
             const displayName = part.varName || atom.var;
             const sliceWidth = part.bitWidth || wire.vector.elementWidth;
-            vectorLines.push(`${displayName} = ${valueStr} (${sliceWidth}bit)`);
+            this._pushDisplayOutput(vectorLines, `${displayName} = ${valueStr} (${sliceWidth}bit)`, opts);
             if (!atom.bitRange) {
               const meta = this.getWireTensorMeta(wire);
               const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
@@ -6360,7 +6430,7 @@ if (this.isBuiltinDEMUX(name)) {
           if (part) {
             let valueStr = part.value != null ? part.value : '-';
             if (valueStr === '-' && part.ref) valueStr = this.getValueFromRef(part.ref) || '-';
-            const vlines = this._formatVectorShowLines(atom.var, valueStr);
+            const vlines = this._formatVectorShowLines(atom.var, valueStr, opts);
             if (vlines) {
               vectorLines.push(...vlines);
               continue;
@@ -6405,10 +6475,10 @@ if (this.isBuiltinDEMUX(name)) {
           const v = this.getValueFromRef(part.ref);
           let valueStr = (v == null) ? '-' : v;
           if (valueStr !== '-') {
-            if (part.bitWidth) valueStr = this.formatValue(valueStr, part.bitWidth);
+            if (part.bitWidth) valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, false);
             else if (displayType) {
               const bw = this.getBitWidth(displayType);
-              if (bw) valueStr = this.formatValue(valueStr, bw);
+              if (bw) valueStr = this._formatShowWireValue(valueStr, bw, opts, false);
             }
           }
           const shown = this._formatShowValue(part, valueStr);
@@ -6416,18 +6486,27 @@ if (this.isBuiltinDEMUX(name)) {
             const wire = this.wires.get(displayName);
             const variable = this.vars.get(displayName);
             const ref = wire?.ref ?? variable?.ref;
-            const refStr = (ref && ref !== '&-') ? ` (ref: ${ref})` : '';
-            results.push(`${displayName} (${displayType}) = ${shown}${refStr}`);
+            const refStr = (!isPeek && ref && ref !== '&-') ? ` (ref: ${ref})` : '';
+            const line = `${displayName} (${displayType}) = ${shown}${refStr}`;
+            if (opts && opts.multiline) {
+              this._pushDisplayOutput(results, line, opts);
+            } else {
+              results.push(line);
+            }
           } else {
-            results.push(shown);
+            if (opts && opts.multiline) {
+              this._pushDisplayOutput(results, shown, opts);
+            } else {
+              results.push(shown);
+            }
           }
         } else {
           let valueStr = part.value !== null ? part.value : '-';
           if (valueStr !== '-' && !part.isText) {
-            if (part.bitWidth) valueStr = this.formatValue(valueStr, part.bitWidth);
+            if (part.bitWidth) valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, false);
             else if (displayType) {
               const bw = this.getBitWidth(displayType);
-              if (bw) valueStr = this.formatValue(valueStr, bw);
+              if (bw) valueStr = this._formatShowWireValue(valueStr, bw, opts, false);
             }
           }
           const shown = this._formatShowValue(part, valueStr);
@@ -6435,16 +6514,31 @@ if (this.isBuiltinDEMUX(name)) {
             const wire = this.wires.get(displayName);
             const variable = this.vars.get(displayName);
             const ref = wire?.ref ?? variable?.ref;
-            const refStr = (ref && ref !== '&-') ? ` (ref: ${ref})` : '';
-            results.push(`${displayName} (${displayType}) = ${shown}${refStr}`);
+            const refStr = (!isPeek && ref && ref !== '&-') ? ` (ref: ${ref})` : '';
+            const line = `${displayName} (${displayType}) = ${shown}${refStr}`;
+            if (opts && opts.multiline) {
+              this._pushDisplayOutput(results, line, opts);
+            } else {
+              results.push(line);
+            }
           } else {
-            results.push(shown);
+            if (opts && opts.multiline) {
+              this._pushDisplayOutput(results, shown, opts);
+            } else {
+              results.push(shown);
+            }
           }
         }
       }
     }
     for (const line of vectorLines) this.out.push(line);
-    if (results.length) this.out.push(results.join(', '));
+    if (results.length) {
+      if (opts && opts.multiline) {
+        for (const line of results) this.out.push(line);
+      } else {
+        this.out.push(results.join(', '));
+      }
+    }
     } finally {
       this.evalContext = prevCtx;
     }
@@ -12995,9 +13089,18 @@ Interpreter.BUILTIN_DOC = {
 };
 
 Interpreter.DEBUG_DOC = {
-  show:  ['show(expr, ...) — print formatted values to Output panel'],
-  peek:  ['peek(expr, ...) — like show, compact wire lines (no ref suffix)'],
-  probe: ['probe(expr) — log value changes (wire, .comp, .inst:pin, &ref, bit slice)'],
+  show:  [
+    'show(expr, …) — print formatted values to Output panel',
+    'show(expr, … ; dec decSigned hex elAll elNonZero multiline) — display tags once after all args',
+  ],
+  peek:  [
+    'peek(expr, …) — like show, compact wire lines (no ref suffix)',
+    'peek(expr, … ; dec decSigned hex elAll elNonZero multiline) — same display tags as show',
+  ],
+  probe: [
+    'probe(expr) — log value changes (wire, .comp, .inst:pin, &ref, bit slice)',
+    'probe(expr ; dec decSigned hex multiline) — flat blob format; no el* tags',
+  ],
   watch: ['watch(expr) — record timeline trace for watch panel'],
   Zlist: ['Zlist(wireName) — list registered bus drivers (MODE ZSTATE, at RUN/NEXT)'],
 };
