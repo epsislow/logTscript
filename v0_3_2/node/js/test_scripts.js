@@ -12,10 +12,12 @@ function loadTestScripts() {
   const runtime = raw.runtime.slice();
   const browserTail = raw.afterRuntime.browser.slice();
   const nodeTail = raw.afterRuntime.node.slice();
+  const editorPipelineTail = (raw.editorPipelineTail || []).slice();
   return {
     runtime,
     browserTail,
     nodeTail,
+    editorPipelineTail,
     browserAll() {
       return runtime.concat(browserTail);
     },

@@ -6550,10 +6550,56 @@ After **RUN**, toggle \`.s1\` in the panel — **\`probe\`** logs each change wi
 ### Syntax
 
 \`\`\`
-show(expr1, expr2, ...)
+show(expr1, expr2, …)
+show(expr1, expr2, … ; tag tag …)
 \`\`\`
 
-Each argument is an expression atom: wire name, component reference (\`.comp:get\`), bit slice (\`a.0\`, \`a.2-4\`), storage ref (\`&3\`), literal, etc.
+Display tags are **optional**, appear **once after all arguments** (after \`;\`), and are **only** valid on \`show\`, \`peek\`, and \`probe\` (with restrictions on \`probe\` — see below).
+
+#### Format tags (exactly one per statement)
+
+| Tag | Effect |
+|-----|--------|
+| \`dec\` | Unsigned decimal — scalar/element ≤64 bit → \`\\N\`; wire &gt;64 bit → 64-bit chunks + \`+ \\N (Rbit)\` rest |
+| \`signed\` | Signed two's complement (shorthand for \`dec signed\` when used alone). Negative: \`\\-N;W\`; positive: \`\\N\` without \`;W\` |
+| \`decSigned\` | Legacy alias for \`dec\` + \`signed\` (still accepted in parser) |
+| \`hex\` | Nibbles \`^…\` (4 bit) on **vector/matrix cells**; plain wire uses grouped hex like default \`show\` |
+| \`hexWide\` | With \`hex\` only — grouped wide hex on vector elements (≥32 bit) |
+| \`bin\` | Explicit binary grouping (8-bit groups on wide wires) |
+| \`ascii\` | ASCII string in quotes — \`"A"\`, \`"Hello"\`, NUL → \`□\`, LF → \`↵\`, other control → \`.\` (bytes MSB-first) |
+
+Exactly **one** of \`dec\`, \`hex\`, \`bin\`, or \`ascii\` per statement. \`signed\` combines with \`dec\` or \`hex\` (value hex), not with \`bin\` or \`ascii\`.
+
+#### Layout / element tags (\`show\` and \`peek\` only)
+
+| Tag | Effect |
+|-----|--------|
+| \`compact\` | Vector/matrix: header + \`has length\` / \`has shape\` only — no \`:i\` lines |
+| \`elAll\` | List every vector/matrix cell (no \`..\` truncation) |
+| \`elNonZero\` | List only non-zero cells |
+| \`elRange=0-3\` | Vector: elements \`:0\`…\`:3\`; matrix: rows \`0\`…\`3\` (all columns). Matrix 2D: \`elRange=0-1,2-4\` |
+| \`elLast=N\` | Last \`N\` elements (vector) or rows (matrix) |
+| \`maxWidth=N\` | Truncate single-line output to \`N\` chars + \` ..\` |
+| \`multiline\` | Wrap formatted value (default wrap 40, or \`maxWidth\` when set) |
+
+\`elAll\`, \`elNonZero\`, \`compact\`, \`elRange\`, and \`elLast\` are **mutually exclusive**. \`probe\` allows format tags + \`maxWidth\` + \`multiline\` only (no \`el*\` / \`compact\`).
+
+Without format tags, wide wires keep the default hex grouping (\`^0000 … 7B\`).
+
+\`\`\`logts-play
+408wire a := \\123
+show(a)                    # default hex
+show(a; dec)               # decimal chunks
+show(a; signed)            # signed decimal chunks
+4wire w := 1111
+show(w; signed)            # w (4wire) = \\-1;4
+8wire code := 01000001
+show(code; ascii)          # code (8wire) = "A"
+40wire msg := "Hello"
+show(msg; ascii)           # msg (40wire) = "Hello"
+\`\`\`
+
+Each argument is an expression atom: wire name, component reference (\`.comp:get\`), bit slice (\`a.0\`, \`a.2-4\`), storage ref (\`&3\`), literal (\`\\255\`, \`^-A;8\`, \`"text"\`), etc.
 
 ### Output format
 
@@ -6606,8 +6652,11 @@ After **RUN**, flip the switch in the panel — wires update; run \`show\` again
 ### Syntax
 
 \`\`\`
-peek(expr1, expr2, ...)
+peek(expr1, expr2, …)
+peek(expr1, expr2, … ; tag tag …)
 \`\`\`
+
+Same display tags as \`show\` (see [show — display tags](#syntax)).
 
 Same argument forms as \`show\`.
 
@@ -6656,6 +6705,15 @@ a (1wire) = 0 (ref: &0), b (1wire) = 1 (ref: &1)
 
 \`\`\`
 probe(expr)
+probe(expr ; tag …)
+\`\`\`
+
+Display tags on \`probe\`: \`dec\`, \`signed\`, \`hex\`, \`hexWide\`, \`bin\`, \`ascii\`, \`maxWidth=\`, \`multiline\` — same formatting as \`show\` on the **flat blob** value. No \`elAll\` / \`elNonZero\` / \`compact\` / \`elRange\` / \`elLast\`.
+
+\`\`\`logts-play
+8wire v := 01000001
+probe(v; ascii)    # # v = "A" - initialised
+probe(v; dec)      # # v = \\65 - initialised
 \`\`\`
 
 **One argument only:**
@@ -17416,6 +17474,40 @@ Decimal literals (with \`\\\`) can be used directly or inside \`[]\`:
 \`a | [^FF] | [\\31]\`        →  OR(OR(a,^FF),\\31)
 \`\`\`
 
+#### Signed decimal \`\\-N;W\`
+
+Signed decimal literals require an **explicit width** after \`;\` (two's complement on exactly \`W\` bits). The \`;W\` suffix is **width**, not padding (unlike unsigned \`\\31;8\`).
+
+\`\`\`
+8wire a = \`\\-3;8\`           →  8wire a = \\-3;8
+\`a | \\-3;8\`                →  OR(a,\\-3;8)
+\`\\-3\` without \`;W\`         →  parse error
+\`\`\`
+
+### Signed value hex — \`[^-HEX;W]\`
+
+In short notation, \`^\` outside \`[]\` is XOR — signed **value** hex uses brackets like unsigned hex:
+
+\`\`\`
+8wire a = \`[^-A;8]\`         →  8wire a = ^-A;8
+\`a | [^-A;8]\`               →  OR(a,^-A;8)
+\`^-A;8\` in backticks        →  INVALID (parsed as XOR) — use [^-A;8]
+\`\`\`
+
+\`^-HEX;W\` without brackets works in normal (non-backtick) expressions.
+
+### Wire string literals — \`"..."\` / \`'...'\`
+
+Both quote styles are equivalent. Each character → 8 bits (MSB-first), unsigned ASCII:
+
+\`\`\`
+40wire msg = \`"Hello"\`
+msg = \`"Hi" + "\\s" + "!"\`    # \\s = explicit space
+72wire q = \`"Question\\nAnswers:"\`
+\`\`\`
+
+Escapes inside quotes only: \`\\s\` \`\\n\` \`\\t\` \`\\r\` \`\\b\` \`\\0\` \`\\\\\` \`\\"\` \`\\'\`.
+
 ---
 
 ## Bit range on literals
@@ -17491,6 +17583,8 @@ Literal bit-ranges can be combined with \`+\` (concatenation) or used as argumen
 ## Padding operator \`;p\`
 
 The \`;p\` operator pads a value to \`p\` bits by adding zeroes on the left (\`padStart\`). It can be applied to literals and variables, optionally combined with a bit range.
+
+**Signed literals:** on \`\\-N;W\` and \`^-HEX;W\`, the \`;W\` suffix is **always** two's-complement width (not padding). Unsigned \`\\N;8\` and \`^F;8\` keep the padding meaning above.
 
 ### Syntax
 
@@ -19523,6 +19617,7 @@ vectorA has length [3]
 | More than 5 elements | First three elements, \`..\`, last element |
 | \`show(vectorA:1)\` | Single element line + length line |
 | \`peek(vectorA)\` | Same layout as \`show\` (emitted at statement position) |
+| \`show(vectorA; elAll dec)\` | All cells in decimal; tags at end — see [debug.md — show](debug.md#show) |
 
 ---
 

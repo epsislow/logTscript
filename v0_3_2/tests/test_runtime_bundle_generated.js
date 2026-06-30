@@ -70,6 +70,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/signed-arithmetic.js",
   "core/debug-display-wrap.js",
   "core/debug-display-format.js",
+  "core/wire-literals.js",
   "core/parser.js",
   "core/interpreter.js",
   "core/signal-propagation.js",

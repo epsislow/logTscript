@@ -144,8 +144,38 @@ pushSource({ src, alias }) {
     return this.token('LOGIC', v.toUpperCase());
   }
 
+  // Wire string literal "..." or '...' (before generic SYM — quotes are not operators)
+  if (c === '"' || c === "'") {
+    const quote = c;
+    this.next();
+    let str = '';
+    while (!this.eof()) {
+      const ch = this.peek();
+      if (ch === '\n') {
+        throw Error(`Unclosed wire string literal at ${this.file}: ${this.line}:${this.col}`);
+      }
+      if (ch === '\\' && this.i + 1 < this.src.length) {
+        this.next();
+        const esc = this.next();
+        const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+        const decoded = WL ? WL.decodeWireStringEscape(esc) : null;
+        if (decoded == null) {
+          throw Error(`Unknown escape '\\${esc}' in wire string at ${this.file}: ${this.line}:${this.col}`);
+        }
+        str += decoded;
+        continue;
+      }
+      if (ch === quote) {
+        this.next();
+        break;
+      }
+      str += this.next();
+    }
+    return this.token('WSTR', str);
+  }
+
   // Symbols (including { and } for property blocks, ! for NOT prefix, * for multiplier shortname)
-    if ('=,+():-.@[]\"\'{}>!*;'.includes(c)) return this.token('SYM', this.next());
+    if ('=,+():-.@[]{}>!*;'.includes(c)) return this.token('SYM', this.next());
 
   // Lone _ is unpack wildcard; _foo is a normal identifier
   if (c === '_') {
@@ -260,7 +290,7 @@ pushSource({ src, alias }) {
       }
       return this.token('SYM', '<');
     }
-    // Global inline/component ref: ^.name (not hex — hex is ^ without leading dot)
+    // Hex literal ^… or signed value hex ^-HEX;W
     if (c === '^') {
       if (this.i + 1 < this.src.length && this.src[this.i + 1] === '.') {
         this.next();
@@ -272,18 +302,38 @@ pushSource({ src, alias }) {
         return this.token('GREF', v);
       }
       this.next();
+      let signedNeg = false;
+      if (!this.eof() && this.peek() === '-') {
+        signedNeg = true;
+        this.next();
+      }
       let hex = '';
       while (!this.eof()) {
         const peek = this.peek();
         if (/[0-9A-Fa-f]/.test(peek)) {
           hex += this.next();
         } else if (peek === ' ' || peek === '\t') {
-          // Skip spaces and tabs (but not newlines)
           this.next();
         } else {
-          // End of hex literal (newline, or any other character)
           break;
         }
+      }
+      if (signedNeg) {
+        if (hex === '') {
+          throw Error(`Invalid signed hexadecimal literal at ${this.file}: ${this.line}:${this.col}`);
+        }
+        if (this.eof() || this.peek() !== ';') {
+          throw Error(`Signed hex literal requires explicit width: use ^-HEX;W at ${this.file}: ${this.line}:${this.col}`);
+        }
+        this.next();
+        let width = '';
+        while (!this.eof() && /[0-9]/.test(this.peek())) {
+          width += this.next();
+        }
+        if (width === '') {
+          throw Error(`Expected width after ';' in signed hex literal at ${this.file}: ${this.line}:${this.col}`);
+        }
+        return this.token('SHEX', { hex: hex.toUpperCase(), width: parseInt(width, 10) });
       }
       if (hex === '') {
         throw Error(`Invalid hexadecimal literal at ${this.file}: ${this.line}:${this.col}`);
@@ -291,12 +341,34 @@ pushSource({ src, alias }) {
       return this.token('HEX', hex.toUpperCase());
     }
 
-    // Decimal literal: \ followed by decimal digits (wire values only, not vector indices)
+    // Decimal literal \N or signed \-N;W
     if (c === '\\') {
       this.next();
+      let signedNeg = false;
+      if (!this.eof() && this.peek() === '-') {
+        signedNeg = true;
+        this.next();
+      }
       let dec = '';
       while (!this.eof() && /[0-9]/.test(this.peek())) {
         dec += this.next();
+      }
+      if (signedNeg) {
+        if (dec === '') {
+          throw Error(`Invalid signed decimal literal at ${this.file}: ${this.line}:${this.col}`);
+        }
+        if (this.eof() || this.peek() !== ';') {
+          throw Error(`Signed decimal literal requires explicit width: use \\-N;W at ${this.file}: ${this.line}:${this.col}`);
+        }
+        this.next();
+        let width = '';
+        while (!this.eof() && /[0-9]/.test(this.peek())) {
+          width += this.next();
+        }
+        if (width === '') {
+          throw Error(`Expected width after ';' in signed decimal literal at ${this.file}: ${this.line}:${this.col}`);
+        }
+        return this.token('SDEC', { signed: true, dec, width: parseInt(width, 10) });
       }
       if (dec === '') {
         throw Error(`Invalid decimal literal at ${this.file}: ${this.line}:${this.col}`);

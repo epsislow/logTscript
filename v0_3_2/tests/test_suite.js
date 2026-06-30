@@ -16225,6 +16225,86 @@ reg(1936, 'show-tags', 'show(w; signed ascii) — parse error', function(h, sess
   h.assertThrows('mutually exclusive', () => session.parse('show(w; signed ascii)'));
 });
 
+reg(1937, 'literals', 'Signed decimal \\-3;8 assign', function(h, session) {
+  const { interp } = session.run('8wire a = \\-3;8');
+  h.assert('tc -3', session.getWire(interp, 'a'), '11111101');
+});
+
+reg(1938, 'literals', 'Signed decimal without width — parse error', function(h, session) {
+  h.assertThrows('explicit width', () => session.parse('8wire a = \\-3'));
+});
+
+reg(1939, 'literals', 'Signed hex ^-A;8 assign', function(h, session) {
+  const { interp } = session.run('8wire a = ^-A;8');
+  h.assert('tc -10', session.getWire(interp, 'a'), '11110110');
+});
+
+reg(1940, 'literals', 'Signed hex without width — parse error', function(h, session) {
+  h.assertThrows('explicit width', () => session.parse('8wire a = ^-A'));
+});
+
+reg(1941, 'literals', 'Signed width mismatch on assign', function(h, session) {
+  h.assertThrows('bits', () => session.run('8wire a = \\-3;4'));
+});
+
+reg(1942, 'literals', 'Wire string "Hello" assign', function(h, session) {
+  const hello = '0100100001100101011011000110110001101111';
+  const { interp } = session.run('40wire msg = "Hello"');
+  h.assert('hello bits', session.getWire(interp, 'msg'), hello);
+});
+
+reg(1943, 'literals', 'Wire string concat', function(h, session) {
+  const { interp } = session.run('24wire s = "Hi" + "!"');
+  h.assert('hi bang', session.getWire(interp, 's'), '010010000110100100100001');
+});
+
+reg(1944, 'literals', 'Wire string escapes \\n \\s \\0', function(h, session) {
+  const r1 = session.run('16wire s = "a\\n"');
+  const w = session.getWire(r1.interp, 's');
+  h.assert('len 16', String(w.length === 16), 'true');
+  h.assert('a byte', String(w.substring(0, 8) === '01100001'), 'true');
+  h.assert('lf byte', String(w.substring(8, 16) === '00001010'), 'true');
+  const r2 = session.run('8wire sp = "\\s"');
+  h.assert('space', session.getWire(r2.interp, 'sp'), '00100000');
+  const r3 = session.run('16wire t = "b\\0"');
+  h.assert('nul byte', session.getWire(r3.interp, 't').substring(8, 16), '00000000');
+});
+
+reg(1945, 'literals', 'Wire string single quotes', function(h, session) {
+  const { interp } = session.run("8wire c = 'A'");
+  h.assert('A', session.getWire(interp, 'c'), '01000001');
+});
+
+reg(1946, 'show-tags', 'show(a; signed) after signed assign', function(h, session) {
+  const { out } = session.run('8wire a = \\-3;8\nshow(a; signed)');
+  h.assert('signed display', String(out.some(l => /a \(8wire\) = \\-3;8/.test(l))), 'true');
+});
+
+reg(1947, 'literals', 'Short notation signed decimal', function(h, session) {
+  const { interp } = session.run('8wire c = `\\-3;8`');
+  h.assert('tc', session.getWire(interp, 'c'), '11111101');
+});
+
+reg(1948, 'literals', 'Short notation signed hex bracket', function(h, session) {
+  const { interp } = session.run('8wire c = `[^-A;8]`');
+  h.assert('tc', session.getWire(interp, 'c'), '11110110');
+});
+
+reg(1949, 'literals', 'Runtime bundle includes wire-literals module', function(h) {
+  h.assert('LogTScriptWireLiterals', String(typeof LogTScriptWireLiterals !== 'undefined'), 'true');
+  h.assert('parseSdecToken', String(typeof LogTScriptWireLiterals.parseSdecToken === 'function'), 'true');
+});
+
+reg(1950, 'literals', 'User examples — signed dec, signed hex, wire string', function(h, session) {
+  const r1 = session.run('8wire a = \\-3;8');
+  h.assert('signed dec', session.getWire(r1.interp, 'a'), '11111101');
+  const r2 = session.run('8wire b = ^-A;8');
+  h.assert('signed hex', session.getWire(r2.interp, 'b'), '11110110');
+  const hello = '0100100001100101011011000110110001101111';
+  const r3 = session.run('40wire msg = "Hello"');
+  h.assert('hello', session.getWire(r3.interp, 'msg'), hello);
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

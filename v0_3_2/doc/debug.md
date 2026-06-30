@@ -127,28 +127,52 @@ show(expr1, expr2, …)
 show(expr1, expr2, … ; tag tag …)
 ```
 
-Display tags are **optional**, appear **once after all arguments** (after `;`), and are **only** valid on `show`, `peek`, and `probe`:
+Display tags are **optional**, appear **once after all arguments** (after `;`), and are **only** valid on `show`, `peek`, and `probe` (with restrictions on `probe` — see below).
+
+#### Format tags (exactly one per statement)
 
 | Tag | Effect |
 |-----|--------|
 | `dec` | Unsigned decimal — scalar/element ≤64 bit → `\N`; wire &gt;64 bit → 64-bit chunks + `+ \N (Rbit)` rest |
-| `decSigned` | Signed two's complement — same layout as `dec` |
-| `hex` | Nibbles `^…` (4 bit) on **vector/matrix cells**; plain wire uses grouped hex (`^0000 0000 …`, 4 hex chars per block) like default `show` |
+| `signed` | Signed two's complement (shorthand for `dec signed` when used alone). Negative: `\-N;W`; positive: `\N` without `;W` |
+| `decSigned` | Legacy alias for `dec` + `signed` (still accepted in parser) |
+| `hex` | Nibbles `^…` (4 bit) on **vector/matrix cells**; plain wire uses grouped hex like default `show` |
+| `hexWide` | With `hex` only — grouped wide hex on vector elements (≥32 bit) |
+| `bin` | Explicit binary grouping (8-bit groups on wide wires) |
+| `ascii` | ASCII string in quotes — `"A"`, `"Hello"`, NUL → `□`, LF → `↵`, other control → `.` (bytes MSB-first) |
+
+Exactly **one** of `dec`, `hex`, `bin`, or `ascii` per statement. `signed` combines with `dec` or `hex` (value hex), not with `bin` or `ascii`.
+
+#### Layout / element tags (`show` and `peek` only)
+
+| Tag | Effect |
+|-----|--------|
+| `compact` | Vector/matrix: header + `has length` / `has shape` only — no `:i` lines |
 | `elAll` | List every vector/matrix cell (no `..` truncation) |
 | `elNonZero` | List only non-zero cells |
-| `multiline` | Wrap formatted value at 40 characters |
+| `elRange=0-3` | Vector: elements `:0`…`:3`; matrix: rows `0`…`3` (all columns). Matrix 2D: `elRange=0-1,2-4` |
+| `elLast=N` | Last `N` elements (vector) or rows (matrix) |
+| `maxWidth=N` | Truncate single-line output to `N` chars + ` ..` |
+| `multiline` | Wrap formatted value (default wrap 40, or `maxWidth` when set) |
 
-Exactly **one** of `dec`, `decSigned`, or `hex` per statement. Mixed formats on different values → separate `show` calls.
+`elAll`, `elNonZero`, `compact`, `elRange`, and `elLast` are **mutually exclusive**. `probe` allows format tags + `maxWidth` + `multiline` only (no `el*` / `compact`).
 
-Without tags, wide wires keep the default hex grouping (`^0000 … 7B`).
+Without format tags, wide wires keep the default hex grouping (`^0000 … 7B`).
 
 ```logts-play
 408wire a := \123
-show(a)           # default hex
-show(a; dec)      # decimal chunks
+show(a)                    # default hex
+show(a; dec)               # decimal chunks
+show(a; signed)            # signed decimal chunks
+4wire w := 1111
+show(w; signed)            # w (4wire) = \-1;4
+8wire code := 01000001
+show(code; ascii)          # code (8wire) = "A"
+40wire msg := "Hello"
+show(msg; ascii)           # msg (40wire) = "Hello"
 ```
 
-Each argument is an expression atom: wire name, component reference (`.comp:get`), bit slice (`a.0`, `a.2-4`), storage ref (`&3`), literal, etc.
+Each argument is an expression atom: wire name, component reference (`.comp:get`), bit slice (`a.0`, `a.2-4`), storage ref (`&3`), literal (`\255`, `^-A;8`, `"text"`), etc.
 
 ### Output format
 
@@ -254,6 +278,15 @@ a (1wire) = 0 (ref: &0), b (1wire) = 1 (ref: &1)
 
 ```
 probe(expr)
+probe(expr ; tag …)
+```
+
+Display tags on `probe`: `dec`, `signed`, `hex`, `hexWide`, `bin`, `ascii`, `maxWidth=`, `multiline` — same formatting as `show` on the **flat blob** value. No `elAll` / `elNonZero` / `compact` / `elRange` / `elLast`.
+
+```logts-play
+8wire v := 01000001
+probe(v; ascii)    # # v = "A" - initialised
+probe(v; dec)      # # v = \65 - initialised
 ```
 
 **One argument only:**

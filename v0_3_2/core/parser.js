@@ -8,7 +8,51 @@ function tokenStartCol(tok) {
 }
 
 function slashDecToBin(value) {
+  const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+  if (WL) return WL.slashDecToBin(value);
   return parseInt(value, 10).toString(2);
+}
+
+function parserLoc(c) {
+  if (!c) return '';
+  const file = c.file != null ? c.file : '';
+  if (c.line == null) return file ? ` at ${file}` : '';
+  return ` at ${file}: ${c.line}:${c.col}`;
+}
+
+function parseSdecAtom(raw, tok) {
+  const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+  if (raw && typeof raw === 'object' && raw.signed) {
+    if (!WL) {
+      throw Error(
+        `Signed decimal literals require core/wire-literals.js — load it before parser.js${parserLoc(tok)}`
+      );
+    }
+    return WL.parseSdecToken(raw);
+  }
+  if (WL) return WL.parseSdecToken(raw);
+  const decVal = String(raw);
+  return { bin: slashDecToBin(decVal), dec: decVal };
+}
+
+function parseShexAtom(raw, tok) {
+  const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+  if (!WL) {
+    throw Error(
+      `Signed hex literals require core/wire-literals.js — load it before parser.js${parserLoc(tok)}`
+    );
+  }
+  return WL.parseShexToken(raw);
+}
+
+function wireStringToBin(str, tok) {
+  const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+  if (!WL) {
+    throw Error(
+      `Wire string literals require core/wire-literals.js — load it before parser.js${parserLoc(tok)}`
+    );
+  }
+  return WL.wireStringToBin(str);
 }
 
 const SHOW_PEEK_DISPLAY_TAGS = new Set([
@@ -1673,9 +1717,21 @@ assignment() {
       atom = {bin: this.c.value};
       this.eat('BIN');
     } else if(this.c.type === 'SDEC'){
-      const decVal = this.c.value;
-      atom = {bin: slashDecToBin(decVal), dec: decVal};
+      const parsed = parseSdecAtom(this.c.value, this.c);
+      atom = { bin: parsed.bin, dec: parsed.dec };
+      if (parsed.signedDec) {
+        atom.signedDec = true;
+        atom.tcWidth = parsed.tcWidth;
+      }
       this.eat('SDEC');
+    } else if(this.c.type === 'SHEX'){
+      const parsed = parseShexAtom(this.c.value, this.c);
+      atom = { bin: parsed.bin, hex: parsed.hex, signedHex: true, tcWidth: parsed.tcWidth };
+      this.eat('SHEX');
+    } else if(this.c.type === 'WSTR'){
+      const str = this.c.value;
+      atom = { bin: wireStringToBin(str, this.c), wireString: str };
+      this.eat('WSTR');
     } else if(this.c.type === 'LOGIC'){
       atom = {logic: this.c.value};
       this.eat('LOGIC');
@@ -1688,7 +1744,7 @@ assignment() {
     } else if (this.c.type === 'META') {
       atom = this.eatMetaConstantAtom();
     } else {
-      throw Error(`Expected a literal value (binary, hex ^, decimal \\, or meta constant /name/) after : at ${this.c.line}:${this.c.col}`);
+      throw Error(`Expected a literal value (binary, hex ^, decimal \\, wire string "…", or meta constant /name/) after : at ${this.c.line}:${this.c.col}`);
     }
     if(notPrefix) atom.not = true;
     return atom;
@@ -2708,8 +2764,14 @@ assignment() {
             initialValue = this.c.value;
             this.eat('BIN');
           } else if (this.c.type === 'SDEC') {
-            initialValue = slashDecToBin(this.c.value);
+            initialValue = parseSdecAtom(this.c.value, this.c).bin;
             this.eat('SDEC');
+          } else if (this.c.type === 'SHEX') {
+            initialValue = parseShexAtom(this.c.value, this.c).bin;
+            this.eat('SHEX');
+          } else if (this.c.type === 'WSTR') {
+            initialValue = wireStringToBin(this.c.value, this.c);
+            this.eat('WSTR');
           } else if (this.c.type === 'HEX') {
             // Convert hex to binary string
             const hexStr = this.c.value;
@@ -3042,16 +3104,38 @@ assignment() {
   }
   
   if (this.c.type === 'SDEC') {
-    const decVal = this.c.value;
-    const v = slashDecToBin(decVal);
+    const parsed = parseSdecAtom(this.c.value, this.c);
     this.eat('SDEC');
     let br = null;
     if (this.c.type === 'SYM' && this.c.value === '.') {
       br = this.parseLiteralBitRange();
     }
-    const atomSdec = br ? { bin: v, dec: decVal, bitRange: br } : { bin: v, dec: decVal };
-    { const _p = this.maybeParsePadding(); if (_p != null) atomSdec.pad = _p; }
+    const atomSdec = br ? { ...parsed, bitRange: br } : { ...parsed };
+    if (!parsed.signedDec) {
+      const _p = this.maybeParsePadding();
+      if (_p != null) atomSdec.pad = _p;
+    }
     return addNot(atomSdec);
+  }
+
+  if (this.c.type === 'SHEX') {
+    const parsed = parseShexAtom(this.c.value, this.c);
+    this.eat('SHEX');
+    let br = null;
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      br = this.parseLiteralBitRange();
+    }
+    const atomShex = br ? { ...parsed, bitRange: br } : { ...parsed };
+    return addNot(atomShex);
+  }
+
+  if (this.c.type === 'WSTR') {
+    const str = this.c.value;
+    this.eat('WSTR');
+    const atomStr = { bin: wireStringToBin(str, this.c), wireString: str };
+    const _p = this.maybeParsePadding();
+    if (_p != null) atomStr.pad = _p;
+    return addNot(atomStr);
   }
 
   if (this.c.type === 'BIN') {

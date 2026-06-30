@@ -66,10 +66,19 @@
     "core/signed-arithmetic.js",
     "core/debug-display-wrap.js",
     "core/debug-display-format.js",
+    "core/wire-literals.js",
     "core/parser.js",
     "core/interpreter.js",
     "core/signal-propagation.js",
     "tests/test_session.js"
+  ],
+  "editorPipelineTail": [
+    "core/debug-display-wrap.js",
+    "core/debug-display-format.js",
+    "core/wire-literals.js",
+    "core/parser.js",
+    "core/interpreter.js",
+    "core/signal-propagation.js"
   ],
   "afterRuntime": {
     "browser": [

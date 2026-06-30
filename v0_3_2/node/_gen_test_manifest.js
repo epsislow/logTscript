@@ -12,9 +12,12 @@ const { loadTestScripts } = require('./js/test_scripts');
 
 const OUT = path.join(TESTS, 'test_manifest_generated.js');
 const RUN_TESTS_HTML = path.join(ROOT, 'run_tests.html');
+const SCRIPT_EDITOR_HTML = path.join(ROOT, 'script_editor_v0_3_2.html');
 const RUNTIME_BUNDLE = path.join(TESTS, 'test_runtime_bundle_generated.js');
 const SCRIPT_MARKER_START = '<!-- @generated test-scripts start -->';
 const SCRIPT_MARKER_END = '<!-- @generated test-scripts end -->';
+const EDITOR_PIPELINE_START = '<!-- @generated editor-pipeline-tail start -->';
+const EDITOR_PIPELINE_END = '<!-- @generated editor-pipeline-tail end -->';
 
 const GROUP_META = [
   { id: 'loop', label: 'Loop preprocessor' },
@@ -213,5 +216,28 @@ function syncRunTestsHtml() {
   console.log('Wrote', RUN_TESTS_HTML, browserScripts.length, 'script tags (browser)');
 }
 
+function syncScriptEditorHtml() {
+  const scripts = loadTestScripts();
+  const tail = scripts.editorPipelineTail;
+  if (!tail.length) return;
+  const block =
+    EDITOR_PIPELINE_START + '\n' +
+    tail.map(f => `<script src="${f}"></script>`).join('\n') + '\n' +
+    EDITOR_PIPELINE_END;
+  let html = fs.readFileSync(SCRIPT_EDITOR_HTML, 'utf8');
+  const re = new RegExp(
+    EDITOR_PIPELINE_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+    '[\\s\\S]*?' +
+    EDITOR_PIPELINE_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  );
+  if (!re.test(html)) {
+    throw new Error('script_editor_v0_3_2.html: missing ' + EDITOR_PIPELINE_START);
+  }
+  html = html.replace(re, block);
+  fs.writeFileSync(SCRIPT_EDITOR_HTML, html, 'utf8');
+  console.log('Wrote', SCRIPT_EDITOR_HTML, tail.length, 'pipeline script tags');
+}
+
 writeRuntimeBundle();
 syncRunTestsHtml();
+syncScriptEditorHtml();

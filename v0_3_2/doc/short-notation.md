@@ -263,6 +263,40 @@ Decimal literals (with `\`) can be used directly or inside `[]`:
 `a | [^FF] | [\31]`        →  OR(OR(a,^FF),\31)
 ```
 
+#### Signed decimal `\-N;W`
+
+Signed decimal literals require an **explicit width** after `;` (two's complement on exactly `W` bits). The `;W` suffix is **width**, not padding (unlike unsigned `\31;8`).
+
+```
+8wire a = `\-3;8`           →  8wire a = \-3;8
+`a | \-3;8`                →  OR(a,\-3;8)
+`\-3` without `;W`         →  parse error
+```
+
+### Signed value hex — `[^-HEX;W]`
+
+In short notation, `^` outside `[]` is XOR — signed **value** hex uses brackets like unsigned hex:
+
+```
+8wire a = `[^-A;8]`         →  8wire a = ^-A;8
+`a | [^-A;8]`               →  OR(a,^-A;8)
+`^-A;8` in backticks        →  INVALID (parsed as XOR) — use [^-A;8]
+```
+
+`^-HEX;W` without brackets works in normal (non-backtick) expressions.
+
+### Wire string literals — `"..."` / `'...'`
+
+Both quote styles are equivalent. Each character → 8 bits (MSB-first), unsigned ASCII:
+
+```
+40wire msg = `"Hello"`
+msg = `"Hi" + "\s" + "!"`    # \s = explicit space
+72wire q = `"Question\nAnswers:"`
+```
+
+Escapes inside quotes only: `\s` `\n` `\t` `\r` `\b` `\0` `\\` `\"` `\'`.
+
 ---
 
 ## Bit range on literals
@@ -338,6 +372,8 @@ Literal bit-ranges can be combined with `+` (concatenation) or used as arguments
 ## Padding operator `;p`
 
 The `;p` operator pads a value to `p` bits by adding zeroes on the left (`padStart`). It can be applied to literals and variables, optionally combined with a bit range.
+
+**Signed literals:** on `\-N;W` and `^-HEX;W`, the `;W` suffix is **always** two's-complement width (not padding). Unsigned `\N;8` and `^F;8` keep the padding meaning above.
 
 ### Syntax
 
