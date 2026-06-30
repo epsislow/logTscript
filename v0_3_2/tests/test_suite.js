@@ -14575,8 +14575,10 @@ reg(1798, 'builtin-signed', 'DOT — signed vs unsigned', function(h, session) {
 
 reg(1799, 'doc', 'BUILTIN_DOC — DOT signed signature', function(h, session) {
   const lines = Interpreter.getDocLines('DOT', new Map());
-  h.assert('DOT 2 signatures', String(lines.length), '2');
+  h.assert('DOT 4 signatures', String(lines.length), '4');
   h.assert('DOT signed', lines[1], 'DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over');
+  h.assert('DOT matmul', lines[2], 'DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over');
+  h.assert('DOT matmul signed', lines[3], 'DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over');
 });
 
 reg(1800, 'builtin-signed', 'SUM — signed vs unsigned', function(h, session) {

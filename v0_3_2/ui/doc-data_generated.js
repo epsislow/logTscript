@@ -3173,33 +3173,51 @@ show(m)
 `,
     'builtin-DOT.md': `# DOT (dot product)
 
-Index: [Vector reduction](vector-reduction.md) · [Tagged built-ins](builtin-tagged-index.md)
+Index: [Vector reduction](vector-reduction.md) · [2D tensors](wire-vectors.md#dot-and-argmax--argmin-on-tensors) · [Tagged built-ins](builtin-tagged-index.md)
 
-Pairwise multiply and sum: **\`Σ a[i] × b[i]\`**.
+Pairwise multiply and sum along the **inner** dimension: **\`Σ a[k] × b[k]\`**.
+
+On **rank-1** tensors the result is a **scalar**. On compatible **2D** shapes the result is a **matrix** (one dot product per output cell). **No \`; matrix\` tag** — behaviour follows operand shapes automatically.
 
 ## Signatures
 
 \`\`\`
 DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
 DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
+DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over
+DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over
 \`\`\`
 
-**No \`; vector\` tag** — operands are always vectors; output is always scalar.
+Rank-1 operands must have the same shape \`[1,N]\` / \`[N]\` / \`[N,1]\` (see table). Matrix multiply requires **\`A.cols == B.rows\`**.
 
-## Scalar (default)
+## Tensor shape rules
 
-- \`result\` = low **W** bits of dot product
-- \`over\` = next **2W** bits; full value = \`over\` ‖ \`result\`
+| A | B | Result | Inner dim K |
+|---|---|--------|-------------|
+| \`[1,N]\` | \`[1,N]\` | scalar \`Wbit\` + \`(2W)bit over\` | N |
+| \`[N,1]\` | \`[1,N]\` | scalar | N |
+| \`[1,N]\` | \`[N,1]\` | scalar | N |
+| \`[N,K]\` | \`[K,M]\` | matrix \`[N,M]\` — \`W\` result/cell, \`2W\` over/cell | K |
+| \`[N,1]\` | \`[N,M]\` | matrix \`[N,M]\` (column × matrix) | N |
+
+Incompatible shapes are a **runtime error**. Assign the target to match the output rank (\`4wire\` vs \`4wire[2,2]\` vs \`8wire[2,2]\` for over).
+
+## Scalar / vector output (default)
+
+- \`result\` = low **W** bits of each dot product
+- \`over\` = next **2W** bits; full value = \`over\` ‖ \`result\` (per cell on matrices)
 
 ## Call tags
 
 | Tag | Behaviour |
 |-----|-----------|
-| \`signed\` | Signed multiply per pair, signed accumulate. |
+| \`signed\` | Signed multiply per pair, signed accumulate (scalar or per matrix cell). |
+
+**No \`; vector\`** or **\`; matrix\`** — whole tensors only.
 
 ## Examples
 
-### \`DOT(Wbit[n] a, Wbit[n] b)\`
+### \`DOT(Wbit[n] a, Wbit[n] b)\` — rank-1 → scalar
 
 \`\`\`logts-play
 4wire[2] a = 0001 + 0010
@@ -3231,9 +3249,54 @@ show(o)
 
 Signed \`(−1)×(−1) + 2×1 = 3\`.
 
+### \`DOT(Wwire[N,K] A, Wwire[K,M] B)\` — matrix multiply
+
+\`\`\`logts-play
+4wire[2,2] a = 0001 + 0010 + 0011 + 0100
+4wire[2,2] b = 0101 + 0110 + 0111 + 1000
+4wire[2,2] r, 8wire[2,2] o = DOT(a, b)
+show(r)
+show(o)
+\`\`\`
+
+Each output cell \`(i,j)\` is \`DOT(row i of A, col j of B)\`. **\`over\`** is **\`8wire[2,2]\`** here ( **\`2W\`** bits per cell).
+
+### \`DOT(A, IDENTITY(\\N))\` — identity on the right
+
+\`\`\`logts-play
+4wire[2,2] a = 0001 + 0010 + 0011 + 0100
+4wire[2,2] eye = IDENTITY(\\2)
+4wire[2,2] r, 8wire[2,2] o = DOT(a, eye)
+show(r)
+\`\`\`
+
+\`DOT(a, I) = a\` (same low **W** bits per cell). See [builtin-IDENTITY.md](builtin-IDENTITY.md).
+
+### \`DOT(col, row)\` — column × row → scalar
+
+\`\`\`logts-play
+4wire[3,1] col = 0001 + 0010 + 0011
+4wire[3] row = 0100 + 0101 + 0110
+4wire r, 8wire o = DOT(col, row)
+show(r)
+show(o)
+\`\`\`
+
+\`[N,1]\` × \`[1,N]\` contracts to one scalar (\`N\` products summed).
+
+### \`DOT(col, row; signed)\` — signed contraction
+
+\`\`\`logts-play
+4wire[2,1] col = 1111 + 0010
+4wire[2] row = 1111 + 0001
+4wire r, 8wire o = DOT(col, row; signed)
+show(r)
+show(o)
+\`\`\`
+
 ## See also
 
-[MAC](builtin-MAC.md) · [SUM](builtin-SUM.md) · [MULTIPLY](builtin-MULTIPLY.md)
+[MAC](builtin-MAC.md) · [SUM](builtin-SUM.md) · [OUTER](builtin-OUTER.md) · [IDENTITY](builtin-IDENTITY.md)
 `,
     'builtin-EQ.md': `# EQ (equality)
 

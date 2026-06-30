@@ -12886,6 +12886,8 @@ Interpreter.BUILTIN_DOC = {
   DOT:      [
     'DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over',
     'DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over',
+    'DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over',
+    'DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over',
   ],
   CNTN10S:  ['CNTN10S(Xbit value) -> Ybit'],
   N2N10S:   ['N2N10S(Xbit value) -> Zbit packed'],
