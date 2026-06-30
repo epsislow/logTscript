@@ -110,6 +110,65 @@
     return { rows: cols, cols: rows };
   }
 
+  const REPEAT_MAX_BITS = 16384;
+
+  function checkRepeatTotalBits(totalBits, fnName) {
+    const n = totalBits | 0;
+    if (n > REPEAT_MAX_BITS) {
+      throw new Error(`${fnName}: result exceeds ${REPEAT_MAX_BITS} bits (${n} bits)`);
+    }
+  }
+
+  function repeatPlainBlob(val, times) {
+    const s = val == null ? '' : String(val);
+    const t = times | 0;
+    if (t < 1) return s;
+    let out = '';
+    for (let i = 0; i < t; i++) out += s;
+    return out;
+  }
+
+  /** [N,1] or column-oriented N elements → [N,T] row-major */
+  function repeatColumnStackBlob(val, rows, ew, times) {
+    const W = ew | 0;
+    const R = rows | 0;
+    const T = times | 0;
+    const s = val == null ? '' : String(val);
+    let out = '';
+    for (let r = 0; r < R; r++) {
+      const cell = s.substring(r * W, r * W + W);
+      for (let t = 0; t < T; t++) out += cell;
+    }
+    return out;
+  }
+
+  /** [1,N] row → [T,N] vertical stack of identical rows */
+  function repeatRowStackBlob(val, ew, cols, times) {
+    const W = ew | 0;
+    const C = cols | 0;
+    const T = times | 0;
+    const s = val == null ? '' : String(val);
+    const rowBits = C * W;
+    const row = s.substring(0, rowBits);
+    let out = '';
+    for (let t = 0; t < T; t++) out += row;
+    return out;
+  }
+
+  /** N elements in [1,N] single-dim vector → [N,T] row-major */
+  function repeatSingleDimVectorBlob(val, ew, count, times) {
+    const W = ew | 0;
+    const N = count | 0;
+    const T = times | 0;
+    const s = val == null ? '' : String(val);
+    let out = '';
+    for (let i = 0; i < N; i++) {
+      const cell = s.substring(i * W, i * W + W);
+      for (let t = 0; t < T; t++) out += cell;
+    }
+    return out;
+  }
+
   /** N×N identity matrix blob: diagonal = 1 (W bits), off-diagonal = 0. */
   function identityBlob(n, ew) {
     const N = n | 0;
@@ -282,6 +341,12 @@
     declBitTotal,
     pivotBlob,
     pivotedDims,
+    REPEAT_MAX_BITS,
+    checkRepeatTotalBits,
+    repeatPlainBlob,
+    repeatColumnStackBlob,
+    repeatRowStackBlob,
+    repeatSingleDimVectorBlob,
     identityBlob,
     cellZero,
     cellOne,

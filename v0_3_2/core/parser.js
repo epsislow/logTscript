@@ -258,7 +258,9 @@ class Parser {
     this.eat(this.c.type);
     let rows = 1;
     let cols = first;
+    let hadComma = false;
     if (this.c.type === 'SYM' && this.c.value === ',') {
+      hadComma = true;
       this.eat('SYM', ',');
       if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
         throw Error(`Expected second tensor dimension after ',' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
@@ -275,7 +277,7 @@ class Parser {
     if (!Number.isFinite(first) || first < 1 || !Number.isFinite(cols) || cols < 1) {
       throw Error(`Tensor dimensions must be >= 1 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    return { rows, cols };
+    return { rows, cols, singleDim: !hadComma };
   }
 
   parseVectorCountSuffix(wireType) {
@@ -289,6 +291,7 @@ class Parser {
     if (!shape) return;
     decl.tensorRows = shape.rows;
     decl.tensorCols = shape.cols;
+    decl.tensorSingleDim = !!shape.singleDim;
     if (!(shape.rows === 1 && shape.cols === 1)) {
       decl.vectorCount = shape.rows * shape.cols;
     }

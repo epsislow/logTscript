@@ -163,6 +163,44 @@
     return null;
   }
 
+  function expectedPivotTarget(meta) {
+    if (!meta) return null;
+    return { rows: meta.cols, cols: meta.rows };
+  }
+
+  function resolveRepeatOutputShape(srcWire, srcMeta) {
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (!srcMeta || !TS) {
+      return { kind: 'plain' };
+    }
+    if (TS.isMatrix(srcMeta)) {
+      return { kind: 'error', message: 'Cannot repeat matrix' };
+    }
+    const singleDim = !!(srcWire && srcWire.tensor && srcWire.tensor.singleDim);
+    if (srcMeta.rows > 1 && srcMeta.cols === 1) {
+      return { kind: 'tensor', rows: srcMeta.rows, cols: null, mode: 'column' };
+    }
+    if (srcMeta.rows === 1 && srcMeta.cols > 1) {
+      if (singleDim) {
+        return { kind: 'tensor', rows: srcMeta.cols, cols: null, mode: 'singleDim' };
+      }
+      return { kind: 'tensor', rows: null, cols: srcMeta.cols, mode: 'row' };
+    }
+    if (srcMeta.elementCount > 1) {
+      return { kind: 'tensor', rows: srcMeta.cols, cols: null, mode: 'singleDim' };
+    }
+    return { kind: 'plain' };
+  }
+
+  function finalizeRepeatShape(shape, times) {
+    const T = times | 0;
+    if (!shape || shape.kind !== 'tensor') return shape;
+    if (shape.mode === 'row') {
+      return { kind: 'tensor', rows: T, cols: shape.cols };
+    }
+    return { kind: 'tensor', rows: shape.rows, cols: T };
+  }
+
   const api = {
     isWholeTensorArg,
     isWholeVectorArg,
@@ -177,6 +215,9 @@
     readHorizontalVectorValues,
     resolveOuterShapes,
     resolveCatShapes,
+    expectedPivotTarget,
+    resolveRepeatOutputShape,
+    finalizeRepeatShape,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

@@ -2379,6 +2379,78 @@ class Interpreter {
     return n;
   }
 
+  _evalCallArgRepeatCount(argExpr, fnName) {
+    if (!argExpr || argExpr.length !== 1) {
+      this._throwRuntime(
+        `${fnName}: expects one scalar times argument (literal or wire)`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    const atom = argExpr[0];
+    if (atom.vectorIndex !== undefined || atom.vectorIndexExpr || atom.bitRange
+        || atom.tensorSlice || atom.tensorRowIndex !== undefined || atom.tensorColIndex !== undefined
+        || atom.tensorRowIndexExpr || atom.tensorColIndexExpr) {
+      this._throwRuntime(
+        `${fnName}: times must be a scalar literal or wire, not a vector slice`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    if (atom.dec != null && atom.dec !== '') {
+      const n = parseInt(atom.dec, 10);
+      if (!Number.isFinite(n) || n < 1) {
+        this._throwRuntime(
+          `${fnName}: times must be >= 1`,
+          this.currentStmt,
+          fnName.length
+        );
+      }
+      return n;
+    }
+    const val = this._evalCallArgValue(argExpr);
+    if (!val || val === '-') {
+      this._throwRuntime(
+        `${fnName}: times value is empty`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    let n;
+    try {
+      n = BigInt('0b' + String(val).padStart(val.length, '0'));
+    } catch (e) {
+      this._throwRuntime(
+        `${fnName}: times must be an unsigned integer`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    if (n < 1n) {
+      this._throwRuntime(
+        `${fnName}: times must be >= 1`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    if (n > 1000000n) {
+      this._throwRuntime(
+        `${fnName}: times is too large`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    const num = Number(n);
+    if (!Number.isSafeInteger(num)) {
+      this._throwRuntime(
+        `${fnName}: times is too large`,
+        this.currentStmt,
+        fnName.length
+      );
+    }
+    return num;
+  }
+
   _tensorBuiltinEvalFns() {
     return {
       evalCell: (varName, row, col) =>
@@ -2957,7 +3029,11 @@ class Interpreter {
     const ew = this.getBitWidth(decl.type);
     if (!ew) return;
     const { rows, cols } = dims;
-    wireEntry.tensor = { elementWidth: ew, dims: [rows, cols] };
+    wireEntry.tensor = {
+      elementWidth: ew,
+      dims: [rows, cols],
+      singleDim: !!(decl && decl.tensorSingleDim),
+    };
     wireEntry.vector = { elementWidth: ew, elementCount: rows * cols };
     wireEntry.type = `${ew * rows * cols}wire`;
   }
@@ -3381,12 +3457,12 @@ class Interpreter {
          'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE',
          'REVERSE', 'LROTATE', 'RROTATE',
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
-         'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ISDIGIT',
+         'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ABS', 'ISDIGIT',
          'CNTN10S', 'N2N10S', 'N10S2N',
          'CNTN16S', 'N2N16S', 'N16S2N',
          'PIVOT', 'IDENTITY', 'ZEROS', 'FILL', 'DIAG', 'IOTA',
          'OUTER', 'TRACE', 'NORM', 'L2', 'TRIL', 'TRIU',
-         'FLIPUD', 'FLIPLR', 'MCAT', 'MSLICE'].includes(name)) {
+         'FLIPUD', 'FLIPLR', 'MCAT', 'MSLICE', 'REPEAT'].includes(name)) {
       return true;
     }
 
@@ -4376,6 +4452,10 @@ const idx = parseInt(
     }
   }
 
+  if (name === 'ABS' && !signedMode) {
+    fail('ABS requires ; signed');
+  }
+
   if (name === 'ZCONNECT' || name === 'ZCONN') {
     if (!this.zstate) {
       const err = new Error('ZCONNECT() requires MODE ZSTATE');
@@ -4414,6 +4494,13 @@ const idx = parseInt(
     if (!meta || meta.elementCount < 1) fail('PIVOT expects one whole tensor argument');
     const val = this._evalCallArgValue(args[0]);
     if (!val || val === '-') fail('PIVOT: empty tensor value');
+    const piv = TS.pivotedDims(meta.rows, meta.cols);
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    const tgt = TB ? TB.resolveAssignTargetMeta(this) : null;
+    if (!tgt) fail('PIVOT: assign to a tensor wire');
+    if (tgt.rows !== piv.rows || tgt.cols !== piv.cols) {
+      fail(`PIVOT: target [${tgt.rows},${tgt.cols}] does not match [${piv.rows},${piv.cols}]`);
+    }
     const pivoted = TS.pivotBlob(val, meta.elementWidth, meta.rows, meta.cols);
     return computeRefs
       ? { value: pivoted, ref: `&${this.storeValue(pivoted)}` }
@@ -4678,6 +4765,50 @@ const idx = parseInt(
     const val = this._evalCallArgValue(args[0]);
     if (!val || val === '-') fail('MSLICE: empty tensor value');
     const blob = TS.sliceBlob(val, meta.elementWidth, meta.rows, meta.cols, r0, c0, h, w);
+    return computeRefs
+      ? { value: blob, ref: `&${this.storeValue(blob)}` }
+      : { value: blob, ref: null };
+  }
+
+  if (name === 'REPEAT') {
+    if (args.length !== 2) fail('REPEAT expects 2 arguments (data, times)');
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (!TB || !TS) fail('REPEAT: internal error (tensor modules not loaded)');
+    const dataAtom = args[0] && args[0][0];
+    if (!dataAtom || !dataAtom.var) fail('REPEAT expects a whole wire as first argument');
+    if (dataAtom.vectorIndex !== undefined || dataAtom.vectorIndexExpr || dataAtom.bitRange
+        || dataAtom.tensorSlice || dataAtom.tensorRowIndex !== undefined || dataAtom.tensorColIndex !== undefined
+        || dataAtom.tensorRowIndexExpr || dataAtom.tensorColIndexExpr) {
+      fail('REPEAT: first argument must be a whole wire');
+    }
+    const times = this._evalCallArgRepeatCount(args[1], 'REPEAT');
+    const wire = this.wires.get(dataAtom.var);
+    if (!wire) fail(`REPEAT: unknown wire '${dataAtom.var}'`);
+    const meta = TS.getWireTensorMeta(wire);
+    const shapePre = TB.resolveRepeatOutputShape(wire, meta);
+    if (shapePre.kind === 'error') fail(shapePre.message);
+    const outShape = TB.finalizeRepeatShape(shapePre, times);
+    const val = this._evalCallArgValue(args[0]);
+    if (!val || val === '-') fail('REPEAT: empty data value');
+    let blob;
+    if (outShape.kind === 'plain') {
+      TS.checkRepeatTotalBits(val.length * times, 'REPEAT');
+      blob = TS.repeatPlainBlob(val, times);
+    } else {
+      const tgt = TB.resolveAssignTargetMeta(this);
+      if (!tgt || tgt.rows !== outShape.rows || tgt.cols !== outShape.cols) {
+        fail(`REPEAT: target [${tgt ? tgt.rows : '?'},${tgt ? tgt.cols : '?'}] does not match [${outShape.rows},${outShape.cols}]`);
+      }
+      const ew = meta.elementWidth;
+      if (shapePre.mode === 'row') {
+        blob = TS.repeatRowStackBlob(val, ew, meta.cols, times);
+      } else {
+        const count = shapePre.mode === 'column' ? meta.rows : meta.cols;
+        blob = TS.repeatSingleDimVectorBlob(val, ew, count, times);
+      }
+      TS.checkRepeatTotalBits(blob.length, 'REPEAT');
+    }
     return computeRefs
       ? { value: blob, ref: `&${this.storeValue(blob)}` }
       : { value: blob, ref: null };
@@ -5498,6 +5629,22 @@ if (this.isBuiltinDEMUX(name)) {
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
+  }
+
+  // ================= BUILTIN: ABS =================
+  if (name === 'ABS') {
+    if (argValues.length !== 1) fail('ABS expects 1 argument');
+    if (vectorMode || matrixMode) fail('ABS: does not accept tag \'vector\' or \'matrix\'');
+    if (!signedMode) fail('ABS requires ; signed');
+    this._zstateRequireBinary(argValues, 'ABS', ['x']);
+    const x = argValues[0];
+    const depth = x.length;
+    if (!SA) fail('ABS: internal error (signed-arithmetic not loaded)');
+    const { result, overflow } = SA.absAtWidth(x, depth);
+    return [
+      computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+      computeRefs ? { value: overflow, ref: `&${this.storeValue(overflow)}` } : { value: overflow, ref: null },
+    ];
   }
 
   // ================= BUILTIN: ADD =================
@@ -13174,6 +13321,7 @@ Interpreter.BUILTIN_DOC = {
     'CLAMP(Wbit[n,m] x, Wbit/Wbit[n,m] min, Wbit/Wbit[n,m] max ; matrix) -> Wbit[n,m]',
     'CLAMP(Wbit[n,m] x, Wbit/Wbit[n,m] min, Wbit/Wbit[n,m] max ; matrix signed) -> Wbit[n,m]',
   ],
+  ABS:      ['ABS(Xbit x; signed) -> Xbit result, 1bit overflow'],
   ISDIGIT:  ['ISDIGIT(Xbit value) -> 1bit'],
   HIGH:     ['HIGH(Xbit) -> Xbit'],
   LOW:      ['LOW(Xbit) -> Xbit'],
@@ -13206,6 +13354,7 @@ Interpreter.BUILTIN_DOC = {
   FLIPLR:   ['FLIPLR(Wwire tensor) -> Wwire tensor — flip columns'],
   MCAT:     ['MCAT(Wwire tensor A, Wwire tensor B) -> Wwire tensor — concat rows or cols'],
   MSLICE:   ['MSLICE(matrix, \\r0, \\c0, \\h, \\w) -> Wwire[h,w] — submatrix window'],
+  REPEAT:   ['REPEAT(Wbit data, Nbit/\\N times) -> Wbit or Wwire tensor — tile data T times (max 16384 bits)'],
   LROTATE:  [
     'LROTATE(Xbit data, Ybit count) -> Xbit',
     'LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]',

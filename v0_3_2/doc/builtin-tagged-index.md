@@ -22,6 +22,7 @@ Cross-cutting topics:
 | MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | yes | yes | yes | — | arithmetic |
 | DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | yes | yes | yes | — | arithmetic |
 | MAC | [builtin-MAC.md](builtin-MAC.md) | yes | yes | yes | — | arithmetic |
+| ABS | [builtin-ABS.md](builtin-ABS.md) | **required** | — | — | — | arithmetic |
 | GT | [builtin-GT.md](builtin-GT.md) | yes | yes | yes | — | arithmetic |
 | LT | [builtin-LT.md](builtin-LT.md) | yes | yes | yes | — | arithmetic |
 | MIN | [builtin-MIN.md](builtin-MIN.md) | yes | yes | yes | — | arithmetic / vector |

@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NORM.md, builtin-OUTER.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NORM.md, builtin-OUTER.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -614,6 +614,7 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 | MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | \`signed\`, \`vector\`, \`matrix\` |
 | DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | \`signed\`, \`vector\`, \`matrix\` |
 | MAC | [builtin-MAC.md](builtin-MAC.md) | \`signed\`, \`vector\`, \`matrix\` |
+| ABS | [builtin-ABS.md](builtin-ABS.md) | \`signed\` (required) |
 | GT | [builtin-GT.md](builtin-GT.md) | \`signed\`, \`vector\`, \`matrix\` |
 | LT | [builtin-LT.md](builtin-LT.md) | \`signed\`, \`vector\`, \`matrix\` |
 | MIN | [builtin-MIN.md](builtin-MIN.md) | \`signed\`, \`vector\`, \`matrix\` |
@@ -654,6 +655,7 @@ Optional **bool tags** after \`;\` in the call (\`signed\`, \`vector\`, \`matrix
 | GT / LT | unsigned order | signed order | \`1wire[n]\` | \`1wire[N×M]\` |
 | MIN / MAX | unsigned min/max | signed | \`Wbit[n]\` | \`Wbit[N,M]\` |
 | CLAMP | unsigned bounds | signed bounds | \`Wbit[n]\` | \`Wbit[N,M]\` |
+| ABS | — | **\`|x|\`** + **overflow** on \`INT_MIN\` | — | — |
 | SUM / DOT | see [vector-reduction](vector-reduction.md) | signed | SUM only | SUM only |
 
 \`LSHIFT\`, rotates, and \`REVERSE\` do **not** support \`; signed\`. \`RSHIFT\` with \`; signed\` is **ASHR** — [builtin-RSHIFT.md](builtin-RSHIFT.md).
@@ -2244,6 +2246,50 @@ Wire width on the left must match LUT \`depth\`; mismatch → \`useExpr: wire wi
 
 \`useExpr(…)\` as a standalone statement is a **parse error**.
 `,
+    'builtin-ABS.md': `# ABS
+
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
+
+Signed absolute value on a two's-complement scalar wire. **\`; signed\` is required** — there is no unsigned mode.
+
+## Signatures
+
+\`\`\`
+ABS(Xbit x; signed) -> Xbit result, 1bit overflow
+\`\`\`
+
+## Behaviour
+
+| Input | \`result\` | \`overflow\` |
+|-------|----------|------------|
+| Non-negative signed value | \`x\` unchanged | \`0\` |
+| Negative signed value | \`|x|\` (two's complement negate) | \`0\` |
+| \`INT_MIN\` at width *W* (MSB \`1\`, rest \`0\`) | \`x\` unchanged | \`1\` |
+
+\`X\` follows the operand width. The second return is always \`1bit\`.
+
+## Examples
+
+\`\`\`logts-play
+4wire x = 1101
+4wire a, 1wire ovf = ABS(x; signed)
+show(a)
+show(ovf)
+\`\`\`
+
+\`INT_MIN\` at 4 bits:
+
+\`\`\`logts-play
+4wire min = 1000
+4wire a, 1wire ovf = ABS(min; signed)
+show(a)
+show(ovf)
+\`\`\`
+
+## See also
+
+[SUBTRACT](builtin-SUBTRACT.md) · [arithmetic tag overview](arithmetic.md#tag-overview)
+`,
     'builtin-ADD.md': `# ADD
 
 Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector) · [Matrix \`; matrix\`](matrix-reduction.md)
@@ -3502,9 +3548,9 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Logic gates** | \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, \`EQ\` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) · \`EQ\` tags: [builtin-EQ.md](builtin-EQ.md) |
 | **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
-| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) · tags \`; vector\` / **\`; matrix\`**: [builtin-tagged-index.md](builtin-tagged-index.md) |
+| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`ABS\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) · tags \`; vector\` / **\`; matrix\`**: [builtin-tagged-index.md](builtin-tagged-index.md) |
 | **Vector reduction** | \`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\` | [vector-reduction.md](vector-reduction.md) · **\`; matrix\`** (element-wise 2D): [matrix-reduction.md](matrix-reduction.md) |
-| **Tensor / matrix** | \`PIVOT\`, \`IDENTITY\`, \`ZEROS\`, \`FILL\`, \`DIAG\`, \`IOTA\`, \`OUTER\`, \`TRACE\`, \`NORM\`, \`L2\`, \`TRIL\`, \`TRIU\`, \`FLIPUD\`, \`FLIPLR\`, \`MCAT\`, \`MSLICE\` | [wire-vectors.md](wire-vectors.md) · [builtin-IDENTITY.md](builtin-IDENTITY.md) |
+| **Tensor / matrix** | \`PIVOT\`, \`REPEAT\`, \`IDENTITY\`, \`ZEROS\`, \`FILL\`, \`DIAG\`, \`IOTA\`, \`OUTER\`, \`TRACE\`, \`NORM\`, \`L2\`, \`TRIL\`, \`TRIU\`, \`FLIPUD\`, \`FLIPLR\`, \`MCAT\`, \`MSLICE\` | [wire-vectors.md](wire-vectors.md) · [builtin-REPEAT.md](builtin-REPEAT.md) · [builtin-IDENTITY.md](builtin-IDENTITY.md) |
 | **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
@@ -4720,6 +4766,74 @@ show(m)
 
 [DOT](builtin-DOT.md) · [MULTIPLY](builtin-MULTIPLY.md)
 `,
+    'builtin-REPEAT.md': `# REPEAT
+
+Index: [2D tensors](wire-vectors.md) · [wire vectors](wire-vectors.md#repeat)
+
+Tile a wire or rank-1 tensor **T** times along its natural axis. Plain wires concatenate; vectors grow along the repeat dimension.
+
+## Signatures
+
+\`\`\`
+REPEAT(Wbit data, Nbit/\\N times) -> Wbit or Wwire tensor
+\`\`\`
+
+- **\`data\`** — whole wire (plain or tensor); no slices.
+- **\`times\`** — decimal literal \`\\N\` or scalar wire (unsigned integer, **≥ 1**).
+- **Limit** — total output bits ≤ **16384** (\`len(data) × times\` for plain wires).
+
+## Output shape
+
+| Input | Output |
+|-------|--------|
+| Plain \`Wbit\` | \`Wbit\` of length \`len × T\` (concatenation) |
+| \`Wwire[N]\` / \`Wwire[N,1]\` (single-dim vector) | \`Wwire[N,T]\` — column stack |
+| \`Wwire[1,N]\` (comma in decl) | \`Wwire[T,N]\` — row stack |
+| \`Wwire[R,C]\` with **R > 1** and **C > 1** | **Error:** \`Cannot repeat matrix\` |
+
+Plain wires stay plain (no tensor metadata on output).
+
+## Examples
+
+### Plain wire
+
+\`\`\`logts-play
+8wire d = 10101010
+24wire bus = REPEAT(d, \\3)
+show(bus)
+\`\`\`
+
+### Column vector → matrix
+
+\`\`\`logts-play
+4wire[3] col = 0001 + 0010 + 0100
+4wire[3,2] m = REPEAT(col, \\2)
+4wire a = m:0:1
+show(a)
+\`\`\`
+
+### Row vector \`4wire[1,3]\` → \`4wire[2,3]\`
+
+\`\`\`logts-play
+4wire[1,3] row = 0001 + 0010 + 0100
+4wire[2,3] m = REPEAT(row, \\2)
+4wire a = m:1:2
+show(a)
+\`\`\`
+
+### Times from a scalar wire
+
+\`\`\`logts-play
+8wire d = 10101010
+2wire t = 11
+24wire bus = REPEAT(d, t)
+show(bus)
+\`\`\`
+
+## See also
+
+[PIVOT](wire-vectors.md#pivot) · [MCAT](builtin-MCAT.md) · [FILL](builtin-FILL.md)
+`,
     'builtin-REVERSE.md': `# REVERSE (bit order)
 
 Index: [Bit transform](builtin-bit-transform-functions.md) · [Tagged built-ins](builtin-tagged-index.md) · [Matrix \`; matrix\`](matrix-reduction.md)
@@ -5439,6 +5553,7 @@ Cross-cutting topics:
 | MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | yes | yes | yes | — | arithmetic |
 | DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | yes | yes | yes | — | arithmetic |
 | MAC | [builtin-MAC.md](builtin-MAC.md) | yes | yes | yes | — | arithmetic |
+| ABS | [builtin-ABS.md](builtin-ABS.md) | **required** | — | — | — | arithmetic |
 | GT | [builtin-GT.md](builtin-GT.md) | yes | yes | yes | — | arithmetic |
 | LT | [builtin-LT.md](builtin-LT.md) | yes | yes | yes | — | arithmetic |
 | MIN | [builtin-MIN.md](builtin-MIN.md) | yes | yes | yes | — | arithmetic / vector |
@@ -19739,6 +19854,33 @@ Use \`:=\` or \`=:\` when you intentionally pad or truncate; see [assignment-ope
 
 ---
 
+## Large decimals and \`show(…; dec)\` round-trip
+
+Decimal literals use **BigInt** internally (not JavaScript \`Number\` / \`parseInt\`), so values far above \`Number.MAX_SAFE_INTEGER\` (~9×10¹⁵) are exact — for example \`\\5216694956355245935;64\`.
+
+Wide wires in **\`show(w; dec)\`** / **\`show(w; dec signed)\`** are split into **64-bit chunks** (MSB first), then a remainder:
+
+\`\`\`text
+199wire msg =: "Hello\\sWorld"
+show(msg; dec signed)
+→ \\5216694956355245935 \\8245074968971313152 \\0 + \\0
+  └ 64 bit              └ 64 bit              └ 64 + 7 bit rest
+\`\`\`
+
+You can rebuild the same bits from that output (unsigned chunk values with \`;64\` padding):
+
+\`\`\`logts
+199wire test = \\5216694956355245935;64 + \\8245074968971313152;64 + \\0;64 + \\0;7
+\`\`\`
+
+Each \`\\N;64\` pads the BigInt-derived binary to **at least 64 bits** (left zero-fill). Show chunk values are always below 2⁶⁴, so this matches the displayed unsigned chunk.
+
+**Why 64-bit chunks (not 32)?** Chunk size is only a **display** convention. With BigInt literals, 64-bit chunk values round-trip correctly; 32-bit chunks would mean more tokens on wide buses without fixing the underlying precision issue (\`parseInt\` / \`Number\` still break above 2⁵³−1).
+
+For copy-paste of arbitrary wide values without decimal, prefer **\`"…"\`** wire strings, binary concat, or \`probe\` / hex display.
+
+---
+
 ## Module loading (editor)
 
 Signed decimal, signed hex, and wire strings are implemented in \`core/wire-literals.js\`. The script editor loads it **before** \`parser.js\`. If you embed the runtime manually, include the same script order as \`run_tests.html\`.
@@ -19818,12 +19960,23 @@ show(b)
 
 ### PIVOT
 
-\`PIVOT(tensor)\` swaps rows and columns (transpose). Vectors change orientation: \`4wire[3]\` ↔ \`4wire[3,1]\`.
+\`PIVOT(tensor)\` swaps rows and columns (transpose). Vectors change orientation: \`4wire[3]\` ↔ \`4wire[3,1]\`. The assignment target shape must match the transposed dimensions.
 
 \`\`\`logts-play
 4wire[3] row = 1111 + 0011 + 0101
 4wire[3,1] col = PIVOT(row)
 show(col)
+\`\`\`
+
+### REPEAT
+
+\`REPEAT(data, times)\` tiles a whole wire **T** times. Plain wires concatenate; rank-1 tensors grow along the repeat axis (\`4wire[N]\` → \`4wire[N,T]\`, \`4wire[1,N]\` → \`4wire[T,N]\`). Matrices (\`R>1\`, \`C>1\`) are rejected. Max **16384** output bits. See [builtin-REPEAT.md](builtin-REPEAT.md).
+
+\`\`\`logts-play
+4wire[3] col = 0001 + 0010 + 0100
+4wire[3,2] m = REPEAT(col, \\2)
+4wire a = m:0:1
+show(a)
 \`\`\`
 
 ### Tag \`; matrix\` (element-wise on 2D tensors)
@@ -19884,6 +20037,7 @@ show(hot)
 | \`FLIPUD\` / \`FLIPLR\` | flip rows / columns | [builtin-FLIPUD.md](builtin-FLIPUD.md) · [builtin-FLIPLR.md](builtin-FLIPLR.md) |
 | \`MCAT(A,B)\` | concat matrices | [builtin-MCAT.md](builtin-MCAT.md) |
 | \`MSLICE(m,\\r,\\c,\\h,\\w)\` | submatrix window | [builtin-MSLICE.md](builtin-MSLICE.md) |
+| \`REPEAT(data, times)\` | tile wire / vector | [builtin-REPEAT.md](builtin-REPEAT.md) |
 
 \`\`\`logts-play
 4wire[3,3] I = IDENTITY(\\3)

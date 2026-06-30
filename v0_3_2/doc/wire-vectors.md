@@ -64,12 +64,23 @@ show(b)
 
 ### PIVOT
 
-`PIVOT(tensor)` swaps rows and columns (transpose). Vectors change orientation: `4wire[3]` ↔ `4wire[3,1]`.
+`PIVOT(tensor)` swaps rows and columns (transpose). Vectors change orientation: `4wire[3]` ↔ `4wire[3,1]`. The assignment target shape must match the transposed dimensions.
 
 ```logts-play
 4wire[3] row = 1111 + 0011 + 0101
 4wire[3,1] col = PIVOT(row)
 show(col)
+```
+
+### REPEAT
+
+`REPEAT(data, times)` tiles a whole wire **T** times. Plain wires concatenate; rank-1 tensors grow along the repeat axis (`4wire[N]` → `4wire[N,T]`, `4wire[1,N]` → `4wire[T,N]`). Matrices (`R>1`, `C>1`) are rejected. Max **16384** output bits. See [builtin-REPEAT.md](builtin-REPEAT.md).
+
+```logts-play
+4wire[3] col = 0001 + 0010 + 0100
+4wire[3,2] m = REPEAT(col, \2)
+4wire a = m:0:1
+show(a)
 ```
 
 ### Tag `; matrix` (element-wise on 2D tensors)
@@ -130,6 +141,7 @@ show(hot)
 | `FLIPUD` / `FLIPLR` | flip rows / columns | [builtin-FLIPUD.md](builtin-FLIPUD.md) · [builtin-FLIPLR.md](builtin-FLIPLR.md) |
 | `MCAT(A,B)` | concat matrices | [builtin-MCAT.md](builtin-MCAT.md) |
 | `MSLICE(m,\r,\c,\h,\w)` | submatrix window | [builtin-MSLICE.md](builtin-MSLICE.md) |
+| `REPEAT(data, times)` | tile wire / vector | [builtin-REPEAT.md](builtin-REPEAT.md) |
 
 ```logts-play
 4wire[3,3] I = IDENTITY(\3)

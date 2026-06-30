@@ -23,6 +23,7 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 | MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | `signed`, `vector`, `matrix` |
 | DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | `signed`, `vector`, `matrix` |
 | MAC | [builtin-MAC.md](builtin-MAC.md) | `signed`, `vector`, `matrix` |
+| ABS | [builtin-ABS.md](builtin-ABS.md) | `signed` (required) |
 | GT | [builtin-GT.md](builtin-GT.md) | `signed`, `vector`, `matrix` |
 | LT | [builtin-LT.md](builtin-LT.md) | `signed`, `vector`, `matrix` |
 | MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `vector`, `matrix` |
@@ -63,6 +64,7 @@ Optional **bool tags** after `;` in the call (`signed`, `vector`, `matrix`, or c
 | GT / LT | unsigned order | signed order | `1wire[n]` | `1wire[N×M]` |
 | MIN / MAX | unsigned min/max | signed | `Wbit[n]` | `Wbit[N,M]` |
 | CLAMP | unsigned bounds | signed bounds | `Wbit[n]` | `Wbit[N,M]` |
+| ABS | — | **`|x|`** + **overflow** on `INT_MIN` | — | — |
 | SUM / DOT | see [vector-reduction](vector-reduction.md) | signed | SUM only | SUM only |
 
 `LSHIFT`, rotates, and `REVERSE` do **not** support `; signed`. `RSHIFT` with `; signed` is **ASHR** — [builtin-RSHIFT.md](builtin-RSHIFT.md).

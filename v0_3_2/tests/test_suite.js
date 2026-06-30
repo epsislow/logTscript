@@ -16326,6 +16326,138 @@ reg(1952, 'literals', 'Decimal above Number.MAX_SAFE_INTEGER token exact', funct
   h.assert('token exact', sdec.value, dec);
 });
 
+reg(1953, 'builtins', 'ABS(-7; signed) no overflow', function(h, session) {
+  const { interp } = session.run(
+    '4wire a = 1001\n' +
+    '4wire r, 1wire ovf = ABS(a; signed)\n' +
+    'show(r)\nshow(ovf)'
+  );
+  h.assert('abs -7', session.getWire(interp, 'r'), '0111');
+  h.assert('ovf 0', session.getWire(interp, 'ovf'), '0');
+});
+
+reg(1954, 'builtins', 'ABS INT_MIN overflow on 4 bits', function(h, session) {
+  const { interp } = session.run(
+    '4wire a = 1000\n' +
+    '4wire r, 1wire ovf = ABS(a; signed)'
+  );
+  h.assert('int min pattern', session.getWire(interp, 'r'), '1000');
+  h.assert('ovf 1', session.getWire(interp, 'ovf'), '1');
+});
+
+reg(1955, 'builtins', 'ABS(+3; signed) unchanged', function(h, session) {
+  const { interp } = session.run(
+    '4wire a = 0011\n' +
+    '4wire r, 1wire ovf = ABS(a; signed)'
+  );
+  h.assert('unchanged', session.getWire(interp, 'r'), '0011');
+  h.assert('ovf 0', session.getWire(interp, 'ovf'), '0');
+});
+
+reg(1956, 'builtins', 'ABS requires ; signed', function(h, session) {
+  const r = session.run('4wire a = 1111\n4wire r, 1wire o = ABS(a)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('signed required', String(/requires ; signed/.test(err)), 'true');
+});
+
+reg(1957, 'wire-tensor', 'REPEAT plain 8wire × 3', function(h, session) {
+  const { interp } = session.run(
+    '8wire d = 10101010\n' +
+    '24wire bus = REPEAT(d, \\3)'
+  );
+  h.assert('triple', session.getWire(interp, 'bus'), '10101010'.repeat(3));
+});
+
+reg(1958, 'wire-tensor', 'REPEAT 4wire[3] → 4wire[3,2]', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3] v = 0001 + 0010 + 0100\n' +
+    '4wire[3,2] m = REPEAT(v, \\2)\n' +
+    '4wire a = m:0:0\n' +
+    '4wire b = m:1:1\n' +
+    '4wire c = m:2:0'
+  );
+  h.assert('r0c0', session.getWire(interp, 'a'), '0001');
+  h.assert('r1c1', session.getWire(interp, 'b'), '0010');
+  h.assert('r2c0', session.getWire(interp, 'c'), '0100');
+});
+
+reg(1959, 'wire-tensor', 'REPEAT 4wire[3,1] → 4wire[3,2]', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3,1] v = 0001 + 0010 + 0100\n' +
+    '4wire[3,2] m = REPEAT(v, \\2)\n' +
+    '4wire x = m:2:1'
+  );
+  h.assert('r2c1', session.getWire(interp, 'x'), '0100');
+});
+
+reg(1960, 'wire-tensor', 'REPEAT 4wire[1,3] → 4wire[2,3] row stack', function(h, session) {
+  const { interp } = session.run(
+    '4wire[1,3] row = 0001 + 0010 + 0100\n' +
+    '4wire[2,3] m = REPEAT(row, \\2)\n' +
+    '4wire a = m:0:0\n' +
+    '4wire b = m:1:2'
+  );
+  h.assert('row0', session.getWire(interp, 'a'), '0001');
+  h.assert('row1c2', session.getWire(interp, 'b'), '0100');
+});
+
+reg(1961, 'wire-tensor', 'REPEAT matrix error', function(h, session) {
+  const r = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2,4] bad = REPEAT(m, \\2)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('matrix err', String(/Cannot repeat matrix/.test(err)), 'true');
+});
+
+reg(1962, 'wire-tensor', 'REPEAT times=0 error', function(h, session) {
+  const r = session.run('8wire d = 10101010\n24wire bus = REPEAT(d, \\0)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('times>=1', String(/times must be >= 1/.test(err)), 'true');
+});
+
+reg(1963, 'wire-tensor', 'REPEAT times from wire', function(h, session) {
+  const { interp } = session.run(
+    '8wire d = 10101010\n' +
+    '2wire t = 11\n' +
+    '24wire bus = REPEAT(d, t)'
+  );
+  h.assert('wire times 3', session.getWire(interp, 'bus'), '10101010'.repeat(3));
+});
+
+reg(1964, 'wire-tensor', 'REPEAT exceeds 16384 bits', function(h, session) {
+  const r = session.run('8wire d = 10101010\n8wire t = REPEAT(d, \\2049)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('bit limit', String(/exceeds 16384/.test(err)), 'true');
+});
+
+reg(1965, 'wire-tensor', 'PIVOT 4wire[3,1] → 4wire[3] round-trip', function(h, session) {
+  const { interp } = session.run(
+    '4wire[3,1] col = 0001 + 0010 + 0100\n' +
+    '4wire[3] row = PIVOT(col)\n' +
+    '4wire x = row:1'
+  );
+  h.assert('elem 1', session.getWire(interp, 'x'), '0010');
+});
+
+reg(1966, 'wire-tensor', 'PIVOT shape mismatch error', function(h, session) {
+  const r = session.run(
+    '4wire[3] row = 0001 + 0010 + 0100\n' +
+    '4wire[2,2] bad = PIVOT(row)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('pivot shape', String(/does not match/.test(err)), 'true');
+});
+
+reg(1967, 'wire-tensor', 'PIVOT 4wire[1,3] → 4wire[3,1]', function(h, session) {
+  const { interp } = session.run(
+    '4wire[1,3] r = 0001 + 0010 + 0100\n' +
+    '4wire[3,1] c = PIVOT(r)\n' +
+    '4wire x = c:1:0'
+  );
+  h.assert('cell', session.getWire(interp, 'x'), '0010');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

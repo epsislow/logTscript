@@ -146,6 +146,9 @@ const DOC_SEARCH_ONLY = [
     { file: 'builtin-MAC.md', label: 'MAC', section: 'Arithmetic',
       searchExtra:
         'signed vector multiply accumulate' },
+    { file: 'builtin-ABS.md', label: 'ABS', section: 'Arithmetic',
+      searchExtra:
+        'signed absolute value overflow INT_MIN' },
     { file: 'builtin-GT.md', label: 'GT', section: 'Arithmetic',
       searchExtra:
         'signed vector greater than compare' },
@@ -190,7 +193,10 @@ const DOC_SEARCH_ONLY = [
         'vector rotate right' },
     { file: 'builtin-REVERSE.md', label: 'REVERSE', section: 'Bit transform',
       searchExtra:
-        'vector reverse bits' }
+        'vector reverse bits' },
+    { file: 'builtin-REPEAT.md', label: 'REPEAT', section: 'Tensor / matrix',
+      searchExtra:
+        'tile repeat vector matrix concat stack' }
 ];
 // END GENERATED DOC_SECTIONS
 

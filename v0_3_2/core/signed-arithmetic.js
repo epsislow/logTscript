@@ -5,7 +5,7 @@
   'use strict';
 
   const BUILTIN_SIGNED_TAG_FUNCS = new Set([
-    'ADD', 'SUBTRACT', 'GT', 'LT', 'MIN', 'MAX', 'CLAMP',
+    'ADD', 'SUBTRACT', 'GT', 'LT', 'MIN', 'MAX', 'CLAMP', 'ABS',
     'MULTIPLY', 'MAC', 'RSHIFT', 'SUM', 'DOT', 'DIVIDE',
     'ARGMAX', 'ARGMIN',
   ]);
@@ -104,6 +104,21 @@
     if (xn < lon) chosen = lon;
     else if (xn > hin) chosen = hin;
     return signedBigIntToBin(chosen, Y);
+  }
+
+  function absAtWidth(x, width) {
+    const w = width | 0;
+    if (w <= 0) throw new Error('ABS: width must be positive');
+    const xp = String(x).padStart(w, '0');
+    const n = signedBinToBigInt(xp);
+    if (n >= 0n) {
+      return { result: xp, overflow: '0' };
+    }
+    const intMin = -(BigInt(1) << BigInt(w - 1));
+    if (n === intMin) {
+      return { result: xp, overflow: '1' };
+    }
+    return { result: signedBigIntToBin(-n, w), overflow: '0' };
   }
 
   function addAtWidth(a, b, width, signed) {
@@ -276,6 +291,7 @@
     macAtWidth,
     divideAtWidth,
     arithmeticRshift,
+    absAtWidth,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
