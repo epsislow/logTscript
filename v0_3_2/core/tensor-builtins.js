@@ -168,6 +168,24 @@
     return { rows: meta.cols, cols: meta.rows };
   }
 
+  function getWholeWireMetaFromArg(argExpr, getWire) {
+    if (!argExpr || argExpr.length !== 1 || !TS) return null;
+    const wire = getWire(argExpr[0].var);
+    if (!wire) return null;
+    if ((MR && MR.isWholeTensorWireArg(argExpr, getWire))
+        || (VR && VR.isWholeVectorWireArg(argExpr, getWire))) {
+      return TS.getWireTensorMeta(wire);
+    }
+    return null;
+  }
+
+  function readShapeRankFromArg(argExpr, getWire) {
+    const meta = getWholeWireMetaFromArg(argExpr, getWire);
+    if (!meta) return null;
+    const rank = TS.isMatrix(meta) ? 2 : 1;
+    return { rows: meta.rows, cols: meta.cols, rank };
+  }
+
   function resolveRepeatOutputShape(srcWire, srcMeta) {
     const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
     if (!srcMeta || !TS) {
@@ -206,6 +224,8 @@
     isWholeVectorArg,
     getTensorMetaFromArg,
     getVectorMetaFromArg,
+    getWholeWireMetaFromArg,
+    readShapeRankFromArg,
     resolveAssignTargetMeta,
     resolveSquareContext,
     resolveVectorContext,

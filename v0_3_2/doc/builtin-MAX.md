@@ -11,6 +11,10 @@ MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
 MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
 MAX(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar ... ; matrix) -> Wbit[n,m]
 MAX(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]
+MAX(Wbit[n,m] m ; row) -> Wbit[n]
+MAX(Wbit[n,m] m ; col) -> Wbit[m]
+MAX(Wbit[n,m] m ; row signed) -> Wbit[n]
+MAX(Wbit[n,m] m ; col signed) -> Wbit[m]
 ```
 
 Variadic (≥ 2 operands after expansion).
@@ -26,8 +30,10 @@ Variadic (≥ 2 operands after expansion).
 | `signed` | Signed maximum. |
 | `vector` | Per index on **rank-1** tensors. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
+| `row` | Per-row maximum across columns → `Wbit[N]`. Mutually exclusive with `vector` and `matrix`. |
+| `col` | Per-column maximum across rows → `Wbit[M]`. Mutually exclusive with `vector` and `matrix`. |
 
-**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
+**Shapes:** [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix). On rank-1 tensors without `; row` / `; col`: `use scalar MAX without col|row tag`.
 
 ## Examples
 
@@ -88,6 +94,16 @@ show(out)
 4wire[2,2] b = 0001 + 1111 + 0100 + 0010
 4wire[2,2] out = MAX(a, b; matrix signed)
 show(out)
+```
+
+### `MAX(Wbit[n,m] m ; row)` / `MAX(Wbit[n,m] m ; col)`
+
+```logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2] rmax = MAX(m; row)
+4wire[2] cmax = MAX(m; col)
+show(rmax)
+show(cmax)
 ```
 
 ## See also

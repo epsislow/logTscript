@@ -57,7 +57,7 @@ Same set as **`; vector`**, **except**:
 | GT, LT, EQ | yes | `1wire[rows×cols]` — one bit per cell (packed) |
 | LSHIFT, RSHIFT, LROTATE, RROTATE, REVERSE | yes | per-cell transform |
 | **DOT** | **no** | shape-based only — [builtin-DOT.md](builtin-DOT.md) |
-| **ARGMAX**, **ARGMIN** | **no** | shape-based + optional `; index` — [builtin-ARGMAX.md](builtin-ARGMAX.md) |
+| **ARGMAX**, **ARGMIN** | **no** | whole-matrix / axis `; row` / `; col` — [builtin-ARGMAX.md](builtin-ARGMAX.md) |
 
 Per-function pages: [builtin-tagged-index.md](builtin-tagged-index.md).
 
@@ -70,6 +70,28 @@ Per-function pages: [builtin-tagged-index.md](builtin-tagged-index.md).
 | `signed` | Signed ops per cell (`; signed matrix` ≡ `; matrix signed`) |
 | `vector` | **Error** — mutually exclusive |
 | `index` | Only on ARGMAX/ARGMIN (not with `; matrix`) |
+| `row`, `col` | Axis reduction on SUM/MIN/MAX/ARGMAX/ARGMIN — mutually exclusive with `vector` and `matrix` |
+
+---
+
+## Axis reduction (`; row` / `; col`) {#axis-reduction-row--col}
+
+Separate from **`; matrix`** (per-cell element-wise ops). **`; row`** and **`; col`** collapse one axis of a **true matrix**:
+
+| Tag | Meaning | SUM / MIN / MAX | ARGMAX / ARGMIN |
+|-----|---------|-----------------|-----------------|
+| **`; row`** | reduce across columns | `Wbit[N]` (+ over for SUM) | one-hot `1wire[N×M]` or `; index` → `bitIndexWidth(M) wire[N]` |
+| **`; col`** | reduce across rows | `Wbit[M]` | one-hot `1wire[N×M]` or `; index` → `bitIndexWidth(N) wire[M]` |
+
+Whole-matrix ARGMAX/ARGMIN (no axis tag) still returns global one-hot or `(row, col)` indices.
+
+```logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2] r, 4wire[2] o = SUM(m; row)
+1wire[2] idx = ARGMAX(m; row; index)
+show(r)
+show(idx)
+```
 
 ---
 

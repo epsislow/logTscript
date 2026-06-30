@@ -585,10 +585,15 @@ parseDef() {
 }
 
 parseFuncTags() {
-  this.eat('SYM', ';');
   const tags = [];
   const seen = new Set();
 
+  if (this.c.type !== 'SYM' || this.c.value !== ';') {
+    throw Error(`Expected tag name after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  this.eat('SYM', ';');
+
+  let gotTag = false;
   while (this.c.type === 'ID') {
     const tagName = this.c.value;
     this.eat('ID');
@@ -609,10 +614,14 @@ parseFuncTags() {
     } else {
       tags.push({ name: tagName, bool: true, value: 1 });
     }
+    gotTag = true;
+  }
+  if (!gotTag) {
+    throw Error(`Expected tag name after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
 
-  if (!tags.length) {
-    throw Error(`Expected tag name after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  if (this.c.type === 'SYM' && this.c.value === ';') {
+    throw Error(`Extra ';' between tags — combine tags with spaces (e.g. '; row index') at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
 
   return tags;

@@ -24,6 +24,8 @@
     'GT', 'LT', 'EQ', 'RSHIFT', 'LSHIFT', 'LROTATE', 'RROTATE', 'REVERSE',
   ]);
 
+  const BUILTIN_AXIS_TAG_FUNCS = new Set(['SUM', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN']);
+
   function signedBinToBigInt(binStr) {
     const s = binStr == null ? '' : String(binStr);
     if (!s.length) return 0n;
@@ -215,13 +217,14 @@
     return fill.repeat(amount) + data.slice(0, len - amount);
   }
 
-  function parseBuiltinCallTags(callTags, fnName, fail, acceptsSigned, acceptsVector, acceptsIndex, acceptsMatrix) {
+  function parseBuiltinCallTags(callTags, fnName, fail, acceptsSigned, acceptsVector, acceptsIndex, acceptsMatrix, acceptsAxis) {
     let signed = false;
     let vector = false;
     let index = false;
     let matrix = false;
+    let axis = null;
     if (!callTags || !callTags.length) {
-      return { signed, vector, index, matrix };
+      return { signed, vector, index, matrix, axis };
     }
     for (const t of callTags) {
       if (t.name === 'signed') {
@@ -256,6 +259,17 @@
           fail(`${fnName}: tag 'index' must be enabled (use '; index' or '; index=1')`);
         }
         index = true;
+      } else if (t.name === 'row' || t.name === 'col') {
+        if (!acceptsAxis) {
+          fail(`${fnName}: does not accept tag '${t.name}'`);
+        }
+        if (t.value !== 1) {
+          fail(`${fnName}: tag '${t.name}' must be enabled (use '; ${t.name}' or '; ${t.name}=1')`);
+        }
+        if (axis) {
+          fail(`${fnName}: '; row' and '; col' are mutually exclusive`);
+        }
+        axis = t.name;
       } else {
         fail(`${fnName}: unknown tag '${t.name}'`);
       }
@@ -263,7 +277,10 @@
     if (vector && matrix) {
       fail(`${fnName}: '; vector' and '; matrix' are mutually exclusive`);
     }
-    return { signed, vector, index, matrix };
+    if (axis && (vector || matrix)) {
+      fail(`${fnName}: '; ${axis}' is mutually exclusive with '; vector' and '; matrix'`);
+    }
+    return { signed, vector, index, matrix, axis };
   }
 
   /** @deprecated use parseBuiltinCallTags */
@@ -276,6 +293,7 @@
     BUILTIN_SIGNED_TAG_FUNCS,
     BUILTIN_VECTOR_TAG_FUNCS,
     BUILTIN_MATRIX_TAG_FUNCS,
+    BUILTIN_AXIS_TAG_FUNCS,
     BUILTIN_INDEX_TAG_FUNCS,
     parseBuiltinCallTags,
     parseBuiltinSignedCallTags,

@@ -196,7 +196,13 @@ const DOC_SEARCH_ONLY = [
         'vector reverse bits' },
     { file: 'builtin-REPEAT.md', label: 'REPEAT', section: 'Tensor / matrix',
       searchExtra:
-        'tile repeat vector matrix concat stack' }
+        'tile repeat vector matrix concat stack' },
+    { file: 'builtin-SHAPE.md', label: 'SHAPE', section: 'Tensor / matrix',
+      searchExtra:
+        'tensor rows cols dimensions metadata shape' },
+    { file: 'builtin-RANK.md', label: 'RANK', section: 'Tensor / matrix',
+      searchExtra:
+        'tensor rank 1 2 matrix vector metadata' }
 ];
 // END GENERATED DOC_SECTIONS
 

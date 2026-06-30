@@ -3483,7 +3483,7 @@ class Interpreter {
          'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ABS', 'ISDIGIT',
          'CNTN10S', 'N2N10S', 'N10S2N',
          'CNTN16S', 'N2N16S', 'N16S2N',
-         'PIVOT', 'IDENTITY', 'ZEROS', 'FILL', 'DIAG', 'IOTA',
+         'PIVOT', 'IDENTITY', 'ZEROS', 'FILL', 'DIAG', 'IOTA', 'SHAPE', 'RANK',
          'OUTER', 'TRACE', 'NORM', 'L2', 'TRIL', 'TRIU',
          'FLIPUD', 'FLIPLR', 'MCAT', 'MSLICE', 'REPEAT'].includes(name)) {
       return true;
@@ -4464,23 +4464,26 @@ const idx = parseInt(
   let vectorMode = false;
   let matrixMode = false;
   let indexMode = false;
+  let axisMode = null;
   if (callTags && callTags.length) {
     const isBuiltin = !!Interpreter.BUILTIN_DOC[name];
     const acceptsSigned = SA && SA.BUILTIN_SIGNED_TAG_FUNCS.has(name);
     const acceptsVector = SA && SA.BUILTIN_VECTOR_TAG_FUNCS.has(name);
     const acceptsMatrix = SA && SA.BUILTIN_MATRIX_TAG_FUNCS.has(name);
     const acceptsIndex = SA && SA.BUILTIN_INDEX_TAG_FUNCS.has(name);
-    if (isBuiltin && !acceptsSigned && !acceptsVector && !acceptsMatrix && !acceptsIndex) {
+    const acceptsAxis = SA && SA.BUILTIN_AXIS_TAG_FUNCS.has(name);
+    if (isBuiltin && !acceptsSigned && !acceptsVector && !acceptsMatrix && !acceptsIndex && !acceptsAxis) {
       fail(`${name}: does not accept call tags`);
     }
-    if (acceptsSigned || acceptsVector || acceptsMatrix || acceptsIndex) {
+    if (acceptsSigned || acceptsVector || acceptsMatrix || acceptsIndex || acceptsAxis) {
       const tags = SA.parseBuiltinCallTags(
-        callTags, name, (msg) => fail(msg), acceptsSigned, acceptsVector, acceptsIndex, acceptsMatrix
+        callTags, name, (msg) => fail(msg), acceptsSigned, acceptsVector, acceptsIndex, acceptsMatrix, acceptsAxis
       );
       signedMode = tags.signed;
       vectorMode = tags.vector;
       matrixMode = tags.matrix;
       indexMode = tags.index;
+      axisMode = tags.axis;
     }
   }
 
@@ -4802,6 +4805,52 @@ const idx = parseInt(
       : { value: blob, ref: null };
   }
 
+  if (name === 'SHAPE' || name === 'RANK') {
+    if (args.length !== 1) fail(`${name} expects 1 argument`);
+    const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
+    if (!TB) fail(`${name}: internal error (tensor-builtins not loaded)`);
+    const getWire = (n) => this.wires.get(n);
+    const a = args[0] && args[0][0];
+    if (!a || !a.var) fail(`${name}: expects one whole tensor argument`);
+    if (a.vectorIndex !== undefined || a.vectorIndexExpr || a.bitRange
+        || a.tensorSlice || a.tensorRowIndex !== undefined || a.tensorColIndex !== undefined
+        || a.tensorRowIndexExpr || a.tensorColIndexExpr) {
+      fail(`${name}: expects one whole tensor argument`);
+    }
+    let info;
+    try {
+      info = TB.readShapeRankFromArg(args[0], getWire);
+    } catch (e) {
+      fail(e.message);
+    }
+    if (!info) fail(`${name}: expects one whole tensor argument`);
+    const declWireWidths = [];
+    const stmt = this.currentStmt;
+    if (stmt && stmt.decls) {
+      for (const d of stmt.decls) {
+        if (!d.type || !this.isWire(d.type)) continue;
+        if (d.name === '_' || d.name === '~' || d.name === '%' || d.name === '$') continue;
+        const w = getBitWidthFromDecl(this, d) || this.getBitWidth(d.type);
+        if (w) declWireWidths.push(w);
+      }
+    }
+    if (name === 'RANK') {
+      const rankW = declWireWidths[0] || 2;
+      const v = binPadInt(info.rank, rankW);
+      return computeRefs
+        ? { value: v, ref: `&${this.storeValue(v)}` }
+        : { value: v, ref: null };
+    }
+    const rowW = declWireWidths[0] || bitIndexWidth(info.rows + 1);
+    const colW = declWireWidths[1] || bitIndexWidth(info.cols + 1);
+    const rowV = binPadInt(info.rows, rowW);
+    const colV = binPadInt(info.cols, colW);
+    return [
+      computeRefs ? { value: rowV, ref: `&${this.storeValue(rowV)}` } : { value: rowV, ref: null },
+      computeRefs ? { value: colV, ref: `&${this.storeValue(colV)}` } : { value: colV, ref: null },
+    ];
+  }
+
   if (name === 'REPEAT') {
     if (args.length !== 2) fail('REPEAT expects 2 arguments (data, times)');
     const TB = typeof LogTScriptTensorBuiltins !== 'undefined' ? LogTScriptTensorBuiltins : null;
@@ -4849,7 +4898,27 @@ const idx = parseInt(
   if (name === 'SUM') {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
     const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+    const XR = typeof LogTScriptTensorAxisReduce !== 'undefined' ? LogTScriptTensorAxisReduce : null;
     const getWire = (n) => this.wires.get(n);
+    if (axisMode) {
+      if (!XR) fail('SUM: internal error (tensor-axis-reduce not loaded)');
+      let sumAxis;
+      try {
+        sumAxis = XR.sumAxisTagged(
+          args, getWire, 'SUM', axisMode, signedMode, this._matrixTaggedEvalFns()
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return [
+        computeRefs
+          ? { value: sumAxis.resultBlob, ref: `&${this.storeValue(sumAxis.resultBlob)}` }
+          : { value: sumAxis.resultBlob, ref: null },
+        computeRefs
+          ? { value: sumAxis.overBlob, ref: `&${this.storeValue(sumAxis.overBlob)}` }
+          : { value: sumAxis.overBlob, ref: null },
+      ];
+    }
     if (matrixMode) {
       if (!MR) fail('SUM: internal error (matrix-reduce not loaded)');
       let sumMat;
@@ -4975,11 +5044,35 @@ const idx = parseInt(
     if (args.length !== 1) fail(`${name} expects 1 argument`);
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
     const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+    const XR = typeof LogTScriptTensorAxisReduce !== 'undefined' ? LogTScriptTensorAxisReduce : null;
     const getWire = (n) => this.wires.get(n);
     const compareFns = {
       unsigned: unsignedCompareBigInt,
       signed: SA ? SA.signedCompareBigInt : null,
     };
+    const pickMax = name === 'ARGMAX';
+    if (axisMode) {
+      if (!XR) fail(`${name}: internal error (tensor-axis-reduce not loaded)`);
+      let step;
+      try {
+        step = XR.argExtremumAxisTagged(
+          args, getWire, name, axisMode, pickMax, signedMode, indexMode,
+          this._matrixTaggedEvalFns(), compareFns
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      if (step.indexMode) {
+        const w = bitIndexWidth(step.idxWidth);
+        const blob = step.indices.map((i) => binPadInt(i, w)).join('');
+        return computeRefs
+          ? { value: blob, ref: `&${this.storeValue(blob)}` }
+          : { value: blob, ref: null };
+      }
+      return computeRefs
+        ? { value: step.oneHot, ref: `&${this.storeValue(step.oneHot)}` }
+        : { value: step.oneHot, ref: null };
+    }
     if (MR) {
       let matStep = null;
       try {
@@ -6153,6 +6246,23 @@ if (this.isBuiltinDEMUX(name)) {
 
   if (name === 'MIN') {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const XR = typeof LogTScriptTensorAxisReduce !== 'undefined' ? LogTScriptTensorAxisReduce : null;
+    if (axisMode) {
+      if (!XR) fail('MIN: internal error (tensor-axis-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let blob;
+      try {
+        blob = XR.minMaxAxisTagged(
+          args, getWire, 'MIN', axisMode, true, signedMode, this._matrixTaggedEvalFns(),
+          SA ? SA.pickMinMaxSigned : null
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     if (matrixMode) {
       const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
       if (!MR) fail('MIN: internal error (matrix-reduce not loaded)');
@@ -6204,6 +6314,23 @@ if (this.isBuiltinDEMUX(name)) {
 
   if (name === 'MAX') {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+    const XR = typeof LogTScriptTensorAxisReduce !== 'undefined' ? LogTScriptTensorAxisReduce : null;
+    if (axisMode) {
+      if (!XR) fail('MAX: internal error (tensor-axis-reduce not loaded)');
+      const getWire = (n) => this.wires.get(n);
+      let blob;
+      try {
+        blob = XR.minMaxAxisTagged(
+          args, getWire, 'MAX', axisMode, false, signedMode, this._matrixTaggedEvalFns(),
+          SA ? SA.pickMinMaxSigned : null
+        );
+      } catch (e) {
+        fail(e.message);
+      }
+      return computeRefs
+        ? { value: blob, ref: `&${this.storeValue(blob)}` }
+        : { value: blob, ref: null };
+    }
     if (matrixMode) {
       const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
       if (!MR) fail('MAX: internal error (matrix-reduce not loaded)');
@@ -13294,6 +13421,10 @@ Interpreter.BUILTIN_DOC = {
     'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]',
     'SUM(Wbit[n,m] ... ; matrix) -> Wbit[n,m], Wbit[n,m]',
     'SUM(Wbit[n,m] ... ; signed matrix) -> Wbit[n,m], Wbit[n,m]',
+    'SUM(Wbit[n,m] m ; row) -> Wbit[n], Wbit[n]',
+    'SUM(Wbit[n,m] m ; col) -> Wbit[m], Wbit[m]',
+    'SUM(Wbit[n,m] m ; row signed) -> Wbit[n], Wbit[n]',
+    'SUM(Wbit[n,m] m ; col signed) -> Wbit[m], Wbit[m]',
   ],
   DOT:      [
     'DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over',
@@ -13330,6 +13461,10 @@ Interpreter.BUILTIN_DOC = {
     'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]',
     'MIN(Wbit[n,m] ... ; matrix) -> Wbit[n,m]',
     'MIN(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]',
+    'MIN(Wbit[n,m] m ; row) -> Wbit[n]',
+    'MIN(Wbit[n,m] m ; col) -> Wbit[m]',
+    'MIN(Wbit[n,m] m ; row signed) -> Wbit[n]',
+    'MIN(Wbit[n,m] m ; col signed) -> Wbit[m]',
   ],
   MAX:      [
     'MAX(Wbit ...) -> Wbit',
@@ -13338,18 +13473,34 @@ Interpreter.BUILTIN_DOC = {
     'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]',
     'MAX(Wbit[n,m] ... ; matrix) -> Wbit[n,m]',
     'MAX(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]',
+    'MAX(Wbit[n,m] m ; row) -> Wbit[n]',
+    'MAX(Wbit[n,m] m ; col) -> Wbit[m]',
+    'MAX(Wbit[n,m] m ; row signed) -> Wbit[n]',
+    'MAX(Wbit[n,m] m ; col signed) -> Wbit[m]',
   ],
   ARGMAX:   [
     'ARGMAX(Wbit[n] vector) -> 1wire[n]',
     'ARGMAX(Wbit[n] vector; index) -> bitIndexWidth(n) bit',
     'ARGMAX(Wbit[n] vector; signed) -> 1wire[n]',
     'ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit',
+    'ARGMAX(Wbit[n,m] matrix) -> 1wire[n×m]',
+    'ARGMAX(Wbit[n,m] matrix; index) -> bit rows, bit cols',
+    'ARGMAX(Wbit[n,m] m ; row) -> 1wire[n×m]',
+    'ARGMAX(Wbit[n,m] m ; row index) -> bitIndexWidth(m) wire[n]',
+    'ARGMAX(Wbit[n,m] m ; col) -> 1wire[n×m]',
+    'ARGMAX(Wbit[n,m] m ; col index) -> bitIndexWidth(n) wire[m]',
   ],
   ARGMIN:   [
     'ARGMIN(Wbit[n] vector) -> 1wire[n]',
     'ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit',
     'ARGMIN(Wbit[n] vector; signed) -> 1wire[n]',
     'ARGMIN(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit',
+    'ARGMIN(Wbit[n,m] matrix) -> 1wire[n×m]',
+    'ARGMIN(Wbit[n,m] matrix; index) -> bit rows, bit cols',
+    'ARGMIN(Wbit[n,m] m ; row) -> 1wire[n×m]',
+    'ARGMIN(Wbit[n,m] m ; row index) -> bitIndexWidth(m) wire[n]',
+    'ARGMIN(Wbit[n,m] m ; col) -> 1wire[n×m]',
+    'ARGMIN(Wbit[n,m] m ; col index) -> bitIndexWidth(n) wire[m]',
   ],
   CLAMP:    [
     'CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit',
@@ -13382,6 +13533,8 @@ Interpreter.BUILTIN_DOC = {
   FILL:     ['FILL(\\N, Wbit scalar) -> Wwire[N,N] — constant fill'],
   DIAG:     ['DIAG(Wwire[n] vector) -> Wwire[n,n] — diagonal matrix'],
   IOTA:     ['IOTA(\\N) -> Wwire[N] — vector 0..N-1'],
+  SHAPE:    ['SHAPE(Wwire tensor) -> bit rows, bit cols'],
+  RANK:     ['RANK(Wwire tensor) -> 1wire scalar (1=rank-1, 2=matrix)'],
   OUTER:    ['OUTER(Wwire[N,1] col, Wwire[1,M] row) -> Wwire[N,M], (2W) over — outer product'],
   TRACE:    ['TRACE(Wwire[n,n] matrix) -> Wbit result, Wbit over'],
   NORM:     ['NORM(Wwire[n] vector) -> Wbit result, (2W)bit over — L2² = DOT(v,v)'],

@@ -20,7 +20,7 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 | **Routing** | `MUX`, `DEMUX` | [builtin-routing-functions.md](builtin-routing-functions.md) |
 | **Arithmetic** | `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `MAC`, `ABS`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP` | [arithmetic.md](arithmetic.md) · tags `; vector` / **`; matrix`**: [builtin-tagged-index.md](builtin-tagged-index.md) |
 | **Vector reduction** | `SUM`, `DOT`, `ARGMAX`, `ARGMIN` | [vector-reduction.md](vector-reduction.md) · **`; matrix`** (element-wise 2D): [matrix-reduction.md](matrix-reduction.md) |
-| **Tensor / matrix** | `PIVOT`, `REPEAT`, `IDENTITY`, `ZEROS`, `FILL`, `DIAG`, `IOTA`, `OUTER`, `TRACE`, `NORM`, `L2`, `TRIL`, `TRIU`, `FLIPUD`, `FLIPLR`, `MCAT`, `MSLICE` | [wire-vectors.md](wire-vectors.md) · [builtin-REPEAT.md](builtin-REPEAT.md) · [builtin-IDENTITY.md](builtin-IDENTITY.md) |
+| **Tensor / matrix** | `SHAPE`, `RANK`, `PIVOT`, `REPEAT`, `IDENTITY`, `ZEROS`, `FILL`, `DIAG`, `IOTA`, `OUTER`, `TRACE`, `NORM`, `L2`, `TRIL`, `TRIU`, `FLIPUD`, `FLIPLR`, `MCAT`, `MSLICE` | [wire-vectors.md](wire-vectors.md) · [builtin-SHAPE.md](builtin-SHAPE.md) · [builtin-RANK.md](builtin-RANK.md) · [builtin-REPEAT.md](builtin-REPEAT.md) |
 | **Number conversion** | `CNTN10S`, `N2N10S`, `N10S2N`, `CNTN16S`, `N2N16S`, `N16S2N`, `ISDIGIT` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | `HIGH`, `LOW`, `ANY`, `ZERO`, `ANY*`, `ALL*`, `BITINDEX`, `ONEHOT` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | `PARITY`, `CNTONE`, `CNTZERO`, `BITSIZE` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |

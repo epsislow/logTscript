@@ -12,12 +12,12 @@ See also: [1D wire vectors](wire-vectors.md), [2D `; matrix` mode](matrix-reduct
 
 | Function | Page | Tags |
 |----------|------|------|
-| SUM | [builtin-SUM.md](builtin-SUM.md) | `signed`, `vector`, `matrix` |
+| SUM | [builtin-SUM.md](builtin-SUM.md) | `signed`, `vector`, `matrix`, `row`, `col` |
 | DOT | [builtin-DOT.md](builtin-DOT.md) | `signed` |
-| MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `vector`, `matrix` |
-| MAX | [builtin-MAX.md](builtin-MAX.md) | `signed`, `vector`, `matrix` |
-| ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | `signed`, `index` |
-| ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | `signed`, `index` |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `vector`, `matrix`, `row`, `col` |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | `signed`, `vector`, `matrix`, `row`, `col` |
+| ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | `signed`, `index`, `row`, `col` |
+| ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | `signed`, `index`, `row`, `col` |
 
 Element-wise `EQ`: [builtin-EQ.md](builtin-EQ.md).
 
@@ -99,6 +99,33 @@ On **2D tensors** (`4wire[N,M]` with **N>1** and **M>1**), use **`; matrix`** fo
 Broadcast at cell `(r,c)`: matrix cell, scalar, or rank-1 vector (`[1,M]` across columns, `[N,1]` across rows). Compares (`GT`, `LT`, `EQ`) return **`1wire[N×M]`** (one bit per cell).
 
 Semantics: **[matrix-reduction.md](matrix-reduction.md)**. Examples: **[builtin-SUM.md](builtin-SUM.md)**, **[builtin-ADD.md](builtin-ADD.md)**, **[builtin-MIN.md](builtin-MIN.md)**, … — [builtin-tagged-index.md](builtin-tagged-index.md).
+
+---
+
+## Axis reduction (`; row` / `; col`) {#axis-reduction-row-col}
+
+On a **true matrix** (`N>1`, `M>1`), **SUM**, **MIN**, **MAX**, **ARGMAX**, and **ARGMIN** accept **`; row`** or **`; col`** to reduce along one axis:
+
+| Tag | Reduces over | Output shape |
+|-----|--------------|--------------|
+| **`; row`** | columns (per row) | `Wbit[N]` or `1wire[N×M]` / index vector (ARG*) |
+| **`; col`** | rows (per column) | `Wbit[M]` or `1wire[N×M]` / index vector (ARG*) |
+
+Mutually exclusive with **`; vector`** and **`; matrix`**. Rank-1 tensors without axis tags → `use scalar <FN> without col|row tag`.
+
+```logts-play
+4wire[2,2] m = 0001 + 0010 + 0100 + 1000
+4wire[2] r, 4wire[2] o = SUM(m; row)
+4wire[2] cmin = MIN(m; col)
+4wire[2] rmax = MAX(m; row)
+1wire[2] idx = ARGMAX(m; row; index)
+show(r)
+show(cmin)
+show(rmax)
+show(idx)
+```
+
+Details: [builtin-SUM.md](builtin-SUM.md), [builtin-MIN.md](builtin-MIN.md), [builtin-MAX.md](builtin-MAX.md), [builtin-ARGMAX.md](builtin-ARGMAX.md), [builtin-ARGMIN.md](builtin-ARGMIN.md).
 
 ---
 

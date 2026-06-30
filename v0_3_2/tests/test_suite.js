@@ -13353,13 +13353,15 @@ reg(1734, 'vector-reduction', 'SUM vector sub-range same width', function(h, ses
 
 reg(1728, 'vector-reduction', 'doc(SUM) signature', function(h, session) {
   const lines = Interpreter.getDocLines('SUM', new Map());
-  h.assert('SUM 6 signatures', String(lines.length), '6');
+  h.assert('SUM 10 signatures', String(lines.length), '10');
   h.assert('SUM unsigned', lines[0], 'SUM(Wbit ...) -> Wbit result, Wbit over');
   h.assert('SUM signed', lines[1], 'SUM(Wbit ...; signed) -> Wbit result, Wbit over');
   h.assert('SUM vector', lines[2], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]');
   h.assert('SUM signed vector', lines[3], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]');
   h.assert('SUM matrix', lines[4], 'SUM(Wbit[n,m] ... ; matrix) -> Wbit[n,m], Wbit[n,m]');
   h.assert('SUM signed matrix', lines[5], 'SUM(Wbit[n,m] ... ; signed matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUM row', lines[6], 'SUM(Wbit[n,m] m ; row) -> Wbit[n], Wbit[n]');
+  h.assert('SUM col', lines[7], 'SUM(Wbit[n,m] m ; col) -> Wbit[m], Wbit[m]');
 });
 
 reg(1729, 'vector-reduction', 'MIN/MAX plain wires regression', function(h, session) {
@@ -14705,12 +14707,14 @@ reg(1811, 'builtin-vector', 'SUM(vectorA, vectorB; vector) — wave mode', funct
 reg(1812, 'builtin-vector', 'doc(MIN/MAX) vector signatures', function(h, session) {
   const minLines = Interpreter.getDocLines('MIN', new Map());
   const maxLines = Interpreter.getDocLines('MAX', new Map());
-  h.assert('MIN 6 signatures', String(minLines.length), '6');
-  h.assert('MAX 6 signatures', String(maxLines.length), '6');
+  h.assert('MIN 10 signatures', String(minLines.length), '10');
+  h.assert('MAX 10 signatures', String(maxLines.length), '10');
   h.assert('MIN vector', minLines[2], 'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]');
   h.assert('MAX vector signed', maxLines[3], 'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]');
   h.assert('MIN matrix', minLines[4], 'MIN(Wbit[n,m] ... ; matrix) -> Wbit[n,m]');
   h.assert('MAX matrix signed', maxLines[5], 'MAX(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]');
+  h.assert('MIN row', minLines[6], 'MIN(Wbit[n,m] m ; row) -> Wbit[n]');
+  h.assert('MAX col', maxLines[7], 'MAX(Wbit[n,m] m ; col) -> Wbit[m]');
 });
 
 reg(1813, 'builtin-vector', 'ADD implicit vs explicit ; vector', function(h, session) {
@@ -16499,6 +16503,109 @@ reg(1971, 'builtin-matrix', 'ADD(matrix, matrix:0; matrix) — row slice broadca
     '4wire[2,2] r, 4wire[2,2] f = ADD(m, m:0; matrix)'
   );
   h.assert('row slice broadcast', session.getWire(interp, 'r'), '0010010001011010');
+});
+
+reg(1972, 'wire-tensor', 'SHAPE and RANK on matrix', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '2wire rows, 2wire cols = SHAPE(m)\n' +
+    '2wire rank = RANK(m)'
+  );
+  h.assert('rows', session.getWire(interp, 'rows'), '10');
+  h.assert('cols', session.getWire(interp, 'cols'), '10');
+  h.assert('rank 2', session.getWire(interp, 'rank'), '10');
+});
+
+reg(1973, 'wire-tensor', 'SHAPE and RANK on rank-1 vector', function(h, session) {
+  const { interp } = session.run(
+    '4wire[4] v = 0001 + 0010 + 0100 + 1000\n' +
+    '2wire rows, 3wire cols = SHAPE(v)\n' +
+    '1wire rank = RANK(v)'
+  );
+  h.assert('rows 1', session.getWire(interp, 'rows'), '01');
+  h.assert('cols 4', session.getWire(interp, 'cols'), '100');
+  h.assert('rank 1', session.getWire(interp, 'rank'), '1');
+});
+
+reg(1974, 'builtin-matrix', 'SUM(matrix; row) axis reduce', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2] r, 4wire[2] o = SUM(m; row)'
+  );
+  h.assert('row sums', session.getWire(interp, 'r'), '00111100');
+  h.assert('over zero', session.getWire(interp, 'o'), '00000000');
+});
+
+reg(1975, 'builtin-matrix', 'SUM(matrix; col) axis reduce', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2] r, 4wire[2] o = SUM(m; col)'
+  );
+  h.assert('col sums', session.getWire(interp, 'r'), '01011010');
+});
+
+reg(1976, 'builtin-matrix', 'ARGMAX(matrix; row index)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '1wire[2] idx = ARGMAX(m; row index)'
+  );
+  h.assert('col index per row', session.getWire(interp, 'idx'), '11');
+});
+
+reg(1977, 'builtin-matrix', 'ARGMAX(matrix; col index)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '1wire[2] idx = ARGMAX(m; col index)'
+  );
+  h.assert('row index per col', session.getWire(interp, 'idx'), '11');
+});
+
+reg(1978, 'builtin-matrix', 'ARGMAX(matrix; row) one-hot per row', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '1wire[4] hot = ARGMAX(m; row)'
+  );
+  h.assert('one-hot rows', session.getWire(interp, 'hot'), '0101');
+});
+
+reg(1979, 'builtin-matrix', 'MIN(matrix; col) and MAX(matrix; row)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2] cmin = MIN(m; col)\n' +
+    '4wire[2] rmax = MAX(m; row)'
+  );
+  h.assert('col min', session.getWire(interp, 'cmin'), '00010010');
+  h.assert('row max', session.getWire(interp, 'rmax'), '00101000');
+});
+
+reg(1980, 'builtin-matrix', 'ARGMIN(matrix; row index)', function(h, session) {
+  const { interp } = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '1wire[2] idx = ARGMIN(m; row index)'
+  );
+  h.assert('min col per row', session.getWire(interp, 'idx'), '00');
+});
+
+reg(1983, 'builtin-matrix', 'ARGMAX(row; index) — extra semicolon parse error', function(h, session) {
+  h.assertThrows('extra semicolon', () => session.parse('1wire[2] idx = ARGMAX(m; row; index)'), 'Extra');
+});
+
+reg(1981, 'builtin-vector', 'SUM(vector; row) error without col|row tag', function(h, session) {
+  const r = session.run(
+    '4wire[4] v = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[4] r, 4wire[4] o = SUM(v; row)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('axis error', String(err.includes('without col|row tag')), 'true');
+});
+
+reg(1982, 'builtin-matrix', 'SUM(matrix; row; matrix) exclusive tags', function(h, session) {
+  const r = session.run(
+    '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n' +
+    '4wire[2] r, 4wire[2] o = SUM(m; row matrix)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('exclusive', String(err.includes('mutually exclusive')), 'true');
 });
 
 

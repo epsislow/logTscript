@@ -129,6 +129,8 @@
     { "file": "builtin-LROTATE.md", "label": "LROTATE", "section": "Bit transform", "searchExtra": "vector rotate left" },
     { "file": "builtin-RROTATE.md", "label": "RROTATE", "section": "Bit transform", "searchExtra": "vector rotate right" },
     { "file": "builtin-REVERSE.md", "label": "REVERSE", "section": "Bit transform", "searchExtra": "vector reverse bits" },
-    { "file": "builtin-REPEAT.md", "label": "REPEAT", "section": "Tensor / matrix", "searchExtra": "tile repeat vector matrix concat stack" }
+    { "file": "builtin-REPEAT.md", "label": "REPEAT", "section": "Tensor / matrix", "searchExtra": "tile repeat vector matrix concat stack" },
+    { "file": "builtin-SHAPE.md", "label": "SHAPE", "section": "Tensor / matrix", "searchExtra": "tensor rows cols dimensions metadata shape" },
+    { "file": "builtin-RANK.md", "label": "RANK", "section": "Tensor / matrix", "searchExtra": "tensor rank 1 2 matrix vector metadata" }
   ]
 }
