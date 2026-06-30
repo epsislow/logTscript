@@ -6557,6 +6557,17 @@ if (this.isBuiltinDEMUX(name)) {
     return { colStart: 0, colEnd: cols - 1 };
   }
 
+  _resolveMatrixRowSliceIndex(atom) {
+    if (!atom || atom.tensorSlice === 'col' || atom.tensorSlice === 'cell') return null;
+    if (atom.tensorSlice === 'row' || atom.tensorRowIndex !== undefined || atom.tensorRowIndexExpr) {
+      return this._resolveTensorIndexValue(atom.tensorRowIndex, atom.tensorRowIndexExpr, 'row');
+    }
+    if (atom.vectorIndex !== undefined || atom.vectorIndexExpr) {
+      return this._resolveVectorIndexValue(atom);
+    }
+    return null;
+  }
+
   _formatMatrixRowShowLines(wireName, valueStr, rowIndex, opts, meta) {
     const { elementWidth, cols } = meta;
     const lines = [];
@@ -6661,7 +6672,8 @@ if (this.isBuiltinDEMUX(name)) {
         if ((atom.vectorIndex !== undefined || atom.vectorIndexExpr || atom.tensorSlice) && wire && wire.vector) {
           const meta = this.getWireTensorMeta(wire);
           const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
-          if (atom.tensorSlice === 'row' && meta && TS && TS.isMatrix(meta)) {
+          const rowIndex = this._resolveMatrixRowSliceIndex(atom);
+          if (meta && TS && TS.isMatrix(meta) && rowIndex != null) {
             const r = this.evalExpr(e, computeRefs);
             const part = r[0];
             if (part) {
@@ -6671,7 +6683,7 @@ if (this.isBuiltinDEMUX(name)) {
               const rowLines = this._formatMatrixRowShowLines(
                 atom.var,
                 fullWire.length >= valueStr.length ? fullWire : valueStr,
-                atom.tensorRowIndex,
+                rowIndex,
                 opts,
                 meta
               );

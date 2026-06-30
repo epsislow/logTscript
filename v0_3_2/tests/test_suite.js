@@ -16458,6 +16458,19 @@ reg(1967, 'wire-tensor', 'PIVOT 4wire[1,3] → 4wire[3,1]', function(h, session)
   h.assert('cell', session.getWire(interp, 'x'), '0010');
 });
 
+reg(1968, 'show-tags', 'show(matrix row; dec) — flat header + cell lines', function(h, session) {
+  const { out } = session.run(
+    '4wire[1,3] row = 0001 + 0010 + 0100\n' +
+    '4wire[2,3] m = REPEAT(row, \\2)\n' +
+    'show(m:0; dec)\n' +
+    'show(m:0; hex)'
+  );
+  h.assert('dec flat header', String(out.some(l => /^m:0 = \\292/.test(l))), 'true');
+  h.assert('dec :0:0', String(out.some(l => /:0:0 = \\1 \(4bit\)/.test(l))), 'true');
+  h.assert('dec :0:2', String(out.some(l => /:0:2 = \\4 \(4bit\)/.test(l))), 'true');
+  h.assert('hex :0:1', String(out.some(l => /:0:1 = \^2 \(4bit\)/.test(l))), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

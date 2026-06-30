@@ -1450,7 +1450,8 @@
       {"id":1964,"group":"wire-tensor","title":"REPEAT exceeds 16384 bits","detail":{"scripts":["8wire d = 10101010\n8wire t = REPEAT(d, \\2049)"],"steps":[],"assertions":["bit limit"]}},
       {"id":1965,"group":"wire-tensor","title":"PIVOT 4wire[3,1] → 4wire[3] round-trip","detail":{"scripts":["4wire[3,1] col = 0001 + 0010 + 0100"],"steps":[],"assertions":["elem 1"]}},
       {"id":1966,"group":"wire-tensor","title":"PIVOT shape mismatch error","detail":{"scripts":["4wire[3] row = 0001 + 0010 + 0100"],"steps":[],"assertions":["pivot shape"]}},
-      {"id":1967,"group":"wire-tensor","title":"PIVOT 4wire[1,3] → 4wire[3,1]","detail":{"scripts":["4wire[1,3] r = 0001 + 0010 + 0100"],"steps":[],"assertions":["cell"]}}
+      {"id":1967,"group":"wire-tensor","title":"PIVOT 4wire[1,3] → 4wire[3,1]","detail":{"scripts":["4wire[1,3] r = 0001 + 0010 + 0100"],"steps":[],"assertions":["cell"]}},
+      {"id":1968,"group":"show-tags","title":"show(matrix row; dec) — flat header + cell lines","detail":{"scripts":["4wire[1,3] row = 0001 + 0010 + 0100"],"steps":[],"assertions":["dec flat header","dec :0:0","dec :0:2","hex :0:1"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1521,7 +1522,7 @@
       { id: 'select', label: 'select', rangeLabel: '1673–1676', testIds: [1673, 1674, 1675, 1676] },
       { id: 'short-notation', label: 'Short notation preprocessor', rangeLabel: '102–133, 1334–1336, 1707–1710', testIds: [102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 1334, 1335, 1336, 1707, 1708, 1709, 1710] },
       { id: 'debug', label: 'show / peek / probe', rangeLabel: '804–819, 1176–1187, 1711–1714', testIds: [804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 1176, 1177, 1178, 1179, 1180, 1181, 1182, 1183, 1184, 1185, 1186, 1187, 1711, 1712, 1713, 1714] },
-      { id: 'show-tags', label: 'show-tags', rangeLabel: '1905–1936, 1946', testIds: [1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, 1946] },
+      { id: 'show-tags', label: 'show-tags', rangeLabel: '1905–1936, 1946, 1968', testIds: [1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, 1946, 1968] },
       { id: 'slider', label: 'Slider component', rangeLabel: '1206–1220', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983, 1571–1574, 1643–1653, 1661, 1663', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 1571, 1572, 1573, 1574, 1643, 1644, 1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1661, 1663] },
       { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775] },
