@@ -352,7 +352,8 @@
     return results.join('');
   }
 
-  function compareMatrixTagged(args, getWire, fnName, op, signed, evalFns, compareFns) {
+  function compareMatrixTagged(args, getWire, fnName, op, signedOrMode, evalFns, compareFns) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     if (args.length !== 2) {
       throw new Error(`${fnName}: expects 2 arguments`);
     }
@@ -367,9 +368,11 @@
       if (op === 'EQ') {
         bits.push(a === b ? '1' : '0');
       } else {
-        const cmp = signed && compareFns.signed
-          ? compareFns.signed(a, b)
-          : compareFns.unsigned(a, b);
+        const cmp = NF
+          ? NF.compareTagged(a, b, signedOrMode, compareFns)
+          : (signedOrMode && compareFns.signed
+            ? compareFns.signed(a, b)
+            : compareFns.unsigned(a, b));
         if (op === 'GT') bits.push(cmp > 0 ? '1' : '0');
         else if (op === 'LT') bits.push(cmp < 0 ? '1' : '0');
       }
@@ -377,7 +380,8 @@
     return bits.join('');
   }
 
-  function shiftMatrixTagged(args, getWire, fnName, op, signed, evalFns, shiftFns) {
+  function shiftMatrixTagged(args, getWire, fnName, op, signedOrMode, evalFns, shiftFns) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     const { classified, meta } = requireMatrixTaggedOperands(args, getWire, fnName, 2);
     const W = meta.elementWidth;
     const results = [];
@@ -400,7 +404,10 @@
       let out;
       if (op === 'LSHIFT') {
         out = shiftFns.lshift(dataVal, n, fill);
-      } else if (signed && shiftFns.arithmeticRshift) {
+      } else if (NF && typeof signedOrMode === 'string' && NF.isFormatMode(signedOrMode)) {
+        NF.rejectsFloatRshift(signedOrMode, fnName);
+        out = shiftFns.arithmeticRshift(dataVal, n);
+      } else if (NF && NF.usesArithmeticRshift(signedOrMode) && shiftFns.arithmeticRshift) {
         out = shiftFns.arithmeticRshift(dataVal, n);
       } else {
         out = shiftFns.rshift(dataVal, n, fill);
@@ -528,7 +535,8 @@
     };
   }
 
-  function argExtremumFromWholeMatrix(args, getWire, fnName, pickMax, signed, evalFns, compareFns) {
+  function argExtremumFromWholeMatrix(args, getWire, fnName, pickMax, signedOrMode, evalFns, compareFns) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     if (!args || args.length !== 1) {
       throw new Error(`${fnName}: expects 1 argument`);
     }
@@ -548,9 +556,11 @@
       for (let c = 0; c < meta.cols; c++) {
         const v = String(evalFns.evalCell(varName, r, c)).padStart(W, '0');
         if (v.length !== W) throw new Error(`${fnName}: ${SHAPE_ERR}`);
-        const cmp = signed && compareFns.signed
-          ? compareFns.signed(v, best)
-          : compareFns.unsigned(v, best);
+        const cmp = NF
+          ? NF.compareTagged(v, best, signedOrMode, compareFns)
+          : (signedOrMode && compareFns.signed
+            ? compareFns.signed(v, best)
+            : compareFns.unsigned(v, best));
         const better = pickMax ? cmp > 0 : cmp < 0;
         if (better) {
           bestR = r;

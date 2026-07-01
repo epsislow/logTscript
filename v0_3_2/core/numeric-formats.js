@@ -6,6 +6,8 @@
 
   const BUILTIN_FORMAT_TAG_FUNCS = new Set([
     'ADD', 'SUBTRACT', 'SUM', 'MIN', 'MAX',
+    'GT', 'LT', 'CLAMP', 'MULTIPLY', 'MAC', 'DOT', 'DIVIDE', 'ABS', 'RSHIFT',
+    'ARGMAX', 'ARGMIN',
   ]);
 
   const FORMAT_TAG_NAMES = new Set(['q4p4', 'q8p8', 'bf16', 'fp16']);
@@ -17,6 +19,27 @@
 
   function isFormatMode(mode) {
     return FORMAT_TAG_NAMES.has(mode);
+  }
+
+  /** ASHR semantics on raw bits (signed + fixed-point Q formats). */
+  function usesArithmeticRshift(mode) {
+    return mode === true || mode === 'q4p4' || mode === 'q8p8';
+  }
+
+  function rejectsFloatRshift(mode, opName) {
+    if (mode === 'fp16' || mode === 'bf16') {
+      throw new Error(`${opName}: does not accept tag '${mode}'`);
+    }
+  }
+
+  function compareTagged(a, b, signedOrMode, compareFns) {
+    if (isFormatMode(signedOrMode)) {
+      return compareValues(a, b, signedOrMode);
+    }
+    if (signedOrMode && compareFns && compareFns.signed) {
+      return compareFns.signed(a, b);
+    }
+    return compareFns.unsigned(a, b);
   }
 
   function signedBinToBigInt(binStr) {
@@ -275,6 +298,172 @@
     return best;
   }
 
+  function multiplyAtWidth(a, b, width, mode) {
+    assertFormatWidth(mode, width, 'MULTIPLY');
+    if (fixedSpec(mode)) {
+      const spec = fixedSpec(mode);
+      const ap = String(a).padStart(width, '0');
+      const bp = String(b).padStart(width, '0');
+      const rawA = signedBinToBigInt(ap);
+      const rawB = signedBinToBigInt(bp);
+      const scaled = rawA * rawB >> BigInt(spec.fracBits);
+      const mask = (BigInt(1) << BigInt(width)) - BigInt(1);
+      const result = signedBigIntToBin(scaled & mask, width);
+      const over = ((scaled >> BigInt(width)) & mask).toString(2).padStart(width, '0');
+      const vp = fixedRawToNumber(ap, mode) * fixedRawToNumber(bp, mode);
+      if (fixedOverflowFlag(mode, vp) === '1') {
+        return { result, over };
+      }
+      return { result, over };
+    }
+    const af = decodeToFloat(a, mode, width);
+    const bf = decodeToFloat(b, mode, width);
+    let prod = af * bf;
+    if (Number.isNaN(af) || Number.isNaN(bf)) prod = NaN;
+    const result = encodeFromFloat(prod, mode);
+    const flag = floatFlag(af, bf, prod);
+    return { result, over: flag === '1' ? result : '0'.repeat(width) };
+  }
+
+  function macAtWidth(acc, a, b, mode) {
+    const width = acc.length;
+    if (a.length !== width || b.length !== width) {
+      throw new Error('MAC: all arguments must have the same bit width');
+    }
+    assertFormatWidth(mode, width, 'MAC');
+    if (fixedSpec(mode)) {
+      const sum = fixedRawToNumber(acc, mode)
+        + fixedRawToNumber(a, mode) * fixedRawToNumber(b, mode);
+      const spec = fixedSpec(mode);
+      const accRaw = BigInt(Math.round(sum * Number(BigInt(1) << BigInt(spec.fracBits))));
+      const maskN = (BigInt(1) << BigInt(width)) - BigInt(1);
+      const maskOver = (BigInt(1) << BigInt(width + 1)) - BigInt(1);
+      const result = (accRaw & maskN).toString(2).padStart(width, '0');
+      const over = ((accRaw >> BigInt(width)) & maskOver).toString(2).padStart(width + 1, '0');
+      return { result, over };
+    }
+    const af = decodeToFloat(acc, mode, width);
+    const pf = decodeToFloat(a, mode, width) * decodeToFloat(b, mode, width);
+    let sum = af + pf;
+    if (Number.isNaN(af) || Number.isNaN(pf)) sum = NaN;
+    const result = encodeFromFloat(sum, mode);
+    const flag = floatFlag(af, pf, sum);
+    const overW = width + 1;
+    const over = flag === '1'
+      ? result.padStart(overW, '0').slice(-overW)
+      : '0'.repeat(overW);
+    return { result, over };
+  }
+
+  function divideAtWidth(a, b, width, mode) {
+    assertFormatWidth(mode, width, 'DIVIDE');
+    const ap = String(a).padStart(width, '0');
+    const bp = String(b).padStart(width, '0');
+    if (fixedSpec(mode)) {
+      const va = fixedRawToNumber(ap, mode);
+      const vb = fixedRawToNumber(bp, mode);
+      if (vb === 0) {
+        return { result: '0'.repeat(width), mod: '0'.repeat(width) };
+      }
+      const q = va / vb;
+      const r = va - q * vb;
+      return {
+        result: fixedNumberToRaw(q, mode),
+        mod: fixedNumberToRaw(r, mode),
+      };
+    }
+    const af = decodeToFloat(ap, mode, width);
+    const bf = decodeToFloat(bp, mode, width);
+    if (bf === 0 || Number.isNaN(bf)) {
+      const nan = encodeFromFloat(NaN, mode);
+      return { result: nan, mod: nan };
+    }
+    const q = af / bf;
+    const r = af % bf;
+    return {
+      result: encodeFromFloat(q, mode),
+      mod: encodeFromFloat(r, mode),
+    };
+  }
+
+  function dotExpanded(aVals, bVals, X, mode) {
+    if (aVals.length !== bVals.length) {
+      throw new Error('DOT: vectors must have the same number of elements');
+    }
+    assertFormatWidth(mode, X, 'DOT');
+    if (fixedSpec(mode)) {
+      let acc = 0;
+      for (let i = 0; i < aVals.length; i++) {
+        acc += fixedRawToNumber(aVals[i], mode) * fixedRawToNumber(bVals[i], mode);
+      }
+      const spec = fixedSpec(mode);
+      const accRaw = BigInt(Math.round(acc * Number(BigInt(1) << BigInt(spec.fracBits))));
+      const maskX = (BigInt(1) << BigInt(X)) - BigInt(1);
+      const maskOver = (BigInt(1) << BigInt(2 * X)) - BigInt(1);
+      const result = (accRaw & maskX).toString(2).padStart(X, '0');
+      const over = ((accRaw >> BigInt(X)) & maskOver).toString(2).padStart(2 * X, '0');
+      return { result, over };
+    }
+    let acc = 0;
+    let flag = '0';
+    for (let i = 0; i < aVals.length; i++) {
+      const af = decodeToFloat(aVals[i], mode, X);
+      const bf = decodeToFloat(bVals[i], mode, X);
+      const term = af * bf;
+      const prev = acc;
+      acc = prev + (Number.isNaN(term) ? NaN : term);
+      if (!Number.isFinite(acc)) flag = '1';
+      acc = decodeToFloat(encodeFromFloat(acc, mode), mode, X);
+    }
+    const result = encodeFromFloat(acc, mode);
+    const over = flag === '1' ? result.padStart(2 * X, '0').slice(-2 * X) : '0'.repeat(2 * X);
+    return { result, over };
+  }
+
+  function clampAtWidth(x, lo, hi, mode) {
+    const width = lo.length;
+    if (hi.length !== width || String(x).length !== width) {
+      throw new Error('CLAMP: min and max must have the same bit width');
+    }
+    assertFormatWidth(mode, width, 'CLAMP');
+    const xp = String(x).padStart(width, '0');
+    const lp = String(lo).padStart(width, '0');
+    const hp = String(hi).padStart(width, '0');
+    if (fixedSpec(mode)) {
+      const xn = fixedRawToNumber(xp, mode);
+      const lon = fixedRawToNumber(lp, mode);
+      const hin = fixedRawToNumber(hp, mode);
+      let chosen = xn;
+      if (xn < lon) chosen = lon;
+      else if (xn > hin) chosen = hin;
+      return fixedNumberToRaw(chosen, mode);
+    }
+    const xn = decodeToFloat(xp, mode, width);
+    const lon = decodeToFloat(lp, mode, width);
+    const hin = decodeToFloat(hp, mode, width);
+    let chosen = xn;
+    if (xn < lon) chosen = lon;
+    else if (xn > hin) chosen = hin;
+    return encodeFromFloat(chosen, mode);
+  }
+
+  function absAtWidth(x, width, mode) {
+    assertFormatWidth(mode, width, 'ABS');
+    const xp = String(x).padStart(width, '0');
+    if (fixedSpec(mode)) {
+      const n = fixedRawToNumber(xp, mode);
+      const { max } = fixedMinMax(mode);
+      if (Math.abs(n) > max) {
+        return { result: xp, overflow: '1' };
+      }
+      const av = n < 0 ? -n : n;
+      return { result: fixedNumberToRaw(av, mode), overflow: '0' };
+    }
+    const f = decodeToFloat(xp, mode, width);
+    const a = Math.abs(f);
+    return { result: encodeFromFloat(a, mode), overflow: '0' };
+  }
+
   function formatFixedDisplay(binStr, mode) {
     const spec = fixedSpec(mode);
     const w = spec.width;
@@ -316,6 +505,15 @@
     sumExpanded,
     pickMinMax,
     compareValues,
+    compareTagged,
+    usesArithmeticRshift,
+    rejectsFloatRshift,
+    multiplyAtWidth,
+    macAtWidth,
+    divideAtWidth,
+    dotExpanded,
+    clampAtWidth,
+    absAtWidth,
     formatForShow,
     fixedRawToNumber,
     decodeToFloat,

@@ -117,7 +117,12 @@
     return sumExpanded(values, X, false);
   }
 
-  function dotExpanded(aVals, bVals, X, signed) {
+  function dotExpanded(aVals, bVals, X, signedOrMode) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+    if (typeof signedOrMode === 'string' && NF && NF.isFormatMode(signedOrMode)) {
+      return NF.dotExpanded(aVals, bVals, X, signedOrMode);
+    }
+    const signed = !!signedOrMode;
     if (aVals.length !== bVals.length) {
       throw new Error('DOT: vectors must have the same number of elements');
     }
@@ -579,7 +584,8 @@
     return scalar.length;
   }
 
-  function compareVectorTagged(args, getWire, fnName, op, signed, evalFns, compareFns) {
+  function compareVectorTagged(args, getWire, fnName, op, signedOrMode, evalFns, compareFns) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     if (args.length !== 2) {
       throw new Error(`${fnName}: expects 2 arguments`);
     }
@@ -597,9 +603,11 @@
       if (op === 'EQ') {
         bits.push(a === b ? '1' : '0');
       } else {
-        const cmp = signed && compareFns.signed
-          ? compareFns.signed(a, b)
-          : compareFns.unsigned(a, b);
+        const cmp = NF
+          ? NF.compareTagged(a, b, signedOrMode, compareFns)
+          : (signedOrMode && compareFns.signed
+            ? compareFns.signed(a, b)
+            : compareFns.unsigned(a, b));
         if (op === 'GT') bits.push(cmp > 0 ? '1' : '0');
         else if (op === 'LT') bits.push(cmp < 0 ? '1' : '0');
       }
@@ -607,7 +615,8 @@
     return bits.join('');
   }
 
-  function shiftVectorTagged(args, getWire, fnName, op, signed, evalFns, shiftFns) {
+  function shiftVectorTagged(args, getWire, fnName, op, signedOrMode, evalFns, shiftFns) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     const { classified, elementCount } = requireVectorTaggedSameCount(
       args, getWire, fnName, 2, 3
     );
@@ -637,7 +646,10 @@
       let out;
       if (op === 'LSHIFT') {
         out = shiftFns.lshift(dataVal, n, fill);
-      } else if (signed && shiftFns.arithmeticRshift) {
+      } else if (NF && typeof signedOrMode === 'string' && NF.isFormatMode(signedOrMode)) {
+        NF.rejectsFloatRshift(signedOrMode, fnName);
+        out = shiftFns.arithmeticRshift(dataVal, n);
+      } else if (NF && NF.usesArithmeticRshift(signedOrMode) && shiftFns.arithmeticRshift) {
         out = shiftFns.arithmeticRshift(dataVal, n);
       } else {
         out = shiftFns.rshift(dataVal, n, fill);
@@ -684,7 +696,8 @@
     return results.join('');
   }
 
-  function findVectorExtremumIndex(values, W, pickMax, signed, compareFns, fnName) {
+  function findVectorExtremumIndex(values, W, pickMax, signedOrMode, compareFns, fnName) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     const N = values.length;
     if (N === 0) {
       throw new Error(`${fnName}: vector has zero elements`);
@@ -699,9 +712,11 @@
       if (v.length !== W) {
         throw new Error(`${fnName}: ${SHAPE_ERR}`);
       }
-      const cmp = signed && compareFns.signed
-        ? compareFns.signed(v, best)
-        : compareFns.unsigned(v, best);
+      const cmp = NF
+        ? NF.compareTagged(v, best, signedOrMode, compareFns)
+        : (signedOrMode && compareFns.signed
+          ? compareFns.signed(v, best)
+          : compareFns.unsigned(v, best));
       if (pickMax ? cmp > 0 : cmp < 0) {
         bestIdx = i;
         best = v;
@@ -711,7 +726,7 @@
     return { bestIdx, oneHot, elementCount: N };
   }
 
-  function argExtremumFromWholeVector(args, getWire, fnName, pickMax, signed, evalFns, compareFns) {
+  function argExtremumFromWholeVector(args, getWire, fnName, pickMax, signedOrMode, evalFns, compareFns) {
     if (!args || args.length !== 1) {
       throw new Error(`${fnName}: expects 1 argument`);
     }
@@ -726,7 +741,7 @@
     for (let i = 0; i < N; i++) {
       values.push(evalFns.evalElement(varName, i));
     }
-    return findVectorExtremumIndex(values, W, pickMax, signed, compareFns, fnName);
+    return findVectorExtremumIndex(values, W, pickMax, signedOrMode, compareFns, fnName);
   }
 
   function getTensorShapeMeta(argExpr, getWire) {

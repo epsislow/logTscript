@@ -4493,8 +4493,8 @@ const idx = parseInt(
 
   const reductionMode = NF && NF.isFormatMode(numericMode) ? numericMode : signedMode;
 
-  if (name === 'ABS' && !signedMode) {
-    fail('ABS requires ; signed');
+  if (name === 'ABS' && !signedMode && !(NF && NF.isFormatMode(numericMode))) {
+    fail('ABS requires ; signed or a format tag');
   }
 
   if (name === 'ZCONNECT' || name === 'ZCONN') {
@@ -5000,7 +5000,7 @@ const idx = parseInt(
       if (!rank1Dot && MR.resolveDotMatrixShape(metaA, metaB)) {
         let dotMat;
         try {
-          dotMat = MR.dotMatrixMultiply(args, getWire, signedMode, this._matrixTaggedEvalFns());
+          dotMat = MR.dotMatrixMultiply(args, getWire, reductionMode, this._matrixTaggedEvalFns());
         } catch (e) {
           fail(e.message);
         }
@@ -5036,7 +5036,7 @@ const idx = parseInt(
     let dot;
     try {
       const X = metaA.elementWidth;
-      dot = VR.dotExpanded(aVals, bVals, X, signedMode);
+      dot = VR.dotExpanded(aVals, bVals, X, reductionMode);
     } catch (e) {
       fail(e.message);
     }
@@ -5062,7 +5062,7 @@ const idx = parseInt(
       let step;
       try {
         step = XR.argExtremumAxisTagged(
-          args, getWire, name, axisMode, pickMax, signedMode, indexMode,
+          args, getWire, name, axisMode, pickMax, reductionMode, indexMode,
           this._matrixTaggedEvalFns(), compareFns
         );
       } catch (e) {
@@ -5083,7 +5083,7 @@ const idx = parseInt(
       let matStep = null;
       try {
         matStep = MR.argExtremumFromWholeMatrix(
-          args, getWire, name, name === 'ARGMAX', signedMode,
+          args, getWire, name, name === 'ARGMAX', reductionMode,
           this._matrixTaggedEvalFns(), compareFns
         );
       } catch (e) {
@@ -5108,7 +5108,7 @@ const idx = parseInt(
     let step;
     try {
       step = VR.argExtremumFromWholeVector(
-        args, getWire, name, name === 'ARGMAX', signedMode,
+        args, getWire, name, name === 'ARGMAX', reductionMode,
         this._vectorTaggedEvalFns(), compareFns
       );
     } catch (e) {
@@ -5542,11 +5542,11 @@ if (this.isBuiltinDEMUX(name)) {
         if (matrixMode) {
           if (!MR) fail(`${name}: internal error (matrix-reduce not loaded)`);
           blob = MR.shiftMatrixTagged(
-            args, getWire, name, name, signedMode, this._matrixTaggedEvalFns(), shiftFns
+            args, getWire, name, name, reductionMode, this._matrixTaggedEvalFns(), shiftFns
           );
         } else {
           blob = VR.shiftVectorTagged(
-            args, getWire, name, name, signedMode, this._vectorTaggedEvalFns(), shiftFns
+            args, getWire, name, name, reductionMode, this._vectorTaggedEvalFns(), shiftFns
           );
         }
       } catch (e) {
@@ -5566,6 +5566,9 @@ if (this.isBuiltinDEMUX(name)) {
     if (name === 'LSHIFT') {
       // Append n fill bits on the right → data.length + n bits
       v = data + fill.repeat(n);
+    } else if (NF && NF.isFormatMode(numericMode)) {
+      NF.rejectsFloatRshift(numericMode, name);
+      v = SA.arithmeticRshift(data, n);
     } else if (signedMode && SA) {
       v = SA.arithmeticRshift(data, n);
     } else {
@@ -5768,10 +5771,19 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'ABS') {
     if (argValues.length !== 1) fail('ABS expects 1 argument');
     if (vectorMode || matrixMode) fail('ABS: does not accept tag \'vector\' or \'matrix\'');
-    if (!signedMode) fail('ABS requires ; signed');
+    if (!signedMode && !(NF && NF.isFormatMode(numericMode))) {
+      fail('ABS requires ; signed or a format tag');
+    }
     this._zstateRequireBinary(argValues, 'ABS', ['x']);
     const x = argValues[0];
     const depth = x.length;
+    if (NF && NF.isFormatMode(numericMode)) {
+      const { result, overflow } = NF.absAtWidth(x, depth, numericMode);
+      return [
+        computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+        computeRefs ? { value: overflow, ref: `&${this.storeValue(overflow)}` } : { value: overflow, ref: null },
+      ];
+    }
     if (!SA) fail('ABS: internal error (signed-arithmetic not loaded)');
     const { result, overflow } = SA.absAtWidth(x, depth);
     return [
@@ -5918,8 +5930,11 @@ if (this.isBuiltinDEMUX(name)) {
     const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
     const getWire = (n) => this.wires.get(n);
     const evalFns = this._vectorTaggedEvalFns();
-    const multiplyFn = (a, b, W, signed) => {
-      if (SA) return SA.multiplyAtWidth(a, b, W, signed);
+    const multiplyFn = (a, b, W, modeOrSigned) => {
+      if (NF && typeof modeOrSigned === 'string' && NF.isFormatMode(modeOrSigned)) {
+        return NF.multiplyAtWidth(a, b, W, modeOrSigned);
+      }
+      if (SA) return SA.multiplyAtWidth(a, b, W, !!modeOrSigned);
       return VR.multiplyUnsignedAtWidth(a, b, W);
     };
     if (matrixMode) {
@@ -5927,7 +5942,7 @@ if (this.isBuiltinDEMUX(name)) {
       let mulMat;
       try {
         mulMat = MR.multiplyMatrixTagged(
-          args, getWire, 'MULTIPLY', signedMode, this._matrixTaggedEvalFns(), multiplyFn
+          args, getWire, 'MULTIPLY', reductionMode, this._matrixTaggedEvalFns(), multiplyFn
         );
       } catch (e) {
         fail(e.message);
@@ -5939,7 +5954,7 @@ if (this.isBuiltinDEMUX(name)) {
       let mulVec;
       try {
         mulVec = VR.multiplyVectorTagged(
-          args, getWire, 'MULTIPLY', signedMode, evalFns, multiplyFn
+          args, getWire, 'MULTIPLY', reductionMode, evalFns, multiplyFn
         );
       } catch (e) {
         fail(e.message);
@@ -5949,6 +5964,13 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'MULTIPLY', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
+    if (NF && NF.isFormatMode(numericMode)) {
+      const { result, over } = NF.multiplyAtWidth(a, b, depth, numericMode);
+      return [
+        computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+        computeRefs ? { value: over,   ref: `&${this.storeValue(over)}`   } : { value: over,   ref: null },
+      ];
+    }
     if (SA) {
       const { result, over } = SA.multiplyAtWidth(a, b, depth, signedMode);
       return [
@@ -5972,8 +5994,11 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'DIVIDE') {
     if (argValues.length !== 2) fail('DIVIDE expects 2 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
-    const divideFn = (a, b, W, signed) => {
-      if (SA) return SA.divideAtWidth(a, b, W, signed);
+    const divideFn = (a, b, W, modeOrSigned) => {
+      if (NF && typeof modeOrSigned === 'string' && NF.isFormatMode(modeOrSigned)) {
+        return NF.divideAtWidth(a, b, W, modeOrSigned);
+      }
+      if (SA) return SA.divideAtWidth(a, b, W, !!modeOrSigned);
       const ap = String(a).padStart(W, '0');
       const bp = String(b).padStart(W, '0');
       const mask = (BigInt(1) << BigInt(W)) - BigInt(1);
@@ -6000,7 +6025,7 @@ if (this.isBuiltinDEMUX(name)) {
       let divMat;
       try {
         divMat = MR.divideMatrixTagged(
-          args, getWire, 'DIVIDE', signedMode, this._matrixTaggedEvalFns(), divideFn
+          args, getWire, 'DIVIDE', reductionMode, this._matrixTaggedEvalFns(), divideFn
         );
       } catch (e) {
         fail(e.message);
@@ -6014,7 +6039,7 @@ if (this.isBuiltinDEMUX(name)) {
       let divVec;
       try {
         divVec = VR.divideVectorTagged(
-          args, getWire, 'DIVIDE', signedMode, evalFns, divideFn
+          args, getWire, 'DIVIDE', reductionMode, evalFns, divideFn
         );
       } catch (e) {
         fail(e.message);
@@ -6027,7 +6052,11 @@ if (this.isBuiltinDEMUX(name)) {
     const depth = Math.max(a.length, b.length);
     let div;
     try {
-      div = divideFn(a, b, depth, signedMode);
+      if (NF && NF.isFormatMode(numericMode)) {
+        div = NF.divideAtWidth(a, b, depth, numericMode);
+      } else {
+        div = divideFn(a, b, depth, signedMode);
+      }
     } catch (e) {
       fail(e.message);
     }
@@ -6042,8 +6071,11 @@ if (this.isBuiltinDEMUX(name)) {
     if (argValues.length !== 3) fail('MAC expects 3 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
     const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
-    const macFn = (acc, a, b, signed) => {
-      if (SA) return SA.macAtWidth(acc, a, b, signed);
+    const macFn = (acc, a, b, modeOrSigned) => {
+      if (NF && typeof modeOrSigned === 'string' && NF.isFormatMode(modeOrSigned)) {
+        return NF.macAtWidth(acc, a, b, modeOrSigned);
+      }
+      if (SA) return SA.macAtWidth(acc, a, b, !!modeOrSigned);
       return macUnsigned(acc, a, b);
     };
     if (matrixMode) {
@@ -6052,7 +6084,7 @@ if (this.isBuiltinDEMUX(name)) {
       let macMat;
       try {
         macMat = MR.macMatrixTagged(
-          args, getWire, 'MAC', signedMode, this._matrixTaggedEvalFns(), macFn
+          args, getWire, 'MAC', reductionMode, this._matrixTaggedEvalFns(), macFn
         );
       } catch (e) {
         fail(e.message);
@@ -6066,7 +6098,7 @@ if (this.isBuiltinDEMUX(name)) {
       let macVec;
       try {
         macVec = VR.macVectorTagged(
-          args, getWire, 'MAC', signedMode, evalFns, macFn
+          args, getWire, 'MAC', reductionMode, evalFns, macFn
         );
       } catch (e) {
         fail(e.message);
@@ -6076,7 +6108,9 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'MAC', ['acc', 'a', 'b']);
     let mac;
     try {
-      if (SA && signedMode) {
+      if (NF && NF.isFormatMode(numericMode)) {
+        mac = NF.macAtWidth(argValues[0], argValues[1], argValues[2], numericMode);
+      } else if (SA && signedMode) {
         mac = SA.macAtWidth(argValues[0], argValues[1], argValues[2], true);
       } else {
         mac = macUnsigned(argValues[0], argValues[1], argValues[2]);
@@ -6172,7 +6206,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = MR.compareMatrixTagged(
-          args, getWire, 'GT', 'GT', signedMode, this._matrixTaggedEvalFns(), compareFns
+          args, getWire, 'GT', 'GT', reductionMode, this._matrixTaggedEvalFns(), compareFns
         );
       } catch (e) {
         fail(e.message);
@@ -6191,7 +6225,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = VR.compareVectorTagged(
-          args, getWire, 'GT', 'GT', signedMode, this._vectorTaggedEvalFns(), compareFns
+          args, getWire, 'GT', 'GT', reductionMode, this._vectorTaggedEvalFns(), compareFns
         );
       } catch (e) {
         fail(e.message);
@@ -6201,9 +6235,11 @@ if (this.isBuiltinDEMUX(name)) {
         : { value: blob, ref: null };
     }
     this._zstateRequireBinary(argValues, 'GT', ['a', 'b']);
-    const cmp = signedMode && SA
-      ? SA.signedCompareBigInt(argValues[0], argValues[1])
-      : unsignedCompareBigInt(argValues[0], argValues[1]);
+    const cmp = NF && NF.isFormatMode(numericMode)
+      ? NF.compareValues(argValues[0], argValues[1], numericMode)
+      : (signedMode && SA
+        ? SA.signedCompareBigInt(argValues[0], argValues[1])
+        : unsignedCompareBigInt(argValues[0], argValues[1]));
     const v = cmp > 0 ? '1' : '0';
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
@@ -6224,7 +6260,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = MR.compareMatrixTagged(
-          args, getWire, 'LT', 'LT', signedMode, this._matrixTaggedEvalFns(), compareFns
+          args, getWire, 'LT', 'LT', reductionMode, this._matrixTaggedEvalFns(), compareFns
         );
       } catch (e) {
         fail(e.message);
@@ -6243,7 +6279,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = VR.compareVectorTagged(
-          args, getWire, 'LT', 'LT', signedMode, this._vectorTaggedEvalFns(), compareFns
+          args, getWire, 'LT', 'LT', reductionMode, this._vectorTaggedEvalFns(), compareFns
         );
       } catch (e) {
         fail(e.message);
@@ -6253,9 +6289,11 @@ if (this.isBuiltinDEMUX(name)) {
         : { value: blob, ref: null };
     }
     this._zstateRequireBinary(argValues, 'LT', ['a', 'b']);
-    const cmp = signedMode && SA
-      ? SA.signedCompareBigInt(argValues[0], argValues[1])
-      : unsignedCompareBigInt(argValues[0], argValues[1]);
+    const cmp = NF && NF.isFormatMode(numericMode)
+      ? NF.compareValues(argValues[0], argValues[1], numericMode)
+      : (signedMode && SA
+        ? SA.signedCompareBigInt(argValues[0], argValues[1])
+        : unsignedCompareBigInt(argValues[0], argValues[1]));
     const v = cmp < 0 ? '1' : '0';
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
@@ -6409,7 +6447,10 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'CLAMP') {
     if (argValues.length !== 3) fail('CLAMP expects 3 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
-    const clampAtWidth = (x, lo, hi) => {
+    const clampAtWidthFn = (x, lo, hi) => {
+      if (NF && NF.isFormatMode(numericMode)) {
+        return NF.clampAtWidth(x, lo, hi, numericMode);
+      }
       if (signedMode && SA) return SA.clampSigned(x, lo, hi);
       return clampUnsigned(x, lo, hi);
     };
@@ -6420,7 +6461,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = MR.clampMatrixTagged(
-          args, getWire, 'CLAMP', this._matrixTaggedEvalFns(), clampAtWidth
+          args, getWire, 'CLAMP', this._matrixTaggedEvalFns(), clampAtWidthFn
         );
       } catch (e) {
         fail(e.message);
@@ -6435,7 +6476,7 @@ if (this.isBuiltinDEMUX(name)) {
       const evalFns = this._vectorTaggedEvalFns();
       let blob;
       try {
-        blob = VR.clampVectorTagged(args, getWire, 'CLAMP', evalFns, clampAtWidth);
+        blob = VR.clampVectorTagged(args, getWire, 'CLAMP', evalFns, clampAtWidthFn);
       } catch (e) {
         fail(e.message);
       }
@@ -6446,9 +6487,13 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'CLAMP', ['x', 'min', 'max']);
     let v;
     try {
-      v = signedMode && SA
-        ? SA.clampSigned(argValues[0], argValues[1], argValues[2])
-        : clampUnsigned(argValues[0], argValues[1], argValues[2]);
+      if (NF && NF.isFormatMode(numericMode)) {
+        v = NF.clampAtWidth(argValues[0], argValues[1], argValues[2], numericMode);
+      } else {
+        v = signedMode && SA
+          ? SA.clampSigned(argValues[0], argValues[1], argValues[2])
+          : clampUnsigned(argValues[0], argValues[1], argValues[2]);
+      }
     } catch (e) {
       fail(e.message);
     }
@@ -13392,6 +13437,8 @@ Interpreter.BUILTIN_DOC = {
     'RSHIFT(Xbit data, Nbit n) -> Xbit',
     'RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit',
     'RSHIFT(Xbit data, Nbit n; signed) -> Xbit',
+    'RSHIFT(8bit data, Nbit n; q4p4) -> 8bit',
+    'RSHIFT(16bit data, Nbit n; q8p8) -> 16bit',
     'RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]',
     'RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector signed) -> Wbit[n]',
     'RSHIFT(Wbit[n,m] data, Nbit/Kbit[n,m] count ; matrix) -> Wbit[n,m]',
@@ -13427,6 +13474,10 @@ Interpreter.BUILTIN_DOC = {
   MULTIPLY: [
     'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over',
     'MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over',
+    'MULTIPLY(8bit a, 8bit b; q4p4) -> 8bit result, 8bit over',
+    'MULTIPLY(16bit a, 16bit b; q8p8) -> 16bit result, 16bit over',
+    'MULTIPLY(16bit a, 16bit b; fp16) -> 16bit result, 16bit inexact',
+    'MULTIPLY(16bit a, 16bit b; bf16) -> 16bit result, 16bit inexact',
     'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
     'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
     'MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]',
@@ -13435,6 +13486,10 @@ Interpreter.BUILTIN_DOC = {
   DIVIDE:   [
     'DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod',
     'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod',
+    'DIVIDE(8bit a, 8bit b; q4p4) -> 8bit result, 8bit mod',
+    'DIVIDE(16bit a, 16bit b; q8p8) -> 16bit result, 16bit mod',
+    'DIVIDE(16bit a, 16bit b; fp16) -> 16bit result, 16bit mod',
+    'DIVIDE(16bit a, 16bit b; bf16) -> 16bit result, 16bit mod',
     'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
     'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
     'DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]',
@@ -13443,6 +13498,10 @@ Interpreter.BUILTIN_DOC = {
   MAC:      [
     'MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over',
     'MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over',
+    'MAC(8bit acc, 8bit a, 8bit b; q4p4) -> 8bit result, 9bit over',
+    'MAC(16bit acc, 16bit a, 16bit b; q8p8) -> 16bit result, 17bit over',
+    'MAC(16bit acc, 16bit a, 16bit b; fp16) -> 16bit result, 17bit inexact',
+    'MAC(16bit acc, 16bit a, 16bit b; bf16) -> 16bit result, 17bit inexact',
     'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]',
     'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], (W+1)bit[n]',
     'MAC(Wbit[n,m] acc, Wbit/Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], (W+1)bit[n,m]',
@@ -13467,6 +13526,10 @@ Interpreter.BUILTIN_DOC = {
   DOT:      [
     'DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over',
     'DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over',
+    'DOT(8wire[n] a, 8wire[n] b; q4p4) -> 8bit result, 16bit over',
+    'DOT(16wire[n] a, 16wire[n] b; q8p8) -> 16bit result, 32bit over',
+    'DOT(16wire[n] a, 16wire[n] b; fp16) -> 16bit result, 32bit inexact',
+    'DOT(16wire[n] a, 16wire[n] b; bf16) -> 16bit result, 32bit inexact',
     'DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over',
     'DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over',
   ],
@@ -13479,6 +13542,10 @@ Interpreter.BUILTIN_DOC = {
   GT:       [
     'GT(Xbit a, Xbit b) -> 1bit',
     'GT(Xbit a, Xbit b; signed) -> 1bit',
+    'GT(8bit a, 8bit b; q4p4) -> 1bit',
+    'GT(16bit a, 16bit b; q8p8) -> 1bit',
+    'GT(16bit a, 16bit b; fp16) -> 1bit',
+    'GT(16bit a, 16bit b; bf16) -> 1bit',
     'GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]',
     'GT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]',
     'GT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> 1wire[n×m]',
@@ -13487,6 +13554,10 @@ Interpreter.BUILTIN_DOC = {
   LT:       [
     'LT(Xbit a, Xbit b) -> 1bit',
     'LT(Xbit a, Xbit b; signed) -> 1bit',
+    'LT(8bit a, 8bit b; q4p4) -> 1bit',
+    'LT(16bit a, 16bit b; q8p8) -> 1bit',
+    'LT(16bit a, 16bit b; fp16) -> 1bit',
+    'LT(16bit a, 16bit b; bf16) -> 1bit',
     'LT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]',
     'LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]',
     'LT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> 1wire[n×m]',
@@ -13528,6 +13599,7 @@ Interpreter.BUILTIN_DOC = {
     'ARGMAX(Wbit[n] vector) -> 1wire[n]',
     'ARGMAX(Wbit[n] vector; index) -> bitIndexWidth(n) bit',
     'ARGMAX(Wbit[n] vector; signed) -> 1wire[n]',
+    'ARGMAX(Wbit[n] vector; q4p4) -> 1wire[n]',
     'ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit',
     'ARGMAX(Wbit[n,m] matrix) -> 1wire[n×m]',
     'ARGMAX(Wbit[n,m] matrix; index) -> bit rows, bit cols',
@@ -13540,6 +13612,7 @@ Interpreter.BUILTIN_DOC = {
     'ARGMIN(Wbit[n] vector) -> 1wire[n]',
     'ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit',
     'ARGMIN(Wbit[n] vector; signed) -> 1wire[n]',
+    'ARGMIN(Wbit[n] vector; q4p4) -> 1wire[n]',
     'ARGMIN(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit',
     'ARGMIN(Wbit[n,m] matrix) -> 1wire[n×m]',
     'ARGMIN(Wbit[n,m] matrix; index) -> bit rows, bit cols',
@@ -13551,12 +13624,22 @@ Interpreter.BUILTIN_DOC = {
   CLAMP:    [
     'CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit',
     'CLAMP(Xbit x, Ybit min, Ybit max; signed) -> Ybit',
+    'CLAMP(8bit x, 8bit min, 8bit max; q4p4) -> 8bit',
+    'CLAMP(16bit x, 16bit min, 16bit max; q8p8) -> 16bit',
+    'CLAMP(16bit x, 16bit min, 16bit max; fp16) -> 16bit',
+    'CLAMP(16bit x, 16bit min, 16bit max; bf16) -> 16bit',
     'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector) -> Wbit[n]',
     'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]',
     'CLAMP(Wbit[n,m] x, Wbit/Wbit[n,m] min, Wbit/Wbit[n,m] max ; matrix) -> Wbit[n,m]',
     'CLAMP(Wbit[n,m] x, Wbit/Wbit[n,m] min, Wbit/Wbit[n,m] max ; matrix signed) -> Wbit[n,m]',
   ],
-  ABS:      ['ABS(Xbit x; signed) -> Xbit result, 1bit overflow'],
+  ABS:      [
+    'ABS(Xbit x; signed) -> Xbit result, 1bit overflow',
+    'ABS(8bit x; q4p4) -> 8bit result, 1bit overflow',
+    'ABS(16bit x; q8p8) -> 16bit result, 1bit overflow',
+    'ABS(16bit x; fp16) -> 16bit result, 1bit overflow',
+    'ABS(16bit x; bf16) -> 16bit result, 1bit overflow',
+  ],
   ISDIGIT:  ['ISDIGIT(Xbit value) -> 1bit'],
   HIGH:     ['HIGH(Xbit) -> Xbit'],
   LOW:      ['LOW(Xbit) -> Xbit'],

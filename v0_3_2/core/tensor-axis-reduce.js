@@ -102,13 +102,16 @@
     return results.join('');
   }
 
-  function argExtremumAxisTagged(args, getWire, fnName, axis, pickMax, signed, indexMode, evalFns, compareFns) {
+  function argExtremumAxisTagged(args, getWire, fnName, axis, pickMax, signedOrMode, indexMode, evalFns, compareFns) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     const { meta, varName } = requireAxisMatrixArg(args, getWire, fnName);
     const W = meta.elementWidth;
     const { rows, cols } = meta;
-    const compare = (a, b) => (signed && compareFns.signed
-      ? compareFns.signed(a, b)
-      : compareFns.unsigned(a, b));
+    const compare = (a, b) => (NF
+      ? NF.compareTagged(a, b, signedOrMode, compareFns)
+      : (signedOrMode && compareFns.signed
+        ? compareFns.signed(a, b)
+        : compareFns.unsigned(a, b)));
 
     if (indexMode) {
       const outer = axis === 'row' ? rows : cols;
@@ -118,7 +121,7 @@
         const vals = axis === 'row'
           ? rowValues(meta, varName, i, evalFns)
           : colValues(meta, varName, i, evalFns);
-        const step = VR.findVectorExtremumIndex(vals, W, pickMax, signed, compareFns, fnName);
+        const step = VR.findVectorExtremumIndex(vals, W, pickMax, signedOrMode, compareFns, fnName);
         indices.push(step.bestIdx);
       }
       return { indexMode: true, indices, idxWidth };

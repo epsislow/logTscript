@@ -224,10 +224,10 @@ show(z; fp16)
 
 ## Faze ulterioare (în afara scope-ului faza 1)
 
-| Fază | Conținut |
-|------|----------|
-| **2** | GT, LT, CLAMP, MULTIPLY, MAC, DOT, DIVIDE, ABS, RSHIFT, ARGMAX, ARGMIN cu tag-uri format |
-| **3** | Familie Q extinsă: `q16p16` și altele (reutilizare motor `Qx.y` generic) |
+| Fază | Conținut | Status |
+|------|----------|--------|
+| **2** | GT, LT, CLAMP, MULTIPLY, MAC, DOT, DIVIDE, ABS, RSHIFT, ARGMAX, ARGMIN cu tag-uri format | **implementată** — teste 1994–2005, grup `builtin-numeric-formats-phase2`, suite 1483/1483 |
+| **3** | Familie Q extinsă: `q16p16` și altele (reutilizare motor `Qx.y` generic) | — |
 | **4** | Literali sursă pentru inițializare (ex. `1.5` în q4p4) în [`wire-literals.js`](../v0_3_2/core/wire-literals.js) |
 | **5** | Overload-uri user `def` cu tag `q4p4`/`q8p8`/`fp16` ([`user-func-overloads.js`](../v0_3_2/core/user-func-overloads.js)) |
 

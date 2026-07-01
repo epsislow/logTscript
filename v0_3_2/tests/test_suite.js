@@ -2794,10 +2794,11 @@ reg(312, 'doc', 'BUILTIN_DOC — LSHIFT signatures', function(h, session) {
 
 reg(313, 'doc', 'BUILTIN_DOC — RSHIFT signatures', function(h, session) {
   const lines = Interpreter.getDocLines('RSHIFT', new Map());
-  h.assert('RSHIFT 7 signatures', String(lines.length), '7');
+  h.assert('RSHIFT 9 signatures', String(lines.length), '9');
   h.assert('RSHIFT signed', lines[2], 'RSHIFT(Xbit data, Nbit n; signed) -> Xbit');
-  h.assert('RSHIFT vector', lines[3], 'RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]');
-  h.assert('RSHIFT matrix', lines[5], 'RSHIFT(Wbit[n,m] data, Nbit/Kbit[n,m] count ; matrix) -> Wbit[n,m]');
+  h.assert('RSHIFT q4p4', lines[3], 'RSHIFT(8bit data, Nbit n; q4p4) -> 8bit');
+  h.assert('RSHIFT vector', lines[5], 'RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]');
+  h.assert('RSHIFT matrix', lines[7], 'RSHIFT(Wbit[n,m] data, Nbit/Kbit[n,m] count ; matrix) -> Wbit[n,m]');
 });
 
 reg(314, 'doc', 'BUILTIN_DOC — LATCH', function(h, session) {
@@ -2911,20 +2912,21 @@ reg(329, 'doc', 'BUILTIN_DOC — SUBTRACT signature', function(h, session) {
 
 reg(330, 'doc', 'BUILTIN_DOC — MULTIPLY signature', function(h, session) {
   const lines = Interpreter.getDocLines('MULTIPLY', new Map());
-  h.assert('MULTIPLY 6 signatures', String(lines.length), '6');
+  h.assert('MULTIPLY 10 signatures', String(lines.length), '10');
   h.assert('MULTIPLY unsigned', lines[0], 'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over');
   h.assert('MULTIPLY signed', lines[1], 'MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over');
-  h.assert('MULTIPLY vector', lines[2], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('MULTIPLY matrix', lines[4], 'MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('MULTIPLY q4p4', lines[2], 'MULTIPLY(8bit a, 8bit b; q4p4) -> 8bit result, 8bit over');
+  h.assert('MULTIPLY vector', lines[6], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('MULTIPLY matrix', lines[8], 'MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(331, 'doc', 'BUILTIN_DOC — DIVIDE signature', function(h, session) {
   const lines = Interpreter.getDocLines('DIVIDE', new Map());
-  h.assert('DIVIDE 6 signatures', String(lines.length), '6');
+  h.assert('DIVIDE 10 signatures', String(lines.length), '10');
   h.assert('DIVIDE unsigned', lines[0], 'DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod');
   h.assert('DIVIDE signed', lines[1], 'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod');
-  h.assert('DIVIDE vector', lines[2], 'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('DIVIDE matrix', lines[4], 'DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('DIVIDE vector', lines[6], 'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('DIVIDE matrix', lines[8], 'DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(332, 'doc', 'doc(def) — lists built-in and user-defined separately', function(h, session) {
@@ -14583,10 +14585,11 @@ reg(1798, 'builtin-signed', 'DOT — signed vs unsigned', function(h, session) {
 
 reg(1799, 'doc', 'BUILTIN_DOC — DOT signed signature', function(h, session) {
   const lines = Interpreter.getDocLines('DOT', new Map());
-  h.assert('DOT 4 signatures', String(lines.length), '4');
+  h.assert('DOT 8 signatures', String(lines.length), '8');
   h.assert('DOT signed', lines[1], 'DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over');
-  h.assert('DOT matmul', lines[2], 'DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over');
-  h.assert('DOT matmul signed', lines[3], 'DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over');
+  h.assert('DOT q4p4', lines[2], 'DOT(8wire[n] a, 8wire[n] b; q4p4) -> 8bit result, 16bit over');
+  h.assert('DOT matmul', lines[6], 'DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over');
+  h.assert('DOT matmul signed', lines[7], 'DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over');
 });
 
 reg(1800, 'builtin-signed', 'SUM — signed vs unsigned', function(h, session) {
@@ -14808,9 +14811,9 @@ reg(1822, 'builtin-vector', 'doc(ADD/SUBTRACT/CLAMP) vector signatures', functio
   const clampLines = Interpreter.getDocLines('CLAMP', new Map());
   h.assert('ADD 10 signatures', String(addLines.length), '10');
   h.assert('SUBTRACT 10 signatures', String(subLines.length), '10');
-  h.assert('CLAMP 6 signatures', String(clampLines.length), '6');
+  h.assert('CLAMP 10 signatures', String(clampLines.length), '10');
   h.assert('ADD vector', addLines[6], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('CLAMP vector signed', clampLines[3], 'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]');
+  h.assert('CLAMP vector signed', clampLines[7], 'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]');
   h.assert('ADD matrix', addLines[8], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
   h.assert('SUBTRACT matrix signed', subLines[9], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed) -> Wbit[n,m], Wbit[n,m]');
 });
@@ -14924,9 +14927,9 @@ reg(1833, 'builtin-vector', 'doc(MULTIPLY/MAC/DIVIDE) vector signatures', functi
   const mulLines = Interpreter.getDocLines('MULTIPLY', new Map());
   const macLines = Interpreter.getDocLines('MAC', new Map());
   const divLines = Interpreter.getDocLines('DIVIDE', new Map());
-  h.assert('MAC vector over', macLines[2], 'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]');
+  h.assert('MAC vector over', macLines[6], 'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]');
   h.assert('DIVIDE signed', divLines[1], 'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod');
-  h.assert('MULTIPLY vector signed', mulLines[3], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]');
+  h.assert('MULTIPLY vector signed', mulLines[7], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]');
 });
 
 reg(1834, 'builtin-vector', 'GT(vectorA, vectorB; vector)', function(h, session) {
@@ -15082,8 +15085,8 @@ reg(1850, 'builtin-vector', 'doc(GT/LT/EQ/LSHIFT) vector signatures', function(h
   const ltLines = Interpreter.getDocLines('LT', new Map());
   const eqLines = Interpreter.getDocLines('EQ', new Map());
   const lsLines = Interpreter.getDocLines('LSHIFT', new Map());
-  h.assert('GT vector', gtLines[2], 'GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
-  h.assert('LT vector signed', ltLines[3], 'LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]');
+  h.assert('GT vector', gtLines[6], 'GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
+  h.assert('LT vector signed', ltLines[7], 'LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]');
   h.assert('EQ vector', eqLines[2], 'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]');
   h.assert('LSHIFT vector', lsLines[2], 'LSHIFT(Wbit[n] data, Nbit count ; vector) -> (W+n)bit[n]');
 });
@@ -15188,7 +15191,7 @@ reg(1863, 'builtin-vector', 'doc(ARGMAX/ARGMIN) signatures', function(h, session
   const maxLines = Interpreter.getDocLines('ARGMAX', new Map());
   const minLines = Interpreter.getDocLines('ARGMIN', new Map());
   h.assert('ARGMAX one-hot', maxLines[0], 'ARGMAX(Wbit[n] vector) -> 1wire[n]');
-  h.assert('ARGMAX index signed', maxLines[3], 'ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit');
+  h.assert('ARGMAX index signed', maxLines[4], 'ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit');
   h.assert('ARGMIN index', minLines[1], 'ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit');
 });
 
@@ -16696,6 +16699,112 @@ reg(1993, 'builtin-numeric-formats', 'ADD(vector) — q4p4 per element', functio
   );
   h.assert('elem0 2.0', session.getWire(interp, 'r').slice(0, 8), '00100000');
   h.assert('elem1 1.0', session.getWire(interp, 'r').slice(8, 16), '00010000');
+});
+
+reg(1994, 'builtin-numeric-formats-phase2', 'GT — q4p4 1.5 > 0.5', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 00011000\n' +
+    '8wire b = 00001000\n' +
+    '1wire gt = GT(a, b; q4p4)'
+  );
+  h.assert('gt true', session.getWire(interp, 'gt'), '1');
+});
+
+reg(1995, 'builtin-numeric-formats-phase2', 'LT — q4p4 0.5 < 1.5', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 00001000\n' +
+    '8wire b = 00011000\n' +
+    '1wire lt = LT(a, b; q4p4)'
+  );
+  h.assert('lt true', session.getWire(interp, 'lt'), '1');
+});
+
+reg(1996, 'builtin-numeric-formats-phase2', 'MULTIPLY — q4p4 1.5×2.0=3.0', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 00011000\n' +
+    '8wire b = 00100000\n' +
+    '8wire r, 8wire o = MULTIPLY(a, b; q4p4)'
+  );
+  h.assert('result 3.0', session.getWire(interp, 'r'), '00110000');
+});
+
+reg(1997, 'builtin-numeric-formats-phase2', 'DIVIDE — q4p4 2.0/0.5=4.0', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 00100000\n' +
+    '8wire b = 00001000\n' +
+    '8wire q, 8wire m = DIVIDE(a, b; q4p4)'
+  );
+  h.assert('quotient 4.0', session.getWire(interp, 'q'), '01000000');
+  h.assert('remainder 0', session.getWire(interp, 'm'), '00000000');
+});
+
+reg(1998, 'builtin-numeric-formats-phase2', 'MAC — q4p4 acc+1.5×0.5=1.75', function(h, session) {
+  const { interp } = session.run(
+    '8wire acc = 00010000\n' +
+    '8wire a = 00011000\n' +
+    '8wire b = 00001000\n' +
+    '8wire r, 9wire o = MAC(acc, a, b; q4p4)'
+  );
+  h.assert('result 1.75', session.getWire(interp, 'r'), '00011100');
+});
+
+reg(1999, 'builtin-numeric-formats-phase2', 'DOT — q4p4 [1.5,0.5]·[1,1]=2.0', function(h, session) {
+  const { interp } = session.run(
+    '8wire[2] a = 00011000 + 00001000\n' +
+    '8wire[2] b = 00010000 + 00010000\n' +
+    '8wire dot, 16wire over = DOT(a, b; q4p4)'
+  );
+  h.assert('dot 2.0', session.getWire(interp, 'dot'), '00100000');
+});
+
+reg(2000, 'builtin-numeric-formats-phase2', 'CLAMP — q4p4 3.0 to [0,2.0]', function(h, session) {
+  const { interp } = session.run(
+    '8wire x = 00110000\n' +
+    '8wire lo = 00000000\n' +
+    '8wire hi = 00100000\n' +
+    '8wire y = CLAMP(x, lo, hi; q4p4)'
+  );
+  h.assert('clamped 2.0', session.getWire(interp, 'y'), '00100000');
+});
+
+reg(2001, 'builtin-numeric-formats-phase2', 'ABS — q4p4 |-1|=1.0', function(h, session) {
+  const { interp } = session.run(
+    '8wire x = 11110000\n' +
+    '8wire a, 1wire ovf = ABS(x; q4p4)'
+  );
+  h.assert('abs 1.0', session.getWire(interp, 'a'), '00010000');
+  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+});
+
+reg(2002, 'builtin-numeric-formats-phase2', 'RSHIFT — q4p4 arithmetic -1>>1', function(h, session) {
+  const { interp } = session.run(
+    '8wire x = 11110000\n' +
+    '8wire y = RSHIFT(x, 1; q4p4)'
+  );
+  h.assert('arith -0.5', session.getWire(interp, 'y'), '11111000');
+});
+
+reg(2003, 'builtin-numeric-formats-phase2', 'RSHIFT — fp16 tag rejected', function(h, session) {
+  const r = session.run('16wire x = 0011110000000000\n16wire y = RSHIFT(x, 1; fp16)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('rejected', String(err.includes('fp16')), 'true');
+});
+
+reg(2004, 'builtin-numeric-formats-phase2', 'ARGMAX — q4p4 index of 1.5', function(h, session) {
+  const { interp } = session.run(
+    '8wire[3] v = 00001000 + 00011000 + 00010000\n' +
+    '2wire idx = ARGMAX(v; index q4p4)'
+  );
+  h.assert('index 1', session.getWire(interp, 'idx'), '01');
+});
+
+reg(2005, 'builtin-numeric-formats-phase2', 'MULTIPLY — fp16 2.0×1.5=3.0', function(h, session) {
+  const { interp } = session.run(
+    '16wire a = 0100000000000000\n' +
+    '16wire b = 0011111000000000\n' +
+    '16wire r, 16wire o = MULTIPLY(a, b; fp16)'
+  );
+  h.assert('result 3.0', session.getWire(interp, 'r'), '0100001000000000');
 });
 
 
