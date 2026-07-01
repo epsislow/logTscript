@@ -1,0 +1,214 @@
+Numeric format literals
+
+Numeric formats allow decimal values to be converted directly into their binary wire representation at compile time. They extend the existing decimal literal syntax with a format qualifier.
+
+Unlike tagged built-ins (such as "ADD(... ; q4p4)"), which control how an operation interprets existing wires, numeric format literals control how a decimal value is encoded into bits.
+
+Syntax
+
+Unsigned decimal:
+
+\value;format
+
+Signed decimal:
+
+\-value;format
+
+where "format" is one of the supported numeric formats.
+
+Examples:
+
+Literal| Meaning
+"\1.5;q4p4"| Encode decimal 1.5 as signed Q4.4
+"\-2;q4p4"| Encode decimal −2 as signed Q4.4
+"\1.0;fp16"| Encode decimal 1.0 as IEEE754 binary16
+"\-3.25;fp16"| Encode decimal −3.25 as IEEE754 binary16
+"\1.5;bf16"| Encode decimal 1.5 as Brain Floating Point 16
+"\-2;bf16"| Encode decimal −2 as Brain Floating Point 16
+
+The compiler performs the conversion during parsing and produces the corresponding wire bits.
+
+---
+
+Supported formats
+
+q4p4
+
+Signed fixed-point Q4.4 stored in an 8-bit wire.
+
+\3.75;q4p4
+
+↓
+
+00111100
+
+because
+
+3.75 × 2⁴ = 60
+
+Negative values use two's complement.
+
+\-1.5;q4p4
+
+↓
+
+11101000
+
+---
+
+q8p8
+
+Signed fixed-point Q8.8 stored in a 16-bit wire.
+
+\12.5;q8p8
+
+↓
+
+0000110010000000
+
+---
+
+fp16
+
+IEEE754 binary16 floating-point.
+
+\1.0;fp16
+
+↓
+
+0011110000000000
+
+\-2;fp16
+
+↓
+
+IEEE754 binary16 encoding of −2.
+
+---
+
+bf16
+
+Brain Floating Point 16.
+
+\1.0;bf16
+
+↓
+
+0011111110000000
+
+\-2;bf16
+
+↓
+
+Brain Floating Point encoding of −2.
+
+---
+
+Decimal values
+
+Integer and fractional values are accepted.
+
+Examples:
+
+\12;q8p8
+\12.5;q8p8
+
+\-5;q4p4
+\-5.25;q4p4
+
+\0.125;fp16
+\1000;bf16
+
+Scientific notation may also be supported:
+
+\1e-3;fp16
+\2.5e4;bf16
+
+---
+
+Relationship with hexadecimal literals
+
+Numeric format literals convert a decimal value into bits.
+
+\1.5;fp16
+
+means
+
+decimal value
+
+↓
+
+IEEE754 conversion
+
+↓
+
+16-bit wire
+
+Hexadecimal literals represent an existing bit pattern.
+
+^3E00
+
+means
+
+literal bit pattern
+
+↓
+
+16-bit wire
+
+No numeric conversion is performed.
+
+This distinction is identical to the existing decimal/hex behaviour:
+
+Decimal| Hex
+"\255" → numeric value| "^FF" → bit pattern
+"\1.5;fp16" → numeric value| "^3E00" → FP16 bit pattern
+"\-2;q4p4" → numeric value| "^E0" → Q4.4 bit pattern
+
+---
+
+Width
+
+The resulting wire width is determined by the selected format.
+
+Format| Width
+q4p4| 8 bits
+q8p8| 16 bits
+fp16| 16 bits
+bf16| 16 bits
+
+Assignments using "=" must match the generated width exactly.
+
+8wire a = \1.5;q4p4 ✓
+16wire b = \1.5;fp16 ✓
+
+8wire c = \1.5;fp16 ✗ width mismatch
+
+---
+
+Built-in compatibility
+
+Numeric format literals only affect literal encoding.
+
+Operations still use tagged built-ins to select arithmetic semantics.
+
+16wire a = \1.5;fp16
+16wire b = \2.0;fp16
+
+16wire r,
+1wire status
+= ADD(a, b ; fp16)
+
+The literal determines how the initial bits are generated.
+
+The tag determines how those bits are interpreted by the operation.
+
+---
+
+Notes
+
+- Numeric formats are compile-time conversions.
+- The generated value is an ordinary wire after parsing.
+- Decimal literals remain value-based.
+- Hex literals remain bit-pattern based.
+- Format qualifiers are independent of assignment width and cannot be combined with padding (";8") or signed-width ("\-3;8") suffixes.
