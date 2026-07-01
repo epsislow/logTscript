@@ -9,6 +9,10 @@ Binary subtraction with wrap-around (two's complement style borrow).
 ```
 SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
 SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
+SUBTRACT(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow
+SUBTRACT(16bit a, 16bit b; q8p8) -> 16bit result, 1bit overflow
+SUBTRACT(16bit a, 16bit b; fp16) -> 16bit result, 1bit inexact
+SUBTRACT(16bit a, 16bit b; bf16) -> 16bit result, 1bit inexact
 SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -25,6 +29,9 @@ SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Same `result` bits; second return is signed **overflow**. |
+| `q4p4` | Q4.4 on **8-bit** wires. |
+| `q8p8` | Q8.8 on **16-bit** wires. |
+| `fp16` / `bf16` | Float16 / bf16 on **16-bit** wires. |
 | `vector` | Per index on **rank-1** tensors; matching `elementCount`. **No** implicit broadcast without the tag (unlike ADD). |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -67,6 +74,18 @@ show(ovf)
 ```
 
 Signed `−8 − 1` on 4 bits → `r=0111`, overflow `1`.
+
+### `SUBTRACT(8bit a, 8bit b; q4p4)`
+
+`2.0 − 0.5 = 1.5`:
+
+```logts-play
+8wire a = 00100000
+8wire b = 00001000
+8wire s, 1wire ovf = SUBTRACT(a, b; q4p4)
+show(s; q4p4)
+show(ovf)
+```
 
 ### `SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector)`
 

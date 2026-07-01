@@ -1822,7 +1822,7 @@ class Interpreter {
     if (!target) return;
     let valueStr = value == null ? '-' : String(value);
     const opts = this._normalizeShowDisplayOpts(target.displayTags);
-    const useTagFormat = opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii);
+    const useTagFormat = opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat);
     if (target.bitWidth && valueStr !== '-' && !target.isText) {
       const wire = target.wireName ? this.wires.get(target.wireName) : null;
       const skipGroup = wire && wire.vector && target.kind === 'wire' && !useTagFormat;
@@ -4460,7 +4460,9 @@ const idx = parseInt(
   const fail = (msg, len) => this._throwRuntime(msg, fn, len != null ? len : name.length);
 
   const SA = typeof LogTScriptSignedArithmetic !== 'undefined' ? LogTScriptSignedArithmetic : null;
+  const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
   let signedMode = false;
+  let numericMode = 'unsigned';
   let vectorMode = false;
   let matrixMode = false;
   let indexMode = false;
@@ -4468,24 +4470,28 @@ const idx = parseInt(
   if (callTags && callTags.length) {
     const isBuiltin = !!Interpreter.BUILTIN_DOC[name];
     const acceptsSigned = SA && SA.BUILTIN_SIGNED_TAG_FUNCS.has(name);
+    const acceptsFormat = NF && NF.BUILTIN_FORMAT_TAG_FUNCS.has(name);
     const acceptsVector = SA && SA.BUILTIN_VECTOR_TAG_FUNCS.has(name);
     const acceptsMatrix = SA && SA.BUILTIN_MATRIX_TAG_FUNCS.has(name);
     const acceptsIndex = SA && SA.BUILTIN_INDEX_TAG_FUNCS.has(name);
     const acceptsAxis = SA && SA.BUILTIN_AXIS_TAG_FUNCS.has(name);
-    if (isBuiltin && !acceptsSigned && !acceptsVector && !acceptsMatrix && !acceptsIndex && !acceptsAxis) {
+    if (isBuiltin && !acceptsSigned && !acceptsFormat && !acceptsVector && !acceptsMatrix && !acceptsIndex && !acceptsAxis) {
       fail(`${name}: does not accept call tags`);
     }
-    if (acceptsSigned || acceptsVector || acceptsMatrix || acceptsIndex || acceptsAxis) {
+    if (acceptsSigned || acceptsFormat || acceptsVector || acceptsMatrix || acceptsIndex || acceptsAxis) {
       const tags = SA.parseBuiltinCallTags(
-        callTags, name, (msg) => fail(msg), acceptsSigned, acceptsVector, acceptsIndex, acceptsMatrix, acceptsAxis
+        callTags, name, (msg) => fail(msg), acceptsSigned, acceptsVector, acceptsIndex, acceptsMatrix, acceptsAxis, acceptsFormat
       );
       signedMode = tags.signed;
+      numericMode = tags.numericMode;
       vectorMode = tags.vector;
       matrixMode = tags.matrix;
       indexMode = tags.index;
       axisMode = tags.axis;
     }
   }
+
+  const reductionMode = NF && NF.isFormatMode(numericMode) ? numericMode : signedMode;
 
   if (name === 'ABS' && !signedMode) {
     fail('ABS requires ; signed');
@@ -4905,7 +4911,7 @@ const idx = parseInt(
       let sumAxis;
       try {
         sumAxis = XR.sumAxisTagged(
-          args, getWire, 'SUM', axisMode, signedMode, this._matrixTaggedEvalFns()
+          args, getWire, 'SUM', axisMode, reductionMode, this._matrixTaggedEvalFns()
         );
       } catch (e) {
         fail(e.message);
@@ -4924,7 +4930,7 @@ const idx = parseInt(
       let sumMat;
       try {
         sumMat = MR.sumMatrixTagged(
-          args, getWire, 'SUM', signedMode, this._matrixTaggedEvalFns()
+          args, getWire, 'SUM', reductionMode, this._matrixTaggedEvalFns()
         );
       } catch (e) {
         fail(e.message);
@@ -4944,10 +4950,10 @@ const idx = parseInt(
       try {
         const pair = VR.detectOrientedVectorPair(args, getWire);
         if (pair) {
-          sumVec = VR.sumVectorOrientedTagged(args, pair, 'SUM', signedMode, this._vectorTaggedEvalFns());
+          sumVec = VR.sumVectorOrientedTagged(args, pair, 'SUM', reductionMode, this._vectorTaggedEvalFns());
         } else {
           sumVec = VR.sumVectorTagged(
-            args, getWire, 'SUM', signedMode, this._vectorTaggedEvalFns()
+            args, getWire, 'SUM', reductionMode, this._vectorTaggedEvalFns()
           );
         }
       } catch (e) {
@@ -4969,7 +4975,7 @@ const idx = parseInt(
     try {
       if (!VR) fail('SUM: internal error (vector-reduce not loaded)');
       const X = VR.requireSameBitWidth(expanded, 'SUM');
-      sum = VR.sumExpanded(expanded, X, signedMode);
+      sum = VR.sumExpanded(expanded, X, reductionMode);
     } catch (e) {
       fail(e.message);
     }
@@ -5781,6 +5787,9 @@ if (this.isBuiltinDEMUX(name)) {
     const getWire = (n) => this.wires.get(n);
     const evalFns = this._vectorTaggedEvalFns();
     const applyAdd = (a, b, W) => {
+      if (NF && NF.isFormatMode(numericMode)) {
+        return NF.addAtWidth(a, b, W, numericMode);
+      }
       if (SA) return SA.addAtWidth(a, b, W, signedMode);
       const u = VR.addUnsignedAtWidth(a, b, W);
       return { result: u.result, flag: u.carry };
@@ -5814,8 +5823,11 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'ADD', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
-    if (SA) {
-      const { result, flag } = SA.addAtWidth(a, b, depth, signedMode);
+    if (SA || (NF && NF.isFormatMode(numericMode))) {
+      const addFn = NF && NF.isFormatMode(numericMode)
+        ? (a, b, d) => NF.addAtWidth(a, b, d, numericMode)
+        : (a, b, d) => SA.addAtWidth(a, b, d, signedMode);
+      const { result, flag } = addFn(a, b, depth);
       return [
         computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
         computeRefs ? { value: flag,  ref: `&${this.storeValue(flag)}`  } : { value: flag,  ref: null },
@@ -5841,6 +5853,9 @@ if (this.isBuiltinDEMUX(name)) {
     const getWire = (n) => this.wires.get(n);
     const evalFns = this._vectorTaggedEvalFns();
     const applySub = (a, b, W) => {
+      if (NF && NF.isFormatMode(numericMode)) {
+        return NF.subtractAtWidth(a, b, W, numericMode);
+      }
       if (SA) return SA.subtractAtWidth(a, b, W, signedMode);
       return VR.subtractUnsignedAtWidth(a, b, W);
     };
@@ -5872,8 +5887,11 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'SUBTRACT', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
-    if (SA) {
-      const { result, flag } = SA.subtractAtWidth(a, b, depth, signedMode);
+    if (SA || (NF && NF.isFormatMode(numericMode))) {
+      const subFn = NF && NF.isFormatMode(numericMode)
+        ? (a, b, d) => NF.subtractAtWidth(a, b, d, numericMode)
+        : (a, b, d) => SA.subtractAtWidth(a, b, d, signedMode);
+      const { result, flag } = subFn(a, b, depth);
       return [
         computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
         computeRefs ? { value: flag,  ref: `&${this.storeValue(flag)}`  } : { value: flag,  ref: null },
@@ -6253,7 +6271,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = XR.minMaxAxisTagged(
-          args, getWire, 'MIN', axisMode, true, signedMode, this._matrixTaggedEvalFns(),
+          args, getWire, 'MIN', axisMode, true, reductionMode, this._matrixTaggedEvalFns(),
           SA ? SA.pickMinMaxSigned : null
         );
       } catch (e) {
@@ -6270,7 +6288,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = MR.minMaxMatrixTagged(
-          args, getWire, 'MIN', true, signedMode, this._matrixTaggedEvalFns(),
+          args, getWire, 'MIN', true, reductionMode, this._matrixTaggedEvalFns(),
           SA ? SA.pickMinMaxSigned : null
         );
       } catch (e) {
@@ -6286,7 +6304,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = VR.minMaxVectorTagged(
-          args, getWire, 'MIN', true, signedMode, this._vectorTaggedEvalFns(),
+          args, getWire, 'MIN', true, reductionMode, this._vectorTaggedEvalFns(),
           SA ? SA.pickMinMaxSigned : null
         );
       } catch (e) {
@@ -6301,9 +6319,13 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(expanded, 'MIN', expanded.map((_, i) => `arg${i}`));
     let v;
     try {
-      v = signedMode && SA
-        ? SA.pickMinMaxSigned(expanded, true)
-        : pickMinMaxUnsigned(expanded, true);
+      if (NF && NF.isFormatMode(numericMode)) {
+        v = NF.pickMinMax(expanded, true, numericMode);
+      } else if (signedMode && SA) {
+        v = SA.pickMinMaxSigned(expanded, true);
+      } else {
+        v = pickMinMaxUnsigned(expanded, true);
+      }
     } catch (e) {
       fail(e.message);
     }
@@ -6321,7 +6343,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = XR.minMaxAxisTagged(
-          args, getWire, 'MAX', axisMode, false, signedMode, this._matrixTaggedEvalFns(),
+          args, getWire, 'MAX', axisMode, false, reductionMode, this._matrixTaggedEvalFns(),
           SA ? SA.pickMinMaxSigned : null
         );
       } catch (e) {
@@ -6338,7 +6360,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = MR.minMaxMatrixTagged(
-          args, getWire, 'MAX', false, signedMode, this._matrixTaggedEvalFns(),
+          args, getWire, 'MAX', false, reductionMode, this._matrixTaggedEvalFns(),
           SA ? SA.pickMinMaxSigned : null
         );
       } catch (e) {
@@ -6354,7 +6376,7 @@ if (this.isBuiltinDEMUX(name)) {
       let blob;
       try {
         blob = VR.minMaxVectorTagged(
-          args, getWire, 'MAX', false, signedMode, this._vectorTaggedEvalFns(),
+          args, getWire, 'MAX', false, reductionMode, this._vectorTaggedEvalFns(),
           SA ? SA.pickMinMaxSigned : null
         );
       } catch (e) {
@@ -6369,9 +6391,13 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(expanded, 'MAX', expanded.map((_, i) => `arg${i}`));
     let v;
     try {
-      v = signedMode && SA
-        ? SA.pickMinMaxSigned(expanded, false)
-        : pickMinMaxUnsigned(expanded, false);
+      if (NF && NF.isFormatMode(numericMode)) {
+        v = NF.pickMinMax(expanded, false, numericMode);
+      } else if (signedMode && SA) {
+        v = SA.pickMinMaxSigned(expanded, false);
+      } else {
+        v = pickMinMaxUnsigned(expanded, false);
+      }
     } catch (e) {
       fail(e.message);
     }
@@ -6599,20 +6625,20 @@ if (this.isBuiltinDEMUX(name)) {
   _formatDebugDisplayValue(binStr, bitWidth, opts, isElement) {
     const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
     if (!DF || !opts) return binStr;
-    if (!(opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii)) return binStr;
+    if (!(opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat)) return binStr;
     return DF.formatDebugDisplayValue(binStr, bitWidth, opts, isElement);
   }
 
   _formatShowWireValue(valueStr, bitWidth, opts, isElement) {
     if (valueStr === '-' || valueStr == null) return valueStr;
-    if (opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii)) {
+    if (opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat)) {
       return this._formatDebugDisplayValue(valueStr, bitWidth, opts, isElement);
     }
     return this.formatValue(valueStr, bitWidth);
   }
 
   _hasShowFormatOpts(opts) {
-    return opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii);
+    return opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat);
   }
 
   _elementIsNonZero(valueStr, elementWidth) {
@@ -13377,6 +13403,10 @@ Interpreter.BUILTIN_DOC = {
   ADD:      [
     'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry',
     'ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow',
+    'ADD(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow',
+    'ADD(16bit a, 16bit b; q8p8) -> 16bit result, 1bit overflow',
+    'ADD(16bit a, 16bit b; fp16) -> 16bit result, 1bit inexact',
+    'ADD(16bit a, 16bit b; bf16) -> 16bit result, 1bit inexact',
     'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
     'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
     'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]',
@@ -13385,6 +13415,10 @@ Interpreter.BUILTIN_DOC = {
   SUBTRACT: [
     'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry',
     'SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow',
+    'SUBTRACT(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow',
+    'SUBTRACT(16bit a, 16bit b; q8p8) -> 16bit result, 1bit overflow',
+    'SUBTRACT(16bit a, 16bit b; fp16) -> 16bit result, 1bit inexact',
+    'SUBTRACT(16bit a, 16bit b; bf16) -> 16bit result, 1bit inexact',
     'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
     'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
     'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]',
@@ -13417,6 +13451,10 @@ Interpreter.BUILTIN_DOC = {
   SUM:      [
     'SUM(Wbit ...) -> Wbit result, Wbit over',
     'SUM(Wbit ...; signed) -> Wbit result, Wbit over',
+    'SUM(Wbit ...; q4p4) -> Wbit result, Wbit over',
+    'SUM(Wbit ...; q8p8) -> Wbit result, Wbit over',
+    'SUM(Wbit ...; fp16) -> Wbit result, Wbit over',
+    'SUM(Wbit ...; bf16) -> Wbit result, Wbit over',
     'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]',
     'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]',
     'SUM(Wbit[n,m] ... ; matrix) -> Wbit[n,m], Wbit[n,m]',
@@ -13457,6 +13495,10 @@ Interpreter.BUILTIN_DOC = {
   MIN:      [
     'MIN(Wbit ...) -> Wbit',
     'MIN(Wbit ...; signed) -> Wbit',
+    'MIN(Wbit ...; q4p4) -> Wbit',
+    'MIN(Wbit ...; q8p8) -> Wbit',
+    'MIN(Wbit ...; fp16) -> Wbit',
+    'MIN(Wbit ...; bf16) -> Wbit',
     'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]',
     'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]',
     'MIN(Wbit[n,m] ... ; matrix) -> Wbit[n,m]',
@@ -13469,6 +13511,10 @@ Interpreter.BUILTIN_DOC = {
   MAX:      [
     'MAX(Wbit ...) -> Wbit',
     'MAX(Wbit ...; signed) -> Wbit',
+    'MAX(Wbit ...; q4p4) -> Wbit',
+    'MAX(Wbit ...; q8p8) -> Wbit',
+    'MAX(Wbit ...; fp16) -> Wbit',
+    'MAX(Wbit ...; bf16) -> Wbit',
     'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]',
     'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]',
     'MAX(Wbit[n,m] ... ; matrix) -> Wbit[n,m]',

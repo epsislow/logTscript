@@ -9,6 +9,10 @@ Reduce operands to a scalar sum, or per-index with `; vector` on rank-1 tensors,
 ```
 SUM(Wbit ...) -> Wbit result, Wbit over
 SUM(Wbit ...; signed) -> Wbit result, Wbit over
+SUM(Wbit ...; q4p4) -> Wbit result, Wbit over
+SUM(Wbit ...; q8p8) -> Wbit result, Wbit over
+SUM(Wbit ...; fp16) -> Wbit result, Wbit over
+SUM(Wbit ...; bf16) -> Wbit result, Wbit over
 SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]
 SUM(Wbit[n] ... ; signed vector) -> Wbit[n], Wbit[n]
 SUM(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b, ... ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -31,6 +35,9 @@ Variadic: whole vectors expand to elements (see [vector-reduction.md](vector-red
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed two's complement sum; same 2W packing. |
+| `q4p4` | Q4.4 sum on **8-bit** wires. |
+| `q8p8` | Q8.8 sum on **16-bit** wires. |
+| `fp16` / `bf16` | Float sum on **16-bit** wires (round at each step). |
 | `vector` | Per index on **rank-1** tensors → `Wbit[n]` + `Wbit[n] over`. Element slices (`vectorB:i`) and plain **W**-bit scalars broadcast. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. Mutually exclusive with `vector`. See [matrix-reduction.md](matrix-reduction.md). |
 | `row` | On a **matrix**, sum each **row** across columns → `Wbit[N]` + `Wbit[N] over`. Mutually exclusive with `vector` and `matrix`. |
@@ -76,6 +83,17 @@ show(o)
 ```
 
 Signed `−1 + 1 = 0`.
+
+### `SUM(Wbit ...; q4p4)`
+
+Sum of vector elements in Q4.4:
+
+```logts-play
+8wire[2] v = 00011000 + 00001000
+8wire total, 8wire over = SUM(v; q4p4)
+show(total; q4p4)
+show(over)
+```
 
 ### `SUM(Wbit[n] a, … ; vector)`
 

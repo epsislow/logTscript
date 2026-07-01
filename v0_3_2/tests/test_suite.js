@@ -2891,20 +2891,22 @@ reg(327, 'doc', 'All gates AND NAND NOR NXOR XOR', function(h, session) {
 
 reg(328, 'doc', 'BUILTIN_DOC — ADD signature', function(h, session) {
   const lines = Interpreter.getDocLines('ADD', new Map());
-  h.assert('ADD 6 signatures', String(lines.length), '6');
+  h.assert('ADD 10 signatures', String(lines.length), '10');
   h.assert('ADD unsigned', lines[0], 'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry');
   h.assert('ADD signed', lines[1], 'ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
-  h.assert('ADD vector', lines[2], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('ADD matrix', lines[4], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('ADD q4p4', lines[2], 'ADD(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow');
+  h.assert('ADD vector', lines[6], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('ADD matrix', lines[8], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(329, 'doc', 'BUILTIN_DOC — SUBTRACT signature', function(h, session) {
   const lines = Interpreter.getDocLines('SUBTRACT', new Map());
-  h.assert('SUBTRACT 6 signatures', String(lines.length), '6');
+  h.assert('SUBTRACT 10 signatures', String(lines.length), '10');
   h.assert('SUBTRACT unsigned', lines[0], 'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry');
   h.assert('SUBTRACT signed', lines[1], 'SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
-  h.assert('SUBTRACT vector', lines[2], 'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('SUBTRACT matrix', lines[4], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUBTRACT q4p4', lines[2], 'SUBTRACT(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow');
+  h.assert('SUBTRACT vector', lines[6], 'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('SUBTRACT matrix', lines[8], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(330, 'doc', 'BUILTIN_DOC — MULTIPLY signature', function(h, session) {
@@ -13353,15 +13355,16 @@ reg(1734, 'vector-reduction', 'SUM vector sub-range same width', function(h, ses
 
 reg(1728, 'vector-reduction', 'doc(SUM) signature', function(h, session) {
   const lines = Interpreter.getDocLines('SUM', new Map());
-  h.assert('SUM 10 signatures', String(lines.length), '10');
+  h.assert('SUM 14 signatures', String(lines.length), '14');
   h.assert('SUM unsigned', lines[0], 'SUM(Wbit ...) -> Wbit result, Wbit over');
   h.assert('SUM signed', lines[1], 'SUM(Wbit ...; signed) -> Wbit result, Wbit over');
-  h.assert('SUM vector', lines[2], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]');
-  h.assert('SUM signed vector', lines[3], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]');
-  h.assert('SUM matrix', lines[4], 'SUM(Wbit[n,m] ... ; matrix) -> Wbit[n,m], Wbit[n,m]');
-  h.assert('SUM signed matrix', lines[5], 'SUM(Wbit[n,m] ... ; signed matrix) -> Wbit[n,m], Wbit[n,m]');
-  h.assert('SUM row', lines[6], 'SUM(Wbit[n,m] m ; row) -> Wbit[n], Wbit[n]');
-  h.assert('SUM col', lines[7], 'SUM(Wbit[n,m] m ; col) -> Wbit[m], Wbit[m]');
+  h.assert('SUM q4p4', lines[2], 'SUM(Wbit ...; q4p4) -> Wbit result, Wbit over');
+  h.assert('SUM vector', lines[6], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('SUM signed vector', lines[7], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]');
+  h.assert('SUM matrix', lines[8], 'SUM(Wbit[n,m] ... ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUM signed matrix', lines[9], 'SUM(Wbit[n,m] ... ; signed matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUM row', lines[10], 'SUM(Wbit[n,m] m ; row) -> Wbit[n], Wbit[n]');
+  h.assert('SUM col', lines[11], 'SUM(Wbit[n,m] m ; col) -> Wbit[m], Wbit[m]');
 });
 
 reg(1729, 'vector-reduction', 'MIN/MAX plain wires regression', function(h, session) {
@@ -14707,14 +14710,14 @@ reg(1811, 'builtin-vector', 'SUM(vectorA, vectorB; vector) — wave mode', funct
 reg(1812, 'builtin-vector', 'doc(MIN/MAX) vector signatures', function(h, session) {
   const minLines = Interpreter.getDocLines('MIN', new Map());
   const maxLines = Interpreter.getDocLines('MAX', new Map());
-  h.assert('MIN 10 signatures', String(minLines.length), '10');
-  h.assert('MAX 10 signatures', String(maxLines.length), '10');
-  h.assert('MIN vector', minLines[2], 'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]');
-  h.assert('MAX vector signed', maxLines[3], 'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]');
-  h.assert('MIN matrix', minLines[4], 'MIN(Wbit[n,m] ... ; matrix) -> Wbit[n,m]');
-  h.assert('MAX matrix signed', maxLines[5], 'MAX(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]');
-  h.assert('MIN row', minLines[6], 'MIN(Wbit[n,m] m ; row) -> Wbit[n]');
-  h.assert('MAX col', maxLines[7], 'MAX(Wbit[n,m] m ; col) -> Wbit[m]');
+  h.assert('MIN 14 signatures', String(minLines.length), '14');
+  h.assert('MAX 14 signatures', String(maxLines.length), '14');
+  h.assert('MIN vector', minLines[6], 'MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]');
+  h.assert('MAX vector signed', maxLines[7], 'MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]');
+  h.assert('MIN matrix', minLines[8], 'MIN(Wbit[n,m] ... ; matrix) -> Wbit[n,m]');
+  h.assert('MAX matrix signed', maxLines[9], 'MAX(Wbit[n,m] ... ; matrix signed) -> Wbit[n,m]');
+  h.assert('MIN row', minLines[10], 'MIN(Wbit[n,m] m ; row) -> Wbit[n]');
+  h.assert('MAX col', maxLines[11], 'MAX(Wbit[n,m] m ; col) -> Wbit[m]');
 });
 
 reg(1813, 'builtin-vector', 'ADD implicit vs explicit ; vector', function(h, session) {
@@ -14803,13 +14806,13 @@ reg(1822, 'builtin-vector', 'doc(ADD/SUBTRACT/CLAMP) vector signatures', functio
   const addLines = Interpreter.getDocLines('ADD', new Map());
   const subLines = Interpreter.getDocLines('SUBTRACT', new Map());
   const clampLines = Interpreter.getDocLines('CLAMP', new Map());
-  h.assert('ADD 6 signatures', String(addLines.length), '6');
-  h.assert('SUBTRACT 6 signatures', String(subLines.length), '6');
+  h.assert('ADD 10 signatures', String(addLines.length), '10');
+  h.assert('SUBTRACT 10 signatures', String(subLines.length), '10');
   h.assert('CLAMP 6 signatures', String(clampLines.length), '6');
-  h.assert('ADD vector', addLines[2], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
+  h.assert('ADD vector', addLines[6], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
   h.assert('CLAMP vector signed', clampLines[3], 'CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]');
-  h.assert('ADD matrix', addLines[4], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
-  h.assert('SUBTRACT matrix signed', subLines[5], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('ADD matrix', addLines[8], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
+  h.assert('SUBTRACT matrix signed', subLines[9], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix signed) -> Wbit[n,m], Wbit[n,m]');
 });
 
 reg(1823, 'builtin-vector', 'MULTIPLY(vectorA, vectorB; vector) per index', function(h, session) {
@@ -16606,6 +16609,93 @@ reg(1982, 'builtin-matrix', 'SUM(matrix; row; matrix) exclusive tags', function(
   );
   const err = r.out.find(l => l.startsWith('Error:')) || '';
   h.assert('exclusive', String(err.includes('mutually exclusive')), 'true');
+});
+
+
+reg(1984, 'builtin-numeric-formats', 'ADD — q4p4 fixed-point 1.5+0.5', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 00011000\n' +
+    '8wire b = 00001000\n' +
+    '8wire s, 1wire ovf = ADD(a, b; q4p4)'
+  );
+  h.assert('result 2.0', session.getWire(interp, 's'), '00100000');
+  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+});
+
+reg(1985, 'builtin-numeric-formats', 'ADD — q8p8 fixed-point 1.25+0.75', function(h, session) {
+  const { interp } = session.run(
+    '16wire a = 0000000101000000\n' +
+    '16wire b = 0000000011000000\n' +
+    '16wire s, 1wire ovf = ADD(a, b; q8p8)'
+  );
+  h.assert('result 2.0', session.getWire(interp, 's'), '0000001000000000');
+  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+});
+
+reg(1986, 'builtin-numeric-formats', 'ADD — fp16 1.0+2.0=3.0', function(h, session) {
+  const { interp } = session.run(
+    '16wire a = 0011110000000000\n' +
+    '16wire b = 0100000000000000\n' +
+    '16wire s, 1wire flag = ADD(a, b; fp16)'
+  );
+  h.assert('result 3.0', session.getWire(interp, 's'), '0100001000000000');
+  h.assert('no flag', session.getWire(interp, 'flag'), '0');
+});
+
+reg(1987, 'builtin-numeric-formats', 'SUBTRACT — q4p4 2.0-0.5', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 00100000\n' +
+    '8wire b = 00001000\n' +
+    '8wire s, 1wire ovf = SUBTRACT(a, b; q4p4)'
+  );
+  h.assert('result 1.5', session.getWire(interp, 's'), '00011000');
+  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+});
+
+reg(1988, 'builtin-numeric-formats', 'SUM — q4p4 two elements', function(h, session) {
+  const { interp } = session.run(
+    '8wire[2] v = 00011000 + 00001000\n' +
+    '8wire total, 8wire over = SUM(v; q4p4)'
+  );
+  h.assert('sum 2.0', session.getWire(interp, 'total'), '00100000');
+});
+
+reg(1989, 'builtin-numeric-formats', 'MIN/MAX — q4p4 ordering', function(h, session) {
+  const { interp } = session.run(
+    '8wire neg = 11110000\n' +
+    '8wire pos = 00011000\n' +
+    '8wire lo = MIN(neg, pos; q4p4)\n' +
+    '8wire hi = MAX(neg, pos; q4p4)'
+  );
+  h.assert('min -1', session.getWire(interp, 'lo'), '11110000');
+  h.assert('max 1.5', session.getWire(interp, 'hi'), '00011000');
+});
+
+reg(1990, 'builtin-numeric-formats', 'ADD — signed and q4p4 mutually exclusive', function(h, session) {
+  const r = session.run('8wire a = 00011000\n8wire b = 00001000\n8wire s, 1wire f = ADD(a, b; signed q4p4)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('exclusive', String(err.includes('mutually exclusive')), 'true');
+});
+
+reg(1991, 'builtin-numeric-formats', 'ADD — fp16 wrong width error', function(h, session) {
+  const r = session.run('8wire a = 00011000\n8wire b = 00001000\n8wire s, 1wire f = ADD(a, b; fp16)');
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('width error', String(err.includes('16-bit')), 'true');
+});
+
+reg(1992, 'builtin-numeric-formats', 'show — q4p4 display tag', function(h, session) {
+  const { out } = session.run('8wire w = 00011000\nshow(w; q4p4)');
+  h.assert('shows 1.5', String(out.some(l => /w \(8wire\) = 1\.5/.test(l))), 'true');
+});
+
+reg(1993, 'builtin-numeric-formats', 'ADD(vector) — q4p4 per element', function(h, session) {
+  const { interp } = session.run(
+    '8wire[2] a = 00011000 + 00001000\n' +
+    '8wire[2] b = 00001000 + 00001000\n' +
+    '8wire[2] r, 8wire[2] f = ADD(a, b; vector q4p4)'
+  );
+  h.assert('elem0 2.0', session.getWire(interp, 'r').slice(0, 8), '00100000');
+  h.assert('elem1 1.0', session.getWire(interp, 'r').slice(8, 16), '00010000');
 });
 
 

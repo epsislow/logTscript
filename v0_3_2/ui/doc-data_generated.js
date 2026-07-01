@@ -609,16 +609,16 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 
 | Function | Page | Tags |
 |----------|------|------|
-| ADD | [builtin-ADD.md](builtin-ADD.md) | \`signed\`, \`vector\`, \`matrix\` |
-| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | \`signed\`, \`vector\`, \`matrix\` |
+| ADD | [builtin-ADD.md](builtin-ADD.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
+| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
 | MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | \`signed\`, \`vector\`, \`matrix\` |
 | DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | \`signed\`, \`vector\`, \`matrix\` |
 | MAC | [builtin-MAC.md](builtin-MAC.md) | \`signed\`, \`vector\`, \`matrix\` |
 | ABS | [builtin-ABS.md](builtin-ABS.md) | \`signed\` (required) |
 | GT | [builtin-GT.md](builtin-GT.md) | \`signed\`, \`vector\`, \`matrix\` |
 | LT | [builtin-LT.md](builtin-LT.md) | \`signed\`, \`vector\`, \`matrix\` |
-| MIN | [builtin-MIN.md](builtin-MIN.md) | \`signed\`, \`vector\`, \`matrix\` |
-| MAX | [builtin-MAX.md](builtin-MAX.md) | \`signed\`, \`vector\`, \`matrix\` |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
 | CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | \`signed\`, \`vector\`, \`matrix\` |
 
 Vector reduction (\`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\`): [vector-reduction.md](vector-reduction.md). **2D element-wise:** [matrix-reduction.md](matrix-reduction.md). Bitwise equality: [builtin-EQ.md](builtin-EQ.md).
@@ -642,6 +642,14 @@ Bit width \`N\` = \`max(len(a), len(b))\` for binary ops; short inputs are zero-
 ---
 
 ## Tag overview {#tag-overview}
+
+Optional tags after \`;\` in the call: **\`signed\`**, **\`q4p4\`**, **\`q8p8\`**, **\`fp16\`**, **\`bf16\`** (mutually exclusive numeric formats), plus **\`vector\`**, **\`matrix\`** (not together). See [builtin-tagged-index.md](builtin-tagged-index.md).
+
+| Built-in | \`; q4p4\` (8-bit) | \`; q8p8\` / \`; fp16\` / \`; bf16\` (16-bit) |
+|----------|------------------|----------------------------------------|
+| ADD / SUBTRACT | fixed-point + overflow flag | fixed / float + flag |
+| SUM | fixed sum + over | fixed / float sum + over |
+| MIN / MAX | fixed compare | fixed / float compare |
 
 Optional **bool tags** after \`;\` in the call (\`signed\`, \`vector\`, \`matrix\`, or combinations except **\`vector\` + \`matrix\`**). Operand expansion vs element-wise mode: [vector-reduction.md](vector-reduction.md#element-wise-mode-vector), [matrix-reduction.md](matrix-reduction.md).
 
@@ -2301,6 +2309,10 @@ Binary addition with wrap-around.
 \`\`\`
 ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
 ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
+ADD(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow
+ADD(16bit a, 16bit b; q8p8) -> 16bit result, 1bit overflow
+ADD(16bit a, 16bit b; fp16) -> 16bit result, 1bit inexact
+ADD(16bit a, 16bit b; bf16) -> 16bit result, 1bit inexact
 ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -2318,6 +2330,10 @@ ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], 
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Same \`result\` bits; second return is **signed overflow** (not unsigned carry). |
+| \`q4p4\` | Fixed-point Q4.4 on **8-bit** wires; second return = overflow out of representable range. |
+| \`q8p8\` | Fixed-point Q8.8 on **16-bit** wires; second return = overflow. |
+| \`fp16\` | IEEE 754 half on **16-bit** wires; second return = inexact (\`Inf\`/\`NaN\` from finite operands). |
+| \`bf16\` | Brain float 16 on **16-bit** wires; same second return as \`fp16\`. |
 | \`vector\` | Per index on **rank-1** tensors (\`Wwire[N]\`, \`Wwire[1,N]\`, \`Wwire[N,1]\`); matching \`elementCount\`. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\` (\`N>1\`, \`M>1\`); rank-1 operands broadcast. Mutually exclusive with \`vector\`. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -2362,6 +2378,30 @@ show(nextU)
 show(carry)
 show(nextS)
 show(ovf)
+\`\`\`
+
+### \`ADD(8bit a, 8bit b; q4p4)\`
+
+Fixed-point Q4.4: \`1.5 + 0.5 = 2.0\` on 8-bit wires.
+
+\`\`\`logts-play
+8wire a = 00011000
+8wire b = 00001000
+8wire s, 1wire ovf = ADD(a, b; q4p4)
+show(s; q4p4)
+show(ovf)
+\`\`\`
+
+### \`ADD(16bit a, 16bit b; fp16)\`
+
+IEEE half-precision add (\`1.0 + 2.0 = 3.0\`):
+
+\`\`\`logts-play
+16wire a = 0011110000000000
+16wire b = 0100000000000000
+16wire s, 1wire flag = ADD(a, b; fp16)
+show(s; fp16)
+show(flag)
 \`\`\`
 
 ### \`ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
@@ -4395,6 +4435,10 @@ Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) ·
 \`\`\`
 MAX(Wbit ...) -> Wbit
 MAX(Wbit ...; signed) -> Wbit
+MAX(Wbit ...; q4p4) -> Wbit
+MAX(Wbit ...; q8p8) -> Wbit
+MAX(Wbit ...; fp16) -> Wbit
+MAX(Wbit ...; bf16) -> Wbit
 MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
 MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
 MAX(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar ... ; matrix) -> Wbit[n,m]
@@ -4416,6 +4460,9 @@ Variadic (≥ 2 operands after expansion).
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed maximum. |
+| \`q4p4\` | Q4.4 maximum on **8-bit** wires. |
+| \`q8p8\` | Q8.8 maximum on **16-bit** wires. |
+| \`fp16\` / \`bf16\` | Float maximum on **16-bit** wires. |
 | \`vector\` | Per index on **rank-1** tensors. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 | \`row\` | Per-row maximum across columns → \`Wbit[N]\`. Mutually exclusive with \`vector\` and \`matrix\`. |
@@ -4447,6 +4494,15 @@ show(hi)
 \`\`\`
 
 Signed \`MAX(−1, 2)=2\` → \`0010\`.
+
+### \`MAX(Wbit ...; q4p4)\`
+
+\`\`\`logts-play
+8wire neg = 11110000
+8wire pos = 00011000
+8wire hi = MAX(neg, pos; q4p4)
+show(hi; q4p4)
+\`\`\`
 
 ### \`MAX(Wbit[n] a, … ; vector)\`
 
@@ -4541,6 +4597,10 @@ Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) ·
 \`\`\`
 MIN(Wbit ...) -> Wbit
 MIN(Wbit ...; signed) -> Wbit
+MIN(Wbit ...; q4p4) -> Wbit
+MIN(Wbit ...; q8p8) -> Wbit
+MIN(Wbit ...; fp16) -> Wbit
+MIN(Wbit ...; bf16) -> Wbit
 MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
 MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
 MIN(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar ... ; matrix) -> Wbit[n,m]
@@ -4562,6 +4622,9 @@ Variadic (≥ 2 operands after expansion). Whole vectors expand to elements.
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed minimum. |
+| \`q4p4\` | Q4.4 minimum on **8-bit** wires. |
+| \`q8p8\` | Q8.8 minimum on **16-bit** wires. |
+| \`fp16\` / \`bf16\` | Float minimum on **16-bit** wires. |
 | \`vector\` | Per index on **rank-1** tensors. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 | \`row\` | Per-row minimum across columns → \`Wbit[N]\`. Mutually exclusive with \`vector\` and \`matrix\`. |
@@ -4601,6 +4664,15 @@ show(lo)
 \`\`\`
 
 Signed \`MIN(−1, 2)=−1\` → \`1111\`.
+
+### \`MIN(Wbit ...; q4p4)\`
+
+\`\`\`logts-play
+8wire neg = 11110000
+8wire pos = 00011000
+8wire lo = MIN(neg, pos; q4p4)
+show(lo; q4p4)
+\`\`\`
 
 ### \`MIN(Wbit[n] a, … ; vector)\`
 
@@ -5491,6 +5563,10 @@ Binary subtraction with wrap-around (two's complement style borrow).
 \`\`\`
 SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry
 SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
+SUBTRACT(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow
+SUBTRACT(16bit a, 16bit b; q8p8) -> 16bit result, 1bit overflow
+SUBTRACT(16bit a, 16bit b; fp16) -> 16bit result, 1bit inexact
+SUBTRACT(16bit a, 16bit b; bf16) -> 16bit result, 1bit inexact
 SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -5507,6 +5583,9 @@ SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Same \`result\` bits; second return is signed **overflow**. |
+| \`q4p4\` | Q4.4 on **8-bit** wires. |
+| \`q8p8\` | Q8.8 on **16-bit** wires. |
+| \`fp16\` / \`bf16\` | Float16 / bf16 on **16-bit** wires. |
 | \`vector\` | Per index on **rank-1** tensors; matching \`elementCount\`. **No** implicit broadcast without the tag (unlike ADD). |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -5549,6 +5628,18 @@ show(ovf)
 \`\`\`
 
 Signed \`−8 − 1\` on 4 bits → \`r=0111\`, overflow \`1\`.
+
+### \`SUBTRACT(8bit a, 8bit b; q4p4)\`
+
+\`2.0 − 0.5 = 1.5\`:
+
+\`\`\`logts-play
+8wire a = 00100000
+8wire b = 00001000
+8wire s, 1wire ovf = SUBTRACT(a, b; q4p4)
+show(s; q4p4)
+show(ovf)
+\`\`\`
 
 ### \`SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
 
@@ -5606,6 +5697,10 @@ Reduce operands to a scalar sum, or per-index with \`; vector\` on rank-1 tensor
 \`\`\`
 SUM(Wbit ...) -> Wbit result, Wbit over
 SUM(Wbit ...; signed) -> Wbit result, Wbit over
+SUM(Wbit ...; q4p4) -> Wbit result, Wbit over
+SUM(Wbit ...; q8p8) -> Wbit result, Wbit over
+SUM(Wbit ...; fp16) -> Wbit result, Wbit over
+SUM(Wbit ...; bf16) -> Wbit result, Wbit over
 SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]
 SUM(Wbit[n] ... ; signed vector) -> Wbit[n], Wbit[n]
 SUM(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b, ... ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -5628,6 +5723,9 @@ Variadic: whole vectors expand to elements (see [vector-reduction.md](vector-red
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed two's complement sum; same 2W packing. |
+| \`q4p4\` | Q4.4 sum on **8-bit** wires. |
+| \`q8p8\` | Q8.8 sum on **16-bit** wires. |
+| \`fp16\` / \`bf16\` | Float sum on **16-bit** wires (round at each step). |
 | \`vector\` | Per index on **rank-1** tensors → \`Wbit[n]\` + \`Wbit[n] over\`. Element slices (\`vectorB:i\`) and plain **W**-bit scalars broadcast. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. Mutually exclusive with \`vector\`. See [matrix-reduction.md](matrix-reduction.md). |
 | \`row\` | On a **matrix**, sum each **row** across columns → \`Wbit[N]\` + \`Wbit[N] over\`. Mutually exclusive with \`vector\` and \`matrix\`. |
@@ -5673,6 +5771,17 @@ show(o)
 \`\`\`
 
 Signed \`−1 + 1 = 0\`.
+
+### \`SUM(Wbit ...; q4p4)\`
+
+Sum of vector elements in Q4.4:
+
+\`\`\`logts-play
+8wire[2] v = 00011000 + 00001000
+8wire total, 8wire over = SUM(v; q4p4)
+show(total; q4p4)
+show(over)
+\`\`\`
 
 ### \`SUM(Wbit[n] a, … ; vector)\`
 
@@ -5747,7 +5856,7 @@ Row sums: \`3\`, \`12\` → \`00111100\`. Column sums: \`5\`, \`10\` → \`01011
 `,
     'builtin-tagged-index.md': `# Built-in functions with call tags
 
-Canonical reference for built-ins that accept **\`; signed\`**, **\`; vector\`**, **\`; matrix\`**, **\`; row\`**, **\`; col\`**, and/or **\`; index\`**. Scalar behaviour and tag semantics live on each function page — not duplicated here.
+Canonical reference for built-ins that accept **\`; signed\`**, **\`; q4p4\`**, **\`; q8p8\`**, **\`; fp16\`**, **\`; bf16\`**, **\`; vector\`**, **\`; matrix\`**, **\`; row\`**, **\`; col\`**, and/or **\`; index\`**. Scalar behaviour and tag semantics live on each function page — not duplicated here.
 
 Index: [Arithmetic overview](arithmetic.md) · [Vector reduction](vector-reduction.md) · [Matrix element-wise (\`; matrix\`)](matrix-reduction.md) · [Bit transform](builtin-bit-transform-functions.md) · [Built-in functions](builtin-functions.md)
 
@@ -5762,33 +5871,33 @@ Cross-cutting topics:
 
 ## Index by function
 
-| Function | Page | \`signed\` | \`vector\` | \`matrix\` | \`row\` / \`col\` | \`index\` | Hub |
-|----------|------|----------|----------|----------|---------------|---------|-----|
-| ADD | [builtin-ADD.md](builtin-ADD.md) | yes | yes | yes | — | — | arithmetic |
-| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | yes | yes | yes | — | — | arithmetic |
-| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | yes | yes | yes | — | — | arithmetic |
-| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | yes | yes | yes | — | — | arithmetic |
-| MAC | [builtin-MAC.md](builtin-MAC.md) | yes | yes | yes | — | — | arithmetic |
-| ABS | [builtin-ABS.md](builtin-ABS.md) | **required** | — | — | — | — | arithmetic |
-| GT | [builtin-GT.md](builtin-GT.md) | yes | yes | yes | — | — | arithmetic |
-| LT | [builtin-LT.md](builtin-LT.md) | yes | yes | yes | — | — | arithmetic |
-| MIN | [builtin-MIN.md](builtin-MIN.md) | yes | yes | yes | yes | — | arithmetic / vector |
-| MAX | [builtin-MAX.md](builtin-MAX.md) | yes | yes | yes | yes | — | arithmetic / vector |
-| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | yes | yes | yes | — | — | arithmetic |
-| SUM | [builtin-SUM.md](builtin-SUM.md) | yes | yes | yes | yes | — | vector |
-| DOT | [builtin-DOT.md](builtin-DOT.md) | yes | — | — | — | — | vector |
-| ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | yes | — | — | yes | yes | vector |
-| ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | yes | — | — | yes | yes | vector |
-| EQ | [builtin-EQ.md](builtin-EQ.md) | — | yes | yes | — | — | logic gates |
-| RSHIFT | [builtin-RSHIFT.md](builtin-RSHIFT.md) | yes | yes | yes | — | — | bit transform |
-| LSHIFT | [builtin-LSHIFT.md](builtin-LSHIFT.md) | — | yes | yes | — | — | bit transform |
-| LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | — | yes | yes | — | — | bit transform |
-| RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | — | yes | yes | — | — | bit transform |
-| REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | — | yes | yes | — | — | bit transform |
+| Function | Page | \`signed\` | \`q4p4\` | \`q8p8\` | \`fp16\` | \`bf16\` | \`vector\` | \`matrix\` | \`row\` / \`col\` | \`index\` | Hub |
+|----------|------|----------|--------|--------|--------|--------|----------|----------|---------------|---------|-----|
+| ADD | [builtin-ADD.md](builtin-ADD.md) | yes | yes | yes | yes | yes | yes | yes | — | — | arithmetic |
+| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | yes | yes | yes | yes | yes | yes | yes | — | — | arithmetic |
+| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | yes | — | — | — | — | yes | yes | — | — | arithmetic |
+| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | yes | — | — | — | — | yes | yes | — | — | arithmetic |
+| MAC | [builtin-MAC.md](builtin-MAC.md) | yes | — | — | — | — | yes | yes | — | — | arithmetic |
+| ABS | [builtin-ABS.md](builtin-ABS.md) | **required** | — | — | — | — | — | — | — | — | arithmetic |
+| GT | [builtin-GT.md](builtin-GT.md) | yes | — | — | — | — | yes | yes | — | — | arithmetic |
+| LT | [builtin-LT.md](builtin-LT.md) | yes | — | — | — | — | yes | yes | — | — | arithmetic |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | yes | yes | yes | yes | yes | yes | yes | yes | — | arithmetic / vector |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | yes | yes | yes | yes | yes | yes | yes | yes | — | arithmetic / vector |
+| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | yes | — | — | — | — | yes | yes | — | — | arithmetic |
+| SUM | [builtin-SUM.md](builtin-SUM.md) | yes | yes | yes | yes | yes | yes | yes | yes | — | vector |
+| DOT | [builtin-DOT.md](builtin-DOT.md) | yes | — | — | — | — | — | — | — | — | vector |
+| ARGMAX | [builtin-ARGMAX.md](builtin-ARGMAX.md) | yes | — | — | — | — | — | — | yes | yes | vector |
+| ARGMIN | [builtin-ARGMIN.md](builtin-ARGMIN.md) | yes | — | — | — | — | — | — | yes | yes | vector |
+| EQ | [builtin-EQ.md](builtin-EQ.md) | — | — | — | — | — | yes | yes | — | — | logic gates |
+| RSHIFT | [builtin-RSHIFT.md](builtin-RSHIFT.md) | yes | — | — | — | — | yes | yes | — | — | bit transform |
+| LSHIFT | [builtin-LSHIFT.md](builtin-LSHIFT.md) | — | — | — | — | — | yes | yes | — | — | bit transform |
+| LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | — | — | — | — | — | yes | yes | — | — | bit transform |
+| RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | — | — | — | — | — | yes | yes | — | — | bit transform |
+| REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | — | — | — | — | — | yes | yes | — | — | bit transform |
 
 Use \`doc(NAME)\` in scripts for live signatures from \`Interpreter.BUILTIN_DOC\`.
 
-**Note:** **\`; vector\`**, **\`; matrix\`**, **\`; row\`**, and **\`; col\`** cannot appear together. **DOT** does not use axis tags. **ARGMAX** / **ARGMIN** use shape rules instead of **\`; matrix\`** (but support **\`; row\`** / **\`; col\`**).
+**Note:** **\`; signed\`**, **\`; q4p4\`**, **\`; q8p8\`**, **\`; fp16\`**, and **\`; bf16\`** are **mutually exclusive** (at most one numeric-format tag per call). **\`; vector\`**, **\`; matrix\`**, **\`; row\`**, and **\`; col\`** cannot appear together. **DOT** does not use axis tags. **ARGMAX** / **ARGMIN** use shape rules instead of **\`; matrix\`** (but support **\`; row\`** / **\`; col\`**).
 
 **Rank-1** (\`[N]\`, \`[1,N]\`, \`[N,1]\`) = vector for **\`; vector\`**; only **\`[R,C]\` with R>1 and C>1** is a matrix for **\`; matrix\`**. See [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 `,
@@ -6902,8 +7011,12 @@ Display tags are **optional**, appear **once after all arguments** (after \`;\`)
 | \`hexWide\` | With \`hex\` only — grouped wide hex on vector elements (≥32 bit) |
 | \`bin\` | Explicit binary grouping (8-bit groups on wide wires) |
 | \`ascii\` | ASCII string in quotes — \`"A"\`, \`"Hello"\`, NUL → \`□\`, LF → \`↵\`, other control → \`.\` (bytes MSB-first) |
+| \`q4p4\` | Fixed-point **Q4.4** decimal on **8-bit** wires (e.g. \`1.5\`, \`-1\`) |
+| \`q8p8\` | Fixed-point **Q8.8** decimal on **16-bit** wires |
+| \`fp16\` | IEEE 754 half as decimal (\`3\`, \`nan\`, \`inf\`) on **16-bit** wires |
+| \`bf16\` | Brain float 16 as decimal on **16-bit** wires |
 
-Exactly **one** of \`dec\`, \`hex\`, \`bin\`, or \`ascii\` per statement. \`signed\` combines with \`dec\` or \`hex\` (value hex), not with \`bin\` or \`ascii\`.
+Exactly **one** of \`dec\`, \`hex\`, \`bin\`, \`ascii\`, \`q4p4\`, \`q8p8\`, \`fp16\`, or \`bf16\` per statement. \`signed\` combines with \`dec\` or \`hex\` (value hex), not with \`bin\`, \`ascii\`, or numeric-format tags.
 
 #### Layout / element tags (\`show\` and \`peek\` only)
 
@@ -6930,6 +7043,8 @@ show(a; signed)            # signed decimal chunks
 show(w; signed)            # w (4wire) = \\-1;4
 8wire code := 01000001
 show(code; ascii)          # code (8wire) = "A"
+8wire fp = 00011000
+show(fp; q4p4)             # fp (8wire) = 1.5
 40wire msg := "Hello"
 show(msg; ascii)           # msg (40wire) = "Hello"
 \`\`\`

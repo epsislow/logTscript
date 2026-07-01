@@ -217,14 +217,16 @@
     return fill.repeat(amount) + data.slice(0, len - amount);
   }
 
-  function parseBuiltinCallTags(callTags, fnName, fail, acceptsSigned, acceptsVector, acceptsIndex, acceptsMatrix, acceptsAxis) {
+  function parseBuiltinCallTags(callTags, fnName, fail, acceptsSigned, acceptsVector, acceptsIndex, acceptsMatrix, acceptsAxis, acceptsFormat) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     let signed = false;
+    let numericMode = 'unsigned';
     let vector = false;
     let index = false;
     let matrix = false;
     let axis = null;
     if (!callTags || !callTags.length) {
-      return { signed, vector, index, matrix, axis };
+      return { signed, numericMode, vector, index, matrix, axis };
     }
     for (const t of callTags) {
       if (t.name === 'signed') {
@@ -234,7 +236,22 @@
         if (t.value !== 1) {
           fail(`${fnName}: tag 'signed' must be enabled (use '; signed' or '; signed=1')`);
         }
+        if (numericMode !== 'unsigned') {
+          fail(`${fnName}: '; signed' is mutually exclusive with '; ${numericMode}'`);
+        }
         signed = true;
+        numericMode = 'signed';
+      } else if (NF && NF.FORMAT_TAG_NAMES.has(t.name)) {
+        if (!acceptsFormat) {
+          fail(`${fnName}: does not accept tag '${t.name}'`);
+        }
+        if (t.value !== 1) {
+          fail(`${fnName}: tag '${t.name}' must be enabled (use '; ${t.name}' or '; ${t.name}=1')`);
+        }
+        if (numericMode !== 'unsigned') {
+          fail(`${fnName}: '; ${t.name}' is mutually exclusive with '; ${numericMode === 'signed' ? 'signed' : numericMode}'`);
+        }
+        numericMode = t.name;
       } else if (t.name === 'vector') {
         if (!acceptsVector) {
           fail(`${fnName}: does not accept tag 'vector'`);
@@ -280,7 +297,7 @@
     if (axis && (vector || matrix)) {
       fail(`${fnName}: '; ${axis}' is mutually exclusive with '; vector' and '; matrix'`);
     }
-    return { signed, vector, index, matrix, axis };
+    return { signed, numericMode, vector, index, matrix, axis };
   }
 
   /** @deprecated use parseBuiltinCallTags */

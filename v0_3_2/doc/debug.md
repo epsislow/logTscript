@@ -142,8 +142,12 @@ Display tags are **optional**, appear **once after all arguments** (after `;`), 
 | `hexWide` | With `hex` only — grouped wide hex on vector elements (≥32 bit) |
 | `bin` | Explicit binary grouping (8-bit groups on wide wires) |
 | `ascii` | ASCII string in quotes — `"A"`, `"Hello"`, NUL → `□`, LF → `↵`, other control → `.` (bytes MSB-first) |
+| `q4p4` | Fixed-point **Q4.4** decimal on **8-bit** wires (e.g. `1.5`, `-1`) |
+| `q8p8` | Fixed-point **Q8.8** decimal on **16-bit** wires |
+| `fp16` | IEEE 754 half as decimal (`3`, `nan`, `inf`) on **16-bit** wires |
+| `bf16` | Brain float 16 as decimal on **16-bit** wires |
 
-Exactly **one** of `dec`, `hex`, `bin`, or `ascii` per statement. `signed` combines with `dec` or `hex` (value hex), not with `bin` or `ascii`.
+Exactly **one** of `dec`, `hex`, `bin`, `ascii`, `q4p4`, `q8p8`, `fp16`, or `bf16` per statement. `signed` combines with `dec` or `hex` (value hex), not with `bin`, `ascii`, or numeric-format tags.
 
 #### Layout / element tags (`show` and `peek` only)
 
@@ -170,6 +174,8 @@ show(a; signed)            # signed decimal chunks
 show(w; signed)            # w (4wire) = \-1;4
 8wire code := 01000001
 show(code; ascii)          # code (8wire) = "A"
+8wire fp = 00011000
+show(fp; q4p4)             # fp (8wire) = 1.5
 40wire msg := "Hello"
 show(msg; ascii)           # msg (40wire) = "Hello"
 ```

@@ -78,7 +78,12 @@
     return BigInt('0b' + s);
   }
 
-  function sumExpanded(values, X, signed) {
+  function sumExpanded(values, X, signedOrMode) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+    if (typeof signedOrMode === 'string' && NF && NF.isFormatMode(signedOrMode)) {
+      return NF.sumExpanded(values, X, signedOrMode);
+    }
+    const signed = !!signedOrMode;
     let acc = 0n;
     for (const v of values) {
       const s = String(v).padStart(X, '0');
@@ -264,7 +269,8 @@
     return best;
   }
 
-  function minMaxVectorTagged(args, getWire, fnName, pickMin, signed, evalFns, pickMinMaxSigned) {
+  function minMaxVectorTagged(args, getWire, fnName, pickMin, signedOrMode, evalFns, pickMinMaxSigned) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     const { classified, meta } = requireVectorTaggedOperands(args, getWire, fnName);
     const W = meta.elementWidth;
     const N = meta.elementCount;
@@ -275,9 +281,14 @@
       );
       requireValuesElementWidth(vals, W, fnName);
       const padded = vals.map((v) => String(v).padStart(W, '0'));
-      const best = signed && pickMinMaxSigned
-        ? pickMinMaxSigned(padded, pickMin)
-        : pickMinMaxUnsigned(padded, pickMin);
+      let best;
+      if (typeof signedOrMode === 'string' && NF && NF.isFormatMode(signedOrMode)) {
+        best = NF.pickMinMax(padded, pickMin, signedOrMode);
+      } else if (signedOrMode && pickMinMaxSigned) {
+        best = pickMinMaxSigned(padded, pickMin);
+      } else {
+        best = pickMinMaxUnsigned(padded, pickMin);
+      }
       results.push(best);
     }
     return results.join('');

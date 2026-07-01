@@ -69,6 +69,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "files/storage.js",
   "core/user-func-overloads.js",
   "core/signed-arithmetic.js",
+  "core/numeric-formats.js",
   "core/debug-display-wrap.js",
   "core/debug-display-format.js",
   "core/wire-literals.js",

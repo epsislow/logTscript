@@ -55,14 +55,18 @@ function wireStringToBin(str, tok) {
   return WL.wireStringToBin(str);
 }
 
+const NUMERIC_FORMAT_DISPLAY_TAGS = new Set(['q4p4', 'q8p8', 'bf16', 'fp16']);
 const SHOW_PEEK_DISPLAY_TAGS = new Set([
   'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide',
+  'q4p4', 'q8p8', 'bf16', 'fp16',
   'elAll', 'elNonZero', 'compact', 'elRange', 'elLast', 'maxWidth', 'multiline',
 ]);
 const PROBE_DISPLAY_TAGS = new Set([
-  'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide', 'maxWidth', 'multiline',
+  'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide',
+  'q4p4', 'q8p8', 'bf16', 'fp16',
+  'maxWidth', 'multiline',
 ]);
-const DISPLAY_FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed']);
+const DISPLAY_FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'q4p4', 'q8p8', 'bf16', 'fp16']);
 const DISPLAY_ELEMENT_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
 const DISPLAY_VALUED_TAGS = new Set(['elRange', 'elLast', 'maxWidth']);
 
@@ -690,13 +694,15 @@ parseDebugDisplayTags(allowedTags) {
   const hasFormatHex = tags.includes('hex');
   const hasFormatBin = tags.includes('bin');
   const hasFormatAscii = tags.includes('ascii');
+  const numericFormatTags = tags.filter((t) => NUMERIC_FORMAT_DISPLAY_TAGS.has(t));
   let formatCount = 0;
   if (hasFormatDec) formatCount++;
   if (hasFormatHex) formatCount++;
   if (hasFormatBin) formatCount++;
   if (hasFormatAscii) formatCount++;
+  if (numericFormatTags.length) formatCount += numericFormatTags.length;
   if (formatCount > 1) {
-    throw Error(`Display format tags (dec, hex, bin, ascii) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    throw Error(`Display format tags (dec, hex, bin, ascii, q4p4, q8p8, bf16, fp16) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   if (tags.includes('signed') && tags.includes('bin')) {
     throw Error(`Display tags signed and bin are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);

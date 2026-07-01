@@ -7,6 +7,10 @@ Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) ·
 ```
 MAX(Wbit ...) -> Wbit
 MAX(Wbit ...; signed) -> Wbit
+MAX(Wbit ...; q4p4) -> Wbit
+MAX(Wbit ...; q8p8) -> Wbit
+MAX(Wbit ...; fp16) -> Wbit
+MAX(Wbit ...; bf16) -> Wbit
 MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
 MAX(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
 MAX(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar ... ; matrix) -> Wbit[n,m]
@@ -28,6 +32,9 @@ Variadic (≥ 2 operands after expansion).
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed maximum. |
+| `q4p4` | Q4.4 maximum on **8-bit** wires. |
+| `q8p8` | Q8.8 maximum on **16-bit** wires. |
+| `fp16` / `bf16` | Float maximum on **16-bit** wires. |
 | `vector` | Per index on **rank-1** tensors. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 | `row` | Per-row maximum across columns → `Wbit[N]`. Mutually exclusive with `vector` and `matrix`. |
@@ -59,6 +66,15 @@ show(hi)
 ```
 
 Signed `MAX(−1, 2)=2` → `0010`.
+
+### `MAX(Wbit ...; q4p4)`
+
+```logts-play
+8wire neg = 11110000
+8wire pos = 00011000
+8wire hi = MAX(neg, pos; q4p4)
+show(hi; q4p4)
+```
 
 ### `MAX(Wbit[n] a, … ; vector)`
 

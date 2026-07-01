@@ -78,7 +78,8 @@
     return { resultBlob: results.join(''), overBlob: overs.join('') };
   }
 
-  function minMaxAxisTagged(args, getWire, fnName, axis, pickMin, signed, evalFns, pickMinMaxSigned) {
+  function minMaxAxisTagged(args, getWire, fnName, axis, pickMin, signedOrMode, evalFns, pickMinMaxSigned) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     const { meta, varName } = requireAxisMatrixArg(args, getWire, fnName);
     const W = meta.elementWidth;
     const outer = axis === 'row' ? meta.rows : meta.cols;
@@ -88,9 +89,14 @@
         ? rowValues(meta, varName, i, evalFns)
         : colValues(meta, varName, i, evalFns);
       const padded = vals.map((v) => String(v).padStart(W, '0'));
-      const best = signed && pickMinMaxSigned
-        ? pickMinMaxSigned(padded, pickMin)
-        : pickMinMaxUnsigned(padded, pickMin);
+      let best;
+      if (typeof signedOrMode === 'string' && NF && NF.isFormatMode(signedOrMode)) {
+        best = NF.pickMinMax(padded, pickMin, signedOrMode);
+      } else if (signedOrMode && pickMinMaxSigned) {
+        best = pickMinMaxSigned(padded, pickMin);
+      } else {
+        best = pickMinMaxUnsigned(padded, pickMin);
+      }
       results.push(best);
     }
     return results.join('');

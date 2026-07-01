@@ -18,16 +18,16 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 
 | Function | Page | Tags |
 |----------|------|------|
-| ADD | [builtin-ADD.md](builtin-ADD.md) | `signed`, `vector`, `matrix` |
-| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | `signed`, `vector`, `matrix` |
+| ADD | [builtin-ADD.md](builtin-ADD.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
+| SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
 | MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | `signed`, `vector`, `matrix` |
 | DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | `signed`, `vector`, `matrix` |
 | MAC | [builtin-MAC.md](builtin-MAC.md) | `signed`, `vector`, `matrix` |
 | ABS | [builtin-ABS.md](builtin-ABS.md) | `signed` (required) |
 | GT | [builtin-GT.md](builtin-GT.md) | `signed`, `vector`, `matrix` |
 | LT | [builtin-LT.md](builtin-LT.md) | `signed`, `vector`, `matrix` |
-| MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `vector`, `matrix` |
-| MAX | [builtin-MAX.md](builtin-MAX.md) | `signed`, `vector`, `matrix` |
+| MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
+| MAX | [builtin-MAX.md](builtin-MAX.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
 | CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | `signed`, `vector`, `matrix` |
 
 Vector reduction (`SUM`, `DOT`, `ARGMAX`, `ARGMIN`): [vector-reduction.md](vector-reduction.md). **2D element-wise:** [matrix-reduction.md](matrix-reduction.md). Bitwise equality: [builtin-EQ.md](builtin-EQ.md).
@@ -51,6 +51,14 @@ Bit width `N` = `max(len(a), len(b))` for binary ops; short inputs are zero-padd
 ---
 
 ## Tag overview {#tag-overview}
+
+Optional tags after `;` in the call: **`signed`**, **`q4p4`**, **`q8p8`**, **`fp16`**, **`bf16`** (mutually exclusive numeric formats), plus **`vector`**, **`matrix`** (not together). See [builtin-tagged-index.md](builtin-tagged-index.md).
+
+| Built-in | `; q4p4` (8-bit) | `; q8p8` / `; fp16` / `; bf16` (16-bit) |
+|----------|------------------|----------------------------------------|
+| ADD / SUBTRACT | fixed-point + overflow flag | fixed / float + flag |
+| SUM | fixed sum + over | fixed / float sum + over |
+| MIN / MAX | fixed compare | fixed / float compare |
 
 Optional **bool tags** after `;` in the call (`signed`, `vector`, `matrix`, or combinations except **`vector` + `matrix`**). Operand expansion vs element-wise mode: [vector-reduction.md](vector-reduction.md#element-wise-mode-vector), [matrix-reduction.md](matrix-reduction.md).
 

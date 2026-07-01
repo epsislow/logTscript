@@ -7,6 +7,10 @@ Index: [Arithmetic](arithmetic.md) · [Vector reduction](vector-reduction.md) ·
 ```
 MIN(Wbit ...) -> Wbit
 MIN(Wbit ...; signed) -> Wbit
+MIN(Wbit ...; q4p4) -> Wbit
+MIN(Wbit ...; q8p8) -> Wbit
+MIN(Wbit ...; fp16) -> Wbit
+MIN(Wbit ...; bf16) -> Wbit
 MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n]
 MIN(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector signed) -> Wbit[n]
 MIN(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar ... ; matrix) -> Wbit[n,m]
@@ -28,6 +32,9 @@ Variadic (≥ 2 operands after expansion). Whole vectors expand to elements.
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed minimum. |
+| `q4p4` | Q4.4 minimum on **8-bit** wires. |
+| `q8p8` | Q8.8 minimum on **16-bit** wires. |
+| `fp16` / `bf16` | Float minimum on **16-bit** wires. |
 | `vector` | Per index on **rank-1** tensors. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 | `row` | Per-row minimum across columns → `Wbit[N]`. Mutually exclusive with `vector` and `matrix`. |
@@ -67,6 +74,15 @@ show(lo)
 ```
 
 Signed `MIN(−1, 2)=−1` → `1111`.
+
+### `MIN(Wbit ...; q4p4)`
+
+```logts-play
+8wire neg = 11110000
+8wire pos = 00011000
+8wire lo = MIN(neg, pos; q4p4)
+show(lo; q4p4)
+```
 
 ### `MIN(Wbit[n] a, … ; vector)`
 

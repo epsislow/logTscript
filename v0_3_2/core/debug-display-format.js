@@ -9,7 +9,7 @@
   const SHOW_HEX_NIBBLE_BITS = 4;
   const SHOW_HEX_GROUP_HEX_CHARS = 4;
 
-  const FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed']);
+  const FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'q4p4', 'q8p8', 'bf16', 'fp16']);
   const ELEMENT_MODE_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
   const MODIFIER_TAGS = new Set(['signed', 'hexWide', 'multiline']);
 
@@ -362,8 +362,12 @@
     const hasHex = tags.includes('hex');
     const hasBin = tags.includes('bin');
     const hasAscii = tags.includes('ascii');
+    let numericFormat = null;
+    for (const t of ['q4p4', 'q8p8', 'bf16', 'fp16']) {
+      if (tags.includes(t)) numericFormat = t;
+    }
 
-    if (hasSigned && !hasDec && !hasHex && !hasAscii) {
+    if (hasSigned && !hasDec && !hasHex && !hasAscii && !numericFormat) {
       tags.push('dec');
       hasDec = true;
     }
@@ -371,12 +375,13 @@
     const signedLiteral = hasSigned && (hasDec || hasHex);
 
     return {
-      dec: hasDec && !hasBin && !hasAscii,
+      dec: hasDec && !hasBin && !hasAscii && !numericFormat,
       signed: hasSigned,
       signedLiteral,
-      hex: hasHex && !hasBin && !hasAscii,
-      bin: hasBin && !hasAscii,
-      ascii: hasAscii,
+      hex: hasHex && !hasBin && !hasAscii && !numericFormat,
+      bin: hasBin && !hasAscii && !numericFormat,
+      ascii: hasAscii && !numericFormat,
+      numericFormat,
       hexWide: tags.includes('hexWide'),
       compact: tags.includes('compact'),
       elAll: tags.includes('elAll'),
@@ -391,6 +396,10 @@
 
   function formatDebugDisplayValue(binStr, bitWidth, opts, isElement) {
     if (!opts || binStr == null || binStr === '-') return binStr;
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+    if (opts.numericFormat && NF) {
+      return NF.formatForShow(binStr, bitWidth, opts.numericFormat);
+    }
     let formatted;
     if (opts.ascii) {
       formatted = formatAsciiDisplay(binStr, bitWidth, !!isElement);

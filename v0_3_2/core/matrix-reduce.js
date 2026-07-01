@@ -229,7 +229,8 @@
     return best;
   }
 
-  function minMaxMatrixTagged(args, getWire, fnName, pickMin, signed, evalFns, pickMinMaxSigned) {
+  function minMaxMatrixTagged(args, getWire, fnName, pickMin, signedOrMode, evalFns, pickMinMaxSigned) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     const { classified, meta } = requireMatrixTaggedOperands(args, getWire, fnName);
     const W = meta.elementWidth;
     const results = [];
@@ -237,9 +238,14 @@
       const vals = cellValuesAt(args, classified, r, c, meta, evalFns);
       requireValuesWidth(vals, W, fnName);
       const padded = vals.map((v) => String(v).padStart(W, '0'));
-      const best = signed && pickMinMaxSigned
-        ? pickMinMaxSigned(padded, pickMin)
-        : pickMinMaxUnsigned(padded, pickMin);
+      let best;
+      if (typeof signedOrMode === 'string' && NF && NF.isFormatMode(signedOrMode)) {
+        best = NF.pickMinMax(padded, pickMin, signedOrMode);
+      } else if (signedOrMode && pickMinMaxSigned) {
+        best = pickMinMaxSigned(padded, pickMin);
+      } else {
+        best = pickMinMaxUnsigned(padded, pickMin);
+      }
       results.push(best);
     });
     return results.join('');
