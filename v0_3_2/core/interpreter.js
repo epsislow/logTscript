@@ -13811,6 +13811,8 @@ Interpreter.BUILTIN_DOC = {
     'NFORMAT(16bit a; bf16 to_fp16) -> 16bit result, 4bit status',
     'NFORMAT(Wsrc·wire[n] a; <src> to_<dst> vector) -> Wdst·wire[n] result, 4wire[n] status',
     'NFORMAT(Wsrc·wire[n,m] a; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] status',
+    'NFORMAT(Xbit a; sX to_<dst>) -> Wdst result, 4bit status',
+    'NFORMAT((X+Y)bit a; qXpY to_<dst>) -> Wdst result, 4bit status',
   ],
   ISDIGIT:  ['ISDIGIT(Xbit value) -> 1bit'],
   HIGH:     ['HIGH(Xbit) -> Xbit'],

@@ -12,12 +12,26 @@
 
   const FORMAT_TAG_NAMES = new Set(['q4p4', 'q8p8', 'bf16', 'fp16']);
 
-  const NFORMAT_MODES = new Set(['signed', 'q4p4', 'q8p8', 'fp16', 'bf16']);
   const NFORMAT_DST_PREFIX = 'to_';
 
-  function parseNformatDstTag(tagName) {
-    const m = new RegExp('^' + NFORMAT_DST_PREFIX + '(signed|q4p4|q8p8|fp16|bf16)$').exec(String(tagName));
-    return m ? m[1] : null;
+  /** Recognize an NFORMAT format name: signed, sX, q4p4/q8p8/qXpY, fp16, bf16. Returns canonical mode or null. */
+  function parseNformatFormatName(name, fail, role) {
+    if (name === 'signed' || name === 'fp16' || name === 'bf16') return name;
+    if (/^s\d+$/.test(name)) {
+      const w = parseInt(name.slice(1), 10);
+      if (w < 1 || w > MAX_FORMAT_WIDTH) {
+        fail(`NFORMAT: ${role} '${name}' requires signed width 1..${MAX_FORMAT_WIDTH}`);
+      }
+      return name;
+    }
+    if (/^q\d+p\d+$/.test(name)) {
+      const spec = qModeSpec(name);
+      if (!spec || spec.width > MAX_FORMAT_WIDTH) {
+        fail(`NFORMAT: ${role} '${name}' requires at most ${MAX_FORMAT_WIDTH} bits (X+Y)`);
+      }
+      return name;
+    }
+    return null;
   }
 
   function parseNformatCallTags(callTags, fail) {
@@ -32,13 +46,12 @@
       if (t.value !== 1) {
         fail(`NFORMAT: tag '${t.name}' must be enabled (use '; ${t.name}' or '; ${t.name}=1')`);
       }
-      const parsedDst = parseNformatDstTag(t.name);
-      if (parsedDst) {
+      if (String(t.name).startsWith(NFORMAT_DST_PREFIX)) {
+        const inner = String(t.name).slice(NFORMAT_DST_PREFIX.length);
+        const mode = parseNformatFormatName(inner, fail, 'destination');
+        if (!mode) fail(`NFORMAT: unknown destination tag '${t.name}'`);
         if (dst) fail('NFORMAT: duplicate destination format tag');
-        dst = parsedDst;
-      } else if (NFORMAT_MODES.has(t.name)) {
-        if (src) fail('NFORMAT: duplicate source format tag');
-        src = t.name;
+        dst = mode;
       } else if (t.name === 'vector') {
         if (vector) fail('NFORMAT: duplicate tag \'vector\'');
         vector = true;
@@ -46,17 +59,20 @@
         if (matrix) fail('NFORMAT: duplicate tag \'matrix\'');
         matrix = true;
       } else {
-        fail(`NFORMAT: unknown tag '${t.name}'`);
+        const mode = parseNformatFormatName(t.name, fail, 'source');
+        if (!mode) fail(`NFORMAT: unknown tag '${t.name}'`);
+        if (src) fail('NFORMAT: duplicate source format tag');
+        src = mode;
       }
     }
     if (vector && matrix) {
       fail('NFORMAT: \'vector\' and \'matrix\' are mutually exclusive');
     }
     if (!src) {
-      fail('NFORMAT: requires source format tag (signed, q4p4, q8p8, fp16, bf16)');
+      fail('NFORMAT: requires source format tag (signed, sX, q4p4/qXpY, fp16, bf16)');
     }
     if (!dst) {
-      fail('NFORMAT: requires destination tag (to_signed, to_q4p4, to_q8p8, to_fp16, to_bf16)');
+      fail('NFORMAT: requires destination tag (to_signed, to_sX, to_qXpY, to_fp16, to_bf16)');
     }
     if (src === dst) {
       fail(`NFORMAT: source and destination format '${src}' are the same`);
@@ -74,7 +90,7 @@
 
   function decodeNformatValue(bits, width, srcMode) {
     const padded = String(bits).padStart(width, '0');
-    if (srcMode === 'signed') {
+    if (srcMode === 'signed' || isSignedWidthMode(srcMode)) {
       return Number(signedBinToBigInt(padded));
     }
     if (qModeSpec(srcMode)) {
@@ -90,7 +106,7 @@
       }
       return '0'.repeat(resultWidth);
     }
-    if (dstMode === 'signed') {
+    if (dstMode === 'signed' || isSignedWidthMode(dstMode)) {
       return signedBigIntToBin(BigInt(Math.round(value)), resultWidth);
     }
     if (qModeSpec(dstMode)) {
@@ -133,7 +149,7 @@
     if (qModeSpec(dstMode)) {
       return fixedStatusForMath(dstMode, realValue, rawResult);
     }
-    if (dstMode === 'signed') {
+    if (dstMode === 'signed' || isSignedWidthMode(dstMode)) {
       return signedConvertStatus(realValue, rawResult, resultWidth);
     }
     if (dstMode === 'fp16' || dstMode === 'bf16') {
@@ -972,7 +988,6 @@
     fixedRawToNumber,
     decodeToFloat,
     encodeFromFloat,
-    NFORMAT_MODES,
     parseNformatCallTags,
     convertFormat,
   };

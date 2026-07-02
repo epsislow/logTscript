@@ -17049,11 +17049,58 @@ reg(2037, 'builtin-nformat', 'NFORMAT missing destination tag', function(h, sess
 
 reg(2038, 'builtin-nformat', 'BUILTIN_DOC NFORMAT signatures', function(h, session) {
   const lines = Interpreter.getDocLines('NFORMAT', new Map());
-  h.assert('count', String(lines.length), '22');
+  h.assert('count', String(lines.length), '24');
   h.assert('signed to_q4p4', lines[0], 'NFORMAT(Xbit a; signed to_q4p4) -> 8bit result, 4bit status');
   h.assert('q4p4 to_fp16', lines[6], 'NFORMAT(8bit a; q4p4 to_fp16) -> 16bit result, 4bit status');
   h.assert('vector', lines[20], 'NFORMAT(Wsrc·wire[n] a; <src> to_<dst> vector) -> Wdst·wire[n] result, 4wire[n] status');
   h.assert('matrix', lines[21], 'NFORMAT(Wsrc·wire[n,m] a; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] status');
+  h.assert('sX', lines[22], 'NFORMAT(Xbit a; sX to_<dst>) -> Wdst result, 4bit status');
+  h.assert('qXpY', lines[23], 'NFORMAT((X+Y)bit a; qXpY to_<dst>) -> Wdst result, 4bit status');
+});
+
+reg(2044, 'builtin-nformat', 'NFORMAT s8 to_fp16 scalar', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 01110000\n' +
+    '16wire r, 4wire st = NFORMAT(a; s8 to_fp16)'
+  );
+  h.assert('result 112.0', session.getWire(interp, 'r'), '0101011100000000');
+  h.assert('status', session.getWire(interp, 'st'), '0000');
+});
+
+reg(2045, 'builtin-nformat', 'NFORMAT q6p2 to_s16 scalar', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 00011000\n' +
+    '16wire r, 4wire st = NFORMAT(a; q6p2 to_s16)'
+  );
+  h.assert('result 6', session.getWire(interp, 'r'), '0000000000000110');
+  h.assert('status', session.getWire(interp, 'st'), '0000');
+});
+
+reg(2046, 'builtin-nformat', 'NFORMAT s8 to_fp16 vector', function(h, session) {
+  const { interp } = session.run(
+    '8wire[2] v = 01110000 + 11111111\n' +
+    '16wire[2] r, 4wire[2] st = NFORMAT(v; s8 to_fp16 vector)'
+  );
+  h.assert('result', session.getWire(interp, 'r'), '01010111000000001011110000000000');
+  h.assert('status', session.getWire(interp, 'st'), '00000000');
+});
+
+reg(2047, 'builtin-nformat', 'NFORMAT sX width mismatch', function(h, session) {
+  const r = session.run(
+    '4wire a = 0110\n' +
+    '16wire r, 4wire st = NFORMAT(a; s8 to_fp16)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('width err', String(err.includes('8-bit operand')), 'true');
+});
+
+reg(2048, 'builtin-nformat', 'NFORMAT qXpY over 64 bits rejected', function(h, session) {
+  const r = session.run(
+    '8wire a = 00011000\n' +
+    '16wire r, 4wire st = NFORMAT(a; q40p40 to_fp16)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('parse err', String(err.includes('64 bits')), 'true');
 });
 
 reg(2039, 'builtin-nformat', 'NFORMAT vector q4p4 to_signed same width', function(h, session) {

@@ -111,8 +111,10 @@ NFORMAT(tensor ; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] st
 | `; q4p4 to_signed` | 8 (operand width) |
 | `; q4p4 to_q8p8` / `to_fp16` / `to_bf16` | 16 |
 | `; q8p8` / `fp16` / `bf16` ↔ other formats | per destination tag |
+| `; sX to_…` / `; … to_sX` | parametrized signed, width **X** |
+| `; qXpY to_…` / `; … to_qXpY` | parametrized fixed-point, width **X+Y** (≤64) |
 
-`src` and `dst` must differ. Scalar, `; vector`, or `; matrix` (mutually exclusive). See [builtin-NFORMAT.md](builtin-NFORMAT.md).
+`src` and `dst` must differ. Formats: `signed`, `sX`, `q4p4`/`q8p8`/`qXpY`, `fp16`, `bf16` (and `to_*` for destination). Scalar, `; vector`, or `; matrix` (mutually exclusive). See [builtin-NFORMAT.md](builtin-NFORMAT.md).
 
 ```logts-play
 8wire[2] v = 01110000 + 11110000

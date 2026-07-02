@@ -34,8 +34,8 @@ NFORMAT scalar (Faza 4): [`builtin-NFORMAT.md`](../v0_3_2/doc/builtin-NFORMAT.md
 | **Domeniu conversii** | Orice pereche `src` / `to_dst` permisă la scalar (inclusiv lățimi diferite, ex. `q4p4` → `fp16`) |
 | **Siguranță** | Nu restricție same-width — **`4bit status` per element** marchează overflow/underflow/inexact/nan |
 | **Tag-uri formă** | `; vector` și `; matrix` (mutual exclusive între ele) |
-| **Formate** | Aceleași ca scalar: `signed`, `q4p4`, `q8p8`, `fp16`, `bf16` + `to_*` |
-| **`to_signed`** | `Wdst` = lățimea elementului sursă (aceeași pentru toate elementele/celulele) |
+| **Formate** | `signed`, `sX`, `q4p4`/`q8p8`/`qXpY`, `fp16`, `bf16` + `to_*` (parametrizate `sX`/`qXpY` adăugate ulterior, valabile și scalar și vector/matrix) |
+| **`to_signed`** | `Wdst` = lățimea elementului sursă (aceeași pentru toate elementele/celulele); `to_sX` fixează `Wdst = X` |
 
 ---
 

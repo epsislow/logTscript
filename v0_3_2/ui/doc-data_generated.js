@@ -702,8 +702,10 @@ NFORMAT(tensor ; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] st
 | \`; q4p4 to_signed\` | 8 (operand width) |
 | \`; q4p4 to_q8p8\` / \`to_fp16\` / \`to_bf16\` | 16 |
 | \`; q8p8\` / \`fp16\` / \`bf16\` ↔ other formats | per destination tag |
+| \`; sX to_…\` / \`; … to_sX\` | parametrized signed, width **X** |
+| \`; qXpY to_…\` / \`; … to_qXpY\` | parametrized fixed-point, width **X+Y** (≤64) |
 
-\`src\` and \`dst\` must differ. Scalar, \`; vector\`, or \`; matrix\` (mutually exclusive). See [builtin-NFORMAT.md](builtin-NFORMAT.md).
+\`src\` and \`dst\` must differ. Formats: \`signed\`, \`sX\`, \`q4p4\`/\`q8p8\`/\`qXpY\`, \`fp16\`, \`bf16\` (and \`to_*\` for destination). Scalar, \`; vector\`, or \`; matrix\` (mutually exclusive). See [builtin-NFORMAT.md](builtin-NFORMAT.md).
 
 \`\`\`logts-play
 8wire[2] v = 01110000 + 11110000
@@ -5166,6 +5168,8 @@ NFORMAT(16bit a; bf16 to_q8p8) -> 16bit result, 4bit status
 NFORMAT(16bit a; bf16 to_fp16) -> 16bit result, 4bit status
 NFORMAT(Wsrc·wire[n] a; <src> to_<dst> vector) -> Wdst·wire[n] result, 4wire[n] status
 NFORMAT(Wsrc·wire[n,m] a; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] status
+NFORMAT(Xbit a; sX to_<dst>) -> Wdst result, 4bit status
+NFORMAT((X+Y)bit a; qXpY to_<dst>) -> Wdst result, 4bit status
 \`\`\`
 
 Use \`doc(NFORMAT)\` for the full signature list from \`Interpreter.BUILTIN_DOC\`.
@@ -5176,19 +5180,25 @@ Exactly **one source** tag and **one destination** tag (\`to_*\`). Source and de
 
 | Source tag | Operand width | Meaning |
 |------------|---------------|---------|
-| \`signed\` | any *W* | Two's complement integer on *W* bits |
+| \`signed\` | any *W* (adaptive) | Two's complement integer on *W* bits |
+| \`sX\` | exactly **X** (1≤X≤64) | Two's complement integer, fixed width |
 | \`q4p4\` | **8** | Q4.4 fixed-point |
 | \`q8p8\` | **16** | Q8.8 fixed-point |
+| \`qXpY\` | exactly **X+Y** (≤64) | Signed fixed-point Q{X}.{Y} |
 | \`fp16\` | **16** | IEEE 754 half |
 | \`bf16\` | **16** | Brain float 16 |
 
 | Destination tag | Result width |
 |-----------------|--------------|
 | \`to_signed\` | same as operand |
+| \`to_sX\` | **X** |
 | \`to_q4p4\` | **8** |
 | \`to_q8p8\` | **16** |
+| \`to_qXpY\` | **X+Y** |
 | \`to_fp16\` | **16** |
 | \`to_bf16\` | **16** |
+
+**\`signed\`** uses the operand width adaptively; **\`sX\`** fixes the width (\`; sX\` validates the operand is exactly X bits). The same applies to \`to_signed\` vs \`to_sX\` for the result.
 
 | Shape tag | Behaviour |
 |-----------|-----------|
@@ -5265,6 +5275,16 @@ show(st)
 \`\`\`
 
 Per-cell conversion; \`status\` is \`4wire[2,2]\` (4 bits per cell).
+
+### Parametrized \`sX\` / \`qXpY\`
+
+\`\`\`logts-play
+8wire a = 01110000
+16wire r, 4wire st = NFORMAT(a; s8 to_fp16)
+show(r; fp16)
+\`\`\`
+
+\`s8\` reads the 8-bit operand as a signed integer (\`112\`) and converts to fp16. Use \`to_sX\` / \`to_qXpY\` to control the result width, e.g. \`NFORMAT(x; q6p2 to_s16)\`.
 `,
     'builtin-NORM.md': `# NORM (L2² norm)
 

@@ -1521,12 +1521,17 @@
       {"id":2035,"group":"builtin-nformat","title":"NFORMAT fp16 NaN to_q4p4","detail":{"scripts":["16wire nan = 0111111000000000"],"steps":[],"assertions":["nan status"]}},
       {"id":2036,"group":"builtin-nformat","title":"NFORMAT same src/dst error","detail":{"scripts":["8wire a = 01110000"],"steps":[],"assertions":["same format"]}},
       {"id":2037,"group":"builtin-nformat","title":"NFORMAT missing destination tag","detail":{"scripts":["8wire a = 01110000"],"steps":[],"assertions":["no dst"]}},
-      {"id":2038,"group":"builtin-nformat","title":"BUILTIN_DOC NFORMAT signatures","detail":{"scripts":[],"steps":["getDocLines(NFORMAT)"],"assertions":["count","signed to_q4p4","q4p4 to_fp16","vector","matrix"]}},
+      {"id":2038,"group":"builtin-nformat","title":"BUILTIN_DOC NFORMAT signatures","detail":{"scripts":[],"steps":["getDocLines(NFORMAT)"],"assertions":["count","signed to_q4p4","q4p4 to_fp16","vector","matrix","sX","qXpY"]}},
       {"id":2039,"group":"builtin-nformat","title":"NFORMAT vector q4p4 to_signed same width","detail":{"scripts":["8wire[2] v = 01110000 + 11110000"],"steps":[],"assertions":["result","status"]}},
       {"id":2040,"group":"builtin-nformat","title":"NFORMAT vector q4p4 to_fp16 width change","detail":{"scripts":["8wire[2] v = 01110000 + 11110000"],"steps":[],"assertions":["result","status"]}},
       {"id":2041,"group":"builtin-nformat","title":"NFORMAT vector q8p8 to_bf16 inexact","detail":{"scripts":["16wire[2] v = 0000000101010101 + 0000000000000000"],"steps":[],"assertions":["result","inexact elem0","exact elem1"]}},
       {"id":2042,"group":"builtin-nformat","title":"NFORMAT matrix q4p4 to_fp16","detail":{"scripts":["8wire[2,2] m = 01110000 + 00010000 + 11110000 + 00100000"],"steps":[],"assertions":["result","status"]}},
-      {"id":2043,"group":"builtin-nformat","title":"NFORMAT vector matrix mutually exclusive","detail":{"scripts":["8wire[2] v = 01110000 + 11110000"],"steps":[],"assertions":["exclusive"]}}
+      {"id":2043,"group":"builtin-nformat","title":"NFORMAT vector matrix mutually exclusive","detail":{"scripts":["8wire[2] v = 01110000 + 11110000"],"steps":[],"assertions":["exclusive"]}},
+      {"id":2044,"group":"builtin-nformat","title":"NFORMAT s8 to_fp16 scalar","detail":{"scripts":["8wire a = 01110000"],"steps":[],"assertions":["result 112.0","status"]}},
+      {"id":2045,"group":"builtin-nformat","title":"NFORMAT q6p2 to_s16 scalar","detail":{"scripts":["8wire a = 00011000"],"steps":[],"assertions":["result 6","status"]}},
+      {"id":2046,"group":"builtin-nformat","title":"NFORMAT s8 to_fp16 vector","detail":{"scripts":["8wire[2] v = 01110000 + 11111111"],"steps":[],"assertions":["result","status"]}},
+      {"id":2047,"group":"builtin-nformat","title":"NFORMAT sX width mismatch","detail":{"scripts":["4wire a = 0110"],"steps":[],"assertions":["width err"]}},
+      {"id":2048,"group":"builtin-nformat","title":"NFORMAT qXpY over 64 bits rejected","detail":{"scripts":["8wire a = 00011000"],"steps":[],"assertions":["parse err"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1549,7 +1554,7 @@
       { id: 'bool-lut-mb', label: 'bool-lut-mb', rangeLabel: '1108–1121, 1123–1124, 1145, 1149–1150, 1152–1153', testIds: [1108, 1109, 1110, 1111, 1112, 1113, 1114, 1115, 1116, 1117, 1118, 1119, 1120, 1121, 1123, 1124, 1145, 1149, 1150, 1152, 1153] },
       { id: 'bool-lut-use', label: 'bool-lut-use', rangeLabel: '1192–1205, 1221', testIds: [1192, 1193, 1194, 1195, 1196, 1197, 1198, 1199, 1200, 1201, 1202, 1203, 1204, 1205, 1221] },
       { id: 'builtin-matrix', label: 'builtin-matrix', rangeLabel: '1877–1879, 1882–1888, 1971, 1974–1980, 1982–1983', testIds: [1877, 1878, 1879, 1882, 1883, 1884, 1885, 1886, 1887, 1888, 1971, 1974, 1975, 1976, 1977, 1978, 1979, 1980, 1982, 1983] },
-      { id: 'builtin-nformat', label: 'builtin-nformat', rangeLabel: '2033–2043', testIds: [2033, 2034, 2035, 2036, 2037, 2038, 2039, 2040, 2041, 2042, 2043] },
+      { id: 'builtin-nformat', label: 'builtin-nformat', rangeLabel: '2033–2048', testIds: [2033, 2034, 2035, 2036, 2037, 2038, 2039, 2040, 2041, 2042, 2043, 2044, 2045, 2046, 2047, 2048] },
       { id: 'builtin-numeric-formats', label: 'builtin-numeric-formats', rangeLabel: '1984–1993', testIds: [1984, 1985, 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993] },
       { id: 'builtin-numeric-formats-phase2', label: 'builtin-numeric-formats-phase2', rangeLabel: '1994–2005', testIds: [1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005] },
       { id: 'builtin-param-formats', label: 'builtin-param-formats', rangeLabel: '2017–2029', testIds: [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028, 2029] },
