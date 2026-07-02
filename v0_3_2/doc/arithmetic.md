@@ -96,10 +96,12 @@ Exemplu: `1000` = doar overflow. Fixed-point: bit0 + bit2 (rotunjire); float: to
 | `result`, `over`, `4bit status` | MULTIPLY, MAC, DOT, SUM |
 | `result`, `mod`, `4bit status` | DIVIDE |
 
-### `NFORMAT` — scalar conversion
+### `NFORMAT` — format conversion
 
 ```
 NFORMAT(a ; <src> to_<dst>) -> result, 4bit status
+NFORMAT(tensor ; <src> to_<dst> vector) -> Wdst·wire[n] result, 4wire[n] status
+NFORMAT(tensor ; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] status
 ```
 
 | Tag pair | Result width |
@@ -110,11 +112,11 @@ NFORMAT(a ; <src> to_<dst>) -> result, 4bit status
 | `; q4p4 to_q8p8` / `to_fp16` / `to_bf16` | 16 |
 | `; q8p8` / `fp16` / `bf16` ↔ other formats | per destination tag |
 
-`src` and `dst` must differ. Scalar only — no `; vector` / `; matrix`. See [builtin-NFORMAT.md](builtin-NFORMAT.md).
+`src` and `dst` must differ. Scalar, `; vector`, or `; matrix` (mutually exclusive). See [builtin-NFORMAT.md](builtin-NFORMAT.md).
 
 ```logts-play
-8wire a = \7;q4p4
-16wire r, 4wire st = NFORMAT(a; q4p4 to_fp16)
+8wire[2] v = 01110000 + 11110000
+16wire[2] r, 4wire[2] st = NFORMAT(v; q4p4 to_fp16 vector)
 show(st)
 ```
 

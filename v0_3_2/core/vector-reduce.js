@@ -712,6 +712,25 @@
     return results.join('');
   }
 
+  function nformatVectorTagged(args, getWire, fnName, src, dst, evalFns, convertFn) {
+    const { meta } = requireVectorTaggedUnaryOperand(args, getWire, fnName);
+    const W = meta.elementWidth;
+    const N = meta.elementCount;
+    const atom = args[0][0];
+    const results = [];
+    const statuses = [];
+    for (let i = 0; i < N; i++) {
+      const dataVal = String(evalFns.evalElement(atom.var, i)).padStart(W, '0');
+      if (dataVal.length !== W) {
+        throw new Error(`${fnName}: ${SHAPE_ERR}`);
+      }
+      const step = convertFn(dataVal, W, src, dst);
+      results.push(step.result);
+      statuses.push(step.status);
+    }
+    return { resultBlob: results.join(''), statusBlob: statuses.join('') };
+  }
+
   function findVectorExtremumIndex(values, W, pickMax, signedOrMode, compareFns, fnName) {
     const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
     const N = values.length;
@@ -874,6 +893,7 @@
     shiftVectorTagged,
     rotateVectorTagged,
     reverseVectorTagged,
+    nformatVectorTagged,
     detectOrientedVectorPair,
     sumVectorOrientedTagged,
     addSubtractVectorOrientedTagged,

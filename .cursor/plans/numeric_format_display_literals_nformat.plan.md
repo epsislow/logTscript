@@ -37,7 +37,7 @@ todos:
     status: completed
   - id: p5-future
     content: "Faza 5: NFORMAT ; vector / ; matrix — detalii faza_5_nformat_vector_matrix.plan.md"
-    status: pending
+    status: completed
 isProject: false
 ---
 

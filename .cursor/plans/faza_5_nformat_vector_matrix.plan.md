@@ -4,19 +4,19 @@ overview: "Extinde NFORMAT cu tag-urile ; vector și ; matrix: conversie per-ele
 todos:
   - id: p5-parse
     content: "numeric-formats.js: parseNformatCallTags acceptă vector/matrix (mutual exclusive), returnează {src,dst,vector,matrix}"
-    status: pending
+    status: completed
   - id: p5-vector
     content: "vector-reduce.js: nformatVectorTagged (unar, per-element convertFormat → resultBlob + statusBlob 4bit) + export"
-    status: pending
+    status: completed
   - id: p5-matrix
     content: "matrix-reduce.js: nformatMatrixTagged (per-celulă convertFormat → resultBlob + statusBlob) + export"
-    status: pending
+    status: completed
   - id: p5-interp
     content: "interpreter.js: dispatch NFORMAT vector/matrix via _returnBuiltinVectorPair + BUILTIN_DOC signatures noi"
-    status: pending
+    status: completed
   - id: p5-tests-doc
     content: "Teste (vector same/diff width, inexact, matrix, eroare mutual excl, doc) + builtin-NFORMAT.md/arithmetic.md/tagged-index + manifest + doc-data + plan părinte"
-    status: pending
+    status: completed
 isProject: false
 ---
 

@@ -449,6 +449,24 @@
     return results.join('');
   }
 
+  function nformatMatrixTagged(args, getWire, fnName, src, dst, evalFns, convertFn) {
+    const { classified, meta } = requireMatrixTaggedOperands(args, getWire, fnName, 1);
+    if (classified[0].kind !== 'matrix') {
+      throw new Error(`${fnName}: with '; matrix' expects a matrix operand`);
+    }
+    const W = meta.elementWidth;
+    const varName = args[0][0].var;
+    const results = [];
+    const statuses = [];
+    forEachMatrixCell(meta, (r, c) => {
+      const dataVal = String(evalFns.evalCell(varName, r, c)).padStart(W, '0');
+      const step = convertFn(dataVal, W, src, dst);
+      results.push(step.result);
+      statuses.push(step.status);
+    });
+    return { resultBlob: results.join(''), statusBlob: statuses.join('') };
+  }
+
   function getWholeTensorMeta(argExpr, getWire) {
     return getTensorMeta(argExpr, getWire);
   }
@@ -603,6 +621,7 @@
     shiftMatrixTagged,
     rotateMatrixTagged,
     reverseMatrixTagged,
+    nformatMatrixTagged,
     dotMatrixMultiply,
     resolveDotMatrixShape,
     argExtremumFromWholeMatrix,

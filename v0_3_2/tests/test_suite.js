@@ -17049,9 +17049,58 @@ reg(2037, 'builtin-nformat', 'NFORMAT missing destination tag', function(h, sess
 
 reg(2038, 'builtin-nformat', 'BUILTIN_DOC NFORMAT signatures', function(h, session) {
   const lines = Interpreter.getDocLines('NFORMAT', new Map());
-  h.assert('count', String(lines.length), '20');
+  h.assert('count', String(lines.length), '22');
   h.assert('signed to_q4p4', lines[0], 'NFORMAT(Xbit a; signed to_q4p4) -> 8bit result, 4bit status');
   h.assert('q4p4 to_fp16', lines[6], 'NFORMAT(8bit a; q4p4 to_fp16) -> 16bit result, 4bit status');
+  h.assert('vector', lines[20], 'NFORMAT(Wsrc·wire[n] a; <src> to_<dst> vector) -> Wdst·wire[n] result, 4wire[n] status');
+  h.assert('matrix', lines[21], 'NFORMAT(Wsrc·wire[n,m] a; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] status');
+});
+
+reg(2039, 'builtin-nformat', 'NFORMAT vector q4p4 to_signed same width', function(h, session) {
+  const { interp } = session.run(
+    '8wire[2] v = 01110000 + 11110000\n' +
+    '8wire[2] r, 4wire[2] st = NFORMAT(v; q4p4 to_signed vector)'
+  );
+  h.assert('result', session.getWire(interp, 'r'), '0000011111111111');
+  h.assert('status', session.getWire(interp, 'st'), '00000000');
+});
+
+reg(2040, 'builtin-nformat', 'NFORMAT vector q4p4 to_fp16 width change', function(h, session) {
+  const { interp } = session.run(
+    '8wire[2] v = 01110000 + 11110000\n' +
+    '16wire[2] r, 4wire[2] st = NFORMAT(v; q4p4 to_fp16 vector)'
+  );
+  h.assert('result', session.getWire(interp, 'r'), '01000111000000001011110000000000');
+  h.assert('status', session.getWire(interp, 'st'), '00000000');
+});
+
+reg(2041, 'builtin-nformat', 'NFORMAT vector q8p8 to_bf16 inexact', function(h, session) {
+  const { interp } = session.run(
+    '16wire[2] v = 0000000101010101 + 0000000000000000\n' +
+    '16wire[2] r, 4wire[2] st = NFORMAT(v; q8p8 to_bf16 vector)'
+  );
+  h.assert('result', session.getWire(interp, 'r'), '00111111101010100000000000000000');
+  h.assert('inexact elem0', session.getWire(interp, 'st').slice(0, 4), '0010');
+  h.assert('exact elem1', session.getWire(interp, 'st').slice(4, 8), '0000');
+});
+
+reg(2042, 'builtin-nformat', 'NFORMAT matrix q4p4 to_fp16', function(h, session) {
+  const { interp } = session.run(
+    '8wire[2,2] m = 01110000 + 00010000 + 11110000 + 00100000\n' +
+    '16wire[2,2] r, 4wire[2,2] st = NFORMAT(m; q4p4 to_fp16 matrix)'
+  );
+  h.assert('result', session.getWire(interp, 'r'),
+    '0100011100000000001111000000000010111100000000000100000000000000');
+  h.assert('status', session.getWire(interp, 'st'), '0000000000000000');
+});
+
+reg(2043, 'builtin-nformat', 'NFORMAT vector matrix mutually exclusive', function(h, session) {
+  const r = session.run(
+    '8wire[2] v = 01110000 + 11110000\n' +
+    '8wire[2] r, 4wire[2] st = NFORMAT(v; q4p4 to_signed vector matrix)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('exclusive', String(err.includes('mutually exclusive')), 'true');
 });
 
 

@@ -2,7 +2,7 @@
 
 Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Status register (4bit)](arithmetic.md#status-4bit)
 
-Scalar format conversion: decode source format → real value → encode destination format. Returns **`4bit status`** per [arithmetic.md — status register](arithmetic.md#status-4bit).
+Scalar format conversion: decode source format → real value → encode destination format. Returns **`4bit status`** per [arithmetic.md — status register](arithmetic.md#status-4bit). With **`; vector`** or **`; matrix`**, conversion is per-element / per-cell; `status` is one 4-bit word per element or cell.
 
 ## Signatures
 
@@ -27,13 +27,15 @@ NFORMAT(16bit a; bf16 to_signed) -> 16bit result, 4bit status
 NFORMAT(16bit a; bf16 to_q4p4) -> 8bit result, 4bit status
 NFORMAT(16bit a; bf16 to_q8p8) -> 16bit result, 4bit status
 NFORMAT(16bit a; bf16 to_fp16) -> 16bit result, 4bit status
+NFORMAT(Wsrc·wire[n] a; <src> to_<dst> vector) -> Wdst·wire[n] result, 4wire[n] status
+NFORMAT(Wsrc·wire[n,m] a; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] status
 ```
 
 Use `doc(NFORMAT)` for the full signature list from `Interpreter.BUILTIN_DOC`.
 
 ## Call tags
 
-Exactly **one source** tag and **one destination** tag (`to_*`). Source and destination must differ.
+Exactly **one source** tag and **one destination** tag (`to_*`). Source and destination must differ. Optional **`; vector`** or **`; matrix`** (mutually exclusive).
 
 | Source tag | Operand width | Meaning |
 |------------|---------------|---------|
@@ -51,7 +53,13 @@ Exactly **one source** tag and **one destination** tag (`to_*`). Source and dest
 | `to_fp16` | **16** |
 | `to_bf16` | **16** |
 
-**No `; vector`** or **`; matrix`** in this release — scalar only.
+| Shape tag | Behaviour |
+|-----------|-----------|
+| *(none)* | Scalar — one operand wire |
+| `vector` | Per index on rank-1 tensors (`Wwire[N]`, `Wwire[1,N]`, `Wwire[N,1]`) |
+| `matrix` | Per cell on matrix `Wwire[N,M]` (`N>1`, `M>1`) |
+
+Declare the assignment target at **`Wdst`** (result element width). Tensor shape (`n` or `n,m`) is unchanged.
 
 ## Behaviour
 
@@ -99,3 +107,24 @@ show(st)
 ```
 
 `status.bit3` (nan) set → `0001`.
+
+### `; vector` — `q4p4` → `fp16` (width change)
+
+```logts-play
+8wire[2] v = 01110000 + 11110000
+16wire[2] r, 4wire[2] st = NFORMAT(v; q4p4 to_fp16 vector)
+show(r; fp16)
+show(st)
+```
+
+Each element converted independently; `16wire[2]` target matches `Wdst=16`.
+
+### `; matrix` — `q4p4` → `fp16`
+
+```logts-play
+8wire[2,2] m = 01110000 + 00010000 + 11110000 + 00100000
+16wire[2,2] r, 4wire[2,2] st = NFORMAT(m; q4p4 to_fp16 matrix)
+show(st)
+```
+
+Per-cell conversion; `status` is `4wire[2,2]` (4 bits per cell).

@@ -5824,11 +5824,32 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'NFORMAT') {
     if (argValues.length !== 1) fail('NFORMAT expects 1 argument');
     if (!nformatSpec) fail('NFORMAT requires format tags (e.g. ; q4p4 to_fp16)');
-    if (vectorMode || matrixMode) fail('NFORMAT: does not accept tag \'vector\' or \'matrix\'');
     if (!NF) fail('NFORMAT: internal error (numeric-formats not loaded)');
+    const { src, dst, vector, matrix } = nformatSpec;
+    if (vector || matrix) {
+      const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
+      const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
+      const getWire = (n) => this.wires.get(n);
+      let out;
+      try {
+        if (matrix) {
+          if (!MR) fail('NFORMAT: internal error (matrix-reduce not loaded)');
+          out = MR.nformatMatrixTagged(
+            args, getWire, 'NFORMAT', src, dst, this._matrixTaggedEvalFns(), NF.convertFormat
+          );
+        } else {
+          if (!VR) fail('NFORMAT: internal error (vector-reduce not loaded)');
+          out = VR.nformatVectorTagged(
+            args, getWire, 'NFORMAT', src, dst, this._vectorTaggedEvalFns(), NF.convertFormat
+          );
+        }
+      } catch (e) {
+        fail(e.message);
+      }
+      return this._returnBuiltinVectorPair(out.resultBlob, out.statusBlob, computeRefs);
+    }
     this._zstateRequireBinary(argValues, 'NFORMAT', ['a']);
     const a = argValues[0];
-    const { src, dst } = nformatSpec;
     const { result, status } = NF.convertFormat(a, a.length, src, dst);
     return [
       computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
@@ -13788,6 +13809,8 @@ Interpreter.BUILTIN_DOC = {
     'NFORMAT(16bit a; bf16 to_q4p4) -> 8bit result, 4bit status',
     'NFORMAT(16bit a; bf16 to_q8p8) -> 16bit result, 4bit status',
     'NFORMAT(16bit a; bf16 to_fp16) -> 16bit result, 4bit status',
+    'NFORMAT(Wsrc·wire[n] a; <src> to_<dst> vector) -> Wdst·wire[n] result, 4wire[n] status',
+    'NFORMAT(Wsrc·wire[n,m] a; <src> to_<dst> matrix) -> Wdst·wire[n,m] result, 4wire[n,m] status',
   ],
   ISDIGIT:  ['ISDIGIT(Xbit value) -> 1bit'],
   HIGH:     ['HIGH(Xbit) -> Xbit'],

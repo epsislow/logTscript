@@ -23,7 +23,7 @@ Cross-cutting topics:
 | DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | yes | yes | yes | yes | yes | yes | yes | — | — | arithmetic |
 | MAC | [builtin-MAC.md](builtin-MAC.md) | yes | yes | yes | yes | yes | yes | yes | — | — | arithmetic |
 | ABS | [builtin-ABS.md](builtin-ABS.md) | yes | yes | yes | yes | yes | — | — | — | — | arithmetic |
-| NFORMAT | [builtin-NFORMAT.md](builtin-NFORMAT.md) | src | src | src | src | src | — | — | — | — | arithmetic |
+| NFORMAT | [builtin-NFORMAT.md](builtin-NFORMAT.md) | src | src | src | src | src | yes | yes | — | — | arithmetic |
 | GT | [builtin-GT.md](builtin-GT.md) | yes | yes | yes | yes | yes | yes | yes | — | — | arithmetic |
 | LT | [builtin-LT.md](builtin-LT.md) | yes | yes | yes | yes | yes | yes | yes | — | — | arithmetic |
 | MIN | [builtin-MIN.md](builtin-MIN.md) | yes | yes | yes | yes | yes | yes | yes | yes | — | arithmetic / vector |

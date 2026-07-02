@@ -23,6 +23,8 @@
   function parseNformatCallTags(callTags, fail) {
     let src = null;
     let dst = null;
+    let vector = false;
+    let matrix = false;
     if (!callTags || !callTags.length) {
       fail('NFORMAT: requires format tags (e.g. ; q4p4 to_fp16)');
     }
@@ -37,9 +39,18 @@
       } else if (NFORMAT_MODES.has(t.name)) {
         if (src) fail('NFORMAT: duplicate source format tag');
         src = t.name;
+      } else if (t.name === 'vector') {
+        if (vector) fail('NFORMAT: duplicate tag \'vector\'');
+        vector = true;
+      } else if (t.name === 'matrix') {
+        if (matrix) fail('NFORMAT: duplicate tag \'matrix\'');
+        matrix = true;
       } else {
         fail(`NFORMAT: unknown tag '${t.name}'`);
       }
+    }
+    if (vector && matrix) {
+      fail('NFORMAT: \'vector\' and \'matrix\' are mutually exclusive');
     }
     if (!src) {
       fail('NFORMAT: requires source format tag (signed, q4p4, q8p8, fp16, bf16)');
@@ -50,7 +61,7 @@
     if (src === dst) {
       fail(`NFORMAT: source and destination format '${src}' are the same`);
     }
-    return { src, dst };
+    return { src, dst, vector, matrix };
   }
 
   function assertNformatSrcWidth(srcMode, width) {
