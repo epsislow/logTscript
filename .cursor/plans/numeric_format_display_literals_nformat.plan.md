@@ -36,14 +36,14 @@ todos:
     content: "Faza 4: NFORMAT scalar — convertFormat + status 4bit; builtin-NFORMAT.md + teste + doc; _gen_doc_data.js"
     status: completed
   - id: p5-future
-    content: "Faza 5+ (viitor, fara detalii): NFORMAT ; vector / ; matrix"
+    content: "Faza 5: NFORMAT ; vector / ; matrix — detalii faza_5_nformat_vector_matrix.plan.md"
     status: pending
 isProject: false
 ---
 
 ## Numeric formats: display, literali, status, NFORMAT
 
-Ordine: **Faza 0 → 1–2 → 2.5 → 3 → 4** (Faza 5+ viitor). După fiecare fază: `node node/_gen_test_manifest.js` + `node node/_run_test_suite_node.js` din `v0_3_2/`.
+Ordine: **Faza 0 → 1–2 → 2.5 → 3 → 4 → 5**. După fiecare fază: `node node/_gen_test_manifest.js` + `node node/_run_test_suite_node.js` din `v0_3_2/`.
 
 **Notă generală:** modificările se aplică direct în cod, teste, documentație și `files/fs.js` unde există exemple. Nu documentăm „migrări” sau versiuni anterioare — semnăturile și exemplele reflectă starea curentă.
 
@@ -200,14 +200,21 @@ Sintaxa: `NFORMAT(a ; <src> to_<dst>)` → `result`, `4bit status`.
 
 ---
 
-### Faza 5+ (viitor) — NFORMAT vector / matrix
+### Faza 5 — NFORMAT `; vector` / `; matrix`
 
-Extindere planificată: `NFORMAT` cu tag-uri `; vector` și `; matrix` (conversie per-element / per-celulă, `status` per element). **Fără detalii de implementare în acest plan** — placeholder pentru fază ulterioară.
+**Plan detaliat:** [`faza_5_nformat_vector_matrix.plan.md`](faza_5_nformat_vector_matrix.plan.md)
+
+Extindere `NFORMAT` (după Faza 4 scalar):
+
+- `NFORMAT(a ; <src> to_<dst> vector)` → `Wdst·wire[n] result`, `4wire[n] status`
+- `NFORMAT(a ; <src> to_<dst> matrix)` → `Wdst·wire[n,m] result`, `4wire[n,m] status`
+- Orice conversie permisă (inclusiv lățimi diferite); `status` per element marchează pierderile
+- `convertFormat` scalar reutilizat per-element/per-celulă
 
 ---
 
 ### Note
-- Ordine: **0 → 1–2 → 2.5 → 3 → 4 → (5+)**
+- Ordine: **0 → 1–2 → 2.5 → 3 → 4 → 5**
 - Faza 2.5 depinde de `parseLiteralTag` din Fazele 1–2
 - peek = show (Faze 1–2)
 - Doc complet pe fiecare pagină builtin (nu doar hub arithmetic.md)
