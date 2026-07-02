@@ -60,6 +60,111 @@ class Tokenizer {
     }
   }
 
+  skipInlineWs() {
+    while (!this.eof() && (this.peek() === ' ' || this.peek() === '\t')) this.next();
+  }
+
+  readLiteralTagSuffix() {
+    let tag = '';
+    while (!this.eof() && /[a-zA-Z0-9]/.test(this.peek())) {
+      tag += this.next();
+    }
+    if (!tag.length) {
+      throw Error(`Expected width/format tag after ';' at ${this.file}: ${this.line}:${this.col}`);
+    }
+    return tag;
+  }
+
+  readBackslashAtomValue() {
+    let neg = false;
+    if (!this.eof() && this.peek() === '-') {
+      neg = true;
+      this.next();
+    }
+    let intPart = '';
+    while (!this.eof() && /[0-9]/.test(this.peek())) {
+      intPart += this.next();
+    }
+    let fracPart = null;
+    if (!this.eof() && this.peek() === '.') {
+      const rest = this.src.substring(this.i);
+      if (!/^\.(\d+(-\d+|\/\d+)|\/\d+)/.test(rest)) {
+        this.next();
+        fracPart = '';
+        while (!this.eof() && /[0-9]/.test(this.peek())) {
+          fracPart += this.next();
+        }
+        if (fracPart === '') {
+          throw Error(`Invalid fractional decimal literal at ${this.file}: ${this.line}:${this.col}`);
+        }
+      }
+    }
+    if (neg && intPart === '' && fracPart == null) {
+      throw Error(`Invalid signed decimal literal at ${this.file}: ${this.line}:${this.col}`);
+    }
+    if (!neg && intPart === '' && fracPart == null) {
+      throw Error(`Invalid decimal literal at ${this.file}: ${this.line}:${this.col}`);
+    }
+    return { neg, intPart, fracPart };
+  }
+
+  readBackslashDecimalLiteral() {
+    const first = this.readBackslashAtomValue();
+
+    if (!first.fracPart && first.intPart !== '') {
+      const rest = this.src.substring(this.i);
+      if (/^\.(\d+(-\d+|\/\d+)|\/\d+)/.test(rest)) {
+        if (first.neg) {
+          throw Error(`Use \\-N;sM for signed, e.g. \\-3;s8 at ${this.file}: ${this.line}:${this.col}`);
+        }
+        return this.token('SDEC', first.intPart);
+      }
+    }
+
+    const atoms = [first];
+
+    while (true) {
+      this.skipInlineWs();
+      if (this.eof() || this.peek() !== '\\') break;
+      this.next();
+      atoms.push(this.readBackslashAtomValue());
+    }
+
+    const isGroup = atoms.length > 1;
+    const hasSuffix = !this.eof() && this.peek() === ';';
+
+    if (isGroup && !hasSuffix) {
+      throw Error(`Missing width/format tag for grouped literal at ${this.file}: ${this.line}:${this.col}`);
+    }
+
+    if (hasSuffix) {
+      const tagMark = this.i;
+      this.next();
+      const tag = this.readLiteralTagSuffix();
+      const isNumericTag = /^\d+$/.test(tag);
+      const isLegacyPad = atoms.length === 1 && isNumericTag && atoms[0].fracPart == null;
+      if (isLegacyPad) {
+        this.i = tagMark;
+        if (atoms[0].neg) {
+          throw Error(`Use \\-N;sM for signed, e.g. \\-3;s8 at ${this.file}: ${this.line}:${this.col}`);
+        }
+        return this.token('SDEC', atoms[0].intPart);
+      }
+      if (isNumericTag && atoms.some((a) => a.neg)) {
+        throw Error(`Use \\-N;sM for signed, e.g. \\-3;s8 at ${this.file}: ${this.line}:${this.col}`);
+      }
+      return this.token('GLIT', { atoms, tag });
+    }
+
+    if (atoms[0].neg) {
+      throw Error(`Use \\-N;sM for signed, e.g. \\-3;s8 at ${this.file}: ${this.line}:${this.col}`);
+    }
+    if (atoms[0].fracPart != null) {
+      throw Error(`Fractional decimal requires a format tag, e.g. \\1.5;q4p4 at ${this.file}: ${this.line}:${this.col}`);
+    }
+    return this.token('SDEC', atoms[0].intPart);
+  }
+
 pushSource({ src, alias }) {
   const t = new Tokenizer(src);
   t.alias = alias;
@@ -341,39 +446,10 @@ pushSource({ src, alias }) {
       return this.token('HEX', hex.toUpperCase());
     }
 
-    // Decimal literal \N or signed \-N;W
+    // Decimal literal \N, grouped \N \N;tag, or signed \-N;sM
     if (c === '\\') {
       this.next();
-      let signedNeg = false;
-      if (!this.eof() && this.peek() === '-') {
-        signedNeg = true;
-        this.next();
-      }
-      let dec = '';
-      while (!this.eof() && /[0-9]/.test(this.peek())) {
-        dec += this.next();
-      }
-      if (signedNeg) {
-        if (dec === '') {
-          throw Error(`Invalid signed decimal literal at ${this.file}: ${this.line}:${this.col}`);
-        }
-        if (this.eof() || this.peek() !== ';') {
-          throw Error(`Signed decimal literal requires explicit width: use \\-N;W at ${this.file}: ${this.line}:${this.col}`);
-        }
-        this.next();
-        let width = '';
-        while (!this.eof() && /[0-9]/.test(this.peek())) {
-          width += this.next();
-        }
-        if (width === '') {
-          throw Error(`Expected width after ';' in signed decimal literal at ${this.file}: ${this.line}:${this.col}`);
-        }
-        return this.token('SDEC', { signed: true, dec, width: parseInt(width, 10) });
-      }
-      if (dec === '') {
-        throw Error(`Invalid decimal literal at ${this.file}: ${this.line}:${this.col}`);
-      }
-      return this.token('SDEC', dec);
+      return this.readBackslashDecimalLiteral();
     }
 
     // Starts with letter a-z ID or keyword

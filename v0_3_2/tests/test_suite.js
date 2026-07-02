@@ -16033,7 +16033,7 @@ reg(1906, 'show-tags', 'show(vectorA; dec) — decimal per element', function(h,
 
 reg(1907, 'show-tags', 'show(w; decSigned) — signed scalar', function(h, session) {
   const { out } = session.run('4wire w := 1111\nshow(w; decSigned)');
-  h.assert('signed -1', String(out.some(l => /w \(4wire\) = \\-1;4/.test(l))), 'true');
+  h.assert('signed -1', String(out.some(l => /w \(4wire\) = \\-1;s4/.test(l))), 'true');
 });
 
 reg(1908, 'show-tags', 'show(24wire; dec) — single decimal', function(h, session) {
@@ -16142,7 +16142,7 @@ probe(.n:get; dec)`;
 
 reg(1920, 'show-tags', 'show(w; signed) — shorthand dec signed', function(h, session) {
   const { out } = session.run('4wire w := 1111\nshow(w; signed)');
-  h.assert('signed literal', String(out.some(l => /w \(4wire\) = \\-1;4/.test(l))), 'true');
+  h.assert('signed literal', String(out.some(l => /w \(4wire\) = \\-1;s4/.test(l))), 'true');
 });
 
 reg(1921, 'show-tags', 'show(16wire; bin) — grouped binary', function(h, session) {
@@ -16172,8 +16172,8 @@ reg(1925, 'show-tags', '128wire signed all-ones — chunk display', function(h, 
   const ones = '1'.repeat(128);
   const { out } = session.run(`128wire w := ${ones}\nshow(w; signed)`);
   const line = out.find(l => l.includes('w (128wire)'));
-  h.assert('chunk -1', String(line && line.includes('\\-1;64')), 'true');
-  h.assert('two chunks', String(line && (line.match(/\\-1;64/g) || []).length === 2), 'true');
+  h.assert('chunk -1', String(line && line.includes('\\-1 \\-1;s64')), 'true');
+  h.assert('two elements', String(line && (line.match(/\\-1/g) || []).length === 2), 'true');
 });
 
 reg(1926, 'show-tags', 'Parser — show(w; ascii) displayTags AST', function(h, session) {
@@ -16191,10 +16191,10 @@ reg(1928, 'show-tags', 'show(8wire; ascii) — NUL placeholder', function(h, ses
   h.assert('nul square', String(out.some(l => /nul \(8wire\) = "\u25A1"/.test(l))), 'true');
 });
 
-reg(1929, 'show-tags', 'show(40wire; ascii) — LF glyph', function(h, session) {
+reg(1929, 'show-tags', 'show(40wire; ascii) — LF glyph grouped', function(h, session) {
   const bits = '0100100001101001000010100100100001101111';
   const { out } = session.run(`40wire line := ${bits}\nshow(line; ascii)`);
-  h.assert('lf glyph', String(out.some(l => /line \(40wire\) = "Hi\u21B5Ho"/.test(l))), 'true');
+  h.assert('lf byte', String(out.some(l => /line \(40wire\) = \\72 \\105 \\10 \\72 \\111;ascii/.test(l))), 'true');
 });
 
 reg(1930, 'show-tags', 'show(8wire; ascii) — TAB as dot', function(h, session) {
@@ -16202,10 +16202,10 @@ reg(1930, 'show-tags', 'show(8wire; ascii) — TAB as dot', function(h, session)
   h.assert('tab dot', String(out.some(l => /tab \(8wire\) = "\."/.test(l))), 'true');
 });
 
-reg(1931, 'show-tags', 'show(40wire; ascii) — multi-byte string', function(h, session) {
+reg(1931, 'show-tags', 'show(40wire; ascii) — multi-byte grouped literal', function(h, session) {
   const hello = '0100100001100101011011000110110001101111';
   const { out } = session.run(`40wire msg := ${hello}\nshow(msg; ascii)`);
-  h.assert('hello', String(out.some(l => /msg \(40wire\) = "Hello"/.test(l))), 'true');
+  h.assert('hello grouped', String(out.some(l => /msg \(40wire\) = \\72 \\101 \\108 \\108 \\111;ascii/.test(l))), 'true');
 });
 
 reg(1932, 'show-tags', 'show(vec; ascii) — per-element quoted', function(h, session) {
@@ -16235,13 +16235,13 @@ reg(1936, 'show-tags', 'show(w; signed ascii) — parse error', function(h, sess
   h.assertThrows('mutually exclusive', () => session.parse('show(w; signed ascii)'));
 });
 
-reg(1937, 'literals', 'Signed decimal \\-3;8 assign', function(h, session) {
-  const { interp } = session.run('8wire a = \\-3;8');
+reg(1937, 'literals', 'Signed decimal \\-3;s8 assign', function(h, session) {
+  const { interp } = session.run('8wire a = \\-3;s8');
   h.assert('tc -3', session.getWire(interp, 'a'), '11111101');
 });
 
 reg(1938, 'literals', 'Signed decimal without width — parse error', function(h, session) {
-  h.assertThrows('explicit width', () => session.parse('8wire a = \\-3'));
+  h.assertThrows('sM for signed', () => session.parse('8wire a = \\-3'));
 });
 
 reg(1939, 'literals', 'Signed hex ^-A;8 assign', function(h, session) {
@@ -16254,7 +16254,7 @@ reg(1940, 'literals', 'Signed hex without width — parse error', function(h, se
 });
 
 reg(1941, 'literals', 'Signed width mismatch on assign', function(h, session) {
-  h.assertThrows('bits', () => session.run('8wire a = \\-3;4'));
+  h.assertThrows('sM for signed', () => session.parse('8wire a = \\-3;4'));
 });
 
 reg(1942, 'literals', 'Wire string "Hello" assign', function(h, session) {
@@ -16286,12 +16286,12 @@ reg(1945, 'literals', 'Wire string single quotes', function(h, session) {
 });
 
 reg(1946, 'show-tags', 'show(a; signed) after signed assign', function(h, session) {
-  const { out } = session.run('8wire a = \\-3;8\nshow(a; signed)');
-  h.assert('signed display', String(out.some(l => /a \(8wire\) = \\-3;8/.test(l))), 'true');
+  const { out } = session.run('8wire a = \\-3;s8\nshow(a; signed)');
+  h.assert('signed display', String(out.some(l => /a \(8wire\) = \\-3;s8/.test(l))), 'true');
 });
 
 reg(1947, 'literals', 'Short notation signed decimal', function(h, session) {
-  const { interp } = session.run('8wire c = `\\-3;8`');
+  const { interp } = session.run('8wire c = `\\-3;s8`');
   h.assert('tc', session.getWire(interp, 'c'), '11111101');
 });
 
@@ -16306,7 +16306,7 @@ reg(1949, 'literals', 'Runtime bundle includes wire-literals module', function(h
 });
 
 reg(1950, 'literals', 'User examples — signed dec, signed hex, wire string', function(h, session) {
-  const r1 = session.run('8wire a = \\-3;8');
+  const r1 = session.run('8wire a = \\-3;s8');
   h.assert('signed dec', session.getWire(r1.interp, 'a'), '11111101');
   const r2 = session.run('8wire b = ^-A;8');
   h.assert('signed hex', session.getWire(r2.interp, 'b'), '11110110');
@@ -16688,7 +16688,7 @@ reg(1991, 'builtin-numeric-formats', 'ADD — fp16 wrong width error', function(
 
 reg(1992, 'builtin-numeric-formats', 'show — q4p4 display tag', function(h, session) {
   const { out } = session.run('8wire w = 00011000\nshow(w; q4p4)');
-  h.assert('shows 1.5', String(out.some(l => /w \(8wire\) = 1\.5/.test(l))), 'true');
+  h.assert('shows grouped literal', String(out.some(l => /w \(8wire\) = \\1\.5;q4p4/.test(l))), 'true');
 });
 
 reg(1993, 'builtin-numeric-formats', 'ADD(vector) — q4p4 per element', function(h, session) {
@@ -16805,6 +16805,68 @@ reg(2005, 'builtin-numeric-formats-phase2', 'MULTIPLY — fp16 2.0×1.5=3.0', fu
     '16wire r, 16wire o = MULTIPLY(a, b; fp16)'
   );
   h.assert('result 3.0', session.getWire(interp, 'r'), '0100001000000000');
+});
+
+reg(2006, 'grouped-literals-display', 'Grup unsigned \\2 \\23 \\242 \\1;8', function(h, session) {
+  const { interp } = session.run('8wire[4] v = \\2 \\23 \\242 \\1;8');
+  h.assert('32 bits', String(session.getWire(interp, 'v').length === 32), 'true');
+  h.assert('elem0', session.getWire(interp, 'v').slice(0, 8), '00000010');
+  h.assert('elem2', session.getWire(interp, 'v').slice(16, 24), '11110010');
+});
+
+reg(2007, 'grouped-literals-display', 'Grup signed \\2 \\-1 \\5 \\0;s8', function(h, session) {
+  const { interp } = session.run('8wire[4] v = \\2 \\-1 \\5 \\0;s8');
+  h.assert('elem1 -1', session.getWire(interp, 'v').slice(8, 16), '11111111');
+});
+
+reg(2008, 'grouped-literals-display', 'show(v; signed) header și celule per-element', function(h, session) {
+  const { out } = session.run('8wire[4] v = \\2 \\-1 \\5 \\0;s8\nshow(v; signed)');
+  h.assert('header s32', String(out.some(l => /v = \\33752329;s32/.test(l) || /v = \\-?\d+;s32/.test(l))), 'true');
+  h.assert('cell :0', String(out.some(l => /:0 = \\2;s8/.test(l))), 'true');
+  h.assert('cell :1', String(out.some(l => /:1 = \\-1;s8/.test(l))), 'true');
+});
+
+reg(2009, 'grouped-literals-display', 'Grup q4p4 roundtrip', function(h, session) {
+  const { interp } = session.run('8wire[4] v = \\2 \\-1.5 \\0.5 \\1;q4p4');
+  h.assert('elem0', session.getWire(interp, 'v').slice(0, 8), '00100000');
+  const { out } = session.run('8wire[4] v = \\2 \\-1.5 \\0.5 \\1;q4p4\nshow(v; q4p4)');
+  h.assert('grouped header', String(out.some(l => /v = \\2 \\-1\.5 \\0\.5 \\1;q4p4/.test(l))), 'true');
+});
+
+reg(2010, 'grouped-literals-display', 'show(r; signed) 64wire — ;s64', function(h, session) {
+  const dec = '33752329';
+  const { out } = session.run(`64wire r = \\${dec};s64\nshow(r; signed)`);
+  h.assert('s64 literal', String(out.some(l => new RegExp(`r \\(64wire\\) = \\\\${dec};s64`).test(l))), 'true');
+});
+
+reg(2011, 'grouped-literals-display', '128wire signed chunk display', function(h, session) {
+  const ones = '1'.repeat(128);
+  const { out } = session.run(`128wire w := ${ones}\nshow(w; signed)`);
+  const line = out.find(l => l.includes('w (128wire)'));
+  h.assert('grouped s64', String(line && /\\-1 \\-1;s64/.test(line)), 'true');
+});
+
+reg(2012, 'grouped-literals-display', 'ASCII grup \\65 \\66;ascii', function(h, session) {
+  const { interp } = session.run('16wire w = \\65 \\66;ascii');
+  h.assert('AB bits', session.getWire(interp, 'w'), '0100000101000010');
+  const { out } = session.run('16wire w = \\65 \\66;ascii\nshow(w; ascii)');
+  h.assert('quoted AB', String(out.some(l => /w \(16wire\) = \\65 \\66;ascii/.test(l))), 'true');
+});
+
+reg(2013, 'grouped-literals-display', 'Eroare \\-N;M unsigned', function(h, session) {
+  h.assertThrows('sM for signed', () => session.parse('8wire a = \\-3;8'));
+});
+
+reg(2014, 'grouped-literals-display', 'Eroare grup fără sufix', function(h, session) {
+  h.assertThrows('Missing width/format tag', () => session.parse('8wire v = \\2 \\3'));
+});
+
+reg(2015, 'grouped-literals-display', 'C7 fracționar pe ;8', function(h, session) {
+  h.assertThrows('unsigned 8bit', () => session.run('8wire a = \\1.5;8'));
+});
+
+reg(2016, 'grouped-literals-display', 'C7 fracționar pe ;s8', function(h, session) {
+  h.assertThrows('signed 8bit', () => session.run('8wire a = \\1.5;s8'));
 });
 
 

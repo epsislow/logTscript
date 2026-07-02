@@ -495,6 +495,164 @@
     return String(binStr);
   }
 
+  function parseLiteralTag(tagStr) {
+    const tag = String(tagStr || '').trim().toLowerCase();
+    if (!tag.length) throw new Error('Empty literal tag');
+
+    if (tag === 'ascii') {
+      return { kind: 'ascii', elementW: 8, tagSuffix: 'ascii', signed: false, formatMode: null };
+    }
+
+    const sm = /^s(\d+)$/.exec(tag);
+    if (sm) {
+      const w = parseInt(sm[1], 10);
+      if (w < 1 || w > 64) throw new Error(`Signed literal width must be 1..64, got ${w}`);
+      return { kind: 'signed', elementW: w, tagSuffix: 's' + w, signed: true, formatMode: null };
+    }
+
+    const qm = /^q(\d+)p(\d+)$/.exec(tag);
+    if (qm) {
+      const X = parseInt(qm[1], 10);
+      const Y = parseInt(qm[2], 10);
+      const W = X + Y;
+      const suffix = 'q' + X + 'p' + Y;
+      return {
+        kind: 'fixed',
+        elementW: W,
+        tagSuffix: suffix,
+        signed: true,
+        formatMode: FIXED_SPECS[suffix] ? suffix : null,
+        fracBits: Y,
+        intBits: X,
+      };
+    }
+
+    const bfm = /^bf(\d+)$/.exec(tag);
+    if (bfm) {
+      const w = parseInt(bfm[1], 10);
+      if (w !== 16) throw new Error(`bf literal tag width must be 16, got ${w}`);
+      return { kind: 'float', elementW: 16, tagSuffix: 'bf16', signed: true, formatMode: 'bf16' };
+    }
+
+    const fpm = /^fp(\d+)$/.exec(tag);
+    if (fpm) {
+      const w = parseInt(fpm[1], 10);
+      if (w !== 16) throw new Error(`fp literal tag width must be 16, got ${w}`);
+      return { kind: 'float', elementW: 16, tagSuffix: 'fp16', signed: true, formatMode: 'fp16' };
+    }
+
+    const um = /^(\d+)$/.exec(tag);
+    if (um) {
+      const w = parseInt(um[1], 10);
+      if (w < 1 || w > 64) throw new Error(`Unsigned literal width must be 1..64, got ${w}`);
+      return { kind: 'unsigned', elementW: w, tagSuffix: String(w), signed: false, formatMode: null };
+    }
+
+    throw new Error(`Unknown literal tag: ${tagStr}`);
+  }
+
+  function getFormatModeWidth(mode) {
+    if (fixedSpec(mode)) return fixedSpec(mode).width;
+    if (mode === 'fp16' || mode === 'bf16') return 16;
+    return null;
+  }
+
+  function tagParsedFromFormatMode(mode) {
+    if (fixedSpec(mode)) {
+      const spec = fixedSpec(mode);
+      const fracBits = spec.fracBits;
+      const intBits = spec.width - fracBits;
+      return {
+        kind: 'fixed',
+        elementW: spec.width,
+        tagSuffix: mode,
+        signed: true,
+        formatMode: mode,
+        fracBits,
+        intBits,
+      };
+    }
+    if (mode === 'fp16' || mode === 'bf16') {
+      return { kind: 'float', elementW: 16, tagSuffix: mode, signed: true, formatMode: mode };
+    }
+    return parseLiteralTag(mode);
+  }
+
+  function genericFixedRawToNumber(raw, width, fracBits) {
+    const scale = BigInt(1) << BigInt(fracBits);
+    const n = signedBinToBigInt(String(raw).padStart(width, '0'));
+    return Number(n) / Number(scale);
+  }
+
+  function genericFixedNumberToRaw(value, width, fracBits) {
+    const scale = BigInt(1) << BigInt(fracBits);
+    const rounded = BigInt(Math.round(value * Number(scale)));
+    return signedBigIntToBin(rounded, width);
+  }
+
+  function formatFixedLiteralText(binStr, tagParsed) {
+    let text;
+    if (tagParsed.formatMode && fixedSpec(tagParsed.formatMode)) {
+      text = formatFixedDisplay(binStr, tagParsed.formatMode);
+    } else {
+      const n = genericFixedRawToNumber(binStr, tagParsed.elementW, tagParsed.fracBits);
+      if (Object.is(n, -0)) text = '-0';
+      else text = String(n);
+    }
+    if (text.startsWith('-')) return '\\' + text;
+    return '\\' + text;
+  }
+
+  function formatGroupedElementLiteral(binStr, tagParsed) {
+    const w = tagParsed.elementW;
+    const bits = String(binStr).padStart(w, '0');
+    if (tagParsed.kind === 'unsigned' || tagParsed.kind === 'ascii') {
+      const n = BigInt('0b' + bits);
+      return '\\' + n.toString();
+    }
+    if (tagParsed.kind === 'signed') {
+      const n = signedBinToBigInt(bits);
+      if (n < 0n) return '\\' + n.toString();
+      return '\\' + n.toString();
+    }
+    if (tagParsed.kind === 'fixed') {
+      return formatFixedLiteralText(bits, tagParsed);
+    }
+    if (tagParsed.kind === 'float') {
+      const text = formatFloatDisplay(bits, tagParsed.formatMode);
+      if (text.startsWith('-')) return '\\' + text;
+      return '\\' + text;
+    }
+    return '\\' + bits;
+  }
+
+  function formatGroupedShow(binStr, modeOrTag, options) {
+    const opts = options || {};
+    const tagParsed = typeof modeOrTag === 'string' && isFormatMode(modeOrTag)
+      ? tagParsedFromFormatMode(modeOrTag)
+      : (typeof modeOrTag === 'object' && modeOrTag != null && modeOrTag.kind
+        ? modeOrTag
+        : tagParsedFromFormatMode(String(modeOrTag)));
+    const elementW = opts.elementWidth || tagParsed.elementW;
+    const bits = String(binStr == null ? '' : binStr);
+    const complete = Math.floor(bits.length / elementW);
+    const restLen = bits.length % elementW;
+    const elems = [];
+    for (let i = 0; i < complete; i++) {
+      elems.push(formatGroupedElementLiteral(bits.substring(i * elementW, (i + 1) * elementW), tagParsed));
+    }
+    if (!elems.length && restLen > 0) {
+      return bits.substring(complete * elementW);
+    }
+    let out = elems.join(' ');
+    if (elems.length) out += ';' + tagParsed.tagSuffix;
+    if (restLen > 0) {
+      const rest = bits.substring(complete * elementW);
+      out += (elems.length ? ' + ' : '') + rest;
+    }
+    return out;
+  }
+
   const api = {
     BUILTIN_FORMAT_TAG_FUNCS,
     FORMAT_TAG_NAMES,
@@ -515,8 +673,16 @@
     clampAtWidth,
     absAtWidth,
     formatForShow,
+    parseLiteralTag,
+    getFormatModeWidth,
+    genericFixedNumberToRaw,
+    genericFixedRawToNumber,
+    formatGroupedShow,
+    tagParsedFromFormatMode,
+    fixedNumberToRaw,
     fixedRawToNumber,
     decodeToFloat,
+    encodeFromFloat,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

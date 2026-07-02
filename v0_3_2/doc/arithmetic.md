@@ -20,15 +20,15 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 |----------|------|------|
 | ADD | [builtin-ADD.md](builtin-ADD.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
 | SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
-| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | `signed`, `vector`, `matrix` |
-| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | `signed`, `vector`, `matrix` |
-| MAC | [builtin-MAC.md](builtin-MAC.md) | `signed`, `vector`, `matrix` |
-| ABS | [builtin-ABS.md](builtin-ABS.md) | `signed` (required) |
-| GT | [builtin-GT.md](builtin-GT.md) | `signed`, `vector`, `matrix` |
-| LT | [builtin-LT.md](builtin-LT.md) | `signed`, `vector`, `matrix` |
+| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
+| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
+| MAC | [builtin-MAC.md](builtin-MAC.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
+| ABS | [builtin-ABS.md](builtin-ABS.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16` (required) |
+| GT | [builtin-GT.md](builtin-GT.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
+| LT | [builtin-LT.md](builtin-LT.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
 | MIN | [builtin-MIN.md](builtin-MIN.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
 | MAX | [builtin-MAX.md](builtin-MAX.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
-| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | `signed`, `vector`, `matrix` |
+| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`, `vector`, `matrix` |
 
 Vector reduction (`SUM`, `DOT`, `ARGMAX`, `ARGMIN`): [vector-reduction.md](vector-reduction.md). **2D element-wise:** [matrix-reduction.md](matrix-reduction.md). Bitwise equality: [builtin-EQ.md](builtin-EQ.md).
 
@@ -57,8 +57,15 @@ Optional tags after `;` in the call: **`signed`**, **`q4p4`**, **`q8p8`**, **`fp
 | Built-in | `; q4p4` (8-bit) | `; q8p8` / `; fp16` / `; bf16` (16-bit) |
 |----------|------------------|----------------------------------------|
 | ADD / SUBTRACT | fixed-point + overflow flag | fixed / float + flag |
+| MULTIPLY / DIVIDE / MAC | fixed ops + over/mod | fixed / float ops |
 | SUM | fixed sum + over | fixed / float sum + over |
 | MIN / MAX | fixed compare | fixed / float compare |
+| GT / LT | fixed compare → `1bit` | fixed / float compare |
+| CLAMP | fixed bounds | fixed / float bounds |
+| ABS | fixed `|x|` + overflow | fixed / float `|x|` |
+| DOT | rank-1 dot + `over` | rank-1 dot + flag |
+| ARGMAX / ARGMIN | rank-1 `; q4p4` compare | — |
+| RSHIFT | ASHR on 8-bit | ASHR on 16-bit (`q8p8` only) |
 
 Optional **bool tags** after `;` in the call (`signed`, `vector`, `matrix`, or combinations except **`vector` + `matrix`**). Operand expansion vs element-wise mode: [vector-reduction.md](vector-reduction.md#element-wise-mode-vector), [matrix-reduction.md](matrix-reduction.md).
 

@@ -233,7 +233,7 @@ show(z; fp16)
 
 **Explicit fără format tags (ca la signed):** porți logice, MUX/REG, LSHIFT, rotații, N2N10S, ZCONNECT.
 
-Vezi și: [user_def_tag_overloads.plan.md](user_def_tag_overloads.plan.md) (faza `signed` implementată).
+Vezi și: [user_def_tag_overloads.plan.md](user_def_tag_overloads.plan.md) (faza `signed` implementată). [numeric_format_display_literals_nformat.plan.md](numeric_format_display_literals_nformat.plan.md) — show, literali, status 4bit, NFORMAT.
 
 ---
 

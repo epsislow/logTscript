@@ -35,6 +35,15 @@ function parseSdecAtom(raw, tok) {
   return { bin: slashDecToBin(decVal), dec: decVal };
 }
 
+function parseGlitAtom(raw, tok) {
+  const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+  if (!WL || typeof WL.groupedLiteralToBits !== 'function') {
+    throw Error(`Grouped literals require core/wire-literals.js${parserLoc(tok)}`);
+  }
+  const bin = WL.groupedLiteralToBits(raw.atoms, raw.tag);
+  return { bin, groupedLiteral: raw, tag: raw.tag };
+}
+
 function parseShexAtom(raw, tok) {
   const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
   if (!WL) {
@@ -1734,6 +1743,10 @@ assignment() {
     if(this.c.type === 'BIN'){
       atom = {bin: this.c.value};
       this.eat('BIN');
+    } else if(this.c.type === 'GLIT'){
+      const parsed = parseGlitAtom(this.c.value, this.c);
+      atom = { bin: parsed.bin, groupedLiteral: parsed.groupedLiteral, literalTag: parsed.tag };
+      this.eat('GLIT');
     } else if(this.c.type === 'SDEC'){
       const parsed = parseSdecAtom(this.c.value, this.c);
       atom = { bin: parsed.bin, dec: parsed.dec };
@@ -2781,6 +2794,9 @@ assignment() {
           if (this.c.type === 'BIN') {
             initialValue = this.c.value;
             this.eat('BIN');
+          } else if (this.c.type === 'GLIT') {
+            initialValue = parseGlitAtom(this.c.value, this.c).bin;
+            this.eat('GLIT');
           } else if (this.c.type === 'SDEC') {
             initialValue = parseSdecAtom(this.c.value, this.c).bin;
             this.eat('SDEC');
@@ -3121,6 +3137,17 @@ assignment() {
     return addNot({ refLiteral: v });
   }
   
+  if (this.c.type === 'GLIT') {
+    const parsed = parseGlitAtom(this.c.value, this.c);
+    this.eat('GLIT');
+    let br = null;
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      br = this.parseLiteralBitRange();
+    }
+    const atomGlit = br ? { ...parsed, bitRange: br } : { ...parsed };
+    return addNot(atomGlit);
+  }
+
   if (this.c.type === 'SDEC') {
     const parsed = parseSdecAtom(this.c.value, this.c);
     this.eat('SDEC');

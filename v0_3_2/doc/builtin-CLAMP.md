@@ -9,6 +9,10 @@ Clamp value to `[min, max]`.
 ```
 CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit
 CLAMP(Xbit x, Ybit min, Ybit max; signed) -> Ybit
+CLAMP(8bit x, 8bit min, 8bit max; q4p4) -> 8bit
+CLAMP(16bit x, 16bit min, 16bit max; q8p8) -> 16bit
+CLAMP(16bit x, 16bit min, 16bit max; fp16) -> 16bit
+CLAMP(16bit x, 16bit min, 16bit max; bf16) -> 16bit
 CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector) -> Wbit[n]
 CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]
 CLAMP(Wbit[n,m] x, Wbit/Wbit[n,m]/scalar min, Wbit/Wbit[n,m]/scalar max ; matrix) -> Wbit[n,m]
@@ -26,6 +30,9 @@ CLAMP(Wbit[n,m] x, … ; matrix signed) -> Wbit[n,m]
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed bounds. |
+| `q4p4` | Q4.4 bounds on **8-bit** wires. |
+| `q8p8` | Q8.8 bounds on **16-bit** wires. |
+| `fp16` / `bf16` | Float clamp on **16-bit** wires. |
 | `vector` | Per index on **rank-1** tensors; bounds broadcast if scalar. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]`; bounds broadcast as rank-1 row/col/scalar. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -70,6 +77,18 @@ show(yS)
 ```
 
 Unsigned: `15` → `2`. Signed: `−1` → `0`.
+
+### `CLAMP(8bit x, 8bit min, 8bit max; q4p4)`
+
+```logts-play
+8wire x = 00110000
+8wire lo = 00000000
+8wire hi = 00100000
+8wire y = CLAMP(x, lo, hi; q4p4)
+show(y; q4p4)
+```
+
+`3.0` clamped to `[0, 2.0]` → `2.0`.
 
 ### `CLAMP(Wbit[n] x, … ; vector)`
 

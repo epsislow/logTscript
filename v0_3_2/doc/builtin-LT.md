@@ -7,6 +7,10 @@ Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md
 ```
 LT(Xbit a, Xbit b) -> 1bit result
 LT(Xbit a, Xbit b; signed) -> 1bit result
+LT(8bit a, 8bit b; q4p4) -> 1bit result
+LT(16bit a, 16bit b; q8p8) -> 1bit result
+LT(16bit a, 16bit b; fp16) -> 1bit result
+LT(16bit a, 16bit b; bf16) -> 1bit result
 LT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
 LT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> 1wire[n×m]
@@ -22,6 +26,9 @@ LT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> 1wire[n×m]
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Two's complement comparison. |
+| `q4p4` | Fixed-point Q4.4 on **8-bit** wires. |
+| `q8p8` | Fixed-point Q8.8 on **16-bit** wires. |
+| `fp16` / `bf16` | IEEE half / brain float on **16-bit** wires. |
 | `vector` | Per index on **rank-1** tensors → `1wire[n]`. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]` → `1wire[N×M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -52,6 +59,17 @@ show(ltS)
 ```
 
 Unsigned: `15 < 2` → `ltU=0`. Signed: `−1 < 2` → `ltS=1`.
+
+### `LT(8bit a, 8bit b; q4p4)`
+
+```logts-play
+8wire a = 00001000
+8wire b = 00011000
+1wire lt = LT(a, b; q4p4)
+show(lt)
+```
+
+`0.5 < 1.5` → `lt=1`.
 
 ### `LT(Wbit[n] a, Wbit/Wbit[n] b ; vector)`
 

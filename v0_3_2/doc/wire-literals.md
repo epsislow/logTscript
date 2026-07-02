@@ -14,7 +14,8 @@ Related: [assignment operators](assignment-operators.md) (`=`, `:=`, `=:`), [sho
 |------|---------|---------|
 | **Binary** | `1010` | Bits as written (only `0` and `1`) |
 | **Decimal unsigned** | `\255` | Unsigned integer → minimal binary |
-| **Decimal signed** | `\-3;8` | Two's complement value on **exactly** `W` bits |
+| **Grouped literal** | `\2 \23 \242;8` | Multiple `\N` values + one `;tag` on the last atom |
+| **Decimal signed** | `\-3;s8` | Two's complement on **exactly** `W` bits (`;sW`) |
 | **Hex pattern** | `^FF` | Each hex digit → 4 bits (unsigned pattern) |
 | **Hex value signed** | `^-A;8` | Signed numeric value in hex + **explicit** width |
 | **Wire string** | `"Hello"` / `'Hi'` | One byte per character (8 bit), MSB-first in the wire |
@@ -26,8 +27,8 @@ Postfixes shared by several forms:
 | Postfix | Example | Effect |
 |---------|---------|--------|
 | **Bit range** | `\255.0-7`, `^FF.4/8` | Slice after conversion to bits |
-| **Padding** `;p` | `\12;8`, `^f;8` | Pad unsigned literal to `p` bits (left zeroes) |
-| **Signed width** `;W` | `\-3;8`, `^-A;8` | **Not** padding — TC width (signed forms only) |
+| **Padding** `;p` | `\12;8`, `^f;8` | Pad unsigned **scalar** literal to `p` bits (left zeroes) |
+| **Grouped tag** | `\2 \-1;s8`, `\1.5;q4p4` | Suffix on last atom applies to **all** elements in the group |
 
 ---
 
@@ -79,29 +80,76 @@ show(n)
 
 ---
 
-## Decimal signed — `\-N;W`
+## Decimal signed — `\-N;sW`
 
-Signed decimal literals use a **minus after the backslash** and require an **explicit width** `;W` (wire type `8wire` does **not** infer `W`).
+Signed decimal literals use a **minus after the backslash** (or a positive `\N`) and require an **explicit signed tag** `;sW` (`W` = two's-complement width).
 
 ```logts-play
-8wire a = \-3;8
+8wire a = \-3;s8
 show(a)
 ```
 
 | Source | Result on `8wire` |
 |--------|-------------------|
-| `\-3;8` | `11111101` (TC −3) |
-| `\-1;4` | `1111` on `4wire` |
-| `\-3` | **Parse error** — missing `;W` |
-| `\-3;4` on `8wire` | **Width error** — pattern is 4 bits, wire is 8 |
+| `\-3;s8` | `11111101` (TC −3) |
+| `\3;s8` | `00000011` (TC +3) |
+| `\-1;s4` | `1111` on `4wire` |
+| `\-3` | **Parse error** — use `;sW` |
+| `\-3;8` | **Parse error** — use `;s8` for signed |
+| `\-3;s4` on `8wire` | **Width error** — pattern is 4 bits, wire is 8 |
 
 In [short notation](short-notation.md):
 
 ```
-8wire c = `\-3;8`     →  same as \-3;8
+8wire c = `\-3;s8`     →  same as \-3;s8
 ```
 
-**Disambiguation `;W` vs `;p`:** on unsigned `\31;8`, the suffix pads to 8 bits. On signed `\-3;8`, the suffix is always the **two's-complement width**, never padding.
+**Disambiguation `;p` vs grouped tag:** a **single** unsigned scalar `\31;8` still uses `;8` as **padding**. A **group** of two or more atoms, or any `;sW` / `;qXpY` / `;ascii` suffix, uses the grouped-literal rules below.
+
+---
+
+## Grouped literals — `\v1 \v2 … ;tag`
+
+A **group** is a whitespace-separated sequence of `\value` atoms with **one suffix** on the last atom that applies **retroactively** to every element:
+
+```logts-play
+8wire[4] v = \2 \23 \242 \1;8
+show(v)
+```
+
+| Suffix | Width | Meaning |
+|--------|-------|---------|
+| `;M` (digits only, **group** with ≥2 atoms) | M | Unsigned / padding per element |
+| `;sM` | M | Signed two's complement per element |
+| `;qXpY` | X+Y | Fixed-point QX.Y (e.g. `;q4p4` → 8 bit) |
+| `;fp16`, `;bf16` | 16 | IEEE / brain float16 per element |
+| `;ascii` | 8 | Byte per element (alias of `;8` in groups) |
+
+Examples:
+
+```logts-play
+8wire[4] v = \2 \-1 \5 \0;s8
+show(v; signed)
+```
+
+```logts-play
+8wire[4] v = \2 \-1.5 \0.5 \1;q4p4
+show(v; q4p4)
+```
+
+```logts-play
+16wire w = \65 \66;ascii
+show(w; ascii)
+```
+
+| Rule | Detail |
+|------|--------|
+| Single `\N` without suffix | Unchanged — minimal unsigned width |
+| `\N \N` without suffix | **Error** — missing width/format tag |
+| `\-N;M` (unsigned M) | **Error** — use `;sM` |
+| Fractional `\1.5` | Requires `;qXpY`, `;fp16`, or `;bf16` — not plain `;8` / `;s8` |
+
+Concatenation between groups still uses `+`: `\1 \2;8 + ^0F`.
 
 ---
 

@@ -11,6 +11,10 @@ On **rank-1** tensors the result is a **scalar**. On compatible **2D** shapes th
 ```
 DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
 DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
+DOT(8wire[n] a, 8wire[n] b; q4p4) -> 8bit result, 16bit over
+DOT(16wire[n] a, 16wire[n] b; q8p8) -> 16bit result, 32bit over
+DOT(16wire[n] a, 16wire[n] b; fp16) -> 16bit result, 32bit inexact
+DOT(16wire[n] a, 16wire[n] b; bf16) -> 16bit result, 32bit inexact
 DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over
 DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over
 ```
@@ -39,8 +43,11 @@ Incompatible shapes are a **runtime error**. Assign the target to match the outp
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed multiply per pair, signed accumulate (scalar or per matrix cell). |
+| `q4p4` | Rank-1 dot on **8-bit** elements; result **8** bits, `over` **16** bits. |
+| `q8p8` | Rank-1 dot on **16-bit** elements; result **16** bits, `over` **32** bits. |
+| `fp16` / `bf16` | Rank-1 dot on **16-bit** float wires; `over` = inexact accumulation flag width. |
 
-**No `; vector`** or **`; matrix`** — whole tensors only.
+**No `; vector`** or **`; matrix`** — whole tensors only. Format tags apply to **rank-1** dot products only (not 2D matrix multiply).
 
 ## Examples
 
@@ -77,6 +84,18 @@ show(o)
 ```
 
 Signed `(−1)×(−1) + 2×1 = 3`.
+
+### `DOT(8wire[n] a, 8wire[n] b; q4p4)`
+
+```logts-play
+8wire[2] a = 00011000 + 00001000
+8wire[2] b = 00010000 + 00010000
+8wire dot, 16wire over = DOT(a, b; q4p4)
+show(dot; q4p4)
+show(over)
+```
+
+`[1.5, 0.5]·[1, 1] = 2.0`.
 
 ### `DOT(Wwire[N,K] A, Wwire[K,M] B)` — matrix multiply
 

@@ -10,7 +10,9 @@ Position of the maximum element in a wire vector or matrix (one-hot or index).
 ARGMAX(Wbit[n] vector) -> 1wire[n]
 ARGMAX(Wbit[n] vector; index) -> bitIndexWidth(n) bit
 ARGMAX(Wbit[n] vector; signed) -> 1wire[n]
+ARGMAX(Wbit[n] vector; q4p4) -> 1wire[n]
 ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit
+ARGMAX(Wbit[n] vector; index q4p4) -> bitIndexWidth(n) bit
 ARGMAX(Wbit[n,m] matrix) -> 1wire[n×m]
 ARGMAX(Wbit[n,m] matrix; index) -> bit rows, bit cols
 ARGMAX(Wbit[n,m] m ; row) -> 1wire[n×m]
@@ -32,6 +34,7 @@ ARGMAX(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
 | `; col` | `1wire[n×m]` | One `1` per column at the maximal row |
 | `; col; index` | `bitIndexWidth(n) wire[m]` | Row index per column |
 | `signed` | (any of above) | Signed compare |
+| `q4p4` | (rank-1 modes above) | Q4.4 compare on **8-bit** elements |
 
 **Ties:** lowest index wins. For the **value** at max, use [MAX](builtin-MAX.md).
 
@@ -88,6 +91,16 @@ show(hot)
 ```
 
 Signed max is `0100` at index 2 → `hot=001`.
+
+### `ARGMAX(Wbit[n] vector; index q4p4)`
+
+```logts-play
+8wire[3] v = 00001000 + 00011000 + 00010000
+2wire idx = ARGMAX(v; index q4p4)
+show(idx)
+```
+
+Max `1.5` at index 1 → `idx=01`.
 
 ## See also
 

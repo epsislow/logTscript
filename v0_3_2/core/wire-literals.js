@@ -110,6 +110,66 @@
     return bin;
   }
 
+  function atomToFloat(atom) {
+    const sign = atom.neg ? '-' : '';
+    if (atom.fracPart != null) {
+      return parseFloat(sign + atom.intPart + '.' + atom.fracPart);
+    }
+    const n = parseDecimalBigInt(atom.intPart || '0');
+    return atom.neg ? -Number(n) : Number(n);
+  }
+
+  function fractionalOnIntegerTagError(tag) {
+    const widthKind = tag.kind === 'signed' ? 'signed' : 'unsigned';
+    throw new Error(
+      `Missing floating point numeric format. The Numeric Width used is for ${widthKind} ${tag.elementW}bit`
+    );
+  }
+
+  function atomToBin(atom, tag, NF) {
+    const w = tag.elementW;
+    if (atom.fracPart != null && tag.kind !== 'fixed' && tag.kind !== 'float') {
+      fractionalOnIntegerTagError(tag);
+    }
+    if (atom.neg && (tag.kind === 'unsigned' || tag.kind === 'ascii')) {
+      throw new Error(`Negative value not allowed in unsigned ${w}bit literal group`);
+    }
+    if (tag.kind === 'unsigned' || tag.kind === 'ascii') {
+      return unsignedDecToWidthBin(atom.intPart, w);
+    }
+    if (tag.kind === 'signed') {
+      let n = parseDecimalBigInt(atom.intPart || '0');
+      if (atom.neg) n = -n;
+      return signedIntToTcBin(n, w);
+    }
+    if (tag.kind === 'fixed') {
+      const val = atomToFloat(atom);
+      if (tag.formatMode) return NF.fixedNumberToRaw(val, tag.formatMode);
+      return NF.genericFixedNumberToRaw(val, w, tag.fracBits);
+    }
+    if (tag.kind === 'float') {
+      const val = atomToFloat(atom);
+      return NF.encodeFromFloat(val, tag.formatMode);
+    }
+    throw new Error(`Unsupported literal tag kind: ${tag.kind}`);
+  }
+
+  function groupedLiteralToBits(atoms, tagStr) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+    if (!NF || typeof NF.parseLiteralTag !== 'function') {
+      throw new Error('groupedLiteralToBits requires core/numeric-formats.js');
+    }
+    const tag = NF.parseLiteralTag(tagStr);
+    if (!Array.isArray(atoms) || !atoms.length) {
+      throw new Error('Grouped literal requires at least one value');
+    }
+    let bin = '';
+    for (const atom of atoms) {
+      bin += atomToBin(atom, tag, NF);
+    }
+    return bin;
+  }
+
   const api = {
     signedIntToTcBin,
     slashDecToBin,
@@ -120,6 +180,7 @@
     parseShexToken,
     decodeWireStringEscape,
     wireStringToBin,
+    groupedLiteralToBits,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

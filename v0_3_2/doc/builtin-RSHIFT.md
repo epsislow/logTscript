@@ -10,6 +10,8 @@ Shift bits toward LSB. Vacated MSBs use **`fill`** (logical) or the sign bit (`;
 RSHIFT(Xbit data, Nbit n) -> Xbit
 RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
 RSHIFT(Xbit data, Nbit n; signed) -> Xbit
+RSHIFT(8bit data, Nbit n; q4p4) -> 8bit
+RSHIFT(16bit data, Nbit n; q8p8) -> 16bit
 RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector signed) -> Wbit[n]
 RSHIFT(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
@@ -30,6 +32,8 @@ Sugar: `data > n` and `data > n w1` — [short-notation.md](short-notation.md).
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Arithmetic shift (ASHR): MSB replicated; `fill` ignored. |
+| `q4p4` | ASHR on **8-bit** fixed-point wires (same as `; signed` on raw bits). |
+| `q8p8` | ASHR on **16-bit** fixed-point wires. |
 | `vector` | Per element on **rank-1** tensors. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]`; `count` scalar or rank-1 broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -100,6 +104,18 @@ show(y)
 ```
 
 → `1111` (still −1).
+
+### `RSHIFT(8bit data, Nbit n; q4p4)`
+
+```logts-play
+8wire x = 11110000
+8wire y = RSHIFT(x, 1; q4p4)
+show(y; q4p4)
+```
+
+Fixed-point `−1.0 >> 1 = −0.5` → `11111000`.
+
+**Note:** `; fp16` and `; bf16` are **not** accepted on RSHIFT (runtime error).
 
 ### `RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector)`
 

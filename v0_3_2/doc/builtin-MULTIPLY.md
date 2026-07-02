@@ -9,6 +9,10 @@ Binary multiplication with overflow capture.
 ```
 MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
 MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
+MULTIPLY(8bit a, 8bit b; q4p4) -> 8bit result, 8bit over
+MULTIPLY(16bit a, 16bit b; q8p8) -> 16bit result, 16bit over
+MULTIPLY(16bit a, 16bit b; fp16) -> 16bit result, 16bit inexact
+MULTIPLY(16bit a, 16bit b; bf16) -> 16bit result, 16bit inexact
 MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -25,6 +29,9 @@ MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Product as two's complement; same wire packing. |
+| `q4p4` | Fixed-point Q4.4 on **8-bit** wires; `over` = high 8 bits of 16-bit product. |
+| `q8p8` | Fixed-point Q8.8 on **16-bit** wires; `over` = high 16 bits of 32-bit product. |
+| `fp16` / `bf16` | Float multiply on **16-bit** wires; second return = inexact flag. |
 | `vector` | Per index on **rank-1** tensors; `over[i]` = high **W** bits of the **2W**-bit product. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -65,6 +72,30 @@ show(oS)
 ```
 
 Signed `(−1)×(−1)=1` → `rS=0001`, `oS=0000`.
+
+### `MULTIPLY(8bit a, 8bit b; q4p4)`
+
+```logts-play
+8wire a = 00011000
+8wire b = 00100000
+8wire r, 8wire o = MULTIPLY(a, b; q4p4)
+show(r; q4p4)
+show(o)
+```
+
+`1.5×2.0=3.0` → `r=00110000`.
+
+### `MULTIPLY(16bit a, 16bit b; fp16)`
+
+```logts-play
+16wire a = 0100000000000000
+16wire b = 0011111000000000
+16wire r, 16wire o = MULTIPLY(a, b; fp16)
+show(r; fp16)
+show(o)
+```
+
+`2.0×1.5=3.0`.
 
 ### `MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector)`
 

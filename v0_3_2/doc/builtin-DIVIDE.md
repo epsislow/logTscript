@@ -9,6 +9,10 @@ Integer quotient and remainder (no floating-point).
 ```
 DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
 DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod
+DIVIDE(8bit a, 8bit b; q4p4) -> 8bit result, 8bit mod
+DIVIDE(16bit a, 16bit b; q8p8) -> 16bit result, 16bit mod
+DIVIDE(16bit a, 16bit b; fp16) -> 16bit result, 16bit mod
+DIVIDE(16bit a, 16bit b; bf16) -> 16bit result, 16bit mod
 DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -26,6 +30,9 @@ DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Operands as two's complement; integer `/` and `%`. |
+| `q4p4` | Fixed-point Q4.4 on **8-bit** wires. |
+| `q8p8` | Fixed-point Q8.8 on **16-bit** wires. |
+| `fp16` / `bf16` | Float divide on **16-bit** wires. |
 | `vector` | Quotient and remainder per index on **rank-1** tensors. |
 | `matrix` | Quotient and remainder per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -76,6 +83,18 @@ show(m)
 ```
 
 Signed `−1 / 2 = 0`, remainder `−1` (`1111`).
+
+### `DIVIDE(8bit a, 8bit b; q4p4)`
+
+```logts-play
+8wire a = 00100000
+8wire b = 00001000
+8wire q, 8wire m = DIVIDE(a, b; q4p4)
+show(q; q4p4)
+show(m; q4p4)
+```
+
+`2.0/0.5=4.0`, remainder `0`.
 
 ### `DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector)`
 

@@ -1,0 +1,243 @@
+---
+name: Numeric format display literals NFORMAT
+overview: "Șase faze: (0) doc builtin faza-2; (1–2) literali grupați + afișare; (2.5) tag-uri parametrizate pe built-in-uri; (3) status 4bit; (4) NFORMAT scalar; (5+) viitor. Detalii Faze 1–2: literali_grupați_unificați.plan.md"
+todos:
+  - id: p0-doc-builtin
+    content: "Faza 0: doc pagini individuale GT/LT/MULTIPLY/MAC/DIVIDE/DOT/CLAMP/ABS/RSHIFT/ARGMAX/ARGMIN (pattern builtin-ADD.md) + tagged-index; _gen_doc_data.js"
+    status: completed
+  - id: p1-parse-tag
+    content: "Faze 1–2: numeric-formats.js — parseLiteralTag(sX/qXpY/bfX/fpX/ascii) + formatGroupedShow (signed adaptiv ;sW / chunk ;s64)"
+    status: pending
+  - id: p1-tokenizer
+    content: "Faze 1–2: tokenizer.js — grup \\N \\N;tag, eroare \\-N;M, backward compat \\N singular"
+    status: pending
+  - id: p1-wire-literals
+    content: "Faze 1–2: wire-literals.js + parser.js — GroupedLiteral, groupedLiteralToBits"
+    status: pending
+  - id: p1-display
+    content: "Faze 1–2: debug-display-format.js + interpreter.js — header grupat ;tag, celula formatW vs elementW"
+    status: pending
+  - id: p1-tests-doc
+    content: "Faze 1–2: teste grouped-literals-display + actualizare 1907/1920/1925/1946/1992 + wire-literals.md + debug.md"
+    status: pending
+  - id: p25-parse-builtin-tags
+    content: "Faza 2.5: parseBuiltinCallTags + parser whitelist — sX, qXpY, bfX, fpX pe ADD/SUB/SUM/MIN/MAX/GT/LT/MULTIPLY/MAC/DOT/DIVIDE/CLAMP/ABS/RSHIFT/ARGMAX/ARGMIN"
+    status: pending
+  - id: p25-display-builtin-tags
+    content: "Faza 2.5: show/peek/probe — display tags parametrizate (reutilizează parseLiteralTag); signed bare tag neschimbat"
+    status: pending
+  - id: p25-tests-doc
+    content: "Faza 2.5: teste builtin-param-formats + doc arithmetic.md + builtin-tagged-index + pagini builtin; _gen_doc_data.js"
+    status: pending
+  - id: p3-status
+    content: "Faza 3: numeric-formats.js buildStatus (bit0=MSB stanga); ops + interpreter — status 4bit, over+status, mod+status; BUILTIN_DOC + teste + doc toate paginile builtin"
+    status: pending
+  - id: p4-nformat
+    content: "Faza 4: NFORMAT scalar — convertFormat + status 4bit; builtin-NFORMAT.md + teste + doc; _gen_doc_data.js"
+    status: pending
+  - id: p5-future
+    content: "Faza 5+ (viitor, fara detalii): NFORMAT ; vector / ; matrix"
+    status: pending
+isProject: false
+---
+
+## Numeric formats: display, literali, status, NFORMAT
+
+Ordine: **Faza 0 → 1–2 → 2.5 → 3 → 4** (Faza 5+ viitor). După fiecare fază: `node node/_gen_test_manifest.js` + `node node/_run_test_suite_node.js` din `v0_3_2/`.
+
+**Notă generală:** modificările se aplică direct în cod, teste, documentație și `files/fs.js` unde există exemple. Nu documentăm „migrări” sau versiuni anterioare — semnăturile și exemplele reflectă starea curentă.
+
+Modele de valoare:
+- `signed`: întreg cu semn pe lățimea wire-ului
+- `q4p4` (8 biți) / `q8p8` (16 biți): fixed-point
+- `fp16` / `bf16` (16 biți): float
+
+Lățimi intrinseci format: `q4p4`=8, `q8p8`/`fp16`/`bf16`=16.
+
+Vezi și: [numeric_format_tags.plan.md](numeric_format_tags.plan.md) (faza 1–2 tag-uri format pe built-in-uri).
+
+---
+
+### Faza 0 — Documentație pagini builtin (faza 2 cod, doc lipsă)
+
+**Primul task** înainte de implementări noi: completare doc pentru funcțiile deja implementate cu tag-uri format, urmând pattern-ul complet din [`builtin-ADD.md`](../v0_3_2/doc/builtin-ADD.md) (semnături, tabel Call tags, exemple `logts-play` per funcție — **nu** doar hub în arithmetic.md):
+
+- GT, LT, MULTIPLY, MAC, DIVIDE, DOT, CLAMP, ABS, RSHIFT, ARGMAX, ARGMIN
+- Actualizare [`builtin-tagged-index.md`](../v0_3_2/doc/builtin-tagged-index.md)
+- `node node/_gen_doc_data.js`
+
+---
+
+### Faze 1–2 — Literali grupați + afișare unificată
+
+**Plan detaliat:** [`literali_grupați_unificați.plan.md`](literali_grupați_unificați.plan.md)
+
+Rezumat decizii cheie:
+
+- Grup literal: `\v1 \v2 ... \vk ; <tag>` — sufixul retroactiv pe ultimul atom.
+- `;M` = unsigned/padding; `;sM` = signed TC; `\-N;M` → eroare (folosește `;sM`).
+- Tag-uri parametrizate în literali/display: `;sX`, `;qXpY`, `;bfX`, `;fpX`, `;ascii` (≡ `;8` la grupuri).
+- `\N` singular fără sufix = unsigned lățime minimă (neschimbat).
+- `\N \N` fără sufix = eroare.
+- Afișare header grupată cu `;tag` pentru roundtrip (C5).
+- Signed display adaptiv: wire ≤64 → `;sW` lățime reală; wire >64 → chunk-uri `;s64` + rest binar
+- Doc/teste: reflectă direct noua sintaxă, fără secțiuni de migrare
+
+**Scope tag-uri parametrizate în Faze 1–2:** doar **literali + afișare** (`;sX`, `;qXpY`, `;bfX`, `;fpX`). Built-in call tags rămân fixe până la **Faza 2.5**.
+
+---
+
+### Faza 2.5 — Tag-uri parametrizate pe built-in-uri
+
+**După Fazele 1–2**, înainte de status 4bit. Extinde apelurile built-in și display tags de la setul fix (`signed`, `q4p4`, `q8p8`, `fp16`, `bf16`) la familii parametrizate, reutilizând `parseLiteralTag()` din Fazele 1–2.
+
+#### Tag-uri noi acceptate la apel
+
+| Familie | Sintaxă apel | Lățime | Exemplu |
+|---------|--------------|--------|---------|
+| Signed cu lungime | `; sX` | X biți | `ADD(a, b; s32)` |
+| Fixed-point | `; qXpY` | X+Y biți | `ADD(a, b; q6p2)`, `SUM(v; q16p16)` |
+| Brain float | `; bfX` | X biți | `ADD(a, b; bf16)` |
+| IEEE float | `; fpX` | X biți | `ADD(a, b; fp16)` |
+| Signed adaptiv (neschimbat) | `; signed` | lățime wire | `ADD(a, b; signed)` — **fără X** |
+
+**Mutual exclusion:** cel mult un tag de format per apel (ca acum). `; signed` și `; s32` sunt mutual exclusive.
+
+**Compatibilitate:** tag-urile fixe existente (`q4p4`, `q8p8`, `fp16`, `bf16`, `signed`) rămân valide — sunt cazuri particulare ale familiilor parametrizate.
+
+#### Built-in-uri acoperite
+
+Toate funcțiile cu tag format din [numeric_format_tags.plan.md](numeric_format_tags.plan.md) faza 1–2:
+
+ADD, SUBTRACT, SUM, MIN, MAX, GT, LT, MULTIPLY, MAC, DOT, DIVIDE, CLAMP, ABS, RSHIFT, ARGMAX, ARGMIN
+
+Plus display: `show`, `peek`, `probe` — acceptă tag-uri parametrizate (`show(w; q6p2)`, `show(w; s32)`).
+
+#### Modificări cod
+
+| Fișier | Schimbare |
+|--------|-----------|
+| [`numeric-formats.js`](../v0_3_2/core/numeric-formats.js) | `parseBuiltinFormatTag(str)` — delegare la `parseLiteralTag`; registry extins `numericMode` din string fix la obiect `{ family, width, I?, F? }` |
+| [`signed-arithmetic.js`](../v0_3_2/core/signed-arithmetic.js) / `parseBuiltinCallTags` | Recunoaște `s32`, `q6p2`, `bf16`, `fp32` etc.; validare mutual exclusion |
+| [`parser.js`](../v0_3_2/core/parser.js) | Whitelist display tags: pattern `s\d+`, `q\d+p\d+`, `bf\d+`, `fp\d+` |
+| [`interpreter.js`](../v0_3_2/core/interpreter.js) | Dispatch ops pe `numericMode` parametrizat; `assertWidthForFormat` cu lățime dinamică |
+| [`vector-reduce.js`](../v0_3_2/core/vector-reduce.js), [`matrix-reduce.js`](../v0_3_2/core/matrix-reduce.js), [`tensor-axis-reduce.js`](../v0_3_2/core/tensor-axis-reduce.js) | Propagare `numericMode` parametrizat |
+| [`debug-display-format.js`](../v0_3_2/core/debug-display-format.js) | Display tags parametrizate via `parseLiteralTag` |
+
+#### Validare lățime
+
+- `qXpY` → operand wire trebuie să aibă exact X+Y biți
+- `sX` → operand wire trebuie să aibă exact X biți
+- `bfX` / `fpX` → operand wire trebuie să aibă exact X biți
+- Eroare clară: `ADD: ; q6p2 requires 8-bit operands, got 16`
+
+#### Exemple țintă
+
+```logts-play
+8wire a = \1.25 \-0.5;q6p2
+8wire b = \0.75 \0.25;q6p2
+8wire s, 1wire ovf = ADD(a, b; q6p2)
+show(s; q6p2)
+
+32wire x = ...
+32wire y = ...
+32wire z = ADD(x, y; s32)
+show(z; s32)
+```
+
+#### Documentație
+
+- [`arithmetic.md`](../v0_3_2/doc/arithmetic.md): secțiune „Parametric format tags”
+- [`builtin-tagged-index.md`](../v0_3_2/doc/builtin-tagged-index.md): familii sX / qXpY / bfX / fpX
+- Actualizare pagini builtin (ADD, SUM, …): semnături cu tag-uri parametrizate + exemple
+- `node node/_gen_doc_data.js`
+
+#### Teste
+
+Grup nou `builtin-param-formats` în [`test_suite.js`](../v0_3_2/tests/test_suite.js):
+
+- `ADD(a, b; q6p2)` pe 8wire
+- `ADD(a, b; s32)` pe 32wire
+- `show(w; q6p2)` roundtrip cu literali grupați din Fazele 1–2
+- Regresie: `; q4p4`, `; signed`, `; fp16` neschimbate
+- Mutual exclusion: `; signed s32`, `; q4p4 q6p2` → eroare
+- Lățime greșită → eroare
+
+---
+
+### Faza 3 — Registru `status` 4bit
+
+Implementare **înainte** de NFORMAT. Toate ops cu tag format folosesc `4bit status` de la început.
+
+#### Semnături
+
+```
+ADD(... ; fp16) -> result, 4bit status
+MULTIPLY(... ; fp16) -> result, (N)bit over, 4bit status
+DOT(... ; fp16) -> result, (2N)bit over, 4bit status
+DIVIDE(... ; fp16) -> result, (N)bit mod, 4bit status
+```
+
+#### Layout status — convenție bitRange (bit0 = cel mai din stânga)
+
+Șir MSB-first de 4 biți; **bit0** = primul bit din stânga (ca `bitRange`):
+
+| Bit | Semnificație |
+|-----|--------------|
+| bit0 | overflow |
+| bit1 | underflow |
+| bit2 | inexact |
+| bit3 | nan |
+
+Exemplu: `1000` = doar overflow setat.
+
+- Float: toți 4 biții relevanți.
+- Fixed-point: bit0 overflow, bit2 inexact la rotunjire; bit1/bit3 = 0.
+- `over` (lat) = cuvânt extins de precizie; `status` = excepții (ambele pot fi non-zero).
+
+#### Funcții
+- **2 returnuri:** ADD, SUBTRACT, ABS → `result`, `status`
+- **3 returnuri:** MULTIPLY, MAC, DOT, SUM → `result`, `over` (lat), `status`
+- **3 returnuri:** DIVIDE → `result`, `mod`, `status`
+
+#### Modificări
+- `numeric-formats.js`: `buildStatus({overflow, underflow, inexact, nan})` — bit0 MSB stânga.
+- `interpreter.js` + `BUILTIN_DOC`: semnături și returnuri actualizate.
+- Teste, doc pe **fiecare** pagină builtin cu formate (pattern complet ADD.md); `files/fs.js` unde e cazul.
+- Exemple assignment: `8wire r, 8wire o, 4wire st = MULTIPLY(a, b; fp16)`.
+
+#### Documentație
+- [`arithmetic.md`](../v0_3_2/doc/arithmetic.md): secțiune „Status register (4bit)” cu convenția bit0=stânga.
+- Fiecare pagină builtin: semnături + exemple status.
+
+---
+
+### Faza 4 — Builtin `NFORMAT` (scalar)
+
+Sintaxa: `NFORMAT(a ; <src> to_<dst>)` → `result`, `4bit status`.
+
+- `src` / `dst`: `signed`, `q4p4`, `q8p8`, `fp16`, `bf16`
+- `src === dst` → eroare
+- Scalar only (fără `; vector` / `; matrix`)
+- Conversie: decode(src) → real → encode(dst); `status` per layout Faza 3
+- Operand NaN / invalid → `status.bit3` (nan) unde e cazul
+- Latime rezultat: `to_q4p4`=8, `to_q8p8`/`fp16`/`bf16`=16; `to_signed` = latime sursă
+
+#### Documentație
+- **NOU** [`builtin-NFORMAT.md`](../v0_3_2/doc/builtin-NFORMAT.md)
+- [`builtin-tagged-index.md`](../v0_3_2/doc/builtin-tagged-index.md), [`arithmetic.md`](../v0_3_2/doc/arithmetic.md), [`builtin-functions.md`](../v0_3_2/doc/builtin-functions.md)
+
+---
+
+### Faza 5+ (viitor) — NFORMAT vector / matrix
+
+Extindere planificată: `NFORMAT` cu tag-uri `; vector` și `; matrix` (conversie per-element / per-celulă, `status` per element). **Fără detalii de implementare în acest plan** — placeholder pentru fază ulterioară.
+
+---
+
+### Note
+- Ordine: **0 → 1–2 → 2.5 → 3 → 4 → (5+)**
+- Faza 2.5 depinde de `parseLiteralTag` din Fazele 1–2
+- peek = show (Faze 1–2)
+- Doc complet pe fiecare pagină builtin (nu doar hub arithmetic.md)
+- La final implementare: actualizare status în [numeric_format_tags.plan.md](numeric_format_tags.plan.md)

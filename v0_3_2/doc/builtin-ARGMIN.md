@@ -10,7 +10,9 @@ Position of the minimum element in a wire vector or matrix (one-hot or index).
 ARGMIN(Wbit[n] vector) -> 1wire[n]
 ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit
 ARGMIN(Wbit[n] vector; signed) -> 1wire[n]
+ARGMIN(Wbit[n] vector; q4p4) -> 1wire[n]
 ARGMIN(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit
+ARGMIN(Wbit[n] vector; index q4p4) -> bitIndexWidth(n) bit
 ARGMIN(Wbit[n,m] matrix) -> 1wire[n×m]
 ARGMIN(Wbit[n,m] matrix; index) -> bit rows, bit cols
 ARGMIN(Wbit[n,m] m ; row) -> 1wire[n×m]
@@ -32,6 +34,7 @@ ARGMIN(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
 | `; col` | `1wire[n×m]` | One `1` per column at the minimal row |
 | `; col; index` | `bitIndexWidth(n) wire[m]` | Row index per column |
 | `signed` | (any of above) | Signed compare |
+| `q4p4` | (rank-1 modes above) | Q4.4 compare on **8-bit** elements |
 
 **Ties:** lowest index wins.
 
@@ -68,6 +71,16 @@ show(hot)
 ```
 
 Signed min `1100` (−4) at index 2 → `hot=010`.
+
+### `ARGMIN(Wbit[n] vector; index q4p4)`
+
+```logts-play
+8wire[3] v = 00011000 + 00001000 + 00010000
+2wire idx = ARGMIN(v; index q4p4)
+show(idx)
+```
+
+Min `0.5` at index 1 → `idx=01`.
 
 ## See also
 

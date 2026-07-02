@@ -9,6 +9,10 @@ Computes **`acc + (a × b)`**. Equivalent to `ADD(acc, MULTIPLY(a, b))`; may be 
 ```
 MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
+MAC(8bit acc, 8bit a, 8bit b; q4p4) -> 8bit result, 9bit over
+MAC(16bit acc, 16bit a, 16bit b; q8p8) -> 16bit result, 17bit over
+MAC(16bit acc, 16bit a, 16bit b; fp16) -> 16bit result, 17bit inexact
+MAC(16bit acc, 16bit a, 16bit b; bf16) -> 16bit result, 17bit inexact
 MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]
 MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], (W+1)bit[n]
 MAC(Wbit[n,m] acc, Wbit/Wbit[n,m]/row/col/scalar a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], (W+1)bit[n,m]
@@ -29,6 +33,9 @@ Full integer: concatenate **`over` then `result`** (MSB → LSB).
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Signed accumulate; same packing. |
+| `q4p4` | Q4.4 on **8-bit** wires; `over` is **9** bits. |
+| `q8p8` | Q8.8 on **16-bit** wires; `over` is **17** bits. |
+| `fp16` / `bf16` | Float MAC on **16-bit** wires; second return = inexact. |
 | `vector` | Per index on **rank-1** tensors; `over[i]` is **(W+1)** bits — assign e.g. `4wire[n] r, 5wire[n] o`. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]`; rank-1 operands broadcast. Assign e.g. `4wire[N,M] r, 5wire[N,M] o`. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -74,6 +81,19 @@ show(over)
 ```
 
 Signed `−8 + 2×1 = −6` → `r=1010`.
+
+### `MAC(8bit acc, 8bit a, 8bit b; q4p4)`
+
+```logts-play
+8wire acc = 00010000
+8wire a = 00011000
+8wire b = 00001000
+8wire r, 9wire o = MAC(acc, a, b; q4p4)
+show(r; q4p4)
+show(o)
+```
+
+`1.0 + 1.5×0.5 = 1.75`.
 
 ### `MAC(Wbit[n] acc, … ; vector)`
 

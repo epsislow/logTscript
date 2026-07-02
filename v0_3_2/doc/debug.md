@@ -136,13 +136,13 @@ Display tags are **optional**, appear **once after all arguments** (after `;`), 
 | Tag | Effect |
 |-----|--------|
 | `dec` | Unsigned decimal — scalar/element ≤64 bit → `\N`; wire &gt;64 bit → 64-bit chunks + `+ \N (Rbit)` rest |
-| `signed` | Signed two's complement (shorthand for `dec signed` when used alone). Negative: `\-N;W`; positive: `\N` without `;W` |
+| `signed` | Signed two's complement (shorthand for `dec signed` when used alone). Header: `\N;sW` (wire ≤64) or grouped `;s64` chunks; cells: `\N;s{elementW}` |
 | `decSigned` | Legacy alias for `dec` + `signed` (still accepted in parser) |
 | `hex` | Nibbles `^…` (4 bit) on **vector/matrix cells**; plain wire uses grouped hex like default `show` |
 | `hexWide` | With `hex` only — grouped wide hex on vector elements (≥32 bit) |
 | `bin` | Explicit binary grouping (8-bit groups on wide wires) |
-| `ascii` | ASCII string in quotes — `"A"`, `"Hello"`, NUL → `□`, LF → `↵`, other control → `.` (bytes MSB-first) |
-| `q4p4` | Fixed-point **Q4.4** decimal on **8-bit** wires (e.g. `1.5`, `-1`) |
+| `ascii` | 8-bit cells — scalar ≤8 bit: `"A"`; wider wires: grouped `\65 \66;ascii` |
+| `q4p4` | Fixed-point **Q4.4** — grouped literal `\1.5;q4p4` on **8-bit** elements |
 | `q8p8` | Fixed-point **Q8.8** decimal on **16-bit** wires |
 | `fp16` | IEEE 754 half as decimal (`3`, `nan`, `inf`) on **16-bit** wires |
 | `bf16` | Brain float 16 as decimal on **16-bit** wires |
@@ -171,13 +171,13 @@ show(a)                    # default hex
 show(a; dec)               # decimal chunks
 show(a; signed)            # signed decimal chunks
 4wire w := 1111
-show(w; signed)            # w (4wire) = \-1;4
+show(w; signed)            # w (4wire) = \-1;s4
 8wire code := 01000001
 show(code; ascii)          # code (8wire) = "A"
 8wire fp = 00011000
-show(fp; q4p4)             # fp (8wire) = 1.5
+show(fp; q4p4)             # fp (8wire) = \1.5;q4p4
 40wire msg := "Hello"
-show(msg; ascii)           # msg (40wire) = "Hello"
+show(msg; ascii)           # msg (40wire) = \72 \101 \108 \108 \111;ascii
 ```
 
 Rank-1 tensors (`4wire[3]`, `4wire[3,1]`) use `has length [N]` in `show` output. Matrix row slices (`show(m:0)`) print a flat row header plus `:0:0`…`:0:(C-1)` cell lines and the parent `has shape [R,C]`:

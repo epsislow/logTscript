@@ -1828,7 +1828,7 @@ class Interpreter {
       const skipGroup = wire && wire.vector && target.kind === 'wire' && !useTagFormat;
       if (!skipGroup) {
         if (useTagFormat) {
-          valueStr = this._formatShowWireValue(valueStr, target.bitWidth, opts, false);
+          valueStr = this._formatShowWireValue(valueStr, target.bitWidth, opts, false, target.bitWidth);
         } else {
           valueStr = this.formatValue(valueStr, target.bitWidth);
         }
@@ -6667,17 +6667,17 @@ if (this.isBuiltinDEMUX(name)) {
     return DF.normalizeShowDisplayTags(displayTags);
   }
 
-  _formatDebugDisplayValue(binStr, bitWidth, opts, isElement) {
+  _formatDebugDisplayValue(binStr, bitWidth, opts, isElement, elementWidth) {
     const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
     if (!DF || !opts) return binStr;
     if (!(opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat)) return binStr;
-    return DF.formatDebugDisplayValue(binStr, bitWidth, opts, isElement);
+    return DF.formatDebugDisplayValue(binStr, bitWidth, opts, isElement, elementWidth);
   }
 
-  _formatShowWireValue(valueStr, bitWidth, opts, isElement) {
+  _formatShowWireValue(valueStr, bitWidth, opts, isElement, elementWidth) {
     if (valueStr === '-' || valueStr == null) return valueStr;
     if (opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat)) {
-      return this._formatDebugDisplayValue(valueStr, bitWidth, opts, isElement);
+      return this._formatDebugDisplayValue(valueStr, bitWidth, opts, isElement, elementWidth);
     }
     return this.formatValue(valueStr, bitWidth);
   }
@@ -6695,7 +6695,7 @@ if (this.isBuiltinDEMUX(name)) {
 
   _formatVectorElementLine(index, valueStr, elementWidth, opts) {
     const formatted = valueStr !== '-'
-      ? this._formatShowWireValue(valueStr, elementWidth, opts, true)
+      ? this._formatShowWireValue(valueStr, elementWidth, opts, true, elementWidth)
       : valueStr;
     return `:${index} = ${formatted} (${elementWidth}bit)`;
   }
@@ -6806,7 +6806,7 @@ if (this.isBuiltinDEMUX(name)) {
     const rowStart = rowIndex * cols * elementWidth;
     const rowBits = valueStr.substring(rowStart, rowStart + cols * elementWidth);
     const headerValue = this._hasShowFormatOpts(opts)
-      ? this._formatShowWireValue(rowBits, rowBits.length, opts, false)
+      ? this._formatShowWireValue(rowBits, rowBits.length, opts, false, elementWidth)
       : rowBits;
     this._pushDisplayOutput(lines, `${wireName}:${rowIndex} = ${headerValue} (${rowBits.length}bit)`, opts);
     const { colStart, colEnd } = this._resolveMatrixColRange(opts, cols);
@@ -6829,7 +6829,7 @@ if (this.isBuiltinDEMUX(name)) {
     const { elementWidth, rows, cols, elementCount } = meta;
     const lines = [];
     const headerValue = this._hasShowFormatOpts(opts)
-      ? this._formatShowWireValue(valueStr, valueStr.length, opts, false)
+      ? this._formatShowWireValue(valueStr, valueStr.length, opts, false, elementWidth)
       : valueStr;
     this._pushDisplayOutput(lines, `${wireName} = ${headerValue} (${valueStr.length}bit)`, opts);
 
@@ -6922,7 +6922,7 @@ if (this.isBuiltinDEMUX(name)) {
           if (part) {
             let valueStr = part.value != null ? part.value : '-';
             if (valueStr !== '-' && part.bitWidth) {
-              valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, true);
+              valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, true, part.bitWidth);
             }
             const displayName = part.varName || atom.var;
             const sliceWidth = part.bitWidth || wire.vector.elementWidth;
@@ -6991,10 +6991,10 @@ if (this.isBuiltinDEMUX(name)) {
           const v = this.getValueFromRef(part.ref);
           let valueStr = (v == null) ? '-' : v;
           if (valueStr !== '-') {
-            if (part.bitWidth) valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, false);
+            if (part.bitWidth) valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, false, part.bitWidth);
             else if (displayType) {
               const bw = this.getBitWidth(displayType);
-              if (bw) valueStr = this._formatShowWireValue(valueStr, bw, opts, false);
+              if (bw) valueStr = this._formatShowWireValue(valueStr, bw, opts, false, bw);
             }
           }
           const shown = this._formatShowValue(part, valueStr);
@@ -7019,10 +7019,10 @@ if (this.isBuiltinDEMUX(name)) {
         } else {
           let valueStr = part.value !== null ? part.value : '-';
           if (valueStr !== '-' && !part.isText) {
-            if (part.bitWidth) valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, false);
+            if (part.bitWidth) valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, false, part.bitWidth);
             else if (displayType) {
               const bw = this.getBitWidth(displayType);
-              if (bw) valueStr = this._formatShowWireValue(valueStr, bw, opts, false);
+              if (bw) valueStr = this._formatShowWireValue(valueStr, bw, opts, false, bw);
             }
           }
           const shown = this._formatShowValue(part, valueStr);

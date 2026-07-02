@@ -611,15 +611,15 @@ MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 |----------|------|------|
 | ADD | [builtin-ADD.md](builtin-ADD.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
 | SUBTRACT | [builtin-SUBTRACT.md](builtin-SUBTRACT.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
-| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | \`signed\`, \`vector\`, \`matrix\` |
-| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | \`signed\`, \`vector\`, \`matrix\` |
-| MAC | [builtin-MAC.md](builtin-MAC.md) | \`signed\`, \`vector\`, \`matrix\` |
-| ABS | [builtin-ABS.md](builtin-ABS.md) | \`signed\` (required) |
-| GT | [builtin-GT.md](builtin-GT.md) | \`signed\`, \`vector\`, \`matrix\` |
-| LT | [builtin-LT.md](builtin-LT.md) | \`signed\`, \`vector\`, \`matrix\` |
+| MULTIPLY | [builtin-MULTIPLY.md](builtin-MULTIPLY.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
+| DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
+| MAC | [builtin-MAC.md](builtin-MAC.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
+| ABS | [builtin-ABS.md](builtin-ABS.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\` (required) |
+| GT | [builtin-GT.md](builtin-GT.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
+| LT | [builtin-LT.md](builtin-LT.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
 | MIN | [builtin-MIN.md](builtin-MIN.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
 | MAX | [builtin-MAX.md](builtin-MAX.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
-| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | \`signed\`, \`vector\`, \`matrix\` |
+| CLAMP | [builtin-CLAMP.md](builtin-CLAMP.md) | \`signed\`, \`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`, \`vector\`, \`matrix\` |
 
 Vector reduction (\`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\`): [vector-reduction.md](vector-reduction.md). **2D element-wise:** [matrix-reduction.md](matrix-reduction.md). Bitwise equality: [builtin-EQ.md](builtin-EQ.md).
 
@@ -648,8 +648,15 @@ Optional tags after \`;\` in the call: **\`signed\`**, **\`q4p4\`**, **\`q8p8\`*
 | Built-in | \`; q4p4\` (8-bit) | \`; q8p8\` / \`; fp16\` / \`; bf16\` (16-bit) |
 |----------|------------------|----------------------------------------|
 | ADD / SUBTRACT | fixed-point + overflow flag | fixed / float + flag |
+| MULTIPLY / DIVIDE / MAC | fixed ops + over/mod | fixed / float ops |
 | SUM | fixed sum + over | fixed / float sum + over |
 | MIN / MAX | fixed compare | fixed / float compare |
+| GT / LT | fixed compare → \`1bit\` | fixed / float compare |
+| CLAMP | fixed bounds | fixed / float bounds |
+| ABS | fixed \`|x|\` + overflow | fixed / float \`|x|\` |
+| DOT | rank-1 dot + \`over\` | rank-1 dot + flag |
+| ARGMAX / ARGMIN | rank-1 \`; q4p4\` compare | — |
+| RSHIFT | ASHR on 8-bit | ASHR on 16-bit (\`q8p8\` only) |
 
 Optional **bool tags** after \`;\` in the call (\`signed\`, \`vector\`, \`matrix\`, or combinations except **\`vector\` + \`matrix\`**). Operand expansion vs element-wise mode: [vector-reduction.md](vector-reduction.md#element-wise-mode-vector), [matrix-reduction.md](matrix-reduction.md).
 
@@ -2258,25 +2265,42 @@ Wire width on the left must match LUT \`depth\`; mismatch → \`useExpr: wire wi
 
 Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md)
 
-Signed absolute value on a two's-complement scalar wire. **\`; signed\` is required** — there is no unsigned mode.
+Absolute value on a scalar wire. Requires a **numeric format tag** — \`; signed\`, \`; q4p4\`, \`; q8p8\`, \`; fp16\`, or \`; bf16\`. There is no unsigned mode.
 
 ## Signatures
 
 \`\`\`
 ABS(Xbit x; signed) -> Xbit result, 1bit overflow
+ABS(8bit x; q4p4) -> 8bit result, 1bit overflow
+ABS(16bit x; q8p8) -> 16bit result, 1bit overflow
+ABS(16bit x; fp16) -> 16bit result, 1bit overflow
+ABS(16bit x; bf16) -> 16bit result, 1bit overflow
 \`\`\`
 
 ## Behaviour
 
 | Input | \`result\` | \`overflow\` |
 |-------|----------|------------|
-| Non-negative signed value | \`x\` unchanged | \`0\` |
-| Negative signed value | \`|x|\` (two's complement negate) | \`0\` |
+| Non-negative value | \`x\` unchanged | \`0\` |
+| Negative value | \`|x|\` (two's complement negate) | \`0\` |
 | \`INT_MIN\` at width *W* (MSB \`1\`, rest \`0\`) | \`x\` unchanged | \`1\` |
 
 \`X\` follows the operand width. The second return is always \`1bit\`.
 
+## Call tags
+
+| Tag | Behaviour |
+|-----|-----------|
+| \`signed\` | Two's complement absolute value on any width. |
+| \`q4p4\` | Q4.4 on **8-bit** wires. |
+| \`q8p8\` | Q8.8 on **16-bit** wires. |
+| \`fp16\` / \`bf16\` | Float absolute value on **16-bit** wires. |
+
+**No \`; vector\`** or **\`; matrix\`** — scalar only.
+
 ## Examples
+
+### \`ABS(Xbit x; signed)\`
 
 \`\`\`logts-play
 4wire x = 1101
@@ -2293,6 +2317,17 @@ show(ovf)
 show(a)
 show(ovf)
 \`\`\`
+
+### \`ABS(8bit x; q4p4)\`
+
+\`\`\`logts-play
+8wire x = 11110000
+8wire a, 1wire ovf = ABS(x; q4p4)
+show(a; q4p4)
+show(ovf)
+\`\`\`
+
+\`|-1.0| = 1.0\` → \`a=00010000\`, \`ovf=0\`.
 
 ## See also
 
@@ -2480,7 +2515,9 @@ Position of the maximum element in a wire vector or matrix (one-hot or index).
 ARGMAX(Wbit[n] vector) -> 1wire[n]
 ARGMAX(Wbit[n] vector; index) -> bitIndexWidth(n) bit
 ARGMAX(Wbit[n] vector; signed) -> 1wire[n]
+ARGMAX(Wbit[n] vector; q4p4) -> 1wire[n]
 ARGMAX(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit
+ARGMAX(Wbit[n] vector; index q4p4) -> bitIndexWidth(n) bit
 ARGMAX(Wbit[n,m] matrix) -> 1wire[n×m]
 ARGMAX(Wbit[n,m] matrix; index) -> bit rows, bit cols
 ARGMAX(Wbit[n,m] m ; row) -> 1wire[n×m]
@@ -2502,6 +2539,7 @@ ARGMAX(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
 | \`; col\` | \`1wire[n×m]\` | One \`1\` per column at the maximal row |
 | \`; col; index\` | \`bitIndexWidth(n) wire[m]\` | Row index per column |
 | \`signed\` | (any of above) | Signed compare |
+| \`q4p4\` | (rank-1 modes above) | Q4.4 compare on **8-bit** elements |
 
 **Ties:** lowest index wins. For the **value** at max, use [MAX](builtin-MAX.md).
 
@@ -2559,6 +2597,16 @@ show(hot)
 
 Signed max is \`0100\` at index 2 → \`hot=001\`.
 
+### \`ARGMAX(Wbit[n] vector; index q4p4)\`
+
+\`\`\`logts-play
+8wire[3] v = 00001000 + 00011000 + 00010000
+2wire idx = ARGMAX(v; index q4p4)
+show(idx)
+\`\`\`
+
+Max \`1.5\` at index 1 → \`idx=01\`.
+
 ## See also
 
 [ARGMIN](builtin-ARGMIN.md) · [MAX](builtin-MAX.md) · [matrix-reduction.md](matrix-reduction.md)
@@ -2575,7 +2623,9 @@ Position of the minimum element in a wire vector or matrix (one-hot or index).
 ARGMIN(Wbit[n] vector) -> 1wire[n]
 ARGMIN(Wbit[n] vector; index) -> bitIndexWidth(n) bit
 ARGMIN(Wbit[n] vector; signed) -> 1wire[n]
+ARGMIN(Wbit[n] vector; q4p4) -> 1wire[n]
 ARGMIN(Wbit[n] vector; index signed) -> bitIndexWidth(n) bit
+ARGMIN(Wbit[n] vector; index q4p4) -> bitIndexWidth(n) bit
 ARGMIN(Wbit[n,m] matrix) -> 1wire[n×m]
 ARGMIN(Wbit[n,m] matrix; index) -> bit rows, bit cols
 ARGMIN(Wbit[n,m] m ; row) -> 1wire[n×m]
@@ -2597,6 +2647,7 @@ ARGMIN(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
 | \`; col\` | \`1wire[n×m]\` | One \`1\` per column at the minimal row |
 | \`; col; index\` | \`bitIndexWidth(n) wire[m]\` | Row index per column |
 | \`signed\` | (any of above) | Signed compare |
+| \`q4p4\` | (rank-1 modes above) | Q4.4 compare on **8-bit** elements |
 
 **Ties:** lowest index wins.
 
@@ -2633,6 +2684,16 @@ show(hot)
 \`\`\`
 
 Signed min \`1100\` (−4) at index 2 → \`hot=010\`.
+
+### \`ARGMIN(Wbit[n] vector; index q4p4)\`
+
+\`\`\`logts-play
+8wire[3] v = 00011000 + 00001000 + 00010000
+2wire idx = ARGMIN(v; index q4p4)
+show(idx)
+\`\`\`
+
+Min \`0.5\` at index 1 → \`idx=01\`.
 
 ## See also
 
@@ -3041,6 +3102,10 @@ Clamp value to \`[min, max]\`.
 \`\`\`
 CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit
 CLAMP(Xbit x, Ybit min, Ybit max; signed) -> Ybit
+CLAMP(8bit x, 8bit min, 8bit max; q4p4) -> 8bit
+CLAMP(16bit x, 16bit min, 16bit max; q8p8) -> 16bit
+CLAMP(16bit x, 16bit min, 16bit max; fp16) -> 16bit
+CLAMP(16bit x, 16bit min, 16bit max; bf16) -> 16bit
 CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector) -> Wbit[n]
 CLAMP(Wbit[n] x, Wbit/Wbit[n] min, Wbit/Wbit[n] max ; vector signed) -> Wbit[n]
 CLAMP(Wbit[n,m] x, Wbit/Wbit[n,m]/scalar min, Wbit/Wbit[n,m]/scalar max ; matrix) -> Wbit[n,m]
@@ -3058,6 +3123,9 @@ CLAMP(Wbit[n,m] x, … ; matrix signed) -> Wbit[n,m]
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed bounds. |
+| \`q4p4\` | Q4.4 bounds on **8-bit** wires. |
+| \`q8p8\` | Q8.8 bounds on **16-bit** wires. |
+| \`fp16\` / \`bf16\` | Float clamp on **16-bit** wires. |
 | \`vector\` | Per index on **rank-1** tensors; bounds broadcast if scalar. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; bounds broadcast as rank-1 row/col/scalar. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -3102,6 +3170,18 @@ show(yS)
 \`\`\`
 
 Unsigned: \`15\` → \`2\`. Signed: \`−1\` → \`0\`.
+
+### \`CLAMP(8bit x, 8bit min, 8bit max; q4p4)\`
+
+\`\`\`logts-play
+8wire x = 00110000
+8wire lo = 00000000
+8wire hi = 00100000
+8wire y = CLAMP(x, lo, hi; q4p4)
+show(y; q4p4)
+\`\`\`
+
+\`3.0\` clamped to \`[0, 2.0]\` → \`2.0\`.
 
 ### \`CLAMP(Wbit[n] x, … ; vector)\`
 
@@ -3185,6 +3265,10 @@ Integer quotient and remainder (no floating-point).
 \`\`\`
 DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod
 DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod
+DIVIDE(8bit a, 8bit b; q4p4) -> 8bit result, 8bit mod
+DIVIDE(16bit a, 16bit b; q8p8) -> 16bit result, 16bit mod
+DIVIDE(16bit a, 16bit b; fp16) -> 16bit result, 16bit mod
+DIVIDE(16bit a, 16bit b; bf16) -> 16bit result, 16bit mod
 DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -3202,6 +3286,9 @@ DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Operands as two's complement; integer \`/\` and \`%\`. |
+| \`q4p4\` | Fixed-point Q4.4 on **8-bit** wires. |
+| \`q8p8\` | Fixed-point Q8.8 on **16-bit** wires. |
+| \`fp16\` / \`bf16\` | Float divide on **16-bit** wires. |
 | \`vector\` | Quotient and remainder per index on **rank-1** tensors. |
 | \`matrix\` | Quotient and remainder per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -3252,6 +3339,18 @@ show(m)
 \`\`\`
 
 Signed \`−1 / 2 = 0\`, remainder \`−1\` (\`1111\`).
+
+### \`DIVIDE(8bit a, 8bit b; q4p4)\`
+
+\`\`\`logts-play
+8wire a = 00100000
+8wire b = 00001000
+8wire q, 8wire m = DIVIDE(a, b; q4p4)
+show(q; q4p4)
+show(m; q4p4)
+\`\`\`
+
+\`2.0/0.5=4.0\`, remainder \`0\`.
 
 ### \`DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
 
@@ -3310,6 +3409,10 @@ On **rank-1** tensors the result is a **scalar**. On compatible **2D** shapes th
 \`\`\`
 DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over
 DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over
+DOT(8wire[n] a, 8wire[n] b; q4p4) -> 8bit result, 16bit over
+DOT(16wire[n] a, 16wire[n] b; q8p8) -> 16bit result, 32bit over
+DOT(16wire[n] a, 16wire[n] b; fp16) -> 16bit result, 32bit inexact
+DOT(16wire[n] a, 16wire[n] b; bf16) -> 16bit result, 32bit inexact
 DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over
 DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over
 \`\`\`
@@ -3338,8 +3441,11 @@ Incompatible shapes are a **runtime error**. Assign the target to match the outp
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed multiply per pair, signed accumulate (scalar or per matrix cell). |
+| \`q4p4\` | Rank-1 dot on **8-bit** elements; result **8** bits, \`over\` **16** bits. |
+| \`q8p8\` | Rank-1 dot on **16-bit** elements; result **16** bits, \`over\` **32** bits. |
+| \`fp16\` / \`bf16\` | Rank-1 dot on **16-bit** float wires; \`over\` = inexact accumulation flag width. |
 
-**No \`; vector\`** or **\`; matrix\`** — whole tensors only.
+**No \`; vector\`** or **\`; matrix\`** — whole tensors only. Format tags apply to **rank-1** dot products only (not 2D matrix multiply).
 
 ## Examples
 
@@ -3376,6 +3482,18 @@ show(o)
 \`\`\`
 
 Signed \`(−1)×(−1) + 2×1 = 3\`.
+
+### \`DOT(8wire[n] a, 8wire[n] b; q4p4)\`
+
+\`\`\`logts-play
+8wire[2] a = 00011000 + 00001000
+8wire[2] b = 00010000 + 00010000
+8wire dot, 16wire over = DOT(a, b; q4p4)
+show(dot; q4p4)
+show(over)
+\`\`\`
+
+\`[1.5, 0.5]·[1, 1] = 2.0\`.
 
 ### \`DOT(Wwire[N,K] A, Wwire[K,M] B)\` — matrix multiply
 
@@ -3698,6 +3816,10 @@ Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md
 \`\`\`
 GT(Xbit a, Xbit b) -> 1bit result
 GT(Xbit a, Xbit b; signed) -> 1bit result
+GT(8bit a, 8bit b; q4p4) -> 1bit result
+GT(16bit a, 16bit b; q8p8) -> 1bit result
+GT(16bit a, 16bit b; fp16) -> 1bit result
+GT(16bit a, 16bit b; bf16) -> 1bit result
 GT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 GT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
 GT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> 1wire[n×m]
@@ -3713,6 +3835,9 @@ GT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> 1wire[n×m]
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Two's complement comparison. |
+| \`q4p4\` | Fixed-point Q4.4 on **8-bit** wires. |
+| \`q8p8\` | Fixed-point Q8.8 on **16-bit** wires. |
+| \`fp16\` / \`bf16\` | IEEE half / brain float on **16-bit** wires. |
 | \`vector\` | Per index on **rank-1** tensors → \`1wire[n]\`; scalar operand broadcast. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\` → \`1wire[N×M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -3752,6 +3877,17 @@ show(gtS)
 \`\`\`
 
 Unsigned: \`15 > 2\` → \`gtU=1\`. Signed: \`−1 > 2\` → \`gtS=0\`.
+
+### \`GT(8bit a, 8bit b; q4p4)\`
+
+\`\`\`logts-play
+8wire a = 00011000
+8wire b = 00001000
+1wire gt = GT(a, b; q4p4)
+show(gt)
+\`\`\`
+
+\`1.5 > 0.5\` → \`gt=1\`.
 
 ### \`GT(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
 
@@ -4215,6 +4351,10 @@ Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md
 \`\`\`
 LT(Xbit a, Xbit b) -> 1bit result
 LT(Xbit a, Xbit b; signed) -> 1bit result
+LT(8bit a, 8bit b; q4p4) -> 1bit result
+LT(16bit a, 16bit b; q8p8) -> 1bit result
+LT(16bit a, 16bit b; fp16) -> 1bit result
+LT(16bit a, 16bit b; bf16) -> 1bit result
 LT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]
 LT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> 1wire[n]
 LT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> 1wire[n×m]
@@ -4230,6 +4370,9 @@ LT(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> 1wire[n×m]
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Two's complement comparison. |
+| \`q4p4\` | Fixed-point Q4.4 on **8-bit** wires. |
+| \`q8p8\` | Fixed-point Q8.8 on **16-bit** wires. |
+| \`fp16\` / \`bf16\` | IEEE half / brain float on **16-bit** wires. |
 | \`vector\` | Per index on **rank-1** tensors → \`1wire[n]\`. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\` → \`1wire[N×M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -4260,6 +4403,17 @@ show(ltS)
 \`\`\`
 
 Unsigned: \`15 < 2\` → \`ltU=0\`. Signed: \`−1 < 2\` → \`ltS=1\`.
+
+### \`LT(8bit a, 8bit b; q4p4)\`
+
+\`\`\`logts-play
+8wire a = 00001000
+8wire b = 00011000
+1wire lt = LT(a, b; q4p4)
+show(lt)
+\`\`\`
+
+\`0.5 < 1.5\` → \`lt=1\`.
 
 ### \`LT(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
 
@@ -4312,6 +4466,10 @@ Computes **\`acc + (a × b)\`**. Equivalent to \`ADD(acc, MULTIPLY(a, b))\`; may
 \`\`\`
 MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over
 MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over
+MAC(8bit acc, 8bit a, 8bit b; q4p4) -> 8bit result, 9bit over
+MAC(16bit acc, 16bit a, 16bit b; q8p8) -> 16bit result, 17bit over
+MAC(16bit acc, 16bit a, 16bit b; fp16) -> 16bit result, 17bit inexact
+MAC(16bit acc, 16bit a, 16bit b; bf16) -> 16bit result, 17bit inexact
 MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]
 MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], (W+1)bit[n]
 MAC(Wbit[n,m] acc, Wbit/Wbit[n,m]/row/col/scalar a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], (W+1)bit[n,m]
@@ -4332,6 +4490,9 @@ Full integer: concatenate **\`over\` then \`result\`** (MSB → LSB).
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Signed accumulate; same packing. |
+| \`q4p4\` | Q4.4 on **8-bit** wires; \`over\` is **9** bits. |
+| \`q8p8\` | Q8.8 on **16-bit** wires; \`over\` is **17** bits. |
+| \`fp16\` / \`bf16\` | Float MAC on **16-bit** wires; second return = inexact. |
 | \`vector\` | Per index on **rank-1** tensors; \`over[i]\` is **(W+1)** bits — assign e.g. \`4wire[n] r, 5wire[n] o\`. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. Assign e.g. \`4wire[N,M] r, 5wire[N,M] o\`. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -4377,6 +4538,19 @@ show(over)
 \`\`\`
 
 Signed \`−8 + 2×1 = −6\` → \`r=1010\`.
+
+### \`MAC(8bit acc, 8bit a, 8bit b; q4p4)\`
+
+\`\`\`logts-play
+8wire acc = 00010000
+8wire a = 00011000
+8wire b = 00001000
+8wire r, 9wire o = MAC(acc, a, b; q4p4)
+show(r; q4p4)
+show(o)
+\`\`\`
+
+\`1.0 + 1.5×0.5 = 1.75\`.
 
 ### \`MAC(Wbit[n] acc, … ; vector)\`
 
@@ -4762,6 +4936,10 @@ Binary multiplication with overflow capture.
 \`\`\`
 MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over
 MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over
+MULTIPLY(8bit a, 8bit b; q4p4) -> 8bit result, 8bit over
+MULTIPLY(16bit a, 16bit b; q8p8) -> 16bit result, 16bit over
+MULTIPLY(16bit a, 16bit b; fp16) -> 16bit result, 16bit inexact
+MULTIPLY(16bit a, 16bit b; bf16) -> 16bit result, 16bit inexact
 MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -4778,6 +4956,9 @@ MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Product as two's complement; same wire packing. |
+| \`q4p4\` | Fixed-point Q4.4 on **8-bit** wires; \`over\` = high 8 bits of 16-bit product. |
+| \`q8p8\` | Fixed-point Q8.8 on **16-bit** wires; \`over\` = high 16 bits of 32-bit product. |
+| \`fp16\` / \`bf16\` | Float multiply on **16-bit** wires; second return = inexact flag. |
 | \`vector\` | Per index on **rank-1** tensors; \`over[i]\` = high **W** bits of the **2W**-bit product. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; rank-1 operands broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -4818,6 +4999,30 @@ show(oS)
 \`\`\`
 
 Signed \`(−1)×(−1)=1\` → \`rS=0001\`, \`oS=0000\`.
+
+### \`MULTIPLY(8bit a, 8bit b; q4p4)\`
+
+\`\`\`logts-play
+8wire a = 00011000
+8wire b = 00100000
+8wire r, 8wire o = MULTIPLY(a, b; q4p4)
+show(r; q4p4)
+show(o)
+\`\`\`
+
+\`1.5×2.0=3.0\` → \`r=00110000\`.
+
+### \`MULTIPLY(16bit a, 16bit b; fp16)\`
+
+\`\`\`logts-play
+16wire a = 0100000000000000
+16wire b = 0011111000000000
+16wire r, 16wire o = MULTIPLY(a, b; fp16)
+show(r; fp16)
+show(o)
+\`\`\`
+
+\`2.0×1.5=3.0\`.
 
 ### \`MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector)\`
 
@@ -5318,6 +5523,8 @@ Shift bits toward LSB. Vacated MSBs use **\`fill\`** (logical) or the sign bit (
 RSHIFT(Xbit data, Nbit n) -> Xbit
 RSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit
 RSHIFT(Xbit data, Nbit n; signed) -> Xbit
+RSHIFT(8bit data, Nbit n; q4p4) -> 8bit
+RSHIFT(16bit data, Nbit n; q8p8) -> 16bit
 RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]
 RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector signed) -> Wbit[n]
 RSHIFT(Wbit[n,m] data, Nbit/Kbit[n,m]/scalar count ; matrix) -> Wbit[n,m]
@@ -5338,6 +5545,8 @@ Sugar: \`data > n\` and \`data > n w1\` — [short-notation.md](short-notation.m
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Arithmetic shift (ASHR): MSB replicated; \`fill\` ignored. |
+| \`q4p4\` | ASHR on **8-bit** fixed-point wires (same as \`; signed\` on raw bits). |
+| \`q8p8\` | ASHR on **16-bit** fixed-point wires. |
 | \`vector\` | Per element on **rank-1** tensors. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\`; \`count\` scalar or rank-1 broadcast. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -5408,6 +5617,18 @@ show(y)
 \`\`\`
 
 → \`1111\` (still −1).
+
+### \`RSHIFT(8bit data, Nbit n; q4p4)\`
+
+\`\`\`logts-play
+8wire x = 11110000
+8wire y = RSHIFT(x, 1; q4p4)
+show(y; q4p4)
+\`\`\`
+
+Fixed-point \`−1.0 >> 1 = −0.5\` → \`11111000\`.
+
+**Note:** \`; fp16\` and \`; bf16\` are **not** accepted on RSHIFT (runtime error).
 
 ### \`RSHIFT(Wbit[n] data, Nbit/Kbit[n] count ; vector)\`
 
@@ -7005,13 +7226,13 @@ Display tags are **optional**, appear **once after all arguments** (after \`;\`)
 | Tag | Effect |
 |-----|--------|
 | \`dec\` | Unsigned decimal — scalar/element ≤64 bit → \`\\N\`; wire &gt;64 bit → 64-bit chunks + \`+ \\N (Rbit)\` rest |
-| \`signed\` | Signed two's complement (shorthand for \`dec signed\` when used alone). Negative: \`\\-N;W\`; positive: \`\\N\` without \`;W\` |
+| \`signed\` | Signed two's complement (shorthand for \`dec signed\` when used alone). Header: \`\\N;sW\` (wire ≤64) or grouped \`;s64\` chunks; cells: \`\\N;s{elementW}\` |
 | \`decSigned\` | Legacy alias for \`dec\` + \`signed\` (still accepted in parser) |
 | \`hex\` | Nibbles \`^…\` (4 bit) on **vector/matrix cells**; plain wire uses grouped hex like default \`show\` |
 | \`hexWide\` | With \`hex\` only — grouped wide hex on vector elements (≥32 bit) |
 | \`bin\` | Explicit binary grouping (8-bit groups on wide wires) |
-| \`ascii\` | ASCII string in quotes — \`"A"\`, \`"Hello"\`, NUL → \`□\`, LF → \`↵\`, other control → \`.\` (bytes MSB-first) |
-| \`q4p4\` | Fixed-point **Q4.4** decimal on **8-bit** wires (e.g. \`1.5\`, \`-1\`) |
+| \`ascii\` | 8-bit cells — scalar ≤8 bit: \`"A"\`; wider wires: grouped \`\\65 \\66;ascii\` |
+| \`q4p4\` | Fixed-point **Q4.4** — grouped literal \`\\1.5;q4p4\` on **8-bit** elements |
 | \`q8p8\` | Fixed-point **Q8.8** decimal on **16-bit** wires |
 | \`fp16\` | IEEE 754 half as decimal (\`3\`, \`nan\`, \`inf\`) on **16-bit** wires |
 | \`bf16\` | Brain float 16 as decimal on **16-bit** wires |
@@ -7040,13 +7261,13 @@ show(a)                    # default hex
 show(a; dec)               # decimal chunks
 show(a; signed)            # signed decimal chunks
 4wire w := 1111
-show(w; signed)            # w (4wire) = \\-1;4
+show(w; signed)            # w (4wire) = \\-1;s4
 8wire code := 01000001
 show(code; ascii)          # code (8wire) = "A"
 8wire fp = 00011000
-show(fp; q4p4)             # fp (8wire) = 1.5
+show(fp; q4p4)             # fp (8wire) = \\1.5;q4p4
 40wire msg := "Hello"
-show(msg; ascii)           # msg (40wire) = "Hello"
+show(msg; ascii)           # msg (40wire) = \\72 \\101 \\108 \\108 \\111;ascii
 \`\`\`
 
 Rank-1 tensors (\`4wire[3]\`, \`4wire[3,1]\`) use \`has length [N]\` in \`show\` output. Matrix row slices (\`show(m:0)\`) print a flat row header plus \`:0:0\`…\`:0:(C-1)\` cell lines and the parent \`has shape [R,C]\`:
@@ -19956,7 +20177,8 @@ Related: [assignment operators](assignment-operators.md) (\`=\`, \`:=\`, \`=:\`)
 |------|---------|---------|
 | **Binary** | \`1010\` | Bits as written (only \`0\` and \`1\`) |
 | **Decimal unsigned** | \`\\255\` | Unsigned integer → minimal binary |
-| **Decimal signed** | \`\\-3;8\` | Two's complement value on **exactly** \`W\` bits |
+| **Grouped literal** | \`\\2 \\23 \\242;8\` | Multiple \`\\N\` values + one \`;tag\` on the last atom |
+| **Decimal signed** | \`\\-3;s8\` | Two's complement on **exactly** \`W\` bits (\`;sW\`) |
 | **Hex pattern** | \`^FF\` | Each hex digit → 4 bits (unsigned pattern) |
 | **Hex value signed** | \`^-A;8\` | Signed numeric value in hex + **explicit** width |
 | **Wire string** | \`"Hello"\` / \`'Hi'\` | One byte per character (8 bit), MSB-first in the wire |
@@ -19968,8 +20190,8 @@ Postfixes shared by several forms:
 | Postfix | Example | Effect |
 |---------|---------|--------|
 | **Bit range** | \`\\255.0-7\`, \`^FF.4/8\` | Slice after conversion to bits |
-| **Padding** \`;p\` | \`\\12;8\`, \`^f;8\` | Pad unsigned literal to \`p\` bits (left zeroes) |
-| **Signed width** \`;W\` | \`\\-3;8\`, \`^-A;8\` | **Not** padding — TC width (signed forms only) |
+| **Padding** \`;p\` | \`\\12;8\`, \`^f;8\` | Pad unsigned **scalar** literal to \`p\` bits (left zeroes) |
+| **Grouped tag** | \`\\2 \\-1;s8\`, \`\\1.5;q4p4\` | Suffix on last atom applies to **all** elements in the group |
 
 ---
 
@@ -20021,29 +20243,76 @@ show(n)
 
 ---
 
-## Decimal signed — \`\\-N;W\`
+## Decimal signed — \`\\-N;sW\`
 
-Signed decimal literals use a **minus after the backslash** and require an **explicit width** \`;W\` (wire type \`8wire\` does **not** infer \`W\`).
+Signed decimal literals use a **minus after the backslash** (or a positive \`\\N\`) and require an **explicit signed tag** \`;sW\` (\`W\` = two's-complement width).
 
 \`\`\`logts-play
-8wire a = \\-3;8
+8wire a = \\-3;s8
 show(a)
 \`\`\`
 
 | Source | Result on \`8wire\` |
 |--------|-------------------|
-| \`\\-3;8\` | \`11111101\` (TC −3) |
-| \`\\-1;4\` | \`1111\` on \`4wire\` |
-| \`\\-3\` | **Parse error** — missing \`;W\` |
-| \`\\-3;4\` on \`8wire\` | **Width error** — pattern is 4 bits, wire is 8 |
+| \`\\-3;s8\` | \`11111101\` (TC −3) |
+| \`\\3;s8\` | \`00000011\` (TC +3) |
+| \`\\-1;s4\` | \`1111\` on \`4wire\` |
+| \`\\-3\` | **Parse error** — use \`;sW\` |
+| \`\\-3;8\` | **Parse error** — use \`;s8\` for signed |
+| \`\\-3;s4\` on \`8wire\` | **Width error** — pattern is 4 bits, wire is 8 |
 
 In [short notation](short-notation.md):
 
 \`\`\`
-8wire c = \`\\-3;8\`     →  same as \\-3;8
+8wire c = \`\\-3;s8\`     →  same as \\-3;s8
 \`\`\`
 
-**Disambiguation \`;W\` vs \`;p\`:** on unsigned \`\\31;8\`, the suffix pads to 8 bits. On signed \`\\-3;8\`, the suffix is always the **two's-complement width**, never padding.
+**Disambiguation \`;p\` vs grouped tag:** a **single** unsigned scalar \`\\31;8\` still uses \`;8\` as **padding**. A **group** of two or more atoms, or any \`;sW\` / \`;qXpY\` / \`;ascii\` suffix, uses the grouped-literal rules below.
+
+---
+
+## Grouped literals — \`\\v1 \\v2 … ;tag\`
+
+A **group** is a whitespace-separated sequence of \`\\value\` atoms with **one suffix** on the last atom that applies **retroactively** to every element:
+
+\`\`\`logts-play
+8wire[4] v = \\2 \\23 \\242 \\1;8
+show(v)
+\`\`\`
+
+| Suffix | Width | Meaning |
+|--------|-------|---------|
+| \`;M\` (digits only, **group** with ≥2 atoms) | M | Unsigned / padding per element |
+| \`;sM\` | M | Signed two's complement per element |
+| \`;qXpY\` | X+Y | Fixed-point QX.Y (e.g. \`;q4p4\` → 8 bit) |
+| \`;fp16\`, \`;bf16\` | 16 | IEEE / brain float16 per element |
+| \`;ascii\` | 8 | Byte per element (alias of \`;8\` in groups) |
+
+Examples:
+
+\`\`\`logts-play
+8wire[4] v = \\2 \\-1 \\5 \\0;s8
+show(v; signed)
+\`\`\`
+
+\`\`\`logts-play
+8wire[4] v = \\2 \\-1.5 \\0.5 \\1;q4p4
+show(v; q4p4)
+\`\`\`
+
+\`\`\`logts-play
+16wire w = \\65 \\66;ascii
+show(w; ascii)
+\`\`\`
+
+| Rule | Detail |
+|------|--------|
+| Single \`\\N\` without suffix | Unchanged — minimal unsigned width |
+| \`\\N \\N\` without suffix | **Error** — missing width/format tag |
+| \`\\-N;M\` (unsigned M) | **Error** — use \`;sM\` |
+| Fractional \`\\1.5\` | Requires \`;qXpY\`, \`;fp16\`, or \`;bf16\` — not plain \`;8\` / \`;s8\` |
+
+Concatenation between groups still uses \`+\`: \`\\1 \\2;8 + ^0F\`.
 
 ---
 

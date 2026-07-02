@@ -35,8 +35,7 @@
 
   function formatSignedDecLiteral(n, w) {
     const num = typeof n === 'bigint' ? n : BigInt(n);
-    if (num < 0n) return '\\' + num.toString() + ';' + w;
-    return formatDecimalLiteral(num);
+    return '\\' + num.toString() + ';s' + w;
   }
 
   function formatSignedHexLiteral(n, w) {
@@ -394,15 +393,66 @@
     };
   }
 
-  function formatDebugDisplayValue(binStr, bitWidth, opts, isElement) {
+  function formatSignedGroupedElementValue(binStr, width) {
+    const padded = normalizeBits(binStr, width);
+    const n = signedBinToBigInt(padded);
+    if (n < 0n) return '\\' + n.toString();
+    return '\\' + n.toString();
+  }
+
+  function formatSignedGroupedHeader(binStr, bitWidth) {
+    const bits = normalizeBits(binStr, bitWidth);
+    const w = bits.length;
+    if (w <= SHOW_DEC_SCALAR_MAX_BITS) {
+      return formatSignedDecLiteral(signedBinToBigInt(bits), w);
+    }
+    const elems = [];
+    let remaining = bits;
+    while (remaining.length > SHOW_DEC_CHUNK_BITS) {
+      elems.push(formatSignedGroupedElementValue(remaining.substring(0, SHOW_DEC_CHUNK_BITS), SHOW_DEC_CHUNK_BITS));
+      remaining = remaining.substring(SHOW_DEC_CHUNK_BITS);
+    }
+    if (remaining.length === SHOW_DEC_CHUNK_BITS) {
+      elems.push(formatSignedGroupedElementValue(remaining, SHOW_DEC_CHUNK_BITS));
+      return elems.join(' ') + ';s64';
+    }
+    if (remaining.length > 0) {
+      const head = elems.length ? elems.join(' ') + ';s64 + ' + remaining : remaining;
+      return head;
+    }
+    return elems.join(' ') + ';s64';
+  }
+
+  function formatAsciiGroupedHeader(binStr, bitWidth) {
+    const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+    if (!NF) return formatAsciiDisplay(binStr, bitWidth, false);
+    return NF.formatGroupedShow(binStr, 'ascii', { elementWidth: 8 });
+  }
+
+  function formatDebugDisplayValue(binStr, bitWidth, opts, isElement, elementWidth) {
     if (!opts || binStr == null || binStr === '-') return binStr;
     const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+    const elW = elementWidth != null ? elementWidth : bitWidth;
     if (opts.numericFormat && NF) {
+      const formatW = NF.getFormatModeWidth(opts.numericFormat);
+      if (formatW != null && elW === formatW) {
+        return NF.formatGroupedShow(binStr, opts.numericFormat, { elementWidth: formatW });
+      }
+      if (formatW != null && elW > formatW) {
+        return formatHexTagDisplay(binStr, bitWidth, opts.hexWide);
+      }
+      if (formatW != null && elW < formatW) {
+        return normalizeBits(binStr, elW);
+      }
       return NF.formatForShow(binStr, bitWidth, opts.numericFormat);
     }
     let formatted;
     if (opts.ascii) {
-      formatted = formatAsciiDisplay(binStr, bitWidth, !!isElement);
+      if (!isElement && bitWidth > 8 && bitWidth % 8 === 0) {
+        formatted = formatAsciiGroupedHeader(binStr, bitWidth);
+      } else {
+        formatted = formatAsciiDisplay(binStr, bitWidth, !!isElement);
+      }
     } else if (opts.bin) {
       formatted = formatBinDisplay(binStr, bitWidth, !!isElement);
     } else if (opts.hex) {
@@ -416,13 +466,23 @@
         formatted = formatHexGroupedDisplay(binStr, bitWidth);
       }
     } else if (opts.dec || opts.signed) {
-      formatted = formatDecimalDisplay(
-        binStr,
-        bitWidth,
-        !!opts.signed,
-        !!isElement,
-        !!opts.signedLiteral
-      );
+      if (opts.signed && opts.signedLiteral && !isElement) {
+        formatted = formatSignedGroupedHeader(binStr, bitWidth);
+      } else if (opts.signed && opts.signedLiteral && isElement) {
+        if (bitWidth > SHOW_DEC_SCALAR_MAX_BITS) {
+          formatted = formatWideElementHex(binStr, bitWidth);
+        } else {
+          formatted = formatSignedDecLiteral(signedBinToBigInt(normalizeBits(binStr, bitWidth)), bitWidth);
+        }
+      } else {
+        formatted = formatDecimalDisplay(
+          binStr,
+          bitWidth,
+          !!opts.signed,
+          !!isElement,
+          !!opts.signedLiteral
+        );
+      }
     } else {
       return binStr;
     }
@@ -470,6 +530,7 @@
     formatBinDisplay,
     formatAsciiDisplay,
     formatSignedDecLiteral,
+    formatSignedGroupedHeader,
     formatSignedHexLiteral,
     parseElRangeSpec,
     maybeWrapLines,
