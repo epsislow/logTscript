@@ -645,6 +645,26 @@ Bit width \`N\` = \`max(len(a), len(b))\` for binary ops; short inputs are zero-
 
 Optional tags after \`;\` in the call: **\`signed\`**, **\`q4p4\`**, **\`q8p8\`**, **\`fp16\`**, **\`bf16\`** (mutually exclusive numeric formats), plus **\`vector\`**, **\`matrix\`** (not together). See [builtin-tagged-index.md](builtin-tagged-index.md).
 
+### Parametric format tags (\`sX\`, \`qXpY\`) {#parametric-formats}
+
+Beyond the fixed aliases above, built-ins accept **parametric** tags (mutually exclusive with each other and with \`signed\`):
+
+| Pattern | Meaning | Operand width |
+|---------|---------|---------------|
+| **\`sX\`** | Signed two's complement, exactly **X** bits (1≤X≤64) | wire = **X** bit |
+| **\`qXpY\`** | Signed fixed-point **Q{X}.{Y}** (X+Y≤64) | wire = **(X+Y)** bit |
+
+Examples: \`ADD(a, b; q6p2)\` on **8wire**, \`ADD(x, y; s32)\` on **32wire**, \`q0p8\` for fractional values in (−1…+1), \`q8p0\` for integers (same bits as \`s8\`, distinct display suffix). **\`fp16\`** / **\`bf16\`** remain fixed at 16 bits only — no \`fpX\`/\`bfX\`.
+
+\`\`\`logts-play
+8wire a = \\1.5;q6p2
+8wire b = \\0.5;q6p2
+8wire s, 1wire ovf = ADD(a, b; q6p2)
+show(s; q6p2)
+\`\`\`
+
+\`MULTIPLY\` / \`MAC\` / \`DOT\` / \`SUM\` with \`qXpY\`: overflow wire **\`over\`** is **2×W** bits (W = X+Y), same as \`q4p4\`.
+
 | Built-in | \`; q4p4\` (8-bit) | \`; q8p8\` / \`; fp16\` / \`; bf16\` (16-bit) |
 |----------|------------------|----------------------------------------|
 | ADD / SUBTRACT | fixed-point + overflow flag | fixed / float + flag |
@@ -7236,8 +7256,10 @@ Display tags are **optional**, appear **once after all arguments** (after \`;\`)
 | \`q8p8\` | Fixed-point **Q8.8** decimal on **16-bit** wires |
 | \`fp16\` | IEEE 754 half as decimal (\`3\`, \`nan\`, \`inf\`) on **16-bit** wires |
 | \`bf16\` | Brain float 16 as decimal on **16-bit** wires |
+| \`sX\` | Fixed signed width per element — e.g. \`show(v; s8)\` → \`\\2 \\-1 \\5 \\0;s8\` (distinct from adaptive \`signed\`) |
+| \`qXpY\` | Parametric Q format — e.g. \`show(w; q6p2)\` → \`\\1.5;q6p2\`, \`show(w; q8p0)\` → \`\\5;q8p0\` (not \`;s8\`) |
 
-Exactly **one** of \`dec\`, \`hex\`, \`bin\`, \`ascii\`, \`q4p4\`, \`q8p8\`, \`fp16\`, or \`bf16\` per statement. \`signed\` combines with \`dec\` or \`hex\` (value hex), not with \`bin\`, \`ascii\`, or numeric-format tags.
+Exactly **one** format tag per statement: \`dec\`, \`hex\`, \`bin\`, \`ascii\`, fixed (\`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`), or parametric (\`sX\`, \`qXpY\` with X+Y≤64). \`signed\` (adaptive) is mutually exclusive with \`sX\` and with numeric-format tags; \`dec\` + \`sX\` is rejected.
 
 #### Layout / element tags (\`show\` and \`peek\` only)
 
@@ -7266,6 +7288,8 @@ show(w; signed)            # w (4wire) = \\-1;s4
 show(code; ascii)          # code (8wire) = "A"
 8wire fp = 00011000
 show(fp; q4p4)             # fp (8wire) = \\1.5;q4p4
+show(v; s8)                # 8wire[4] v = \\2 \\-1 \\5 \\0;s8  (fixed per element)
+show(w; q8p0)              # w (8wire) = \\5;q8p0
 40wire msg := "Hello"
 show(msg; ascii)           # msg (40wire) = \\72 \\101 \\108 \\108 \\111;ascii
 \`\`\`

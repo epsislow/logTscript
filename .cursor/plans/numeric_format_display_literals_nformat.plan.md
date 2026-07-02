@@ -7,24 +7,24 @@ todos:
     status: completed
   - id: p1-parse-tag
     content: "Faze 1–2: numeric-formats.js — parseLiteralTag(sX/qXpY/bfX/fpX/ascii) + formatGroupedShow (signed adaptiv ;sW / chunk ;s64)"
-    status: pending
+    status: completed
   - id: p1-tokenizer
     content: "Faze 1–2: tokenizer.js — grup \\N \\N;tag, eroare \\-N;M, backward compat \\N singular"
-    status: pending
+    status: completed
   - id: p1-wire-literals
     content: "Faze 1–2: wire-literals.js + parser.js — GroupedLiteral, groupedLiteralToBits"
-    status: pending
+    status: completed
   - id: p1-display
     content: "Faze 1–2: debug-display-format.js + interpreter.js — header grupat ;tag, celula formatW vs elementW"
-    status: pending
+    status: completed
   - id: p1-tests-doc
     content: "Faze 1–2: teste grouped-literals-display + actualizare 1907/1920/1925/1946/1992 + wire-literals.md + debug.md"
-    status: pending
+    status: completed
   - id: p25-parse-builtin-tags
-    content: "Faza 2.5: parseBuiltinCallTags + parser whitelist — sX, qXpY, bfX, fpX pe ADD/SUB/SUM/MIN/MAX/GT/LT/MULTIPLY/MAC/DOT/DIVIDE/CLAMP/ABS/RSHIFT/ARGMAX/ARGMIN"
+    content: "Faza 2.5: parseBuiltinCallTags + ops generic — sX, qXpY (W≤64, signed); fp16/bf16 fixe; detalii faza_2.5_tag-uri_parametrizate.plan.md"
     status: pending
   - id: p25-display-builtin-tags
-    content: "Faza 2.5: show/peek/probe — display tags parametrizate (reutilizează parseLiteralTag); signed bare tag neschimbat"
+    content: "Faza 2.5: show/peek/probe — sX și qXpY (signed adaptiv distinct); show(v; s8) fix per element"
     status: pending
   - id: p25-tests-doc
     content: "Faza 2.5: teste builtin-param-formats + doc arithmetic.md + builtin-tagged-index + pagini builtin; _gen_doc_data.js"
@@ -89,47 +89,34 @@ Rezumat decizii cheie:
 
 ### Faza 2.5 — Tag-uri parametrizate pe built-in-uri
 
-**După Fazele 1–2**, înainte de status 4bit. Extinde apelurile built-in și display tags de la setul fix (`signed`, `q4p4`, `q8p8`, `fp16`, `bf16`) la familii parametrizate, reutilizând `parseLiteralTag()` din Fazele 1–2.
+**Plan detaliat:** [`faza_2.5_tag-uri_parametrizate.plan.md`](faza_2.5_tag-uri_parametrizate.plan.md)
 
-#### Tag-uri noi acceptate la apel
+**După Fazele 1–2**, înainte de status 4bit.
 
-| Familie | Sintaxă apel | Lățime | Exemplu |
-|---------|--------------|--------|---------|
-| Signed cu lungime | `; sX` | X biți | `ADD(a, b; s32)` |
-| Fixed-point | `; qXpY` | X+Y biți | `ADD(a, b; q6p2)`, `SUM(v; q16p16)` |
-| Brain float | `; bfX` | X biți | `ADD(a, b; bf16)` |
-| IEEE float | `; fpX` | X biți | `ADD(a, b; fp16)` |
-| Signed adaptiv (neschimbat) | `; signed` | lățime wire | `ADD(a, b; signed)` — **fără X** |
+#### Decizii design (confirmate)
 
-**Mutual exclusion:** cel mult un tag de format per apel (ca acum). `; signed` și `; s32` sunt mutual exclusive.
+| Subiect | Decizie |
+|---------|---------|
+| **qXpY** | Signed only; **X+Y ≤ 64** (ex. `q32p32` OK, `q70p1` respins la parse) |
+| **sX** | 1 ≤ X ≤ 64; distinct de **`signed`** adaptiv |
+| **q0pW** | Permis — fracție signed (ex. `q0p8`) |
+| **qWp0** | Permis cu **nume propriu** (`q8p0`); biți = `s8`, afișare `\N;q8p0` (generic Y=0, fără alias intern) |
+| **Float** | Doar **`fp16`** și **`bf16`** fixe — fără `fpX`/`bfX`, fără fp8/fp32 |
+| **Unsigned qXpY** | Out of scope (viitor `uqXpY` dacă e nevoie) |
+| **show** | `show(v; s8)` fix per element; `show(v; signed)` adaptiv; `dec`+`s8` → eroare |
+| **over** | Lățime 2×W pentru MULTIPLY/MAC/DOT/SUM |
+| **Erori W>64** | La **parse**; width mismatch operand la **runtime** |
 
-**Compatibilitate:** tag-urile fixe existente (`q4p4`, `q8p8`, `fp16`, `bf16`, `signed`) rămân valide — sunt cazuri particulare ale familiilor parametrizate.
+#### Tag-uri la apel și display
 
-#### Built-in-uri acoperite
+| Familie | Exemplu | Lățime |
+|---------|---------|--------|
+| `signed` | `ADD(a,b; signed)` | adaptiv (wire) |
+| `sX` | `ADD(a,b; s32)`, `show(z; s32)` | exact X |
+| `qXpY` | `ADD(a,b; q6p2)`, `show(s; q8p0)` | exact X+Y ≤ 64 |
+| `q4p4` / `q8p8` / `fp16` / `bf16` | alias fixe | ca acum |
 
-Toate funcțiile cu tag format din [numeric_format_tags.plan.md](numeric_format_tags.plan.md) faza 1–2:
-
-ADD, SUBTRACT, SUM, MIN, MAX, GT, LT, MULTIPLY, MAC, DOT, DIVIDE, CLAMP, ABS, RSHIFT, ARGMAX, ARGMIN
-
-Plus display: `show`, `peek`, `probe` — acceptă tag-uri parametrizate (`show(w; q6p2)`, `show(w; s32)`).
-
-#### Modificări cod
-
-| Fișier | Schimbare |
-|--------|-----------|
-| [`numeric-formats.js`](../v0_3_2/core/numeric-formats.js) | `parseBuiltinFormatTag(str)` — delegare la `parseLiteralTag`; registry extins `numericMode` din string fix la obiect `{ family, width, I?, F? }` |
-| [`signed-arithmetic.js`](../v0_3_2/core/signed-arithmetic.js) / `parseBuiltinCallTags` | Recunoaște `s32`, `q6p2`, `bf16`, `fp32` etc.; validare mutual exclusion |
-| [`parser.js`](../v0_3_2/core/parser.js) | Whitelist display tags: pattern `s\d+`, `q\d+p\d+`, `bf\d+`, `fp\d+` |
-| [`interpreter.js`](../v0_3_2/core/interpreter.js) | Dispatch ops pe `numericMode` parametrizat; `assertWidthForFormat` cu lățime dinamică |
-| [`vector-reduce.js`](../v0_3_2/core/vector-reduce.js), [`matrix-reduce.js`](../v0_3_2/core/matrix-reduce.js), [`tensor-axis-reduce.js`](../v0_3_2/core/tensor-axis-reduce.js) | Propagare `numericMode` parametrizat |
-| [`debug-display-format.js`](../v0_3_2/core/debug-display-format.js) | Display tags parametrizate via `parseLiteralTag` |
-
-#### Validare lățime
-
-- `qXpY` → operand wire trebuie să aibă exact X+Y biți
-- `sX` → operand wire trebuie să aibă exact X biți
-- `bfX` / `fpX` → operand wire trebuie să aibă exact X biți
-- Eroare clară: `ADD: ; q6p2 requires 8-bit operands, got 16`
+Built-in-uri: ADD, SUBTRACT, SUM, MIN, MAX, GT, LT, MULTIPLY, MAC, DOT, DIVIDE, CLAMP, ABS, RSHIFT, ARGMAX, ARGMIN + show/peek/probe.
 
 #### Exemple țintă
 
@@ -139,29 +126,13 @@ Plus display: `show`, `peek`, `probe` — acceptă tag-uri parametrizate (`show(
 8wire s, 1wire ovf = ADD(a, b; q6p2)
 show(s; q6p2)
 
-32wire x = ...
-32wire y = ...
-32wire z = ADD(x, y; s32)
-show(z; s32)
+8wire[4] v = \2 \-1 \5 \0;s8
+show(v; s8)        # header: \2 \-1 \5 \0;s8
+show(v; signed)    # header adaptiv: \…;s32
+
+8wire w = \3;q8p0
+show(w; q8p0)      # \3;q8p0 (nu ;s8)
 ```
-
-#### Documentație
-
-- [`arithmetic.md`](../v0_3_2/doc/arithmetic.md): secțiune „Parametric format tags”
-- [`builtin-tagged-index.md`](../v0_3_2/doc/builtin-tagged-index.md): familii sX / qXpY / bfX / fpX
-- Actualizare pagini builtin (ADD, SUM, …): semnături cu tag-uri parametrizate + exemple
-- `node node/_gen_doc_data.js`
-
-#### Teste
-
-Grup nou `builtin-param-formats` în [`test_suite.js`](../v0_3_2/tests/test_suite.js):
-
-- `ADD(a, b; q6p2)` pe 8wire
-- `ADD(a, b; s32)` pe 32wire
-- `show(w; q6p2)` roundtrip cu literali grupați din Fazele 1–2
-- Regresie: `; q4p4`, `; signed`, `; fp16` neschimbate
-- Mutual exclusion: `; signed s32`, `; q4p4 q6p2` → eroare
-- Lățime greșită → eroare
 
 ---
 

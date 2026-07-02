@@ -90,7 +90,7 @@
         : colValues(meta, varName, i, evalFns);
       const padded = vals.map((v) => String(v).padStart(W, '0'));
       let best;
-      if (typeof signedOrMode === 'string' && NF && NF.isFormatMode(signedOrMode)) {
+      if (typeof signedOrMode === 'string' && NF && NF.isBuiltinNumericFormatMode(signedOrMode)) {
         best = NF.pickMinMax(padded, pickMin, signedOrMode);
       } else if (signedOrMode && pickMinMaxSigned) {
         best = pickMinMaxSigned(padded, pickMin);

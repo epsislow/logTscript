@@ -16869,6 +16869,105 @@ reg(2016, 'grouped-literals-display', 'C7 fracționar pe ;s8', function(h, sessi
   h.assertThrows('signed 8bit', () => session.run('8wire a = \\1.5;s8'));
 });
 
+reg(2017, 'builtin-param-formats', 'ADD — q6p2 fixed-point 1.5+0.5', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 00000110\n' +
+    '8wire b = 00000010\n' +
+    '8wire s, 1wire ovf = ADD(a, b; q6p2)'
+  );
+  h.assert('result 2.0', session.getWire(interp, 's'), '00001000');
+  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+});
+
+reg(2018, 'builtin-param-formats', 'ADD — s32 signed pe 32wire', function(h, session) {
+  const { interp } = session.run(
+    '32wire a = 00000000000000000000000000000001\n' +
+    '32wire b = 00000000000000000000000000000001\n' +
+    '32wire s, 1wire ovf = ADD(a, b; s32)'
+  );
+  h.assert('result 2', session.getWire(interp, 's'), '00000000000000000000000000000010');
+  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+});
+
+reg(2019, 'builtin-param-formats', 'show — s8 fix per element', function(h, session) {
+  const { out } = session.run(
+    '8wire[4] v = \\2 \\-1 \\5 \\0;s8\n' +
+    'show(v; s8)'
+  );
+  h.assert('grouped s8', String(out.some(l => /v = \\2 \\-1 \\5 \\0;s8/.test(l))), 'true');
+});
+
+reg(2020, 'builtin-param-formats', 'show — signed adaptiv distinct de s8', function(h, session) {
+  const { out } = session.run(
+    '8wire[4] v = \\2 \\-1 \\5 \\0;s8\n' +
+    'show(v; signed)'
+  );
+  h.assert('adaptive signed header', String(out.some(l => /;s32/.test(l))), 'true');
+  h.assert('not fixed s8 header', String(out.some(l => /v = \\2 \\-1 \\5 \\0;s8/.test(l))), 'false');
+});
+
+reg(2021, 'builtin-param-formats', 'show — q6p2 grouped literal', function(h, session) {
+  const { out } = session.run('8wire w = 00000110\nshow(w; q6p2)');
+  h.assert('shows q6p2', String(out.some(l => /w \(8wire\) = \\1\.5;q6p2/.test(l))), 'true');
+});
+
+reg(2022, 'builtin-param-formats', 'show — q8p0 nu alias la s8', function(h, session) {
+  const { out } = session.run('8wire w = 00000101\nshow(w; q8p0)');
+  h.assert('shows q8p0 suffix', String(out.some(l => /w \(8wire\) = \\5;q8p0/.test(l))), 'true');
+});
+
+reg(2023, 'builtin-param-formats', 'q32p32 pe 64wire — OK', function(h, session) {
+  const z64 = '0'.repeat(64);
+  session.parse('64wire a = ' + z64 + '\n64wire b = ' + z64 + '\n64wire s, 1wire f = ADD(a, b; q32p32)');
+  const { interp } = session.run('64wire a = ' + z64 + '\n64wire b = ' + z64 + '\n64wire s, 1wire f = ADD(a, b; q32p32)');
+  h.assert('sum zero', session.getWire(interp, 's'), z64);
+});
+
+reg(2024, 'builtin-param-formats', 'q70p1 — eroare parse W>64', function(h, session) {
+  h.assertThrows('W>64', () => session.parse('8wire a = \\1;q70p1'));
+});
+
+reg(2025, 'builtin-param-formats', 'q0p8 fracție signed literal', function(h, session) {
+  const { interp } = session.run('8wire a = \\0.25;q0p8');
+  h.assert('0.25 raw', session.getWire(interp, 'a'), '01000000');
+  const { out } = session.run('8wire w = 01000000\nshow(w; q0p8)');
+  h.assert('shows q0p8', String(out.some(l => /\\0\.25;q0p8/.test(l))), 'true');
+});
+
+reg(2026, 'builtin-param-formats', 'ADD — width mismatch q6p2', function(h, session) {
+  const r = session.run(
+    '16wire a = 0000000000000000\n' +
+    '16wire b = 0000000000000000\n' +
+    '16wire s, 1wire f = ADD(a, b; q6p2)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('runtime error', String(err.includes('8-bit')), 'true');
+});
+
+reg(2027, 'builtin-param-formats', 'ADD — signed și q6p2 mutual exclusion', function(h, session) {
+  const r = session.run(
+    '8wire a = 00000000\n' +
+    '8wire b = 00000000\n' +
+    '8wire s, 1wire f = ADD(a, b; signed q6p2)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('mutual exclusion', String(err.includes('mutually exclusive')), 'true');
+});
+
+reg(2028, 'builtin-param-formats', 'show — dec și s8 mutual exclusion', function(h, session) {
+  h.assertThrows('dec+s8', () => session.parse('8wire w = 0\nshow(w; dec s8)'));
+});
+
+reg(2029, 'builtin-param-formats', 'ADD(vector) — s8 per element', function(h, session) {
+  const { interp } = session.run(
+    '8wire[2] a = 00000001 + 00000010\n' +
+    '8wire[2] b = 00000001 + 00000001\n' +
+    '8wire[2] r, 8wire[2] f = ADD(a, b; vector s8)'
+  );
+  h.assert('elem0', session.getWire(interp, 'r').slice(0, 8), '00000010');
+  h.assert('elem1', session.getWire(interp, 'r').slice(8, 16), '00000011');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

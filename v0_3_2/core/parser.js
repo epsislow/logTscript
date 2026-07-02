@@ -64,6 +64,33 @@ function wireStringToBin(str, tok) {
   return WL.wireStringToBin(str);
 }
 
+function isParametricFormatDisplayTag(tagName) {
+  if (NUMERIC_FORMAT_DISPLAY_TAGS.has(tagName)) return true;
+  const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+  if (!NF) return false;
+  if (/^s\d+$/.test(tagName)) {
+    try {
+      NF.parseLiteralTag(tagName);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  if (/^q\d+p\d+$/.test(tagName)) {
+    try {
+      NF.parseBuiltinFormatTag(tagName);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  return false;
+}
+
+function isNumericFormatDisplayTag(tagName) {
+  return isParametricFormatDisplayTag(tagName);
+}
+
 const NUMERIC_FORMAT_DISPLAY_TAGS = new Set(['q4p4', 'q8p8', 'bf16', 'fp16']);
 const SHOW_PEEK_DISPLAY_TAGS = new Set([
   'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide',
@@ -672,7 +699,7 @@ parseDebugDisplayTags(allowedTags) {
 
   while (this.c.type === 'ID') {
     const tagName = this.c.value;
-    if (!allowedTags.has(tagName)) {
+    if (!allowedTags.has(tagName) && !isParametricFormatDisplayTag(tagName)) {
       throw Error(`Unknown display tag '${tagName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     if (seen.has(tagName)) {
@@ -703,7 +730,7 @@ parseDebugDisplayTags(allowedTags) {
   const hasFormatHex = tags.includes('hex');
   const hasFormatBin = tags.includes('bin');
   const hasFormatAscii = tags.includes('ascii');
-  const numericFormatTags = tags.filter((t) => NUMERIC_FORMAT_DISPLAY_TAGS.has(t));
+  const numericFormatTags = tags.filter((t) => isNumericFormatDisplayTag(t));
   let formatCount = 0;
   if (hasFormatDec) formatCount++;
   if (hasFormatHex) formatCount++;
@@ -711,7 +738,16 @@ parseDebugDisplayTags(allowedTags) {
   if (hasFormatAscii) formatCount++;
   if (numericFormatTags.length) formatCount += numericFormatTags.length;
   if (formatCount > 1) {
-    throw Error(`Display format tags (dec, hex, bin, ascii, q4p4, q8p8, bf16, fp16) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    throw Error(`Display format tags (dec, hex, bin, ascii, q4p4, q8p8, bf16, fp16, sX, qXpY) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  if (tags.includes('signed') && tags.some((t) => /^s\d+$/.test(t))) {
+    throw Error(`Display tags signed and fixed signed width (sX) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  if (tags.includes('signed') && numericFormatTags.length) {
+    throw Error(`Display tags signed and numeric format tags are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  if (tags.includes('dec') && tags.some((t) => /^s\d+$/.test(t))) {
+    throw Error(`Display tags dec and fixed signed width (sX) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   if (tags.includes('signed') && tags.includes('bin')) {
     throw Error(`Display tags signed and bin are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);

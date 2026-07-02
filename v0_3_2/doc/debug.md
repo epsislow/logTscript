@@ -146,8 +146,10 @@ Display tags are **optional**, appear **once after all arguments** (after `;`), 
 | `q8p8` | Fixed-point **Q8.8** decimal on **16-bit** wires |
 | `fp16` | IEEE 754 half as decimal (`3`, `nan`, `inf`) on **16-bit** wires |
 | `bf16` | Brain float 16 as decimal on **16-bit** wires |
+| `sX` | Fixed signed width per element — e.g. `show(v; s8)` → `\2 \-1 \5 \0;s8` (distinct from adaptive `signed`) |
+| `qXpY` | Parametric Q format — e.g. `show(w; q6p2)` → `\1.5;q6p2`, `show(w; q8p0)` → `\5;q8p0` (not `;s8`) |
 
-Exactly **one** of `dec`, `hex`, `bin`, `ascii`, `q4p4`, `q8p8`, `fp16`, or `bf16` per statement. `signed` combines with `dec` or `hex` (value hex), not with `bin`, `ascii`, or numeric-format tags.
+Exactly **one** format tag per statement: `dec`, `hex`, `bin`, `ascii`, fixed (`q4p4`, `q8p8`, `fp16`, `bf16`), or parametric (`sX`, `qXpY` with X+Y≤64). `signed` (adaptive) is mutually exclusive with `sX` and with numeric-format tags; `dec` + `sX` is rejected.
 
 #### Layout / element tags (`show` and `peek` only)
 
@@ -176,6 +178,8 @@ show(w; signed)            # w (4wire) = \-1;s4
 show(code; ascii)          # code (8wire) = "A"
 8wire fp = 00011000
 show(fp; q4p4)             # fp (8wire) = \1.5;q4p4
+show(v; s8)                # 8wire[4] v = \2 \-1 \5 \0;s8  (fixed per element)
+show(w; q8p0)              # w (8wire) = \5;q8p0
 40wire msg := "Hello"
 show(msg; ascii)           # msg (40wire) = \72 \101 \108 \108 \111;ascii
 ```

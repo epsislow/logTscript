@@ -17,13 +17,82 @@
     q8p8: { width: 16, fracBits: 8 },
   };
 
+  const MAX_FORMAT_WIDTH = 64;
+
   function isFormatMode(mode) {
     return FORMAT_TAG_NAMES.has(mode);
   }
 
-  /** ASHR semantics on raw bits (signed + fixed-point Q formats). */
+  function qModeSpec(mode) {
+    const fixed = FIXED_SPECS[mode];
+    if (fixed) {
+      return { width: fixed.width, fracBits: fixed.fracBits, intBits: fixed.width - fixed.fracBits };
+    }
+    const m = /^q(\d+)p(\d+)$/.exec(String(mode));
+    if (!m) return null;
+    const X = parseInt(m[1], 10);
+    const Y = parseInt(m[2], 10);
+    return { width: X + Y, fracBits: Y, intBits: X };
+  }
+
+  function isSignedWidthMode(mode) {
+    return /^s\d+$/.test(String(mode));
+  }
+
+  function signedWidthFromMode(mode) {
+    const m = /^s(\d+)$/.exec(String(mode));
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  function isBuiltinNumericFormatMode(mode) {
+    if (isFormatMode(mode)) return true;
+    if (/^q\d+p\d+$/.test(String(mode))) {
+      try {
+        parseBuiltinFormatTag(mode);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  function isNumericFormatMode(mode) {
+    return isBuiltinNumericFormatMode(mode) || isSignedWidthMode(mode);
+  }
+
+  function resolveFormatSpec(mode) {
+    if (mode === 'fp16' || mode === 'bf16') {
+      return { kind: 'float', width: 16, tagSuffix: mode };
+    }
+    if (isSignedWidthMode(mode)) {
+      const w = signedWidthFromMode(mode);
+      return { kind: 'signed', width: w, tagSuffix: mode };
+    }
+    const q = qModeSpec(mode);
+    if (q) {
+      return {
+        kind: 'fixed',
+        width: q.width,
+        fracBits: q.fracBits,
+        intBits: q.intBits,
+        tagSuffix: mode,
+      };
+    }
+    return null;
+  }
+
+  function parseBuiltinFormatTag(tagStr) {
+    const tag = parseLiteralTag(tagStr);
+    if (tag.kind === 'ascii' || tag.kind === 'unsigned') {
+      throw new Error(`Format tag '${tagStr}' is not valid for built-in calls`);
+    }
+    return tag;
+  }
+
+  /** ASHR semantics on raw bits (signed + fixed-point Q formats + sX). */
   function usesArithmeticRshift(mode) {
-    return mode === true || mode === 'q4p4' || mode === 'q8p8';
+    return mode === true || qModeSpec(mode) != null || isSignedWidthMode(mode);
   }
 
   function rejectsFloatRshift(mode, opName) {
@@ -33,7 +102,7 @@
   }
 
   function compareTagged(a, b, signedOrMode, compareFns) {
-    if (isFormatMode(signedOrMode)) {
+    if (isBuiltinNumericFormatMode(signedOrMode)) {
       return compareValues(a, b, signedOrMode);
     }
     if (signedOrMode && compareFns && compareFns.signed) {
@@ -60,10 +129,10 @@
   }
 
   function assertFormatWidth(mode, width, opName) {
-    if (mode === 'q4p4' || mode === 'q8p8') {
-      const spec = FIXED_SPECS[mode];
-      if (width !== spec.width) {
-        throw new Error(`${opName}: ; ${mode} requires ${spec.width}-bit operands, got ${width}`);
+    const qspec = qModeSpec(mode);
+    if (qspec) {
+      if (width !== qspec.width) {
+        throw new Error(`${opName}: ; ${mode} requires ${qspec.width}-bit operands, got ${width}`);
       }
       return;
     }
@@ -74,26 +143,21 @@
     }
   }
 
-  function fixedSpec(mode) {
-    return FIXED_SPECS[mode] || null;
-  }
-
   function fixedRawToNumber(raw, mode) {
-    const spec = fixedSpec(mode);
-    const scale = BigInt(1) << BigInt(spec.fracBits);
-    const n = signedBinToBigInt(String(raw).padStart(spec.width, '0'));
-    return Number(n) / Number(scale);
+    const spec = qModeSpec(mode);
+    if (!spec) throw new Error(`Unknown fixed format: ${mode}`);
+    return genericFixedRawToNumber(raw, spec.width, spec.fracBits);
   }
 
   function fixedNumberToRaw(value, mode) {
-    const spec = fixedSpec(mode);
-    const scale = BigInt(1) << BigInt(spec.fracBits);
-    const rounded = BigInt(Math.round(value * Number(scale)));
-    return signedBigIntToBin(rounded, spec.width);
+    const spec = qModeSpec(mode);
+    if (!spec) throw new Error(`Unknown fixed format: ${mode}`);
+    return genericFixedNumberToRaw(value, spec.width, spec.fracBits);
   }
 
   function fixedMinMax(mode) {
-    const spec = fixedSpec(mode);
+    const spec = qModeSpec(mode);
+    if (!spec) throw new Error(`Unknown fixed format: ${mode}`);
     const scale = Number(BigInt(1) << BigInt(spec.fracBits));
     const maxInt = (1 << (spec.width - 1)) - 1;
     const minInt = -(1 << (spec.width - 1));
@@ -190,7 +254,7 @@
 
   function addAtWidth(a, b, width, mode) {
     assertFormatWidth(mode, width, 'ADD');
-    if (fixedSpec(mode)) {
+    if (qModeSpec(mode)) {
       const ap = String(a).padStart(width, '0');
       const bp = String(b).padStart(width, '0');
       const va = fixedRawToNumber(ap, mode);
@@ -212,7 +276,7 @@
 
   function subtractAtWidth(a, b, width, mode) {
     assertFormatWidth(mode, width, 'SUBTRACT');
-    if (fixedSpec(mode)) {
+    if (qModeSpec(mode)) {
       const ap = String(a).padStart(width, '0');
       const bp = String(b).padStart(width, '0');
       const va = fixedRawToNumber(ap, mode);
@@ -237,12 +301,12 @@
 
   function sumExpanded(values, X, mode) {
     assertFormatWidth(mode, X, 'SUM');
-    if (fixedSpec(mode)) {
+    if (qModeSpec(mode)) {
       let acc = 0;
       for (const v of values) {
         acc += fixedRawToNumber(v, mode);
       }
-      const spec = fixedSpec(mode);
+      const spec = qModeSpec(mode);
       const scale = BigInt(1) << BigInt(spec.fracBits);
       const accRaw = BigInt(Math.round(acc * Number(scale)));
       const maskX = (BigInt(1) << BigInt(X)) - BigInt(1);
@@ -269,7 +333,7 @@
   }
 
   function compareValues(a, b, mode) {
-    if (fixedSpec(mode)) {
+    if (qModeSpec(mode)) {
       const va = fixedRawToNumber(a, mode);
       const vb = fixedRawToNumber(b, mode);
       if (va === vb) return 0;
@@ -300,8 +364,8 @@
 
   function multiplyAtWidth(a, b, width, mode) {
     assertFormatWidth(mode, width, 'MULTIPLY');
-    if (fixedSpec(mode)) {
-      const spec = fixedSpec(mode);
+    if (qModeSpec(mode)) {
+      const spec = qModeSpec(mode);
       const ap = String(a).padStart(width, '0');
       const bp = String(b).padStart(width, '0');
       const rawA = signedBinToBigInt(ap);
@@ -331,10 +395,10 @@
       throw new Error('MAC: all arguments must have the same bit width');
     }
     assertFormatWidth(mode, width, 'MAC');
-    if (fixedSpec(mode)) {
+    if (qModeSpec(mode)) {
       const sum = fixedRawToNumber(acc, mode)
         + fixedRawToNumber(a, mode) * fixedRawToNumber(b, mode);
-      const spec = fixedSpec(mode);
+      const spec = qModeSpec(mode);
       const accRaw = BigInt(Math.round(sum * Number(BigInt(1) << BigInt(spec.fracBits))));
       const maskN = (BigInt(1) << BigInt(width)) - BigInt(1);
       const maskOver = (BigInt(1) << BigInt(width + 1)) - BigInt(1);
@@ -359,7 +423,7 @@
     assertFormatWidth(mode, width, 'DIVIDE');
     const ap = String(a).padStart(width, '0');
     const bp = String(b).padStart(width, '0');
-    if (fixedSpec(mode)) {
+    if (qModeSpec(mode)) {
       const va = fixedRawToNumber(ap, mode);
       const vb = fixedRawToNumber(bp, mode);
       if (vb === 0) {
@@ -391,12 +455,12 @@
       throw new Error('DOT: vectors must have the same number of elements');
     }
     assertFormatWidth(mode, X, 'DOT');
-    if (fixedSpec(mode)) {
+    if (qModeSpec(mode)) {
       let acc = 0;
       for (let i = 0; i < aVals.length; i++) {
         acc += fixedRawToNumber(aVals[i], mode) * fixedRawToNumber(bVals[i], mode);
       }
-      const spec = fixedSpec(mode);
+      const spec = qModeSpec(mode);
       const accRaw = BigInt(Math.round(acc * Number(BigInt(1) << BigInt(spec.fracBits))));
       const maskX = (BigInt(1) << BigInt(X)) - BigInt(1);
       const maskOver = (BigInt(1) << BigInt(2 * X)) - BigInt(1);
@@ -429,7 +493,7 @@
     const xp = String(x).padStart(width, '0');
     const lp = String(lo).padStart(width, '0');
     const hp = String(hi).padStart(width, '0');
-    if (fixedSpec(mode)) {
+    if (qModeSpec(mode)) {
       const xn = fixedRawToNumber(xp, mode);
       const lon = fixedRawToNumber(lp, mode);
       const hin = fixedRawToNumber(hp, mode);
@@ -450,7 +514,7 @@
   function absAtWidth(x, width, mode) {
     assertFormatWidth(mode, width, 'ABS');
     const xp = String(x).padStart(width, '0');
-    if (fixedSpec(mode)) {
+    if (qModeSpec(mode)) {
       const n = fixedRawToNumber(xp, mode);
       const { max } = fixedMinMax(mode);
       if (Math.abs(n) > max) {
@@ -465,7 +529,7 @@
   }
 
   function formatFixedDisplay(binStr, mode) {
-    const spec = fixedSpec(mode);
+    const spec = qModeSpec(mode);
     const w = spec.width;
     const n = fixedRawToNumber(binStr, mode);
     if (Object.is(n, -0)) return '-0';
@@ -484,7 +548,7 @@
   }
 
   function formatForShow(binStr, bitWidth, mode) {
-    if (fixedSpec(mode)) {
+    if (qModeSpec(mode)) {
       assertFormatWidth(mode, bitWidth || String(binStr).length, 'show');
       return formatFixedDisplay(binStr, mode);
     }
@@ -515,6 +579,9 @@
       const X = parseInt(qm[1], 10);
       const Y = parseInt(qm[2], 10);
       const W = X + Y;
+      if (W > MAX_FORMAT_WIDTH) {
+        throw new Error(`Format ${'q' + X + 'p' + Y} requires at most ${MAX_FORMAT_WIDTH} bits (X+Y=${W})`);
+      }
       const suffix = 'q' + X + 'p' + Y;
       return {
         kind: 'fixed',
@@ -552,14 +619,16 @@
   }
 
   function getFormatModeWidth(mode) {
-    if (fixedSpec(mode)) return fixedSpec(mode).width;
+    const q = qModeSpec(mode);
+    if (q) return q.width;
     if (mode === 'fp16' || mode === 'bf16') return 16;
+    if (isSignedWidthMode(mode)) return signedWidthFromMode(mode);
     return null;
   }
 
   function tagParsedFromFormatMode(mode) {
-    if (fixedSpec(mode)) {
-      const spec = fixedSpec(mode);
+    if (qModeSpec(mode)) {
+      const spec = qModeSpec(mode);
       const fracBits = spec.fracBits;
       const intBits = spec.width - fracBits;
       return {
@@ -592,7 +661,7 @@
 
   function formatFixedLiteralText(binStr, tagParsed) {
     let text;
-    if (tagParsed.formatMode && fixedSpec(tagParsed.formatMode)) {
+    if (tagParsed.formatMode && qModeSpec(tagParsed.formatMode)) {
       text = formatFixedDisplay(binStr, tagParsed.formatMode);
     } else {
       const n = genericFixedRawToNumber(binStr, tagParsed.elementW, tagParsed.fracBits);
@@ -628,7 +697,7 @@
 
   function formatGroupedShow(binStr, modeOrTag, options) {
     const opts = options || {};
-    const tagParsed = typeof modeOrTag === 'string' && isFormatMode(modeOrTag)
+    const tagParsed = typeof modeOrTag === 'string' && isNumericFormatMode(modeOrTag)
       ? tagParsedFromFormatMode(modeOrTag)
       : (typeof modeOrTag === 'object' && modeOrTag != null && modeOrTag.kind
         ? modeOrTag
@@ -656,7 +725,15 @@
   const api = {
     BUILTIN_FORMAT_TAG_FUNCS,
     FORMAT_TAG_NAMES,
+    MAX_FORMAT_WIDTH,
     isFormatMode,
+    isBuiltinNumericFormatMode,
+    isNumericFormatMode,
+    isSignedWidthMode,
+    signedWidthFromMode,
+    qModeSpec,
+    resolveFormatSpec,
+    parseBuiltinFormatTag,
     assertFormatWidth,
     addAtWidth,
     subtractAtWidth,

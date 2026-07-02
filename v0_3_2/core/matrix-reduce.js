@@ -239,7 +239,7 @@
       requireValuesWidth(vals, W, fnName);
       const padded = vals.map((v) => String(v).padStart(W, '0'));
       let best;
-      if (typeof signedOrMode === 'string' && NF && NF.isFormatMode(signedOrMode)) {
+      if (typeof signedOrMode === 'string' && NF && NF.isBuiltinNumericFormatMode(signedOrMode)) {
         best = NF.pickMinMax(padded, pickMin, signedOrMode);
       } else if (signedOrMode && pickMinMaxSigned) {
         best = pickMinMaxSigned(padded, pickMin);
@@ -404,7 +404,7 @@
       let out;
       if (op === 'LSHIFT') {
         out = shiftFns.lshift(dataVal, n, fill);
-      } else if (NF && typeof signedOrMode === 'string' && NF.isFormatMode(signedOrMode)) {
+      } else if (NF && typeof signedOrMode === 'string' && NF.isBuiltinNumericFormatMode(signedOrMode)) {
         NF.rejectsFloatRshift(signedOrMode, fnName);
         out = shiftFns.arithmeticRshift(dataVal, n);
       } else if (NF && NF.usesArithmeticRshift(signedOrMode) && shiftFns.arithmeticRshift) {

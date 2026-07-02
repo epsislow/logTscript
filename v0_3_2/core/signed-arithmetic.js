@@ -241,6 +241,38 @@
         }
         signed = true;
         numericMode = 'signed';
+      } else if (/^s(\d+)$/.test(t.name)) {
+        if (!acceptsSigned && !acceptsFormat) {
+          fail(`${fnName}: does not accept tag '${t.name}'`);
+        }
+        if (t.value !== 1) {
+          fail(`${fnName}: tag '${t.name}' must be enabled (use '; ${t.name}' or '; ${t.name}=1')`);
+        }
+        const w = parseInt(t.name.slice(1), 10);
+        if (w < 1 || w > 64) {
+          fail(`${fnName}: tag '${t.name}' requires signed width 1..64`);
+        }
+        if (numericMode !== 'unsigned') {
+          fail(`${fnName}: '; ${t.name}' is mutually exclusive with '; ${numericMode === 'signed' ? 'signed' : numericMode}'`);
+        }
+        signed = true;
+        numericMode = t.name;
+      } else if (/^q(\d+)p(\d+)$/.test(t.name)) {
+        if (!acceptsFormat) {
+          fail(`${fnName}: does not accept tag '${t.name}'`);
+        }
+        if (t.value !== 1) {
+          fail(`${fnName}: tag '${t.name}' must be enabled (use '; ${t.name}' or '; ${t.name}=1')`);
+        }
+        try {
+          NF.parseBuiltinFormatTag(t.name);
+        } catch (e) {
+          fail(e.message);
+        }
+        if (numericMode !== 'unsigned') {
+          fail(`${fnName}: '; ${t.name}' is mutually exclusive with '; ${numericMode === 'signed' ? 'signed' : numericMode}'`);
+        }
+        numericMode = t.name;
       } else if (NF && NF.FORMAT_TAG_NAMES.has(t.name)) {
         if (!acceptsFormat) {
           fail(`${fnName}: does not accept tag '${t.name}'`);

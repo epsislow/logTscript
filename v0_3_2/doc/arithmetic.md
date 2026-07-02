@@ -54,6 +54,26 @@ Bit width `N` = `max(len(a), len(b))` for binary ops; short inputs are zero-padd
 
 Optional tags after `;` in the call: **`signed`**, **`q4p4`**, **`q8p8`**, **`fp16`**, **`bf16`** (mutually exclusive numeric formats), plus **`vector`**, **`matrix`** (not together). See [builtin-tagged-index.md](builtin-tagged-index.md).
 
+### Parametric format tags (`sX`, `qXpY`) {#parametric-formats}
+
+Beyond the fixed aliases above, built-ins accept **parametric** tags (mutually exclusive with each other and with `signed`):
+
+| Pattern | Meaning | Operand width |
+|---------|---------|---------------|
+| **`sX`** | Signed two's complement, exactly **X** bits (1≤X≤64) | wire = **X** bit |
+| **`qXpY`** | Signed fixed-point **Q{X}.{Y}** (X+Y≤64) | wire = **(X+Y)** bit |
+
+Examples: `ADD(a, b; q6p2)` on **8wire**, `ADD(x, y; s32)` on **32wire**, `q0p8` for fractional values in (−1…+1), `q8p0` for integers (same bits as `s8`, distinct display suffix). **`fp16`** / **`bf16`** remain fixed at 16 bits only — no `fpX`/`bfX`.
+
+```logts-play
+8wire a = \1.5;q6p2
+8wire b = \0.5;q6p2
+8wire s, 1wire ovf = ADD(a, b; q6p2)
+show(s; q6p2)
+```
+
+`MULTIPLY` / `MAC` / `DOT` / `SUM` with `qXpY`: overflow wire **`over`** is **2×W** bits (W = X+Y), same as `q4p4`.
+
 | Built-in | `; q4p4` (8-bit) | `; q8p8` / `; fp16` / `; bf16` (16-bit) |
 |----------|------------------|----------------------------------------|
 | ADD / SUBTRACT | fixed-point + overflow flag | fixed / float + flag |

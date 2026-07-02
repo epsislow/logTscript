@@ -4491,9 +4491,18 @@ const idx = parseInt(
     }
   }
 
-  const reductionMode = NF && NF.isFormatMode(numericMode) ? numericMode : signedMode;
+  const reductionMode = NF && NF.isBuiltinNumericFormatMode(numericMode) ? numericMode : signedMode;
 
-  if (name === 'ABS' && !signedMode && !(NF && NF.isFormatMode(numericMode))) {
+  const assertSignedFixedWidth = (depth, opName) => {
+    if (NF && NF.isSignedWidthMode(numericMode)) {
+      const fw = NF.signedWidthFromMode(numericMode);
+      if (depth !== fw) {
+        fail(`${opName}: ; ${numericMode} requires ${fw}-bit operands, got ${depth}`);
+      }
+    }
+  };
+
+  if (name === 'ABS' && !signedMode && !(NF && NF.isBuiltinNumericFormatMode(numericMode))) {
     fail('ABS requires ; signed or a format tag');
   }
 
@@ -5566,10 +5575,11 @@ if (this.isBuiltinDEMUX(name)) {
     if (name === 'LSHIFT') {
       // Append n fill bits on the right → data.length + n bits
       v = data + fill.repeat(n);
-    } else if (NF && NF.isFormatMode(numericMode)) {
+    } else if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
       NF.rejectsFloatRshift(numericMode, name);
       v = SA.arithmeticRshift(data, n);
-    } else if (signedMode && SA) {
+    } else if ((signedMode || (NF && NF.isSignedWidthMode(numericMode))) && SA) {
+      assertSignedFixedWidth(len, name);
       v = SA.arithmeticRshift(data, n);
     } else {
       // RSHIFT: same width, shift right (MSBs filled with fill, LSBs discarded)
@@ -5771,13 +5781,14 @@ if (this.isBuiltinDEMUX(name)) {
   if (name === 'ABS') {
     if (argValues.length !== 1) fail('ABS expects 1 argument');
     if (vectorMode || matrixMode) fail('ABS: does not accept tag \'vector\' or \'matrix\'');
-    if (!signedMode && !(NF && NF.isFormatMode(numericMode))) {
+    if (!signedMode && !(NF && NF.isBuiltinNumericFormatMode(numericMode))) {
       fail('ABS requires ; signed or a format tag');
     }
     this._zstateRequireBinary(argValues, 'ABS', ['x']);
     const x = argValues[0];
     const depth = x.length;
-    if (NF && NF.isFormatMode(numericMode)) {
+    assertSignedFixedWidth(depth, 'ABS');
+    if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
       const { result, overflow } = NF.absAtWidth(x, depth, numericMode);
       return [
         computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
@@ -5799,7 +5810,8 @@ if (this.isBuiltinDEMUX(name)) {
     const getWire = (n) => this.wires.get(n);
     const evalFns = this._vectorTaggedEvalFns();
     const applyAdd = (a, b, W) => {
-      if (NF && NF.isFormatMode(numericMode)) {
+      assertSignedFixedWidth(W, 'ADD');
+      if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
         return NF.addAtWidth(a, b, W, numericMode);
       }
       if (SA) return SA.addAtWidth(a, b, W, signedMode);
@@ -5835,8 +5847,9 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'ADD', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
-    if (SA || (NF && NF.isFormatMode(numericMode))) {
-      const addFn = NF && NF.isFormatMode(numericMode)
+    assertSignedFixedWidth(depth, 'ADD');
+    if (SA || (NF && NF.isBuiltinNumericFormatMode(numericMode))) {
+      const addFn = NF && NF.isBuiltinNumericFormatMode(numericMode)
         ? (a, b, d) => NF.addAtWidth(a, b, d, numericMode)
         : (a, b, d) => SA.addAtWidth(a, b, d, signedMode);
       const { result, flag } = addFn(a, b, depth);
@@ -5865,7 +5878,8 @@ if (this.isBuiltinDEMUX(name)) {
     const getWire = (n) => this.wires.get(n);
     const evalFns = this._vectorTaggedEvalFns();
     const applySub = (a, b, W) => {
-      if (NF && NF.isFormatMode(numericMode)) {
+      assertSignedFixedWidth(W, 'SUBTRACT');
+      if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
         return NF.subtractAtWidth(a, b, W, numericMode);
       }
       if (SA) return SA.subtractAtWidth(a, b, W, signedMode);
@@ -5899,8 +5913,9 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'SUBTRACT', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
-    if (SA || (NF && NF.isFormatMode(numericMode))) {
-      const subFn = NF && NF.isFormatMode(numericMode)
+    assertSignedFixedWidth(depth, 'SUBTRACT');
+    if (SA || (NF && NF.isBuiltinNumericFormatMode(numericMode))) {
+      const subFn = NF && NF.isBuiltinNumericFormatMode(numericMode)
         ? (a, b, d) => NF.subtractAtWidth(a, b, d, numericMode)
         : (a, b, d) => SA.subtractAtWidth(a, b, d, signedMode);
       const { result, flag } = subFn(a, b, depth);
@@ -5931,7 +5946,10 @@ if (this.isBuiltinDEMUX(name)) {
     const getWire = (n) => this.wires.get(n);
     const evalFns = this._vectorTaggedEvalFns();
     const multiplyFn = (a, b, W, modeOrSigned) => {
-      if (NF && typeof modeOrSigned === 'string' && NF.isFormatMode(modeOrSigned)) {
+      if (NF && NF.isSignedWidthMode(numericMode)) {
+        assertSignedFixedWidth(W, 'MULTIPLY');
+      }
+      if (NF && typeof modeOrSigned === 'string' && NF.isBuiltinNumericFormatMode(modeOrSigned)) {
         return NF.multiplyAtWidth(a, b, W, modeOrSigned);
       }
       if (SA) return SA.multiplyAtWidth(a, b, W, !!modeOrSigned);
@@ -5964,7 +5982,8 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(argValues, 'MULTIPLY', ['a', 'b']);
     const a = argValues[0], b = argValues[1];
     const depth = Math.max(a.length, b.length);
-    if (NF && NF.isFormatMode(numericMode)) {
+    assertSignedFixedWidth(depth, 'MULTIPLY');
+    if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
       const { result, over } = NF.multiplyAtWidth(a, b, depth, numericMode);
       return [
         computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
@@ -5995,7 +6014,10 @@ if (this.isBuiltinDEMUX(name)) {
     if (argValues.length !== 2) fail('DIVIDE expects 2 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
     const divideFn = (a, b, W, modeOrSigned) => {
-      if (NF && typeof modeOrSigned === 'string' && NF.isFormatMode(modeOrSigned)) {
+      if (NF && NF.isSignedWidthMode(numericMode)) {
+        assertSignedFixedWidth(W, 'DIVIDE');
+      }
+      if (NF && typeof modeOrSigned === 'string' && NF.isBuiltinNumericFormatMode(modeOrSigned)) {
         return NF.divideAtWidth(a, b, W, modeOrSigned);
       }
       if (SA) return SA.divideAtWidth(a, b, W, !!modeOrSigned);
@@ -6050,9 +6072,10 @@ if (this.isBuiltinDEMUX(name)) {
     const a = argValues[0];
     const b = argValues[1];
     const depth = Math.max(a.length, b.length);
+    assertSignedFixedWidth(depth, 'DIVIDE');
     let div;
     try {
-      if (NF && NF.isFormatMode(numericMode)) {
+      if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
         div = NF.divideAtWidth(a, b, depth, numericMode);
       } else {
         div = divideFn(a, b, depth, signedMode);
@@ -6072,7 +6095,11 @@ if (this.isBuiltinDEMUX(name)) {
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
     const MR = typeof LogTScriptMatrixReduce !== 'undefined' ? LogTScriptMatrixReduce : null;
     const macFn = (acc, a, b, modeOrSigned) => {
-      if (NF && typeof modeOrSigned === 'string' && NF.isFormatMode(modeOrSigned)) {
+      const W = acc.length;
+      if (NF && NF.isSignedWidthMode(numericMode)) {
+        assertSignedFixedWidth(W, 'MAC');
+      }
+      if (NF && typeof modeOrSigned === 'string' && NF.isBuiltinNumericFormatMode(modeOrSigned)) {
         return NF.macAtWidth(acc, a, b, modeOrSigned);
       }
       if (SA) return SA.macAtWidth(acc, a, b, !!modeOrSigned);
@@ -6106,9 +6133,11 @@ if (this.isBuiltinDEMUX(name)) {
       return this._returnBuiltinVectorPair(macVec.resultBlob, macVec.overBlob, computeRefs);
     }
     this._zstateRequireBinary(argValues, 'MAC', ['acc', 'a', 'b']);
+    const macDepth = Math.max(argValues[0].length, argValues[1].length, argValues[2].length);
+    assertSignedFixedWidth(macDepth, 'MAC');
     let mac;
     try {
-      if (NF && NF.isFormatMode(numericMode)) {
+      if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
         mac = NF.macAtWidth(argValues[0], argValues[1], argValues[2], numericMode);
       } else if (SA && signedMode) {
         mac = SA.macAtWidth(argValues[0], argValues[1], argValues[2], true);
@@ -6235,7 +6264,8 @@ if (this.isBuiltinDEMUX(name)) {
         : { value: blob, ref: null };
     }
     this._zstateRequireBinary(argValues, 'GT', ['a', 'b']);
-    const cmp = NF && NF.isFormatMode(numericMode)
+    assertSignedFixedWidth(Math.max(argValues[0].length, argValues[1].length), 'GT');
+    const cmp = NF && NF.isBuiltinNumericFormatMode(numericMode)
       ? NF.compareValues(argValues[0], argValues[1], numericMode)
       : (signedMode && SA
         ? SA.signedCompareBigInt(argValues[0], argValues[1])
@@ -6289,7 +6319,8 @@ if (this.isBuiltinDEMUX(name)) {
         : { value: blob, ref: null };
     }
     this._zstateRequireBinary(argValues, 'LT', ['a', 'b']);
-    const cmp = NF && NF.isFormatMode(numericMode)
+    assertSignedFixedWidth(Math.max(argValues[0].length, argValues[1].length), 'LT');
+    const cmp = NF && NF.isBuiltinNumericFormatMode(numericMode)
       ? NF.compareValues(argValues[0], argValues[1], numericMode)
       : (signedMode && SA
         ? SA.signedCompareBigInt(argValues[0], argValues[1])
@@ -6357,7 +6388,7 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(expanded, 'MIN', expanded.map((_, i) => `arg${i}`));
     let v;
     try {
-      if (NF && NF.isFormatMode(numericMode)) {
+      if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
         v = NF.pickMinMax(expanded, true, numericMode);
       } else if (signedMode && SA) {
         v = SA.pickMinMaxSigned(expanded, true);
@@ -6429,7 +6460,7 @@ if (this.isBuiltinDEMUX(name)) {
     this._zstateRequireBinary(expanded, 'MAX', expanded.map((_, i) => `arg${i}`));
     let v;
     try {
-      if (NF && NF.isFormatMode(numericMode)) {
+      if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
         v = NF.pickMinMax(expanded, false, numericMode);
       } else if (signedMode && SA) {
         v = SA.pickMinMaxSigned(expanded, false);
@@ -6448,7 +6479,9 @@ if (this.isBuiltinDEMUX(name)) {
     if (argValues.length !== 3) fail('CLAMP expects 3 arguments');
     const VR = typeof LogTScriptVectorReduce !== 'undefined' ? LogTScriptVectorReduce : null;
     const clampAtWidthFn = (x, lo, hi) => {
-      if (NF && NF.isFormatMode(numericMode)) {
+      const W = lo.length;
+      assertSignedFixedWidth(W, 'CLAMP');
+      if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
         return NF.clampAtWidth(x, lo, hi, numericMode);
       }
       if (signedMode && SA) return SA.clampSigned(x, lo, hi);
@@ -6485,9 +6518,10 @@ if (this.isBuiltinDEMUX(name)) {
         : { value: blob, ref: null };
     }
     this._zstateRequireBinary(argValues, 'CLAMP', ['x', 'min', 'max']);
+    assertSignedFixedWidth(Math.max(argValues[0].length, argValues[1].length, argValues[2].length), 'CLAMP');
     let v;
     try {
-      if (NF && NF.isFormatMode(numericMode)) {
+      if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
         v = NF.clampAtWidth(argValues[0], argValues[1], argValues[2], numericMode);
       } else {
         v = signedMode && SA

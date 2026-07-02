@@ -362,8 +362,10 @@
     const hasBin = tags.includes('bin');
     const hasAscii = tags.includes('ascii');
     let numericFormat = null;
-    for (const t of ['q4p4', 'q8p8', 'bf16', 'fp16']) {
-      if (tags.includes(t)) numericFormat = t;
+    for (const t of tags) {
+      if (['q4p4', 'q8p8', 'bf16', 'fp16'].includes(t)) numericFormat = t;
+      else if (/^q\d+p\d+$/.test(t)) numericFormat = t;
+      else if (/^s\d+$/.test(t)) numericFormat = t;
     }
 
     if (hasSigned && !hasDec && !hasHex && !hasAscii && !numericFormat) {
@@ -439,6 +441,9 @@
         return NF.formatGroupedShow(binStr, opts.numericFormat, { elementWidth: formatW });
       }
       if (formatW != null && elW > formatW) {
+        if (bitWidth % formatW === 0) {
+          return NF.formatGroupedShow(binStr, opts.numericFormat, { elementWidth: formatW });
+        }
         return formatHexTagDisplay(binStr, bitWidth, opts.hexWide);
       }
       if (formatW != null && elW < formatW) {
