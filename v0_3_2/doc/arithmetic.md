@@ -68,17 +68,61 @@ Examples: `ADD(a, b; q6p2)` on **8wire**, `ADD(x, y; s32)` on **32wire**, `q0p8`
 ```logts-play
 8wire a = \1.5;q6p2
 8wire b = \0.5;q6p2
-8wire s, 1wire ovf = ADD(a, b; q6p2)
+8wire s, 4wire st = ADD(a, b; q6p2)
 show(s; q6p2)
+show(st)
 ```
 
-`MULTIPLY` / `MAC` / `DOT` / `SUM` with `qXpY`: overflow wire **`over`** is **2×W** bits (W = X+Y), same as `q4p4`.
+`MULTIPLY` / `MAC` / `DOT` / `SUM` with `qXpY`: overflow wire **`over`** is **2×W** bits (W = X+Y), plus **`4bit status`**.
+
+### Status register (`4bit`) {#status-4bit}
+
+Built-in-uri cu tag de format (`q4p4`, `q8p8`, `qXpY`, `sX`, `fp16`, `bf16`) returnează **`4bit status`** în loc de `1bit` overflow/inexact. Tag-ul bare **`signed`** (adaptiv) păstrează **`1bit overflow`**.
+
+Layout MSB-first (bit0 = cel mai din stânga, ca `bitRange`):
+
+| Bit | Semnificație |
+|-----|--------------|
+| bit0 | overflow |
+| bit1 | underflow |
+| bit2 | inexact |
+| bit3 | nan |
+
+Exemplu: `1000` = doar overflow. Fixed-point: bit0 + bit2 (rotunjire); float: toți cei 4 biți relevanți.
+
+| Returnuri | Built-in |
+|-----------|----------|
+| `result`, `4bit status` | ADD, SUBTRACT, ABS |
+| `result`, `over`, `4bit status` | MULTIPLY, MAC, DOT, SUM |
+| `result`, `mod`, `4bit status` | DIVIDE |
+
+### `NFORMAT` — scalar conversion
+
+```
+NFORMAT(a ; <src> to_<dst>) -> result, 4bit status
+```
+
+| Tag pair | Result width |
+|----------|--------------|
+| `; signed to_q4p4` | 8 |
+| `; signed to_q8p8` / `to_fp16` / `to_bf16` | 16 |
+| `; q4p4 to_signed` | 8 (operand width) |
+| `; q4p4 to_q8p8` / `to_fp16` / `to_bf16` | 16 |
+| `; q8p8` / `fp16` / `bf16` ↔ other formats | per destination tag |
+
+`src` and `dst` must differ. Scalar only — no `; vector` / `; matrix`. See [builtin-NFORMAT.md](builtin-NFORMAT.md).
+
+```logts-play
+8wire a = \7;q4p4
+16wire r, 4wire st = NFORMAT(a; q4p4 to_fp16)
+show(st)
+```
 
 | Built-in | `; q4p4` (8-bit) | `; q8p8` / `; fp16` / `; bf16` (16-bit) |
 |----------|------------------|----------------------------------------|
-| ADD / SUBTRACT | fixed-point + overflow flag | fixed / float + flag |
-| MULTIPLY / DIVIDE / MAC | fixed ops + over/mod | fixed / float ops |
-| SUM | fixed sum + over | fixed / float sum + over |
+| ADD / SUBTRACT | fixed-point + **4bit status** | fixed / float + **4bit status** |
+| MULTIPLY / DIVIDE / MAC | fixed ops + over/mod + **status** | fixed / float ops + **status** |
+| SUM | fixed sum + over + **status** | fixed / float sum + over + **status** |
 | MIN / MAX | fixed compare | fixed / float compare |
 | GT / LT | fixed compare → `1bit` | fixed / float compare |
 | CLAMP | fixed bounds | fixed / float bounds |

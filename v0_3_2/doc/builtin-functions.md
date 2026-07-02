@@ -18,7 +18,7 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 | **Logic gates** | `NOT`, `AND`, `OR`, `XOR`, `NXOR`, `NAND`, `NOR`, `EQ` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) · `EQ` tags: [builtin-EQ.md](builtin-EQ.md) |
 | **Sequential** | `LATCH`, `REG` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · `REG` → [reg.md](reg.md) |
 | **Routing** | `MUX`, `DEMUX` | [builtin-routing-functions.md](builtin-routing-functions.md) |
-| **Arithmetic** | `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `MAC`, `ABS`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP` | [arithmetic.md](arithmetic.md) · tags `; vector` / **`; matrix`**: [builtin-tagged-index.md](builtin-tagged-index.md) |
+| **Arithmetic** | `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `MAC`, `ABS`, `NFORMAT`, `GT`, `LT`, `MIN`, `MAX`, `CLAMP` | [arithmetic.md](arithmetic.md) · tags `; vector` / **`; matrix`**: [builtin-tagged-index.md](builtin-tagged-index.md) |
 | **Vector reduction** | `SUM`, `DOT`, `ARGMAX`, `ARGMIN` | [vector-reduction.md](vector-reduction.md) · **`; matrix`** (element-wise 2D): [matrix-reduction.md](matrix-reduction.md) |
 | **Tensor / matrix** | `SHAPE`, `RANK`, `PIVOT`, `REPEAT`, `IDENTITY`, `ZEROS`, `FILL`, `DIAG`, `IOTA`, `OUTER`, `TRACE`, `NORM`, `L2`, `TRIL`, `TRIU`, `FLIPUD`, `FLIPLR`, `MCAT`, `MSLICE` | [wire-vectors.md](wire-vectors.md) · [builtin-SHAPE.md](builtin-SHAPE.md) · [builtin-RANK.md](builtin-RANK.md) · [builtin-REPEAT.md](builtin-REPEAT.md) |
 | **Number conversion** | `CNTN10S`, `N2N10S`, `N10S2N`, `CNTN16S`, `N2N16S`, `N16S2N`, `ISDIGIT` | [number-conversion.md](number-conversion.md) |

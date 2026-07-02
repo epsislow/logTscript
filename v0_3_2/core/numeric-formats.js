@@ -12,12 +12,191 @@
 
   const FORMAT_TAG_NAMES = new Set(['q4p4', 'q8p8', 'bf16', 'fp16']);
 
+  const NFORMAT_MODES = new Set(['signed', 'q4p4', 'q8p8', 'fp16', 'bf16']);
+  const NFORMAT_DST_PREFIX = 'to_';
+
+  function parseNformatDstTag(tagName) {
+    const m = new RegExp('^' + NFORMAT_DST_PREFIX + '(signed|q4p4|q8p8|fp16|bf16)$').exec(String(tagName));
+    return m ? m[1] : null;
+  }
+
+  function parseNformatCallTags(callTags, fail) {
+    let src = null;
+    let dst = null;
+    if (!callTags || !callTags.length) {
+      fail('NFORMAT: requires format tags (e.g. ; q4p4 to_fp16)');
+    }
+    for (const t of callTags) {
+      if (t.value !== 1) {
+        fail(`NFORMAT: tag '${t.name}' must be enabled (use '; ${t.name}' or '; ${t.name}=1')`);
+      }
+      const parsedDst = parseNformatDstTag(t.name);
+      if (parsedDst) {
+        if (dst) fail('NFORMAT: duplicate destination format tag');
+        dst = parsedDst;
+      } else if (NFORMAT_MODES.has(t.name)) {
+        if (src) fail('NFORMAT: duplicate source format tag');
+        src = t.name;
+      } else {
+        fail(`NFORMAT: unknown tag '${t.name}'`);
+      }
+    }
+    if (!src) {
+      fail('NFORMAT: requires source format tag (signed, q4p4, q8p8, fp16, bf16)');
+    }
+    if (!dst) {
+      fail('NFORMAT: requires destination tag (to_signed, to_q4p4, to_q8p8, to_fp16, to_bf16)');
+    }
+    if (src === dst) {
+      fail(`NFORMAT: source and destination format '${src}' are the same`);
+    }
+    return { src, dst };
+  }
+
+  function assertNformatSrcWidth(srcMode, width) {
+    if (srcMode === 'signed') return;
+    const w = getFormatModeWidth(srcMode);
+    if (width !== w) {
+      throw new Error(`NFORMAT: ; ${srcMode} requires ${w}-bit operand, got ${width}`);
+    }
+  }
+
+  function decodeNformatValue(bits, width, srcMode) {
+    const padded = String(bits).padStart(width, '0');
+    if (srcMode === 'signed') {
+      return Number(signedBinToBigInt(padded));
+    }
+    if (qModeSpec(srcMode)) {
+      return fixedRawToNumber(padded, srcMode);
+    }
+    return decodeToFloat(padded, srcMode, width);
+  }
+
+  function encodeNformatValue(value, dstMode, resultWidth) {
+    if (Number.isNaN(value)) {
+      if (dstMode === 'fp16' || dstMode === 'bf16') {
+        return encodeFromFloat(NaN, dstMode);
+      }
+      return '0'.repeat(resultWidth);
+    }
+    if (dstMode === 'signed') {
+      return signedBigIntToBin(BigInt(Math.round(value)), resultWidth);
+    }
+    if (qModeSpec(dstMode)) {
+      return fixedNumberToRaw(value, dstMode);
+    }
+    return encodeFromFloat(value, dstMode);
+  }
+
+  function signedConvertStatus(realValue, rawResult, width) {
+    const decoded = Number(signedBinToBigInt(rawResult));
+    const min = Number(-(BigInt(1) << BigInt(width - 1)));
+    const max = Number((BigInt(1) << BigInt(width - 1)) - BigInt(1));
+    const rounded = Math.round(realValue);
+    const overflow = rounded < min || rounded > max;
+    const inexact = !overflow && realValue !== decoded;
+    return buildStatus({ overflow, inexact });
+  }
+
+  function floatConvertStatus(realValue, rawResult, dstMode) {
+    const resultFin = decodeToFloat(rawResult, dstMode, 16);
+    const nan = Number.isNaN(realValue) || Number.isNaN(resultFin);
+    const overflow = !nan && Number.isFinite(realValue)
+      && (resultFin === Infinity || resultFin === -Infinity);
+    let inexact = false;
+    if (!nan && Number.isFinite(resultFin)) {
+      const roundtrip = decodeToFloat(encodeFromFloat(resultFin, dstMode), dstMode, 16);
+      inexact = realValue !== roundtrip;
+    }
+    const underflow = !nan && !overflow && resultFin === 0
+      && Number.isFinite(realValue) && realValue !== 0;
+    return buildStatus({ overflow, underflow, inexact, nan });
+  }
+
+  function convertFormatStatus(srcMode, dstMode, realValue, rawResult, resultWidth) {
+    if (srcMode === 'fp16' || srcMode === 'bf16') {
+      if (Number.isNaN(realValue)) {
+        return buildStatus({ nan: true });
+      }
+    }
+    if (qModeSpec(dstMode)) {
+      return fixedStatusForMath(dstMode, realValue, rawResult);
+    }
+    if (dstMode === 'signed') {
+      return signedConvertStatus(realValue, rawResult, resultWidth);
+    }
+    if (dstMode === 'fp16' || dstMode === 'bf16') {
+      return floatConvertStatus(realValue, rawResult, dstMode);
+    }
+    return buildStatus({});
+  }
+
+  function convertFormat(bits, width, srcMode, dstMode) {
+    if (srcMode === dstMode) {
+      throw new Error(`NFORMAT: source and destination format '${srcMode}' are the same`);
+    }
+    assertNformatSrcWidth(srcMode, width);
+    const resultWidth = dstMode === 'signed' ? width : getFormatModeWidth(dstMode);
+    const realValue = decodeNformatValue(bits, width, srcMode);
+    if ((srcMode === 'fp16' || srcMode === 'bf16') && Number.isNaN(realValue)) {
+      const result = encodeNformatValue(NaN, dstMode, resultWidth);
+      return { result, status: buildStatus({ nan: true }) };
+    }
+    const result = encodeNformatValue(realValue, dstMode, resultWidth);
+    const status = convertFormatStatus(srcMode, dstMode, realValue, result, resultWidth);
+    return { result, status };
+  }
+
   const FIXED_SPECS = {
     q4p4: { width: 8, fracBits: 4 },
     q8p8: { width: 16, fracBits: 8 },
   };
 
   const MAX_FORMAT_WIDTH = 64;
+  const STATUS_WIDTH = 4;
+
+  function buildStatus(opts) {
+    const o = opts || {};
+    return (o.overflow ? '1' : '0')
+      + (o.underflow ? '1' : '0')
+      + (o.inexact ? '1' : '0')
+      + (o.nan ? '1' : '0');
+  }
+
+  function statusFromOverflowFlag(flag) {
+    return buildStatus({ overflow: flag === '1' });
+  }
+
+  function usesFormatStatus(mode) {
+    return isBuiltinNumericFormatMode(mode) || isSignedWidthMode(mode);
+  }
+
+  function fixedStatusForMath(mode, mathValue, rawResult) {
+    const { min, max } = fixedMinMax(mode);
+    const overflow = mathValue < min || mathValue > max;
+    let inexact = false;
+    if (!overflow && rawResult != null) {
+      const decoded = fixedRawToNumber(rawResult, mode);
+      inexact = decoded !== mathValue;
+    }
+    return buildStatus({ overflow, inexact });
+  }
+
+  function floatStatus(aFin, bFin, resultFin, mode) {
+    const nan = Number.isNaN(resultFin) || Number.isNaN(aFin) || Number.isNaN(bFin);
+    const overflow = !nan
+      && Number.isFinite(aFin) && Number.isFinite(bFin)
+      && (resultFin === Infinity || resultFin === -Infinity);
+    let inexact = false;
+    if (!nan && Number.isFinite(resultFin)) {
+      const roundtrip = decodeToFloat(encodeFromFloat(resultFin, mode), mode, 16);
+      inexact = resultFin !== roundtrip;
+    }
+    const underflow = !nan && !overflow && resultFin === 0
+      && Number.isFinite(aFin) && Number.isFinite(bFin)
+      && aFin !== 0 && bFin !== 0;
+    return buildStatus({ overflow, underflow, inexact, nan });
+  }
 
   function isFormatMode(mode) {
     return FORMAT_TAG_NAMES.has(mode);
@@ -159,8 +338,8 @@
     const spec = qModeSpec(mode);
     if (!spec) throw new Error(`Unknown fixed format: ${mode}`);
     const scale = Number(BigInt(1) << BigInt(spec.fracBits));
-    const maxInt = (1 << (spec.width - 1)) - 1;
-    const minInt = -(1 << (spec.width - 1));
+    const maxInt = Number((BigInt(1) << BigInt(spec.width - 1)) - BigInt(1));
+    const minInt = Number(-(BigInt(1) << BigInt(spec.width - 1)));
     return { min: minInt / scale, max: maxInt / scale };
   }
 
@@ -264,14 +443,14 @@
       const bNum = BigInt('0b' + bp);
       const mask = (BigInt(1) << BigInt(width)) - BigInt(1);
       const result = ((aNum + bNum) & mask).toString(2).padStart(width, '0');
-      return { result, flag: fixedOverflowFlag(mode, vs) };
+      return { result, status: fixedStatusForMath(mode, vs, result) };
     }
     const af = decodeToFloat(a, mode, width);
     const bf = decodeToFloat(b, mode, width);
     let sum = af + bf;
     if (Number.isNaN(af) || Number.isNaN(bf)) sum = NaN;
     const result = encodeFromFloat(sum, mode);
-    return { result, flag: floatFlag(af, bf, sum) };
+    return { result, status: floatStatus(af, bf, sum, mode) };
   }
 
   function subtractAtWidth(a, b, width, mode) {
@@ -289,14 +468,14 @@
       let diff = aNum - bNum;
       if (diff < 0n) diff += wrap;
       const result = (diff & mask).toString(2).padStart(width, '0');
-      return { result, flag: fixedOverflowFlag(mode, vs) };
+      return { result, status: fixedStatusForMath(mode, vs, result) };
     }
     const af = decodeToFloat(a, mode, width);
     const bf = decodeToFloat(b, mode, width);
     let diff = af - bf;
     if (Number.isNaN(af) || Number.isNaN(bf)) diff = NaN;
     const result = encodeFromFloat(diff, mode);
-    return { result, flag: floatFlag(af, bf, diff) };
+    return { result, status: floatStatus(af, bf, diff, mode) };
   }
 
   function sumExpanded(values, X, mode) {
@@ -312,24 +491,30 @@
       const maskX = (BigInt(1) << BigInt(X)) - BigInt(1);
       const result = (accRaw & maskX).toString(2).padStart(X, '0');
       const over = ((accRaw >> BigInt(X)) & maskX).toString(2).padStart(X, '0');
-      const flag = fixedOverflowFlag(mode, acc);
-      return { result, over: flag === '1' ? over : '0'.repeat(X) };
+      const status = fixedStatusForMath(mode, acc, result);
+      const overflow = status[0] === '1';
+      return { result, over: overflow ? over : '0'.repeat(X), status };
     }
     let acc = 0;
-    let flag = '0';
-    for (const v of values) {
-      const f = decodeToFloat(v, mode, X);
+    let hadException = false;
+    let aFin = 0;
+    let bFin = 0;
+    for (let i = 0; i < values.length; i++) {
+      const f = decodeToFloat(values[i], mode, X);
+      if (i === 0) aFin = f;
+      else if (i === 1) bFin = f;
       const prev = acc;
       acc = f + acc;
       if (Number.isNaN(f)) acc = NaN;
       if (!Number.isFinite(acc) || (Number.isFinite(prev) && Number.isFinite(f) && !Number.isFinite(acc))) {
-        flag = '1';
+        hadException = true;
       }
       acc = decodeToFloat(encodeFromFloat(acc, mode), mode, X);
     }
     const result = encodeFromFloat(acc, mode);
-    const over = flag === '1' ? result : '0'.repeat(X);
-    return { result, over };
+    const over = hadException ? result : '0'.repeat(X);
+    const status = floatStatus(aFin, bFin, acc, mode);
+    return { result, over, status };
   }
 
   function compareValues(a, b, mode) {
@@ -375,18 +560,18 @@
       const result = signedBigIntToBin(scaled & mask, width);
       const over = ((scaled >> BigInt(width)) & mask).toString(2).padStart(width, '0');
       const vp = fixedRawToNumber(ap, mode) * fixedRawToNumber(bp, mode);
-      if (fixedOverflowFlag(mode, vp) === '1') {
-        return { result, over };
-      }
-      return { result, over };
+      const decoded = fixedRawToNumber(result, mode);
+      const status = fixedStatusForMath(mode, vp, result);
+      return { result, over, status };
     }
     const af = decodeToFloat(a, mode, width);
     const bf = decodeToFloat(b, mode, width);
     let prod = af * bf;
     if (Number.isNaN(af) || Number.isNaN(bf)) prod = NaN;
     const result = encodeFromFloat(prod, mode);
-    const flag = floatFlag(af, bf, prod);
-    return { result, over: flag === '1' ? result : '0'.repeat(width) };
+    const status = floatStatus(af, bf, prod, mode);
+    const over = status[0] === '1' || status[3] === '1' ? result : '0'.repeat(width);
+    return { result, over, status };
   }
 
   function macAtWidth(acc, a, b, mode) {
@@ -404,19 +589,20 @@
       const maskOver = (BigInt(1) << BigInt(width + 1)) - BigInt(1);
       const result = (accRaw & maskN).toString(2).padStart(width, '0');
       const over = ((accRaw >> BigInt(width)) & maskOver).toString(2).padStart(width + 1, '0');
-      return { result, over };
+      const status = fixedStatusForMath(mode, sum, result);
+      return { result, over, status };
     }
     const af = decodeToFloat(acc, mode, width);
     const pf = decodeToFloat(a, mode, width) * decodeToFloat(b, mode, width);
     let sum = af + pf;
     if (Number.isNaN(af) || Number.isNaN(pf)) sum = NaN;
     const result = encodeFromFloat(sum, mode);
-    const flag = floatFlag(af, pf, sum);
+    const status = floatStatus(af, pf, sum, mode);
     const overW = width + 1;
-    const over = flag === '1'
+    const over = status[0] === '1' || status[3] === '1'
       ? result.padStart(overW, '0').slice(-overW)
       : '0'.repeat(overW);
-    return { result, over };
+    return { result, over, status };
   }
 
   function divideAtWidth(a, b, width, mode) {
@@ -427,27 +613,31 @@
       const va = fixedRawToNumber(ap, mode);
       const vb = fixedRawToNumber(bp, mode);
       if (vb === 0) {
-        return { result: '0'.repeat(width), mod: '0'.repeat(width) };
+        return {
+          result: '0'.repeat(width),
+          mod: '0'.repeat(width),
+          status: buildStatus({ nan: true }),
+        };
       }
       const q = va / vb;
       const r = va - q * vb;
-      return {
-        result: fixedNumberToRaw(q, mode),
-        mod: fixedNumberToRaw(r, mode),
-      };
+      const result = fixedNumberToRaw(q, mode);
+      const mod = fixedNumberToRaw(r, mode);
+      const status = fixedStatusForMath(mode, q, result);
+      return { result, mod, status };
     }
     const af = decodeToFloat(ap, mode, width);
     const bf = decodeToFloat(bp, mode, width);
     if (bf === 0 || Number.isNaN(bf)) {
       const nan = encodeFromFloat(NaN, mode);
-      return { result: nan, mod: nan };
+      return { result: nan, mod: nan, status: buildStatus({ nan: true }) };
     }
     const q = af / bf;
     const r = af % bf;
-    return {
-      result: encodeFromFloat(q, mode),
-      mod: encodeFromFloat(r, mode),
-    };
+    const result = encodeFromFloat(q, mode);
+    const mod = encodeFromFloat(r, mode);
+    const status = floatStatus(af, bf, q, mode);
+    return { result, mod, status };
   }
 
   function dotExpanded(aVals, bVals, X, mode) {
@@ -466,22 +656,27 @@
       const maskOver = (BigInt(1) << BigInt(2 * X)) - BigInt(1);
       const result = (accRaw & maskX).toString(2).padStart(X, '0');
       const over = ((accRaw >> BigInt(X)) & maskOver).toString(2).padStart(2 * X, '0');
-      return { result, over };
+      const status = fixedStatusForMath(mode, acc, result);
+      const overflow = status[0] === '1';
+      return { result, over: overflow ? over : '0'.repeat(2 * X), status };
     }
     let acc = 0;
-    let flag = '0';
+    let hadException = false;
+    let aFin = decodeToFloat(aVals[0], mode, X);
+    let bFin = decodeToFloat(bVals[0], mode, X);
     for (let i = 0; i < aVals.length; i++) {
       const af = decodeToFloat(aVals[i], mode, X);
       const bf = decodeToFloat(bVals[i], mode, X);
       const term = af * bf;
       const prev = acc;
       acc = prev + (Number.isNaN(term) ? NaN : term);
-      if (!Number.isFinite(acc)) flag = '1';
+      if (!Number.isFinite(acc)) hadException = true;
       acc = decodeToFloat(encodeFromFloat(acc, mode), mode, X);
     }
     const result = encodeFromFloat(acc, mode);
-    const over = flag === '1' ? result.padStart(2 * X, '0').slice(-2 * X) : '0'.repeat(2 * X);
-    return { result, over };
+    const over = hadException ? result.padStart(2 * X, '0').slice(-2 * X) : '0'.repeat(2 * X);
+    const status = floatStatus(aFin, bFin, acc, mode);
+    return { result, over, status };
   }
 
   function clampAtWidth(x, lo, hi, mode) {
@@ -518,14 +713,16 @@
       const n = fixedRawToNumber(xp, mode);
       const { max } = fixedMinMax(mode);
       if (Math.abs(n) > max) {
-        return { result: xp, overflow: '1' };
+        return { result: xp, status: buildStatus({ overflow: true }) };
       }
       const av = n < 0 ? -n : n;
-      return { result: fixedNumberToRaw(av, mode), overflow: '0' };
+      return { result: fixedNumberToRaw(av, mode), status: buildStatus({}) };
     }
     const f = decodeToFloat(xp, mode, width);
     const a = Math.abs(f);
-    return { result: encodeFromFloat(a, mode), overflow: '0' };
+    const result = encodeFromFloat(a, mode);
+    const status = floatStatus(f, f, a, mode);
+    return { result, status };
   }
 
   function formatFixedDisplay(binStr, mode) {
@@ -726,6 +923,10 @@
     BUILTIN_FORMAT_TAG_FUNCS,
     FORMAT_TAG_NAMES,
     MAX_FORMAT_WIDTH,
+    STATUS_WIDTH,
+    buildStatus,
+    statusFromOverflowFlag,
+    usesFormatStatus,
     isFormatMode,
     isBuiltinNumericFormatMode,
     isNumericFormatMode,
@@ -760,6 +961,9 @@
     fixedRawToNumber,
     decodeToFloat,
     encodeFromFloat,
+    NFORMAT_MODES,
+    parseNformatCallTags,
+    convertFormat,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

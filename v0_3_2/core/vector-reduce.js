@@ -305,6 +305,7 @@
     const N = meta.elementCount;
     const results = [];
     const overs = [];
+    const statuses = [];
     for (let i = 0; i < N; i++) {
       const vals = elementValuesAtIndex(
         args, classified, i, evalFns.evalElement, evalFns.evalScalar
@@ -314,8 +315,11 @@
       const step = sumExpanded(padded, W, signed);
       results.push(step.result);
       overs.push(step.over);
+      if (step.status != null) statuses.push(step.status);
     }
-    return { resultBlob: results.join(''), overBlob: overs.join('') };
+    const out = { resultBlob: results.join(''), overBlob: overs.join('') };
+    if (statuses.length) out.statusBlob = statuses.join('');
+    return out;
   }
 
   function subtractUnsignedAtWidth(a, b, width) {
@@ -339,7 +343,7 @@
       requireValuesElementWidth([a, b], W, fnName);
       const step = applyAtWidth(String(a).padStart(W, '0'), String(b).padStart(W, '0'), W);
       results.push(step.result);
-      flags.push(String(step.flag).padStart(W, '0'));
+      flags.push(step.status != null ? step.status : String(step.flag).padStart(W, '0'));
     }
     return { resultBlob: results.join(''), flagBlob: flags.join('') };
   }
@@ -421,6 +425,7 @@
     const N = meta.elementCount;
     const results = [];
     const overs = [];
+    const statuses = [];
     for (let i = 0; i < N; i++) {
       const vals = elementValuesAtIndex(
         args, classified, i, evalFns.evalElement, evalFns.evalScalar
@@ -434,8 +439,11 @@
       );
       results.push(step.result);
       overs.push(step.over);
+      if (step.status != null) statuses.push(step.status);
     }
-    return { resultBlob: results.join(''), overBlob: overs.join('') };
+    const out = { resultBlob: results.join(''), overBlob: overs.join('') };
+    if (statuses.length) out.statusBlob = statuses.join('');
+    return out;
   }
 
   function macVectorTagged(args, getWire, fnName, signed, evalFns, macAtWidthFn) {
@@ -447,6 +455,7 @@
     const N = meta.elementCount;
     const results = [];
     const overs = [];
+    const statuses = [];
     for (let i = 0; i < N; i++) {
       const vals = elementValuesAtIndex(
         args, classified, i, evalFns.evalElement, evalFns.evalScalar
@@ -458,8 +467,11 @@
       const step = macAtWidthFn(acc, a, b, signed);
       results.push(step.result);
       overs.push(step.over);
+      if (step.status != null) statuses.push(step.status);
     }
-    return { resultBlob: results.join(''), overBlob: overs.join('') };
+    const out = { resultBlob: results.join(''), overBlob: overs.join('') };
+    if (statuses.length) out.statusBlob = statuses.join('');
+    return out;
   }
 
   function divideVectorTagged(args, getWire, fnName, signed, evalFns, divideAtWidthFn) {
@@ -471,6 +483,7 @@
     const N = meta.elementCount;
     const results = [];
     const mods = [];
+    const statuses = [];
     for (let i = 0; i < N; i++) {
       const vals = elementValuesAtIndex(
         args, classified, i, evalFns.evalElement, evalFns.evalScalar
@@ -484,8 +497,11 @@
       );
       results.push(step.result);
       mods.push(step.mod);
+      if (step.status != null) statuses.push(step.status);
     }
-    return { resultBlob: results.join(''), modBlob: mods.join('') };
+    const out = { resultBlob: results.join(''), modBlob: mods.join('') };
+    if (statuses.length) out.statusBlob = statuses.join('');
+    return out;
   }
 
   function requireVectorTaggedUnaryOperand(args, getWire, fnName) {

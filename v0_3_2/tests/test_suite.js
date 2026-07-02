@@ -2895,7 +2895,7 @@ reg(328, 'doc', 'BUILTIN_DOC — ADD signature', function(h, session) {
   h.assert('ADD 10 signatures', String(lines.length), '10');
   h.assert('ADD unsigned', lines[0], 'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry');
   h.assert('ADD signed', lines[1], 'ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
-  h.assert('ADD q4p4', lines[2], 'ADD(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow');
+  h.assert('ADD q4p4', lines[2], 'ADD(8bit a, 8bit b; q4p4) -> 8bit result, 4bit status');
   h.assert('ADD vector', lines[6], 'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
   h.assert('ADD matrix', lines[8], 'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
@@ -2905,7 +2905,7 @@ reg(329, 'doc', 'BUILTIN_DOC — SUBTRACT signature', function(h, session) {
   h.assert('SUBTRACT 10 signatures', String(lines.length), '10');
   h.assert('SUBTRACT unsigned', lines[0], 'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry');
   h.assert('SUBTRACT signed', lines[1], 'SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow');
-  h.assert('SUBTRACT q4p4', lines[2], 'SUBTRACT(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow');
+  h.assert('SUBTRACT q4p4', lines[2], 'SUBTRACT(8bit a, 8bit b; q4p4) -> 8bit result, 4bit status');
   h.assert('SUBTRACT vector', lines[6], 'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
   h.assert('SUBTRACT matrix', lines[8], 'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
@@ -2915,7 +2915,7 @@ reg(330, 'doc', 'BUILTIN_DOC — MULTIPLY signature', function(h, session) {
   h.assert('MULTIPLY 10 signatures', String(lines.length), '10');
   h.assert('MULTIPLY unsigned', lines[0], 'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over');
   h.assert('MULTIPLY signed', lines[1], 'MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over');
-  h.assert('MULTIPLY q4p4', lines[2], 'MULTIPLY(8bit a, 8bit b; q4p4) -> 8bit result, 8bit over');
+  h.assert('MULTIPLY q4p4', lines[2], 'MULTIPLY(8bit a, 8bit b; q4p4) -> 8bit result, 8bit over, 4bit status');
   h.assert('MULTIPLY vector', lines[6], 'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]');
   h.assert('MULTIPLY matrix', lines[8], 'MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]');
 });
@@ -13360,7 +13360,7 @@ reg(1728, 'vector-reduction', 'doc(SUM) signature', function(h, session) {
   h.assert('SUM 14 signatures', String(lines.length), '14');
   h.assert('SUM unsigned', lines[0], 'SUM(Wbit ...) -> Wbit result, Wbit over');
   h.assert('SUM signed', lines[1], 'SUM(Wbit ...; signed) -> Wbit result, Wbit over');
-  h.assert('SUM q4p4', lines[2], 'SUM(Wbit ...; q4p4) -> Wbit result, Wbit over');
+  h.assert('SUM q4p4', lines[2], 'SUM(Wbit ...; q4p4) -> Wbit result, Wbit over, 4bit status');
   h.assert('SUM vector', lines[6], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]');
   h.assert('SUM signed vector', lines[7], 'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]');
   h.assert('SUM matrix', lines[8], 'SUM(Wbit[n,m] ... ; matrix) -> Wbit[n,m], Wbit[n,m]');
@@ -14587,7 +14587,7 @@ reg(1799, 'doc', 'BUILTIN_DOC — DOT signed signature', function(h, session) {
   const lines = Interpreter.getDocLines('DOT', new Map());
   h.assert('DOT 8 signatures', String(lines.length), '8');
   h.assert('DOT signed', lines[1], 'DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over');
-  h.assert('DOT q4p4', lines[2], 'DOT(8wire[n] a, 8wire[n] b; q4p4) -> 8bit result, 16bit over');
+  h.assert('DOT q4p4', lines[2], 'DOT(8wire[n] a, 8wire[n] b; q4p4) -> 8bit result, 16bit over, 4bit status');
   h.assert('DOT matmul', lines[6], 'DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over');
   h.assert('DOT matmul signed', lines[7], 'DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over');
 });
@@ -16619,48 +16619,49 @@ reg(1984, 'builtin-numeric-formats', 'ADD — q4p4 fixed-point 1.5+0.5', functio
   const { interp } = session.run(
     '8wire a = 00011000\n' +
     '8wire b = 00001000\n' +
-    '8wire s, 1wire ovf = ADD(a, b; q4p4)'
+    '8wire s, 4wire st = ADD(a, b; q4p4)'
   );
   h.assert('result 2.0', session.getWire(interp, 's'), '00100000');
-  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+  h.assert('no overflow', session.getWire(interp, 'st'), '0000');
 });
 
 reg(1985, 'builtin-numeric-formats', 'ADD — q8p8 fixed-point 1.25+0.75', function(h, session) {
   const { interp } = session.run(
     '16wire a = 0000000101000000\n' +
     '16wire b = 0000000011000000\n' +
-    '16wire s, 1wire ovf = ADD(a, b; q8p8)'
+    '16wire s, 4wire st = ADD(a, b; q8p8)'
   );
   h.assert('result 2.0', session.getWire(interp, 's'), '0000001000000000');
-  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+  h.assert('no overflow', session.getWire(interp, 'st'), '0000');
 });
 
 reg(1986, 'builtin-numeric-formats', 'ADD — fp16 1.0+2.0=3.0', function(h, session) {
   const { interp } = session.run(
     '16wire a = 0011110000000000\n' +
     '16wire b = 0100000000000000\n' +
-    '16wire s, 1wire flag = ADD(a, b; fp16)'
+    '16wire s, 4wire st = ADD(a, b; fp16)'
   );
   h.assert('result 3.0', session.getWire(interp, 's'), '0100001000000000');
-  h.assert('no flag', session.getWire(interp, 'flag'), '0');
+  h.assert('clean status', session.getWire(interp, 'st'), '0000');
 });
 
 reg(1987, 'builtin-numeric-formats', 'SUBTRACT — q4p4 2.0-0.5', function(h, session) {
   const { interp } = session.run(
     '8wire a = 00100000\n' +
     '8wire b = 00001000\n' +
-    '8wire s, 1wire ovf = SUBTRACT(a, b; q4p4)'
+    '8wire s, 4wire st = SUBTRACT(a, b; q4p4)'
   );
   h.assert('result 1.5', session.getWire(interp, 's'), '00011000');
-  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+  h.assert('no overflow', session.getWire(interp, 'st'), '0000');
 });
 
 reg(1988, 'builtin-numeric-formats', 'SUM — q4p4 two elements', function(h, session) {
   const { interp } = session.run(
     '8wire[2] v = 00011000 + 00001000\n' +
-    '8wire total, 8wire over = SUM(v; q4p4)'
+    '8wire total, 8wire over, 4wire st = SUM(v; q4p4)'
   );
   h.assert('sum 2.0', session.getWire(interp, 'total'), '00100000');
+  h.assert('status clean', session.getWire(interp, 'st'), '0000');
 });
 
 reg(1989, 'builtin-numeric-formats', 'MIN/MAX — q4p4 ordering', function(h, session) {
@@ -16695,10 +16696,12 @@ reg(1993, 'builtin-numeric-formats', 'ADD(vector) — q4p4 per element', functio
   const { interp } = session.run(
     '8wire[2] a = 00011000 + 00001000\n' +
     '8wire[2] b = 00001000 + 00001000\n' +
-    '8wire[2] r, 8wire[2] f = ADD(a, b; vector q4p4)'
+    '8wire[2] r, 4wire[2] st = ADD(a, b; vector q4p4)'
   );
   h.assert('elem0 2.0', session.getWire(interp, 'r').slice(0, 8), '00100000');
   h.assert('elem1 1.0', session.getWire(interp, 'r').slice(8, 16), '00010000');
+  h.assert('status elem0', session.getWire(interp, 'st').slice(0, 4), '0000');
+  h.assert('status elem1', session.getWire(interp, 'st').slice(4, 8), '0000');
 });
 
 reg(1994, 'builtin-numeric-formats-phase2', 'GT — q4p4 1.5 > 0.5', function(h, session) {
@@ -16723,19 +16726,21 @@ reg(1996, 'builtin-numeric-formats-phase2', 'MULTIPLY — q4p4 1.5×2.0=3.0', fu
   const { interp } = session.run(
     '8wire a = 00011000\n' +
     '8wire b = 00100000\n' +
-    '8wire r, 8wire o = MULTIPLY(a, b; q4p4)'
+    '8wire r, 8wire o, 4wire st = MULTIPLY(a, b; q4p4)'
   );
   h.assert('result 3.0', session.getWire(interp, 'r'), '00110000');
+  h.assert('status clean', session.getWire(interp, 'st'), '0000');
 });
 
 reg(1997, 'builtin-numeric-formats-phase2', 'DIVIDE — q4p4 2.0/0.5=4.0', function(h, session) {
   const { interp } = session.run(
     '8wire a = 00100000\n' +
     '8wire b = 00001000\n' +
-    '8wire q, 8wire m = DIVIDE(a, b; q4p4)'
+    '8wire q, 8wire m, 4wire st = DIVIDE(a, b; q4p4)'
   );
   h.assert('quotient 4.0', session.getWire(interp, 'q'), '01000000');
   h.assert('remainder 0', session.getWire(interp, 'm'), '00000000');
+  h.assert('status clean', session.getWire(interp, 'st'), '0000');
 });
 
 reg(1998, 'builtin-numeric-formats-phase2', 'MAC — q4p4 acc+1.5×0.5=1.75', function(h, session) {
@@ -16743,18 +16748,20 @@ reg(1998, 'builtin-numeric-formats-phase2', 'MAC — q4p4 acc+1.5×0.5=1.75', fu
     '8wire acc = 00010000\n' +
     '8wire a = 00011000\n' +
     '8wire b = 00001000\n' +
-    '8wire r, 9wire o = MAC(acc, a, b; q4p4)'
+    '8wire r, 9wire o, 4wire st = MAC(acc, a, b; q4p4)'
   );
   h.assert('result 1.75', session.getWire(interp, 'r'), '00011100');
+  h.assert('status clean', session.getWire(interp, 'st'), '0000');
 });
 
 reg(1999, 'builtin-numeric-formats-phase2', 'DOT — q4p4 [1.5,0.5]·[1,1]=2.0', function(h, session) {
   const { interp } = session.run(
     '8wire[2] a = 00011000 + 00001000\n' +
     '8wire[2] b = 00010000 + 00010000\n' +
-    '8wire dot, 16wire over = DOT(a, b; q4p4)'
+    '8wire dot, 16wire over, 4wire st = DOT(a, b; q4p4)'
   );
   h.assert('dot 2.0', session.getWire(interp, 'dot'), '00100000');
+  h.assert('status clean', session.getWire(interp, 'st'), '0000');
 });
 
 reg(2000, 'builtin-numeric-formats-phase2', 'CLAMP — q4p4 3.0 to [0,2.0]', function(h, session) {
@@ -16770,10 +16777,10 @@ reg(2000, 'builtin-numeric-formats-phase2', 'CLAMP — q4p4 3.0 to [0,2.0]', fun
 reg(2001, 'builtin-numeric-formats-phase2', 'ABS — q4p4 |-1|=1.0', function(h, session) {
   const { interp } = session.run(
     '8wire x = 11110000\n' +
-    '8wire a, 1wire ovf = ABS(x; q4p4)'
+    '8wire a, 4wire st = ABS(x; q4p4)'
   );
   h.assert('abs 1.0', session.getWire(interp, 'a'), '00010000');
-  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+  h.assert('no overflow', session.getWire(interp, 'st'), '0000');
 });
 
 reg(2002, 'builtin-numeric-formats-phase2', 'RSHIFT — q4p4 arithmetic -1>>1', function(h, session) {
@@ -16802,9 +16809,10 @@ reg(2005, 'builtin-numeric-formats-phase2', 'MULTIPLY — fp16 2.0×1.5=3.0', fu
   const { interp } = session.run(
     '16wire a = 0100000000000000\n' +
     '16wire b = 0011111000000000\n' +
-    '16wire r, 16wire o = MULTIPLY(a, b; fp16)'
+    '16wire r, 16wire o, 4wire st = MULTIPLY(a, b; fp16)'
   );
   h.assert('result 3.0', session.getWire(interp, 'r'), '0100001000000000');
+  h.assert('status clean', session.getWire(interp, 'st'), '0000');
 });
 
 reg(2006, 'grouped-literals-display', 'Grup unsigned \\2 \\23 \\242 \\1;8', function(h, session) {
@@ -16873,20 +16881,20 @@ reg(2017, 'builtin-param-formats', 'ADD — q6p2 fixed-point 1.5+0.5', function(
   const { interp } = session.run(
     '8wire a = 00000110\n' +
     '8wire b = 00000010\n' +
-    '8wire s, 1wire ovf = ADD(a, b; q6p2)'
+    '8wire s, 4wire st = ADD(a, b; q6p2)'
   );
   h.assert('result 2.0', session.getWire(interp, 's'), '00001000');
-  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+  h.assert('no overflow', session.getWire(interp, 'st'), '0000');
 });
 
 reg(2018, 'builtin-param-formats', 'ADD — s32 signed pe 32wire', function(h, session) {
   const { interp } = session.run(
     '32wire a = 00000000000000000000000000000001\n' +
     '32wire b = 00000000000000000000000000000001\n' +
-    '32wire s, 1wire ovf = ADD(a, b; s32)'
+    '32wire s, 4wire st = ADD(a, b; s32)'
   );
   h.assert('result 2', session.getWire(interp, 's'), '00000000000000000000000000000010');
-  h.assert('no overflow', session.getWire(interp, 'ovf'), '0');
+  h.assert('no overflow', session.getWire(interp, 'st'), '0000');
 });
 
 reg(2019, 'builtin-param-formats', 'show — s8 fix per element', function(h, session) {
@@ -16918,9 +16926,10 @@ reg(2022, 'builtin-param-formats', 'show — q8p0 nu alias la s8', function(h, s
 
 reg(2023, 'builtin-param-formats', 'q32p32 pe 64wire — OK', function(h, session) {
   const z64 = '0'.repeat(64);
-  session.parse('64wire a = ' + z64 + '\n64wire b = ' + z64 + '\n64wire s, 1wire f = ADD(a, b; q32p32)');
-  const { interp } = session.run('64wire a = ' + z64 + '\n64wire b = ' + z64 + '\n64wire s, 1wire f = ADD(a, b; q32p32)');
+  session.parse('64wire a = ' + z64 + '\n64wire b = ' + z64 + '\n64wire s, 4wire st = ADD(a, b; q32p32)');
+  const { interp } = session.run('64wire a = ' + z64 + '\n64wire b = ' + z64 + '\n64wire s, 4wire st = ADD(a, b; q32p32)');
   h.assert('sum zero', session.getWire(interp, 's'), z64);
+  h.assert('status clean', session.getWire(interp, 'st'), '0000');
 });
 
 reg(2024, 'builtin-param-formats', 'q70p1 — eroare parse W>64', function(h, session) {
@@ -16966,6 +16975,83 @@ reg(2029, 'builtin-param-formats', 'ADD(vector) — s8 per element', function(h,
   );
   h.assert('elem0', session.getWire(interp, 'r').slice(0, 8), '00000010');
   h.assert('elem1', session.getWire(interp, 'r').slice(8, 16), '00000011');
+});
+
+reg(2030, 'builtin-status-4bit', 'ADD — q4p4 overflow status bit0', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 01110000\n' +
+    '8wire b = 01110000\n' +
+    '8wire s, 4wire st = ADD(a, b; q4p4)'
+  );
+  h.assert('overflow status', session.getWire(interp, 'st'), '1000');
+});
+
+reg(2031, 'builtin-status-4bit', 'DIVIDE — q4p4 /0 status nan', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 00100000\n' +
+    '8wire b = 00000000\n' +
+    '8wire q, 8wire m, 4wire st = DIVIDE(a, b; q4p4)'
+  );
+  h.assert('nan bit3', session.getWire(interp, 'st'), '0001');
+});
+
+reg(2032, 'builtin-status-4bit', 'signed adaptiv rămâne 1bit overflow', function(h, session) {
+  const { interp } = session.run(
+    '4wire a = 0111\n' +
+    '4wire b = 0001\n' +
+    '4wire s, 1wire ovf = ADD(a, b; signed)'
+  );
+  h.assert('signed overflow', session.getWire(interp, 'ovf'), '1');
+});
+
+reg(2033, 'builtin-nformat', 'NFORMAT q4p4 to_fp16 exact', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 01110000\n' +
+    '16wire r, 4wire st = NFORMAT(a; q4p4 to_fp16)'
+  );
+  h.assert('result', session.getWire(interp, 'r'), '0100011100000000');
+  h.assert('status', session.getWire(interp, 'st'), '0000');
+});
+
+reg(2034, 'builtin-nformat', 'NFORMAT signed to_q4p4 overflow', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 01111111\n' +
+    '8wire r, 4wire st = NFORMAT(a; signed to_q4p4)'
+  );
+  h.assert('overflow status', session.getWire(interp, 'st'), '1000');
+});
+
+reg(2035, 'builtin-nformat', 'NFORMAT fp16 NaN to_q4p4', function(h, session) {
+  const { interp } = session.run(
+    '16wire nan = 0111111000000000\n' +
+    '8wire r, 4wire st = NFORMAT(nan; fp16 to_q4p4)'
+  );
+  h.assert('nan status', session.getWire(interp, 'st'), '0001');
+});
+
+reg(2036, 'builtin-nformat', 'NFORMAT same src/dst error', function(h, session) {
+  const r = session.run(
+    '8wire a = 01110000\n' +
+    '8wire r, 4wire st = NFORMAT(a; q4p4 to_q4p4)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('same format', String(err.includes('are the same')), 'true');
+});
+
+reg(2037, 'builtin-nformat', 'NFORMAT missing destination tag', function(h, session) {
+  const r = session.run(
+    '8wire a = 01110000\n' +
+    '8wire r, 4wire st = NFORMAT(a; q4p4)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('no dst', String(err.includes('destination tag')), 'true');
+});
+
+reg(2038, 'builtin-nformat', 'BUILTIN_DOC NFORMAT signatures', function(h, session) {
+  const lines = Interpreter.getDocLines('NFORMAT', new Map());
+  h.assert('count', String(lines.length), '20');
+  h.assert('signed to_q4p4', lines[0], 'NFORMAT(Xbit a; signed to_q4p4) -> 8bit result, 4bit status');
+  h.assert('q4p4 to_fp16', lines[6], 'NFORMAT(8bit a; q4p4 to_fp16) -> 16bit result, 4bit status');
 });
 
 

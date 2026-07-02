@@ -3480,7 +3480,7 @@ class Interpreter {
          'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE',
          'REVERSE', 'LROTATE', 'RROTATE',
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
-         'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ABS', 'ISDIGIT',
+         'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ABS', 'NFORMAT', 'ISDIGIT',
          'CNTN10S', 'N2N10S', 'N10S2N',
          'CNTN16S', 'N2N16S', 'N16S2N',
          'PIVOT', 'IDENTITY', 'ZEROS', 'FILL', 'DIAG', 'IOTA', 'SHAPE', 'RANK',
@@ -4444,6 +4444,20 @@ const idx = parseInt(
     };
   }
 
+  _returnBuiltinVectorTriple(resultBlob, overBlob, statusBlob, computeRefs) {
+    return [
+      computeRefs
+        ? { value: resultBlob, ref: `&${this.storeValue(resultBlob)}` }
+        : { value: resultBlob, ref: null },
+      computeRefs
+        ? { value: overBlob, ref: `&${this.storeValue(overBlob)}` }
+        : { value: overBlob, ref: null },
+      computeRefs
+        ? { value: statusBlob, ref: `&${this.storeValue(statusBlob)}` }
+        : { value: statusBlob, ref: null },
+    ];
+  }
+
   _returnBuiltinVectorPair(resultBlob, flagBlob, computeRefs) {
     return [
       computeRefs
@@ -4467,8 +4481,13 @@ const idx = parseInt(
   let matrixMode = false;
   let indexMode = false;
   let axisMode = null;
+  let nformatSpec = null;
   if (callTags && callTags.length) {
     const isBuiltin = !!Interpreter.BUILTIN_DOC[name];
+    if (name === 'NFORMAT') {
+      if (!NF) fail('NFORMAT: internal error (numeric-formats not loaded)');
+      nformatSpec = NF.parseNformatCallTags(callTags, (msg) => fail(msg));
+    } else {
     const acceptsSigned = SA && SA.BUILTIN_SIGNED_TAG_FUNCS.has(name);
     const acceptsFormat = NF && NF.BUILTIN_FORMAT_TAG_FUNCS.has(name);
     const acceptsVector = SA && SA.BUILTIN_VECTOR_TAG_FUNCS.has(name);
@@ -4489,6 +4508,7 @@ const idx = parseInt(
       indexMode = tags.index;
       axisMode = tags.axis;
     }
+    }
   }
 
   const reductionMode = NF && NF.isBuiltinNumericFormatMode(numericMode) ? numericMode : signedMode;
@@ -4500,6 +4520,15 @@ const idx = parseInt(
         fail(`${opName}: ; ${numericMode} requires ${fw}-bit operands, got ${depth}`);
       }
     }
+  };
+
+  const formatStatusMode = NF && NF.usesFormatStatus(numericMode);
+
+  const pickSecondReturn = (step) => {
+    if (formatStatusMode && NF) {
+      return step.status != null ? step.status : NF.statusFromOverflowFlag(step.flag);
+    }
+    return step.flag != null ? step.flag : step.carry;
   };
 
   if (name === 'ABS' && !signedMode && !(NF && NF.isBuiltinNumericFormatMode(numericMode))) {
@@ -4988,6 +5017,13 @@ const idx = parseInt(
     } catch (e) {
       fail(e.message);
     }
+    if (formatStatusMode && sum.status != null) {
+      return [
+        computeRefs ? { value: sum.result, ref: `&${this.storeValue(sum.result)}` } : { value: sum.result, ref: null },
+        computeRefs ? { value: sum.over, ref: `&${this.storeValue(sum.over)}` } : { value: sum.over, ref: null },
+        computeRefs ? { value: sum.status, ref: `&${this.storeValue(sum.status)}` } : { value: sum.status, ref: null },
+      ];
+    }
     return [
       computeRefs ? { value: sum.result, ref: `&${this.storeValue(sum.result)}` } : { value: sum.result, ref: null },
       computeRefs ? { value: sum.over, ref: `&${this.storeValue(sum.over)}` } : { value: sum.over, ref: null },
@@ -5048,6 +5084,13 @@ const idx = parseInt(
       dot = VR.dotExpanded(aVals, bVals, X, reductionMode);
     } catch (e) {
       fail(e.message);
+    }
+    if (formatStatusMode && dot.status != null) {
+      return [
+        computeRefs ? { value: dot.result, ref: `&${this.storeValue(dot.result)}` } : { value: dot.result, ref: null },
+        computeRefs ? { value: dot.over, ref: `&${this.storeValue(dot.over)}` } : { value: dot.over, ref: null },
+        computeRefs ? { value: dot.status, ref: `&${this.storeValue(dot.status)}` } : { value: dot.status, ref: null },
+      ];
     }
     return [
       computeRefs ? { value: dot.result, ref: `&${this.storeValue(dot.result)}` } : { value: dot.result, ref: null },
@@ -5777,6 +5820,22 @@ if (this.isBuiltinDEMUX(name)) {
       : { value: v, ref: null };
   }
 
+  // ================= BUILTIN: NFORMAT =================
+  if (name === 'NFORMAT') {
+    if (argValues.length !== 1) fail('NFORMAT expects 1 argument');
+    if (!nformatSpec) fail('NFORMAT requires format tags (e.g. ; q4p4 to_fp16)');
+    if (vectorMode || matrixMode) fail('NFORMAT: does not accept tag \'vector\' or \'matrix\'');
+    if (!NF) fail('NFORMAT: internal error (numeric-formats not loaded)');
+    this._zstateRequireBinary(argValues, 'NFORMAT', ['a']);
+    const a = argValues[0];
+    const { src, dst } = nformatSpec;
+    const { result, status } = NF.convertFormat(a, a.length, src, dst);
+    return [
+      computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+      computeRefs ? { value: status, ref: `&${this.storeValue(status)}` } : { value: status, ref: null },
+    ];
+  }
+
   // ================= BUILTIN: ABS =================
   if (name === 'ABS') {
     if (argValues.length !== 1) fail('ABS expects 1 argument');
@@ -5789,10 +5848,18 @@ if (this.isBuiltinDEMUX(name)) {
     const depth = x.length;
     assertSignedFixedWidth(depth, 'ABS');
     if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
-      const { result, overflow } = NF.absAtWidth(x, depth, numericMode);
+      const { result, status } = NF.absAtWidth(x, depth, numericMode);
       return [
         computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
-        computeRefs ? { value: overflow, ref: `&${this.storeValue(overflow)}` } : { value: overflow, ref: null },
+        computeRefs ? { value: status, ref: `&${this.storeValue(status)}` } : { value: status, ref: null },
+      ];
+    }
+    if (formatStatusMode && NF) {
+      const { result, overflow } = SA.absAtWidth(x, depth);
+      const status = NF.statusFromOverflowFlag(overflow);
+      return [
+        computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
+        computeRefs ? { value: status, ref: `&${this.storeValue(status)}` } : { value: status, ref: null },
       ];
     }
     if (!SA) fail('ABS: internal error (signed-arithmetic not loaded)');
@@ -5842,6 +5909,9 @@ if (this.isBuiltinDEMUX(name)) {
       fail(e.message);
     }
     if (addVec) {
+      if (formatStatusMode && addVec.statusBlob != null) {
+        return this._returnBuiltinVectorTriple(addVec.resultBlob, addVec.flagBlob, addVec.statusBlob, computeRefs);
+      }
       return this._returnBuiltinVectorPair(addVec.resultBlob, addVec.flagBlob, computeRefs);
     }
     this._zstateRequireBinary(argValues, 'ADD', ['a', 'b']);
@@ -5852,10 +5922,11 @@ if (this.isBuiltinDEMUX(name)) {
       const addFn = NF && NF.isBuiltinNumericFormatMode(numericMode)
         ? (a, b, d) => NF.addAtWidth(a, b, d, numericMode)
         : (a, b, d) => SA.addAtWidth(a, b, d, signedMode);
-      const { result, flag } = addFn(a, b, depth);
+      const step = addFn(a, b, depth);
+      const second = pickSecondReturn(step);
       return [
-        computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
-        computeRefs ? { value: flag,  ref: `&${this.storeValue(flag)}`  } : { value: flag,  ref: null },
+        computeRefs ? { value: step.result, ref: `&${this.storeValue(step.result)}` } : { value: step.result, ref: null },
+        computeRefs ? { value: second,  ref: `&${this.storeValue(second)}`  } : { value: second,  ref: null },
       ];
     }
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
@@ -5908,6 +5979,9 @@ if (this.isBuiltinDEMUX(name)) {
       } catch (e) {
         fail(e.message);
       }
+      if (formatStatusMode && subVec.statusBlob != null) {
+        return this._returnBuiltinVectorTriple(subVec.resultBlob, subVec.flagBlob, subVec.statusBlob, computeRefs);
+      }
       return this._returnBuiltinVectorPair(subVec.resultBlob, subVec.flagBlob, computeRefs);
     }
     this._zstateRequireBinary(argValues, 'SUBTRACT', ['a', 'b']);
@@ -5918,10 +5992,11 @@ if (this.isBuiltinDEMUX(name)) {
       const subFn = NF && NF.isBuiltinNumericFormatMode(numericMode)
         ? (a, b, d) => NF.subtractAtWidth(a, b, d, numericMode)
         : (a, b, d) => SA.subtractAtWidth(a, b, d, signedMode);
-      const { result, flag } = subFn(a, b, depth);
+      const step = subFn(a, b, depth);
+      const second = pickSecondReturn(step);
       return [
-        computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
-        computeRefs ? { value: flag,  ref: `&${this.storeValue(flag)}`  } : { value: flag,  ref: null },
+        computeRefs ? { value: step.result, ref: `&${this.storeValue(step.result)}` } : { value: step.result, ref: null },
+        computeRefs ? { value: second,  ref: `&${this.storeValue(second)}`  } : { value: second,  ref: null },
       ];
     }
     const aNum = BigInt('0b' + a.padStart(depth, '0'));
@@ -5977,6 +6052,9 @@ if (this.isBuiltinDEMUX(name)) {
       } catch (e) {
         fail(e.message);
       }
+      if (formatStatusMode && mulVec.statusBlob != null) {
+        return this._returnBuiltinVectorTriple(mulVec.resultBlob, mulVec.overBlob, mulVec.statusBlob, computeRefs);
+      }
       return this._returnBuiltinVectorPair(mulVec.resultBlob, mulVec.overBlob, computeRefs);
     }
     this._zstateRequireBinary(argValues, 'MULTIPLY', ['a', 'b']);
@@ -5984,10 +6062,11 @@ if (this.isBuiltinDEMUX(name)) {
     const depth = Math.max(a.length, b.length);
     assertSignedFixedWidth(depth, 'MULTIPLY');
     if (NF && NF.isBuiltinNumericFormatMode(numericMode)) {
-      const { result, over } = NF.multiplyAtWidth(a, b, depth, numericMode);
+      const { result, over, status } = NF.multiplyAtWidth(a, b, depth, numericMode);
       return [
         computeRefs ? { value: result, ref: `&${this.storeValue(result)}` } : { value: result, ref: null },
         computeRefs ? { value: over,   ref: `&${this.storeValue(over)}`   } : { value: over,   ref: null },
+        computeRefs ? { value: status, ref: `&${this.storeValue(status)}` } : { value: status, ref: null },
       ];
     }
     if (SA) {
@@ -6083,6 +6162,13 @@ if (this.isBuiltinDEMUX(name)) {
     } catch (e) {
       fail(e.message);
     }
+    if (formatStatusMode && div.status != null) {
+      return [
+        computeRefs ? { value: div.result, ref: `&${this.storeValue(div.result)}` } : { value: div.result, ref: null },
+        computeRefs ? { value: div.mod, ref: `&${this.storeValue(div.mod)}` } : { value: div.mod, ref: null },
+        computeRefs ? { value: div.status, ref: `&${this.storeValue(div.status)}` } : { value: div.status, ref: null },
+      ];
+    }
     return [
       computeRefs ? { value: div.result, ref: `&${this.storeValue(div.result)}` } : { value: div.result, ref: null },
       computeRefs ? { value: div.mod, ref: `&${this.storeValue(div.mod)}` } : { value: div.mod, ref: null },
@@ -6146,6 +6232,13 @@ if (this.isBuiltinDEMUX(name)) {
       }
     } catch (e) {
       fail(e.message);
+    }
+    if (formatStatusMode && mac.status != null) {
+      return [
+        computeRefs ? { value: mac.result, ref: `&${this.storeValue(mac.result)}` } : { value: mac.result, ref: null },
+        computeRefs ? { value: mac.over,   ref: `&${this.storeValue(mac.over)}`   } : { value: mac.over,   ref: null },
+        computeRefs ? { value: mac.status, ref: `&${this.storeValue(mac.status)}` } : { value: mac.status, ref: null },
+      ];
     }
     return [
       computeRefs ? { value: mac.result, ref: `&${this.storeValue(mac.result)}` } : { value: mac.result, ref: null },
@@ -13484,10 +13577,10 @@ Interpreter.BUILTIN_DOC = {
   ADD:      [
     'ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry',
     'ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow',
-    'ADD(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow',
-    'ADD(16bit a, 16bit b; q8p8) -> 16bit result, 1bit overflow',
-    'ADD(16bit a, 16bit b; fp16) -> 16bit result, 1bit inexact',
-    'ADD(16bit a, 16bit b; bf16) -> 16bit result, 1bit inexact',
+    'ADD(8bit a, 8bit b; q4p4) -> 8bit result, 4bit status',
+    'ADD(16bit a, 16bit b; q8p8) -> 16bit result, 4bit status',
+    'ADD(16bit a, 16bit b; fp16) -> 16bit result, 4bit status',
+    'ADD(16bit a, 16bit b; bf16) -> 16bit result, 4bit status',
     'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
     'ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
     'ADD(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]',
@@ -13496,10 +13589,10 @@ Interpreter.BUILTIN_DOC = {
   SUBTRACT: [
     'SUBTRACT(Xbit a, Xbit b) -> Xbit result, 1bit carry',
     'SUBTRACT(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow',
-    'SUBTRACT(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow',
-    'SUBTRACT(16bit a, 16bit b; q8p8) -> 16bit result, 1bit overflow',
-    'SUBTRACT(16bit a, 16bit b; fp16) -> 16bit result, 1bit inexact',
-    'SUBTRACT(16bit a, 16bit b; bf16) -> 16bit result, 1bit inexact',
+    'SUBTRACT(8bit a, 8bit b; q4p4) -> 8bit result, 4bit status',
+    'SUBTRACT(16bit a, 16bit b; q8p8) -> 16bit result, 4bit status',
+    'SUBTRACT(16bit a, 16bit b; fp16) -> 16bit result, 4bit status',
+    'SUBTRACT(16bit a, 16bit b; bf16) -> 16bit result, 4bit status',
     'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
     'SUBTRACT(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
     'SUBTRACT(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]',
@@ -13508,10 +13601,10 @@ Interpreter.BUILTIN_DOC = {
   MULTIPLY: [
     'MULTIPLY(Xbit a, Xbit b) -> Xbit result, Xbit over',
     'MULTIPLY(Xbit a, Xbit b; signed) -> Xbit result, Xbit over',
-    'MULTIPLY(8bit a, 8bit b; q4p4) -> 8bit result, 8bit over',
-    'MULTIPLY(16bit a, 16bit b; q8p8) -> 16bit result, 16bit over',
-    'MULTIPLY(16bit a, 16bit b; fp16) -> 16bit result, 16bit inexact',
-    'MULTIPLY(16bit a, 16bit b; bf16) -> 16bit result, 16bit inexact',
+    'MULTIPLY(8bit a, 8bit b; q4p4) -> 8bit result, 8bit over, 4bit status',
+    'MULTIPLY(16bit a, 16bit b; q8p8) -> 16bit result, 16bit over, 4bit status',
+    'MULTIPLY(16bit a, 16bit b; fp16) -> 16bit result, 16bit over, 4bit status',
+    'MULTIPLY(16bit a, 16bit b; bf16) -> 16bit result, 16bit over, 4bit status',
     'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
     'MULTIPLY(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
     'MULTIPLY(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]',
@@ -13520,10 +13613,10 @@ Interpreter.BUILTIN_DOC = {
   DIVIDE:   [
     'DIVIDE(Xbit a, Xbit b) -> Xbit result, Xbit mod',
     'DIVIDE(Xbit a, Xbit b; signed) -> Xbit result, Xbit mod',
-    'DIVIDE(8bit a, 8bit b; q4p4) -> 8bit result, 8bit mod',
-    'DIVIDE(16bit a, 16bit b; q8p8) -> 16bit result, 16bit mod',
-    'DIVIDE(16bit a, 16bit b; fp16) -> 16bit result, 16bit mod',
-    'DIVIDE(16bit a, 16bit b; bf16) -> 16bit result, 16bit mod',
+    'DIVIDE(8bit a, 8bit b; q4p4) -> 8bit result, 8bit mod, 4bit status',
+    'DIVIDE(16bit a, 16bit b; q8p8) -> 16bit result, 16bit mod, 4bit status',
+    'DIVIDE(16bit a, 16bit b; fp16) -> 16bit result, 16bit mod, 4bit status',
+    'DIVIDE(16bit a, 16bit b; bf16) -> 16bit result, 16bit mod, 4bit status',
     'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]',
     'DIVIDE(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]',
     'DIVIDE(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], Wbit[n,m]',
@@ -13532,10 +13625,10 @@ Interpreter.BUILTIN_DOC = {
   MAC:      [
     'MAC(Xbit acc, Xbit a, Xbit b) -> Xbit result, (X+1)bit over',
     'MAC(Xbit acc, Xbit a, Xbit b; signed) -> Xbit result, (X+1)bit over',
-    'MAC(8bit acc, 8bit a, 8bit b; q4p4) -> 8bit result, 9bit over',
-    'MAC(16bit acc, 16bit a, 16bit b; q8p8) -> 16bit result, 17bit over',
-    'MAC(16bit acc, 16bit a, 16bit b; fp16) -> 16bit result, 17bit inexact',
-    'MAC(16bit acc, 16bit a, 16bit b; bf16) -> 16bit result, 17bit inexact',
+    'MAC(8bit acc, 8bit a, 8bit b; q4p4) -> 8bit result, 9bit over, 4bit status',
+    'MAC(16bit acc, 16bit a, 16bit b; q8p8) -> 16bit result, 17bit over, 4bit status',
+    'MAC(16bit acc, 16bit a, 16bit b; fp16) -> 16bit result, 17bit over, 4bit status',
+    'MAC(16bit acc, 16bit a, 16bit b; bf16) -> 16bit result, 17bit over, 4bit status',
     'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], (W+1)bit[n]',
     'MAC(Wbit[n] acc, Wbit/Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], (W+1)bit[n]',
     'MAC(Wbit[n,m] acc, Wbit/Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> Wbit[n,m], (W+1)bit[n,m]',
@@ -13544,10 +13637,10 @@ Interpreter.BUILTIN_DOC = {
   SUM:      [
     'SUM(Wbit ...) -> Wbit result, Wbit over',
     'SUM(Wbit ...; signed) -> Wbit result, Wbit over',
-    'SUM(Wbit ...; q4p4) -> Wbit result, Wbit over',
-    'SUM(Wbit ...; q8p8) -> Wbit result, Wbit over',
-    'SUM(Wbit ...; fp16) -> Wbit result, Wbit over',
-    'SUM(Wbit ...; bf16) -> Wbit result, Wbit over',
+    'SUM(Wbit ...; q4p4) -> Wbit result, Wbit over, 4bit status',
+    'SUM(Wbit ...; q8p8) -> Wbit result, Wbit over, 4bit status',
+    'SUM(Wbit ...; fp16) -> Wbit result, Wbit over, 4bit status',
+    'SUM(Wbit ...; bf16) -> Wbit result, Wbit over, 4bit status',
     'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; vector) -> Wbit[n], Wbit[n]',
     'SUM(Wbit[n] a, Wbit/Wbit[n] b, ... ; signed vector) -> Wbit[n], Wbit[n]',
     'SUM(Wbit[n,m] ... ; matrix) -> Wbit[n,m], Wbit[n,m]',
@@ -13560,10 +13653,10 @@ Interpreter.BUILTIN_DOC = {
   DOT:      [
     'DOT(Wbit[n] a, Wbit[n] b) -> Wbit result, (2W)bit over',
     'DOT(Wbit[n] a, Wbit[n] b; signed) -> Wbit result, (2W)bit over',
-    'DOT(8wire[n] a, 8wire[n] b; q4p4) -> 8bit result, 16bit over',
-    'DOT(16wire[n] a, 16wire[n] b; q8p8) -> 16bit result, 32bit over',
-    'DOT(16wire[n] a, 16wire[n] b; fp16) -> 16bit result, 32bit inexact',
-    'DOT(16wire[n] a, 16wire[n] b; bf16) -> 16bit result, 32bit inexact',
+    'DOT(8wire[n] a, 8wire[n] b; q4p4) -> 8bit result, 16bit over, 4bit status',
+    'DOT(16wire[n] a, 16wire[n] b; q8p8) -> 16bit result, 32bit over, 4bit status',
+    'DOT(16wire[n] a, 16wire[n] b; fp16) -> 16bit result, 32bit over, 4bit status',
+    'DOT(16wire[n] a, 16wire[n] b; bf16) -> 16bit result, 32bit over, 4bit status',
     'DOT(Wwire[N,K] a, Wwire[K,M] b) -> Wwire[N,M] result, (2W)wire[N,M] over',
     'DOT(Wwire[N,K] a, Wwire[K,M] b; signed) -> Wwire[N,M] result, (2W)wire[N,M] over',
   ],
@@ -13669,10 +13762,32 @@ Interpreter.BUILTIN_DOC = {
   ],
   ABS:      [
     'ABS(Xbit x; signed) -> Xbit result, 1bit overflow',
-    'ABS(8bit x; q4p4) -> 8bit result, 1bit overflow',
-    'ABS(16bit x; q8p8) -> 16bit result, 1bit overflow',
-    'ABS(16bit x; fp16) -> 16bit result, 1bit overflow',
-    'ABS(16bit x; bf16) -> 16bit result, 1bit overflow',
+    'ABS(8bit x; q4p4) -> 8bit result, 4bit status',
+    'ABS(16bit x; q8p8) -> 16bit result, 4bit status',
+    'ABS(16bit x; fp16) -> 16bit result, 4bit status',
+    'ABS(16bit x; bf16) -> 16bit result, 4bit status',
+  ],
+  NFORMAT:  [
+    'NFORMAT(Xbit a; signed to_q4p4) -> 8bit result, 4bit status',
+    'NFORMAT(Xbit a; signed to_q8p8) -> 16bit result, 4bit status',
+    'NFORMAT(Xbit a; signed to_fp16) -> 16bit result, 4bit status',
+    'NFORMAT(Xbit a; signed to_bf16) -> 16bit result, 4bit status',
+    'NFORMAT(8bit a; q4p4 to_signed) -> 8bit result, 4bit status',
+    'NFORMAT(8bit a; q4p4 to_q8p8) -> 16bit result, 4bit status',
+    'NFORMAT(8bit a; q4p4 to_fp16) -> 16bit result, 4bit status',
+    'NFORMAT(8bit a; q4p4 to_bf16) -> 16bit result, 4bit status',
+    'NFORMAT(16bit a; q8p8 to_signed) -> 16bit result, 4bit status',
+    'NFORMAT(16bit a; q8p8 to_q4p4) -> 8bit result, 4bit status',
+    'NFORMAT(16bit a; q8p8 to_fp16) -> 16bit result, 4bit status',
+    'NFORMAT(16bit a; q8p8 to_bf16) -> 16bit result, 4bit status',
+    'NFORMAT(16bit a; fp16 to_signed) -> 16bit result, 4bit status',
+    'NFORMAT(16bit a; fp16 to_q4p4) -> 8bit result, 4bit status',
+    'NFORMAT(16bit a; fp16 to_q8p8) -> 16bit result, 4bit status',
+    'NFORMAT(16bit a; fp16 to_bf16) -> 16bit result, 4bit status',
+    'NFORMAT(16bit a; bf16 to_signed) -> 16bit result, 4bit status',
+    'NFORMAT(16bit a; bf16 to_q4p4) -> 8bit result, 4bit status',
+    'NFORMAT(16bit a; bf16 to_q8p8) -> 16bit result, 4bit status',
+    'NFORMAT(16bit a; bf16 to_fp16) -> 16bit result, 4bit status',
   ],
   ISDIGIT:  ['ISDIGIT(Xbit value) -> 1bit'],
   HIGH:     ['HIGH(Xbit) -> Xbit'],

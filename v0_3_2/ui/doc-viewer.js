@@ -113,6 +113,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-L2.md', label: 'L2 (L2² norm)' },
       { file: 'builtin-MCAT.md', label: 'MCAT (matrix concat)' },
       { file: 'builtin-MSLICE.md', label: 'MSLICE (matrix slice)' },
+      { file: 'builtin-NFORMAT.md', label: 'NFORMAT' },
       { file: 'builtin-NORM.md', label: 'NORM (L2² norm)' },
       { file: 'builtin-OUTER.md', label: 'OUTER (outer product)' },
       { file: 'builtin-TRACE.md', label: 'TRACE (matrix trace)' },

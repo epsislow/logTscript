@@ -9,10 +9,10 @@ Binary addition with wrap-around.
 ```
 ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
 ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
-ADD(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow
-ADD(16bit a, 16bit b; q8p8) -> 16bit result, 1bit overflow
-ADD(16bit a, 16bit b; fp16) -> 16bit result, 1bit inexact
-ADD(16bit a, 16bit b; bf16) -> 16bit result, 1bit inexact
+ADD(8bit a, 8bit b; q4p4) -> 8bit result, 4bit status
+ADD(16bit a, 16bit b; q8p8) -> 16bit result, 4bit status
+ADD(16bit a, 16bit b; fp16) -> 16bit result, 4bit status
+ADD(16bit a, 16bit b; bf16) -> 16bit result, 4bit status
 ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -30,10 +30,10 @@ ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], 
 | Tag | Behaviour |
 |-----|-----------|
 | `signed` | Same `result` bits; second return is **signed overflow** (not unsigned carry). |
-| `q4p4` | Fixed-point Q4.4 on **8-bit** wires; second return = overflow out of representable range. |
-| `q8p8` | Fixed-point Q8.8 on **16-bit** wires; second return = overflow. |
-| `fp16` | IEEE 754 half on **16-bit** wires; second return = inexact (`Inf`/`NaN` from finite operands). |
-| `bf16` | Brain float 16 on **16-bit** wires; same second return as `fp16`. |
+| `q4p4` | Fixed-point Q4.4 on **8-bit** wires; second return = **4bit status**. |
+| `q8p8` | Fixed-point Q8.8 on **16-bit** wires; second return = **4bit status**. |
+| `fp16` | IEEE 754 half on **16-bit** wires; second return = **4bit status**. |
+| `bf16` | Brain float 16 on **16-bit** wires; second return = **4bit status**. |
 | `vector` | Per index on **rank-1** tensors (`Wwire[N]`, `Wwire[1,N]`, `Wwire[N,1]`); matching `elementCount`. |
 | `matrix` | Per cell on **matrix** `Wwire[N,M]` (`N>1`, `M>1`); rank-1 operands broadcast. Mutually exclusive with `vector`. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -87,9 +87,9 @@ Fixed-point Q4.4: `1.5 + 0.5 = 2.0` on 8-bit wires.
 ```logts-play
 8wire a = 00011000
 8wire b = 00001000
-8wire s, 1wire ovf = ADD(a, b; q4p4)
+8wire s, 4wire st = ADD(a, b; q4p4)
 show(s; q4p4)
-show(ovf)
+show(st)
 ```
 
 ### `ADD(16bit a, 16bit b; fp16)`

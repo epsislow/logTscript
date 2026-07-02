@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip.md, clcd-symbols.md, clcd.md, components.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -659,17 +659,61 @@ Examples: \`ADD(a, b; q6p2)\` on **8wire**, \`ADD(x, y; s32)\` on **32wire**, \`
 \`\`\`logts-play
 8wire a = \\1.5;q6p2
 8wire b = \\0.5;q6p2
-8wire s, 1wire ovf = ADD(a, b; q6p2)
+8wire s, 4wire st = ADD(a, b; q6p2)
 show(s; q6p2)
+show(st)
 \`\`\`
 
-\`MULTIPLY\` / \`MAC\` / \`DOT\` / \`SUM\` with \`qXpY\`: overflow wire **\`over\`** is **2×W** bits (W = X+Y), same as \`q4p4\`.
+\`MULTIPLY\` / \`MAC\` / \`DOT\` / \`SUM\` with \`qXpY\`: overflow wire **\`over\`** is **2×W** bits (W = X+Y), plus **\`4bit status\`**.
+
+### Status register (\`4bit\`) {#status-4bit}
+
+Built-in-uri cu tag de format (\`q4p4\`, \`q8p8\`, \`qXpY\`, \`sX\`, \`fp16\`, \`bf16\`) returnează **\`4bit status\`** în loc de \`1bit\` overflow/inexact. Tag-ul bare **\`signed\`** (adaptiv) păstrează **\`1bit overflow\`**.
+
+Layout MSB-first (bit0 = cel mai din stânga, ca \`bitRange\`):
+
+| Bit | Semnificație |
+|-----|--------------|
+| bit0 | overflow |
+| bit1 | underflow |
+| bit2 | inexact |
+| bit3 | nan |
+
+Exemplu: \`1000\` = doar overflow. Fixed-point: bit0 + bit2 (rotunjire); float: toți cei 4 biți relevanți.
+
+| Returnuri | Built-in |
+|-----------|----------|
+| \`result\`, \`4bit status\` | ADD, SUBTRACT, ABS |
+| \`result\`, \`over\`, \`4bit status\` | MULTIPLY, MAC, DOT, SUM |
+| \`result\`, \`mod\`, \`4bit status\` | DIVIDE |
+
+### \`NFORMAT\` — scalar conversion
+
+\`\`\`
+NFORMAT(a ; <src> to_<dst>) -> result, 4bit status
+\`\`\`
+
+| Tag pair | Result width |
+|----------|--------------|
+| \`; signed to_q4p4\` | 8 |
+| \`; signed to_q8p8\` / \`to_fp16\` / \`to_bf16\` | 16 |
+| \`; q4p4 to_signed\` | 8 (operand width) |
+| \`; q4p4 to_q8p8\` / \`to_fp16\` / \`to_bf16\` | 16 |
+| \`; q8p8\` / \`fp16\` / \`bf16\` ↔ other formats | per destination tag |
+
+\`src\` and \`dst\` must differ. Scalar only — no \`; vector\` / \`; matrix\`. See [builtin-NFORMAT.md](builtin-NFORMAT.md).
+
+\`\`\`logts-play
+8wire a = \\7;q4p4
+16wire r, 4wire st = NFORMAT(a; q4p4 to_fp16)
+show(st)
+\`\`\`
 
 | Built-in | \`; q4p4\` (8-bit) | \`; q8p8\` / \`; fp16\` / \`; bf16\` (16-bit) |
 |----------|------------------|----------------------------------------|
-| ADD / SUBTRACT | fixed-point + overflow flag | fixed / float + flag |
-| MULTIPLY / DIVIDE / MAC | fixed ops + over/mod | fixed / float ops |
-| SUM | fixed sum + over | fixed / float sum + over |
+| ADD / SUBTRACT | fixed-point + **4bit status** | fixed / float + **4bit status** |
+| MULTIPLY / DIVIDE / MAC | fixed ops + over/mod + **status** | fixed / float ops + **status** |
+| SUM | fixed sum + over + **status** | fixed / float sum + over + **status** |
 | MIN / MAX | fixed compare | fixed / float compare |
 | GT / LT | fixed compare → \`1bit\` | fixed / float compare |
 | CLAMP | fixed bounds | fixed / float bounds |
@@ -2364,10 +2408,10 @@ Binary addition with wrap-around.
 \`\`\`
 ADD(Xbit a, Xbit b) -> Xbit result, 1bit carry
 ADD(Xbit a, Xbit b; signed) -> Xbit result, 1bit overflow
-ADD(8bit a, 8bit b; q4p4) -> 8bit result, 1bit overflow
-ADD(16bit a, 16bit b; q8p8) -> 16bit result, 1bit overflow
-ADD(16bit a, 16bit b; fp16) -> 16bit result, 1bit inexact
-ADD(16bit a, 16bit b; bf16) -> 16bit result, 1bit inexact
+ADD(8bit a, 8bit b; q4p4) -> 8bit result, 4bit status
+ADD(16bit a, 16bit b; q8p8) -> 16bit result, 4bit status
+ADD(16bit a, 16bit b; fp16) -> 16bit result, 4bit status
+ADD(16bit a, 16bit b; bf16) -> 16bit result, 4bit status
 ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> Wbit[n], Wbit[n]
 ADD(Wbit[n] a, Wbit/Wbit[n] b ; vector signed) -> Wbit[n], Wbit[n]
 ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix) -> Wbit[n,m], Wbit[n,m]
@@ -2385,10 +2429,10 @@ ADD(Wbit[n,m] a, Wbit/Wbit[n,m]/row/col/scalar b ; matrix signed) -> Wbit[n,m], 
 | Tag | Behaviour |
 |-----|-----------|
 | \`signed\` | Same \`result\` bits; second return is **signed overflow** (not unsigned carry). |
-| \`q4p4\` | Fixed-point Q4.4 on **8-bit** wires; second return = overflow out of representable range. |
-| \`q8p8\` | Fixed-point Q8.8 on **16-bit** wires; second return = overflow. |
-| \`fp16\` | IEEE 754 half on **16-bit** wires; second return = inexact (\`Inf\`/\`NaN\` from finite operands). |
-| \`bf16\` | Brain float 16 on **16-bit** wires; same second return as \`fp16\`. |
+| \`q4p4\` | Fixed-point Q4.4 on **8-bit** wires; second return = **4bit status**. |
+| \`q8p8\` | Fixed-point Q8.8 on **16-bit** wires; second return = **4bit status**. |
+| \`fp16\` | IEEE 754 half on **16-bit** wires; second return = **4bit status**. |
+| \`bf16\` | Brain float 16 on **16-bit** wires; second return = **4bit status**. |
 | \`vector\` | Per index on **rank-1** tensors (\`Wwire[N]\`, \`Wwire[1,N]\`, \`Wwire[N,1]\`); matching \`elementCount\`. |
 | \`matrix\` | Per cell on **matrix** \`Wwire[N,M]\` (\`N>1\`, \`M>1\`); rank-1 operands broadcast. Mutually exclusive with \`vector\`. See [matrix-reduction.md](matrix-reduction.md). |
 
@@ -2442,9 +2486,9 @@ Fixed-point Q4.4: \`1.5 + 0.5 = 2.0\` on 8-bit wires.
 \`\`\`logts-play
 8wire a = 00011000
 8wire b = 00001000
-8wire s, 1wire ovf = ADD(a, b; q4p4)
+8wire s, 4wire st = ADD(a, b; q4p4)
 show(s; q4p4)
-show(ovf)
+show(st)
 \`\`\`
 
 ### \`ADD(16bit a, 16bit b; fp16)\`
@@ -3770,7 +3814,7 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Logic gates** | \`NOT\`, \`AND\`, \`OR\`, \`XOR\`, \`NXOR\`, \`NAND\`, \`NOR\`, \`EQ\` | [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md) · \`EQ\` tags: [builtin-EQ.md](builtin-EQ.md) |
 | **Sequential** | \`LATCH\`, \`REG\` | [builtin-sequential-functions.md](builtin-sequential-functions.md) · \`REG\` → [reg.md](reg.md) |
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
-| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`ABS\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) · tags \`; vector\` / **\`; matrix\`**: [builtin-tagged-index.md](builtin-tagged-index.md) |
+| **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`ABS\`, \`NFORMAT\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) · tags \`; vector\` / **\`; matrix\`**: [builtin-tagged-index.md](builtin-tagged-index.md) |
 | **Vector reduction** | \`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\` | [vector-reduction.md](vector-reduction.md) · **\`; matrix\`** (element-wise 2D): [matrix-reduction.md](matrix-reduction.md) |
 | **Tensor / matrix** | \`SHAPE\`, \`RANK\`, \`PIVOT\`, \`REPEAT\`, \`IDENTITY\`, \`ZEROS\`, \`FILL\`, \`DIAG\`, \`IOTA\`, \`OUTER\`, \`TRACE\`, \`NORM\`, \`L2\`, \`TRIL\`, \`TRIU\`, \`FLIPUD\`, \`FLIPLR\`, \`MCAT\`, \`MSLICE\` | [wire-vectors.md](wire-vectors.md) · [builtin-SHAPE.md](builtin-SHAPE.md) · [builtin-RANK.md](builtin-RANK.md) · [builtin-REPEAT.md](builtin-REPEAT.md) |
 | **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
@@ -5089,6 +5133,108 @@ show(o)
 
 [MAC](builtin-MAC.md) · [DIVIDE](builtin-DIVIDE.md)
 `,
+    'builtin-NFORMAT.md': `# NFORMAT
+
+Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Status register (4bit)](arithmetic.md#status-4bit)
+
+Scalar format conversion: decode source format → real value → encode destination format. Returns **\`4bit status\`** per [arithmetic.md — status register](arithmetic.md#status-4bit).
+
+## Signatures
+
+\`\`\`
+NFORMAT(Xbit a; signed to_q4p4) -> 8bit result, 4bit status
+NFORMAT(Xbit a; signed to_q8p8) -> 16bit result, 4bit status
+NFORMAT(Xbit a; signed to_fp16) -> 16bit result, 4bit status
+NFORMAT(Xbit a; signed to_bf16) -> 16bit result, 4bit status
+NFORMAT(8bit a; q4p4 to_signed) -> 8bit result, 4bit status
+NFORMAT(8bit a; q4p4 to_q8p8) -> 16bit result, 4bit status
+NFORMAT(8bit a; q4p4 to_fp16) -> 16bit result, 4bit status
+NFORMAT(8bit a; q4p4 to_bf16) -> 16bit result, 4bit status
+NFORMAT(16bit a; q8p8 to_signed) -> 16bit result, 4bit status
+NFORMAT(16bit a; q8p8 to_q4p4) -> 8bit result, 4bit status
+NFORMAT(16bit a; q8p8 to_fp16) -> 16bit result, 4bit status
+NFORMAT(16bit a; q8p8 to_bf16) -> 16bit result, 4bit status
+NFORMAT(16bit a; fp16 to_signed) -> 16bit result, 4bit status
+NFORMAT(16bit a; fp16 to_q4p4) -> 8bit result, 4bit status
+NFORMAT(16bit a; fp16 to_q8p8) -> 16bit result, 4bit status
+NFORMAT(16bit a; fp16 to_bf16) -> 16bit result, 4bit status
+NFORMAT(16bit a; bf16 to_signed) -> 16bit result, 4bit status
+NFORMAT(16bit a; bf16 to_q4p4) -> 8bit result, 4bit status
+NFORMAT(16bit a; bf16 to_q8p8) -> 16bit result, 4bit status
+NFORMAT(16bit a; bf16 to_fp16) -> 16bit result, 4bit status
+\`\`\`
+
+Use \`doc(NFORMAT)\` for the full signature list from \`Interpreter.BUILTIN_DOC\`.
+
+## Call tags
+
+Exactly **one source** tag and **one destination** tag (\`to_*\`). Source and destination must differ.
+
+| Source tag | Operand width | Meaning |
+|------------|---------------|---------|
+| \`signed\` | any *W* | Two's complement integer on *W* bits |
+| \`q4p4\` | **8** | Q4.4 fixed-point |
+| \`q8p8\` | **16** | Q8.8 fixed-point |
+| \`fp16\` | **16** | IEEE 754 half |
+| \`bf16\` | **16** | Brain float 16 |
+
+| Destination tag | Result width |
+|-----------------|--------------|
+| \`to_signed\` | same as operand |
+| \`to_q4p4\` | **8** |
+| \`to_q8p8\` | **16** |
+| \`to_fp16\` | **16** |
+| \`to_bf16\` | **16** |
+
+**No \`; vector\`** or **\`; matrix\`** in this release — scalar only.
+
+## Behaviour
+
+1. Decode operand as \`src\` format → real number.
+2. Encode real number as \`dst\` format → \`result\`.
+3. Set \`status\` (4 bits, MSB-first): overflow, underflow, inexact, nan — same layout as ADD/MULTIPLY with format tags.
+
+| Condition | Typical \`status\` |
+|-----------|------------------|
+| Exact conversion | \`0000\` |
+| Fixed-point out of range | \`1000\` (overflow) |
+| Rounding / precision loss | bit2 inexact (\`0010\` or \`1010\`) |
+| Float \`NaN\` input | \`0001\` (nan) |
+
+## Examples
+
+### \`q4p4\` → \`fp16\`
+
+\`\`\`logts-play
+8wire a = \\7;q4p4
+16wire r, 4wire st = NFORMAT(a; q4p4 to_fp16)
+show(r; fp16)
+show(st)
+\`\`\`
+
+\`7.0\` in Q4.4 converts exactly to fp16; \`st = 0000\`.
+
+### \`signed\` → \`q4p4\` overflow
+
+\`\`\`logts-play
+8wire a = \\127;s8
+8wire r, 4wire st = NFORMAT(a; signed to_q4p4)
+show(r; q4p4)
+show(st)
+\`\`\`
+
+\`127\` exceeds Q4.4 range → overflow (\`1000\`).
+
+### \`fp16\` \`NaN\` → \`q4p4\`
+
+\`\`\`logts-play
+16wire nan = 0111111000000000
+8wire r, 4wire st = NFORMAT(nan; fp16 to_q4p4)
+show(st)
+\`\`\`
+
+\`status.bit3\` (nan) set → \`0001\`.
+`,
     'builtin-NORM.md': `# NORM (L2² norm)
 
 Index: [Vector reduction](vector-reduction.md) · [DOT](builtin-DOT.md)
@@ -6120,6 +6266,7 @@ Cross-cutting topics:
 | DIVIDE | [builtin-DIVIDE.md](builtin-DIVIDE.md) | yes | yes | yes | yes | yes | yes | yes | — | — | arithmetic |
 | MAC | [builtin-MAC.md](builtin-MAC.md) | yes | yes | yes | yes | yes | yes | yes | — | — | arithmetic |
 | ABS | [builtin-ABS.md](builtin-ABS.md) | yes | yes | yes | yes | yes | — | — | — | — | arithmetic |
+| NFORMAT | [builtin-NFORMAT.md](builtin-NFORMAT.md) | src | src | src | src | src | — | — | — | — | arithmetic |
 | GT | [builtin-GT.md](builtin-GT.md) | yes | yes | yes | yes | yes | yes | yes | — | — | arithmetic |
 | LT | [builtin-LT.md](builtin-LT.md) | yes | yes | yes | yes | yes | yes | yes | — | — | arithmetic |
 | MIN | [builtin-MIN.md](builtin-MIN.md) | yes | yes | yes | yes | yes | yes | yes | yes | — | arithmetic / vector |

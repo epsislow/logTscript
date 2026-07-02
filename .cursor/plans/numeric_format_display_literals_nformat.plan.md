@@ -31,10 +31,10 @@ todos:
     status: pending
   - id: p3-status
     content: "Faza 3: numeric-formats.js buildStatus (bit0=MSB stanga); ops + interpreter — status 4bit, over+status, mod+status; BUILTIN_DOC + teste + doc toate paginile builtin"
-    status: pending
+    status: completed
   - id: p4-nformat
     content: "Faza 4: NFORMAT scalar — convertFormat + status 4bit; builtin-NFORMAT.md + teste + doc; _gen_doc_data.js"
-    status: pending
+    status: completed
   - id: p5-future
     content: "Faza 5+ (viitor, fara detalii): NFORMAT ; vector / ; matrix"
     status: pending
