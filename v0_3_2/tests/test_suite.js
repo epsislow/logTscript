@@ -17235,11 +17235,28 @@ reg(2051, 'lut-writable', 'countKey and countValue', function(h, session) {
 1wire _ = .huff:add(000, 0011)
 4wire ck = .huff:countKey(000)
 4wire cv = .huff:countValue(0000)
-4wire cm = .huff:countKey(111)`;
+4wire cm = .huff:countKey(111)
+1wire hk = .huff:hasKey(000)
+1wire hv = .huff:hasValue(0000)
+1wire hv2 = .huff:hasValue(0011)`;
   const { interp } = session.run(src);
   h.assert('count key', session.getWire(interp, 'ck'), '0010');
   h.assert('count fill', session.getWire(interp, 'cv'), '0000');
   h.assert('missing key', session.getWire(interp, 'cm'), '0000');
+  h.assert('has key', session.getWire(interp, 'hk'), '1');
+  h.assert('has value fill', session.getWire(interp, 'hv'), '0');
+  h.assert('has value hit', session.getWire(interp, 'hv2'), '1');
+});
+
+reg(2059, 'lut-writable', 'hasKey missing vs get fillwith', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+4wire x = .huff:get(111)
+1wire hk = .huff:hasKey(111)
+4wire ck = .huff:countKey(111)`;
+  const { interp } = session.run(src);
+  h.assert('get fill', session.getWire(interp, 'x'), '0000');
+  h.assert('hasKey 0', session.getWire(interp, 'hk'), '0');
+  h.assert('countKey 0', session.getWire(interp, 'ck'), '0000');
 });
 
 reg(2052, 'lut-writable', 'get fallback fillwith', function(h, session) {

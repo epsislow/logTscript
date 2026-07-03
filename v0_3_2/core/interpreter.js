@@ -1187,6 +1187,8 @@ class Interpreter {
         size: () => lutSize(lutInst),
         countKey: () => lutCountKey(lutInst, args[0], this),
         countValue: () => lutCountValue(lutInst, args[0], this),
+        hasKey: () => lutHasKey(lutInst, args[0], this),
+        hasValue: () => lutHasValue(lutInst, args[0], this),
         isEmpty: () => lutIsEmpty(lutInst),
       };
       if (writableMutators[method]) {

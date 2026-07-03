@@ -12919,9 +12919,27 @@ inline [lut] .huff:
 | \`.lut:remove(key [, matchIndex])\` | Remove entry (no-op if missing) |
 | \`.lut:clear()\` | Remove all entries |
 | \`.lut:size()\` | Entry count |
-| \`.lut:countKey(key)\` | Matches for key (0 if absent) |
-| \`.lut:countValue(value)\` | Matches for value (**0** for fillwith) |
+| \`.lut:countKey(key)\` | Matches for key (**0** if absent; fillwith does not affect key presence) |
+| \`.lut:countValue(value)\` | Matches for value (**0** for fillwith, even if \`get\` would return it) |
+| \`.lut:hasKey(key)\` | \`1\` if any entry has key, else \`0\` (missing key → \`0\`) |
+| \`.lut:hasValue(value)\` | \`1\` if any entry has value, else \`0\` (**0** for fillwith) |
 | \`.lut:isEmpty()\` | \`1\` if no entries |
+
+### \`fillwith\` vs explicit entries
+
+Statistics and reverse lookup scan **only explicit entries** in the list. \`get\` alone uses fillwith as fallback:
+
+| Operation | Key / value absent from list | \`fillwith\` as argument |
+|-----------|------------------------------|-------------------------|
+| \`get(key)\` | returns **fillwith** | — |
+| \`hasKey(key)\` | \`0\` | — |
+| \`countKey(key)\` | \`0\` | — |
+| \`hasValue(fillwith)\` | — | **\`0\`** |
+| \`countValue(fillwith)\` | — | **\`0\`** |
+| \`decode(fillwith)\` | — | **error** |
+| \`isValid(key, fillwith)\` | \`0\` unless pair exists | — |
+
+Read-only LUTs (without \`writable\`) keep the previous \`lutTable\` semantics for \`decode\` / \`get\`.
 
 Writable notes:
 
@@ -13055,6 +13073,105 @@ show(y)
 \`00 → 0\` then \`01 → 10\` — valid prefix-free extension. \`size()\` → \`2\`, lookup \`01\` → \`10\`.
 
 If a new codeword would violate prefix-free (e.g. adding \`01\` when \`0\` already exists), the mutation throws and the table is unchanged.
+
+### Runnable — \`countKey\` / \`countValue\` / \`hasKey\` / \`hasValue\`
+
+\`\`\`logts-play
+inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+
+1wire _ = .huff:add(000, 0011)
+4wire ck = .huff:countKey(000)
+4wire cv_fill = .huff:countValue(0000)
+4wire cv_real = .huff:countValue(0011)
+4wire hk_miss = .huff:hasKey(111)
+4wire hk_hit = .huff:hasKey(000)
+1wire hv_fill = .huff:hasValue(0000)
+1wire hv_hit = .huff:hasValue(0011)
+show(ck)
+show(cv_fill)
+show(cv_real)
+show(hk_miss)
+show(hk_hit)
+show(hv_fill)
+show(hv_hit)
+\`\`\`
+
+\`countKey(000)\` → \`2\` (two explicit entries). \`countValue(0000)\` → \`0\` (fillwith is not counted). \`hasKey(111)\` → \`0\`; \`hasKey(000)\` → \`1\`. \`hasValue(0000)\` → \`0\`; \`hasValue(0011)\` → \`1\`.
+
+### Runnable — \`get\` fallback vs \`hasKey\` (missing key)
+
+\`\`\`logts-play
+inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+  }
+  :
+
+4wire x = .huff:get(111)
+1wire hk = .huff:hasKey(111)
+4wire ck = .huff:countKey(111)
+show(x)
+show(hk)
+show(ck)
+\`\`\`
+
+Key \`111\` is not in the list: \`get\` returns **fillwith** (\`0000\`), but \`hasKey\` → \`0\` and \`countKey\` → \`0\`.
+
+### Runnable — \`decode(fillwith)\` error
+
+\`\`\`logts-play
+inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+  }
+  :
+
+4wire x = .huff:decode(0000)
+show(x)
+\`\`\`
+
+\`decode\` scans explicit entries only — \`fillwith\` is not stored as an entry, so this fails at runtime.
+
+### Runnable — \`set\` with \`matchIndex\` (duplicate keys)
+
+\`\`\`logts-play
+inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+
+1wire _a = .huff:add(000, 0011)
+1wire _b = .huff:set(000, 1100, 0001)
+4wire first = .huff:get(000)
+4wire second = .huff:get(000, 0001)
+show(first)
+show(second)
+\`\`\`
+
+\`set(000, 1100, 1)\` updates the **second** \`000\` entry; the first stays \`0001\`.
 
 ---
 

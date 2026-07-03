@@ -347,6 +347,28 @@ function lutCountValue(inst, valueExpr, ctx) {
   return intToWire(n, statBitWidth(inst));
 }
 
+function lutHasKey(inst, keyExpr, ctx) {
+  requireWritable(inst);
+  const keyBits = resolveKeyOnly(keyExpr, ctx, inst);
+  let n = 0;
+  for (const entry of inst.lutEntryList) {
+    if (entry.key === keyBits) n++;
+  }
+  return { value: n > 0 ? '1' : '0', bitWidth: 1 };
+}
+
+function lutHasValue(inst, valueExpr, ctx) {
+  requireWritable(inst);
+  const valueBits = typeof resolveLutArgValue === 'function'
+    ? resolveLutArgValue(ctx, valueExpr, inst)
+    : '';
+  if (isFillValue(inst, valueBits)) return { value: '0', bitWidth: 1 };
+  for (const entry of inst.lutEntryList) {
+    if (entry.value === valueBits) return { value: '1', bitWidth: 1 };
+  }
+  return { value: '0', bitWidth: 1 };
+}
+
 function lutIsEmpty(inst) {
   requireWritable(inst);
   return { value: inst.lutEntryList.length === 0 ? '1' : '0', bitWidth: 1 };
@@ -370,6 +392,8 @@ const lutWritableExports = {
   lutSize,
   lutCountKey,
   lutCountValue,
+  lutHasKey,
+  lutHasValue,
   lutIsEmpty,
   lutGetWritable,
 };

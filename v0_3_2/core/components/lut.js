@@ -174,7 +174,7 @@ var LutComponent = class LutComponent extends BuiltinComponent {
     lines.push('Writable API (when writable):');
     lines.push('  .name:add(key, value)  .name:set(key, value [, matchIndex])');
     lines.push('  .name:remove(key [, matchIndex])  .name:clear()');
-    lines.push('  .name:size()  .name:countKey(key)  .name:countValue(value)  .name:isEmpty()');
+    lines.push('  .name:size()  .name:countKey(key)  .name:countValue(value)  .name:hasKey(key)  .name:hasValue(value)  .name:isEmpty()');
     lines.push('  .name:get(key [, matchIndex])');
     return lines;
   }
@@ -219,7 +219,7 @@ var LutComponent = class LutComponent extends BuiltinComponent {
     lines.push('    supported');
     if (writable) {
       lines.push('  writable API:');
-      lines.push('    add, set, remove, clear, size, countKey, countValue, isEmpty, get');
+      lines.push('    add, set, remove, clear, size, countKey, countValue, hasKey, hasValue, isEmpty, get');
     }
     lines.push('  matches:');
     lines.push('    reverse lookup');
