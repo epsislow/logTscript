@@ -414,6 +414,133 @@ Writable notes:
 - `writable + prefixFree`: each `add` / `set` re-validates prefix-free codewords; violations throw and leave the list unchanged.
 - Mutations are used as expressions, e.g. `1wire _ = .huff:add(000, C)` (standalone `.huff:add(...)` is not a statement).
 
+### Runnable — `:add(key, value)`
+
+Appends a new entry. Duplicate keys are kept in order; `get(key)` returns the first match unless `matchIndex` is supplied.
+
+```logts-play
+inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+
+1wire _ = .huff:add(000, 0011)
+4wire first = .huff:get(000)
+4wire second = .huff:get(000, 0001)
+4wire sz = .huff:size()
+show(first)
+show(second)
+show(sz)
+```
+
+After `add`, key `000` has two entries: first `0001`, second `0011`. `size()` → `3`.
+
+### Runnable — `:set(key, value)`
+
+Replaces the first matching key, or appends if the key is absent.
+
+```logts-play
+inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+
+1wire _ = .huff:set(000, 1111)
+4wire x = .huff:get(000)
+show(x)
+```
+
+Key `000` was `0001` → now `1111`. Key `001` unchanged (`0010`).
+
+### Runnable — `:remove(key)`
+
+Removes the first entry with the given key. No error if the key is missing.
+
+```logts-play
+inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+
+1wire _a = .huff:add(000, 0011)
+1wire _b = .huff:remove(000)
+4wire sz = .huff:size()
+4wire x = .huff:get(000)
+show(sz)
+show(x)
+```
+
+Removes the **first** `000` entry (`0001`). The appended `0011` remains; `size()` → `2`.
+
+### Runnable — `:clear()`
+
+Removes all entries. Lookups fall back to `fillwith`.
+
+```logts-play
+inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+
+1wire _ = .huff:clear()
+1wire empty = .huff:isEmpty()
+4wire sz = .huff:size()
+4wire x = .huff:get(000)
+show(empty)
+show(sz)
+show(x)
+```
+
+`isEmpty()` → `1`, `size()` → `0`, `get(000)` → `fillwith` (`0000`).
+
+### Runnable — `prefixFree` + `:add` (incremental Huffman)
+
+With `writable` and `prefixFree`, each `add` / `set` must keep codewords prefix-free. Build a codebook step by step:
+
+```logts-play
+inline [lut] .huff:
+  writable
+  prefixFree
+  data {
+    00: 0
+  }
+  :
+
+1wire _ = .huff:add(01, 10)
+4wire sz = .huff:size()
+2wire y = .huff(01)
+show(sz)
+show(y)
+```
+
+`00 → 0` then `01 → 10` — valid prefix-free extension. `size()` → `2`, lookup `01` → `10`.
+
+If a new codeword would violate prefix-free (e.g. adding `01` when `0` already exists), the mutation throws and the table is unchanged.
+
 ---
 
 ## `show()` and `probe()` with labels
