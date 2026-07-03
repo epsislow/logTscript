@@ -12927,7 +12927,7 @@ inline [lut] .huff:
 
 ### \`fillwith\` vs explicit entries
 
-Statistics and reverse lookup scan **only explicit entries** in the list. \`get\` alone uses fillwith as fallback:
+Statistics scan **only explicit entries** in the list. \`get\` uses fillwith as a fallback, and \`decode\` treats fillwith as a table operation (unmapped slots hold it):
 
 | Operation | Key / value absent from list | \`fillwith\` as argument |
 |-----------|------------------------------|-------------------------|
@@ -12936,14 +12936,16 @@ Statistics and reverse lookup scan **only explicit entries** in the list. \`get\
 | \`countKey(key)\` | \`0\` | — |
 | \`hasValue(fillwith)\` | — | **\`0\`** |
 | \`countValue(fillwith)\` | — | **\`0\`** |
-| \`decode(fillwith)\` | — | **error** |
+| \`decode(fillwith)\` | — | **first unmapped slot** (then gaps by \`matchIndex\`) |
 | \`isValid(key, fillwith)\` | \`0\` unless pair exists | — |
+
+\`decode\` is a table operation, not a \`get\`: it first returns keys of **explicit entries** with the value, then — when the value equals \`fillwith\` — the **unmapped slot addresses** in ascending order. This mirrors read-only \`decode\` (which scans \`lutTable\`, fill slots included), while duplicate-key entries are still decodable from the list.
 
 Read-only LUTs (without \`writable\`) keep the previous \`lutTable\` semantics for \`decode\` / \`get\`.
 
 Writable notes:
 
-- \`decode(fillwith)\` → error (fillwith is not an explicit entry); read-only LUTs still decode via \`lutTable\` including fill slots.
+- \`decode(fillwith)\` returns the first unmapped slot (gap); with \`matchIndex\` it walks the gaps. It only errors when there are no matching entries **and** no unmapped slots (fully-mapped table with a non-fill value).
 - \`writable + prefixFree\`: each \`add\` / \`set\` re-validates prefix-free codewords; violations throw and leave the list unchanged.
 - Mutations are used as expressions, e.g. \`1wire _ = .huff:add(000, C)\` (standalone \`.huff:add(...)\` is not a statement).
 
@@ -13130,7 +13132,7 @@ show(ck)
 
 Key \`111\` is not in the list: \`get\` returns **fillwith** (\`0000\`), but \`hasKey\` → \`0\` and \`countKey\` → \`0\`.
 
-### Runnable — \`decode(fillwith)\` error
+### Runnable — \`decode(fillwith)\` returns unmapped slots
 
 \`\`\`logts-play
 inline [lut] .huff:
@@ -13143,11 +13145,13 @@ inline [lut] .huff:
   }
   :
 
-4wire x = .huff:decode(0000)
-show(x)
+4wire slot = .huff:decode(0000)
+4wire slot2 = .huff:decode(0000, 0001)
+show(slot)
+show(slot2)
 \`\`\`
 
-\`decode\` scans explicit entries only — \`fillwith\` is not stored as an entry, so this fails at runtime.
+Only slot \`000\` is mapped (\`0001\`). \`decode(0000)\` — the fillwith — returns the **first unmapped slot** (\`0001\`), and \`matchIndex 1\` the next gap (\`0010\`). Real values still decode from explicit entries: \`decode(0001)\` → \`0000\`.
 
 ### Runnable — \`set\` with \`matchIndex\` (duplicate keys)
 

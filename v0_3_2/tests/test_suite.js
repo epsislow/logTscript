@@ -17273,10 +17273,13 @@ reg(2053, 'lut-writable', 'decode on entry list', function(h, session) {
   h.assert('key', session.getWire(interp, 'x'), '0001');
 });
 
-reg(2054, 'lut-writable', 'decode(fillValue) error', function(h, session) {
-  const { out } = session.run(WRITABLE_LUT_BASE + '\n4wire x = .huff:decode(0000)');
-  const err = out.find(l => l.startsWith('Error:')) || '';
-  h.assert('error', String(err.includes('does not exist')), 'true');
+reg(2054, 'lut-writable', 'decode(fillValue) returns first unmapped slot', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+4wire slot = .huff:decode(0000)
+4wire slot2 = .huff:decode(0000, 0001)`;
+  const { interp } = session.run(src);
+  h.assert('first gap', session.getWire(interp, 'slot'), '0010');
+  h.assert('second gap', session.getWire(interp, 'slot2'), '0011');
 });
 
 reg(2055, 'lut-writable', 'mutation without writable errors', function(h, session) {

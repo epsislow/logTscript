@@ -213,14 +213,22 @@ function lutDecodeWritable(inst, valueExpr, matchIndexExpr, ctx) {
   const valueBits = typeof resolveLutArgValue === 'function'
     ? resolveLutArgValue(ctx, valueExpr, inst)
     : '';
-  if (isFillValue(inst, valueBits)) {
-    throw new Error(`LUT decode failed:\nvalue ${valueBits} does not exist in lookup table`);
-  }
   const matchIndex = parseMatchIndex(matchIndexExpr, ctx, inst);
 
   const matches = [];
   for (const entry of list) {
     if (entry.value === valueBits) matches.push(entry.key);
+  }
+
+  // When the requested value equals fillwith, unmapped slots also "hold" it
+  // (mirrors read-only decode over lutTable). Explicit entries come first,
+  // then the gap addresses in ascending order.
+  if (isFillValue(inst, valueBits)) {
+    const occupied = new Set(list.map(e => e.key));
+    for (let i = 0; i < length; i++) {
+      const keyBits = i.toString(2).padStart(addrWidth, '0');
+      if (!occupied.has(keyBits)) matches.push(keyBits);
+    }
   }
 
   if (!matches.length) {
