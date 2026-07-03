@@ -303,6 +303,10 @@ function parseLutBody(bodyRaw) {
       attributes.prefixFree = true;
       continue;
     }
+    if (trimmed === 'writable') {
+      attributes.writable = true;
+      continue;
+    }
 
     const colon = trimmed.indexOf(':');
     if (colon >= 0) {

@@ -3745,6 +3745,18 @@ isBuiltinFunction(name) {
     for (const line of beforeData.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
+      if (trimmed === 'writable') {
+        attributes.writable = true;
+        continue;
+      }
+      if (trimmed === 'variableDepth') {
+        attributes.variableDepth = true;
+        continue;
+      }
+      if (trimmed === 'prefixFree') {
+        attributes.prefixFree = true;
+        continue;
+      }
       const colon = trimmed.indexOf(':');
       if (colon < 0) continue;
       const key = trimmed.slice(0, colon).trim();
@@ -4174,7 +4186,11 @@ isBuiltinFunction(name) {
         throw Error(`Unclosed '(' in component invocation at ${this.c.line}:${this.c.col}`);
       }
       if (Object.keys(args).length > 0) {
-        throw Error(`Component invocation accepts at most one argument at ${this.c.line}:${this.c.col}`);
+        this.eat('SYM', ',');
+        this.t.skip();
+      }
+      if (Object.keys(args).length >= 2) {
+        throw Error(`Component invocation accepts at most two arguments at ${this.c.line}:${this.c.col}`);
       }
       if (this.c.type === 'ID') {
         const argName = this.c.value;
@@ -4185,18 +4201,19 @@ isBuiltinFunction(name) {
           this.eat('SYM', '=');
           this.t.skip();
           args[argName] = this.expr();
-        } else {
+        } else if (!args.in) {
           this._syncTokenizerAt(idStartPos);
           args.in = this.expr();
+        } else {
+          this._syncTokenizerAt(idStartPos);
+          args.matchIndex = this.expr();
         }
-      } else {
+      } else if (!args.in) {
         args.in = this.expr();
+      } else {
+        args.matchIndex = this.expr();
       }
       this.t.skip();
-      if (!(this.c.type === 'SYM' && this.c.value === ')')) {
-        throw Error(`Component invocation accepts at most one argument at ${this.c.line}:${this.c.col}`);
-      }
-      break;
     }
     this.eat('SYM', ')');
     const invoke = { var: compName, args };

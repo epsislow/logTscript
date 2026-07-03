@@ -17150,6 +17150,174 @@ reg(2043, 'builtin-nformat', 'NFORMAT vector matrix mutually exclusive', functio
   h.assert('exclusive', String(err.includes('mutually exclusive')), 'true');
 });
 
+const WRITABLE_LUT_BASE = `inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :`;
+
+reg(2044, 'lut-writable', 'writable parse + flag', function(h, session) {
+  session.run(WRITABLE_LUT_BASE);
+  const inst = session.interp.inlineInstances.get('.huff');
+  h.assert('writable', String(!!inst.writable), 'true');
+  h.assert('entry list', String(inst.lutEntryList.length), '2');
+});
+
+reg(2045, 'lut-writable', 'add append duplicate keys', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:add(000, 0011)
+4wire a = .huff:get(000)
+4wire b = .huff:get(000, 0001)
+4wire sz = .huff:size()`;
+  const { interp } = session.run(src);
+  h.assert('first', session.getWire(interp, 'a'), '0001');
+  h.assert('second', session.getWire(interp, 'b'), '0011');
+  h.assert('size', session.getWire(interp, 'sz'), '0011');
+});
+
+reg(2046, 'lut-writable', 'set first match', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:set(000, 1111)
+4wire x = .huff:get(000)`;
+  const { interp } = session.run(src);
+  h.assert('updated', session.getWire(interp, 'x'), '1111');
+});
+
+reg(2047, 'lut-writable', 'set append missing key', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:set(010, 1010)
+4wire x = .huff:get(010)
+4wire sz = .huff:size()`;
+  const { interp } = session.run(src);
+  h.assert('value', session.getWire(interp, 'x'), '1010');
+  h.assert('size', session.getWire(interp, 'sz'), '0011');
+});
+
+reg(2048, 'lut-writable', 'set with matchIndex', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _a = .huff:add(000, 0011)
+1wire _b = .huff:set(000, 1100, 0001)
+4wire a = .huff:get(000)
+4wire b = .huff:get(000, 0001)`;
+  const { interp } = session.run(src);
+  h.assert('first', session.getWire(interp, 'a'), '0001');
+  h.assert('second', session.getWire(interp, 'b'), '1100');
+});
+
+reg(2049, 'lut-writable', 'remove first match', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _a = .huff:add(000, 0011)
+1wire _b = .huff:remove(000)
+4wire sz = .huff:size()
+4wire a = .huff:get(000)`;
+  const { interp } = session.run(src);
+  h.assert('size', session.getWire(interp, 'sz'), '0010');
+  h.assert('remaining', session.getWire(interp, 'a'), '0011');
+});
+
+reg(2050, 'lut-writable', 'clear + isEmpty', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:clear()
+1wire e = .huff:isEmpty()
+4wire sz = .huff:size()`;
+  const { interp } = session.run(src);
+  h.assert('empty', session.getWire(interp, 'e'), '1');
+  h.assert('size', session.getWire(interp, 'sz'), '0000');
+});
+
+reg(2051, 'lut-writable', 'countKey and countValue', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:add(000, 0011)
+4wire ck = .huff:countKey(000)
+4wire cv = .huff:countValue(0000)
+4wire cm = .huff:countKey(111)`;
+  const { interp } = session.run(src);
+  h.assert('count key', session.getWire(interp, 'ck'), '0010');
+  h.assert('count fill', session.getWire(interp, 'cv'), '0000');
+  h.assert('missing key', session.getWire(interp, 'cm'), '0000');
+});
+
+reg(2052, 'lut-writable', 'get fallback fillwith', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+4wire x = .huff:get(111)`;
+  const { interp } = session.run(src);
+  h.assert('fill', session.getWire(interp, 'x'), '0000');
+});
+
+reg(2053, 'lut-writable', 'decode on entry list', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+4wire x = .huff:decode(0010)`;
+  const { interp } = session.run(src);
+  h.assert('key', session.getWire(interp, 'x'), '0001');
+});
+
+reg(2054, 'lut-writable', 'decode(fillValue) error', function(h, session) {
+  const { out } = session.run(WRITABLE_LUT_BASE + '\n4wire x = .huff:decode(0000)');
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('error', String(err.includes('does not exist')), 'true');
+});
+
+reg(2055, 'lut-writable', 'mutation without writable errors', function(h, session) {
+  const { out } = session.run(`inline [lut] .ro:
+  depth: 4
+  length: 16
+  data { 000 : 0001 }
+  :
+1wire _ = .ro:add(000, 0010)`);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('not writable', String(err.includes('not writable')), 'true');
+});
+
+reg(2056, 'lut-writable', 'prefixFree add valid', function(h, session) {
+  const src = `inline [lut] .huff:
+  writable
+  prefixFree
+  data {
+    00: 0
+  }
+  :
+1wire _ = .huff:add(01, 10)
+4wire sz = .huff:size()`;
+  const { interp } = session.run(src);
+  h.assert('size', session.getWire(interp, 'sz'), '0010');
+});
+
+reg(2057, 'lut-writable', 'prefixFree add violation', function(h, session) {
+  const { out } = session.run(`inline [lut] .huff:
+  writable
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+1wire _ = .huff:add(00, 01)
+4wire sz = .huff:size()`);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('prefix error', String(err.includes('prefixFree violation')), 'true');
+});
+
+reg(2058, 'lut-writable', 'read-only decode fillwith unchanged', function(h, session) {
+  const src = `inline [lut] .ro:
+  depth: 4
+  length: 16
+  fillwith: 1111
+  data {
+    0000 : 0001
+  }
+  :
+4wire x = .ro:decode(1111)`;
+  const { interp } = session.run(src);
+  h.assert('fill slot', session.getWire(interp, 'x'), '0001');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

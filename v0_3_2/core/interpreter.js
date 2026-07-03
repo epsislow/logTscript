@@ -826,7 +826,10 @@ class Interpreter {
       throw Error(`Component ${compName} does not support inline invocation`);
     }
     const args = invoke.args || {};
-    for (const [argName, argExpr] of Object.entries(args)) {
+    const compArgs = comp.type === 'lut'
+      ? Object.fromEntries(Object.entries(args).filter(([k]) => k === 'in'))
+      : args;
+    for (const [argName, argExpr] of Object.entries(compArgs)) {
       const exprResult = this.evalExpr(argExpr, false);
       let value = '';
       for (const part of exprResult) {
@@ -1039,6 +1042,13 @@ class Interpreter {
     if (!this.componentRegistry) throw Error('Component registry unavailable for inline LUT');
     const handler = this.componentRegistry.get('lut');
     if (!handler) throw Error('LUT handler unavailable for inline invocation');
+    const writable = !!(inst.writable || (inst.attributes && inst.attributes.writable));
+    if (writable) {
+      if (typeof lutLookupWritable !== 'function') throw Error('Writable LUT module is not loaded');
+      const inExpr = invoke.args.in;
+      if (!inExpr) throw Error(`LUT invocation ${inst.name}(...) requires address argument 'in'`);
+      return lutLookupWritable(inst, inExpr, invoke.args.matchIndex, this);
+    }
     const length = inst.attributes.length !== undefined ? parseInt(inst.attributes.length, 10) : 16;
     const depth = inst.attributes.depth !== undefined ? parseInt(inst.attributes.depth, 10) : 4;
     const addrBits = handler._addrBits(length);
@@ -1147,13 +1157,42 @@ class Interpreter {
 
     const lutInst = this._getLutInst(instName);
     if (lutInst) {
+      const writable = !!(lutInst.writable || (lutInst.attributes && lutInst.attributes.writable));
       if (method === 'isValid') {
+        if (writable) {
+          if (typeof lutIsValidWritable !== 'function') throw new Error('Writable LUT module is not loaded');
+          return lutIsValidWritable(lutInst, args[0], args[1], this);
+        }
         if (typeof lutIsValid !== 'function') throw new Error('LUT decode module is not loaded');
         return lutIsValid(lutInst, args[0], args[1], this);
       }
       if (method === 'decode') {
+        if (writable) {
+          if (typeof lutDecodeWritable !== 'function') throw new Error('Writable LUT module is not loaded');
+          return lutDecodeWritable(lutInst, args[0], args[1], this);
+        }
         if (typeof lutDecode !== 'function') throw new Error('LUT decode module is not loaded');
         return lutDecode(lutInst, args[0], args[1], this);
+      }
+      if (method === 'get') {
+        if (!writable) throw new Error(`LUT ${instName} is not writable`);
+        if (typeof lutGetWritable !== 'function') throw new Error('Writable LUT module is not loaded');
+        return lutGetWritable(lutInst, args[0], args[1], this);
+      }
+      const writableMutators = {
+        add: () => lutAdd(lutInst, args[0], args[1], this),
+        set: () => lutSet(lutInst, args[0], args[1], args[2], this),
+        remove: () => lutRemove(lutInst, args[0], args[1], this),
+        clear: () => lutClear(lutInst),
+        size: () => lutSize(lutInst),
+        countKey: () => lutCountKey(lutInst, args[0], this),
+        countValue: () => lutCountValue(lutInst, args[0], this),
+        isEmpty: () => lutIsEmpty(lutInst),
+      };
+      if (writableMutators[method]) {
+        if (!writable) throw new Error(`LUT ${instName} is not writable`);
+        if (typeof lutAdd !== 'function') throw new Error('Writable LUT module is not loaded');
+        return writableMutators[method]();
       }
     }
 
@@ -1191,14 +1230,25 @@ class Interpreter {
         }
       }
     }
-    const lutTable = handler._buildTable(length, depth, fillwith, initialValue);
+    const writable = !!(attributes && attributes.writable);
+    let lutEntryList = null;
+    let lutTable;
+    if (writable && typeof buildWritableLutTable === 'function') {
+      const tempInst = { attributes, fillwithValue: fillwith, lutEntryList: [] };
+      lutTable = buildWritableLutTable(tempInst, length, depth, fillwith, initialValue);
+      lutEntryList = tempInst.lutEntryList;
+    } else {
+      lutTable = handler._buildTable(length, depth, fillwith, initialValue);
+    }
     this.inlineInstances.set(name, {
       kind: 'lut',
       name,
       attributes,
+      writable,
       fillwithValue: fillwith,
       lutEntries: initialValue.entries || [],
       lutRawEntries: initialValue.rawEntries || [],
+      lutEntryList,
       lutTable,
       labelMap: built.labelMap || {},
       labelExprs: built.labelExprs || {},

@@ -157,6 +157,7 @@ var LutComponent = class LutComponent extends BuiltinComponent {
   static formatInlineTypeDoc() {
     const lines = [];
     lines.push('inline [lut] .name:');
+    lines.push('  writable            # optional: enable runtime add/set/remove');
     lines.push('  depth: 4');
     lines.push('  length: 16');
     lines.push('  fillwith: 0110');
@@ -169,6 +170,12 @@ var LutComponent = class LutComponent extends BuiltinComponent {
     lines.push('Lookup (combinational):');
     lines.push('  .name(in = addr)   # named address');
     lines.push('  .name(0011)        # positional address');
+    lines.push('');
+    lines.push('Writable API (when writable):');
+    lines.push('  .name:add(key, value)  .name:set(key, value [, matchIndex])');
+    lines.push('  .name:remove(key [, matchIndex])  .name:clear()');
+    lines.push('  .name:size()  .name:countKey(key)  .name:countValue(value)  .name:isEmpty()');
+    lines.push('  .name:get(key [, matchIndex])');
     return lines;
   }
 
@@ -176,11 +183,15 @@ var LutComponent = class LutComponent extends BuiltinComponent {
     const attrs = inst.attributes || {};
     const variableDepth = !!attrs.variableDepth;
     const prefixFree = !!attrs.prefixFree;
+    const writable = !!attrs.writable;
     const depth = attrs.depth !== undefined ? parseInt(attrs.depth, 10) : 4;
     const length = attrs.length !== undefined ? parseInt(attrs.length, 10) : 16;
     const fill = inst.fillwithValue || (variableDepth ? '0' : '0'.repeat(depth));
     const lines = [];
     lines.push(`${alias} (inline [lut])`);
+    if (writable) {
+      lines.push('  writable');
+    }
     if (prefixFree) {
       lines.push('  prefixFree');
     } else if (variableDepth) {
@@ -206,11 +217,21 @@ var LutComponent = class LutComponent extends BuiltinComponent {
     }
     lines.push('  decode:');
     lines.push('    supported');
+    if (writable) {
+      lines.push('  writable API:');
+      lines.push('    add, set, remove, clear, size, countKey, countValue, isEmpty, get');
+    }
     lines.push('  matches:');
     lines.push('    reverse lookup');
     const raw = inst.lutRawEntries || [];
     const entries = inst.lutEntries || [];
-    if (raw.length) {
+    const entryList = inst.lutEntryList || [];
+    if (writable && entryList.length) {
+      lines.push('  entries:');
+      for (const e of entryList) {
+        lines.push(`    ${e.key} -> ${e.value}`);
+      }
+    } else if (raw.length) {
       lines.push(labelNames.length ? '  data:' : '  map:');
       for (let i = 0; i < raw.length; i++) {
         const r = raw[i];

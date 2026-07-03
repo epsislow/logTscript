@@ -12892,6 +12892,45 @@ Protocol reverse transform: [protocol.md — \`:decode()\`](protocol.md#decodech
 
 ---
 
+## Writable LUT API (\`inline [lut]\` only)
+
+Add the \`writable\` flag to enable runtime \`add\` / \`set\` / \`remove\` / \`clear\` and statistics on an **ordered entry list** (duplicate keys allowed). Without \`writable\`, the LUT stays read-only.
+
+\`\`\`logts
+inline [lut] .huff:
+    writable
+    depth: 8
+    length: 16
+    fillwith: 00000000
+    data {
+        000 : 00000001
+        001 : 00000010
+    }
+    :
+\`\`\`
+
+| Method | Description |
+|--------|-------------|
+| \`.lut(key)\` / \`.lut:get(key)\` | First value for key; missing key → **fillwith** |
+| \`.lut(key, matchIndex)\` | Nth matching entry for key |
+| \`.lut:decode(value)\` | Reverse lookup on **entry list** |
+| \`.lut:add(key, value)\` | Append entry |
+| \`.lut:set(key, value [, matchIndex])\` | Replace or append |
+| \`.lut:remove(key [, matchIndex])\` | Remove entry (no-op if missing) |
+| \`.lut:clear()\` | Remove all entries |
+| \`.lut:size()\` | Entry count |
+| \`.lut:countKey(key)\` | Matches for key (0 if absent) |
+| \`.lut:countValue(value)\` | Matches for value (**0** for fillwith) |
+| \`.lut:isEmpty()\` | \`1\` if no entries |
+
+Writable notes:
+
+- \`decode(fillwith)\` → error (fillwith is not an explicit entry); read-only LUTs still decode via \`lutTable\` including fill slots.
+- \`writable + prefixFree\`: each \`add\` / \`set\` re-validates prefix-free codewords; violations throw and leave the list unchanged.
+- Mutations are used as expressions, e.g. \`1wire _ = .huff:add(000, C)\` (standalone \`.huff:add(...)\` is not a statement).
+
+---
+
 ## \`show()\` and \`probe()\` with labels
 
 \`\`\`logts

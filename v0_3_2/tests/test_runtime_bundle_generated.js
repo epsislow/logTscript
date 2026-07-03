@@ -55,6 +55,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/protocol-assembler.js",
   "core/lut-labels.js",
   "core/lut-decode.js",
+  "core/lut-writable.js",
   "core/boolean-minimize.js",
   "core/logic-value.js",
   "core/boolean-lut.js",
