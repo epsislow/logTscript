@@ -290,10 +290,12 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
 
       let anyScheduled = false;
       for (const compName of compsChanged) {
+        // Run conditional assignments / property blocks before re-evaluating wires
+        // that depend on this component (e.g. MUX(.sw:get, …, .lut:size()) after clear).
+        interp.updateComponentConnections(compName, new Set());
         if (this._scheduleWiresDependingOnComponent(compName, executedThisPropagate)) {
           anyScheduled = true;
         }
-        interp.updateComponentConnections(compName, new Set());
       }
 
       const changed = this.commitPendingWires();
@@ -1123,6 +1125,8 @@ Interpreter.prototype.updateComponentConnections = function(compName, _visited =
       block.lastSetValue = newSetValue;
     }
   }
+
+  this.reevaluateConditionalAssignmentsForComponent(compName, comp ? comp.ref : null);
   
   // Check property blocks that have dependencies on the changed component
   // This handles cases where a block has dependencies (like a = .as) but setExprDirectRef is null or constant
@@ -1364,6 +1368,33 @@ Interpreter.prototype.exprDependsOnTilde = function(expr, visitedWires = new Set
   }
   
   return false;
+};
+
+Interpreter.prototype.conditionalAssignmentDependsOnComponent = function(entry, compName, compRef) {
+  if (!entry || !entry.triggerExpr || !compName) return false;
+  if (entry.dependencies && entry.dependencies.has(compName)) return true;
+  if (this.exprReferencesComponent(entry.triggerExpr, compName, compRef)) return true;
+  if (!entry.wireDependencies || entry.wireDependencies.size === 0) return false;
+  for (const wireName of entry.wireDependencies) {
+    const ws = this.wireStatements.find((w) => {
+      if (w.assignment) return w.assignment.target.var === wireName;
+      if (w.decls) return w.decls.some((d) => d.name === wireName);
+      return false;
+    });
+    if (!ws) continue;
+    const expr = ws.assignment ? ws.assignment.expr : ws.expr;
+    if (expr && this.exprReferencesComponent(expr, compName, compRef)) return true;
+  }
+  return false;
+};
+
+Interpreter.prototype.reevaluateConditionalAssignmentsForComponent = function(compName, compRef) {
+  if (!this.conditionalAssignments || this.conditionalAssignments.length === 0) return;
+  for (const entry of this.conditionalAssignments) {
+    if (entry.insideBody || !entry.triggerExpr) continue;
+    if (!this.conditionalAssignmentDependsOnComponent(entry, compName, compRef)) continue;
+    this.tryExecuteConditionalAssignment(entry, false);
+  }
 };
 
 // Check if expression depends on special variables that change ($ and % only, NOT ~)

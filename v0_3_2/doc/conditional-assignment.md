@@ -209,6 +209,89 @@ zeroFlag = 0
 show(fired)
 ```
 
+### Switch trigger — clear LUT from the panel
+
+**Load** this example, press **Run**, then flip the **clr** switch in **Devices**.
+
+- `probe(.clear)` — confirms the switch toggles.
+- `4wire hSize = .huff:size()` + `probe(hSize)` — after a rising-edge clear, `hSize` refreshes and probe shows the new value.
+
+Use a **wire** for LUT size (not `probe(.huff:size())` — inline LUT methods are not valid probe targets).
+
+```logts-play wave
+MODE WIREWRITE
+
+inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+
+comp [switch] .clear:
+  text: 'clr'
+  :
+
+1wire ok = 0
+
+on:raise {
+  .clear:get,
+  ok = .huff:clear()
+}
+
+probe(.clear)
+4wire hSize = .huff:size()
+probe(hSize)
+```
+
+After **Load & Run**, flip **clr** once (`0→1`). **Output** should show `hSize = 0000 - changed`.
+
+`on:raise` fires only on rising edges — toggling back to `0` does not clear again until the next `0→1`.
+
+### MUX sentinel — verify `hSize` on every toggle
+
+Use `1111` as a sentinel when `.clear` is `0`, and real `.huff:size()` when `.clear` is `1`. With `on:1`, each `0→1` clears the LUT; each `1→0` shows `1111` again.
+
+```logts-play wave
+MODE WIREWRITE
+
+inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+
+comp [switch] .clear:
+  text: 'clr'
+  :
+
+4wire hSize = MUX(.clear:get, 1111, .huff:size())
+1wire ok = 0
+
+on:1 {
+  .clear:get,
+  ok = .huff:clear()
+}
+
+probe(.clear)
+probe(hSize)
+```
+
+Toggle **clr** `0→1→0→1` — **Output** alternates `hSize = 0000` / `1111` (no spurious `0010` after clear).
+
+### Alternate — add on fall, clear on rise
+
+`on:raise` with `!.clear:get` adds an entry when the switch falls; `on:1` clears when it rises. `hSize = .huff:size()` changes every toggle (`0010` → `0000` → `0001` → …).
+
 ---
 
 ## Restrictions

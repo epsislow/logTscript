@@ -17443,6 +17443,176 @@ clearFlag = 1`;
   h.assert('lut cleared wave', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
 });
 
+reg(2067, 'conditional-assignment', 'on:raise switch via wire (wave)', function(h, session) {
+  session.propagation = 'wave';
+  const src = COND_LUT_BASE + `
+comp [switch] .clear:
+  text: 'clr'
+  :
+
+1wire clearFlag = .clear
+1wire ok = 0
+
+on:raise {
+  clearFlag,
+  ok = .huff:clear()
+}
+
+4wire hSize = .huff:size()`;
+  const { interp } = session.run(src);
+  h.assert('init lut', String(interp.inlineInstances.get('.huff').lutEntryList.length), '2');
+  session.setComp(interp, '.clear', '1');
+  h.assert('lut cleared', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+  h.assert('clearFlag', session.getWire(interp, 'clearFlag'), '1');
+  h.assert('hSize refreshed', session.getWire(interp, 'hSize'), '0000');
+});
+
+reg(2068, 'conditional-assignment', 'on:raise switch direct .clear:get (wave)', function(h, session) {
+  session.propagation = 'wave';
+  const src = `MODE WIREWRITE
+` + COND_LUT_BASE + `
+comp [switch] .clear:
+  text: 'clr'
+  :
+
+1wire ok = 0
+
+on:raise {
+  .clear:get,
+  ok = .huff:clear()
+}`;
+  const { interp } = session.run(src);
+  session.setComp(interp, '.clear', '1');
+  h.assert('lut cleared', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+});
+
+reg(2069, 'conditional-assignment', 'switch hSize wire refreshes on clear (wave)', function(h, session) {
+  session.propagation = 'wave';
+  const src = `MODE WIREWRITE
+` + COND_LUT_BASE + `
+comp [switch] .clear:
+  text: 'clr'
+  :
+
+on:raise {
+  .clear:get,
+  ok = .huff:clear()
+}
+
+1wire ok = 0
+4wire hSize = .huff:size()
+probe(hSize)`;
+  const { interp } = session.run(src);
+  session.setComp(interp, '.clear', '1');
+  h.assert('lut cleared', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+  h.assert('hSize refreshed', session.getWire(interp, 'hSize'), '0000');
+});
+
+reg(2070, 'conditional-assignment', 'switch double toggle no recursion (wave)', function(h, session) {
+  session.propagation = 'wave';
+  const src = `MODE WIREWRITE
+` + COND_LUT_BASE + `
+comp [switch] .clear:
+  text: 'clr'
+  :
+
+on:raise {
+  .clear:get,
+  ok = .huff:clear()
+}
+
+1wire ok = 0
+4wire hSize = .huff:size()
+probe(hSize)`;
+  const { interp } = session.run(src);
+  for (let i = 0; i < 4; i++) {
+    session.setComp(interp, '.clear', i % 2 === 0 ? '1' : '0');
+  }
+  h.assert('lut still empty', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+  h.assert('hSize stable', session.getWire(interp, 'hSize'), '0000');
+});
+
+reg(2071, 'conditional-assignment', 'on:1 MUX hSize alternates on switch toggle (wave)', function(h, session) {
+  session.propagation = 'wave';
+  const src = `MODE WIREWRITE
+` + COND_LUT_BASE + `
+comp [switch] .clear:
+  text: 'clr'
+  :
+
+4wire hSize = MUX(.clear:get, 1111, .huff:size())
+1wire ok = 0
+
+on:1 {
+  .clear:get,
+  ok = .huff:clear()
+}
+
+probe(.clear)
+probe(hSize)`;
+  const { interp } = session.run(src);
+  h.assert('init hSize sentinel', session.getWire(interp, 'hSize'), '1111');
+  h.assert('init lut', String(interp.inlineInstances.get('.huff').lutEntryList.length), '2');
+
+  session.setComp(interp, '.clear', '1');
+  h.assert('lut cleared on 0->1', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+  h.assert('hSize size when clear 1', session.getWire(interp, 'hSize'), '0000');
+
+  session.setComp(interp, '.clear', '0');
+  h.assert('hSize sentinel when clear 0', session.getWire(interp, 'hSize'), '1111');
+
+  session.setComp(interp, '.clear', '1');
+  h.assert('hSize size when clear 1', session.getWire(interp, 'hSize'), '0000');
+
+  session.setComp(interp, '.clear', '0');
+  h.assert('hSize sentinel again', session.getWire(interp, 'hSize'), '1111');
+
+  session.setComp(interp, '.clear', '1');
+  h.assert('hSize size again', session.getWire(interp, 'hSize'), '0000');
+});
+
+reg(2072, 'conditional-assignment', 'on:1 clear and on:raise add alternate lut size (wave)', function(h, session) {
+  session.propagation = 'wave';
+  const src = `MODE WIREWRITE
+` + COND_LUT_BASE + `
+comp [switch] .clear:
+  text: 'clr'
+  :
+
+4wire hSize = .huff:size()
+1wire ok = 0
+
+on:1 {
+  .clear:get,
+  ok = .huff:clear()
+}
+
+on:raise {
+  !.clear:get,
+  ok = .huff:add(010, 1010)
+}
+
+probe(hSize)`;
+  const { interp } = session.run(src);
+  h.assert('init size', session.getWire(interp, 'hSize'), '0010');
+
+  session.setComp(interp, '.clear', '1');
+  h.assert('cleared', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+  h.assert('size 0', session.getWire(interp, 'hSize'), '0000');
+
+  session.setComp(interp, '.clear', '0');
+  h.assert('added one', String(interp.inlineInstances.get('.huff').lutEntryList.length), '1');
+  h.assert('size 1', session.getWire(interp, 'hSize'), '0001');
+
+  session.setComp(interp, '.clear', '1');
+  h.assert('cleared again', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+  h.assert('size 0 again', session.getWire(interp, 'hSize'), '0000');
+
+  session.setComp(interp, '.clear', '0');
+  h.assert('added again', String(interp.inlineInstances.get('.huff').lutEntryList.length), '1');
+  h.assert('size 1 again', session.getWire(interp, 'hSize'), '0001');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

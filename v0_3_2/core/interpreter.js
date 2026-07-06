@@ -802,6 +802,57 @@ class Interpreter {
     return null;
   }
 
+  _exprReferencesInlineLutInst(expr, instName, readOnly) {
+    if (!expr || !Array.isArray(expr) || !instName) return false;
+    const readonlyMethods = new Set([
+      'size', 'isEmpty', 'countKey', 'countValue', 'hasKey', 'hasValue', 'get', 'decode', 'isValid',
+    ]);
+    const mutators = new Set(['clear', 'add', 'set', 'remove']);
+    for (const atom of expr) {
+      if (atom.inlineMethod && atom.inlineMethod.var === instName) {
+        const m = atom.inlineMethod.method;
+        if (readOnly) return readonlyMethods.has(m);
+        return true;
+      }
+      if (!readOnly) {
+        if (atom.compInvoke && atom.compInvoke.var === instName) return true;
+        if (atom.var === instName) return true;
+      }
+      if (atom.group && this._exprReferencesInlineLutInst(atom.group, instName, readOnly)) return true;
+      if (typeof this.forEachSubExprInAtom === 'function') {
+        let found = false;
+        this.forEachSubExprInAtom(atom, (sub) => {
+          if (this._exprReferencesInlineLutInst(sub, instName, readOnly)) found = true;
+        });
+        if (found) return true;
+      }
+      if (readOnly) continue;
+      if (mutators.has(atom.property)) return true;
+    }
+    return false;
+  }
+
+  _notifyInlineLutMutation(instName) {
+    if (this._lutMutationNotifyDepth) return;
+    this._lutMutationNotifyDepth = true;
+    try {
+      for (const ws of this.wireStatements) {
+        const expr = ws.assignment ? ws.assignment.expr : ws.expr;
+        if (!expr || !this._exprReferencesInlineLutInst(expr, instName, true)) continue;
+        const outputs = this.execWireStatement(ws, true);
+        if (!outputs || !outputs.length) continue;
+        for (const [wName, wVal] of outputs) {
+          if (this.deferWirePropagation()) {
+            this.writeWireStable(wName, wVal);
+          }
+          this._emitProbeForWire(wName, wVal);
+        }
+      }
+    } finally {
+      this._lutMutationNotifyDepth = false;
+    }
+  }
+
   _emitComputedComponentProbes(compName) {
     for (const target of this.probeTargets) {
       if (target.kind !== 'componentComputed' || target.compName !== compName) continue;
@@ -1195,7 +1246,11 @@ class Interpreter {
       if (writableMutators[method]) {
         if (!writable) throw new Error(`LUT ${instName} is not writable`);
         if (typeof lutAdd !== 'function') throw new Error('Writable LUT module is not loaded');
-        return writableMutators[method]();
+        const result = writableMutators[method]();
+        if (method === 'clear' || method === 'add' || method === 'set' || method === 'remove') {
+          this._notifyInlineLutMutation(instName);
+        }
+        return result;
       }
     }
 
