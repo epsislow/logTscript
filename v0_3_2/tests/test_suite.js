@@ -17693,9 +17693,14 @@ on:1 {
   h.assert('qsz size when clear 1 again', session.getWire(interp, 'qsz'), '00001');
 });
 
-reg(2076, 'lut-writable', 'keys values entries export', function(h, session) {
+reg(2076, 'lut-writable', 'keys values entries export (wave on:1)', function(h, session) {
   const src = WRITABLE_LUT_BASE + `
-1wire _ = .huff:add(010, 1010)
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .huff:add(010, 1010)
+}
 4wire[3] ks = .huff:keys()
 4wire[3] vs = .huff:values()
 4wire[3,2] ent = .huff:entries()`;
@@ -17703,17 +17708,22 @@ reg(2076, 'lut-writable', 'keys values entries export', function(h, session) {
   h.assert('keys', session.getWire(interp, 'ks'), '000000010010');
   h.assert('values', session.getWire(interp, 'vs'), '000100101010');
   h.assert('entries', session.getWire(interp, 'ent'), '000000010001001000101010');
-});
+}, { propagation: 'wave' });
 
-reg(2077, 'lut-writable', 'keys values empty after clear', function(h, session) {
+reg(2077, 'lut-writable', 'keys values empty after clear (wave on:1)', function(h, session) {
   const src = WRITABLE_LUT_BASE + `
-1wire _ = .huff:clear()
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .huff:clear()
+}
 4wire sz = .huff:size()
 1wire e = .huff:isEmpty()`;
   const { interp } = session.run(src);
   h.assert('size', session.getWire(interp, 'sz'), '0000');
   h.assert('empty', session.getWire(interp, 'e'), '1');
-});
+}, { propagation: 'wave' });
 
 reg(2078, 'builtin-sort', 'SORT vector asc', function(h, session) {
   const src =
@@ -17776,18 +17786,45 @@ reg(2084, 'builtin-sort', 'SORT col out of range', function(h, session) {
   }, 'out of range');
 });
 
-reg(2085, 'builtin-sort', 'SORT entries from writable lut', function(h, session) {
-  const src = WRITABLE_LUT_BASE + `
-1wire _0 = .huff:clear()
-1wire _a = .huff:add(000, 0001)
-1wire _b = .huff:add(001, 0100)
-1wire _c = .huff:add(010, 0011)
+reg(2085, 'builtin-sort', 'SORT entries from writable lut (wave)', function(h, session) {
+  const src = `inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0100
+    010 : 0011
+  }
+  :
 4wire[3,2] e = .huff:entries()
 4wire[3,2] s = SORT(e; col=1)
 4wire[3] syms = s::0`;
   const { interp } = session.run(src);
   h.assert('by freq asc', session.getWire(interp, 'syms'), '000000100001');
-});
+}, { propagation: 'wave' });
+
+reg(2086, 'lut-writable', 'wave bare add runs twice on propagate', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:add(010, 1010)`;
+  const { interp } = session.run(src);
+  h.assert('double add', String(interp.inlineInstances.get('.huff').lutEntryList.length), '4');
+}, { propagation: 'wave' });
+
+reg(2087, 'lut-writable', 'wave on:1 add runs once', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .huff:add(010, 1010)
+}
+4wire[3] ks = .huff:keys()`;
+  const { interp } = session.run(src);
+  h.assert('once', String(interp.inlineInstances.get('.huff').lutEntryList.length), '3');
+  h.assert('keys', session.getWire(interp, 'ks'), '000000010010');
+}, { propagation: 'wave' });
 
 
   window.LogTScriptTestSuite = {

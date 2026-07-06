@@ -57,7 +57,7 @@ show(keys)
 
 ### LUT entries by value (frequency column)
 
-```logts-play
+```logts-play wave
 inline [lut] .freq:
   writable
   depth: 4

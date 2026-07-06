@@ -6049,16 +6049,18 @@ show(keys)
 
 ### LUT entries by value (frequency column)
 
-\`\`\`logts-play
+\`\`\`logts-play wave
 inline [lut] .freq:
   writable
   depth: 4
   length: 16
   fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0100
+    010 : 0011
+  }
   :
-1wire _ = .freq:add(000, 0001)
-1wire _ = .freq:add(001, 0100)
-1wire _ = .freq:add(010, 0011)
 4wire[3,2] e = .freq:entries()
 4wire[3,2] s = SORT(e; col=1)
 4wire[3] syms = s::0
@@ -13338,7 +13340,26 @@ inline [lut] .huff:
 
 Read-only snapshots of the **ordered entry list** (same order as \`add\` / \`set\`). Empty list → zero-length blob (declare width \`0\` or match \`size()\`).
 
-\`\`\`logts-play
+**Sizing:** declare rank-1 tensors with element count = \`.lut:size()\` and element width = **\`bitIndexWidth(length)\`** for keys (e.g. \`length: 16\` → 4 bits per key) and **\`depth\`** for values (unless \`variableDepth\`). For \`:entries\`, use \`Ewire[N,2]\` with \`Ewire = max(keyW, depth)\` and \`N = size()\`.
+
+### Wave mode and mutable methods (\`on:\`)
+
+In the editor, **wave** is the default propagation mode. After **Run**, wave **\`propagate()\` re-executes tracked wire statements** — including a top-level \`1wire _ = .lut:add(...)\`, so **\`:add\` / \`:set\` / \`:remove\` can run twice on the first Run** (append twice, etc.). **\`show\` does not mutate the LUT**; it runs after propagation.
+
+**Safe patterns in wave:**
+
+| Pattern | When to use |
+|---------|-------------|
+| Static \`data { ... }\` | Fixed codebook / export demos |
+| \`on:1 { trigger, ok = .lut:mutate(...) }\` | One-shot init (\`trigger = 1\` on first RUN) |
+| \`on:raise { trigger, ok = .lut:mutate(...) }\` | Mutate on \`0→1\` edge (switch, flag) |
+| \`logts-play legacy\` | Multi-step mutation scripts in docs |
+
+Use a named wire for the assignment (\`ok = .huff:add(...)\`) — not \`_\` (undefined in \`on:\` blocks). See [conditional assignment](conditional-assignment.md).
+
+**Affected methods:** \`:add\`, \`:set\`, \`:remove\`, \`:clear\` (all mutate \`lutEntryList\`). Read-only methods (\`:keys\`, \`:values\`, \`:entries\`, \`:get\`, \`:size\`, …) are safe to assign on a wire; re-execution only refreshes the snapshot.
+
+\`\`\`logts-play wave
 inline [lut] .freq:
   writable
   depth: 4
@@ -13349,7 +13370,12 @@ inline [lut] .freq:
     001 : 0010
   }
   :
-1wire _ = .freq:add(010, 1010)
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .freq:add(010, 1010)
+}
 4wire[3] ks = .freq:keys()
 4wire[3] vs = .freq:values()
 4wire[3,2] ent = .freq:entries()
@@ -13388,7 +13414,7 @@ Writable notes:
 
 Appends a new entry. Duplicate keys are kept in order; \`get(key)\` returns the first match unless \`matchIndex\` is supplied.
 
-\`\`\`logts-play
+\`\`\`logts-play wave
 inline [lut] .huff:
   writable
   depth: 4
@@ -13400,7 +13426,12 @@ inline [lut] .huff:
   }
   :
 
-1wire _ = .huff:add(000, 0011)
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .huff:add(000, 0011)
+}
 4wire first = .huff:get(000)
 4wire second = .huff:get(000, 0001)
 4wire sz = .huff:size()
@@ -13415,7 +13446,7 @@ After \`add\`, key \`000\` has two entries: first \`0001\`, second \`0011\`. \`s
 
 Replaces the first matching key, or appends if the key is absent.
 
-\`\`\`logts-play
+\`\`\`logts-play wave
 inline [lut] .huff:
   writable
   depth: 4
@@ -13427,7 +13458,12 @@ inline [lut] .huff:
   }
   :
 
-1wire _ = .huff:set(000, 1111)
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .huff:set(000, 1111)
+}
 4wire x = .huff:get(000)
 show(x)
 \`\`\`
@@ -13438,7 +13474,7 @@ Key \`000\` was \`0001\` → now \`1111\`. Key \`001\` unchanged (\`0010\`).
 
 Removes the first entry with the given key. No error if the key is missing.
 
-\`\`\`logts-play
+\`\`\`logts-play legacy
 inline [lut] .huff:
   writable
   depth: 4
@@ -13464,7 +13500,7 @@ Removes the **first** \`000\` entry (\`0001\`). The appended \`0011\` remains; \
 
 Removes all entries. Lookups fall back to \`fillwith\`.
 
-\`\`\`logts-play
+\`\`\`logts-play wave
 inline [lut] .huff:
   writable
   depth: 4
@@ -13476,7 +13512,12 @@ inline [lut] .huff:
   }
   :
 
-1wire _ = .huff:clear()
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .huff:clear()
+}
 1wire empty = .huff:isEmpty()
 4wire sz = .huff:size()
 4wire x = .huff:get(000)
@@ -13500,7 +13541,7 @@ on:raise {
 
 With \`writable\` and \`prefixFree\`, each \`add\` / \`set\` must keep codewords prefix-free. Build a codebook step by step:
 
-\`\`\`logts-play
+\`\`\`logts-play wave
 inline [lut] .huff:
   writable
   prefixFree
@@ -13509,7 +13550,12 @@ inline [lut] .huff:
   }
   :
 
-1wire _ = .huff:add(01, 10)
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .huff:add(01, 10)
+}
 4wire sz = .huff:size()
 2wire y = .huff(01)
 show(sz)
@@ -13522,7 +13568,7 @@ If a new codeword would violate prefix-free (e.g. adding \`01\` when \`0\` alrea
 
 ### Runnable — \`countKey\` / \`countValue\` / \`hasKey\` / \`hasValue\`
 
-\`\`\`logts-play
+\`\`\`logts-play wave
 inline [lut] .huff:
   writable
   depth: 4
@@ -13534,7 +13580,12 @@ inline [lut] .huff:
   }
   :
 
-1wire _ = .huff:add(000, 0011)
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .huff:add(000, 0011)
+}
 4wire ck = .huff:countKey(000)
 4wire cv_fill = .huff:countValue(0000)
 4wire cv_real = .huff:countValue(0011)
@@ -13599,7 +13650,7 @@ Only slot \`000\` is mapped (\`0001\`). \`decode(0000)\` — the fillwith — re
 
 ### Runnable — \`set\` with \`matchIndex\` (duplicate keys)
 
-\`\`\`logts-play
+\`\`\`logts-play legacy
 inline [lut] .huff:
   writable
   depth: 4

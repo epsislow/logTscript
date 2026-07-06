@@ -2377,6 +2377,7 @@ class Interpreter {
   }
 
   trackWireStatement(s) {
+    if (this._executingConditionalAssignment) return;
     if (!this.insidePcbBody && !this.wireStatements.includes(s)) {
       this.wireStatements.push(s);
     }
@@ -14501,7 +14502,12 @@ Interpreter.prototype.executeConditionalAssignmentEntry = function(entry) {
   if (this._uccExecutedStatements && entry.sourceStmt) {
     this._uccExecutedStatements.add(entry.sourceStmt);
   }
-  this.exec({ assignment: entry.assignment }, true);
+  this._executingConditionalAssignment = true;
+  try {
+    this.exec({ assignment: entry.assignment }, true);
+  } finally {
+    this._executingConditionalAssignment = false;
+  }
 };
 
 Interpreter.prototype.tryExecuteConditionalAssignment = function(entry, isFirstRun) {
