@@ -1,317 +1,744 @@
 ---
 name: Huffman wave demo
-overview: "Faza 0 (prioritară): mod propagare signal/sim — simulator digital (re-exec stmt în settle, NEXT ca osc pe ~). Apoi huffman-v2.md: (A) add static; (B) osc scan preferat."
+overview: "Faza 0b/0c/0d: LUT export + SORT + keyAt + popMin/peekMin. Faza 0z: NEXT wave. Huffman v2 (inclusiv N-general cu popMin). Fără buildFrom."
 todos:
-  - id: phase0-signal-mode-design
-    content: "Design mod signal/sim: semantica re-exec în settle, NEXT fără _recomputeAllWires, closure pe ~; doc signal-propagation.md"
+  - id: lut-keys-values-entries
+    content: "Writable LUT: .lut:keys, .lut:values, .lut:entries [N,2] — export lutEntryList; teste + doc lut.md"
     status: pending
-  - id: phase0-signal-strategy
-    content: "SignalPropagationStrategy + createSignalPropagationStrategy('signal'); toggle UI wave/legacy/signal; teste regresie + feedback/NEXT"
+  - id: builtin-SORT
+    content: "Builtin SORT + doc: builtin-SORT.md nou; curățare sintaxă multi-; în builtin-ARGMAX.md, builtin-ARGMIN.md, matrix-reduction.md, vector-reduction.md; teste SORT"
     status: pending
-  - id: test-writable-protocol-wave
-    content: "Teste huffman-wave: round-trip writable → expand → huffPacket → huffRecover (128–200 biți, padding =:, propagation wave)"
+  - id: lut-keyAt-valueAt
+    content: "Writable LUT: .lut:keyAt(i) + .lut:valueAt(i) — acces index singular; teste lut-writable"
     status: pending
-  - id: test-osc-scan-wave
-    content: "Teste huffman-wave-osc: counter + osc tick + slice dinamic + set gated hasKey; oprire MUX la lungime; apoi encode"
+  - id: lut-minmax-removeAt
+    content: "Writable LUT: removeAt(idx), peekMin/Max, popMin/Max cu tag-uri format (; q4p4 signed s4…); parser callTags pe inlineMethod; teste + doc lut.md"
     status: pending
-  - id: design-payload-codebook
-    content: "Literal sursă ~200 biți, keyWidth 4b; v1 coduri prefixFree pre-calculate; v2 osc — alfabet mic + value=symbol sau coduri fixe mapate"
+  - id: phase0z-next-like-osc
+    content: "Faza 0z: NEXT în wave = cascade ca osc (fără _recomputeAllWires); teste regresie + doc — imediat înainte de Huffman"
+    status: pending
+  - id: gap-analysis-huffman
+    content: "Inventar pas-cu-pas Huffman: ce merge azi vs ce lipsește; propuneri extensii GENERICE (nu Huffman-specific)"
+    status: pending
+  - id: huffman-freq-scan
+    content: "Implementare/test scan frecvențe: osc+counter+slice+on:raise+writable freq LUT (add/set/ADD)"
+    status: pending
+  - id: huffman-code-assign
+    content: "Atribuire coduri prefixFree din frecvențe — logică în script (alfabet mic) sau extensie generică dacă gap confirmat"
+    status: pending
+  - id: test-huffman-wave-full
+    content: "Teste huffman-wave: freq→codes→expand→huffPacket→huffRecover round-trip wave 128–200 biți"
     status: pending
   - id: huffman-v2-md
-    content: "huffman-v2.md — secțiuni v1 (static add) + v2 osc (multi-step), ambele logts-play wave, show x3, explicații propagare/NEXT vs osc"
+    content: "huffman-v2.md — pipeline complet în limbaj, gap-uri documentate, logts-play wave, osc, on:"
     status: pending
   - id: regen-manifest-doc
-    content: "doc-index.json + regen doc/test manifest; link din huffman.md; mențiune osc + counter + slice dinamic"
+    content: "doc-index + regen; cross-ref conditional-assignment, counter, osc, lut writable"
+    status: pending
+  - id: backlog-signal-mode
+    content: "BACKLOG după Huffman: mod signal (simulator digital settle complet)"
     status: pending
 isProject: false
 ---
 
-# Plan: Huffman v2 — compresie/decompresie wave (două variante)
+# Plan: Huffman v2 — simulator digital, fără shortcut-uri
 
-## Obiectiv
+## Principiu (decizie utilizator)
 
-Document **nou** [`v0_3_2/doc/huffman-v2.md`](v0_3_2/doc/huffman-v2.md) cu exemple **complete** (`logts-play wave` → **Load** / **Load & Run**), acoperind encode/decode pe date lungi (~128–200 biți) cu `inline [lut] writable` + `.huffPacket` / `.huffRecover`.
+- **Nu** `buildFrom`, **nu** builtin Huffman, **nu** cheat-uri domain-specific.
+- Tot ce se poate face cu **limbajul de simulator digital** existent: wires, `comp`, `inline [lut] writable`, `on:` conditional assignment, `expand`/`collapse`, protocol, built-in-uri (`ADD`, `MUX`, `GT`, …), `osc`, `counter`, slice dinamic.
+- Unde **nu** putem: documentăm gap-ul explicit și propunem **extensie generică** (componentă, metodă LUT, builtin reutilizabil) — nu Huffman în engine.
 
-**Preferință utilizator:** varianta **B — `comp [osc]`** ca clock pentru scan multi-step (nu doar NEXT manual).
-
-[`huffman.md`](v0_3_2/doc/huffman.md) rămâne v1 (codebook static); v2 documentează ambele abordări de construire codebook.
+[`conditional-assignment.md`](v0_3_2/doc/conditional-assignment.md) — **livrat** (2060–2075). [`huffman.md`](v0_3_2/doc/huffman.md) — v1 static.
 
 ---
 
-## Faza 0 — Mod propagare `signal` / `sim` (ÎNAINTE de Faza 1)
+## Ordine lucrări
 
-**Motivație:** Wave actual e un compromis între settle combinațional și execuție secvențială. Pentru demo Huffman osc + counter + feedback, utilizatorul dorește comportament de **simulator digital de semnale**, nu „rulează fiecare statement o dată per RUN/NEXT”.
+| # | Lucru |
+|---|---|
+| **0b** | **`:keys` / `:values` / `:entries`** + builtin **`SORT`** (+ curățare doc multi-`;`) |
+| **0c** | **`keyAt(i)` / `valueAt(i)`** (acces singular) |
+| **0d** | **`removeAt(idx)`**, **`peekMin`/`peekMax`**, **`popMin`/`popMax`** (+ tag-uri format numeric) — **coadă min pe LUT** pentru Huffman N-general |
+| **0z** | **NEXT în wave** = comportament osc — **ultimul pas înainte de Huffman** |
+| **1** | Huffman: freq scan + `SORT(.freq:entries)` + coduri + round-trip |
+| **2** | Teste + `huffman-v2.md` complet |
+| **Later** | Mod `signal` (backlog) |
 
-### Problema actuală (wave)
+---
 
-| Mecanism | Comportament | Efect |
-|---|---|---|
-| `executedThisPropagate` | Fiecare wire statement max **1× per `propagate()`** (inclusiv inner `maxWaves`) | Blochează re-evaluare combinațională în același settle |
-| `onNextCycle` → `_recomputeAllWires = true` | La **NEXT**, **toate** statement-urile se re-evaluează | Simulează limbaj secvențial, nu osc parțial |
-| osc tick | `propagate()` nou, **doar lanț dependent** | Comportament dorit pentru clock |
+## Faza 0b — LUT export bulk + builtin `SORT` (DECIS)
 
-Doc confirmă: self-referential `a = NOT(a)` → „one update per user action” ([signal-propagation.md](v0_3_2/doc/signal-propagation.md)).
+**Scop:** sortare frecvențe Huffman fără alfabet fix, fără `ARGSORT` în v1.
 
-### Ce NU recomandăm
+### API LUT (writable)
 
-- **Eliminarea globală a guard-ului din `wave`** — rupe stabilitatea, ~1500+ teste, risc runaway fără cap (`maxWaves` există dar nu e suficient semantic).
-- **Buton simplu „off guard”** fără mod separat — utilizatorii fără feedback loops ar primi comportament imprevizibil.
+| Metodă | Return | Note |
+|--------|--------|------|
+| `.lut:keys` | `addrWidth wire[N]` | cheile din `lutEntryList`, ordine inserție |
+| `.lut:values` | `depth wire[N]` | valorile (lățime fixă `depth`; `variableDepth` = max width) |
+| `.lut:entries` | `addrWidth wire[N,2]` | col **0** = cheie, col **1** = valoare |
 
-### Recomandare: mod nou **`signal`** (sau `sim` / `electric`)
+- Sursă: **`lutEntryList`** (ca `add`/`set`), nu slot-uri `fillwith`.
+- `size()=0` → vectori lungime 0 / matrice `[0,2]` (de definit în teste).
+- Duplicate keys: fiecare intrare din listă apare (util la `freq` cu `set` pe aceeași cheie = o singură intrare).
 
-**Nu modificăm `wave` existent** (backward compat). Adăugăm a **3-a strategie** lângă `wave` și `legacy`:
+### Reguli tag-uri la apel (canonic)
 
-Infrastructură deja pregătită:
-- [`createSignalPropagationStrategy(kind)`](v0_3_2/core/components/index.js) — extinde cu `'signal'`
-- Editor: [`togglePropagationMode()`](v0_3_2/ui/app.js) — cycle `wave` → `legacy` → `signal`
-- Opțional script: `MODE SIGNAL` (parallel cu `MODE ZSTATE`)
+Un singur **`;`** separă argumentele de tag-uri. După `;`, tag-urile sunt **spațiu-separate**, în **orice ordine**:
 
-#### Semantica propusă `signal`
+| Formă | Semnificație |
+|-------|----------------|
+| `tag` | tag bool = 1 (ex. `desc`, `index`) |
+| `tag=N` | tag cu valoare numerică (int, de obicei decimal la apel) |
 
-**1. Settle combinațional (per RUN / per eveniment UI / per osc tick)**
+**Interzis:** `; tag1 ; tag2` — al doilea `;` e eroare de parse (`Extra ';' between tags'`). Corect: `; tag1 tag2`.
 
-- Inner loop `maxWaves`: statement-urile **pot re-rula** când un input din dependency graph s-a schimbat (fără `executedThisPropagate` permanent, sau reset per wave când deps changed).
-- Convergență la fixed-point sau oprire la `maxWaves` + warning/debug.
-- `a = NOT(a)` → oscilație detectată / o singură toggle (documentat), nu loop infinit.
+Referințe: [`user-functions.md` — Tag overloads](v0_3_2/doc/user-functions.md), `parser.js` → `parseFuncTags()`.
 
-**2. NEXT în mod `signal`**
+### Curățare doc sintaxă multi-`;` (împreună cu SORT)
 
-- **Fără** `_recomputeAllWires = true`.
-- Comportament ca **osc**: declanșează doar **closure-ul de dependență** pornind de la `~`:
-  - property blocks cu `set = ~` sau `set` depinde de `~`;
-  - wire statements care referă `~` sau wires/componente atinse de aceste block-uri.
-- `REG(..., ~, ...)` — latch la NEXT, ca acum, dar fără re-evaluarea întregului program.
+**Același pas de implementare ca builtin `SORT`** — nu task separat. Șterge / înlocuiește toate aparițiile `; tag1 ; tag2` (ex. `; row; index`) cu tag-uri spațiu-separate (ex. `; row index`).
 
-**3. osc / switch / dip**
+| Fișier | Ce se corectează |
+|--------|------------------|
+| [`builtin-ARGMAX.md`](v0_3_2/doc/builtin-ARGMAX.md) | semnături + exemple: `; row index`, `; col index` (nu `; row; index`) |
+| [`builtin-ARGMIN.md`](v0_3_2/doc/builtin-ARGMIN.md) | idem |
+| [`matrix-reduction.md`](v0_3_2/doc/matrix-reduction.md) | exemple `ARGMAX(m; row index)` |
+| [`vector-reduction.md`](v0_3_2/doc/vector-reduction.md) | idem |
 
-- Identic cu wave actual: `scheduleComponentOutputChange` → `propagate()` cu semantica `signal` settle.
+Regula de aur în aceste pagini: **un singur `;` per apel**; tag-urile după el sunt separate prin spațiu. `builtin-SORT.md` (nou) documentează de la început regula corectă (`col=1`, `desc col=1`, etc.).
 
-```mermaid
-flowchart TB
-  subgraph wave_now [wave actual]
-    W1["1 exec per stmt per propagate"]
-    W2["NEXT = recompute ALL wires"]
-  end
-  subgraph signal_new [signal propus]
-    S1["re-exec stmt când deps changed în settle"]
-    S2["NEXT = cascade doar din ~"]
-    S3["osc = cascade din output osc"]
-  end
+### Builtin `SORT` — sintaxă (DECIS)
+
+La ARGMAX/SUM, `row` / `col` sunt tag-uri **bool** (reducere pe axă). La SORT, `col` / `row` sunt tag-uri **cu valoare** = indexul coloanei/rândului cheie:
+
+```
+SORT(Wbit[n] vector) -> Wbit[n]
+SORT(Wbit[n] vector; desc) -> Wbit[n]
+
+SORT(Wbit[r,c] matrix; col=k) -> Wbit[r,c]   # reordonează RÂNDURILE după coloana k
+SORT(Wbit[r,c] matrix; row=k) -> Wbit[r,c]   # reordonează COLOANELE după rândul k
+SORT(...; col=k desc)                          # ordinea tag-urilor e liberă
 ```
 
-### Fișiere Faza 0
+Exemple apel:
+
+```logts
+SORT(entries; col=1)           # asc (implicit) pe coloana 1 (frecvențe)
+SORT(entries; desc col=1)      # echivalent — tag-uri în orice ordine
+SORT(entries; row=0)             # reordonează coloanele după rândul 0
+SORT(vector; desc)
+```
+
+- `col=k` / `row=k` — **mutual exclusive**; matricea necesită exact unul.
+- `k` = int nenegativ (literal decimal în tag, ex. `col=1`).
+- `desc` = tag bool; fără `desc` → **asc** unsigned (implicit).
+- **Stabil** la egalitate; compare unsigned pe coloana/rândul cheie.
+- **Nu** `ARGSORT` în v1; **nu** `keysAt`/`valuesAt` în v1.
+
+**Invalid:** `SORT(matrix; 0 col)` — `0` nu e nume de tag; folosește `col=0`. `SORT(matrix; col 1)` — `1` singur nu e tag; folosește `col=1`.
+
+### Acces coloane după sort (important)
+
+Pe matrice `[N,2]`:
+
+| Intenție | Sintaxă corectă |
+|----------|-----------------|
+| coloana cheilor | `sorted::0` |
+| coloana valorilor | `sorted::1` |
+| rândul 0 (cheie+valoare pereche) | `sorted:0` |
+
+`matrix:0` = **rând** 0, nu coloana 0 — vezi [wire-vectors.md — indexing 2D](v0_3_2/doc/wire-vectors.md#indexing-2d).
+
+### Pipeline Huffman (Pas 4)
+
+```logts
+8wire[n,2] e = .freq:entries
+8wire[n,2] byFreq = SORT(e; col=1)            # asc — cele mai mici frecvențe primele (merge Huffman)
+4wire[n] syms = byFreq::0
+8wire[n] cnts = byFreq::1
+```
+
+Pentru „cel mai frecvent” direct: `SORT(e; col=1 desc)` + primul rând `byFreq:0` sau `ARGMAX` pe `byFreq::1`.
+
+### Fișiere
+
+| Fișier | Schimbare |
+|--------|-----------|
+| [`lut-writable.js`](v0_3_2/core/lut-writable.js) | `lutKeys`, `lutValues`, `lutEntries` |
+| [`interpreter.js`](v0_3_2/core/interpreter.js) | dispatch `:keys`/`:values`/`:entries`; builtin `SORT` |
+| [`lut.md`](v0_3_2/doc/lut.md) | secțiune export + runnable |
+| **nou** [`builtin-SORT.md`](v0_3_2/doc/builtin-SORT.md) | semnături `col=k` / `row=k` / `desc`; reguli tag-uri |
+| [`builtin-ARGMAX.md`](v0_3_2/doc/builtin-ARGMAX.md) | **șterge** sintaxa `; row; index` → `; row index` |
+| [`builtin-ARGMIN.md`](v0_3_2/doc/builtin-ARGMIN.md) | **șterge** sintaxa multi-`;` (ca ARGMAX) |
+| [`matrix-reduction.md`](v0_3_2/doc/matrix-reduction.md) | **șterge** sintaxa multi-`;` în exemple |
+| [`vector-reduction.md`](v0_3_2/doc/vector-reduction.md) | **șterge** sintaxa multi-`;` în exemple |
+| [`tests/test_suite.js`](v0_3_2/tests/test_suite.js) | lut export ~2076+; SORT ~2085+ |
+
+### Teste minime
+
+| Test | Verifică |
+|------|----------|
+| `add`×3 → `:keys`, `:values`, `:entries` | ordine + shape `[3,2]` |
+| `SORT(entries; col=1)` | rânduri după col 1 asc |
+| `SORT(entries; desc col=1)` | desc; ordine tag-uri liberă |
+| `SORT(entries; row=0)` | reordonează coloane după rând 0 |
+| egalități pe col 1 | sort stabil |
+| `SORT(vector)` | vector simplu |
+| `col=k` / `row=k` out of range | eroare |
+
+### Backlog (nu v1)
+
+| API | Motiv |
+|-----|-------|
+| `ARGSORT(vector)` | frumos generic; Huffman acoperit cu `SORT` + `::0` |
+| `.lut:keysAt(idxVec)` / `valuesAt` | `SORT` + slice sau viitor `GATHER` |
+
+---
+
+## Faza 0c — Writable LUT: `keyAt(i)` / `valueAt(i)` (DECIS)
+
+**Scop:** parcurgere runtime a intrărilor din `lutEntryList` (ordine de inserție), fără alfabet fix hardcodat.
+
+### API propus
+
+| Metodă | Semnătură | Return |
+|--------|-----------|--------|
+| `.lut:keyAt(i)` | `i` = index **0 … size()-1** | cheia intrării `i` (lățime addr) |
+| `.lut:valueAt(i)` | idem | valoarea intrării `i` (depth sau variableDepth) |
+
+```logts
+4wire i = \0
+4wire n = .freq:size()
+4wire key = .freq:keyAt(i)
+8wire val = .freq:valueAt(i)
+```
+
+- Sursă de adevăr: **`lutEntryList`** (aceeași ordine ca `add`/`set`), nu scan `lutTable` pe slot-uri goale.
+- **`i` out of range** (`i >= size()` sau negativ): **eroare runtime** (consistent cu alte LUT ops invalide).
+- Doar pe **`writable`** LUT; read-only → eroare „not writable” (ca celelalte mutații).
+- Duplicate keys: `keyAt`/`valueAt` pe index — fiecare intrare din listă e vizibilă (util dacă lista are duplicate).
+
+### Fișiere
+
+| Fișier | Schimbare |
+|--------|-----------|
+| [`lut-writable.js`](v0_3_2/core/lut-writable.js) | `lutKeyAt`, `lutValueAt` |
+| [`interpreter.js`](v0_3_2/core/interpreter.js) | dispatch `:keyAt` / `:valueAt` |
+| [`lut.md`](v0_3_2/doc/lut.md) | secțiune Writable API + runnable |
+| [`tests/test_suite.js`](v0_3_2/tests/test_suite.js) | grup `lut-writable` — keyAt/valueAt, bounds, după add/set |
+
+### Teste minime (ID ~2076+, înainte de huffman-wave)
+
+| Test | Verifică |
+|------|----------|
+| `keyAt(0)` / `valueAt(0)` după `add` | cheie/valoare corecte |
+| două `add` → `keyAt(0)`, `keyAt(1)` | ordine listă |
+| `set` înlocuiește → `valueAt` actualizat | sync listă |
+| `i >= size()` | eroare |
+| read-only LUT `:keyAt` | eroare not writable |
+
+### Utilizare Huffman (Pas 4)
+
+După scan frecvențe, **iterare pe `.freq`** cu `comp [counter]` sau `loop`+`NEXT`+index:
+
+```logts
+# conceptual — i de la 0 la size-1 la fiecare pas
+4wire sym = .freq:keyAt(i)
+8wire cnt = .freq:valueAt(i)
+# → ARGMAX / GT / merge Huffman pe perechi (cnt), nu doar 4 nibele fixe
+```
+
+**Notă:** iterarea indexului `i` tot necesită counter/osc — `keyAt`/`valueAt` rezolvă accesul la index, nu bucla.
+
+---
+
+## Faza 0d — Writable LUT: `removeAt`, `peekMin`/`Max`, `popMin`/`Max` (DECIS)
+
+**Scop:** simulare **min-priority** pe `lutEntryList` fără `comp [priorityqueue]` — suficient pentru merge Huffman N-general (osc + `on:raise`).
+
+### API
+
+| Metodă | Efect | Return |
+|--------|-------|--------|
+| `.lut:removeAt(i)` | elimină intrarea la index `i` | `1wire` ack (`0`) |
+| `.lut:peekMin` | **nu** mută lista | **cheie** + **valoare** (dual assign) |
+| `.lut:peekMax` | idem | cheie + valoare |
+| `.lut:popMin` | elimină intrarea min | **cheie** + **valoare** (dual assign) |
+| `.lut:popMax` | elimină intrarea max | cheie + valoare |
+
+**Fără index la `peek*` / `pop*`:** după `popMin`, intrarea e scoasă — orice index ar fi fost **invalid** (lista se scurtează, indicii se shift-uiesc). Pentru Huffman ai nevoie de **simbol + frecvență**, nu de poziție în listă.
+
+Diferența `peek` vs `pop`: ambele returnează **key + value**; doar `pop*` mută lista (`size` scade). `removeAt(i)` rămâne pentru cazuri unde știi indexul din altă sursă (ex. după `SORT` + logică pe rânduri), nu ca follow-up la `pop`.
+
+- Compară pe câmpul **valoare** (`entry.value`), nu pe cheie — pentru `.freq` = frecvențe.
+- **Egalități:** câștigă **indexul cel mai mic** (stabil, ca `ARGMAX`).
+- Listă goală / `peek`/`pop` pe `size()==0` → **eroare runtime**.
+- `i` out of range la `removeAt` → eroare (ca `keyAt`).
+- `pop*` / `removeAt` declanșează `_notifyWritableLutMutation` (ca `remove`).
+- Doar **`writable`** LUT.
+
+### Tag-uri format numeric (compare)
+
+Același set ca built-in-urile aritmetice — **un singur** tag format per apel, după `)`:
+
+```logts
+4wire sym, 8wire cnt = .freq:peekMin(; q4p4)   # citește min, lista neschimbată
+4wire sym, 8wire cnt = .freq:popMin(; signed)  # scoate min; key+value înainte de remove
+4wire a, 8wire b = .freq:popMin(; s8)
+4wire c, 8wire d = .freq:popMin()              # unsigned implicit
+```
+
+Tag-uri acceptate (ca `GT`/`ARGMAX`): `signed`, `s4`…`s64`, `q4p4`, `q8p8`, `fp16`, `bf16` — mutually exclusive.
+
+**Notă implementare:** astăzi `inlineMethod` **nu** parsează `callTags` după `)` — extindere **`parser.js`** + `evalInlineMethod` transmite tag-urile la `lutPeekMin` / `lutPopMin` (reutilizează `parseBuiltinCallTags` / compare din `numeric-formats.js`).
+
+Sintaxă canonică: `.lut:popMin(; q4p4)` — **nu** `.lut:popMin(q4p4)` (în paranteză e doar pentru argumente poziționale; formatul e tag).
+
+### Huffman N-general — pattern cu `popMin`
+
+LUT `.nodes` writable (cheie = id nod / simbol, valoare = frecvență):
+
+```logts
+# după scan: copiere .freq → .nodes (add per intrare)
+# la fiecare osc / on:raise cât timp .nodes:size() >= 2:
+4wire k1, 8wire f1 = .nodes:popMin()
+4wire k2, 8wire f2 = .nodes:popMin()
+8wire fParent = ADD(f1, f2)
+_ = .nodes:add(parentKey, fParent)   # parentKey = alocat din counter
+```
+
+**Rămâne în script:** alocare `parentKey`, reconstrucție arbore pentru coduri (LUT auxiliar părinte-copil sau pași finiți). `popMin` rezolvă **extract-min repetat**; nu înlocuiește întregul Pas 5 (atribuire biți 0/1).
+
+#### `parentKey` vs valoare structurată (`depth: 8[n]`)
+
+| Concept | Rol |
+|---------|-----|
+| **`parentKey`** | **cheia** noului nod intern (din `counter` / id alocat) — rămâne scalar, `add(parentKey, …)` |
+| **valoarea** | ce atașezi cheii: frecvență, copii stânga/dreapta, etc. |
+
+`depth: 8[2]` / `8[3,2]` descrie **forma valorii**, nu înlocuiește `parentKey`.
+
+**Variantă fără tensor depth (recomandat pentru v2):** două LUT-uri writable:
+
+| LUT | `depth` | cheie → valoare | Rol |
+|-----|---------|-----------------|-----|
+| `.heap` | `8` | nod → **frecvență** | `popMin` / merge; intrări scoase la pop |
+| `.links` | `8[2]` sau `16` flat | nod → **`[parent, bit]`** | muchii; **nu** participă la `popMin` |
+
+La fiecare merge (după `popMin`×2):
+
+```logts
+4wire k1, 8wire f1 = .heap:popMin()
+4wire k2, 8wire f2 = .heap:popMin()
+8wire fParent = ADD(f1, f2)
+4wire parentKey = ...   # counter / id nou
+_ = .heap:add(parentKey, fParent)
+_ = .links:set(k1, parentKey + 0)    # bit 0 către părinte
+_ = .links:set(k2, parentKey + 1)    # bit 1
+```
+
+**`[parent, bit]` vs `[left, right]`** (DECIS — preferăm **parent, bit** pe copil):
+
+| Reprezentare | Unde se scrie | Potrivit pentru |
+|--------------|---------------|-----------------|
+| `[left, right]` pe **părinte** | `set(parentKey, k1 + k2)` | parcurgere top-down (rădăcină → frunză) |
+| **`[parent, bit]` pe copil A** | `set(k1, parentKey + bit)` | **generare cod** — urci de la simbol la rădăcină, concat biți |
+
+Pentru **`.huff:add(sym, codeword)`** urcarea cu `.links:get(sym)` → părinte → … → rădăcină e naturală. Rădăcina finală nu are intrare în `.links` (sau `parent = fillwith`).
+
+`bit` = `1wire` (0 sau 1), stocat în al doilea câmp `8[2]` (zero-padded) sau `depth: 9` flat (`8+1`).
+
+**Variantă tensor depth (backlog):** un singur `.nodes` cu `depth: 8[3]` = `[freq, parent, bit]` — `popMin` compară coloana 0; după merge, `set` pe k1/k2 actualizează parent+bit păstrând freq (mai greu la `set` parțial). **Două LUT-uri** evită amestecul heap vs topologie.
+
+---
+
+### Fișiere
+
+| Fișier | Schimbare |
+|--------|-----------|
+| [`lut-writable.js`](v0_3_2/core/lut-writable.js) | `lutRemoveAt`, `lutPeekMin/Max`, `lutPopMin/Max`, helper compare cu format tag |
+| [`parser.js`](v0_3_2/core/parser.js) | `callTags` pe apel `inlineMethod` după `)` |
+| [`interpreter.js`](v0_3_2/core/interpreter.js) | dispatch + dual return `popMin`/`popMax`; mutators în `_exprReferencesWritableLutInst` |
+| [`lut.md`](v0_3_2/doc/lut.md) | secțiune min/max + runnable Huffman merge |
+| [`tests/test_suite.js`](v0_3_2/tests/test_suite.js) | ~2095+ removeAt, peek, pop, tags, empty, ties |
+
+### Teste minime
+
+| Test | Verifică |
+|------|----------|
+| `peekMin` pe 3 intrări | key + value corecte; `size` neschimbat |
+| egalitate valori | intrarea cu index mic câștigă (tie-break intern) |
+| `popMin` | scoate intrarea; `size` scade |
+| dual assign `k, v = popMin()` | cheie + valoare (nu index) |
+| `popMin(; signed)` | compare signed |
+| `removeAt(1)` | ordine listă |
+| `popMin` pe listă goală | eroare |
+
+### Backlog redus
+
+| Înainte | După 0d |
+|---------|---------|
+| `comp [priorityqueue]` obligatoriu pentru N-general | **opțional** — `popMin` pe LUT acoperă extract-min |
+| `ARGSORT` | rămâne backlog; `SORT` + `popMin` suficient pentru merge |
+
+### Backlog — `depth` tensorial (`depth: 8[2]`, `8[3,2]`)
+
+**Propunere:** `depth:` acceptă formă tensor (ca la `8wire[3]`):
+
+```logts
+inline [lut] .nodes:
+  writable
+  depth: 8[3]      # valoare = 8wire[3], 24 biți flat în spate
+```
+
+| Formă | Biți | Huffman |
+|-------|------|---------|
+| `depth: 8` | 8 | heap — doar frecvență |
+| `depth: 8[2]` | 16 | `.links` — **`[parent, bit]`** pe copil |
+| `depth: 8[3]` | 24 | `[freq, parent, bit]` — un LUT (backlog) |
+| `depth: 8[3,2]` | 48 | peste nevoie pentru arbore standard |
+
+**Ajută `parentKey`?** Indirect: `parentKey` rămâne cheie alocată (counter); tensor depth structurează **valoarea** (`fParent + k1 + k2`). `popMin` pe `8[3]` compară coloana 0 (freq) — tag `col=0` sau convenție implicită.
+
+**Fără tensor depth (merge acum):** `depth: 24` flat + concat, sau `.heap` depth 8 + `.tree` depth 16.
+
+**Decizie:** backlog generic după 0d; nu blochează demo v2.
+
+---
+
+## Faza 0z — NEXT ca osc în wave (DECIS — imediat înainte de Huffman)
+
+**Poziție:** după **0b** (LUT+SORT) și **0c** (keyAt/valueAt), **înainte** de pipeline Huffman. Demo-ul wave (osc + counter + `on:raise` + scan frecvențe) beneficiază de NEXT≈osc pentru multi-step stabil.
+
+La `NEXT(~)` / `doNext()` / `toggleSEC()`: **nu** `_recomputeAllWires = true`; cascade parțial din `~` (ca `scheduleComponentOutputChange` la osc).
 
 | Fișier | Schimbare |
 |---|---|
-| [`core/signal-propagation.js`](v0_3_2/core/signal-propagation.js) | `SignalPropagationStrategy` (sau subclass `SignalSimPropagationStrategy`) |
-| [`core/components/index.js`](v0_3_2/core/components/index.js) | `createSignalPropagationStrategy('signal')` |
-| [`core/interpreter.js`](v0_3_2/core/interpreter.js) | `postExecNext` — branch pe mod; closure ~ |
-| [`ui/app.js`](v0_3_2/ui/app.js) + [`script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html) | Toggle 3 moduri |
-| [`doc/signal-propagation.md`](v0_3_2/doc/signal-propagation.md) | Secțiune `signal` vs `wave` vs `legacy` |
-| [`doc/modes.md`](v0_3_2/doc/modes.md) | Opțional `MODE SIGNAL` |
-| [`tests/test_suite.js`](v0_3_2/tests/test_suite.js) | Grup `signal-propagation` — feedback, NEXT selective, osc |
+| [`signal-propagation.js`](v0_3_2/core/signal-propagation.js) | `onNextCycle()` wave: fără full recompute |
+| [`interpreter.js`](v0_3_2/core/interpreter.js) | Closure dependențe `~` la NEXT |
+| [`signal-propagation.md`](v0_3_2/doc/signal-propagation.md) | Documentare comportament |
 
-### Teste Faza 0 (minim)
-
-| Test | Verifică |
-|---|---|
-| Combinational chain A→B→C | re-evaluare completă într-un settle |
-| `a = NOT(a)` | comportament stabil/documentat (nu hang) |
-| NEXT `signal` | **nu** re-evaluează wire fără legătură cu `~` |
-| NEXT `signal` | **da** re-evaluează closure `~` + REG latch |
-| osc tick + counter | același pattern ca varianta B Huffman |
-| Regresie `wave` / `legacy` | neschimbate |
-
-### Efort Faza 0
-
-| Task | Efort |
-|---|---|
-| Design + doc semantica | ~1–2 h |
-| `SignalPropagationStrategy` + dependency re-exec | ~4–8 h |
-| NEXT selective (~ closure) | ~2–4 h |
-| UI toggle + teste | ~2–3 h |
-| **Total Faza 0** | **~9–17 h** |
-
-### Legătură cu Huffman v2
-
-- Varianta **B (osc scan)** devine naturală pe mod **`signal`** după Faza 0.
-- Până atunci, varianta B poate fi prototipată pe **`wave` + osc** (funcțional dar NEXT diferit).
-- Varianta **A** rămâne pe `wave` sau `legacy` fără Faza 0.
+Teste: REG/NEXT wave (704, 811), cpu4 (866, 1062), wire fără `~` nemodificat la NEXT, legacy neschimbat.
 
 ---
 
-## Două variante de construire codebook
+## Pipeline Huffman — pas cu pas (ce avem / ce lipsește)
 
-### Varianta A — statică (Load & Run instant)
+### Pas 1 — Sursă necomprimată
 
-**Scop:** demo simplu, round-trip Huffman complet într-un singur RUN.
-
-| Aspect | Detalii |
+| | |
 |---|---|
-| Codebook | Coduri prefixFree **pre-calculate offline** (Huffman manual) |
-| Script | Secvență explicită `1wire _ = .huff:add(cheie, cod)` înainte de `expand` |
-| Propagare | Wave; fără NEXT / osc obligatoriu |
-| UX | Load & Run → `show(source/packet/recovered)` imediat |
+| **Ce** | `200wire source = <literal>`, tokeni `keyWidth 4b` |
+| **Status** | **OK** — wire literals |
+| **Extensie** | — |
 
-```mermaid
-flowchart LR
-  Source["source literal"]
-  Add["add explicit x N"]
-  Enc["huffPacket"]
-  Dec["huffRecover"]
-  Source --> Add --> Enc --> Dec
+---
+
+### Pas 2 — Parcurgere sursă (cursor)
+
+| | |
+|---|---|
+| **Ce** | Index pe biți, avans +4, oprire la lungime |
+| **Status** | **OK** cu `comp [counter]` + `comp [osc]` + property block / conditional pe front osc |
+| **Pattern** | `source.(idx)/4` — slice dinamic confirmat |
+| **Extensie** | Faza 0z (NEXT≈osc) îmbunătățește multi-step wave; osc deja OK |
+
+```logts
+comp [osc] .clk: ...
+comp [counter] .idx: depth: 8, on: 1, :
+.idx:{ data = ADD(.idx:get, 4); write = 0; set = .clk:get; dir = 0 }
+4wire sym = source.(.idx:get)/4
+1wire atEnd = GT(.idx:get, endIdx)   # sau EQ după ultimul pas
 ```
 
-**Limitări:** nu demonstrează scan runtime; codurile sunt fixe în script.
+---
+
+### Pas 3 — Numărare frecvențe
+
+| | |
+|---|---|
+| **Ce** | LUT `.freq`: cheie = simbol, valoare = contor apariții |
+| **Status** | **OK** — pattern simplu cu un singur `set` + `ADD` (confirmat în `lutSet`: cheie lipsă → append) |
+
+**LUT frecvențe (fără `prefixFree`):**
+
+```logts
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 16
+  fillwith: 00000000
+  :
+```
+
+**Increment la fiecare tick osc** (un singur conditional, fără `add` separat):
+
+```logts
+on:raise {
+  AND(.clk:get, NOT(atEnd)),
+  _ = .freq:set(sym, ADD(.freq:get(sym), \1;8))
+}
+```
+
+**De ce merge:**
+
+| Apel | `get(sym)` | `ADD(..., 1)` | `set` |
+|------|------------|---------------|-------|
+| Prima apariție | `fillwith` = `00000000` | `00000001` | **append** intrare nouă (`lutSet` L285–286) |
+| Apariții următoare | contorul curent | +1 | **replace** prima potrivire |
+
+Nu e nevoie de `hasKey` + `add` + `set` în două branch-uri — dacă `fillwith` e zero pe toți biții.
+
+**Atenții la implementare/test:**
+
+- `fillwith` trebuie să fie **zero numeric** (nu cod Huffman); `.freq` **nu** are `prefixFree`
+- Lățime contor (`depth: 8`) ≥ `ADD` fără overflow pe literalul ales
+- În `on:raise`, RHS se evaluează integral înainte de `set` — OK
+- După `set`, wire-uri ca `show(.freq:get(sym))` — prefer direct probe (pattern conditional-assignment.md); sau așteptare settle wave
+
+**Gap redus:** nu mai e nevoie de `.lut:increment` decât dacă testele arată stale reads în același tick — de verificat în Faza 1 teste.
 
 ---
 
-### Varianta B — multi-step cu osc (PREFERATĂ)
+### Pas 4 — Care sunt cele mai frecvente chei?
 
-**Scop:** demonstrează cursor runtime, slice dinamic, dedup condiționat — pedagogic pentru „construiesc tabel din date”.
-
-| Aspect | Detalii |
+| | |
 |---|---|
-| Clock | **`comp [osc]`** — fiecare tick 0↔1 = `propagate()` nou (`executedThisPropagate` resetat) |
-| Cursor | **`comp [counter]`** — index pe biți; increment +4 la fiecare front osc |
-| Citire simbol | **`source.(counterVal)/4`** — slice dinamic confirmat în parser/interpreter |
-| Dedup | Property block cu **`set = gate`** (edge): `hasKey(sym)==0 AND index<end` → `inline [lut]:set(key, value)` |
-| Stop | **MUX**: când `index >= lungime_date` → `set = 0` (oprește increment / add) |
-| Encode | După scan complet: `huffPacket` / `huffRecover` (faza 2 — manual NEXT sau osc oprit + flag `done`) |
+| **Ce** | Din `.freq`, ordonăm / extragem simboluri după frecvență |
+| **Status** | **OK** cu **`:entries` + `SORT`** (Faza 0b); varianta A (4 nibele + ARGMAX) rămâne fallback demo mic |
+
+#### Varianta principală — `entries` + `SORT` (DECIS)
+
+```logts
+8wire[n,2] e = .freq:entries
+8wire[n,2] sorted = SORT(e; col=1)         # asc pe frecvențe (col 1)
+4wire[n] syms = sorted::0
+8wire[n] cnts = sorted::1
+```
+
+Merge Huffman: consumă din cap (`sorted:0` pereche minimă) sau re-`SORT` după fiecare combinare.
+
+#### Varianta A — alfabet cunoscut (4 nibele) — demo v2 simplu
+
+După scan, citești fiecare contor direct (cheia e fixă în script):
+
+```logts
+8wire f0 = .freq:get(0000)
+8wire f1 = .freq:get(0001)
+8wire f2 = .freq:get(0010)
+8wire f3 = .freq:get(0011)
+
+8wire[4] counts = f0 + f1 + f2 + f3
+
+4wire maxIdx = ARGMAX(counts; index)
+1wire[4] maxHot = ARGMAX(counts)
+```
+
+| Built-in | Ce îți dă |
+|----------|-----------|
+| `ARGMAX(counts; index)` | **indexul** elementului cu frecvența maximă (`0`…`3`) |
+| `ARGMAX(counts)` | **one-hot** — bit `1` la poziția câștigătoare |
+| `MAX(counts)` | valoarea maximă (nu cheia) |
+
+**Mapare index → simbol** (cheie nibble) cu `MUX` / `DECODE` / mini-LUT:
+
+```logts
+4wire topSym = MUX(maxIdx.0-1, 0000, 0001, 0010, 0011)
+```
+
+**Egalități:** `ARGMAX` — la egalitate câștigă **indexul cel mai mic** (documentat în builtin-ARGMAX).
+
+#### Varianta B — al doilea / al treilea cel mai frecvent (pentru merge Huffman)
+
+Pentru arbore Huffman trebuie repetat „extrage minim/maxim două câte două”:
+
+| Abordare | În limbaj? |
+|----------|------------|
+| Rețea `GT`/`MUX` pentru 4 simboluri — compară toate perechile, află min1, min2 | **DA** — multe wires, dar finit |
+| `ARGMAX` → zeroează câștigătorul → `ARGMAX` din nou | **PARȚIAL** — trebuie „mask” pe vector (AND cu NOT one-hot); **de prototipat** |
+| Buclă `while` peste intrări LUT | **NU** |
+
+#### Varianta C — alfabet dinamic (după Faza 0b `entries` + `SORT`)
+
+| Ce avem | Cu `:entries` + `SORT` |
+|---------|-------------------------|
+| `.freq:entries` | matrice `[N,2]` cheie \| frecvență |
+| `SORT(e; col=1)` | ordine după frecvență; `sorted::0` = simboluri |
+| `keyAt`/`valueAt` | acces punctual la index (Faza 0c), fără sort |
+
+```logts
+8wire[n,2] sorted = SORT(.freq:entries; col=1)
+4wire[n] syms = sorted::0
+```
+
+**Varianta A** (4 nibele fixe + `get`) rămâne validă ca demo simplu; **varianta C** e calea principală după Faza 0b.
+
+#### Rezumat practic pentru v2
+
+1. Scan → `.freq` cu `set`+`ADD`
+2. `.freq:entries` → `SORT(...; col=1)` → `syms = sorted::0`
+3. Merge Huffman / coduri din ordinea sortată (sau rețea `GT`+`MUX` pentru 4 simboluri)
+4. Pas 5 (coduri Huffman) — rețea finită sau pași osc pe lista sortată
+
+---
+
+### Pas 5 — Construire arbore Huffman din frecvențe
+
+| | |
+|---|---|
+| **Ce** | Merge repetat cele 2 noduri minime → arbore → lungimi cod |
+| **Status** | **PARȚIAL** — `SORT` ordonează; **0d `popMin`** acoperă extract-min repetat; **GAP** rămâne reconstrucție arbore + coduri |
+
+**Ce avem:** `GT`, `LT`, `MIN`, `MUX`, `ADD`, counter, **`SORT`**, `:entries`, **`popMin`/`peekMin`** (Faza 0d) — **nu** avem:
+- sortare runtime → **rezolvat** (Faza 0b `SORT`)
+- extract-min repetat din set variabil → **rezolvat** (Faza 0d `popMin` pe `.nodes`)
+- coadă de priorități dedicată → **nu e obligatorie** dacă `popMin` pe LUT e suficient
+- buclă `while` runtime → tot **NU**; merge pe **osc + `on:raise` + `size()`**
+- atribuire automată coduri din arbore → tot în script (LUT auxiliar / pași finiți)
+
+**Pentru demo v2 (alfabet 4 simboluri, frecvențe runtime):**
+
+Realizabil **în script** ca rețea combinatională / secvență de pași osc:
+- Compară `freq(a)`…`freq(d)` cu `GT`/`MUX`
+- Ordine descrescătoare frecvențe → atribuie coduri scurte manual cu `MUX` (arbore Huffman pentru 4 noduri = logică finită, multe linii dar **corect în limbaj**)
+- Sau: **două faze osc** — faza A freq, faza B „assign codes” cu counter pe pași de merge simulat
+
+**Pentru alfabet arbitrar N (după Faza 0d):**
+
+| Opțiune | Tip | Acceptabil? |
+|---|---|---|
+| `buildFrom` / `HUFFMAN_BUILD` | Cheat Huffman | **NU** (respins) |
+| **`.nodes:popMin` + `add` în buclă osc** | Extensie LUT generică | **DA — Faza 0d** |
+| `comp [priorityqueue]` | Componentă separată | backlog — redundant dacă `popMin` e suficient |
+| Builtin `SORT` | Generic | **Faza 0b** |
+
+**Decizie plan:** demo v2 poate folosi **4 simboluri** (rețea finită) **sau** **N-general** cu `popMin` pe osc; documentăm ambele în `huffman-v2.md`.
+
+---
+
+### Pas 6 — Atribuire coduri prefixFree în `.huff`
+
+| | |
+|---|---|
+| **Ce** | `.huff:add(sym, cod)` sau `set` cu coduri din pas 5 |
+| **Status** | **OK** — writable + `prefixFree` revalidare la `add`/`set` |
+| **Control** | `on:raise { gate, _ = .huff:add(sym, cod) }` |
+| **Gap** | Codurile trebuie **calculate în pas 5**; nu `add` automat din frecvențe |
+
+---
+
+### Pas 7 — Encode
+
+| | |
+|---|---|
+| **Ce** | `.huffPacket { tokens = source }` → `expand` + `lengthOf` |
+| **Status** | **OK** — există (test 1086, huffman.md) |
+| **Condiție** | `.huff` complet și prefixFree înainte de `expand` |
+
+---
+
+### Pas 8 — Decode + round-trip
+
+| | |
+|---|---|
+| **Ce** | `.huffRecover` + `withLength` |
+| **Status** | **OK** |
+| **Verificare** | `recovered === source`, `packet =:` padding |
+
+---
+
+## Arhitectură demo v2 (integral limbaj)
 
 ```mermaid
 flowchart TD
-  subgraph scan [Faza 1 - multi-step osc]
-    Osc["comp osc tick"]
-    Cnt["counter += 4"]
-    Slice["sym = source.(idx)/4"]
-    Gate["set = hasKey AND notDone"]
-    Lut["writable .huff set/add"]
-    Mux["MUX index >= end → stop"]
-    Osc --> Cnt --> Slice --> Gate --> Lut
-    Cnt --> Mux
+  subgraph phaseA [Faza A - osc scan]
+    Osc[clk tick]
+    Idx[counter += 4]
+    Slice[sym = source.idx/4]
+    Freq[on:raise → freq LUT add/set]
+    Osc --> Idx --> Slice --> Freq
   end
-  subgraph enc [Faza 2 - după scan]
-    Packet["huffPacket expand"]
-    Recover["huffRecover collapse"]
+  subgraph phaseB [Faza B - assign codes]
+    Cmp[GT/MUX pe freq 0000..0011]
+    Codes[on:raise → huff:add sym cod]
+    Cmp --> Codes
   end
-  scan --> enc
+  subgraph phaseC [Faza C - encode decode]
+    Enc[huffPacket]
+    Dec[huffRecover]
+    Enc --> Dec
+  end
+  phaseA --> phaseB --> phaseC
 ```
 
-**Alternativă la osc:** `NEXT(~)` / `doNext()` / `toggleSEC()` (setInterval) — re-evaluează **toate** wire-urile (`_recomputeAllWires`); documentat ca opțiune, dar **osc e preferat**.
-
-**Ce NU rezolvă nici varianta B:**
-- Nu generează coduri Huffman din frecvențe (fără arbore în limbaj)
-- Scanarea poate construi **dicționar simboluri** (key→value fix sau key→key), nu codebook optim
-- Nu e instant: necesită N tick-uri osc (sau N NEXT) pentru N/4 simboluri
-- `comp [lut]` writable + `:add` **nu există încă** — folosim **`inline [lut] writable`** + `:set` / `:add` în wire sau gate pe property block pe alt component
-
-**Mecanism verificat în cod:**
-- `executedThisPropagate` = per apel `propagate()`, nu permanent
-- osc: `scheduleComponentOutputChange` → `propagate()` (lanț dependent)
-- NEXT: `postExecNext` → `_recomputeAllWires` → toate wire-urile o dată per pas
-- Property block `set` = edge `0→1` = gate condiționat real
+**Două LUT-uri writable:**
+- `.freq` — cheie=simbol, valoare=contor (depth 8)
+- `.huff` — cheie=simbol, valoare=cod prefixFree (`prefixFree` activ)
 
 ---
 
-## Comparație variante
+## Faza 1 — Teste (ID ~2076+, după 2060–2075 conditional)
 
-| | **A — static add** | **B — osc scan (preferat)** |
-|---|---|---|
-| Load & Run instant | da | parțial (setup; scan = timp real osc) |
-| Slice dinamic `.(idx)/4` | nu e nevoie | da |
-| Dedup `hasKey` + gate | nu e nevoie | da |
-| Round-trip Huffman | da | da (după faza 2) |
-| Complexitate doc/test | mică | mare |
-| Valoare pedagogică | pipeline encode/decode | + cursor, wave multi-step, osc |
-
-**Implementare doc:** ambele secțiuni în `huffman-v2.md`; teste separate; varianta B ca exemplu principal dacă testele trec.
-
----
-
-## Pipeline comun (ambele variante)
-
-1. Sursă `200wire source` — literal necomprimat, `keyWidth 4b`
-2. `inline [lut] .huff` — `writable`, `prefixFree`
-3. `.huffPacket` — `expand` + `lengthOf` + payload
-4. `.huffRecover` — `withLength` + `collapse`
-5. `show(source)`, `show(packet)`, `show(recovered)`
-
----
-
-## Structură `huffman-v2.md`
-
-1. Intro — v1 vs v2; wave obligatoriu
-2. **Varianta A** — add explicit, tabel frecvențe offline, script complet `logts-play wave`
-3. **Varianta B (osc)** — arhitectură counter+osc+MUX; explicație propagare multi-step; script complet
-4. Framing `lengthOf` / `withLength` / `packet =:`
-5. Trace biți (tabel compresie)
-6. Limitări — fără Huffman automat; B construiește alfabet, nu arbore
-7. Related — [lut.md](lut.md), [counter.md](counter.md), [oscillator.md](oscillator.md), [signal-propagation.md](signal-propagation.md)
-
----
-
-## Faza 1 — Teste
-
-**Fișier:** [`tests/test_suite.js`](v0_3_2/tests/test_suite.js)
-
-### Grup `huffman-wave` (~2060+) — varianta A + pipeline comun
-
-| Test | Verifică |
+| Grup | Teste |
 |---|---|
-| writable `add` → `expand` | da |
-| round-trip 128–200 biți | da |
-| `packet =:` padding | da |
-| `propagation: 'wave'` | da |
+| `huffman-wave-freq` | osc scan; freq corecte pe literal cunoscut |
+| `huffman-wave-codes` | după assign manual/MUX; prefixFree valid |
+| `huffman-wave` | round-trip 128–200 biți |
+| `huffman-wave-padding` | `packet =:` |
 
-### Grup `huffman-wave-osc` (~2070+) — varianta B
-
-| Test | Verifică |
-|---|---|
-| osc tick → counter increment | da |
-| `source.(idx)/4` slice la index variabil | da |
-| `set` gated — nu dublează cheie existentă | da |
-| MUX stop la `index >= end` | da |
-| după N tick-uri simulate → encode round-trip | da (dacă coduri fixe pre-mapate) |
-
-Testele osc pot folosi `session.setComp` / tick manual (pattern test **611**), nu timp real în CI.
+CI: tick osc simulat (`session.setComp`, pattern 611), nu sleep real.
 
 ---
 
-## Faza 2 — `huffman-v2.md` + index
+## Faza 2 — `huffman-v2.md`
 
-- [`v0_3_2/doc/huffman-v2.md`](v0_3_2/doc/huffman-v2.md) — ambele variante
-- [`doc-index.json`](v0_3_2/doc/doc-index.json) — `searchExtra`: osc, counter, slice dinamic, multi-step
-- Link scurt din [`huffman.md`](v0_3_2/doc/huffman.md)
-- Regen: `node node/_gen_doc_data.js`, `node node/_gen_test_manifest.js`
+1. Principiu: **fără magic Huffman în engine**
+2. Tabel gap-uri (secțiunea de mai sus, user-facing)
+3. Faza A: osc + counter + `on:` + `.freq`
+4. Faza B: atribuire coduri (MUX/compare pentru 4 simboluri)
+5. Faza C: packet + recover + show
+6. Runnable `logts-play wave` — Load / Load & Run
+7. `SORT(.freq:entries)` + slice `::0` (Faza 0b)
+8. Ce lipsește încă pentru Huffman N-general (priority queue, …)
+8. Related: conditional-assignment, counter, osc, lut, protocol, huffman v1
+
+---
+
+## Extensii generice — backlog (nu Huffman-specific)
+
+| Extensie | Status |
+|---|---|
+| **`.lut:keys` / `:values` / `:entries` + `SORT`** | **ÎN PLAN — Faza 0b** (înainte de Huffman) |
+| **`.lut:keyAt(i)` / `valueAt(i)`** | **ÎN PLAN — Faza 0c** |
+| **`.lut:removeAt` / `peekMin`/`Max` / `popMin`/`Max`** | **ÎN PLAN — Faza 0d** (Huffman N-general) |
+| **NEXT≈osc în wave** | **ÎN PLAN — Faza 0z** (imediat înainte de Huffman) |
+| `ARGSORT` / `keysAt` / `valuesAt` | backlog generic |
+| `comp [priorityqueue]` | backlog — probabil redundant cu `popMin` |
+| Mod `signal` | după Huffman |
+| `.lut:increment` | doar dacă freq `set`+`ADD` e fragil la test |
+| `comp [priorityqueue]` | backlog — `popMin` (0d) acoperă merge |
+| `comp [lut]` writable + `on:` | opțional |
 
 ---
 
 ## Out of scope
 
-- Algoritm Huffman din frecvențe
-- `comp [lut]` writable (doar inline acum)
+- `buildFrom`, `HUFFMAN_*` builtin
 - Board UI dedicat
-- Buclă combinațională infinită într-un singur settle (feedback wave fără osc/NEXT)
+- Mod `signal` înainte de Huffman (Faza 0z NEXT≈osc e OK — e pregătire wave, nu mod signal complet)
 
 ---
 
-## Ordine implementare
+## Criteriu „gata”
 
-0. **Faza 0** — mod `signal` (design → strategie → teste → doc → UI toggle)
-1. Test varianta A (round-trip) — baseline pe `wave`
-2. Prototip + test varianta B (osc scan) — pe `signal` dacă Faza 0 gata, altfel `wave`
-3. `huffman-v2.md` — A + B (B prominent, osc preferat; mențiune mod `signal`)
-4. doc-index + regen
-
----
-
-## Efort estimativ
-
-| Fază | Efort |
-|---|---|
-| **Faza 0 signal mode** | ~9–17 h |
-| Teste A + literal/codebook | ~2 h |
-| Teste B osc scan | ~3–4 h |
-| Doc ambele variante | ~2 h |
-| **Total (cu Faza 0)** | ~16–25 h |
+- [ ] **Faza 0b: `:keys`/`:values`/`:entries` + `SORT`, teste + doc (inclusiv curățare multi-`;` în builtin-ARGMAX.md, builtin-ARGMIN.md, matrix-reduction.md, vector-reduction.md)**
+- [ ] **Faza 0c: `keyAt` / `valueAt` implementat, teste + doc lut.md**
+- [ ] **Faza 0d: `removeAt`, `peekMin`/`Max`, `popMin`/`Max` + tag-uri format + parser callTags pe inlineMethod**
+- [ ] **Faza 0z: NEXT wave = osc cascade, teste verzi** (ultimul pas înainte de Huffman)
+- [ ] Frecvențe măsurate runtime din `source` (osc + `on:` + `.freq`)
+- [ ] Coduri în `.huff` produse **din script** (nu engine Huffman)
+- [ ] Round-trip `source` → `packet` → `recovered` pe wave
+- [ ] `huffman-v2.md` explică ce merge, ce nu, ce extensii urmează
+- [ ] Gap-uri N-general documentate cu propuneri generice
