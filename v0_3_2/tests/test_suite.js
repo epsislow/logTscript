@@ -17894,6 +17894,105 @@ on:1 {
   h.assert('value', session.getWire(interp, 'v2'), '1010');
 }, { propagation: 'wave' });
 
+const WRITABLE_LUT_MINMAX = `inline [lut] .heap:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    0000 : 0010
+    0001 : 0010
+    0010 : 0001
+  }
+  :`;
+
+const WRITABLE_LUT_SIGNED = `inline [lut] .freq:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data {
+    00000000 : 11111111
+    00000001 : 00000001
+  }
+  :`;
+
+reg(2094, 'lut-writable', 'removeAt drops entry at index', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:removeAt(0001)
+4wire k0 = .huff:keyAt(0000)
+4wire sz = .huff:size()`;
+  const { interp } = session.run(src);
+  h.assert('key', session.getWire(interp, 'k0'), '0000');
+  h.assert('size', session.getWire(interp, 'sz'), '0001');
+});
+
+reg(2095, 'lut-writable', 'peekMin returns min value size unchanged', function(h, session) {
+  const src = WRITABLE_LUT_MINMAX + `
+4wire k, 4wire v = .heap:peekMin()
+4wire sz = .heap:size()`;
+  const { interp } = session.run(src);
+  h.assert('key', session.getWire(interp, 'k'), '0010');
+  h.assert('value', session.getWire(interp, 'v'), '0001');
+  h.assert('size', session.getWire(interp, 'sz'), '0011');
+});
+
+reg(2096, 'lut-writable', 'peekMin tie-break lower index wins', function(h, session) {
+  const src = WRITABLE_LUT_MINMAX + `
+4wire k, 4wire v = .heap:peekMax()`;
+  const { interp } = session.run(src);
+  h.assert('key', session.getWire(interp, 'k'), '0000');
+  h.assert('value', session.getWire(interp, 'v'), '0010');
+});
+
+reg(2097, 'lut-writable', 'popMin dual assign shrinks list', function(h, session) {
+  const src = WRITABLE_LUT_MINMAX + `
+4wire k, 4wire v = .heap:popMin()
+4wire sz = .heap:size()`;
+  const { interp } = session.run(src);
+  h.assert('key', session.getWire(interp, 'k'), '0010');
+  h.assert('value', session.getWire(interp, 'v'), '0001');
+  h.assert('size', session.getWire(interp, 'sz'), '0010');
+});
+
+reg(2098, 'lut-writable', 'popMin signed compares negative as min', function(h, session) {
+  const src = WRITABLE_LUT_SIGNED + `
+8wire k, 8wire v = .freq:popMin(; signed)
+8wire sz = .freq:size()`;
+  const { interp } = session.run(src);
+  h.assert('key', session.getWire(interp, 'k'), '00000000');
+  h.assert('value', session.getWire(interp, 'v'), '11111111');
+  h.assert('size', session.getWire(interp, 'sz'), '00000001');
+});
+
+reg(2099, 'lut-writable', 'popMin empty list errors', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:clear()
+4wire k, 4wire v = .huff:popMin()`;
+  h.assertThrows('empty', () => {
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    if (!err) throw new Error('expected runtime error');
+    throw err;
+  }, 'empty entry list');
+});
+
+reg(2100, 'lut-writable', 'peekMin wave after on:1 add', function(h, session) {
+  const src = WRITABLE_LUT_MINMAX + `
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .heap:add(0011, 0000)
+}
+4wire k, 4wire v = .heap:peekMin()
+4wire sz = .heap:size()`;
+  const { interp } = session.run(src);
+  h.assert('min key', session.getWire(interp, 'k'), '0011');
+  h.assert('min value', session.getWire(interp, 'v'), '0000');
+  h.assert('size', session.getWire(interp, 'sz'), '0100');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

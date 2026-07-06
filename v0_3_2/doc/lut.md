@@ -414,6 +414,51 @@ inline [lut] .huff:
 | `.lut:entries()` | Matrix **N×2**: column 0 = key, column 1 = value (`ew = max(keyW, valW)`) |
 | `.lut:keyAt(i)` | Key at list index `i` (`0 … size()-1`; addr width) |
 | `.lut:valueAt(i)` | Value at list index `i` (depth or variableDepth width) |
+| `.lut:removeAt(i)` | Remove entry at index `i`; returns `1wire` ack `0` |
+| `.lut:peekMin` / `.lut:peekMax` | Min/max by **value**; **dual assign** key + value; list unchanged |
+| `.lut:popMin` / `.lut:popMax` | Min/max by **value**; **dual assign** key + value; entry removed |
+
+### Min / max by value (`:peekMin`, `:popMin`, …)
+
+Compare on **entry value** (not key). Equal values: **lower index wins** (stable). Empty list → runtime error. Optional format tags after `;` inside `()` — same as builtins (`; signed`, `; q4p4`, `; s8`, …). Canonical form: `.lut:popMin(; signed)` — format is a **tag**, not a positional argument.
+
+| Method | Mutates list | Returns |
+|--------|--------------|---------|
+| `peekMin` / `peekMax` | no | `key, value` (dual assign) |
+| `popMin` / `popMax` | yes | `key, value` (dual assign) |
+| `removeAt(i)` | yes | `0` ack |
+
+`pop*` and `removeAt` trigger wave re-propagation for wires that read the LUT (same as `:add` / `:remove`). In wave, prefer `on:1 { once, k, v = .heap:popMin() }` for one-shot extract-min (Huffman merge).
+
+```logts-play wave
+inline [lut] .heap:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    0000 : 0010
+    0001 : 0010
+    0010 : 0001
+  }
+  :
+1wire once = 1
+4wire k1 = 0000
+4wire f1 = 0000
+4wire k2 = 0000
+4wire f2 = 0000
+on:1 {
+  once,
+  k1, f1 = .heap:popMin()
+}
+4wire parent = 0110
+1wire _ = .heap:add(parent, ADD(f1, f2))
+show(k1)
+show(f1)
+show(parent)
+```
+
+For Huffman **N-general**: repeated `popMin` on a `.nodes` LUT replaces a dedicated priority-queue component. Pair with `:add` for merged parent nodes; use a separate LUT (e.g. `.links`) for parent/child bookkeeping.
 
 ### Indexed access (`:keyAt`, `:valueAt`)
 
@@ -469,7 +514,7 @@ In the editor, **wave** is the default propagation mode. After **Run**, wave **`
 
 Use a named wire for the assignment (`ok = .huff:add(...)`) — not `_` (undefined in `on:` blocks). See [conditional assignment](conditional-assignment.md).
 
-**Affected methods:** `:add`, `:set`, `:remove`, `:clear` (all mutate `lutEntryList`). Read-only methods (`:keys`, `:values`, `:entries`, `:keyAt`, `:valueAt`, `:get`, `:size`, …) are safe to assign on a wire; re-execution only refreshes the snapshot.
+**Affected methods:** `:add`, `:set`, `:remove`, `:removeAt`, `:clear`, `:popMin`, `:popMax` (all mutate `lutEntryList`). Read-only methods (`:keys`, `:values`, `:entries`, `:keyAt`, `:valueAt`, `:peekMin`, `:peekMax`, `:get`, `:size`, …) are safe to assign on a wire; re-execution only refreshes the snapshot.
 
 ```logts-play wave
 inline [lut] .freq:

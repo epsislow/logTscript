@@ -806,9 +806,9 @@ class Interpreter {
     if (!expr || !Array.isArray(expr) || !instName) return false;
     const readonlyMethods = new Set([
       'size', 'isEmpty', 'countKey', 'countValue', 'hasKey', 'hasValue', 'get', 'decode', 'isValid',
-      'keys', 'values', 'entries', 'keyAt', 'valueAt',
+      'keys', 'values', 'entries', 'keyAt', 'valueAt', 'peekMin', 'peekMax',
     ]);
-    const mutators = new Set(['clear', 'add', 'set', 'remove']);
+    const mutators = new Set(['clear', 'add', 'set', 'remove', 'removeAt', 'popMin', 'popMax']);
     for (const atom of expr) {
       if (atom.inlineMethod && atom.inlineMethod.var === instName) {
         const m = atom.inlineMethod.method;
@@ -1303,6 +1303,29 @@ class Interpreter {
         if (!writable) throw new Error(`LUT ${instName} is not writable`);
         if (typeof lutValueAt !== 'function') throw new Error('Writable LUT module is not loaded');
         return lutValueAt(lutInst, args[0], this);
+      }
+      const callTags = invoke.callTags || null;
+      const minMaxMethods = {
+        peekMin: () => lutPeekMin(lutInst, callTags, this, computeRefs),
+        peekMax: () => lutPeekMax(lutInst, callTags, this, computeRefs),
+        popMin: () => lutPopMin(lutInst, callTags, this, computeRefs),
+        popMax: () => lutPopMax(lutInst, callTags, this, computeRefs),
+      };
+      if (minMaxMethods[method]) {
+        if (!writable) throw new Error(`LUT ${instName} is not writable`);
+        if (typeof lutPeekMin !== 'function') throw new Error('Writable LUT module is not loaded');
+        const result = minMaxMethods[method]();
+        if (method === 'popMin' || method === 'popMax') {
+          this._notifyWritableLutMutation(instName);
+        }
+        return result;
+      }
+      if (method === 'removeAt') {
+        if (!writable) throw new Error(`LUT ${instName} is not writable`);
+        if (typeof lutRemoveAt !== 'function') throw new Error('Writable LUT module is not loaded');
+        const result = lutRemoveAt(lutInst, args[0], this);
+        this._notifyWritableLutMutation(instName);
+        return result;
       }
       const writableMutators = {
         add: () => lutAdd(lutInst, args[0], args[1], this),

@@ -445,6 +445,128 @@ function lutValueAt(inst, indexExpr, ctx) {
   return { value: v, bitWidth: valW, varName: `${inst.name}:valueAt` };
 }
 
+function normalizeEntryValueBits(entry, valW) {
+  let v = entry.value == null ? '' : String(entry.value);
+  if (v.length < valW) v = v.padStart(valW, '0');
+  else if (v.length > valW) v = v.substring(v.length - valW);
+  return v;
+}
+
+function normalizeEntryKeyBits(entry, keyW) {
+  let k = entry.key == null ? '' : String(entry.key);
+  if (k.length < keyW) k = k.padStart(keyW, '0');
+  else if (k.length > keyW) k = k.substring(k.length - keyW);
+  return k;
+}
+
+function parseLutMinMaxNumericMode(callTags, methodName, fail) {
+  const SA = typeof LogTScriptSignedArithmetic !== 'undefined' ? LogTScriptSignedArithmetic : null;
+  if (!SA || typeof SA.parseBuiltinCallTags !== 'function') {
+    return 'unsigned';
+  }
+  const tags = SA.parseBuiltinCallTags(
+    callTags, methodName, fail, true, false, false, false, false, true
+  );
+  if (tags.numericMode && tags.numericMode !== 'unsigned') return tags.numericMode;
+  return tags.signed ? 'signed' : 'unsigned';
+}
+
+function compareEntryValueBits(va, vb, numericMode) {
+  const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+  const SA = typeof LogTScriptSignedArithmetic !== 'undefined' ? LogTScriptSignedArithmetic : null;
+  if (NF && typeof NF.isBuiltinNumericFormatMode === 'function' && NF.isBuiltinNumericFormatMode(numericMode)) {
+    return NF.compareValues(va, vb, numericMode);
+  }
+  if (numericMode === 'signed' || (typeof numericMode === 'string' && /^s\d+$/.test(numericMode))) {
+    if (!SA) throw new Error('Signed compare is not available');
+    return SA.signedCompareBigInt(va, vb);
+  }
+  const w = Math.max(va.length, vb.length);
+  const ai = BigInt('0b' + va.padStart(w, '0'));
+  const bi = BigInt('0b' + vb.padStart(w, '0'));
+  if (ai === bi) return 0;
+  return ai > bi ? 1 : -1;
+}
+
+function assertNonEmptyEntryList(inst, methodName) {
+  if (!inst.lutEntryList.length) {
+    throw new Error(`LUT: ${methodName}: empty entry list`);
+  }
+}
+
+function findExtremeEntryIndex(inst, pickMin, numericMode, methodName) {
+  requireWritable(inst);
+  const list = inst.lutEntryList;
+  assertNonEmptyEntryList(inst, methodName);
+  const valW = getExportValueWidth(inst);
+  let bestIdx = 0;
+  let bestVal = normalizeEntryValueBits(list[0], valW);
+  for (let i = 1; i < list.length; i++) {
+    const v = normalizeEntryValueBits(list[i], valW);
+    const cmp = compareEntryValueBits(v, bestVal, numericMode);
+    if (pickMin ? cmp < 0 : cmp > 0) {
+      bestIdx = i;
+      bestVal = v;
+    }
+  }
+  return bestIdx;
+}
+
+function entryKeyValuePair(inst, idx, computeRefs, ctx, methodName) {
+  const entry = inst.lutEntryList[idx];
+  const keyW = getExportKeyWidth(inst);
+  const valW = getExportValueWidth(inst);
+  const keyBits = normalizeEntryKeyBits(entry, keyW);
+  const valBits = normalizeEntryValueBits(entry, valW);
+  const keyPart = { value: keyBits, bitWidth: keyW, varName: `${inst.name}:${methodName}:key` };
+  const valPart = { value: valBits, bitWidth: valW, varName: `${inst.name}:${methodName}:value` };
+  if (computeRefs) {
+    keyPart.ref = `&${ctx.storeValue(keyBits)}`;
+    valPart.ref = `&${ctx.storeValue(valBits)}`;
+  } else {
+    keyPart.ref = null;
+    valPart.ref = null;
+  }
+  return [keyPart, valPart];
+}
+
+function lutRemoveAt(inst, indexExpr, ctx) {
+  requireWritable(inst);
+  const idx = parseEntryIndex(indexExpr, ctx, inst);
+  assertEntryIndexInRange(inst, idx);
+  inst.lutEntryList = inst.lutEntryList.filter((_, i) => i !== idx);
+  syncWritableLutTable(inst);
+  return { value: '0', bitWidth: 1 };
+}
+
+function lutPeekOrPopExtreme(inst, pickMin, remove, callTags, ctx, computeRefs, methodName) {
+  const fail = (msg) => { throw new Error(msg); };
+  const numericMode = parseLutMinMaxNumericMode(callTags, methodName, fail);
+  const idx = findExtremeEntryIndex(inst, pickMin, numericMode, methodName);
+  const pair = entryKeyValuePair(inst, idx, computeRefs, ctx, methodName);
+  if (remove) {
+    inst.lutEntryList = inst.lutEntryList.filter((_, i) => i !== idx);
+    syncWritableLutTable(inst);
+  }
+  return pair;
+}
+
+function lutPeekMin(inst, callTags, ctx, computeRefs) {
+  return lutPeekOrPopExtreme(inst, true, false, callTags, ctx, computeRefs, 'peekMin');
+}
+
+function lutPeekMax(inst, callTags, ctx, computeRefs) {
+  return lutPeekOrPopExtreme(inst, false, false, callTags, ctx, computeRefs, 'peekMax');
+}
+
+function lutPopMin(inst, callTags, ctx, computeRefs) {
+  return lutPeekOrPopExtreme(inst, true, true, callTags, ctx, computeRefs, 'popMin');
+}
+
+function lutPopMax(inst, callTags, ctx, computeRefs) {
+  return lutPeekOrPopExtreme(inst, false, true, callTags, ctx, computeRefs, 'popMax');
+}
+
 function lutKeys(inst) {
   requireWritable(inst);
   const list = inst.lutEntryList;
@@ -519,6 +641,11 @@ const lutWritableExports = {
   lutEntries,
   lutKeyAt,
   lutValueAt,
+  lutRemoveAt,
+  lutPeekMin,
+  lutPeekMax,
+  lutPopMin,
+  lutPopMax,
   getExportKeyWidth,
   getExportValueWidth,
 };

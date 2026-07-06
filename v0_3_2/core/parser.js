@@ -3510,16 +3510,25 @@ assignment() {
         const methodArgs = [];
         this.eat('SYM', '(');
         this.t.skip();
+        let callTags = null;
         while (!(this.c.type === 'SYM' && this.c.value === ')')) {
           if (this.c.type === 'EOF') {
             throw Error(`Unclosed '(' in inline method at ${this.c.line}:${this.c.col}`);
+          }
+          if (this.c.type === 'SYM' && this.c.value === ';') {
+            callTags = this.parseFuncTags();
+            break;
           }
           if (methodArgs.length > 0) this.eat('SYM', ',');
           methodArgs.push(this.expr());
           this.t.skip();
         }
+        if (callTags == null && this.c.type === 'SYM' && this.c.value === ';') {
+          callTags = this.parseFuncTags();
+        }
         this.eat('SYM', ')');
         const method = { var: compName, method: property, args: methodArgs };
+        if (callTags) method.callTags = callTags;
         if (globalRef) method.globalRef = true;
         return tagGlobal({ inlineMethod: method });
       }
