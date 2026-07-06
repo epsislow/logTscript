@@ -18214,6 +18214,181 @@ reg(2110, 'huffman-wave', 'N-general popMin merge builds codebook aacb round-tri
   h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
 });
 
+const HUFF_FULL_BASE = `MODE WIREWRITE
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .heap:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .links:
+  writable
+  depth: 16
+  length: 256
+  fillwith: 0000000000000000
+  data { }
+  :
+inline [lut] .huff:
+  writable
+  prefixFree
+  variableDepth
+  length: 256
+  data { }
+  :
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 8b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 8b)
+  :`;
+
+function huffMergeRound(id, parentKey) {
+  return `
+8wire _m${id}k1, 8wire _m${id}f1 = .heap:popMin()
+8wire _m${id}k2, 8wire _m${id}f2 = .heap:popMin()
+8wire _m${id}sum, 1wire _m${id}c = ADD(_m${id}f1, _m${id}f2)
+8wire _m${id}p = ${parentKey}
+16wire _m${id}l0 = _m${id}p + 00000000
+16wire _m${id}l1 = _m${id}p + 00000001
+1wire _ = .heap:add(_m${id}p, _m${id}sum)
+1wire _ = .links:set(_m${id}k1, _m${id}l0)
+1wire _ = .links:set(_m${id}k2, _m${id}l1)`;
+}
+
+function huffWalkEmit(symLiteral, codName, codeDepth, hopCount) {
+  hopCount = hopCount || 7;
+  const lines = [];
+  lines.push(`8wire _${codName}_n0 = ${symLiteral}`);
+  lines.push(`8wire _${codName}_root = 11111111`);
+  for (let i = 1; i <= hopCount; i++) {
+    const prev = i === 1 ? `_${codName}_n0` : `_${codName}_n${i - 1}`;
+    const g = `_${codName}_g${i}`;
+    if (i === 1) {
+      lines.push(`1wire ${g} = NOT(EQ(${prev}, _${codName}_root))`);
+    } else {
+      lines.push(`1wire ${g} = AND(_${codName}_g${i - 1}, NOT(EQ(${prev}, _${codName}_root)))`);
+    }
+    lines.push(`16wire _${codName}_lk${i} = .links:get(${prev})`);
+    lines.push(`1wire _${codName}_b${i} = MUX(${g}, 0, _${codName}_lk${i}.15/1)`);
+    lines.push(`8wire _${codName}_n${i} = MUX(${g}, ${prev}, _${codName}_lk${i}.0/8)`);
+  }
+  lines.push(`1wire _${codName}_u1 = AND(_${codName}_g1, NOT(_${codName}_g2))`);
+  const bits = [];
+  for (let j = codeDepth; j >= 1; j--) bits.push(`_${codName}_b${j}`);
+  if (codeDepth === 1) {
+    lines.push(`1wire ${codName} = MUX(_${codName}_u1, 0, _${codName}_b1)`);
+  } else {
+    lines.push(`${codeDepth}wire ${codName} = ${bits.join(' + ')}`);
+  }
+  return lines.join('\n');
+}
+
+reg(2111, 'huffman-wave', 'links set get 16b parent bit layout', function(h, session) {
+  const src = HUFF_FULL_BASE + `
+8wire parent = 11111110
+16wire val = parent + 00000000
+1wire _ = .links:set(01100010, val)
+16wire raw = .links:get(01100010)
+8wire hi = raw.0/8
+8wire lo = raw.8/8
+1wire bit = raw.15/1`;
+  const { interp } = session.run(src);
+  h.assert('raw', session.getWire(interp, 'raw'), '1111111000000000');
+  h.assert('parent hi', session.getWire(interp, 'hi'), '11111110');
+  h.assert('bit lo byte', session.getWire(interp, 'lo'), '00000000');
+  h.assert('bit lsb', session.getWire(interp, 'bit'), '0');
+});
+
+reg(2112, 'huffman-wave', 'walk links hardcoded aacb codewords round-trip', function(h, session) {
+  const src = HUFF_FULL_BASE + `
+8wire pA = 11111110
+16wire l1 = pA + 00000000
+16wire l2 = pA + 00000001
+1wire _ = .links:set(01100010, l1)
+1wire _ = .links:set(01100011, l2)
+8wire pB = 11111111
+16wire l3 = pB + 00000000
+16wire l4 = pB + 00000001
+1wire _ = .links:set(01100001, l3)
+1wire _ = .links:set(11111110, l4)
+${huffWalkEmit('01100001', 'ca', 1)}
+${huffWalkEmit('01100010', 'cb', 2)}
+${huffWalkEmit('01100011', 'cc', 2)}
+1wire _ = .huff:add(01100001, ca)
+1wire _ = .huff:add(01100010, cb)
+1wire _ = .huff:add(01100011, cc)
+32wire source =: 'aacb'
+64wire packet =: .huffPacket { tokens = source }
+32wire recovered = .huffRecover { data = packet }`;
+  const { interp } = session.run(src);
+  h.assert('ca', session.getWire(interp, 'ca'), '0');
+  h.assert('cb', session.getWire(interp, 'cb'), '10');
+  h.assert('cc', session.getWire(interp, 'cc'), '11');
+  h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
+});
+
+reg(2113, 'huffman-wave', 'merge aacb links parent bit after popMin', function(h, session) {
+  const src = HUFF_FULL_BASE + `
+1wire _ = .freq:set(01100001, \\2;8)
+1wire _ = .freq:set(01100010, \\1;8)
+1wire _ = .freq:set(01100011, \\1;8)
+1wire _ = .heap:clear()
+1wire _ = .heap:add(01100001, \\2;8)
+1wire _ = .heap:add(01100010, \\1;8)
+1wire _ = .heap:add(01100011, \\1;8)
+${huffMergeRound(1, '11111110')}
+${huffMergeRound(2, '11111111')}
+16wire lb = .links:get(01100010)
+16wire lc = .links:get(01100011)
+16wire la = .links:get(01100001)
+8wire root, 8wire rf = .heap:peekMin()`;
+  const { interp } = session.run(src);
+  h.assert('link b', session.getWire(interp, 'lb'), '1111111000000000');
+  h.assert('link c', session.getWire(interp, 'lc'), '1111111000000001');
+  h.assert('link a', session.getWire(interp, 'la'), '1111111100000000');
+  h.assert('root', session.getWire(interp, 'root'), '11111111');
+});
+
+reg(2114, 'huffman-wave', 'auto codewords from merge links aacb round-trip', function(h, session) {
+  const src = HUFF_FULL_BASE + `
+32wire source =: 'aacb'
+1wire _ = .freq:set(01100001, \\2;8)
+1wire _ = .freq:set(01100010, \\1;8)
+1wire _ = .freq:set(01100011, \\1;8)
+1wire _ = .heap:clear()
+1wire _ = .heap:add(01100001, \\2;8)
+1wire _ = .heap:add(01100010, \\1;8)
+1wire _ = .heap:add(01100011, \\1;8)
+${huffMergeRound(1, '11111110')}
+${huffMergeRound(2, '11111111')}
+1wire _ = .huff:clear()
+${huffWalkEmit('01100001', 'ca', 1)}
+${huffWalkEmit('01100010', 'cb', 2)}
+${huffWalkEmit('01100011', 'cc', 2)}
+1wire _ = .huff:add(01100001, ca)
+1wire _ = .huff:add(01100010, cb)
+1wire _ = .huff:add(01100011, cc)
+64wire packet =: .huffPacket { tokens = source }
+32wire recovered = .huffRecover { data = packet }`;
+  const { interp } = session.run(src);
+  h.assert('ca', session.getWire(interp, 'ca'), '0');
+  h.assert('cb', session.getWire(interp, 'cb'), '10');
+  h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

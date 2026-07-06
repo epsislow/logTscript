@@ -10638,7 +10638,7 @@ End-to-end **wave** demo: measure symbol frequencies from a source wire, sort en
 
 For the static codebook + protocol walkthrough (v1), see **[huffman.md](huffman.md)**.
 
-**Suite tests:** **2104** (freq \`set\`+\`ADD\`), **2105** (\`SORT\` entries), **2106–2107** (round-trip wave), **2108** (\`=:\` padding), **2109** (osc scan + counter), **2110** (N-general \`popMin\` merge + byte codebook).
+**Suite tests:** **2104** (freq \`set\`+\`ADD\`), **2105** (\`SORT\` entries), **2106–2107** (round-trip wave), **2108** (\`=:\` padding), **2109** (osc scan + counter), **2110** (N-general \`popMin\` merge + manual codebook), **2111–2114** (\`.links\` + auto codewords).
 
 ---
 
@@ -10651,7 +10651,7 @@ For the static codebook + protocol walkthrough (v1), see **[huffman.md](huffman.
 | Encode / decode | Same protocols as v1 — [huffman.md](huffman.md) |
 | Wave mode | Use \`on:raise\` / \`on:1 { once, … }\` for LUT mutations; bare top-level \`:add\` can run twice on first Run |
 
-Runnable blocks use **\`logts-play wave\`** — open in the doc viewer and **Load & Run** (wave propagation is selected automatically).
+Runnable blocks use **\`logts-play wave\`** or **\`logts-play legacy\`** — open in the doc viewer and use **Load** / **Load & Run**. For **auto codewords** (merge + \`.links\` walk), see [Auto codewords from \`.links\`](#auto-codewords-from-links) (**legacy**, test **2114**).
 
 ---
 
@@ -10918,9 +10918,212 @@ show(recovered; ascii)
 | \`hk1\` | \`01100010\` | first \`popMin\` = \`'b'\` |
 | \`recovered\` | same as \`source\` | \`"aacb"\` + pad |
 
-**Scaling:** for larger **N**, unroll more merge rounds (\`popMin\`×2 + \`:add\`) per osc tick, or use a fixed max-N network. **Codeword bits** still come from tracking left/right choices in a \`.links\` LUT — not automatic yet (see gap table). Test **2110**.
+**Scaling:** for larger **N**, unroll more merge rounds (\`popMin\`×2 + \`:add\`) per osc tick, or use a fixed max-N network. See [Auto codewords](#auto-codewords-from-links) (tests **2111–2114**) — no manual \`.huff:add\` codewords.
 
 For wave + switch-driven merge, chain \`on:1 { onceN, … }\` blocks with separate \`once\` wires per tick (see [conditional-assignment.md](conditional-assignment.md)).
+
+---
+
+### Auto codewords from \`.links\`
+
+After merge, each child stores **\`parent(8b) ‖ bit(8b)\`** in a writable **\`.links\`** LUT (\`depth: 16\`). Walk from each leaf symbol up to \`rootKey\`, prepend bits, then \`.huff:add(sym, cod)\` — suite tests **2111–2114**.
+
+Use **\`logts-play legacy\`** below (sequential \`popMin\` + walk). Open [huffman-v2.md](huffman-v2.md) in the **doc viewer**, then **Load** or **Load & Run** on each block.
+
+#### Runnable — \`.links\` layout (\`'b'\` → parent \`11111110\`, bit \`0\`)
+
+**Load & Run** — after merge round 1, \`'b'\` (\`01100010\`) links to internal node \`11111110\` with bit \`0\`:
+
+\`\`\`logts-play legacy
+MODE WIREWRITE
+inline [lut] .heap:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .links:
+  writable
+  depth: 16
+  length: 256
+  fillwith: 0000000000000000
+  data { }
+  :
+1wire _ = .heap:add(01100010, \\1;8)
+1wire _ = .heap:add(01100011, \\1;8)
+8wire k1, 8wire f1 = .heap:popMin()
+8wire k2, 8wire f2 = .heap:popMin()
+8wire sum, 1wire hc = ADD(f1, f2)
+8wire parent = 11111110
+16wire l0 = parent + 00000000
+16wire l1 = parent + 00000001
+1wire _ = .heap:add(parent, sum)
+1wire _ = .links:set(k1, l0)
+1wire _ = .links:set(k2, l1)
+16wire linkB = .links:get(01100010)
+show(linkB)
+show(linkB.0/8)
+show(linkB.15/1)
+\`\`\`
+
+→ \`linkB = 1111111000000000\`, parent \`11111110\`, bit \`0\`.
+
+#### Runnable — full auto pipeline (\`'aacb'\`)
+
+**Load & Run** — frequencies → \`popMin\` merge → \`.links\` → walk-up → \`.huff\` (no manual codewords) → encode/decode round-trip. Check **Output** for \`show\` lines:
+
+\`\`\`logts-play legacy
+MODE WIREWRITE
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .heap:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .links:
+  writable
+  depth: 16
+  length: 256
+  fillwith: 0000000000000000
+  data { }
+  :
+inline [lut] .huff:
+  writable
+  prefixFree
+  variableDepth
+  length: 256
+  data { }
+  :
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 8b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 8b)
+  :
+32wire source =: 'aacb'
+1wire _ = .freq:set(01100001, \\2;8)
+1wire _ = .freq:set(01100010, \\1;8)
+1wire _ = .freq:set(01100011, \\1;8)
+1wire _ = .heap:clear()
+1wire _ = .heap:add(01100001, \\2;8)
+1wire _ = .heap:add(01100010, \\1;8)
+1wire _ = .heap:add(01100011, \\1;8)
+8wire _m1k1, 8wire _m1f1 = .heap:popMin()
+8wire _m1k2, 8wire _m1f2 = .heap:popMin()
+8wire _m1sum, 1wire _m1c = ADD(_m1f1, _m1f2)
+8wire _m1p = 11111110
+16wire _m1l0 = _m1p + 00000000
+16wire _m1l1 = _m1p + 00000001
+1wire _ = .heap:add(_m1p, _m1sum)
+1wire _ = .links:set(_m1k1, _m1l0)
+1wire _ = .links:set(_m1k2, _m1l1)
+8wire _m2k1, 8wire _m2f1 = .heap:popMin()
+8wire _m2k2, 8wire _m2f2 = .heap:popMin()
+8wire _m2sum, 1wire _m2c = ADD(_m2f1, _m2f2)
+8wire _m2p = 11111111
+16wire _m2l0 = _m2p + 00000000
+16wire _m2l1 = _m2p + 00000001
+1wire _ = .heap:add(_m2p, _m2sum)
+1wire _ = .links:set(_m2k1, _m2l0)
+1wire _ = .links:set(_m2k2, _m2l1)
+1wire _ = .huff:clear()
+8wire _ca_n0 = 01100001
+8wire _ca_root = 11111111
+1wire _ca_g1 = NOT(EQ(_ca_n0, _ca_root))
+16wire _ca_lk1 = .links:get(_ca_n0)
+1wire _ca_b1 = MUX(_ca_g1, 0, _ca_lk1.15/1)
+8wire _ca_n1 = MUX(_ca_g1, _ca_n0, _ca_lk1.0/8)
+1wire _ca_g2 = AND(_ca_g1, NOT(EQ(_ca_n1, _ca_root)))
+16wire _ca_lk2 = .links:get(_ca_n1)
+1wire _ca_b2 = MUX(_ca_g2, 0, _ca_lk2.15/1)
+8wire _ca_n2 = MUX(_ca_g2, _ca_n1, _ca_lk2.0/8)
+1wire _ca_u1 = AND(_ca_g1, NOT(_ca_g2))
+1wire ca = MUX(_ca_u1, 0, _ca_b1)
+8wire _cb_n0 = 01100010
+8wire _cb_root = 11111111
+1wire _cb_g1 = NOT(EQ(_cb_n0, _cb_root))
+16wire _cb_lk1 = .links:get(_cb_n0)
+1wire _cb_b1 = MUX(_cb_g1, 0, _cb_lk1.15/1)
+8wire _cb_n1 = MUX(_cb_g1, _cb_n0, _cb_lk1.0/8)
+1wire _cb_g2 = AND(_cb_g1, NOT(EQ(_cb_n1, _cb_root)))
+16wire _cb_lk2 = .links:get(_cb_n1)
+1wire _cb_b2 = MUX(_cb_g2, 0, _cb_lk2.15/1)
+8wire _cb_n2 = MUX(_cb_g2, _cb_n1, _cb_lk2.0/8)
+1wire _cb_u1 = AND(_cb_g1, NOT(_cb_g2))
+2wire cb = _cb_b2 + _cb_b1
+8wire _cc_n0 = 01100011
+8wire _cc_root = 11111111
+1wire _cc_g1 = NOT(EQ(_cc_n0, _cc_root))
+16wire _cc_lk1 = .links:get(_cc_n0)
+1wire _cc_b1 = MUX(_cc_g1, 0, _cc_lk1.15/1)
+8wire _cc_n1 = MUX(_cc_g1, _cc_n0, _cc_lk1.0/8)
+1wire _cc_g2 = AND(_cc_g1, NOT(EQ(_cc_n1, _cc_root)))
+16wire _cc_lk2 = .links:get(_cc_n1)
+1wire _cc_b2 = MUX(_cc_g2, 0, _cc_lk2.15/1)
+8wire _cc_n2 = MUX(_cc_g2, _cc_n1, _cc_lk2.0/8)
+1wire _cc_u1 = AND(_cc_g1, NOT(_cc_g2))
+2wire cc = _cc_b2 + _cc_b1
+1wire _ = .huff:add(01100001, ca)
+1wire _ = .huff:add(01100010, cb)
+1wire _ = .huff:add(01100011, cc)
+64wire packet =: .huffPacket { tokens = source }
+32wire recovered = .huffRecover { data = packet }
+show(source; ascii)
+show(ca)
+show(cb)
+show(cc)
+show(recovered; ascii)
+\`\`\`
+
+| Output | Expected |
+|--------|----------|
+| \`source\` | \`"aacb"\` |
+| \`ca\` / \`cb\` / \`cc\` | \`0\` / \`10\` / \`11\` |
+| \`recovered\` | same as \`source\` |
+
+#### Implementation notes
+
+**Write layout** — always build the 16-bit value in a wire **before** \`:set\` (inline \`parent + 00000000\` inside \`:set\` can pad wrong):
+
+\`\`\`logts
+8wire parent = 11111110
+16wire linkVal = parent + 00000000
+1wire _ = .links:set(01100010, linkVal)
+\`\`\`
+
+**Read layout** — \`link.0/8\` = parent, \`link.15/1\` = Huffman bit (LSB of low byte).
+
+**Merge round** (after \`popMin\`×2):
+
+\`\`\`logts
+8wire k1, 8wire f1 = .heap:popMin()
+8wire k2, 8wire f2 = .heap:popMin()
+8wire sum, 1wire hc = ADD(f1, f2)
+8wire parent = 11111110
+16wire l0 = parent + 00000000
+16wire l1 = parent + 00000001
+1wire _ = .heap:add(parent, sum)
+1wire _ = .links:set(k1, l0)
+1wire _ = .links:set(k2, l1)
+\`\`\`
+
+**Walk + codeword** — \`MUX(sel, a, b)\` → \`sel=1\` picks **\`b\`**. Gate hops with \`g1\`, mask bits with \`MUX(g, 0, link.15/1)\`, advance node with \`MUX(g, n, link.0/8)\`. For \`'aacb'\`, codeword depth per symbol is known (a=1, b/c=2 bits); concat \`b2 + b1\` for 2-bit codes.
+
+**Limits (v1):** codeword depth per symbol is **fixed in script** for the demo (\`codeDepth\` 1 or 2 for \`'aacb'\`). Fully dynamic depth for arbitrary **N** needs more unroll or osc ticks — backlog.
 
 ---
 
@@ -11119,8 +11322,9 @@ Four tokens \`00\` \`01\` \`10\` \`11\` → payload 9 bits + 8-bit length = **17
 | \`NEXT\` ≈ osc in wave | **Done** (Faza 0z) |
 | Runtime freq scan | **Done** — tests **2104**, **2109** |
 | Round-trip wave | **Done** — tests **2106–2108** |
-| N-general merge + byte codebook | **Done** — test **2110** (\`popMin\`, writable \`prefixFree\` collapse) |
-| Automatic tree + codewords from freqs | **Partial** — merge unrolled; codewords from merge order (script); \`.links\` LUT for large N |
+| N-general merge + byte codebook | **Done** — test **2110** (\`popMin\`, manual \`.huff\`) |
+| Auto codewords via \`.links\` walk | **Done** — tests **2111–2114** (\`'aacb'\`, fixed code depth) |
+| Automatic tree + codewords from freqs | **Partial** — merge + walk for bounded demo; dynamic depth per symbol = backlog |
 | \`ARGSORT\` / \`keysAt\` / \`valuesAt\` | **Backlog** (generic) |
 | \`comp [priorityqueue]\` | **Backlog** — redundant if \`popMin\` suffices |
 | \`buildFrom\` / \`HUFFMAN_*\` builtin | **Out of scope** (by design) |
@@ -11523,7 +11727,7 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 | **Length field width** | \`8b\` allows payloads up to 255 bits. Use \`16b\` for larger frames ([\`withLength\`](protocol.md#withlengthdata-nb)). |
 | **Separate protocols** | Encoder and decoder are independent definitions — swap codebooks or framing without changing the other side's structure. |
 | **Not in scope** | \`checksum()\`, \`concat()\`, \`padLeft()\`, \`padRight()\` — add framing or integrity in user logic if needed. |
-| **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2110** ([huffman-v2.md](huffman-v2.md) wave pipeline). |
+| **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2114** ([huffman-v2.md](huffman-v2.md) wave pipeline). |
 
 ---
 
