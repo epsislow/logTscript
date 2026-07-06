@@ -4,19 +4,19 @@ overview: Adaugarea statement-ului standalone `on:<mode> { trigger, assignment }
 todos:
   - id: parser-conditional-on
     content: parseConditionalAssignment() in parser.js + handler stmt() + validari corp (doar on:1 in pcb/chip/board)
-    status: pending
+    status: completed
   - id: runtime-registry
     content: "conditionalAssignments[] in interpreter.js: inregistrare, collectExprDependencies, lastTriggerValue, evalConditionalAssignments()"
-    status: pending
+    status: completed
   - id: propagation-hooks
     content: Integrare in signal-propagation.js (wave + legacy) si NEXT(~) re-evaluare
-    status: pending
+    status: completed
   - id: tests-conditional
     content: "Grup teste: parse, on:raise/edge/1, LUT writable, mem:set, wave+legacy, ZSTATE"
-    status: pending
+    status: completed
   - id: doc-conditional
     content: doc/conditional-assignment.md (moduri raise/edge/1) + cross-ref; curatare on:0 din doc componente (pcb/mem/led/board/doc-function, alu.js)
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -336,3 +336,109 @@ Grup nou `conditional-assignment`:
 3. Integrare wave propagation + teste wave
 4. Teste ZSTATE
 5. Documentatie + regenerare doc viewer
+
+---
+
+## Post-implementare (dupa plan)
+
+Implementarea de baza a fost livrata conform sectiunilor de mai sus. In timpul integrarii si al testelor interactive (switch + MUX + queue) s-au adaugat fix-uri de propagare, teste suplimentare si clarificari de semantica care **nu erau in planul initial**.
+
+### Status
+
+- **Teste**: grup `conditional-assignment` **2060–2075** (16 teste); suite completa **1558/1558 PASS**
+- **Doc**: [`v0_3_2/doc/conditional-assignment.md`](v0_3_2/doc/conditional-assignment.md) — exemple runnable (`logts-play`), MUX sentinel, switch toggle, `on:raise` vs `on:1`
+- **Curatare `on:0`**: parse error la `on:0`; doc componente aliniat (`raise` / `edge` / `1`)
+
+### Fix propagare — writable LUT (`_notifyWritableLutMutation`)
+
+**Problema**: dupa `on:raise { .clear:get, ok = .huff:clear() }`, wire-ul `hSize = .huff:size()` ramanea stale in wave (MUX/probe arata `0010` dupa clear).
+
+**Solutie** in [`interpreter.js`](v0_3_2/core/interpreter.js) (~L835):
+- `_notifyWritableLutMutation(instName)` — re-evalueaza `wireStatements` care refera LUT-ul mutat (read-only refs, ex. `:size()`)
+- In wave: `writeWireStable` + sterge `wirePendingStates` pentru wire-urile re-calculate
+- Redenumit din `_notifyInlineLutMutation` (nume mai precis — nu e doar pentru inline LUT)
+
+**Teste**: 2069 (`hSize` refresh dupa clear), 2070 (double toggle fara recursie), 2071 (MUX alternanta).
+
+### Fix propagare — proprietati calculate componenta (`_notifyComponentComputedMutation`)
+
+**Problema**: `qsz = MUX(.clear:get, 11111, .q:size)` nu se actualiza dupa primul push pe queue (stale size in wave).
+
+**Solutie** in [`interpreter.js`](v0_3_2/core/interpreter.js) (~L859–901, ~L12098):
+- Index `_componentDependentsIndex` in [`signal-propagation.js`](v0_3_2/core/signal-propagation.js) — wire-uri dependente de `.comp:prop` calculata
+- `_notifyComponentComputedMutation(compName)` — re-exec wire statements din index
+- `_shouldNotifyComponentComputedAfterApply(comp, pending, when, reEvaluate)` — **calculat inainte** de `handler.applyProperties`, pentru ca dupa apply `pending.push` / `pending.send` sunt consumate si notify-ul nu mai pornea la primul push
+- Tipuri interne: `queue`, `stack`, `network`, `terminal`, `mem` cu `set` activ + operatie pending (`push`, `send`, `adr`+`data`, etc.)
+
+**Teste**: 2073 (queue push), 2074 (network cross-instance), 2075 (MUX `qsz` alternanta).
+
+### Re-evaluare conditional la schimbare componenta
+
+**Adaugat**: `reevaluateConditionalAssignmentsForComponent(compName, compRef)` in [`signal-propagation.js`](v0_3_2/core/signal-propagation.js) (~L1389), apelat din `updateComponentConnections` (~L1127) — conditional assignments cu trigger `.clear:get` / `.go` se re-evalueaza cand switch-ul sau alta componenta se schimba (nu doar la schimbare wire).
+
+**Teste**: 2067 (switch via wire), 2068 (switch direct `.clear:get`).
+
+### Fix regresie wave — property blocks (test 1663)
+
+**Problema**: keyboard + key Left + OR pe `:set` → triple fire in wave.
+
+**Solutie**: in `updateComponentConnections`, commit `block.lastSetValue = newSetValue` **inainte** de `executePropertyBlock` (~L1108); ordinea globala a pending property blocks in program order (`_uccPendingBlocks` sortat pe `blockIndex`) — pattern existent, verificat de test **1663** (grup `terminal`, nu `conditional-assignment`).
+
+### Teste suplimentare (peste tabelul din plan)
+
+| ID | Nume | Ce verifica |
+|----|------|-------------|
+| 2060–2066 | (din plan) | parse, raise/edge/1, first-run, wave |
+| 2067 | `on:raise switch via wire (wave)` | trigger pe wire legat de switch |
+| 2068 | `on:raise switch direct .clear:get (wave)` | trigger direct pe pin componenta |
+| 2069 | `switch hSize wire refreshes on clear (wave)` | LUT notify → `hSize` dupa clear |
+| 2070 | `switch double toggle no recursion (wave)` | 4 toggle-uri, fara recursie / stale |
+| 2071 | `on:1 MUX hSize alternates on switch toggle (wave)` | sentinel `1111` ↔ size `0000` |
+| 2072 | `on:1 clear and on:raise add alternate lut size (wave)` | doua conditional-uri pe acelasi LUT |
+| 2073 | `on:1 queue push via pending push + set (wave)` | `.q:push` pending + `on:1 { .q:set = 1 }` |
+| 2074 | `on:1 network send cross-instance (wave)` | `.n:send` pending + `on:1 { .n:set = 1 }` |
+| 2075 | `on:1 queue MUX qsz alternates on switch toggle (wave)` | MUX + size refresh dupa push |
+
+Helper-e test: `COND_LUT_BASE`, `COND_QUEUE_BASE` in [`test_suite.js`](v0_3_2/tests/test_suite.js).
+
+### Semantica descoperita — `pending.push` + `on:1` (queue / network)
+
+Pattern:
+
+```logts
+.q:push = data          // pending la RUN — one-shot
+on:1 {
+  .clear:get,
+  .q:set = 1            // singura asignare permisa
+}
+```
+
+- La fiecare `0→1` pe trigger, `on:1` **ruleaza din nou** (`set = 1` se reaplica).
+- Dar `pending.push` se **consuma** la primul `applyProperties` — la toggle-uri ulterioare ramane doar `set`, fara push nou → **size nu creste** (ramane `00001`).
+- Probe MUX (`11111` ↔ `00001`) e consistent: alternanta sentinel / size, nu incrementare.
+
+**Workaround** pentru push repetat: property block (nu conditional standalone):
+
+```logts
+.q:{
+  set = .clear:get
+  push = data
+}
+```
+
+**De documentat optional** in `conditional-assignment.md` (sectiune queue/network) — inca absent din doc.
+
+### API runtime (rezumat fisiere modificate)
+
+| Fisier | Adaugari post-plan |
+|--------|-------------------|
+| [`interpreter.js`](v0_3_2/core/interpreter.js) | `tryExecuteConditionalAssignment`, `_notifyWritableLutMutation`, `_notifyComponentComputedMutation`, `_shouldNotifyComponentComputedAfterApply`, hook in `applyComponentProperties` |
+| [`signal-propagation.js`](v0_3_2/core/signal-propagation.js) | conditional in bucla wire (~L2151), `reevaluateConditionalAssignmentsForComponent`, `_componentDependentsIndex` |
+| [`parser.js`](v0_3_2/core/parser.js) | `parseConditionalAssignment()` (din plan) |
+| [`test_suite.js`](v0_3_2/tests/test_suite.js) | 2060–2075 |
+| [`doc/conditional-assignment.md`](v0_3_2/doc/conditional-assignment.md) | doc + exemple interactive |
+
+### Urmator pas optional (neimplementat)
+
+- Sectiune doc: limitarea `pending.push`/`send` one-shot vs property block pentru push repetat
+- Test explicit: property block `.q:{ set push }` → size `00001` → `00010` → `00011` la toggle-uri repetate (contrast cu 2075)
