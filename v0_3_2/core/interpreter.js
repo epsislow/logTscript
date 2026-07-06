@@ -397,6 +397,7 @@ class Interpreter {
     this.componentPendingSet=new Map(); // Component name -> 'immediate' | 'next' - when to apply pending properties
     this.memWriteBatching = false;
     this.componentPropertyBlocks=[]; // Array of {component, properties, dependencies} - property blocks for re-execution
+    this.conditionalAssignments=[]; // Standalone on:{ trigger, assignment } statements
     this.debugLogs = {};
     this.cLogs = [];
     
@@ -7658,6 +7659,11 @@ if (this.isBuiltinDEMUX(name)) {
       return;
     }
 
+    if (s.conditionalAssignment) {
+      this.execConditionalAssignment(s);
+      return;
+    }
+
     if(s.componentPropertyBlock){
       // Property block: .component:{ property1 = expr1 \n property2 = expr2 \n ... }
       const { component, properties } = s.componentPropertyBlock;
@@ -8141,6 +8147,14 @@ if (this.isBuiltinDEMUX(name)) {
               // Always update lastSetValue
               block.lastSetValue = setValue;
             }
+          }
+        }
+
+        if (this.conditionalAssignments && this.conditionalAssignments.length > 0) {
+          for (const entry of this.conditionalAssignments) {
+            if (entry.insideBody) continue;
+            if (!entry.triggerExpr) continue;
+            this.tryExecuteConditionalAssignment(entry, false);
           }
         }
       }
@@ -14271,11 +14285,119 @@ Interpreter.formatCompDef = function(alias, type, def) {
   return lines;
 };
 
+Interpreter.prototype.evalTriggerExprValue = function(expr) {
+  if (!expr || !Array.isArray(expr)) return '0';
+  if (expr.length === 1 && expr[0].var === '~') return '~';
+  const exprResult = this.evalExpr(expr, false);
+  let value = '';
+  for (const part of exprResult) {
+    if (part.value !== undefined && part.value !== null && part.value !== '-') {
+      value += part.value;
+    } else if (part.ref && part.ref !== '&-') {
+      const val = this.getValueFromRef(part.ref);
+      if (val) value += val;
+    }
+  }
+  return value === '' ? '0' : value;
+};
+
+Interpreter.prototype.conditionalOnShouldExecute = function(onMode, prevValue, newValue, insideBody, triggerDependsOnTilde) {
+  const prev = prevValue || '0';
+  const next = newValue || '0';
+  const newBit = next.length > 0 ? next[next.length - 1] : '0';
+  const prevBit = prev.length > 0 ? prev[prev.length - 1] : '0';
+  if (insideBody) {
+    return newBit === '1';
+  }
+  const mode = onMode || 'raise';
+  if (mode === 'raise' || mode === 'rising' || mode === 'edge' || mode === 'falling') {
+    return (typeof LogicValue !== 'undefined' && LogicValue.logicEdgeTriggered)
+      ? LogicValue.logicEdgeTriggered(prevBit, newBit, mode)
+      : ((mode === 'raise' || mode === 'rising')
+        ? (prevBit === '0' && newBit === '1')
+        : (prevBit === '1' && newBit === '0'));
+  }
+  if (mode === '1' || mode === 'level') {
+    return (typeof LogicValue !== 'undefined' && LogicValue.logicLevelTriggered)
+      ? LogicValue.logicLevelTriggered(newBit, next, prev, !!triggerDependsOnTilde)
+      : (triggerDependsOnTilde ? (newBit === '1') : ((newBit === '1') && (next !== prev)));
+  }
+  return false;
+};
+
+Interpreter.prototype.executeConditionalAssignmentEntry = function(entry) {
+  if (!entry || !entry.assignment) return;
+  if (this._uccExecutedStatements && entry.sourceStmt && this._uccExecutedStatements.has(entry.sourceStmt)) {
+    return;
+  }
+  if (this._uccExecutedStatements && entry.sourceStmt) {
+    this._uccExecutedStatements.add(entry.sourceStmt);
+  }
+  this.exec({ assignment: entry.assignment }, true);
+};
+
+Interpreter.prototype.tryExecuteConditionalAssignment = function(entry, isFirstRun) {
+  if (!entry || !entry.triggerExpr) return false;
+  const prevValue = entry.lastTriggerValue || '0';
+  const newValue = this.evalTriggerExprValue(entry.triggerExpr);
+  const triggerDependsOnTilde = this.exprDependsOnTilde(entry.triggerExpr);
+  let shouldExecute;
+  if (isFirstRun) {
+    const mode = entry.onMode || 'raise';
+    const insideBody = !!entry.insideBody;
+    if (insideBody) {
+      const bit = newValue.length > 0 ? newValue[newValue.length - 1] : '0';
+      shouldExecute = (bit === '1');
+    } else if (mode === '1' || mode === 'level') {
+      const bit = newValue.length > 0 ? newValue[newValue.length - 1] : '0';
+      shouldExecute = (bit === '1');
+    } else {
+      shouldExecute = false;
+    }
+  } else {
+    shouldExecute = this.conditionalOnShouldExecute(
+      entry.onMode,
+      prevValue,
+      newValue,
+      entry.insideBody,
+      triggerDependsOnTilde
+    );
+  }
+  entry.lastTriggerValue = newValue;
+  if (!shouldExecute) return false;
+  this.executeConditionalAssignmentEntry(entry);
+  return true;
+};
+
+Interpreter.prototype.execConditionalAssignment = function(s) {
+  const { onMode, triggerExpr, assignment } = s.conditionalAssignment;
+  const initialTriggerValue = this.evalTriggerExprValue(triggerExpr);
+  const dependencies = new Set();
+  const wireDependencies = new Set();
+  this.collectExprDependencies(triggerExpr, dependencies, wireDependencies);
+  const insideBody = this.insidePcbBody || this.insideChipBody || this.insideBoardBody;
+  const entry = {
+    onMode: String(onMode),
+    triggerExpr,
+    assignment,
+    dependencies,
+    wireDependencies,
+    lastTriggerValue: initialTriggerValue,
+    stmtIndex: this.conditionalAssignments.length,
+    insideBody,
+    sourceStmt: s,
+  };
+  if (!insideBody) {
+    this.conditionalAssignments.push(entry);
+  }
+  this.tryExecuteConditionalAssignment(entry, true);
+};
+
 Interpreter.formatPcbDef = function(alias, name, def, compNames) {
   const lines = [];
   lines.push(`pcb [${name}] ${alias}:`);
   if (def.exec) lines.push(`  exec: ${def.exec}`);
-  lines.push(`  on: raise/edge/1/0`);
+  lines.push(`  on: raise/edge/1`);
   lines.push('  :{');
   for (const pin of (def.pins || [])) {
     lines.push(`    ${pin.bits}pin ${pin.name}`);
@@ -14301,7 +14423,7 @@ Interpreter.formatChipDef = function(alias, name, def, compNames) {
   const lines = [];
   lines.push(`chip [${name}] ${alias}:`);
   if (def.exec) lines.push(`  exec: ${def.exec}`);
-  lines.push(`  on: raise/edge/1/0`);
+  lines.push(`  on: raise/edge/1`);
   lines.push('  :{');
   for (const pin of (def.pins || [])) {
     lines.push(`    ${pin.bits}pin ${pin.name}`);
@@ -14327,7 +14449,7 @@ Interpreter.formatBoardDef = function(alias, name, def, compNames) {
   const lines = [];
   lines.push(`board [${name}] ${alias}:`);
   if (def.exec) lines.push(`  exec: ${def.exec}`);
-  lines.push(`  on: raise/edge/1/0`);
+  lines.push(`  on: raise/edge/1`);
   lines.push('  :{');
   for (const pin of (def.pins || [])) {
     lines.push(`    ${pin.bits}pin ${pin.name}`);

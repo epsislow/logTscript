@@ -15,7 +15,7 @@ pcb +[name]:
   Npin inputName
   Mpout outputName
   exec: triggerPin
-  on: raise/edge/1/0
+  on: raise/edge/1
   # body — assignments, comp, def, chip, nested pcb
   :Nbit returnVar
 ```
@@ -25,7 +25,7 @@ pcb +[name]:
 | `pcb +[name]:` | Define a new PCB type (top-level only) |
 | `Npin` / `Npout` | Input / output ports exposed on instances |
 | `exec: pinName` | Which pin fires property blocks (default `set`) |
-| `on: mode` | When the block runs: `raise`, `edge`, `1`, `0` |
+| `on: mode` | When the block runs: `raise`, `edge`, or `1` |
 | body | Logic between header and final `:Nbit var` |
 | `:Nbit var` | Optional return type shown in `doc()` |
 

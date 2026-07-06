@@ -15,7 +15,7 @@ board +[name]:
   Npin inputName
   Mpout outputName
   exec: triggerPin
-  on: raise/edge/1/0
+  on: raise/edge/1
   comp [switch] .sw::
   # wiring, chip/board instances, probe
   :Nbit returnVar

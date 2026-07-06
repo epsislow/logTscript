@@ -299,7 +299,7 @@ Output:
 comp [mem] .name:
   length: integer
   depth: integer
-  on: raise/edge/1/0
+  on: raise/edge/1
   = Xbit
   :{
     Xpin adr

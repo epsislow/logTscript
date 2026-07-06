@@ -2116,8 +2116,39 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         }
       }
     }
-    
-    // (blocks are collected into _uccPendingBlocks above, not executed here)
+  }
+
+  // Conditional assignments (standalone on:{ })
+  if (this.conditionalAssignments && this.conditionalAssignments.length > 0) {
+    for (const entry of this.conditionalAssignments) {
+      if (entry.insideBody) continue;
+      if (!entry.triggerExpr) continue;
+      let hasDep = false;
+      if (entry.wireDependencies && entry.wireDependencies.has(varName)) {
+        hasDep = true;
+      }
+      if (!hasDep) {
+        for (const depWire of dependentWires) {
+          if (entry.wireDependencies && entry.wireDependencies.has(depWire)) {
+            hasDep = true;
+            break;
+          }
+        }
+      }
+      if (!hasDep && this.exprReferencesWire(entry.triggerExpr, varName)) {
+        hasDep = true;
+      }
+      if (!hasDep) {
+        for (const depWire of dependentWires) {
+          if (this.exprReferencesWire(entry.triggerExpr, depWire)) {
+            hasDep = true;
+            break;
+          }
+        }
+      }
+      if (!hasDep) continue;
+      this.tryExecuteConditionalAssignment(entry, false);
+    }
   }
 
   // TOP-LEVEL ONLY: execute all pending blocks in program order (by blockIndex).

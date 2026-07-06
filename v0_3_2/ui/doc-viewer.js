@@ -120,6 +120,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-TRIL.md', label: 'TRIL (lower triangle)' },
       { file: 'builtin-TRIU.md', label: 'TRIU (upper triangle)' },
       { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)' },
+      { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
       { file: 'slider.md', label: 'Slider component' }

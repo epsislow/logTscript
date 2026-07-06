@@ -130,6 +130,10 @@ Programs that use **PCB** instances and property blocks (`.instance:{ data=… s
 
 For examples and edge cases, see PCB tests **500–515** (legacy) and **516–531** (wave) in the test runner.
 
+### Conditional assignment (`on:`)
+
+Standalone `on:<mode> { trigger, assignment }` statements use the same trigger helpers as property blocks and are re-evaluated when trigger dependencies change during propagation. See [conditional-assignment.md](conditional-assignment.md).
+
 ---
 
 ## Chip components

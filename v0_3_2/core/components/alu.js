@@ -62,7 +62,7 @@ var AluComponent = class AluComponent extends BuiltinComponent {
     const opBits = aluOpBits(extraOp);
     const defAttrs = [
       { name: 'length', value: 'integer' },
-      { name: 'on', value: '0/1/raise/edge' },
+      { name: 'on', value: '1/raise/edge' },
       { name: 'extraOp', value: 'ID list (optional)' },
       { name: 'extraFlags', value: 'ID list (optional)' },
       { name: 'lut', value: '.component (optional)' },

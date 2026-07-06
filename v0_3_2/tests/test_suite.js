@@ -17338,6 +17338,111 @@ reg(2058, 'lut-writable', 'read-only decode fillwith unchanged', function(h, ses
   h.assert('fill slot', session.getWire(interp, 'x'), '0001');
 });
 
+const COND_LUT_BASE = `inline [lut] .huff:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+`;
+
+reg(2060, 'conditional-assignment', 'parse registers on:raise', function(h, session) {
+  const src = COND_LUT_BASE + `
+1wire clearFlag = 0
+1wire ok = 0
+on:raise {
+  clearFlag,
+  ok = .huff:clear()
+}`;
+  const { interp } = session.run(src);
+  h.assert('registered', String(interp.conditionalAssignments.length), '1');
+  h.assert('onMode', interp.conditionalAssignments[0].onMode, 'raise');
+});
+
+reg(2061, 'conditional-assignment', 'on:raise no exec when flag 0', function(h, session) {
+  const src = COND_LUT_BASE + `
+1wire clearFlag = 0
+1wire ok = 0
+on:raise {
+  clearFlag,
+  ok = .huff:clear()
+}`;
+  const { interp } = session.run(src);
+  h.assert('ok stays 0', session.getWire(interp, 'ok'), '0');
+  h.assert('lut size', String(interp.inlineInstances.get('.huff').lutEntryList.length), '2');
+});
+
+reg(2062, 'conditional-assignment', 'on:raise fires on 0 to 1', function(h, session) {
+  const src = `MODE WIREWRITE
+` + COND_LUT_BASE + `
+1wire clearFlag = 0
+1wire ok = 0
+on:raise {
+  clearFlag,
+  ok = .huff:clear()
+}
+clearFlag = 1`;
+  const { interp } = session.run(src);
+  h.assert('lut cleared', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+});
+
+reg(2063, 'conditional-assignment', 'on:0 parse error', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`on:0 { x, y = 1 }`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('rejects on:0', String(err.includes('on:0')), 'true');
+});
+
+reg(2064, 'conditional-assignment', 'on:1 fires when flag becomes 1', function(h, session) {
+  const src = `MODE WIREWRITE
+` + COND_LUT_BASE + `
+1wire flag = 0
+1wire ok = 0
+on:1 {
+  flag,
+  ok = .huff:clear()
+}
+flag = 1`;
+  const { interp } = session.run(src);
+  h.assert('lut cleared', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+});
+
+reg(2065, 'conditional-assignment', 'on:edge fires on 1 to 0', function(h, session) {
+  const src = `MODE WIREWRITE
+` + COND_LUT_BASE + `
+1wire clk = 1
+1wire ok = 0
+on:edge {
+  clk,
+  ok = .huff:clear()
+}
+clk = 0`;
+  const { interp } = session.run(src);
+  h.assert('lut cleared', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+});
+
+reg(2066, 'conditional-assignment', 'on:raise wave mode', function(h, session) {
+  session.propagation = 'wave';
+  const src = `MODE WIREWRITE
+` + COND_LUT_BASE + `
+1wire clearFlag = 0
+1wire ok = 0
+on:raise {
+  clearFlag,
+  ok = .huff:clear()
+}
+clearFlag = 1`;
+  const { interp } = session.run(src);
+  h.assert('lut cleared wave', String(interp.inlineInstances.get('.huff').lutEntryList.length), '0');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

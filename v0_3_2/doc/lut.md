@@ -537,6 +537,15 @@ show(x)
 
 `isEmpty()` → `1`, `size()` → `0`, `get(000)` → `fillwith` (`0000`).
 
+To run writable methods only when a flag rises (instead of at every RUN), use [conditional assignment](conditional-assignment.md):
+
+```logts
+on:raise {
+  clearFlag,
+  _ = .huff:clear()
+}
+```
+
 ### Runnable — `prefixFree` + `:add` (incremental Huffman)
 
 With `writable` and `prefixFree`, each `add` / `set` must keep codewords prefix-free. Build a codebook step by step:

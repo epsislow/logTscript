@@ -635,7 +635,7 @@ Output:
 ```
 pcb [bcd] .name:
   exec: set
-  on: raise/edge/1/0
+  on: raise/edge/1
   :{
     4pin sum
     1pin set
@@ -647,7 +647,7 @@ pcb [bcd] .name:
 
 **Output structure:**
 - `exec: set` — the pin that triggers execution
-- `on: raise/edge/1/0` — the trigger condition (value depends on the PCB definition)
+- `on: raise/edge/1` — the trigger condition (value depends on the PCB definition)
 - `:{` ... `}` — the defined pins (inputs) and pouts (outputs)
 - `-> Nbit` — the return type (if `:Nbit varName` is at the end of the definition)
 

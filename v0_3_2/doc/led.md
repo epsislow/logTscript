@@ -13,7 +13,7 @@ comp [led] .name:
   color: ^f00
   square
   nl
-  on: raise/edge/1/0
+  on: raise/edge/1
   :
 ```
 
@@ -236,7 +236,7 @@ comp [led] .name:
   color: string
   square
   nl
-  on: raise/edge/1/0
+  on: raise/edge/1
   = Xbit
   :{
     1pin set

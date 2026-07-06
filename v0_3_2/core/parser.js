@@ -905,6 +905,7 @@ parsePcbDefinition() {
       const stmtLine = this.c.line;
       const stmtCol = this.c.col;
       const stmt = this.stmt();
+      this.validateConditionalAssignmentInBody(stmt, 'pcb body', this.c.file, stmtLine, stmtCol);
       this.validateTopLevelOnlyComponent(stmt, 'pcb body', this.c.file, stmtLine, stmtCol);
       if (inNextSection) {
         nextSection.push(stmt);
@@ -973,6 +974,14 @@ validateTopLevelOnlyComponent(stmt, scopeLabel, file, line, col) {
   }
 }
 
+validateConditionalAssignmentInBody(stmt, scopeLabel, file, line, col) {
+  if (!stmt || !stmt.conditionalAssignment) return;
+  const mode = String(stmt.conditionalAssignment.onMode || '');
+  if (mode === 'raise' || mode === 'rising' || mode === 'edge' || mode === 'falling') {
+    throw Error(`on:${mode} conditional assignment is not allowed in ${scopeLabel}; use on:1 at ${file}: ${line}:${col}`);
+  }
+}
+
 validateChipBodyStatement(stmt, file, line, col) {
   if (!stmt) return;
   if (stmt.def) {
@@ -984,6 +993,7 @@ validateChipBodyStatement(stmt, file, line, col) {
   if (stmt.comp && Parser.CHIP_FORBIDDEN_TYPES.includes(stmt.comp.type)) {
     throw Error(`Chip body cannot contain component '${stmt.comp.type}' at ${file}: ${line}:${col}`);
   }
+  this.validateConditionalAssignmentInBody(stmt, 'chip body', file, line, col);
   this.validateTopLevelOnlyComponent(stmt, 'chip body', file, line, col);
 }
 
@@ -1005,6 +1015,7 @@ validateBoardBodyStatement(stmt, file, line, col) {
   if (stmt.pcbInstance) {
     throw Error(`Board body cannot contain PCB instances at ${file}: ${line}:${col}`);
   }
+  this.validateConditionalAssignmentInBody(stmt, 'board body', file, line, col);
   this.validateTopLevelOnlyComponent(stmt, 'board body', file, line, col);
 }
 
@@ -1334,6 +1345,78 @@ parseBoardInstance() {
   return { boardInstance: { boardName, instanceName } };
 }
 
+  peekOnConditional() {
+    let i = this.t.i;
+    const src = this.t.src;
+    while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (i >= src.length || src[i] !== ':') return false;
+    i++;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (i >= src.length) return false;
+    if (/[a-zA-Z_]/.test(src[i])) {
+      while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
+    } else if (/[0-9]/.test(src[i])) {
+      while (i < src.length && /[0-9]/.test(src[i])) i++;
+    } else {
+      return false;
+    }
+    while (i < src.length && /\s/.test(src[i])) i++;
+    return i < src.length && src[i] === '{';
+  }
+
+  parseOnModeValue(contextLabel) {
+    let onMode;
+    if (this.c.type === 'ID') {
+      onMode = this.c.value;
+      this.eat('ID');
+    } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
+      onMode = this.c.value;
+      this.eat(this.c.type);
+    } else {
+      throw Error(`Expected on mode (raise, edge, 1) after 'on:' in ${contextLabel} at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    if (onMode === '0') {
+      throw Error(`on:0 is not supported in ${contextLabel}; use on:raise with inverted trigger (e.g. !flag) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    return String(onMode);
+  }
+
+  parseConditionalAssignment() {
+    const stmtLine = this.c.line;
+    const stmtCol = tokenStartCol(this.c);
+    this.eat('ID', 'on');
+    this.eat('SYM', ':');
+    const onMode = this.parseOnModeValue('conditional assignment');
+    this.eat('SYM', '{');
+    while (this.c.type === 'EOL') this.c = this.t.get();
+    const triggerExpr = this.expr();
+    while (this.c.type === 'EOL') this.c = this.t.get();
+    if (this.c.type !== 'SYM' || this.c.value !== ',') {
+      throw Error(`Expected ',' between trigger and assignment in on:${onMode} { } at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    this.eat('SYM', ',');
+    while (this.c.type === 'EOL') this.c = this.t.get();
+    const assignResult = this.assignment();
+    if (!assignResult || !assignResult.assignment) {
+      throw Error(`on:${onMode} body must contain exactly one assignment at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    if (this.c.type === 'SYM' && this.c.value === ',') {
+      throw Error(`on:${onMode} body allows only one assignment at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    while (this.c.type === 'EOL') this.c = this.t.get();
+    this.eat('SYM', '}');
+    return {
+      conditionalAssignment: {
+        onMode,
+        triggerExpr,
+        assignment: assignResult.assignment,
+        line: stmtLine,
+        col: stmtCol
+      }
+    };
+  }
+
   // --- Dispatch map for keyword statements ---
   stmt(){
     if (this.c.type === 'TYPE') return this.var();
@@ -1341,6 +1424,10 @@ parseBoardInstance() {
     if (this.c.type === 'KEYWORD') {
       const handler = Parser.KEYWORD_HANDLERS[this.c.value];
       if (handler) return this[handler]();
+    }
+
+    if (this.c.type === 'ID' && this.c.value === 'on' && this.peekOnConditional()) {
+      return this.parseConditionalAssignment();
     }
 
     if (this.c.type === 'ID' && (this.c.value === 'ZCONNECT' || this.c.value === 'ZCONN')) {
