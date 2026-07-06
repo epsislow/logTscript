@@ -16,9 +16,9 @@ ARGMIN(Wbit[n] vector; index q4p4) -> bitIndexWidth(n) bit
 ARGMIN(Wbit[n,m] matrix) -> 1wire[n×m]
 ARGMIN(Wbit[n,m] matrix; index) -> bit rows, bit cols
 ARGMIN(Wbit[n,m] m ; row) -> 1wire[n×m]
-ARGMIN(Wbit[n,m] m ; row; index) -> bitIndexWidth(m) wire[n]
+ARGMIN(Wbit[n,m] m ; row index) -> bitIndexWidth(m) wire[n]
 ARGMIN(Wbit[n,m] m ; col) -> 1wire[n×m]
-ARGMIN(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
+ARGMIN(Wbit[n,m] m ; col index) -> bitIndexWidth(n) wire[m]
 ```
 
 **No `; vector` tag** — the argument is already a whole tensor. Applies to any **rank-1** tensor (`Wwire[N]`, `Wwire[1,N]`, `Wwire[N,1]`); see [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
@@ -30,9 +30,9 @@ ARGMIN(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
 | whole matrix | `1wire[n×m]` | One-hot over all cells |
 | matrix `; index` | `bit rows`, `bit cols` | Row and column index of global min |
 | `; row` | `1wire[n×m]` | One `1` per row at the minimal column |
-| `; row; index` | `bitIndexWidth(m) wire[n]` | Column index per row |
+| `; row index` | `bitIndexWidth(m) wire[n]` | Column index per row |
 | `; col` | `1wire[n×m]` | One `1` per column at the minimal row |
-| `; col; index` | `bitIndexWidth(n) wire[m]` | Row index per column |
+| `; col index` | `bitIndexWidth(n) wire[m]` | Row index per column |
 | `signed` | (any of above) | Signed compare |
 | `q4p4` | (rank-1 modes above) | Q4.4 compare on **8-bit** elements |
 
@@ -52,11 +52,11 @@ show(hot)
 
 Min `1` at indices 1 and 2 → one-hot `010`.
 
-### `ARGMIN(Wbit[n,m] m ; row; index)`
+### `ARGMIN(Wbit[n,m] m ; row index)`
 
 ```logts-play
 4wire[2,2] m = 0001 + 0010 + 0100 + 1000
-1wire[2] idx = ARGMIN(m; row; index)
+1wire[2] idx = ARGMIN(m; row index)
 show(idx)
 ```
 

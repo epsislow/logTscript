@@ -88,7 +88,7 @@ Whole-matrix ARGMAX/ARGMIN (no axis tag) still returns global one-hot or `(row, 
 ```logts-play
 4wire[2,2] m = 0001 + 0010 + 0100 + 1000
 4wire[2] r, 4wire[2] o = SUM(m; row)
-1wire[2] idx = ARGMAX(m; row; index)
+1wire[2] idx = ARGMAX(m; row index)
 show(r)
 show(idx)
 ```

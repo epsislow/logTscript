@@ -118,7 +118,7 @@ Mutually exclusive with **`; vector`** and **`; matrix`**. Rank-1 tensors withou
 4wire[2] r, 4wire[2] o = SUM(m; row)
 4wire[2] cmin = MIN(m; col)
 4wire[2] rmax = MAX(m; row)
-1wire[2] idx = ARGMAX(m; row; index)
+1wire[2] idx = ARGMAX(m; row index)
 show(r)
 show(cmin)
 show(rmax)

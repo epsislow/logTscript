@@ -409,6 +409,39 @@ inline [lut] .huff:
 | `.lut:hasKey(key)` | `1` if any entry has key, else `0` (missing key → `0`) |
 | `.lut:hasValue(value)` | `1` if any entry has value, else `0` (**0** for fillwith) |
 | `.lut:isEmpty()` | `1` if no entries |
+| `.lut:keys()` | Vector of all keys (key width × entry count) |
+| `.lut:values()` | Vector of all values (value width × entry count) |
+| `.lut:entries()` | Matrix **N×2**: column 0 = key, column 1 = value (`ew = max(keyW, valW)`) |
+
+### Bulk export (`:keys`, `:values`, `:entries`)
+
+Read-only snapshots of the **ordered entry list** (same order as `add` / `set`). Empty list → zero-length blob (declare width `0` or match `size()`).
+
+**Sizing:** declare rank-1 tensors with element count = `.lut:size()` and element width = **`bitIndexWidth(length)`** for keys (e.g. `length: 16` → 4 bits per key) and **`depth`** for values (unless `variableDepth`). For `:entries`, use `Ewire[N,2]` with `Ewire = max(keyW, depth)` and `N = size()`.
+
+**`logts-play`:** the script is re-run on each `show` / update. A runtime `:add` appends again — use a static `data { ... }` block in demos, or `:clear()` before mutations.
+
+```logts-play
+inline [lut] .freq:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+    010 : 1010
+  }
+  :
+4wire[3] ks = .freq:keys()
+4wire[3] vs = .freq:values()
+4wire[3,2] ent = .freq:entries()
+show(ks)
+show(vs)
+show(ent)
+```
+
+Use with [SORT](builtin-SORT.md) to reorder by frequency, e.g. `SORT(.freq:entries(); col=1)`.
 
 ### `fillwith` vs explicit entries
 

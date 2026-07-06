@@ -806,6 +806,7 @@ class Interpreter {
     if (!expr || !Array.isArray(expr) || !instName) return false;
     const readonlyMethods = new Set([
       'size', 'isEmpty', 'countKey', 'countValue', 'hasKey', 'hasValue', 'get', 'decode', 'isValid',
+      'keys', 'values', 'entries',
     ]);
     const mutators = new Set(['clear', 'add', 'set', 'remove']);
     for (const atom of expr) {
@@ -1277,6 +1278,21 @@ class Interpreter {
         if (!writable) throw new Error(`LUT ${instName} is not writable`);
         if (typeof lutGetWritable !== 'function') throw new Error('Writable LUT module is not loaded');
         return lutGetWritable(lutInst, args[0], args[1], this);
+      }
+      if (method === 'keys') {
+        if (!writable) throw new Error(`LUT ${instName} is not writable`);
+        if (typeof lutKeys !== 'function') throw new Error('Writable LUT module is not loaded');
+        return lutKeys(lutInst);
+      }
+      if (method === 'values') {
+        if (!writable) throw new Error(`LUT ${instName} is not writable`);
+        if (typeof lutValues !== 'function') throw new Error('Writable LUT module is not loaded');
+        return lutValues(lutInst);
+      }
+      if (method === 'entries') {
+        if (!writable) throw new Error(`LUT ${instName} is not writable`);
+        if (typeof lutEntries !== 'function') throw new Error('Writable LUT module is not loaded');
+        return lutEntries(lutInst);
       }
       const writableMutators = {
         add: () => lutAdd(lutInst, args[0], args[1], this),
@@ -3640,7 +3656,7 @@ class Interpreter {
          'CNTN16S', 'N2N16S', 'N16S2N',
          'PIVOT', 'IDENTITY', 'ZEROS', 'FILL', 'DIAG', 'IOTA', 'SHAPE', 'RANK',
          'OUTER', 'TRACE', 'NORM', 'L2', 'TRIL', 'TRIU',
-         'FLIPUD', 'FLIPLR', 'MCAT', 'MSLICE', 'REPEAT'].includes(name)) {
+         'FLIPUD', 'FLIPLR', 'MCAT', 'MSLICE', 'REPEAT', 'SORT'].includes(name)) {
       return true;
     }
 
@@ -4637,7 +4653,15 @@ const idx = parseInt(
   let indexMode = false;
   let axisMode = null;
   let nformatSpec = null;
-  if (callTags && callTags.length) {
+  let sortOpts = null;
+  if (name === 'SORT') {
+    sortOpts = { desc: false, col: null, row: null };
+    if (callTags && callTags.length) {
+      const SB = typeof LogTScriptSortBuiltin !== 'undefined' ? LogTScriptSortBuiltin : null;
+      if (!SB) fail('SORT: internal error (sort-builtin not loaded)');
+      sortOpts = SB.parseSortCallTags(callTags, (msg) => fail(msg));
+    }
+  } else if (callTags && callTags.length) {
     const isBuiltin = !!Interpreter.BUILTIN_DOC[name];
     if (name === 'NFORMAT') {
       if (!NF) fail('NFORMAT: internal error (numeric-formats not loaded)');
@@ -5092,6 +5116,37 @@ const idx = parseInt(
     return computeRefs
       ? { value: blob, ref: `&${this.storeValue(blob)}` }
       : { value: blob, ref: null };
+  }
+
+  if (name === 'SORT') {
+    if (args.length !== 1) fail('SORT expects 1 argument');
+    const SB = typeof LogTScriptSortBuiltin !== 'undefined' ? LogTScriptSortBuiltin : null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (!SB || !TS) fail('SORT: internal error (sort-builtin not loaded)');
+    const dataAtom = args[0] && args[0][0];
+    if (!dataAtom || !dataAtom.var) fail('SORT expects one whole tensor argument');
+    if (dataAtom.vectorIndex !== undefined || dataAtom.vectorIndexExpr || dataAtom.bitRange
+        || dataAtom.tensorSlice || dataAtom.tensorRowIndex !== undefined || dataAtom.tensorColIndex !== undefined
+        || dataAtom.tensorRowIndexExpr || dataAtom.tensorColIndexExpr) {
+      fail('SORT expects one whole tensor argument');
+    }
+    const wire = this.wires.get(dataAtom.var);
+    if (!wire) fail(`SORT: unknown wire '${dataAtom.var}'`);
+    const meta = TS.getWireTensorMeta(wire);
+    if (!meta || meta.elementCount <= 0) {
+      fail('SORT: empty tensor');
+    }
+    const val = this._evalCallArgValue(args[0]);
+    if (val == null || val === '-') fail('SORT: empty tensor value');
+    let sorted;
+    try {
+      sorted = SB.sortTensor(val, meta, sortOpts || { desc: false, col: null, row: null });
+    } catch (e) {
+      fail(e.message);
+    }
+    return computeRefs
+      ? { value: sorted, ref: `&${this.storeValue(sorted)}` }
+      : { value: sorted, ref: null };
   }
 
   if (name === 'SUM') {
@@ -13940,6 +13995,13 @@ Interpreter.BUILTIN_DOC = {
     'ARGMIN(Wbit[n,m] m ; row index) -> bitIndexWidth(m) wire[n]',
     'ARGMIN(Wbit[n,m] m ; col) -> 1wire[n×m]',
     'ARGMIN(Wbit[n,m] m ; col index) -> bitIndexWidth(n) wire[m]',
+  ],
+  SORT: [
+    'SORT(Wbit[n] vector) -> Wbit[n]',
+    'SORT(Wbit[n] vector; desc) -> Wbit[n]',
+    'SORT(Wbit[r,c] matrix; col=k) -> Wbit[r,c]',
+    'SORT(Wbit[r,c] matrix; row=k) -> Wbit[r,c]',
+    'SORT(Wbit[r,c] matrix; col=k desc) -> Wbit[r,c]',
   ],
   CLAMP:    [
     'CLAMP(Xbit x, Ybit min, Ybit max) -> Ybit',

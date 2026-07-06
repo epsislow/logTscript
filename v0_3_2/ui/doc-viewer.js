@@ -116,6 +116,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-NFORMAT.md', label: 'NFORMAT' },
       { file: 'builtin-NORM.md', label: 'NORM (L2² norm)' },
       { file: 'builtin-OUTER.md', label: 'OUTER (outer product)' },
+      { file: 'builtin-SORT.md', label: 'SORT' },
       { file: 'builtin-TRACE.md', label: 'TRACE (matrix trace)' },
       { file: 'builtin-TRIL.md', label: 'TRIL (lower triangle)' },
       { file: 'builtin-TRIU.md', label: 'TRIU (upper triangle)' },

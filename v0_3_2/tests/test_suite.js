@@ -17693,6 +17693,102 @@ on:1 {
   h.assert('qsz size when clear 1 again', session.getWire(interp, 'qsz'), '00001');
 });
 
+reg(2076, 'lut-writable', 'keys values entries export', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:add(010, 1010)
+4wire[3] ks = .huff:keys()
+4wire[3] vs = .huff:values()
+4wire[3,2] ent = .huff:entries()`;
+  const { interp } = session.run(src);
+  h.assert('keys', session.getWire(interp, 'ks'), '000000010010');
+  h.assert('values', session.getWire(interp, 'vs'), '000100101010');
+  h.assert('entries', session.getWire(interp, 'ent'), '000000010001001000101010');
+});
+
+reg(2077, 'lut-writable', 'keys values empty after clear', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:clear()
+4wire sz = .huff:size()
+1wire e = .huff:isEmpty()`;
+  const { interp } = session.run(src);
+  h.assert('size', session.getWire(interp, 'sz'), '0000');
+  h.assert('empty', session.getWire(interp, 'e'), '1');
+});
+
+reg(2078, 'builtin-sort', 'SORT vector asc', function(h, session) {
+  const src =
+    '4wire[4] v = 0100 + 0001 + 1000 + 0010\n' +
+    '4wire[4] s = SORT(v)';
+  const { interp } = session.run(src);
+  h.assert('sorted', session.getWire(interp, 's'), '0001001001001000');
+});
+
+reg(2079, 'builtin-sort', 'SORT vector desc', function(h, session) {
+  const src =
+    '4wire[4] v = 0100 + 0001 + 1000 + 0010\n' +
+    '4wire[4] s = SORT(v; desc)';
+  const { interp } = session.run(src);
+  h.assert('sorted', session.getWire(interp, 's'), '1000010000100001');
+});
+
+reg(2080, 'builtin-sort', 'SORT matrix by col=1 asc', function(h, session) {
+  const src =
+    '4wire[3,2] m = 0001 + 0010 + 0100 + 0001 + 0011 + 1000\n' +
+    '4wire[3,2] s = SORT(m; col=1)\n' +
+    '4wire[3] keys = s::0';
+  const { interp } = session.run(src);
+  h.assert('row order keys', session.getWire(interp, 'keys'), '010000010011');
+});
+
+reg(2081, 'builtin-sort', 'SORT matrix desc col=1', function(h, session) {
+  const src =
+    '4wire[3,2] m = 0001 + 0010 + 0100 + 0001 + 0011 + 1000\n' +
+    '4wire[3,2] s = SORT(m; desc col=1)';
+  const { interp } = session.run(src);
+  h.assert('sorted', session.getWire(interp, 's'), '001110000001001001000001');
+});
+
+reg(2082, 'builtin-sort', 'SORT stable tie keeps lower index', function(h, session) {
+  const src =
+    '4wire[3] v = 0010 + 0001 + 0010\n' +
+    '4wire[3] s = SORT(v)';
+  const { interp } = session.run(src);
+  h.assert('stable', session.getWire(interp, 's'), '000100100010');
+});
+
+reg(2083, 'builtin-sort', 'SORT matrix requires col or row', function(h, session) {
+  const src = '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n4wire[2,2] s = SORT(m)';
+  h.assertThrows('needs axis tag', () => {
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    if (!err) throw new Error('expected runtime error');
+    throw err;
+  }, 'requires col=index');
+});
+
+reg(2084, 'builtin-sort', 'SORT col out of range', function(h, session) {
+  const src = '4wire[2,2] m = 0001 + 0010 + 0100 + 1000\n4wire[2,2] s = SORT(m; col=2)';
+  h.assertThrows('col range', () => {
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    if (!err) throw new Error('expected runtime error');
+    throw err;
+  }, 'out of range');
+});
+
+reg(2085, 'builtin-sort', 'SORT entries from writable lut', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _0 = .huff:clear()
+1wire _a = .huff:add(000, 0001)
+1wire _b = .huff:add(001, 0100)
+1wire _c = .huff:add(010, 0011)
+4wire[3,2] e = .huff:entries()
+4wire[3,2] s = SORT(e; col=1)
+4wire[3] syms = s::0`;
+  const { interp } = session.run(src);
+  h.assert('by freq asc', session.getWire(interp, 'syms'), '000000100001');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

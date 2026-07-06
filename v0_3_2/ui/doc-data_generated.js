@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -2589,9 +2589,9 @@ ARGMAX(Wbit[n] vector; index q4p4) -> bitIndexWidth(n) bit
 ARGMAX(Wbit[n,m] matrix) -> 1wire[n×m]
 ARGMAX(Wbit[n,m] matrix; index) -> bit rows, bit cols
 ARGMAX(Wbit[n,m] m ; row) -> 1wire[n×m]
-ARGMAX(Wbit[n,m] m ; row; index) -> bitIndexWidth(m) wire[n]
+ARGMAX(Wbit[n,m] m ; row index) -> bitIndexWidth(m) wire[n]
 ARGMAX(Wbit[n,m] m ; col) -> 1wire[n×m]
-ARGMAX(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
+ARGMAX(Wbit[n,m] m ; col index) -> bitIndexWidth(n) wire[m]
 \`\`\`
 
 **No \`; vector\` tag** — the argument is already a whole tensor. Applies to any **rank-1** tensor (\`Wwire[N]\`, \`Wwire[1,N]\`, \`Wwire[N,1]\`); see [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
@@ -2603,9 +2603,9 @@ ARGMAX(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
 | whole matrix | \`1wire[n×m]\` | One-hot over all cells |
 | matrix \`; index\` | \`bit rows\`, \`bit cols\` | Row and column index of global max |
 | \`; row\` | \`1wire[n×m]\` | One \`1\` per row at the maximal column |
-| \`; row; index\` | \`bitIndexWidth(m) wire[n]\` | Column index per row |
+| \`; row index\` | \`bitIndexWidth(m) wire[n]\` | Column index per row |
 | \`; col\` | \`1wire[n×m]\` | One \`1\` per column at the maximal row |
-| \`; col; index\` | \`bitIndexWidth(n) wire[m]\` | Row index per column |
+| \`; col index\` | \`bitIndexWidth(n) wire[m]\` | Row index per column |
 | \`signed\` | (any of above) | Signed compare |
 | \`q4p4\` | (rank-1 modes above) | Q4.4 compare on **8-bit** elements |
 
@@ -2635,11 +2635,11 @@ show(idx)
 
 → \`idx=01\`.
 
-### \`ARGMAX(Wbit[n,m] m ; row; index)\`
+### \`ARGMAX(Wbit[n,m] m ; row index)\`
 
 \`\`\`logts-play
 4wire[2,2] m = 0001 + 0010 + 0100 + 1000
-1wire[2] idx = ARGMAX(m; row; index)
+1wire[2] idx = ARGMAX(m; row index)
 show(idx)
 \`\`\`
 
@@ -2697,9 +2697,9 @@ ARGMIN(Wbit[n] vector; index q4p4) -> bitIndexWidth(n) bit
 ARGMIN(Wbit[n,m] matrix) -> 1wire[n×m]
 ARGMIN(Wbit[n,m] matrix; index) -> bit rows, bit cols
 ARGMIN(Wbit[n,m] m ; row) -> 1wire[n×m]
-ARGMIN(Wbit[n,m] m ; row; index) -> bitIndexWidth(m) wire[n]
+ARGMIN(Wbit[n,m] m ; row index) -> bitIndexWidth(m) wire[n]
 ARGMIN(Wbit[n,m] m ; col) -> 1wire[n×m]
-ARGMIN(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
+ARGMIN(Wbit[n,m] m ; col index) -> bitIndexWidth(n) wire[m]
 \`\`\`
 
 **No \`; vector\` tag** — the argument is already a whole tensor. Applies to any **rank-1** tensor (\`Wwire[N]\`, \`Wwire[1,N]\`, \`Wwire[N,1]\`); see [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
@@ -2711,9 +2711,9 @@ ARGMIN(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
 | whole matrix | \`1wire[n×m]\` | One-hot over all cells |
 | matrix \`; index\` | \`bit rows\`, \`bit cols\` | Row and column index of global min |
 | \`; row\` | \`1wire[n×m]\` | One \`1\` per row at the minimal column |
-| \`; row; index\` | \`bitIndexWidth(m) wire[n]\` | Column index per row |
+| \`; row index\` | \`bitIndexWidth(m) wire[n]\` | Column index per row |
 | \`; col\` | \`1wire[n×m]\` | One \`1\` per column at the minimal row |
-| \`; col; index\` | \`bitIndexWidth(n) wire[m]\` | Row index per column |
+| \`; col index\` | \`bitIndexWidth(n) wire[m]\` | Row index per column |
 | \`signed\` | (any of above) | Signed compare |
 | \`q4p4\` | (rank-1 modes above) | Q4.4 compare on **8-bit** elements |
 
@@ -2733,11 +2733,11 @@ show(hot)
 
 Min \`1\` at indices 1 and 2 → one-hot \`010\`.
 
-### \`ARGMIN(Wbit[n,m] m ; row; index)\`
+### \`ARGMIN(Wbit[n,m] m ; row index)\`
 
 \`\`\`logts-play
 4wire[2,2] m = 0001 + 0010 + 0100 + 1000
-1wire[2] idx = ARGMIN(m; row; index)
+1wire[2] idx = ARGMIN(m; row index)
 show(idx)
 \`\`\`
 
@@ -5990,6 +5990,85 @@ show(cols)
 
 [RANK](builtin-RANK.md) · [wire-vectors.md](wire-vectors.md)
 `,
+    'builtin-SORT.md': `# SORT
+
+Index: [2D tensors](wire-vectors.md) · [LUT bulk export](lut.md#bulk-export-keys-values-entries) · [Tagged built-ins](builtin-tagged-index.md)
+
+Stable sort of a whole wire vector or matrix. Comparison is **unsigned** on each element's bit pattern.
+
+**Tag rule:** one semicolon per call; tags after it are **space-separated** (e.g. \`; desc col=1\`, not \`; desc; col=1\`).
+
+## Signatures
+
+\`\`\`
+SORT(Wbit[n] vector) -> Wbit[n]
+SORT(Wbit[n] vector; desc) -> Wbit[n]
+SORT(Wbit[r,c] matrix; col=k) -> Wbit[r,c]
+SORT(Wbit[r,c] matrix; row=k) -> Wbit[r,c]
+SORT(Wbit[r,c] matrix; col=k desc) -> Wbit[r,c]
+\`\`\`
+
+| Tag | Applies to | Description |
+|-----|------------|-------------|
+| *(none)* | vector | Ascending element order |
+| \`desc\` | vector | Descending element order |
+| \`col=k\` | matrix (\`r>1\`, \`c>1\`) | Sort **rows** by column \`k\` (ascending) |
+| \`row=k\` | matrix | Sort **columns** by row \`k\` (ascending) |
+| \`desc\` | matrix | Reverse compare direction for the chosen axis |
+
+**Ties:** lower original index wins (stable sort).
+
+**Errors:** matrix without \`col=\` or \`row=\`; \`col\` / \`row\` on vectors; \`col\` and \`row\` together; index out of range.
+
+## Examples
+
+### Vector ascending
+
+\`\`\`logts-play
+4wire[4] v = 0100 + 0001 + 1000 + 0010
+4wire[4] s = SORT(v)
+show(s)
+\`\`\`
+
+### Vector descending
+
+\`\`\`logts-play
+4wire[4] v = 0100 + 0001 + 1000 + 0010
+4wire[4] s = SORT(v; desc)
+show(s)
+\`\`\`
+
+### Matrix — sort rows by column 1
+
+\`\`\`logts-play
+4wire[3,2] m = 0001 + 0010 + 0100 + 0001 + 0011 + 1000
+4wire[3,2] s = SORT(m; col=1)
+4wire[3] keys = s::0
+show(keys)
+\`\`\`
+
+### LUT entries by value (frequency column)
+
+\`\`\`logts-play
+inline [lut] .freq:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  :
+1wire _ = .freq:add(000, 0001)
+1wire _ = .freq:add(001, 0100)
+1wire _ = .freq:add(010, 0011)
+4wire[3,2] e = .freq:entries()
+4wire[3,2] s = SORT(e; col=1)
+4wire[3] syms = s::0
+show(syms)
+\`\`\`
+
+## See also
+
+[ARGMAX](builtin-ARGMAX.md) · [REPEAT](builtin-REPEAT.md) · [lut.md — \`:entries\`](lut.md#bulk-export-keys-values-entries)
+`,
     'builtin-SUBTRACT.md': `# SUBTRACT
 
 Index: [Arithmetic](arithmetic.md) · [Tagged built-ins](builtin-tagged-index.md) · [Element-wise \`; vector\`](vector-reduction.md#element-wise-mode-vector) · [Matrix \`; matrix\`](matrix-reduction.md)
@@ -6333,10 +6412,11 @@ Cross-cutting topics:
 | LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | — | — | — | — | — | yes | yes | — | — | bit transform |
 | RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | — | — | — | — | — | yes | yes | — | — | bit transform |
 | REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | — | — | — | — | — | yes | yes | — | — | bit transform |
+| SORT | [builtin-SORT.md](builtin-SORT.md) | — | — | — | — | — | — | — | \`col=k\` / \`row=k\` / \`desc\` | — | wire-vectors |
 
 Use \`doc(NAME)\` in scripts for live signatures from \`Interpreter.BUILTIN_DOC\`.
 
-**Note:** **\`; signed\`**, **\`; q4p4\`**, **\`; q8p8\`**, **\`; fp16\`**, and **\`; bf16\`** are **mutually exclusive** (at most one numeric-format tag per call). **\`; vector\`**, **\`; matrix\`**, **\`; row\`**, and **\`; col\`** cannot appear together. **DOT** does not use axis tags. **ARGMAX** / **ARGMIN** use shape rules instead of **\`; matrix\`** (but support **\`; row\`** / **\`; col\`**).
+**Note:** **\`; signed\`**, **\`; q4p4\`**, **\`; q8p8\`**, **\`; fp16\`**, and **\`; bf16\`** are **mutually exclusive** (at most one numeric-format tag per call). **\`; vector\`**, **\`; matrix\`**, **\`; row\`**, and **\`; col\`** cannot appear together. **DOT** does not use axis tags. **ARGMAX** / **ARGMIN** use shape rules instead of **\`; matrix\`** (but support **\`; row\`** / **\`; col\`**). **SORT** uses **\`col=k\`** / **\`row=k\`** (numeric axis index) and optional **\`desc\`** — see [builtin-SORT.md](builtin-SORT.md).
 
 **Rank-1** (\`[N]\`, \`[1,N]\`, \`[N,1]\`) = vector for **\`; vector\`**; only **\`[R,C]\` with R>1 and C>1** is a matrix for **\`; matrix\`**. See [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
 `,
@@ -13250,6 +13330,35 @@ inline [lut] .huff:
 | \`.lut:hasKey(key)\` | \`1\` if any entry has key, else \`0\` (missing key → \`0\`) |
 | \`.lut:hasValue(value)\` | \`1\` if any entry has value, else \`0\` (**0** for fillwith) |
 | \`.lut:isEmpty()\` | \`1\` if no entries |
+| \`.lut:keys()\` | Vector of all keys (key width × entry count) |
+| \`.lut:values()\` | Vector of all values (value width × entry count) |
+| \`.lut:entries()\` | Matrix **N×2**: column 0 = key, column 1 = value (\`ew = max(keyW, valW)\`) |
+
+### Bulk export (\`:keys\`, \`:values\`, \`:entries\`)
+
+Read-only snapshots of the **ordered entry list** (same order as \`add\` / \`set\`). Empty list → zero-length blob (declare width \`0\` or match \`size()\`).
+
+\`\`\`logts-play
+inline [lut] .freq:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+1wire _ = .freq:add(010, 1010)
+4wire[3] ks = .freq:keys()
+4wire[3] vs = .freq:values()
+4wire[3,2] ent = .freq:entries()
+show(ks)
+show(vs)
+show(ent)
+\`\`\`
+
+Use with [SORT](builtin-SORT.md) to reorder by frequency, e.g. \`SORT(.freq:entries(); col=1)\`.
 
 ### \`fillwith\` vs explicit entries
 
@@ -14028,7 +14137,7 @@ Whole-matrix ARGMAX/ARGMIN (no axis tag) still returns global one-hot or \`(row,
 \`\`\`logts-play
 4wire[2,2] m = 0001 + 0010 + 0100 + 1000
 4wire[2] r, 4wire[2] o = SUM(m; row)
-1wire[2] idx = ARGMAX(m; row; index)
+1wire[2] idx = ARGMAX(m; row index)
 show(r)
 show(idx)
 \`\`\`
@@ -20975,7 +21084,7 @@ Mutually exclusive with **\`; vector\`** and **\`; matrix\`**. Rank-1 tensors wi
 4wire[2] r, 4wire[2] o = SUM(m; row)
 4wire[2] cmin = MIN(m; col)
 4wire[2] rmax = MAX(m; row)
-1wire[2] idx = ARGMAX(m; row; index)
+1wire[2] idx = ARGMAX(m; row index)
 show(r)
 show(cmin)
 show(rmax)

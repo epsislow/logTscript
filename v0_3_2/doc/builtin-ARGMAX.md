@@ -16,9 +16,9 @@ ARGMAX(Wbit[n] vector; index q4p4) -> bitIndexWidth(n) bit
 ARGMAX(Wbit[n,m] matrix) -> 1wire[n×m]
 ARGMAX(Wbit[n,m] matrix; index) -> bit rows, bit cols
 ARGMAX(Wbit[n,m] m ; row) -> 1wire[n×m]
-ARGMAX(Wbit[n,m] m ; row; index) -> bitIndexWidth(m) wire[n]
+ARGMAX(Wbit[n,m] m ; row index) -> bitIndexWidth(m) wire[n]
 ARGMAX(Wbit[n,m] m ; col) -> 1wire[n×m]
-ARGMAX(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
+ARGMAX(Wbit[n,m] m ; col index) -> bitIndexWidth(n) wire[m]
 ```
 
 **No `; vector` tag** — the argument is already a whole tensor. Applies to any **rank-1** tensor (`Wwire[N]`, `Wwire[1,N]`, `Wwire[N,1]`); see [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
@@ -30,9 +30,9 @@ ARGMAX(Wbit[n,m] m ; col; index) -> bitIndexWidth(n) wire[m]
 | whole matrix | `1wire[n×m]` | One-hot over all cells |
 | matrix `; index` | `bit rows`, `bit cols` | Row and column index of global max |
 | `; row` | `1wire[n×m]` | One `1` per row at the maximal column |
-| `; row; index` | `bitIndexWidth(m) wire[n]` | Column index per row |
+| `; row index` | `bitIndexWidth(m) wire[n]` | Column index per row |
 | `; col` | `1wire[n×m]` | One `1` per column at the maximal row |
-| `; col; index` | `bitIndexWidth(n) wire[m]` | Row index per column |
+| `; col index` | `bitIndexWidth(n) wire[m]` | Row index per column |
 | `signed` | (any of above) | Signed compare |
 | `q4p4` | (rank-1 modes above) | Q4.4 compare on **8-bit** elements |
 
@@ -62,11 +62,11 @@ show(idx)
 
 → `idx=01`.
 
-### `ARGMAX(Wbit[n,m] m ; row; index)`
+### `ARGMAX(Wbit[n,m] m ; row index)`
 
 ```logts-play
 4wire[2,2] m = 0001 + 0010 + 0100 + 1000
-1wire[2] idx = ARGMAX(m; row; index)
+1wire[2] idx = ARGMAX(m; row index)
 show(idx)
 ```
 

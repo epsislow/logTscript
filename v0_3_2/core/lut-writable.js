@@ -386,6 +386,72 @@ function lutGetWritable(inst, keyExpr, matchIndexExpr, ctx) {
   return lutLookupWritable(inst, keyExpr, matchIndexExpr, ctx);
 }
 
+function getExportKeyWidth(inst) {
+  return lutAddrBits(getInstLength(inst));
+}
+
+function getExportValueWidth(inst) {
+  const variableDepth = !!(inst.attributes && inst.attributes.variableDepth);
+  if (!variableDepth) return getInstDepth(inst) || 4;
+  let max = 1;
+  const list = inst.lutEntryList || [];
+  for (const entry of list) {
+    if (entry.value && entry.value.length > max) max = entry.value.length;
+  }
+  return max;
+}
+
+function lutKeys(inst) {
+  requireWritable(inst);
+  const list = inst.lutEntryList;
+  const keyW = getExportKeyWidth(inst);
+  let bits = '';
+  for (const entry of list) bits += entry.key;
+  return { value: bits, bitWidth: keyW * list.length, varName: `${inst.name}:keys` };
+}
+
+function lutValues(inst) {
+  requireWritable(inst);
+  const list = inst.lutEntryList;
+  const valW = getExportValueWidth(inst);
+  let bits = '';
+  for (const entry of list) {
+    let v = entry.value == null ? '' : String(entry.value);
+    if (v.length < valW) v = v.padStart(valW, '0');
+    else if (v.length > valW) v = v.substring(v.length - valW);
+    bits += v;
+  }
+  return { value: bits, bitWidth: valW * list.length, varName: `${inst.name}:values` };
+}
+
+function lutEntries(inst) {
+  requireWritable(inst);
+  const list = inst.lutEntryList;
+  const keyW = getExportKeyWidth(inst);
+  const valW = getExportValueWidth(inst);
+  const ew = Math.max(keyW, valW);
+  let bits = '';
+  for (const entry of list) {
+    let k = entry.key == null ? '' : String(entry.key);
+    let v = entry.value == null ? '' : String(entry.value);
+    if (k.length < ew) k = k.padStart(ew, '0');
+    else if (k.length > ew) k = k.substring(k.length - ew);
+    if (v.length < ew) v = v.padStart(ew, '0');
+    else if (v.length > ew) v = v.substring(v.length - ew);
+    bits += k + v;
+  }
+  const rows = list.length;
+  const cols = 2;
+  return {
+    value: bits,
+    bitWidth: ew * rows * cols,
+    varName: `${inst.name}:entries`,
+    tensorRows: rows,
+    tensorCols: cols,
+    tensorElementWidth: ew,
+  };
+}
+
 const lutWritableExports = {
   buildEntryListFromLutData,
   buildWritableLutTable,
@@ -404,6 +470,11 @@ const lutWritableExports = {
   lutHasValue,
   lutIsEmpty,
   lutGetWritable,
+  lutKeys,
+  lutValues,
+  lutEntries,
+  getExportKeyWidth,
+  getExportValueWidth,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = lutWritableExports;

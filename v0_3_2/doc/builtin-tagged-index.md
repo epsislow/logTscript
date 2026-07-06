@@ -39,9 +39,10 @@ Cross-cutting topics:
 | LROTATE | [builtin-LROTATE.md](builtin-LROTATE.md) | — | — | — | — | — | yes | yes | — | — | bit transform |
 | RROTATE | [builtin-RROTATE.md](builtin-RROTATE.md) | — | — | — | — | — | yes | yes | — | — | bit transform |
 | REVERSE | [builtin-REVERSE.md](builtin-REVERSE.md) | — | — | — | — | — | yes | yes | — | — | bit transform |
+| SORT | [builtin-SORT.md](builtin-SORT.md) | — | — | — | — | — | — | — | `col=k` / `row=k` / `desc` | — | wire-vectors |
 
 Use `doc(NAME)` in scripts for live signatures from `Interpreter.BUILTIN_DOC`.
 
-**Note:** **`; signed`**, **`; q4p4`**, **`; q8p8`**, **`; fp16`**, and **`; bf16`** are **mutually exclusive** (at most one numeric-format tag per call). **`; vector`**, **`; matrix`**, **`; row`**, and **`; col`** cannot appear together. **DOT** does not use axis tags. **ARGMAX** / **ARGMIN** use shape rules instead of **`; matrix`** (but support **`; row`** / **`; col`**).
+**Note:** **`; signed`**, **`; q4p4`**, **`; q8p8`**, **`; fp16`**, and **`; bf16`** are **mutually exclusive** (at most one numeric-format tag per call). **`; vector`**, **`; matrix`**, **`; row`**, and **`; col`** cannot appear together. **DOT** does not use axis tags. **ARGMAX** / **ARGMIN** use shape rules instead of **`; matrix`** (but support **`; row`** / **`; col`**). **SORT** uses **`col=k`** / **`row=k`** (numeric axis index) and optional **`desc`** — see [builtin-SORT.md](builtin-SORT.md).
 
 **Rank-1** (`[N]`, `[1,N]`, `[N,1]`) = vector for **`; vector`**; only **`[R,C]` with R>1 and C>1** is a matrix for **`; matrix`**. See [wire-vectors.md — rank-1 vs matrix](wire-vectors.md#rank-1-vs-matrix).
