@@ -316,3 +316,12 @@ Counter:  0000  0001     0001 0010   0010 0011
                   ^               ^            ^
               increment       increment    increment
 ```
+
+---
+
+## Related
+
+- [signal-propagation.md](signal-propagation.md) — component → wire propagation in wave mode
+- [counter.md](counter.md) — separate `comp [counter]` for scan indices (Huffman v2)
+- [huffman-v2.md](huffman-v2.md) — `comp [osc]` or [switch](switch.md) as scan clock
+- [switch.md](switch.md) — manual tick when you do not want real-time osc

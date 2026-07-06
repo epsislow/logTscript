@@ -7713,6 +7713,7 @@ Use multiple property blocks or sequential triggers to step the counter.
 - [reg.md](reg.md) — clocked storage
 - [shifter.md](shifter.md)
 - [components.md](components.md)
+- [huffman-v2.md](huffman-v2.md) — scan index stepping (\`write\` + \`data\` on falling clock)
 `,
     'debug.md': `# Debug output — \`show\`, \`peek\`, \`probe\`, \`watch\`, and boolean LUT utilities
 
@@ -10633,9 +10634,24 @@ Subjective **teaching value** vs **estimated complexity** — for comparison onl
 
 End-to-end **wave** demo: measure symbol frequencies from a source wire, sort entries, encode with a **prefix-free** codebook, round-trip through \`.huffPacket\` / \`.huffRecover\`.
 
-No \`buildFrom\`, no \`HUFFMAN_*\` builtins — everything is plain logTscript (writable LUT, \`on:raise\`, counter, osc, \`SORT\`, optional \`popMin\` for N-general merge).
+**No** \`buildFrom\`, **no** \`HUFFMAN_*\` builtins — everything is plain logTscript: writable LUT, \`on:raise\`, [counter](counter.md), [oscillator](oscillator.md) or [switch](switch.md), \`SORT\`, optional \`popMin\` for N-general merge.
 
 For the static codebook + protocol walkthrough (v1), see **[huffman.md](huffman.md)**.
+
+**Suite tests:** **2104** (freq \`set\`+\`ADD\`), **2105** (\`SORT\` entries), **2106–2107** (round-trip wave), **2108** (\`=:\` padding), **2109** (osc scan + counter).
+
+---
+
+## Principle
+
+| Rule | Detail |
+|------|--------|
+| Frequencies | Measured at runtime into a writable \`.freq\` LUT (\`set\` + \`ADD\`) |
+| Codebook | Built **in script** (fixed table for 4 symbols, or merge steps with \`popMin\`) — not by the engine |
+| Encode / decode | Same protocols as v1 — [huffman.md](huffman.md) |
+| Wave mode | Use \`on:raise\` / \`on:1 { once, … }\` for LUT mutations; bare top-level \`:add\` can run twice on first Run |
+
+Runnable blocks use **\`logts-play wave\`** — open in the doc viewer and **Load & Run** (wave propagation is selected automatically).
 
 ---
 
@@ -10643,16 +10659,16 @@ For the static codebook + protocol walkthrough (v1), see **[huffman.md](huffman.
 
 | Phase | What | Building blocks |
 |-------|------|-----------------|
-| **A — Scan** | Walk \`source\` in steps of \`keyWidth\`, count in \`.freq\` | \`comp [osc]\`, \`comp [counter]\`, \`on:raise\`, \`.freq:set\` + \`ADD\` |
-| **B — Codes** | Build \`.huff\` codebook (manual / MUX for 4 symbols, or merge with \`popMin\` for N) | writable LUT \`prefixFree\`, \`on:1\` one-shot |
+| **A — Scan** | Walk \`source\` in steps of \`keyWidth\`, count in \`.freq\` | \`comp [osc]\` or \`comp [switch]\`, \`comp [counter]\`, \`on:raise\`, \`.freq:set\` + \`ADD\` |
+| **B — Sort + codes** | Order symbols by count; fill \`.huff\` | \`e = .freq:entries()\` then \`SORT(e; col=1)\`, writable \`prefixFree\` LUT, optional \`popMin\` merge |
 | **C — Packet** | Encode + decode | \`.huffPacket\`, \`.huffRecover\`, \`=:\` padding if needed |
 
 \`\`\`mermaid
 flowchart LR
   subgraph A [Phase A scan]
-    Osc[osc tick]
+    Osc[clk tick]
     Idx[counter += keyWidth]
-  Slice[symbol from source]
+    Slice[symbol from source]
     Freq[freq set ADD]
     Osc --> Idx --> Slice --> Freq
   end
@@ -10673,6 +10689,10 @@ flowchart LR
 
 ## Phase A — Frequency LUT
 
+Writable LUT with **\`fillwith: 00000000\`** so \`ADD(.freq:get(sym), \\1;8)\` treats a missing key as count **0** (not a Huffman codeword).
+
+Use **\`\\N;8\`** grouped literals for 8-bit counts — a bare \`00000001\` literal is only **1 bit** wide.
+
 \`\`\`logts-play wave
 inline [lut] .freq:
   writable
@@ -10682,34 +10702,48 @@ inline [lut] .freq:
   data {
   }
   :
+1wire _ = .freq:set(0010, \\1;8)
+1wire _ = .freq:set(0010, ADD(.freq:get(0010), \\1;8))
+1wire _ = .freq:set(0010, ADD(.freq:get(0010), \\1;8))
+1wire _ = .freq:set(0011, \\1;8)
+8wire f10 = .freq:get(0010)
+8wire f11 = .freq:get(0011)
+4wire sz = .freq:size()
+show(f10)
+show(f11)
+show(sz)
 \`\`\`
 
-\`fillwith: 00000000\` is required so the first \`set(sym, ADD(.freq:get(sym), 1))\` treats a missing key as count **0** (not a Huffman codeword).
+→ \`f10 = 00000011\`, \`f11 = 00000001\`, \`sz = 0010\` (three×\`0010\`, one×\`0011\`).
 
-### Increment pattern (\`set\` + \`ADD\`, one \`on:raise\`)
+### \`on:raise\` increment (dynamic index)
 
 \`\`\`logts
 on:raise {
   AND(.clk:get, NOT(atEnd)),
-  ok = .freq:set(sym, ADD(.freq:get(sym), 00000001))
+  ok = .freq:set(sym, ADD(.freq:get(sym), \\1;8))
 }
 \`\`\`
 
-### Osc + counter scan (4 nibbles, \`keyWidth = 4\`)
+Evaluate the symbol slice **inside** the \`on:raise\` body (or use fixed \`EQ(.idx:get, …)\` branches). A top-level \`4wire sym = source.(pos)/4\` can go **stale** across ticks in wave mode.
 
-Use **\`write = 1\`** on the counter so \`data = ADD(.idx:get, 4)\` loads the new index (not \`dir\` increment-by-1).
+### Manual tick — switch + counter (editor-friendly)
 
-Advance the counter on the **falling** edge (\`set = NOT(.clk:get)\`) with \`comp [counter] … on: raise\` so \`on:raise\` still sees the current index when the clock rises.
+Same logic as test **2109**, but with a **switch** you click in the UI (rising edge = scan step). Advance the [counter](counter.md) on the **falling** edge (\`set = NOT(.clk:get)\`) with **\`on: raise\`** on the component so \`on:raise\` still sees the current index when the clock rises.
 
-Re-read \`.freq:get\` wires after osc ticks — top-level \`8wire f10 = .freq:get(sym)\` can go **stale** in wave mode.
-
-Index \`i\` on each rising edge: \`0\`, \`4\`, \`8\`, \`12\`. Use **one \`on:raise\` per index** so the symbol is read before the counter advances:
-
-\`\`\`logts
+\`\`\`logts-play wave
 MODE WIREWRITE
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 16
+  fillwith: 00000000
+  data {
+  }
+  :
 16wire source = 0010 + 0010 + 0010 + 0011
-comp [osc] .clk:
-  freq: 10
+comp [switch] .clk:
+  text: 'tick'
   :
 comp [counter] .idx:
   depth: 8
@@ -10720,29 +10754,68 @@ comp [counter] .idx:
   write = 1
   set = NOT(.clk:get)
 }
-on:raise { AND(.clk:get, EQ(.idx:get, 00000000)), ok = .freq:set(0010, ADD(.freq:get(0010), 00000001)) }
-on:raise { AND(.clk:get, EQ(.idx:get, 00000100)), ok = .freq:set(0010, ADD(.freq:get(0010), 00000001)) }
-on:raise { AND(.clk:get, EQ(.idx:get, 00001000)), ok = .freq:set(0010, ADD(.freq:get(0010), 00000001)) }
-on:raise { AND(.clk:get, EQ(.idx:get, 00001100)), ok = .freq:set(0011, ADD(.freq:get(0011), 00000001)) }
+1wire ok = 0
+on:raise { AND(.clk:get, EQ(.idx:get, 00000000)), ok = .freq:set(0010, ADD(.freq:get(0010), \\1;8)) }
+on:raise { AND(.clk:get, EQ(.idx:get, 00000100)), ok = .freq:set(0010, ADD(.freq:get(0010), \\1;8)) }
+on:raise { AND(.clk:get, EQ(.idx:get, 00001000)), ok = .freq:set(0010, ADD(.freq:get(0010), \\1;8)) }
+on:raise { AND(.clk:get, EQ(.idx:get, 00001100)), ok = .freq:set(0011, ADD(.freq:get(0011), \\1;8)) }
+probe(.freq:get(0010))
+probe(.freq:get(0011))
 \`\`\`
 
-Simulate ticks in tests with \`session.setComp(interp, '.clk', '1')\` then \`'0'\` (see test **2109**).
+**How to run:** Load & Run, then click **tick** four times (each click: press = \`1\`, release = \`0\`). After four scans, probes show \`0010 → 00000011\` and \`0011 → 00000001\`.
 
-**Note:** \`4wire sym = source.(pos)/4\` as a top-level wire can go **stale** across osc ticks; evaluate the slice inside \`on:raise\` or use fixed \`EQ(.idx:get, …)\` branches as above.
+With a real [oscillator](oscillator.md) instead of a switch, use \`session.setComp(interp, '.clk', '1')\` then \`'0'\` in tests (pattern test **611**).
 
 ---
 
 ## Phase B — Sort + codebook
 
-After scan:
+### Sort entries by frequency
 
-\`\`\`logts
-8wire[n,2] sorted = SORT(.freq:entries(); col=1)
-4wire[n] syms = sorted::0
-8wire[n] cnts = sorted::1
+\`\`\`logts-play wave
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 16
+  fillwith: 00000000
+  data {
+  }
+  :
+1wire _ = .freq:set(0010, \\3;8)
+1wire _ = .freq:set(0011, \\1;8)
+1wire _ = .freq:set(0000, \\2;8)
+8wire[3,2] e = .freq:entries()
+8wire[3,2] sorted = SORT(e; col=1)
+8wire[3] syms = sorted::0
+8wire[3] cnts = sorted::1
+show(syms)
+show(cnts)
 \`\`\`
 
-For a **fixed 4-symbol** demo, assign codewords in script (matches [huffman.md](huffman.md) table):
+Ascending sort on column 1 (counts): symbols \`0011\`, \`0000\`, \`0010\` with counts \`1\`, \`2\`, \`3\`.
+
+Syntax reminders:
+
+| Intent | Form |
+|--------|------|
+| Sort rows by value column | \`SORT(matrix; col=1)\` |
+| \`SORT\` argument | **Named tensor wire** — assign \`.freq:entries()\` to \`8wire[n,2] e\` first; inline \`:entries()\` inside \`SORT(...)\` is rejected |
+| Column 0 = keys, column 1 = values | \`sorted::0\`, \`sorted::1\` |
+| Row access | \`sorted:0\` (not column 0) |
+
+See [builtin-SORT.md](builtin-SORT.md) and [lut.md — entries](lut.md).
+
+### Assigning codewords (4-symbol demo)
+
+For a **fixed 4-symbol** alphabet, the Huffman tree for arbitrary positive counts is still a **finite** network — but the v2 demo usually **reuses the v1 table** once frequencies justify it:
+
+| Key | Codeword |
+|-----|----------|
+| \`00\` | \`0\` |
+| \`01\` | \`10\` |
+| \`10\` | \`110\` |
+| \`11\` | \`111\` |
 
 \`\`\`logts
 inline [lut] .huff:
@@ -10756,13 +10829,38 @@ inline [lut] .huff:
   :
 \`\`\`
 
-For **N-general** merge, use \`.heap:popMin()\` + \`:add\` on osc (see [lut.md — min/max](lut.md)); no dedicated priority-queue component required.
+To **derive order** from counts without a builtin tree builder:
+
+- **\`ARGMAX(cnts; index)\`** — index of the largest count (ties → smallest index). See [builtin-ARGMAX.md](builtin-ARGMAX.md).
+- **\`MUX\` / \`GT\`** — finite compare network for 4 nibbles (documented in the internal plan; many wires, but valid logTscript).
+
+### N-general merge (\`popMin\`)
+
+For arbitrary **N** symbols, repeated **\`:popMin\`** on a writable \`.nodes\` LUT replaces a dedicated priority-queue component. Pair with \`:add\` for merged parent nodes — see [lut.md — min/max](lut.md#min--max-by-value-peekmin-popmin-).
+
+\`\`\`logts
+on:1 {
+  once,
+  k1, f1 = .nodes:popMin()
+}
+on:1 {
+  once,
+  k2, f2 = .nodes:popMin()
+}
+on:raise {
+  mergeGate,
+  parentK, parentF = …,
+  ok = .nodes:add(parentK, parentF)
+}
+\`\`\`
+
+Chain osc ticks or \`on:raise\` gates for each merge step. **Automatic codeword assignment from the tree** remains script / finite-step logic — not an engine builtin.
 
 ---
 
 ## Phase C — Packet round-trip
 
-Same protocols as v1:
+Same protocols as [huffman.md](huffman.md):
 
 \`\`\`logts-play wave
 inline [lut] .huff:
@@ -10793,14 +10891,173 @@ show(packet)
 show(recovered)
 \`\`\`
 
-Padded wire (\`=:\`) when the packet is shorter than the declared width — see [huffman.md — padded packet](huffman.md#runnable--longer-input-padded-packet-).
+### Four tokens — dynamic width
+
+Four 2-bit tokens need **17 bits** total (8-bit length + 9-bit payload). Declare the wire wide enough:
+
+\`\`\`logts-play wave
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 2b)
+  :
+8wire source = 00011011
+17wire packet = .huffPacket { tokens = source }
+8wire recovered = .huffRecover { data = packet }
+show(recovered)
+\`\`\`
+
+### Padded packet (\`=:\`)
+
+When the encoder emits fewer bits than the wire width, **\`=:\`** right-pads. The decoder reads only the length prefix + payload — padding is ignored. Same example as [huffman.md — padded packet](huffman.md#runnable--longer-input-padded-packet-):
+
+\`\`\`logts-play wave
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 2b)
+  :
+8wire source = 00011011
+24wire packet =: .huffPacket { tokens = source }
+8wire recovered = .huffRecover { data = packet }
+show(source)
+show(packet)
+show(recovered)
+\`\`\`
+
+---
+
+## Full pipeline (A → B → C, single Run)
+
+Populate counts, sort, then encode a **readable ASCII message** and recover it. Uses **\`=:\`** so the packet wire can be wider than the encoder output, and **\`show(…; ascii)\`** for human-readable output — see [wire-literals.md — ASCII](wire-literals.md#ascii-literals-vs-show-ascii).
+
+The frequency lines at the top are a **compact Phase A+B demo** (three×\`10\`, one×\`11\`); the string encode in Phase C is independent — in a full design you would scan \`source\` into \`.freq\` first (osc + counter, test **2109**).
+
+\`\`\`logts-play wave
+MODE WIREWRITE
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 16
+  fillwith: 00000000
+  data {
+  }
+  :
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 2b)
+  :
+1wire _ = .freq:set(10, \\1;8)
+1wire _ = .freq:set(10, ADD(.freq:get(10), \\1;8))
+1wire _ = .freq:set(10, ADD(.freq:get(10), \\1;8))
+1wire _ = .freq:set(11, \\1;8)
+8wire[2,2] e = .freq:entries()
+8wire[2,2] sorted = SORT(e; col=1)
+8wire[2] cnts = sorted::1
+300wire source =: 'Hello World!'
+250wire packet =: .huffPacket { tokens = source }
+300wire recovered = .huffRecover { data = packet }
+show(cnts)
+show(source; ascii)
+show(packet; ascii)
+show(recovered; ascii)
+\`\`\`
+
+### What you should see
+
+| Output | Typical value | Meaning |
+|--------|---------------|---------|
+| \`cnts\` | \`0000000100000011\` | Sorted counts: \`11\` → 1, \`10\` → 3 (16 bits = 2×\`8wire\`) |
+| \`source\` | \`"Hello World!"\` + pad glyphs | 12 ASCII chars (96 bits) right-padded in \`300wire\` |
+| \`packet\` | short gibberish + pad | Huffman bitstream shown as ASCII (\`□\` / \`.\` for non-printable bytes) |
+| \`recovered\` | same as \`source\` | Round-trip OK — padding after the string is ignored by \`withLength\` |
+
+\`'Hello World!'\` is **12×8 = 96 bits**; \`expand(…, 2b)\` walks that bit stream in **2-bit token** steps. Pick \`300wire\` / \`250wire\` wide enough for experimentation; \`=:\` fills the rest with \`0\` bits.
+
+### Binary token variant (exact bit width)
+
+If you prefer a minimal numeric demo (test **2107**), use a fixed token wire and declare the packet **exactly** (no \`=:\`):
+
+\`\`\`logts
+8wire source = 00011011
+17wire packet = .huffPacket { tokens = source }
+8wire recovered = .huffRecover { data = packet }
+show(recovered)
+\`\`\`
+
+Four tokens \`00\` \`01\` \`10\` \`11\` → payload 9 bits + 8-bit length = **17** bits total.
 
 ---
 
 ## Wave / NEXT notes
 
-- Use **\`on:1 { once, … }\`** or **\`on:raise\`** for one-shot LUT mutations; bare \`1wire _ = .lut:add(...)\` at top level can run twice on first Run in wave.
-- **\`NEXT(~)\`** in wave only recomputes wires in the \`~\` / \`%\` / \`$\` closure — stateful counters and \`.freq\` entries persist between steps ([signal-propagation.md](signal-propagation.md)).
+- **\`on:1 { once, … }\`** or **\`on:raise\`** for one-shot LUT writes. Bare \`1wire _ = .lut:add(…)\` at top level can run **twice** on the first Run in wave — see [conditional-assignment.md](conditional-assignment.md).
+- **\`NEXT(~)\`** in wave only recomputes wires in the \`~\` / \`%\` / \`$\` closure — counters, \`.freq\` entries, and writable LUT state **persist** between steps ([signal-propagation.md](signal-propagation.md)).
+- After osc / \`on:raise\` mutations, wires assigned once at parse time may be **stale**; use \`probe\`, re-assign, or \`exec\` a fresh \`wire = .freq:get(sym)\` before \`show\`.
+
+---
+
+## Gap analysis (N-general)
+
+| Need | Status |
+|------|--------|
+| \`:entries\` + \`SORT\` | **Done** (Faza 0b) — tests **2085**, **2105** |
+| \`:keyAt\` / \`:valueAt\` | **Done** (Faza 0c) |
+| \`popMin\` / \`peekMin\` on LUT | **Done** (Faza 0d) — merge extract-min |
+| \`NEXT\` ≈ osc in wave | **Done** (Faza 0z) |
+| Runtime freq scan | **Done** — tests **2104**, **2109** |
+| Round-trip wave | **Done** — tests **2106–2108** |
+| Automatic tree + codewords from freqs | **Script** — \`GT\`/\`MUX\`/\`ARGMAX\` for small N; \`popMin\` loop for general N |
+| \`ARGSORT\` / \`keysAt\` / \`valuesAt\` | **Backlog** (generic) |
+| \`comp [priorityqueue]\` | **Backlog** — redundant if \`popMin\` suffices |
+| \`buildFrom\` / \`HUFFMAN_*\` builtin | **Out of scope** (by design) |
+| Mod \`signal\` (full digital settle) | **Backlog** — after Huffman v2 |
 
 ---
 
@@ -10808,21 +11065,17 @@ Padded wire (\`=:\`) when the packet is shorter than the declared width — see 
 
 - [huffman.md](huffman.md) — static codebook + protocols (v1)
 - [lut.md](lut.md) — writable LUT, \`:entries\`, \`SORT\`, \`popMin\`
-- [conditional-assignment.md](conditional-assignment.md) — \`on:raise\`, \`on:1\`
+- [conditional-assignment.md](conditional-assignment.md) — \`on:raise\`, \`on:1\`, wave vs legacy
 - [builtin-SORT.md](builtin-SORT.md) — \`SORT(matrix; col=1)\`
+- [builtin-ARGMAX.md](builtin-ARGMAX.md) — max frequency index
+- [counter.md](counter.md) — index stepping (\`write\`, \`data\`, \`set\`)
+- [oscillator.md](oscillator.md) — periodic clock (tests use \`setComp\`)
+- [switch.md](switch.md) — manual tick in the editor
+- [protocol.md](protocol.md) — \`expand\`, \`collapse\`, \`withLength\`
 - [signal-propagation.md](signal-propagation.md) — wave + NEXT
-
----
-
-## Gaps (N-general, backlog)
-
-| Need | Status |
-|------|--------|
-| \`SORT\` + \`:entries\` | **Done** (Faza 0b) |
-| \`popMin\` on LUT heap | **Done** (Faza 0d) |
-| Automatic code assignment from tree | Script / finite osc steps |
-| \`comp [priorityqueue]\` | Backlog — redundant with \`popMin\` |
-| \`ARGSORT\` | Backlog |
+- [assignment-operators.md](assignment-operators.md) — \`=:\` padding
+- [wire-literals.md](wire-literals.md) — \`'Hello World!'\` wire strings, \`show(w; ascii)\`
+- [debug.md](debug.md) — \`show(…; ascii)\` display tags
 `,
     'huffman.md': `# Huffman coding walkthrough
 
@@ -11203,12 +11456,13 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 | **Length field width** | \`8b\` allows payloads up to 255 bits. Use \`16b\` for larger frames ([\`withLength\`](protocol.md#withlengthdata-nb)). |
 | **Separate protocols** | Encoder and decoder are independent definitions — swap codebooks or framing without changing the other side's structure. |
 | **Not in scope** | \`checksum()\`, \`concat()\`, \`padLeft()\`, \`padRight()\` — add framing or integrity in user logic if needed. |
-| **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip). |
+| **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2109** ([huffman-v2.md](huffman-v2.md) wave pipeline). |
 
 ---
 
 ## Related
 
+- [huffman-v2.md](huffman-v2.md) — runtime frequency scan + wave round-trip
 - [lut.md](lut.md) — \`variableDepth\`, \`prefixFree\`, LUT invoke
 - [protocol.md](protocol.md) — \`def\`, \`expand\`, \`collapse\`, \`length\`, \`lengthOf\`, \`withLength\`
 - [assignment-operators.md](assignment-operators.md) — \`=\`, \`=:\`, \`:=\` for dynamic-width wires
@@ -17287,6 +17541,15 @@ Counter:  0000  0001     0001 0010   0010 0011
                   ^               ^            ^
               increment       increment    increment
 \`\`\`
+
+---
+
+## Related
+
+- [signal-propagation.md](signal-propagation.md) — component → wire propagation in wave mode
+- [counter.md](counter.md) — separate \`comp [counter]\` for scan indices (Huffman v2)
+- [huffman-v2.md](huffman-v2.md) — \`comp [osc]\` or [switch](switch.md) as scan clock
+- [switch.md](switch.md) — manual tick when you do not want real-time osc
 `,
     'pcb.md': `# PCB components
 

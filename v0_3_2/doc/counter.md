@@ -65,3 +65,4 @@ Use multiple property blocks or sequential triggers to step the counter.
 - [reg.md](reg.md) — clocked storage
 - [shifter.md](shifter.md)
 - [components.md](components.md)
+- [huffman-v2.md](huffman-v2.md) — scan index stepping (`write` + `data` on falling clock)

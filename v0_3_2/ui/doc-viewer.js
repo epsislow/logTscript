@@ -94,6 +94,7 @@ const DOC_SECTIONS = [
       { file: 'boolean-analysis.md', label: 'Boolean analysis helpers', searchExtra: 'truthTableOf simplify equivalent inputsOf costOf filters comma x' },
       { file: 'protocol.md', label: 'protocol', searchExtra: 'inline uart spi i2c reverse parity clock repeat tx sda scl mosi decode expand collapse length lengthOf withLength def huffPacket huffRecover variable width' },
       { file: 'huffman.md', label: 'Huffman example', searchExtra: 'prefixFree expand collapse huffPacket huffRecover variable length coding codebook packet round-trip greedy decode' },
+      { file: 'huffman-v2.md', label: 'Huffman v2 — wave frequencies', searchExtra: 'freq osc counter on:raise SORT entries popMin wave runtime scan round-trip writable set ADD' },
       { file: 'reg.md', label: 'reg' },
       { file: 'queue.md', label: 'queue', searchExtra: 'fifo buffer push pop front empty full size capacity free' },
       { file: 'network.md', label: 'network', searchExtra: 'packet bus channel send target broadcast unicast sendId fifo rx' },
@@ -122,7 +123,6 @@ const DOC_SECTIONS = [
       { file: 'builtin-TRIU.md', label: 'TRIU (upper triangle)' },
       { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)' },
       { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)' },
-      { file: 'huffman-v2.md', label: 'Huffman v2 — runtime frequencies in wave mode' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
       { file: 'slider.md', label: 'Slider component' }
