@@ -445,20 +445,21 @@ inline [lut] .heap:
 1wire once = 1
 4wire k1 = 0000
 4wire f1 = 0000
-4wire k2 = 0000
-4wire f2 = 0000
 on:1 {
   once,
   k1, f1 = .heap:popMin()
 }
-4wire parent = 0110
-1wire _ = .heap:add(parent, ADD(f1, f2))
+4wire sz = .heap:size()
 show(k1)
 show(f1)
-show(parent)
+show(sz)
 ```
 
+After Run: `k1=0010`, `f1=0001` (min entry removed), `sz=0010` (2 entries left). For a full Huffman merge, chain additional `on:` blocks or oscillators for the second `popMin` and `:add` of the parent node.
+
 For Huffman **N-general**: repeated `popMin` on a `.nodes` LUT replaces a dedicated priority-queue component. Pair with `:add` for merged parent nodes; use a separate LUT (e.g. `.links`) for parent/child bookkeeping.
+
+Dual assign in `on:1 { trigger, k, v = .lut:popMin() }` is supported (same as top-level `k, v = …` or `4wire k, 4wire v = …`).
 
 ### Indexed access (`:keyAt`, `:valueAt`)
 

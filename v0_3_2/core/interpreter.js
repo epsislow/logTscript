@@ -14528,7 +14528,7 @@ Interpreter.prototype.conditionalOnShouldExecute = function(onMode, prevValue, n
 };
 
 Interpreter.prototype.executeConditionalAssignmentEntry = function(entry) {
-  if (!entry || !entry.assignment) return;
+  if (!entry || (!entry.assignment && !(entry.decls && entry.expr))) return;
   if (this._uccExecutedStatements && entry.sourceStmt && this._uccExecutedStatements.has(entry.sourceStmt)) {
     return;
   }
@@ -14537,7 +14537,15 @@ Interpreter.prototype.executeConditionalAssignmentEntry = function(entry) {
   }
   this._executingConditionalAssignment = true;
   try {
-    this.exec({ assignment: entry.assignment }, true);
+    if (entry.assignment) {
+      this.exec({ assignment: entry.assignment }, true);
+    } else {
+      this.exec({
+        decls: entry.decls,
+        expr: entry.expr,
+        assignPad: entry.assignPad || 'strict',
+      }, true);
+    }
   } finally {
     this._executingConditionalAssignment = false;
   }
@@ -14577,16 +14585,24 @@ Interpreter.prototype.tryExecuteConditionalAssignment = function(entry, isFirstR
 };
 
 Interpreter.prototype.execConditionalAssignment = function(s) {
-  const { onMode, triggerExpr, assignment } = s.conditionalAssignment;
+  const { onMode, triggerExpr, assignment, decls, expr, assignPad } = s.conditionalAssignment;
   const initialTriggerValue = this.evalTriggerExprValue(triggerExpr);
   const dependencies = new Set();
   const wireDependencies = new Set();
   this.collectExprDependencies(triggerExpr, dependencies, wireDependencies);
+  if (assignment) {
+    this.collectExprDependencies(assignment.expr, dependencies, wireDependencies);
+  } else if (expr) {
+    this.collectExprDependencies(expr, dependencies, wireDependencies);
+  }
   const insideBody = this.insidePcbBody || this.insideChipBody || this.insideBoardBody;
   const entry = {
     onMode: String(onMode),
     triggerExpr,
     assignment,
+    decls,
+    expr,
+    assignPad,
     dependencies,
     wireDependencies,
     lastTriggerValue: initialTriggerValue,

@@ -1397,12 +1397,30 @@ parseBoardInstance() {
     }
     this.eat('SYM', ',');
     while (this.c.type === 'EOL') this.c = this.t.get();
-    const assignResult = this.assignment();
-    if (!assignResult || !assignResult.assignment) {
-      throw Error(`on:${onMode} body must contain exactly one assignment at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-    }
-    if (this.c.type === 'SYM' && this.c.value === ',') {
-      throw Error(`on:${onMode} body allows only one assignment at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    let conditionalBody;
+    if (this.c.type === 'TYPE') {
+      const varResult = this.var();
+      if (!varResult.expr) {
+        throw Error(`on:${onMode} body must contain an assignment at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      conditionalBody = {
+        decls: varResult.decls,
+        expr: varResult.expr,
+        assignPad: varResult.assignPad || 'strict',
+      };
+    } else if ((this.c.type === 'ID' || this.c.type === 'SPECIAL') && this.peekNextIsCommaThenType()) {
+      const mixed = this.mixedVar();
+      conditionalBody = {
+        decls: mixed.decls,
+        expr: mixed.expr,
+        assignPad: 'strict',
+      };
+    } else {
+      const assignResult = this.assignment();
+      if (!assignResult || !assignResult.assignment) {
+        throw Error(`on:${onMode} body must contain exactly one assignment at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      conditionalBody = { assignment: assignResult.assignment };
     }
     while (this.c.type === 'EOL') this.c = this.t.get();
     this.eat('SYM', '}');
@@ -1410,7 +1428,7 @@ parseBoardInstance() {
       conditionalAssignment: {
         onMode,
         triggerExpr,
-        assignment: assignResult.assignment,
+        ...conditionalBody,
         line: stmtLine,
         col: stmtCol
       }

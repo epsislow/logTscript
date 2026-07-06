@@ -17993,6 +17993,22 @@ on:1 {
   h.assert('size', session.getWire(interp, 'sz'), '0100');
 }, { propagation: 'wave' });
 
+reg(2101, 'lut-writable', 'on:1 dual assign popMin wave', function(h, session) {
+  const src = WRITABLE_LUT_MINMAX + `
+1wire once = 1
+4wire k1 = 0000
+4wire f1 = 0000
+on:1 {
+  once,
+  k1, f1 = .heap:popMin()
+}
+4wire sz = .heap:size()`;
+  const { interp } = session.run(src);
+  h.assert('k1', session.getWire(interp, 'k1'), '0010');
+  h.assert('f1', session.getWire(interp, 'f1'), '0001');
+  h.assert('size', session.getWire(interp, 'sz'), '0010');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,
