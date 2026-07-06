@@ -290,12 +290,10 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
 
       let anyScheduled = false;
       for (const compName of compsChanged) {
-        // Run conditional assignments / property blocks before re-evaluating wires
-        // that depend on this component (e.g. MUX(.sw:get, …, .lut:size()) after clear).
-        interp.updateComponentConnections(compName, new Set());
         if (this._scheduleWiresDependingOnComponent(compName, executedThisPropagate)) {
           anyScheduled = true;
         }
+        interp.updateComponentConnections(compName, new Set());
       }
 
       const changed = this.commitPendingWires();

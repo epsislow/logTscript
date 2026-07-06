@@ -1560,7 +1560,10 @@
       {"id":2069,"group":"conditional-assignment","title":"switch hSize wire refreshes on clear (wave)","detail":{"scripts":["MODE WIREWRITE"],"steps":[],"assertions":["lut cleared","hSize refreshed"]}},
       {"id":2070,"group":"conditional-assignment","title":"switch double toggle no recursion (wave)","detail":{"scripts":["MODE WIREWRITE"],"steps":[],"assertions":["lut still empty","hSize stable"]}},
       {"id":2071,"group":"conditional-assignment","title":"on:1 MUX hSize alternates on switch toggle (wave)","detail":{"scripts":["MODE WIREWRITE"],"steps":[],"assertions":["init hSize sentinel","init lut","lut cleared on 0->1","hSize size when clear 1","hSize sentinel when clear 0","hSize sentinel again","hSize size again"]}},
-      {"id":2072,"group":"conditional-assignment","title":"on:1 clear and on:raise add alternate lut size (wave)","detail":{"scripts":["MODE WIREWRITE"],"steps":[],"assertions":["init size","cleared","size 0","added one","size 1","cleared again","size 0 again","added again","size 1 again"]}}
+      {"id":2072,"group":"conditional-assignment","title":"on:1 clear and on:raise add alternate lut size (wave)","detail":{"scripts":["MODE WIREWRITE"],"steps":[],"assertions":["init size","cleared","size 0","added one","size 1","cleared again","size 0 again","added again","size 1 again"]}},
+      {"id":2073,"group":"conditional-assignment","title":"on:1 queue push via pending push + set (wave)","detail":{"scripts":["MODE WIREWRITE"],"steps":[],"assertions":["empty init","pushed A","size 1","not empty"]}},
+      {"id":2074,"group":"conditional-assignment","title":"on:1 network send cross-instance (wave)","detail":{"scripts":[],"steps":[],"assertions":["rx empty init","rx A","rx size"]}},
+      {"id":2075,"group":"conditional-assignment","title":"on:1 queue MUX qsz alternates on switch toggle (wave)","detail":{"scripts":["MODE WIREWRITE"],"steps":[],"assertions":["init qsz sentinel","pushed","qsz size when clear 1","qsz sentinel when clear 0","qsz size when clear 1 again"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1595,7 +1598,7 @@
       { id: 'clcd', label: 'CLCD component', rangeLabel: '1337–1352, 1383–1387, 1399–1428, 1549–1558', testIds: [1337, 1338, 1339, 1340, 1341, 1342, 1343, 1344, 1345, 1346, 1347, 1348, 1349, 1350, 1351, 1352, 1383, 1384, 1385, 1386, 1387, 1399, 1400, 1401, 1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 1413, 1414, 1415, 1416, 1417, 1418, 1419, 1420, 1421, 1422, 1423, 1424, 1425, 1426, 1427, 1428, 1549, 1550, 1551, 1552, 1553, 1554, 1555, 1556, 1557, 1558] },
       { id: 'compare', label: 'compare', rangeLabel: '1670–1672, 1679', testIds: [1670, 1671, 1672, 1679] },
       { id: 'registry', label: 'Component registry', rangeLabel: '200–223', testIds: [200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223] },
-      { id: 'conditional-assignment', label: 'conditional-assignment', rangeLabel: '2060–2072', testIds: [2060, 2061, 2062, 2063, 2064, 2065, 2066, 2067, 2068, 2069, 2070, 2071, 2072] },
+      { id: 'conditional-assignment', label: 'conditional-assignment', rangeLabel: '2060–2075', testIds: [2060, 2061, 2062, 2063, 2064, 2065, 2066, 2067, 2068, 2069, 2070, 2071, 2072, 2073, 2074, 2075] },
       { id: 'decimal', label: 'decimal', rangeLabel: '1610–1613, 1615', testIds: [1610, 1611, 1612, 1613, 1615] },
       { id: 'literals', label: 'Decimal \\\\N literals', rangeLabel: '15–17, 19–21, 1937–1945, 1947–1952', testIds: [15, 16, 17, 19, 20, 21, 1937, 1938, 1939, 1940, 1941, 1942, 1943, 1944, 1945, 1947, 1948, 1949, 1950, 1951, 1952] },
       { id: 'doc-comp', label: 'Doc for body comps', rangeLabel: '400–431, 848–850, 1163', testIds: [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 848, 849, 850, 1163] },

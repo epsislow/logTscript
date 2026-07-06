@@ -802,7 +802,7 @@ class Interpreter {
     return null;
   }
 
-  _exprReferencesInlineLutInst(expr, instName, readOnly) {
+  _exprReferencesWritableLutInst(expr, instName, readOnly) {
     if (!expr || !Array.isArray(expr) || !instName) return false;
     const readonlyMethods = new Set([
       'size', 'isEmpty', 'countKey', 'countValue', 'hasKey', 'hasValue', 'get', 'decode', 'isValid',
@@ -818,11 +818,11 @@ class Interpreter {
         if (atom.compInvoke && atom.compInvoke.var === instName) return true;
         if (atom.var === instName) return true;
       }
-      if (atom.group && this._exprReferencesInlineLutInst(atom.group, instName, readOnly)) return true;
+      if (atom.group && this._exprReferencesWritableLutInst(atom.group, instName, readOnly)) return true;
       if (typeof this.forEachSubExprInAtom === 'function') {
         let found = false;
         this.forEachSubExprInAtom(atom, (sub) => {
-          if (this._exprReferencesInlineLutInst(sub, instName, readOnly)) found = true;
+          if (this._exprReferencesWritableLutInst(sub, instName, readOnly)) found = true;
         });
         if (found) return true;
       }
@@ -832,25 +832,72 @@ class Interpreter {
     return false;
   }
 
-  _notifyInlineLutMutation(instName) {
-    if (this._lutMutationNotifyDepth) return;
-    this._lutMutationNotifyDepth = true;
+  _notifyWritableLutMutation(instName) {
+    if (this._writableLutMutationNotifyDepth) return;
+    this._writableLutMutationNotifyDepth = true;
     try {
       for (const ws of this.wireStatements) {
         const expr = ws.assignment ? ws.assignment.expr : ws.expr;
-        if (!expr || !this._exprReferencesInlineLutInst(expr, instName, true)) continue;
+        if (!expr || !this._exprReferencesWritableLutInst(expr, instName, true)) continue;
+        const outputs = this.execWireStatement(ws, true);
+        if (!outputs || !outputs.length) continue;
+      for (const [wName, wVal] of outputs) {
+        if (this.deferWirePropagation()) {
+          this.writeWireStable(wName, wVal);
+          if (this.signalPropagationStrategy && this.signalPropagationStrategy.wirePendingStates) {
+            this.signalPropagationStrategy.wirePendingStates.delete(wName);
+          }
+        }
+        this._emitProbeForWire(wName, wVal);
+      }
+      }
+    } finally {
+      this._writableLutMutationNotifyDepth = false;
+    }
+  }
+
+  _notifyComponentComputedMutation(compName) {
+    if (this._componentComputedMutationNotifyDepth) return;
+    const strategy = this.signalPropagationStrategy;
+    const index = strategy && strategy._componentDependentsIndex;
+    const toExec = index && index.has(compName) ? index.get(compName) : null;
+    if (!toExec || toExec.size === 0) return;
+    this._componentComputedMutationNotifyDepth = true;
+    try {
+      for (const ws of toExec) {
         const outputs = this.execWireStatement(ws, true);
         if (!outputs || !outputs.length) continue;
         for (const [wName, wVal] of outputs) {
           if (this.deferWirePropagation()) {
             this.writeWireStable(wName, wVal);
+            if (strategy.wirePendingStates) {
+              strategy.wirePendingStates.delete(wName);
+            }
           }
           this._emitProbeForWire(wName, wVal);
         }
       }
     } finally {
-      this._lutMutationNotifyDepth = false;
+      this._componentComputedMutationNotifyDepth = false;
     }
+  }
+
+  _shouldNotifyComponentComputedAfterApply(comp, pending, when, reEvaluate) {
+    if (when !== 'immediate' || !comp || !pending || pending.set === undefined) return false;
+    const internalTypes = new Set(['queue', 'stack', 'network', 'terminal', 'mem']);
+    if (!internalTypes.has(comp.type)) return false;
+    if (!this.componentRegistry) return false;
+    const handler = this.componentRegistry.get(comp.type);
+    if (!handler || typeof handler.reEvalPendingValue !== 'function') return false;
+    const setValue = handler.reEvalPendingValue(pending, 'set', reEvaluate, this);
+    const active = setValue === '1' || (setValue && setValue.length > 0 && setValue[setValue.length - 1] === '1');
+    if (!active) return false;
+    const opKeys = [
+      'push', 'pop', 'clear', 'send', 'target',
+      'append', 'insert', 'newline', 'backDelete', 'frontDelete', 'moveCursor',
+      'adr', 'data', 'write', '2adr', '2data', '2write', '3adr', '3data', '3write', '4adr', '4data', '4write',
+    ];
+    return opKeys.some((k) => pending[k] !== undefined);
   }
 
   _emitComputedComponentProbes(compName) {
@@ -1248,7 +1295,7 @@ class Interpreter {
         if (typeof lutAdd !== 'function') throw new Error('Writable LUT module is not loaded');
         const result = writableMutators[method]();
         if (method === 'clear' || method === 'add' || method === 'set' || method === 'remove') {
-          this._notifyInlineLutMutation(instName);
+          this._notifyWritableLutMutation(instName);
         }
         return result;
       }
@@ -12048,9 +12095,13 @@ if (s.assignment) {
     if(this.componentRegistry){
       const handler = this.componentRegistry.get(comp.type);
       if(handler && handler.applyProperties){
+        const shouldNotify = this._shouldNotifyComponentComputedAfterApply(comp, pending, when, reEvaluate);
         handler.applyProperties(comp, compName, pending, when, reEvaluate, this);
         if(!reEvaluate) this.componentPendingSet.delete(compName);
         this._emitComputedComponentProbes(compName);
+        if (shouldNotify) {
+          this._notifyComponentComputedMutation(compName);
+        }
         return;
       }
     }

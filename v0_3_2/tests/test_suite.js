@@ -17613,6 +17613,86 @@ probe(hSize)`;
   h.assert('size 1 again', session.getWire(interp, 'hSize'), '0001');
 });
 
+const COND_QUEUE_BASE = `comp [queue] .q:
+  width: 8
+  length: 16
+  on: 1
+  :
+`;
+
+reg(2073, 'conditional-assignment', 'on:1 queue push via pending push + set (wave)', function(h, session) {
+  session.propagation = 'wave';
+  const src = `MODE WIREWRITE
+` + COND_QUEUE_BASE + `comp [switch] .go:
+  text: 'go'
+  :
+8wire data = ^41
+.q:push = data
+on:1 {
+  .go,
+  .q:set = 1
+}`;
+  const { interp } = session.run(src);
+  h.assert('empty init', session.getCompProperty(interp, '.q', 'empty'), '1');
+  session.setComp(interp, '.go', '1');
+  h.assert('pushed A', session.getCompProperty(interp, '.q', 'get'), '01000001');
+  h.assert('size 1', session.getCompProperty(interp, '.q', 'size'), '00001');
+  h.assert('not empty', session.getCompProperty(interp, '.q', 'empty'), '0');
+});
+
+reg(2074, 'conditional-assignment', 'on:1 network send cross-instance (wave)', function(h) {
+  const s1 = createSession({ instanceId: 1, propagation: 'wave' });
+  const s2 = createSession({ instanceId: 2, propagation: 'wave' });
+  const net = `comp [network] .n:
+  width: 8
+  length: 16
+  channel: 'demo'
+  on: 1
+  :
+`;
+  s1.run(`MODE WIREWRITE
+` + net + `comp [switch] .go:
+  text: 'go'
+  :
+8wire pkt = ^41
+.n:send = pkt
+on:1 {
+  .go,
+  .n:set = 1
+}`);
+  s2.run(net);
+  h.assert('rx empty init', s2.getCompProperty(s2.interp, '.n', 'empty'), '1');
+  s1.setComp(s1.interp, '.go', '1');
+  h.assert('rx A', s2.getCompProperty(s2.interp, '.n', 'get'), '01000001');
+  h.assert('rx size', s2.getCompProperty(s2.interp, '.n', 'size'), '00001');
+  s1.cleanup();
+  s2.cleanup();
+});
+
+reg(2075, 'conditional-assignment', 'on:1 queue MUX qsz alternates on switch toggle (wave)', function(h, session) {
+  session.propagation = 'wave';
+  const src = `MODE WIREWRITE
+` + COND_QUEUE_BASE + `comp [switch] .clear:
+  text: 'clr'
+  :
+8wire data = ^41
+.q:push = data
+on:1 {
+  .clear:get,
+  .q:set = 1
+}
+5wire qsz = MUX(.clear:get, 11111, .q:size)`;
+  const { interp } = session.run(src);
+  h.assert('init qsz sentinel', session.getWire(interp, 'qsz'), '11111');
+  session.setComp(interp, '.clear', '1');
+  h.assert('pushed', session.getCompProperty(interp, '.q', 'get'), '01000001');
+  h.assert('qsz size when clear 1', session.getWire(interp, 'qsz'), '00001');
+  session.setComp(interp, '.clear', '0');
+  h.assert('qsz sentinel when clear 0', session.getWire(interp, 'qsz'), '11111');
+  session.setComp(interp, '.clear', '1');
+  h.assert('qsz size when clear 1 again', session.getWire(interp, 'qsz'), '00001');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,
