@@ -3,19 +3,19 @@ name: Huffman wave demo
 overview: "Faza 0b/0c/0d: LUT export + SORT + keyAt + popMin/peekMin. Faza 0z: NEXT wave. Huffman v2 (inclusiv N-general cu popMin). Fără buildFrom."
 todos:
   - id: lut-keys-values-entries
-    content: "Writable LUT: .lut:keys, .lut:values, .lut:entries [N,2] — export lutEntryList; teste + doc lut.md"
+    content: "Writable LUT: :keys/:values/:entries; teste; doc lut.md; apoi run full test suite"
     status: pending
   - id: builtin-SORT
-    content: "Builtin SORT + doc: builtin-SORT.md nou; curățare sintaxă multi-; în builtin-ARGMAX.md, builtin-ARGMIN.md, matrix-reduction.md, vector-reduction.md; teste SORT"
+    content: "Builtin SORT + doc (builtin-SORT.md, ARGMAX/ARGMIN/matrix/vector-reduction fix multi-;); run full test suite"
     status: pending
   - id: lut-keyAt-valueAt
-    content: "Writable LUT: .lut:keyAt(i) + .lut:valueAt(i) — acces index singular; teste lut-writable"
+    content: "Writable LUT: keyAt/valueAt; teste; doc lut.md; run full test suite"
     status: pending
   - id: lut-minmax-removeAt
-    content: "Writable LUT: removeAt(idx), peekMin/Max, popMin/Max cu tag-uri format (; q4p4 signed s4…); parser callTags pe inlineMethod; teste + doc lut.md"
+    content: "Writable LUT: removeAt, peek/pop min/max + callTags; teste; doc lut.md; run full test suite"
     status: pending
   - id: phase0z-next-like-osc
-    content: "Faza 0z: NEXT în wave = cascade ca osc (fără _recomputeAllWires); teste regresie + doc — imediat înainte de Huffman"
+    content: "Faza 0z: NEXT wave; teste regresie; doc signal-propagation.md; run full test suite"
     status: pending
   - id: gap-analysis-huffman
     content: "Inventar pas-cu-pas Huffman: ce merge azi vs ce lipsește; propuneri extensii GENERICE (nu Huffman-specific)"
@@ -33,7 +33,7 @@ todos:
     content: "huffman-v2.md — pipeline complet în limbaj, gap-uri documentate, logts-play wave, osc, on:"
     status: pending
   - id: regen-manifest-doc
-    content: "doc-index + regen; cross-ref conditional-assignment, counter, osc, lut writable"
+    content: "După fiecare fază: doc pagini existente actualizate (lut.md, ARGMAX/ARGMIN, …); doc-index + regen manifest teste"
     status: pending
   - id: backlog-signal-mode
     content: "BACKLOG după Huffman: mod signal (simulator digital settle complet)"
@@ -64,6 +64,45 @@ isProject: false
 | **1** | Huffman: freq scan + `SORT(.freq:entries)` + coduri + round-trip |
 | **2** | Teste + `huffman-v2.md` complet |
 | **Later** | Mod `signal` (backlog) |
+
+---
+
+## Reguli implementare — teste + documentație (DECIS)
+
+**După fiecare fază** (0b, 0c, 0d, 0z, 1, 2), înainte de a trece la următoarea:
+
+### 1. Teste — suite completă verde
+
+| Pas | Comandă (din `v0_3_2/`) |
+|-----|-------------------------|
+| Regen manifest (dacă s-au adăugat teste noi) | `node node/_gen_test_manifest.js` |
+| **Toate testele** | `node node/_run_test_suite_node.js` |
+
+- **Criteriu:** exit code 0, **toate** testele cu success — nu doar grupul nou.
+- Dacă un test vechi cade: fix înainte de faza următoare (regresie).
+- Teste noi în [`tests/test_suite.js`](v0_3_2/tests/test_suite.js); ID-uri documentate în manifest generat.
+
+### 2. Documentație — pagini existente actualizate
+
+Nu doar fișiere noi: **actualizăm paginile existente** cu ce s-a schimbat (semnături, runnable, note).
+
+| Fază | Fișiere doc de actualizat |
+|------|---------------------------|
+| **0b** | [`lut.md`](v0_3_2/doc/lut.md) — secțiune writable: `:keys`, `:values`, `:entries` · **nou** [`builtin-SORT.md`](v0_3_2/doc/builtin-SORT.md) · [`builtin-tagged-index.md`](v0_3_2/doc/builtin-tagged-index.md) — index SORT · [`builtin-ARGMAX.md`](v0_3_2/doc/builtin-ARGMAX.md) · [`builtin-ARGMIN.md`](v0_3_2/doc/builtin-ARGMIN.md) — **șters** `; row; index` → `; row index` · [`matrix-reduction.md`](v0_3_2/doc/matrix-reduction.md) · [`vector-reduction.md`](v0_3_2/doc/vector-reduction.md) — exemple tag-uri |
+| **0c** | [`lut.md`](v0_3_2/doc/lut.md) — `:keyAt`, `:valueAt` + runnable |
+| **0d** | [`lut.md`](v0_3_2/doc/lut.md) — `removeAt`, `peekMin`/`Max`, `popMin`/`Max`, tag-uri format pe apel metodă · notă parser `callTags` pe `inlineMethod` dacă e cazul |
+| **0z** | [`signal-propagation.md`](v0_3_2/doc/signal-propagation.md) — NEXT ≈ osc în wave |
+| **1–2** | **nou** [`huffman-v2.md`](v0_3_2/doc/huffman-v2.md) · [`huffman.md`](v0_3_2/doc/huffman.md) — link scurt către v2 · cross-ref [`conditional-assignment.md`](v0_3_2/doc/conditional-assignment.md), counter, osc unde e relevant |
+
+După modificări doc: regen [`doc-index.json`](v0_3_2/doc/doc-index.json) / manifest doc (pipeline proiect) ca paginile noi să apară în viewer.
+
+### 3. Checklist per fază (template)
+
+- [ ] Cod implementat
+- [ ] Teste noi în `test_suite.js` (+ regen manifest dacă e cazul)
+- [ ] **`node node/_run_test_suite_node.js` — toate verzi**
+- [ ] Paginile doc din tabelul fazei actualizate (nu doar plan intern)
+- [ ] `BUILTIN_DOC` / `doc(NAME)` actualizat în interpreter unde e cazul (ex. SORT)
 
 ---
 
@@ -707,12 +746,14 @@ CI: tick osc simulat (`session.setComp`, pattern 611), nu sleep real.
 
 ## Criteriu „gata”
 
-- [ ] **Faza 0b: `:keys`/`:values`/`:entries` + `SORT`, teste + doc (inclusiv curățare multi-`;` în builtin-ARGMAX.md, builtin-ARGMIN.md, matrix-reduction.md, vector-reduction.md)**
-- [ ] **Faza 0c: `keyAt` / `valueAt` implementat, teste + doc lut.md**
-- [ ] **Faza 0d: `removeAt`, `peekMin`/`Max`, `popMin`/`Max` + tag-uri format + parser callTags pe inlineMethod**
-- [ ] **Faza 0z: NEXT wave = osc cascade, teste verzi** (ultimul pas înainte de Huffman)
-- [ ] Frecvențe măsurate runtime din `source` (osc + `on:` + `.freq`)
-- [ ] Coduri în `.huff` produse **din script** (nu engine Huffman)
-- [ ] Round-trip `source` → `packet` → `recovered` pe wave
-- [ ] `huffman-v2.md` explică ce merge, ce nu, ce extensii urmează
+**Per fază:** suite completă verde + doc pagini existente actualizate (vezi secțiunea „Reguli implementare”).
+
+- [ ] **Faza 0b:** implementat + **toate testele** + doc: `lut.md`, `builtin-SORT.md`, `builtin-ARGMAX.md`, `builtin-ARGMIN.md`, `matrix-reduction.md`, `vector-reduction.md`, `builtin-tagged-index.md`
+- [ ] **Faza 0c:** implementat + **toate testele** + doc: `lut.md` (`keyAt`/`valueAt`)
+- [ ] **Faza 0d:** implementat + **toate testele** + doc: `lut.md` (min/max/removeAt)
+- [ ] **Faza 0z:** implementat + **toate testele** + doc: `signal-propagation.md`
+- [ ] Frecvențe măsurate runtime din `source` (osc + `on:` + `.freq`) — **toate testele** verzi
+- [ ] Coduri în `.huff` produse **din script** — **toate testele** verzi
+- [ ] Round-trip `source` → `packet` → `recovered` pe wave — **toate testele** verzi
+- [ ] `huffman-v2.md` + actualizări `huffman.md`; doc-index regen
 - [ ] Gap-uri N-general documentate cu propuneri generice
