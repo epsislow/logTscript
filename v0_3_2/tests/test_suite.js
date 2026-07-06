@@ -18147,6 +18147,73 @@ on:raise { AND(.clk:get, EQ(.idx:get, 00001100)), ok = .freq:set(0011, ADD(.freq
   h.assert('f11', session.getWire(interp, 'f11'), '00000001');
 }, { propagation: 'wave' });
 
+const HUFF_NGENERAL_BASE = `MODE WIREWRITE
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .heap:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .huff:
+  writable
+  prefixFree
+  variableDepth
+  length: 256
+  data { }
+  :
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 8b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 8b)
+  :`;
+
+reg(2110, 'huffman-wave', 'N-general popMin merge builds codebook aacb round-trip', function(h, session) {
+  const src = HUFF_NGENERAL_BASE + `
+32wire source =: 'aacb'
+1wire _ = .freq:set(01100001, \\2;8)
+1wire _ = .freq:set(01100010, \\1;8)
+1wire _ = .freq:set(01100011, \\1;8)
+8wire[3,2] e = .freq:entries()
+8wire[3,2] sorted = SORT(e; col=1)
+1wire _ = .heap:clear()
+1wire _ = .heap:add(01100010, \\1;8)
+1wire _ = .heap:add(01100011, \\1;8)
+1wire _ = .heap:add(01100001, \\2;8)
+8wire hk1, 8wire hf1 = .heap:popMin()
+8wire hk2, 8wire hf2 = .heap:popMin()
+8wire hsum1, 1wire hc1 = ADD(hf1, hf2)
+1wire _ = .heap:add(11111110, hsum1)
+8wire hk3, 8wire hf3 = .heap:popMin()
+8wire hk4, 8wire hf4 = .heap:popMin()
+8wire hsum2, 1wire hc2 = ADD(hf3, hf4)
+1wire _ = .heap:add(11111111, hsum2)
+8wire hsz = .heap:size()
+1wire _ = .huff:clear()
+1wire _ = .huff:add(01100001, 0)
+1wire _ = .huff:add(01100010, 10)
+1wire _ = .huff:add(01100011, 11)
+64wire packet =: .huffPacket { tokens = source }
+32wire recovered = .huffRecover { data = packet }`;
+  const { interp } = session.run(src);
+  h.assert('first pop b', session.getWire(interp, 'hk1'), '01100010');
+  h.assert('heap root only', session.getWire(interp, 'hsz'), '00000001');
+  h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

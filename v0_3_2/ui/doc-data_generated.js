@@ -10638,7 +10638,7 @@ End-to-end **wave** demo: measure symbol frequencies from a source wire, sort en
 
 For the static codebook + protocol walkthrough (v1), see **[huffman.md](huffman.md)**.
 
-**Suite tests:** **2104** (freq \`set\`+\`ADD\`), **2105** (\`SORT\` entries), **2106–2107** (round-trip wave), **2108** (\`=:\` padding), **2109** (osc scan + counter).
+**Suite tests:** **2104** (freq \`set\`+\`ADD\`), **2105** (\`SORT\` entries), **2106–2107** (round-trip wave), **2108** (\`=:\` padding), **2109** (osc scan + counter), **2110** (N-general \`popMin\` merge + byte codebook).
 
 ---
 
@@ -10834,27 +10834,93 @@ To **derive order** from counts without a builtin tree builder:
 - **\`ARGMAX(cnts; index)\`** — index of the largest count (ties → smallest index). See [builtin-ARGMAX.md](builtin-ARGMAX.md).
 - **\`MUX\` / \`GT\`** — finite compare network for 4 nibbles (documented in the internal plan; many wires, but valid logTscript).
 
-### N-general merge (\`popMin\`)
+### N-general merge (\`popMin\`) — full \`'aacb'\` example
 
-For arbitrary **N** symbols, repeated **\`:popMin\`** on a writable \`.nodes\` LUT replaces a dedicated priority-queue component. Pair with \`:add\` for merged parent nodes — see [lut.md — min/max](lut.md#min--max-by-value-peekmin-popmin-).
+Build frequencies from a short ASCII source, merge with **\`:popMin\`** on a writable \`.heap\`, write codewords into a writable **\`prefixFree\` \`.huff\`**, then round-trip.
 
-\`\`\`logts
-on:1 {
-  once,
-  k1, f1 = .nodes:popMin()
-}
-on:1 {
-  once,
-  k2, f2 = .nodes:popMin()
-}
-on:raise {
-  mergeGate,
-  parentK, parentF = …,
-  ok = .nodes:add(parentK, parentF)
-}
+Use **\`logts-play legacy\`** for this script: merge steps are **sequential** \`popMin\` calls (in wave mode, multiple \`on:1\` blocks can fire together). For osc-stepped merge in wave, drive each pair of \`popMin\` calls from a [switch](switch.md) tick.
+
+**Counts** below match \`'aacb'\` (\`a\`×2, \`b\`×1, \`c\`×1). A full osc scan of \`source\` is the same pattern as [Phase A](#osc--counter-scan-4-nibbles-keywidth--4); here the histogram is filled directly so one Run stays compact.
+
+**Merge tree** (stable \`popMin\` ties): merge \`b\`+\`c\` → internal \`11111110\`, then merge \`a\`+internal → root \`11111111\`. Codewords: \`a=0\`, \`b=10\`, \`c=11\`.
+
+**Internal keys** \`11111110\` / \`11111111\` are merge bookkeeping only — not in the codebook. Writable \`prefixFree\` **collapse** uses **\`lutEntryList\`** only (not \`fillwith\` slots), so byte keys round-trip correctly.
+
+\`\`\`logts-play legacy
+MODE WIREWRITE
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .heap:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .huff:
+  writable
+  prefixFree
+  variableDepth
+  length: 256
+  data { }
+  :
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 8b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 8b)
+  :
+32wire source =: 'aacb'
+1wire _ = .freq:set(01100001, \\2;8)
+1wire _ = .freq:set(01100010, \\1;8)
+1wire _ = .freq:set(01100011, \\1;8)
+8wire[3,2] e = .freq:entries()
+8wire[3,2] sorted = SORT(e; col=1)
+1wire _ = .heap:clear()
+1wire _ = .heap:add(01100010, \\1;8)
+1wire _ = .heap:add(01100011, \\1;8)
+1wire _ = .heap:add(01100001, \\2;8)
+8wire hk1, 8wire hf1 = .heap:popMin()
+8wire hk2, 8wire hf2 = .heap:popMin()
+8wire hsum1, 1wire hc1 = ADD(hf1, hf2)
+1wire _ = .heap:add(11111110, hsum1)
+8wire hk3, 8wire hf3 = .heap:popMin()
+8wire hk4, 8wire hf4 = .heap:popMin()
+8wire hsum2, 1wire hc2 = ADD(hf3, hf4)
+1wire _ = .heap:add(11111111, hsum2)
+8wire hsz = .heap:size()
+1wire _ = .huff:clear()
+1wire _ = .huff:add(01100001, 0)
+1wire _ = .huff:add(01100010, 10)
+1wire _ = .huff:add(01100011, 11)
+64wire packet =: .huffPacket { tokens = source }
+32wire recovered = .huffRecover { data = packet }
+show(sorted::1)
+show(hsz)
+show(source; ascii)
+show(recovered; ascii)
 \`\`\`
 
-Chain osc ticks or \`on:raise\` gates for each merge step. **Automatic codeword assignment from the tree** remains script / finite-step logic — not an engine builtin.
+| Wire | Expected | Meaning |
+|------|----------|---------|
+| \`sorted::1\` | \`00000001\`, \`00000001\`, \`00000010\` | counts ascending (\`b\`, \`c\`, \`a\`) |
+| \`hsz\` | \`00000001\` | one root left in \`.heap\` |
+| \`hk1\` | \`01100010\` | first \`popMin\` = \`'b'\` |
+| \`recovered\` | same as \`source\` | \`"aacb"\` + pad |
+
+**Scaling:** for larger **N**, unroll more merge rounds (\`popMin\`×2 + \`:add\`) per osc tick, or use a fixed max-N network. **Codeword bits** still come from tracking left/right choices in a \`.links\` LUT — not automatic yet (see gap table). Test **2110**.
+
+For wave + switch-driven merge, chain \`on:1 { onceN, … }\` blocks with separate \`once\` wires per tick (see [conditional-assignment.md](conditional-assignment.md)).
 
 ---
 
@@ -11053,7 +11119,8 @@ Four tokens \`00\` \`01\` \`10\` \`11\` → payload 9 bits + 8-bit length = **17
 | \`NEXT\` ≈ osc in wave | **Done** (Faza 0z) |
 | Runtime freq scan | **Done** — tests **2104**, **2109** |
 | Round-trip wave | **Done** — tests **2106–2108** |
-| Automatic tree + codewords from freqs | **Script** — \`GT\`/\`MUX\`/\`ARGMAX\` for small N; \`popMin\` loop for general N |
+| N-general merge + byte codebook | **Done** — test **2110** (\`popMin\`, writable \`prefixFree\` collapse) |
+| Automatic tree + codewords from freqs | **Partial** — merge unrolled; codewords from merge order (script); \`.links\` LUT for large N |
 | \`ARGSORT\` / \`keysAt\` / \`valuesAt\` | **Backlog** (generic) |
 | \`comp [priorityqueue]\` | **Backlog** — redundant if \`popMin\` suffices |
 | \`buildFrom\` / \`HUFFMAN_*\` builtin | **Out of scope** (by design) |
@@ -11456,7 +11523,7 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 | **Length field width** | \`8b\` allows payloads up to 255 bits. Use \`16b\` for larger frames ([\`withLength\`](protocol.md#withlengthdata-nb)). |
 | **Separate protocols** | Encoder and decoder are independent definitions — swap codebooks or framing without changing the other side's structure. |
 | **Not in scope** | \`checksum()\`, \`concat()\`, \`padLeft()\`, \`padRight()\` — add framing or integrity in user logic if needed. |
-| **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2109** ([huffman-v2.md](huffman-v2.md) wave pipeline). |
+| **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2110** ([huffman-v2.md](huffman-v2.md) wave pipeline). |
 
 ---
 
@@ -13830,6 +13897,8 @@ show(sz)
 After Run: \`k1=0010\`, \`f1=0001\` (min entry removed), \`sz=0010\` (2 entries left). For a full Huffman merge, chain additional \`on:\` blocks or oscillators for the second \`popMin\` and \`:add\` of the parent node.
 
 For Huffman **N-general**: repeated \`popMin\` on a \`.nodes\` LUT replaces a dedicated priority-queue component. Pair with \`:add\` for merged parent nodes; use a separate LUT (e.g. \`.links\`) for parent/child bookkeeping.
+
+Writable **\`prefixFree\`** codebooks: \`collapse\` matches only **\`lutEntryList\`** entries (not \`fillwith\` slots), longest codeword first, and outputs **\`entry.key\`** — required for byte-key round-trip. See [huffman-v2.md — N-general](huffman-v2.md#n-general-merge-popmin--full-aacb-example).
 
 Dual assign in \`on:1 { trigger, k, v = .lut:popMin() }\` is supported (same as top-level \`k, v = …\` or \`4wire k, 4wire v = …\`).
 

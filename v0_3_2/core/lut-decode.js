@@ -116,19 +116,40 @@ function lutDecode(inst, valueExpr, matchIndexExpr, ctx) {
 
 function lutCollapsePrefixFree(inst, dataBits, keyWidth) {
   if (!inst || !inst.lutTable) throw new Error('LUT collapse requires a lookup table');
+
+  const useEntryList = !!(inst.writable && inst.lutEntryList && inst.lutEntryList.length);
+  const entries = useEntryList
+    ? inst.lutEntryList.slice().sort((a, b) => b.value.length - a.value.length)
+    : null;
   const length = inst.attributes.length !== undefined ? parseInt(inst.attributes.length, 10) : 16;
+
   let pos = 0;
   let out = '';
   while (pos < dataBits.length) {
     let matched = false;
-    for (let i = 0; i < length; i++) {
-      const val = inst.lutTable[i];
-      if (!val || val.length === 0) continue;
-      if (dataBits.substr(pos, val.length) === val) {
-        out += i.toString(2).padStart(keyWidth, '0');
+    if (entries) {
+      for (const entry of entries) {
+        const val = entry.value;
+        if (!val || val.length === 0) continue;
+        if (dataBits.substr(pos, val.length) !== val) continue;
+        let keyBits = entry.key == null ? '' : String(entry.key);
+        if (keyBits.length < keyWidth) keyBits = keyBits.padStart(keyWidth, '0');
+        else if (keyBits.length > keyWidth) keyBits = keyBits.substring(keyBits.length - keyWidth);
+        out += keyBits;
         pos += val.length;
         matched = true;
         break;
+      }
+    } else {
+      for (let i = 0; i < length; i++) {
+        const val = inst.lutTable[i];
+        if (!val || val.length === 0) continue;
+        if (dataBits.substr(pos, val.length) === val) {
+          out += i.toString(2).padStart(keyWidth, '0');
+          pos += val.length;
+          matched = true;
+          break;
+        }
       }
     }
     if (!matched) {

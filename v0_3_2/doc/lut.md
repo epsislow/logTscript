@@ -459,6 +459,8 @@ After Run: `k1=0010`, `f1=0001` (min entry removed), `sz=0010` (2 entries left).
 
 For Huffman **N-general**: repeated `popMin` on a `.nodes` LUT replaces a dedicated priority-queue component. Pair with `:add` for merged parent nodes; use a separate LUT (e.g. `.links`) for parent/child bookkeeping.
 
+Writable **`prefixFree`** codebooks: `collapse` matches only **`lutEntryList`** entries (not `fillwith` slots), longest codeword first, and outputs **`entry.key`** — required for byte-key round-trip. See [huffman-v2.md — N-general](huffman-v2.md#n-general-merge-popmin--full-aacb-example).
+
 Dual assign in `on:1 { trigger, k, v = .lut:popMin() }` is supported (same as top-level `k, v = …` or `4wire k, 4wire v = …`).
 
 ### Indexed access (`:keyAt`, `:valueAt`)
