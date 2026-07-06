@@ -311,21 +311,19 @@ _ = .nodes:add(parentKey, fParent)   # parentKey = alocat din counter
 
 **Rămâne în script:** alocare `parentKey`, reconstrucție arbore pentru coduri (LUT auxiliar părinte-copil sau pași finiți). `popMin` rezolvă **extract-min repetat**; nu înlocuiește întregul Pas 5 (atribuire biți 0/1).
 
-#### `parentKey` vs valoare structurată (`depth: 8[n]`)
+#### `parentKey` + două LUT-uri (DECIS — fără `depth: 8[2]`)
 
 | Concept | Rol |
 |---------|-----|
-| **`parentKey`** | **cheia** noului nod intern (din `counter` / id alocat) — rămâne scalar, `add(parentKey, …)` |
-| **valoarea** | ce atașezi cheii: frecvență, copii stânga/dreapta, etc. |
+| **`parentKey`** | **cheia** noului nod intern (din `counter`) — `add(parentKey, …)` |
+| **valoarea** | blob flat la `depth` scalar; concat `parentKey + bit` la `set` |
 
-`depth: 8[2]` / `8[3,2]` descrie **forma valorii**, nu înlocuiește `parentKey`.
-
-**Variantă fără tensor depth (recomandat pentru v2):** două LUT-uri writable:
+**Nu implementăm `depth: 8[n]` / tensor pe LUT** în acest plan — Huffman merge cu `depth` scalar + slice/concat. Motive: `set` înlocuiește tot blob-ul, `decode`/`hasValue` pe match integral, `parseInt("8[2]")` periculos fără parser dedicat, `exprOfLut` nu se potrivește.
 
 | LUT | `depth` | cheie → valoare | Rol |
 |-----|---------|-----------------|-----|
-| `.heap` | `8` | nod → **frecvență** | `popMin` / merge; intrări scoase la pop |
-| `.links` | `8[2]` sau `16` flat | nod → **`[parent, bit]`** | muchii; **nu** participă la `popMin` |
+| `.heap` | `8` | nod → **frecvență** | `popMin` / merge |
+| `.links` | **`16`** flat | nod → **`parent(8b) ‖ bit(8b)`** | `[parent, bit]`; nu `popMin` |
 
 La fiecare merge (după `popMin`×2):
 
@@ -346,11 +344,7 @@ _ = .links:set(k2, parentKey + 1)    # bit 1
 | `[left, right]` pe **părinte** | `set(parentKey, k1 + k2)` | parcurgere top-down (rădăcină → frunză) |
 | **`[parent, bit]` pe copil A** | `set(k1, parentKey + bit)` | **generare cod** — urci de la simbol la rădăcină, concat biți |
 
-Pentru **`.huff:add(sym, codeword)`** urcarea cu `.links:get(sym)` → părinte → … → rădăcină e naturală. Rădăcina finală nu are intrare în `.links` (sau `parent = fillwith`).
-
-`bit` = `1wire` (0 sau 1), stocat în al doilea câmp `8[2]` (zero-padded) sau `depth: 9` flat (`8+1`).
-
-**Variantă tensor depth (backlog):** un singur `.nodes` cu `depth: 8[3]` = `[freq, parent, bit]` — `popMin` compară coloana 0; după merge, `set` pe k1/k2 actualizează parent+bit păstrând freq (mai greu la `set` parțial). **Două LUT-uri** evită amestecul heap vs topologie.
+Pentru **`.huff:add(sym, codeword)`** urcarea: `.links:get(sym)` → slice parent (`.0/8`) → repetă. `bit` = câmpul low (`.8/8` sau al doilea octet din concat).
 
 ---
 
@@ -382,29 +376,6 @@ Pentru **`.huff:add(sym, codeword)`** urcarea cu `.links:get(sym)` → părinte 
 |---------|---------|
 | `comp [priorityqueue]` obligatoriu pentru N-general | **opțional** — `popMin` pe LUT acoperă extract-min |
 | `ARGSORT` | rămâne backlog; `SORT` + `popMin` suficient pentru merge |
-
-### Backlog — `depth` tensorial (`depth: 8[2]`, `8[3,2]`)
-
-**Propunere:** `depth:` acceptă formă tensor (ca la `8wire[3]`):
-
-```logts
-inline [lut] .nodes:
-  writable
-  depth: 8[3]      # valoare = 8wire[3], 24 biți flat în spate
-```
-
-| Formă | Biți | Huffman |
-|-------|------|---------|
-| `depth: 8` | 8 | heap — doar frecvență |
-| `depth: 8[2]` | 16 | `.links` — **`[parent, bit]`** pe copil |
-| `depth: 8[3]` | 24 | `[freq, parent, bit]` — un LUT (backlog) |
-| `depth: 8[3,2]` | 48 | peste nevoie pentru arbore standard |
-
-**Ajută `parentKey`?** Indirect: `parentKey` rămâne cheie alocată (counter); tensor depth structurează **valoarea** (`fParent + k1 + k2`). `popMin` pe `8[3]` compară coloana 0 (freq) — tag `col=0` sau convenție implicită.
-
-**Fără tensor depth (merge acum):** `depth: 24` flat + concat, sau `.heap` depth 8 + `.tree` depth 16.
-
-**Decizie:** backlog generic după 0d; nu blochează demo v2.
 
 ---
 
@@ -673,9 +644,11 @@ flowchart TD
   phaseA --> phaseB --> phaseC
 ```
 
-**Două LUT-uri writable:**
-- `.freq` — cheie=simbol, valoare=contor (depth 8)
-- `.huff` — cheie=simbol, valoare=cod prefixFree (`prefixFree` activ)
+**Trei LUT-uri writable (Huffman N-general):**
+- `.freq` — cheie=simbol, `depth: 8` contor scan
+- `.heap` — cheie=nod, `depth: 8` frecvență (`popMin`)
+- `.links` — cheie=nod, **`depth: 16`** `[parent‖bit]`
+- `.huff` — `prefixFree` coduri finale
 
 ---
 
@@ -726,6 +699,7 @@ CI: tick osc simulat (`session.setComp`, pattern 611), nu sleep real.
 ## Out of scope
 
 - `buildFrom`, `HUFFMAN_*` builtin
+- **`depth: 8[2]` / tensor depth pe LUT** — nu în acest plan; Huffman folosește `depth: 8` + `depth: 16` flat
 - Board UI dedicat
 - Mod `signal` înainte de Huffman (Faza 0z NEXT≈osc e OK — e pregătire wave, nu mod signal complet)
 
