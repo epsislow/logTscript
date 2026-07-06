@@ -401,6 +401,50 @@ function getExportValueWidth(inst) {
   return max;
 }
 
+function parseEntryIndex(indexExpr, ctx, inst) {
+  const idxStr = typeof resolveLutArgValue === 'function'
+    ? resolveLutArgValue(ctx, indexExpr, inst)
+    : '';
+  let idx = parseInt(idxStr, 2);
+  if (isNaN(idx)) idx = parseInt(idxStr, 10);
+  if (isNaN(idx)) {
+    throw new Error(`LUT: invalid entry index '${idxStr || ''}'`);
+  }
+  return idx;
+}
+
+function assertEntryIndexInRange(inst, idx) {
+  const list = inst.lutEntryList;
+  const max = list.length - 1;
+  if (idx < 0 || idx >= list.length) {
+    throw new Error(`LUT: entry index ${idx} out of range [0,${max < 0 ? 0 : max}]`);
+  }
+}
+
+function lutKeyAt(inst, indexExpr, ctx) {
+  requireWritable(inst);
+  const idx = parseEntryIndex(indexExpr, ctx, inst);
+  assertEntryIndexInRange(inst, idx);
+  const entry = inst.lutEntryList[idx];
+  const keyW = getExportKeyWidth(inst);
+  let k = entry.key == null ? '' : String(entry.key);
+  if (k.length < keyW) k = k.padStart(keyW, '0');
+  else if (k.length > keyW) k = k.substring(k.length - keyW);
+  return { value: k, bitWidth: keyW, varName: `${inst.name}:keyAt` };
+}
+
+function lutValueAt(inst, indexExpr, ctx) {
+  requireWritable(inst);
+  const idx = parseEntryIndex(indexExpr, ctx, inst);
+  assertEntryIndexInRange(inst, idx);
+  const entry = inst.lutEntryList[idx];
+  const valW = getExportValueWidth(inst);
+  let v = entry.value == null ? '' : String(entry.value);
+  if (v.length < valW) v = v.padStart(valW, '0');
+  else if (v.length > valW) v = v.substring(v.length - valW);
+  return { value: v, bitWidth: valW, varName: `${inst.name}:valueAt` };
+}
+
 function lutKeys(inst) {
   requireWritable(inst);
   const list = inst.lutEntryList;
@@ -473,6 +517,8 @@ const lutWritableExports = {
   lutKeys,
   lutValues,
   lutEntries,
+  lutKeyAt,
+  lutValueAt,
   getExportKeyWidth,
   getExportValueWidth,
 };

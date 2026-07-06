@@ -806,7 +806,7 @@ class Interpreter {
     if (!expr || !Array.isArray(expr) || !instName) return false;
     const readonlyMethods = new Set([
       'size', 'isEmpty', 'countKey', 'countValue', 'hasKey', 'hasValue', 'get', 'decode', 'isValid',
-      'keys', 'values', 'entries',
+      'keys', 'values', 'entries', 'keyAt', 'valueAt',
     ]);
     const mutators = new Set(['clear', 'add', 'set', 'remove']);
     for (const atom of expr) {
@@ -1293,6 +1293,16 @@ class Interpreter {
         if (!writable) throw new Error(`LUT ${instName} is not writable`);
         if (typeof lutEntries !== 'function') throw new Error('Writable LUT module is not loaded');
         return lutEntries(lutInst);
+      }
+      if (method === 'keyAt') {
+        if (!writable) throw new Error(`LUT ${instName} is not writable`);
+        if (typeof lutKeyAt !== 'function') throw new Error('Writable LUT module is not loaded');
+        return lutKeyAt(lutInst, args[0], this);
+      }
+      if (method === 'valueAt') {
+        if (!writable) throw new Error(`LUT ${instName} is not writable`);
+        if (typeof lutValueAt !== 'function') throw new Error('Writable LUT module is not loaded');
+        return lutValueAt(lutInst, args[0], this);
       }
       const writableMutators = {
         add: () => lutAdd(lutInst, args[0], args[1], this),

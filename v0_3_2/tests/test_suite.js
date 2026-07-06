@@ -17826,6 +17826,74 @@ on:1 {
   h.assert('keys', session.getWire(interp, 'ks'), '000000010010');
 }, { propagation: 'wave' });
 
+reg(2088, 'lut-writable', 'keyAt valueAt index 0 from data', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+4wire k = .huff:keyAt(0000)
+4wire v = .huff:valueAt(0000)`;
+  const { interp } = session.run(src);
+  h.assert('key', session.getWire(interp, 'k'), '0000');
+  h.assert('value', session.getWire(interp, 'v'), '0001');
+});
+
+reg(2089, 'lut-writable', 'keyAt valueAt list order after add', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:add(000, 0011)
+4wire k0 = .huff:keyAt(0000)
+4wire k1 = .huff:keyAt(0001)
+4wire k2 = .huff:keyAt(0010)
+4wire v2 = .huff:valueAt(0010)`;
+  const { interp } = session.run(src);
+  h.assert('k0', session.getWire(interp, 'k0'), '0000');
+  h.assert('k1', session.getWire(interp, 'k1'), '0001');
+  h.assert('k2', session.getWire(interp, 'k2'), '0000');
+  h.assert('v2', session.getWire(interp, 'v2'), '0011');
+});
+
+reg(2090, 'lut-writable', 'valueAt after set', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire _ = .huff:set(000, 1111)
+4wire v = .huff:valueAt(0000)`;
+  const { interp } = session.run(src);
+  h.assert('value', session.getWire(interp, 'v'), '1111');
+});
+
+reg(2091, 'lut-writable', 'keyAt index out of range', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+4wire k = .huff:keyAt(0010)`;
+  h.assertThrows('range', () => {
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    if (!err) throw new Error('expected runtime error');
+    throw err;
+  }, 'out of range');
+});
+
+reg(2092, 'lut-writable', 'keyAt read-only LUT errors', function(h, session) {
+  const { out } = session.run(`inline [lut] .ro:
+  depth: 4
+  length: 16
+  data { 000 : 0001 }
+  :
+4wire k = .ro:keyAt(0000)`);
+  const err = out.find(l => l.startsWith('Error:')) || '';
+  h.assert('not writable', String(err.includes('not writable')), 'true');
+});
+
+reg(2093, 'lut-writable', 'keyAt valueAt wave after on:1 add', function(h, session) {
+  const src = WRITABLE_LUT_BASE + `
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .huff:add(010, 1010)
+}
+4wire k2 = .huff:keyAt(0010)
+4wire v2 = .huff:valueAt(0010)`;
+  const { interp } = session.run(src);
+  h.assert('key', session.getWire(interp, 'k2'), '0010');
+  h.assert('value', session.getWire(interp, 'v2'), '1010');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

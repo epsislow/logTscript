@@ -13335,6 +13335,41 @@ inline [lut] .huff:
 | \`.lut:keys()\` | Vector of all keys (key width × entry count) |
 | \`.lut:values()\` | Vector of all values (value width × entry count) |
 | \`.lut:entries()\` | Matrix **N×2**: column 0 = key, column 1 = value (\`ew = max(keyW, valW)\`) |
+| \`.lut:keyAt(i)\` | Key at list index \`i\` (\`0 … size()-1\`; addr width) |
+| \`.lut:valueAt(i)\` | Value at list index \`i\` (depth or variableDepth width) |
+
+### Indexed access (\`:keyAt\`, \`:valueAt\`)
+
+Point access into **\`lutEntryList\`** by **insertion order** (same order as \`:add\` / \`:set\`). Index \`i\` is **0-based**; \`i >= size()\` or negative → runtime error. Writable LUT only (read-only → \`not writable\`).
+
+Duplicate keys: each list slot has its own index — \`keyAt(1)\` may repeat a key seen at \`keyAt(0)\`.
+
+\`\`\`logts-play wave
+inline [lut] .freq:
+  writable
+  depth: 4
+  length: 16
+  fillwith: 0000
+  data {
+    000 : 0001
+    001 : 0010
+  }
+  :
+1wire once = 1
+1wire ok = 0
+on:1 {
+  once,
+  ok = .freq:add(010, 1010)
+}
+4wire k0 = .freq:keyAt(0000)
+4wire k2 = .freq:keyAt(0010)
+4wire v2 = .freq:valueAt(0010)
+show(k0)
+show(k2)
+show(v2)
+\`\`\`
+
+Use with a counter / \`NEXT\` to walk \`i = 0 … size()-1\` when building Huffman merges. For bulk export without a loop, prefer \`:entries\` + \`SORT\`.
 
 ### Bulk export (\`:keys\`, \`:values\`, \`:entries\`)
 
@@ -13357,7 +13392,7 @@ In the editor, **wave** is the default propagation mode. After **Run**, wave **\
 
 Use a named wire for the assignment (\`ok = .huff:add(...)\`) — not \`_\` (undefined in \`on:\` blocks). See [conditional assignment](conditional-assignment.md).
 
-**Affected methods:** \`:add\`, \`:set\`, \`:remove\`, \`:clear\` (all mutate \`lutEntryList\`). Read-only methods (\`:keys\`, \`:values\`, \`:entries\`, \`:get\`, \`:size\`, …) are safe to assign on a wire; re-execution only refreshes the snapshot.
+**Affected methods:** \`:add\`, \`:set\`, \`:remove\`, \`:clear\` (all mutate \`lutEntryList\`). Read-only methods (\`:keys\`, \`:values\`, \`:entries\`, \`:keyAt\`, \`:valueAt\`, \`:get\`, \`:size\`, …) are safe to assign on a wire; re-execution only refreshes the snapshot.
 
 \`\`\`logts-play wave
 inline [lut] .freq:
