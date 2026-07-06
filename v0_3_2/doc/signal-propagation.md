@@ -13,7 +13,7 @@ This document explains **what you see** when values spread through your circuit.
 | Event | What happens |
 |-------|----------------|
 | **RUN** | All wire assignments are evaluated. Displays (`show`) reflect the final settled values. |
-| **NEXT(~)** | Wires that depend on `~`, `%`, or `$` are recomputed. Registers with `REG(..., ~, ...)` latch on `NEXT`. |
+| **NEXT(~)** | Wires that depend on `~`, `%`, or `$` (and their downstream dependents) are recomputed. Registers with `REG(..., ~, ...)` latch on `NEXT`. Other wires keep their current values. |
 | **UI interaction** | Toggling a switch, pressing a key, changing a DIP, or an oscillator tick updates connected wires. |
 | **Wire assignment in code** | Changing a wire (e.g. `data = 1`) updates everything downstream in the same step. |
 
@@ -57,6 +57,18 @@ show(a, b)
 ```
 
 After **RUN**, `a` is `0` and `b` is `1`. When you flip the switch in the panel, `a` becomes `1` and `b` becomes `0` without running the script again.
+
+### `NEXT(~)` in Wave — partial cascade (like `osc`)
+
+In **Wave**, `NEXT(~)` does **not** re-run every wire assignment from scratch (unlike the first **RUN**). Only wires in the **closure** of `~`, `%`, and `$` are recomputed, then dependents settle through the normal wave loop — similar to how an **osc** tick schedules only connected logic.
+
+| Wire | After `NEXT(~)` in Wave |
+|------|-------------------------|
+| `4wire x = 0000` then `x = 0011` (no `~`) | Stays `0011` |
+| `1wire q = REG(data, ~, 0)` | Latches `data` on NEXT |
+| `1wire y = NOT(q)` | Updates when `q` changes |
+
+**Legacy** still re-evaluates wire statements in program order inside `NEXT` (unchanged). Use **wave** for multi-step demos (Huffman scan, counters + `on:raise`) where state must persist between NEXT steps.
 
 ### MODE ZSTATE — multi-driver commit
 
@@ -157,7 +169,7 @@ See chip tests **540–543** (legacy) and **556–557** (wave) in the test runne
 |-------|---------------|--------|
 | Default in editor | Yes | No |
 | Wire + component updates | Settle together, then refresh UI | Update as each step runs |
-| `REG(..., ~, ...)` + `NEXT` | Same as Legacy | Reference |
+| `REG(..., ~, ...)` + `NEXT` | Partial cascade (`~` closure) | Full re-eval in program order |
 | `REG(data, clk, clr)` wire clock | Falling edge (`clk` 1→0); same semantics | Same |
 | `show` | After settle | After each top-level step |
 | `probe` | On every commit (elaboration registry) | On every commit |

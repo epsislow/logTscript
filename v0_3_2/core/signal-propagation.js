@@ -12,6 +12,9 @@ class SignalPropagationStrategy {
     this._wireDependentsIndex = null;
     this._componentDependentsIndex = null;
     this._recomputeAllWires = false;
+    this._recomputeNextAffectedWires = false;
+    this._nextAffectedWireStmts = new Set();
+    this._nextAffectedWireOrder = [];
   }
 
   bind(interp) {
@@ -46,6 +49,7 @@ class SignalPropagationStrategy {
     return this.wirePendingStates.size > 0
       || this.componentPendingStates.size > 0
       || this._recomputeAllWires
+      || this._recomputeNextAffectedWires
       || (this.interp && this.interp.zstate && this.interp.wireContributionQueue.size > 0);
   }
 
@@ -139,11 +143,66 @@ class SignalPropagationStrategy {
   initializeFromElaboration() {
     this.buildWireDependentsIndex();
     this.buildComponentDependentsIndex();
+    this.buildNextAffectedWireIndex();
     this._recomputeAllWires = true;
   }
 
+  buildNextAffectedWireIndex() {
+    const interp = this.interp;
+    this._nextAffectedWireStmts = new Set();
+    this._nextAffectedWireOrder = [];
+    if (!interp || !interp.wireStatements) return;
+
+    const producer = new Map();
+    for (const ws of interp.wireStatements) {
+      if (ws.assignment && ws.assignment.target && ws.assignment.target.var) {
+        producer.set(ws.assignment.target.var, ws);
+      } else if (ws.decls) {
+        for (const d of ws.decls) {
+          if (d.name && d.name !== '_') producer.set(d.name, ws);
+        }
+      }
+    }
+
+    const dependsOnNext = (expr) => {
+      if (!expr) return false;
+      return interp.exprDependsOnNextCycle(expr);
+    };
+
+    const affected = this._nextAffectedWireStmts;
+    for (const ws of interp.wireStatements) {
+      const expr = ws.assignment ? ws.assignment.expr : ws.expr;
+      if (dependsOnNext(expr)) affected.add(ws);
+    }
+
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const ws of interp.wireStatements) {
+        if (affected.has(ws)) continue;
+        const expr = ws.assignment ? ws.assignment.expr : ws.expr;
+        if (!expr) continue;
+        const inputs = new Set();
+        interp.collectWireInputsFromExpr(expr, inputs);
+        for (const w of inputs) {
+          const p = producer.get(w);
+          if (p && affected.has(p)) {
+            affected.add(ws);
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+
+    this._nextAffectedWireOrder = interp.wireStatements.filter((ws) => affected.has(ws));
+  }
+
   onNextCycle() {
-    this._recomputeAllWires = true;
+    this._recomputeNextAffectedWires = true;
+    if (this.interp && typeof this.interp.advanceRegTildeLatchesForWave === 'function') {
+      this.interp.advanceRegTildeLatchesForWave();
+    }
   }
 
   _scheduleWiresDependingOnComponent(compName, executedThisPropagate) {
@@ -241,13 +300,16 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
     super();
     this.deferWireWrites = true;
     this.deferShow = true;
+    this._recomputeNextAffectedWires = false;
+    this._nextAffectedWireStmts = new Set();
+    this._nextAffectedWireOrder = [];
   }
 
-  onNextCycle() {
+  initializeFromElaboration() {
+    this.buildWireDependentsIndex();
+    this.buildComponentDependentsIndex();
+    this.buildNextAffectedWireIndex();
     this._recomputeAllWires = true;
-    if (this.interp && typeof this.interp.advanceRegTildeLatchesForWave === 'function') {
-      this.interp.advanceRegTildeLatchesForWave();
-    }
   }
 
   propagate() {
@@ -264,6 +326,17 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
     if (this._recomputeAllWires) {
       this._recomputeAllWires = false;
       for (const ws of interp.wireStatements) {
+        const outputs = interp.execWireStatement(ws, true);
+        if (outputs && outputs.length) {
+          for (const [name, val] of outputs) {
+            this.scheduleWireChange(name, val);
+          }
+        }
+        executedThisPropagate.add(ws);
+      }
+    } else if (this._recomputeNextAffectedWires) {
+      this._recomputeNextAffectedWires = false;
+      for (const ws of this._nextAffectedWireOrder) {
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
           for (const [name, val] of outputs) {
@@ -1320,21 +1393,17 @@ Interpreter.prototype.exprDependsOnTilde = function(expr, visitedWires = new Set
   if(!expr || !Array.isArray(expr)) return false;
   
   for(const atom of expr){
-    // Direct reference to ~
     if(atom.var === '~'){
       return true;
     }
     
-    // Check if wire depends on ~
     if(atom.var && !atom.var.startsWith('.') && atom.var !== '~' && atom.var !== '%' && atom.var !== '$'){
-      // Avoid infinite recursion by tracking visited wires
       if(visitedWires.has(atom.var)){
-        return false; // Already checked this wire, assume it doesn't depend on ~ to avoid cycles
+        continue;
       }
       
       const wire = this.wires.get(atom.var);
       if(wire){
-        // Check wire's expression for ~ dependency
         const ws = this.wireStatements.find(ws => {
           if(ws.assignment) return ws.assignment.target.var === atom.var;
           if(ws.decls) return ws.decls.some(d => d.name === atom.var);
@@ -1353,19 +1422,64 @@ Interpreter.prototype.exprDependsOnTilde = function(expr, visitedWires = new Set
       }
     }
     
-    // Check nested expressions in function calls (like MUX)
-    if(atom.func && atom.args){
-      for(const arg of atom.args){
-        if(Array.isArray(arg)){
-          if(this.exprDependsOnTilde(arg, visitedWires)){
-            return true;
+    let nestedTilde = false;
+    this.forEachSubExprInAtom(atom, (sub) => {
+      if (!nestedTilde && this.exprDependsOnTilde(sub, visitedWires)) nestedTilde = true;
+    });
+    if (nestedTilde) return true;
+  }
+  
+  return false;
+};
+
+Interpreter.prototype.exprDependsOnPercent = function(expr, visitedWires = new Set()){
+  if(!expr || !Array.isArray(expr)) return false;
+  
+  for(const atom of expr){
+    if(atom.var === '%'){
+      return true;
+    }
+    
+    if(atom.var && !atom.var.startsWith('.') && atom.var !== '~' && atom.var !== '%' && atom.var !== '$'){
+      if(visitedWires.has(atom.var)){
+        continue;
+      }
+      
+      const wire = this.wires.get(atom.var);
+      if(wire){
+        const ws = this.wireStatements.find(ws => {
+          if(ws.assignment) return ws.assignment.target.var === atom.var;
+          if(ws.decls) return ws.decls.some(d => d.name === atom.var);
+          return false;
+        });
+        if(ws){
+          const wireExpr = ws.assignment ? ws.assignment.expr : ws.expr;
+          if(wireExpr){
+            visitedWires.add(atom.var);
+            if(this.exprDependsOnPercent(wireExpr, visitedWires)){
+              return true;
+            }
+            visitedWires.delete(atom.var);
           }
         }
       }
     }
+    
+    let nestedPercent = false;
+    this.forEachSubExprInAtom(atom, (sub) => {
+      if (!nestedPercent && this.exprDependsOnPercent(sub, visitedWires)) nestedPercent = true;
+    });
+    if (nestedPercent) return true;
   }
   
   return false;
+};
+
+Interpreter.prototype.exprDependsOnNextCycle = function(expr, visitedWires = new Set()) {
+  if (!expr || !Array.isArray(expr)) return false;
+  return this.exprDependsOnTilde(expr, visitedWires)
+    || this.exprDependsOnPercent(expr, visitedWires)
+    || this.exprDependsOnRandom(expr, visitedWires);
 };
 
 Interpreter.prototype.conditionalAssignmentDependsOnComponent = function(entry, compName, compRef) {
@@ -1452,21 +1566,17 @@ Interpreter.prototype.exprDependsOnRandom = function(expr, visitedWires = new Se
   if(!expr || !Array.isArray(expr)) return false;
   
   for(const atom of expr){
-    // Direct reference to $
     if(atom.var === '$'){
       return true;
     }
     
-    // Check if wire depends on $
     if(atom.var && !atom.var.startsWith('.') && atom.var !== '~' && atom.var !== '%' && atom.var !== '$'){
-      // Avoid infinite recursion by tracking visited wires
       if(visitedWires.has(atom.var)){
-        return false; // Already checked this wire, assume it doesn't depend on $ to avoid cycles
+        continue;
       }
       
       const wire = this.wires.get(atom.var);
       if(wire){
-        // Check wire's expression for $ dependency
         const ws = this.wireStatements.find(ws => {
           if(ws.assignment) return ws.assignment.target.var === atom.var;
           if(ws.decls) return ws.decls.some(d => d.name === atom.var);
@@ -1485,16 +1595,11 @@ Interpreter.prototype.exprDependsOnRandom = function(expr, visitedWires = new Se
       }
     }
     
-    // Check nested expressions in function calls (like MUX)
-    if(atom.func && atom.args){
-      for(const arg of atom.args){
-        if(Array.isArray(arg)){
-          if(this.exprDependsOnRandom(arg, visitedWires)){
-            return true;
-          }
-        }
-      }
-    }
+    let nestedRandom = false;
+    this.forEachSubExprInAtom(atom, (sub) => {
+      if (!nestedRandom && this.exprDependsOnRandom(sub, visitedWires)) nestedRandom = true;
+    });
+    if (nestedRandom) return true;
   }
   
   return false;

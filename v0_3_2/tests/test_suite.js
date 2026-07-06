@@ -18009,6 +18009,27 @@ on:1 {
   h.assert('size', session.getWire(interp, 'sz'), '0010');
 }, { propagation: 'wave' });
 
+reg(2102, 'wave-next', 'wire without ~ unchanged at NEXT wave', function(h, session) {
+  const { interp } = session.run(`
+1wire held = 0
+held = 1`);
+  h.assert('held before NEXT', session.getWire(interp, 'held'), '1');
+  session.execNext(interp, 1);
+  h.assert('held after NEXT', session.getWire(interp, 'held'), '1');
+}, { propagation: 'wave' });
+
+reg(2103, 'wave-next', 'REG(~) downstream updates at NEXT wave', function(h, session) {
+  const { interp } = session.run(`
+1wire data = 1
+1wire read = REG(data, ~, 0)
+1wire inv = NOT(read)`);
+  h.assert('read before', session.getWire(interp, 'read'), '0');
+  h.assert('inv before', session.getWire(interp, 'inv'), '1');
+  session.execNext(interp, 1);
+  h.assert('read latched', session.getWire(interp, 'read'), '1');
+  h.assert('inv after NEXT', session.getWire(interp, 'inv'), '0');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,
