@@ -35,14 +35,22 @@ function resolveLutArgValue(ctx, argExpr, lutInst) {
     const labelMap = lutInst.labelMap || {};
     if (labelMap[part.var]) return labelMap[part.var].bits;
   }
-  if (ctx && part.var) {
+  if (ctx) {
     const evaluated = ctx.evalExpr(argExpr, false);
+    const parts = Array.isArray(evaluated) ? evaluated : [evaluated];
     let value = '';
-    for (const p of evaluated) {
-      if (p.value && p.value !== '-') value += p.value;
-      else if (p.ref && p.ref !== '&-') {
+    for (const p of parts) {
+      if (!p) continue;
+      if (p.value && p.value !== '-') {
+        value += p.value;
+        break;
+      }
+      if (p.ref && p.ref !== '&-') {
         const v = ctx.getValueFromRef(p.ref);
-        if (v) value += v;
+        if (v) {
+          value += v;
+          break;
+        }
       }
     }
     return value;

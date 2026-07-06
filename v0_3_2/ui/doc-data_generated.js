@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -10629,9 +10629,204 @@ Subjective **teaching value** vs **estimated complexity** — for comparison onl
 - [Mini CPU demo](mini-cpu.md)
 - [Mini CPU feasibility plan](mini-cpu-plan.md)
 `,
+    'huffman-v2.md': `# Huffman v2 — runtime frequencies in wave mode
+
+End-to-end **wave** demo: measure symbol frequencies from a source wire, sort entries, encode with a **prefix-free** codebook, round-trip through \`.huffPacket\` / \`.huffRecover\`.
+
+No \`buildFrom\`, no \`HUFFMAN_*\` builtins — everything is plain logTscript (writable LUT, \`on:raise\`, counter, osc, \`SORT\`, optional \`popMin\` for N-general merge).
+
+For the static codebook + protocol walkthrough (v1), see **[huffman.md](huffman.md)**.
+
+---
+
+## Architecture (three phases)
+
+| Phase | What | Building blocks |
+|-------|------|-----------------|
+| **A — Scan** | Walk \`source\` in steps of \`keyWidth\`, count in \`.freq\` | \`comp [osc]\`, \`comp [counter]\`, \`on:raise\`, \`.freq:set\` + \`ADD\` |
+| **B — Codes** | Build \`.huff\` codebook (manual / MUX for 4 symbols, or merge with \`popMin\` for N) | writable LUT \`prefixFree\`, \`on:1\` one-shot |
+| **C — Packet** | Encode + decode | \`.huffPacket\`, \`.huffRecover\`, \`=:\` padding if needed |
+
+\`\`\`mermaid
+flowchart LR
+  subgraph A [Phase A scan]
+    Osc[osc tick]
+    Idx[counter += keyWidth]
+  Slice[symbol from source]
+    Freq[freq set ADD]
+    Osc --> Idx --> Slice --> Freq
+  end
+  subgraph B [Phase B codes]
+    Sort[SORT entries]
+    Huff[huff codebook]
+    Sort --> Huff
+  end
+  subgraph C [Phase C packet]
+    Enc[huffPacket]
+    Dec[huffRecover]
+    Enc --> Dec
+  end
+  A --> B --> C
+\`\`\`
+
+---
+
+## Phase A — Frequency LUT
+
+\`\`\`logts-play wave
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 16
+  fillwith: 00000000
+  data {
+  }
+  :
+\`\`\`
+
+\`fillwith: 00000000\` is required so the first \`set(sym, ADD(.freq:get(sym), 1))\` treats a missing key as count **0** (not a Huffman codeword).
+
+### Increment pattern (\`set\` + \`ADD\`, one \`on:raise\`)
+
+\`\`\`logts
+on:raise {
+  AND(.clk:get, NOT(atEnd)),
+  ok = .freq:set(sym, ADD(.freq:get(sym), 00000001))
+}
+\`\`\`
+
+### Osc + counter scan (4 nibbles, \`keyWidth = 4\`)
+
+Use **\`write = 1\`** on the counter so \`data = ADD(.idx:get, 4)\` loads the new index (not \`dir\` increment-by-1).
+
+Advance the counter on the **falling** edge (\`set = NOT(.clk:get)\`) with \`comp [counter] … on: raise\` so \`on:raise\` still sees the current index when the clock rises.
+
+Re-read \`.freq:get\` wires after osc ticks — top-level \`8wire f10 = .freq:get(sym)\` can go **stale** in wave mode.
+
+Index \`i\` on each rising edge: \`0\`, \`4\`, \`8\`, \`12\`. Use **one \`on:raise\` per index** so the symbol is read before the counter advances:
+
+\`\`\`logts
+MODE WIREWRITE
+16wire source = 0010 + 0010 + 0010 + 0011
+comp [osc] .clk:
+  freq: 10
+  :
+comp [counter] .idx:
+  depth: 8
+  on: raise
+  :
+.idx:{
+  data = ADD(.idx:get, 00000100)
+  write = 1
+  set = NOT(.clk:get)
+}
+on:raise { AND(.clk:get, EQ(.idx:get, 00000000)), ok = .freq:set(0010, ADD(.freq:get(0010), 00000001)) }
+on:raise { AND(.clk:get, EQ(.idx:get, 00000100)), ok = .freq:set(0010, ADD(.freq:get(0010), 00000001)) }
+on:raise { AND(.clk:get, EQ(.idx:get, 00001000)), ok = .freq:set(0010, ADD(.freq:get(0010), 00000001)) }
+on:raise { AND(.clk:get, EQ(.idx:get, 00001100)), ok = .freq:set(0011, ADD(.freq:get(0011), 00000001)) }
+\`\`\`
+
+Simulate ticks in tests with \`session.setComp(interp, '.clk', '1')\` then \`'0'\` (see test **2109**).
+
+**Note:** \`4wire sym = source.(pos)/4\` as a top-level wire can go **stale** across osc ticks; evaluate the slice inside \`on:raise\` or use fixed \`EQ(.idx:get, …)\` branches as above.
+
+---
+
+## Phase B — Sort + codebook
+
+After scan:
+
+\`\`\`logts
+8wire[n,2] sorted = SORT(.freq:entries(); col=1)
+4wire[n] syms = sorted::0
+8wire[n] cnts = sorted::1
+\`\`\`
+
+For a **fixed 4-symbol** demo, assign codewords in script (matches [huffman.md](huffman.md) table):
+
+\`\`\`logts
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+\`\`\`
+
+For **N-general** merge, use \`.heap:popMin()\` + \`:add\` on osc (see [lut.md — min/max](lut.md)); no dedicated priority-queue component required.
+
+---
+
+## Phase C — Packet round-trip
+
+Same protocols as v1:
+
+\`\`\`logts-play wave
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 2b)
+  :
+4wire source = 0001
+11wire packet = .huffPacket { tokens = source }
+4wire recovered = .huffRecover { data = packet }
+show(source)
+show(packet)
+show(recovered)
+\`\`\`
+
+Padded wire (\`=:\`) when the packet is shorter than the declared width — see [huffman.md — padded packet](huffman.md#runnable--longer-input-padded-packet-).
+
+---
+
+## Wave / NEXT notes
+
+- Use **\`on:1 { once, … }\`** or **\`on:raise\`** for one-shot LUT mutations; bare \`1wire _ = .lut:add(...)\` at top level can run twice on first Run in wave.
+- **\`NEXT(~)\`** in wave only recomputes wires in the \`~\` / \`%\` / \`$\` closure — stateful counters and \`.freq\` entries persist between steps ([signal-propagation.md](signal-propagation.md)).
+
+---
+
+## Related
+
+- [huffman.md](huffman.md) — static codebook + protocols (v1)
+- [lut.md](lut.md) — writable LUT, \`:entries\`, \`SORT\`, \`popMin\`
+- [conditional-assignment.md](conditional-assignment.md) — \`on:raise\`, \`on:1\`
+- [builtin-SORT.md](builtin-SORT.md) — \`SORT(matrix; col=1)\`
+- [signal-propagation.md](signal-propagation.md) — wave + NEXT
+
+---
+
+## Gaps (N-general, backlog)
+
+| Need | Status |
+|------|--------|
+| \`SORT\` + \`:entries\` | **Done** (Faza 0b) |
+| \`popMin\` on LUT heap | **Done** (Faza 0d) |
+| Automatic code assignment from tree | Script / finite osc steps |
+| \`comp [priorityqueue]\` | Backlog — redundant with \`popMin\` |
+| \`ARGSORT\` | Backlog |
+`,
     'huffman.md': `# Huffman coding walkthrough
 
-End-to-end example that ties together three v0_3_2 features:
+End-to-end example that ties together three v0_3_2 features. For **runtime frequency scan + wave** (v2), see **[huffman-v2.md](huffman-v2.md)**.
 
 | Piece | Inline type | Role |
 |-------|-------------|------|
@@ -13368,20 +13563,21 @@ inline [lut] .heap:
 1wire once = 1
 4wire k1 = 0000
 4wire f1 = 0000
-4wire k2 = 0000
-4wire f2 = 0000
 on:1 {
   once,
   k1, f1 = .heap:popMin()
 }
-4wire parent = 0110
-1wire _ = .heap:add(parent, ADD(f1, f2))
+4wire sz = .heap:size()
 show(k1)
 show(f1)
-show(parent)
+show(sz)
 \`\`\`
 
+After Run: \`k1=0010\`, \`f1=0001\` (min entry removed), \`sz=0010\` (2 entries left). For a full Huffman merge, chain additional \`on:\` blocks or oscillators for the second \`popMin\` and \`:add\` of the parent node.
+
 For Huffman **N-general**: repeated \`popMin\` on a \`.nodes\` LUT replaces a dedicated priority-queue component. Pair with \`:add\` for merged parent nodes; use a separate LUT (e.g. \`.links\`) for parent/child bookkeeping.
+
+Dual assign in \`on:1 { trigger, k, v = .lut:popMin() }\` is supported (same as top-level \`k, v = …\` or \`4wire k, 4wire v = …\`).
 
 ### Indexed access (\`:keyAt\`, \`:valueAt\`)
 
@@ -19662,7 +19858,7 @@ This document explains **what you see** when values spread through your circuit.
 | Event | What happens |
 |-------|----------------|
 | **RUN** | All wire assignments are evaluated. Displays (\`show\`) reflect the final settled values. |
-| **NEXT(~)** | Wires that depend on \`~\`, \`%\`, or \`$\` are recomputed. Registers with \`REG(..., ~, ...)\` latch on \`NEXT\`. |
+| **NEXT(~)** | Wires that depend on \`~\`, \`%\`, or \`$\` (and their downstream dependents) are recomputed. Registers with \`REG(..., ~, ...)\` latch on \`NEXT\`. Other wires keep their current values. |
 | **UI interaction** | Toggling a switch, pressing a key, changing a DIP, or an oscillator tick updates connected wires. |
 | **Wire assignment in code** | Changing a wire (e.g. \`data = 1\`) updates everything downstream in the same step. |
 
@@ -19706,6 +19902,18 @@ show(a, b)
 \`\`\`
 
 After **RUN**, \`a\` is \`0\` and \`b\` is \`1\`. When you flip the switch in the panel, \`a\` becomes \`1\` and \`b\` becomes \`0\` without running the script again.
+
+### \`NEXT(~)\` in Wave — partial cascade (like \`osc\`)
+
+In **Wave**, \`NEXT(~)\` does **not** re-run every wire assignment from scratch (unlike the first **RUN**). Only wires in the **closure** of \`~\`, \`%\`, and \`$\` are recomputed, then dependents settle through the normal wave loop — similar to how an **osc** tick schedules only connected logic.
+
+| Wire | After \`NEXT(~)\` in Wave |
+|------|-------------------------|
+| \`4wire x = 0000\` then \`x = 0011\` (no \`~\`) | Stays \`0011\` |
+| \`1wire q = REG(data, ~, 0)\` | Latches \`data\` on NEXT |
+| \`1wire y = NOT(q)\` | Updates when \`q\` changes |
+
+**Legacy** still re-evaluates wire statements in program order inside \`NEXT\` (unchanged). Use **wave** for multi-step demos (Huffman scan, counters + \`on:raise\`) where state must persist between NEXT steps.
 
 ### MODE ZSTATE — multi-driver commit
 
@@ -19806,7 +20014,7 @@ See chip tests **540–543** (legacy) and **556–557** (wave) in the test runne
 |-------|---------------|--------|
 | Default in editor | Yes | No |
 | Wire + component updates | Settle together, then refresh UI | Update as each step runs |
-| \`REG(..., ~, ...)\` + \`NEXT\` | Same as Legacy | Reference |
+| \`REG(..., ~, ...)\` + \`NEXT\` | Partial cascade (\`~\` closure) | Full re-eval in program order |
 | \`REG(data, clk, clr)\` wire clock | Falling edge (\`clk\` 1→0); same semantics | Same |
 | \`show\` | After settle | After each top-level step |
 | \`probe\` | On every commit (elaboration registry) | On every commit |

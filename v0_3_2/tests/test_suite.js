@@ -18030,6 +18030,123 @@ reg(2103, 'wave-next', 'REG(~) downstream updates at NEXT wave', function(h, ses
   h.assert('inv after NEXT', session.getWire(interp, 'inv'), '0');
 }, { propagation: 'wave' });
 
+const HUFF_FREQ_LUT = `inline [lut] .freq:
+  writable
+  depth: 8
+  length: 16
+  fillwith: 00000000
+  data {
+  }
+  :`;
+
+const HUFF_WAVE_PACKET = INLINE_HUFF + `
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 2b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 2b)
+  :`;
+
+function oscPulse(session, interp, compName) {
+  session.setComp(interp, compName, '0');
+  session.setComp(interp, compName, '1');
+  session.setComp(interp, compName, '0');
+}
+
+reg(2104, 'huffman-wave', 'freq set+ADD populate counts legacy', function(h, session) {
+  const src = HUFF_FREQ_LUT + `
+1wire _ = .freq:set(0010, \\1;8)
+1wire _ = .freq:set(0010, ADD(.freq:get(0010), \\1;8))
+1wire _ = .freq:set(0010, ADD(.freq:get(0010), \\1;8))
+1wire _ = .freq:set(0011, \\1;8)
+8wire f10 = .freq:get(0010)
+8wire f11 = .freq:get(0011)
+4wire sz = .freq:size()`;
+  const { interp } = session.run(src);
+  h.assert('f10', session.getWire(interp, 'f10'), '00000011');
+  h.assert('f11', session.getWire(interp, 'f11'), '00000001');
+  h.assert('size', session.getWire(interp, 'sz'), '0010');
+});
+
+reg(2105, 'huffman-wave', 'SORT freq entries by count wave', function(h, session) {
+  const src = HUFF_FREQ_LUT + `
+1wire _ = .freq:set(0010, \\3;8)
+1wire _ = .freq:set(0011, \\1;8)
+1wire _ = .freq:set(0000, \\2;8)
+8wire[3,2] e = .freq:entries()
+8wire[3,2] sorted = SORT(e; col=1)
+8wire[3] syms = sorted::0
+8wire[3] cnts = sorted::1`;
+  const { interp } = session.run(src);
+  h.assert('sym order', session.getWire(interp, 'syms'), '000000110000000000000010');
+  h.assert('cnt order', session.getWire(interp, 'cnts'), '000000010000001000000011');
+}, { propagation: 'wave' });
+
+reg(2106, 'huffman-wave', 'round-trip source packet recover wave', function(h, session) {
+  const src = HUFF_WAVE_PACKET + `
+4wire source = 0001
+11wire packet = .huffPacket { tokens = source }
+4wire recovered = .huffRecover { data = packet }`;
+  const { interp } = session.run(src);
+  h.assert('packet', session.getWire(interp, 'packet'), '00000011010');
+  h.assert('recovered', session.getWire(interp, 'recovered'), '0001');
+}, { propagation: 'wave' });
+
+reg(2107, 'huffman-wave', 'round-trip 8bit four tokens wave', function(h, session) {
+  const src = HUFF_WAVE_PACKET + `
+8wire source = 00011011
+17wire packet = .huffPacket { tokens = source }
+8wire recovered = .huffRecover { data = packet }`;
+  const { interp } = session.run(src);
+  h.assert('recovered', session.getWire(interp, 'recovered'), '00011011');
+}, { propagation: 'wave' });
+
+reg(2108, 'huffman-wave', 'packet =: padding recover wave', function(h, session) {
+  const src = HUFF_WAVE_PACKET + `
+8wire source = 00011011
+24wire packet =: .huffPacket { tokens = source }
+8wire recovered = .huffRecover { data = packet }`;
+  const { interp } = session.run(src);
+  h.assert('packet width', String(session.getWire(interp, 'packet').length), '24');
+  h.assert('recovered', session.getWire(interp, 'recovered'), '00011011');
+}, { propagation: 'wave' });
+
+reg(2109, 'huffman-wave', 'osc scan freq via counter idx wave', function(h, session) {
+  const src = `MODE WIREWRITE
+` + HUFF_FREQ_LUT + `
+16wire source = 0010 + 0010 + 0010 + 0011
+comp [osc] .clk:
+  freq: 10
+  :
+comp [counter] .idx:
+  depth: 8
+  on: raise
+  :
+.idx:{
+  data = ADD(.idx:get, 00000100)
+  write = 1
+  set = NOT(.clk:get)
+}
+1wire ok = 0
+on:raise { AND(.clk:get, EQ(.idx:get, 00000000)), ok = .freq:set(0010, ADD(.freq:get(0010), \\1;8)) }
+on:raise { AND(.clk:get, EQ(.idx:get, 00000100)), ok = .freq:set(0010, ADD(.freq:get(0010), \\1;8)) }
+on:raise { AND(.clk:get, EQ(.idx:get, 00001000)), ok = .freq:set(0010, ADD(.freq:get(0010), \\1;8)) }
+on:raise { AND(.clk:get, EQ(.idx:get, 00001100)), ok = .freq:set(0011, ADD(.freq:get(0011), \\1;8)) }
+8wire f10 = .freq:get(0010)
+8wire f11 = .freq:get(0011)`;
+  const { interp } = session.run(src);
+  for (let i = 0; i < 4; i++) oscPulse(session, interp, '.clk');
+  session.execStmts(interp, `8wire f10 = .freq:get(0010)
+8wire f11 = .freq:get(0011)`);
+  h.assert('f10', session.getWire(interp, 'f10'), '00000011');
+  h.assert('f11', session.getWire(interp, 'f11'), '00000001');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

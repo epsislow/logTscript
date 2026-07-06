@@ -122,6 +122,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-TRIU.md', label: 'TRIU (upper triangle)' },
       { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)' },
       { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)' },
+      { file: 'huffman-v2.md', label: 'Huffman v2 — runtime frequencies in wave mode' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
       { file: 'slider.md', label: 'Slider component' }

@@ -1,6 +1,6 @@
 # Huffman coding walkthrough
 
-End-to-end example that ties together three v0_3_2 features:
+End-to-end example that ties together three v0_3_2 features. For **runtime frequency scan + wave** (v2), see **[huffman-v2.md](huffman-v2.md)**.
 
 | Piece | Inline type | Role |
 |-------|-------------|------|
