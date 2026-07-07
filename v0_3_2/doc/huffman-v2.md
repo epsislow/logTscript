@@ -652,7 +652,7 @@ show(recovered; ascii)
 |--------|---------------|---------|
 | `cnts` | `0000000100000011` | Sorted counts: `11` → 1, `10` → 3 (16 bits = 2×`8wire`) |
 | `source` | `"Hello World!"` + pad glyphs | 12 ASCII chars (96 bits) right-padded in `300wire` |
-| `packet` | short gibberish + pad | Huffman bitstream shown as ASCII (`□` / `.` for non-printable bytes) |
+| `packet` | short gibberish + pad | Huffman bitstream shown as ASCII (`◦` / `·` for non-printable bytes) |
 | `recovered` | same as `source` | Round-trip OK — padding after the string is ignored by `withLength` |
 
 `'Hello World!'` is **12×8 = 96 bits**; `expand(…, 2b)` walks that bit stream in **2-bit token** steps. Pick `300wire` / `250wire` wide enough for experimentation; `=:` fills the rest with `0` bits.

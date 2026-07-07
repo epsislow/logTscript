@@ -16188,7 +16188,7 @@ reg(1927, 'show-tags', 'show(8wire; ascii) — printable char', function(h, sess
 
 reg(1928, 'show-tags', 'show(8wire; ascii) — NUL placeholder', function(h, session) {
   const { out } = session.run('8wire nul := 00000000\nshow(nul; ascii)');
-  h.assert('nul square', String(out.some(l => /nul \(8wire\) = "\u25A1"/.test(l))), 'true');
+  h.assert('nul glyph', String(out.some(l => /nul \(8wire\) = "\u25E6"/.test(l))), 'true');
 });
 
 reg(1929, 'show-tags', 'show(40wire; ascii) — LF glyph quoted', function(h, session) {
@@ -16197,9 +16197,9 @@ reg(1929, 'show-tags', 'show(40wire; ascii) — LF glyph quoted', function(h, se
   h.assert('lf glyph', String(out.some(l => /line \(40wire\) = "Hi\u21B5Ho"/.test(l))), 'true');
 });
 
-reg(1930, 'show-tags', 'show(8wire; ascii) — TAB as dot', function(h, session) {
+reg(1930, 'show-tags', 'show(8wire; ascii) — TAB as middle dot', function(h, session) {
   const { out } = session.run('8wire tab := 00001001\nshow(tab; ascii)');
-  h.assert('tab dot', String(out.some(l => /tab \(8wire\) = "\."/.test(l))), 'true');
+  h.assert('tab mid dot', String(out.some(l => /tab \(8wire\) = "\u00B7"/.test(l))), 'true');
 });
 
 reg(1931, 'show-tags', 'show(40wire; ascii) — multi-byte quoted string', function(h, session) {
@@ -16213,7 +16213,7 @@ reg(1932, 'show-tags', 'show(vec; ascii) — per-element quoted', function(h, se
     '8wire[2] vec = 01000001 + 00000000\nshow(vec; ascii)'
   );
   h.assert(':0 A', String(out.some(l => /:0 = "A"/.test(l))), 'true');
-  h.assert(':1 nul', String(out.some(l => /:1 = "\u25A1"/.test(l))), 'true');
+  h.assert(':1 nul', String(out.some(l => /:1 = "\u25E6"/.test(l))), 'true');
 });
 
 reg(1933, 'show-tags', 'probe(v; ascii) — flat quoted blob', function(h, session) {

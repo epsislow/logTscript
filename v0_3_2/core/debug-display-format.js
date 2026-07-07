@@ -225,18 +225,19 @@
     return parts.join(' ');
   }
 
-  const ASCII_NUL = '\u25A1';
+  const ASCII_NUL = '\u25E6';
+  const ASCII_NONPRINT = '\u00B7';
   const ASCII_LF = '\u21B5';
 
   function byteBinToAsciiGlyph(byteBin) {
-    if (byteBin.length !== 8) return '.';
-    if (hasLogicXZ(byteBin)) return '.';
+    if (byteBin.length !== 8) return ASCII_NONPRINT;
+    if (hasLogicXZ(byteBin)) return ASCII_NONPRINT;
     const val = parseInt(byteBin, 2);
-    if (Number.isNaN(val)) return '.';
+    if (Number.isNaN(val)) return ASCII_NONPRINT;
     if (val === 0) return ASCII_NUL;
     if (val === 0x0A) return ASCII_LF;
     if (val >= 32 && val <= 126) return String.fromCharCode(val);
-    return '.';
+    return ASCII_NONPRINT;
   }
 
   function formatAsciiQuotedChars(bits, bitWidth, isElement) {
@@ -253,14 +254,14 @@
     for (let i = 0; i < fullBytes * 8; i += 8) {
       chars += byteBinToAsciiGlyph(bits.substring(i, i + 8));
     }
-    if (w % 8 !== 0) chars += '.';
+    if (w % 8 !== 0) chars += ASCII_NONPRINT;
     return '"' + chars + '"';
   }
 
   function formatAsciiDisplay(binStr, bitWidth, isElement) {
     const w = bitWidth || String(binStr).length;
     if (hasLogicXZ(binStr) && w <= 8 && isElement) {
-      return '"."';
+      return '"' + ASCII_NONPRINT + '"';
     }
     const bits = normalizeBits(binStr, w);
     return formatAsciiQuotedChars(bits, w, !!isElement);

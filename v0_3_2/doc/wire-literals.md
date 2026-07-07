@@ -259,7 +259,7 @@ Two related features:
 |--|----------------------|----------------------|
 | **Where** | Source code / assignment | Debug output only |
 | **Effect** | Builds bits in the circuit | Formats existing bits as `"Hello"` |
-| **NUL / control** | Real bytes in the wire | Display glyphs: `□` `↵` `.` (see [debug.md](debug.md)) |
+| **NUL / control** | Real bytes in the wire | Display glyphs: `◦` `↵` `·` (see [debug.md](debug.md)) |
 
 Example — same bytes, source vs display:
 
