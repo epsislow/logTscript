@@ -944,6 +944,8 @@ show(packet)
 
 Decode = **protocol separat** with `mode: parse` — **not** `:decode()` on the encoder.
 
+Explicație detaliată (`stream` vs `data`, cursor, exemplu runnable): [protocol.md — Complex example `.huffRecoverSC`](protocol.md#complex-example--huffman-self-contained-recover-huffrecoversc).
+
 ```logts
 inline [protocol] .huffRecoverSC:
   mode: parse

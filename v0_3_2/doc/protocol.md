@@ -144,10 +144,17 @@ inline [protocol] .spi:
 | Attribute | Values |
 |-----------|--------|
 | `clockType` | `lowFirst`, `highFirst` |
+| `mode` | `assemble` (default), `parse` |
+| `parseResult` | `all` (default), `collapseOnly` — **parse mode only** |
+| `codebookLoad` | inline LUT name (e.g. `.huff`) — **parse mode only** |
 
 `clockType: lowFirst` → `01010101…`
 
 `clockType: highFirst` → `10101010…`
+
+`mode: parse` — read from invoke param `data` / `stream` instead of assembling from params. See [`mode: parse`](#mode-parse--sequential-field-extraction).
+
+`parseResult` and `codebookLoad` are documented in detail under [Parse-only attributes](#parse-only-attributes).
 
 ---
 
@@ -710,6 +717,193 @@ Magic `'H'` (`01001000`) verified; output = **`keyWidth` + `nSym`** → `0000100
 | `parse: expected literal '...' but received '...'` | Magic or fixed field mismatch |
 | `parse: need N bits but only M remain` | Truncated input |
 | `Parse protocol requires 'data' parameter` | Missing invoke argument |
+
+### `stream` vs `data` — the parse cursor
+
+In **`mode: parse`**, you do **not** declare a `stream` wire in your script. At invoke time:
+
+```logts
+32wire recovered = .myParseProto { data = packet }
+```
+
+the engine wraps `packet` in an internal **ParseStream** (a read cursor over the bitstring). Each segment in `out:` runs **in order** and advances that cursor.
+
+| Name | Where | Meaning |
+|------|-------|---------|
+| **`data`** | Invoke argument `{ data = packet }` | The **full input bitstring** (the whole packet). Alias: `{ stream = packet }` — same thing at invoke. |
+| **`stream`** | Inside protocol segments (`withLength(stream, 16b, entry)`) | **Reserved keyword** — “read from the **current cursor**”, not a script parameter. |
+| **`data`** | Inside some segments (`validateChecksum(crc16, data)`) | The **full invoke argument** again — used when a check needs the entire packet, not just unread tail. |
+
+Think of it like a file pointer:
+
+```text
+data = packet (123 bit)                    cursor →
+[···························································································]
+ ↑ pos=0
+
+out: 01001000           → verify 8 bit,           pos += 8
+     keyWidth 8b        → read 8 bit,             pos += 8
+     nSym 8b            → read 8 bit,             pos += 8
+     codebook           → withLength(stream, 16b, entry): read 16b len + body, pos += 16+53
+     validateChecksum(crc16, data)  → CRC over **whole** packet (ignores cursor)
+     collapse(withLength(stream, 8b), …) → read payload len + bits from cursor, decode
+```
+
+**`withLength(stream, Nb, def)`** — from the cursor: read `Nb`-bit length, fork a sub-stream of that many bits, parse `def` repeatedly until the sub-stream is exhausted (used for codebooks).
+
+**`withLength(rest, field b)`** — from the cursor: read exactly as many bits as the **already-parsed field** `field` says (used for variable-length codewords).
+
+Segments such as `keyWidth 8b` also read from the cursor — you never pass `keyWidth` at invoke; it is **extracted** from the wire.
+
+### Parse-only attributes
+
+Used with **`mode: parse`** on the protocol block (before `out:`).
+
+#### `parseResult: all | collapseOnly`
+
+Controls **what bits** the protocol invoke returns as its output wire. Parsing still runs in full (literals verified, fields read, checksum checked); only the **returned blob** is filtered.
+
+| Value | Default | Output wire contains |
+|-------|---------|----------------------|
+| `all` | yes | Concatenation of every segment that produces bits: parsed fields (`keyWidth 8b`, …), `withLength`/`def` regions, **`collapse`** result, etc. Literals and `validateChecksum` contribute nothing. |
+| `collapseOnly` | no | Only bits from **`collapse(...)`** segments. Header, codebook body, CRC verification — parsed/consumed but **not** included in the returned wire. |
+
+Use **`collapseOnly`** for recover/decode protocols where the caller wants the **decoded payload only** (e.g. Huffman tokens), not a dump of every parsed field.
+
+Default without attribute = `all`.
+
+#### `codebookLoad: .lut`
+
+Side-effect during parse: before reading the stream, **clear** the named writable inline LUT, then on each `withLength(..., def)` codebook entry call **`.lut:add(sym, codeword)`** (via internal `onParseEntry`). Enables recover without a pre-filled codebook — the packet carries its own LUT.
+
+Requires a **writable** inline LUT (`writable` attribute). See [huffman-v2.md — `.huffRecoverSC`](huffman-v2.md#recover--huffrecoversc-faza-3).
+
+#### Runnable — `parseResult: all` vs `collapseOnly`
+
+**`all` (default)** — output = bits from parsed fields (`keyWidth`, `nSym`, …):
+
+```logts-play
+inline [protocol] .parseHdr:
+  mode: parse
+  out:
+    01001000
+    keyWidth 8b
+    nSym 8b
+  :
+
+16wire fields = .parseHdr { data = 010010000000100000000011 }
+show(fields)
+```
+
+→ `fields` = `0000100000000011` (8 + 8 bit, fără magic).
+
+**`collapseOnly`** — același parse, dar wire-ul returnat conține **doar** rezultatul segmentelor `collapse(...)`. Header, codebook, `validateChecksum` rulează, dar nu apar în output. Exemplu complet: [`.huffRecoverSC`](huffman-v2.md#recover--huffrecoversc-faza-3) — `32wire recovered` = tokenii decodați (`aacb`), nu cei 123 bit ai packetului.
+
+Dacă protocolul parse **nu** are niciun `collapse`, `collapseOnly` produce un wire **gol** (0 bit).
+
+### Complex example — Huffman self-contained recover (`.huffRecoverSC`)
+
+Full **parse** protocol from [huffman-v2.md — Packet SC](huffman-v2.md#packet-self-contained-sc). Combines: parse cursor, `def`/`withLength`, dynamic `keyWidth b`, `codebookLoad`, `validateChecksum`, `collapse`, `parseResult: collapseOnly`.
+
+#### Protocol definition
+
+```logts
+inline [lut] .huff:
+  writable
+  prefixFree
+  variableDepth
+  length: 256
+  data { }
+  :
+
+inline [protocol] .huffRecoverSC:
+  mode: parse
+  codebookLoad: .huff
+  parseResult: collapseOnly
+  def entry:
+    sym 8b
+    cwLen 8b
+    withLength(rest, cwLen b)
+  def codebook:
+    withLength(stream, 16b, entry)
+  out:
+    01001000
+    keyWidth 8b
+    nSym 8b
+    codebook
+    validateChecksum(crc16, data)
+    collapse(withLength(stream, 8b), .huff, keyWidth b)
+  :
+```
+
+#### Wire layout consumed by the cursor (`'aacb'` packet, 123 bit)
+
+```text
+┌─ header 24b ─┬ cbLen 16b ┬── codebook body 53b ──┬─ payload 14b ─┬ crc 16b ┐
+│ H │ kw │ nSym │ len=53 │ sym|cwLen|cw × nSym   │ len │ Huff bits │ CRC   │
+└──────────────┴────────┴─────────────────────────┴─────┴───────────┴───────┘
+  literal+fields   ↑ withLength(stream,16b,entry)   ↑ collapse(withLength(stream,8b))
+                     codebookLoad → .huff:add       decode tokens only (output)
+```
+
+**Codebook entry format** (defined by `def entry`, not guessed by the engine):
+
+| Field on wire | Width | Role |
+|---------------|-------|------|
+| `sym` | 8b | LUT key (ASCII byte) |
+| `cwLen` | 8b | Codeword length in bits |
+| `rest` | `cwLen` b | Huffman codeword value |
+
+`codebookLoad: .huff` calls `.huff:add(sym, rest)` after each parsed entry. `nSym` from the header is checked against the entry count.
+
+#### Runnable — recover without preset codebook
+
+Packet is **self-contained** — no `.huff:add` before invoke. LUT is rebuilt during parse.
+
+```logts-play legacy
+inline [lut] .huff:
+  writable
+  prefixFree
+  variableDepth
+  length: 256
+  data { }
+  :
+
+inline [protocol] .huffRecoverSC:
+  mode: parse
+  codebookLoad: .huff
+  parseResult: collapseOnly
+  def entry:
+    sym 8b
+    cwLen 8b
+    withLength(rest, cwLen b)
+  def codebook:
+    withLength(stream, 16b, entry)
+  out:
+    01001000
+    keyWidth 8b
+    nSym 8b
+    codebook
+    validateChecksum(crc16, data)
+    collapse(withLength(stream, 8b), .huff, keyWidth b)
+  :
+
+123wire packet = ^4808 0300 3561 0131 014C 6058 31C4 63 + 111
+32wire recovered = .huffRecoverSC { data = packet }
+8wire huffSz = .huff:size()
+peek(recovered; ascii)
+peek(huffSz)
+```
+
+→ `recovered` = `"aacb"`, `huffSz` = `3` (LUT rebuilt from embedded codebook). Encode side and round-trip: [huffman-v2.md](huffman-v2.md#runnable--round-trip-sc-aacb).
+
+| Segment | Cursor / `data` | Effect |
+|---------|---------------|--------|
+| `01001000` | cursor | Verify magic `'H'` |
+| `keyWidth 8b`, `nSym 8b` | cursor | Read header fields; `keyWidth` used later by `collapse` |
+| `codebook` | cursor | Frame + entries; **`codebookLoad`** fills `.huff` |
+| `validateChecksum(crc16, data)` | **full `data`** | CRC over body (123−16 bit), not tail-only |
+| `collapse(withLength(stream, 8b), …)` | cursor | Read payload; output wire = decoded tokens only (`parseResult: collapseOnly`) |
 
 ---
 
