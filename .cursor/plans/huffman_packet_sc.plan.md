@@ -4,16 +4,16 @@ overview: Extinderi protocol (Faza 0a–0d) apoi packet self-contained Huffman v
 todos:
   - id: faza-0a-withLength
     content: "Faza 0a: withLength extins — parse cursor, width din câmp, withLength(data,Nb,def)"
-    status: pending
+    status: completed
   - id: faza-0b-codebook-len
     content: "Faza 0b: cadru lengthOf(codebook) 16b + codebookBody în layout SC"
-    status: pending
+    status: completed
   - id: faza-0c-keywidth
     content: "Faza 0c: expand/collapse cu keyWidth parametru (keyWidth b)"
-    status: pending
+    status: completed
   - id: faza-0d-checksum
     content: "Faza 0d: checksum() encode + validateChecksum() în protocol recover separat (sau amânăm validarea)"
-    status: pending
+    status: completed
   - id: huff-faza-1-doc
     content: Secțiune Packet SC în huffman-v2.md + backlog protocol.md (Faza 0a–0d)
     status: pending

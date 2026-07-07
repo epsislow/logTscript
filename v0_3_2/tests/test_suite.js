@@ -6028,6 +6028,48 @@ reg(923, 'protocol', 'repeat 1 — 1111', function(h, session) {
   h.assert('repeat1', session.getWire(interp, 'out'), '1111');
 });
 
+reg(2139, 'protocol-ext', 'repeat(0101, 8b) — pattern literal tiled', function(h, session) {
+  const src = `inline [protocol] .repPat:
+  out:
+    repeat(0101, 8b)
+  :
+8wire out = .repPat { }`;
+  const { interp } = session.run(src);
+  h.assert('tiled', session.getWire(interp, 'out'), '01010101');
+});
+
+reg(2140, 'protocol-ext', 'repeat(sync 4b, 16b) — param pattern tiled', function(h, session) {
+  const src = `inline [protocol] .repSync:
+  out:
+    repeat(sync 4b, 16b)
+  :
+16wire out = .repSync { sync = 1010 }`;
+  const { interp } = session.run(src);
+  h.assert('param tiled', session.getWire(interp, 'out'), '1010101010101010');
+});
+
+reg(2141, 'protocol-ext', 'repeat(01, 8b) — 2-bit pattern tiled', function(h, session) {
+  const src = `inline [protocol] .repDec:
+  out:
+    repeat(01, 8b)
+  :
+8wire tx = .repDec { }`;
+  const { interp } = session.run(src);
+  h.assert('encoded', session.getWire(interp, 'tx'), '01010101');
+  session.execStmts(interp, 'show(.repDec:decode(tx))');
+  h.assert('decode ok', String(!session.outIncludes(interp, 'Protocol decode failed')), 'true');
+});
+
+reg(2142, 'protocol-ext', 'repeat(010, 8b) — width not multiple throws', function(h, session) {
+  const src = `inline [protocol] .repBad:
+  out:
+    repeat(010, 8b)
+  :
+8wire out = .repBad { }`;
+  const { interp } = session.run(src);
+  h.assert('repeat error', String(session.outIncludes(interp, 'not a multiple of pattern length')), 'true');
+});
+
 reg(924, 'protocol', 'UART 8N1 — reverse + start/stop', function(h, session) {
   const { interp } = session.run(INLINE_UART8N1 + '\n10wire tx = .uart8n1 { data = ^41 }');
   h.assert('uart8n1', session.getWire(interp, 'tx'), '0100000101');
@@ -8106,6 +8148,149 @@ reg(1089, 'protocol-ext', 'doc(inline.protocol) — generatoare noi', function(h
 reg(1090, 'protocol-ext', 'regresie :decode UART (945) — neschimbat', function(h, session) {
   const { interp } = session.run(INLINE_UART8N1 + '\n8wire data = .uart8n1:decode(0100000101)');
   h.assert('data', session.getWire(interp, 'data'), '01000001');
+});
+
+// --- Faza 0a: mode parse + withLength extins ---
+
+const INLINE_PARSE_HDR = `inline [protocol] .parseHdr:
+  mode: parse
+  out:
+    01001000
+    keyWidth 8b
+    nSym 8b
+  :`;
+
+reg(2129, 'protocol-ext', 'Faza 0a — mode parse header magic keyWidth nSym', function(h, session) {
+  const pkt = '01001000' + '00001000' + '00000011';
+  const src = INLINE_PARSE_HDR + `
+16wire out = .parseHdr { data = ${pkt} }`;
+  const { interp } = session.run(src);
+  h.assert('parsed fields', session.getWire(interp, 'out'), '0000100000000011');
+});
+
+const INLINE_PARSE_ENTRY = `inline [protocol] .parseEntry:
+  mode: parse
+  def entry:
+    sym 8b
+    cwLen 8b
+    withLength(rest, cwLen b)
+  out:
+    withLength(data, 16b, entry)
+  :`;
+
+reg(2130, 'protocol-ext', 'Faza 0a — withLength(data,16b,entry) + cwLen field width', function(h, session) {
+  const e1 = '01100001' + '00000001' + '0';
+  const e2 = '01100010' + '00000010' + '10';
+  const e3 = '01100011' + '00000010' + '11';
+  const body = e1 + e2 + e3;
+  const len16 = body.length.toString(2).padStart(16, '0');
+  const pkt = len16 + body;
+  const src = INLINE_PARSE_ENTRY + `
+53wire out = .parseEntry { data = ${pkt} }`;
+  const { interp } = session.run(src);
+  h.assert('entries', session.getWire(interp, 'out'), body);
+});
+
+reg(2131, 'protocol-ext', 'Faza 0a — parse bad magic throws', function(h, session) {
+  const src = INLINE_PARSE_HDR + `
+16wire out = .parseHdr { data = 11111111 }`;
+  const { interp } = session.run(src);
+  h.assert('parse error', String(session.outIncludes(interp, 'expected literal')), 'true');
+});
+
+// --- Faza 0b: lengthOf(codebook) 16b framing ---
+
+const INLINE_CODEBOOK_FRAME = `inline [protocol] .cbFrame:
+  def codebookBody:
+    book ~b
+  def codebook:
+    lengthOf(codebookBody) 16b
+    codebookBody
+  out:
+    codebook
+  :`;
+
+reg(2132, 'protocol-ext', 'Faza 0b — lengthOf(codebookBody) 16b + book ~b', function(h, session) {
+  const book = '011000010000000010';
+  const len16 = book.length.toString(2).padStart(16, '0');
+  const src = INLINE_CODEBOOK_FRAME + `
+34wire out = .cbFrame { book = ${book} }`;
+  const { interp } = session.run(src);
+  h.assert('framed', session.getWire(interp, 'out'), len16 + book);
+});
+
+// --- Faza 0c: keyWidth dinamic expand/collapse ---
+
+reg(2133, 'protocol-ext', 'Faza 0c — expand(tokens,.huff,keyWidth b)', function(h, session) {
+  const src = INLINE_HUFF + `
+inline [protocol] .encKw:
+  def encoded:
+    expand(tokens, .huff, keyWidth b)
+  out:
+    encoded
+  :
+9wire out = .encKw { tokens = 00011011, keyWidth = 00000010 }`;
+  const { interp } = session.run(src);
+  h.assert('encoded', session.getWire(interp, 'out'), '010110111');
+});
+
+reg(2134, 'protocol-ext', 'Faza 0c — collapse(withLength(data,8b),.huff,keyWidth b)', function(h, session) {
+  const src = INLINE_HUFF + `
+inline [protocol] .decKw:
+  out:
+    collapse(withLength(data, 8b), .huff, keyWidth b)
+  :
+8wire out = .decKw { data = 00001001010110111, keyWidth = 00000010 }`;
+  const { interp } = session.run(src);
+  h.assert('decoded', session.getWire(interp, 'out'), '00011011');
+});
+
+// --- Faza 0d: checksum + validateChecksum ---
+
+const INLINE_CHECKSUM_ENC = `inline [protocol] .pktCs:
+  def body:
+    data 8b
+  out:
+    body
+    checksum(crc16, body)
+  :`;
+
+const INLINE_CHECKSUM_VERIFY = `
+inline [protocol] .verifyCs:
+  mode: parse
+  out:
+    validateChecksum(crc16, data)
+  :`;
+
+reg(2135, 'protocol-ext', 'Faza 0d — checksum(crc16,body) append 16b', function(h, session) {
+  const src = INLINE_CHECKSUM_ENC + `
+24wire out = .pktCs { data = 10101010 }`;
+  const { interp } = session.run(src);
+  const w = session.getWire(interp, 'out');
+  h.assert('body+checksum width', String(w.length), '24');
+  h.assert('body prefix', w.substr(0, 8), '10101010');
+});
+
+reg(2136, 'protocol-ext', 'Faza 0d — validateChecksum round-trip', function(h, session) {
+  const src = INLINE_CHECKSUM_ENC + INLINE_CHECKSUM_VERIFY + `
+24wire pkt = .pktCs { data = 10101010 }`;
+  const { interp } = session.run(src);
+  session.execStmts(interp, '1wire _ = .verifyCs { data = pkt }');
+  h.assert('no mismatch', String(!session.outIncludes(interp, 'validateChecksum: mismatch')), 'true');
+});
+
+reg(2137, 'protocol-ext', 'Faza 0d — validateChecksum mismatch throws', function(h, session) {
+  const src = INLINE_CHECKSUM_VERIFY;
+  const { interp } = session.run(src);
+  session.execStmts(interp, '1wire _ = .verifyCs { data = 1010101010101010 }');
+  h.assert('checksum error', String(session.outIncludes(interp, 'validateChecksum: mismatch')), 'true');
+});
+
+reg(2138, 'protocol-ext', 'doc(inline.protocol) — Faza 0a-0d generators', function(h, session) {
+  const out = session.runDoc('doc(inline.protocol)');
+  h.assert('withLength def', String(out.some(l => l.includes('withLength(param, Nb, def)'))), 'true');
+  h.assert('checksum', String(out.some(l => l.includes('checksum(crc16'))), 'true');
+  h.assert('mode parse', String(out.some(l => l.includes('mode: assemble | parse'))), 'true');
 });
 
 const INLINE_OR2 = `inline [lut] .or2:

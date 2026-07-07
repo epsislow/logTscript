@@ -210,7 +210,8 @@ Syntax reference:
 | `parityEven(param)` | `parityEven(data)` | `0` or `1` (even parity) |
 | `parityOdd(param)` | `parityOdd(data)` | `0` or `1` (odd parity) |
 | `clock Nb` | `clock 8b` | toggling waveform per `clockType` |
-| `repeat bit Nb` | `repeat 0 8b` | constant bit repeated |
+| `repeat(pattern, Nb)` | `repeat(0101, 8b)` | pattern tiled to total width `Nb` |
+| `repeat bit Nb` | `repeat 0 8b` | single-bit shorthand (same as `repeat(0, 8b)`) |
 
 ### Runnable — reverse()
 
@@ -272,6 +273,8 @@ show(high)
 
 ### Runnable — repeat
 
+`Nb` is the **total output width** in bits. The pattern is tiled left-to-right until exactly `Nb` bits are produced — so `Nb` must be a multiple of the pattern length.
+
 ```logts-play
 inline [protocol] .rep0:
   out:
@@ -283,13 +286,39 @@ inline [protocol] .rep1:
     repeat 1 4b
   :
 
+inline [protocol] .repPat:
+  out:
+    repeat(0101, 8b)
+  :
+
 4wire zeros = .rep0 { }
 4wire ones  = .rep1 { }
+8wire pat   = .repPat { }
 show(zeros)
 show(ones)
+show(pat)
 ```
 
-`repeat 0 4b` → `0000`, `repeat 1 4b` → `1111`.
+`repeat 0 4b` → `0000`, `repeat 1 4b` → `1111`, `repeat(0101, 8b)` → **`01010101`** (pattern length 4, tiled twice).
+
+Parameter pattern:
+
+```logts-play
+inline [protocol] .repSync:
+  out:
+    repeat(sync 4b, 16b)
+  :
+
+16wire out = .repSync { sync = 1010 }
+show(out)
+```
+
+→ **`1010101010101010`**.
+
+| Error | Cause |
+|-------|-------|
+| `repeat: output width Nb is not a multiple of pattern length M` | e.g. `repeat(010, 8b)` (3 does not divide 8) |
+| `Protocol decode failed: expected repeat pattern '...'` | Wire does not match tiled pattern |
 
 ---
 
@@ -608,6 +637,80 @@ show(out)
 
 First 8 bits = `00000011` (length 3); payload = **`010`**.
 
+### `withLength(rest, field b)` — width from a parsed field
+
+When the length is not a fixed prefix but comes from a field parsed earlier in the same `def`, use the field name instead of `Nb`:
+
+```logts
+def entry:
+  sym 8b
+  cwLen 8b
+  withLength(rest, cwLen b)
+```
+
+Reads exactly `cwLen` bits (value of the `cwLen` field) into `rest`. No length prefix on the wire.
+
+### `withLength(data, Nb, def)` — repeated parse until sub-stream exhausted
+
+In **`mode: parse`**, read an `Nb`-bit length prefix, then parse `def` repeatedly until the sub-stream is consumed. Used for variable-length codebooks (see [huffman-v2.md](huffman-v2.md)).
+
+```logts-play
+inline [protocol] .parseEntry:
+  mode: parse
+  def entry:
+    sym 8b
+    cwLen 8b
+    withLength(rest, cwLen b)
+  out:
+    withLength(data, 16b, entry)
+  :
+```
+
+| Error | Cause |
+|-------|-------|
+| `withLength: def '...' consumed no bits` | Empty or malformed entry in repeated parse |
+| `withLength: def '...' left N bits unconsumed` | Entry def did not consume full sub-stream |
+| `parse: field 'cwLen' is not set` | `withLength(rest, cwLen b)` before `cwLen` was parsed |
+
+---
+
+## `mode: parse` — sequential field extraction
+
+By default protocols **assemble** bits from parameters (`mode: assemble`, implicit). Set **`mode: parse`** to read from an input bitstream instead.
+
+| Aspect | assemble (default) | parse |
+|--------|-------------------|-------|
+| Direction | params → wire | wire → extracted fields |
+| Field syntax | `data 8b` = emit param | `data 8b` = read 8 bits from stream |
+| Literals | emit fixed bits | verify bits on wire |
+| Invoke param | supply field values | supply `data` or `stream` bitstring |
+| Output | concatenated channel bits | concatenated parsed field bits |
+
+Recovery protocols (Huffman SC, checksum verify) use `mode: parse`. **`:decode()` is unchanged** — it only reverses simple assemble protocols; use a dedicated parse protocol instead.
+
+### Runnable — parse header fields
+
+```logts-play
+inline [protocol] .parseHdr:
+  mode: parse
+  out:
+    01001000
+    keyWidth 8b
+    nSym 8b
+  :
+
+16wire out = .parseHdr { data = 010010000000100000000011 }
+show(out)
+```
+
+Magic `'H'` (`01001000`) verified; output = **`keyWidth` + `nSym`** → `0000100000000011`.
+
+| Error | Cause |
+|-------|-------|
+| `parse: expected literal '...' but received '...'` | Magic or fixed field mismatch |
+| `parse: need N bits but only M remain` | Truncated input |
+| `Parse protocol requires 'data' parameter` | Missing invoke argument |
+
 ---
 
 ## `expand` / `collapse` with LUT
@@ -616,10 +719,10 @@ Map a token stream through an [inline LUT](lut.md) in both directions.
 
 | Generator | Syntax | Direction |
 |-----------|--------|-----------|
-| `expand` | `expand(param, .lut, keyWidth)` | Concatenate `keyWidth`-bit keys → LUT values |
-| `collapse` | `collapse(param, .lut, keyWidth)` | Split value stream → keys (fixed-depth LUT) or greedy prefix match ([`prefixFree`](lut.md#prefixfree) LUT) |
+| `expand` | `expand(param, .lut, keyWidth)` or `expand(param, .lut, keyWidth b)` | Concatenate `keyWidth`-bit keys → LUT values |
+| `collapse` | `collapse(param, .lut, keyWidth)` or `collapse(param, .lut, keyWidth b)` | Split value stream → keys (fixed-depth LUT) or greedy prefix match ([`prefixFree`](lut.md#prefixfree) LUT) |
 
-`keyWidth` is the bit width of each LUT address key. Input to `expand` must be a multiple of `keyWidth`.
+`keyWidth` may be a fixed width (`2b`, `8b`) or a **parameter/field name** (`keyWidth b`) whose value at invoke/parse time sets the key width dynamically (Faza 0c — Huffman packet SC).
 
 With a **`prefixFree`** LUT, `collapse` uses greedy longest-prefix decoding (Huffman-style). See [lut.md — prefixFree](lut.md#prefixfree) and the full walkthrough in **[huffman.md](huffman.md)**.
 
@@ -696,6 +799,42 @@ show(out)
 ```
 
 Greedy decode of `010` → keys `01`, `10` → **`0001`**.
+
+### Runnable — dynamic `keyWidth b`
+
+```logts-play
+inline [lut] .huff:
+  prefixFree
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
+  :
+
+inline [protocol] .encKw:
+  def encoded:
+    expand(tokens, .huff, keyWidth b)
+  out:
+    encoded
+  :
+
+inline [protocol] .decKw:
+  out:
+    collapse(withLength(data, 8b), .huff, keyWidth b)
+  :
+
+9wire out = .encKw { tokens = 00011011, keyWidth = 00000010 }
+8wire back = .decKw { data = 00001001010110111, keyWidth = 00000010 }
+
+show(out)
+show(back)
+```
+
+`keyWidth = 2` → encode **`010110111`**, decode back to **`00011011`**.
+
+Input to `expand` must be a multiple of `keyWidth` (fixed or dynamic).
 
 | Error | Cause |
 |-------|-------|
@@ -833,6 +972,51 @@ show(out)
 
 ---
 
+## `checksum` / `validateChecksum` (CRC-16-CCITT)
+
+Append or verify a **16-bit CRC** over a preceding body segment. Algorithm: CRC-16-CCITT (polynomial `0x1021`, init `0xFFFF`), computed over the body bitstream (padded to byte boundary).
+
+| Generator | Mode | Syntax | Effect |
+|-----------|------|--------|--------|
+| `checksum` | assemble | `checksum(crc16, defName)` | Append 16-bit CRC of `defName` body |
+| `validateChecksum` | parse | `validateChecksum(crc16, param)` | Verify trailing 16 bits match CRC of preceding bits |
+
+Scope: all bits **before** the checksum field (body only, checksum excluded).
+
+### Runnable — encode + verify
+
+```logts-play
+inline [protocol] .pktCs:
+  def body:
+    data 8b
+  out:
+    body
+    checksum(crc16, body)
+  :
+
+inline [protocol] .verifyCs:
+  mode: parse
+  out:
+    validateChecksum(crc16, data)
+  :
+
+24wire pkt = .pktCs { data = 10101010 }
+1wire ok = .verifyCs { data = pkt }
+
+show(pkt)
+show(ok)
+```
+
+Body `10101010` + CRC suffix → 24-bit packet. Verify succeeds silently (empty output channel).
+
+| Error | Cause |
+|-------|-------|
+| `validateChecksum: mismatch (expected ..., got ...)` | Corrupt or truncated packet |
+| `validateChecksum: input shorter than checksum field` | Fewer than 16 bits after body |
+| `checksum body '...' is not a local def or parameter` | Invalid def reference in encode |
+
+---
+
 ## Not included (planned)
 
 These generators are **not** implemented in v2:
@@ -842,7 +1026,6 @@ These generators are **not** implemented in v2:
 | `concat(...)` | Concatenate arbitrary segment expressions |
 | `padLeft(param, Nb)` | Left-pad parameter to width |
 | `padRight(param, Nb)` | Right-pad parameter to width |
-| `checksum(...)` | Checksum over segment range |
 
 Use literals, `def` blocks, and existing generators for now.
 
@@ -903,6 +1086,8 @@ Example `doc(.uart8n1)`:
 | expand input length N is not a multiple of keyWidth M | Token stream not aligned to LUT key width |
 | length(param) value N exceeds maximum for Nb field | Parameter too long for length prefix |
 | withLength: input shorter than length prefix | Packet shorter than declared length |
+| validateChecksum: mismatch | CRC suffix does not match body |
+| parse: expected literal '...' | Fixed field mismatch in parse mode |
 | prefixFree violation | LUT codewords not prefix-free (parse time) |
 
 ---
@@ -948,6 +1133,7 @@ A protocol definition is entirely generic. The compiler has no knowledge of UART
 ## Related
 
 - [huffman.md](huffman.md) — Huffman coding walkthrough (`.huff` + `.huffPacket` / `.huffRecover`)
+- [huffman-v2.md](huffman-v2.md) — self-contained packet SC (magic, codebook, checksum)
 - [lut.md](lut.md) — `prefixFree`, `variableDepth`, LUT invoke
 - [asm.md](asm.md) — single-blob machine code
 - [assignment-operators.md](assignment-operators.md) — dynamic-width assignment

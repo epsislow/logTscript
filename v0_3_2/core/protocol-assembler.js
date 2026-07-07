@@ -1,6 +1,7 @@
 /* ================= PROTOCOL ASSEMBLER ================= */
 
-const PROTOCOL_ATTRS = new Set(['clockType']);
+const PROTOCOL_ATTRS = new Set(['clockType', 'mode']);
+const PROTOCOL_MODES = new Set(['assemble', 'parse']);
 const CLOCK_TYPES = new Set(['lowFirst', 'highFirst']);
 
 function stripComment(line) {
@@ -67,10 +68,42 @@ function resolveParamWidth(parameters, name, width) {
   return parameters[name];
 }
 
+function parseRepeatPattern(text, parameters) {
+  const t = text.trim();
+  if (/^(?:0|1|[01]+|\^[0-9a-fA-F]+|\\[0-9]+)$/.test(t)) {
+    const lit = parseLiteralToken(t);
+    return { kind: 'literal', bits: lit.bits };
+  }
+  const ref = parseParamRef(t);
+  if (!ref.name) throw new Error('repeat() expects a literal or parameter pattern');
+  ensureParam(parameters, ref);
+  return { kind: 'param', param: ref.name, width: ref.width === null ? parameters[ref.name] : ref.width };
+}
+
+function repeatSegmentBits(seg, args) {
+  let pat;
+  if (seg.pattern.kind === 'literal') pat = seg.pattern.bits;
+  else {
+    pat = args[seg.pattern.param];
+    if (pat === undefined || pat === null) throw new Error(`Unknown parameter '${seg.pattern.param}'`);
+    pat = String(pat);
+  }
+  if (!pat.length) throw new Error('repeat pattern is empty');
+  if (seg.width % pat.length !== 0) {
+    throw new Error(
+      `repeat: output width ${seg.width}b is not a multiple of pattern length ${pat.length}`
+    );
+  }
+  return pat.repeat(seg.width / pat.length);
+}
+
 function parseSegmentLine(line, parameters, ctx) {
   const t = line.trim();
   if (!t) return null;
   const localDefNames = (ctx && ctx.localDefNames) || [];
+  const protocolMode = (ctx && ctx.protocolMode) || 'assemble';
+  const inDef = !!(ctx && ctx.inDef);
+  const parseFieldMode = protocolMode === 'parse' && (inDef || !!(ctx && ctx.inChannel));
 
   const lenOfM = /^lengthOf\s*\(\s*(\w+)\s*\)\s+(\d+)b$/i.exec(t);
   if (lenOfM) {
@@ -88,6 +121,24 @@ function parseSegmentLine(line, parameters, ctx) {
     return { kind: 'length', param: ref.name, width: parseInt(lenM[2], 10) };
   }
 
+  const wlDefM = /^withLength\s*\(\s*([^,]+)\s*,\s*(\d+)b\s*,\s*(\w+)\s*\)$/i.exec(t);
+  if (wlDefM) {
+    const ref = parseParamRef(wlDefM[1]);
+    ensureParam(parameters, ref);
+    const defName = wlDefM[3];
+    if (!localDefNames.includes(defName)) {
+      throw new Error(`withLength() def '${defName}' is not a local def`);
+    }
+    return { kind: 'withLengthDef', param: ref.name, width: parseInt(wlDefM[2], 10), defName };
+  }
+
+  const wlFieldM = /^withLength\s*\(\s*([^,]+)\s*,\s*(\w+)\s+b\s*\)$/i.exec(t);
+  if (wlFieldM) {
+    const ref = parseParamRef(wlFieldM[1]);
+    if (protocolMode !== 'parse') ensureParam(parameters, ref);
+    return { kind: 'withLength', param: ref.name, widthField: wlFieldM[2] };
+  }
+
   const wlM = /^withLength\s*\(\s*([^,]+)\s*,\s*(\d+)b\s*\)$/i.exec(t);
   if (wlM) {
     const ref = parseParamRef(wlM[1]);
@@ -95,11 +146,52 @@ function parseSegmentLine(line, parameters, ctx) {
     return { kind: 'withLength', param: ref.name, width: parseInt(wlM[2], 10) };
   }
 
+  const chkM = /^checksum\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)$/i.exec(t);
+  if (chkM) {
+    const algo = chkM[1].toLowerCase();
+    const target = chkM[2];
+    if (algo !== 'crc16') throw new Error(`checksum algorithm '${chkM[1]}' is not supported`);
+    if (!localDefNames.includes(target) && parameters[target] === undefined) {
+      throw new Error(`checksum body '${target}' is not a local def or parameter`);
+    }
+    return { kind: 'checksum', algo, target };
+  }
+
+  const vchkM = /^validateChecksum\s*\(\s*(\w+)\s*,\s*([^)]+)\s*\)$/i.exec(t);
+  if (vchkM) {
+    const algo = vchkM[1].toLowerCase();
+    if (algo !== 'crc16') throw new Error(`validateChecksum algorithm '${vchkM[1]}' is not supported`);
+    const ref = parseParamRef(vchkM[2]);
+    ensureParam(parameters, ref);
+    return { kind: 'validateChecksum', algo, param: ref.name };
+  }
+
+  const expVarKw = /^expand\s*\(\s*([^,]+)\s*,\s*(\.\w+)\s*,\s*(\w+)\s+b\s*\)$/i.exec(t);
+  if (expVarKw) {
+    const ref = parseParamRef(expVarKw[1]);
+    ensureParam(parameters, ref);
+    registerParam(parameters, expVarKw[3], 8);
+    return { kind: 'expand', param: ref.name, lutRef: expVarKw[2], keyWidthParam: expVarKw[3] };
+  }
+
   const expM = /^expand\s*\(\s*([^,]+)\s*,\s*(\.\w+)\s*,\s*(\d+)b\s*\)$/i.exec(t);
   if (expM) {
     const ref = parseParamRef(expM[1]);
     ensureParam(parameters, ref);
     return { kind: 'expand', param: ref.name, lutRef: expM[2], keyWidth: parseInt(expM[3], 10) };
+  }
+
+  const colNestVarM = /^collapse\s*\(\s*withLength\s*\(\s*([^,]+)\s*,\s*(\d+)b\s*\)\s*,\s*(\.\w+)\s*,\s*(\w+)\s+b\s*\)$/i.exec(t);
+  if (colNestVarM) {
+    const ref = parseParamRef(colNestVarM[1]);
+    ensureParam(parameters, ref);
+    registerParam(parameters, colNestVarM[4], 8);
+    return {
+      kind: 'collapse',
+      withLength: { param: ref.name, width: parseInt(colNestVarM[2], 10) },
+      lutRef: colNestVarM[3],
+      keyWidthParam: colNestVarM[4],
+    };
   }
 
   const colNestM = /^collapse\s*\(\s*withLength\s*\(\s*([^,]+)\s*,\s*(\d+)b\s*\)\s*,\s*(\.\w+)\s*,\s*(\d+)b\s*\)$/i.exec(t);
@@ -112,6 +204,14 @@ function parseSegmentLine(line, parameters, ctx) {
       lutRef: colNestM[3],
       keyWidth: parseInt(colNestM[4], 10),
     };
+  }
+
+  const colVarM = /^collapse\s*\(\s*([^,]+)\s*,\s*(\.\w+)\s*,\s*(\w+)\s+b\s*\)$/i.exec(t);
+  if (colVarM) {
+    const ref = parseParamRef(colVarM[1]);
+    ensureParam(parameters, ref);
+    registerParam(parameters, colVarM[3], 8);
+    return { kind: 'collapse', param: ref.name, lutRef: colVarM[2], keyWidthParam: colVarM[3] };
   }
 
   const colM = /^collapse\s*\(\s*([^,]+)\s*,\s*(\.\w+)\s*,\s*(\d+)b\s*\)$/i.exec(t);
@@ -148,12 +248,26 @@ function parseSegmentLine(line, parameters, ctx) {
   const clkM = /^clock\s+(\d+)b$/i.exec(t);
   if (clkM) return { kind: 'clock', width: parseInt(clkM[1], 10) };
 
+  const repFnM = /^repeat\s*\(\s*([^,]+)\s*,\s*(\d+)b\s*\)$/i.exec(t);
+  if (repFnM) {
+    const width = parseInt(repFnM[2], 10);
+    const pattern = parseRepeatPattern(repFnM[1], parameters);
+    return { kind: 'repeat', pattern, width };
+  }
+
   const repM = /^repeat\s+([01])\s+(\d+)b$/i.exec(t);
-  if (repM) return { kind: 'repeat', bit: repM[1], width: parseInt(repM[2], 10) };
+  if (repM) {
+    return {
+      kind: 'repeat',
+      pattern: { kind: 'literal', bits: repM[1] },
+      width: parseInt(repM[2], 10),
+    };
+  }
 
   const varM = /^(\w+)\s+~b$/i.exec(t);
   if (varM) {
     const name = varM[1];
+    if (parseFieldMode) return { kind: 'parseField', param: name, width: 'var' };
     registerParam(parameters, name, 'var');
     return { kind: 'param', param: name, width: 'var' };
   }
@@ -162,6 +276,7 @@ function parseSegmentLine(line, parameters, ctx) {
   if (parM) {
     const name = parM[1];
     const width = parseInt(parM[2], 10);
+    if (parseFieldMode) return { kind: 'parseField', param: name, width };
     registerParam(parameters, name, width);
     return { kind: 'param', param: name, width };
   }
@@ -196,10 +311,16 @@ function parseProtocolBody(bodyRaw) {
   let currentChannel = null;
   let currentDef = null;
   let seenChannel = false;
+  let protocolMode = 'assemble';
 
   for (const rawLine of bodyRaw.split('\n')) {
     const trimmed = stripComment(rawLine).trim();
     if (!trimmed || trimmed === ':') continue;
+
+    const attrMEarly = !seenChannel && !currentDef && /^(\w+)\s*:\s*(.+)$/.exec(trimmed);
+    if (attrMEarly && PROTOCOL_ATTRS.has(attrMEarly[1])) {
+      if (attrMEarly[1] === 'mode') protocolMode = attrMEarly[2].trim();
+    }
 
     const defLine = /^def\s+(\w+)\s*:\s*$/i.exec(trimmed);
     if (defLine && !seenChannel) {
@@ -218,9 +339,16 @@ function parseProtocolBody(bodyRaw) {
       continue;
     }
 
+    const segCtx = {
+      localDefNames: Object.keys(localDefs),
+      protocolMode,
+      inDef: !!currentDef && !seenChannel,
+      inChannel: !!currentChannel,
+    };
+
     if (!seenChannel) {
       if (currentDef) {
-        const seg = parseSegmentLine(trimmed, parameters, { localDefNames: Object.keys(localDefs) });
+        const seg = parseSegmentLine(trimmed, parameters, segCtx);
         if (seg) {
           currentDef.segments.push(seg);
           currentDef.sourceLines.push(trimmed);
@@ -235,13 +363,16 @@ function parseProtocolBody(bodyRaw) {
         if (key === 'clockType' && !CLOCK_TYPES.has(val)) {
           throw new Error('clockType must be \'lowFirst\' or \'highFirst\'');
         }
+        if (key === 'mode' && !PROTOCOL_MODES.has(val)) {
+          throw new Error('mode must be \'assemble\' or \'parse\'');
+        }
         attributes[key] = val;
         continue;
       }
     }
 
     if (!currentChannel) throw new Error(`Protocol segment '${trimmed}' outside of any output channel`);
-    const seg = parseSegmentLine(trimmed, parameters, { localDefNames: Object.keys(localDefs) });
+    const seg = parseSegmentLine(trimmed, parameters, segCtx);
     if (seg) {
       currentChannel.segments.push(seg);
       currentChannel.sourceLines.push(trimmed);
@@ -250,6 +381,9 @@ function parseProtocolBody(bodyRaw) {
 
   if (currentDef && !seenChannel) finishDef(currentDef, localDefs);
   if (!channels.length) throw new Error('Protocol definition has no output channels');
+  if (attributes.mode === 'parse') {
+    registerParam(parameters, 'data', 'var');
+  }
   return { attributes, channels, parameters, channelOrder, localDefs, bodyRaw };
 }
 
@@ -357,6 +491,225 @@ function protocolWithLength(dataBits, width) {
   return dataBits.substr(width, len);
 }
 
+function crc16Bits(dataBits) {
+  const padded = dataBits.length % 8 === 0
+    ? dataBits
+    : dataBits + '0'.repeat(8 - (dataBits.length % 8));
+  let crc = 0xFFFF;
+  for (let i = 0; i < padded.length; i += 8) {
+    crc ^= parseInt(padded.substr(i, 8), 2) << 8;
+    for (let j = 0; j < 8; j++) {
+      if (crc & 0x8000) crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+      else crc = (crc << 1) & 0xFFFF;
+    }
+  }
+  return crc;
+}
+
+function checksumCrc16(bodyBits) {
+  return padBinary(crc16Bits(bodyBits).toString(2), 16);
+}
+
+function validateChecksumCrc16(fullBits) {
+  if (fullBits.length < 16) throw new Error('validateChecksum: input shorter than checksum field');
+  const body = fullBits.substr(0, fullBits.length - 16);
+  const expected = fullBits.substr(fullBits.length - 16);
+  const actual = checksumCrc16(body);
+  if (actual !== expected) {
+    throw new Error(`validateChecksum: mismatch (expected ${expected}, got ${actual})`);
+  }
+  return body;
+}
+
+function resolveKeyWidth(seg, args, fields) {
+  if (seg.keyWidthParam) {
+    const raw = (fields && fields.get(seg.keyWidthParam)) || args[seg.keyWidthParam];
+    if (raw === undefined || raw === null) {
+      throw new Error(`Unknown keyWidth parameter '${seg.keyWidthParam}'`);
+    }
+    const kw = parseInt(raw, 2);
+    if (!kw || kw < 1) throw new Error(`Invalid keyWidth value '${raw}'`);
+    return kw;
+  }
+  return seg.keyWidth;
+}
+
+class ParseFields {
+  constructor() {
+    this._values = {};
+  }
+  set(name, bits) { this._values[name] = bits; }
+  get(name) { return this._values[name]; }
+  widthFrom(name) {
+    const val = this.get(name);
+    if (val === undefined || val === null) {
+      throw new Error(`parse: field '${name}' is not set`);
+    }
+    const w = parseInt(val, 2);
+    if (!Number.isFinite(w) || w < 0) {
+      throw new Error(`parse: invalid width in field '${name}'`);
+    }
+    return w;
+  }
+}
+
+class ParseStream {
+  constructor(bits) {
+    this.bits = String(bits);
+    this.pos = 0;
+  }
+  get remaining() { return this.bits.length - this.pos; }
+  read(n) {
+    if (n < 0) throw new Error('parse: negative read width');
+    if (this.pos + n > this.bits.length) {
+      throw new Error(`parse: need ${n} bits but only ${this.remaining} remain`);
+    }
+    const val = this.bits.substr(this.pos, n);
+    this.pos += n;
+    return val;
+  }
+  readRest() {
+    const val = this.bits.substr(this.pos);
+    this.pos = this.bits.length;
+    return val;
+  }
+  fork(n) {
+    return new ParseStream(this.read(n));
+  }
+}
+
+function parseDefSegments(defName, stream, fields, inst, args, attributes, ctx, cache) {
+  const localDefs = inst.localDefs || {};
+  const def = localDefs[defName];
+  if (!def) throw new Error(`Unknown protocol def '${defName}'`);
+  let out = '';
+  for (const seg of def.segments) {
+    out += parseSegment(seg, stream, fields, inst, args, attributes, ctx, cache);
+  }
+  return out;
+}
+
+function parseSegment(seg, stream, fields, inst, args, attributes, ctx, cache) {
+  const localDefs = inst.localDefs || {};
+  switch (seg.kind) {
+    case 'literal': {
+      const val = stream.read(seg.bits.length);
+      if (val !== seg.bits) {
+        throw new Error(`parse: expected literal '${seg.bits}' but received '${val}'`);
+      }
+      return '';
+    }
+    case 'parseField': {
+      const w = seg.width === 'var' ? stream.remaining : seg.width;
+      const val = stream.read(w);
+      fields.set(seg.param, val);
+      return val;
+    }
+    case 'param': {
+      const w = seg.width === 'var' ? stream.remaining : seg.width;
+      const val = stream.read(w);
+      fields.set(seg.param, val);
+      return val;
+    }
+    case 'localRef':
+      return parseDefSegments(seg.name, stream, fields, inst, args, attributes, ctx, cache);
+    case 'withLengthDef': {
+      const prefixW = seg.width;
+      const len = parseInt(stream.read(prefixW), 2);
+      const maxLen = (1 << prefixW) - 1;
+      if (len > maxLen) {
+        throw new Error(`withLength: length ${len} exceeds maximum ${maxLen} for ${prefixW}b prefix`);
+      }
+      const region = stream.fork(len);
+      let out = '';
+      while (region.remaining > 0) {
+        const entryFields = new ParseFields();
+        const before = region.pos;
+        out += parseDefSegments(seg.defName, region, entryFields, inst, args, attributes, ctx, cache);
+        if (region.pos === before) {
+          throw new Error(`withLength: def '${seg.defName}' consumed no bits`);
+        }
+        if (typeof ctx.onParseEntry === 'function') {
+          ctx.onParseEntry(entryFields.get('sym'), entryFields.get('rest') || entryFields.get('codeword'));
+        }
+      }
+      if (region.remaining !== 0) {
+        throw new Error(`withLength: def '${seg.defName}' left ${region.remaining} bits unconsumed`);
+      }
+      return out;
+    }
+    case 'withLength': {
+      if (seg.widthField) {
+        const w = fields.widthFrom(seg.widthField);
+        const payload = stream.read(w);
+        fields.set(seg.param, payload);
+        return payload;
+      }
+      let prefixW = seg.width;
+      const len = parseInt(stream.read(prefixW), 2);
+      const maxLen = (1 << prefixW) - 1;
+      if (len > maxLen) {
+        throw new Error(`withLength: length ${len} exceeds maximum ${maxLen} for ${prefixW}b prefix`);
+      }
+      const payload = stream.read(len);
+      fields.set(seg.param, payload);
+      return payload;
+    }
+    case 'validateChecksum': {
+      const full = args[seg.param];
+      if (full === undefined || full === null) throw new Error(`Unknown parameter '${seg.param}'`);
+      if (seg.algo === 'crc16') validateChecksumCrc16(full);
+      return '';
+    }
+    case 'collapse': {
+      let data;
+      if (seg.withLength) {
+        const prefixW = seg.withLength.width;
+        const len = parseInt(stream.read(prefixW), 2);
+        data = stream.read(len);
+      } else if (seg.param === 'stream' || seg.param === 'data') {
+        data = stream.readRest();
+      } else {
+        data = args[seg.param];
+        if (data === undefined || data === null) throw new Error(`Unknown parameter '${seg.param}'`);
+      }
+      const lut = resolveLutInst(seg.lutRef, ctx);
+      const keyWidth = resolveKeyWidth(seg, args, fields);
+      return protocolCollapse(data, lut, keyWidth);
+    }
+    default:
+      throw new Error(`Protocol parse does not support segment kind '${seg.kind}'`);
+  }
+}
+
+function parseProtocol(inst, args, ctx) {
+  const streamParam = args.stream !== undefined ? 'stream' : 'data';
+  const streamBits = args[streamParam];
+  if (streamBits === undefined || streamBits === null) {
+    throw new Error(`Parse protocol requires '${streamParam}' parameter`);
+  }
+  const stream = new ParseStream(streamBits);
+  const fields = new ParseFields();
+  const cache = new Map();
+  const channelWidths = [];
+  let blob = '';
+  for (const chName of inst.channelOrder) {
+    const channel = inst.channels.find(c => c.name === chName);
+    if (!channel) throw new Error(`Missing channel '${chName}' in protocol instance`);
+    let bits = '';
+    for (const seg of channel.segments) {
+      bits += parseSegment(seg, stream, fields, inst, args, inst.attributes || {}, ctx, cache);
+    }
+    channelWidths.push(bits.length);
+    blob += bits;
+  }
+  return { blob, channelWidths, totalWidth: blob.length, fields: fields._values };
+}
+
+function protocolUsesParseMode(inst) {
+  return (inst.attributes && inst.attributes.mode === 'parse');
+}
+
 function evalSegment(seg, args, attributes, ctx) {
   const inst = ctx && ctx.inst;
   switch (seg.kind) {
@@ -380,7 +733,7 @@ function evalSegment(seg, args, attributes, ctx) {
       return out.slice(0, seg.width);
     }
     case 'repeat':
-      return seg.bit.repeat(seg.width);
+      return repeatSegmentBits(seg, args);
     case 'length': {
       const len = paramBitLength(inst, seg.param, args);
       const maxLen = (1 << seg.width) - 1;
@@ -392,12 +745,16 @@ function evalSegment(seg, args, attributes, ctx) {
     case 'withLength': {
       const full = args[seg.param];
       if (full === undefined || full === null) throw new Error(`Unknown parameter '${seg.param}'`);
+      if (seg.widthField) {
+        throw new Error(`withLength(..., ${seg.widthField} b) is only supported in mode: parse`);
+      }
       return protocolWithLength(full, seg.width);
     }
     case 'expand': {
       const data = paramBits(inst, seg, args);
       const lut = resolveLutInst(seg.lutRef, ctx);
-      return protocolExpand(data, lut, seg.keyWidth);
+      const keyWidth = resolveKeyWidth(seg, args, null);
+      return protocolExpand(data, lut, keyWidth);
     }
     case 'collapse': {
       let data;
@@ -409,7 +766,11 @@ function evalSegment(seg, args, attributes, ctx) {
         data = paramBits(inst, seg, args);
       }
       const lut = resolveLutInst(seg.lutRef, ctx);
-      return protocolCollapse(data, lut, seg.keyWidth);
+      const keyWidth = resolveKeyWidth(seg, args, null);
+      return protocolCollapse(data, lut, keyWidth);
+    }
+    case 'checksum': {
+      throw new Error('checksum() cannot be evaluated as a standalone segment; use in channel/def body');
     }
     default:
       throw new Error(`Unknown protocol segment kind '${seg.kind}'`);
@@ -438,6 +799,22 @@ function evalSegmentWithCache(seg, inst, args, attributes, ctx, cache) {
     }
     return padBinary(len.toString(2), seg.width);
   }
+  if (seg.kind === 'checksum') {
+    const localDefs = inst.localDefs || {};
+    let bodyBits;
+    if (localDefs[seg.target]) {
+      bodyBits = evalDefBits(seg.target, inst, args, attributes, ctx, cache);
+    } else {
+      const val = args[seg.target];
+      if (val === undefined || val === null) throw new Error(`Unknown checksum body '${seg.target}'`);
+      bodyBits = val;
+    }
+    if (seg.algo === 'crc16') return checksumCrc16(bodyBits);
+    throw new Error(`checksum algorithm '${seg.algo}' is not supported`);
+  }
+  if (seg.kind === 'withLengthDef') {
+    throw new Error('withLength(..., def) is only supported in mode: parse');
+  }
   const evalCtx = Object.assign({}, ctx || {}, { inst });
   return evalSegment(seg, args, attributes, evalCtx);
 }
@@ -452,6 +829,7 @@ function evalChannelSegments(segments, inst, args, attributes, ctx) {
 }
 
 function generateProtocol(inst, args, ctx) {
+  if (protocolUsesParseMode(inst)) return parseProtocol(inst, args, ctx);
   const channelWidths = [];
   let blob = '';
   for (const chName of inst.channelOrder) {
@@ -473,10 +851,14 @@ function segmentTriggersDynamic(seg, getLut) {
     case 'param':
       return seg.width === 'var';
     case 'withLength':
+    case 'withLengthDef':
+    case 'validateChecksum':
+      return true;
+    case 'checksum':
       return true;
     case 'expand':
     case 'collapse': {
-      if (seg.withLength) return true;
+      if (seg.withLength || seg.keyWidthParam) return true;
       const lut = getLut && getLut(seg.lutRef);
       return lut ? lutIsPrefixFree(lut) : true;
     }
@@ -504,6 +886,7 @@ function segmentStaticWidth(seg, localDefs, parameters, getLut, visiting) {
     case 'localRef':
       return defStaticWidth(seg.name, localDefs, parameters, getLut, visiting);
     case 'expand': {
+      if (seg.keyWidthParam) return null;
       const lut = getLut && getLut(seg.lutRef);
       if (!lut || lutIsPrefixFree(lut)) return null;
       const dataW = parameters[seg.param];
@@ -513,6 +896,7 @@ function segmentStaticWidth(seg, localDefs, parameters, getLut, visiting) {
       return (dataW / seg.keyWidth) * depth;
     }
     case 'collapse': {
+      if (seg.keyWidthParam) return null;
       const lut = getLut && getLut(seg.lutRef);
       if (!lut || lutIsPrefixFree(lut)) return null;
       if (seg.withLength) return null;
@@ -523,6 +907,9 @@ function segmentStaticWidth(seg, localDefs, parameters, getLut, visiting) {
       return (dataW / depth) * seg.keyWidth;
     }
     case 'withLength':
+    case 'withLengthDef':
+    case 'checksum':
+    case 'validateChecksum':
       return null;
     default:
       return 0;
@@ -663,10 +1050,13 @@ function decodeChannel(channel, bits, attributes, paramOutputs) {
         break;
       }
       case 'repeat': {
-        const expected = seg.bit.repeat(seg.width);
+        const expected = repeatSegmentBits(seg, {});
         const actual = bits.substr(pos, seg.width);
         if (actual !== expected) {
-          throw new Error(`Protocol decode failed:\nexpected repeat bit '${seg.bit}'`);
+          const pat = seg.pattern.kind === 'literal'
+            ? seg.pattern.bits
+            : seg.pattern.param;
+          throw new Error(`Protocol decode failed:\nexpected repeat pattern '${pat}'`);
         }
         pos += seg.width;
         break;
@@ -769,13 +1159,15 @@ function formatProtocolTypeDoc() {
     '',
     'Built-in generators:',
     '  reverse(param)     parityEven(param)     parityOdd(param)',
-    '  clock Nb           repeat bit Nb',
+    '  clock Nb           repeat(pattern, Nb)   repeat bit Nb',
     '  length(param) Nb   lengthOf(def) Nb',
-    '  withLength(param, Nb)',
+    '  withLength(param, Nb)   withLength(param, field b)   withLength(param, Nb, def)',
     '  expand(param, .lut, keyWidth)   collapse(param, .lut, keyWidth)',
+    '  checksum(crc16, def)   validateChecksum(crc16, param)',
     '',
     'Attributes:',
     '  clockType: lowFirst | highFirst',
+    '  mode: assemble | parse',
     '',
     'Invoke (assignment only):',
     '  10bit tx = .name { data = ^41 }',
@@ -786,11 +1178,15 @@ function formatProtocolTypeDoc() {
 const protocolAssemblerExports = {
   parseProtocolBody,
   generateProtocol,
+  parseProtocol,
   decodeProtocol,
   inferProtocolWidth,
   protocolExpand,
   protocolCollapse,
   protocolWithLength,
+  crc16Bits,
+  checksumCrc16,
+  validateChecksumCrc16,
   formatProtocolInstanceDoc,
   formatProtocolTypeDoc,
 };

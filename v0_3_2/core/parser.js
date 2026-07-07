@@ -3859,6 +3859,10 @@ isBuiltinFunction(name) {
       this.t.skip();
       args[argName] = this.expr();
       this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        this.eat('SYM', ',');
+        this.t.skip();
+      }
     }
     this.eat('SYM', '}');
     return { kind: 'protocolInvoke', args };
