@@ -1,0 +1,53 @@
+
+<!-- Control Panel Layout -->
+<div class="editor-controls">
+<button id="toggle-select-btn" onclick="toggleSelectionMode()" style="background-color: #f0f0f0;">
+Selection Mode: OFF
+</button>
+<br><br>
+<button onclick="moveCursor('left')">◀ Left</button>
+<button onclick="moveCursor('up')">▲ Up</button>
+<button onclick="moveCursor('down')">▼ Down</button>
+<button onclick="moveCursor('right')">▶ Right</button>
+</div>
+
+<script>
+// Track whether we are moving the cursor or stretching a selection
+let selectionModeActive = false;
+
+// Toggle selection mode state and update button look
+function toggleSelectionMode() {
+selectionModeActive = !selectionModeActive;
+const btn = document.getElementById('toggle-select-btn');
+
+if (selectionModeActive) {
+btn.innerText = "Selection Mode: ON";
+btn.style.backgroundColor = "#ffcccb"; // Light red highlight when active
+} else {
+btn.innerText = "Selection Mode: OFF";
+btn.style.backgroundColor = "#f0f0f0";
+}
+editor.focus();
+}
+
+// Core navigation function
+function moveCursor(direction) {
+// 1. Determine what action to execute based on the toggle state
+// 'move' changes the cursor position; 'extend' changes the selection bounds
+const actionType = selectionModeActive ? 'extend' : 'move';
+
+// 2. Map the directions to CodeMirror 5's internal movement commands
+switch (direction) {
+case 'left':
+editor.execCommand(goCharLeft${actionType === 'extend' ? 'Extending' : ''}); break; case 'right': editor.execCommand(goCharRight${actionType === 'extend' ? 'Extending' : ''});
+break;
+case 'up':
+editor.execCommand(goLineUp${actionType === 'extend' ? 'Extending' : ''}); break; case 'down': editor.execCommand(goLineDown${actionType === 'extend' ? 'Extending' : ''});
+break;
+}
+
+// 3. Keep focus inside the editor so the Android keyboard doesn't hide
+editor.focus();
+}
+</script>
+
