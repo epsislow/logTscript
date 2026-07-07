@@ -15,13 +15,24 @@ on:<mode> {
 }
 ```
 
+Multiple comma-separated assignments are allowed after the trigger (all run atomically when the condition fires):
+
+```logts
+on:raise {
+  AND(.clk, phMerge),
+  mk, mf = .heap:popMin(),
+  mk2, mf2 = .heap:popMin(),
+  1wire _ = .links:set(mk, parent + 00000000)
+}
+```
+
 | Part | Meaning |
 |------|---------|
 | `on:<mode>` | When the block may run: `raise`, `edge`, or `1` |
 | `triggerExpr` | Expression whose **LSB** is observed for edges/level |
-| `assignment` | **One** assignment (`=`, `:=`, `=:`) or component pin write |
+| `assignment` | One or more assignments (`=`, `:=`, `=:`), mixed multi-target (`a, b = expr`), or component pin writes |
 
-The entire statement is **absent** while the trigger condition is false: neither the left-hand side nor the right-hand side runs (no LUT/mem side effects, no wire writes).
+The entire statement is **absent** while the trigger condition is false: neither the left-hand side nor the right-hand side runs (no LUT/mem side effects, no wire writes). When the trigger fires, **every** assignment in the block runs in order before any other propagation step. Suite tests **2123–2124**.
 
 ---
 
@@ -298,10 +309,10 @@ Toggle **clr** `0→1→0→1` — **Output** alternates `hSize = 0000` / `1111`
 
 | Allowed in `{ }` | Not allowed |
 |------------------|-------------|
-| `target = expr` | `.lut:clear()` without destination |
+| `target = expr` (one or many, comma-separated) | `.lut:clear()` without destination |
 | `.comp:pin = expr` | `pcb`, `chip`, `board`, `comp`, `def` |
-| `.mem:set = flag` | Multiple assignments |
-| `process = 1` | Any non-assignment statement |
+| `a, b = expr` (multi-target) | Any non-assignment statement |
+| `process = 1` | |
 
 ---
 
@@ -310,7 +321,7 @@ Toggle **clr** `0→1→0→1` — **Output** alternates `hSize = 0000` / `1111`
 | | `on: { }` (standalone) | `.comp:{ }` (property block) |
 |--|------------------------|------------------------------|
 | Scope | Program / PCB body | Bound to one component instance |
-| Statements | Exactly one assignment | Multiple pin assignments |
+| Statements | One or more comma-separated assignments | Multiple pin assignments |
 | Typical use | LUT/mem ops gated by a flag | Pin wiring on `exec:` trigger |
 
 Property blocks remain the right tool for multi-pin updates on a component; conditional assignment is for isolated side-effect writes (LUT, mem, a single wire).

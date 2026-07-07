@@ -377,7 +377,7 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 | **Length field width** | `8b` allows payloads up to 255 bits. Use `16b` for larger frames ([`withLength`](protocol.md#withlengthdata-nb)). |
 | **Separate protocols** | Encoder and decoder are independent definitions — swap codebooks or framing without changing the other side's structure. |
 | **Not in scope** | `checksum()`, `concat()`, `padLeft()`, `padRight()` — add framing or integrity in user logic if needed. |
-| **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2114** ([huffman-v2.md](huffman-v2.md) wave pipeline). |
+| **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2114** ([huffman-v2.md](huffman-v2.md) wave pipeline), **2115–2118** (FSM wave + round-trip doc block), **2128** (protocol via `execStmts`). |
 
 ---
 

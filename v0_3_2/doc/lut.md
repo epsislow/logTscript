@@ -412,6 +412,8 @@ inline [lut] .huff:
 | `.lut:keys()` | Vector of all keys (key width × entry count) |
 | `.lut:values()` | Vector of all values (value width × entry count) |
 | `.lut:entries()` | Matrix **N×2**: column 0 = key, column 1 = value (`ew = max(keyW, valW)`) |
+| `.lut:entries(sortKeys)` | Keys only, sorted by value ascending (unsigned default); tie-break: lower entry index |
+| `.lut:entries(sortValues)` | Values only, same sort order as `sortKeys` |
 | `.lut:keyAt(i)` | Key at list index `i` (`0 … size()-1`; addr width) |
 | `.lut:valueAt(i)` | Value at list index `i` (depth or variableDepth width) |
 | `.lut:removeAt(i)` | Remove entry at index `i`; returns `1wire` ack `0` |
@@ -519,6 +521,8 @@ Use a named wire for the assignment (`ok = .huff:add(...)`) — not `_` (undefin
 
 **Affected methods:** `:add`, `:set`, `:remove`, `:removeAt`, `:clear`, `:popMin`, `:popMax` (all mutate `lutEntryList`). Read-only methods (`:keys`, `:values`, `:entries`, `:keyAt`, `:valueAt`, `:peekMin`, `:peekMax`, `:get`, `:size`, …) are safe to assign on a wire; re-execution only refreshes the snapshot.
 
+On **wave**, a top-level wire like `16wire lb = .links:get(key)` or `4wire sz = .heap:size()` **tracks** the LUT and re-evaluates after mutations (and after test-harness `execStmts` + `propagate()`) — tests **2126–2127**. See [signal propagation](signal-propagation.md#declarative-wire-re-evaluation).
+
 ```logts-play wave
 inline [lut] .freq:
   writable
@@ -545,6 +549,34 @@ show(ent)
 ```
 
 Use with [SORT](builtin-SORT.md) to reorder by frequency, e.g. `SORT(.freq:entries(); col=1)`.
+
+**Sorted export (Huffman heap load):** avoid `SORT` on an empty or changing list at init — use value-sorted snapshots instead:
+
+```logts-play wave
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 16
+  fillwith: 00000000
+  data { }
+  :
+1wire _ = .freq:set(0010, \\3;8)
+1wire _ = .freq:set(0011, \\1;8)
+1wire _ = .freq:set(0000, \\2;8)
+8wire[3] syms = .freq:entries(sortKeys)
+8wire[3] cnts = .freq:entries(sortValues)
+show(syms)
+show(cnts)
+```
+
+Optional format tags (same as `:popMin` / `:peekMin`): unsigned default, `; signed`, or `; q4p4` etc.
+
+```logts
+8wire syms = .freq:entries(sortKeys; signed)
+8wire cnts = .freq:entries(sortValues; signed)
+```
+
+Empty list → zero-length blob (`bitWidth = 0`). Fixed-width wire assignment requires `N >= 1` in `[N]` — gate heap load on `.freq:size()` or use after scan populates entries.
 
 ### `fillwith` vs explicit entries
 

@@ -590,6 +590,73 @@ function lutValues(inst) {
   return { value: bits, bitWidth: valW * list.length, varName: `${inst.name}:values` };
 }
 
+function sortedEntryPermutation(inst, numericMode) {
+  requireWritable(inst);
+  const list = inst.lutEntryList;
+  const valW = getExportValueWidth(inst);
+  const order = [];
+  for (let i = 0; i < list.length; i++) order.push(i);
+  order.sort((a, b) => {
+    const va = normalizeEntryValueBits(list[a], valW);
+    const vb = normalizeEntryValueBits(list[b], valW);
+    const cmp = compareEntryValueBits(va, vb, numericMode);
+    if (cmp !== 0) return cmp;
+    return a - b;
+  });
+  return order;
+}
+
+function parseEntriesSortModeFromArgs(args) {
+  if (!args || args.length === 0) return null;
+  if (args.length !== 1) {
+    throw new Error('LUT: entries(mode): expected sortKeys or sortValues');
+  }
+  const e = args[0];
+  if (!Array.isArray(e) || e.length !== 1) {
+    throw new Error('LUT: entries(mode): mode must be sortKeys or sortValues');
+  }
+  const atom = e[0];
+  if (atom.var === 'sortKeys') return 'sortKeys';
+  if (atom.var === 'sortValues') return 'sortValues';
+  throw new Error('LUT: entries(mode): mode must be sortKeys or sortValues');
+}
+
+function lutEntriesSortKeys(inst, callTags) {
+  const fail = (msg) => { throw new Error(msg); };
+  const numericMode = parseLutMinMaxNumericMode(callTags, 'entries', fail);
+  const list = inst.lutEntryList;
+  const keyW = getExportKeyWidth(inst);
+  const order = sortedEntryPermutation(inst, numericMode);
+  let bits = '';
+  for (const i of order) bits += normalizeEntryKeyBits(list[i], keyW);
+  return {
+    value: bits,
+    bitWidth: keyW * list.length,
+    varName: `${inst.name}:entries:sortKeys`,
+    tensorRows: list.length,
+    tensorCols: 1,
+    tensorElementWidth: keyW,
+  };
+}
+
+function lutEntriesSortValues(inst, callTags) {
+  const fail = (msg) => { throw new Error(msg); };
+  const numericMode = parseLutMinMaxNumericMode(callTags, 'entries', fail);
+  const list = inst.lutEntryList;
+  const valW = getExportValueWidth(inst);
+  const order = sortedEntryPermutation(inst, numericMode);
+  let bits = '';
+  for (const i of order) bits += normalizeEntryValueBits(list[i], valW);
+  return {
+    value: bits,
+    bitWidth: valW * list.length,
+    varName: `${inst.name}:entries:sortValues`,
+    tensorRows: list.length,
+    tensorCols: 1,
+    tensorElementWidth: valW,
+  };
+}
+
 function lutEntries(inst) {
   requireWritable(inst);
   const list = inst.lutEntryList;
@@ -639,6 +706,9 @@ const lutWritableExports = {
   lutKeys,
   lutValues,
   lutEntries,
+  lutEntriesSortKeys,
+  lutEntriesSortValues,
+  parseEntriesSortModeFromArgs,
   lutKeyAt,
   lutValueAt,
   lutRemoveAt,

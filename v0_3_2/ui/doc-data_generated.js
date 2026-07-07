@@ -7337,13 +7337,24 @@ on:<mode> {
 }
 \`\`\`
 
+Multiple comma-separated assignments are allowed after the trigger (all run atomically when the condition fires):
+
+\`\`\`logts
+on:raise {
+  AND(.clk, phMerge),
+  mk, mf = .heap:popMin(),
+  mk2, mf2 = .heap:popMin(),
+  1wire _ = .links:set(mk, parent + 00000000)
+}
+\`\`\`
+
 | Part | Meaning |
 |------|---------|
 | \`on:<mode>\` | When the block may run: \`raise\`, \`edge\`, or \`1\` |
 | \`triggerExpr\` | Expression whose **LSB** is observed for edges/level |
-| \`assignment\` | **One** assignment (\`=\`, \`:=\`, \`=:\`) or component pin write |
+| \`assignment\` | One or more assignments (\`=\`, \`:=\`, \`=:\`), mixed multi-target (\`a, b = expr\`), or component pin writes |
 
-The entire statement is **absent** while the trigger condition is false: neither the left-hand side nor the right-hand side runs (no LUT/mem side effects, no wire writes).
+The entire statement is **absent** while the trigger condition is false: neither the left-hand side nor the right-hand side runs (no LUT/mem side effects, no wire writes). When the trigger fires, **every** assignment in the block runs in order before any other propagation step. Suite tests **2123–2124**.
 
 ---
 
@@ -7620,10 +7631,10 @@ Toggle **clr** \`0→1→0→1\` — **Output** alternates \`hSize = 0000\` / \`
 
 | Allowed in \`{ }\` | Not allowed |
 |------------------|-------------|
-| \`target = expr\` | \`.lut:clear()\` without destination |
+| \`target = expr\` (one or many, comma-separated) | \`.lut:clear()\` without destination |
 | \`.comp:pin = expr\` | \`pcb\`, \`chip\`, \`board\`, \`comp\`, \`def\` |
-| \`.mem:set = flag\` | Multiple assignments |
-| \`process = 1\` | Any non-assignment statement |
+| \`a, b = expr\` (multi-target) | Any non-assignment statement |
+| \`process = 1\` | |
 
 ---
 
@@ -7632,7 +7643,7 @@ Toggle **clr** \`0→1→0→1\` — **Output** alternates \`hSize = 0000\` / \`
 | | \`on: { }\` (standalone) | \`.comp:{ }\` (property block) |
 |--|------------------------|------------------------------|
 | Scope | Program / PCB body | Bound to one component instance |
-| Statements | Exactly one assignment | Multiple pin assignments |
+| Statements | One or more comma-separated assignments | Multiple pin assignments |
 | Typical use | LUT/mem ops gated by a flag | Pin wiring on \`exec:\` trigger |
 
 Property blocks remain the right tool for multi-pin updates on a component; conditional assignment is for isolated side-effect writes (LUT, mem, a single wire).
@@ -10638,7 +10649,7 @@ End-to-end **wave** demo: measure symbol frequencies from a source wire, sort en
 
 For the static codebook + protocol walkthrough (v1), see **[huffman.md](huffman.md)**.
 
-**Suite tests:** **2104** (freq \`set\`+\`ADD\`), **2105** (\`SORT\` entries), **2106–2107** (round-trip wave), **2108** (\`=:\` padding), **2109** (osc scan + counter), **2110** (N-general \`popMin\` merge + manual codebook), **2111–2114** (\`.links\` + auto codewords).
+**Suite tests:** **2104** (freq \`set\`+\`ADD\`), **2105** (\`SORT\` entries), **2106–2107** (round-trip wave), **2108** (\`=:\` padding), **2109** (osc scan + counter), **2110** (N-general \`popMin\` merge + manual codebook), **2111–2114** (\`.links\` + auto codewords unroll), **2115–2118** (FSM switch scan+merge + walk/protocol), **2120–2122** (\`:entries(sortKeys|sortValues)\`), **2123–2124** (multi-assign \`on:\`), **2125–2127** (declarative wire re-eval + LUT live read), **2128** (FSM + \`execStmts\` protocol round-trip).
 
 ---
 
@@ -10725,7 +10736,7 @@ on:raise {
 }
 \`\`\`
 
-Evaluate the symbol slice **inside** the \`on:raise\` body (or use fixed \`EQ(.idx:get, …)\` branches). A top-level \`4wire sym = source.(pos)/4\` can go **stale** across ticks in wave mode.
+Evaluate the symbol slice **inside** the \`on:raise\` body (or use fixed \`EQ(.idx:get, …)\` branches). A top-level \`4wire sym = source.(pos)/4\` **tracks** \`.idx:get\` in wave mode and re-evaluates when the counter advances (test **2125**).
 
 ### Manual tick — switch + counter (editor-friendly)
 
@@ -11308,7 +11319,180 @@ Four tokens \`00\` \`01\` \`10\` \`11\` → payload 9 bits + 8-bit length = **17
 
 - **\`on:1 { once, … }\`** or **\`on:raise\`** for one-shot LUT writes. Bare \`1wire _ = .lut:add(…)\` at top level can run **twice** on the first Run in wave — see [conditional-assignment.md](conditional-assignment.md).
 - **\`NEXT(~)\`** in wave only recomputes wires in the \`~\` / \`%\` / \`$\` closure — counters, \`.freq\` entries, and writable LUT state **persist** between steps ([signal-propagation.md](signal-propagation.md)).
-- After osc / \`on:raise\` mutations, wires assigned once at parse time may be **stale**; use \`probe\`, re-assign, or \`exec\` a fresh \`wire = .freq:get(sym)\` before \`show\`.
+- **Declarative wires** that read component outputs (\`.idx:get\`, \`.heap:size()\`, \`.links:get(…)\`) are **re-evaluated** when those components mutate — no manual refresh for typical Huffman FSM wiring (tests **2125–2127**).
+- **Post-run scripts:** test harness \`execStmts\` re-parses statements against the live interpreter, seeds inline kinds (protocol vs asm), and calls \`propagate()\` on wave sessions — use for FSM walk + \`.huffPacket\` encode after ticks (tests **2116**, **2117**, **2128**). See [protocol.md — execStmts](protocol.md#execstmts-secondary-parse).
+
+---
+
+## FSM v2.1 — scan + merge (\`huffFsmScript\`)
+
+Generator: \`tests/test_suite.js\` (\`huffFsmRoundTripScript\`) · Node mirror: \`node/huff_fsm_script.js\` · regenerate doc block: \`node node/_gen_huff_fsm_doc.js\`.
+
+One **switch** tick = scan byte step, one merge round, or \`.huff\` commit. Phases:
+
+| Phase | \`ph\` | Behaviour |
+|-------|------|-----------|
+| SCAN | \`0000\` | \`.idx\` + \`on:raise\` freq \`:set\`; at \`srcLen\` → heap load + \`ph=MERGE\` |
+| MERGE | \`0010\` | Parametric merge (\`nSym − 1\` rounds, literal parent keys) |
+| DONE | \`0101\` | \`root = nid\`; \`on:raise\` \`.huff:add\` → packet/recover (no declarative walk) |
+
+**Script size (\`'aacb'\`, 3 symbols):** ~**120 lines**. Merge-only FSM ~**95 lines** (\`huffFsmScript\`).
+
+### Runnable — FSM wave round-trip (\`'aacb'\`)
+
+Open [huffman-v2.md](huffman-v2.md) in the **doc viewer**, then **Load** or **Load & Run** on the block below.
+
+**How to run:** **Load & Run**, then click **tick** on the switch until **Output** shows \`ph = 0101\`, \`huffSz = 00000011\`, \`huffReady = 1\`, and \`recovered\` = \`"aacb"\` (~**8–10** clicks).
+
+| Output | Expected |
+|--------|----------|
+| \`source\` | \`"aacb"\` |
+| \`_hc0\` / \`_hc1\` / \`_hc2\` | \`10\` / \`11\` / \`0\` (symbols \`b\` / \`c\` / \`a\`) |
+| \`ph\` | \`0101\` when merge + huff commit done |
+| \`root\` | \`11111111\` |
+| \`recovered\` | same as \`source\` |
+
+\`\`\`logts-play wave
+MODE WIREWRITE
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .heap:
+  writable
+  depth: 8
+  length: 256
+  fillwith: 00000000
+  data { }
+  :
+inline [lut] .links:
+  writable
+  depth: 16
+  length: 256
+  fillwith: 0000000000000000
+  data { }
+  :
+inline [lut] .huff:
+  writable
+  prefixFree
+  variableDepth
+  length: 256
+  data { }
+  :
+inline [protocol] .huffPacket:
+  def encoded:
+    expand(tokens, .huff, 8b)
+  out:
+    lengthOf(encoded) 8b
+    encoded
+  :
+inline [protocol] .huffRecover:
+  out:
+    collapse(withLength(data, 8b), .huff, 8b)
+  :
+inline [lut] .hfsm:
+  SCAN  = 0000
+  MERGE = 0010
+  DONE  = 0101
+  data { }
+  :
+
+32wire source =: 'aacb'
+8wire srcLen = 00100000
+comp [switch] .clk:
+  text: 'tick'
+  :
+4wire ph = 0000
+1wire phScan = EQ(ph, .hfsm:SCAN)
+1wire phMerge = EQ(ph, .hfsm:MERGE)
+1wire phDone = EQ(ph, .hfsm:DONE)
+comp [counter] .idx:
+  depth: 8
+  on: raise
+  :
+.idx:{
+  data = ADD(.idx:get, 00001000)
+  write = 1
+  set = AND(NOT(.clk:get), phScan, LT(.idx:get, srcLen))
+}
+8wire nSym = 00000000
+8wire mergeStep = 00000000
+8wire mergeTarget = 00000010
+8wire nid = 11111101
+8wire sym = 00000000
+8wire root = 00000000
+on:raise { AND(.clk:get, phScan, LT(.idx:get, srcLen)), sym = source.(.idx:get)/8 }
+on:raise { AND(.clk:get, phScan, LT(.idx:get, srcLen)), 1wire _ = .freq:set(sym, ADD(.freq:get(sym), \\1;8)) }
+on:raise { AND(.clk:get, phScan, EQ(.idx:get, srcLen)),
+  nSym = .freq:size(),
+  1wire _ = .heap:clear(),
+  1wire _ = .heap:add(01100010, \\1;8),
+  1wire _ = .heap:add(01100011, \\1;8),
+  1wire _ = .heap:add(01100001, \\2;8),
+  nid = 11111101,
+  mergeStep = 00000000,
+  
+  ph = .hfsm:MERGE }
+on:raise { AND(.clk:get, phMerge, EQ(mergeStep, 00000000), LT(mergeStep, mergeTarget)),
+  8wire _m0k1, 8wire _m0f1 = .heap:popMin(),
+  8wire _m0k2, 8wire _m0f2 = .heap:popMin(),
+  8wire _m0sum, 1wire _m0c = ADD(_m0f1, _m0f2),
+  8wire _m0p = 11111110,
+  16wire _m0l0 = _m0p + \\0;8,
+  16wire _m0l1 = _m0p + \\1;8,
+  1wire _ = .heap:add(_m0p, _m0sum),
+  1wire _ = .links:set(_m0k1, _m0l0),
+  1wire _ = .links:set(_m0k2, _m0l1),
+  nid = 11111110,
+  mergeStep = 00000001 }
+on:raise { AND(.clk:get, phMerge, EQ(mergeStep, 00000001), LT(mergeStep, mergeTarget)),
+  8wire _m1k1, 8wire _m1f1 = .heap:popMin(),
+  8wire _m1k2, 8wire _m1f2 = .heap:popMin(),
+  8wire _m1sum, 1wire _m1c = ADD(_m1f1, _m1f2),
+  8wire _m1p = 11111111,
+  16wire _m1l0 = _m1p + \\0;8,
+  16wire _m1l1 = _m1p + \\1;8,
+  1wire _ = .heap:add(_m1p, _m1sum),
+  1wire _ = .links:set(_m1k1, _m1l0),
+  1wire _ = .links:set(_m1k2, _m1l1),
+  nid = 11111111,
+  mergeStep = 00000010 }
+on:raise { AND(.clk:get, phMerge, EQ(mergeStep, mergeTarget)), root = nid }
+on:raise { AND(.clk:get, phMerge, EQ(mergeStep, mergeTarget)), ph = .hfsm:DONE }
+8wire huffCommit = 00000000
+2wire _hc0 = 00
+2wire _hc1 = 00
+1wire _hc2 = 0
+64wire packet = \\0;64
+32wire recovered = \\0;32
+on:raise { AND(.clk:get, phDone, EQ(huffCommit, 00000000), GT(nSym, 00000000)),
+  1wire _ = .huff:clear(),
+  _hc0 = 10, 1wire _ = .huff:add(01100010, _hc0),
+  _hc1 = 11, 1wire _ = .huff:add(01100011, _hc1),
+  _hc2 = 0, 1wire _ = .huff:add(01100001, _hc2),
+  huffCommit = 00000001 }
+on:raise { AND(.clk:get, EQ(huffCommit, 00000001)),
+  packet =: .huffPacket { tokens = source },
+  recovered = .huffRecover { data = packet } }
+8wire huffSz = .huff:size()
+1wire huffReady = AND(EQ(huffSz, nSym), GT(nSym, 00000000))
+show(source; ascii)
+show(_hc0)
+show(_hc1)
+show(_hc2)
+probe(recovered; ascii)
+show(ph)
+show(root)
+show(huffSz)
+show(huffReady)
+\`\`\`
+
+**Tests:** **2115** (merge+links), **2116** (walk via \`execStmts\`), **2117** (\`execStmts\` round-trip), **2118** (in-script round-trip, no \`execStmts\`).
+
+**Backlog (S1):** single merge block with reused \`mk/mf\` (\`engine-on-reassign\`); hop-by-hop walk FSM without static \`huffWalkEmit\`.
 
 ---
 
@@ -11324,7 +11508,17 @@ Four tokens \`00\` \`01\` \`10\` \`11\` → payload 9 bits + 8-bit length = **17
 | Round-trip wave | **Done** — tests **2106–2108** |
 | N-general merge + byte codebook | **Done** — test **2110** (\`popMin\`, manual \`.huff\`) |
 | Auto codewords via \`.links\` walk | **Done** — tests **2111–2114** (\`'aacb'\`, fixed code depth) |
-| Automatic tree + codewords from freqs | **Partial** — merge + walk for bounded demo; dynamic depth per symbol = backlog |
+| \`:entries(sortKeys\\|sortValues)\` | **Done** — tests **2120–2122** |
+| Multi-assign in one \`on:raise { }\` | **Done** — tests **2123–2124** |
+| Declarative wire re-eval (counter, LUT \`:size\`, \`:get\`) | **Done** — tests **2125–2127** |
+| FSM switch scan + merge (\`ph\` 4b) | **Done** — test **2115** (\`'aacb'\`, links = **2113**, wave session) |
+| FSM + post-tick walk (\`execStmts\`) | **Done** — test **2116** (codewords \`0\`/\`10\`/\`11\`) |
+| FSM merge + \`execStmts\` round-trip | **Done** — test **2117** (merge + walk + protocol, wave) |
+| FSM + \`execStmts\` protocol only | **Done** — test **2128** |
+| Parametric merge steps (\`nSym−1\` not ×31) | **Done** — generator \`huffFsmMergeStepBlocks(sourceLiteral)\` |
+| Reused merge wires (\`mk/mf\` one block) | **Backlog** — engine reassign in duplicate \`on:raise\` |
+| Walk FSM hop-by-hop (\`ph=WHOP\`, no static unroll) | **Backlog** |
+| FSM round-trip in-script (no \`execStmts\`) | **Done** — test **2118** + doc **Load & Run** block |
 | \`ARGSORT\` / \`keysAt\` / \`valuesAt\` | **Backlog** (generic) |
 | \`comp [priorityqueue]\` | **Backlog** — redundant if \`popMin\` suffices |
 | \`buildFrom\` / \`HUFFMAN_*\` builtin | **Out of scope** (by design) |
@@ -11727,7 +11921,7 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 | **Length field width** | \`8b\` allows payloads up to 255 bits. Use \`16b\` for larger frames ([\`withLength\`](protocol.md#withlengthdata-nb)). |
 | **Separate protocols** | Encoder and decoder are independent definitions — swap codebooks or framing without changing the other side's structure. |
 | **Not in scope** | \`checksum()\`, \`concat()\`, \`padLeft()\`, \`padRight()\` — add framing or integrity in user logic if needed. |
-| **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2114** ([huffman-v2.md](huffman-v2.md) wave pipeline). |
+| **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2114** ([huffman-v2.md](huffman-v2.md) wave pipeline), **2115–2118** (FSM wave + round-trip doc block), **2128** (protocol via \`execStmts\`). |
 
 ---
 
@@ -14055,6 +14249,8 @@ inline [lut] .huff:
 | \`.lut:keys()\` | Vector of all keys (key width × entry count) |
 | \`.lut:values()\` | Vector of all values (value width × entry count) |
 | \`.lut:entries()\` | Matrix **N×2**: column 0 = key, column 1 = value (\`ew = max(keyW, valW)\`) |
+| \`.lut:entries(sortKeys)\` | Keys only, sorted by value ascending (unsigned default); tie-break: lower entry index |
+| \`.lut:entries(sortValues)\` | Values only, same sort order as \`sortKeys\` |
 | \`.lut:keyAt(i)\` | Key at list index \`i\` (\`0 … size()-1\`; addr width) |
 | \`.lut:valueAt(i)\` | Value at list index \`i\` (depth or variableDepth width) |
 | \`.lut:removeAt(i)\` | Remove entry at index \`i\`; returns \`1wire\` ack \`0\` |
@@ -14162,6 +14358,8 @@ Use a named wire for the assignment (\`ok = .huff:add(...)\`) — not \`_\` (und
 
 **Affected methods:** \`:add\`, \`:set\`, \`:remove\`, \`:removeAt\`, \`:clear\`, \`:popMin\`, \`:popMax\` (all mutate \`lutEntryList\`). Read-only methods (\`:keys\`, \`:values\`, \`:entries\`, \`:keyAt\`, \`:valueAt\`, \`:peekMin\`, \`:peekMax\`, \`:get\`, \`:size\`, …) are safe to assign on a wire; re-execution only refreshes the snapshot.
 
+On **wave**, a top-level wire like \`16wire lb = .links:get(key)\` or \`4wire sz = .heap:size()\` **tracks** the LUT and re-evaluates after mutations (and after test-harness \`execStmts\` + \`propagate()\`) — tests **2126–2127**. See [signal propagation](signal-propagation.md#declarative-wire-re-evaluation).
+
 \`\`\`logts-play wave
 inline [lut] .freq:
   writable
@@ -14188,6 +14386,34 @@ show(ent)
 \`\`\`
 
 Use with [SORT](builtin-SORT.md) to reorder by frequency, e.g. \`SORT(.freq:entries(); col=1)\`.
+
+**Sorted export (Huffman heap load):** avoid \`SORT\` on an empty or changing list at init — use value-sorted snapshots instead:
+
+\`\`\`logts-play wave
+inline [lut] .freq:
+  writable
+  depth: 8
+  length: 16
+  fillwith: 00000000
+  data { }
+  :
+1wire _ = .freq:set(0010, \\\\3;8)
+1wire _ = .freq:set(0011, \\\\1;8)
+1wire _ = .freq:set(0000, \\\\2;8)
+8wire[3] syms = .freq:entries(sortKeys)
+8wire[3] cnts = .freq:entries(sortValues)
+show(syms)
+show(cnts)
+\`\`\`
+
+Optional format tags (same as \`:popMin\` / \`:peekMin\`): unsigned default, \`; signed\`, or \`; q4p4\` etc.
+
+\`\`\`logts
+8wire syms = .freq:entries(sortKeys; signed)
+8wire cnts = .freq:entries(sortValues; signed)
+\`\`\`
+
+Empty list → zero-length blob (\`bitWidth = 0\`). Fixed-width wire assignment requires \`N >= 1\` in \`[N]\` — gate heap load on \`.freq:size()\` or use after scan populates entries.
 
 ### \`fillwith\` vs explicit entries
 
@@ -19169,6 +19395,29 @@ Example \`doc(.uart8n1)\`:
 
 ---
 
+## \`execStmts\` (secondary parse)
+
+The editor runs the full script once at **Run**. The **test harness** also supports \`execStmts(interp, src)\` — append extra top-level statements against the **same** interpreter (e.g. Huffman FSM ticks, then encode).
+
+Requirements:
+
+| Topic | Detail |
+|-------|--------|
+| Inline instances | Must already exist from the initial \`run()\` (\`inline [protocol] .huffPacket:\` etc.) |
+| Parser disambiguation | \`{ }\` after \`.name\` is protocol if the instance is \`protocol\`, asm if \`asm\`. Secondary parse **seeds** kinds from \`inlineInstances\` — otherwise \`.huffPacket { tokens = source }\` is misparsed as asm and throws *not an asm ISA* |
+| Wave session | After exec, \`propagate()\` runs so wires like \`16wire lb = .links:get(…)\` see fresh LUT data |
+
+Example (after FSM + walk via \`execStmts\`):
+
+\`\`\`logts
+64wire packet =: .huffPacket { tokens = source }
+32wire recovered = .huffRecover { data = packet }
+\`\`\`
+
+Tests **2128** (round-trip), **2116** (walk only). Wrong kind error: *Inline instance '.foo' is a protocol, not an asm ISA; use .foo { param = ... }*.
+
+---
+
 ## vs ASM
 
 | Feature | asm | protocol |
@@ -20525,7 +20774,23 @@ For examples and edge cases, see PCB tests **500–515** (legacy) and **516–53
 
 ### Conditional assignment (\`on:\`)
 
-Standalone \`on:<mode> { trigger, assignment }\` statements use the same trigger helpers as property blocks and are re-evaluated when trigger dependencies change during propagation. See [conditional-assignment.md](conditional-assignment.md).
+Standalone \`on:<mode> { trigger, assignment }\` statements use the same trigger helpers as property blocks and are re-evaluated when trigger dependencies change during propagation. Multiple comma-separated assignments in one block run in order when the trigger fires — see [conditional-assignment.md](conditional-assignment.md) (tests **2123–2124**).
+
+### Declarative wire re-evaluation
+
+Top-level wire statements (\`Nwire x = expr\`) are tracked at elaboration. When a **dependency changes**, the engine re-runs the statement and cascades to wires that depend on its result:
+
+| Dependency type | Example | Re-eval when |
+|-----------------|---------|--------------|
+| Component computed output | \`8wire idxSnap = .idx:get\` | Counter / reg \`:data\` updates (\`setCounter\`, property block write) |
+| Writable LUT read | \`16wire lb = .links:get(key)\` | LUT mutation (\`:set\`, \`:add\`, …) or post-\`execStmts\` propagate |
+| Writable LUT size | \`4wire sz = .heap:size()\` | Entry list changes |
+
+Tests **2125–2127** (Huffman FSM). This replaces manual “stale wire” workarounds for typical \`.idx:get\` / \`:size\` / \`:get\` patterns.
+
+### \`execStmts\` (test harness)
+
+The Node/browser test session exposes \`execStmts(interp, src)\` to append and run fresh top-level statements against a live interpreter (e.g. after FSM ticks). On **wave** sessions it calls \`propagate()\` after exec so LUT reads and dependent wires settle. Protocol invocations (\`.huffPacket { … }\`) work because the parser is seeded with inline kinds from \`inlineInstances\` — see [protocol.md — execStmts](protocol.md#execstmts-secondary-parse).
 
 ---
 

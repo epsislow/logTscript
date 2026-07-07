@@ -907,6 +907,29 @@ Example `doc(.uart8n1)`:
 
 ---
 
+## `execStmts` (secondary parse)
+
+The editor runs the full script once at **Run**. The **test harness** also supports `execStmts(interp, src)` — append extra top-level statements against the **same** interpreter (e.g. Huffman FSM ticks, then encode).
+
+Requirements:
+
+| Topic | Detail |
+|-------|--------|
+| Inline instances | Must already exist from the initial `run()` (`inline [protocol] .huffPacket:` etc.) |
+| Parser disambiguation | `{ }` after `.name` is protocol if the instance is `protocol`, asm if `asm`. Secondary parse **seeds** kinds from `inlineInstances` — otherwise `.huffPacket { tokens = source }` is misparsed as asm and throws *not an asm ISA* |
+| Wave session | After exec, `propagate()` runs so wires like `16wire lb = .links:get(…)` see fresh LUT data |
+
+Example (after FSM + walk via `execStmts`):
+
+```logts
+64wire packet =: .huffPacket { tokens = source }
+32wire recovered = .huffRecover { data = packet }
+```
+
+Tests **2128** (round-trip), **2116** (walk only). Wrong kind error: *Inline instance '.foo' is a protocol, not an asm ISA; use .foo { param = ... }*.
+
+---
+
 ## vs ASM
 
 | Feature | asm | protocol |

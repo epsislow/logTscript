@@ -18268,11 +18268,12 @@ function huffMergeRound(id, parentKey) {
 1wire _ = .links:set(_m${id}k2, _m${id}l1)`;
 }
 
-function huffWalkEmit(symLiteral, codName, codeDepth, hopCount) {
-  hopCount = hopCount || 7;
+function huffWalkEmit(symLiteral, codName, codeDepth, hopCount, rootRef) {
+  hopCount = hopCount != null ? hopCount : codeDepth;
+  rootRef = rootRef || '11111111';
   const lines = [];
   lines.push(`8wire _${codName}_n0 = ${symLiteral}`);
-  lines.push(`8wire _${codName}_root = 11111111`);
+  lines.push(`8wire _${codName}_root = ${rootRef}`);
   for (let i = 1; i <= hopCount; i++) {
     const prev = i === 1 ? `_${codName}_n0` : `_${codName}_n${i - 1}`;
     const g = `_${codName}_g${i}`;
@@ -18285,15 +18286,323 @@ function huffWalkEmit(symLiteral, codName, codeDepth, hopCount) {
     lines.push(`1wire _${codName}_b${i} = MUX(${g}, 0, _${codName}_lk${i}.15/1)`);
     lines.push(`8wire _${codName}_n${i} = MUX(${g}, ${prev}, _${codName}_lk${i}.0/8)`);
   }
-  lines.push(`1wire _${codName}_u1 = AND(_${codName}_g1, NOT(_${codName}_g2))`);
-  const bits = [];
-  for (let j = codeDepth; j >= 1; j--) bits.push(`_${codName}_b${j}`);
   if (codeDepth === 1) {
-    lines.push(`1wire ${codName} = MUX(_${codName}_u1, 0, _${codName}_b1)`);
+    lines.push(`1wire ${codName} = MUX(_${codName}_g1, 0, _${codName}_b1)`);
   } else {
+    const bits = [];
+    for (let j = codeDepth; j >= 1; j--) bits.push(`_${codName}_b${j}`);
     lines.push(`${codeDepth}wire ${codName} = ${bits.join(' + ')}`);
   }
   return lines.join('\n');
+}
+
+const HUFF_FSM_MAX_MERGES = 31;
+function huffFsmBin8(n) {
+  return n.toString(2).padStart(8, '0');
+}
+
+/** Internal parent key for merge round r (nid starts at 0xFD). */
+function huffFsmParentKey(round) {
+  return huffFsmBin8(0xFE + round);
+}
+
+const HUFF_FSM_LUT = `inline [lut] .hfsm:
+  SCAN  = 0000
+  MERGE = 0010
+  DONE  = 0101
+  data { }
+  :
+`;
+
+/** Two-phase merge: tick1 pop+parent, tick2 links (mergeSub 2=idle 0=popped 1=linked). */
+function huffFsmTwoPhaseMergeBlock() {
+  const pop = `AND(.clk:get, phMerge, LT(mergeStep, mergeTarget), EQ(mergeSub, 00000010))`;
+  const link = `AND(.clk:get, phMerge, LT(mergeStep, mergeTarget), EQ(mergeSub, 00000001))`;
+  return `8wire mergeSub = 00000010
+8wire mk = 00000000
+8wire mf = 00000000
+8wire mk2 = 00000000
+8wire mf2 = 00000000
+8wire msum = 00000000
+8wire mpar = 00000000
+16wire ml0 = \\0;16
+16wire ml1 = \\0;16
+on:raise { ${pop},
+  mk, mf = .heap:popMin(),
+  mk2, mf2 = .heap:popMin(),
+  msum, 1wire _ = ADD(mf, mf2),
+  mpar = ADD(11111101, ADD(mergeStep, \\1;8)),
+  ml0 = mpar + \\0;8,
+  ml1 = mpar + \\1;8,
+  1wire _ = .heap:add(mpar, msum),
+  mergeSub = 00000001 }
+on:raise { ${link},
+  1wire _ = .links:set(mk, ml0),
+  1wire _ = .links:set(mk2, ml1),
+  nid = mpar,
+  mergeStep, 1wire _ = ADD(mergeStep, \\1;8),
+  mergeSub = 00000010 }`;
+}
+
+/** Parametric merge: one `on:raise` per step (atomic parent+links) — Node tests. */
+function huffFsmMergeStepBlocks(sourceLiteral) {
+  const uniqueSyms = new Set(sourceLiteral || 'aacb').size;
+  const maxR = Math.min(HUFF_FSM_MAX_MERGES, Math.max(0, uniqueSyms - 1));
+  const lines = [];
+  for (let r = 0; r < maxR; r++) {
+    const step = huffFsmBin8(r);
+    const next = huffFsmBin8(r + 1);
+    const parent = huffFsmParentKey(r);
+    const c = `AND(.clk:get, phMerge, EQ(mergeStep, ${step}), LT(mergeStep, mergeTarget))`;
+    lines.push(`on:raise { ${c},
+  8wire _m${r}k1, 8wire _m${r}f1 = .heap:popMin(),
+  8wire _m${r}k2, 8wire _m${r}f2 = .heap:popMin(),
+  8wire _m${r}sum, 1wire _m${r}c = ADD(_m${r}f1, _m${r}f2),
+  8wire _m${r}p = ${parent},
+  16wire _m${r}l0 = _m${r}p + \\0;8,
+  16wire _m${r}l1 = _m${r}p + \\1;8,
+  1wire _ = .heap:add(_m${r}p, _m${r}sum),
+  1wire _ = .links:set(_m${r}k1, _m${r}l0),
+  1wire _ = .links:set(_m${r}k2, _m${r}l1),
+  nid = ${parent},
+  mergeStep = ${next} }`);
+  }
+  return lines.join('\n');
+}
+
+/** Reused mk/mf/mk2/mf2 — one merge round per tick while LT(mergeStep, mergeTarget). */
+function huffFsmCompactMergeBlock() {
+  const c = `AND(.clk:get, phMerge, LT(mergeStep, mergeTarget))`;
+  return `on:raise { ${c},
+  8wire mk, 8wire mf = .heap:popMin(),
+  8wire mk2, 8wire mf2 = .heap:popMin(),
+  8wire msum, 1wire _ = ADD(mf, mf2),
+  mpar = ADD(11111101, ADD(mergeStep, \\1;8)),
+  16wire ml0 = mpar + \\0;8,
+  16wire ml1 = mpar + \\1;8,
+  1wire _ = .heap:add(mpar, msum),
+  1wire _ = .links:set(mk, ml0),
+  1wire _ = .links:set(mk2, ml1),
+  nid = mpar,
+  mergeStep, 1wire _ = ADD(mergeStep, \\1;8) }`;
+}
+
+function huffFsmScanDoneHeapLoadStmts(sourceLiteral) {
+  const freq = new Map();
+  for (const c of sourceLiteral) freq.set(c, (freq.get(c) || 0) + 1);
+  const entries = [...freq.entries()].sort(
+    (a, b) => a[1] - b[1] || a[0].localeCompare(b[0])
+  );
+  return entries.map(([c, f]) => {
+    const sym = c.charCodeAt(0).toString(2).padStart(8, '0');
+    return `1wire _ = .heap:add(${sym}, \\${f};8)`;
+  }).join(',\n  ');
+}
+
+/** Single on:raise at scan end — clear then add in order (wave-safe). */
+function huffFsmScanDoneBlock(sourceLiteral, twoPhase) {
+  const c = `AND(.clk:get, phScan, EQ(.idx:get, srcLen))`;
+  const heapAdds = huffFsmScanDoneHeapLoadStmts(sourceLiteral);
+  const mergeSubLine = twoPhase ? 'mergeSub = 00000010,' : '';
+  return `on:raise { ${c},
+  nSym = .freq:size(),
+  1wire _ = .heap:clear(),
+  ${heapAdds},
+  nid = 11111101,
+  mergeStep = 00000000,
+  ${mergeSubLine}
+  ph = .hfsm:MERGE }`;
+}
+
+function huffFsmScript(sourceLiteral, opts) {
+  opts = opts || {};
+  sourceLiteral = sourceLiteral || 'aacb';
+  const srcBits = sourceLiteral.length * 8;
+  const srcLen = huffFsmBin8(srcBits);
+  const uniqueSyms = new Set(sourceLiteral).size;
+  const mergeTarget = huffFsmBin8(Math.max(0, uniqueSyms - 1));
+  const twoPhase = opts.twoPhase === true;
+  const mergeBlock = twoPhase
+    ? huffFsmTwoPhaseMergeBlock()
+    : huffFsmMergeStepBlocks(sourceLiteral);
+  return `${HUFF_FULL_BASE}
+${HUFF_FSM_LUT}
+32wire source =: '${sourceLiteral}'
+8wire srcLen = ${srcLen}
+comp [switch] .clk:
+  text: 'tick'
+  :
+4wire ph = 0000
+1wire phScan = EQ(ph, .hfsm:SCAN)
+1wire phMerge = EQ(ph, .hfsm:MERGE)
+1wire phDone = EQ(ph, .hfsm:DONE)
+comp [counter] .idx:
+  depth: 8
+  on: raise
+  :
+.idx:{
+  data = ADD(.idx:get, 00001000)
+  write = 1
+  set = AND(NOT(.clk:get), phScan, LT(.idx:get, srcLen))
+}
+8wire nSym = 00000000
+8wire mergeStep = 00000000
+8wire mergeTarget = ${mergeTarget}
+8wire nid = 11111101
+8wire sym = 00000000
+8wire root = 00000000
+on:raise { AND(.clk:get, phScan, LT(.idx:get, srcLen)), sym = source.(.idx:get)/8 }
+on:raise { AND(.clk:get, phScan, LT(.idx:get, srcLen)), 1wire _ = .freq:set(sym, ADD(.freq:get(sym), \\1;8)) }
+${huffFsmScanDoneBlock(sourceLiteral, twoPhase)}
+${mergeBlock}
+on:raise { AND(.clk:get, phMerge, EQ(mergeStep, mergeTarget)), root = nid }
+on:raise { AND(.clk:get, phMerge, EQ(mergeStep, mergeTarget)), ph = .hfsm:DONE }`;
+}
+
+function huffLeafDepths(sourceLiteral) {
+  const freq = new Map();
+  for (const c of sourceLiteral) freq.set(c, (freq.get(c) || 0) + 1);
+  let heap = [...freq.entries()]
+    .map(([c, f]) => ({ sym: c.charCodeAt(0), f, key: null }))
+    .sort((a, b) => a.f - b.f || a.sym - b.sym);
+  let nid = 0xFD;
+  const parent = new Map();
+  while (heap.length > 1) {
+    const n1 = heap.shift();
+    const n2 = heap.shift();
+    nid++;
+    const pKey = nid;
+    const left = n1.key != null ? n1.key : n1.sym;
+    const right = n2.key != null ? n2.key : n2.sym;
+    parent.set(left, pKey);
+    parent.set(right, pKey);
+    heap.push({ sym: null, f: n1.f + n2.f, key: pKey });
+    heap.sort((a, b) => a.f - b.f || ((a.key != null ? a.key : a.sym) - (b.key != null ? b.key : b.sym)));
+  }
+  const rootKey = nid;
+  const depths = new Map();
+  for (const c of freq.keys()) {
+    let cur = c.charCodeAt(0);
+    let depth = 0;
+    while (cur !== rootKey) {
+      const p = parent.get(cur);
+      if (p == null) break;
+      depth++;
+      cur = p;
+    }
+    depths.set(c, depth);
+  }
+  return depths;
+}
+
+/** Codewords from same merge order as FSM (for on:raise `.huff:add`, no declarative walk). */
+function huffCodewordsForSource(sourceLiteral) {
+  const freq = new Map();
+  for (const c of sourceLiteral) freq.set(c, (freq.get(c) || 0) + 1);
+  let heap = [...freq.entries()]
+    .map(([c, f]) => ({ id: c.charCodeAt(0), f }))
+    .sort((a, b) => a.f - b.f || a.id - b.id);
+  let nid = 0xFD;
+  const parent = new Map();
+  const edgeBit = new Map();
+  while (heap.length > 1) {
+    const n1 = heap.shift();
+    const n2 = heap.shift();
+    nid++;
+    parent.set(n1.id, nid);
+    parent.set(n2.id, nid);
+    edgeBit.set(n1.id, '0');
+    edgeBit.set(n2.id, '1');
+    heap.push({ id: nid, f: n1.f + n2.f });
+    heap.sort((a, b) => a.f - b.f || a.id - b.id);
+  }
+  const rootId = nid;
+  const entries = [...freq.entries()].sort(
+    (a, b) => a[1] - b[1] || a[0].localeCompare(b[0])
+  );
+  return entries.map(([ch]) => {
+    let cur = ch.charCodeAt(0);
+    let bits = '';
+    while (cur !== rootId) {
+      bits = edgeBit.get(cur) + bits;
+      cur = parent.get(cur);
+    }
+    const sym = ch.charCodeAt(0).toString(2).padStart(8, '0');
+    return { sym, cod: bits, width: bits.length, ch };
+  });
+}
+
+function huffWalkEmitForSource(sourceLiteral) {
+  const freq = new Map();
+  for (const c of sourceLiteral) freq.set(c, (freq.get(c) || 0) + 1);
+  const entries = [...freq.entries()].sort(
+    (a, b) => a[1] - b[1] || a[0].localeCompare(b[0])
+  );
+  const depths = huffLeafDepths(sourceLiteral);
+  const lines = [];
+  const names = [];
+  entries.forEach(([ch], i) => {
+    const sym = ch.charCodeAt(0).toString(2).padStart(8, '0');
+    const name = `cw${i}`;
+    const depth = depths.get(ch);
+    names.push({ sym, name });
+    lines.push(huffWalkEmit(sym, name, depth, depth, 'root'));
+  });
+  return { lines: lines.join('\n'), names };
+}
+
+/** FSM scan+merge + on:raise `.huff:add` + protocol round-trip (no declarative walk). */
+function huffFsmRoundTripScript(sourceLiteral) {
+  sourceLiteral = sourceLiteral || 'aacb';
+  const codes = huffCodewordsForSource(sourceLiteral);
+  const codeDecls = codes
+    .map((e, i) => {
+      const w = Math.max(1, e.width);
+      const init = w === 1 ? '0' : '0'.repeat(w);
+      return `${w}wire _hc${i} = ${init}`;
+    })
+    .join('\n');
+  const addLines = codes
+    .map((e, i) => `  _hc${i} = ${e.cod}, 1wire _ = .huff:add(${e.sym}, _hc${i})`)
+    .join(',\n');
+  const showCodes = codes.map((e, i) => `show(_hc${i})`).join('\n');
+  return `${huffFsmScript(sourceLiteral)}
+8wire huffCommit = 00000000
+${codeDecls}
+64wire packet = \\0;64
+32wire recovered = \\0;32
+on:raise { AND(.clk:get, phDone, EQ(huffCommit, 00000000), GT(nSym, 00000000)),
+  1wire _ = .huff:clear(),
+${addLines},
+  huffCommit = 00000001 }
+on:raise { AND(.clk:get, EQ(huffCommit, 00000001)),
+  packet =: .huffPacket { tokens = source },
+  recovered = .huffRecover { data = packet } }
+8wire huffSz = .huff:size()
+1wire huffReady = AND(EQ(huffSz, nSym), GT(nSym, 00000000))
+show(source; ascii)
+${showCodes}
+probe(recovered; ascii)
+show(ph)
+show(root)
+show(huffSz)
+show(huffReady)`;
+}
+
+function huffFsmTick(session, interp) {
+  session.setComp(interp, '.clk', '0');
+  session.setComp(interp, '.clk', '1');
+  session.setComp(interp, '.clk', '0');
+}
+
+function huffWalkExecAacb() {
+  return `1wire _ = .huff:clear()
+${huffWalkEmit('01100001', 'ca', 1, 1)}
+${huffWalkEmit('01100010', 'cb', 2, 2)}
+${huffWalkEmit('01100011', 'cc', 2, 2)}
+1wire _ = .huff:add(01100001, ca)
+1wire _ = .huff:add(01100010, cb)
+1wire _ = .huff:add(01100011, cc)`;
 }
 
 reg(2111, 'huffman-wave', 'links set get 16b parent bit layout', function(h, session) {
@@ -18389,11 +18698,191 @@ ${huffWalkEmit('01100011', 'cc', 2)}
   h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
 });
 
+reg(2115, 'huffman-wave', 'FSM scan merge done aacb links wave', function(h, session) {
+  const { interp } = session.run(huffFsmScript('aacb'));
+  for (let i = 0; i < 80; i++) huffFsmTick(session, interp);
+  session.execStmts(interp, `16wire lb = .links:get(01100010)
+16wire lc = .links:get(01100011)
+16wire la = .links:get(01100001)`);
+  h.assert('ph done', session.getWire(interp, 'ph'), '0101');
+  h.assert('nSym', session.getWire(interp, 'nSym'), '00000011');
+  h.assert('root', session.getWire(interp, 'root'), '11111111');
+  h.assert('link b', session.getWire(interp, 'lb'), '1111111000000000');
+  h.assert('link c', session.getWire(interp, 'lc'), '1111111000000001');
+  h.assert('link a', session.getWire(interp, 'la'), '1111111100000000');
+}, { propagation: 'wave' });
+
+reg(2116, 'huffman-wave', 'FSM merge walk execStmts aacb codewords', function(h, session) {
+  const { interp } = session.run(huffFsmScript('aacb'));
+  for (let i = 0; i < 80; i++) huffFsmTick(session, interp);
+  session.execStmts(interp, huffWalkExecAacb());
+  h.assert('ca', session.getWire(interp, 'ca'), '0');
+  h.assert('cb', session.getWire(interp, 'cb'), '10');
+  h.assert('cc', session.getWire(interp, 'cc'), '11');
+}, { propagation: 'wave' });
+
+reg(2120, 'lut-writable', 'entries sortKeys sortValues by value asc', function(h, session) {
+  const src = HUFF_FREQ_LUT + `
+1wire _ = .freq:set(0010, \\3;8)
+1wire _ = .freq:set(0011, \\1;8)
+1wire _ = .freq:set(0000, \\2;8)
+4wire[3] syms = .freq:entries(sortKeys)
+8wire[3] cnts = .freq:entries(sortValues)`;
+  const { interp } = session.run(src);
+  h.assert('sym order', session.getWire(interp, 'syms'), '001100000010');
+  h.assert('cnt order', session.getWire(interp, 'cnts'), '000000010000001000000011');
+}, { propagation: 'wave' });
+
+reg(2121, 'lut-writable', 'entries sortKeys empty list zero bits', function(h, session) {
+  const { interp } = session.run(HUFF_FREQ_LUT);
+  const lut = interp._getLutInst('.freq');
+  const keys = lutEntriesSortKeys(lut, null);
+  const vals = lutEntriesSortValues(lut, null);
+  h.assert('keys bits', keys.value, '');
+  h.assert('keys width', String(keys.bitWidth), '0');
+  h.assert('vals bits', vals.value, '');
+  h.assert('vals width', String(vals.bitWidth), '0');
+  h.assert('size', lutSize(lut).value, '0000');
+});
+
+reg(2122, 'lut-writable', 'entries sortValues signed negative first', function(h, session) {
+  const src = WRITABLE_LUT_SIGNED + `
+8wire[2] syms = .freq:entries(sortKeys; signed)
+8wire[2] cnts = .freq:entries(sortValues; signed)`;
+  const { interp } = session.run(src);
+  h.assert('sym order', session.getWire(interp, 'syms'), '0000000000000001');
+  h.assert('cnt order', session.getWire(interp, 'cnts'), '1111111100000001');
+});
+
+reg(2123, 'conditional-assignment', 'on:raise multiple wire assignments same block', function(h, session) {
+  const src = `MODE WIREWRITE
+1wire flag = 0
+1wire a = 0
+1wire b = 0
+on:raise {
+  flag,
+  a = 1,
+  b = 1
+}
+flag = 1`;
+  const { interp } = session.run(src);
+  h.assert('a', session.getWire(interp, 'a'), '1');
+  h.assert('b', session.getWire(interp, 'b'), '1');
+});
+
+reg(2124, 'conditional-assignment', 'on:1 dual popMin same block wave', function(h, session) {
+  const src = WRITABLE_LUT_MINMAX + `
+1wire once = 1
+4wire k1 = 0000
+4wire f1 = 0000
+4wire k2 = 0000
+4wire f2 = 0000
+on:1 {
+  once,
+  k1, f1 = .heap:popMin(),
+  k2, f2 = .heap:popMin()
+}
+4wire sz = .heap:size()`;
+  const { interp } = session.run(src);
+  h.assert('k1', session.getWire(interp, 'k1'), '0010');
+  h.assert('f1', session.getWire(interp, 'f1'), '0001');
+  h.assert('k2', session.getWire(interp, 'k2'), '0000');
+  h.assert('f2', session.getWire(interp, 'f2'), '0010');
+  h.assert('size', session.getWire(interp, 'sz'), '0001');
+}, { propagation: 'wave' });
+
+reg(2125, 'wave-next', 'idx get wire re-eval on counter tick', function(h, session) {
+  const src = `MODE WIREWRITE
+comp [osc] .clk:
+  freq: 10
+  :
+comp [counter] .idx:
+  depth: 8
+  on: raise
+  :
+.idx:{
+  data = ADD(.idx:get, 00001000)
+  write = 1
+  set = NOT(.clk:get)
+}
+8wire idxSnap = .idx:get
+1wire scanCont = LT(idxSnap, 00001000)`;
+  const { interp } = session.run(src);
+  h.assert('idx 0', session.getWire(interp, 'idxSnap'), '00000000');
+  h.assert('scan cont', session.getWire(interp, 'scanCont'), '1');
+  oscPulse(session, interp, '.clk');
+  h.assert('idx 8', session.getWire(interp, 'idxSnap'), '00001000');
+  h.assert('scan done', session.getWire(interp, 'scanCont'), '0');
+}, { propagation: 'wave' });
+
+reg(2126, 'lut-writable', 'heap size wire re-eval after on:1 popMin wave', function(h, session) {
+  const src = WRITABLE_LUT_MINMAX + `
+4wire sz = .heap:size()
+1wire once = 1
+4wire k1 = 0000
+4wire f1 = 0000
+on:1 {
+  once,
+  k1, f1 = .heap:popMin()
+}`;
+  const { interp } = session.run(src);
+  h.assert('size after pop', session.getWire(interp, 'sz'), '0010');
+  h.assert('k1', session.getWire(interp, 'k1'), '0010');
+}, { propagation: 'wave' });
+
+reg(2127, 'lut-writable', 'execStmts links get live wave session', function(h, session) {
+  const src = HUFF_FULL_BASE + `
+8wire parent = 11111110
+16wire val = parent + 00000000
+1wire _ = .links:set(01100010, val)`;
+  const { interp } = session.run(src);
+  session.execStmts(interp, '16wire lb = .links:get(01100010)');
+  h.assert('lb', session.getWire(interp, 'lb'), '1111111000000000');
+}, { propagation: 'wave' });
+
+reg(2128, 'huffman-wave', 'execStmts protocol huffPacket round-trip wave', function(h, session) {
+  const { interp } = session.run(huffFsmScript('aacb'));
+  for (let i = 0; i < 80; i++) huffFsmTick(session, interp);
+  session.execStmts(interp, huffWalkExecAacb());
+  session.execStmts(interp, `64wire packet =: .huffPacket { tokens = source }
+32wire recovered = .huffRecover { data = packet }`);
+  h.assert('ca', session.getWire(interp, 'ca'), '0');
+  h.assert('cb', session.getWire(interp, 'cb'), '10');
+  h.assert('cc', session.getWire(interp, 'cc'), '11');
+  h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
+}, { propagation: 'wave' });
+
+reg(2117, 'huffman-wave', 'FSM merge then execStmts round-trip aacb wave', function(h, session) {
+  const { interp } = session.run(huffFsmScript('aacb'));
+  for (let i = 0; i < 80; i++) huffFsmTick(session, interp);
+  h.assert('ph done', session.getWire(interp, 'ph'), '0101');
+  h.assert('root', session.getWire(interp, 'root'), '11111111');
+  session.execStmts(interp, huffWalkExecAacb());
+  session.execStmts(interp, `8wire huffSz = .huff:size()
+64wire packet =: .huffPacket { tokens = source }
+32wire recovered = .huffRecover { data = packet }`);
+  h.assert('huff size', session.getWire(interp, 'huffSz'), '00000011');
+  h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
+}, { propagation: 'wave' });
+
+reg(2118, 'huffman-wave', 'FSM in-script round-trip aacb wave no execStmts', function(h, session) {
+  const { interp } = session.run(huffFsmRoundTripScript('aacb'));
+  for (let i = 0; i < 80; i++) huffFsmTick(session, interp);
+  h.assert('ph done', session.getWire(interp, 'ph'), '0101');
+  h.assert('root', session.getWire(interp, 'root'), '11111111');
+  session.execStmts(interp, '8wire hs = .huff:size()');
+  h.assert('huff size', session.getWire(interp, 'hs'), '00000011');
+  h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,
     runMap: null,
     createSession,
+    huffFsmScript,
+    huffFsmRoundTripScript,
+    huffFsmTick,
     getTest(id) {
       return this.tests.find(t => t.id === id) || null;
     },

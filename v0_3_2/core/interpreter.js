@@ -833,25 +833,83 @@ class Interpreter {
     return false;
   }
 
+  _exprHasProtocolInvoke(expr) {
+    if (!expr || !Array.isArray(expr)) return false;
+    for (const atom of expr) {
+      if (atom.protocolInvoke) return true;
+      if (atom.group && this._exprHasProtocolInvoke(atom.group)) return true;
+      if (typeof this.forEachSubExprInAtom === 'function') {
+        let found = false;
+        this.forEachSubExprInAtom(atom, (sub) => {
+          if (this._exprHasProtocolInvoke(sub)) found = true;
+        });
+        if (found) return true;
+      }
+    }
+    return false;
+  }
+
+  _applyWireStatementOutputs(outputs, strategy) {
+    const changedWires = new Set();
+    if (!outputs || !outputs.length) return changedWires;
+    for (const [wName, wVal] of outputs) {
+      changedWires.add(wName);
+      if (this.deferWirePropagation()) {
+        this.writeWireStable(wName, wVal);
+        if (strategy && strategy.wirePendingStates) {
+          strategy.wirePendingStates.delete(wName);
+        }
+      }
+      this._emitProbeForWire(wName, wVal);
+    }
+    return changedWires;
+  }
+
+  _refreshDependentWireStatements(changedWires, alreadyExecuted) {
+    if (!changedWires || changedWires.size === 0) return;
+    const strategy = this.signalPropagationStrategy;
+    if (!strategy || typeof strategy.collectAffectedStatements !== 'function') return;
+    const executed = alreadyExecuted || new Set();
+    let pending = strategy.collectAffectedStatements(changedWires);
+    while (pending.size > 0) {
+      const batch = [...pending];
+      pending = new Set();
+      const nextChanged = new Set();
+      for (const ws of batch) {
+        if (executed.has(ws)) continue;
+        executed.add(ws);
+        const outputs = this.execWireStatement(ws, true);
+        const changed = this._applyWireStatementOutputs(outputs, strategy);
+        for (const wName of changed) nextChanged.add(wName);
+      }
+      if (nextChanged.size === 0) break;
+      const more = strategy.collectAffectedStatements(nextChanged);
+      for (const ws of more) {
+        if (!executed.has(ws)) pending.add(ws);
+      }
+    }
+  }
+
   _notifyWritableLutMutation(instName) {
     if (this._writableLutMutationNotifyDepth) return;
     this._writableLutMutationNotifyDepth = true;
     try {
+      const strategy = this.signalPropagationStrategy;
+      const executed = new Set();
+      const changedWires = new Set();
       for (const ws of this.wireStatements) {
         const expr = ws.assignment ? ws.assignment.expr : ws.expr;
-        if (!expr || !this._exprReferencesWritableLutInst(expr, instName, true)) continue;
+        if (!expr) continue;
+        const lutHit = this._exprReferencesWritableLutInst(expr, instName, true);
+        const protoHit = instName === '.huff' && this._exprHasProtocolInvoke(expr);
+        if (!lutHit && !protoHit) continue;
+        executed.add(ws);
         const outputs = this.execWireStatement(ws, true);
-        if (!outputs || !outputs.length) continue;
-      for (const [wName, wVal] of outputs) {
-        if (this.deferWirePropagation()) {
-          this.writeWireStable(wName, wVal);
-          if (this.signalPropagationStrategy && this.signalPropagationStrategy.wirePendingStates) {
-            this.signalPropagationStrategy.wirePendingStates.delete(wName);
-          }
+        for (const wName of this._applyWireStatementOutputs(outputs, strategy)) {
+          changedWires.add(wName);
         }
-        this._emitProbeForWire(wName, wVal);
       }
-      }
+      this._refreshDependentWireStatements(changedWires, executed);
     } finally {
       this._writableLutMutationNotifyDepth = false;
     }
@@ -865,19 +923,15 @@ class Interpreter {
     if (!toExec || toExec.size === 0) return;
     this._componentComputedMutationNotifyDepth = true;
     try {
+      const executed = new Set(toExec);
+      const changedWires = new Set();
       for (const ws of toExec) {
         const outputs = this.execWireStatement(ws, true);
-        if (!outputs || !outputs.length) continue;
-        for (const [wName, wVal] of outputs) {
-          if (this.deferWirePropagation()) {
-            this.writeWireStable(wName, wVal);
-            if (strategy.wirePendingStates) {
-              strategy.wirePendingStates.delete(wName);
-            }
-          }
-          this._emitProbeForWire(wName, wVal);
+        for (const wName of this._applyWireStatementOutputs(outputs, strategy)) {
+          changedWires.add(wName);
         }
       }
+      this._refreshDependentWireStatements(changedWires, executed);
     } finally {
       this._componentComputedMutationNotifyDepth = false;
     }
@@ -1039,7 +1093,12 @@ class Interpreter {
     const isaRef = prog.isaRef;
     const inst = this.inlineInstances.get(isaRef);
     if (!inst) throw Error(`Undefined inline instance '${isaRef}'`);
-    if (inst.kind !== 'asm') throw Error(`Inline instance '${isaRef}' is not an asm ISA`);
+    if (inst.kind !== 'asm') {
+      if (inst.kind === 'protocol') {
+        throw Error(`Inline instance '${isaRef}' is a protocol, not an asm ISA; use ${isaRef} { param = ... }`);
+      }
+      throw Error(`Inline instance '${isaRef}' is not an asm ISA`);
+    }
     const isa = { opcodes: inst.opcodes, wordWidth: inst.wordWidth, opcodeOrder: inst.opcodeOrder };
     const opts = {};
     if (memAttributes) {
@@ -1292,6 +1351,19 @@ class Interpreter {
       if (method === 'entries') {
         if (!writable) throw new Error(`LUT ${instName} is not writable`);
         if (typeof lutEntries !== 'function') throw new Error('Writable LUT module is not loaded');
+        const sortMode = typeof parseEntriesSortModeFromArgs === 'function'
+          ? parseEntriesSortModeFromArgs(args)
+          : null;
+        const callTags = invoke.callTags || null;
+        if (sortMode === 'sortKeys') {
+          if (typeof lutEntriesSortKeys !== 'function') throw new Error('Writable LUT module is not loaded');
+          return lutEntriesSortKeys(lutInst, callTags);
+        }
+        if (sortMode === 'sortValues') {
+          if (typeof lutEntriesSortValues !== 'function') throw new Error('Writable LUT module is not loaded');
+          return lutEntriesSortValues(lutInst, callTags);
+        }
+        if (sortMode !== null) throw new Error('LUT: entries(mode): mode must be sortKeys or sortValues');
         return lutEntries(lutInst);
       }
       if (method === 'keyAt') {
@@ -14527,27 +14599,65 @@ Interpreter.prototype.conditionalOnShouldExecute = function(onMode, prevValue, n
   return false;
 };
 
+Interpreter.prototype.conditionalAssignmentBodyItems = function(entryOrStmt) {
+  if (!entryOrStmt) return [];
+  const body = entryOrStmt.body;
+  if (Array.isArray(body) && body.length > 0) return body;
+  if (entryOrStmt.assignment) return [{ assignment: entryOrStmt.assignment }];
+  if (entryOrStmt.decls && entryOrStmt.expr) {
+    return [{
+      decls: entryOrStmt.decls,
+      expr: entryOrStmt.expr,
+      assignPad: entryOrStmt.assignPad || 'strict',
+    }];
+  }
+  return [];
+};
+
+Interpreter.prototype.collectConditionalBodyDependencies = function(body, dependencies, wireDependencies) {
+  if (!body || !body.length) return;
+  for (const item of body) {
+    if (item.assignment) {
+      this.collectExprDependencies(item.assignment.expr, dependencies, wireDependencies);
+    } else if (item.expr) {
+      this.collectExprDependencies(item.expr, dependencies, wireDependencies);
+    }
+  }
+};
+
 Interpreter.prototype.executeConditionalAssignmentEntry = function(entry) {
-  if (!entry || (!entry.assignment && !(entry.decls && entry.expr))) return;
+  const body = this.conditionalAssignmentBodyItems(entry);
+  if (!entry || body.length === 0) return;
   if (this._uccExecutedStatements && entry.sourceStmt && this._uccExecutedStatements.has(entry.sourceStmt)) {
     return;
   }
   if (this._uccExecutedStatements && entry.sourceStmt) {
     this._uccExecutedStatements.add(entry.sourceStmt);
   }
+  const changedWires = new Set();
   this._executingConditionalAssignment = true;
   try {
-    if (entry.assignment) {
-      this.exec({ assignment: entry.assignment }, true);
-    } else {
-      this.exec({
-        decls: entry.decls,
-        expr: entry.expr,
-        assignPad: entry.assignPad || 'strict',
-      }, true);
+    for (const item of body) {
+      if (item.assignment) {
+        const targetVar = item.assignment.target && item.assignment.target.var;
+        if (targetVar) changedWires.add(targetVar);
+        this.exec({ assignment: item.assignment }, true);
+      } else {
+        for (const d of (item.decls || [])) {
+          if (d.name && d.name !== '_') changedWires.add(d.name);
+        }
+        this.exec({
+          decls: item.decls,
+          expr: item.expr,
+          assignPad: item.assignPad || 'strict',
+        }, true);
+      }
     }
   } finally {
     this._executingConditionalAssignment = false;
+    if (changedWires.size > 0) {
+      this._refreshDependentWireStatements(changedWires, new Set());
+    }
   }
 };
 
@@ -14585,24 +14695,19 @@ Interpreter.prototype.tryExecuteConditionalAssignment = function(entry, isFirstR
 };
 
 Interpreter.prototype.execConditionalAssignment = function(s) {
-  const { onMode, triggerExpr, assignment, decls, expr, assignPad } = s.conditionalAssignment;
+  const ca = s.conditionalAssignment;
+  const { onMode, triggerExpr } = ca;
+  const body = this.conditionalAssignmentBodyItems(ca);
   const initialTriggerValue = this.evalTriggerExprValue(triggerExpr);
   const dependencies = new Set();
   const wireDependencies = new Set();
   this.collectExprDependencies(triggerExpr, dependencies, wireDependencies);
-  if (assignment) {
-    this.collectExprDependencies(assignment.expr, dependencies, wireDependencies);
-  } else if (expr) {
-    this.collectExprDependencies(expr, dependencies, wireDependencies);
-  }
+  this.collectConditionalBodyDependencies(body, dependencies, wireDependencies);
   const insideBody = this.insidePcbBody || this.insideChipBody || this.insideBoardBody;
   const entry = {
     onMode: String(onMode),
     triggerExpr,
-    assignment,
-    decls,
-    expr,
-    assignPad,
+    body,
     dependencies,
     wireDependencies,
     lastTriggerValue: initialTriggerValue,

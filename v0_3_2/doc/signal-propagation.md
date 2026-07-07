@@ -144,7 +144,23 @@ For examples and edge cases, see PCB tests **500–515** (legacy) and **516–53
 
 ### Conditional assignment (`on:`)
 
-Standalone `on:<mode> { trigger, assignment }` statements use the same trigger helpers as property blocks and are re-evaluated when trigger dependencies change during propagation. See [conditional-assignment.md](conditional-assignment.md).
+Standalone `on:<mode> { trigger, assignment }` statements use the same trigger helpers as property blocks and are re-evaluated when trigger dependencies change during propagation. Multiple comma-separated assignments in one block run in order when the trigger fires — see [conditional-assignment.md](conditional-assignment.md) (tests **2123–2124**).
+
+### Declarative wire re-evaluation
+
+Top-level wire statements (`Nwire x = expr`) are tracked at elaboration. When a **dependency changes**, the engine re-runs the statement and cascades to wires that depend on its result:
+
+| Dependency type | Example | Re-eval when |
+|-----------------|---------|--------------|
+| Component computed output | `8wire idxSnap = .idx:get` | Counter / reg `:data` updates (`setCounter`, property block write) |
+| Writable LUT read | `16wire lb = .links:get(key)` | LUT mutation (`:set`, `:add`, …) or post-`execStmts` propagate |
+| Writable LUT size | `4wire sz = .heap:size()` | Entry list changes |
+
+Tests **2125–2127** (Huffman FSM). This replaces manual “stale wire” workarounds for typical `.idx:get` / `:size` / `:get` patterns.
+
+### `execStmts` (test harness)
+
+The Node/browser test session exposes `execStmts(interp, src)` to append and run fresh top-level statements against a live interpreter (e.g. after FSM ticks). On **wave** sessions it calls `propagate()` after exec so LUT reads and dependent wires settle. Protocol invocations (`.huffPacket { … }`) work because the parser is seeded with inline kinds from `inlineInstances` — see [protocol.md — execStmts](protocol.md#execstmts-secondary-parse).
 
 ---
 

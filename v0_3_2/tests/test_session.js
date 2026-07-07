@@ -202,8 +202,14 @@
         if (!i) return;
         const processed = preprocessLoop(src);
         const p = new Parser(new Tokenizer(processed), this._ensureRegistry());
+        if (typeof p.seedInlineKindsFrom === 'function' && i.inlineInstances) {
+          p.seedInlineKindsFrom(i.inlineInstances);
+        }
         for (const s of p.parse()) {
           i.exec(s);
+        }
+        if (i.deferWirePropagation && i.deferWirePropagation() && i.signalPropagationStrategy) {
+          i.signalPropagationStrategy.propagate();
         }
       },
 

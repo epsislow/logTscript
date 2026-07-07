@@ -68,6 +68,9 @@ var CounterComponent = class CounterComponent extends BuiltinComponent {
           else if (dataValue.length > depth) dataValue = dataValue.substring(0, depth);
           if (typeof setCounter === 'function') setCounter(counterId, dataValue);
           if (!reEvaluate) { delete pending.write; delete pending.dir; delete pending.data; }
+          if (ctx && typeof ctx._notifyComponentComputedMutation === 'function') {
+            ctx._notifyComponentComputedMutation(compName);
+          }
         } else {
           let direction = 1;
           if (pending.dir !== undefined) {
@@ -88,6 +91,9 @@ var CounterComponent = class CounterComponent extends BuiltinComponent {
           else numValue = (numValue - 1 + maxValue + 1) % (maxValue + 1);
           const newValue = numValue.toString(2).padStart(depth, '0');
           if (typeof setCounter === 'function') setCounter(counterId, newValue);
+          if (ctx && typeof ctx._notifyComponentComputedMutation === 'function') {
+            ctx._notifyComponentComputedMutation(compName);
+          }
         }
       }
     }
