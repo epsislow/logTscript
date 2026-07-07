@@ -453,11 +453,7 @@
     }
     let formatted;
     if (opts.ascii) {
-      if (!isElement && bitWidth > 8 && bitWidth % 8 === 0) {
-        formatted = formatAsciiGroupedHeader(binStr, bitWidth);
-      } else {
-        formatted = formatAsciiDisplay(binStr, bitWidth, !!isElement);
-      }
+      formatted = formatAsciiDisplay(binStr, bitWidth, !!isElement);
     } else if (opts.bin) {
       formatted = formatBinDisplay(binStr, bitWidth, !!isElement);
     } else if (opts.hex) {

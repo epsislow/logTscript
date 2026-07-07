@@ -16191,10 +16191,10 @@ reg(1928, 'show-tags', 'show(8wire; ascii) — NUL placeholder', function(h, ses
   h.assert('nul square', String(out.some(l => /nul \(8wire\) = "\u25A1"/.test(l))), 'true');
 });
 
-reg(1929, 'show-tags', 'show(40wire; ascii) — LF glyph grouped', function(h, session) {
+reg(1929, 'show-tags', 'show(40wire; ascii) — LF glyph quoted', function(h, session) {
   const bits = '0100100001101001000010100100100001101111';
   const { out } = session.run(`40wire line := ${bits}\nshow(line; ascii)`);
-  h.assert('lf byte', String(out.some(l => /line \(40wire\) = \\72 \\105 \\10 \\72 \\111;ascii/.test(l))), 'true');
+  h.assert('lf glyph', String(out.some(l => /line \(40wire\) = "Hi\u21B5Ho"/.test(l))), 'true');
 });
 
 reg(1930, 'show-tags', 'show(8wire; ascii) — TAB as dot', function(h, session) {
@@ -16202,10 +16202,10 @@ reg(1930, 'show-tags', 'show(8wire; ascii) — TAB as dot', function(h, session)
   h.assert('tab dot', String(out.some(l => /tab \(8wire\) = "\."/.test(l))), 'true');
 });
 
-reg(1931, 'show-tags', 'show(40wire; ascii) — multi-byte grouped literal', function(h, session) {
+reg(1931, 'show-tags', 'show(40wire; ascii) — multi-byte quoted string', function(h, session) {
   const hello = '0100100001100101011011000110110001101111';
   const { out } = session.run(`40wire msg := ${hello}\nshow(msg; ascii)`);
-  h.assert('hello grouped', String(out.some(l => /msg \(40wire\) = \\72 \\101 \\108 \\108 \\111;ascii/.test(l))), 'true');
+  h.assert('hello quoted', String(out.some(l => /msg \(40wire\) = "Hello"/.test(l))), 'true');
 });
 
 reg(1932, 'show-tags', 'show(vec; ascii) — per-element quoted', function(h, session) {
@@ -16858,7 +16858,7 @@ reg(2012, 'grouped-literals-display', 'ASCII grup \\65 \\66;ascii', function(h, 
   const { interp } = session.run('16wire w = \\65 \\66;ascii');
   h.assert('AB bits', session.getWire(interp, 'w'), '0100000101000010');
   const { out } = session.run('16wire w = \\65 \\66;ascii\nshow(w; ascii)');
-  h.assert('quoted AB', String(out.some(l => /w \(16wire\) = \\65 \\66;ascii/.test(l))), 'true');
+  h.assert('quoted AB', String(out.some(l => /w \(16wire\) = "AB"/.test(l))), 'true');
 });
 
 reg(2013, 'grouped-literals-display', 'Eroare \\-N;M unsigned', function(h, session) {
