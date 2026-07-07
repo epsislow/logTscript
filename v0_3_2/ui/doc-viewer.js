@@ -1274,6 +1274,88 @@ function enhancePlayBlocks(container) {
   });
 }
 
+function parsePacketLayoutSpec(text) {
+  const line = String(text || '').trim().split('\n').map(function (l) { return l.trim(); }).filter(Boolean)[0];
+  if (!line) return [];
+  if (line.charAt(0) === '[') {
+    const parsed = JSON.parse(line);
+    return parsed.map(function (seg) {
+      return { label: String(seg.label), bits: parseInt(seg.bits, 10) };
+    });
+  }
+  return line.split(',').map(function (part) {
+    const m = /^([^:]+):(\d+)\s*b?$/i.exec(part.trim());
+    if (!m) throw new Error('Invalid packet-layout segment: ' + part);
+    return { label: m[1].trim(), bits: parseInt(m[2], 10) };
+  });
+}
+
+function buildPacketLayoutBar(segments) {
+  let total = 0;
+  for (let i = 0; i < segments.length; i++) total += segments[i].bits;
+  if (!total) return null;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'doc-packet-bar';
+
+  const ticks = document.createElement('div');
+  ticks.className = 'doc-packet-bar__ticks';
+  let offset = 0;
+  for (let i = 0; i < segments.length; i++) {
+    const tickSeg = document.createElement('div');
+    tickSeg.className = 'doc-packet-bar__tick-seg';
+    tickSeg.style.flex = String(segments[i].bits);
+    tickSeg.textContent = String(offset);
+    ticks.appendChild(tickSeg);
+    offset += segments[i].bits;
+  }
+  wrap.appendChild(ticks);
+
+  const track = document.createElement('div');
+  track.className = 'doc-packet-bar__track';
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const el = document.createElement('div');
+    el.className = 'doc-packet-bar__seg doc-packet-bar__seg--' + (i % 7);
+    el.style.flex = String(seg.bits);
+    const label = document.createElement('div');
+    label.className = 'doc-packet-bar__seg-label';
+    label.textContent = seg.label;
+    const bits = document.createElement('div');
+    bits.className = 'doc-packet-bar__seg-bits';
+    bits.textContent = seg.bits + 'b';
+    el.appendChild(label);
+    el.appendChild(bits);
+    track.appendChild(el);
+  }
+  wrap.appendChild(track);
+
+  const footer = document.createElement('div');
+  footer.className = 'doc-packet-bar__footer';
+  footer.textContent = total + ' bit total (end offset ' + total + ')';
+  wrap.appendChild(footer);
+  return wrap;
+}
+
+function enhancePacketLayoutBlocks(container) {
+  const blocks = container.querySelectorAll('pre > code[class*="packet-layout"]');
+  blocks.forEach(function (codeEl) {
+    const pre = codeEl.parentElement;
+    if (!pre || !pre.parentNode) return;
+    try {
+      const segments = parsePacketLayoutSpec(codeEl.textContent || '');
+      const bar = buildPacketLayoutBar(segments);
+      if (!bar) return;
+      pre.parentNode.replaceChild(bar, pre);
+    } catch (err) {
+      const fail = document.createElement('p');
+      fail.className = 'doc-error';
+      fail.textContent = 'packet-layout: ' + (err && err.message ? err.message : String(err));
+      pre.parentNode.replaceChild(fail, pre);
+    }
+  });
+}
+
 function loadDoc(filename, options) {
   options = options || {};
   if (docNavSuppressPush) {
@@ -1311,6 +1393,7 @@ function renderDocPage(filename, options) {
   }
   el.innerHTML = marked.parse(content, { gfm: true, breaks: false });
   enhancePlayBlocks(el);
+  enhancePacketLayoutBlocks(el);
   enhanceClcdSymbolGallery(el);
   updateDocToolbar();
   syncDocSearchInput();

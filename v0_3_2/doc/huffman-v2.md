@@ -976,10 +976,20 @@ Side-effect at parse: populate `.huff` from codebook entries (no preset LUT requ
 
 ### Bit layout — `'aacb'` example
 
-```text
-┌──────── header 24b ────────┬─ cbLen 16b ─┬──── codebook 53b ────┬─ payload 14b ─┬ crc 16b ┐
-│ H │ kw=8 │ nSym=3 │ len=53 │ sym|len|cw ×3 (sorted by sym) │ len=8 │ encoded │ CRC │
-└────────────────────────────┴─────────────┴──────────────────────┴─────────────┴───────┘
+| Offset (bit) | Width | Section | Content (`'aacb'`) |
+|--------------|-------|---------|---------------------|
+| 0 | 8b | magic | `H` |
+| 8 | 8b | keyWidth | 8 |
+| 16 | 8b | nSym | 3 |
+| 24 | 16b | cbLen | 53 |
+| 40 | 53b | codebook | `a\|1\|0`, `b\|2\|10`, `c\|2\|11` (sym \| cwLen \| cw) |
+| 93 | 14b | payload | len=8 + `00001110` (6 Huffman bits) |
+| 107 | 16b | CRC | 16-bit suffix |
+
+**Total: 123 bit.**
+
+```packet-layout
+H:8,kw:8,nSym:8,cbLen:16,codebook:53,payload:14,CRC:16
 ```
 
 Payload encoded = `00000110001110` (14 bit — same as v1 `.huffPacket` for `'aacb'`).

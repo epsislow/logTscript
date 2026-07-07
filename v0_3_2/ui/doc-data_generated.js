@@ -11630,10 +11630,20 @@ Side-effect at parse: populate \`.huff\` from codebook entries (no preset LUT re
 
 ### Bit layout — \`'aacb'\` example
 
-\`\`\`text
-┌──────── header 24b ────────┬─ cbLen 16b ─┬──── codebook 53b ────┬─ payload 14b ─┬ crc 16b ┐
-│ H │ kw=8 │ nSym=3 │ len=53 │ sym|len|cw ×3 (sorted by sym) │ len=8 │ encoded │ CRC │
-└────────────────────────────┴─────────────┴──────────────────────┴─────────────┴───────┘
+| Offset (bit) | Width | Section | Content (\`'aacb'\`) |
+|--------------|-------|---------|---------------------|
+| 0 | 8b | magic | \`H\` |
+| 8 | 8b | keyWidth | 8 |
+| 16 | 8b | nSym | 3 |
+| 24 | 16b | cbLen | 53 |
+| 40 | 53b | codebook | \`a\\|1\\|0\`, \`b\\|2\\|10\`, \`c\\|2\\|11\` (sym \\| cwLen \\| cw) |
+| 93 | 14b | payload | len=8 + \`00001110\` (6 Huffman bits) |
+| 107 | 16b | CRC | 16-bit suffix |
+
+**Total: 123 bit.**
+
+\`\`\`packet-layout
+H:8,kw:8,nSym:8,cbLen:16,codebook:53,payload:14,CRC:16
 \`\`\`
 
 Payload encoded = \`00000110001110\` (14 bit — same as v1 \`.huffPacket\` for \`'aacb'\`).
@@ -19429,6 +19439,41 @@ inline [protocol] .parseEntry:
 
 ---
 
+## Feature matrix — assemble, \`mode: parse\`, \`:decode\`
+
+Not every generator works in every direction. Use this table when choosing encode vs recover vs \`:decode()\`.
+
+| Segment / generator | \`mode: assemble\` (default) | \`mode: parse\` | \`:decode(channels…)\` |
+|---------------------|----------------------------|---------------|----------------------|
+| Literals \`0\`, \`0101\`, \`^AA\`, \`\\42\` | emit | verify on wire | verify |
+| \`param Nb\` / \`param ~b\` | read from invoke args | **read from cursor** (\`parseField\`) | extract from channel bits |
+| \`def\` + \`localRef\` | compose sub-segments | parse sub-stream | ✗ |
+| \`reverse\`, \`parityEven/Odd\`, \`clock\`, \`repeat\` | ✓ | ✗ (use literals + fields instead) | verify + extract params |
+| \`length(param) Nb\`, \`lengthOf(def) Nb\` | ✓ | ✗ | ✗ |
+| \`withLength(param, Nb)\` | strip length prefix (assemble) | read length prefix + payload | ✗ |
+| \`withLength(param, field b)\` | ✗ | read \`field\`-wide payload | ✗ |
+| \`withLength(stream\\|data, Nb, def)\` | ✗ | framed repeat-parse (\`entry\` loop) | ✗ |
+| \`expand\`, \`collapse\`, \`collapse(withLength(…), …)\` | ✓ | \`collapse\` only (incl. nested \`withLength\`) | ✗ |
+| \`checksum(crc16, def\\|param)\` | append CRC | ✗ | ✗ |
+| \`validateChecksum(crc16, param)\` | ✗ | verify CRC on **full** invoke param | ✗ |
+| Attributes \`codebookLoad\`, \`parseResult\` | ✗ | parse only | ✗ |
+
+**Rules of thumb:**
+
+- **UART / SPI / I2C encode** → default assemble + optional \`:decode()\` on simple channels.
+- **Huffman / framed packets** → assemble encoder + separate **\`mode: parse\`** recover protocol (not \`:decode()\` on the encoder).
+- **\`:decode()\`** recovers only \`param\`-like fields from fixed layouts — not \`expand\`/\`collapse\`/\`def\`/\`withLength\`/\`checksum\`.
+
+Invoke shapes:
+
+| Mode | Example |
+|------|---------|
+| assemble | \`123wire pkt = .encoder { tokens = …, codebook = … }\` |
+| parse | \`32wire out = .recover { data = pkt }\` or \`{ stream = pkt }\` |
+| \`:decode\` | \`8wire data = .uart8n1:decode(tx)\` |
+
+---
+
 ## \`mode: parse\` — sequential field extraction
 
 By default protocols **assemble** bits from parameters (\`mode: assemble\`, implicit). Set **\`mode: parse\`** to read from an input bitstream instead.
@@ -19502,6 +19547,22 @@ out: 01001000           → verify 8 bit,           pos += 8
 **\`withLength(rest, field b)\`** — from the cursor: read exactly as many bits as the **already-parsed field** \`field\` says (used for variable-length codewords).
 
 Segments such as \`keyWidth 8b\` also read from the cursor — you never pass \`keyWidth\` at invoke; it is **extracted** from the wire.
+
+### Parsed fields (\`sym 8b\`, \`cwLen 8b\`, …)
+
+In **\`mode: parse\`**, a line like \`sym 8b\` inside a \`def\` or \`out:\` channel is a **parse field**, not an invoke parameter:
+
+| Syntax | Assemble | Parse |
+|--------|----------|-------|
+| \`data 8b\` | emit 8 bits from invoke arg \`data\` | read 8 bits from cursor into field \`data\` |
+| \`payload ~b\` | emit all bits from var-width arg | read **remaining** bits in current region (\`~b\`) |
+| \`codebook\` (bare def name) | expand \`def codebook\` segments | parse \`def codebook\` against cursor |
+
+Fields parsed earlier in the same \`def\` can drive later segments — e.g. \`cwLen 8b\` then \`withLength(rest, cwLen b)\` reads exactly \`cwLen\` bits into \`rest\`.
+
+**\`codebookLoad\`** hooks each completed \`withLength(..., entry)\` row: \`.lut:add(sym, rest)\` using those field values.
+
+**\`nSym\` check:** after the codebook region, if header field \`nSym\` was parsed and at least one entry was loaded, entry count must equal \`nSym\` or parse throws.
 
 ### Parse-only attributes
 
@@ -19586,13 +19647,30 @@ inline [protocol] .huffRecoverSC:
 
 #### Wire layout consumed by the cursor (\`'aacb'\` packet, 123 bit)
 
-\`\`\`text
-┌─ header 24b ─┬ cbLen 16b ┬── codebook body 53b ──┬─ payload 14b ─┬ crc 16b ┐
-│ H │ kw │ nSym │ len=53 │ sym|cwLen|cw × nSym   │ len │ Huff bits │ CRC   │
-└──────────────┴────────┴─────────────────────────┴─────┴───────────┴───────┘
-  literal+fields   ↑ withLength(stream,16b,entry)   ↑ collapse(withLength(stream,8b))
-                     codebookLoad → .huff:add       decode tokens only (output)
+| Offset (bit) | Width | Section | On-wire content |
+|--------------|-------|---------|-----------------|
+| 0 | 8b | magic | \`H\` → \`01001000\` |
+| 8 | 8b | keyWidth | ex. \`00001000\` (= 8) |
+| 16 | 8b | nSym | ex. \`00000011\` (= 3) |
+| 24 | 16b | cbLen | codebook body length (ex. 53) |
+| 40 | 53b | codebook body | \`sym 8b \\| cwLen 8b \\| codeword\` × nSym |
+| 93 | 14b | payload | \`len 8b\` + Huffman bits |
+| 107 | 16b | CRC | CRC-16-CCITT over body (bits 0–106) |
+
+**Total: 123 bit.** Visual layout (proportional bar):
+
+\`\`\`packet-layout
+H:8,kw:8,nSym:8,cbLen:16,codebook:53,payload:14,CRC:16
 \`\`\`
+
+**Parse mapping:**
+
+| Section | Protocol segment |
+|---------|------------------|
+| Header | literals + \`keyWidth 8b\` + \`nSym 8b\` (cursor) |
+| Codebook | \`withLength(stream, 16b, entry)\` → \`codebookLoad\` → \`.huff:add\` |
+| CRC | \`validateChecksum(crc16, data)\` — full packet param |
+| Payload | \`collapse(withLength(stream, 8b), .huff, keyWidth b)\` — output only if \`parseResult: collapseOnly\` |
 
 **Codebook entry format** (defined by \`def entry\`, not guessed by the engine):
 
@@ -19920,10 +19998,10 @@ Append or verify a **16-bit CRC** over a preceding body segment. Algorithm: CRC-
 
 | Generator | Mode | Syntax | Effect |
 |-----------|------|--------|--------|
-| \`checksum\` | assemble | \`checksum(crc16, defName)\` | Append 16-bit CRC of \`defName\` body |
-| \`validateChecksum\` | parse | \`validateChecksum(crc16, param)\` | Verify trailing 16 bits match CRC of preceding bits |
+| \`checksum\` | assemble | \`checksum(crc16, defName)\` or \`checksum(crc16, param)\` | Append 16-bit CRC of body bits |
+| \`validateChecksum\` | parse | \`validateChecksum(crc16, param)\` | Verify last 16 bits of **full** invoke param match CRC of preceding bits |
 
-Scope: all bits **before** the checksum field (body only, checksum excluded).
+Scope for **\`checksum\`**: CRC over the referenced def/param body only. For **\`validateChecksum\`**: \`param\` is the **entire packet** passed at invoke (\`data\`); CRC is the last 16 bits, body is everything before that (same bits the cursor walked, plus any unread tail — typically the whole packet minus CRC).
 
 ### Runnable — encode + verify
 
@@ -20030,7 +20108,18 @@ Example \`doc(.uart8n1)\`:
 | withLength: input shorter than length prefix | Packet shorter than declared length |
 | validateChecksum: mismatch | CRC suffix does not match body |
 | parse: expected literal '...' | Fixed field mismatch in parse mode |
-| prefixFree violation | LUT codewords not prefix-free (parse time) |
+| parse: codebook entry count N does not match nSym M | Codebook rows ≠ header \`nSym\` |
+| parse: need N bits but only M remain | Truncated packet / cursor overrun |
+| withLength: def '...' consumed no bits | Empty or malformed framed region |
+| withLength: def '...' left N bits unconsumed | Entry layout does not match wire |
+| codebookLoad '…' must be a writable LUT | LUT missing \`writable\` attribute |
+| parseResult must be 'all' or 'collapseOnly' | Invalid \`parseResult\` attribute |
+| mode must be 'assemble' or 'parse' | Invalid \`mode\` attribute |
+| withLength(..., def) is only supported in mode: parse | Framed def-parse in assemble protocol |
+| Protocol parse does not support segment kind '…' | e.g. \`expand\`/\`lengthOf\` inside parse protocol |
+| Circular protocol def reference '…' | \`def\` cycle via \`localRef\` |
+| prefixFree violation | LUT codewords not prefix-free (at \`codebookLoad\`) |
+| prefixFree collapse failed at bit offset N | Invalid Huffman bitstream at decode |
 
 ---
 
