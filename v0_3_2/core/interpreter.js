@@ -1182,9 +1182,32 @@ class Interpreter {
       }
     }
 
-    const result = generateFn(inst, argValues, {
+    const parseCtx = {
       getInlineLut: (name) => this._getLutInst(name),
-    });
+    };
+    const codebookLoad = inst.attributes && inst.attributes.codebookLoad;
+    if (codebookLoad && inst.attributes.mode === 'parse') {
+      const lutInst = this._getLutInst(codebookLoad);
+      if (!lutInst || lutInst.kind !== 'lut') {
+        throw Error(`codebookLoad '${codebookLoad}' is not a LUT inline instance`);
+      }
+      if (!lutInst.writable) {
+        throw Error(`codebookLoad '${codebookLoad}' must be a writable LUT`);
+      }
+      if (!lutInst.lutEntryList) lutInst.lutEntryList = [];
+      lutInst.lutEntryList.length = 0;
+      const syncFn = typeof syncWritableLutTable === 'function' ? syncWritableLutTable : null;
+      if (syncFn) syncFn(lutInst);
+      const assertPf = typeof assertPrefixFreeIfNeeded === 'function' ? assertPrefixFreeIfNeeded : null;
+      parseCtx.onParseEntry = (sym, codeword) => {
+        const next = lutInst.lutEntryList.concat([{ key: sym, value: codeword }]);
+        if (assertPf) assertPf(lutInst, next);
+        lutInst.lutEntryList.push({ key: sym, value: codeword });
+        if (syncFn) syncFn(lutInst);
+      };
+    }
+
+    const result = generateFn(inst, argValues, parseCtx);
     return { value: result.blob, bitWidth: result.totalWidth, channelWidths: result.channelWidths };
   }
 

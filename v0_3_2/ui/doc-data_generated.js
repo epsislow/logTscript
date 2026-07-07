@@ -10660,7 +10660,7 @@ End-to-end **wave** demo: measure symbol frequencies from a source wire, sort en
 
 For the static codebook + protocol walkthrough (v1), see **[huffman.md](huffman.md)**.
 
-**Suite tests:** **2104** (freq \`set\`+\`ADD\`), **2105** (\`SORT\` entries), **2106–2107** (round-trip wave), **2108** (\`=:\` padding), **2109** (osc scan + counter), **2110** (N-general \`popMin\` merge + manual codebook), **2111–2114** (\`.links\` + auto codewords unroll), **2115–2118** (FSM switch scan+merge + walk/protocol), **2120–2122** (\`:entries(sortKeys|sortValues)\`), **2123–2124** (multi-assign \`on:\`), **2125–2127** (declarative wire re-eval + LUT live read), **2128** (FSM + \`execStmts\` protocol round-trip).
+**Suite tests:** **2104** (freq \`set\`+\`ADD\`), **2105** (\`SORT\` entries), **2106–2107** (round-trip wave), **2108** (\`=:\` padding), **2109** (osc scan + counter), **2110** (N-general \`popMin\` merge + manual codebook), **2111–2114** (\`.links\` + auto codewords unroll), **2115–2118** (FSM switch scan+merge + walk/protocol), **2119** (packet SC encode), **2145–2146** (packet SC recover + round-trip), **2120–2122** (\`:entries(sortKeys|sortValues)\`), **2123–2124** (multi-assign \`on:\`), **2125–2127** (declarative wire re-eval + LUT live read), **2128** (FSM + \`execStmts\` protocol round-trip).
 
 ---
 
@@ -11507,6 +11507,250 @@ show(huffReady)
 
 ---
 
+## Packet self-contained (SC)
+
+A **self-contained** Huffman packet embeds the codebook on the wire — decode does **not** require a preloaded \`.huff\` LUT. Encode still uses \`.huff\` locally (built by FSM merge + walk); the wire carries everything a decoder needs.
+
+| Region | Width | Content |
+|--------|-------|---------|
+| **Header** | 24b | \`magic\` \`'H'\` (\`01001000\`) + \`keyWidth\` 8b + \`nSym\` 8b |
+| **Codebook frame** | 16b + var | \`lengthOf(codebookBody) 16b\` + body (see below) |
+| **Payload** | 8b + var | \`lengthOf(encoded) 8b\` + Huffman bitstream |
+| **Checksum** | 16b | CRC-16-CCITT over header + codebook + payload |
+
+### Codebook body (compact, \`sym\` ascending)
+
+Per entry: \`sym 8b\` + \`cwLen 8b\` + \`codeword\` (\`cwLen\` bit, MSB-first).
+
+Helper in the test harness (same layout as on-wire):
+
+\`\`\`javascript
+huffBuildCodebookWire(entries)  // [{ sym, cod, width }, …] → bit string
+\`\`\`
+
+Build from FSM codewords, sorted by symbol:
+
+\`\`\`logts
+// after .huff:add(…) for each symbol
+53wire codebook = …   // huffBuildCodebookWire from sorted entries
+\`\`\`
+
+### Encode — \`.huffPacketSC\`
+
+Separate protocol from v1 \`.huffPacket\` — includes header, framed codebook, payload, checksum.
+
+\`\`\`logts-play legacy
+# --- Setup: writable codebook LUT + encode protocol ---
+inline [lut] .huff:
+  writable
+  prefixFree
+  variableDepth
+  length: 256
+  data { }
+  :
+
+inline [protocol] .huffPacketSC:
+  def codebookBody:
+    codebook ~b
+  def codebook:
+    lengthOf(codebookBody) 16b
+    codebookBody
+  def encoded:
+    expand(tokens, .huff, keyWidth b)
+  def payload:
+    lengthOf(encoded) 8b
+    encoded
+  def body:
+    01001000
+    keyWidth 8b
+    nSym 8b
+    codebook
+    payload
+  out:
+    body
+    checksum(crc16, body)
+  :
+
+# --- Codewords pentru 'aacb' (folosite la expand) ---
+1wire _ = .huff:add(01100001, 0)
+1wire _ = .huff:add(01100010, 10)
+1wire _ = .huff:add(01100011, 11)
+32wire source =: 'aacb'
+
+# --- Codebook body 53b (sym 8 + cwLen 8 + codeword)*3, sortat după sym ---
+# a: 01100001|00000001|0   b: 01100010|00000010|10   c: 01100011|00000010|11
+53wire codebook = 01100001000000010011000100000001010011000110000001011
+
+# --- Encode packet SC ---
+# layout: HEADER 24b | cbLen 16b | CODEBOOK 53b | PAYLOAD 14b | CRC 16b
+123wire packet =: .huffPacketSC {
+  tokens = source,
+  keyWidth = 00001000,
+  nSym = 00000011,
+  codebook = codebook
+}
+show(packet)
+\`\`\`
+
+**Test 2119** verifies magic, codebook frame, payload (matches v1 \`.huffPacket\`), and CRC suffix.
+
+### Recover — \`.huffRecoverSC\` (Faza 3)
+
+Decode = **protocol separat** with \`mode: parse\` — **not** \`:decode()\` on the encoder.
+
+\`\`\`logts
+inline [protocol] .huffRecoverSC:
+  mode: parse
+  codebookLoad: .huff
+  parseResult: collapseOnly
+  def entry:
+    sym 8b
+    cwLen 8b
+    withLength(rest, cwLen b)
+  def codebook:
+    withLength(stream, 16b, entry)
+  out:
+    01001000
+    keyWidth 8b
+    nSym 8b
+    codebook
+    validateChecksum(crc16, data)
+    collapse(withLength(stream, 8b), .huff, keyWidth b)
+  :
+\`\`\`
+
+**Attributes:**
+- \`codebookLoad: .huff\` — clears LUT, then \`.huff:add(sym, codeword)\` per parsed entry
+- \`parseResult: collapseOnly\` — output wire = decoded tokens only (not header/codebook bits)
+- Validates \`nSym\` matches entry count after codebook parse
+
+Side-effect at parse: populate \`.huff\` from codebook entries (no preset LUT required).
+
+### Bit layout — \`'aacb'\` example
+
+\`\`\`text
+┌──────── header 24b ────────┬─ cbLen 16b ─┬──── codebook 53b ────┬─ payload 14b ─┬ crc 16b ┐
+│ H │ kw=8 │ nSym=3 │ len=53 │ sym|len|cw ×3 (sorted by sym) │ len=8 │ encoded │ CRC │
+└────────────────────────────┴─────────────┴──────────────────────┴─────────────┴───────┘
+\`\`\`
+
+Payload encoded = \`00000110001110\` (14 bit — same as v1 \`.huffPacket\` for \`'aacb'\`).
+
+### Runnable — round-trip SC (\`'aacb'\`)
+
+Script **complet** — **Load** sau **Load & Run** în doc viewer (fără copy-paste din alte secțiuni). Writable LUT = atributul \`writable\` pe \`inline [lut] .huff\` (nu necesită \`MODE WIREWRITE\`).
+
+\`\`\`logts-play legacy
+# --- Setup: writable LUT + protocoale encode / recover ---
+inline [lut] .huff:
+  writable
+  prefixFree
+  variableDepth
+  length: 256
+  data { }
+  :
+
+inline [protocol] .huffPacketSC:
+  def codebookBody:
+    codebook ~b
+  def codebook:
+    lengthOf(codebookBody) 16b
+    codebookBody
+  def encoded:
+    expand(tokens, .huff, keyWidth b)
+  def payload:
+    lengthOf(encoded) 8b
+    encoded
+  def body:
+    01001000
+    keyWidth 8b
+    nSym 8b
+    codebook
+    payload
+  out:
+    body
+    checksum(crc16, body)
+  :
+
+inline [protocol] .huffRecoverSC:
+  mode: parse
+  codebookLoad: .huff
+  parseResult: collapseOnly
+  def entry:
+    sym 8b
+    cwLen 8b
+    withLength(rest, cwLen b)
+  def codebook:
+    withLength(stream, 16b, entry)
+  out:
+    01001000
+    keyWidth 8b
+    nSym 8b
+    codebook
+    validateChecksum(crc16, data)
+    collapse(withLength(stream, 8b), .huff, keyWidth b)
+  :
+
+# --- Sursă + codewords (encode) ---
+32wire source =: 'aacb'
+1wire _ = .huff:add(01100001, 0)
+1wire _ = .huff:add(01100010, 10)
+1wire _ = .huff:add(01100011, 11)
+
+# --- Codebook body 53b (embedded în packet) ---
+53wire codebook = 01100001000000010011000100000001010011000110000001011
+
+# --- ENCODE (live — necesită .huff populat pentru expand) ---
+123wire packetEncoded =: .huffPacketSC {
+  tokens = source,
+  keyWidth = 00001000,
+  nSym = 00000011,
+  codebook = codebook
+}
+peek(source; ascii)
+peek(packetEncoded)
+
+# --- SNAPSHOT 123b pentru recover ---
+# Wave mode re-evaluează \`.huffPacketSC\` după \`:clear()\` → CRC invalid dacă folosești \`packetEncoded\` direct.
+# Copiază valoarea din \`peek(packetEncoded)\` (hex grupat + rest binar):
+123wire packet = ^4808 0300 3561 0131 014C 6058 31C4 63 + 111
+peek(packet)
+
+# --- RECOVER: parse packet → rebuild .huff din codebook → decode payload ---
+1wire _ = .huff:clear()
+32wire recovered = .huffRecoverSC { data = packet }
+8wire huffSz = .huff:size()
+
+show(recovered; ascii)
+show(huffSz)
+\`\`\`
+
+**Output așteptat:**
+
+\`\`\`text
+source (32wire) = "aacb"
+packetEncoded (123wire) = ^4808 0300 3561 0131 014C 6058 31C4 63 + 111
+packet (123wire) = ^4808 0300 3561 0131 014C 6058 31C4 63 + 111
+recovered (32wire) = "aacb" (ref: &4)
+huffSz (8wire) = 00000011 (ref: &5)
+\`\`\`
+
+→ \`recovered\` = \`source\` (\`aacb\`), \`huffSz = 3\` după recover (LUT reconstruit din codebook). **Test 2145** verifică același flux (fără \`peek\`/\`show\`, legacy propagation).
+
+**\`peek\` vs \`show\`:** \`peek(expr)\` citește valoarea **fix în acel moment** (înainte de propagation ulterioară). \`show(expr)\` rulează după ce se termină propagation — deci \`show(packetEncoded)\` *după* \`.huff:clear()\` poate afișa un packet corupt (\`… + 000\` în loc de \`… + 111\`), pentru că \`.huffPacketSC\` depinde de \`expand(..., .huff)\` și LUT-ul e gol. Folosește \`peek\` pentru encode + snapshot, \`show\` doar pe rezultatele finale care nu depind de \`.huff\`.
+
+### Policy
+
+| Mechanism | Role |
+|-----------|------|
+| \`.huffPacketSC\` | Encode — needs local \`.huff\` + \`codebook ~b\` param |
+| \`.huffRecoverSC\` | Recover — parse wire, rebuild \`.huff\`, decode payload |
+| \`:decode()\` | **Not used** for SC packets |
+
+See [protocol.md](protocol.md) — Faza 0a–0d (\`mode: parse\`, \`withLength\`, \`keyWidth b\`, \`checksum\`).
+
+---
+
 ## Gap analysis (N-general)
 
 | Need | Status |
@@ -11526,6 +11770,9 @@ show(huffReady)
 | FSM + post-tick walk (\`execStmts\`) | **Done** — test **2116** (codewords \`0\`/\`10\`/\`11\`) |
 | FSM merge + \`execStmts\` round-trip | **Done** — test **2117** (merge + walk + protocol, wave) |
 | FSM + \`execStmts\` protocol only | **Done** — test **2128** |
+| Packet SC encode (\`.huffPacketSC\`) | **Done** — test **2119** |
+| Packet SC recover (\`.huffRecoverSC\`) | **Done** — tests **2145**, **2146** |
+| Round-trip SC fără \`.huff\` preset | **Done** — test **2145** |
 | Parametric merge steps (\`nSym−1\` not ×31) | **Done** — generator \`huffFsmMergeStepBlocks(sourceLiteral)\` |
 | Reused merge wires (\`mk/mf\` one block) | **Backlog** — engine reassign in duplicate \`on:raise\` |
 | Walk FSM hop-by-hop (\`ph=WHOP\`, no static unroll) | **Backlog** |

@@ -18451,6 +18451,51 @@ inline [protocol] .huffRecover:
     collapse(withLength(data, 8b), .huff, 8b)
   :`;
 
+const INLINE_HUFF_PACKET_SC = `inline [protocol] .huffPacketSC:
+  def codebookBody:
+    codebook ~b
+  def codebook:
+    lengthOf(codebookBody) 16b
+    codebookBody
+  def encoded:
+    expand(tokens, .huff, keyWidth b)
+  def payload:
+    lengthOf(encoded) 8b
+    encoded
+  def body:
+    01001000
+    keyWidth 8b
+    nSym 8b
+    codebook
+    payload
+  out:
+    body
+    checksum(crc16, body)
+  :`;
+
+const HUFF_SC_BASE = HUFF_FULL_BASE + '\n' + INLINE_HUFF_PACKET_SC;
+
+const INLINE_HUFF_RECOVER_SC = `inline [protocol] .huffRecoverSC:
+  mode: parse
+  codebookLoad: .huff
+  parseResult: collapseOnly
+  def entry:
+    sym 8b
+    cwLen 8b
+    withLength(rest, cwLen b)
+  def codebook:
+    withLength(stream, 16b, entry)
+  out:
+    01001000
+    keyWidth 8b
+    nSym 8b
+    codebook
+    validateChecksum(crc16, data)
+    collapse(withLength(stream, 8b), .huff, keyWidth b)
+  :`;
+
+const HUFF_SC_FULL = HUFF_SC_BASE + '\n' + INLINE_HUFF_RECOVER_SC;
+
 function huffMergeRound(id, parentKey) {
   return `
 8wire _m${id}k1, 8wire _m${id}f1 = .heap:popMin()
@@ -18728,6 +18773,25 @@ function huffCodewordsForSource(sourceLiteral) {
   });
 }
 
+/** Wire codebook body: sym 8b + cwLen 8b + codeword (MSB-first), entries sorted by sym ascending. */
+function huffBuildCodebookWire(entries) {
+  return entries
+    .slice()
+    .sort((a, b) => a.sym.localeCompare(b.sym))
+    .map(e => e.sym + e.width.toString(2).padStart(8, '0') + e.cod)
+    .join('');
+}
+
+/** Bit offsets in `.huffPacketSC` (header 24b + cbLen 16b + codebookBody). */
+function huffScPayloadBitOffset(codebookBodyLen) {
+  return 24 + 16 + codebookBodyLen;
+}
+
+/** Total SC packet width: header + codebook frame + payload + CRC-16. */
+function huffScTotalBitLen(codebookBodyLen, payloadLen) {
+  return 24 + 16 + codebookBodyLen + payloadLen + 16;
+}
+
 function huffWalkEmitForSource(sourceLiteral) {
   const freq = new Map();
   for (const c of sourceLiteral) freq.set(c, (freq.get(c) || 0) + 1);
@@ -18892,6 +18956,68 @@ ${huffWalkEmit('01100011', 'cc', 2)}
   h.assert('ca', session.getWire(interp, 'ca'), '0');
   h.assert('cb', session.getWire(interp, 'cb'), '10');
   h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
+});
+
+reg(2119, 'huffman-sc', 'Faza 2 — huffPacketSC encode aacb + codebook wire', function(h, session) {
+  const codes = huffCodewordsForSource('aacb');
+  const codebook = huffBuildCodebookWire(codes);
+  const cbLen = codebook.length;
+  const payloadOff = huffScPayloadBitOffset(cbLen);
+  const adds = codes.map(e => `1wire _ = .huff:add(${e.sym}, ${e.cod})`).join('\n');
+  const src = HUFF_SC_BASE + `
+32wire source =: 'aacb'
+${adds}
+${cbLen}wire codebook = ${codebook}
+14wire legacy = .huffPacket { tokens = source }
+128wire packet =: .huffPacketSC { tokens = source, keyWidth = 00001000, nSym = 00000011, codebook = codebook }`;
+  const { interp } = session.run(src);
+  h.assert('codebook wire', session.getWire(interp, 'codebook'), codebook);
+  h.assert('codebook len', String(cbLen), '53');
+  const legacy = session.getWire(interp, 'legacy');
+  const pkt = session.getWire(interp, 'packet');
+  h.assert('magic H', pkt.substr(0, 8), '01001000');
+  h.assert('keyWidth 8', pkt.substr(8, 8), '00001000');
+  h.assert('nSym 3', pkt.substr(16, 8), '00000011');
+  h.assert('cbLen prefix', pkt.substr(24, 16), cbLen.toString(2).padStart(16, '0'));
+  h.assert('codebook body', pkt.substr(40, cbLen), codebook);
+  h.assert('payload matches legacy', pkt.substr(payloadOff, legacy.length), legacy);
+  h.assert('checksum suffix', String(pkt.length >= payloadOff + legacy.length + 16), 'true');
+});
+
+reg(2145, 'huffman-sc', 'Faza 4 — round-trip SC fără .huff preset la recover', function(h, session) {
+  const codes = huffCodewordsForSource('aacb');
+  const codebook = huffBuildCodebookWire(codes);
+  const cbLen = codebook.length;
+  const adds = codes.map(e => `1wire _ = .huff:add(${e.sym}, ${e.cod})`).join('\n');
+  const src = HUFF_SC_FULL + `
+32wire source =: 'aacb'
+${adds}
+${cbLen}wire codebook = ${codebook}
+128wire packetPadded =: .huffPacketSC { tokens = source, keyWidth = 00001000, nSym = 00000011, codebook = codebook }
+123wire packet = packetPadded.0/123
+1wire _ = .huff:clear()
+32wire recovered = .huffRecoverSC { data = packet }
+8wire huffSz = .huff:size()`;
+  const { interp } = session.run(src);
+  h.assert('huff loaded', session.getWire(interp, 'huffSz'), '00000011');
+  h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
+});
+
+reg(2146, 'huffman-sc', 'Faza 3 — huffRecoverSC bad checksum throws', function(h, session) {
+  const codes = huffCodewordsForSource('aacb');
+  const codebook = huffBuildCodebookWire(codes);
+  const cbLen = codebook.length;
+  const adds = codes.map(e => `1wire _ = .huff:add(${e.sym}, ${e.cod})`).join('\n');
+  const src = HUFF_SC_FULL + `
+32wire source =: 'aacb'
+${adds}
+${cbLen}wire codebook = ${codebook}
+128wire packetPadded =: .huffPacketSC { tokens = source, keyWidth = 00001000, nSym = 00000011, codebook = codebook }
+123wire packet = packetPadded.0/123
+1wire _ = .huff:clear()`;
+  const { interp } = session.run(src);
+  session.execStmts(interp, '123wire bad = packet.0/122 + 0\n32wire recovered = .huffRecoverSC { data = bad }');
+  h.assert('checksum error', String(session.outIncludes(interp, 'validateChecksum: mismatch')), 'true');
 });
 
 reg(2115, 'huffman-wave', 'FSM scan merge done aacb links wave', function(h, session) {
@@ -19079,6 +19205,10 @@ reg(2118, 'huffman-wave', 'FSM in-script round-trip aacb wave no execStmts', fun
     huffFsmScript,
     huffFsmRoundTripScript,
     huffFsmTick,
+    huffBuildCodebookWire,
+    huffCodewordsForSource,
+    huffScPayloadBitOffset,
+    huffScTotalBitLen,
     getTest(id) {
       return this.tests.find(t => t.id === id) || null;
     },

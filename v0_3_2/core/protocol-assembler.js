@@ -1,6 +1,7 @@
 /* ================= PROTOCOL ASSEMBLER ================= */
 
-const PROTOCOL_ATTRS = new Set(['clockType', 'mode']);
+const PROTOCOL_ATTRS = new Set(['clockType', 'mode', 'codebookLoad', 'parseResult']);
+const PARSE_RESULT_MODES = new Set(['all', 'collapseOnly']);
 const PROTOCOL_MODES = new Set(['assemble', 'parse']);
 const CLOCK_TYPES = new Set(['lowFirst', 'highFirst']);
 
@@ -124,7 +125,9 @@ function parseSegmentLine(line, parameters, ctx) {
   const wlDefM = /^withLength\s*\(\s*([^,]+)\s*,\s*(\d+)b\s*,\s*(\w+)\s*\)$/i.exec(t);
   if (wlDefM) {
     const ref = parseParamRef(wlDefM[1]);
-    ensureParam(parameters, ref);
+    if (!(protocolMode === 'parse' && (ref.name === 'stream' || ref.name === 'data'))) {
+      ensureParam(parameters, ref);
+    }
     const defName = wlDefM[3];
     if (!localDefNames.includes(defName)) {
       throw new Error(`withLength() def '${defName}' is not a local def`);
@@ -142,7 +145,9 @@ function parseSegmentLine(line, parameters, ctx) {
   const wlM = /^withLength\s*\(\s*([^,]+)\s*,\s*(\d+)b\s*\)$/i.exec(t);
   if (wlM) {
     const ref = parseParamRef(wlM[1]);
-    ensureParam(parameters, ref);
+    if (!(protocolMode === 'parse' && (ref.name === 'stream' || ref.name === 'data'))) {
+      ensureParam(parameters, ref);
+    }
     return { kind: 'withLength', param: ref.name, width: parseInt(wlM[2], 10) };
   }
 
@@ -170,7 +175,7 @@ function parseSegmentLine(line, parameters, ctx) {
   if (expVarKw) {
     const ref = parseParamRef(expVarKw[1]);
     ensureParam(parameters, ref);
-    registerParam(parameters, expVarKw[3], 8);
+    if (protocolMode !== 'parse') registerParam(parameters, expVarKw[3], 8);
     return { kind: 'expand', param: ref.name, lutRef: expVarKw[2], keyWidthParam: expVarKw[3] };
   }
 
@@ -184,8 +189,10 @@ function parseSegmentLine(line, parameters, ctx) {
   const colNestVarM = /^collapse\s*\(\s*withLength\s*\(\s*([^,]+)\s*,\s*(\d+)b\s*\)\s*,\s*(\.\w+)\s*,\s*(\w+)\s+b\s*\)$/i.exec(t);
   if (colNestVarM) {
     const ref = parseParamRef(colNestVarM[1]);
-    ensureParam(parameters, ref);
-    registerParam(parameters, colNestVarM[4], 8);
+    if (!(protocolMode === 'parse' && (ref.name === 'stream' || ref.name === 'data'))) {
+      ensureParam(parameters, ref);
+    }
+    if (protocolMode !== 'parse') registerParam(parameters, colNestVarM[4], 8);
     return {
       kind: 'collapse',
       withLength: { param: ref.name, width: parseInt(colNestVarM[2], 10) },
@@ -197,7 +204,9 @@ function parseSegmentLine(line, parameters, ctx) {
   const colNestM = /^collapse\s*\(\s*withLength\s*\(\s*([^,]+)\s*,\s*(\d+)b\s*\)\s*,\s*(\.\w+)\s*,\s*(\d+)b\s*\)$/i.exec(t);
   if (colNestM) {
     const ref = parseParamRef(colNestM[1]);
-    ensureParam(parameters, ref);
+    if (!(protocolMode === 'parse' && (ref.name === 'stream' || ref.name === 'data'))) {
+      ensureParam(parameters, ref);
+    }
     return {
       kind: 'collapse',
       withLength: { param: ref.name, width: parseInt(colNestM[2], 10) },
@@ -210,7 +219,7 @@ function parseSegmentLine(line, parameters, ctx) {
   if (colVarM) {
     const ref = parseParamRef(colVarM[1]);
     ensureParam(parameters, ref);
-    registerParam(parameters, colVarM[3], 8);
+    if (protocolMode !== 'parse') registerParam(parameters, colVarM[3], 8);
     return { kind: 'collapse', param: ref.name, lutRef: colVarM[2], keyWidthParam: colVarM[3] };
   }
 
@@ -365,6 +374,12 @@ function parseProtocolBody(bodyRaw) {
         }
         if (key === 'mode' && !PROTOCOL_MODES.has(val)) {
           throw new Error('mode must be \'assemble\' or \'parse\'');
+        }
+        if (key === 'codebookLoad' && !/^\.\w+$/.test(val)) {
+          throw new Error('codebookLoad must be an inline LUT reference (e.g. .huff)');
+        }
+        if (key === 'parseResult' && !PARSE_RESULT_MODES.has(val)) {
+          throw new Error('parseResult must be \'all\' or \'collapseOnly\'');
         }
         attributes[key] = val;
         continue;
@@ -693,15 +708,35 @@ function parseProtocol(inst, args, ctx) {
   const cache = new Map();
   const channelWidths = [];
   let blob = '';
+  let parseEntryCount = 0;
+  const parseCtx = Object.assign({}, ctx || {}, {
+    onParseEntry(sym, codeword) {
+      parseEntryCount++;
+      if (ctx && typeof ctx.onParseEntry === 'function') ctx.onParseEntry(sym, codeword);
+    },
+  });
   for (const chName of inst.channelOrder) {
     const channel = inst.channels.find(c => c.name === chName);
     if (!channel) throw new Error(`Missing channel '${chName}' in protocol instance`);
     let bits = '';
+    const collapseOnly = (inst.attributes && inst.attributes.parseResult) === 'collapseOnly';
     for (const seg of channel.segments) {
-      bits += parseSegment(seg, stream, fields, inst, args, inst.attributes || {}, ctx, cache);
+      const segBits = parseSegment(seg, stream, fields, inst, args, inst.attributes || {}, parseCtx, cache);
+      if (collapseOnly) {
+        if (seg.kind === 'collapse') bits += segBits;
+      } else {
+        bits += segBits;
+      }
     }
     channelWidths.push(bits.length);
     blob += bits;
+  }
+  const nSymRaw = fields.get('nSym');
+  if (nSymRaw !== undefined && nSymRaw !== null) {
+    const expected = parseInt(nSymRaw, 2);
+    if (Number.isFinite(expected) && parseEntryCount > 0 && parseEntryCount !== expected) {
+      throw new Error(`parse: codebook entry count ${parseEntryCount} does not match nSym ${expected}`);
+    }
   }
   return { blob, channelWidths, totalWidth: blob.length, fields: fields._values };
 }
@@ -1168,6 +1203,8 @@ function formatProtocolTypeDoc() {
     'Attributes:',
     '  clockType: lowFirst | highFirst',
     '  mode: assemble | parse',
+    '  codebookLoad: .lut   (parse mode — populate LUT from codebook entries)',
+    '  parseResult: all | collapseOnly   (parse output filter)',
     '',
     'Invoke (assignment only):',
     '  10bit tx = .name { data = ^41 }',

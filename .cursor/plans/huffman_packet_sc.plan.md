@@ -16,16 +16,16 @@ todos:
     status: completed
   - id: huff-faza-1-doc
     content: Secțiune Packet SC în huffman-v2.md + backlog protocol.md (Faza 0a–0d)
-    status: pending
+    status: completed
   - id: huff-faza-2-encode
     content: ".huffPacketSC + helpers huffBuildCodebookWire + teste encode"
-    status: pending
+    status: completed
   - id: huff-faza-3-recover
     content: ".huffRecoverSC protocol separat (după Faza 0a) + round-trip fără .huff preset"
-    status: pending
+    status: completed
   - id: huff-faza-4-tests
     content: Teste 2119–2120 round-trip SC complet
-    status: pending
+    status: completed
 isProject: false
 ---
 
