@@ -16626,6 +16626,17 @@ reg(1964, 'wire-tensor', 'REPEAT exceeds 16384 bits', function(h, session) {
   h.assert('bit limit', String(/exceeds 16384/.test(err)), 'true');
 });
 
+reg(2143, 'wire-tensor', 'REPEAT string literal "abc" × 2', function(h, session) {
+  const abc = '011000010110001001100011';
+  const { interp } = session.run('48wire msg = REPEAT("abc", \\2)');
+  h.assert('doubled ascii', session.getWire(interp, 'msg'), abc + abc);
+});
+
+reg(2144, 'wire-tensor', 'REPEAT bin literal 1010 × 3', function(h, session) {
+  const { interp } = session.run('12wire out = REPEAT(1010, \\3)');
+  h.assert('triple nibble', session.getWire(interp, 'out'), '1010'.repeat(3));
+});
+
 reg(1965, 'wire-tensor', 'PIVOT 4wire[3,1] → 4wire[3] round-trip', function(h, session) {
   const { interp } = session.run(
     '4wire[3,1] col = 0001 + 0010 + 0100\n' +

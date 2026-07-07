@@ -5186,21 +5186,28 @@ const idx = parseInt(
     const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
     if (!TB || !TS) fail('REPEAT: internal error (tensor modules not loaded)');
     const dataAtom = args[0] && args[0][0];
-    if (!dataAtom || !dataAtom.var) fail('REPEAT expects a whole wire as first argument');
-    if (dataAtom.vectorIndex !== undefined || dataAtom.vectorIndexExpr || dataAtom.bitRange
-        || dataAtom.tensorSlice || dataAtom.tensorRowIndex !== undefined || dataAtom.tensorColIndex !== undefined
-        || dataAtom.tensorRowIndexExpr || dataAtom.tensorColIndexExpr) {
-      fail('REPEAT: first argument must be a whole wire');
-    }
+    const isWholeWire = !!(dataAtom && dataAtom.var
+      && dataAtom.vectorIndex === undefined && !dataAtom.vectorIndexExpr && !dataAtom.bitRange
+      && !dataAtom.tensorSlice && dataAtom.tensorRowIndex === undefined && dataAtom.tensorColIndex === undefined
+      && !dataAtom.tensorRowIndexExpr && !dataAtom.tensorColIndexExpr);
     const times = this._evalCallArgRepeatCount(args[1], 'REPEAT');
-    const wire = this.wires.get(dataAtom.var);
-    if (!wire) fail(`REPEAT: unknown wire '${dataAtom.var}'`);
-    const meta = TS.getWireTensorMeta(wire);
-    const shapePre = TB.resolveRepeatOutputShape(wire, meta);
-    if (shapePre.kind === 'error') fail(shapePre.message);
-    const outShape = TB.finalizeRepeatShape(shapePre, times);
-    const val = this._evalCallArgValue(args[0]);
+    let shapePre;
+    let val;
+    let meta = null;
+    if (isWholeWire) {
+      const wire = this.wires.get(dataAtom.var);
+      if (!wire) fail(`REPEAT: unknown wire '${dataAtom.var}'`);
+      meta = TS.getWireTensorMeta(wire);
+      shapePre = TB.resolveRepeatOutputShape(wire, meta);
+      if (shapePre.kind === 'error') fail(shapePre.message);
+      val = this._evalCallArgValue(args[0]);
+    } else {
+      val = this._evalCallArgValue(args[0]);
+      if (!val || val === '-') fail('REPEAT: empty data value');
+      shapePre = { kind: 'plain' };
+    }
     if (!val || val === '-') fail('REPEAT: empty data value');
+    const outShape = TB.finalizeRepeatShape(shapePre, times);
     let blob;
     if (outShape.kind === 'plain') {
       TS.checkRepeatTotalBits(val.length * times, 'REPEAT');
@@ -14188,7 +14195,7 @@ Interpreter.BUILTIN_DOC = {
   FLIPLR:   ['FLIPLR(Wwire tensor) -> Wwire tensor — flip columns'],
   MCAT:     ['MCAT(Wwire tensor A, Wwire tensor B) -> Wwire tensor — concat rows or cols'],
   MSLICE:   ['MSLICE(matrix, \\r0, \\c0, \\h, \\w) -> Wwire[h,w] — submatrix window'],
-  REPEAT:   ['REPEAT(Wbit data, Nbit/\\N times) -> Wbit or Wwire tensor — tile data T times (max 16384 bits)'],
+  REPEAT:   ['REPEAT(data, Nbit/\\N times) -> Wbit or Wwire tensor — tile data T times (wire, literal, or expression; max 16384 bits)'],
   LROTATE:  [
     'LROTATE(Xbit data, Ybit count) -> Xbit',
     'LROTATE(Wbit[n] data, Nbit/Kbit[n] count ; vector) -> Wbit[n]',

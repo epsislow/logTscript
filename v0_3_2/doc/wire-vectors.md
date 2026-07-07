@@ -91,7 +91,7 @@ show(col)
 
 ### REPEAT
 
-`REPEAT(data, times)` tiles a whole wire **T** times. Plain wires concatenate; rank-1 tensors grow along the repeat axis (`4wire[N]` → `4wire[N,T]`, `4wire[1,N]` → `4wire[T,N]`). Matrices (`R>1`, `C>1`) are rejected. Max **16384** output bits. See [builtin-REPEAT.md](builtin-REPEAT.md).
+`REPEAT(data, times)` tiles a wire, **literal**, or bit expression **T** times. Plain wires concatenate; rank-1 tensors grow along the repeat axis (`4wire[N]` → `4wire[N,T]`, `4wire[1,N]` → `4wire[T,N]`). Matrices (`R>1`, `C>1`) are rejected. Max **16384** output bits. See [builtin-REPEAT.md](builtin-REPEAT.md).
 
 ```logts-play
 4wire[3] col = 0001 + 0010 + 0100
