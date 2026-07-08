@@ -683,7 +683,7 @@ Four tokens `00` `01` `10` `11` → payload 9 bits + 8-bit length = **17** bits 
 
 ## FSM v2.1 — scan + merge (`huffFsmScript`)
 
-Generator: `tests/test_suite.js` (`huffFsmRoundTripScript`) · Node mirror: `node/huff_fsm_script.js` · regenerate doc block: `node node/_gen_huff_fsm_doc.js`.
+Generator: `tests/test_suite.js` (`huffFsmRoundTripScript`) · regenerate doc block: `node node/_gen_huff_fsm_doc.js`.
 
 One **clock** tick (osc `afterSettle` or manual switch) = scan byte step, one merge round, or `.huff` commit. Phases:
 

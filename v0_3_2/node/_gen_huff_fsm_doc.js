@@ -13,5 +13,5 @@ for (const f of TEST_RUNTIME_SCRIPTS) {
 }
 const sandbox = createTestNodeSandbox();
 vm.runInNewContext(src, sandbox);
-const script = sandbox.LogTScriptTestSuite.huffFsmRoundTripScript('aacb');
+const script = sandbox.LogTScriptTestSuite.huffFsmRoundTripScript('aacb', { afterSettleClock: true });
 process.stdout.write('```logts-play wave\n' + script + '\n```\n');

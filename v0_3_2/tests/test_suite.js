@@ -18710,13 +18710,21 @@ function huffFsmScript(sourceLiteral, opts) {
   const mergeBlock = twoPhase
     ? huffFsmTwoPhaseMergeBlock()
     : huffFsmMergeStepBlocks(sourceLiteral);
+  const clockBlock = opts.afterSettleClock
+    ? `comp [~] .clk:
+  afterSettle
+  delay0: 5
+  delay1: 5
+  delayIsSec: 0
+  :`
+    : `comp [switch] .clk:
+  text: 'tick'
+  :`;
   return `${HUFF_FULL_BASE}
 ${HUFF_FSM_LUT}
 32wire source =: '${sourceLiteral}'
 8wire srcLen = ${srcLen}
-comp [switch] .clk:
-  text: 'tick'
-  :
+${clockBlock}
 4wire ph = 0000
 1wire phScan = EQ(ph, .hfsm:SCAN)
 1wire phMerge = EQ(ph, .hfsm:MERGE)
@@ -18856,8 +18864,9 @@ function huffWalkEmitForSource(sourceLiteral) {
 }
 
 /** FSM scan+merge + on:raise `.huff:add` + protocol round-trip (no declarative walk). */
-function huffFsmRoundTripScript(sourceLiteral) {
+function huffFsmRoundTripScript(sourceLiteral, opts) {
   sourceLiteral = sourceLiteral || 'aacb';
+  opts = opts || {};
   const codes = huffCodewordsForSource(sourceLiteral);
   const codeDecls = codes
     .map((e, i) => {
@@ -18870,7 +18879,7 @@ function huffFsmRoundTripScript(sourceLiteral) {
     .map((e, i) => `  _hc${i} = ${e.cod}, 1wire _ = .huff:add(${e.sym}, _hc${i})`)
     .join(',\n');
   const showCodes = codes.map((e, i) => `show(_hc${i})`).join('\n');
-  return `${huffFsmScript(sourceLiteral)}
+  return `${huffFsmScript(sourceLiteral, opts)}
 8wire huffCommit = 00000000
 ${codeDecls}
 64wire packet = \\0;64

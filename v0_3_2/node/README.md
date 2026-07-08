@@ -10,12 +10,10 @@
 | `node node/_gen_fa_index.js` | Parse FA CSS → `res/fonts/fa_index_generated.json` |
 | `node node/_gen_clcd_symbols.js` | Generează `devices/clcd-symbols_generated.js` |
 | `node node/_gen_huff_fsm_doc.js` | Afișează blocul `logts-play wave` FSM (stdout) |
-| `node node/_patch_huffman_v2_fsm_doc.js` | Patch secțiunea FSM în `doc/huffman-v2.md` |
 
 ## Huffman FSM (doc)
 
-- `huff_fsm_script.js` — mirror Node al helperilor din `tests/test_suite.js` (scratch local, opțional)
-- Regenerare doc după modificări în generator: `node node/_patch_huffman_v2_fsm_doc.js` apoi `node node/_gen_doc_data.js`
+După modificări în `huffFsmScript` din `tests/test_suite.js`: `node node/_gen_huff_fsm_doc.js` (copie bloc în `doc/huffman-v2.md` dacă e cazul), apoi `node node/_gen_doc_data.js`.
 
 ## Debug (opțional)
 
