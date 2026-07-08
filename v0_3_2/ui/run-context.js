@@ -37,7 +37,9 @@ function createRunContext(id) {
     lastProcessedSource: '',
     secTimerId: null,
     currentInterval: 1000,
-    currentIdx: 0
+    currentIdx: 0,
+    waveListenLog: [],
+    waveListenActive: false
   };
 }
 
@@ -289,6 +291,9 @@ function mountPanelSnapshot(snapshot) {
   }
   const sec = document.getElementById('sec');
   if (sec) sec.classList.remove('btn--primary');
+  if (typeof restoreWaveListenFromSnapshot === 'function') {
+    restoreWaveListenFromSnapshot(snapshot);
+  }
 }
 
 function mountTabPanels() {
@@ -342,12 +347,18 @@ function freezePanelSnapshot(tabId) {
     varsSnapshot: ctx.varsSnapshot || '',
     devicesHtml: ctx.devicesHtml || '',
     astText: tabInfo.astText || '',
-    timelineLabels: (ctx.timelineLabels || []).slice()
+    timelineLabels: (ctx.timelineLabels || []).slice(),
+    waveListenLog: typeof captureWaveListenSnapshot === 'function'
+      ? captureWaveListenSnapshot()
+      : (ctx.waveListenLog || []).slice()
   };
 }
 
 function preemptInstanceForRun(instanceId, newOwnerTabId) {
   const id = clampInstance(instanceId);
+  if (typeof endWaveListenRun === 'function') {
+    endWaveListenRun(id, 'preempt');
+  }
   releaseTabFromOtherInstances(newOwnerTabId, id);
 
   const prevOwner = getOwnerTabId(id);
@@ -383,6 +394,8 @@ function preemptInstanceForRun(instanceId, newOwnerTabId) {
   ctx.devicesHtml = '';
   ctx.timelineLabels = [];
   ctx.lastProcessedSource = '';
+  ctx.waveListenLog = [];
+  ctx.waveListenActive = false;
 }
 
 function releaseRunContext(instanceId) {
@@ -434,6 +447,10 @@ function stopSimulationForTab(tabId) {
   instanceOwners.delete(inst);
   if (ctx) ctx.ownerTabId = null;
 
+  if (typeof endWaveListenRun === 'function') {
+    endWaveListenRun(inst, 'stop');
+  }
+
   if (typeof syncHasRunFromOwners === 'function') syncHasRunFromOwners();
   if (typeof updateRunButtonUI === 'function') updateRunButtonUI();
   if (typeof updateStepControlsUI === 'function') updateStepControlsUI();
@@ -456,6 +473,9 @@ function bindInterpToRunContext(interp, ctx) {
   interp._instanceId = ctx.id;
   interp._ownerTabId = ctx.ownerTabId;
   ctx.interp = interp;
+  if (typeof applyWaveListenToInterp === 'function') {
+    applyWaveListenToInterp(interp, ctx);
+  }
 }
 
 function shouldRefreshRunDom(interp) {

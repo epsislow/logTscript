@@ -25,6 +25,41 @@ class SignalPropagationStrategy {
     this.debugLevel = level;
   }
 
+  _emitWaveListen(text, kind, minLevel = 1) {
+    if (this.debugLevel < minLevel) return;
+    const interp = this.interp;
+    if (!interp || !interp.waveListenActive) return;
+    if (typeof interp.emitWaveListenLine === 'function') {
+      interp.emitWaveListenLine(text, kind || 'trace');
+    }
+  }
+
+  _formatWireStmtRef(ws) {
+    const interp = this.interp;
+    if (!interp || !ws) return 'st(?)';
+    const loc = interp.getLocation(ws);
+    if (ws.assignment && ws.assignment.target && ws.assignment.target.var) {
+      const name = ws.assignment.target.var;
+      const op = ws.assignment.assignPad === 'left' ? ':=' : '=';
+      return `st(${loc}:asg) ${name} ${op} …`;
+    }
+    if (ws.decls && ws.decls.length) {
+      const names = ws.decls.filter((d) => d.name && d.name !== '_').map((d) => d.name).join(', ');
+      return `st(${loc}:decl) ${names} …`;
+    }
+    return `st(${loc}) …`;
+  }
+
+  _formatWaveListenValue(name, val) {
+    const interp = this.interp;
+    if (val == null) return '∅';
+    let s = String(val);
+    if (this.debugLevel < 3 && s.length > 48) {
+      s = s.slice(0, 45) + '…';
+    }
+    return s;
+  }
+
   scheduleWireChange(name, value) {
     if (value === null || value === undefined) return false;
     const interp = this.interp;
@@ -238,6 +273,15 @@ class SignalPropagationStrategy {
     const pending = this._deferredShows;
     this._deferredShows = [];
     for (const stmt of pending) {
+      if (this.deferShow && stmt.show) {
+        const args = stmt.show.args || [];
+        const labels = [];
+        for (const arg of args) {
+          if (Array.isArray(arg) && arg[0] && arg[0].var) labels.push(arg[0].var);
+          else labels.push('?');
+        }
+        this._emitWaveListen(`flush deferred show(${labels.join(', ')})`, 'flush', 1);
+      }
       this.interp._execShowImmediate(stmt, true);
     }
   }
@@ -322,10 +366,17 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
       16
     );
     const executedThisPropagate = new Set();
+    let waveIndex = 0;
+    let loggedInit = false;
 
     if (this._recomputeAllWires) {
       this._recomputeAllWires = false;
+      if (!loggedInit) {
+        this._emitWaveListen('[wave 0] RUN init → recompute all wires', 'init', 1);
+        loggedInit = true;
+      }
       for (const ws of interp.wireStatements) {
+        this._emitWaveListen(`[wave 0] exec ${this._formatWireStmtRef(ws)}`, 'exec', 2);
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
           for (const [name, val] of outputs) {
@@ -336,7 +387,9 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
       }
     } else if (this._recomputeNextAffectedWires) {
       this._recomputeNextAffectedWires = false;
+      this._emitWaveListen('[wave 0] NEXT → recompute next-affected wires', 'init', 1);
       for (const ws of this._nextAffectedWireOrder) {
+        this._emitWaveListen(`[wave 0] exec ${this._formatWireStmtRef(ws)}`, 'exec', 2);
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
           for (const [name, val] of outputs) {
@@ -355,11 +408,22 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
     }
 
     for (let wave = 0; wave < maxWaves; wave++) {
+      waveIndex = wave;
       if (typeof beginAllMemWritePhases === 'function') beginAllMemWritePhases();
       if (interp) interp.memWriteBatching = true;
 
       const compsChanged = this.commitComponentOutputs();
-      for (const c of compsChanged) allChanged.add(c);
+      for (const c of compsChanged) {
+        allChanged.add(c);
+        if (this.debugLevel >= 2) {
+          const val = interp.getComponentStableValue(c);
+          this._emitWaveListen(
+            `[wave ${wave}] commit component ${c} = ${this._formatWaveListenValue(c, val)}`,
+            'commit',
+            2
+          );
+        }
+      }
 
       let anyScheduled = false;
       for (const compName of compsChanged) {
@@ -370,16 +434,32 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
       }
 
       const changed = this.commitPendingWires();
-      for (const n of changed) allChanged.add(n);
+      for (const n of changed) {
+        allChanged.add(n);
+        const val = interp.getWireStableValue(n);
+        this._emitWaveListen(
+          `[wave ${wave}] commit ${n} = ${this._formatWaveListenValue(n, val)}`,
+          'commit',
+          1
+        );
+      }
 
       const toExec = this.collectAffectedStatements(changed);
       for (const ws of toExec) {
         if (executedThisPropagate.has(ws)) continue;
         executedThisPropagate.add(ws);
+        this._emitWaveListen(`[wave ${wave}] exec ${this._formatWireStmtRef(ws)}`, 'exec', 2);
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
           for (const [name, val] of outputs) {
             if (this.scheduleWireChange(name, val)) anyScheduled = true;
+            if (this.debugLevel >= 3) {
+              this._emitWaveListen(
+                `[wave ${wave}] schedule ${name} = ${this._formatWaveListenValue(name, val)}`,
+                'schedule',
+                3
+              );
+            }
           }
         }
       }

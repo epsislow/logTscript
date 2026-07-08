@@ -372,6 +372,8 @@ class Interpreter {
     if (this.signalPropagationStrategy) {
       this.signalPropagationStrategy.bind(this);
     }
+    this.waveListenActive = false;
+    this.onWaveListenLine = null;
     this.componentRegistry = componentRegistry;
     this.storage=[]; // Array of stored values: [{value: "101", index: 0}, ...]
     this.nextIndex=0;
@@ -903,6 +905,13 @@ class Interpreter {
         const lutHit = this._exprReferencesWritableLutInst(expr, instName, true);
         const protoHit = instName === '.huff' && this._exprHasProtocolInvoke(expr);
         if (!lutHit && !protoHit) continue;
+        if (strategy && typeof strategy._emitWaveListen === 'function') {
+          strategy._emitWaveListen(
+            `lut-mut ${instName} → re-exec ${strategy._formatWireStmtRef(ws)}`,
+            'lut-mut',
+            1
+          );
+        }
         executed.add(ws);
         const outputs = this.execWireStatement(ws, true);
         for (const wName of this._applyWireStatementOutputs(outputs, strategy)) {
@@ -3086,6 +3095,230 @@ class Interpreter {
     }
     this._probeDriverSnapshots.set(wireName, snap);
     return suffix;
+  }
+
+  emitWaveListenLine(text, kind) {
+    if (!this.waveListenActive) return;
+    if (typeof this.onWaveListenLine === 'function') {
+      this.onWaveListenLine(text, kind || 'trace');
+    }
+  }
+
+  _findProducerWireStmt(wireName) {
+    for (const ws of this.wireStatements) {
+      if (ws.assignment && ws.assignment.target && ws.assignment.target.var === wireName) return ws;
+      if (ws.decls && ws.decls.some((d) => d.name === wireName)) return ws;
+    }
+    return null;
+  }
+
+  _collectProtocolRefsFromExpr(expr, outSet) {
+    if (!expr || !Array.isArray(expr)) return;
+    for (const atom of expr) {
+      if (atom.protocolInvoke && atom.protocolInvoke.protocolRef) {
+        outSet.add(atom.protocolInvoke.protocolRef);
+      }
+      if (typeof this.forEachSubExprInAtom === 'function') {
+        this.forEachSubExprInAtom(atom, (sub) => this._collectProtocolRefsFromExpr(sub, outSet));
+      }
+    }
+  }
+
+  _collectLutRefsFromExpr(expr, outSet) {
+    if (!expr || !this.inlineInstances) return;
+    for (const [instName, inst] of this.inlineInstances.entries()) {
+      if (!inst || inst.kind !== 'lut') continue;
+      if (this._exprReferencesWritableLutInst(expr, instName, true)) {
+        outSet.add(instName);
+      }
+    }
+  }
+
+  _formatDepsStmtLine(ws) {
+    if (!ws) return '(unknown)';
+    const loc = this.getLocation(ws);
+    if (ws.assignment && ws.assignment.target && ws.assignment.target.var) {
+      const name = ws.assignment.target.var;
+      const op = ws.assignment.assignPad === 'left' ? ':=' : '=';
+      return `${loc} — ${name} ${op} …`;
+    }
+    if (ws.decls && ws.decls.length) {
+      const d0 = ws.decls[0];
+      const wtype = d0.type || 'wire';
+      const name = d0.name || '_';
+      return `${loc} — ${wtype} ${name} = …`;
+    }
+    return `${loc} — …`;
+  }
+
+  _depsFormatWireList(wireNames) {
+    const lines = [];
+    for (const name of wireNames) {
+      const wire = this.wires.get(name);
+      const label = wire ? this.getWireTypeLabel(wire) : 'wire';
+      lines.push(`  ${name} (${label})`);
+    }
+    return lines;
+  }
+
+  _depsCollectNextSensitiveInputs(expr) {
+    const names = new Set();
+    const visit = (e) => {
+      if (!e || !Array.isArray(e)) return;
+      for (const atom of e) {
+        if (atom.var === '~' || atom.var === '%' || atom.var === '$') names.add(atom.var);
+        if (typeof this.forEachSubExprInAtom === 'function') {
+          this.forEachSubExprInAtom(atom, (sub) => visit(sub));
+        }
+      }
+    };
+    visit(expr);
+    if (this.exprDependsOnNextCycle(expr)) {
+      const wireInputs = new Set();
+      this.collectWireInputsFromExpr(expr, wireInputs);
+      for (const w of wireInputs) {
+        const ws = this._findProducerWireStmt(w);
+        if (!ws) continue;
+        const wexpr = ws.assignment ? ws.assignment.expr : ws.expr;
+        if (wexpr && this.exprDependsOnNextCycle(wexpr)) names.add(w);
+      }
+    }
+    return [...names];
+  }
+
+  _depsStmtTargetName(ws) {
+    if (ws.assignment && ws.assignment.target && ws.assignment.target.var) {
+      return ws.assignment.target.var;
+    }
+    if (ws.decls && ws.decls.length) {
+      const names = ws.decls.filter((d) => d.name && d.name !== '_').map((d) => d.name);
+      if (names.length) return names.join(', ');
+    }
+    return '…';
+  }
+
+  _execDeps(stmt) {
+    const expr = stmt.deps && stmt.deps.expr;
+    if (!expr || !Array.isArray(expr)) {
+      throw Error('deps() requires an expression argument');
+    }
+
+    const strategy = this.signalPropagationStrategy;
+    if (strategy && !strategy._wireDependentsIndex) {
+      strategy.buildWireDependentsIndex();
+      strategy.buildComponentDependentsIndex();
+    }
+    const index = strategy && strategy._wireDependentsIndex;
+
+    const isLutTarget = expr.length === 1 && expr[0].var && expr[0].var.startsWith('.')
+      && this.inlineInstances && this.inlineInstances.has(expr[0].var)
+      && this.inlineInstances.get(expr[0].var).kind === 'lut';
+    const wireName = (!isLutTarget && expr.length === 1 && expr[0].var && !expr[0].var.startsWith('.'))
+      ? expr[0].var
+      : null;
+
+    const lines = [];
+
+    if (isLutTarget) {
+      const instName = expr[0].var;
+      lines.push(`=== deps(${instName}) ===`);
+      lines.push('Type: LUT instance (writable)');
+      lines.push('');
+      lines.push(`Wire statements re-exec on ${instName} mutation:`);
+      let any = false;
+      for (const ws of this.wireStatements) {
+        const wexpr = ws.assignment ? ws.assignment.expr : ws.expr;
+        if (!wexpr) continue;
+        const lutHit = this._exprReferencesWritableLutInst(wexpr, instName, true);
+        const protoHit = instName === '.huff' && this._exprHasProtocolInvoke(wexpr);
+        if (!lutHit && !protoHit) continue;
+        any = true;
+        const tag = protoHit && lutHit ? 'lut-read + protocol' : (protoHit ? 'protocol' : 'lut-read');
+        const target = ws.assignment && ws.assignment.target ? ws.assignment.target.var : '…';
+        lines.push(`  → st(${this.getLocation(ws)}:asg) ${target} [${tag}]`);
+      }
+      if (!any) lines.push('  (none)');
+      for (const line of lines) this.out.push(line);
+      return;
+    }
+
+    const label = wireName || '(expression)';
+    lines.push(`=== deps(${label}) ===`);
+
+    const producer = wireName ? this._findProducerWireStmt(wireName) : null;
+    const producerExpr = producer ? (producer.assignment ? producer.assignment.expr : producer.expr) : null;
+    const analyzeExpr = producerExpr || expr;
+
+    if (wireName) {
+      const wire = this.wires.get(wireName);
+      if (!wire) throw Error(`Unknown wire '${wireName}' in deps()`);
+      lines.push(`Type: ${this.getWireTypeLabel(wire)}`);
+      lines.push(`Producer: ${producer ? this._formatDepsStmtLine(producer) : '(none)'}`);
+    } else {
+      lines.push('Type: (ad-hoc expression — no wire producer)');
+      lines.push('Producer: (ad-hoc expression — no wire producer)');
+    }
+
+    const upstream = new Set();
+    this.collectWireInputsFromExpr(analyzeExpr, upstream);
+    lines.push('');
+    lines.push('Upstream wires:');
+    if (upstream.size === 0) lines.push('  (none)');
+    else lines.push(...this._depsFormatWireList([...upstream].sort()));
+
+    const lutRefs = new Set();
+    const protoRefs = new Set();
+    this._collectLutRefsFromExpr(analyzeExpr, lutRefs);
+    this._collectProtocolRefsFromExpr(analyzeExpr, protoRefs);
+
+    lines.push('');
+    lines.push('Upstream LUT / protocol:');
+    if (lutRefs.size === 0 && protoRefs.size === 0) lines.push('  (none)');
+    else {
+      for (const r of lutRefs) lines.push(`  ${r} (writable, read)`);
+      for (const p of protoRefs) lines.push(`  protocol ${p}`);
+    }
+
+    const nextSens = this._depsCollectNextSensitiveInputs(analyzeExpr);
+    lines.push('');
+    lines.push(`NEXT-sensitive inputs: ${nextSens.length ? nextSens.join(', ') : '(none)'}`);
+
+    lines.push('');
+    lines.push('Downstream consumers (re-exec when target changes):');
+    if (wireName && index && index.has(wireName)) {
+      const stmts = index.get(wireName);
+      if (stmts && stmts.size) {
+        for (const ws of stmts) {
+          lines.push(`  → st(${this.getLocation(ws)}:asg) ${this._depsStmtTargetName(ws)}`);
+        }
+      } else lines.push('  (none)');
+    } else if (wireName) {
+      lines.push('  (none)');
+    } else {
+      lines.push('  (ad-hoc expression — no downstream index)');
+    }
+
+    lines.push('');
+    lines.push('LUT-mutation sensitive (re-exec when LUT mutates):');
+    if (wireName) {
+      const pexpr = producerExpr;
+      let lutAny = false;
+      if (pexpr && this.inlineInstances) {
+        for (const [instName] of this.inlineInstances.entries()) {
+          const lutHit = this._exprReferencesWritableLutInst(pexpr, instName, true);
+          const protoHit = instName === '.huff' && this._exprHasProtocolInvoke(pexpr);
+          if (lutHit || protoHit) {
+            lutAny = true;
+            lines.push(`  → producer st(${this.getLocation(producer)}:asg) ${wireName} ← ${instName}`);
+          }
+        }
+      }
+      if (!lutAny) lines.push('  (none)');
+    } else {
+      lines.push('  (ad-hoc expression — see upstream LUT / protocol)');
+    }
+
+    for (const line of lines) this.out.push(line);
   }
 
   _execZlist(stmt) {
@@ -7844,6 +8077,11 @@ if (this.isBuiltinDEMUX(name)) {
 
     if (s.zlist) {
       this.runSafely(() => this._execZlist(s));
+      return;
+    }
+
+    if (s.deps) {
+      this.runSafely(() => this._execDeps(s));
       return;
     }
 
@@ -14249,6 +14487,7 @@ Interpreter.DEBUG_DOC = {
   ],
   watch: ['watch(expr) — record timeline trace for watch panel'],
   Zlist: ['Zlist(wireName) — list registered bus drivers (MODE ZSTATE, at RUN/NEXT)'],
+  deps: ['deps(expr) — dependency graph dump (wire, expr, or LUT instance)'],
 };
 
 Interpreter.DEBUG_DOC_NAMES = new Set(Object.keys(Interpreter.DEBUG_DOC));
@@ -14264,7 +14503,7 @@ Interpreter.getDocIndexLines = function() {
     '  inline — inline instances; inline.kind — template (asm, lut, protocol)',
     '  .inst — inline instance (e.g. .myisa)',
     '  Name — builtin or user function (OR, ADD, myFunc, …)',
-    '  show, peek, probe, watch, Zlist — debug statements',
+    '  show, peek, probe, watch, Zlist, deps — debug statements',
   ];
 };
 

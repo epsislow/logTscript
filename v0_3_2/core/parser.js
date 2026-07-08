@@ -608,7 +608,7 @@ parseDef() {
     
     if (
       this.c.type === 'TYPE' ||
-      (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek' || this.c.value === 'lutOf' || this.c.value === 'exprOfLut' || this.c.value === 'useLutAs' || this.c.value === 'truthTableOf' || this.c.value === 'simplify' || this.c.value === 'equivalent' || this.c.value === 'inputsOf' || this.c.value === 'costOf')) ||
+      (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek' || this.c.value === 'deps' || this.c.value === 'lutOf' || this.c.value === 'exprOfLut' || this.c.value === 'useLutAs' || this.c.value === 'truthTableOf' || this.c.value === 'simplify' || this.c.value === 'equivalent' || this.c.value === 'inputsOf' || this.c.value === 'costOf')) ||
       this.c.type === 'ID' ||
       this.c.type === 'SPECIAL'
     ) {
@@ -2309,6 +2309,14 @@ assignment() {
     this.eat(this.c.type);
     this.eat('SYM', ')');
     return { zRelease: wireName };
+  }
+
+  deps(){
+    this.eat('KEYWORD', 'deps');
+    this.eat('SYM', '(');
+    const expr = this.expr();
+    this.eat('SYM', ')');
+    return { deps: { expr }, line: this.c.line, col: this.c.col };
   }
 
   zList(){
@@ -4385,6 +4393,7 @@ Parser.KEYWORD_HANDLERS = {
   TEST: 'test',
   MODE: 'mode',
   ZRELEASE: 'zRelease',
+  deps: 'deps',
   Zlist: 'zList',
   comp: 'parseComp',
   pcb: 'parsePcbInstance',

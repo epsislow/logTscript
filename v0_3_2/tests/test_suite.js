@@ -19197,6 +19197,49 @@ reg(2118, 'huffman-wave', 'FSM in-script round-trip aacb wave no execStmts', fun
   h.assert('recovered', session.getWire(interp, 'recovered'), session.getWire(interp, 'source'));
 }, { propagation: 'wave' });
 
+reg(2200, 'wave-debug', 'deps — wire upstream and downstream', function(h, session) {
+  const { out } = session.run(`4wire a = 1010
+4wire b = a
+4wire c = b
+deps(b)`);
+  const text = out.join('\n');
+  h.assert('header', String(text.includes('=== deps(b) ===')), 'true');
+  h.assert('upstream a', String(text.includes('a (4wire)')), 'true');
+  h.assert('downstream c', String(/→ st\(3:1:asg\) c/.test(text)), 'true');
+}, { propagation: 'wave' });
+
+reg(2201, 'wave-debug', 'deps — ad-hoc expression', function(h, session) {
+  const { out } = session.run(`4wire a = 1010
+4wire b = 0101
+deps(a + b)`);
+  const text = out.join('\n');
+  h.assert('ad-hoc producer', String(text.includes('ad-hoc expression')), 'true');
+  h.assert('upstream a', String(text.includes('a (4wire)')), 'true');
+  h.assert('upstream b', String(text.includes('b (4wire)')), 'true');
+}, { propagation: 'wave' });
+
+reg(2202, 'wave-debug', 'Wave Listen — level 1 commit trace', function(h, session) {
+  const processed = preprocessLoop('2wire a = 11\n2wire b = a');
+  const registry = session._ensureRegistry();
+  const strategy = session._ensureSignalPropagationStrategy();
+  strategy.setDebugLevel(1);
+  const p = new Parser(new Tokenizer(processed), registry);
+  const stmts = p.parse();
+  const lines = [];
+  const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
+  interp.waveListenActive = true;
+  interp.onWaveListenLine = function (text) { lines.push(text); };
+  for (const s of stmts) interp.exec(s);
+  interp.postExecSrc();
+  h.assert('some trace', String(lines.length > 0), 'true');
+  h.assert('commit line', String(lines.some((l) => l.includes('commit'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2203, 'wave-debug', 'Parser — deps(expr) AST', function(h, session) {
+  const stmts = session.parse('4wire a = 1\ndeps(a + b)');
+  h.assert('deps node', String(stmts.some((s) => s.deps && s.deps.expr)), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

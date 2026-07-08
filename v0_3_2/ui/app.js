@@ -474,6 +474,10 @@ function run(){
   globalInterp = interp;
   bindWatchRecorder(interp);
 
+  if (typeof beginWaveListenRun === 'function') {
+    beginWaveListenRun(instanceId, { legacy: getPropagationMode() === 'legacy' });
+  }
+
   for (const s of stmts) {
       const isShow = s.show !== undefined;
     interp.exec(s, !isShow);
@@ -503,6 +507,9 @@ function run(){
     markTabHasRun();
   }
   updateStepControlsUI();
+  if (typeof endWaveListenRun === 'function') {
+    endWaveListenRun(instanceId, 'complete');
+  }
   }catch(e){
     if (!lastProcessedSource) {
       try { lastProcessedSource = preprocessLoop(code.value); } catch (_) { /* keep */ }
@@ -522,6 +529,9 @@ function run(){
     syncHasRunFromOwners();
     updateRunButtonUI();
     fShowTabs();
+    if (typeof endWaveListenRun === 'function') {
+      endWaveListenRun(instanceId, 'error');
+    }
   }
 }
 
@@ -805,6 +815,8 @@ items.forEach(item => {
         toggleTimeline();
     } else if (panelName === 'networkTraffic') {
         toggleNetworkTraffic();
+    } else if (panelName === 'waveListen') {
+        toggleWaveListenPanel();
     } else if (panelName === 'output') {
         toggleOutput();
     } else if (panelName === 'variables') {

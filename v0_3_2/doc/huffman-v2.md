@@ -1097,6 +1097,8 @@ huffSz (8wire) = 00000011 (ref: &5)
 
 **`peek` vs `show`:** `peek(expr)` citește valoarea **fix în acel moment** (înainte de propagation ulterioară). `show(expr)` rulează după ce se termină propagation — deci `show(packetEncoded)` *după* `.huff:clear()` poate afișa un packet corupt (`… + 000` în loc de `… + 111`), pentru că `.huffPacketSC` depinde de `expand(..., .huff)` și LUT-ul e gol. Folosește `peek` pentru encode + snapshot, `show` doar pe rezultatele finale care nu depind de `.huff`.
 
+**Wave debug:** `deps(packetEncoded)` arată legătura cu `.huff` / `.huffPacketSC`; **Wave Listen** (Win ▾) arată re-eval după `:clear()` — vezi [debug.md — wave-debug patterns](debug.md#wave-debug-patterns).
+
 ### Policy
 
 | Mechanism | Role |

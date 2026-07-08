@@ -120,6 +120,75 @@ After **RUN**, toggle `.s1` in the panel — **`probe`** logs each change with `
 
 ---
 
+## Wave Listen (UI panel)
+
+Wave propagation trace — **separate panel**, not Output. Open from **Win ▾ → Wave Listen**.
+
+| Control | Role |
+|---------|------|
+| **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
+| **L1 / L2 / L3** | Trace verbosity (`debugLevel` on wave engine) |
+| **Clear** | Clears panel history (no auto-clear on Run) |
+| **Listening…** badge | Internal **listen** active while script runs (distinct from ON/OFF) |
+
+**Listen** is runtime-only: ON at Run start (if armed + wave mode), OFF at Stop or script end. The ON button stays armed for the next Run.
+
+Example trace (level 1):
+
+```text
+[wave 0] RUN init → recompute all wires
+[wave 1] commit packetEncoded = ^4808…
+[wave 1] lut-mut .huff:clear → re-exec st(1062:asg) packetEncoded := …
+* script stopped listen is OFF
+```
+
+Legacy mode: one status line (`listen is ON/OFF`), no `[wave N]` lines.
+
+See [Wave debug patterns](#wave-debug-patterns) and [huffman-v2.md](huffman-v2.md) (SC round-trip).
+
+---
+
+## `deps`
+
+Dependency graph dump (tree text in **Output**). Runs at statement position like **`peek`**.
+
+### Syntax
+
+```
+deps(wireName)
+deps(expr)
+deps(.lutInstance)
+```
+
+### Examples
+
+```logts
+deps(packetEncoded)     # producer, upstream, downstream, LUT-mutation
+deps(source)            # downstream consumers
+deps(source + codebook) # ad-hoc expr — upstream only
+deps(.huff)             # stmts re-exec on LUT mutation
+```
+
+Works in **wave and legacy** (static elaboration index). For Huffman SC debugging, use with [Wave Listen](#wave-listen-ui-panel) — see [wave-debug patterns](#wave-debug-patterns).
+
+---
+
+## Wave debug patterns
+
+| Pattern | When |
+|---------|------|
+| **`peek`** right after encode | Before any LUT mutation |
+| **Literal wire snapshot** | Before `.huff:clear()` for recover |
+| **`show`** on final results only | Wires that do not depend on mutated LUT |
+| **`probe(.huff:size())`** | Witness LUT mutations |
+| **`watch(ph.*)`** | FSM + multi-step protocol |
+| **`deps(wire)`** | Before Run — see `.huff` / protocol links |
+| **Wave Listen ON** | During Run — wave commits and LUT re-eval |
+
+Huffman SC round-trip: [huffman-v2.md — Load & Run](huffman-v2.md).
+
+---
+
 ## `show`
 
 ### Syntax
