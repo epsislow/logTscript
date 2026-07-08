@@ -10033,7 +10033,7 @@ The landing page lists topics grouped by section (**Reference**, **Composite blo
 |---------|--------|
 | **← Back** | Return to the previous page in your session (disabled on the first page) |
 | **History** | List of pages you opened this session — click to jump back |
-| **Search** | Filter topics by title and keywords (type-ahead menu; **Enter** to open selection) |
+| **Search** | Filter topics by title and **primary keywords** (canonical page for a function/mode/component) plus secondary synonyms; best match appears first (**Enter** to open) |
 
 Internal links (\`[label](other-page.md)\` or \`[label](other-page.md#anchor)\`) stay inside the viewer. External \`http(s)\` links open normally.
 

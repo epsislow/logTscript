@@ -6,7 +6,9 @@
 |---------|---------|
 | `node node/_gen_test_manifest.js` | Regenerează `tests/test_manifest_generated.js`, `tests/test_runtime_bundle_generated.js`, actualizează `run_tests.html` și `script_editor_v0_3_2.html` (pipeline tail) |
 | `node node/_run_test_suite_node.js` | Rulează toate testele (1121) în terminal |
-| `node node/_gen_doc_data.js` | Regenerează `ui/doc-data_generated.js` din `doc/*.md` |
+| `node node/_gen_doc_data.js` | Regenerează `ui/doc-data_generated.js` + `searchPrimary` în `ui/doc-viewer.js` |
+| `node node/_validate_doc_search.js` | Verifică keywords canonice search doc (conflicte, ranking MODE/ADD) |
+| `node node/_audit_doc_search_gaps.js` | Raport built-ins fără pagină dedicată + acoperire searchPrimary |
 | `node node/_gen_fa_index.js` | Parse FA CSS → `res/fonts/fa_index_generated.json` |
 | `node node/_gen_clcd_symbols.js` | Generează `devices/clcd-symbols_generated.js` |
 | `node node/_gen_huff_fsm_doc.js` | Afișează blocul `logts-play wave` FSM (stdout) |

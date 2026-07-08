@@ -19498,6 +19498,63 @@ reg(2219, 'parser', 'Rotary for.N — quoted colon label', function(h, session) 
   h.assert('for.3 colon', labels[3], ':');
 });
 
+reg(2220, 'doc', 'Search — MODE ranks modes.md first', function(h) {
+  const sections = [{
+    title: 'Reference',
+    items: [
+      { file: 'modes.md', label: 'Script modes (MODE)', searchPrimary: 'MODE STRICT WIREWRITE ZSTATE', searchExtra: 'script mode' },
+      { file: 'zstate.md', label: 'MODE ZSTATE (tristate)', searchPrimary: 'ZSTATE ZRELEASE ZCONNECT', searchExtra: 'MODE tristate bus' },
+    ],
+  }];
+  const idx = DocSearchIndex.buildIndex(sections, []);
+  const results = DocSearchIndex.filterDocSearch(idx, 'mode');
+  h.assert('results found', String(results.length >= 2), 'true');
+  h.assert('modes first', results[0].file, 'modes.md');
+  h.assert('zstate also listed', String(results.some(function (r) { return r.file === 'zstate.md'; })), 'true');
+  h.assert('modes rank better', String(DocSearchIndex.docSearchRank(results[0], 'mode') < DocSearchIndex.docSearchRank(results[1], 'mode')), 'true');
+});
+
+reg(2221, 'doc', 'Search — ADD ranks dedicated page first', function(h) {
+  const sections = [{
+    title: 'Reference',
+    items: [
+      { file: 'builtin-functions.md', label: 'Built-in functions', searchExtra: 'ADD MUX catalog' },
+    ],
+  }];
+  const searchOnly = [
+    { file: 'builtin-ADD.md', label: 'ADD', section: 'Arithmetic', searchPrimary: 'ADD', searchExtra: 'signed vector' },
+  ];
+  const idx = DocSearchIndex.buildIndex(sections, searchOnly);
+  const results = DocSearchIndex.filterDocSearch(idx, 'add');
+  h.assert('add first dedicated', results[0].file, 'builtin-ADD.md');
+});
+
+reg(2222, 'doc', 'Search — afterSettle primary on oscillator', function(h) {
+  const sections = [{
+    title: 'Storage & timing',
+    items: [
+      { file: 'oscillator.md', label: 'oscillator', searchPrimary: 'afterSettle delay0 delay1 delayIsSec duration1 duration0 freq freqIsSec', searchExtra: 'osc comp.osc' },
+    ],
+  }];
+  const idx = DocSearchIndex.buildIndex(sections, []);
+  const results = DocSearchIndex.filterDocSearch(idx, 'aftersettle');
+  h.assert('oscillator found', results[0].file, 'oscillator.md');
+  h.assert('primary rank', String(DocSearchIndex.docSearchRank(results[0], 'aftersettle')), '0');
+});
+
+reg(2223, 'doc', 'Search — PIVOT primary on wire-vectors', function(h) {
+  const sections = [{
+    title: 'Reference',
+    items: [
+      { file: 'wire-vectors.md', label: 'Wire vectors (4wire[3])', searchPrimary: 'PIVOT REPEAT IDENTITY', searchExtra: 'vector tensor transpose' },
+      { file: 'builtin-functions.md', label: 'Built-in functions', searchExtra: 'PIVOT catalog index' },
+    ],
+  }];
+  const idx = DocSearchIndex.buildIndex(sections, []);
+  const results = DocSearchIndex.filterDocSearch(idx, 'pivot');
+  h.assert('pivot first wire-vectors', results[0].file, 'wire-vectors.md');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

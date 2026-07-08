@@ -82,6 +82,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/interpreter.js",
   "core/signal-propagation.js",
   "ui/timeline-analyzer.js",
+  "ui/doc-search-index.js",
   "tests/test_session.js",
   "tests/test_suite.js"
 ];

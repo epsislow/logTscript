@@ -1658,7 +1658,11 @@
       {"id":2216,"group":"wave-debug","title":"Timeline — clientToCanvasCoords scale Y","detail":{"scripts":[],"steps":[],"assertions":["scaleY 2","mapped y 110"]}},
       {"id":2217,"group":"wave-debug","title":"Timeline — tooltip anchor X follows client","detail":{"scripts":[],"steps":[],"assertions":["left anchor x","right anchor x","same row y","col 0","col 2"]}},
       {"id":2218,"group":"wave-debug","title":"Timeline — tooltip prefers right of anchor","detail":{"scripts":[],"steps":[],"assertions":["right of anchor","flip left near edge"]}},
-      {"id":2219,"group":"parser","title":"Rotary for.N — quoted colon label","detail":{"scripts":["comp [rotary] .rr:\n    text: 'R1'\n    for.0: '+'\n    for.1: '-'\n    for.2: 'x'\n    for.3: ':'\n    states: 4\n    :"],"steps":[],"assertions":["for.0","for.1","for.2","for.3 colon"]}}
+      {"id":2219,"group":"parser","title":"Rotary for.N — quoted colon label","detail":{"scripts":["comp [rotary] .rr:\n    text: 'R1'\n    for.0: '+'\n    for.1: '-'\n    for.2: 'x'\n    for.3: ':'\n    states: 4\n    :"],"steps":[],"assertions":["for.0","for.1","for.2","for.3 colon"]}},
+      {"id":2220,"group":"doc","title":"Search — MODE ranks modes.md first","detail":{"scripts":[],"steps":[],"assertions":["results found","modes first","zstate also listed","modes rank better"]}},
+      {"id":2221,"group":"doc","title":"Search — ADD ranks dedicated page first","detail":{"scripts":[],"steps":[],"assertions":["add first dedicated"]}},
+      {"id":2222,"group":"doc","title":"Search — afterSettle primary on oscillator","detail":{"scripts":[],"steps":[],"assertions":["oscillator found","primary rank"]}},
+      {"id":2223,"group":"doc","title":"Search — PIVOT primary on wire-vectors","detail":{"scripts":[],"steps":[],"assertions":["pivot first wire-vectors"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1698,7 +1702,7 @@
       { id: 'decimal', label: 'decimal', rangeLabel: '1610–1613, 1615', testIds: [1610, 1611, 1612, 1613, 1615] },
       { id: 'literals', label: 'Decimal \\\\N literals', rangeLabel: '15–17, 19–21, 1937–1945, 1947–1952', testIds: [15, 16, 17, 19, 20, 21, 1937, 1938, 1939, 1940, 1941, 1942, 1943, 1944, 1945, 1947, 1948, 1949, 1950, 1951, 1952] },
       { id: 'doc-comp', label: 'Doc for body comps', rangeLabel: '400–431, 848–850, 1163', testIds: [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 848, 849, 850, 1163] },
-      { id: 'doc', label: 'doc() tests', rangeLabel: '300–362, 1593, 1597–1598, 1614, 1668, 1678, 1799', testIds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 1593, 1597, 1598, 1614, 1668, 1678, 1799] },
+      { id: 'doc', label: 'doc() tests', rangeLabel: '300–362, 1593, 1597–1598, 1614, 1668, 1678, 1799, 2220–2223', testIds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 1593, 1597, 1598, 1614, 1668, 1678, 1799, 2220, 2221, 2222, 2223] },
       { id: 'bitrange', label: 'Dynamic bit range', rangeLabel: '53–60', testIds: [53, 54, 55, 56, 57, 58, 59, 60] },
       { id: 'error-display', label: 'Error display (caret + editor)', rangeLabel: '1388–1395, 1532–1533', testIds: [1388, 1389, 1390, 1391, 1392, 1393, 1394, 1395, 1532, 1533] },
       { id: 'gates', label: 'gates', rangeLabel: '1662', testIds: [1662] },

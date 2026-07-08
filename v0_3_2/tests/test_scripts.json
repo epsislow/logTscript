@@ -78,6 +78,7 @@
     "core/interpreter.js",
     "core/signal-propagation.js",
     "ui/timeline-analyzer.js",
+    "ui/doc-search-index.js",
     "tests/test_session.js"
   ],
   "editorPipelineTail": [

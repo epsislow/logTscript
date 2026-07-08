@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ROOT, DOC } = require('./js/paths');
+const { enrichDocIndex } = require('./js/doc_search_keywords');
 
 function toLf(text) {
   return String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -103,6 +104,9 @@ function mergeAutoSection(index, docFiles) {
 
 function formatItem(item) {
   let line = "      { file: '" + item.file + "', label: '" + escForJsString(item.label) + "'";
+  if (item.searchPrimary) {
+    line += ", searchPrimary: '" + escForJsString(item.searchPrimary) + "'";
+  }
   if (item.searchExtra) {
     line += ", searchExtra: '" + escForJsString(item.searchExtra) + "'";
   }
@@ -114,6 +118,9 @@ function formatSearchOnlyItem(item) {
   let line = "    { file: '" + item.file + "', label: '" + escForJsString(item.label) + "'";
   if (item.section) {
     line += ", section: '" + escForJsString(item.section) + "'";
+  }
+  if (item.searchPrimary) {
+    line += ",\n      searchPrimary:\n        '" + escForJsString(item.searchPrimary) + "'";
   }
   if (item.searchExtra) {
     line += ",\n      searchExtra:\n        '" + escForJsString(item.searchExtra) + "'";
@@ -173,12 +180,16 @@ if (!DOC_FILES.length) {
 const rawIndex = loadDocIndex();
 const mergedIndex = mergeAutoSection(rawIndex, DOC_FILES);
 
+const contentByFile = new Map();
 const entries = [];
 for (const file of DOC_FILES) {
   const full = path.join(DOC_DIR, file);
   const content = fs.readFileSync(full, 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  contentByFile.set(file, content);
   entries.push({ file, content });
 }
+
+const enrichedIndex = enrichDocIndex(mergedIndex, DOC_FILES, contentByFile);
 
 const outData = `/**
  * AUTO-GENERATED — do not edit.
@@ -196,6 +207,6 @@ ${entries.map(e => `    '${e.file}': \`${escForJs(e.content)}\``).join(',\n')}
 writeLf(OUT_DATA, outData);
 console.log('Wrote', OUT_DATA, entries.length, 'files');
 
-const sectionsBlock = buildDocSectionsBlock(mergedIndex);
+const sectionsBlock = buildDocSectionsBlock(enrichedIndex);
 patchDocViewer(sectionsBlock);
 console.log('Updated', OUT_VIEWER, 'DOC_SECTIONS');

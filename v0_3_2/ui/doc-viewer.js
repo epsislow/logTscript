@@ -5,31 +5,31 @@ const DOC_SECTIONS = [
   {
     title: 'Reference',
     items: [
-      { file: 'doc-function.md', label: 'doc() function' },
-      { file: 'user-functions.md', label: 'User functions (def)', searchExtra: 'def define call return LOAD alias library user-defined function arity body' },
+      { file: 'doc-function.md', label: 'doc() function', searchPrimary: 'doc' },
+      { file: 'user-functions.md', label: 'User functions (def)', searchPrimary: 'def', searchExtra: 'def define call return alias library user-defined function arity body' },
       { file: 'builtin-functions.md', label: 'Built-in functions', searchExtra: 'internal MUX DEMUX REG LATCH NOT AND OR shift arithmetic builtin HIGH BITINDEX ONEHOT ADD SUBTRACT vector signed tag' },
       { file: 'builtin-tagged-index.md', label: 'Tagged built-ins (signed / vector / index)', searchExtra: 'ADD SUBTRACT MULTIPLY DIVIDE MAC GT LT MIN MAX CLAMP SUM DOT ARGMAX ARGMIN EQ RSHIFT LSHIFT signed vector index call tag' },
-      { file: 'builtin-logic-gate-functions.md', label: 'Built-in logic gates' },
-      { file: 'builtin-sequential-functions.md', label: 'Built-in sequential (LATCH, REG)' },
-      { file: 'builtin-routing-functions.md', label: 'Built-in routing (MUX, DEMUX)' },
-      { file: 'builtin-bit-selection-functions.md', label: 'Built-in bit selection', searchExtra: 'HIGH LOW ANY ZERO ANYZ ANYX ANY1 ANY0 ANY01 ANYZX ALLZ ALLX ALL1 ALL0 ALL01 ALLZX BITINDEX ONEHOT priority encoder' },
-      { file: 'builtin-bit-analysis-functions.md', label: 'Built-in bit analysis', searchExtra: 'PARITY CNTONE CNTZERO BITSIZE' },
+      { file: 'builtin-logic-gate-functions.md', label: 'Built-in logic gates', searchPrimary: 'NOT AND OR XOR NXOR NAND NOR EQ' },
+      { file: 'builtin-sequential-functions.md', label: 'Built-in sequential (LATCH, REG)', searchPrimary: 'LATCH REG' },
+      { file: 'builtin-routing-functions.md', label: 'Built-in routing (MUX, DEMUX)', searchPrimary: 'MUX DEMUX' },
+      { file: 'builtin-bit-selection-functions.md', label: 'Built-in bit selection', searchPrimary: 'HIGH LOW ANY ZERO ALL BITINDEX ONEHOT', searchExtra: 'HIGH LOW ANY ZERO ANYZ ANYX ANY1 ANY0 ANY01 ANYZX ALLZ ALLX ALL1 ALL0 ALL01 ALLZX BITINDEX ONEHOT priority encoder' },
+      { file: 'builtin-bit-analysis-functions.md', label: 'Built-in bit analysis', searchPrimary: 'PARITY CNTONE CNTZERO BITSIZE', searchExtra: 'PARITY CNTONE CNTZERO BITSIZE' },
       { file: 'builtin-bit-transform-functions.md', label: 'Built-in bit transform', searchExtra: 'LSHIFT RSHIFT REVERSE LROTATE RROTATE rotate shift' },
       { file: 'components.md', label: 'Component catalog' },
       { file: 'short-notation.md', label: 'Short notation' },
-      { file: 'loop.md', label: 'Loop preprocessor (loop N..M[)', searchExtra: 'repeat placeholder ?N deduplicate nested expand preprocessor' },
-      { file: 'assignment-operators.md', label: 'Assignment operators (=, =:, :=)', searchExtra: 'right pad left pad wire assignment initial vector element slice' },
+      { file: 'loop.md', label: 'Loop preprocessor (loop N..M[)', searchPrimary: 'loop', searchExtra: 'repeat placeholder ?N deduplicate nested expand preprocessor' },
+      { file: 'assignment-operators.md', label: 'Assignment operators (=, =:, :=)', searchExtra: 'right pad left wire assignment initial vector element slice' },
       { file: 'wire-literals.md', label: 'Wire literals', searchExtra: 'binary decimal hex signed \\-N;W ^-HEX;W string Hello ascii quotes escape \\n \\s \\0 padding bit range literal' },
-      { file: 'wire-vectors.md', label: 'Wire vectors (4wire[3])', searchExtra: 'vector element index slice 1D array Nwire count show peek probe Zlist SUM DOT MIN MAX reduction' },
-      { file: 'vector-reduction.md', label: 'Vector reduction (SUM, DOT, MIN, MAX)', searchExtra: 'SUM DOT MIN MAX vector expand dot product perceptron reduction over result' },
-      { file: 'modes.md', label: 'Script modes (MODE)', searchExtra: 'MODE STRICT WIREWRITE ZSTATE default wirewrite tristate' },
+      { file: 'wire-vectors.md', label: 'Wire vectors (4wire[3])', searchPrimary: 'PIVOT', searchExtra: 'vector element index slice 1D array count show peek probe Zlist SUM DOT MIN MAX reduction transpose tensor' },
+      { file: 'vector-reduction.md', label: 'Vector reduction (SUM, DOT, MIN, MAX)', searchExtra: 'SUM DOT MIN MAX vector expand product perceptron reduction over result' },
+      { file: 'modes.md', label: 'Script modes (MODE)', searchPrimary: 'MODE STRICT WIREWRITE ZSTATE', searchExtra: 'script mode assignment propagation default wirewrite tristate' },
       { file: 'arithmetic.md', label: 'Arithmetic (built-in)' },
-      { file: 'number-conversion.md', label: 'Number conversion', searchExtra: 'decimal BCD hex CNTN10S N2N10S N10S2N CNTN16S N2N16S N16S2N ISDIGIT packed digits' },
-      { file: 'debug.md', label: 'Debug (show / peek / probe / lutOf)', searchExtra: 'show peek probe lutOf exprOfLut truthTableOf output panel ascii signed bin dec compact elRange' },
+      { file: 'number-conversion.md', label: 'Number conversion', searchPrimary: 'CNTN10S N2N10S N10S2N CNTN16S N2N16S N16S2N ISDIGIT', searchExtra: 'decimal BCD hex CNTN10S N2N10S N10S2N CNTN16S N2N16S N16S2N ISDIGIT packed digits' },
+      { file: 'debug.md', label: 'Debug (show / peek / probe / lutOf)', searchPrimary: 'show peek probe watch Zlist deps lutOf', searchExtra: 'lutOf exprOfLut truthTableOf output panel ascii signed bin dec compact elRange' },
       { file: 'signal-propagation.md', label: 'Signal propagation' },
-      { file: 'zstate.md', label: 'MODE ZSTATE (tristate / multi-driver)', searchExtra: 'Z X high impedance bus buffer tristate conflict get>= out>= ZRELEASE()' },
+      { file: 'zstate.md', label: 'MODE ZSTATE (tristate / multi-driver)', searchPrimary: 'ZSTATE ZRELEASE ZCONNECT ZCONN', searchExtra: 'Z X high impedance bus buffer tristate conflict get>= out>= MODE' },
       { file: 'editorUI.md', label: 'Editor UI' },
-      { file: 'doc-viewer.md', label: 'Documentation viewer', searchExtra: 'Doc Load Load and Run logts-play search history index examples runnable' },
+      { file: 'doc-viewer.md', label: 'Documentation viewer', searchExtra: 'Doc Load and Run logts-play search history index examples runnable' },
       { file: 'network-traffic-panel.md', label: 'Network Traffic panel', searchExtra: 'Win traffic send log filter pause live pagination packet id clear dropped received' }
     ],
   },
@@ -49,83 +49,83 @@ const DOC_SECTIONS = [
     title: 'Interactive inputs',
     items: [
       { file: 'interactive-components.md', label: 'Overview' },
-      { file: 'switch.md', label: 'switch' },
-      { file: 'key.md', label: 'key' },
-      { file: 'keyboard.md', label: 'keyboard', searchExtra: 'input ASCII onlyDigits allowEnter allowBackspace valid focus UART RX' },
-      { file: 'dip.md', label: 'dip' },
-      { file: 'ioport.md', label: 'ioport', searchExtra: 'I/O port gpio port aggregation in out bus' },
-      { file: 'rotary.md', label: 'rotary' }
+      { file: 'switch.md', label: 'switch', searchPrimary: 'switch comp.switch doc(comp.switch) text nl' },
+      { file: 'key.md', label: 'key', searchPrimary: 'key comp.key doc(comp.key) label size type nl' },
+      { file: 'keyboard.md', label: 'keyboard', searchPrimary: 'KEYBOARD comp.keyboard doc(comp.keyboard) label color bgColor focusColor focusBgColor onlyDigits allowEnter allowBackspace allowArrows allowDelete codesAccepted showCode pulseColor nl', searchExtra: 'input ASCII onlyDigits allowEnter allowBackspace valid focus UART RX' },
+      { file: 'dip.md', label: 'dip', searchPrimary: 'dip comp.dip doc(comp.dip) length text color colorFor visual noLabels noTrans nl' },
+      { file: 'ioport.md', label: 'ioport', searchPrimary: 'IOPORT comp.ioport doc(comp.ioport)', searchExtra: 'I/O port gpio aggregation in out bus' },
+      { file: 'rotary.md', label: 'rotary', searchPrimary: 'rotary comp.rotary doc(comp.rotary) states text color for nl' }
     ],
   },
   {
     title: 'Displays',
     items: [
-      { file: 'led.md', label: 'led' },
-      { file: 'led-bar.md', label: 'LED bar' },
-      { file: 'seven-seg.md', label: '7seg' },
-      { file: '14seg.md', label: '14seg' },
-      { file: 'lcd.md', label: 'lcd' },
-      { file: 'clcd.md', label: 'clcd' },
+      { file: 'led.md', label: 'led', searchPrimary: 'led comp.led doc(comp.led) length text color square nl on' },
+      { file: 'led-bar.md', label: 'LED bar', searchPrimary: 'bar comp.bar doc(comp.bar)' },
+      { file: 'seven-seg.md', label: '7seg', searchPrimary: '7seg comp.7seg doc(comp.7seg) 7 comp.7 doc(comp.7)' },
+      { file: '14seg.md', label: '14seg', searchPrimary: '14seg comp.14seg doc(comp.14seg) 14 comp.14 doc(comp.14)' },
+      { file: 'lcd.md', label: 'lcd', searchPrimary: 'lcd comp.lcd doc(comp.lcd)' },
+      { file: 'clcd.md', label: 'clcd', searchPrimary: 'clcd comp.clcd doc(comp.clcd) width height color bgColor bgColorSym touch touchColor touchPadding nl' },
       { file: 'clcd-symbols.md', label: 'CLCD symbols', searchExtra: 'catalog icon font awesome search symbol style' },
-      { file: 'alu.md', label: 'alu' },
-      { file: 'terminal.md', label: 'terminal' },
-      { file: 'dots.md', label: 'dots' }
+      { file: 'alu.md', label: 'alu', searchPrimary: 'alu comp.alu doc(comp.alu) length on extraOp extraFlags lut' },
+      { file: 'terminal.md', label: 'terminal', searchPrimary: 'terminal comp.terminal doc(comp.terminal)' },
+      { file: 'dots.md', label: 'dots', searchPrimary: 'dots comp.dots doc(comp.dots) : comp.: doc(comp.:)' }
     ],
   },
   {
     title: 'Arithmetic devices',
     items: [
-      { file: 'adder.md', label: 'adder' },
-      { file: 'subtract.md', label: 'subtract' },
-      { file: 'multiplier.md', label: 'multiplier' },
-      { file: 'divider.md', label: 'divider' },
-      { file: 'shifter.md', label: 'shifter' },
-      { file: 'counter.md', label: 'counter' }
+      { file: 'adder.md', label: 'adder', searchPrimary: 'adder comp.adder doc(comp.adder) + comp.+ doc(comp.+)' },
+      { file: 'subtract.md', label: 'subtract', searchPrimary: 'subtract comp.subtract doc(comp.subtract) - comp.- doc(comp.-)' },
+      { file: 'multiplier.md', label: 'multiplier', searchPrimary: 'multiplier comp.multiplier doc(comp.multiplier) * comp.* doc(comp.*)' },
+      { file: 'divider.md', label: 'divider', searchPrimary: 'divider comp.divider doc(comp.divider) / comp./ doc(comp./)' },
+      { file: 'shifter.md', label: 'shifter', searchPrimary: 'shifter comp.shifter doc(comp.shifter) > comp.> doc(comp.>)' },
+      { file: 'counter.md', label: 'counter', searchPrimary: 'counter comp.counter doc(comp.counter) = comp.= doc(comp.=)' }
     ],
   },
   {
     title: 'Storage & timing',
     items: [
-      { file: 'mem.md', label: 'mem' },
-      { file: 'asm.md', label: 'asm', searchExtra: 'inline assembler isa mnemonic program blob myisa decode disassemble disassembly' },
+      { file: 'mem.md', label: 'mem', searchPrimary: 'mem comp.mem doc(comp.mem) depth length on' },
+      { file: 'asm.md', label: 'asm', searchPrimary: 'ASM', searchExtra: 'inline assembler isa mnemonic program blob myisa decode disassemble disassembly' },
       { file: 'asm-composition.md', label: 'ASM composition', searchExtra: 'use repeat align base external label multi-isa firmware boot dsp metadata asmModuleId' },
-      { file: 'lut.md', label: 'lut', searchExtra: 'inline lookup table decoder comp variableDepth prefixFree Huffman decode isValid' },
-      { file: 'boolean-lut.md', label: 'Boolean LUT (lutOf / exprOfLut)', searchExtra: 'lutOf exprOfLut description filters inline truth table minimize Quine' },
-      { file: 'boolean-analysis.md', label: 'Boolean analysis helpers', searchExtra: 'truthTableOf simplify equivalent inputsOf costOf filters comma x' },
-      { file: 'protocol.md', label: 'protocol', searchExtra: 'inline uart spi i2c reverse parity clock repeat tx sda scl mosi decode expand collapse length lengthOf withLength def huffPacket huffRecover variable width execStmts secondary parse' },
+      { file: 'lut.md', label: 'lut', searchPrimary: 'LUT comp.lut doc(comp.lut)', searchExtra: 'inline lookup table decoder comp variableDepth prefixFree Huffman decode isValid' },
+      { file: 'boolean-lut.md', label: 'Boolean LUT (lutOf / exprOfLut)', searchPrimary: 'lutOf exprOfLut', searchExtra: 'lutOf exprOfLut description filters inline truth table minimize Quine' },
+      { file: 'boolean-analysis.md', label: 'Boolean analysis helpers', searchPrimary: 'truthTableOf simplify equivalent inputsOf costOf', searchExtra: 'truthTableOf simplify equivalent inputsOf costOf filters comma x' },
+      { file: 'protocol.md', label: 'protocol', searchPrimary: 'PROTOCOL', searchExtra: 'inline uart spi i2c reverse parity clock repeat tx sda scl mosi decode expand collapse length lengthOf withLength def huffPacket huffRecover variable width execStmts secondary parse' },
       { file: 'huffman.md', label: 'Huffman example', searchExtra: 'prefixFree expand collapse huffPacket huffRecover variable length coding codebook packet round-trip greedy decode' },
-      { file: 'huffman-v2.md', label: 'Huffman v2 — wave frequencies', searchExtra: 'freq osc counter on:raise SORT entries sortKeys sortValues popMin wave runtime scan round-trip writable set ADD execStmts FSM 2115 2116 2117 2118 Load Load and Run logts-play re-eval parametric merge' },
+      { file: 'huffman-v2.md', label: 'Huffman v2 — wave frequencies', searchExtra: 'freq osc counter on:raise SORT entries sortKeys sortValues popMin wave runtime scan round-trip writable set ADD execStmts FSM 2115 2116 2117 2118 Load and Run logts-play re-eval parametric merge' },
       { file: 'reg.md', label: 'reg' },
-      { file: 'queue.md', label: 'queue', searchExtra: 'fifo buffer push pop front empty full size capacity free' },
-      { file: 'network.md', label: 'network', searchExtra: 'packet bus channel send target broadcast unicast sendId fifo rx' },
-      { file: 'stack.md', label: 'stack', searchExtra: 'lifo push pop top call stack subroutine' },
-      { file: 'oscillator.md', label: 'oscillator' }
+      { file: 'queue.md', label: 'queue', searchPrimary: 'FIFO queue comp.queue doc(comp.queue) comp.fifo doc(comp.fifo)', searchExtra: 'fifo buffer push pop front empty full size capacity free' },
+      { file: 'network.md', label: 'network', searchPrimary: 'network comp.network doc(comp.network)', searchExtra: 'packet bus channel send target broadcast unicast sendId fifo rx' },
+      { file: 'stack.md', label: 'stack', searchPrimary: 'LIFO stack comp.stack doc(comp.stack) comp.lifo doc(comp.lifo)', searchExtra: 'lifo push pop top call stack subroutine' },
+      { file: 'oscillator.md', label: 'oscillator', searchPrimary: 'osc comp.osc doc(comp.osc) ~ comp.~ doc(comp.~) duration1 duration0 length freq freqIsSec eachCycle afterSettle delay0 delay1 delayIsSec', searchExtra: 'osc comp.osc comp.~' }
     ],
   },
   {
     title: 'Other',
     items: [
-      { file: 'builtin-DIAG.md', label: 'DIAG (diagonal matrix)' },
-      { file: 'builtin-FILL.md', label: 'FILL (constant matrix)' },
-      { file: 'builtin-FLIPLR.md', label: 'FLIPLR (flip columns)' },
-      { file: 'builtin-FLIPUD.md', label: 'FLIPUD (flip rows)' },
-      { file: 'builtin-IDENTITY.md', label: 'IDENTITY (identity matrix)' },
-      { file: 'builtin-IOTA.md', label: 'IOTA (index vector)' },
-      { file: 'builtin-L2.md', label: 'L2 (L2² norm)' },
-      { file: 'builtin-MCAT.md', label: 'MCAT (matrix concat)' },
-      { file: 'builtin-MSLICE.md', label: 'MSLICE (matrix slice)' },
-      { file: 'builtin-NFORMAT.md', label: 'NFORMAT' },
-      { file: 'builtin-NORM.md', label: 'NORM (L2² norm)' },
-      { file: 'builtin-OUTER.md', label: 'OUTER (outer product)' },
-      { file: 'builtin-SORT.md', label: 'SORT' },
-      { file: 'builtin-TRACE.md', label: 'TRACE (matrix trace)' },
-      { file: 'builtin-TRIL.md', label: 'TRIL (lower triangle)' },
-      { file: 'builtin-TRIU.md', label: 'TRIU (upper triangle)' },
-      { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)' },
-      { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)' },
+      { file: 'builtin-DIAG.md', label: 'DIAG (diagonal matrix)', searchPrimary: 'DIAG' },
+      { file: 'builtin-FILL.md', label: 'FILL (constant matrix)', searchPrimary: 'FILL' },
+      { file: 'builtin-FLIPLR.md', label: 'FLIPLR (flip columns)', searchPrimary: 'FLIPLR' },
+      { file: 'builtin-FLIPUD.md', label: 'FLIPUD (flip rows)', searchPrimary: 'FLIPUD' },
+      { file: 'builtin-IDENTITY.md', label: 'IDENTITY (identity matrix)', searchPrimary: 'IDENTITY' },
+      { file: 'builtin-IOTA.md', label: 'IOTA (index vector)', searchPrimary: 'IOTA' },
+      { file: 'builtin-L2.md', label: 'L2 (L2² norm)', searchPrimary: 'L2' },
+      { file: 'builtin-MCAT.md', label: 'MCAT (matrix concat)', searchPrimary: 'MCAT' },
+      { file: 'builtin-MSLICE.md', label: 'MSLICE (matrix slice)', searchPrimary: 'MSLICE' },
+      { file: 'builtin-NFORMAT.md', label: 'NFORMAT', searchPrimary: 'NFORMAT' },
+      { file: 'builtin-NORM.md', label: 'NORM (L2² norm)', searchPrimary: 'NORM' },
+      { file: 'builtin-OUTER.md', label: 'OUTER (outer product)', searchPrimary: 'OUTER' },
+      { file: 'builtin-SORT.md', label: 'SORT', searchPrimary: 'SORT' },
+      { file: 'builtin-TRACE.md', label: 'TRACE (matrix trace)', searchPrimary: 'TRACE' },
+      { file: 'builtin-TRIL.md', label: 'TRIL (lower triangle)', searchPrimary: 'TRIL' },
+      { file: 'builtin-TRIU.md', label: 'TRIU (upper triangle)', searchPrimary: 'TRIU' },
+      { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)', searchPrimary: 'ZEROS' },
+      { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)', searchPrimary: 'on:' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
-      { file: 'slider.md', label: 'Slider component' }
+      { file: 'slider.md', label: 'Slider component', searchPrimary: 'slider comp.slider doc(comp.slider) length text color orientation reversed size for nl' }
     ],
   }
 ];
@@ -136,77 +136,176 @@ const DOC_SEARCH_ONLY = [
       searchExtra:
         'planning roadmap backlog alu dpram lut mux demux decoder rom stack fifo uart gpio slider irq dma eeprom' },
     { file: 'builtin-ADD.md', label: 'ADD', section: 'Arithmetic',
+      searchPrimary:
+        'ADD',
       searchExtra:
         'signed vector carry overflow add' },
     { file: 'builtin-SUBTRACT.md', label: 'SUBTRACT', section: 'Arithmetic',
+      searchPrimary:
+        'SUBTRACT',
       searchExtra:
         'signed vector borrow subtract' },
     { file: 'builtin-MULTIPLY.md', label: 'MULTIPLY', section: 'Arithmetic',
+      searchPrimary:
+        'MULTIPLY',
       searchExtra:
         'signed vector multiply over' },
     { file: 'builtin-DIVIDE.md', label: 'DIVIDE', section: 'Arithmetic',
+      searchPrimary:
+        'DIVIDE',
       searchExtra:
         'signed vector quotient mod divide' },
     { file: 'builtin-MAC.md', label: 'MAC', section: 'Arithmetic',
+      searchPrimary:
+        'MAC',
       searchExtra:
         'signed vector multiply accumulate' },
     { file: 'builtin-ABS.md', label: 'ABS', section: 'Arithmetic',
+      searchPrimary:
+        'ABS',
       searchExtra:
         'signed absolute value overflow INT_MIN' },
     { file: 'builtin-GT.md', label: 'GT', section: 'Arithmetic',
+      searchPrimary:
+        'GT',
       searchExtra:
         'signed vector greater than compare' },
     { file: 'builtin-LT.md', label: 'LT', section: 'Arithmetic',
+      searchPrimary:
+        'LT',
       searchExtra:
         'signed vector less than compare' },
     { file: 'builtin-MIN.md', label: 'MIN', section: 'Arithmetic',
+      searchPrimary:
+        'MIN',
       searchExtra:
         'signed vector minimum' },
     { file: 'builtin-MAX.md', label: 'MAX', section: 'Arithmetic',
+      searchPrimary:
+        'MAX',
       searchExtra:
         'signed vector maximum' },
     { file: 'builtin-CLAMP.md', label: 'CLAMP', section: 'Arithmetic',
+      searchPrimary:
+        'CLAMP',
       searchExtra:
         'signed vector bounds clamp' },
     { file: 'builtin-SUM.md', label: 'SUM', section: 'Vector reduction',
+      searchPrimary:
+        'SUM',
       searchExtra:
         'signed vector sum reduction over' },
     { file: 'builtin-DOT.md', label: 'DOT', section: 'Vector reduction',
+      searchPrimary:
+        'DOT',
       searchExtra:
         'signed dot product vector' },
     { file: 'builtin-ARGMAX.md', label: 'ARGMAX', section: 'Vector reduction',
+      searchPrimary:
+        'ARGMAX',
       searchExtra:
         'signed index one-hot argmax maximum position' },
     { file: 'builtin-ARGMIN.md', label: 'ARGMIN', section: 'Vector reduction',
+      searchPrimary:
+        'ARGMIN',
       searchExtra:
         'signed index one-hot argmin minimum position' },
     { file: 'builtin-EQ.md', label: 'EQ', section: 'Logic gates',
+      searchPrimary:
+        'EQ',
       searchExtra:
         'vector equality bitwise equal' },
     { file: 'builtin-RSHIFT.md', label: 'RSHIFT', section: 'Bit transform',
+      searchPrimary:
+        'RSHIFT',
       searchExtra:
         'signed vector shift right ASHR logical' },
     { file: 'builtin-LSHIFT.md', label: 'LSHIFT', section: 'Bit transform',
+      searchPrimary:
+        'LSHIFT',
       searchExtra:
         'vector shift left' },
     { file: 'builtin-LROTATE.md', label: 'LROTATE', section: 'Bit transform',
+      searchPrimary:
+        'LROTATE',
       searchExtra:
         'vector rotate left' },
     { file: 'builtin-RROTATE.md', label: 'RROTATE', section: 'Bit transform',
+      searchPrimary:
+        'RROTATE',
       searchExtra:
         'vector rotate right' },
     { file: 'builtin-REVERSE.md', label: 'REVERSE', section: 'Bit transform',
+      searchPrimary:
+        'REVERSE',
       searchExtra:
         'vector reverse bits' },
     { file: 'builtin-REPEAT.md', label: 'REPEAT', section: 'Tensor / matrix',
+      searchPrimary:
+        'REPEAT',
       searchExtra:
         'tile repeat vector matrix concat stack' },
     { file: 'builtin-SHAPE.md', label: 'SHAPE', section: 'Tensor / matrix',
+      searchPrimary:
+        'SHAPE',
       searchExtra:
         'tensor rows cols dimensions metadata shape' },
     { file: 'builtin-RANK.md', label: 'RANK', section: 'Tensor / matrix',
+      searchPrimary:
+        'RANK',
       searchExtra:
-        'tensor rank 1 2 matrix vector metadata' }
+        'tensor rank 1 2 matrix vector metadata' },
+    { file: 'builtin-DIAG.md', label: 'DIAG', section: 'Tensor / matrix',
+      searchPrimary:
+        'DIAG' },
+    { file: 'builtin-FILL.md', label: 'FILL', section: 'Tensor / matrix',
+      searchPrimary:
+        'FILL' },
+    { file: 'builtin-FLIPLR.md', label: 'FLIPLR', section: 'Tensor / matrix',
+      searchPrimary:
+        'FLIPLR' },
+    { file: 'builtin-FLIPUD.md', label: 'FLIPUD', section: 'Tensor / matrix',
+      searchPrimary:
+        'FLIPUD' },
+    { file: 'builtin-IDENTITY.md', label: 'IDENTITY', section: 'Tensor / matrix',
+      searchPrimary:
+        'IDENTITY' },
+    { file: 'builtin-IOTA.md', label: 'IOTA', section: 'Tensor / matrix',
+      searchPrimary:
+        'IOTA' },
+    { file: 'builtin-L2.md', label: 'L2', section: 'Tensor / matrix',
+      searchPrimary:
+        'L2' },
+    { file: 'builtin-MCAT.md', label: 'MCAT', section: 'Tensor / matrix',
+      searchPrimary:
+        'MCAT' },
+    { file: 'builtin-MSLICE.md', label: 'MSLICE', section: 'Tensor / matrix',
+      searchPrimary:
+        'MSLICE' },
+    { file: 'builtin-NFORMAT.md', label: 'NFORMAT', section: 'Tensor / matrix',
+      searchPrimary:
+        'NFORMAT' },
+    { file: 'builtin-NORM.md', label: 'NORM', section: 'Tensor / matrix',
+      searchPrimary:
+        'NORM' },
+    { file: 'builtin-OUTER.md', label: 'OUTER', section: 'Tensor / matrix',
+      searchPrimary:
+        'OUTER' },
+    { file: 'builtin-SORT.md', label: 'SORT', section: 'Tensor / matrix',
+      searchPrimary:
+        'SORT' },
+    { file: 'builtin-TRACE.md', label: 'TRACE', section: 'Tensor / matrix',
+      searchPrimary:
+        'TRACE' },
+    { file: 'builtin-TRIL.md', label: 'TRIL', section: 'Tensor / matrix',
+      searchPrimary:
+        'TRIL' },
+    { file: 'builtin-TRIU.md', label: 'TRIU', section: 'Tensor / matrix',
+      searchPrimary:
+        'TRIU' },
+    { file: 'builtin-ZEROS.md', label: 'ZEROS', section: 'Tensor / matrix',
+      searchPrimary:
+        'ZEROS' }
 ];
 // END GENERATED DOC_SECTIONS
 
@@ -214,28 +313,7 @@ const DOCS = DOC_SECTIONS.flatMap(function (section) {
   return section.items;
 });
 
-const DOC_SEARCH_INDEX = (function () {
-  const list = [];
-  function pushEntry(sectionTitle, item) {
-    const stem = item.file.replace(/\.md$/, '');
-    const extra = item.searchExtra ? ' ' + item.searchExtra : '';
-    list.push({
-      file: item.file,
-      label: item.label,
-      section: sectionTitle,
-      haystack: (item.label + ' ' + stem + ' ' + stem.replace(/-/g, ' ') + extra).toLowerCase(),
-    });
-  }
-  DOC_SECTIONS.forEach(function (section) {
-    section.items.forEach(function (item) {
-      pushEntry(section.title, item);
-    });
-  });
-  DOC_SEARCH_ONLY.forEach(function (item) {
-    pushEntry(item.section || 'Other', item);
-  });
-  return list;
-})();
+const DOC_SEARCH_INDEX = DocSearchIndex.buildIndex(DOC_SECTIONS, DOC_SEARCH_ONLY);
 
 let currentDocFile = '';
 let lastDocScrollTop = 0;
@@ -566,34 +644,11 @@ function initDocSearch() {
 }
 
 function docSearchRank(entry, query) {
-  const label = entry.label.toLowerCase();
-  const stem = entry.file.replace(/\.md$/, '').toLowerCase();
-  if (label === query || stem === query) return 0;
-  if (label.startsWith(query) || stem.startsWith(query)) return 1;
-  if (label.includes(query) || stem.includes(query)) return 2;
-  return 3;
+  return DocSearchIndex.docSearchRank(entry, query);
 }
 
 function filterDocSearch(query) {
-  const q = query.trim().toLowerCase();
-  let list;
-  if (!q) {
-    list = DOC_SEARCH_INDEX.slice();
-  } else {
-    const tokens = q.split(/\s+/).filter(Boolean);
-    list = DOC_SEARCH_INDEX.filter(function (entry) {
-      return tokens.every(function (token) {
-        return entry.haystack.indexOf(token) !== -1;
-      });
-    });
-    list.sort(function (a, b) {
-      const ra = docSearchRank(a, q);
-      const rb = docSearchRank(b, q);
-      if (ra !== rb) return ra - rb;
-      return a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
-    });
-  }
-  return list;
+  return DocSearchIndex.filterDocSearch(DOC_SEARCH_INDEX, query);
 }
 
 function closeDocSearchMenu() {
