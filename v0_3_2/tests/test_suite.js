@@ -19228,7 +19228,14 @@ reg(2202, 'wave-debug', 'Wave Listen — level 1 commit trace', function(h, sess
   const lines = [];
   const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
   interp.waveListenActive = true;
-  interp.onWaveListenLine = function (text) { lines.push(text); };
+  interp.onWaveListenLine = function (payload) {
+    const text = typeof payload === 'string'
+      ? payload
+      : (typeof waveListenPayloadToText === 'function'
+        ? waveListenPayloadToText(payload, (v, bw) => interp.formatValue(v, bw))
+        : JSON.stringify(payload));
+    lines.push(text);
+  };
   for (const s of stmts) interp.exec(s);
   interp.postExecSrc();
   h.assert('some trace', String(lines.length > 0), 'true');
@@ -19238,6 +19245,30 @@ reg(2202, 'wave-debug', 'Wave Listen — level 1 commit trace', function(h, sess
 reg(2203, 'wave-debug', 'Parser — deps(expr) AST', function(h, session) {
   const stmts = session.parse('4wire a = 1\ndeps(a + b)');
   h.assert('deps node', String(stmts.some((s) => s.deps && s.deps.expr)), 'true');
+});
+
+reg(2204, 'wave-debug', 'Wave Listen format — expand threshold and bin wrap', function(h) {
+  const entry = {
+    name: 'big',
+    rawValue: '1'.repeat(512),
+    bitWidth: 512,
+    wireType: '512bit',
+    tensorMeta: null,
+  };
+  h.assert('needs expand', String(waveListenNeedsExpand(entry)), 'true');
+  const small = { name: 'a', rawValue: '1010', bitWidth: 4, wireType: '4wire' };
+  h.assert('no expand small', String(waveListenNeedsExpand(small)), 'false');
+  const binLines = wrapBinaryGroupLines('1'.repeat(512), 40);
+  h.assert('multi line bin', String(binLines.length > 1), 'true');
+  for (const line of binLines) {
+    for (const part of line.split(' ')) {
+      h.assert('group intact', String(part.length <= 8), 'true');
+    }
+  }
+  const inline = formatWaveListenInline(small, 'hex', (v, bw) => v);
+  h.assert('bits suffix inline', String(/\(\d+bits\)/.test(inline)), 'true');
+  const text = waveListenPayloadToText({ wave: 1, label: 'commit', name: 'a', rawValue: '1010', bitWidth: 4, wireType: '4wire' });
+  h.assert('payload text', String(text.includes('commit a')), 'true');
 });
 
 

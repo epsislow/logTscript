@@ -2,8 +2,8 @@
 name: Wave debug tooling
 overview: "Plan incremental pentru debug propagare wave: Wave Listen panel UI, deps(), cauzalitate (cause), snapshot wire, dependențe protocol→LUT. Punct de plecare: bug Huffman SC round-trip după `.huff:clear()`."
 todos:
-  - id: strat1-waveListen
-    content: "Strat 1.1: Wave Listen panel — UI ON/OFF + level 1/2/3, debugLevel în propagate(), fără statement în script"
+  - id: strat1-waveListen-fmt
+    content: "Strat 1.1b: Wave Listen — Fmt hex/bin + [+] expand stânga, bin wrap la granița grupurilor 8b"
     status: completed
   - id: strat1-deps
     content: "Strat 1.2: deps(wireOrExpr) — wire + expr, format tree text, dump index dependențe + teste"
@@ -282,6 +282,83 @@ flowchart TB
 [wave 1] commit packetEncoded = ^4808… + 000
 [wave 1] flush deferred show(packetEncoded)
 ```
+
+#### Formatare valori commit (decizie 2026-07-08 — de implementat)
+
+**Problema:** `_formatWaveListenValue` taie brut la ~48 caractere; fire/tensori mari (ex. `1000wire[3,3]` = 9000 bit) sunt ilizibile.
+
+**Prag:** `bitWidth ≤ 256` → afișare inline cu `formatValue` (ca `show`), fără `[+]`.  
+Peste 256 bit (scalar sau total tensor) → rezumat + control expand.
+
+##### Toolbar — `Fmt` global
+
+Buton pe toolbar (lângă L1/L2/L3): **`Fmt: hex ▾`** — ciclu la click: **hex ↔ bin**.
+
+| Mod | Afișare |
+|-----|---------|
+| **hex** | literal `^…` hex; suffix **`(Nbits)`** mereu |
+| **bin** | grupe câte 8 biți; wrap multi-rând **doar între grupuri** (nu sparge grupuri); suffix **`(Nbits)`** |
+
+Persistență: `sdb` → `prog/waveListenFmt` (`hex` | `bin`; `short` migrat la `hex`).
+
+##### `[+]` expand — stânga, înainte de valoare (fix)
+
+Doar când `bitWidth > 256` (sau total biți tensor):
+
+```text
+[wave 1] commit matrixA  [+]  (1000wire[3,3]) — 9000 bits
+```
+
+- **`[+]`** rămâne **stânga, înainte de valoarea rezumat** — poziție fixă pe linia principală
+- Click → **`[-]`** + bloc expand **dedesubt** (indentat), ca Network Traffic row expand
+- `[+]` **nu** se mută la dreapta când expandezi
+
+Layout DOM:
+
+```text
+wave-listen-row-main:   prefix + wireName + [+] + inlineSummary
+wave-listen-row-expand: (wrap multi-linie, doar dacă expand ON)
+```
+
+##### Conținut expand — multi-linie, wrap ca Network Traffic
+
+Reutilizare logică din [`network-traffic-display.js`](v0_3_2/ui/network-traffic-display.js):
+
+- `PACKET_WRAP_MAX_CHARS = 40` (același default) — linii scurte, lizibile
+- `wrapFormattedPacket(formatted, maxRowChars)` pentru hex/bin scalar
+- **`formatValue`** / **`_formatShowWireValue`** pentru hex (ca `show`)
+- **bin:** grupe câte 8 biți, wrap la 40–64 caractere/rând — **tot conținutul**, fără omitere
+
+**Tensor / matrix** (expand sau `Fmt: hex|bin`):
+
+- Aceeași abordare ca scalar mare: **multi-linie în blocul expand**
+- Opțional: sub-linii stil `show` (`name:0 = …`, `:1 = …`) când e vector/matrix — nu un singur șir de 9000 caractere
+- `short` fără expand: doar tip + `has shape [R,C]` / total biți
+
+**Limită UX (nu omitere date):**
+
+- Bloc expand: `max-height` + scroll intern (ex. 240px) — tot textul e acolo, scroll pentru 9000 bit
+- Opțional viitor: Copy pe bloc expand
+
+##### Metadata log entry (engine)
+
+În loc de string simplu, commit entries stochează:
+
+```javascript
+{ kind: 'commit', wireName, rawValue, bitWidth, tensorMeta?, prefix: '[wave 1] commit …' }
+```
+
+Panelul formatează la render după `Fmt` + `expandedIds`.
+
+##### Fișiere (formatare)
+
+- [`signal-propagation.js`](v0_3_2/core/signal-propagation.js) — `_formatWaveListenValue` → metadata sau delegare `interp.formatValue`
+- [`wave-listen-panel.js`](v0_3_2/ui/wave-listen-panel.js) — Fmt toolbar, `[+]` expand, wrap
+- Extrage/refolosește `wrapFormattedPacket` din [`network-traffic-display.js`](v0_3_2/ui/network-traffic-display.js) (shared sau import)
+
+##### UI mic (done)
+
+- Buton ON/OFF: lățime fixă `3.25rem` — nu sare la toggle
 
 #### Engine → UI (fără poluare Output)
 

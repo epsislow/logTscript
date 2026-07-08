@@ -128,6 +128,7 @@ Wave propagation trace — **separate panel**, not Output. Open from **Win ▾ �
 |---------|------|
 | **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
 | **L1 / L2 / L3** | Trace verbosity (`debugLevel` on wave engine) |
+| **Fmt: hex / bin** | Value display format (cycles on click; persisted) |
 | **Clear** | Clears panel history (no auto-clear on Run) |
 | **Listening…** badge | Internal **listen** active while script runs (distinct from ON/OFF) |
 
@@ -143,6 +144,8 @@ Example trace (level 1):
 ```
 
 Legacy mode: one status line (`listen is ON/OFF`), no `[wave N]` lines.
+
+**Value formatting:** **hex** = literal `^…`; **bin** = grupe câte 8 biți (wrap pe linii doar la granița grupurilor). Suffix **`(Nbits)`** pe fiecare linie cu valoare (afișare). Valori >256 bit: preview + **`[+]`**; expand multi-linie. **`[cpy]`** copiază valoarea completă **fără** `(Nbits)`.
 
 See [Wave debug patterns](#wave-debug-patterns) and [huffman-v2.md](huffman-v2.md) (SC round-trip).
 

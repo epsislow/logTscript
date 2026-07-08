@@ -112,6 +112,13 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .wave-listen-toolbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .wave-listen-out { background:#000; padding:8px; max-height:220px; overflow:auto; font-size:12px; font-family:Consolas, monospace; }
 .wave-listen-line { white-space:pre; min-height:1em; }
+.wave-listen-row-main { display:flex; align-items:baseline; gap:4px; flex-wrap:wrap; white-space:pre; }
+.wave-listen-prefix { flex-shrink:0; }
+.wave-listen-expand-btn { flex-shrink:0; min-width:2rem; width:2rem; text-align:center; box-sizing:border-box; font-family:inherit; font-size:inherit; background:#333; color:#ddd; border:1px solid #555; border-radius:2px; cursor:pointer; padding:0 2px; line-height:1.2; }
+.wave-listen-copy-btn { flex-shrink:0; min-width:2.35rem; width:2.35rem; text-align:center; box-sizing:border-box; font-family:inherit; font-size:inherit; background:#333; color:#ddd; border:1px solid #555; border-radius:2px; cursor:pointer; padding:0 2px; line-height:1.2; }
+.wave-listen-expand-btn:hover, .wave-listen-copy-btn:hover { background:#444; border-color:#777; }
+.wave-listen-value { min-width:0; }
+.wave-listen-row-expand { margin:2px 0 4px 1.5em; padding:4px 6px; max-height:240px; overflow:auto; white-space:pre-wrap; word-break:break-all; color:inherit; font-family:inherit; font-size:inherit; background:#111; border-left:2px solid #444; }
 .wave-listen-line--meta { color:#888; font-style:italic; }
 .wave-listen-line--status { color:#6ab0ff; }
 .wave-listen-line--lut-mut { color:#e8a040; }
@@ -2831,6 +2838,7 @@ show(a,b,c)
           <button type="button" id="waveListenLevel1" class="btn" data-level="1" title="Level 1 — commits, LUT re-eval">L1</button>
           <button type="button" id="waveListenLevel2" class="btn" data-level="2" title="Level 2 — + exec statements">L2</button>
           <button type="button" id="waveListenLevel3" class="btn" data-level="3" title="Level 3 — verbose">L3</button>
+          <button type="button" id="waveListenFmtBtn" class="btn" title="Cycle value format: hex ↔ bin">Fmt: hex</button>
           <button type="button" id="waveListenClear" class="btn" title="Clear panel">Clear</button>
         </div>
       </div>
@@ -2993,6 +3001,7 @@ show(a,b,c)
 <script src="ui/timeline-analyzer.js"></script>
 <script src="ui/network-traffic-display.js"></script>
 <script src="ui/network-traffic-panel.js"></script>
+<script src="ui/wave-listen-format.js"></script>
 <script src="ui/wave-listen-panel.js"></script>
 <script src="ui/app.js"></script>
 

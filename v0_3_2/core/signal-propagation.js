@@ -50,14 +50,72 @@ class SignalPropagationStrategy {
     return `st(${loc}) …`;
   }
 
-  _formatWaveListenValue(name, val) {
+  _buildWaveListenValuePayload(name, val, opts) {
     const interp = this.interp;
-    if (val == null) return '∅';
-    let s = String(val);
-    if (this.debugLevel < 3 && s.length > 48) {
-      s = s.slice(0, 45) + '…';
+    const isComponent = !!(opts && opts.isComponent);
+    if (val == null) {
+      return {
+        name,
+        rawValue: null,
+        bitWidth: 0,
+        wireType: null,
+        tensorMeta: null,
+        isComponent,
+      };
     }
-    return s;
+    let bitWidth = val.length;
+    let wireType = null;
+    let tensorMeta = null;
+    if (isComponent) {
+      const comp = interp.components.get(name);
+      if (comp) {
+        bitWidth = interp.getComponentBits(comp.type, comp.attributes) || val.length;
+        wireType = `${bitWidth}bit`;
+      }
+    } else {
+      const wire = interp.wires.get(name);
+      if (wire) {
+        wireType = interp.getWireTypeLabel(wire);
+        const meta = interp.getWireTensorMeta(wire);
+        if (meta) {
+          const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+          tensorMeta = {
+            rows: meta.rows,
+            cols: meta.cols,
+            elementWidth: meta.elementWidth,
+            elementCount: meta.elementCount,
+            isMatrix: TS ? TS.isMatrix(meta) : (meta.rows > 1 && meta.cols > 1),
+          };
+          bitWidth = val.length;
+        } else {
+          bitWidth = interp.getBitWidth(wire.type) || val.length;
+        }
+      }
+    }
+    return {
+      name,
+      rawValue: val,
+      bitWidth,
+      wireType,
+      tensorMeta,
+      isComponent,
+    };
+  }
+
+  _emitWaveListenValueEntry(wave, name, val, kind, minLevel, isComponent) {
+    if (this.debugLevel < minLevel) return;
+    const interp = this.interp;
+    if (!interp || !interp.waveListenActive) return;
+    if (typeof interp.emitWaveListenLine !== 'function') return;
+    let label = 'commit';
+    if (isComponent) label = 'commit component';
+    else if (kind === 'schedule') label = 'schedule';
+    const payload = {
+      wave,
+      label,
+      ...this._buildWaveListenValuePayload(name, val, { isComponent }),
+    };
+    interp.emitWaveListenLine(payload, kind);
   }
 
   scheduleWireChange(name, value) {
@@ -417,11 +475,7 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         allChanged.add(c);
         if (this.debugLevel >= 2) {
           const val = interp.getComponentStableValue(c);
-          this._emitWaveListen(
-            `[wave ${wave}] commit component ${c} = ${this._formatWaveListenValue(c, val)}`,
-            'commit',
-            2
-          );
+          this._emitWaveListenValueEntry(wave, c, val, 'commit', 2, true);
         }
       }
 
@@ -437,11 +491,7 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
       for (const n of changed) {
         allChanged.add(n);
         const val = interp.getWireStableValue(n);
-        this._emitWaveListen(
-          `[wave ${wave}] commit ${n} = ${this._formatWaveListenValue(n, val)}`,
-          'commit',
-          1
-        );
+        this._emitWaveListenValueEntry(wave, n, val, 'commit', 1, false);
       }
 
       const toExec = this.collectAffectedStatements(changed);
@@ -454,11 +504,7 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
           for (const [name, val] of outputs) {
             if (this.scheduleWireChange(name, val)) anyScheduled = true;
             if (this.debugLevel >= 3) {
-              this._emitWaveListen(
-                `[wave ${wave}] schedule ${name} = ${this._formatWaveListenValue(name, val)}`,
-                'schedule',
-                3
-              );
+              this._emitWaveListenValueEntry(wave, name, val, 'schedule', 3, false);
             }
           }
         }

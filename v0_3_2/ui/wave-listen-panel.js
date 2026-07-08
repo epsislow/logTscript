@@ -2,12 +2,16 @@
 
 const WAVE_LISTEN_ARMED_KEY = 'prog/waveListenArmed';
 const WAVE_LISTEN_LEVEL_KEY = 'prog/waveListenLevel';
+const WAVE_LISTEN_FMT_KEY = 'prog/waveListenFmt';
 const WAVE_LISTEN_MAX_LINES = 2000;
 
 const _waveListenState = {
   armed: false,
   level: 1,
+  fmt: 'hex',
   displayLog: [],
+  expanded: new Set(),
+  nextId: 1,
   initialized: false,
   viewTabId: null,
 };
@@ -27,6 +31,27 @@ function getWaveListenArmed() {
 
 function getWaveListenLevel() {
   return _waveListenState.level;
+}
+
+function getWaveListenFmt() {
+  return _waveListenState.fmt;
+}
+
+function setWaveListenFmt(fmt) {
+  const next = typeof normalizeWaveListenFmt === 'function'
+    ? normalizeWaveListenFmt(fmt)
+    : (fmt === 'bin' ? 'bin' : 'hex');
+  if (_waveListenState.fmt === next) return;
+  _waveListenState.fmt = next;
+  _waveListenSdbSet(WAVE_LISTEN_FMT_KEY, next);
+  renderWaveListenPanel();
+}
+
+function cycleWaveListenFmt() {
+  const next = typeof nextWaveListenFmt === 'function'
+    ? nextWaveListenFmt(_waveListenState.fmt)
+    : 'hex';
+  setWaveListenFmt(next);
 }
 
 function setWaveListenArmed(on) {
@@ -52,6 +77,10 @@ function setWaveListenLevel(level) {
 function loadWaveListenPreferences() {
   _waveListenState.armed = _waveListenSdbGet(WAVE_LISTEN_ARMED_KEY, '0') === '1';
   _waveListenState.level = Math.max(1, Math.min(3, parseInt(_waveListenSdbGet(WAVE_LISTEN_LEVEL_KEY, '1'), 10) || 1));
+  const fmt = _waveListenSdbGet(WAVE_LISTEN_FMT_KEY, 'hex');
+  _waveListenState.fmt = typeof normalizeWaveListenFmt === 'function'
+    ? normalizeWaveListenFmt(fmt)
+    : (fmt === 'bin' ? 'bin' : 'hex');
 }
 
 function _countActiveListenInstances() {
@@ -67,17 +96,63 @@ function _getCtxForInstance(instanceId) {
   return typeof getRunContext === 'function' ? getRunContext(instanceId) : null;
 }
 
-function appendWaveListenPanelLine(instanceId, text, kind) {
-  const prefix = _countActiveListenInstances() >= 2 ? `[inst ${instanceId}] ` : '';
-  const entry = { text: prefix + text, kind: kind || 'trace', instanceId };
+function _isWaveListenValuePayload(payload) {
+  return payload && typeof payload === 'object' && payload.rawValue !== undefined;
+}
+
+function _allocWaveListenEntryId() {
+  return _waveListenState.nextId++;
+}
+
+function _pushWaveListenEntry(entry) {
   _waveListenState.displayLog.push(entry);
   if (_waveListenState.displayLog.length > WAVE_LISTEN_MAX_LINES) {
-    _waveListenState.displayLog.splice(0, _waveListenState.displayLog.length - WAVE_LISTEN_MAX_LINES);
+    const drop = _waveListenState.displayLog.length - WAVE_LISTEN_MAX_LINES;
+    const removed = _waveListenState.displayLog.splice(0, drop);
+    for (const r of removed) {
+      if (r && r.id != null) _waveListenState.expanded.delete(r.id);
+    }
   }
+}
+
+function appendWaveListenPanelLine(instanceId, payload, kind) {
+  const prefix = _countActiveListenInstances() >= 2 ? `[inst ${instanceId}] ` : '';
+  let entry;
+  if (typeof payload === 'string') {
+    entry = {
+      id: _allocWaveListenEntryId(),
+      text: prefix + payload,
+      kind: kind || 'trace',
+      instanceId,
+    };
+  } else if (_isWaveListenValuePayload(payload)) {
+    entry = {
+      id: _allocWaveListenEntryId(),
+      kind: kind || 'commit',
+      instanceId,
+      instPrefix: prefix,
+      wave: payload.wave,
+      label: payload.label,
+      name: payload.name,
+      rawValue: payload.rawValue,
+      bitWidth: payload.bitWidth,
+      wireType: payload.wireType,
+      tensorMeta: payload.tensorMeta,
+      isComponent: payload.isComponent,
+    };
+  } else {
+    entry = {
+      id: _allocWaveListenEntryId(),
+      text: prefix + String(payload),
+      kind: kind || 'trace',
+      instanceId,
+    };
+  }
+  _pushWaveListenEntry(entry);
   const ctx = _getCtxForInstance(instanceId);
   if (ctx) {
     if (!ctx.waveListenLog) ctx.waveListenLog = [];
-    ctx.waveListenLog.push(entry);
+    ctx.waveListenLog.push({ ...entry });
     if (ctx.waveListenLog.length > WAVE_LISTEN_MAX_LINES) {
       ctx.waveListenLog.splice(0, ctx.waveListenLog.length - WAVE_LISTEN_MAX_LINES);
     }
@@ -86,20 +161,18 @@ function appendWaveListenPanelLine(instanceId, text, kind) {
 }
 
 function appendWaveListenMeta(text) {
-  _waveListenState.displayLog.push({ text, kind: 'meta', instanceId: null });
-  if (_waveListenState.displayLog.length > WAVE_LISTEN_MAX_LINES) {
-    _waveListenState.displayLog.splice(0, _waveListenState.displayLog.length - WAVE_LISTEN_MAX_LINES);
-  }
+  _pushWaveListenEntry({ id: _allocWaveListenEntryId(), text, kind: 'meta', instanceId: null });
   renderWaveListenPanel();
 }
 
 function appendWaveListenStatus(text) {
-  _waveListenState.displayLog.push({ text, kind: 'status', instanceId: null });
+  _pushWaveListenEntry({ id: _allocWaveListenEntryId(), text, kind: 'status', instanceId: null });
   renderWaveListenPanel();
 }
 
 function clearWaveListenPanel() {
   _waveListenState.displayLog = [];
+  _waveListenState.expanded.clear();
   if (typeof runContextRegistry !== 'undefined' && runContextRegistry) {
     for (const ctx of runContextRegistry.values()) {
       if (ctx) ctx.waveListenLog = [];
@@ -134,9 +207,9 @@ function _applyWaveListenPrefsToInterp(interp, ctx) {
   if (interp.signalPropagationStrategy && typeof interp.signalPropagationStrategy.setDebugLevel === 'function') {
     interp.signalPropagationStrategy.setDebugLevel(armed && ctx && ctx.waveListenActive ? level : 0);
   }
-  interp.onWaveListenLine = function (text, kind) {
+  interp.onWaveListenLine = function (payload, kind) {
     const inst = interp._instanceId != null ? interp._instanceId : (ctx ? ctx.id : 1);
-    appendWaveListenPanelLine(inst, text, kind);
+    appendWaveListenPanelLine(inst, payload, kind);
   };
 }
 
@@ -207,8 +280,140 @@ function _waveListenLineClass(kind) {
     case 'flush': return 'wave-listen-line--flush';
     case 'init': return 'wave-listen-line--init';
     case 'exec': return 'wave-listen-line--exec';
+    case 'schedule': return 'wave-listen-line--commit';
     default: return 'wave-listen-line--trace';
   }
+}
+
+function _waveListenInterpForEntry(entry) {
+  if (!entry || entry.instanceId == null) return null;
+  const ctx = _getCtxForInstance(entry.instanceId);
+  return ctx && ctx.interp ? ctx.interp : null;
+}
+
+function _waveListenFormatValueFn(entry) {
+  const interp = _waveListenInterpForEntry(entry);
+  if (!interp || typeof interp.formatValue !== 'function') return null;
+  return (v, bw) => interp.formatValue(v, bw);
+}
+
+function _waveListenValuePrefix(entry) {
+  const wave = entry.wave != null ? entry.wave : '?';
+  const label = entry.label || 'commit';
+  const name = entry.name != null ? entry.name : '?';
+  return `[wave ${wave}] ${label} ${name}`;
+}
+
+function _toggleWaveListenExpand(entryId) {
+  if (_waveListenState.expanded.has(entryId)) _waveListenState.expanded.delete(entryId);
+  else _waveListenState.expanded.add(entryId);
+  renderWaveListenPanel();
+}
+
+function _waveListenCopyValue(entry, btn) {
+  const fmt = getWaveListenFmt();
+  const interp = _waveListenInterpForEntry(entry);
+  const text = typeof formatWaveListenFullText === 'function'
+    ? formatWaveListenFullText(entry, fmt, interp)
+    : String(entry.rawValue);
+  const doCopy = typeof copyTextToClipboard === 'function'
+    ? copyTextToClipboard(text)
+    : (navigator.clipboard && navigator.clipboard.writeText
+      ? navigator.clipboard.writeText(text)
+      : Promise.reject(new Error('clipboard unavailable')));
+  doCopy.then(function () {
+    if (!btn) return;
+    const prev = btn.textContent;
+    const prevTitle = btn.title;
+    btn.textContent = 'ok';
+    btn.title = 'Copied';
+    setTimeout(function () {
+      btn.textContent = prev;
+      btn.title = prevTitle;
+    }, 1200);
+  }).catch(function () {
+    if (btn) btn.title = 'Copy failed';
+  });
+}
+
+function _waveListenAddActionBtn(main, className, label, title, onClick) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = className;
+  btn.textContent = label;
+  btn.title = title;
+  btn.addEventListener('click', onClick);
+  main.appendChild(btn);
+  return btn;
+}
+
+function _renderWaveListenValueRow(entry, out) {
+  const wrap = document.createElement('div');
+  wrap.className = 'wave-listen-line ' + _waveListenLineClass(entry.kind);
+
+  const main = document.createElement('div');
+  main.className = 'wave-listen-row-main';
+
+  const prefixSpan = document.createElement('span');
+  prefixSpan.className = 'wave-listen-prefix';
+  prefixSpan.textContent = (entry.instPrefix || '') + _waveListenValuePrefix(entry);
+
+  const fmt = getWaveListenFmt();
+  const formatFn = _waveListenFormatValueFn(entry);
+  const needsExpand = typeof waveListenNeedsExpand === 'function'
+    ? waveListenNeedsExpand(entry)
+    : (entry.bitWidth || (entry.rawValue ? entry.rawValue.length : 0)) > 256;
+
+  main.appendChild(prefixSpan);
+
+  if (needsExpand) {
+    _waveListenAddActionBtn(
+      main,
+      'wave-listen-expand-btn',
+      _waveListenState.expanded.has(entry.id) ? '[-]' : '[+]',
+      _waveListenState.expanded.has(entry.id) ? 'Collapse value' : 'Expand value',
+      function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        _toggleWaveListenExpand(entry.id);
+      }
+    );
+  }
+
+  _waveListenAddActionBtn(
+    main,
+    'wave-listen-copy-btn',
+    '[cpy]',
+    'Copy full value',
+    function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      _waveListenCopyValue(entry, e.currentTarget);
+    }
+  );
+
+  const valSpan = document.createElement('span');
+  valSpan.className = 'wave-listen-value';
+  const inline = typeof formatWaveListenInline === 'function'
+    ? formatWaveListenInline(entry, fmt, formatFn)
+    : String(entry.rawValue);
+  valSpan.textContent = ` = ${inline}`;
+  main.appendChild(valSpan);
+
+  wrap.appendChild(main);
+
+  if (needsExpand && _waveListenState.expanded.has(entry.id)) {
+    const expand = document.createElement('pre');
+    expand.className = 'wave-listen-row-expand';
+    const interp = _waveListenInterpForEntry(entry);
+    const lines = typeof formatWaveListenExpandLines === 'function'
+      ? formatWaveListenExpandLines(entry, fmt, interp)
+      : [String(entry.rawValue)];
+    expand.textContent = lines.join('\n');
+    wrap.appendChild(expand);
+  }
+
+  out.appendChild(wrap);
 }
 
 function renderWaveListenPanel() {
@@ -218,6 +423,10 @@ function renderWaveListenPanel() {
   const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 40;
   out.innerHTML = '';
   for (const entry of _waveListenState.displayLog) {
+    if (_isWaveListenValuePayload(entry)) {
+      _renderWaveListenValueRow(entry, out);
+      continue;
+    }
     const div = document.createElement('div');
     div.className = 'wave-listen-line ' + _waveListenLineClass(entry.kind);
     div.textContent = entry.text;
@@ -230,12 +439,18 @@ function renderWaveListenPanel() {
 function updateWaveListenToolbarUI() {
   const armedBtn = document.getElementById('waveListenArmBtn');
   const badge = document.getElementById('waveListenBadge');
+  const fmtBtn = document.getElementById('waveListenFmtBtn');
   const levelBtns = [1, 2, 3].map((n) => document.getElementById('waveListenLevel' + n));
 
   if (armedBtn) {
     armedBtn.textContent = _waveListenState.armed ? 'ON' : 'OFF';
     armedBtn.classList.toggle('wave-listen-arm--on', _waveListenState.armed);
     armedBtn.classList.toggle('wave-listen-arm--off', !_waveListenState.armed);
+  }
+
+  if (fmtBtn) {
+    fmtBtn.textContent = `Fmt: ${_waveListenState.fmt}`;
+    fmtBtn.title = 'Cycle value format: hex ↔ bin';
   }
 
   for (const btn of levelBtns) {
@@ -246,7 +461,6 @@ function updateWaveListenToolbarUI() {
   }
 
   if (badge) {
-    const active = _countActiveListenInstances();
     const listening = [];
     if (typeof runContextRegistry !== 'undefined' && runContextRegistry) {
       for (const ctx of runContextRegistry.values()) {
@@ -273,11 +487,15 @@ function initWaveListenPanel() {
 
   const armBtn = document.getElementById('waveListenArmBtn');
   const clearBtn = document.getElementById('waveListenClear');
+  const fmtBtn = document.getElementById('waveListenFmtBtn');
   if (armBtn) {
     armBtn.addEventListener('click', () => setWaveListenArmed(!getWaveListenArmed()));
   }
   if (clearBtn) {
     clearBtn.addEventListener('click', () => clearWaveListenPanel());
+  }
+  if (fmtBtn) {
+    fmtBtn.addEventListener('click', () => cycleWaveListenFmt());
   }
   for (const n of [1, 2, 3]) {
     const btn = document.getElementById('waveListenLevel' + n);
@@ -305,6 +523,7 @@ function toggleWaveListenPanel() {
 function restoreWaveListenFromSnapshot(snapshot) {
   if (!snapshot || !Array.isArray(snapshot.waveListenLog)) return;
   _waveListenState.displayLog = snapshot.waveListenLog.map((e) => ({ ...e }));
+  _waveListenState.expanded.clear();
   renderWaveListenPanel();
 }
 
