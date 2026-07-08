@@ -7859,6 +7859,78 @@ After **RUN**, toggle \`.s1\` in the panel — **\`probe\`** logs each change wi
 
 ---
 
+## Wave Listen (UI panel)
+
+Wave propagation trace — **separate panel**, not Output. Open from **Win ▾ → Wave Listen**.
+
+| Control | Role |
+|---------|------|
+| **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
+| **L1 / L2 / L3** | Trace verbosity (\`debugLevel\` on wave engine) |
+| **Fmt ▾** | hex / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii (dropdown, persisted) |
+| **Clear** | Clears panel history (no auto-clear on Run) |
+| **Listening…** badge | Internal **listen** active while script runs (distinct from ON/OFF) |
+
+**Listen** is runtime-only: ON at Run start (if armed + wave mode), OFF at Stop or script end. The ON button stays armed for the next Run.
+
+Example trace (level 1):
+
+\`\`\`text
+[wave 0] RUN init → recompute all wires
+[wave 1] commit packetEncoded = ^4808…
+[wave 1] lut-mut .huff:clear → re-exec st(1062:asg) packetEncoded := …
+* script stopped listen is OFF
+\`\`\`
+
+Legacy mode: one status line (\`listen is ON/OFF\`), no \`[wave N]\` lines.
+
+**Value formatting:** dropdown **hex / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **ascii** afișează ca \`show(…; ascii)\` — \`"Hello"\` sau \`\\72 \\101 …;ascii\`. Suffix **\`(Nbits)\`** la afișare. **\`[cpy]\`** — literal script: **bin** = biți continui; **hex** = \`^…\` fără spații; **dec/s8/…** = cu \`;format\`; **ascii** = \`"abc"\` pentru text printabil, \`"abc" + \\2 + "zz"\` dacă mix, \`\\65 \\66;ascii\` dacă doar \`\\N\` (2+ cu \`;ascii\`). X/Z → fallback hex la copy.
+
+See [Wave debug patterns](#wave-debug-patterns) and [huffman-v2.md](huffman-v2.md) (SC round-trip).
+
+---
+
+## \`deps\`
+
+Dependency graph dump (tree text in **Output**). Runs at statement position like **\`peek\`**.
+
+### Syntax
+
+\`\`\`
+deps(wireName)
+deps(expr)
+deps(.lutInstance)
+\`\`\`
+
+### Examples
+
+\`\`\`logts
+deps(packetEncoded)     # producer, upstream, downstream, LUT-mutation
+deps(source)            # downstream consumers
+deps(source + codebook) # ad-hoc expr — upstream only
+deps(.huff)             # stmts re-exec on LUT mutation
+\`\`\`
+
+Works in **wave and legacy** (static elaboration index). For Huffman SC debugging, use with [Wave Listen](#wave-listen-ui-panel) — see [wave-debug patterns](#wave-debug-patterns).
+
+---
+
+## Wave debug patterns
+
+| Pattern | When |
+|---------|------|
+| **\`peek\`** right after encode | Before any LUT mutation |
+| **Literal wire snapshot** | Before \`.huff:clear()\` for recover |
+| **\`show\`** on final results only | Wires that do not depend on mutated LUT |
+| **\`probe(.huff:size())\`** | Witness LUT mutations |
+| **\`watch(ph.*)\`** | FSM + multi-step protocol |
+| **\`deps(wire)\`** | Before Run — see \`.huff\` / protocol links |
+| **Wave Listen ON** | During Run — wave commits and LUT re-eval |
+
+Huffman SC round-trip: [huffman-v2.md — Load & Run](huffman-v2.md).
+
+---
+
 ## \`show\`
 
 ### Syntax
@@ -8040,7 +8112,15 @@ probe(expr)
 probe(expr ; tag …)
 \`\`\`
 
-Display tags on \`probe\`: \`dec\`, \`signed\`, \`hex\`, \`hexWide\`, \`bin\`, \`ascii\`, \`maxWidth=\`, \`multiline\` — same formatting as \`show\` on the **flat blob** value. No \`elAll\` / \`elNonZero\` / \`compact\` / \`elRange\` / \`elLast\`.
+Display tags on \`probe\`: \`dec\`, \`signed\`, \`hex\`, \`hexWide\`, \`bin\`, \`ascii\`, \`maxWidth=\`, \`multiline\`, **\`level=0|1|2\`** — same formatting as \`show\` on the **flat blob** value. No \`elAll\` / \`elNonZero\` / \`compact\` / \`elRange\` / \`elLast\`.
+
+**Cause lines (\`level=1|2\`):** value on line 1 (\`# name = … - reason\`); cause on indented lines 2+ (not inline). Level **0** (default) = status only, like before.
+
+\`\`\`logts-play
+2wire a = 01
+2wire b = a
+probe(b; level=2)   # after change: wave / st(…) / re-eval ← … on lines 2+
+\`\`\`
 
 \`\`\`logts-play
 8wire v := 01000001
@@ -8672,14 +8752,18 @@ Same as \`probe\` — **one expression** per statement:
 
 \`\`\`
 watch(clk)
-watch(o)
+watch(o; level=1)
 watch(o.1-3)
 watch(.sw)
 watch(.o:counter)
 watch(.u1:sum)
 \`\`\`
 
-Collected during **elaboration** (end of **Run**), like \`probe\`. Does **not** write to **Output**; samples appear in the editor **Timeline** panel (above Output). Toggle the panel from **Panels → Timeline**.
+Optional tag **\`level=0|1|2\`** (default **0**). Level **0** = Timeline only (no \`@watch\` Output). Level **≥ 1** adds \`@watch …\` plus cause on indented lines in Output.
+
+**Timeline tooltip:** hover (desktop) or **tap** on a row (touch). Tooltip follows the pointer horizontally (within the lane area) and is vertically centered on the row. Cause lines need \`level≥1\`; at \`level=0\` only \`seq\` / \`cycle\` appear. Canvas is scaled to panel width — hit-test uses backing-store coordinates.
+
+Collected during **elaboration** (end of **Run**), like \`probe\`. Timeline samples appear in **Panels → Timeline**.
 
 ### What \`watch\` accepts
 
@@ -11750,6 +11834,8 @@ huffSz (8wire) = 00000011 (ref: &5)
 → \`recovered\` = \`source\` (\`aacb\`), \`huffSz = 3\` după recover (LUT reconstruit din codebook). **Test 2145** verifică același flux (fără \`peek\`/\`show\`, legacy propagation).
 
 **\`peek\` vs \`show\`:** \`peek(expr)\` citește valoarea **fix în acel moment** (înainte de propagation ulterioară). \`show(expr)\` rulează după ce se termină propagation — deci \`show(packetEncoded)\` *după* \`.huff:clear()\` poate afișa un packet corupt (\`… + 000\` în loc de \`… + 111\`), pentru că \`.huffPacketSC\` depinde de \`expand(..., .huff)\` și LUT-ul e gol. Folosește \`peek\` pentru encode + snapshot, \`show\` doar pe rezultatele finale care nu depind de \`.huff\`.
+
+**Wave debug:** \`deps(packetEncoded)\` arată legătura cu \`.huff\` / \`.huffPacketSC\`; **Wave Listen** (Win ▾) arată re-eval după \`:clear()\` — vezi [debug.md — wave-debug patterns](debug.md#wave-debug-patterns).
 
 ### Policy
 

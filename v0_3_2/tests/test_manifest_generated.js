@@ -1648,7 +1648,12 @@
       {"id":2210,"group":"wave-debug","title":"watch level=1 — @watch Output on change","detail":{"scripts":["2wire a = 01\n2wire b = a\nwatch(b; level=1)"],"steps":[],"assertions":["new @watch line","@watch mentions b"]}},
       {"id":2211,"group":"wave-debug","title":"watch level=0 — silent Output","detail":{"scripts":["1wire clk = 0\nwatch(clk; level=0)"],"steps":[],"assertions":["no @watch"]}},
       {"id":2212,"group":"wave-debug","title":"probe-cause — dominant priority","detail":{"scripts":[],"steps":[],"assertions":["lut wins","level1 one line","level2 multi"]}},
-      {"id":2213,"group":"wave-debug","title":"probe UI cause — switch toggle","detail":{"scripts":["comp [switch] .sw:\n  = 0\n  :\n1wire q = .sw\nprobe(q; level=1)"],"steps":[],"assertions":["ui cause"]}}
+      {"id":2213,"group":"wave-debug","title":"probe UI cause — switch toggle","detail":{"scripts":["comp [switch] .sw:\n  = 0\n  :\n1wire q = .sw\nprobe(q; level=1)"],"steps":[],"assertions":["ui cause"]}},
+      {"id":2214,"group":"wave-debug","title":"Timeline — row hit-test at row 0 band","detail":{"scripts":[],"steps":[],"assertions":["row 0 at y=214","header miss","unscaled css y not row 0"]}},
+      {"id":2215,"group":"wave-debug","title":"Timeline — clamp tooltip inside viewport","detail":{"scripts":[],"steps":[],"assertions":["left clamped","top clamped","min pad"]}},
+      {"id":2216,"group":"wave-debug","title":"Timeline — clientToCanvasCoords scale Y","detail":{"scripts":[],"steps":[],"assertions":["scaleY 2","mapped y 110"]}},
+      {"id":2217,"group":"wave-debug","title":"Timeline — tooltip anchor X follows client","detail":{"scripts":[],"steps":[],"assertions":["left anchor x","right anchor x","same row y","col 0","col 2"]}},
+      {"id":2218,"group":"wave-debug","title":"Timeline — tooltip prefers right of anchor","detail":{"scripts":[],"steps":[],"assertions":["right of anchor","flip left near edge"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1736,7 +1741,7 @@
       { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775] },
       { id: 'user-def-tags', label: 'user-def-tags', rangeLabel: '1776–1781', testIds: [1776, 1777, 1778, 1779, 1780, 1781] },
       { id: 'vector-reduction', label: 'vector-reduction', rangeLabel: '1715–1734, 1797', testIds: [1715, 1716, 1717, 1718, 1719, 1720, 1721, 1722, 1723, 1724, 1725, 1726, 1727, 1728, 1729, 1730, 1731, 1732, 1733, 1734, 1797] },
-      { id: 'wave-debug', label: 'wave-debug', rangeLabel: '2200–2213', testIds: [2200, 2201, 2202, 2203, 2204, 2205, 2206, 2207, 2208, 2209, 2210, 2211, 2212, 2213] },
+      { id: 'wave-debug', label: 'wave-debug', rangeLabel: '2200–2218', testIds: [2200, 2201, 2202, 2203, 2204, 2205, 2206, 2207, 2208, 2209, 2210, 2211, 2212, 2213, 2214, 2215, 2216, 2217, 2218] },
       { id: 'wave-next', label: 'wave-next', rangeLabel: '2102–2103, 2125', testIds: [2102, 2103, 2125] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611, 1654', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 1654] },
       { id: 'wire-tensor', label: 'wire-tensor', rangeLabel: '1864–1876, 1889–1904, 1957–1967, 1969, 1972–1973, 2143–2144', testIds: [1864, 1865, 1866, 1867, 1868, 1869, 1870, 1871, 1872, 1873, 1874, 1875, 1876, 1889, 1890, 1891, 1892, 1893, 1894, 1895, 1896, 1897, 1898, 1899, 1900, 1901, 1902, 1903, 1904, 1957, 1958, 1959, 1960, 1961, 1962, 1963, 1964, 1965, 1966, 1967, 1969, 1972, 1973, 2143, 2144] },

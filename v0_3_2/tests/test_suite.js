@@ -19368,6 +19368,70 @@ probe(q; level=1)`);
   h.assert('ui cause', String(out.includes('  ui')), 'true');
 }, { propagation: 'wave' });
 
+reg(2214, 'wave-debug', 'Timeline — row hit-test at row 0 band', function(h) {
+  const TL = TimelineLogic;
+  const canvasH = 220;
+  const scroll = 0;
+  const rows = 10;
+  const rh = TL.ROW_HEIGHT;
+  const band = TL.LABEL_BAND;
+  h.assert('row 0 at y=214', String(TL.rowIndexAtCanvasY(214, canvasH, scroll, rows, rh, band)), '0');
+  h.assert('header miss', String(TL.rowIndexAtCanvasY(10, canvasH, scroll, rows, rh, band)), '-1');
+  const wrongCss = TL.rowIndexAtCanvasY(107, canvasH, scroll, rows, rh, band);
+  h.assert('unscaled css y not row 0', String(wrongCss !== 0), 'true');
+});
+
+reg(2215, 'wave-debug', 'Timeline — clamp tooltip inside viewport', function(h) {
+  const TL = TimelineLogic;
+  window.innerWidth = 800;
+  window.innerHeight = 600;
+  const c = TL.clampTooltipPosition(900, 600, 200, 80);
+  h.assert('left clamped', String(c.left), '592');
+  h.assert('top clamped', String(c.top), '512');
+  h.assert('min pad', String(c.left >= 8 && c.top >= 8), 'true');
+});
+
+reg(2216, 'wave-debug', 'Timeline — clientToCanvasCoords scale Y', function(h) {
+  const mockCanvas = {
+    width: 640,
+    height: 220,
+    getBoundingClientRect() {
+      return { left: 10, top: 20, width: 320, height: 110 };
+    },
+  };
+  const cc = TimelineLogic.clientToCanvasCoords(mockCanvas, 10, 75);
+  h.assert('scaleY 2', String(Math.abs(cc.scaleY - 2) < 0.001), 'true');
+  h.assert('mapped y 110', String(Math.abs(cc.y - 110) < 0.001), 'true');
+});
+
+reg(2217, 'wave-debug', 'Timeline — tooltip anchor X follows client', function(h) {
+  const TL = TimelineLogic;
+  const mockCanvas = {
+    width: 640,
+    height: 220,
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 640, height: 220 };
+    },
+  };
+  const left = TL.anchorClientPosForRow(mockCanvas, 0, 80, 0, 10, TL.ROW_HEIGHT);
+  const right = TL.anchorClientPosForRow(mockCanvas, 0, 400, 0, 10, TL.ROW_HEIGHT);
+  h.assert('left anchor x', String(Math.round(left.x)), '80');
+  h.assert('right anchor x', String(Math.round(right.x)), '400');
+  h.assert('same row y', String(Math.abs(left.y - right.y) < 0.001), 'true');
+  h.assert('col 0', String(TL.columnIndexAtCanvasX(80, 588, 4)), '0');
+  h.assert('col 2', String(TL.columnIndexAtCanvasX(350, 588, 4)), '2');
+});
+
+reg(2218, 'wave-debug', 'Timeline — tooltip prefers right of anchor', function(h) {
+  const TL = TimelineLogic;
+  window.innerWidth = 1200;
+  window.innerHeight = 800;
+  const p = TL.placeTooltipNearAnchor(300, 400, 180, 60);
+  h.assert('right of anchor', String(p.left), '310');
+  const pLeft = TL.placeTooltipNearAnchor(1100, 400, 180, 60);
+  h.assert('flip left near edge', String(pLeft.left), '910');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

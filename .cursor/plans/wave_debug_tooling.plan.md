@@ -17,6 +17,9 @@ todos:
   - id: strat2-watch-cause
     content: "Strat 2: watch level≥1 → @watch Output + tooltip canvas; fără textbox/text fix"
     status: completed
+  - id: strat2-1-tooltip-fix
+    content: "Strat 2.1: fix tooltip Timeline — scale CSS/canvas, touch, clamp, ancorare rând"
+    status: completed
   - id: strat3-snapshot
     content: "Strat 3.1: snapshot(wire) sau atribut noReeval — decizie sintaxă + filtru re-eval"
     status: pending
@@ -580,6 +583,79 @@ Level 2:
 - [`v0_3_2/doc/debug.md`](v0_3_2/doc/debug.md)
 
 **Acceptance:** `watch(packetEncoded; level=2)` — canvas fără text permanent; hover arată cause; Output `@watch …`; `level=0` = zero tooltip cause / zero Output; probe `level=2` neschimbat.
+
+---
+
+## Strat 2.1 — Fix tooltip Timeline (prioritate, înainte de compact)
+
+**Feedback (2026-07-08):** tooltip deplasat față de pointer; pe ecran mic nu funcționează. **Compact watch amânat** — livrăm doar fix-ul tooltip.
+
+### Cauze identificate
+
+1. **Scalare CSS vs backing store (bug principal)**  
+   - Canvas: `width="640" height="220"` (coord. interne) + CSS `width:100%; height:auto` ([`script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html)).  
+   - Hit-test: `y = clientY - rect.top` în **pixeli CSS**, dar `_rowIndexAtCanvasY` compară cu `canvas.height` (220).  
+   - Pe panel îngust, raportul `canvas.height / rect.height ≠ 1` → rând greșit (pare „pe lângă” cursor).
+
+2. **Rânduri de 8px** — toleranță mică; o eroare de 1 rând = 8px vizual.
+
+3. **Tooltip doar la `watchLevel ≥ 1`** — fără `level=1/2` în script, hover nu arată nimic (poate părea „nu merge”).
+
+4. **Fără touch** — doar `mousemove`; pe mobil/tablet mic nu există hover.
+
+5. **Clamp incomplet** — `_showTooltip` evită depășirea dreapta/jos, nu garantează `left/top ≥ 8`; pe viewport mic tooltip poate ieși sau fi ilizibil.
+
+### Fix propus — [`timeline-analyzer.js`](v0_3_2/ui/timeline-analyzer.js)
+
+**A. Coordonate corecte (obligatoriu)**
+
+```javascript
+function canvasCoords(canvas, clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY,
+  };
+}
+```
+
+Folosit în `_rowIndexAtCanvasY` și oriunde se mapează pointer → rând.
+
+**B. Hit-test pe banda desenată** — folosește aceeași formulă `currentY` ca în `render()` (deja aliniată cu `scrollOffsetY` + `LABEL_BAND` clip).
+
+**C. Tooltip ancorat la rând, nu doar la cursor**
+
+- Poziție: `rect.left + lanesWidth/2` (sau marginea rândului) + `rect.top + rowCenterY / scaleY` convertit în client — tooltip lângă rândul hit, nu offset arbitrar de la mouse.
+- Clamp complet: `left/top` min 8px, max `innerWidth/Height - size - 8`.
+
+**D. Touch (ecran mic)**
+
+- `touchstart` / `touchmove` (când nu drag): același hit-test; tooltip rămâne până la `touchend` sau tap în afara canvas.
+- Opțional: `long-press` dacă conflict cu scroll drag — inițial tap simplu pe rând.
+
+**E. Opțional UX**
+
+- Tooltip minimal la `level=0`: doar `seq/cycle` + nume canale (fără cause) — reduce confuzia „nu merge fără level”.
+- `ResizeObserver` pe canvas: la redimensionare panel, invalidare hit-test (scale se recalculează automat din rect).
+
+### Fișiere
+
+- [`v0_3_2/ui/timeline-analyzer.js`](v0_3_2/ui/timeline-analyzer.js) — coord scale, tooltip anchor, touch, clamp
+- [`v0_3_2/script_editor_v0_3_2.html`](v0_3_2/script_editor_v0_3_2.html) — opțional `touch-action` / min-height canvas pe mobile
+- [`v0_3_2/doc/debug.md`](v0_3_2/doc/debug.md) — notă: tooltip cause necesită `level≥1`; pe touch tap pe rând
+
+### Acceptance
+
+- Panel Timeline redimensionat (50% lățime): hover pe bară → tooltip pe **rândul corect** (cause matches seq vizual).
+- Viewport îngust (&lt;768px): tap pe rând → tooltip vizibil, în ecran.
+- `watch(x; level=2)` + drag scroll: tooltip nu sare pe rând vecin.
+- Regresie: Pause/Live, drag scroll, cause bandă portocalie neschimbate.
+
+### Amânat
+
+- **Watch `compact`** — plan separat, după 2.1.
 
 ---
 

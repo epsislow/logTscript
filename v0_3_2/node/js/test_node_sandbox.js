@@ -81,7 +81,8 @@ function createTestNodeSandbox() {
     clearTimeout,
     setTimeout,
     localStorage,
-    window: {},
+    innerWidth: 1024,
+    innerHeight: 768,
     document,
   };
   sandbox.window = sandbox;

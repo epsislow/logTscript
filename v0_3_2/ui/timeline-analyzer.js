@@ -23,6 +23,9 @@
   const MAX_HISTORY = 1500;
   const ROW_HEIGHT = 8;
   const LABEL_BAND = 18;
+  const GUTTER_WIDTH = 52;
+  const TAP_MOVE_PX = 10;
+  const VIEWPORT_PAD = 8;
 
   function steadyLevel(state) {
     if (state === STATE_Z || state === STATE_X) return state;
@@ -46,6 +49,103 @@
     return /1/.test(s) ? STATE_HIGH : STATE_LOW;
   }
 
+  /** Map client (screen) coords to canvas backing-store coords. */
+  function clientToCanvasCoords(canvas, clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return { x: 0, y: 0, rect, scaleX: 1, scaleY: 1 };
+    }
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+      rect,
+      scaleX,
+      scaleY,
+    };
+  }
+
+  /** Canvas Y → client Y; lanes anchor X in client space. */
+  function canvasPointToClient(canvas, canvasX, canvasY, rectOptional, scaleXOptional, scaleYOptional) {
+    const rect = rectOptional || canvas.getBoundingClientRect();
+    const scaleX = scaleXOptional != null ? scaleXOptional : (rect.width ? canvas.width / rect.width : 1);
+    const scaleY = scaleYOptional != null ? scaleYOptional : (rect.height ? canvas.height / rect.height : 1);
+    return {
+      x: rect.left + canvasX / scaleX,
+      y: rect.top + canvasY / scaleY,
+    };
+  }
+
+  function rowIndexAtCanvasY(canvasY, canvasHeight, scrollOffsetY, rowCount, rowHeight, labelBand) {
+    if (canvasY < labelBand) return -1;
+    let currentY = canvasHeight + scrollOffsetY;
+    for (let idx = 0; idx < rowCount; idx++) {
+      const targetY = currentY - rowHeight;
+      if (canvasY >= targetY && canvasY < currentY) return idx;
+      currentY = targetY;
+      if (currentY < -rowHeight) break;
+    }
+    return -1;
+  }
+
+  function rowBandCenterCanvasY(rowIndex, canvasHeight, scrollOffsetY, rowCount, rowHeight) {
+    let currentY = canvasHeight + scrollOffsetY;
+    for (let idx = 0; idx < rowCount; idx++) {
+      const targetY = currentY - rowHeight;
+      if (idx === rowIndex) return (targetY + currentY) / 2;
+      currentY = targetY;
+      if (currentY < -rowHeight) break;
+    }
+    return null;
+  }
+
+  function columnIndexAtCanvasX(canvasX, lanesWidth, colCount) {
+    const cols = Math.max(colCount, 1);
+    if (canvasX < 0 || canvasX >= lanesWidth) return -1;
+    const columnWidth = lanesWidth / cols;
+    return Math.min(cols - 1, Math.floor(canvasX / columnWidth));
+  }
+
+  /** Row center Y + client X (clamped to lanes) → client anchor for tooltip. */
+  function anchorClientPosForRow(canvas, rowIndex, clientX, scrollOffsetY, rowCount, rowHeight) {
+    const centerY = rowBandCenterCanvasY(
+      rowIndex,
+      canvas.height,
+      scrollOffsetY,
+      rowCount,
+      rowHeight
+    );
+    if (centerY == null) return null;
+    const cc = clientToCanvasCoords(canvas, clientX, 0);
+    const lanesWidth = canvas.width - GUTTER_WIDTH;
+    const canvasX = Math.max(0, Math.min(cc.x, lanesWidth));
+    return canvasPointToClient(canvas, canvasX, centerY, cc.rect, cc.scaleX, cc.scaleY);
+  }
+
+  function placeTooltipNearAnchor(anchorClientX, anchorClientY, width, height) {
+    const pad = 10;
+    const maxW = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : anchorClientX + width + pad + VIEWPORT_PAD;
+    let left = anchorClientX + pad;
+    let top = anchorClientY - height / 2;
+    if (left + width > maxW - VIEWPORT_PAD) {
+      left = anchorClientX - width - pad;
+    }
+    return clampTooltipPosition(left, top, width, height);
+  }
+
+  function clampTooltipPosition(left, top, width, height) {
+    const maxW = typeof window !== 'undefined' ? window.innerWidth : width + left + VIEWPORT_PAD;
+    const maxH = typeof window !== 'undefined' ? window.innerHeight : height + top + VIEWPORT_PAD;
+    let x = left;
+    let y = top;
+    if (x + width > maxW - VIEWPORT_PAD) x = maxW - VIEWPORT_PAD - width;
+    if (y + height > maxH - VIEWPORT_PAD) y = maxH - VIEWPORT_PAD - height;
+    if (x < VIEWPORT_PAD) x = VIEWPORT_PAD;
+    if (y < VIEWPORT_PAD) y = VIEWPORT_PAD;
+    return { left: x, top: y };
+  }
+
   function TimelineAnalyzer(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
@@ -60,6 +160,9 @@
     this.timeMarkers = [];
     this.isDragging = false;
     this.dragStartY = 0;
+    this._touchDragged = false;
+    this._touchPinRow = false;
+    this._pinnedRowIndex = -1;
     this._rafId = null;
     this._hoverRowIndex = -1;
     this._tooltipEl = null;
@@ -75,7 +178,7 @@
     const el = document.createElement('div');
     el.className = 'timeline-watch-tooltip';
     el.style.cssText = 'position:fixed;display:none;pointer-events:none;z-index:10050;'
-      + 'max-width:420px;padding:6px 8px;border-radius:4px;font:11px/1.35 monospace;'
+      + 'max-width:min(420px,calc(100vw - 16px));padding:6px 8px;border-radius:4px;font:11px/1.35 monospace;'
       + 'color:#e2e8f0;background:#1e1e24;border:1px solid #3d3d46;white-space:pre-wrap;'
       + 'box-shadow:0 4px 12px rgba(0,0,0,0.45);';
     document.body.appendChild(el);
@@ -85,44 +188,55 @@
   TimelineAnalyzer.prototype._hideTooltip = function () {
     if (this._tooltipEl) this._tooltipEl.style.display = 'none';
     this._hoverRowIndex = -1;
+    this._pinnedRowIndex = -1;
+    this._touchPinRow = false;
   };
 
-  TimelineAnalyzer.prototype._showTooltip = function (text, clientX, clientY) {
+  TimelineAnalyzer.prototype._showTooltipAtAnchor = function (text, anchorClientX, anchorClientY) {
     if (!this._tooltipEl || !text) {
       this._hideTooltip();
       return;
     }
     this._tooltipEl.textContent = text;
     this._tooltipEl.style.display = 'block';
-    const pad = 12;
-    let left = clientX + pad;
-    let top = clientY + pad;
-    const rect = this._tooltipEl.getBoundingClientRect();
-    if (left + rect.width > window.innerWidth - 8) left = clientX - rect.width - pad;
-    if (top + rect.height > window.innerHeight - 8) top = clientY - rect.height - pad;
-    this._tooltipEl.style.left = left + 'px';
-    this._tooltipEl.style.top = top + 'px';
+    const tipRect = this._tooltipEl.getBoundingClientRect();
+    const placed = placeTooltipNearAnchor(anchorClientX, anchorClientY, tipRect.width, tipRect.height);
+    this._tooltipEl.style.left = placed.left + 'px';
+    this._tooltipEl.style.top = placed.top + 'px';
   };
 
   TimelineAnalyzer.prototype._rowIndexAtCanvasY = function (canvasY) {
-    if (canvasY < LABEL_BAND) return -1;
-    let currentY = this.canvas.height + this.scrollOffsetY;
-    for (let idx = 0; idx < this.rows.length; idx++) {
-      const targetY = currentY - this.baseRowHeight;
-      if (canvasY >= targetY && canvasY < currentY) return idx;
-      currentY = targetY;
-      if (currentY < -ROW_HEIGHT) break;
-    }
-    return -1;
+    return rowIndexAtCanvasY(
+      canvasY,
+      this.canvas.height,
+      this.scrollOffsetY,
+      this.rows.length,
+      this.baseRowHeight,
+      LABEL_BAND
+    );
+  };
+
+  TimelineAnalyzer.prototype._rowAnchorClientPos = function (rowIndex, clientX) {
+    return anchorClientPosForRow(
+      this.canvas,
+      rowIndex,
+      clientX,
+      this.scrollOffsetY,
+      this.rows.length,
+      this.baseRowHeight
+    );
   };
 
   TimelineAnalyzer.prototype._tooltipTextForRow = function (rowIndex) {
     const meta = this.rowMetas[rowIndex];
-    if (!meta || !meta.watchLevel || meta.watchLevel < 1) return '';
+    if (!meta) return '';
     const lines = [];
     if (meta.seq != null) {
       const cyclePart = meta.cycle != null ? ` cycle ${meta.cycle}` : '';
       lines.push(`seq ${meta.seq}${cyclePart}`);
+    }
+    if (!meta.watchLevel || meta.watchLevel < 1) {
+      return lines.length ? lines.join('\n') : '';
     }
     if (meta.watchReason) lines.push('— ' + meta.watchReason);
     const cause = meta.watchLevel >= 2
@@ -132,14 +246,43 @@
     return lines.join('\n');
   };
 
+  TimelineAnalyzer.prototype._updateTooltipForClient = function (clientX, clientY, pin) {
+    const cc = clientToCanvasCoords(this.canvas, clientX, clientY);
+    const rowIndex = this._rowIndexAtCanvasY(cc.y);
+    if (rowIndex < 0) {
+      if (!pin) this._hideTooltip();
+      return;
+    }
+    const text = this._tooltipTextForRow(rowIndex);
+    if (!text) {
+      if (!pin) this._hideTooltip();
+      return;
+    }
+    const anchor = this._rowAnchorClientPos(rowIndex, clientX);
+    if (!anchor) {
+      if (!pin) this._hideTooltip();
+      return;
+    }
+    this._hoverRowIndex = rowIndex;
+    if (pin) {
+      this._pinnedRowIndex = rowIndex;
+      this._touchPinRow = true;
+    }
+    this._showTooltipAtAnchor(text, anchor.x, anchor.y);
+  };
+
   TimelineAnalyzer.prototype._bindGestures = function () {
     const canvas = this.canvas;
     const self = this;
 
     canvas.addEventListener('mousedown', (e) => {
+      self._touchPinRow = false;
+      self._pinnedRowIndex = -1;
       self.isDragging = true;
+      self._touchDragged = false;
       self.dragStartY = e.clientY;
       self.isPaused = true;
+      self._hideTooltip();
     });
     window.addEventListener('mousemove', (e) => {
       if (!self.isDragging) return;
@@ -151,41 +294,62 @@
     });
     window.addEventListener('mouseup', () => { self.isDragging = false; });
 
+    canvas.addEventListener('mousemove', (e) => {
+      if (self.isDragging || self._touchPinRow) return;
+      self._updateTooltipForClient(e.clientX, e.clientY, false);
+    });
+    canvas.addEventListener('mouseleave', () => {
+      if (!self._touchPinRow) self._hideTooltip();
+    });
+
     canvas.addEventListener('touchstart', (e) => {
+      if (!e.touches.length) return;
+      const t = e.touches[0];
+      self._touchPinRow = false;
+      self._pinnedRowIndex = -1;
       self.isDragging = true;
-      self.dragStartY = e.touches[0].clientY;
+      self._touchDragged = false;
+      self.dragStartY = t.clientY;
+      self._touchStartX = t.clientX;
+      self._touchStartY = t.clientY;
       self.isPaused = true;
+      self._hideTooltip();
     }, { passive: true });
+
     canvas.addEventListener('touchmove', (e) => {
-      if (!self.isDragging) return;
-      const currentTouchY = e.touches[0].clientY;
-      const deltaY = currentTouchY - self.dragStartY;
-      self.dragStartY = currentTouchY;
+      if (!self.isDragging || !e.touches.length) return;
+      const t = e.touches[0];
+      const dx = t.clientX - (self._touchStartX || t.clientX);
+      const dy = t.clientY - (self._touchStartY || t.clientY);
+      if (Math.abs(dx) > TAP_MOVE_PX || Math.abs(dy) > TAP_MOVE_PX) {
+        self._touchDragged = true;
+        self._hideTooltip();
+      }
+      const deltaY = t.clientY - self.dragStartY;
+      self.dragStartY = t.clientY;
       self.scrollOffsetY += deltaY;
       if (self.scrollOffsetY < 0) self.scrollOffsetY = 0;
       self.render();
     }, { passive: true });
-    canvas.addEventListener('touchend', () => { self.isDragging = false; });
-    canvas.addEventListener('touchcancel', () => { self.isDragging = false; });
 
-    canvas.addEventListener('mousemove', (e) => {
-      if (self.isDragging) return;
-      const rect = canvas.getBoundingClientRect();
-      const y = e.clientY - rect.top;
-      const rowIndex = self._rowIndexAtCanvasY(y);
-      if (rowIndex < 0) {
-        self._hideTooltip();
-        return;
+    canvas.addEventListener('touchend', (e) => {
+      self.isDragging = false;
+      if (!self._touchDragged && e.changedTouches.length) {
+        const t = e.changedTouches[0];
+        self._updateTooltipForClient(t.clientX, t.clientY, true);
       }
-      const text = self._tooltipTextForRow(rowIndex);
-      if (!text) {
-        self._hideTooltip();
-        return;
-      }
-      self._hoverRowIndex = rowIndex;
-      self._showTooltip(text, e.clientX, e.clientY);
+      self._touchDragged = false;
     });
-    canvas.addEventListener('mouseleave', () => { self._hideTooltip(); });
+    canvas.addEventListener('touchcancel', () => {
+      self.isDragging = false;
+      self._touchDragged = false;
+    });
+
+    document.addEventListener('touchstart', (e) => {
+      if (!self._touchPinRow || !self.canvas) return;
+      if (e.target === self.canvas || self.canvas.contains(e.target)) return;
+      self._hideTooltip();
+    }, { passive: true });
   };
 
   TimelineAnalyzer.prototype._loop = function () {
@@ -227,6 +391,7 @@
     this.timeMarkers = [];
     this.scrollOffsetY = 0;
     this.isPaused = false;
+    this._hideTooltip();
     this.render();
   };
 
@@ -327,7 +492,7 @@
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const cols = Math.max(this.channelCount, 1);
-    const lanesWidth = canvas.width - 52;
+    const lanesWidth = canvas.width - GUTTER_WIDTH;
     const columnWidth = lanesWidth / cols;
     const rowCount = this.rows.length;
     if (!rowCount) {
@@ -433,7 +598,7 @@
     }
 
     ctx.fillStyle = '#141416';
-    ctx.fillRect(lanesWidth, 0, 52, canvas.height);
+    ctx.fillRect(lanesWidth, 0, GUTTER_WIDTH, canvas.height);
     ctx.strokeStyle = '#2d2d34';
     ctx.beginPath();
     ctx.moveTo(lanesWidth, 0);
@@ -449,7 +614,18 @@
     STATE_HIGH,
     STATE_Z,
     STATE_X,
+    LABEL_BAND,
+    ROW_HEIGHT,
+    GUTTER_WIDTH,
     logicLevelFromValueStr,
+    clientToCanvasCoords,
+    canvasPointToClient,
+    rowIndexAtCanvasY,
+    rowBandCenterCanvasY,
+    columnIndexAtCanvasX,
+    anchorClientPosForRow,
+    placeTooltipNearAnchor,
+    clampTooltipPosition,
     colorForLevel(level) { return COLORS[level] || COLORS[STATE_LOW]; }
   };
 })();

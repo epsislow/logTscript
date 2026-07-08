@@ -1020,7 +1020,9 @@ watch(.o:counter)
 watch(.u1:sum)
 ```
 
-Optional tag **`level=0|1|2`** (default **0**). Level **0** = Timeline only (no Output). Level **≥ 1** adds `@watch …` lines in **Output** plus cause on indented lines; Timeline tooltip shows cause on row hover (optional orange band on re-eval).
+Optional tag **`level=0|1|2`** (default **0**). Level **0** = Timeline only (no `@watch` Output). Level **≥ 1** adds `@watch …` plus cause on indented lines in Output.
+
+**Timeline tooltip:** hover (desktop) or **tap** on a row (touch). Tooltip follows the pointer horizontally (within the lane area) and is vertically centered on the row. Cause lines need `level≥1`; at `level=0` only `seq` / `cycle` appear. Canvas is scaled to panel width — hit-test uses backing-store coordinates.
 
 Collected during **elaboration** (end of **Run**), like `probe`. Timeline samples appear in **Panels → Timeline**.
 
