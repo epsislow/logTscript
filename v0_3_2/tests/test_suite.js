@@ -19482,6 +19482,22 @@ reg(2218, 'wave-debug', 'Timeline — tooltip prefers right of anchor', function
   h.assert('flip left near edge', String(pLeft.left), '910');
 });
 
+reg(2219, 'parser', 'Rotary for.N — quoted colon label', function(h, session) {
+  const stmts = session.parse(`comp [rotary] .rr:
+    text: 'R1'
+    for.0: '+'
+    for.1: '-'
+    for.2: 'x'
+    for.3: ':'
+    states: 4
+    :`);
+  const labels = stmts[0].comp.attributes.for;
+  h.assert('for.0', labels[0], '+');
+  h.assert('for.1', labels[1], '-');
+  h.assert('for.2', labels[2], 'x');
+  h.assert('for.3 colon', labels[3], ':');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

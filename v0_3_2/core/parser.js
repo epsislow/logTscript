@@ -2638,7 +2638,21 @@ assignment() {
 
         if (this.c.value === ':' && !attributesWithNoValues.includes(attrName)) {
           this.eat('SYM', ':');
-          
+
+          if (this.c.type === 'WSTR') {
+            const strValue = this.c.value;
+            this.eat('WSTR');
+            if (isArray) {
+              if (!attributes[attrName]) {
+                attributes[attrName] = {};
+              }
+              attributes[attrName][stateNum] = strValue;
+            } else {
+              attributes[attrName] = strValue;
+            }
+            continue;
+          }
+
           let colonPos = -1;
           for (let i = this.t.i - 1; i >= 0 && i >= this.t.i - 50; i--) {
             if (this.t.src[i] === ':') {

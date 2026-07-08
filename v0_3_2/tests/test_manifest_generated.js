@@ -1657,7 +1657,8 @@
       {"id":2215,"group":"wave-debug","title":"Timeline — clamp tooltip inside viewport","detail":{"scripts":[],"steps":[],"assertions":["left clamped","top clamped","min pad"]}},
       {"id":2216,"group":"wave-debug","title":"Timeline — clientToCanvasCoords scale Y","detail":{"scripts":[],"steps":[],"assertions":["scaleY 2","mapped y 110"]}},
       {"id":2217,"group":"wave-debug","title":"Timeline — tooltip anchor X follows client","detail":{"scripts":[],"steps":[],"assertions":["left anchor x","right anchor x","same row y","col 0","col 2"]}},
-      {"id":2218,"group":"wave-debug","title":"Timeline — tooltip prefers right of anchor","detail":{"scripts":[],"steps":[],"assertions":["right of anchor","flip left near edge"]}}
+      {"id":2218,"group":"wave-debug","title":"Timeline — tooltip prefers right of anchor","detail":{"scripts":[],"steps":[],"assertions":["right of anchor","flip left near edge"]}},
+      {"id":2219,"group":"parser","title":"Rotary for.N — quoted colon label","detail":{"scripts":["comp [rotary] .rr:\n    text: 'R1'\n    for.0: '+'\n    for.1: '-'\n    for.2: 'x'\n    for.3: ':'\n    states: 4\n    :"],"steps":[],"assertions":["for.0","for.1","for.2","for.3 colon"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1728,7 +1729,7 @@
       { id: 'number-conversion', label: 'number-conversion', rangeLabel: '1664–1667, 1669, 1677', testIds: [1664, 1665, 1666, 1667, 1669, 1677] },
       { id: 'osc', label: 'Oscillator', rangeLabel: '134–157', testIds: [134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157] },
       { id: 'other', label: 'Other', rangeLabel: '38–39', testIds: [38, 39] },
-      { id: 'parser', label: 'parser', rangeLabel: '1655', testIds: [1655] },
+      { id: 'parser', label: 'parser', rangeLabel: '1655, 2219', testIds: [1655, 2219] },
       { id: 'pcb', label: 'PCB property block', rangeLabel: '504–515, 520–531, 1168–1175', testIds: [504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531, 1168, 1169, 1170, 1171, 1172, 1173, 1174, 1175] },
       { id: 'probe', label: 'probe debug', rangeLabel: '800–803, 820–839, 851–854, 864, 1702–1703', testIds: [800, 801, 802, 803, 820, 821, 822, 823, 824, 825, 826, 827, 828, 829, 830, 831, 832, 833, 834, 835, 836, 837, 838, 839, 851, 852, 853, 854, 864, 1702, 1703] },
       { id: 'protocol-decode', label: 'Protocol decode()', rangeLabel: '945–946', testIds: [945, 946] },
