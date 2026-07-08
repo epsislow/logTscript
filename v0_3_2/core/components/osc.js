@@ -1,4 +1,5 @@
 var BuiltinComponent = (typeof require !== 'undefined') ? require('./builtin-component') : BuiltinComponent;
+var OscTiming = (typeof require !== 'undefined') ? require('../osc-timing') : (typeof LogTScriptOscTiming !== 'undefined' ? LogTScriptOscTiming : null);
 
 var OscComponent = class OscComponent extends BuiltinComponent {
   static get type() { return 'osc'; }
@@ -11,7 +12,18 @@ var OscComponent = class OscComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'duration1', value: 'integer' }, { name: 'duration0', value: 'integer' }, { name: 'length', value: 'integer' }, { name: 'freq', value: 'integer' }, { name: 'freqIsSec', value: '0/1' }, { name: 'eachCycle', value: '0/1' }],
+      attrs: [
+        { name: 'duration1', value: 'integer' },
+        { name: 'duration0', value: 'integer' },
+        { name: 'length', value: 'integer' },
+        { name: 'freq', value: 'integer' },
+        { name: 'freqIsSec', value: '0/1' },
+        { name: 'eachCycle', value: '0/1' },
+        { name: 'afterSettle', value: null },
+        { name: 'delay0', value: 'integer' },
+        { name: 'delay1', value: 'integer' },
+        { name: 'delayIsSec', value: '0/1' },
+      ],
       initValue: null,
       pins: [{ bits: '1', name: 'reset' }],
       pouts: [{ bits: '1', name: 'get' }, { bits: 'X', name: 'counter' }],
@@ -39,50 +51,20 @@ var OscComponent = class OscComponent extends BuiltinComponent {
   }
 
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
-    const duration1 = attributes['duration1'] !== undefined ? parseInt(attributes['duration1'], 10) : 4;
-    const duration0 = attributes['duration0'] !== undefined ? parseInt(attributes['duration0'], 10) : 4;
-    const length = attributes['length'] !== undefined ? parseInt(attributes['length'], 10) : 4;
-    const freq = attributes['freq'] !== undefined ? parseFloat(attributes['freq']) : 1;
-    const freqIsSec = attributes['freqIsSec'] !== undefined ? parseInt(attributes['freqIsSec'], 10) : 0;
-    const eachCycle = attributes['eachCycle'] !== undefined ? parseInt(attributes['eachCycle'], 10) : 1;
+    const timing = OscTiming || LogTScriptOscTiming;
+    if (!timing) throw Error('LogTScriptOscTiming is not loaded');
 
-    if (duration1 < 1 || duration1 > 8) throw Error(`Oscillator duration1 must be between 1 and 8 for component ${name}`);
-    if (duration0 < 1 || duration0 > 8) throw Error(`Oscillator duration0 must be between 1 and 8 for component ${name}`);
-    if (length < 1) throw Error(`Oscillator length must be positive for component ${name}`);
-    if (freq <= 0) throw Error(`Oscillator freq must be positive for component ${name}`);
-    if (freqIsSec !== 0 && freqIsSec !== 1) throw Error(`Oscillator freqIsSec must be 0 (Hz) or 1 (seconds) for component ${name}`);
-    if (eachCycle !== 0 && eachCycle !== 1) throw Error(`Oscillator eachCycle must be 0 (each state) or 1 (each cycle) for component ${name}`);
-
+    const parsed = timing.parseOscAttributes(attributes, name);
     const storageIdx = ctx.storeValue('0');
     const oscRef = `&${storageIdx}`;
-    const oscState = { counterValue: '0'.repeat(length), length, eachCycle };
-    const period = freqIsSec === 1 ? freq * 1000 : 1000 / freq;
-    const highTime = period * duration1 / (duration1 + duration0);
-    const lowTime = period * duration0 / (duration1 + duration0);
+    const oscState = {
+      counterValue: '0'.repeat(parsed.length),
+      length: parsed.length,
+      eachCycle: parsed.eachCycle,
+      afterSettle: parsed.afterSettle,
+    };
 
-    function incrementCounter() {
-      const maxVal = (1 << oscState.length) - 1;
-      let current = parseInt(oscState.counterValue, 2);
-      current = (current + 1) > maxVal ? 0 : current + 1;
-      oscState.counterValue = current.toString(2).padStart(oscState.length, '0');
-    }
-
-    function goHigh() {
-      if (eachCycle === 0) incrementCounter();
-      ctx.scheduleComponentOutputChange(name, '1');
-      const tid = setTimeout(goLow, highTime);
-      ctx.oscTimers.push(tid);
-    }
-
-    function goLow() {
-      incrementCounter();
-      ctx.scheduleComponentOutputChange(name, '0');
-      const tid = setTimeout(goHigh, lowTime);
-      ctx.oscTimers.push(tid);
-    }
-
-    const startTid = setTimeout(goHigh, lowTime);
-    ctx.oscTimers.push(startTid);
+    timing.startOscLoop(ctx, name, oscState, parsed.highTime, parsed.lowTime, parsed.eachCycle);
 
     return {
       deviceIds: [],
@@ -97,8 +79,8 @@ var OscComponent = class OscComponent extends BuiltinComponent {
         returnType,
         ref: oscRef,
         deviceIds: [],
-        oscState
-      }
+        oscState,
+      },
     };
   }
 

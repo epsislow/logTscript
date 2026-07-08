@@ -10534,85 +10534,20 @@ if (s.assignment) {
       deviceIds.push(counterId);
       // Counter components don't have a ref (they can't be assigned to directly)
     } else if(type === 'osc'){
-      const duration1 = attributes['duration1'] !== undefined ? parseInt(attributes['duration1'], 10) : 4;
-      const duration0 = attributes['duration0'] !== undefined ? parseInt(attributes['duration0'], 10) : 4;
-      const length = attributes['length'] !== undefined ? parseInt(attributes['length'], 10) : 4;
-      const freq = attributes['freq'] !== undefined ? parseFloat(attributes['freq']) : 1;
-      const freqIsSec = attributes['freqIsSec'] !== undefined ? parseInt(attributes['freqIsSec'], 10) : 0;
-      const eachCycle = attributes['eachCycle'] !== undefined ? parseInt(attributes['eachCycle'], 10) : 1;
-
-      if(duration1 < 1 || duration1 > 8){
-        throw Error(`Oscillator duration1 must be between 1 and 8 for component ${name}`);
+      const timing = typeof LogTScriptOscTiming !== 'undefined' ? LogTScriptOscTiming : null;
+      if (!timing) {
+        throw Error('LogTScriptOscTiming is not loaded');
       }
-      if(duration0 < 1 || duration0 > 8){
-        throw Error(`Oscillator duration0 must be between 1 and 8 for component ${name}`);
-      }
-      if(length < 1){
-        throw Error(`Oscillator length must be positive for component ${name}`);
-      }
-      if(freq <= 0){
-        throw Error(`Oscillator freq must be positive for component ${name}`);
-      }
-      if(freqIsSec !== 0 && freqIsSec !== 1){
-        throw Error(`Oscillator freqIsSec must be 0 (Hz) or 1 (seconds) for component ${name}`);
-      }
-      if(eachCycle !== 0 && eachCycle !== 1){
-        throw Error(`Oscillator eachCycle must be 0 (each state) or 1 (each cycle) for component ${name}`);
-      }
-
+      const parsed = timing.parseOscAttributes(attributes, name);
       const storageIdx = this.storeValue('0');
       const oscRef = `&${storageIdx}`;
-
       const oscState = {
-        counterValue: '0'.repeat(length),
-        length: length,
-        eachCycle: eachCycle
+        counterValue: '0'.repeat(parsed.length),
+        length: parsed.length,
+        eachCycle: parsed.eachCycle,
+        afterSettle: parsed.afterSettle,
       };
-
-      const period = freqIsSec === 1 ? freq * 1000 : 1000 / freq;
-      const highTime = period * duration1 / (duration1 + duration0);
-      const lowTime = period * duration0 / (duration1 + duration0);
-
-      const self = this;
-      const compName = name;
-
-      function incrementCounter(){
-        const maxVal = (1 << oscState.length) - 1;
-        let current = parseInt(oscState.counterValue, 2);
-        current = (current + 1) > maxVal ? 0 : current + 1;
-        oscState.counterValue = current.toString(2).padStart(oscState.length, '0');
-      }
-
-      function goHigh(){
-        const stored = self.storage.find(s => s.index === storageIdx);
-        if(stored) stored.value = '1';
-        if(eachCycle === 0) incrementCounter();
-        self._withProbeCause({ osc: true }, () => {
-          self.updateComponentConnections(compName);
-        });
-        self._emitComputedComponentProbes(compName);
-        if(typeof showVars === 'function') showVars();
-        const tid = setTimeout(goLow, highTime);
-        self.oscTimers.push(tid);
-      }
-
-      function goLow(){
-        const stored = self.storage.find(s => s.index === storageIdx);
-        if(stored) stored.value = '0';
-        incrementCounter();
-        self._withProbeCause({ osc: true }, () => {
-          self.updateComponentConnections(compName);
-        });
-        self._emitComputedComponentProbes(compName);
-        if(typeof showVars === 'function') showVars();
-        const tid = setTimeout(goHigh, lowTime);
-        self.oscTimers.push(tid);
-      }
-
-      const startTid = setTimeout(goHigh, lowTime);
-      this.oscTimers.push(startTid);
-
-      // Osc has a ref (1-bit value accessible via .osc1 or .osc1:get)
+      timing.startOscLoop(this, name, oscState, parsed.highTime, parsed.lowTime, parsed.eachCycle);
       const compInfo = {
         type: type,
         componentType: null,

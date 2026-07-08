@@ -2419,6 +2419,47 @@ probe(.n:get)`;
     h.assert('length: 8', String(stmts[0].comp.attributes.length), '8');
   });
 
+  reg(154, 'osc', 'Parser — afterSettle flag + delay attrs', function(h, session) {
+    const stmts = session.parse(`comp [~] .o:
+  afterSettle
+  delay0: 10
+  delay1: 5
+  delayIsSec: 0
+  length: 4
+  :`);
+    const a = stmts[0].comp.attributes;
+    h.assert('afterSettle flag', String(!!a.afterSettle), 'true');
+    h.assert('delay0', String(a.delay0), '10');
+    h.assert('delay1', String(a.delay1), '5');
+    h.assert('delayIsSec', String(a.delayIsSec), '0');
+  });
+
+  reg(155, 'osc', 'oscDelayMs — delayIsSec 0 and 1', function(h, session) {
+    const T = typeof LogTScriptOscTiming !== 'undefined' ? LogTScriptOscTiming : null;
+    h.assert('timing loaded', String(!!T), 'true');
+    h.assert('inv 10', String(T.oscDelayMs(10, 0)), '100');
+    h.assert('inv 2', String(T.oscDelayMs(2, 0)), '500');
+    h.assert('sec 5', String(T.oscDelayMs(5, 1)), '5000');
+  });
+
+  reg(156, 'osc', 'afterSettle — invalid delay throws', function(h, session) {
+    h.assertThrows('delay0 zero', function() {
+      session.run(`comp [~] .o:
+  afterSettle
+  delay0: 0
+  delay1: 4
+  :`);
+    }, 'positive');
+  });
+
+  reg(157, 'osc', 'afterSettle flag with value throws parse', function(h, session) {
+    h.assertThrows('afterSettle: 1', function() {
+      session.parse(`comp [~] .o:
+  afterSettle: 1
+  :`);
+    }, 'flag attribute');
+  });
+
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
     const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider'];

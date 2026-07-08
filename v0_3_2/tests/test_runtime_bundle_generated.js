@@ -34,6 +34,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/components/queue.js",
   "core/components/stack.js",
   "core/components/network.js",
+  "core/osc-timing.js",
   "core/components/osc.js",
   "core/components/rotary.js",
   "core/components/slider.js",

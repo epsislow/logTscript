@@ -2618,7 +2618,7 @@ assignment() {
           continue;
         }
 
-        const attributesWithNoValues = ['square', 'nl', 'circular', 'glow', 'rgb', 'noLabels', 'noTrans', 'readonly', 'reversed', 'onlyDigits', 'allowEnter', 'allowBackspace', 'allowArrows', 'allowDelete'];
+        const attributesWithNoValues = ['square', 'nl', 'circular', 'glow', 'rgb', 'noLabels', 'noTrans', 'readonly', 'reversed', 'onlyDigits', 'allowEnter', 'allowBackspace', 'allowArrows', 'allowDelete', 'afterSettle'];
         
         
         if (attrNamesArray.includes(attrName) && this.c.type === 'SYM' && this.c.value === '.') {
@@ -2957,6 +2957,15 @@ assignment() {
           attributes.allowArrows = true;
         } else if (attrName === 'allowDelete') {
           attributes.allowDelete = true;
+        } else if (attrName === 'afterSettle') {
+          if (this.c.type === 'SYM' && this.c.value === ':') {
+            this.eat('SYM', ':');
+            this.t.skip();
+            if (this.c.type === 'DEC' || this.c.type === 'BIN') {
+              throw Error(`afterSettle is a flag attribute (no value) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+            }
+          }
+          attributes.afterSettle = true;
         } else {
           continue;
         }

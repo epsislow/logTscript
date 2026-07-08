@@ -45,6 +45,40 @@ comp [osc] .name::
 | `freq`       | float | >0  | -   | 1       | Frequency in Hz or period in seconds (see `freqIsSec`) |
 | `freqIsSec`  | int   | 0   | 1   | 0       | How `freq` is interpreted: `0` = Hz (cycles/second), `1` = seconds (period of one cycle) |
 | `eachCycle`  | int   | 0   | 1   | 1       | When the counter increments: `1` = once per full cycle, `0` = on every state change |
+| `afterSettle`| flag  | -   | -   | (off)   | Post-settle timing mode — see below |
+| `delay0`     | number| >0  | -   | 4       | With `afterSettle`: wait after LOW phase settles (see `delayIsSec`) |
+| `delay1`     | number| >0  | -   | 4       | With `afterSettle`: wait after HIGH phase settles |
+| `delayIsSec` | int   | 0   | 1   | 0       | `0` = inverse seconds (`delay: 10` → 100ms); `1` = seconds |
+
+### Mod `afterSettle` (post-propagare)
+
+By default the oscillator uses **`freq`** + **`duration0`/`duration1`** (real-time wall clock).
+
+Add the flag **`afterSettle`** on its own line (no value — like `onlyDigits` on keyboard). When present:
+
+- **`freq`**, **`duration0`**, **`duration1`**, **`freqIsSec`** are **ignored**
+- Phase waits use **`delay0`** (LOW) and **`delay1`** (HIGH) **after wave propagation settles**
+- Timer starts only after `scheduleComponentOutputChange` → `propagate()` completes
+
+**Syntax:**
+
+```
+comp [~] .clk:
+  afterSettle
+  delay0: 10
+  delay1: 10
+  delayIsSec: 0
+  :
+```
+
+**`delayIsSec`** (parallel to `freqIsSec`):
+
+| delayIsSec | Meaning | Example |
+|------------|---------|---------|
+| **0** (default) | `delay` = inverse fraction of second | `delay0: 10` → 100ms; `delay0: 2` → 500ms |
+| **1** | `delay` = seconds | `delay1: 5` → 5 seconds |
+
+`afterSettle: 1` is invalid — use bare `afterSettle`.
 
 ### Frequency and freqIsSec
 
