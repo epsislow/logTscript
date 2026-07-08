@@ -1640,7 +1640,8 @@
       {"id":2202,"group":"wave-debug","title":"Wave Listen — level 1 commit trace","detail":{"scripts":["2wire a = 11\n2wire b = a"],"steps":["Tokenizer(processed)","Parser(…)","session._ensureRegistry()"],"assertions":["some trace","commit line"]}},
       {"id":2203,"group":"wave-debug","title":"Parser — deps(expr) AST","detail":{"scripts":["4wire a = 1\ndeps(a + b)"],"steps":[],"assertions":["deps node"]}},
       {"id":2204,"group":"wave-debug","title":"Wave Listen format — expand threshold and bin wrap","detail":{"scripts":[],"steps":[],"assertions":["needs expand","no expand small","multi line bin","group intact","bits suffix inline","fmt options"]}},
-      {"id":2205,"group":"wave-debug","title":"Wave Listen copy — script literals","detail":{"scripts":[],"steps":[],"assertions":["bin copy raw","hex no spaces","hex starts ^","s8 suffix","dec suffix"]}}
+      {"id":2205,"group":"wave-debug","title":"Wave Listen copy — script literals","detail":{"scripts":[],"steps":[],"assertions":["bin copy raw","hex no spaces","hex starts ^","s8 suffix","dec suffix"]}},
+      {"id":2206,"group":"wave-debug","title":"Wave Listen ascii — display and script copy","detail":{"scripts":[],"steps":[],"assertions":["display quoted","copy wire string","copy mixed concat","copy printable pair","copy control group"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1728,7 +1729,7 @@
       { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775] },
       { id: 'user-def-tags', label: 'user-def-tags', rangeLabel: '1776–1781', testIds: [1776, 1777, 1778, 1779, 1780, 1781] },
       { id: 'vector-reduction', label: 'vector-reduction', rangeLabel: '1715–1734, 1797', testIds: [1715, 1716, 1717, 1718, 1719, 1720, 1721, 1722, 1723, 1724, 1725, 1726, 1727, 1728, 1729, 1730, 1731, 1732, 1733, 1734, 1797] },
-      { id: 'wave-debug', label: 'wave-debug', rangeLabel: '2200–2205', testIds: [2200, 2201, 2202, 2203, 2204, 2205] },
+      { id: 'wave-debug', label: 'wave-debug', rangeLabel: '2200–2206', testIds: [2200, 2201, 2202, 2203, 2204, 2205, 2206] },
       { id: 'wave-next', label: 'wave-next', rangeLabel: '2102–2103, 2125', testIds: [2102, 2103, 2125] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611, 1654', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 1654] },
       { id: 'wire-tensor', label: 'wire-tensor', rangeLabel: '1864–1876, 1889–1904, 1957–1967, 1969, 1972–1973, 2143–2144', testIds: [1864, 1865, 1866, 1867, 1868, 1869, 1870, 1871, 1872, 1873, 1874, 1875, 1876, 1889, 1890, 1891, 1892, 1893, 1894, 1895, 1896, 1897, 1898, 1899, 1900, 1901, 1902, 1903, 1904, 1957, 1958, 1959, 1960, 1961, 1962, 1963, 1964, 1965, 1966, 1967, 1969, 1972, 1973, 2143, 2144] },

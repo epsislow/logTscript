@@ -2,7 +2,7 @@
 
 const WAVE_LISTEN_EXPAND_THRESHOLD = 256;
 const WAVE_LISTEN_INLINE_PREVIEW_MAX = 48;
-const WAVE_LISTEN_FMT_OPTIONS = ['hex', 'bin', 'dec', 's8', 'q4p4', 'fp16', 'bf16'];
+const WAVE_LISTEN_FMT_OPTIONS = ['hex', 'bin', 'dec', 'ascii', 's8', 'q4p4', 'fp16', 'bf16'];
 const WAVE_LISTEN_BIN_GROUP_BITS = 8;
 
 function normalizeWaveListenFmt(fmt) {
@@ -16,6 +16,7 @@ function waveListenFormatWidth(fmt) {
     case 'dec':
     case 's8':
     case 'q4p4':
+    case 'ascii':
       return 8;
     case 'fp16':
     case 'bf16':
@@ -34,6 +35,7 @@ function waveListenFmtToShowOpts(fmt) {
     case 'q4p4': return { numericFormat: 'q4p4' };
     case 'fp16': return { numericFormat: 'fp16' };
     case 'bf16': return { numericFormat: 'bf16' };
+    case 'ascii': return { ascii: true };
     default: return { hex: true };
   }
 }
@@ -151,7 +153,101 @@ function _formatFlatGrouped(rawValue, fmt) {
   const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
   if (!NF || typeof NF.formatGroupedShow !== 'function') return String(rawValue);
   if (fmt === 'dec') return NF.formatGroupedShow(rawValue, '8');
+  if (fmt === 'ascii') return NF.formatGroupedShow(rawValue, 'ascii');
   return NF.formatGroupedShow(rawValue, fmt);
+}
+
+function _byteValFromBin(byteBin) {
+  if (!byteBin || byteBin.length !== 8) return null;
+  if (/[XZ]/i.test(byteBin)) return null;
+  const val = parseInt(byteBin, 2);
+  return Number.isNaN(val) ? null : val;
+}
+
+function _wireStringCharEncode(val) {
+  switch (val) {
+    case 0: return '\\0';
+    case 8: return '\\b';
+    case 9: return '\\t';
+    case 10: return '\\n';
+    case 13: return '\\r';
+    case 92: return '\\\\';
+    case 34: return '\\"';
+    default:
+      if (val >= 32 && val <= 126) return String.fromCharCode(val);
+      return null;
+  }
+}
+
+function _canEmbedInWireString(val) {
+  return _wireStringCharEncode(val) != null;
+}
+
+function _isDecimalLiteralPart(part) {
+  return /^\\-?\d+(?:\.\d+)?$/.test(String(part));
+}
+
+/**
+ * Script-ready ASCII copy: coalesce printable runs into "abc", isolated bytes as \N,
+ * join with + ;ascii only on pure decimal groups (2+ atoms). See wire-literals.md.
+ */
+function formatWaveListenAsciiCopy(rawValue, bitWidth, formatValueFn) {
+  const bits = String(rawValue == null ? '' : rawValue);
+  if (!bits) return '""';
+  if (typeof LogicValue !== 'undefined'
+    && typeof LogicValue.stringHasLogicXZ === 'function'
+    && LogicValue.stringHasLogicXZ(bits)) {
+    const displayed = _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
+    return String(displayed).replace(/\s/g, '');
+  }
+
+  const parts = [];
+  let strRun = [];
+
+  function flushStrRun() {
+    if (!strRun.length) return;
+    let inner = '';
+    for (const v of strRun) inner += _wireStringCharEncode(v);
+    parts.push('"' + inner + '"');
+    strRun = [];
+  }
+
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    const val = _byteValFromBin(bits.substring(i, i + 8));
+    if (val != null && _canEmbedInWireString(val)) {
+      strRun.push(val);
+    } else {
+      flushStrRun();
+      if (val != null) parts.push('\\' + val);
+      else parts.push(bits.substring(i, i + 8));
+    }
+  }
+  flushStrRun();
+
+  const remBits = bits.length % 8 ? bits.substring(Math.floor(bits.length / 8) * 8) : null;
+
+  let result;
+  if (parts.length === 1 && parts[0].startsWith('"')) {
+    result = parts[0];
+  } else if (parts.length > 0 && parts.every((p) => _isDecimalLiteralPart(p))) {
+    result = parts.length === 1 ? parts[0] : parts.join(' ') + ';ascii';
+  } else if (parts.length > 0) {
+    result = parts.join(' + ');
+  } else {
+    result = '""';
+  }
+
+  if (remBits) result += (result ? ' + ' : '') + remBits;
+  return result;
+}
+
+function _waveListenAsciiDisplay(rawValue, bitWidth) {
+  const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
+  const bw = bitWidth || (rawValue ? rawValue.length : 0);
+  if (DF && typeof DF.formatDebugDisplayValue === 'function') {
+    return DF.formatDebugDisplayValue(rawValue, bw, { ascii: true }, false, bw);
+  }
+  return rawValue;
 }
 
 function _waveListenHexDisplay(rawValue, bitWidth, formatValueFn) {
@@ -175,6 +271,18 @@ function _waveListenHexDisplay(rawValue, bitWidth, formatValueFn) {
 function _formatWaveListenScalarFormatted(rawValue, bitWidth, fmt, formatValueFn, interp, entry) {
   if (fmt === 'bin') return formatWaveListenBinary(rawValue);
   if (fmt === 'hex') return _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
+  if (fmt === 'ascii') {
+    if (_tensorUsesShowLines(entry, fmt) && interp
+      && typeof interp._formatVectorShowLines === 'function') {
+      const lines = interp._formatVectorShowLines(entry.name, rawValue, waveListenFmtToShowOpts(fmt));
+      if (lines && lines.length) {
+        const header = lines.find((l) => l.includes('=')) || lines[0];
+        const eq = header.indexOf('=');
+        return eq >= 0 ? header.slice(eq + 1).replace(/\s*\(\d+bit\)\s*$/, '').trim() : header;
+      }
+    }
+    return _waveListenAsciiDisplay(rawValue, bitWidth);
+  }
   if (['dec', 's8', 'q4p4', 'fp16', 'bf16'].includes(fmt)) {
     if (_tensorUsesShowLines(entry, fmt) && interp
       && typeof interp._formatVectorShowLines === 'function') {
@@ -268,6 +376,12 @@ function formatWaveListenExpandLines(entry, fmt, interp) {
     return wrapBinaryGroupLines(rawValue);
   }
 
+  if (mode === 'ascii') {
+    const formatted = _waveListenAsciiDisplay(rawValue, bw);
+    if (String(formatted).startsWith('"')) return [formatted];
+    return wrapLiteralTokenLines(formatted);
+  }
+
   if (['dec', 's8', 'q4p4', 'fp16', 'bf16'].includes(mode)) {
     return wrapLiteralTokenLines(_formatFlatGrouped(rawValue, mode));
   }
@@ -297,6 +411,10 @@ function formatWaveListenCopyText(entry, fmt, interp) {
   if (mode === 'hex') {
     const displayed = _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
     return String(displayed).replace(/\s/g, '');
+  }
+
+  if (mode === 'ascii') {
+    return formatWaveListenAsciiCopy(rawValue, bitWidth, formatValueFn);
   }
 
   if (['dec', 's8', 'q4p4', 'fp16', 'bf16'].includes(mode)) {
@@ -330,6 +448,7 @@ if (typeof module !== 'undefined' && module.exports) {
     formatWaveListenExpandLines,
     formatWaveListenFullText,
     formatWaveListenCopyText,
+    formatWaveListenAsciiCopy,
     waveListenNeedsExpand,
   };
 }

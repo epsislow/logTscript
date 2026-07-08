@@ -128,7 +128,7 @@ Wave propagation trace — **separate panel**, not Output. Open from **Win ▾ �
 |---------|------|
 | **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
 | **L1 / L2 / L3** | Trace verbosity (`debugLevel` on wave engine) |
-| **Fmt ▾** | hex / bin / dec / s8 / q4p4 / fp16 / bf16 (dropdown, persisted) |
+| **Fmt ▾** | hex / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii (dropdown, persisted) |
 | **Clear** | Clears panel history (no auto-clear on Run) |
 | **Listening…** badge | Internal **listen** active while script runs (distinct from ON/OFF) |
 
@@ -145,7 +145,7 @@ Example trace (level 1):
 
 Legacy mode: one status line (`listen is ON/OFF`), no `[wave N]` lines.
 
-**Value formatting:** dropdown **hex / bin / dec / s8 / q4p4 / fp16 / bf16**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). Suffix **`(Nbits)`** la afișare. **`[cpy]`** — literal script: **bin** = biți continui fără spații; **hex** = `^…` fără spații; **dec/s8/q4p4/fp16/bf16** = cu `;format` (ex. `;s8`, `;8`, `;q4p4`).
+**Value formatting:** dropdown **hex / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **ascii** afișează ca `show(…; ascii)` — `"Hello"` sau `\72 \101 …;ascii`. Suffix **`(Nbits)`** la afișare. **`[cpy]`** — literal script: **bin** = biți continui; **hex** = `^…` fără spații; **dec/s8/…** = cu `;format`; **ascii** = `"abc"` pentru text printabil, `"abc" + \2 + "zz"` dacă mix, `\65 \66;ascii` dacă doar `\N` (2+ cu `;ascii`). X/Z → fallback hex la copy.
 
 See [Wave debug patterns](#wave-debug-patterns) and [huffman-v2.md](huffman-v2.md) (SC round-trip).
 

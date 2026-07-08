@@ -19284,6 +19284,21 @@ reg(2205, 'wave-debug', 'Wave Listen copy — script literals', function(h) {
   }
 });
 
+reg(2206, 'wave-debug', 'Wave Listen ascii — display and script copy', function(h) {
+  const helloBits = '0100100001100101011011000110110001101111';
+  const entry = { name: 'msg', rawValue: helloBits, bitWidth: 40, wireType: '40wire' };
+  const inline = formatWaveListenInline(entry, 'ascii', null, null);
+  h.assert('display quoted', String(/"Hello"/.test(inline)), 'true');
+  h.assert('copy wire string', formatWaveListenAsciiCopy(helloBits, 40, null), '"Hello"');
+
+  const mixed = '0110000101100010000000100111101001111010'; // a b STX z z
+  const mixedCopy = formatWaveListenAsciiCopy(mixed, 40, null);
+  h.assert('copy mixed concat', mixedCopy, '"ab" + \\2 + "zz"');
+
+  h.assert('copy printable pair', formatWaveListenAsciiCopy('0100000101000010', 16, null), '"AB"');
+  h.assert('copy control group', formatWaveListenAsciiCopy('0000000100000010', 16, null), '\\1 \\2;ascii');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,
