@@ -685,7 +685,7 @@ Four tokens `00` `01` `10` `11` → payload 9 bits + 8-bit length = **17** bits 
 
 Generator: `tests/test_suite.js` (`huffFsmRoundTripScript`) · Node mirror: `node/huff_fsm_script.js` · regenerate doc block: `node node/_gen_huff_fsm_doc.js`.
 
-One **switch** tick = scan byte step, one merge round, or `.huff` commit. Phases:
+One **clock** tick (osc `afterSettle` or manual switch) = scan byte step, one merge round, or `.huff` commit. Phases:
 
 | Phase | `ph` | Behaviour |
 |-------|------|-----------|
@@ -699,7 +699,7 @@ One **switch** tick = scan byte step, one merge round, or `.huff` commit. Phases
 
 Open [huffman-v2.md](huffman-v2.md) in the **doc viewer**, then **Load** or **Load & Run** on the block below.
 
-**How to run:** **Load & Run**, then click **tick** on the switch until **Output** shows `ph = 0101`, `huffSz = 00000011`, `huffReady = 1`, and `recovered` = `"aacb"` (~**8–10** clicks).
+**How to run:** **Load & Run** — the **`afterSettle`** osc advances automatically (~200ms per half-cycle with `delay0`/`delay1: 5`, `delayIsSec: 0`). Wait until **Output** shows `ph = 0101`, `huffSz = 00000011`, `huffReady = 1`, and `recovered` = `"aacb"`. Alternatively use `comp [switch] .clk` with `text: 'tick'` and click manually (~8–10 ticks).
 
 | Output | Expected |
 |--------|----------|
@@ -759,8 +759,11 @@ inline [lut] .hfsm:
 
 32wire source =: 'aacb'
 8wire srcLen = 00100000
-comp [switch] .clk:
-  text: 'tick'
+comp [~] .clk:
+  afterSettle
+  delay0: 5
+  delay1: 5
+  delayIsSec: 0
   :
 4wire ph = 0000
 1wire phScan = EQ(ph, .hfsm:SCAN)
