@@ -20,6 +20,9 @@ todos:
   - id: strat2-1-tooltip-fix
     content: "Strat 2.1: fix tooltip Timeline — scale CSS/canvas, touch, clamp, ancorare rând"
     status: completed
+  - id: strat2-5-watch-compact
+    content: "Strat 2.5: watch compact — vezi watch_compact.plan.md"
+    status: pending
   - id: strat3-snapshot
     content: "Strat 3.1: snapshot(wire) sau atribut noReeval — decizie sintaxă + filtru re-eval"
     status: pending
@@ -42,6 +45,7 @@ Plan **elaborabil pe parcurs** — nu presupune implementare într-o singură it
 **Planuri înrudite (deja în repo):**
 - [wave_signal_propagation_5efca976.plan.md](.cursor/plans/wave_signal_propagation_5efca976.plan.md) — engine wave (DONE)
 - [evaluare_timeline_watch.plan.md](.cursor/plans/evaluare_timeline_watch.plan.md) — `cause` în watch (parțial overlap, todo-uri pending)
+- [watch_compact.plan.md](.cursor/plans/watch_compact.plan.md) — tag `watch(…; compact)` — 1 coloană per expresie (pending)
 - [huffman_packet_sc.plan.md](.cursor/plans/huffman_packet_sc.plan.md) — cazul care a expus limitările debug
 
 **Documentație existentă:**
@@ -655,7 +659,7 @@ Folosit în `_rowIndexAtCanvasY` și oriunde se mapează pointer → rând.
 
 ### Amânat
 
-- **Watch `compact`** — plan separat, după 2.1.
+- **Watch `compact`** — [watch_compact.plan.md](watch_compact.plan.md) (Strat 2.5, după 2.1 ✅).
 
 ---
 
@@ -758,6 +762,7 @@ Folosit în `_rowIndexAtCanvasY` și oriunde se mapează pointer → rând.
 | **2.7 watch level** | Cause în **Output** (`@watch`) + **tooltip hover** pe rând Timeline |
 | **2.8 Timeline** | Grafic (bare); opțional bandă color; **tooltip da**, textbox/text fix **nu** |
 | **2.9 batch watch** | Un set cause per batch; canale grupate pe linia `@watch` |
+| **2.10 watch compact** | Tag `compact` — 1 coloană per expr; [watch_compact.plan.md](watch_compact.plan.md) |
 
 ### Recomandări tehnice (de inclus la implementare)
 

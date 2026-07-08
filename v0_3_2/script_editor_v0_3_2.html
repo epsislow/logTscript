@@ -188,6 +188,59 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .timeline-head h3 { margin:0; font-size:14px; }
 .timeline-toolbar { display:flex; gap:6px; }
 .timeline-toolbar .btn { font-size:11px; padding:4px 10px; }
+
+.selection-panel {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  margin-top: 0;
+}
+.selection-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.selection-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.selection-mode-btn {
+  min-width: 2.4rem;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 8px;
+  background: #101010;
+  border-color: #444;
+}
+.btn.selection-mode-btn--active,
+.btn.selection-mode-btn--active:hover {
+  background: #1f66e0;
+  border-color: #5a9fff;
+  color: #fff;
+}
+.selection-arrows {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.selection-arrow-btn {
+  min-width: 2rem;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 6px;
+  background: #101010;
+  border-color: #444;
+}
+.selection-arrow-btn:active {
+  background: #242424;
+}
 #timelineCanvas {
   display:block;
   width:100%;
@@ -2714,6 +2767,7 @@ show(a,b,c)
         <button class="dropdown-item" data-panel="timeline">Timeline</button>
         <button class="dropdown-item" data-panel="networkTraffic">Network Traffic</button>
         <button class="dropdown-item" data-panel="waveListen">Wave Listen</button>
+        <button class="dropdown-item" data-panel="selection">Selection</button>
         <button class="dropdown-item active" data-panel="output">Output</button>
         <button class="dropdown-item active" data-panel="variables">Variables</button>
         <button class="dropdown-item active" data-panel="tabs">Tabs</button>
@@ -2758,6 +2812,20 @@ show(a,b,c)
   <button onclick="goto('run_tests')" class="btn">T</button>
 </div>
 
+<div class="panel selection-panel" id="selectionPanel" style="display:none">
+  <div class="selection-head">
+    <h3>Selection</h3>
+  </div>
+  <div class="selection-toolbar">
+    <button type="button" id="selectionModeBtn" class="btn selection-mode-btn" aria-pressed="false" title="Selection extend OFF — arrows move cursor">Sel</button>
+    <div class="selection-arrows" aria-label="Move cursor">
+      <button type="button" class="btn selection-arrow-btn" data-dir="left" title="Left">◀</button>
+      <button type="button" class="btn selection-arrow-btn" data-dir="up" title="Up">▲</button>
+      <button type="button" class="btn selection-arrow-btn" data-dir="down" title="Down">▼</button>
+      <button type="button" class="btn selection-arrow-btn" data-dir="right" title="Right">▶</button>
+    </div>
+  </div>
+</div>
 
 <div class="panel" id="tabsPanel">
   <button class="btn" onclick="addTab()">+tab</button>
@@ -3007,6 +3075,7 @@ show(a,b,c)
 
 <!-- UI: editor, file browser, app init -->
 <script src="ui/editor.js"></script>
+<script src="ui/selection-panel.js"></script>
 <script src="ui/file-browser.js"></script>
 
 <script src="res/js/marked.min.js"></script>

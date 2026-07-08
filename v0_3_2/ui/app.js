@@ -419,6 +419,7 @@ async function init() {
   }
 
   initTimelineAnalyzer();
+  if (typeof initSelectionPanel === 'function') initSelectionPanel();
   updateInstSelectorUI();
   updateStepControlsUI();
 }
@@ -829,6 +830,8 @@ items.forEach(item => {
         toggleDevices();
     } else if (panelName === 'ast') {
         toggleAST();
+    } else if (panelName === 'selection') {
+        toggleSelection();
     }
   });
 });

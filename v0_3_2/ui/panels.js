@@ -29,6 +29,12 @@ function toggleTimeline() {
   }
 }
 
+function toggleSelection() {
+  if (typeof toggleSelectionPanel === 'function') {
+    toggleSelectionPanel();
+  }
+}
+
 function toggleOutput() {
   const panel = document.getElementById('outputPanel');
   if (panel.style.display === 'none') {
