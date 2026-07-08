@@ -75,6 +75,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/numeric-formats.js",
   "core/debug-display-wrap.js",
   "core/debug-display-format.js",
+  "core/probe-cause.js",
   "core/wire-literals.js",
   "core/parser.js",
   "core/interpreter.js",

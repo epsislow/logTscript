@@ -100,11 +100,12 @@ const SHOW_PEEK_DISPLAY_TAGS = new Set([
 const PROBE_DISPLAY_TAGS = new Set([
   'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide',
   'q4p4', 'q8p8', 'bf16', 'fp16',
-  'maxWidth', 'multiline',
+  'maxWidth', 'multiline', 'level',
 ]);
 const DISPLAY_FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'q4p4', 'q8p8', 'bf16', 'fp16']);
 const DISPLAY_ELEMENT_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
-const DISPLAY_VALUED_TAGS = new Set(['elRange', 'elLast', 'maxWidth']);
+const DISPLAY_VALUED_TAGS = new Set(['elRange', 'elLast', 'maxWidth', 'level']);
+const WATCH_DISPLAY_TAGS = new Set(['level']);
 
 class Parser {
   constructor(t, componentRegistry){
@@ -690,7 +691,7 @@ _parseDisplayTagValue(tagName) {
     }
     return spec;
   }
-  if (tagName === 'elLast' || tagName === 'maxWidth') {
+  if (tagName === 'elLast' || tagName === 'maxWidth' || tagName === 'level') {
     if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
       throw Error(`Expected integer after '${tagName}=' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
@@ -705,7 +706,7 @@ parseDebugDisplayTags(allowedTags) {
   this.eat('SYM', ';');
   const tags = [];
   const seen = new Set();
-  const result = { tags, elRange: null, elLast: null, maxWidth: null };
+  const result = { tags, elRange: null, elLast: null, maxWidth: null, level: null };
 
   while (this.c.type === 'ID') {
     const tagName = this.c.value;
@@ -727,12 +728,13 @@ parseDebugDisplayTags(allowedTags) {
       if (tagName === 'elRange') result.elRange = val;
       else if (tagName === 'elLast') result.elLast = val;
       else if (tagName === 'maxWidth') result.maxWidth = val;
+      else if (tagName === 'level') result.level = val;
     } else {
       tags.push(tagName);
     }
   }
 
-  if (!tags.length && result.elRange == null && result.elLast == null && result.maxWidth == null) {
+  if (!tags.length && result.elRange == null && result.elLast == null && result.maxWidth == null && result.level == null) {
     throw Error(`Expected display tag after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
 
@@ -1952,9 +1954,14 @@ assignment() {
     this.eat('KEYWORD');
     this.eat('SYM', '(');
     const expr = this.expr();
+    let displayTags = null;
+    if (this.c.type === 'SYM' && this.c.value === ';') {
+      displayTags = this.parseDebugDisplayTags(WATCH_DISPLAY_TAGS);
+    }
     this.eat('SYM', ')');
-    this.watches.push(expr);
-    return { watch: expr };
+    const watchNode = { expr, displayTags: displayTags || undefined };
+    this.watches.push(watchNode);
+    return { watch: watchNode };
   }
 
   doc(){

@@ -9159,7 +9159,7 @@ reg(1176, 'debug', 'Parser — watch(clk) AST and watches[]', function(h, sessio
   const stmts = p.parse();
   h.assert('watch stmt', String(!!stmts[1].watch), 'true');
   h.assert('watches collected', String(p.watches.length), '1');
-  h.assert('watch expr var', stmts[1].watch[0].var, 'clk');
+  h.assert('watch expr var', stmts[1].watch.expr[0].var, 'clk');
 });
 
 reg(1177, 'debug', 'watch(clk) records samples on wire change', function(h, session) {
@@ -9292,7 +9292,7 @@ reg(1185, 'debug', 'Parser — watch(.o:counter) property syntax', function(h, s
   const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
   const stmts = p.parse();
   h.assert('watch stmt', String(!!stmts[2].watch), 'true');
-  const atom = stmts[2].watch[0];
+  const atom = stmts[2].watch.expr[0];
   h.assert('var .o', atom.var, '.o');
   h.assert('property counter', atom.property, 'counter');
 });
@@ -9326,6 +9326,9 @@ reg(1187, 'debug', 'watch(.o:counter) records on osc tick (wave)', function(h, s
   :
 watch(.o:counter)`);
   interp.watchRecorder = (s) => samples.push(s);
+  for (const target of interp.watchTargets) {
+    target.lastWatchValue = null;
+  }
   interp._emitComputedComponentProbes('.o');
   h.assert('emit after tick', String(samples.length >= 1), 'true');
   const flat = samples.flatMap(s => s.channels || []);
@@ -13357,7 +13360,7 @@ reg(1711, 'debug', 'Parser — watch(vectorA:0) AST and watches[]', function(h, 
   const stmts = p.parse();
   h.assert('watch stmt', String(!!stmts[1].watch), 'true');
   h.assert('watches collected', String(p.watches.length), '1');
-  const w = stmts[1].watch[0];
+  const w = stmts[1].watch.expr[0];
   h.assert('var', w.var, 'vectorA');
   h.assert('vectorIndex', String(w.vectorIndex), '0');
 });
@@ -13632,7 +13635,7 @@ reg(1736, 'wire-vectors', 'vectorA:10 — index after : is decimal', function(h,
   const processed = preprocessLoop('10wire[21] a\nwatch(a:10)');
   const p = new Parser(new Tokenizer(processed), session._ensureRegistry());
   const stmts = p.parse();
-  const w = stmts[1].watch[0];
+  const w = stmts[1].watch.expr[0];
   h.assert('vectorIndex 10', String(w.vectorIndex), '10');
   const { interp } = session.run(
     '10wire[21] a\n' +
@@ -19298,6 +19301,72 @@ reg(2206, 'wave-debug', 'Wave Listen ascii — display and script copy', functio
   h.assert('copy printable pair', formatWaveListenAsciiCopy('0100000101000010', 16, null), '"AB"');
   h.assert('copy control group', formatWaveListenAsciiCopy('0000000100000010', 16, null), '\\1 \\2;ascii');
 });
+
+reg(2207, 'wave-debug', 'Parser — probe/watch level=N tags', function(h, session) {
+  const p1 = session.parse('probe(a; level=2)');
+  h.assert('probe level', String(p1[0].probe.displayTags.level), '2');
+  const p2 = session.parse('watch(clk; level=1)');
+  h.assert('watch level', String(p2[0].watch.displayTags.level), '1');
+});
+
+reg(2208, 'wave-debug', 'probe level=0 — no cause sub-lines', function(h, session) {
+  const { interp } = session.run(`2wire a = 01
+2wire b = a
+probe(b; level=0)`);
+  session.setWire(interp, 'a', '10');
+  const out = session.outLines(interp);
+  const idx = out.findIndex((l) => l.startsWith('# b ='));
+  h.assert('probe line', String(idx >= 0), 'true');
+  if (idx >= 0 && idx + 1 < out.length) {
+    h.assert('no cause indent after', String(!out[idx + 1].startsWith('  ')), 'true');
+  }
+}, { propagation: 'wave' });
+
+reg(2209, 'wave-debug', 'probe level=2 — wave cause in wave mode', function(h, session) {
+  const { interp } = session.run(`2wire a = 01
+2wire b = a
+probe(b; level=2)`);
+  session.setWire(interp, 'a', '10');
+  const out = session.outLines(interp).join('\n');
+  h.assert('has wave cause', String(/\n  wave \d+/.test(out) || out.includes('  wave ')), 'true');
+}, { propagation: 'wave' });
+
+reg(2210, 'wave-debug', 'watch level=1 — @watch Output on change', function(h, session) {
+  const { interp } = session.run(`2wire a = 01
+2wire b = a
+watch(b; level=1)`);
+  const before = session.outLines(interp).filter((l) => l.startsWith('@watch')).length;
+  session.setWire(interp, 'a', '10');
+  const after = session.outLines(interp).filter((l) => l.startsWith('@watch'));
+  h.assert('new @watch line', String(after.length > before), 'true');
+  h.assert('@watch mentions b', String(after.some((l) => l.includes('b'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2211, 'wave-debug', 'watch level=0 — silent Output', function(h, session) {
+  const { interp } = session.run(`1wire clk = 0
+watch(clk; level=0)`);
+  session.setWire(interp, 'clk', '1');
+  h.assert('no @watch', String(!session.outLines(interp).some((l) => l.startsWith('@watch'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2212, 'wave-debug', 'probe-cause — dominant priority', function(h) {
+  const PC = LogTScriptProbeCause;
+  const ctx = { lutReeval: '.huff:clear', wave: 2, stmt: 'st(9:asg)', ui: true };
+  h.assert('lut wins', PC.pickDominantCauseLine(ctx, 'changed', true), 're-eval ← .huff:clear');
+  h.assert('level1 one line', String(PC.causeLinesForLevel(ctx, 'changed', 1, true).length), '1');
+  h.assert('level2 multi', String(PC.causeLinesForLevel(ctx, 'changed', 2, true).length >= 3), 'true');
+});
+
+reg(2213, 'wave-debug', 'probe UI cause — switch toggle', function(h, session) {
+  const { interp } = session.run(`comp [switch] .sw:
+  = 0
+  :
+1wire q = .sw
+probe(q; level=1)`);
+  session.setComp(interp, '.sw', '1');
+  const out = session.outLines(interp).join('\n');
+  h.assert('ui cause', String(out.includes('  ui')), 'true');
+}, { propagation: 'wave' });
 
 
   window.LogTScriptTestSuite = {

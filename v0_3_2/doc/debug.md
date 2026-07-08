@@ -373,7 +373,15 @@ probe(expr)
 probe(expr ; tag …)
 ```
 
-Display tags on `probe`: `dec`, `signed`, `hex`, `hexWide`, `bin`, `ascii`, `maxWidth=`, `multiline` — same formatting as `show` on the **flat blob** value. No `elAll` / `elNonZero` / `compact` / `elRange` / `elLast`.
+Display tags on `probe`: `dec`, `signed`, `hex`, `hexWide`, `bin`, `ascii`, `maxWidth=`, `multiline`, **`level=0|1|2`** — same formatting as `show` on the **flat blob** value. No `elAll` / `elNonZero` / `compact` / `elRange` / `elLast`.
+
+**Cause lines (`level=1|2`):** value on line 1 (`# name = … - reason`); cause on indented lines 2+ (not inline). Level **0** (default) = status only, like before.
+
+```logts-play
+2wire a = 01
+2wire b = a
+probe(b; level=2)   # after change: wave / st(…) / re-eval ← … on lines 2+
+```
 
 ```logts-play
 8wire v := 01000001
@@ -1005,14 +1013,16 @@ Same as `probe` — **one expression** per statement:
 
 ```
 watch(clk)
-watch(o)
+watch(o; level=1)
 watch(o.1-3)
 watch(.sw)
 watch(.o:counter)
 watch(.u1:sum)
 ```
 
-Collected during **elaboration** (end of **Run**), like `probe`. Does **not** write to **Output**; samples appear in the editor **Timeline** panel (above Output). Toggle the panel from **Panels → Timeline**.
+Optional tag **`level=0|1|2`** (default **0**). Level **0** = Timeline only (no Output). Level **≥ 1** adds `@watch …` lines in **Output** plus cause on indented lines; Timeline tooltip shows cause on row hover (optional orange band on re-eval).
+
+Collected during **elaboration** (end of **Run**), like `probe`. Timeline samples appear in **Panels → Timeline**.
 
 ### What `watch` accepts
 

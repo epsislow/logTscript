@@ -55,16 +55,82 @@
     this.channelCount = 0;
     this.channelLabels = [];
     this.rows = [];
+    this.rowMetas = [];
     this.holdStates = [];
     this.timeMarkers = [];
     this.isDragging = false;
     this.dragStartY = 0;
     this._rafId = null;
+    this._hoverRowIndex = -1;
+    this._tooltipEl = null;
 
+    this._ensureTooltip();
     this._bindGestures();
     this._loop = this._loop.bind(this);
     this._rafId = requestAnimationFrame(this._loop);
   }
+
+  TimelineAnalyzer.prototype._ensureTooltip = function () {
+    if (this._tooltipEl) return;
+    const el = document.createElement('div');
+    el.className = 'timeline-watch-tooltip';
+    el.style.cssText = 'position:fixed;display:none;pointer-events:none;z-index:10050;'
+      + 'max-width:420px;padding:6px 8px;border-radius:4px;font:11px/1.35 monospace;'
+      + 'color:#e2e8f0;background:#1e1e24;border:1px solid #3d3d46;white-space:pre-wrap;'
+      + 'box-shadow:0 4px 12px rgba(0,0,0,0.45);';
+    document.body.appendChild(el);
+    this._tooltipEl = el;
+  };
+
+  TimelineAnalyzer.prototype._hideTooltip = function () {
+    if (this._tooltipEl) this._tooltipEl.style.display = 'none';
+    this._hoverRowIndex = -1;
+  };
+
+  TimelineAnalyzer.prototype._showTooltip = function (text, clientX, clientY) {
+    if (!this._tooltipEl || !text) {
+      this._hideTooltip();
+      return;
+    }
+    this._tooltipEl.textContent = text;
+    this._tooltipEl.style.display = 'block';
+    const pad = 12;
+    let left = clientX + pad;
+    let top = clientY + pad;
+    const rect = this._tooltipEl.getBoundingClientRect();
+    if (left + rect.width > window.innerWidth - 8) left = clientX - rect.width - pad;
+    if (top + rect.height > window.innerHeight - 8) top = clientY - rect.height - pad;
+    this._tooltipEl.style.left = left + 'px';
+    this._tooltipEl.style.top = top + 'px';
+  };
+
+  TimelineAnalyzer.prototype._rowIndexAtCanvasY = function (canvasY) {
+    if (canvasY < LABEL_BAND) return -1;
+    let currentY = this.canvas.height + this.scrollOffsetY;
+    for (let idx = 0; idx < this.rows.length; idx++) {
+      const targetY = currentY - this.baseRowHeight;
+      if (canvasY >= targetY && canvasY < currentY) return idx;
+      currentY = targetY;
+      if (currentY < -ROW_HEIGHT) break;
+    }
+    return -1;
+  };
+
+  TimelineAnalyzer.prototype._tooltipTextForRow = function (rowIndex) {
+    const meta = this.rowMetas[rowIndex];
+    if (!meta || !meta.watchLevel || meta.watchLevel < 1) return '';
+    const lines = [];
+    if (meta.seq != null) {
+      const cyclePart = meta.cycle != null ? ` cycle ${meta.cycle}` : '';
+      lines.push(`seq ${meta.seq}${cyclePart}`);
+    }
+    if (meta.watchReason) lines.push('— ' + meta.watchReason);
+    const cause = meta.watchLevel >= 2
+      ? (meta.causeLines || [])
+      : (meta.causeDominant ? [meta.causeDominant] : (meta.causeLines || []).slice(0, 1));
+    for (const c of cause) lines.push(String(c));
+    return lines.join('\n');
+  };
 
   TimelineAnalyzer.prototype._bindGestures = function () {
     const canvas = this.canvas;
@@ -101,6 +167,25 @@
     }, { passive: true });
     canvas.addEventListener('touchend', () => { self.isDragging = false; });
     canvas.addEventListener('touchcancel', () => { self.isDragging = false; });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (self.isDragging) return;
+      const rect = canvas.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const rowIndex = self._rowIndexAtCanvasY(y);
+      if (rowIndex < 0) {
+        self._hideTooltip();
+        return;
+      }
+      const text = self._tooltipTextForRow(rowIndex);
+      if (!text) {
+        self._hideTooltip();
+        return;
+      }
+      self._hoverRowIndex = rowIndex;
+      self._showTooltip(text, e.clientX, e.clientY);
+    });
+    canvas.addEventListener('mouseleave', () => { self._hideTooltip(); });
   };
 
   TimelineAnalyzer.prototype._loop = function () {
@@ -112,6 +197,10 @@
 
   TimelineAnalyzer.prototype.destroy = function () {
     if (this._rafId) cancelAnimationFrame(this._rafId);
+    if (this._tooltipEl && this._tooltipEl.parentNode) {
+      this._tooltipEl.parentNode.removeChild(this._tooltipEl);
+    }
+    this._tooltipEl = null;
   };
 
   TimelineAnalyzer.prototype.setPaused = function (paused) {
@@ -134,6 +223,7 @@
       valueStr: '0'
     }));
     this.rows = [];
+    this.rowMetas = [];
     this.timeMarkers = [];
     this.scrollOffsetY = 0;
     this.isPaused = false;
@@ -181,6 +271,19 @@
 
     this.rows.unshift(row);
     if (this.rows.length > MAX_HISTORY) this.rows.pop();
+
+    const PC = typeof LogTScriptProbeCause !== 'undefined' ? LogTScriptProbeCause : null;
+    const hasReeval = PC && payload.causeLines && PC.hasReevalCause(payload.causeLines);
+    this.rowMetas.unshift({
+      seq,
+      cycle,
+      watchLevel: payload.watchLevel || 0,
+      watchReason: payload.watchReason || null,
+      causeLines: payload.causeLines ? payload.causeLines.slice() : null,
+      causeDominant: payload.causeDominant || null,
+      hasReeval: !!hasReeval,
+    });
+    if (this.rowMetas.length > MAX_HISTORY) this.rowMetas.pop();
 
     this.timeMarkers.unshift({
       isMarker: seq % 25 === 0,
@@ -245,9 +348,21 @@
       if (currentY < -ROW_HEIGHT) break;
 
       const row = this.rows[idx];
+      const rowMeta = this.rowMetas[idx];
       const targetY = currentY - this.baseRowHeight;
 
       if (currentY > 0 && targetY < canvas.height) {
+        if (rowMeta && rowMeta.hasReeval && rowMeta.watchLevel >= 1) {
+          const clipTop = LABEL_BAND;
+          const drawTop = Math.max(targetY, clipTop);
+          const drawBottom = Math.min(currentY, canvas.height);
+          const drawH = drawBottom - drawTop;
+          if (drawH > 0) {
+            ctx.fillStyle = '#ea580c';
+            ctx.fillRect(0, drawTop, 2, drawH);
+          }
+        }
+
         const marker = this.timeMarkers[idx];
         if (marker && marker.isMarker) {
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';

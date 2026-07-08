@@ -435,6 +435,8 @@ class Interpreter {
     this.probeReasonContext = 'normal';
     this._probeRegEdgeCommit = false;
     this._probeInitialising = true;
+    this._probeCauseStack = [{}];
+    this._pendingNextProbeCause = false;
     this.pendingProbeExprs = [];
     this.watchTargets = [];
     this.watchByKey = new Map();
@@ -633,6 +635,55 @@ class Interpreter {
   _probeReasonLabel() {
     if (this.probeReasonContext === 'edge_block') return 'edge committed';
     return 'changed';
+  }
+
+  _probeCausePeek() {
+    if (!this._probeCauseStack || !this._probeCauseStack.length) return {};
+    return this._probeCauseStack[this._probeCauseStack.length - 1];
+  }
+
+  _pushProbeCause(patch) {
+    if (!patch) return;
+    if (!this._probeCauseStack) this._probeCauseStack = [{}];
+    const top = Object.assign({}, this._probeCausePeek(), patch);
+    this._probeCauseStack.push(top);
+  }
+
+  _popProbeCause() {
+    if (this._probeCauseStack && this._probeCauseStack.length > 1) {
+      this._probeCauseStack.pop();
+    }
+  }
+
+  _withProbeCause(patch, fn) {
+    this._pushProbeCause(patch);
+    try {
+      return fn();
+    } finally {
+      this._popProbeCause();
+    }
+  }
+
+  _probeDebugLevel(target) {
+    const PC = typeof LogTScriptProbeCause !== 'undefined' ? LogTScriptProbeCause : null;
+    if (!PC) return 0;
+    if (target && target.debugLevel != null) return target.debugLevel;
+    return PC.parseDebugLevel(target && target.displayTags);
+  }
+
+  _probeCauseLinesForTarget(target, reason) {
+    const PC = typeof LogTScriptProbeCause !== 'undefined' ? LogTScriptProbeCause : null;
+    if (!PC) return [];
+    const level = this._probeDebugLevel(target);
+    const waveMode = this.deferWirePropagation();
+    return PC.causeLinesForLevel(this._probeCausePeek(), reason, level, waveMode);
+  }
+
+  _emitProbeCauseLines(causeLines) {
+    if (!causeLines || !causeLines.length || !this.out) return;
+    for (const line of causeLines) {
+      this.out.push('  ' + line);
+    }
   }
 
   _registerProbeTarget(target) {
@@ -892,10 +943,12 @@ class Interpreter {
     }
   }
 
-  _notifyWritableLutMutation(instName) {
+  _notifyWritableLutMutation(instName, methodName) {
     if (this._writableLutMutationNotifyDepth) return;
     this._writableLutMutationNotifyDepth = true;
+    const lutTag = methodName ? `${instName}:${methodName}` : instName;
     try {
+      this._withProbeCause({ lutReeval: lutTag }, () => {
       const strategy = this.signalPropagationStrategy;
       const executed = new Set();
       const changedWires = new Set();
@@ -919,6 +972,7 @@ class Interpreter {
         }
       }
       this._refreshDependentWireStatements(changedWires, executed);
+      });
     } finally {
       this._writableLutMutationNotifyDepth = false;
     }
@@ -932,6 +986,7 @@ class Interpreter {
     if (!toExec || toExec.size === 0) return;
     this._componentComputedMutationNotifyDepth = true;
     try {
+      this._withProbeCause({ compReeval: compName }, () => {
       const executed = new Set(toExec);
       const changedWires = new Set();
       for (const ws of toExec) {
@@ -941,6 +996,7 @@ class Interpreter {
         }
       }
       this._refreshDependentWireStatements(changedWires, executed);
+      });
     } finally {
       this._componentComputedMutationNotifyDepth = false;
     }
@@ -1420,7 +1476,7 @@ class Interpreter {
         if (typeof lutPeekMin !== 'function') throw new Error('Writable LUT module is not loaded');
         const result = minMaxMethods[method]();
         if (method === 'popMin' || method === 'popMax') {
-          this._notifyWritableLutMutation(instName);
+          this._notifyWritableLutMutation(instName, method);
         }
         return result;
       }
@@ -1428,7 +1484,7 @@ class Interpreter {
         if (!writable) throw new Error(`LUT ${instName} is not writable`);
         if (typeof lutRemoveAt !== 'function') throw new Error('Writable LUT module is not loaded');
         const result = lutRemoveAt(lutInst, args[0], this);
-        this._notifyWritableLutMutation(instName);
+        this._notifyWritableLutMutation(instName, 'removeAt');
         return result;
       }
       const writableMutators = {
@@ -1448,7 +1504,7 @@ class Interpreter {
         if (typeof lutAdd !== 'function') throw new Error('Writable LUT module is not loaded');
         const result = writableMutators[method]();
         if (method === 'clear' || method === 'add' || method === 'set' || method === 'remove') {
-          this._notifyWritableLutMutation(instName);
+          this._notifyWritableLutMutation(instName, method);
         }
         return result;
       }
@@ -1819,8 +1875,9 @@ class Interpreter {
   }
 
   _recordWatchBatch(updates) {
-    if (!this.watchRecorder || !updates || !updates.length) return;
+    if (!updates || !updates.length) return;
     const channels = [];
+    const changedTargets = [];
     for (const { target, value } of updates) {
       if (!target) continue;
       let valueStr = value == null ? '-' : String(value);
@@ -1835,6 +1892,7 @@ class Interpreter {
       const state = this._watchLogicState(valueStr, sliceBits);
       target.lastWatchValue = valueStr;
       target.lastCollapsed = collapsed;
+      changedTargets.push(target);
       channels.push({
         channelIndex: target.channelIndex,
         label: target.label || target.wireName || target.ref || '?',
@@ -1843,12 +1901,35 @@ class Interpreter {
       });
     }
     if (!channels.length) return;
+
+    const maxLevel = changedTargets.reduce((m, t) => Math.max(m, this._probeDebugLevel(t)), 0);
+    const watchReason = this._probeInitialising ? 'initialised' : this._probeReasonLabel();
+    const waveMode = this.deferWirePropagation();
+    const PC = typeof LogTScriptProbeCause !== 'undefined' ? LogTScriptProbeCause : null;
+    const causeLines = PC && maxLevel >= 1
+      ? PC.causeLinesForLevel(this._probeCausePeek(), watchReason, maxLevel, waveMode)
+      : [];
+
     this.watchSeq++;
-    this.watchRecorder({
+    const payload = {
       seq: this.watchSeq,
       cycle: this.cycle,
-      channels
-    });
+      channels,
+      watchLevel: maxLevel,
+      watchReason,
+      causeLines: causeLines.length ? causeLines.slice() : undefined,
+      causeDominant: causeLines.length ? causeLines[0] : undefined,
+    };
+
+    if (maxLevel >= 1) {
+      const labels = channels.map((c) => c.label).join(', ');
+      this.out.push(`@watch ${labels} — ${watchReason}`);
+      this._emitProbeCauseLines(causeLines);
+    }
+
+    if (this.watchRecorder) {
+      this.watchRecorder(payload);
+    }
   }
 
   _recordWatchSample(target, value) {
@@ -1873,8 +1954,8 @@ class Interpreter {
     this._recordWatchBatch(batch);
   }
 
-  activateWatches(exprs) {
-    if (!exprs || !exprs.length) return;
+  activateWatches(watchItems) {
+    if (!watchItems || !watchItems.length) return;
     const wireWidths = new Map();
     for (const [name, wire] of this.wires) {
       wireWidths.set(name, this.getBitWidth(wire.type));
@@ -1884,12 +1965,22 @@ class Interpreter {
       ? LogTScriptWatchExpand.buildVectorMetaMapFromWires(this.wires)
       : new Map();
     const WE = typeof LogTScriptWatchExpand !== 'undefined' ? LogTScriptWatchExpand : null;
-    const expanded = WE
-      ? WE.expandWatchExprs(exprs, wireWidths, (br) => this.resolveBitRange(br), compPropWidths, vectorMetas)
-      : exprs;
-    for (const expr of expanded) {
-      const target = this._resolveProbeExpr(expr);
-      if (target) this._registerWatchTarget(target);
+    const PC = typeof LogTScriptProbeCause !== 'undefined' ? LogTScriptProbeCause : null;
+    for (const item of watchItems) {
+      const expr = item && item.expr ? item.expr : item;
+      const displayTags = item && item.displayTags ? item.displayTags : null;
+      const debugLevel = PC ? PC.parseDebugLevel(displayTags) : 0;
+      const expanded = WE
+        ? WE.expandWatchExpr(expr, wireWidths, (br) => this.resolveBitRange(br), compPropWidths, vectorMetas)
+        : [expr];
+      for (const e of expanded) {
+        const target = this._resolveProbeExpr(e);
+        if (target) {
+          if (displayTags) target.displayTags = displayTags;
+          target.debugLevel = debugLevel;
+          this._registerWatchTarget(target);
+        }
+      }
     }
     const initialBatch = [];
     for (const target of this.watchTargets) {
@@ -1914,7 +2005,9 @@ class Interpreter {
         batch.push({ target, value });
       }
     }
-    this._recordWatchBatch(batch);
+    this._withProbeCause({ seed: true }, () => {
+      this._recordWatchBatch(batch);
+    });
   }
 
   _emitWatchForWire(name, value) {
@@ -2099,6 +2192,7 @@ class Interpreter {
       const target = this._resolveProbeExpr(expr);
       if (target) {
         if (displayTags) target.displayTags = displayTags;
+        target.debugLevel = this._probeDebugLevel({ displayTags });
         this._registerProbeTarget(target);
       }
     }
@@ -2159,15 +2253,18 @@ class Interpreter {
     const refPart = ref ? ` (${ref})` : '';
     const symPart = this._probeSymbolicSuffix(target, valueStr);
     const name = target.label || target.wireName || target.ref || '?';
+    const causeLines = this._probeCauseLinesForTarget(target, reason);
     const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
     if (opts && opts.multiline && DF) {
       const wrapped = DF.maybeWrapLines(valueStr, opts);
       for (const wl of wrapped) {
         this.out.push(`# ${name} = ${wl}${refPart}${symPart} - ${reason}${driverSuffix}`);
       }
+      this._emitProbeCauseLines(causeLines);
       return;
     }
     this.out.push(`# ${name} = ${valueStr}${refPart}${symPart} - ${reason}${driverSuffix}`);
+    this._emitProbeCauseLines(causeLines);
   }
 
   _emitProbeForWire(name, value) {
@@ -3476,14 +3573,18 @@ class Interpreter {
       if (this.deferWirePropagation() && this.signalPropagationStrategy) {
         const scheduled = this.signalPropagationStrategy.scheduleComponentChange(compName, value);
         if (scheduled) {
-          this.signalPropagationStrategy.propagate();
+          this._withProbeCause({ ui: true }, () => {
+            this.signalPropagationStrategy.propagate();
+          });
           this._notifyIoportMemberChange(compName);
         }
         this._emitComputedComponentProbes(compName);
         return;
       }
-      this.writeComponentStable(compName, value);
-      this.updateComponentConnections(compName);
+      this._withProbeCause({ ui: true }, () => {
+        this.writeComponentStable(compName, value);
+        this.updateComponentConnections(compName);
+      });
       this._emitComputedComponentProbes(compName);
       this._notifyIoportMemberChange(compName);
       if (typeof showVars === 'function') showVars();
@@ -10486,7 +10587,9 @@ if (s.assignment) {
         const stored = self.storage.find(s => s.index === storageIdx);
         if(stored) stored.value = '1';
         if(eachCycle === 0) incrementCounter();
-        self.updateComponentConnections(compName);
+        self._withProbeCause({ osc: true }, () => {
+          self.updateComponentConnections(compName);
+        });
         self._emitComputedComponentProbes(compName);
         if(typeof showVars === 'function') showVars();
         const tid = setTimeout(goLow, highTime);
@@ -10497,7 +10600,9 @@ if (s.assignment) {
         const stored = self.storage.find(s => s.index === storageIdx);
         if(stored) stored.value = '0';
         incrementCounter();
-        self.updateComponentConnections(compName);
+        self._withProbeCause({ osc: true }, () => {
+          self.updateComponentConnections(compName);
+        });
         self._emitComputedComponentProbes(compName);
         if(typeof showVars === 'function') showVars();
         const tid = setTimeout(goHigh, lowTime);

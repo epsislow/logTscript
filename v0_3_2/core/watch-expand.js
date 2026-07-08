@@ -238,10 +238,15 @@
     return [expr];
   }
 
+  function unwrapWatchItem(item) {
+    if (item && item.expr && Array.isArray(item.expr)) return item.expr;
+    return item;
+  }
+
   function expandWatchExprs(exprs, wireWidths, resolveRange, compPropWidths, vectorMetas) {
     const out = [];
     for (const e of exprs || []) {
-      out.push(...expandWatchExpr(e, wireWidths, resolveRange, compPropWidths, vectorMetas));
+      out.push(...expandWatchExpr(unwrapWatchItem(e), wireWidths, resolveRange, compPropWidths, vectorMetas));
     }
     return out;
   }
@@ -331,9 +336,19 @@
     return out;
   }
 
+  function labelFromWatchItem(item) {
+    return labelFromWatchExpr(unwrapWatchItem(item));
+  }
+
   function watchLabelsFromExprs(exprs, wireWidths, resolveRange, compPropWidths, vectorMetas) {
     return dedupeExpandedWatchExprs(exprs, wireWidths, resolveRange, compPropWidths, vectorMetas)
       .map(labelFromWatchExpr);
+  }
+
+  function watchDebugLevelFromItem(item) {
+    const PC = typeof LogTScriptProbeCause !== 'undefined' ? LogTScriptProbeCause : null;
+    if (!PC || !item || !item.displayTags) return 0;
+    return PC.parseDebugLevel(item.displayTags);
   }
 
   const api = {
@@ -352,6 +367,9 @@
     watchTargetKeyFromExpr,
     dedupeExpandedWatchExprs,
     labelFromWatchExpr,
+    labelFromWatchItem,
+    unwrapWatchItem,
+    watchDebugLevelFromItem,
     watchLabelsFromExprs
   };
 

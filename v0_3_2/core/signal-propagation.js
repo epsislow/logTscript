@@ -50,6 +50,17 @@ class SignalPropagationStrategy {
     return `st(${loc}) …`;
   }
 
+  _formatWireStmtRefShort(ws) {
+    const interp = this.interp;
+    if (!interp || !ws) return 'st(?)';
+    const loc = interp.getLocation(ws);
+    if (ws.assignment && ws.assignment.target && ws.assignment.target.var) {
+      return `st(${loc}:asg)`;
+    }
+    if (ws.decls && ws.decls.length) return `st(${loc}:decl)`;
+    return `st(${loc})`;
+  }
+
   _buildWaveListenValuePayload(name, val, opts) {
     const interp = this.interp;
     const isComponent = !!(opts && opts.isComponent);
@@ -293,6 +304,7 @@ class SignalPropagationStrategy {
 
   onNextCycle() {
     this._recomputeNextAffectedWires = true;
+    this._pendingNextProbeCause = true;
     if (this.interp && typeof this.interp.advanceRegTildeLatchesForWave === 'function') {
       this.interp.advanceRegTildeLatchesForWave();
     }
@@ -427,6 +439,10 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
     let waveIndex = 0;
     let loggedInit = false;
 
+    if (this._pendingNextProbeCause && typeof interp._pushProbeCause === 'function') {
+      interp._pushProbeCause({ next: true });
+    }
+
     if (this._recomputeAllWires) {
       this._recomputeAllWires = false;
       if (!loggedInit) {
@@ -467,6 +483,9 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
 
     for (let wave = 0; wave < maxWaves; wave++) {
       waveIndex = wave;
+      if (typeof interp._pushProbeCause === 'function') {
+        interp._pushProbeCause({ wave });
+      }
       if (typeof beginAllMemWritePhases === 'function') beginAllMemWritePhases();
       if (interp) interp.memWriteBatching = true;
 
@@ -487,6 +506,12 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         interp.updateComponentConnections(compName, new Set());
       }
 
+      const willSettle = this.wirePendingStates.size > 0
+        && this.componentPendingStates.size === 0;
+      if (willSettle && typeof interp._pushProbeCause === 'function') {
+        interp._pushProbeCause({ settle: true });
+      }
+
       const changed = this.commitPendingWires();
       for (const n of changed) {
         allChanged.add(n);
@@ -499,15 +524,34 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         if (executedThisPropagate.has(ws)) continue;
         executedThisPropagate.add(ws);
         this._emitWaveListen(`[wave ${wave}] exec ${this._formatWireStmtRef(ws)}`, 'exec', 2);
-        const outputs = interp.execWireStatement(ws, true);
-        if (outputs && outputs.length) {
-          for (const [name, val] of outputs) {
-            if (this.scheduleWireChange(name, val)) anyScheduled = true;
-            if (this.debugLevel >= 3) {
-              this._emitWaveListenValueEntry(wave, name, val, 'schedule', 3, false);
+        const stmtRef = this._formatWireStmtRefShort(ws);
+        if (typeof interp._withProbeCause === 'function') {
+          interp._withProbeCause({ stmt: stmtRef }, () => {
+            const outputs = interp.execWireStatement(ws, true);
+            if (outputs && outputs.length) {
+              for (const [name, val] of outputs) {
+                if (this.scheduleWireChange(name, val)) anyScheduled = true;
+                if (this.debugLevel >= 3) {
+                  this._emitWaveListenValueEntry(wave, name, val, 'schedule', 3, false);
+                }
+              }
+            }
+          });
+        } else {
+          const outputs = interp.execWireStatement(ws, true);
+          if (outputs && outputs.length) {
+            for (const [name, val] of outputs) {
+              if (this.scheduleWireChange(name, val)) anyScheduled = true;
+              if (this.debugLevel >= 3) {
+                this._emitWaveListenValueEntry(wave, name, val, 'schedule', 3, false);
+              }
             }
           }
         }
+      }
+
+      if (typeof interp._popProbeCause === 'function') {
+        interp._popProbeCause();
       }
 
       if (typeof commitAllMemWrites === 'function') commitAllMemWrites();
@@ -518,6 +562,11 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         if (!this.hasPendingChanges()) break;
       }
       if (wave > 0 && compsChanged.size === 0 && changed.size === 0 && !anyScheduled) break;
+    }
+
+    if (this._pendingNextProbeCause && typeof interp._popProbeCause === 'function') {
+      interp._popProbeCause();
+      this._pendingNextProbeCause = false;
     }
 
     this._finishPropagate(allChanged);

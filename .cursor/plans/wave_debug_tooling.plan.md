@@ -12,11 +12,11 @@ todos:
     content: "Strat 1.3: Secțiune wave-debug patterns în debug.md + link din huffman-v2.md"
     status: completed
   - id: strat2-probe-cause
-    content: "Strat 2: cause în probe — context re-eval LUT/compMut + wave index + stmt id"
-    status: pending
+    content: "Strat 2: cause în probe — level 0/1/2, cauză pe rând(uri) 2+, context wave/stmt/LUT"
+    status: completed
   - id: strat2-watch-cause
-    content: "Strat 2: cause în watch/timeline — tooltip + culori (unificare cu evaluare_timeline_watch.plan.md)"
-    status: pending
+    content: "Strat 2: watch level≥1 → @watch Output + tooltip canvas; fără textbox/text fix"
+    status: completed
   - id: strat3-snapshot
     content: "Strat 3.1: snapshot(wire) sau atribut noReeval — decizie sintaxă + filtru re-eval"
     status: pending
@@ -462,30 +462,124 @@ Opțional: exemplu `logts-play wave` minimal reproducer (fără literal manual d
 
 ## Strat 2 — Cauzalitate în probe / watch
 
-**Scop:** Extinde mesajele de la `# wire = … - changed` la:
+**Scop:** Extinde mesajele probe de la `# wire = … - changed` la explicații **de ce** s-a schimbat (re-eval LUT, wave, stmt, NEXT, UI, …).
 
-```text
-# packetEncoded = … - changed (re-eval ← .huff:clear, stmt st(packetEncoded:asg), wave 1)
-```
-
-**Motive propuse (aliniat cu [evaluare_timeline_watch.plan.md](.cursor/plans/evaluare_timeline_watch.plan.md)):**
+**Strat 2a + 2b livrate împreună** — toate motivele într-o singură implementare:
 
 | Motiv | Sursă |
 |-------|-------|
-| `initialised` / `changed` / `edge committed` | Existent probe |
+| `initialised` / `changed` / `edge committed` | Existent probe (level 0) |
 | `re-eval ← lutMut` | `_notifyWritableLutMutation` |
 | `re-eval ← compMut` | `_notifyComponentComputedMutation` |
 | `wave N` | Index în `propagate()` |
-| `stmt …` | `execWireStatement` context |
-| `next` / `ui` / `seed` | Fază 2 timeline |
+| `stmt st(line:asg)` | Context `execWireStatement` (ca Wave Listen) |
+| `seed` | Primul rând după `seedWatchTimeline()` post-Run |
+| `next` | După `NEXT(~)` / buton Next |
+| `ui` | Toggle switch / key / DIP |
+| `osc tick` | Timer `osc` / `~` |
+| `settle` | Final batch propagare wave |
+
+**Nu duplicăm cause în Wave Listen** — panelul rămâne jurnal propagare; probe/watch = observabilitate la commit.
+
+### Verbozitate — `probe(a; level=N)` / `watch(a; level=N)`
+
+| Level | Default | Probe Output | Ce cause se afișează |
+|-------|---------|--------------|---------------------|
+| **0** | **da** | Ca acum — o linie | Doar `- initialised` / `- changed` / `- edge committed` |
+| **1** | | Linie 1: valoare + status; **rând 2:** cauză dominantă | Un singur motiv (ex. `re-eval ← .huff:clear`) |
+| **2** | | Linie 1: valoare + status; **rânduri 2+:** detaliu | Toate câmpurile relevante, câte unul per rând |
+
+**Motiv dominant (level 1)** — prioritate:
+1. `re-eval ← lutMut` / `compMut`
+2. `edge committed`
+3. `next` / `ui` / `osc tick`
+4. `settle` / `seed`
+5. (altfel fără rând cause — statusul de pe linia 1 e suficient)
+
+**Format probe — cauză NU inline în paranteză** (valori mari = greu de găsit):
+
+```text
+# packetEncoded = ^4808 ABCD EF12 …
+  re-eval ← .huff:clear
+```
+
+Level 2 (exemplu):
+
+```text
+# packetEncoded = ^4808 ABCD EF12 …
+  re-eval ← .huff:clear
+  wave 1
+  st(1062:asg)
+```
+
+- Prefix rând cause: indent `  ` (2 spații) sau `  → ` — aceeași convenție ca sub-linii Output
+- Valoarea rămâne pe **linia 1**; cause pe **linia 2+**
+- Compatibil cu `probe(a; hex; level=2)` — formatare valoare + cause multi-rând
+- `level=0` sau lipsă tag → **fără** rânduri cause
+
+**Legacy:** `wave N` omis în mod legacy; restul cause funcționează.
+
+### Watch / Timeline — grafic + tooltip (decizie 2026-07-08)
+
+**Principiu:** Timeline rămâne **100% grafic** (bare HIGH/LOW) — **fără** text desenat permanent, **fără** textbox / panou inspect. Cause la watch apare în **Output** (`@watch`) și, la hover, în **tooltip canvas** (acceptat).
+
+```mermaid
+flowchart TB
+  commit["Commit wire"] --> batch["_recordWatchBatch()"]
+  batch --> timeline["Timeline: bare HIGH/LOW + tooltip hover"]
+  batch --> out["Output: @watch — level ≥ 1"]
+  commit --> probe["probe → Output # …"]
+```
+
+| Level | Timeline canvas | Output |
+|-------|-----------------|--------|
+| **0** | Ca acum — doar tranziții | **Nimic** |
+| **1** | Bandă color opțională + **tooltip:** cause dominant | `@watch` + 1 rând cause |
+| **2** | Bandă color + **tooltip:** toate liniile cause | `@watch` + cause complet |
+
+**Ce NU punem pe Timeline:** text fix pe rând, icon „i”, textbox, panou lateral — doar hover tooltip nativ canvas.
+
+**Tooltip (level ≥ 1):**
+- Trigger: hover pe **rând** (label stânga sau bandă HIGH/LOW)
+- Conținut = același text cause ca Output (dominant la L1, complet la L2)
+- Opțional prima linie: nume canal + `seq/cycle` — **fără** hex lung (valoarea e vizuală pe bare)
+- Implementare: div tooltip poziționat de `timeline-analyzer.js` (pattern existent în app dacă e) sau `title` pe hit-region — preferat div pentru multi-rând
+
+**Format Output watch** (log / grep; complement tooltip-ului):
+
+```text
+@watch packetEncoded, ph.state — changed
+  re-eval ← .huff:clear
+```
+
+Level 2:
+
+```text
+@watch packetEncoded — changed
+  re-eval ← .huff:clear
+  wave 1
+  st(1062:asg)
+```
+
+- Prefix **`@watch`** — distinct de probe `#`
+- **Fără** valoare hex pe linia 1 — tranziția e pe Timeline
+- Canale din același batch grupate: `@watch a, b, c — changed`
+- Probe + watch pe același target: `#` = valoare + cause; `@watch` = doar eveniment + cause (roluri diferite)
+
+**Bandă color (opțional, level ≥ 1):** indiciu vizual (portocaliu = re-eval) — zero text; poate fi omisă dacă tooltip + Output sunt suficiente.
+
+**Level watch — sursă:** `watch(expr; level=N)` pe target, ca probe.
+
+**Un cause per batch** — același commit → același set cause (tooltip + Output share metadata din `_recordWatchBatch`).
 
 **Fișiere:**
-- [`v0_3_2/core/interpreter.js`](v0_3_2/core/interpreter.js) — `_probeCauseContext`, `_emitProbeTarget`, `_recordWatchBatch`
-- [`v0_3_2/core/signal-propagation.js`](v0_3_2/core/signal-propagation.js) — set/clear context per wave iteration
-- [`v0_3_2/ui/timeline-analyzer.js`](v0_3_2/ui/timeline-analyzer.js) — tooltip / culoare marginală pe motiv
+- [`v0_3_2/core/interpreter.js`](v0_3_2/core/interpreter.js) — `_probeCauseContext`, `_emitProbeTarget`, `_recordWatchBatch` (+ `cause`/`causeLines`, emit `@watch`)
+- [`v0_3_2/core/signal-propagation.js`](v0_3_2/core/signal-propagation.js) — context wave/stmt
+- [`v0_3_2/core/parser.js`](v0_3_2/core/parser.js) — parse `level=N`
+- [`v0_3_2/ui/timeline-analyzer.js`](v0_3_2/ui/timeline-analyzer.js) — bandă color opțională + **tooltip hover** (cause din payload rând)
 - [`v0_3_2/doc/debug.md`](v0_3_2/doc/debug.md)
 
-**Acceptance:** Toggle `.huff:clear()` în panel + `probe(packetEncoded)` distinge commit UI de re-eval declarativă.
+**Acceptance:** `watch(packetEncoded; level=2)` — canvas fără text permanent; hover arată cause; Output `@watch …`; `level=0` = zero tooltip cause / zero Output; probe `level=2` neschimbat.
 
 ---
 
@@ -573,6 +667,21 @@ Opțional: exemplu `logts-play wave` minimal reproducer (fără literal manual d
 | **1.1 multi-instance** | Buffer per run-context; prefix `[inst N]` când ≥2 listen paralele |
 | **1.1 toolbar** | Badge „Listening…” când listen activ |
 | **1.2 deps** | Wire + expr, format tree text, secțiune LUT-mutation |
+
+### Decizii Strat 2 (confirmate 2026-07-08)
+
+| Item | Decizie |
+|------|---------|
+| **2.0 level probe/watch** | `probe(a; level=0\|1\|2)` / `watch(a; level=N)` — default **0** = ca acum |
+| **2.1 layout cause** | **Nu** inline în paranteză; cause pe **rând 2+** (indent), valoarea pe rând 1 |
+| **2.2 level 1** | Un motiv dominant pe rând 2 |
+| **2.3 level 2** | Toate câmpurile cause — câte un rând (wave, stmt, lutMut, …) |
+| **2.4 scope motive** | **2a+2b împreună** — seed, next, ui, osc, settle incluse |
+| **2.5 stmt ref** | `st(line:asg)` — același format ca Wave Listen |
+| **2.6 Wave Listen** | Fără cause duplicat în panel |
+| **2.7 watch level** | Cause în **Output** (`@watch`) + **tooltip hover** pe rând Timeline |
+| **2.8 Timeline** | Grafic (bare); opțional bandă color; **tooltip da**, textbox/text fix **nu** |
+| **2.9 batch watch** | Un set cause per batch; canale grupate pe linia `@watch` |
 
 ### Recomandări tehnice (de inclus la implementare)
 
