@@ -17401,14 +17401,14 @@ const WRITABLE_LUT_BASE = `inline [lut] .huff:
   }
   :`;
 
-reg(2044, 'lut-writable', 'writable parse + flag', function(h, session) {
+reg(2224, 'lut-writable', 'writable parse + flag', function(h, session) {
   session.run(WRITABLE_LUT_BASE);
   const inst = session.interp.inlineInstances.get('.huff');
   h.assert('writable', String(!!inst.writable), 'true');
   h.assert('entry list', String(inst.lutEntryList.length), '2');
 });
 
-reg(2045, 'lut-writable', 'add append duplicate keys', function(h, session) {
+reg(2225, 'lut-writable', 'add append duplicate keys', function(h, session) {
   const src = WRITABLE_LUT_BASE + `
 1wire _ = .huff:add(000, 0011)
 4wire a = .huff:get(000)
@@ -17420,7 +17420,7 @@ reg(2045, 'lut-writable', 'add append duplicate keys', function(h, session) {
   h.assert('size', session.getWire(interp, 'sz'), '0011');
 });
 
-reg(2046, 'lut-writable', 'set first match', function(h, session) {
+reg(2226, 'lut-writable', 'set first match', function(h, session) {
   const src = WRITABLE_LUT_BASE + `
 1wire _ = .huff:set(000, 1111)
 4wire x = .huff:get(000)`;
@@ -17428,7 +17428,7 @@ reg(2046, 'lut-writable', 'set first match', function(h, session) {
   h.assert('updated', session.getWire(interp, 'x'), '1111');
 });
 
-reg(2047, 'lut-writable', 'set append missing key', function(h, session) {
+reg(2227, 'lut-writable', 'set append missing key', function(h, session) {
   const src = WRITABLE_LUT_BASE + `
 1wire _ = .huff:set(010, 1010)
 4wire x = .huff:get(010)
@@ -17438,7 +17438,7 @@ reg(2047, 'lut-writable', 'set append missing key', function(h, session) {
   h.assert('size', session.getWire(interp, 'sz'), '0011');
 });
 
-reg(2048, 'lut-writable', 'set with matchIndex', function(h, session) {
+reg(2228, 'lut-writable', 'set with matchIndex', function(h, session) {
   const src = WRITABLE_LUT_BASE + `
 1wire _a = .huff:add(000, 0011)
 1wire _b = .huff:set(000, 1100, 0001)

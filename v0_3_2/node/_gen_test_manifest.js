@@ -109,6 +109,18 @@ const suiteSource = fs.readFileSync(path.join(TESTS, 'test_suite.js'), 'utf8');
 const tests = loadSuite();
 tests.sort((a, b) => a.id - b.id);
 
+const seenIds = new Map();
+for (const t of tests) {
+  if (seenIds.has(t.id)) {
+    const prev = seenIds.get(t.id);
+    throw new Error(
+      'Duplicate test id ' + t.id + ': "' + prev.title + '" (' + prev.group + ') vs "' +
+      t.title + '" (' + t.group + ') — renumber one before regenerating manifest'
+    );
+  }
+  seenIds.set(t.id, t);
+}
+
 const entries = tests.map(t => ({
   id: t.id,
   group: t.group || 'other',
