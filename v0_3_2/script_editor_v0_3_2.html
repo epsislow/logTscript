@@ -117,6 +117,7 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .wave-listen-expand-btn { flex-shrink:0; min-width:2rem; width:2rem; text-align:center; box-sizing:border-box; font-family:inherit; font-size:inherit; background:#333; color:#ddd; border:1px solid #555; border-radius:2px; cursor:pointer; padding:0 2px; line-height:1.2; }
 .wave-listen-copy-btn { flex-shrink:0; min-width:2.35rem; width:2.35rem; text-align:center; box-sizing:border-box; font-family:inherit; font-size:inherit; background:#333; color:#ddd; border:1px solid #555; border-radius:2px; cursor:pointer; padding:0 2px; line-height:1.2; }
 .wave-listen-expand-btn:hover, .wave-listen-copy-btn:hover { background:#444; border-color:#777; }
+.wave-listen-fmt-select { font-size:12px; padding:2px 4px; background:#222; color:#ddd; border:1px solid #555; border-radius:2px; max-width:5.5rem; }
 .wave-listen-value { min-width:0; }
 .wave-listen-row-expand { margin:2px 0 4px 1.5em; padding:4px 6px; max-height:240px; overflow:auto; white-space:pre-wrap; word-break:break-all; color:inherit; font-family:inherit; font-size:inherit; background:#111; border-left:2px solid #444; }
 .wave-listen-line--meta { color:#888; font-style:italic; }
@@ -2838,7 +2839,18 @@ show(a,b,c)
           <button type="button" id="waveListenLevel1" class="btn" data-level="1" title="Level 1 — commits, LUT re-eval">L1</button>
           <button type="button" id="waveListenLevel2" class="btn" data-level="2" title="Level 2 — + exec statements">L2</button>
           <button type="button" id="waveListenLevel3" class="btn" data-level="3" title="Level 3 — verbose">L3</button>
-          <button type="button" id="waveListenFmtBtn" class="btn" title="Cycle value format: hex ↔ bin">Fmt: hex</button>
+          <label class="wave-listen-fmt-label" title="Value display / copy format">
+            Fmt
+            <select id="waveListenFmtSelect" class="wave-listen-fmt-select">
+              <option value="hex">hex</option>
+              <option value="bin">bin</option>
+              <option value="dec">dec</option>
+              <option value="s8">s8</option>
+              <option value="q4p4">q4p4</option>
+              <option value="fp16">fp16</option>
+              <option value="bf16">bf16</option>
+            </select>
+          </label>
           <button type="button" id="waveListenClear" class="btn" title="Clear panel">Clear</button>
         </div>
       </div>

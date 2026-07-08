@@ -2,8 +2,48 @@
 
 const WAVE_LISTEN_EXPAND_THRESHOLD = 256;
 const WAVE_LISTEN_INLINE_PREVIEW_MAX = 48;
-const WAVE_LISTEN_FMT_CYCLE = ['hex', 'bin'];
+const WAVE_LISTEN_FMT_OPTIONS = ['hex', 'bin', 'dec', 's8', 'q4p4', 'fp16', 'bf16'];
 const WAVE_LISTEN_BIN_GROUP_BITS = 8;
+
+function normalizeWaveListenFmt(fmt) {
+  if (WAVE_LISTEN_FMT_OPTIONS.includes(fmt)) return fmt;
+  if (fmt === 'short') return 'hex';
+  return 'hex';
+}
+
+function waveListenFormatWidth(fmt) {
+  switch (fmt) {
+    case 'dec':
+    case 's8':
+    case 'q4p4':
+      return 8;
+    case 'fp16':
+    case 'bf16':
+      return 16;
+    default:
+      return null;
+  }
+}
+
+function waveListenFmtToShowOpts(fmt) {
+  switch (fmt) {
+    case 'bin': return { bin: true };
+    case 'hex': return { hex: true };
+    case 'dec': return { dec: true };
+    case 's8': return { numericFormat: 's8' };
+    case 'q4p4': return { numericFormat: 'q4p4' };
+    case 'fp16': return { numericFormat: 'fp16' };
+    case 'bf16': return { numericFormat: 'bf16' };
+    default: return { hex: true };
+  }
+}
+
+function _tensorUsesShowLines(entry, fmt) {
+  const meta = entry && entry.tensorMeta;
+  const fw = waveListenFormatWidth(fmt);
+  if (!meta || !fw) return false;
+  return meta.elementWidth === fw;
+}
 
 function formatWaveListenBinary(binStr) {
   if (!binStr) return '';
@@ -55,13 +95,99 @@ function wrapBinaryGroupLines(binStr, maxRowChars) {
   return lines;
 }
 
+function splitGroupedLiteralParts(formatted) {
+  const s = String(formatted == null ? '' : formatted);
+  let suffix = '';
+  let body = s;
+  const semiMatch = s.match(/;([a-z0-9]+)$/i);
+  if (semiMatch) {
+    suffix = ';' + semiMatch[1];
+    body = s.slice(0, -suffix.length).trim();
+  }
+  let remainder = '';
+  const plusIdx = body.lastIndexOf(' + ');
+  if (plusIdx >= 0) {
+    const tail = body.slice(plusIdx + 3);
+    if (!tail.includes('\\') && /^[01XZxz+\s]+$/.test(tail)) {
+      remainder = tail;
+      body = body.slice(0, plusIdx).trim();
+    }
+  }
+  const tokens = body.length ? body.split(/\s+/).filter(Boolean) : [];
+  return { tokens, suffix, remainder };
+}
+
+function wrapLiteralTokenLines(formatted, maxRowChars) {
+  const max = maxRowChars != null ? maxRowChars : (
+    typeof PACKET_WRAP_MAX_CHARS !== 'undefined' ? PACKET_WRAP_MAX_CHARS : 40
+  );
+  const { tokens, suffix, remainder } = splitGroupedLiteralParts(formatted);
+  if (!tokens.length && !remainder) return formatted ? [formatted] : [];
+  const lines = [];
+  let line = '';
+  for (const token of tokens) {
+    const sep = line ? ' ' : '';
+    if (line.length + sep.length + token.length <= max) {
+      line += sep + token;
+    } else {
+      if (line) lines.push(line);
+      line = token;
+    }
+  }
+  if (line) lines.push(line);
+  if (lines.length && suffix) {
+    lines[lines.length - 1] += suffix;
+  } else if (suffix) {
+    lines.push(suffix);
+  }
+  if (remainder) {
+    if (lines.length) lines[lines.length - 1] += ' + ' + remainder;
+    else lines.push(remainder);
+  }
+  return lines.length ? lines : [formatted];
+}
+
+function _formatFlatGrouped(rawValue, fmt) {
+  const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
+  if (!NF || typeof NF.formatGroupedShow !== 'function') return String(rawValue);
+  if (fmt === 'dec') return NF.formatGroupedShow(rawValue, '8');
+  return NF.formatGroupedShow(rawValue, fmt);
+}
+
 function _waveListenHexDisplay(rawValue, bitWidth, formatValueFn) {
   const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
-  if (DF && typeof DF.formatDebugDisplayValue === 'function') {
-    return DF.formatDebugDisplayValue(rawValue, bitWidth, { hex: true }, false, bitWidth);
+  const bw = bitWidth || (rawValue ? rawValue.length : 0);
+  if (DF) {
+    if (bw >= 32 && typeof DF.formatHexGroupedDisplay === 'function') {
+      return DF.formatHexGroupedDisplay(rawValue, bw);
+    }
+    if (typeof DF.formatHexTagDisplay === 'function') {
+      return DF.formatHexTagDisplay(rawValue, bw, bw >= 32);
+    }
+    if (typeof DF.formatDebugDisplayValue === 'function') {
+      return DF.formatDebugDisplayValue(rawValue, bw, { hex: true }, false, bw);
+    }
   }
-  if (formatValueFn) return formatValueFn(rawValue, bitWidth);
+  if (formatValueFn) return formatValueFn(rawValue, bw);
   return rawValue;
+}
+
+function _formatWaveListenScalarFormatted(rawValue, bitWidth, fmt, formatValueFn, interp, entry) {
+  if (fmt === 'bin') return formatWaveListenBinary(rawValue);
+  if (fmt === 'hex') return _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
+  if (['dec', 's8', 'q4p4', 'fp16', 'bf16'].includes(fmt)) {
+    if (_tensorUsesShowLines(entry, fmt) && interp
+      && typeof interp._formatVectorShowLines === 'function') {
+      const lines = interp._formatVectorShowLines(entry.name, rawValue, waveListenFmtToShowOpts(fmt));
+      if (lines && lines.length) {
+        const header = lines.find((l) => l.includes('=')) || lines[0];
+        const eq = header.indexOf('=');
+        return eq >= 0 ? header.slice(eq + 1).replace(/\s*\(\d+bit\)\s*$/, '').trim() : header;
+      }
+    }
+    return _formatFlatGrouped(rawValue, fmt);
+  }
+  return _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
 }
 
 function waveListenPayloadPrefix(payload) {
@@ -101,29 +227,22 @@ function _tensorShapeLabel(tensorMeta) {
     : `[${tensorMeta.elementCount}]`;
 }
 
-function _formatWaveListenValuePart(rawValue, bitWidth, fmt, formatValueFn) {
-  if (fmt === 'bin') return formatWaveListenBinary(rawValue);
-  return _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
-}
-
-function _formatWaveListenLargePreview(rawValue, bitWidth, fmt, formatValueFn) {
-  const formatted = fmt === 'bin'
-    ? formatWaveListenBinary(rawValue)
-    : _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
-  return _truncatePreview(formatted, WAVE_LISTEN_INLINE_PREVIEW_MAX);
-}
-
-function formatWaveListenInline(entry, fmt, formatValueFn) {
+function formatWaveListenInline(entry, fmt, formatValueFn, interp) {
   const rawValue = entry.rawValue;
   if (rawValue == null) return '∅';
   const bitWidth = entry.bitWidth || rawValue.length;
-  const mode = fmt === 'bin' ? 'bin' : 'hex';
+  const mode = normalizeWaveListenFmt(fmt);
 
   let valuePart;
   if (bitWidth <= WAVE_LISTEN_EXPAND_THRESHOLD) {
-    valuePart = _formatWaveListenValuePart(rawValue, bitWidth, mode, formatValueFn);
+    valuePart = _formatWaveListenScalarFormatted(
+      rawValue, bitWidth, mode, formatValueFn, interp, entry
+    );
   } else {
-    valuePart = _formatWaveListenLargePreview(rawValue, bitWidth, mode, formatValueFn);
+    valuePart = _truncatePreview(
+      _formatWaveListenScalarFormatted(rawValue, bitWidth, mode, formatValueFn, interp, entry),
+      WAVE_LISTEN_INLINE_PREVIEW_MAX
+    );
   }
 
   return `${valuePart} ${_bitsSuffix(entry)}`;
@@ -134,21 +253,23 @@ function formatWaveListenExpandLines(entry, fmt, interp) {
   if (rawValue == null) return ['∅'];
 
   const bw = bitWidth || rawValue.length;
-  const mode = fmt === 'bin' ? 'bin' : 'hex';
+  const mode = normalizeWaveListenFmt(fmt);
   const formatValueFn = interp && typeof interp.formatValue === 'function'
     ? (v, w) => interp.formatValue(v, w)
     : null;
 
-  if (tensorMeta && interp && typeof interp._formatVectorShowLines === 'function') {
-    let opts = null;
-    if (mode === 'hex') opts = { hex: true };
-    else if (mode === 'bin') opts = { bin: true };
-    const lines = interp._formatVectorShowLines(name, rawValue, opts);
+  if (tensorMeta && interp && typeof interp._formatVectorShowLines === 'function'
+    && _tensorUsesShowLines(entry, mode)) {
+    const lines = interp._formatVectorShowLines(name, rawValue, waveListenFmtToShowOpts(mode));
     if (lines && lines.length) return lines;
   }
 
   if (mode === 'bin') {
     return wrapBinaryGroupLines(rawValue);
+  }
+
+  if (['dec', 's8', 'q4p4', 'fp16', 'bf16'].includes(mode)) {
+    return wrapLiteralTokenLines(_formatFlatGrouped(rawValue, mode));
   }
 
   const formatted = _waveListenHexDisplay(rawValue, bw, formatValueFn);
@@ -159,18 +280,30 @@ function formatWaveListenExpandLines(entry, fmt, interp) {
 }
 
 function formatWaveListenFullText(entry, fmt, interp) {
-  return formatWaveListenExpandLines(entry, fmt, interp).join('\n');
+  return formatWaveListenCopyText(entry, fmt, interp);
 }
 
-function nextWaveListenFmt(current) {
-  const i = WAVE_LISTEN_FMT_CYCLE.indexOf(current);
-  if (i < 0) return WAVE_LISTEN_FMT_CYCLE[0];
-  return WAVE_LISTEN_FMT_CYCLE[(i + 1) % WAVE_LISTEN_FMT_CYCLE.length];
-}
+function formatWaveListenCopyText(entry, fmt, interp) {
+  if (!entry || entry.rawValue == null) return '';
+  const rawValue = entry.rawValue;
+  const bitWidth = entry.bitWidth || rawValue.length;
+  const mode = normalizeWaveListenFmt(fmt);
+  const formatValueFn = interp && typeof interp.formatValue === 'function'
+    ? (v, w) => interp.formatValue(v, w)
+    : null;
 
-function normalizeWaveListenFmt(fmt) {
-  if (fmt === 'bin') return 'bin';
-  return 'hex';
+  if (mode === 'bin') return rawValue;
+
+  if (mode === 'hex') {
+    const displayed = _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
+    return String(displayed).replace(/\s/g, '');
+  }
+
+  if (['dec', 's8', 'q4p4', 'fp16', 'bf16'].includes(mode)) {
+    return _formatFlatGrouped(rawValue, mode);
+  }
+
+  return rawValue;
 }
 
 function waveListenNeedsExpand(entry) {
@@ -183,17 +316,20 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     WAVE_LISTEN_EXPAND_THRESHOLD,
     WAVE_LISTEN_INLINE_PREVIEW_MAX,
-    WAVE_LISTEN_FMT_CYCLE,
+    WAVE_LISTEN_FMT_OPTIONS,
+    normalizeWaveListenFmt,
+    waveListenFormatWidth,
+    waveListenFmtToShowOpts,
     formatWaveListenBinary,
     splitWaveListenBinaryGroups,
     wrapBinaryGroupLines,
+    wrapLiteralTokenLines,
     waveListenPayloadPrefix,
     waveListenPayloadToText,
     formatWaveListenInline,
     formatWaveListenExpandLines,
     formatWaveListenFullText,
-    nextWaveListenFmt,
-    normalizeWaveListenFmt,
+    formatWaveListenCopyText,
     waveListenNeedsExpand,
   };
 }

@@ -47,13 +47,6 @@ function setWaveListenFmt(fmt) {
   renderWaveListenPanel();
 }
 
-function cycleWaveListenFmt() {
-  const next = typeof nextWaveListenFmt === 'function'
-    ? nextWaveListenFmt(_waveListenState.fmt)
-    : 'hex';
-  setWaveListenFmt(next);
-}
-
 function setWaveListenArmed(on) {
   const next = !!on;
   if (_waveListenState.armed === next) return;
@@ -313,9 +306,11 @@ function _toggleWaveListenExpand(entryId) {
 function _waveListenCopyValue(entry, btn) {
   const fmt = getWaveListenFmt();
   const interp = _waveListenInterpForEntry(entry);
-  const text = typeof formatWaveListenFullText === 'function'
-    ? formatWaveListenFullText(entry, fmt, interp)
-    : String(entry.rawValue);
+  const text = typeof formatWaveListenCopyText === 'function'
+    ? formatWaveListenCopyText(entry, fmt, interp)
+    : (typeof formatWaveListenFullText === 'function'
+      ? formatWaveListenFullText(entry, fmt, interp)
+      : String(entry.rawValue));
   const doCopy = typeof copyTextToClipboard === 'function'
     ? copyTextToClipboard(text)
     : (navigator.clipboard && navigator.clipboard.writeText
@@ -360,6 +355,7 @@ function _renderWaveListenValueRow(entry, out) {
 
   const fmt = getWaveListenFmt();
   const formatFn = _waveListenFormatValueFn(entry);
+  const interp = _waveListenInterpForEntry(entry);
   const needsExpand = typeof waveListenNeedsExpand === 'function'
     ? waveListenNeedsExpand(entry)
     : (entry.bitWidth || (entry.rawValue ? entry.rawValue.length : 0)) > 256;
@@ -384,7 +380,7 @@ function _renderWaveListenValueRow(entry, out) {
     main,
     'wave-listen-copy-btn',
     '[cpy]',
-    'Copy full value',
+    'Copy full value (script literal)',
     function (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -395,7 +391,7 @@ function _renderWaveListenValueRow(entry, out) {
   const valSpan = document.createElement('span');
   valSpan.className = 'wave-listen-value';
   const inline = typeof formatWaveListenInline === 'function'
-    ? formatWaveListenInline(entry, fmt, formatFn)
+    ? formatWaveListenInline(entry, fmt, formatFn, interp)
     : String(entry.rawValue);
   valSpan.textContent = ` = ${inline}`;
   main.appendChild(valSpan);
@@ -439,7 +435,7 @@ function renderWaveListenPanel() {
 function updateWaveListenToolbarUI() {
   const armedBtn = document.getElementById('waveListenArmBtn');
   const badge = document.getElementById('waveListenBadge');
-  const fmtBtn = document.getElementById('waveListenFmtBtn');
+  const fmtSelect = document.getElementById('waveListenFmtSelect');
   const levelBtns = [1, 2, 3].map((n) => document.getElementById('waveListenLevel' + n));
 
   if (armedBtn) {
@@ -448,9 +444,8 @@ function updateWaveListenToolbarUI() {
     armedBtn.classList.toggle('wave-listen-arm--off', !_waveListenState.armed);
   }
 
-  if (fmtBtn) {
-    fmtBtn.textContent = `Fmt: ${_waveListenState.fmt}`;
-    fmtBtn.title = 'Cycle value format: hex ↔ bin';
+  if (fmtSelect && fmtSelect.value !== _waveListenState.fmt) {
+    fmtSelect.value = _waveListenState.fmt;
   }
 
   for (const btn of levelBtns) {
@@ -487,15 +482,15 @@ function initWaveListenPanel() {
 
   const armBtn = document.getElementById('waveListenArmBtn');
   const clearBtn = document.getElementById('waveListenClear');
-  const fmtBtn = document.getElementById('waveListenFmtBtn');
+  const fmtSelect = document.getElementById('waveListenFmtSelect');
   if (armBtn) {
     armBtn.addEventListener('click', () => setWaveListenArmed(!getWaveListenArmed()));
   }
   if (clearBtn) {
     clearBtn.addEventListener('click', () => clearWaveListenPanel());
   }
-  if (fmtBtn) {
-    fmtBtn.addEventListener('click', () => cycleWaveListenFmt());
+  if (fmtSelect) {
+    fmtSelect.addEventListener('change', () => setWaveListenFmt(fmtSelect.value));
   }
   for (const n of [1, 2, 3]) {
     const btn = document.getElementById('waveListenLevel' + n);

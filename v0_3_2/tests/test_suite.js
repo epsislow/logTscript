@@ -19265,10 +19265,23 @@ reg(2204, 'wave-debug', 'Wave Listen format — expand threshold and bin wrap', 
       h.assert('group intact', String(part.length <= 8), 'true');
     }
   }
-  const inline = formatWaveListenInline(small, 'hex', (v, bw) => v);
+  const inline = formatWaveListenInline(small, 'hex', (v, bw) => v, null);
   h.assert('bits suffix inline', String(/\(\d+bits\)/.test(inline)), 'true');
-  const text = waveListenPayloadToText({ wave: 1, label: 'commit', name: 'a', rawValue: '1010', bitWidth: 4, wireType: '4wire' });
-  h.assert('payload text', String(text.includes('commit a')), 'true');
+  h.assert('fmt options', String(WAVE_LISTEN_FMT_OPTIONS.includes('s8')), 'true');
+});
+
+reg(2205, 'wave-debug', 'Wave Listen copy — script literals', function(h) {
+  const entry = { name: 'w', rawValue: '10101100', bitWidth: 8, wireType: '8wire' };
+  h.assert('bin copy raw', formatWaveListenCopyText(entry, 'bin', null), '10101100');
+  const hexCopy = formatWaveListenCopyText(entry, 'hex', null);
+  h.assert('hex no spaces', String(!/\s/.test(hexCopy)), 'true');
+  h.assert('hex starts ^', String(hexCopy.startsWith('^')), 'true');
+  if (typeof LogTScriptNumericFormats !== 'undefined') {
+    const s8Copy = formatWaveListenCopyText(entry, 's8', null);
+    h.assert('s8 suffix', String(/;s8$/.test(s8Copy)), 'true');
+    const decCopy = formatWaveListenCopyText(entry, 'dec', null);
+    h.assert('dec suffix', String(/;8$/.test(decCopy)), 'true');
+  }
 });
 
 
