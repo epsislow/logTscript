@@ -20764,9 +20764,22 @@ Top-level block — schema name is written as **\`<name>\`**:
 \`\`\`logts
 16wire<opcode> instr
 16wire[64]<opcode> rom
+16wire[2,3]<opcode> grid
 \`\`\`
 
-The wire width and schema total width must **match exactly**. Mismatch is a compile-time error:
+**What \`<schema>\` does:** it attaches the named field layout to **each element** of the wire’s storage — not to the whole concatenated bit string.
+
+| Declaration | Storage | Schema applies to |
+|-------------|---------|-------------------|
+| \`16wire<opcode> instr\` | one 16-bit word | that word |
+| \`16wire[4]<opcode> rom\` | 4 × 16 bits (64 total) | **each** of the 4 elements |
+| \`16wire[2,3]<opcode> grid\` | 2×3 × 16 bits (96 total) | **each** matrix cell |
+
+Validation compares **schema total width** with **element width** (\`16\` in the examples above), not the full wire/tensor size. A 16-bit schema on \`16wire[64]\` is valid (64 elements × 16 bits); a 16-bit schema on \`8wire[4]\` is an error.
+
+Type labels in debug output reflect the shape + schema, e.g. \`16wire[3]<opcode>\`, \`16wire[2,2]<opcode>\`.
+
+Mismatch between schema width and **element** width is a compile-time error:
 
 \`\`\`logts
 # ERROR:
@@ -20808,6 +20821,88 @@ Valid attach (16 bits):
 \`\`\`
 
 Type label in debug output becomes \`16wire<opcode>\`.
+
+---
+
+## Vectors and matrices
+
+On a vector or matrix wire, \`<schema>\` means: **every element/cell is one packed instance of that schema**. Field access picks an index (or row:col), then a field name:
+
+\`\`\`logts
+rom:1:alu              # vector element 1, field alu
+grid:0:1:jump          # matrix cell (row 0, col 1), field jump
+\`\`\`
+
+Rules are the same as on a scalar wire: \`=\` strict width, \`:=\` left-pad; RHS is any expression; reads use a wire matching the field width.
+
+\`show(rom:1)\` / \`show(grid:0:1)\` on a schema wire prints a **per-field breakdown of that one element** (not the whole tensor). \`show(rom)\` on the full vector still lists elements flat (one line per index) — use an indexed \`show\` for schema detail on a single slot.
+
+### Vector example
+
+**Load & Run** — three ROM slots, write element 1 via field access, read back, schema \`show\` on that element:
+
+\`\`\`logts-play wave
+<opcode>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:8
+:
+16wire[3]<opcode> rom := 0
+rom:1:alu := \\5
+rom:1:cycles := \\3
+4wire aluSlot = rom:1:alu
+2wire cycSlot = rom:1:cycles
+show(rom:1)
+\`\`\`
+
+Expected **Output**: \`alu = 0101\`, \`cycles = 11\`; \`aluSlot\` / \`cycSlot\` match; elements \`0\` and \`2\` stay zero.
+
+Initialize one element with a schema literal:
+
+\`\`\`logts
+rom:2 = { alu=\\5 cycles=\\3 jump=1 }<opcode>
+\`\`\`
+
+### Matrix example
+
+**Load & Run** — 2×2 grid, literal on one cell, field write on another, schema \`show\`:
+
+\`\`\`logts-play wave
+<opcode>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:8
+:
+16wire[2,2]<opcode> grid := 0
+grid:1:0 = { alu=\\5 cycles=\\3 }<opcode>
+grid:0:1:jump = 1
+1wire j = grid:0:1:jump
+show(grid:1:0)
+show(grid:0:1)
+\`\`\`
+
+Expected **Output**: \`grid:1:0\` shows \`alu=0101\`, \`cycles=11\`; \`grid:0:1\` shows \`jump=1\`; \`j = 1\`.
+
+### Pixel-style schema (optional)
+
+For RGB-style cells, declare a wider schema and use \`row:col:field\`:
+
+\`\`\`logts
+<pixel>:
+    red:5
+    green:6
+    blue:5
+:
+16wire[2,2]<pixel> framebuffer := 0
+framebuffer:0:1:red := \\15
+5wire r = framebuffer:0:1:red
+\`\`\`
+
+Here \`16wire\` is the **element** width (5+6+5); each of the four cells is one \`<pixel>\`.
 
 ---
 

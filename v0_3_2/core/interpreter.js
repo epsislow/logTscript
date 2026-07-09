@@ -3739,8 +3739,10 @@ class Interpreter {
     const SS = this._semanticSchemas();
     if (!SS) throw new Error('semantic-schemas.js is not loaded');
     const schema = this._resolveSchema(decl.schemaRef);
+    const elemWidth = this._elementWidthForWire(wireEntry);
+    const widthToMatch = elemWidth != null ? elemWidth : wireWidth;
     try {
-      SS.validateSchemaWidth(schema, wireWidth);
+      SS.validateSchemaWidth(schema, widthToMatch);
     } catch (e) {
       throw new Error(`${e.message}${loc ? ` at ${loc}` : ''}`);
     }
@@ -7929,11 +7931,32 @@ if (this.isBuiltinDEMUX(name)) {
           const part = r[0];
           if (part) {
             let valueStr = part.value != null ? part.value : '-';
+            const displayName = part.varName || atom.var;
+            const sliceWidth = part.bitWidth || wire.vector.elementWidth;
+            if (valueStr !== '-' && wire.schemaRef && !atom.schemaField && !atom.bitRange) {
+              try {
+                const schemaLines = this._formatShowWithSchema(valueStr, wire, opts, displayName, isPeek);
+                if (schemaLines && schemaLines.length) {
+                  for (const sl of schemaLines) this._pushDisplayOutput(vectorLines, sl, opts);
+                  if (!atom.bitRange) {
+                    const meta = this.getWireTensorMeta(wire);
+                    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+                    if (meta && TS && TS.isMatrix(meta)) {
+                      vectorLines.push(`${atom.var} has shape [${meta.rows},${meta.cols}]`);
+                    } else {
+                      vectorLines.push(`${atom.var} has length [${wire.vector.elementCount}]`);
+                    }
+                  }
+                  continue;
+                }
+              } catch (err) {
+                this.reportRuntimeError(err);
+                continue;
+              }
+            }
             if (valueStr !== '-' && part.bitWidth) {
               valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, true, part.bitWidth);
             }
-            const displayName = part.varName || atom.var;
-            const sliceWidth = part.bitWidth || wire.vector.elementWidth;
             this._pushDisplayOutput(vectorLines, `${displayName} = ${valueStr} (${sliceWidth}bit)`, opts);
             if (!atom.bitRange) {
               const meta = this.getWireTensorMeta(wire);

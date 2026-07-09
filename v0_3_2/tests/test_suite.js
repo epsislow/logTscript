@@ -19677,6 +19677,35 @@ reg(2238, 'semantic-schemas', 'Wave Listen fmt auto breakdown', function(h, sess
   h.assert('expand cycles', String(lines.some((l) => l.includes('cycles') && l.includes('11'))), 'true');
 });
 
+reg(2239, 'semantic-schemas', 'vector schema field access', function(h, session) {
+  session.run(OPCODE16_SCHEMA + [
+    '16wire[3]<opcode> rom := 0',
+    'rom:1:alu := \\5',
+    'rom:1:cycles := \\3',
+    '4wire aluSlot = rom:1:alu',
+    '2wire cycSlot = rom:1:cycles',
+  ].join('\n'));
+  h.assert('vector decl schema', String(session.interp.wires.get('rom').schemaRef), 'opcode');
+  h.assert('vector alu', session.getWire(session.interp, 'aluSlot'), '0101');
+  h.assert('vector cycles', session.getWire(session.interp, 'cycSlot'), '11');
+  const full = session.getWire(session.interp, 'rom');
+  h.assert('other elements zero', full.substring(0, 16) + full.substring(32), '0'.repeat(32));
+});
+
+reg(2240, 'semantic-schemas', 'matrix schema field access and show element', function(h, session) {
+  const out = session.runDoc(OPCODE16_SCHEMA + [
+    '16wire[2,2]<opcode> grid := 0',
+    'grid:1:0 = { alu=\\5 cycles=\\3 }<opcode>',
+    'grid:0:1:jump = 1',
+    '1wire j = grid:0:1:jump',
+    'show(grid:1:0)',
+  ].join('\n'));
+  h.assert('matrix schema ref', String(session.interp.wires.get('grid').schemaRef), 'opcode');
+  h.assert('matrix show alu', String(out.some(l => l.includes('alu') && l.includes('0101'))), 'true');
+  h.assert('matrix show cycles', String(out.some(l => l.includes('cycles') && l.includes('11'))), 'true');
+  h.assert('matrix jump read', session.getWire(session.interp, 'j'), '1');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,
