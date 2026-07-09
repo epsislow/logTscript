@@ -305,6 +305,64 @@ Toggle **clr** `0→1→0→1` — **Output** alternates `hSize = 0000` / `1111`
 
 ---
 
+## Chip and board bodies
+
+In **chip** and **board** definitions, `on:raise` / `on:edge` / `on:1` blocks are part of the instance **wire graph** — they run during propagation on each exec, not as top-level script statements. See [chip-board-execution.md](chip-board-execution.md) for elaboration vs propagation and more runnable examples.
+
+### Chip — `on:raise` toggles on exec pulse
+
+**Load & Run** — first `set = 1` inverts internal `acc`; **Output:** `r = 1111`.
+
+```logts-play wave
+chip +[tickAcc]:
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  4wire acc = 0000
+  on:raise {
+    set,
+    acc = NOT(acc)
+  }
+  sum = acc
+  :4bit sum
+
+chip [tickAcc] .u1::
+.u1:{ set = 1 }
+4wire r = .u1:sum
+show(r)
+```
+
+### Board — `on:edge` when `set` falls
+
+**Load & Run** — two property blocks: `set = 1` then `set = 0`. Falling edge fires; **Output:** `r = 1111`.
+
+```logts-play wave
+board +[edgeTick]:
+  1pin set
+  4pout out
+  exec: set
+  on: 1
+  1wire en = set
+  4wire result = 0000
+  on:edge {
+    en,
+    result = 1111
+  }
+  out = result
+  :4bit out
+
+board [edgeTick] .u1::
+.u1:{ set = 1 }
+.u1:{ set = 0 }
+4wire r = .u1:out
+show(r)
+```
+
+More examples (internal `adder`, `counter`, nested chip, interactive switch): [chip-board-execution.md](chip-board-execution.md).
+
+---
+
 ## Restrictions
 
 | Allowed in `{ }` | Not allowed |

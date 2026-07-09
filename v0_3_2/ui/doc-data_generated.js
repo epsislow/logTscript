@@ -6684,6 +6684,294 @@ For multi-step state machines, rely on component state (\`mem\`, \`reg\`, \`coun
 
 ---
 
+## Running examples (Load / Load & Run)
+
+Runnable blocks below use the \`logts-play\` format. Each block shows two buttons:
+
+| Button | What it does |
+|--------|----------------|
+| **Load** | Copies the script into a **new editor tab** without running it. Edit operands, add probes, or append property blocks, then press toolbar **Run**. |
+| **Load & Run** | Copies the script **and** runs it immediately. Read results in the **Output** panel (\`show\` lines) and on **probes**. |
+
+Tips:
+
+- Blocks use \`logts-play wave\` (default propagation in the editor).
+- Chip and board bodies are **not** re-run as scripts on each exec — only the captured graph propagates. Change inputs with another \`.u1:{ … }\` block (or flip a **switch** in a board) and **Run** again.
+- Several examples chain multiple property blocks in one script (\`set = 1\` then \`set = 0\`) to demonstrate edge/conditional behaviour in a single **Load & Run**.
+
+---
+
+## Runnable examples
+
+### Chip — propagation through internal \`adder\`
+
+**Load & Run** — \`0101 + 0011\` through \`comp [adder]\` inside the chip. **Output:** \`r = 1000\`, \`c = 0\`.
+
+The adder is elaborated once; each \`set = 1\` property block propagates pin values into \`.add\` and out to \`sum\`.
+
+\`\`\`logts-play wave
+chip +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  1pout carry
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  carry = .add:carry
+  :4bit sum
+
+chip [halfAdd] .u1::
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+4wire r = .u1:sum
+1wire c = .u1:carry
+show(r, c)
+\`\`\`
+
+### Chip — graph order: \`on:raise\` latch, then \`adder\`
+
+**Load & Run** — on the first rising edge of \`set\`, \`latA\`/\`latB\` capture \`a\`/\`b\`, then the adder reads those wires. **Output:** \`r = 1000\`.
+
+Declaration order in the body is the propagation order: conditional → component inputs → pout.
+
+\`\`\`logts-play wave
+chip +[gatedAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  4wire latA = 0000
+  4wire latB = 0000
+  on:raise {
+    set,
+    latA = a,
+    latB = b
+  }
+  .add:a = latA
+  .add:b = latB
+  sum = .add:get
+  :4bit sum
+
+chip [gatedAdd] .u1::
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+4wire r = .u1:sum
+show(r)
+\`\`\`
+
+### Chip — \`on:raise\` toggles accumulator (\`NOT\`)
+
+**Load & Run** — first pulse inverts \`acc\` from \`0000\` to \`1111\`. **Output:** \`r = 1111\`.
+
+Hold \`set = 1\` again without a \`0\` in between does **not** toggle a second time.
+
+\`\`\`logts-play wave
+chip +[tickAcc]:
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  4wire acc = 0000
+  on:raise {
+    set,
+    acc = NOT(acc)
+  }
+  sum = acc
+  :4bit sum
+
+chip [tickAcc] .u1::
+.u1:{ set = 1 }
+4wire r = .u1:sum
+show(r)
+\`\`\`
+
+### Chip — repulse: three property blocks in one run
+
+**Load & Run** — \`set\` goes \`1 → 0 → 1\`; the conditional fires on each rising edge. **Output:** \`r = 0000\` (toggled twice).
+
+\`\`\`logts-play wave
+chip +[tickAcc]:
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  4wire acc = 0000
+  on:raise {
+    set,
+    acc = NOT(acc)
+  }
+  sum = acc
+  :4bit sum
+
+chip [tickAcc] .u1::
+.u1:{ set = 1 }
+.u1:{ set = 0 }
+.u1:{ set = 1 }
+4wire r = .u1:sum
+show(r)
+\`\`\`
+
+### Chip — \`on:raise\` pulses internal \`counter\`
+
+**Load & Run** — rising \`set\` sets \`inc = 1\`, the \`.cnt:{ set = inc }\` property block increments the counter, then \`inc\` resets. **Output:** \`r = 0001\`.
+
+\`\`\`logts-play wave
+chip +[pulseCnt]:
+  1pin set
+  4pout count
+  exec: set
+  on: 1
+  comp [counter] .cnt:
+    depth: 4
+    on: 1
+    :
+  1wire inc = 0
+  on:raise {
+    set,
+    inc = 1
+  }
+  .cnt:{ set = inc }
+  inc = 0
+  count = .cnt:get
+  :4bit count
+
+chip [pulseCnt] .u1::
+.u1:{ set = 1 }
+4wire r = .u1:count
+show(r)
+\`\`\`
+
+### Board — nested chip + internal adder
+
+**Load & Run** — board wraps \`chip [halfAdd]\`; parent wires feed the child, child exec propagates, parent reads \`.ha:sum\`. **Output:** \`r = 1000\`.
+
+\`\`\`logts-play wave
+chip +[halfAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  .add:a = a
+  .add:b = b
+  sum = .add:get
+  :4bit sum
+
+board +[wrapAdd]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  chip [halfAdd] .ha::
+  .ha:a = a
+  .ha:b = b
+  .ha:{ set = 1 }
+  sum = .ha:sum
+  :4bit sum
+
+board [wrapAdd] .u1::
+.u1:{
+  a = 0101
+  b = 0011
+  set = 1
+}
+4wire r = .u1:sum
+show(r)
+\`\`\`
+
+### Board — \`on:edge\` on falling \`set\`
+
+**Load & Run** — \`set\` starts high (no edge yet), then falls (\`1 → 0\`); the conditional sets \`result = 1111\`. **Output:** \`r = 1111\`.
+
+\`\`\`logts-play wave
+board +[edgeTick]:
+  1pin set
+  4pout out
+  exec: set
+  on: 1
+  1wire en = set
+  4wire result = 0000
+  on:edge {
+    en,
+    result = 1111
+  }
+  out = result
+  :4bit out
+
+board [edgeTick] .u1::
+.u1:{ set = 1 }
+.u1:{ set = 0 }
+4wire r = .u1:out
+show(r)
+\`\`\`
+
+### Board — interactive: \`on:edge\` + switch + adder
+
+**Load & Run** — \`count\` starts at \`0000\`. Flip the **clk** switch **on** then **off** (falling edge on \`en\`); \`held\` toggles and the adder drives \`count\`. **Output** probe lines show \`count\` flip to \`1111\`.
+
+Use **Load** if you want to watch probes step by step after toggling the switch.
+
+\`\`\`logts-play wave
+board +[edgeCnt]:
+  4pout count
+  1pin set
+  exec: set
+  on: 1
+  comp [switch] .clk:
+    text: 'clk'
+    :
+  comp [adder] .add:
+    depth: 4
+    on: 1
+    :
+  4wire held = 0000
+  1wire en = .clk:get
+  on:edge {
+    en,
+    held = NOT(held)
+  }
+  .add:a = held
+  .add:b = 0000
+  count = .add:get
+  :4bit count
+
+board [edgeCnt] .u1::
+.u1:{ set = 1 }
+4wire r = .u1:count
+probe(r)
+probe(.clk)
+show(r)
+\`\`\`
+
+---
+
 ## Quick reference
 
 | Event | Chip / board |
@@ -7799,6 +8087,64 @@ Toggle **clr** \`0→1→0→1\` — **Output** alternates \`hSize = 0000\` / \`
 ### Alternate — add on fall, clear on rise
 
 \`on:raise\` with \`!.clear:get\` adds an entry when the switch falls; \`on:1\` clears when it rises. \`hSize = .huff:size()\` changes every toggle (\`0010\` → \`0000\` → \`0001\` → …).
+
+---
+
+## Chip and board bodies
+
+In **chip** and **board** definitions, \`on:raise\` / \`on:edge\` / \`on:1\` blocks are part of the instance **wire graph** — they run during propagation on each exec, not as top-level script statements. See [chip-board-execution.md](chip-board-execution.md) for elaboration vs propagation and more runnable examples.
+
+### Chip — \`on:raise\` toggles on exec pulse
+
+**Load & Run** — first \`set = 1\` inverts internal \`acc\`; **Output:** \`r = 1111\`.
+
+\`\`\`logts-play wave
+chip +[tickAcc]:
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  4wire acc = 0000
+  on:raise {
+    set,
+    acc = NOT(acc)
+  }
+  sum = acc
+  :4bit sum
+
+chip [tickAcc] .u1::
+.u1:{ set = 1 }
+4wire r = .u1:sum
+show(r)
+\`\`\`
+
+### Board — \`on:edge\` when \`set\` falls
+
+**Load & Run** — two property blocks: \`set = 1\` then \`set = 0\`. Falling edge fires; **Output:** \`r = 1111\`.
+
+\`\`\`logts-play wave
+board +[edgeTick]:
+  1pin set
+  4pout out
+  exec: set
+  on: 1
+  1wire en = set
+  4wire result = 0000
+  on:edge {
+    en,
+    result = 1111
+  }
+  out = result
+  :4bit out
+
+board [edgeTick] .u1::
+.u1:{ set = 1 }
+.u1:{ set = 0 }
+4wire r = .u1:out
+show(r)
+\`\`\`
+
+More examples (internal \`adder\`, \`counter\`, nested chip, interactive switch): [chip-board-execution.md](chip-board-execution.md).
 
 ---
 
