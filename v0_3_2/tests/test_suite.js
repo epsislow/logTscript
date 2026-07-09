@@ -19706,6 +19706,117 @@ reg(2240, 'semantic-schemas', 'matrix schema field access and show element', fun
   h.assert('matrix jump read', session.getWire(session.interp, 'j'), '1');
 });
 
+reg(2241, 'semantic-schemas', 'chip body schema literal and re-exec', function(h, session) {
+  const { interp } = session.run(OPCODE16_SCHEMA + [
+    'chip +[cpu]:',
+    '  4pin aluIn',
+    '  1pin set',
+    '  4pout aluOut',
+    '  exec: set',
+    '  on: 1',
+    '  16wire<opcode> instr = { alu=\\5 }<opcode>',
+    '  instr:alu = aluIn',
+    '  aluOut = instr:alu',
+    '  :4bit aluOut',
+    'chip [cpu] .u1::',
+    '.u1:{ aluIn = 0101',
+    '  set = 1 }',
+  ].join('\n'));
+  const inst = interp.chipInstances.get('.u1');
+  const saved = inst && inst.internalBodyWires && inst.internalBodyWires.get('instr');
+  h.assert('chip internal schemaRef', saved && saved.schemaRef, 'opcode');
+  h.assert('chip first aluOut', session.getPcbPout(interp, '.u1', 'aluOut'), '0101');
+  session.execStmts(interp, '.u1:{ aluIn = 1111\n  set = 1 }');
+  h.assert('chip second aluOut', session.getPcbPout(interp, '.u1', 'aluOut'), '1111');
+});
+
+reg(2242, 'semantic-schemas', 'board body schema literal and re-exec', function(h, session) {
+  const { interp } = session.run(OPCODE16_SCHEMA + [
+    'board +[enc]:',
+    '  4pin aluIn',
+    '  1pin set',
+    '  4pout aluOut',
+    '  exec: set',
+    '  on: 1',
+    '  16wire<opcode> instr = { alu=\\5 }<opcode>',
+    '  instr:alu = aluIn',
+    '  aluOut = instr:alu',
+    '  :4bit aluOut',
+    'board [enc] .u1::',
+    '.u1:{ aluIn = 0101',
+    '  set = 1 }',
+  ].join('\n'));
+  const inst = interp.boardInstances.get('.u1');
+  const saved = inst && inst.internalBodyWires && inst.internalBodyWires.get('instr');
+  h.assert('board internal schemaRef', saved && saved.schemaRef, 'opcode');
+  h.assert('board first aluOut', session.getPcbPout(interp, '.u1', 'aluOut'), '0101');
+  session.execStmts(interp, '.u1:{ aluIn = 1111\n  set = 1 }');
+  h.assert('board second aluOut', session.getPcbPout(interp, '.u1', 'aluOut'), '1111');
+});
+
+reg(2243, 'semantic-schemas', 'pcb body schema literal and re-exec', function(h, session) {
+  const { interp } = session.run(OPCODE16_SCHEMA + [
+    'pcb +[enc]:',
+    '  4pin aluIn',
+    '  1pin set',
+    '  4pout aluOut',
+    '  exec: set',
+    '  on: 1',
+    '  16wire<opcode> instr = { alu=\\5 }<opcode>',
+    '  instr:alu = aluIn',
+    '  aluOut = instr:alu',
+    '  :4bit aluOut',
+    'pcb [enc] .q::',
+    '.q:{ aluIn = 0101',
+    '  set = 1 }',
+  ].join('\n'));
+  const inst = interp.pcbInstances.get('.q');
+  const saved = inst && inst.internalBodyWires && inst.internalBodyWires.get('instr');
+  h.assert('pcb internal schemaRef', saved && saved.schemaRef, 'opcode');
+  h.assert('pcb first aluOut', session.getPcbPout(interp, '.q', 'aluOut'), '0101');
+  session.execStmts(interp, '.q:{ aluIn = 1111\n  set = 1 }');
+  h.assert('pcb second aluOut', session.getPcbPout(interp, '.q', 'aluOut'), '1111');
+});
+
+reg(2244, 'semantic-schemas', 'peek and probe schema breakdown smoke', function(h, session) {
+  const { out } = session.run(OPCODE16_SCHEMA + [
+    '16wire<opcode> instr = { alu=\\5 cycles=\\3 }<opcode>',
+    'peek(instr)',
+    'probe(instr)',
+    'instr:alu := \\15',
+  ].join('\n'));
+  h.assert('peek alu field', String(out.some(l => l.includes('alu') && l.includes('0101'))), 'true');
+  h.assert('probe initialised', String(out.some(l => l.includes('instr') && l.includes('initialised'))), 'true');
+  h.assert('probe changed', String(out.some(l => l.includes('changed'))), 'true');
+  h.assert('field updated', String(out.some(l => l.includes('1111'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2245, 'semantic-schemas', 'field assign with AND expression', function(h, session) {
+  session.run(OPCODE16_SCHEMA + [
+    '4wire a = 0101',
+    '4wire b = 0011',
+    '16wire<opcode> instr := 0',
+    'instr:alu = AND(a, b)',
+    '4wire x = instr:alu',
+  ].join('\n'));
+  h.assert('and into field', session.getWire(session.interp, 'x'), '0001');
+});
+
+reg(2246, 'semantic-schemas', 'schema field feeds comp alu', function(h, session) {
+  const { interp } = session.run(OPCODE16_SCHEMA + [
+    '16wire<opcode> instr = { alu=0101 }<opcode>',
+    'comp [alu] .alu:',
+    '  length: 4',
+    '  on: 1',
+    '  :',
+    '.alu:{ a = instr:alu',
+    '  b = 0001',
+    '  op = 00',
+    '  set = 1 }',
+  ].join('\n'));
+  h.assert('alu add from schema field', session.getCompProperty(interp, '.alu', 'result'), '0110');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

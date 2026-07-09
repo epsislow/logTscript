@@ -2420,6 +2420,7 @@ class Interpreter {
       }
       existing.type = decl.type;
       this._applyDeclVectorMeta(existing, decl);
+      this._applySchemaRefToWireEntry(existing, decl, bits, null);
     }
   }
 
@@ -3747,6 +3748,41 @@ class Interpreter {
       throw new Error(`${e.message}${loc ? ` at ${loc}` : ''}`);
     }
     wireEntry.schemaRef = decl.schemaRef;
+  }
+
+  _snapshotInternalBodyWire(wireEntry) {
+    if (!wireEntry) return null;
+    const snap = { type: wireEntry.type, ref: wireEntry.ref };
+    if (wireEntry.schemaRef) snap.schemaRef = wireEntry.schemaRef;
+    if (wireEntry.vector) {
+      snap.vector = {
+        elementWidth: wireEntry.vector.elementWidth,
+        elementCount: wireEntry.vector.elementCount,
+      };
+    }
+    if (wireEntry.tensor) {
+      snap.tensor = {
+        elementWidth: wireEntry.tensor.elementWidth,
+        dims: wireEntry.tensor.dims ? wireEntry.tensor.dims.slice() : undefined,
+        singleDim: wireEntry.tensor.singleDim,
+      };
+    }
+    return snap;
+  }
+
+  _restoreInternalBodyWire(snap, initOnly = true) {
+    if (!snap) return null;
+    const wireEntry = { type: snap.type, ref: snap.ref, initOnly };
+    if (snap.schemaRef) wireEntry.schemaRef = snap.schemaRef;
+    if (snap.vector) wireEntry.vector = { ...snap.vector };
+    if (snap.tensor) {
+      wireEntry.tensor = {
+        elementWidth: snap.tensor.elementWidth,
+        dims: snap.tensor.dims ? snap.tensor.dims.slice() : undefined,
+        singleDim: snap.tensor.singleDim,
+      };
+    }
+    return wireEntry;
   }
 
   _execSchemaDecl(s) {
@@ -11204,7 +11240,7 @@ if (s.assignment) {
     // initOnly=true allows re-declaration/assignment each time the body executes.
     if(instance.internalBodyWires){
       for(const [k, v] of instance.internalBodyWires){
-        this.wires.set(k, {type: v.type, ref: v.ref, initOnly: true});
+        this.wires.set(k, this._restoreInternalBodyWire(v, true));
         if(v.ref && v.ref.startsWith('&')){
           this.wireStorageMap.set(k, parseInt(v.ref.slice(1)));
         }
@@ -11255,7 +11291,7 @@ if (s.assignment) {
     instance.internalBodyWires = new Map();
     for(const [k, v] of this.wires){
       if(!savedWires.has(k) && !pinStorage.has(k) && !poutStorage.has(k)){
-        instance.internalBodyWires.set(k, {type: v.type, ref: v.ref});
+        instance.internalBodyWires.set(k, this._snapshotInternalBodyWire(v));
       }
     }
 
@@ -12263,7 +12299,7 @@ if (s.assignment) {
 
     if (instance.internalBodyWires) {
       for (const [k, v] of instance.internalBodyWires) {
-        this.wires.set(k, { type: v.type, ref: v.ref, initOnly: true });
+        this.wires.set(k, this._restoreInternalBodyWire(v, true));
         if (v.ref && v.ref.startsWith('&')) {
           this.wireStorageMap.set(k, parseInt(v.ref.slice(1), 10));
         }
@@ -12319,7 +12355,7 @@ if (s.assignment) {
     instance.internalBodyWires = new Map();
     for (const [k, v] of this.wires) {
       if (!savedWires.has(k) && !pinStorage.has(k) && !poutStorage.has(k)) {
-        instance.internalBodyWires.set(k, { type: v.type, ref: v.ref });
+        instance.internalBodyWires.set(k, this._snapshotInternalBodyWire(v));
       }
     }
 
@@ -12516,7 +12552,7 @@ if (s.assignment) {
 
     if (instance.internalBodyWires) {
       for (const [k, v] of instance.internalBodyWires) {
-        this.wires.set(k, { type: v.type, ref: v.ref, initOnly: true });
+        this.wires.set(k, this._restoreInternalBodyWire(v, true));
         if (v.ref && v.ref.startsWith('&')) {
           this.wireStorageMap.set(k, parseInt(v.ref.slice(1), 10));
         }
@@ -12572,7 +12608,7 @@ if (s.assignment) {
     instance.internalBodyWires = new Map();
     for (const [k, v] of this.wires) {
       if (!savedWires.has(k) && !pinStorage.has(k) && !poutStorage.has(k)) {
-        instance.internalBodyWires.set(k, { type: v.type, ref: v.ref });
+        instance.internalBodyWires.set(k, this._snapshotInternalBodyWire(v));
       }
     }
 
