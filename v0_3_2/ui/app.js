@@ -336,8 +336,9 @@ function bindInterpErrorHandler(interp) {
   };
 }
 
-function createInterpreter(funcs, pcbs, registry, chips, boards, probes, watches) {
+function createInterpreter(funcs, pcbs, registry, chips, boards, probes, watches, schemaRegistry) {
   const interp = new Interpreter(funcs, [], pcbs, registry, createSignalStrategy(), chips, boards);
+  if (schemaRegistry) interp.bindSchemaRegistry(schemaRegistry);
   interp.pendingProbeExprs = probes || [];
   interp.pendingWatchExprs = watches || [];
   bindInterpErrorHandler(interp);
@@ -468,7 +469,7 @@ function run(){
 
   prepareTimelineForRun(p.watches, stmts, _registry);
 
-  const interp = createInterpreter(p.funcs, p.pcbs, _registry, p.chips, p.boards, p.probes, p.watches);
+  const interp = createInterpreter(p.funcs, p.pcbs, _registry, p.chips, p.boards, p.probes, p.watches, p.schemaRegistry);
   interp.aliases = p.aliases;
   bindInterpToRunContext(interp, ctx);
   runInterpAssigned = true;

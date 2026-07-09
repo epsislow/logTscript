@@ -2907,9 +2907,10 @@ show(a,b,c)
           <button type="button" id="waveListenLevel1" class="btn" data-level="1" title="Level 1 — commits, LUT re-eval">L1</button>
           <button type="button" id="waveListenLevel2" class="btn" data-level="2" title="Level 2 — + exec statements">L2</button>
           <button type="button" id="waveListenLevel3" class="btn" data-level="3" title="Level 3 — verbose">L3</button>
-          <label class="wave-listen-fmt-label" title="Value display / copy format">
+          <label class="wave-listen-fmt-label" title="Value display / copy format (auto = schema field breakdown when wire has &lt;schema&gt;)">
             Fmt
             <select id="waveListenFmtSelect" class="wave-listen-fmt-select">
+              <option value="auto">auto</option>
               <option value="hex">hex</option>
               <option value="bin">bin</option>
               <option value="dec">dec</option>
@@ -3038,6 +3039,7 @@ show(a,b,c)
 <script src="core/user-func-overloads.js"></script>
 <script src="core/signed-arithmetic.js"></script>
 <script src="core/numeric-formats.js"></script>
+<script src="core/semantic-schemas.js"></script>
 <!-- @generated editor-pipeline-tail start -->
 <script src="core/numeric-formats.js"></script>
 <script src="core/debug-display-wrap.js"></script>

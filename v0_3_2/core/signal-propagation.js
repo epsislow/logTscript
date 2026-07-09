@@ -77,6 +77,7 @@ class SignalPropagationStrategy {
     let bitWidth = val.length;
     let wireType = null;
     let tensorMeta = null;
+    let wire = null;
     if (isComponent) {
       const comp = interp.components.get(name);
       if (comp) {
@@ -109,6 +110,7 @@ class SignalPropagationStrategy {
       bitWidth,
       wireType,
       tensorMeta,
+      schemaRef: isComponent ? null : (wire && wire.schemaRef) || null,
       isComponent,
     };
   }
@@ -338,6 +340,18 @@ class SignalPropagationStrategy {
     this._deferredShows.push(stmt);
   }
 
+  _reconcileSliceDriverWires() {
+    const interp = this.interp;
+    if (!interp) return;
+    for (const [name, wire] of interp.wires) {
+      if (!interp._wireHasSliceDriver(name)) continue;
+      const bits = interp.getBitWidth(wire.type);
+      if (!bits) continue;
+      const resolved = interp._resolveZlistResolvedValue(name, bits);
+      if (resolved != null) this.wirePendingStates.set(name, resolved);
+    }
+  }
+
   flushDeferredShows() {
     if (!this.interp || this._deferredShows.length === 0) return;
     const pending = this._deferredShows;
@@ -454,11 +468,13 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
           for (const [name, val] of outputs) {
+            if (interp._wireHasSliceDriver(name)) continue;
             this.scheduleWireChange(name, val);
           }
         }
         executedThisPropagate.add(ws);
       }
+      this._reconcileSliceDriverWires();
     } else if (this._recomputeNextAffectedWires) {
       this._recomputeNextAffectedWires = false;
       this._emitWaveListen('[wave 0] NEXT → recompute next-affected wires', 'init', 1);
@@ -467,11 +483,13 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
           for (const [name, val] of outputs) {
+            if (interp._wireHasSliceDriver(name)) continue;
             this.scheduleWireChange(name, val);
           }
         }
         executedThisPropagate.add(ws);
       }
+      this._reconcileSliceDriverWires();
     }
 
     if (!this.hasPendingChanges()) {

@@ -375,6 +375,11 @@ pushSource({ src, alias }) {
         if (ch !== ' ' && ch !== '\t') { lineStart = false; break; } // non-ws before '<'
       }
       if (lineStart) {
+        const rest = this.src.slice(this.i);
+        const schemaMatch = /^([A-Za-z_][A-Za-z0-9_]*)\s*>/.exec(rest);
+        if (schemaMatch) {
+          return this.token('SYM', '<');
+        }
         // Treat as LOAD
         let path = '';
         while (!this.eof()) {

@@ -119,6 +119,91 @@ class Parser {
     this.watches = [];
     this.componentRegistry = componentRegistry || null;
     this.metaConstantsScope = 'top';
+    this.schemaRegistry = new Map();
+  }
+
+  parseSchemaRef() {
+    this.eat('SYM', '<');
+    if (this.c.type !== 'ID') {
+      throw Error(`Expected schema name after '<' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const name = this.c.value;
+    this.eat('ID');
+    this.eat('SYM', '>');
+    return name;
+  }
+
+  parseSchemaDecl() {
+    const name = this.parseSchemaRef();
+    this.eat('SYM', ':');
+    const fields = [];
+    while (true) {
+      while (this.c.type === 'EOL') {
+        this.c = this.t.get();
+      }
+      if (this.c.type === 'EOF') {
+        throw Error(`Unclosed schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      if (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        break;
+      }
+      if (this.c.type !== 'ID') {
+        throw Error(`Expected field name in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const fieldName = this.c.value;
+      this.eat('ID');
+      this.eat('SYM', ':');
+      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+        throw Error(`Expected field width for '${fieldName}' in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const width = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      fields.push({ name: fieldName, width });
+      while (this.c.type === 'EOL') {
+        this.c = this.t.get();
+      }
+    }
+    return { name, fields };
+  }
+
+  parseOptionalSchemaSuffix() {
+    if (this.c.type === 'SYM' && this.c.value === '<') {
+      return this.parseSchemaRef();
+    }
+    return null;
+  }
+
+  parseSchemaLiteralAtom() {
+    this.eat('SYM', '{');
+    const fields = {};
+    while (!(this.c.type === 'SYM' && this.c.value === '}')) {
+      if (this.c.type === 'EOF') {
+        throw Error(`Unclosed '{' in schema literal at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      while (this.c.type === 'EOL') {
+        this.c = this.t.get();
+      }
+      if (this.c.type === 'SYM' && this.c.value === '}') break;
+      if (this.c.type !== 'ID') {
+        throw Error(`Expected field name in schema literal at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const fieldName = this.c.value;
+      this.eat('ID');
+      this.eat('SYM', '=');
+      fields[fieldName] = this.expr();
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        this.eat('SYM', ',');
+      }
+    }
+    this.eat('SYM', '}');
+    const schemaRef = this.parseSchemaRef();
+    return { schemaLiteral: { fields, schemaRef } };
+  }
+
+  _parseSchemaDisplayTag() {
+    if (this.c.type !== 'SYM' || this.c.value !== '<') return null;
+    return this.parseSchemaRef();
   }
 
   /** Seed inline kind hints from a live interpreter (e.g. execStmts re-parse). */
@@ -190,7 +275,13 @@ class Parser {
       if (i < src.length && src[i] === ')') i++;
       return;
     }
-    while (i < src.length && /[0-9]/.test(src[i])) i++;
+    if (i < src.length && /[0-9]/.test(src[i])) {
+      while (i < src.length && /[0-9]/.test(src[i])) i++;
+      return;
+    }
+    if (i < src.length && /[a-zA-Z_]/.test(src[i])) {
+      while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
+    }
   };
   const consumeBitRange = () => {
     if (i >= src.length || src[i] !== '.') return;
@@ -369,6 +460,15 @@ class Parser {
 
   parseWireIndexSuffix(name, withAtomLoc) {
     this.eat('SYM', ':');
+    if (this.c.type === 'ID') {
+      const fieldName = this.c.value;
+      this.eat('ID');
+      const idAtom = withAtomLoc({ var: name, schemaField: fieldName });
+      const br = this.parseBitRangeSuffix();
+      if (br) idAtom.bitRange = br;
+      { const _p = this.maybeParsePadding(); if (_p != null) idAtom.pad = _p; }
+      return idAtom;
+    }
     if (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
       const colPart = this.parseWireIndexValue();
@@ -383,6 +483,17 @@ class Parser {
     const firstPart = this.parseWireIndexValue();
     if (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
+      if (this.c.type === 'ID') {
+        const fieldName = this.c.value;
+        this.eat('ID');
+        const idAtom = withAtomLoc({ var: name, schemaField: fieldName });
+        if (firstPart.index !== undefined) idAtom.vectorIndex = firstPart.index;
+        else idAtom.vectorIndexExpr = firstPart.indexExpr;
+        const br = this.parseBitRangeSuffix();
+        if (br) idAtom.bitRange = br;
+        { const _p = this.maybeParsePadding(); if (_p != null) idAtom.pad = _p; }
+        return idAtom;
+      }
       const secondPart = this.parseWireIndexValue();
       const idAtom = withAtomLoc({ var: name, tensorSlice: 'cell' });
       if (firstPart.index !== undefined) idAtom.tensorRowIndex = firstPart.index;
@@ -391,6 +502,14 @@ class Parser {
       else idAtom.tensorColIndexExpr = secondPart.indexExpr;
       const br = this.parseBitRangeSuffix();
       if (br) idAtom.bitRange = br;
+      if (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        if (this.c.type !== 'ID') {
+          throw Error(`Expected schema field name after ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        idAtom.schemaField = this.c.value;
+        this.eat('ID');
+      }
       { const _p = this.maybeParsePadding(); if (_p != null) idAtom.pad = _p; }
       return idAtom;
     }
@@ -413,6 +532,12 @@ parse() {
     
     if (this.c.type === 'LOAD') {
       this.parseLoad();
+      continue;
+    }
+
+    if (this.c.type === 'SYM' && this.c.value === '<') {
+      const schemaDecl = this.parseSchemaDecl();
+      stmts.push({ schemaDecl });
       continue;
     }
     
@@ -528,6 +653,12 @@ parseLoad() {
   const processedContent = preprocessLoop(content);
   const subParser = new Parser(new Tokenizer(processedContent, path), this.componentRegistry);
   subParser.parse();
+
+  for (const [sname, sdef] of subParser.schemaRegistry.entries()) {
+    const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
+    if (SS) SS.registerSchema(this.schemaRegistry, sdef);
+    else this.schemaRegistry.set(sname, sdef);
+  }
 
   for (const [fname, fdef] of subParser.funcs.entries()) {
     if (typeof UserFuncOverloads !== 'undefined') {
@@ -706,9 +837,19 @@ parseDebugDisplayTags(allowedTags) {
   this.eat('SYM', ';');
   const tags = [];
   const seen = new Set();
-  const result = { tags, elRange: null, elLast: null, maxWidth: null, level: null };
+  const result = { tags, elRange: null, elLast: null, maxWidth: null, level: null, schemaRef: null };
 
-  while (this.c.type === 'ID') {
+  while (true) {
+    const schemaTag = this._parseSchemaDisplayTag();
+    if (schemaTag) {
+      if (result.schemaRef) {
+        throw Error(`Duplicate schema display tag '<${schemaTag}>' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      result.schemaRef = schemaTag;
+      continue;
+    }
+    if (this.c.type !== 'ID') break;
+
     const tagName = this.c.value;
     if (!allowedTags.has(tagName) && !isParametricFormatDisplayTag(tagName)) {
       throw Error(`Unknown display tag '${tagName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
@@ -734,7 +875,7 @@ parseDebugDisplayTags(allowedTags) {
     }
   }
 
-  if (!tags.length && result.elRange == null && result.elLast == null && result.maxWidth == null && result.level == null) {
+  if (!tags.length && result.elRange == null && result.elLast == null && result.maxWidth == null && result.level == null && !result.schemaRef) {
     throw Error(`Expected display tag after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
 
@@ -1828,6 +1969,7 @@ assignment() {
     const type = this.c.value;
     this.eat('TYPE');
     const tensorShape = this.parseTensorShapeSuffix(type);
+    const schemaRef = this.parseOptionalSchemaSuffix();
 
     let name;
     if (this.c.type === 'ID' || this.c.type === 'SPECIAL') {
@@ -1838,6 +1980,7 @@ assignment() {
     }
 
     const decl = { type, name, line: declLine, col: declCol };
+    if (schemaRef) decl.schemaRef = schemaRef;
     this._applyTensorShapeToDecl(decl, tensorShape);
     decls.push(decl);
 
@@ -3219,6 +3362,10 @@ assignment() {
       this.eat('SYM', ')');
       if (inner.length === 1) return addNot(inner[0]);
       return addNot({ group: inner });
+    }
+
+    if (this.c.type === 'SYM' && this.c.value === '{') {
+      return addNot(this.parseSchemaLiteralAtom());
     }
 
     if (

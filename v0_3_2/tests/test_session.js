@@ -57,6 +57,7 @@
         const stmts = p.parse();
         this.out = [];
         this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry, signalPropagationStrategy, p.chips, p.boards);
+        this.interp.bindSchemaRegistry(p.schemaRegistry);
         this.interp._instanceId = instanceId;
         if (typeof setDeviceOperationInstanceId === 'function') {
           setDeviceOperationInstanceId(instanceId);

@@ -349,7 +349,11 @@
       return null;
     }
 
-    if (!tags.length && elRangeSpec == null && elLast == null && maxWidth == null) return null;
+    const schemaRef = typeof displayTags === 'object' && displayTags.schemaRef != null
+      ? displayTags.schemaRef
+      : null;
+
+    if (!tags.length && elRangeSpec == null && elLast == null && maxWidth == null && !schemaRef) return null;
 
     if (tags.includes('decSigned')) {
       if (!tags.includes('signed')) tags.push('signed');
@@ -393,6 +397,7 @@
       multiline: tags.includes('multiline'),
       maxWidth: maxWidth != null ? maxWidth : null,
       decSigned: hasSigned && hasDec,
+      schemaRef,
     };
   }
 

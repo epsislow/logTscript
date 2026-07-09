@@ -393,6 +393,7 @@ class Interpreter {
     this.zconnRedirectRegistrations = new Map();
     this._probeDriverSnapshots = new Map();
     this.aliases = new Map();
+    this.schemaRegistry = new Map();
     this.components=new Map(); // Component name -> {type, componentType, attributes, initialValue, returnType, ref, deviceIds}
     this.componentConnections=new Map(); // Component name -> {source: ref or expr, bitRange}
     this.componentPendingProperties=new Map(); // Component name -> {property: {expr, value}} - properties waiting to be applied
@@ -2408,6 +2409,7 @@ class Interpreter {
       this.wireStorageMap.set(decl.name, storageIdx);
       const wireEntry = { type: decl.type, ref: `&${storageIdx}`, initOnly: true };
       this._applyDeclVectorMeta(wireEntry, decl);
+      this._applySchemaRefToWireEntry(wireEntry, decl, bits, null);
       this.wires.set(decl.name, wireEntry);
     } else {
       const existing = this.wires.get(decl.name);
@@ -3055,10 +3057,13 @@ class Interpreter {
         }
       }
       const sliceWidth = this._sliceRangeWidth(sliceRange);
-      if (rhs.length !== sliceWidth) {
+      const assignPad = stmtAssignPad(ws);
+      try {
+        rhs = fitWireAssignBits(rhs, sliceWidth, assignPad, 'lsb', this);
+      } catch (e) {
         return { active: false, value: null };
       }
-      const merged = this._applySliceWrite(target.var, wire, bits, sliceRange, rhs, 'strict');
+      const merged = this._applySliceWrite(target.var, wire, bits, sliceRange, rhs, assignPad);
       return { active: true, value: merged };
     }
     const outputs = this.execWireStatement(ws, true);
@@ -3130,7 +3135,12 @@ class Interpreter {
               }
             }
             const sliceWidth = this._sliceRangeWidth(sliceRange);
-            if (rhs.length !== sliceWidth) continue;
+            const assignPad = stmtAssignPad(ws);
+            try {
+              rhs = fitWireAssignBits(rhs, sliceWidth, assignPad, 'lsb', this);
+            } catch (e) {
+              continue;
+            }
             if (sliceRange.nonContiguous === 'col') {
               const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
               const meta = this.getWireTensorMeta(wire);
@@ -3653,14 +3663,21 @@ class Interpreter {
     if (!wire) return '';
     const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
     const meta = TS ? TS.getWireTensorMeta(wire) : null;
+    let base = '';
     if (meta && TS) {
-      return TS.formatTensorTypeLabel(meta.elementWidth, meta.rows, meta.cols);
+      base = TS.formatTensorTypeLabel(meta.elementWidth, meta.rows, meta.cols);
+    } else {
+      const v = wire.vector;
+      if (v && v.elementWidth && v.elementCount) {
+        base = `${v.elementWidth}wire[${v.elementCount}]`;
+      } else {
+        base = wire.type || '';
+      }
     }
-    const v = wire.vector;
-    if (v && v.elementWidth && v.elementCount) {
-      return `${v.elementWidth}wire[${v.elementCount}]`;
+    if (wire.schemaRef) {
+      return `${base}<${wire.schemaRef}>`;
     }
-    return wire.type || '';
+    return base;
   }
 
   _zlistTypeLabel(wire) {
@@ -3697,6 +3714,149 @@ class Interpreter {
 
   _applyDeclVectorMeta(wireEntry, decl) {
     this._applyDeclTensorMeta(wireEntry, decl);
+  }
+
+  bindSchemaRegistry(registry) {
+    if (registry) {
+      this.schemaRegistry = registry;
+    } else if (!this.schemaRegistry) {
+      this.schemaRegistry = new Map();
+    }
+  }
+
+  _semanticSchemas() {
+    return typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
+  }
+
+  _resolveSchema(name) {
+    const SS = this._semanticSchemas();
+    if (!SS) throw new Error('semantic-schemas.js is not loaded');
+    return SS.resolveSchema(this.schemaRegistry, name);
+  }
+
+  _applySchemaRefToWireEntry(wireEntry, decl, wireWidth, loc) {
+    if (!decl || !decl.schemaRef) return;
+    const SS = this._semanticSchemas();
+    if (!SS) throw new Error('semantic-schemas.js is not loaded');
+    const schema = this._resolveSchema(decl.schemaRef);
+    try {
+      SS.validateSchemaWidth(schema, wireWidth);
+    } catch (e) {
+      throw new Error(`${e.message}${loc ? ` at ${loc}` : ''}`);
+    }
+    wireEntry.schemaRef = decl.schemaRef;
+  }
+
+  _execSchemaDecl(s) {
+    const SS = this._semanticSchemas();
+    if (!SS || !s.schemaDecl) return;
+    const def = SS.buildSchemaDef(s.schemaDecl.name, s.schemaDecl.fields);
+    SS.registerSchema(this.schemaRegistry, def);
+  }
+
+  _elementWidthForWire(wire) {
+    if (!wire) return null;
+    const meta = this.getWireTensorMeta(wire);
+    if (meta && meta.elementWidth) return meta.elementWidth;
+    if (wire.vector && wire.vector.elementWidth) return wire.vector.elementWidth;
+    return this.getBitWidth(wire.type);
+  }
+
+  _resolveSchemaFieldAbsoluteRange(atom, wire) {
+    const SS = this._semanticSchemas();
+    if (!SS || !atom || !atom.schemaField) return null;
+    if (!wire || !wire.schemaRef) {
+      throw new Error(`Wire ${atom.var} has no schema for field access '${atom.schemaField}'`);
+    }
+    const schema = this._resolveSchema(wire.schemaRef);
+    const field = SS.getField(schema, atom.schemaField);
+    if (!field) {
+      throw new Error(`Unknown schema field '${atom.schemaField}' in schema '${wire.schemaRef}'`);
+    }
+    const elemWidth = this._elementWidthForWire(wire);
+    let elemStart = 0;
+    if (atom.tensorSlice === 'cell') {
+      const slice = this.resolveAtomWireSlice(atom, wire);
+      if (!slice || slice.nonContiguous) {
+        throw new Error(`Invalid tensor cell for schema field access on ${atom.var}`);
+      }
+      elemStart = slice.start;
+    } else if (atom.vectorIndex !== undefined || atom.vectorIndexExpr || atom.tensorSlice) {
+      const slice = this.resolveAtomWireSlice(atom, wire);
+      if (!slice || slice.nonContiguous) {
+        throw new Error(`Invalid vector slice for schema field access on ${atom.var}`);
+      }
+      elemStart = slice.start;
+    }
+    return {
+      start: elemStart + field.bitStart,
+      end: elemStart + field.bitEnd,
+      field,
+      schema,
+      elemStart,
+    };
+  }
+
+  _formatSchemaFieldLabel(atom) {
+    if (!atom || !atom.schemaField) return null;
+    if (atom.tensorSlice === 'cell') {
+      return `${atom.var}:${atom.tensorRowIndex}:${atom.tensorColIndex}:${atom.schemaField}`;
+    }
+    if (atom.vectorIndex !== undefined || atom.vectorIndexExpr) {
+      const idx = atom.vectorIndex !== undefined ? atom.vectorIndex : '?';
+      return `${atom.var}:${idx}:${atom.schemaField}`;
+    }
+    return `${atom.var}:${atom.schemaField}`;
+  }
+
+  evalSchemaLiteralAtom(a, computeRefs) {
+    const SS = this._semanticSchemas();
+    if (!SS) throw new Error('semantic-schemas.js is not loaded');
+    const lit = a.schemaLiteral || a;
+    const schema = this._resolveSchema(lit.schemaRef);
+    const fieldValues = {};
+    for (const [name, expr] of Object.entries(lit.fields || {})) {
+      const parts = this.evalExpr(expr, false);
+      let bits = '';
+      for (const part of parts) {
+        if (part.value != null && part.value !== '-') bits += part.value;
+        else if (part.ref) {
+          const v = this.getValueFromRef(part.ref);
+          if (v) bits += v;
+        }
+      }
+      fieldValues[name] = bits;
+    }
+    const totalBits = SS.buildSchemaLiteralBits(schema, fieldValues);
+    if (computeRefs) {
+      const idx = this.storeValue(totalBits);
+      return { value: totalBits, ref: `&${idx}`, varName: null, bitWidth: schema.totalWidth };
+    }
+    return { value: totalBits, ref: null, varName: null, bitWidth: schema.totalWidth };
+  }
+
+  _formatShowWithSchema(valueStr, wire, opts, displayName, isPeek) {
+    const SS = this._semanticSchemas();
+    if (!SS || !wire) return null;
+    const schemaName = opts && opts.schemaRef ? opts.schemaRef : wire.schemaRef;
+    if (!schemaName) return null;
+    const schema = this._resolveSchema(schemaName);
+    SS.validateSchemaWidthForShow(schema, valueStr.length);
+    const typeLabel = displayName
+      ? `${displayName} (${this.getWireTypeLabel(wire)})`
+      : this.getWireTypeLabel(wire);
+    const lines = SS.formatSchemaShowLines(
+      valueStr,
+      schema,
+      opts,
+      (bits, w) => this.formatValue(bits, w)
+    );
+    if (lines.length) lines[0] = typeLabel;
+    const ref = wire.ref;
+    const refStr = (!isPeek && ref && ref !== '&-') ? ` (ref: ${ref})` : '';
+    if (lines.length === 1) return [lines[0] + refStr];
+    lines[0] = lines[0] + refStr;
+    return lines;
   }
 
   _vectorElementLabel(varName, index) {
@@ -3990,7 +4150,7 @@ class Interpreter {
     return !!(target && (
       target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange
       || target.tensorSlice || target.tensorRowIndex !== undefined || target.tensorColIndex !== undefined
-      || target.tensorRowIndexExpr || target.tensorColIndexExpr
+      || target.tensorRowIndexExpr || target.tensorColIndexExpr || target.schemaField
     ));
   }
 
@@ -4020,6 +4180,10 @@ class Interpreter {
 
   _assignmentTargetSliceRange(target, wireName) {
     const wire = this.wires.get(wireName);
+    if (target && target.schemaField) {
+      const abs = this._resolveSchemaFieldAbsoluteRange(target, wire);
+      if (abs) return { start: abs.start, end: abs.end };
+    }
     const slice = this.resolveAtomWireSlice(target, wire);
     if (!slice) return null;
     if (slice.nonContiguous) return slice;
@@ -4628,6 +4792,10 @@ class Interpreter {
       return this.evalProtocolInvokeAtom(a.protocolInvoke, computeRefs);
     }
 
+    if (a.schemaLiteral) {
+      return this.evalSchemaLiteralAtom(a, computeRefs);
+    }
+
     if(a.bin){
       let binStr = a.bin;
       if(a.bitRange){
@@ -4870,6 +5038,18 @@ class Interpreter {
             // Reference exists but value not computed yet - compute it
             val = '0'.repeat(this.getBitWidth(wire.type));
           }
+        }
+        if (a.schemaField) {
+          const abs = this._resolveSchemaFieldAbsoluteRange(a, wire);
+          let extracted = val.substring(abs.start, abs.end + 1);
+          if (a.pad) extracted = this.applyPad(extracted, a.pad);
+          const displayName = this._formatSchemaFieldLabel(a);
+          return {
+            value: extracted,
+            ref: null,
+            varName: displayName,
+            bitWidth: extracted.length,
+          };
         }
       } else {
         const varInfo = this.vars.get(a.var);
@@ -7804,6 +7984,27 @@ if (this.isBuiltinDEMUX(name)) {
         }
       }
       const r = this.evalExpr(e, computeRefs);
+      if (e && e.length === 1 && e[0].var && !e[0].bitRange && e[0].vectorIndex === undefined
+          && !e[0].vectorIndexExpr && !e[0].tensorSlice && !e[0].schemaField) {
+        const schemaWire = this.wires.get(e[0].var);
+        if (schemaWire && (schemaWire.schemaRef || (opts && opts.schemaRef))) {
+          const part0 = r[0];
+          let valueStr = part0 && part0.value != null ? part0.value : '-';
+          if (valueStr === '-' && part0 && part0.ref) valueStr = this.getValueFromRef(part0.ref) || '-';
+          if (valueStr !== '-') {
+            try {
+              const schemaLines = this._formatShowWithSchema(valueStr, schemaWire, opts, e[0].var, isPeek);
+              if (schemaLines && schemaLines.length) {
+                for (const sl of schemaLines) this.out.push(sl);
+                continue;
+              }
+            } catch (err) {
+              this.reportRuntimeError(err);
+              continue;
+            }
+          }
+        }
+      }
       for (const part of r) {
         if (!part) continue;
         let displayName = part.varName;
@@ -8079,6 +8280,10 @@ if (this.isBuiltinDEMUX(name)) {
     
     try {
     if(s.watch){
+      return;
+    }
+    if (s.schemaDecl) {
+      this._execSchemaDecl(s);
       return;
     }
     if(s.doc !== undefined && s.doc !== null){
@@ -8866,7 +9071,7 @@ if (s.assignment) {
   let range = null;
   if (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange
       || target.tensorSlice || target.tensorRowIndex !== undefined || target.tensorColIndex !== undefined
-      || target.tensorRowIndexExpr || target.tensorColIndexExpr) {
+      || target.tensorRowIndexExpr || target.tensorColIndexExpr || target.schemaField) {
     try {
       range = this._assignmentTargetSliceRange(target, name);
     } catch (e) {
@@ -9316,7 +9521,13 @@ if (s.assignment) {
     }
   }
 
-  if (rhs.length !== sliceWidth) {
+  if (range) {
+    try {
+      rhs = fitWireAssignBits(rhs, sliceWidth, wireAssignPad, 'lsb', this);
+    } catch (e) {
+      this._throwRuntime(e.message, s, rhs.length);
+    }
+  } else if (rhs.length !== sliceWidth) {
     const sliceLabel = range && range.nonContiguous === 'col'
       ? `${name}::${range.col}`
       : `${name}.${start}-${end}`;
@@ -9502,6 +9713,7 @@ if (s.assignment) {
           this.wireStorageMap.set(d.name, storageIdx);
           const wireEntry = { type: d.type, ref: `&${storageIdx}`, initOnly: true };
           this._applyDeclVectorMeta(wireEntry, d);
+          this._applySchemaRefToWireEntry(wireEntry, d, bits, loc);
           this.wires.set(d.name, wireEntry);
           if (this.deferWirePropagation()) {
             this.scheduleWireChange(d.name, initValue);
@@ -9526,6 +9738,7 @@ if (s.assignment) {
         this.wireStorageMap.set(d.name, storageIdx);
         const wireEntry = { type: d.type, ref: `&${storageIdx}`, initOnly: true };
         this._applyDeclVectorMeta(wireEntry, d);
+        this._applySchemaRefToWireEntry(wireEntry, d, bits, loc);
         this.wires.set(d.name, wireEntry);
       }
       return;
@@ -9777,6 +9990,7 @@ if (s.assignment) {
         const simpleRef = `&${storageIdx}`;
         const wireEntry = { type: actualType, ref: simpleRef };
         this._applyDeclVectorMeta(wireEntry, d);
+        this._applySchemaRefToWireEntry(wireEntry, d, bits, this.getLocation(s, d));
         const modPart = exprResult.find(p => p.asmModuleId != null);
         let asmModuleId = modPart ? modPart.asmModuleId : null;
         if (asmModuleId == null) {
@@ -9795,6 +10009,7 @@ if (s.assignment) {
           existing.ref = simpleRef;
           if (wireEntry.vector) existing.vector = wireEntry.vector;
           else delete existing.vector;
+          if (d.schemaRef) existing.schemaRef = wireEntry.schemaRef;
           if (asmModuleId != null) existing.asmModuleId = asmModuleId;
           else if (!hasAsmBlob) delete existing.asmModuleId;
         }
@@ -10033,12 +10248,14 @@ if (s.assignment) {
         const simpleRef = `&${storageIdx}`;
         const wireEntry = { type: actualType, ref: simpleRef };
         this._applyDeclVectorMeta(wireEntry, d);
+        this._applySchemaRefToWireEntry(wireEntry, d, bits, this.getLocation(s, d));
         if(this.wires.has(d.name)){
           const existing = this.wires.get(d.name);
           existing.type = wireEntry.type;
           existing.ref = simpleRef;
           if (wireEntry.vector) existing.vector = wireEntry.vector;
           else delete existing.vector;
+          if (d.schemaRef) existing.schemaRef = wireEntry.schemaRef;
           this._syncAsmModuleMeta(existing, exprResult);
         } else {
           this._syncAsmModuleMeta(wireEntry, exprResult);

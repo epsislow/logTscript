@@ -19555,6 +19555,128 @@ reg(2223, 'doc', 'Search — PIVOT primary on wire-vectors', function(h) {
   h.assert('pivot first wire-vectors', results[0].file, 'wire-vectors.md');
 });
 
+const OPCODE16_SCHEMA = `<opcode>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:8
+:
+`;
+
+const OPCODE13_SCHEMA = `<opcode13>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:5
+:
+`;
+
+reg(2230, 'semantic-schemas', 'schema width mismatch on wire decl', function(h, session) {
+  h.assertThrows('width mismatch', function() {
+    session.run(OPCODE13_SCHEMA + '16wire<opcode13> instr');
+  }, 'width mismatch between opcode13 (13bit) and definition (16bit)');
+});
+
+reg(2231, 'semantic-schemas', 'schema literal partial init', function(h, session) {
+  session.run(OPCODE16_SCHEMA + [
+    '16wire<opcode> instr = {',
+    '    cycles=\\3',
+    '    alu=0',
+    '    reserved=^FF',
+    '}<opcode>',
+  ].join('\n'));
+  h.assert('cycles field', session.getWire(session.interp, 'instr').substring(6, 8), '11');
+  h.assert('alu zero', session.getWire(session.interp, 'instr').substring(0, 4), '0000');
+});
+
+reg(2232, 'semantic-schemas', 'field access read and write', function(h, session) {
+  session.run(OPCODE16_SCHEMA + [
+    '16wire<opcode> instr := 0',
+    'instr:alu := \\5',
+    'instr:cycles := \\3',
+    '4wire x = instr:alu',
+    '2wire y = instr:cycles',
+  ].join('\n'));
+  h.assert('alu read', session.getWire(session.interp, 'x'), '0101');
+  h.assert('cycles read', session.getWire(session.interp, 'y'), '11');
+});
+
+reg(2236, 'semantic-schemas', 'field assign strict = rejects short literal', function(h, session) {
+  h.assertThrows('strict width', function() {
+    session.run(OPCODE16_SCHEMA + [
+      '16wire<opcode> instr := 0',
+      'instr:alu = \\5',
+    ].join('\n'));
+  }, 'Expected 4 bits, got 3');
+});
+
+reg(2237, 'semantic-schemas', 'field access show wave propagation', function(h, session) {
+  const s = createSession({ propagation: 'wave' });
+  const out = s.runDoc(OPCODE16_SCHEMA + [
+    '16wire<opcode> instr := 0',
+    'instr:alu := \\5',
+    'instr:cycles := \\3',
+    'show(instr)',
+  ].join('\n'));
+  h.assert('alu in show', String(out.some(l => l.includes('alu') && l.includes('0101'))), 'true');
+  h.assert('cycles in show', String(out.some(l => l.includes('cycles') && l.includes('11'))), 'true');
+  s.cleanup();
+});
+
+reg(2233, 'semantic-schemas', 'show auto schema breakdown', function(h, session) {
+  const out = session.runDoc(OPCODE16_SCHEMA + [
+    '16wire<opcode> instr = { cycles=\\3 alu=0 }<opcode>',
+    'show(instr)',
+  ].join('\n'));
+  h.assert('header', String(out.some(l => l.includes('instr (16wire<opcode>)'))), 'true');
+  h.assert('cycles line', String(out.some(l => l.includes('cycles') && l.includes('11'))), 'true');
+});
+
+reg(2234, 'semantic-schemas', 'show alt schema width error', function(h, session) {
+  const altSchema = `<opcode15>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:7
+:
+`;
+  const out = session.runDoc(OPCODE16_SCHEMA + altSchema + [
+    '16wire<opcode> instr := 0',
+    'show(instr; <opcode15>)',
+  ].join('\n'));
+  h.assert('incompatible width', String(out.some(l => String(l).includes('width incompatible'))), 'true');
+});
+
+reg(2235, 'semantic-schemas', 'show without schema flat s8 unchanged', function(h, session) {
+  const out = session.runDoc([
+    '2wire a := 0',
+    'show(a; s8)',
+  ].join('\n'));
+  h.assert('flat s8', String(out.some(l => l.startsWith('a (2wire) = 00'))), 'true');
+});
+
+reg(2238, 'semantic-schemas', 'Wave Listen fmt auto breakdown', function(h, session) {
+  session.run(OPCODE16_SCHEMA + '16wire<opcode> instr = { cycles=\\3 alu=\\5 }<opcode>');
+  const wire = session.interp.wires.get('instr');
+  const raw = session.getWire(session.interp, 'instr');
+  const entry = {
+    name: 'instr',
+    rawValue: raw,
+    bitWidth: 16,
+    wireType: '16wire<opcode>',
+    schemaRef: wire && wire.schemaRef,
+    tensorMeta: null,
+  };
+  h.assert('auto fmt option', String(WAVE_LISTEN_FMT_OPTIONS.includes('auto')), 'true');
+  const inline = formatWaveListenInline(entry, 'auto', null, session.interp);
+  h.assert('inline alu', String(inline.includes('alu=0101') || inline.includes('alu = 0101')), 'true');
+  const lines = formatWaveListenExpandLines(entry, 'auto', session.interp);
+  h.assert('expand cycles', String(lines.some((l) => l.includes('cycles') && l.includes('11'))), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

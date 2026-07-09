@@ -2,7 +2,7 @@
 
 const WAVE_LISTEN_EXPAND_THRESHOLD = 256;
 const WAVE_LISTEN_INLINE_PREVIEW_MAX = 48;
-const WAVE_LISTEN_FMT_OPTIONS = ['hex', 'bin', 'dec', 'ascii', 's8', 'q4p4', 'fp16', 'bf16'];
+const WAVE_LISTEN_FMT_OPTIONS = ['auto', 'hex', 'bin', 'dec', 'ascii', 's8', 'q4p4', 'fp16', 'bf16'];
 const WAVE_LISTEN_BIN_GROUP_BITS = 8;
 
 function normalizeWaveListenFmt(fmt) {
@@ -269,6 +269,19 @@ function _waveListenHexDisplay(rawValue, bitWidth, formatValueFn) {
 }
 
 function _formatWaveListenScalarFormatted(rawValue, bitWidth, fmt, formatValueFn, interp, entry) {
+  if (fmt === 'auto') {
+    const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
+    if (SS && entry && entry.schemaRef && interp && interp.schemaRegistry) {
+      try {
+        const schema = SS.resolveSchema(interp.schemaRegistry, entry.schemaRef);
+        SS.validateSchemaWidthForShow(schema, bitWidth || rawValue.length);
+        return SS.formatSchemaShowInline(rawValue, schema, null, formatValueFn);
+      } catch (e) {
+        return _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
+      }
+    }
+    return _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
+  }
   if (fmt === 'bin') return formatWaveListenBinary(rawValue);
   if (fmt === 'hex') return _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
   if (fmt === 'ascii') {
@@ -365,6 +378,20 @@ function formatWaveListenExpandLines(entry, fmt, interp) {
   const formatValueFn = interp && typeof interp.formatValue === 'function'
     ? (v, w) => interp.formatValue(v, w)
     : null;
+
+  if (mode === 'auto') {
+    const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
+    if (SS && entry.schemaRef && interp && interp.schemaRegistry) {
+      try {
+        const schema = SS.resolveSchema(interp.schemaRegistry, entry.schemaRef);
+        SS.validateSchemaWidthForShow(schema, bw);
+        return SS.formatSchemaShowLines(rawValue, schema, null, formatValueFn);
+      } catch (e) {
+        return wrapBinaryGroupLines(rawValue);
+      }
+    }
+    return wrapBinaryGroupLines(rawValue);
+  }
 
   if (tensorMeta && interp && typeof interp._formatVectorShowLines === 'function'
     && _tensorUsesShowLines(entry, mode)) {

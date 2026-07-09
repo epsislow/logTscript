@@ -475,9 +475,26 @@ function updateWaveListenToolbarUI() {
   }
 }
 
+function syncWaveListenFmtSelectOptions() {
+  const fmtSelect = document.getElementById('waveListenFmtSelect');
+  if (!fmtSelect || typeof WAVE_LISTEN_FMT_OPTIONS === 'undefined') return;
+  const current = fmtSelect.value;
+  fmtSelect.replaceChildren();
+  for (const fmt of WAVE_LISTEN_FMT_OPTIONS) {
+    const opt = document.createElement('option');
+    opt.value = fmt;
+    opt.textContent = fmt;
+    fmtSelect.appendChild(opt);
+  }
+  if (WAVE_LISTEN_FMT_OPTIONS.includes(current)) {
+    fmtSelect.value = current;
+  }
+}
+
 function initWaveListenPanel() {
   if (_waveListenState.initialized) return;
   _waveListenState.initialized = true;
+  syncWaveListenFmtSelectOptions();
   loadWaveListenPreferences();
 
   const armBtn = document.getElementById('waveListenArmBtn');
