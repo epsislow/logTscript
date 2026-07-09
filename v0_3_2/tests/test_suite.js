@@ -19791,6 +19791,61 @@ reg(2244, 'semantic-schemas', 'peek and probe schema breakdown smoke', function(
   h.assert('field updated', String(out.some(l => l.includes('1111'))), 'true');
 }, { propagation: 'wave' });
 
+reg(2253, 'semantic-schemas', 'vector show peek probe schema inline per element', function(h, session) {
+  const script = OPCODE16_SCHEMA + [
+    '16wire[3]<opcode> rom := 0',
+    'rom:1:alu := \\5',
+    'rom:1:cycles := \\3',
+    'show(rom)',
+    'peek(rom)',
+    'probe(rom:1)',
+  ].join('\n');
+  const { out } = session.run(script);
+  const slot1Lines = out.filter((l) => l.includes(':1 =') && l.includes('alu=0101'));
+  h.assert('show rom slot1 schema inline', String(slot1Lines.length >= 1), 'true');
+  h.assert('show rom slot1 cycles', String(slot1Lines.some((l) => l.includes('cycles=11'))), 'true');
+  const peekSlot1 = out.filter((l) => l.includes(':1 =') && l.includes('alu=0101'));
+  h.assert('peek rom slot1 schema inline', String(peekSlot1.length >= 1), 'true');
+  const probeLine = out.find((l) => l.startsWith('# rom:1 =') && l.includes('alu=0101'));
+  h.assert('probe rom:1 schema inline', String(!!probeLine), 'true');
+  h.assert('probe rom:1 cycles', String(probeLine && probeLine.includes('cycles=11')), 'true');
+}, { propagation: 'wave' });
+
+reg(2254, 'semantic-schemas', 'Wave Listen auto vector schema inline and expand', function(h, session) {
+  session.run(OPCODE16_SCHEMA + [
+    '16wire[3]<opcode> rom := 0',
+    'rom:1:alu := \\5',
+    'rom:1:cycles := \\3',
+  ].join('\n'));
+  const wire = session.interp.wires.get('rom');
+  const raw = session.getWire(session.interp, 'rom');
+  const meta = session.interp.getWireTensorMeta(wire);
+  const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+  const strat = session.interp.signalPropagationStrategy;
+  const payload = strat && typeof strat._buildWaveListenValuePayload === 'function'
+    ? strat._buildWaveListenValuePayload('rom', raw, {})
+    : null;
+  h.assert('payload schemaRef', String(payload && payload.schemaRef === 'opcode'), 'true');
+  const entry = payload || {
+    name: 'rom',
+    rawValue: raw,
+    bitWidth: raw.length,
+    schemaRef: wire.schemaRef,
+    tensorMeta: {
+      rows: meta.rows,
+      cols: meta.cols,
+      elementWidth: meta.elementWidth,
+      elementCount: meta.elementCount,
+      isMatrix: TS ? TS.isMatrix(meta) : false,
+    },
+  };
+  const inline = formatWaveListenInline(entry, 'auto', null, session.interp);
+  h.assert('inline slot1 alu', String(inline.includes('alu=0101')), 'true');
+  h.assert('inline slot1 cycles', String(inline.includes('cycles=11')), 'true');
+  const lines = formatWaveListenExpandLines(entry, 'auto', session.interp);
+  h.assert('expand slot1 alu', String(lines.some((l) => l.includes(':1 =') && l.includes('alu=0101'))), 'true');
+}, { propagation: 'wave' });
+
 reg(2245, 'semantic-schemas', 'field assign with AND expression', function(h, session) {
   session.run(OPCODE16_SCHEMA + [
     '4wire a = 0101',

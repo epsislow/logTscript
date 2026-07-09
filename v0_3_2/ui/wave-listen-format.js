@@ -268,8 +268,32 @@ function _waveListenHexDisplay(rawValue, bitWidth, formatValueFn) {
   return rawValue;
 }
 
+function _tensorUsesSchemaAuto(entry, fmt) {
+  return fmt === 'auto' && entry && entry.schemaRef && entry.tensorMeta;
+}
+
+function _waveListenVectorSchemaLines(entry, rawValue, interp) {
+  if (!entry || !entry.tensorMeta || !entry.schemaRef || !interp
+      || typeof interp._formatVectorShowLines !== 'function') {
+    return null;
+  }
+  return interp._formatVectorShowLines(entry.name, rawValue, null);
+}
+
+function _waveListenVectorSchemaInline(entry, rawValue, interp) {
+  const lines = _waveListenVectorSchemaLines(entry, rawValue, interp);
+  if (!lines || !lines.length) return null;
+  const cells = lines.filter((l) => l.startsWith(':'));
+  if (cells.length) return cells.join(' ');
+  return lines.join(' ');
+}
+
 function _formatWaveListenScalarFormatted(rawValue, bitWidth, fmt, formatValueFn, interp, entry) {
   if (fmt === 'auto') {
+    if (_tensorUsesSchemaAuto(entry, fmt)) {
+      const summary = _waveListenVectorSchemaInline(entry, rawValue, interp);
+      if (summary) return summary;
+    }
     const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
     if (SS && entry && entry.schemaRef && interp && interp.schemaRegistry) {
       try {
@@ -380,6 +404,10 @@ function formatWaveListenExpandLines(entry, fmt, interp) {
     : null;
 
   if (mode === 'auto') {
+    if (_tensorUsesSchemaAuto(entry, mode)) {
+      const vlines = _waveListenVectorSchemaLines(entry, rawValue, interp);
+      if (vlines && vlines.length) return vlines;
+    }
     const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
     if (SS && entry.schemaRef && interp && interp.schemaRegistry) {
       try {

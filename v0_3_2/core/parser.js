@@ -1798,6 +1798,8 @@ parseBoardInstance() {
 
 assignment() {
   if (this.c.type === 'GREF') {
+    const stmtLine = this.c.line;
+    const stmtCol = tokenStartCol(this.c);
     const compName = this.c.value;
     this.eat('GREF');
     this.eat('SYM', ':');
@@ -1828,7 +1830,9 @@ assignment() {
         target: { var: compName, property, globalRef: true },
         expr,
         assignPad
-      }
+      },
+      line: stmtLine,
+      col: stmtCol,
     };
   }
   if (this.c.type === 'SYM' && this.c.value === '.') {
@@ -1864,6 +1868,8 @@ assignment() {
     }
   }
   
+  const stmtLine = this.c.line;
+  const stmtCol = tokenStartCol(this.c);
   const targetAtom = this.atom();
   
   if (!targetAtom.var) {
@@ -1893,7 +1899,9 @@ assignment() {
       expr,
       assignPad,
       ...enableSuffix
-    }
+    },
+    line: stmtLine,
+    col: stmtCol,
   };
 }
 

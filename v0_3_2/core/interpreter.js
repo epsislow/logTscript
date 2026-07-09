@@ -2235,9 +2235,12 @@ class Interpreter {
     if (!target) return;
     let valueStr = value == null ? '-' : String(value);
     const opts = this._normalizeShowDisplayOpts(target.displayTags);
-    const useTagFormat = opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat);
-    if (target.bitWidth && valueStr !== '-' && !target.isText) {
-      const wire = target.wireName ? this.wires.get(target.wireName) : null;
+    const wire = target.wireName ? this.wires.get(target.wireName) : null;
+    const schemaFormatted = this._formatProbeDisplayValue(valueStr, wire, opts, target);
+    if (schemaFormatted != null) {
+      valueStr = schemaFormatted;
+    } else if (target.bitWidth && valueStr !== '-' && !target.isText) {
+      const useTagFormat = opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat);
       const skipGroup = wire && wire.vector && target.kind === 'wire' && !useTagFormat;
       if (!skipGroup) {
         if (useTagFormat) {
@@ -3884,10 +3887,66 @@ class Interpreter {
     return { value: totalBits, ref: null, varName: null, bitWidth: schema.totalWidth };
   }
 
+  _resolveShowSchemaName(wire, opts) {
+    if (!wire) return null;
+    return (opts && opts.schemaRef) ? opts.schemaRef : (wire.schemaRef || null);
+  }
+
+  _formatSchemaInlineValue(valueStr, wire, opts, bitWidth) {
+    if (!wire || valueStr === '-' || valueStr == null) return null;
+    const SS = this._semanticSchemas();
+    if (!SS) return null;
+    const schemaName = this._resolveShowSchemaName(wire, opts);
+    if (!schemaName) return null;
+    try {
+      const schema = this._resolveSchema(schemaName);
+      if (valueStr.length !== schema.totalWidth) return null;
+      if (bitWidth != null && bitWidth !== schema.totalWidth) return null;
+      return SS.formatSchemaShowInline(
+        valueStr,
+        schema,
+        opts,
+        (bits, w) => this.formatValue(bits, w)
+      );
+    } catch (err) {
+      return null;
+    }
+  }
+
+  _formatVectorSchemaInlineValue(wireName, valueStr, wire, opts) {
+    if (!wire || !wire.vector || valueStr === '-' || valueStr == null) return null;
+    if (!this._resolveShowSchemaName(wire, opts)) return null;
+    const lines = this._formatVectorShowLines(wireName, valueStr, opts);
+    if (!lines || !lines.length) return null;
+    const cells = lines.filter((l) => l.startsWith(':'));
+    return cells.length ? cells.join(' ') : null;
+  }
+
+  _formatProbeDisplayValue(valueStr, wire, opts, target) {
+    if (valueStr === '-' || valueStr == null) return null;
+    if (wire && wire.vector && target && target.kind === 'wire') {
+      const vectorInline = this._formatVectorSchemaInlineValue(
+        target.wireName || target.label,
+        valueStr,
+        wire,
+        opts
+      );
+      if (vectorInline != null) return vectorInline;
+    }
+    return this._formatSchemaInlineValue(valueStr, wire, opts, target && target.bitWidth);
+  }
+
+  _formatElementValueWithSchema(valueStr, wire, opts, elementWidth) {
+    if (valueStr === '-' || valueStr == null) return valueStr;
+    const schemaInline = this._formatSchemaInlineValue(valueStr, wire, opts, elementWidth);
+    if (schemaInline != null) return schemaInline;
+    return this._formatShowWireValue(valueStr, elementWidth, opts, true, elementWidth);
+  }
+
   _formatShowWithSchema(valueStr, wire, opts, displayName, isPeek) {
     const SS = this._semanticSchemas();
     if (!SS || !wire) return null;
-    const schemaName = opts && opts.schemaRef ? opts.schemaRef : wire.schemaRef;
+    const schemaName = this._resolveShowSchemaName(wire, opts);
     if (!schemaName) return null;
     const schema = this._resolveSchema(schemaName);
     SS.validateSchemaWidthForShow(schema, valueStr.length);
@@ -7750,9 +7809,9 @@ if (this.isBuiltinDEMUX(name)) {
     return !/^0+$/.test(padded);
   }
 
-  _formatVectorElementLine(index, valueStr, elementWidth, opts) {
+  _formatVectorElementLine(index, valueStr, elementWidth, opts, wire) {
     const formatted = valueStr !== '-'
-      ? this._formatShowWireValue(valueStr, elementWidth, opts, true, elementWidth)
+      ? this._formatElementValueWithSchema(valueStr, wire, opts, elementWidth)
       : valueStr;
     return `:${index} = ${formatted} (${elementWidth}bit)`;
   }
@@ -7858,6 +7917,7 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   _formatMatrixRowShowLines(wireName, valueStr, rowIndex, opts, meta) {
+    const wire = this.wires.get(wireName);
     const { elementWidth, cols } = meta;
     const lines = [];
     const rowStart = rowIndex * cols * elementWidth;
@@ -7871,7 +7931,7 @@ if (this.isBuiltinDEMUX(name)) {
       const cellStart = c * elementWidth;
       const bits = rowBits.substring(cellStart, cellStart + elementWidth);
       if (opts && opts.elNonZero && !this._elementIsNonZero(bits, elementWidth)) continue;
-      lines.push(this._formatVectorElementLine(`${rowIndex}:${c}`, bits, elementWidth, opts));
+      lines.push(this._formatVectorElementLine(`${rowIndex}:${c}`, bits, elementWidth, opts, wire));
     }
     lines.push(`${wireName} has shape [${meta.rows},${meta.cols}]`);
     return lines;
@@ -7901,7 +7961,7 @@ if (this.isBuiltinDEMUX(name)) {
 
     const emitCell = (index, bits) => {
       if (opts && opts.elNonZero && !this._elementIsNonZero(bits, elementWidth)) return;
-      lines.push(this._formatVectorElementLine(index, bits, elementWidth, opts));
+      lines.push(this._formatVectorElementLine(index, bits, elementWidth, opts, wire));
     };
 
     if (TS && TS.isMatrix(meta)) {

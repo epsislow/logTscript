@@ -131,6 +131,7 @@ function appendWaveListenPanelLine(instanceId, payload, kind) {
       bitWidth: payload.bitWidth,
       wireType: payload.wireType,
       tensorMeta: payload.tensorMeta,
+      schemaRef: payload.schemaRef || null,
       isComponent: payload.isComponent,
     };
   } else {
@@ -249,17 +250,34 @@ function beginWaveListenRun(instanceId, opts) {
 
 function endWaveListenRun(instanceId, reason) {
   const ctx = _getCtxForInstance(instanceId);
+  const armed = getWaveListenArmed();
+  const legacy = _isLegacyPropagation();
+  const keepListening = armed && !legacy && reason === 'complete';
+
   if (ctx) {
-    ctx.waveListenActive = false;
-    if (ctx.interp) {
-      ctx.interp.waveListenActive = false;
-      if (ctx.interp.signalPropagationStrategy) {
-        ctx.interp.signalPropagationStrategy.setDebugLevel(0);
+    if (keepListening) {
+      ctx.waveListenActive = true;
+      if (ctx.interp) {
+        ctx.interp.waveListenActive = true;
+        applyWaveListenToInterp(ctx.interp, ctx);
+      }
+    } else {
+      ctx.waveListenActive = false;
+      if (ctx.interp) {
+        ctx.interp.waveListenActive = false;
+        if (ctx.interp.signalPropagationStrategy) {
+          ctx.interp.signalPropagationStrategy.setDebugLevel(0);
+        }
       }
     }
   }
-  if (reason === 'preempt' || reason === 'stop' || reason === 'complete' || reason === 'error') {
+
+  if (reason === 'preempt' || reason === 'stop' || reason === 'error') {
     appendWaveListenStatus('* script stopped listen is OFF');
+  } else if (reason === 'complete' && !keepListening) {
+    appendWaveListenStatus('* script stopped listen is OFF');
+  } else if (reason === 'complete' && keepListening) {
+    appendWaveListenStatus('* Run complete — listen stays ON (interactive updates)');
   }
   updateWaveListenToolbarUI();
 }

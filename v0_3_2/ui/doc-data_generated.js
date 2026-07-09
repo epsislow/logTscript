@@ -21346,7 +21346,7 @@ grid:0:1:jump          # matrix cell (row 0, col 1), field jump
 
 Rules are the same as on a scalar wire: \`=\` strict width, \`:=\` left-pad; RHS is any expression; reads use a wire matching the field width.
 
-\`show(rom:1)\` / \`show(grid:0:1)\` on a schema wire prints a **per-field breakdown of that one element** (not the whole tensor). \`show(rom)\` on the full vector still lists elements flat (one line per index) — use an indexed \`show\` for schema detail on a single slot.
+\`show(rom:1)\` / \`show(grid:0:1)\` on a schema wire prints a **per-field multi-line breakdown of that one element**. \`show(rom)\` / \`peek(rom)\` on the full vector lists each \`:i\` / \`:row:col\` line with **inline schema fields** when the wire has \`schemaRef\` (e.g. \`:1 = alu=0101 jump=0 …\`). \`probe(rom:1)\` uses the same inline layout. Use \`compact\` for header + length/shape only; use indexed \`show\` for full multi-line detail on one slot.
 
 ### Vector example
 
@@ -21612,6 +21612,7 @@ In the **Wave Listen** panel toolbar, set **Fmt** to **\`auto\`** (first item in
 
 - **Inline** (narrow wires): compact \`alu=0101 cycles=11 …\`
 - **Expand** (+ button): multi-line field list
+- **Vectors / matrices** (\`16wire[3]<opcode>\`): each \`:i\` / \`:row:col\` line uses inline schema fields (same as \`show(rom)\`); expand lists all element lines
 
 Without \`schemaRef\`, \`auto\` falls back to **hex** (same as before).
 

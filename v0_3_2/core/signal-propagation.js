@@ -85,7 +85,7 @@ class SignalPropagationStrategy {
         wireType = `${bitWidth}bit`;
       }
     } else {
-      const wire = interp.wires.get(name);
+      wire = interp.wires.get(name);
       if (wire) {
         wireType = interp.getWireTypeLabel(wire);
         const meta = interp.getWireTensorMeta(wire);
@@ -352,6 +352,18 @@ class SignalPropagationStrategy {
     }
   }
 
+  _emitWaveListenSliceDriverSnapshot(wave) {
+    const interp = this.interp;
+    if (!interp || !interp.waveListenActive || this.debugLevel < 1) return;
+    for (const [name] of interp.wires) {
+      if (!interp._wireHasSliceDriver(name)) continue;
+      const val = interp.getWireStableValue(name);
+      if (val != null) {
+        this._emitWaveListenValueEntry(wave, name, val, 'commit', 1, false);
+      }
+    }
+  }
+
   flushDeferredShows() {
     if (!this.interp || this._deferredShows.length === 0) return;
     const pending = this._deferredShows;
@@ -475,6 +487,9 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         executedThisPropagate.add(ws);
       }
       this._reconcileSliceDriverWires();
+      if (loggedInit) {
+        this._emitWaveListenSliceDriverSnapshot(0);
+      }
     } else if (this._recomputeNextAffectedWires) {
       this._recomputeNextAffectedWires = false;
       this._emitWaveListen('[wave 0] NEXT → recompute next-affected wires', 'init', 1);
