@@ -6604,6 +6604,7 @@ The body statements themselves are **not** re-run as a script on each exec — o
 | \`4wire partial = .add:get\` | wire declaration + initializer |
 | \`.add:a = a\` | connection to component input |
 | \`.ram:{ adr = pcval set = 1 }\` | property block (stateful components) |
+| \`on:raise { clk, acc = ADD(acc, a) }\` | conditional assignment (edge/level per mode) |
 
 **Not** re-executed on exec (elaboration only):
 
@@ -7562,7 +7563,7 @@ Alias values accepted at parse time (not promoted in docs): \`rising\` ≡ \`rai
 | \`on:raise\` / \`on:edge\` | Does **not** run; waits for the first edge |
 | \`on:1\` | Runs if LSB is already \`1\` at init |
 
-Inside **PCB / chip / board** bodies, only \`on:1\` is allowed (\`on:raise\` / \`on:edge\` → parse error).
+Inside **PCB** bodies, only \`on:1\` is allowed (\`on:raise\` / \`on:edge\` → parse error). In **chip** and **board** bodies, all modes are allowed and run through the instance wire graph on each exec (see [chip-board-execution.md](chip-board-execution.md)).
 
 ---
 

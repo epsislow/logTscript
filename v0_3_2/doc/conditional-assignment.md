@@ -66,7 +66,7 @@ Alias values accepted at parse time (not promoted in docs): `rising` ≡ `raise`
 | `on:raise` / `on:edge` | Does **not** run; waits for the first edge |
 | `on:1` | Runs if LSB is already `1` at init |
 
-Inside **PCB / chip / board** bodies, only `on:1` is allowed (`on:raise` / `on:edge` → parse error).
+Inside **PCB** bodies, only `on:1` is allowed (`on:raise` / `on:edge` → parse error). In **chip** and **board** bodies, all modes are allowed and run through the instance wire graph on each exec (see [chip-board-execution.md](chip-board-execution.md)).
 
 ---
 

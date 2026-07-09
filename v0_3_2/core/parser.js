@@ -1035,7 +1035,7 @@ parsePcbDefinition() {
       continue;
     }
     
-    if (this.c.type === 'ID' && this.c.value === 'on') {
+    if (this.c.type === 'ID' && this.c.value === 'on' && !this.peekOnConditional()) {
       this.eat('ID');
       this.eat('SYM', ':');
       if (this.c.type === 'ID') {
@@ -1129,6 +1129,7 @@ validateTopLevelOnlyComponent(stmt, scopeLabel, file, line, col) {
 
 validateConditionalAssignmentInBody(stmt, scopeLabel, file, line, col) {
   if (!stmt || !stmt.conditionalAssignment) return;
+  if (scopeLabel !== 'pcb body') return;
   const mode = String(stmt.conditionalAssignment.onMode || '');
   if (mode === 'raise' || mode === 'rising' || mode === 'edge' || mode === 'falling') {
     throw Error(`on:${mode} conditional assignment is not allowed in ${scopeLabel}; use on:1 at ${file}: ${line}:${col}`);
@@ -1249,7 +1250,7 @@ parseChipDefinition() {
       continue;
     }
 
-    if (this.c.type === 'ID' && this.c.value === 'on') {
+    if (this.c.type === 'ID' && this.c.value === 'on' && !this.peekOnConditional()) {
       this.eat('ID');
       this.eat('SYM', ':');
       if (this.c.type === 'ID') {
@@ -1410,7 +1411,7 @@ parseBoardDefinition() {
       continue;
     }
 
-    if (this.c.type === 'ID' && this.c.value === 'on') {
+    if (this.c.type === 'ID' && this.c.value === 'on' && !this.peekOnConditional()) {
       this.eat('ID');
       this.eat('SYM', ':');
       if (this.c.type === 'ID') {

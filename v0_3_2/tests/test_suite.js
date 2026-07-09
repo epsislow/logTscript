@@ -19817,6 +19817,114 @@ reg(2246, 'semantic-schemas', 'schema field feeds comp alu', function(h, session
   h.assert('alu add from schema field', session.getCompProperty(interp, '.alu', 'result'), '0110');
 });
 
+const CHIP_COND_RAISE = `chip +[tick]:
+  4pin a
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  4wire acc = 0000
+  on:raise {
+    set,
+    acc = NOT(acc)
+  }
+  sum = acc
+  :4bit sum`;
+
+function runChipCondRaise(h, session) {
+  const src = CHIP_COND_RAISE + `
+chip [tick] .u1::
+.u1:{
+  set = 1
+}
+4wire r = .u1:sum`;
+  const { interp } = session.run(src);
+  h.assert('first pulse sum', session.getPcbPout(interp, '.u1', 'sum'), '1111');
+  session.execStmts(interp, `.u1:{
+  set = 1
+}`);
+  h.assert('hold set no double count', session.getPcbPout(interp, '.u1', 'sum'), '1111');
+  session.execStmts(interp, `.u1:{
+  set = 0
+}`);
+  session.execStmts(interp, `.u1:{
+  set = 1
+}`);
+  h.assert('re-pulse sum', session.getPcbPout(interp, '.u1', 'sum'), '0000');
+}
+
+reg(2247, 'conditional-assignment', 'chip body on:raise in propagate graph', runChipCondRaise);
+reg(2248, 'conditional-assignment', 'chip body on:raise in propagate graph (wave)', runChipCondRaise, { propagation: 'wave' });
+
+const BOARD_COND_EDGE = `board +[edgeTick]:
+  1pin set
+  4pout out
+  exec: set
+  on: 1
+  1wire en = set
+  4wire result = 0000
+  on:edge {
+    en,
+    result = 1111
+  }
+  out = result
+  :4bit out`;
+
+function runBoardCondEdge(h, session) {
+  const src = BOARD_COND_EDGE + `
+board [edgeTick] .u1::
+.u1:{
+  set = 1
+}
+4wire r = .u1:out`;
+  const { interp } = session.run(src);
+  h.assert('set high no edge yet', session.getPcbPout(interp, '.u1', 'out'), '0000');
+  session.execStmts(interp, `.u1:{
+  set = 0
+}`);
+  h.assert('falling edge fires', session.getPcbPout(interp, '.u1', 'out'), '1111');
+}
+
+reg(2249, 'conditional-assignment', 'board body on:edge in propagate graph', runBoardCondEdge);
+reg(2250, 'conditional-assignment', 'board body on:edge in propagate graph (wave)', runBoardCondEdge, { propagation: 'wave' });
+
+reg(2251, 'conditional-assignment', 'chip body on:raise parses', function(h, session) {
+  const src = `chip +[t]:
+  4pin a
+  1pin set
+  4pout b
+  exec: set
+  on: 1
+  on:raise {
+    set,
+    a = 0001
+  }
+  b = a
+  :4bit b`;
+  const { interp } = session.run(src);
+  const def = interp.chipDefinitions.get('t');
+  h.assert('has conditional', String(def && def.body && def.body.some(s => s.conditionalAssignment && s.conditionalAssignment.onMode === 'raise')), 'true');
+});
+
+reg(2252, 'conditional-assignment', 'pcb body on:raise still rejected', function(h, session) {
+  let err = '';
+  try {
+    session.parse(`pcb +[p]:
+  4pin a
+  4pout b
+  exec: set
+  on: 1
+  on:raise {
+    a,
+    b = a
+  }
+  :4bit b`);
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('pcb rejects on:raise', String(err.includes('not allowed in pcb body')), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

@@ -54,6 +54,7 @@ The body statements themselves are **not** re-run as a script on each exec — o
 | `4wire partial = .add:get` | wire declaration + initializer |
 | `.add:a = a` | connection to component input |
 | `.ram:{ adr = pcval set = 1 }` | property block (stateful components) |
+| `on:raise { clk, acc = ADD(acc, a) }` | conditional assignment (edge/level per mode) |
 
 **Not** re-executed on exec (elaboration only):
 

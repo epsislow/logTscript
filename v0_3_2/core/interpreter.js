@@ -8567,6 +8567,9 @@ if (this.isBuiltinDEMUX(name)) {
     }
 
     if (s.conditionalAssignment) {
+      if (this.insideChipBody || this.insideBoardBody) {
+        return;
+      }
       this.execConditionalAssignment(s);
       return;
     }
@@ -8680,8 +8683,12 @@ if (this.isBuiltinDEMUX(name)) {
       // Inside PCB/chip/board body: blocks run inline each time the body runs — use level-style
       // gating on :set when present; edge mode applies only to top-level blocks (registered above).
       const insideBody = this.insidePcbBody || this.insideChipBody || this.insideBoardBody;
+      const isCompositeInstance = !!(chipInst || boardInst);
       let shouldExecuteFirstRun = true;
-      if(insideBody){
+      if (isCompositeInstance) {
+        // Chip/board instances always apply pin writes; propagate gating is internal.
+        shouldExecuteFirstRun = true;
+      } else if(insideBody){
         if(setExpr){
           const setBit = (initialSetValue && initialSetValue.length > 0) ? initialSetValue[initialSetValue.length - 1] : '0';
           shouldExecuteFirstRun = (setBit === '1');
@@ -12254,6 +12261,21 @@ if (s.assignment) {
     return null;
   }
 
+  _isPureLiteralWireInit(stmt) {
+    if (!stmt || !stmt.decls || !stmt.expr || !Array.isArray(stmt.expr)) return false;
+    if (stmt.assignment) return false;
+    for (const part of stmt.expr) {
+      if (part.var || part.ref || part.refLiteral || part.compInvoke || part.call) return false;
+      const hasLiteral = (part.value !== undefined && part.value !== null && part.value !== '-')
+        || part.bin !== undefined
+        || part.hex !== undefined
+        || part.dec !== undefined
+        || part.logic !== undefined;
+      if (!hasLiteral) return false;
+    }
+    return stmt.expr.length > 0;
+  }
+
   _buildCompositeWireGraph(statements) {
     const graph = [];
     if (!statements) return graph;
@@ -12267,14 +12289,80 @@ if (s.assignment) {
           stmt: JSON.parse(JSON.stringify(stmt)),
         });
       } else if (stmt.decls && stmt.expr && stmt.decls.some(d => d.type && this.isWire(d.type))) {
-        graph.push({ kind: 'wire', stmt: JSON.parse(JSON.stringify(stmt)) });
+        if (!this._isPureLiteralWireInit(stmt)) {
+          graph.push({ kind: 'wire', stmt: JSON.parse(JSON.stringify(stmt)) });
+        }
       } else if (stmt.compAssign) {
         graph.push({ kind: 'compAssign', stmt: JSON.parse(JSON.stringify(stmt)) });
       } else if (stmt.componentPropertyBlock) {
         graph.push({ kind: 'propertyBlock', stmt: JSON.parse(JSON.stringify(stmt)) });
+      } else if (stmt.conditionalAssignment) {
+        graph.push({
+          kind: 'conditional',
+          stmt: JSON.parse(JSON.stringify(stmt)),
+          lastTriggerValue: null,
+        });
       }
     }
     return graph;
+  }
+
+  _initCompositeConditionalGraphState(instance, internalPrefix) {
+    const graph = instance.internalWireGraph || [];
+    for (const entry of graph) {
+      if (entry.kind !== 'conditional') continue;
+      const renamed = this.renamePcbStatement(JSON.parse(JSON.stringify(entry.stmt)), internalPrefix);
+      const ca = renamed.conditionalAssignment;
+      if (!ca || !ca.triggerExpr) continue;
+      entry.lastTriggerValue = this.evalTriggerExprValue(ca.triggerExpr);
+    }
+  }
+
+  _tryExecuteCompositeConditionalGraphEntry(entry, renamedStmt, opts = {}) {
+    const ca = renamedStmt && renamedStmt.conditionalAssignment;
+    if (!ca || !ca.triggerExpr) return false;
+    const prevValue = entry.lastTriggerValue || '0';
+    const newValue = this.evalTriggerExprValue(ca.triggerExpr);
+    const triggerDependsOnTilde = this.exprDependsOnTilde(ca.triggerExpr);
+    let shouldExecute;
+    if (opts.isFirstRun) {
+      const mode = ca.onMode || 'raise';
+      if (mode === '1' || mode === 'level') {
+        const bit = newValue.length > 0 ? newValue[newValue.length - 1] : '0';
+        shouldExecute = (bit === '1');
+      } else {
+        shouldExecute = false;
+      }
+    } else {
+      shouldExecute = this.conditionalOnShouldExecute(
+        ca.onMode,
+        prevValue,
+        newValue,
+        false,
+        triggerDependsOnTilde
+      );
+    }
+    entry.lastTriggerValue = newValue;
+    if (!shouldExecute) return false;
+    const body = this.conditionalAssignmentBodyItems(ca);
+    if (!body.length) return false;
+    this._executingConditionalAssignment = true;
+    try {
+      for (const item of body) {
+        if (item.assignment) {
+          this.exec({ assignment: item.assignment }, true);
+        } else {
+          this.exec({
+            decls: item.decls,
+            expr: item.expr,
+            assignPad: item.assignPad || 'strict',
+          }, true);
+        }
+      }
+    } finally {
+      this._executingConditionalAssignment = false;
+    }
+    return true;
   }
 
   _injectCompositeBodyWires(instance) {
@@ -12387,7 +12475,9 @@ if (s.assignment) {
             || (renamed.assignment && renamed.assignment.target
               && !(renamed.assignment.target.var && String(renamed.assignment.target.var).startsWith('.')
                 && renamed.assignment.target.property));
-          if (useWireExec) {
+          if (entry.kind === 'conditional') {
+            this._tryExecuteCompositeConditionalGraphEntry(entry, renamed);
+          } else if (useWireExec) {
             const toPending = this.deferWirePropagation();
             const outputs = this.execWireStatement(renamed, toPending);
             if (toPending && outputs && outputs.length) {
@@ -12464,6 +12554,7 @@ if (s.assignment) {
 
     if (isElaboration) {
       instance.internalWireGraph = this._buildCompositeWireGraph(statements);
+      this._initCompositeConditionalGraphState(instance, internalPrefix);
       instance.elaborated = true;
     }
 
@@ -12514,6 +12605,7 @@ if (s.assignment) {
   executeChipPropertyBlock(instanceName, instance, properties, reEvaluate, block) {
     const def = instance.def;
     let shouldTriggerExec = false;
+    let pinOrPoutWritten = false;
 
     for (const prop of properties) {
       const property = prop.property;
@@ -12541,6 +12633,11 @@ if (s.assignment) {
           if (pinVal.length < execPinInfo.bits) pinVal = pinVal.padStart(execPinInfo.bits, '0');
           else if (pinVal.length > execPinInfo.bits) pinVal = pinVal.substring(pinVal.length - execPinInfo.bits);
           this.setValueAtRef(execPinInfo.ref, pinVal);
+          pinOrPoutWritten = true;
+          if (pinVal.length > 0 && pinVal[pinVal.length - 1] === '0') {
+            if (block) block.lastExecValue = '0';
+            else instance.lastExecValue = '0';
+          }
         }
         if (property === 'set' || property === execPin) {
           if ((value === '~' && reEvaluate) || value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
@@ -12564,6 +12661,7 @@ if (s.assignment) {
         if (value.length < pinInfo.bits) value = value.padStart(pinInfo.bits, '0');
         else if (value.length > pinInfo.bits) value = value.substring(value.length - pinInfo.bits);
         this.setValueAtRef(pinInfo.ref, value);
+        pinOrPoutWritten = true;
         continue;
       }
 
@@ -12581,6 +12679,7 @@ if (s.assignment) {
         if (value.length < poutInfo.bits) value = value.padStart(poutInfo.bits, '0');
         else if (value.length > poutInfo.bits) value = value.substring(value.length - poutInfo.bits);
         this.setValueAtRef(poutInfo.ref, value);
+        pinOrPoutWritten = true;
         continue;
       }
 
@@ -12605,6 +12704,10 @@ if (s.assignment) {
         this.reEvalWiresDependingOnChip(instanceName);
         if (typeof showVars === 'function') showVars();
       }
+    } else if (pinOrPoutWritten && instance.internalWireGraph && instance.internalWireGraph.length > 0) {
+      this.propagateCompositeInstance('chip', instanceName);
+      this.reEvalWiresDependingOnChip(instanceName);
+      if (typeof showVars === 'function') showVars();
     }
 
     for (const prop of properties) {
@@ -12662,6 +12765,7 @@ if (s.assignment) {
   executeBoardPropertyBlock(instanceName, instance, properties, reEvaluate, block) {
     const def = instance.def;
     let shouldTriggerExec = false;
+    let pinOrPoutWritten = false;
 
     for (const prop of properties) {
       const property = prop.property;
@@ -12689,6 +12793,11 @@ if (s.assignment) {
           if (pinVal.length < execPinInfo.bits) pinVal = pinVal.padStart(execPinInfo.bits, '0');
           else if (pinVal.length > execPinInfo.bits) pinVal = pinVal.substring(pinVal.length - execPinInfo.bits);
           this.setValueAtRef(execPinInfo.ref, pinVal);
+          pinOrPoutWritten = true;
+          if (pinVal.length > 0 && pinVal[pinVal.length - 1] === '0') {
+            if (block) block.lastExecValue = '0';
+            else instance.lastExecValue = '0';
+          }
         }
         if (property === 'set' || property === execPin) {
           if ((value === '~' && reEvaluate) || value === '1' || (value.length > 0 && value[value.length - 1] === '1')) {
@@ -12712,6 +12821,7 @@ if (s.assignment) {
         if (value.length < pinInfo.bits) value = value.padStart(pinInfo.bits, '0');
         else if (value.length > pinInfo.bits) value = value.substring(value.length - pinInfo.bits);
         this.setValueAtRef(pinInfo.ref, value);
+        pinOrPoutWritten = true;
         continue;
       }
 
@@ -12729,6 +12839,7 @@ if (s.assignment) {
         if (value.length < poutInfo.bits) value = value.padStart(poutInfo.bits, '0');
         else if (value.length > poutInfo.bits) value = value.substring(value.length - poutInfo.bits);
         this.setValueAtRef(poutInfo.ref, value);
+        pinOrPoutWritten = true;
         continue;
       }
 
@@ -12753,6 +12864,10 @@ if (s.assignment) {
         this.reEvalWiresDependingOnBoard(instanceName);
         if (typeof showVars === 'function') showVars();
       }
+    } else if (pinOrPoutWritten && instance.internalWireGraph && instance.internalWireGraph.length > 0) {
+      this.propagateCompositeInstance('board', instanceName);
+      this.reEvalWiresDependingOnBoard(instanceName);
+      if (typeof showVars === 'function') showVars();
     }
 
     for (const prop of properties) {
