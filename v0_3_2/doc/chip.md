@@ -63,6 +63,10 @@ Read pout from outside:
 1wire c = .u1:carry
 ```
 
+### Execution model
+
+At **instance creation**, the body runs once (elaboration) and a wire graph is captured. On each **exec** trigger from a property block, values propagate through that graph — the body is not re-run as a script. Write the body as **dataflow connections**; see [chip-board-execution.md](chip-board-execution.md).
+
 ---
 
 ## Allowed and forbidden in chip body
@@ -146,4 +150,4 @@ PCBs are for complete interactive circuits; chips are building blocks. A typical
 2. Instantiate inside `pcb +[board]:` with `chip [aluSlice] .slice::`
 3. Add `led`, `switch`, and panel wiring only in the PCB
 
-Interactive circuits: [board.md](board.md). Component catalog: [components.md](components.md).
+Interactive circuits: [board.md](board.md). Execution model: [chip-board-execution.md](chip-board-execution.md). Component catalog: [components.md](components.md).

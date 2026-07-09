@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -1596,6 +1596,10 @@ Read pouts:
 4wire out = .instance:outputName
 \`\`\`
 
+### Execution model
+
+Same as [chip](chip.md): **elaboration** at \`board [type] .inst::\`, then **propagation** on each exec from a property block. Details and writing style: [chip-board-execution.md](chip-board-execution.md).
+
 ---
 
 ## Allowed in board body
@@ -1677,6 +1681,7 @@ See [debug.md](debug.md).
 ## Related
 
 - [chip.md](chip.md) — logic-only blocks
+- [chip-board-execution.md](chip-board-execution.md) — elaboration and propagation
 - [pcb.md](pcb.md) — deprecated
 - [components.md](components.md) — index
 `,
@@ -6543,6 +6548,159 @@ show(a)
 
 [IDENTITY](builtin-IDENTITY.md) · [FILL](builtin-FILL.md)
 `,
+    'chip-board-execution.md': `# Chip and board execution
+
+Chip and board instances share the same **two-phase** execution model: **elaboration** when the instance is first created, then **propagation** each time the \`exec\` pin fires. Syntax, property blocks, probes, and pout reads are unchanged — only the internal scheduling is optimized so the body structure is built once and signals flow through a captured wire graph on each exec.
+
+For pin/pout syntax and examples, see [chip.md](chip.md) and [board.md](board.md). PCB uses a different model (full body re-run each exec) — see [pcb.md](pcb.md).
+
+---
+
+## Phase 1 — elaboration (instance creation)
+
+When you write:
+
+\`\`\`
+chip [halfAdd] .u1::
+\`\`\`
+
+or:
+
+\`\`\`
+board [halfAdd] .u1::
+\`\`\`
+
+the runtime:
+
+1. Allocates pin and pout storage for \`.u1\`.
+2. Runs the type body **once** to create internal structure:
+   - \`comp\` instances
+   - nested \`chip\` / \`board\` instances
+   - internal wires (\`4wire partial = …\`, and similar)
+3. Captures a **wire graph** from the body — the connections that will carry values on each exec.
+
+After elaboration, the instance is ready. Driving pins from outside (property block or direct assignment) does not rebuild this structure.
+
+---
+
+## Phase 2 — propagation (each exec)
+
+When a property block sets the exec pin (e.g. \`set = 1\` with \`on: 1\`, or a rising edge on \`on: raise\`):
+
+1. Pin values from the property block are written to instance storage.
+2. The runtime propagates values through the captured wire graph **in declaration order**, one pass per exec.
+3. Pouts and internal wires update; external wires reading \`.u1:sum\` see the new values.
+4. \`probe\` targets on that instance emit **\`changed\`** when their value moves (see [debug.md](debug.md)).
+
+The body statements themselves are **not** re-run as a script on each exec — only the graph edges fire. Instantiations (\`comp\`, \`chip\`, \`board\`) happened during elaboration and stay in place.
+
+---
+
+## What the wire graph includes
+
+| Body form | Included in graph |
+|-----------|-------------------|
+| \`sum = .add:get\` | wire assignment |
+| \`4wire partial = .add:get\` | wire declaration + initializer |
+| \`.add:a = a\` | connection to component input |
+| \`.ram:{ adr = pcval set = 1 }\` | property block (stateful components) |
+
+**Not** re-executed on exec (elaboration only):
+
+- \`comp [adder] .add::\`
+- \`chip [alu] .slice::\`
+- \`board [panel] .ui::\`
+
+---
+
+## Writing the body — dataflow connections
+
+Treat each line in a chip or board body as a **persistent connection** in the schematic, not as a sequential imperative program step.
+
+**Natural style** — inputs feed components, outputs feed pouts:
+
+\`\`\`
+.add:a = a
+.add:b = b
+sum = .add:get
+carry = .add:carry
+\`\`\`
+
+**Internal wires** — name intermediate nets explicitly:
+
+\`\`\`
+4wire partial = .add:get
+sum = partial
+carry = .add:carry
+\`\`\`
+
+This matches how you would draw the circuit: wires exist continuously; exec updates values through them.
+
+**Sequential scratch logic** — reusing the same wire as a temporary in multiple assignment steps in one exec pass is not the intended model. Prefer direct combinational paths or stateful components (\`reg\`, \`mem\`, \`counter\`) when you need stored state between exec cycles.
+
+---
+
+## Nested instances
+
+Nested \`chip\` and \`board\` instances are elaborated when the parent instance is created. On parent exec, connections into the child (e.g. \`.ha:a = a\`, \`.ha:{ set = 1 }\`, \`sum = .ha:sum\`) propagate through the parent graph and into the child’s graph as needed.
+
+Example — board inside a chip wrapper:
+
+\`\`\`
+chip +[wrap]:
+  4pin a
+  4pin b
+  1pin set
+  4pout sum
+  exec: set
+  on: 1
+  board [halfAdd] .ha::
+  .ha:a = a
+  .ha:b = b
+  .ha:{ set = 1 }
+  sum = .ha:sum
+  :4bit sum
+\`\`\`
+
+---
+
+## Probes and reads from outside
+
+| Goal | Syntax |
+|------|--------|
+| pout | \`probe(.u1:sum)\` or \`4wire r = .u1:sum\` |
+| internal wire | \`probe(.u1.partial)\` (dot, not colon) |
+
+On the first **RUN**, probes on the instance report **\`initialised\`** at settle (after the property block and propagation). On later property blocks or exec triggers, they report **\`changed\`**.
+
+---
+
+## Relation to signal propagation
+
+Main-script wires still use [wave](signal-propagation.md) or legacy propagation as configured. Inside a chip or board instance, each exec performs **one graph pass** — enough for combinational paths (adders, muxes) and for property blocks that touch stateful components in graph order.
+
+For multi-step state machines, rely on component state (\`mem\`, \`reg\`, \`counter\`) or multiple exec/NEXT cycles rather than imperative ordering inside a single body.
+
+---
+
+## Quick reference
+
+| Event | Chip / board |
+|-------|----------------|
+| \`chip [t] .u1::\` / \`board [t] .u1::\` | Elaboration — structure + graph |
+| \`.u1:{ … set = 1 }\` | Apply pins + propagate graph |
+| Second \`.u1:{ … }\` | Propagate again (same graph) |
+| \`probe(.u1:…)\` | Same syntax; \`initialised\` then \`changed\` |
+
+---
+
+## Related
+
+- [chip.md](chip.md) — definition and nesting rules
+- [board.md](board.md) — UI components and interactive blocks
+- [debug.md](debug.md) — \`probe\`, \`show\`, \`peek\`
+- [signal-propagation.md](signal-propagation.md) — wave and NEXT on the main script
+`,
     'chip.md': `# Chip components
 
 A **chip** is a lightweight reusable block — same pin/pout/exec model as [board.md](board.md), but **without** UI components, \`def\`, nested PCB/board definitions, or \`~~\`. Use chips to build libraries of logic (adders, multiplexers, ALU slices) that you compose inside **boards** or other chips.
@@ -6607,6 +6765,10 @@ Read pout from outside:
 4wire r = .u1:sum
 1wire c = .u1:carry
 \`\`\`
+
+### Execution model
+
+At **instance creation**, the body runs once (elaboration) and a wire graph is captured. On each **exec** trigger from a property block, values propagate through that graph — the body is not re-run as a script. Write the body as **dataflow connections**; see [chip-board-execution.md](chip-board-execution.md).
 
 ---
 
@@ -6691,7 +6853,7 @@ PCBs are for complete interactive circuits; chips are building blocks. A typical
 2. Instantiate inside \`pcb +[board]:\` with \`chip [aluSlice] .slice::\`
 3. Add \`led\`, \`switch\`, and panel wiring only in the PCB
 
-Interactive circuits: [board.md](board.md). Component catalog: [components.md](components.md).
+Interactive circuits: [board.md](board.md). Execution model: [chip-board-execution.md](chip-board-execution.md). Component catalog: [components.md](components.md).
 `,
     'clcd-symbols.md': `# CLCD — Symbol catalog
 
@@ -7248,6 +7410,7 @@ LogTscript includes built-in **components** (\`comp\`), **inline** declarations 
 |-------|------|
 | **Board** — interactive circuits, wave propagation (recommended) | [board.md](board.md) |
 | Chip — reusable logic without UI | [chip.md](chip.md) |
+| **Chip / board execution** — elaboration, propagation, dataflow body style | [chip-board-execution.md](chip-board-execution.md) |
 | PCB — deprecated, legacy propagation | [pcb.md](pcb.md) |
 | **Mini CPU demo** — Harvard step CPU (chip ALU + board) | [mini-cpu.md](mini-cpu.md) |
 | **Mini CPU v2** — ASM, BEQ, LUT decode, terminal | [mini-cpu-v2.md](mini-cpu-v2.md) |
@@ -8710,7 +8873,8 @@ b (1wire) = 1 …
 | \`probe\` + \`[key]\` + \`REG\` after RUN | \`initialised\` at RUN; \`edge committed\` on key release (818–819) | Same |
 | \`probe(.comp)\` on key/switch/dip/rotary/osc | \`initialised\` at RUN; \`changed\` on UI (821–824) | Same |
 | \`probe(.div:mod)\` computed component | \`initialised\` / \`changed\` on \`:set\` (836–837) | Same |
-| \`probe(.u1.partial)\` chip/PCB internal wire | \`initialised\` / \`changed\` on body re-exec (832–835) | Same |
+| \`probe(.u1.partial)\` chip / board internal wire | \`initialised\` / \`changed\` when instance exec fires (832–833, 853–854) | Same |
+| \`probe(.q.shadow)\` PCB internal wire | \`initialised\` / \`changed\` on PCB body re-run (834–835) | Same |
 | \`probe(.u1.sum)\` dot on pout | ignored — use \`probe(.u1:sum)\` (839) | Same |
 
 ### 7. \`probe\` — \`initialised\` then \`changed\` at settle (815 wave)

@@ -786,6 +786,16 @@ class Interpreter {
     }
   }
 
+  _emitCompositeProbeTargets(instanceName) {
+    for (const target of this.probeTargets) {
+      if (target.kind !== 'composite' || target.instanceName !== instanceName) continue;
+      const value = this._readCompositeProbeValue(target);
+      if (value !== null && value !== undefined) {
+        this._emitProbeTarget(target, value);
+      }
+    }
+  }
+
   _resolveProbeComponentTarget(atom) {
     const compName = atom.var;
     const property = atom.property || 'get';
@@ -2614,6 +2624,7 @@ class Interpreter {
   }
 
   trackWireStatement(s) {
+    if (this._compositePropagating) return;
     if (this._executingConditionalAssignment) return;
     if (!this.insidePcbBody && !this.wireStatements.includes(s)) {
       this.wireStatements.push(s);
@@ -9258,7 +9269,7 @@ if (s.assignment) {
           else if (onMode === 'edge' || onMode === 'falling') shouldExecute = (prevBit === '1' && newBit === '0');
           else if (onMode === '1' || onMode === 'level') shouldExecute = (newBit === '1') && (newBit !== prevBit);
           if (shouldExecute) {
-            this.executeChipBody(name, instance.def.body);
+            this.propagateCompositeInstance('chip', name);
             this.reEvalWiresDependingOnChip(name);
           }
           instance.lastExecValue = newBit;
@@ -9311,7 +9322,7 @@ if (s.assignment) {
           else if (onMode === 'edge' || onMode === 'falling') shouldExecute = (prevBit === '1' && newBit === '0');
           else if (onMode === '1' || onMode === 'level') shouldExecute = (newBit === '1') && (newBit !== prevBit);
           if (shouldExecute) {
-            this.executeBoardBody(name, instance.def.body);
+            this.propagateCompositeInstance('board', name);
             this.reEvalWiresDependingOnBoard(name);
           }
           instance.lastExecValue = newBit;
@@ -9606,7 +9617,7 @@ if (s.assignment) {
   if (isWire) {
     // STRICT check — skip if this wire was initialized with : (first real assignment is allowed)
     // Slice / vector-element writes are allowed (not a full-wire reassignment).
-    if (this.mode === 'STRICT' && !range && entry.ref !== null && entry.ref !== '&-' && !entry.initOnly) {
+    if (this.mode === 'STRICT' && !range && entry.ref !== null && entry.ref !== '&-' && !entry.initOnly && !this._compositePropagating) {
       this._throwRuntime(`Cannot reassign wire ${name} in STRICT mode`, s, name.length);
     }
     // Clear initOnly flag after first real assignment
@@ -11148,6 +11159,7 @@ if (s.assignment) {
     }
     
     const prefix = instanceName.substring(1); // Remove leading '.'
+    const internalPrefix = this._compositeInternalPrefix(instanceName);
     
     // Create storage for pins and pouts
     const pinStorage = new Map(); // pinName -> { bits, storageIdx, ref }
@@ -11181,7 +11193,7 @@ if (s.assignment) {
       def,
       pinStorage,
       poutStorage,
-      internalPrefix: `_${prefix}`,
+      internalPrefix,
       lastExecValue: '0', // For edge detection
       pendingNextSection: false // Flag to indicate ~~ section should run at NEXT(~)
     };
@@ -12231,72 +12243,54 @@ if (s.assignment) {
     this.reEvalWiresDependingOnPcb(instanceName);
   }
 
-  execChipInstance(inst) {
-    const { chipName, instanceName } = inst;
-    const def = this.chipDefinitions.get(chipName);
-    if (!def) {
-      throw Error(`Chip '${chipName}' is not defined. Available chips: ${[...this.chipDefinitions.keys()].join(', ')}`);
-    }
-
-    const prefix = instanceName.substring(1);
-    const pinStorage = new Map();
-    const poutStorage = new Map();
-
-    for (const pin of def.pins) {
-      const initialValue = '0'.repeat(pin.bits);
-      const storageIdx = this.storeValue(initialValue);
-      pinStorage.set(pin.name, { bits: pin.bits, storageIdx, ref: `&${storageIdx}` });
-    }
-
-    for (const pout of def.pouts) {
-      const initialValue = '0'.repeat(pout.bits);
-      const storageIdx = this.storeValue(initialValue);
-      poutStorage.set(pout.name, { bits: pout.bits, storageIdx, ref: `&${storageIdx}` });
-    }
-
-    const instanceInfo = {
-      chipName,
-      def,
-      pinStorage,
-      poutStorage,
-      internalPrefix: `_${prefix}`,
-      lastExecValue: '0'
-    };
-    this.chipInstances.set(instanceName, instanceInfo);
-    this.executeChipBody(instanceName, def.body);
+  _compositeInternalPrefix(instanceName) {
+    const prefix = instanceName.startsWith('.') ? instanceName.substring(1) : instanceName;
+    return prefix.startsWith('_') ? prefix : `_${prefix}`;
   }
 
-  executeChipBody(instanceName, statements) {
-    const instance = this.chipInstances.get(instanceName);
-    if (!instance) return;
+  _getCompositeInstanceByKind(kind, instanceName) {
+    if (kind === 'chip') return this.chipInstances.get(instanceName);
+    if (kind === 'board') return this.boardInstances.get(instanceName);
+    return null;
+  }
 
-    const { def, pinStorage, poutStorage, internalPrefix } = instance;
+  _buildCompositeWireGraph(statements) {
+    const graph = [];
+    if (!statements) return graph;
+    for (const stmt of statements) {
+      if (!stmt) continue;
+      if (stmt.assignment) {
+        const tgt = stmt.assignment.target;
+        const isCompWire = tgt && tgt.var && String(tgt.var).startsWith('.') && tgt.property;
+        graph.push({
+          kind: isCompWire ? 'compWire' : 'wire',
+          stmt: JSON.parse(JSON.stringify(stmt)),
+        });
+      } else if (stmt.decls && stmt.expr && stmt.decls.some(d => d.type && this.isWire(d.type))) {
+        graph.push({ kind: 'wire', stmt: JSON.parse(JSON.stringify(stmt)) });
+      } else if (stmt.compAssign) {
+        graph.push({ kind: 'compAssign', stmt: JSON.parse(JSON.stringify(stmt)) });
+      } else if (stmt.componentPropertyBlock) {
+        graph.push({ kind: 'propertyBlock', stmt: JSON.parse(JSON.stringify(stmt)) });
+      }
+    }
+    return graph;
+  }
 
-    const savedVars = new Map(this.vars);
-    const savedWires = new Map(this.wires);
-    const savedComponents = new Map(this.components);
-    const savedChipInstances = new Map(this.chipInstances);
-    const savedBoardInstances = new Map(this.boardInstances);
-    const savedInsideChipBody = this.insideChipBody;
-    const savedCurrentChipInstance = this.currentChipInstance;
-
-    this.insideChipBody = true;
-    this.currentChipInstance = instanceName;
-
+  _injectCompositeBodyWires(instance) {
+    const { pinStorage, poutStorage } = instance;
     for (const [pinName, pinInfo] of pinStorage) {
       this.wires.set(pinName, { type: `${pinInfo.bits}wire`, ref: pinInfo.ref, initOnly: true });
       if (pinInfo.ref && pinInfo.ref.startsWith('&')) {
         this.wireStorageMap.set(pinName, parseInt(pinInfo.ref.slice(1), 10));
       }
     }
-
     for (const [poutName, poutInfo] of poutStorage) {
       this.wires.set(poutName, { type: `${poutInfo.bits}wire`, ref: poutInfo.ref, initOnly: true });
       if (poutInfo.ref && poutInfo.ref.startsWith('&')) {
         this.wireStorageMap.set(poutName, parseInt(poutInfo.ref.slice(1), 10));
       }
     }
-
     if (instance.internalBodyWires) {
       for (const [k, v] of instance.internalBodyWires) {
         this.wires.set(k, this._restoreInternalBodyWire(v, true));
@@ -12305,23 +12299,20 @@ if (s.assignment) {
         }
       }
     }
+  }
 
-    for (const stmt of statements) {
-      const renamedStmt = this.renamePcbStatement(stmt, internalPrefix);
-      this.exec(renamedStmt, true);
-    }
-    this.postExecBody();
-
-    if (this.deferWirePropagation() && this.signalPropagationStrategy) {
-      this.signalPropagationStrategy.propagate();
-    }
-
+  _syncCompositePouts(instance) {
+    const { poutStorage } = instance;
     for (const [poutName, poutInfo] of poutStorage) {
       const currentWire = this.wires.get(poutName);
       const value = currentWire ? this.getValueFromRef(currentWire.ref) : null;
-      if (value) this.setValueAtRef(poutInfo.ref, value);
+      if (value !== null && value !== undefined) this.setValueAtRef(poutInfo.ref, value);
     }
+  }
 
+  _finalizeCompositeBodyContext(kind, instanceName, instance, savedVars, savedWires, savedComponents,
+      savedChipInstances, savedBoardInstances, internalPrefix, pinStorage, poutStorage) {
+    const { def } = instance;
     if (def.returnSpec) {
       const retVarName = def.returnSpec.varName;
       const retWire = this.wires.get(retVarName) || null;
@@ -12336,7 +12327,8 @@ if (s.assignment) {
     for (const [compName, compInfo] of this.components) {
       if (compName.startsWith('.' + internalPrefix + '_')) {
         savedComponents.set(compName, compInfo);
-        instance.internalComponentName.set(compName.replace('.' + internalPrefix + '_', '.'), 'comp.' + compInfo.type);
+        const label = kind === 'board' ? 'comp.' + compInfo.type : 'comp.' + compInfo.type;
+        instance.internalComponentName.set(compName.replace('.' + internalPrefix + '_', '.'), label);
       }
     }
     for (const [chipInstName, chipInst] of this.chipInstances) {
@@ -12368,12 +12360,155 @@ if (s.assignment) {
     }
     this._bindInternalProbeTargets(instanceName);
     this._emitInternalProbeTargets(instanceName);
+    this._emitCompositeProbeTargets(instanceName);
     this._emitComputedForBodyComponents(internalPrefix);
     this.components = savedComponents;
     this.chipInstances = savedChipInstances;
     this.boardInstances = savedBoardInstances;
-    this.insideChipBody = savedInsideChipBody;
-    this.currentChipInstance = savedCurrentChipInstance;
+    if (kind === 'chip') {
+      this.insideChipBody = false;
+      this.currentChipInstance = null;
+    } else {
+      this.insideBoardBody = false;
+      this.currentBoardInstance = null;
+    }
+  }
+
+  _runCompositeGraphPropagation(instance, internalPrefix) {
+    const graph = instance.internalWireGraph || [];
+    if (!graph.length) return;
+    const maxRounds = 1;
+    this._compositePropagating = true;
+    try {
+      for (let round = 0; round < maxRounds; round++) {
+        for (const entry of graph) {
+          const renamed = this.renamePcbStatement(JSON.parse(JSON.stringify(entry.stmt)), internalPrefix);
+          const useWireExec = entry.kind === 'wire'
+            || (renamed.assignment && renamed.assignment.target
+              && !(renamed.assignment.target.var && String(renamed.assignment.target.var).startsWith('.')
+                && renamed.assignment.target.property));
+          if (useWireExec) {
+            const toPending = this.deferWirePropagation();
+            const outputs = this.execWireStatement(renamed, toPending);
+            if (toPending && outputs && outputs.length) {
+              for (const [wName, wVal] of outputs) {
+                this.scheduleWireChange(wName, wVal);
+              }
+            }
+          } else {
+            this.exec(renamed, true);
+          }
+        }
+        if (this.deferWirePropagation() && this.signalPropagationStrategy) {
+          this.signalPropagationStrategy.propagate();
+        }
+      }
+      this._emitComputedForBodyComponents(internalPrefix);
+    } finally {
+      this._compositePropagating = false;
+    }
+  }
+
+  propagateCompositeInstance(kind, instanceName) {
+    const instance = this._getCompositeInstanceByKind(kind, instanceName);
+    if (!instance || !instance.elaborated) {
+      throw new Error(`Composite instance ${instanceName} is not elaborated`);
+    }
+    return this.executeCompositeBody(kind, instanceName, instance.def.body, { propagateOnly: true });
+  }
+
+  executeCompositeBody(kind, instanceName, statements, options = {}) {
+    const instance = this._getCompositeInstanceByKind(kind, instanceName);
+    if (!instance) return;
+
+    const propagateOnly = options.propagateOnly === true;
+    const { def, pinStorage, poutStorage, internalPrefix } = instance;
+
+    const savedVars = new Map(this.vars);
+    const savedWires = new Map(this.wires);
+    const savedComponents = new Map(this.components);
+    const savedChipInstances = new Map(this.chipInstances);
+    const savedBoardInstances = new Map(this.boardInstances);
+
+    if (kind === 'chip') {
+      this.insideChipBody = true;
+      this.currentChipInstance = instanceName;
+    } else {
+      this.insideBoardBody = true;
+      this.currentBoardInstance = instanceName;
+    }
+
+    this._injectCompositeBodyWires(instance);
+
+    if (propagateOnly) {
+      this._runCompositeGraphPropagation(instance, internalPrefix);
+      this.postExecBody();
+      this._syncCompositePouts(instance);
+      this._finalizeCompositeBodyContext(kind, instanceName, instance, savedVars, savedWires,
+        savedComponents, savedChipInstances, savedBoardInstances, internalPrefix, pinStorage, poutStorage);
+      return;
+    }
+
+    const isElaboration = !instance.elaborated;
+    for (const stmt of statements) {
+      const renamedStmt = this.renamePcbStatement(stmt, internalPrefix);
+      this.exec(renamedStmt, true);
+    }
+    this.postExecBody();
+
+    if (this.deferWirePropagation() && this.signalPropagationStrategy) {
+      this.signalPropagationStrategy.propagate();
+    }
+
+    this._syncCompositePouts(instance);
+
+    if (isElaboration) {
+      instance.internalWireGraph = this._buildCompositeWireGraph(statements);
+      instance.elaborated = true;
+    }
+
+    this._finalizeCompositeBodyContext(kind, instanceName, instance, savedVars, savedWires,
+      savedComponents, savedChipInstances, savedBoardInstances, internalPrefix, pinStorage, poutStorage);
+  }
+
+  execChipInstance(inst) {
+    const { chipName, instanceName } = inst;
+    const def = this.chipDefinitions.get(chipName);
+    if (!def) {
+      throw Error(`Chip '${chipName}' is not defined. Available chips: ${[...this.chipDefinitions.keys()].join(', ')}`);
+    }
+
+    const prefix = instanceName.substring(1);
+    const internalPrefix = this._compositeInternalPrefix(instanceName);
+    const pinStorage = new Map();
+    const poutStorage = new Map();
+
+    for (const pin of def.pins) {
+      const initialValue = '0'.repeat(pin.bits);
+      const storageIdx = this.storeValue(initialValue);
+      pinStorage.set(pin.name, { bits: pin.bits, storageIdx, ref: `&${storageIdx}` });
+    }
+
+    for (const pout of def.pouts) {
+      const initialValue = '0'.repeat(pout.bits);
+      const storageIdx = this.storeValue(initialValue);
+      poutStorage.set(pout.name, { bits: pout.bits, storageIdx, ref: `&${storageIdx}` });
+    }
+
+    const instanceInfo = {
+      chipName,
+      def,
+      pinStorage,
+      poutStorage,
+      internalPrefix,
+      lastExecValue: '0'
+    };
+    this.chipInstances.set(instanceName, instanceInfo);
+    this.executeCompositeBody('chip', instanceName, def.body);
+  }
+
+  executeChipBody(instanceName, statements) {
+    this.executeCompositeBody('chip', instanceName, statements);
   }
 
   executeChipPropertyBlock(instanceName, instance, properties, reEvaluate, block) {
@@ -12466,7 +12601,7 @@ if (s.assignment) {
       }
 
       if (shouldExecute) {
-        this.executeChipBody(instanceName, def.body);
+        this.propagateCompositeInstance('chip', instanceName);
         this.reEvalWiresDependingOnChip(instanceName);
         if (typeof showVars === 'function') showVars();
       }
@@ -12492,6 +12627,7 @@ if (s.assignment) {
     }
 
     const prefix = instanceName.substring(1);
+    const internalPrefix = this._compositeInternalPrefix(instanceName);
     const pinStorage = new Map();
     const poutStorage = new Map();
 
@@ -12512,121 +12648,15 @@ if (s.assignment) {
       def,
       pinStorage,
       poutStorage,
-      internalPrefix: `_${prefix}`,
+      internalPrefix,
       lastExecValue: '0'
     };
     this.boardInstances.set(instanceName, instanceInfo);
-    this.executeBoardBody(instanceName, def.body);
+    this.executeCompositeBody('board', instanceName, def.body);
   }
 
   executeBoardBody(instanceName, statements) {
-    const instance = this.boardInstances.get(instanceName);
-    if (!instance) return;
-
-    const { def, pinStorage, poutStorage, internalPrefix } = instance;
-
-    const savedVars = new Map(this.vars);
-    const savedWires = new Map(this.wires);
-    const savedComponents = new Map(this.components);
-    const savedChipInstances = new Map(this.chipInstances);
-    const savedBoardInstances = new Map(this.boardInstances);
-    const savedInsideBoardBody = this.insideBoardBody;
-    const savedCurrentBoardInstance = this.currentBoardInstance;
-
-    this.insideBoardBody = true;
-    this.currentBoardInstance = instanceName;
-
-    for (const [pinName, pinInfo] of pinStorage) {
-      this.wires.set(pinName, { type: `${pinInfo.bits}wire`, ref: pinInfo.ref, initOnly: true });
-      if (pinInfo.ref && pinInfo.ref.startsWith('&')) {
-        this.wireStorageMap.set(pinName, parseInt(pinInfo.ref.slice(1), 10));
-      }
-    }
-
-    for (const [poutName, poutInfo] of poutStorage) {
-      this.wires.set(poutName, { type: `${poutInfo.bits}wire`, ref: poutInfo.ref, initOnly: true });
-      if (poutInfo.ref && poutInfo.ref.startsWith('&')) {
-        this.wireStorageMap.set(poutName, parseInt(poutInfo.ref.slice(1), 10));
-      }
-    }
-
-    if (instance.internalBodyWires) {
-      for (const [k, v] of instance.internalBodyWires) {
-        this.wires.set(k, this._restoreInternalBodyWire(v, true));
-        if (v.ref && v.ref.startsWith('&')) {
-          this.wireStorageMap.set(k, parseInt(v.ref.slice(1), 10));
-        }
-      }
-    }
-
-    for (const stmt of statements) {
-      const renamedStmt = this.renamePcbStatement(stmt, internalPrefix);
-      this.exec(renamedStmt, true);
-    }
-    this.postExecBody();
-
-    if (this.deferWirePropagation() && this.signalPropagationStrategy) {
-      this.signalPropagationStrategy.propagate();
-    }
-
-    for (const [poutName, poutInfo] of poutStorage) {
-      const currentWire = this.wires.get(poutName);
-      const value = currentWire ? this.getValueFromRef(currentWire.ref) : null;
-      if (value) this.setValueAtRef(poutInfo.ref, value);
-    }
-
-    if (def.returnSpec) {
-      const retVarName = def.returnSpec.varName;
-      const retWire = this.wires.get(retVarName) || null;
-      const retVar = this.vars.get(retVarName) || null;
-      let retValue = null;
-      if (retWire && retWire.ref) retValue = this.getValueFromRef(retWire.ref);
-      else if (retVar && retVar.value) retValue = retVar.value;
-      if (retValue !== null) instance.returnValue = retValue;
-    }
-
-    instance.internalComponentName = new Map();
-    for (const [compName, compInfo] of this.components) {
-      if (compName.startsWith('.' + internalPrefix + '_')) {
-        savedComponents.set(compName, compInfo);
-        instance.internalComponentName.set(compName.replace('.' + internalPrefix + '_', '.'), 'comp.' + compInfo.type);
-      }
-    }
-    for (const [chipInstName, chipInst] of this.chipInstances) {
-      if (chipInstName.startsWith('.' + internalPrefix + '_')) {
-        savedChipInstances.set(chipInstName, chipInst);
-        instance.internalComponentName.set(chipInstName.replace('.' + internalPrefix + '_', '.'), 'chip.' + chipInst.chipName);
-      }
-    }
-    for (const [boardInstName, boardInst] of this.boardInstances) {
-      if (boardInstName.startsWith('.' + internalPrefix + '_')) {
-        savedBoardInstances.set(boardInstName, boardInst);
-        instance.internalComponentName.set(boardInstName.replace('.' + internalPrefix + '_', '.'), 'board.' + boardInst.boardName);
-      }
-    }
-
-    instance.internalBodyWires = new Map();
-    for (const [k, v] of this.wires) {
-      if (!savedWires.has(k) && !pinStorage.has(k) && !poutStorage.has(k)) {
-        instance.internalBodyWires.set(k, this._snapshotInternalBodyWire(v));
-      }
-    }
-
-    this.vars = savedVars;
-    this.wires = savedWires;
-    for (const pinName of pinStorage.keys()) this.wireStorageMap.delete(pinName);
-    for (const poutName of poutStorage.keys()) this.wireStorageMap.delete(poutName);
-    if (instance.internalBodyWires) {
-      for (const k of instance.internalBodyWires.keys()) this.wireStorageMap.delete(k);
-    }
-    this._bindInternalProbeTargets(instanceName);
-    this._emitInternalProbeTargets(instanceName);
-    this._emitComputedForBodyComponents(internalPrefix);
-    this.components = savedComponents;
-    this.chipInstances = savedChipInstances;
-    this.boardInstances = savedBoardInstances;
-    this.insideBoardBody = savedInsideBoardBody;
-    this.currentBoardInstance = savedCurrentBoardInstance;
+    this.executeCompositeBody('board', instanceName, statements);
   }
 
   executeBoardPropertyBlock(instanceName, instance, properties, reEvaluate, block) {
@@ -12719,7 +12749,7 @@ if (s.assignment) {
       }
 
       if (shouldExecute) {
-        this.executeBoardBody(instanceName, def.body);
+        this.propagateCompositeInstance('board', instanceName);
         this.reEvalWiresDependingOnBoard(instanceName);
         if (typeof showVars === 'function') showVars();
       }

@@ -44,6 +44,10 @@ Read pouts:
 4wire out = .instance:outputName
 ```
 
+### Execution model
+
+Same as [chip](chip.md): **elaboration** at `board [type] .inst::`, then **propagation** on each exec from a property block. Details and writing style: [chip-board-execution.md](chip-board-execution.md).
+
 ---
 
 ## Allowed in board body
@@ -125,5 +129,6 @@ See [debug.md](debug.md).
 ## Related
 
 - [chip.md](chip.md) — logic-only blocks
+- [chip-board-execution.md](chip-board-execution.md) — elaboration and propagation
 - [pcb.md](pcb.md) — deprecated
 - [components.md](components.md) — index

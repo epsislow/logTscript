@@ -971,7 +971,8 @@ b (1wire) = 1 …
 | `probe` + `[key]` + `REG` after RUN | `initialised` at RUN; `edge committed` on key release (818–819) | Same |
 | `probe(.comp)` on key/switch/dip/rotary/osc | `initialised` at RUN; `changed` on UI (821–824) | Same |
 | `probe(.div:mod)` computed component | `initialised` / `changed` on `:set` (836–837) | Same |
-| `probe(.u1.partial)` chip/PCB internal wire | `initialised` / `changed` on body re-exec (832–835) | Same |
+| `probe(.u1.partial)` chip / board internal wire | `initialised` / `changed` when instance exec fires (832–833, 853–854) | Same |
+| `probe(.q.shadow)` PCB internal wire | `initialised` / `changed` on PCB body re-run (834–835) | Same |
 | `probe(.u1.sum)` dot on pout | ignored — use `probe(.u1:sum)` (839) | Same |
 
 ### 7. `probe` — `initialised` then `changed` at settle (815 wave)

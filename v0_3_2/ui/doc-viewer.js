@@ -123,6 +123,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-TRIL.md', label: 'TRIL (lower triangle)', searchPrimary: 'TRIL' },
       { file: 'builtin-TRIU.md', label: 'TRIU (upper triangle)', searchPrimary: 'TRIU' },
       { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)', searchPrimary: 'ZEROS' },
+      { file: 'chip-board-execution.md', label: 'Chip and board execution' },
       { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)', searchPrimary: 'on:' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
