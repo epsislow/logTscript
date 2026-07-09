@@ -42,6 +42,74 @@
     focusEditor();
   }
 
+  function writeClipboard(text) {
+    if (typeof copyTextToClipboard === 'function') {
+      return copyTextToClipboard(text);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return Promise.reject(new Error('clipboard unavailable'));
+  }
+
+  function readClipboard() {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      return navigator.clipboard.readText();
+    }
+    return Promise.reject(new Error('clipboard unavailable'));
+  }
+
+  function copyEditorSelection() {
+    const ed = getEditor();
+    if (!ed) return;
+    const text = ed.getSelection();
+    if (!text) {
+      focusEditor();
+      return;
+    }
+    writeClipboard(text).then(focusEditor).catch(focusEditor);
+  }
+
+  function cutEditorSelection() {
+    const ed = getEditor();
+    if (!ed) return;
+    const text = ed.getSelection();
+    if (!text) {
+      focusEditor();
+      return;
+    }
+    writeClipboard(text).then(function () {
+      ed.replaceSelection('');
+      focusEditor();
+    }).catch(focusEditor);
+  }
+
+  function pasteEditorSelection() {
+    const ed = getEditor();
+    if (!ed) return;
+    focusEditor();
+    readClipboard().then(function (text) {
+      ed.replaceSelection(text);
+      focusEditor();
+    }).catch(focusEditor);
+  }
+
+  function runClipboardAction(action) {
+    switch (action) {
+      case 'copy':
+        copyEditorSelection();
+        break;
+      case 'cut':
+        cutEditorSelection();
+        break;
+      case 'paste':
+        pasteEditorSelection();
+        break;
+      default:
+        break;
+    }
+  }
+
   function moveEditorSelection(direction) {
     const ed = getEditor();
     if (!ed) return;
@@ -89,6 +157,12 @@
     bindTapControl(btn, () => moveEditorSelection(dir));
   }
 
+  function bindClipButton(btn) {
+    const action = btn.getAttribute('data-clip');
+    if (!action) return;
+    bindTapControl(btn, () => runClipboardAction(action));
+  }
+
   function initSelectionPanel() {
     const modeBtn = document.getElementById('selectionModeBtn');
     if (modeBtn) {
@@ -98,6 +172,7 @@
       updateSelectionModeBtn();
     }
     document.querySelectorAll('.selection-arrow-btn').forEach(bindArrowButton);
+    document.querySelectorAll('.selection-clip-btn').forEach(bindClipButton);
   }
 
   window.toggleSelectionPanel = function toggleSelectionPanel() {

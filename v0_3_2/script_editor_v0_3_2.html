@@ -241,6 +241,29 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .selection-arrow-btn:active {
   background: #242424;
 }
+.selection-clip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.selection-clip-btn {
+  min-width: 2rem;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 6px;
+  background: #101010;
+  border-color: #444;
+}
+.selection-clip-btn--copy {
+  font-weight: bold;
+  background-color: #048;
+}
+.selection-clip-btn:active {
+  background: #242424;
+}
+.selection-clip-btn--copy:active {
+  background: #06a;
+}
 #timelineCanvas {
   display:block;
   width:100%;
@@ -2823,6 +2846,11 @@ show(a,b,c)
       <button type="button" class="btn selection-arrow-btn" data-dir="up" title="Up">▲</button>
       <button type="button" class="btn selection-arrow-btn" data-dir="down" title="Down">▼</button>
       <button type="button" class="btn selection-arrow-btn" data-dir="right" title="Right">▶</button>
+    </div>
+    <div class="selection-clip" aria-label="Clipboard">
+      <button type="button" class="btn selection-clip-btn selection-clip-btn--copy" data-clip="copy" title="Copy selection">⿻</button>
+      <button type="button" class="btn selection-clip-btn" data-clip="paste" title="Paste">⧉</button>
+      <button type="button" class="btn selection-clip-btn" data-clip="cut" title="Cut selection">✂</button>
     </div>
   </div>
 </div>
