@@ -1,7 +1,9 @@
 /* ================= EDITOR & TABS ================= */
 
-const maxTabs = 25;
+const maxTabs = 30;
 const TABS_STORAGE_KEY = 'prog/tabs';
+const TABS_DISPLAY_MODE_KEY = 'prog/tabsDisplayMode';
+const TABS_DISPLAY_MODES = ['all', '1line', 'grid'];
 const tabs = new Map();
 let currentTab = 0;
 let lastTab = 0;
@@ -10,6 +12,75 @@ let codeCheckDisabled = false;
 let cmEditor;
 let debug = {};
 let persistTabsTimer = null;
+let tabsDisplayMode = 'all';
+
+function tabsDisplayModeLabel(mode) {
+  if (mode === '1line') return '1-line';
+  return mode;
+}
+
+function loadTabsDisplayMode() {
+  const db = tabsDb();
+  if (db.has(TABS_DISPLAY_MODE_KEY)) {
+    const v = db.get(TABS_DISPLAY_MODE_KEY);
+    if (TABS_DISPLAY_MODES.includes(v)) tabsDisplayMode = v;
+  }
+}
+
+function cycleTabsDisplayMode() {
+  const i = TABS_DISPLAY_MODES.indexOf(tabsDisplayMode);
+  tabsDisplayMode = TABS_DISPLAY_MODES[(i + 1) % TABS_DISPLAY_MODES.length];
+  tabsDb().set(TABS_DISPLAY_MODE_KEY, tabsDisplayMode);
+  applyTabsDisplayMode();
+}
+
+function applyTabsDisplayMode() {
+  const strip = document.getElementById('tabsStrip');
+  const btn = document.getElementById('tabsDisplayModeBtn');
+  const prevBtn = document.getElementById('tabsStripScrollPrev');
+  const nextBtn = document.getElementById('tabsStripScrollNext');
+  const outer = document.getElementById('tabsStripOuter');
+  if (strip) strip.dataset.tabsMode = tabsDisplayMode;
+  if (outer) outer.classList.toggle('tabs-strip-outer--1line', tabsDisplayMode === '1line');
+  if (btn) {
+    btn.textContent = tabsDisplayModeLabel(tabsDisplayMode);
+    btn.title = 'Tab display (click to cycle): all → 1-line → grid';
+  }
+  const showScroll = tabsDisplayMode === '1line';
+  if (prevBtn) prevBtn.hidden = !showScroll;
+  if (nextBtn) nextBtn.hidden = !showScroll;
+  scrollActiveTabIntoView();
+}
+
+function scrollTabsStrip(direction) {
+  const strip = document.getElementById('tabsStrip');
+  if (!strip || tabsDisplayMode !== '1line') return;
+  const step = Math.max(72, Math.floor(strip.clientWidth * 0.8));
+  strip.scrollBy({ left: direction * step, behavior: 'smooth' });
+}
+
+function scrollActiveTabIntoView() {
+  if (tabsDisplayMode !== '1line' && tabsDisplayMode !== 'grid') return;
+  const strip = document.getElementById('tabsStrip');
+  if (!strip) return;
+  const active = strip.querySelector('.tab-active, .tab-run-current');
+  if (active && typeof active.scrollIntoView === 'function') {
+    active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+}
+
+function initTabsDisplayPanel() {
+  loadTabsDisplayMode();
+  const prevBtn = document.getElementById('tabsStripScrollPrev');
+  const nextBtn = document.getElementById('tabsStripScrollNext');
+  if (prevBtn) {
+    prevBtn.addEventListener('click', function () { scrollTabsStrip(-1); });
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener('click', function () { scrollTabsStrip(1); });
+  }
+  applyTabsDisplayMode();
+}
 
 function tabsDb() {
   if (typeof sdb !== 'undefined') return sdb;
@@ -546,6 +617,7 @@ function fShowTabs() {
     const instSuffix = runningInst != null ? ' ·' + runningInst : '';
     tabsActiveEl.innerHTML += '<div class="'+tabClass+'" data-key="'+k+'" onClick="tabClick(this)">'+tab.filename+instSuffix+isChangedText+'</div>';
   }
+  scrollActiveTabIntoView();
 }
 
 function tabClick(element) {

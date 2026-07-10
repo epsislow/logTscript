@@ -403,6 +403,8 @@ async function init() {
   tabShowCurrent();
   fShowTabs();
 
+  initTabsDisplayPanel();
+
   cmEditor.on('beforeChange', function () {
     dismissEditorErrorHighlight();
   });
