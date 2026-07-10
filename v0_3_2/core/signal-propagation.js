@@ -25,6 +25,56 @@ class SignalPropagationStrategy {
     this.debugLevel = level;
   }
 
+  resetListenTrace() {
+    this._listenStepCounter = 0;
+  }
+
+  _isLegacyListen() {
+    return !this.deferWireWrites;
+  }
+
+  _legacyCascadeStep() {
+    if (this._listenStepCounter == null) this._listenStepCounter = 0;
+    return ++this._listenStepCounter;
+  }
+
+  _emitLegacyListenAtStep(step, text, kind, minLevel = 1) {
+    if (!this._isLegacyListen()) return;
+    if (this.debugLevel < minLevel) return;
+    const interp = this.interp;
+    if (!interp || !interp.waveListenActive) return;
+    const prefixed = `[step ${step}] ${text}`;
+    if (typeof interp.emitWaveListenLine === 'function') {
+      interp.emitWaveListenLine(prefixed, kind || 'trace');
+    }
+  }
+
+  _emitLegacyListenValueEntryAtStep(step, name, val, kind, minLevel, isComponent) {
+    if (!this._isLegacyListen()) return;
+    if (this.debugLevel < minLevel) return;
+    const interp = this.interp;
+    if (!interp || !interp.waveListenActive) return;
+    if (typeof interp.emitWaveListenLine !== 'function') return;
+    let label = 'commit';
+    if (isComponent) label = 'commit component';
+    else if (kind === 'eval') label = 'eval';
+    else if (kind === 'schedule') label = 'schedule';
+    const payload = {
+      wave: step,
+      mode: 'legacy',
+      traceCategory: 'wire',
+      label,
+      ...this._buildWaveListenValuePayload(name, val, { isComponent }),
+    };
+    interp.emitWaveListenLine(payload, kind || 'commit');
+  }
+
+  notifyLegacyWireCommit(name, val) {
+    if (!this._isLegacyListen()) return;
+    const step = this._legacyCascadeStep();
+    this._emitLegacyListenValueEntryAtStep(step, name, val, 'commit', 1, false);
+  }
+
   _emitWaveListen(text, kind, minLevel = 1) {
     if (this.debugLevel < minLevel) return;
     const interp = this.interp;
@@ -125,6 +175,8 @@ class SignalPropagationStrategy {
     else if (kind === 'schedule') label = 'schedule';
     const payload = {
       wave,
+      mode: 'wave',
+      traceCategory: 'wire',
       label,
       ...this._buildWaveListenValuePayload(name, val, { isComponent }),
     };
@@ -2086,10 +2138,24 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         if (this._uccExecutedStatements) this._uccExecutedStatements.add(ds);
 
         const oldWireValue = this.getValueFromRef(wire.ref);
+        const strat = this.signalPropagationStrategy;
+        const legacyTrace = strat && strat._isLegacyListen && strat._isLegacyListen()
+          && this.waveListenActive;
+        let cascadeStep = 0;
+        if (legacyTrace) cascadeStep = strat._legacyCascadeStep();
+        if (legacyTrace && strat.debugLevel >= 2) {
+          strat._emitLegacyListenAtStep(cascadeStep, `exec ${strat._formatWireStmtRef(ds)}`, 'exec', 2);
+        }
         this.execWireStatement(ds);
         const newWireValue = this.getValueFromRef(wire.ref);
+        if (legacyTrace && strat.debugLevel >= 3 && newWireValue != null) {
+          strat._emitLegacyListenValueEntryAtStep(cascadeStep, target.var, newWireValue, 'eval', 3, false);
+        }
         this.clog(`${target.var} = ${oldWireValue} -> ${newWireValue}`);
         if (newWireValue !== oldWireValue) {
+          if (legacyTrace && strat.debugLevel >= 1 && newWireValue != null) {
+            strat._emitLegacyListenValueEntryAtStep(cascadeStep, target.var, newWireValue, 'commit', 1, false);
+          }
           this.clog('ex.asg: ',target.var, newWireValue, ds);
           this.updateConnectedComponents(target.var, newWireValue, ds);
         }
@@ -2108,6 +2174,14 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
           const w = this.wires.get(decl.name);
           if (w) oldDeclValues.set(decl.name, this.getValueFromRef(w.ref));
         }
+        const strat = this.signalPropagationStrategy;
+        const legacyTrace = strat && strat._isLegacyListen && strat._isLegacyListen()
+          && this.waveListenActive;
+        let cascadeStep = 0;
+        if (legacyTrace) cascadeStep = strat._legacyCascadeStep();
+        if (legacyTrace && strat.debugLevel >= 2) {
+          strat._emitLegacyListenAtStep(cascadeStep, `exec ${strat._formatWireStmtRef(ds)}`, 'exec', 2);
+        }
         this.clog('pre-exec', ds);
         this.execWireStatement(ds);
         this.clog('post-exec', ds);
@@ -2118,8 +2192,14 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
          if (!w) continue;
          const newDeclValue = this.getValueFromRef(w.ref);
          const oldDeclValue = oldDeclValues.get(decl.name);
+         if (legacyTrace && strat.debugLevel >= 3 && newDeclValue != null) {
+           strat._emitLegacyListenValueEntryAtStep(cascadeStep, decl.name, newDeclValue, 'eval', 3, false);
+         }
          this.clog(`${decl.name} = ${oldDeclValue} -> ${newDeclValue}`);
          if (newDeclValue !== null && newDeclValue !== oldDeclValue) {
+           if (legacyTrace && strat.debugLevel >= 1) {
+             strat._emitLegacyListenValueEntryAtStep(cascadeStep, decl.name, newDeclValue, 'commit', 1, false);
+           }
            this.clog(`ex.dcl: ${decl.name} ${this.jstmt(ds)}`);
            this.updateConnectedComponents(decl.name, newDeclValue, ds);
          }

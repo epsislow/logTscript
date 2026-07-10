@@ -357,9 +357,13 @@ function _formatWaveListenScalarFormatted(rawValue, bitWidth, fmt, formatValueFn
 }
 
 function waveListenPayloadPrefix(payload) {
-  const wave = payload.wave != null ? payload.wave : '?';
   const label = payload.label || 'commit';
   const name = payload.name != null ? payload.name : '?';
+  if (payload.mode === 'legacy') {
+    const step = payload.wave != null ? payload.wave : '?';
+    return `[step ${step}] ${label} ${name}`;
+  }
+  const wave = payload.wave != null ? payload.wave : '?';
   return `[wave ${wave}] ${label} ${name}`;
 }
 

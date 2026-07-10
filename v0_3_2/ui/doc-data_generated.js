@@ -8371,32 +8371,42 @@ After **RUN**, toggle \`.s1\` in the panel — **\`probe\`** logs each change wi
 
 ---
 
-## Wave Listen (UI panel)
+## Signal Trace (UI panel)
 
-Wave propagation trace — **separate panel**, not Output. Open from **Win ▾ → Wave Listen**.
+Signal propagation trace — **separate panel**, not Output. Open from **Win ▾ → Signal Trace** (formerly Wave Listen).
 
 | Control | Role |
 |---------|------|
 | **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
-| **L1 / L2 / L3** | Trace verbosity (\`debugLevel\` on wave engine) |
-| **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii (dropdown, persisted) |
+| **L1 / L2 / L3** | Trace verbosity (\`debugLevel\` on propagation engine) |
+| **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii / auto (dropdown, persisted) |
 | **Clear** | Clears panel history (no auto-clear on Run) |
-| **Listening…** badge | Internal **listen** active while script runs (distinct from ON/OFF) |
+| **Tracing…** badge | Internal trace active while script runs (distinct from ON/OFF) |
 
-**Listen** is runtime-only: ON at Run start (if armed + wave mode), OFF at Stop or script end. The ON button stays armed for the next Run.
+**Trace** is runtime-only: ON at Run start (if armed), stays ON after Run complete when armed (interactive key/switch updates). OFF at Stop or when disarmed.
 
-Example trace (level 1):
+Example trace — **Wave** (level 1):
 
 \`\`\`text
 [wave 0] RUN init → recompute all wires
 [wave 1] commit packetEncoded = ^4808…
 [wave 1] lut-mut .huff:clear → re-exec st(1062:asg) packetEncoded := …
-* script stopped listen is OFF
+* script stopped trace is OFF
 \`\`\`
 
-Legacy mode: one status line (\`listen is ON/OFF\`), no \`[wave N]\` lines.
+Example trace — **Legacy** (level 1):
 
-**Value formatting:** dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **oct**, **b32hex**, **b32c** produc literali \`o^…\`, \`x^…\`, \`xc^…\` (roundtrip ca la hex). **ascii** afișează ca \`show(…; ascii)\` — \`"Hello"\` sau \`\\72 \\101 …;ascii\`. Suffix **\`(Nbits)\`** la afișare. **\`[cpy]\`** — literal script: **bin** = biți continui; **hex** = \`^…\` fără spații; **oct/b32hex/b32c** = \`o^…\` / \`x^…\` / \`xc^…\` fără spații; **dec/s8/…** = cu \`;format\`; **ascii** = \`"abc"\` pentru text printabil, \`"abc" + \\2 + "zz"\` dacă mix, \`\\65 \\66;ascii\` dacă doar \`\\N\` (2+ cu \`;ascii\`). X/Z → fallback hex la copy.
+\`\`\`text
+* Run start (legacy cascade) — trace is ON
+[step 1] commit a = ^3
+[step 2] commit b = ^3
+lut-mut .huff:clear → re-exec st(5:asg) packetEncoded := …
+* Run complete — trace stays ON (interactive updates)
+\`\`\`
+
+Legacy uses **\`[step N]\`** prefix (immediate cascade) instead of **\`[wave N]\`**. Level 2 adds \`exec\` on cascade re-eval; level 3 adds \`eval\` (wire values computed before commit).
+
+**Value formatting:** dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii / auto**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **oct**, **b32hex**, **b32c** produc literali \`o^…\`, \`x^…\`, \`xc^…\` (roundtrip ca la hex). **ascii** afișează ca \`show(…; ascii)\` — \`"Hello"\` sau \`\\72 \\101 …;ascii\`. Suffix **\`(Nbits)\`** la afișare. **\`[cpy]\`** — literal script: **bin** = biți continui; **hex** = \`^…\` fără spații; **oct/b32hex/b32c** = \`o^…\` / \`x^…\` / \`xc^…\` fără spații; **dec/s8/…** = cu \`;format\`; **ascii** = \`"abc"\` pentru text printabil, \`"abc" + \\2 + "zz"\` dacă mix, \`\\65 \\66;ascii\` dacă doar \`\\N\` (2+ cu \`;ascii\`). X/Z → fallback hex la copy.
 
 See [Wave debug patterns](#wave-debug-patterns) and [huffman-v2.md](huffman-v2.md) (SC round-trip).
 
@@ -8423,7 +8433,7 @@ deps(source + codebook) # ad-hoc expr — upstream only
 deps(.huff)             # stmts re-exec on LUT mutation
 \`\`\`
 
-Works in **wave and legacy** (static elaboration index). For Huffman SC debugging, use with [Wave Listen](#wave-listen-ui-panel) — see [wave-debug patterns](#wave-debug-patterns).
+Works in **wave and legacy** (static elaboration index). For Huffman SC debugging, use with [Signal Trace](#signal-trace-ui-panel) — see [wave-debug patterns](#wave-debug-patterns).
 
 ---
 
@@ -8437,7 +8447,7 @@ Works in **wave and legacy** (static elaboration index). For Huffman SC debuggin
 | **\`probe(.huff:size())\`** | Witness LUT mutations |
 | **\`watch(ph.*)\`** | FSM + multi-step protocol |
 | **\`deps(wire)\`** | Before Run — see \`.huff\` / protocol links |
-| **Wave Listen ON** | During Run — wave commits and LUT re-eval |
+| **Signal Trace ON** | During Run — commits and LUT re-eval (wave or legacy) |
 
 Huffman SC round-trip: [huffman-v2.md — Load & Run](huffman-v2.md).
 

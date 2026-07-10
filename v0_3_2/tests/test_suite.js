@@ -20041,6 +20041,49 @@ reg(2268, 'wave-debug', 'Wave Listen copy — oct b32hex b32c literals', functio
   h.assert('fmt options b32c', String(WAVE_LISTEN_FMT_OPTIONS.includes('b32c')), 'true');
 });
 
+reg(2269, 'wave-debug', 'Signal Trace — legacy level 1 commit trace', function(h, session) {
+  const processed = preprocessLoop('2wire a = 11\n2wire b = a');
+  const registry = session._ensureRegistry();
+  const strategy = session._ensureSignalPropagationStrategy();
+  strategy.setDebugLevel(1);
+  const p = new Parser(new Tokenizer(processed), registry);
+  const stmts = p.parse();
+  const lines = [];
+  const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
+  interp.waveListenActive = true;
+  interp.onWaveListenLine = function (payload) {
+    const text = typeof payload === 'string'
+      ? payload
+      : (typeof waveListenPayloadToText === 'function'
+        ? waveListenPayloadToText(payload, (v, bw) => interp.formatValue(v, bw))
+        : JSON.stringify(payload));
+    lines.push(text);
+  };
+  for (const s of stmts) interp.exec(s);
+  interp.postExecSrc();
+  h.assert('some trace', String(lines.length > 0), 'true');
+  h.assert('commit line', String(lines.some((l) => l.includes('commit'))), 'true');
+  h.assert('step prefix', String(lines.some((l) => l.includes('[step'))), 'true');
+}, { propagation: 'legacy' });
+
+reg(2270, 'wave-debug', 'Signal Trace — legacy L2 exec on cascade', function(h, session) {
+  const processed = preprocessLoop('1wire a : 0\n1wire b = NOT(a)\na = 1');
+  const registry = session._ensureRegistry();
+  const strategy = session._ensureSignalPropagationStrategy();
+  strategy.setDebugLevel(2);
+  const p = new Parser(new Tokenizer(processed), registry);
+  const stmts = p.parse();
+  const lines = [];
+  const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
+  interp.waveListenActive = true;
+  interp.onWaveListenLine = function (payload) {
+    lines.push(typeof payload === 'string' ? payload : String(payload));
+  };
+  for (const s of stmts) interp.exec(s);
+  interp.postExecSrc();
+  h.assert('exec line', String(lines.some((l) => l.includes('exec st('))), 'true');
+}, { propagation: 'legacy' });
+
 
   window.LogTScriptTestSuite = {
     tests,

@@ -3,26 +3,26 @@ name: Signal Trace Legacy
 overview: "Redenumire Wave Listen → Signal Trace; Legacy listen [step N]; faza 2: trace componente A–F + filtru All|Wires|Components|Internals (Wave + Legacy)."
 todos:
   - id: rename-ui
-    content: "Redenumire UI: Signal Trace (meniu Win, titlu panou, debug.md, doc-data)"
-    status: pending
+    content: "Redenumire UI: Signal Trace (meniu Win, titlu panou, debug.md)"
+    status: completed
   - id: unlock-panel
     content: "Deblochează listen în legacy (wave-listen-panel.js: begin/sync/end)"
-    status: pending
+    status: completed
   - id: legacy-emit-helpers
     content: Adaugă resetListenTrace + _emitLegacyListen* pe SignalPropagationStrategy
-    status: pending
+    status: completed
   - id: hook-cascade
     content: Instrumentează updateConnectedComponents pentru exec/commit/eval în legacy
-    status: pending
+    status: completed
   - id: hook-direct-writes
     content: Instrumentează scrieri wire directe în interpreter.js (când old !== new)
-    status: pending
+    status: completed
   - id: prefix-format
     content: Actualizează prefix [step N] / [wave N] în format + panel
-    status: pending
+    status: completed
   - id: tests-docs
-    content: Test 2207 legacy listen + actualizare debug.md
-    status: pending
+    content: Test 2269/2270 legacy trace + actualizare debug.md
+    status: completed
   - id: phase2-components-all
     content: "Faza 2: trace componente A–F (commit/prop/connect/block/state) + filtru All|Wires|Components|Internals"
     status: pending

@@ -1,4 +1,4 @@
-/* ================= WAVE LISTEN PANEL ================= */
+/* ================= SIGNAL TRACE PANEL (wave-listen internals) ================= */
 
 const WAVE_LISTEN_ARMED_KEY = 'prog/waveListenArmed';
 const WAVE_LISTEN_LEVEL_KEY = 'prog/waveListenLevel';
@@ -125,6 +125,8 @@ function appendWaveListenPanelLine(instanceId, payload, kind) {
       instanceId,
       instPrefix: prefix,
       wave: payload.wave,
+      mode: payload.mode || 'wave',
+      traceCategory: payload.traceCategory || 'wire',
       label: payload.label,
       name: payload.name,
       rawValue: payload.rawValue,
@@ -178,12 +180,11 @@ function clearWaveListenPanel() {
 function _syncWaveListenToActiveInterps() {
   if (typeof runContextRegistry === 'undefined' || !runContextRegistry) return;
   const armed = getWaveListenArmed();
-  const legacy = _isLegacyPropagation();
   for (const ctx of runContextRegistry.values()) {
     if (!ctx || !ctx.interp) continue;
     const running = !!ctx.ownerTabId && typeof getOwnerTabId === 'function'
       && getOwnerTabId(ctx.id) != null;
-    if (running && armed && !legacy) {
+    if (running && armed) {
       ctx.waveListenActive = true;
       ctx.interp.waveListenActive = true;
     } else if (!armed) {
@@ -229,11 +230,13 @@ function beginWaveListenRun(instanceId, opts) {
 
   const legacy = o.legacy != null ? o.legacy : _isLegacyPropagation();
 
-  if (legacy) {
-    appendWaveListenStatus(`* Script runs in mode legacy, listen is ${armed ? 'ON' : 'OFF'}`);
-    ctx.waveListenActive = false;
-    if (ctx.interp) ctx.interp.waveListenActive = false;
-    return;
+  if (legacy && armed && ctx.interp && ctx.interp.signalPropagationStrategy
+      && typeof ctx.interp.signalPropagationStrategy.resetListenTrace === 'function') {
+    ctx.interp.signalPropagationStrategy.resetListenTrace();
+  }
+
+  if (legacy && armed) {
+    appendWaveListenStatus('* Run start (legacy cascade) — trace is ON');
   }
 
   ctx.waveListenActive = armed;
@@ -251,11 +254,10 @@ function beginWaveListenRun(instanceId, opts) {
 function endWaveListenRun(instanceId, reason) {
   const ctx = _getCtxForInstance(instanceId);
   const armed = getWaveListenArmed();
-  const legacy = _isLegacyPropagation();
-  const keepListening = armed && !legacy && reason === 'complete';
+  const keepTracing = armed && reason === 'complete';
 
   if (ctx) {
-    if (keepListening) {
+    if (keepTracing) {
       ctx.waveListenActive = true;
       if (ctx.interp) {
         ctx.interp.waveListenActive = true;
@@ -273,11 +275,11 @@ function endWaveListenRun(instanceId, reason) {
   }
 
   if (reason === 'preempt' || reason === 'stop' || reason === 'error') {
-    appendWaveListenStatus('* script stopped listen is OFF');
-  } else if (reason === 'complete' && !keepListening) {
-    appendWaveListenStatus('* script stopped listen is OFF');
-  } else if (reason === 'complete' && keepListening) {
-    appendWaveListenStatus('* Run complete — listen stays ON (interactive updates)');
+    appendWaveListenStatus('* script stopped trace is OFF');
+  } else if (reason === 'complete' && !keepTracing) {
+    appendWaveListenStatus('* script stopped trace is OFF');
+  } else if (reason === 'complete' && keepTracing) {
+    appendWaveListenStatus('* Run complete — trace stays ON (interactive updates)');
   }
   updateWaveListenToolbarUI();
 }
@@ -291,6 +293,7 @@ function _waveListenLineClass(kind) {
     case 'flush': return 'wave-listen-line--flush';
     case 'init': return 'wave-listen-line--init';
     case 'exec': return 'wave-listen-line--exec';
+    case 'eval': return 'wave-listen-line--exec';
     case 'schedule': return 'wave-listen-line--commit';
     default: return 'wave-listen-line--trace';
   }
@@ -309,9 +312,13 @@ function _waveListenFormatValueFn(entry) {
 }
 
 function _waveListenValuePrefix(entry) {
-  const wave = entry.wave != null ? entry.wave : '?';
   const label = entry.label || 'commit';
   const name = entry.name != null ? entry.name : '?';
+  if (entry.mode === 'legacy') {
+    const step = entry.wave != null ? entry.wave : '?';
+    return `[step ${step}] ${label} ${name}`;
+  }
+  const wave = entry.wave != null ? entry.wave : '?';
   return `[wave ${wave}] ${label} ${name}`;
 }
 
@@ -484,10 +491,10 @@ function updateWaveListenToolbarUI() {
       badge.textContent = 'Idle';
       badge.className = 'wave-listen-badge wave-listen-badge--idle';
     } else if (listening.length === 1) {
-      badge.textContent = `Listening… inst ${listening[0]}`;
+      badge.textContent = `Tracing… inst ${listening[0]}`;
       badge.className = 'wave-listen-badge wave-listen-badge--live';
     } else {
-      badge.textContent = `Listening… (${listening.map((i) => 'inst ' + i).join(', ')})`;
+      badge.textContent = `Tracing… (${listening.map((i) => 'inst ' + i).join(', ')})`;
       badge.className = 'wave-listen-badge wave-listen-badge--live';
     }
   }

@@ -500,6 +500,14 @@ class Interpreter {
     return this.getWireStableValue(name);
   }
 
+  _notifyLegacyWireCommit(name, val) {
+    if (this.deferWirePropagation() || !this.waveListenActive) return;
+    const strategy = this.signalPropagationStrategy;
+    if (strategy && typeof strategy.notifyLegacyWireCommit === 'function') {
+      strategy.notifyLegacyWireCommit(name, val);
+    }
+  }
+
   writeWireStable(name, value) {
     const wire = this.wires.get(name);
     if (!wire) return;
@@ -2546,7 +2554,10 @@ class Interpreter {
     const v = this._fitRedirectValue(value, bits);
     const old = this.getWireStableValue(targetName);
     this.writeWireStable(targetName, v);
-    if (old !== v) this.updateConnectedComponents(targetName, v);
+    if (old !== v) {
+      this._notifyLegacyWireCommit(targetName, v);
+      this.updateConnectedComponents(targetName, v);
+    }
   }
 
   _applyBusEnableRedirect(busName, value, prop, registerEntry) {
@@ -3572,6 +3583,7 @@ class Interpreter {
           this.wireStorageMap.set(wireName, storageIdx);
         }
       }
+      this._notifyLegacyWireCommit(wireName, v);
       this.updateConnectedComponents(wireName, v);
     });
   }
@@ -9762,6 +9774,7 @@ if (s.assignment) {
     if (this.deferWirePropagation()) {
       this.scheduleWireChange(name, newValue);
     } else {
+      this._notifyLegacyWireCommit(name, newValue);
       this.updateConnectedComponents(name, newValue);
       this._emitProbeForWire(name, newValue);
     }
@@ -10205,6 +10218,10 @@ if (s.assignment) {
         // Track wire statement for NEXT (not inside PCB body)
         if(!this.insidePcbBody && !this.wireStatements.includes(s)){
           this.wireStatements.push(s);
+        }
+        if (!this.deferWirePropagation()) {
+          const committedVal = wireValue || '0'.repeat(bits);
+          this._notifyLegacyWireCommit(d.name, committedVal);
         }
       } else {
         // Bit assignment - store value
