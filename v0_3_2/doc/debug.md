@@ -131,6 +131,7 @@ Signal propagation trace — **separate panel**, not Output. Open from **Win ▾
 | **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
 | **L1 / L2 / L3** | Trace verbosity (`debugLevel` on propagation engine) |
 | **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii / auto (dropdown, persisted) |
+| **Filter ▾** | All / Wires / Components / Internals (persisted as `prog/signalTraceFilter`) |
 | **Clear** | Clears panel history (no auto-clear on Run) |
 | **Tracing…** badge | Internal trace active while script runs (distinct from ON/OFF) |
 
@@ -156,6 +157,19 @@ lut-mut .huff:clear → re-exec st(5:asg) packetEncoded := …
 ```
 
 Legacy uses **`[step N]`** prefix (immediate cascade) instead of **`[wave N]`**. Level 2 adds `exec` on cascade re-eval; level 3 adds `eval` (wire values computed before commit).
+
+### Component & internal lines (L2–L3)
+
+| Line kind | Example | Level | Filter |
+|-----------|---------|-------|--------|
+| **commit component** | `[step 2] commit component .s = ^101` | L2 | Components |
+| **prop** | `[step 2] prop .s.data = ^101` | L2 | Components |
+| **connect** | `[step 2] connect .alu:get → result` | L2 | Components |
+| **exec block** | `[step 3] exec block .cnt.on:raise` | L3 | Internals |
+| **state** | `[step 3] state mem1[0] = ^0101` | L3 | Internals |
+| **lut-mut** | `lut-mut .huff:clear → re-exec …` | L1 | Wires + Components |
+
+**Filter** (toolbar): **All** shows everything; **Wires** — wire commit/exec/eval, init, flush, schedule, lut-mut; **Components** — commit component, prop, connect, lut-mut; **Internals** — eval L3, block exec, state/mem, schedule (wave L3).
 
 **Value formatting:** dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii / auto**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **oct**, **b32hex**, **b32c** produc literali `o^…`, `x^…`, `xc^…` (roundtrip ca la hex). **ascii** afișează ca `show(…; ascii)` — `"Hello"` sau `\72 \101 …;ascii`. Suffix **`(Nbits)`** la afișare. **`[cpy]`** — literal script: **bin** = biți continui; **hex** = `^…` fără spații; **oct/b32hex/b32c** = `o^…` / `x^…` / `xc^…` fără spații; **dec/s8/…** = cu `;format`; **ascii** = `"abc"` pentru text printabil, `"abc" + \2 + "zz"` dacă mix, `\65 \66;ascii` dacă doar `\N` (2+ cu `;ascii`). X/Z → fallback hex la copy.
 

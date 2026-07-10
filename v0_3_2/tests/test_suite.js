@@ -20077,11 +20077,167 @@ reg(2270, 'wave-debug', 'Signal Trace — legacy L2 exec on cascade', function(h
   const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
   interp.waveListenActive = true;
   interp.onWaveListenLine = function (payload) {
-    lines.push(typeof payload === 'string' ? payload : String(payload));
+    const text = typeof payload === 'string'
+      ? payload
+      : (payload && payload.listenText != null
+        ? payload.listenText
+        : String(payload));
+    lines.push(text);
   };
   for (const s of stmts) interp.exec(s);
   interp.postExecSrc();
   h.assert('exec line', String(lines.some((l) => l.includes('exec st('))), 'true');
+}, { propagation: 'legacy' });
+
+reg(2271, 'wave-debug', 'Signal Trace — legacy prop at L2', function(h, session) {
+  const processed = preprocessLoop(`comp [slider] .s:
+  length: 3
+  on: 1
+  :
+3wire out = .s:get
+1wire trig = 0
+3wire val = 101
+.s:{
+  data = val
+  set = trig
+}`);
+  const registry = session._ensureRegistry();
+  const strategy = session._ensureSignalPropagationStrategy();
+  strategy.setDebugLevel(2);
+  const p = new Parser(new Tokenizer(processed), registry);
+  const stmts = p.parse();
+  const lines = [];
+  const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
+  interp.waveListenActive = true;
+  interp.onWaveListenLine = function (payload) {
+    const text = typeof payload === 'string'
+      ? payload
+      : (typeof waveListenPayloadToText === 'function'
+        ? waveListenPayloadToText(payload, (v, bw) => interp.formatValue(v, bw))
+        : JSON.stringify(payload));
+    lines.push(text);
+  };
+  for (const s of stmts) interp.exec(s);
+  interp.postExecSrc();
+  const trigWire = interp.wires.get('trig');
+  const trigRef = trigWire && trigWire.ref;
+  if (trigRef) interp.setValueAtRef(trigRef, '1');
+  interp.updateConnectedComponents('trig', '1');
+  h.assert('prop line', String(lines.some((l) => l.includes('prop') && l.includes('.s.data'))), 'true');
+}, { propagation: 'legacy' });
+
+reg(2272, 'wave-debug', 'Signal Trace — connect alu get> at L2', function(h, session) {
+  const processed = preprocessLoop(`comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+4wire result
+.alu:{ a = 1111
+  b = 0000
+  op = 0000
+  get >= result
+  set = 1
+}`);
+  const registry = session._ensureRegistry();
+  const strategy = session._ensureSignalPropagationStrategy();
+  strategy.setDebugLevel(2);
+  const p = new Parser(new Tokenizer(processed), registry);
+  const stmts = p.parse();
+  const lines = [];
+  const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
+  interp.waveListenActive = true;
+  interp.onWaveListenLine = function (payload) {
+    lines.push(typeof payload === 'string' ? payload : (payload.listenText || JSON.stringify(payload)));
+  };
+  for (const s of stmts) interp.exec(s);
+  interp.postExecSrc();
+  h.assert('connect line', String(lines.some((l) => l.includes('connect') && l.includes('.alu:get') && l.includes('result'))), 'true');
+}, { propagation: 'legacy' });
+
+reg(2273, 'wave-debug', 'Signal Trace — exec block component on:1 at L3', function(h, session) {
+  const processed = preprocessLoop(`comp [slider] .s:
+  length: 3
+  on: 1
+  :
+1wire trig = 0
+3wire val = 101
+.s:{
+  data = val
+  set = trig
+}`);
+  const registry = session._ensureRegistry();
+  const strategy = session._ensureSignalPropagationStrategy();
+  strategy.setDebugLevel(3);
+  const p = new Parser(new Tokenizer(processed), registry);
+  const stmts = p.parse();
+  const lines = [];
+  const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
+  interp.waveListenActive = true;
+  interp.onWaveListenLine = function (payload) {
+    lines.push(typeof payload === 'string' ? payload : (payload.listenText || JSON.stringify(payload)));
+  };
+  for (const s of stmts) interp.exec(s);
+  interp.postExecSrc();
+  const trigWire = interp.wires.get('trig');
+  if (trigWire && trigWire.ref) interp.setValueAtRef(trigWire.ref, '1');
+  interp.updateConnectedComponents('trig', '1');
+  h.assert('block exec line', String(lines.some((l) => l.includes('exec block') && l.includes('.s.on:1'))), 'true');
+}, { propagation: 'legacy' });
+
+reg(2274, 'wave-debug', 'Signal Trace — traceCategory wire vs internal', function(h, session) {
+  const processed = preprocessLoop('1wire a : 0\n1wire b = NOT(a)\na = 1');
+  const registry = session._ensureRegistry();
+  const strategy = session._ensureSignalPropagationStrategy();
+  strategy.setDebugLevel(3);
+  const p = new Parser(new Tokenizer(processed), registry);
+  const stmts = p.parse();
+  const categories = [];
+  const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
+  interp.waveListenActive = true;
+  interp.onWaveListenLine = function (payload) {
+    if (payload && typeof payload === 'object' && payload.traceCategory) {
+      categories.push(payload.traceCategory);
+    }
+  };
+  for (const s of stmts) interp.exec(s);
+  interp.postExecSrc();
+  h.assert('wire category', String(categories.includes('wire')), 'true');
+  h.assert('internal category', String(categories.includes('internal')), 'true');
+}, { propagation: 'legacy' });
+
+reg(2275, 'wave-debug', 'Signal Trace — mem state at L3', function(h, session) {
+  const processed = preprocessLoop(`comp [mem] .ram:
+ports: 2
+length: 4
+depth: 4
+on: 1
+= 1010
+:
+.ram:{ 2adr = 0000
+  2data = 0101
+  2write = 1
+  set = 1
+}
+4wire r = .ram:2get`);
+  const registry = session._ensureRegistry();
+  const strategy = session._ensureSignalPropagationStrategy();
+  strategy.setDebugLevel(3);
+  const p = new Parser(new Tokenizer(processed), registry);
+  const stmts = p.parse();
+  const lines = [];
+  const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
+  interp.waveListenActive = true;
+  interp.onWaveListenLine = function (payload) {
+    const text = typeof payload === 'string'
+      ? payload
+      : (typeof waveListenPayloadToText === 'function'
+        ? waveListenPayloadToText(payload, (v, bw) => interp.formatValue(v, bw))
+        : JSON.stringify(payload));
+    lines.push(text);
+  };
+  for (const s of stmts) interp.exec(s);
+  interp.postExecSrc();
+  h.assert('state line', String(lines.some((l) => l.includes('state') && l.includes('mem'))), 'true');
 }, { propagation: 'legacy' });
 
 

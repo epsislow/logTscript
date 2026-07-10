@@ -3,12 +3,15 @@
 const WAVE_LISTEN_ARMED_KEY = 'prog/waveListenArmed';
 const WAVE_LISTEN_LEVEL_KEY = 'prog/waveListenLevel';
 const WAVE_LISTEN_FMT_KEY = 'prog/waveListenFmt';
+const SIGNAL_TRACE_FILTER_KEY = 'prog/signalTraceFilter';
+const SIGNAL_TRACE_FILTER_OPTIONS = ['all', 'wires', 'components', 'internals'];
 const WAVE_LISTEN_MAX_LINES = 2000;
 
 const _waveListenState = {
   armed: false,
   level: 1,
   fmt: 'hex',
+  filter: 'all',
   displayLog: [],
   expanded: new Set(),
   nextId: 1,
@@ -35,6 +38,18 @@ function getWaveListenLevel() {
 
 function getWaveListenFmt() {
   return _waveListenState.fmt;
+}
+
+function getSignalTraceFilter() {
+  return _waveListenState.filter;
+}
+
+function setSignalTraceFilter(filter) {
+  const next = SIGNAL_TRACE_FILTER_OPTIONS.includes(filter) ? filter : 'all';
+  if (_waveListenState.filter === next) return;
+  _waveListenState.filter = next;
+  _waveListenSdbSet(SIGNAL_TRACE_FILTER_KEY, next);
+  renderWaveListenPanel();
 }
 
 function setWaveListenFmt(fmt) {
@@ -74,6 +89,43 @@ function loadWaveListenPreferences() {
   _waveListenState.fmt = typeof normalizeWaveListenFmt === 'function'
     ? normalizeWaveListenFmt(fmt)
     : (fmt === 'bin' ? 'bin' : 'hex');
+  const filter = _waveListenSdbGet(SIGNAL_TRACE_FILTER_KEY, 'all');
+  _waveListenState.filter = SIGNAL_TRACE_FILTER_OPTIONS.includes(filter) ? filter : 'all';
+}
+
+function _inferTraceCategory(entry) {
+  if (entry.traceCategory) return entry.traceCategory;
+  const kind = entry.kind || 'trace';
+  if (kind === 'lut-mut' || kind === 'prop' || kind === 'connect') return 'component';
+  if (kind === 'state' || kind === 'eval' || kind === 'schedule') return 'internal';
+  if (entry.label === 'commit component' || entry.isComponent) return 'component';
+  if (kind === 'commit' || kind === 'exec' || kind === 'init' || kind === 'flush') return 'wire';
+  return 'wire';
+}
+
+function waveListenEntryMatchesFilter(entry, filter) {
+  if (!filter || filter === 'all') return true;
+  if (entry.kind === 'meta' || entry.kind === 'status') return true;
+  const kind = entry.kind || 'trace';
+  const cat = _inferTraceCategory(entry);
+  if (filter === 'wires') {
+    if (kind === 'lut-mut') return true;
+    if (cat === 'wire') return true;
+    if (kind === 'init' || kind === 'flush') return true;
+    return false;
+  }
+  if (filter === 'components') {
+    if (kind === 'lut-mut') return true;
+    if (cat === 'component') return true;
+    if (kind === 'prop' || kind === 'connect') return true;
+    return false;
+  }
+  if (filter === 'internals') {
+    if (cat === 'internal') return true;
+    if (kind === 'schedule' || kind === 'eval' || kind === 'state') return true;
+    return false;
+  }
+  return true;
 }
 
 function _countActiveListenInstances() {
@@ -135,6 +187,14 @@ function appendWaveListenPanelLine(instanceId, payload, kind) {
       tensorMeta: payload.tensorMeta,
       schemaRef: payload.schemaRef || null,
       isComponent: payload.isComponent,
+    };
+  } else if (payload && payload.listenText !== undefined) {
+    entry = {
+      id: _allocWaveListenEntryId(),
+      text: prefix + payload.listenText,
+      kind: kind || 'trace',
+      traceCategory: payload.traceCategory || 'wire',
+      instanceId,
     };
   } else {
     entry = {
@@ -294,6 +354,9 @@ function _waveListenLineClass(kind) {
     case 'init': return 'wave-listen-line--init';
     case 'exec': return 'wave-listen-line--exec';
     case 'eval': return 'wave-listen-line--exec';
+    case 'prop': return 'wave-listen-line--prop';
+    case 'connect': return 'wave-listen-line--connect';
+    case 'state': return 'wave-listen-line--state';
     case 'schedule': return 'wave-listen-line--commit';
     default: return 'wave-listen-line--trace';
   }
@@ -443,7 +506,9 @@ function renderWaveListenPanel() {
   if (!panel || !out) return;
   const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 40;
   out.innerHTML = '';
+  const filter = getSignalTraceFilter();
   for (const entry of _waveListenState.displayLog) {
+    if (!waveListenEntryMatchesFilter(entry, filter)) continue;
     if (_isWaveListenValuePayload(entry)) {
       _renderWaveListenValueRow(entry, out);
       continue;
@@ -461,6 +526,7 @@ function updateWaveListenToolbarUI() {
   const armedBtn = document.getElementById('waveListenArmBtn');
   const badge = document.getElementById('waveListenBadge');
   const fmtSelect = document.getElementById('waveListenFmtSelect');
+  const filterSelect = document.getElementById('signalTraceFilterSelect');
   const levelBtns = [1, 2, 3].map((n) => document.getElementById('waveListenLevel' + n));
 
   if (armedBtn) {
@@ -471,6 +537,10 @@ function updateWaveListenToolbarUI() {
 
   if (fmtSelect && fmtSelect.value !== _waveListenState.fmt) {
     fmtSelect.value = _waveListenState.fmt;
+  }
+
+  if (filterSelect && filterSelect.value !== _waveListenState.filter) {
+    filterSelect.value = _waveListenState.filter;
   }
 
   for (const btn of levelBtns) {
@@ -525,6 +595,7 @@ function initWaveListenPanel() {
   const armBtn = document.getElementById('waveListenArmBtn');
   const clearBtn = document.getElementById('waveListenClear');
   const fmtSelect = document.getElementById('waveListenFmtSelect');
+  const filterSelect = document.getElementById('signalTraceFilterSelect');
   if (armBtn) {
     armBtn.addEventListener('click', () => setWaveListenArmed(!getWaveListenArmed()));
   }
@@ -533,6 +604,9 @@ function initWaveListenPanel() {
   }
   if (fmtSelect) {
     fmtSelect.addEventListener('change', () => setWaveListenFmt(fmtSelect.value));
+  }
+  if (filterSelect) {
+    filterSelect.addEventListener('change', () => setSignalTraceFilter(filterSelect.value));
   }
   for (const n of [1, 2, 3]) {
     const btn = document.getElementById('waveListenLevel' + n);

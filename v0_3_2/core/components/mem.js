@@ -244,7 +244,7 @@ var MemComponent = class MemComponent extends BuiltinComponent {
     }
 
     if (!ctx.memWriteBatching && typeof commitMemWrites === 'function') {
-      commitMemWrites(memId);
+      commitMemWrites(memId, ctx);
     }
   }
 };

@@ -52,18 +52,25 @@ function queueMemWrite(id, port, startAddress, words) {
   }
 }
 
-function commitMemWrites(id) {
+function commitMemWrites(id, interpCtx) {
   const mem = dm().memories.get(id);
   if (!mem || mem.writeQueue.size === 0) return;
+  const interp = interpCtx || (typeof getExecInterp === 'function' ? getExecInterp() : null);
+  const strat = interp && interp.signalPropagationStrategy;
+  const traceState = interp && interp.waveListenActive && strat
+    && strat.debugLevel >= 3 && typeof strat.emitListenState === 'function';
   for (const [address, entry] of mem.writeQueue.entries()) {
+    if (traceState) {
+      strat.emitListenState(`mem${id}[${address}]`, entry.value, 3);
+    }
     setMem(id, address, entry.value);
   }
   mem.writeQueue.clear();
 }
 
-function commitAllMemWrites() {
+function commitAllMemWrites(interpCtx) {
   for (const [id] of dm().memories) {
-    commitMemWrites(id);
+    commitMemWrites(id, interpCtx);
   }
 }
 

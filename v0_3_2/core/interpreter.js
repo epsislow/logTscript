@@ -981,7 +981,8 @@ class Interpreter {
           strategy._emitWaveListen(
             `lut-mut ${instName} → re-exec ${strategy._formatWireStmtRef(ws)}`,
             'lut-mut',
-            1
+            1,
+            'component'
           );
         }
         executed.add(ws);
@@ -2608,6 +2609,25 @@ class Interpreter {
     }
 
     this._writeWireRedirectDirect(targetName, value);
+    this._emitListenWireConnect(component, sourceProp, targetName);
+  }
+
+  _emitListenWireConnect(component, sourceProp, wireName) {
+    if (!this.waveListenActive || !this.signalPropagationStrategy) return;
+    const strat = this.signalPropagationStrategy;
+    if (typeof strat.emitListenConnect === 'function') {
+      strat.emitListenConnect(component, sourceProp, wireName, 2);
+    }
+  }
+
+  _emitListenAppliedProps(compName, pending) {
+    if (!this.waveListenActive || !this.signalPropagationStrategy || !pending) return;
+    const strat = this.signalPropagationStrategy;
+    if (strat.debugLevel < 2 || typeof strat.emitListenProp !== 'function') return;
+    for (const [propName, propData] of Object.entries(pending)) {
+      if (propName === 'set' || !propData || propData.value == null) continue;
+      strat.emitListenProp(compName, propName, propData.value, 2);
+    }
   }
 
   _refreshZconnRedirectsForBus(busName) {
@@ -3601,7 +3621,14 @@ class Interpreter {
     let v = value;
     if (v.length < bits) v = v.padStart(bits, '0');
     else if (v.length > bits) v = v.substring(v.length - bits);
+    const old = this.getValueFromRef(comp.ref);
     this.setValueAtRef(comp.ref, v);
+    if (old !== v && !this.deferWirePropagation() && this.waveListenActive) {
+      const strat = this.signalPropagationStrategy;
+      if (strat && typeof strat.notifyLegacyComponentCommit === 'function') {
+        strat.notifyLegacyComponentCommit(compName, v);
+      }
+    }
   }
 
   scheduleComponentOutputChange(compName, value) {
@@ -11718,6 +11745,12 @@ if (s.assignment) {
     const onMode = block && block.onMode ? String(block.onMode) : null;
     const isEdgeMode = onMode === 'raise' || onMode === 'edge' || onMode === 'rising' || onMode === 'falling';
     const useEdgeProbe = !!(reEvaluate && block && isEdgeMode);
+    if (reEvaluate && block && this.waveListenActive && this.signalPropagationStrategy) {
+      const strat = this.signalPropagationStrategy;
+      if (strat.debugLevel >= 3 && typeof strat.emitListenBlockExec === 'function') {
+        strat.emitListenBlockExec(component, onMode || 'raise', 3);
+      }
+    }
     if (useEdgeProbe) this.probeReasonContext = 'edge_block';
     try {
     // Check if it's a PCB instance first
@@ -13114,7 +13147,9 @@ if (s.assignment) {
       const handler = this.componentRegistry.get(comp.type);
       if(handler && handler.applyProperties){
         const shouldNotify = this._shouldNotifyComponentComputedAfterApply(comp, pending, when, reEvaluate);
+        const pendingSnapshot = pending ? { ...pending } : null;
         handler.applyProperties(comp, compName, pending, when, reEvaluate, this);
+        this._emitListenAppliedProps(compName, pendingSnapshot);
         if(!reEvaluate) this.componentPendingSet.delete(compName);
         this._emitComputedComponentProbes(compName);
         if (shouldNotify) {
@@ -15488,6 +15523,12 @@ Interpreter.prototype.executeConditionalAssignmentEntry = function(entry) {
   if (!entry || body.length === 0) return;
   if (this._uccExecutedStatements && entry.sourceStmt && this._uccExecutedStatements.has(entry.sourceStmt)) {
     return;
+  }
+  if (this.waveListenActive && this.signalPropagationStrategy && !entry.insideBody) {
+    const strat = this.signalPropagationStrategy;
+    if (strat.debugLevel >= 3 && typeof strat.emitListenBlockExec === 'function') {
+      strat.emitListenBlockExec(null, entry.onMode || 'raise', 3);
+    }
   }
   if (this._uccExecutedStatements && entry.sourceStmt) {
     this._uccExecutedStatements.add(entry.sourceStmt);

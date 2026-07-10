@@ -38,15 +38,34 @@ class SignalPropagationStrategy {
     return ++this._listenStepCounter;
   }
 
-  _emitLegacyListenAtStep(step, text, kind, minLevel = 1) {
-    if (!this._isLegacyListen()) return;
+  _currentLegacyStep() {
+    return this._listenStepCounter || 0;
+  }
+
+  _listenCategoryFor(kind, opts) {
+    const o = opts || {};
+    if (o.traceCategory) return o.traceCategory;
+    if (kind === 'lut-mut' || kind === 'prop' || kind === 'connect') return 'component';
+    if (kind === 'state' || kind === 'eval' || kind === 'schedule') return 'internal';
+    if (o.isComponent && kind === 'commit') return 'component';
+    if (kind === 'commit' || kind === 'exec' || kind === 'init' || kind === 'flush') return 'wire';
+    return 'wire';
+  }
+
+  _emitListenText(text, kind, minLevel, traceCategory) {
     if (this.debugLevel < minLevel) return;
     const interp = this.interp;
     if (!interp || !interp.waveListenActive) return;
+    if (typeof interp.emitWaveListenLine !== 'function') return;
+    const cat = traceCategory || this._listenCategoryFor(kind);
+    interp.emitWaveListenLine({ listenText: text, traceCategory: cat }, kind || 'trace');
+  }
+
+  _emitLegacyListenAtStep(step, text, kind, minLevel = 1, traceCategory) {
+    if (!this._isLegacyListen()) return;
+    if (this.debugLevel < minLevel) return;
     const prefixed = `[step ${step}] ${text}`;
-    if (typeof interp.emitWaveListenLine === 'function') {
-      interp.emitWaveListenLine(prefixed, kind || 'trace');
-    }
+    this._emitListenText(prefixed, kind, minLevel, traceCategory || this._listenCategoryFor(kind));
   }
 
   _emitLegacyListenValueEntryAtStep(step, name, val, kind, minLevel, isComponent) {
@@ -59,10 +78,11 @@ class SignalPropagationStrategy {
     if (isComponent) label = 'commit component';
     else if (kind === 'eval') label = 'eval';
     else if (kind === 'schedule') label = 'schedule';
+    else if (kind === 'state') label = 'state';
     const payload = {
       wave: step,
       mode: 'legacy',
-      traceCategory: 'wire',
+      traceCategory: this._listenCategoryFor(kind, { isComponent }),
       label,
       ...this._buildWaveListenValuePayload(name, val, { isComponent }),
     };
@@ -75,13 +95,78 @@ class SignalPropagationStrategy {
     this._emitLegacyListenValueEntryAtStep(step, name, val, 'commit', 1, false);
   }
 
-  _emitWaveListen(text, kind, minLevel = 1) {
+  notifyLegacyComponentCommit(name, val) {
+    if (!this._isLegacyListen()) return;
+    const step = this._legacyCascadeStep();
+    this._emitLegacyListenValueEntryAtStep(step, name, val, 'commit', 2, true);
+  }
+
+  emitListenProp(compName, propName, val, minLevel = 2) {
     if (this.debugLevel < minLevel) return;
     const interp = this.interp;
     if (!interp || !interp.waveListenActive) return;
-    if (typeof interp.emitWaveListenLine === 'function') {
-      interp.emitWaveListenLine(text, kind || 'trace');
+    if (typeof interp.emitWaveListenLine !== 'function') return;
+    const name = `${compName}.${propName}`;
+    const step = this._isLegacyListen()
+      ? (this._currentLegacyStep() || this._legacyCascadeStep())
+      : (this._listenWaveIndex != null ? this._listenWaveIndex : 0);
+    const payload = {
+      wave: step,
+      mode: this._isLegacyListen() ? 'legacy' : 'wave',
+      traceCategory: 'component',
+      label: 'prop',
+      ...this._buildWaveListenValuePayload(name, val, {}),
+    };
+    interp.emitWaveListenLine(payload, 'prop');
+  }
+
+  emitListenConnect(component, sourceProp, wireName, minLevel = 2) {
+    if (this.debugLevel < minLevel) return;
+    const text = `connect ${component}:${sourceProp} → ${wireName}`;
+    if (this._isLegacyListen()) {
+      const step = this._currentLegacyStep() || this._legacyCascadeStep();
+      this._emitLegacyListenAtStep(step, text, 'connect', minLevel, 'component');
+    } else {
+      const wave = this._listenWaveIndex != null ? this._listenWaveIndex : 0;
+      this._emitListenText(`[wave ${wave}] ${text}`, 'connect', minLevel, 'component');
     }
+  }
+
+  emitListenBlockExec(subject, onMode, minLevel = 3) {
+    if (this.debugLevel < minLevel) return;
+    const mode = onMode || 'raise';
+    const text = subject
+      ? `exec block ${subject}.on:${mode}`
+      : `exec block on:${mode}`;
+    if (this._isLegacyListen()) {
+      const step = this._currentLegacyStep() || this._legacyCascadeStep();
+      this._emitLegacyListenAtStep(step, text, 'exec', minLevel, 'internal');
+    } else {
+      const wave = this._listenWaveIndex != null ? this._listenWaveIndex : 0;
+      this._emitListenText(`[wave ${wave}] ${text}`, 'exec', minLevel, 'internal');
+    }
+  }
+
+  emitListenState(stateName, val, minLevel = 3) {
+    if (this.debugLevel < minLevel) return;
+    const interp = this.interp;
+    if (!interp || !interp.waveListenActive) return;
+    if (typeof interp.emitWaveListenLine !== 'function') return;
+    const step = this._isLegacyListen()
+      ? (this._currentLegacyStep() || this._legacyCascadeStep())
+      : (this._listenWaveIndex != null ? this._listenWaveIndex : 0);
+    const payload = {
+      wave: step,
+      mode: this._isLegacyListen() ? 'legacy' : 'wave',
+      traceCategory: 'internal',
+      label: 'state',
+      ...this._buildWaveListenValuePayload(stateName, val, {}),
+    };
+    interp.emitWaveListenLine(payload, 'state');
+  }
+
+  _emitWaveListen(text, kind, minLevel = 1, traceCategory) {
+    this._emitListenText(text, kind, minLevel, traceCategory);
   }
 
   _formatWireStmtRef(ws) {
@@ -176,7 +261,7 @@ class SignalPropagationStrategy {
     const payload = {
       wave,
       mode: 'wave',
-      traceCategory: 'wire',
+      traceCategory: this._listenCategoryFor(kind, { isComponent }),
       label,
       ...this._buildWaveListenValuePayload(name, val, { isComponent }),
     };
@@ -428,7 +513,7 @@ class SignalPropagationStrategy {
           if (Array.isArray(arg) && arg[0] && arg[0].var) labels.push(arg[0].var);
           else labels.push('?');
         }
-        this._emitWaveListen(`flush deferred show(${labels.join(', ')})`, 'flush', 1);
+        this._emitWaveListen(`flush deferred show(${labels.join(', ')})`, 'flush', 1, 'wire');
       }
       this.interp._execShowImmediate(stmt, true);
     }
@@ -524,11 +609,11 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
     if (this._recomputeAllWires) {
       this._recomputeAllWires = false;
       if (!loggedInit) {
-        this._emitWaveListen('[wave 0] RUN init → recompute all wires', 'init', 1);
+        this._emitWaveListen('[wave 0] RUN init → recompute all wires', 'init', 1, 'wire');
         loggedInit = true;
       }
       for (const ws of interp.wireStatements) {
-        this._emitWaveListen(`[wave 0] exec ${this._formatWireStmtRef(ws)}`, 'exec', 2);
+        this._emitWaveListen(`[wave 0] exec ${this._formatWireStmtRef(ws)}`, 'exec', 2, 'wire');
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
           for (const [name, val] of outputs) {
@@ -544,9 +629,9 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
       }
     } else if (this._recomputeNextAffectedWires) {
       this._recomputeNextAffectedWires = false;
-      this._emitWaveListen('[wave 0] NEXT → recompute next-affected wires', 'init', 1);
+      this._emitWaveListen('[wave 0] NEXT → recompute next-affected wires', 'init', 1, 'wire');
       for (const ws of this._nextAffectedWireOrder) {
-        this._emitWaveListen(`[wave 0] exec ${this._formatWireStmtRef(ws)}`, 'exec', 2);
+        this._emitWaveListen(`[wave 0] exec ${this._formatWireStmtRef(ws)}`, 'exec', 2, 'wire');
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
           for (const [name, val] of outputs) {
@@ -568,6 +653,7 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
 
     for (let wave = 0; wave < maxWaves; wave++) {
       waveIndex = wave;
+      this._listenWaveIndex = wave;
       if (typeof interp._pushProbeCause === 'function') {
         interp._pushProbeCause({ wave });
       }
@@ -608,7 +694,7 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
       for (const ws of toExec) {
         if (executedThisPropagate.has(ws)) continue;
         executedThisPropagate.add(ws);
-        this._emitWaveListen(`[wave ${wave}] exec ${this._formatWireStmtRef(ws)}`, 'exec', 2);
+        this._emitWaveListen(`[wave ${wave}] exec ${this._formatWireStmtRef(ws)}`, 'exec', 2, 'wire');
         const stmtRef = this._formatWireStmtRefShort(ws);
         if (typeof interp._withProbeCause === 'function') {
           interp._withProbeCause({ stmt: stmtRef }, () => {
@@ -639,7 +725,7 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         interp._popProbeCause();
       }
 
-      if (typeof commitAllMemWrites === 'function') commitAllMemWrites();
+      if (typeof commitAllMemWrites === 'function') commitAllMemWrites(interp);
       if (interp) interp.memWriteBatching = false;
 
       if (compsChanged.size === 0 && changed.size === 0 && !anyScheduled) {
@@ -2144,7 +2230,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         let cascadeStep = 0;
         if (legacyTrace) cascadeStep = strat._legacyCascadeStep();
         if (legacyTrace && strat.debugLevel >= 2) {
-          strat._emitLegacyListenAtStep(cascadeStep, `exec ${strat._formatWireStmtRef(ds)}`, 'exec', 2);
+          strat._emitLegacyListenAtStep(cascadeStep, `exec ${strat._formatWireStmtRef(ds)}`, 'exec', 2, 'wire');
         }
         this.execWireStatement(ds);
         const newWireValue = this.getValueFromRef(wire.ref);
@@ -2180,7 +2266,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         let cascadeStep = 0;
         if (legacyTrace) cascadeStep = strat._legacyCascadeStep();
         if (legacyTrace && strat.debugLevel >= 2) {
-          strat._emitLegacyListenAtStep(cascadeStep, `exec ${strat._formatWireStmtRef(ds)}`, 'exec', 2);
+          strat._emitLegacyListenAtStep(cascadeStep, `exec ${strat._formatWireStmtRef(ds)}`, 'exec', 2, 'wire');
         }
         this.clog('pre-exec', ds);
         this.execWireStatement(ds);
@@ -2617,7 +2703,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
     this._uccPendingBlocks = null;
     this._uccExecutedStatements = null;
 
-    if (typeof commitAllMemWrites === 'function') commitAllMemWrites();
+    if (typeof commitAllMemWrites === 'function') commitAllMemWrites(this);
     this.memWriteBatching = false;
 
     if(executedBlockKeys.size > 0){

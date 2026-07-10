@@ -25,7 +25,7 @@ todos:
     status: completed
   - id: phase2-components-all
     content: "Faza 2: trace componente A–F (commit/prop/connect/block/state) + filtru All|Wires|Components|Internals"
-    status: pending
+    status: completed
 isProject: false
 ---
 
