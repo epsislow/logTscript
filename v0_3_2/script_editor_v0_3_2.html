@@ -107,9 +107,23 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .timeline-panel { flex-shrink:0; padding:8px 10px; }
 .network-traffic-panel { flex-shrink:0; padding:8px 10px; min-width:0; max-width:100%; }
 .wave-listen-panel { flex-shrink:0; padding:8px 10px; min-width:0; max-width:100%; }
-.wave-listen-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
-.wave-listen-head h3 { margin:0; font-size:14px; }
-.wave-listen-toolbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.wave-listen-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:6px; flex-wrap:wrap; }
+.wave-listen-head h3 { margin:0; font-size:14px; flex:1 1 100%; }
+.wave-listen-toolbar { display:flex; flex-direction:column; gap:6px; flex:1 1 100%; min-width:0; }
+.wave-listen-toolbar-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; }
+.wave-listen-toolbar-row--secondary { gap:8px; }
+.wave-listen-arm-group { display:flex; align-items:center; gap:6px; flex-shrink:0; flex-wrap:nowrap; }
+.wave-listen-level-group { display:flex; align-items:center; gap:4px; flex-shrink:0; flex-wrap:nowrap; }
+.wave-listen-fmt-label { display:inline-flex; align-items:center; gap:4px; font-size:12px; color:#ccc; white-space:nowrap; }
+@media (min-width: 720px) {
+  .wave-listen-head h3 { flex:0 1 auto; }
+  .wave-listen-toolbar { flex:1 1 280px; margin-left:auto; align-items:flex-end; }
+}
+@media (max-width: 719px) {
+  .wave-listen-toolbar-row--primary { justify-content:flex-start; }
+  .wave-listen-toolbar-row--secondary .wave-listen-fmt-select { max-width:none; flex:1 1 7rem; min-width:5.5rem; }
+  .wave-listen-badge { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+}
 .wave-listen-out { background:#000; padding:8px; max-height:220px; overflow:auto; font-size:12px; font-family:Consolas, monospace; }
 .wave-listen-line { white-space:pre; min-height:1em; }
 .wave-listen-row-main { display:flex; align-items:baseline; gap:4px; flex-wrap:wrap; white-space:pre; }
@@ -2933,35 +2947,43 @@ show(a,b,c)
       <div class="wave-listen-head">
         <h3>Signal Trace</h3>
         <div class="wave-listen-toolbar">
-          <span id="waveListenBadge" class="wave-listen-badge wave-listen-badge--idle">Idle</span>
-          <button type="button" id="waveListenArmBtn" class="btn wave-listen-arm--off" title="Arm Signal Trace during Run and after (interactive key/switch/clcd)">OFF</button>
-          <button type="button" id="waveListenLevel1" class="btn" data-level="1" title="Level 1 — commits, LUT re-eval">L1</button>
-          <button type="button" id="waveListenLevel2" class="btn" data-level="2" title="Level 2 — + exec statements">L2</button>
-          <button type="button" id="waveListenLevel3" class="btn" data-level="3" title="Level 3 — verbose">L3</button>
-          <label class="wave-listen-fmt-label" title="Show commits/props/connects, wire activity, or internal eval/state">
-            Filter
-            <select id="signalTraceFilterSelect" class="wave-listen-fmt-select">
-              <option value="all">All</option>
-              <option value="wires">Wires</option>
-              <option value="components">Components</option>
-              <option value="internals">Internals</option>
-            </select>
-          </label>
-          <label class="wave-listen-fmt-label" title="Value display / copy format (auto = schema field breakdown when wire has &lt;schema&gt;)">
-            Fmt
-            <select id="waveListenFmtSelect" class="wave-listen-fmt-select">
-              <option value="auto">auto</option>
-              <option value="hex">hex</option>
-              <option value="bin">bin</option>
-              <option value="dec">dec</option>
-              <option value="ascii">ascii</option>
-              <option value="s8">s8</option>
-              <option value="q4p4">q4p4</option>
-              <option value="fp16">fp16</option>
-              <option value="bf16">bf16</option>
-            </select>
-          </label>
-          <button type="button" id="waveListenClear" class="btn" title="Clear panel">Clear</button>
+          <div class="wave-listen-toolbar-row wave-listen-toolbar-row--primary">
+            <div class="wave-listen-arm-group">
+              <span id="waveListenBadge" class="wave-listen-badge wave-listen-badge--idle">Idle</span>
+              <button type="button" id="waveListenArmBtn" class="btn wave-listen-arm--off" title="Arm Signal Trace during Run and after (interactive key/switch/clcd)">OFF</button>
+            </div>
+            <div class="wave-listen-level-group" role="group" aria-label="Trace level and clear">
+              <button type="button" id="waveListenLevel1" class="btn" data-level="1" title="Level 1 — commits, LUT re-eval">L1</button>
+              <button type="button" id="waveListenLevel2" class="btn" data-level="2" title="Level 2 — + exec statements">L2</button>
+              <button type="button" id="waveListenLevel3" class="btn" data-level="3" title="Level 3 — verbose">L3</button>
+              <button type="button" id="waveListenClear" class="btn" title="Clear panel">Clear</button>
+            </div>
+          </div>
+          <div class="wave-listen-toolbar-row wave-listen-toolbar-row--secondary">
+            <label class="wave-listen-fmt-label" title="Show commits/props/connects, wire activity, or internal eval/state">
+              Filter
+              <select id="signalTraceFilterSelect" class="wave-listen-fmt-select">
+                <option value="all">All</option>
+                <option value="wires">Wires</option>
+                <option value="components">Components</option>
+                <option value="internals">Internals</option>
+              </select>
+            </label>
+            <label class="wave-listen-fmt-label" title="Value display / copy format (auto = schema field breakdown when wire has &lt;schema&gt;)">
+              Fmt
+              <select id="waveListenFmtSelect" class="wave-listen-fmt-select">
+                <option value="auto">auto</option>
+                <option value="hex">hex</option>
+                <option value="bin">bin</option>
+                <option value="dec">dec</option>
+                <option value="ascii">ascii</option>
+                <option value="s8">s8</option>
+                <option value="q4p4">q4p4</option>
+                <option value="fp16">fp16</option>
+                <option value="bf16">bf16</option>
+              </select>
+            </label>
+          </div>
         </div>
       </div>
       <div id="waveListenOut" class="wave-listen-out"></div>
