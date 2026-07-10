@@ -385,6 +385,8 @@ class Interpreter {
     this.regStorageMap=new Map(); // Map from statement to REG storage index
     this.regPendingMap=new Map(); // Map from statement to REG pending input value (for next cycle)
     this.regOutputMap=new Map();  // Map from statement to REG current output value (for wire clock)
+    this.latchOutputMap=new Map(); // Map from statement to LATCH stored value (wire clock)
+    this.latchPendingMap=new Map(); // Map from statement to LATCH pending state (for ~ clock)
     this.wireStorageMap=new Map(); // Map from wire name to storage index (for reuse during NEXT)
     this.mode='STRICT'; // Default mode: STRICT (wires immutable)
     this.zstate = false;
@@ -6400,6 +6402,73 @@ const idx = parseInt(
       : { value: v, ref: null };
   }
 
+
+  // ================= BUILTIN: LATCH =================
+  if (name === 'LATCH') {
+    if (argValues.length !== 3) {
+      fail('LATCH expects 3 arguments');
+    }
+
+    this._zstateRequireBinary(argValues, 'LATCH', ['data', 'clock', 'clear']);
+
+    const data = argValues[0];
+    const clock = argValues[1];
+    const clear = argValues[2];
+    const width = data.length;
+    this.clog(`LATCH( d= ${data}/${width} , clk= ${clock}, clr= ${clear} )`);
+
+    const clockIsTilde = args[1] && args[1].length === 1 && args[1][0].var === '~';
+
+    if (clockIsTilde) {
+      const pending = this.latchPendingMap.get(this.currentStmt);
+      let output;
+
+      if (clear === '1') {
+        output = '0'.repeat(width);
+      } else if (!pending) {
+        output = '0'.repeat(width);
+      } else if (pending.cycle !== this.cycle) {
+        output = data;
+      } else {
+        output = pending.output;
+      }
+
+      if (this.currentStmt) {
+        if (!this.latchPendingMap) this.latchPendingMap = new Map();
+        this.latchPendingMap.set(this.currentStmt, { cycle: this.cycle, output });
+      }
+
+      return computeRefs
+        ? { value: output, ref: `&${this.storeValue(output)}` }
+        : { value: output, ref: null };
+    }
+
+    if (!this.latchOutputMap) this.latchOutputMap = new Map();
+
+    const latchState = this.latchOutputMap.get(this.currentStmt) ?? {
+      storedValue: '0'.repeat(width),
+    };
+
+    let stored = latchState.storedValue;
+    let output;
+    if (clear === '1') {
+      output = '0'.repeat(width);
+      stored = output;
+    } else if (clock === '1') {
+      output = data;
+      stored = data;
+    } else {
+      output = stored;
+    }
+
+    this.clog('latch out = ', this.currentStmt, output);
+
+    this.latchOutputMap.set(this.currentStmt, { storedValue: stored });
+
+    return computeRefs
+      ? { value: output, ref: `&${this.storeValue(output)}` }
+      : { value: output, ref: null };
+  }
 
   // ================= BUILTIN: REG =================
   if (this.isBuiltinREG(name)) {
@@ -14799,7 +14868,7 @@ Interpreter.BUILTIN_DOC = {
     'EQ(Wbit[n] a, Wbit/Wbit[n] b ; vector) -> 1wire[n]',
     'EQ(Wbit[n,m] a, Wbit/Wbit[n,m] b ; matrix) -> 1wire[n×m]',
   ],
-  LATCH: ['LATCH(Xbit data, 1bit clock) -> Xbit'],
+  LATCH: ['LATCH(Xbit data, 1bit clock, 1bit clear) -> Xbit'],
   LSHIFT:[
     'LSHIFT(Xbit data, Nbit n) -> Xbit',
     'LSHIFT(Xbit data, Nbit n, 1bit fill) -> Xbit',

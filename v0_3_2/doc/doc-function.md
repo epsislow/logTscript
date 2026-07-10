@@ -69,7 +69,7 @@ See [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md).
 | `doc(NAND)` | `NAND(Xbit) -> 1bit` / `NAND(Xbit, Xbit) -> Xbit` |
 | `doc(NOR)` | `NOR(Xbit) -> 1bit` / `NOR(Xbit, Xbit) -> Xbit` |
 | `doc(EQ)` | `EQ(Xbit, Xbit) -> 1bit` / `EQ(Xbit, Xbit, Xbit, ...) -> 1bit` / `EQ(...; vector) -> 1wire[n]` |
-| `doc(LATCH)` | `LATCH(Xbit data, 1bit clock) -> Xbit` |
+| `doc(LATCH)` | `LATCH(Xbit data, 1bit clock, 1bit clear) -> Xbit` |
 
 **`Xbit`** means the function accepts a bit string of any width.
 

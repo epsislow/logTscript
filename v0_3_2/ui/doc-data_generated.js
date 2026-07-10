@@ -5925,18 +5925,51 @@ Stateful built-ins (no panel device). Index: [builtin-functions.md](builtin-func
 ## LATCH
 
 \`\`\`
-LATCH(Xbit data, 1bit clock) -> Xbit
+LATCH(Xbit data, 1bit clock, 1bit clear) -> Xbit
 \`\`\`
 
-Transparent latch: when \`clock = 1\`, output follows \`data\`; when \`clock = 0\`, output holds.
+Transparent latch: when \`clock = 1\`, output follows \`data\`; when \`clock = 0\`, output holds. \`clear = 1\` forces all zeros immediately (same as \`REG\`).
 
-### Runnable example
+### Wire clock — level-sensitive
+
+Use a regular wire as \`clock\`. While \`clock = 1\`, output tracks \`data\`; when \`clock = 0\`, output holds.
+
+### NEXT clock — \`~\`
+
+When \`clock\` is \`~\`, \`LATCH\` updates on each \`NEXT(~)\` (or \`doNext()\`):
+
+- On each \`NEXT(~)\`: output ← **current** \`data\` (latch open — transparent)
+- Between \`NEXT\` calls: output **holds** even if \`data\` changes
+- \`clear = 1\` → all zeros immediately
+
+Compare with \`REG(data, ~, clr)\`: \`REG\` latches the value \`data\` had **before** the \`NEXT\`; \`LATCH\` follows \`data\` **at** the \`NEXT\`. See [reg.md](reg.md) for \`REG\` clock modes.
+
+### Runnable example (wire clock)
 
 \`\`\`logts-play
 4wire data = 1010
 1wire clk = 1
-4wire out = LATCH(data, clk)
+1wire clr = 0
+4wire out = LATCH(data, clk, clr)
 probe(out)
+\`\`\`
+
+### Runnable example (\`~\` clock)
+
+\`\`\`logts-play
+1wire data = 1
+1wire clr = 0
+1wire q = LATCH(data, ~, clr)
+# q = 0 before any NEXT
+
+NEXT(~)
+# q = 1 (follows current data)
+
+data = 0
+# q = 1 (hold until NEXT)
+
+NEXT(~)
+# q = 0
 \`\`\`
 
 ---
@@ -8380,6 +8413,7 @@ Signal propagation trace — **separate panel**, not Output. Open from **Win ▾
 | **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
 | **L1 / L2 / L3** | Trace verbosity (\`debugLevel\` on propagation engine) |
 | **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii / auto (dropdown, persisted) |
+| **Filter ▾** | All / Wires / Components / Internals (persisted as \`prog/signalTraceFilter\`) |
 | **Clear** | Clears panel history (no auto-clear on Run) |
 | **Tracing…** badge | Internal trace active while script runs (distinct from ON/OFF) |
 
@@ -8405,6 +8439,19 @@ lut-mut .huff:clear → re-exec st(5:asg) packetEncoded := …
 \`\`\`
 
 Legacy uses **\`[step N]\`** prefix (immediate cascade) instead of **\`[wave N]\`**. Level 2 adds \`exec\` on cascade re-eval; level 3 adds \`eval\` (wire values computed before commit).
+
+### Component & internal lines (L2–L3)
+
+| Line kind | Example | Level | Filter |
+|-----------|---------|-------|--------|
+| **commit component** | \`[step 2] commit component .s = ^101\` | L2 | Components |
+| **prop** | \`[step 2] prop .s.data = ^101\` | L2 | Components |
+| **connect** | \`[step 2] connect .alu:get → result\` | L2 | Components |
+| **exec block** | \`[step 3] exec block .cnt.on:raise\` | L3 | Internals |
+| **state** | \`[step 3] state mem1[0] = ^0101\` | L3 | Internals |
+| **lut-mut** | \`lut-mut .huff:clear → re-exec …\` | L1 | Wires + Components |
+
+**Filter** (toolbar): **All** shows everything; **Wires** — wire commit/exec/eval, init, flush, schedule, lut-mut; **Components** — commit component, prop, connect, lut-mut; **Internals** — eval L3, block exec, state/mem, schedule (wave L3).
 
 **Value formatting:** dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii / auto**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **oct**, **b32hex**, **b32c** produc literali \`o^…\`, \`x^…\`, \`xc^…\` (roundtrip ca la hex). **ascii** afișează ca \`show(…; ascii)\` — \`"Hello"\` sau \`\\72 \\101 …;ascii\`. Suffix **\`(Nbits)\`** la afișare. **\`[cpy]\`** — literal script: **bin** = biți continui; **hex** = \`^…\` fără spații; **oct/b32hex/b32c** = \`o^…\` / \`x^…\` / \`xc^…\` fără spații; **dec/s8/…** = cu \`;format\`; **ascii** = \`"abc"\` pentru text printabil, \`"abc" + \\2 + "zz"\` dacă mix, \`\\65 \\66;ascii\` dacă doar \`\\N\` (2+ cu \`;ascii\`). X/Z → fallback hex la copy.
 
@@ -9746,7 +9793,7 @@ See [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md).
 | \`doc(NAND)\` | \`NAND(Xbit) -> 1bit\` / \`NAND(Xbit, Xbit) -> Xbit\` |
 | \`doc(NOR)\` | \`NOR(Xbit) -> 1bit\` / \`NOR(Xbit, Xbit) -> Xbit\` |
 | \`doc(EQ)\` | \`EQ(Xbit, Xbit) -> 1bit\` / \`EQ(Xbit, Xbit, Xbit, ...) -> 1bit\` / \`EQ(...; vector) -> 1wire[n]\` |
-| \`doc(LATCH)\` | \`LATCH(Xbit data, 1bit clock) -> Xbit\` |
+| \`doc(LATCH)\` | \`LATCH(Xbit data, 1bit clock, 1bit clear) -> Xbit\` |
 
 **\`Xbit\`** means the function accepts a bit string of any width.
 

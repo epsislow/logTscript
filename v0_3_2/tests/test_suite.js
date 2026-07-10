@@ -2844,7 +2844,7 @@ reg(313, 'doc', 'BUILTIN_DOC — RSHIFT signatures', function(h, session) {
 
 reg(314, 'doc', 'BUILTIN_DOC — LATCH', function(h, session) {
   const lines = Interpreter.getDocLines('LATCH', new Map());
-  h.assert('LATCH signature', lines[0], 'LATCH(Xbit data, 1bit clock) -> Xbit');
+  h.assert('LATCH signature', lines[0], 'LATCH(Xbit data, 1bit clock, 1bit clear) -> Xbit');
 });
 
 reg(315, 'doc', 'getDocLines — REG generic', function(h, session) {
@@ -4268,6 +4268,86 @@ reg(707, 'reg', 'REG falling edge — data ignored until clk 1→0 (wave)', func
   h.assert('707 falling edge data=0101 → read=0101', session.getWire(interp, 'read'), '0101');
   h.assert('707 shadow=0101', session.getWire(interp, 'shadow'), '0101');
 }, { propagation: 'wave' });
+
+function runLatch720Transparent(h, session, prefix) {
+  const { interp } = session.run(`
+4wire data = 1010
+1wire clk = 1
+1wire clr = 0
+4wire out = LATCH(data, clk, clr)`);
+  h.assert(prefix + ' clk=1 data=1010 → out=1010', session.getWire(interp, 'out'), '1010');
+}
+
+reg(720, 'latch', 'LATCH transparent when clk=1', function(h, session) {
+  runLatch720Transparent(h, session, '720');
+});
+
+reg(721, 'latch', 'LATCH holds when clk=0', function(h, session) {
+  const { interp } = session.run(`
+4wire data = 1010
+1wire clk = 1
+1wire clr = 0
+4wire out = LATCH(data, clk, clr)`);
+  h.assert('721 initial out=1010', session.getWire(interp, 'out'), '1010');
+  session.setWire(interp, 'clk', '0');
+  h.assert('721 clk=0 → out=1010 (hold)', session.getWire(interp, 'out'), '1010');
+  session.setWire(interp, 'data', '0101');
+  h.assert('721 data=0101 clk=0 → out=1010 (hold)', session.getWire(interp, 'out'), '1010');
+  session.setWire(interp, 'clk', '1');
+  h.assert('721 clk=1 data=0101 → out=0101', session.getWire(interp, 'out'), '0101');
+});
+
+function runLatch722ClearOverride(h, session, prefix) {
+  const { interp } = session.run(`
+4wire data = 1010
+1wire clk = 1
+1wire clr = 0
+4wire out = LATCH(data, clk, clr)`);
+  h.assert(prefix + ' initial clk=1 data=1010 → out=1010', session.getWire(interp, 'out'), '1010');
+  session.setWire(interp, 'clr', '1');
+  h.assert(prefix + ' clr=1 → out=0000', session.getWire(interp, 'out'), '0000');
+  session.setWire(interp, 'clr', '0');
+  session.setWire(interp, 'data', '0101');
+  h.assert(prefix + ' clr=0 clk=1 data=0101 → out=0101', session.getWire(interp, 'out'), '0101');
+  session.setWire(interp, 'clk', '0');
+  h.assert(prefix + ' clk=0 → out=0101 (hold)', session.getWire(interp, 'out'), '0101');
+  session.setWire(interp, 'clr', '1');
+  h.assert(prefix + ' clr=1 clk=0 → out=0000', session.getWire(interp, 'out'), '0000');
+}
+
+reg(722, 'latch', 'LATCH clear override', function(h, session) {
+  runLatch722ClearOverride(h, session, '722');
+});
+
+const PROBE_LATCH = `4wire data = 1010
+1wire clk = 1
+1wire clr = 0
+4wire out = LATCH(data, clk, clr)
+probe(out)`;
+
+function runProbeLatch(h, session) {
+  const { out } = session.run(PROBE_LATCH);
+  h.assert('probe out=1010 initialised', String(out.some(l => l.includes('# out = 1010') && l.includes('initialised'))), 'true');
+}
+
+reg(723, 'latch', 'LATCH multi-bit + probe', runProbeLatch);
+
+function runLatch724NextBased(h, session) {
+  const { interp } = session.run(`
+1wire data = 1
+1wire read = LATCH(data, ~, 0)`);
+  h.assert('724 initial read=0', session.getWire(interp, 'read'), '0');
+  session.execNext(interp, 1);
+  h.assert('724 after NEXT(1) read=1 (transparent data=1)', session.getWire(interp, 'read'), '1');
+  session.setWire(interp, 'data', '0');
+  h.assert('724 data=0 without NEXT → read=1 (hold)', session.getWire(interp, 'read'), '1');
+  session.execNext(interp, 1);
+  h.assert('724 after NEXT(2) read=0 (transparent data=0)', session.getWire(interp, 'read'), '0');
+}
+
+reg(724, 'latch', 'LATCH with clock ~ — NEXT-based', runLatch724NextBased);
+
+reg(725, 'latch', 'LATCH with clock ~ — NEXT-based (wave)', runLatch724NextBased, { propagation: 'wave' });
 
 const CHIP_HALFADD = `chip +[halfAdd]:
   4pin a
@@ -11489,6 +11569,12 @@ reg(1490, 'zstate', 'MUX selector with X — error', function(h, session) {
 reg(1491, 'zstate', 'REG data with X — error', function(h, session) {
   h.assertThrows('REG X', function() {
     session.run('MODE ZSTATE\n4wire d = ?X1XX\n1wire clk = 0\n1wire clr = 0\n4wire q = REG(d, clk, clr)');
+  }, 'X');
+}, ZSTATE_WAVE);
+
+reg(726, 'zstate', 'LATCH data with X — error', function(h, session) {
+  h.assertThrows('LATCH X', function() {
+    session.run('MODE ZSTATE\n4wire d = ?X1XX\n1wire clk = 0\n1wire clr = 0\n4wire q = LATCH(d, clk, clr)');
   }, 'X');
 }, ZSTATE_WAVE);
 
