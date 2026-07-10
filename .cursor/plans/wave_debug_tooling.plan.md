@@ -43,7 +43,8 @@ isProject: false
 Plan **elaborabil pe parcurs** — nu presupune implementare într-o singură iterație.
 
 **Planuri înrudite (deja în repo):**
-- [wave_signal_propagation_5efca976.plan.md](.cursor/plans/wave_signal_propagation_5efca976.plan.md) — engine wave (DONE)
+- [signal_trace_legacy.plan.md](signal_trace_legacy.plan.md) — Wave Listen → Signal Trace; Legacy `[step N]`; componente A–F + filtru (pending)
+- [wave_signal_propagation_5efca976.plan.md](wave_signal_propagation_5efca976.plan.md) — engine wave (DONE)
 - [evaluare_timeline_watch.plan.md](.cursor/plans/evaluare_timeline_watch.plan.md) — `cause` în watch (parțial overlap, todo-uri pending)
 - [watch_compact.plan.md](.cursor/plans/watch_compact.plan.md) — tag `watch(…; compact)` — 1 coloană per expresie (pending)
 - [huffman_packet_sc.plan.md](.cursor/plans/huffman_packet_sc.plan.md) — cazul care a expus limitările debug
