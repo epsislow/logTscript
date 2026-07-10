@@ -2,7 +2,7 @@
 
 const WAVE_LISTEN_EXPAND_THRESHOLD = 256;
 const WAVE_LISTEN_INLINE_PREVIEW_MAX = 48;
-const WAVE_LISTEN_FMT_OPTIONS = ['auto', 'hex', 'bin', 'dec', 'ascii', 's8', 'q4p4', 'fp16', 'bf16'];
+const WAVE_LISTEN_FMT_OPTIONS = ['auto', 'hex', 'oct', 'b32hex', 'b32c', 'bin', 'dec', 'ascii', 's8', 'q4p4', 'fp16', 'bf16'];
 const WAVE_LISTEN_BIN_GROUP_BITS = 8;
 
 function normalizeWaveListenFmt(fmt) {
@@ -13,6 +13,11 @@ function normalizeWaveListenFmt(fmt) {
 
 function waveListenFormatWidth(fmt) {
   switch (fmt) {
+    case 'oct':
+      return 3;
+    case 'b32hex':
+    case 'b32c':
+      return 5;
     case 'dec':
     case 's8':
     case 'q4p4':
@@ -30,6 +35,9 @@ function waveListenFmtToShowOpts(fmt) {
   switch (fmt) {
     case 'bin': return { bin: true };
     case 'hex': return { hex: true };
+    case 'oct': return { oct: true };
+    case 'b32hex': return { b32hex: true };
+    case 'b32c': return { b32c: true };
     case 'dec': return { dec: true };
     case 's8': return { numericFormat: 's8' };
     case 'q4p4': return { numericFormat: 'q4p4' };
@@ -250,6 +258,16 @@ function _waveListenAsciiDisplay(rawValue, bitWidth) {
   return rawValue;
 }
 
+function _waveListenPatternDisplay(rawValue, bitWidth, opts, formatValueFn) {
+  const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
+  const bw = bitWidth || (rawValue ? rawValue.length : 0);
+  if (DF && typeof DF.formatDebugDisplayValue === 'function') {
+    return DF.formatDebugDisplayValue(rawValue, bw, opts, false, bw);
+  }
+  if (formatValueFn) return formatValueFn(rawValue, bw);
+  return rawValue;
+}
+
 function _waveListenHexDisplay(rawValue, bitWidth, formatValueFn) {
   const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
   const bw = bitWidth || (rawValue ? rawValue.length : 0);
@@ -308,6 +326,9 @@ function _formatWaveListenScalarFormatted(rawValue, bitWidth, fmt, formatValueFn
   }
   if (fmt === 'bin') return formatWaveListenBinary(rawValue);
   if (fmt === 'hex') return _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
+  if (fmt === 'oct') return _waveListenPatternDisplay(rawValue, bitWidth, { oct: true }, formatValueFn);
+  if (fmt === 'b32hex') return _waveListenPatternDisplay(rawValue, bitWidth, { b32hex: true }, formatValueFn);
+  if (fmt === 'b32c') return _waveListenPatternDisplay(rawValue, bitWidth, { b32c: true }, formatValueFn);
   if (fmt === 'ascii') {
     if (_tensorUsesShowLines(entry, fmt) && interp
       && typeof interp._formatVectorShowLines === 'function') {
@@ -437,6 +458,11 @@ function formatWaveListenExpandLines(entry, fmt, interp) {
     return wrapLiteralTokenLines(formatted);
   }
 
+  if (['oct', 'b32hex', 'b32c'].includes(mode)) {
+    const formatted = _waveListenPatternDisplay(rawValue, bw, waveListenFmtToShowOpts(mode), formatValueFn);
+    return wrapLiteralTokenLines(formatted);
+  }
+
   if (['dec', 's8', 'q4p4', 'fp16', 'bf16'].includes(mode)) {
     return wrapLiteralTokenLines(_formatFlatGrouped(rawValue, mode));
   }
@@ -465,6 +491,11 @@ function formatWaveListenCopyText(entry, fmt, interp) {
 
   if (mode === 'hex') {
     const displayed = _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
+    return String(displayed).replace(/\s/g, '');
+  }
+
+  if (['oct', 'b32hex', 'b32c'].includes(mode)) {
+    const displayed = _waveListenPatternDisplay(rawValue, bitWidth, waveListenFmtToShowOpts(mode), formatValueFn);
     return String(displayed).replace(/\s/g, '');
   }
 

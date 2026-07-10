@@ -19980,6 +19980,67 @@ reg(2252, 'conditional-assignment', 'pcb body on:raise still rejected', function
   h.assert('pcb rejects on:raise', String(err.includes('not allowed in pcb body')), 'true');
 });
 
+reg(2261, 'pattern-literals', 'oct literal o^12 on 6wire', function(h, session) {
+  const { interp } = session.run('6wire v = o^12\nshow(v)');
+  h.assert('oct bits', session.getWire(interp, 'v'), '001010');
+});
+
+reg(2262, 'pattern-literals', 'oct padding o^1;6', function(h, session) {
+  const { interp } = session.run('6wire v = o^1;6\nshow(v)');
+  h.assert('oct pad', session.getWire(interp, 'v'), '000001');
+});
+
+reg(2263, 'pattern-literals', 'base32hex literal x^A', function(h, session) {
+  const { interp } = session.run('5wire v = x^A\nshow(v)');
+  h.assert('b32hex bits', session.getWire(interp, 'v'), '01010');
+});
+
+reg(2264, 'pattern-literals', 'crockford literal xc^10', function(h, session) {
+  const { interp } = session.run('10wire v = xc^10\nshow(v)');
+  h.assert('b32c bits', session.getWire(interp, 'v'), '0000100000');
+});
+
+reg(2265, 'pattern-literals', 'show tag oct roundtrip', function(h, session) {
+  const { out } = session.run('6wire v = o^12\nshow(v; oct)');
+  const line = out.find(l => l.includes('v (6wire)'));
+  h.assert('show oct literal', String(line && line.includes('o^12')), 'true');
+});
+
+reg(2266, 'pattern-literals', 'show tag b32hex and b32c', function(h, session) {
+  const { out: outHex } = session.run('5wire a = x^A\nshow(a; b32hex)');
+  h.assert('show b32hex', String(outHex.some(l => l.includes('x^A'))), 'true');
+  const { out: outC } = session.run('10wire b = xc^10\nshow(b; b32c)');
+  h.assert('show b32c', String(outC.some(l => l.includes('xc^10'))), 'true');
+});
+
+reg(2267, 'pattern-literals', 'oct invalid digit parse error', function(h, session) {
+  let err = '';
+  try {
+    session.parse('6wire v = o^18');
+  } catch (e) {
+    err = String(e.message || e);
+  }
+  h.assert('o^8 rejected', String(err.length > 0), 'true');
+});
+
+reg(2268, 'wave-debug', 'Wave Listen copy — oct b32hex b32c literals', function(h) {
+  const octEntry = { name: 'v', rawValue: '001010', bitWidth: 6, wireType: '6wire' };
+  const octCopy = formatWaveListenCopyText(octEntry, 'oct', null);
+  h.assert('oct copy prefix', String(octCopy.startsWith('o^')), 'true');
+  h.assert('oct copy no spaces', String(!/\s/.test(octCopy)), 'true');
+
+  const b32Entry = { name: 'a', rawValue: '01010', bitWidth: 5, wireType: '5wire' };
+  const b32Copy = formatWaveListenCopyText(b32Entry, 'b32hex', null);
+  h.assert('b32hex copy prefix', String(b32Copy.startsWith('x^')), 'true');
+
+  const b32cEntry = { name: 'b', rawValue: '0000100000', bitWidth: 10, wireType: '10wire' };
+  const b32cCopy = formatWaveListenCopyText(b32cEntry, 'b32c', null);
+  h.assert('b32c copy prefix', String(b32cCopy.startsWith('xc^')), 'true');
+  h.assert('fmt options oct', String(WAVE_LISTEN_FMT_OPTIONS.includes('oct')), 'true');
+  h.assert('fmt options b32hex', String(WAVE_LISTEN_FMT_OPTIONS.includes('b32hex')), 'true');
+  h.assert('fmt options b32c', String(WAVE_LISTEN_FMT_OPTIONS.includes('b32c')), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

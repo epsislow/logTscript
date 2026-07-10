@@ -18,6 +18,9 @@ Related: [assignment operators](assignment-operators.md) (`=`, `:=`, `=:`), [sho
 | **Decimal signed** | `\-3;s8` | Two's complement on **exactly** `W` bits (`;sW`) |
 | **Hex pattern** | `^FF` | Each hex digit → 4 bits (unsigned pattern) |
 | **Hex value signed** | `^-A;8` | Signed numeric value in hex + **explicit** width |
+| **Oct pattern** | `o^12` | Each oct digit → 3 bits (`0`–`7`) |
+| **Base32hex pattern** | `x^AB` | RFC 4648 §7 — each digit → 5 bits (`0`–`9`, `A`–`V`) |
+| **Crockford base32** | `xc^10` | Each digit → 5 bits (Crockford alphabet, no I/L/O/U) |
 | **Wire string** | `"Hello"` / `'Hi'` | One byte per character (8 bit), MSB-first in the wire |
 | **Logic** (ZSTATE) | `?10Z0` | Tristate `0` / `1` / `Z` / `X` |
 | **Meta constant** | `/instance/` | Compile-time constant from the meta registry |
@@ -199,6 +202,50 @@ Short notation:
 ```
 8wire a = `[^-A;8]`
 ```
+
+---
+
+## Oct pattern (unsigned) — `o^DIGITS`
+
+Caret after **`o`** starts an **octal pattern**: each digit `0`–`7` expands to **3 bits**.
+
+```logts-play
+6wire v = o^12
+show(v)
+```
+
+| Form | Bits |
+|------|------|
+| `o^12` | `001` + `010` = `001010` (6 bits) |
+| `o^1;6` | `000001` — `;6` is unsigned padding |
+
+In short notation: `` `[o^12]` ``.
+
+---
+
+## Base32hex pattern — `x^DIGITS`
+
+**`x^`** uses the RFC 4648 §7 alphabet (`0`–`9`, `A`–`V`). Each digit → **5 bits**.
+
+```logts-play
+5wire v = x^A
+show(v)
+```
+
+`x^A` → `01010` (5 bits). Short notation: `` `[x^AB]` ``.
+
+---
+
+## Crockford base32 — `xc^DIGITS`
+
+**`xc^`** uses the Crockford alphabet (excludes `I`, `L`, `O`, `U`). Each digit → **5 bits** with a **different** mapping than `x^`.
+
+```logts-play
+10wire v = xc^10
+show(v)
+```
+
+Short notation: `` `[xc^J0]` ``.
 
 ---
 

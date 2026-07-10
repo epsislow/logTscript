@@ -457,8 +457,10 @@ pushSource({ src, alias }) {
       return this.readBackslashDecimalLiteral();
     }
 
-    // Starts with letter a-z ID or keyword
+    // Starts with letter a-z ID or keyword (or o^ / x^ / xc^ literals)
   if (/[a-zA-Z]/.test(c)) {
+    const prefixed = this.tryPrefixedCaretLiterals(c);
+    if (prefixed) return prefixed;
     let v = '';
     while (!this.eof() && /[a-zA-Z0-9_]/.test(this.peek())) {
       v += this.next();
@@ -467,6 +469,57 @@ pushSource({ src, alias }) {
     }
   
     throw Error(`Unexpected char '${c}' at ${this.file}: ${this.line}:${this.col}`);
+  }
+
+  readPrefixedCaretLiteral(prefix, tokenType, isValidChar, normalize) {
+    for (let pi = 0; pi < prefix.length; pi++) {
+      if (this.eof() || this.peek() !== prefix[pi]) {
+        throw Error(`Invalid ${tokenType} literal at ${this.file}: ${this.line}:${this.col}`);
+      }
+      this.next();
+    }
+    if (this.eof() || this.peek() !== '^') {
+      throw Error(`Invalid ${tokenType} literal at ${this.file}: ${this.line}:${this.col}`);
+    }
+    this.next();
+    let digits = '';
+    while (!this.eof()) {
+      const peek = this.peek();
+      if (isValidChar(peek)) {
+        digits += this.next();
+      } else if (peek === ' ' || peek === '\t') {
+        this.next();
+      } else {
+        break;
+      }
+    }
+    if (digits === '') {
+      throw Error(`Invalid ${tokenType} literal at ${this.file}: ${this.line}:${this.col}`);
+    }
+    const value = normalize ? normalize(digits) : digits;
+    return this.token(tokenType, value);
+  }
+
+  tryPrefixedCaretLiterals(c) {
+    if (c === 'x' && this.i + 1 < this.src.length && this.src[this.i + 1] === 'c'
+        && this.i + 2 < this.src.length && this.src[this.i + 2] === '^') {
+      return this.readPrefixedCaretLiteral('xc', 'B32C', (ch) => {
+        const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+        const alpha = WL ? WL.B32C_ALPHABET : '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+        return alpha.indexOf(ch.toUpperCase()) >= 0;
+      }, (s) => s.toUpperCase());
+    }
+    if (c === 'x' && this.i + 1 < this.src.length && this.src[this.i + 1] === '^') {
+      return this.readPrefixedCaretLiteral('x', 'B32HEX', (ch) => {
+        const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+        const alpha = WL ? WL.B32HEX_ALPHABET : '0123456789ABCDEFGHIJKLMNOPQRSTUV';
+        return alpha.indexOf(ch.toUpperCase()) >= 0;
+      }, (s) => s.toUpperCase());
+    }
+    if (c === 'o' && this.i + 1 < this.src.length && this.src[this.i + 1] === '^') {
+      return this.readPrefixedCaretLiteral('o', 'OCT', (ch) => /[0-7]/.test(ch), (s) => s);
+    }
+    return null;
   }
 
   tokenizeIdentifier(v) {

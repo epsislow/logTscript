@@ -2240,7 +2240,7 @@ class Interpreter {
     if (schemaFormatted != null) {
       valueStr = schemaFormatted;
     } else if (target.bitWidth && valueStr !== '-' && !target.isText) {
-      const useTagFormat = opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat);
+      const useTagFormat = opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.oct || opts.b32hex || opts.b32c || opts.numericFormat);
       const skipGroup = wire && wire.vector && target.kind === 'wire' && !useTagFormat;
       if (!skipGroup) {
         if (useTagFormat) {
@@ -4963,6 +4963,57 @@ class Interpreter {
         return {value: binStr, ref: null, varName: null, bitWidth: binStr.length};
       }
       // If computeRefs is true (wire assignment), store in storage and return reference
+      if(computeRefs){
+        const idx = this.storeValue(binStr);
+        return {value: binStr, ref: `&${idx}`, varName: null};
+      }
+      return {value: binStr, ref: null, varName: null};
+    }
+    if(a.oct){
+      const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+      let binStr = WL ? WL.octDigitsToBin(a.oct) : a.oct;
+      if(a.bitRange){
+        const {start, end} = a.bitRange;
+        binStr = binStr.substring(start, end + 1);
+      }
+      if(a.pad) binStr = this.applyPad(binStr, a.pad);
+      if(a.bitRange || a.pad){
+        return {value: binStr, ref: null, varName: null, bitWidth: binStr.length};
+      }
+      if(computeRefs){
+        const idx = this.storeValue(binStr);
+        return {value: binStr, ref: `&${idx}`, varName: null};
+      }
+      return {value: binStr, ref: null, varName: null};
+    }
+    if(a.b32hex){
+      const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+      let binStr = WL ? WL.b32hexDigitsToBin(a.b32hex) : a.b32hex;
+      if(a.bitRange){
+        const {start, end} = a.bitRange;
+        binStr = binStr.substring(start, end + 1);
+      }
+      if(a.pad) binStr = this.applyPad(binStr, a.pad);
+      if(a.bitRange || a.pad){
+        return {value: binStr, ref: null, varName: null, bitWidth: binStr.length};
+      }
+      if(computeRefs){
+        const idx = this.storeValue(binStr);
+        return {value: binStr, ref: `&${idx}`, varName: null};
+      }
+      return {value: binStr, ref: null, varName: null};
+    }
+    if(a.b32c){
+      const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+      let binStr = WL ? WL.b32cDigitsToBin(a.b32c) : a.b32c;
+      if(a.bitRange){
+        const {start, end} = a.bitRange;
+        binStr = binStr.substring(start, end + 1);
+      }
+      if(a.pad) binStr = this.applyPad(binStr, a.pad);
+      if(a.bitRange || a.pad){
+        return {value: binStr, ref: null, varName: null, bitWidth: binStr.length};
+      }
       if(computeRefs){
         const idx = this.storeValue(binStr);
         return {value: binStr, ref: `&${idx}`, varName: null};
@@ -7786,20 +7837,20 @@ if (this.isBuiltinDEMUX(name)) {
   _formatDebugDisplayValue(binStr, bitWidth, opts, isElement, elementWidth) {
     const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
     if (!DF || !opts) return binStr;
-    if (!(opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat)) return binStr;
+    if (!(opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.oct || opts.b32hex || opts.b32c || opts.numericFormat)) return binStr;
     return DF.formatDebugDisplayValue(binStr, bitWidth, opts, isElement, elementWidth);
   }
 
   _formatShowWireValue(valueStr, bitWidth, opts, isElement, elementWidth) {
     if (valueStr === '-' || valueStr == null) return valueStr;
-    if (opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat)) {
+    if (opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.oct || opts.b32hex || opts.b32c || opts.numericFormat)) {
       return this._formatDebugDisplayValue(valueStr, bitWidth, opts, isElement, elementWidth);
     }
     return this.formatValue(valueStr, bitWidth);
   }
 
   _hasShowFormatOpts(opts) {
-    return opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.numericFormat);
+    return opts && (opts.dec || opts.decSigned || opts.hex || opts.bin || opts.signed || opts.ascii || opts.oct || opts.b32hex || opts.b32c || opts.numericFormat);
   }
 
   _elementIsNonZero(valueStr, elementWidth) {

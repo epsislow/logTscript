@@ -94,15 +94,17 @@ function isNumericFormatDisplayTag(tagName) {
 const NUMERIC_FORMAT_DISPLAY_TAGS = new Set(['q4p4', 'q8p8', 'bf16', 'fp16']);
 const SHOW_PEEK_DISPLAY_TAGS = new Set([
   'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide',
+  'oct', 'b32hex', 'b32c',
   'q4p4', 'q8p8', 'bf16', 'fp16',
   'elAll', 'elNonZero', 'compact', 'elRange', 'elLast', 'maxWidth', 'multiline',
 ]);
 const PROBE_DISPLAY_TAGS = new Set([
   'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide',
+  'oct', 'b32hex', 'b32c',
   'q4p4', 'q8p8', 'bf16', 'fp16',
   'maxWidth', 'multiline', 'level',
 ]);
-const DISPLAY_FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'q4p4', 'q8p8', 'bf16', 'fp16']);
+const DISPLAY_FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'oct', 'b32hex', 'b32c', 'q4p4', 'q8p8', 'bf16', 'fp16']);
 const DISPLAY_ELEMENT_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
 const DISPLAY_VALUED_TAGS = new Set(['elRange', 'elLast', 'maxWidth', 'level']);
 const WATCH_DISPLAY_TAGS = new Set(['level']);
@@ -883,15 +885,21 @@ parseDebugDisplayTags(allowedTags) {
   const hasFormatHex = tags.includes('hex');
   const hasFormatBin = tags.includes('bin');
   const hasFormatAscii = tags.includes('ascii');
+  const hasFormatOct = tags.includes('oct');
+  const hasFormatB32hex = tags.includes('b32hex');
+  const hasFormatB32c = tags.includes('b32c');
   const numericFormatTags = tags.filter((t) => isNumericFormatDisplayTag(t));
   let formatCount = 0;
   if (hasFormatDec) formatCount++;
   if (hasFormatHex) formatCount++;
   if (hasFormatBin) formatCount++;
   if (hasFormatAscii) formatCount++;
+  if (hasFormatOct) formatCount++;
+  if (hasFormatB32hex) formatCount++;
+  if (hasFormatB32c) formatCount++;
   if (numericFormatTags.length) formatCount += numericFormatTags.length;
   if (formatCount > 1) {
-    throw Error(`Display format tags (dec, hex, bin, ascii, q4p4, q8p8, bf16, fp16, sX, qXpY) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    throw Error(`Display format tags (dec, hex, bin, ascii, oct, b32hex, b32c, q4p4, q8p8, bf16, fp16, sX, qXpY) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   if (tags.includes('signed') && tags.some((t) => /^s\d+$/.test(t))) {
     throw Error(`Display tags signed and fixed signed width (sX) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
@@ -2090,6 +2098,15 @@ assignment() {
     } else if(this.c.type === 'HEX'){
       atom = {hex: this.c.value};
       this.eat('HEX');
+    } else if(this.c.type === 'OCT'){
+      atom = {oct: this.c.value};
+      this.eat('OCT');
+    } else if(this.c.type === 'B32HEX'){
+      atom = {b32hex: this.c.value};
+      this.eat('B32HEX');
+    } else if(this.c.type === 'B32C'){
+      atom = {b32c: this.c.value};
+      this.eat('B32C');
     } else if(this.c.type === 'DEC'){
       atom = {dec: this.c.value};
       this.eat('DEC');
@@ -3172,6 +3189,18 @@ assignment() {
             }
             initialValue = binStr;
             this.eat('HEX');
+          } else if (this.c.type === 'OCT') {
+            const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+            initialValue = WL ? WL.octDigitsToBin(this.c.value) : this.c.value;
+            this.eat('OCT');
+          } else if (this.c.type === 'B32HEX') {
+            const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+            initialValue = WL ? WL.b32hexDigitsToBin(this.c.value) : this.c.value;
+            this.eat('B32HEX');
+          } else if (this.c.type === 'B32C') {
+            const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+            initialValue = WL ? WL.b32cDigitsToBin(this.c.value) : this.c.value;
+            this.eat('B32C');
           } else if (this.c.type === 'DEC') {
             const dec = parseInt(this.c.value, 10);
             const typeMatch = type.match(/^(\d+)(bit|wire)$/);
@@ -3578,6 +3607,42 @@ assignment() {
     const atomHex = br ? { hex: v, bitRange: br } : { hex: v };
     { const _p = this.maybeParsePadding(); if (_p != null) atomHex.pad = _p; }
     return addNot(atomHex);
+  }
+
+  if (this.c.type === 'OCT') {
+    const v = this.c.value;
+    this.eat('OCT');
+    let br = null;
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      br = this.parseLiteralBitRange();
+    }
+    const atomOct = br ? { oct: v, bitRange: br } : { oct: v };
+    { const _p = this.maybeParsePadding(); if (_p != null) atomOct.pad = _p; }
+    return addNot(atomOct);
+  }
+
+  if (this.c.type === 'B32HEX') {
+    const v = this.c.value;
+    this.eat('B32HEX');
+    let br = null;
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      br = this.parseLiteralBitRange();
+    }
+    const atomB32 = br ? { b32hex: v, bitRange: br } : { b32hex: v };
+    { const _p = this.maybeParsePadding(); if (_p != null) atomB32.pad = _p; }
+    return addNot(atomB32);
+  }
+
+  if (this.c.type === 'B32C') {
+    const v = this.c.value;
+    this.eat('B32C');
+    let br = null;
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      br = this.parseLiteralBitRange();
+    }
+    const atomB32c = br ? { b32c: v, bitRange: br } : { b32c: v };
+    { const _p = this.maybeParsePadding(); if (_p != null) atomB32c.pad = _p; }
+    return addNot(atomB32c);
   }
   
   if (this.c.type === 'SPECIAL') {

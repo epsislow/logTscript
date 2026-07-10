@@ -55,6 +55,78 @@
     return bin;
   }
 
+  const B32HEX_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUV';
+  const B32C_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  const OCT_DIGIT_BITS = 3;
+  const B32_DIGIT_BITS = 5;
+
+  function octDigitsToBin(octStr) {
+    const s = String(octStr).trim();
+    if (!s.length || !/^[0-7]+$/.test(s)) {
+      throw new Error(`Invalid oct literal: ${octStr}`);
+    }
+    let bin = '';
+    for (let i = 0; i < s.length; i++) {
+      bin += parseInt(s[i], 8).toString(2).padStart(OCT_DIGIT_BITS, '0');
+    }
+    return bin;
+  }
+
+  function b32CharToValue(ch, alphabet) {
+    const idx = alphabet.indexOf(String(ch).toUpperCase());
+    if (idx < 0) throw new Error(`Invalid base32 character '${ch}'`);
+    return idx;
+  }
+
+  function b32DigitsToBin(str, alphabet) {
+    const s = String(str).trim();
+    if (!s.length) throw new Error('Invalid base32 literal: empty');
+    let bin = '';
+    for (let i = 0; i < s.length; i++) {
+      const val = b32CharToValue(s[i], alphabet);
+      bin += val.toString(2).padStart(B32_DIGIT_BITS, '0');
+    }
+    return bin;
+  }
+
+  function b32hexDigitsToBin(str) {
+    return b32DigitsToBin(str, B32HEX_ALPHABET);
+  }
+
+  function b32cDigitsToBin(str) {
+    return b32DigitsToBin(str, B32C_ALPHABET);
+  }
+
+  function binToPatternLiteral(binStr, bitWidth, bitsPerDigit, alphabet, prefix) {
+    const w = bitWidth || (binStr == null ? 0 : String(binStr).length);
+    const s = binStr == null ? '' : String(binStr);
+    const displayStr = w && s.length >= w ? s.substring(s.length - w) : s.padStart(w, '0');
+    let digits = '';
+    let i = 0;
+    while (i + bitsPerDigit <= displayStr.length) {
+      const chunk = displayStr.substring(i, i + bitsPerDigit);
+      digits += alphabet[parseInt(chunk, 2)];
+      i += bitsPerDigit;
+    }
+    const remainder = displayStr.substring(i);
+    if (!digits && remainder) return remainder;
+    let result = prefix + digits;
+    if (remainder.length > 0) result += (digits ? ' + ' : '') + remainder;
+    return result;
+  }
+
+  function binToOctLiteral(binStr, bitWidth) {
+    return binToPatternLiteral(binStr, bitWidth, OCT_DIGIT_BITS, '01234567', 'o^');
+  }
+
+  function binToB32HexLiteral(binStr, bitWidth) {
+    return binToPatternLiteral(binStr, bitWidth, B32_DIGIT_BITS, B32HEX_ALPHABET, 'x^');
+  }
+
+  function binToB32CLiteral(binStr, bitWidth) {
+    return binToPatternLiteral(binStr, bitWidth, B32_DIGIT_BITS, B32C_ALPHABET, 'xc^');
+  }
+
   function parseSdecToken(raw) {
     if (raw && typeof raw === 'object' && raw.signed) {
       const n = -parseDecimalBigInt(raw.dec);
@@ -176,6 +248,18 @@
     unsignedDecToWidthBin,
     parseDecimalBigInt,
     hexDigitsToBin,
+    B32HEX_ALPHABET,
+    B32C_ALPHABET,
+    OCT_DIGIT_BITS,
+    B32_DIGIT_BITS,
+    octDigitsToBin,
+    b32DigitsToBin,
+    b32hexDigitsToBin,
+    b32cDigitsToBin,
+    b32CharToValue,
+    binToOctLiteral,
+    binToB32HexLiteral,
+    binToB32CLiteral,
     parseSdecToken,
     parseShexToken,
     decodeWireStringEscape,

@@ -9,7 +9,10 @@
   const SHOW_HEX_NIBBLE_BITS = 4;
   const SHOW_HEX_GROUP_HEX_CHARS = 4;
 
-  const FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'q4p4', 'q8p8', 'bf16', 'fp16']);
+  const SHOW_OCT_DIGIT_BITS = 3;
+  const SHOW_B32_DIGIT_BITS = 5;
+
+  const FORMAT_TAGS = new Set(['dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'oct', 'b32hex', 'b32c', 'q4p4', 'q8p8', 'bf16', 'fp16']);
   const ELEMENT_MODE_TAGS = new Set(['elAll', 'elNonZero', 'compact', 'elRange', 'elLast']);
   const MODIFIER_TAGS = new Set(['signed', 'hexWide', 'multiline']);
 
@@ -74,6 +77,79 @@
     const n = signed ? signedBinToBigInt(padded) : unsignedBinToBigInt(padded);
     if (signed && signedLiteral) return formatSignedDecLiteral(n, width);
     return formatDecimalLiteral(n);
+  }
+
+  function formatPatternTagDisplay(binStr, bitWidth, prefix, bitsPerDigit, alphabet) {
+    const w = bitWidth || String(binStr).length;
+    if (hasLogicXZ(binStr)) return formatXZBinary(binStr);
+    let remaining = normalizeBits(binStr, w);
+    const parts = [];
+    while (remaining.length >= bitsPerDigit) {
+      const chunk = remaining.substring(0, bitsPerDigit);
+      const digit = alphabet[parseInt(chunk, 2)];
+      parts.push(`${prefix}${digit}`);
+      remaining = remaining.substring(bitsPerDigit);
+    }
+    if (remaining.length > 0) {
+      if (parts.length) return parts.join(' ') + ' + ' + remaining;
+      return remaining;
+    }
+    return parts.join(' ');
+  }
+
+  function formatPatternGroupedDisplay(binStr, bitWidth, prefix, bitsPerDigit, alphabet) {
+    const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+    if (WL) {
+      if (prefix === 'o^' && typeof WL.binToOctLiteral === 'function') {
+        return WL.binToOctLiteral(binStr, bitWidth);
+      }
+      if (prefix === 'x^' && typeof WL.binToB32HexLiteral === 'function') {
+        return WL.binToB32HexLiteral(binStr, bitWidth);
+      }
+      if (prefix === 'xc^' && typeof WL.binToB32CLiteral === 'function') {
+        return WL.binToB32CLiteral(binStr, bitWidth);
+      }
+    }
+    const w = bitWidth || String(binStr).length;
+    if (hasLogicXZ(binStr)) return formatXZBinary(binStr);
+    const displayStr = normalizeBits(binStr, w);
+    let digits = '';
+    let i = 0;
+    while (i + bitsPerDigit <= displayStr.length) {
+      const chunk = displayStr.substring(i, i + bitsPerDigit);
+      digits += alphabet[parseInt(chunk, 2)];
+      i += bitsPerDigit;
+    }
+    const remainder = displayStr.substring(i);
+    if (!digits && remainder) return remainder;
+    let result = prefix + digits;
+    if (remainder.length > 0) result += ' + ' + remainder;
+    return result;
+  }
+
+  function formatOctDisplay(binStr, bitWidth, isElement) {
+    if (isElement) {
+      return formatPatternTagDisplay(binStr, bitWidth, 'o^', SHOW_OCT_DIGIT_BITS, '01234567');
+    }
+    return formatPatternGroupedDisplay(binStr, bitWidth, 'o^', SHOW_OCT_DIGIT_BITS, '01234567');
+  }
+
+  function formatB32HexDisplay(binStr, bitWidth, isElement) {
+    const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+    const alpha = WL ? WL.B32HEX_ALPHABET : '0123456789ABCDEFGHIJKLMNOPQRSTUV';
+    if (isElement) {
+      return formatPatternTagDisplay(binStr, bitWidth, 'x^', SHOW_B32_DIGIT_BITS, alpha);
+    }
+    return formatPatternGroupedDisplay(binStr, bitWidth, 'x^', SHOW_B32_DIGIT_BITS, alpha);
+  }
+
+  function formatB32CDisplay(binStr, bitWidth, isElement) {
+    const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+    const alpha = WL ? WL.B32C_ALPHABET : '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+    if (isElement) {
+      return formatPatternTagDisplay(binStr, bitWidth, 'xc^', SHOW_B32_DIGIT_BITS, alpha);
+    }
+    return formatPatternGroupedDisplay(binStr, bitWidth, 'xc^', SHOW_B32_DIGIT_BITS, alpha);
   }
 
   function formatHexTagDisplay(binStr, bitWidth, hexWide) {
@@ -366,6 +442,9 @@
     const hasHex = tags.includes('hex');
     const hasBin = tags.includes('bin');
     const hasAscii = tags.includes('ascii');
+    const hasOct = tags.includes('oct');
+    const hasB32hex = tags.includes('b32hex');
+    const hasB32c = tags.includes('b32c');
     let numericFormat = null;
     for (const t of tags) {
       if (['q4p4', 'q8p8', 'bf16', 'fp16'].includes(t)) numericFormat = t;
@@ -381,12 +460,15 @@
     const signedLiteral = hasSigned && (hasDec || hasHex);
 
     return {
-      dec: hasDec && !hasBin && !hasAscii && !numericFormat,
+      dec: hasDec && !hasBin && !hasAscii && !numericFormat && !hasOct && !hasB32hex && !hasB32c,
       signed: hasSigned,
       signedLiteral,
-      hex: hasHex && !hasBin && !hasAscii && !numericFormat,
-      bin: hasBin && !hasAscii && !numericFormat,
-      ascii: hasAscii && !numericFormat,
+      hex: hasHex && !hasBin && !hasAscii && !numericFormat && !hasOct && !hasB32hex && !hasB32c,
+      bin: hasBin && !hasAscii && !numericFormat && !hasOct && !hasB32hex && !hasB32c,
+      ascii: hasAscii && !numericFormat && !hasOct && !hasB32hex && !hasB32c,
+      oct: hasOct && !hasBin && !hasAscii && !numericFormat && !hasHex && !hasB32hex && !hasB32c,
+      b32hex: hasB32hex && !hasBin && !hasAscii && !numericFormat && !hasHex && !hasOct && !hasB32c,
+      b32c: hasB32c && !hasBin && !hasAscii && !numericFormat && !hasHex && !hasOct && !hasB32hex,
       numericFormat,
       hexWide: tags.includes('hexWide'),
       compact: tags.includes('compact'),
@@ -472,6 +554,12 @@
       } else {
         formatted = formatHexGroupedDisplay(binStr, bitWidth);
       }
+    } else if (opts.oct) {
+      formatted = formatOctDisplay(binStr, bitWidth, !!isElement);
+    } else if (opts.b32hex) {
+      formatted = formatB32HexDisplay(binStr, bitWidth, !!isElement);
+    } else if (opts.b32c) {
+      formatted = formatB32CDisplay(binStr, bitWidth, !!isElement);
     } else if (opts.dec || opts.signed) {
       if (opts.signed && opts.signedLiteral && !isElement) {
         formatted = formatSignedGroupedHeader(binStr, bitWidth);
@@ -534,6 +622,9 @@
     formatDecimalDisplay,
     formatHexTagDisplay,
     formatHexGroupedDisplay,
+    formatOctDisplay,
+    formatB32HexDisplay,
+    formatB32CDisplay,
     formatBinDisplay,
     formatAsciiDisplay,
     formatSignedDecLiteral,

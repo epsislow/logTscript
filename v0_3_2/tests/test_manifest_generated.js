@@ -1687,7 +1687,15 @@
       {"id":2251,"group":"conditional-assignment","title":"chip body on:raise parses","detail":{"scripts":["chip +[t]:\n  4pin a\n  1pin set\n  4pout b\n  exec: set\n  on: 1\n  on:raise {\n    set,\n    a = 0001\n  }\n  b = a\n  :4bit b"],"steps":[],"assertions":["has conditional"]}},
       {"id":2252,"group":"conditional-assignment","title":"pcb body on:raise still rejected","detail":{"scripts":["pcb +[p]:\n  4pin a\n  4pout b\n  exec: set\n  on: 1\n  on:raise {\n    a,\n    b = a\n  }\n  :4bit b"],"steps":[],"assertions":["pcb rejects on:raise"]}},
       {"id":2253,"group":"semantic-schemas","title":"vector show peek probe schema inline per element","detail":{"scripts":[],"steps":["run(script) [nerezolvat]"],"assertions":["show rom slot1 schema inline","show rom slot1 cycles","peek rom slot1 schema inline","probe rom:1 schema inline","probe rom:1 cycles"]}},
-      {"id":2254,"group":"semantic-schemas","title":"Wave Listen auto vector schema inline and expand","detail":{"scripts":["<opcode>:\n    alu:4\n    jump:1\n    write:1\n    cycles:2\n    reserved:8\n:"],"steps":["run(OPCODE16_SCHEMA + [ '16wire[3]<opcode> rom := 0', 'rom:1:alu := \\\\5', 'rom:1:cycles := \\\\3', ].join…) [nerezolvat]"],"assertions":["payload schemaRef","inline slot1 alu","inline slot1 cycles","expand slot1 alu"]}}
+      {"id":2254,"group":"semantic-schemas","title":"Wave Listen auto vector schema inline and expand","detail":{"scripts":["<opcode>:\n    alu:4\n    jump:1\n    write:1\n    cycles:2\n    reserved:8\n:"],"steps":["run(OPCODE16_SCHEMA + [ '16wire[3]<opcode> rom := 0', 'rom:1:alu := \\\\5', 'rom:1:cycles := \\\\3', ].join…) [nerezolvat]"],"assertions":["payload schemaRef","inline slot1 alu","inline slot1 cycles","expand slot1 alu"]}},
+      {"id":2261,"group":"pattern-literals","title":"oct literal o^12 on 6wire","detail":{"scripts":["6wire v = o^12\nshow(v)"],"steps":[],"assertions":["oct bits"]}},
+      {"id":2262,"group":"pattern-literals","title":"oct padding o^1;6","detail":{"scripts":["6wire v = o^1;6\nshow(v)"],"steps":[],"assertions":["oct pad"]}},
+      {"id":2263,"group":"pattern-literals","title":"base32hex literal x^A","detail":{"scripts":["5wire v = x^A\nshow(v)"],"steps":[],"assertions":["b32hex bits"]}},
+      {"id":2264,"group":"pattern-literals","title":"crockford literal xc^10","detail":{"scripts":["10wire v = xc^10\nshow(v)"],"steps":[],"assertions":["b32c bits"]}},
+      {"id":2265,"group":"pattern-literals","title":"show tag oct roundtrip","detail":{"scripts":["6wire v = o^12\nshow(v; oct)"],"steps":[],"assertions":["show oct literal"]}},
+      {"id":2266,"group":"pattern-literals","title":"show tag b32hex and b32c","detail":{"scripts":["10wire b = xc^10\nshow(b; b32c)"],"steps":[],"assertions":["show b32hex","show b32c"]}},
+      {"id":2267,"group":"pattern-literals","title":"oct invalid digit parse error","detail":{"scripts":["6wire v = o^18"],"steps":[],"assertions":["o^8 rejected"]}},
+      {"id":2268,"group":"wave-debug","title":"Wave Listen copy — oct b32hex b32c literals","detail":{"scripts":[],"steps":[],"assertions":["oct copy prefix","oct copy no spaces","b32hex copy prefix","b32c copy prefix","fmt options oct","fmt options b32hex","fmt options b32c"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1759,6 +1767,7 @@
       { id: 'osc', label: 'Oscillator', rangeLabel: '134–157', testIds: [134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157] },
       { id: 'other', label: 'Other', rangeLabel: '38–39', testIds: [38, 39] },
       { id: 'parser', label: 'parser', rangeLabel: '1655, 2219', testIds: [1655, 2219] },
+      { id: 'pattern-literals', label: 'pattern-literals', rangeLabel: '2261–2267', testIds: [2261, 2262, 2263, 2264, 2265, 2266, 2267] },
       { id: 'pcb', label: 'PCB property block', rangeLabel: '504–515, 520–531, 1168–1175', testIds: [504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531, 1168, 1169, 1170, 1171, 1172, 1173, 1174, 1175] },
       { id: 'probe', label: 'probe debug', rangeLabel: '800–803, 820–839, 851–854, 864, 1702–1703', testIds: [800, 801, 802, 803, 820, 821, 822, 823, 824, 825, 826, 827, 828, 829, 830, 831, 832, 833, 834, 835, 836, 837, 838, 839, 851, 852, 853, 854, 864, 1702, 1703] },
       { id: 'protocol-decode', label: 'Protocol decode()', rangeLabel: '945–946', testIds: [945, 946] },
@@ -1776,7 +1785,7 @@
       { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775] },
       { id: 'user-def-tags', label: 'user-def-tags', rangeLabel: '1776–1781', testIds: [1776, 1777, 1778, 1779, 1780, 1781] },
       { id: 'vector-reduction', label: 'vector-reduction', rangeLabel: '1715–1734, 1797', testIds: [1715, 1716, 1717, 1718, 1719, 1720, 1721, 1722, 1723, 1724, 1725, 1726, 1727, 1728, 1729, 1730, 1731, 1732, 1733, 1734, 1797] },
-      { id: 'wave-debug', label: 'wave-debug', rangeLabel: '2200–2218', testIds: [2200, 2201, 2202, 2203, 2204, 2205, 2206, 2207, 2208, 2209, 2210, 2211, 2212, 2213, 2214, 2215, 2216, 2217, 2218] },
+      { id: 'wave-debug', label: 'wave-debug', rangeLabel: '2200–2218, 2268', testIds: [2200, 2201, 2202, 2203, 2204, 2205, 2206, 2207, 2208, 2209, 2210, 2211, 2212, 2213, 2214, 2215, 2216, 2217, 2218, 2268] },
       { id: 'wave-next', label: 'wave-next', rangeLabel: '2102–2103, 2125', testIds: [2102, 2103, 2125] },
       { id: 'signal', label: 'Wire cascade propagation', rangeLabel: '600–611, 1654', testIds: [600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 1654] },
       { id: 'wire-tensor', label: 'wire-tensor', rangeLabel: '1864–1876, 1889–1904, 1957–1967, 1969, 1972–1973, 2143–2144', testIds: [1864, 1865, 1866, 1867, 1868, 1869, 1870, 1871, 1872, 1873, 1874, 1875, 1876, 1889, 1890, 1891, 1892, 1893, 1894, 1895, 1896, 1897, 1898, 1899, 1900, 1901, 1902, 1903, 1904, 1957, 1958, 1959, 1960, 1961, 1962, 1963, 1964, 1965, 1966, 1967, 1969, 1972, 1973, 2143, 2144] },

@@ -8379,7 +8379,7 @@ Wave propagation trace — **separate panel**, not Output. Open from **Win ▾ �
 |---------|------|
 | **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
 | **L1 / L2 / L3** | Trace verbosity (\`debugLevel\` on wave engine) |
-| **Fmt ▾** | hex / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii (dropdown, persisted) |
+| **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii (dropdown, persisted) |
 | **Clear** | Clears panel history (no auto-clear on Run) |
 | **Listening…** badge | Internal **listen** active while script runs (distinct from ON/OFF) |
 
@@ -8396,7 +8396,7 @@ Example trace (level 1):
 
 Legacy mode: one status line (\`listen is ON/OFF\`), no \`[wave N]\` lines.
 
-**Value formatting:** dropdown **hex / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **ascii** afișează ca \`show(…; ascii)\` — \`"Hello"\` sau \`\\72 \\101 …;ascii\`. Suffix **\`(Nbits)\`** la afișare. **\`[cpy]\`** — literal script: **bin** = biți continui; **hex** = \`^…\` fără spații; **dec/s8/…** = cu \`;format\`; **ascii** = \`"abc"\` pentru text printabil, \`"abc" + \\2 + "zz"\` dacă mix, \`\\65 \\66;ascii\` dacă doar \`\\N\` (2+ cu \`;ascii\`). X/Z → fallback hex la copy.
+**Value formatting:** dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **oct**, **b32hex**, **b32c** produc literali \`o^…\`, \`x^…\`, \`xc^…\` (roundtrip ca la hex). **ascii** afișează ca \`show(…; ascii)\` — \`"Hello"\` sau \`\\72 \\101 …;ascii\`. Suffix **\`(Nbits)\`** la afișare. **\`[cpy]\`** — literal script: **bin** = biți continui; **hex** = \`^…\` fără spații; **oct/b32hex/b32c** = \`o^…\` / \`x^…\` / \`xc^…\` fără spații; **dec/s8/…** = cu \`;format\`; **ascii** = \`"abc"\` pentru text printabil, \`"abc" + \\2 + "zz"\` dacă mix, \`\\65 \\66;ascii\` dacă doar \`\\N\` (2+ cu \`;ascii\`). X/Z → fallback hex la copy.
 
 See [Wave debug patterns](#wave-debug-patterns) and [huffman-v2.md](huffman-v2.md) (SC round-trip).
 
@@ -8462,6 +8462,9 @@ Display tags are **optional**, appear **once after all arguments** (after \`;\`)
 | \`signed\` | Signed two's complement (shorthand for \`dec signed\` when used alone). Header: \`\\N;sW\` (wire ≤64) or grouped \`;s64\` chunks; cells: \`\\N;s{elementW}\` |
 | \`decSigned\` | Legacy alias for \`dec\` + \`signed\` (still accepted in parser) |
 | \`hex\` | Nibbles \`^…\` (4 bit) on **vector/matrix cells**; plain wire uses grouped hex like default \`show\` |
+| \`oct\` | Octal pattern \`o^…\` (3 bit per digit) |
+| \`b32hex\` | Base32hex pattern \`x^…\` (RFC 4648 §7, 5 bit per digit) |
+| \`b32c\` | Crockford base32 \`xc^…\` (5 bit per digit) |
 | \`hexWide\` | With \`hex\` only — grouped wide hex on vector elements (≥32 bit) |
 | \`bin\` | Explicit binary grouping (8-bit groups on wide wires) |
 | \`ascii\` | 8-bit cells — scalar ≤8 bit: \`"A"\`; wider wires: grouped \`\\65 \\66;ascii\` |
@@ -24100,6 +24103,9 @@ Related: [assignment operators](assignment-operators.md) (\`=\`, \`:=\`, \`=:\`)
 | **Decimal signed** | \`\\-3;s8\` | Two's complement on **exactly** \`W\` bits (\`;sW\`) |
 | **Hex pattern** | \`^FF\` | Each hex digit → 4 bits (unsigned pattern) |
 | **Hex value signed** | \`^-A;8\` | Signed numeric value in hex + **explicit** width |
+| **Oct pattern** | \`o^12\` | Each oct digit → 3 bits (\`0\`–\`7\`) |
+| **Base32hex pattern** | \`x^AB\` | RFC 4648 §7 — each digit → 5 bits (\`0\`–\`9\`, \`A\`–\`V\`) |
+| **Crockford base32** | \`xc^10\` | Each digit → 5 bits (Crockford alphabet, no I/L/O/U) |
 | **Wire string** | \`"Hello"\` / \`'Hi'\` | One byte per character (8 bit), MSB-first in the wire |
 | **Logic** (ZSTATE) | \`?10Z0\` | Tristate \`0\` / \`1\` / \`Z\` / \`X\` |
 | **Meta constant** | \`/instance/\` | Compile-time constant from the meta registry |
@@ -24281,6 +24287,50 @@ Short notation:
 \`\`\`
 8wire a = \`[^-A;8]\`
 \`\`\`
+
+---
+
+## Oct pattern (unsigned) — \`o^DIGITS\`
+
+Caret after **\`o\`** starts an **octal pattern**: each digit \`0\`–\`7\` expands to **3 bits**.
+
+\`\`\`logts-play
+6wire v = o^12
+show(v)
+\`\`\`
+
+| Form | Bits |
+|------|------|
+| \`o^12\` | \`001\` + \`010\` = \`001010\` (6 bits) |
+| \`o^1;6\` | \`000001\` — \`;6\` is unsigned padding |
+
+In short notation: \`\` \`[o^12]\` \`\`.
+
+---
+
+## Base32hex pattern — \`x^DIGITS\`
+
+**\`x^\`** uses the RFC 4648 §7 alphabet (\`0\`–\`9\`, \`A\`–\`V\`). Each digit → **5 bits**.
+
+\`\`\`logts-play
+5wire v = x^A
+show(v)
+\`\`\`
+
+\`x^A\` → \`01010\` (5 bits). Short notation: \`\` \`[x^AB]\` \`\`.
+
+---
+
+## Crockford base32 — \`xc^DIGITS\`
+
+**\`xc^\`** uses the Crockford alphabet (excludes \`I\`, \`L\`, \`O\`, \`U\`). Each digit → **5 bits** with a **different** mapping than \`x^\`.
+
+\`\`\`logts-play
+10wire v = xc^10
+show(v)
+\`\`\`
+
+Short notation: \`\` \`[xc^J0]\` \`\`.
 
 ---
 
