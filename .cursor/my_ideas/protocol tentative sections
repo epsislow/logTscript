@@ -1,0 +1,182 @@
+Tentative sections (?)
+A protocol section or protocol definition may be marked with ? to indicate tentative parsing.
+A tentative section is attempted in order. If it cannot be parsed successfully, the parser restores the stream position to the beginning of that section and continues with the next sibling section.
+This provides declarative parser backtracking without introducing procedural control-flow statements such as if, switch, case, or else.
+Syntax
+Protocol section:
+logts
+header:
+    ...
+
+payload?:
+    ...
+
+crc:
+
+Reusable definition:
+logts
+def ipv4?:
+    ...
+:
+
+def ipv6?:
+    ...
+:
+
+The ? modifier is only valid for protocol sections and protocol definitions.
+
+───
+
+Behaviour
+A normal section is mandatory.
+logts
+header:
+payload:
+crc:
+
+If a mandatory section cannot be parsed, the protocol fails.
+A tentative section is an alternative.
+logts
+ipv4?:
+    ...
+
+ipv6?:
+    ...
+
+arp?:
+    ...
+
+For every tentative section the parser performs the following steps:
+1. Save the current stream position.
+2. Attempt to parse the section.
+3. If parsing succeeds, continue normally.
+4. If parsing fails, restore the saved stream position.
+5. Continue with the next sibling section.
+Only the stream position is restored. No error is reported for a failed tentative section.
+
+───
+
+Example
+logts
+packet:
+
+    ipv4?:
+        ...
+
+    ipv6?:
+        ...
+
+    unknown:
+        ...
+
+If the incoming packet matches IPv4, parsing continues inside ipv4.
+If it does not match, the parser restores the stream position and immediately attempts ipv6.
+If neither matches, parsing continues with unknown.
+This behaves similarly to a declarative parser choice while preserving the sequential structure of the protocol.
+
+───
+
+Nested tentative sections
+Tentative sections may themselves contain additional tentative sections.
+Each tentative section owns an independent parsing checkpoint.
+logts
+packet?:
+
+    header
+
+    extension?:
+        ...
+
+    payload
+
+Execution is conceptually:
+Checkpoint A
+
+read header
+
+Checkpoint B
+
+try extension
+
+    success
+        continue
+
+    failure
+        restore Checkpoint B
+        continue with payload
+
+...
+
+if packet later fails
+
+    restore Checkpoint A
+
+The rollback performed by extension? never affects the checkpoint created by packet?.
+
+───
+
+Multiple nesting levels
+Any number of tentative sections may be nested.
+logts
+outer?:
+
+    inner1?:
+
+        inner2?:
+
+            ...
+
+    footer
+
+Each tentative section creates its own rollback scope.
+outer?
+    Checkpoint A
+
+    inner1?
+        Checkpoint B
+
+        inner2?
+            Checkpoint C
+
+Possible outcomes:
+• inner2? fails → restore Checkpoint C, continue inside inner1.
+• inner1? fails → restore Checkpoint B, continue inside outer.
+• outer? fails → restore Checkpoint A, continue with the next sibling section.
+Rollbacks are always local to the tentative section that owns the checkpoint.
+
+───
+
+Typical use cases
+Tentative sections are intended for protocol constructs such as:
+• protocol version selection
+• packet type dispatch
+• instruction decoding
+• optional protocol extensions
+• alternative message layouts
+• nested protocol headers
+Example:
+logts
+ethernet:
+
+    vlan?:
+
+        qinq?:
+            ...
+
+    ipv4?:
+        ...
+
+    arp?:
+        ...
+
+Each optional branch is attempted independently, allowing complex protocol grammars to be expressed declaratively without explicit branching constructs.
+
+───
+
+Notes
+• ? does not ignore parsing errors.
+• It only changes how parsing failures are handled.
+• Successful tentative sections behave exactly like normal sections.
+• Failed tentative sections restore the stream position to the beginning of that section.
+• Nested tentative sections create independent rollback scopes.
+• Parsing remains deterministic: once a tentative section succeeds, parsing continues from that point without reconsidering previous alternatives.

@@ -1,0 +1,241 @@
+Înainte de documentație, o observație de design: cred că aceste două mecanisme completează foarte frumos Semantic Schemas. Unul este composition by inclusion (flatten), celălalt este composition by nesting (ierarhic). Nu introduc tipuri noi și păstrează filosofia actuală a LogTScript.
+
+───
+
+Schema composition (merge and nested schemas)
+Semantic Schemas may be composed from other schemas. LogTScript supports two composition forms:
+• Schema merge (<schema>) – copy all fields from another schema into the current one.
+• Nested schema (field:<schema>) – embed another schema as a named field.
+Neither form changes the underlying wire layout. Both are compile-time descriptions only.
+
+───
+
+Schema merge
+Place another schema on its own line inside a schema definition.
+logts
+<flags>:
+    carry:1
+    zero:1
+    negative:1
+    overflow:1
+:
+
+<instruction>:
+    opcode:4
+    <flags>
+    immediate:8
+:
+
+Equivalent to:
+logts
+<instruction>:
+    opcode:4
+    carry:1
+    zero:1
+    negative:1
+    overflow:1
+    immediate:8
+:
+
+The merged schema is expanded at compile time. Field offsets are computed exactly as if the fields had been written directly.
+
+───
+
+Nested schemas
+A schema may also appear as the type of a named field.
+logts
+<flags>:
+    carry:1
+    zero:1
+    negative:1
+    overflow:1
+:
+
+<instruction>:
+    opcode:4
+    flags:<flags>
+    immediate:8
+:
+
+Unlike schema merge, the nested schema remains grouped under its field name.
+Access:
+logts
+instr:flags:carry
+instr:flags:zero
+instr:flags:overflow
+
+instead of
+logts
+instr:carry
+instr:zero
+
+
+───
+
+Merge vs nested
+
+Syntax
+Behaviour
+
+<schema>
+Merge all fields into the current schema (flatten).
+
+field:<schema>
+Create a nested semantic object accessible through field:.
+
+
+Example:
+logts
+<header>:
+    version:4
+    type:4
+:
+
+<packet>:
+    <header>
+    payload:8
+:
+
+becomes
+text
+version
+type
+payload
+
+while
+logts
+<packet>:
+    header:<header>
+    payload:8
+:
+
+becomes
+text
+header
+    version
+    type
+
+payload
+
+
+───
+
+Nested schemas may be nested again
+Schemas may contain any number of nested schemas.
+logts
+<rgb>:
+    r:8
+    g:8
+    b:8
+:
+
+<pixel>:
+    color:<rgb>
+    alpha:8
+:
+
+Access:
+logts
+pixel:color:r
+pixel:color:g
+pixel:color:b
+pixel:alpha
+
+
+───
+
+Combining both forms
+Both composition mechanisms may appear in the same schema.
+logts
+<header>:
+    version:4
+    type:4
+:
+
+<flags>:
+    carry:1
+    zero:1
+:
+
+<packet>:
+    <header>
+    flags:<flags>
+    crc:16
+:
+
+Result:
+text
+version
+type
+
+flags
+    carry
+    zero
+
+crc
+
+The header fields are merged into the packet, while flags remains a nested semantic object.
+
+───
+
+Bit layout
+Composition never inserts padding.
+Field offsets are assigned sequentially in declaration order, whether fields originate from the current schema or from merged schemas.
+Nested schemas occupy exactly the sum of their contained field widths.
+Example:
+logts
+<sub>:
+    a:3
+    b:5
+:
+
+<test>:
+    x:4
+    child:<sub>
+    y:4
+:
+
+Bit layout:
+text
+x       4 bits
+child
+    a   3 bits
+    b   5 bits
+y       4 bits
+
+Total width:
+4 + (3 + 5) + 4 = 16 bits
+
+
+───
+
+show()
+When a wire has an associated semantic schema, show() displays nested schemas hierarchically.
+logts
+16wire<instruction> instr
+show(instr)
+
+Output:
+text
+instr
+
+opcode = ADD
+
+flags
+    carry = 1
+    zero = 0
+    overflow = 0
+
+immediate = 15
+
+Merged schemas appear as normal top-level fields.
+
+───
+
+Rules
+• <schema> merges all fields from another schema into the current schema.
+• field:<schema> embeds another schema under a field name.
+• Both operations are compile-time only.
+• Neither changes the stored wire value.
+• Field offsets remain deterministic and follow declaration order.
+• Nested schemas may themselves contain merged or nested schemas recursively.
