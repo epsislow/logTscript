@@ -20326,6 +20326,233 @@ on: 1
   h.assert('state line', String(lines.some((l) => l.includes('state') && l.includes('mem'))), 'true');
 }, { propagation: 'legacy' });
 
+const FLAGS_SCHEMA = `<flags>:
+    carry:1
+    zero:1
+    negative:1
+    overflow:1
+:
+`;
+
+const INSTR_MERGE_SCHEMA = `<instruction_merge>:
+    opcode:4
+    <flags>
+    immediate:8
+:
+`;
+
+const INSTR_NESTED_SCHEMA = `<instruction>:
+    opcode:4
+    flags:<flags>
+    immediate:8
+:
+`;
+
+reg(2276, 'schema-composition', 'merge flatten same bit layout', function(h, session) {
+  const EXPLICIT = `<instruction_explicit>:
+    opcode:4
+    carry:1
+    zero:1
+    negative:1
+    overflow:1
+    immediate:8
+:
+`;
+  session.run(FLAGS_SCHEMA + INSTR_MERGE_SCHEMA + EXPLICIT + [
+    '16wire<instruction_merge> a = { opcode=\\5 carry=1 zero=0 negative=0 overflow=0 immediate=^0F }<instruction_merge>',
+    '16wire<instruction_explicit> b = { opcode=\\5 carry=1 zero=0 negative=0 overflow=0 immediate=^0F }<instruction_explicit>',
+  ].join('\n'));
+  h.assert('merge equals explicit', session.getWire(session.interp, 'a'), session.getWire(session.interp, 'b'));
+});
+
+reg(2277, 'schema-composition', 'nested field access read write', function(h, session) {
+  session.run(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + [
+    '16wire<instruction> instr := 0',
+    'instr:flags:carry := 1',
+    'instr:flags:zero := 0',
+    'instr:opcode := \\5',
+    '1wire c = instr:flags:carry',
+    '4wire o = instr:opcode',
+  ].join('\n'));
+  h.assert('carry', session.getWire(session.interp, 'c'), '1');
+  h.assert('opcode', session.getWire(session.interp, 'o'), '0101');
+});
+
+reg(2278, 'schema-composition', 'nested flat access error message', function(h, session) {
+  const out = session.runDoc(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + [
+    '16wire<instruction> instr := 0',
+    'instr:carry := 1',
+  ].join('\n'));
+  h.assert('error mentions nested path', String(out.some((l) => l.includes('instr:flags:carry'))), 'true');
+});
+
+reg(2279, 'schema-composition', 'show hierarchical nested group', function(h, session) {
+  const out = session.runDoc(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + [
+    '16wire<instruction> instr := 0',
+    'instr:flags:carry := 1',
+    'show(instr)',
+  ].join('\n'));
+  const flagsIdx = out.findIndex((l) => l.trim() === 'flags');
+  h.assert('flags group line', String(flagsIdx >= 0), 'true');
+  h.assert('carry indented', String(out.some((l) => l.includes('carry') && l.includes('1'))), 'true');
+});
+
+reg(2280, 'schema-composition', 'combined packet header merge flags nested', function(h, session) {
+  const src = [
+    '<header>:',
+    '    version:4',
+    '    type:4',
+    ':',
+    FLAGS_SCHEMA,
+    '<packet>:',
+    '    <header>',
+    '    flags:<flags>',
+    '    crc:16',
+    ':',
+    '28wire<packet> pkt := 0',
+    'pkt:version := \\1',
+    'pkt:flags:carry := 1',
+    'pkt:crc := ^FFFF',
+  ].join('\n');
+  session.run(src);
+  h.assert('total width 16+4+16=36? wait 4+4+4+16=28', session.getWire(session.interp, 'pkt').length, '28');
+});
+
+reg(2281, 'schema-composition', 'deep nest rgb pixel', function(h, session) {
+  session.run([
+    '<rgb>:',
+    '    r:8',
+    '    g:8',
+    '    b:8',
+    ':',
+    '<pixel>:',
+    '    color:<rgb>',
+    '    alpha:8',
+    ':',
+    '32wire<pixel> px := 0',
+    'px:color:r := ^FF',
+    'px:color:g := ^80',
+    'px:alpha := ^0F',
+    '8wire r = px:color:r',
+  ].join('\n'));
+  h.assert('red', session.getWire(session.interp, 'r'), '11111111');
+});
+
+reg(2282, 'schema-composition', 'vector nested field access', function(h, session) {
+  session.run(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + [
+    '16wire[2]<instruction> rom := 0',
+    'rom:1:flags:carry := 1',
+    '1wire c = rom:1:flags:carry',
+  ].join('\n'));
+  h.assert('vector nested', session.getWire(session.interp, 'c'), '1');
+});
+
+reg(2283, 'schema-composition', 'circular schema reference error', function(h, session) {
+  h.assertThrows('circular', function() {
+    session.run([
+      '<a>:',
+      '    b:<b>',
+      ':',
+      '<b>:',
+      '    a:<a>',
+      ':',
+    ].join('\n'));
+  }, 'Circular schema reference');
+});
+
+reg(2284, 'schema-composition', 'duplicate field after merge', function(h, session) {
+  h.assertThrows('duplicate merge', function() {
+    session.run([
+      '<header>:',
+      '    version:4',
+      '    type:4',
+      ':',
+      '<packet>:',
+      '    <header>',
+      '    version:4',
+      ':',
+    ].join('\n'));
+  }, 'Duplicate schema field');
+});
+
+reg(2285, 'schema-composition', 'LOAD imports schemas', function(h, session) {
+  seedLoadFile('schemas/opcode16.logts', OPCODE16_SCHEMA);
+  session.run('<schemas/opcode16.logts\n16wire<opcode> instr := 0\ninstr:alu := \\5');
+  h.assert('loaded schema wire', session.getWire(session.interp, 'instr').substring(0, 4), '0101');
+});
+
+reg(2286, 'schema-composition', 'forward reference same unit', function(h, session) {
+  session.run([
+    '<packet>:',
+    '    <header>',
+    '    payload:8',
+    ':',
+    '<header>:',
+    '    version:4',
+    '    type:4',
+    ':',
+    '16wire<packet> p := 0',
+    'p:payload := ^FF',
+  ].join('\n'));
+  h.assert('forward ref width', session.getWire(session.interp, 'p').length, '16');
+});
+
+reg(2287, 'schema-composition', 'nested schema literal', function(h, session) {
+  session.run(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + [
+    '16wire<instruction> instr = {',
+    '    opcode=\\5',
+    '    flags={ carry=1 zero=0 }<flags>',
+    '    immediate=^0F',
+    '}<instruction>',
+    '1wire c = instr:flags:carry',
+  ].join('\n'));
+  h.assert('nested literal carry', session.getWire(session.interp, 'c'), '1');
+});
+
+reg(2288, 'schema-composition', 'Wave Listen copy schema literal roundtrip', function(h, session) {
+  session.run(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + [
+    '16wire<instruction> instr := 0',
+    'instr:flags:carry := 1',
+    'instr:opcode := \\5',
+  ].join('\n'));
+  const wire = session.getWire(session.interp, 'instr');
+  const entry = {
+    name: 'instr',
+    rawValue: wire,
+    bitWidth: 16,
+    schemaRef: 'instruction',
+  };
+  const copyText = formatWaveListenCopyText(entry, 'auto', session.interp);
+  h.assert('copy has literal', String(copyText.includes('{') && copyText.includes('}<instruction>')), 'true');
+  h.assert('copy nested flags', String(copyText.includes('flags={') && copyText.includes('}<flags>')), 'true');
+  const literal = copyText.replace(/^instr = /, '');
+  session.run(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + '16wire<instruction> instr2 = ' + literal);
+  h.assert('roundtrip bits', session.getWire(session.interp, 'instr2'), wire);
+});
+
+reg(2290, 'schema-composition', 'show nested container field view', function(h, session) {
+  const out = session.runDoc(FLAGS_SCHEMA + [
+    '<instruction>:',
+    '    opcode:4',
+    '    f:<flags>',
+    '    immediate:8',
+    ':',
+    '16wire<instruction> instr = {',
+    '    opcode=\\5',
+    '    f={ carry=1 zero=0 }<flags>',
+    '    immediate=^0F',
+    '}<instruction>',
+    'show(instr:f)',
+  ].join('\n'));
+  h.assert('header', String(out.some((l) => l.includes('instr:f (4wire<flags>)'))), 'true');
+  h.assert('carry shown', String(out.some((l) => l.includes('carry') && l.includes('1'))), 'true');
+});
+
+reg(2289, 'schema-composition', 'flat schema regression OPCODE16', function(h, session) {
+  session.run(OPCODE16_SCHEMA + '16wire<opcode> instr := 0\ninstr:alu := \\5');
+  h.assert('flat still works', session.getWire(session.interp, 'instr').substring(0, 4), '0101');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

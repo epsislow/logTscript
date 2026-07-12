@@ -420,6 +420,61 @@ After **Load & Run**: open **Wave Listen**, arm **ON**, choose **Fmt → auto**,
 
 ---
 
+## Schema composition (merge and nested)
+
+Schemas may reference other schemas in two ways:
+
+| Syntax | Effect |
+|--------|--------|
+| `<schema>` on its own line | **Merge** — copy all fields into the current schema (flat) |
+| `field:<schema>` | **Nested** — group under `field`; access `wire:field:subfield` |
+
+```logts
+<flags>:
+    carry:1
+    zero:1
+    negative:1
+    overflow:1
+:
+
+<instruction>:
+    opcode:4
+    flags:<flags>
+    immediate:8
+:
+
+16wire<instruction> instr := 0
+instr:flags:carry := 1
+instr:opcode := \5
+show(instr)
+show(instr:f)          # nested group only — breakdown of <flags> inside f
+```
+
+`show(wire:nestedField)` on a nested container prints the sub-schema breakdown for that slice (same tree layout as `show` on the full wire, but scoped to the nested block). Leaf access (`instr:f:carry`) and assignment to a nested container (`instr:f := …`) are unchanged — assignment to a container still requires subfields or a nested literal on the parent wire.
+
+`show(instr)` prints nested groups with indentation. Wave Listen **inline** (`auto`) shows all leaf fields flat (`carry=1 opcode=…`); **expand** uses the same tree as `show`.
+
+**Nested literals** (phase 2):
+
+```logts
+16wire<instruction> instr = {
+    opcode=\5
+    flags={ carry=1 zero=0 }<flags>
+    immediate=^0F
+}<instruction>
+```
+
+**LOAD** imports schemas from another file (line must start with `<`):
+
+```logts
+<schemas/opcodes.logts
+16wire<opcode> instr
+```
+
+Within one script, referenced schemas must be defined in the same unit (or loaded via `<path`). Forward references within a file work when the parser resolves all `<schema>:` blocks at end of parse.
+
+---
+
 ## Error reference
 
 | Situation | Message (example) |
@@ -430,6 +485,10 @@ After **Load & Run**: open **Wave Listen**, arm **ON**, choose **Fmt → auto**,
 | Unknown field | `Unknown schema field 'foo' in schema 'opcode'` |
 | Literal overflow | `Field 'cycles' overflow: value exceeds 2-bit capacity` |
 | Field assign strict width | `Expected 4 bits, got 3 bits.` |
+| Nested field accessed flat | `Field 'carry' is nested under 'flags' in schema 'instruction'; use instr:flags:carry` |
+| Circular schema reference | `Circular schema reference: a → b → a` |
+| Duplicate after merge | `Duplicate schema field 'version' in schema 'packet' (from merge of 'header')` |
+| Unknown schema | `Unknown schema 'opcode'` |
 
 ---
 

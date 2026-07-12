@@ -150,23 +150,54 @@ class Parser {
         this.eat('SYM', ':');
         break;
       }
+      if (this.c.type === 'SYM' && this.c.value === '<') {
+        const ref = this.parseSchemaRef();
+        fields.push({ kind: 'merge', ref });
+        while (this.c.type === 'EOL') {
+          this.c = this.t.get();
+        }
+        continue;
+      }
       if (this.c.type !== 'ID') {
         throw Error(`Expected field name in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
       const fieldName = this.c.value;
       this.eat('ID');
       this.eat('SYM', ':');
-      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
-        throw Error(`Expected field width for '${fieldName}' in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      if (this.c.type === 'SYM' && this.c.value === '<') {
+        const ref = this.parseSchemaRef();
+        fields.push({ kind: 'nested', name: fieldName, ref });
+      } else if (this.c.type === 'DEC' || this.c.type === 'BIN') {
+        const width = parseInt(this.c.value, 10);
+        this.eat(this.c.type);
+        fields.push({ kind: 'leaf', name: fieldName, width });
+      } else {
+        throw Error(`Expected field width or schema ref for '${fieldName}' in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
-      const width = parseInt(this.c.value, 10);
-      this.eat(this.c.type);
-      fields.push({ name: fieldName, width });
       while (this.c.type === 'EOL') {
         this.c = this.t.get();
       }
     }
     return { name, fields };
+  }
+
+  _attachSchemaFieldPath(atom) {
+    let path = atom.schemaFieldPath
+      ? atom.schemaFieldPath.slice()
+      : (atom.schemaField ? [atom.schemaField] : []);
+    while (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+      if (this.c.type !== 'ID') {
+        throw Error(`Expected schema field name after ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      path.push(this.c.value);
+      this.eat('ID');
+    }
+    if (path.length) {
+      atom.schemaFieldPath = path;
+      atom.schemaField = path[path.length - 1];
+    }
+    return atom;
   }
 
   parseOptionalSchemaSuffix() {
@@ -193,7 +224,11 @@ class Parser {
       const fieldName = this.c.value;
       this.eat('ID');
       this.eat('SYM', '=');
-      fields[fieldName] = this.expr();
+      if (this.c.type === 'SYM' && this.c.value === '{') {
+        fields[fieldName] = this.parseSchemaLiteralAtom();
+      } else {
+        fields[fieldName] = this.expr();
+      }
       if (this.c.type === 'SYM' && this.c.value === ',') {
         this.eat('SYM', ',');
       }
@@ -463,9 +498,9 @@ class Parser {
   parseWireIndexSuffix(name, withAtomLoc) {
     this.eat('SYM', ':');
     if (this.c.type === 'ID') {
-      const fieldName = this.c.value;
+      const idAtom = withAtomLoc({ var: name, schemaField: this.c.value, schemaFieldPath: [this.c.value] });
       this.eat('ID');
-      const idAtom = withAtomLoc({ var: name, schemaField: fieldName });
+      this._attachSchemaFieldPath(idAtom);
       const br = this.parseBitRangeSuffix();
       if (br) idAtom.bitRange = br;
       { const _p = this.maybeParsePadding(); if (_p != null) idAtom.pad = _p; }
@@ -486,11 +521,15 @@ class Parser {
     if (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
       if (this.c.type === 'ID') {
-        const fieldName = this.c.value;
+        const idAtom = withAtomLoc({
+          var: name,
+          schemaField: this.c.value,
+          schemaFieldPath: [this.c.value],
+        });
         this.eat('ID');
-        const idAtom = withAtomLoc({ var: name, schemaField: fieldName });
         if (firstPart.index !== undefined) idAtom.vectorIndex = firstPart.index;
         else idAtom.vectorIndexExpr = firstPart.indexExpr;
+        this._attachSchemaFieldPath(idAtom);
         const br = this.parseBitRangeSuffix();
         if (br) idAtom.bitRange = br;
         { const _p = this.maybeParsePadding(); if (_p != null) idAtom.pad = _p; }
@@ -510,7 +549,9 @@ class Parser {
           throw Error(`Expected schema field name after ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
         }
         idAtom.schemaField = this.c.value;
+        idAtom.schemaFieldPath = [this.c.value];
         this.eat('ID');
+        this._attachSchemaFieldPath(idAtom);
       }
       { const _p = this.maybeParsePadding(); if (_p != null) idAtom.pad = _p; }
       return idAtom;
@@ -522,6 +563,13 @@ class Parser {
     if (br) idAtom.bitRange = br;
     { const _p = this.maybeParsePadding(); if (_p != null) idAtom.pad = _p; }
     return idAtom;
+  }
+
+  _finalizeSchemaRegistry(stmts) {
+    const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
+    if (SS && typeof SS.resolveSchemaDecls === 'function') {
+      SS.resolveSchemaDecls(stmts, this.schemaRegistry);
+    }
   }
 
 parse() {
@@ -607,7 +655,8 @@ parse() {
       this.c = this.t.get();
     }
   }
-  
+
+  this._finalizeSchemaRegistry(stmts);
   return stmts;
 }
 
@@ -654,12 +703,16 @@ parseLoad() {
 
   const processedContent = preprocessLoop(content);
   const subParser = new Parser(new Tokenizer(processedContent, path), this.componentRegistry);
-  subParser.parse();
+  const subStmts = subParser.parse();
 
-  for (const [sname, sdef] of subParser.schemaRegistry.entries()) {
-    const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
-    if (SS) SS.registerSchema(this.schemaRegistry, sdef);
-    else this.schemaRegistry.set(sname, sdef);
+  const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
+  if (SS && typeof SS.resolveSchemaDecls === 'function') {
+    SS.resolveSchemaDecls(subStmts, this.schemaRegistry);
+  } else {
+    for (const [sname, sdef] of subParser.schemaRegistry.entries()) {
+      if (SS) SS.registerSchema(this.schemaRegistry, sdef);
+      else this.schemaRegistry.set(sname, sdef);
+    }
   }
 
   for (const [fname, fdef] of subParser.funcs.entries()) {

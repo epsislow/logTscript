@@ -3843,6 +3843,7 @@ class Interpreter {
   _execSchemaDecl(s) {
     const SS = this._semanticSchemas();
     if (!SS || !s.schemaDecl) return;
+    if (this.schemaRegistry.has(s.schemaDecl.name)) return;
     const def = SS.buildSchemaDef(s.schemaDecl.name, s.schemaDecl.fields);
     SS.registerSchema(this.schemaRegistry, def);
   }
@@ -3857,15 +3858,14 @@ class Interpreter {
 
   _resolveSchemaFieldAbsoluteRange(atom, wire) {
     const SS = this._semanticSchemas();
-    if (!SS || !atom || !atom.schemaField) return null;
+    const path = SS && SS.atomSchemaFieldPath(atom);
+    if (!SS || !atom || !path || !path.length) return null;
     if (!wire || !wire.schemaRef) {
-      throw new Error(`Wire ${atom.var} has no schema for field access '${atom.schemaField}'`);
+      const label = path.join(':');
+      throw new Error(`Wire ${atom.var} has no schema for field access '${label}'`);
     }
     const schema = this._resolveSchema(wire.schemaRef);
-    const field = SS.getField(schema, atom.schemaField);
-    if (!field) {
-      throw new Error(`Unknown schema field '${atom.schemaField}' in schema '${wire.schemaRef}'`);
-    }
+    const field = SS.resolveSchemaView(schema, path, { wireVar: atom.var });
     const elemWidth = this._elementWidthForWire(wire);
     let elemStart = 0;
     if (atom.tensorSlice === 'cell') {
@@ -3887,19 +3887,23 @@ class Interpreter {
       field,
       schema,
       elemStart,
+      path,
     };
   }
 
   _formatSchemaFieldLabel(atom) {
-    if (!atom || !atom.schemaField) return null;
+    const SS = this._semanticSchemas();
+    const path = SS && SS.atomSchemaFieldPath(atom);
+    if (!atom || !path || !path.length) return null;
+    const fieldSuffix = path.join(':');
     if (atom.tensorSlice === 'cell') {
-      return `${atom.var}:${atom.tensorRowIndex}:${atom.tensorColIndex}:${atom.schemaField}`;
+      return `${atom.var}:${atom.tensorRowIndex}:${atom.tensorColIndex}:${fieldSuffix}`;
     }
     if (atom.vectorIndex !== undefined || atom.vectorIndexExpr) {
       const idx = atom.vectorIndex !== undefined ? atom.vectorIndex : '?';
-      return `${atom.var}:${idx}:${atom.schemaField}`;
+      return `${atom.var}:${idx}:${fieldSuffix}`;
     }
-    return `${atom.var}:${atom.schemaField}`;
+    return `${atom.var}:${fieldSuffix}`;
   }
 
   evalSchemaLiteralAtom(a, computeRefs) {
@@ -3909,6 +3913,11 @@ class Interpreter {
     const schema = this._resolveSchema(lit.schemaRef);
     const fieldValues = {};
     for (const [name, expr] of Object.entries(lit.fields || {})) {
+      if (expr && expr.schemaLiteral) {
+        const subResult = this.evalSchemaLiteralAtom(expr, false);
+        fieldValues[name] = subResult.value;
+        continue;
+      }
       const parts = this.evalExpr(expr, false);
       let bits = '';
       for (const part of parts) {
@@ -3918,6 +3927,8 @@ class Interpreter {
           if (v) bits += v;
         }
       }
+      const path = name.includes('.') ? name.split('.') : [name];
+      SS.resolveFieldPath(schema, path);
       fieldValues[name] = bits;
     }
     const totalBits = SS.buildSchemaLiteralBits(schema, fieldValues);
@@ -4005,6 +4016,35 @@ class Interpreter {
     const refStr = (!isPeek && ref && ref !== '&-') ? ` (ref: ${ref})` : '';
     if (lines.length === 1) return [lines[0] + refStr];
     lines[0] = lines[0] + refStr;
+    return lines;
+  }
+
+  _formatShowSchemaFieldView(part, wire, atom, opts, isPeek) {
+    const SS = this._semanticSchemas();
+    if (!SS || !wire || !part) return null;
+    const path = SS.atomSchemaFieldPath(atom);
+    if (!path || !wire.schemaRef) return null;
+    let view;
+    try {
+      const schema = this._resolveSchema(wire.schemaRef);
+      view = SS.resolveSchemaView(schema, path, { wireVar: atom.var });
+    } catch (err) {
+      return null;
+    }
+    if (!view || view.kind !== 'nested') return null;
+    let valueStr = part.value != null ? part.value : '-';
+    if (valueStr === '-' && part.ref) valueStr = this.getValueFromRef(part.ref) || '-';
+    if (valueStr === '-') return null;
+    SS.validateSchemaWidthForShow(view.schema, valueStr.length);
+    const displayName = part.varName || this._formatSchemaFieldLabel(atom) || atom.var;
+    const typeLabel = `${displayName} (${view.width}wire<${view.schema.name}>)`;
+    const lines = SS.formatSchemaShowTree(
+      valueStr,
+      view.schema,
+      opts,
+      (bits, w) => this.formatValue(bits, w)
+    );
+    if (lines.length) lines[0] = typeLabel;
     return lines;
   }
 
@@ -8273,6 +8313,22 @@ if (this.isBuiltinDEMUX(name)) {
         }
       }
       const r = this.evalExpr(e, computeRefs);
+      if (e && e.length === 1 && e[0].var && e[0].schemaField) {
+        const schemaWire = this.wires.get(e[0].var);
+        const part0 = r[0];
+        if (schemaWire && part0) {
+          try {
+            const nestedLines = this._formatShowSchemaFieldView(part0, schemaWire, e[0], opts, isPeek);
+            if (nestedLines && nestedLines.length) {
+              for (const sl of nestedLines) this.out.push(sl);
+              continue;
+            }
+          } catch (err) {
+            this.reportRuntimeError(err);
+            continue;
+          }
+        }
+      }
       if (e && e.length === 1 && e[0].var && !e[0].bitRange && e[0].vectorIndex === undefined
           && !e[0].vectorIndexExpr && !e[0].tensorSlice && !e[0].schemaField) {
         const schemaWire = this.wires.get(e[0].var);

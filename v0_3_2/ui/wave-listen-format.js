@@ -317,6 +317,9 @@ function _formatWaveListenScalarFormatted(rawValue, bitWidth, fmt, formatValueFn
       try {
         const schema = SS.resolveSchema(interp.schemaRegistry, entry.schemaRef);
         SS.validateSchemaWidthForShow(schema, bitWidth || rawValue.length);
+        if (typeof SS.formatSchemaShowInlineFlat === 'function') {
+          return SS.formatSchemaShowInlineFlat(rawValue, schema, null, formatValueFn);
+        }
         return SS.formatSchemaShowInline(rawValue, schema, null, formatValueFn);
       } catch (e) {
         return _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
@@ -438,6 +441,10 @@ function formatWaveListenExpandLines(entry, fmt, interp) {
       try {
         const schema = SS.resolveSchema(interp.schemaRegistry, entry.schemaRef);
         SS.validateSchemaWidthForShow(schema, bw);
+        if (typeof SS.formatSchemaShowTree === 'function'
+            && schema.structure && schema.structure.some((n) => n.kind === 'nested')) {
+          return SS.formatSchemaShowTree(rawValue, schema, null, formatValueFn);
+        }
         return SS.formatSchemaShowLines(rawValue, schema, null, formatValueFn);
       } catch (e) {
         return wrapBinaryGroupLines(rawValue);
@@ -490,6 +497,20 @@ function formatWaveListenCopyText(entry, fmt, interp) {
   const formatValueFn = interp && typeof interp.formatValue === 'function'
     ? (v, w) => interp.formatValue(v, w)
     : null;
+
+  if (mode === 'auto') {
+    const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
+    if (SS && entry && entry.schemaRef && interp && interp.schemaRegistry) {
+      try {
+        const schema = SS.resolveSchema(interp.schemaRegistry, entry.schemaRef);
+        SS.validateSchemaWidthForShow(schema, bitWidth || rawValue.length);
+        if (typeof SS.formatSchemaCopyLiteral === 'function') {
+          return SS.formatSchemaCopyLiteral(rawValue, schema, { wireName: entry.name });
+        }
+      } catch (e) { /* fall through */ }
+    }
+    return rawValue;
+  }
 
   if (mode === 'bin') return rawValue;
 
