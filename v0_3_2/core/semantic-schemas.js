@@ -233,6 +233,12 @@
       totalWidth: bitStart,
       structure,
       leafPaths,
+      rawFields: rawFields.map((raw) => {
+        const spec = normalizeRawFieldSpec(raw);
+        if (spec.kind === 'merge') return { kind: 'merge', ref: spec.ref };
+        if (spec.kind === 'nested') return { kind: 'nested', name: spec.name, ref: spec.ref };
+        return { kind: 'leaf', name: spec.name, width: spec.width };
+      }),
     };
     return syncFieldsFromLeafPaths(schema);
   }
@@ -654,6 +660,95 @@
     return `${assignPrefix}{ ${parts.join(' ')} }<${schema.name}>`;
   }
 
+  const SCHEMA_DOC_INDENT = '    ';
+
+  function schemaDocPad(depth) {
+    return SCHEMA_DOC_INDENT.repeat(Math.max(0, depth));
+  }
+
+  function schemaRawFieldList(schema) {
+    ensureSchemaShape(schema);
+    if (schema.rawFields && schema.rawFields.length) return schema.rawFields;
+    const fields = [];
+    for (const node of schema.structure) {
+      if (node.kind === 'leaf') fields.push({ kind: 'leaf', name: node.name, width: node.width });
+      else if (node.kind === 'nested') fields.push({ kind: 'nested', name: node.name, ref: node.schema.name });
+    }
+    return fields;
+  }
+
+  function appendSchemaDocImportBlock(lines, refName, registry, depth, visited) {
+    const blockPad = schemaDocPad(depth);
+    if (visited.has(refName)) {
+      lines.push(`${blockPad}<${refName}>: (already shown)`);
+      return;
+    }
+    if (!registry || !registry.has(refName)) {
+      lines.push(`${blockPad}<${refName}>: (not defined)`);
+      return;
+    }
+    const sub = ensureSchemaShape(registry.get(refName));
+    const subVisited = new Set(visited);
+    subVisited.add(refName);
+    lines.push(`${blockPad}<${refName}>:`);
+    for (const subSpec of schemaRawFieldList(sub)) {
+      appendSchemaDocFieldLines(lines, subSpec, registry, depth + 1, subVisited);
+    }
+    lines.push(`${blockPad}(${sub.totalWidth}bit)`);
+  }
+
+  function appendSchemaDocFieldLines(lines, spec, registry, depth, visited) {
+    const pad = schemaDocPad(depth);
+    if (spec.kind === 'leaf') {
+      lines.push(`${pad}${spec.name}:${spec.width}`);
+      return;
+    }
+    if (!registry || registry.size === 0) {
+      if (spec.kind === 'merge') lines.push(`${pad}<${spec.ref}>`);
+      else if (spec.kind === 'nested') lines.push(`${pad}${spec.name}:<${spec.ref}>`);
+      return;
+    }
+    if (spec.kind === 'nested') {
+      lines.push(`${pad}${spec.name}:`);
+      appendSchemaDocImportBlock(lines, spec.ref, registry, depth + 1, visited);
+      return;
+    }
+    if (spec.kind === 'merge') {
+      appendSchemaDocImportBlock(lines, spec.ref, registry, depth, visited);
+    }
+  }
+
+  function formatSchemaDocLines(schema, registry) {
+    ensureSchemaShape(schema);
+    const lines = [`<${schema.name}>:`];
+    const visited = new Set([schema.name]);
+    for (const spec of schemaRawFieldList(schema)) {
+      appendSchemaDocFieldLines(lines, spec, registry, 1, visited);
+    }
+    lines.push(':');
+    lines.push(`(${schema.totalWidth}bit)`);
+    return lines;
+  }
+
+  function formatSchemaIndexLines(registry) {
+    const lines = [];
+    if (!registry || registry.size === 0) {
+      lines.push('(no schemas defined)');
+    } else {
+      const names = [...registry.keys()].sort();
+      for (const n of names) lines.push(`schema.${n}`);
+    }
+    lines.push('');
+    lines.push('schema.none — reserved (see doc(schema.none))');
+    return lines;
+  }
+
+  function formatSchemaNoneDocLines() {
+    return [
+      '<none> is not a schema — reserved tag for show / peek / probe to use no schema information',
+    ];
+  }
+
   function parseSchemaFieldLine(line) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) return null;
@@ -721,6 +816,9 @@
     formatSchemaShowInline,
     formatSchemaShowInlineFlat,
     formatSchemaCopyLiteral,
+    formatSchemaDocLines,
+    formatSchemaIndexLines,
+    formatSchemaNoneDocLines,
     parseSchemaFieldLine,
     registerSchema,
     mergeSchemaIntoRegistry,

@@ -687,10 +687,100 @@ inline [protocol] .ethParse:
 
 ---
 
-## Decizii deschise (pentru discuție — nu blocante pentru Faza 1)
+## Discriminare ramură la output (choice → ce returnează wire-ul)
+
+### Ce intră în `blob` azi (`parseResult: all`)
+
+| Segment | În output wire? |
+|---------|-----------------|
+| `magic 3b` (parseField) | **da** — 3 biți |
+| `00000001` (literal) | **nu** — doar verificare |
+| `kind 8b` (parseField) | **da** — 8 biți |
+| `dataA 32b` (parseField) | **da** — 32 biți |
+| `validateChecksum` | **nu** |
+
+### Exemplu utilizator — două variante
+
+**Varianta greșită pentru dispatch** (`kind 8b` fără literal):
+
+```logts
+typeA?:
+  kind 8b      # citește ORICE 8 biți — typeA reușește mereu primul!
+  dataA 32b
+```
+
+**Varianta corectă pentru dispatch:**
+
+```logts
+typeA?:
+  00000001     # literal — eșec → rollback, încearcă typeB
+  dataA 32b
+typeB?:
+  00000010
+  dataB 64b
+```
+
+| Input | Output wire (`all`) | Lățime |
+|-------|---------------------|--------|
+| `111` + typeA payload | `111` + `dataA` (32b) | **35** |
+| `111` + typeB payload | `111` + `dataB` (64b) | **67** |
+
+**Nu** returnează `111 00000001` dacă `00000001` e **literal** — discriminatorul nu e în blob.  
+**Da** returnează `111 00000001 ...` dacă `kind 8b` e **parseField** — dar atunci dispatch-ul tentative e broken (typeA absorbă tot).
+
+### Problema: nu știi explicit „typeA” vs „typeB”
+
+Cu designul actual:
+- inferi din **lățimea wire-ului** (35 vs 67) sau
+- pui discriminator ca **parseField** în fiecare ramură (dar dispatch trebuie făcut cu **literale** la începutul ramurii, apoi câmpuri)
+
+**Nu există round-trip** — decode validează + extrage; nu reconstruiește automat pachetul identic.
+
+### Opțiuni (v1 → v2)
+
+| Opțiune | Descriere | Verdict |
+|---------|-----------|---------|
+| **A. Pattern v1 (fără motor nou)** | Literale pentru match; payload ca parseField; inferență din lățime sau citire manuală slice | **Faza 1** — documentat în protocol.md |
+| **B. `parseTag: branchName`** | Atribut protocol; la succes secțiune `typeA?:`, prefixează output cu tag fix (ex. 8b enum) | **v2 opțional** — explicit, lățime +8 |
+| **C. Al doilea canal output** | `out:` + `tag:` canal mic cu ID ramură | posibil dar awkward pentru parse |
+| **D. Schema union generată** | `<packetUnion>` cu variante — necesită extensie schemas (tagged union) | **v2+** — complementar cu schema composition |
+| **E. `_matched` în `fields`** | expunere în script (nu doar blob) | necesită API nou pe invoke — **v2** |
+
+### Schema semantică — ce merge acum
+
+Schemas cer **lățime fixă** pe wire (`43wire<typeA>` ≠ `75wire<typeB>`). Un singur `Nwire<union>` nu acoperă ramuri cu lățimi diferite.
+
+**Pattern v1 recomandat:**
+
+```logts
+<typeAPayload>:
+  dataA:32
+:
+
+<typeBPayload>:
+  dataB:64
+:
+
+# după parse — știi ramura din lățime sau ai citit discriminator separat
+35wire raw = .myProtocolPackageDecode { data = packet }
+show(raw)<typeAPayload>    # dacă 35b
+# sau
+67wire raw = .myProtocolPackageDecode { data = packet }
+show(raw)<typeBPayload>    # dacă 67b
+```
+
+**Viitor (schema union):** sketch în [schema composition](.cursor/my_ideas/schema composition_) — `variant:<typeA>|<typeB>` cu tag — **nu în Faza 1 tentative**.
+
+### Decizie Faza 1
+
+- **Nu** schimbăm formatul output-ului protocolului
+- **Documentăm** pattern: literale la head de ramură; payload în blob; inferență ramură din lățime sau tag manual
+- **Deschidem** `parseTag` / schema union ca follow-up (nu blocker)
+
+---
 
 1. **`?` pe parametri/câmpuri individuale** (`src? 32b`) — sketch-ul spune explicit NU; păstrăm restricția.
-2. **Metadata „care ramură a match-uit”** — util (`fields.set('_matched', 'ipv4')`)? Propun **nu în v1**; utilizatorul extrage din câmpuri specifice ramurii sau din structura output-ului.
+2. **Metadata „care ramură a match-uit”** — vezi § Discriminare ramură la output; **v1: pattern documentat** (discriminator în blob + lățime variabilă); **v2: `parseTag` sau schema union**.
 3. **Side-effects LUT la rollback** — dacă o tentativă apelează `withLength(..., entry)` cu `codebookLoad`, trebuie golit LUT-ul la restore. De tratat în Faza 2 când avem nesting + codebook.
 4. **`:decode` pe protocol parse fără tentative** — rămâne comportamentul actual (eșec pe parseField); nu extindem decode la parse mode.
 

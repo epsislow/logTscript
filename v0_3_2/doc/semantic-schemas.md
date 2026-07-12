@@ -454,6 +454,8 @@ show(instr:f; <none>)  # flat blob — no semantic breakdown
 
 `<none>` is a **reserved** schema display tag (not a user-defined schema name). It disables field breakdown for that `show` / `peek` / `probe` call; numeric tags still apply (`show(instr:f; <none> dec)`).
 
+Use `doc(schema)` to list defined schemas and `doc(schema.name)` for an indented definition tree (imported schemas expanded inline); `doc(schema.none)` documents this reserved tag.
+
 `show(wire:nestedField)` on a nested container prints the sub-schema breakdown for that slice. Assignment to a nested container (`instr:f := …`) still requires subfields or a nested literal on the parent wire.
 
 `show(instr)` prints nested groups with indentation. Wave Listen **inline** (`auto`) shows all leaf fields flat (`carry=1 opcode=…`); **expand** uses the same tree as `show`.

@@ -20565,6 +20565,50 @@ reg(2293, 'schema-composition', 'reserved schema name none', function(h, session
   }, 'Reserved schema name');
 });
 
+reg(2294, 'semantic-schemas', 'doc(schema) index and doc(schema.name) definition', function(h, session) {
+  const stmts = session.parse('doc(schema)\ndoc(schema.flags)\ndoc(schema.instruction)\ndoc(schema.none)\ndoc(schema.missing)');
+  h.assert('doc schema ast', String(stmts[0].doc === 'schema'), 'true');
+  h.assert('doc schema.flags ast', String(stmts[1].doc === 'schema.flags'), 'true');
+  const out = session.runDoc(FLAGS_SCHEMA + [
+    '<instruction>:',
+    '    opcode:4',
+    '    flags:<flags>',
+    '    immediate:8',
+    ':',
+    'doc(schema)',
+    'doc(schema.flags)',
+    'doc(schema.instruction)',
+    'doc(schema.none)',
+    'doc(schema.missing)',
+  ].join('\n'));
+  h.assert('index flags', String(out.some((l) => l === 'schema.flags')), 'true');
+  h.assert('index instruction', String(out.some((l) => l === 'schema.instruction')), 'true');
+  h.assert('index none hint', String(out.some((l) => l.includes('schema.none'))), 'true');
+  h.assert('flags carry line', String(out.some((l) => l.includes('carry:1'))), 'true');
+  const instrDocStart = out.findIndex((l) => l === '<instruction>:');
+  h.assert('instruction doc block', String(instrDocStart >= 0), 'true');
+  const instrDoc = instrDocStart >= 0 ? out.slice(instrDocStart, instrDocStart + 20) : [];
+  h.assert('instruction flags field', String(instrDoc.some((l) => l === '    flags:')), 'true');
+  h.assert('instruction nested flags block', String(instrDoc.some((l) => l === '        <flags>:')), 'true');
+  h.assert('instruction nested carry', String(instrDoc.some((l) => l === '            carry:1')), 'true');
+  h.assert('instruction nested width', String(instrDoc.some((l) => l === '        (4bit)')), 'true');
+  h.assert('instruction immediate', String(instrDoc.some((l) => l === '    immediate:8')), 'true');
+  h.assert('no flat flags ref', String(!instrDoc.some((l) => l === '    flags:<flags>')), 'true');
+  h.assert('instruction width', String(out.some((l) => l === '(16bit)')), 'true');
+  h.assert('none doc', String(out.some((l) => l.includes('<none>') && l.includes('not a schema'))), 'true');
+  h.assert('missing schema', String(out.some((l) => l.includes('schema.missing: undefined schema'))), 'true');
+});
+
+reg(2295, 'semantic-schemas', 'doc(schema) expands merged import fields', function(h, session) {
+  const out = session.runDoc(FLAGS_SCHEMA + INSTR_MERGE_SCHEMA + 'doc(schema.instruction_merge)');
+  const start = out.findIndex((l) => l === '<instruction_merge>:');
+  const block = start >= 0 ? out.slice(start, start + 20) : [];
+  h.assert('merge flags block', String(block.some((l) => l === '    <flags>:')), 'true');
+  h.assert('merge carry indented', String(block.some((l) => l === '        carry:1')), 'true');
+  h.assert('merge flags width', String(block.some((l) => l === '    (4bit)')), 'true');
+  h.assert('no from section', String(!out.some((l) => l.startsWith('from <'))), 'true');
+});
+
 reg(2290, 'schema-composition', 'show nested container field view', function(h, session) {
   const out = session.runDoc(FLAGS_SCHEMA + [
     '<instruction>:',

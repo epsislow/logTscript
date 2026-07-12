@@ -8702,7 +8702,8 @@ if (this.isBuiltinDEMUX(name)) {
         this.chipDefinitions,
         boardInstNames,
         this.boardDefinitions,
-        this.inlineInstances
+        this.inlineInstances,
+        this.schemaRegistry
       );
       for (const line of lines) {
         this.out.push(line);
@@ -15253,6 +15254,7 @@ Interpreter.getDocIndexLines = function() {
     '  chip — chip types; chip.name — syntax',
     '  board — board types; board.name — syntax',
     '  inline — inline instances; inline.kind — template (asm, lut, protocol)',
+    '  schema — semantic schemas; schema.name — definition (e.g. schema.opcode)',
     '  .inst — inline instance (e.g. .myisa)',
     '  Name — builtin or user function (OR, ADD, myFunc, …)',
     '  show, peek, probe, watch, Zlist, deps — debug statements',
@@ -15263,7 +15265,7 @@ if (typeof LogicValue !== 'undefined' && LogicValue.buildBitPredicateBuiltinDoc)
   Object.assign(Interpreter.BUILTIN_DOC, LogicValue.buildBitPredicateBuiltinDoc());
 }
 
-Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions, boardInstNames, boardDefinitions, inlineInstances) {
+Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbInstNames, pcbDefinitions, pcbCompNames, chipInstNames, chipDefinitions, boardInstNames, boardDefinitions, inlineInstances, schemaRegistry) {
   // ---- doc(def) — list all built-in functions and user-defined functions ----
   if (name === 'def') {
     const bitPredExclude = (typeof LogicValue !== 'undefined' && LogicValue.BIT_PREDICATE_DOC_NAMES)
@@ -15434,6 +15436,35 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
       }
     }
     return lines;
+  }
+
+  // ---- doc(schema) — list semantic schemas ----
+  if (name === 'schema') {
+    const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
+    if (SS && typeof SS.formatSchemaIndexLines === 'function') {
+      return SS.formatSchemaIndexLines(schemaRegistry);
+    }
+    if (!schemaRegistry || schemaRegistry.size === 0) return ['(no schemas defined)'];
+    return [...schemaRegistry.keys()].sort().map((n) => `schema.${n}`);
+  }
+
+  // ---- doc(schema.name) or doc(schema.none) ----
+  if (name.startsWith('schema.')) {
+    const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
+    const schemaName = name.slice(7);
+    if (schemaName === 'none') {
+      if (SS && typeof SS.formatSchemaNoneDocLines === 'function') {
+        return SS.formatSchemaNoneDocLines();
+      }
+      return ['<none> is not a schema — reserved tag for show / peek / probe to use no schema information'];
+    }
+    if (!schemaRegistry || !schemaRegistry.has(schemaName)) {
+      return [`${name}: undefined schema`];
+    }
+    if (SS && typeof SS.formatSchemaDocLines === 'function') {
+      return SS.formatSchemaDocLines(SS.resolveSchema(schemaRegistry, schemaName), schemaRegistry);
+    }
+    return [`${name}: (no schema doc available)`];
   }
 
   // ---- doc(board.type) ----
