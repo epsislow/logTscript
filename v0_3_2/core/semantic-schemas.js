@@ -5,6 +5,14 @@
 (function (global) {
   'use strict';
 
+  const RESERVED_SCHEMA_NAMES = new Set(['none']);
+
+  function assertSchemaNameAllowed(name) {
+    if (RESERVED_SCHEMA_NAMES.has(name)) {
+      throw new Error(`Reserved schema name '${name}' — choose another name for a user-defined schema`);
+    }
+  }
+
   function pathKeyFromSegments(segments) {
     return segments.join('.');
   }
@@ -142,6 +150,7 @@
   }
 
   function buildResolvedSchema(name, rawFields, ctx) {
+    assertSchemaNameAllowed(name);
     const structure = [];
     const leafPaths = new Map();
     let bitStart = 0;
@@ -655,6 +664,7 @@
 
   function registerSchema(registry, schemaDef) {
     if (!registry) throw new Error('schema registry missing');
+    assertSchemaNameAllowed(schemaDef.name);
     if (registry.has(schemaDef.name)) {
       throw new Error(`Duplicate schema '${schemaDef.name}'`);
     }
@@ -717,6 +727,8 @@
     resolveSchema,
     atomSchemaFieldPath,
     ensureSchemaShape,
+    assertSchemaNameAllowed,
+    RESERVED_SCHEMA_NAMES,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

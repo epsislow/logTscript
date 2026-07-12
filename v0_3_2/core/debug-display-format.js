@@ -428,8 +428,9 @@
     const schemaRef = typeof displayTags === 'object' && displayTags.schemaRef != null
       ? displayTags.schemaRef
       : null;
+    const schemaSuppress = typeof displayTags === 'object' && displayTags.schemaSuppress === true;
 
-    if (!tags.length && elRangeSpec == null && elLast == null && maxWidth == null && !schemaRef) return null;
+    if (!tags.length && elRangeSpec == null && elLast == null && maxWidth == null && !schemaRef && !schemaSuppress) return null;
 
     if (tags.includes('decSigned')) {
       if (!tags.includes('signed')) tags.push('signed');
@@ -480,6 +481,7 @@
       maxWidth: maxWidth != null ? maxWidth : null,
       decSigned: hasSigned && hasDec,
       schemaRef,
+      schemaSuppress,
     };
   }
 

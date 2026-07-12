@@ -448,9 +448,12 @@ instr:flags:carry := 1
 instr:opcode := \5
 show(instr)
 show(instr:f)          # nested group only — breakdown of <flags> inside f
+show(instr:f; <none>)  # flat blob — no semantic breakdown
 ```
 
-`show(wire:nestedField)` on a nested container prints the sub-schema breakdown for that slice (same tree layout as `show` on the full wire, but scoped to the nested block). Leaf access (`instr:f:carry`) and assignment to a nested container (`instr:f := …`) are unchanged — assignment to a container still requires subfields or a nested literal on the parent wire.
+`<none>` is a **reserved** schema display tag (not a user-defined schema name). It disables field breakdown for that `show` / `peek` / `probe` call; numeric tags still apply (`show(instr:f; <none> dec)`).
+
+`show(wire:nestedField)` on a nested container prints the sub-schema breakdown for that slice. Assignment to a nested container (`instr:f := …`) still requires subfields or a nested literal on the parent wire.
 
 `show(instr)` prints nested groups with indentation. Wave Listen **inline** (`auto`) shows all leaf fields flat (`carry=1 opcode=…`); **expand** uses the same tree as `show`.
 
@@ -489,6 +492,7 @@ Within one script, referenced schemas must be defined in the same unit (or loade
 | Circular schema reference | `Circular schema reference: a → b → a` |
 | Duplicate after merge | `Duplicate schema field 'version' in schema 'packet' (from merge of 'header')` |
 | Unknown schema | `Unknown schema 'opcode'` |
+| Reserved schema name | `Reserved schema name 'none' — choose another name for a user-defined schema` |
 
 ---
 

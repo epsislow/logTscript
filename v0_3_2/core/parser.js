@@ -240,7 +240,15 @@ class Parser {
 
   _parseSchemaDisplayTag() {
     if (this.c.type !== 'SYM' || this.c.value !== '<') return null;
-    return this.parseSchemaRef();
+    this.eat('SYM', '<');
+    if (this.c.type !== 'ID') {
+      throw Error(`Expected schema name after '<' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const name = this.c.value;
+    this.eat('ID');
+    this.eat('SYM', '>');
+    if (name === 'none') return { schemaSuppress: true };
+    return { schemaRef: name };
   }
 
   /** Seed inline kind hints from a live interpreter (e.g. execStmts re-parse). */
@@ -892,15 +900,16 @@ parseDebugDisplayTags(allowedTags) {
   this.eat('SYM', ';');
   const tags = [];
   const seen = new Set();
-  const result = { tags, elRange: null, elLast: null, maxWidth: null, level: null, schemaRef: null };
+  const result = { tags, elRange: null, elLast: null, maxWidth: null, level: null, schemaRef: null, schemaSuppress: false };
 
   while (true) {
     const schemaTag = this._parseSchemaDisplayTag();
     if (schemaTag) {
-      if (result.schemaRef) {
-        throw Error(`Duplicate schema display tag '<${schemaTag}>' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      if (result.schemaRef || result.schemaSuppress) {
+        throw Error(`Duplicate schema display tag at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
-      result.schemaRef = schemaTag;
+      if (schemaTag.schemaSuppress) result.schemaSuppress = true;
+      else if (schemaTag.schemaRef) result.schemaRef = schemaTag.schemaRef;
       continue;
     }
     if (this.c.type !== 'ID') break;
@@ -930,7 +939,7 @@ parseDebugDisplayTags(allowedTags) {
     }
   }
 
-  if (!tags.length && result.elRange == null && result.elLast == null && result.maxWidth == null && result.level == null && !result.schemaRef) {
+  if (!tags.length && result.elRange == null && result.elLast == null && result.maxWidth == null && result.level == null && !result.schemaRef && !result.schemaSuppress) {
     throw Error(`Expected display tag after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
 

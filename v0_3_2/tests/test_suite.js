@@ -20530,6 +20530,39 @@ reg(2288, 'schema-composition', 'Wave Listen copy schema literal roundtrip', fun
   h.assert('roundtrip bits', session.getWire(session.interp, 'instr2'), wire);
 });
 
+reg(2291, 'schema-composition', 'show none tag flat nested slice', function(h, session) {
+  const out = session.runDoc(FLAGS_SCHEMA + [
+    '<instruction>:',
+    '    opcode:4',
+    '    f:<flags>',
+    '    immediate:8',
+    ':',
+    '16wire<instruction> instr = {',
+    '    opcode=\\5',
+    '    f={ carry=1 zero=0 }<flags>',
+    '    immediate=^0F',
+    '}<instruction>',
+    'show(instr:f; <none>)',
+  ].join('\n'));
+  h.assert('flat line', String(out.some((l) => l.includes('instr:f') && l.includes('=') && !l.includes('carry'))), 'true');
+  h.assert('no carry breakdown', String(out.every((l) => !l.trim().startsWith('carry'))), 'true');
+});
+
+reg(2292, 'schema-composition', 'show none tag on full wire', function(h, session) {
+  const out = session.runDoc(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + [
+    '16wire<instruction> instr = { opcode=\\5 f={ carry=1 }<flags> immediate=^0F }<instruction>',
+    'show(instr; <none>)',
+  ].join('\n'));
+  h.assert('single line flat', String(out.filter((l) => l.includes('instr') && l.includes('=')).length), '1');
+  h.assert('no opcode field line', String(out.every((l) => !l.trim().startsWith('opcode'))), 'true');
+});
+
+reg(2293, 'schema-composition', 'reserved schema name none', function(h, session) {
+  h.assertThrows('reserved none', function() {
+    session.run('<none>:\n    a:4\n:');
+  }, 'Reserved schema name');
+});
+
 reg(2290, 'schema-composition', 'show nested container field view', function(h, session) {
   const out = session.runDoc(FLAGS_SCHEMA + [
     '<instruction>:',

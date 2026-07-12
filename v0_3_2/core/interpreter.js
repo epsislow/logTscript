@@ -3941,6 +3941,7 @@ class Interpreter {
 
   _resolveShowSchemaName(wire, opts) {
     if (!wire) return null;
+    if (opts && opts.schemaSuppress) return null;
     return (opts && opts.schemaRef) ? opts.schemaRef : (wire.schemaRef || null);
   }
 
@@ -3997,7 +3998,7 @@ class Interpreter {
 
   _formatShowWithSchema(valueStr, wire, opts, displayName, isPeek) {
     const SS = this._semanticSchemas();
-    if (!SS || !wire) return null;
+    if (!SS || !wire || (opts && opts.schemaSuppress)) return null;
     const schemaName = this._resolveShowSchemaName(wire, opts);
     if (!schemaName) return null;
     const schema = this._resolveSchema(schemaName);
@@ -4021,7 +4022,7 @@ class Interpreter {
 
   _formatShowSchemaFieldView(part, wire, atom, opts, isPeek) {
     const SS = this._semanticSchemas();
-    if (!SS || !wire || !part) return null;
+    if (!SS || !wire || !part || (opts && opts.schemaSuppress)) return null;
     const path = SS.atomSchemaFieldPath(atom);
     if (!path || !wire.schemaRef) return null;
     let view;
@@ -8239,7 +8240,8 @@ if (this.isBuiltinDEMUX(name)) {
             let valueStr = part.value != null ? part.value : '-';
             const displayName = part.varName || atom.var;
             const sliceWidth = part.bitWidth || wire.vector.elementWidth;
-            if (valueStr !== '-' && wire.schemaRef && !atom.schemaField && !atom.bitRange) {
+            if (valueStr !== '-' && wire.schemaRef && !atom.schemaField && !atom.bitRange
+                && !(opts && opts.schemaSuppress)) {
               try {
                 const schemaLines = this._formatShowWithSchema(valueStr, wire, opts, displayName, isPeek);
                 if (schemaLines && schemaLines.length) {
@@ -8332,7 +8334,8 @@ if (this.isBuiltinDEMUX(name)) {
       if (e && e.length === 1 && e[0].var && !e[0].bitRange && e[0].vectorIndex === undefined
           && !e[0].vectorIndexExpr && !e[0].tensorSlice && !e[0].schemaField) {
         const schemaWire = this.wires.get(e[0].var);
-        if (schemaWire && (schemaWire.schemaRef || (opts && opts.schemaRef))) {
+        if (schemaWire && !(opts && opts.schemaSuppress)
+            && (schemaWire.schemaRef || (opts && opts.schemaRef))) {
           const part0 = r[0];
           let valueStr = part0 && part0.value != null ? part0.value : '-';
           if (valueStr === '-' && part0 && part0.ref) valueStr = this.getValueFromRef(part0.ref) || '-';
