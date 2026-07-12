@@ -445,7 +445,7 @@ function _renderWaveListenValueRow(entry, out) {
   const formatFn = _waveListenFormatValueFn(entry);
   const interp = _waveListenInterpForEntry(entry);
   const needsExpand = typeof waveListenNeedsExpand === 'function'
-    ? waveListenNeedsExpand(entry)
+    ? waveListenNeedsExpand(entry, fmt)
     : (entry.bitWidth || (entry.rawValue ? entry.rawValue.length : 0)) > 256;
 
   main.appendChild(prefixSpan);

@@ -505,7 +505,7 @@ function formatWaveListenCopyText(entry, fmt, interp) {
         const schema = SS.resolveSchema(interp.schemaRegistry, entry.schemaRef);
         SS.validateSchemaWidthForShow(schema, bitWidth || rawValue.length);
         if (typeof SS.formatSchemaCopyLiteral === 'function') {
-          return SS.formatSchemaCopyLiteral(rawValue, schema, { wireName: entry.name });
+          return SS.formatSchemaCopyLiteral(rawValue, schema, {});
         }
       } catch (e) { /* fall through */ }
     }
@@ -535,10 +535,19 @@ function formatWaveListenCopyText(entry, fmt, interp) {
   return rawValue;
 }
 
-function waveListenNeedsExpand(entry) {
+function waveListenHasSchemaDisplay(entry, fmt) {
+  if (!entry || entry.rawValue == null) return false;
+  const mode = normalizeWaveListenFmt(fmt || 'hex');
+  if (mode !== 'auto') return false;
+  if (entry.schemaRef) return true;
+  return _tensorUsesSchemaAuto(entry, mode);
+}
+
+function waveListenNeedsExpand(entry, fmt) {
   if (!entry || entry.rawValue == null) return false;
   const bw = entry.bitWidth || entry.rawValue.length;
-  return bw > WAVE_LISTEN_EXPAND_THRESHOLD;
+  if (bw > WAVE_LISTEN_EXPAND_THRESHOLD) return true;
+  return waveListenHasSchemaDisplay(entry, fmt);
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -560,6 +569,7 @@ if (typeof module !== 'undefined' && module.exports) {
     formatWaveListenFullText,
     formatWaveListenCopyText,
     formatWaveListenAsciiCopy,
+    waveListenHasSchemaDisplay,
     waveListenNeedsExpand,
   };
 }

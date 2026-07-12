@@ -19757,6 +19757,8 @@ reg(2238, 'semantic-schemas', 'Wave Listen fmt auto breakdown', function(h, sess
     tensorMeta: null,
   };
   h.assert('auto fmt option', String(WAVE_LISTEN_FMT_OPTIONS.includes('auto')), 'true');
+  h.assert('schema expand btn', String(waveListenNeedsExpand(entry, 'auto')), 'true');
+  h.assert('no schema expand hex', String(waveListenNeedsExpand(entry, 'hex')), 'false');
   const inline = formatWaveListenInline(entry, 'auto', null, session.interp);
   h.assert('inline alu', String(inline.includes('alu=0101') || inline.includes('alu = 0101')), 'true');
   const lines = formatWaveListenExpandLines(entry, 'auto', session.interp);
@@ -20525,8 +20527,8 @@ reg(2288, 'schema-composition', 'Wave Listen copy schema literal roundtrip', fun
   const copyText = formatWaveListenCopyText(entry, 'auto', session.interp);
   h.assert('copy has literal', String(copyText.includes('{') && copyText.includes('}<instruction>')), 'true');
   h.assert('copy nested flags', String(copyText.includes('flags={') && copyText.includes('}<flags>')), 'true');
-  const literal = copyText.replace(/^instr = /, '');
-  session.run(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + '16wire<instruction> instr2 = ' + literal);
+  h.assert('copy no assign prefix', String(!/^instr\s*=/.test(copyText)), 'true');
+  session.run(FLAGS_SCHEMA + INSTR_NESTED_SCHEMA + '16wire<instruction> instr2 = ' + copyText);
   h.assert('roundtrip bits', session.getWire(session.interp, 'instr2'), wire);
 });
 

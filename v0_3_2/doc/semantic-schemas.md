@@ -398,7 +398,8 @@ See [debug.md — display tags](debug.md#show).
 In the **Wave Listen** panel toolbar, set **Fmt** to **`auto`** (first item in the dropdown). When the listened wire has a schema attached (`16wire<opcode>`), commit lines show a **per-field breakdown** (same rules as `show`):
 
 - **Inline** (narrow wires): compact `alu=0101 cycles=11 …`
-- **Expand** (+ button): multi-line field list
+- **Expand** ([+] button): appears when **fmt is `auto`** and the wire has a schema (or when the value exceeds 256 bits); shows the same multi-line breakdown as `show`
+- **Copy** ([cpy]): script literal only — `{ opcode=\5 flags={ … }<flags> … }<instruction>` (no `wireName =` prefix)
 - **Vectors / matrices** (`16wire[3]<opcode>`): each `:i` / `:row:col` line uses inline schema fields (same as `show(rom)`); expand lists all element lines
 
 Without `schemaRef`, `auto` falls back to **hex** (same as before).
