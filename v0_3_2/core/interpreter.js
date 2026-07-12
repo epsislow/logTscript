@@ -431,6 +431,10 @@ class Interpreter {
     this.asmModules = new Map();
     this.nextAsmModuleId = 1;
 
+    // Protocol parse views (tree metadata for show / field access)
+    this.parseViews = new Map();
+    this.nextParseViewId = 1;
+
     // Probe debug
     this.probeTargets = [];
     this.probeByKey = new Map();
@@ -1126,6 +1130,46 @@ class Interpreter {
     throw new Error(`Invalid base value '${raw}'`);
   }
 
+  _registerParseView(view, protoRef) {
+    const id = this.nextParseViewId++;
+    const stored = Object.assign({}, view, { protocolRef: protoRef });
+    this.parseViews.set(id, stored);
+    return id;
+  }
+
+  _getParseViewFromWire(wire) {
+    if (!wire || wire.parseViewId == null) return null;
+    return this.parseViews.get(wire.parseViewId) || null;
+  }
+
+  _syncParseViewMeta(wireOrName, exprResult) {
+    const wire = typeof wireOrName === 'string' ? this.wires.get(wireOrName) : wireOrName;
+    if (!wire || !exprResult) return;
+    const hasProtocolBlob = exprResult.some(p => p.protocolBlob);
+    const viewPart = exprResult.find(p => p.parseViewId != null);
+    if (viewPart && viewPart.parseViewId != null) {
+      wire.parseViewId = viewPart.parseViewId;
+    } else if (!hasProtocolBlob) {
+      delete wire.parseViewId;
+    }
+  }
+
+  _resolveParseViewFieldRange(atom, wire) {
+    const fn = typeof resolveParseViewSlice === 'function' ? resolveParseViewSlice : null;
+    if (!fn || !wire || wire.parseViewId == null) return null;
+    const view = this.parseViews.get(wire.parseViewId);
+    if (!view) return null;
+    const path = atom.schemaFieldPath && atom.schemaFieldPath.length
+      ? atom.schemaFieldPath.slice()
+      : (atom.schemaField ? [atom.schemaField] : []);
+    if (!path.length) return null;
+    const slice = fn(view, path);
+    if (slice.fieldBits) {
+      return { fieldBits: slice.fieldBits, path };
+    }
+    return { start: slice.offset, end: slice.offset + slice.width - 1, path };
+  }
+
   _makeAsmCtx(isaRef) {
     const self = this;
     return {
@@ -1281,30 +1325,58 @@ class Interpreter {
       if (!lutInst.writable) {
         throw Error(`codebookLoad '${codebookLoad}' must be a writable LUT`);
       }
-      if (!lutInst.lutEntryList) lutInst.lutEntryList = [];
-      lutInst.lutEntryList.length = 0;
       const syncFn = typeof syncWritableLutTable === 'function' ? syncWritableLutTable : null;
-      if (syncFn) syncFn(lutInst);
       const assertPf = typeof assertPrefixFreeIfNeeded === 'function' ? assertPrefixFreeIfNeeded : null;
+      const pendingLutEntries = [];
+      parseCtx.pendingLutEntries = pendingLutEntries;
       parseCtx.onParseEntry = (sym, codeword) => {
-        const next = lutInst.lutEntryList.concat([{ key: sym, value: codeword }]);
-        if (assertPf) assertPf(lutInst, next);
-        lutInst.lutEntryList.push({ key: sym, value: codeword });
+        pendingLutEntries.push({ key: sym, value: codeword });
+      };
+      parseCtx.flushLut = () => {
+        if (!lutInst.lutEntryList) lutInst.lutEntryList = [];
+        lutInst.lutEntryList.length = 0;
+        for (const entry of pendingLutEntries) {
+          const next = lutInst.lutEntryList.concat([entry]);
+          if (assertPf) assertPf(lutInst, next);
+          lutInst.lutEntryList.push(entry);
+        }
         if (syncFn) syncFn(lutInst);
       };
     }
 
-    const result = generateFn(inst, argValues, parseCtx);
-    return { value: result.blob, bitWidth: result.totalWidth, channelWidths: result.channelWidths };
+    let result;
+    try {
+      result = generateFn(inst, argValues, parseCtx);
+      if (parseCtx.flushLut) parseCtx.flushLut();
+    } catch (e) {
+      throw e;
+    }
+    const out = { value: result.blob, bitWidth: result.totalWidth, channelWidths: result.channelWidths };
+    if (result.parseView) {
+      out.parseViewId = this._registerParseView(result.parseView, protoRef);
+    }
+    return out;
   }
 
   evalProtocolInvokeAtom(invoke, computeRefs) {
     const result = this.evalProtocolInvoke(invoke);
     if (computeRefs) {
       const idx = this.storeValue(result.value);
-      return { value: result.value, ref: `&${idx}`, bitWidth: result.bitWidth, protocolBlob: true };
+      return {
+        value: result.value,
+        ref: `&${idx}`,
+        bitWidth: result.bitWidth,
+        protocolBlob: true,
+        parseViewId: result.parseViewId,
+      };
     }
-    return { value: result.value, ref: null, bitWidth: result.bitWidth, protocolBlob: true };
+    return {
+      value: result.value,
+      ref: null,
+      bitWidth: result.bitWidth,
+      protocolBlob: true,
+      parseViewId: result.parseViewId,
+    };
   }
 
   evalInlineLutInvoke(inst, invoke, computeRefs) {
@@ -1384,6 +1456,12 @@ class Interpreter {
   }
 
   evalProtocolDecode(inst, argExprs, computeRefs) {
+    const hasTentFn = typeof protocolHasTentative === 'function' ? protocolHasTentative : null;
+    if (hasTentFn && hasTentFn(inst)) {
+      throw new Error(
+        'Protocol decode does not support tentative sections — use { data = ... } on a mode: parse protocol'
+      );
+    }
     const channelBits = [];
     for (const argExpr of argExprs) {
       channelBits.push(this._evalExprToBits(argExpr));
@@ -5281,6 +5359,23 @@ class Interpreter {
           }
         }
         if (a.schemaField) {
+          const pvRange = this._resolveParseViewFieldRange(a, wire);
+          if (pvRange) {
+            let extracted;
+            if (pvRange.fieldBits) {
+              extracted = pvRange.fieldBits;
+            } else {
+              extracted = val.substring(pvRange.start, pvRange.end + 1);
+            }
+            if (a.pad) extracted = this.applyPad(extracted, a.pad);
+            const displayName = pvRange.path ? `${a.var}:${pvRange.path.join(':')}` : a.var;
+            return {
+              value: extracted,
+              ref: null,
+              varName: displayName,
+              bitWidth: extracted.length,
+            };
+          }
           const abs = this._resolveSchemaFieldAbsoluteRange(a, wire);
           let extracted = val.substring(abs.start, abs.end + 1);
           if (a.pad) extracted = this.applyPad(extracted, a.pad);
@@ -8334,6 +8429,18 @@ if (this.isBuiltinDEMUX(name)) {
       if (e && e.length === 1 && e[0].var && !e[0].bitRange && e[0].vectorIndex === undefined
           && !e[0].vectorIndexExpr && !e[0].tensorSlice && !e[0].schemaField) {
         const schemaWire = this.wires.get(e[0].var);
+        if (schemaWire && schemaWire.parseViewId != null) {
+          const part0 = r[0];
+          const view = this.parseViews.get(schemaWire.parseViewId);
+          const fn = typeof formatParseViewShow === 'function' ? formatParseViewShow : null;
+          if (view && fn) {
+            let refStr = null;
+            if (part0 && part0.ref) refStr = part0.ref;
+            const text = fn(view, e[0].var, part0 && part0.bitWidth, refStr);
+            this.out.push(text);
+            continue;
+          }
+        }
         if (schemaWire && !(opts && opts.schemaSuppress)
             && (schemaWire.schemaRef || (opts && opts.schemaRef))) {
           const part0 = r[0];
@@ -10350,6 +10457,8 @@ if (s.assignment) {
         this._applySchemaRefToWireEntry(wireEntry, d, bits, this.getLocation(s, d));
         const modPart = exprResult.find(p => p.asmModuleId != null);
         let asmModuleId = modPart ? modPart.asmModuleId : null;
+        const viewPart = exprResult.find(p => p.parseViewId != null);
+        let parseViewId = viewPart ? viewPart.parseViewId : null;
         if (asmModuleId == null) {
           const srcPart = exprResult.find(p => p.varName && this.wires.has(p.varName));
           if (srcPart) {
@@ -10357,7 +10466,15 @@ if (s.assignment) {
             if (sw && sw.asmModuleId != null) asmModuleId = sw.asmModuleId;
           }
         }
+        if (parseViewId == null) {
+          const srcPart = exprResult.find(p => p.varName && this.wires.has(p.varName));
+          if (srcPart) {
+            const sw = this.wires.get(srcPart.varName);
+            if (sw && sw.parseViewId != null) parseViewId = sw.parseViewId;
+          }
+        }
         if (asmModuleId != null) wireEntry.asmModuleId = asmModuleId;
+        if (parseViewId != null) wireEntry.parseViewId = parseViewId;
         if(!this.wires.has(d.name)){
           this.wires.set(d.name, wireEntry);
         } else {
@@ -10368,7 +10485,9 @@ if (s.assignment) {
           else delete existing.vector;
           if (d.schemaRef) existing.schemaRef = wireEntry.schemaRef;
           if (asmModuleId != null) existing.asmModuleId = asmModuleId;
-          else if (!hasAsmBlob) delete existing.asmModuleId;
+          else if (!hasProtocolBlob) delete existing.asmModuleId;
+          if (parseViewId != null) existing.parseViewId = parseViewId;
+          else if (!hasProtocolBlob) delete existing.parseViewId;
         }
         
         // Track wire statement for NEXT (not inside PCB body)

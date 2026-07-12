@@ -699,6 +699,9 @@ Not every generator works in every direction. Use this table when choosing encod
 | `checksum(crc16, def\|param)` | append CRC | ✗ | ✗ |
 | `validateChecksum(crc16, param)` | ✗ | verify CRC on **full** invoke param | ✗ |
 | Attributes `codebookLoad`, `parseResult` | ✗ | parse only | ✗ |
+| **`?` tentative sections** (`foo?`, `foo?:`) | ✗ | ordered choice + rollback | ✗ |
+| **`rest ~`**, **`rest -Nb`** | ✗ | consume tail / reserve footer | ✗ |
+| **`parseView: tree`** | ✗ | optional structured show + `wire:section:field` | ✗ |
 
 **Rules of thumb:**
 
@@ -972,6 +975,139 @@ peek(huffSz)
 | `codebook` | cursor | Frame + entries; **`codebookLoad`** fills `.huff` |
 | `validateChecksum(crc16, data)` | **full `data`** | CRC over body (123−16 bit), not tail-only |
 | `collapse(withLength(stream, 8b), …)` | cursor | Read payload; output wire = decoded tokens only (`parseResult: collapseOnly`) |
+
+---
+
+## Tentative sections (`?`) — parse-only dispatch
+
+**Parse-only.** Tentative sections add **ordered choice** with **backtracking**: try alternatives in order; on failure restore the cursor and parsed fields; **first success wins** (committed choice).
+
+| Form | Meaning |
+|------|---------|
+| `foo` | mandatory `localRef` to `def foo` |
+| `foo?` | tentative `localRef` — all branches may fail with **0 bits** |
+| `foo:` | mandatory **inline** section (body lines follow) |
+| `foo?:` | tentative inline section |
+| `def foo:` | declare reusable block — **no `?` on `def`** |
+
+**Mandatory vs optional at use-site** (no separate `requireChoice` attribute):
+
+| Invoke | All tentative branches fail |
+|--------|----------------------------|
+| `ethernet` | **Error** — `parse: no matching alternative` |
+| `ethernet?` | **OK** — 0 bits consumed, parsing continues |
+
+### Runnable — L3 dispatch (inline sections)
+
+```logts-play
+inline [protocol] .l3inline:
+  mode: parse
+  out:
+    ipv4?:
+      0100
+      src 32b
+      dst 32b
+    ipv6?:
+      0110
+      src 128b
+      dst 128b
+    unknown:
+      rest ~
+  :
+
+64wire out = .l3inline { data = 0100 + repeat(1,32) + repeat(0,32) }
+show(out)
+```
+
+Literals (`0100`, …) verify on wire but **do not** appear in the output blob — only **parse fields** (`src`, `dst`, …).
+
+### Runnable — prefix / body / footer
+
+```logts-play
+inline [protocol] .ethFrame:
+  mode: parse
+  def ipv4:
+    0100
+    src 32b
+  def ethernet:
+    ipv4?
+  out:
+    1111
+    ethernet
+    1111
+  :
+
+36wire out = .ethFrame { data = 1111 + 0100 + repeat(1,32) + 1111 }
+show(out)
+```
+
+Footer `1111` is the **next mandatory segment** in `out:` — not magic inside `ethernet`.
+
+### `rest ~` and `rest -Nb`
+
+| Syntax | Meaning |
+|--------|---------|
+| `rest ~` | consume **all** bits until EOF — only as **last** segment of the protocol |
+| `rest -4b` | consume `remaining − 4`, leave 4 bits for a fixed suffix (e.g. footer `1111`) |
+
+```logts-play
+inline [protocol] .restFoot:
+  mode: parse
+  def ipv4:
+    0100
+    src 32b
+  def ethernet:
+    ipv4?
+    unknown?:
+      rest -4b
+  out:
+    0000
+    ethernet
+    1111
+  :
+
+32wire out = .restFoot { data = 0000 + 0100 + repeat(1,32) + 1111 }
+show(out)
+```
+
+### `parseView: tree` — structured show / field access
+
+Optional attribute (only with `mode: parse`). When set, `show(parsed)` prints a **field tree** with matched branch names. Without it, behaviour is unchanged (flat blob).
+
+```logts-play
+inline [protocol] .pvTest:
+  mode: parse
+  parseView: tree
+  out:
+    magic 3b
+    typeA?:
+      11
+      01
+      dataA 2b
+    unknown:
+      rest ~
+  :
+
+5wire parsed = .pvTest { data = 101110100 }
+2wire dataA = parsed:typeA:dataA
+show(parsed)
+show(dataA)
+```
+
+Verify literals (`11`, `01`) are **not** shown in the tree — only fields with real bits.
+
+### `:decode()` and tentative
+
+**`:decode()` is not supported** on protocols with tentative sections. Use invoke `{ data = … }` on a `mode: parse` protocol instead.
+
+| Error | Cause |
+|-------|-------|
+| `tentative sections require mode: parse` | `?` in `mode: assemble` |
+| `Protocol def cannot use '?'` | `def foo?:` at declaration |
+| `parse: no matching alternative` | mandatory section / ref, all branches failed |
+| `rest -Nb: need N bits reserved…` | not enough bits left for footer |
+| `Protocol decode does not support tentative sections` | `:decode()` on protocol with `?` |
+| `parseView: field '…' has no bits` | field access on 0-bit branch (OK in `show` as `empty (0bit)`) |
 
 ---
 
@@ -1356,6 +1492,11 @@ Example `doc(.uart8n1)`:
 | withLength: def '...' left N bits unconsumed | Entry layout does not match wire |
 | codebookLoad '…' must be a writable LUT | LUT missing `writable` attribute |
 | parseResult must be 'all' or 'collapseOnly' | Invalid `parseResult` attribute |
+| parseView must be 'tree' or 'true' | Invalid `parseView` attribute |
+| tentative sections require mode: parse | `?` in assemble mode |
+| parse: no matching alternative | mandatory section, all branches failed |
+| Protocol decode does not support tentative sections | `:decode()` on protocol with `?` |
+| parseView: field '…' has no bits | field access on 0-bit branch |
 | mode must be 'assemble' or 'parse' | Invalid `mode` attribute |
 | withLength(..., def) is only supported in mode: parse | Framed def-parse in assemble protocol |
 | Protocol parse does not support segment kind '…' | e.g. `expand`/`lengthOf` inside parse protocol |

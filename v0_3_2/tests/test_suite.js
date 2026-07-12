@@ -8414,6 +8414,203 @@ reg(2138, 'protocol-ext', 'doc(inline.protocol) — Faza 0a-0d generators', func
   h.assert('mode parse', String(out.some(l => l.includes('mode: assemble | parse'))), 'true');
 });
 
+// --- Protocol tentative sections (Faza 1-3) ---
+
+const INLINE_L3_INLINE = `inline [protocol] .l3inline:
+  mode: parse
+  out:
+    ipv4?:
+      0100
+      src 32b
+      dst 32b
+    ipv6?:
+      0110
+      src 128b
+      dst 128b
+    unknown:
+      rest ~
+  :`;
+
+reg(2147, 'protocol-ext', 'tentative F1 — inline ipv4?: dispatch', function(h, session) {
+  const pkt = '0100' + '1'.repeat(32) + '0'.repeat(32);
+  const src = INLINE_L3_INLINE + `
+64wire out = .l3inline { data = ${pkt} }`;
+  const { interp } = session.run(src);
+  h.assert('ipv4 payload', session.getWire(interp, 'out'), '1'.repeat(32) + '0'.repeat(32));
+});
+
+const INLINE_L3_DEF = `inline [protocol] .l3def:
+  mode: parse
+  def ipv4:
+    0100
+    src 32b
+    dst 32b
+  def ipv6:
+    0110
+    src 128b
+    dst 128b
+  out:
+    ipv4?
+    ipv6?
+    unknown:
+      rest ~
+  :`;
+
+reg(2148, 'protocol-ext', 'tentative F1 — def + ipv4? ref', function(h, session) {
+  const pkt = '0100' + '1'.repeat(64);
+  const src = INLINE_L3_DEF + `
+64wire out = .l3def { data = ${pkt} }`;
+  const { interp } = session.run(src);
+  h.assert('ipv4 via def', session.getWire(interp, 'out'), '1'.repeat(64));
+});
+
+const INLINE_ETH_FRAME = `inline [protocol] .ethFrame:
+  mode: parse
+  def ipv4:
+    0100
+    src 32b
+  def ethernet:
+    ipv4?
+  out:
+    1111
+    ethernet
+    1111
+  :`;
+
+reg(2149, 'protocol-ext', 'tentative F1 — ethernet obligatoriu all-fail → eroare', function(h, session) {
+  const src = INLINE_ETH_FRAME + `
+8wire out = .ethFrame { data = 11111111 }`;
+  const { interp } = session.run(src);
+  h.assert('no match error', String(session.outIncludes(interp, 'no matching alternative')), 'true');
+});
+
+const INLINE_ETH_OPT = `inline [protocol] .ethOpt:
+  mode: parse
+  def ipv4:
+    0100
+    src 32b
+  def ethernet:
+    ipv4?
+  out:
+    1111
+    ethernet?
+    1111
+  :`;
+
+reg(2150, 'protocol-ext', 'tentative F1 — ethernet? all-fail → 0 biți + footer', function(h, session) {
+  const src = INLINE_ETH_OPT + `
+1wire ok := .ethOpt { data = 11111111 }`;
+  const { interp } = session.run(src);
+  h.assert('parse succeeded', session.getWire(interp, 'ok'), '0');
+});
+
+reg(2151, 'protocol-ext', 'tentative F1 — :decode pe protocol cu ? → eroare', function(h, session) {
+  const src = INLINE_L3_INLINE + `
+1wire _ = .l3inline:decode(0)`;
+  const { interp } = session.run(src);
+  h.assert('decode blocked', String(session.outIncludes(interp, 'tentative sections')), 'true');
+});
+
+const INLINE_VLAN_NEST = `inline [protocol] .vlanNest:
+  mode: parse
+  def qinq:
+    1000
+    outer 16b
+    inner 16b
+  def vlan:
+    qinq?
+    tag 16b
+  def ipv4:
+    0100
+    src 32b
+  def ethernet:
+    vlan?
+    ipv4?
+  out:
+    ethernet
+  :`;
+
+reg(2152, 'protocol-ext', 'tentative F2 — nesting vlan? → qinq?', function(h, session) {
+  const pkt = '1000' + '1'.repeat(32);
+  const src = `inline [protocol] .vlanSimple:
+  mode: parse
+  def qinq:
+    1000
+    payload 32b
+  def vlan:
+    qinq?
+  def ethernet:
+    vlan?
+  out:
+    ethernet
+  :
+32wire out = .vlanSimple { data = ${pkt} }`;
+  const { interp } = session.run(src);
+  h.assert('qinq payload', session.getWire(interp, 'out'), '1'.repeat(32));
+});
+
+const INLINE_REST_FOOT = `inline [protocol] .restFoot:
+  mode: parse
+  def ipv4:
+    0100
+    src 32b
+  def ethernet:
+    ipv4?
+    unknown?:
+      rest -4b
+  out:
+    0000
+    ethernet
+    1111
+  :`;
+
+reg(2153, 'protocol-ext', 'tentative F2 — rest -4b lasă footer 1111', function(h, session) {
+  const pkt = '0000' + '0100' + '1'.repeat(32) + '1111';
+  const src = INLINE_REST_FOOT + `
+32wire out = .restFoot { data = ${pkt} }`;
+  const { interp } = session.run(src);
+  h.assert('payload', session.getWire(interp, 'out'), '1'.repeat(32));
+});
+
+const INLINE_PARSE_VIEW = `inline [protocol] .pvTest:
+  mode: parse
+  parseView: tree
+  out:
+    magic 3b
+    typeA?:
+      11
+      01
+      dataA 2b
+    unknown:
+      rest ~
+  :`;
+
+reg(2154, 'protocol-ext', 'tentative F3 — parseView tree show', function(h, session) {
+  const pkt = '101' + '1101' + '00';
+  const src = INLINE_PARSE_VIEW + `
+5wire parsed = .pvTest { data = ${pkt} }
+show(parsed)`;
+  const { interp } = session.run(src);
+  h.assert('tree typeA', String(session.outIncludes(interp, 'typeA')), 'true');
+  h.assert('dataA field', String(session.outIncludes(interp, 'dataA:')), 'true');
+});
+
+reg(2155, 'protocol-ext', 'tentative F3 — parsed:typeA:dataA field access', function(h, session) {
+  const pkt = '101' + '1101' + '00';
+  const src = INLINE_PARSE_VIEW + `
+5wire parsed = .pvTest { data = ${pkt} }
+2wire dataA = parsed:typeA:dataA`;
+  const { interp } = session.run(src);
+  h.assert('dataA bits', session.getWire(interp, 'dataA'), '00');
+});
+
+reg(2156, 'protocol-ext', 'doc(inline.protocol) — tentative sections + parseView', function(h, session) {
+  const out = session.runDoc('doc(inline.protocol)');
+  h.assert('tentative', String(out.some(l => l.includes('tentative sections') || l.includes('foo?'))), 'true');
+  h.assert('parseView', String(out.some(l => l.includes('parseView'))), 'true');
+  h.assert('rest', String(out.some(l => l.includes('rest -Nb') || l.includes('rest ~'))), 'true');
+});
+
 const INLINE_OR2 = `inline [lut] .or2:
   depth: 1
   length: 4
