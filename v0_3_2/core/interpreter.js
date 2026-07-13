@@ -4181,6 +4181,26 @@ class Interpreter {
     return lines;
   }
 
+  _formatShowParseViewFieldView(atom, wire, part, isPeek) {
+    if (!wire || wire.parseViewId == null || !atom) return null;
+    const path = atom.schemaFieldPath && atom.schemaFieldPath.length
+      ? atom.schemaFieldPath.slice()
+      : (atom.schemaField ? [atom.schemaField] : []);
+    if (!path.length) return null;
+    const view = this.parseViews.get(wire.parseViewId);
+    const fn = typeof formatParseViewSectionShow === 'function' ? formatParseViewSectionShow : null;
+    if (!view || !fn) return null;
+    try {
+      let refStr = null;
+      if (part && part.ref) refStr = part.ref;
+      const text = fn(view, path, atom.var, part && part.bitWidth, refStr);
+      if (!text) return null;
+      return text.split('\n');
+    } catch (err) {
+      throw err;
+    }
+  }
+
   _formatShowSchemaFieldView(part, wire, atom, opts, isPeek) {
     const SS = this._semanticSchemas();
     if (!SS || !wire || !part || (opts && opts.schemaSuppress)) return null;
@@ -8560,6 +8580,16 @@ if (this.isBuiltinDEMUX(name)) {
         const schemaWire = this.wires.get(e[0].var);
         const part0 = r[0];
         if (schemaWire && part0) {
+          try {
+            const pvLines = this._formatShowParseViewFieldView(e[0], schemaWire, part0, isPeek);
+            if (pvLines && pvLines.length) {
+              for (const sl of pvLines) this.out.push(sl);
+              continue;
+            }
+          } catch (err) {
+            this.reportRuntimeError(err);
+            continue;
+          }
           try {
             const nestedLines = this._formatShowSchemaFieldView(part0, schemaWire, e[0], opts, isPeek);
             if (nestedLines && nestedLines.length) {

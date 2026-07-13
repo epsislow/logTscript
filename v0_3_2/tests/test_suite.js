@@ -21416,6 +21416,30 @@ reg(2303, 'semantic-schemas', 'schema array layout matches wire vector model A',
   h.assert('bank:0 eq pkt:slots:0', session.getWire(session.interp, 'b0'), session.getWire(session.interp, 'p0'));
 });
 
+reg(2304, 'protocol-ext', 'parseView repeated section slice show and read', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  const src = INLINE_REPEAT_PV + `
+16wire parsed = .repeatPv { data = ${pkt} }
+8wire k0 = parsed:packet:0:kind
+8wire k1 = parsed:packet:1:kind
+16wire all = parsed:packet`;
+  const { interp, out } = session.run(src + '\nshow(parsed:packet)');
+  h.assert('kind0', session.getWire(interp, 'k0'), '11110000');
+  h.assert('kind1', session.getWire(interp, 'k1'), '00001111');
+  h.assert('slice concat', session.getWire(interp, 'all'), pkt);
+  h.assert('show header', String(out.some((l) => l.includes('parsed:packet (16bit)'))), 'true');
+  h.assert('show packet0', String(out.some((l) => l.includes('packet[0]'))), 'true');
+  h.assert('show packet1', String(out.some((l) => l.includes('packet[1]'))), 'true');
+});
+
+reg(2305, 'protocol-ext', 'parseView repeated section field needs index', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  const out = session.runDoc(INLINE_REPEAT_PV + `
+16wire parsed = .repeatPv { data = ${pkt} }
+8wire bad = parsed:packet:kind`);
+  h.assert('ambiguous error', String(out.some((l) => l.includes('ambiguous under repeated section'))), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

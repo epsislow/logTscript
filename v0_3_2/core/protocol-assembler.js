@@ -1870,6 +1870,40 @@ function resolveParseViewPath(view, pathParts) {
   throw new Error(`parseView: could not resolve '${pathParts.join(':')}'`);
 }
 
+function listParseViewChildrenByName(node, part) {
+  return (node.children || []).filter(c => c.name === part);
+}
+
+function aggregateParseViewIndexedSection(indexed) {
+  const sorted = indexed.slice().sort((a, b) => a.index - b.index);
+  const width = sorted.reduce((sum, c) => sum + (c.width || 0), 0);
+  const offset = sorted[0].offset || 0;
+  return {
+    repeatedSection: sorted[0].name,
+    repeatedChildren: sorted,
+    offset,
+    width,
+  };
+}
+
+function appendParseViewChildLines(lines, children, indent) {
+  for (const ch of children || []) {
+    if (!ch.name) continue;
+    const label = ch.index !== undefined && ch.index !== null ? `${ch.name}[${ch.index}]` : ch.name;
+    if (!ch.width) {
+      lines.push(`${indent}${label} = empty (0bit)`);
+    } else {
+      lines.push(`${indent}${label}`);
+      if (ch.fields) {
+        for (const [k, v] of Object.entries(ch.fields)) {
+          if (v !== undefined && v !== null) lines.push(`${indent}     ${k}: ${v}`);
+        }
+      }
+      appendParseViewChildLines(lines, ch.children, indent + '     ');
+    }
+  }
+}
+
 function findParseViewChild(node, part, nextPart) {
   if (/^\d+$/.test(part)) {
     const index = parseInt(part, 10);
@@ -1901,11 +1935,36 @@ function resolveParseViewSlice(view, pathParts) {
       return { fieldBits: bits };
     }
     const nextPart = i + 1 < pathParts.length ? pathParts[i + 1] : null;
+    if (i === pathParts.length - 1) {
+      const siblings = listParseViewChildrenByName(node, part);
+      if (!siblings.length) {
+        throw new Error(`parseView: field '${part}' is not present`);
+      }
+      const indexed = siblings.filter(c => c.index != null);
+      if (indexed.length) {
+        return aggregateParseViewIndexedSection(indexed);
+      }
+      if (siblings.length > 1) {
+        throw new Error(`parseView: field '${part}' is ambiguous; use numeric index`);
+      }
+      const only = siblings[0];
+      if (!only.width) {
+        throw new Error(`parseView: field '${pathParts.join(':')}' has no bits`);
+      }
+      return { offset: only.offset || 0, width: only.width };
+    }
     let child = findParseViewChild(node, part, nextPart);
     if (child && nextPart != null && /^\d+$/.test(nextPart) && child.index === parseInt(nextPart, 10)) {
       i++;
     }
     if (!child) {
+      const siblings = listParseViewChildrenByName(node, part);
+      const indexed = siblings.filter(c => c.index != null);
+      if (indexed.length > 1 && nextPart && !/^\d+$/.test(nextPart)) {
+        throw new Error(
+          `parseView: field '${nextPart}' is ambiguous under repeated section '${part}'; use ${part}:<index>:${nextPart}`
+        );
+      }
       throw new Error(`parseView: field '${part}' is not present`);
     }
     if (i === pathParts.length - 1) {
@@ -1919,6 +1978,18 @@ function resolveParseViewSlice(view, pathParts) {
   throw new Error(`parseView: could not resolve '${pathParts.join(':')}'`);
 }
 
+function formatParseViewSectionShow(view, pathParts, wireName, bitWidth, refStr) {
+  const slice = resolveParseViewSlice(view, pathParts);
+  if (!slice.repeatedChildren || !slice.repeatedChildren.length) return null;
+  const lines = [];
+  const pathLabel = pathParts.join(':');
+  const headerName = wireName ? `${wireName}:${pathLabel}` : pathLabel;
+  const bw = bitWidth != null ? bitWidth : slice.width;
+  lines.push(`${headerName} (${bw}bit)${refStr ? ` (ref: ${refStr})` : ''}`);
+  appendParseViewChildLines(lines, slice.repeatedChildren, '  ');
+  return lines.join('\n');
+}
+
 function formatParseViewShow(view, wireName, bitWidth, refStr) {
   const lines = [];
   const bw = bitWidth != null ? bitWidth : (view.blobWidth || 0);
@@ -1928,24 +1999,7 @@ function formatParseViewShow(view, wireName, bitWidth, refStr) {
       if (v !== undefined && v !== null) lines.push(`  ${k} = ${v}`);
     }
   }
-  function walkChildren(children, indent) {
-    for (const ch of children || []) {
-      if (!ch.name) continue;
-      const label = ch.index !== undefined && ch.index !== null ? `${ch.name}[${ch.index}]` : ch.name;
-      if (!ch.width) {
-        lines.push(`${indent}${label} = empty (0bit)`);
-      } else {
-        lines.push(`${indent}${label}`);
-        if (ch.fields) {
-          for (const [k, v] of Object.entries(ch.fields)) {
-            if (v !== undefined && v !== null) lines.push(`${indent}     ${k}: ${v}`);
-          }
-        }
-        walkChildren(ch.children, indent + '     ');
-      }
-    }
-  }
-  walkChildren(view.children, '  ');
+  appendParseViewChildLines(lines, view.children, '  ');
   return lines.join('\n');
 }
 
@@ -1966,6 +2020,7 @@ const protocolAssemblerExports = {
   formatProtocolTypeDoc,
   resolveParseViewSlice,
   formatParseViewShow,
+  formatParseViewSectionShow,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = protocolAssemblerExports;

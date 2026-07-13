@@ -1,6 +1,6 @@
 /* ================= EDITOR & TABS ================= */
 
-const maxTabs = 30;
+const maxTabs = 50;
 const TABS_STORAGE_KEY = 'prog/tabs';
 const TABS_DISPLAY_MODE_KEY = 'prog/tabsDisplayMode';
 const TABS_DISPLAY_MODES = ['all', '1line', 'grid'];

@@ -146,6 +146,15 @@ Payload: `10100101` (8 bits). Footer `1111` delimits the repeat region.
 
 With `parseView: tree`, repeated sections appear as `packet[0]`, `packet[1]`, … in `show(parsed)`.
 
+**Repeated section slice** — `parsed:packet` (no index) aggregates **all** instances in order:
+
+| Form | Meaning |
+|------|---------|
+| `16wire all = parsed:packet` | Concatenated bits of every `packet[i]` |
+| `show(parsed:packet)` | Header + tree per `packet[0]`, `packet[1]`, … |
+| `parsed:packet:0:kind` | One indexed instance (unchanged) |
+| `parsed:packet:kind` | **Error** — ambiguous; use `:0:kind` |
+
 Flat `ParseFields` keeps the **last** iteration per field name; full history lives in parseView only.
 
 ---
