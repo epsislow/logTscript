@@ -10780,6 +10780,7 @@ if (s.assignment) {
         if (toPending) {
           outputs.push([wireName, wireValue]);
           this._syncAsmModuleMeta(wire, exprResult);
+          this._syncParseViewMeta(wire, exprResult);
         } else if (s.assignment.busEnable && this.zstate && this.deferWirePropagation()) {
           this.queueWireContribution(wireName, wireValue);
         } else {
@@ -10805,6 +10806,7 @@ if (s.assignment) {
           }
           wire.ref = `&${storageIdx}`;
           this._syncAsmModuleMeta(wire, exprResult);
+          this._syncParseViewMeta(wire, exprResult);
           this._emitProbeForWire(wireName, wireValue);
         }
       } catch(e){
@@ -10888,6 +10890,7 @@ if (s.assignment) {
       if (toPending) {
         outputs.push([d.name, wireValue || '0'.repeat(bits)]);
         this._syncAsmModuleMeta(d.name, exprResult);
+        this._syncParseViewMeta(d.name, exprResult);
       } else {
         let storageIdx;
         if(this.wireStorageMap.has(d.name)){
@@ -10914,8 +10917,10 @@ if (s.assignment) {
           else delete existing.vector;
           if (d.schemaRef) existing.schemaRef = wireEntry.schemaRef;
           this._syncAsmModuleMeta(existing, exprResult);
+          this._syncParseViewMeta(existing, exprResult);
         } else {
           this._syncAsmModuleMeta(wireEntry, exprResult);
+          this._syncParseViewMeta(wireEntry, exprResult);
           this.wires.set(d.name, wireEntry);
         }
         this._emitProbeForWire(d.name, wireValue || '0'.repeat(bits));

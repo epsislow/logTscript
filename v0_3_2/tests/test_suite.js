@@ -21440,6 +21440,19 @@ reg(2305, 'protocol-ext', 'parseView repeated section field needs index', functi
   h.assert('ambiguous error', String(out.some((l) => l.includes('ambiguous under repeated section'))), 'true');
 });
 
+reg(2306, 'protocol-ext', 'parseView repeat show (wave)', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  const src = INLINE_REPEAT_PV + `
+16wire parsed = .repeatPv { data = ${pkt} }`;
+  const { interp, out } = session.run(src + '\nshow(parsed)');
+  const wire = interp.wires.get('parsed');
+  h.assert('parseViewId', wire && wire.parseViewId != null ? 'set' : 'missing', 'set');
+  h.assert('value', session.getWire(interp, 'parsed'), pkt);
+  h.assert('show packet0', String(out.some((l) => l.includes('packet[0]'))), 'true');
+  h.assert('show packet1', String(out.some((l) => l.includes('packet[1]'))), 'true');
+  h.assert('not flat only', String(out.some((l) => l.includes('kind'))), 'true');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,
