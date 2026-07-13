@@ -50,7 +50,7 @@ isProject: false
 |--------------|------------|----------------------|
 | Faza 5 protocol (5a–5c) | [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) | **Prerequisit îndeplinit** ✅ — repetare secțiuni + parseView; **nu se modifică** în Faza 6 |
 | Faza 8–9 protocol | același plan | **Independent** — literali protocol + JSON subset; deja livrate |
-| Doc split protocol | [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) | **Opțional, paralel** — split rămas `protocol.md` / `protocol-lut.md`; **nu blochează** Faza 6 |
+| Doc split protocol | [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) | **Livrată ✅** — hub ~236 linii + `protocol-assemble.md` + `protocol-lut.md`; parse/tentative/repeat/json deja existente |
 
 ### Ce înseamnă propoziția despre ordine
 

@@ -4,7 +4,7 @@ Define reusable logic with **`def`**, then call it like a built-in function: `na
 
 User functions complement the built-in catalogue ([builtin-functions.md](builtin-functions.md)). Use `doc(def)` to list all names, or `doc(myFunc)` for one signature.
 
-> **Not the same as protocol `def`.** Inside `inline [protocol]`, `def` names a local bit segment ([protocol.md](protocol.md#def--local-segments)). This page is about **script-level** `def name(type param, …):`.
+> **Not the same as protocol `def`.** Inside `inline [protocol]`, `def` names a local bit segment ([protocol-assemble.md](protocol-assemble.md#def--local-segments)). This page is about **script-level** `def name(type param, …):`.
 
 ---
 
@@ -307,4 +307,4 @@ doc(add4)
 - [short-notation.md](short-notation.md) — `` `…` `` inside return lines
 - [pcb.md](pcb.md) — calling `def` from PCB bodies
 - [board.md](board.md) / [chip.md](chip.md) — `def` not allowed inside composite bodies
-- [protocol.md](protocol.md) — protocol-local `def` (different feature)
+- [protocol-assemble.md](protocol-assemble.md) — protocol-local `def` (different feature)

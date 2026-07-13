@@ -143,7 +143,7 @@ At parse time every value is checked: no codeword may be a prefix of another.
 | Attribute | `prefixFree` (no value) |
 | Values | Variable-length binary codewords |
 | Lookup | `.name(in = addr)` — encode key → codeword |
-| Reverse in protocol | `collapse(data, .name, keyWidth)` — greedy decode; see [protocol.md — expand / collapse](protocol.md#expand--collapse-with-lut) |
+| Reverse in protocol | `collapse(data, .name, keyWidth)` — greedy decode; see [protocol-lut.md — expand / collapse](protocol-lut.md#expand--collapse-with-lut) |
 
 For a full encode → packet → decode walkthrough (`.huff`, `.huffPacket`, `.huffRecover`), see **[huffman.md](huffman.md)**.
 
@@ -373,7 +373,7 @@ Value label `GREEN` (`10`) maps to key **`RED`** (`00`).
 | `LUT decode failed: value ... does not exist` | Value not in table |
 | `LUT decode failed: match index N exceeds available matches (M)` | Invalid `matchIndex` |
 
-Protocol reverse transform: [protocol.md — `:decode()`](protocol.md#decodechannels). ASM disassembly: [asm.md — `:decode()`](asm.md#decodeinstruction).
+Protocol reverse transform: [protocol-assemble.md — `:decode()`](protocol-assemble.md#decodechannels). ASM disassembly: [asm.md — `:decode()`](asm.md#decodeinstruction).
 
 ---
 
@@ -1284,7 +1284,8 @@ On [14seg](14seg.md), pin `data` (15 bits) accepts the full LUT output in one as
 - [boolean-lut.md](boolean-lut.md) — `lutOf` / `exprOfLut` (generate or reverse boolean LUTs from expressions)
 - [boolean-analysis.md](boolean-analysis.md) — `truthTableOf`, `simplify`, `equivalent`, `inputsOf`, `costOf`
 - [huffman.md](huffman.md) — end-to-end Huffman example (`prefixFree` + `expand` / `collapse`)
-- [protocol.md](protocol.md) — `expand` / `collapse` with LUT; `:decode()` on channels
+- [protocol-lut.md](protocol-lut.md) — `expand` / `collapse` with LUT
+- [protocol-assemble.md](protocol-assemble.md) — `:decode()` on channels
 - [seven-seg.md](seven-seg.md), [14seg.md](14seg.md) — display decode examples (hex 0–F LUT)
 - [mem.md](mem.md) — sequential RAM
 - [asm.md](asm.md) — inline assembler (blob into `mem`)

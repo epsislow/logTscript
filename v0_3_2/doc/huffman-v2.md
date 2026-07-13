@@ -677,7 +677,7 @@ Four tokens `00` `01` `10` `11` → payload 9 bits + 8-bit length = **17** bits 
 - **`on:1 { once, … }`** or **`on:raise`** for one-shot LUT writes. Bare `1wire _ = .lut:add(…)` at top level can run **twice** on the first Run in wave — see [conditional-assignment.md](conditional-assignment.md).
 - **`NEXT(~)`** in wave only recomputes wires in the `~` / `%` / `$` closure — counters, `.freq` entries, and writable LUT state **persist** between steps ([signal-propagation.md](signal-propagation.md)).
 - **Declarative wires** that read component outputs (`.idx:get`, `.heap:size()`, `.links:get(…)`) are **re-evaluated** when those components mutate — no manual refresh for typical Huffman FSM wiring (tests **2125–2127**).
-- **Post-run scripts:** test harness `execStmts` re-parses statements against the live interpreter, seeds inline kinds (protocol vs asm), and calls `propagate()` on wave sessions — use for FSM walk + `.huffPacket` encode after ticks (tests **2116**, **2117**, **2128**). See [protocol.md — execStmts](protocol.md#execstmts-secondary-parse).
+- **Post-run scripts:** test harness `execStmts` re-parses statements against the live interpreter, seeds inline kinds (protocol vs asm), and calls `propagate()` on wave sessions — use for FSM walk + `.huffPacket` encode after ticks (tests **2116**, **2117**, **2128**). See [protocol-parse.md — execStmts](protocol-parse.md#execstmts-secondary-parse).
 
 ---
 
@@ -947,7 +947,7 @@ show(packet)
 
 Decode = **protocol separat** with `mode: parse` — **not** `:decode()` on the encoder.
 
-Explicație detaliată (`stream` vs `data`, cursor, exemplu runnable): [protocol.md — Complex example `.huffRecoverSC`](protocol.md#complex-example--huffman-self-contained-recover-huffrecoversc).
+Explicație detaliată (`stream` vs `data`, cursor, exemplu runnable): [protocol-parse.md — `.huffRecoverSC`](protocol-parse.md#complex-example--huffrecoversc) și [huffman-v2.md — Packet SC](huffman-v2.md#recover--huffrecoversc-faza-3).
 
 ```logts
 inline [protocol] .huffRecoverSC:
@@ -1110,7 +1110,7 @@ huffSz (8wire) = 00000011 (ref: &5)
 | `.huffRecoverSC` | Recover — parse wire, rebuild `.huff`, decode payload |
 | `:decode()` | **Not used** for SC packets |
 
-See [protocol.md](protocol.md) — Faza 0a–0d (`mode: parse`, `withLength`, `keyWidth b`, `checksum`).
+See [protocol-parse.md](protocol-parse.md) — Faza 0a–0d (`mode: parse`, `withLength`, `keyWidth b`, `checksum`).
 
 ---
 
@@ -1157,7 +1157,8 @@ See [protocol.md](protocol.md) — Faza 0a–0d (`mode: parse`, `withLength`, `k
 - [counter.md](counter.md) — index stepping (`write`, `data`, `set`)
 - [oscillator.md](oscillator.md) — periodic clock (tests use `setComp`)
 - [switch.md](switch.md) — manual tick in the editor
-- [protocol.md](protocol.md) — `expand`, `collapse`, `withLength`
+- [protocol-lut.md](protocol-lut.md) — `expand`, `collapse`
+- [protocol-parse.md](protocol-parse.md) — `withLength` parse, `validateChecksum`
 - [signal-propagation.md](signal-propagation.md) — wave + NEXT
 - [assignment-operators.md](assignment-operators.md) — `=:` padding
 - [wire-literals.md](wire-literals.md) — `'Hello World!'` wire strings, `show(w; ascii)`

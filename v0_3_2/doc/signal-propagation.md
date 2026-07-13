@@ -160,7 +160,7 @@ Tests **2125–2127** (Huffman FSM). This replaces manual “stale wire” worka
 
 ### `execStmts` (test harness)
 
-The Node/browser test session exposes `execStmts(interp, src)` to append and run fresh top-level statements against a live interpreter (e.g. after FSM ticks). On **wave** sessions it calls `propagate()` after exec so LUT reads and dependent wires settle. Protocol invocations (`.huffPacket { … }`) work because the parser is seeded with inline kinds from `inlineInstances` — see [protocol.md — execStmts](protocol.md#execstmts-secondary-parse).
+The Node/browser test session exposes `execStmts(interp, src)` to append and run fresh top-level statements against a live interpreter (e.g. after FSM ticks). On **wave** sessions it calls `propagate()` after exec so LUT reads and dependent wires settle. Protocol invocations (`.huffPacket { … }`) work because the parser is seeded with inline kinds from `inlineInstances` — see [protocol-parse.md — execStmts](protocol-parse.md#execstmts-secondary-parse).
 
 ---
 

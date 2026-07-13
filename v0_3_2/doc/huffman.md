@@ -355,7 +355,7 @@ show(encodedLen)
 | `tokenLen` | `00000100` | 4 bits of input tokens |
 | `encodedLen` | `00000011` | 3 bits of compressed payload |
 
-`length(param)` measures the invoke argument; `lengthOf(def)` measures evaluated protocol output. Details: [protocol.md — length / lengthOf](protocol.md#lengthparam-nb-and-lengthofdef-nb).
+`length(param)` measures the invoke argument; `lengthOf(def)` measures evaluated protocol output. Details: [protocol-assemble.md — length / lengthOf](protocol-assemble.md#lengthparam-nb-and-lengthofdef-nb).
 
 ---
 
@@ -365,7 +365,7 @@ show(encodedLen)
 
 `doc(.huffPacket)` shows `width: dynamic`. Assign to a wire wide enough for the largest expected packet, or use runtime width checking with `=`.
 
-See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-width-inferprotocolwidth).
+See [protocol-assemble.md — static vs dynamic width](protocol-assemble.md#static-vs-dynamic-width-inferprotocolwidth).
 
 ---
 
@@ -374,7 +374,7 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 | Topic | Detail |
 |-------|--------|
 | **Key width** | `2b` matches the address width of a 4-entry table. `expand` / `collapse` require the token stream length to be a multiple of `keyWidth`. |
-| **Length field width** | `8b` allows payloads up to 255 bits. Use `16b` for larger frames ([`withLength`](protocol.md#withlengthdata-nb)). |
+| **Length field width** | `8b` allows payloads up to 255 bits. Use `16b` for larger frames ([`withLength`](protocol-assemble.md#withlengthdata-nb)). |
 | **Separate protocols** | Encoder and decoder are independent definitions — swap codebooks or framing without changing the other side's structure. |
 | **Not in scope** | `checksum()`, `concat()`, `padLeft()`, `padRight()` — add framing or integrity in user logic if needed. |
 | **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2114** ([huffman-v2.md](huffman-v2.md) wave pipeline), **2115–2118** (FSM wave + round-trip doc block), **2128** (protocol via `execStmts`). |
@@ -385,5 +385,6 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 
 - [huffman-v2.md](huffman-v2.md) — runtime frequency scan + wave round-trip
 - [lut.md](lut.md) — `variableDepth`, `prefixFree`, LUT invoke
-- [protocol.md](protocol.md) — `def`, `expand`, `collapse`, `length`, `lengthOf`, `withLength`
+- [protocol-assemble.md](protocol-assemble.md) — `def`, `length`, `lengthOf`, `withLength`
+- [protocol-lut.md](protocol-lut.md) — `expand`, `collapse`
 - [assignment-operators.md](assignment-operators.md) — `=`, `=:`, `:=` for dynamic-width wires

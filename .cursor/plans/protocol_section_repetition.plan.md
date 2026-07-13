@@ -25,7 +25,7 @@ todos:
     status: pending
   - id: phase-doc-split
     content: "Faza doc: split protocol.md; toate logts-play migrate + rerulate fără erori"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -670,7 +670,7 @@ flowchart TB
 
 | Moment | Ce |
 |--------|-----|
-| **Faza doc** (opțional, înainte de 5a) | Split `protocol.md` → hub + assemble + parse + tentative + lut (**mutare** conținut existent) |
+| **Faza doc** (opțional, înainte de 5a) | Split `protocol.md` → hub + assemble + parse + tentative + lut (**mutare** conținut existent) — **livrată ✅** |
 | **Faza 5a–5c** | Conținut nou → **`protocol-repeat.md`** (nu înapoi în monolit) |
 | **Faza 8** | Notă literali în `protocol-parse.md` + `protocol-assemble.md` (secțiune scurtă) |
 | **Faza 9** | **`json-subset.md`** — exemplu care *folosește* repeat + tentative + wire-literals |

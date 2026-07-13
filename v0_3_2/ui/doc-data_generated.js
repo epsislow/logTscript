@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -11988,7 +11988,7 @@ Four tokens \`00\` \`01\` \`10\` \`11\` → payload 9 bits + 8-bit length = **17
 - **\`on:1 { once, … }\`** or **\`on:raise\`** for one-shot LUT writes. Bare \`1wire _ = .lut:add(…)\` at top level can run **twice** on the first Run in wave — see [conditional-assignment.md](conditional-assignment.md).
 - **\`NEXT(~)\`** in wave only recomputes wires in the \`~\` / \`%\` / \`$\` closure — counters, \`.freq\` entries, and writable LUT state **persist** between steps ([signal-propagation.md](signal-propagation.md)).
 - **Declarative wires** that read component outputs (\`.idx:get\`, \`.heap:size()\`, \`.links:get(…)\`) are **re-evaluated** when those components mutate — no manual refresh for typical Huffman FSM wiring (tests **2125–2127**).
-- **Post-run scripts:** test harness \`execStmts\` re-parses statements against the live interpreter, seeds inline kinds (protocol vs asm), and calls \`propagate()\` on wave sessions — use for FSM walk + \`.huffPacket\` encode after ticks (tests **2116**, **2117**, **2128**). See [protocol.md — execStmts](protocol.md#execstmts-secondary-parse).
+- **Post-run scripts:** test harness \`execStmts\` re-parses statements against the live interpreter, seeds inline kinds (protocol vs asm), and calls \`propagate()\` on wave sessions — use for FSM walk + \`.huffPacket\` encode after ticks (tests **2116**, **2117**, **2128**). See [protocol-parse.md — execStmts](protocol-parse.md#execstmts-secondary-parse).
 
 ---
 
@@ -12258,7 +12258,7 @@ show(packet)
 
 Decode = **protocol separat** with \`mode: parse\` — **not** \`:decode()\` on the encoder.
 
-Explicație detaliată (\`stream\` vs \`data\`, cursor, exemplu runnable): [protocol.md — Complex example \`.huffRecoverSC\`](protocol.md#complex-example--huffman-self-contained-recover-huffrecoversc).
+Explicație detaliată (\`stream\` vs \`data\`, cursor, exemplu runnable): [protocol-parse.md — \`.huffRecoverSC\`](protocol-parse.md#complex-example--huffrecoversc) și [huffman-v2.md — Packet SC](huffman-v2.md#recover--huffrecoversc-faza-3).
 
 \`\`\`logts
 inline [protocol] .huffRecoverSC:
@@ -12421,7 +12421,7 @@ huffSz (8wire) = 00000011 (ref: &5)
 | \`.huffRecoverSC\` | Recover — parse wire, rebuild \`.huff\`, decode payload |
 | \`:decode()\` | **Not used** for SC packets |
 
-See [protocol.md](protocol.md) — Faza 0a–0d (\`mode: parse\`, \`withLength\`, \`keyWidth b\`, \`checksum\`).
+See [protocol-parse.md](protocol-parse.md) — Faza 0a–0d (\`mode: parse\`, \`withLength\`, \`keyWidth b\`, \`checksum\`).
 
 ---
 
@@ -12468,7 +12468,8 @@ See [protocol.md](protocol.md) — Faza 0a–0d (\`mode: parse\`, \`withLength\`
 - [counter.md](counter.md) — index stepping (\`write\`, \`data\`, \`set\`)
 - [oscillator.md](oscillator.md) — periodic clock (tests use \`setComp\`)
 - [switch.md](switch.md) — manual tick in the editor
-- [protocol.md](protocol.md) — \`expand\`, \`collapse\`, \`withLength\`
+- [protocol-lut.md](protocol-lut.md) — \`expand\`, \`collapse\`
+- [protocol-parse.md](protocol-parse.md) — \`withLength\` parse, \`validateChecksum\`
 - [signal-propagation.md](signal-propagation.md) — wave + NEXT
 - [assignment-operators.md](assignment-operators.md) — \`=:\` padding
 - [wire-literals.md](wire-literals.md) — \`'Hello World!'\` wire strings, \`show(w; ascii)\`
@@ -12831,7 +12832,7 @@ show(encodedLen)
 | \`tokenLen\` | \`00000100\` | 4 bits of input tokens |
 | \`encodedLen\` | \`00000011\` | 3 bits of compressed payload |
 
-\`length(param)\` measures the invoke argument; \`lengthOf(def)\` measures evaluated protocol output. Details: [protocol.md — length / lengthOf](protocol.md#lengthparam-nb-and-lengthofdef-nb).
+\`length(param)\` measures the invoke argument; \`lengthOf(def)\` measures evaluated protocol output. Details: [protocol-assemble.md — length / lengthOf](protocol-assemble.md#lengthparam-nb-and-lengthofdef-nb).
 
 ---
 
@@ -12841,7 +12842,7 @@ show(encodedLen)
 
 \`doc(.huffPacket)\` shows \`width: dynamic\`. Assign to a wire wide enough for the largest expected packet, or use runtime width checking with \`=\`.
 
-See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-width-inferprotocolwidth).
+See [protocol-assemble.md — static vs dynamic width](protocol-assemble.md#static-vs-dynamic-width-inferprotocolwidth).
 
 ---
 
@@ -12850,7 +12851,7 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 | Topic | Detail |
 |-------|--------|
 | **Key width** | \`2b\` matches the address width of a 4-entry table. \`expand\` / \`collapse\` require the token stream length to be a multiple of \`keyWidth\`. |
-| **Length field width** | \`8b\` allows payloads up to 255 bits. Use \`16b\` for larger frames ([\`withLength\`](protocol.md#withlengthdata-nb)). |
+| **Length field width** | \`8b\` allows payloads up to 255 bits. Use \`16b\` for larger frames ([\`withLength\`](protocol-assemble.md#withlengthdata-nb)). |
 | **Separate protocols** | Encoder and decoder are independent definitions — swap codebooks or framing without changing the other side's structure. |
 | **Not in scope** | \`checksum()\`, \`concat()\`, \`padLeft()\`, \`padRight()\` — add framing or integrity in user logic if needed. |
 | **Tests** | Suite IDs 1069–1074 (LUT), 1078–1086 (protocol round-trip), **2104–2114** ([huffman-v2.md](huffman-v2.md) wave pipeline), **2115–2118** (FSM wave + round-trip doc block), **2128** (protocol via \`execStmts\`). |
@@ -12861,7 +12862,8 @@ See [protocol.md — static vs dynamic width](protocol.md#static-vs-dynamic-widt
 
 - [huffman-v2.md](huffman-v2.md) — runtime frequency scan + wave round-trip
 - [lut.md](lut.md) — \`variableDepth\`, \`prefixFree\`, LUT invoke
-- [protocol.md](protocol.md) — \`def\`, \`expand\`, \`collapse\`, \`length\`, \`lengthOf\`, \`withLength\`
+- [protocol-assemble.md](protocol-assemble.md) — \`def\`, \`length\`, \`lengthOf\`, \`withLength\`
+- [protocol-lut.md](protocol-lut.md) — \`expand\`, \`collapse\`
 - [assignment-operators.md](assignment-operators.md) — \`=\`, \`=:\`, \`:=\` for dynamic-width wires
 `,
     'interactive-components.md': `# Interactive components
@@ -15077,7 +15079,7 @@ At parse time every value is checked: no codeword may be a prefix of another.
 | Attribute | \`prefixFree\` (no value) |
 | Values | Variable-length binary codewords |
 | Lookup | \`.name(in = addr)\` — encode key → codeword |
-| Reverse in protocol | \`collapse(data, .name, keyWidth)\` — greedy decode; see [protocol.md — expand / collapse](protocol.md#expand--collapse-with-lut) |
+| Reverse in protocol | \`collapse(data, .name, keyWidth)\` — greedy decode; see [protocol-lut.md — expand / collapse](protocol-lut.md#expand--collapse-with-lut) |
 
 For a full encode → packet → decode walkthrough (\`.huff\`, \`.huffPacket\`, \`.huffRecover\`), see **[huffman.md](huffman.md)**.
 
@@ -15307,7 +15309,7 @@ Value label \`GREEN\` (\`10\`) maps to key **\`RED\`** (\`00\`).
 | \`LUT decode failed: value ... does not exist\` | Value not in table |
 | \`LUT decode failed: match index N exceeds available matches (M)\` | Invalid \`matchIndex\` |
 
-Protocol reverse transform: [protocol.md — \`:decode()\`](protocol.md#decodechannels). ASM disassembly: [asm.md — \`:decode()\`](asm.md#decodeinstruction).
+Protocol reverse transform: [protocol-assemble.md — \`:decode()\`](protocol-assemble.md#decodechannels). ASM disassembly: [asm.md — \`:decode()\`](asm.md#decodeinstruction).
 
 ---
 
@@ -16218,7 +16220,8 @@ On [14seg](14seg.md), pin \`data\` (15 bits) accepts the full LUT output in one 
 - [boolean-lut.md](boolean-lut.md) — \`lutOf\` / \`exprOfLut\` (generate or reverse boolean LUTs from expressions)
 - [boolean-analysis.md](boolean-analysis.md) — \`truthTableOf\`, \`simplify\`, \`equivalent\`, \`inputsOf\`, \`costOf\`
 - [huffman.md](huffman.md) — end-to-end Huffman example (\`prefixFree\` + \`expand\` / \`collapse\`)
-- [protocol.md](protocol.md) — \`expand\` / \`collapse\` with LUT; \`:decode()\` on channels
+- [protocol-lut.md](protocol-lut.md) — \`expand\` / \`collapse\` with LUT
+- [protocol-assemble.md](protocol-assemble.md) — \`:decode()\` on channels
 - [seven-seg.md](seven-seg.md), [14seg.md](14seg.md) — display decode examples (hex 0–F LUT)
 - [mem.md](mem.md) — sequential RAM
 - [asm.md](asm.md) — inline assembler (blob into \`mem\`)
@@ -19617,428 +19620,11 @@ After **Load & Run**: focus **Digits**, type \`12\`, click **\`+\`** — termina
 - [number-conversion.md](number-conversion.md) — \`N2N10S\` / \`N10S2N\` alternative display
 - [mini-cpu-v2.md](mini-cpu-v2.md) — similar doc layout with **Load & Run** runnable block
 `,
-    'protocol-parse.md': `# Protocol — \`mode: parse\`
+    'protocol-assemble.md': `# Protocol — assemble (encode)
 
-Sequential **field extraction** from a bitstream. The parse cursor walks \`data\` (or \`stream\`) and verifies literals, reads fields, and optionally builds a **parseView** tree.
+Build bitstreams from named parameters. Default \`mode: assemble\` (implicit).
 
-Hub: [protocol.md](protocol.md). Related: [protocol-tentative.md](protocol-tentative.md), [protocol-repeat.md](protocol-repeat.md).
-
----
-
-## Invoke
-
-\`\`\`logts-play legacy
-inline [protocol] .parseHdr:
-  mode: parse
-  out:
-    magic 8b
-    len 16b
-  :
-
-24wire out = .parseHdr { data = 01001000 + 00000000 + 00010000 }
-show(out)
-\`\`\`
-
-| Parameter | Role |
-|-----------|------|
-| \`data\` | Full packet bitstream (default) |
-| \`stream\` | Alias for \`data\` in some generators |
-
-Output wire width may be **dynamic** when sections repeat or use \`rest ~\`. Use \`=:\` when the declared wire is wider than extracted fields.
-
----
-
-## Literals vs fields
-
-| Line in \`def\` / \`out\` | Parse behaviour |
-|-----------------------|-----------------|
-| \`0101\` | Verify bits; **not** in output blob |
-| \`kind 8b\` | Read 8 bits into field \`kind\`; **in** output blob |
-| \`rest ~\` | Consume all remaining bits (last segment only) |
-| \`rest -4b\` | Consume \`remaining − 4\`, leave footer |
-
----
-
-## Wire literals in parse protocol
-
-Protocol lines accept a **subset** of [wire-literals.md](wire-literals.md):
-
-| Form | Example | Notes |
-|------|---------|-------|
-| Binary | \`01010101\` | as today |
-| Wire string | \`"true"\`, \`"{"\`, \`'x'\` | 8 bits per character |
-| Decimal pad | \`\\123;8\` | unsigned, fixed width |
-| Hex pad | \`^7B;8\` | pad to width |
-| Hex short | \`^7B\` | minimal width (no pad) |
-| Decimal short | \`\\10\` | minimal unsigned width |
-
-\`\`\`logts-play legacy
-inline [protocol] .litDemo:
-  mode: parse
-  out:
-    "Hi"
-  :
-
-16wire chk =: .litDemo { data = 01001000 + 01101001 }
-show(chk)
-\`\`\`
-
-Use **local \`def\` wrappers** for tentative string choice (\`trueLit?\` / \`falseLit?\`) — literal lines cannot take \`?\` directly.
-
----
-
-## Attributes (parse)
-
-| Attribute | Values | Purpose |
-|-----------|--------|---------|
-| \`parseView\` | \`tree\`, \`true\` | Structured \`show()\` + \`wire:section:field\` access |
-| \`parseResult\` | \`all\`, \`collapseOnly\` | Include/exclude collapse payload in output |
-| \`codebookLoad\` | \`.lutName\` | Load LUT from embedded codebook during parse |
-
----
-
-## Section repeat
-
-For \`packet[n]\`, \`packet*\`, anchor footers, and \`parsed:packet:0:field\`, see **[protocol-repeat.md](protocol-repeat.md)**.
-`,
-    'protocol-repeat.md': `# Protocol — section repetition
-
-Repeat local \`def\` sections in **\`mode: parse\`** protocols. Syntax attaches to the section name (not to individual fields).
-
-Requires [\`mode: parse\`](protocol.md#mode-parse--sequential-field-extraction). For optional branches without repeat counts, see tentative \`?\` in [protocol.md](protocol.md#tentative-sections).
-
----
-
-## Syntax
-
-| Form | Meaning |
-|------|---------|
-| \`packet[3]\` | exactly 3 times |
-| \`packet[1-3]\` | between 1 and 3 (greedy: try max first) |
-| \`packet[0-]\` | zero or more until anchor or EOF |
-| \`packet*\` | sugar for \`packet[0-]\` |
-| \`packet+\` | sugar for \`packet[1-]\` |
-| \`data1[1-3]?\` | tentative choice branch with its own repeat |
-
-Invalid: \`[-]\`, \`[-3]\`, \`*?\`, \`+?\`, \`name?[3]\` (\`?\` must follow the repeat spec).
-
----
-
-## Exact repeat — \`packet[2]\`
-
-\`\`\`logts-play legacy
-inline [protocol] .repeatExact:
-  mode: parse
-  def packet:
-    kind 8b
-  out:
-    packet[2]
-  :
-
-16wire out = .repeatExact { data = 10101010 + 11001100 }
-show(out)
-\`\`\`
-
----
-
-## Bounded range — greedy max-first
-
-\`packet[1-2]\` accepts one or two packets; the parser tries two first.
-
-\`\`\`logts-play legacy
-inline [protocol] .repeatPv:
-  mode: parse
-  parseView: tree
-  def packet:
-    kind 8b
-  out:
-    packet[1-2]
-  :
-
-16wire parsed = .repeatPv { data = 11110000 + 00001111 }
-8wire k0 = parsed:packet:0:kind
-8wire k1 = parsed:packet:1:kind
-show(k0)
-show(k1)
-\`\`\`
-
-parseView indexes are **0-based** (\`packet[0]\` in \`show\`, \`parsed:packet:0:kind\` in field access).
-
----
-
-## Composing with tentative
-
-Different repeat specs per choice branch:
-
-\`\`\`logts-play legacy
-inline [protocol] .repeatChoice:
-  mode: parse
-  def data1:
-    kind 8b
-  def data2:
-    idx 3b
-    1
-    short 4b
-  out:
-    data1[1-2]?
-    data2[2]?
-  :
-
-16wire a = .repeatChoice { data = 11111111 + 00000000 }
-16wire b = .repeatChoice { data = 10110101 + 10110101 }
-show(a)
-show(b)
-\`\`\`
-
-| Pattern | Mechanism |
-|---------|-----------|
-| \`foo?\` | optional **choice** branch — 0 or 1 alternative in a group |
-| \`foo[0-1]\` | **sequential** optional — 0 or 1 occurrence, independent of other sections |
-| \`data1[1-3]?\` | choice + repeat on that branch |
-
-### Sequential \`[0-1]\` — independent optionals
-
-Unlike \`?\` choice groups, each \`[0-1]\` section is parsed **in order** and may be omitted independently:
-
-\`\`\`logts-play legacy
-inline [protocol] .seq01:
-  mode: parse
-  def dataA:
-    x 4b
-  def dataB:
-    y 4b
-  def dataC:
-    z 4b
-  out:
-    dataA[0-1]
-    dataB[0-1]
-    dataC[0-1]
-  :
-
-8wire out = .seq01 { data = 1010 + 0101 }
-show(out)
-\`\`\`
-
-See also [protocol-tentative.md](protocol-tentative.md) for the full \`?\` vs \`[0-1]\` table.
-
----
-
-## Anchor footer — \`cell[0-]\` + literal
-
-Unbounded repeat stops before a mandatory follower on the next line. The anchor literal is consumed from the stream but **not** included in the output wire (delimiter only).
-
-\`\`\`logts-play legacy
-inline [protocol] .repeatAnchor:
-  mode: parse
-  def cell:
-    x 4b
-  out:
-    cell[0-]
-    1111
-  :
-
-8wire out = .repeatAnchor { data = 1010 + 0101 + 1111 }
-show(out)
-\`\`\`
-
-Payload: \`10100101\` (8 bits). Footer \`1111\` delimits the repeat region.
-
----
-
-## parseView tree
-
-With \`parseView: tree\`, repeated sections appear as \`packet[0]\`, \`packet[1]\`, … in \`show(parsed)\`.
-
-Flat \`ParseFields\` keeps the **last** iteration per field name; full history lives in parseView only.
-
----
-
-## Related
-
-- [protocol.md](protocol.md) — hub, \`mode: parse\`, \`rest\`
-- [protocol-tentative.md](protocol-tentative.md) — \`?\` choice vs \`[0-1]\` sequential
-- [json-subset.md](json-subset.md) — JSON cookbook (repeat + tentative + wire-literals)
-`,
-    'protocol-tentative.md': `# Protocol — tentative sections (\`?\`)
-
-**Parse-only.** Tentative sections add **ordered choice** with **backtracking**: try alternatives in order; on failure restore the cursor and parsed fields; **first success wins**.
-
-Hub: [protocol.md](protocol.md). For section repetition (\`packet[1-3]\`, \`*\`, anchor), see [protocol-repeat.md](protocol-repeat.md).
-
----
-
-## Syntax
-
-| Form | Meaning |
-|------|---------|
-| \`foo\` | mandatory \`localRef\` to \`def foo\` |
-| \`foo?\` | tentative \`localRef\` — all branches may fail with **0 bits** |
-| \`foo:\` | mandatory **inline** section (body lines follow) |
-| \`foo?:\` | tentative inline section |
-| \`def foo:\` | declare reusable block — **no \`?\` on \`def\`** |
-
-**Mandatory vs optional at use-site:**
-
-| Invoke | All tentative branches fail |
-|--------|----------------------------|
-| \`ethernet\` | **Error** — \`parse: no matching alternative\` |
-| \`ethernet?\` | **OK** — 0 bits consumed, parsing continues |
-
----
-
-## \`?\` vs \`[0-1]\` vs \`data1[1-3]?\`
-
-| Pattern | Mechanism |
-|---------|-----------|
-| \`foo?\` | **Choice group** — pick at most one branch from adjacent \`?\` items |
-| \`foo[0-1]\` | **Sequential** — 0 or 1 occurrence; not a choice with neighbours |
-| \`data1[1-3]?\` | **Choice + repeat** — whole branch repeats 1–3 times if chosen |
-
-Example: \`dataA[0-1] dataB[0-1]\` may yield A only, B only, both, or neither (four outcomes).  
-\`dataA? dataB?\` picks **at most one** of A or B.
-
-Composed choice + repeat: [protocol-repeat.md — Composing with tentative](protocol-repeat.md#composing-with-tentative).
-
----
-
-## Runnable — L3 dispatch
-
-\`\`\`logts-play legacy
-inline [protocol] .l3inline:
-  mode: parse
-  out:
-    ipv4?:
-      0100
-      src 32b
-      dst 32b
-    ipv6?:
-      0110
-      src 128b
-      dst 128b
-    unknown:
-      rest ~
-  :
-
-64wire out = .l3inline { data = 0100 + repeat(1,32) + repeat(0,32) }
-show(out)
-\`\`\`
-
-Literals verify on wire but **do not** appear in the output blob — only **parse fields** (\`src\`, \`dst\`, …).
-
----
-
-## \`parseView: tree\`
-
-With \`parseView: tree\`, \`show(parsed)\` prints a field tree. Field access: \`parsed:typeA:dataA\` (section names, not numeric index unless repeating — see [protocol-repeat.md](protocol-repeat.md)).
-
-\`\`\`logts-play legacy
-inline [protocol] .pvTest:
-  mode: parse
-  parseView: tree
-  out:
-    magic 3b
-    typeA?:
-      11
-      01
-      dataA 2b
-    unknown:
-      rest ~
-  :
-
-5wire parsed = .pvTest { data = 101110100 }
-2wire dataA = parsed:typeA:dataA
-show(parsed)
-show(dataA)
-\`\`\`
-
----
-
-## \`:decode()\` and tentative
-
-**\`:decode()\` is not supported** on protocols with tentative sections. Use \`{ data = … }\` on a \`mode: parse\` protocol instead.
-
-| Error | Cause |
-|-------|--------|
-| \`tentative sections require mode: parse\` | \`?\` in \`mode: assemble\` |
-| \`Protocol def cannot use '?'\` | \`def foo?:\` at declaration |
-| \`parse: no matching alternative\` | mandatory section, all branches failed |
-| \`Protocol decode does not support tentative sections\` | \`:decode()\` on protocol with \`?\` |
-`,
-    'protocol.md': `# PROTOCOL
-
-A protocol generator. A protocol definition transforms named parameters into one or more fixed-length bit sequences.
-
-Unlike [ASM](asm.md), which generates a single binary blob, a protocol may generate **multiple output channels** (\`tx\`, \`sda\`, \`scl\`, \`mosi\`, etc.).
-
-There is **no panel UI** in v1 — logic only.
-
-### Documentation map
-
-| Topic | Page |
-|-------|------|
-| Assemble, UART/SPI, \`:decode()\` | This page (hub) + sections below |
-| **\`mode: parse\`**, cursor, \`rest\` | [protocol-parse.md](protocol-parse.md) |
-| Tentative \`?\`, choice groups | [protocol-tentative.md](protocol-tentative.md) |
-| Section repeat \`[n]\`, \`*\`, anchor | [protocol-repeat.md](protocol-repeat.md) |
-| \`expand\` / \`collapse\` / Huffman | [protocol-lut.md](protocol-lut.md) · [huffman-v2.md](huffman-v2.md) |
-| JSON subset example | [json-subset.md](json-subset.md) |
-| Wire string literals in protocol | [protocol-parse.md](protocol-parse.md#wire-literals-in-parse-protocol) · [wire-literals.md](wire-literals.md) |
-
----
-
-## Naming rules
-
-| Rule | Example |
-|------|---------|
-| Instance name must start with \`.\` | \`.uart8n1\` ✓ — \`uart8n1\` ✗ |
-| Letters and digits only (no \`_\`) | \`.uart8n1\` ✓ — \`.uart_8n1\` ✗ |
-| Same name at declaration and use | \`inline [protocol] .uart8n1:\` → \`.uart8n1 { … }\` |
-
-Using a protocol without the leading dot is a parse error:
-
-\`\`\`text
-Expected '.' before inline instance name
-(use '.uart8n1' not 'uart8n1')
-\`\`\`
-
----
-
-## Declare vs use
-
-| Step | Syntax |
-|------|--------|
-| Define protocol | \`inline [protocol] .name: … :\` |
-| Assign outputs | \`10wire tx = .uart8n1 { data = ^41 }\` |
-| Assign multiple outputs | \`8wire mosi, 8wire sclk, 8wire cs = .spi { data = ^A5 }\` |
-
-Multi-target assignments may span lines before \`=\`:
-
-\`\`\`logts
-8wire mosi,
-8wire sclk,
-8wire cs
-= .spi { data = ^A5 }
-\`\`\`
-
-Use **\`Nwire\`** for assignable signal wires (same as [ASM](asm.md)). **\`Nbit\`** variables are also supported but are immutable bit values, not wires.
-
-Protocol uses **\`{ }\`** with named parameters (\`data = ^41\`). ASM uses **\`{ }\`** with mnemonics. LUT uses **\`(...)\`** for lookup.
-
-### Runnable — quick start
-
-\`\`\`logts-play
-inline [protocol] .uart8n1:
-  tx:
-    0
-    reverse(data 8b)
-    1
-  :
-
-10wire tx = .uart8n1 { data = ^41 }
-show(tx)
-\`\`\`
-
-Single channel, one parameter — result on wire \`tx\`.
+Hub: [protocol.md](protocol.md). Related: [protocol-parse.md](protocol-parse.md) (decode stream), [protocol-lut.md](protocol-lut.md) (\`expand\` / \`collapse\`), [\`:decode\`](protocol-assemble.md#decodechannels).
 
 ---
 
@@ -20130,9 +19716,9 @@ inline [protocol] .spi:
 
 \`clockType: highFirst\` → \`10101010…\`
 
-\`mode: parse\` — read from invoke param \`data\` / \`stream\` instead of assembling from params. See [\`mode: parse\`](#mode-parse--sequential-field-extraction).
+\`mode: parse\` — read from invoke param \`data\` / \`stream\` instead of assembling from params. See [protocol-parse.md](protocol-parse.md).
 
-\`parseResult\` and \`codebookLoad\` are documented in detail under [Parse-only attributes](#parse-only-attributes).
+\`parseResult\` and \`codebookLoad\` are documented in detail under [Parse-only attributes](protocol-parse.md#parse-only-attributes).
 
 ---
 
@@ -20416,8 +20002,6 @@ show(scl)
 
 Invoke parameters may span multiple lines inside \`{ }\`. sda = 20 data bits; scl = 20-bit \`lowFirst\` clock.
 
----
-
 ## \`:decode(channels...)\`
 
 Reverse a protocol encode: extract parameter values from one or more channel bit strings.
@@ -20622,471 +20206,162 @@ show(out)
 
 First 8 bits = \`00000011\` (length 3); payload = **\`010\`**.
 
-### \`withLength(rest, field b)\` — width from a parsed field
 
-When the length is not a fixed prefix but comes from a field parsed earlier in the same \`def\`, use the field name instead of \`Nb\`:
 
-\`\`\`logts
-def entry:
-  sym 8b
-  cwLen 8b
-  withLength(rest, cwLen b)
-\`\`\`
+Parse-side \`withLength\` variants (\`withLength(rest, field b)\`, \`withLength(stream, Nb, def)\`) — [protocol-parse.md](protocol-parse.md#withlength-parse).
 
-Reads exactly \`cwLen\` bits (value of the \`cwLen\` field) into \`rest\`. No length prefix on the wire.
 
-### \`withLength(data, Nb, def)\` — repeated parse until sub-stream exhausted
+## Static vs dynamic width (\`inferProtocolWidth\`)
 
-In **\`mode: parse\`**, read an \`Nb\`-bit length prefix, then parse \`def\` repeatedly until the sub-stream is consumed. Used for variable-length codebooks (see [huffman-v2.md](huffman-v2.md)).
+At parse time the compiler classifies each protocol instance:
 
-\`\`\`logts-play
-inline [protocol] .parseEntry:
-  mode: parse
-  def entry:
-    sym 8b
-    cwLen 8b
-    withLength(rest, cwLen b)
-  out:
-    withLength(data, 16b, entry)
-  :
-\`\`\`
+| Kind | When | \`doc()\` shows |
+|------|------|---------------|
+| **static** | All segment widths known (fixed params, fixed-depth LUT expand) | \`width: static Nb\` |
+| **dynamic** | Variable params (\`~b\`), \`withLength\`, \`prefixFree\` expand/collapse, or other runtime-sized segments | \`width: dynamic\` |
 
-| Error | Cause |
-|-------|-------|
-| \`withLength: def '...' consumed no bits\` | Empty or malformed entry in repeated parse |
-| \`withLength: def '...' left N bits unconsumed\` | Entry def did not consume full sub-stream |
-| \`parse: field 'cwLen' is not set\` | \`withLength(rest, cwLen b)\` before \`cwLen\` was parsed |
+Dynamic protocols may produce different bit counts per invoke. Assign to a wire wide enough for the maximum case, or rely on runtime width checking with \`=\`.
 
----
-
-## Feature matrix — assemble, \`mode: parse\`, \`:decode\`
-
-Not every generator works in every direction. Use this table when choosing encode vs recover vs \`:decode()\`.
-
-| Segment / generator | \`mode: assemble\` (default) | \`mode: parse\` | \`:decode(channels…)\` |
-|---------------------|----------------------------|---------------|----------------------|
-| Literals \`0\`, \`0101\`, \`^AA\`, \`\\42\` | emit | verify on wire | verify |
-| \`param Nb\` / \`param ~b\` | read from invoke args | **read from cursor** (\`parseField\`) | extract from channel bits |
-| \`def\` + \`localRef\` | compose sub-segments | parse sub-stream | ✗ |
-| \`reverse\`, \`parityEven/Odd\`, \`clock\`, \`repeat\` | ✓ | ✗ (use literals + fields instead) | verify + extract params |
-| \`length(param) Nb\`, \`lengthOf(def) Nb\` | ✓ | ✗ | ✗ |
-| \`withLength(param, Nb)\` | strip length prefix (assemble) | read length prefix + payload | ✗ |
-| \`withLength(param, field b)\` | ✗ | read \`field\`-wide payload | ✗ |
-| \`withLength(stream\\|data, Nb, def)\` | ✗ | framed repeat-parse (\`entry\` loop) | ✗ |
-| \`expand\`, \`collapse\`, \`collapse(withLength(…), …)\` | ✓ | \`collapse\` only (incl. nested \`withLength\`) | ✗ |
-| \`checksum(crc16, def\\|param)\` | append CRC | ✗ | ✗ |
-| \`validateChecksum(crc16, param)\` | ✗ | verify CRC on **full** invoke param | ✗ |
-| Attributes \`codebookLoad\`, \`parseResult\` | ✗ | parse only | ✗ |
-| **\`?\` tentative sections** (\`foo?\`, \`foo?:\`) | ✗ | ordered choice + rollback | ✗ |
-| **Section repeat** (\`packet[n]\`, \`[min-max]\`, \`*\`, \`+\`) | ✗ | repeat \`def\` — see [protocol-repeat.md](protocol-repeat.md) | ✗ |
-| **\`rest ~\`**, **\`rest -Nb\`** | ✗ | consume tail / reserve footer | ✗ |
-| **\`parseView: tree\`** | ✗ | optional structured show + \`wire:section:field\` | ✗ |
-
-**Rules of thumb:**
-
-- **UART / SPI / I2C encode** → default assemble + optional \`:decode()\` on simple channels.
-- **Huffman / framed packets** → assemble encoder + separate **\`mode: parse\`** recover protocol (not \`:decode()\` on the encoder).
-- **\`:decode()\`** recovers only \`param\`-like fields from fixed layouts — not \`expand\`/\`collapse\`/\`def\`/\`withLength\`/\`checksum\`.
-
-Invoke shapes:
-
-| Mode | Example |
-|------|---------|
-| assemble | \`123wire pkt = .encoder { tokens = …, codebook = … }\` |
-| parse | \`32wire out = .recover { data = pkt }\` or \`{ stream = pkt }\` |
-| \`:decode\` | \`8wire data = .uart8n1:decode(tx)\` |
-
----
-
-## \`mode: parse\` — sequential field extraction
-
-By default protocols **assemble** bits from parameters (\`mode: assemble\`, implicit). Set **\`mode: parse\`** to read from an input bitstream instead.
-
-| Aspect | assemble (default) | parse |
-|--------|-------------------|-------|
-| Direction | params → wire | wire → extracted fields |
-| Field syntax | \`data 8b\` = emit param | \`data 8b\` = read 8 bits from stream |
-| Literals | emit fixed bits | verify bits on wire |
-| Invoke param | supply field values | supply \`data\` or \`stream\` bitstring |
-| Output | concatenated channel bits | concatenated parsed field bits |
-
-Recovery protocols (Huffman SC, checksum verify) use \`mode: parse\`. **\`:decode()\` is unchanged** — it only reverses simple assemble protocols; use a dedicated parse protocol instead.
-
-### Runnable — parse header fields
+### Runnable — static vs dynamic
 
 \`\`\`logts-play
-inline [protocol] .parseHdr:
-  mode: parse
-  out:
-    01001000
-    keyWidth 8b
-    nSym 8b
+inline [lut] .table:
+  depth: 4
+  length: 16
+  data {
+    0000: 0000
+    0001: 0001
+    0010: 0010
+    0011: 0011
+  }
   :
 
-16wire out = .parseHdr { data = 010010000000100000000011 }
-show(out)
-\`\`\`
-
-Magic \`'H'\` (\`01001000\`) verified; output = **\`keyWidth\` + \`nSym\`** → \`0000100000000011\`.
-
-| Error | Cause |
-|-------|-------|
-| \`parse: expected literal '...' but received '...'\` | Magic or fixed field mismatch |
-| \`parse: need N bits but only M remain\` | Truncated input |
-| \`Parse protocol requires 'data' parameter\` | Missing invoke argument |
-
-### \`stream\` vs \`data\` — the parse cursor
-
-In **\`mode: parse\`**, you do **not** declare a \`stream\` wire in your script. At invoke time:
-
-\`\`\`logts
-32wire recovered = .myParseProto { data = packet }
-\`\`\`
-
-the engine wraps \`packet\` in an internal **ParseStream** (a read cursor over the bitstring). Each segment in \`out:\` runs **in order** and advances that cursor.
-
-| Name | Where | Meaning |
-|------|-------|---------|
-| **\`data\`** | Invoke argument \`{ data = packet }\` | The **full input bitstring** (the whole packet). Alias: \`{ stream = packet }\` — same thing at invoke. |
-| **\`stream\`** | Inside protocol segments (\`withLength(stream, 16b, entry)\`) | **Reserved keyword** — “read from the **current cursor**”, not a script parameter. |
-| **\`data\`** | Inside some segments (\`validateChecksum(crc16, data)\`) | The **full invoke argument** again — used when a check needs the entire packet, not just unread tail. |
-
-Think of it like a file pointer:
-
-\`\`\`text
-data = packet (123 bit)                    cursor →
-[···························································································]
- ↑ pos=0
-
-out: 01001000           → verify 8 bit,           pos += 8
-     keyWidth 8b        → read 8 bit,             pos += 8
-     nSym 8b            → read 8 bit,             pos += 8
-     codebook           → withLength(stream, 16b, entry): read 16b len + body, pos += 16+53
-     validateChecksum(crc16, data)  → CRC over **whole** packet (ignores cursor)
-     collapse(withLength(stream, 8b), …) → read payload len + bits from cursor, decode
-\`\`\`
-
-**\`withLength(stream, Nb, def)\`** — from the cursor: read \`Nb\`-bit length, fork a sub-stream of that many bits, parse \`def\` repeatedly until the sub-stream is exhausted (used for codebooks).
-
-**\`withLength(rest, field b)\`** — from the cursor: read exactly as many bits as the **already-parsed field** \`field\` says (used for variable-length codewords).
-
-Segments such as \`keyWidth 8b\` also read from the cursor — you never pass \`keyWidth\` at invoke; it is **extracted** from the wire.
-
-### Parsed fields (\`sym 8b\`, \`cwLen 8b\`, …)
-
-In **\`mode: parse\`**, a line like \`sym 8b\` inside a \`def\` or \`out:\` channel is a **parse field**, not an invoke parameter:
-
-| Syntax | Assemble | Parse |
-|--------|----------|-------|
-| \`data 8b\` | emit 8 bits from invoke arg \`data\` | read 8 bits from cursor into field \`data\` |
-| \`payload ~b\` | emit all bits from var-width arg | read **remaining** bits in current region (\`~b\`) |
-| \`codebook\` (bare def name) | expand \`def codebook\` segments | parse \`def codebook\` against cursor |
-
-Fields parsed earlier in the same \`def\` can drive later segments — e.g. \`cwLen 8b\` then \`withLength(rest, cwLen b)\` reads exactly \`cwLen\` bits into \`rest\`.
-
-**\`codebookLoad\`** hooks each completed \`withLength(..., entry)\` row: \`.lut:add(sym, rest)\` using those field values.
-
-**\`nSym\` check:** after the codebook region, if header field \`nSym\` was parsed and at least one entry was loaded, entry count must equal \`nSym\` or parse throws.
-
-### Parse-only attributes
-
-Used with **\`mode: parse\`** on the protocol block (before \`out:\`).
-
-#### \`parseResult: all | collapseOnly\`
-
-Controls **what bits** the protocol invoke returns as its output wire. Parsing still runs in full (literals verified, fields read, checksum checked); only the **returned blob** is filtered.
-
-| Value | Default | Output wire contains |
-|-------|---------|----------------------|
-| \`all\` | yes | Concatenation of every segment that produces bits: parsed fields (\`keyWidth 8b\`, …), \`withLength\`/\`def\` regions, **\`collapse\`** result, etc. Literals and \`validateChecksum\` contribute nothing. |
-| \`collapseOnly\` | no | Only bits from **\`collapse(...)\`** segments. Header, codebook body, CRC verification — parsed/consumed but **not** included in the returned wire. |
-
-Use **\`collapseOnly\`** for recover/decode protocols where the caller wants the **decoded payload only** (e.g. Huffman tokens), not a dump of every parsed field.
-
-Default without attribute = \`all\`.
-
-#### \`codebookLoad: .lut\`
-
-Side-effect during parse: before reading the stream, **clear** the named writable inline LUT, then on each \`withLength(..., def)\` codebook entry call **\`.lut:add(sym, codeword)\`** (via internal \`onParseEntry\`). Enables recover without a pre-filled codebook — the packet carries its own LUT.
-
-Requires a **writable** inline LUT (\`writable\` attribute). See [huffman-v2.md — \`.huffRecoverSC\`](huffman-v2.md#recover--huffrecoversc-faza-3).
-
-#### Runnable — \`parseResult: all\` vs \`collapseOnly\`
-
-**\`all\` (default)** — output = bits from parsed fields (\`keyWidth\`, \`nSym\`, …):
-
-\`\`\`logts-play
-inline [protocol] .parseHdr:
-  mode: parse
+inline [protocol] .encStatic:
   out:
-    01001000
-    keyWidth 8b
-    nSym 8b
+    expand(tokens 8b, .table, 2b)
   :
 
-16wire fields = .parseHdr { data = 010010000000100000000011 }
-show(fields)
-\`\`\`
-
-→ \`fields\` = \`0000100000000011\` (8 + 8 bit, fără magic).
-
-**\`collapseOnly\`** — același parse, dar wire-ul returnat conține **doar** rezultatul segmentelor \`collapse(...)\`. Header, codebook, \`validateChecksum\` rulează, dar nu apar în output. Exemplu complet: [\`.huffRecoverSC\`](huffman-v2.md#recover--huffrecoversc-faza-3) — \`32wire recovered\` = tokenii decodați (\`aacb\`), nu cei 123 bit ai packetului.
-
-Dacă protocolul parse **nu** are niciun \`collapse\`, \`collapseOnly\` produce un wire **gol** (0 bit).
-
-### Complex example — Huffman self-contained recover (\`.huffRecoverSC\`)
-
-Full **parse** protocol from [huffman-v2.md — Packet SC](huffman-v2.md#packet-self-contained-sc). Combines: parse cursor, \`def\`/\`withLength\`, dynamic \`keyWidth b\`, \`codebookLoad\`, \`validateChecksum\`, \`collapse\`, \`parseResult: collapseOnly\`.
-
-#### Protocol definition
-
-\`\`\`logts
 inline [lut] .huff:
-  writable
   prefixFree
-  variableDepth
-  length: 256
-  data { }
+  data {
+    00: 0
+    01: 10
+    10: 110
+    11: 111
+  }
   :
 
-inline [protocol] .huffRecoverSC:
-  mode: parse
-  codebookLoad: .huff
-  parseResult: collapseOnly
-  def entry:
-    sym 8b
-    cwLen 8b
-    withLength(rest, cwLen b)
-  def codebook:
-    withLength(stream, 16b, entry)
+inline [protocol] .encDynamic:
+  def encoded:
+    expand(tokens, .huff, 2b)
   out:
-    01001000
-    keyWidth 8b
-    nSym 8b
-    codebook
+    lengthOf(encoded) 8b
+    encoded
+  :
+
+doc(.encStatic)
+doc(.encDynamic)
+\`\`\`
+
+\`.encStatic\` → \`width: static 16b\`. \`.encDynamic\` → \`width: dynamic\`.
+
+
+## \`data ~b\` — variable-width parameters
+
+Append **\`~b\`** instead of a fixed width to declare a parameter whose bit length comes from the invoke value:
+
+\`\`\`logts
+data ~b
+\`\`\`
+
+At invoke, \`data = 101010\` supplies six bits; the protocol emits exactly six data bits (no padding).
+
+### Runnable — length prefix + variable payload
+
+\`\`\`logts-play
+inline [protocol] .packet:
+  out:
+    length(data) 16b
+    data ~b
+  :
+
+22wire out = .packet { data = 101010 }
+show(out)
+\`\`\`
+
+16-bit length = \`0000000000000110\` (6), payload = \`101010\` → **\`0000000000000110101010\`**.
+
+## \`checksum\` / \`validateChecksum\` (CRC-16-CCITT)
+
+Append or verify a **16-bit CRC** over a preceding body segment. Algorithm: CRC-16-CCITT (polynomial \`0x1021\`, init \`0xFFFF\`), computed over the body bitstream (padded to byte boundary).
+
+| Generator | Mode | Syntax | Effect |
+|-----------|------|--------|--------|
+| \`checksum\` | assemble | \`checksum(crc16, defName)\` or \`checksum(crc16, param)\` | Append 16-bit CRC of body bits |
+| \`validateChecksum\` | parse | \`validateChecksum(crc16, param)\` | Verify last 16 bits of **full** invoke param match CRC of preceding bits |
+
+Scope for **\`checksum\`**: CRC over the referenced def/param body only. For **\`validateChecksum\`**: \`param\` is the **entire packet** passed at invoke (\`data\`); CRC is the last 16 bits, body is everything before that (same bits the cursor walked, plus any unread tail — typically the whole packet minus CRC).
+
+### Runnable — encode + verify
+
+\`\`\`logts-play
+inline [protocol] .pktCs:
+  def body:
+    data 8b
+  out:
+    body
+    checksum(crc16, body)
+  :
+
+inline [protocol] .verifyCs:
+  mode: parse
+  out:
     validateChecksum(crc16, data)
-    collapse(withLength(stream, 8b), .huff, keyWidth b)
-  :
-\`\`\`
-
-#### Wire layout consumed by the cursor (\`'aacb'\` packet, 123 bit)
-
-| Offset (bit) | Width | Section | On-wire content |
-|--------------|-------|---------|-----------------|
-| 0 | 8b | magic | \`H\` → \`01001000\` |
-| 8 | 8b | keyWidth | ex. \`00001000\` (= 8) |
-| 16 | 8b | nSym | ex. \`00000011\` (= 3) |
-| 24 | 16b | cbLen | codebook body length (ex. 53) |
-| 40 | 53b | codebook body | \`sym 8b \\| cwLen 8b \\| codeword\` × nSym |
-| 93 | 14b | payload | \`len 8b\` + Huffman bits |
-| 107 | 16b | CRC | CRC-16-CCITT over body (bits 0–106) |
-
-**Total: 123 bit.** Visual layout (proportional bar):
-
-\`\`\`packet-layout
-H:8,kw:8,nSym:8,cbLen:16,codebook:53,payload:14,CRC:16
-\`\`\`
-
-**Parse mapping:**
-
-| Section | Protocol segment |
-|---------|------------------|
-| Header | literals + \`keyWidth 8b\` + \`nSym 8b\` (cursor) |
-| Codebook | \`withLength(stream, 16b, entry)\` → \`codebookLoad\` → \`.huff:add\` |
-| CRC | \`validateChecksum(crc16, data)\` — full packet param |
-| Payload | \`collapse(withLength(stream, 8b), .huff, keyWidth b)\` — output only if \`parseResult: collapseOnly\` |
-
-**Codebook entry format** (defined by \`def entry\`, not guessed by the engine):
-
-| Field on wire | Width | Role |
-|---------------|-------|------|
-| \`sym\` | 8b | LUT key (ASCII byte) |
-| \`cwLen\` | 8b | Codeword length in bits |
-| \`rest\` | \`cwLen\` b | Huffman codeword value |
-
-\`codebookLoad: .huff\` calls \`.huff:add(sym, rest)\` after each parsed entry. \`nSym\` from the header is checked against the entry count.
-
-#### Runnable — recover without preset codebook
-
-Packet is **self-contained** — no \`.huff:add\` before invoke. LUT is rebuilt during parse.
-
-\`\`\`logts-play legacy
-inline [lut] .huff:
-  writable
-  prefixFree
-  variableDepth
-  length: 256
-  data { }
   :
 
-inline [protocol] .huffRecoverSC:
-  mode: parse
-  codebookLoad: .huff
-  parseResult: collapseOnly
-  def entry:
-    sym 8b
-    cwLen 8b
-    withLength(rest, cwLen b)
-  def codebook:
-    withLength(stream, 16b, entry)
-  out:
-    01001000
-    keyWidth 8b
-    nSym 8b
-    codebook
-    validateChecksum(crc16, data)
-    collapse(withLength(stream, 8b), .huff, keyWidth b)
-  :
+24wire pkt = .pktCs { data = 10101010 }
+1wire ok = .verifyCs { data = pkt }
 
-123wire packet = ^4808 0300 3561 0131 014C 6058 31C4 63 + 111
-32wire recovered = .huffRecoverSC { data = packet }
-8wire huffSz = .huff:size()
-peek(recovered; ascii)
-peek(huffSz)
+show(pkt)
+show(ok)
 \`\`\`
 
-→ \`recovered\` = \`"aacb"\`, \`huffSz\` = \`3\` (LUT rebuilt from embedded codebook). Encode side and round-trip: [huffman-v2.md](huffman-v2.md#runnable--round-trip-sc-aacb).
-
-| Segment | Cursor / \`data\` | Effect |
-|---------|---------------|--------|
-| \`01001000\` | cursor | Verify magic \`'H'\` |
-| \`keyWidth 8b\`, \`nSym 8b\` | cursor | Read header fields; \`keyWidth\` used later by \`collapse\` |
-| \`codebook\` | cursor | Frame + entries; **\`codebookLoad\`** fills \`.huff\` |
-| \`validateChecksum(crc16, data)\` | **full \`data\`** | CRC over body (123−16 bit), not tail-only |
-| \`collapse(withLength(stream, 8b), …)\` | cursor | Read payload; output wire = decoded tokens only (\`parseResult: collapseOnly\`) |
-
----
-
-## Tentative sections (\`?\`) — parse-only dispatch
-
-**Parse-only.** Tentative sections add **ordered choice** with **backtracking**: try alternatives in order; on failure restore the cursor and parsed fields; **first success wins** (committed choice).
-
-| Form | Meaning |
-|------|---------|
-| \`foo\` | mandatory \`localRef\` to \`def foo\` |
-| \`foo?\` | tentative \`localRef\` — all branches may fail with **0 bits** |
-| \`foo:\` | mandatory **inline** section (body lines follow) |
-| \`foo?:\` | tentative inline section |
-| \`def foo:\` | declare reusable block — **no \`?\` on \`def\`** |
-
-**Mandatory vs optional at use-site** (no separate \`requireChoice\` attribute):
-
-| Invoke | All tentative branches fail |
-|--------|----------------------------|
-| \`ethernet\` | **Error** — \`parse: no matching alternative\` |
-| \`ethernet?\` | **OK** — 0 bits consumed, parsing continues |
-
-### Runnable — L3 dispatch (inline sections)
-
-\`\`\`logts-play
-inline [protocol] .l3inline:
-  mode: parse
-  out:
-    ipv4?:
-      0100
-      src 32b
-      dst 32b
-    ipv6?:
-      0110
-      src 128b
-      dst 128b
-    unknown:
-      rest ~
-  :
-
-64wire out = .l3inline { data = 0100 + repeat(1,32) + repeat(0,32) }
-show(out)
-\`\`\`
-
-Literals (\`0100\`, …) verify on wire but **do not** appear in the output blob — only **parse fields** (\`src\`, \`dst\`, …).
-
-### Runnable — prefix / body / footer
-
-\`\`\`logts-play
-inline [protocol] .ethFrame:
-  mode: parse
-  def ipv4:
-    0100
-    src 32b
-  def ethernet:
-    ipv4?
-  out:
-    1111
-    ethernet
-    1111
-  :
-
-36wire out = .ethFrame { data = 1111 + 0100 + repeat(1,32) + 1111 }
-show(out)
-\`\`\`
-
-Footer \`1111\` is the **next mandatory segment** in \`out:\` — not magic inside \`ethernet\`.
-
-### \`rest ~\` and \`rest -Nb\`
-
-| Syntax | Meaning |
-|--------|---------|
-| \`rest ~\` | consume **all** bits until EOF — only as **last** segment of the protocol |
-| \`rest -4b\` | consume \`remaining − 4\`, leave 4 bits for a fixed suffix (e.g. footer \`1111\`) |
-
-\`\`\`logts-play
-inline [protocol] .restFoot:
-  mode: parse
-  def ipv4:
-    0100
-    src 32b
-  def ethernet:
-    ipv4?
-    unknown?:
-      rest -4b
-  out:
-    0000
-    ethernet
-    1111
-  :
-
-32wire out = .restFoot { data = 0000 + 0100 + repeat(1,32) + 1111 }
-show(out)
-\`\`\`
-
-### \`parseView: tree\` — structured show / field access
-
-Optional attribute (only with \`mode: parse\`). When set, \`show(parsed)\` prints a **field tree** with matched branch names. Without it, behaviour is unchanged (flat blob).
-
-\`\`\`logts-play
-inline [protocol] .pvTest:
-  mode: parse
-  parseView: tree
-  out:
-    magic 3b
-    typeA?:
-      11
-      01
-      dataA 2b
-    unknown:
-      rest ~
-  :
-
-5wire parsed = .pvTest { data = 101110100 }
-2wire dataA = parsed:typeA:dataA
-show(parsed)
-show(dataA)
-\`\`\`
-
-Verify literals (\`11\`, \`01\`) are **not** shown in the tree — only fields with real bits.
-
-### \`:decode()\` and tentative
-
-**\`:decode()\` is not supported** on protocols with tentative sections. Use invoke \`{ data = … }\` on a \`mode: parse\` protocol instead.
+Body \`10101010\` + CRC suffix → 24-bit packet. Verify succeeds silently (empty output channel).
 
 | Error | Cause |
 |-------|-------|
-| \`tentative sections require mode: parse\` | \`?\` in \`mode: assemble\` |
-| \`Protocol def cannot use '?'\` | \`def foo?:\` at declaration |
-| \`parse: no matching alternative\` | mandatory section / ref, all branches failed |
-| \`rest -Nb: need N bits reserved…\` | not enough bits left for footer |
-| \`Protocol decode does not support tentative sections\` | \`:decode()\` on protocol with \`?\` |
-| \`parseView: field '…' has no bits\` | field access on 0-bit branch (OK in \`show\` as \`empty (0bit)\`) |
+| \`validateChecksum: mismatch (expected ..., got ...)\` | Corrupt or truncated packet |
+| \`validateChecksum: input shorter than checksum field\` | Fewer than 16 bits after body |
+| \`checksum body '...' is not a local def or parameter\` | Invalid def reference in encode |
+
+## Not included (planned)
+
+These generators are **not** implemented in v2:
+
+| Planned | Purpose |
+|---------|---------|
+| \`concat(...)\` | Concatenate arbitrary segment expressions |
+| \`padLeft(param, Nb)\` | Left-pad parameter to width |
+| \`padRight(param, Nb)\` | Right-pad parameter to width |
+
+Use literals, \`def\` blocks, and existing generators for now.
+
+
+
+---
+
+## Related
+
+- [protocol.md](protocol.md) — hub, feature matrix, \`doc()\`
+- [protocol-parse.md](protocol-parse.md) — \`mode: parse\`, \`validateChecksum\`
+- [protocol-lut.md](protocol-lut.md) — \`expand\` / \`collapse\`
+- [lut.md](lut.md) — inline LUT tables
+`,
+    'protocol-lut.md': `# Protocol — LUT transforms (\`expand\` / \`collapse\`)
+
+Map token streams through an [inline LUT](lut.md) in both directions. Used for Huffman-style encode/decode.
+
+Hub: [protocol.md](protocol.md). Full walkthrough: [huffman.md](huffman.md). Self-contained packet SC: [huffman-v2.md](huffman-v2.md).
 
 ---
 
@@ -21219,7 +20494,6 @@ Input to \`expand\` must be a multiple of \`keyWidth\` (fixed or dynamic).
 | \`collapse failed: no LUT entry for value '...'\` | Value not in table (fixed-depth) |
 | \`prefixFree collapse failed at bit offset N\` | No valid prefix at position |
 
----
 
 ## Combined Huffman round-trip (\`.huffPacket\` / \`.huffRecover\`)
 
@@ -21264,88 +20538,314 @@ show(recovered)
 
 \`0001\` → packet **\`00000011010\`** → recovered **\`0001\`**. Step-by-step bit layout: [huffman.md — packet layout](huffman.md#packet-layout).
 
----
 
-## Static vs dynamic width (\`inferProtocolWidth\`)
-
-At parse time the compiler classifies each protocol instance:
-
-| Kind | When | \`doc()\` shows |
-|------|------|---------------|
-| **static** | All segment widths known (fixed params, fixed-depth LUT expand) | \`width: static Nb\` |
-| **dynamic** | Variable params (\`~b\`), \`withLength\`, \`prefixFree\` expand/collapse, or other runtime-sized segments | \`width: dynamic\` |
-
-Dynamic protocols may produce different bit counts per invoke. Assign to a wire wide enough for the maximum case, or rely on runtime width checking with \`=\`.
-
-### Runnable — static vs dynamic
-
-\`\`\`logts-play
-inline [lut] .table:
-  depth: 4
-  length: 16
-  data {
-    0000: 0000
-    0001: 0001
-    0010: 0010
-    0011: 0011
-  }
-  :
-
-inline [protocol] .encStatic:
-  out:
-    expand(tokens 8b, .table, 2b)
-  :
-
-inline [lut] .huff:
-  prefixFree
-  data {
-    00: 0
-    01: 10
-    10: 110
-    11: 111
-  }
-  :
-
-inline [protocol] .encDynamic:
-  def encoded:
-    expand(tokens, .huff, 2b)
-  out:
-    lengthOf(encoded) 8b
-    encoded
-  :
-
-doc(.encStatic)
-doc(.encDynamic)
-\`\`\`
-
-\`.encStatic\` → \`width: static 16b\`. \`.encDynamic\` → \`width: dynamic\`.
 
 ---
 
-## \`data ~b\` — variable-width parameters
+## Related
 
-Append **\`~b\`** instead of a fixed width to declare a parameter whose bit length comes from the invoke value:
+- [protocol-assemble.md](protocol-assemble.md) — \`length\` / \`lengthOf\` / \`withLength\` encode
+- [protocol-parse.md](protocol-parse.md) — \`collapse\` in \`mode: parse\`, \`codebookLoad\`
+- [huffman.md](huffman.md) — packet layout and round-trip trace
+- [huffman-v2.md](huffman-v2.md) — \`.huffRecoverSC\` self-contained recover
+- [lut.md](lut.md) — \`prefixFree\`, \`variableDepth\`
+`,
+    'protocol-parse.md': `# Protocol — \`mode: parse\`
 
-\`\`\`logts
-data ~b
-\`\`\`
+Sequential **field extraction** from a bitstream. The parse cursor walks \`data\` (or \`stream\`) and verifies literals, reads fields, and optionally builds a **parseView** tree.
 
-At invoke, \`data = 101010\` supplies six bits; the protocol emits exactly six data bits (no padding).
+Hub: [protocol.md](protocol.md). Related: [protocol-tentative.md](protocol-tentative.md), [protocol-repeat.md](protocol-repeat.md).
 
-### Runnable — length prefix + variable payload
+---
 
-\`\`\`logts-play
-inline [protocol] .packet:
+## Invoke
+
+\`\`\`logts-play legacy
+inline [protocol] .parseHdr:
+  mode: parse
   out:
-    length(data) 16b
-    data ~b
+    magic 8b
+    len 16b
   :
 
-22wire out = .packet { data = 101010 }
+24wire out = .parseHdr { data = 01001000 + 00000000 + 00010000 }
 show(out)
 \`\`\`
 
-16-bit length = \`0000000000000110\` (6), payload = \`101010\` → **\`0000000000000110101010\`**.
+| Parameter | Role |
+|-----------|------|
+| \`data\` | Full packet bitstream (default) |
+| \`stream\` | Alias for \`data\` in some generators |
+
+Output wire width may be **dynamic** when sections repeat or use \`rest ~\`. Use \`=:\` when the declared wire is wider than extracted fields.
+
+---
+
+## Literals vs fields
+
+| Line in \`def\` / \`out\` | Parse behaviour |
+|-----------------------|-----------------|
+| \`0101\` | Verify bits; **not** in output blob |
+| \`kind 8b\` | Read 8 bits into field \`kind\`; **in** output blob |
+| \`rest ~\` | Consume all remaining bits (last segment only) |
+| \`rest -4b\` | Consume \`remaining − 4\`, leave footer |
+
+---
+
+## Wire literals in parse protocol
+
+Protocol lines accept a **subset** of [wire-literals.md](wire-literals.md):
+
+| Form | Example | Notes |
+|------|---------|-------|
+| Binary | \`01010101\` | as today |
+| Wire string | \`"true"\`, \`"{"\`, \`'x'\` | 8 bits per character |
+| Decimal pad | \`\\123;8\` | unsigned, fixed width |
+| Hex pad | \`^7B;8\` | pad to width |
+| Hex short | \`^7B\` | minimal width (no pad) |
+| Decimal short | \`\\10\` | minimal unsigned width |
+
+\`\`\`logts-play legacy
+inline [protocol] .litDemo:
+  mode: parse
+  out:
+    "Hi"
+  :
+
+16wire chk =: .litDemo { data = 01001000 + 01101001 }
+show(chk)
+\`\`\`
+
+Use **local \`def\` wrappers** for tentative string choice (\`trueLit?\` / \`falseLit?\`) — literal lines cannot take \`?\` directly.
+
+---
+
+## Attributes (parse)
+
+| Attribute | Values | Purpose |
+|-----------|--------|---------|
+| \`parseView\` | \`tree\`, \`true\` | Structured \`show()\` + \`wire:section:field\` access |
+| \`parseResult\` | \`all\`, \`collapseOnly\` | Include/exclude collapse payload in output |
+| \`codebookLoad\` | \`.lutName\` | Load LUT from embedded codebook during parse |
+
+---
+
+## \`mode: parse\` — overview
+
+By default protocols **assemble** bits from parameters (\`mode: assemble\`, implicit). Set **\`mode: parse\`** to read from an input bitstream instead.
+
+| Aspect | assemble (default) | parse |
+|--------|-------------------|-------|
+| Direction | params → wire | wire → extracted fields |
+| Field syntax | \`data 8b\` = emit param | \`data 8b\` = read 8 bits from stream |
+| Literals | emit fixed bits | verify bits on wire |
+| Invoke param | supply field values | supply \`data\` or \`stream\` bitstring |
+| Output | concatenated channel bits | concatenated parsed field bits |
+
+Recovery protocols (Huffman SC, checksum verify) use \`mode: parse\`. **\`:decode()\` is unchanged** — it only reverses simple assemble protocols; use a dedicated parse protocol instead.
+
+### Runnable — parse header fields
+
+\`\`\`logts-play
+inline [protocol] .parseHdr:
+  mode: parse
+  out:
+    01001000
+    keyWidth 8b
+    nSym 8b
+  :
+
+16wire out = .parseHdr { data = 010010000000100000000011 }
+show(out)
+\`\`\`
+
+Magic \`'H'\` (\`01001000\`) verified; output = **\`keyWidth\` + \`nSym\`** → \`0000100000000011\`.
+
+| Error | Cause |
+|-------|-------|
+| \`parse: expected literal '...' but received '...'\` | Magic or fixed field mismatch |
+| \`parse: need N bits but only M remain\` | Truncated input |
+| \`Parse protocol requires 'data' parameter\` | Missing invoke argument |
+
+### \`stream\` vs \`data\` — the parse cursor
+
+In **\`mode: parse\`**, you do **not** declare a \`stream\` wire in your script. At invoke time:
+
+\`\`\`logts
+32wire recovered = .myParseProto { data = packet }
+\`\`\`
+
+the engine wraps \`packet\` in an internal **ParseStream** (a read cursor over the bitstring). Each segment in \`out:\` runs **in order** and advances that cursor.
+
+| Name | Where | Meaning |
+|------|-------|---------|
+| **\`data\`** | Invoke argument \`{ data = packet }\` | The **full input bitstring** (the whole packet). Alias: \`{ stream = packet }\` — same thing at invoke. |
+| **\`stream\`** | Inside protocol segments (\`withLength(stream, 16b, entry)\`) | **Reserved keyword** — “read from the **current cursor**”, not a script parameter. |
+| **\`data\`** | Inside some segments (\`validateChecksum(crc16, data)\`) | The **full invoke argument** again — used when a check needs the entire packet, not just unread tail. |
+
+Think of it like a file pointer:
+
+\`\`\`text
+data = packet (123 bit)                    cursor →
+[···························································································]
+ ↑ pos=0
+
+out: 01001000           → verify 8 bit,           pos += 8
+     keyWidth 8b        → read 8 bit,             pos += 8
+     nSym 8b            → read 8 bit,             pos += 8
+     codebook           → withLength(stream, 16b, entry): read 16b len + body, pos += 16+53
+     validateChecksum(crc16, data)  → CRC over **whole** packet (ignores cursor)
+     collapse(withLength(stream, 8b), …) → read payload len + bits from cursor, decode
+\`\`\`
+
+**\`withLength(stream, Nb, def)\`** — from the cursor: read \`Nb\`-bit length, fork a sub-stream of that many bits, parse \`def\` repeatedly until the sub-stream is exhausted (used for codebooks).
+
+**\`withLength(rest, field b)\`** — from the cursor: read exactly as many bits as the **already-parsed field** \`field\` says (used for variable-length codewords).
+
+Segments such as \`keyWidth 8b\` also read from the cursor — you never pass \`keyWidth\` at invoke; it is **extracted** from the wire.
+
+### Parsed fields (\`sym 8b\`, \`cwLen 8b\`, …)
+
+In **\`mode: parse\`**, a line like \`sym 8b\` inside a \`def\` or \`out:\` channel is a **parse field**, not an invoke parameter:
+
+| Syntax | Assemble | Parse |
+|--------|----------|-------|
+| \`data 8b\` | emit 8 bits from invoke arg \`data\` | read 8 bits from cursor into field \`data\` |
+| \`payload ~b\` | emit all bits from var-width arg | read **remaining** bits in current region (\`~b\`) |
+| \`codebook\` (bare def name) | expand \`def codebook\` segments | parse \`def codebook\` against cursor |
+
+Fields parsed earlier in the same \`def\` can drive later segments — e.g. \`cwLen 8b\` then \`withLength(rest, cwLen b)\` reads exactly \`cwLen\` bits into \`rest\`.
+
+**\`codebookLoad\`** hooks each completed \`withLength(..., entry)\` row: \`.lut:add(sym, rest)\` using those field values.
+
+**\`nSym\` check:** after the codebook region, if header field \`nSym\` was parsed and at least one entry was loaded, entry count must equal \`nSym\` or parse throws.
+
+
+### Parse-only attributes
+
+Used with **\`mode: parse\`** on the protocol block (before \`out:\`).
+
+#### \`parseResult: all | collapseOnly\`
+
+Controls **what bits** the protocol invoke returns as its output wire. Parsing still runs in full (literals verified, fields read, checksum checked); only the **returned blob** is filtered.
+
+| Value | Default | Output wire contains |
+|-------|---------|----------------------|
+| \`all\` | yes | Concatenation of every segment that produces bits: parsed fields (\`keyWidth 8b\`, …), \`withLength\`/\`def\` regions, **\`collapse\`** result, etc. Literals and \`validateChecksum\` contribute nothing. |
+| \`collapseOnly\` | no | Only bits from **\`collapse(...)\`** segments. Header, codebook body, CRC verification — parsed/consumed but **not** included in the returned wire. |
+
+Use **\`collapseOnly\`** for recover/decode protocols where the caller wants the **decoded payload only** (e.g. Huffman tokens), not a dump of every parsed field.
+
+Default without attribute = \`all\`.
+
+#### \`codebookLoad: .lut\`
+
+Side-effect during parse: before reading the stream, **clear** the named writable inline LUT, then on each \`withLength(..., def)\` codebook entry call **\`.lut:add(sym, codeword)\`** (via internal \`onParseEntry\`). Enables recover without a pre-filled codebook — the packet carries its own LUT.
+
+Requires a **writable** inline LUT (\`writable\` attribute). See [huffman-v2.md — \`.huffRecoverSC\`](huffman-v2.md#recover--huffrecoversc-faza-3).
+
+#### Runnable — \`parseResult: all\` vs \`collapseOnly\`
+
+**\`all\` (default)** — output = bits from parsed fields (\`keyWidth\`, \`nSym\`, …):
+
+\`\`\`logts-play
+inline [protocol] .parseHdr:
+  mode: parse
+  out:
+    01001000
+    keyWidth 8b
+    nSym 8b
+  :
+
+16wire fields = .parseHdr { data = 010010000000100000000011 }
+show(fields)
+\`\`\`
+
+→ \`fields\` = \`0000100000000011\` (8 + 8 bit, fără magic).
+
+**\`collapseOnly\`** — același parse, dar wire-ul returnat conține **doar** rezultatul segmentelor \`collapse(...)\`. Header, codebook, \`validateChecksum\` rulează, dar nu apar în output. Exemplu complet: [\`.huffRecoverSC\`](huffman-v2.md#recover--huffrecoversc-faza-3) — \`32wire recovered\` = tokenii decodați (\`aacb\`), nu cei 123 bit ai packetului.
+
+Dacă protocolul parse **nu** are niciun \`collapse\`, \`collapseOnly\` produce un wire **gol** (0 bit).
+
+## \`withLength\` (parse)
+
+### \`withLength(rest, field b)\` — width from a parsed field
+
+When the length is not a fixed prefix but comes from a field parsed earlier in the same \`def\`, use the field name instead of \`Nb\`:
+
+\`\`\`logts
+def entry:
+  sym 8b
+  cwLen 8b
+  withLength(rest, cwLen b)
+\`\`\`
+
+Reads exactly \`cwLen\` bits (value of the \`cwLen\` field) into \`rest\`. No length prefix on the wire.
+
+### \`withLength(data, Nb, def)\` — repeated parse until sub-stream exhausted
+
+In **\`mode: parse\`**, read an \`Nb\`-bit length prefix, then parse \`def\` repeatedly until the sub-stream is consumed. Used for variable-length codebooks (see [huffman-v2.md](huffman-v2.md)).
+
+\`\`\`logts-play
+inline [protocol] .parseEntry:
+  mode: parse
+  def entry:
+    sym 8b
+    cwLen 8b
+    withLength(rest, cwLen b)
+  out:
+    withLength(data, 16b, entry)
+  :
+\`\`\`
+
+| Error | Cause |
+|-------|-------|
+| \`withLength: def '...' consumed no bits\` | Empty or malformed entry in repeated parse |
+| \`withLength: def '...' left N bits unconsumed\` | Entry def did not consume full sub-stream |
+| \`parse: field 'cwLen' is not set\` | \`withLength(rest, cwLen b)\` before \`cwLen\` was parsed |
+
+## Complex example — \`.huffRecoverSC\`
+
+Full **parse** protocol for self-contained Huffman packet SC — cursor, \`def\`/\`withLength\`, \`codebookLoad\`, \`validateChecksum\`, \`collapse\`, \`parseResult: collapseOnly\`.
+
+**Runnable definition, wire layout, and step-by-step cursor mapping:** [huffman-v2.md — Packet SC / \`.huffRecoverSC\`](huffman-v2.md#recover--huffrecoversc-faza-3).
+
+Short invoke (packet must be built separately):
+
+\`\`\`logts-play legacy
+123wire packet = ^4808 0300 3561 0131 014C 6058 31C4 63 + 111
+32wire recovered = .huffRecoverSC { data = packet }
+peek(recovered; ascii)
+\`\`\`
+
+## \`rest ~\` and \`rest -Nb\`
+
+| Syntax | Meaning |
+|--------|---------|
+| \`rest ~\` | consume **all** bits until EOF — only as **last** segment of the protocol |
+| \`rest -4b\` | consume \`remaining − 4\`, leave 4 bits for a fixed suffix (e.g. footer \`1111\`) |
+
+\`\`\`logts-play
+inline [protocol] .restFoot:
+  mode: parse
+  def ipv4:
+    0100
+    src 32b
+  def ethernet:
+    ipv4?
+    unknown?:
+      rest -4b
+  out:
+    0000
+    ethernet
+    1111
+  :
+
+32wire out = .restFoot { data = 0000 + 0100 + repeat(1,32) + 1111 }
+show(out)
+\`\`\`
+
+Tentative choice around \`rest\` — [protocol-tentative.md](protocol-tentative.md).
 
 ---
 
@@ -21358,9 +20858,9 @@ Append or verify a **16-bit CRC** over a preceding body segment. Algorithm: CRC-
 | \`checksum\` | assemble | \`checksum(crc16, defName)\` or \`checksum(crc16, param)\` | Append 16-bit CRC of body bits |
 | \`validateChecksum\` | parse | \`validateChecksum(crc16, param)\` | Verify last 16 bits of **full** invoke param match CRC of preceding bits |
 
-Scope for **\`checksum\`**: CRC over the referenced def/param body only. For **\`validateChecksum\`**: \`param\` is the **entire packet** passed at invoke (\`data\`); CRC is the last 16 bits, body is everything before that (same bits the cursor walked, plus any unread tail — typically the whole packet minus CRC).
+Encode side (\`checksum\`) — [protocol-assemble.md](protocol-assemble.md#checksum--validatechecksum-crc-16-ccitt).
 
-### Runnable — encode + verify
+### Runnable — verify on parse
 
 \`\`\`logts-play
 inline [protocol] .pktCs:
@@ -21394,17 +20894,424 @@ Body \`10101010\` + CRC suffix → 24-bit packet. Verify succeeds silently (empt
 
 ---
 
-## Not included (planned)
+## \`execStmts\` (secondary parse)
 
-These generators are **not** implemented in v2:
+The editor runs the full script once at **Run**. The **test harness** also supports \`execStmts(interp, src)\` — append extra top-level statements against the **same** interpreter (e.g. Huffman FSM ticks, then encode).
 
-| Planned | Purpose |
-|---------|---------|
-| \`concat(...)\` | Concatenate arbitrary segment expressions |
-| \`padLeft(param, Nb)\` | Left-pad parameter to width |
-| \`padRight(param, Nb)\` | Right-pad parameter to width |
+Requirements:
 
-Use literals, \`def\` blocks, and existing generators for now.
+| Topic | Detail |
+|-------|--------|
+| Inline instances | Must already exist from the initial \`run()\` (\`inline [protocol] .huffPacket:\` etc.) |
+| Parser disambiguation | \`{ }\` after \`.name\` is protocol if the instance is \`protocol\`, asm if \`asm\`. Secondary parse **seeds** kinds from \`inlineInstances\` — otherwise \`.huffPacket { tokens = source }\` is misparsed as asm and throws *not an asm ISA* |
+| Wave session | After exec, \`propagate()\` runs so wires like \`16wire lb = .links:get(…)\` see fresh LUT data |
+
+Example (after FSM + walk via \`execStmts\`):
+
+\`\`\`logts
+64wire packet =: .huffPacket { tokens = source }
+32wire recovered = .huffRecover { data = packet }
+\`\`\`
+
+Tests **2128** (round-trip), **2116** (walk only). Wrong kind error: *Inline instance '.foo' is a protocol, not an asm ISA; use .foo { param = ... }*.
+
+---
+
+## Section repeat
+
+For \`packet[n]\`, \`packet*\`, anchor footers, and \`parsed:packet:0:field\`, see **[protocol-repeat.md](protocol-repeat.md)**.
+
+---
+
+## Related
+
+- [protocol.md](protocol.md) — hub
+- [protocol-tentative.md](protocol-tentative.md) — \`?\` choice groups
+- [protocol-repeat.md](protocol-repeat.md) — section repeat \`[n]\`, \`*\`
+- [protocol-lut.md](protocol-lut.md) — \`expand\` / \`collapse\`
+- [huffman-v2.md](huffman-v2.md) — \`.huffRecoverSC\`
+`,
+    'protocol-repeat.md': `# Protocol — section repetition
+
+Repeat local \`def\` sections in **\`mode: parse\`** protocols. Syntax attaches to the section name (not to individual fields).
+
+Requires [\`mode: parse\`](protocol-parse.md). For optional branches without repeat counts, see [protocol-tentative.md](protocol-tentative.md).
+
+---
+
+## Syntax
+
+| Form | Meaning |
+|------|---------|
+| \`packet[3]\` | exactly 3 times |
+| \`packet[1-3]\` | between 1 and 3 (greedy: try max first) |
+| \`packet[0-]\` | zero or more until anchor or EOF |
+| \`packet*\` | sugar for \`packet[0-]\` |
+| \`packet+\` | sugar for \`packet[1-]\` |
+| \`data1[1-3]?\` | tentative choice branch with its own repeat |
+
+Invalid: \`[-]\`, \`[-3]\`, \`*?\`, \`+?\`, \`name?[3]\` (\`?\` must follow the repeat spec).
+
+---
+
+## Exact repeat — \`packet[2]\`
+
+\`\`\`logts-play legacy
+inline [protocol] .repeatExact:
+  mode: parse
+  def packet:
+    kind 8b
+  out:
+    packet[2]
+  :
+
+16wire out = .repeatExact { data = 10101010 + 11001100 }
+show(out)
+\`\`\`
+
+---
+
+## Bounded range — greedy max-first
+
+\`packet[1-2]\` accepts one or two packets; the parser tries two first.
+
+\`\`\`logts-play legacy
+inline [protocol] .repeatPv:
+  mode: parse
+  parseView: tree
+  def packet:
+    kind 8b
+  out:
+    packet[1-2]
+  :
+
+16wire parsed = .repeatPv { data = 11110000 + 00001111 }
+8wire k0 = parsed:packet:0:kind
+8wire k1 = parsed:packet:1:kind
+show(k0)
+show(k1)
+\`\`\`
+
+parseView indexes are **0-based** (\`packet[0]\` in \`show\`, \`parsed:packet:0:kind\` in field access).
+
+---
+
+## Composing with tentative
+
+Different repeat specs per choice branch:
+
+\`\`\`logts-play legacy
+inline [protocol] .repeatChoice:
+  mode: parse
+  def data1:
+    kind 8b
+  def data2:
+    idx 3b
+    1
+    short 4b
+  out:
+    data1[1-2]?
+    data2[2]?
+  :
+
+16wire a = .repeatChoice { data = 11111111 + 00000000 }
+16wire b = .repeatChoice { data = 10110101 + 10110101 }
+show(a)
+show(b)
+\`\`\`
+
+| Pattern | Mechanism |
+|---------|-----------|
+| \`foo?\` | optional **choice** branch — 0 or 1 alternative in a group |
+| \`foo[0-1]\` | **sequential** optional — 0 or 1 occurrence, independent of other sections |
+| \`data1[1-3]?\` | choice + repeat on that branch |
+
+### Sequential \`[0-1]\` — independent optionals
+
+Unlike \`?\` choice groups, each \`[0-1]\` section is parsed **in order** and may be omitted independently:
+
+\`\`\`logts-play legacy
+inline [protocol] .seq01:
+  mode: parse
+  def dataA:
+    x 4b
+  def dataB:
+    y 4b
+  def dataC:
+    z 4b
+  out:
+    dataA[0-1]
+    dataB[0-1]
+    dataC[0-1]
+  :
+
+8wire out = .seq01 { data = 1010 + 0101 }
+show(out)
+\`\`\`
+
+See also [protocol-tentative.md](protocol-tentative.md) for the full \`?\` vs \`[0-1]\` table.
+
+---
+
+## Anchor footer — \`cell[0-]\` + literal
+
+Unbounded repeat stops before a mandatory follower on the next line. The anchor literal is consumed from the stream but **not** included in the output wire (delimiter only).
+
+\`\`\`logts-play legacy
+inline [protocol] .repeatAnchor:
+  mode: parse
+  def cell:
+    x 4b
+  out:
+    cell[0-]
+    1111
+  :
+
+8wire out = .repeatAnchor { data = 1010 + 0101 + 1111 }
+show(out)
+\`\`\`
+
+Payload: \`10100101\` (8 bits). Footer \`1111\` delimits the repeat region.
+
+---
+
+## parseView tree
+
+With \`parseView: tree\`, repeated sections appear as \`packet[0]\`, \`packet[1]\`, … in \`show(parsed)\`.
+
+Flat \`ParseFields\` keeps the **last** iteration per field name; full history lives in parseView only.
+
+---
+
+## Related
+
+- [protocol.md](protocol.md) — hub
+- [protocol-parse.md](protocol-parse.md) — \`mode: parse\`, \`rest\`
+- [protocol-tentative.md](protocol-tentative.md) — \`?\` choice vs \`[0-1]\` sequential
+- [json-subset.md](json-subset.md) — JSON cookbook (repeat + tentative + wire-literals)
+`,
+    'protocol-tentative.md': `# Protocol — tentative sections (\`?\`)
+
+**Parse-only.** Tentative sections add **ordered choice** with **backtracking**: try alternatives in order; on failure restore the cursor and parsed fields; **first success wins**.
+
+Hub: [protocol.md](protocol.md). For section repetition (\`packet[1-3]\`, \`*\`, anchor), see [protocol-repeat.md](protocol-repeat.md).
+
+---
+
+## Syntax
+
+| Form | Meaning |
+|------|---------|
+| \`foo\` | mandatory \`localRef\` to \`def foo\` |
+| \`foo?\` | tentative \`localRef\` — all branches may fail with **0 bits** |
+| \`foo:\` | mandatory **inline** section (body lines follow) |
+| \`foo?:\` | tentative inline section |
+| \`def foo:\` | declare reusable block — **no \`?\` on \`def\`** |
+
+**Mandatory vs optional at use-site:**
+
+| Invoke | All tentative branches fail |
+|--------|----------------------------|
+| \`ethernet\` | **Error** — \`parse: no matching alternative\` |
+| \`ethernet?\` | **OK** — 0 bits consumed, parsing continues |
+
+---
+
+## \`?\` vs \`[0-1]\` vs \`data1[1-3]?\`
+
+| Pattern | Mechanism |
+|---------|-----------|
+| \`foo?\` | **Choice group** — pick at most one branch from adjacent \`?\` items |
+| \`foo[0-1]\` | **Sequential** — 0 or 1 occurrence; not a choice with neighbours |
+| \`data1[1-3]?\` | **Choice + repeat** — whole branch repeats 1–3 times if chosen |
+
+Example: \`dataA[0-1] dataB[0-1]\` may yield A only, B only, both, or neither (four outcomes).  
+\`dataA? dataB?\` picks **at most one** of A or B.
+
+Composed choice + repeat: [protocol-repeat.md — Composing with tentative](protocol-repeat.md#composing-with-tentative).
+
+---
+
+## Runnable — L3 dispatch
+
+\`\`\`logts-play legacy
+inline [protocol] .l3inline:
+  mode: parse
+  out:
+    ipv4?:
+      0100
+      src 32b
+      dst 32b
+    ipv6?:
+      0110
+      src 128b
+      dst 128b
+    unknown:
+      rest ~
+  :
+
+64wire out = .l3inline { data = 0100 + repeat(1,32) + repeat(0,32) }
+show(out)
+\`\`\`
+
+Literals verify on wire but **do not** appear in the output blob — only **parse fields** (\`src\`, \`dst\`, …).
+
+---
+
+## \`parseView: tree\`
+
+With \`parseView: tree\`, \`show(parsed)\` prints a field tree. Field access: \`parsed:typeA:dataA\` (section names, not numeric index unless repeating — see [protocol-repeat.md](protocol-repeat.md)).
+
+\`\`\`logts-play legacy
+inline [protocol] .pvTest:
+  mode: parse
+  parseView: tree
+  out:
+    magic 3b
+    typeA?:
+      11
+      01
+      dataA 2b
+    unknown:
+      rest ~
+  :
+
+5wire parsed = .pvTest { data = 101110100 }
+2wire dataA = parsed:typeA:dataA
+show(parsed)
+show(dataA)
+\`\`\`
+
+---
+
+## \`:decode()\` and tentative
+
+**\`:decode()\` is not supported** on protocols with tentative sections. Use \`{ data = … }\` on a \`mode: parse\` protocol instead.
+
+| Error | Cause |
+|-------|--------|
+| \`tentative sections require mode: parse\` | \`?\` in \`mode: assemble\` |
+| \`Protocol def cannot use '?'\` | \`def foo?:\` at declaration |
+| \`parse: no matching alternative\` | mandatory section, all branches failed |
+| \`Protocol decode does not support tentative sections\` | \`:decode()\` on protocol with \`?\` |
+`,
+    'protocol.md': `# PROTOCOL
+
+A protocol generator. A protocol definition transforms named parameters into one or more fixed-length bit sequences.
+
+Unlike [ASM](asm.md), which generates a single binary blob, a protocol may generate **multiple output channels** (\`tx\`, \`sda\`, \`scl\`, \`mosi\`, etc.).
+
+There is **no panel UI** in v1 — logic only.
+
+### Documentation map
+
+| Topic | Page |
+|-------|------|
+| Assemble, UART/SPI, \`:decode()\` | [protocol-assemble.md](protocol-assemble.md) |
+| **\`mode: parse\`**, cursor, \`rest\` | [protocol-parse.md](protocol-parse.md) |
+| Tentative \`?\`, choice groups | [protocol-tentative.md](protocol-tentative.md) |
+| Section repeat \`[n]\`, \`*\`, anchor | [protocol-repeat.md](protocol-repeat.md) |
+| \`expand\` / \`collapse\` / Huffman | [protocol-lut.md](protocol-lut.md) · [huffman-v2.md](huffman-v2.md) |
+| JSON subset example | [json-subset.md](json-subset.md) |
+| Wire string literals in protocol | [protocol-parse.md](protocol-parse.md#wire-literals-in-parse-protocol) · [wire-literals.md](wire-literals.md) |
+
+---
+
+## Naming rules
+
+| Rule | Example |
+|------|---------|
+| Instance name must start with \`.\` | \`.uart8n1\` ✓ — \`uart8n1\` ✗ |
+| Letters and digits only (no \`_\`) | \`.uart8n1\` ✓ — \`.uart_8n1\` ✗ |
+| Same name at declaration and use | \`inline [protocol] .uart8n1:\` → \`.uart8n1 { … }\` |
+
+Using a protocol without the leading dot is a parse error:
+
+\`\`\`text
+Expected '.' before inline instance name
+(use '.uart8n1' not 'uart8n1')
+\`\`\`
+
+---
+
+## Declare vs use
+
+| Step | Syntax |
+|------|--------|
+| Define protocol | \`inline [protocol] .name: … :\` |
+| Assign outputs | \`10wire tx = .uart8n1 { data = ^41 }\` |
+| Assign multiple outputs | \`8wire mosi, 8wire sclk, 8wire cs = .spi { data = ^A5 }\` |
+
+Multi-target assignments may span lines before \`=\`:
+
+\`\`\`logts
+8wire mosi,
+8wire sclk,
+8wire cs
+= .spi { data = ^A5 }
+\`\`\`
+
+Use **\`Nwire\`** for assignable signal wires (same as [ASM](asm.md)). **\`Nbit\`** variables are also supported but are immutable bit values, not wires.
+
+Protocol uses **\`{ }\`** with named parameters (\`data = ^41\`). ASM uses **\`{ }\`** with mnemonics. LUT uses **\`(...)\`** for lookup.
+
+### Runnable — quick start
+
+\`\`\`logts-play
+inline [protocol] .uart8n1:
+  tx:
+    0
+    reverse(data 8b)
+    1
+  :
+
+10wire tx = .uart8n1 { data = ^41 }
+show(tx)
+\`\`\`
+
+Single channel, one parameter — result on wire \`tx\`.
+
+---
+
+---
+
+## Feature matrix — assemble, \`mode: parse\`, \`:decode\`
+
+Not every generator works in every direction. Use this table when choosing encode vs recover vs \`:decode()\`.
+
+| Segment / generator | \`mode: assemble\` (default) | \`mode: parse\` | \`:decode(channels…)\` |
+|---------------------|----------------------------|---------------|----------------------|
+| Literals \`0\`, \`0101\`, \`^AA\`, \`\\42\` | emit | verify on wire | verify |
+| \`param Nb\` / \`param ~b\` | read from invoke args | **read from cursor** (\`parseField\`) | extract from channel bits |
+| \`def\` + \`localRef\` | compose sub-segments | parse sub-stream | ✗ |
+| \`reverse\`, \`parityEven/Odd\`, \`clock\`, \`repeat\` | ✓ | ✗ (use literals + fields instead) | verify + extract params |
+| \`length(param) Nb\`, \`lengthOf(def) Nb\` | ✓ | ✗ | ✗ |
+| \`withLength(param, Nb)\` | strip length prefix (assemble) | read length prefix + payload | ✗ |
+| \`withLength(param, field b)\` | ✗ | read \`field\`-wide payload | ✗ |
+| \`withLength(stream\\|data, Nb, def)\` | ✗ | framed repeat-parse (\`entry\` loop) | ✗ |
+| \`expand\`, \`collapse\`, \`collapse(withLength(…), …)\` | ✓ | \`collapse\` only (incl. nested \`withLength\`) | ✗ |
+| \`checksum(crc16, def\\|param)\` | append CRC | ✗ | ✗ |
+| \`validateChecksum(crc16, param)\` | ✗ | verify CRC on **full** invoke param | ✗ |
+| Attributes \`codebookLoad\`, \`parseResult\` | ✗ | parse only | ✗ |
+| **\`?\` tentative sections** (\`foo?\`, \`foo?:\`) | ✗ | ordered choice + rollback | ✗ |
+| **Section repeat** (\`packet[n]\`, \`[min-max]\`, \`*\`, \`+\`) | ✗ | repeat \`def\` — see [protocol-repeat.md](protocol-repeat.md) | ✗ |
+| **\`rest ~\`**, **\`rest -Nb\`** | ✗ | consume tail / reserve footer | ✗ |
+| **\`parseView: tree\`** | ✗ | optional structured show + \`wire:section:field\` | ✗ |
+
+**Rules of thumb:**
+
+- **UART / SPI / I2C encode** → default assemble + optional \`:decode()\` on simple channels.
+- **Huffman / framed packets** → assemble encoder + separate **\`mode: parse\`** recover protocol (not \`:decode()\` on the encoder).
+- **\`:decode()\`** recovers only \`param\`-like fields from fixed layouts — not \`expand\`/\`collapse\`/\`def\`/\`withLength\`/\`checksum\`.
+
+Invoke shapes:
+
+| Mode | Example |
+|------|---------|
+| assemble | \`123wire pkt = .encoder { tokens = …, codebook = … }\` |
+| parse | \`32wire out = .recover { data = pkt }\` or \`{ stream = pkt }\` |
+| \`:decode\` | \`8wire data = .uart8n1:decode(tx)\` |
+
 
 ---
 
@@ -21449,6 +21356,16 @@ Example \`doc(.uart8n1)\`:
 
 ## Common errors
 
+| Category | Page |
+|----------|------|
+| Assemble / \`:decode\` / generators | [protocol-assemble.md](protocol-assemble.md) |
+| \`expand\` / \`collapse\` | [protocol-lut.md](protocol-lut.md) |
+| \`mode: parse\`, cursor, CRC verify | [protocol-parse.md](protocol-parse.md) |
+| Tentative \`?\` | [protocol-tentative.md](protocol-tentative.md) |
+| Section repeat | [protocol-repeat.md](protocol-repeat.md) |
+
+Quick reference (most frequent):
+
 | Error | Cause |
 |-------|--------|
 | Expected '.' before inline instance name | Missing leading dot |
@@ -21485,29 +21402,6 @@ Example \`doc(.uart8n1)\`:
 
 ---
 
-## \`execStmts\` (secondary parse)
-
-The editor runs the full script once at **Run**. The **test harness** also supports \`execStmts(interp, src)\` — append extra top-level statements against the **same** interpreter (e.g. Huffman FSM ticks, then encode).
-
-Requirements:
-
-| Topic | Detail |
-|-------|--------|
-| Inline instances | Must already exist from the initial \`run()\` (\`inline [protocol] .huffPacket:\` etc.) |
-| Parser disambiguation | \`{ }\` after \`.name\` is protocol if the instance is \`protocol\`, asm if \`asm\`. Secondary parse **seeds** kinds from \`inlineInstances\` — otherwise \`.huffPacket { tokens = source }\` is misparsed as asm and throws *not an asm ISA* |
-| Wave session | After exec, \`propagate()\` runs so wires like \`16wire lb = .links:get(…)\` see fresh LUT data |
-
-Example (after FSM + walk via \`execStmts\`):
-
-\`\`\`logts
-64wire packet =: .huffPacket { tokens = source }
-32wire recovered = .huffRecover { data = packet }
-\`\`\`
-
-Tests **2128** (round-trip), **2116** (walk only). Wrong kind error: *Inline instance '.foo' is a protocol, not an asm ISA; use .foo { param = ... }*.
-
----
-
 ## vs ASM
 
 | Feature | asm | protocol |
@@ -21521,13 +21415,19 @@ Tests **2128** (round-trip), **2116** (walk only). Wrong kind error: *Inline ins
 
 A protocol definition is entirely generic. The compiler has no knowledge of UART, SPI, I2C, SDA, SCL, MOSI, or SCLK — these are user-defined channel and parameter names.
 
+
 ---
 
 ## Related
 
-- [huffman.md](huffman.md) — Huffman coding walkthrough (\`.huff\` + \`.huffPacket\` / \`.huffRecover\`)
-- [huffman-v2.md](huffman-v2.md) — self-contained packet SC (magic, codebook, checksum)
-- [lut.md](lut.md) — \`prefixFree\`, \`variableDepth\`, LUT invoke
+- [protocol-assemble.md](protocol-assemble.md) — segments, UART/SPI/I2C, \`:decode\`, \`def\`, \`length\`
+- [protocol-parse.md](protocol-parse.md) — \`mode: parse\`, cursor, \`rest\`, \`validateChecksum\`
+- [protocol-tentative.md](protocol-tentative.md) — \`?\` choice groups
+- [protocol-repeat.md](protocol-repeat.md) — \`[n]\`, \`*\`, anchor
+- [protocol-lut.md](protocol-lut.md) — \`expand\` / \`collapse\`
+- [json-subset.md](json-subset.md) — JSON subset cookbook
+- [huffman.md](huffman.md) · [huffman-v2.md](huffman-v2.md) — Huffman packets
+- [lut.md](lut.md) — inline LUT
 - [asm.md](asm.md) — single-blob machine code
 - [assignment-operators.md](assignment-operators.md) — dynamic-width assignment
 `,
@@ -21989,7 +21889,7 @@ Top-level block — schema name is written as **\`<name>\`**:
 
 | Rule | Detail |
 |------|--------|
-| Field syntax | \`name:width\` (width in bits) |
+| Field syntax | \`name:width\` (width in bits); \`name:W[N]\` vector; \`name:W[N,M]\` matrix inside schema |
 | Bit layout | **MSB-left, index 0** — same convention as \`.bitRange\` / wire slices |
 | Total width | Sum of field widths |
 | Duplicate names | Error at parse time |
@@ -22015,6 +21915,161 @@ Top-level block — schema name is written as **\`<name>\`**:
 Validation compares **schema total width** with **element width** (\`16\` in the examples above), not the full wire/tensor size. A 16-bit schema on \`16wire[64]\` is valid (64 elements × 16 bits); a 16-bit schema on \`8wire[4]\` is an error.
 
 Type labels in debug output reflect the shape + schema, e.g. \`16wire[3]<opcode>\`, \`16wire[2,2]<opcode>\`.
+
+---
+
+## Array fields inside a schema
+
+A schema may contain **fixed-size arrays** of raw bit slices (model B — one wire holds the full packed record):
+
+\`\`\`logts
+<frame>:
+    tag:8
+    cells:8[3]      # vector — 3 × 8b = 24b
+    grid:4[2,2]     # matrix — 2×2 × 4b = 16b
+:
+48wire<frame> pkt := 0
+\`\`\`
+
+| Syntax | Meaning | Total bits |
+|--------|---------|------------|
+| \`cells:8[3]\` | 3 elements, 8 bits each | 24 |
+| \`grid:4[2,2]\` | 2×2 matrix, 4 bits per cell | 16 |
+
+**Indices are 0-based** (same as wire vectors): \`pkt:cells:1\`, \`pkt:grid:0:1\`.
+
+Attach with a scalar wire whose width equals **schema \`totalWidth\`** (here \`48wire<frame>\`). Do **not** use \`8wire[3]<frame>\` — element width must match the whole schema, not one array cell.
+
+### Read / write
+
+\`\`\`logts
+pkt:tag := \\42
+pkt:cells:0 := \\15
+pkt:cells:1 := \\240
+pkt:grid:0:1 := \\6
+8wire c0 = pkt:cells:0
+4wire g = pkt:grid:0:1
+\`\`\`
+
+### Literals on array slices
+
+Use the same RHS forms as [wire-literals.md](wire-literals.md) on the **array slice** (\`pkt:cells\`, \`pkt:grid\`). Width must match \`W×N\` or \`W×rows×cols\`:
+
+| Accepted | Example | Width |
+|----------|---------|-------|
+| Concatenation | \`pkt:cells = 00001111 + 11110000 + 10101010\` | 3×8 = 24b |
+| Hex pattern | \`pkt:cells = ^0FF0AA\` | 24b |
+| Grouped + tag | \`pkt:cells = \\1 \\2 \\3;8\` | 3×8 = 24b |
+| Per-element | \`pkt:cells:1 := \\5\` | 8b |
+
+**Not supported (v1):** schema literals with array lists — \`{ cells=[\\1,\\2,\\3] }<frame>\`.
+
+Variable-length arrays (\`field:8[1-3]\`) are planned for a later phase. **Schema arrays** (\`field:<sub>[N]\` / \`[R,C]\`) are supported — see below.
+
+### Matrix row / column slices
+
+Same syntax as wire matrices — \`pkt:grid:0\` (row), \`pkt:grid::1\` (column), including \`pkt:grid:(rowIdx)\` and \`pkt:grid::(colIdx)\`:
+
+\`\`\`logts
+pkt:grid:0 = 0101 + 0110
+pkt:grid::1 = 0110 + 1111
+show(pkt:grid:0)    # :0:0 … :0:1 + pkt:grid has shape [2,2]
+show(pkt:grid::1)   # :0:1 … :1:1 + pkt:grid has shape [2,2]
+\`\`\`
+
+### \`show\` on array fields
+
+\`show(pkt)\` prints scalar fields normally; array fields use a **section header** plus **flat index lines** (\`:0 = … (Wbit)\`), without \`cells[3]\` syntax. \`show(pkt:cells)\` / \`show(pkt:grid)\` add a \`has length\` / \`has shape\` footer.
+
+---
+
+## Schema arrays (\`field:<schema>[N]\` / \`[R,C]\`)
+
+A schema may contain **fixed-size arrays of sub-schemas** — each element is a full nested record (model B), analogous to \`16wire[2]<opcode>\` on wires (model A):
+
+\`\`\`logts
+<opcode>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:8
+:
+
+<frame>:
+    tag: 8
+    slots: <opcode>[2]    # 2 × 16b = 32b
+    tiles: <opcode>[2,2]  # 2×2 × 16b = 64b
+:
+40wire<frame> pkt := 0
+\`\`\`
+
+| Syntax | Meaning | Total bits |
+|--------|---------|------------|
+| \`slots:<opcode>[2]\` | 2 elements, each \`opcode.totalWidth\` | 2×16 = 32 |
+| \`tiles:<opcode>[2,2]\` | 2×2 matrix of \`opcode\` records | 4×16 = 64 |
+
+**Indices are 0-based:** \`pkt:slots:1:alu\`, \`pkt:tiles:0:1:cycles\`. Matrix row/column slices use the same rules as raw arrays — \`pkt:tiles:0\`, \`pkt:tiles::1\`.
+
+### Read / write
+
+\`\`\`logts
+pkt:tag := \\42
+pkt:slots:0:alu := \\5
+pkt:slots:1 = { alu=\\5 cycles=\\3 }<opcode>
+pkt:tiles:0:1:alu := \\5
+4wire a = pkt:slots:0:alu
+16wire s0 = pkt:slots:0
+\`\`\`
+
+### Literals on schema array slices
+
+Same RHS forms as wire vectors — concatenation, hex, per-element schema literal:
+
+| Accepted | Example | Width |
+|----------|---------|-------|
+| Concatenation | \`pkt:slots = s0 + s1\` | 2×16 = 32b |
+| Per-element literal | \`pkt:slots:1 = { alu=\\5 }<opcode>\` | 16b |
+| Sub-field assign | \`pkt:slots:0:alu := \\5\` | 4b |
+
+**Not supported (v1):** structured slice literal — \`{ slots=[…] }<frame>\`.
+
+### \`show\` on schema arrays
+
+Same layout as wire vectors with schema (rev. 4): section header \`slots\`, flat \`:i = … (Wbit)\` per element, then **indented sub-schema tree** underneath. \`show(pkt:slots:1)\` shows one element only.
+
+\`\`\`logts-play wave
+<opcode>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:8
+:
+
+<frame>:
+    tag: 8
+    slots: <opcode>[2]
+:
+40wire<frame> pkt := 0
+pkt:slots:1:alu := \\5
+pkt:slots:1:cycles := \\3
+show(pkt)
+\`\`\`
+
+Mixed scalar + schema array + nested scalar on one record is supported — e.g. \`tag:8\` + \`slots:<opcode>[2]\` + \`meta:<flags>\`.
+
+\`\`\`logts
+<frame>:
+    tag:8
+    cells:8[3]
+    grid:4[2,2]
+:
+48wire<frame> pkt := 0
+pkt:cells:1 := \\240
+pkt:grid:0:1 := \\6
+show(pkt)
+\`\`\`
 
 Mismatch between schema width and **element** width is a compile-time error:
 
@@ -22072,7 +22127,7 @@ grid:0:1:jump          # matrix cell (row 0, col 1), field jump
 
 Rules are the same as on a scalar wire: \`=\` strict width, \`:=\` left-pad; RHS is any expression; reads use a wire matching the field width.
 
-\`show(rom:1)\` / \`show(grid:0:1)\` on a schema wire prints a **per-field multi-line breakdown of that one element**. \`show(rom)\` / \`peek(rom)\` on the full vector lists each \`:i\` / \`:row:col\` line with **inline schema fields** when the wire has \`schemaRef\` (e.g. \`:1 = alu=0101 jump=0 …\`). \`probe(rom:1)\` uses the same inline layout. Use \`compact\` for header + length/shape only; use indexed \`show\` for full multi-line detail on one slot.
+\`show(rom:1)\` / \`show(grid:0:1)\` on a schema wire prints a **per-field multi-line breakdown of that one element**. \`show(rom)\` / \`peek(rom)\` on the full vector lists each \`:i\` / \`:row:col\` as a **flat index line** (\`:1 = … (16bit)\`), then **indented schema fields** on the following lines (not inline \`alu=0101\` on the same line). \`probe(rom:1)\` uses the same tree layout. Use \`compact\` for header + length/shape only; use indexed \`show\` for full multi-line detail on one slot.
 
 ### Vector example
 
@@ -22336,10 +22391,11 @@ See [debug.md — display tags](debug.md#show).
 
 In the **Wave Listen** panel toolbar, set **Fmt** to **\`auto\`** (first item in the dropdown). When the listened wire has a schema attached (\`16wire<opcode>\`), commit lines show a **per-field breakdown** (same rules as \`show\`):
 
-- **Inline** (narrow wires): compact \`alu=0101 cycles=11 …\`
-- **Expand** ([+] button): appears when **fmt is \`auto\`** and the wire has a schema (or when the value exceeds 256 bits); shows the same multi-line breakdown as \`show\`
+- **Inline** (scalar wires): compact \`alu=0101 cycles=11 …\`
+- **Inline** (vector/matrix + schema): flat slot lines only — \`:0 = … :1 = …\` (no inline \`alu=0101\` on the same line)
+- **Expand** ([+] button): appears when **fmt is \`auto\`** and the wire has a schema (or when the value exceeds 256 bits); shows the same multi-line tree as \`show\`
 - **Copy** ([cpy]): script literal only — \`{ opcode=\\5 flags={ … }<flags> … }<instruction>\` (no \`wireName =\` prefix)
-- **Vectors / matrices** (\`16wire[3]<opcode>\`): each \`:i\` / \`:row:col\` line uses inline schema fields (same as \`show(rom)\`); expand lists all element lines
+- **Vectors / matrices** (\`16wire[3]<opcode>\`): expand lists flat index lines plus indented fields per slot
 
 Without \`schemaRef\`, \`auto\` falls back to **hex** (same as before).
 
@@ -22397,7 +22453,7 @@ Use \`doc(schema)\` to list defined schemas and \`doc(schema.name)\` for an inde
 
 \`show(wire:nestedField)\` on a nested container prints the sub-schema breakdown for that slice. Assignment to a nested container (\`instr:f := …\`) still requires subfields or a nested literal on the parent wire.
 
-\`show(instr)\` prints nested groups with indentation. Wave Listen **inline** (\`auto\`) shows all leaf fields flat (\`carry=1 opcode=…\`); **expand** uses the same tree as \`show\`.
+\`show(instr)\` prints nested groups with indentation. Wave Listen **inline** (\`auto\`) on scalars shows all leaf fields flat (\`carry=1 opcode=…\`); on vectors shows flat slot lines only. **Expand** uses the same tree as \`show\`.
 
 **Nested literals** (phase 2):
 
@@ -23404,7 +23460,7 @@ Tests **2125–2127** (Huffman FSM). This replaces manual “stale wire” worka
 
 ### \`execStmts\` (test harness)
 
-The Node/browser test session exposes \`execStmts(interp, src)\` to append and run fresh top-level statements against a live interpreter (e.g. after FSM ticks). On **wave** sessions it calls \`propagate()\` after exec so LUT reads and dependent wires settle. Protocol invocations (\`.huffPacket { … }\`) work because the parser is seeded with inline kinds from \`inlineInstances\` — see [protocol.md — execStmts](protocol.md#execstmts-secondary-parse).
+The Node/browser test session exposes \`execStmts(interp, src)\` to append and run fresh top-level statements against a live interpreter (e.g. after FSM ticks). On **wave** sessions it calls \`propagate()\` after exec so LUT reads and dependent wires settle. Protocol invocations (\`.huffPacket { … }\`) work because the parser is seeded with inline kinds from \`inlineInstances\` — see [protocol-parse.md — execStmts](protocol-parse.md#execstmts-secondary-parse).
 
 ---
 
@@ -24413,7 +24469,7 @@ Define reusable logic with **\`def\`**, then call it like a built-in function: \
 
 User functions complement the built-in catalogue ([builtin-functions.md](builtin-functions.md)). Use \`doc(def)\` to list all names, or \`doc(myFunc)\` for one signature.
 
-> **Not the same as protocol \`def\`.** Inside \`inline [protocol]\`, \`def\` names a local bit segment ([protocol.md](protocol.md#def--local-segments)). This page is about **script-level** \`def name(type param, …):\`.
+> **Not the same as protocol \`def\`.** Inside \`inline [protocol]\`, \`def\` names a local bit segment ([protocol-assemble.md](protocol-assemble.md#def--local-segments)). This page is about **script-level** \`def name(type param, …):\`.
 
 ---
 
@@ -24716,7 +24772,7 @@ doc(add4)
 - [short-notation.md](short-notation.md) — \`\` \`…\` \`\` inside return lines
 - [pcb.md](pcb.md) — calling \`def\` from PCB bodies
 - [board.md](board.md) / [chip.md](chip.md) — \`def\` not allowed inside composite bodies
-- [protocol.md](protocol.md) — protocol-local \`def\` (different feature)
+- [protocol-assemble.md](protocol-assemble.md) — protocol-local \`def\` (different feature)
 `,
     'vector-reduction.md': `# Vector reduction functions
 

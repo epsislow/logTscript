@@ -152,6 +152,7 @@ Flat `ParseFields` keeps the **last** iteration per field name; full history liv
 
 ## Related
 
-- [protocol.md](protocol.md) — hub, `mode: parse`, `rest`
+- [protocol.md](protocol.md) — hub
+- [protocol-parse.md](protocol-parse.md) — `mode: parse`, `rest`
 - [protocol-tentative.md](protocol-tentative.md) — `?` choice vs `[0-1]` sequential
 - [json-subset.md](json-subset.md) — JSON cookbook (repeat + tentative + wire-literals)
