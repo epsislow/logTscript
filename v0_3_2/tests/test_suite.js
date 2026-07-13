@@ -20383,7 +20383,7 @@ reg(2244, 'semantic-schemas', 'peek and probe schema breakdown smoke', function(
   h.assert('field updated', String(out.some(l => l.includes('1111'))), 'true');
 }, { propagation: 'wave' });
 
-reg(2253, 'semantic-schemas', 'vector show peek probe schema inline per element', function(h, session) {
+reg(2253, 'semantic-schemas', 'vector show peek probe schema flat tree per element', function(h, session) {
   const script = OPCODE16_SCHEMA + [
     '16wire[3]<opcode> rom := 0',
     'rom:1:alu := \\5',
@@ -20393,14 +20393,13 @@ reg(2253, 'semantic-schemas', 'vector show peek probe schema inline per element'
     'probe(rom:1)',
   ].join('\n');
   const { out } = session.run(script);
-  const slot1Lines = out.filter((l) => l.includes(':1 =') && l.includes('alu=0101'));
-  h.assert('show rom slot1 schema inline', String(slot1Lines.length >= 1), 'true');
-  h.assert('show rom slot1 cycles', String(slot1Lines.some((l) => l.includes('cycles=11'))), 'true');
-  const peekSlot1 = out.filter((l) => l.includes(':1 =') && l.includes('alu=0101'));
-  h.assert('peek rom slot1 schema inline', String(peekSlot1.length >= 1), 'true');
-  const probeLine = out.find((l) => l.startsWith('# rom:1 =') && l.includes('alu=0101'));
-  h.assert('probe rom:1 schema inline', String(!!probeLine), 'true');
-  h.assert('probe rom:1 cycles', String(probeLine && probeLine.includes('cycles=11')), 'true');
+  h.assert('show rom slot1 flat line', String(out.some((l) => l.includes(':1 =') && l.includes('(16bit)'))), 'true');
+  h.assert('show rom slot1 alu field', String(out.some((l) => l.includes('alu') && l.includes('0101'))), 'true');
+  h.assert('show rom slot1 cycles field', String(out.some((l) => l.includes('cycles') && l.includes('11'))), 'true');
+  h.assert('peek rom slot1 flat', String(out.filter((l) => l.includes(':1 =') && l.includes('(16bit)')).length >= 1), 'true');
+  const probeLine = out.find((l) => l.startsWith('# rom:1 ='));
+  h.assert('probe rom:1 header', String(!!probeLine), 'true');
+  h.assert('probe rom:1 alu field', String(out.some((l) => l.startsWith('#') && l.includes('alu') && l.includes('0101'))), 'true');
 }, { propagation: 'wave' });
 
 reg(2254, 'semantic-schemas', 'Wave Listen auto vector schema inline and expand', function(h, session) {
@@ -20432,10 +20431,10 @@ reg(2254, 'semantic-schemas', 'Wave Listen auto vector schema inline and expand'
     },
   };
   const inline = formatWaveListenInline(entry, 'auto', null, session.interp);
-  h.assert('inline slot1 alu', String(inline.includes('alu=0101')), 'true');
-  h.assert('inline slot1 cycles', String(inline.includes('cycles=11')), 'true');
+  h.assert('inline slot1 flat', String(inline.includes(':1 =')), 'true');
   const lines = formatWaveListenExpandLines(entry, 'auto', session.interp);
-  h.assert('expand slot1 alu', String(lines.some((l) => l.includes(':1 =') && l.includes('alu=0101'))), 'true');
+  h.assert('expand slot1 alu', String(lines.some((l) => l.includes('alu') && l.includes('0101'))), 'true');
+  h.assert('expand slot1 cycles', String(lines.some((l) => l.includes('cycles') && l.includes('11'))), 'true');
 }, { propagation: 'wave' });
 
 reg(2245, 'semantic-schemas', 'field assign with AND expression', function(h, session) {
@@ -21134,6 +21133,93 @@ reg(2290, 'schema-composition', 'show nested container field view', function(h, 
 reg(2289, 'schema-composition', 'flat schema regression OPCODE16', function(h, session) {
   session.run(OPCODE16_SCHEMA + '16wire<opcode> instr := 0\ninstr:alu := \\5');
   h.assert('flat still works', session.getWire(session.interp, 'instr').substring(0, 4), '0101');
+});
+
+const FRAME48_SCHEMA = `<frame>:
+    tag: 8
+    cells: 8[3]
+    grid: 4[2,2]
+:
+`;
+
+reg(2180, 'semantic-schemas', 'schema array field parse totalWidth 48', function(h, session) {
+  session.run(FRAME48_SCHEMA);
+  const schema = session.interp.schemaRegistry.get('frame');
+  h.assert('totalWidth', String(schema && schema.totalWidth === 48), 'true');
+  h.assert('has array cells', String(schema && schema.structure.some((n) => n.kind === 'array' && n.name === 'cells')), 'true');
+});
+
+reg(2181, 'semantic-schemas', 'array field vector access read write', function(h, session) {
+  session.run(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:tag := \\42',
+    'pkt:cells:0 := \\15',
+    'pkt:cells:1 := \\240',
+    'pkt:cells:2 := \\170',
+    '8wire c0 = pkt:cells:0',
+    '8wire c1 = pkt:cells:1',
+  ].join('\n'));
+  h.assert('tag', session.getWire(session.interp, 'pkt').substring(0, 8), '00101010');
+  h.assert('cells:0', session.getWire(session.interp, 'c0'), '00001111');
+  h.assert('cells:1', session.getWire(session.interp, 'c1'), '11110000');
+});
+
+reg(2182, 'semantic-schemas', 'array field matrix cell access', function(h, session) {
+  session.run(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:grid:0:1 := \\6',
+    'pkt:grid:1:0 := \\15',
+    '4wire a = pkt:grid:0:1',
+    '4wire b = pkt:grid:1:0',
+  ].join('\n'));
+  h.assert('grid:0:1', session.getWire(session.interp, 'a'), '0110');
+  h.assert('grid:1:0', session.getWire(session.interp, 'b'), '1111');
+});
+
+reg(2183, 'semantic-schemas', 'array schema width mismatch on wire vector', function(h, session) {
+  h.assertThrows('width mismatch', function() {
+    session.run(FRAME48_SCHEMA + '8wire[3]<frame> bad');
+  }, 'width mismatch');
+});
+
+reg(2184, 'semantic-schemas', 'show array fields flat index lines', function(h, session) {
+  const { out } = session.run(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:cells:1 := \\240',
+    'pkt:grid:0:1 := \\6',
+    'show(pkt)',
+  ].join('\n'));
+  h.assert('cells section', String(out.some((l) => l.trim() === 'cells')), 'true');
+  h.assert('cells :1 flat', String(out.some((l) => l.includes(':1 =') && l.includes('11110000'))), 'true');
+  h.assert('grid :0:1', String(out.some((l) => l.includes(':0:1 =') && l.includes('0110'))), 'true');
+});
+
+reg(2185, 'semantic-schemas', 'array slice assign binary', function(h, session) {
+  session.run(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:cells = 00001111 + 11110000 + 10101010',
+  ].join('\n'));
+  h.assert('cells:0', session.getWire(session.interp, 'pkt').substring(8, 16), '00001111');
+  h.assert('cells:2', session.getWire(session.interp, 'pkt').substring(24, 32), '10101010');
+});
+
+reg(2186, 'semantic-schemas', 'wire vector of frame schema composite path', function(h, session) {
+  session.run(FRAME48_SCHEMA + [
+    '48wire[2]<frame> pktb := 0',
+    'pktb:1:cells:2 := \\170',
+    '8wire x = pktb:1:cells:2',
+  ].join('\n'));
+  h.assert('pktb:1:cells:2', session.getWire(session.interp, 'x'), '10101010');
+});
+
+reg(2187, 'semantic-schemas', 'show pktb vector flat tree slots', function(h, session) {
+  const { out } = session.run(FRAME48_SCHEMA + [
+    '48wire[2]<frame> pktb := 0',
+    'pktb:0:tag := \\42',
+    'show(pktb)',
+  ].join('\n'));
+  h.assert('slot :0 flat', String(out.some((l) => l.includes(':0 =') && l.includes('(48bit)'))), 'true');
+  h.assert('slot :0 tag field', String(out.some((l) => l.includes('tag') && l.includes('00101010'))), 'true');
 });
 
 

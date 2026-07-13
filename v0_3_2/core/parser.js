@@ -170,7 +170,19 @@ class Parser {
       } else if (this.c.type === 'DEC' || this.c.type === 'BIN') {
         const width = parseInt(this.c.value, 10);
         this.eat(this.c.type);
-        fields.push({ kind: 'leaf', name: fieldName, width });
+        const shape = this.parseSchemaArraySuffix();
+        if (shape) {
+          fields.push({
+            kind: 'array',
+            name: fieldName,
+            elementWidth: width,
+            rows: shape.rows,
+            cols: shape.cols,
+            singleDim: shape.singleDim,
+          });
+        } else {
+          fields.push({ kind: 'leaf', name: fieldName, width });
+        }
       } else {
         throw Error(`Expected field width or schema ref for '${fieldName}' in schema '${name}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
@@ -467,6 +479,38 @@ class Parser {
     this.eat('SYM', ']');
     if (!Number.isFinite(first) || first < 1 || !Number.isFinite(cols) || cols < 1) {
       throw Error(`Tensor dimensions must be >= 1 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    return { rows, cols, singleDim: !hadComma };
+  }
+
+  parseSchemaArraySuffix() {
+    if (this.c.type !== 'SYM' || this.c.value !== '[') return null;
+    this.eat('SYM', '[');
+    if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+      throw Error(`Expected array dimension after '[' in schema field at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const first = parseInt(this.c.value, 10);
+    this.eat(this.c.type);
+    let rows = 1;
+    let cols = first;
+    let hadComma = false;
+    if (this.c.type === 'SYM' && this.c.value === ',') {
+      hadComma = true;
+      this.eat('SYM', ',');
+      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+        throw Error(`Expected second array dimension after ',' in schema field at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const second = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      rows = first;
+      cols = second;
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        throw Error(`Array dimensions beyond 2D are not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+    }
+    this.eat('SYM', ']');
+    if (!Number.isFinite(first) || first < 1 || !Number.isFinite(cols) || cols < 1) {
+      throw Error(`Array dimensions must be >= 1 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     return { rows, cols, singleDim: !hadComma };
   }

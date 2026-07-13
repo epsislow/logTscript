@@ -4110,18 +4110,33 @@ class Interpreter {
     } catch (err) {
       return null;
     }
-    if (!view || view.kind !== 'nested') return null;
+    if (!view || (view.kind !== 'nested' && view.kind !== 'array' && view.kind !== 'array_row')) return null;
     let valueStr = part.value != null ? part.value : '-';
     if (valueStr === '-' && part.ref) valueStr = this.getValueFromRef(part.ref) || '-';
     if (valueStr === '-') return null;
-    SS.validateSchemaWidthForShow(view.schema, valueStr.length);
     const displayName = part.varName || this._formatSchemaFieldLabel(atom) || atom.var;
-    const typeLabel = `${displayName} (${view.width}wire<${view.schema.name}>)`;
-    const lines = SS.formatSchemaShowTree(
+    if (view.kind === 'nested') {
+      SS.validateSchemaWidthForShow(view.schema, valueStr.length);
+      const typeLabel = `${displayName} (${view.width}wire<${view.schema.name}>)`;
+      const lines = SS.formatSchemaShowTree(
+        valueStr,
+        view.schema,
+        opts,
+        (bits, w) => this.formatValue(bits, w)
+      );
+      if (lines.length) lines[0] = typeLabel;
+      return lines;
+    }
+    if (view.width !== valueStr.length) {
+      throw new Error(`${displayName} (${view.width}bit) width incompatible with wire (${valueStr.length}bit)`);
+    }
+    const typeLabel = `${displayName} (${view.width}wire)`;
+    const lines = SS.formatSchemaArraySliceShow(
       valueStr,
-      view.schema,
+      view,
       opts,
-      (bits, w) => this.formatValue(bits, w)
+      (bits, w) => this.formatValue(bits, w),
+      displayName
     );
     if (lines.length) lines[0] = typeLabel;
     return lines;
@@ -8106,9 +8121,29 @@ if (this.isBuiltinDEMUX(name)) {
 
   _formatVectorElementLine(index, valueStr, elementWidth, opts, wire) {
     const formatted = valueStr !== '-'
-      ? this._formatElementValueWithSchema(valueStr, wire, opts, elementWidth)
+      ? this._formatShowWireValue(valueStr, elementWidth, opts, true, elementWidth)
       : valueStr;
     return `:${index} = ${formatted} (${elementWidth}bit)`;
+  }
+
+  _appendSchemaTreeUnderElement(lines, valueStr, elementWidth, wire, opts, indent) {
+    if (!wire || !wire.schemaRef || valueStr === '-' || valueStr == null) return;
+    const SS = this._semanticSchemas();
+    if (!SS) return;
+    try {
+      const schema = this._resolveSchema(wire.schemaRef);
+      if (valueStr.length !== schema.totalWidth || schema.totalWidth !== elementWidth) return;
+      SS.appendSchemaShowTreeLines(
+        lines,
+        valueStr,
+        schema,
+        opts,
+        (bits, w) => this.formatValue(bits, w),
+        indent + 1
+      );
+    } catch (err) {
+      // no sub-tree
+    }
   }
 
   _pushDisplayOutput(lines, formatted, opts) {
@@ -8227,6 +8262,7 @@ if (this.isBuiltinDEMUX(name)) {
       const bits = rowBits.substring(cellStart, cellStart + elementWidth);
       if (opts && opts.elNonZero && !this._elementIsNonZero(bits, elementWidth)) continue;
       lines.push(this._formatVectorElementLine(`${rowIndex}:${c}`, bits, elementWidth, opts, wire));
+      this._appendSchemaTreeUnderElement(lines, bits, elementWidth, wire, opts, 0);
     }
     lines.push(`${wireName} has shape [${meta.rows},${meta.cols}]`);
     return lines;
@@ -8257,6 +8293,7 @@ if (this.isBuiltinDEMUX(name)) {
     const emitCell = (index, bits) => {
       if (opts && opts.elNonZero && !this._elementIsNonZero(bits, elementWidth)) return;
       lines.push(this._formatVectorElementLine(index, bits, elementWidth, opts, wire));
+      this._appendSchemaTreeUnderElement(lines, bits, elementWidth, wire, opts, 0);
     };
 
     if (TS && TS.isMatrix(meta)) {

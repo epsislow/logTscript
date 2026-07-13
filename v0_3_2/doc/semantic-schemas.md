@@ -50,7 +50,7 @@ Top-level block — schema name is written as **`<name>`**:
 
 | Rule | Detail |
 |------|--------|
-| Field syntax | `name:width` (width in bits) |
+| Field syntax | `name:width` (width in bits); `name:W[N]` vector; `name:W[N,M]` matrix inside schema |
 | Bit layout | **MSB-left, index 0** — same convention as `.bitRange` / wire slices |
 | Total width | Sum of field widths |
 | Duplicate names | Error at parse time |
@@ -76,6 +76,72 @@ Top-level block — schema name is written as **`<name>`**:
 Validation compares **schema total width** with **element width** (`16` in the examples above), not the full wire/tensor size. A 16-bit schema on `16wire[64]` is valid (64 elements × 16 bits); a 16-bit schema on `8wire[4]` is an error.
 
 Type labels in debug output reflect the shape + schema, e.g. `16wire[3]<opcode>`, `16wire[2,2]<opcode>`.
+
+---
+
+## Array fields inside a schema
+
+A schema may contain **fixed-size arrays** of raw bit slices (model B — one wire holds the full packed record):
+
+```logts
+<frame>:
+    tag:8
+    cells:8[3]      # vector — 3 × 8b = 24b
+    grid:4[2,2]     # matrix — 2×2 × 4b = 16b
+:
+48wire<frame> pkt := 0
+```
+
+| Syntax | Meaning | Total bits |
+|--------|---------|------------|
+| `cells:8[3]` | 3 elements, 8 bits each | 24 |
+| `grid:4[2,2]` | 2×2 matrix, 4 bits per cell | 16 |
+
+**Indices are 0-based** (same as wire vectors): `pkt:cells:1`, `pkt:grid:0:1`.
+
+Attach with a scalar wire whose width equals **schema `totalWidth`** (here `48wire<frame>`). Do **not** use `8wire[3]<frame>` — element width must match the whole schema, not one array cell.
+
+### Read / write
+
+```logts
+pkt:tag := \42
+pkt:cells:0 := \15
+pkt:cells:1 := \240
+pkt:grid:0:1 := \6
+8wire c0 = pkt:cells:0
+4wire g = pkt:grid:0:1
+```
+
+### Literals on array slices
+
+Use the same RHS forms as [wire-literals.md](wire-literals.md) on the **array slice** (`pkt:cells`, `pkt:grid`). Width must match `W×N` or `W×rows×cols`:
+
+| Accepted | Example | Width |
+|----------|---------|-------|
+| Concatenation | `pkt:cells = 00001111 + 11110000 + 10101010` | 3×8 = 24b |
+| Hex pattern | `pkt:cells = ^0FF0AA` | 24b |
+| Grouped + tag | `pkt:cells = \1 \2 \3;8` | 3×8 = 24b |
+| Per-element | `pkt:cells:1 := \5` | 8b |
+
+**Not supported (v1):** schema literals with array lists — `{ cells=[\1,\2,\3] }<frame>`.
+
+Variable-length arrays (`field:8[1-3]`) and nested schemas on array elements (`field:<sub>[N]`) are planned for a later phase.
+
+### `show` on array fields
+
+`show(pkt)` prints scalar fields normally; array fields use a **section header** plus **flat index lines** (`:0 = … (Wbit)`), without `cells[3]` syntax. `show(pkt:cells)` / `show(pkt:grid)` add a `has length` / `has shape` footer.
+
+```logts-play wave
+<frame>:
+    tag:8
+    cells:8[3]
+    grid:4[2,2]
+:
+48wire<frame> pkt := 0
+pkt:cells:1 := \240
+pkt:grid:0:1 := \6
+show(pkt)
+```
 
 Mismatch between schema width and **element** width is a compile-time error:
 
@@ -133,7 +199,7 @@ grid:0:1:jump          # matrix cell (row 0, col 1), field jump
 
 Rules are the same as on a scalar wire: `=` strict width, `:=` left-pad; RHS is any expression; reads use a wire matching the field width.
 
-`show(rom:1)` / `show(grid:0:1)` on a schema wire prints a **per-field multi-line breakdown of that one element**. `show(rom)` / `peek(rom)` on the full vector lists each `:i` / `:row:col` line with **inline schema fields** when the wire has `schemaRef` (e.g. `:1 = alu=0101 jump=0 …`). `probe(rom:1)` uses the same inline layout. Use `compact` for header + length/shape only; use indexed `show` for full multi-line detail on one slot.
+`show(rom:1)` / `show(grid:0:1)` on a schema wire prints a **per-field multi-line breakdown of that one element**. `show(rom)` / `peek(rom)` on the full vector lists each `:i` / `:row:col` as a **flat index line** (`:1 = … (16bit)`), then **indented schema fields** on the following lines (not inline `alu=0101` on the same line). `probe(rom:1)` uses the same tree layout. Use `compact` for header + length/shape only; use indexed `show` for full multi-line detail on one slot.
 
 ### Vector example
 
@@ -397,10 +463,11 @@ See [debug.md — display tags](debug.md#show).
 
 In the **Wave Listen** panel toolbar, set **Fmt** to **`auto`** (first item in the dropdown). When the listened wire has a schema attached (`16wire<opcode>`), commit lines show a **per-field breakdown** (same rules as `show`):
 
-- **Inline** (narrow wires): compact `alu=0101 cycles=11 …`
-- **Expand** ([+] button): appears when **fmt is `auto`** and the wire has a schema (or when the value exceeds 256 bits); shows the same multi-line breakdown as `show`
+- **Inline** (scalar wires): compact `alu=0101 cycles=11 …`
+- **Inline** (vector/matrix + schema): flat slot lines only — `:0 = … :1 = …` (no inline `alu=0101` on the same line)
+- **Expand** ([+] button): appears when **fmt is `auto`** and the wire has a schema (or when the value exceeds 256 bits); shows the same multi-line tree as `show`
 - **Copy** ([cpy]): script literal only — `{ opcode=\5 flags={ … }<flags> … }<instruction>` (no `wireName =` prefix)
-- **Vectors / matrices** (`16wire[3]<opcode>`): each `:i` / `:row:col` line uses inline schema fields (same as `show(rom)`); expand lists all element lines
+- **Vectors / matrices** (`16wire[3]<opcode>`): expand lists flat index lines plus indented fields per slot
 
 Without `schemaRef`, `auto` falls back to **hex** (same as before).
 
@@ -458,7 +525,7 @@ Use `doc(schema)` to list defined schemas and `doc(schema.name)` for an indented
 
 `show(wire:nestedField)` on a nested container prints the sub-schema breakdown for that slice. Assignment to a nested container (`instr:f := …`) still requires subfields or a nested literal on the parent wire.
 
-`show(instr)` prints nested groups with indentation. Wave Listen **inline** (`auto`) shows all leaf fields flat (`carry=1 opcode=…`); **expand** uses the same tree as `show`.
+`show(instr)` prints nested groups with indentation. Wave Listen **inline** (`auto`) on scalars shows all leaf fields flat (`carry=1 opcode=…`); on vectors shows flat slot lines only. **Expand** uses the same tree as `show`.
 
 **Nested literals** (phase 2):
 
