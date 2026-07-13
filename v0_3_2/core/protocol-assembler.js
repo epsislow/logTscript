@@ -12,10 +12,63 @@ function stripComment(line) {
   return line;
 }
 
+function parseQuotedWireString(t) {
+  const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+  if (!WL) {
+    throw new Error('wire string literals require core/wire-literals.js');
+  }
+  const quote = t[0];
+  if ((quote !== '"' && quote !== "'") || t.length < 2 || t[t.length - 1] !== quote) {
+    throw new Error(`Invalid protocol literal '${t}'`);
+  }
+  let str = '';
+  for (let i = 1; i < t.length - 1; i++) {
+    const ch = t[i];
+    if (ch === '\\' && i + 1 < t.length - 1) {
+      const decoded = WL.decodeWireStringEscape(t[i + 1]);
+      if (decoded == null) {
+        throw new Error(`Unknown escape '\\${t[i + 1]}' in protocol literal '${t}'`);
+      }
+      str += decoded;
+      i++;
+      continue;
+    }
+    str += ch;
+  }
+  return WL.wireStringToBin(str);
+}
+
 function parseLiteralToken(token) {
   const t = token.trim();
   if (t === '0' || t === '1') return { kind: 'literal', bits: t };
   if (/^[01]+$/.test(t)) return { kind: 'literal', bits: t };
+
+  const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    return { kind: 'literal', bits: parseQuotedWireString(t) };
+  }
+
+  const decPadM = /^\\(\d+);(\d+)$/.exec(t);
+  if (decPadM) {
+    if (!WL) throw new Error('padded decimal literals require core/wire-literals.js');
+    return {
+      kind: 'literal',
+      bits: WL.unsignedDecToWidthBin(decPadM[1], parseInt(decPadM[2], 10)),
+    };
+  }
+
+  const hexPadM = /^\^([0-9a-fA-F]+);(\d+)$/.exec(t);
+  if (hexPadM) {
+    if (!WL) throw new Error('padded hex literals require core/wire-literals.js');
+    let bits = WL.hexDigitsToBin(hexPadM[1]);
+    const w = parseInt(hexPadM[2], 10);
+    if (bits.length > w) {
+      throw new Error(`hex literal '${t}' exceeds ${w} bits`);
+    }
+    return { kind: 'literal', bits: bits.padStart(w, '0') };
+  }
+
   if (t.startsWith('^')) {
     const hex = t.slice(1);
     if (!/^[0-9a-fA-F]+$/.test(hex)) throw new Error(`Invalid hex literal '${t}'`);
@@ -27,6 +80,62 @@ function parseLiteralToken(token) {
     return { kind: 'literal', bits: parseInt(num, 10).toString(2) };
   }
   throw new Error(`Invalid protocol literal '${t}'`);
+}
+
+function parseRepeatSuffix(suffix) {
+  const s = suffix.trim();
+  if (s === '*') return { min: 0, max: null };
+  if (s === '+') return { min: 1, max: null };
+  if (s === '[-]') {
+    throw new Error("invalid repeat spec '[-]': use '*' or '[0-]'");
+  }
+  const exactM = /^\[(\d+)\]$/.exec(s);
+  if (exactM) {
+    const n = parseInt(exactM[1], 10);
+    return { min: n, max: n };
+  }
+  const rangeM = /^\[(\d+)-(\d+)\]$/.exec(s);
+  if (rangeM) {
+    const min = parseInt(rangeM[1], 10);
+    const max = parseInt(rangeM[2], 10);
+    if (max < min) {
+      throw new Error(`invalid repeat range '[${min}-${max}]': max < min`);
+    }
+    return { min, max };
+  }
+  const openM = /^\[(\d+)-\]$/.exec(s);
+  if (openM) {
+    return { min: parseInt(openM[1], 10), max: null };
+  }
+  throw new Error(`invalid repeat spec '${suffix}'`);
+}
+
+function formatRepeatSpec(repeat) {
+  if (!repeat) return '';
+  if (repeat.max === repeat.min) return `[${repeat.min}]`;
+  if (repeat.max == null) return `[${repeat.min}-]`;
+  return `[${repeat.min}-${repeat.max}]`;
+}
+
+function tryParseLocalRefUse(t, localDefNames, protocolMode) {
+  if (!localDefNames.length) return null;
+  const trimmed = t.trim();
+  if (/^(\w+)\?\s*(\[|\*|\+)/.test(trimmed)) {
+    throw new Error(`invalid section syntax '${trimmed}': '?' must follow repeat spec, not precede it`);
+  }
+  if (/^(\w+)(\*|\+)\?\s*$/.test(trimmed)) {
+    throw new Error(`invalid section syntax '${trimmed}': use '[0-]' or '[1-]' instead of '*?' or '+?'`);
+  }
+  const m = /^(\w+)((?:\[[^\]]+\]|\*|\+))?\??\s*$/.exec(trimmed);
+  if (!m || !localDefNames.includes(m[1])) return null;
+  const name = m[1];
+  const tentative = /\?\s*$/.test(trimmed);
+  if (tentative && protocolMode !== 'parse') {
+    throw new Error(`tentative reference '${name}?' requires mode: parse`);
+  }
+  let repeat = null;
+  if (m[2]) repeat = parseRepeatSuffix(m[2]);
+  return { kind: 'localRef', name, tentative, repeat };
 }
 
 function parseParamRef(text) {
@@ -286,13 +395,8 @@ function parseSegmentLine(line, parameters, ctx) {
     return { kind: 'rest', mode: 'reserve', reserve: parseInt(restResM[1], 10) };
   }
 
-  const tentRefM = /^(\w+)\?\s*$/.exec(t);
-  if (tentRefM && localDefNames.includes(tentRefM[1])) {
-    if (protocolMode !== 'parse') {
-      throw new Error(`tentative reference '${tentRefM[1]}?' requires mode: parse`);
-    }
-    return { kind: 'localRef', name: tentRefM[1], tentative: true };
-  }
+  const localRefUse = tryParseLocalRefUse(t, localDefNames, protocolMode);
+  if (localRefUse) return localRefUse;
 
   const varM = /^(\w+)\s+~b$/i.exec(t);
   if (varM) {
@@ -331,7 +435,7 @@ function isInlineSiblingHeader(trimmed, localDefNames) {
     if (m && PROTOCOL_ATTRS.has(m[1])) return false;
     return true;
   }
-  const mr = /^(\w+)\?\s*$/.exec(trimmed);
+  const mr = /^(\w+)((?:\[[0-9]+(?:-[0-9]*)?\]|\*|\+))?\?\s*$/.exec(trimmed);
   if (mr && localDefNames.includes(mr[1])) return true;
   return false;
 }
@@ -442,6 +546,12 @@ function parseProtocolBody(bodyRaw) {
   const channelOrder = [];
   const parameters = {};
   const localDefs = {};
+  const allLocalDefNames = [];
+  for (const rawLine of bodyRaw.split('\n')) {
+    const trimmed = stripComment(rawLine).trim();
+    const defLine = /^def\s+(\w+)\s*:\s*$/i.exec(trimmed);
+    if (defLine) allLocalDefNames.push(defLine[1]);
+  }
   let currentChannel = null;
   let currentDef = null;
   let defBodyLines = null;
@@ -452,7 +562,7 @@ function parseProtocolBody(bodyRaw) {
   function flushDef() {
     if (!currentDef) return;
     const segCtx = {
-      localDefNames: Object.keys(localDefs).filter(n => n !== currentDef.name),
+      localDefNames: allLocalDefNames.filter(n => n !== currentDef.name),
       protocolMode,
       inDef: true,
       inChannel: false,
@@ -471,7 +581,7 @@ function parseProtocolBody(bodyRaw) {
   function flushChannel() {
     if (!currentChannel) return;
     const segCtx = {
-      localDefNames: Object.keys(localDefs),
+      localDefNames: allLocalDefNames.slice(),
       protocolMode,
       inDef: false,
       inChannel: true,
@@ -766,12 +876,122 @@ class ParseStream {
 
 function normalizeParseItem(item) {
   if (item.kind === 'segment' && item.seg && item.seg.kind === 'localRef') {
-    return { kind: 'localRef', name: item.seg.name, tentative: !!item.seg.tentative };
+    return {
+      kind: 'localRef',
+      name: item.seg.name,
+      tentative: !!item.seg.tentative,
+      repeat: item.seg.repeat || null,
+    };
   }
   return item;
 }
 
-function parseSingleItem(item, stream, fields, inst, args, attributes, ctx, cache, viewCtx) {
+function getLocalRefFromItem(item) {
+  if (item.kind === 'segment' && item.seg && item.seg.kind === 'localRef') return item.seg;
+  const norm = normalizeParseItem(item);
+  if (norm.kind === 'localRef') return norm;
+  return null;
+}
+
+function appendRepeatViewNodes(viewCtx, viewOffset, nodes) {
+  if (!viewCtx || !viewCtx.root || !nodes || !nodes.length) return viewOffset;
+  for (const node of nodes) {
+    node.offset = viewOffset;
+    viewCtx.root.children.push(node);
+    viewOffset += node.width || 0;
+  }
+  viewCtx.root._nextOffset = viewOffset;
+  return viewOffset;
+}
+
+function parseRepeatedLocalDef(defName, repeat, stream, fields, inst, args, attributes, ctx, cache, viewCtx, options, anchorItems) {
+  const localDefs = inst.localDefs || {};
+  if (!localDefs[defName]) throw new Error(`Unknown protocol def '${defName}'`);
+  const min = repeat.min;
+  const max = repeat.max;
+  const hasAnchor = anchorItems && anchorItems.length;
+
+  if (max == null && !hasAnchor) {
+    let out = '';
+    const viewNodes = [];
+    let count = 0;
+    while (true) {
+      const snap = stream.save();
+      const fieldSnap = fields.snapshot();
+      const iterView = viewCtx ? { root: { children: [], fields: {} } } : null;
+      try {
+        const chunk = parseDefSegments(
+          defName, stream, fields, inst, args, attributes, ctx, cache, iterView, options
+        );
+        out += chunk;
+        if (viewCtx) {
+          viewNodes.push({
+            name: defName,
+            index: count,
+            width: chunk.length,
+            children: iterView && iterView.root ? iterView.root.children : [],
+            fields: iterView && iterView.root ? Object.assign({}, iterView.root.fields || {}) : {},
+          });
+        }
+        count++;
+      } catch (err) {
+        stream.restore(snap);
+        fields.restore(fieldSnap);
+        break;
+      }
+    }
+    if (count < min) {
+      const spec = formatRepeatSpec(repeat);
+      const where = options && options.sectionName ? ` in '${options.sectionName}'` : '';
+      throw new Error(`parse: repeat ${defName}${spec} minimum ${min} not met${where}`);
+    }
+    if (viewCtx) appendRepeatViewNodes(viewCtx, viewCtx.root._nextOffset || 0, viewNodes);
+    return out;
+  }
+
+  const maxTry = max != null ? max : 4096;
+  for (let count = maxTry; count >= min; count--) {
+    const snap = stream.save();
+    const fieldSnap = fields.snapshot();
+    try {
+      let out = '';
+      const viewNodes = [];
+      for (let i = 0; i < count; i++) {
+        const iterView = viewCtx ? { root: { children: [], fields: {} } } : null;
+        const chunk = parseDefSegments(
+          defName, stream, fields, inst, args, attributes, ctx, cache, iterView, options
+        );
+        out += chunk;
+        if (viewCtx) {
+          viewNodes.push({
+            name: defName,
+            index: i,
+            width: chunk.length,
+            children: iterView && iterView.root ? iterView.root.children : [],
+            fields: iterView && iterView.root ? Object.assign({}, iterView.root.fields || {}) : {},
+          });
+        }
+      }
+      let anchorOut = '';
+      if (hasAnchor) {
+        anchorOut = parseItemsList(
+          anchorItems, stream, fields, inst, args, attributes, ctx, cache, viewCtx, options
+        );
+      }
+      if (viewCtx) appendRepeatViewNodes(viewCtx, viewCtx.root._nextOffset || 0, viewNodes);
+      return out + anchorOut;
+    } catch (err) {
+      stream.restore(snap);
+      fields.restore(fieldSnap);
+    }
+  }
+  if (min === 0) return '';
+  const spec = formatRepeatSpec(repeat);
+  const where = options && options.sectionName ? ` in '${options.sectionName}'` : '';
+  throw new Error(`parse: repeat ${defName}${spec} minimum ${min} not met${where}`);
+}
+
+function parseSingleItem(item, stream, fields, inst, args, attributes, ctx, cache, viewCtx, anchorItems) {
   const it = normalizeParseItem(item);
   switch (it.kind) {
     case 'segment':
@@ -780,6 +1000,12 @@ function parseSingleItem(item, stream, fields, inst, args, attributes, ctx, cach
       const localDefs = inst.localDefs || {};
       const def = localDefs[it.name];
       if (!def) throw new Error(`Unknown protocol def '${it.name}'`);
+      if (it.repeat) {
+        return parseRepeatedLocalDef(
+          it.name, it.repeat, stream, fields, inst, args, attributes, ctx, cache, viewCtx,
+          { mandatory: !it.tentative, sectionName: it.name }, anchorItems || null
+        );
+      }
       return parseItemsList(
         getBodyItems(def), stream, fields, inst, args, attributes, ctx, cache, viewCtx,
         { mandatory: !it.tentative, sectionName: it.name }
@@ -850,14 +1076,18 @@ function parseItemsList(items, stream, fields, inst, args, attributes, ctx, cach
         out += altBits;
       }
     } else {
-      const secName = items[idx].kind === 'inlineSection' ? items[idx].name
-        : (items[idx].kind === 'segment' && items[idx].seg && items[idx].seg.kind === 'localRef'
-          ? items[idx].seg.name : null);
-      const childView = (viewCtx && secName)
+      const item = items[idx];
+      const localRef = getLocalRefFromItem(item);
+      const secName = item.kind === 'inlineSection' ? item.name
+        : (localRef ? localRef.name : null);
+      const anchorItems = (localRef && localRef.repeat && localRef.repeat.max == null && idx + 1 < items.length)
+        ? items.slice(idx + 1)
+        : null;
+      const childView = (viewCtx && secName && !(localRef && localRef.repeat))
         ? { root: { children: [], fields: {} }, activeNode: null }
         : viewCtx;
-      const bits = parseSingleItem(items[idx], stream, fields, inst, args, attributes, ctx, cache, childView);
-      if (viewCtx && secName) {
+      const bits = parseSingleItem(item, stream, fields, inst, args, attributes, ctx, cache, childView, anchorItems);
+      if (viewCtx && secName && !(localRef && localRef.repeat)) {
         pushViewNode({
           name: secName,
           width: bits.length,
@@ -865,8 +1095,12 @@ function parseItemsList(items, stream, fields, inst, args, attributes, ctx, cach
           fields: childView && childView.root ? Object.assign({}, childView.root.fields || {}) : {},
         });
       }
-      if (includeParseOutput(items[idx], ctx)) out += bits;
-      idx++;
+      if (includeParseOutput(item, ctx)) out += bits;
+      if (anchorItems && localRef && localRef.repeat && localRef.repeat.max == null) {
+        idx += 1 + anchorItems.length;
+      } else {
+        idx++;
+      }
     }
   }
   return out;
@@ -957,6 +1191,12 @@ function parseSegment(seg, stream, fields, inst, args, attributes, ctx, cache, v
       throw new Error(`Unknown rest mode '${seg.mode}'`);
     }
     case 'localRef':
+      if (seg.repeat) {
+        return parseRepeatedLocalDef(
+          seg.name, seg.repeat, stream, fields, inst, args, attributes, ctx, cache, viewCtx,
+          { mandatory: !seg.tentative, sectionName: seg.name }, null
+        );
+      }
       return parseDefSegments(
         seg.name, stream, fields, inst, args, attributes, ctx, cache, viewCtx,
         { mandatory: !seg.tentative, sectionName: seg.name }
@@ -1319,6 +1559,7 @@ function itemStaticWidth(item, localDefs, parameters, getLut, visiting) {
     case 'rest':
       return null;
     case 'localRef':
+      if (seg.repeat) return null;
       return defStaticWidth(seg.name, localDefs, parameters, getLut, visiting);
     default:
       return segmentStaticWidth(seg, localDefs, parameters, getLut, visiting);
@@ -1364,6 +1605,7 @@ function inferProtocolWidth(inst, getLut) {
       if (item.kind === 'localRef' || item.kind === 'inlineSection') return true;
       if (seg && segmentTriggersDynamic(seg, getLut)) return true;
       if (seg && seg.kind === 'localRef') {
+        if (seg.repeat) return true;
         const def = localDefs[seg.name];
         if (def && scanItems(getBodyItems(def))) return true;
       }
@@ -1628,6 +1870,21 @@ function resolveParseViewPath(view, pathParts) {
   throw new Error(`parseView: could not resolve '${pathParts.join(':')}'`);
 }
 
+function findParseViewChild(node, part, nextPart) {
+  if (/^\d+$/.test(part)) {
+    const index = parseInt(part, 10);
+    return (node.children || []).find(c => c.index === index);
+  }
+  const byName = (node.children || []).filter(c => c.name === part);
+  if (!byName.length) return null;
+  if (byName.length === 1 && byName[0].index == null) return byName[0];
+  if (nextPart != null && /^\d+$/.test(nextPart)) {
+    const index = parseInt(nextPart, 10);
+    return byName.find(c => c.index === index) || null;
+  }
+  return byName.length === 1 ? byName[0] : null;
+}
+
 function resolveParseViewSlice(view, pathParts) {
   if (!pathParts || !pathParts.length) return { offset: 0, width: view.blobWidth || 0 };
   let node = view;
@@ -1643,7 +1900,11 @@ function resolveParseViewSlice(view, pathParts) {
       }
       return { fieldBits: bits };
     }
-    const child = (node.children || []).find(c => c.name === part);
+    const nextPart = i + 1 < pathParts.length ? pathParts[i + 1] : null;
+    let child = findParseViewChild(node, part, nextPart);
+    if (child && nextPart != null && /^\d+$/.test(nextPart) && child.index === parseInt(nextPart, 10)) {
+      i++;
+    }
     if (!child) {
       throw new Error(`parseView: field '${part}' is not present`);
     }
@@ -1670,10 +1931,11 @@ function formatParseViewShow(view, wireName, bitWidth, refStr) {
   function walkChildren(children, indent) {
     for (const ch of children || []) {
       if (!ch.name) continue;
+      const label = ch.index !== undefined && ch.index !== null ? `${ch.name}[${ch.index}]` : ch.name;
       if (!ch.width) {
-        lines.push(`${indent}${ch.name} = empty (0bit)`);
+        lines.push(`${indent}${label} = empty (0bit)`);
       } else {
-        lines.push(`${indent}${ch.name}`);
+        lines.push(`${indent}${label}`);
         if (ch.fields) {
           for (const [k, v] of Object.entries(ch.fields)) {
             if (v !== undefined && v !== null) lines.push(`${indent}     ${k}: ${v}`);

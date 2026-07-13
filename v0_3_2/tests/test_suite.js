@@ -8611,6 +8611,313 @@ reg(2156, 'protocol-ext', 'doc(inline.protocol) — tentative sections + parseVi
   h.assert('rest', String(out.some(l => l.includes('rest -Nb') || l.includes('rest ~'))), 'true');
 });
 
+const INLINE_REPEAT_EXACT = `inline [protocol] .repeatExact:
+  mode: parse
+  parseView: tree
+  def packet:
+    kind 8b
+  out:
+    packet[2]
+  :`;
+
+reg(2157, 'protocol-ext', 'repeat F5a — packet[2] exact', function(h, session) {
+  const pkt = '10101010' + '11001100';
+  const src = INLINE_REPEAT_EXACT + `
+16wire out = .repeatExact { data = ${pkt} }`;
+  const { interp } = session.run(src);
+  h.assert('two packets', session.getWire(interp, 'out'), pkt);
+});
+
+const INLINE_REPEAT_CHOICE = `inline [protocol] .repeatChoice:
+  mode: parse
+  def data1:
+    kind 8b
+  def data2:
+    idx 3b
+    1
+    short 4b
+  out:
+    data1[1-2]?
+    data2[2]?
+  :`;
+
+reg(2158, 'protocol-ext', 'repeat F5a — data1[1-2]? vs data2[2]? choice', function(h, session) {
+  const pkt1 = '11111111' + '00000000';
+  const pkt2 = '101' + '1' + '0101' + '101' + '1' + '0101';
+  const src1 = INLINE_REPEAT_CHOICE + `
+16wire a = .repeatChoice { data = ${pkt1} }`;
+  const src2 = INLINE_REPEAT_CHOICE + `
+16wire b = .repeatChoice { data = ${pkt2} }`;
+  const r1 = session.run(src1);
+  const r2 = session.run(src2);
+  h.assert('data1 x2', session.getWire(r1.interp, 'a'), pkt1);
+  h.assert('data2 x2', session.getWire(r2.interp, 'b'), pkt2);
+});
+
+const INLINE_REPEAT_PV = `inline [protocol] .repeatPv:
+  mode: parse
+  parseView: tree
+  def packet:
+    kind 8b
+  out:
+    packet[1-2]
+  :`;
+
+reg(2159, 'protocol-ext', 'repeat F5a — parsed:packet:0:kind field access', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  const src = INLINE_REPEAT_PV + `
+16wire parsed = .repeatPv { data = ${pkt} }
+8wire k0 = parsed:packet:0:kind
+8wire k1 = parsed:packet:1:kind`;
+  const { interp } = session.run(src);
+  h.assert('kind0', session.getWire(interp, 'k0'), '11110000');
+  h.assert('kind1', session.getWire(interp, 'k1'), '00001111');
+});
+
+reg(2160, 'protocol-ext', 'repeat F5b — packet[0-] anchor footer', function(h, session) {
+  const src = `inline [protocol] .repeatAnchor:
+  mode: parse
+  def cell:
+    x 4b
+  out:
+    cell[0-]
+    1111
+  :
+8wire out = .repeatAnchor { data = 1010 + 0101 + 1111 }`;
+  const { interp } = session.run(src);
+  h.assert('payload', session.getWire(interp, 'out'), '10100101');
+});
+
+reg(2161, 'protocol-ext', 'repeat F5b — invalid [-] error', function(h, session) {
+  const src = `inline [protocol] .badRepeat:
+  mode: parse
+  def foo:
+    x 4b
+  out:
+    foo[-]
+  :
+1wire _ = .badRepeat { data = 0000 }`;
+  let err = null;
+  try {
+    session.run(src);
+  } catch (e) {
+    err = e;
+  }
+  h.assert('throws', String(!!err), 'true');
+  h.assert('message', err ? err.message : '', "invalid repeat spec '[-]': use '*' or '[0-]'");
+});
+
+reg(2162, 'protocol-ext', 'protocol-repeat.md — logts-play examples (smoke)', function(h, session) {
+  const pkt = '10101010' + '11001100';
+  const src = INLINE_REPEAT_EXACT + `
+16wire out = .repeatExact { data = ${pkt} }
+show(out)`;
+  const { interp } = session.run(src);
+  h.assert('exact', session.getWire(interp, 'out'), pkt);
+  h.assert('show', String(session.outIncludes(interp, '10101010')), 'true');
+});
+
+reg(2163, 'protocol-ext', 'repeat F5b — packet+ exact twice', function(h, session) {
+  const pkt = '1010' + '0101';
+  const src = `inline [protocol] .plusTwice:
+  mode: parse
+  def cell:
+    x 4b
+  out:
+    cell+
+  :
+8wire out = .plusTwice { data = ${pkt} }`;
+  const { interp } = session.run(src);
+  h.assert('two cells', session.getWire(interp, 'out'), pkt);
+});
+
+reg(2164, 'protocol-ext', 'repeat F5b — packet* one cell + anchor', function(h, session) {
+  const pkt = '1010' + '1111';
+  const src = `inline [protocol] .starOne:
+  mode: parse
+  def cell:
+    x 4b
+  out:
+    cell*
+    1111
+  :
+4wire out = .starOne { data = ${pkt} }`;
+  const { interp } = session.run(src);
+  h.assert('one cell', session.getWire(interp, 'out'), '1010');
+});
+
+reg(2165, 'protocol-ext', 'repeat F5b — width DYNAMIC packet[1-3]', function(h, session) {
+  session.run(`inline [protocol] .dynRepeat:
+  mode: parse
+  def packet:
+    kind 8b
+  out:
+    packet[1-3]
+  :`);
+  const inst = session.interp.inlineInstances.get('.dynRepeat');
+  h.assert('dynamic', inst.widthInfo.kind, 'dynamic');
+});
+
+reg(2166, 'protocol-ext', 'repeat F5c — dataA[0-1] dataB[0-1] dataC[0-1] sequential', function(h, session) {
+  const src = `inline [protocol] .seq01:
+  mode: parse
+  def dataA:
+    x 4b
+  def dataB:
+    y 4b
+  def dataC:
+    z 4b
+  out:
+    dataA[0-1]
+    dataB[0-1]
+    dataC[0-1]
+  :
+8wire out = .seq01 { data = 1010 + 0101 }`;
+  const { interp } = session.run(src);
+  h.assert('A+B only', session.getWire(interp, 'out'), '10100101');
+});
+
+reg(2167, 'protocol-ext', 'repeat F5c — data1?[3] compile error', function(h, session) {
+  let err = null;
+  try {
+    session.run(`inline [protocol] .badOrder:
+  mode: parse
+  def data1:
+    x 4b
+  out:
+    data1?[3]
+  :
+1wire _ = .badOrder { data = 0000 }`);
+  } catch (e) {
+    err = e;
+  }
+  h.assert('throws', String(!!err), 'true');
+  h.assert('message', err ? err.message : '', "invalid section syntax 'data1?[3]': '?' must follow repeat spec, not precede it");
+});
+
+reg(2168, 'protocol-ext', 'wire-literals F8 — "true" literal matches stream', function(h, session) {
+  const trueBits = '01110100' + '01110010' + '01110101' + '01100101';
+  const src = `inline [protocol] .litTrue:
+  mode: parse
+  out:
+    "true"
+  :
+32wire chk =: .litTrue { data = ${trueBits} }`;
+  let err = null;
+  try {
+    session.run(src);
+  } catch (e) {
+    err = e;
+  }
+  h.assert('literal match', String(!err), 'true');
+});
+
+function asciiWireBits(s) {
+  let b = '';
+  for (let i = 0; i < s.length; i++) {
+    b += s.charCodeAt(i).toString(2).padStart(8, '0');
+  }
+  return b;
+}
+
+const INLINE_JSON_SUBSET = `inline [protocol] .jsonSubset:
+  mode: parse
+  parseView: tree
+
+  def trueLit:
+    "true"
+  def falseLit:
+    "false"
+  def jsonBool:
+    trueLit?
+    falseLit?
+
+  def jsonChar:
+    byte 8b
+
+  def jsonString:
+    "\\""
+    jsonChar[0-]
+    "\\""
+
+  def jsonValue:
+    jsonObject?
+    jsonArray?
+    jsonString?
+    jsonBool?
+
+  def jsonPair:
+    jsonString
+    ":"
+    jsonValue
+
+  def pairEntry:
+    ","
+    jsonPair
+
+  def pairList:
+    jsonPair
+    pairEntry*
+
+  def jsonObject:
+    "{"
+    pairList?
+    "}"
+
+  def arrayEntry:
+    ","
+    jsonValue
+
+  def valueList:
+    jsonValue
+    arrayEntry*
+
+  def jsonArray:
+    "["
+    valueList?
+    "]"
+
+  out:
+    jsonValue
+  :`;
+
+reg(2169, 'protocol-ext', 'json F9 — minimal object parse + parseView', function(h, session) {
+  const json = '{"active":true}';
+  const pkt = asciiWireBits(json);
+  const src = INLINE_JSON_SUBSET + `
+${pkt.length}wire parsed =: .jsonSubset { data = ${pkt} }
+show(parsed)`;
+  const { interp } = session.run(src);
+  h.assert('jsonObject', String(session.outIncludes(interp, 'jsonObject')), 'true');
+  h.assert('jsonPair', String(session.outIncludes(interp, 'jsonPair')), 'true');
+  h.assert('jsonString', String(session.outIncludes(interp, 'jsonString')), 'true');
+});
+
+reg(2170, 'protocol-ext', 'json F9 — full sample parses without error', function(h, session) {
+  const json = '{"active":true,"tags":["x","y"],"meta":{"ok":false}}';
+  const pkt = asciiWireBits(json);
+  const src = INLINE_JSON_SUBSET + `
+${pkt.length}wire parsed =: .jsonSubset { data = ${pkt} }`;
+  let err = null;
+  try {
+    session.run(src);
+  } catch (e) {
+    err = e;
+  }
+  h.assert('parses', String(!err), 'true');
+  if (err) h.assert('error detail', err.message, '');
+});
+
+reg(2171, 'protocol-ext', 'forward def ref — jsonValue before jsonObject', function(h, session) {
+  let err = null;
+  try {
+    session.run(INLINE_JSON_SUBSET);
+  } catch (e) {
+    err = e;
+  }
+  h.assert('protocol compiles', String(!err), 'true');
+});
+
 const INLINE_OR2 = `inline [lut] .or2:
   depth: 1
   length: 4

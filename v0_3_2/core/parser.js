@@ -187,11 +187,15 @@ class Parser {
       : (atom.schemaField ? [atom.schemaField] : []);
     while (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
-      if (this.c.type !== 'ID') {
+      if (this.c.type === 'ID') {
+        path.push(this.c.value);
+        this.eat('ID');
+      } else if (this.c.type === 'DEC' || this.c.type === 'BIN') {
+        path.push(this.c.value);
+        this.eat(this.c.type);
+      } else {
         throw Error(`Expected schema field name after ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
-      path.push(this.c.value);
-      this.eat('ID');
     }
     if (path.length) {
       atom.schemaFieldPath = path;

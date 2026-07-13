@@ -56,6 +56,8 @@ isProject: false
 | **Faza 4** — documentație | ✅ | 2156 |
 | **Faza 4+** — `parseTag`, schema union, `rest -footer` | ⏳ amânat | — |
 
+**Continuare:** [protocol_section_repetition.plan.md](protocol_section_repetition.plan.md) — Fazele 5–9 (repetări, wire-literals, JSON subset).
+
 **Suite:** 1734/1734 teste trec (`node node/_run_test_suite_node.js`).
 
 ### Notă: `rest -footer` — amânat

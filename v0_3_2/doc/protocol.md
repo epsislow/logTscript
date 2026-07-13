@@ -6,6 +6,18 @@ Unlike [ASM](asm.md), which generates a single binary blob, a protocol may gener
 
 There is **no panel UI** in v1 — logic only.
 
+### Documentation map
+
+| Topic | Page |
+|-------|------|
+| Assemble, UART/SPI, `:decode()` | This page (hub) + sections below |
+| **`mode: parse`**, cursor, `rest` | [protocol-parse.md](protocol-parse.md) |
+| Tentative `?`, choice groups | [protocol-tentative.md](protocol-tentative.md) |
+| Section repeat `[n]`, `*`, anchor | [protocol-repeat.md](protocol-repeat.md) |
+| `expand` / `collapse` / Huffman | [protocol-lut.md](protocol-lut.md) · [huffman-v2.md](huffman-v2.md) |
+| JSON subset example | [json-subset.md](json-subset.md) |
+| Wire string literals in protocol | [protocol-parse.md](protocol-parse.md#wire-literals-in-parse-protocol) · [wire-literals.md](wire-literals.md) |
+
 ---
 
 ## Naming rules
@@ -700,6 +712,7 @@ Not every generator works in every direction. Use this table when choosing encod
 | `validateChecksum(crc16, param)` | ✗ | verify CRC on **full** invoke param | ✗ |
 | Attributes `codebookLoad`, `parseResult` | ✗ | parse only | ✗ |
 | **`?` tentative sections** (`foo?`, `foo?:`) | ✗ | ordered choice + rollback | ✗ |
+| **Section repeat** (`packet[n]`, `[min-max]`, `*`, `+`) | ✗ | repeat `def` — see [protocol-repeat.md](protocol-repeat.md) | ✗ |
 | **`rest ~`**, **`rest -Nb`** | ✗ | consume tail / reserve footer | ✗ |
 | **`parseView: tree`** | ✗ | optional structured show + `wire:section:field` | ✗ |
 

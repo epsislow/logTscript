@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol.md, queue.md, reg.md, rotary.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -13850,6 +13850,171 @@ show(value, .portA:in, .portB:out)
 * Intended for educational CPU, bus, and memory-mapped I/O examples.
 * See also [dip.md](dip.md), [led.md](led.md), [interactive-components.md](interactive-components.md).
 `,
+    'json-subset.md': `# JSON subset — protocol example
+
+Minimal JSON on a **single bitstream** (no whitespace, no numbers). Demonstrates **tentative choice**, **section repeat**, **anchor strings**, and **wire string literals** together.
+
+Mechanisms: [protocol-tentative.md](protocol-tentative.md), [protocol-repeat.md](protocol-repeat.md), [protocol-parse.md](protocol-parse.md#wire-literals-in-parse-protocol).
+
+---
+
+## Target document
+
+\`\`\`json
+{"active":true,"tags":["x","y"],"meta":{"ok":false}}
+\`\`\`
+
+---
+
+## Protocol \`.jsonSubset\`
+
+\`\`\`logts-play legacy
+inline [protocol] .jsonSubset:
+  mode: parse
+  parseView: tree
+
+  def trueLit:
+    "true"
+  def falseLit:
+    "false"
+  def jsonBool:
+    trueLit?
+    falseLit?
+
+  def jsonChar:
+    byte 8b
+
+  def jsonString:
+    "\\""
+    jsonChar[0-]
+    "\\""
+
+  def jsonValue:
+    jsonObject?
+    jsonArray?
+    jsonString?
+    jsonBool?
+
+  def jsonPair:
+    jsonString
+    ":"
+    jsonValue
+
+  def pairEntry:
+    ","
+    jsonPair
+
+  def pairList:
+    jsonPair
+    pairEntry*
+
+  def jsonObject:
+    "{"
+    pairList?
+    "}"
+
+  def arrayEntry:
+    ","
+    jsonValue
+
+  def valueList:
+    jsonValue
+    arrayEntry*
+
+  def jsonArray:
+    "["
+    valueList?
+    "]"
+
+  out:
+    jsonValue
+  :
+\`\`\`
+
+| Fragment | Mechanism |
+|----------|-----------|
+| \`trueLit?\` / \`falseLit?\` | tentative choice between defs |
+| \`jsonObject?\` / … | \`jsonValue\` dispatch |
+| \`pairEntry*\` | unbounded repeat (comma-separated pairs) |
+| \`"\\"\` … \`"\\""\` | wire-string anchor for \`jsonChar[0-]\` |
+| \`pairList?\` | empty object \`{}\` allowed |
+
+**Limits:** no \`\\\` escapes inside strings; no numbers; no whitespace between tokens.
+
+---
+
+## Runnable — minimal object
+
+\`\`\`logts-play legacy
+inline [protocol] .jsonSubset:
+  mode: parse
+  parseView: tree
+  def trueLit:
+    "true"
+  def falseLit:
+    "false"
+  def jsonBool:
+    trueLit?
+    falseLit?
+  def jsonChar:
+    byte 8b
+  def jsonString:
+    "\\""
+    jsonChar[0-]
+    "\\""
+  def jsonValue:
+    jsonObject?
+    jsonArray?
+    jsonString?
+    jsonBool?
+  def jsonPair:
+    jsonString
+    ":"
+    jsonValue
+  def pairEntry:
+    ","
+    jsonPair
+  def pairList:
+    jsonPair
+    pairEntry*
+  def jsonObject:
+    "{"
+    pairList?
+    "}"
+  def arrayEntry:
+    ","
+    jsonValue
+  def valueList:
+    jsonValue
+    arrayEntry*
+  def jsonArray:
+    "["
+    valueList?
+    "]"
+  out:
+    jsonValue
+  :
+
+# ASCII bits for {"active":true} — build in script or paste from encoder
+# Example: assign via external tool; here we show parseView after manual bit wire:
+\`\`\`
+
+For a full bit-exact demo in tests, see suite tests **2169–2170** (\`asciiWireBits\` pattern).
+
+---
+
+## parseView (conceptual)
+
+\`\`\`text
+jsonObject
+  pairList
+    jsonPair[0] → "active" : true
+    jsonPair[1] → "tags" : jsonArray …
+    jsonPair[2] → "meta" : jsonObject …
+\`\`\`
+
+Access uses **0-based** indices on repeated sections: \`parsed:jsonPair:0:…\` (see [protocol-repeat.md](protocol-repeat.md)).
+`,
     'key.md': `# Key component
 
 \`comp [key]\` is an interactive panel button. Output is **1 bit** on property \`:get\`. Uses \`onPress\` / \`onRelease\` in the engine (unlike switch/dip which use \`onChange\`).
@@ -19452,6 +19617,353 @@ After **Load & Run**: focus **Digits**, type \`12\`, click **\`+\`** — termina
 - [number-conversion.md](number-conversion.md) — \`N2N10S\` / \`N10S2N\` alternative display
 - [mini-cpu-v2.md](mini-cpu-v2.md) — similar doc layout with **Load & Run** runnable block
 `,
+    'protocol-parse.md': `# Protocol — \`mode: parse\`
+
+Sequential **field extraction** from a bitstream. The parse cursor walks \`data\` (or \`stream\`) and verifies literals, reads fields, and optionally builds a **parseView** tree.
+
+Hub: [protocol.md](protocol.md). Related: [protocol-tentative.md](protocol-tentative.md), [protocol-repeat.md](protocol-repeat.md).
+
+---
+
+## Invoke
+
+\`\`\`logts-play legacy
+inline [protocol] .parseHdr:
+  mode: parse
+  out:
+    magic 8b
+    len 16b
+  :
+
+24wire out = .parseHdr { data = 01001000 + 00000000 + 00010000 }
+show(out)
+\`\`\`
+
+| Parameter | Role |
+|-----------|------|
+| \`data\` | Full packet bitstream (default) |
+| \`stream\` | Alias for \`data\` in some generators |
+
+Output wire width may be **dynamic** when sections repeat or use \`rest ~\`. Use \`=:\` when the declared wire is wider than extracted fields.
+
+---
+
+## Literals vs fields
+
+| Line in \`def\` / \`out\` | Parse behaviour |
+|-----------------------|-----------------|
+| \`0101\` | Verify bits; **not** in output blob |
+| \`kind 8b\` | Read 8 bits into field \`kind\`; **in** output blob |
+| \`rest ~\` | Consume all remaining bits (last segment only) |
+| \`rest -4b\` | Consume \`remaining − 4\`, leave footer |
+
+---
+
+## Wire literals in parse protocol
+
+Protocol lines accept a **subset** of [wire-literals.md](wire-literals.md):
+
+| Form | Example | Notes |
+|------|---------|-------|
+| Binary | \`01010101\` | as today |
+| Wire string | \`"true"\`, \`"{"\`, \`'x'\` | 8 bits per character |
+| Decimal pad | \`\\123;8\` | unsigned, fixed width |
+| Hex pad | \`^7B;8\` | pad to width |
+| Hex short | \`^7B\` | minimal width (no pad) |
+| Decimal short | \`\\10\` | minimal unsigned width |
+
+\`\`\`logts-play legacy
+inline [protocol] .litDemo:
+  mode: parse
+  out:
+    "Hi"
+  :
+
+16wire chk =: .litDemo { data = 01001000 + 01101001 }
+show(chk)
+\`\`\`
+
+Use **local \`def\` wrappers** for tentative string choice (\`trueLit?\` / \`falseLit?\`) — literal lines cannot take \`?\` directly.
+
+---
+
+## Attributes (parse)
+
+| Attribute | Values | Purpose |
+|-----------|--------|---------|
+| \`parseView\` | \`tree\`, \`true\` | Structured \`show()\` + \`wire:section:field\` access |
+| \`parseResult\` | \`all\`, \`collapseOnly\` | Include/exclude collapse payload in output |
+| \`codebookLoad\` | \`.lutName\` | Load LUT from embedded codebook during parse |
+
+---
+
+## Section repeat
+
+For \`packet[n]\`, \`packet*\`, anchor footers, and \`parsed:packet:0:field\`, see **[protocol-repeat.md](protocol-repeat.md)**.
+`,
+    'protocol-repeat.md': `# Protocol — section repetition
+
+Repeat local \`def\` sections in **\`mode: parse\`** protocols. Syntax attaches to the section name (not to individual fields).
+
+Requires [\`mode: parse\`](protocol.md#mode-parse--sequential-field-extraction). For optional branches without repeat counts, see tentative \`?\` in [protocol.md](protocol.md#tentative-sections).
+
+---
+
+## Syntax
+
+| Form | Meaning |
+|------|---------|
+| \`packet[3]\` | exactly 3 times |
+| \`packet[1-3]\` | between 1 and 3 (greedy: try max first) |
+| \`packet[0-]\` | zero or more until anchor or EOF |
+| \`packet*\` | sugar for \`packet[0-]\` |
+| \`packet+\` | sugar for \`packet[1-]\` |
+| \`data1[1-3]?\` | tentative choice branch with its own repeat |
+
+Invalid: \`[-]\`, \`[-3]\`, \`*?\`, \`+?\`, \`name?[3]\` (\`?\` must follow the repeat spec).
+
+---
+
+## Exact repeat — \`packet[2]\`
+
+\`\`\`logts-play legacy
+inline [protocol] .repeatExact:
+  mode: parse
+  def packet:
+    kind 8b
+  out:
+    packet[2]
+  :
+
+16wire out = .repeatExact { data = 10101010 + 11001100 }
+show(out)
+\`\`\`
+
+---
+
+## Bounded range — greedy max-first
+
+\`packet[1-2]\` accepts one or two packets; the parser tries two first.
+
+\`\`\`logts-play legacy
+inline [protocol] .repeatPv:
+  mode: parse
+  parseView: tree
+  def packet:
+    kind 8b
+  out:
+    packet[1-2]
+  :
+
+16wire parsed = .repeatPv { data = 11110000 + 00001111 }
+8wire k0 = parsed:packet:0:kind
+8wire k1 = parsed:packet:1:kind
+show(k0)
+show(k1)
+\`\`\`
+
+parseView indexes are **0-based** (\`packet[0]\` in \`show\`, \`parsed:packet:0:kind\` in field access).
+
+---
+
+## Composing with tentative
+
+Different repeat specs per choice branch:
+
+\`\`\`logts-play legacy
+inline [protocol] .repeatChoice:
+  mode: parse
+  def data1:
+    kind 8b
+  def data2:
+    idx 3b
+    1
+    short 4b
+  out:
+    data1[1-2]?
+    data2[2]?
+  :
+
+16wire a = .repeatChoice { data = 11111111 + 00000000 }
+16wire b = .repeatChoice { data = 10110101 + 10110101 }
+show(a)
+show(b)
+\`\`\`
+
+| Pattern | Mechanism |
+|---------|-----------|
+| \`foo?\` | optional **choice** branch — 0 or 1 alternative in a group |
+| \`foo[0-1]\` | **sequential** optional — 0 or 1 occurrence, independent of other sections |
+| \`data1[1-3]?\` | choice + repeat on that branch |
+
+### Sequential \`[0-1]\` — independent optionals
+
+Unlike \`?\` choice groups, each \`[0-1]\` section is parsed **in order** and may be omitted independently:
+
+\`\`\`logts-play legacy
+inline [protocol] .seq01:
+  mode: parse
+  def dataA:
+    x 4b
+  def dataB:
+    y 4b
+  def dataC:
+    z 4b
+  out:
+    dataA[0-1]
+    dataB[0-1]
+    dataC[0-1]
+  :
+
+8wire out = .seq01 { data = 1010 + 0101 }
+show(out)
+\`\`\`
+
+See also [protocol-tentative.md](protocol-tentative.md) for the full \`?\` vs \`[0-1]\` table.
+
+---
+
+## Anchor footer — \`cell[0-]\` + literal
+
+Unbounded repeat stops before a mandatory follower on the next line. The anchor literal is consumed from the stream but **not** included in the output wire (delimiter only).
+
+\`\`\`logts-play legacy
+inline [protocol] .repeatAnchor:
+  mode: parse
+  def cell:
+    x 4b
+  out:
+    cell[0-]
+    1111
+  :
+
+8wire out = .repeatAnchor { data = 1010 + 0101 + 1111 }
+show(out)
+\`\`\`
+
+Payload: \`10100101\` (8 bits). Footer \`1111\` delimits the repeat region.
+
+---
+
+## parseView tree
+
+With \`parseView: tree\`, repeated sections appear as \`packet[0]\`, \`packet[1]\`, … in \`show(parsed)\`.
+
+Flat \`ParseFields\` keeps the **last** iteration per field name; full history lives in parseView only.
+
+---
+
+## Related
+
+- [protocol.md](protocol.md) — hub, \`mode: parse\`, \`rest\`
+- [protocol-tentative.md](protocol-tentative.md) — \`?\` choice vs \`[0-1]\` sequential
+- [json-subset.md](json-subset.md) — JSON cookbook (repeat + tentative + wire-literals)
+`,
+    'protocol-tentative.md': `# Protocol — tentative sections (\`?\`)
+
+**Parse-only.** Tentative sections add **ordered choice** with **backtracking**: try alternatives in order; on failure restore the cursor and parsed fields; **first success wins**.
+
+Hub: [protocol.md](protocol.md). For section repetition (\`packet[1-3]\`, \`*\`, anchor), see [protocol-repeat.md](protocol-repeat.md).
+
+---
+
+## Syntax
+
+| Form | Meaning |
+|------|---------|
+| \`foo\` | mandatory \`localRef\` to \`def foo\` |
+| \`foo?\` | tentative \`localRef\` — all branches may fail with **0 bits** |
+| \`foo:\` | mandatory **inline** section (body lines follow) |
+| \`foo?:\` | tentative inline section |
+| \`def foo:\` | declare reusable block — **no \`?\` on \`def\`** |
+
+**Mandatory vs optional at use-site:**
+
+| Invoke | All tentative branches fail |
+|--------|----------------------------|
+| \`ethernet\` | **Error** — \`parse: no matching alternative\` |
+| \`ethernet?\` | **OK** — 0 bits consumed, parsing continues |
+
+---
+
+## \`?\` vs \`[0-1]\` vs \`data1[1-3]?\`
+
+| Pattern | Mechanism |
+|---------|-----------|
+| \`foo?\` | **Choice group** — pick at most one branch from adjacent \`?\` items |
+| \`foo[0-1]\` | **Sequential** — 0 or 1 occurrence; not a choice with neighbours |
+| \`data1[1-3]?\` | **Choice + repeat** — whole branch repeats 1–3 times if chosen |
+
+Example: \`dataA[0-1] dataB[0-1]\` may yield A only, B only, both, or neither (four outcomes).  
+\`dataA? dataB?\` picks **at most one** of A or B.
+
+Composed choice + repeat: [protocol-repeat.md — Composing with tentative](protocol-repeat.md#composing-with-tentative).
+
+---
+
+## Runnable — L3 dispatch
+
+\`\`\`logts-play legacy
+inline [protocol] .l3inline:
+  mode: parse
+  out:
+    ipv4?:
+      0100
+      src 32b
+      dst 32b
+    ipv6?:
+      0110
+      src 128b
+      dst 128b
+    unknown:
+      rest ~
+  :
+
+64wire out = .l3inline { data = 0100 + repeat(1,32) + repeat(0,32) }
+show(out)
+\`\`\`
+
+Literals verify on wire but **do not** appear in the output blob — only **parse fields** (\`src\`, \`dst\`, …).
+
+---
+
+## \`parseView: tree\`
+
+With \`parseView: tree\`, \`show(parsed)\` prints a field tree. Field access: \`parsed:typeA:dataA\` (section names, not numeric index unless repeating — see [protocol-repeat.md](protocol-repeat.md)).
+
+\`\`\`logts-play legacy
+inline [protocol] .pvTest:
+  mode: parse
+  parseView: tree
+  out:
+    magic 3b
+    typeA?:
+      11
+      01
+      dataA 2b
+    unknown:
+      rest ~
+  :
+
+5wire parsed = .pvTest { data = 101110100 }
+2wire dataA = parsed:typeA:dataA
+show(parsed)
+show(dataA)
+\`\`\`
+
+---
+
+## \`:decode()\` and tentative
+
+**\`:decode()\` is not supported** on protocols with tentative sections. Use \`{ data = … }\` on a \`mode: parse\` protocol instead.
+
+| Error | Cause |
+|-------|--------|
+| \`tentative sections require mode: parse\` | \`?\` in \`mode: assemble\` |
+| \`Protocol def cannot use '?'\` | \`def foo?:\` at declaration |
+| \`parse: no matching alternative\` | mandatory section, all branches failed |
+| \`Protocol decode does not support tentative sections\` | \`:decode()\` on protocol with \`?\` |
+`,
     'protocol.md': `# PROTOCOL
 
 A protocol generator. A protocol definition transforms named parameters into one or more fixed-length bit sequences.
@@ -19459,6 +19971,18 @@ A protocol generator. A protocol definition transforms named parameters into one
 Unlike [ASM](asm.md), which generates a single binary blob, a protocol may generate **multiple output channels** (\`tx\`, \`sda\`, \`scl\`, \`mosi\`, etc.).
 
 There is **no panel UI** in v1 — logic only.
+
+### Documentation map
+
+| Topic | Page |
+|-------|------|
+| Assemble, UART/SPI, \`:decode()\` | This page (hub) + sections below |
+| **\`mode: parse\`**, cursor, \`rest\` | [protocol-parse.md](protocol-parse.md) |
+| Tentative \`?\`, choice groups | [protocol-tentative.md](protocol-tentative.md) |
+| Section repeat \`[n]\`, \`*\`, anchor | [protocol-repeat.md](protocol-repeat.md) |
+| \`expand\` / \`collapse\` / Huffman | [protocol-lut.md](protocol-lut.md) · [huffman-v2.md](huffman-v2.md) |
+| JSON subset example | [json-subset.md](json-subset.md) |
+| Wire string literals in protocol | [protocol-parse.md](protocol-parse.md#wire-literals-in-parse-protocol) · [wire-literals.md](wire-literals.md) |
 
 ---
 
@@ -20154,6 +20678,7 @@ Not every generator works in every direction. Use this table when choosing encod
 | \`validateChecksum(crc16, param)\` | ✗ | verify CRC on **full** invoke param | ✗ |
 | Attributes \`codebookLoad\`, \`parseResult\` | ✗ | parse only | ✗ |
 | **\`?\` tentative sections** (\`foo?\`, \`foo?:\`) | ✗ | ordered choice + rollback | ✗ |
+| **Section repeat** (\`packet[n]\`, \`[min-max]\`, \`*\`, \`+\`) | ✗ | repeat \`def\` — see [protocol-repeat.md](protocol-repeat.md) | ✗ |
 | **\`rest ~\`**, **\`rest -Nb\`** | ✗ | consume tail / reserve footer | ✗ |
 | **\`parseView: tree\`** | ✗ | optional structured show + \`wire:section:field\` | ✗ |
 
