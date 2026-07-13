@@ -3141,7 +3141,9 @@ class Interpreter {
 
   _sliceRangeWidth(sliceRange) {
     if (!sliceRange) return null;
-    if (sliceRange.nonContiguous === 'col') return sliceRange.sliceWidth;
+    if (sliceRange.nonContiguous === 'col' || sliceRange.nonContiguous === 'schema_col') {
+      return sliceRange.sliceWidth;
+    }
     return sliceRange.end - sliceRange.start + 1;
   }
 
@@ -3272,6 +3274,17 @@ class Interpreter {
               const meta = this.getWireTensorMeta(wire);
               if (TS && meta) {
                 acc = TS.scatterColumnBits(acc, sliceRange.col, meta.elementWidth, meta.rows, meta.cols, rhs);
+              }
+            } else if (sliceRange.nonContiguous === 'schema_col') {
+              const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+              if (TS) {
+                const arrayBits = acc.substring(sliceRange.arrayBitStart, sliceRange.arrayBitStart + sliceRange.arrayWidth);
+                const updatedArray = TS.scatterColumnBits(
+                  arrayBits, sliceRange.col, sliceRange.elementWidth, sliceRange.rows, sliceRange.cols, rhs
+                );
+                acc = acc.substring(0, sliceRange.arrayBitStart)
+                  + updatedArray
+                  + acc.substring(sliceRange.arrayBitStart + sliceRange.arrayWidth);
               }
             } else {
               acc = acc.substring(0, sliceRange.start)
@@ -3934,6 +3947,47 @@ class Interpreter {
     return this.getBitWidth(wire.type);
   }
 
+  _buildSchemaFieldResolvePath(atom) {
+    const SS = this._semanticSchemas();
+    if (!SS || !atom) return null;
+    let path = SS.atomSchemaFieldPath(atom);
+    if (!path || !path.length) return null;
+    path = path.slice();
+    if (atom.schemaArrayRowIndexExpr) {
+      const row = this._resolveTensorIndexValue(null, atom.schemaArrayRowIndexExpr, 'row');
+      if (path.length === 1) {
+        path.push(String(row));
+      } else if (path.length >= 2) {
+        path = [path[0], String(row), ...path.slice(1)];
+      }
+    }
+    return path;
+  }
+
+  _resolveSchemaFieldView(atom, wire) {
+    const SS = this._semanticSchemas();
+    if (!SS || !atom || !wire || !wire.schemaRef) return null;
+    const schema = this._resolveSchema(wire.schemaRef);
+    const path = this._buildSchemaFieldResolvePath(atom);
+    if (!path || !path.length) return null;
+    const opts = { wireVar: atom.var };
+    if (atom.schemaArraySlice === 'col') {
+      const col = this._resolveTensorIndexValue(
+        atom.schemaArrayColIndex, atom.schemaArrayColIndexExpr, 'col'
+      );
+      const fieldPath = [path[0]];
+      const view = SS.resolveSchemaFieldView(schema, fieldPath, { ...opts, arrayColIndex: col });
+      view.parentDisplayName = `${atom.var}:${fieldPath[0]}`;
+      return view;
+    }
+    const view = SS.resolveSchemaFieldView(schema, path, opts);
+    if (view && view.kind === 'array_row') {
+      const parentSuffix = view.path.slice(0, -1).join(':');
+      view.parentDisplayName = `${atom.var}:${parentSuffix}`;
+    }
+    return view;
+  }
+
   _resolveSchemaFieldAbsoluteRange(atom, wire) {
     const SS = this._semanticSchemas();
     const path = SS && SS.atomSchemaFieldPath(atom);
@@ -3943,7 +3997,7 @@ class Interpreter {
       throw new Error(`Wire ${atom.var} has no schema for field access '${label}'`);
     }
     const schema = this._resolveSchema(wire.schemaRef);
-    const field = SS.resolveSchemaView(schema, path, { wireVar: atom.var });
+    const field = this._resolveSchemaFieldView(atom, wire);
     const elemWidth = this._elementWidthForWire(wire);
     let elemStart = 0;
     if (atom.tensorSlice === 'cell') {
@@ -3959,13 +4013,29 @@ class Interpreter {
       }
       elemStart = slice.start;
     }
+    if (field.kind === 'array_col') {
+      return {
+        nonContiguous: 'schema_col',
+        col: field.colIndex,
+        rows: field.array.rows,
+        cols: field.array.cols,
+        elementWidth: field.array.elementWidth,
+        arrayBitStart: elemStart + field.bitStart,
+        arrayWidth: field.array.width,
+        sliceWidth: field.width,
+        field,
+        schema,
+        elemStart,
+        path: this._buildSchemaFieldResolvePath(atom) || path,
+      };
+    }
     return {
       start: elemStart + field.bitStart,
       end: elemStart + field.bitEnd,
       field,
       schema,
       elemStart,
-      path,
+      path: this._buildSchemaFieldResolvePath(atom) || path,
     };
   }
 
@@ -3973,7 +4043,20 @@ class Interpreter {
     const SS = this._semanticSchemas();
     const path = SS && SS.atomSchemaFieldPath(atom);
     if (!atom || !path || !path.length) return null;
-    const fieldSuffix = path.join(':');
+    let fieldSuffix = path.join(':');
+    if (atom.schemaArraySlice === 'col') {
+      const col = atom.schemaArrayColIndex != null ? atom.schemaArrayColIndex : '?';
+      if (atom.schemaArrayColIndexExpr && atom.schemaArrayColIndexExpr.length === 1 && atom.schemaArrayColIndexExpr[0].var) {
+        fieldSuffix = `${path[0]}::(${atom.schemaArrayColIndexExpr[0].var})`;
+      } else {
+        fieldSuffix = `${path[0]}::${col}`;
+      }
+    } else if (atom.schemaArrayRowIndexExpr) {
+      if (atom.schemaArrayRowIndexExpr.length === 1 && atom.schemaArrayRowIndexExpr[0].var) {
+        const suffix = path.length > 1 ? `:${path.slice(1).join(':')}` : '';
+        fieldSuffix = `${path[0]}:(${atom.schemaArrayRowIndexExpr[0].var})${suffix}`;
+      }
+    }
     if (atom.tensorSlice === 'cell') {
       return `${atom.var}:${atom.tensorRowIndex}:${atom.tensorColIndex}:${fieldSuffix}`;
     }
@@ -4105,12 +4188,11 @@ class Interpreter {
     if (!path || !wire.schemaRef) return null;
     let view;
     try {
-      const schema = this._resolveSchema(wire.schemaRef);
-      view = SS.resolveSchemaView(schema, path, { wireVar: atom.var });
+      view = this._resolveSchemaFieldView(atom, wire);
     } catch (err) {
       return null;
     }
-    if (!view || (view.kind !== 'nested' && view.kind !== 'array' && view.kind !== 'array_row')) return null;
+    if (!view || (view.kind !== 'nested' && view.kind !== 'array' && view.kind !== 'array_row' && view.kind !== 'array_col')) return null;
     let valueStr = part.value != null ? part.value : '-';
     if (valueStr === '-' && part.ref) valueStr = this.getValueFromRef(part.ref) || '-';
     if (valueStr === '-') return null;
@@ -4434,11 +4516,26 @@ class Interpreter {
       target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange
       || target.tensorSlice || target.tensorRowIndex !== undefined || target.tensorColIndex !== undefined
       || target.tensorRowIndexExpr || target.tensorColIndexExpr || target.schemaField
+      || target.schemaArraySlice
     ));
   }
 
   _applySliceWrite(wireName, wire, bits, sliceRange, totalValue, assignPad) {
     const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (sliceRange && sliceRange.nonContiguous === 'schema_col' && TS) {
+      const SS = this._semanticSchemas();
+      const sliceWidth = sliceRange.sliceWidth;
+      const rhs = fitWireAssignBits(totalValue, sliceWidth, assignPad, 'msb', this);
+      let currentValue = this.getWireContributionAwareValue(wireName);
+      if (!currentValue) currentValue = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
+      const arrayBits = currentValue.substring(sliceRange.arrayBitStart, sliceRange.arrayBitStart + sliceRange.arrayWidth);
+      const updatedArray = TS.scatterColumnBits(
+        arrayBits, sliceRange.col, sliceRange.elementWidth, sliceRange.rows, sliceRange.cols, rhs
+      );
+      return currentValue.substring(0, sliceRange.arrayBitStart)
+        + updatedArray
+        + currentValue.substring(sliceRange.arrayBitStart + sliceRange.arrayWidth);
+    }
     if (sliceRange && sliceRange.nonContiguous === 'col' && TS) {
       const meta = this.getWireTensorMeta(wire);
       const sliceWidth = sliceRange.sliceWidth;
@@ -4465,7 +4562,10 @@ class Interpreter {
     const wire = this.wires.get(wireName);
     if (target && target.schemaField) {
       const abs = this._resolveSchemaFieldAbsoluteRange(target, wire);
-      if (abs) return { start: abs.start, end: abs.end };
+      if (abs) {
+        if (abs.nonContiguous === 'schema_col') return abs;
+        return { start: abs.start, end: abs.end };
+      }
     }
     const slice = this.resolveAtomWireSlice(target, wire);
     if (!slice) return null;
@@ -5392,7 +5492,16 @@ class Interpreter {
             };
           }
           const abs = this._resolveSchemaFieldAbsoluteRange(a, wire);
-          let extracted = val.substring(abs.start, abs.end + 1);
+          let extracted;
+          if (abs.nonContiguous === 'schema_col') {
+            const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+            const arrayBits = val.substring(abs.arrayBitStart, abs.arrayBitStart + abs.arrayWidth);
+            extracted = TS.gatherColumnBits(
+              arrayBits, abs.col, abs.elementWidth, abs.rows, abs.cols
+            );
+          } else {
+            extracted = val.substring(abs.start, abs.end + 1);
+          }
           if (a.pad) extracted = this.applyPad(extracted, a.pad);
           const displayName = this._formatSchemaFieldLabel(a);
           return {
@@ -9571,7 +9680,8 @@ if (s.assignment) {
   let range = null;
   if (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange
       || target.tensorSlice || target.tensorRowIndex !== undefined || target.tensorColIndex !== undefined
-      || target.tensorRowIndexExpr || target.tensorColIndexExpr || target.schemaField) {
+      || target.tensorRowIndexExpr || target.tensorColIndexExpr || target.schemaField
+      || target.schemaArraySlice) {
     try {
       range = this._assignmentTargetSliceRange(target, name);
     } catch (e) {
@@ -9995,7 +10105,7 @@ if (s.assignment) {
   let start, end;
   let sliceWidth;
   if (range) {
-    if (range.nonContiguous === 'col') {
+    if (range.nonContiguous === 'col' || range.nonContiguous === 'schema_col') {
       sliceWidth = range.sliceWidth;
       start = null;
       end = null;
@@ -10037,7 +10147,7 @@ if (s.assignment) {
   }
 
   // Construct new value
-  const newValue = range && range.nonContiguous === 'col'
+  const newValue = (range && (range.nonContiguous === 'col' || range.nonContiguous === 'schema_col'))
     ? this._applySliceWrite(name, entry, bitWidth, range, rhs, wireAssignPad)
     : currentValue.substring(0, start) +
       rhs +

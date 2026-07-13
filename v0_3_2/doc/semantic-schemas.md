@@ -125,13 +125,102 @@ Use the same RHS forms as [wire-literals.md](wire-literals.md) on the **array sl
 
 **Not supported (v1):** schema literals with array lists — `{ cells=[\1,\2,\3] }<frame>`.
 
-Variable-length arrays (`field:8[1-3]`) and nested schemas on array elements (`field:<sub>[N]`) are planned for a later phase.
+Variable-length arrays (`field:8[1-3]`) are planned for a later phase. **Schema arrays** (`field:<sub>[N]` / `[R,C]`) are supported — see below.
+
+### Matrix row / column slices
+
+Same syntax as wire matrices — `pkt:grid:0` (row), `pkt:grid::1` (column), including `pkt:grid:(rowIdx)` and `pkt:grid::(colIdx)`:
+
+```logts
+pkt:grid:0 = 0101 + 0110
+pkt:grid::1 = 0110 + 1111
+show(pkt:grid:0)    # :0:0 … :0:1 + pkt:grid has shape [2,2]
+show(pkt:grid::1)   # :0:1 … :1:1 + pkt:grid has shape [2,2]
+```
 
 ### `show` on array fields
 
 `show(pkt)` prints scalar fields normally; array fields use a **section header** plus **flat index lines** (`:0 = … (Wbit)`), without `cells[3]` syntax. `show(pkt:cells)` / `show(pkt:grid)` add a `has length` / `has shape` footer.
 
+---
+
+## Schema arrays (`field:<schema>[N]` / `[R,C]`)
+
+A schema may contain **fixed-size arrays of sub-schemas** — each element is a full nested record (model B), analogous to `16wire[2]<opcode>` on wires (model A):
+
+```logts
+<opcode>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:8
+:
+
+<frame>:
+    tag: 8
+    slots: <opcode>[2]    # 2 × 16b = 32b
+    tiles: <opcode>[2,2]  # 2×2 × 16b = 64b
+:
+40wire<frame> pkt := 0
+```
+
+| Syntax | Meaning | Total bits |
+|--------|---------|------------|
+| `slots:<opcode>[2]` | 2 elements, each `opcode.totalWidth` | 2×16 = 32 |
+| `tiles:<opcode>[2,2]` | 2×2 matrix of `opcode` records | 4×16 = 64 |
+
+**Indices are 0-based:** `pkt:slots:1:alu`, `pkt:tiles:0:1:cycles`. Matrix row/column slices use the same rules as raw arrays — `pkt:tiles:0`, `pkt:tiles::1`.
+
+### Read / write
+
+```logts
+pkt:tag := \42
+pkt:slots:0:alu := \5
+pkt:slots:1 = { alu=\5 cycles=\3 }<opcode>
+pkt:tiles:0:1:alu := \5
+4wire a = pkt:slots:0:alu
+16wire s0 = pkt:slots:0
+```
+
+### Literals on schema array slices
+
+Same RHS forms as wire vectors — concatenation, hex, per-element schema literal:
+
+| Accepted | Example | Width |
+|----------|---------|-------|
+| Concatenation | `pkt:slots = s0 + s1` | 2×16 = 32b |
+| Per-element literal | `pkt:slots:1 = { alu=\5 }<opcode>` | 16b |
+| Sub-field assign | `pkt:slots:0:alu := \5` | 4b |
+
+**Not supported (v1):** structured slice literal — `{ slots=[…] }<frame>`.
+
+### `show` on schema arrays
+
+Same layout as wire vectors with schema (rev. 4): section header `slots`, flat `:i = … (Wbit)` per element, then **indented sub-schema tree** underneath. `show(pkt:slots:1)` shows one element only.
+
 ```logts-play wave
+<opcode>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:8
+:
+
+<frame>:
+    tag: 8
+    slots: <opcode>[2]
+:
+40wire<frame> pkt := 0
+pkt:slots:1:alu := \5
+pkt:slots:1:cycles := \3
+show(pkt)
+```
+
+Mixed scalar + schema array + nested scalar on one record is supported — e.g. `tag:8` + `slots:<opcode>[2]` + `meta:<flags>`.
+
+```logts
 <frame>:
     tag:8
     cells:8[3]

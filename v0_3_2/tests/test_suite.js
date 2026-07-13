@@ -21222,6 +21222,200 @@ reg(2187, 'semantic-schemas', 'show pktb vector flat tree slots', function(h, se
   h.assert('slot :0 tag field', String(out.some((l) => l.includes('tag') && l.includes('00101010'))), 'true');
 });
 
+reg(2188, 'semantic-schemas', 'array matrix row slice read assign', function(h, session) {
+  session.run(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:grid:0 = 0101 + 0110',
+    '8wire row0 = pkt:grid:0',
+  ].join('\n'));
+  h.assert('row0 bits', session.getWire(session.interp, 'row0'), '01010110');
+  h.assert('grid:0:0', session.getWire(session.interp, 'pkt').substring(32, 36), '0101');
+  h.assert('grid:0:1', session.getWire(session.interp, 'pkt').substring(36, 40), '0110');
+});
+
+reg(2189, 'semantic-schemas', 'array matrix column slice read assign', function(h, session) {
+  session.run(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:grid::1 = 0110 + 1111',
+    '8wire col1 = pkt:grid::1',
+  ].join('\n'));
+  h.assert('col1 bits', session.getWire(session.interp, 'col1'), '01101111');
+  h.assert('grid:0:1', session.getWire(session.interp, 'pkt').substring(36, 40), '0110');
+  h.assert('grid:1:1', session.getWire(session.interp, 'pkt').substring(44, 48), '1111');
+});
+
+reg(2190, 'semantic-schemas', 'show array row and column slice shape footer', function(h, session) {
+  const { out } = session.run(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:grid:0 = 0101 + 0110',
+    'pkt:grid::1 = 0110 + 1111',
+    'show(pkt:grid:0)',
+    'show(pkt:grid::1)',
+  ].join('\n'));
+  h.assert('row header', String(out.some((l) => l.includes('pkt:grid:0 (8wire)'))), 'true');
+  h.assert('row cell :0:1', String(out.some((l) => l.includes(':0:1 =') && l.includes('0110'))), 'true');
+  h.assert('row shape footer', String(out.some((l) => l.trim() === 'pkt:grid has shape [2,2]')), 'true');
+  h.assert('col header', String(out.some((l) => l.includes('pkt:grid::1 (8wire)'))), 'true');
+  h.assert('col cell :1:1', String(out.some((l) => l.includes(':1:1 =') && l.includes('1111'))), 'true');
+});
+
+reg(2191, 'semantic-schemas', 'array matrix dynamic row index', function(h, session) {
+  session.run(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:grid:1:0 := \\15',
+    '2wire idx = 01',
+    '4wire cell = pkt:grid:(idx):0',
+  ].join('\n'));
+  h.assert('dynamic row cell', session.getWire(session.interp, 'cell'), '1111');
+});
+
+reg(2192, 'semantic-schemas', 'array matrix dynamic column index', function(h, session) {
+  session.run(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:grid:0:1 := \\6',
+    'pkt:grid:1:1 := \\15',
+    '2wire idx = 01',
+    '8wire col = pkt:grid::(idx)',
+  ].join('\n'));
+  h.assert('dynamic col', session.getWire(session.interp, 'col'), '01101111');
+});
+
+reg(2193, 'semantic-schemas', 'wire vector plus schema array column slice', function(h, session) {
+  session.run(FRAME48_SCHEMA + [
+    '48wire[2]<frame> pktb := 0',
+    'pktb:1:grid::0 = 0101 + 1111',
+    '8wire col = pktb:1:grid::0',
+  ].join('\n'));
+  h.assert('pktb:1:grid::0', session.getWire(session.interp, 'col'), '01011111');
+});
+
+
+const FRAME40_SCHEMA = `<frame>:
+    tag: 8
+    slots: <opcode>[2]
+:
+`;
+
+const FLAGS4_SCHEMA = `<flags>:
+    carry:1
+    zero:1
+    negative:1
+    overflow:1
+:
+`;
+
+const FRAME44_MIXED_SCHEMA = `<frame>:
+    tag: 8
+    slots: <opcode>[2]
+    meta: <flags>
+:
+`;
+
+reg(2296, 'semantic-schemas', 'schema array of sub-schema parse width 40', function(h, session) {
+  session.run(OPCODE16_SCHEMA + FRAME40_SCHEMA);
+  const schema = session.interp.schemaRegistry.get('frame');
+  h.assert('totalWidth', String(schema && schema.totalWidth === 40), 'true');
+  const slots = schema && schema.structure.find((n) => n.name === 'slots');
+  h.assert('has elementSchema', String(!!(slots && slots.elementSchema && slots.elementSchema.name === 'opcode')), 'true');
+  h.assert('elementWidth 16', String(slots && slots.elementWidth === 16), 'true');
+});
+
+reg(2297, 'semantic-schemas', 'schema array sub-field read write', function(h, session) {
+  session.run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    'pkt:tag := \\42',
+    'pkt:slots:0:alu := \\5',
+    'pkt:slots:1:cycles := \\3',
+    '4wire a = pkt:slots:0:alu',
+    '2wire c = pkt:slots:1:cycles',
+  ].join('\n'));
+  h.assert('tag', session.getWire(session.interp, 'pkt').substring(0, 8), '00101010');
+  h.assert('slots:0:alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('slots:1:cycles', session.getWire(session.interp, 'c'), '11');
+});
+
+reg(2298, 'semantic-schemas', 'schema array element literal assign', function(h, session) {
+  session.run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    'pkt:slots:1 = { alu=\\5 cycles=\\3 }<opcode>',
+    '4wire a = pkt:slots:1:alu',
+    '2wire c = pkt:slots:1:cycles',
+  ].join('\n'));
+  h.assert('literal alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('literal cycles', session.getWire(session.interp, 'c'), '11');
+});
+
+reg(2299, 'semantic-schemas', 'schema array slice concat assign', function(h, session) {
+  session.run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    '16wire s0 = { alu=\\5 }<opcode>',
+    '16wire s1 = { cycles=\\3 }<opcode>',
+    'pkt:slots = s0 + s1',
+    '4wire a = pkt:slots:0:alu',
+    '2wire c = pkt:slots:1:cycles',
+  ].join('\n'));
+  h.assert('slice concat alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('slice concat cycles', session.getWire(session.interp, 'c'), '11');
+});
+
+reg(2300, 'semantic-schemas', 'show schema array flat tree per element', function(h, session) {
+  const { out } = session.run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    'pkt:slots:1:alu := \\5',
+    'pkt:slots:1:cycles := \\3',
+    'show(pkt)',
+  ].join('\n'));
+  h.assert('slots section', String(out.some((l) => l.trim() === 'slots')), 'true');
+  h.assert('slot :1 flat', String(out.some((l) => l.includes(':1 =') && l.includes('(16bit)'))), 'true');
+  h.assert('slot :1 alu tree', String(out.some((l) => l.includes('alu') && l.includes('0101'))), 'true');
+  h.assert('slot :1 cycles tree', String(out.some((l) => l.includes('cycles') && l.includes('11'))), 'true');
+});
+
+reg(2301, 'semantic-schemas', 'schema array matrix of sub-schema', function(h, session) {
+  const schema = `<frame>:
+    tag: 8
+    tiles: <opcode>[2,2]
+:
+`;
+  session.run(schema + OPCODE16_SCHEMA + [
+    '72wire<frame> pkt := 0',
+    'pkt:tiles:0:1:alu := \\5',
+    'pkt:tiles:1:0:cycles := \\3',
+    '4wire a = pkt:tiles:0:1:alu',
+    '2wire c = pkt:tiles:1:0:cycles',
+  ].join('\n'));
+  h.assert('tiles:0:1:alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('tiles:1:0:cycles', session.getWire(session.interp, 'c'), '11');
+});
+
+reg(2302, 'semantic-schemas', 'mixed tag slots meta regression', function(h, session) {
+  session.run(FRAME44_MIXED_SCHEMA + OPCODE16_SCHEMA + FLAGS4_SCHEMA + [
+    '44wire<frame> pkt := 0',
+    'pkt:tag := \\42',
+    'pkt:slots:0:alu := \\5',
+    'pkt:meta:carry := 1',
+    '4wire a = pkt:slots:0:alu',
+    '1wire f = pkt:meta:carry',
+  ].join('\n'));
+  h.assert('tag', session.getWire(session.interp, 'pkt').substring(0, 8), '00101010');
+  h.assert('slots alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('meta carry', session.getWire(session.interp, 'f'), '1');
+});
+
+reg(2303, 'semantic-schemas', 'schema array layout matches wire vector model A', function(h, session) {
+  session.run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [
+    '16wire[2]<opcode> bank := 0',
+    '40wire<frame> pkt := 0',
+    'bank:0:alu := \\5',
+    'bank:1:cycles := \\3',
+    'pkt:slots:0:alu := \\5',
+    'pkt:slots:1:cycles := \\3',
+    '16wire b0 = bank:0',
+    '16wire p0 = pkt:slots:0',
+  ].join('\n'));
+  h.assert('bank:0 eq pkt:slots:0', session.getWire(session.interp, 'b0'), session.getWire(session.interp, 'p0'));
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

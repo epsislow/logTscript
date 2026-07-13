@@ -4,25 +4,31 @@ overview: Extindere semantic schema cu `field:W[N]` (vector) și `field:W[N,M]` 
 todos:
   - id: 6.0-parser
     content: "Faza 6.0: parseSchemaArraySuffix după width în parseSchemaDecl → AST kind array"
-    status: pending
+    status: completed
   - id: 6.1-resolve
     content: "Faza 6.1: semantic-schemas.js — nod array, leafPaths indexate, totalWidth, resolveSchemaView"
-    status: pending
+    status: completed
   - id: 6.2-interpreter
     content: "Faza 6.2: interpreter + show/peek/probe — assign/read pkt:cells:1, formatSchemaShow"
-    status: pending
+    status: completed
   - id: 6.3-literals
     content: "Faza 6.3: literali wire-style pe slice array (hex/bin/tag) — fără { cells=[...] }"
-    status: pending
+    status: completed
   - id: 6.4-validate
     content: "Faza 6.4: validare wire width vs schema total; erori explicite model A vs B"
-    status: pending
+    status: completed
   - id: 6.5-tests
     content: "Faza 6.5: teste ~2180+ — array, literali, regresie 16wire[3]<opcode>"
-    status: pending
+    status: completed
   - id: 6.6-doc
     content: "Faza 6.6: semantic-schemas.md — array fields + tabel literali acceptați/respins"
-    status: pending
+    status: completed
+  - id: 7a-slice
+    content: "Faza 7a: slice rând/coloană — pkt:grid:0, pkt:grid::1, show, assign, index dinamic"
+    status: completed
+  - id: 7b-schema-array
+    content: "Faza 7b: field:<schema>[N] și [R,C] — array de sub-scheme în record"
+    status: completed
 isProject: false
 ---
 
@@ -34,7 +40,8 @@ isProject: false
 |----------|--------------|
 | **Faza 6** (umbrelă) | Același nume ca în [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) §8 — **acest fișier = detalierea completă** a Fazei 6 |
 | **Faza 6.0 … 6.6** | Sub-faze **ale acestui plan** — ordine de implementare |
-| **Faza 7+**, **7b+** | Amânate — **neconfirmate**, fără detaliere de implementare încă |
+| **Faza 7a**, **7b** | Următoarele sub-faze **confirmate** (design) — vezi § Faza 7 |
+| **Faza 7+** (range variabil), **7b+** (bridge protocol) | Amânate — neconfirmate |
 | **↗ alt plan** | Referință la fază din alt document; nu se implementează aici |
 
 ### Legături cu alte planuri
@@ -410,7 +417,7 @@ pktb has length [2]
 
 **Regresie doc/teste (6.5–6.6):** actualizare teste **2253**, **2254** (vector show inline), alte assert-uri `:1 = alu=0101`; [`semantic-schemas.md`](v0_3_2/doc/semantic-schemas.md) § Vectors — descriere flat+tree; Wave Listen **inline** pe vector schema: fie păstrează compact flat pe o linie, fie tree — de aliniat la `show` (preferat: expand = tree, inline = flat sumar pe `:i` fără câmpuri amestecate).
 
-**Slice rând/coloană (✅ v1):** `show(pkt:grid:0)` / `show(pkt:grid::1)` — ca wire; rând/col cu `:c =` flat pe celule.
+**Slice rând/coloană (Faza 7a):** `show(pkt:grid:0)` / `show(pkt:grid::1)` — paritate wire; rând/col cu `:r:c =` flat; footer `pkt:grid has shape [R,C]`.
 
 ### Array de **frunză** vs array de **schema** (7+)
 
@@ -474,9 +481,62 @@ pktb:1:cells:1 (8wire)
 | Indici | 0-based; aceeași logică ca wire tensor; compunere `pktb:1:cells:1` |
 | v1 scope | Doar frunze array; fără `{ cells=[...] }`; literali wire pe slice (6.3) |
 | `show` | **Unificat rev. 4:** `:i =` flat + câmpuri schema indentate — wire `rom`, array schema, `pktb` |
-| Slice rând/coloană | **Da în v1** (`pkt:grid:0`, `pkt:grid::1`) |
 | Wire parse + schema | **Da** — vezi § mai jos |
 | Index, chip, wave | Confirmat în conversație |
+| **Faza 6.x livrată** | Frunze `W[N]` / `W[N,M]`; literali concat pe slice; 1757 teste ✅ |
+
+### ✅ Confirmat Faza 7b — `field:<schema>[N]` / `[R,C]` (conversație 2026-07-13)
+
+| Subiect | Decizie |
+|---------|---------|
+| **A. Sintaxă declarație** | `slots: <opcode>[3]` — același `<schema>` ca la nested scalar `meta:<flags>` |
+| **B. Dimensiuni** | Vector **`[N]`** și matrice **`[R,C]`** — ambele în 7b |
+| **C. Slice întreg** | `pkt:slots = ^…` sau `a + b + c` — **da** (aceeași lățime `N × subSchema.totalWidth`) |
+| **C. Literal structurat pe slice** | **Nu** în 7b — amânat la **Faza 4 / 7++** (`{ slots=[…] }`) |
+| **C. Paritate Model A** | `16wire[2]<opcode> bank = ^…` / `s0 + s1` / `bank:0 = { … }<opcode>` — **aceleași reguli** pentru `pkt:slots` în 7b |
+| **D. Erori** | La fel ca azi — mesaj + sugestie path (`use pkt:slots:1:alu`) |
+| **E. Regresie mixed** | Exemplu obligatoriu: `tag:8` + `slots:<opcode>[2]` + `meta:<flags>` pe același `<frame>` |
+| **Show per element** | `:i = flat (Wbit)` + tree sub-schemă dedesubt (rev. 4) |
+| **Faza 7b livrată** | `slots:<opcode>[N]` / `[R,C]`; teste 2296–2303; **1771 teste** ✅ |
+
+### ✅ Confirmat Faza 7a — slice rând/coloană (conversație 2026-07-13)
+
+| Subiect | Decizie |
+|---------|---------|
+| **Sintaxă** | `pkt:grid:0` (rând), `pkt:grid::1` (coloană) — dublu `:` ca wire `matrixA::1` |
+| **Scope** | **read + assign + show** pe ambele (rând și coloană) |
+| **Show** | Același layout ca wire matrix slice: header flat pe slice, linii `:r:c = …` per celulă, footer `has shape` |
+| **Index dinamic** | **Da** — `pkt:grid:(rowIdx)`, `pkt:grid::(colIdx)` — paritate wire `(index)` |
+| **Ordine path** | `field:row:col:subfield` — ca wire matrix + schema; ex. `pkt:tiles:0:1:alu` (7b) |
+| **Footer show** | `pkt:grid has shape [R,C]` — **forma părinte** a matricei (ca `show(matrixA:0)` → `matrixA has shape [2,2]`), nu doar slice-ul |
+| **Ordine fază** | **7a înainte de 7b** |
+
+**Exemple țintă (`grid:4[2,2]`):**
+
+```logts
+pkt:grid:0 = 0101 + 0110          # assign rând (8b)
+pkt:grid::1 = 0110 + 1111         # assign coloană (8b, non-contiguu)
+4wire c = pkt:grid:0:1
+12wire col = pkt:grid::1
+show(pkt:grid:0)
+show(pkt:grid::1)
+```
+
+**Show așteptat (valori exemplu):**
+
+```text
+pkt:grid:0 = 01010110 (8bit)
+:0:0 = 0101 (4bit)
+:0:1 = 0110 (4bit)
+pkt:grid has shape [2,2]
+
+pkt:grid::1 = 01101111 (8bit)
+:0:1 = 0110 (4bit)
+:1:1 = 1111 (4bit)
+pkt:grid has shape [2,2]
+```
+
+**Compunere wire + schema:** `pktb:1:grid::0` — index wire, apoi câmp array, apoi coloană.
 
 ### Wire protocol parse + schema array (opțiunea A — explicație)
 
@@ -505,11 +565,12 @@ parsed:packet:0:field         # parseView — OK dacă protocolul definește pac
 
 **Faza 6.x:** implementăm schema path pe orice wire cu `schemaRef` + lățime potrivită (inclusiv după `=: .proto`); test cu proto fix 48b + `parsed:cells:1`.
 
-### ⏳ Amânat explicit (nu decide acum)
+### ⏳ Amânat explicit
 
 | Subiect | Unde |
 |---------|------|
-| `field:<schema>[N]`, range `[min..max]` | **7+** |
+| Range variabil `field:W[min..max]` | **7+** |
+| Literal structurat vector/matrix în `{ }<schema>` (`{ slots=[…] }`) | **7++ / punct 4** — utilizator „mă mai gândesc” |
 | Bridge protocol → schema tooling | **7b+** |
 | Doc split protocol | plan protocol, paralel |
 
@@ -620,14 +681,89 @@ Mesaj eroare explicit: *schema total width X vs wire element width Y*.
 
 ---
 
-## Faze amânate (neconfirmate)
+## Faza 7 — următorul pas (design confirmat, neimplementat)
 
-| Fază | Conținut | Status | Plan sursă |
-|------|----------|--------|------------|
-| **7+** | `field:<schema>[N]`, range `field:W[min..max]`, schema variabilă | **Amânat** — necesită detaliere | [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) Faza 7+ |
-| **7b+** | Bridge opțional protocol fix → schema (doc/tool, fără runtime coupling) | **Amânat** — idee, neconfirmat | acest plan § Relația cu protocol |
+**Ordine:** **7a → 7b** (7a e incremental pe array-uri frunză din 6.x; 7b adaugă sub-scheme).
 
-**Nu implementăm în Faza 6.x:** mapare automată protocol variabil → schema; `parseTag`; `rest -footer` (vezi plan protocol).
+### Faza 7a — slice rând / coloană pe câmp array (punct 3) ✅ design închis
+
+**Țintă:** paritate completă cu wire tensor (`matrixA:0`, `matrixA::1`, `matrixA:(i)`, `matrixA::(j)`).
+
+| Path | Lățime slice | Stare după 6.x |
+|------|--------------|----------------|
+| `pkt:grid:0:1` | `W` (celulă) | ✅ |
+| `pkt:grid:0` | `cols × W` (rând) | parțial — assign/show/footer de aliniat la wire |
+| `pkt:grid::1` | `rows × W` (coloană) | ❌ parser `::` + `array_col` + scatter assign |
+| `pkt:grid:(r)` / `pkt:grid::(c)` | ca mai sus | ❌ — include în 7a |
+| `pktb:1:grid::0` | compunere wire + schema | ❌ — test regresie |
+
+**Implementare:**
+
+1. **Parser:** după nume câmp array în path, acceptă `:DEC` (rând) sau `::DEC` / `::(wire)` (coloană) înainte de eventual `:subfield` (7b).
+2. **semantic-schemas:** `resolveArrayElementView` → `array_row` / `array_col`; `formatSchemaArrayColSliceShow` (simetric `formatSchemaArrayRowSliceShow`).
+3. **interpreter:** assign coloană non-contiguu (reutilizare `scatterColumnBits` / logică `tensorSlice: 'col'`).
+4. **Show footer:** `displayName` fără sufix slice + `has shape [R,C]` — **identic wire** (`matrixA has shape [2,2]` pe `show(matrixA:0)`).
+
+**Literali slice (ca 6.3):** `pkt:grid:0 = 0101 + 0110`, `pkt:grid::1 = ^56F0` — concat pe lățimea slice-ului.
+
+**Teste ~2190+:**
+
+1. read/write `pkt:grid:0`, `pkt:grid::1`
+2. assign rând + coloană (splice, nu corup restul recordului)
+3. `show(pkt:grid:0)` + `show(pkt:grid::1)` — header, `:r:c`, footer shape
+4. index dinamic `(idx)`
+5. `pktb:1:grid:0:1` compunere
+6. regresie wire `matrixA::1` neschimbat
+
+### Faza 7b — array de sub-scheme `field:<schema>[N]` / `[R,C]` (punct 1)
+
+**Declarație:**
+
+```logts
+<opcode>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:8
+:
+
+<frame>:
+    tag: 8
+    slots: <opcode>[2]       # 2 × 16b = 32b
+    tiles: <opcode>[2,2]     # 4 × 16b = 64b (opțional același release)
+    meta: <flags>            # nested scalar — regresie E
+:
+```
+
+**Acces:** `pkt:slots:1:alu`, `pkt:tiles:0:1:cycles` (**ordine `field:row:col:subfield`** — ca wire), compunere `pktb:1:slots:0:alu`.
+
+**Inițializare (paritate Model A — confirmat):**
+
+| Țintă | Forme acceptate | Respins în 7b |
+|-------|-----------------|---------------|
+| `16wire[2]<opcode> bank` | `bank = ^…`, `s0 + s1`, `bank:0 = { alu=\5 }<opcode>`, `bank:1:alu := \5` | `{ bank=[…] }` |
+| `pkt:slots` (slice întreg) | `pkt:slots = ^…`, `pkt:slots = a + b` | `{ slots=[…] }<frame>` |
+| Per element | `pkt:slots:1 = { cycles=\3 alu=\5 }<opcode>`, `pkt:slots:1:alu := \5` | — |
+
+**Implementare:**
+
+1. **Parser:** după `<schema>`, `parseSchemaArraySuffix()` — `kind: 'schema_array'`, `elementRef`, `rows`, `cols`.
+2. **semantic-schemas:** nod `array` cu `elementSchema` (resolved); `leafPaths` → `slots.0.alu`, …; `elementWidth = subSchema.totalWidth`.
+3. **Show:** `appendSchemaArrayElementLines(..., subSchema)` — hook deja pregătit în cod.
+4. **Assign slice:** pipeline lățime `N × elementWidth` (ca 6.3 pe frunză).
+
+**Teste 2296–2303:** parse width, read/write câmpuri, slice concat, literal pe element, show flat+tree, matrice `tiles`, regresie mixed `tag`+`slots`+`meta`, echivalență layout cu `16wire[2]<opcode>`. **1771 teste ✅**
+
+### Faze amânate (neconfirmate)
+
+| Fază | Conținut | Status |
+|------|----------|--------|
+| **7+** | `field:W[min..max]`, schema variabilă | Amânat — utilizator „la urmă” |
+| **7++** | `{ slots=[…] }` literal structurat pe vector/matrix în schema | Amânat — punct 4 |
+| **7b+** | Bridge protocol fix → schema (doc/tool) | Amânat |
+
+**Nu implementăm în 6.x / 7a–7b:** mapare automată protocol variabil → schema; `parseTag`; `rest -footer`.
 
 ---
 
@@ -691,4 +827,7 @@ flowchart LR
 
 - **`field:W[N]` și `field:W[N,M]`** — da, merită implementat; completează modelul A (vector pe wire) cu modelul B (array în record).
 - **Protocol:** nu blochează și nu dublează parseView; **ajută** doar unde layout-ul e **fix**; pentru JSON/repeat variabil rămâne parseView.
-- **v1 (Faza 6.0–6.6):** doar frunze `W[N]` / `W[N,M]`; nested și range variabil → **7+**.
+- **Faza 6.0–6.6:** livrată ✅ — frunze `W[N]` / `W[N,M]`.
+- **Faza 7a:** slice rând/coloană ✅ design închis — `pkt:grid:0`, `pkt:grid::1`, show/assign, index dinamic, footer `has shape [R,C]`.
+- **Faza 7b:** `field:<schema>[N]` / `[R,C]` — **livrată** ✅; inițializare = concat / per-element / schema literal pe slot (ca `16wire[N]<schema>`); teste 2296–2303.
+- **Amânat:** range variabil **7+**; literal `{ slots=[…] }` **7++**.

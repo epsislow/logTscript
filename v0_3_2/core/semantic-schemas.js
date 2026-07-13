@@ -21,6 +21,9 @@
     if (spec.kind === 'merge') return { kind: 'merge', ref: spec.ref };
     if (spec.kind === 'nested') return { kind: 'nested', name: spec.name, ref: spec.ref };
     if (spec.kind === 'array') return { kind: 'array', name: spec.name, elementWidth: spec.elementWidth, rows: spec.rows, cols: spec.cols, singleDim: spec.singleDim };
+    if (spec.kind === 'schema_array') {
+      return { kind: 'schema_array', name: spec.name, ref: spec.ref, rows: spec.rows, cols: spec.cols, singleDim: spec.singleDim };
+    }
     if (spec.ref && spec.name && spec.kind !== 'leaf') {
       return { kind: 'nested', name: spec.name, ref: spec.ref };
     }
@@ -35,6 +38,45 @@
 
   function isMatrixArrayNode(node) {
     return node && node.kind === 'array' && node.rows > 1 && node.cols > 1;
+  }
+
+  function appendSchemaArrayLeafPaths(leafPaths, arrayNode, bitStart, duplicateContext) {
+    const sub = arrayNode.elementSchema;
+    if (!sub) {
+      appendArrayLeafPaths(leafPaths, arrayNode, bitStart, duplicateContext);
+      return;
+    }
+    ensureSchemaShape(sub);
+    const ew = arrayNode.elementWidth;
+    const { rows, cols, name } = arrayNode;
+    const registerElement = (indexPath, elStart) => {
+      for (const info of sub.leafPaths.values()) {
+        const path = [...indexPath, ...info.path];
+        const key = pathKeyFromSegments(path);
+        if (leafPaths.has(key)) {
+          throw new Error(`Duplicate schema field '${path.join(':')}' in schema '${duplicateContext.schemaName}'`);
+        }
+        leafPaths.set(key, {
+          path,
+          name: info.name,
+          width: info.width,
+          bitStart: elStart + info.bitStart,
+          bitEnd: elStart + info.bitEnd,
+        });
+      }
+    };
+    if (arrayNode.singleDim && rows === 1) {
+      for (let i = 0; i < cols; i++) {
+        registerElement([name, String(i)], bitStart + i * ew);
+      }
+      return;
+    }
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        registerElement([name, String(r), String(c)], bitStart + idx * ew);
+      }
+    }
   }
 
   function appendArrayLeafPaths(leafPaths, arrayNode, bitStart, duplicateContext) {
@@ -281,7 +323,40 @@
           bitEnd,
         };
         structure.push(arrayNode);
-        appendArrayLeafPaths(leafPaths, arrayNode, bitStart, { schemaName: name });
+        appendSchemaArrayLeafPaths(leafPaths, arrayNode, bitStart, { schemaName: name });
+        bitStart += width;
+        continue;
+      }
+      if (spec.kind === 'schema_array') {
+        const sub = getResolvedSchema(spec.ref, ctx);
+        const ew = sub.totalWidth;
+        const rows = spec.rows || 1;
+        const cols = spec.cols || 1;
+        const count = rows * cols;
+        const width = ew * count;
+        if (!Number.isFinite(ew) || ew < 1 || !Number.isFinite(width) || width < 1) {
+          throw new Error(`Invalid schema array field '${spec.name}' in schema '${name}'`);
+        }
+        if (leafPaths.has(spec.name)) {
+          throw new Error(`Duplicate schema field '${spec.name}' in schema '${name}'`);
+        }
+        const bitEnd = bitStart + width - 1;
+        const arrayNode = {
+          kind: 'array',
+          name: spec.name,
+          elementWidth: ew,
+          elementSchema: sub,
+          elementSchemaRef: spec.ref,
+          rows,
+          cols,
+          singleDim: !!spec.singleDim,
+          elementCount: count,
+          width,
+          bitStart,
+          bitEnd,
+        };
+        structure.push(arrayNode);
+        appendSchemaArrayLeafPaths(leafPaths, arrayNode, bitStart, { schemaName: name });
         bitStart += width;
         continue;
       }
@@ -324,6 +399,16 @@
             kind: 'array',
             name: spec.name,
             elementWidth: spec.elementWidth,
+            rows: spec.rows,
+            cols: spec.cols,
+            singleDim: spec.singleDim,
+          };
+        }
+        if (spec.kind === 'schema_array') {
+          return {
+            kind: 'schema_array',
+            name: spec.name,
+            ref: spec.ref,
             rows: spec.rows,
             cols: spec.cols,
             singleDim: spec.singleDim,
@@ -452,7 +537,203 @@
     return wireVar ? `${wireVar}:${path.join(':')}` : path.join(':');
   }
 
+  function resolveSchemaArrayColView(arrayNode, absBase, path, colIndex, wireVar, schemaName) {
+    if (!isMatrixArrayNode(arrayNode)) {
+      throw new Error(`Column slice '::' requires matrix field '${arrayNode.name}' in schema '${schemaName}'`);
+    }
+    if (colIndex < 0 || colIndex >= arrayNode.cols) {
+      throw new Error(`Column index ${colIndex} out of range for '${arrayNode.name}' in schema '${schemaName}' (cols ${arrayNode.cols})`);
+    }
+    const absStart = absBase + arrayNode.bitStart;
+    return {
+      kind: 'array_col',
+      name: arrayNode.name,
+      width: arrayNode.rows * arrayNode.elementWidth,
+      bitStart: absStart,
+      bitEnd: absStart + arrayNode.width - 1,
+      array: arrayNode,
+      colIndex,
+      path: path.slice(),
+    };
+  }
+
+  function resolveSchemaFieldView(schema, path, opts) {
+    const wireVar = opts && opts.wireVar;
+    const arrayColIndex = opts && opts.arrayColIndex;
+    if (arrayColIndex != null && path && path.length >= 1) {
+      ensureSchemaShape(schema);
+      let currentSchema = schema;
+      let absBase = 0;
+      for (let i = 0; i < path.length; i++) {
+        const seg = path[i];
+        const nestedNode = currentSchema.structure.find((n) => n.kind === 'nested' && n.name === seg);
+        if (nestedNode) {
+          if (i === path.length - 1) {
+            throw new Error(`Field '${seg}' is a nested schema in '${schema.name}'; column slice requires an array field`);
+          }
+          currentSchema = nestedNode.schema;
+          absBase = nestedNode.bitStart;
+          continue;
+        }
+        const arrayNode = currentSchema.structure.find((n) => n.kind === 'array' && n.name === seg);
+        if (arrayNode && i === path.length - 1) {
+          return resolveSchemaArrayColView(arrayNode, absBase, path, arrayColIndex, wireVar, schema.name);
+        }
+        break;
+      }
+      throw new Error(`Unknown schema array field for column slice in schema '${schema.name}'`);
+    }
+    return resolveSchemaView(schema, path, opts);
+  }
+
+  function resolveSchemaSubFieldView(subSchema, subPath, elBase, parentPath, wireVar, schemaName) {
+    ensureSchemaShape(subSchema);
+    if (!subPath || !subPath.length) {
+      throw new Error(`Empty sub-field path in schema '${schemaName}'`);
+    }
+    let currentSchema = subSchema;
+    let absBase = elBase;
+    for (let i = 0; i < subPath.length; i++) {
+      const seg = subPath[i];
+      const nestedNode = currentSchema.structure.find((n) => n.kind === 'nested' && n.name === seg);
+      if (nestedNode) {
+        if (i === subPath.length - 1) {
+          return {
+            kind: 'nested',
+            name: seg,
+            width: nestedNode.width,
+            bitStart: absBase + nestedNode.bitStart,
+            bitEnd: absBase + nestedNode.bitEnd,
+            schema: nestedNode.schema,
+            path: parentPath.slice(),
+          };
+        }
+        currentSchema = nestedNode.schema;
+        absBase += nestedNode.bitStart;
+        continue;
+      }
+      const remaining = subPath.slice(i);
+      const key = pathKeyFromSegments(remaining);
+      const leaf = currentSchema.leafPaths.get(key);
+      if (leaf) {
+        return {
+          kind: 'leaf',
+          name: leaf.name,
+          width: leaf.width,
+          bitStart: absBase + leaf.bitStart,
+          bitEnd: absBase + leaf.bitEnd,
+          path: parentPath.slice(),
+        };
+      }
+      if (remaining.length === 1) {
+        const segLeaf = currentSchema.structure.find((n) => n.kind === 'leaf' && n.name === seg);
+        if (segLeaf) {
+          return {
+            kind: 'leaf',
+            name: segLeaf.name,
+            width: segLeaf.width,
+            bitStart: absBase + segLeaf.bitStart,
+            bitEnd: absBase + segLeaf.bitEnd,
+            path: parentPath.slice(),
+          };
+        }
+      }
+      break;
+    }
+    const seg = subPath[0];
+    for (const [, info] of subSchema.leafPaths.entries()) {
+      if (info.name === seg && info.path.length > 1) {
+        const parent = info.path[info.path.length - 2];
+        throw new Error(
+          `Field '${seg}' is nested under '${parent}' in schema '${subSchema.name}'; use ${suggestWirePath(wireVar, [...parentPath, ...info.path])}`
+        );
+      }
+    }
+    throw new Error(`Unknown schema field '${subPath[subPath.length - 1]}' in schema '${subSchema.name}'`);
+  }
+
   function resolveArrayElementView(arrayNode, absBase, path, rem, wireVar, schemaName) {
+    if (arrayNode.elementSchema && rem && rem.length) {
+      const sub = arrayNode.elementSchema;
+      if (isMatrixArrayNode(arrayNode)) {
+        if (rem.length === 1) {
+          const idx0 = segmentAsIndex(rem[0]);
+          if (idx0 == null) {
+            throw new Error(`Expected numeric row index for '${arrayNode.name}' in schema '${schemaName}'`);
+          }
+          if (idx0 < 0 || idx0 >= arrayNode.rows) {
+            throw new Error(`Row index ${idx0} out of range for '${arrayNode.name}' in schema '${schemaName}' (rows ${arrayNode.rows})`);
+          }
+          const rowWidth = arrayNode.cols * arrayNode.elementWidth;
+          const rowStart = absBase + arrayNode.bitStart + idx0 * rowWidth;
+          return {
+            kind: 'array_row',
+            name: arrayNode.name,
+            width: rowWidth,
+            bitStart: rowStart,
+            bitEnd: rowStart + rowWidth - 1,
+            array: arrayNode,
+            rowIndex: idx0,
+            path: path.slice(),
+          };
+        }
+        if (rem.length === 2) {
+          const idx0 = segmentAsIndex(rem[0]);
+          const idx1 = segmentAsIndex(rem[1]);
+          if (idx0 == null || idx1 == null) {
+            throw new Error(`Expected numeric matrix index for '${arrayNode.name}' in schema '${schemaName}'`);
+          }
+          if (idx0 < 0 || idx0 >= arrayNode.rows || idx1 < 0 || idx1 >= arrayNode.cols) {
+            throw new Error(`Matrix index ${idx0}:${idx1} out of range for '${arrayNode.name}' in schema '${schemaName}' ([${arrayNode.rows},${arrayNode.cols}])`);
+          }
+          const linear = idx0 * arrayNode.cols + idx1;
+          const elStart = absBase + arrayNode.bitStart + linear * arrayNode.elementWidth;
+          return {
+            kind: 'nested',
+            name: `${idx0}:${idx1}`,
+            width: arrayNode.elementWidth,
+            bitStart: elStart,
+            bitEnd: elStart + arrayNode.elementWidth - 1,
+            schema: sub,
+            path: path.slice(),
+          };
+        }
+        if (rem.length >= 3) {
+          const idx0 = segmentAsIndex(rem[0]);
+          const idx1 = segmentAsIndex(rem[1]);
+          if (idx0 == null || idx1 == null) {
+            throw new Error(`Expected numeric matrix index for '${arrayNode.name}' in schema '${schemaName}'`);
+          }
+          if (idx0 < 0 || idx0 >= arrayNode.rows || idx1 < 0 || idx1 >= arrayNode.cols) {
+            throw new Error(`Matrix index ${idx0}:${idx1} out of range for '${arrayNode.name}' in schema '${schemaName}' ([${arrayNode.rows},${arrayNode.cols}])`);
+          }
+          const linear = idx0 * arrayNode.cols + idx1;
+          const elStart = absBase + arrayNode.bitStart + linear * arrayNode.elementWidth;
+          return resolveSchemaSubFieldView(sub, rem.slice(2), elStart, path, wireVar, schemaName);
+        }
+        throw new Error(`Invalid path for matrix schema array '${arrayNode.name}' in schema '${schemaName}'`);
+      }
+      const idx0 = segmentAsIndex(rem[0]);
+      if (idx0 == null) {
+        throw new Error(`Expected numeric array index for '${arrayNode.name}' in schema '${schemaName}'`);
+      }
+      if (idx0 < 0 || idx0 >= arrayNode.elementCount) {
+        throw new Error(`Index ${idx0} out of range for '${arrayNode.name}' in schema '${schemaName}' (length ${arrayNode.elementCount})`);
+      }
+      const elStart = absBase + arrayNode.bitStart + idx0 * arrayNode.elementWidth;
+      if (rem.length === 1) {
+        return {
+          kind: 'nested',
+          name: String(idx0),
+          width: arrayNode.elementWidth,
+          bitStart: elStart,
+          bitEnd: elStart + arrayNode.elementWidth - 1,
+          schema: sub,
+          path: path.slice(),
+        };
+      }
+      return resolveSchemaSubFieldView(sub, rem.slice(1), elStart, path, wireVar, schemaName);
+    }
     if (!rem || !rem.length) {
       return {
         kind: 'array',
@@ -609,10 +890,39 @@
         `Field '${view.name}' is a nested schema in '${schemaName}'; use ${suggestWirePath(wireVar, [...view.path, '<field>'])}`
       );
     }
-    if (view.kind === 'array' || view.kind === 'array_row') {
+    if (view.kind === 'array' || view.kind === 'array_row' || view.kind === 'array_col') {
       return view;
     }
     return view;
+  }
+
+  function gatherSchemaArrayColumnBits(fullBits, schema, view) {
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (!TS || !view || view.kind !== 'array_col') {
+      throw new Error('gatherSchemaArrayColumnBits requires array_col view');
+    }
+    const s = fullBits == null ? '' : String(fullBits);
+    const arrayNode = view.array;
+    const arrayBits = s.substring(view.bitStart, view.bitStart + arrayNode.width);
+    return TS.gatherColumnBits(arrayBits, view.colIndex, arrayNode.elementWidth, arrayNode.rows, arrayNode.cols);
+  }
+
+  function scatterSchemaArrayColumnBits(fullBits, schema, view, colValue) {
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    if (!TS || !view || view.kind !== 'array_col') {
+      throw new Error('scatterSchemaArrayColumnBits requires array_col view');
+    }
+    const s = fullBits == null ? '' : String(fullBits);
+    const w = Math.max(s.length, schema.totalWidth);
+    let base = s.length < w ? s.padStart(w, '0') : s.substring(s.length - w);
+    const arrayNode = view.array;
+    const arrayStart = view.bitStart;
+    const arrayBits = base.substring(arrayStart, arrayStart + arrayNode.width);
+    const fv = normalizeSliceBits(colValue, view.width);
+    const updatedArray = TS.scatterColumnBits(
+      arrayBits, view.colIndex, arrayNode.elementWidth, arrayNode.rows, arrayNode.cols, fv
+    );
+    return base.substring(0, arrayStart) + updatedArray + base.substring(arrayStart + arrayNode.width);
   }
 
   function normalizeSliceBits(fieldValue, width) {
@@ -623,6 +933,9 @@
   }
 
   function packViewBits(bits, schema, view, fieldValue) {
+    if (view.kind === 'array_col') {
+      return scatterSchemaArrayColumnBits(bits, schema, view, fieldValue);
+    }
     const fv = normalizeSliceBits(fieldValue, view.width);
     if (view.kind === 'leaf') {
       validateFieldBits(view, fv);
@@ -640,6 +953,9 @@
     const s = bits == null ? '' : String(bits);
     if (s.length < schema.totalWidth) {
       throw new Error(`Wire value shorter than schema '${schema.name}' (${s.length} < ${schema.totalWidth})`);
+    }
+    if (view.kind === 'array_col') {
+      return gatherSchemaArrayColumnBits(s, schema, view);
     }
     const slice = s.substring(view.bitStart, view.bitStart + view.width);
     return slice.padEnd(view.width, '0');
@@ -790,9 +1106,17 @@
       } else if (node.kind === 'array') {
         lines.push(`${pad}${node.name}`);
         const sliceBits = bits.substring(node.bitStart, node.bitStart + node.width);
-        appendSchemaArrayElementLines(lines, sliceBits, node, opts, formatValueFn, indent + 1, null);
+        appendSchemaArrayElementLines(lines, sliceBits, node, opts, formatValueFn, indent + 1, node.elementSchema || null);
       }
     }
+  }
+
+  function schemaArrayParentDisplayName(displayName, view) {
+    if (view && view.parentDisplayName) return view.parentDisplayName;
+    if (!displayName) return displayName;
+    const lastColon = displayName.lastIndexOf(':');
+    if (lastColon > 0) return displayName.substring(0, lastColon);
+    return displayName;
   }
 
   function formatSchemaArrayRowSliceShow(bits, view, opts, formatValueFn, displayName) {
@@ -806,8 +1130,32 @@
       const elBits = bits.substring(c * ew, (c + 1) * ew);
       const formatted = formatSchemaFieldValue(elBits, ew, opts, formatValueFn);
       lines.push(`:${rowIdx}:${c} = ${formatted} (${ew}bit)`);
+      if (arrayNode.elementSchema) {
+        appendSchemaShowTreeLines(lines, elBits, arrayNode.elementSchema, opts, formatValueFn, 1);
+      }
     }
-    lines.push(`${displayName} has shape [1,${arrayNode.cols}]`);
+    const parentName = schemaArrayParentDisplayName(displayName, view);
+    lines.push(`${parentName} has shape [${arrayNode.rows},${arrayNode.cols}]`);
+    return lines;
+  }
+
+  function formatSchemaArrayColSliceShow(bits, view, opts, formatValueFn, displayName) {
+    const arrayNode = view.array;
+    const lines = [];
+    const headerValue = formatSchemaFieldValue(bits, view.width, opts, formatValueFn);
+    lines.push(`${displayName} = ${headerValue} (${view.width}bit)`);
+    const ew = arrayNode.elementWidth;
+    const colIdx = view.colIndex;
+    for (let r = 0; r < arrayNode.rows; r++) {
+      const elBits = bits.substring(r * ew, (r + 1) * ew);
+      const formatted = formatSchemaFieldValue(elBits, ew, opts, formatValueFn);
+      lines.push(`:${r}:${colIdx} = ${formatted} (${ew}bit)`);
+      if (arrayNode.elementSchema) {
+        appendSchemaShowTreeLines(lines, elBits, arrayNode.elementSchema, opts, formatValueFn, 1);
+      }
+    }
+    const parentName = schemaArrayParentDisplayName(displayName, view);
+    lines.push(`${parentName} has shape [${arrayNode.rows},${arrayNode.cols}]`);
     return lines;
   }
 
@@ -815,11 +1163,14 @@
     if (view.kind === 'array_row') {
       return formatSchemaArrayRowSliceShow(bits, view, opts, formatValueFn, displayName);
     }
+    if (view.kind === 'array_col') {
+      return formatSchemaArrayColSliceShow(bits, view, opts, formatValueFn, displayName);
+    }
     const arrayNode = view.array;
     const lines = [];
     const headerValue = formatSchemaFieldValue(bits, view.width, opts, formatValueFn);
     lines.push(`${displayName} = ${headerValue} (${view.width}bit)`);
-    appendSchemaArrayElementLines(lines, bits, arrayNode, opts, formatValueFn, 0, null);
+    appendSchemaArrayElementLines(lines, bits, arrayNode, opts, formatValueFn, 0, arrayNode.elementSchema || null);
     if (arrayNode.singleDim && arrayNode.rows === 1) {
       lines.push(`${displayName} has length [${arrayNode.elementCount}]`);
     } else {
@@ -922,6 +1273,25 @@
     for (const node of schema.structure) {
       if (node.kind === 'leaf') fields.push({ kind: 'leaf', name: node.name, width: node.width });
       else if (node.kind === 'nested') fields.push({ kind: 'nested', name: node.name, ref: node.schema.name });
+      else if (node.kind === 'array' && node.elementSchemaRef) {
+        fields.push({
+          kind: 'schema_array',
+          name: node.name,
+          ref: node.elementSchemaRef,
+          rows: node.rows,
+          cols: node.cols,
+          singleDim: node.singleDim,
+        });
+      } else if (node.kind === 'array') {
+        fields.push({
+          kind: 'array',
+          name: node.name,
+          elementWidth: node.elementWidth,
+          rows: node.rows,
+          cols: node.cols,
+          singleDim: node.singleDim,
+        });
+      }
     }
     return fields;
   }
@@ -960,6 +1330,11 @@
     if (spec.kind === 'nested') {
       lines.push(`${pad}${spec.name}:`);
       appendSchemaDocImportBlock(lines, spec.ref, registry, depth + 1, visited);
+      return;
+    }
+    if (spec.kind === 'schema_array') {
+      const dim = spec.singleDim ? `[${spec.cols}]` : `[${spec.rows},${spec.cols}]`;
+      lines.push(`${pad}${spec.name}:<${spec.ref}>${dim}`);
       return;
     }
     if (spec.kind === 'merge') {
@@ -1051,6 +1426,9 @@
     getField,
     resolveFieldPath,
     resolveSchemaView,
+    resolveSchemaFieldView,
+    gatherSchemaArrayColumnBits,
+    scatterSchemaArrayColumnBits,
     findLeafPathInfo,
     extractField,
     extractFieldPath,
@@ -1064,6 +1442,7 @@
     formatSchemaShowTree,
     formatSchemaArraySliceShow,
     formatSchemaArrayRowSliceShow,
+    formatSchemaArrayColSliceShow,
     appendSchemaShowTreeLines,
     appendSchemaArrayElementLines,
     formatSchemaShowInline,

@@ -166,7 +166,19 @@ class Parser {
       this.eat('SYM', ':');
       if (this.c.type === 'SYM' && this.c.value === '<') {
         const ref = this.parseSchemaRef();
-        fields.push({ kind: 'nested', name: fieldName, ref });
+        const shape = this.parseSchemaArraySuffix();
+        if (shape) {
+          fields.push({
+            kind: 'schema_array',
+            name: fieldName,
+            ref,
+            rows: shape.rows,
+            cols: shape.cols,
+            singleDim: shape.singleDim,
+          });
+        } else {
+          fields.push({ kind: 'nested', name: fieldName, ref });
+        }
       } else if (this.c.type === 'DEC' || this.c.type === 'BIN') {
         const width = parseInt(this.c.value, 10);
         this.eat(this.c.type);
@@ -199,6 +211,25 @@ class Parser {
       : (atom.schemaField ? [atom.schemaField] : []);
     while (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
+      if (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        const colPart = this.parseWireIndexValue();
+        atom.schemaArraySlice = 'col';
+        if (colPart.index !== undefined) atom.schemaArrayColIndex = colPart.index;
+        else atom.schemaArrayColIndexExpr = colPart.indexExpr;
+        break;
+      }
+      if (this.c.type === 'SYM' && this.c.value === '(') {
+        this.eat('SYM', '(');
+        if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+          throw Error(`Only wire names supported in schema array index (...) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        const indexWire = this.c.value;
+        this.eat(this.c.type);
+        this.eat('SYM', ')');
+        atom.schemaArrayRowIndexExpr = [{ var: indexWire }];
+        continue;
+      }
       if (this.c.type === 'ID') {
         path.push(this.c.value);
         this.eat('ID');
