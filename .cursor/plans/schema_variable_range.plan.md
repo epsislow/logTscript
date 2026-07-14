@@ -15,7 +15,7 @@ todos:
     content: "Faza 1.3: <schema>[min-max] / [min-] — aceleași reguli ca frunză"
     status: pending
   - id: 1-4-show-wave
-    content: "Faza 1.4: show tags + Signal Trace (wave listen) pe var_array"
+    content: "Faza 1.4: show tags + Signal Trace legacy+wave pe var_array"
     status: pending
   - id: 1-5-tests-doc
     content: "Faza 1.5: suite ~2335+ legacy+wave, doc, regresie 6.x/7b"
@@ -308,7 +308,7 @@ flowchart TB
 | **1.1**  | `minWidth`/`maxWidth`; `varArrayCounts`; resolve; `Nwire<schema>` validare `N≥minWidth`; `effectiveBitLen` | `[semantic-schemas.js](../v0_3_2/core/semantic-schemas.js)` |
 | **1.2**  | Assign, show de bază, `=:`/`:=` + schema variabilă, eroare flat package3                                   | `[interpreter.js](../v0_3_2/core/interpreter.js)`           |
 | **1.3**  | `slots: <opcode>[1-3]` — aceleași reguli ca frunză                                                         | semantic-schemas + interpreter                              |
-| **1.4**  | Show tags + Signal Trace (wave listen) pe `var_array`                                                        | semantic-schemas, interpreter, wave-listen-format.js        |
+| **1.4**  | Show tags + Signal Trace pe `var_array` (`[step N]` + `[wave N]`)                                            | semantic-schemas, interpreter, wave-listen-format.js        |
 | **1.5**  | Suite completă teste + doc + regresie                                                                        | test_suite, semantic-schemas.md                             |
 
 ### Strategie teste
@@ -322,14 +322,16 @@ flowchart TB
 
 | Tip test | Legacy | Wave |
 |----------|--------|------|
-| Parser / compile / AST (1.0) | ✅ suficient | — |
+| Parser / compile / AST (1.0) | ✅ | ✅ pereche (paritate manifest) |
 | Assign, read, show, peek, probe (1.1+) | ✅ | ✅ pereche |
-| Signal Trace / expand (1.4) | — | ✅ (wave listen) |
-| Regresie comportament | ambele unde există echivalent legacy | |
+| Signal Trace / expand (1.4) | ✅ `[step N]` legacy | ✅ `[wave N]` wave |
+| Regresie comportament | ambele | ambele |
 
-Paritate cu 7++ (2308–2315 legacy, 2316–2318 wave) și 6.x — același scenariu, două intrări în manifest când ține de runtime wire.
+**Notă:** parse/compile e **agnostic** față de propagare (același tokenizer/parser). Duplicăm pe **wave** ca în restul suitei — verifică încărcarea scriptului în ambele sesiuni; zero diferență așteptată la erori compile.
 
-**În plan:** scenariile detaliate stau la **1.5**; la implementare fiecare fază livrează smoke-ul ei (legacy + wave unde e cazul).
+Paritate cu 7++ (2308–2315 legacy, 2316–2318 wave), **Signal Trace** (2269–2275 legacy, 2306+ wave) și 6.x.
+
+**În plan:** scenariile detaliate stau la **1.5**; la implementare fiecare fază livrează smoke-ul ei (**legacy + wave** pentru toate tipurile de test).
 
 ### Faza 1.0 — parser
 
@@ -337,7 +339,7 @@ Paritate cu 7++ (2308–2315 legacy, 2316–2318 wave) și 6.x — același scen
 - Sugar: `8+` → `8[1-]`, `8*` → `8[0-]`.
 - AST: `kind: 'var_array'` / `schema_var_array`.
 
-**Smoke 1.0 (~2335–2338):** parse `[1-3]`, `[1-]`, `[0-]`; sugar `8+`/`8*`; eroare `8[1..3]`; AST `var_array` pe declarație.
+**Smoke 1.0 (~2335–2340):** parse `[1-3]`, `[1-]`, `[0-]`; sugar `8+`/`8*`; eroare `8[1..3]`; AST `var_array` — **legacy + wave**.
 
 ### Faza 1.1 — resolve
 
@@ -370,10 +372,10 @@ Paritate cu 7++ (2308–2315 legacy, 2316–2318 wave) și 6.x — același scen
 - `appendSchemaArrayElementLines` / `formatSchemaShow*` — loop pe `varArrayCounts`, nu `elementCount` fix.
 - `validateSchemaWidthForShow` — `minWidth`–`maxWidth` / `declaredWidth`, nu doar `totalWidth`.
 - Offset-uri câmpuri variabile din `varArrayCounts` la show tree.
-- **Signal Trace:** `varArrayCounts` în payload wave; expand `[+]` Fmt **auto** — paritate array fix (test 2233).
+- **Signal Trace:** `varArrayCounts` în payload; expand `[+]` Fmt **auto** — **legacy** (`[step N]`, teste 2269+) și **wave** (`[wave N]`, teste 2306+); paritate array fix (2233 / 2307).
 - Fișiere: [`wave-listen-format.js`](../v0_3_2/ui/wave-listen-format.js), [`signal-propagation.js`](../v0_3_2/core/signal-propagation.js).
 
-**Smoke 1.4 (~2365–2370):** `show(pkt:cells; dec)` tags (**legacy + wave**); Signal Trace expand Fmt auto pe `var_array` (**wave**); regresie show fix `cells:8[3]` (**legacy + wave**).
+**Smoke 1.4 (~2365–2372):** `show(pkt:cells; dec)` tags (**legacy + wave**); Signal Trace expand Fmt auto pe `var_array` (**legacy + wave**); regresie show fix `cells:8[3]` (**legacy + wave**).
 
 **Show așteptat** (`cells:8[1-3]`, count=2):
 
@@ -401,7 +403,7 @@ pkt:cells has length [2]
 | 5 | regresie `cells:8[3]` neschimbat | legacy + wave |
 | 6 | `WWIDTH(pkt:tokens:0)` / `BITSIZE(pkt:tokens)` pe `var_array` | legacy + wave |
 | 7 | `=:` + `paddingRight` parseView fără schema | legacy + wave |
-| 8 | Signal Trace expand `<schema>` + `cells:8[1-3]` count=2 (Fmt auto) | **wave** |
+| 8 | Signal Trace expand `<schema>` + `cells:8[1-3]` count=2 (Fmt auto) | legacy + wave |
 | 9 | grouped `{…}{…}` count pe `8[1-]` | legacy + wave |
 | 10 | `peek` / `probe` `has length [N]` | legacy + wave |
 
@@ -430,7 +432,7 @@ pkt:cells has length [2]
 | `**[0-]` pe câmp non-final**   | Declarație permisă; assign **structurat** da; flat pe întreg record → **eroare** (split ambiguu față de suffix)                      |
 | **Ordine assign per câmp**     | Secvențial în schemă — `pkt:codeDatas = …` înainte de `pkt:tokens = …` → **eroare** (câmp variabil anterior fără count)              |
 | `**WWIDTH` vs `BITSIZE**`      | Vector/matrix (wire sau schema array): **WWIDTH** = `elementWidth` (ex. `8` din `8[1-3]`); **BITSIZE** = total runtime (`count × W`) |
-| **Teste MVP**                  | Scenarii runtime → **legacy + wave** perechi; Signal Trace → **wave**; parser-only → legacy suficient |
+| **Teste MVP**                  | **Toate** scenariile, inclusiv parser/compile → **legacy + wave** perechi |
 
 
 ---

@@ -290,6 +290,19 @@ function _tensorUsesSchemaAuto(entry, fmt) {
   return fmt === 'auto' && entry && entry.schemaRef && entry.tensorMeta;
 }
 
+function _waveListenSchemaOpts(entry, interp) {
+  const opts = {};
+  if (entry && entry.varArrayCounts && Object.keys(entry.varArrayCounts).length) {
+    opts.varArrayCounts = entry.varArrayCounts;
+    return opts;
+  }
+  if (entry && entry.name && interp && interp.wires) {
+    const wire = interp.wires.get(entry.name);
+    if (wire && wire.varArrayCounts) opts.varArrayCounts = wire.varArrayCounts;
+  }
+  return opts;
+}
+
 function _waveListenVectorSchemaLines(entry, rawValue, interp) {
   if (!entry || !entry.tensorMeta || !entry.schemaRef || !interp
       || typeof interp._formatVectorShowLines !== 'function') {
@@ -314,9 +327,14 @@ function _waveListenParseViewFromEntry(entry, interp) {
 function _waveListenParseViewLines(entry, interp) {
   const view = _waveListenParseViewFromEntry(entry, interp);
   if (!view) return null;
+  const bw = entry.bitWidth || (entry.rawValue ? entry.rawValue.length : 0);
+  if (interp && typeof interp._formatParseViewShowWithPadding === 'function') {
+    const wire = interp.wires ? interp.wires.get(entry.name) : null;
+    const lines = interp._formatParseViewShowWithPadding(wire, view, entry.name, bw, null);
+    if (lines && lines.length) return lines;
+  }
   const fn = typeof formatParseViewShow === 'function' ? formatParseViewShow : null;
   if (!fn) return null;
-  const bw = entry.bitWidth || (entry.rawValue ? entry.rawValue.length : 0);
   const text = fn(view, entry.name, bw, null);
   return text ? text.split('\n') : null;
 }
@@ -344,11 +362,13 @@ function _formatWaveListenScalarFormatted(rawValue, bitWidth, fmt, formatValueFn
     if (SS && entry && entry.schemaRef && interp && interp.schemaRegistry) {
       try {
         const schema = SS.resolveSchema(interp.schemaRegistry, entry.schemaRef);
-        SS.validateSchemaWidthForShow(schema, bitWidth || rawValue.length);
+        const bw = bitWidth || rawValue.length;
+        SS.validateSchemaWidthForShow(schema, bw);
+        const schemaOpts = _waveListenSchemaOpts(entry, interp);
         if (typeof SS.formatSchemaShowInlineFlat === 'function') {
-          return SS.formatSchemaShowInlineFlat(rawValue, schema, null, formatValueFn);
+          return SS.formatSchemaShowInlineFlat(rawValue, schema, schemaOpts, formatValueFn);
         }
-        return SS.formatSchemaShowInline(rawValue, schema, null, formatValueFn);
+        return SS.formatSchemaShowInline(rawValue, schema, schemaOpts, formatValueFn);
       } catch (e) {
         return _waveListenHexDisplay(rawValue, bitWidth, formatValueFn);
       }
@@ -471,11 +491,12 @@ function formatWaveListenExpandLines(entry, fmt, interp) {
       try {
         const schema = SS.resolveSchema(interp.schemaRegistry, entry.schemaRef);
         SS.validateSchemaWidthForShow(schema, bw);
+        const schemaOpts = _waveListenSchemaOpts(entry, interp);
         if (typeof SS.formatSchemaShowTree === 'function'
             && schema.structure && schema.structure.some((n) => n.kind === 'nested')) {
-          return SS.formatSchemaShowTree(rawValue, schema, null, formatValueFn);
+          return SS.formatSchemaShowTree(rawValue, schema, schemaOpts, formatValueFn);
         }
-        return SS.formatSchemaShowLines(rawValue, schema, null, formatValueFn);
+        return SS.formatSchemaShowLines(rawValue, schema, schemaOpts, formatValueFn);
       } catch (e) {
         return wrapBinaryGroupLines(rawValue);
       }
@@ -534,8 +555,9 @@ function formatWaveListenCopyText(entry, fmt, interp) {
       try {
         const schema = SS.resolveSchema(interp.schemaRegistry, entry.schemaRef);
         SS.validateSchemaWidthForShow(schema, bitWidth || rawValue.length);
+        const schemaOpts = _waveListenSchemaOpts(entry, interp);
         if (typeof SS.formatSchemaCopyLiteral === 'function') {
-          return SS.formatSchemaCopyLiteral(rawValue, schema, {});
+          return SS.formatSchemaCopyLiteral(rawValue, schema, schemaOpts);
         }
       } catch (e) { /* fall through */ }
     }

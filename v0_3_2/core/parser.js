@@ -167,7 +167,16 @@ class Parser {
       if (this.c.type === 'SYM' && this.c.value === '<') {
         const ref = this.parseSchemaRef();
         const shape = this.parseSchemaArraySuffix();
-        if (shape) {
+        if (shape && shape.varRange) {
+          fields.push({
+            kind: 'schema_var_array',
+            name: fieldName,
+            ref,
+            minCount: shape.minCount,
+            maxCount: shape.maxCount,
+            singleDim: true,
+          });
+        } else if (shape) {
           fields.push({
             kind: 'schema_array',
             name: fieldName,
@@ -182,8 +191,26 @@ class Parser {
       } else if (this.c.type === 'DEC' || this.c.type === 'BIN') {
         const width = parseInt(this.c.value, 10);
         this.eat(this.c.type);
+        let sugarRange = null;
+        if (this.c.type === 'SYM' && this.c.value === '+') {
+          this.eat('SYM', '+');
+          sugarRange = { varRange: true, minCount: 1, maxCount: null };
+        } else if (this.c.type === 'SYM' && this.c.value === '*') {
+          this.eat('SYM', '*');
+          sugarRange = { varRange: true, minCount: 0, maxCount: null };
+        }
         const shape = this.parseSchemaArraySuffix();
-        if (shape) {
+        const varRange = (shape && shape.varRange) ? shape : sugarRange;
+        if (varRange) {
+          fields.push({
+            kind: 'var_array',
+            name: fieldName,
+            elementWidth: width,
+            minCount: varRange.minCount,
+            maxCount: varRange.maxCount,
+            singleDim: true,
+          });
+        } else if (shape) {
           fields.push({
             kind: 'array',
             name: fieldName,
@@ -545,6 +572,26 @@ class Parser {
     }
     const first = parseInt(this.c.value, 10);
     this.eat(this.c.type);
+    if (this.c.type === 'SYM' && this.c.value === '-') {
+      this.eat('SYM', '-');
+      if (this.c.type === 'SYM' && this.c.value === ']') {
+        this.eat('SYM', ']');
+        if (!Number.isFinite(first) || first < 0) {
+          throw Error(`Array min count must be >= 0 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        return { varRange: true, minCount: first, maxCount: null };
+      }
+      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+        throw Error(`Expected max array count or ']' after '-' in schema field at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const maxCount = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      this.eat('SYM', ']');
+      if (!Number.isFinite(first) || first < 0 || !Number.isFinite(maxCount) || maxCount < first) {
+        throw Error(`Invalid variable array range [${first}-${maxCount}] at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      return { varRange: true, minCount: first, maxCount };
+    }
     let rows = 1;
     let cols = first;
     let hadComma = false;

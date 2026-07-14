@@ -1154,6 +1154,71 @@ class Interpreter {
     }
   }
 
+  _syncAssignPaddingMeta(wire, blobLen, declaredBits, assignPad) {
+    if (!wire) return;
+    delete wire.paddingRightWidth;
+    delete wire.paddingLeftWidth;
+    if (wire.schemaRef) return;
+    const blob = blobLen != null ? blobLen : 0;
+    const declared = declaredBits != null ? declaredBits : blob;
+    if (assignPad === 'right' && declared > blob) {
+      wire.paddingRightWidth = declared - blob;
+    } else if (assignPad === 'left' && declared > blob) {
+      wire.paddingLeftWidth = declared - blob;
+    }
+  }
+
+  _assignPaddingFieldPath(atom) {
+    const SS = this._semanticSchemas();
+    const path = SS && SS.atomSchemaFieldPath(atom);
+    if (!path || path.length !== 1) return null;
+    const name = path[0];
+    if (name === 'paddingRight' || name === 'paddingLeft') return name;
+    return null;
+  }
+
+  _resolveAssignPaddingFieldRange(atom, wire) {
+    if (!wire || wire.schemaRef) return null;
+    const padField = this._assignPaddingFieldPath(atom);
+    if (!padField) return null;
+    const declared = this.getBitWidth(wire.type);
+    if (!declared) return null;
+    if (padField === 'paddingRight') {
+      const padW = wire.paddingRightWidth || 0;
+      if (!padW) return null;
+      const start = declared - padW;
+      return { start, end: declared - 1, path: [padField] };
+    }
+    const padW = wire.paddingLeftWidth || 0;
+    if (!padW) return null;
+    return { start: 0, end: padW - 1, path: [padField] };
+  }
+
+  _parseViewWireOffset(wire) {
+    if (!wire || wire.schemaRef) return 0;
+    return wire.paddingLeftWidth || 0;
+  }
+
+  _formatParseViewShowWithPadding(wire, view, wireName, bitWidth, refStr) {
+    const fn = typeof formatParseViewShow === 'function' ? formatParseViewShow : null;
+    if (!view || !fn) return null;
+    const bw = bitWidth != null ? bitWidth : (wire && this.getBitWidth(wire.type)) || (view.blobWidth || 0);
+    const text = fn(view, wireName, bw, refStr);
+    if (!text) return null;
+    const lines = text.split('\n');
+    if (wire && !wire.schemaRef) {
+      if (wire.paddingLeftWidth) {
+        const pad = '0'.repeat(wire.paddingLeftWidth);
+        lines.splice(1, 0, `  paddingLeft = ${pad} (${wire.paddingLeftWidth}bit)`);
+      }
+      if (wire.paddingRightWidth) {
+        const pad = '0'.repeat(wire.paddingRightWidth);
+        lines.push(`  paddingRight = ${pad} (${wire.paddingRightWidth}bit)`);
+      }
+    }
+    return lines;
+  }
+
   _resolveParseViewFieldRange(atom, wire) {
     const fn = typeof resolveParseViewSlice === 'function' ? resolveParseViewSlice : null;
     if (!fn || !wire || wire.parseViewId == null) return null;
@@ -1163,11 +1228,12 @@ class Interpreter {
       ? atom.schemaFieldPath.slice()
       : (atom.schemaField ? [atom.schemaField] : []);
     if (!path.length) return null;
+    const padOffset = this._parseViewWireOffset(wire);
     const slice = fn(view, path);
     if (slice.fieldBits) {
       return { fieldBits: slice.fieldBits, path };
     }
-    return { start: slice.offset, end: slice.offset + slice.width - 1, path };
+    return { start: slice.offset + padOffset, end: slice.offset + padOffset + slice.width - 1, path };
   }
 
   _makeAsmCtx(isaRef) {
@@ -2325,6 +2391,38 @@ class Interpreter {
     let valueStr = value == null ? '-' : String(value);
     const opts = this._normalizeShowDisplayOpts(target.displayTags);
     const wire = target.wireName ? this.wires.get(target.wireName) : null;
+    const ref = target.ref && target.ref !== '&-' ? target.ref : (target.wireName ? (this.wires.get(target.wireName)?.ref) : null);
+    const refPart = ref ? ` (${ref})` : '';
+    const symPart = this._probeSymbolicSuffix(target, valueStr);
+    const name = target.label || target.wireName || target.ref || '?';
+    let reason = reasonOverride;
+    if (!reason) {
+      if (this._probeRegEdgeCommit) {
+        reason = 'edge committed';
+        this._probeRegEdgeCommit = false;
+      } else {
+        reason = target.seen ? this._probeReasonLabel() : 'initialised';
+      }
+    }
+    const causeLines = this._probeCauseLinesForTarget(target, reason);
+    if (wire && wire.schemaRef && wire.varArrayCounts
+        && Object.keys(wire.varArrayCounts).length && target.kind === 'wire'
+        && !target.bitRange && valueStr !== '-') {
+      try {
+        const schemaLines = this._formatShowWithSchema(valueStr, wire, opts, name, false);
+        if (schemaLines && schemaLines.length) {
+          const displayKey = schemaLines.join('\n') + (target.symbolicMeta ? JSON.stringify(target.symbolicMeta) : '');
+          if (target.lastValue === displayKey) return;
+          target.seen = true;
+          target.lastValue = displayKey;
+          for (const sl of schemaLines) {
+            this.out.push(`# ${sl}${refPart}${symPart} - ${reason}${driverSuffix}`);
+          }
+          this._emitProbeCauseLines(causeLines);
+          return;
+        }
+      } catch (err) { /* fall through to inline probe */ }
+    }
     const schemaFormatted = this._formatProbeDisplayValue(valueStr, wire, opts, target);
     if (schemaFormatted != null) {
       valueStr = schemaFormatted;
@@ -2341,22 +2439,8 @@ class Interpreter {
     }
     const displayKey = valueStr + (target.symbolicMeta ? JSON.stringify(target.symbolicMeta) : '');
     if (target.lastValue === displayKey) return;
-    let reason = reasonOverride;
-    if (!reason) {
-      if (this._probeRegEdgeCommit) {
-        reason = 'edge committed';
-        this._probeRegEdgeCommit = false;
-      } else {
-        reason = target.seen ? this._probeReasonLabel() : 'initialised';
-      }
-    }
     target.seen = true;
     target.lastValue = displayKey;
-    const ref = target.ref && target.ref !== '&-' ? target.ref : (target.wireName ? (this.wires.get(target.wireName)?.ref) : null);
-    const refPart = ref ? ` (${ref})` : '';
-    const symPart = this._probeSymbolicSuffix(target, valueStr);
-    const name = target.label || target.wireName || target.ref || '?';
-    const causeLines = this._probeCauseLinesForTarget(target, reason);
     const DF = typeof LogTScriptDebugDisplayFormat !== 'undefined' ? LogTScriptDebugDisplayFormat : null;
     if (opts && opts.multiline && DF) {
       const wrapped = DF.maybeWrapLines(valueStr, opts);
@@ -3881,6 +3965,86 @@ class Interpreter {
     return SS.resolveSchema(this.schemaRegistry, name);
   }
 
+  _schemaResolveOpts(wire, wireVar) {
+    const opts = { wireVar: wireVar || null };
+    if (wire && wire.varArrayCounts) opts.varArrayCounts = wire.varArrayCounts;
+    if (wire && wire.effectiveBitLen != null) opts.declaredWidth = wire.effectiveBitLen;
+    else if (wire && wire.type) {
+      const w = this.getBitWidth(wire.type);
+      if (w) opts.declaredWidth = w;
+    }
+    return opts;
+  }
+
+  _mergeVarArrayCounts(wire, counts) {
+    if (!wire || !counts || !Object.keys(counts).length) return;
+    wire.varArrayCounts = { ...(wire.varArrayCounts || {}), ...counts };
+  }
+
+  _mergeVarArrayCountsFromExpr(wire, exprResult) {
+    if (!exprResult) return;
+    for (const part of exprResult) {
+      if (part.varArrayCounts) this._mergeVarArrayCounts(wire, part.varArrayCounts);
+    }
+  }
+
+  _syncVarArrayCountsFromFlatAssign(wire, wireValue, options) {
+    if (!wire || !wire.schemaRef || wireValue == null) return;
+    const SS = this._semanticSchemas();
+    if (!SS) return;
+    const schema = this._resolveSchema(wire.schemaRef);
+    if (!schema.hasVarArray) return;
+    const valueStr = String(wireValue);
+    const allowAmbiguousZeroInit = options && options.allowAmbiguousZeroInit;
+    if (allowAmbiguousZeroInit && /^0+$/.test(valueStr)) {
+      return;
+    }
+    let counts;
+    try {
+      counts = SS.resolveFlatVarArrayCounts(schema, valueStr.length);
+    } catch (e) {
+      if (allowAmbiguousZeroInit && /Ambiguous variable array layout/.test(e.message)) {
+        return;
+      }
+      throw e;
+    }
+    this._mergeVarArrayCounts(wire, counts);
+    wire.effectiveBitLen = valueStr.length;
+  }
+
+  _findVarArrayNodeForPath(schema, path) {
+    const SS = this._semanticSchemas();
+    if (!SS || !schema || !path || !path.length) return null;
+    const node = schema.structure.find((n) => n.kind === 'var_array' && n.name === path[0]);
+    if (!node || path.length !== 1) return null;
+    return node;
+  }
+
+  _tryAssignVarArraySchemaField(wireName, wire, target, totalValue, assignPad, bits) {
+    const SS = this._semanticSchemas();
+    if (!SS || !wire || !wire.schemaRef || !target || !target.schemaField) return null;
+    const schema = this._resolveSchema(wire.schemaRef);
+    const path = SS.atomSchemaFieldPath(target);
+    if (!path || path.length !== 1) return null;
+    const node = this._findVarArrayNodeForPath(schema, path);
+    if (!node) return null;
+
+    SS.assertPriorVarArrayCounts(schema, node.name, wire.varArrayCounts || {});
+    const count = SS.countFromFieldBits(node, totalValue.length, schema.name);
+    const counts = { ...(wire.varArrayCounts || {}), [node.name]: count };
+    const offset = SS.computeStructureOffsets(schema, counts).get(node.name);
+    const width = node.elementWidth * count;
+    const rhs = fitWireAssignBits(totalValue, width, assignPad, 'lsb', this);
+
+    let currentValue = this.getWireContributionAwareValue(wireName);
+    if (!currentValue) currentValue = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
+    if (currentValue.length < bits) currentValue = currentValue.padStart(bits, '0');
+
+    this._mergeVarArrayCounts(wire, counts);
+    wire.effectiveBitLen = bits;
+    return currentValue.substring(0, offset) + rhs + currentValue.substring(offset + width);
+  }
+
   _applySchemaRefToWireEntry(wireEntry, decl, wireWidth, loc) {
     if (!decl || !decl.schemaRef) return;
     const SS = this._semanticSchemas();
@@ -3900,6 +4064,8 @@ class Interpreter {
     if (!wireEntry) return null;
     const snap = { type: wireEntry.type, ref: wireEntry.ref };
     if (wireEntry.schemaRef) snap.schemaRef = wireEntry.schemaRef;
+    if (wireEntry.varArrayCounts) snap.varArrayCounts = { ...wireEntry.varArrayCounts };
+    if (wireEntry.effectiveBitLen != null) snap.effectiveBitLen = wireEntry.effectiveBitLen;
     if (wireEntry.vector) {
       snap.vector = {
         elementWidth: wireEntry.vector.elementWidth,
@@ -3920,6 +4086,8 @@ class Interpreter {
     if (!snap) return null;
     const wireEntry = { type: snap.type, ref: snap.ref, initOnly };
     if (snap.schemaRef) wireEntry.schemaRef = snap.schemaRef;
+    if (snap.varArrayCounts) wireEntry.varArrayCounts = { ...snap.varArrayCounts };
+    if (snap.effectiveBitLen != null) wireEntry.effectiveBitLen = snap.effectiveBitLen;
     if (snap.vector) wireEntry.vector = { ...snap.vector };
     if (snap.tensor) {
       wireEntry.tensor = {
@@ -4016,10 +4184,25 @@ class Interpreter {
       return binStr.length;
     }
     if (atom.groupedSchemaLiteral || atom.schemaLiteral) {
-      const lit = atom.groupedSchemaLiteral || atom.schemaLiteral;
-      const schema = this._resolveSchema(lit.schemaRef);
       if (atom.groupedSchemaLiteral) {
-        return (lit.elements || []).length * schema.totalWidth;
+        const gs = atom.groupedSchemaLiteral;
+        const innerSchema = this._resolveSchema(gs.schemaRef);
+        return (gs.elements || []).length * innerSchema.totalWidth;
+      }
+      const lit = atom.schemaLiteral;
+      const schema = this._resolveSchema(lit.schemaRef);
+      if (schema.hasVarArray) {
+        let total = 0;
+        for (const [name, expr] of Object.entries(lit.fields || {})) {
+          const node = schema.structure.find((n) => n.name === name && n.kind === 'var_array');
+          if (node && expr && expr.groupedSchemaLiteral) {
+            const inner = this._resolveSchema(expr.groupedSchemaLiteral.schemaRef);
+            total += (expr.groupedSchemaLiteral.elements || []).length * inner.totalWidth;
+          } else {
+            total += this._evalSchemaLiteralFieldBits(schema, name, expr).length;
+          }
+        }
+        return total || schema.minWidth;
       }
       return schema.totalWidth;
     }
@@ -4043,6 +4226,12 @@ class Interpreter {
       }
       const abs = this._resolveSchemaFieldAbsoluteRange(atom, wire);
       if (abs.nonContiguous === 'schema_col') return abs.sliceWidth;
+      const SS = this._semanticSchemas();
+      const fpath = SS && SS.atomSchemaFieldPath(atom);
+      const fview = this._resolveSchemaFieldView(atom, wire);
+      if (fview && fview.kind === 'array' && fview.array && fpath && fpath.length === 1) {
+        return fview.array.elementWidth;
+      }
       return abs.end - abs.start + 1;
     }
     const slice = this.resolveAtomWireSlice(atom, wire);
@@ -4166,7 +4355,7 @@ class Interpreter {
     const schema = this._resolveSchema(wire.schemaRef);
     const path = this._buildSchemaFieldResolvePath(atom);
     if (!path || !path.length) return null;
-    const opts = { wireVar: atom.var };
+    const opts = this._schemaResolveOpts(wire, atom.var);
     if (atom.schemaArraySlice === 'col') {
       const col = this._resolveTensorIndexValue(
         atom.schemaArrayColIndex, atom.schemaArrayColIndexExpr, 'col'
@@ -4281,7 +4470,10 @@ class Interpreter {
       }
     }
     const path = name.includes('.') ? name.split('.') : [name];
-    SS.resolveFieldPath(schema, path);
+    const node = schema.structure.find((n) => n.name === path[0] && n.kind === 'var_array');
+    if (!node) {
+      SS.resolveFieldPath(schema, path);
+    }
     return bits;
   }
 
@@ -4303,7 +4495,7 @@ class Interpreter {
       for (const [name, expr] of Object.entries(fields || {})) {
         fieldValues[name] = this._evalSchemaLiteralFieldBits(schema, name, expr);
       }
-      totalBits += SS.buildSchemaLiteralBits(schema, fieldValues);
+      totalBits += SS.buildSchemaLiteralBits(schema, fieldValues).bits;
     }
     const bitWidth = totalBits.length;
     if (computeRefs) {
@@ -4325,12 +4517,25 @@ class Interpreter {
     for (const [name, expr] of Object.entries(lit.fields || {})) {
       fieldValues[name] = this._evalSchemaLiteralFieldBits(schema, name, expr);
     }
-    const totalBits = SS.buildSchemaLiteralBits(schema, fieldValues);
+    const built = SS.buildSchemaLiteralBits(schema, fieldValues);
+    const totalBits = built.bits;
     if (computeRefs) {
       const idx = this.storeValue(totalBits);
-      return { value: totalBits, ref: `&${idx}`, varName: null, bitWidth: schema.totalWidth };
+      return {
+        value: totalBits,
+        ref: `&${idx}`,
+        varName: null,
+        bitWidth: totalBits.length,
+        varArrayCounts: built.varArrayCounts,
+      };
     }
-    return { value: totalBits, ref: null, varName: null, bitWidth: schema.totalWidth };
+    return {
+      value: totalBits,
+      ref: null,
+      varName: null,
+      bitWidth: totalBits.length,
+      varArrayCounts: built.varArrayCounts,
+    };
   }
 
   _resolveShowSchemaName(wire, opts) {
@@ -4347,12 +4552,16 @@ class Interpreter {
     if (!schemaName) return null;
     try {
       const schema = this._resolveSchema(schemaName);
-      if (valueStr.length !== schema.totalWidth) return null;
-      if (bitWidth != null && bitWidth !== schema.totalWidth) return null;
+      if (schema.hasVarArray) {
+        if (valueStr.length < schema.minWidth) return null;
+      } else if (valueStr.length !== schema.totalWidth) {
+        return null;
+      }
+      if (bitWidth != null && !schema.hasVarArray && bitWidth !== schema.totalWidth) return null;
       return SS.formatSchemaShowInline(
         valueStr,
         schema,
-        opts,
+        Object.assign({}, opts || {}, { varArrayCounts: wire.varArrayCounts || {} }),
         (bits, w) => this.formatValue(bits, w)
       );
     } catch (err) {
@@ -4397,13 +4606,16 @@ class Interpreter {
     if (!schemaName) return null;
     const schema = this._resolveSchema(schemaName);
     SS.validateSchemaWidthForShow(schema, valueStr.length);
+    const showOpts = Object.assign({}, opts || {}, {
+      varArrayCounts: wire.varArrayCounts || {},
+    });
     const typeLabel = displayName
       ? `${displayName} (${this.getWireTypeLabel(wire)})`
       : this.getWireTypeLabel(wire);
     const lines = SS.formatSchemaShowLines(
       valueStr,
       schema,
-      opts,
+      showOpts,
       (bits, w) => this.formatValue(bits, w)
     );
     if (lines.length) lines[0] = typeLabel;
@@ -4450,13 +4662,16 @@ class Interpreter {
     if (valueStr === '-' && part.ref) valueStr = this.getValueFromRef(part.ref) || '-';
     if (valueStr === '-') return null;
     const displayName = part.varName || this._formatSchemaFieldLabel(atom) || atom.var;
+    const showOpts = Object.assign({}, opts || {}, {
+      varArrayCounts: wire.varArrayCounts || {},
+    });
     if (view.kind === 'nested') {
       SS.validateSchemaWidthForShow(view.schema, valueStr.length);
       const typeLabel = `${displayName} (${view.width}wire<${view.schema.name}>)`;
       const lines = SS.formatSchemaShowTree(
         valueStr,
         view.schema,
-        opts,
+        showOpts,
         (bits, w) => this.formatValue(bits, w)
       );
       if (lines.length) lines[0] = typeLabel;
@@ -4469,7 +4684,7 @@ class Interpreter {
     const lines = SS.formatSchemaArraySliceShow(
       valueStr,
       view,
-      opts,
+      showOpts,
       (bits, w) => this.formatValue(bits, w),
       displayName
     );
@@ -5727,6 +5942,17 @@ class Interpreter {
           }
         }
         if (a.schemaField) {
+          const padRange = this._resolveAssignPaddingFieldRange(a, wire);
+          if (padRange) {
+            const extracted = val.substring(padRange.start, padRange.end + 1);
+            const displayName = this._formatSchemaFieldLabel(a);
+            return {
+              value: extracted,
+              ref: null,
+              varName: displayName,
+              bitWidth: extracted.length,
+            };
+          }
           const pvRange = this._resolveParseViewFieldRange(a, wire);
           if (pvRange) {
             let extracted;
@@ -5744,8 +5970,8 @@ class Interpreter {
               bitWidth: extracted.length,
             };
           }
-          const abs = this._resolveSchemaFieldAbsoluteRange(a, wire);
-          let extracted;
+      const abs = this._resolveSchemaFieldAbsoluteRange(a, wire);
+      let extracted;
           if (abs.nonContiguous === 'schema_col') {
             const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
             const arrayBits = val.substring(abs.arrayBitStart, abs.arrayBitStart + abs.arrayWidth);
@@ -8858,13 +9084,20 @@ if (this.isBuiltinDEMUX(name)) {
         if (schemaWire && schemaWire.parseViewId != null) {
           const part0 = r[0];
           const view = this.parseViews.get(schemaWire.parseViewId);
-          const fn = typeof formatParseViewShow === 'function' ? formatParseViewShow : null;
-          if (view && fn) {
+          if (view) {
             let refStr = null;
             if (part0 && part0.ref) refStr = part0.ref;
-            const text = fn(view, e[0].var, part0 && part0.bitWidth, refStr);
-            this.out.push(text);
-            continue;
+            const lines = this._formatParseViewShowWithPadding(
+              schemaWire,
+              view,
+              e[0].var,
+              part0 && part0.bitWidth,
+              refStr
+            );
+            if (lines && lines.length) {
+              for (const sl of lines) this.out.push(sl);
+              continue;
+            }
           }
         }
         if (schemaWire && !(opts && opts.schemaSuppress)
@@ -9958,15 +10191,33 @@ if (s.assignment) {
   let expr = assignmentExpr;
   const name = target.var;
   let range = null;
+  let varArrayFieldTarget = false;
   if (target.vectorIndex !== undefined || target.vectorIndexExpr || target.bitRange
       || target.tensorSlice || target.tensorRowIndex !== undefined || target.tensorColIndex !== undefined
       || target.tensorRowIndexExpr || target.tensorColIndexExpr || target.schemaField
       || target.schemaArraySlice) {
-    try {
-      range = this._assignmentTargetSliceRange(target, name);
-    } catch (e) {
-      this.reportRuntimeError(e);
-      return;
+    const wireForTarget = this.wires.get(name);
+    const SS = this._semanticSchemas();
+    const path = SS && SS.atomSchemaFieldPath(target);
+    if (wireForTarget && wireForTarget.schemaRef && path && path.length === 1) {
+      try {
+        const schema = this._resolveSchema(wireForTarget.schemaRef);
+        if (this._findVarArrayNodeForPath(schema, path)) {
+          varArrayFieldTarget = true;
+        } else {
+          range = this._assignmentTargetSliceRange(target, name);
+        }
+      } catch (e) {
+        this.reportRuntimeError(e);
+        return;
+      }
+    } else {
+      try {
+        range = this._assignmentTargetSliceRange(target, name);
+      } catch (e) {
+        this.reportRuntimeError(e);
+        return;
+      }
     }
   }
   const property = target.property || null;
@@ -10401,7 +10652,7 @@ if (s.assignment) {
   }
 
   const wireAssignPad = assignmentPad || 'strict';
-  if (isWire && !range) {
+  if (isWire && !range && !varArrayFieldTarget) {
     if (wireAssignPad === 'strict') {
       if (rhs.length !== bitWidth) {
         this._throwRuntime(wireBitsMismatchError(bitWidth, rhs.length), s, rhs.length);
@@ -10411,13 +10662,13 @@ if (s.assignment) {
     }
   }
 
-  if (range) {
+  if (range && !varArrayFieldTarget) {
     try {
       rhs = fitWireAssignBits(rhs, sliceWidth, wireAssignPad, 'lsb', this);
     } catch (e) {
       this._throwRuntime(e.message, s, rhs.length);
     }
-  } else if (rhs.length !== sliceWidth) {
+  } else if (!varArrayFieldTarget && rhs.length !== sliceWidth) {
     const sliceLabel = range && range.nonContiguous === 'col'
       ? `${name}::${range.col}`
       : `${name}.${start}-${end}`;
@@ -10427,17 +10678,34 @@ if (s.assignment) {
   }
 
   // Construct new value
-  const newValue = (range && (range.nonContiguous === 'col' || range.nonContiguous === 'schema_col'))
-    ? this._applySliceWrite(name, entry, bitWidth, range, rhs, wireAssignPad)
-    : currentValue.substring(0, start) +
-      rhs +
-      currentValue.substring(end + 1);
+  let newValue;
+  if (varArrayFieldTarget) {
+    newValue = this._tryAssignVarArraySchemaField(name, entry, target, rhs, wireAssignPad, bitWidth);
+    if (newValue == null) {
+      throw new Error(`Failed to assign variable array field on ${name}`);
+    }
+  } else {
+    newValue = (range && (range.nonContiguous === 'col' || range.nonContiguous === 'schema_col'))
+      ? this._applySliceWrite(name, entry, bitWidth, range, rhs, wireAssignPad)
+      : currentValue.substring(0, start) +
+        rhs +
+        currentValue.substring(end + 1);
+  }
+
+  if (isWire) {
+    this._mergeVarArrayCountsFromExpr(entry, exprResult);
+    if (!varArrayFieldTarget && !range) {
+      this._syncVarArrayCountsFromFlatAssign(entry, newValue, {
+        allowAmbiguousZeroInit: wireAssignPad === 'left',
+      });
+    }
+  }
 
   // Store result
   if (isWire) {
     // STRICT check — skip if this wire was initialized with : (first real assignment is allowed)
     // Slice / vector-element writes are allowed (not a full-wire reassignment).
-    if (this.mode === 'STRICT' && !range && entry.ref !== null && entry.ref !== '&-' && !entry.initOnly && !this._compositePropagating) {
+    if (this.mode === 'STRICT' && !range && !varArrayFieldTarget && entry.ref !== null && entry.ref !== '&-' && !entry.initOnly && !this._compositePropagating) {
       this._throwRuntime(`Cannot reassign wire ${name} in STRICT mode`, s, name.length);
     }
     // Clear initOnly flag after first real assignment
@@ -10780,6 +11048,7 @@ if (s.assignment) {
         if (wireValue == null || wireValue === '') {
           wireValue = totalValue.substring(bitOffset, bitOffset + bits);
         }
+        const blobLenBeforePad = wireValue != null ? wireValue.length : 0;
 
         const hasAsmBlob = exprResult.some(p => p.asmBlob);
         const hasProtocolBlob = exprResult.some(p => p.protocolBlob);
@@ -10902,7 +11171,12 @@ if (s.assignment) {
         }
         if (asmModuleId != null) wireEntry.asmModuleId = asmModuleId;
         if (parseViewId != null) wireEntry.parseViewId = parseViewId;
+        this._syncAssignPaddingMeta(wireEntry, blobLenBeforePad, bits, declAssignPad);
         if(!this.wires.has(d.name)){
+          this._mergeVarArrayCountsFromExpr(wireEntry, exprResult);
+          this._syncVarArrayCountsFromFlatAssign(wireEntry, wireValue || '0'.repeat(bits), {
+            allowAmbiguousZeroInit: declAssignPad === 'left',
+          });
           this.wires.set(d.name, wireEntry);
         } else {
           const existing = this.wires.get(d.name);
@@ -10915,6 +11189,10 @@ if (s.assignment) {
           else if (!hasProtocolBlob) delete existing.asmModuleId;
           if (parseViewId != null) existing.parseViewId = parseViewId;
           else if (!hasProtocolBlob) delete existing.parseViewId;
+          this._mergeVarArrayCountsFromExpr(existing, exprResult);
+          this._syncVarArrayCountsFromFlatAssign(existing, wireValue || '0'.repeat(bits), {
+            allowAmbiguousZeroInit: declAssignPad === 'left',
+          });
         }
         
         // Track wire statement for NEXT (not inside PCB body)
@@ -10983,9 +11261,21 @@ if (s.assignment) {
       if(!bits){ this.currentStmt = prevStmt; return outputs; }
       const target = s.assignment.target;
       let sliceRange = null;
+      let varArrayFieldTarget = false;
       try {
         if (this._assignmentTargetHasSlice(target)) {
-          sliceRange = this._assignmentTargetSliceRange(target, wireName);
+          const SS = this._semanticSchemas();
+          const path = SS && SS.atomSchemaFieldPath(target);
+          if (wire.schemaRef && path && path.length === 1) {
+            const schema = this._resolveSchema(wire.schemaRef);
+            if (this._findVarArrayNodeForPath(schema, path)) {
+              varArrayFieldTarget = true;
+            } else {
+              sliceRange = this._assignmentTargetSliceRange(target, wireName);
+            }
+          } else {
+            sliceRange = this._assignmentTargetSliceRange(target, wireName);
+          }
         }
       } catch (e) {
         if (!s._runtimeErrorReported) {
@@ -10996,7 +11286,7 @@ if (s.assignment) {
         return outputs;
       }
       try {
-        this.lowerUseExprInStatement(s, sliceRange ? this._sliceRangeWidth(sliceRange) : bits);
+        this.lowerUseExprInStatement(s, varArrayFieldTarget ? bits : (sliceRange ? this._sliceRangeWidth(sliceRange) : bits));
         if (s.assignment.busEnable) {
           const enVal = this._evalCallArgValue(s.assignment.busEnableExpr);
           if (!this._zConnectShouldDrive(enVal, s.assignment.busEnable)) {
@@ -11022,10 +11312,24 @@ if (s.assignment) {
         }
         const assignPad = stmtAssignPad(s);
         let wireValue;
-        if (sliceRange) {
+        if (varArrayFieldTarget) {
+          wireValue = this._tryAssignVarArraySchemaField(wireName, wire, target, totalValue, assignPad, bits);
+          if (wireValue == null) {
+            throw new Error(`Failed to assign variable array field on ${wireName}`);
+          }
+        } else if (sliceRange) {
           wireValue = this._applySliceWrite(wireName, wire, bits, sliceRange, totalValue, assignPad);
         } else {
           wireValue = fitWireAssignBits(totalValue, bits, assignPad, 'msb', this);
+        }
+        this._syncAssignPaddingMeta(wire, totalValue.length, bits, assignPad);
+        for (const part of exprResult) {
+          if (part.varArrayCounts) this._mergeVarArrayCounts(wire, part.varArrayCounts);
+        }
+        if (!varArrayFieldTarget && !sliceRange) {
+          this._syncVarArrayCountsFromFlatAssign(wire, wireValue, {
+            allowAmbiguousZeroInit: assignPad === 'left',
+          });
         }
         if (toPending) {
           outputs.push([wireName, wireValue]);
@@ -11133,11 +11437,32 @@ if (s.assignment) {
       
       // Extract value directly from expression parts (no need to build ref and then get value)
       const valueBits = totalValue.substring(bitOffset, bitOffset + bits);
-      let wireValue = declPad === 'strict'
-        ? valueBits
-        : fitWireAssignBits(valueBits, bits, declPad, 'lsb', this);
+      const blobLenBeforePad = valueBits.length;
+      const hasProtocolBlob = exprResult.some(p => p.protocolBlob);
+      let wireValue = valueBits;
+      if (hasProtocolBlob) {
+        if (wireValue.length < bits && (declPad === 'left' || declPad === 'right')) {
+          wireValue = padWireBits(wireValue, bits, declPad);
+        } else if (wireValue.length !== bits) {
+          wireValue = declPad === 'strict'
+            ? valueBits
+            : fitWireAssignBits(valueBits, bits, declPad, 'lsb', this);
+        }
+      } else {
+        wireValue = declPad === 'strict'
+          ? valueBits
+          : fitWireAssignBits(valueBits, bits, declPad, 'lsb', this);
+      }
       
       if (toPending) {
+        const pendingWire = this.wires.get(d.name);
+        if (pendingWire) {
+          this._syncAssignPaddingMeta(pendingWire, blobLenBeforePad, bits, declPad);
+          this._mergeVarArrayCountsFromExpr(pendingWire, exprResult);
+          this._syncVarArrayCountsFromFlatAssign(pendingWire, wireValue || '0'.repeat(bits), {
+            allowAmbiguousZeroInit: declPad === 'left',
+          });
+        }
         outputs.push([d.name, wireValue || '0'.repeat(bits)]);
         this._syncAsmModuleMeta(d.name, exprResult);
         this._syncParseViewMeta(d.name, exprResult);
@@ -11166,9 +11491,23 @@ if (s.assignment) {
           if (wireEntry.vector) existing.vector = wireEntry.vector;
           else delete existing.vector;
           if (d.schemaRef) existing.schemaRef = wireEntry.schemaRef;
+          this._syncAssignPaddingMeta(existing, blobLenBeforePad, bits, declPad);
+          for (const part of exprResult) {
+            if (part.varArrayCounts) this._mergeVarArrayCounts(existing, part.varArrayCounts);
+          }
+          this._syncVarArrayCountsFromFlatAssign(existing, wireValue || '0'.repeat(bits), {
+            allowAmbiguousZeroInit: declPad === 'left',
+          });
           this._syncAsmModuleMeta(existing, exprResult);
           this._syncParseViewMeta(existing, exprResult);
         } else {
+          this._syncAssignPaddingMeta(wireEntry, blobLenBeforePad, bits, declPad);
+          for (const part of exprResult) {
+            if (part.varArrayCounts) this._mergeVarArrayCounts(wireEntry, part.varArrayCounts);
+          }
+          this._syncVarArrayCountsFromFlatAssign(wireEntry, wireValue || '0'.repeat(bits), {
+            allowAmbiguousZeroInit: declPad === 'left',
+          });
           this._syncAsmModuleMeta(wireEntry, exprResult);
           this._syncParseViewMeta(wireEntry, exprResult);
           this.wires.set(d.name, wireEntry);

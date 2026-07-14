@@ -21732,6 +21732,429 @@ reg(2334, 'bit-analysis', 'WWIDTH parseView repeated field needs index (wave)', 
   }, 'ambiguous under repeated section');
 }, { propagation: 'wave' });
 
+const PACKAGE2_SCHEMA = `<package2>:
+    cells: 8[1-]
+    footer: 8
+:
+`;
+
+const PACKAGE1_SCHEMA = `<package1>:
+    cells: 8[1-3]
+:
+`;
+
+const PACKAGE3_SCHEMA = `<package3>:
+    tokens: 8[1-]
+    codeDatas: 8[1-]
+:
+`;
+
+const FRAME_VAR_SLOTS_SCHEMA = `<frameVar>:
+    tag: 8
+    slots: <opcode>[1-2]
+:
+`;
+
+reg(2335, 'semantic-schemas', 'var array schema minWidth compile', function(h, session) {
+  session.run(PACKAGE2_SCHEMA);
+  const schema = session.interp.schemaRegistry.get('package2');
+  h.assert('minWidth 16', String(schema && schema.minWidth === 16), 'true');
+  h.assert('maxWidth open', String(schema && schema.maxWidth == null), 'true');
+  h.assert('hasVarArray', String(schema && schema.hasVarArray), 'true');
+});
+
+reg(2336, 'semantic-schemas', 'var array schema minWidth compile (wave)', function(h, session) {
+  const s = createSession({ propagation: 'wave' });
+  s.run(PACKAGE2_SCHEMA);
+  const schema = s.interp.schemaRegistry.get('package2');
+  h.assert('minWidth 16', String(schema && schema.minWidth === 16), 'true');
+  s.cleanup();
+}, { propagation: 'wave' });
+
+reg(2337, 'semantic-schemas', 'var array wire below minWidth error', function(h, session) {
+  h.assertThrows('min width', function() {
+    session.run(PACKAGE2_SCHEMA + '8wire<package2> pkt');
+  }, 'min 16bit');
+});
+
+reg(2338, 'semantic-schemas', 'var array package2 flat suffix anchor', function(h, session) {
+  session.run(PACKAGE2_SCHEMA + [
+    '32wire<package2> pkt = ^AABBCCFF',
+    '8wire f = pkt:footer',
+    '8wire c0 = pkt:cells:0',
+    '8wire c2 = pkt:cells:2',
+  ].join('\n'));
+  h.assert('footer', session.getWire(session.interp, 'f'), '11111111');
+  h.assert('cells count via slot0', session.getWire(session.interp, 'c0'), '10101010');
+  h.assert('cells slot2', session.getWire(session.interp, 'c2'), '11001100');
+  h.assert('varArrayCounts', String(session.interp.wires.get('pkt').varArrayCounts.cells), '3');
+});
+
+reg(2339, 'semantic-schemas', 'var array package2 flat suffix anchor (wave)', function(h, session) {
+  session.run(PACKAGE2_SCHEMA + '32wire<package2> pkt = ^AABBCCFF');
+  h.assert('cells count', String(session.interp.wires.get('pkt').varArrayCounts.cells), '3');
+}, { propagation: 'wave' });
+
+reg(2340, 'semantic-schemas', 'var array structured per-field counts', function(h, session) {
+  session.run(PACKAGE3_SCHEMA + [
+    '32wire<package3> pkt := 0',
+    'pkt:tokens = ^AABB',
+    'pkt:codeDatas = ^CCDDEE',
+    '8wire t0 = pkt:tokens:0',
+    '8wire c1 = pkt:codeDatas:1',
+  ].join('\n'));
+  h.assert('tokens0', session.getWire(session.interp, 't0'), '10101010');
+  h.assert('codeDatas1', session.getWire(session.interp, 'c1'), '11011101');
+  h.assert('tokens count', String(session.interp.wires.get('pkt').varArrayCounts.tokens), '2');
+  h.assert('codeDatas count', String(session.interp.wires.get('pkt').varArrayCounts.codeDatas), '3');
+});
+
+reg(2341, 'semantic-schemas', 'var array structured per-field counts (wave)', function(h, session) {
+  session.run(PACKAGE3_SCHEMA + [
+    '32wire<package3> pkt := 0',
+    'pkt:tokens = ^AA',
+    'pkt:codeDatas = ^BBCC',
+  ].join('\n'));
+  h.assert('tokens count', String(session.interp.wires.get('pkt').varArrayCounts.tokens), '1');
+  h.assert('codeDatas count', String(session.interp.wires.get('pkt').varArrayCounts.codeDatas), '2');
+}, { propagation: 'wave' });
+
+reg(2342, 'semantic-schemas', 'var array package3 flat assign error', function(h, session) {
+  h.assertThrows('ambiguous flat', function() {
+    session.run(PACKAGE3_SCHEMA + '32wire<package3> pkt = ^00000000');
+  }, 'Ambiguous variable array layout');
+});
+
+reg(2343, 'semantic-schemas', 'var array package3 flat assign error (wave)', function(h, session) {
+  h.assertThrows('ambiguous flat', function() {
+    session.run(PACKAGE3_SCHEMA + '32wire<package3> pkt = ^00000000');
+  }, 'Ambiguous variable array layout');
+}, { propagation: 'wave' });
+
+reg(2344, 'semantic-schemas', 'var array package3 schema literal OK', function(h, session) {
+  session.run(PACKAGE3_SCHEMA + [
+    '32wire<package3> pkt := 0',
+    'pkt:tokens = ^AA',
+    'pkt:codeDatas = ^BBCC',
+    '8wire t = pkt:tokens:0',
+    '8wire c = pkt:codeDatas:1',
+  ].join('\n'));
+  h.assert('token0', session.getWire(session.interp, 't'), '10101010');
+  h.assert('codeData1', session.getWire(session.interp, 'c'), '11001100');
+});
+
+reg(2345, 'semantic-schemas', 'var array case B 24wire unique count', function(h, session) {
+  session.run(PACKAGE1_SCHEMA + '24wire<package1> pkt = ^AABBCC');
+  h.assert('cells count 3', String(session.interp.wires.get('pkt').varArrayCounts.cells), '3');
+  h.assert('cell1', session.getWire(session.interp, 'pkt').substring(8, 16), '10111011');
+});
+
+reg(2346, 'semantic-schemas', 'var array grouped count on field', function(h, session) {
+  session.run(PACKAGE2_SCHEMA + [
+    '32wire<package2> pkt := 0',
+    'pkt:cells = ^AABBCC',
+    'pkt:footer = ^FF',
+  ].join('\n'));
+  h.assert('cells count 3', String(session.interp.wires.get('pkt').varArrayCounts.cells), '3');
+});
+
+reg(2347, 'semantic-schemas', 'var array show has length dynamic', function(h, session) {
+  const out = session.runDoc(PACKAGE2_SCHEMA + [
+    '24wire<package2> pkt = ^AABBFF',
+    'show(pkt)',
+  ].join('\n'));
+  h.assert('has length', String(out.some((l) => l.includes('cells has length [2]'))), 'true');
+  h.assert('footer line', String(out.some((l) => l.includes('footer') && l.includes('11111111'))), 'true');
+});
+
+reg(2348, 'semantic-schemas', 'schema var array grouped assign', function(h, session) {
+  session.run(FRAME_VAR_SLOTS_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frameVar> pkt := 0',
+    'pkt:slots = { alu=\\5 } { cycles=\\3 }<opcode>',
+    '4wire a = pkt:slots:0:alu',
+    '2wire c = pkt:slots:1:cycles',
+  ].join('\n'));
+  h.assert('slots count 2', String(session.interp.wires.get('pkt').varArrayCounts.slots), '2');
+  h.assert('slot0 alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('slot1 cycles', session.getWire(session.interp, 'c'), '11');
+});
+
+reg(2349, 'semantic-schemas', 'schema var array grouped assign (wave)', function(h, session) {
+  session.run(FRAME_VAR_SLOTS_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frameVar> pkt := 0',
+    'pkt:slots = { alu=\\5 }<opcode>',
+    '4wire a = pkt:slots:0:alu',
+  ].join('\n'));
+  h.assert('slot0 alu', session.getWire(session.interp, 'a'), '0101');
+}, { propagation: 'wave' });
+
+reg(2350, 'semantic-schemas', 'schema var array show has length', function(h, session) {
+  const out = session.runDoc(FRAME_VAR_SLOTS_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frameVar> pkt := 0',
+    'pkt:slots = { alu=\\5 } { cycles=\\3 }<opcode>',
+    'show(pkt:slots)',
+  ].join('\n'));
+  h.assert('has length', String(out.some((l) => l.includes('has length [2]'))), 'true');
+});
+
+reg(2351, 'semantic-schemas', 'schema var array read sub-field (wave)', function(h, session) {
+  session.run(FRAME_VAR_SLOTS_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frameVar> pkt := 0',
+    'pkt:slots = { alu=\\5 }<opcode>',
+    '4wire a = pkt:slots:0:alu',
+  ].join('\n'));
+  h.assert('slot0 alu wave', session.getWire(session.interp, 'a'), '0101');
+}, { propagation: 'wave' });
+
+reg(2352, 'semantic-schemas', 'var array parser sugar 8+ and 8*', function(h, session) {
+  session.run([
+    '<sugar>:',
+    '    a: 8+',
+    '    b: 8*',
+    ':',
+  ].join('\n'));
+  const schema = session.interp.schemaRegistry.get('sugar');
+  const a = schema.structure.find((n) => n.name === 'a');
+  const b = schema.structure.find((n) => n.name === 'b');
+  h.assert('a min 1', String(a && a.minCount === 1 && a.maxCount == null), 'true');
+  h.assert('b min 0', String(b && b.minCount === 0 && b.maxCount == null), 'true');
+});
+
+reg(2353, 'semantic-schemas', 'var array parser sugar 8+ (wave)', function(h, session) {
+  session.run('<sugar2>:\n    a: 8+\n:');
+  const a = session.interp.schemaRegistry.get('sugar2').structure[0];
+  h.assert('a var', String(a && a.kind === 'var_array'), 'true');
+}, { propagation: 'wave' });
+
+reg(2354, 'semantic-schemas', 'var array show field dec tag', function(h, session) {
+  const out = session.runDoc(PACKAGE1_SCHEMA + [
+    '24wire<package1> pkt = ^AABBCC',
+    'show(pkt:cells; dec)',
+  ].join('\n'));
+  h.assert('header', String(out.some((l) => l.includes('pkt:cells (24wire)'))), 'true');
+  h.assert('cell0 dec', String(out.some((l) => l.includes(':0 =') && l.includes('\\170'))), 'true');
+  h.assert('cell1 dec', String(out.some((l) => l.includes(':1 =') && l.includes('\\187'))), 'true');
+  h.assert('has length', String(out.some((l) => l.includes('cells has length [3]'))), 'true');
+});
+
+reg(2355, 'semantic-schemas', 'var array show field dec tag (wave)', function(h, session) {
+  const out = session.runDoc(PACKAGE1_SCHEMA + [
+    '24wire<package1> pkt = ^AABBCC',
+    'show(pkt:cells; dec)',
+  ].join('\n'));
+  h.assert('cell0 dec', String(out.some((l) => l.includes(':0 =') && l.includes('\\170'))), 'true');
+  h.assert('has length 3', String(out.some((l) => l.includes('has length [3]'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2356, 'semantic-schemas', 'var array Signal Trace expand auto', function(h, session) {
+  session.run(PACKAGE2_SCHEMA + '24wire<package2> pkt = ^AABBFF');
+  const wire = session.interp.wires.get('pkt');
+  const raw = session.getWire(session.interp, 'pkt');
+  const strat = session.interp.signalPropagationStrategy;
+  const payload = strat && typeof strat._buildWaveListenValuePayload === 'function'
+    ? strat._buildWaveListenValuePayload('pkt', raw, {})
+    : null;
+  h.assert('varArrayCounts payload', String(payload && payload.varArrayCounts && payload.varArrayCounts.cells), '2');
+  const entry = payload || {
+    name: 'pkt',
+    rawValue: raw,
+    bitWidth: raw.length,
+    schemaRef: wire && wire.schemaRef,
+    varArrayCounts: wire && wire.varArrayCounts,
+  };
+  h.assert('needs expand auto', String(waveListenNeedsExpand(entry, 'auto')), 'true');
+  const lines = formatWaveListenExpandLines(entry, 'auto', session.interp);
+  h.assert('expand cell0', String(lines.some((l) => l.includes(':0 ='))), 'true');
+  h.assert('expand cell1', String(lines.some((l) => l.includes(':1 ='))), 'true');
+  h.assert('expand length', String(lines.some((l) => l.includes('cells has length [2]'))), 'true');
+  h.assert('expand footer', String(lines.some((l) => l.includes('footer') && l.includes('11111111'))), 'true');
+});
+
+reg(2357, 'semantic-schemas', 'var array Signal Trace expand auto (wave)', function(h, session) {
+  session.run(PACKAGE2_SCHEMA + '24wire<package2> pkt = ^AABBFF');
+  const wire = session.interp.wires.get('pkt');
+  const raw = session.getWire(session.interp, 'pkt');
+  const strat = session.interp.signalPropagationStrategy;
+  const payload = strat._buildWaveListenValuePayload('pkt', raw, {});
+  h.assert('cells count 2', String(payload.varArrayCounts.cells), '2');
+  h.assert('needs expand', String(waveListenNeedsExpand(payload, 'auto')), 'true');
+  const lines = formatWaveListenExpandLines(payload, 'auto', session.interp);
+  h.assert('expand cells', String(lines.some((l) => l.includes('cells has length [2]'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2358, 'semantic-schemas', 'fixed array show regression cells 8[3]', function(h, session) {
+  const out = session.runDoc(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:cells:1 := \\240',
+    'show(pkt)',
+  ].join('\n'));
+  h.assert('cells section', String(out.some((l) => l.trim() === 'cells')), 'true');
+  h.assert('cells :0', String(out.some((l) => l.includes(':0 ='))), 'true');
+  h.assert('cells :1 flat', String(out.some((l) => l.includes(':1 =') && l.includes('11110000'))), 'true');
+  h.assert('cells :2', String(out.some((l) => l.includes(':2 ='))), 'true');
+  h.assert('no var length', String(out.every((l) => !l.includes('cells has length'))), 'true');
+});
+
+reg(2359, 'semantic-schemas', 'fixed array show regression cells 8[3] (wave)', function(h, session) {
+  const out = session.runDoc(FRAME48_SCHEMA + [
+    '48wire<frame> pkt := 0',
+    'pkt:cells:2 := \\170',
+    'show(pkt:cells)',
+  ].join('\n'));
+  h.assert('length 3', String(out.some((l) => l.includes('has length [3]'))), 'true');
+  h.assert('cell2', String(out.some((l) => l.includes(':2 =') && l.includes('10101010'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2360, 'semantic-schemas', 'var array show pkt dec tag', function(h, session) {
+  const out = session.runDoc(PACKAGE2_SCHEMA + [
+    '24wire<package2> pkt = ^AABBFF',
+    'show(pkt; dec)',
+  ].join('\n'));
+  h.assert('cell0 dec', String(out.some((l) => l.includes(':0 =') && l.includes('\\170'))), 'true');
+  h.assert('footer dec', String(out.some((l) => l.includes('footer') && l.includes('\\255'))), 'true');
+  h.assert('cells length', String(out.some((l) => l.includes('cells has length [2]'))), 'true');
+});
+
+reg(2361, 'semantic-schemas', 'var array show pkt dec tag (wave)', function(h, session) {
+  const out = session.runDoc(PACKAGE2_SCHEMA + [
+    '24wire<package2> pkt = ^AABBFF',
+    'show(pkt; dec)',
+  ].join('\n'));
+  h.assert('cells length', String(out.some((l) => l.includes('cells has length [2]'))), 'true');
+  h.assert('cell1 dec', String(out.some((l) => l.includes(':1 =') && l.includes('\\187'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2362, 'semantic-schemas', 'var array schema literal single record', function(h, session) {
+  session.run(PACKAGE1_SCHEMA + '24wire<package1> pkt = { cells=^AABBCC }<package1>');
+  h.assert('cells count 3', String(session.interp.wires.get('pkt').varArrayCounts.cells), '3');
+  h.assert('cell1', session.getWire(session.interp, 'pkt').substring(8, 16), '10111011');
+});
+
+reg(2363, 'semantic-schemas', 'var array schema literal single record (wave)', function(h, session) {
+  session.run(PACKAGE3_SCHEMA + [
+    '32wire<package3> pkt := 0',
+    'pkt:tokens = ^AA',
+    'pkt:codeDatas = ^BBCC',
+  ].join('\n'));
+  h.assert('tokens count', String(session.interp.wires.get('pkt').varArrayCounts.tokens), '1');
+  h.assert('codeDatas count', String(session.interp.wires.get('pkt').varArrayCounts.codeDatas), '2');
+}, { propagation: 'wave' });
+
+reg(2364, 'semantic-schemas', 'var array per-field assign order error', function(h, session) {
+  h.assertThrows('order', function() {
+    session.run(PACKAGE3_SCHEMA + [
+      '32wire<package3> pkt := 0',
+      'pkt:codeDatas = ^BB',
+      'pkt:tokens = ^AA',
+    ].join('\n'));
+  }, 'requires prior variable array');
+});
+
+reg(2365, 'semantic-schemas', 'var array per-field assign order error (wave)', function(h, session) {
+  h.assertThrows('order', function() {
+    session.run(PACKAGE3_SCHEMA + [
+      '32wire<package3> pkt := 0',
+      'pkt:codeDatas = ^BB',
+    ].join('\n'));
+  }, 'requires prior variable array');
+}, { propagation: 'wave' });
+
+reg(2366, 'semantic-schemas', 'var array WWIDTH and BITSIZE', function(h, session) {
+  const { interp } = session.run(PACKAGE3_SCHEMA + [
+    '32wire<package3> pkt := 0',
+    'pkt:tokens = ^AABB',
+    'pkt:codeDatas = ^CC',
+    '4wire ew = WWIDTH(pkt:tokens:0)',
+    '4wire w = WWIDTH(pkt:tokens)',
+    '5wire sz = BITSIZE(pkt:tokens)',
+  ].join('\n'));
+  h.assert('element WWIDTH', session.getWire(interp, 'ew'), '1000');
+  h.assert('field WWIDTH', session.getWire(interp, 'w'), '1000');
+  h.assert('BITSIZE total', session.getWire(interp, 'sz'), '10000');
+});
+
+reg(2367, 'semantic-schemas', 'var array WWIDTH and BITSIZE (wave)', function(h, session) {
+  const { interp } = session.run(PACKAGE3_SCHEMA + [
+    '32wire<package3> pkt := 0',
+    'pkt:tokens = ^AABB',
+    '5wire sz = BITSIZE(pkt:tokens)',
+  ].join('\n'));
+  h.assert('BITSIZE 16', session.getWire(interp, 'sz'), '10000');
+}, { propagation: 'wave' });
+
+reg(2368, 'semantic-schemas', 'parseView paddingRight on =: show', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  const out = session.runDoc(INLINE_REPEAT_PV + '\n' + [
+    `64wire parsed =: .repeatPv { data = ${pkt} }`,
+    'show(parsed)',
+  ].join('\n'));
+  h.assert('paddingRight line', String(out.some((l) => l.includes('paddingRight'))), 'true');
+  h.assert('packet0', String(out.some((l) => l.includes('packet[0]'))), 'true');
+  h.assert('pad width 48', String(session.interp.wires.get('parsed').paddingRightWidth), '48');
+});
+
+reg(2369, 'semantic-schemas', 'parseView paddingRight on =: show (wave)', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  const out = session.runDoc(INLINE_REPEAT_PV + '\n' + [
+    `64wire parsed =: .repeatPv { data = ${pkt} }`,
+    'show(parsed)',
+  ].join('\n'));
+  h.assert('paddingRight', String(out.some((l) => l.includes('paddingRight'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2370, 'semantic-schemas', 'var array peek has length', function(h, session) {
+  const out = session.runDoc(PACKAGE2_SCHEMA + [
+    '24wire<package2> pkt = ^AABBFF',
+    'peek(pkt)',
+  ].join('\n'));
+  h.assert('has length', String(out.some((l) => l.includes('cells has length [2]'))), 'true');
+});
+
+reg(2371, 'semantic-schemas', 'var array peek has length (wave)', function(h, session) {
+  const out = session.runDoc(PACKAGE1_SCHEMA + [
+    '24wire<package1> pkt = ^AABBCC',
+    'peek(pkt:cells)',
+  ].join('\n'));
+  h.assert('has length 3', String(out.some((l) => l.includes('has length [3]'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2372, 'semantic-schemas', 'var array probe has length', function(h, session) {
+  const out = session.runDoc(PACKAGE2_SCHEMA + [
+    '24wire<package2> pkt = ^AABBFF',
+    'probe(pkt)',
+  ].join('\n'));
+  h.assert('probe init', String(out.some((l) => l.includes('initialised'))), 'true');
+  h.assert('has length', String(out.some((l) => l.includes('cells has length [2]'))), 'true');
+});
+
+reg(2373, 'semantic-schemas', 'var array probe has length (wave)', function(h, session) {
+  const out = session.runDoc(PACKAGE1_SCHEMA + [
+    '24wire<package1> pkt = ^AABBCC',
+    'probe(pkt:cells)',
+  ].join('\n'));
+  h.assert('has length', String(out.some((l) => l.includes('has length [3]'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2374, 'semantic-schemas', 'schema var array show slots (wave)', function(h, session) {
+  const out = session.runDoc(FRAME_VAR_SLOTS_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frameVar> pkt := 0',
+    'pkt:slots = { alu=\\5 } { cycles=\\3 }<opcode>',
+    'show(pkt:slots)',
+  ].join('\n'));
+  h.assert('slot0 alu', String(out.some((l) => l.includes(':0 =') && l.includes('0101'))), 'true');
+  h.assert('has length', String(out.some((l) => l.includes('has length [2]'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2375, 'semantic-schemas', 'var array Signal Trace package1 expand', function(h, session) {
+  session.run(PACKAGE1_SCHEMA + '24wire<package1> pkt = ^AABBCC');
+  const wire = session.interp.wires.get('pkt');
+  const raw = session.getWire(session.interp, 'pkt');
+  const payload = session.interp.signalPropagationStrategy._buildWaveListenValuePayload('pkt', raw, {});
+  h.assert('varArrayCounts', String(payload.varArrayCounts.cells), '3');
+  const lines = formatWaveListenExpandLines(payload, 'auto', session.interp);
+  h.assert('expand length', String(lines.some((l) => l.includes('cells has length [3]'))), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

@@ -24,6 +24,19 @@ class Tokenizer {
     return c;
   }
   token(type,value){ return new Token(type,value,this.line,this.col, this.file) }
+
+  _hexLiteralContinuesAfterWhitespace() {
+    let j = this.i + 1;
+    while (j < this.src.length && (this.src[j] === ' ' || this.src[j] === '\t')) j++;
+    if (j >= this.src.length) return false;
+    const rest = this.src.slice(j);
+    if (/^[A-Za-z_][A-Za-z0-9_]*\s*=/.test(rest)) return false;
+    if (!/[0-9A-Fa-f]/.test(this.src[j])) return false;
+    while (j < this.src.length && /[0-9A-Fa-f]/.test(this.src[j])) j++;
+    while (j < this.src.length && (this.src[j] === ' ' || this.src[j] === '\t')) j++;
+    return j < this.src.length && /[0-9A-Fa-f]/.test(this.src[j]);
+  }
+
   skip(){
     while(!this.eof()){
       // Skip spaces and tabs, but NOT newlines (they generate EOL tokens)
@@ -423,6 +436,7 @@ pushSource({ src, alias }) {
         if (/[0-9A-Fa-f]/.test(peek)) {
           hex += this.next();
         } else if (peek === ' ' || peek === '\t') {
+          if (!this._hexLiteralContinuesAfterWhitespace()) break;
           this.next();
         } else {
           break;

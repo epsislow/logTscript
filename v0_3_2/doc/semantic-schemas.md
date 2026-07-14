@@ -135,7 +135,42 @@ Equivalent to concatenating per-element literals with `+`. Whitespace between `}
 
 **Not supported:** comma lists `[\1,\2,\3]` or `{ cells=[\1,\2,\3] }` — use grouped numeric `\1 \2 \3;8` or grouped schema above.
 
-Variable-length arrays (`field:8[1-3]`) are planned for a later phase. **Schema arrays** (`field:<sub>[N]` / `[R,C]`) are supported — see below.
+### Variable-length arrays (`field:W[min-max]` / `W[min-]`)
+
+Syntax mirrors protocol repetition: **`8[1-3]`** (1–3 elements), **`8[1-]`** (at least 1, open upper bound), **`8[0-]`** (zero or more). Sugar: **`8+`** → `8[1-]`, **`8*`** → `8[0-]`.
+
+```logts
+<package2>:
+    cells: 8[1-]
+    footer: 8
+:
+
+<package3>:
+    tokens: 8[1-]
+    codeDatas: 8[1-]
+:
+```
+
+| Topic | Rule |
+|-------|------|
+| **Flat `=` on whole record** | OK when count is **unique** (e.g. `24wire` + suffix anchor, or single open-ended field last). |
+| **Two `8[1-]` fields** | Structured per-field assign OK; flat `pkt = ^…` → **ambiguous** error. |
+| **Runtime count** | Stored in `wire.varArrayCounts`; drives layout, show, read, Wave Listen. |
+| **Show** | Tree + `:i` lines + `field has length [N]`; tags (`; dec`) and field slices supported. |
+| **Peek / probe** | Same tree as `show`, including dynamic `has length [N]`. |
+| **WWIDTH / BITSIZE** | `WWIDTH(pkt:tokens:0)` = element width (`8`); `BITSIZE(pkt:tokens)` = runtime total (`count × W`). |
+
+```logts
+24wire<package2> pkt = ^AABBFF          # cells count=2 (suffix anchor)
+32wire<package3> pkt := 0
+pkt:tokens = ^AABB
+pkt:codeDatas = ^CC
+32wire<package3> pkt2 = { tokens=^AA codeDatas=^BBCC }<package3>
+show(pkt:cells; dec)
+peek(pkt)
+```
+
+**Schema arrays** (`field:<sub>[N]` / `[R,C]`) with fixed size are unchanged — see below.
 
 ### Matrix row / column slices
 

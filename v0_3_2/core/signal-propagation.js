@@ -249,6 +249,7 @@ class SignalPropagationStrategy {
       tensorMeta,
       schemaRef: isComponent ? null : (wire && wire.schemaRef) || null,
       parseViewId: isComponent ? null : (wire && wire.parseViewId != null ? wire.parseViewId : null),
+      varArrayCounts: isComponent ? null : (wire && wire.varArrayCounts) || null,
       isComponent,
     };
   }

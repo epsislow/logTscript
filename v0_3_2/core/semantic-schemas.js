@@ -21,8 +21,28 @@
     if (spec.kind === 'merge') return { kind: 'merge', ref: spec.ref };
     if (spec.kind === 'nested') return { kind: 'nested', name: spec.name, ref: spec.ref };
     if (spec.kind === 'array') return { kind: 'array', name: spec.name, elementWidth: spec.elementWidth, rows: spec.rows, cols: spec.cols, singleDim: spec.singleDim };
+    if (spec.kind === 'var_array') {
+      return {
+        kind: 'var_array',
+        name: spec.name,
+        elementWidth: spec.elementWidth,
+        minCount: spec.minCount,
+        maxCount: spec.maxCount,
+        singleDim: spec.singleDim,
+      };
+    }
     if (spec.kind === 'schema_array') {
       return { kind: 'schema_array', name: spec.name, ref: spec.ref, rows: spec.rows, cols: spec.cols, singleDim: spec.singleDim };
+    }
+    if (spec.kind === 'schema_var_array') {
+      return {
+        kind: 'schema_var_array',
+        name: spec.name,
+        ref: spec.ref,
+        minCount: spec.minCount,
+        maxCount: spec.maxCount,
+        singleDim: spec.singleDim,
+      };
     }
     if (spec.ref && spec.name && spec.kind !== 'leaf') {
       return { kind: 'nested', name: spec.name, ref: spec.ref };
@@ -38,6 +58,194 @@
 
   function isMatrixArrayNode(node) {
     return node && node.kind === 'array' && node.rows > 1 && node.cols > 1;
+  }
+
+  function isVarArrayNode(node) {
+    return node && node.kind === 'var_array';
+  }
+
+  function validateVarArrayCount(node, count, schemaName) {
+    if (!Number.isFinite(count) || count < 0 || Math.floor(count) !== count) {
+      throw new Error(`Invalid element count for '${node.name}' in schema '${schemaName}'`);
+    }
+    if (count < node.minCount) {
+      throw new Error(`Field '${node.name}' in schema '${schemaName}' requires at least ${node.minCount} elements, got ${count}`);
+    }
+    if (node.maxCount != null && count > node.maxCount) {
+      throw new Error(`Field '${node.name}' in schema '${schemaName}' allows at most ${node.maxCount} elements, got ${count}`);
+    }
+  }
+
+  function fixedWidthOfNode(node) {
+    if (node.kind === 'leaf' || node.kind === 'nested' || node.kind === 'array') return node.width;
+    if (node.kind === 'var_array') return node.minWidth;
+    return 0;
+  }
+
+  function runtimeWidthOfNode(node, varArrayCounts) {
+    if (node.kind === 'var_array') {
+      const count = varArrayCounts[node.name];
+      if (count == null) return node.minWidth;
+      return node.elementWidth * count;
+    }
+    return node.width;
+  }
+
+  function computeStructureOffsets(schema, varArrayCounts) {
+    const offsets = new Map();
+    let offset = 0;
+    for (const node of schema.structure) {
+      offsets.set(node.name, offset);
+      if (node.kind === 'var_array') {
+        const count = varArrayCounts[node.name];
+        offset += count != null ? node.elementWidth * count : node.minWidth;
+      } else {
+        offset += node.width;
+      }
+    }
+    return offsets;
+  }
+
+  function assertPriorVarArrayCounts(schema, fieldName, varArrayCounts) {
+    for (const node of schema.structure) {
+      if (node.name === fieldName) break;
+      if (node.kind === 'var_array' && varArrayCounts[node.name] == null) {
+        throw new Error(
+          `Assign to '${fieldName}' requires prior variable array '${node.name}' count in schema '${schema.name}'`
+        );
+      }
+    }
+  }
+
+  function countFromFieldBits(node, bitLen, schemaName) {
+    if (bitLen % node.elementWidth !== 0) {
+      throw new Error(
+        `Field '${node.name}' in schema '${schemaName}' expects a multiple of ${node.elementWidth} bits, got ${bitLen}`
+      );
+    }
+    const count = bitLen / node.elementWidth;
+    validateVarArrayCount(node, count, schemaName);
+    return count;
+  }
+
+  function resolveFlatVarArrayCounts(schema, declaredWidth) {
+    ensureSchemaShape(schema);
+    const varNodes = schema.structure.filter((n) => n.kind === 'var_array');
+    if (!varNodes.length) return {};
+
+    const prefixWidth = (beforeName) => {
+      let w = 0;
+      for (const node of schema.structure) {
+        if (node.name === beforeName) break;
+        w += runtimeWidthOfNode(node, {});
+      }
+      return w;
+    };
+
+    const suffixWidthAfter = (afterName) => {
+      let found = false;
+      let w = 0;
+      for (const node of schema.structure) {
+        if (node.name === afterName) {
+          found = true;
+          continue;
+        }
+        if (!found) continue;
+        if (node.kind === 'var_array') break;
+        w += node.width;
+      }
+      return w;
+    };
+
+    if (varNodes.length === 1) {
+      const vf = varNodes[0];
+      const prefix = prefixWidth(vf.name);
+      const suffix = suffixWidthAfter(vf.name);
+      const payload = declaredWidth - prefix - suffix;
+      if (payload < 0 || payload % vf.elementWidth !== 0) {
+        throw new Error(
+          `Cannot resolve variable array '${vf.name}' from ${declaredWidth} bits in schema '${schema.name}'`
+        );
+      }
+      const count = payload / vf.elementWidth;
+      validateVarArrayCount(vf, count, schema.name);
+      return { [vf.name]: count };
+    }
+
+    const prefix = prefixWidth(varNodes[0].name);
+    const suffix = suffixWidthAfter(varNodes[varNodes.length - 1].name);
+    const payload = declaredWidth - prefix - suffix;
+    if (payload < 0) {
+      throw new Error(`Wire width ${declaredWidth} too small for schema '${schema.name}'`);
+    }
+
+    const solutions = [];
+    function enumerate(idx, remaining, current) {
+      if (idx >= varNodes.length) {
+        if (remaining === 0) solutions.push({ ...current });
+        return;
+      }
+      const vf = varNodes[idx];
+      const minW = vf.minCount * vf.elementWidth;
+      const maxW = vf.maxCount != null ? vf.maxCount * vf.elementWidth : remaining;
+      for (let w = minW; w <= Math.min(maxW, remaining); w += vf.elementWidth) {
+        const c = w / vf.elementWidth;
+        current[vf.name] = c;
+        enumerate(idx + 1, remaining - w, current);
+      }
+    }
+    enumerate(0, payload, {});
+
+    if (solutions.length !== 1) {
+      throw new Error(
+        `Ambiguous variable array layout for schema '${schema.name}' at ${declaredWidth} bits`
+      );
+    }
+    return solutions[0];
+  }
+
+  function runtimeArrayNode(arrayNode, varArrayCounts, schemaName) {
+    if (!isVarArrayNode(arrayNode)) return arrayNode;
+    const count = varArrayCounts[arrayNode.name];
+    if (count == null) {
+      throw new Error(`Variable array '${arrayNode.name}' has no runtime count in schema '${schemaName}'`);
+    }
+    validateVarArrayCount(arrayNode, count, schemaName);
+    const width = arrayNode.elementWidth * count;
+    const result = {
+      ...arrayNode,
+      kind: 'array',
+      elementCount: count,
+      width,
+      bitEnd: arrayNode.bitStart + width - 1,
+    };
+    if (arrayNode.singleDim && arrayNode.rows === 1) {
+      result.cols = count;
+    } else if (arrayNode.singleDim && arrayNode.cols === 1) {
+      result.rows = count;
+    }
+    return result;
+  }
+
+  function applySchemaMinMaxMeta(schema) {
+    let minWidth = 0;
+    let maxWidth = 0;
+    let maxOpen = false;
+    for (const node of schema.structure) {
+      if (node.kind === 'var_array') {
+        minWidth += node.minWidth;
+        if (node.maxWidth != null) maxWidth += node.maxWidth;
+        else maxOpen = true;
+      } else {
+        minWidth += node.width;
+        maxWidth += node.width;
+      }
+    }
+    schema.minWidth = minWidth;
+    schema.maxWidth = maxOpen ? null : maxWidth;
+    schema.hasVarArray = schema.structure.some((n) => n.kind === 'var_array');
+    schema.totalWidth = minWidth;
+    return schema;
   }
 
   function appendSchemaArrayLeafPaths(leafPaths, arrayNode, bitStart, duplicateContext) {
@@ -360,6 +568,48 @@
         bitStart += width;
         continue;
       }
+      if (spec.kind === 'var_array' || spec.kind === 'schema_var_array') {
+        const minCount = spec.minCount != null ? spec.minCount : 0;
+        const maxCount = spec.maxCount != null ? spec.maxCount : null;
+        let ew;
+        let elementSchema = null;
+        let elementSchemaRef = null;
+        if (spec.kind === 'schema_var_array') {
+          elementSchema = getResolvedSchema(spec.ref, ctx);
+          ew = elementSchema.totalWidth;
+          elementSchemaRef = spec.ref;
+        } else {
+          ew = spec.elementWidth;
+        }
+        if (!Number.isFinite(ew) || ew < 1) {
+          throw new Error(`Invalid variable array field '${spec.name}' in schema '${name}'`);
+        }
+        if (leafPaths.has(spec.name)) {
+          throw new Error(`Duplicate schema field '${spec.name}' in schema '${name}'`);
+        }
+        const minWidth = ew * minCount;
+        const maxWidth = maxCount != null ? ew * maxCount : null;
+        const arrayNode = {
+          kind: 'var_array',
+          name: spec.name,
+          elementWidth: ew,
+          minCount,
+          maxCount,
+          minWidth,
+          maxWidth,
+          rows: 1,
+          cols: minCount,
+          singleDim: true,
+          elementSchema,
+          elementSchemaRef,
+          width: minWidth,
+          bitStart,
+          bitEnd: bitStart + minWidth - 1,
+        };
+        structure.push(arrayNode);
+        bitStart += minWidth;
+        continue;
+      }
       const width = spec.width;
       if (!Number.isFinite(width) || width < 1) {
         throw new Error(`Invalid field width for '${spec.name}' in schema '${name}'`);
@@ -404,6 +654,16 @@
             singleDim: spec.singleDim,
           };
         }
+        if (spec.kind === 'var_array') {
+          return {
+            kind: 'var_array',
+            name: spec.name,
+            elementWidth: spec.elementWidth,
+            minCount: spec.minCount,
+            maxCount: spec.maxCount,
+            singleDim: spec.singleDim,
+          };
+        }
         if (spec.kind === 'schema_array') {
           return {
             kind: 'schema_array',
@@ -414,9 +674,20 @@
             singleDim: spec.singleDim,
           };
         }
+        if (spec.kind === 'schema_var_array') {
+          return {
+            kind: 'schema_var_array',
+            name: spec.name,
+            ref: spec.ref,
+            minCount: spec.minCount,
+            maxCount: spec.maxCount,
+            singleDim: spec.singleDim,
+          };
+        }
         return { kind: 'leaf', name: spec.name, width: spec.width };
       }),
     };
+    applySchemaMinMaxMeta(schema);
     return syncFieldsFromLeafPaths(schema);
   }
 
@@ -490,6 +761,15 @@
 
   function validateSchemaWidth(schema, wireWidth) {
     if (!schema) return;
+    ensureSchemaShape(schema);
+    if (schema.hasVarArray) {
+      if (wireWidth < schema.minWidth) {
+        throw new Error(
+          `width mismatch between ${schema.name} (min ${schema.minWidth}bit) and definition (${wireWidth}bit)`
+        );
+      }
+      return;
+    }
     if (schema.totalWidth !== wireWidth) {
       throw new Error(
         `width mismatch between ${schema.name} (${schema.totalWidth}bit) and definition (${wireWidth}bit)`
@@ -499,6 +779,20 @@
 
   function validateSchemaWidthForShow(schema, wireWidth) {
     if (!schema) return;
+    ensureSchemaShape(schema);
+    if (schema.hasVarArray) {
+      if (wireWidth < schema.minWidth) {
+        throw new Error(
+          `${schema.name} (min ${schema.minWidth}bit) width incompatible with wire (${wireWidth}bit)`
+        );
+      }
+      if (schema.maxWidth != null && wireWidth > schema.maxWidth) {
+        throw new Error(
+          `${schema.name} (max ${schema.maxWidth}bit) width incompatible with wire (${wireWidth}bit)`
+        );
+      }
+      return;
+    }
     if (schema.totalWidth !== wireWidth) {
       throw new Error(
         `${schema.name} (${schema.totalWidth}bit) width incompatible with wire (${wireWidth}bit)`
@@ -812,6 +1106,8 @@
     }
     const wireVar = opts && opts.wireVar;
     const rootName = schema.name;
+    const varArrayCounts = (opts && opts.varArrayCounts) || {};
+    const offsets = schema.hasVarArray ? computeStructureOffsets(schema, varArrayCounts) : null;
 
     let currentSchema = schema;
     let absBase = 0;
@@ -819,29 +1115,36 @@
       const seg = path[i];
       const nestedNode = currentSchema.structure.find((n) => n.kind === 'nested' && n.name === seg);
       if (nestedNode) {
+        const nestedStart = offsets ? offsets.get(nestedNode.name) : nestedNode.bitStart;
         if (i === path.length - 1) {
           return {
             kind: 'nested',
             name: seg,
             width: nestedNode.width,
-            bitStart: nestedNode.bitStart,
-            bitEnd: nestedNode.bitEnd,
+            bitStart: nestedStart,
+            bitEnd: nestedStart + nestedNode.width - 1,
             schema: nestedNode.schema,
             path: path.slice(),
           };
         }
         currentSchema = nestedNode.schema;
-        absBase = nestedNode.bitStart;
+        absBase = nestedStart;
         continue;
       }
-      const arrayNode = currentSchema.structure.find((n) => n.kind === 'array' && n.name === seg);
+      const arrayNode = currentSchema.structure.find(
+        (n) => (n.kind === 'array' || n.kind === 'var_array') && n.name === seg
+      );
       if (arrayNode) {
-        return resolveArrayElementView(arrayNode, absBase, path, path.slice(i + 1), wireVar, rootName);
+        const arrayBitStart = offsets ? offsets.get(arrayNode.name) : absBase + arrayNode.bitStart;
+        const resolvedNode = isVarArrayNode(arrayNode)
+          ? runtimeArrayNode({ ...arrayNode, bitStart: arrayBitStart }, varArrayCounts, currentSchema.name || rootName)
+          : { ...arrayNode, bitStart: arrayBitStart };
+        return resolveArrayElementView(resolvedNode, 0, path, path.slice(i + 1), wireVar, rootName);
       }
       const remaining = path.slice(i);
       const key = pathKeyFromSegments(remaining);
       const leaf = currentSchema.leafPaths.get(key);
-      if (leaf) {
+      if (leaf && !offsets) {
         return {
           kind: 'leaf',
           name: leaf.name,
@@ -854,12 +1157,13 @@
       if (remaining.length === 1) {
         const segLeaf = currentSchema.structure.find((n) => n.kind === 'leaf' && n.name === seg);
         if (segLeaf) {
+          const bitStart = offsets ? offsets.get(segLeaf.name) : absBase + segLeaf.bitStart;
           return {
             kind: 'leaf',
             name: segLeaf.name,
             width: segLeaf.width,
-            bitStart: absBase + segLeaf.bitStart,
-            bitEnd: absBase + segLeaf.bitEnd,
+            bitStart,
+            bitEnd: bitStart + segLeaf.width - 1,
             path: path.slice(),
           };
         }
@@ -966,8 +1270,8 @@
     return extractViewBits(bits, schema, view);
   }
 
-  function packFieldPath(bits, schema, path, fieldValue) {
-    const view = resolveSchemaView(schema, path);
+  function packFieldPath(bits, schema, path, fieldValue, opts) {
+    const view = resolveSchemaView(schema, path, opts);
     if (view.kind === 'nested') {
       throw new Error(`Field '${view.name}' is a nested schema; use a sub-field path`);
     }
@@ -1012,26 +1316,43 @@
     return base.substring(0, bitStart) + fv + base.substring(bitStart + width);
   }
 
-  function buildSchemaLiteralBits(schema, fieldValues) {
+  function buildSchemaLiteralBits(schema, fieldValues, options) {
     ensureSchemaShape(schema);
-    let bits = '0'.repeat(schema.totalWidth);
+    const varArrayCounts = {};
+    const declaredWidth = options && options.declaredWidth;
+    let bits = declaredWidth != null ? '0'.repeat(declaredWidth) : '0'.repeat(schema.totalWidth);
     for (const [key, val] of Object.entries(fieldValues || {})) {
       const path = key.includes('.') ? key.split('.') : [key];
       if (path.length === 1) {
         const node = schema.structure.find((n) => n.name === key);
+        if (node && node.kind === 'var_array') {
+          const bitLen = val == null ? 0 : String(val).length;
+          const count = countFromFieldBits(node, bitLen, schema.name);
+          varArrayCounts[node.name] = count;
+          const offset = computeStructureOffsets(schema, varArrayCounts).get(node.name);
+          bits = packBlock(bits, schema, offset, node.elementWidth * count, val);
+          continue;
+        }
         if (node && (node.kind === 'nested' || node.kind === 'array')) {
           bits = packBlock(bits, schema, node.bitStart, node.width, val);
           continue;
         }
       }
       if (schema.leafPaths.has(pathKeyFromSegments(path))) {
-        bits = packFieldPath(bits, schema, path, val);
+        bits = packFieldPath(bits, schema, path, val, { varArrayCounts });
       } else if (path.length === 1) {
         const field = getField(schema, key);
         if (field) bits = packField(bits, schema, key, val);
       }
     }
-    return bits;
+    if (schema.hasVarArray) {
+      for (const node of schema.structure) {
+        if (node.kind === 'var_array' && varArrayCounts[node.name] == null) {
+          throw new Error(`Missing value for variable array '${node.name}' in schema '${schema.name}'`);
+        }
+      }
+    }
+    return { bits, varArrayCounts };
   }
 
   function formatSchemaFieldValue(fieldBits, fieldWidth, opts, formatValueFn) {
@@ -1093,20 +1414,41 @@
   function appendSchemaShowTreeLines(lines, bits, schema, opts, formatValueFn, indent) {
     ensureSchemaShape(schema);
     const pad = '  '.repeat(indent);
+    const varArrayCounts = (opts && opts.varArrayCounts) || {};
+    const offsets = schema.hasVarArray ? computeStructureOffsets(schema, varArrayCounts) : null;
     for (const node of schema.structure) {
+      const nodeStart = offsets ? offsets.get(node.name) : node.bitStart;
+      const nodeWidth = node.kind === 'var_array'
+        ? node.elementWidth * (varArrayCounts[node.name] != null ? varArrayCounts[node.name] : node.minCount)
+        : node.width;
       if (node.kind === 'leaf') {
-        const fieldBits = bits.substring(node.bitStart, node.bitStart + node.width);
+        const fieldBits = bits.substring(nodeStart, nodeStart + node.width);
         const formatted = formatSchemaFieldValue(fieldBits, node.width, opts, formatValueFn);
         const padName = node.name.padEnd(Math.max(10 - indent * 2, 4), ' ');
         lines.push(`${pad}${padName}= ${formatted}`);
       } else if (node.kind === 'nested') {
         lines.push(`${pad}${node.name}`);
-        const subBits = bits.substring(node.bitStart, node.bitStart + node.width);
+        const subBits = bits.substring(nodeStart, nodeStart + node.width);
         appendSchemaShowTreeLines(lines, subBits, node.schema, opts, formatValueFn, indent + 1);
       } else if (node.kind === 'array') {
         lines.push(`${pad}${node.name}`);
-        const sliceBits = bits.substring(node.bitStart, node.bitStart + node.width);
+        const sliceBits = bits.substring(nodeStart, nodeStart + node.width);
         appendSchemaArrayElementLines(lines, sliceBits, node, opts, formatValueFn, indent + 1, node.elementSchema || null);
+      } else if (node.kind === 'var_array') {
+        lines.push(`${pad}${node.name}`);
+        const count = varArrayCounts[node.name] != null ? varArrayCounts[node.name] : node.minCount;
+        const sliceBits = bits.substring(nodeStart, nodeStart + nodeWidth);
+        const runtimeNode = {
+          ...node,
+          kind: 'array',
+          elementCount: count,
+          cols: count,
+          width: nodeWidth,
+        };
+        appendSchemaArrayElementLines(lines, sliceBits, runtimeNode, opts, formatValueFn, indent + 1, node.elementSchema || null);
+        if (opts && opts.showVarArrayLength !== false) {
+          lines.push(`${pad}${node.name} has length [${count}]`);
+        }
       }
     }
   }
@@ -1191,7 +1533,7 @@
 
   function formatSchemaShowLines(bits, schema, opts, formatValueFn, wireTypeLabel) {
     ensureSchemaShape(schema);
-    if (schema.structure.some((n) => n.kind === 'nested' || n.kind === 'array')) {
+    if (schema.structure.some((n) => n.kind === 'nested' || n.kind === 'array' || n.kind === 'var_array')) {
       return formatSchemaShowTree(bits, schema, opts, formatValueFn, wireTypeLabel);
     }
     const lines = [];
@@ -1291,6 +1633,16 @@
           cols: node.cols,
           singleDim: node.singleDim,
         });
+      } else if (node.kind === 'var_array') {
+        fields.push({
+          kind: 'var_array',
+          name: node.name,
+          elementWidth: node.elementWidth,
+          minCount: node.minCount,
+          maxCount: node.maxCount,
+          singleDim: node.singleDim,
+          ref: node.elementSchemaRef,
+        });
       }
     }
     return fields;
@@ -1335,6 +1687,17 @@
     if (spec.kind === 'schema_array') {
       const dim = spec.singleDim ? `[${spec.cols}]` : `[${spec.rows},${spec.cols}]`;
       lines.push(`${pad}${spec.name}:<${spec.ref}>${dim}`);
+      return;
+    }
+    if (spec.kind === 'schema_var_array' || spec.kind === 'var_array') {
+      const range = spec.maxCount == null
+        ? `[${spec.minCount}-]`
+        : `[${spec.minCount}-${spec.maxCount}]`;
+      if (spec.kind === 'schema_var_array' || spec.ref) {
+        lines.push(`${pad}${spec.name}:<${spec.ref}>${range}`);
+      } else {
+        lines.push(`${pad}${spec.name}:${spec.elementWidth}${range}`);
+      }
       return;
     }
     if (spec.kind === 'merge') {
@@ -1458,6 +1821,14 @@
     atomSchemaFieldPath,
     ensureSchemaShape,
     assertSchemaNameAllowed,
+    validateVarArrayCount,
+    computeStructureOffsets,
+    assertPriorVarArrayCounts,
+    countFromFieldBits,
+    resolveFlatVarArrayCounts,
+    runtimeArrayNode,
+    isVarArrayNode,
+    applySchemaMinMaxMeta,
     RESERVED_SCHEMA_NAMES,
   };
 
