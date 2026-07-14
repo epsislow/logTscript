@@ -1,6 +1,6 @@
 ---
 name: Schema variable range
-overview: "Range variabil în semantic schema — `field:W[min-max]`, `field:W[min-]`; numerotare internă Faza 1.0–1.4; amânat 1+ / 1++. Mapare externă: Faza 7+ în schema_field_arrays."
+overview: "Range variabil în semantic schema — `field:W[min-max]`, `field:W[min-]`; numerotare internă Faza 1.0–1.5; amânat 1+a … 1+z. Mapare externă: Faza 7+ în schema_field_arrays."
 todos:
   - id: 1-0-parser
     content: "Faza 1.0: parser [min-max]/[min-]/[0-] + sugar 8+/8*"
@@ -14,8 +14,11 @@ todos:
   - id: 1-3-schema-array
     content: "Faza 1.3: <schema>[min-max] / [min-] — aceleași reguli ca frunză"
     status: pending
-  - id: 1-4-tests-doc
-    content: "Faza 1.4: teste package2/3, doc semantic-schemas.md, regresie 6.x/7b"
+  - id: 1-4-show-wave
+    content: "Faza 1.4: show tags + Signal Trace (wave listen) pe var_array"
+    status: pending
+  - id: 1-5-tests-doc
+    content: "Faza 1.5: teste package2/3, doc semantic-schemas.md, regresie 6.x/7b"
     status: pending
 isProject: false
 ---
@@ -35,10 +38,10 @@ isProject: false
 | ----------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
 | **Faza 1** (umbrelă)    | Tot acest plan                                       | **Faza 7+** în `[schema_field_arrays.plan.md](schema_field_arrays.plan.md)` |
 | **Faza 1.0 … 1.10**     | Sub-faze **de implementare** — ordine 1.0 → 1.1 → …  | —                                                                           |
-| **Faza 1+**, **1++**, … | Subiecte **amânate** — design, fără ordine fixă încă | —                                                                           |
+| **Faza 1+a … 1+z** | Subiecte **amânate** — design, fără ordine fixă | — |
 
 
-> Spațiu pentru până la **1.10** dacă apare nevoia (ex. 1.5 wave, 1.6 WWIDTH). Sub-fazele 1.0–1.4 acoperă MVP-ul propus.
+> Spațiu pentru până la **1.10** dacă apare nevoia. Sub-fazele **1.0–1.5** acoperă MVP-ul propus.
 
 **Planuri înrudite:**
 
@@ -294,18 +297,19 @@ flowchart TB
 
 ---
 
-## Fazare implementare (Faza 1.0 – 1.4)
+## Fazare implementare (Faza 1.0 – 1.5)
 
-**Ordine recomandată:** 1.0 → 1.1 → 1.2 → 1.3 → 1.4.
+**Ordine recomandată:** 1.0 → 1.1 → 1.2 → 1.3 → 1.4 → 1.5.
 
 
 | Sub-fază | Conținut                                                                                                   | Fișiere                                                     |
 | -------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | **1.0**  | Parser `[min-max]`, `[min-]`                                                                               | `[parser.js](../v0_3_2/core/parser.js)`                     |
 | **1.1**  | `minWidth`/`maxWidth`; `varArrayCounts`; resolve; `Nwire<schema>` validare `N≥minWidth`; `effectiveBitLen` | `[semantic-schemas.js](../v0_3_2/core/semantic-schemas.js)` |
-| **1.2**  | Assign, show dinamic, `=:`/`:=` + schema variabilă, eroare flat package3                                   | `[interpreter.js](../v0_3_2/core/interpreter.js)`           |
+| **1.2**  | Assign, show de bază, `=:`/`:=` + schema variabilă, eroare flat package3                                   | `[interpreter.js](../v0_3_2/core/interpreter.js)`           |
 | **1.3**  | `slots: <opcode>[1-3]` — aceleași reguli ca frunză                                                         | semantic-schemas + interpreter                              |
-| **1.4**  | Teste + doc                                                                                                | test_suite, semantic-schemas.md                             |
+| **1.4**  | Show tags + Signal Trace (wave listen) pe `var_array`                                                        | semantic-schemas, interpreter, wave-listen-format.js        |
+| **1.5**  | Teste + doc                                                                                                | test_suite, semantic-schemas.md                             |
 
 
 ### Faza 1.0 — parser
@@ -326,7 +330,7 @@ flowchart TB
 
 - Assign per câmp → count din lățime literal **sau** din numărul de grupuri grouped (`{…}{…}`).
 - Eroare `pkt = ^…` când split ambiguu (package3).
-- `show` / `peek` / `probe` cu `has length [N]` dinamic.
+- `show` / `peek` / `probe` cu `has length [N]` dinamic (bază — tree complet + tags în **1.4**).
 - Reguli `:=` înainte de `=:` (doar cu N declarat); interzis `:=` fără țintă.
 - `paddingRight` / `paddingLeft` sintetic în show/read când parseView + `=:` / `:=` fără schema.
 
@@ -334,7 +338,13 @@ flowchart TB
 
 - `slots: <opcode>[1-3]` / `[1-]` — paritate reguli cu frunză.
 
-### Faza 1.4 — teste și doc
+### Faza 1.4 — show tags + Signal Trace
+
+- `appendSchemaArrayElementLines` / `formatSchemaShow*` — loop pe `varArrayCounts`, nu `elementCount` fix.
+- `validateSchemaWidthForShow` — `minWidth`–`maxWidth` / `declaredWidth`, nu doar `totalWidth`.
+- Offset-uri câmpuri variabile din `varArrayCounts` la show tree.
+- **Signal Trace:** `varArrayCounts` în payload wave; expand `[+]` Fmt **auto** — paritate array fix (test 2233).
+- Fișiere: [`wave-listen-format.js`](../v0_3_2/ui/wave-listen-format.js), [`signal-propagation.js`](../v0_3_2/core/signal-propagation.js).
 
 **Show așteptat** (`cells:8[1-3]`, count=2):
 
@@ -347,6 +357,8 @@ pkt (24wire<package2>)
 pkt:cells has length [2]
 ```
 
+### Faza 1.5 — teste și doc
+
 **Teste țintă (~2335+):**
 
 1. package2 — flat OK, suffix anchor
@@ -354,8 +366,9 @@ pkt:cells has length [2]
 3. `{ tokens=^… codeDatas=^… }<package3>`
 4. `slots: <opcode>[1-2]` — show flat+tree dinamic
 5. regresie `cells:8[3]` neschimbat
-6. `WWIDTH(pkt:tokens)` / `WWIDTH(pkt:tokens:0)` pe `var_array` → `elementWidth` (8) — **fără** count; aliniat la `WWIDTH(16wire[3,2])` → 16
-7. `BITSIZE(pkt:tokens)` → total runtime după assign (`count × W`)
+6. `WWIDTH(pkt:tokens)` / `WWIDTH(pkt:tokens:0)` pe `var_array` → `elementWidth` (8)
+7. `BITSIZE(pkt:tokens)` → total runtime (`count × W`)
+8. Signal Trace expand pe wire `<schema>` cu `cells:8[1-3]` count=2 (Fmt auto)
 
 ---
 
@@ -478,7 +491,7 @@ Schema se aplică pe **întregul wire declarat** (64b). Zerourile din padding **
 
 **Validare:** `count` dedus din 64 trebuie să respecte `[min-max]` — ex. `cells:8[1-3]` pe 64wire cu suffix → count=6 → **eroare** (depășește max). Utilizatorul trebuie să declare `[1-]` sau `maxWidth` compatibil cu `64wire`, sau să folosească `32wire`.
 
-#### Convenția B — **payload** (amânat 1+): `wireLen = effectiveBitLen`
+#### Convenția B — **payload** (amânat **1+e**): `wireLen = effectiveBitLen`
 
 Schema se aplică doar pe biții **semnificativi** (24b din proto, înainte de pad). Padding-ul e invizibil la resolve. **Nu e default** — opt-in viitor.
 
@@ -618,7 +631,7 @@ Nodurile padding în show **nu înlocuiesc** parseView — îl **completează**,
 | ID     | Opțiune                                              | Descriere                                                        |
 | ------ | ---------------------------------------------------- | ---------------------------------------------------------------- |
 | **W0** | `**declaredWidth`** (Convenția A) ✅                  | Suffix anchor + count din N declarat; padding = parte din layout |
-| **W1** | `effectiveBitLen` la resolve (Convenția B)           | Amânat 1+ — opt-in payload-only                                  |
+| **W1** | `effectiveBitLen` la resolve (Convenția B) | Amânat **1+e** — opt-in payload-only |
 | **W2** | Wire declarat = `maxWidth` schema                    | `32wire` nu `64wire` dacă max schema e 32                        |
 | **W4** | Suffix anchor interzis când `rhsLen < declaredWidth` | Forțează assign structurat — prea restrictiv dacă A e default    |
 | **W5** | `=:` interzis pe wire cu schemă variabilă            | respins — contrazice cazul frame intenționat                     |
@@ -640,25 +653,41 @@ Assign structurat pe câmpuri **nu** trece prin pad pe întreg record — deja s
 
 ---
 
-## Faze amânate (1+, 1++, …)
+## Faze amânate (1+a … 1+z)
 
-> Nu sunt numerotate 1.5+ până la confirmare; folosim **1+** pentru primul val de amânat, **1++** pentru următorul, etc.
+> Sub-fazele **1.0–1.5** = MVP. Amânate = **1+a**, **1+b**, … **1+z** (litere, nu `++`).
 
+| Fază | Subiect | Note |
+|------|---------|------|
+| **1+a** | Count din câmp scalar: `nTokens:4` + `tokens:8[nTokens]` | flat determinist package3 — vezi § 1+a |
+| **1+b** | Range variabil pe matrice 2D | vezi § 1+b — max o dim variabilă; `[1-,1-]` → **1+a** |
+| **1+c** | Slice rând/coloană (paritate 7a) pe `var_array` / matrice variabilă | vezi § 1+c — **altceva** decât 1+a |
+| **1+e** | Convenția B — resolve pe `effectiveBitLen` (payload-only) | opt-in explicit |
 
-| Fază         | Subiect                                                                                     | Note                                                                                        |
-| ------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| **1+**       | Count din câmp scalar: `nTokens:4` + `tokens:8[nTokens]` — flat determinist pentru package3 | elimină ambiguitatea flat fără assign manual                                                |
-| **1++**      | Range variabil pe matrice 2D                                                                | vezi § 1++ mai jos — **nu** `[1-,1-]` flat; max o dimensiune variabilă fără scalari         |
-| **1+++**     | ~~Grouped literal pe slice variabil~~                                                       | **Absorbit în 1.2** — 7++ deja are `{…}{…}<schema>`; la `[1-]` count = nr. grupuri          |
-| **1++++**    | ~~WWIDTH + validare Nwire~~                                                                 | **Absorbit** — WWIDTH schema ✅; var_array în **1.4**; min/max pe `Nwire<schema>` în **1.1** |
-| **1+++**++   | Slice rând/coloană (paritate 7a) pe câmp `var_array` cu count runtime                       | `pkt:tokens:0`, `pkt:grid::1` variabil                                                      |
-| **1++++++**  | Wave listen / show tags pe array variabil                                                   | wave_debug_tooling                                                                          |
-| **1+++++++** | Convenția B — resolve pe `effectiveBitLen` (payload-only)                                   | opt-in explicit                                                                             |
+**Absorbite în MVP (fără literă):** grouped literal → **1.2**; WWIDTH + validare `Nwire` → **1.1** / **1.5**; show tags + wave → **1.4**.
 
+*Subiecte noi: **1+f**, **1+g**, … până la **1+z**.*
 
-*Adaugă **1++++++++** etc. pe măsură ce apar idei noi.*
+### 1+a — count din scalar (flat package3)
 
-### 1++ — matrice variabilă: ce merge și ce nu
+**Problema:** două câmpuri `8[1-]` — split ambiguu la `pkt = ^…` (package3).
+
+**Soluție:** prefix scalar în wire:
+
+```logts
+<package3det>:
+    nTokens: 4
+    tokens: 8[nTokens]
+    codeDatas: 8[1-]
+:
+
+44wire pkt = ^0010AABBCCDDEEFF112233
+# nTokens=2 → tokens 16b → codeDatas 24b — flat UNIC
+```
+
+**Nu e legat de slice 7a** — e doar header de count pentru flat assign.
+
+### 1+b — matrice variabilă: ce merge și ce nu
 
 Analogie cu package3: ambiguitatea apare când **două dimensiuni** trebuie deduse dintr-un singur `wireLen`.
 
@@ -670,14 +699,53 @@ Analogie cu package3: ambiguitatea apare când **două dimensiuni** trebuie dedu
 | `grid:8[2, 1-3]`   | ✅               | ✅                               | rows fixe — `cols = payload / (2×8)` |
 | `grid:8[1-3, 1-3]` | ❌ ambiguu       | ✅                               | `72b` → 3×3 sau 9×1 sau 1×9…         |
 | `grid:8[1-, 2]`    | ✅ (ultim câmp)  | ✅                               | rows din rest / 16 — ca `[1-]` 1D    |
-| `grid:8[1-, 1-]`   | ❌ imposibil     | ⚠️ doar cu `nRows`+`nCols` (1+) | factorizare nedeterministă           |
+| `grid:8[1-, 1-]` | ❌ imposibil | ⚠️ doar cu **1+a** (`nRows`, `nCols`) | factorizare nedeterministă |
 
+**`grid:8[1-, 1-]`** — fără scalari (Faza **1+a**): respins; nu există split unic din biți.
 
-`**grid:8[1-, 1-]**` — fără scalari `nRows`/`nCols` (Faza 1+): **respins** la compile sau doar cu ambele dimensiuni fixe la assign structurat; nu există split unic din biți.
+**Regulă 1+b (minimal):** max **o dimensiune variabilă** per matrice. Ambele variabile → **1+a** (`nRows:4`, `nCols:4`, `grid:8[nRows,nCols]`).
 
-**Regulă propusă 1++ (minimal):** max **o dimensiune variabilă** per matrice; cealaltă fixă. Pentru ambele variabile → **1+** (`nRows:4`, `nCols:4`, `grid:8[nRows,nCols]`) — amânat.
+**Efort 1+b** (o dim variabilă): ~**3–5 zile** peste MVP.
 
-**Efort 1++** (doar o dim variabilă): ~**3–5 zile** peste MVP — extinde parser suffix `[,]`, `minWidth`/`maxWidth` 2D, resolve rows/cols, show `has shape [R,C]` dinamic.
+### 1+c — slice rând/coloană (7a) pe count runtime
+
+**7a ✅ azi** = array **fix** `grid:8[2,3]`:
+
+```logts
+pkt:grid:0 = ^...          # rând 0 (3×8 = 24b) — offset fix la compile
+pkt:grid::1                # coloană 1 (2×8 = 16b, gather)
+show(pkt:grid)             # has shape [2, 3]
+```
+
+**Problema la variabil** `grid:8[1-3, 2]` — **R** (rows) e runtime (`varArrayCounts`):
+
+```logts
+<frame>:
+    grid: 8[1-3, 2]    # rows 1–3, cols fix 2
+:
+
+# după assign: R = 2 (nu 3)
+48wire pkt = ^...       # 2×2×8 = 32b (+ prefix dacă e)
+
+pkt:grid:0              # rând 0 — lățime 2×8=16, offset OK dacă știm R=2
+pkt:grid:2              # EROARE — index 2, dar R=2 (max index 1)
+pkt:grid::1             # coloană 1 — gather peste R=2 rânduri (nu R=3)
+show(pkt:grid)          # has shape [2, 2] — dinamic, nu [?, 2] la compile
+pkt:grid:(rowIdx)       # index dinamic — bounds din R runtime, nu din [1-3] static
+```
+
+| Ce lipsește față de 7a fix | De ce amânăm |
+|----------------------------|---------------|
+| `array_row` / `array_col` cu `rows` din `varArrayCounts` | offset-uri depind de R efectiv |
+| Bounds `pkt:grid:2` când R=2 | eroare runtime, nu compile-time |
+| `show` → `has shape [R, C]` dinamic | nu `[2, 3]` fix |
+| `pkt:grid::1` gather | pașii între rânduri = `cols×W` fix, dar **câți rânduri** = R |
+
+**Ce intră în MVP 1.2 (nu 1+c):** index simplu 1D `pkt:tokens:0` pe `8[1-]` — bounds din count; **fără** `::` coloană, **fără** matrice variabilă.
+
+**Legătură cu 1+a:** doar la **`grid:8[1-, 1-]`** — acolo **1+a** rezolvă flat (scalar count); **1+c** e separat — acces rând/coloană după ce forma e deja cunoscută.
+
+**Efort 1+c:** ~**2–4 zile** — extinde 7a existent cu `varArrayCounts` + shape dinamic în show.
 
 **Extern (nu 1.x):** bridge protocol `packet[1-3]` → schema variabilă automată — plan viitor **7b+**.
 
@@ -711,7 +779,7 @@ flowchart LR
 ## Concluzie
 
 - **Faza 1** (acest plan) = range variabil în schema, **Model D**; mapare externă **Faza 7+**.
-- **Implementare:** 1.0 → 1.4 (MVP); spațiu până la **1.10** dacă e nevoie.
-- **Amânat:** **1+**, **1++**, … — nu se amestecă cu 1.5, 1.6 (acelea sunt pentru sub-faze confirmate în serie).
+- **Implementare:** 1.0 → 1.5 (MVP); spațiu până la **1.10** dacă e nevoie.
+- **Amânat:** **1+a** … **1+z** — litere, separat de sub-fazele 1.0–1.5.
 - **Flat** doar când split-ul e unic; **structurat** mereu pentru `package3`.
 
