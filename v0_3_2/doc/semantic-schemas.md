@@ -160,15 +160,78 @@ Syntax mirrors protocol repetition: **`8[1-3]`** (1–3 elements), **`8[1-]`** (
 | **Peek / probe** | Same tree as `show`, including dynamic `has length [N]`. |
 | **WWIDTH / BITSIZE** | `WWIDTH(pkt:tokens:0)` = element width (`8`); `BITSIZE(pkt:tokens)` = runtime total (`count × W`). |
 
+Static reference (no buttons):
+
 ```logts
 24wire<package2> pkt = ^AABBFF          # cells count=2 (suffix anchor)
 32wire<package3> pkt := 0
 pkt:tokens = ^AABB
 pkt:codeDatas = ^CC
-32wire<package3> pkt2 = { tokens=^AA codeDatas=^BBCC }<package3>
+24wire<package1> pkt = { cells=^AABBCC }<package1>   # single var field — grouped literal OK
 show(pkt:cells; dec)
 peek(pkt)
 ```
+
+**Load & Run** — `package2`: flat hex init (suffix anchor resolves `cells` count), full-record `show`, decimal tag on the cells slice, `peek`:
+
+```logts-play wave
+<package2>:
+    cells: 8[1-]
+    footer: 8
+:
+24wire<package2> pkt = ^AABBFF
+show(pkt)
+show(pkt:cells; dec)
+peek(pkt)
+```
+
+Expected **Output**: `cells has length [2]`; `:0` / `:1` under `cells`; `footer = 11111111`; peek tree matches `show(pkt)`.
+
+**Load & Run** — `package3`: two variable fields — use **structured per-field assign** (flat `pkt = ^…` is ambiguous):
+
+```logts-play wave
+<package3>:
+    tokens: 8[1-]
+    codeDatas: 8[1-]
+:
+32wire<package3> pkt := 0
+pkt:tokens = ^AABB
+pkt:codeDatas = ^CC
+show(pkt)
+```
+
+Expected **Output**: `tokens has length [2]`, `codeDatas has length [1]`.
+
+**Load & Run** — bounded range `8[1-3]`, grouped schema literal, `BITSIZE` / `WWIDTH`:
+
+```logts-play wave
+<package1>:
+    cells: 8[1-3]
+:
+24wire<package1> pkt = { cells=^AABBCC }<package1>
+show(pkt)
+5wire sz = BITSIZE(pkt:cells)
+4wire ew = WWIDTH(pkt:cells:0)
+show(sz)
+show(ew)
+```
+
+Expected **Output**: `cells has length [3]`; `sz = 11000` (24 bits); `ew = 1000` (8-bit element width).
+
+**Load & Run** — `probe` on a variable array field after per-field writes:
+
+```logts-play wave
+<package3>:
+    tokens: 8[1-]
+    codeDatas: 8[1-]
+:
+32wire<package3> pkt := 0
+pkt:tokens = ^AA
+pkt:codeDatas = ^BBCC
+probe(pkt:tokens)
+```
+
+Expected **Output**: probe tree with `tokens has length [1]` and `:0 = 10101010`.
 
 **Schema arrays** (`field:<sub>[N]` / `[R,C]`) with fixed size are unchanged — see below.
 
