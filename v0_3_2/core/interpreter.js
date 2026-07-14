@@ -4036,6 +4036,11 @@ class Interpreter {
       throw new Error(`WWIDTH: undefined '${atom.var}'`);
     }
     if (atom.schemaField || (atom.schemaFieldPath && atom.schemaFieldPath.length)) {
+      const pvRange = this._resolveParseViewFieldRange(atom, wire);
+      if (pvRange) {
+        if (pvRange.fieldBits) return pvRange.fieldBits.length;
+        return pvRange.end - pvRange.start + 1;
+      }
       const abs = this._resolveSchemaFieldAbsoluteRange(atom, wire);
       if (abs.nonContiguous === 'schema_col') return abs.sliceWidth;
       return abs.end - abs.start + 1;

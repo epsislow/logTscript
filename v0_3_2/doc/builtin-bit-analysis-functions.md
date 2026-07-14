@@ -137,3 +137,26 @@ WWIDTH(b)     -> 1000    # when b is 8wire[2] (element width 8, not 16)
 4wire ew = WWIDTH(vec)
 show(ew)
 ```
+
+### Schema field paths
+
+When the wire has a semantic schema tag (`40wire<frame> pkt`), `WWIDTH` resolves **declared field width** from the schema definition (same paths as read/assign):
+
+```logts
+40wire<frame> pkt := 0
+4wire w = WWIDTH(pkt:tag)           # 8 → 1000 on 4wire target
+3wire a = WWIDTH(pkt:slots:0:alu)   # 4 → 100 (minimal-width binary)
+```
+
+Static indices only — dynamic `(expr)` indices are not supported at compile time.
+
+### parseView (protocol) field paths
+
+When the wire has a **parseView** tree (after `=: .myProto { … }`), `WWIDTH` uses the same resolution as `show` and field read — **parseView first**, then schema if both exist:
+
+```logts
+16wire parsed = .repeatPv { data = ... }
+4wire w = WWIDTH(parsed:packet:0:kind)   # width from protocol def (e.g. 8b)
+```
+
+Repeated sections require an explicit index (`packet:0:kind`, not `packet:kind`) — same error as read access.

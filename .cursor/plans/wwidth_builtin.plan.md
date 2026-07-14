@@ -170,9 +170,9 @@ Manifest: `node node/_gen_test_manifest.js`.
 
 ---
 
-## Extensie planificată — schema + parseView
+## Extensie livrată — schema + parseView
 
-Vezi [`wwidth_schema_parseview.plan.md`](wwidth_schema_parseview.plan.md):
+Vezi [`wwidth_schema_parseview.plan.md`](wwidth_schema_parseview.plan.md) ✅:
 
-- **Schema** (`WWIDTH(pkt:tag)`, `pkt:slots:0:alu`) — parțial în cod, teste 2327–2328
-- **parseView** (`WWIDTH(parsed:packet:0:kind)`) — ramură de adăugat, teste 2329–2330
+- **Schema** (`WWIDTH(pkt:tag)`, `pkt:slots:0:alu`) — teste 2327–2328, wave 2331–2332
+- **parseView** (`WWIDTH(parsed:packet:0:kind)`) — teste 2329–2330, wave 2333–2334

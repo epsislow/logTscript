@@ -21663,6 +21663,75 @@ reg(2326, 'bit-analysis', 'WWIDTH wire assign (wave)', function(h, session) {
   h.assert('wave literal width', session.getWire(interp, 'w'), '101');
 }, { propagation: 'wave' });
 
+reg(2327, 'bit-analysis', 'WWIDTH schema field tag', function(h, session) {
+  const { interp } = session.run(OPCODE16_SCHEMA + FRAME40_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    '4wire w = WWIDTH(pkt:tag)',
+  ].join('\n'));
+  h.assert('tag width 8', session.getWire(interp, 'w'), '1000');
+});
+
+reg(2328, 'bit-analysis', 'WWIDTH schema array sub-field', function(h, session) {
+  const { interp } = session.run(OPCODE16_SCHEMA + FRAME40_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    '3wire w = WWIDTH(pkt:slots:0:alu)',
+  ].join('\n'));
+  h.assert('alu width 4', session.getWire(interp, 'w'), '100');
+});
+
+reg(2329, 'bit-analysis', 'WWIDTH parseView field', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  const { interp } = session.run(INLINE_REPEAT_PV + '\n' + [
+    `16wire parsed = .repeatPv { data = ${pkt} }`,
+    '4wire w = WWIDTH(parsed:packet:0:kind)',
+  ].join('\n'));
+  h.assert('kind width 8', session.getWire(interp, 'w'), '1000');
+});
+
+reg(2330, 'bit-analysis', 'WWIDTH parseView repeated field needs index', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  const out = session.runDoc(INLINE_REPEAT_PV + '\n' + [
+    `16wire parsed = .repeatPv { data = ${pkt} }`,
+    '4wire bad = WWIDTH(parsed:packet:kind)',
+  ].join('\n'));
+  h.assert('ambiguous error', String(out.some((l) => l.includes('ambiguous under repeated section'))), 'true');
+});
+
+reg(2331, 'bit-analysis', 'WWIDTH schema field tag (wave)', function(h, session) {
+  const { interp } = session.run(OPCODE16_SCHEMA + FRAME40_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    '4wire w = WWIDTH(pkt:tag)',
+  ].join('\n'));
+  h.assert('tag width 8', session.getWire(interp, 'w'), '1000');
+}, { propagation: 'wave' });
+
+reg(2332, 'bit-analysis', 'WWIDTH schema array sub-field (wave)', function(h, session) {
+  const { interp } = session.run(OPCODE16_SCHEMA + FRAME40_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    '3wire w = WWIDTH(pkt:slots:0:alu)',
+  ].join('\n'));
+  h.assert('alu width 4', session.getWire(interp, 'w'), '100');
+}, { propagation: 'wave' });
+
+reg(2333, 'bit-analysis', 'WWIDTH parseView field (wave)', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  const { interp } = session.run(INLINE_REPEAT_PV + '\n' + [
+    `16wire parsed = .repeatPv { data = ${pkt} }`,
+    '4wire w = WWIDTH(parsed:packet:0:kind)',
+  ].join('\n'));
+  h.assert('kind width 8', session.getWire(interp, 'w'), '1000');
+}, { propagation: 'wave' });
+
+reg(2334, 'bit-analysis', 'WWIDTH parseView repeated field needs index (wave)', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  h.assertThrows('ambiguous', function() {
+    session.run(INLINE_REPEAT_PV + '\n' + [
+      `16wire parsed = .repeatPv { data = ${pkt} }`,
+      '4wire bad = WWIDTH(parsed:packet:kind)',
+    ].join('\n'));
+  }, 'ambiguous under repeated section');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

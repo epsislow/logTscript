@@ -4,16 +4,16 @@ overview: "Extensie WWIDTH: câmpuri semantic schema (parțial în cod) + parseV
 todos:
   - id: wwidth-parseview-branch
     content: "Ramură _resolveParseViewFieldRange în _inferWireAtomStaticBitWidth (înainte de schema)"
-    status: pending
+    status: completed
   - id: wwidth-schema-tests
     content: "Teste 2327–2328: WWIDTH pe pkt:tag și pkt:slots:0:alu"
-    status: pending
+    status: completed
   - id: wwidth-parseview-tests
     content: "Teste 2329–2330: parsed:packet:0:kind + eroare ambiguous"
-    status: pending
+    status: completed
   - id: wwidth-doc-schema-pv
     content: "Doc builtin-bit-analysis-functions.md + update wwidth_builtin.plan.md"
-    status: pending
+    status: completed
 isProject: false
 ---
 
