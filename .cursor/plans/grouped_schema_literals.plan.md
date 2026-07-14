@@ -132,7 +132,7 @@ pkt = { tag=\42, cells=\1 \2 \3;8 }<frame>   # dacă field value acceptă expr g
 |-------|------|
 | `{ alu=\5 }<packet>` singur | scalar 16b — neschimbat |
 | `packets = { alu=\5, cycles=\3 }<packet>` | un element, **câmpuri** separate cu virgulă (OK) |
-| `field:8[1-3]` range variabil | Faza 7+ (amânat) |
+| `field:8[1-3]` range variabil | [`schema_variable_range.plan.md`](schema_variable_range.plan.md) (Faza 7+) |
 | **`[\1,\2,\3]`** | **NU implementăm** |
 | **`{ cells=[\1,\2,\3] }`** | **NU implementăm** |
 | **`{ slots=[{…},{…}] }`** | **NU implementăm** — folosește grouped `{…}{…}<schema>` |
@@ -199,7 +199,7 @@ pkt = { tag=\42, cells=\1 \2 \3;8 }<frame>   # dacă field value acceptă expr g
 
 | Fază | Conținut |
 |------|----------|
-| **7+** | `field:W[min..max]`, range variabil în schema |
+| **7+** | `field:W[min-max]` / `[min-]` — [`schema_variable_range.plan.md`](schema_variable_range.plan.md) |
 | **7b+** | Bridge protocol fix → schema (doc/tool) |
 
 Vezi [`schema_field_arrays.plan.md`](schema_field_arrays.plan.md) § Faze amânate.

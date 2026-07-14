@@ -42,7 +42,8 @@ isProject: false
 | **Faza 6.0 … 6.6** | Sub-faze **ale acestui plan** — ordine de implementare |
 | **Faza 7a**, **7b** | Sub-faze **livrate** ✅ — vezi § Faza 7 |
 | **Faza 7++** (grouped schema literals) | **Livrată ✅** — [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) |
-| **Faza 7+** (range variabil), **7b+** (bridge protocol) | Amânate — neconfirmate |
+| **Faza 7+** (range variabil) | **↗** [`schema_variable_range.plan.md`](schema_variable_range.plan.md) — plan dedicat |
+| **7b+** (bridge protocol → schema) | Amânat |
 | **↗ alt plan** | Referință la fază din alt document; nu se implementează aici |
 
 ### Legături cu alte planuri
@@ -52,7 +53,8 @@ isProject: false
 | Faza 5 protocol (5a–5c) | [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) | **Prerequisit îndeplinit** ✅ — repetare secțiuni + parseView; **nu se modifică** în Faza 6 |
 | Faza 8–9 protocol | același plan | **Independent** — literali protocol + JSON subset; deja livrate |
 | Doc split protocol | [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) | **Livrată ✅** — hub ~236 linii + `protocol-assemble.md` + `protocol-lut.md`; parse/tentative/repeat/json deja existente |
-| Faza 7++ grouped literals | [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) | **Livrată ✅** — `{ elem0 } { elem1 }<schema>`; teste 2308–2318; **fără** liste cu virgulă |
+| Faza 7++ grouped literals | [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) | **Livrată ✅** — `{ elem0 } { elem1 }<schema>`; teste 2308–2318 |
+| Faza 7+ range variabil | [`schema_variable_range.plan.md`](schema_variable_range.plan.md) | **Design** — numerotare internă 1.0–1.4; amânat 1+ / 1++ |
 
 ### Ce înseamnă propoziția despre ordine
 
@@ -571,7 +573,7 @@ parsed:packet:0:field         # parseView — OK dacă protocolul definește pac
 
 | Subiect | Unde |
 |---------|------|
-| Range variabil `field:W[min..max]` | **7+** |
+| Range variabil `field:W[min-max]` / `[min-]` | **↗** [`schema_variable_range.plan.md`](schema_variable_range.plan.md) |
 | Literal structurat vector/matrix în `{ }<schema>` | **7++ livrat ✅** — grouped `{…}{…}<schema>`; [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) |
 | Bridge protocol → schema tooling | **7b+** |
 | Doc split protocol | plan protocol, paralel |
@@ -757,15 +759,17 @@ Mesaj eroare explicit: *schema total width X vs wire element width Y*.
 
 **Teste 2296–2303:** parse width, read/write câmpuri, slice concat, literal pe element, show flat+tree, matrice `tiles`, regresie mixed `tag`+`slots`+`meta`, echivalență layout cu `16wire[2]<opcode>`. **1771 teste ✅**
 
-### Faze amânate (neconfirmate)
+### Faze în alte planuri
 
-| Fază | Conținut | Status |
-|------|----------|--------|
-| **7+** | `field:W[min..max]`, schema variabilă | Amânat — utilizator „la urmă” |
-| **7++** | Grouped schema `{ elem0 } { elem1 }<schema>` pe wire / slice / record | **Livrat ✅** — [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md); teste 2308–2318 |
-| **7b+** | Bridge protocol fix → schema (doc/tool) | Amânat |
+| Fază | Plan | Status |
+|------|------|--------|
+| **7+** | [`schema_variable_range.plan.md`](schema_variable_range.plan.md) | Design — Faza 1.0–1.4; amânat 1+ / 1++ |
+| **7++** | [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) | **Livrat ✅** |
+| **7b+** | (viitor) | Bridge protocol → schema |
 
 **Nu implementăm în 6.x / 7a–7b:** mapare automată protocol variabil → schema; `parseTag`; `rest -footer`.
+
+Detalii range variabil (package2, package3, `varArrayCounts`, fazare **1.0–1.4**): **↗** [`schema_variable_range.plan.md`](schema_variable_range.plan.md).
 
 ---
 
@@ -798,18 +802,20 @@ Flux manual rezonabil:
 
 - **Protocol variabil** → `parseView` + `parsed:section:N:field` (↗ Faza 5 protocol, **implementat**).
 - **Schema fixă** → `field:W[N]` (Faza 6.x, **acest plan**).
-- **Variabil în schema** → **7+** amânat.
+- **Variabil în schema** → **↗** [`schema_variable_range.plan.md`](schema_variable_range.plan.md) (Faza 7+).
 
 ```mermaid
 flowchart LR
   parseFixed["Protocol fix packet[3]"]
   parseVar["Protocol variabil packet[1-3]"]
   schemaFix["Schema cells:8[3]"]
+  schemaVar["Schema cells:8[1-3] + footer"]
   parseView["parseView tree"]
   wire24["24wire&lt;frame&gt;"]
   wireDyn["Nwire dynamic"]
   parseFixed --> wire24
   wire24 --> schemaFix
+  schemaVar --> wireDyn
   parseVar --> parseView
   parseView --> wireDyn
 ```
@@ -832,5 +838,5 @@ flowchart LR
 - **Faza 6.0–6.6:** livrată ✅ — frunze `W[N]` / `W[N,M]`.
 - **Faza 7a:** slice rând/coloană ✅ design închis — `pkt:grid:0`, `pkt:grid::1`, show/assign, index dinamic, footer `has shape [R,C]`.
 - **Faza 7b:** `field:<schema>[N]` / `[R,C]` — **livrată** ✅; inițializare = concat / per-element / schema literal pe slot (ca `16wire[N]<schema>`); teste 2296–2303.
-- **Faza 7++:** grouped schema literals ✅ — `{ elem0 } { elem1 }<schema>`; vezi [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md).
-- **Amânat:** range variabil **7+**; bridge protocol **7b+**.
+- **Faza 7++:** grouped schema literals ✅ — [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md).
+- **Faza 7+:** range variabil — plan dedicat [`schema_variable_range.plan.md`](schema_variable_range.plan.md).
