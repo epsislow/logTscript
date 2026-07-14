@@ -699,13 +699,53 @@ Analogie cu package3: ambiguitatea apare când **două dimensiuni** trebuie dedu
 | `grid:8[2, 1-3]`   | ✅               | ✅                               | rows fixe — `cols = payload / (2×8)` |
 | `grid:8[1-3, 1-3]` | ❌ ambiguu       | ✅                               | `72b` → 3×3 sau 9×1 sau 1×9…         |
 | `grid:8[1-, 2]`    | ✅ (ultim câmp)  | ✅                               | rows din rest / 16 — ca `[1-]` 1D    |
-| `grid:8[1-, 1-]` | ❌ imposibil | ⚠️ doar cu **1+a** (`nRows`, `nCols`) | factorizare nedeterministă |
+| `grid:8[1-, 1-]` | ❌ flat | ✅ literal cu **formă explicită** (vezi § 1+b literali) | factorizare nedeterministă fără shape |
 
-**`grid:8[1-, 1-]`** — fără scalari (Faza **1+a**): respins; nu există split unic din biți.
+**Flat `grid:8[1-, 1-]`** — fără shape la assign: respins (ca package3). **Cu literal grouped + `[R,C]`** sau rânduri delimitate: OK.
 
-**Regulă 1+b (minimal):** max **o dimensiune variabilă** per matrice. Ambele variabile → **1+a** (`nRows:4`, `nCols:4`, `grid:8[nRows,nCols]`).
+**Regulă 1+b (minimal):** max **o dimensiune variabilă** per matrice la **flat**; ambele variabile flat → **1+a** (`nRows`, `nCols` în wire) **sau** assign literal cu formă.
 
-**Efort 1+b** (o dim variabilă): ~**3–5 zile** peste MVP.
+#### Literali grouped — formă explicită (propunere 2026-07-14)
+
+**Problema:** `{}{}{}{}<cell>` pe `grid:8[1-,1-]` — parser știe 4 elemente, **nu** 2×2 vs 4×1.
+
+**Soluție A — suffix `[R,C]` / `[N]`** (recomandat, paritate `16wire[2,2]`):
+
+```logts
+# vector variabil
+pkt:cells = { }{ }{ }[3]<cell>              # count=3, validare [min-max]
+
+# matrice variabilă — forma la assign
+test:matrix2_2 = { }{ }{ }{ }[2,2]<cell>    # R=2, C=2; #grupuri === R×C
+pkt:grid = { alu=\5 }{ cycles=\3 }{ jump=1 }{ write=1 }[2,2]<opcode>
+```
+
+| Regulă | Detaliu |
+|--------|---------|
+| Poziție | după ultimul `{…}`, **înainte** de `<schema>` |
+| Vector | `[N]` — N grupuri |
+| Matrice | `[R,C]` — R×C grupuri, ordine rând-major (ca 7++) |
+| Validare | `#grupuri === R×C`; `[R,C]` în bounds schema `[min-max, min-max]` |
+| Ținte | `wire = …`, `pkt:field = …`, `{ grid=… }<frame>` — aceleași reguli |
+
+**Soluție B — delimitator rând `,`** (opțional, lizibilitate):
+
+```logts
+grid = { { alu=\5 }{ cycles=\3 } , { jump=1 }{ write=1 } }<opcode>
+# virgula = trecere la rândul următor (NU listă cu virgulă 7++ respinsă)
+# infer R = nr. segmente; C = grupuri per segment; dreptunghiular obligatoriu
+```
+
+| | Soluția A `[R,C]` | Soluția B `,` rând |
+|--|-------------------|---------------------|
+| Explicit | da | inferat |
+| `[1-,1-]` | ✅ | ✅ dacă dreptunghiular |
+| Parser | extinde grouped 7++ | nou: grupuri de rând |
+| Conflict 7++ | nu (suffix nou) | virgula **doar** între rânduri, nu între elemente |
+
+**Recomandare:** **A obligatoriu** pentru `[1-,1-]`; **B opțional** sugar. Ambele pe aceleași ținte literal.
+
+**Efort 1+b:** ~**3–5 zile** (o dim variabilă flat) + ~**2–3 zile** suffix `[R,C]` / rând `,` (extinde [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md)).
 
 ### 1+c — slice rând/coloană (7a) pe count runtime
 
