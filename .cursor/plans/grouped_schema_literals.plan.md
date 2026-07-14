@@ -1,29 +1,38 @@
 ---
 name: Grouped schema literals
-overview: "Extindere 7++: literal grupat de schema `{ elem0 } { elem1 }<schema>` — analog `\\2 \\23 \\242;8`, înlocuiește concat-ul cu `+` pentru vectori wire, slice-uri schema array și câmpuri array în record."
+overview: "Extindere 7++: literal grupat de schema `{ elem0 } { elem1 }<schema>` — analog `\\2 \\23 \\242;8`, înlocuiește concat-ul cu `+` pentru vectori wire, slice-uri schema array și câmpuri array în record. **Livrat ✅**"
 todos:
   - id: 7pp-parser
-    content: "Parser: parseGroupedSchemaLiteralAtom + disambiguare nested vs grouped"
-    status: pending
+    content: "Parser: parseSchemaLiteralAtom grouped + disambiguare nested vs grouped"
+    status: completed
   - id: 7pp-eval
     content: "Interpreter: evalGroupedSchemaLiteralAtom + validare count/lățime"
-    status: pending
+    status: completed
   - id: 7pp-wire-vector
     content: "Țintă A: wire vector/matrix — teste 2308-2311 (incl. un singur rând {}{}{}<schema>)"
-    status: pending
+    status: completed
   - id: 7pp-slice
     content: "Țintă B: pkt:slots grouped — test 2312"
-    status: pending
+    status: completed
   - id: 7pp-record
     content: "Țintă C: câmp array în record literal — test 2313"
-    status: pending
+    status: completed
   - id: 7pp-doc-tests
     content: semantic-schemas.md + regresii 2314-2315 + manifest
-    status: pending
+    status: completed
+  - id: 7pp-wave
+    content: "Teste wave 2316-2318 — vector field access, pkt:slots, show"
+    status: completed
 isProject: false
 ---
 
 # Plan: Grouped schema literals (7++)
+
+**Status: livrat ✅** — implementare în `v0_3_2`; **1786 teste** în suite (inclusiv 2308–2318).
+
+**Plan părinte:** [`schema_field_arrays.plan.md`](schema_field_arrays.plan.md) — Faza 7++ (literal structurat pe vector/matrix/slice în schema).
+
+---
 
 ## Verdict
 
@@ -61,10 +70,10 @@ packets = { alu=\5 }<packet> + { cycles=\3 }<packet> + { jump=1 }<packet>
 
 ```logts
 # multiline
-16wire[3]<packet> packets =
+16wire[3]<opcode> packets =
   { alu=\5 }
   { cycles=\3 }
-  { jump=1 }<packet>
+  { jump=1 }<opcode>
 
 # un singur rând, fără spații între grupuri
 16wire[2,2]<opcode> grid = { alu=\5 }{ cycles=\3 }{ jump=1 }{ write=1 }<opcode>
@@ -77,12 +86,13 @@ packets = { alu=\5 }<packet> + { cycles=\3 }<packet> + { jump=1 }<packet>
 - Mai multe `{ … }` + **un singur** `<schema>` la final = câte un **element** (vector/matrix/slice)
 - Un singur `{ alu=\5, cycles=\3 }<packet>` = **un** element cu mai multe câmpuri (comportament actual)
 - Tag `<schema>` **doar pe ultimul** grup (ca `;8` la grouped numeric)
+- Ordine elemente: **rând-major** (ca `+` și `16wire[R,C]`)
 
 ---
 
-## Ținte — status confirmare utilizator
+## Ținte — livrate
 
-### A — Wire vector / matrix ✅ CONFIRMAT
+### A — Wire vector / matrix ✅
 
 ```logts
 16wire[3]<opcode> rom = { alu=\5 } { cycles=\3 } { jump=0 }<opcode>
@@ -93,19 +103,19 @@ packets = { alu=\5 }<packet> + { cycles=\3 }<packet> + { jump=1 }<packet>
 - Fiecare grup: `buildSchemaLiteralBits` (parțial OK)
 - `+` între literali rămâne valid (regresie)
 
-### B — Slice schema array ✅ CONFIRMAT
+### B — Slice schema array ✅
 
 ```logts
 pkt:slots = { alu=\5 } { cycles=\3 }<opcode>
 ```
 
-### C — În record schema literal ✅ CONFIRMAT
+### C — În record schema literal ✅
 
 ```logts
 pkt = { tag=\42, slots={ alu=\5 } { cycles=\3 }<opcode> }<frame>
 ```
 
-### D — Frunză array numeric ✅ CONFIRMAT (deja există, fără cod nou)
+### D — Frunză array numeric ✅ (deja există, fără cod nou în 7++)
 
 Grouped **numeric** pe câmp frunză — **merge azi**, nu face parte din grouped schema:
 
@@ -113,8 +123,6 @@ Grouped **numeric** pe câmp frunză — **merge azi**, nu face parte din groupe
 pkt:cells = \1 \2 \3;8
 pkt = { tag=\42, cells=\1 \2 \3;8 }<frame>   # dacă field value acceptă expr grouped
 ```
-
-Nu grouped schema pe `cells:8[3]`.
 
 ---
 
@@ -124,50 +132,74 @@ Nu grouped schema pe `cells:8[3]`.
 |-------|------|
 | `{ alu=\5 }<packet>` singur | scalar 16b — neschimbat |
 | `packets = { alu=\5, cycles=\3 }<packet>` | un element, **câmpuri** separate cu virgulă (OK) |
-| `field:8[1-3]` range variabil | Faza 7+ |
-| **`[\1,\2,\3]`** | **NU implementăm** — decizie finală |
-| **`{ cells=[\1,\2,\3] }`** | **NU implementăm** — decizie finală |
+| `field:8[1-3]` range variabil | Faza 7+ (amânat) |
+| **`[\1,\2,\3]`** | **NU implementăm** |
+| **`{ cells=[\1,\2,\3] }`** | **NU implementăm** |
 | **`{ slots=[{…},{…}] }`** | **NU implementăm** — folosește grouped `{…}{…}<schema>` |
 | Orice listă cu **virgulă** între elemente | **NU** — doar spațiu (numeric) sau `{}{}` (schema) |
 
 ---
 
-## Implementare
+## Implementare (livrată)
 
 ### Parser — [`parser.js`](v0_3_2/core/parser.js)
 
-- `parseGroupedSchemaLiteralAtom()`: loop `{ fields }`, apoi un `<schemaRef>`
-- AST: `{ groupedSchemaLiteral: { elements, schemaRef } }`
-- După `}`, următorul token poate fi `{` sau `<` (fără `+`) → grouped
-- Nested `{ flags={ carry=1 } }<instr>` — al doilea `{` e **în** primul bloc, nu al doilea element
+- `parseSchemaLiteralFieldsBlock()` — un bloc `{ fields }` fără `<schema>` propriu
+- `parseSchemaLiteralAtom()` — loop `{ fields }`, apoi un `<schemaRef>`; un singur grup → `schemaLiteral`, mai multe → `groupedSchemaLiteral`
+- Disambiguare: al doilea `{` după `}` închis = element grouped; nested `{ flags={ carry=1 } }` rămâne **în** primul bloc
 
 ### Runtime — [`interpreter.js`](v0_3_2/core/interpreter.js)
 
 - `evalGroupedSchemaLiteralAtom()` → concat `buildSchemaLiteralBits` per element
-- Validare count + lățime la assign wire vector / slice / record
+- `evalSchemaLiteralAtom()` — delegare grouped; `_evalSchemaLiteralFieldBits` pentru câmpuri
+- `evalAtom` — `groupedSchemaLiteral` + `schemaLiteral`
 
-### Teste ~2308+
+### semantic-schemas — [`semantic-schemas.js`](v0_3_2/core/semantic-schemas.js)
 
-| ID | Scenariu |
-|----|----------|
-| 2308 | vector 3 elem grouped ≡ `+` |
-| 2309 | matrix 2×2 pe **un singur rând** `{}{}{}{}<opcode>` |
-| 2310 | multiline vs `{}{}` vs spații |
-| 2311 | eroare count mismatch |
-| 2312 | `pkt:slots` grouped |
-| 2313 | record `slots={…}{…}<opcode>` |
-| 2314 | regresie single `{ alu=\5 }<opcode>` |
-| 2315 | regresie `+` concat |
+- `buildSchemaLiteralBits` — `packBlock` și pentru `node.kind === 'array'` (câmp `slots` în record literal)
+
+### Documentație — [`semantic-schemas.md`](v0_3_2/doc/semantic-schemas.md)
+
+- Secțiune grouped schema + exemplu vector `rom = { … }{ … }<opcode>`
+- Notă „not supported” pentru liste cu virgulă
 
 ---
 
-## Confirmare utilizator
+## Teste
+
+| ID | Scenariu | Propagare |
+|----|----------|-----------|
+| 2308 | vector 3 elem grouped ≡ `+` | legacy |
+| 2309 | matrix 2×2 pe un singur rând `{}{}{}{}<opcode>` | legacy |
+| 2310 | multiline vs `{}{}` vs spații | legacy |
+| 2311 | eroare count mismatch | legacy |
+| 2312 | `pkt:slots` grouped | legacy |
+| 2313 | record `slots={…}{…}<opcode>` | legacy |
+| 2314 | regresie single `{ alu=\5 }<opcode>` | legacy |
+| 2315 | regresie `+` concat | legacy |
+| 2316 | vector grouped + field slice read | **wave** |
+| 2317 | `pkt:slots` grouped pe wire existent (`:= 0`) | **wave** |
+| 2318 | `show(rom)` după init grouped vector | **wave** |
+
+---
+
+## Confirmare utilizator (închisă)
 
 - [x] **A** — wire vector/matrix grouped (inclusiv un singur rând `{}{}{}<schema>`)
 - [x] **B** — slice schema array
 - [x] **D** — frunză numeric `\1 \2 \3;8` rămâne cum e (nu grouped schema)
 - [x] **C** — grouped în `{ }<frame>` pe câmp array
 - [x] Tag `<schema>` doar pe ultimul grup
-- [x] **Fără virgulă** pentru liste de elemente — nu `[\1,\2,\3]`, nu `{ cells=[…] }`
+- [x] **Fără virgulă** pentru liste de elemente
+- [x] Teste wave (2316–2318)
 
-**Gata de implementare** după „execute” / „implementează”.
+---
+
+## Amânat (nu face parte din 7++)
+
+| Fază | Conținut |
+|------|----------|
+| **7+** | `field:W[min..max]`, range variabil în schema |
+| **7b+** | Bridge protocol fix → schema (doc/tool) |
+
+Vezi [`schema_field_arrays.plan.md`](schema_field_arrays.plan.md) § Faze amânate.

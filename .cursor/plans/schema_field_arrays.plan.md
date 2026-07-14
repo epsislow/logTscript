@@ -40,7 +40,8 @@ isProject: false
 |----------|--------------|
 | **Faza 6** (umbrelă) | Același nume ca în [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) §8 — **acest fișier = detalierea completă** a Fazei 6 |
 | **Faza 6.0 … 6.6** | Sub-faze **ale acestui plan** — ordine de implementare |
-| **Faza 7a**, **7b** | Următoarele sub-faze **confirmate** (design) — vezi § Faza 7 |
+| **Faza 7a**, **7b** | Sub-faze **livrate** ✅ — vezi § Faza 7 |
+| **Faza 7++** (grouped schema literals) | **Livrată ✅** — [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) |
 | **Faza 7+** (range variabil), **7b+** (bridge protocol) | Amânate — neconfirmate |
 | **↗ alt plan** | Referință la fază din alt document; nu se implementează aici |
 
@@ -51,6 +52,7 @@ isProject: false
 | Faza 5 protocol (5a–5c) | [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) | **Prerequisit îndeplinit** ✅ — repetare secțiuni + parseView; **nu se modifică** în Faza 6 |
 | Faza 8–9 protocol | același plan | **Independent** — literali protocol + JSON subset; deja livrate |
 | Doc split protocol | [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) | **Livrată ✅** — hub ~236 linii + `protocol-assemble.md` + `protocol-lut.md`; parse/tentative/repeat/json deja existente |
+| Faza 7++ grouped literals | [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) | **Livrată ✅** — `{ elem0 } { elem1 }<schema>`; teste 2308–2318; **fără** liste cu virgulă |
 
 ### Ce înseamnă propoziția despre ordine
 
@@ -492,7 +494,7 @@ pktb:1:cells:1 (8wire)
 | **A. Sintaxă declarație** | `slots: <opcode>[3]` — același `<schema>` ca la nested scalar `meta:<flags>` |
 | **B. Dimensiuni** | Vector **`[N]`** și matrice **`[R,C]`** — ambele în 7b |
 | **C. Slice întreg** | `pkt:slots = ^…` sau `a + b + c` — **da** (aceeași lățime `N × subSchema.totalWidth`) |
-| **C. Literal structurat pe slice** | **Nu** în 7b — amânat la **Faza 4 / 7++** (`{ slots=[…] }`) |
+| **C. Literal structurat pe slice** | **Livrat în 7++** ✅ — grouped `{ alu=\5 } { cycles=\3 }<opcode>` (nu `{ slots=[…] }`); vezi [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) |
 | **C. Paritate Model A** | `16wire[2]<opcode> bank = ^…` / `s0 + s1` / `bank:0 = { … }<opcode>` — **aceleași reguli** pentru `pkt:slots` în 7b |
 | **D. Erori** | La fel ca azi — mesaj + sugestie path (`use pkt:slots:1:alu`) |
 | **E. Regresie mixed** | Exemplu obligatoriu: `tag:8` + `slots:<opcode>[2]` + `meta:<flags>` pe același `<frame>` |
@@ -570,7 +572,7 @@ parsed:packet:0:field         # parseView — OK dacă protocolul definește pac
 | Subiect | Unde |
 |---------|------|
 | Range variabil `field:W[min..max]` | **7+** |
-| Literal structurat vector/matrix în `{ }<schema>` (`{ slots=[…] }`) | **7++ / punct 4** — utilizator „mă mai gândesc” |
+| Literal structurat vector/matrix în `{ }<schema>` | **7++ livrat ✅** — grouped `{…}{…}<schema>`; [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) |
 | Bridge protocol → schema tooling | **7b+** |
 | Doc split protocol | plan protocol, paralel |
 
@@ -760,7 +762,7 @@ Mesaj eroare explicit: *schema total width X vs wire element width Y*.
 | Fază | Conținut | Status |
 |------|----------|--------|
 | **7+** | `field:W[min..max]`, schema variabilă | Amânat — utilizator „la urmă” |
-| **7++** | `{ slots=[…] }` literal structurat pe vector/matrix în schema | Amânat — punct 4 |
+| **7++** | Grouped schema `{ elem0 } { elem1 }<schema>` pe wire / slice / record | **Livrat ✅** — [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md); teste 2308–2318 |
 | **7b+** | Bridge protocol fix → schema (doc/tool) | Amânat |
 
 **Nu implementăm în 6.x / 7a–7b:** mapare automată protocol variabil → schema; `parseTag`; `rest -footer`.
@@ -830,4 +832,5 @@ flowchart LR
 - **Faza 6.0–6.6:** livrată ✅ — frunze `W[N]` / `W[N,M]`.
 - **Faza 7a:** slice rând/coloană ✅ design închis — `pkt:grid:0`, `pkt:grid::1`, show/assign, index dinamic, footer `has shape [R,C]`.
 - **Faza 7b:** `field:<schema>[N]` / `[R,C]` — **livrată** ✅; inițializare = concat / per-element / schema literal pe slot (ca `16wire[N]<schema>`); teste 2296–2303.
-- **Amânat:** range variabil **7+**; literal `{ slots=[…] }` **7++**.
+- **Faza 7++:** grouped schema literals ✅ — `{ elem0 } { elem1 }<schema>`; vezi [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md).
+- **Amânat:** range variabil **7+**; bridge protocol **7b+**.
