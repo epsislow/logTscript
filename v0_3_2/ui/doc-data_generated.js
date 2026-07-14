@@ -2875,6 +2875,42 @@ BITSIZE(0101010) -> 111   # 7 bits long
 3wire len = BITSIZE(data)
 show(len)
 \`\`\`
+
+---
+
+## WWIDTH
+
+Returns the **declared / static** bit width of a literal, wire, or expression (from type metadata and AST inference), encoded as a minimal-width binary integer (like \`CNTONE\`).
+
+\`\`\`
+WWIDTH(X) -> Ybit
+\`\`\`
+
+### WWIDTH vs BITSIZE
+
+| Input | WWIDTH | BITSIZE |
+|-------|--------|---------|
+| \`11111\` (literal) | \`11\` (5) | \`11\` (5) — same |
+| \`10wire a\` | \`1010\` (declared 10) | length of current value (often 10) |
+| \`8wire[2] b\` (whole vector) | \`1000\` (element 8b) | \`10000\` (storage 16b) |
+
+Use **WWIDTH** for compile-time / declared scalar width (e.g. element width of \`Nw\` or \`Nw[N]\`). Use **BITSIZE** for the runtime length of the evaluated bit string.
+
+### Examples
+
+\`\`\`
+WWIDTH(11111) -> 11
+WWIDTH(a)     -> 1010    # when a is 10wire
+WWIDTH(b)     -> 1000    # when b is 8wire[2] (element width 8, not 16)
+\`\`\`
+
+### Runnable example
+
+\`\`\`logts-play
+8wire[2] vec
+4wire ew = WWIDTH(vec)
+show(ew)
+\`\`\`
 `,
     'builtin-bit-selection-functions.md': `# Built-in bit selection and detection functions
 
@@ -3828,7 +3864,7 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Tensor / matrix** | \`SHAPE\`, \`RANK\`, \`PIVOT\`, \`REPEAT\`, \`IDENTITY\`, \`ZEROS\`, \`FILL\`, \`DIAG\`, \`IOTA\`, \`OUTER\`, \`TRACE\`, \`NORM\`, \`L2\`, \`TRIL\`, \`TRIU\`, \`FLIPUD\`, \`FLIPLR\`, \`MCAT\`, \`MSLICE\` | [wire-vectors.md](wire-vectors.md) · [builtin-SHAPE.md](builtin-SHAPE.md) · [builtin-RANK.md](builtin-RANK.md) · [builtin-REPEAT.md](builtin-REPEAT.md) |
 | **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
-| **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
+| **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\`, \`WWIDTH\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) · \`RSHIFT\` \`; signed\` = ASHR · **\`; matrix\`**: [matrix-reduction.md](matrix-reduction.md) |
 | **Tristate (ZSTATE)** | \`ZRELEASE(wire)\`, \`bus = ZCONNECT(en, data)\` | [zstate.md](zstate.md) |
 

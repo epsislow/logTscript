@@ -21606,6 +21606,63 @@ reg(2318, 'semantic-schemas', 'grouped schema literal show vector (wave)', funct
   h.assert('elem2 jump field', String(out.some(l => l.includes('jump') && l.includes('= 1'))), 'true');
 }, { propagation: 'wave' });
 
+reg(2319, 'bit-analysis', 'WWIDTH literal', function(h, session) {
+  const { interp } = session.run('3wire w = WWIDTH(11111)');
+  h.assert('literal width 5 padded to 3wire', session.getWire(interp, 'w'), '101');
+});
+
+reg(2320, 'bit-analysis', 'WWIDTH scalar wire', function(h, session) {
+  const { interp } = session.run([
+    '10wire a',
+    '4wire w = WWIDTH(a)',
+  ].join('\n'));
+  h.assert('scalar wire width', session.getWire(interp, 'w'), '1010');
+});
+
+reg(2321, 'bit-analysis', 'WWIDTH vector element width', function(h, session) {
+  const { interp } = session.run([
+    '8wire[2] b',
+    '4wire w = WWIDTH(b)',
+  ].join('\n'));
+  h.assert('element width not storage', session.getWire(interp, 'w'), '1000');
+});
+
+reg(2322, 'bit-analysis', 'WWIDTH vs BITSIZE on vector', function(h, session) {
+  const { interp } = session.run([
+    '8wire[2] b = 01000001 + 00000000',
+    '4wire w = WWIDTH(b)',
+    '5wire sz = BITSIZE(b)',
+  ].join('\n'));
+  h.assert('WWIDTH element', session.getWire(interp, 'w'), '1000');
+  h.assert('BITSIZE total', session.getWire(interp, 'sz'), '10000');
+});
+
+reg(2323, 'bit-analysis', 'WWIDTH bit slice', function(h, session) {
+  const { interp } = session.run([
+    '4wire a',
+    '1wire w = WWIDTH(a.2)',
+  ].join('\n'));
+  h.assert('single bit slice', session.getWire(interp, 'w'), '1');
+});
+
+reg(2324, 'bit-analysis', 'WWIDTH expression NOT', function(h, session) {
+  const { interp } = session.run([
+    '4wire a',
+    '3wire w = WWIDTH(NOT(a))',
+  ].join('\n'));
+  h.assert('NOT preserves width', session.getWire(interp, 'w'), '100');
+});
+
+reg(2325, 'bit-analysis', 'WWIDTH doc signature', function(h, session) {
+  const lines = Interpreter.getDocLines('WWIDTH', new Map());
+  h.assert('doc WWIDTH', String(lines[0] && lines[0].includes('WWIDTH(X)')), 'true');
+});
+
+reg(2326, 'bit-analysis', 'WWIDTH wire assign (wave)', function(h, session) {
+  const { interp } = session.run('3wire w = WWIDTH(11111)');
+  h.assert('wave literal width', session.getWire(interp, 'w'), '101');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

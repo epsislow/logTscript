@@ -1791,7 +1791,15 @@
       {"id":2315,"group":"semantic-schemas","title":"schema literal plus concat regression","detail":{"scripts":["<frame>:\n    tag: 8\n    slots: <opcode>[2]\n:"],"steps":["run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [ '40wire<frame> pkt := 0', '16wire s0 = { alu=\\\\5 }<opcode>', '…) [nerezolvat]"],"assertions":["concat alu","concat cycles"]}},
       {"id":2316,"group":"semantic-schemas","title":"grouped schema literal vector field access (wave)","detail":{"scripts":["<opcode>:\n    alu:4\n    jump:1\n    write:1\n    cycles:2\n    reserved:8\n:"],"steps":["run(OPCODE16_SCHEMA + [ '16wire[3]<opcode> rom = { alu=\\\\5 } { cycles=\\\\3 } { jump=1 }<opcode>', '4wire…) [nerezolvat]"],"assertions":["alu0","cyc1","jmp2"]}},
       {"id":2317,"group":"semantic-schemas","title":"grouped schema literal pkt:slots assignment (wave)","detail":{"scripts":["<frame>:\n    tag: 8\n    slots: <opcode>[2]\n:"],"steps":["run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [ '40wire<frame> pkt := 0', 'pkt:slots = { alu=\\\\5 } { cycles=\\\\…) [nerezolvat]"],"assertions":["slot0 alu","slot1 cycles"]}},
-      {"id":2318,"group":"semantic-schemas","title":"grouped schema literal show vector (wave)","detail":{"scripts":["<opcode>:\n    alu:4\n    jump:1\n    write:1\n    cycles:2\n    reserved:8\n:"],"steps":["runDoc(OPCODE16_SCHEMA + [ '16wire[3]<opcode> rom = { alu=\\\\5 } { cycles=\\\\3 } { jump=1 }<opcode>', 'show(…) [nerezolvat]"],"assertions":["length line","elem0 flat line","elem0 alu field","elem1 cycles field","elem2 jump field"]}}
+      {"id":2318,"group":"semantic-schemas","title":"grouped schema literal show vector (wave)","detail":{"scripts":["<opcode>:\n    alu:4\n    jump:1\n    write:1\n    cycles:2\n    reserved:8\n:"],"steps":["runDoc(OPCODE16_SCHEMA + [ '16wire[3]<opcode> rom = { alu=\\\\5 } { cycles=\\\\3 } { jump=1 }<opcode>', 'show(…) [nerezolvat]"],"assertions":["length line","elem0 flat line","elem0 alu field","elem1 cycles field","elem2 jump field"]}},
+      {"id":2319,"group":"bit-analysis","title":"WWIDTH literal","detail":{"scripts":["3wire w = WWIDTH(11111)"],"steps":[],"assertions":["literal width 5 padded to 3wire"]}},
+      {"id":2320,"group":"bit-analysis","title":"WWIDTH scalar wire","detail":{"scripts":[],"steps":["run([ '10wire a', '4wire w = WWIDTH(a)', ].join('\\n')) [nerezolvat]"],"assertions":["scalar wire width"]}},
+      {"id":2321,"group":"bit-analysis","title":"WWIDTH vector element width","detail":{"scripts":[],"steps":["run([ '8wire[2] b', '4wire w = WWIDTH(b)', ].join('\\n')) [nerezolvat]"],"assertions":["element width not storage"]}},
+      {"id":2322,"group":"bit-analysis","title":"WWIDTH vs BITSIZE on vector","detail":{"scripts":[],"steps":["run([ '8wire[2] b = 01000001 + 00000000', '4wire w = WWIDTH(b)', '5wire sz = BITSIZE(b)', ].join('\\n')) [nerezolvat]"],"assertions":["WWIDTH element","BITSIZE total"]}},
+      {"id":2323,"group":"bit-analysis","title":"WWIDTH bit slice","detail":{"scripts":[],"steps":["run([ '4wire a', '1wire w = WWIDTH(a.2)', ].join('\\n')) [nerezolvat]"],"assertions":["single bit slice"]}},
+      {"id":2324,"group":"bit-analysis","title":"WWIDTH expression NOT","detail":{"scripts":[],"steps":["run([ '4wire a', '3wire w = WWIDTH(NOT(a))', ].join('\\n')) [nerezolvat]"],"assertions":["NOT preserves width"]}},
+      {"id":2325,"group":"bit-analysis","title":"WWIDTH doc signature","detail":{"scripts":[],"steps":["getDocLines(WWIDTH)"],"assertions":["doc WWIDTH"]}},
+      {"id":2326,"group":"bit-analysis","title":"WWIDTH wire assign (wave)","detail":{"scripts":["3wire w = WWIDTH(11111)"],"steps":[],"assertions":["wave literal width"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1802,7 +1810,7 @@
       { id: 'arithmetic', label: 'arithmetic', rangeLabel: '1680–1683', testIds: [1680, 1681, 1682, 1683] },
       { id: 'asm-decode', label: 'ASM disassemble / decode', rangeLabel: '947–948, 1740, 1762', testIds: [947, 948, 1740, 1762] },
       { id: 'asm-composition', label: 'asm-composition', rangeLabel: '1746–1761, 1763', testIds: [1746, 1747, 1748, 1749, 1750, 1751, 1752, 1753, 1754, 1755, 1756, 1757, 1758, 1759, 1760, 1761, 1763] },
-      { id: 'bit-analysis', label: 'Bit analysis built-ins', rangeLabel: '232–234', testIds: [232, 233, 234] },
+      { id: 'bit-analysis', label: 'Bit analysis built-ins', rangeLabel: '232–234, 2319–2326', testIds: [232, 233, 234, 2319, 2320, 2321, 2322, 2323, 2324, 2325, 2326] },
       { id: 'bit-ops', label: 'Bit operations', rangeLabel: '61–81, 1535', testIds: [61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 1535] },
       { id: 'bit-selection', label: 'Bit selection built-ins', rangeLabel: '224–231, 1588–1592', testIds: [224, 225, 226, 227, 228, 229, 230, 231, 1588, 1589, 1590, 1591, 1592] },
       { id: 'bit-transform', label: 'Bit transform built-ins', rangeLabel: '40–52, 492–496', testIds: [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 492, 493, 494, 495, 496] },

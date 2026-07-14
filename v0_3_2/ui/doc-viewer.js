@@ -13,7 +13,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-sequential-functions.md', label: 'Built-in sequential (LATCH, REG)', searchPrimary: 'LATCH REG' },
       { file: 'builtin-routing-functions.md', label: 'Built-in routing (MUX, DEMUX)', searchPrimary: 'MUX DEMUX' },
       { file: 'builtin-bit-selection-functions.md', label: 'Built-in bit selection', searchPrimary: 'HIGH LOW ANY ZERO ALL BITINDEX ONEHOT', searchExtra: 'HIGH LOW ANY ZERO ANYZ ANYX ANY1 ANY0 ANY01 ANYZX ALLZ ALLX ALL1 ALL0 ALL01 ALLZX BITINDEX ONEHOT priority encoder' },
-      { file: 'builtin-bit-analysis-functions.md', label: 'Built-in bit analysis', searchPrimary: 'PARITY CNTONE CNTZERO BITSIZE', searchExtra: 'PARITY CNTONE CNTZERO BITSIZE' },
+      { file: 'builtin-bit-analysis-functions.md', label: 'Built-in bit analysis', searchPrimary: 'PARITY CNTONE CNTZERO BITSIZE WWIDTH', searchExtra: 'PARITY CNTONE CNTZERO BITSIZE' },
       { file: 'builtin-bit-transform-functions.md', label: 'Built-in bit transform', searchExtra: 'LSHIFT RSHIFT REVERSE LROTATE RROTATE rotate shift' },
       { file: 'components.md', label: 'Component catalog' },
       { file: 'short-notation.md', label: 'Short notation' },

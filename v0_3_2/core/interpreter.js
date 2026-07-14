@@ -3947,6 +3947,197 @@ class Interpreter {
     return this.getBitWidth(wire.type);
   }
 
+  _inferLiteralStaticBitWidth(atom) {
+    if (!atom) return null;
+    const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+    if (atom.bin) {
+      let binStr = atom.bin;
+      if (atom.bitRange) {
+        const { start, end } = atom.bitRange;
+        binStr = binStr.substring(start, end + 1);
+      }
+      if (atom.pad) binStr = this.applyPad(binStr, atom.pad);
+      return binStr.length;
+    }
+    if (atom.logic) {
+      let logicStr = atom.logic;
+      if (atom.bitRange) {
+        const { start, end } = atom.bitRange;
+        logicStr = logicStr.substring(start, end + 1);
+      }
+      if (typeof LogicValue !== 'undefined' && LogicValue.validateLogicLiteral) {
+        logicStr = LogicValue.validateLogicLiteral(logicStr, null, 'logic literal');
+      }
+      if (atom.pad) logicStr = this.applyPad(logicStr, atom.pad);
+      return logicStr.length;
+    }
+    if (atom.hex) {
+      let binStr = '';
+      for (let i = 0; i < atom.hex.length; i++) {
+        binStr += parseInt(atom.hex[i], 16).toString(2).padStart(4, '0');
+      }
+      if (atom.bitRange) {
+        const { start, end } = atom.bitRange;
+        binStr = binStr.substring(start, end + 1);
+      }
+      if (atom.pad) binStr = this.applyPad(binStr, atom.pad);
+      return binStr.length;
+    }
+    if (atom.oct) {
+      let binStr = WL ? WL.octDigitsToBin(atom.oct) : atom.oct;
+      if (atom.bitRange) {
+        const { start, end } = atom.bitRange;
+        binStr = binStr.substring(start, end + 1);
+      }
+      if (atom.pad) binStr = this.applyPad(binStr, atom.pad);
+      return binStr.length;
+    }
+    if (atom.b32hex) {
+      let binStr = WL ? WL.b32hexDigitsToBin(atom.b32hex) : atom.b32hex;
+      if (atom.bitRange) {
+        const { start, end } = atom.bitRange;
+        binStr = binStr.substring(start, end + 1);
+      }
+      if (atom.pad) binStr = this.applyPad(binStr, atom.pad);
+      return binStr.length;
+    }
+    if (atom.b32c) {
+      let binStr = WL ? WL.b32cDigitsToBin(atom.b32c) : atom.b32c;
+      if (atom.bitRange) {
+        const { start, end } = atom.bitRange;
+        binStr = binStr.substring(start, end + 1);
+      }
+      if (atom.pad) binStr = this.applyPad(binStr, atom.pad);
+      return binStr.length;
+    }
+    if (atom.dec) {
+      let binStr = WL ? WL.slashDecToBin(atom.dec) : parseInt(atom.dec, 10).toString(2);
+      if (atom.pad) binStr = this.applyPad(binStr, atom.pad);
+      return binStr.length;
+    }
+    if (atom.groupedSchemaLiteral || atom.schemaLiteral) {
+      const lit = atom.groupedSchemaLiteral || atom.schemaLiteral;
+      const schema = this._resolveSchema(lit.schemaRef);
+      if (atom.groupedSchemaLiteral) {
+        return (lit.elements || []).length * schema.totalWidth;
+      }
+      return schema.totalWidth;
+    }
+    return null;
+  }
+
+  _inferWireAtomStaticBitWidth(atom) {
+    const wire = this.wires.get(atom.var);
+    if (!wire) {
+      const varInfo = this.vars.get(atom.var);
+      if (varInfo && varInfo.type && this.isWire(varInfo.type)) {
+        return this.getBitWidth(varInfo.type);
+      }
+      throw new Error(`WWIDTH: undefined '${atom.var}'`);
+    }
+    if (atom.schemaField || (atom.schemaFieldPath && atom.schemaFieldPath.length)) {
+      const abs = this._resolveSchemaFieldAbsoluteRange(atom, wire);
+      if (abs.nonContiguous === 'schema_col') return abs.sliceWidth;
+      return abs.end - abs.start + 1;
+    }
+    const slice = this.resolveAtomWireSlice(atom, wire);
+    if (slice) {
+      if (slice.nonContiguous === 'col' || slice.nonContiguous === 'schema_col') {
+        return slice.sliceWidth;
+      }
+      return slice.end - slice.start + 1;
+    }
+    if (wire.vector || wire.tensor) {
+      const ew = this._elementWidthForWire(wire);
+      if (ew) return ew;
+    }
+    const bits = this.getBitWidth(wire.type);
+    if (bits) return bits;
+    throw new Error(`WWIDTH: cannot infer width of '${atom.var}'`);
+  }
+
+  _inferCallStaticResultWidth(fn, args) {
+    const name = (fn && fn.name) ? fn.name : fn;
+    if (name === 'WWIDTH' && args && args.length === 1) {
+      return this._inferExprStaticBitWidth(args[0]);
+    }
+    const unaryPreserve = new Set([
+      'NOT', 'REVERSE', 'ABS', 'CLAMP', 'NFORMAT', 'LSHIFT', 'RSHIFT', 'LROTATE', 'RROTATE',
+      'HIGH', 'LOW', 'ISDIGIT',
+    ]);
+    if (unaryPreserve.has(name) && args && args.length >= 1) {
+      return this._inferExprStaticBitWidth(args[0]);
+    }
+    const binaryMax = new Set([
+      'AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR', 'EQ',
+      'ADD', 'SUBTRACT', 'MULTIPLY', 'MAC', 'MIN', 'MAX', 'GT', 'LT', 'DOT',
+    ]);
+    if (binaryMax.has(name) && args && args.length >= 2) {
+      const w0 = this._inferExprStaticBitWidth(args[0]);
+      const w1 = this._inferExprStaticBitWidth(args[1]);
+      return Math.max(w0, w1);
+    }
+    if (name === 'MUX' && args && args.length >= 3) {
+      return Math.max(
+        this._inferExprStaticBitWidth(args[1]),
+        this._inferExprStaticBitWidth(args[2])
+      );
+    }
+    if (name === 'DEMUX' && args && args.length >= 2) {
+      return this._inferExprStaticBitWidth(args[1]);
+    }
+    if (name === 'MAC' && args && args.length >= 3) {
+      return Math.max(
+        this._inferExprStaticBitWidth(args[0]) + this._inferExprStaticBitWidth(args[1]),
+        this._inferExprStaticBitWidth(args[2])
+      );
+    }
+    if (args && args.length === 1) {
+      return this._inferExprStaticBitWidth(args[0]);
+    }
+    if (args && args.length > 1) {
+      let total = 0;
+      for (const arg of args) total += this._inferExprStaticBitWidth(arg);
+      return total;
+    }
+    throw new Error('WWIDTH: cannot infer width of expression');
+  }
+
+  _inferAtomStaticBitWidth(atom) {
+    if (!atom) throw new Error('WWIDTH: cannot infer width of expression');
+    const litW = this._inferLiteralStaticBitWidth(atom);
+    if (litW != null) return litW;
+    if (atom.call) {
+      return this._inferCallStaticResultWidth(atom.call, atom.args);
+    }
+    if (atom.var) {
+      if (atom.var === '~' || atom.var === '%') return 1;
+      if (atom.var === '$') {
+        if (atom.bitRange) {
+          const { start, end } = this.resolveBitRange(atom.bitRange);
+          return end - start + 1;
+        }
+        throw new Error('WWIDTH: cannot infer width of $ without bit range');
+      }
+      if (atom.var.startsWith('.')) {
+        throw new Error('WWIDTH: component references are not supported');
+      }
+      return this._inferWireAtomStaticBitWidth(atom);
+    }
+    throw new Error('WWIDTH: cannot infer width of expression');
+  }
+
+  _inferExprStaticBitWidth(expr) {
+    if (!expr || !Array.isArray(expr) || !expr.length) {
+      throw new Error('WWIDTH: cannot infer width of expression');
+    }
+    let total = 0;
+    for (const atom of expr) {
+      total += this._inferAtomStaticBitWidth(atom);
+    }
+    return total;
+  }
+
   _buildSchemaFieldResolvePath(atom) {
     const SS = this._semanticSchemas();
     if (!SS || !atom) return null;
@@ -4715,7 +4906,7 @@ class Interpreter {
     if (['NOT', 'AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR', 'EQ', 'LATCH',
          'LSHIFT', 'RSHIFT',
          'HIGH', 'LOW', 'ANY', 'ZERO', 'BITINDEX', 'ONEHOT',
-         'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE',
+         'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE', 'WWIDTH',
          'REVERSE', 'LROTATE', 'RROTATE',
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
          'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ABS', 'NFORMAT', 'ISDIGIT',
@@ -7185,6 +7376,23 @@ if (this.isBuiltinDEMUX(name)) {
     const len = argValues[0].length;
     const w = bitIndexWidth(len);
     const v = binPadInt(len, w);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'WWIDTH') {
+    if (args.length !== 1) fail('WWIDTH expects 1 argument');
+    let width;
+    try {
+      width = this._inferExprStaticBitWidth(args[0]);
+    } catch (e) {
+      fail(e.message || 'WWIDTH: cannot infer width of expression');
+    }
+    if (!Number.isFinite(width) || width < 0) {
+      fail('WWIDTH: cannot infer width of expression');
+    }
+    const v = width === 0 ? '0' : width.toString(2);
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -15524,6 +15732,7 @@ Interpreter.BUILTIN_DOC = {
   CNTONE:   ['CNTONE(Xbit) -> Ybit'],
   CNTZERO:  ['CNTZERO(Xbit) -> Ybit'],
   BITSIZE:  ['BITSIZE(Xbit) -> Ybit'],
+  WWIDTH:   ['WWIDTH(X) -> Ybit — declared/static bit width of literal, wire, or expression'],
   REVERSE:  [
     'REVERSE(Xbit) -> Xbit',
     'REVERSE(Wbit[n] data ; vector) -> Wbit[n]',

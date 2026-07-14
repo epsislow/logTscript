@@ -23,7 +23,7 @@ Full `doc()` reference: [doc-function.md](doc-function.md).
 | **Tensor / matrix** | `SHAPE`, `RANK`, `PIVOT`, `REPEAT`, `IDENTITY`, `ZEROS`, `FILL`, `DIAG`, `IOTA`, `OUTER`, `TRACE`, `NORM`, `L2`, `TRIL`, `TRIU`, `FLIPUD`, `FLIPLR`, `MCAT`, `MSLICE` | [wire-vectors.md](wire-vectors.md) · [builtin-SHAPE.md](builtin-SHAPE.md) · [builtin-RANK.md](builtin-RANK.md) · [builtin-REPEAT.md](builtin-REPEAT.md) |
 | **Number conversion** | `CNTN10S`, `N2N10S`, `N10S2N`, `CNTN16S`, `N2N16S`, `N16S2N`, `ISDIGIT` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | `HIGH`, `LOW`, `ANY`, `ZERO`, `ANY*`, `ALL*`, `BITINDEX`, `ONEHOT` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
-| **Bit analysis** | `PARITY`, `CNTONE`, `CNTZERO`, `BITSIZE` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
+| **Bit analysis** | `PARITY`, `CNTONE`, `CNTZERO`, `BITSIZE`, `WWIDTH` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
 | **Bit transform** | `LSHIFT`, `RSHIFT`, `REVERSE`, `LROTATE`, `RROTATE` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) · `RSHIFT` `; signed` = ASHR · **`; matrix`**: [matrix-reduction.md](matrix-reduction.md) |
 | **Tristate (ZSTATE)** | `ZRELEASE(wire)`, `bus = ZCONNECT(en, data)` | [zstate.md](zstate.md) |
 
