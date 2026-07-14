@@ -2003,6 +2003,30 @@ function formatParseViewShow(view, wireName, bitWidth, refStr) {
   return lines.join('\n');
 }
 
+function _parseViewInlineFlatParts(node, prefix) {
+  const parts = [];
+  if (node && node.fields) {
+    for (const [k, v] of Object.entries(node.fields)) {
+      if (v === undefined || v === null) continue;
+      const label = prefix ? `${prefix}:${k}` : k;
+      parts.push(`${label}=${v}`);
+    }
+  }
+  for (const ch of (node && node.children) || []) {
+    if (!ch.name) continue;
+    const seg = ch.index !== undefined && ch.index !== null ? `${ch.name}[${ch.index}]` : ch.name;
+    const nextPrefix = prefix ? `${prefix}:${seg}` : seg;
+    parts.push(..._parseViewInlineFlatParts(ch, nextPrefix));
+  }
+  return parts;
+}
+
+function formatParseViewShowInlineFlat(view) {
+  if (!view) return '';
+  const parts = _parseViewInlineFlatParts(view, '');
+  return parts.join(' ');
+}
+
 const protocolAssemblerExports = {
   parseProtocolBody,
   generateProtocol,
@@ -2020,6 +2044,7 @@ const protocolAssemblerExports = {
   formatProtocolTypeDoc,
   resolveParseViewSlice,
   formatParseViewShow,
+  formatParseViewShowInlineFlat,
   formatParseViewSectionShow,
 };
 

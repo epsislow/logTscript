@@ -4067,30 +4067,67 @@ class Interpreter {
     return `${atom.var}:${fieldSuffix}`;
   }
 
+  _evalSchemaLiteralFieldBits(schema, name, expr) {
+    const SS = this._semanticSchemas();
+    if (expr && expr.groupedSchemaLiteral) {
+      return this.evalGroupedSchemaLiteralAtom(expr, false).value;
+    }
+    if (expr && expr.schemaLiteral) {
+      return this.evalSchemaLiteralAtom(expr, false).value;
+    }
+    const parts = this.evalExpr(expr, false);
+    let bits = '';
+    for (const part of parts) {
+      if (part.value != null && part.value !== '-') bits += part.value;
+      else if (part.ref) {
+        const v = this.getValueFromRef(part.ref);
+        if (v) bits += v;
+      }
+    }
+    const path = name.includes('.') ? name.split('.') : [name];
+    SS.resolveFieldPath(schema, path);
+    return bits;
+  }
+
+  evalGroupedSchemaLiteralAtom(a, computeRefs) {
+    const SS = this._semanticSchemas();
+    if (!SS) throw new Error('semantic-schemas.js is not loaded');
+    const gs = a.groupedSchemaLiteral || a;
+    if (!gs || !gs.schemaRef) {
+      throw new Error('grouped schema literal: schema ref required');
+    }
+    const schema = this._resolveSchema(gs.schemaRef);
+    const elements = gs.elements || [];
+    if (!elements.length) {
+      throw new Error('grouped schema literal: at least one element required');
+    }
+    let totalBits = '';
+    for (const fields of elements) {
+      const fieldValues = {};
+      for (const [name, expr] of Object.entries(fields || {})) {
+        fieldValues[name] = this._evalSchemaLiteralFieldBits(schema, name, expr);
+      }
+      totalBits += SS.buildSchemaLiteralBits(schema, fieldValues);
+    }
+    const bitWidth = totalBits.length;
+    if (computeRefs) {
+      const idx = this.storeValue(totalBits);
+      return { value: totalBits, ref: `&${idx}`, varName: null, bitWidth };
+    }
+    return { value: totalBits, ref: null, varName: null, bitWidth };
+  }
+
   evalSchemaLiteralAtom(a, computeRefs) {
     const SS = this._semanticSchemas();
     if (!SS) throw new Error('semantic-schemas.js is not loaded');
+    if (a.groupedSchemaLiteral) {
+      return this.evalGroupedSchemaLiteralAtom(a, computeRefs);
+    }
     const lit = a.schemaLiteral || a;
     const schema = this._resolveSchema(lit.schemaRef);
     const fieldValues = {};
     for (const [name, expr] of Object.entries(lit.fields || {})) {
-      if (expr && expr.schemaLiteral) {
-        const subResult = this.evalSchemaLiteralAtom(expr, false);
-        fieldValues[name] = subResult.value;
-        continue;
-      }
-      const parts = this.evalExpr(expr, false);
-      let bits = '';
-      for (const part of parts) {
-        if (part.value != null && part.value !== '-') bits += part.value;
-        else if (part.ref) {
-          const v = this.getValueFromRef(part.ref);
-          if (v) bits += v;
-        }
-      }
-      const path = name.includes('.') ? name.split('.') : [name];
-      SS.resolveFieldPath(schema, path);
-      fieldValues[name] = bits;
+      fieldValues[name] = this._evalSchemaLiteralFieldBits(schema, name, expr);
     }
     const totalBits = SS.buildSchemaLiteralBits(schema, fieldValues);
     if (computeRefs) {
@@ -5195,7 +5232,7 @@ class Interpreter {
       return this.evalProtocolInvokeAtom(a.protocolInvoke, computeRefs);
     }
 
-    if (a.schemaLiteral) {
+    if (a.groupedSchemaLiteral || a.schemaLiteral) {
       return this.evalSchemaLiteralAtom(a, computeRefs);
     }
 

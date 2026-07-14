@@ -1019,7 +1019,7 @@
       const path = key.includes('.') ? key.split('.') : [key];
       if (path.length === 1) {
         const node = schema.structure.find((n) => n.name === key);
-        if (node && node.kind === 'nested') {
+        if (node && (node.kind === 'nested' || node.kind === 'array')) {
           bits = packBlock(bits, schema, node.bitStart, node.width, val);
           continue;
         }

@@ -21453,6 +21453,159 @@ reg(2306, 'protocol-ext', 'parseView repeat show (wave)', function(h, session) {
   h.assert('not flat only', String(out.some((l) => l.includes('kind'))), 'true');
 }, { propagation: 'wave' });
 
+reg(2307, 'protocol-ext', 'Signal Trace parseView auto inline and expand', function(h, session) {
+  const pkt = '11110000' + '00001111';
+  session.run(INLINE_REPEAT_PV + `
+16wire parsed = .repeatPv { data = ${pkt} }`);
+  const wire = session.interp.wires.get('parsed');
+  const raw = session.getWire(session.interp, 'parsed');
+  const strat = session.interp.signalPropagationStrategy;
+  const payload = strat && typeof strat._buildWaveListenValuePayload === 'function'
+    ? strat._buildWaveListenValuePayload('parsed', raw, {})
+    : null;
+  h.assert('payload parseViewId', payload && payload.parseViewId != null ? 'set' : 'missing', 'set');
+  const entry = payload || {
+    name: 'parsed',
+    rawValue: raw,
+    bitWidth: raw.length,
+    parseViewId: wire && wire.parseViewId,
+  };
+  h.assert('needs expand auto', String(waveListenNeedsExpand(entry, 'auto')), 'true');
+  h.assert('no expand hex', String(waveListenNeedsExpand(entry, 'hex')), 'false');
+  const inline = formatWaveListenInline(entry, 'auto', null, session.interp);
+  h.assert('inline kind0', String(inline.includes('11110000')), 'true');
+  h.assert('inline kind1', String(inline.includes('00001111')), 'true');
+  const lines = formatWaveListenExpandLines(entry, 'auto', session.interp);
+  h.assert('expand packet0', String(lines.some((l) => l.includes('packet[0]'))), 'true');
+  h.assert('expand packet1', String(lines.some((l) => l.includes('packet[1]'))), 'true');
+});
+
+reg(2308, 'semantic-schemas', 'grouped schema literal wire vector equals plus', function(h, session) {
+  session.run(OPCODE16_SCHEMA + [
+    '16wire[3]<opcode> romA = { alu=\\5 } { cycles=\\3 } { jump=1 }<opcode>',
+    '16wire[3]<opcode> romB = { alu=\\5 }<opcode> + { cycles=\\3 }<opcode> + { jump=1 }<opcode>',
+    '4wire a0 = romA:0:alu',
+    '2wire c1 = romA:1:cycles',
+    '1wire j2 = romA:2:jump',
+    '4wire b0 = romB:0:alu',
+    '2wire d1 = romB:1:cycles',
+    '1wire k2 = romB:2:jump',
+  ].join('\n'));
+  h.assert('alu0', session.getWire(session.interp, 'a0'), session.getWire(session.interp, 'b0'));
+  h.assert('cyc1', session.getWire(session.interp, 'c1'), session.getWire(session.interp, 'd1'));
+  h.assert('jmp2', session.getWire(session.interp, 'j2'), session.getWire(session.interp, 'k2'));
+});
+
+reg(2309, 'semantic-schemas', 'grouped schema literal matrix single line', function(h, session) {
+  session.run(OPCODE16_SCHEMA + [
+    '16wire[2,2]<opcode> grid = { alu=\\5 }{ cycles=\\3 }{ jump=1 }{ write=1 }<opcode>',
+    '4wire a = grid:0:0:alu',
+    '2wire c = grid:0:1:cycles',
+    '1wire j = grid:1:0:jump',
+    '1wire w = grid:1:1:write',
+  ].join('\n'));
+  h.assert('cell00 alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('cell01 cycles', session.getWire(session.interp, 'c'), '11');
+  h.assert('cell10 jump', session.getWire(session.interp, 'j'), '1');
+  h.assert('cell11 write', session.getWire(session.interp, 'w'), '1');
+});
+
+reg(2310, 'semantic-schemas', 'grouped schema literal whitespace variants', function(h, session) {
+  session.run(OPCODE16_SCHEMA + [
+    '16wire[2]<opcode> a = { alu=\\5 } { cycles=\\3 }<opcode>',
+    '16wire[2]<opcode> b = { alu=\\5 }{ cycles=\\3 }<opcode>',
+    '16wire[2]<opcode> c = { alu=\\5 }',
+    '  { cycles=\\3 }<opcode>',
+  ].join('\n'));
+  h.assert('a eq b', session.getWire(session.interp, 'a'), session.getWire(session.interp, 'b'));
+  h.assert('a eq c', session.getWire(session.interp, 'a'), session.getWire(session.interp, 'c'));
+});
+
+reg(2311, 'semantic-schemas', 'grouped schema literal count mismatch error', function(h, session) {
+  h.assertThrows('element count', function() {
+    session.run(OPCODE16_SCHEMA + '16wire[3]<opcode> rom = { alu=\\5 } { cycles=\\3 }<opcode>');
+  }, '48');
+});
+
+reg(2312, 'semantic-schemas', 'grouped schema literal on schema array slice', function(h, session) {
+  session.run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    'pkt:slots = { alu=\\5 } { cycles=\\3 }<opcode>',
+    '4wire a = pkt:slots:0:alu',
+    '2wire c = pkt:slots:1:cycles',
+  ].join('\n'));
+  h.assert('slot0 alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('slot1 cycles', session.getWire(session.interp, 'c'), '11');
+});
+
+reg(2313, 'semantic-schemas', 'grouped schema literal in record', function(h, session) {
+  session.run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frame> pkt = { tag=\\42 slots={ alu=\\5 } { cycles=\\3 }<opcode> }<frame>',
+    '4wire a = pkt:slots:0:alu',
+    '2wire c = pkt:slots:1:cycles',
+    '8wire t = pkt:tag',
+  ].join('\n'));
+  h.assert('tag', session.getWire(session.interp, 't'), '00101010');
+  h.assert('slots0 alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('slots1 cycles', session.getWire(session.interp, 'c'), '11');
+});
+
+reg(2314, 'semantic-schemas', 'single schema literal unchanged', function(h, session) {
+  session.run(OPCODE16_SCHEMA + [
+    '16wire<opcode> instr = { alu=\\5 }<opcode>',
+    '4wire a = instr:alu',
+  ].join('\n'));
+  h.assert('alu', session.getWire(session.interp, 'a'), '0101');
+});
+
+reg(2315, 'semantic-schemas', 'schema literal plus concat regression', function(h, session) {
+  session.run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    '16wire s0 = { alu=\\5 }<opcode>',
+    '16wire s1 = { cycles=\\3 }<opcode>',
+    'pkt:slots = s0 + s1',
+    '4wire a = pkt:slots:0:alu',
+    '2wire c = pkt:slots:1:cycles',
+  ].join('\n'));
+  h.assert('concat alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('concat cycles', session.getWire(session.interp, 'c'), '11');
+});
+
+reg(2316, 'semantic-schemas', 'grouped schema literal vector field access (wave)', function(h, session) {
+  session.run(OPCODE16_SCHEMA + [
+    '16wire[3]<opcode> rom = { alu=\\5 } { cycles=\\3 } { jump=1 }<opcode>',
+    '4wire a0 = rom:0:alu',
+    '2wire c1 = rom:1:cycles',
+    '1wire j2 = rom:2:jump',
+  ].join('\n'));
+  h.assert('alu0', session.getWire(session.interp, 'a0'), '0101');
+  h.assert('cyc1', session.getWire(session.interp, 'c1'), '11');
+  h.assert('jmp2', session.getWire(session.interp, 'j2'), '1');
+}, { propagation: 'wave' });
+
+reg(2317, 'semantic-schemas', 'grouped schema literal pkt:slots assignment (wave)', function(h, session) {
+  session.run(FRAME40_SCHEMA + OPCODE16_SCHEMA + [
+    '40wire<frame> pkt := 0',
+    'pkt:slots = { alu=\\5 } { cycles=\\3 }<opcode>',
+    '4wire a = pkt:slots:0:alu',
+    '2wire c = pkt:slots:1:cycles',
+  ].join('\n'));
+  h.assert('slot0 alu', session.getWire(session.interp, 'a'), '0101');
+  h.assert('slot1 cycles', session.getWire(session.interp, 'c'), '11');
+}, { propagation: 'wave' });
+
+reg(2318, 'semantic-schemas', 'grouped schema literal show vector (wave)', function(h, session) {
+  const out = session.runDoc(OPCODE16_SCHEMA + [
+    '16wire[3]<opcode> rom = { alu=\\5 } { cycles=\\3 } { jump=1 }<opcode>',
+    'show(rom)',
+  ].join('\n'));
+  h.assert('length line', String(out.some(l => l.includes('rom has length [3]'))), 'true');
+  h.assert('elem0 flat line', String(out.some(l => l.includes(':0 =') && l.includes('(16bit)'))), 'true');
+  h.assert('elem0 alu field', String(out.some(l => l.includes('alu') && l.includes('0101'))), 'true');
+  h.assert('elem1 cycles field', String(out.some(l => l.includes('cycles') && l.includes('11'))), 'true');
+  h.assert('elem2 jump field', String(out.some(l => l.includes('jump') && l.includes('= 1'))), 'true');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

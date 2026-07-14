@@ -206,6 +206,8 @@ class SignalPropagationStrategy {
         bitWidth: 0,
         wireType: null,
         tensorMeta: null,
+        schemaRef: null,
+        parseViewId: null,
         isComponent,
       };
     }
@@ -246,6 +248,7 @@ class SignalPropagationStrategy {
       wireType,
       tensorMeta,
       schemaRef: isComponent ? null : (wire && wire.schemaRef) || null,
+      parseViewId: isComponent ? null : (wire && wire.parseViewId != null ? wire.parseViewId : null),
       isComponent,
     };
   }

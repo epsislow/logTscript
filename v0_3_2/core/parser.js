@@ -254,7 +254,18 @@ class Parser {
     return null;
   }
 
-  parseSchemaLiteralAtom() {
+  _skipSchemaLiteralSeparators() {
+    while (this.c.type === 'EOL') {
+      this.c = this.t.get();
+    }
+  }
+
+  _isNextGroupedSchemaElement() {
+    this._skipSchemaLiteralSeparators();
+    return this.c.type === 'SYM' && this.c.value === '{';
+  }
+
+  parseSchemaLiteralFieldsBlock() {
     this.eat('SYM', '{');
     const fields = {};
     while (!(this.c.type === 'SYM' && this.c.value === '}')) {
@@ -281,8 +292,20 @@ class Parser {
       }
     }
     this.eat('SYM', '}');
+    return fields;
+  }
+
+  parseSchemaLiteralAtom() {
+    const elements = [this.parseSchemaLiteralFieldsBlock()];
+    while (this._isNextGroupedSchemaElement()) {
+      elements.push(this.parseSchemaLiteralFieldsBlock());
+    }
+    this._skipSchemaLiteralSeparators();
     const schemaRef = this.parseSchemaRef();
-    return { schemaLiteral: { fields, schemaRef } };
+    if (elements.length === 1) {
+      return { schemaLiteral: { fields: elements[0], schemaRef } };
+    }
+    return { groupedSchemaLiteral: { elements, schemaRef } };
   }
 
   _parseSchemaDisplayTag() {

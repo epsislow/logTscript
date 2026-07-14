@@ -186,6 +186,7 @@ function appendWaveListenPanelLine(instanceId, payload, kind) {
       wireType: payload.wireType,
       tensorMeta: payload.tensorMeta,
       schemaRef: payload.schemaRef || null,
+      parseViewId: payload.parseViewId != null ? payload.parseViewId : null,
       isComponent: payload.isComponent,
     };
   } else if (payload && payload.listenText !== undefined) {

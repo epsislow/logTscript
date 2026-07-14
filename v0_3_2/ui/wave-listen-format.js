@@ -306,12 +306,40 @@ function _waveListenVectorSchemaInline(entry, rawValue, interp) {
   return lines.join(' ');
 }
 
+function _waveListenParseViewFromEntry(entry, interp) {
+  if (!entry || entry.parseViewId == null || !interp || !interp.parseViews) return null;
+  return interp.parseViews.get(entry.parseViewId) || null;
+}
+
+function _waveListenParseViewLines(entry, interp) {
+  const view = _waveListenParseViewFromEntry(entry, interp);
+  if (!view) return null;
+  const fn = typeof formatParseViewShow === 'function' ? formatParseViewShow : null;
+  if (!fn) return null;
+  const bw = entry.bitWidth || (entry.rawValue ? entry.rawValue.length : 0);
+  const text = fn(view, entry.name, bw, null);
+  return text ? text.split('\n') : null;
+}
+
+function _waveListenParseViewInline(entry, interp) {
+  const view = _waveListenParseViewFromEntry(entry, interp);
+  if (!view) return null;
+  const fn = typeof formatParseViewShowInlineFlat === 'function'
+    ? formatParseViewShowInlineFlat
+    : null;
+  if (!fn) return null;
+  const flat = fn(view);
+  return flat || null;
+}
+
 function _formatWaveListenScalarFormatted(rawValue, bitWidth, fmt, formatValueFn, interp, entry) {
   if (fmt === 'auto') {
     if (_tensorUsesSchemaAuto(entry, fmt)) {
       const summary = _waveListenVectorSchemaInline(entry, rawValue, interp);
       if (summary) return summary;
     }
+    const pvInline = _waveListenParseViewInline(entry, interp);
+    if (pvInline) return pvInline;
     const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
     if (SS && entry && entry.schemaRef && interp && interp.schemaRegistry) {
       try {
@@ -436,6 +464,8 @@ function formatWaveListenExpandLines(entry, fmt, interp) {
       const vlines = _waveListenVectorSchemaLines(entry, rawValue, interp);
       if (vlines && vlines.length) return vlines;
     }
+    const pvLines = _waveListenParseViewLines(entry, interp);
+    if (pvLines && pvLines.length) return pvLines;
     const SS = typeof LogTScriptSemanticSchemas !== 'undefined' ? LogTScriptSemanticSchemas : null;
     if (SS && entry.schemaRef && interp && interp.schemaRegistry) {
       try {
@@ -539,6 +569,7 @@ function waveListenHasSchemaDisplay(entry, fmt) {
   if (!entry || entry.rawValue == null) return false;
   const mode = normalizeWaveListenFmt(fmt || 'hex');
   if (mode !== 'auto') return false;
+  if (entry.parseViewId != null) return true;
   if (entry.schemaRef) return true;
   return _tensorUsesSchemaAuto(entry, mode);
 }

@@ -123,7 +123,17 @@ Use the same RHS forms as [wire-literals.md](wire-literals.md) on the **array sl
 | Grouped + tag | `pkt:cells = \1 \2 \3;8` | 3×8 = 24b |
 | Per-element | `pkt:cells:1 := \5` | 8b |
 
-**Not supported (v1):** schema literals with array lists — `{ cells=[\1,\2,\3] }<frame>`.
+**Grouped schema elements** (vector/matrix wire, schema array slice, or record field) — one `{ … }` per element, single `<schema>` on the last group (like `\2 \23 \242;8`):
+
+```logts
+16wire[3]<opcode> rom = { alu=\5 } { cycles=\3 } { jump=1 }<opcode>
+pkt:slots = { alu=\5 } { cycles=\3 }<opcode>
+pkt = { tag=\42, slots={ alu=\5 } { cycles=\3 }<opcode> }<frame>
+```
+
+Equivalent to concatenating per-element literals with `+`. Whitespace between `}` and `{` is optional (`{}{}<schema>` on one line is fine).
+
+**Not supported:** comma lists `[\1,\2,\3]` or `{ cells=[\1,\2,\3] }` — use grouped numeric `\1 \2 \3;8` or grouped schema above.
 
 Variable-length arrays (`field:8[1-3]`) are planned for a later phase. **Schema arrays** (`field:<sub>[N]` / `[R,C]`) are supported — see below.
 
@@ -193,7 +203,9 @@ Same RHS forms as wire vectors — concatenation, hex, per-element schema litera
 | Per-element literal | `pkt:slots:1 = { alu=\5 }<opcode>` | 16b |
 | Sub-field assign | `pkt:slots:0:alu := \5` | 4b |
 
-**Not supported (v1):** structured slice literal — `{ slots=[…] }<frame>`.
+**Grouped schema** (one `{ … }` per slot, `<opcode>` on last): `pkt:slots = { alu=\5 } { cycles=\3 }<opcode>`
+
+**Not supported:** comma lists `[{…},{…}]` or `{ slots=[…] }` — use grouped schema or `+` concat.
 
 ### `show` on schema arrays
 
@@ -316,6 +328,12 @@ Initialize one element with a schema literal:
 
 ```logts
 rom:2 = { alu=\5 cycles=\3 jump=1 }<opcode>
+```
+
+Initialize all elements with a **grouped** schema literal (one `{ … }` per slot, `<opcode>` on last):
+
+```logts
+rom = { alu=\5 } { cycles=\3 } { jump=1 }<opcode>
 ```
 
 ### Matrix example
