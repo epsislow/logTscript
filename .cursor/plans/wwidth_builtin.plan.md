@@ -167,3 +167,12 @@ Manifest: `node node/_gen_test_manifest.js`.
 2. Ramură `WWIDTH` în interpreter
 3. Teste 2319–2326
 4. Doc + manifest
+
+---
+
+## Extensie planificată — schema + parseView
+
+Vezi [`wwidth_schema_parseview.plan.md`](wwidth_schema_parseview.plan.md):
+
+- **Schema** (`WWIDTH(pkt:tag)`, `pkt:slots:0:alu`) — parțial în cod, teste 2327–2328
+- **parseView** (`WWIDTH(parsed:packet:0:kind)`) — ramură de adăugat, teste 2329–2330
