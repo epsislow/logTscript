@@ -3,13 +3,13 @@ name: Schema variable range
 overview: "Range variabil în semantic schema — `field:W[min-max]`, `field:W[min-]`; numerotare internă Faza 1.0–1.4; amânat 1+ / 1++. Mapare externă: Faza 7+ în schema_field_arrays."
 todos:
   - id: 1-0-parser
-    content: "Faza 1.0: parser schema [min-max] / [min-] — aliniat protocol-repeat"
+    content: "Faza 1.0: parser [min-max]/[min-]/[0-] + sugar 8+/8*"
     status: pending
   - id: 1-1-resolve
     content: "Faza 1.1: min/maxWidth; varArrayCounts; declaredWidth resolve; effectiveBitLen metadata"
     status: pending
   - id: 1-2-interpreter
-    content: "Faza 1.2: assign, =:/:=, paddingRight/Left+parseView, show, eroare flat package3"
+    content: "Faza 1.2: assign, grouped pe var_array, =:/:=, padding, show, eroare flat package3"
     status: pending
   - id: 1-3-schema-array
     content: "Faza 1.3: <schema>[min-max] / [min-] — aceleași reguli ca frunză"
@@ -24,28 +24,32 @@ isProject: false
 
 **Status:** amânat explicit („la urmă”) — **design** activ; acest fișier e hub-ul pentru tot ce ține de range variabil în schema.
 
-**Plan părinte:** [`schema_field_arrays.plan.md`](schema_field_arrays.plan.md) — Fazele 6.x / 7a / 7b (array fix) sunt **prerequisit** ✅.
+**Plan părinte:** `[schema_field_arrays.plan.md](schema_field_arrays.plan.md)` — Fazele 6.x / 7a / 7b (array fix) sunt **prerequisit** ✅.
 
 ---
 
 ## Numerotare (acest plan)
 
-| Etichetă aici | Semnificație | Mapare externă |
-|---------------|--------------|----------------|
-| **Faza 1** (umbrelă) | Tot acest plan | **Faza 7+** în [`schema_field_arrays.plan.md`](schema_field_arrays.plan.md) |
-| **Faza 1.0 … 1.10** | Sub-faze **de implementare** — ordine 1.0 → 1.1 → … | — |
-| **Faza 1+**, **1++**, … | Subiecte **amânate** — design, fără ordine fixă încă | — |
+
+| Etichetă aici           | Semnificație                                         | Mapare externă                                                              |
+| ----------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
+| **Faza 1** (umbrelă)    | Tot acest plan                                       | **Faza 7+** în `[schema_field_arrays.plan.md](schema_field_arrays.plan.md)` |
+| **Faza 1.0 … 1.10**     | Sub-faze **de implementare** — ordine 1.0 → 1.1 → …  | —                                                                           |
+| **Faza 1+**, **1++**, … | Subiecte **amânate** — design, fără ordine fixă încă | —                                                                           |
+
 
 > Spațiu pentru până la **1.10** dacă apare nevoia (ex. 1.5 wave, 1.6 WWIDTH). Sub-fazele 1.0–1.4 acoperă MVP-ul propus.
 
 **Planuri înrudite:**
 
-| Plan | Raport |
-|------|--------|
-| [`schema_field_arrays.plan.md`](schema_field_arrays.plan.md) | Array fix `field:W[N]` / `<schema>[N]` — baza |
-| [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) | Literali grouped — complement la assign structurat |
-| [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) | Sintaxă `[1-3]` / `[1-]` la protocol — referință |
-| Bridge protocol → schema | **extern** — plan viitor 7b+ (nu 1.x) |
+
+| Plan                                                                         | Raport                                             |
+| ---------------------------------------------------------------------------- | -------------------------------------------------- |
+| `[schema_field_arrays.plan.md](schema_field_arrays.plan.md)`                 | Array fix `field:W[N]` / `<schema>[N]` — baza      |
+| `[grouped_schema_literals.plan.md](grouped_schema_literals.plan.md)`         | Literali grouped — complement la assign structurat |
+| `[protocol_section_repetition.plan.md](protocol_section_repetition.plan.md)` | Sintaxă `[1-3]` / `[1-]` la protocol — referință   |
+| Bridge protocol → schema                                                     | **extern** — plan viitor 7b+ (nu 1.x)              |
+
 
 ---
 
@@ -53,7 +57,7 @@ isProject: false
 
 **Da** — `cells:8[1-3]` și `cells:8[1-]` completează modelul B (array fix din Faza 6) cu **Model D**: număr de elemente variabil la runtime, layout binar secvențial.
 
-**Nu înlocuiește parseView** pentru choice, tentative, JSON `pairEntry*`, etc.
+**Nu înlocuiește parseView** pentru choice, tentative, JSON `pairEntry`*, etc.
 
 **Sintaxă:** aceeași ca protocol — `[1-3]`, `[1-]`, **nu** `..` (ex. respins `8[1..3]`).
 
@@ -76,26 +80,32 @@ flowchart TB
   D -.->|"1.x [min-max]"| dynW["totalWidth runtime"]
 ```
 
-| Model | Exemplu | `totalWidth` | Acces |
-|-------|---------|--------------|-------|
-| **B** (6.x ✅) | `cells:8[3]` | 24 fix | `pkt:cells:1` |
-| **D** (Faza 1) | `cells:8[1-3]` | min–max + rest | `pkt:cells:1` după count |
-| **C** (protocol ✅) | `packet[1-3]` + parseView | dinamic | `parsed:packet:0:kind` |
+
+
+
+| Model              | Exemplu                   | `totalWidth`   | Acces                    |
+| ------------------ | ------------------------- | -------------- | ------------------------ |
+| **B** (6.x ✅)      | `cells:8[3]`              | 24 fix         | `pkt:cells:1`            |
+| **D** (Faza 1)     | `cells:8[1-3]`            | min–max + rest | `pkt:cells:1` după count |
+| **C** (protocol ✅) | `packet[1-3]` + parseView | dinamic        | `parsed:packet:0:kind`   |
+
 
 ---
 
 ## Sintaxă — aliniată protocol
 
-Referință: [`protocol-repeat.md`](../v0_3_2/doc/protocol-repeat.md).
+Referință: `[protocol-repeat.md](../v0_3_2/doc/protocol-repeat.md)`.
 
-| Declarație schema | Echivalent protocol | Semnificație |
-|-------------------|---------------------|--------------|
-| `cells: 8[1-3]` | `cell[1-3]` | 1–3 × 8b |
-| `cells: 8[1-]` | `cell+` / `cell[1-]` | ≥1, max deschis |
-| `cells: 8[0-]` | `cell*` / `cell[0-]` | 0..∞ |
-| `cells: 8[3]` | `cell[3]` | fix (Faza 6) |
 
-Sugar opțional: `8+` → `8[1-]`, `8*` → `8[0-]` — paritate protocol, dacă nu intră în conflict cu token-uri schema.
+| Declarație schema | Echivalent protocol  | Semnificație    |
+| ----------------- | -------------------- | --------------- |
+| `cells: 8[1-3]`   | `cell[1-3]`          | 1–3 × 8b        |
+| `cells: 8[1-]`    | `cell+` / `cell[1-]` | ≥1, max deschis |
+| `cells: 8[0-]`    | `cell*` / `cell[0-]` | 0..∞            |
+| `cells: 8[3]`     | `cell[3]`            | fix (Faza 6)    |
+
+
+Sugar opțional: `8+` → `8[1-]`, `8*` → `8[0-]` — paritate protocol ✅ **confirmat Faza 1.0**.
 
 **Parser (Faza 1.0):** extinde `parseSchemaArraySuffix()` — `[min-max]` cu `min`/`max` DEC sau `-` (open bound), aceeași gramatică ca `parseSectionRepeat` din `protocol-assembler.js`.
 
@@ -124,12 +134,14 @@ Sugar opțional: `8+` → `8[1-]`, `8*` → `8[0-]` — paritate protocol, dacă
 4. `count = payload / elementWidth` — trebuie întreg.
 5. Validare: `min ≤ count ≤ max`.
 
-| Wire (biți) | cells count | footer |
-|-------------|-------------|--------|
-| 32 | (32−8)/8 = **3** | 8 |
-| 24 | **2** | 8 |
-| 16 | **1** | 8 |
-| 20 | 12/8 = 1.5 | **eroare** |
+
+| Wire (biți) | cells count      | footer     |
+| ----------- | ---------------- | ---------- |
+| 32          | (32−8)/8 = **3** | 8          |
+| 24          | **2**            | 8          |
+| 16          | **1**            | 8          |
+| 20          | 12/8 = 1.5       | **eroare** |
+
 
 **Flat assign pe `pkt = ^…`:** permis — split unic.
 
@@ -147,11 +159,13 @@ Sugar opțional: `8+` → `8[1-]`, `8*` → `8[0-]` — paritate protocol, dacă
 
 **Nu e ambiguu** când wire-ul are **N fix** și assign flat `=` cere **width match** (RHS exact N biți) — count = `N / W` (dacă singurul câmp e `cells` și umple wire-ul).
 
-| Situație | Comportament |
-|----------|--------------|
-| `Nwire` cu N cunoscut la runtime | count dedus din N — la fel ca wire fix, N finit |
-| Schema acceptă 8 / 16 / 24b (`[1-3]`) | **Nu** ambiguitate la același N — fiecare N dă un count unic |
+
+| Situație                                     | Comportament                                                                                                                                |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Nwire` cu N cunoscut la runtime             | count dedus din N — la fel ca wire fix, N finit                                                                                             |
+| Schema acceptă 8 / 16 / 24b (`[1-3]`)        | **Nu** ambiguitate la același N — fiecare N dă un count unic                                                                                |
 | „Mai multe count posibile” (formulare veche) | **Retras** — se referea greșit la același N; corect: schema permite **mai multe lățimi wire** valide, nu același N cu interpretări multiple |
+
 
 **Padding:** `:= 0` / `=:` știu ținta **N** declarată; nu există padding „la infinit” decât dacă N însuși ar fi infinit (nu există).
 
@@ -166,20 +180,24 @@ Sugar opțional: `8+` → `8[1-]`, `8*` → `8[0-]` — paritate protocol, dacă
 :
 ```
 
+
 | `wireLen` | tokens | codeDatas |
-|-----------|--------|-----------|
-| 32 | 1 | 3 |
-| 32 | 2 | 2 |
-| 32 | 3 | 1 |
+| --------- | ------ | --------- |
+| 32        | 1      | 3         |
+| 32        | 2      | 2         |
+| 32        | 3      | 1         |
+
 
 **Decizie confirmată (2026-07-14):** declarația e **validă**; ambiguitatea e doar la **assign/read flat** pe întreg `pkt`.
 
-| Operație | Comportament |
-|----------|--------------|
-| `<package3>:` | permis la compile |
-| `pkt:tokens = ^…`, `pkt:codeDatas = ^…` | permis — count per câmp |
-| `pkt = { tokens=^… codeDatas=^… }<package3>` | permis |
-| `pkt = ^AABBCC` | **eroare** — split ambiguu |
+
+| Operație                                     | Comportament               |
+| -------------------------------------------- | -------------------------- |
+| `<package3>:`                                | permis la compile          |
+| `pkt:tokens = ^…`, `pkt:codeDatas = ^…`      | permis — count per câmp    |
+| `pkt = { tokens=^… codeDatas=^… }<package3>` | permis                     |
+| `pkt = ^AABBCC`                              | **eroare** — split ambiguu |
+
 
 ```logts
 pkt:tokens    = ^AABB          # count tokens = 2
@@ -202,11 +220,14 @@ Assign per câmp: `count = literalWidth / W`. La flat cu un singur variabil: `co
 
 ## Trei moduri de assign
 
-| Mod | Exemplu | package2 | package3 |
-|-----|---------|----------|----------|
-| **Flat întreg** | `pkt = ^…` | ✅ suffix fix | ❌ ambiguu |
-| **Per câmp** | `pkt:tokens = ^…` | ✅ | ✅ |
-| **Schema literal** | `pkt = { … }<pkg>` | ✅ | ✅ |
+
+| Mod                  | Exemplu                        | package2     | package3                                    |
+| -------------------- | ------------------------------ | ------------ | ------------------------------------------- |
+| **Flat întreg**      | `pkt = ^…`                     | ✅ suffix fix | ❌ ambiguu                                   |
+| **Per câmp**         | `pkt:tokens = ^…`              | ✅            | ✅                                           |
+| **Schema literal**   | `pkt = { … }<pkg>`             | ✅            | ✅                                           |
+| **Grouped pe slice** | `pkt:tokens = { … }{ … }<tok>` | ✅ (1.2)      | ✅ — count = **nr. grupuri**, nu din wireLen |
+
 
 Ambiguitatea e problemă a **operației flat**, nu a declarației schema. Paritate cu 6.x/7b: `pkt:cells:1 := \5`, `{ slots={…} }<frame>`.
 
@@ -224,7 +245,7 @@ COMPILE
 
 RUNTIME — structurat
 4. pkt:field = ^… → count = literalWidth / W; validare min..max.
-5. { field=… }<schema> → count per câmp din sub-literal.
+5. `{ field=… }<schema>` → count per câmp din sub-literal sau grouped `{…}{…}` (nr. grupuri).
 6. varArrayCounts pe wire; offset-uri secvențiale.
 
 RUNTIME — flat
@@ -238,12 +259,14 @@ RUNTIME — flat
 
 ## Flat vs parseView
 
-| Întrebare | Răspuns |
-|-----------|---------|
-| Parser protocol pentru schema variabilă? | **Nu** — `varArrayCounts` + suffix anchor |
-| package2 flat? | **Da** |
-| package3 flat? | **Nu** — structurat sau literal |
-| parseView? | Model C separat; bridge protocol → plan extern 7b+ |
+
+| Întrebare                                | Răspuns                                            |
+| ---------------------------------------- | -------------------------------------------------- |
+| Parser protocol pentru schema variabilă? | **Nu** — `varArrayCounts` + suffix anchor          |
+| package2 flat?                           | **Da**                                             |
+| package3 flat?                           | **Nu** — structurat sau literal                    |
+| parseView?                               | Model C separat; bridge protocol → plan extern 7b+ |
+
 
 ```mermaid
 flowchart TB
@@ -267,35 +290,41 @@ flowchart TB
   P3f -.-> err["split ambiguu"]
 ```
 
+
+
 ---
 
 ## Fazare implementare (Faza 1.0 – 1.4)
 
 **Ordine recomandată:** 1.0 → 1.1 → 1.2 → 1.3 → 1.4.
 
-| Sub-fază | Conținut | Fișiere |
-|----------|----------|---------|
-| **1.0** | Parser `[min-max]`, `[min-]` | [`parser.js`](../v0_3_2/core/parser.js) |
-| **1.1** | `minWidth`/`maxWidth`; `varArrayCounts`; resolve pe `declaredWidth`; `effectiveBitLen` metadata | [`semantic-schemas.js`](../v0_3_2/core/semantic-schemas.js) |
-| **1.2** | Assign, show dinamic, `=:`/`:=` + schema variabilă, eroare flat package3 | [`interpreter.js`](../v0_3_2/core/interpreter.js) |
-| **1.3** | `slots: <opcode>[1-3]` — aceleași reguli ca frunză | semantic-schemas + interpreter |
-| **1.4** | Teste + doc | test_suite, semantic-schemas.md |
+
+| Sub-fază | Conținut                                                                                                   | Fișiere                                                     |
+| -------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **1.0**  | Parser `[min-max]`, `[min-]`                                                                               | `[parser.js](../v0_3_2/core/parser.js)`                     |
+| **1.1**  | `minWidth`/`maxWidth`; `varArrayCounts`; resolve; `Nwire<schema>` validare `N≥minWidth`; `effectiveBitLen` | `[semantic-schemas.js](../v0_3_2/core/semantic-schemas.js)` |
+| **1.2**  | Assign, show dinamic, `=:`/`:=` + schema variabilă, eroare flat package3                                   | `[interpreter.js](../v0_3_2/core/interpreter.js)`           |
+| **1.3**  | `slots: <opcode>[1-3]` — aceleași reguli ca frunză                                                         | semantic-schemas + interpreter                              |
+| **1.4**  | Teste + doc                                                                                                | test_suite, semantic-schemas.md                             |
+
 
 ### Faza 1.0 — parser
 
 - `parseSchemaArraySuffix()` acceptă `[min-max]`, `[min-]`, `[0-]`.
+- Sugar: `8+` → `8[1-]`, `8*` → `8[0-]`.
 - AST: `kind: 'var_array'` / `schema_var_array`.
 
 ### Faza 1.1 — resolve
 
 - `minWidth` / `maxWidth` pe schemă.
+- Validare wire: `declaredWidth >= minWidth` (eroare); `declaredWidth > maxWidth` permis; la `Nwire<schema>` runtime: `N >= minWidth`.
 - `varArrayCounts` pe wire după assign structurat.
-- Suffix anchor pentru flat determinist (package2) — pe **`declaredWidth`** (Convenția A, default).
+- Suffix anchor pentru flat determinist (package2) — pe `**declaredWidth**` (Convenția A, default).
 - `effectiveBitLen` setat la assign `=:` / `=` / proto invoke — **metadata informativă**; la resolve activ doar cu opt-in (W1).
 
 ### Faza 1.2 — interpreter
 
-- Assign per câmp → count din lățime literal.
+- Assign per câmp → count din lățime literal **sau** din numărul de grupuri grouped (`{…}{…}`).
 - Eroare `pkt = ^…` când split ambiguu (package3).
 - `show` / `peek` / `probe` cu `has length [N]` dinamic.
 - Reguli `:=` înainte de `=:` (doar cu N declarat); interzis `:=` fără țintă.
@@ -325,26 +354,35 @@ pkt:cells has length [2]
 3. `{ tokens=^… codeDatas=^… }<package3>`
 4. `slots: <opcode>[1-2]` — show flat+tree dinamic
 5. regresie `cells:8[3]` neschimbat
+6. `WWIDTH(pkt:tokens)` / `WWIDTH(pkt:tokens:0)` pe `var_array` → `elementWidth` (8) — **fără** count; aliniat la `WWIDTH(16wire[3,2])` → 16
+7. `BITSIZE(pkt:tokens)` → total runtime după assign (`count × W`)
 
 ---
 
 ## Decizii confirmate
 
-| Subiect | Decizie |
-|---------|---------|
-| Sintaxă | `[1-3]`, `[1-]` — ca protocol, nu `..` |
-| Două `8[1-]` în schemă | Permis (`package3`) |
-| Ambiguitate count | **Doar** package3 flat pe întreg record — **nu** Cazul B cu N fix |
-| Assign structurat | Count dedus per câmp; `varArrayCounts` |
-| Eroare flat package3 | `pkt = ^…` când split neunic între câmpuri variabile |
-| **N finit → count dedus** | `Nwire` cu N la runtime = la fel ca `24wire`; padding la N, nu la infinit |
-| **Flat `=`** | RHS trebuie să match-uiască **exact** lățimea wire-ului declarată; count unic din N |
-| **`:=` / `=:`** | Țintă = lățimea wire **declarată** (N); `=:` right-pad = umple cadrul declarat cu 0 — **parte din layout**, nu „date ignorate” |
-| **Resolve pe wire lat** | **Convenția A confirmată** — `declaredWidth`; proto scurt + pad = sloturi zero rezervate |
-| **Pipeline `LHS =: RHS`** | (1) exec RHS → valoare + parseView; (2) padding right la `declaredWidth` LHS; (3) assign flat pe schema LHS (dacă există) |
-| **parseView fără schema** | La `=:` → `paddingRight`; la `:=` → `paddingLeft` — **doar** când LHS **nu** are `<schema>` |
-| **Padding sintetic + schema** | Dacă LHS are schema → **fără** `paddingRight`/`paddingLeft`; resolve câmpuri de la **bit 0** pe `declaredWidth` |
-| **Lățime la compile** | `24wire` = N fix; `=: .proto` variabil = N efectiv **după** parse; nu „fără lățime”, ci **necunoscută static** |
+
+| Subiect                        | Decizie                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Sintaxă                        | `[1-3]`, `[1-]` — ca protocol, nu `..`                                                                                               |
+| Două `8[1-]` în schemă         | Permis (`package3`)                                                                                                                  |
+| Ambiguitate count              | **Doar** package3 flat pe întreg record — **nu** Cazul B cu N fix                                                                    |
+| Assign structurat              | Count dedus per câmp; `varArrayCounts`                                                                                               |
+| Eroare flat package3           | `pkt = ^…` când split neunic între câmpuri variabile                                                                                 |
+| **N finit → count dedus**      | `Nwire` cu N la runtime = la fel ca `24wire`; padding la N, nu la infinit                                                            |
+| **Flat `=`**                   | RHS trebuie să match-uiască **exact** lățimea wire-ului declarată; count unic din N                                                  |
+| `**:=` / `=:**`                | Țintă = lățimea wire **declarată** (N); `=:` right-pad = umple cadrul declarat cu 0 — **parte din layout**, nu „date ignorate”       |
+| **Resolve pe wire lat**        | **Convenția A confirmată** — `declaredWidth`; proto scurt + pad = sloturi zero rezervate                                             |
+| **Pipeline `LHS =: RHS`**      | (1) exec RHS → valoare + parseView; (2) padding right la `declaredWidth` LHS; (3) assign flat pe schema LHS (dacă există)            |
+| **parseView fără schema**      | La `=:` → `paddingRight`; la `:=` → `paddingLeft` — **doar** când LHS **nu** are `<schema>`                                          |
+| **Padding sintetic + schema**  | Dacă LHS are schema → **fără** `paddingRight`/`paddingLeft`; resolve câmpuri de la **bit 0** pe `declaredWidth`                      |
+| **Lățime la compile**          | `24wire` = N fix; `=: .proto` variabil = N efectiv **după** parse; nu „fără lățime”, ci **necunoscută static**                       |
+| `**:=` fără lățime declarată** | `pkt := 0` sau `:=` înainte de `=:` **fără** `Nwire`/`64wire` → **eroare** — nu există țintă de padding                              |
+| **Sugar `8+` / `8*`**          | Da — în **Faza 1.0** (`8+` → `8[1-]`, `8`* → `8[0-]`)                                                                                |
+| `**[0-]` pe câmp non-final**   | Declarație permisă; assign **structurat** da; flat pe întreg record → **eroare** (split ambiguu față de suffix)                      |
+| **Ordine assign per câmp**     | Secvențial în schemă — `pkt:codeDatas = …` înainte de `pkt:tokens = …` → **eroare** (câmp variabil anterior fără count)              |
+| `**WWIDTH` vs `BITSIZE**`      | Vector/matrix (wire sau schema array): **WWIDTH** = `elementWidth` (ex. `8` din `8[1-3]`); **BITSIZE** = total runtime (`count × W`) |
+
 
 ---
 
@@ -358,32 +396,40 @@ flowchart LR
   R2 --> R3["3. Assign pe LHS\nschema flat dacă există"]
 ```
 
-| Pas | Ce se întâmplă |
-|-----|----------------|
-| **1. RHS** | exec ca acum → `value`, `bitWidth` efectiv, opțional `parseView` (`blobWidth` = lățimea proto) |
-| **2. Padding** | dacă `assignPad = right` (`=:`) → `padWireBits(value, LHS.declaredWidth, 'right')` |
-| **3. Assign** | valoarea pad-uită intră în storage wire; dacă LHS are **schema** → resolve flat pe **întregul** `declaredWidth` (Convenția A) |
+
+
+
+| Pas            | Ce se întâmplă                                                                                                                |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **1. RHS**     | exec ca acum → `value`, `bitWidth` efectiv, opțional `parseView` (`blobWidth` = lățimea proto)                                |
+| **2. Padding** | dacă `assignPad = right` (`=:`) → `padWireBits(value, LHS.declaredWidth, 'right')`                                            |
+| **3. Assign**  | valoarea pad-uită intră în storage wire; dacă LHS are **schema** → resolve flat pe **întregul** `declaredWidth` (Convenția A) |
+
 
 **Fără schema pe LHS:** wire primește biții pad-uiți + `parseViewId` (dacă RHS era proto). Schema nu participă la pasul 3.
 
 ### Comportament existent (baseline)
 
-| Operator | Padding | Exemplu |
-|----------|---------|---------|
-| `=` | **strict** — exact N biți | `24wire pkt = ^AABBCC` |
-| `=:` | **right-pad** cu 0 până la N declarat | `8wire q =: 101` → `10100000` |
+
+| Operator     | Padding                                     | Exemplu                        |
+| ------------ | ------------------------------------------- | ------------------------------ |
+| `=`          | **strict** — exact N biți                   | `24wire pkt = ^AABBCC`         |
+| `=:`         | **right-pad** cu 0 până la N declarat       | `8wire q =: 101` → `10100000`  |
 | `:=` / `: 0` | umple wire-ul declarat (left-pad la assign) | `64wire pkt := 0` → 64 zerouri |
 
-Referință: [`protocol-parse.md`](../v0_3_2/doc/protocol-parse.md) — *„Use `=:` when the declared wire is wider than extracted fields”*; teste right-pad-assign 1000+.
+
+Referință: `[protocol-parse.md](../v0_3_2/doc/protocol-parse.md)` — *„Use `=:` when the declared wire is wider than extracted fields”*; teste right-pad-assign 1000+.
 
 ### `:=` înainte de `=: ?`
 
-| Pattern | Permis? | Notă |
-|---------|---------|------|
-| `64wire<frame> pkt := 0` apoi `pkt =: .proto {…}` | **Da** | N=64 la compile; `:=` opțional (zero init) |
-| `64wire pkt =: .proto {…}` fără `:=` | **Da** | proto + right-pad la 64 direct |
-| `pkt =: .proto` **fără** `64wire` | **Da** | N = lățimea declarată dacă există, altfel N din output parse (dinamic) |
-| `pkt := 0` **înainte** de `=:` **fără** lățime declarată | **Eroare** sau `minWidth` | nu există țintă de padding — de decis la 1.2 |
+
+| Pattern                                                  | Permis?    | Notă                                                                   |
+| -------------------------------------------------------- | ---------- | ---------------------------------------------------------------------- |
+| `64wire<frame> pkt := 0` apoi `pkt =: .proto {…}`        | **Da**     | N=64 la compile; `:=` opțional (zero init)                             |
+| `64wire pkt =: .proto {…}` fără `:=`                     | **Da**     | proto + right-pad la 64 direct                                         |
+| `pkt =: .proto` **fără** `64wire`                        | **Da**     | N = lățimea declarată dacă există, altfel N din output parse (dinamic) |
+| `pkt := 0` **înainte** de `=:` **fără** lățime declarată | **Eroare** | nu există țintă de padding                                             |
+
 
 **Concluzie provizorie:** `:=` înainte de `=:` are sens doar când wire-ul are **N declarat la compile** (`64wire`). Nu e obligatoriu — `=:` singur umple/pad-uiește la N.
 
@@ -411,11 +457,13 @@ Referință: [`protocol-parse.md`](../v0_3_2/doc/protocol-parse.md) — *„Use 
 
 Schema se aplică pe **întregul wire declarat** (64b). Zerourile din padding **fac parte din layout** — nu sunt „ignorate”.
 
-| Efect | Exemplu |
-|-------|---------|
-| `footer` la sfârșitul fizic al wire-ului (biți 56–63) | citește **0** din pad — poate fi **voit** (slot footer gol, rezervat) |
-| `cells` între prefix și suffix | count = `(64 − tag − footer) / W` — sloturi suplimentare umplute cu 0 din pad |
-| Proto 24b = tag + 2×cells | primele sloturi au date; restul cells = 0 (rezervat) |
+
+| Efect                                                 | Exemplu                                                                       |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `footer` la sfârșitul fizic al wire-ului (biți 56–63) | citește **0** din pad — poate fi **voit** (slot footer gol, rezervat)         |
+| `cells` între prefix și suffix                        | count = `(64 − tag − footer) / W` — sloturi suplimentare umplute cu 0 din pad |
+| Proto 24b = tag + 2×cells                             | primele sloturi au date; restul cells = 0 (rezervat)                          |
+
 
 ```text
 64wire, proto 24b (tag 8 + 2 cells 16), footer slot la 56–63:
@@ -434,22 +482,26 @@ Schema se aplică pe **întregul wire declarat** (64b). Zerourile din padding **
 
 Schema se aplică doar pe biții **semnificativi** (24b din proto, înainte de pad). Padding-ul e invizibil la resolve. **Nu e default** — opt-in viitor.
 
-| Efect | Exemplu |
-|-------|---------|
-| `footer` | în zona payload (ex. biți 16–23) — match cu layout-ul proto |
-| `cells` count | din `(24 − tag − footer) / W` = 2 |
-| biți 24–63 | ignorați la schema resolve |
+
+| Efect         | Exemplu                                                     |
+| ------------- | ----------------------------------------------------------- |
+| `footer`      | în zona payload (ex. biți 16–23) — match cu layout-ul proto |
+| `cells` count | din `(24 − tag − footer) / W` = 2                           |
+| biți 24–63    | ignorați la schema resolve                                  |
+
 
 **Când are sens:** proto + schema descriu **exact** payload-ul extras; `64wire` e doar container de transport, nu cadru semantic complet.
 
 #### Implicație pentru design
 
-| | Convenția A (frame) | Convenția B (payload) |
-|--|---------------------|------------------------|
-| `wireLen` la resolve | `declaredWidth` (64) | `effectiveBitLen` (24) |
-| Footer din padding | **feature**, nu bug | nedorit / ignorat |
-| `=:` right-pad | umple cadrul declarat | separă payload de rezervă |
-| Metadata opțională | `effectiveBitLen` informativ (proto a scris 24b) | `effectiveBitLen` **activ** la resolve |
+
+|                      | Convenția A (frame)                              | Convenția B (payload)                  |
+| -------------------- | ------------------------------------------------ | -------------------------------------- |
+| `wireLen` la resolve | `declaredWidth` (64)                             | `effectiveBitLen` (24)                 |
+| Footer din padding   | **feature**, nu bug                              | nedorit / ignorat                      |
+| `=:` right-pad       | umple cadrul declarat                            | separă payload de rezervă              |
+| Metadata opțională   | `effectiveBitLen` informativ (proto a scris 24b) | `effectiveBitLen` **activ** la resolve |
+
 
 **Decizie (2026-07-14):** **Convenția A** — `declaredWidth` la resolve; `effectiveBitLen` = metadata informativă (`blobWidth` proto), nu schimbă resolve.
 
@@ -471,10 +523,12 @@ Schema se aplică doar pe biții **semnificativi** (24b din proto, înainte de p
 
 **Decizie:** păstrăm parseView intact + expunem padding-ul ca nod sintetic din **layer assign** (nu protocol), simetric pe operator — **numai dacă LHS nu are schema** (`64wire parsed`, nu `64wire<frame> parsed`).
 
-| Operator | Padding | Nod show | Layout fizic (MSB-left) |
-|----------|---------|----------|-------------------------|
-| `=:` | right | **`paddingRight`** | `[ payload 24b ][ pad 40b ]` |
-| `:=` | left | **`paddingLeft`** | `[ pad 40b ][ payload 24b ]` |
+
+| Operator | Padding | Nod show           | Layout fizic (MSB-left)      |
+| -------- | ------- | ------------------ | ---------------------------- |
+| `=:`     | right   | `**paddingRight**` | `[ payload 24b ][ pad 40b ]` |
+| `:=`     | left    | `**paddingLeft**`  | `[ pad 40b ][ payload 24b ]` |
+
 
 #### `=:` → `paddingRight`
 
@@ -488,12 +542,14 @@ parsed (64wire<.repeatPv>)
   paddingRight = 000...0 (40bit)
 ```
 
-| Aspect | Regulă |
-|--------|--------|
-| **Condiție** | `assignPad = right` **și** `declaredWidth > blobWidth` |
-| **show** | parseView tree, apoi `paddingRight` la final |
-| **read** | `parsed:paddingRight` → `[blobWidth .. declaredWidth−1]` |
+
+| Aspect               | Regulă                                                           |
+| -------------------- | ---------------------------------------------------------------- |
+| **Condiție**         | `assignPad = right` **și** `declaredWidth > blobWidth`           |
+| **show**             | parseView tree, apoi `paddingRight` la final                     |
+| **read**             | `parsed:paddingRight` → `[blobWidth .. declaredWidth−1]`         |
 | **parseView offset** | neschimbat — payload la bit 0; `parsed:packet:0` → wire offset 0 |
+
 
 #### `:=` → `paddingLeft` (doar fără schema)
 
@@ -507,23 +563,27 @@ parsed (64wire)          # fără <schema>
       kind = 11110000 (8bit)
 ```
 
-| Aspect | Regulă |
-|--------|--------|
-| **Condiție** | LHS **fără** schema **și** `assignPad = left` **și** `declaredWidth > blobWidth` |
-| **show** | `paddingLeft` la început, apoi parseView tree |
-| **read** | `parsed:paddingLeft` → `[0 .. declaredWidth−blobWidth−1]` |
+
+| Aspect               | Regulă                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------ |
+| **Condiție**         | LHS **fără** schema **și** `assignPad = left` **și** `declaredWidth > blobWidth`                 |
+| **show**             | `paddingLeft` la început, apoi parseView tree                                                    |
+| **read**             | `parsed:paddingLeft` → `[0 .. declaredWidth−blobWidth−1]`                                        |
 | **parseView offset** | payload la `paddingLeftWidth` în wire; `parsed:packet:0` → `paddingLeftWidth + parseView.offset` |
+
 
 #### Cu schema pe LHS — offset de la 0, fără shift parseView
 
 Când LHS are `<schema>` (`64wire<frame> parsed := .proto` sau `=: .proto`):
 
-| Aspect | Regulă |
-|--------|--------|
-| **padding sintetic** | **nu** — nici `paddingLeft`, nici `paddingRight` |
-| **resolve câmpuri** | schema pe `declaredWidth`, de la **bit 0** (Convenția A) |
-| **parseView** | poate rămâne atașat (metadata), dar **nu** ajustează offset-uri pentru padding |
-| **read** | `parsed:cells:0`, `parsed:packet:0` etc. → offset **0** în wire conform **schema**, nu `paddingLeftWidth + …` |
+
+| Aspect               | Regulă                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **padding sintetic** | **nu** — nici `paddingLeft`, nici `paddingRight`                                                              |
+| **resolve câmpuri**  | schema pe `declaredWidth`, de la **bit 0** (Convenția A)                                                      |
+| **parseView**        | poate rămâne atașat (metadata), dar **nu** ajustează offset-uri pentru padding                                |
+| **read**             | `parsed:cells:0`, `parsed:packet:0` etc. → offset **0** în wire conform **schema**, nu `paddingLeftWidth + …` |
+
 
 La `=:` + schema: payload tot la bit 0 (right-pad după) — parseView și schema coincid natural la începutul wire-ului.
 
@@ -531,12 +591,14 @@ La `:=` + schema: left-pad în wire, dar **schema citește de la 0** — primii 
 
 #### Reguli comune
 
-| Aspect | Regulă |
-|--------|--------|
-| **Sursă** | sintetic — pasul 2 (padding), nu protocol-assembler |
-| **wave / trace** | aceleași noduri la expand (paritate show) |
+
+| Aspect               | Regulă                                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sursă**            | sintetic — pasul 2 (padding), nu protocol-assembler                                                                                    |
+| **wave / trace**     | aceleași noduri la expand (paritate show)                                                                                              |
 | **Cu schema pe LHS** | **Fără excepție:** nici `paddingRight`, nici `paddingLeft` — show/resolve pe schema; pad = câmpuri zero (footer, cells rezervate etc.) |
-| **`= ` strict** | `declaredWidth === blobWidth` → fără noduri padding |
+| `**=` strict**       | `declaredWidth === blobWidth` → fără noduri padding                                                                                    |
+
 
 **Metadata wire (1.2):**
 
@@ -552,13 +614,15 @@ Nodurile padding în show **nu înlocuiesc** parseView — îl **completează**,
 
 ### Opțiuni de design (revizuit)
 
-| ID | Opțiune | Descriere |
-|----|---------|-----------|
-| **W0** | **`declaredWidth`** (Convenția A) ✅ | Suffix anchor + count din N declarat; padding = parte din layout |
-| **W1** | `effectiveBitLen` la resolve (Convenția B) | Amânat 1+ — opt-in payload-only |
-| **W2** | Wire declarat = `maxWidth` schema | `32wire` nu `64wire` dacă max schema e 32 |
-| **W4** | Suffix anchor interzis când `rhsLen < declaredWidth` | Forțează assign structurat — prea restrictiv dacă A e default |
-| **W5** | `=:` interzis pe wire cu schemă variabilă | respins — contrazice cazul frame intenționat |
+
+| ID     | Opțiune                                              | Descriere                                                        |
+| ------ | ---------------------------------------------------- | ---------------------------------------------------------------- |
+| **W0** | `**declaredWidth`** (Convenția A) ✅                  | Suffix anchor + count din N declarat; padding = parte din layout |
+| **W1** | `effectiveBitLen` la resolve (Convenția B)           | Amânat 1+ — opt-in payload-only                                  |
+| **W2** | Wire declarat = `maxWidth` schema                    | `32wire` nu `64wire` dacă max schema e 32                        |
+| **W4** | Suffix anchor interzis când `rhsLen < declaredWidth` | Forțează assign structurat — prea restrictiv dacă A e default    |
+| **W5** | `=:` interzis pe wire cu schemă variabilă            | respins — contrazice cazul frame intenționat                     |
+
 
 ### `:=` pe sub-câmpuri după `=:`
 
@@ -572,14 +636,7 @@ Assign structurat pe câmpuri **nu** trece prin pad pe întreg record — deja s
 
 ## Decizii deschise (la implementare 1.x)
 
-| # | Subiect | Recomandare |
-|---|---------|-------------|
-| 1 | Convenția A + `paddingRight`/`paddingLeft` la parseView fără schema | **Confirmat** — implementare 1.2 |
-| 2 | `:=` fără `Nwire`/`64wire` înainte de `=:` | Eroare sau `schema.minWidth` |
-| 3 | Sugar `8+` / `8*` | Da — poate intra în 1.0 |
-| 4 | `[0-]` pe câmp non-final | Structurat da |
-| 5 | Assign `codeDatas` înainte de `tokens` | Eroare |
-| 6 | Validare `declaredWidth` vs `minWidth`/`maxWidth` | `64wire` + schema max 32 — warning sau eroare? |
+*Nimic deschis momentan — pe măsură ce apar întrebări noi, se adaugă aici câte un rând; la confirmare, mutăm în § Decizii confirmate.*
 
 ---
 
@@ -587,18 +644,40 @@ Assign structurat pe câmpuri **nu** trece prin pad pe întreg record — deja s
 
 > Nu sunt numerotate 1.5+ până la confirmare; folosim **1+** pentru primul val de amânat, **1++** pentru următorul, etc.
 
-| Fază | Subiect | Note |
-|------|---------|------|
-| **1+** | Count din câmp scalar: `nTokens:4` + `tokens:8[nTokens]` — flat determinist pentru package3 | elimină ambiguitatea flat fără assign manual |
-| **1++** | Range variabil pe matrice: `grid:8[1-3,2]` sau `[2,1-3]` | tensor 2D cu bound variabil |
-| **1+++** | Grouped literal pe slice variabil: `pkt:tokens = { … }{ … }` cu count dinamic | legătură cu grouped_schema_literals |
-| **1++++** | `WWIDTH(pkt:tokens)` + validare `minWidth`–`maxWidth` pe `Nwire<schema>` | extensie wwidth_builtin |
-| **1+++++** | Slice rând/coloană (paritate 7a) pe câmp `var_array` cu count runtime | `pkt:tokens:0`, `pkt:grid::1` variabil |
-| **1++++++** | Wave listen / show tags pe array variabil | wave_debug_tooling |
 
-| **1+++++++** | Convenția B — resolve pe `effectiveBitLen` (payload-only) | opt-in explicit |
+| Fază         | Subiect                                                                                     | Note                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **1+**       | Count din câmp scalar: `nTokens:4` + `tokens:8[nTokens]` — flat determinist pentru package3 | elimină ambiguitatea flat fără assign manual                                                |
+| **1++**      | Range variabil pe matrice 2D                                                                | vezi § 1++ mai jos — **nu** `[1-,1-]` flat; max o dimensiune variabilă fără scalari         |
+| **1+++**     | ~~Grouped literal pe slice variabil~~                                                       | **Absorbit în 1.2** — 7++ deja are `{…}{…}<schema>`; la `[1-]` count = nr. grupuri          |
+| **1++++**    | ~~WWIDTH + validare Nwire~~                                                                 | **Absorbit** — WWIDTH schema ✅; var_array în **1.4**; min/max pe `Nwire<schema>` în **1.1** |
+| **1+++**++   | Slice rând/coloană (paritate 7a) pe câmp `var_array` cu count runtime                       | `pkt:tokens:0`, `pkt:grid::1` variabil                                                      |
+| **1++++++**  | Wave listen / show tags pe array variabil                                                   | wave_debug_tooling                                                                          |
+| **1+++++++** | Convenția B — resolve pe `effectiveBitLen` (payload-only)                                   | opt-in explicit                                                                             |
+
 
 *Adaugă **1++++++++** etc. pe măsură ce apar idei noi.*
+
+### 1++ — matrice variabilă: ce merge și ce nu
+
+Analogie cu package3: ambiguitatea apare când **două dimensiuni** trebuie deduse dintr-un singur `wireLen`.
+
+
+| Sintaxă            | Flat `pkt = ^…` | Structurat                      | Notă                                 |
+| ------------------ | --------------- | ------------------------------- | ------------------------------------ |
+| `grid:8[2, 3]`     | ✅               | ✅                               | fix (Faza 6) — 48b                   |
+| `grid:8[1-3, 2]`   | ✅               | ✅                               | cols fixe — `rows = payload / (2×8)` |
+| `grid:8[2, 1-3]`   | ✅               | ✅                               | rows fixe — `cols = payload / (2×8)` |
+| `grid:8[1-3, 1-3]` | ❌ ambiguu       | ✅                               | `72b` → 3×3 sau 9×1 sau 1×9…         |
+| `grid:8[1-, 2]`    | ✅ (ultim câmp)  | ✅                               | rows din rest / 16 — ca `[1-]` 1D    |
+| `grid:8[1-, 1-]`   | ❌ imposibil     | ⚠️ doar cu `nRows`+`nCols` (1+) | factorizare nedeterministă           |
+
+
+`**grid:8[1-, 1-]**` — fără scalari `nRows`/`nCols` (Faza 1+): **respins** la compile sau doar cu ambele dimensiuni fixe la assign structurat; nu există split unic din biți.
+
+**Regulă propusă 1++ (minimal):** max **o dimensiune variabilă** per matrice; cealaltă fixă. Pentru ambele variabile → **1+** (`nRows:4`, `nCols:4`, `grid:8[nRows,nCols]`) — amânat.
+
+**Efort 1++** (doar o dim variabilă): ~**3–5 zile** peste MVP — extinde parser suffix `[,]`, `minWidth`/`maxWidth` 2D, resolve rows/cols, show `has shape [R,C]` dinamic.
 
 **Extern (nu 1.x):** bridge protocol `packet[1-3]` → schema variabilă automată — plan viitor **7b+**.
 
@@ -606,12 +685,14 @@ Assign structurat pe câmpuri **nu** trece prin pad pe întreg record — deja s
 
 ## Relația cu protocol
 
-| Flux | Strat |
-|------|-------|
-| `packet[1-3]` + parseView | Model C — rămâne |
-| `cells:8[3]` fix | Model B — schema_field_arrays |
-| `cells:8[1-3]` + `footer:8` | Model D — **acest plan (Faza 1)** |
-| Proto variabil → schema auto | 7b+ — extern |
+
+| Flux                         | Strat                             |
+| ---------------------------- | --------------------------------- |
+| `packet[1-3]` + parseView    | Model C — rămâne                  |
+| `cells:8[3]` fix             | Model B — schema_field_arrays     |
+| `cells:8[1-3]` + `footer:8`  | Model D — **acest plan (Faza 1)** |
+| Proto variabil → schema auto | 7b+ — extern                      |
+
 
 ```mermaid
 flowchart LR
@@ -623,6 +704,8 @@ flowchart LR
   schemaVar --> wireDyn
 ```
 
+
+
 ---
 
 ## Concluzie
@@ -631,3 +714,4 @@ flowchart LR
 - **Implementare:** 1.0 → 1.4 (MVP); spațiu până la **1.10** dacă e nevoie.
 - **Amânat:** **1+**, **1++**, … — nu se amestecă cu 1.5, 1.6 (acelea sunt pentru sub-faze confirmate în serie).
 - **Flat** doar când split-ul e unic; **structurat** mereu pentru `package3`.
+
