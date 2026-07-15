@@ -257,6 +257,28 @@
         }
         signed = true;
         numericMode = t.name;
+      } else if (/^u(\d+)$/.test(t.name)) {
+        if (!acceptsFormat) {
+          fail(`${fnName}: does not accept tag '${t.name}'`);
+        }
+        if (t.value !== 1) {
+          fail(`${fnName}: tag '${t.name}' must be enabled (use '; ${t.name}' or '; ${t.name}=1')`);
+        }
+        const w = parseInt(t.name.slice(1), 10);
+        if (w < 1 || w > 64) {
+          fail(`${fnName}: tag '${t.name}' requires unsigned width 1..64`);
+        }
+        if (NF) {
+          try {
+            NF.parseLiteralTag(t.name);
+          } catch (e) {
+            fail(e.message);
+          }
+        }
+        if (numericMode !== 'unsigned') {
+          fail(`${fnName}: '; ${t.name}' is mutually exclusive with '; ${numericMode === 'signed' ? 'signed' : numericMode}'`);
+        }
+        numericMode = t.name;
       } else if (/^q(\d+)p(\d+)$/.test(t.name)) {
         if (!acceptsFormat) {
           fail(`${fnName}: does not accept tag '${t.name}'`);

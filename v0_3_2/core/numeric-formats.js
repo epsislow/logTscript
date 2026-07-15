@@ -14,13 +14,20 @@
 
   const NFORMAT_DST_PREFIX = 'to_';
 
-  /** Recognize an NFORMAT format name: signed, sX, q4p4/q8p8/qXpY, fp16, bf16. Returns canonical mode or null. */
+  /** Recognize an NFORMAT format name: signed, sX, uX, q4p4/q8p8/qXpY, fp16, bf16. Returns canonical mode or null. */
   function parseNformatFormatName(name, fail, role) {
     if (name === 'signed' || name === 'fp16' || name === 'bf16') return name;
     if (/^s\d+$/.test(name)) {
       const w = parseInt(name.slice(1), 10);
       if (w < 1 || w > MAX_FORMAT_WIDTH) {
         fail(`NFORMAT: ${role} '${name}' requires signed width 1..${MAX_FORMAT_WIDTH}`);
+      }
+      return name;
+    }
+    if (/^u\d+$/.test(name)) {
+      const w = parseInt(name.slice(1), 10);
+      if (w < 1 || w > MAX_FORMAT_WIDTH) {
+        fail(`NFORMAT: ${role} '${name}' requires unsigned width 1..${MAX_FORMAT_WIDTH}`);
       }
       return name;
     }
@@ -69,10 +76,10 @@
       fail('NFORMAT: \'vector\' and \'matrix\' are mutually exclusive');
     }
     if (!src) {
-      fail('NFORMAT: requires source format tag (signed, sX, q4p4/qXpY, fp16, bf16)');
+      fail('NFORMAT: requires source format tag (signed, sX, uX, q4p4/qXpY, fp16, bf16)');
     }
     if (!dst) {
-      fail('NFORMAT: requires destination tag (to_signed, to_sX, to_qXpY, to_fp16, to_bf16)');
+      fail('NFORMAT: requires destination tag (to_signed, to_sX, to_uX, to_qXpY, to_fp16, to_bf16)');
     }
     if (src === dst) {
       fail(`NFORMAT: source and destination format '${src}' are the same`);
@@ -93,6 +100,9 @@
     if (srcMode === 'signed' || isSignedWidthMode(srcMode)) {
       return Number(signedBinToBigInt(padded));
     }
+    if (isUnsignedWidthMode(srcMode)) {
+      return Number(BigInt('0b' + padded));
+    }
     if (qModeSpec(srcMode)) {
       return fixedRawToNumber(padded, srcMode);
     }
@@ -109,6 +119,9 @@
     if (dstMode === 'signed' || isSignedWidthMode(dstMode)) {
       return signedBigIntToBin(BigInt(Math.round(value)), resultWidth);
     }
+    if (isUnsignedWidthMode(dstMode)) {
+      return unsignedBigIntToBin(BigInt(Math.round(value)), resultWidth);
+    }
     if (qModeSpec(dstMode)) {
       return fixedNumberToRaw(value, dstMode);
     }
@@ -121,6 +134,15 @@
     const max = Number((BigInt(1) << BigInt(width - 1)) - BigInt(1));
     const rounded = Math.round(realValue);
     const overflow = rounded < min || rounded > max;
+    const inexact = !overflow && realValue !== decoded;
+    return buildStatus({ overflow, inexact });
+  }
+
+  function unsignedConvertStatus(realValue, rawResult, width) {
+    const decoded = Number(BigInt('0b' + String(rawResult).padStart(width, '0')));
+    const max = Number((BigInt(1) << BigInt(width)) - BigInt(1));
+    const rounded = Math.round(realValue);
+    const overflow = rounded < 0 || rounded > max;
     const inexact = !overflow && realValue !== decoded;
     return buildStatus({ overflow, inexact });
   }
@@ -151,6 +173,9 @@
     }
     if (dstMode === 'signed' || isSignedWidthMode(dstMode)) {
       return signedConvertStatus(realValue, rawResult, resultWidth);
+    }
+    if (isUnsignedWidthMode(dstMode)) {
+      return unsignedConvertStatus(realValue, rawResult, resultWidth);
     }
     if (dstMode === 'fp16' || dstMode === 'bf16') {
       return floatConvertStatus(realValue, rawResult, dstMode);
@@ -250,6 +275,22 @@
     return m ? parseInt(m[1], 10) : null;
   }
 
+  function isUnsignedWidthMode(mode) {
+    return /^u\d+$/.test(String(mode));
+  }
+
+  function unsignedWidthFromMode(mode) {
+    const m = /^u(\d+)$/.exec(String(mode));
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  function unsignedBigIntToBin(n, width) {
+    const mod = BigInt(1) << BigInt(width);
+    let v = n % mod;
+    if (v < 0n) v += mod;
+    return v.toString(2).padStart(width, '0');
+  }
+
   function isBuiltinNumericFormatMode(mode) {
     if (isFormatMode(mode)) return true;
     if (/^q\d+p\d+$/.test(String(mode))) {
@@ -264,7 +305,7 @@
   }
 
   function isNumericFormatMode(mode) {
-    return isBuiltinNumericFormatMode(mode) || isSignedWidthMode(mode);
+    return isBuiltinNumericFormatMode(mode) || isSignedWidthMode(mode) || isUnsignedWidthMode(mode);
   }
 
   function resolveFormatSpec(mode) {
@@ -274,6 +315,10 @@
     if (isSignedWidthMode(mode)) {
       const w = signedWidthFromMode(mode);
       return { kind: 'signed', width: w, tagSuffix: mode };
+    }
+    if (isUnsignedWidthMode(mode)) {
+      const w = unsignedWidthFromMode(mode);
+      return { kind: 'unsigned', width: w, tagSuffix: mode };
     }
     const q = qModeSpec(mode);
     if (q) {
@@ -798,6 +843,13 @@
       return { kind: 'signed', elementW: w, tagSuffix: 's' + w, signed: true, formatMode: null };
     }
 
+    const umTag = /^u(\d+)$/.exec(tag);
+    if (umTag) {
+      const w = parseInt(umTag[1], 10);
+      if (w < 1 || w > 64) throw new Error(`Unsigned literal width must be 1..64, got ${w}`);
+      return { kind: 'unsigned', elementW: w, tagSuffix: 'u' + w, signed: false, formatMode: null };
+    }
+
     const qm = /^q(\d+)p(\d+)$/.exec(tag);
     if (qm) {
       const X = parseInt(qm[1], 10);
@@ -847,6 +899,7 @@
     if (q) return q.width;
     if (mode === 'fp16' || mode === 'bf16') return 16;
     if (isSignedWidthMode(mode)) return signedWidthFromMode(mode);
+    if (isUnsignedWidthMode(mode)) return unsignedWidthFromMode(mode);
     return null;
   }
 
@@ -959,6 +1012,9 @@
     isNumericFormatMode,
     isSignedWidthMode,
     signedWidthFromMode,
+    isUnsignedWidthMode,
+    unsignedWidthFromMode,
+    unsignedBigIntToBin,
     qModeSpec,
     resolveFormatSpec,
     parseBuiltinFormatTag,

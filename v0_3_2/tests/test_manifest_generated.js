@@ -1882,7 +1882,17 @@
       {"id":2406,"group":"semantic-schemas","title":"matrix countRef rows fixed cols","detail":{"scripts":["<frameGridRows>:\n    nRows: 4\n    grid: 8[nRows, 2]\n:"],"steps":[],"assertions":["grid count 4","cell r0c1"]}},
       {"id":2407,"group":"semantic-schemas","title":"matrix dual countRef parse duplicate field","detail":{"scripts":["<bad>:\n    nRows: 4\n    grid: 8[nRows, nRows]\n:"],"steps":[],"assertions":["dup ref"]}},
       {"id":2408,"group":"semantic-schemas","title":"var matrix row slice assign (wave)","detail":{"scripts":["<cell8>:\n    v: 8\n:"],"steps":["run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [ '32wire<frameVarGrid> pkt := 0', 'pkt:grid = [2,2]{ v=\\\\1 …) [nerezolvat]"],"assertions":["row0","cell00"]}},
-      {"id":2409,"group":"semantic-schemas","title":"var matrix column slice assign (wave)","detail":{"scripts":["<cell8>:\n    v: 8\n:"],"steps":["run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [ '32wire<frameVarGrid> pkt := 0', 'pkt:grid = [2,2]{ v=\\\\1 …) [nerezolvat]"],"assertions":["col1"]}}
+      {"id":2409,"group":"semantic-schemas","title":"var matrix column slice assign (wave)","detail":{"scripts":["<cell8>:\n    v: 8\n:"],"steps":["run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [ '32wire<frameVarGrid> pkt := 0', 'pkt:grid = [2,2]{ v=\\\\1 …) [nerezolvat]"],"assertions":["col1"]}},
+      {"id":2410,"group":"unsigned-width-tags","title":"show(24wire; u8) — grupuri unsigned 8bit","detail":{"scripts":["24wire w := ^AABBCC\nshow(w; u8)"],"steps":[],"assertions":["grouped u8"]}},
+      {"id":2411,"group":"unsigned-width-tags","title":"literal grup \\170 \\187 \\204;u8","detail":{"scripts":["8wire[3] v = \\170 \\187 \\204;u8\nshow(v; u8)"],"steps":[],"assertions":["bits","vector show"]}},
+      {"id":2412,"group":"unsigned-width-tags","title":"Eroare \\-3;u8","detail":{"scripts":["8wire a = \\-3;u8"],"steps":[],"assertions":["negative u8"]}},
+      {"id":2413,"group":"unsigned-width-tags","title":";8 rămâne alias (suffix 8)","detail":{"scripts":["8wire[2] v = \\2 \\3;8\nshow(v; u8)"],"steps":[],"assertions":["bits","u8 display"]}},
+      {"id":2414,"group":"unsigned-width-tags","title":"show — dec și u8 mutual exclusion","detail":{"scripts":["8wire w = 0\nshow(w; dec u8)"],"steps":[],"assertions":["dec+u8"]}},
+      {"id":2415,"group":"unsigned-width-tags","title":"ADD — u8 pe 8wire","detail":{"scripts":["8wire a = 11111111"],"steps":[],"assertions":["wrap","carry"]}},
+      {"id":2416,"group":"unsigned-width-tags","title":"ADD — u8 width mismatch","detail":{"scripts":["16wire a = 1111111111111111"],"steps":[],"assertions":["8-bit required"]}},
+      {"id":2417,"group":"unsigned-width-tags","title":"NFORMAT u8 to_s8 scalar","detail":{"scripts":["8wire a = \\127;u8"],"steps":[],"assertions":["same bits","no overflow"]}},
+      {"id":2418,"group":"unsigned-width-tags","title":"NFORMAT s8 to_u8 scalar","detail":{"scripts":["8wire a = \\127;s8"],"steps":[],"assertions":["127 unsigned"]}},
+      {"id":2419,"group":"unsigned-width-tags","title":"RSHIFT — u8 logic (nu ASHR)","detail":{"scripts":["8wire a = 10000000"],"steps":[],"assertions":["logical shift"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -1971,6 +1981,7 @@
       { id: 'show-tags', label: 'show-tags', rangeLabel: '1905–1936, 1946, 1968', testIds: [1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, 1946, 1968] },
       { id: 'slider', label: 'Slider component', rangeLabel: '1206–1220', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983, 1571–1574, 1643–1653, 1661, 1663', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 1571, 1572, 1573, 1574, 1643, 1644, 1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1661, 1663] },
+      { id: 'unsigned-width-tags', label: 'unsigned-width-tags', rangeLabel: '2410–2419', testIds: [2410, 2411, 2412, 2413, 2414, 2415, 2416, 2417, 2418, 2419] },
       { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775] },
       { id: 'user-def-tags', label: 'user-def-tags', rangeLabel: '1776–1781', testIds: [1776, 1777, 1778, 1779, 1780, 1781] },
       { id: 'vector-reduction', label: 'vector-reduction', rangeLabel: '1715–1734, 1797', testIds: [1715, 1716, 1717, 1718, 1719, 1720, 1721, 1722, 1723, 1724, 1725, 1726, 1727, 1728, 1729, 1730, 1731, 1732, 1733, 1734, 1797] },

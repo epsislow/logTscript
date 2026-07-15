@@ -22497,6 +22497,78 @@ reg(2409, 'semantic-schemas', 'var matrix column slice assign (wave)', function(
   h.assert('col1', session.getWire(session.interp, 'col1'), '0000011000001111');
 }, { propagation: 'wave' });
 
+reg(2410, 'unsigned-width-tags', 'show(24wire; u8) — grupuri unsigned 8bit', function(h, session) {
+  const { out } = session.run('24wire w := ^AABBCC\nshow(w; u8)');
+  h.assert('grouped u8', String(out.some(l => /w \(24wire\) = \\170 \\187 \\204;u8/.test(l))), 'true');
+});
+
+reg(2411, 'unsigned-width-tags', 'literal grup \\170 \\187 \\204;u8', function(h, session) {
+  const { interp } = session.run('24wire w = \\170 \\187 \\204;u8');
+  h.assert('bits', session.getWire(interp, 'w'), '101010101011101111001100');
+  const { out } = session.run('8wire[3] v = \\170 \\187 \\204;u8\nshow(v; u8)');
+  h.assert('vector show', String(out.some(l => /v = \\170 \\187 \\204;u8/.test(l))), 'true');
+});
+
+reg(2412, 'unsigned-width-tags', 'Eroare \\-3;u8', function(h, session) {
+  h.assertThrows('negative u8', () => session.run('8wire a = \\-3;u8'));
+});
+
+reg(2413, 'unsigned-width-tags', ';8 rămâne alias (suffix 8)', function(h, session) {
+  const { interp } = session.run('8wire a = \\12;8');
+  h.assert('bits', session.getWire(interp, 'a'), '00001100');
+  const { out } = session.run('8wire[2] v = \\2 \\3;8\nshow(v; u8)');
+  h.assert('u8 display', String(out.some(l => /v = \\2 \\3;u8/.test(l))), 'true');
+});
+
+reg(2414, 'unsigned-width-tags', 'show — dec și u8 mutual exclusion', function(h, session) {
+  h.assertThrows('dec+u8', () => session.parse('8wire w = 0\nshow(w; dec u8)'));
+});
+
+reg(2415, 'unsigned-width-tags', 'ADD — u8 pe 8wire', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 11111111\n' +
+    '8wire b = 00000001\n' +
+    '8wire s, 1wire c = ADD(a, b; u8)'
+  );
+  h.assert('wrap', session.getWire(interp, 's'), '00000000');
+  h.assert('carry', session.getWire(interp, 'c'), '1');
+});
+
+reg(2416, 'unsigned-width-tags', 'ADD — u8 width mismatch', function(h, session) {
+  const r = session.run(
+    '16wire a = 1111111111111111\n' +
+    '16wire b = 0000000000000001\n' +
+    '16wire s, 1wire c = ADD(a, b; u8)'
+  );
+  const err = r.out.find(l => l.startsWith('Error:')) || '';
+  h.assert('8-bit required', String(err.includes('8-bit')), 'true');
+});
+
+reg(2417, 'unsigned-width-tags', 'NFORMAT u8 to_s8 scalar', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = \\127;u8\n' +
+    '8wire r, 4wire st = NFORMAT(a; u8 to_s8)'
+  );
+  h.assert('same bits', session.getWire(interp, 'r'), '01111111');
+  h.assert('no overflow', session.getWire(interp, 'st'), '0000');
+});
+
+reg(2418, 'unsigned-width-tags', 'NFORMAT s8 to_u8 scalar', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = \\127;s8\n' +
+    '8wire r, 4wire st = NFORMAT(a; s8 to_u8)'
+  );
+  h.assert('127 unsigned', session.getWire(interp, 'r'), '01111111');
+});
+
+reg(2419, 'unsigned-width-tags', 'RSHIFT — u8 logic (nu ASHR)', function(h, session) {
+  const { interp } = session.run(
+    '8wire a = 10000000\n' +
+    '8wire r = RSHIFT(a, 1; u8)'
+  );
+  h.assert('logical shift', session.getWire(interp, 'r'), '01000000');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

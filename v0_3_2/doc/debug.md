@@ -130,7 +130,7 @@ Signal propagation trace — **separate panel**, not Output. Open from **Win ▾
 |---------|------|
 | **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
 | **L1 / L2 / L3** | Trace verbosity (`debugLevel` on propagation engine) |
-| **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii / auto (dropdown, persisted) |
+| **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / u8 / q4p4 / fp16 / bf16 / ascii / auto (dropdown, persisted) |
 | **Filter ▾** | All / Wires / Components / Internals (persisted as `prog/signalTraceFilter`) |
 | **Clear** | Clears panel history (no auto-clear on Run) |
 | **Tracing…** badge | Internal trace active while script runs (distinct from ON/OFF) |
@@ -171,7 +171,7 @@ Legacy uses **`[step N]`** prefix (immediate cascade) instead of **`[wave N]`**.
 
 **Filter** (toolbar): **All** shows everything; **Wires** — wire commit/exec/eval, init, flush, schedule, lut-mut; **Components** — commit component, prop, connect, lut-mut; **Internals** — eval L3, block exec, state/mem, schedule (wave L3).
 
-**Value formatting:** dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii / auto**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **oct**, **b32hex**, **b32c** produc literali `o^…`, `x^…`, `xc^…` (roundtrip ca la hex). **ascii** afișează ca `show(…; ascii)` — `"Hello"` sau `\72 \101 …;ascii`. Suffix **`(Nbits)`** la afișare. **`[cpy]`** — literal script: **bin** = biți continui; **hex** = `^…` fără spații; **oct/b32hex/b32c** = `o^…` / `x^…` / `xc^…` fără spații; **dec/s8/…** = cu `;format`; **ascii** = `"abc"` pentru text printabil, `"abc" + \2 + "zz"` dacă mix, `\65 \66;ascii` dacă doar `\N` (2+ cu `;ascii`). X/Z → fallback hex la copy.
+**Value formatting:** dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / u8 / q4p4 / fp16 / bf16 / ascii / auto**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **oct**, **b32hex**, **b32c** produc literali `o^…`, `x^…`, `xc^…` (roundtrip ca la hex). **ascii** afișează ca `show(…; ascii)` — `"Hello"` sau `\72 \101 …;ascii`. Suffix **`(Nbits)`** la afișare. **`[cpy]`** — literal script: **bin** = biți continui; **hex** = `^…` fără spații; **oct/b32hex/b32c** = `o^…` / `x^…` / `xc^…` fără spații; **dec/s8/…** = cu `;format`; **ascii** = `"abc"` pentru text printabil, `"abc" + \2 + "zz"` dacă mix, `\65 \66;ascii` dacă doar `\N` (2+ cu `;ascii`). X/Z → fallback hex la copy.
 
 See [Wave debug patterns](#wave-debug-patterns) and [huffman-v2.md](huffman-v2.md) (SC round-trip).
 
@@ -248,9 +248,10 @@ Display tags are **optional**, appear **once after all arguments** (after `;`), 
 | `fp16` | IEEE 754 half as decimal (`3`, `nan`, `inf`) on **16-bit** wires |
 | `bf16` | Brain float 16 as decimal on **16-bit** wires |
 | `sX` | Fixed signed width per element — e.g. `show(v; s8)` → `\2 \-1 \5 \0;s8` (distinct from adaptive `signed`) |
+| `uX` | Fixed unsigned width per element — e.g. `show(w; u8)` on 24wire → `\170 \187 \204;u8` (distinct from scalar `dec`) |
 | `qXpY` | Parametric Q format — e.g. `show(w; q6p2)` → `\1.5;q6p2`, `show(w; q8p0)` → `\5;q8p0` (not `;s8`) |
 
-Exactly **one** format tag per statement: `dec`, `hex`, `bin`, `ascii`, fixed (`q4p4`, `q8p8`, `fp16`, `bf16`), or parametric (`sX`, `qXpY` with X+Y≤64). `signed` (adaptive) is mutually exclusive with `sX` and with numeric-format tags; `dec` + `sX` is rejected.
+Exactly **one** format tag per statement: `dec`, `hex`, `bin`, `ascii`, fixed (`q4p4`, `q8p8`, `fp16`, `bf16`), or parametric (`sX`, `uX`, `qXpY` with X+Y≤64). `signed` (adaptive) is mutually exclusive with `sX` and with numeric-format tags; `dec` + `sX` / `dec` + `uX` is rejected. Literal `;8` remains valid (suffix `8`); `;u8` uses suffix `u8`.
 
 #### Layout / element tags (`show` and `peek` only)
 

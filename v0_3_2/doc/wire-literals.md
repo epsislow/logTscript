@@ -14,8 +14,9 @@ Related: [assignment operators](assignment-operators.md) (`=`, `:=`, `=:`), [sho
 |------|---------|---------|
 | **Binary** | `1010` | Bits as written (only `0` and `1`) |
 | **Decimal unsigned** | `\255` | Unsigned integer → minimal binary |
-| **Grouped literal** | `\2 \23 \242;8` | Multiple `\N` values + one `;tag` on the last atom |
+| **Grouped literal** | `\2 \23 \242;8` or `\170 \187 \204;u8` | Multiple `\N` values + one `;tag` on the last atom |
 | **Decimal signed** | `\-3;s8` | Two's complement on **exactly** `W` bits (`;sW`) |
+| **Decimal unsigned width** | `\170;u8` | Unsigned integer on **exactly** `W` bits (`;uW`, 1..64) |
 | **Hex pattern** | `^FF` | Each hex digit → 4 bits (unsigned pattern) |
 | **Hex value signed** | `^-A;8` | Signed numeric value in hex + **explicit** width |
 | **Oct pattern** | `o^12` | Each oct digit → 3 bits (`0`–`7`) |
@@ -31,7 +32,7 @@ Postfixes shared by several forms:
 |---------|---------|--------|
 | **Bit range** | `\255.0-7`, `^FF.4/8` | Slice after conversion to bits |
 | **Padding** `;p` | `\12;8`, `^f;8` | Pad unsigned **scalar** literal to `p` bits (left zeroes) |
-| **Grouped tag** | `\2 \-1;s8`, `\1.5;q4p4` | Suffix on last atom applies to **all** elements in the group |
+| **Grouped tag** | `\2 \-1;s8`, `\170 \187 \204;u8`, `\1.5;q4p4` | Suffix on last atom applies to **all** elements in the group |
 
 ---
 

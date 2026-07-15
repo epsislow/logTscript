@@ -43,6 +43,7 @@ Exactly **one source** tag and **one destination** tag (`to_*`). Source and dest
 |------------|---------------|---------|
 | `signed` | any *W* (adaptive) | Two's complement integer on *W* bits |
 | `sX` | exactly **X** (1≤X≤64) | Two's complement integer, fixed width |
+| `uX` | exactly **X** (1≤X≤64) | Unsigned integer, fixed width |
 | `q4p4` | **8** | Q4.4 fixed-point |
 | `q8p8` | **16** | Q8.8 fixed-point |
 | `qXpY` | exactly **X+Y** (≤64) | Signed fixed-point Q{X}.{Y} |
@@ -53,13 +54,14 @@ Exactly **one source** tag and **one destination** tag (`to_*`). Source and dest
 |-----------------|--------------|
 | `to_signed` | same as operand |
 | `to_sX` | **X** |
+| `to_uX` | **X** |
 | `to_q4p4` | **8** |
 | `to_q8p8` | **16** |
 | `to_qXpY` | **X+Y** |
 | `to_fp16` | **16** |
 | `to_bf16` | **16** |
 
-**`signed`** uses the operand width adaptively; **`sX`** fixes the width (`; sX` validates the operand is exactly X bits). The same applies to `to_signed` vs `to_sX` for the result.
+**`signed`** uses the operand width adaptively; **`sX`** / **`uX`** fix the width (`; sX` / `; uX` validates the operand is exactly X bits). The same applies to `to_signed` / `to_sX` / `to_uX` for the result.
 
 | Shape tag | Behaviour |
 |-----------|-----------|

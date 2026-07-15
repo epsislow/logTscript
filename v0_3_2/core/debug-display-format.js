@@ -451,6 +451,7 @@
       if (['q4p4', 'q8p8', 'bf16', 'fp16'].includes(t)) numericFormat = t;
       else if (/^q\d+p\d+$/.test(t)) numericFormat = t;
       else if (/^s\d+$/.test(t)) numericFormat = t;
+      else if (/^u\d+$/.test(t)) numericFormat = t;
     }
 
     if (hasSigned && !hasDec && !hasHex && !hasAscii && !numericFormat) {

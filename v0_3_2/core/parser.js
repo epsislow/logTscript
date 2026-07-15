@@ -76,6 +76,14 @@ function isParametricFormatDisplayTag(tagName) {
       return false;
     }
   }
+  if (/^u\d+$/.test(tagName)) {
+    try {
+      NF.parseLiteralTag(tagName);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
   if (/^q\d+p\d+$/.test(tagName)) {
     try {
       NF.parseBuiltinFormatTag(tagName);
@@ -1259,16 +1267,19 @@ parseDebugDisplayTags(allowedTags) {
   if (hasFormatB32c) formatCount++;
   if (numericFormatTags.length) formatCount += numericFormatTags.length;
   if (formatCount > 1) {
-    throw Error(`Display format tags (dec, hex, bin, ascii, oct, b32hex, b32c, q4p4, q8p8, bf16, fp16, sX, qXpY) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    throw Error(`Display format tags (dec, hex, bin, ascii, oct, b32hex, b32c, q4p4, q8p8, bf16, fp16, sX, uX, qXpY) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   if (tags.includes('signed') && tags.some((t) => /^s\d+$/.test(t))) {
     throw Error(`Display tags signed and fixed signed width (sX) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
-  if (tags.includes('signed') && numericFormatTags.length) {
-    throw Error(`Display tags signed and numeric format tags are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  if (tags.includes('dec') && tags.some((t) => /^u\d+$/.test(t))) {
+    throw Error(`Display tags dec and fixed unsigned width (uX) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   if (tags.includes('dec') && tags.some((t) => /^s\d+$/.test(t))) {
     throw Error(`Display tags dec and fixed signed width (sX) are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  if (tags.includes('signed') && numericFormatTags.length) {
+    throw Error(`Display tags signed and numeric format tags are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);
   }
   if (tags.includes('signed') && tags.includes('bin')) {
     throw Error(`Display tags signed and bin are mutually exclusive at ${this.c.file}: ${this.c.line}:${this.c.col}`);

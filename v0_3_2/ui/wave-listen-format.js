@@ -2,7 +2,7 @@
 
 const WAVE_LISTEN_EXPAND_THRESHOLD = 256;
 const WAVE_LISTEN_INLINE_PREVIEW_MAX = 48;
-const WAVE_LISTEN_FMT_OPTIONS = ['auto', 'hex', 'oct', 'b32hex', 'b32c', 'bin', 'dec', 'ascii', 's8', 'q4p4', 'fp16', 'bf16'];
+const WAVE_LISTEN_FMT_OPTIONS = ['auto', 'hex', 'oct', 'b32hex', 'b32c', 'bin', 'dec', 'ascii', 's8', 'u8', 'q4p4', 'fp16', 'bf16'];
 const WAVE_LISTEN_BIN_GROUP_BITS = 8;
 
 function normalizeWaveListenFmt(fmt) {
@@ -20,6 +20,7 @@ function waveListenFormatWidth(fmt) {
       return 5;
     case 'dec':
     case 's8':
+    case 'u8':
     case 'q4p4':
     case 'ascii':
       return 8;
@@ -40,6 +41,7 @@ function waveListenFmtToShowOpts(fmt) {
     case 'b32c': return { b32c: true };
     case 'dec': return { dec: true };
     case 's8': return { numericFormat: 's8' };
+    case 'u8': return { numericFormat: 'u8' };
     case 'q4p4': return { numericFormat: 'q4p4' };
     case 'fp16': return { numericFormat: 'fp16' };
     case 'bf16': return { numericFormat: 'bf16' };
@@ -392,7 +394,7 @@ function _formatWaveListenScalarFormatted(rawValue, bitWidth, fmt, formatValueFn
     }
     return _waveListenAsciiDisplay(rawValue, bitWidth);
   }
-  if (['dec', 's8', 'q4p4', 'fp16', 'bf16'].includes(fmt)) {
+  if (['dec', 's8', 'u8', 'q4p4', 'fp16', 'bf16'].includes(fmt)) {
     if (_tensorUsesShowLines(entry, fmt) && interp
       && typeof interp._formatVectorShowLines === 'function') {
       const lines = interp._formatVectorShowLines(entry.name, rawValue, waveListenFmtToShowOpts(fmt));
@@ -525,7 +527,7 @@ function formatWaveListenExpandLines(entry, fmt, interp) {
     return wrapLiteralTokenLines(formatted);
   }
 
-  if (['dec', 's8', 'q4p4', 'fp16', 'bf16'].includes(mode)) {
+  if (['dec', 's8', 'u8', 'q4p4', 'fp16', 'bf16'].includes(mode)) {
     return wrapLiteralTokenLines(_formatFlatGrouped(rawValue, mode));
   }
 
@@ -580,7 +582,7 @@ function formatWaveListenCopyText(entry, fmt, interp) {
     return formatWaveListenAsciiCopy(rawValue, bitWidth, formatValueFn);
   }
 
-  if (['dec', 's8', 'q4p4', 'fp16', 'bf16'].includes(mode)) {
+  if (['dec', 's8', 'u8', 'q4p4', 'fp16', 'bf16'].includes(mode)) {
     return _formatFlatGrouped(rawValue, mode);
   }
 
