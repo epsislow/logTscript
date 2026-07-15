@@ -22720,6 +22720,181 @@ reg(2442, 'semantic-schemas', 'frame wide flat first assign sets count and paddi
   h.assert('padding 164', String(session.interp.wires.get('pkt').paddingRightWidth), '164');
 });
 
+// --- sock (Faza 1) ---
+
+function regSockWave(id, legacyId, title, run) {
+  reg(id, 'sock', title + ' (wave)', run, { propagation: 'wave' });
+}
+
+reg(2450, 'sock', 'sock rx sugar cap 65536', function(h, session) {
+  session.run('sock rx');
+  const entry = session.interp.socks.get('rx');
+  h.assert('declared', !!entry, true);
+  h.assert('cap', String(entry.cap), '65536');
+  h.assert('empty', session.getSockBits(session.interp, 'rx'), '');
+});
+
+reg(2451, 'sock', '1000sock tx explicit cap', function(h, session) {
+  session.run('1000sock tx');
+  h.assert('cap', String(session.interp.socks.get('tx').cap), '1000');
+});
+
+reg(2452, 'sock', 'rx << ^FF append 8 bits', function(h, session) {
+  session.run('sock rx\nrx << ^FF');
+  h.assert('bits', session.getSockBits(session.interp, 'rx'), '11111111');
+});
+
+reg(2453, 'sock', 'peek rx./4 leaves sock intact', function(h, session) {
+  const { interp } = session.run('sock rx\nrx << ^FF\n4wire a = rx./4');
+  h.assert('peek', session.getWire(interp, 'a'), '1111');
+  h.assert('sock len', session.getSockLen(interp, 'rx'), 8);
+});
+
+reg(2454, 'sock', 'consume 4wire b << rx./4', function(h, session) {
+  const { interp } = session.run('sock rx\nrx << ^FF\n4wire b << rx./4');
+  h.assert('wire', session.getWire(interp, 'b'), '1111');
+  h.assert('sock rest', session.getSockBits(interp, 'rx'), '1111');
+});
+
+reg(2455, 'sock', 'rx << clear empties buffer', function(h, session) {
+  const { interp } = session.run('sock rx\nrx << ^FF\nrx << clear');
+  h.assert('cleared', session.getSockLen(interp, 'rx'), 0);
+});
+
+reg(2456, 'sock', 'rx:clear fallback', function(h, session) {
+  const { interp } = session.run('sock rx\nrx << ^0F\nrx:clear');
+  h.assert('cleared', session.getSockLen(interp, 'rx'), 0);
+});
+
+reg(2457, 'sock', 'overflow throws', function(h, session) {
+  h.assertThrows('overflow', () => {
+    session.run('8sock rx\nrx << ^FFFF');
+  }, 'overflow');
+});
+
+reg(2458, 'sock', 'underflow consume throws', function(h, session) {
+  h.assertThrows('underflow', () => {
+    session.run('sock rx\n4wire x << rx./4');
+  }, 'underflow');
+});
+
+reg(2459, 'sock', 'BITSIZE and WWIDTH on empty sock', function(h, session) {
+  const { interp } = session.run('sock rx\n1wire bs = BITSIZE(rx)\n1wire ww = WWIDTH(rx)');
+  h.assert('BITSIZE 0', session.getWire(interp, 'bs'), '0');
+  h.assert('WWIDTH 0', session.getWire(interp, 'ww'), '0');
+});
+
+reg(2460, 'sock', 'BITSIZE/WWIDTH after append', function(h, session) {
+  const { interp } = session.run('sock rx\nrx << ^FF\n4wire bs = BITSIZE(rx)\n4wire ww = WWIDTH(rx)');
+  h.assert('BITSIZE 8', session.getWire(interp, 'bs'), '1000');
+  h.assert('WWIDTH 8', session.getWire(interp, 'ww'), '1000');
+});
+
+reg(2461, 'sock', 'show rx with u8 tag', function(h, session) {
+  session.run('sock rx\nrx << ^FF\nshow(rx; u8)');
+  h.assert('show line', session.outIncludes(session.interp, '255'), true);
+});
+
+reg(2462, 'sock', 'show rx dec tag', function(h, session) {
+  session.run('sock rx\nrx << ^FF\nshow(rx; dec)');
+  h.assert('dec 255', session.outIncludes(session.interp, '255'), true);
+});
+
+reg(2463, 'sock', 'TEST peek slice', function(h, session) {
+  session.run('sock rx\nrx << ^FF\nTEST(rx./4, 1111)');
+});
+
+reg(2464, 'sock', 'on:1 consume from sock', function(h, session) {
+  const { interp } = session.run([
+    'sock rx',
+    '1wire ready : 0',
+    '4wire op : 0',
+    'on:1 { ready, op << rx./4 }',
+    'rx << ^F',
+    'ready = 1',
+  ].join('\n'));
+  h.assert('consumed', session.getWire(interp, 'op'), '1111');
+  h.assert('rest empty', session.getSockLen(interp, 'rx'), 0);
+});
+
+reg(2465, 'sock', 'append rejects Z in ZSTATE', function(h, session) {
+  h.assertThrows('Z append', () => {
+    session.run('MODE ZSTATE\nsock rx\n1wire z = ?Z\nrx << z');
+  }, 'rejects Z');
+}, { propagation: 'wave' });
+
+const _sockWavePairs = [
+  [2453, 2466], [2454, 2467], [2458, 2468],
+];
+for (const [legacyId, waveId] of _sockWavePairs) {
+  const t = tests.find(x => x.id === legacyId);
+  if (t) regSockWave(waveId, legacyId, t.title, t.run);
+}
+
+reg(2469, 'sock', 'peek rx/(len) dynamic slice', function(h, session) {
+  const { interp } = session.run([
+    'sock rx',
+    'rx << ^FF',
+    '4wire len : 0100',
+    '4wire a = rx/(len)',
+  ].join('\n'));
+  h.assert('peek', session.getWire(interp, 'a'), '1111');
+  h.assert('sock len', session.getSockLen(interp, 'rx'), 8);
+});
+
+reg(2470, 'sock', 'consume op << rx/(lenField)', function(h, session) {
+  const { interp } = session.run([
+    'sock rx',
+    'rx << ^FF',
+    '4wire lenField : 0100',
+    '4wire op << rx/(lenField)',
+  ].join('\n'));
+  h.assert('wire', session.getWire(interp, 'op'), '1111');
+  h.assert('sock rest', session.getSockBits(interp, 'rx'), '1111');
+});
+
+reg(2471, 'sock', 'show rx/(8) dynamic peek', function(h, session) {
+  session.run('sock rx\nrx << ^FF\nshow(rx/(8); u8)');
+  h.assert('show u8', session.outIncludes(session.interp, '255'), true);
+});
+
+reg(2472, 'sock', 'TEST rx/(len) dynamic peek', function(h, session) {
+  session.run([
+    'sock rx',
+    'rx << ^FF',
+    '4wire len : 0100',
+    'TEST(rx/(len), 1111)',
+  ].join('\n'));
+});
+
+reg(2473, 'sock', 'WWIDTH(rx/(8)) after append', function(h, session) {
+  const { interp } = session.run([
+    'sock rx',
+    'rx << ^FF',
+    '4wire w = WWIDTH(rx/(8))',
+  ].join('\n'));
+  h.assert('WWIDTH 8', session.getWire(interp, 'w'), '1000');
+});
+
+reg(2474, 'sock', 'underflow rx/(8) consume throws', function(h, session) {
+  h.assertThrows('underflow', () => {
+    session.run('sock rx\n4wire x << rx/(8)');
+  }, 'underflow');
+});
+
+reg(2475, 'sock', 'rx./(len) equivalent peek to rx/(len)', function(h, session) {
+  const { interp } = session.run([
+    'sock rx',
+    'rx << ^FF',
+    '4wire len : 0100',
+    '4wire a = rx./(len)',
+    '4wire b = rx/(len)',
+  ].join('\n'));
+  h.assert('dot form', session.getWire(interp, 'a'), '1111');
+  h.assert('slash form', session.getWire(interp, 'b'), '1111');
+  h.assert('sock intact', session.getSockLen(interp, 'rx'), 8);
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

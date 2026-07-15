@@ -634,9 +634,42 @@ class Parser {
       while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
     }
   };
+  const consumeFrontSlashSlice = () => {
+    skipWs();
+    if (i >= src.length || src[i] !== '/') return;
+    i++;
+    skipWs();
+    if (i < src.length && src[i] === '(') {
+      let depth = 1;
+      i++;
+      while (i < src.length && depth > 0) {
+        if (src[i] === '(') depth++;
+        else if (src[i] === ')') depth--;
+        i++;
+      }
+      return;
+    }
+    while (i < src.length && /[0-9]/.test(src[i])) i++;
+  };
   const consumeBitRange = () => {
     if (i >= src.length || src[i] !== '.') return;
     i++;
+    if (i < src.length && src[i] === '/') {
+      i++;
+      skipWs();
+      if (i < src.length && src[i] === '(') {
+        let depth = 1;
+        i++;
+        while (i < src.length && depth > 0) {
+          if (src[i] === '(') depth++;
+          else if (src[i] === ')') depth--;
+          i++;
+        }
+        return;
+      }
+      while (i < src.length && /[0-9]/.test(src[i])) i++;
+      return;
+    }
     while (i < src.length && /[0-9]/.test(src[i])) i++;
     if (i < src.length && src[i] === '-') {
       i++;
@@ -644,11 +677,23 @@ class Parser {
     }
     if (i < src.length && src[i] === '/') {
       i++;
+      skipWs();
+      if (i < src.length && src[i] === '(') {
+        let depth = 1;
+        i++;
+        while (i < src.length && depth > 0) {
+          if (src[i] === '(') depth++;
+          else if (src[i] === ')') depth--;
+          i++;
+        }
+        return;
+      }
       while (i < src.length && /[0-9]/.test(src[i])) i++;
     }
   };
 
   skipWs();
+  consumeFrontSlashSlice();
   consumeBitRange();
   skipWs();
 
@@ -666,18 +711,79 @@ class Parser {
       }
     }
     skipWs();
+    consumeFrontSlashSlice();
     consumeBitRange();
     skipWs();
   }
 
+  if (i + 1 < src.length && src[i] === '<' && src[i + 1] === '<') return true;
   if (i < src.length && src[i] === '=') return true;
   if (i + 1 < src.length && src[i] === ':' && src[i + 1] === '=') return true;
   return false;
 }
 
+  peekNextIsSockAppend() {
+    let i = this.t.i;
+    const src = this.t.src;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (i >= src.length || !/[a-zA-Z_]/.test(src[i])) return false;
+    while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    return i + 1 < src.length && src[i] === '<' && src[i + 1] === '<';
+  }
+
+  peekNextIsSockClearFallback() {
+    let i = this.t.i;
+    const src = this.t.src;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (i >= src.length || !/[a-zA-Z_]/.test(src[i])) return false;
+    while (i < src.length && /[a-zA-Z0-9_]/.test(src[i])) i++;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (i >= src.length || src[i] !== ':') return false;
+    i++;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (i + 4 >= src.length) return false;
+    return src.substring(i, i + 5) === 'clear';
+  }
+
+  parseSliceLengthSuffix() {
+    let len = null, lenExpr = null;
+    let isDynamic = false;
+    if (this.c.type === 'SYM' && this.c.value === '(') {
+      this.eat('SYM', '(');
+      if (this.c.type === 'BIN' || this.c.type === 'DEC') {
+        len = parseInt(this.c.value, 10);
+        if (len < 1) throw Error(`Length must be >= 1 at ${this.c.line}:${this.c.col}`);
+        this.eat(this.c.type);
+        this.eat('SYM', ')');
+      } else {
+        lenExpr = this.expr();
+        this.eat('SYM', ')');
+        isDynamic = true;
+      }
+    } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
+      len = parseInt(this.c.value, 10);
+      if (len < 1) throw Error(`Length must be >= 1 at ${this.c.line}:${this.c.col}`);
+      this.eat(this.c.type);
+    } else {
+      throw Error(`Expected length or '(' after '/' at ${this.c.line}:${this.c.col}`);
+    }
+    return { len, lenExpr, isDynamic };
+  }
+
   parseBitRangeSuffix() {
     if (this.c.type !== 'SYM' || this.c.value !== '.') return null;
     this.eat('SYM', '.');
+
+    // ./len — front slice (sock canonical)
+    if (this.c.type === 'SYM' && this.c.value === '/') {
+      this.eat('SYM', '/');
+      const { len, lenExpr, isDynamic } = this.parseSliceLengthSuffix();
+      if (!isDynamic) {
+        return { start: 0, end: len - 1, isLength: true, len, frontSlice: true };
+      }
+      return { start: 0, startExpr: null, len, lenExpr, isDynamic, isLength: true, frontSlice: true };
+    }
 
     let start = null, startExpr = null, isDynamic = false;
 
@@ -715,19 +821,8 @@ class Parser {
 
     if (this.c.type === 'SYM' && this.c.value === '/') {
       this.eat('SYM', '/');
-      let len = null, lenExpr = null;
-      if (this.c.type === 'SYM' && this.c.value === '(') {
-        this.eat('SYM', '(');
-        lenExpr = this.expr();
-        this.eat('SYM', ')');
-        isDynamic = true;
-      } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
-        len = parseInt(this.c.value, 10);
-        if (len < 1) throw Error(`Length must be >= 1 at ${this.c.line}:${this.c.col}`);
-        this.eat(this.c.type);
-      } else {
-        throw Error(`Expected length or '(' after '/' at ${this.c.line}:${this.c.col}`);
-      }
+      const { len, lenExpr, isDynamic: lenDynamic } = this.parseSliceLengthSuffix();
+      if (lenDynamic) isDynamic = true;
       if (!isDynamic) {
         return { start, end: start + len - 1 };
       }
@@ -738,6 +833,16 @@ class Parser {
       return { start, end: start };
     }
     return { start, startExpr, isDynamic };
+  }
+
+  parseFrontSlashSliceSuffix() {
+    if (this.c.type !== 'SYM' || this.c.value !== '/') return null;
+    this.eat('SYM', '/');
+    const { len, lenExpr, isDynamic } = this.parseSliceLengthSuffix();
+    if (!isDynamic) {
+      return { start: 0, end: len - 1, isLength: true, len, frontSlice: true, noDotFront: true };
+    }
+    return { start: 0, startExpr: null, len, lenExpr, isDynamic, isLength: true, frontSlice: true, noDotFront: true };
   }
 
   parseTensorShapeSuffix(wireType) {
@@ -2008,6 +2113,30 @@ parseBoardInstance() {
     if (this.c.type === 'GREF') {
       return this.assignment();
     }
+    if ((this.c.type === 'ID' || this.c.type === 'SPECIAL') && this.peekNextIsSockAppend()) {
+      return this.sockAppend();
+    }
+    if (this.c.type === 'ID') {
+      const savedPos = this.t.i;
+      const savedLine = this.t.line;
+      const savedCol = this.t.col;
+      const savedC = this.c;
+      const stmtLine = this.c.line;
+      const stmtCol = tokenStartCol(this.c);
+      const name = this.c.value;
+      this.eat('ID');
+      if (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        if (this.c.type === 'ID' && this.c.value === 'clear') {
+          this.eat('ID');
+          return { sockAppend: { name, clear: true }, line: stmtLine, col: stmtCol };
+        }
+      }
+      this.t.i = savedPos;
+      this.t.line = savedLine;
+      this.t.col = savedCol;
+      this.c = savedC;
+    }
     if (this.c.type === 'SYM' && this.c.value === '.' && this.peekNextIsComponentAssign()) {
       return this.assignment();
     }
@@ -2258,7 +2387,11 @@ assignment() {
   }
   
   let assignPad;
-  if (this.c.value === '=:') {
+  let lshiftAssign = false;
+  if (this.c.type === 'SYM' && this.c.value === '<<') {
+    this.eat('SYM', '<<');
+    lshiftAssign = true;
+  } else if (this.c.value === '=:') {
     this.eat('SYM', '=:');
     assignPad = 'right';
   } else if (this.c.value === ':=') {
@@ -2277,6 +2410,7 @@ assignment() {
       target: targetAtom,
       expr,
       assignPad,
+      lshiftAssign,
       ...enableSuffix
     },
     line: stmtLine,
@@ -2294,6 +2428,31 @@ assignment() {
     return {
       assignment: {name, expr}
     };
+  }
+
+  sockAppend() {
+    const stmtLine = this.c.line;
+    const stmtCol = tokenStartCol(this.c);
+    const name = this.c.value;
+    this.eat(this.c.type);
+    this.eat('SYM', '<<');
+    this.t.skip();
+    if (this.c.type === 'ID' && this.c.value === 'clear') {
+      this.eat('ID');
+      return { sockAppend: { name, clear: true }, line: stmtLine, col: stmtCol };
+    }
+    const expr = this.expr();
+    return { sockAppend: { name, expr }, line: stmtLine, col: stmtCol };
+  }
+
+  sockClearFallback() {
+    const stmtLine = this.c.line;
+    const stmtCol = tokenStartCol(this.c);
+    const name = this.c.value;
+    this.eat(this.c.type);
+    this.eat('SYM', ':');
+    this.eat('ID', 'clear');
+    return { sockAppend: { name, clear: true }, line: stmtLine, col: stmtCol };
   }
 
   mixedVar(){
@@ -2401,6 +2560,16 @@ assignment() {
         decls,
         expr: this.expr(),
         assignPad: 'right',
+        line: stmtLine,
+        col: stmtCol
+      };
+    } else if (this.c.type === 'SYM' && this.c.value === '<<') {
+      this.eat('SYM', '<<');
+      return {
+        decls,
+        expr: this.expr(),
+        assignPad: 'strict',
+        lshiftAssign: true,
         line: stmtLine,
         col: stmtCol
       };
@@ -4303,6 +4472,13 @@ assignment() {
 
     if (this.c.type === 'SYM' && this.c.value === ':') {
       return addNot(this.parseWireIndexSuffix(name, withAtomLoc));
+    }
+
+    const brSlash = this.parseFrontSlashSliceSuffix();
+    if (brSlash) {
+      const idAtomSlash = withAtomLoc({ var: name, bitRange: brSlash });
+      { const _p = this.maybeParsePadding(); if (_p != null) idAtomSlash.pad = _p; }
+      return addNot(idAtomSlash);
     }
     
     const brWire = this.parseBitRangeSuffix();

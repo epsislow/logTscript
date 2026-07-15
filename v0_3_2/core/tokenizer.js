@@ -341,7 +341,7 @@ pushSource({ src, alias }) {
       v += this.next();
     }
 
-    if (/^\d+(bit|wire|b|w|pin|pout)$/.test(v)) {  
+    if (/^\d+(bit|wire|sock|b|w|pin|pout)$/.test(v)) {  
       v = v.replace(/b$/, 'bit').replace(/w$/, 'wire');
       return this.token('TYPE', v);
     }
@@ -377,6 +377,10 @@ pushSource({ src, alias }) {
 
     if(c === '<') {
       this.next();
+      if (!this.eof() && this.peek() === '<') {
+        this.next();
+        return this.token('SYM', '<<');
+      }
       // LOAD if '<' is the first non-whitespace character on its line.
       // Otherwise it is the LSHIFT infix operator.
       // Scan backwards in source from position of '<' to detect line start.
@@ -537,6 +541,9 @@ pushSource({ src, alias }) {
   }
 
   tokenizeIdentifier(v) {
+    if (v === 'sock') {
+      return this.token('TYPE', '65536sock');
+    }
     if (['def', 'show', 'peek', 'probe', 'deps', 'lutOf', 'exprOfLut', 'useLutAs', 'useExpr', 'truthTableOf', 'simplify', 'equivalent', 'inputsOf', 'costOf', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'ZSTATE', 'ZRELEASE', 'Zlist', 'comp', 'pcb', 'chip', 'board', 'inline', 'doc', 'watch'].includes(v)) {
       return this.token('KEYWORD', v);
     }

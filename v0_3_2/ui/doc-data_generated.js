@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -24305,6 +24305,156 @@ comp [slider] .op:
 | **dip** | Arbitrary bit patterns (each bit independent) |
 | **rotary** | Few named states (\`states\` not necessarily \`2^bits\`) |
 | **slider** | Many sequential values (\`0 … 2^length−1\`) with one drag control |
+`,
+    'sock.md': `# Socket (\`sock\`) — dynamic bit stream
+
+\`sock\` is a **language type** (not a component) for a mutable serial bit buffer. Bits are stored as \`0\`/\`1\` only; append at the back, peek or consume from the front.
+
+Compare with [\`queue.md\`](queue.md): queue holds fixed-width **elements**; sock holds a single **bitstream**.
+
+---
+
+## Declaration
+
+\`\`\`logts
+sock rx              # sugar → 65536sock (65536 bit capacity)
+65536sock rx         # explicit default capacity
+1000sock tx          # cap = 1000 bit
+\`\`\`
+
+| Form | Capacity |
+|------|----------|
+| \`sock name\` | 65536 bit |
+| \`Nsock name\` | N bit |
+
+---
+
+## Append and clear
+
+\`\`\`logts-play
+sock rx
+rx << ^FF
+rx << ^0F
+show(rx)
+rx << clear          # empty buffer (keyword clear only after <<)
+# fallback:
+rx:clear
+\`\`\`
+
+Append rejects **\`Z\`/\`X\`** in the source bitstring (even in \`MODE ZSTATE\`).
+
+---
+
+## Peek vs consume
+
+| Form | Semantics |
+|------|-----------|
+| \`4wire x = rx./4\` | **Peek** — first 4 bits; sock unchanged |
+| \`show(rx./8)\` | Peek for display |
+| \`4wire x << rx./4\` | **Consume** — assign wire and remove 4 bits from front |
+
+Slice canonical form: **\`rx./N\`** (front N bits). Dynamic length: **\`rx/(expr)\`** — length evaluated at runtime from a wire expression (e.g. \`4wire len : 0100\` then \`rx/(len)\`). Sugar **\`rx./(expr)\`** is equivalent. Consume is **only** through \`<<\` on a wire target.
+
+\`\`\`logts-play
+sock rx
+rx << ^FF
+4wire len : 0100
+4wire peek = rx/(len)
+4wire take << rx/(len)
+show(BITSIZE(rx))
+\`\`\`
+
+---
+
+## Dynamic slice examples
+
+\`\`\`logts-play
+sock rx
+rx << ^F0F0
+4wire n : 0100
+4wire hdr = rx/(n)
+show(hdr)
+4wire body << rx/(4)
+show(BITSIZE(rx))
+\`\`\`
+
+\`WWIDTH(rx/(8))\` resolves the slice width at runtime (8 when eight bits are available).
+
+---
+
+## Builtins
+
+On sock, **\`BITSIZE(rx)\`** and **\`WWIDTH(rx)\`** both report **runtime length** (bits stored now), not declared capacity. Empty sock → \`0\`.
+
+\`\`\`logts-play
+sock rx
+1wire bs = BITSIZE(rx)
+1wire ww = WWIDTH(rx)
+show(bs)
+show(ww)
+rx << ^FF
+bs = BITSIZE(rx)
+show(bs)
+\`\`\`
+
+---
+
+## Show / peek tags
+
+Same display tags as wires (\`; u8\`, \`; dec\`, \`; hex\`, …). See [\`debug.md\`](debug.md).
+
+\`\`\`logts-play
+sock rx
+rx << ^FF
+show(rx)
+show(rx; u8)
+show(rx; dec)
+peek(rx; dec)
+\`\`\`
+
+---
+
+## Overflow / underflow
+
+- **Overflow** — append would exceed \`Nsock\` cap → error
+- **Underflow** — peek/consume more bits than stored → error
+
+---
+
+## Example — stream parse pattern
+
+\`\`\`logts-play
+sock rx
+rx << ^F0F0
+4wire op = rx./4
+show(op)
+4wire op2 << rx./4
+show(BITSIZE(rx))
+\`\`\`
+
+After peek, \`BITSIZE(rx)\` stays 16; after consume, length drops by 4 each time.
+
+---
+
+## Example — conditional consume (wave)
+
+\`\`\`logts-play wave
+sock rx
+1wire ready : 0
+4wire op : 0
+on:1 { ready, op << rx./4 }
+rx << ^F
+ready = 1
+show(op)
+show(BITSIZE(rx))
+\`\`\`
+
+---
+
+## Related
+
+- [\`queue.md\`](queue.md) — FIFO elements vs bit stream
+- Faza 1.3 (planned): protocol parse \`{ data << rx }\`
 `,
     'stack.md': `# Stack component (LIFO)
 

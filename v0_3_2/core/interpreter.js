@@ -379,6 +379,7 @@ class Interpreter {
     this.nextIndex=0;
     this.vars=new Map(); // Variable name -> {type, value, ref}
     this.wires=new Map(); // Wire name -> {type, ref}
+    this.socks=new Map(); // Sock name -> {type, bits, cap}
     this.cycle=0;
     this.wireStatements=[]; // Statements that assign to wires (for NEXT)
     this.regStatements=[]; // REG statements (for NEXT)
@@ -4378,6 +4379,9 @@ class Interpreter {
       if (atom.var.startsWith('.')) {
         throw new Error('WWIDTH: component references are not supported');
       }
+      if (this.socks.has(atom.var)) {
+        return this._inferSockAtomStaticBitWidth(atom);
+      }
       return this._inferWireAtomStaticBitWidth(atom);
     }
     throw new Error('WWIDTH: cannot infer width of expression');
@@ -5217,6 +5221,251 @@ class Interpreter {
   isWire(type){
     return type && type.endsWith('wire');
   }
+
+  isSock(type){
+    return type && /^\d+sock$/.test(type);
+  }
+
+  getSockCap(type){
+    if (!type) return null;
+    const m = type.match(/^(\d+)sock$/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  _ensureSockDecl(name, type, loc) {
+    if (!this.isSock(type)) throw Error(`Invalid sock type ${type} at ${loc}`);
+    const cap = this.getSockCap(type);
+    if (!cap) throw Error(`Invalid sock type ${type} at ${loc}`);
+    if (this.socks.has(name)) throw Error(`Sock ${name} already declared at ${loc}`);
+    this.socks.set(name, { type, bits: '', cap });
+  }
+
+  getSockBits(name) {
+    const entry = this.socks.get(name);
+    return entry ? (entry.bits || '') : null;
+  }
+
+  getSockRuntimeLength(name) {
+    const entry = this.socks.get(name);
+    return entry ? (entry.bits || '').length : null;
+  }
+
+  _validateSockAppendBits(bits, context) {
+    if (bits == null || bits === '') return;
+    if (/[XZ]/i.test(bits)) {
+      throw Error(`sock append rejects Z/X in bitstream${context ? ` (${context})` : ''}`);
+    }
+  }
+
+  _formatSockSliceLabel(name, bitRange, n) {
+    if (!bitRange) return name;
+    if (bitRange.frontSlice || (bitRange.start === 0 && bitRange.isLength)) {
+      if (bitRange.noDotFront) return `${name}/${n}`;
+      return `${name}./${n}`;
+    }
+    const { start, end } = bitRange.isDynamic
+      ? { start: bitRange.start, end: bitRange.end }
+      : { start: bitRange.start, end: bitRange.end != null ? bitRange.end : bitRange.start };
+    return start === end ? `${name}.${start}` : `${name}.${start}-${end}`;
+  }
+
+  _peekSockSlice(name, atom) {
+    const entry = this.socks.get(name);
+    if (!entry) this._throwRuntime(`Undefined sock ${name}`, atom, name.length);
+    const bits = entry.bits || '';
+    if (!atom || !atom.bitRange) {
+      return bits;
+    }
+    const { start, end } = this.resolveBitRange(atom.bitRange);
+    const n = end - start + 1;
+    if (start < 0 || start > end || n > bits.length) {
+      throw Error(`sock underflow: need ${n} bits but only ${bits.length} remain in ${name}`);
+    }
+    return bits.substring(start, end + 1);
+  }
+
+  _consumeSockSlice(name, atom) {
+    const entry = this.socks.get(name);
+    if (!entry) this._throwRuntime(`Undefined sock ${name}`, atom, name.length);
+    if (!atom || !atom.bitRange) {
+      throw Error(`sock consume requires front slice rx./N or rx/(expr)`);
+    }
+    const { start, end } = this.resolveBitRange(atom.bitRange);
+    if (start !== 0) {
+      throw Error(`sock consume only supports front slice rx./N or rx/(expr)`);
+    }
+    const n = end - start + 1;
+    const bits = entry.bits || '';
+    if (bits.length < n) {
+      throw Error(`sock underflow: need ${n} bits but only ${bits.length} remain in ${name}`);
+    }
+    const chunk = bits.substring(0, n);
+    entry.bits = bits.substring(n);
+    return chunk;
+  }
+
+  _appendSockBits(name, appendBits) {
+    const entry = this.socks.get(name);
+    if (!entry) throw Error(`Undefined sock ${name}`);
+    this._validateSockAppendBits(appendBits, name);
+    const bits = appendBits || '';
+    const nextLen = (entry.bits || '').length + bits.length;
+    if (nextLen > entry.cap) {
+      throw Error(`sock overflow: cap ${entry.cap} bit, would be ${nextLen} after append`);
+    }
+    entry.bits = (entry.bits || '') + bits;
+  }
+
+  _clearSock(name) {
+    const entry = this.socks.get(name);
+    if (!entry) throw Error(`Undefined sock ${name}`);
+    entry.bits = '';
+  }
+
+  _inferSockAtomStaticBitWidth(atom) {
+    const entry = this.socks.get(atom.var);
+    if (!entry) throw new Error(`WWIDTH: undefined '${atom.var}'`);
+    if (atom.bitRange) {
+      const { start, end } = this.resolveBitRange(atom.bitRange);
+      return end - start + 1;
+    }
+    return (entry.bits || '').length;
+  }
+
+  _evalSockAtom(a, computeRefs) {
+    const entry = this.socks.get(a.var);
+    if (!entry) this._throwRuntime(`Undefined sock ${a.var}`, a, a.var.length);
+    let val = entry.bits || '';
+    if (a.bitRange) {
+      const { start, end } = this.resolveBitRange(a.bitRange);
+      const n = end - start + 1;
+      if (start < 0 || start > end || n > val.length) {
+        throw Error(`sock underflow: need ${n} bits but only ${val.length} remain in ${a.var}`);
+      }
+      val = val.substring(start, end + 1);
+      const displayName = this._formatSockSliceLabel(a.var, a.bitRange, val.length);
+      const extractedPadded = a.pad ? this.applyPad(val, a.pad) : val;
+      return {
+        value: extractedPadded,
+        ref: null,
+        varName: displayName,
+        bitWidth: extractedPadded.length,
+        isSock: true,
+      };
+    }
+    const padded = a.pad ? this.applyPad(val, a.pad) : val;
+    return {
+      value: padded,
+      ref: null,
+      varName: a.var,
+      bitWidth: padded.length,
+      isSock: true,
+    };
+  }
+
+  _execSockAppend(s) {
+    const payload = s.sockAppend;
+    if (!payload) return;
+    const name = payload.name;
+    if (!this.socks.has(name)) {
+      throw Error(`Undefined sock ${name}`);
+    }
+    if (payload.clear) {
+      this._clearSock(name);
+      return;
+    }
+    const bits = this._evalExprToBitString(payload.expr);
+    this._appendSockBits(name, bits);
+  }
+
+  _execSockConsumeAssign(s, computeRefs) {
+    const decls = s.decls || null;
+    const asg = s.assignment || null;
+    const expr = s.expr || (asg && asg.expr);
+    const assignPad = stmtAssignPad(s);
+    const lshiftAssign = s.lshiftAssign || (asg && asg.lshiftAssign);
+
+    if (!lshiftAssign) return false;
+    if (!expr || expr.length !== 1 || !expr[0].var || expr[0].property) {
+      throw Error('sock consume assign requires single sock slice expression on RHS');
+    }
+    const srcAtom = expr[0];
+    if (!this.socks.has(srcAtom.var)) {
+      throw Error(`Undefined sock ${srcAtom.var}`);
+    }
+    const chunk = this._consumeSockSlice(srcAtom.var, srcAtom);
+
+    if (decls && decls.length) {
+      let bitOffset = 0;
+      for (const d of decls) {
+        if (d.name === '~' || d.name === '%' || d.name === '$' || d.name === '_') {
+          bitOffset += getBitWidthFromDecl(this, d) || this.getBitWidth(d.type) || 0;
+          continue;
+        }
+        const bits = getBitWidthFromDecl(this, d) || this.getBitWidth(d.type);
+        const loc = this.getLocation(s, d);
+        if (!bits || !this.isWire(d.type)) {
+          throw Error(`sock consume assign target must be wire at ${loc}`);
+        }
+        if (this.wires.has(d.name)) throw Error(`Wire ${d.name} already declared at ${loc}`);
+        let slice = chunk.substring(bitOffset, bitOffset + bits);
+        slice = fitWireAssignBits(slice, bits, assignPad, 'msb', this);
+        const storageIdx = this.storeValue(slice);
+        this.wireStorageMap.set(d.name, storageIdx);
+        const wireEntry = { type: d.type, ref: `&${storageIdx}`, initOnly: true };
+        this._applyDeclVectorMeta(wireEntry, d);
+        this._applySchemaRefToWireEntry(wireEntry, d, bits, loc);
+        this.wires.set(d.name, wireEntry);
+        if (this.deferWirePropagation()) {
+          this.scheduleWireChange(d.name, slice);
+        }
+        bitOffset += bits;
+      }
+      if (bitOffset !== chunk.length) {
+        throw Error(`sock consume width mismatch: got ${chunk.length} bits for ${bitOffset} bit target(s)`);
+      }
+      return true;
+    }
+
+    if (asg && asg.target && asg.target.var) {
+      const target = asg.target;
+      const name = target.var;
+      const wire = this.wires.get(name);
+      if (!wire) throw Error(`Undefined wire ${name}`);
+      let range = null;
+      if (target.bitRange || target.vectorIndex !== undefined || target.vectorIndexExpr
+          || target.tensorSlice || target.schemaField) {
+        range = this._assignmentTargetSliceRange(target, name);
+      }
+      const bits = range
+        ? range.end - range.start + 1
+        : this.getBitWidth(wire.type);
+      if (!bits) throw Error(`Cannot infer width for sock consume assign to ${name}`);
+      if (chunk.length !== bits) {
+        throw Error(`sock consume width mismatch: got ${chunk.length} bits for ${bits} bit target`);
+      }
+      let value = fitWireAssignBits(chunk, bits, assignPad, 'msb', this);
+      if (range) {
+        const merged = this._applySliceWrite(name, wire, bits, range, value, assignPad);
+        if (this.deferWirePropagation()) {
+          this.scheduleWireChange(name, merged);
+        } else {
+          this.setValueAtRef(wire.ref, merged);
+          this.updateConnectedComponents(name, merged);
+        }
+      } else {
+        this.setValueAtRef(wire.ref, value);
+        if (this.deferWirePropagation()) {
+          this.scheduleWireChange(name, value);
+        } else {
+          this.updateConnectedComponents(name, value);
+        }
+      }
+      return true;
+    }
+
+    throw Error('Invalid sock consume assign');
+  }
   
   isBuiltinREG(name) {
     return name === 'REG';
@@ -6006,6 +6255,10 @@ class Interpreter {
           }
           return {value: val, ref: ref, varName: a.var};
         }
+      }
+
+      if (this.socks.has(a.var) && !a.property && !a.var.startsWith('.')) {
+        return this._evalSockAtom(a, computeRefs);
       }
       
       const wire = this.wires.get(a.var);
@@ -9154,7 +9407,10 @@ if (this.isBuiltinDEMUX(name)) {
         bitRange = e[0].bitRange;
         const wire = this.wires.get(varName);
         if (wire) varType = this.getWireTypeLabel(wire) || wire.type;
-        else {
+        else if (this.socks.has(varName)) {
+          const len = this.getSockRuntimeLength(varName);
+          varType = `${len != null ? len : 0}bit`;
+        } else {
           const varInfo = this.vars.get(varName);
           if (varInfo) varType = varInfo.type;
         }
@@ -9595,6 +9851,11 @@ if (this.isBuiltinDEMUX(name)) {
 
     if (s.inline) {
       this.execInline(s.inline);
+      return;
+    }
+
+    if (s.sockAppend) {
+      this._execSockAppend(s);
       return;
     }
 
@@ -10303,6 +10564,20 @@ if (this.isBuiltinDEMUX(name)) {
     }
 
 if (s.assignment) {
+  if (s.assignment.lshiftAssign) {
+    const tgt = s.assignment.target;
+    if (tgt && tgt.var && this.socks.has(tgt.var) && !tgt.property && !tgt.bitRange) {
+      const expr = s.assignment.expr;
+      if (expr && expr.length === 1 && expr[0].var === 'clear' && !expr[0].property) {
+        this._clearSock(tgt.var);
+      } else {
+        this._appendSockBits(tgt.var, this._evalExprToBitString(expr));
+      }
+      return;
+    }
+    this._execSockConsumeAssign(s, computeRefs);
+    return;
+  }
   const { target, expr: assignmentExpr, assignPad: assignmentPad } = s.assignment;
   let expr = assignmentExpr;
   const name = target.var;
@@ -10969,7 +11244,12 @@ if (s.assignment) {
       this._throwRuntime(`Undefined variable/wire ${name}`, s, name.length);
     }*/
 
-    // Variable/wire declaration
+    // Variable/wire/sock declaration
+    if (s.decls && s.lshiftAssign) {
+      this._execSockConsumeAssign(s, computeRefs);
+      return;
+    }
+
     if(!s.expr){
       // Declaration with : (wire initialization literal, e.g. 1wire q : 1)
       if(s.initExpr){
@@ -11003,12 +11283,18 @@ if (s.assignment) {
         // Do NOT add to wireStatements — no cascading re-execution for literal init
         return;
       }
-      // Declaration without assignment (only wires)
+      // Declaration without assignment (wires or socks)
       for(const d of s.decls){
+        if (this.isSock(d.type)) {
+          const loc = this.getLocation(s, d);
+          if (d.name === '_') continue;
+          this._ensureSockDecl(d.name, d.type, loc);
+          continue;
+        }
         const bits = getBitWidthFromDecl(this, d) || this.getBitWidth(d.type);
         const loc = this.getLocation(s, d);
         if(!bits) throw Error(`Invalid type ${d.type} at ${loc}`);
-        if(!this.isWire(d.type)) throw Error(`Only wires can be declared without assignment at ${loc} (found ${d.type} for ${d.name})`);
+        if(!this.isWire(d.type)) throw Error(`Only wires or socks can be declared without assignment at ${loc} (found ${d.type} for ${d.name})`);
         if(d.name === '_') continue;
         if(this.wires.has(d.name)) {
           if (this.insideBoardBody || this.insideChipBody) continue;

@@ -4,12 +4,12 @@ overview: "Plan **`sock`** — buffer bit serial mutable. Slice canonical `rx./N
 todos:
   - id: "1"
     content: "Faza 1: core + BITSIZE/WWIDTH runtime + show/peek tags + Z/X reject + sock.md"
-    status: pending
+    status: completed
   - id: "1.1"
-    content: "Faza 1.1: rx/(expr) dynamic peek + consume, teste 2467–2473"
-    status: pending
+    content: "Faza 1.1: rx/(expr) dynamic peek + consume, teste 2469–2475"
+    status: completed
   - id: "1.2"
-    content: "Faza 1.2: probe/watch/Wave Listen + probe tags, teste 2474–2479"
+    content: "Faza 1.2: probe/watch/Wave Listen + probe tags, teste 2476–2481"
     status: pending
   - id: "1.3"
     content: "Faza 1.3: protocol peek/consume sock (`=` vs `<<`), teste 2480–2486 — vezi sock_protocol_1.3.plan.md"
@@ -236,7 +236,7 @@ opcode << rx/(lenField)
 length << rx/(8)
 ```
 
-**Teste 2467–2473.** Doc: secțiune în `sock.md`.
+**Teste 2469–2475** (2467–2468 rezervate wave). Doc: secțiune în `sock.md`.
 
 ---
 
@@ -247,7 +247,7 @@ length << rx/(8)
 - `watch rx` — timeline Wave debug
 - Wave Listen — format sock în panoul wave ([`wave-listen-format.js`](../../v0_3_2/core/wave-listen-format.js)); respectă tag/context dacă aplicabil
 
-**Teste 2474–2479** — inclusiv `probe(rx; u8)`, watch după append/consume. Doc: `sock.md` + [`debug.md`](../../v0_3_2/doc/debug.md).
+**Teste 2476–2481** — inclusiv `probe(rx; u8)`, watch după append/consume. Doc: `sock.md` + [`debug.md`](../../v0_3_2/doc/debug.md).
 
 ---
 

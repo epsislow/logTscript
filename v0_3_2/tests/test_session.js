@@ -94,6 +94,17 @@
         return i.getValueFromRef(w.ref);
       },
 
+      getSockBits(interp, name) {
+        const i = interp || this.interp;
+        if (!i || typeof i.getSockBits !== 'function') return null;
+        return i.getSockBits(name);
+      },
+
+      getSockLen(interp, name) {
+        const bits = this.getSockBits(interp, name);
+        return bits == null ? null : bits.length;
+      },
+
       setWire(interp, name, val) {
         const i = interp || this.interp;
         if (!i) return;
