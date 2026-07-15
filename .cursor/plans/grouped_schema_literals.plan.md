@@ -200,6 +200,6 @@ pkt = { tag=\42, cells=\1 \2 \3;8 }<frame>   # dacă field value acceptă expr g
 | Fază | Conținut |
 |------|----------|
 | **7+** | `field:W[min-max]` / `[min-]` — [`schema_variable_range.plan.md`](schema_variable_range.plan.md) |
-| **7b+** | Bridge protocol fix → schema (doc/tool) |
+| **7c** | **↗** [`schema_protocol_bridge.plan.md`](schema_protocol_bridge.plan.md) — bridge protocol → schema |
 
 Vezi [`schema_field_arrays.plan.md`](schema_field_arrays.plan.md) § Faze amânate.

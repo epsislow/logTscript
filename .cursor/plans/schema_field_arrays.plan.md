@@ -43,7 +43,8 @@ isProject: false
 | **Faza 7a**, **7b** | Sub-faze **livrate** ✅ — vezi § Faza 7 |
 | **Faza 7++** (grouped schema literals) | **Livrată ✅** — [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) |
 | **Faza 7+** (range variabil) | **↗** [`schema_variable_range.plan.md`](schema_variable_range.plan.md) — plan dedicat |
-| **7b+** (bridge protocol → schema) | Amânat |
+| **Faza 2.5** (frame padding / buffer) | **↗** [`schema_frame_padding.plan.md`](schema_frame_padding.plan.md) — grow/shrink grid, `paddingRight` cu schema |
+| **Faza 7c** (bridge protocol → schema) | **↗** [`schema_protocol_bridge.plan.md`](schema_protocol_bridge.plan.md) — plan dedicat (7b+ → 7c) |
 | **↗ alt plan** | Referință la fază din alt document; nu se implementează aici |
 
 ### Legături cu alte planuri
@@ -55,6 +56,7 @@ isProject: false
 | Doc split protocol | [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) | **Livrată ✅** — hub ~236 linii + `protocol-assemble.md` + `protocol-lut.md`; parse/tentative/repeat/json deja existente |
 | Faza 7++ grouped literals | [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) | **Livrată ✅** — `{ elem0 } { elem1 }<schema>`; teste 2308–2318 |
 | Faza 7+ range variabil | [`schema_variable_range.plan.md`](schema_variable_range.plan.md) | **Faza 1 ✅ livrată**; **Faza 2.0–2.4** (matrice 2D, slice, scalar count) |
+| Faza 7c bridge protocol → schema | [`schema_protocol_bridge.plan.md`](schema_protocol_bridge.plan.md) | **Plan dedicat** — sync parseView → `varArrayCounts`; prerequisit 7b + Model D ✅ |
 
 ### Ce înseamnă propoziția despre ordine
 
@@ -575,7 +577,7 @@ parsed:packet:0:field         # parseView — OK dacă protocolul definește pac
 |---------|------|
 | Range variabil `field:W[min-max]` / `[min-]` | **↗** [`schema_variable_range.plan.md`](schema_variable_range.plan.md) |
 | Literal structurat vector/matrix în `{ }<schema>` | **7++ livrat ✅** — grouped `{…}{…}<schema>`; [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) |
-| Bridge protocol → schema tooling | **7b+** |
+| Bridge protocol → schema tooling | **↗** [`schema_protocol_bridge.plan.md`](schema_protocol_bridge.plan.md) (Faza 7c) |
 | Doc split protocol | plan protocol, paralel |
 
 ### 🔧 La implementare (fără blocaj)
@@ -765,7 +767,7 @@ Mesaj eroare explicit: *schema total width X vs wire element width Y*.
 |------|------|--------|
 | **7+** | [`schema_variable_range.plan.md`](schema_variable_range.plan.md) | **Faza 1 ✅**; **Faza 2.0–2.4** (matrice 2D, slice 7a, scalar count) |
 | **7++** | [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) | **Livrat ✅** |
-| **7b+** | (viitor) | Bridge protocol → schema |
+| **7c** | [`schema_protocol_bridge.plan.md`](schema_protocol_bridge.plan.md) | Bridge protocol → schema (plan dedicat) |
 
 **Nu implementăm în 6.x / 7a–7b:** mapare automată protocol variabil → schema; `parseTag`; `rest -footer`.
 

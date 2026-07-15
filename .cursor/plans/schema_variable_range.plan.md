@@ -71,7 +71,8 @@ isProject: false
 | `[schema_field_arrays.plan.md](schema_field_arrays.plan.md)`                 | Array fix `field:W[N]` / `<schema>[N]` — baza      |
 | `[grouped_schema_literals.plan.md](grouped_schema_literals.plan.md)`         | Literali grouped — complement la assign structurat |
 | `[protocol_section_repetition.plan.md](protocol_section_repetition.plan.md)` | Sintaxă `[1-3]` / `[1-]` la protocol — referință   |
-| Bridge protocol → schema                                                     | **extern** — plan viitor 7b+ (nu 1.x)              |
+| Bridge protocol → schema                                                     | **↗** [`schema_protocol_bridge.plan.md`](schema_protocol_bridge.plan.md) (Faza 7c) |
+| Schema frame padding (buffer)                                                | **↗** [`schema_frame_padding.plan.md`](schema_frame_padding.plan.md) (Faza 2.5)   |
 
 
 ---
@@ -288,7 +289,7 @@ RUNTIME — flat
 | Parser protocol pentru schema variabilă? | **Nu** — `varArrayCounts` + suffix anchor          |
 | package2 flat?                           | **Da**                                             |
 | package3 flat?                           | **Nu** — structurat sau literal                    |
-| parseView?                               | Model C separat; bridge protocol → plan extern 7b+ |
+| parseView?                               | Model C separat; bridge protocol → [`schema_protocol_bridge.plan.md`](schema_protocol_bridge.plan.md) |
 
 
 ```mermaid
@@ -915,7 +916,7 @@ Vezi § Wire, `=:` și `:=` — comparație A vs B. Reluat doar dacă apare caz 
 | `packet[1-3]` + parseView    | Model C — rămâne                  |
 | `cells:8[3]` fix             | Model B — schema_field_arrays     |
 | `cells:8[1-3]` + `footer:8`  | Model D — **acest plan (Faza 1)** |
-| Proto variabil → schema auto | 7b+ — extern                      |
+| Proto variabil → schema auto | **↗** [`schema_protocol_bridge.plan.md`](schema_protocol_bridge.plan.md) (Faza 7c) |
 
 
 ```mermaid
@@ -938,6 +939,6 @@ flowchart LR
 - **Faza 2** (2.0–2.4) — matrice 2D variabilă, slice 7a runtime, scalar count; opțional Sol B (2.4).
 - **Amânat 2+a:** Convenția B — **unlikely**; A rămâne singura.
 - **Ordine implementare:** **2.0 → 2.1 → 2.2** (prioritar); **2.3** independent; **2.4** opțional.
-- **Extern:** bridge protocol variabil → schema auto — plan **7b+**.
+- **Extern:** bridge protocol variabil → schema auto — **↗** [`schema_protocol_bridge.plan.md`](schema_protocol_bridge.plan.md) (Faza 7c).
 - **Flat** doar când split-ul e unic; **structurat** mereu pentru `package3`.
 
