@@ -27,6 +27,34 @@ show(out)
 
 Output wire width may be **dynamic** when sections repeat or use `rest ~`. Use `=:` when the declared wire is wider than extracted fields.
 
+### Parse from sock
+
+When `data` (or `stream`) is a **sock** reference:
+
+| Invoke | Behaviour |
+|--------|-----------|
+| `{ data = rx }` | **Peek** — parse uses a snapshot; sock length unchanged |
+| `{ data << rx }` | **Consume** — each protocol `read` cuts from the sock front; on parse error the sock is restored (transaction) |
+
+```logts-play wave
+inline [protocol] .parseHdr:
+  mode: parse
+  parseView: tree
+  out:
+    01001000
+    opcode 4b
+    len 8b
+  :
+
+sock rx
+rx << 0100100010101100000111110000
+12wire hdr =: .parseHdr { data << rx }
+show(BITSIZE(rx))
+show(hdr:opcode)
+```
+
+Wire arguments still use `{ data = packet }` only. See [sock.md — Protocol + sock](sock.md#protocol--sock) for the Wave streaming pattern.
+
 ---
 
 ## Literals vs fields

@@ -128,7 +128,56 @@ After peek, `BITSIZE(rx)` stays 16; after consume, length drops by 4 each time.
 
 ---
 
-## Example — conditional consume (wave)
+## Protocol + sock
+
+Parse protocols accept a **sock** as the `data` argument. Two invoke forms:
+
+| Invoke | On sock | On wire (unchanged) |
+|--------|---------|---------------------|
+| `{ data = rx }` | **Peek** — parse on snapshot; sock unchanged | Static bitstring copy |
+| `{ data << rx }` | **Consume** — parsed bits removed from front; rollback on error | Not supported |
+
+**Anti-pattern (Wave):** copying the whole payload into a wire after header parse — e.g. `payload << rx/(hdr:len)` — duplicates the stream and breaks incremental processing. Leave the tail in `rx` and parse or slice incrementally.
+
+See also [protocol-parse.md — Parse from sock](protocol-parse.md#parse-from-sock).
+
+---
+
+## Example — protocol consume (wave)
+
+Pattern **“parse until you cannot, then wait”**: `on:1` re-fires when append increases `BITSIZE(rx)`; `{ data << rx }` consumes only the header; payload stays in the sock.
+
+```logts-play wave
+inline [protocol] .parseHdr:
+  mode: parse
+  parseView: tree
+  out:
+    01001000
+    opcode 4b
+    len 8b
+  :
+
+sock rx
+1wire ready : 0
+20wire hdr : 0
+
+on:1 {
+  AND(ready, GT(BITSIZE(rx), 10011)),
+  hdr =: .parseHdr { data << rx }
+}
+
+ready = 1
+rx << 0100100010101100000111110000
+
+show(BITSIZE(rx))
+show(hdr:opcode)
+```
+
+After **Load & Run**: header (20 bit) is consumed; `BITSIZE(rx)` is 8 (payload tail); `show(hdr:opcode)` prints `1010`.
+
+---
+
+## Example — manual slice consume (wave)
 
 ```logts-play wave
 sock rx
@@ -163,4 +212,4 @@ probe(rx; u8)
 ## Related
 
 - [`queue.md`](queue.md) — FIFO elements vs bit stream
-- Faza 1.3 (planned): protocol parse `{ data << rx }`
+- [`protocol-parse.md`](protocol-parse.md) — `{ data = rx }` peek vs `{ data << rx }` consume

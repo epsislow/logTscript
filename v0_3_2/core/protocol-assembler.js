@@ -874,6 +874,41 @@ class ParseStream {
   }
 }
 
+class SockParseStream {
+  constructor(readState) {
+    this.readState = readState;
+  }
+  get remaining() {
+    return this.readState.getBits().length;
+  }
+  save() {
+    return this.readState.getBits();
+  }
+  restore(bits) {
+    this.readState.setBits(bits);
+  }
+  read(n) {
+    if (n < 0) throw new Error('parse: negative read width');
+    const bits = this.readState.getBits();
+    if (n > bits.length) {
+      throw new Error(`parse: need ${n} bits but only ${bits.length} remain`);
+    }
+    const val = bits.substr(0, n);
+    this.readState.setBits(bits.substr(n));
+    if (this.readState.notify) this.readState.notify();
+    return val;
+  }
+  readRest() {
+    const bits = this.readState.getBits();
+    this.readState.setBits('');
+    if (this.readState.notify) this.readState.notify();
+    return bits;
+  }
+  fork(n) {
+    return new ParseStream(this.read(n));
+  }
+}
+
 function normalizeParseItem(item) {
   if (item.kind === 'segment' && item.seg && item.seg.kind === 'localRef') {
     return {
@@ -1274,10 +1309,12 @@ function parseSegment(seg, stream, fields, inst, args, attributes, ctx, cache, v
 function parseProtocol(inst, args, ctx) {
   const streamParam = args.stream !== undefined ? 'stream' : 'data';
   const streamBits = args[streamParam];
-  if (streamBits === undefined || streamBits === null) {
+  if (!(ctx && ctx.stream) && (streamBits === undefined || streamBits === null)) {
     throw new Error(`Parse protocol requires '${streamParam}' parameter`);
   }
-  const stream = new ParseStream(streamBits);
+  const stream = (ctx && ctx.stream)
+    ? ctx.stream
+    : new ParseStream(String(streamBits));
   const fields = new ParseFields();
   const cache = new Map();
   const channelWidths = [];
@@ -2046,6 +2083,8 @@ const protocolAssemblerExports = {
   formatParseViewShow,
   formatParseViewShowInlineFlat,
   formatParseViewSectionShow,
+  ParseStream,
+  SockParseStream,
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = protocolAssemblerExports;

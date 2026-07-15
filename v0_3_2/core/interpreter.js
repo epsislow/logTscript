@@ -1387,6 +1387,26 @@ class Interpreter {
     return value;
   }
 
+  _protocolInvokeSockRef(expr) {
+    if (!expr || !Array.isArray(expr) || expr.length !== 1) return null;
+    const a = expr[0];
+    if (!a || !a.var || a.property || a.bitRange || a.var.startsWith('.')) return null;
+    if (!this.socks.has(a.var)) return null;
+    return a.var;
+  }
+
+  _makeSockParseStream(sockName) {
+    const SockStream = typeof SockParseStream === 'function' ? SockParseStream : null;
+    if (!SockStream) throw Error('Protocol assembler is not loaded');
+    const entry = this.socks.get(sockName);
+    if (!entry) throw Error(`Undefined sock ${sockName}`);
+    return new SockStream({
+      getBits: () => entry.bits || '',
+      setBits: (bits) => { entry.bits = bits; },
+      notify: () => this._emitProbeForSock(sockName),
+    });
+  }
+
   evalProtocolInvoke(invoke) {
     const protoRef = invoke.protocolRef;
     const inst = this.inlineInstances.get(protoRef);
@@ -1397,8 +1417,25 @@ class Interpreter {
 
     const argValues = {};
     const args = invoke.args || {};
-    for (const [argName, argExpr] of Object.entries(args)) {
-      argValues[argName] = this._exprToBinary(this.evalExpr(argExpr, false));
+    let consumeStream = null;
+    let consumeSnap = null;
+    for (const [argName, argSpec] of Object.entries(args)) {
+      const argExpr = argSpec && argSpec.expr ? argSpec.expr : argSpec;
+      const consume = !!(argSpec && argSpec.consume);
+      const sockName = this._protocolInvokeSockRef(argExpr);
+      if (consume && !sockName) {
+        throw Error(`Protocol invoke '${argName} << …' requires a sock reference`);
+      }
+      if (sockName) {
+        const bits = this.getSockBits(sockName) || '';
+        argValues[argName] = bits;
+        if (consume) {
+          consumeStream = this._makeSockParseStream(sockName);
+          consumeSnap = consumeStream.save();
+        }
+      } else {
+        argValues[argName] = this._exprToBinary(this.evalExpr(argExpr, false));
+      }
     }
 
     for (const paramName of Object.keys(inst.parameters || {})) {
@@ -1410,6 +1447,7 @@ class Interpreter {
     const parseCtx = {
       getInlineLut: (name) => this._getLutInst(name),
     };
+    if (consumeStream) parseCtx.stream = consumeStream;
     const codebookLoad = inst.attributes && inst.attributes.codebookLoad;
     if (codebookLoad && inst.attributes.mode === 'parse') {
       const lutInst = this._getLutInst(codebookLoad);
@@ -1443,6 +1481,7 @@ class Interpreter {
       result = generateFn(inst, argValues, parseCtx);
       if (parseCtx.flushLut) parseCtx.flushLut();
     } catch (e) {
+      if (consumeStream && consumeSnap !== null) consumeStream.restore(consumeSnap);
       throw e;
     }
     const out = { value: result.blob, bitWidth: result.totalWidth, channelWidths: result.channelWidths };

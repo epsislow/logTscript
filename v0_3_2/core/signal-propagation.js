@@ -835,7 +835,9 @@ Interpreter.prototype.forEachSubExprInAtom = function(atom, visit) {
     nested.push(...Object.values(atom.compInvoke.args));
   }
   if (atom.protocolInvoke && atom.protocolInvoke.args) {
-    nested.push(...Object.values(atom.protocolInvoke.args));
+    for (const arg of Object.values(atom.protocolInvoke.args)) {
+      nested.push(arg && arg.expr ? arg.expr : arg);
+    }
   }
   if (atom.inlineMethod && atom.inlineMethod.args) {
     nested.push(...atom.inlineMethod.args);

@@ -4662,12 +4662,17 @@ isBuiltinFunction(name) {
       const argName = this.c.value;
       this.eat('ID');
       this.t.skip();
-      if (!(this.c.type === 'SYM' && this.c.value === '=')) {
-        throw Error(`Expected '=' after parameter '${argName}' in protocol invocation at ${this.c.line}:${this.c.col}`);
+      let consume = false;
+      if (this.c.type === 'SYM' && this.c.value === '=') {
+        this.eat('SYM', '=');
+      } else if (this.c.type === 'SYM' && this.c.value === '<<') {
+        consume = true;
+        this.eat('SYM', '<<');
+      } else {
+        throw Error(`Expected '=' or '<<' after parameter '${argName}' in protocol invocation at ${this.c.line}:${this.c.col}`);
       }
-      this.eat('SYM', '=');
       this.t.skip();
-      args[argName] = this.expr();
+      args[argName] = { expr: this.expr(), consume };
       this.t.skip();
       if (this.c.type === 'SYM' && this.c.value === ',') {
         this.eat('SYM', ',');

@@ -22944,6 +22944,111 @@ reg(2481, 'sock', 'watch(rx) records consume', function(h, session) {
   h.assert('consume sample', String(flat.some(c => c.label === 'rx' && c.valueStr === '1111')), 'true');
 });
 
+// --- Faza 1.3: protocol parse + sock (= peek, << consume) ---
+
+const INLINE_SOCK_PARSE_HDR = `inline [protocol] .parseHdr:
+  mode: parse
+  parseView: tree
+  out:
+    01001000
+    opcode 4b
+    len 8b
+  :`;
+
+const SOCK_PKT_HDR = '01001000101011000001';
+const SOCK_PKT_TAIL = '11110000';
+const SOCK_PKT_FULL = SOCK_PKT_HDR + SOCK_PKT_TAIL;
+const SOCK_HDR_OUT = '101011000001';
+const SOCK_HDR_WIRE = '10101100000100000000';
+
+reg(2482, 'sock', 'protocol { data << rx } consumes header', function(h, session) {
+  const src = INLINE_SOCK_PARSE_HDR + `
+sock rx
+rx << ${SOCK_PKT_FULL}
+20wire hdr =: .parseHdr { data << rx }`;
+  const { interp } = session.run(src);
+  h.assert('hdr opcode+len', session.getWire(interp, 'hdr'), SOCK_HDR_WIRE);
+  h.assert('sock tail', session.getSockBits(interp, 'rx'), SOCK_PKT_TAIL);
+  h.assert('sock len 8', session.getSockLen(interp, 'rx'), 8);
+});
+
+reg(2483, 'sock', 'protocol { data = rx } peek leaves sock intact', function(h, session) {
+  const src = INLINE_SOCK_PARSE_HDR + `
+sock rx
+rx << ${SOCK_PKT_FULL}
+20wire hdr =: .parseHdr { data = rx }`;
+  const { interp } = session.run(src);
+  h.assert('parsed', session.getWire(interp, 'hdr'), SOCK_HDR_WIRE);
+  h.assert('sock full', session.getSockBits(interp, 'rx'), SOCK_PKT_FULL);
+  h.assert('sock len 28', session.getSockLen(interp, 'rx'), 28);
+});
+
+reg(2484, 'sock', 'protocol << rx rollback on literal mismatch', function(h, session) {
+  const src = INLINE_SOCK_PARSE_HDR + `
+sock rx
+rx << 11111111111111111111
+20wire hdr =: .parseHdr { data << rx }`;
+  const { interp } = session.run(src);
+  h.assert('parse error', String(session.outIncludes(interp, 'expected literal')), 'true');
+  h.assert('sock restored', session.getSockBits(interp, 'rx'), '11111111111111111111');
+});
+
+reg(2485, 'sock', 'protocol << rx underflow leaves sock intact', function(h, session) {
+  const src = INLINE_SOCK_PARSE_HDR + `
+sock rx
+rx << 01001000
+20wire hdr =: .parseHdr { data << rx }`;
+  const { interp } = session.run(src);
+  h.assert('underflow', String(session.outIncludes(interp, 'need') && session.outIncludes(interp, 'remain')), 'true');
+  h.assert('sock restored', session.getSockBits(interp, 'rx'), '01001000');
+});
+
+reg(2486, 'sock', 'parseView show(hdr:opcode) after consume', function(h, session) {
+  const src = INLINE_SOCK_PARSE_HDR + `
+sock rx
+rx << ${SOCK_PKT_FULL}
+20wire hdr =: .parseHdr { data << rx }
+show(hdr:opcode)`;
+  const { interp } = session.run(src);
+  h.assert('opcode field', String(session.outIncludes(interp, 'opcode')), 'true');
+  h.assert('opcode 1010', String(session.outIncludes(interp, '1010')), 'true');
+});
+
+reg(2487, 'sock', 'wave on:1 parse header on append', function(h, session) {
+  const src = INLINE_SOCK_PARSE_HDR + `
+sock rx
+1wire ready : 0
+20wire hdr : 0
+on:1 {
+  AND(ready, GT(BITSIZE(rx), 10011)),
+  hdr =: .parseHdr { data << rx }
+}
+ready = 1
+rx << ${SOCK_PKT_FULL}
+show(hdr:opcode)`;
+  const { interp } = session.run(src);
+  h.assert('sock tail', session.getSockBits(interp, 'rx'), SOCK_PKT_TAIL);
+  h.assert('opcode show', String(session.outIncludes(interp, '1010')), 'true');
+}, { propagation: 'wave' });
+
+reg(2488, 'sock', 'wave payload stays in sock without payload wire', function(h, session) {
+  const src = INLINE_SOCK_PARSE_HDR + `
+sock rx
+1wire ready : 0
+20wire hdr : 0
+on:1 {
+  AND(ready, GT(BITSIZE(rx), 10011)),
+  hdr =: .parseHdr { data << rx }
+}
+ready = 1
+rx << ${SOCK_PKT_FULL}
+show(BITSIZE(rx))`;
+  const { interp } = session.run(src);
+  h.assert('no payload wire', String(interp.wires.has('payload')), 'false');
+  h.assert('tail in sock', session.getSockLen(interp, 'rx'), 8);
+  h.assert('bitsize show 8', String(session.outIncludes(interp, '1000')), 'true');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

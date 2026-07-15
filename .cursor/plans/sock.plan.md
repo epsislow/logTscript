@@ -12,8 +12,8 @@ todos:
     content: "Faza 1.2: probe/watch/Wave Listen + probe tags, teste 2476–2481"
     status: completed
   - id: "1.3"
-    content: "Faza 1.3: protocol peek/consume sock (`=` vs `<<`), teste 2480–2486 — vezi sock_protocol_1.3.plan.md"
-    status: pending
+    content: "Faza 1.3: protocol peek/consume sock (`=` vs `<<`), teste 2482–2488 — vezi sock_protocol_1.3.plan.md"
+    status: completed
   - id: "1.4"
     content: "Faza 1.4: bridge network→sock, teste 2487–2490"
     status: pending
@@ -304,16 +304,22 @@ body =: .parseBody { data << rx, maxBits = hdr:len }
 
 #### Wave: parse incremental + așteptare
 
-Invoke **nu** face loop infinit. Pattern Wave:
+Invoke **nu** face loop infinit. Pattern Wave (syntax validă — detaliu în [`sock_protocol_1.3.plan.md`](sock_protocol_1.3.plan.md)):
 
-```logts
-on:1, ready, BITSIZE(rx) >= 20 {
+```logts-play wave
+sock rx
+1wire ready : 0
+20wire hdr : 0
+
+on:1 {
+  AND(ready, GT(BITSIZE(rx), 10011)),
   hdr =: .parseHdr { data << rx }
-  show hdr:opcode
 }
+
+show(hdr:opcode)
 ```
 
-Guard `BITSIZE >= N` → aștepți append; la biți noi, re-invoke consume. Underflow cu `<<` → **tranzacție** (zero tăiere parțială).
+Guard pe trigger (`GT(BITSIZE(rx), …)`); `show(...)` cu paranteze, **în afara** blocului `on:`. Underflow cu `<<` → **tranzacție** (zero tăiere parțială).
 
 #### Implementare (rezumat)
 
@@ -328,17 +334,19 @@ Guard `BITSIZE >= N` → aștepți append; la biți noi, re-invoke consume. Unde
 - **Nu** consume fără `{ data << rx }` explicit.
 - **Nu** bridge UART/file (→ 1.4).
 
-#### Teste 2480–2486
+#### Teste 2482–2488
 
 | ID | Scenariu |
 |----|----------|
-| 2480 | `{ data << rx }` — `BITSIZE(rx)` scade corect |
-| 2481 | `{ data = rx }` — peek; `BITSIZE(rx)` neschimbat |
-| 2482 | literal mismatch + `<<` → tranzacție; sock nemodificat |
-| 2483 | underflow + `<<` → eroare; sock nemodificat |
-| 2484 | parseView după consume parțial |
-| 2485 | wave: append incremental + `on:1` + `{ data << rx }` |
-| 2486 | wave: tail rămâne în sock, fără wire payload gigant |
+| 2482 | `{ data << rx }` — `BITSIZE(rx)` scade corect |
+| 2483 | `{ data = rx }` — peek; `BITSIZE(rx)` neschimbat |
+| 2484 | literal mismatch + `<<` → tranzacție; sock nemodificat |
+| 2485 | underflow + `<<` → eroare; sock nemodificat |
+| 2486 | parseView `show(hdr:opcode)` după consume parțial |
+| 2487 | wave: append incremental + `on:1 { … { data << rx } }` |
+| 2488 | wave: tail rămâne în sock, fără wire payload gigant |
+
+*(2480–2481 = Faza 1.2 watch)*
 
 **Doc:** `sock.md` + [`protocol-parse.md`](../../v0_3_2/doc/protocol-parse.md).
 
@@ -348,7 +356,7 @@ Guard `BITSIZE >= N` → aștepți append; la biți noi, re-invoke consume. Unde
 
 `comp [network]` RX → `rx << .wifi:get`; exemple keyboard/terminal.
 
-**Teste 2487–2490**.
+**Teste 2489–2492**.
 
 ---
 
