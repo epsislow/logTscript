@@ -22153,6 +22153,8 @@ Mirrors protocol repetition: **\`8[1-3]\`** (1–3 elements), **\`8[1-]\`** (at 
 
 **Count from prior scalar field:** **\`8[nTokens]\`** — element count is read from an earlier **fixed-width leaf** field (e.g. \`nTokens: 4\` before \`tokens: 8[nTokens]\`). Enables deterministic flat assign when another open-ended field follows.
 
+For **2D matrices**, countRef applies per dimension — see [Variable matrix (2D)](schema-variable-matrix.md): \`8[nRows, 2]\`, \`8[2, nCols]\`, or **\`8[nRows, nCols]\`** (both dims from prior scalars).
+
 \`\`\`logts
 <package2>:
     cells: 8[1-]
@@ -22176,6 +22178,7 @@ Mirrors protocol repetition: **\`8[1-3]\`** (1–3 elements), **\`8[1-]\`** (at 
 | **Flat \`=\` on whole record** | OK when count is **unique** (e.g. \`24wire\` + suffix anchor, single open-ended field last, or **countRef** chain). |
 | **Two \`8[1-]\` fields** | Structured per-field assign OK; flat \`pkt = ^…\` → **ambiguous** error (use \`package3det\` with scalar count). |
 | **\`8[nTokens]\` countRef** | \`nTokens\` must be a **prior leaf** with fixed width; count = unsigned value of that field at flat resolve time. |
+| **Matrix countRef** | \`8[nRows, nCols]\`, \`8[nRows, 2]\`, \`8[2, nCols]\` — each ref must be a distinct prior leaf; see [Variable matrix (2D)](schema-variable-matrix.md). |
 | **Runtime count** | Stored in \`wire.varArrayCounts\`; drives layout, show, read, Wave Listen. |
 | **Show** | Tree + \`:i\` lines + \`field has length [N]\`; tags (\`; dec\`) and field slices supported. |
 | **Peek / probe** | Same tree as \`show\`, including dynamic \`has length [N]\`. |
@@ -22305,7 +22308,7 @@ Use **\`logts-play wave\`** for examples with \`show\`. See [Semantic schemas �
 
 ## Syntax and layout
 
-At most **one variable dimension** per field at flat assign time. \`varArrayCounts[field]\` stores **total cells** \`N = R×C\`; the fixed dimension from the declaration derives the other (\`rows = N / colsFix\`).
+At most **one variable dimension** per field at flat assign time — **unless** dimensions are driven by **countRef** scalars (\`8[nRows, nCols]\`). \`varArrayCounts[field]\` stores **total cells** \`N = R×C\`; the fixed dimension from the declaration derives the other (\`rows = N / colsFix\`).
 
 \`\`\`logts
 <cell8>:
@@ -22327,13 +22330,21 @@ At most **one variable dimension** per field at flat assign time. \`varArrayCoun
 <frameVarTiles>:
     tiles: <opcode>[1-3, 2]
 :
+
+<frameGridDet>:
+    nRows: 4
+    nCols: 4
+    grid: 8[nRows, nCols]
+:
 \`\`\`
 
 | Syntax | Flat \`pkt = ^…\` | Notes |
 |--------|-----------------|-------|
 | \`grid:8[1-3, 2]\` | ✅ | \`N = payload/8\`, \`rows = N/2\` |
 | \`grid:8[2, 1-3]\` | ✅ | \`cols = N/2\` |
-| \`grid:8[1-3, 1-3]\` | ❌ ambiguous | use shape literal or per-field assign |
+| \`grid:8[1-3, 1-3]\` | ❌ ambiguous | use shape literal, countRef, or per-field assign |
+| \`grid:8[nRows, nCols]\` | ✅ | both dims from prior leaf scalars — flat unique |
+| \`grid:8[nRows, 2]\` | ✅ | rows from scalar, cols fixed |
 | \`tiles:<opcode>[1-3, 2]\` | ✅ | element width = 16 (\`opcode.totalWidth\`) |
 
 ---
@@ -22368,6 +22379,23 @@ show(pkt:grid)
 \`\`\`
 
 Expected **Output**: \`:0:0\`, \`:0:1\`, \`:1:0\`, \`:1:1\` under \`grid\`; \`pkt:grid has shape [2,2]\`.
+
+**Dual countRef** — flat assign with \`nRows\` / \`nCols\` scalars (replaces ambiguous \`8[1-, 1-]\` at flat):
+
+\`\`\`logts-play wave
+<cell8>:
+    v: 8
+:
+<frameGridDet>:
+    nRows: 4
+    nCols: 4
+    grid: 8[nRows, nCols]
+:
+56wire<frameGridDet> pkt = ^23AABBCCDDEEFF
+show(pkt)
+\`\`\`
+
+Expected **Output**: \`nRows = 0010\` (2), \`nCols = 0011\` (3); \`grid has shape [2,3]\`; six \`:r:c\` cell lines.
 
 **Grouped literal with shape prefix** + per-field assign:
 

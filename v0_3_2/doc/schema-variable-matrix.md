@@ -14,7 +14,7 @@ Use **`logts-play wave`** for examples with `show`. See [Semantic schemas — Ru
 
 ## Syntax and layout
 
-At most **one variable dimension** per field at flat assign time. `varArrayCounts[field]` stores **total cells** `N = R×C`; the fixed dimension from the declaration derives the other (`rows = N / colsFix`).
+At most **one variable dimension** per field at flat assign time — **unless** dimensions are driven by **countRef** scalars (`8[nRows, nCols]`). `varArrayCounts[field]` stores **total cells** `N = R×C`; the fixed dimension from the declaration derives the other (`rows = N / colsFix`).
 
 ```logts
 <cell8>:
@@ -36,13 +36,21 @@ At most **one variable dimension** per field at flat assign time. `varArrayCount
 <frameVarTiles>:
     tiles: <opcode>[1-3, 2]
 :
+
+<frameGridDet>:
+    nRows: 4
+    nCols: 4
+    grid: 8[nRows, nCols]
+:
 ```
 
 | Syntax | Flat `pkt = ^…` | Notes |
 |--------|-----------------|-------|
 | `grid:8[1-3, 2]` | ✅ | `N = payload/8`, `rows = N/2` |
 | `grid:8[2, 1-3]` | ✅ | `cols = N/2` |
-| `grid:8[1-3, 1-3]` | ❌ ambiguous | use shape literal or per-field assign |
+| `grid:8[1-3, 1-3]` | ❌ ambiguous | use shape literal, countRef, or per-field assign |
+| `grid:8[nRows, nCols]` | ✅ | both dims from prior leaf scalars — flat unique |
+| `grid:8[nRows, 2]` | ✅ | rows from scalar, cols fixed |
 | `tiles:<opcode>[1-3, 2]` | ✅ | element width = 16 (`opcode.totalWidth`) |
 
 ---
@@ -77,6 +85,23 @@ show(pkt:grid)
 ```
 
 Expected **Output**: `:0:0`, `:0:1`, `:1:0`, `:1:1` under `grid`; `pkt:grid has shape [2,2]`.
+
+**Dual countRef** — flat assign with `nRows` / `nCols` scalars (replaces ambiguous `8[1-, 1-]` at flat):
+
+```logts-play wave
+<cell8>:
+    v: 8
+:
+<frameGridDet>:
+    nRows: 4
+    nCols: 4
+    grid: 8[nRows, nCols]
+:
+56wire<frameGridDet> pkt = ^23AABBCCDDEEFF
+show(pkt)
+```
+
+Expected **Output**: `nRows = 0010` (2), `nCols = 0011` (3); `grid has shape [2,3]`; six `:r:c` cell lines.
 
 **Grouped literal with shape prefix** + per-field assign:
 

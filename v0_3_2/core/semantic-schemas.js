@@ -115,7 +115,28 @@
     return (1 << refLeaf.width) - 1;
   }
 
+  function hasDualCountRef(node) {
+    return node.countRefDim === 'both'
+      || (node.rowsSpec && node.rowsSpec.countRef && node.colsSpec && node.colsSpec.countRef);
+  }
+
+  function hasAnyCountRef(node) {
+    return !!(node.countRef || hasDualCountRef(node));
+  }
+
   function resolveCountRefBounds(spec, structure, schemaName) {
+    if (spec.matrixVar && spec.rowsSpec && spec.rowsSpec.countRef && spec.colsSpec && spec.colsSpec.countRef) {
+      const rowsLeaf = findCountRefLeaf(structure, spec.rowsSpec.countRef, schemaName);
+      const colsLeaf = findCountRefLeaf(structure, spec.colsSpec.countRef, schemaName);
+      return {
+        minCount: 0,
+        maxCount: countRefScalarMax(rowsLeaf) * countRefScalarMax(colsLeaf),
+        countRef: null,
+        countRefDim: 'both',
+        countRefRows: spec.rowsSpec.countRef,
+        countRefCols: spec.colsSpec.countRef,
+      };
+    }
     if (!spec.countRef) return null;
     const refLeaf = findCountRefLeaf(structure, spec.countRef, schemaName);
     const scalarMax = countRefScalarMax(refLeaf);
@@ -159,6 +180,24 @@
     return parseInt(bits, 2);
   }
 
+  function resolveMatrixCountFromDualRefs(node, wireBits, schemaName, structure) {
+    const rowsRef = node.countRefRows || (node.rowsSpec && node.rowsSpec.countRef);
+    const colsRef = node.countRefCols || (node.colsSpec && node.colsSpec.countRef);
+    const rowsNode = findCountRefLeaf(structure, rowsRef, schemaName);
+    const colsNode = findCountRefLeaf(structure, colsRef, schemaName);
+    const rows = readLeafUInt(wireBits, rowsNode, schemaName);
+    const cols = readLeafUInt(wireBits, colsNode, schemaName);
+    if (rows < node.rowsMin || (node.rowsMax != null && rows > node.rowsMax)) {
+      throw new Error(`Matrix row count ${rows} out of range for '${node.name}' in schema '${schemaName}'`);
+    }
+    if (cols < node.colsMin || (node.colsMax != null && cols > node.colsMax)) {
+      throw new Error(`Matrix column count ${cols} out of range for '${node.name}' in schema '${schemaName}'`);
+    }
+    const count = rows * cols;
+    validateVarArrayCount(node, count, schemaName);
+    return { count, rows, cols };
+  }
+
   function elementCountFromCountRef(node, refVal, schemaName) {
     if (!node.matrixVar) {
       validateVarArrayCount(node, refVal, schemaName);
@@ -186,11 +225,28 @@
     return refVal;
   }
 
-  function resolveMatrixShapeFromCount(node, totalCells, schemaName) {
+  function resolveMatrixShapeFromCount(node, totalCells, schemaName, runtimeOpts) {
     if (!node.matrixVar) {
       return { rows: 1, cols: totalCells, singleDim: true };
     }
     if (node.rowsVar && node.colsVar) {
+      if (hasDualCountRef(node)) {
+        const wireBits = runtimeOpts && runtimeOpts.wireBits;
+        const structure = (runtimeOpts && runtimeOpts.schema && runtimeOpts.schema.structure)
+          || (runtimeOpts && runtimeOpts.structure);
+        if (!wireBits || !structure) {
+          throw new Error(
+            `Cannot resolve matrix shape for '${node.name}' in schema '${schemaName}' without wire data`
+          );
+        }
+        const { rows, cols } = resolveMatrixCountFromDualRefs(node, wireBits, schemaName, structure);
+        if (rows * cols !== totalCells) {
+          throw new Error(
+            `Matrix cell count ${totalCells} does not match shape [${rows},${cols}] for '${node.name}' in schema '${schemaName}'`
+          );
+        }
+        return { rows, cols, singleDim: false };
+      }
       throw new Error(
         `Ambiguous matrix shape for '${node.name}' in schema '${schemaName}' — use grouped literal shape [R,C]`
       );
@@ -358,7 +414,15 @@
     const unresolved = [];
 
     for (const node of varNodes) {
-      if (node.countRef) {
+      if (hasDualCountRef(node)) {
+        if (!wireBits) {
+          throw new Error(
+            `Cannot resolve '${node.name}' from dual countRef without wire data in schema '${schema.name}'`
+          );
+        }
+        const { count } = resolveMatrixCountFromDualRefs(node, wireBits, schema.name, schema.structure);
+        counts[node.name] = count;
+      } else if (node.countRef) {
         if (!wireBits) {
           throw new Error(
             `Cannot resolve '${node.name}' from countRef '${node.countRef}' without wire data in schema '${schema.name}'`
@@ -452,7 +516,7 @@
     return { ...counts, ...solutions[0] };
   }
 
-  function runtimeArrayNode(arrayNode, varArrayCounts, schemaName) {
+  function runtimeArrayNode(arrayNode, varArrayCounts, schemaName, runtimeOpts) {
     if (!isVarArrayNode(arrayNode)) return arrayNode;
     const count = varArrayCounts[arrayNode.name];
     if (count == null) {
@@ -470,7 +534,10 @@
       bitEnd: bitStart + width - 1,
     };
     if (isVarMatrixNode(arrayNode)) {
-      const shape = resolveMatrixShapeFromCount(arrayNode, count, schemaName);
+      const shapeOpts = Object.assign({}, runtimeOpts || {}, {
+        structure: (runtimeOpts && runtimeOpts.schema && runtimeOpts.schema.structure) || null,
+      });
+      const shape = resolveMatrixShapeFromCount(arrayNode, count, schemaName, shapeOpts);
       result.rows = shape.rows;
       result.cols = shape.cols;
       result.singleDim = false;
@@ -855,7 +922,7 @@
         const matrixMeta = spec.matrixVar && spec.rowsSpec && spec.colsSpec
           ? expandMatrixVarMeta(spec.rowsSpec, spec.colsSpec)
           : { singleDim: spec.singleDim !== false, rows: 1, cols: minCount };
-        if (countRefBounds && spec.matrixVar) {
+        if (countRefBounds && spec.matrixVar && countRefBounds.countRef) {
           const refLeaf = findCountRefLeaf(structure, countRefBounds.countRef, name);
           const scalarMax = countRefScalarMax(refLeaf);
           if (countRefBounds.countRefDim === 'rows') {
@@ -863,6 +930,12 @@
           } else if (countRefBounds.countRefDim === 'cols') {
             matrixMeta.colsMax = scalarMax;
           }
+        }
+        if (countRefBounds && countRefBounds.countRefDim === 'both') {
+          const rowsLeaf = findCountRefLeaf(structure, countRefBounds.countRefRows, name);
+          const colsLeaf = findCountRefLeaf(structure, countRefBounds.countRefCols, name);
+          matrixMeta.rowsMax = countRefScalarMax(rowsLeaf);
+          matrixMeta.colsMax = countRefScalarMax(colsLeaf);
         }
         const arrayNode = {
           kind: 'var_array',
@@ -874,6 +947,8 @@
           maxWidth,
           countRef: countRefBounds ? countRefBounds.countRef : null,
           countRefDim: countRefBounds ? countRefBounds.countRefDim : null,
+          countRefRows: countRefBounds ? countRefBounds.countRefRows : null,
+          countRefCols: countRefBounds ? countRefBounds.countRefCols : null,
           matrixVar: !!spec.matrixVar,
           rowsVar: matrixMeta.rowsVar,
           colsVar: matrixMeta.colsVar,
@@ -1175,7 +1250,12 @@
         if (arrayNode && i === path.length - 1) {
           const arrayBitStart = offsets ? offsets.get(arrayNode.name) : absBase + (arrayNode.bitStart || 0);
           const resolvedNode = isVarArrayNode(arrayNode)
-            ? runtimeArrayNode({ ...arrayNode, bitStart: arrayBitStart }, varArrayCounts, currentSchema.name || schema.name)
+            ? runtimeArrayNode(
+              { ...arrayNode, bitStart: arrayBitStart },
+              varArrayCounts,
+              currentSchema.name || schema.name,
+              { wireBits: opts && opts.wireBits, schema }
+            )
             : { ...arrayNode, bitStart: arrayBitStart };
           return resolveSchemaArrayColView(resolvedNode, 0, path, arrayColIndex, wireVar, schema.name);
         }
@@ -1443,7 +1523,12 @@
       if (arrayNode) {
         const arrayBitStart = offsets ? offsets.get(arrayNode.name) : absBase + arrayNode.bitStart;
         const resolvedNode = isVarArrayNode(arrayNode)
-          ? runtimeArrayNode({ ...arrayNode, bitStart: arrayBitStart }, varArrayCounts, currentSchema.name || rootName)
+          ? runtimeArrayNode(
+            { ...arrayNode, bitStart: arrayBitStart },
+            varArrayCounts,
+            currentSchema.name || rootName,
+            { wireBits: opts && opts.wireBits, schema }
+          )
           : { ...arrayNode, bitStart: arrayBitStart };
         return resolveArrayElementView(resolvedNode, 0, path, path.slice(i + 1), wireVar, rootName);
       }
@@ -1748,7 +1833,8 @@
         const runtimeNode = runtimeArrayNode(
           { ...node, bitStart: nodeStart },
           varArrayCounts,
-          schema.name
+          schema.name,
+          { wireBits: bits, schema }
         );
         appendSchemaArrayElementLines(lines, sliceBits, runtimeNode, opts, formatValueFn, indent + 1, node.elementSchema || null);
         if (opts && opts.showVarArrayLength !== false) {

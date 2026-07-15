@@ -18,6 +18,8 @@ Mirrors protocol repetition: **`8[1-3]`** (1–3 elements), **`8[1-]`** (at leas
 
 **Count from prior scalar field:** **`8[nTokens]`** — element count is read from an earlier **fixed-width leaf** field (e.g. `nTokens: 4` before `tokens: 8[nTokens]`). Enables deterministic flat assign when another open-ended field follows.
 
+For **2D matrices**, countRef applies per dimension — see [Variable matrix (2D)](schema-variable-matrix.md): `8[nRows, 2]`, `8[2, nCols]`, or **`8[nRows, nCols]`** (both dims from prior scalars).
+
 ```logts
 <package2>:
     cells: 8[1-]
@@ -41,6 +43,7 @@ Mirrors protocol repetition: **`8[1-3]`** (1–3 elements), **`8[1-]`** (at leas
 | **Flat `=` on whole record** | OK when count is **unique** (e.g. `24wire` + suffix anchor, single open-ended field last, or **countRef** chain). |
 | **Two `8[1-]` fields** | Structured per-field assign OK; flat `pkt = ^…` → **ambiguous** error (use `package3det` with scalar count). |
 | **`8[nTokens]` countRef** | `nTokens` must be a **prior leaf** with fixed width; count = unsigned value of that field at flat resolve time. |
+| **Matrix countRef** | `8[nRows, nCols]`, `8[nRows, 2]`, `8[2, nCols]` — each ref must be a distinct prior leaf; see [Variable matrix (2D)](schema-variable-matrix.md). |
 | **Runtime count** | Stored in `wire.varArrayCounts`; drives layout, show, read, Wave Listen. |
 | **Show** | Tree + `:i` lines + `field has length [N]`; tags (`; dec`) and field slices supported. |
 | **Peek / probe** | Same tree as `show`, including dynamic `has length [N]`. |

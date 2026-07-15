@@ -167,8 +167,11 @@ class Parser {
       if (this.c.type === 'SYM' && this.c.value === '<') {
         const ref = this.parseSchemaRef();
         const shape = this.parseSchemaArraySuffix();
-        if (shape && (shape.varRange || shape.countRef)) {
-          if (shape.countRef) {
+        if (shape && (shape.varRange || shape.countRef || shape.countRefDim === 'both')) {
+          if (shape.countRefDim === 'both') {
+            this._assertSchemaCountRef(fields, shape.rowsSpec.countRef, fieldName, name);
+            this._assertSchemaCountRef(fields, shape.colsSpec.countRef, fieldName, name);
+          } else if (shape.countRef) {
             this._assertSchemaCountRef(fields, shape.countRef, fieldName, name);
           } else if (shape.rowsSpec && shape.rowsSpec.countRef) {
             this._assertSchemaCountRef(fields, shape.rowsSpec.countRef, fieldName, name);
@@ -213,13 +216,18 @@ class Parser {
         }
         const shape = this.parseSchemaArraySuffix();
         const varRange = (shape && shape.varRange) ? shape : sugarRange;
-        if (shape && shape.countRef) {
-          this._assertSchemaCountRef(fields, shape.countRef, fieldName, name);
+        if (shape && (shape.countRef || shape.countRefDim === 'both')) {
+          if (shape.countRefDim === 'both') {
+            this._assertSchemaCountRef(fields, shape.rowsSpec.countRef, fieldName, name);
+            this._assertSchemaCountRef(fields, shape.colsSpec.countRef, fieldName, name);
+          } else {
+            this._assertSchemaCountRef(fields, shape.countRef, fieldName, name);
+          }
           fields.push({
             kind: 'var_array',
             name: fieldName,
             elementWidth: width,
-            countRef: shape.countRef,
+            countRef: shape.countRef || null,
             countRefDim: shape.countRefDim || null,
             singleDim: shape.singleDim !== false,
             matrixVar: !!shape.matrixVar,
@@ -490,9 +498,20 @@ class Parser {
         return { rows: d0.fixed, cols: d1.fixed, singleDim: false };
       }
       if (d0.countRef && d1.countRef) {
-        throw Error(
-          `Only one matrix dimension may use countRef at ${this.c.file}: ${this.c.line}:${this.c.col}`
-        );
+        if (d0.countRef === d1.countRef) {
+          throw Error(
+            `Matrix countRef dimensions must refer to different fields at ${this.c.file}: ${this.c.line}:${this.c.col}`
+          );
+        }
+        return {
+          matrixVar: true,
+          countRefDim: 'both',
+          rowsSpec: d0,
+          colsSpec: d1,
+          minCount: 0,
+          maxCount: null,
+          singleDim: false,
+        };
       }
       const counts = this._matrixVarRangeCounts(d0, d1);
       return {

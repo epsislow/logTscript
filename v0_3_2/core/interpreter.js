@@ -3968,6 +3968,13 @@ class Interpreter {
   _schemaResolveOpts(wire, wireVar) {
     const opts = { wireVar: wireVar || null };
     if (wire && wire.varArrayCounts) opts.varArrayCounts = wire.varArrayCounts;
+    if (wire && wire.schemaRef) {
+      opts.schema = this._resolveSchema(wire.schemaRef);
+    }
+    if (wire && wire.ref && wire.ref !== '&-') {
+      const wireBits = this.getValueFromRef(wire.ref);
+      if (wireBits != null) opts.wireBits = String(wireBits);
+    }
     if (wire && wire.effectiveBitLen != null) opts.declaredWidth = wire.effectiveBitLen;
     else if (wire && wire.type) {
       const w = this.getBitWidth(wire.type);
@@ -4590,7 +4597,11 @@ class Interpreter {
       return SS.formatSchemaShowInline(
         valueStr,
         schema,
-        Object.assign({}, opts || {}, { varArrayCounts: wire.varArrayCounts || {} }),
+        Object.assign({}, opts || {}, {
+          varArrayCounts: wire.varArrayCounts || {},
+          wireBits: valueStr,
+          schema,
+        }),
         (bits, w) => this.formatValue(bits, w)
       );
     } catch (err) {
@@ -4637,6 +4648,8 @@ class Interpreter {
     SS.validateSchemaWidthForShow(schema, valueStr.length);
     const showOpts = Object.assign({}, opts || {}, {
       varArrayCounts: wire.varArrayCounts || {},
+      wireBits: valueStr,
+      schema,
     });
     const typeLabel = displayName
       ? `${displayName} (${this.getWireTypeLabel(wire)})`
@@ -4691,8 +4704,12 @@ class Interpreter {
     if (valueStr === '-' && part.ref) valueStr = this.getValueFromRef(part.ref) || '-';
     if (valueStr === '-') return null;
     const displayName = part.varName || this._formatSchemaFieldLabel(atom) || atom.var;
+    const fullWireBits = wire.ref && wire.ref !== '&-' ? this.getValueFromRef(wire.ref) : valueStr;
+    const rootSchema = wire.schemaRef ? this._resolveSchema(wire.schemaRef) : null;
     const showOpts = Object.assign({}, opts || {}, {
       varArrayCounts: wire.varArrayCounts || {},
+      wireBits: fullWireBits != null ? String(fullWireBits) : valueStr,
+      schema: rootSchema,
     });
     if (view.kind === 'nested') {
       SS.validateSchemaWidthForShow(view.schema, valueStr.length);

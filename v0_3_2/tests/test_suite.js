@@ -22420,6 +22420,62 @@ reg(2402, 'semantic-schemas', 'countRef flat assign count too large', function(h
   }, "Cannot resolve variable array 'codeDatas'");
 });
 
+const FRAME_GRID_DET_SCHEMA = `<frameGridDet>:
+    nRows: 4
+    nCols: 4
+    grid: 8[nRows, nCols]
+:
+`;
+
+reg(2403, 'semantic-schemas', 'matrix dual countRef schema compile', function(h, session) {
+  session.run(FRAME_GRID_DET_SCHEMA);
+  const schema = session.interp.schemaRegistry.get('frameGridDet');
+  const grid = schema && schema.structure.find((n) => n.name === 'grid');
+  h.assert('countRefDim both', String(grid && grid.countRefDim === 'both'), 'true');
+  h.assert('countRefRows', String(grid && grid.countRefRows === 'nRows'), 'true');
+  h.assert('countRefCols', String(grid && grid.countRefCols === 'nCols'), 'true');
+  h.assert('maxCount 225', String(grid && grid.maxCount === 225), 'true');
+});
+
+reg(2404, 'semantic-schemas', 'matrix dual countRef flat assign', function(h, session) {
+  session.run(FRAME_GRID_DET_SCHEMA + [
+    '56wire<frameGridDet> pkt = ^23AABBCCDDEEFF',
+    '8wire c00 = pkt:grid:0:0',
+    '8wire c12 = pkt:grid:1:2',
+  ].join('\n'));
+  h.assert('grid count 6', String(session.interp.wires.get('pkt').varArrayCounts.grid), '6');
+  h.assert('cell00', session.getWire(session.interp, 'c00'), '10101010');
+  h.assert('cell12', session.getWire(session.interp, 'c12'), '11111111');
+});
+
+reg(2405, 'semantic-schemas', 'matrix dual countRef flat assign (wave)', function(h, session) {
+  session.run(FRAME_GRID_DET_SCHEMA + '56wire<frameGridDet> pkt = ^23AABBCCDDEEFF');
+  h.assert('grid count 6', String(session.interp.wires.get('pkt').varArrayCounts.grid), '6');
+}, { propagation: 'wave' });
+
+reg(2406, 'semantic-schemas', 'matrix countRef rows fixed cols', function(h, session) {
+  session.run(`<frameGridRows>:
+    nRows: 4
+    grid: 8[nRows, 2]
+:
+` + [
+    '36wire<frameGridRows> pkt = ^2AABBCCDD',
+    '8wire r0c1 = pkt:grid:0:1',
+  ].join('\n'));
+  h.assert('grid count 4', String(session.interp.wires.get('pkt').varArrayCounts.grid), '4');
+  h.assert('cell r0c1', session.getWire(session.interp, 'r0c1'), '10111011');
+});
+
+reg(2407, 'semantic-schemas', 'matrix dual countRef parse duplicate field', function(h, session) {
+  h.assertThrows('dup ref', function() {
+    session.run(`<bad>:
+    nRows: 4
+    grid: 8[nRows, nRows]
+:
+`);
+  }, 'must refer to different fields');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,
