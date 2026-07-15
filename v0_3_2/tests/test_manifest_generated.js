@@ -1932,7 +1932,13 @@
       {"id":2472,"group":"sock","title":"TEST rx/(len) dynamic peek","detail":{"scripts":[],"steps":["run([ 'sock rx', 'rx << ^FF', '4wire len : 0100', 'TEST(rx/(len), 1111)', ].join('\\n')) [nerezolvat]"],"assertions":[]}},
       {"id":2473,"group":"sock","title":"WWIDTH(rx/(8)) after append","detail":{"scripts":[],"steps":["run([ 'sock rx', 'rx << ^FF', '4wire w = WWIDTH(rx/(8))', ].join('\\n')) [nerezolvat]"],"assertions":["WWIDTH 8"]}},
       {"id":2474,"group":"sock","title":"underflow rx/(8) consume throws","detail":{"scripts":["sock rx\n4wire x << rx/(8)"],"steps":[],"assertions":["underflow"]}},
-      {"id":2475,"group":"sock","title":"rx./(len) equivalent peek to rx/(len)","detail":{"scripts":[],"steps":["run([ 'sock rx', 'rx << ^FF', '4wire len : 0100', '4wire a = rx./(len)', '4wire b = rx/(len)', ].join('…) [nerezolvat]"],"assertions":["dot form","slash form","sock intact"]}}
+      {"id":2475,"group":"sock","title":"rx./(len) equivalent peek to rx/(len)","detail":{"scripts":[],"steps":["run([ 'sock rx', 'rx << ^FF', '4wire len : 0100', '4wire a = rx./(len)', '4wire b = rx/(len)', ].join('…) [nerezolvat]"],"assertions":["dot form","slash form","sock intact"]}},
+      {"id":2476,"group":"sock","title":"Parser — probe(rx) and watch(rx) AST","detail":{"scripts":["probe(rx)"],"steps":[],"assertions":["probe stmt","probe expr","watch stmt"]}},
+      {"id":2477,"group":"sock","title":"probe(rx) initialised and changed on append","detail":{"scripts":["sock rx\nprobe(rx)"],"steps":[],"assertions":["initialised empty","changed after append","sock len 8"]}},
+      {"id":2478,"group":"sock","title":"probe(rx; u8) tag after append","detail":{"scripts":["sock rx\nprobe(rx; u8)\nrx << ^FF"],"steps":[],"assertions":["u8 255","sock len 8"]}},
+      {"id":2479,"group":"sock","title":"probe(rx./4) slice tracks front","detail":{"scripts":["sock rx\nrx << ^F0\nprobe(rx./4)"],"steps":[],"assertions":["slice initialised","slice changed","rest 0000"]}},
+      {"id":2480,"group":"sock","title":"watch(rx) records append","detail":{"scripts":["sock rx\nwatch(rx)"],"steps":[],"assertions":["watch target","sample recorded"]}},
+      {"id":2481,"group":"sock","title":"watch(rx) records consume","detail":{"scripts":["sock rx\nrx << ^FF\nwatch(rx)"],"steps":[],"assertions":["consume sample"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -2020,7 +2026,7 @@
       { id: 'debug', label: 'show / peek / probe', rangeLabel: '804–819, 1176–1187, 1711–1714', testIds: [804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 1176, 1177, 1178, 1179, 1180, 1181, 1182, 1183, 1184, 1185, 1186, 1187, 1711, 1712, 1713, 1714] },
       { id: 'show-tags', label: 'show-tags', rangeLabel: '1905–1936, 1946, 1968', testIds: [1905, 1906, 1907, 1908, 1909, 1910, 1911, 1912, 1913, 1914, 1915, 1916, 1917, 1918, 1919, 1920, 1921, 1922, 1923, 1924, 1925, 1926, 1927, 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, 1946, 1968] },
       { id: 'slider', label: 'Slider component', rangeLabel: '1206–1220', testIds: [1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215, 1216, 1217, 1218, 1219, 1220] },
-      { id: 'sock', label: 'sock', rangeLabel: '2450–2475', testIds: [2450, 2451, 2452, 2453, 2454, 2455, 2456, 2457, 2458, 2459, 2460, 2461, 2462, 2463, 2464, 2465, 2466, 2467, 2468, 2469, 2470, 2471, 2472, 2473, 2474, 2475] },
+      { id: 'sock', label: 'sock', rangeLabel: '2450–2481', testIds: [2450, 2451, 2452, 2453, 2454, 2455, 2456, 2457, 2458, 2459, 2460, 2461, 2462, 2463, 2464, 2465, 2466, 2467, 2468, 2469, 2470, 2471, 2472, 2473, 2474, 2475, 2476, 2477, 2478, 2479, 2480, 2481] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983, 1571–1574, 1643–1653, 1661, 1663', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 1571, 1572, 1573, 1574, 1643, 1644, 1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1661, 1663] },
       { id: 'unsigned-width-tags', label: 'unsigned-width-tags', rangeLabel: '2410–2419', testIds: [2410, 2411, 2412, 2413, 2414, 2415, 2416, 2417, 2418, 2419] },
       { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775] },

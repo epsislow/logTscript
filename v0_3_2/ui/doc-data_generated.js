@@ -8767,6 +8767,7 @@ probe(v; dec)      # # v = \\65 - initialised
 | Form | Example |
 |------|---------|
 | Wire name | \`probe(a)\` |
+| Sock (bitstream) | \`probe(rx)\`, \`probe(rx./8; u8)\` |
 | Component \`:get\` (implicit) | \`probe(.clk)\` → \`probe(.clk:get)\` |
 | Component property | \`probe(.clk:get)\` |
 | Chip / PCB pin or pout | \`probe(.u1:sum)\`, \`probe(.q:result)\` |
@@ -24448,6 +24449,23 @@ ready = 1
 show(op)
 show(BITSIZE(rx))
 \`\`\`
+
+---
+
+## Probe and watch
+
+Non-destructive debug on the live buffer — same display tags as wires (\`; u8\`, \`; dec\`, \`; hex\`, …). See [\`debug.md\`](debug.md).
+
+\`\`\`logts-play
+sock rx
+probe(rx)
+watch(rx)
+rx << ^FF
+probe(rx; u8)
+4wire hdr << rx./4
+\`\`\`
+
+\`probe(rx./4)\` peeks the front slice; append and consume update probe/watch without extra assignments. Signal Trace (Wave Listen) logs sock commits as \`commit sock rx\`.
 
 ---
 

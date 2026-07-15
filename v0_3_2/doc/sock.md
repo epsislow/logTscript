@@ -143,6 +143,23 @@ show(BITSIZE(rx))
 
 ---
 
+## Probe and watch
+
+Non-destructive debug on the live buffer — same display tags as wires (`; u8`, `; dec`, `; hex`, …). See [`debug.md`](debug.md).
+
+```logts-play
+sock rx
+probe(rx)
+watch(rx)
+rx << ^FF
+probe(rx; u8)
+4wire hdr << rx./4
+```
+
+`probe(rx./4)` peeks the front slice; append and consume update probe/watch without extra assignments. Signal Trace (Wave Listen) logs sock commits as `commit sock rx`.
+
+---
+
 ## Related
 
 - [`queue.md`](queue.md) — FIFO elements vs bit stream

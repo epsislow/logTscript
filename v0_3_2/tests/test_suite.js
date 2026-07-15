@@ -22895,6 +22895,55 @@ reg(2475, 'sock', 'rx./(len) equivalent peek to rx/(len)', function(h, session) 
   h.assert('sock intact', session.getSockLen(interp, 'rx'), 8);
 });
 
+reg(2476, 'sock', 'Parser — probe(rx) and watch(rx) AST', function(h, session) {
+  const probeStmts = session.parse('probe(rx)');
+  h.assert('probe stmt', String(probeStmts[0].probe !== undefined), 'true');
+  h.assert('probe expr', String(probeStmts[0].probe.expr !== undefined), 'true');
+  const watchStmts = session.parse('watch(rx)');
+  h.assert('watch stmt', String(watchStmts[0].watch !== undefined), 'true');
+});
+
+reg(2477, 'sock', 'probe(rx) initialised and changed on append', function(h, session) {
+  const { interp, out } = session.run('sock rx\nprobe(rx)');
+  h.assert('initialised empty', String(out.some(l => l.includes('# rx') && l.includes('initialised'))), 'true');
+  session.parse('rx << ^FF').forEach((s) => interp.exec(s));
+  h.assert('changed after append', String(interp.out.some(l => l.includes('# rx') && l.includes('11111111') && l.includes('changed'))), 'true');
+  h.assert('sock len 8', session.getSockLen(interp, 'rx'), 8);
+});
+
+reg(2478, 'sock', 'probe(rx; u8) tag after append', function(h, session) {
+  const { interp, out } = session.run('sock rx\nprobe(rx; u8)\nrx << ^FF');
+  h.assert('u8 255', String(out.some(l => l.includes('# rx') && l.includes('255') && l.includes('initialised'))), 'true');
+  h.assert('sock len 8', session.getSockLen(interp, 'rx'), 8);
+});
+
+reg(2479, 'sock', 'probe(rx./4) slice tracks front', function(h, session) {
+  const { interp, out } = session.run('sock rx\nrx << ^F0\nprobe(rx./4)');
+  h.assert('slice initialised', String(out.some(l => l.includes('rx./4') && l.includes('1111'))), 'true');
+  session.parse('4wire x << rx./4').forEach((s) => interp.exec(s));
+  h.assert('slice changed', String(interp.out.some(l => l.includes('rx./4') && l.includes('0000') && l.includes('changed'))), 'true');
+  h.assert('rest 0000', session.getSockBits(interp, 'rx'), '0000');
+});
+
+reg(2480, 'sock', 'watch(rx) records append', function(h, session) {
+  const samples = [];
+  const { interp } = session.run('sock rx\nwatch(rx)');
+  interp.watchRecorder = (s) => samples.push(s);
+  session.parse('rx << ^FF').forEach((s) => interp.exec(s));
+  const flat = samples.flatMap(s => s.channels || [s]);
+  h.assert('watch target', String(interp.watchTargets.length), '1');
+  h.assert('sample recorded', String(flat.some(c => c.label === 'rx' && c.valueStr === '11111111')), 'true');
+});
+
+reg(2481, 'sock', 'watch(rx) records consume', function(h, session) {
+  const samples = [];
+  const { interp } = session.run('sock rx\nrx << ^FF\nwatch(rx)');
+  interp.watchRecorder = (s) => samples.push(s);
+  session.parse('4wire x << rx./4').forEach((s) => interp.exec(s));
+  const flat = samples.flatMap(s => s.channels || [s]);
+  h.assert('consume sample', String(flat.some(c => c.label === 'rx' && c.valueStr === '1111')), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

@@ -2047,6 +2047,11 @@ class Interpreter {
       value = this.getWireStableValue(target.wireName);
       const wire = this.wires.get(target.wireName);
       if (wire) target.ref = wire.ref;
+    } else if (target.kind === 'sock' && target.sockName) {
+      value = this.getSockBits(target.sockName);
+      if (value != null) target.bitWidth = value.length;
+    } else if (target.kind === 'sockSlice' && target.sockName) {
+      value = this._readSockProbeSlice(target);
     } else if (target.kind === 'ref' && target.ref) {
       value = this.getValueFromRef(target.ref);
     } else if (target.kind === 'component') {
@@ -2075,10 +2080,13 @@ class Interpreter {
     for (const { target, value } of updates) {
       if (!target) continue;
       let valueStr = value == null ? '-' : String(value);
-      const sliceBits = (target.kind === 'wireSlice' || target.kind === 'componentComputedSlice')
-        ? 1 : target.bitWidth;
+      const sliceBits = (target.kind === 'wireSlice' || target.kind === 'componentComputedSlice' || target.kind === 'sockSlice')
+        ? (target.bitWidth || 1) : target.bitWidth;
+      if (target.isSock && target.kind === 'sock' && valueStr !== '-') {
+        target.bitWidth = valueStr.length;
+      }
       if (target.bitWidth && valueStr !== '-' && !target.isText
-          && target.kind !== 'wireSlice' && target.kind !== 'componentComputedSlice') {
+          && target.kind !== 'wireSlice' && target.kind !== 'componentComputedSlice' && target.kind !== 'sockSlice') {
         valueStr = this.formatValue(valueStr, target.bitWidth);
       }
       if (target.lastWatchValue === valueStr) continue;
@@ -2089,7 +2097,7 @@ class Interpreter {
       changedTargets.push(target);
       channels.push({
         channelIndex: target.channelIndex,
-        label: target.label || target.wireName || target.ref || '?',
+        label: target.label || target.wireName || target.sockName || target.ref || '?',
         state,
         valueStr
       });
@@ -2244,6 +2252,44 @@ class Interpreter {
     this._recordWatchBatch(batch);
   }
 
+  _resolveProbeSockTarget(atom) {
+    if (!atom || !atom.var || atom.var.startsWith('.') || !this.socks.has(atom.var)) return null;
+    const name = atom.var;
+    if (atom.bitRange) {
+      const { start, end } = this.resolveBitRange(atom.bitRange);
+      const n = end - start + 1;
+      return {
+        kind: 'sockSlice',
+        key: 's:' + name + ':' + start + '-' + end,
+        label: this._formatSockSliceLabel(name, atom.bitRange, n),
+        sockName: name,
+        bitRange: atom.bitRange,
+        sliceStart: start,
+        sliceEnd: end,
+        bitWidth: n,
+        isSock: true,
+        seen: false,
+        lastValue: null
+      };
+    }
+    const len = this.getSockRuntimeLength(name);
+    return {
+      kind: 'sock',
+      key: 's:' + name,
+      label: name,
+      sockName: name,
+      bitWidth: len != null ? len : 0,
+      isSock: true,
+      seen: false,
+      lastValue: null
+    };
+  }
+
+  _readSockProbeSlice(target) {
+    if (!target || !target.sockName || !target.bitRange) return null;
+    return this._peekSockSlice(target.sockName, { var: target.sockName, bitRange: target.bitRange });
+  }
+
   _resolveProbeExpr(expr) {
     if (!expr || !expr.length) return null;
     const atom = expr[0];
@@ -2260,6 +2306,8 @@ class Interpreter {
         }
         return this._resolveProbeComponentTarget(atom);
       }
+      const sockTarget = this._resolveProbeSockTarget(atom);
+      if (sockTarget) return sockTarget;
       const wire = this.wires.get(atom.var);
       if (!wire) return null;
       if (atom.vectorIndex !== undefined || atom.vectorIndexExpr) {
@@ -2341,6 +2389,11 @@ class Interpreter {
       value = this.getWireStableValue(target.wireName);
       const wire = this.wires.get(target.wireName);
       if (wire) target.ref = wire.ref;
+    } else if (target.kind === 'sock' && target.sockName) {
+      value = this.getSockBits(target.sockName);
+      if (value != null) target.bitWidth = value.length;
+    } else if (target.kind === 'sockSlice' && target.sockName) {
+      value = this._readSockProbeSlice(target);
     } else if (target.kind === 'ref' && target.ref) {
       value = this.getValueFromRef(target.ref);
     } else if (target.kind === 'component') {
@@ -2417,6 +2470,9 @@ class Interpreter {
   _emitProbeTarget(target, value, reasonOverride, driverSuffix = '') {
     if (!target) return;
     let valueStr = value == null ? '-' : String(value);
+    if (target.isSock && valueStr !== '-') {
+      target.bitWidth = valueStr.length;
+    }
     const opts = this._normalizeShowDisplayOpts(target.displayTags);
     const wire = target.wireName ? this.wires.get(target.wireName) : null;
     const ref = target.ref && target.ref !== '&-' ? target.ref : (target.wireName ? (this.wires.get(target.wireName)?.ref) : null);
@@ -2504,6 +2560,48 @@ class Interpreter {
       }
     }
     this._emitWatchRowForWire(name, value);
+  }
+
+  _notifyLegacySockCommit(name, val) {
+    if (this.deferWirePropagation() || !this.waveListenActive) return;
+    const strategy = this.signalPropagationStrategy;
+    if (strategy && typeof strategy.notifyLegacySockCommit === 'function') {
+      strategy.notifyLegacySockCommit(name, val);
+    }
+  }
+
+  _emitWatchRowForSock(name, fullValue) {
+    const batch = [];
+    const value = fullValue != null ? String(fullValue) : (this.getSockBits(name) || '');
+    for (const target of this.watchTargets) {
+      if (target.sockName !== name) continue;
+      if (target.kind === 'sockSlice') {
+        const v = this._readSockProbeSlice(target);
+        if (v !== null) batch.push({ target, value: v });
+      } else if (target.kind === 'sock') {
+        batch.push({ target, value });
+      }
+    }
+    this._recordWatchBatch(batch);
+  }
+
+  _emitProbeForSock(name) {
+    const bits = this.getSockBits(name);
+    const value = bits != null ? bits : '';
+    const target = this.probeByKey.get('s:' + name);
+    if (target) {
+      target.bitWidth = value.length;
+      this._emitProbeTarget(target, value);
+    }
+    for (const sliceTarget of this.probeTargets) {
+      if (sliceTarget.kind !== 'sockSlice' || sliceTarget.sockName !== name) continue;
+      const sliceVal = this._readSockProbeSlice(sliceTarget);
+      if (sliceVal !== null) {
+        this._emitProbeTarget(sliceTarget, sliceVal);
+      }
+    }
+    this._emitWatchRowForSock(name, value);
+    this._notifyLegacySockCommit(name, value);
   }
 
   _emitProbeForRef(refStr, value) {
@@ -5301,6 +5399,7 @@ class Interpreter {
     }
     const chunk = bits.substring(0, n);
     entry.bits = bits.substring(n);
+    this._emitProbeForSock(name);
     return chunk;
   }
 
@@ -5314,12 +5413,14 @@ class Interpreter {
       throw Error(`sock overflow: cap ${entry.cap} bit, would be ${nextLen} after append`);
     }
     entry.bits = (entry.bits || '') + bits;
+    this._emitProbeForSock(name);
   }
 
   _clearSock(name) {
     const entry = this.socks.get(name);
     if (!entry) throw Error(`Undefined sock ${name}`);
     entry.bits = '';
+    this._emitProbeForSock(name);
   }
 
   _inferSockAtomStaticBitWidth(atom) {

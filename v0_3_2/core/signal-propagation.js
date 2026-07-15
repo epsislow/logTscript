@@ -68,7 +68,7 @@ class SignalPropagationStrategy {
     this._emitListenText(prefixed, kind, minLevel, traceCategory || this._listenCategoryFor(kind));
   }
 
-  _emitLegacyListenValueEntryAtStep(step, name, val, kind, minLevel, isComponent) {
+  _emitLegacyListenValueEntryAtStep(step, name, val, kind, minLevel, isComponent, isSock) {
     if (!this._isLegacyListen()) return;
     if (this.debugLevel < minLevel) return;
     const interp = this.interp;
@@ -76,6 +76,7 @@ class SignalPropagationStrategy {
     if (typeof interp.emitWaveListenLine !== 'function') return;
     let label = 'commit';
     if (isComponent) label = 'commit component';
+    else if (isSock) label = 'commit sock';
     else if (kind === 'eval') label = 'eval';
     else if (kind === 'schedule') label = 'schedule';
     else if (kind === 'state') label = 'state';
@@ -84,7 +85,7 @@ class SignalPropagationStrategy {
       mode: 'legacy',
       traceCategory: this._listenCategoryFor(kind, { isComponent }),
       label,
-      ...this._buildWaveListenValuePayload(name, val, { isComponent }),
+      ...this._buildWaveListenValuePayload(name, val, { isComponent, isSock }),
     };
     interp.emitWaveListenLine(payload, kind || 'commit');
   }
@@ -93,6 +94,12 @@ class SignalPropagationStrategy {
     if (!this._isLegacyListen()) return;
     const step = this._legacyCascadeStep();
     this._emitLegacyListenValueEntryAtStep(step, name, val, 'commit', 1, false);
+  }
+
+  notifyLegacySockCommit(name, val) {
+    if (!this._isLegacyListen()) return;
+    const step = this._legacyCascadeStep();
+    this._emitLegacyListenValueEntryAtStep(step, name, val, 'commit', 1, false, true);
   }
 
   notifyLegacyComponentCommit(name, val) {
@@ -215,6 +222,7 @@ class SignalPropagationStrategy {
     let wireType = null;
     let tensorMeta = null;
     let wire = null;
+    let isSock = !!(opts && opts.isSock);
     if (isComponent) {
       const comp = interp.components.get(name);
       if (comp) {
@@ -239,6 +247,10 @@ class SignalPropagationStrategy {
         } else {
           bitWidth = interp.getBitWidth(wire.type) || val.length;
         }
+      } else if (interp.socks && interp.socks.has(name)) {
+        isSock = true;
+        bitWidth = val.length;
+        wireType = bitWidth ? `${bitWidth}bit sock` : 'sock';
       }
     }
     return {
@@ -247,10 +259,11 @@ class SignalPropagationStrategy {
       bitWidth,
       wireType,
       tensorMeta,
-      schemaRef: isComponent ? null : (wire && wire.schemaRef) || null,
-      parseViewId: isComponent ? null : (wire && wire.parseViewId != null ? wire.parseViewId : null),
-      varArrayCounts: isComponent ? null : (wire && wire.varArrayCounts) || null,
+      schemaRef: isComponent || isSock ? null : (wire && wire.schemaRef) || null,
+      parseViewId: isComponent || isSock ? null : (wire && wire.parseViewId != null ? wire.parseViewId : null),
+      varArrayCounts: isComponent || isSock ? null : (wire && wire.varArrayCounts) || null,
       isComponent,
+      isSock,
     };
   }
 

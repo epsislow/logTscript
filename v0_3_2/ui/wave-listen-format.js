@@ -422,7 +422,7 @@ function waveListenPayloadPrefix(payload) {
 
 function _bitsSuffix(entry) {
   const bw = entry.bitWidth || (entry.rawValue ? entry.rawValue.length : 0);
-  let s = `(${bw}bits)`;
+  let s = entry.isSock ? `(${bw}bits sock)` : `(${bw}bits)`;
   if (entry.tensorMeta) {
     s += ` ${_tensorShapeLabel(entry.tensorMeta)}`;
   }

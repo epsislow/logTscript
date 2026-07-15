@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: "1.2"
     content: "Faza 1.2: probe/watch/Wave Listen + probe tags, teste 2476–2481"
-    status: pending
+    status: completed
   - id: "1.3"
     content: "Faza 1.3: protocol peek/consume sock (`=` vs `<<`), teste 2480–2486 — vezi sock_protocol_1.3.plan.md"
     status: pending

@@ -424,6 +424,7 @@ probe(v; dec)      # # v = \65 - initialised
 | Form | Example |
 |------|---------|
 | Wire name | `probe(a)` |
+| Sock (bitstream) | `probe(rx)`, `probe(rx./8; u8)` |
 | Component `:get` (implicit) | `probe(.clk)` → `probe(.clk:get)` |
 | Component property | `probe(.clk:get)` |
 | Chip / PCB pin or pout | `probe(.u1:sum)`, `probe(.q:result)` |
