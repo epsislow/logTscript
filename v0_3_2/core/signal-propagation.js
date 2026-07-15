@@ -481,15 +481,21 @@ class SignalPropagationStrategy {
     this._deferredShows.push(stmt);
   }
 
+  _syncSliceDriverWirePending(name) {
+    const interp = this.interp;
+    if (!interp || !interp._wireHasSliceDriver(name)) return;
+    const wire = interp.wires.get(name);
+    const bits = wire && interp.getBitWidth(wire.type);
+    if (!bits) return;
+    const resolved = interp._resolveZlistResolvedValue(name, bits);
+    if (resolved != null) this.wirePendingStates.set(name, resolved);
+  }
+
   _reconcileSliceDriverWires() {
     const interp = this.interp;
     if (!interp) return;
-    for (const [name, wire] of interp.wires) {
-      if (!interp._wireHasSliceDriver(name)) continue;
-      const bits = interp.getBitWidth(wire.type);
-      if (!bits) continue;
-      const resolved = interp._resolveZlistResolvedValue(name, bits);
-      if (resolved != null) this.wirePendingStates.set(name, resolved);
+    for (const [name] of interp.wires) {
+      this._syncSliceDriverWirePending(name);
     }
   }
 
@@ -621,7 +627,10 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
           for (const [name, val] of outputs) {
-            if (interp._wireHasSliceDriver(name)) continue;
+            if (interp._wireHasSliceDriver(name)) {
+              this._syncSliceDriverWirePending(name);
+              continue;
+            }
             this.scheduleWireChange(name, val);
           }
         }
@@ -639,7 +648,10 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
         const outputs = interp.execWireStatement(ws, true);
         if (outputs && outputs.length) {
           for (const [name, val] of outputs) {
-            if (interp._wireHasSliceDriver(name)) continue;
+            if (interp._wireHasSliceDriver(name)) {
+              this._syncSliceDriverWirePending(name);
+              continue;
+            }
             this.scheduleWireChange(name, val);
           }
         }
@@ -705,7 +717,11 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
             const outputs = interp.execWireStatement(ws, true);
             if (outputs && outputs.length) {
               for (const [name, val] of outputs) {
-                if (this.scheduleWireChange(name, val)) anyScheduled = true;
+                if (interp._wireHasSliceDriver(name)) {
+                  this._syncSliceDriverWirePending(name);
+                } else if (this.scheduleWireChange(name, val)) {
+                  anyScheduled = true;
+                }
                 if (this.debugLevel >= 3) {
                   this._emitWaveListenValueEntry(wave, name, val, 'schedule', 3, false);
                 }
@@ -716,7 +732,11 @@ class WavePropagationStrategy extends SignalPropagationStrategy {
           const outputs = interp.execWireStatement(ws, true);
           if (outputs && outputs.length) {
             for (const [name, val] of outputs) {
-              if (this.scheduleWireChange(name, val)) anyScheduled = true;
+              if (interp._wireHasSliceDriver(name)) {
+                this._syncSliceDriverWirePending(name);
+              } else if (this.scheduleWireChange(name, val)) {
+                anyScheduled = true;
+              }
               if (this.debugLevel >= 3) {
                 this._emitWaveListenValueEntry(wave, name, val, 'schedule', 3, false);
               }

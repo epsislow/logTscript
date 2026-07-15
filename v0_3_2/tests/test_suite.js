@@ -22476,6 +22476,27 @@ reg(2407, 'semantic-schemas', 'matrix dual countRef parse duplicate field', func
   }, 'must refer to different fields');
 });
 
+reg(2408, 'semantic-schemas', 'var matrix row slice assign (wave)', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'pkt:grid:0 = 00000101 + 00000110',
+    '16wire row0 = pkt:grid:0',
+  ].join('\n'));
+  h.assert('row0', session.getWire(session.interp, 'row0'), '0000010100000110');
+  h.assert('cell00', session.getWire(session.interp, 'pkt').substring(0, 8), '00000101');
+}, { propagation: 'wave' });
+
+reg(2409, 'semantic-schemas', 'var matrix column slice assign (wave)', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'pkt:grid::1 = 00000110 + 00001111',
+    '16wire col1 = pkt:grid::1',
+  ].join('\n'));
+  h.assert('col1', session.getWire(session.interp, 'col1'), '0000011000001111');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,
