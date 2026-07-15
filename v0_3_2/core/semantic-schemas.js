@@ -29,6 +29,9 @@
         minCount: spec.minCount,
         maxCount: spec.maxCount,
         singleDim: spec.singleDim,
+        matrixVar: spec.matrixVar,
+        rowsSpec: spec.rowsSpec,
+        colsSpec: spec.colsSpec,
       };
     }
     if (spec.kind === 'schema_array') {
@@ -42,6 +45,9 @@
         minCount: spec.minCount,
         maxCount: spec.maxCount,
         singleDim: spec.singleDim,
+        matrixVar: spec.matrixVar,
+        rowsSpec: spec.rowsSpec,
+        colsSpec: spec.colsSpec,
       };
     }
     if (spec.ref && spec.name && spec.kind !== 'leaf') {
@@ -57,7 +63,127 @@
   }
 
   function isMatrixArrayNode(node) {
-    return node && node.kind === 'array' && node.rows > 1 && node.cols > 1;
+    if (!node || node.kind !== 'array') return false;
+    if (node.matrixVar || (node.rows != null && node.cols != null && !node.singleDim)) {
+      return node.rows > 1 || node.cols > 1;
+    }
+    return node.rows > 1 && node.cols > 1;
+  }
+
+  function isVarMatrixNode(node) {
+    return node && node.kind === 'var_array' && !!node.matrixVar;
+  }
+
+  function expandMatrixVarMeta(rowsSpec, colsSpec) {
+    const rowsVar = !!rowsSpec.var;
+    const colsVar = !!colsSpec.var;
+    const rowsFixed = rowsVar ? null : rowsSpec.fixed;
+    const colsFixed = colsVar ? null : colsSpec.fixed;
+    const rowsMin = rowsVar ? rowsSpec.min : rowsSpec.fixed;
+    const rowsMax = rowsVar ? rowsSpec.max : rowsSpec.fixed;
+    const colsMin = colsVar ? colsSpec.min : colsSpec.fixed;
+    const colsMax = colsVar ? colsSpec.max : colsSpec.fixed;
+    return {
+      matrixVar: true,
+      rowsVar,
+      colsVar,
+      rowsFixed,
+      colsFixed,
+      rowsMin,
+      rowsMax,
+      colsMin,
+      colsMax,
+      rows: rowsMin,
+      cols: colsMin,
+      singleDim: false,
+    };
+  }
+
+  function resolveMatrixShapeFromCount(node, totalCells, schemaName) {
+    if (!node.matrixVar) {
+      return { rows: 1, cols: totalCells, singleDim: true };
+    }
+    if (node.rowsVar && node.colsVar) {
+      throw new Error(
+        `Ambiguous matrix shape for '${node.name}' in schema '${schemaName}' — use grouped literal shape [R,C]`
+      );
+    }
+    if (node.colsFixed != null && !node.colsVar) {
+      if (totalCells % node.colsFixed !== 0) {
+        throw new Error(
+          `Field '${node.name}' in schema '${schemaName}' expects a multiple of ${node.colsFixed} cells per row, got ${totalCells}`
+        );
+      }
+      const rows = totalCells / node.colsFixed;
+      if (rows < node.rowsMin || (node.rowsMax != null && rows > node.rowsMax)) {
+        throw new Error(
+          `Matrix row count ${rows} out of range for '${node.name}' in schema '${schemaName}'`
+        );
+      }
+      return { rows, cols: node.colsFixed, singleDim: false };
+    }
+    if (node.rowsFixed != null && !node.rowsVar) {
+      if (totalCells % node.rowsFixed !== 0) {
+        throw new Error(
+          `Field '${node.name}' in schema '${schemaName}' expects a multiple of ${node.rowsFixed} rows, got ${totalCells}`
+        );
+      }
+      const cols = totalCells / node.rowsFixed;
+      if (cols < node.colsMin || (node.colsMax != null && cols > node.colsMax)) {
+        throw new Error(
+          `Matrix column count ${cols} out of range for '${node.name}' in schema '${schemaName}'`
+        );
+      }
+      return { rows: node.rowsFixed, cols, singleDim: false };
+    }
+    throw new Error(`Invalid matrix field '${node.name}' in schema '${schemaName}'`);
+  }
+
+  function validateGroupedLiteralShape(node, shape, elementCount, schemaName) {
+    if (!shape) {
+      if (isVarMatrixNode(node) && node.rowsVar && node.colsVar) {
+        throw new Error(
+          `Shape prefix or suffix [R,C] required for '${node.name}' in schema '${schemaName}'`
+        );
+      }
+      return null;
+    }
+    let rows;
+    let cols;
+    if (shape.kind === 'vector') {
+      if (isVarMatrixNode(node)) {
+        throw new Error(`Expected matrix shape [R,C] for '${node.name}' in schema '${schemaName}'`);
+      }
+      rows = 1;
+      cols = shape.count;
+    } else {
+      rows = shape.rows;
+      cols = shape.cols;
+    }
+    if (elementCount !== rows * cols) {
+      throw new Error(
+        `Grouped literal shape [${rows},${cols}] expects ${rows * cols} elements, got ${elementCount} for '${node.name}' in schema '${schemaName}'`
+      );
+    }
+    if (isVarMatrixNode(node)) {
+      if (node.rowsVar) {
+        if (rows < node.rowsMin || (node.rowsMax != null && rows > node.rowsMax)) {
+          throw new Error(`Matrix row count ${rows} out of range for '${node.name}' in schema '${schemaName}'`);
+        }
+      } else if (rows !== node.rowsFixed) {
+        throw new Error(`Matrix row count must be ${node.rowsFixed} for '${node.name}' in schema '${schemaName}', got ${rows}`);
+      }
+      if (node.colsVar) {
+        if (cols < node.colsMin || (node.colsMax != null && cols > node.colsMax)) {
+          throw new Error(`Matrix column count ${cols} out of range for '${node.name}' in schema '${schemaName}'`);
+        }
+      } else if (cols !== node.colsFixed) {
+        throw new Error(`Matrix column count must be ${node.colsFixed} for '${node.name}' in schema '${schemaName}', got ${cols}`);
+      }
+    } else if (shape.kind === 'matrix') {
+      throw new Error(`Expected vector shape [N] for '${node.name}' in schema '${schemaName}'`);
+    }
+    return { rows, cols, singleDim: shape.kind === 'matrix' ? false : true };
   }
 
   function isVarArrayNode(node) {
@@ -117,7 +243,7 @@
     }
   }
 
-  function countFromFieldBits(node, bitLen, schemaName) {
+  function countFromFieldBits(node, bitLen, schemaName, shape) {
     if (bitLen % node.elementWidth !== 0) {
       throw new Error(
         `Field '${node.name}' in schema '${schemaName}' expects a multiple of ${node.elementWidth} bits, got ${bitLen}`
@@ -125,6 +251,14 @@
     }
     const count = bitLen / node.elementWidth;
     validateVarArrayCount(node, count, schemaName);
+    if (isVarMatrixNode(node)) {
+      if (shape) {
+        validateGroupedLiteralShape(node, shape, count, schemaName);
+      }
+      resolveMatrixShapeFromCount(node, count, schemaName);
+    } else if (shape) {
+      validateGroupedLiteralShape(node, shape, count, schemaName);
+    }
     return count;
   }
 
@@ -169,6 +303,9 @@
       }
       const count = payload / vf.elementWidth;
       validateVarArrayCount(vf, count, schema.name);
+      if (isVarMatrixNode(vf)) {
+        resolveMatrixShapeFromCount(vf, count, schema.name);
+      }
       return { [vf.name]: count };
     }
 
@@ -212,17 +349,31 @@
     }
     validateVarArrayCount(arrayNode, count, schemaName);
     const width = arrayNode.elementWidth * count;
+    const bitStart = arrayNode.bitStart != null ? arrayNode.bitStart : 0;
     const result = {
       ...arrayNode,
       kind: 'array',
       elementCount: count,
       width,
-      bitEnd: arrayNode.bitStart + width - 1,
+      bitStart,
+      bitEnd: bitStart + width - 1,
     };
+    if (isVarMatrixNode(arrayNode)) {
+      const shape = resolveMatrixShapeFromCount(arrayNode, count, schemaName);
+      result.rows = shape.rows;
+      result.cols = shape.cols;
+      result.singleDim = false;
+      result.matrixVar = true;
+      return result;
+    }
     if (arrayNode.singleDim && arrayNode.rows === 1) {
       result.cols = count;
+      result.rows = 1;
+      result.singleDim = true;
     } else if (arrayNode.singleDim && arrayNode.cols === 1) {
       result.rows = count;
+      result.cols = 1;
+      result.singleDim = true;
     }
     return result;
   }
@@ -589,6 +740,9 @@
         }
         const minWidth = ew * minCount;
         const maxWidth = maxCount != null ? ew * maxCount : null;
+        const matrixMeta = spec.matrixVar && spec.rowsSpec && spec.colsSpec
+          ? expandMatrixVarMeta(spec.rowsSpec, spec.colsSpec)
+          : { singleDim: spec.singleDim !== false, rows: 1, cols: minCount };
         const arrayNode = {
           kind: 'var_array',
           name: spec.name,
@@ -597,9 +751,20 @@
           maxCount,
           minWidth,
           maxWidth,
-          rows: 1,
-          cols: minCount,
-          singleDim: true,
+          matrixVar: !!spec.matrixVar,
+          rowsVar: matrixMeta.rowsVar,
+          colsVar: matrixMeta.colsVar,
+          rowsFixed: matrixMeta.rowsFixed,
+          colsFixed: matrixMeta.colsFixed,
+          rowsMin: matrixMeta.rowsMin,
+          rowsMax: matrixMeta.rowsMax,
+          colsMin: matrixMeta.colsMin,
+          colsMax: matrixMeta.colsMax,
+          rowsSpec: spec.rowsSpec || null,
+          colsSpec: spec.colsSpec || null,
+          rows: matrixMeta.rows,
+          cols: matrixMeta.cols,
+          singleDim: matrixMeta.singleDim,
           elementSchema,
           elementSchemaRef,
           width: minWidth,
@@ -662,6 +827,9 @@
             minCount: spec.minCount,
             maxCount: spec.maxCount,
             singleDim: spec.singleDim,
+            matrixVar: spec.matrixVar,
+            rowsSpec: spec.rowsSpec,
+            colsSpec: spec.colsSpec,
           };
         }
         if (spec.kind === 'schema_array') {
@@ -682,6 +850,9 @@
             minCount: spec.minCount,
             maxCount: spec.maxCount,
             singleDim: spec.singleDim,
+            matrixVar: spec.matrixVar,
+            rowsSpec: spec.rowsSpec,
+            colsSpec: spec.colsSpec,
           };
         }
         return { kind: 'leaf', name: spec.name, width: spec.width };
@@ -854,10 +1025,12 @@
   function resolveSchemaFieldView(schema, path, opts) {
     const wireVar = opts && opts.wireVar;
     const arrayColIndex = opts && opts.arrayColIndex;
+    const varArrayCounts = (opts && opts.varArrayCounts) || {};
     if (arrayColIndex != null && path && path.length >= 1) {
       ensureSchemaShape(schema);
       let currentSchema = schema;
       let absBase = 0;
+      const offsets = schema.hasVarArray ? computeStructureOffsets(schema, varArrayCounts) : null;
       for (let i = 0; i < path.length; i++) {
         const seg = path[i];
         const nestedNode = currentSchema.structure.find((n) => n.kind === 'nested' && n.name === seg);
@@ -869,9 +1042,15 @@
           absBase = nestedNode.bitStart;
           continue;
         }
-        const arrayNode = currentSchema.structure.find((n) => n.kind === 'array' && n.name === seg);
+        const arrayNode = currentSchema.structure.find(
+          (n) => (n.kind === 'array' || n.kind === 'var_array') && n.name === seg
+        );
         if (arrayNode && i === path.length - 1) {
-          return resolveSchemaArrayColView(arrayNode, absBase, path, arrayColIndex, wireVar, schema.name);
+          const arrayBitStart = offsets ? offsets.get(arrayNode.name) : absBase + (arrayNode.bitStart || 0);
+          const resolvedNode = isVarArrayNode(arrayNode)
+            ? runtimeArrayNode({ ...arrayNode, bitStart: arrayBitStart }, varArrayCounts, currentSchema.name || schema.name)
+            : { ...arrayNode, bitStart: arrayBitStart };
+          return resolveSchemaArrayColView(resolvedNode, 0, path, arrayColIndex, wireVar, schema.name);
         }
         break;
       }
@@ -1327,7 +1506,8 @@
         const node = schema.structure.find((n) => n.name === key);
         if (node && node.kind === 'var_array') {
           const bitLen = val == null ? 0 : String(val).length;
-          const count = countFromFieldBits(node, bitLen, schema.name);
+          const shape = options && options.fieldShapes && options.fieldShapes[key];
+          const count = countFromFieldBits(node, bitLen, schema.name, shape);
           varArrayCounts[node.name] = count;
           const offset = computeStructureOffsets(schema, varArrayCounts).get(node.name);
           bits = packBlock(bits, schema, offset, node.elementWidth * count, val);
@@ -1438,16 +1618,18 @@
         lines.push(`${pad}${node.name}`);
         const count = varArrayCounts[node.name] != null ? varArrayCounts[node.name] : node.minCount;
         const sliceBits = bits.substring(nodeStart, nodeStart + nodeWidth);
-        const runtimeNode = {
-          ...node,
-          kind: 'array',
-          elementCount: count,
-          cols: count,
-          width: nodeWidth,
-        };
+        const runtimeNode = runtimeArrayNode(
+          { ...node, bitStart: nodeStart },
+          varArrayCounts,
+          schema.name
+        );
         appendSchemaArrayElementLines(lines, sliceBits, runtimeNode, opts, formatValueFn, indent + 1, node.elementSchema || null);
         if (opts && opts.showVarArrayLength !== false) {
-          lines.push(`${pad}${node.name} has length [${count}]`);
+          if (isVarMatrixNode(node) || (runtimeNode.rows > 1 || runtimeNode.cols > 1) && !runtimeNode.singleDim) {
+            lines.push(`${pad}${node.name} has shape [${runtimeNode.rows},${runtimeNode.cols}]`);
+          } else {
+            lines.push(`${pad}${node.name} has length [${count}]`);
+          }
         }
       }
     }
@@ -1604,6 +1786,22 @@
 
   const SCHEMA_DOC_INDENT = '    ';
 
+  function formatMatrixVarDimSuffix(rowsSpec, colsSpec) {
+    const fmt = (d) => {
+      if (!d) return '';
+      if (d.var) return d.max != null ? `${d.min}-${d.max}` : `${d.min}-`;
+      return String(d.fixed);
+    };
+    return `[${fmt(rowsSpec)},${fmt(colsSpec)}]`;
+  }
+
+  function formatVarArrayDimSuffix(spec) {
+    if (spec.matrixVar && spec.rowsSpec && spec.colsSpec) {
+      return formatMatrixVarDimSuffix(spec.rowsSpec, spec.colsSpec);
+    }
+    return spec.maxCount == null ? `[${spec.minCount}-]` : `[${spec.minCount}-${spec.maxCount}]`;
+  }
+
   function schemaDocPad(depth) {
     return SCHEMA_DOC_INDENT.repeat(Math.max(0, depth));
   }
@@ -1641,6 +1839,9 @@
           minCount: node.minCount,
           maxCount: node.maxCount,
           singleDim: node.singleDim,
+          matrixVar: node.matrixVar,
+          rowsSpec: node.rowsSpec,
+          colsSpec: node.colsSpec,
           ref: node.elementSchemaRef,
         });
       }
@@ -1690,9 +1891,7 @@
       return;
     }
     if (spec.kind === 'schema_var_array' || spec.kind === 'var_array') {
-      const range = spec.maxCount == null
-        ? `[${spec.minCount}-]`
-        : `[${spec.minCount}-${spec.maxCount}]`;
+      const range = formatVarArrayDimSuffix(spec);
       if (spec.kind === 'schema_var_array' || spec.ref) {
         lines.push(`${pad}${spec.name}:<${spec.ref}>${range}`);
       } else {
@@ -1828,6 +2027,9 @@
     resolveFlatVarArrayCounts,
     runtimeArrayNode,
     isVarArrayNode,
+    isVarMatrixNode,
+    validateGroupedLiteralShape,
+    resolveMatrixShapeFromCount,
     applySchemaMinMaxMeta,
     RESERVED_SCHEMA_NAMES,
   };

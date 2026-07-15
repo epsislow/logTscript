@@ -4012,6 +4012,13 @@ class Interpreter {
     wire.effectiveBitLen = valueStr.length;
   }
 
+  _isVarArrayWholeFieldAssign(target, path) {
+    if (!path || path.length !== 1) return false;
+    if (target && target.schemaArraySlice) return false;
+    if (target && target.schemaFieldPath && target.schemaFieldPath.length > 1) return false;
+    return true;
+  }
+
   _findVarArrayNodeForPath(schema, path) {
     const SS = this._semanticSchemas();
     if (!SS || !schema || !path || !path.length) return null;
@@ -4020,7 +4027,7 @@ class Interpreter {
     return node;
   }
 
-  _tryAssignVarArraySchemaField(wireName, wire, target, totalValue, assignPad, bits) {
+  _tryAssignVarArraySchemaField(wireName, wire, target, totalValue, assignPad, bits, literalShape) {
     const SS = this._semanticSchemas();
     if (!SS || !wire || !wire.schemaRef || !target || !target.schemaField) return null;
     const schema = this._resolveSchema(wire.schemaRef);
@@ -4030,7 +4037,7 @@ class Interpreter {
     if (!node) return null;
 
     SS.assertPriorVarArrayCounts(schema, node.name, wire.varArrayCounts || {});
-    const count = SS.countFromFieldBits(node, totalValue.length, schema.name);
+    const count = SS.countFromFieldBits(node, totalValue.length, schema.name, literalShape || null);
     const counts = { ...(wire.varArrayCounts || {}), [node.name]: count };
     const offset = SS.computeStructureOffsets(schema, counts).get(node.name);
     const width = node.elementWidth * count;
@@ -4455,6 +4462,11 @@ class Interpreter {
   _evalSchemaLiteralFieldBits(schema, name, expr) {
     const SS = this._semanticSchemas();
     if (expr && expr.groupedSchemaLiteral) {
+      const gs = expr.groupedSchemaLiteral;
+      const node = schema.structure.find((n) => n.name === name && n.kind === 'var_array');
+      if (node) {
+        SS.validateGroupedLiteralShape(node, gs.shape || null, (gs.elements || []).length, schema.name);
+      }
       return this.evalGroupedSchemaLiteralAtom(expr, false).value;
     }
     if (expr && expr.schemaLiteral) {
@@ -4489,6 +4501,19 @@ class Interpreter {
     if (!elements.length) {
       throw new Error('grouped schema literal: at least one element required');
     }
+    if (gs.shape) {
+      const n = elements.length;
+      if (gs.shape.kind === 'vector') {
+        if (n !== gs.shape.count) {
+          throw new Error(`Grouped literal shape [${gs.shape.count}] expects ${gs.shape.count} elements, got ${n}`);
+        }
+      } else if (gs.shape.kind === 'matrix') {
+        const expected = gs.shape.rows * gs.shape.cols;
+        if (n !== expected) {
+          throw new Error(`Grouped literal shape [${gs.shape.rows},${gs.shape.cols}] expects ${expected} elements, got ${n}`);
+        }
+      }
+    }
     let totalBits = '';
     for (const fields of elements) {
       const fieldValues = {};
@@ -4500,9 +4525,9 @@ class Interpreter {
     const bitWidth = totalBits.length;
     if (computeRefs) {
       const idx = this.storeValue(totalBits);
-      return { value: totalBits, ref: `&${idx}`, varName: null, bitWidth };
+      return { value: totalBits, ref: `&${idx}`, varName: null, bitWidth, literalShape: gs.shape || null };
     }
-    return { value: totalBits, ref: null, varName: null, bitWidth };
+    return { value: totalBits, ref: null, varName: null, bitWidth, literalShape: gs.shape || null };
   }
 
   evalSchemaLiteralAtom(a, computeRefs) {
@@ -4514,10 +4539,14 @@ class Interpreter {
     const lit = a.schemaLiteral || a;
     const schema = this._resolveSchema(lit.schemaRef);
     const fieldValues = {};
+    const fieldShapes = {};
     for (const [name, expr] of Object.entries(lit.fields || {})) {
+      if (expr && expr.groupedSchemaLiteral && expr.groupedSchemaLiteral.shape) {
+        fieldShapes[name] = expr.groupedSchemaLiteral.shape;
+      }
       fieldValues[name] = this._evalSchemaLiteralFieldBits(schema, name, expr);
     }
-    const built = SS.buildSchemaLiteralBits(schema, fieldValues);
+    const built = SS.buildSchemaLiteralBits(schema, fieldValues, { fieldShapes });
     const totalBits = built.bits;
     if (computeRefs) {
       const idx = this.storeValue(totalBits);
@@ -10202,7 +10231,7 @@ if (s.assignment) {
     if (wireForTarget && wireForTarget.schemaRef && path && path.length === 1) {
       try {
         const schema = this._resolveSchema(wireForTarget.schemaRef);
-        if (this._findVarArrayNodeForPath(schema, path)) {
+        if (this._findVarArrayNodeForPath(schema, path) && this._isVarArrayWholeFieldAssign(target, path)) {
           varArrayFieldTarget = true;
         } else {
           range = this._assignmentTargetSliceRange(target, name);
@@ -10680,7 +10709,13 @@ if (s.assignment) {
   // Construct new value
   let newValue;
   if (varArrayFieldTarget) {
-    newValue = this._tryAssignVarArraySchemaField(name, entry, target, rhs, wireAssignPad, bitWidth);
+    let literalShape = null;
+    if (exprResult) {
+      for (const part of exprResult) {
+        if (part.literalShape) literalShape = part.literalShape;
+      }
+    }
+    newValue = this._tryAssignVarArraySchemaField(name, entry, target, rhs, wireAssignPad, bitWidth, literalShape);
     if (newValue == null) {
       throw new Error(`Failed to assign variable array field on ${name}`);
     }
@@ -11268,7 +11303,7 @@ if (s.assignment) {
           const path = SS && SS.atomSchemaFieldPath(target);
           if (wire.schemaRef && path && path.length === 1) {
             const schema = this._resolveSchema(wire.schemaRef);
-            if (this._findVarArrayNodeForPath(schema, path)) {
+            if (this._findVarArrayNodeForPath(schema, path) && this._isVarArrayWholeFieldAssign(target, path)) {
               varArrayFieldTarget = true;
             } else {
               sliceRange = this._assignmentTargetSliceRange(target, wireName);
@@ -11313,7 +11348,11 @@ if (s.assignment) {
         const assignPad = stmtAssignPad(s);
         let wireValue;
         if (varArrayFieldTarget) {
-          wireValue = this._tryAssignVarArraySchemaField(wireName, wire, target, totalValue, assignPad, bits);
+          let literalShape = null;
+          for (const part of exprResult) {
+            if (part.literalShape) literalShape = part.literalShape;
+          }
+          wireValue = this._tryAssignVarArraySchemaField(wireName, wire, target, totalValue, assignPad, bits, literalShape);
           if (wireValue == null) {
             throw new Error(`Failed to assign variable array field on ${wireName}`);
           }

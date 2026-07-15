@@ -174,7 +174,10 @@ class Parser {
             ref,
             minCount: shape.minCount,
             maxCount: shape.maxCount,
-            singleDim: true,
+            singleDim: shape.singleDim !== false,
+            matrixVar: !!shape.matrixVar,
+            rowsSpec: shape.rowsSpec || null,
+            colsSpec: shape.colsSpec || null,
           });
         } else if (shape) {
           fields.push({
@@ -208,7 +211,10 @@ class Parser {
             elementWidth: width,
             minCount: varRange.minCount,
             maxCount: varRange.maxCount,
-            singleDim: true,
+            singleDim: varRange.singleDim !== false,
+            matrixVar: !!varRange.matrixVar,
+            rowsSpec: varRange.rowsSpec || null,
+            colsSpec: varRange.colsSpec || null,
           });
         } else if (shape) {
           fields.push({
@@ -323,16 +329,130 @@ class Parser {
   }
 
   parseSchemaLiteralAtom() {
+    this._skipSchemaLiteralSeparators();
+    let prefixShape = null;
+    if (this.c.type === 'SYM' && this.c.value === '[') {
+      prefixShape = this.parseGroupedLiteralShape();
+      this._skipSchemaLiteralSeparators();
+    }
     const elements = [this.parseSchemaLiteralFieldsBlock()];
     while (this._isNextGroupedSchemaElement()) {
       elements.push(this.parseSchemaLiteralFieldsBlock());
     }
     this._skipSchemaLiteralSeparators();
+    let suffixShape = null;
+    if (this.c.type === 'SYM' && this.c.value === '[') {
+      suffixShape = this.parseGroupedLiteralShape();
+    }
+    if (prefixShape && suffixShape) {
+      throw Error(`Grouped schema literal cannot have both prefix and suffix shape at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
     const schemaRef = this.parseSchemaRef();
-    if (elements.length === 1) {
+    const shape = prefixShape || suffixShape || null;
+    if (elements.length === 1 && !shape) {
       return { schemaLiteral: { fields: elements[0], schemaRef } };
     }
-    return { groupedSchemaLiteral: { elements, schemaRef } };
+    const grouped = { elements, schemaRef };
+    if (shape) grouped.shape = shape;
+    return { groupedSchemaLiteral: grouped };
+  }
+
+  parseGroupedLiteralShape() {
+    if (this.c.type !== 'SYM' || this.c.value !== '[') return null;
+    this.eat('SYM', '[');
+    const d0 = this.parseSchemaArrayDimFixed();
+    if (this.c.type === 'SYM' && this.c.value === ',') {
+      this.eat('SYM', ',');
+      const d1 = this.parseSchemaArrayDimFixed();
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        throw Error(`Grouped literal shape beyond 2D is not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', ']');
+      return { kind: 'matrix', rows: d0.fixed, cols: d1.fixed };
+    }
+    this.eat('SYM', ']');
+    return { kind: 'vector', count: d0.fixed };
+  }
+
+  parseSchemaArrayDimFixed() {
+    const dim = this.parseSchemaArrayDim();
+    if (dim.var) {
+      throw Error(`Variable bounds not allowed in grouped literal shape at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    return dim;
+  }
+
+  _matrixVarRangeCounts(rowsSpec, colsSpec) {
+    const rMin = rowsSpec.var ? rowsSpec.min : rowsSpec.fixed;
+    const rMax = rowsSpec.var ? rowsSpec.max : rowsSpec.fixed;
+    const cMin = colsSpec.var ? colsSpec.min : colsSpec.fixed;
+    const cMax = colsSpec.var ? colsSpec.max : colsSpec.fixed;
+    return {
+      minCount: rMin * cMin,
+      maxCount: rMax != null && cMax != null ? rMax * cMax : null,
+    };
+  }
+
+  parseSchemaArrayDim() {
+    if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+      throw Error(`Expected array dimension at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const minVal = parseInt(this.c.value, 10);
+    this.eat(this.c.type);
+    if (this.c.type === 'SYM' && this.c.value === '-') {
+      this.eat('SYM', '-');
+      if (this.c.type === 'SYM' && (this.c.value === ']' || this.c.value === ',')) {
+        if (!Number.isFinite(minVal) || minVal < 0) {
+          throw Error(`Array min count must be >= 0 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        return { var: true, min: minVal, max: null };
+      }
+      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+        throw Error(`Expected max array count or ']' after '-' in schema field at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const maxVal = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      if (!Number.isFinite(minVal) || minVal < 0 || !Number.isFinite(maxVal) || maxVal < minVal) {
+        throw Error(`Invalid variable array range [${minVal}-${maxVal}] at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      return { var: true, min: minVal, max: maxVal };
+    }
+    if (!Number.isFinite(minVal) || minVal < 1) {
+      throw Error(`Array dimension must be >= 1 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    return { var: false, fixed: minVal };
+  }
+
+  parseSchemaArraySuffix() {
+    if (this.c.type !== 'SYM' || this.c.value !== '[') return null;
+    this.eat('SYM', '[');
+    const d0 = this.parseSchemaArrayDim();
+    if (this.c.type === 'SYM' && this.c.value === ',') {
+      this.eat('SYM', ',');
+      const d1 = this.parseSchemaArrayDim();
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        throw Error(`Array dimensions beyond 2D are not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', ']');
+      if (!d0.var && !d1.var) {
+        return { rows: d0.fixed, cols: d1.fixed, singleDim: false };
+      }
+      const counts = this._matrixVarRangeCounts(d0, d1);
+      return {
+        matrixVar: true,
+        varRange: true,
+        rowsSpec: d0,
+        colsSpec: d1,
+        minCount: counts.minCount,
+        maxCount: counts.maxCount,
+        singleDim: false,
+      };
+    }
+    this.eat('SYM', ']');
+    if (d0.var) {
+      return { varRange: true, minCount: d0.min, maxCount: d0.max, singleDim: true };
+    }
+    return { rows: 1, cols: d0.fixed, singleDim: true };
   }
 
   _parseSchemaDisplayTag() {
@@ -560,58 +680,6 @@ class Parser {
     this.eat('SYM', ']');
     if (!Number.isFinite(first) || first < 1 || !Number.isFinite(cols) || cols < 1) {
       throw Error(`Tensor dimensions must be >= 1 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-    }
-    return { rows, cols, singleDim: !hadComma };
-  }
-
-  parseSchemaArraySuffix() {
-    if (this.c.type !== 'SYM' || this.c.value !== '[') return null;
-    this.eat('SYM', '[');
-    if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
-      throw Error(`Expected array dimension after '[' in schema field at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-    }
-    const first = parseInt(this.c.value, 10);
-    this.eat(this.c.type);
-    if (this.c.type === 'SYM' && this.c.value === '-') {
-      this.eat('SYM', '-');
-      if (this.c.type === 'SYM' && this.c.value === ']') {
-        this.eat('SYM', ']');
-        if (!Number.isFinite(first) || first < 0) {
-          throw Error(`Array min count must be >= 0 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-        }
-        return { varRange: true, minCount: first, maxCount: null };
-      }
-      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
-        throw Error(`Expected max array count or ']' after '-' in schema field at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-      }
-      const maxCount = parseInt(this.c.value, 10);
-      this.eat(this.c.type);
-      this.eat('SYM', ']');
-      if (!Number.isFinite(first) || first < 0 || !Number.isFinite(maxCount) || maxCount < first) {
-        throw Error(`Invalid variable array range [${first}-${maxCount}] at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-      }
-      return { varRange: true, minCount: first, maxCount };
-    }
-    let rows = 1;
-    let cols = first;
-    let hadComma = false;
-    if (this.c.type === 'SYM' && this.c.value === ',') {
-      hadComma = true;
-      this.eat('SYM', ',');
-      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
-        throw Error(`Expected second array dimension after ',' in schema field at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-      }
-      const second = parseInt(this.c.value, 10);
-      this.eat(this.c.type);
-      rows = first;
-      cols = second;
-      if (this.c.type === 'SYM' && this.c.value === ',') {
-        throw Error(`Array dimensions beyond 2D are not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-      }
-    }
-    this.eat('SYM', ']');
-    if (!Number.isFinite(first) || first < 1 || !Number.isFinite(cols) || cols < 1) {
-      throw Error(`Array dimensions must be >= 1 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     return { rows, cols, singleDim: !hadComma };
   }
@@ -3614,6 +3682,10 @@ assignment() {
     }
 
     if (this.c.type === 'SYM' && this.c.value === '{') {
+      return addNot(this.parseSchemaLiteralAtom());
+    }
+
+    if (this.c.type === 'SYM' && this.c.value === '[') {
       return addNot(this.parseSchemaLiteralAtom());
     }
 

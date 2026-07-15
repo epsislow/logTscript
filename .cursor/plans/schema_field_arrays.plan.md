@@ -54,7 +54,7 @@ isProject: false
 | Faza 8–9 protocol | același plan | **Independent** — literali protocol + JSON subset; deja livrate |
 | Doc split protocol | [`protocol_section_repetition.plan.md`](protocol_section_repetition.plan.md) | **Livrată ✅** — hub ~236 linii + `protocol-assemble.md` + `protocol-lut.md`; parse/tentative/repeat/json deja existente |
 | Faza 7++ grouped literals | [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) | **Livrată ✅** — `{ elem0 } { elem1 }<schema>`; teste 2308–2318 |
-| Faza 7+ range variabil | [`schema_variable_range.plan.md`](schema_variable_range.plan.md) | **Design** — numerotare internă 1.0–1.4; amânat 1+ / 1++ |
+| Faza 7+ range variabil | [`schema_variable_range.plan.md`](schema_variable_range.plan.md) | **Faza 1 ✅ livrată**; **Faza 2.0–2.4** (matrice 2D, slice, scalar count) |
 
 ### Ce înseamnă propoziția despre ordine
 
@@ -763,13 +763,13 @@ Mesaj eroare explicit: *schema total width X vs wire element width Y*.
 
 | Fază | Plan | Status |
 |------|------|--------|
-| **7+** | [`schema_variable_range.plan.md`](schema_variable_range.plan.md) | Design — Faza 1.0–1.4; amânat 1+ / 1++ |
+| **7+** | [`schema_variable_range.plan.md`](schema_variable_range.plan.md) | **Faza 1 ✅**; **Faza 2.0–2.4** (matrice 2D, slice 7a, scalar count) |
 | **7++** | [`grouped_schema_literals.plan.md`](grouped_schema_literals.plan.md) | **Livrat ✅** |
 | **7b+** | (viitor) | Bridge protocol → schema |
 
 **Nu implementăm în 6.x / 7a–7b:** mapare automată protocol variabil → schema; `parseTag`; `rest -footer`.
 
-Detalii range variabil (package2, package3, `varArrayCounts`, fazare **1.0–1.4**): **↗** [`schema_variable_range.plan.md`](schema_variable_range.plan.md).
+Detalii range variabil (package2, package3, `varArrayCounts`, fazare **1.0–1.5 ✅**, **2.0–2.4**): **↗** [`schema_variable_range.plan.md`](schema_variable_range.plan.md).
 
 ---
 

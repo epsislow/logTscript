@@ -8,7 +8,7 @@ For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md]
 
 For **source literals** in assignments (`\255`, `\-3;8`, `"Hello"`), see **[wire-literals.md](wire-literals.md)**. Display tag `ascii` formats wire values as quoted text in the Output panel (see [show — display tags](#show)).
 
-For **named bit fields** on wires (schema declaration, field access, structured literals), see **[semantic-schemas.md](semantic-schemas.md)**. Wires with an attached schema get automatic multi-line breakdown in `show` / `peek` / `probe`; combine with numeric tags (`s8`, `dec`, …) per field.
+For **named bit fields** on wires (schema declaration, field access, structured literals), see **[semantic-schemas.md](semantic-schemas.md)** and the array sub-pages ([fixed arrays](schema-field-arrays.md), [variable 1D](schema-variable-arrays.md), [variable 2D matrix](schema-variable-matrix.md)). Wires with an attached schema get automatic multi-line breakdown in `show` / `peek` / `probe`; combine with numeric tags (`s8`, `dec`, …) per field.
 
 ---
 

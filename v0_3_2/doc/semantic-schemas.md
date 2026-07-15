@@ -8,6 +8,16 @@ See also: [debug.md](debug.md) (show/peek/probe), [wire-literals.md](wire-litera
 
 ---
 
+## Related topics (array fields)
+
+| Page | When to read |
+|------|----------------|
+| [Schema field arrays (fixed)](schema-field-arrays.md) | `cells:8[3]`, `grid:4[2,2]`, `slots:<opcode>[2]`, slice `:0` / `::1`, grouped `{…}<schema>` |
+| [Variable arrays (1D)](schema-variable-arrays.md) | `8[1-3]`, `8[1-]`, `varArrayCounts`, flat vs per-field assign, `has length [N]` |
+| [Variable matrix (2D)](schema-variable-matrix.md) | `8[1-3,2]`, `<opcode>[1-3,2]`, shape `[R,C]`, runtime row/col slice |
+
+---
+
 ## Runnable examples (Load / Load & Run)
 
 Blocks marked `logts-play` show two buttons in the documentation viewer:
@@ -50,7 +60,7 @@ Top-level block — schema name is written as **`<name>`**:
 
 | Rule | Detail |
 |------|--------|
-| Field syntax | `name:width` (width in bits); `name:W[N]` vector; `name:W[N,M]` matrix inside schema |
+| Field syntax | `name:width` (width in bits); `name:W[N]` vector; `name:W[N,M]` matrix — see [field arrays](schema-field-arrays.md) |
 | Bit layout | **MSB-left, index 0** — same convention as `.bitRange` / wire slices |
 | Total width | Sum of field widths |
 | Duplicate names | Error at parse time |
@@ -76,314 +86,6 @@ Top-level block — schema name is written as **`<name>`**:
 Validation compares **schema total width** with **element width** (`16` in the examples above), not the full wire/tensor size. A 16-bit schema on `16wire[64]` is valid (64 elements × 16 bits); a 16-bit schema on `8wire[4]` is an error.
 
 Type labels in debug output reflect the shape + schema, e.g. `16wire[3]<opcode>`, `16wire[2,2]<opcode>`.
-
----
-
-## Array fields inside a schema
-
-A schema may contain **fixed-size arrays** of raw bit slices (model B — one wire holds the full packed record):
-
-```logts
-<frame>:
-    tag:8
-    cells:8[3]      # vector — 3 × 8b = 24b
-    grid:4[2,2]     # matrix — 2×2 × 4b = 16b
-:
-48wire<frame> pkt := 0
-```
-
-| Syntax | Meaning | Total bits |
-|--------|---------|------------|
-| `cells:8[3]` | 3 elements, 8 bits each | 24 |
-| `grid:4[2,2]` | 2×2 matrix, 4 bits per cell | 16 |
-
-**Indices are 0-based** (same as wire vectors): `pkt:cells:1`, `pkt:grid:0:1`.
-
-Attach with a scalar wire whose width equals **schema `totalWidth`** (here `48wire<frame>`). Do **not** use `8wire[3]<frame>` — element width must match the whole schema, not one array cell.
-
-### Read / write
-
-```logts
-pkt:tag := \42
-pkt:cells:0 := \15
-pkt:cells:1 := \240
-pkt:grid:0:1 := \6
-8wire c0 = pkt:cells:0
-4wire g = pkt:grid:0:1
-```
-
-### Literals on array slices
-
-Use the same RHS forms as [wire-literals.md](wire-literals.md) on the **array slice** (`pkt:cells`, `pkt:grid`). Width must match `W×N` or `W×rows×cols`:
-
-| Accepted | Example | Width |
-|----------|---------|-------|
-| Concatenation | `pkt:cells = 00001111 + 11110000 + 10101010` | 3×8 = 24b |
-| Hex pattern | `pkt:cells = ^0FF0AA` | 24b |
-| Grouped + tag | `pkt:cells = \1 \2 \3;8` | 3×8 = 24b |
-| Per-element | `pkt:cells:1 := \5` | 8b |
-
-**Grouped schema elements** (vector/matrix wire, schema array slice, or record field) — one `{ … }` per element, single `<schema>` on the last group (like `\2 \23 \242;8`):
-
-```logts
-16wire[3]<opcode> rom = { alu=\5 } { cycles=\3 } { jump=1 }<opcode>
-pkt:slots = { alu=\5 } { cycles=\3 }<opcode>
-pkt = { tag=\42, slots={ alu=\5 } { cycles=\3 }<opcode> }<frame>
-```
-
-Equivalent to concatenating per-element literals with `+`. Whitespace between `}` and `{` is optional (`{}{}<schema>` on one line is fine).
-
-**Not supported:** comma lists `[\1,\2,\3]` or `{ cells=[\1,\2,\3] }` — use grouped numeric `\1 \2 \3;8` or grouped schema above.
-
-### Variable-length arrays (`field:W[min-max]` / `W[min-]`)
-
-Syntax mirrors protocol repetition: **`8[1-3]`** (1–3 elements), **`8[1-]`** (at least 1, open upper bound), **`8[0-]`** (zero or more). Sugar: **`8+`** → `8[1-]`, **`8*`** → `8[0-]`.
-
-```logts
-<package2>:
-    cells: 8[1-]
-    footer: 8
-:
-
-<package3>:
-    tokens: 8[1-]
-    codeDatas: 8[1-]
-:
-```
-
-| Topic | Rule |
-|-------|------|
-| **Flat `=` on whole record** | OK when count is **unique** (e.g. `24wire` + suffix anchor, or single open-ended field last). |
-| **Two `8[1-]` fields** | Structured per-field assign OK; flat `pkt = ^…` → **ambiguous** error. |
-| **Runtime count** | Stored in `wire.varArrayCounts`; drives layout, show, read, Wave Listen. |
-| **Show** | Tree + `:i` lines + `field has length [N]`; tags (`; dec`) and field slices supported. |
-| **Peek / probe** | Same tree as `show`, including dynamic `has length [N]`. |
-| **WWIDTH / BITSIZE** | `WWIDTH(pkt:tokens:0)` = element width (`8`); `BITSIZE(pkt:tokens)` = runtime total (`count × W`). |
-
-Static reference (no buttons):
-
-```logts
-24wire<package2> pkt = ^AABBFF          # cells count=2 (suffix anchor)
-32wire<package3> pkt := 0
-pkt:tokens = ^AABB
-pkt:codeDatas = ^CC
-24wire<package1> pkt = { cells=^AABBCC }<package1>   # single var field — grouped literal OK
-show(pkt:cells; dec)
-peek(pkt)
-```
-
-**Load & Run** — `package2`: flat hex init (suffix anchor resolves `cells` count), full-record `show`, decimal tag on the cells slice, `peek`:
-
-```logts-play wave
-<package2>:
-    cells: 8[1-]
-    footer: 8
-:
-24wire<package2> pkt = ^AABBFF
-show(pkt)
-show(pkt:cells; dec)
-peek(pkt)
-```
-
-Expected **Output**: `cells has length [2]`; `:0` / `:1` under `cells`; `footer = 11111111`; peek tree matches `show(pkt)`.
-
-**Load & Run** — `package3`: two variable fields — use **structured per-field assign** (flat `pkt = ^…` is ambiguous):
-
-```logts-play wave
-<package3>:
-    tokens: 8[1-]
-    codeDatas: 8[1-]
-:
-32wire<package3> pkt := 0
-pkt:tokens = ^AABB
-pkt:codeDatas = ^CC
-show(pkt)
-```
-
-Expected **Output**: `tokens has length [2]`, `codeDatas has length [1]`.
-
-**Load & Run** — bounded range `8[1-3]`, grouped schema literal, `BITSIZE` / `WWIDTH`:
-
-```logts-play wave
-<package1>:
-    cells: 8[1-3]
-:
-24wire<package1> pkt = { cells=^AABBCC }<package1>
-show(pkt)
-5wire sz = BITSIZE(pkt:cells)
-4wire ew = WWIDTH(pkt:cells:0)
-show(sz)
-show(ew)
-```
-
-Expected **Output**: `cells has length [3]`; `sz = 11000` (24 bits); `ew = 1000` (8-bit element width).
-
-**Load & Run** — `probe` on a variable array field after per-field writes:
-
-```logts-play wave
-<package3>:
-    tokens: 8[1-]
-    codeDatas: 8[1-]
-:
-32wire<package3> pkt := 0
-pkt:tokens = ^AA
-pkt:codeDatas = ^BBCC
-probe(pkt:tokens)
-```
-
-Expected **Output**: probe tree with `tokens has length [1]` and `:0 = 10101010`.
-
-**Schema arrays** (`field:<sub>[N]` / `[R,C]`) with fixed size are unchanged — see below.
-
-### Matrix row / column slices
-
-Same syntax as wire matrices — `pkt:grid:0` (row), `pkt:grid::1` (column), including `pkt:grid:(rowIdx)` and `pkt:grid::(colIdx)`:
-
-```logts
-pkt:grid:0 = 0101 + 0110
-pkt:grid::1 = 0110 + 1111
-show(pkt:grid:0)    # :0:0 … :0:1 + pkt:grid has shape [2,2]
-show(pkt:grid::1)   # :0:1 … :1:1 + pkt:grid has shape [2,2]
-```
-
-### `show` on array fields
-
-`show(pkt)` prints scalar fields normally; array fields use a **section header** plus **flat index lines** (`:0 = … (Wbit)`), without `cells[3]` syntax. `show(pkt:cells)` / `show(pkt:grid)` add a `has length` / `has shape` footer.
-
----
-
-## Schema arrays (`field:<schema>[N]` / `[R,C]`)
-
-A schema may contain **fixed-size arrays of sub-schemas** — each element is a full nested record (model B), analogous to `16wire[2]<opcode>` on wires (model A):
-
-```logts
-<opcode>:
-    alu:4
-    jump:1
-    write:1
-    cycles:2
-    reserved:8
-:
-
-<frame>:
-    tag: 8
-    slots: <opcode>[2]    # 2 × 16b = 32b
-    tiles: <opcode>[2,2]  # 2×2 × 16b = 64b
-:
-40wire<frame> pkt := 0
-```
-
-| Syntax | Meaning | Total bits |
-|--------|---------|------------|
-| `slots:<opcode>[2]` | 2 elements, each `opcode.totalWidth` | 2×16 = 32 |
-| `tiles:<opcode>[2,2]` | 2×2 matrix of `opcode` records | 4×16 = 64 |
-
-**Indices are 0-based:** `pkt:slots:1:alu`, `pkt:tiles:0:1:cycles`. Matrix row/column slices use the same rules as raw arrays — `pkt:tiles:0`, `pkt:tiles::1`.
-
-### Read / write
-
-```logts
-pkt:tag := \42
-pkt:slots:0:alu := \5
-pkt:slots:1 = { alu=\5 cycles=\3 }<opcode>
-pkt:tiles:0:1:alu := \5
-4wire a = pkt:slots:0:alu
-16wire s0 = pkt:slots:0
-```
-
-### Literals on schema array slices
-
-Same RHS forms as wire vectors — concatenation, hex, per-element schema literal:
-
-| Accepted | Example | Width |
-|----------|---------|-------|
-| Concatenation | `pkt:slots = s0 + s1` | 2×16 = 32b |
-| Per-element literal | `pkt:slots:1 = { alu=\5 }<opcode>` | 16b |
-| Sub-field assign | `pkt:slots:0:alu := \5` | 4b |
-
-**Grouped schema** (one `{ … }` per slot, `<opcode>` on last): `pkt:slots = { alu=\5 } { cycles=\3 }<opcode>`
-
-**Not supported:** comma lists `[{…},{…}]` or `{ slots=[…] }` — use grouped schema or `+` concat.
-
-### `show` on schema arrays
-
-Same layout as wire vectors with schema (rev. 4): section header `slots`, flat `:i = … (Wbit)` per element, then **indented sub-schema tree** underneath. `show(pkt:slots:1)` shows one element only.
-
-```logts-play wave
-<opcode>:
-    alu:4
-    jump:1
-    write:1
-    cycles:2
-    reserved:8
-:
-
-<frame>:
-    tag: 8
-    slots: <opcode>[2]
-:
-40wire<frame> pkt := 0
-pkt:slots:1:alu := \5
-pkt:slots:1:cycles := \3
-show(pkt)
-```
-
-Mixed scalar + schema array + nested scalar on one record is supported — e.g. `tag:8` + `slots:<opcode>[2]` + `meta:<flags>`.
-
-```logts
-<frame>:
-    tag:8
-    cells:8[3]
-    grid:4[2,2]
-:
-48wire<frame> pkt := 0
-pkt:cells:1 := \240
-pkt:grid:0:1 := \6
-show(pkt)
-```
-
-Mismatch between schema width and **element** width is a compile-time error:
-
-```logts
-# ERROR:
-# width mismatch between opcode13 (13bit) and definition (16bit)
-<opcode13>:
-    alu:4
-    jump:1
-    write:1
-    cycles:2
-    reserved:5
-:
-16wire<opcode13> instr
-```
-
-**Load & Run** — width mismatch error (13-bit schema on 16-wire):
-
-```logts-play
-<opcode13>:
-    alu:4
-    jump:1
-    write:1
-    cycles:2
-    reserved:5
-:
-16wire<opcode13> instr
-```
-
-Valid attach (16 bits):
-
-```logts
-<opcode>:
-    alu:4
-    jump:1
-    write:1
-    cycles:2
-    reserved:8
-:
-16wire<opcode> instr
-```
-
-Type label in debug output becomes `16wire<opcode>`.
 
 ---
 
@@ -512,6 +214,8 @@ Initialize (or assign) a full wire from named fields:
 show(instr)
 ```
 
+Grouped multi-element literals on array fields: [Schema field arrays](schema-field-arrays.md#literals-on-array-slices).
+
 ---
 
 ## Field access (read and write)
@@ -592,6 +296,8 @@ instr (16wire<opcode>)
   cycles    = 11
   reserved  = 00000000
 ```
+
+Array fields inside a record use section headers and `:i` / `:r:c` lines — see [field arrays](schema-field-arrays.md#show-on-array-fields). Variable arrays add `has length [N]` or `has shape [R,C]` footers — [1D](schema-variable-arrays.md) / [2D](schema-variable-matrix.md).
 
 ### Alternate schema tag
 
@@ -768,6 +474,7 @@ Within one script, referenced schemas must be defined in the same unit (or loade
 | Duplicate after merge | `Duplicate schema field 'version' in schema 'packet' (from merge of 'header')` |
 | Unknown schema | `Unknown schema 'opcode'` |
 | Reserved schema name | `Reserved schema name 'none' — choose another name for a user-defined schema` |
+| Ambiguous variable layout | `Ambiguous variable array layout for schema '…'` — see [Variable arrays (1D)](schema-variable-arrays.md) |
 
 ---
 

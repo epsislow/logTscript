@@ -22155,6 +22155,209 @@ reg(2375, 'semantic-schemas', 'var array Signal Trace package1 expand', function
   h.assert('expand length', String(lines.some((l) => l.includes('cells has length [3]'))), 'true');
 });
 
+const CELL8_SCHEMA = `<cell8>:
+    v: 8
+:
+`;
+
+const FRAME_VAR_GRID_SCHEMA = `<frameVarGrid>:
+    grid: 8[1-3, 2]
+:
+`;
+
+const FRAME_VAR_GRID_BOTH_SCHEMA = `<frameVarGridAmbig>:
+    grid: 8[1-3, 1-3]
+:
+`;
+
+const FRAME_VAR_TILES_SCHEMA = `<frameVarTiles>:
+    tiles: <opcode>[1-3, 2]
+:
+`;
+
+reg(2376, 'semantic-schemas', 'var matrix 2D parser minWidth', function(h, session) {
+  session.run(FRAME_VAR_GRID_SCHEMA);
+  const schema = session.interp.schemaRegistry.get('frameVarGrid');
+  const grid = schema.structure.find((n) => n.name === 'grid');
+  h.assert('minWidth 16', String(schema && schema.minWidth === 16), 'true');
+  h.assert('matrixVar', String(grid && grid.matrixVar && grid.colsFixed === 2), 'true');
+  h.assert('minCount 2', String(grid && grid.minCount === 2), 'true');
+});
+
+reg(2377, 'semantic-schemas', 'var matrix 2D parser minWidth (wave)', function(h, session) {
+  session.run(FRAME_VAR_GRID_SCHEMA);
+  const grid = session.interp.schemaRegistry.get('frameVarGrid').structure[0];
+  h.assert('colsFixed 2', String(grid && grid.colsFixed === 2), 'true');
+}, { propagation: 'wave' });
+
+reg(2378, 'semantic-schemas', 'var matrix flat assign cols fixed', function(h, session) {
+  session.run(FRAME_VAR_GRID_SCHEMA + '32wire<frameVarGrid> pkt = ^AABBCCDD');
+  h.assert('grid count 4', String(session.interp.wires.get('pkt').varArrayCounts.grid), '4');
+  h.assert('cell00', session.getWire(session.interp, 'pkt').substring(0, 8), '10101010');
+  h.assert('cell01', session.getWire(session.interp, 'pkt').substring(8, 16), '10111011');
+});
+
+reg(2379, 'semantic-schemas', 'var matrix flat assign cols fixed (wave)', function(h, session) {
+  session.run(FRAME_VAR_GRID_SCHEMA + '32wire<frameVarGrid> pkt = ^AABBCCDD');
+  h.assert('grid count 4', String(session.interp.wires.get('pkt').varArrayCounts.grid), '4');
+}, { propagation: 'wave' });
+
+reg(2380, 'semantic-schemas', 'var matrix grouped literal suffix shape', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt := 0',
+    'pkt:grid = { v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }[2,2]<cell8>',
+  ].join('\n'));
+  h.assert('grid count 4', String(session.interp.wires.get('pkt').varArrayCounts.grid), '4');
+  h.assert('cell03', session.getWire(session.interp, 'pkt').substring(24, 32), '00000100');
+});
+
+reg(2381, 'semantic-schemas', 'var matrix grouped literal prefix shape', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\5 }{ v=\\6 }{ v=\\7 }{ v=\\8 }<cell8>',
+  ].join('\n'));
+  h.assert('grid count 4', String(session.interp.wires.get('pkt').varArrayCounts.grid), '4');
+  h.assert('cell00', session.getWire(session.interp, 'pkt').substring(0, 8), '00000101');
+});
+
+reg(2382, 'semantic-schemas', 'var matrix show has shape footer', function(h, session) {
+  const { out } = session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt = ^AABBCCDD',
+    'show(pkt:grid)',
+  ].join('\n'));
+  h.assert('shape footer', String(out.some((l) => l.trim() === 'pkt:grid has shape [2,2]')), 'true');
+  h.assert('cell01', String(out.some((l) => l.includes(':0:1 =') && l.includes('10111011'))), 'true');
+  h.assert('cell10', String(out.some((l) => l.includes(':1:0 =') && l.includes('11001100'))), 'true');
+});
+
+reg(2383, 'semantic-schemas', 'var matrix show has shape footer (wave)', function(h, session) {
+  const out = session.runDoc(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt = ^AABBCCDD',
+    'show(pkt:grid)',
+  ].join('\n'));
+  h.assert('shape [2,2]', String(out.some((l) => l.includes('has shape [2,2]'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2384, 'semantic-schemas', 'var matrix both dims var flat error', function(h, session) {
+  h.assertThrows('ambiguous matrix flat', function() {
+    session.run(FRAME_VAR_GRID_BOTH_SCHEMA + '72wire<frameVarGridAmbig> pkt = ^' + 'AA'.repeat(9));
+  }, 'Ambiguous matrix shape');
+});
+
+reg(2385, 'semantic-schemas', 'var matrix both dims var flat error (wave)', function(h, session) {
+  h.assertThrows('ambiguous matrix flat', function() {
+    session.run(FRAME_VAR_GRID_BOTH_SCHEMA + '72wire<frameVarGridAmbig> pkt = ^' + 'AA'.repeat(9));
+  }, 'Ambiguous matrix shape');
+}, { propagation: 'wave' });
+
+reg(2386, 'semantic-schemas', 'var matrix schema array flat assign', function(h, session) {
+  session.run(OPCODE16_SCHEMA + FRAME_VAR_TILES_SCHEMA + '64wire<frameVarTiles> pkt = ^' + 'A'.repeat(16));
+  h.assert('tiles count 4', String(session.interp.wires.get('pkt').varArrayCounts.tiles), '4');
+  h.assert('tile00 alu', session.getWire(session.interp, 'pkt').substring(0, 4), '1010');
+});
+
+reg(2387, 'semantic-schemas', 'var matrix schema array flat assign (wave)', function(h, session) {
+  session.run(OPCODE16_SCHEMA + FRAME_VAR_TILES_SCHEMA + '64wire<frameVarTiles> pkt = ^' + 'A'.repeat(16));
+  h.assert('tiles count 4', String(session.interp.wires.get('pkt').varArrayCounts.tiles), '4');
+}, { propagation: 'wave' });
+
+reg(2388, 'semantic-schemas', 'var matrix schema grouped literal shape', function(h, session) {
+  session.run(OPCODE16_SCHEMA + FRAME_VAR_TILES_SCHEMA + [
+    '64wire<frameVarTiles> pkt := 0',
+    'pkt:tiles = [2,2]',
+    '    { alu=\\5 cycles=\\3 jump=1 write=1 reserved=00000000 }',
+    '    { alu=\\6 cycles=\\2 jump=0 write=0 reserved=00000000 }',
+    '    { alu=\\1 cycles=\\1 jump=1 write=1 reserved=00000000 }',
+    '    { alu=\\2 cycles=\\2 jump=0 write=0 reserved=00000000 }',
+    '<opcode>',
+  ].join('\n'));
+  h.assert('tiles count 4', String(session.interp.wires.get('pkt').varArrayCounts.tiles), '4');
+  h.assert('tile11 alu', session.getWire(session.interp, 'pkt').substring(52, 56), '0010');
+});
+
+reg(2389, 'semantic-schemas', 'var matrix schema show sub-fields', function(h, session) {
+  const { out } = session.run(OPCODE16_SCHEMA + FRAME_VAR_TILES_SCHEMA + [
+    '64wire<frameVarTiles> pkt := 0',
+    'pkt:tiles = [2,2]{ alu=\\5 }{ alu=\\6 }{ alu=\\1 }{ alu=\\2 }<opcode>',
+    'show(pkt:tiles)',
+  ].join('\n'));
+  h.assert('shape footer', String(out.some((l) => l.trim() === 'pkt:tiles has shape [2,2]')), 'true');
+  h.assert('tile00 alu', String(out.some((l) => l.includes(':0:0') && l.includes('0101'))), 'true');
+  h.assert('nested alu', String(out.some((l) => l.includes('alu') && l.includes('0101'))), 'true');
+});
+
+reg(2390, 'semantic-schemas', 'var matrix schema show sub-fields (wave)', function(h, session) {
+  const out = session.runDoc(OPCODE16_SCHEMA + FRAME_VAR_TILES_SCHEMA + [
+    '64wire<frameVarTiles> pkt := 0',
+    'pkt:tiles = [2,2]{ alu=\\5 }{ alu=\\6 }{ alu=\\1 }{ alu=\\2 }<opcode>',
+    'show(pkt:tiles)',
+  ].join('\n'));
+  h.assert('has shape', String(out.some((l) => l.includes('has shape [2,2]'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2391, 'semantic-schemas', 'var matrix row slice read assign', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'pkt:grid:0 = 00000101 + 00000110',
+    '16wire row0 = pkt:grid:0',
+  ].join('\n'));
+  h.assert('row0', session.getWire(session.interp, 'row0'), '0000010100000110');
+  h.assert('cell00', session.getWire(session.interp, 'pkt').substring(0, 8), '00000101');
+});
+
+reg(2392, 'semantic-schemas', 'var matrix column slice read assign', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'pkt:grid::1 = 00000110 + 00001111',
+    '16wire col1 = pkt:grid::1',
+  ].join('\n'));
+  h.assert('col1', session.getWire(session.interp, 'col1'), '0000011000001111');
+});
+
+reg(2393, 'semantic-schemas', 'var matrix show row slice shape footer', function(h, session) {
+  const { out } = session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'pkt:grid:0 = 00000101 + 00000110',
+    'show(pkt:grid:0)',
+  ].join('\n'));
+  h.assert('row header', String(out.some((l) => l.includes('pkt:grid:0 (16wire)'))), 'true');
+  h.assert('shape footer', String(out.some((l) => l.trim() === 'pkt:grid has shape [2,2]')), 'true');
+});
+
+reg(2394, 'semantic-schemas', 'var matrix row slice (wave)', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\5 }{ v=\\6 }{ v=\\7 }{ v=\\8 }<cell8>',
+    '8wire cell = pkt:grid:1:0',
+  ].join('\n'));
+  h.assert('cell10', session.getWire(session.interp, 'cell'), '00000111');
+}, { propagation: 'wave' });
+
+reg(2395, 'semantic-schemas', 'var matrix column slice (wave)', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+    '32wire<frameVarGrid> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\5 }{ v=\\6 }{ v=\\7 }{ v=\\8 }<cell8>',
+    '16wire col0 = pkt:grid::0',
+  ].join('\n'));
+  h.assert('col0', session.getWire(session.interp, 'col0'), '0000010100000111');
+}, { propagation: 'wave' });
+
+reg(2396, 'semantic-schemas', 'var matrix row index out of range', function(h, session) {
+  h.assertThrows('row oob', function() {
+    session.run(CELL8_SCHEMA + FRAME_VAR_GRID_SCHEMA + [
+      '32wire<frameVarGrid> pkt := 0',
+      'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+      '8wire bad = pkt:grid:2',
+    ].join('\n'));
+    const err = session.interp && session.interp.lastReportedError;
+    if (!err) throw new Error('expected runtime error');
+    throw err;
+  }, 'Row index 2 out of range');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

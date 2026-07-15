@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -8349,7 +8349,7 @@ For LUT generation / reversal and other analysis helpers, see **[boolean-lut.md]
 
 For **source literals** in assignments (\`\\255\`, \`\\-3;8\`, \`"Hello"\`), see **[wire-literals.md](wire-literals.md)**. Display tag \`ascii\` formats wire values as quoted text in the Output panel (see [show — display tags](#show)).
 
-For **named bit fields** on wires (schema declaration, field access, structured literals), see **[semantic-schemas.md](semantic-schemas.md)**. Wires with an attached schema get automatic multi-line breakdown in \`show\` / \`peek\` / \`probe\`; combine with numeric tags (\`s8\`, \`dec\`, …) per field.
+For **named bit fields** on wires (schema declaration, field access, structured literals), see **[semantic-schemas.md](semantic-schemas.md)** and the array sub-pages ([fixed arrays](schema-field-arrays.md), [variable 1D](schema-variable-arrays.md), [variable 2D matrix](schema-variable-matrix.md)). Wires with an attached schema get automatic multi-line breakdown in \`show\` / \`peek\` / \`probe\`; combine with numeric tags (\`s8\`, \`dec\`, …) per field.
 
 ---
 
@@ -21905,88 +21905,21 @@ Turn the knob after **RUN** — \`idx\` shows the current position.
 - Not allowed inside [chip.md](chip.md) bodies.
 - \`probe(.ch)\` — [debug.md](debug.md).
 `,
-    'semantic-schemas.md': `# Semantic schemas — named bit fields on wires
+    'schema-field-arrays.md': `# Schema field arrays (fixed size)
 
-Semantic schemas add a **named field layout** on top of raw wire bits: declare fields once, attach a schema to a wire, initialize with structured literals, read/write individual fields, and display or trace values field-by-field.
+Fixed-size **array fields** inside a semantic schema record — raw bit slices (\`cells:8[3]\`) or arrays of sub-schemas (\`slots:<opcode>[2]\`). Part of [Semantic schemas](semantic-schemas.md).
 
-This is **independent** from numeric display formats (\`s8\`, \`q4p4\`, \`dec\`, …). Schemas describe **what each bit slice means**; numeric tags describe **how to print** a slice. Both can be combined in \`show\` / \`peek\` / \`probe\`.
-
-See also: [debug.md](debug.md) (show/peek/probe), [wire-literals.md](wire-literals.md) (RHS literals), [short-notation.md](short-notation.md) (bit indexing), [wire-vectors.md](wire-vectors.md) (vector/tensor access), [doc-viewer.md](doc-viewer.md) (Load / Load & Run).
+See also: [Variable arrays (1D)](schema-variable-arrays.md), [Variable matrix (2D)](schema-variable-matrix.md), [wire-literals.md](wire-literals.md), [wire-vectors.md](wire-vectors.md).
 
 ---
 
 ## Runnable examples (Load / Load & Run)
 
-Blocks marked \`logts-play\` show two buttons in the documentation viewer:
-
-| Button | Action |
-|--------|--------|
-| **Load** | Copy the script into the editor without running |
-| **Load & Run** | Copy and run immediately — check the **Output** panel |
-
-Use **\`logts-play wave\`** (orange badge) for examples with \`show\` — same as [debug.md](debug.md). Static syntax reference below uses plain fences (no buttons).
+Use **\`logts-play wave\`** for examples with \`show\`. See [Semantic schemas — Runnable examples](semantic-schemas.md#runnable-examples-load--load--run).
 
 ---
 
-## Quick comparison
-
-| | Numeric formats (\`s8\`, \`q4p4\`, …) | Semantic schemas (\`<name>\`) |
-|---|-----------------------------------|------------------------------|
-| Module | \`numeric-formats.js\` | \`semantic-schemas.js\` |
-| Attached to wire | No (only at literal / show tag) | Yes — \`wireEntry.schemaRef\` |
-| Literals | \`\\1.5;q4p4\`, \`^FF\` | \`{ alu=\\5 cycles=\\3 }<opcode>\` |
-| Field access | — | \`instr:alu\`, \`vector:2:alu\` |
-| \`show(w)\` | Flat wire value | Auto breakdown by schema |
-| Wave Listen | Global fmt dropdown | **\`auto\`** uses wire schema |
-
----
-
-## Declaring a schema
-
-Top-level block — schema name is written as **\`<name>\`**:
-
-\`\`\`logts
-<opcode>:
-    alu:4
-    jump:1
-    write:1
-    cycles:2
-    reserved:8
-:
-\`\`\`
-
-| Rule | Detail |
-|------|--------|
-| Field syntax | \`name:width\` (width in bits); \`name:W[N]\` vector; \`name:W[N,M]\` matrix inside schema |
-| Bit layout | **MSB-left, index 0** — same convention as \`.bitRange\` / wire slices |
-| Total width | Sum of field widths |
-| Duplicate names | Error at parse time |
-
----
-
-## Attaching a schema to a wire
-
-\`\`\`logts
-16wire<opcode> instr
-16wire[64]<opcode> rom
-16wire[2,3]<opcode> grid
-\`\`\`
-
-**What \`<schema>\` does:** it attaches the named field layout to **each element** of the wire’s storage — not to the whole concatenated bit string.
-
-| Declaration | Storage | Schema applies to |
-|-------------|---------|-------------------|
-| \`16wire<opcode> instr\` | one 16-bit word | that word |
-| \`16wire[4]<opcode> rom\` | 4 × 16 bits (64 total) | **each** of the 4 elements |
-| \`16wire[2,3]<opcode> grid\` | 2×3 × 16 bits (96 total) | **each** matrix cell |
-
-Validation compares **schema total width** with **element width** (\`16\` in the examples above), not the full wire/tensor size. A 16-bit schema on \`16wire[64]\` is valid (64 elements × 16 bits); a 16-bit schema on \`8wire[4]\` is an error.
-
-Type labels in debug output reflect the shape + schema, e.g. \`16wire[3]<opcode>\`, \`16wire[2,2]<opcode>\`.
-
----
-
-## Array fields inside a schema
+## Raw bit arrays (\`field:W[N]\` / \`[R,C]\`)
 
 A schema may contain **fixed-size arrays** of raw bit slices (model B — one wire holds the full packed record):
 
@@ -22042,106 +21975,6 @@ Equivalent to concatenating per-element literals with \`+\`. Whitespace between 
 
 **Not supported:** comma lists \`[\\1,\\2,\\3]\` or \`{ cells=[\\1,\\2,\\3] }\` — use grouped numeric \`\\1 \\2 \\3;8\` or grouped schema above.
 
-### Variable-length arrays (\`field:W[min-max]\` / \`W[min-]\`)
-
-Syntax mirrors protocol repetition: **\`8[1-3]\`** (1–3 elements), **\`8[1-]\`** (at least 1, open upper bound), **\`8[0-]\`** (zero or more). Sugar: **\`8+\`** → \`8[1-]\`, **\`8*\`** → \`8[0-]\`.
-
-\`\`\`logts
-<package2>:
-    cells: 8[1-]
-    footer: 8
-:
-
-<package3>:
-    tokens: 8[1-]
-    codeDatas: 8[1-]
-:
-\`\`\`
-
-| Topic | Rule |
-|-------|------|
-| **Flat \`=\` on whole record** | OK when count is **unique** (e.g. \`24wire\` + suffix anchor, or single open-ended field last). |
-| **Two \`8[1-]\` fields** | Structured per-field assign OK; flat \`pkt = ^…\` → **ambiguous** error. |
-| **Runtime count** | Stored in \`wire.varArrayCounts\`; drives layout, show, read, Wave Listen. |
-| **Show** | Tree + \`:i\` lines + \`field has length [N]\`; tags (\`; dec\`) and field slices supported. |
-| **Peek / probe** | Same tree as \`show\`, including dynamic \`has length [N]\`. |
-| **WWIDTH / BITSIZE** | \`WWIDTH(pkt:tokens:0)\` = element width (\`8\`); \`BITSIZE(pkt:tokens)\` = runtime total (\`count × W\`). |
-
-Static reference (no buttons):
-
-\`\`\`logts
-24wire<package2> pkt = ^AABBFF          # cells count=2 (suffix anchor)
-32wire<package3> pkt := 0
-pkt:tokens = ^AABB
-pkt:codeDatas = ^CC
-24wire<package1> pkt = { cells=^AABBCC }<package1>   # single var field — grouped literal OK
-show(pkt:cells; dec)
-peek(pkt)
-\`\`\`
-
-**Load & Run** — \`package2\`: flat hex init (suffix anchor resolves \`cells\` count), full-record \`show\`, decimal tag on the cells slice, \`peek\`:
-
-\`\`\`logts-play wave
-<package2>:
-    cells: 8[1-]
-    footer: 8
-:
-24wire<package2> pkt = ^AABBFF
-show(pkt)
-show(pkt:cells; dec)
-peek(pkt)
-\`\`\`
-
-Expected **Output**: \`cells has length [2]\`; \`:0\` / \`:1\` under \`cells\`; \`footer = 11111111\`; peek tree matches \`show(pkt)\`.
-
-**Load & Run** — \`package3\`: two variable fields — use **structured per-field assign** (flat \`pkt = ^…\` is ambiguous):
-
-\`\`\`logts-play wave
-<package3>:
-    tokens: 8[1-]
-    codeDatas: 8[1-]
-:
-32wire<package3> pkt := 0
-pkt:tokens = ^AABB
-pkt:codeDatas = ^CC
-show(pkt)
-\`\`\`
-
-Expected **Output**: \`tokens has length [2]\`, \`codeDatas has length [1]\`.
-
-**Load & Run** — bounded range \`8[1-3]\`, grouped schema literal, \`BITSIZE\` / \`WWIDTH\`:
-
-\`\`\`logts-play wave
-<package1>:
-    cells: 8[1-3]
-:
-24wire<package1> pkt = { cells=^AABBCC }<package1>
-show(pkt)
-5wire sz = BITSIZE(pkt:cells)
-4wire ew = WWIDTH(pkt:cells:0)
-show(sz)
-show(ew)
-\`\`\`
-
-Expected **Output**: \`cells has length [3]\`; \`sz = 11000\` (24 bits); \`ew = 1000\` (8-bit element width).
-
-**Load & Run** — \`probe\` on a variable array field after per-field writes:
-
-\`\`\`logts-play wave
-<package3>:
-    tokens: 8[1-]
-    codeDatas: 8[1-]
-:
-32wire<package3> pkt := 0
-pkt:tokens = ^AA
-pkt:codeDatas = ^BBCC
-probe(pkt:tokens)
-\`\`\`
-
-Expected **Output**: probe tree with \`tokens has length [1]\` and \`:0 = 10101010\`.
-
-**Schema arrays** (\`field:<sub>[N]\` / \`[R,C]\`) with fixed size are unchanged — see below.
-
 ### Matrix row / column slices
 
 Same syntax as wire matrices — \`pkt:grid:0\` (row), \`pkt:grid::1\` (column), including \`pkt:grid:(rowIdx)\` and \`pkt:grid::(colIdx)\`:
@@ -22161,7 +21994,7 @@ show(pkt:grid::1)   # :0:1 … :1:1 + pkt:grid has shape [2,2]
 
 ## Schema arrays (\`field:<schema>[N]\` / \`[R,C]\`)
 
-A schema may contain **fixed-size arrays of sub-schemas** — each element is a full nested record (model B), analogous to \`16wire[2]<opcode>\` on wires (model A):
+Fixed-size arrays of **sub-schemas** — each element is a full nested record, analogous to \`16wire[2]<opcode>\` on wires:
 
 \`\`\`logts
 <opcode>:
@@ -22214,7 +22047,9 @@ Same RHS forms as wire vectors — concatenation, hex, per-element schema litera
 
 ### \`show\` on schema arrays
 
-Same layout as wire vectors with schema (rev. 4): section header \`slots\`, flat \`:i = … (Wbit)\` per element, then **indented sub-schema tree** underneath. \`show(pkt:slots:1)\` shows one element only.
+Same layout as wire vectors with schema: section header \`slots\`, flat \`:i = … (Wbit)\` per element, then **indented sub-schema tree** underneath. \`show(pkt:slots:1)\` shows one element only.
+
+**Load & Run** — mixed scalar + schema array field write + \`show\`:
 
 \`\`\`logts-play wave
 <opcode>:
@@ -22235,7 +22070,7 @@ pkt:slots:1:cycles := \\3
 show(pkt)
 \`\`\`
 
-Mixed scalar + schema array + nested scalar on one record is supported — e.g. \`tag:8\` + \`slots:<opcode>[2]\` + \`meta:<flags>\`.
+Mixed scalar + raw array + matrix on one record:
 
 \`\`\`logts
 <frame>:
@@ -22291,6 +22126,373 @@ Valid attach (16 bits):
 \`\`\`
 
 Type label in debug output becomes \`16wire<opcode>\`.
+
+---
+
+## Variable-size arrays
+
+For runtime element count (\`8[1-3]\`, \`8[1-]\`) see [Variable arrays (1D)](schema-variable-arrays.md). For variable 2D matrices (\`8[1-3,2]\`, \`<opcode>[1-3,2]\`) see [Variable matrix (2D)](schema-variable-matrix.md).
+`,
+    'schema-variable-arrays.md': `# Variable arrays in schema (1D)
+
+**Model D** — variable element count at runtime inside a schema field: \`cells:8[1-3]\`, \`cells:8[1-]\`, \`tokens:8[nTokens]\` (future). Part of [Semantic schemas](semantic-schemas.md).
+
+See also: [Fixed field arrays](schema-field-arrays.md), [Variable matrix (2D)](schema-variable-matrix.md), [protocol-repeat.md](protocol-repeat.md) (same \`[min-max]\` syntax).
+
+---
+
+## Runnable examples (Load / Load & Run)
+
+Use **\`logts-play wave\`** for examples with \`show\`. See [Semantic schemas — Runnable examples](semantic-schemas.md#runnable-examples-load--load--run).
+
+---
+
+## Syntax
+
+Mirrors protocol repetition: **\`8[1-3]\`** (1–3 elements), **\`8[1-]\`** (at least 1, open upper bound), **\`8[0-]\`** (zero or more). Sugar: **\`8+\`** → \`8[1-]\`, **\`8*\`** → \`8[0-]\`.
+
+\`\`\`logts
+<package2>:
+    cells: 8[1-]
+    footer: 8
+:
+
+<package3>:
+    tokens: 8[1-]
+    codeDatas: 8[1-]
+:
+\`\`\`
+
+| Topic | Rule |
+|-------|------|
+| **Flat \`=\` on whole record** | OK when count is **unique** (e.g. \`24wire\` + suffix anchor, or single open-ended field last). |
+| **Two \`8[1-]\` fields** | Structured per-field assign OK; flat \`pkt = ^…\` → **ambiguous** error. |
+| **Runtime count** | Stored in \`wire.varArrayCounts\`; drives layout, show, read, Wave Listen. |
+| **Show** | Tree + \`:i\` lines + \`field has length [N]\`; tags (\`; dec\`) and field slices supported. |
+| **Peek / probe** | Same tree as \`show\`, including dynamic \`has length [N]\`. |
+| **WWIDTH / BITSIZE** | \`WWIDTH(pkt:tokens:0)\` = element width (\`8\`); \`BITSIZE(pkt:tokens)\` = runtime total (\`count × W\`). |
+
+Static reference (no buttons):
+
+\`\`\`logts
+24wire<package2> pkt = ^AABBFF          # cells count=2 (suffix anchor)
+32wire<package3> pkt := 0
+pkt:tokens = ^AABB
+pkt:codeDatas = ^CC
+24wire<package1> pkt = { cells=^AABBCC }<package1>   # single var field — grouped literal OK
+show(pkt:cells; dec)
+peek(pkt)
+\`\`\`
+
+---
+
+## Load & Run examples
+
+**\`package2\`** — flat hex init (suffix anchor resolves \`cells\` count), full-record \`show\`, decimal tag on the cells slice, \`peek\`:
+
+\`\`\`logts-play wave
+<package2>:
+    cells: 8[1-]
+    footer: 8
+:
+24wire<package2> pkt = ^AABBFF
+show(pkt)
+show(pkt:cells; dec)
+peek(pkt)
+\`\`\`
+
+Expected **Output**: \`cells has length [2]\`; \`:0\` / \`:1\` under \`cells\`; \`footer = 11111111\`; peek tree matches \`show(pkt)\`.
+
+**\`package3\`** — two variable fields — use **structured per-field assign** (flat \`pkt = ^…\` is ambiguous):
+
+\`\`\`logts-play wave
+<package3>:
+    tokens: 8[1-]
+    codeDatas: 8[1-]
+:
+32wire<package3> pkt := 0
+pkt:tokens = ^AABB
+pkt:codeDatas = ^CC
+show(pkt)
+\`\`\`
+
+Expected **Output**: \`tokens has length [2]\`, \`codeDatas has length [1]\`.
+
+**Bounded range \`8[1-3]\`** — grouped schema literal, \`BITSIZE\` / \`WWIDTH\`:
+
+\`\`\`logts-play wave
+<package1>:
+    cells: 8[1-3]
+:
+24wire<package1> pkt = { cells=^AABBCC }<package1>
+show(pkt)
+5wire sz = BITSIZE(pkt:cells)
+4wire ew = WWIDTH(pkt:cells:0)
+show(sz)
+show(ew)
+\`\`\`
+
+Expected **Output**: \`cells has length [3]\`; \`sz = 11000\` (24 bits); \`ew = 1000\` (8-bit element width).
+
+**\`probe\`** on a variable array field after per-field writes:
+
+\`\`\`logts-play wave
+<package3>:
+    tokens: 8[1-]
+    codeDatas: 8[1-]
+:
+32wire<package3> pkt := 0
+pkt:tokens = ^AA
+pkt:codeDatas = ^BBCC
+probe(pkt:tokens)
+\`\`\`
+
+Expected **Output**: probe tree with \`tokens has length [1]\` and \`:0 = 10101010\`.
+
+---
+
+## Grouped literal shape \`[N]\`
+
+When count alone is ambiguous, use a **prefix or suffix** shape on grouped literals (same rules as matrix \`[R,C]\` — see [Variable matrix (2D)](schema-variable-matrix.md)):
+
+\`\`\`logts
+pkt:cells = { }{ }{ }[3]<cell>
+pkt:cells = [3]{ }{ }{ }<cell>
+\`\`\`
+
+---
+
+## Next: 2D variable matrices
+
+Matrices with one variable dimension (\`grid:8[1-3,2]\`, \`tiles:<opcode>[1-3,2]\`) are documented in [Variable matrix (2D)](schema-variable-matrix.md).
+`,
+    'schema-variable-matrix.md': `# Variable matrix in schema (2D)
+
+**Model D — 2D** — variable row or column count at runtime: \`grid:8[1-3,2]\`, \`tiles:<opcode>[1-3,2]\`. Part of [Semantic schemas](semantic-schemas.md).
+
+Prerequisite: [Variable arrays (1D)](schema-variable-arrays.md) (\`varArrayCounts\`, flat vs structured assign). Fixed-size slice syntax: [Schema field arrays](schema-field-arrays.md).
+
+---
+
+## Runnable examples (Load / Load & Run)
+
+Use **\`logts-play wave\`** for examples with \`show\`. See [Semantic schemas — Runnable examples](semantic-schemas.md#runnable-examples-load--load--run).
+
+---
+
+## Syntax and layout
+
+At most **one variable dimension** per field at flat assign time. \`varArrayCounts[field]\` stores **total cells** \`N = R×C\`; the fixed dimension from the declaration derives the other (\`rows = N / colsFix\`).
+
+\`\`\`logts
+<cell8>:
+    v: 8
+:
+
+<frameVarGrid>:
+    grid: 8[1-3, 2]    # cols fixed at 2; rows 1–3 at runtime
+:
+
+<opcode>:
+    alu: 4
+    jump: 1
+    write: 1
+    cycles: 2
+    reserved: 8
+:
+
+<frameVarTiles>:
+    tiles: <opcode>[1-3, 2]
+:
+\`\`\`
+
+| Syntax | Flat \`pkt = ^…\` | Notes |
+|--------|-----------------|-------|
+| \`grid:8[1-3, 2]\` | ✅ | \`N = payload/8\`, \`rows = N/2\` |
+| \`grid:8[2, 1-3]\` | ✅ | \`cols = N/2\` |
+| \`grid:8[1-3, 1-3]\` | ❌ ambiguous | use shape literal or per-field assign |
+| \`tiles:<opcode>[1-3, 2]\` | ✅ | element width = 16 (\`opcode.totalWidth\`) |
+
+---
+
+## Grouped literal shape
+
+Prefix **or** suffix \`[R,C]\` / \`[N]\` — **not both** in the same literal:
+
+\`\`\`logts
+pkt:grid = { v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }[2,2]<cell8>
+pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>
+pkt:tiles = [2,2]{ alu=\\5 }{ alu=\\6 }{ alu=\\1 }{ alu=\\2 }<opcode>
+\`\`\`
+
+**Show** — tree \`:r:c\` plus \`pkt:grid has shape [R,C]\` (or \`grid has shape [R,C]\` inside full-record \`show\`).
+
+---
+
+## Load & Run examples
+
+**Flat assign 2×2 leaf matrix**, \`show\`, shape footer:
+
+\`\`\`logts-play wave
+<cell8>:
+    v: 8
+:
+<frameVarGrid>:
+    grid: 8[1-3, 2]
+:
+32wire<frameVarGrid> pkt = ^AABBCCDD
+show(pkt:grid)
+\`\`\`
+
+Expected **Output**: \`:0:0\`, \`:0:1\`, \`:1:0\`, \`:1:1\` under \`grid\`; \`pkt:grid has shape [2,2]\`.
+
+**Grouped literal with shape prefix** + per-field assign:
+
+\`\`\`logts-play wave
+<cell8>:
+    v: 8
+:
+<frameVarGrid>:
+    grid: 8[1-3, 2]
+:
+32wire<frameVarGrid> pkt := 0
+pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>
+show(pkt:grid)
+\`\`\`
+
+Expected **Output**: \`pkt:grid has shape [2,2]\`; four \`:r:c\` lines.
+
+**Variable schema matrix** \`<opcode>[1-3, 2]\`:
+
+\`\`\`logts-play wave
+<opcode>:
+    alu: 4
+    jump: 1
+    write: 1
+    cycles: 2
+    reserved: 8
+:
+<frameVarTiles>:
+    tiles: <opcode>[1-3, 2]
+:
+64wire<frameVarTiles> pkt := 0
+pkt:tiles = [2,2]{ alu=\\5 }{ alu=\\6 }{ alu=\\1 }{ alu=\\2 }<opcode>
+show(pkt:tiles)
+\`\`\`
+
+Expected **Output**: \`pkt:tiles has shape [2,2]\`; nested \`alu\`/\`cycles\`/… under each \`:r:c\`.
+
+**Row/column slice on runtime shape** (7a parity with fixed arrays):
+
+\`\`\`logts-play wave
+<cell8>:
+    v: 8
+:
+<frameVarGrid>:
+    grid: 8[1-3, 2]
+:
+32wire<frameVarGrid> pkt := 0
+pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>
+pkt:grid:0 = 00000101 + 00000110
+pkt:grid::1 = 00000110 + 00001111
+show(pkt:grid:0)
+show(pkt:grid::1)
+8wire cell10 = pkt:grid:1:0
+show(cell10)
+\`\`\`
+
+Expected **Output**: row/col slice headers; \`pkt:grid has shape [2,2]\` on each slice show; \`cell10 = 00000111\` (8bit).
+
+Slice syntax matches [fixed matrix slices](schema-field-arrays.md#matrix-row--column-slices); bounds use runtime \`rows\` / \`cols\` from \`varArrayCounts\`.
+`,
+    'semantic-schemas.md': `# Semantic schemas — named bit fields on wires
+
+Semantic schemas add a **named field layout** on top of raw wire bits: declare fields once, attach a schema to a wire, initialize with structured literals, read/write individual fields, and display or trace values field-by-field.
+
+This is **independent** from numeric display formats (\`s8\`, \`q4p4\`, \`dec\`, …). Schemas describe **what each bit slice means**; numeric tags describe **how to print** a slice. Both can be combined in \`show\` / \`peek\` / \`probe\`.
+
+See also: [debug.md](debug.md) (show/peek/probe), [wire-literals.md](wire-literals.md) (RHS literals), [short-notation.md](short-notation.md) (bit indexing), [wire-vectors.md](wire-vectors.md) (vector/tensor access), [doc-viewer.md](doc-viewer.md) (Load / Load & Run).
+
+---
+
+## Related topics (array fields)
+
+| Page | When to read |
+|------|----------------|
+| [Schema field arrays (fixed)](schema-field-arrays.md) | \`cells:8[3]\`, \`grid:4[2,2]\`, \`slots:<opcode>[2]\`, slice \`:0\` / \`::1\`, grouped \`{…}<schema>\` |
+| [Variable arrays (1D)](schema-variable-arrays.md) | \`8[1-3]\`, \`8[1-]\`, \`varArrayCounts\`, flat vs per-field assign, \`has length [N]\` |
+| [Variable matrix (2D)](schema-variable-matrix.md) | \`8[1-3,2]\`, \`<opcode>[1-3,2]\`, shape \`[R,C]\`, runtime row/col slice |
+
+---
+
+## Runnable examples (Load / Load & Run)
+
+Blocks marked \`logts-play\` show two buttons in the documentation viewer:
+
+| Button | Action |
+|--------|--------|
+| **Load** | Copy the script into the editor without running |
+| **Load & Run** | Copy and run immediately — check the **Output** panel |
+
+Use **\`logts-play wave\`** (orange badge) for examples with \`show\` — same as [debug.md](debug.md). Static syntax reference below uses plain fences (no buttons).
+
+---
+
+## Quick comparison
+
+| | Numeric formats (\`s8\`, \`q4p4\`, …) | Semantic schemas (\`<name>\`) |
+|---|-----------------------------------|------------------------------|
+| Module | \`numeric-formats.js\` | \`semantic-schemas.js\` |
+| Attached to wire | No (only at literal / show tag) | Yes — \`wireEntry.schemaRef\` |
+| Literals | \`\\1.5;q4p4\`, \`^FF\` | \`{ alu=\\5 cycles=\\3 }<opcode>\` |
+| Field access | — | \`instr:alu\`, \`vector:2:alu\` |
+| \`show(w)\` | Flat wire value | Auto breakdown by schema |
+| Wave Listen | Global fmt dropdown | **\`auto\`** uses wire schema |
+
+---
+
+## Declaring a schema
+
+Top-level block — schema name is written as **\`<name>\`**:
+
+\`\`\`logts
+<opcode>:
+    alu:4
+    jump:1
+    write:1
+    cycles:2
+    reserved:8
+:
+\`\`\`
+
+| Rule | Detail |
+|------|--------|
+| Field syntax | \`name:width\` (width in bits); \`name:W[N]\` vector; \`name:W[N,M]\` matrix — see [field arrays](schema-field-arrays.md) |
+| Bit layout | **MSB-left, index 0** — same convention as \`.bitRange\` / wire slices |
+| Total width | Sum of field widths |
+| Duplicate names | Error at parse time |
+
+---
+
+## Attaching a schema to a wire
+
+\`\`\`logts
+16wire<opcode> instr
+16wire[64]<opcode> rom
+16wire[2,3]<opcode> grid
+\`\`\`
+
+**What \`<schema>\` does:** it attaches the named field layout to **each element** of the wire’s storage — not to the whole concatenated bit string.
+
+| Declaration | Storage | Schema applies to |
+|-------------|---------|-------------------|
+| \`16wire<opcode> instr\` | one 16-bit word | that word |
+| \`16wire[4]<opcode> rom\` | 4 × 16 bits (64 total) | **each** of the 4 elements |
+| \`16wire[2,3]<opcode> grid\` | 2×3 × 16 bits (96 total) | **each** matrix cell |
+
+Validation compares **schema total width** with **element width** (\`16\` in the examples above), not the full wire/tensor size. A 16-bit schema on \`16wire[64]\` is valid (64 elements × 16 bits); a 16-bit schema on \`8wire[4]\` is an error.
+
+Type labels in debug output reflect the shape + schema, e.g. \`16wire[3]<opcode>\`, \`16wire[2,2]<opcode>\`.
 
 ---
 
@@ -22419,6 +22621,8 @@ Initialize (or assign) a full wire from named fields:
 show(instr)
 \`\`\`
 
+Grouped multi-element literals on array fields: [Schema field arrays](schema-field-arrays.md#literals-on-array-slices).
+
 ---
 
 ## Field access (read and write)
@@ -22499,6 +22703,8 @@ instr (16wire<opcode>)
   cycles    = 11
   reserved  = 00000000
 \`\`\`
+
+Array fields inside a record use section headers and \`:i\` / \`:r:c\` lines — see [field arrays](schema-field-arrays.md#show-on-array-fields). Variable arrays add \`has length [N]\` or \`has shape [R,C]\` footers — [1D](schema-variable-arrays.md) / [2D](schema-variable-matrix.md).
 
 ### Alternate schema tag
 
@@ -22675,6 +22881,7 @@ Within one script, referenced schemas must be defined in the same unit (or loade
 | Duplicate after merge | \`Duplicate schema field 'version' in schema 'packet' (from merge of 'header')\` |
 | Unknown schema | \`Unknown schema 'opcode'\` |
 | Reserved schema name | \`Reserved schema name 'none' — choose another name for a user-defined schema\` |
+| Ambiguous variable layout | \`Ambiguous variable array layout for schema '…'\` — see [Variable arrays (1D)](schema-variable-arrays.md) |
 
 ---
 
