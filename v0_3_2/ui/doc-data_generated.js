@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -5246,6 +5246,7 @@ Exactly **one source** tag and **one destination** tag (\`to_*\`). Source and de
 |------------|---------------|---------|
 | \`signed\` | any *W* (adaptive) | Two's complement integer on *W* bits |
 | \`sX\` | exactly **X** (1≤X≤64) | Two's complement integer, fixed width |
+| \`uX\` | exactly **X** (1≤X≤64) | Unsigned integer, fixed width |
 | \`q4p4\` | **8** | Q4.4 fixed-point |
 | \`q8p8\` | **16** | Q8.8 fixed-point |
 | \`qXpY\` | exactly **X+Y** (≤64) | Signed fixed-point Q{X}.{Y} |
@@ -5256,13 +5257,14 @@ Exactly **one source** tag and **one destination** tag (\`to_*\`). Source and de
 |-----------------|--------------|
 | \`to_signed\` | same as operand |
 | \`to_sX\` | **X** |
+| \`to_uX\` | **X** |
 | \`to_q4p4\` | **8** |
 | \`to_q8p8\` | **16** |
 | \`to_qXpY\` | **X+Y** |
 | \`to_fp16\` | **16** |
 | \`to_bf16\` | **16** |
 
-**\`signed\`** uses the operand width adaptively; **\`sX\`** fixes the width (\`; sX\` validates the operand is exactly X bits). The same applies to \`to_signed\` vs \`to_sX\` for the result.
+**\`signed\`** uses the operand width adaptively; **\`sX\`** / **\`uX\`** fix the width (\`; sX\` / \`; uX\` validates the operand is exactly X bits). The same applies to \`to_signed\` / \`to_sX\` / \`to_uX\` for the result.
 
 | Shape tag | Behaviour |
 |-----------|-----------|
@@ -8471,7 +8473,7 @@ Signal propagation trace — **separate panel**, not Output. Open from **Win ▾
 |---------|------|
 | **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
 | **L1 / L2 / L3** | Trace verbosity (\`debugLevel\` on propagation engine) |
-| **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii / auto (dropdown, persisted) |
+| **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / u8 / q4p4 / fp16 / bf16 / ascii / auto (dropdown, persisted) |
 | **Filter ▾** | All / Wires / Components / Internals (persisted as \`prog/signalTraceFilter\`) |
 | **Clear** | Clears panel history (no auto-clear on Run) |
 | **Tracing…** badge | Internal trace active while script runs (distinct from ON/OFF) |
@@ -8512,7 +8514,7 @@ Legacy uses **\`[step N]\`** prefix (immediate cascade) instead of **\`[wave N]\
 
 **Filter** (toolbar): **All** shows everything; **Wires** — wire commit/exec/eval, init, flush, schedule, lut-mut; **Components** — commit component, prop, connect, lut-mut; **Internals** — eval L3, block exec, state/mem, schedule (wave L3).
 
-**Value formatting:** dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / q4p4 / fp16 / bf16 / ascii / auto**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **oct**, **b32hex**, **b32c** produc literali \`o^…\`, \`x^…\`, \`xc^…\` (roundtrip ca la hex). **ascii** afișează ca \`show(…; ascii)\` — \`"Hello"\` sau \`\\72 \\101 …;ascii\`. Suffix **\`(Nbits)\`** la afișare. **\`[cpy]\`** — literal script: **bin** = biți continui; **hex** = \`^…\` fără spații; **oct/b32hex/b32c** = \`o^…\` / \`x^…\` / \`xc^…\` fără spații; **dec/s8/…** = cu \`;format\`; **ascii** = \`"abc"\` pentru text printabil, \`"abc" + \\2 + "zz"\` dacă mix, \`\\65 \\66;ascii\` dacă doar \`\\N\` (2+ cu \`;ascii\`). X/Z → fallback hex la copy.
+**Value formatting:** dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / u8 / q4p4 / fp16 / bf16 / ascii / auto**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **oct**, **b32hex**, **b32c** produc literali \`o^…\`, \`x^…\`, \`xc^…\` (roundtrip ca la hex). **ascii** afișează ca \`show(…; ascii)\` — \`"Hello"\` sau \`\\72 \\101 …;ascii\`. Suffix **\`(Nbits)\`** la afișare. **\`[cpy]\`** — literal script: **bin** = biți continui; **hex** = \`^…\` fără spații; **oct/b32hex/b32c** = \`o^…\` / \`x^…\` / \`xc^…\` fără spații; **dec/s8/…** = cu \`;format\`; **ascii** = \`"abc"\` pentru text printabil, \`"abc" + \\2 + "zz"\` dacă mix, \`\\65 \\66;ascii\` dacă doar \`\\N\` (2+ cu \`;ascii\`). X/Z → fallback hex la copy.
 
 See [Wave debug patterns](#wave-debug-patterns) and [huffman-v2.md](huffman-v2.md) (SC round-trip).
 
@@ -8589,9 +8591,10 @@ Display tags are **optional**, appear **once after all arguments** (after \`;\`)
 | \`fp16\` | IEEE 754 half as decimal (\`3\`, \`nan\`, \`inf\`) on **16-bit** wires |
 | \`bf16\` | Brain float 16 as decimal on **16-bit** wires |
 | \`sX\` | Fixed signed width per element — e.g. \`show(v; s8)\` → \`\\2 \\-1 \\5 \\0;s8\` (distinct from adaptive \`signed\`) |
+| \`uX\` | Fixed unsigned width per element — e.g. \`show(w; u8)\` on 24wire → \`\\170 \\187 \\204;u8\` (distinct from scalar \`dec\`) |
 | \`qXpY\` | Parametric Q format — e.g. \`show(w; q6p2)\` → \`\\1.5;q6p2\`, \`show(w; q8p0)\` → \`\\5;q8p0\` (not \`;s8\`) |
 
-Exactly **one** format tag per statement: \`dec\`, \`hex\`, \`bin\`, \`ascii\`, fixed (\`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`), or parametric (\`sX\`, \`qXpY\` with X+Y≤64). \`signed\` (adaptive) is mutually exclusive with \`sX\` and with numeric-format tags; \`dec\` + \`sX\` is rejected.
+Exactly **one** format tag per statement: \`dec\`, \`hex\`, \`bin\`, \`ascii\`, fixed (\`q4p4\`, \`q8p8\`, \`fp16\`, \`bf16\`), or parametric (\`sX\`, \`uX\`, \`qXpY\` with X+Y≤64). \`signed\` (adaptive) is mutually exclusive with \`sX\` and with numeric-format tags; \`dec\` + \`sX\` / \`dec\` + \`uX\` is rejected. Literal \`;8\` remains valid (suffix \`8\`); \`;u8\` uses suffix \`u8\`.
 
 #### Layout / element tags (\`show\` and \`peek\` only)
 
@@ -22133,11 +22136,242 @@ Type label in debug output becomes \`16wire<opcode>\`.
 
 For runtime element count (\`8[1-3]\`, \`8[1-]\`) see [Variable arrays (1D)](schema-variable-arrays.md). For variable 2D matrices (\`8[1-3,2]\`, \`<opcode>[1-3,2]\`) see [Variable matrix (2D)](schema-variable-matrix.md).
 `,
+    'schema-frame-padding.md': `# Schema frame padding (grow / shrink)
+
+**Faza 2.5** — wide wire + variable schema: reserve a **frame** (\`declaredWidth\`) larger than the runtime payload. Surplus bits are **\`paddingRight\`** (buffer) used when a variable field **grows** or **shrinks** at assign time.
+
+Prerequisite: [Variable arrays (1D)](schema-variable-arrays.md), [Variable matrix (2D)](schema-variable-matrix.md). See also [Assignment operators](assignment-operators.md) (\`=\`, \`=:\` , \`:=\`).
+
+---
+
+## Runnable examples (Load / Load & Run)
+
+Use **\`logts-play wave\`** for examples with \`show\`. See [Semantic schemas — Runnable examples](semantic-schemas.md#runnable-examples-load--load--run).
+
+---
+
+## Model
+
+\`\`\`text
+declaredWidth (e.g. 200) = schemaUsedWidth (runtime) + paddingRight (buffer)
+\`\`\`
+
+| Concept | Meaning |
+|---------|---------|
+| **\`declaredWidth\`** | Wire type width — e.g. \`200wire<framePkt>\` → 200 bits reserved |
+| **\`schemaUsedWidth\`** | Sum of all schema fields at current \`varArrayCounts\` (or **minWidth** after \`:= 0\` only) |
+| **\`paddingRight\`** | \`declaredWidth − schemaUsedWidth\` when surplus ≥ 1 bit; zeros in storage; shown in \`show(pkt)\` |
+| **Wire strâns (tight)** | \`declaredWidth\` equals current layout exactly — **no buffer**; changing variable **count** → **error** |
+| **Wire cadru (frame)** | \`declaredWidth\` > runtime layout — grow/shrink on variable fields **in scope** |
+
+**Fixed schemas** on a wide wire keep constant payload width; padding stays static (no grow/shrink).
+
+**parseView without schema** (protocol \`=: .proto {…}\` on a plain wire) still uses synthetic \`paddingRight\` / \`paddingLeft\` as before — this page covers **\`<schema>\` on the wire**.
+
+---
+
+## Example schema
+
+Record with header/footer and a **variable 2D grid** (\`rows\` 1–3, \`cols\` fixed at 2):
+
+\`\`\`logts
+<cell8>:
+    v: 8
+:
+
+<framePkt>:
+    header: 2
+    grid: 8[1-3, 2]
+    footer: 2
+:
+\`\`\`
+
+| Layout | Bits |
+|--------|------|
+| min (1×2 grid) | 2 + 16 + 2 = **20** |
+| 2×2 grid | 2 + 32 + 2 = **36** |
+| 3×2 grid | 2 + 48 + 2 = **52** |
+
+---
+
+## Init — \`:= 0\` on a wide wire
+
+All bits zero. Runtime layout uses **minimum** counts; full surplus is buffer from the start.
+
+\`\`\`logts-play wave
+<cell8>:
+    v: 8
+:
+<framePkt>:
+    header: 2
+    grid: 8[1-3, 2]
+    footer: 2
+:
+200wire<framePkt> pkt := 0
+show(pkt)
+\`\`\`
+
+Expected **Output**:
+
+- \`header\`, \`grid\` with \`:0:0\`, \`:0:1\` (min shape **\\[1,2\\]**), \`footer\`
+- \`grid has shape [1,2]\`
+- \`paddingRight = … (180bit)\` — because 200 − 20 = 180
+
+\`show(pkt:grid)\` **before** any assign that sets grid count still **errors** (slice needs explicit count). Full-record \`show(pkt)\` after \`:= 0\` is OK.
+
+---
+
+## Grow — take bits from buffer
+
+Start on a **200wire** frame, set header/footer, assign 2×2 grid, then **grow** to 3×2. Header and footer are **relocated**; new grid cells come from the assign RHS; freed buffer shrinks.
+
+\`\`\`logts-play wave
+<cell8>:
+    v: 8
+:
+<framePkt>:
+    header: 2
+    grid: 8[1-3, 2]
+    footer: 2
+:
+200wire<framePkt> pkt := 0
+pkt:header = 11
+pkt:footer = 00
+pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>
+pkt:grid = [3,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }{ v=\\5 }{ v=\\6 }<cell8>
+show(pkt)
+\`\`\`
+
+Expected **Output**:
+
+- \`header = 11\`, \`footer = 00\` (unchanged values)
+- \`grid has shape [3,2]\` — six \`:r:c\` lines
+- \`paddingRight … (148bit)\` — 200 − 52 = 148
+
+Same rebuild path for:
+
+- \`pkt:grid = ^AABBCCDDEEFF\` (flat — length ÷ 8 ⇒ count 6 ⇒ 3×2 with fixed cols)
+- \`pkt:grid = .myProto { … }\` (proto blob length sets count — matrix shape rules still apply)
+
+---
+
+## Shrink — return bits to buffer
+
+From 2×2 on a **200wire** frame, shrink to 1×2. Payload shrinks; **paddingRight** grows.
+
+\`\`\`logts-play wave
+<cell8>:
+    v: 8
+:
+<framePkt>:
+    header: 2
+    grid: 8[1-3, 2]
+    footer: 2
+:
+200wire<framePkt> pkt := 0
+pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>
+pkt:grid = [1,2]{ v=\\9 }{ v=\\10 }<cell8>
+show(pkt)
+\`\`\`
+
+Expected **Output**:
+
+- \`grid has shape [1,2]\` — two cells
+- \`paddingRight … (180bit)\` — 200 − 20 = 180
+
+---
+
+## Tight wire — errors (no buffer)
+
+When \`declaredWidth\` matches the current layout **exactly**, changing row/column **count** is rejected (no silent fail).
+
+**Grow** on \`36wire\` (exact 2×2 layout):
+
+\`\`\`logts
+36wire<framePkt> pkt := 0
+pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>
+pkt:grid = [3,2]{ … }<cell8>    # error: requires 52 bits …
+\`\`\`
+
+**Shrink**:
+
+\`\`\`logts
+pkt:grid = [1,2]{ v=\\9 }{ v=\\10 }<cell8>   # error: … without frame buffer …
+\`\`\`
+
+**Same count** assign still works (fast splice):
+
+\`\`\`logts
+pkt:grid = [2,2]{ v=\\5 }{ v=\\6 }{ v=\\7 }{ v=\\8 }<cell8>   # OK
+\`\`\`
+
+**Insufficient frame** (layout would exceed declared width):
+
+\`\`\`logts
+50wire<framePkt> pkt := 0
+pkt:grid = [2,2]{ … }<cell8>
+pkt:grid = [3,2]{ … }<cell8>    # error: requires 52 bits but wire is 50bit
+\`\`\`
+
+---
+
+## Padding in \`show\` / read
+
+| Action | Behaviour |
+|--------|-----------|
+| **\`show(pkt)\`** | Schema tree on payload bits + \`paddingRight = 000… (Nbit)\` when N ≥ 1 |
+| **\`show(pkt:grid)\`** | Field slice only — no padding line (same as before) |
+| **\`pkt:paddingRight\`** | Read/write the buffer slice (when \`paddingRightWidth\` > 0) |
+| **Flat \`=\` on whole wire** | Strict — RHS must match **declaredWidth**; use per-field assign or \`:=\` for frame init |
+
+---
+
+## 1D variable fields
+
+Same rules apply to **1D** variable arrays (\`cells:8[1-3]\`) on a wide wire: grow/shrink via \`pkt:cells = …\` uses buffer; tight wire rejects count change.
+
+\`\`\`logts
+<package2>:
+    cells: 8[1-]
+    footer: 8
+:
+64wire<package2> pkt := 0
+show(pkt)                          # min layout + paddingRight
+pkt:cells = ^AABB                  # count 2 — padding recalculated
+pkt:cells = ^AABBCCDD              # count 4 — grow from buffer (if room)
+\`\`\`
+
+Use a wire wide enough for the **maximum** count you need, or assign per-field on a tight wire at fixed count only.
+
+---
+
+## Quick reference
+
+| Situation | Result |
+|-----------|--------|
+| \`200wire<varSchema> pkt := 0\` | min layout + max \`paddingRight\` |
+| Assign changes grid/cells **count** on **frame** wire | Rebuild + update \`paddingRightWidth\` |
+| Assign same count on frame wire | Splice field + refresh padding metadata |
+| Count change on **tight** wire | **Error** |
+| \`newUsed > declaredWidth\` | **Error** (\`requires N bits\`) |
+| Fixed schema on wide wire | Static payload; padding only |
+
+---
+
+## Related
+
+| Doc | Topic |
+|-----|-------|
+| [Variable arrays (1D)](schema-variable-arrays.md) | \`varArrayCounts\`, flat vs per-field assign |
+| [Variable matrix (2D)](schema-variable-matrix.md) | \`[R,C]\` shape, row/col slice |
+| [Semantic schemas](semantic-schemas.md) | Field access, literals, show |
+| [Assignment operators](assignment-operators.md) | \`=\`, \`=:\`, \`:=\`, padding on plain wires |
+`,
     'schema-variable-arrays.md': `# Variable arrays in schema (1D)
 
 **Model D** — variable element count at runtime inside a schema field: \`cells:8[1-3]\`, \`cells:8[1-]\`, \`tokens:8[nTokens]\`. Part of [Semantic schemas](semantic-schemas.md).
 
-See also: [Fixed field arrays](schema-field-arrays.md), [Variable matrix (2D)](schema-variable-matrix.md), [protocol-repeat.md](protocol-repeat.md) (same \`[min-max]\` syntax).
+See also: [Fixed field arrays](schema-field-arrays.md), [Variable matrix (2D)](schema-variable-matrix.md), [Frame padding (grow / shrink)](schema-frame-padding.md), [protocol-repeat.md](protocol-repeat.md) (same \`[min-max]\` syntax).
 
 ---
 
@@ -22296,7 +22530,7 @@ Matrices with one variable dimension (\`grid:8[1-3,2]\`, \`tiles:<opcode>[1-3,2]
 
 **Model D — 2D** — variable row or column count at runtime: \`grid:8[1-3,2]\`, \`tiles:<opcode>[1-3,2]\`. Part of [Semantic schemas](semantic-schemas.md).
 
-Prerequisite: [Variable arrays (1D)](schema-variable-arrays.md) (\`varArrayCounts\`, flat vs structured assign). Fixed-size slice syntax: [Schema field arrays](schema-field-arrays.md).
+Prerequisite: [Variable arrays (1D)](schema-variable-arrays.md) (\`varArrayCounts\`, flat vs structured assign). Fixed-size slice syntax: [Schema field arrays](schema-field-arrays.md). **Grow/shrink** on wide wires: [Frame padding](schema-frame-padding.md).
 
 ---
 
@@ -22473,6 +22707,7 @@ See also: [debug.md](debug.md) (show/peek/probe), [wire-literals.md](wire-litera
 | [Schema field arrays (fixed)](schema-field-arrays.md) | \`cells:8[3]\`, \`grid:4[2,2]\`, \`slots:<opcode>[2]\`, slice \`:0\` / \`::1\`, grouped \`{…}<schema>\` |
 | [Variable arrays (1D)](schema-variable-arrays.md) | \`8[1-3]\`, \`8[1-]\`, \`varArrayCounts\`, flat vs per-field assign, \`has length [N]\` |
 | [Variable matrix (2D)](schema-variable-matrix.md) | \`8[1-3,2]\`, \`<opcode>[1-3,2]\`, shape \`[R,C]\`, runtime row/col slice |
+| [Frame padding (grow / shrink)](schema-frame-padding.md) | Wide wire buffer \`paddingRight\`, resize variable fields, tight vs frame wire |
 
 ---
 
@@ -25386,8 +25621,9 @@ Related: [assignment operators](assignment-operators.md) (\`=\`, \`:=\`, \`=:\`)
 |------|---------|---------|
 | **Binary** | \`1010\` | Bits as written (only \`0\` and \`1\`) |
 | **Decimal unsigned** | \`\\255\` | Unsigned integer → minimal binary |
-| **Grouped literal** | \`\\2 \\23 \\242;8\` | Multiple \`\\N\` values + one \`;tag\` on the last atom |
+| **Grouped literal** | \`\\2 \\23 \\242;8\` or \`\\170 \\187 \\204;u8\` | Multiple \`\\N\` values + one \`;tag\` on the last atom |
 | **Decimal signed** | \`\\-3;s8\` | Two's complement on **exactly** \`W\` bits (\`;sW\`) |
+| **Decimal unsigned width** | \`\\170;u8\` | Unsigned integer on **exactly** \`W\` bits (\`;uW\`, 1..64) |
 | **Hex pattern** | \`^FF\` | Each hex digit → 4 bits (unsigned pattern) |
 | **Hex value signed** | \`^-A;8\` | Signed numeric value in hex + **explicit** width |
 | **Oct pattern** | \`o^12\` | Each oct digit → 3 bits (\`0\`–\`7\`) |
@@ -25403,7 +25639,7 @@ Postfixes shared by several forms:
 |---------|---------|--------|
 | **Bit range** | \`\\255.0-7\`, \`^FF.4/8\` | Slice after conversion to bits |
 | **Padding** \`;p\` | \`\\12;8\`, \`^f;8\` | Pad unsigned **scalar** literal to \`p\` bits (left zeroes) |
-| **Grouped tag** | \`\\2 \\-1;s8\`, \`\\1.5;q4p4\` | Suffix on last atom applies to **all** elements in the group |
+| **Grouped tag** | \`\\2 \\-1;s8\`, \`\\170 \\187 \\204;u8\`, \`\\1.5;q4p4\` | Suffix on last atom applies to **all** elements in the group |
 
 ---
 

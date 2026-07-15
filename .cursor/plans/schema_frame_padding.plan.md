@@ -4,16 +4,16 @@ overview: "Plan **Faza 2.5** — cadru wire lat + schema: `paddingRight` ca **bu
 todos:
   - id: 2.5.0-fail-loud
     content: "Faza 2.5.0: totalRuntimeWidth + validare assign count change; teste 2429–2432; doc"
-    status: pending
+    status: completed
   - id: 2.5.1-padding-show
     content: "Faza 2.5.1: paddingRight buffer + show/peek/Wave Listen; validateSchemaWidthForShow; teste 2433–2437"
-    status: pending
+    status: completed
   - id: 2.5.2-resize-relayout
     content: "Faza 2.5.2: rebuild wire la schimbare count; grow/shrink din/în buffer; teste 2438–2442"
-    status: pending
+    status: completed
   - id: 2.5.3-doc-plan-sync
     content: "Faza 2.5.3: actualizare schema_variable_range.plan.md § padding; regresie 2368–2369"
-    status: pending
+    status: completed
 isProject: false
 ---
 

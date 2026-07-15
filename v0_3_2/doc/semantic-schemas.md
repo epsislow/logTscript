@@ -15,6 +15,7 @@ See also: [debug.md](debug.md) (show/peek/probe), [wire-literals.md](wire-litera
 | [Schema field arrays (fixed)](schema-field-arrays.md) | `cells:8[3]`, `grid:4[2,2]`, `slots:<opcode>[2]`, slice `:0` / `::1`, grouped `{…}<schema>` |
 | [Variable arrays (1D)](schema-variable-arrays.md) | `8[1-3]`, `8[1-]`, `varArrayCounts`, flat vs per-field assign, `has length [N]` |
 | [Variable matrix (2D)](schema-variable-matrix.md) | `8[1-3,2]`, `<opcode>[1-3,2]`, shape `[R,C]`, runtime row/col slice |
+| [Frame padding (grow / shrink)](schema-frame-padding.md) | Wide wire buffer `paddingRight`, resize variable fields, tight vs frame wire |
 
 ---
 

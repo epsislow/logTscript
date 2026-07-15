@@ -375,6 +375,96 @@
     return offsets;
   }
 
+  function totalRuntimeWidth(schema, varArrayCounts) {
+    ensureSchemaShape(schema);
+    let total = 0;
+    for (const node of schema.structure) {
+      total += runtimeWidthOfNode(node, varArrayCounts || {});
+    }
+    return total;
+  }
+
+  function effectiveVarArrayCountsForWire(schema, varArrayCounts) {
+    const counts = { ...(varArrayCounts || {}) };
+    for (const node of schema.structure) {
+      if (node.kind === 'var_array' && counts[node.name] == null) {
+        counts[node.name] = node.minCount;
+      }
+    }
+    return counts;
+  }
+
+  function schemaFramePaddingWidth(declaredWidth, schemaUsedWidth) {
+    const pad = declaredWidth - schemaUsedWidth;
+    return pad >= 1 ? pad : 0;
+  }
+
+  function varArrayCountsChanged(oldCounts, newCounts, schema) {
+    for (const node of schema.structure) {
+      if (node.kind !== 'var_array') continue;
+      const oldC = oldCounts[node.name] != null ? oldCounts[node.name] : node.minCount;
+      const newC = newCounts[node.name] != null ? newCounts[node.name] : node.minCount;
+      if (oldC !== newC) return true;
+    }
+    return false;
+  }
+
+  function validateVarArrayAssignFrame(schema, oldCounts, newCounts, declaredWidth) {
+    const oldEffective = effectiveVarArrayCountsForWire(schema, oldCounts);
+    const newEffective = effectiveVarArrayCountsForWire(schema, newCounts);
+    const oldUsed = totalRuntimeWidth(schema, oldEffective);
+    const newUsed = totalRuntimeWidth(schema, newEffective);
+    if (!varArrayCountsChanged(oldEffective, newEffective, schema)) {
+      return { oldUsed, newUsed, oldEffective, newEffective };
+    }
+    if (newUsed > declaredWidth) {
+      throw new Error(
+        `Variable array layout requires ${newUsed} bits but wire is ${declaredWidth}bit`
+      );
+    }
+    if (oldUsed === declaredWidth && newUsed !== oldUsed) {
+      throw new Error(
+        `Cannot resize variable array on ${declaredWidth}bit wire without frame buffer (layout ${oldUsed}bit → ${newUsed}bit)`
+      );
+    }
+    return { oldUsed, newUsed, oldEffective, newEffective };
+  }
+
+  function rebuildWireVarArrayAssign(currentValue, schema, oldCounts, newCounts, assignFieldName, assignSegmentBits, declaredWidth) {
+    const oldEffective = effectiveVarArrayCountsForWire(schema, oldCounts);
+    const newEffective = effectiveVarArrayCountsForWire(schema, newCounts);
+    const oldOffsets = computeStructureOffsets(schema, oldEffective);
+    const newUsed = totalRuntimeWidth(schema, newEffective);
+    const parts = [];
+
+    for (const node of schema.structure) {
+      if (node.name === assignFieldName) {
+        const width = runtimeWidthOfNode(node, newEffective);
+        const seg = assignSegmentBits.substring(0, width);
+        parts.push(seg.length < width ? seg.padEnd(width, '0') : seg);
+      } else {
+        const oldOff = oldOffsets.get(node.name);
+        let width;
+        if (node.kind === 'var_array') {
+          width = runtimeWidthOfNode(node, oldEffective);
+        } else {
+          width = node.width;
+        }
+        const seg = currentValue.substring(oldOff, oldOff + width);
+        parts.push(seg.length < width ? seg.padEnd(width, '0') : seg);
+      }
+    }
+
+    let payload = parts.join('');
+    const paddingRightWidth = schemaFramePaddingWidth(declaredWidth, newUsed);
+    if (payload.length < declaredWidth) {
+      payload = payload.padEnd(declaredWidth, '0');
+    } else if (payload.length > declaredWidth) {
+      payload = payload.substring(0, declaredWidth);
+    }
+    return { value: payload, paddingRightWidth, schemaUsedWidth: newUsed };
+  }
+
   function assertPriorVarArrayCounts(schema, fieldName, varArrayCounts) {
     for (const node of schema.structure) {
       if (node.name === fieldName) break;
@@ -1157,11 +1247,6 @@
       if (wireWidth < schema.minWidth) {
         throw new Error(
           `${schema.name} (min ${schema.minWidth}bit) width incompatible with wire (${wireWidth}bit)`
-        );
-      }
-      if (schema.maxWidth != null && wireWidth > schema.maxWidth) {
-        throw new Error(
-          `${schema.name} (max ${schema.maxWidth}bit) width incompatible with wire (${wireWidth}bit)`
         );
       }
       return;
@@ -2235,6 +2320,12 @@
     assertSchemaNameAllowed,
     validateVarArrayCount,
     computeStructureOffsets,
+    totalRuntimeWidth,
+    effectiveVarArrayCountsForWire,
+    schemaFramePaddingWidth,
+    varArrayCountsChanged,
+    validateVarArrayAssignFrame,
+    rebuildWireVarArrayAssign,
     assertPriorVarArrayCounts,
     countFromFieldBits,
     resolveFlatVarArrayCounts,

@@ -21797,7 +21797,7 @@ reg(2339, 'semantic-schemas', 'var array package2 flat suffix anchor (wave)', fu
 
 reg(2340, 'semantic-schemas', 'var array structured per-field counts', function(h, session) {
   session.run(PACKAGE3_SCHEMA + [
-    '32wire<package3> pkt := 0',
+    '40wire<package3> pkt := 0',
     'pkt:tokens = ^AABB',
     'pkt:codeDatas = ^CCDDEE',
     '8wire t0 = pkt:tokens:0',
@@ -22162,6 +22162,13 @@ const CELL8_SCHEMA = `<cell8>:
 
 const FRAME_VAR_GRID_SCHEMA = `<frameVarGrid>:
     grid: 8[1-3, 2]
+:
+`;
+
+const FRAME_VAR_GRID2_SCHEMA = `<frameVarGrid2>:
+    header: 2
+    grid: 8[1-3, 2]
+    footer: 2
 :
 `;
 
@@ -22567,6 +22574,150 @@ reg(2419, 'unsigned-width-tags', 'RSHIFT — u8 logic (nu ASHR)', function(h, se
     '8wire r = RSHIFT(a, 1; u8)'
   );
   h.assert('logical shift', session.getWire(interp, 'r'), '01000000');
+});
+
+reg(2429, 'semantic-schemas', 'frame tight wire grow grid count error', function(h, session) {
+  h.assertThrows('grow tight', function() {
+    session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+      '36wire<frameVarGrid2> pkt := 0',
+      'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+      'pkt:grid = [3,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }{ v=\\5 }{ v=\\6 }<cell8>',
+    ].join('\n'));
+  }, 'requires 52 bits');
+});
+
+reg(2430, 'semantic-schemas', 'frame tight wire shrink grid count error', function(h, session) {
+  h.assertThrows('shrink tight', function() {
+    session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+      '36wire<frameVarGrid2> pkt := 0',
+      'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+      'pkt:grid = [1,2]{ v=\\9 }{ v=\\10 }<cell8>',
+    ].join('\n'));
+  }, 'without frame buffer');
+});
+
+reg(2431, 'semantic-schemas', 'frame tight wire same count assign ok', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+    '36wire<frameVarGrid2> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'pkt:grid = [2,2]{ v=\\5 }{ v=\\6 }{ v=\\7 }{ v=\\8 }<cell8>',
+  ].join('\n'));
+  h.assert('grid count 4', String(session.interp.wires.get('pkt').varArrayCounts.grid), '4');
+  h.assert('cell00', session.getWire(session.interp, 'pkt').substring(2, 10), '00000101');
+  h.assert('footer', session.getWire(session.interp, 'pkt').substring(34, 36), '00');
+});
+
+reg(2432, 'semantic-schemas', 'frame tight wire grow error (wave)', function(h, session) {
+  h.assertThrows('grow tight wave', function() {
+    session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+      '36wire<frameVarGrid2> pkt := 0',
+      'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+      'pkt:grid = [3,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }{ v=\\5 }{ v=\\6 }<cell8>',
+    ].join('\n'));
+  }, 'requires 52 bits');
+}, { propagation: 'wave' });
+
+reg(2433, 'semantic-schemas', 'frame wide wire show min layout padding', function(h, session) {
+  const { out } = session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+    '200wire<frameVarGrid2> pkt := 0',
+    'show(pkt)',
+  ].join('\n'));
+  h.assert('paddingRight line', String(out.some((l) => l.includes('paddingRight =') && l.includes('(180bit)'))), 'true');
+  h.assert('grid min shape', String(out.some((l) => l.includes('grid has shape [1,2]'))), 'true');
+  h.assert('pad width meta', String(session.interp.wires.get('pkt').paddingRightWidth), '180');
+});
+
+reg(2434, 'semantic-schemas', 'frame wide wire show after grid assign', function(h, session) {
+  const { out } = session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+    '200wire<frameVarGrid2> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'show(pkt)',
+  ].join('\n'));
+  h.assert('paddingRight 164', String(out.some((l) => l.includes('paddingRight =') && l.includes('(164bit)'))), 'true');
+  h.assert('grid shape', String(out.some((l) => l.includes('grid has shape [2,2]'))), 'true');
+});
+
+reg(2435, 'semantic-schemas', 'frame wide wire grow grid from buffer', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+    '200wire<frameVarGrid2> pkt := 0',
+    'pkt:header = 11',
+    'pkt:footer = 00',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'pkt:grid = [3,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }{ v=\\5 }{ v=\\6 }<cell8>',
+  ].join('\n'));
+  h.assert('grid count 6', String(session.interp.wires.get('pkt').varArrayCounts.grid), '6');
+  h.assert('header kept', session.getWire(session.interp, 'pkt').substring(0, 2), '11');
+  h.assert('footer kept', session.getWire(session.interp, 'pkt').substring(50, 52), '00');
+  h.assert('padding 148', String(session.interp.wires.get('pkt').paddingRightWidth), '148');
+});
+
+reg(2436, 'semantic-schemas', 'frame wide wire shrink grid to buffer', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+    '200wire<frameVarGrid2> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'pkt:grid = [1,2]{ v=\\9 }{ v=\\10 }<cell8>',
+  ].join('\n'));
+  h.assert('grid count 2', String(session.interp.wires.get('pkt').varArrayCounts.grid), '2');
+  h.assert('padding 180', String(session.interp.wires.get('pkt').paddingRightWidth), '180');
+});
+
+reg(2437, 'semantic-schemas', 'frame wide wire show padding (wave)', function(h, session) {
+  const out = session.runDoc(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+    '200wire<frameVarGrid2> pkt := 0',
+    'show(pkt)',
+  ].join('\n'));
+  h.assert('paddingRight wave', String(out.some((l) => l.includes('paddingRight =') && l.includes('(180bit)'))), 'true');
+}, { propagation: 'wave' });
+
+reg(2438, 'semantic-schemas', 'frame grow flat assign preserves footer', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+    '200wire<frameVarGrid2> pkt := 0',
+    'pkt:header = 10',
+    'pkt:footer = 01',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'pkt:grid = ^AABBCCDDEEFF',
+  ].join('\n'));
+  h.assert('grid count 6', String(session.interp.wires.get('pkt').varArrayCounts.grid), '6');
+  h.assert('header', session.getWire(session.interp, 'pkt').substring(0, 2), '10');
+  h.assert('footer', session.getWire(session.interp, 'pkt').substring(50, 52), '01');
+});
+
+reg(2439, 'semantic-schemas', 'frame grow insufficient buffer error', function(h, session) {
+  h.assertThrows('buffer too small', function() {
+    session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+      '50wire<frameVarGrid2> pkt := 0',
+      'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+      'pkt:grid = [3,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }{ v=\\5 }{ v=\\6 }<cell8>',
+    ].join('\n'));
+  }, 'requires 52 bits');
+});
+
+reg(2440, 'semantic-schemas', 'frame tight wire grow exceeds width error', function(h, session) {
+  h.assertThrows('exceeds width', function() {
+    session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+      '36wire<frameVarGrid2> pkt := 0',
+      'pkt:grid = [3,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }{ v=\\5 }{ v=\\6 }<cell8>',
+    ].join('\n'));
+  }, 'requires 52 bits');
+});
+
+reg(2441, 'semantic-schemas', 'frame wide wire same count flat assign ok', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+    '200wire<frameVarGrid2> pkt := 0',
+    'pkt:grid = [2,2]{ v=\\1 }{ v=\\2 }{ v=\\3 }{ v=\\4 }<cell8>',
+    'pkt:grid = ^AABBCCDD',
+  ].join('\n'));
+  h.assert('grid count 4', String(session.interp.wires.get('pkt').varArrayCounts.grid), '4');
+  h.assert('cell00', session.getWire(session.interp, 'pkt').substring(2, 10), '10101010');
+});
+
+reg(2442, 'semantic-schemas', 'frame wide flat first assign sets count and padding', function(h, session) {
+  session.run(CELL8_SCHEMA + FRAME_VAR_GRID2_SCHEMA + [
+    '200wire<frameVarGrid2> pkt := 0',
+    'pkt:grid = ^AABBCCDD',
+  ].join('\n'));
+  h.assert('grid count 4', String(session.interp.wires.get('pkt').varArrayCounts.grid), '4');
+  h.assert('padding 164', String(session.interp.wires.get('pkt').paddingRightWidth), '164');
 });
 
 

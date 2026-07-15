@@ -446,7 +446,7 @@ pkt:cells has length [2]
 | **Resolve pe wire lat**        | **Convenția A confirmată** — `declaredWidth`; proto scurt + pad = sloturi zero rezervate                                             |
 | **Pipeline `LHS =: RHS`**      | (1) exec RHS → valoare + parseView; (2) padding right la `declaredWidth` LHS; (3) assign flat pe schema LHS (dacă există)            |
 | **parseView fără schema**      | La `=:` → `paddingRight`; la `:=` → `paddingLeft` — **doar** când LHS **nu** are `<schema>`                                          |
-| **Padding sintetic + schema**  | Dacă LHS are schema → **fără** `paddingRight`/`paddingLeft`; resolve câmpuri de la **bit 0** pe `declaredWidth`                      |
+| **Padding sintetic + schema**  | **Revizuit Faza 2.5** — wire **cadru lat** (`200wire<schema variabil>`): `paddingRightWidth = declared − schemaUsed`; `show` afișează buffer. Wire **strâns** (fără surplus): schimbare count → **eroare**. parseView **fără** schema: ca înainte (`=:` → paddingRight). |
 | **Lățime la compile**          | `24wire` = N fix; `=: .proto` variabil = N efectiv **după** parse; nu „fără lățime”, ci **necunoscută static**                       |
 | `**:=` fără lățime declarată** | `pkt := 0` sau `:=` înainte de `=:` **fără** `Nwire`/`64wire` → **eroare** — nu există țintă de padding                              |
 | **Sugar `8+` / `8*`**          | Da — în **Faza 1.0** (`8+` → `8[1-]`, `8`* → `8[0-]`)                                                                                |

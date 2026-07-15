@@ -2,7 +2,7 @@
 
 **Model D — 2D** — variable row or column count at runtime: `grid:8[1-3,2]`, `tiles:<opcode>[1-3,2]`. Part of [Semantic schemas](semantic-schemas.md).
 
-Prerequisite: [Variable arrays (1D)](schema-variable-arrays.md) (`varArrayCounts`, flat vs structured assign). Fixed-size slice syntax: [Schema field arrays](schema-field-arrays.md).
+Prerequisite: [Variable arrays (1D)](schema-variable-arrays.md) (`varArrayCounts`, flat vs structured assign). Fixed-size slice syntax: [Schema field arrays](schema-field-arrays.md). **Grow/shrink** on wide wires: [Frame padding](schema-frame-padding.md).
 
 ---
 

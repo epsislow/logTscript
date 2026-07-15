@@ -23,6 +23,7 @@
         { "file": "schema-field-arrays.md", "label": "Schema field arrays (fixed)", "searchExtra": "cells grid slots tiles 8[3] 4[2,2] opcode array slice row column grouped schema literal has shape has length" },
         { "file": "schema-variable-arrays.md", "label": "Variable arrays in schema (1D)", "searchExtra": "varArrayCounts 8[1-3] 8[1-] 8+ package2 package3 flat ambiguous has length BITSIZE WWIDTH" },
         { "file": "schema-variable-matrix.md", "label": "Variable matrix in schema (2D)", "searchExtra": "8[1-3,2] opcode matrix shape R,C grouped literal row col slice runtime varArrayCounts" },
+        { "file": "schema-frame-padding.md", "label": "Schema frame padding (grow / shrink)", "searchExtra": "paddingRight paddingLeft frame buffer declaredWidth schemaUsedWidth grow shrink tight wire 200wire varArrayCounts resize" },
         { "file": "wire-vectors.md", "label": "Wire vectors (4wire[3])", "searchPrimary": "PIVOT", "searchExtra": "vector element index slice 1D array Nwire count show peek probe Zlist SUM DOT MIN MAX reduction transpose tensor" },
         { "file": "vector-reduction.md", "label": "Vector reduction (SUM, DOT, MIN, MAX)", "searchExtra": "SUM DOT MIN MAX vector expand dot product perceptron reduction over result" },
         { "file": "modes.md", "label": "Script modes (MODE)", "searchPrimary": "MODE STRICT WIREWRITE ZSTATE", "searchExtra": "script mode assignment propagation default wirewrite tristate" },

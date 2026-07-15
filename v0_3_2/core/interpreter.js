@@ -1156,9 +1156,15 @@ class Interpreter {
 
   _syncAssignPaddingMeta(wire, blobLen, declaredBits, assignPad) {
     if (!wire) return;
+    if (wire.schemaRef) {
+      const schema = this._resolveSchema(wire.schemaRef);
+      if (schema) {
+        this._syncSchemaFramePadding(wire, schema);
+        return;
+      }
+    }
     delete wire.paddingRightWidth;
     delete wire.paddingLeftWidth;
-    if (wire.schemaRef) return;
     const blob = blobLen != null ? blobLen : 0;
     const declared = declaredBits != null ? declaredBits : blob;
     if (assignPad === 'right' && declared > blob) {
@@ -1166,6 +1172,27 @@ class Interpreter {
     } else if (assignPad === 'left' && declared > blob) {
       wire.paddingLeftWidth = declared - blob;
     }
+  }
+
+  _syncSchemaFramePadding(wire, schema) {
+    if (!wire || !schema) return;
+    const SS = this._semanticSchemas();
+    if (!SS) return;
+    const declared = this.getBitWidth(wire.type);
+    if (!declared) return;
+    delete wire.paddingLeftWidth;
+    if (schema.hasVarArray) {
+      const counts = SS.effectiveVarArrayCountsForWire(schema, wire.varArrayCounts || {});
+      const used = SS.totalRuntimeWidth(schema, counts);
+      const pad = SS.schemaFramePaddingWidth(declared, used);
+      if (pad >= 1) wire.paddingRightWidth = pad;
+      else delete wire.paddingRightWidth;
+    } else {
+      const pad = SS.schemaFramePaddingWidth(declared, schema.totalWidth);
+      if (pad >= 1) wire.paddingRightWidth = pad;
+      else delete wire.paddingRightWidth;
+    }
+    wire.effectiveBitLen = declared;
   }
 
   _assignPaddingFieldPath(atom) {
@@ -1178,7 +1205,7 @@ class Interpreter {
   }
 
   _resolveAssignPaddingFieldRange(atom, wire) {
-    if (!wire || wire.schemaRef) return null;
+    if (!wire) return null;
     const padField = this._assignPaddingFieldPath(atom);
     if (!padField) return null;
     const declared = this.getBitWidth(wire.type);
@@ -4045,8 +4072,11 @@ class Interpreter {
 
     SS.assertPriorVarArrayCounts(schema, node.name, wire.varArrayCounts || {});
     const count = SS.countFromFieldBits(node, totalValue.length, schema.name, literalShape || null);
-    const counts = { ...(wire.varArrayCounts || {}), [node.name]: count };
-    const offset = SS.computeStructureOffsets(schema, counts).get(node.name);
+    const oldCounts = { ...(wire.varArrayCounts || {}) };
+    const counts = { ...oldCounts, [node.name]: count };
+    const { newUsed, oldEffective, newEffective } = SS.validateVarArrayAssignFrame(schema, oldCounts, counts, bits);
+    const countsChanged = SS.varArrayCountsChanged(oldEffective, newEffective, schema);
+
     const width = node.elementWidth * count;
     const rhs = fitWireAssignBits(totalValue, width, assignPad, 'lsb', this);
 
@@ -4054,9 +4084,27 @@ class Interpreter {
     if (!currentValue) currentValue = this.zstate ? 'Z'.repeat(bits) : '0'.repeat(bits);
     if (currentValue.length < bits) currentValue = currentValue.padStart(bits, '0');
 
+    let resultValue;
+    if (countsChanged) {
+      const rebuilt = SS.rebuildWireVarArrayAssign(
+        currentValue, schema, oldCounts, counts, node.name, rhs, bits
+      );
+      resultValue = rebuilt.value;
+      if (rebuilt.paddingRightWidth >= 1) wire.paddingRightWidth = rebuilt.paddingRightWidth;
+      else delete wire.paddingRightWidth;
+    } else {
+      const offset = SS.computeStructureOffsets(schema, newEffective).get(node.name);
+      resultValue = currentValue.substring(0, offset) + rhs + currentValue.substring(offset + width);
+      if (resultValue.length < bits) resultValue = resultValue.padEnd(bits, '0');
+      const pad = SS.schemaFramePaddingWidth(bits, newUsed);
+      if (pad >= 1) wire.paddingRightWidth = pad;
+      else delete wire.paddingRightWidth;
+    }
+
+    delete wire.paddingLeftWidth;
     this._mergeVarArrayCounts(wire, counts);
     wire.effectiveBitLen = bits;
-    return currentValue.substring(0, offset) + rhs + currentValue.substring(offset + width);
+    return resultValue;
   }
 
   _applySchemaRefToWireEntry(wireEntry, decl, wireWidth, loc) {
@@ -4645,22 +4693,38 @@ class Interpreter {
     const schemaName = this._resolveShowSchemaName(wire, opts);
     if (!schemaName) return null;
     const schema = this._resolveSchema(schemaName);
-    SS.validateSchemaWidthForShow(schema, valueStr.length);
+    const wireDeclared = this.getBitWidth(wire.type) || valueStr.length;
+    let widthForValidate = wireDeclared;
+    if (!schema.hasVarArray && schema.totalWidth === valueStr.length && wireDeclared > schema.totalWidth) {
+      widthForValidate = schema.totalWidth;
+    }
+    SS.validateSchemaWidthForShow(schema, widthForValidate);
+    const declaredWidth = wireDeclared;
+    const effectiveCounts = SS.effectiveVarArrayCountsForWire(schema, wire.varArrayCounts || {});
+    const schemaUsed = SS.totalRuntimeWidth(schema, effectiveCounts);
+    const payloadBits = valueStr.length >= schemaUsed ? valueStr.substring(0, schemaUsed) : valueStr;
     const showOpts = Object.assign({}, opts || {}, {
-      varArrayCounts: wire.varArrayCounts || {},
-      wireBits: valueStr,
+      varArrayCounts: effectiveCounts,
+      wireBits: payloadBits,
       schema,
     });
     const typeLabel = displayName
       ? `${displayName} (${this.getWireTypeLabel(wire)})`
       : this.getWireTypeLabel(wire);
     const lines = SS.formatSchemaShowLines(
-      valueStr,
+      payloadBits,
       schema,
       showOpts,
       (bits, w) => this.formatValue(bits, w)
     );
     if (lines.length) lines[0] = typeLabel;
+    const padW = wire.paddingRightWidth != null
+      ? wire.paddingRightWidth
+      : SS.schemaFramePaddingWidth(declaredWidth, schemaUsed);
+    if (padW >= 1) {
+      const pad = '0'.repeat(padW);
+      lines.push(`  paddingRight = ${pad} (${padW}bit)`);
+    }
     const ref = wire.ref;
     const refStr = (!isPeek && ref && ref !== '&-') ? ` (ref: ${ref})` : '';
     if (lines.length === 1) return [lines[0] + refStr];

@@ -2,7 +2,7 @@
 
 **Model D** — variable element count at runtime inside a schema field: `cells:8[1-3]`, `cells:8[1-]`, `tokens:8[nTokens]`. Part of [Semantic schemas](semantic-schemas.md).
 
-See also: [Fixed field arrays](schema-field-arrays.md), [Variable matrix (2D)](schema-variable-matrix.md), [protocol-repeat.md](protocol-repeat.md) (same `[min-max]` syntax).
+See also: [Fixed field arrays](schema-field-arrays.md), [Variable matrix (2D)](schema-variable-matrix.md), [Frame padding (grow / shrink)](schema-frame-padding.md), [protocol-repeat.md](protocol-repeat.md) (same `[min-max]` syntax).
 
 ---
 
