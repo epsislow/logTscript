@@ -22358,6 +22358,68 @@ reg(2396, 'semantic-schemas', 'var matrix row index out of range', function(h, s
   }, 'Row index 2 out of range');
 });
 
+const PACKAGE3DET_SCHEMA = `<package3det>:
+    nTokens: 4
+    tokens: 8[nTokens]
+    codeDatas: 8[1-]
+:
+`;
+
+reg(2397, 'semantic-schemas', 'countRef schema compile bounds', function(h, session) {
+  session.run(PACKAGE3DET_SCHEMA);
+  const schema = session.interp.schemaRegistry.get('package3det');
+  const tokens = schema && schema.structure.find((n) => n.name === 'tokens');
+  h.assert('countRef', String(tokens && tokens.countRef === 'nTokens'), 'true');
+  h.assert('tokens maxCount 15', String(tokens && tokens.maxCount === 15), 'true');
+  h.assert('minWidth 12', String(schema && schema.minWidth === 12), 'true');
+});
+
+reg(2398, 'semantic-schemas', 'countRef flat assign deterministic', function(h, session) {
+  session.run(PACKAGE3DET_SCHEMA + [
+    '44wire<package3det> pkt = ^2AABBCCDDEE',
+    '8wire t0 = pkt:tokens:0',
+    '8wire t1 = pkt:tokens:1',
+    '8wire c2 = pkt:codeDatas:2',
+  ].join('\n'));
+  h.assert('nTokens count 2', String(session.interp.wires.get('pkt').varArrayCounts.tokens), '2');
+  h.assert('codeDatas count 3', String(session.interp.wires.get('pkt').varArrayCounts.codeDatas), '3');
+  h.assert('token0', session.getWire(session.interp, 't0'), '10101010');
+  h.assert('token1', session.getWire(session.interp, 't1'), '10111011');
+  h.assert('codeData2', session.getWire(session.interp, 'c2'), '11101110');
+});
+
+reg(2399, 'semantic-schemas', 'countRef flat assign deterministic (wave)', function(h, session) {
+  session.run(PACKAGE3DET_SCHEMA + '44wire<package3det> pkt = ^2AABBCCDDEE');
+  h.assert('tokens count 2', String(session.interp.wires.get('pkt').varArrayCounts.tokens), '2');
+  h.assert('codeDatas count 3', String(session.interp.wires.get('pkt').varArrayCounts.codeDatas), '3');
+}, { propagation: 'wave' });
+
+reg(2400, 'semantic-schemas', 'countRef parse error field order', function(h, session) {
+  h.assertThrows('order', function() {
+    session.run(`<bad>:
+    tokens: 8[nTokens]
+    nTokens: 4
+:
+`);
+  }, "countRef 'nTokens' must refer to a prior field");
+});
+
+reg(2401, 'semantic-schemas', 'countRef parse error not leaf', function(h, session) {
+  h.assertThrows('not leaf', function() {
+    session.run(`<bad>:
+    hdr: <opcode>
+    cells: 8[hdr]
+:
+` + OPCODE16_SCHEMA);
+  }, "countRef 'hdr' must refer to a fixed-width leaf field");
+});
+
+reg(2402, 'semantic-schemas', 'countRef flat assign count too large', function(h, session) {
+  h.assertThrows('count oob', function() {
+    session.run(PACKAGE3DET_SCHEMA + '44wire<package3det> pkt = ^FAABBCCDDEE');
+  }, "Cannot resolve variable array 'codeDatas'");
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

@@ -22135,7 +22135,7 @@ For runtime element count (\`8[1-3]\`, \`8[1-]\`) see [Variable arrays (1D)](sch
 `,
     'schema-variable-arrays.md': `# Variable arrays in schema (1D)
 
-**Model D** — variable element count at runtime inside a schema field: \`cells:8[1-3]\`, \`cells:8[1-]\`, \`tokens:8[nTokens]\` (future). Part of [Semantic schemas](semantic-schemas.md).
+**Model D** — variable element count at runtime inside a schema field: \`cells:8[1-3]\`, \`cells:8[1-]\`, \`tokens:8[nTokens]\`. Part of [Semantic schemas](semantic-schemas.md).
 
 See also: [Fixed field arrays](schema-field-arrays.md), [Variable matrix (2D)](schema-variable-matrix.md), [protocol-repeat.md](protocol-repeat.md) (same \`[min-max]\` syntax).
 
@@ -22151,6 +22151,8 @@ Use **\`logts-play wave\`** for examples with \`show\`. See [Semantic schemas �
 
 Mirrors protocol repetition: **\`8[1-3]\`** (1–3 elements), **\`8[1-]\`** (at least 1, open upper bound), **\`8[0-]\`** (zero or more). Sugar: **\`8+\`** → \`8[1-]\`, **\`8*\`** → \`8[0-]\`.
 
+**Count from prior scalar field:** **\`8[nTokens]\`** — element count is read from an earlier **fixed-width leaf** field (e.g. \`nTokens: 4\` before \`tokens: 8[nTokens]\`). Enables deterministic flat assign when another open-ended field follows.
+
 \`\`\`logts
 <package2>:
     cells: 8[1-]
@@ -22161,12 +22163,19 @@ Mirrors protocol repetition: **\`8[1-3]\`** (1–3 elements), **\`8[1-]\`** (at 
     tokens: 8[1-]
     codeDatas: 8[1-]
 :
+
+<package3det>:
+    nTokens: 4
+    tokens: 8[nTokens]
+    codeDatas: 8[1-]
+:
 \`\`\`
 
 | Topic | Rule |
 |-------|------|
-| **Flat \`=\` on whole record** | OK when count is **unique** (e.g. \`24wire\` + suffix anchor, or single open-ended field last). |
-| **Two \`8[1-]\` fields** | Structured per-field assign OK; flat \`pkt = ^…\` → **ambiguous** error. |
+| **Flat \`=\` on whole record** | OK when count is **unique** (e.g. \`24wire\` + suffix anchor, single open-ended field last, or **countRef** chain). |
+| **Two \`8[1-]\` fields** | Structured per-field assign OK; flat \`pkt = ^…\` → **ambiguous** error (use \`package3det\` with scalar count). |
+| **\`8[nTokens]\` countRef** | \`nTokens\` must be a **prior leaf** with fixed width; count = unsigned value of that field at flat resolve time. |
 | **Runtime count** | Stored in \`wire.varArrayCounts\`; drives layout, show, read, Wave Listen. |
 | **Show** | Tree + \`:i\` lines + \`field has length [N]\`; tags (\`; dec\`) and field slices supported. |
 | **Peek / probe** | Same tree as \`show\`, including dynamic \`has length [N]\`. |
@@ -22217,6 +22226,20 @@ show(pkt)
 \`\`\`
 
 Expected **Output**: \`tokens has length [2]\`, \`codeDatas has length [1]\`.
+
+**\`package3det\`** — scalar count + flat hex init (deterministic split):
+
+\`\`\`logts-play wave
+<package3det>:
+    nTokens: 4
+    tokens: 8[nTokens]
+    codeDatas: 8[1-]
+:
+44wire<package3det> pkt = ^2AABBCCDDEE
+show(pkt)
+\`\`\`
+
+Expected **Output**: \`nTokens = 0010\` (2); \`tokens has length [2]\`; \`codeDatas has length [3]\`; flat layout unique at 44 bits.
 
 **Bounded range \`8[1-3]\`** — grouped schema literal, \`BITSIZE\` / \`WWIDTH\`:
 

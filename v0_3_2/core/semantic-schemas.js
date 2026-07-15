@@ -28,6 +28,8 @@
         elementWidth: spec.elementWidth,
         minCount: spec.minCount,
         maxCount: spec.maxCount,
+        countRef: spec.countRef,
+        countRefDim: spec.countRefDim,
         singleDim: spec.singleDim,
         matrixVar: spec.matrixVar,
         rowsSpec: spec.rowsSpec,
@@ -44,6 +46,8 @@
         ref: spec.ref,
         minCount: spec.minCount,
         maxCount: spec.maxCount,
+        countRef: spec.countRef,
+        countRefDim: spec.countRefDim,
         singleDim: spec.singleDim,
         matrixVar: spec.matrixVar,
         rowsSpec: spec.rowsSpec,
@@ -75,14 +79,14 @@
   }
 
   function expandMatrixVarMeta(rowsSpec, colsSpec) {
-    const rowsVar = !!rowsSpec.var;
-    const colsVar = !!colsSpec.var;
+    const rowsVar = !!(rowsSpec.var || rowsSpec.countRef);
+    const colsVar = !!(colsSpec.var || colsSpec.countRef);
     const rowsFixed = rowsVar ? null : rowsSpec.fixed;
     const colsFixed = colsVar ? null : colsSpec.fixed;
-    const rowsMin = rowsVar ? rowsSpec.min : rowsSpec.fixed;
-    const rowsMax = rowsVar ? rowsSpec.max : rowsSpec.fixed;
-    const colsMin = colsVar ? colsSpec.min : colsSpec.fixed;
-    const colsMax = colsVar ? colsSpec.max : colsSpec.fixed;
+    const rowsMin = rowsSpec.countRef ? 0 : (rowsSpec.var ? rowsSpec.min : rowsSpec.fixed);
+    const rowsMax = rowsSpec.countRef ? null : (rowsSpec.var ? rowsSpec.max : rowsSpec.fixed);
+    const colsMin = colsSpec.countRef ? 0 : (colsSpec.var ? colsSpec.min : colsSpec.fixed);
+    const colsMax = colsSpec.countRef ? null : (colsSpec.var ? colsSpec.max : colsSpec.fixed);
     return {
       matrixVar: true,
       rowsVar,
@@ -97,6 +101,89 @@
       cols: colsMin,
       singleDim: false,
     };
+  }
+
+  function findCountRefLeaf(structure, refName, schemaName) {
+    const node = structure.find((n) => n.kind === 'leaf' && n.name === refName);
+    if (!node) {
+      throw new Error(`countRef '${refName}' is not a prior leaf field in schema '${schemaName}'`);
+    }
+    return node;
+  }
+
+  function countRefScalarMax(refLeaf) {
+    return (1 << refLeaf.width) - 1;
+  }
+
+  function resolveCountRefBounds(spec, structure, schemaName) {
+    if (!spec.countRef) return null;
+    const refLeaf = findCountRefLeaf(structure, spec.countRef, schemaName);
+    const scalarMax = countRefScalarMax(refLeaf);
+    if (!spec.matrixVar) {
+      return { minCount: 0, maxCount: scalarMax, countRef: spec.countRef, countRefDim: null };
+    }
+    const rowsSpec = spec.rowsSpec;
+    const colsSpec = spec.colsSpec;
+    if (spec.countRefDim === 'rows' || (rowsSpec && rowsSpec.countRef)) {
+      const colsFixed = colsSpec && !colsSpec.var && !colsSpec.countRef ? colsSpec.fixed : null;
+      if (!colsFixed) {
+        throw new Error(`Matrix countRef on rows requires fixed column count in schema '${schemaName}'`);
+      }
+      return {
+        minCount: 0,
+        maxCount: scalarMax * colsFixed,
+        countRef: spec.countRef,
+        countRefDim: 'rows',
+      };
+    }
+    if (spec.countRefDim === 'cols' || (colsSpec && colsSpec.countRef)) {
+      const rowsFixed = rowsSpec && !rowsSpec.var && !rowsSpec.countRef ? rowsSpec.fixed : null;
+      if (!rowsFixed) {
+        throw new Error(`Matrix countRef on columns requires fixed row count in schema '${schemaName}'`);
+      }
+      return {
+        minCount: 0,
+        maxCount: scalarMax * rowsFixed,
+        countRef: spec.countRef,
+        countRefDim: 'cols',
+      };
+    }
+    throw new Error(`Invalid matrix countRef in schema '${schemaName}'`);
+  }
+
+  function readLeafUInt(wireBits, leafNode, schemaName) {
+    if (!wireBits || wireBits.length < leafNode.bitStart + leafNode.width) {
+      throw new Error(`Wire too short to read '${leafNode.name}' in schema '${schemaName}'`);
+    }
+    const bits = wireBits.substring(leafNode.bitStart, leafNode.bitStart + leafNode.width);
+    return parseInt(bits, 2);
+  }
+
+  function elementCountFromCountRef(node, refVal, schemaName) {
+    if (!node.matrixVar) {
+      validateVarArrayCount(node, refVal, schemaName);
+      return refVal;
+    }
+    if (node.countRefDim === 'rows' || (node.rowsSpec && node.rowsSpec.countRef)) {
+      const rows = refVal;
+      if (rows < node.rowsMin || (node.rowsMax != null && rows > node.rowsMax)) {
+        throw new Error(`Matrix row count ${rows} out of range for '${node.name}' in schema '${schemaName}'`);
+      }
+      const count = rows * node.colsFixed;
+      validateVarArrayCount(node, count, schemaName);
+      return count;
+    }
+    if (node.countRefDim === 'cols' || (node.colsSpec && node.colsSpec.countRef)) {
+      const cols = refVal;
+      if (cols < node.colsMin || (node.colsMax != null && cols > node.colsMax)) {
+        throw new Error(`Matrix column count ${cols} out of range for '${node.name}' in schema '${schemaName}'`);
+      }
+      const count = cols * node.rowsFixed;
+      validateVarArrayCount(node, count, schemaName);
+      return count;
+    }
+    validateVarArrayCount(node, refVal, schemaName);
+    return refVal;
   }
 
   function resolveMatrixShapeFromCount(node, totalCells, schemaName) {
@@ -262,16 +349,40 @@
     return count;
   }
 
-  function resolveFlatVarArrayCounts(schema, declaredWidth) {
+  function resolveFlatVarArrayCounts(schema, declaredWidth, wireBits) {
     ensureSchemaShape(schema);
     const varNodes = schema.structure.filter((n) => n.kind === 'var_array');
     if (!varNodes.length) return {};
 
-    const prefixWidth = (beforeName) => {
+    const counts = {};
+    const unresolved = [];
+
+    for (const node of varNodes) {
+      if (node.countRef) {
+        if (!wireBits) {
+          throw new Error(
+            `Cannot resolve '${node.name}' from countRef '${node.countRef}' without wire data in schema '${schema.name}'`
+          );
+        }
+        const refNode = findCountRefLeaf(schema.structure, node.countRef, schema.name);
+        const refVal = readLeafUInt(wireBits, refNode, schema.name);
+        const count = elementCountFromCountRef(node, refVal, schema.name);
+        counts[node.name] = count;
+        if (isVarMatrixNode(node)) {
+          resolveMatrixShapeFromCount(node, count, schema.name);
+        }
+      } else {
+        unresolved.push(node);
+      }
+    }
+
+    if (!unresolved.length) return counts;
+
+    const prefixWidth = (beforeName, resolvedCounts) => {
       let w = 0;
       for (const node of schema.structure) {
         if (node.name === beforeName) break;
-        w += runtimeWidthOfNode(node, {});
+        w += runtimeWidthOfNode(node, resolvedCounts);
       }
       return w;
     };
@@ -291,9 +402,9 @@
       return w;
     };
 
-    if (varNodes.length === 1) {
-      const vf = varNodes[0];
-      const prefix = prefixWidth(vf.name);
+    if (unresolved.length === 1) {
+      const vf = unresolved[0];
+      const prefix = prefixWidth(vf.name, counts);
       const suffix = suffixWidthAfter(vf.name);
       const payload = declaredWidth - prefix - suffix;
       if (payload < 0 || payload % vf.elementWidth !== 0) {
@@ -306,11 +417,11 @@
       if (isVarMatrixNode(vf)) {
         resolveMatrixShapeFromCount(vf, count, schema.name);
       }
-      return { [vf.name]: count };
+      return { ...counts, [vf.name]: count };
     }
 
-    const prefix = prefixWidth(varNodes[0].name);
-    const suffix = suffixWidthAfter(varNodes[varNodes.length - 1].name);
+    const prefix = prefixWidth(unresolved[0].name, counts);
+    const suffix = suffixWidthAfter(unresolved[unresolved.length - 1].name);
     const payload = declaredWidth - prefix - suffix;
     if (payload < 0) {
       throw new Error(`Wire width ${declaredWidth} too small for schema '${schema.name}'`);
@@ -318,11 +429,11 @@
 
     const solutions = [];
     function enumerate(idx, remaining, current) {
-      if (idx >= varNodes.length) {
+      if (idx >= unresolved.length) {
         if (remaining === 0) solutions.push({ ...current });
         return;
       }
-      const vf = varNodes[idx];
+      const vf = unresolved[idx];
       const minW = vf.minCount * vf.elementWidth;
       const maxW = vf.maxCount != null ? vf.maxCount * vf.elementWidth : remaining;
       for (let w = minW; w <= Math.min(maxW, remaining); w += vf.elementWidth) {
@@ -338,7 +449,7 @@
         `Ambiguous variable array layout for schema '${schema.name}' at ${declaredWidth} bits`
       );
     }
-    return solutions[0];
+    return { ...counts, ...solutions[0] };
   }
 
   function runtimeArrayNode(arrayNode, varArrayCounts, schemaName) {
@@ -720,8 +831,9 @@
         continue;
       }
       if (spec.kind === 'var_array' || spec.kind === 'schema_var_array') {
-        const minCount = spec.minCount != null ? spec.minCount : 0;
-        const maxCount = spec.maxCount != null ? spec.maxCount : null;
+        const countRefBounds = resolveCountRefBounds(spec, structure, name);
+        const minCount = countRefBounds ? countRefBounds.minCount : (spec.minCount != null ? spec.minCount : 0);
+        const maxCount = countRefBounds ? countRefBounds.maxCount : (spec.maxCount != null ? spec.maxCount : null);
         let ew;
         let elementSchema = null;
         let elementSchemaRef = null;
@@ -743,6 +855,15 @@
         const matrixMeta = spec.matrixVar && spec.rowsSpec && spec.colsSpec
           ? expandMatrixVarMeta(spec.rowsSpec, spec.colsSpec)
           : { singleDim: spec.singleDim !== false, rows: 1, cols: minCount };
+        if (countRefBounds && spec.matrixVar) {
+          const refLeaf = findCountRefLeaf(structure, countRefBounds.countRef, name);
+          const scalarMax = countRefScalarMax(refLeaf);
+          if (countRefBounds.countRefDim === 'rows') {
+            matrixMeta.rowsMax = scalarMax;
+          } else if (countRefBounds.countRefDim === 'cols') {
+            matrixMeta.colsMax = scalarMax;
+          }
+        }
         const arrayNode = {
           kind: 'var_array',
           name: spec.name,
@@ -751,6 +872,8 @@
           maxCount,
           minWidth,
           maxWidth,
+          countRef: countRefBounds ? countRefBounds.countRef : null,
+          countRefDim: countRefBounds ? countRefBounds.countRefDim : null,
           matrixVar: !!spec.matrixVar,
           rowsVar: matrixMeta.rowsVar,
           colsVar: matrixMeta.colsVar,
@@ -826,6 +949,8 @@
             elementWidth: spec.elementWidth,
             minCount: spec.minCount,
             maxCount: spec.maxCount,
+            countRef: spec.countRef,
+            countRefDim: spec.countRefDim,
             singleDim: spec.singleDim,
             matrixVar: spec.matrixVar,
             rowsSpec: spec.rowsSpec,
@@ -849,6 +974,8 @@
             ref: spec.ref,
             minCount: spec.minCount,
             maxCount: spec.maxCount,
+            countRef: spec.countRef,
+            countRefDim: spec.countRefDim,
             singleDim: spec.singleDim,
             matrixVar: spec.matrixVar,
             rowsSpec: spec.rowsSpec,

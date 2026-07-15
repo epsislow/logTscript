@@ -31,7 +31,7 @@ todos:
     status: completed
   - id: 2-3-scalar-count
     content: "Faza 2.3: count din scalar nTokens + tokens:8[nTokens] — flat package3 determinist"
-    status: pending
+    status: completed
   - id: 2-4-literal-comma-rows
     content: "Faza 2.4 (opțional): literali grouped Sol B — virgulă între rânduri"
     status: pending

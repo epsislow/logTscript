@@ -167,11 +167,20 @@ class Parser {
       if (this.c.type === 'SYM' && this.c.value === '<') {
         const ref = this.parseSchemaRef();
         const shape = this.parseSchemaArraySuffix();
-        if (shape && shape.varRange) {
+        if (shape && (shape.varRange || shape.countRef)) {
+          if (shape.countRef) {
+            this._assertSchemaCountRef(fields, shape.countRef, fieldName, name);
+          } else if (shape.rowsSpec && shape.rowsSpec.countRef) {
+            this._assertSchemaCountRef(fields, shape.rowsSpec.countRef, fieldName, name);
+          } else if (shape.colsSpec && shape.colsSpec.countRef) {
+            this._assertSchemaCountRef(fields, shape.colsSpec.countRef, fieldName, name);
+          }
           fields.push({
             kind: 'schema_var_array',
             name: fieldName,
             ref,
+            countRef: shape.countRef || null,
+            countRefDim: shape.countRefDim || null,
             minCount: shape.minCount,
             maxCount: shape.maxCount,
             singleDim: shape.singleDim !== false,
@@ -204,7 +213,20 @@ class Parser {
         }
         const shape = this.parseSchemaArraySuffix();
         const varRange = (shape && shape.varRange) ? shape : sugarRange;
-        if (varRange) {
+        if (shape && shape.countRef) {
+          this._assertSchemaCountRef(fields, shape.countRef, fieldName, name);
+          fields.push({
+            kind: 'var_array',
+            name: fieldName,
+            elementWidth: width,
+            countRef: shape.countRef,
+            countRefDim: shape.countRefDim || null,
+            singleDim: shape.singleDim !== false,
+            matrixVar: !!shape.matrixVar,
+            rowsSpec: shape.rowsSpec || null,
+            colsSpec: shape.colsSpec || null,
+          });
+        } else if (varRange) {
           fields.push({
             kind: 'var_array',
             name: fieldName,
@@ -383,14 +405,44 @@ class Parser {
   }
 
   _matrixVarRangeCounts(rowsSpec, colsSpec) {
-    const rMin = rowsSpec.var ? rowsSpec.min : rowsSpec.fixed;
-    const rMax = rowsSpec.var ? rowsSpec.max : rowsSpec.fixed;
-    const cMin = colsSpec.var ? colsSpec.min : colsSpec.fixed;
-    const cMax = colsSpec.var ? colsSpec.max : colsSpec.fixed;
+    const rMin = rowsSpec.countRef ? 0 : (rowsSpec.var ? rowsSpec.min : rowsSpec.fixed);
+    const rMax = rowsSpec.countRef ? null : (rowsSpec.var ? rowsSpec.max : rowsSpec.fixed);
+    const cMin = colsSpec.countRef ? 0 : (colsSpec.var ? colsSpec.min : colsSpec.fixed);
+    const cMax = colsSpec.countRef ? null : (colsSpec.var ? colsSpec.max : colsSpec.fixed);
     return {
       minCount: rMin * cMin,
       maxCount: rMax != null && cMax != null ? rMax * cMax : null,
     };
+  }
+
+  _assertSchemaCountRef(fields, countRef, fieldName, schemaName) {
+    let refField = null;
+    for (const f of fields) {
+      if (f.name === fieldName) break;
+      if (f.name === countRef) {
+        refField = f;
+        break;
+      }
+    }
+    if (!refField) {
+      throw Error(
+        `countRef '${countRef}' must refer to a prior field in schema '${schemaName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`
+      );
+    }
+    if (refField.kind !== 'leaf') {
+      throw Error(
+        `countRef '${countRef}' must refer to a fixed-width leaf field in schema '${schemaName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`
+      );
+    }
+  }
+
+  parseSchemaArrayDimOrRef() {
+    if (this.c.type === 'ID') {
+      const name = this.c.value;
+      this.eat('ID');
+      return { countRef: name };
+    }
+    return this.parseSchemaArrayDim();
   }
 
   parseSchemaArrayDim() {
@@ -426,21 +478,28 @@ class Parser {
   parseSchemaArraySuffix() {
     if (this.c.type !== 'SYM' || this.c.value !== '[') return null;
     this.eat('SYM', '[');
-    const d0 = this.parseSchemaArrayDim();
+    const d0 = this.parseSchemaArrayDimOrRef();
     if (this.c.type === 'SYM' && this.c.value === ',') {
       this.eat('SYM', ',');
-      const d1 = this.parseSchemaArrayDim();
+      const d1 = this.parseSchemaArrayDimOrRef();
       if (this.c.type === 'SYM' && this.c.value === ',') {
         throw Error(`Array dimensions beyond 2D are not supported at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
       this.eat('SYM', ']');
-      if (!d0.var && !d1.var) {
+      if (!d0.var && !d1.var && !d0.countRef && !d1.countRef) {
         return { rows: d0.fixed, cols: d1.fixed, singleDim: false };
+      }
+      if (d0.countRef && d1.countRef) {
+        throw Error(
+          `Only one matrix dimension may use countRef at ${this.c.file}: ${this.c.line}:${this.c.col}`
+        );
       }
       const counts = this._matrixVarRangeCounts(d0, d1);
       return {
         matrixVar: true,
-        varRange: true,
+        varRange: !!(d0.var || d1.var),
+        countRef: d0.countRef || d1.countRef || null,
+        countRefDim: d0.countRef ? 'rows' : (d1.countRef ? 'cols' : null),
         rowsSpec: d0,
         colsSpec: d1,
         minCount: counts.minCount,
@@ -449,6 +508,9 @@ class Parser {
       };
     }
     this.eat('SYM', ']');
+    if (d0.countRef) {
+      return { countRef: d0.countRef, singleDim: true };
+    }
     if (d0.var) {
       return { varRange: true, minCount: d0.min, maxCount: d0.max, singleDim: true };
     }

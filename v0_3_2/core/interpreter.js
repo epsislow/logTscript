@@ -4001,7 +4001,7 @@ class Interpreter {
     }
     let counts;
     try {
-      counts = SS.resolveFlatVarArrayCounts(schema, valueStr.length);
+      counts = SS.resolveFlatVarArrayCounts(schema, valueStr.length, valueStr);
     } catch (e) {
       if (allowAmbiguousZeroInit && /Ambiguous variable array layout/.test(e.message)) {
         return;
