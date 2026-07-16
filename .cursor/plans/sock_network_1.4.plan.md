@@ -4,34 +4,34 @@ overview: "Faza 1.4 redefinită: conexiuni socket partajate cross-instance prin 
 todos:
   - id: 1.4.1-baseline-doc
     content: "1.4.1: smoke drain manual + doc sketch network.md/sock.md + update sock.plan.md"
-    status: pending
+    status: completed
   - id: 1.4.2-bus-registry
     content: "1.4.2: network-bus.js _socketPorts + API open/connect/close + teste bus"
-    status: pending
+    status: completed
   - id: 1.4.3-component-pins
     content: "1.4.3: parser bind openSock<-/connSock-> + network.js closeSock/port + applyProperties"
-    status: pending
+    status: completed
   - id: 1.4.4-interp-alias
     content: "1.4.4: interpreter.js sharedKey aliasing pe sock (read/write/clear/probe)"
-    status: pending
+    status: completed
   - id: 1.4.5-role-restrict
     content: "1.4.5: restricții producer/consumer append vs consume"
-    status: pending
+    status: completed
   - id: 1.4.6-lifecycle
     content: "1.4.6: closeSock graceful/abrupt + unregister + detach + precond BITSIZE=0"
-    status: pending
+    status: completed
   - id: 1.4.7-tests-core
     content: "1.4.7: teste 2489–2492 legacy + 2506–2509 wave cross-instance"
-    status: pending
+    status: completed
   - id: 1.4.8-tests-edge
     content: "1.4.8: teste 2493–2504 legacy + 2510–2514 wave edge cases"
-    status: pending
+    status: completed
   - id: 1.4.9-tests-protocol
     content: "1.4.9: teste 2501–2502 + 2505 + 2515–2516 wave protocol/detach"
-    status: pending
+    status: completed
   - id: 1.4.10-regen
     content: "1.4.10: doc logts-play wave verificate Load&Run + regen manifest + 1.4 done"
-    status: pending
+    status: completed
 isProject: false
 ---
 

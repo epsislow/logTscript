@@ -293,7 +293,15 @@ pushSource({ src, alias }) {
   }
 
   // Symbols (including { and } for property blocks, ! for NOT prefix, * for multiplier shortname)
-    if ('=,+():-.@[]{}>!*;'.includes(c)) return this.token('SYM', this.next());
+  if (c === '-') {
+    this.next();
+    if (!this.eof() && this.peek() === '>') {
+      this.next();
+      return this.token('SYM', '->');
+    }
+    return this.token('SYM', '-');
+  }
+    if ('=,+():.@[]{}>!*;'.includes(c)) return this.token('SYM', this.next());
 
   // Lone _ is unpack wildcard; _foo is a normal identifier
   if (c === '_') {
@@ -377,6 +385,10 @@ pushSource({ src, alias }) {
 
     if(c === '<') {
       this.next();
+      if (!this.eof() && this.peek() === '-') {
+        this.next();
+        return this.token('SYM', '<-');
+      }
       if (!this.eof() && this.peek() === '<') {
         this.next();
         return this.token('SYM', '<<');

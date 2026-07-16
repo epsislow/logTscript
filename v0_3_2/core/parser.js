@@ -2227,6 +2227,32 @@ parseBoardInstance() {
       
       const propName = this.c.value;
       this.eat('ID');
+
+      // network socket bind: openSock <- name / connSock -> name
+      if (propName === 'openSock' && this.c.type === 'SYM' && this.c.value === '<-') {
+        this.eat('SYM', '<-');
+        const targetAtom = this.atom();
+        if (targetAtom.bitRange) {
+          throw Error(`Bit ranges not allowed in openSock<- at ${this.c.line}:${this.c.col}`);
+        }
+        if (!targetAtom.var || targetAtom.var.startsWith('.')) {
+          throw Error(`Invalid sock name for openSock<- at ${this.c.line}:${this.c.col}`);
+        }
+        properties.push({ property: 'openSock', sockBind: 'from', target: targetAtom, expr: null });
+        continue;
+      }
+      if (propName === 'connSock' && this.c.type === 'SYM' && this.c.value === '->') {
+        this.eat('SYM', '->');
+        const targetAtom = this.atom();
+        if (targetAtom.bitRange) {
+          throw Error(`Bit ranges not allowed in connSock-> at ${this.c.line}:${this.c.col}`);
+        }
+        if (!targetAtom.var || targetAtom.var.startsWith('.')) {
+          throw Error(`Invalid sock name for connSock-> at ${this.c.line}:${this.c.col}`);
+        }
+        properties.push({ property: 'connSock', sockBind: 'to', target: targetAtom, expr: null });
+        continue;
+      }
       
       // --- DRY redirect properties: get>/2get>/…, mod>, carry>, over>, out> ---
       if ((isGetRedirectProp(propName) || REDIRECT_PROPS.has(propName) || GENERIC_REDIRECT_PROPS.has(propName)) && this.c.type === 'SYM' && this.c.value === '>') {

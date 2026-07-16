@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: "1.4"
     content: "Faza 1.4: network socket connections (openSock/connSock) — vezi sock_network_1.4.plan.md"
-    status: pending
+    status: completed
 isProject: false
 ---
 

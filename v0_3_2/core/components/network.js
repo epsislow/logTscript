@@ -60,6 +60,8 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
         { bits: '4', name: 'target' },
         { bits: '1', name: 'pop' },
         { bits: '1', name: 'clear' },
+        { bits: '8', name: 'port' },
+        { bits: '1', name: 'closeSock' },
       ],
       pouts: [
         { bits: 'X', name: 'get' },
@@ -163,7 +165,149 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
   }
 
   getForbidDirectAssign() {
-    return 'Cannot assign a value to a network component. Use :send, :pop, :clear, and :set properties instead.';
+    return 'Cannot assign a value to a network component. Use :send, :pop, :clear, socket pins, and :set properties instead.';
+  }
+
+  _resolveSockBind(pending, key, ctx) {
+    const spec = pending[key];
+    if (!spec || !spec.target || !spec.target.var) {
+      throw Error(`Network ${key} requires a sock name`);
+    }
+    const sockName = spec.target.var;
+    if (sockName.startsWith('.')) throw Error(`Invalid sock name for ${key}`);
+    if (!ctx.socks || !ctx.socks.has(sockName)) {
+      throw Error(`Undefined sock ${sockName}`);
+    }
+    const entry = ctx.socks.get(sockName);
+    const len = typeof ctx.getSockRuntimeLength === 'function'
+      ? ctx.getSockRuntimeLength(sockName)
+      : (entry.bits || '').length;
+    if (len !== 0) {
+      throw Error(`sock must be empty at ${key}: ${sockName}`);
+    }
+    const cap = typeof ctx.getSockCap === 'function'
+      ? ctx.getSockCap(entry.type)
+      : entry.cap;
+    return { sockName, cap };
+  }
+
+  _resolveSocketPort(pending, reEvaluate, ctx) {
+    if (pending.port === undefined) throw Error('Network socket operation requires port');
+    const raw = this.reEvalPendingValue(pending, 'port', reEvaluate, ctx);
+    const port = parseInt(raw, 2);
+    if (isNaN(port) || port < 1 || port > 255) {
+      throw Error('Invalid network socket port (expected 1..255)');
+    }
+    return port;
+  }
+
+  _countSocketOps(pending) {
+    let n = 0;
+    if (pending.openSock) n++;
+    if (pending.connSock) n++;
+    if (pending.closeSock !== undefined
+      && _isActive(this.reEvalPendingValue(pending, 'closeSock', false, null))) n++;
+    return n;
+  }
+
+  _applySocketDetach(ctx, closeInfo, instanceId) {
+    if (!closeInfo || !ctx) return;
+    const inst = instanceId != null ? instanceId : this._instanceId(ctx);
+    const prod = closeInfo.producer;
+    const cons = closeInfo.consumer;
+    if (prod && prod.instanceId === inst && typeof ctx.detachNetworkSock === 'function') {
+      ctx.detachNetworkSock(prod.sockName, '');
+    }
+    if (cons && cons.instanceId === inst && typeof ctx.detachNetworkSock === 'function') {
+      ctx.detachNetworkSock(cons.sockName, closeInfo.snapshot || '');
+    }
+  }
+
+  _applyOpenSock(id, instanceId, channel, pending, reEvaluate, ctx) {
+    const { sockName, cap } = this._resolveSockBind(pending, 'openSock', ctx);
+    const port = this._resolveSocketPort(pending, reEvaluate, ctx);
+    if (typeof networkSocketOpen !== 'function') throw Error('Network socket bus is not loaded');
+    const sharedKey = networkSocketOpen({
+      channel,
+      instanceId,
+      deviceId: id,
+      port,
+      sockName,
+      cap,
+    });
+    if (typeof ctx.linkSockToNetwork === 'function') {
+      ctx.linkSockToNetwork(sockName, sharedKey, 'producer');
+    }
+  }
+
+  _applyConnSock(id, instanceId, channel, pending, reEvaluate, ctx) {
+    const { sockName, cap } = this._resolveSockBind(pending, 'connSock', ctx);
+    const port = this._resolveSocketPort(pending, reEvaluate, ctx);
+    const target = this._resolveSendTarget(pending, reEvaluate, ctx);
+    if (target === undefined) throw Error('connSock requires target instance');
+    if (typeof networkSocketConnect !== 'function') throw Error('Network socket bus is not loaded');
+    const sharedKey = networkSocketConnect({
+      channel,
+      targetInstanceId: target,
+      port,
+      instanceId,
+      deviceId: id,
+      sockName,
+      consumerCap: cap,
+    });
+    if (typeof ctx.linkSockToNetwork === 'function') {
+      ctx.linkSockToNetwork(sockName, sharedKey, 'consumer');
+    }
+  }
+
+  _applyCloseSock(id, instanceId, channel, pending, reEvaluate, ctx) {
+    const port = this._resolveSocketPort(pending, reEvaluate, ctx);
+    let targetInst;
+    if (pending.target !== undefined) {
+      targetInst = this._resolveSendTarget(pending, reEvaluate, ctx);
+    }
+    if (typeof networkSocketResolveClose !== 'function') {
+      throw Error('Network socket bus is not loaded');
+    }
+    const resolved = networkSocketResolveClose({
+      channel,
+      instanceId,
+      port,
+      targetInstanceId: targetInst,
+    });
+    if (!resolved) throw Error('Network socket close: port not open');
+    if (typeof networkSocketClose !== 'function') throw Error('Network socket bus is not loaded');
+    const closeInfo = networkSocketClose({
+      channel,
+      producerInstanceId: resolved.producerInstanceId,
+      port,
+      closedBy: resolved.closedBy,
+      initiatingInstanceId: instanceId,
+    });
+    if (!closeInfo) throw Error('Network socket close: port not open');
+    this._applySocketDetach(ctx, closeInfo, instanceId);
+  }
+
+  _applySocketOps(id, instanceId, channel, pending, reEvaluate, ctx) {
+    const socketOpCount = this._countSocketOps(pending);
+    const fifoOps = pending.send !== undefined || pending.pop !== undefined || pending.clear !== undefined;
+    if (socketOpCount > 1) throw Error('Conflicting network socket operations');
+    if (socketOpCount > 0 && fifoOps) throw Error('Conflicting network operations');
+    if (pending.openSock && pending.connSock) throw Error('Conflicting network socket operations');
+
+    const closeActive = pending.closeSock !== undefined
+      && _isActive(this.reEvalPendingValue(pending, 'closeSock', reEvaluate, ctx));
+    if (closeActive) {
+      this._applyCloseSock(id, instanceId, channel, pending, reEvaluate, ctx);
+      return;
+    }
+    if (pending.openSock) {
+      this._applyOpenSock(id, instanceId, channel, pending, reEvaluate, ctx);
+      return;
+    }
+    if (pending.connSock) {
+      this._applyConnSock(id, instanceId, channel, pending, reEvaluate, ctx);
+    }
   }
 
   _resolveSendTarget(pending, reEvaluate, ctx) {
@@ -256,6 +400,9 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {
     if (!pending || when !== 'immediate') return;
     if (pending.set === undefined) return;
+    if (ctx && typeof applyNetworkSocketPendingDetaches === 'function') {
+      applyNetworkSocketPendingDetaches(this._instanceId(ctx), ctx);
+    }
     const setValue = this.reEvalPendingValue(pending, 'set', reEvaluate, ctx);
     if (!_isActive(setValue)) return;
 
@@ -263,13 +410,22 @@ var NetworkComponent = class NetworkComponent extends BuiltinComponent {
     const width = this.getWidthBits(comp.attributes);
     const channel = this._channel(comp.attributes);
     const instanceId = this._instanceId(ctx);
-    this._applyNetworkOps(id, instanceId, channel, width, pending, reEvaluate, ctx);
+    const socketOpCount = this._countSocketOps(pending);
+    if (socketOpCount > 0) {
+      this._applySocketOps(id, instanceId, channel, pending, reEvaluate, ctx);
+    } else {
+      this._applyNetworkOps(id, instanceId, channel, width, pending, reEvaluate, ctx);
+    }
 
     if (!reEvaluate) {
       delete pending.send;
       delete pending.target;
       delete pending.pop;
       delete pending.clear;
+      delete pending.openSock;
+      delete pending.connSock;
+      delete pending.port;
+      delete pending.closeSock;
     }
   }
 };

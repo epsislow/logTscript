@@ -212,4 +212,5 @@ probe(rx; u8)
 ## Related
 
 - [`queue.md`](queue.md) — FIFO elements vs bit stream
+- [`network.md`](network.md) — socket connections (`openSock` / `connSock`) cross-instance
 - [`protocol-parse.md`](protocol-parse.md) — `{ data = rx }` peek vs `{ data << rx }` consume

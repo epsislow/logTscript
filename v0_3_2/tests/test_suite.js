@@ -1810,6 +1810,68 @@ on: 1
 }`);
   }
 
+  function netSockDef(channel) {
+    const ch = channel || 'sock-demo';
+    return `comp [network] .n:
+  channel: '${ch}'
+  on: 1
+  :
+`;
+  }
+
+  function openSockNet(session, interp, sockName, portBits) {
+    session.execStmts(interp, `.n:{
+  openSock <- ${sockName}
+  port = ${portBits}
+  set = 1
+}`);
+  }
+
+  function connSockNet(session, interp, sockName, portBits, targetBits) {
+    session.execStmts(interp, `.n:{
+  target = ${targetBits}
+  connSock -> ${sockName}
+  port = ${portBits}
+  set = 1
+}`);
+  }
+
+  function closeSockNet(session, interp, portBits, targetBits) {
+    let block = `.n:{ closeSock = 1
+  port = ${portBits}`;
+    if (targetBits != null) {
+      block += `\n  target = ${targetBits}`;
+    }
+    block += '\n  set = 1\n}';
+    session.execStmts(interp, block);
+  }
+
+  function setupSockPair(s1, s2, channel, portBits) {
+    const def = netSockDef(channel);
+    s1.run(def + 'sock chat\n');
+    s2.run(def + 'sock chat\n');
+    openSockNet(s1, s1.interp, 'chat', portBits || '00000001');
+    connSockNet(s2, s2.interp, 'chat', portBits || '00000001', '0001');
+  }
+
+  function regNetSockWave(legacyId, title, run) {
+    reg(legacyId, 'network-sock', title, run);
+    const waveMap = {
+      2489: 2506,
+      2491: 2509,
+      2493: 2510,
+      2494: 2511,
+      2495: 2512,
+      2496: 2513,
+      2504: 2514,
+      2502: 2516,
+    };
+    const waveId = waveMap[legacyId];
+    if (waveId != null) {
+      reg(waveId, 'network-sock', title + ' (wave)', run, { propagation: 'wave' });
+    }
+  }
+
   reg(1240, 'network', 'parse — comp [network] attrs and pins', function(h, session) {
     const stmts = session.parse(`comp [network] .n:
   width: 8
@@ -23047,6 +23109,225 @@ show(BITSIZE(rx))`;
   h.assert('no payload wire', String(interp.wires.has('payload')), 'false');
   h.assert('tail in sock', session.getSockLen(interp, 'rx'), 8);
   h.assert('bitsize show 8', String(session.outIncludes(interp, '1000')), 'true');
+}, { propagation: 'wave' });
+
+// --- Faza 1.4: network socket connections (shared sock) ---
+
+regNetSockWave(2489, 'openSock connSock basic stream', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41');
+  h.assert('consumer bits', s2.getSockBits(s2.interp, 'chat'), '01000001');
+});
+
+reg(2490, 'network-sock', 'two producer appends consumer consumes twice', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41\nchat << ^42');
+  s2.execStmts(s2.interp, '8wire a << chat./8\n8wire b << chat./8');
+  h.assert('first byte', s2.getWire(s2.interp, 'a'), '01000001');
+  h.assert('second byte', s2.getWire(s2.interp, 'b'), '01000010');
+});
+
+regNetSockWave(2491, 'append on consumer and consume on producer throw', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  h.assertThrows('consumer append', () => s2.execStmts(s2.interp, 'chat << ^41'), 'consumer endpoint');
+  h.assertThrows('producer consume', () => s1.execStmts(s1.interp, '8wire x << chat./8'), 'producer endpoint');
+});
+
+regNetSockWave(2492, 'clear on connected socket throws', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41');
+  h.assertThrows('producer clear', () => s1.execStmts(s1.interp, 'chat << clear'), 'connected socket');
+  h.assertThrows('consumer clear', () => s2.execStmts(s2.interp, 'chat << clear'), 'connected socket');
+});
+
+regNetSockWave(2493, 'connSock before openSock throws', function(h) {
+  const def = netSockDef();
+  const s2 = createSession({ instanceId: 2 });
+  s2.run(def + 'sock chat\n');
+  h.assertThrows('early conn', () => connSockNet(s2, s2.interp, 'chat', '00000001', '0001'), 'not available');
+});
+
+regNetSockWave(2494, 'consumer cap less than producer throws', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(def + 'sock chat\n');
+  s2.run(def + '8sock chat\n');
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  h.assertThrows('cap mismatch', () => connSockNet(s2, s2.interp, 'chat', '00000001', '0001'), 'less than producer cap');
+});
+
+regNetSockWave(2495, 'openSock port occupied by other sock throws', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  s1.run(def + 'sock chat\nsock other\n');
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  h.assertThrows('port busy', () => openSockNet(s1, s1.interp, 'other', '00000001'), 'already in use');
+});
+
+regNetSockWave(2496, 'connSock channel mismatch throws', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(netSockDef('chanA') + 'sock chat\n');
+  s2.run(netSockDef('chanB') + 'sock chat\n');
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  h.assertThrows('channel mismatch', () => connSockNet(s2, s2.interp, 'chat', '00000001', '0001'), 'not available');
+});
+
+reg(2497, 'network-sock', 'openSock requires empty sock', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  s1.run(def + 'sock chat\nchat << ^41\n');
+  h.assertThrows('non-empty bind', () => openSockNet(s1, s1.interp, 'chat', '00000001'), 'must be empty');
+});
+
+reg(2498, 'network-sock', 'consumer closeSock keeps snapshot producer cleared', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41');
+  closeSockNet(s2, s2.interp, '00000001');
+  h.assert('consumer snapshot', s2.getSockBits(s2.interp, 'chat'), '01000001');
+  h.assert('producer empty', s1.getSockLen(s1.interp, 'chat'), 0);
+  h.assertThrows('producer append detached', () => s1.execStmts(s1.interp, 'chat << ^42'), 'disconnected');
+});
+
+reg(2499, 'network-sock', 'producer closeSock abrupt consumer keeps snapshot', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41');
+  closeSockNet(s1, s1.interp, '00000001');
+  h.assert('consumer snapshot', s2.getSockBits(s2.interp, 'chat'), '01000001');
+  h.assertThrows('producer append detached', () => s1.execStmts(s1.interp, 'chat << ^42'), 'disconnected');
+});
+
+reg(2500, 'network-sock', 'producer closeSock on empty sock', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  closeSockNet(s1, s1.interp, '00000001');
+  h.assert('consumer empty snapshot', s2.getSockLen(s2.interp, 'chat'), 0);
+  h.assert('producer empty', s1.getSockLen(s1.interp, 'chat'), 0);
+});
+
+reg(2501, 'network-sock', 'protocol consumer parse over socket stream', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(def + 'sock chat\n');
+  s2.run(INLINE_SOCK_PARSE_HDR + '\n' + def + 'sock chat\n');
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  connSockNet(s2, s2.interp, 'chat', '00000001', '0001');
+  s1.execStmts(s1.interp, `chat << ${SOCK_PKT_FULL}`);
+  s2.execStmts(s2.interp, '20wire hdr =: .parseHdr { data << chat }');
+  h.assert('hdr wire', s2.getWire(s2.interp, 'hdr'), SOCK_HDR_WIRE);
+  h.assert('sock tail', s2.getSockBits(s2.interp, 'chat'), SOCK_PKT_TAIL);
+});
+
+reg(2502, 'network-sock', 're-run producer detaches consumer socket', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41');
+  if (typeof unregisterNetworkEndpoints === 'function') unregisterNetworkEndpoints(1);
+  h.assertThrows('consumer append detached', () => s2.execStmts(s2.interp, '8wire x << chat./8'), 'disconnected');
+});
+
+reg(2503, 'network-sock', 'clear detached sock then re-bind', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41');
+  closeSockNet(s2, s2.interp, '00000001');
+  s2.execStmts(s2.interp, 'chat << clear');
+  h.assert('cleared', s2.getSockLen(s2.interp, 'chat'), 0);
+  openSockNet(s1, s1.interp, 'chat', '00000010');
+  connSockNet(s2, s2.interp, 'chat', '00000010', '0001');
+  s1.execStmts(s1.interp, 'chat << ^42');
+  h.assert('reconnected', s2.getSockBits(s2.interp, 'chat'), '01000010');
+});
+
+regNetSockWave(2504, 'pre-connect buffer visible at connSock', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(def + 'sock chat\n');
+  s2.run(def + 'sock chat\n');
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  s1.execStmts(s1.interp, 'chat << ^41');
+  connSockNet(s2, s2.interp, 'chat', '00000001', '0001');
+  h.assert('pre-buffer visible', s2.getSockBits(s2.interp, 'chat'), '01000001');
+});
+
+reg(2505, 'network-sock', 'show BITSIZE on consumer snapshot after close', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41');
+  closeSockNet(s2, s2.interp, '00000001');
+  s2.execStmts(s2.interp, 'show(BITSIZE(chat))');
+  h.assert('bitsize 8', String(s2.outIncludes(s2.interp, '1000')), 'true');
+});
+
+reg(2507, 'network-sock', 'wave consumer reads on on:1 after producer append', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(def + 'sock chat\n');
+  s2.run(def + `sock chat
+8wire byte : 0
+1wire go : 0
+on:1 {
+  AND(go, GT(BITSIZE(chat), 111)),
+  byte << chat./8
+}`);
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  connSockNet(s2, s2.interp, 'chat', '00000001', '0001');
+  s1.execStmts(s1.interp, 'chat << ^41');
+  s2.execStmts(s2.interp, 'go = 1');
+  h.assert('byte A', s2.getWire(s2.interp, 'byte'), '01000001');
+}, { propagation: 'wave' });
+
+reg(2508, 'network-sock', 'wave closeSock consumer snapshot show BITSIZE', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41');
+  closeSockNet(s2, s2.interp, '00000001');
+  s2.execStmts(s2.interp, 'show(BITSIZE(chat))');
+  h.assert('bitsize 8', String(s2.outIncludes(s2.interp, '1000')), 'true');
+}, { propagation: 'wave' });
+
+reg(2515, 'network-sock', 'wave protocol parse on on:1 after stream append', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(def + 'sock chat\n');
+  s2.run(INLINE_SOCK_PARSE_HDR + '\n' + def + `sock chat
+1wire ready : 0
+20wire hdr : 0
+on:1 {
+  AND(ready, GT(BITSIZE(chat), 10011)),
+  hdr =: .parseHdr { data << chat }
+}`);
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  connSockNet(s2, s2.interp, 'chat', '00000001', '0001');
+  s1.execStmts(s1.interp, `chat << ${SOCK_PKT_FULL}`);
+  s2.execStmts(s2.interp, 'ready = 1');
+  h.assert('hdr parsed', s2.getWire(s2.interp, 'hdr'), SOCK_HDR_WIRE);
+  h.assert('tail left', s2.getSockBits(s2.interp, 'chat'), SOCK_PKT_TAIL);
 }, { propagation: 'wave' });
 
 

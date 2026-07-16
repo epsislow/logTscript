@@ -18659,8 +18659,9 @@ Oscillator timing: \`freq: 2\` with \`freqIsSec: 1\` → **2 s** per cycle; \`ea
 ## Restrictions
 
 - \`comp [network]\` only at **top level** (parse error in chip / pcb / board).
-- Cannot assign directly to \`.net\`; use \`:send\`, \`:pop\`, \`:clear\`, \`:set\`.
+- Cannot assign directly to \`.net\`; use \`:send\`, \`:pop\`, \`:clear\`, socket pins (\`openSock\`, \`connSock\`, \`closeSock\`, \`port\`), and \`:set\`.
 - \`send\` + \`pop\` in the same property block → conflict (like queue \`push\` + \`pop\`).
+- Socket ops (\`openSock\` / \`connSock\` / \`closeSock\`) cannot mix with FIFO ops (\`send\` / \`pop\` / \`clear\`) in one block.
 
 ---
 
@@ -18677,6 +18678,138 @@ Full panel documentation: [network-traffic-panel.md](network-traffic-panel.md).
 \`probe(.wifi:get)\` on the **receiving** instance does not update from wire propagation when a packet arrives from another tab — the bus is outside the simulation graph. The editor **re-reads** probes when a packet is delivered (and when you switch to that tab). Probe history keeps earlier lines (\`initialised\`) and appends \`changed\` when the value updates.
 
 See [editorUI.md — probe: propagation vs network](editorUI.md#probe--propagation-vs-network) for a comparison table and a two-tab walkthrough.
+
+---
+
+## Socket connections (shared \`sock\`)
+
+Cross-instance **bitstream** between Run instances on the same \`channel\` — distinct from the packet FIFO (\`send\` / \`get\` / \`pop\`). A local [\`sock\`](sock.md) aliases a **shared buffer** in the network bus after bind.
+
+| Pin / bind | Syntax | Role |
+|------------|--------|------|
+| \`openSock\` | **\`openSock <- chat\`** | Producer — publishes local \`chat\` on \`port\` |
+| \`connSock\` | **\`connSock -> chat\`** | Consumer — connects to remote \`(target, port)\` |
+| \`port\` | 8 bit (\`1..255\`) | Port number on the producer instance |
+| \`closeSock\` | \`closeSock = 1\` | Tear down connection on \`port\` (bilateral) |
+
+Use **\`=\`** for \`port\`, \`target\`, \`set\`, \`closeSock\`; use **\`<-\` / \`->\`** only for sock binds (not assignments).
+
+**Precondition:** \`BITSIZE(sock) === 0\` at \`openSock\` / \`connSock\`.
+
+**Buffer before connect:** producer may \`chat << …\` after \`openSock\` before the consumer calls \`connSock\`; the consumer sees accumulated bits immediately at connect.
+
+### Permissions (connected)
+
+| Role | Append (\`sock <<\`) | Consume (\`wire << sock./N\`) | Clear (\`sock << clear\`) | Peek / \`BITSIZE\` / \`show\` / \`probe\` |
+|------|-------------------|-----------------------------|-------------------------|-------------------------------------|
+| **Producer** (\`openSock <-\`) | yes | error | error | always |
+| **Consumer** (\`connSock ->\`) | error | yes | error | always |
+
+After **\`closeSock\`**: both ends **detached**; producer sock cleared; consumer keeps a **local snapshot**; reconnect requires \`BITSIZE(sock) === 0\` on both sides (\`chat << clear\` allowed only when detached).
+
+One socket operation per property block (\`openSock\` / \`connSock\` / \`closeSock\` / \`send\` / \`pop\` / \`clear\` are mutually exclusive).
+
+### Example A — producer (single instance)
+
+\`\`\`logts-play wave
+comp [network] .net:
+  channel: 'sock-demo'
+  on: 1
+  :
+
+sock chat
+
+.net:{ openSock <- chat
+  port = 1
+  set = 1 }
+
+chat << ^41
+show(BITSIZE(chat))
+probe(chat)
+\`\`\`
+
+### Example B — consumer with \`on:1\` (wave)
+
+Run **Inst 1** (Example A) then **Inst 2** on the same \`channel\`.
+
+\`\`\`logts-play wave
+comp [network] .net:
+  channel: 'sock-demo'
+  on: 1
+  :
+
+sock chat
+8wire byte : 0
+1wire go : 0
+
+.net:{ target = 1
+  connSock -> chat
+  port = 1
+  set = 1 }
+
+on:1 {
+  AND(go, GT(BITSIZE(chat), 111)),
+  byte << chat./8
+}
+
+go = 1
+show(byte; u8)
+\`\`\`
+
+### Example C — buffer pre-connect
+
+Inst 1: \`openSock\` + \`chat << ^41\`. Inst 2: \`connSock\` → \`BITSIZE(chat) = 8\` immediately.
+
+### Example D — \`closeSock\` (consumer, graceful)
+
+\`\`\`logts-play wave
+comp [network] .net:
+  channel: 'sock-demo'
+  on: 1
+  :
+
+sock chat
+
+.net:{ target = 1
+  connSock -> chat
+  port = 1
+  set = 1 }
+
+.net:{ closeSock = 1
+  port = 1
+  set = 1 }
+
+show(BITSIZE(chat))
+\`\`\`
+
+### Example E — FIFO drain alternative (no socket mode)
+
+Manual bridge from RX FIFO into a local sock — works today without socket pins:
+
+\`\`\`logts-play wave
+comp [network] .net:
+  width: 8
+  length: 8
+  channel: 'sock-demo'
+  on: 1
+  :
+
+sock rx
+1wire drain : 0
+
+on:1 {
+  AND(drain, NOT(.net:empty)),
+  rx << .net:get,
+  .net:{ pop = 1
+    set = 1 }
+}
+
+drain = 1
+show(BITSIZE(rx))
+probe(rx)
+\`\`\`
+
+See also: [\`sock.md\`](sock.md) — local buffer semantics and protocol consume.
 
 ---
 
@@ -24549,6 +24682,7 @@ probe(rx; u8)
 ## Related
 
 - [\`queue.md\`](queue.md) — FIFO elements vs bit stream
+- [\`network.md\`](network.md) — socket connections (\`openSock\` / \`connSock\`) cross-instance
 - [\`protocol-parse.md\`](protocol-parse.md) — \`{ data = rx }\` peek vs \`{ data << rx }\` consume
 `,
     'stack.md': `# Stack component (LIFO)

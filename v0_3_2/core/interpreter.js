@@ -1401,8 +1401,8 @@ class Interpreter {
     const entry = this.socks.get(sockName);
     if (!entry) throw Error(`Undefined sock ${sockName}`);
     return new SockStream({
-      getBits: () => entry.bits || '',
-      setBits: (bits) => { entry.bits = bits; },
+      getBits: () => this._sockBitsForRead(entry),
+      setBits: (bits) => { this._sockBitsWrite(entry, bits, sockName); },
       notify: () => this._emitProbeForSock(sockName),
     });
   }
@@ -5374,17 +5374,98 @@ class Interpreter {
     const cap = this.getSockCap(type);
     if (!cap) throw Error(`Invalid sock type ${type} at ${loc}`);
     if (this.socks.has(name)) throw Error(`Sock ${name} already declared at ${loc}`);
-    this.socks.set(name, { type, bits: '', cap });
+    this.socks.set(name, { type, bits: '', cap, sharedKey: null, role: null, connected: false });
+  }
+
+  _flushNetworkSocketDetaches() {
+    if (typeof applyNetworkSocketPendingDetaches === 'function') {
+      applyNetworkSocketPendingDetaches(this._instanceId, this);
+    }
+  }
+
+  _sharedSockState(sharedKey) {
+    if (!sharedKey || typeof getSharedSockState !== 'function') return null;
+    return getSharedSockState(sharedKey);
+  }
+
+  _sockIsLiveConnected(entry) {
+    return !!(entry && entry.connected && entry.sharedKey && this._sharedSockState(entry.sharedKey));
+  }
+
+  _sockBitsForRead(entry) {
+    if (!entry) return '';
+    if (entry.connected && entry.sharedKey && !this._sharedSockState(entry.sharedKey)) {
+      this._flushNetworkSocketDetaches();
+    }
+    if (entry.connected && entry.sharedKey) {
+      const shared = this._sharedSockState(entry.sharedKey);
+      if (shared) return shared.bits || '';
+      return entry.bits || '';
+    }
+    return entry.bits || '';
+  }
+
+  _sockBitsWrite(entry, bits, sockName) {
+    if (entry.connected && entry.sharedKey) {
+      const shared = this._sharedSockState(entry.sharedKey);
+      if (!shared) throw Error(`socket disconnected${sockName ? `: ${sockName}` : ''}`);
+      shared.bits = bits || '';
+    } else {
+      entry.bits = bits || '';
+    }
+    if (sockName) this._emitProbeForSock(sockName);
+  }
+
+  _sockEnsureMutable(entry, name, op) {
+    if (!entry) throw Error(`Undefined sock ${name}`);
+    if (entry.connected && entry.sharedKey && !this._sharedSockState(entry.sharedKey)) {
+      throw Error(`socket disconnected: ${name}`);
+    }
+    if (op === 'append' && entry.connected && entry.role === 'consumer') {
+      throw Error(`sock append not allowed on consumer endpoint: ${name}`);
+    }
+    if (op === 'consume' && entry.connected && entry.role === 'producer') {
+      throw Error(`sock consume not allowed on producer endpoint: ${name}`);
+    }
+    if (op === 'clear' && entry.connected && this._sockIsLiveConnected(entry)) {
+      throw Error(`sock clear not allowed on connected socket: ${name}`);
+    }
+    if (entry.socketDetached && (op === 'append' || op === 'consume')) {
+      throw Error(`socket disconnected: ${name}`);
+    }
+    if ((op === 'append' || op === 'consume') && entry.connected && !this._sockIsLiveConnected(entry)) {
+      throw Error(`socket disconnected: ${name}`);
+    }
+  }
+
+  linkSockToNetwork(sockName, sharedKey, role) {
+    const entry = this.socks.get(sockName);
+    if (!entry) throw Error(`Undefined sock ${sockName}`);
+    entry.sharedKey = sharedKey;
+    entry.role = role;
+    entry.connected = true;
+    entry.socketDetached = false;
+    entry.bits = '';
+  }
+
+  detachNetworkSock(sockName, snapshotBits) {
+    const entry = this.socks.get(sockName);
+    if (!entry) return;
+    entry.connected = false;
+    entry.sharedKey = null;
+    entry.role = null;
+    entry.socketDetached = true;
+    entry.bits = snapshotBits != null ? snapshotBits : '';
   }
 
   getSockBits(name) {
     const entry = this.socks.get(name);
-    return entry ? (entry.bits || '') : null;
+    return entry ? this._sockBitsForRead(entry) : null;
   }
 
   getSockRuntimeLength(name) {
     const entry = this.socks.get(name);
-    return entry ? (entry.bits || '').length : null;
+    return entry ? this._sockBitsForRead(entry).length : null;
   }
 
   _validateSockAppendBits(bits, context) {
@@ -5409,7 +5490,7 @@ class Interpreter {
   _peekSockSlice(name, atom) {
     const entry = this.socks.get(name);
     if (!entry) this._throwRuntime(`Undefined sock ${name}`, atom, name.length);
-    const bits = entry.bits || '';
+    const bits = this._sockBitsForRead(entry);
     if (!atom || !atom.bitRange) {
       return bits;
     }
@@ -5422,8 +5503,10 @@ class Interpreter {
   }
 
   _consumeSockSlice(name, atom) {
+    this._flushNetworkSocketDetaches();
     const entry = this.socks.get(name);
     if (!entry) this._throwRuntime(`Undefined sock ${name}`, atom, name.length);
+    this._sockEnsureMutable(entry, name, 'consume');
     if (!atom || !atom.bitRange) {
       throw Error(`sock consume requires front slice rx./N or rx/(expr)`);
     }
@@ -5432,34 +5515,39 @@ class Interpreter {
       throw Error(`sock consume only supports front slice rx./N or rx/(expr)`);
     }
     const n = end - start + 1;
-    const bits = entry.bits || '';
+    const bits = this._sockBitsForRead(entry);
     if (bits.length < n) {
       throw Error(`sock underflow: need ${n} bits but only ${bits.length} remain in ${name}`);
     }
     const chunk = bits.substring(0, n);
-    entry.bits = bits.substring(n);
-    this._emitProbeForSock(name);
+    this._sockBitsWrite(entry, bits.substring(n), name);
     return chunk;
   }
 
   _appendSockBits(name, appendBits) {
+    this._flushNetworkSocketDetaches();
     const entry = this.socks.get(name);
     if (!entry) throw Error(`Undefined sock ${name}`);
+    this._sockEnsureMutable(entry, name, 'append');
     this._validateSockAppendBits(appendBits, name);
     const bits = appendBits || '';
-    const nextLen = (entry.bits || '').length + bits.length;
-    if (nextLen > entry.cap) {
-      throw Error(`sock overflow: cap ${entry.cap} bit, would be ${nextLen} after append`);
+    const cur = this._sockBitsForRead(entry);
+    const cap = entry.connected && entry.sharedKey
+      ? (this._sharedSockState(entry.sharedKey) || {}).cap || entry.cap
+      : entry.cap;
+    const nextLen = cur.length + bits.length;
+    if (nextLen > cap) {
+      throw Error(`sock overflow: cap ${cap} bit, would be ${nextLen} after append`);
     }
-    entry.bits = (entry.bits || '') + bits;
-    this._emitProbeForSock(name);
+    this._sockBitsWrite(entry, cur + bits, name);
   }
 
   _clearSock(name) {
+    this._flushNetworkSocketDetaches();
     const entry = this.socks.get(name);
     if (!entry) throw Error(`Undefined sock ${name}`);
-    entry.bits = '';
-    this._emitProbeForSock(name);
+    this._sockEnsureMutable(entry, name, 'clear');
+    this._sockBitsWrite(entry, '', name);
   }
 
   _inferSockAtomStaticBitWidth(atom) {
@@ -5469,13 +5557,13 @@ class Interpreter {
       const { start, end } = this.resolveBitRange(atom.bitRange);
       return end - start + 1;
     }
-    return (entry.bits || '').length;
+    return this._sockBitsForRead(entry).length;
   }
 
   _evalSockAtom(a, computeRefs) {
     const entry = this.socks.get(a.var);
     if (!entry) this._throwRuntime(`Undefined sock ${a.var}`, a, a.var.length);
-    let val = entry.bits || '';
+    let val = this._sockBitsForRead(entry);
     if (a.bitRange) {
       const { start, end } = this.resolveBitRange(a.bitRange);
       const n = end - start + 1;
@@ -10149,7 +10237,7 @@ if (this.isBuiltinDEMUX(name)) {
       
       for(const prop of properties){
         // Skip get> properties when collecting dependencies (they don't have expr)
-        if(!isGetRedirectProperty(prop.property) && !isGenericPoutRedirectProperty(prop.property) && prop.property !== 'mod>' && prop.property !== 'carry>' && prop.property !== 'over>' && prop.property !== 'out>'){
+        if(!isGetRedirectProperty(prop.property) && !isGenericPoutRedirectProperty(prop.property) && prop.property !== 'mod>' && prop.property !== 'carry>' && prop.property !== 'over>' && prop.property !== 'out>' && !prop.sockBind){
           this.collectExprDependencies(prop.expr, allDependencies, allWireDependencies);
         }
         
@@ -13379,6 +13467,15 @@ if (s.assignment) {
       
       // Skip get>, mod>, carry>, over>, out>, and pout> properties - they are processed after all properties are applied
       if(isGetRedirectProperty(property) || isGenericPoutRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>'){
+        continue;
+      }
+
+      if(prop.sockBind){
+        if(!this.componentPendingProperties.has(component)){
+          this.componentPendingProperties.set(component, {});
+        }
+        const pending = this.componentPendingProperties.get(component);
+        pending[property] = { sockBind: prop.sockBind, target: prop.target };
         continue;
       }
       
