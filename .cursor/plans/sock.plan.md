@@ -362,6 +362,8 @@ Conexiuni **socket partajate** cross-instance: `openSock <-`, `connSock ->`, `cl
 
 **1.4+c done:** [`network_socket_traffic_1.4c.plan.md`](network_socket_traffic_1.4c.plan.md) — panel Sockets în Network Traffic (teste 2517–2527).
 
+**Următor (chat demo):** [`network_chat_socket.plan.md`](network_chat_socket.plan.md) — doc `network-chat.md`, chat wave Inst1 server + Inst2–5 client, v1 hibrid socket uplink + pachete downlink.
+
 ---
 
 ## Faze amânate (1+a …)

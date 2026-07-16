@@ -646,6 +646,8 @@ View **Sockets** în panoul Network Traffic: log evenimente (Open/Connect/Append
 
 **Teste:** 2517–2527 (1978 total suite).
 
+**Următor:** [`network_chat_socket.plan.md`](network_chat_socket.plan.md) — demo chat multi-instancă (doc `network-chat.md`).
+
 ---
 
 ## Faze amânate
