@@ -15,7 +15,7 @@ todos:
     content: "Faza 1.3: protocol peek/consume sock (`=` vs `<<`), teste 2482–2488 — vezi sock_protocol_1.3.plan.md"
     status: completed
   - id: "1.4"
-    content: "Faza 1.4: bridge network→sock, teste 2487–2490"
+    content: "Faza 1.4: network socket connections (openSock/connSock) — vezi sock_network_1.4.plan.md"
     status: pending
 isProject: false
 ---
@@ -352,11 +352,13 @@ Guard pe trigger (`GT(BITSIZE(rx), …)`); `show(...)` cu paranteze, **în afara
 
 ---
 
-### Faza 1.4 — Bridge I/O → sock (~1 săpt.)
+### Faza 1.4 — Network socket connections (~1 săpt.)
 
-`comp [network]` RX → `rx << .wifi:get`; exemple keyboard/terminal.
+Conexiuni **socket partajate** cross-instance: `openSock <-`, `connSock ->`, `closeSock`, buffer bitstream unic. Pattern alternativ user-level: `rx << .net:get` + `pop` (fără cod nou).
 
-**Teste 2489–2492**.
+**Detaliu:** [`sock_network_1.4.plan.md`](sock_network_1.4.plan.md)
+
+**Teste 2489–2516** (legacy + wave).
 
 ---
 
@@ -414,6 +416,7 @@ Itemi **out of scope v1** — numerotare **1+a**, **1+b** doar aici:
 | Plan | Relație |
 |------|---------|
 | [`sock_protocol_1.3.plan.md`](sock_protocol_1.3.plan.md) | Detaliu Faza 1.3 — peek/consume, Wave streaming |
+| [`sock_network_1.4.plan.md`](sock_network_1.4.plan.md) | Detaliu Faza 1.4 — socket connections cross-instance |
 | [`schema_protocol_bridge.plan.md`](schema_protocol_bridge.plan.md) | După 1.3 |
 | [`network_component.plan.md`](network_component.plan.md) | Pattern 1.4 |
 | [`queue_stack.plan.md`](queue_stack.plan.md) | Comparație doc |
