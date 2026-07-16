@@ -5521,6 +5521,18 @@ class Interpreter {
     }
     const chunk = bits.substring(0, n);
     this._sockBitsWrite(entry, bits.substring(n), name);
+    if (entry.sharedKey && entry.role === 'consumer'
+      && typeof logNetworkSocketDataOp === 'function') {
+      const shared = this._sharedSockState(entry.sharedKey);
+      const bufLen = shared ? (shared.bits || '').length : bits.length - n;
+      logNetworkSocketDataOp({
+        kind: 'consume',
+        instanceId: this._instanceId,
+        sharedKey: entry.sharedKey,
+        bits: chunk,
+        bufferLenAfter: bufLen,
+      });
+    }
     return chunk;
   }
 
@@ -5540,6 +5552,18 @@ class Interpreter {
       throw Error(`sock overflow: cap ${cap} bit, would be ${nextLen} after append`);
     }
     this._sockBitsWrite(entry, cur + bits, name);
+    if (entry.sharedKey && entry.role === 'producer'
+      && typeof logNetworkSocketDataOp === 'function') {
+      const shared = this._sharedSockState(entry.sharedKey);
+      const bufLen = shared ? (shared.bits || '').length : nextLen;
+      logNetworkSocketDataOp({
+        kind: 'append',
+        instanceId: this._instanceId,
+        sharedKey: entry.sharedKey,
+        bits,
+        bufferLenAfter: bufLen,
+      });
+    }
   }
 
   _clearSock(name) {

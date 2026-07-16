@@ -214,7 +214,7 @@ Oscillator timing: `freq: 2` with `freqIsSec: 1` → **2 s** per cycle; `eachCyc
 
 ## Network Traffic panel
 
-Every `send` is logged globally (all instances). Open **Win → Network Traffic**. The **Id** column uses the same global packet ids as `:sendId` on the sender (see [Packet ids and `:sendId`](#packet-ids-and-sendid)).
+Every `send` is logged globally (all instances). Socket lifecycle and data ops (`Open`, `Connect`, `Append`, `Consume`, `Close`) are logged separately in the **sockets** view. Open **Win → Network Traffic** and toggle **packets** / **sockets**. Packet **Id** uses the same global ids as `:sendId` on the sender (see [Packet ids and `:sendId`](#packet-ids-and-sendid)).
 
 Full panel documentation: [network-traffic-panel.md](network-traffic-panel.md).
 

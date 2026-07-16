@@ -154,6 +154,126 @@ function _resetNetworkTrafficForTests() {
   _trafficLog.length = 0;
 }
 
+/* ================= NETWORK SOCKET TRAFFIC LOG ================= */
+
+let _socketTrafficId = 0;
+const _socketTrafficLog = [];
+const SOCKET_TRAFFIC_LOG_MAX = 500;
+const SOCKET_TRAFFIC_LOG_TRIM = 100;
+const SOCKET_TRAFFIC_TARGET_NONE = '\u2014';
+
+function _ensureSocketTrafficLogCapacity() {
+  if (_socketTrafficLog.length >= SOCKET_TRAFFIC_LOG_MAX) {
+    _socketTrafficLog.splice(0, SOCKET_TRAFFIC_LOG_TRIM);
+  }
+}
+
+function allocNetworkSocketEventId() {
+  return ++_socketTrafficId;
+}
+
+function _logSocketTrafficEntry({
+  event, source, target, channel, port, size, buf, status, bits,
+}) {
+  const eventId = allocNetworkSocketEventId();
+  const entry = {
+    id: eventId,
+    event: String(event),
+    source: _clampInstance(source),
+    target: target != null && target !== SOCKET_TRAFFIC_TARGET_NONE
+      ? (typeof target === 'number' ? _clampInstance(target) : target)
+      : SOCKET_TRAFFIC_TARGET_NONE,
+    channel: String(channel != null && channel !== '' ? channel : 'default'),
+    port: typeof port === 'number' ? port : parseInt(port, 10),
+    size: size != null ? size : 0,
+    buf: buf != null ? buf : 0,
+    status: String(status),
+    bits: bits != null ? bits : '',
+    ts: Date.now(),
+  };
+  _ensureSocketTrafficLogCapacity();
+  _socketTrafficLog.push(entry);
+  if (typeof notifyNetworkSocketTrafficPanel === 'function') {
+    notifyNetworkSocketTrafficPanel();
+  }
+  return entry;
+}
+
+function getNetworkSocketTrafficLog() {
+  return _socketTrafficLog.slice();
+}
+
+function clearNetworkSocketTrafficLog() {
+  _socketTrafficLog.length = 0;
+}
+
+function _resetNetworkSocketTrafficForTests() {
+  _socketTrafficId = 0;
+  _socketTrafficLog.length = 0;
+}
+
+function logNetworkSocketDataOp({ kind, instanceId, sharedKey, bits, bufferLenAfter }) {
+  if (!sharedKey) return null;
+  const rec = _socketPorts.get(sharedKey);
+  if (!rec || rec.state === 'closed') return null;
+  const chunk = bits || '';
+  const bufLen = bufferLenAfter != null ? bufferLenAfter : (rec.shared.bits || '').length;
+  const producerInst = rec.producer.instanceId;
+  const consumerInst = rec.consumer ? rec.consumer.instanceId : null;
+  const connected = rec.state === 'connected' && consumerInst != null;
+
+  if (kind === 'append') {
+    return _logSocketTrafficEntry({
+      event: 'Append',
+      source: producerInst,
+      target: connected ? consumerInst : SOCKET_TRAFFIC_TARGET_NONE,
+      channel: rec.channel,
+      port: rec.port,
+      size: chunk.length,
+      buf: bufLen,
+      status: connected ? 'Connected' : 'Open',
+      bits: chunk,
+    });
+  }
+  if (kind === 'consume') {
+    if (!consumerInst) return null;
+    return _logSocketTrafficEntry({
+      event: 'Consume',
+      source: consumerInst,
+      target: producerInst,
+      channel: rec.channel,
+      port: rec.port,
+      size: chunk.length,
+      buf: bufLen,
+      status: 'Connected',
+      bits: chunk,
+    });
+  }
+  return null;
+}
+
+function _logSocketLifecycleFromRec(rec, spec) {
+  if (!rec || !spec) return null;
+  const producerInst = rec.producer.instanceId;
+  const consumerInst = rec.consumer ? rec.consumer.instanceId : null;
+  let source = spec.source != null ? spec.source : producerInst;
+  let target = spec.target;
+  if (target === undefined) {
+    target = consumerInst != null ? consumerInst : SOCKET_TRAFFIC_TARGET_NONE;
+  }
+  return _logSocketTrafficEntry({
+    event: spec.event,
+    source,
+    target,
+    channel: rec.channel,
+    port: rec.port,
+    size: spec.size != null ? spec.size : 0,
+    buf: spec.buf != null ? spec.buf : (rec.shared.bits || '').length,
+    status: spec.status,
+    bits: spec.bits != null ? spec.bits : '',
+  });
+}
+
 function _networkWidthMismatchError(receiverInstanceId, receiverWidth, packetBits) {
   return `Network send: receiver instance ${receiverInstanceId} (${receiverWidth}bits) cannot accept package ${packetBits}bits. Width mismatch.`;
 }
@@ -328,6 +448,14 @@ function networkSocketOpen({ channel, instanceId, deviceId, port, sockName, cap 
     producer: { instanceId: inst, deviceId, sockName },
     consumer: null,
   });
+  _logSocketLifecycleFromRec(_socketPorts.get(key), {
+    event: 'Open',
+    source: inst,
+    target: SOCKET_TRAFFIC_TARGET_NONE,
+    size: 0,
+    buf: 0,
+    status: 'Open',
+  });
   return key;
 }
 
@@ -355,6 +483,14 @@ function networkSocketConnect({
   }
   rec.consumer = { instanceId: consumerInst, deviceId, sockName };
   rec.state = 'connected';
+  _logSocketLifecycleFromRec(rec, {
+    event: 'Connect',
+    source: consumerInst,
+    target: targetInst,
+    size: 0,
+    buf: (rec.shared.bits || '').length,
+    status: 'Connected',
+  });
   return key;
 }
 
@@ -388,13 +524,30 @@ function networkSocketResolveClose({ channel, instanceId, port, targetInstanceId
   return null;
 }
 
-function networkSocketClose({ channel, producerInstanceId, port, closedBy, initiatingInstanceId }) {
+function networkSocketClose({ channel, producerInstanceId, port, closedBy, initiatingInstanceId, closeReason }) {
   const p = _validateSocketPort(port);
   const ch = String(channel != null && channel !== '' ? channel : 'default');
   const key = networkSocketPortKey(ch, _clampInstance(producerInstanceId), p);
   const rec = _socketPorts.get(key);
   if (!rec || rec.state === 'closed') return null;
   const snapshot = rec.shared.bits || '';
+  const producerInst = rec.producer.instanceId;
+  const consumerInst = rec.consumer ? rec.consumer.instanceId : null;
+  const byConsumer = closedBy === 'consumer';
+  const statusLabel = (closeReason === 'abrupt' || !byConsumer) ? 'Abrupt' : 'Graceful';
+  const closeSource = byConsumer && consumerInst != null ? consumerInst : producerInst;
+  const closeTarget = byConsumer ? producerInst : (consumerInst != null ? consumerInst : SOCKET_TRAFFIC_TARGET_NONE);
+  _logSocketTrafficEntry({
+    event: 'Close',
+    source: closeSource,
+    target: closeTarget,
+    channel: rec.channel,
+    port: rec.port,
+    size: snapshot.length,
+    buf: 0,
+    status: statusLabel,
+    bits: snapshot,
+  });
   rec.shared.bits = '';
   rec.state = 'closed';
   const result = {
@@ -423,6 +576,7 @@ function networkSocketCloseForInstance(instanceId) {
         producerInstanceId: rec.producerInstanceId,
         port: rec.port,
         closedBy: rec.consumer && rec.consumer.instanceId === inst ? 'consumer' : 'producer',
+        closeReason: 'abrupt',
       });
     }
   }
@@ -439,6 +593,7 @@ function _resetNetworkBusForTests() {
   _channelIndex.clear();
   _socketPorts.clear();
   _pendingSockDetaches.clear();
+  _resetNetworkSocketTrafficForTests();
   _resetNetworkTrafficForTests();
 }
 
@@ -462,6 +617,13 @@ if (typeof module !== 'undefined' && module.exports) {
     clearNetworkTrafficLog,
     TRAFFIC_LOG_MAX,
     TRAFFIC_LOG_TRIM,
+    allocNetworkSocketEventId,
+    getNetworkSocketTrafficLog,
+    clearNetworkSocketTrafficLog,
+    logNetworkSocketDataOp,
+    SOCKET_TRAFFIC_LOG_MAX,
+    SOCKET_TRAFFIC_LOG_TRIM,
+    SOCKET_TRAFFIC_TARGET_NONE,
     networkSocketPortKey,
     networkSocketOpen,
     networkSocketConnect,
@@ -473,5 +635,6 @@ if (typeof module !== 'undefined' && module.exports) {
     isSocketPortOpen,
     _resetNetworkBusForTests,
     _resetNetworkTrafficForTests,
+    _resetNetworkSocketTrafficForTests,
   };
 }

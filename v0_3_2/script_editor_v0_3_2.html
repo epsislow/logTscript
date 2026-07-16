@@ -171,6 +171,39 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
 .network-traffic-col-channel { min-width:80px; }
 .network-traffic-col-size { width:44px; min-width:44px; }
 .network-traffic-col-status { width:76px; min-width:76px; }
+.network-traffic-col-event { width:72px; min-width:72px; }
+.network-traffic-col-port { width:44px; min-width:44px; }
+.network-traffic-col-buf { width:44px; min-width:44px; }
+.network-traffic-view-btn {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  width: 72px;
+  min-width: 72px;
+  max-width: 72px;
+  padding-left: 0;
+  padding-right: 0;
+  box-sizing: border-box;
+}
+.network-traffic-view--packets {
+  color: #8cf;
+  background: #102030;
+  border-color: #2a5070;
+}
+.network-traffic-view--packets:hover {
+  background: #183048;
+  border-color: #8cf;
+}
+.network-traffic-view--sockets {
+  color: #c8a0ff;
+  background: #221030;
+  border-color: #503070;
+}
+.network-traffic-view--sockets:hover {
+  background: #2e1840;
+  border-color: #c8a0ff;
+}
 .network-traffic-row { cursor:pointer; }
 .network-traffic-row:hover { background:#222; }
 .network-traffic-row--selected { background:#2a2a35; }
@@ -2973,20 +3006,13 @@ show(a,b,c)
       <div class="network-traffic-head">
         <h3 id="networkTrafficTitle">Network Traffic</h3>
         <div class="network-traffic-toolbar">
+          <button type="button" id="networkTrafficViewBtn" class="btn network-traffic-view-btn network-traffic-view--packets" title="Network traffic view: packets (click to switch to sockets)">packets</button>
           <button type="button" id="networkTrafficLiveBtn" class="btn" title="Pause live updates">Pause</button>
           <button type="button" id="networkTrafficClear" class="btn" title="Clear log">Clear</button>
         </div>
       </div>
       <div class="network-traffic-table-wrap">
         <table class="network-traffic-table" id="networkTrafficTable">
-          <colgroup>
-            <col class="network-traffic-col-id">
-            <col class="network-traffic-col-source">
-            <col class="network-traffic-col-target">
-            <col class="network-traffic-col-channel">
-            <col class="network-traffic-col-size">
-            <col class="network-traffic-col-status">
-          </colgroup>
           <thead>
             <tr id="networkTrafficHeaderRow"></tr>
             <tr id="networkTrafficFilterBar" class="network-traffic-filter-bar" style="display:none">

@@ -1854,6 +1854,30 @@ on: 1
     connSockNet(s2, s2.interp, 'chat', portBits || '00000001', '0001');
   }
 
+  function lastSocketTrafficEntry() {
+    const log = getNetworkSocketTrafficLog();
+    return log.length ? log[log.length - 1] : null;
+  }
+
+  function makeSocketTrafficEntries(n) {
+    const entries = [];
+    for (let i = 1; i <= n; i++) {
+      entries.push({
+        id: i,
+        event: i % 5 === 0 ? 'Close' : (i % 3 === 0 ? 'Append' : 'Open'),
+        source: ((i - 1) % 3) + 1,
+        target: i % 4 === 0 ? SOCKET_TRAFFIC_TARGET_NONE : 2,
+        channel: 'sock-ch',
+        port: 1 + (i % 3),
+        size: i % 2 === 0 ? 8 : 0,
+        buf: i,
+        status: i % 5 === 0 ? 'Graceful' : 'Open',
+        bits: '',
+      });
+    }
+    return entries;
+  }
+
   function regNetSockWave(legacyId, title, run) {
     reg(legacyId, 'network-sock', title, run);
     const waveMap = {
@@ -23329,6 +23353,153 @@ on:1 {
   h.assert('hdr parsed', s2.getWire(s2.interp, 'hdr'), SOCK_HDR_WIRE);
   h.assert('tail left', s2.getSockBits(s2.interp, 'chat'), SOCK_PKT_TAIL);
 }, { propagation: 'wave' });
+
+// --- Faza 1.4+c: network socket traffic log (panel Sockets view) ---
+
+reg(2517, 'network-socket-traffic', 'log — openSock Event Open Buf 0', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  s1.run(def + 'sock chat\n');
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  const e = lastSocketTrafficEntry();
+  h.assert('one entry', String(getNetworkSocketTrafficLog().length), '1');
+  h.assert('event Open', e.event, 'Open');
+  h.assert('buf 0', String(e.buf), '0');
+  h.assert('status Open', e.status, 'Open');
+  h.assert('source 1', String(e.source), '1');
+});
+
+reg(2518, 'network-socket-traffic', 'log — connSock Connect Connected', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(def + 'sock chat\n');
+  s2.run(def + 'sock chat\n');
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  connSockNet(s2, s2.interp, 'chat', '00000001', '0001');
+  const e = lastSocketTrafficEntry();
+  h.assert('event Connect', e.event, 'Connect');
+  h.assert('status Connected', e.status, 'Connected');
+  h.assert('source 2', String(e.source), '2');
+  h.assert('target 1', String(e.target), '1');
+});
+
+reg(2519, 'network-socket-traffic', 'log — consumer closeSock Graceful snapshotLen', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41');
+  closeSockNet(s2, s2.interp, '00000001');
+  const closeEntries = getNetworkSocketTrafficLog().filter((entry) => entry.event === 'Close');
+  h.assert('one close', String(closeEntries.length), '1');
+  h.assert('Graceful', closeEntries[0].status, 'Graceful');
+  h.assert('size 8', String(closeEntries[0].size), '8');
+  h.assert('bits snapshot', closeEntries[0].bits, '01000001');
+});
+
+reg(2520, 'network-socket-traffic', 'log — append and consume data events', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, 'chat << ^41');
+  s2.execStmts(s2.interp, '8wire a << chat./8');
+  const data = getNetworkSocketTrafficLog().filter((entry) => entry.event === 'Append' || entry.event === 'Consume');
+  h.assert('two data', String(data.length), '2');
+  h.assert('append', data[0].event, 'Append');
+  h.assert('consume', data[1].event, 'Consume');
+  h.assert('append target 2', String(data[0].target), '2');
+  h.assert('consume source 2', String(data[1].source), '2');
+});
+
+reg(2521, 'network-socket-traffic', 'log — unregister Close Abrupt', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  unregisterNetworkEndpoints(1);
+  const closeEntries = getNetworkSocketTrafficLog().filter((entry) => entry.event === 'Close');
+  h.assert('one close', String(closeEntries.length), '1');
+  h.assert('Abrupt', closeEntries[0].status, 'Abrupt');
+});
+
+reg(2522, 'network-socket-traffic', 'applySocketTrafficFilters — Event Append', function(h) {
+  const log = [
+    { id: 1, event: 'Open', source: 1, target: SOCKET_TRAFFIC_TARGET_NONE, channel: 'c', port: 1, size: 0, buf: 0, status: 'Open' },
+    { id: 2, event: 'Append', source: 1, target: 2, channel: 'c', port: 1, size: 8, buf: 8, status: 'Connected' },
+    { id: 3, event: 'Consume', source: 2, target: 1, channel: 'c', port: 1, size: 8, buf: 0, status: 'Connected' },
+  ];
+  const filtered = applySocketTrafficFilters(log, { event: 'Append' });
+  h.assert('one append', String(filtered.length), '1');
+  h.assert('id 2', String(filtered[0].id), '2');
+});
+
+reg(2523, 'network-socket-traffic', 'clear socket log independent of packet log', function(h) {
+  registerNetworkEndpoint({ instanceId: 1, deviceId: 'a', channel: 'demo', width: 8, length: 16 });
+  registerNetworkEndpoint({ instanceId: 2, deviceId: 'b', channel: 'demo', width: 8, length: 16 });
+  networkSend({ fromInstanceId: 1, fromDeviceId: 'a', channel: 'demo', packet: '01000001' });
+  networkSocketOpen({ channel: 'sock-demo', instanceId: 1, deviceId: '.n', port: 1, sockName: 'chat', cap: 1024 });
+  h.assert('packet log 1', String(getNetworkTrafficLog().length), '1');
+  h.assert('socket log 1', String(getNetworkSocketTrafficLog().length), '1');
+  clearNetworkSocketTrafficLog();
+  h.assert('socket empty', String(getNetworkSocketTrafficLog().length), '0');
+  h.assert('packet still 1', String(getNetworkTrafficLog().length), '1');
+});
+
+reg(2524, 'network-socket-traffic', 'log — pre-connect append Target dash Status Open', function(h) {
+  const def = netSockDef();
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(def + 'sock chat\n');
+  s2.run(def + 'sock chat\n');
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  s1.execStmts(s1.interp, 'chat << ^41');
+  const appendBefore = getNetworkSocketTrafficLog().filter((entry) => entry.event === 'Append');
+  h.assert('one append', String(appendBefore.length), '1');
+  h.assert('target dash', appendBefore[0].target, SOCKET_TRAFFIC_TARGET_NONE);
+  h.assert('status Open', appendBefore[0].status, 'Open');
+  connSockNet(s2, s2.interp, 'chat', '00000001', '0001');
+});
+
+reg(2525, 'network-socket-traffic', 'log — trim batch at 500 entries', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2);
+  for (let i = 0; i < 498; i++) {
+    s1.execStmts(s1.interp, 'chat << ^41');
+  }
+  let log = getNetworkSocketTrafficLog();
+  h.assert('len 500', String(log.length), '500');
+  h.assert('first id 1', String(log[0].id), '1');
+  s1.execStmts(s1.interp, 'chat << ^42');
+  log = getNetworkSocketTrafficLog();
+  h.assert('len 401', String(log.length), '401');
+  h.assert('no id 1', String(log.some((entry) => entry.id === 1)), 'false');
+  h.assert('has id 501', String(log.some((entry) => entry.id === 501)), 'true');
+});
+
+reg(2526, 'network-socket-traffic', 'getDisplayPage — socket entries page 0', function(h) {
+  const entries = makeSocketTrafficEntries(8);
+  const filtered = entries.sort((a, b) => b.id - a.id);
+  const page = getDisplayPage(filtered, 0);
+  h.assert('entry ids', page.entries.map((entry) => entry.id).join(','), '8,7,6,5,4');
+  h.assert('row start', String(page.rowStart), '1');
+  h.assert('row end', String(page.rowEnd), '5');
+  h.assert('shown', String(page.shown), '5');
+  h.assert('total', String(page.total), '8');
+});
+
+reg(2527, 'network-socket-traffic', 'applySocketTrafficFilters — Event Port Channel Status', function(h) {
+  const log = [
+    { id: 1, event: 'Open', source: 1, target: SOCKET_TRAFFIC_TARGET_NONE, channel: 'wifi', port: 1, size: 0, buf: 0, status: 'Open' },
+    { id: 2, event: 'Append', source: 1, target: 2, channel: 'wifi', port: 1, size: 8, buf: 8, status: 'Connected' },
+    { id: 3, event: 'Close', source: 2, target: 1, channel: 'eth', port: 2, size: 8, buf: 0, status: 'Graceful' },
+    { id: 4, event: 'Close', source: 1, target: 2, channel: 'wifi', port: 1, size: 0, buf: 0, status: 'Abrupt' },
+  ];
+  h.assert('event', applySocketTrafficFilters(log, { event: 'Close' }).map((entry) => entry.id).join(','), '3,4');
+  h.assert('port', applySocketTrafficFilters(log, { port: '2' }).map((entry) => entry.id).join(','), '3');
+  h.assert('channel', applySocketTrafficFilters(log, { channel: 'eth' }).map((entry) => entry.id).join(','), '3');
+  h.assert('status', applySocketTrafficFilters(log, { status: 'Abrupt' }).map((entry) => entry.id).join(','), '4');
+  h.assert('target dash', applySocketTrafficFilters(log, { target: '\u2014' }).map((entry) => entry.id).join(','), '1');
+});
 
 
   window.LogTScriptTestSuite = {

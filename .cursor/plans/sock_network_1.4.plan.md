@@ -302,9 +302,9 @@ Problema inițială (producer clear golește consumer mid-parse, rollback revive
 
 Consumer citește **doar când are trigger** (`on:1`, oscilator, switch). Backlog Wave: **1.4+b**.
 
-### R9 — Traffic panel ✅ amânat
+### R9 — Traffic panel ✅ done (1.4+c)
 
-Socket bytes **nu** apar în Network Traffic v1. Fază amânată: **1.4+c** (traffic panel / logging socket).
+Socket events apar în Network Traffic — view **sockets** (plan [`network_socket_traffic_1.4c.plan.md`](network_socket_traffic_1.4c.plan.md), teste 2517–2527).
 
 ### R10 — `openSock` / `connSock` ✅
 
@@ -404,7 +404,7 @@ Pinuri noi în `getDef()`:
 | G8 | closeSock producer | incorect; parțial-corect dacă producer sock gol |
 | G9 | Bind precondiție | `BITSIZE(sock) === 0` obligatoriu |
 | G10 | După closeSock | consumer păstrează snapshot; clear local permis doar **detached** |
-| G11 | Traffic panel | amânat **1.4+c** |
+| G11 | Traffic panel | **done** — view Sockets (1.4+c, teste 2517–2527) |
 | G12 | Teste | 2489–2516 (legacy + wave) |
 | G16 | Teste wave | perechi legacy/wave; `createSession({ propagation: 'wave' })` |
 | G17 | Doc exemple | `logts-play wave` + Load & Run verificat manual |
@@ -638,13 +638,23 @@ probe(rx)
 
 ---
 
+### Faza 1.4+c — Network Traffic panel (Sockets view) ✅ done
+
+View **Sockets** în panoul Network Traffic: log evenimente (Open/Connect/Append/Consume/Close), toggle unic packets/sockets, filtre ca la Packets.
+
+**Detaliu:** [`network_socket_traffic_1.4c.plan.md`](network_socket_traffic_1.4c.plan.md)
+
+**Teste:** 2517–2527 (1978 total suite).
+
+---
+
 ## Faze amânate
 
 | Fază | Conținut |
 |------|----------|
 | **1.4+a** | Multi-consumer (fan-out) pe același port |
 | **1.4+b** | Wave re-exec când append remote modifică sock consumer |
-| **1.4+c** | Traffic panel / logging pentru socket bytes |
+| **1.4+c** | ~~Traffic panel~~ — **done** (teste 2517–2527) |
 | **1.4+d** | Auto-connect la declarație (fără block manual `set=1`) |
 | **1.4+e** | `comp [network]` în board body cu socket lifecycle |
 | **1.4+f** | Notificare opțională consumer la append (probe refresh cross-tab) |

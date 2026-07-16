@@ -360,6 +360,8 @@ Conexiuni **socket partajate** cross-instance: `openSock <-`, `connSock ->`, `cl
 
 **Teste 2489–2516** (legacy + wave).
 
+**1.4+c done:** [`network_socket_traffic_1.4c.plan.md`](network_socket_traffic_1.4c.plan.md) — panel Sockets în Network Traffic (teste 2517–2527).
+
 ---
 
 ## Faze amânate (1+a …)
