@@ -18428,7 +18428,34 @@ Socket connections (\`openSock\`, \`connSock\`, \`closeSock\`, stream \`<<\` on 
 
 **Click a row** to expand bit data on **Append**, **Consume**, and **Close** (same wrap rules as packet payload).
 
-Pre-connect appends (producer buffer before \`connSock\`) log **Target** \`—\` and **Status** \`Open\`. Consumer **closeSock** → **Close** with **Graceful**; producer close or instance unregister → **Abrupt**.
+Pre-connect appends (producer buffer before \`connSock\`) log **Target** \`—\` and **Status** \`Open\`.
+
+### Who closed? (\`Close\` rows)
+
+Producer (\`openSock\`) and consumer (\`connSock\`) map to server/client roles. On a **Close** row:
+
+| Column | Meaning on **Close** |
+|--------|----------------------|
+| **Source** | Instance that **initiated** the close (\`closeSock\` or **Stop** on that slot) |
+| **Target** | Peer instance on the other end of the socket |
+| **Status** | **How** the session ended — see table below |
+
+| **Status** | Who / what | Typical **Source** |
+|------------|------------|-------------------|
+| **Graceful** | Consumer called \`closeSock\` (clean disconnect) | Consumer instance |
+| **Abrupt** | Producer called \`closeSock\` | Producer instance |
+| **Abrupt** | **Stop** on either instance (unregister tears down sockets) | Whichever instance was stopped |
+
+**Reading the log:**
+
+- **Graceful** → always the consumer (client) closed politely. **Source** = consumer, **Target** = producer.
+- **Abrupt** → not always the producer — check **Source**:
+  - **Source** = producer → producer \`closeSock\` or producer **Stop**
+  - **Source** = consumer → consumer **Stop** without a graceful \`closeSock\`
+
+**Status** = *how* (polite vs abrupt). **Source** = *who* triggered it. Compare **Source** with the earlier **Open** (producer) and **Connect** (consumer) rows on the same **Port** / **Channel** to see which role closed.
+
+See also [network.md — \`closeSock\`](network.md#example-d--closesock-consumer-graceful) and Example D (consumer graceful close).
 
 ---
 
@@ -18755,6 +18782,8 @@ Use **\`=\`** for \`port\`, \`target\`, \`set\`, \`closeSock\`; use **\`<-\` / \
 
 After **\`closeSock\`**: both ends **detached**; producer sock cleared; consumer keeps a **local snapshot**; reconnect requires \`BITSIZE(sock) === 0\` on both sides (\`chat << clear\` allowed only when detached).
 
+In **Win → Network Traffic** (view **sockets**), each close is logged as **Close**. Consumer \`closeSock\` → **Graceful**; producer \`closeSock\` or **Stop** on either instance → **Abrupt**. **Source** on the **Close** row is the instance that initiated the close — see [network-traffic-panel.md — Who closed?](network-traffic-panel.md#who-closed-close-rows).
+
 One socket operation per property block (\`openSock\` / \`connSock\` / \`closeSock\` / \`send\` / \`pop\` / \`clear\` are mutually exclusive).
 
 ### Example A — producer (single instance)
@@ -18809,6 +18838,8 @@ show(byte; u8)
 Inst 1: \`openSock\` + \`chat << ^41\`. Inst 2: \`connSock\` → \`BITSIZE(chat) = 8\` immediately.
 
 ### Example D — \`closeSock\` (consumer, graceful)
+
+Consumer disconnect: traffic log shows **Close**, **Source** = this instance, **Target** = producer, **Status** **Graceful**. Details: [network-traffic-panel.md — Who closed?](network-traffic-panel.md#who-closed-close-rows).
 
 \`\`\`logts-play wave
 comp [network] .net:

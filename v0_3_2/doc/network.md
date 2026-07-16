@@ -254,6 +254,8 @@ Use **`=`** for `port`, `target`, `set`, `closeSock`; use **`<-` / `->`** only f
 
 After **`closeSock`**: both ends **detached**; producer sock cleared; consumer keeps a **local snapshot**; reconnect requires `BITSIZE(sock) === 0` on both sides (`chat << clear` allowed only when detached).
 
+In **Win → Network Traffic** (view **sockets**), each close is logged as **Close**. Consumer `closeSock` → **Graceful**; producer `closeSock` or **Stop** on either instance → **Abrupt**. **Source** on the **Close** row is the instance that initiated the close — see [network-traffic-panel.md — Who closed?](network-traffic-panel.md#who-closed-close-rows).
+
 One socket operation per property block (`openSock` / `connSock` / `closeSock` / `send` / `pop` / `clear` are mutually exclusive).
 
 ### Example A — producer (single instance)
@@ -308,6 +310,8 @@ show(byte; u8)
 Inst 1: `openSock` + `chat << ^41`. Inst 2: `connSock` → `BITSIZE(chat) = 8` immediately.
 
 ### Example D — `closeSock` (consumer, graceful)
+
+Consumer disconnect: traffic log shows **Close**, **Source** = this instance, **Target** = producer, **Status** **Graceful**. Details: [network-traffic-panel.md — Who closed?](network-traffic-panel.md#who-closed-close-rows).
 
 ```logts-play wave
 comp [network] .net:
