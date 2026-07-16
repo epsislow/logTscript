@@ -5737,7 +5737,7 @@ class Interpreter {
     if (['NOT', 'AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR', 'EQ', 'LATCH',
          'LSHIFT', 'RSHIFT',
          'HIGH', 'LOW', 'ANY', 'ZERO', 'BITINDEX', 'ONEHOT',
-         'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE', 'WWIDTH',
+         'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE', 'WWIDTH', 'SOCKATTACHED',
          'REVERSE', 'LROTATE', 'RROTATE',
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
          'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ABS', 'NFORMAT', 'ISDIGIT',
@@ -8228,6 +8228,22 @@ if (this.isBuiltinDEMUX(name)) {
     const len = argValues[0].length;
     const w = bitIndexWidth(len);
     const v = binPadInt(len, w);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'SOCKATTACHED') {
+    if (args.length !== 1) fail('SOCKATTACHED expects 1 argument');
+    const a0 = args[0] && args[0][0];
+    if (!a0 || !a0.var || a0.property || a0.bitRange || a0.var.startsWith('.')) {
+      fail('SOCKATTACHED expects a sock name');
+    }
+    const sockName = a0.var;
+    const entry = this.socks.get(sockName);
+    if (!entry) fail(`Undefined sock ${sockName}`);
+    this._flushNetworkSocketDetaches();
+    const v = this._sockIsLiveConnected(entry) ? '1' : '0';
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -16749,6 +16765,7 @@ Interpreter.BUILTIN_DOC = {
   CNTONE:   ['CNTONE(Xbit) -> Ybit'],
   CNTZERO:  ['CNTZERO(Xbit) -> Ybit'],
   BITSIZE:  ['BITSIZE(Xbit) -> Ybit'],
+  SOCKATTACHED: ['SOCKATTACHED(sock) -> 1bit — 1 if sock is live-connected to network bus, else 0'],
   WWIDTH:   ['WWIDTH(X) -> Ybit — declared/static bit width of literal, wire, or expression'],
   REVERSE:  [
     'REVERSE(Xbit) -> Xbit',

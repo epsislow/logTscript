@@ -23502,6 +23502,232 @@ reg(2527, 'network-socket-traffic', 'applySocketTrafficFilters — Event Port Ch
 });
 
 
+// --- Network chat (socket uplink + packet downlink) ---
+
+const INLINE_CHAT_UP = `inline [protocol] .chatFrame:
+  def frameBody:
+    body ~b
+  out:
+    kind 8b
+    clientId 8b
+    lengthOf(frameBody) 8b
+    frameBody
+  :
+
+inline [protocol] .chatParse:
+  mode: parse
+  parseView: tree
+  out:
+    kind 8b
+    clientId 8b
+    nbytes 8b
+    withLength(body, nbytes b)
+  :`;
+
+const CHAT_JOIN_PKT = '000000010000001000000000';
+const CHAT_HI_PKT = '0000001000000010000100000110100001101001';
+
+const INLINE_CHAT_SERVER_INST2 = `comp [network] .net:
+  width: 136
+  length: 8
+  channel: 'chat-demo'
+  on: 1
+  :
+comp [network] .ns:
+  width: 136
+  length: 8
+  channel: 'chat-demo'
+  on: 1
+  :
+sock up2
+4wire readyToConnectToInst : 0000
+1wire client2wantsToJoin : 0
+1wire seen2 : 0
+1wire joinBroadcast : 0
+136wire joinLine2 : "*client 2 joined*"
+136wire leaveLine2 := "*client 2 left*"
+136wire prefix2 : "client2> "
+136wire chatLine : 0
+.ns:{ connSock -> up2
+  target = 0010
+  port = 0010
+  set = readyToConnectToInst.0 }
+comp [osc] .poll:
+  on: 1
+  :
+on:1 {
+  AND(.poll:get, NOT(.net:empty)),
+  client2wantsToJoin = 1,
+  .net:pop = 1,
+  .net:set = 1
+}
+on:1 {
+  client2wantsToJoin,
+  readyToConnectToInst.0 = 1,
+  client2wantsToJoin = 0
+}
+on:raise {
+  SOCKATTACHED(up2),
+  readyToConnectToInst.0 = 0,
+  joinBroadcast = 1
+}
+on:1 {
+  AND(.poll:get, joinBroadcast),
+  joinBroadcast = 0,
+  .net:send = joinLine2,
+  .net:set = 1,
+  seen2 = 1
+}
+on:1 {
+  AND(.poll:get, SOCKATTACHED(up2), GT(BITSIZE(up2), 011111)),
+  136wire parsed =: .chatParse { data << up2 },
+  8wire kind = parsed:kind,
+  1wire isChat = EQ(kind, \\2;8),
+  chatLine := prefix2 + parsed:body,
+  .net:send = chatLine,
+  .net:set = isChat
+}`;
+
+function setupChatUplink(clientSession, serverSession, portBits) {
+  const def = netSockDef('chat-demo');
+  const port = portBits || '0010';
+  if (!clientSession.interp?.socks?.has('toSrv')) {
+    clientSession.run(def + 'sock toSrv\n');
+  }
+  if (!serverSession.interp?.socks?.has('up2')) {
+    serverSession.run(def + 'sock up2\n');
+  }
+  openSockNet(clientSession, clientSession.interp, 'toSrv', port);
+  connSockNet(serverSession, serverSession.interp, 'up2', port, '0010');
+}
+
+reg(2528, 'socket-chat', 'SOCKATTACHED connected then unregister', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupChatUplink(s2, s1);
+  s1.execStmts(s1.interp, '1wire live = SOCKATTACHED(up2)');
+  s2.execStmts(s2.interp, '1wire live = SOCKATTACHED(toSrv)');
+  h.assert('server up', s1.getWire(s1.interp, 'live'), '1');
+  h.assert('client up', s2.getWire(s2.interp, 'live'), '1');
+  unregisterNetworkEndpoints(2);
+  s1.execStmts(s1.interp, '1wire live2 = SOCKATTACHED(up2)');
+  h.assert('server detached', s1.getWire(s1.interp, 'live2'), '0');
+});
+
+reg(2529, 'socket-chat', 'SOCKATTACHED producer and consumer', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupChatUplink(s2, s1);
+  s2.execStmts(s2.interp, '1wire live = SOCKATTACHED(toSrv)');
+  s1.execStmts(s1.interp, '1wire live = SOCKATTACHED(up2)');
+  h.assert('client producer', s2.getWire(s2.interp, 'live'), '1');
+  h.assert('server consumer', s1.getWire(s1.interp, 'live'), '1');
+  closeSockNet(s2, s2.interp, '0010');
+  s1.execStmts(s1.interp, '1wire live2 = SOCKATTACHED(up2)');
+  h.assert('server after close', s1.getWire(s1.interp, 'live2'), '0');
+});
+
+reg(2530, 'socket-chat', 'chatFrame chatParse round-trip CHAT body', function(h, session) {
+  const src = INLINE_CHAT_UP + `
+40wire pkt = .chatFrame { kind = \\2;8, clientId = \\2;8, body = ^6869 }
+40wire parsed = .chatParse { data = pkt }
+8wire k = parsed:kind
+8wire c = parsed:clientId
+16wire b = parsed:body`;
+  const { interp } = session.run(src);
+  h.assert('kind', session.getWire(interp, 'k'), '00000010');
+  h.assert('clientId', session.getWire(interp, 'c'), '00000010');
+  h.assert('body hi', session.getWire(interp, 'b'), '0110100001101001');
+});
+
+reg(2531, 'socket-chat', 'chatParse JOIN frame empty body', function(h, session) {
+  const src = INLINE_CHAT_UP + `
+24wire pkt = ${CHAT_JOIN_PKT}
+24wire parsed = .chatParse { data = pkt }
+8wire k = parsed:kind
+8wire c = parsed:clientId
+8wire n = parsed:nbytes`;
+  const { interp } = session.run(src);
+  h.assert('join kind', session.getWire(interp, 'k'), '00000001');
+  h.assert('join id', session.getWire(interp, 'c'), '00000010');
+  h.assert('join nbytes', session.getWire(interp, 'n'), '00000000');
+});
+
+reg(2532, 'socket-chat', 'uplink JOIN frame cross-instance', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(INLINE_CHAT_UP + '\n' + netSockDef('chat-demo') + 'sock up2\n');
+  setupChatUplink(s2, s1);
+  s2.execStmts(s2.interp, 'toSrv << ' + CHAT_JOIN_PKT);
+  s1.execStmts(s1.interp, '24wire parsed =: .chatParse { data << up2 }\n8wire k = parsed:kind\n8wire c = parsed:clientId');
+  h.assert('kind', s1.getWire(s1.interp, 'k'), '00000001');
+  h.assert('clientId', s1.getWire(s1.interp, 'c'), '00000010');
+});
+
+reg(2533, 'socket-chat', 'uplink CHAT hi cross-instance', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(INLINE_CHAT_UP + '\n' + netSockDef('chat-demo') + 'sock up2\n');
+  setupChatUplink(s2, s1);
+  s2.execStmts(s2.interp, 'toSrv << ' + CHAT_HI_PKT);
+  s1.execStmts(s1.interp, '40wire parsed =: .chatParse { data << up2 }\n8wire k = parsed:kind\n16wire b = parsed:body');
+  h.assert('kind chat', s1.getWire(s1.interp, 'k'), '00000010');
+  h.assert('body', s1.getWire(s1.interp, 'b'), '0110100001101001');
+});
+
+reg(2535, 'socket-chat', 'chatFrame body from local sock lineBuf', function(h, session) {
+  const src = INLINE_CHAT_UP + `
+sock lineBuf
+lineBuf << ^68
+lineBuf << ^69
+sock toSrv
+toSrv << .chatFrame { kind = \\2;8, clientId = \\2;8, body = lineBuf }
+40wire parsed = .chatParse { data = toSrv }
+16wire b = parsed:body`;
+  const { interp } = session.run(src);
+  h.assert('body hi', session.getWire(interp, 'b'), '0110100001101001');
+  h.assert('frame 40 bits', String(session.getSockLen(interp, 'toSrv')), '40');
+});
+
+reg(2536, 'socket-chat', 'hello frame direct sock append 64 bits', function(h, session) {
+  const src = INLINE_CHAT_UP + `
+sock lineBuf
+lineBuf << ^68
+lineBuf << ^65
+lineBuf << ^6C
+lineBuf << ^6C
+lineBuf << ^6F
+sock toSrv
+toSrv << .chatFrame { kind = \\2;8, clientId = \\2;8, body = lineBuf }`;
+  const { interp } = session.run(src);
+  h.assert('hello frame 64 bits', String(session.getSockLen(interp, 'toSrv')), '64');
+});
+
+reg(2534, 'socket-chat', 'downlink broadcast packet received', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(`comp [network] .net:
+  width: 136
+  length: 8
+  channel: 'chat-demo'
+  on: 1
+  :
+136wire joinPkt : "*client 2 joined*"
+`);
+  s2.run(`comp [network] .net:
+  width: 136
+  length: 8
+  channel: 'chat-demo'
+  on: 1
+  :
+`);
+  s1.execStmts(s1.interp, '.net:send = joinPkt\n.net:set = 1');
+  h.assert('rx not empty', s2.getCompProperty(s2.interp, '.net', 'empty'), '0');
+  s2.execStmts(s2.interp, '136wire rx = .net:get\n.net:{ pop = 1\n  set = 1 }');
+  h.assert('line starts star', s2.getWire(s2.interp, 'rx').slice(0, 8), '00101010');
+});
+
+
   window.LogTScriptTestSuite = {
     tests,
     runMap: null,

@@ -89,6 +89,28 @@ bs = BITSIZE(rx)
 show(bs)
 ```
 
+### `SOCKATTACHED(sock)`
+
+Returns **`1`** when the sock is **live-connected** on the network bus (`openSock` / `connSock`). Returns **`0`** after detach, `closeSock`, or peer **Stop**.
+
+```logts-play wave
+comp [network] .net:
+  channel: 'sock-demo'
+  on: 1
+  :
+
+sock chat
+
+.net:{ openSock <- chat
+  port = 1
+  set = 1 }
+
+1wire live = SOCKATTACHED(chat)
+show(live)
+```
+
+Server chat hub: poll `SOCKATTACHED(upN)` to detect client leave — [network-chat.md](network-chat.md).
+
 ---
 
 ## Show / peek tags

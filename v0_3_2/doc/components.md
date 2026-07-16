@@ -79,6 +79,7 @@ Instant built-in functions (`ADD`, `SUBTRACT`, …) without `comp`: [arithmetic.
 | `reg` | — | [reg.md](reg.md) |
 | `queue` | `fifo` | [queue.md](queue.md) |
 | `network` | — | [network.md](network.md) |
+| **Network chat** — multi-instance socket uplink + packet downlink | — | [network-chat.md](network-chat.md) |
 | `stack` | `lifo` | [stack.md](stack.md) |
 | `counter` | `=` | [counter.md](counter.md) |
 | `osc` | `~` | [oscillator.md](oscillator.md) |

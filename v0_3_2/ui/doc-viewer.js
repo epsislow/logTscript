@@ -137,6 +137,7 @@ const DOC_SECTIONS = [
       { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)', searchPrimary: 'on:' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
+      { file: 'network-chat.md', label: 'Network chat — socket uplink + packet downlink (wave)' },
       { file: 'slider.md', label: 'Slider component', searchPrimary: 'slider comp.slider doc(comp.slider) length text color orientation reversed size for nl' },
       { file: 'sock.md', label: 'Socket (`sock`) — dynamic bit stream', searchPrimary: 'sock' }
     ],

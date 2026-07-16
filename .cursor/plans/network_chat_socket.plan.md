@@ -4,22 +4,22 @@ overview: "Documentație tip Huffman v2 (network-chat.md): chat multi-instancă 
 todos:
   - id: phase-0-sockattached
     content: "Faza 0: builtin SOCKATTACHED(sock) + doc sock.md + teste 2528-2529"
-    status: pending
+    status: completed
   - id: phase-1-protocol
     content: "Faza 1: inline protocol .chatFrame/.chatParse + teste encode/format 2530-2531"
-    status: pending
+    status: completed
   - id: phase-2-server
     content: "Faza 2: script server Inst1 hibrid (uplink sock, downlink send, terminal, join/chat/leave)"
-    status: pending
+    status: completed
   - id: phase-3-client
     content: "Faza 3: script client Inst2-5 (toSrv sock, net RX, keyboard, Send, /instance/)"
-    status: pending
+    status: completed
   - id: phase-4-doc
     content: "Faza 4: network-chat.md (structură huffman-v2) + linkuri components/network"
-    status: pending
+    status: completed
   - id: phase-5-tests-regen
     content: "Faza 5: teste cross-instance 2532-2535, regen manifest/doc, suite 0 failed, verificare manuală"
-    status: pending
+    status: completed
 isProject: false
 ---
 

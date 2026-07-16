@@ -30,7 +30,9 @@ on:raise {
 |------|---------|
 | `on:<mode>` | When the block may run: `raise`, `edge`, or `1` |
 | `triggerExpr` | Expression whose **LSB** is observed for edges/level |
-| `assignment` | One or more assignments (`=`, `:=`, `=:`), mixed multi-target (`a, b = expr`), or component pin writes |
+| `assignment` | One or more assignments (`=`, `:=`, `=:`), mixed multi-target (`a, b = expr`), or **component pin writes** (`.comp:pin = expr`) |
+
+**Not** allowed inside `on:{ }`: a **property block** (`.comp:{ pin = …, set = 1 }`). Use separate pin writes — `.comp:send = pkt` then `.comp:set = 1` — or assign from a wire declared outside the block.
 
 The entire statement is **absent** while the trigger condition is false: neither the left-hand side nor the right-hand side runs (no LUT/mem side effects, no wire writes). When the trigger fires, **every** assignment in the block runs in order before any other propagation step. Suite tests **2123–2124**.
 
