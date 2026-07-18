@@ -12,18 +12,18 @@ Related: [assignment operators](assignment-operators.md) (`=`, `:=`, `=:`), [sho
 
 | Form | Example | Meaning |
 |------|---------|---------|
-| **Binary** | `1010` | Bits as written (only `0` and `1`) |
+| **Binary** | `1010` or `1010 0001` | Bits as written (only `0` and `1`; space may separate groups) |
 | **Decimal unsigned** | `\255` | Unsigned integer → minimal binary |
 | **Grouped literal** | `\2 \23 \242;8` or `\170 \187 \204;u8` | Multiple `\N` values + one `;tag` on the last atom |
 | **Decimal signed** | `\-3;s8` | Two's complement on **exactly** `W` bits (`;sW`) |
 | **Decimal unsigned width** | `\170;u8` | Unsigned integer on **exactly** `W` bits (`;uW`, 1..64) |
-| **Hex pattern** | `^FF` | Each hex digit → 4 bits (unsigned pattern) |
+| **Hex pattern** | `^FF` or `^F F` | Each hex digit → 4 bits (unsigned pattern); no space after `^` |
 | **Hex value signed** | `^-A;8` | Signed numeric value in hex + **explicit** width |
 | **Oct pattern** | `o^12` | Each oct digit → 3 bits (`0`–`7`) |
 | **Base32hex pattern** | `x^AB` | RFC 4648 §7 — each digit → 5 bits (`0`–`9`, `A`–`V`) |
 | **Crockford base32** | `xc^10` | Each digit → 5 bits (Crockford alphabet, no I/L/O/U) |
 | **Wire string** | `"Hello"` / `'Hi'` | One byte per character (8 bit), MSB-first in the wire |
-| **Logic** (ZSTATE) | `?10Z0` | Tristate `0` / `1` / `Z` / `X` |
+| **Logic** (ZSTATE) | `?10Z0` or `1 0 Z 0` | Tristate `0` / `1` / `Z` / `X` (space may separate groups) |
 | **Meta constant** | `/instance/` | Compile-time constant from the meta registry |
 
 Postfixes shared by several forms:
@@ -48,6 +48,7 @@ show(a)
 | Rule | Detail |
 |------|--------|
 | Digits | `0` and `1` only for pure binary |
+| Grouping | Optional **space** between groups: `1111 0111`, `1 1 1 1 0 1 1 1` (not tab) |
 | Width | Number of characters = number of bits |
 | Assignment | With `=`, wire width must match exactly |
 

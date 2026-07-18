@@ -53,7 +53,7 @@ The body statements themselves are **not** re-run as a script on each exec — o
 | `sum = .add:get` | wire assignment |
 | `4wire partial = .add:get` | wire declaration + initializer |
 | `.add:a = a` | connection to component input |
-| `.ram:{ adr = pcval set = 1 }` | property block (stateful components) |
+| `.ram:{ adr = pcval, set = 1 }` | property block (stateful components) |
 | `on:raise { clk, acc = ADD(acc, a) }` | conditional assignment (edge/level per mode) |
 
 **Not** re-executed on exec (elaboration only):
@@ -88,6 +88,22 @@ carry = .add:carry
 This matches how you would draw the circuit: wires exist continuously; exec updates values through them.
 
 **Sequential scratch logic** — reusing the same wire as a temporary in multiple assignment steps in one exec pass is not the intended model. Prefer direct combinational paths or stateful components (`reg`, `mem`, `counter`) when you need stored state between exec cycles.
+
+**Property blocks** — multiple pin assignments in one `:{ }` block. Properties may be separated by **commas** (trailing comma allowed, same as `on:{ }`), **newlines**, or **spaces**:
+
+```
+.ram:{ adr = pcval, set = 1, }
+.q:{ data = 1111 set = 1 }
+```
+
+Multi-line without commas remains valid:
+
+```
+.q:{
+  data = 1111
+  set = 1
+}
+```
 
 ---
 

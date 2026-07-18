@@ -6697,7 +6697,7 @@ The body statements themselves are **not** re-run as a script on each exec — o
 | \`sum = .add:get\` | wire assignment |
 | \`4wire partial = .add:get\` | wire declaration + initializer |
 | \`.add:a = a\` | connection to component input |
-| \`.ram:{ adr = pcval set = 1 }\` | property block (stateful components) |
+| \`.ram:{ adr = pcval, set = 1 }\` | property block (stateful components) |
 | \`on:raise { clk, acc = ADD(acc, a) }\` | conditional assignment (edge/level per mode) |
 
 **Not** re-executed on exec (elaboration only):
@@ -6732,6 +6732,22 @@ carry = .add:carry
 This matches how you would draw the circuit: wires exist continuously; exec updates values through them.
 
 **Sequential scratch logic** — reusing the same wire as a temporary in multiple assignment steps in one exec pass is not the intended model. Prefer direct combinational paths or stateful components (\`reg\`, \`mem\`, \`counter\`) when you need stored state between exec cycles.
+
+**Property blocks** — multiple pin assignments in one \`:{ }\` block. Properties may be separated by **commas** (trailing comma allowed, same as \`on:{ }\`), **newlines**, or **spaces**:
+
+\`\`\`
+.ram:{ adr = pcval, set = 1, }
+.q:{ data = 1111 set = 1 }
+\`\`\`
+
+Multi-line without commas remains valid:
+
+\`\`\`
+.q:{
+  data = 1111
+  set = 1
+}
+\`\`\`
 
 ---
 
@@ -24893,7 +24909,7 @@ Chip bodies follow the **global** propagation strategy (wave or legacy), unlike 
 |------|-----------|
 | **Chip definition body** | Uses wave scheduling when wave mode is active; legacy cascade otherwise. |
 | **External wires** (\`4wire r = .u1:sum\`) | Updated after chip exec / property block, like PCB pouts. |
-| **Property blocks** (\`.u1:{ a = … set = 1 }\`) | Same trigger semantics as PCB (\`on:1\`, \`on:raise\`, etc.). |
+| **Property blocks** (\`.u1:{ a = …, set = 1, }\`) | Same trigger semantics as PCB (\`on:1\`, \`on:raise\`, etc.); comma-separated properties, trailing comma allowed. |
 | **Nested chip instances** | Top-level chip types only; \`chip +[inner]\` inside a body is a parse error. |
 
 See chip tests **540–543** (legacy) and **556–557** (wave) in the test runner.
@@ -26685,18 +26701,18 @@ Related: [assignment operators](assignment-operators.md) (\`=\`, \`:=\`, \`=:\`)
 
 | Form | Example | Meaning |
 |------|---------|---------|
-| **Binary** | \`1010\` | Bits as written (only \`0\` and \`1\`) |
+| **Binary** | \`1010\` or \`1010 0001\` | Bits as written (only \`0\` and \`1\`; space may separate groups) |
 | **Decimal unsigned** | \`\\255\` | Unsigned integer → minimal binary |
 | **Grouped literal** | \`\\2 \\23 \\242;8\` or \`\\170 \\187 \\204;u8\` | Multiple \`\\N\` values + one \`;tag\` on the last atom |
 | **Decimal signed** | \`\\-3;s8\` | Two's complement on **exactly** \`W\` bits (\`;sW\`) |
 | **Decimal unsigned width** | \`\\170;u8\` | Unsigned integer on **exactly** \`W\` bits (\`;uW\`, 1..64) |
-| **Hex pattern** | \`^FF\` | Each hex digit → 4 bits (unsigned pattern) |
+| **Hex pattern** | \`^FF\` or \`^F F\` | Each hex digit → 4 bits (unsigned pattern); no space after \`^\` |
 | **Hex value signed** | \`^-A;8\` | Signed numeric value in hex + **explicit** width |
 | **Oct pattern** | \`o^12\` | Each oct digit → 3 bits (\`0\`–\`7\`) |
 | **Base32hex pattern** | \`x^AB\` | RFC 4648 §7 — each digit → 5 bits (\`0\`–\`9\`, \`A\`–\`V\`) |
 | **Crockford base32** | \`xc^10\` | Each digit → 5 bits (Crockford alphabet, no I/L/O/U) |
 | **Wire string** | \`"Hello"\` / \`'Hi'\` | One byte per character (8 bit), MSB-first in the wire |
-| **Logic** (ZSTATE) | \`?10Z0\` | Tristate \`0\` / \`1\` / \`Z\` / \`X\` |
+| **Logic** (ZSTATE) | \`?10Z0\` or \`1 0 Z 0\` | Tristate \`0\` / \`1\` / \`Z\` / \`X\` (space may separate groups) |
 | **Meta constant** | \`/instance/\` | Compile-time constant from the meta registry |
 
 Postfixes shared by several forms:
@@ -26721,6 +26737,7 @@ show(a)
 | Rule | Detail |
 |------|--------|
 | Digits | \`0\` and \`1\` only for pure binary |
+| Grouping | Optional **space** between groups: \`1111 0111\`, \`1 1 1 1 0 1 1 1\` (not tab) |
 | Width | Number of characters = number of bits |
 | Assignment | With \`=\`, wire width must match exactly |
 

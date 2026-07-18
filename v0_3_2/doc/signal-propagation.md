@@ -172,7 +172,7 @@ Chip bodies follow the **global** propagation strategy (wave or legacy), unlike 
 |------|-----------|
 | **Chip definition body** | Uses wave scheduling when wave mode is active; legacy cascade otherwise. |
 | **External wires** (`4wire r = .u1:sum`) | Updated after chip exec / property block, like PCB pouts. |
-| **Property blocks** (`.u1:{ a = … set = 1 }`) | Same trigger semantics as PCB (`on:1`, `on:raise`, etc.). |
+| **Property blocks** (`.u1:{ a = …, set = 1, }`) | Same trigger semantics as PCB (`on:1`, `on:raise`, etc.); comma-separated properties, trailing comma allowed. |
 | **Nested chip instances** | Top-level chip types only; `chip +[inner]` inside a body is a parse error. |
 
 See chip tests **540–543** (legacy) and **556–557** (wave) in the test runner.

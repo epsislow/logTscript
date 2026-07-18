@@ -2205,132 +2205,138 @@ parseBoardInstance() {
     return {};
   }
 
-  parsePropertyBlock(componentName) {
-    this.eat('SYM', '{');
-    
-    const properties = [];
-    const usedGetRedirects = new Set();
-    const usedGenericRedirects = new Set();
+  parsePropertyBlockItem(componentName, usedGetRedirects, usedGenericRedirects) {
     const REDIRECT_PROPS = new Set(['mod', 'carry', 'over', 'out']);
     const GENERIC_REDIRECT_PROPS = new Set(['front', 'top', 'empty', 'full', 'size', 'capacity', 'free']);
     const isGetRedirectProp = (name) => /^(2|3|4)?get$/.test(name);
-    
-    while (!(this.c.type === 'SYM' && this.c.value === '}')) {
-      if (this.c.type === 'EOL') {
-        this.c = this.t.get();
-        continue;
-      }
-      
-      if (this.c.type === 'EOF') {
-        throw Error(`Unexpected end of file in property block for ${componentName}`);
-      }
-      
-      if (this.c.type !== 'ID') {
-        throw Error(`Expected property name in property block at ${this.c.line}:${this.c.col}, got ${this.c.type} '${this.c.value}'`);
-      }
-      
-      const propName = this.c.value;
-      this.eat('ID');
 
-      // network socket bind: openSock <- name / connSock -> name
-      if (propName === 'openSock' && this.c.type === 'SYM' && this.c.value === '<-') {
-        this.eat('SYM', '<-');
-        const targetAtom = this.atom();
-        if (targetAtom.bitRange) {
-          throw Error(`Bit ranges not allowed in openSock<- at ${this.c.line}:${this.c.col}`);
-        }
-        if (!targetAtom.var || targetAtom.var.startsWith('.')) {
-          throw Error(`Invalid sock name for openSock<- at ${this.c.line}:${this.c.col}`);
-        }
-        properties.push({ property: 'openSock', sockBind: 'from', target: targetAtom, expr: null });
-        continue;
-      }
-      if (propName === 'connSock' && this.c.type === 'SYM' && this.c.value === '->') {
-        this.eat('SYM', '->');
-        const targetAtom = this.atom();
-        if (targetAtom.bitRange) {
-          throw Error(`Bit ranges not allowed in connSock-> at ${this.c.line}:${this.c.col}`);
-        }
-        if (!targetAtom.var || targetAtom.var.startsWith('.')) {
-          throw Error(`Invalid sock name for connSock-> at ${this.c.line}:${this.c.col}`);
-        }
-        properties.push({ property: 'connSock', sockBind: 'to', target: targetAtom, expr: null });
-        continue;
-      }
-      
-      // --- DRY redirect properties: get>/2get>/…, mod>, carry>, over>, out> ---
-      if ((isGetRedirectProp(propName) || REDIRECT_PROPS.has(propName) || GENERIC_REDIRECT_PROPS.has(propName)) && this.c.type === 'SYM' && this.c.value === '>') {
-        if (isGetRedirectProp(propName)) {
-          if (usedGetRedirects.has(propName)) {
-            throw Error(`Only one ${propName}> property allowed per property block at ${this.c.line}:${this.c.col}`);
-          }
-          usedGetRedirects.add(propName);
-        }
-        if (GENERIC_REDIRECT_PROPS.has(propName)) {
-          if (usedGenericRedirects.has(propName)) {
-            throw Error(`Only one ${propName}> property allowed per property block at ${this.c.line}:${this.c.col}`);
-          }
-          usedGenericRedirects.add(propName);
-        }
-
-        this.eat('SYM', '>');
-
-        if (this.c.type === 'SYM' && this.c.value === '=') {
-          this.eat('SYM', '=');
-        }
-
-        const targetAtom = this.atom();
-
-        if (targetAtom.bitRange) {
-          throw Error(`Bit ranges not allowed in ${propName}> property at ${this.c.line}:${this.c.col}`);
-        }
-
-        if (!targetAtom.var || targetAtom.var.startsWith('.')) {
-          throw Error(`Invalid target for ${propName}> property at ${this.c.line}:${this.c.col}`);
-        }
-
-        const enableSuffix = this.parseOptionalBusEnableSuffix();
-        properties.push({ property: propName + '>', target: targetAtom, expr: null, ...enableSuffix });
-        continue;
-      }
-      
-      // Generic pout> handler for PCB instances
-      if(this.c.type === 'SYM' && this.c.value === '>'){
-        this.eat('SYM', '>');
-
-        if(this.c.type === 'SYM' && this.c.value === '='){
-          this.eat('SYM', '=');
-        }
-
-        const targetAtom = this.atom();
-
-        if(targetAtom.bitRange){
-          throw Error(`Bit ranges not allowed in ${propName}>= property at ${this.c.line}:${this.c.col}`);
-        }
-
-        if(!targetAtom.var || targetAtom.var.startsWith('.')){
-          throw Error(`Invalid target for ${propName}>= property at ${this.c.line}:${this.c.col}`);
-        }
-
-        const enableSuffix = this.parseOptionalBusEnableSuffix();
-        properties.push({ property: 'pout>', poutName: propName, target: targetAtom, expr: null, ...enableSuffix });
-        continue;
-      }
-
-      this.eat('SYM', '=');
-      
-      const expr = this.expr();
-      
-      properties.push({ property: propName, expr });
+    if (this.c.type === 'EOF') {
+      throw Error(`Unexpected end of file in property block for ${componentName}`);
     }
-    
+
+    if (this.c.type !== 'ID') {
+      throw Error(`Expected property name in property block at ${this.c.line}:${this.c.col}, got ${this.c.type} '${this.c.value}'`);
+    }
+
+    const propName = this.c.value;
+    this.eat('ID');
+
+    if (propName === 'openSock' && this.c.type === 'SYM' && this.c.value === '<-') {
+      this.eat('SYM', '<-');
+      const targetAtom = this.atom();
+      if (targetAtom.bitRange) {
+        throw Error(`Bit ranges not allowed in openSock<- at ${this.c.line}:${this.c.col}`);
+      }
+      if (!targetAtom.var || targetAtom.var.startsWith('.')) {
+        throw Error(`Invalid sock name for openSock<- at ${this.c.line}:${this.c.col}`);
+      }
+      return { property: 'openSock', sockBind: 'from', target: targetAtom, expr: null };
+    }
+    if (propName === 'connSock' && this.c.type === 'SYM' && this.c.value === '->') {
+      this.eat('SYM', '->');
+      const targetAtom = this.atom();
+      if (targetAtom.bitRange) {
+        throw Error(`Bit ranges not allowed in connSock-> at ${this.c.line}:${this.c.col}`);
+      }
+      if (!targetAtom.var || targetAtom.var.startsWith('.')) {
+        throw Error(`Invalid sock name for connSock-> at ${this.c.line}:${this.c.col}`);
+      }
+      return { property: 'connSock', sockBind: 'to', target: targetAtom, expr: null };
+    }
+
+    if ((isGetRedirectProp(propName) || REDIRECT_PROPS.has(propName) || GENERIC_REDIRECT_PROPS.has(propName)) && this.c.type === 'SYM' && this.c.value === '>') {
+      if (isGetRedirectProp(propName)) {
+        if (usedGetRedirects.has(propName)) {
+          throw Error(`Only one ${propName}> property allowed per property block at ${this.c.line}:${this.c.col}`);
+        }
+        usedGetRedirects.add(propName);
+      }
+      if (GENERIC_REDIRECT_PROPS.has(propName)) {
+        if (usedGenericRedirects.has(propName)) {
+          throw Error(`Only one ${propName}> property allowed per property block at ${this.c.line}:${this.c.col}`);
+        }
+        usedGenericRedirects.add(propName);
+      }
+
+      this.eat('SYM', '>');
+
+      if (this.c.type === 'SYM' && this.c.value === '=') {
+        this.eat('SYM', '=');
+      }
+
+      const targetAtom = this.atom();
+
+      if (targetAtom.bitRange) {
+        throw Error(`Bit ranges not allowed in ${propName}> property at ${this.c.line}:${this.c.col}`);
+      }
+
+      if (!targetAtom.var || targetAtom.var.startsWith('.')) {
+        throw Error(`Invalid target for ${propName}> property at ${this.c.line}:${this.c.col}`);
+      }
+
+      const enableSuffix = this.parseOptionalBusEnableSuffix();
+      return { property: propName + '>', target: targetAtom, expr: null, ...enableSuffix };
+    }
+
+    if (this.c.type === 'SYM' && this.c.value === '>') {
+      this.eat('SYM', '>');
+
+      if (this.c.type === 'SYM' && this.c.value === '=') {
+        this.eat('SYM', '=');
+      }
+
+      const targetAtom = this.atom();
+
+      if (targetAtom.bitRange) {
+        throw Error(`Bit ranges not allowed in ${propName}>= property at ${this.c.line}:${this.c.col}`);
+      }
+
+      if (!targetAtom.var || targetAtom.var.startsWith('.')) {
+        throw Error(`Invalid target for ${propName}>= property at ${this.c.line}:${this.c.col}`);
+      }
+
+      const enableSuffix = this.parseOptionalBusEnableSuffix();
+      return { property: 'pout>', poutName: propName, target: targetAtom, expr: null, ...enableSuffix };
+    }
+
+    this.eat('SYM', '=');
+
+    const expr = this.expr();
+
+    return { property: propName, expr };
+  }
+
+  parsePropertyBlock(componentName) {
+    this.eat('SYM', '{');
+
+    const properties = [];
+    const usedGetRedirects = new Set();
+    const usedGenericRedirects = new Set();
+
+    while (true) {
+      while (this.c.type === 'EOL') this.c = this.t.get();
+      if (this.c.type === 'SYM' && this.c.value === '}') break;
+
+      properties.push(this.parsePropertyBlockItem(componentName, usedGetRedirects, usedGenericRedirects));
+
+      while (this.c.type === 'EOL') this.c = this.t.get();
+      if (this.c.type === 'SYM' && this.c.value === '}') break;
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        this.eat('SYM', ',');
+        continue;
+      }
+      if (this.c.type === 'ID') continue;
+      throw Error(`Expected ',' or '}' in property block for ${componentName} at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+
+    while (this.c.type === 'EOL') this.c = this.t.get();
     this.eat('SYM', '}');
-    
-    return { 
-      componentPropertyBlock: { 
-        component: componentName, 
-        properties 
-      } 
+
+    return {
+      componentPropertyBlock: {
+        component: componentName,
+        properties
+      }
     };
   }
 

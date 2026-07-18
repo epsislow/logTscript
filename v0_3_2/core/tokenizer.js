@@ -25,16 +25,54 @@ class Tokenizer {
   }
   token(type,value){ return new Token(type,value,this.line,this.col, this.file) }
 
-  _hexLiteralContinuesAfterWhitespace() {
+  _literalContinuesAfterSpace(isValidChar) {
+    if (this.peek() !== ' ') return false;
     let j = this.i + 1;
-    while (j < this.src.length && (this.src[j] === ' ' || this.src[j] === '\t')) j++;
+    while (j < this.src.length && this.src[j] === ' ') j++;
     if (j >= this.src.length) return false;
     const rest = this.src.slice(j);
     if (/^[A-Za-z_][A-Za-z0-9_]*\s*=/.test(rest)) return false;
-    if (!/[0-9A-Fa-f]/.test(this.src[j])) return false;
-    while (j < this.src.length && /[0-9A-Fa-f]/.test(this.src[j])) j++;
-    while (j < this.src.length && (this.src[j] === ' ' || this.src[j] === '\t')) j++;
-    return j < this.src.length && /[0-9A-Fa-f]/.test(this.src[j]);
+    return isValidChar(this.src[j]);
+  }
+
+  _appendSpacedLiteralSegments(initial, isValidChar) {
+    let value = initial;
+    while (this._literalContinuesAfterSpace(isValidChar)) {
+      this.next();
+      let segment = '';
+      while (!this.eof() && isValidChar(this.peek())) {
+        segment += this.next();
+      }
+      if (segment === '') break;
+      value += segment;
+    }
+    return value;
+  }
+
+  _tokenizeDigitStartedLiteral(v) {
+    if (/^[01][01XZ]*$/i.test(v)) {
+      v = this._appendSpacedLiteralSegments(v, (ch) => /[01XZ]/i.test(ch));
+      if (/^[01]+$/.test(v)) {
+        return this.token('BIN', v);
+      }
+      if (/^[01][01XZ]*$/i.test(v)) {
+        return this.token('LOGIC', v.toUpperCase());
+      }
+    }
+
+    if (/^[01]+$/.test(v)) {
+      return this.token('BIN', v);
+    }
+
+    if (/^[01][01XZ]*$/i.test(v)) {
+      return this.token('LOGIC', v.toUpperCase());
+    }
+
+    if (/^\d+$/.test(v)) {
+      return this.token('DEC', v);
+    }
+
+    throw Error(`Invalid numeric token '${v}' at ${this.file}: ${this.line}:${this.col}`);
   }
 
   skip(){
@@ -364,23 +402,7 @@ pushSource({ src, alias }) {
         return this.token('DEC', v);
       }
 
-      // If it's only 0s and 1s, treat as binary (for bit values)
-      // In NEXT context, we'll parse BIN tokens as decimal
-    if (/^[01]+$/.test(v)) {
-      return this.token('BIN', v);
-    }
-
-      // Logic literal starting with digit (e.g. 10Z) — MODE ZSTATE
-      if (/^[01][01XZ]*$/i.test(v)) {
-        return this.token('LOGIC', v.toUpperCase());
-      }
-
-      // Plain decimal number (fallback for any other digit string)
-      if (/^\d+$/.test(v)) {
-        return this.token('DEC', v);
-    }
-
-    throw Error(`Invalid numeric token '${v}' at ${this.file}: ${this.line}:${this.col}`);
+      return this._tokenizeDigitStartedLiteral(v);
   }
 
     if(c === '<') {
@@ -447,16 +469,12 @@ pushSource({ src, alias }) {
         this.next();
       }
       let hex = '';
-      while (!this.eof()) {
-        const peek = this.peek();
-        if (/[0-9A-Fa-f]/.test(peek)) {
-          hex += this.next();
-        } else if (peek === ' ' || peek === '\t') {
-          if (!this._hexLiteralContinuesAfterWhitespace()) break;
-          this.next();
-        } else {
-          break;
-        }
+      const isHexChar = (ch) => /[0-9A-Fa-f]/.test(ch);
+      while (!this.eof() && isHexChar(this.peek())) {
+        hex += this.next();
+      }
+      if (hex !== '') {
+        hex = this._appendSpacedLiteralSegments(hex, isHexChar);
       }
       if (signedNeg) {
         if (hex === '') {
@@ -512,17 +530,14 @@ pushSource({ src, alias }) {
       throw Error(`Invalid ${tokenType} literal at ${this.file}: ${this.line}:${this.col}`);
     }
     this.next();
-    let digits = '';
-    while (!this.eof()) {
-      const peek = this.peek();
-      if (isValidChar(peek)) {
-        digits += this.next();
-      } else if (peek === ' ' || peek === '\t') {
-        this.next();
-      } else {
-        break;
-      }
+    if (this.eof() || this.peek() === ' ') {
+      throw Error(`Invalid ${tokenType} literal at ${this.file}: ${this.line}:${this.col}`);
     }
+    let digits = '';
+    while (!this.eof() && isValidChar(this.peek())) {
+      digits += this.next();
+    }
+    digits = this._appendSpacedLiteralSegments(digits, isValidChar);
     if (digits === '') {
       throw Error(`Invalid ${tokenType} literal at ${this.file}: ${this.line}:${this.col}`);
     }

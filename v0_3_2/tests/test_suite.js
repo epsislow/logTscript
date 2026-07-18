@@ -23912,6 +23912,90 @@ flag = 1`;
   h.assert('top-level show snap=1', String(/snap \(1wire\) = 1/.test(lines[1])), 'true');
 }, { propagation: 'wave' });
 
+const PCB_COMMA_BLOCK = `pcb +[passthrough]:
+  4pin data
+  1pin set
+  4pout result
+  exec: set
+  on:1
+
+  result = data
+  :4bit result
+
+pcb [passthrough] .q::
+`;
+
+reg(2549, 'pcb', 'property block comma-separated inline', function(h, session) {
+  const { interp } = session.run(PCB_COMMA_BLOCK + '.q:{ data = 1111, set = 1 }');
+  h.assert('comma inline', session.getPcbPout(interp, '.q', 'result'), '1111');
+});
+
+reg(2550, 'pcb', 'property block trailing comma', function(h, session) {
+  const { interp } = session.run(PCB_COMMA_BLOCK + '.q:{ data = 1111, set = 1, }');
+  h.assert('trailing comma', session.getPcbPout(interp, '.q', 'result'), '1111');
+});
+
+reg(2551, 'pcb', 'property block comma inline equals multiline', function(h, session) {
+  const multiline = `.q:{
+  data = 1010
+  set = 1
+}`;
+  const inline = '.q:{ data = 1010, set = 1 }';
+  const r1 = session.run(PCB_COMMA_BLOCK + multiline);
+  const r2 = session.run(PCB_COMMA_BLOCK + inline);
+  h.assert('multiline', session.getPcbPout(r1.interp, '.q', 'result'), '1010');
+  h.assert('inline', session.getPcbPout(r2.interp, '.q', 'result'), '1010');
+});
+
+reg(2552, 'parser', 'property block rejects bare comma without property', function(h, session) {
+  h.assertThrows('empty item', function() {
+    session.parse(PCB_COMMA_BLOCK + '.q:{ data = 1111, , set = 1 }');
+  }, "Expected property name");
+});
+
+reg(2553, 'literals', 'spaced binary nibble groups', function(h, session) {
+  const { interp } = session.run('8wire a = 1111 0111');
+  h.assert('a', session.getWire(interp, 'a'), '11110111');
+});
+
+reg(2554, 'literals', 'spaced binary per-bit', function(h, session) {
+  const { interp } = session.run('8wire a = 1 1 1 1 0 1 1 1');
+  h.assert('a', session.getWire(interp, 'a'), '11110111');
+});
+
+reg(2555, 'literals', 'spaced hex ^F 7', function(h, session) {
+  const { interp } = session.run('8wire a = ^F 7');
+  h.assert('a', session.getWire(interp, 'a'), '11110111');
+});
+
+reg(2556, 'literals', 'spaced hex rejects space after caret', function(h, session) {
+  h.assertThrows('^ space', function() {
+    session.parse('8wire a = ^ F7');
+  }, 'Invalid hexadecimal literal');
+});
+
+reg(2557, 'literals', 'spaced logic literal 1 0 Z 0', function(h, session) {
+  const { interp } = session.run('MODE ZSTATE\n4wire w = 1 0 Z 0');
+  h.assert('w', session.getWire(interp, 'w'), '10Z0');
+}, { propagation: 'wave' });
+
+reg(2558, 'literals', 'spaced binary tab does not join', function(h, session) {
+  h.assertThrows('tab', function() {
+    session.run('8wire a = 1111\t0111');
+  }, "Invalid statement");
+});
+
+reg(2559, 'literals', 'grouped decimal backslash unchanged', function(h, session) {
+  const { interp } = session.run('4wire[2] v = \\2 \\3;4');
+  h.assert('elem0', session.getWire(interp, 'v').slice(0, 4), '0010');
+  h.assert('elem1', session.getWire(interp, 'v').slice(4, 8), '0011');
+});
+
+reg(2560, 'literals', 'spaced o^ oct literal', function(h, session) {
+  const { interp } = session.run('12wire a = o^12 34');
+  h.assert('a', session.getWire(interp, 'a'), '001010011100');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,
