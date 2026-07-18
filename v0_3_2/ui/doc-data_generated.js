@@ -18899,7 +18899,9 @@ Socket connections (\`openSock\`, \`connSock\`, \`closeSock\`, stream \`<<\` on 
 | **Id** | Monotonic event id (socket log only) |
 | **Event** | \`Open\` · \`Connect\` · \`Append\` · \`Consume\` · \`Close\` |
 | **Source** | Run instance that originated the event |
+| **SourceSock** | Sock name on the **Source** instance for this event |
 | **Target** | Peer instance, or \`—\` when not connected (e.g. pre-connect **Append**) |
+| **TargetSock** | Sock name on the **Target** instance, or \`—\` when no peer |
 | **Channel** | Socket channel name |
 | **Port** | Socket port number |
 | **Size** | Bit length moved in this event (payload or close snapshot) |
@@ -18981,7 +18983,9 @@ Click a column header to open the filter bar (\`>\` apply, \`x\` clear, **Esc** 
 | **Id** | Single id or range | \`23\` · \`1 - 20\` |
 | **Event** | Dropdown | \`Append\` · \`Close\` |
 | **Source** | Single or range | \`2\` · \`1 - 5\` |
+| **SourceSock** | Substring (case-insensitive) | \`chat\` · \`up\` |
 | **Target** | Instance, range, or \`—\` | \`—\` · \`2\` · \`1 - 3\` |
+| **TargetSock** | Substring (case-insensitive) | \`chat\` · \`srv\` |
 | **Port** | Single or range | \`1\` · \`1 - 10\` |
 | **Size** / **Buf** | Single or range | \`8\` · \`0 - 64\` |
 | **Channel** | Substring (case-insensitive) | \`demo\` |

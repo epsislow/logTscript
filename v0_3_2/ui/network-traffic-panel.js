@@ -17,7 +17,8 @@ function _emptyPacketFilters() {
 
 function _emptySocketFilters() {
   return {
-    id: '', event: '', source: '', target: '', channel: '', port: '', size: '', buf: '', status: '',
+    id: '', event: '', source: '', sourceSock: '', target: '', targetSock: '',
+    channel: '', port: '', size: '', buf: '', status: '',
   };
 }
 
@@ -456,7 +457,7 @@ function renderNetworkTrafficPanel() {
       const cell = _entryCellValue(entry, col.key);
       td.textContent = cell;
       td.className = 'network-traffic-col-' + col.key;
-      if (col.key === 'channel') td.title = cell;
+      if (col.key === 'channel' || col.key === 'sourceSock' || col.key === 'targetSock') td.title = cell;
       const statusCls = _statusCellClass(entry, col.key);
       if (statusCls) td.classList.add(statusCls);
       tr.appendChild(td);

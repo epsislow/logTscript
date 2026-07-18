@@ -23367,6 +23367,8 @@ reg(2517, 'network-socket-traffic', 'log — openSock Event Open Buf 0', functio
   h.assert('buf 0', String(e.buf), '0');
   h.assert('status Open', e.status, 'Open');
   h.assert('source 1', String(e.source), '1');
+  h.assert('sourceSock chat', e.sourceSock, 'chat');
+  h.assert('targetSock dash', e.targetSock, SOCKET_TRAFFIC_TARGET_NONE);
 });
 
 reg(2518, 'network-socket-traffic', 'log — connSock Connect Connected', function(h) {
@@ -23382,6 +23384,8 @@ reg(2518, 'network-socket-traffic', 'log — connSock Connect Connected', functi
   h.assert('status Connected', e.status, 'Connected');
   h.assert('source 2', String(e.source), '2');
   h.assert('target 1', String(e.target), '1');
+  h.assert('sourceSock chat', e.sourceSock, 'chat');
+  h.assert('targetSock chat', e.targetSock, 'chat');
 });
 
 reg(2519, 'network-socket-traffic', 'log — consumer closeSock Graceful snapshotLen', function(h) {
@@ -23409,6 +23413,8 @@ reg(2520, 'network-socket-traffic', 'log — append and consume data events', fu
   h.assert('consume', data[1].event, 'Consume');
   h.assert('append target 2', String(data[0].target), '2');
   h.assert('consume source 2', String(data[1].source), '2');
+  h.assert('append socks', data[0].sourceSock + '->' + data[0].targetSock, 'chat->chat');
+  h.assert('consume socks', data[1].sourceSock + '->' + data[1].targetSock, 'chat->chat');
 });
 
 reg(2521, 'network-socket-traffic', 'log — unregister Close Abrupt', function(h) {
@@ -23455,6 +23461,7 @@ reg(2524, 'network-socket-traffic', 'log — pre-connect append Target dash Stat
   const appendBefore = getNetworkSocketTrafficLog().filter((entry) => entry.event === 'Append');
   h.assert('one append', String(appendBefore.length), '1');
   h.assert('target dash', appendBefore[0].target, SOCKET_TRAFFIC_TARGET_NONE);
+  h.assert('targetSock dash', appendBefore[0].targetSock, SOCKET_TRAFFIC_TARGET_NONE);
   h.assert('status Open', appendBefore[0].status, 'Open');
   connSockNet(s2, s2.interp, 'chat', '00000001', '0001');
 });
@@ -23499,6 +23506,21 @@ reg(2527, 'network-socket-traffic', 'applySocketTrafficFilters — Event Port Ch
   h.assert('channel', applySocketTrafficFilters(log, { channel: 'eth' }).map((entry) => entry.id).join(','), '3');
   h.assert('status', applySocketTrafficFilters(log, { status: 'Abrupt' }).map((entry) => entry.id).join(','), '4');
   h.assert('target dash', applySocketTrafficFilters(log, { target: '\u2014' }).map((entry) => entry.id).join(','), '1');
+});
+
+reg(2543, 'network-socket-traffic', 'applySocketTrafficFilters — SourceSock TargetSock', function(h) {
+  const log = [
+    {
+      id: 1, event: 'Open', source: 1, sourceSock: 'srv', target: SOCKET_TRAFFIC_TARGET_NONE,
+      targetSock: SOCKET_TRAFFIC_TARGET_NONE, channel: 'c', port: 1, size: 0, buf: 0, status: 'Open',
+    },
+    {
+      id: 2, event: 'Connect', source: 2, sourceSock: 'cli', target: 1, targetSock: 'srv',
+      channel: 'c', port: 1, size: 0, buf: 0, status: 'Connected',
+    },
+  ];
+  h.assert('sourceSock cli', applySocketTrafficFilters(log, { sourceSock: 'cli' }).map((e) => e.id).join(','), '2');
+  h.assert('targetSock srv', applySocketTrafficFilters(log, { targetSock: 'srv' }).map((e) => e.id).join(','), '2');
 });
 
 

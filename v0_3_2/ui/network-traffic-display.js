@@ -181,7 +181,9 @@ const NETWORK_SOCKET_COLUMNS = [
   { key: 'id', label: 'Id', filterable: true, filterType: 'numeric' },
   { key: 'event', label: 'Event', filterable: true, filterType: 'select' },
   { key: 'source', label: 'Source', filterable: true, filterType: 'numeric' },
+  { key: 'sourceSock', label: 'SourceSock', filterable: true },
   { key: 'target', label: 'Target', filterable: true, filterType: 'socketTarget' },
+  { key: 'targetSock', label: 'TargetSock', filterable: true },
   { key: 'channel', label: 'Channel', filterable: true },
   { key: 'port', label: 'Port', filterable: true, filterType: 'numeric' },
   { key: 'size', label: 'Size', filterable: true, filterType: 'numeric' },
@@ -193,11 +195,14 @@ const SOCKET_EVENT_FILTER_OPTIONS = ['Open', 'Connect', 'Append', 'Consume', 'Cl
 const SOCKET_STATUS_FILTER_OPTIONS = ['Open', 'Connected', 'Graceful', 'Abrupt'];
 
 function socketTrafficCellValue(entry, column) {
+  const dash = typeof SOCKET_TRAFFIC_TARGET_NONE !== 'undefined' ? SOCKET_TRAFFIC_TARGET_NONE : '\u2014';
   switch (column) {
     case 'id': return String(entry.id);
     case 'event': return String(entry.event);
     case 'source': return String(entry.source);
+    case 'sourceSock': return entry.sourceSock != null ? String(entry.sourceSock) : dash;
     case 'target': return String(entry.target);
+    case 'targetSock': return entry.targetSock != null ? String(entry.targetSock) : dash;
     case 'channel': return String(entry.channel);
     case 'port': return String(entry.port);
     case 'size': return String(entry.size);
@@ -235,7 +240,7 @@ function applySocketTrafficFilters(log, filters) {
     }
     const targetParsed = parseSocketTargetFilter(f.target);
     if (targetParsed && !matchSocketTargetValue(entry.target, targetParsed)) return false;
-    for (const col of ['channel']) {
+    for (const col of ['channel', 'sourceSock', 'targetSock']) {
       const q = (f[col] || '').trim();
       if (!q) continue;
       const cell = socketTrafficCellValue(entry, col);

@@ -172,8 +172,33 @@ function allocNetworkSocketEventId() {
   return ++_socketTrafficId;
 }
 
+function _socketSockName(rec, instanceId) {
+  if (!rec || instanceId == null || instanceId === SOCKET_TRAFFIC_TARGET_NONE) {
+    return SOCKET_TRAFFIC_TARGET_NONE;
+  }
+  const inst = typeof instanceId === 'number' ? instanceId : parseInt(instanceId, 10);
+  if (isNaN(inst)) return SOCKET_TRAFFIC_TARGET_NONE;
+  if (rec.producer && rec.producer.instanceId === inst) {
+    return rec.producer.sockName || SOCKET_TRAFFIC_TARGET_NONE;
+  }
+  if (rec.consumer && rec.consumer.instanceId === inst) {
+    return rec.consumer.sockName || SOCKET_TRAFFIC_TARGET_NONE;
+  }
+  return SOCKET_TRAFFIC_TARGET_NONE;
+}
+
+function _socketSockNamesForTraffic(rec, source, target) {
+  const sourceSock = _socketSockName(rec, source);
+  let targetSock = SOCKET_TRAFFIC_TARGET_NONE;
+  if (target != null && target !== SOCKET_TRAFFIC_TARGET_NONE) {
+    targetSock = _socketSockName(rec, target);
+  }
+  return { sourceSock, targetSock };
+}
+
 function _logSocketTrafficEntry({
   event, source, target, channel, port, size, buf, status, bits,
+  sourceSock, targetSock,
 }) {
   const eventId = allocNetworkSocketEventId();
   const entry = {
@@ -182,6 +207,12 @@ function _logSocketTrafficEntry({
     source: _clampInstance(source),
     target: target != null && target !== SOCKET_TRAFFIC_TARGET_NONE
       ? (typeof target === 'number' ? _clampInstance(target) : target)
+      : SOCKET_TRAFFIC_TARGET_NONE,
+    sourceSock: sourceSock != null && sourceSock !== ''
+      ? String(sourceSock)
+      : SOCKET_TRAFFIC_TARGET_NONE,
+    targetSock: targetSock != null && targetSock !== ''
+      ? String(targetSock)
       : SOCKET_TRAFFIC_TARGET_NONE,
     channel: String(channel != null && channel !== '' ? channel : 'default'),
     port: typeof port === 'number' ? port : parseInt(port, 10),
@@ -223,10 +254,14 @@ function logNetworkSocketDataOp({ kind, instanceId, sharedKey, bits, bufferLenAf
   const connected = rec.state === 'connected' && consumerInst != null;
 
   if (kind === 'append') {
+    const socks = _socketSockNamesForTraffic(
+      rec, producerInst, connected ? consumerInst : SOCKET_TRAFFIC_TARGET_NONE);
     return _logSocketTrafficEntry({
       event: 'Append',
       source: producerInst,
       target: connected ? consumerInst : SOCKET_TRAFFIC_TARGET_NONE,
+      sourceSock: socks.sourceSock,
+      targetSock: socks.targetSock,
       channel: rec.channel,
       port: rec.port,
       size: chunk.length,
@@ -237,10 +272,13 @@ function logNetworkSocketDataOp({ kind, instanceId, sharedKey, bits, bufferLenAf
   }
   if (kind === 'consume') {
     if (!consumerInst) return null;
+    const socks = _socketSockNamesForTraffic(rec, consumerInst, producerInst);
     return _logSocketTrafficEntry({
       event: 'Consume',
       source: consumerInst,
       target: producerInst,
+      sourceSock: socks.sourceSock,
+      targetSock: socks.targetSock,
       channel: rec.channel,
       port: rec.port,
       size: chunk.length,
@@ -261,10 +299,13 @@ function _logSocketLifecycleFromRec(rec, spec) {
   if (target === undefined) {
     target = consumerInst != null ? consumerInst : SOCKET_TRAFFIC_TARGET_NONE;
   }
+  const socks = _socketSockNamesForTraffic(rec, source, target);
   return _logSocketTrafficEntry({
     event: spec.event,
     source,
     target,
+    sourceSock: socks.sourceSock,
+    targetSock: socks.targetSock,
     channel: rec.channel,
     port: rec.port,
     size: spec.size != null ? spec.size : 0,
@@ -554,10 +595,13 @@ function networkSocketClose({ channel, producerInstanceId, port, closedBy, initi
   const statusLabel = (closeReason === 'abrupt' || !byConsumer) ? 'Abrupt' : 'Graceful';
   const closeSource = byConsumer && consumerInst != null ? consumerInst : producerInst;
   const closeTarget = byConsumer ? producerInst : (consumerInst != null ? consumerInst : SOCKET_TRAFFIC_TARGET_NONE);
+  const socks = _socketSockNamesForTraffic(rec, closeSource, closeTarget);
   _logSocketTrafficEntry({
     event: 'Close',
     source: closeSource,
     target: closeTarget,
+    sourceSock: socks.sourceSock,
+    targetSock: socks.targetSock,
     channel: rec.channel,
     port: rec.port,
     size: snapshot.length,
