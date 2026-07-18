@@ -23727,6 +23727,88 @@ reg(2534, 'socket-chat', 'downlink broadcast packet received', function(h) {
   h.assert('line starts star', s2.getWire(s2.interp, 'rx').slice(0, 8), '00101010');
 });
 
+reg(2537, 'network-sock', 'SOCKMODE local producer consumer', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  s1.run(netSockDef() + 'sock chat\n');
+  s1.execStmts(s1.interp, '2wire mode = SOCKMODE(chat)');
+  h.assert('local both', s1.getWire(s1.interp, 'mode'), '11');
+  setupSockPair(s1, s2);
+  s1.execStmts(s1.interp, '2wire prod = SOCKMODE(chat)');
+  s2.execStmts(s2.interp, '2wire cons = SOCKMODE(chat)');
+  h.assert('producer append only', s1.getWire(s1.interp, 'prod'), '01');
+  h.assert('consumer consume only', s2.getWire(s2.interp, 'cons'), '10');
+});
+
+reg(2538, 'network-sock', 'SOCKPORT SOCKTARGET when attached', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2, 'sock-demo', '00000010');
+  s1.execStmts(s1.interp, `8wire port = SOCKPORT(chat)
+4wire target = SOCKTARGET(chat)`);
+  s2.execStmts(s2.interp, `8wire port = SOCKPORT(chat)
+4wire target = SOCKTARGET(chat)`);
+  h.assert('producer port 2', s1.getWire(s1.interp, 'port'), '00000010');
+  h.assert('consumer port 2', s2.getWire(s2.interp, 'port'), '00000010');
+  h.assert('producer target inst 1', s1.getWire(s1.interp, 'target'), '0001');
+  h.assert('consumer target inst 1', s2.getWire(s2.interp, 'target'), '0001');
+});
+
+reg(2539, 'network-sock', 'SOCKPORT SOCKTARGET zero when detached', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  s1.run(netSockDef() + 'sock chat\n');
+  s1.execStmts(s1.interp, `8wire port = SOCKPORT(chat)
+4wire target = SOCKTARGET(chat)
+2wire mode = SOCKMODE(chat)`);
+  h.assert('port zero', s1.getWire(s1.interp, 'port'), '00000000');
+  h.assert('target zero', s1.getWire(s1.interp, 'target'), '0000');
+  h.assert('local mode', s1.getWire(s1.interp, 'mode'), '11');
+});
+
+reg(2540, 'network-sock', 'doc(sock) attached producer and consumer', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  setupSockPair(s1, s2, 'sock-demo', '00000010');
+  s1.execStmts(s1.interp, 'doc(chat)');
+  s2.execStmts(s2.interp, 'doc(chat)');
+  const prodOut = s1.outLines(s1.interp);
+  const consOut = s2.outLines(s2.interp);
+  h.assert('producer role', String(prodOut.some(l => l.includes('Role: producer'))), 'true');
+  h.assert('consumer role', String(consOut.some(l => l.includes('Role: consumer'))), 'true');
+  h.assert('producer port', String(prodOut.some(l => l.includes('Port: 2'))), 'true');
+  h.assert('network comp', String(prodOut.some(l => l.includes('Network: .n'))), 'true');
+  h.assert('producer append', String(prodOut.some(l => l.includes('Append (sock <<): allowed'))), 'true');
+  h.assert('consumer consume', String(consOut.some(l => l.includes('Consume (wire << sock): allowed'))), 'true');
+  h.assert('target inst', String(consOut.some(l => l.includes('Target (producer inst): 1'))), 'true');
+  h.assert('no sockmode line', String(prodOut.some(l => l.startsWith('SOCKMODE:'))), 'false');
+});
+
+reg(2541, 'network-sock', 'doc(sock) local unattached', function(h, session) {
+  const out = session.runDoc('sock rx\ndoc(rx)');
+  h.assert('type line', out[0], '65536sock rx');
+  h.assert('blank after type', out[1], '');
+  h.assert('not attached', String(out.some(l => l.includes('Attached: no'))), 'true');
+  h.assert('consume allowed', String(out.some(l => l.includes('Consume (wire << sock): allowed'))), 'true');
+  h.assert('append allowed', String(out.some(l => l.includes('Append (sock <<): allowed'))), 'true');
+  h.assert('no sockattached line', String(out.some(l => l.startsWith('SOCKATTACHED:'))), 'false');
+  h.assert('no builtins footer', String(out.some(l => l.startsWith('Builtins:'))), 'false');
+});
+
+reg(2542, 'network-sock', 'doc(sock) lists defined socks with mode', function(h) {
+  const s1 = createSession({ instanceId: 1 });
+  const s2 = createSession({ instanceId: 2 });
+  const def = netSockDef();
+  s1.run(def + 'sock local\nsock chat\n');
+  s2.run(def + 'sock chat\n');
+  openSockNet(s1, s1.interp, 'chat', '00000001');
+  connSockNet(s2, s2.interp, 'chat', '00000001', '0001');
+  s1.execStmts(s1.interp, 'doc(sock)');
+  const out = s1.outLines(s1.interp);
+  h.assert('socks header', out[0], 'socks:');
+  h.assert('local both', String(out.some(l => l.includes('local — consume & append'))), 'true');
+  h.assert('chat append', String(out.some(l => l.includes('chat — append, attached'))), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

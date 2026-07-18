@@ -25140,6 +25140,89 @@ show(live)
 
 Server chat hub: poll \`SOCKATTACHED(upN)\` to detect client leave — [network-chat.md](network-chat.md).
 
+### \`SOCKMODE(sock)\`
+
+Returns **2 bits** describing which mutating operations are allowed on the sock:
+
+| Bit | Meaning |
+|-----|---------|
+| **bit 0** (left) | **Consume** — \`wire << sock./N\` (destructive read from front) |
+| **bit 1** (right) | **Append** — \`sock << …\` |
+
+| State | \`SOCKMODE\` | Notes |
+|-------|------------|-------|
+| Local / detached | \`11\` | Both peek/consume and append |
+| Connected **producer** (\`openSock <-\`) | \`01\` | Append only — see [network.md](network.md#permissions-connected) |
+| Connected **consumer** (\`connSock ->\`) | \`10\` | Consume only |
+
+\`\`\`logts-play wave
+comp [network] .net:
+  channel: 'sock-demo'
+  on: 1
+  :
+
+sock chat
+
+.net:{ openSock <- chat
+  port = 1
+  set = 1 }
+
+2wire mode = SOCKMODE(chat)
+show(mode)
+\`\`\`
+
+Run a consumer on another instance with \`connSock\` — producer stays \`01\`, consumer reports \`10\`.
+
+### \`SOCKPORT(sock)\` / \`SOCKTARGET(sock)\`
+
+When **\`SOCKATTACHED(sock) === 1\`**, return the network bind metadata:
+
+| Builtin | Width | Value |
+|---------|-------|-------|
+| \`SOCKPORT(sock)\` | 8 bit | Port number (\`1..255\`) |
+| \`SOCKTARGET(sock)\` | 4 bit | **Producer** instance id (same \`target\` as \`connSock\`) |
+
+When detached, both return **\`0\`**.
+
+\`\`\`logts-play wave
+comp [network] .net:
+  channel: 'sock-demo'
+  on: 1
+  :
+
+sock chat
+
+.net:{ target = 1
+  connSock -> chat
+  port = 2
+  set = 1 }
+
+8wire port = SOCKPORT(chat)
+4wire target = SOCKTARGET(chat)
+show(port)
+show(target)
+\`\`\`
+
+Producer on instance 1 with \`port = 2\` → \`SOCKPORT\` = \`00000010\`, \`SOCKTARGET\` = \`0001\` on both ends.
+
+### \`doc(sockName)\`
+
+| Form | Output |
+|------|--------|
+| \`doc(sock)\` | Lists all declared socks with mode: \`consume & append\`, \`consume\`, \`append\`, or \`locked\` |
+| \`doc(rx)\` | Full metadata for one sock |
+
+\`doc(rx)\` / \`doc(chat)\` prints capacity, length, attach state, and (when live-connected) network bind info: \`comp [network]\` instance, channel, role, port, target, peer, bus state, consume/append permissions.
+
+\`\`\`logts-play
+sock rx
+sock chat
+doc(sock)
+doc(rx)
+\`\`\`
+
+After \`openSock\` / \`connSock\`, \`doc(sock)\` shows \`append, attached\` on the producer and \`doc(chat)\` lists port, target, and permissions on each instance.
+
 ---
 
 ## Show / peek tags

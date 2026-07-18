@@ -422,6 +422,23 @@ function isSocketPortOpen(sharedKey) {
   return !!(rec && (rec.state === 'open' || rec.state === 'connected'));
 }
 
+function getNetworkSocketRecord(sharedKey) {
+  const rec = _socketPorts.get(sharedKey);
+  if (!rec || rec.state === 'closed') return null;
+  return {
+    channel: rec.channel,
+    port: rec.port,
+    producerInstanceId: rec.producerInstanceId,
+    producerDeviceId: rec.producer.deviceId,
+    producerSockName: rec.producer.sockName,
+    consumerInstanceId: rec.consumer ? rec.consumer.instanceId : 0,
+    consumerDeviceId: rec.consumer ? rec.consumer.deviceId : null,
+    consumerSockName: rec.consumer ? rec.consumer.sockName : null,
+    state: rec.state,
+    sharedCap: rec.shared ? rec.shared.cap : 0,
+  };
+}
+
 function networkSocketOpen({ channel, instanceId, deviceId, port, sockName, cap }) {
   const inst = _clampInstance(instanceId);
   const p = _validateSocketPort(port);
@@ -633,6 +650,7 @@ if (typeof module !== 'undefined' && module.exports) {
     applyNetworkSocketPendingDetaches,
     getSharedSockState,
     isSocketPortOpen,
+    getNetworkSocketRecord,
     _resetNetworkBusForTests,
     _resetNetworkTrafficForTests,
     _resetNetworkSocketTrafficForTests,

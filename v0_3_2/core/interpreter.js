@@ -5392,6 +5392,126 @@ class Interpreter {
     return !!(entry && entry.connected && entry.sharedKey && this._sharedSockState(entry.sharedKey));
   }
 
+  _resolveSockBuiltinEntry(args, name, fail) {
+    if (args.length !== 1) fail(`${name} expects 1 argument`);
+    const a0 = args[0] && args[0][0];
+    if (!a0 || !a0.var || a0.property || a0.bitRange || a0.var.startsWith('.')) {
+      fail(`${name} expects a sock name`);
+    }
+    const sockName = a0.var;
+    const entry = this.socks.get(sockName);
+    if (!entry) fail(`Undefined sock ${sockName}`);
+    return { sockName, entry };
+  }
+
+  _sockNetworkRecord(entry) {
+    if (!entry || !entry.sharedKey || typeof getNetworkSocketRecord !== 'function') return null;
+    return getNetworkSocketRecord(entry.sharedKey);
+  }
+
+  _sockModeBits(entry) {
+    if (this._sockIsLiveConnected(entry)) {
+      if (entry.role === 'producer') return '01';
+      if (entry.role === 'consumer') return '10';
+    }
+    return '11';
+  }
+
+  _findCompNameByDeviceId(deviceId) {
+    if (deviceId == null) return null;
+    for (const [compName, comp] of this.components) {
+      if (!comp.deviceIds || comp.deviceIds.length === 0) continue;
+      if (comp.deviceIds[0] === deviceId) {
+        return compName.startsWith('.') ? compName : `.${compName}`;
+      }
+    }
+    return null;
+  }
+
+  _sockModeLabel(mode) {
+    const consume = mode[0] === '1';
+    const append = mode[1] === '1';
+    if (consume && append) return 'consume & append';
+    if (consume) return 'consume';
+    if (append) return 'append';
+    return 'locked';
+  }
+
+  _getSockListDocLines() {
+    this._flushNetworkSocketDetaches();
+    const lines = ['socks:'];
+    if (this.socks.size === 0) {
+      lines.push('(none)');
+      return lines;
+    }
+    for (const [sockName] of this.socks) {
+      const entry = this.socks.get(sockName);
+      const mode = this._sockModeBits(entry);
+      const label = this._sockModeLabel(mode);
+      const attached = this._sockIsLiveConnected(entry) ? ', attached' : '';
+      lines.push(`${sockName} — ${label}${attached}`);
+    }
+    return lines;
+  }
+
+  _getSockDocLines(sockName) {
+    this._flushNetworkSocketDetaches();
+    const entry = this.socks.get(sockName);
+    if (!entry) return [`${sockName}: undefined sock`];
+
+    const lines = [];
+    const cap = entry.cap;
+    const len = this._sockBitsForRead(entry).length;
+    const typeLabel = entry.type || `${cap}sock`;
+    const mode = this._sockModeBits(entry);
+    const consumeOk = mode[0] === '1';
+    const appendOk = mode[1] === '1';
+    const live = this._sockIsLiveConnected(entry);
+
+    lines.push(`${typeLabel} ${sockName}`);
+    lines.push('');
+    lines.push(`Capacity: ${cap} bit`);
+    lines.push(`Length: ${len} bit`);
+
+    if (live) {
+      const rec = this._sockNetworkRecord(entry);
+      const deviceId = entry.role === 'producer' ? rec.producerDeviceId : rec.consumerDeviceId;
+      const netComp = this._findCompNameByDeviceId(deviceId);
+      const peerInst = entry.role === 'producer'
+        ? rec.consumerInstanceId
+        : rec.producerInstanceId;
+
+      lines.push('Attached: yes (live)');
+      if (netComp) lines.push(`Network: ${netComp} (comp [network])`);
+      if (rec.channel) lines.push(`Channel: ${rec.channel}`);
+      lines.push(`Role: ${entry.role} (${entry.role === 'producer' ? 'openSock <-' : 'connSock ->'})`);
+      lines.push(`This instance: ${this._instanceId}`);
+      lines.push(`Port: ${rec.port} (SOCKPORT=${rec.port.toString(2).padStart(8, '0')})`);
+      lines.push(`Target (producer inst): ${rec.producerInstanceId} (SOCKTARGET=${rec.producerInstanceId.toString(2).padStart(4, '0')})`);
+      lines.push(`Peer instance: ${peerInst || '—'}`);
+      lines.push(`Bus state: ${rec.state}`);
+      if (rec.sharedCap) lines.push(`Shared buffer cap: ${rec.sharedCap} bit`);
+      lines.push(`Producer sock: inst ${rec.producerInstanceId} / ${rec.producerSockName}`);
+      if (rec.consumerSockName) {
+        lines.push(`Consumer sock: inst ${rec.consumerInstanceId} / ${rec.consumerSockName}`);
+      } else {
+        lines.push('Consumer sock: — (waiting for connSock)');
+      }
+      lines.push(`Consume (wire << sock): ${consumeOk ? 'allowed' : 'not allowed'}`);
+      lines.push(`Append (sock <<): ${appendOk ? 'allowed' : 'not allowed'}`);
+    } else if (entry.socketDetached) {
+      lines.push('Attached: no (detached snapshot)');
+      lines.push(`Consume (wire << sock): ${consumeOk ? 'allowed' : 'not allowed'}`);
+      lines.push(`Append (sock <<): ${appendOk ? 'allowed' : 'not allowed'}`);
+      lines.push(`Clear local buffer: ${sockName} << clear (when BITSIZE=0 required before reconnect)`);
+    } else {
+      lines.push('Attached: no');
+      lines.push('Consume (wire << sock): allowed');
+      lines.push('Append (sock <<): allowed');
+    }
+    return lines;
+  }
+
   _sockBitsForRead(entry) {
     if (!entry) return '';
     if (entry.connected && entry.sharedKey && !this._sharedSockState(entry.sharedKey)) {
@@ -5737,7 +5857,8 @@ class Interpreter {
     if (['NOT', 'AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR', 'EQ', 'LATCH',
          'LSHIFT', 'RSHIFT',
          'HIGH', 'LOW', 'ANY', 'ZERO', 'BITINDEX', 'ONEHOT',
-         'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE', 'WWIDTH', 'SOCKATTACHED',
+         'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE', 'WWIDTH',
+         'SOCKATTACHED', 'SOCKMODE', 'SOCKPORT', 'SOCKTARGET',
          'REVERSE', 'LROTATE', 'RROTATE',
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
          'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ABS', 'NFORMAT', 'ISDIGIT',
@@ -8234,16 +8355,46 @@ if (this.isBuiltinDEMUX(name)) {
   }
 
   if (name === 'SOCKATTACHED') {
-    if (args.length !== 1) fail('SOCKATTACHED expects 1 argument');
-    const a0 = args[0] && args[0][0];
-    if (!a0 || !a0.var || a0.property || a0.bitRange || a0.var.startsWith('.')) {
-      fail('SOCKATTACHED expects a sock name');
-    }
-    const sockName = a0.var;
-    const entry = this.socks.get(sockName);
-    if (!entry) fail(`Undefined sock ${sockName}`);
+    const { entry } = this._resolveSockBuiltinEntry(args, 'SOCKATTACHED', fail);
     this._flushNetworkSocketDetaches();
     const v = this._sockIsLiveConnected(entry) ? '1' : '0';
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'SOCKMODE') {
+    const { entry } = this._resolveSockBuiltinEntry(args, 'SOCKMODE', fail);
+    this._flushNetworkSocketDetaches();
+    const v = this._sockModeBits(entry);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'SOCKPORT') {
+    const { entry } = this._resolveSockBuiltinEntry(args, 'SOCKPORT', fail);
+    this._flushNetworkSocketDetaches();
+    let port = 0;
+    if (this._sockIsLiveConnected(entry)) {
+      const rec = this._sockNetworkRecord(entry);
+      if (rec) port = rec.port;
+    }
+    const v = port.toString(2).padStart(8, '0');
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'SOCKTARGET') {
+    const { entry } = this._resolveSockBuiltinEntry(args, 'SOCKTARGET', fail);
+    this._flushNetworkSocketDetaches();
+    let target = 0;
+    if (this._sockIsLiveConnected(entry)) {
+      const rec = this._sockNetworkRecord(entry);
+      if (rec) target = rec.producerInstanceId;
+    }
+    const v = target.toString(2).padStart(4, '0');
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -10074,6 +10225,22 @@ if (this.isBuiltinDEMUX(name)) {
       if (inlineInst) {
         alias = name;
         name = 'inline.' + inlineInst.kind;
+      }
+
+      if (name === 'sock' || (this.isSock(name) && !this.socks.has(name))) {
+        const sockLines = this._getSockListDocLines();
+        for (const line of sockLines) {
+          this.out.push(line);
+        }
+        return;
+      }
+
+      if (this.socks.has(name)) {
+        const sockLines = this._getSockDocLines(name);
+        for (const line of sockLines) {
+          this.out.push(line);
+        }
+        return;
       }
       
       if(alias.indexOf('_') > 0) {
@@ -16766,6 +16933,9 @@ Interpreter.BUILTIN_DOC = {
   CNTZERO:  ['CNTZERO(Xbit) -> Ybit'],
   BITSIZE:  ['BITSIZE(Xbit) -> Ybit'],
   SOCKATTACHED: ['SOCKATTACHED(sock) -> 1bit — 1 if sock is live-connected to network bus, else 0'],
+  SOCKMODE: ['SOCKMODE(sock) -> 2bit — bit0 consume (wire << sock), bit1 append (sock <<); local/detached 11, producer 01, consumer 10'],
+  SOCKPORT: ['SOCKPORT(sock) -> 8bit — network port when SOCKATTACHED, else 0'],
+  SOCKTARGET: ['SOCKTARGET(sock) -> 4bit — producer instance id when SOCKATTACHED, else 0'],
   WWIDTH:   ['WWIDTH(X) -> Ybit — declared/static bit width of literal, wire, or expression'],
   REVERSE:  [
     'REVERSE(Xbit) -> Xbit',
@@ -16838,6 +17008,7 @@ Interpreter.getDocIndexLines = function() {
     '  schema — semantic schemas; schema.name — definition (e.g. schema.opcode)',
     '  .inst — inline instance (e.g. .myisa)',
     '  Name — builtin or user function (OR, ADD, myFunc, …)',
+    '  sockName — sock instance (e.g. doc(rx)); doc(sock) — list declared socks',
     '  show, peek, probe, watch, Zlist, deps — debug statements',
   ];
 };
