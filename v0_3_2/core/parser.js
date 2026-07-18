@@ -2021,10 +2021,14 @@ parseBoardInstance() {
   }
 
   parseConditionalBodyItem(onMode) {
+    if (this.c.type === 'KEYWORD') {
+      if (this.c.value === 'show') return this.show();
+      if (this.c.value === 'peek') return this.peek();
+    }
     if (this.c.type === 'TYPE') {
       const varResult = this.var();
       if (!varResult.expr) {
-        throw Error(`on:${onMode} body must contain an assignment at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        throw Error(`on:${onMode} body must contain an assignment, show(...), or peek(...) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
       return {
         decls: varResult.decls,
@@ -2042,7 +2046,7 @@ parseBoardInstance() {
     }
     const assignResult = this.assignment();
     if (!assignResult || !assignResult.assignment) {
-      throw Error(`on:${onMode} body must contain an assignment at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      throw Error(`on:${onMode} body must contain an assignment, show(...), or peek(...) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     return { assignment: assignResult.assignment };
   }
@@ -2058,7 +2062,7 @@ parseBoardInstance() {
     const triggerExpr = this.expr();
     while (this.c.type === 'EOL') this.c = this.t.get();
     if (this.c.type !== 'SYM' || this.c.value !== ',') {
-      throw Error(`Expected ',' between trigger and assignment in on:${onMode} { } at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      throw Error(`Expected ',' between trigger and body in on:${onMode} { } at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     this.eat('SYM', ',');
     const body = [];
@@ -2074,7 +2078,7 @@ parseBoardInstance() {
       this.eat('SYM', ',');
     }
     if (body.length === 0) {
-      throw Error(`on:${onMode} body must contain at least one assignment at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      throw Error(`on:${onMode} body must contain at least one item at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     while (this.c.type === 'EOL') this.c = this.t.get();
     this.eat('SYM', '}');

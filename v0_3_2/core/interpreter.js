@@ -14385,7 +14385,11 @@ if (s.assignment) {
     this._executingConditionalAssignment = true;
     try {
       for (const item of body) {
-        if (item.assignment) {
+        if (item.show) {
+          this._execShowImmediate({ show: item.show }, true);
+        } else if (item.peek) {
+          this._execShowImmediate({ peek: item.peek }, true);
+        } else if (item.assignment) {
           this.exec({ assignment: item.assignment }, true);
         } else {
           this.exec({
@@ -17448,7 +17452,11 @@ Interpreter.prototype.executeConditionalAssignmentEntry = function(entry) {
   this._executingConditionalAssignment = true;
   try {
     for (const item of body) {
-      if (item.assignment) {
+      if (item.show) {
+        this._execShowImmediate({ show: item.show }, true);
+      } else if (item.peek) {
+        this._execShowImmediate({ peek: item.peek }, true);
+      } else if (item.assignment) {
         const targetVar = item.assignment.target && item.assignment.target.var;
         if (targetVar) changedWires.add(targetVar);
         this.exec({ assignment: item.assignment }, true);

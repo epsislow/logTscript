@@ -15,14 +15,16 @@ on:<mode> {
 }
 ```
 
-Multiple comma-separated assignments are allowed after the trigger (all run atomically when the condition fires):
+Multiple comma-separated body items are allowed after the trigger (all run atomically when the condition fires):
 
 ```logts
 on:raise {
   AND(.clk, phMerge),
   mk, mf = .heap:popMin(),
   mk2, mf2 = .heap:popMin(),
-  1wire _ = .links:set(mk, parent + 00000000)
+  1wire _ = .links:set(mk, parent + 00000000),
+  show(mk),
+  peek(mf)
 }
 ```
 
@@ -30,11 +32,11 @@ on:raise {
 |------|---------|
 | `on:<mode>` | When the block may run: `raise`, `edge`, or `1` |
 | `triggerExpr` | Expression whose **LSB** is observed for edges/level |
-| `assignment` | One or more assignments (`=`, `:=`, `=:`), mixed multi-target (`a, b = expr`), or **component pin writes** (`.comp:pin = expr`) |
+| body item | One or more comma-separated **assignments** (`=`, `:=`, `=:`), mixed multi-target (`a, b = expr`), **component pin writes** (`.comp:pin = expr`), or **`show(...)` / `peek(...)`** |
 
-**Not** allowed inside `on:{ }`: a **property block** (`.comp:{ pin = …, set = 1 }`). Use separate pin writes — `.comp:send = pkt` then `.comp:set = 1` — or assign from a wire declared outside the block.
+**Not** allowed inside `on:{ }`: a **property block** (`.comp:{ pin = …, set = 1 }`), `probe`, `watch`, or `deps`. Use separate pin writes — `.comp:send = pkt` then `.comp:set = 1` — or assign from a wire declared outside the block.
 
-The entire statement is **absent** while the trigger condition is false: neither the left-hand side nor the right-hand side runs (no LUT/mem side effects, no wire writes). When the trigger fires, **every** assignment in the block runs in order before any other propagation step. Suite tests **2123–2124**.
+The entire statement is **absent** while the trigger condition is false: neither the left-hand side nor the right-hand side of assignments runs (no LUT/mem side effects, no wire writes), and **`show` / `peek` do not run**. When the trigger fires, **every** body item runs in order before any other propagation step. Suite tests **2123–2124**, **2544–2548**.
 
 ---
 
@@ -365,13 +367,30 @@ More examples (internal `adder`, `counter`, nested chip, interactive switch): [c
 
 ---
 
+## `show` and `peek` in the body
+
+`show(...)` and `peek(...)` may appear as body items (comma-separated, same as assignments). They run **only when the trigger fires**, in source order, **after** any preceding assignments in the same block. In **Wave** mode they execute **immediately** inside the block (not deferred like top-level `show`).
+
+```logts
+on:1 {
+  once,
+  done = 1,
+  show(done)
+}
+```
+
+`show`-only or `peek`-only bodies are valid when the trigger still has at least one body item.
+
+---
+
 ## Restrictions
 
 | Allowed in `{ }` | Not allowed |
 |------------------|-------------|
 | `target = expr` (one or many, comma-separated) | `.lut:clear()` without destination |
 | `.comp:pin = expr` | `pcb`, `chip`, `board`, `comp`, `def` |
-| `a, b = expr` (multi-target) | Any non-assignment statement |
+| `a, b = expr` (multi-target) | `probe`, `watch`, `deps` |
+| `show(...)`, `peek(...)` | Property blocks (`.comp:{ }`) |
 | `process = 1` | |
 
 ---
@@ -381,7 +400,7 @@ More examples (internal `adder`, `counter`, nested chip, interactive switch): [c
 | | `on: { }` (standalone) | `.comp:{ }` (property block) |
 |--|------------------------|------------------------------|
 | Scope | Program / PCB body | Bound to one component instance |
-| Statements | One or more comma-separated assignments | Multiple pin assignments |
+| Statements | One or more comma-separated assignments and/or `show`/`peek` | Multiple pin assignments |
 | Typical use | LUT/mem ops gated by a flag | Pin wiring on `exec:` trigger |
 
 Property blocks remain the right tool for multi-pin updates on a component; conditional assignment is for isolated side-effect writes (LUT, mem, a single wire).

@@ -23831,6 +23831,87 @@ reg(2542, 'network-sock', 'doc(sock) lists defined socks with mode', function(h)
   h.assert('chat append', String(out.some(l => l.includes('chat — append, attached'))), 'true');
 });
 
+reg(2544, 'conditional-assignment', 'on:raise show in body fires on edge', function(h, session) {
+  const src = `MODE WIREWRITE
+1wire flag = 0
+on:raise {
+  flag,
+  show(flag)
+}`;
+  const { out: idleOut } = session.run(src);
+  h.assert('no show before trigger', String(debugOutLines(idleOut).length === 0), 'true');
+  const { out } = session.run(src + '\nflag = 1');
+  const lines = debugOutLines(out);
+  h.assert('one show line', String(lines.length === 1), 'true');
+  h.assert('flag=1', String(/flag \(1wire\) = 1/.test(lines[0])), 'true');
+});
+
+reg(2545, 'conditional-assignment', 'on:raise show-only body', function(h, session) {
+  const src = `MODE WIREWRITE
+1wire flag = 0
+on:raise {
+  flag,
+  show(flag)
+}
+flag = 1`;
+  const { out } = session.run(src);
+  const lines = debugOutLines(out);
+  h.assert('show-only body', String(lines.length === 1), 'true');
+  h.assert('flag=1', String(/flag \(1wire\) = 1/.test(lines[0])), 'true');
+});
+
+reg(2546, 'conditional-assignment', 'on:raise assignment then show order', function(h, session) {
+  const src = `MODE WIREWRITE
+1wire flag = 0
+1wire val = 0
+on:raise {
+  flag,
+  val = 1,
+  show(val)
+}
+flag = 1`;
+  const { out, interp } = session.run(src);
+  const lines = debugOutLines(out);
+  h.assert('one show line', String(lines.length === 1), 'true');
+  h.assert('val=1 in show', String(/val \(1wire\) = 1/.test(lines[0])), 'true');
+  h.assert('val wire', session.getWire(interp, 'val'), '1');
+});
+
+reg(2547, 'conditional-assignment', 'on:raise show and peek in body wave', function(h, session) {
+  const src = `MODE WIREWRITE
+1wire flag = 0
+1wire val = NOT(flag)
+on:raise {
+  flag,
+  show(val),
+  peek(val)
+}
+flag = 1`;
+  const { out } = session.run(src);
+  const lines = debugOutLines(out);
+  h.assert('show and peek', String(lines.length === 2), 'true');
+  h.assert('show val=1', String(/val \(1wire\) = 1/.test(lines[0])), 'true');
+  h.assert('peek val=1', String(/val \(1wire\) = 1/.test(lines[1])), 'true');
+}, { propagation: 'wave' });
+
+reg(2548, 'conditional-assignment', 'on:raise body show not deferred like top-level wave', function(h, session) {
+  const src = `MODE WIREWRITE
+1wire flag = 0
+1wire snap = 0
+on:raise {
+  flag,
+  snap = 1,
+  show(snap)
+}
+show(snap)
+flag = 1`;
+  const { out } = session.run(src);
+  const lines = debugOutLines(out);
+  h.assert('two show lines', String(lines.length === 2), 'true');
+  h.assert('conditional show snap=1', String(/snap \(1wire\) = 1/.test(lines[0])), 'true');
+  h.assert('top-level show snap=1', String(/snap \(1wire\) = 1/.test(lines[1])), 'true');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,
