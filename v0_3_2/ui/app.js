@@ -762,6 +762,23 @@ function buildVarsSnapshot(interp, ctx) {
     const typeLabel = typeof interp.getWireTypeLabel === 'function' ? interp.getWireTypeLabel(w) : w.type;
     t += `${k} (${typeLabel}) = ${valueStr} (ref: ${w.ref || 'null'})\n`;
   });
+  if (interp.socks && interp.socks.size > 0) {
+    if (typeof interp._flushNetworkSocketDetaches === 'function') {
+      interp._flushNetworkSocketDetaches();
+    }
+    for (const [sockName, entry] of interp.socks) {
+      const typeLabel = entry.type || 'sock';
+      let bits = typeof interp.getSockBits === 'function'
+        ? (interp.getSockBits(sockName) || '')
+        : (entry.bits || '');
+      const bitLen = bits.length;
+      let valueStr = bitLen ? bits : '-';
+      if (bitLen && typeof interp.formatValue === 'function') {
+        valueStr = interp.formatValue(bits, bitLen, true);
+      }
+      t += `${sockName} (${typeLabel}, ${bitLen} bit) = ${valueStr} (ref: null)\n`;
+    }
+  }
   t += `\nCycle: ${interp.cycle}\n`;
   t += `Storage: ${interp.storage.length} entries\n`;
   if (ctx) {
