@@ -245,7 +245,7 @@ function activateRunContextLive(ctx, tabInfo) {
   syncActiveInstanceRuntime(ctx);
   syncRunContextOutputFromInterp(ctx.id, { refreshProbes: true, probeReason: 'changed', paintPanel: false });
   if (typeof render === 'function') {
-    render(ctx.out, ctx.outBlocks, ctx);
+    render(ctx.out, ctx.outBlocks, ctx, { force: true });
   }
   const varsEl = document.getElementById('vars');
   if (varsEl) varsEl.textContent = ctx.varsSnapshot || '';
@@ -276,7 +276,7 @@ function mountPanelSnapshot(snapshot) {
     return;
   }
   if (typeof render === 'function') {
-    render(snapshot.out || [], snapshot.outBlocks || [], null);
+    render(snapshot.out || [], snapshot.outBlocks || [], null, { force: true });
   }
   const varsEl = document.getElementById('vars');
   if (varsEl) varsEl.textContent = snapshot.varsSnapshot || '';

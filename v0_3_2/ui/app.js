@@ -184,18 +184,170 @@ function findOutputBlockAt(blocks, index) {
   return null;
 }
 
+const OUT_FINGERPRINT_EMPTY = 'empty';
+
+function fnv1aHash32(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16);
+}
+
+function fingerprintFromOutputPlan(plan) {
+  if (!plan || !plan.length) return OUT_FINGERPRINT_EMPTY;
+  const parts = [];
+  for (let i = 0; i < plan.length; i++) {
+    const seg = plan[i];
+    if (seg.kind === 'line') {
+      parts.push('L\x1f' + (seg.className || '') + '\x1f' + seg.text);
+    } else if (seg.kind === 'copy') {
+      parts.push('C\x1f' + seg.text);
+    } else if (seg.kind === 'error') {
+      const d = seg.display;
+      parts.push(
+        'E\x1f' + d.message + '\x1f' + (d.sourceLine != null ? d.sourceLine : '')
+          + '\x1f' + (d.caretLine != null ? d.caretLine : '')
+      );
+    }
+  }
+  return fnv1aHash32(parts.join('\x1e')) + '|' + plan.length;
+}
+
+function buildOutputPlan(lines, blocks, interp, src) {
+  const plan = [];
+  if (!lines || !lines.length) return plan;
+  blocks = blocks || [];
+  let i = 0;
+  while (i < lines.length) {
+    const block = findOutputBlockAt(blocks, i);
+    if (block && block.kind === 'lutOf' && block.end > block.start) {
+      plan.push({ kind: 'copy', text: lines.slice(block.start, block.end).join('\n') });
+      i = block.end;
+      continue;
+    }
+    if (block && block.kind === 'assignPair' && block.end > block.start) {
+      plan.push({ kind: 'copy', text: lines[block.start] });
+      if (block.end > block.start + 1) {
+        plan.push({ kind: 'copy', text: lines[block.start + 1] });
+      }
+      i = block.end;
+      continue;
+    }
+
+    const line = lines[i];
+    if (line.startsWith('Error:')) {
+      const msg = line.slice(6).trimStart();
+      let err = { message: msg };
+      if (interp && interp.lastReportedError) {
+        const re = interp.lastReportedError;
+        const reMsg = (re && re.message) ? re.message : String(re);
+        if (reMsg === msg) err = re;
+      }
+      plan.push({
+        kind: 'error',
+        err: err,
+        display: resolveErrorDisplayForOutput(err, src)
+      });
+    } else {
+      plan.push({ kind: 'line', text: line, className: '' });
+    }
+    i++;
+  }
+  return plan;
+}
+
+function paintOutputFromPlan(plan, src) {
+  if (!plan || !plan.length) return;
+  for (let i = 0; i < plan.length; i++) {
+    const seg = plan[i];
+    if (seg.kind === 'copy') {
+      appendOutputCopyBlock(seg.text);
+    } else if (seg.kind === 'line') {
+      appendOutputLine(seg.text, seg.className || undefined);
+    } else if (seg.kind === 'error') {
+      const display = seg.display;
+      appendOutputLine('Error: ' + display.message, 'output-line--error');
+      if (display.sourceLine != null && display.caretLine != null) {
+        appendOutputLine(display.sourceLine, 'output-line--source');
+        appendOutputLine(display.caretLine, 'output-line--caret');
+      }
+      applyErrorEditorHighlight(display);
+    }
+  }
+}
+
+function isOutputPanelDomEmpty() {
+  const el = document.getElementById('out');
+  return !el || el.childNodes.length === 0;
+}
+
+function resolveRunContextForOutput(ctxOptional, interpOptional) {
+  if (ctxOptional) return ctxOptional;
+  const interp = interpOptional
+    || (typeof getExecInterp === 'function' ? getExecInterp() : null)
+    || globalInterp;
+  if (interp && interp._instanceId != null && typeof getRunContext === 'function') {
+    return getRunContext(interp._instanceId);
+  }
+  return null;
+}
+
+function syncOutputPanel(lines, blocks, ctxOptional, options) {
+  const opts = options || {};
+  const force = !!opts.force;
+  const ctx = resolveRunContextForOutput(ctxOptional, null);
+  const interp = (ctx && ctx.interp) ? ctx.interp : globalInterp;
+  let blockList = blocks;
+  if (blockList == null && interp) blockList = interp.outBlocks || [];
+  blockList = blockList || [];
+  const src = (ctx && ctx.lastProcessedSource) ? ctx.lastProcessedSource : lastProcessedSource;
+  lines = lines || [];
+
+  if (!lines.length) {
+    if (!force && ctx && ctx.lastOutFingerprint === OUT_FINGERPRINT_EMPTY && isOutputPanelDomEmpty()) {
+      return;
+    }
+    clearOutput();
+    if (ctx) ctx.lastOutFingerprint = OUT_FINGERPRINT_EMPTY;
+    return;
+  }
+
+  const plan = buildOutputPlan(lines, blockList, interp, src);
+  const fp = fingerprintFromOutputPlan(plan);
+
+  if (!force && ctx && ctx.lastOutFingerprint === fp && !isOutputPanelDomEmpty()) {
+    return;
+  }
+
+  const preservePage = { x: window.scrollX || 0, y: window.scrollY || 0 };
+  clearOutput();
+  paintOutputFromPlan(plan, src);
+  scrollOutputToBottom(preservePage);
+  if (ctx) ctx.lastOutFingerprint = fp;
+}
+
+function invalidateOutputFingerprint(ctx) {
+  if (ctx) ctx.lastOutFingerprint = null;
+}
+
 function errorDisplayContext() {
   return null;
 }
 
-function appendErrorOutput(err, processedSource) {
+function resolveErrorDisplayForOutput(err, processedSource) {
   const EF = window.LogTScriptErrorFormat;
   const rawMsg = (err && err.message) ? err.message : String(err);
   const runSource = processedSource || lastProcessedSource;
   let display = EF
     ? EF.resolveErrorDisplay(err, runSource)
     : { message: rawMsg, sourceLine: null, caretLine: null, loc: null };
-  display = finalizeErrorDisplay(display, runSource);
+  return finalizeErrorDisplay(display, runSource);
+}
+
+function appendErrorOutput(err, processedSource) {
+  const display = resolveErrorDisplayForOutput(err, processedSource);
 
   appendOutputLine('Error: ' + display.message, 'output-line--error');
   if (display.sourceLine != null && display.caretLine != null) {
@@ -445,6 +597,7 @@ function run(){
 
   try{
   clearOutput();
+  invalidateOutputFingerprint(ctx);
   clearErrorMarkers();
   editorErrorDismissed = false;
 
@@ -520,13 +673,10 @@ function run(){
     }
     const src = processedCode || lastProcessedSource;
     const activeInterp = ctx.interp || globalInterp;
-    if (runInterpAssigned && activeInterp && typeof activeInterp.reportRuntimeError === 'function') {
+    if (activeInterp && typeof activeInterp.reportRuntimeError === 'function') {
       activeInterp.reportRuntimeError(e);
     } else {
       appendErrorOutput(e, src);
-      if (activeInterp) {
-        activeInterp.out = [];
-      }
     }
     if (activeInterp) showVars(activeInterp);
     if (tabInfo) tabInfo.hasRun = false;
@@ -539,49 +689,8 @@ function run(){
   }
 }
 
-function render(lines, blocks, ctxOptional) {
-  const preservePage = { x: window.scrollX || 0, y: window.scrollY || 0 };
-  clearOutput();
-  if (!lines || !lines.length) return;
-  const ctx = ctxOptional || null;
-  const interp = ctx && ctx.interp ? ctx.interp : globalInterp;
-  if (blocks == null && interp) blocks = interp.outBlocks || [];
-  blocks = blocks || [];
-  const src = (ctx && ctx.lastProcessedSource) ? ctx.lastProcessedSource : lastProcessedSource;
-
-  let i = 0;
-  while (i < lines.length) {
-    const block = findOutputBlockAt(blocks, i);
-    if (block && block.kind === 'lutOf' && block.end > block.start) {
-      appendOutputCopyBlock(lines.slice(block.start, block.end).join('\n'));
-      i = block.end;
-      continue;
-    }
-    if (block && block.kind === 'assignPair' && block.end > block.start) {
-      appendOutputCopyBlock(lines[block.start]);
-      if (block.end > block.start + 1) {
-        appendOutputCopyBlock(lines[block.start + 1]);
-      }
-      i = block.end;
-      continue;
-    }
-
-    const line = lines[i];
-    if (line.startsWith('Error:')) {
-      const msg = line.slice(6).trimStart();
-      let err = { message: msg };
-      if (interp && interp.lastReportedError) {
-        const re = interp.lastReportedError;
-        const reMsg = (re && re.message) ? re.message : String(re);
-        if (reMsg === msg) err = re;
-      }
-      appendErrorOutput(err, src);
-    } else {
-      appendOutputLine(line);
-    }
-    i++;
-  }
-  scrollOutputToBottom(preservePage);
+function render(lines, blocks, ctxOptional, options) {
+  syncOutputPanel(lines, blocks, ctxOptional, options || {});
 }
 
 function serializeArray(arr) {
@@ -770,8 +879,12 @@ function doNext(count = 1) {
     if (typeof interp.reportRuntimeError === 'function') {
       interp.reportRuntimeError(e);
     } else {
-      clearOutput();
-      appendErrorOutput(e, ctx ? ctx.lastProcessedSource : lastProcessedSource);
+      const src = ctx ? ctx.lastProcessedSource : lastProcessedSource;
+      const msg = (e && e.message) ? e.message : String(e);
+      interp.lastReportedError = e;
+      if (!interp.out) interp.out = [];
+      interp.out.push('Error: ' + msg);
+      syncOutputPanel(interp.out, interp.outBlocks, ctx, { force: true });
     }
   }
   globalInterp = interp;

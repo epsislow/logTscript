@@ -3858,7 +3858,7 @@ class Interpreter {
     if (typeof this.onRuntimeError === 'function') {
       this.onRuntimeError(err, this.out);
     } else if (typeof render === 'function') {
-      render(this.out);
+      render(this.out, this.outBlocks);
     }
     if (err && err.stack) console.error(err);
   }
