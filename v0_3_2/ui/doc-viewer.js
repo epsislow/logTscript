@@ -13,7 +13,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-sequential-functions.md', label: 'Built-in sequential (LATCH, REG)', searchPrimary: 'LATCH REG' },
       { file: 'builtin-routing-functions.md', label: 'Built-in routing (MUX, DEMUX)', searchPrimary: 'MUX DEMUX' },
       { file: 'builtin-bit-selection-functions.md', label: 'Built-in bit selection', searchPrimary: 'HIGH LOW ANY ZERO ALL BITINDEX ONEHOT', searchExtra: 'HIGH LOW ANY ZERO ANYZ ANYX ANY1 ANY0 ANY01 ANYZX ALLZ ALLX ALL1 ALL0 ALL01 ALLZX BITINDEX ONEHOT priority encoder' },
-      { file: 'builtin-bit-analysis-functions.md', label: 'Built-in bit analysis', searchPrimary: 'PARITY CNTONE CNTZERO BITSIZE WWIDTH', searchExtra: 'PARITY CNTONE CNTZERO BITSIZE' },
+      { file: 'builtin-bit-analysis-functions.md', label: 'Built-in bit analysis', searchPrimary: 'PARITY PARITYEVEN PARITYODD CNTONE CNTZERO BITSIZE WWIDTH', searchExtra: 'PARITY PARITYEVEN PARITYODD CNTONE CNTZERO BITSIZE WWIDTH doc(PARITY) doc(PARITYEVEN)' },
       { file: 'builtin-bit-transform-functions.md', label: 'Built-in bit transform', searchExtra: 'LSHIFT RSHIFT REVERSE LROTATE RROTATE rotate shift' },
       { file: 'components.md', label: 'Component catalog' },
       { file: 'short-notation.md', label: 'Short notation' },
@@ -117,7 +117,6 @@ const DOC_SECTIONS = [
     title: 'Other',
     items: [
       { file: 'builtin-DIAG.md', label: 'DIAG (diagonal matrix)', searchPrimary: 'DIAG' },
-      { file: 'builtin-FILL.md', label: 'FILL (constant matrix)', searchPrimary: 'FILL' },
       { file: 'builtin-FLIPLR.md', label: 'FLIPLR (flip columns)', searchPrimary: 'FLIPLR' },
       { file: 'builtin-FLIPUD.md', label: 'FLIPUD (flip rows)', searchPrimary: 'FLIPUD' },
       { file: 'builtin-IDENTITY.md', label: 'IDENTITY (identity matrix)', searchPrimary: 'IDENTITY' },
@@ -269,12 +268,19 @@ const DOC_SEARCH_ONLY = [
         'RANK',
       searchExtra:
         'tensor rank 1 2 matrix vector metadata' },
+    { file: 'builtin-FILL.md', label: 'FILL', section: 'Tensor / matrix',
+      searchPrimary:
+        'FILL',
+      searchExtra:
+        'matrix constant fill pattern tile repeat protocol doc(FILL) logts-play' },
+    { file: 'builtin-PARITYEVEN.md', label: 'PARITYEVEN · PARITYODD', section: 'Bit analysis',
+      searchPrimary:
+        'PARITYEVEN PARITYODD',
+      searchExtra:
+        'UART even odd parity protocol doc(PARITYEVEN) doc(PARITYODD) logts-play' },
     { file: 'builtin-DIAG.md', label: 'DIAG', section: 'Tensor / matrix',
       searchPrimary:
         'DIAG' },
-    { file: 'builtin-FILL.md', label: 'FILL', section: 'Tensor / matrix',
-      searchPrimary:
-        'FILL' },
     { file: 'builtin-FLIPLR.md', label: 'FLIPLR', section: 'Tensor / matrix',
       searchPrimary:
         'FLIPLR' },

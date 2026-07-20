@@ -2017,7 +2017,14 @@
       {"id":2558,"group":"literals","title":"spaced binary tab does not join","detail":{"scripts":["8wire a = 1111\t0111"],"steps":[],"assertions":["tab"]}},
       {"id":2559,"group":"literals","title":"grouped decimal backslash unchanged","detail":{"scripts":["4wire[2] v = \\2 \\3;4"],"steps":[],"assertions":["elem0","elem1"]}},
       {"id":2560,"group":"literals","title":"spaced o^ oct literal","detail":{"scripts":["12wire a = o^12 34"],"steps":[],"assertions":["a"]}},
-      {"id":2561,"group":"sock","title":"sock append triggers on:1 conditional (wave)","detail":{"scripts":["sock rx\n1wire fired : 0\non:1 {\n  GT(BITSIZE(rx), 011),\n  fired = 1\n}"],"steps":[],"assertions":["before append","after append"]}}
+      {"id":2561,"group":"sock","title":"sock append triggers on:1 conditional (wave)","detail":{"scripts":["sock rx\n1wire fired : 0\non:1 {\n  GT(BITSIZE(rx), 011),\n  fired = 1\n}"],"steps":[],"assertions":["before append","after append"]}},
+      {"id":2562,"group":"bit-analysis","title":"FILL pattern to width","detail":{"scripts":["4wire z = FILL(0, \\4)\n8wire p = FILL(0101, \\8)"],"steps":[],"assertions":["zeros","pattern"]}},
+      {"id":2563,"group":"bit-analysis","title":"PARITYEVEN matches protocol parityEven","detail":{"scripts":["1wire a = PARITYEVEN(01100110)\n1wire b = PARITYEVEN(01100111)"],"steps":[],"assertions":["even popcount","odd popcount"]}},
+      {"id":2564,"group":"bit-analysis","title":"PARITYODD matches protocol parityOdd","detail":{"scripts":["1wire a = PARITYODD(01100110)\n1wire b = PARITYODD(01100111)"],"steps":[],"assertions":["even data odd par","odd data odd par"]}},
+      {"id":2565,"group":"bit-analysis","title":"PARITYEVEN equals PARITY","detail":{"scripts":["1wire p = PARITY(1011)\n1wire e = PARITYEVEN(1011)"],"steps":[],"assertions":["same"]}},
+      {"id":2566,"group":"doc","title":"BUILTIN_DOC — FILL two overloads","detail":{"scripts":[],"steps":["getDocLines(FILL)"],"assertions":["FILL 2 rows","matrix","pattern"]}},
+      {"id":2567,"group":"doc","title":"BUILTIN_DOC — PARITYEVEN PARITYODD","detail":{"scripts":[],"steps":["getDocLines(PARITYEVEN)","getDocLines(PARITYODD)"],"assertions":["PARITYEVEN","PARITYODD"]}},
+      {"id":2568,"group":"doc","title":"doc(FILL) end-to-end output","detail":{"scripts":["doc(FILL)"],"steps":[],"assertions":["two lines","line0"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -2028,7 +2035,7 @@
       { id: 'arithmetic', label: 'arithmetic', rangeLabel: '1680–1683', testIds: [1680, 1681, 1682, 1683] },
       { id: 'asm-decode', label: 'ASM disassemble / decode', rangeLabel: '947–948, 1740, 1762', testIds: [947, 948, 1740, 1762] },
       { id: 'asm-composition', label: 'asm-composition', rangeLabel: '1746–1761, 1763', testIds: [1746, 1747, 1748, 1749, 1750, 1751, 1752, 1753, 1754, 1755, 1756, 1757, 1758, 1759, 1760, 1761, 1763] },
-      { id: 'bit-analysis', label: 'Bit analysis built-ins', rangeLabel: '232–234, 2319–2334', testIds: [232, 233, 234, 2319, 2320, 2321, 2322, 2323, 2324, 2325, 2326, 2327, 2328, 2329, 2330, 2331, 2332, 2333, 2334] },
+      { id: 'bit-analysis', label: 'Bit analysis built-ins', rangeLabel: '232–234, 2319–2334, 2562–2565', testIds: [232, 233, 234, 2319, 2320, 2321, 2322, 2323, 2324, 2325, 2326, 2327, 2328, 2329, 2330, 2331, 2332, 2333, 2334, 2562, 2563, 2564, 2565] },
       { id: 'bit-ops', label: 'Bit operations', rangeLabel: '61–81, 1535', testIds: [61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 1535] },
       { id: 'bit-selection', label: 'Bit selection built-ins', rangeLabel: '224–231, 1588–1592', testIds: [224, 225, 226, 227, 228, 229, 230, 231, 1588, 1589, 1590, 1591, 1592] },
       { id: 'bit-transform', label: 'Bit transform built-ins', rangeLabel: '40–52, 492–496', testIds: [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 492, 493, 494, 495, 496] },
@@ -2057,7 +2064,7 @@
       { id: 'decimal', label: 'decimal', rangeLabel: '1610–1613, 1615', testIds: [1610, 1611, 1612, 1613, 1615] },
       { id: 'literals', label: 'Decimal \\\\N literals', rangeLabel: '15–17, 19–21, 1937–1945, 1947–1952, 2553–2560', testIds: [15, 16, 17, 19, 20, 21, 1937, 1938, 1939, 1940, 1941, 1942, 1943, 1944, 1945, 1947, 1948, 1949, 1950, 1951, 1952, 2553, 2554, 2555, 2556, 2557, 2558, 2559, 2560] },
       { id: 'doc-comp', label: 'Doc for body comps', rangeLabel: '400–431, 848–850, 1163', testIds: [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 848, 849, 850, 1163] },
-      { id: 'doc', label: 'doc() tests', rangeLabel: '300–362, 1593, 1597–1598, 1614, 1668, 1678, 1799, 2220–2223', testIds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 1593, 1597, 1598, 1614, 1668, 1678, 1799, 2220, 2221, 2222, 2223] },
+      { id: 'doc', label: 'doc() tests', rangeLabel: '300–362, 1593, 1597–1598, 1614, 1668, 1678, 1799, 2220–2223, 2566–2568', testIds: [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 1593, 1597, 1598, 1614, 1668, 1678, 1799, 2220, 2221, 2222, 2223, 2566, 2567, 2568] },
       { id: 'bitrange', label: 'Dynamic bit range', rangeLabel: '53–60', testIds: [53, 54, 55, 56, 57, 58, 59, 60] },
       { id: 'error-display', label: 'Error display (caret + editor)', rangeLabel: '1388–1395, 1532–1533', testIds: [1388, 1389, 1390, 1391, 1392, 1393, 1394, 1395, 1532, 1533] },
       { id: 'gates', label: 'gates', rangeLabel: '1662', testIds: [1662] },

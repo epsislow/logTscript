@@ -24009,6 +24009,55 @@ on:1 {
   h.assert('after append', session.getWire(interp, 'fired'), '1');
 }, { propagation: 'wave' });
 
+reg(2562, 'bit-analysis', 'FILL pattern to width', function(h, session) {
+  const { interp } = session.run(
+    '4wire z = FILL(0, \\4)\n8wire p = FILL(0101, \\8)'
+  );
+  h.assert('zeros', session.getWire(interp, 'z'), '0000');
+  h.assert('pattern', session.getWire(interp, 'p'), '01010101');
+});
+
+reg(2563, 'bit-analysis', 'PARITYEVEN matches protocol parityEven', function(h, session) {
+  const { interp } = session.run(
+    '1wire a = PARITYEVEN(01100110)\n1wire b = PARITYEVEN(01100111)'
+  );
+  h.assert('even popcount', session.getWire(interp, 'a'), '0');
+  h.assert('odd popcount', session.getWire(interp, 'b'), '1');
+});
+
+reg(2564, 'bit-analysis', 'PARITYODD matches protocol parityOdd', function(h, session) {
+  const { interp } = session.run(
+    '1wire a = PARITYODD(01100110)\n1wire b = PARITYODD(01100111)'
+  );
+  h.assert('even data odd par', session.getWire(interp, 'a'), '1');
+  h.assert('odd data odd par', session.getWire(interp, 'b'), '0');
+});
+
+reg(2565, 'bit-analysis', 'PARITYEVEN equals PARITY', function(h, session) {
+  const { interp } = session.run('1wire p = PARITY(1011)\n1wire e = PARITYEVEN(1011)');
+  h.assert('same', session.getWire(interp, 'p'), session.getWire(interp, 'e'));
+});
+
+reg(2566, 'doc', 'BUILTIN_DOC — FILL two overloads', function(h, session) {
+  const lines = Interpreter.getDocLines('FILL', null, new Map());
+  h.assert('FILL 2 rows', String(lines.length), '2');
+  h.assert('matrix', lines[0], 'FILL(\\N, Wbit scalar) -> Wwire[N,N] — constant fill (square matrix assign)');
+  h.assert('pattern', lines[1], 'FILL(pattern, \\N or times) -> Wbit — tile binary pattern to total width N (protocol-style repeat)');
+});
+
+reg(2567, 'doc', 'BUILTIN_DOC — PARITYEVEN PARITYODD', function(h, session) {
+  const even = Interpreter.getDocLines('PARITYEVEN', null, new Map());
+  const odd = Interpreter.getDocLines('PARITYODD', null, new Map());
+  h.assert('PARITYEVEN', even[0], 'PARITYEVEN(Xbit) -> 1bit — UART even parity bit to append');
+  h.assert('PARITYODD', odd[0], 'PARITYODD(Xbit) -> 1bit — UART odd parity bit to append');
+});
+
+reg(2568, 'doc', 'doc(FILL) end-to-end output', function(h, session) {
+  const out = session.runDoc('doc(FILL)');
+  h.assert('two lines', String(out.length), '2');
+  h.assert('line0', out[0], 'FILL(\\N, Wbit scalar) -> Wwire[N,N] — constant fill (square matrix assign)');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

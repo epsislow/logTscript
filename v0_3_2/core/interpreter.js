@@ -320,6 +320,19 @@ function countOnesBin(s) {
   return c;
 }
 
+function fillBitPattern(pattern, totalWidth) {
+  const pat = String(pattern || '');
+  if (!pat.length) throw new Error('FILL: pattern is empty');
+  if (!/^[01]+$/.test(pat)) throw new Error('FILL: pattern must be binary 0/1');
+  if (!Number.isFinite(totalWidth) || totalWidth < 1) throw new Error('FILL: width must be >= 1');
+  if (totalWidth % pat.length !== 0) {
+    throw new Error(
+      `FILL: output width ${totalWidth}b is not a multiple of pattern length ${pat.length}`
+    );
+  }
+  return pat.repeat(totalWidth / pat.length);
+}
+
 function highBitMask(s) {
   const len = s.length;
   for (let i = 0; i < len; i++) {
@@ -5885,7 +5898,7 @@ class Interpreter {
     if (['NOT', 'AND', 'OR', 'XOR', 'NXOR', 'NAND', 'NOR', 'EQ', 'LATCH',
          'LSHIFT', 'RSHIFT',
          'HIGH', 'LOW', 'ANY', 'ZERO', 'BITINDEX', 'ONEHOT',
-         'PARITY', 'CNTONE', 'CNTZERO', 'BITSIZE', 'WWIDTH',
+         'PARITY', 'PARITYEVEN', 'PARITYODD', 'CNTONE', 'CNTZERO', 'BITSIZE', 'WWIDTH',
          'SOCKATTACHED', 'SOCKMODE', 'SOCKPORT', 'SOCKTARGET',
          'REVERSE', 'LROTATE', 'RROTATE',
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
@@ -7151,15 +7164,29 @@ const idx = parseInt(
 
   if (name === 'FILL') {
     if (args.length !== 2) fail('FILL expects 2 arguments');
-    const n = this._evalCallArgDecimalInt(args[0], 'FILL');
-    const ctx = this._resolveIdentityAssignContext();
-    if (!ctx) fail('FILL: assign to a square N×N tensor wire');
-    if (ctx.n !== n) fail(`FILL: argument \\${n} does not match wire shape ${ctx.n}×${ctx.n}`);
-    const cellVal = this._evalCallArgValue(args[1]);
-    if (!cellVal || cellVal === '-') fail('FILL: scalar value required');
-    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
-    if (!TS) fail('FILL: internal error (tensor-shape not loaded)');
-    const blob = TS.fillBlob(n, ctx.ew, cellVal);
+    const atom0 = args[0] && args[0][0];
+    const sqCtx = this._resolveIdentityAssignContext();
+    if (atom0 && atom0.dec != null && atom0.dec !== '' && sqCtx) {
+      const n = parseInt(atom0.dec, 10);
+      if (Number.isFinite(n) && n >= 1 && sqCtx.n === n) {
+        const cellVal = this._evalCallArgValue(args[1]);
+        if (!cellVal || cellVal === '-') fail('FILL: scalar value required');
+        const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+        if (!TS) fail('FILL: internal error (tensor-shape not loaded)');
+        const blob = TS.fillBlob(n, sqCtx.ew, cellVal);
+        return computeRefs
+          ? { value: blob, ref: `&${this.storeValue(blob)}` }
+          : { value: blob, ref: null };
+      }
+    }
+    const pat = this._evalCallArgValue(args[0]);
+    const width = this._evalCallArgRepeatCount(args[1], 'FILL');
+    let blob;
+    try {
+      blob = fillBitPattern(pat, width);
+    } catch (e) {
+      fail(e && e.message ? e.message : String(e));
+    }
     return computeRefs
       ? { value: blob, ref: `&${this.storeValue(blob)}` }
       : { value: blob, ref: null };
@@ -8350,6 +8377,18 @@ if (this.isBuiltinDEMUX(name)) {
     let acc = bits[0] === '1';
     for (let i = 1; i < bits.length; i++) acc = acc !== (bits[i] === '1');
     const v = acc ? '1' : '0';
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'PARITYEVEN' || name === 'PARITYODD') {
+    if (argValues.length !== 1) fail(`${name} expects 1 argument`);
+    const s = argValues[0];
+    if (!s || s === '-') fail(`${name}: empty argument`);
+    if (/[XZ]/i.test(s)) fail(`${name}: X/Z not supported`);
+    const even = countOnesBin(s) % 2 === 0;
+    const v = name === 'PARITYEVEN' ? (even ? '0' : '1') : (even ? '1' : '0');
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -16956,7 +16995,9 @@ Interpreter.BUILTIN_DOC = {
   ZERO:     ['ZERO(Xbit) -> 1bit'],
   BITINDEX: ['BITINDEX(Xbit) -> Ybit index, 1bit isInvalid'],
   ONEHOT:   ['ONEHOT(Xbit index) -> 2^X bits'],
-  PARITY:   ['PARITY(Xbit) -> 1bit'],
+  PARITY:   ['PARITY(Xbit) -> 1bit — XOR reduction (odd popcount → 1)'],
+  PARITYEVEN: ['PARITYEVEN(Xbit) -> 1bit — UART even parity bit to append'],
+  PARITYODD:  ['PARITYODD(Xbit) -> 1bit — UART odd parity bit to append'],
   CNTONE:   ['CNTONE(Xbit) -> Ybit'],
   CNTZERO:  ['CNTZERO(Xbit) -> Ybit'],
   BITSIZE:  ['BITSIZE(Xbit) -> Ybit'],
@@ -16973,7 +17014,10 @@ Interpreter.BUILTIN_DOC = {
   PIVOT:    ['PIVOT(Wwire tensor) -> Wwire tensor'],
   IDENTITY: ['IDENTITY(\\N) -> Wwire[N,N] — square identity; W from target wire, N decimal'],
   ZEROS:    ['ZEROS(\\N) -> Wwire[N,N] — square zero matrix'],
-  FILL:     ['FILL(\\N, Wbit scalar) -> Wwire[N,N] — constant fill'],
+  FILL:     [
+    'FILL(\\N, Wbit scalar) -> Wwire[N,N] — constant fill (square matrix assign)',
+    'FILL(pattern, \\N or times) -> Wbit — tile binary pattern to total width N (protocol-style repeat)',
+  ],
   DIAG:     ['DIAG(Wwire[n] vector) -> Wwire[n,n] — diagonal matrix'],
   IOTA:     ['IOTA(\\N) -> Wwire[N] — vector 0..N-1'],
   SHAPE:    ['SHAPE(Wwire tensor) -> bit rows, bit cols'],

@@ -32,6 +32,36 @@ probe(p)
 
 ---
 
+## PARITYEVEN · PARITYODD
+
+UART-style parity bit to append after data (same as `parityEven` / `parityOdd` in [protocol-assemble.md](protocol-assemble.md)).
+
+```
+PARITYEVEN(Xbit value) -> 1bit
+PARITYODD(Xbit value)  -> 1bit
+```
+
+`PARITYEVEN` matches `PARITY` (XOR / odd popcount → `1`). `PARITYODD` is the complement on 1 bit.
+
+Full page with **Load** / **Load & Run** examples: [builtin-PARITYEVEN.md](builtin-PARITYEVEN.md).
+
+```logts-play
+8wire data = 01100110
+1wire pe = PARITYEVEN(data)
+1wire po = PARITYODD(data)
+show(pe)
+show(po)
+```
+
+```logts-play
+1wire p = PARITY(1011)
+1wire e = PARITYEVEN(1011)
+show(p)
+show(e)
+```
+
+---
+
 ## CNTONE
 
 Counts how many bits are `1`. Returns the count as a binary value (minimal width, unpadded).

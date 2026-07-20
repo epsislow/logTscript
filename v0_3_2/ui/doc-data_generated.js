@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, debug.md, dip.md, divider.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -2806,6 +2806,36 @@ probe(p)
 
 ---
 
+## PARITYEVEN · PARITYODD
+
+UART-style parity bit to append after data (same as \`parityEven\` / \`parityOdd\` in [protocol-assemble.md](protocol-assemble.md)).
+
+\`\`\`
+PARITYEVEN(Xbit value) -> 1bit
+PARITYODD(Xbit value)  -> 1bit
+\`\`\`
+
+\`PARITYEVEN\` matches \`PARITY\` (XOR / odd popcount → \`1\`). \`PARITYODD\` is the complement on 1 bit.
+
+Full page with **Load** / **Load & Run** examples: [builtin-PARITYEVEN.md](builtin-PARITYEVEN.md).
+
+\`\`\`logts-play
+8wire data = 01100110
+1wire pe = PARITYEVEN(data)
+1wire po = PARITYODD(data)
+show(pe)
+show(po)
+\`\`\`
+
+\`\`\`logts-play
+1wire p = PARITY(1011)
+1wire e = PARITYEVEN(1011)
+show(p)
+show(e)
+\`\`\`
+
+---
+
 ## CNTONE
 
 Counts how many bits are \`1\`. Returns the count as a binary value (minimal width, unpadded).
@@ -3788,13 +3818,17 @@ show(eqv)
 
 [GT](builtin-GT.md) · [LT](builtin-LT.md) · [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md)
 `,
-    'builtin-FILL.md': `# FILL (constant matrix)
+    'builtin-FILL.md': `# FILL (constant matrix · bit pattern tile)
 
-Index: [2D tensors](wire-vectors.md)
+Index: [builtin-functions.md](builtin-functions.md) · [2D tensors](wire-vectors.md)
+
+Live signatures: \`doc(FILL)\` (two overload lines from \`Interpreter.BUILTIN_DOC\`).
+
+## Matrix fill (N×N)
 
 Fill every cell of an **N×N** matrix with the same scalar value.
 
-## Signatures
+### Signatures
 
 \`\`\`
 FILL(\\N, Wbit scalar) -> Wwire[N,N]
@@ -3803,16 +3837,45 @@ FILL(\\N, Wbit scalar) -> Wwire[N,N]
 - **\`\\N\`** — matrix dimension (must match target).
 - **scalar** — any **W**-bit expression (literal, wire, or slice).
 
-## Examples
+### Runnable example
 
 \`\`\`logts-play
 4wire[2,2] m = FILL(\\2, 0011)
 show(m)
 \`\`\`
 
+## Bit pattern tile (protocol-style \`repeat\`)
+
+Tile a **binary pattern** to an exact total width (same idea as \`repeat 0 8b\` / \`repeat(0101, 8b)\` in [protocol-assemble.md](protocol-assemble.md)).
+
+\`\`\`
+FILL(pattern, \\N) -> Nbit
+\`\`\`
+
+- **pattern** — \`0\`, \`1\`, or a binary literal (\`0101\`, …).
+- **\`\\N\`** — total output width in bits; must be a multiple of \`length(pattern)\`.
+
+### Zeros and clock pattern
+
+\`\`\`logts-play
+4wire cs = FILL(0, \\4)
+8wire clk = FILL(0101, \\8)
+show(cs)
+show(clk)
+\`\`\`
+
+### UART-style frame (data + even parity)
+
+\`\`\`logts-play
+8wire data = 01100110
+1wire par = PARITYEVEN(data)
+9wire frame = data + par
+show(frame)
+\`\`\`
+
 ## See also
 
-[ZEROS](builtin-ZEROS.md) · [IDENTITY](builtin-IDENTITY.md)
+[ZEROS](builtin-ZEROS.md) · [IDENTITY](builtin-IDENTITY.md) · [REPEAT](builtin-REPEAT.md) · [PARITYEVEN](builtin-PARITYEVEN.md)
 `,
     'builtin-FLIPLR.md': `# FLIPLR (flip columns)
 
@@ -3884,10 +3947,10 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Routing** | \`MUX\`, \`DEMUX\` | [builtin-routing-functions.md](builtin-routing-functions.md) |
 | **Arithmetic** | \`ADD\`, \`SUBTRACT\`, \`MULTIPLY\`, \`DIVIDE\`, \`MAC\`, \`ABS\`, \`NFORMAT\`, \`GT\`, \`LT\`, \`MIN\`, \`MAX\`, \`CLAMP\` | [arithmetic.md](arithmetic.md) · tags \`; vector\` / **\`; matrix\`**: [builtin-tagged-index.md](builtin-tagged-index.md) |
 | **Vector reduction** | \`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\` | [vector-reduction.md](vector-reduction.md) · **\`; matrix\`** (element-wise 2D): [matrix-reduction.md](matrix-reduction.md) |
-| **Tensor / matrix** | \`SHAPE\`, \`RANK\`, \`PIVOT\`, \`REPEAT\`, \`IDENTITY\`, \`ZEROS\`, \`FILL\`, \`DIAG\`, \`IOTA\`, \`OUTER\`, \`TRACE\`, \`NORM\`, \`L2\`, \`TRIL\`, \`TRIU\`, \`FLIPUD\`, \`FLIPLR\`, \`MCAT\`, \`MSLICE\` | [wire-vectors.md](wire-vectors.md) · [builtin-SHAPE.md](builtin-SHAPE.md) · [builtin-RANK.md](builtin-RANK.md) · [builtin-REPEAT.md](builtin-REPEAT.md) |
+| **Tensor / matrix** | \`SHAPE\`, \`RANK\`, \`PIVOT\`, \`REPEAT\`, \`IDENTITY\`, \`ZEROS\`, \`FILL\`, \`DIAG\`, \`IOTA\`, \`OUTER\`, \`TRACE\`, \`NORM\`, \`L2\`, \`TRIL\`, \`TRIU\`, \`FLIPUD\`, \`FLIPLR\`, \`MCAT\`, \`MSLICE\` | [wire-vectors.md](wire-vectors.md) · [builtin-SHAPE.md](builtin-SHAPE.md) · [builtin-RANK.md](builtin-RANK.md) · [builtin-REPEAT.md](builtin-REPEAT.md) · [builtin-FILL.md](builtin-FILL.md) (matrix + bit pattern) |
 | **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
-| **Bit analysis** | \`PARITY\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\`, \`WWIDTH\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) |
+| **Bit analysis** | \`PARITY\`, \`PARITYEVEN\`, \`PARITYODD\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\`, \`WWIDTH\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) · UART parity: [builtin-PARITYEVEN.md](builtin-PARITYEVEN.md) |
 | **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) · \`RSHIFT\` \`; signed\` = ASHR · **\`; matrix\`**: [matrix-reduction.md](matrix-reduction.md) |
 | **Tristate (ZSTATE)** | \`ZRELEASE(wire)\`, \`bus = ZCONNECT(en, data)\` | [zstate.md](zstate.md) |
 
@@ -5417,6 +5480,63 @@ show(m)
 ## See also
 
 [DOT](builtin-DOT.md) · [MULTIPLY](builtin-MULTIPLY.md)
+`,
+    'builtin-PARITYEVEN.md': `# PARITYEVEN · PARITYODD
+
+Index: [builtin-functions.md](builtin-functions.md) · [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md)
+
+Live signatures: \`doc(PARITYEVEN)\` · \`doc(PARITYODD)\` (see [doc-function.md](doc-function.md#bit-analysis)).
+
+UART-style **parity bit** to append after data (same rules as \`parityEven\` / \`parityOdd\` in [protocol-assemble.md](protocol-assemble.md)).
+
+## Signatures
+
+\`\`\`
+PARITYEVEN(Xbit) -> 1bit
+PARITYODD(Xbit)  -> 1bit
+\`\`\`
+
+| Function | Bit emitted so that **data + parity** has … |
+|----------|---------------------------------------------|
+| \`PARITYEVEN\` | an **even** number of \`1\` bits |
+| \`PARITYODD\`  | an **odd** number of \`1\` bits |
+
+## Even vs odd parity bit
+
+\`\`\`logts-play
+8wire data = 01100110
+1wire pe = PARITYEVEN(data)
+1wire po = PARITYODD(data)
+show(pe)
+show(po)
+\`\`\`
+
+## Relation to \`PARITY\`
+
+\`PARITY(data)\` is XOR reduction (odd popcount → \`1\`). **\`PARITYEVEN(data)\`** matches that value. **\`PARITYODD(data)\`** is the complement (\`NOT\` on 1 bit).
+
+\`\`\`logts-play
+4wire data = 1011
+1wire p = PARITY(data)
+1wire e = PARITYEVEN(data)
+1wire o = PARITYODD(data)
+show(p)
+show(e)
+show(o)
+\`\`\`
+
+## Append parity on the wire
+
+\`\`\`logts-play
+8wire payload = 11110000
+1wire par = PARITYODD(payload)
+9wire onWire = payload + par
+show(onWire)
+\`\`\`
+
+## See also
+
+[builtin-FILL.md](builtin-FILL.md) · [protocol-assemble.md](protocol-assemble.md)
 `,
     'builtin-RANK.md': `# RANK
 
@@ -9935,12 +10055,33 @@ Full behaviour and priority-encoder pattern: [builtin-bit-selection-functions.md
 
 | Call | Output |
 |------|--------|
-| \`doc(PARITY)\` | \`PARITY(Xbit) -> 1bit\` |
+| \`doc(PARITY)\` | \`PARITY(Xbit) -> 1bit — XOR reduction (odd popcount → 1)\` |
+| \`doc(PARITYEVEN)\` | \`PARITYEVEN(Xbit) -> 1bit — UART even parity bit to append\` |
+| \`doc(PARITYODD)\` | \`PARITYODD(Xbit) -> 1bit — UART odd parity bit to append\` |
 | \`doc(CNTONE)\` | \`CNTONE(Xbit) -> Ybit\` |
 | \`doc(CNTZERO)\` | \`CNTZERO(Xbit) -> Ybit\` |
 | \`doc(BITSIZE)\` | \`BITSIZE(Xbit) -> Ybit\` |
 
-Full behaviour: [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md).
+Live signatures come from \`Interpreter.BUILTIN_DOC\` (same text as \`doc(Name)\` prints in **Output**).
+
+Full behaviour: [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) · [builtin-PARITYEVEN.md](builtin-PARITYEVEN.md).
+
+### Tensor / matrix (\`FILL\`)
+
+\`doc(FILL)\` prints **two** overload lines (matrix constant fill vs bit-pattern tile):
+
+\`\`\`
+doc(FILL)
+\`\`\`
+
+Example output:
+
+\`\`\`
+FILL(\\N, Wbit scalar) -> Wwire[N,N] — constant fill (square matrix assign)
+FILL(pattern, \\N or times) -> Wbit — tile binary pattern to total width N (protocol-style repeat)
+\`\`\`
+
+Runnable examples: [builtin-FILL.md](builtin-FILL.md) (**Load** / **Load & Run** on each \`logts-play\` block).
 
 ### Shift (legacy anchor)
 
@@ -27314,7 +27455,8 @@ show(hot)
 | Function | Role | Doc |
 |----------|------|-----|
 | \`ZEROS(\\N)\` | zero N×N matrix | [builtin-ZEROS.md](builtin-ZEROS.md) |
-| \`FILL(\\N, scalar)\` | constant fill | [builtin-FILL.md](builtin-FILL.md) |
+| \`FILL(\\N, scalar)\` | constant N×N matrix fill | [builtin-FILL.md](builtin-FILL.md) |
+| \`FILL(pattern, \\N)\` | tile binary pattern to width N | [builtin-FILL.md](builtin-FILL.md) |
 | \`DIAG(vector)\` | diagonal from vector | [builtin-DIAG.md](builtin-DIAG.md) |
 | \`IOTA(\\N)\` | index vector 0..N−1 | [builtin-IOTA.md](builtin-IOTA.md) |
 | \`OUTER(col, row)\` | outer product [N,M] | [builtin-OUTER.md](builtin-OUTER.md) |

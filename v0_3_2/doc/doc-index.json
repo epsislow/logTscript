@@ -12,7 +12,7 @@
         { "file": "builtin-sequential-functions.md", "label": "Built-in sequential (LATCH, REG)" },
         { "file": "builtin-routing-functions.md", "label": "Built-in routing (MUX, DEMUX)" },
         { "file": "builtin-bit-selection-functions.md", "label": "Built-in bit selection", "searchExtra": "HIGH LOW ANY ZERO ANYZ ANYX ANY1 ANY0 ANY01 ANYZX ALLZ ALLX ALL1 ALL0 ALL01 ALLZX BITINDEX ONEHOT priority encoder" },
-        { "file": "builtin-bit-analysis-functions.md", "label": "Built-in bit analysis", "searchExtra": "PARITY CNTONE CNTZERO BITSIZE" },
+        { "file": "builtin-bit-analysis-functions.md", "label": "Built-in bit analysis", "searchExtra": "PARITY PARITYEVEN PARITYODD CNTONE CNTZERO BITSIZE WWIDTH doc(PARITY) doc(PARITYEVEN)" },
         { "file": "builtin-bit-transform-functions.md", "label": "Built-in bit transform", "searchExtra": "LSHIFT RSHIFT REVERSE LROTATE RROTATE rotate shift" },
         { "file": "components.md", "label": "Component catalog" },
         { "file": "short-notation.md", "label": "Short notation" },
@@ -143,6 +143,8 @@
     { "file": "builtin-REVERSE.md", "label": "REVERSE", "section": "Bit transform", "searchExtra": "vector reverse bits" },
     { "file": "builtin-REPEAT.md", "label": "REPEAT", "section": "Tensor / matrix", "searchExtra": "tile repeat vector matrix concat stack" },
     { "file": "builtin-SHAPE.md", "label": "SHAPE", "section": "Tensor / matrix", "searchExtra": "tensor rows cols dimensions metadata shape" },
-    { "file": "builtin-RANK.md", "label": "RANK", "section": "Tensor / matrix", "searchExtra": "tensor rank 1 2 matrix vector metadata" }
+    { "file": "builtin-RANK.md", "label": "RANK", "section": "Tensor / matrix", "searchExtra": "tensor rank 1 2 matrix vector metadata" },
+    { "file": "builtin-FILL.md", "label": "FILL", "section": "Tensor / matrix", "searchPrimary": "FILL", "searchExtra": "matrix constant fill pattern tile repeat protocol doc(FILL) logts-play" },
+    { "file": "builtin-PARITYEVEN.md", "label": "PARITYEVEN · PARITYODD", "section": "Bit analysis", "searchPrimary": "PARITYEVEN PARITYODD", "searchExtra": "UART even odd parity protocol doc(PARITYEVEN) doc(PARITYODD) logts-play" }
   ]
 }

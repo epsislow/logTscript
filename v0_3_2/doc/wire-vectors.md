@@ -150,7 +150,8 @@ show(hot)
 | Function | Role | Doc |
 |----------|------|-----|
 | `ZEROS(\N)` | zero N×N matrix | [builtin-ZEROS.md](builtin-ZEROS.md) |
-| `FILL(\N, scalar)` | constant fill | [builtin-FILL.md](builtin-FILL.md) |
+| `FILL(\N, scalar)` | constant N×N matrix fill | [builtin-FILL.md](builtin-FILL.md) |
+| `FILL(pattern, \N)` | tile binary pattern to width N | [builtin-FILL.md](builtin-FILL.md) |
 | `DIAG(vector)` | diagonal from vector | [builtin-DIAG.md](builtin-DIAG.md) |
 | `IOTA(\N)` | index vector 0..N−1 | [builtin-IOTA.md](builtin-IOTA.md) |
 | `OUTER(col, row)` | outer product [N,M] | [builtin-OUTER.md](builtin-OUTER.md) |

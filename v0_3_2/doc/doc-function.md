@@ -110,12 +110,33 @@ Full behaviour and priority-encoder pattern: [builtin-bit-selection-functions.md
 
 | Call | Output |
 |------|--------|
-| `doc(PARITY)` | `PARITY(Xbit) -> 1bit` |
+| `doc(PARITY)` | `PARITY(Xbit) -> 1bit — XOR reduction (odd popcount → 1)` |
+| `doc(PARITYEVEN)` | `PARITYEVEN(Xbit) -> 1bit — UART even parity bit to append` |
+| `doc(PARITYODD)` | `PARITYODD(Xbit) -> 1bit — UART odd parity bit to append` |
 | `doc(CNTONE)` | `CNTONE(Xbit) -> Ybit` |
 | `doc(CNTZERO)` | `CNTZERO(Xbit) -> Ybit` |
 | `doc(BITSIZE)` | `BITSIZE(Xbit) -> Ybit` |
 
-Full behaviour: [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md).
+Live signatures come from `Interpreter.BUILTIN_DOC` (same text as `doc(Name)` prints in **Output**).
+
+Full behaviour: [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) · [builtin-PARITYEVEN.md](builtin-PARITYEVEN.md).
+
+### Tensor / matrix (`FILL`)
+
+`doc(FILL)` prints **two** overload lines (matrix constant fill vs bit-pattern tile):
+
+```
+doc(FILL)
+```
+
+Example output:
+
+```
+FILL(\N, Wbit scalar) -> Wwire[N,N] — constant fill (square matrix assign)
+FILL(pattern, \N or times) -> Wbit — tile binary pattern to total width N (protocol-style repeat)
+```
+
+Runnable examples: [builtin-FILL.md](builtin-FILL.md) (**Load** / **Load & Run** on each `logts-play` block).
 
 ### Shift (legacy anchor)
 
