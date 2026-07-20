@@ -3915,6 +3915,19 @@ class Interpreter {
     return true;
   }
 
+  /** After a wire write in storage: schedule wave commit and/or wake wire-triggered property blocks. */
+  _publishWireAssignment(name, newValue) {
+    if (this.deferWirePropagation()) {
+      if (!this.scheduleWireChange(name, newValue)) {
+        this.updateConnectedComponents(name, newValue);
+      }
+    } else {
+      this._notifyLegacyWireCommit(name, newValue);
+      this.updateConnectedComponents(name, newValue);
+      this._emitProbeForWire(name, newValue);
+    }
+  }
+
   publishWireValue(wireName, value) {
     const wire = this.wires.get(wireName);
     if (!wire || value === null || value === undefined) return;
@@ -5820,7 +5833,7 @@ class Interpreter {
       if (range) {
         const merged = this._applySliceWrite(name, wire, bits, range, value, assignPad);
         if (this.deferWirePropagation()) {
-          this.scheduleWireChange(name, merged);
+          this._publishWireAssignment(name, merged);
         } else {
           this.setValueAtRef(wire.ref, merged);
           this.updateConnectedComponents(name, merged);
@@ -5828,7 +5841,7 @@ class Interpreter {
       } else {
         this.setValueAtRef(wire.ref, value);
         if (this.deferWirePropagation()) {
-          this.scheduleWireChange(name, value);
+          this._publishWireAssignment(name, value);
         } else {
           this.updateConnectedComponents(name, value);
         }
@@ -10456,8 +10469,10 @@ if (this.isBuiltinDEMUX(name)) {
           if(setExpr.length === 1){
             const atom = setExpr[0];
             if(atom.var && !atom.var.startsWith('.')){
-              // Direct wire reference
               setExprDirectRef = { type: 'wire', name: atom.var };
+              if (atom.bitRange) {
+                setExprDirectRef.bitRange = atom.bitRange;
+              }
             } else if(atom.var && atom.var.startsWith('.')){
               // Direct component reference
               setExprDirectRef = { type: 'component', name: atom.var };
@@ -11561,13 +11576,7 @@ if (s.assignment) {
     this.wireStorageMap.set(name, idx);
     this.trackWireStatement(s);
 
-    if (this.deferWirePropagation()) {
-      this.scheduleWireChange(name, newValue);
-    } else {
-      this._notifyLegacyWireCommit(name, newValue);
-      this.updateConnectedComponents(name, newValue);
-      this._emitProbeForWire(name, newValue);
-    }
+    this._publishWireAssignment(name, newValue);
   } else {
     // Variable (immutable unless slice)
     const idx = this.storeValue(newValue);
