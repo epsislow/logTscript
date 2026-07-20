@@ -32,6 +32,10 @@ class Tokenizer {
     if (j >= this.src.length) return false;
     const rest = this.src.slice(j);
     if (/^[A-Za-z_][A-Za-z0-9_]*\s*=/.test(rest)) return false;
+    // Spaced bit-width suffix (e.g. "A.2 1b" or "B.1 1bit") — not one binary literal.
+    if (/^[01]+b(?:it)?(?:\W|$)/i.test(rest) || /^\d+b(?:it)?(?:\W|$)/i.test(rest)) {
+      return false;
+    }
     return isValidChar(this.src[j]);
   }
 

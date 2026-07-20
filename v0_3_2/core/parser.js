@@ -3948,6 +3948,17 @@ assignment() {
     if (this.c.type === 'TYPE' && /^\d+bit$/.test(this.c.value)) {
       width = parseInt(this.c.value, 10);
       this.eat('TYPE');
+    } else if (
+      (this.c.type === 'BIN' || this.c.type === 'DEC')
+      && this.t.peekToken
+      && (() => {
+        const n = this.t.peekToken();
+        return n && n.type === 'ID' && /^b(?:it)?$/i.test(n.value);
+      })()
+    ) {
+      width = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      this.eat('ID');
     }
     return { name, bitRange, width };
   }
