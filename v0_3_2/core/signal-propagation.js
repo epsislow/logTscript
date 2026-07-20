@@ -102,6 +102,17 @@ class SignalPropagationStrategy {
     this._emitLegacyListenValueEntryAtStep(step, name, val, 'commit', 1, false, true);
   }
 
+  notifySockCommitListen(name, val) {
+    const interp = this.interp;
+    if (!interp || !interp.waveListenActive) return;
+    if (this._isLegacyListen && this._isLegacyListen()) {
+      this.notifyLegacySockCommit(name, val);
+      return;
+    }
+    const wave = this._listenWaveIndex != null ? this._listenWaveIndex : 0;
+    this._emitWaveListenValueEntry(wave, name, val, 'commit', 1, false, true);
+  }
+
   notifyLegacyComponentCommit(name, val) {
     if (!this._isLegacyListen()) return;
     const step = this._legacyCascadeStep();
@@ -267,20 +278,21 @@ class SignalPropagationStrategy {
     };
   }
 
-  _emitWaveListenValueEntry(wave, name, val, kind, minLevel, isComponent) {
+  _emitWaveListenValueEntry(wave, name, val, kind, minLevel, isComponent, isSock) {
     if (this.debugLevel < minLevel) return;
     const interp = this.interp;
     if (!interp || !interp.waveListenActive) return;
     if (typeof interp.emitWaveListenLine !== 'function') return;
     let label = 'commit';
     if (isComponent) label = 'commit component';
+    else if (isSock) label = 'commit sock';
     else if (kind === 'schedule') label = 'schedule';
     const payload = {
       wave,
       mode: 'wave',
       traceCategory: this._listenCategoryFor(kind, { isComponent }),
       label,
-      ...this._buildWaveListenValuePayload(name, val, { isComponent }),
+      ...this._buildWaveListenValuePayload(name, val, { isComponent, isSock: !!isSock }),
     };
     interp.emitWaveListenLine(payload, kind);
   }
@@ -2103,20 +2115,31 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
     this._uccWireDependStmts = new Map();
   }
 
+  const isSock = this.socks && this.socks.has(varName);
+  const isWire = this.wires.has(varName);
+  const isWireDepSource = isWire || isSock;
+
   // Update all components connected to this variable/wire
-  const varRef = this.vars.has(varName) ? this.vars.get(varName).ref : 
-                 (this.wires.has(varName) ? this.wires.get(varName).ref : null);
-  
-  //console.log(`[DEBUG updateConnected] called for '${varName}' newValue=${newValue} varRef=${varRef} isTopLevel=${isTopLevel}`);
-  
-  if(!varRef || varRef === '&-'){
-    //console.log(`[DEBUG updateConnected] EARLY RETURN: varRef is null or &- for '${varName}'`);
-    if(isTopLevel){ this._uccPendingBlocks = null; this._uccExecutedStatements = null; this.memWriteBatching = false; }
-    return;
+  const varRef = this.vars.has(varName) ? this.vars.get(varName).ref :
+                 (isWire ? this.wires.get(varName).ref : null);
+
+  if (isSock && (newValue == null || newValue === undefined)) {
+    newValue = this.getSockBits(varName) || '';
   }
-  
-  // Check all component connections
-  for(const [compName, conn] of this.componentConnections.entries()){
+
+  if (!isSock) {
+    if (!varRef || varRef === '&-') {
+      if (isTopLevel) {
+        this._uccPendingBlocks = null;
+        this._uccExecutedStatements = null;
+        this.memWriteBatching = false;
+      }
+      return;
+    }
+  }
+
+  // Check all component connections (storage-backed vars/wires only)
+  if (!isSock) for (const [compName, conn] of this.componentConnections.entries()) {
     // Check if connection references this variable
     if(typeof conn.source === 'string'){
       // Simple reference string
@@ -2188,7 +2211,6 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
 
   // Find all wires that depend on this wire (cascade propagation)
   const dependentWires = new Set();
-  const isWire = this.wires.has(varName);
   // _uccWireDependStmts is only initialized when isTopLevel; guard against undefined
   // when called non-top-level from updateComponentConnections (e.g. key/switch onPress)
   if(!this._uccWireDependStmts) {
@@ -2434,7 +2456,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
       
       // Check if this block has dependencies that include this wire/variable or any dependent wire
       let hasDependency = false;
-      if(isWire && block.wireDependencies){
+      if(isWireDepSource && block.wireDependencies){
         // Check direct dependency
         if(block.wireDependencies.has(varName)){
           hasDependency = true;
@@ -2448,7 +2470,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
             }
           }
         }
-      } else if(!isWire && block.dependencies && block.dependencies.has(varName)){
+      } else if(!isWireDepSource && block.dependencies && block.dependencies.has(varName)){
         hasDependency = true;
       }
       
@@ -2506,23 +2528,23 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
             // Check if setExpr itself has no dependencies (it's just a constant '1')
             const setExprHasWireDep = this.exprReferencesWire(block.setExpr, varName) || 
                                       Array.from(dependentWires).some(dw => this.exprReferencesWire(block.setExpr, dw));
-            const setExprHasDep = !isWire && block.dependencies && block.dependencies.has(varName);
+            const setExprHasDep = !isWireDepSource && block.dependencies && block.dependencies.has(varName);
             if(!setExprHasWireDep && !setExprHasDep){
               // This is a constant set=1 block
               isConstantBlock = true;
               
               // Check if any of the block's properties (excluding 'set') depend on the changed variable
               let hasPropertyDependency = false;
-              if(isWire && block.wireDependencies && block.wireDependencies.has(varName)){
+              if(isWireDepSource && block.wireDependencies && block.wireDependencies.has(varName)){
                 hasPropertyDependency = true;
-              } else if(isWire && block.wireDependencies){
+              } else if(isWireDepSource && block.wireDependencies){
                 for(const depWire of dependentWires){
                   if(block.wireDependencies.has(depWire)){
                     hasPropertyDependency = true;
                     break;
                   }
                 }
-              } else if(!isWire && block.dependencies && block.dependencies.has(varName)){
+              } else if(!isWireDepSource && block.dependencies && block.dependencies.has(varName)){
                 hasPropertyDependency = true;
               }
               
@@ -2536,7 +2558,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
         // If not a constant block, check if it has dependencies
         if(!shouldExecute){
           let hasDependency = false;
-          if(isWire && block.wireDependencies){
+          if(isWireDepSource && block.wireDependencies){
             if(block.wireDependencies.has(varName)){
               hasDependency = true;
             } else {
@@ -2547,7 +2569,7 @@ Interpreter.prototype.updateConnectedComponents = function(varName, newValue, ex
                 }
               }
             }
-          } else if(!isWire && block.dependencies && block.dependencies.has(varName)){
+          } else if(!isWireDepSource && block.dependencies && block.dependencies.has(varName)){
             hasDependency = true;
           }
           

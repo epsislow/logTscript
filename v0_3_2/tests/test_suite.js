@@ -23996,6 +23996,19 @@ reg(2560, 'literals', 'spaced o^ oct literal', function(h, session) {
   h.assert('a', session.getWire(interp, 'a'), '001010011100');
 });
 
+reg(2561, 'sock', 'sock append triggers on:1 conditional (wave)', function(h, session) {
+  const src = `sock rx
+1wire fired : 0
+on:1 {
+  GT(BITSIZE(rx), 011),
+  fired = 1
+}`;
+  const { interp } = session.run(src);
+  h.assert('before append', session.getWire(interp, 'fired'), '0');
+  session.execStmts(interp, 'rx << ^FF');
+  h.assert('after append', session.getWire(interp, 'fired'), '1');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

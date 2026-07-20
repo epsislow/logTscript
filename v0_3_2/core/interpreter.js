@@ -2602,11 +2602,24 @@ class Interpreter {
   }
 
   _notifyLegacySockCommit(name, val) {
-    if (this.deferWirePropagation() || !this.waveListenActive) return;
+    this._notifySockCommitListen(name, val);
+  }
+
+  _notifySockCommitListen(name, val) {
+    if (!this.waveListenActive) return;
     const strategy = this.signalPropagationStrategy;
-    if (strategy && typeof strategy.notifyLegacySockCommit === 'function') {
-      strategy.notifyLegacySockCommit(name, val);
+    if (strategy && typeof strategy.notifySockCommitListen === 'function') {
+      strategy.notifySockCommitListen(name, val);
     }
+  }
+
+  notifySockChanged(sockName) {
+    if (!sockName || !this.socks || !this.socks.has(sockName)) return;
+    const bits = this.getSockBits(sockName);
+    const value = bits != null ? bits : '';
+    this._notifySockCommitListen(sockName, value);
+    this.updateConnectedComponents(sockName, value, null, true);
+    if (typeof showVars === 'function') showVars(this);
   }
 
   _emitWatchRowForSock(name, fullValue) {
@@ -2640,7 +2653,7 @@ class Interpreter {
       }
     }
     this._emitWatchRowForSock(name, value);
-    this._notifyLegacySockCommit(name, value);
+    this.notifySockChanged(name);
   }
 
   _emitProbeForRef(refStr, value) {
@@ -5579,6 +5592,7 @@ class Interpreter {
     entry.connected = true;
     entry.socketDetached = false;
     entry.bits = '';
+    this.notifySockChanged(sockName);
   }
 
   detachNetworkSock(sockName, snapshotBits) {
@@ -5589,6 +5603,7 @@ class Interpreter {
     entry.role = null;
     entry.socketDetached = true;
     entry.bits = snapshotBits != null ? snapshotBits : '';
+    this.notifySockChanged(sockName);
   }
 
   getSockBits(name) {
