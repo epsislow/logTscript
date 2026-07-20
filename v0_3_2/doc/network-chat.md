@@ -4,7 +4,9 @@ Multi-instance **wave** chat demo: clients on **Inst 2–5** send framed message
 
 Related: [sock.md](sock.md) (`openSock`, `connSock`, `SOCKATTACHED`), [network.md](network.md) (`send` broadcast), [protocol-parse.md](protocol-parse.md) (`withLength`, `parseView`).
 
-**Suite tests:** **2528–2529** (`SOCKATTACHED`), **2530–2531** (`.chatFrame` / `.chatParse`), **2532–2533** (uplink cross-instance), **2534** (downlink broadcast), **2535–2536** (`lineBuf` / hello frame width).
+**Suite tests:** **2528–2529** (`SOCKATTACHED`), **2530–2531** (`.chatFrame` / `.chatParse`), **2532–2533** (uplink cross-instance), **2534** (downlink broadcast), **2535–2536** (`lineBuf` / hello frame width), **2569–2571** (wave hub: deferred `connSock`, JOIN packet cu inst în coadă, terminal join, CHAT uplink + downlink prefix).
+
+Scripturile wave validate sunt **`NETWORK_CHAT_SERVER_WAVE`** / **`NETWORK_CHAT_CLIENT_WAVE`** în `tests/test_suite.js` (ca `huffFsmScript` la Huffman v2).
 
 ---
 

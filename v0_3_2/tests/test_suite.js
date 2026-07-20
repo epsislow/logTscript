@@ -23549,6 +23549,167 @@ inline [protocol] .chatParse:
 const CHAT_JOIN_PKT = '000000010000001000000000';
 const CHAT_HI_PKT = '0000001000000010000100000110100001101001';
 
+/** Wave network-chat hub (Inst 1) — deferred connSock, JOIN via packet tail inst id. */
+const NETWORK_CHAT_SERVER_WAVE = INLINE_CHAT_UP + `
+MODE WIREWRITE
+comp [network] .net:
+  width: 136
+  length: 8
+  channel: 'chat-demo'
+  on: 1
+  :
+comp [network] .ns:
+  width: 136
+  length: 8
+  channel: 'chat-demo'
+  on: 1
+  :
+sock up2
+4wire readyToConnectToInst : 0000
+1wire netLock : 0
+1wire netRxDone : 0
+1wire joinPending2 : 0
+1wire seen2 : 0
+1wire isChat : 0
+136wire joinLine2 : "*client 2 joined*"
+136wire leaveLine2 := "*client 2 left*"
+136wire prefix2 : "client2> "
+136wire chatLine : 0
+136wire rxPkt : 0
+136wire parsed : 0
+8wire kind : 0
+.ns:{ connSock -> up2
+  target = 0010
+  port = 0010
+  set = readyToConnectToInst.0 }
+comp [terminal] .term:
+  on: 1
+  :
+comp [osc] .poll:
+  on: 1
+  :
+on:1 {
+  AND(.poll:get, NOT(.net:empty), NOT(netLock), NOT(netRxDone)),
+  rxPkt = .net:get,
+  netRxDone = 1,
+  netLock = 1,
+  .net:pop = 1,
+  .net:set = 1
+}
+on:1 {
+  AND(.poll:get, netLock, netRxDone),
+  netLock = 0
+}
+on:1 {
+  AND(.poll:get, netRxDone),
+  netRxDone = 0
+}
+on:1 {
+  EQ(rxPkt.128-135, \\2;8),
+  readyToConnectToInst.0 = 1
+}
+on:raise {
+  SOCKATTACHED(up2),
+  readyToConnectToInst.0 = 0,
+  joinPending2 = 1
+}
+on:1 {
+  AND(.poll:get, joinPending2, NOT(netLock)),
+  joinPending2 = 0,
+  netLock = 1,
+  .net:send = joinLine2,
+  .net:set = 1,
+  .term:append = joinLine2,
+  .term:newline = 1,
+  .term:set = 1,
+  seen2 = 1
+}
+on:1 {
+  AND(.poll:get, netLock, NOT(joinPending2), NOT(isChat)),
+  netLock = 0
+}
+on:1 {
+  AND(.poll:get, SOCKATTACHED(up2), GT(BITSIZE(up2), 011111)),
+  parsed =: .chatParse { data << up2 },
+  kind = parsed:kind,
+  isChat = EQ(kind, \\2;8),
+  chatLine := prefix2 + parsed:body
+}
+on:1 {
+  AND(.poll:get, isChat, NOT(netLock)),
+  isChat = 0,
+  netLock = 1,
+  .net:send = chatLine,
+  .net:set = 1,
+  .term:append = chatLine,
+  .term:newline = 1,
+  .term:set = 1
+}`;
+
+/** Wave network-chat client (Inst 2–5) — JOIN packet + downlink terminal. */
+const NETWORK_CHAT_CLIENT_WAVE = INLINE_CHAT_UP + `
+MODE WIREWRITE
+comp [network] .net:
+  width: 136
+  length: 8
+  channel: 'chat-demo'
+  on: 1
+  :
+comp [network] .nc:
+  width: 136
+  length: 8
+  channel: 'chat-demo'
+  on: 1
+  :
+8wire myInst : /instance/
+sock toSrv
+128wire joinBase : "JOIN            "
+8wire inst8 = myInst
+136wire joinNet = joinBase + inst8
+1wire dlPop : 0
+136wire line : 0
+comp [terminal] .out:
+  on: 1
+  :
+comp [osc] .poll:
+  on: 1
+  :
+on:1 {
+  AND(.poll:get, NOT(.net:empty), NOT(dlPop)),
+  line = .net:get,
+  dlPop = 1,
+  .net:pop = 1,
+  .net:set = 1
+}
+on:1 {
+  AND(.poll:get, dlPop),
+  dlPop = 0,
+  .out:append = line,
+  .out:newline = 1,
+  .out:set = 1
+}`;
+
+function pulseNetworkChatWave(serverSession, clientSession, n) {
+  for (let i = 0; i < n; i++) {
+    oscPulse(clientSession, clientSession.interp, '.poll');
+    oscPulse(serverSession, serverSession.interp, '.poll');
+  }
+}
+
+/** One-shot JOIN packet + openSock (wave tests — avoids set=boot re-fire). */
+function networkChatClientJoinWave(clientSession) {
+  clientSession.execStmts(clientSession.interp, `.nc:{
+  openSock <- toSrv
+  port = myInst
+  set = 1
+}
+.net:{
+  send = joinNet
+  target = 0001
+  set = 1
+}`);
+}
+
 const INLINE_CHAT_SERVER_INST2 = `comp [network] .net:
   width: 136
   length: 8
@@ -23748,6 +23909,44 @@ reg(2534, 'socket-chat', 'downlink broadcast packet received', function(h) {
   s2.execStmts(s2.interp, '136wire rx = .net:get\n.net:{ pop = 1\n  set = 1 }');
   h.assert('line starts star', s2.getWire(s2.interp, 'rx').slice(0, 8), '00101010');
 });
+
+reg(2569, 'socket-chat', 'wave JOIN packet deferred connSock SOCKATTACHED', function(h) {
+  const s1 = createSession({ instanceId: 1, propagation: 'wave' });
+  const s2 = createSession({ instanceId: 2, propagation: 'wave' });
+  s1.run(NETWORK_CHAT_SERVER_WAVE);
+  s2.run(NETWORK_CHAT_CLIENT_WAVE);
+  networkChatClientJoinWave(s2);
+  pulseNetworkChatWave(s1, s2, 16);
+  s1.execStmts(s1.interp, '1wire live = SOCKATTACHED(up2)');
+  h.assert('server sock live', s1.getWire(s1.interp, 'live'), '1');
+  h.assert('seen client 2', s1.getWire(s1.interp, 'seen2'), '1');
+}, { propagation: 'wave' });
+
+reg(2570, 'socket-chat', 'wave join broadcast server terminal', function(h) {
+  const s1 = createSession({ instanceId: 1, propagation: 'wave' });
+  const s2 = createSession({ instanceId: 2, propagation: 'wave' });
+  s1.run(NETWORK_CHAT_SERVER_WAVE);
+  s2.run(NETWORK_CHAT_CLIENT_WAVE);
+  networkChatClientJoinWave(s2);
+  pulseNetworkChatWave(s1, s2, 16);
+  const text = getTerminalText(_termId(s1.interp, '.term'));
+  h.assert('joined line', String(text.includes('*client 2 joined*')), 'true');
+}, { propagation: 'wave' });
+
+reg(2571, 'socket-chat', 'wave CHAT hi uplink broadcast chatLine', function(h) {
+  const s1 = createSession({ instanceId: 1, propagation: 'wave' });
+  const s2 = createSession({ instanceId: 2, propagation: 'wave' });
+  s1.run(NETWORK_CHAT_SERVER_WAVE);
+  s2.run(NETWORK_CHAT_CLIENT_WAVE);
+  networkChatClientJoinWave(s2);
+  pulseNetworkChatWave(s1, s2, 16);
+  s2.execStmts(s2.interp, 'toSrv << ' + CHAT_HI_PKT);
+  pulseNetworkChatWave(s1, s2, 20);
+  h.assert('parsed kind CHAT', s1.getWire(s1.interp, 'kind'), '00000010');
+  h.assert('uplink consumed', String(s1.getSockLen(s1.interp, 'up2')), '0');
+  const text = getTerminalText(_termId(s2.interp, '.out'));
+  h.assert('client chat prefix', String(text.includes('client2>')), 'true');
+}, { propagation: 'wave' });
 
 reg(2537, 'network-sock', 'SOCKMODE local producer consumer', function(h) {
   const s1 = createSession({ instanceId: 1 });
@@ -24065,6 +24264,10 @@ reg(2568, 'doc', 'doc(FILL) end-to-end output', function(h, session) {
     createSession,
     huffFsmScript,
     huffFsmRoundTripScript,
+    NETWORK_CHAT_SERVER_WAVE,
+    NETWORK_CHAT_CLIENT_WAVE,
+    pulseNetworkChatWave,
+    networkChatClientJoinWave,
     huffFsmTick,
     huffBuildCodebookWire,
     huffCodewordsForSource,
