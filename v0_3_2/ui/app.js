@@ -332,6 +332,59 @@ function invalidateOutputFingerprint(ctx) {
   if (ctx) ctx.lastOutFingerprint = null;
 }
 
+const VARS_FINGERPRINT_EMPTY = 'empty';
+let _varsPanelFingerprintNoCtx = null;
+
+function fingerprintFromVarsSnapshot(text) {
+  if (text == null || text === '') return VARS_FINGERPRINT_EMPTY;
+  const lines = text.split('\n');
+  const parts = [];
+  for (let i = 0; i < lines.length; i++) {
+    parts.push('L\x1f\x1f' + lines[i]);
+  }
+  return fnv1aHash32(parts.join('\x1e')) + '|' + lines.length;
+}
+
+function isVarsPanelDomEmpty() {
+  const el = document.getElementById('vars');
+  return !el || el.textContent === '';
+}
+
+function syncVarsPanel(snapshotText, ctxOptional, options) {
+  const opts = options || {};
+  const force = !!opts.force;
+  const ctx = ctxOptional;
+  const text = snapshotText == null ? '' : String(snapshotText);
+  const varsEl = document.getElementById('vars');
+  if (!varsEl) return;
+
+  const storedFp = ctx ? ctx.lastVarsFingerprint : _varsPanelFingerprintNoCtx;
+
+  if (!text.length) {
+    if (!force && storedFp === VARS_FINGERPRINT_EMPTY && isVarsPanelDomEmpty()) {
+      return;
+    }
+    varsEl.textContent = '';
+    if (ctx) ctx.lastVarsFingerprint = VARS_FINGERPRINT_EMPTY;
+    else _varsPanelFingerprintNoCtx = VARS_FINGERPRINT_EMPTY;
+    return;
+  }
+
+  const fp = fingerprintFromVarsSnapshot(text);
+  if (!force && storedFp === fp && !isVarsPanelDomEmpty()) {
+    return;
+  }
+
+  varsEl.textContent = text;
+  if (ctx) ctx.lastVarsFingerprint = fp;
+  else _varsPanelFingerprintNoCtx = fp;
+}
+
+function invalidateVarsFingerprint(ctx) {
+  if (ctx) ctx.lastVarsFingerprint = null;
+  else _varsPanelFingerprintNoCtx = null;
+}
+
 function errorDisplayContext() {
   return null;
 }
@@ -598,6 +651,7 @@ function run(){
   try{
   clearOutput();
   invalidateOutputFingerprint(ctx);
+  invalidateVarsFingerprint(ctx);
   clearErrorMarkers();
   editorErrorDismissed = false;
 
@@ -656,7 +710,7 @@ function run(){
   captureRunContextDom(ctx);
   render(ctx.out, ctx.outBlocks, ctx);
   buildVarsSnapshot(interp, ctx);
-  showVarsDomFromContext(ctx);
+  showVarsDomFromContext(ctx, { force: true });
   if (typeof publishWindowDeviceAliases === 'function' && ctx.deviceMaps) {
     publishWindowDeviceAliases(ctx.deviceMaps);
   }
@@ -792,10 +846,9 @@ function buildVarsSnapshot(interp, ctx) {
   return t;
 }
 
-function showVarsDomFromContext(ctx) {
+function showVarsDomFromContext(ctx, options) {
   if (!ctx) return;
-  const varsEl = document.getElementById('vars');
-  if (varsEl) varsEl.textContent = ctx.varsSnapshot || '';
+  syncVarsPanel(ctx.varsSnapshot || '', ctx, options || {});
   if (ctx.out && ctx.out.length) {
     render(ctx.out, ctx.outBlocks, ctx);
   }
@@ -818,8 +871,8 @@ function showVars(interpOptional){
   if (ctx) {
     showVarsDomFromContext(ctx);
   } else {
-    const varsEl = document.getElementById('vars');
-    if (varsEl) varsEl.textContent = buildVarsSnapshot(interp, null);
+    const snapshot = buildVarsSnapshot(interp, null);
+    syncVarsPanel(snapshot, null, {});
     if (interp.out && interp.out.length) {
       render(interp.out, interp.outBlocks);
     }

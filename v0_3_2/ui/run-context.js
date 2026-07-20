@@ -158,6 +158,10 @@ function captureRunContextDom(ctx) {
 
 function clearPanelDom() {
   if (typeof clearOutput === 'function') clearOutput();
+  if (typeof invalidateVarsFingerprint === 'function') {
+    const active = typeof getActiveRunContext === 'function' ? getActiveRunContext() : null;
+    invalidateVarsFingerprint(active);
+  }
   const varsEl = document.getElementById('vars');
   if (varsEl) varsEl.textContent = '';
   const devicesEl = document.getElementById('devices');
@@ -247,8 +251,12 @@ function activateRunContextLive(ctx, tabInfo) {
   if (typeof render === 'function') {
     render(ctx.out, ctx.outBlocks, ctx, { force: true });
   }
-  const varsEl = document.getElementById('vars');
-  if (varsEl) varsEl.textContent = ctx.varsSnapshot || '';
+  if (typeof syncVarsPanel === 'function') {
+    syncVarsPanel(ctx.varsSnapshot || '', ctx, { force: true });
+  } else {
+    const varsEl = document.getElementById('vars');
+    if (varsEl) varsEl.textContent = ctx.varsSnapshot || '';
+  }
   if (typeof mountDevicesPanelForContext === 'function') {
     mountDevicesPanelForContext(ctx);
   }
@@ -278,8 +286,12 @@ function mountPanelSnapshot(snapshot) {
   if (typeof render === 'function') {
     render(snapshot.out || [], snapshot.outBlocks || [], null, { force: true });
   }
-  const varsEl = document.getElementById('vars');
-  if (varsEl) varsEl.textContent = snapshot.varsSnapshot || '';
+  if (typeof syncVarsPanel === 'function') {
+    syncVarsPanel(snapshot.varsSnapshot || '', null, { force: true });
+  } else {
+    const varsEl = document.getElementById('vars');
+    if (varsEl) varsEl.textContent = snapshot.varsSnapshot || '';
+  }
   const devicesEl = document.getElementById('devices');
   if (devicesEl) devicesEl.innerHTML = snapshot.devicesHtml || '';
   const astEl = document.getElementById('ast');
@@ -391,6 +403,7 @@ function preemptInstanceForRun(instanceId, newOwnerTabId) {
   ctx.out = [];
   ctx.outBlocks = [];
   ctx.varsSnapshot = '';
+  ctx.lastVarsFingerprint = null;
   ctx.devicesHtml = '';
   ctx.timelineLabels = [];
   ctx.lastProcessedSource = '';
