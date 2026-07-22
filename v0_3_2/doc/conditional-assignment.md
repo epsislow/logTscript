@@ -385,22 +385,22 @@ on:1 {
 
 ## Restrictions
 
-| Allowed in `{ }` | Not allowed |
-|------------------|-------------|
+| Allowed in `on:{ }` | Not allowed in `on:{ }` |
+|---------------------|---------------------------|
 | `target = expr` (one or many, comma-separated) | `.lut:clear()` without destination |
 | `.comp:pin = expr` | `pcb`, `chip`, `board`, `comp`, `def` |
-| `a, b = expr` (multi-target) | `probe`, `watch`, `deps` |
-| `show(...)`, `peek(...)` | Property blocks (`.comp:{ }`) |
+| `a, b = expr` (multi-target) | Property blocks (`.comp:{ … }`) |
+| `show(...)`, `peek(...)` | `probe`, `watch`, `deps` |
 | `process = 1` | |
 
----
+Property blocks (`.comp:{ }`) accept pin assignments **and** `show(...)` / `peek(...)` with the same comma/newline rules; see [chip-board-execution.md — property blocks](chip-board-execution.md#writing-style-dataflow-vs-sequential).
 
 ## vs property blocks
 
 | | `on: { }` (standalone) | `.comp:{ }` (property block) |
 |--|------------------------|------------------------------|
 | Scope | Program / PCB body | Bound to one component instance |
-| Statements | One or more comma-separated assignments and/or `show`/`peek` | Multiple pin assignments |
+| Statements | One or more comma-separated assignments and/or `show`/`peek` | Pin assignments and/or `show`/`peek` |
 | Typical use | LUT/mem ops gated by a flag | Pin wiring on `exec:` trigger |
 
 Property blocks remain the right tool for multi-pin updates on a component; conditional assignment is for isolated side-effect writes (LUT, mem, a single wire).

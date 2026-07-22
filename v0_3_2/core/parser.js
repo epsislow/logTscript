@@ -2214,6 +2214,11 @@ parseBoardInstance() {
       throw Error(`Unexpected end of file in property block for ${componentName}`);
     }
 
+    if (this.c.type === 'KEYWORD') {
+      if (this.c.value === 'show') return this.show();
+      if (this.c.value === 'peek') return this.peek();
+    }
+
     if (this.c.type !== 'ID') {
       throw Error(`Expected property name in property block at ${this.c.line}:${this.c.col}, got ${this.c.type} '${this.c.value}'`);
     }
@@ -2326,6 +2331,7 @@ parseBoardInstance() {
         continue;
       }
       if (this.c.type === 'ID') continue;
+      if (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek')) continue;
       throw Error(`Expected ',' or '}' in property block for ${componentName} at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
 

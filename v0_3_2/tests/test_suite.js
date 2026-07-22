@@ -24257,6 +24257,82 @@ reg(2568, 'doc', 'doc(FILL) end-to-end output', function(h, session) {
   h.assert('line0', out[0], 'FILL(\\N, Wbit scalar) -> Wwire[N,N] — constant fill (square matrix assign)');
 });
 
+reg(2572, 'parser', 'property block show and peek items', function(h, session) {
+  const stmts = session.parse(`comp [led] .L:
+  on: 1
+  :
+
+.L:{
+  show(a)
+  peek(b)
+  data = c
+  set = 1
+}`);
+  const block = stmts[1].componentPropertyBlock;
+  h.assert('property block stmt', String(!!block), 'true');
+  h.assert('four items', String(block.properties.length), '4');
+  h.assert('item0 show', String(!!block.properties[0].show), 'true');
+  h.assert('item1 peek', String(!!block.properties[1].peek), 'true');
+  h.assert('item2 data pin', block.properties[2].property, 'data');
+  h.assert('item3 set', block.properties[3].property, 'set');
+});
+
+reg(2573, 'debug', 'show in property block on:1 fires', function(h, session) {
+  const src = `comp [led] .L:
+  on: 1
+  :
+
+1wire trig = 1
+4wire val = 1010
+.L:{
+  show(val)
+  data = val
+  set = trig
+}`;
+  const { out } = session.run(src);
+  const lines = out.filter(l => /val \(4wire\) = 1010/.test(l));
+  h.assert('show in block', String(lines.length >= 1), 'true');
+});
+
+reg(2574, 'debug', 'property block show before and after set', function(h, session) {
+  const src = `comp [counter] .cnt:
+  length: 4
+  on: 1
+  :
+
+4wire snap = 0000
+.cnt:{
+  show(snap)
+  set = 1
+  show(.cnt:get)
+}`;
+  const { out } = session.run(src);
+  const lines = out.filter(l => /\(4(wire|bit)\) = /.test(l));
+  h.assert('two show lines', String(lines.length), '2');
+  h.assert('before set snap', String(/snap \(4(wire|bit)\) = 0000/.test(lines[0])), 'true');
+  h.assert('after set get', String(/\.cnt:get \(4(wire|bit)\) = 0001/.test(lines[1])), 'true');
+});
+
+reg(2575, 'debug', 'property block show not deferred like top-level wave', function(h, session) {
+  const src = `MODE WIREWRITE
+comp [led] .L:
+  on: 1
+  :
+
+1wire trig = 0
+4wire val = 1010
+.L:{
+  data = val
+  show(val)
+  set = trig
+}
+show(val)
+trig = 1`;
+  const { out } = session.run(src);
+  const lines = out.filter(l => /val \(4wire\) = 1010/.test(l));
+  h.assert('block and top-level show', String(lines.length), '2');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

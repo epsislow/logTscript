@@ -1,11 +1,12 @@
 /* ================= INTERPRETER ================= */
 
 function isGetRedirectProperty(property) {
+  if (!property) return false;
   return /^(2|3|4)?get>$/.test(property);
 }
 
 function isGenericPoutRedirectProperty(property) {
-  if (!property.endsWith('>') || property === 'pout>') return false;
+  if (!property || !property.endsWith('>') || property === 'pout>') return false;
   const base = property.slice(0, -1);
   return ['front', 'top', 'empty', 'full', 'size', 'capacity', 'free'].includes(base);
 }
@@ -9788,6 +9789,19 @@ if (this.isBuiltinDEMUX(name)) {
     return lines;
   }
 
+  _execPropertyBlockDebugItem(prop) {
+    if (!prop) return false;
+    if (prop.show) {
+      this._execShowImmediate({ show: prop.show }, true);
+      return true;
+    }
+    if (prop.peek) {
+      this._execShowImmediate({ peek: prop.peek }, true);
+      return true;
+    }
+    return false;
+  }
+
   _execShowImmediate(s, computeRefs = false) {
     const payload = s.show || s.peek;
     if (!payload) return;
@@ -10510,6 +10524,7 @@ if (this.isBuiltinDEMUX(name)) {
       let setExprDirectRef = null; // Direct component/wire referenced in setExpr
       
       for(const prop of properties){
+        if (prop.show || prop.peek) continue;
         // Skip get> properties when collecting dependencies (they don't have expr)
         if(!isGetRedirectProperty(prop.property) && !isGenericPoutRedirectProperty(prop.property) && prop.property !== 'mod>' && prop.property !== 'carry>' && prop.property !== 'over>' && prop.property !== 'out>' && !prop.sockBind){
           this.collectExprDependencies(prop.expr, allDependencies, allWireDependencies);
@@ -13733,6 +13748,8 @@ if (s.assignment) {
     
     // Execute each property assignment in order
     for(const prop of properties){
+      if (this._execPropertyBlockDebugItem(prop)) continue;
+
       const property = prop.property;
       
       // Skip get>, mod>, carry>, over>, out>, and pout> properties - they are processed after all properties are applied
@@ -13856,6 +13873,7 @@ if (s.assignment) {
     
     // Process bus redirects: get>, front>, top>, out>, etc.
     for (const prop of properties) {
+      if (prop.show || prop.peek) continue;
       if (!isBusRedirectProperty(prop.property)) continue;
       const sourceProp = prop.property.slice(0, -1);
       this._applyComponentWireRedirect(component, prop, sourceProp);
@@ -14103,6 +14121,8 @@ if (s.assignment) {
 
     // Execute each property assignment in order
     for(const prop of properties){
+      if (this._execPropertyBlockDebugItem(prop)) continue;
+
       const property = prop.property;
 
       // Skip pout> properties - they are processed after all properties are applied
@@ -14711,6 +14731,8 @@ if (s.assignment) {
     let pinOrPoutWritten = false;
 
     for (const prop of properties) {
+      if (this._execPropertyBlockDebugItem(prop)) continue;
+
       const property = prop.property;
       if (property === 'pout>') continue;
 
@@ -14871,6 +14893,8 @@ if (s.assignment) {
     let pinOrPoutWritten = false;
 
     for (const prop of properties) {
+      if (this._execPropertyBlockDebugItem(prop)) continue;
+
       const property = prop.property;
       if (property === 'pout>') continue;
 

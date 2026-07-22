@@ -105,6 +105,16 @@ Multi-line without commas remains valid:
 }
 ```
 
+**`show` / `peek` in property blocks** — same comma / newline / space rules as pin assignments. They run **only when the block fires** (same `on:` / `set` trigger as the rest of the block), **immediately** at that moment — not deferred like top-level `show` on Wave (same as [`on:{ }` body](conditional-assignment.md#show-and-peek-in-the-body)).
+
+| Position in block | When it runs |
+|-------------------|--------------|
+| Before `set = …` | After preceding pin expressions are evaluated into pending state; **before** `applyComponentProperties` for that `set` |
+| After `set = …` | After `applyComponentProperties` for that `set` |
+| After all pin/`set` items | Bus redirects (`get >=`, `mod>`, …) still run **after** the main loop; a `show(wire)` written after `get >= wire` in source still executes **before** that redirect fills `wire` |
+
+In the block body, `show` and `peek` share the same evaluation moment; output differs only in formatting (`show` may include `(ref: …)`). See [debug.md](debug.md).
+
 ---
 
 ## Nested instances

@@ -6869,6 +6869,16 @@ Multi-line without commas remains valid:
 }
 \`\`\`
 
+**\`show\` / \`peek\` in property blocks** — same comma / newline / space rules as pin assignments. They run **only when the block fires** (same \`on:\` / \`set\` trigger as the rest of the block), **immediately** at that moment — not deferred like top-level \`show\` on Wave (same as [\`on:{ }\` body](conditional-assignment.md#show-and-peek-in-the-body)).
+
+| Position in block | When it runs |
+|-------------------|--------------|
+| Before \`set = …\` | After preceding pin expressions are evaluated into pending state; **before** \`applyComponentProperties\` for that \`set\` |
+| After \`set = …\` | After \`applyComponentProperties\` for that \`set\` |
+| After all pin/\`set\` items | Bus redirects (\`get >=\`, \`mod>\`, …) still run **after** the main loop; a \`show(wire)\` written after \`get >= wire\` in source still executes **before** that redirect fills \`wire\` |
+
+In the block body, \`show\` and \`peek\` share the same evaluation moment; output differs only in formatting (\`show\` may include \`(ref: …)\`). See [debug.md](debug.md).
+
 ---
 
 ## Nested instances
@@ -8401,22 +8411,22 @@ on:1 {
 
 ## Restrictions
 
-| Allowed in \`{ }\` | Not allowed |
-|------------------|-------------|
+| Allowed in \`on:{ }\` | Not allowed in \`on:{ }\` |
+|---------------------|---------------------------|
 | \`target = expr\` (one or many, comma-separated) | \`.lut:clear()\` without destination |
 | \`.comp:pin = expr\` | \`pcb\`, \`chip\`, \`board\`, \`comp\`, \`def\` |
-| \`a, b = expr\` (multi-target) | \`probe\`, \`watch\`, \`deps\` |
-| \`show(...)\`, \`peek(...)\` | Property blocks (\`.comp:{ }\`) |
+| \`a, b = expr\` (multi-target) | Property blocks (\`.comp:{ … }\`) |
+| \`show(...)\`, \`peek(...)\` | \`probe\`, \`watch\`, \`deps\` |
 | \`process = 1\` | |
 
----
+Property blocks (\`.comp:{ }\`) accept pin assignments **and** \`show(...)\` / \`peek(...)\` with the same comma/newline rules; see [chip-board-execution.md — property blocks](chip-board-execution.md#writing-style-dataflow-vs-sequential).
 
 ## vs property blocks
 
 | | \`on: { }\` (standalone) | \`.comp:{ }\` (property block) |
 |--|------------------------|------------------------------|
 | Scope | Program / PCB body | Bound to one component instance |
-| Statements | One or more comma-separated assignments and/or \`show\`/\`peek\` | Multiple pin assignments |
+| Statements | One or more comma-separated assignments and/or \`show\`/\`peek\` | Pin assignments and/or \`show\`/\`peek\` |
 | Typical use | LUT/mem ops gated by a flag | Pin wiring on \`exec:\` trigger |
 
 Property blocks remain the right tool for multi-pin updates on a component; conditional assignment is for isolated side-effect writes (LUT, mem, a single wire).
@@ -18556,7 +18566,9 @@ Multi-instance **wave** chat demo: clients on **Inst 2–5** send framed message
 
 Related: [sock.md](sock.md) (\`openSock\`, \`connSock\`, \`SOCKATTACHED\`), [network.md](network.md) (\`send\` broadcast), [protocol-parse.md](protocol-parse.md) (\`withLength\`, \`parseView\`).
 
-**Suite tests:** **2528–2529** (\`SOCKATTACHED\`), **2530–2531** (\`.chatFrame\` / \`.chatParse\`), **2532–2533** (uplink cross-instance), **2534** (downlink broadcast), **2535–2536** (\`lineBuf\` / hello frame width).
+**Suite tests:** **2528–2529** (\`SOCKATTACHED\`), **2530–2531** (\`.chatFrame\` / \`.chatParse\`), **2532–2533** (uplink cross-instance), **2534** (downlink broadcast), **2535–2536** (\`lineBuf\` / hello frame width), **2569–2571** (wave hub: deferred \`connSock\`, JOIN packet cu inst în coadă, terminal join, CHAT uplink + downlink prefix).
+
+Scripturile wave validate sunt **\`NETWORK_CHAT_SERVER_WAVE\`** / **\`NETWORK_CHAT_CLIENT_WAVE\`** în \`tests/test_suite.js\` (ca \`huffFsmScript\` la Huffman v2).
 
 ---
 
