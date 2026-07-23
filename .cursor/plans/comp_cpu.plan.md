@@ -17,6 +17,12 @@ todos:
   - id: docs-tests
     content: "doc/cpu.md tabele atribute/pini + doc(comp.cpu); components.md; teste E2E; _gen_doc_data.js"
     status: pending
+  - id: phase4-irq
+    content: "Faza 4: pin irq, IE, vectori RAM, EI/DI/RETI in profil asm, teste handler"
+    status: pending
+  - id: phase5-dma
+    content: "Faza 5: comp [dma] standalone (fara CPU obligatoriu); ram=; doc dma.md; integrare optionala cu cpu"
+    status: pending
 isProject: false
 ---
 
@@ -617,11 +623,157 @@ La livrare **nu omit** tabelele de valori — același stil ca [terminal.md](../
 - Validare: nu combina sub-bloc + binding; depth prog/ram aliniat
 - Teste **2600–2604** în `test_suite.js`
 
-**Încă out of scope (nu e pe roadmap CPU contained)**
+**Faza 4 — IRQ** (plan — nu implementată)
 
-- **`comp [cpu]` ca CPU „wave/hardware”** — nu există atribut `mode: wave` pe `comp [cpu]`; fetch/decode/execute rămân în interpretor JS. Pentru PC/LUT/mem pe fire la fiecare puls, folosești **`board +[cpu4v2]`** ([mini-cpu-v2.md](../v0_3_2/doc/mini-cpu-v2.md)). Scripturile cu `comp [cpu]` pot rula cu propagare **wave** în editor (ca orice alt `comp`), dar CPU-ul nu devine un board.
-- **DMA, IRQ**
+Vezi **[Faza 4: IRQ](#faza-4-irq)**.
+
+**Faza 5 — `comp [dma]`** (plan — nu implementată)
+
+Vezi **[Faza 5: componentă DMA](#faza-5-componentă-dma)**. DMA este componentă **independentă** (funcționează **fără** `comp [cpu]`).
+
+**Încă out of scope**
+
+- **`comp [cpu]` ca CPU „wave/hardware”** — interpretor JS; pentru PC/LUT/mem pe fire: **`board +[cpu4v2]`** ([mini-cpu-v2.md](../v0_3_2/doc/mini-cpu-v2.md)).
 - **Heap cu allocator în nucleul CPU** (rămâne `comp [heap]` + convenții RAM)
+- **Arbiter bus pe fire** (ZSTATE; opțional mem multi-port în faza **5c**)
+
+---
+
+## Faza 4: IRQ
+
+### Focus
+
+Doar **`comp [cpu]`**: IRQ la **sfârșitul** fiecărei instrucțiuni. **DMA** → [Faza 5](#faza-5-componentă-dma).
+
+### De ce nu în faza 1–3
+
+Polling (`LOAD` din I/O mapat, `keyboard`, `queue`) e suficient pentru intro. **IRQ** aduce handler + vectori în interpretor.
+
+`comp [cpu]` rămâne interpretor: IRQ = **eveniment între pași**, nu LUT wave.
+
+### Principii de design (IRQ)
+
+| Principiu | Detaliu |
+|-----------|---------|
+| Granularitate | IRQ evaluat **după** fiecare instrucțiune completă (`cpuStep`), înainte de următorul pas în `run` |
+| ISA | Mnemonici **`EI` / `DI` / `RETI` / `WFI`** (sau echivalent) în **`inline [asm]`**, nu opcode-uri hardcodate în device |
+| Vectori | Tabel în **RAM** (`map.vectorBase` + index) sau **adrese fixe** în atribut `vectors:` |
+| Wave | Pulsul **`irq`** sample la granița de step CPU (documentat) |
+
+```mermaid
+flowchart LR
+  STEP[cpuStep] --> IRQCHK{irq si IE?}
+  IRQCHK -->|da| VEC[PC <- vector]
+  IRQCHK -->|nu| DONE[urmator pas]
+```
+
+---
+
+### Partea A — IRQ (în `comp [cpu]`)
+
+#### Pini / atribute propuse
+
+| Nume | Tip | Rol |
+|------|-----|-----|
+| **`irq`** | pin `1` | Cerere interrupt (activ `1`; edge vs level documentat, default **level** cu `irqAck`) |
+| **`irqVec`** | pin `N` | Index vector (opțional; dacă lipsește, vector `0`) |
+| **`irqAck`** | property / pin | Confirmare handler — debounce / clear level IRQ (opțional faza 4.1) |
+| **`ie`** | pout sau registru virtual | Interrupt enable (oglindă bit în RF sau registru dedicat) |
+| **`irqPending`** | pout | `1` dacă IRQ așteaptă și e mascat de `DI` |
+| **`map.vectorBase`** sau **`vectors:`** | atribut | Adresa în RAM unde sunt intrările PC (câte un cuvânt per vector) |
+| **`irqSave:`** | listă | Ce se salvează la intrare: `pc`, `ie` (default `pc,ie`) |
+
+#### Comportament (propunere)
+
+1. La sfârșitul fiecărei instrucțiuni (inclusiv în bucla `run`), dacă **`halted`** → nu IRQ.
+2. Dacă pin **`irq`** activ (și opțional **`ie`** din stare CPU / registru ISA) → **servire**:
+   - salvează PC (și opțional IE) conform `irqSave` — stack software (`PUSH`) sau celule dedicate în `map` (faza 4.1: **doar PC în registru `irqPc`** intern sau pe stack prin convenție ASM);
+   - **`PC ← ram[vectorBase + irqVec]`** sau prog dacă vectorii în prog;
+   - **`IE ← 0`** automat la intrare (ca pe MCU clasice).
+3. **`RETI`** (în ISA): restaurează PC/IE din profilul asm — implementare în interpretor ca pseudo-flow sau opcode dedicat în profilul `.cpuisa_irq`.
+4. **`WFI` / wait**: opțional — `run` se oprește până la IRQ (alternativ: script extern doar nu mai dă `set`).
+
+#### Legare la viitor PIC
+
+- Faza **4.2**: `irq = .pic` binding (ca `output = .term`) către `comp [pic]` — PIC agregă linii și furnizește `vec`; până atunci un fir `1wire irqLine = …` în property block `.cpu:{ irq = irqLine }`.
+
+#### Teste planificate
+
+- Handler la vector 1, main face `DI` loop, pulse `irq` → PC în handler, `RETI` înapoi.
+- IRQ ignorat când `IE=0`; servit după `EI`.
+
+---
+
+## Faza 5: componentă DMA
+
+**Nu face parte din `comp [cpu]`.** Tip nou **`comp [dma]`** (la implementare: `doc/dma.md`, device + registry).
+
+### Funcționează fără CPU
+
+| Scenariu | Exemplu |
+|----------|---------|
+| Copy în același mem | `mem = .buf`, `srcAdr` / `dstAdr` / `count`, `set` |
+| Copy între două mem | `src = .rom`, `dst = .ram` |
+| Init bulk | Umplere buffer din script, fără buclă LOAD/STORE |
+
+Prezența unui **`comp [cpu]`** în același fișier este **opțională**. Integrarea (stall, RAM partajat) = sub-faza **5c**.
+
+### API MVP (`comp [dma]`)
+
+```logts
+comp [mem] .buf:
+  depth: 8
+  length: 256
+  on: 1
+  :
+
+comp [dma] .copy:
+  mem = .buf
+  on: 1
+  :
+
+.copy:{ srcAdr = 0, dstAdr = 128, count = 16, set = 1 }
+```
+
+| Element | Propunere |
+|---------|-----------|
+| Binding | **`mem = .x`** (un spațiu) sau **`src =` / `dst =`** (două `comp [mem]`) |
+| Pini | `srcAdr`, `dstAdr`, `count`, **`set`** |
+| Pouts | **`busy`**, **`done`** |
+| Execuție | Copiere sincronă a `count` cuvinte (`getMem` / `setMem`) |
+
+### Integrare opțională cu CPU (5c)
+
+- Demo CPU + DMA pe **`ram = .data`** comun
+- Opțional pe CPU: **`dma = .copy`** → stall cât timp `busy`
+- Avansat: **`comp [mem]`** port 2 pentru DMA
+
+---
+
+### Sub-faze livrabile
+
+| Sub-fază | Conținut | Fază |
+|----------|----------|------|
+| **4a** | Pini `irq`, `IE`, vector RAM, teste + `cpu.md` | 4 |
+| **4b** | Profil `.cpuisa_irq` (`EI`, `DI`, `RETI`), runnable | 4 |
+| **4c** | `irq = .pic` (după PIC) | 4 |
+| **5a** | `comp [dma]` copy pe un mem, teste **fără CPU** | 5 |
+| **5b** | `src`/`dst`, `doc/dma.md`, `logts-play` | 5 |
+| **5c** | CPU + DMA partajat, stall / port 2 mem | 5 |
+
+### Explicit nu (faza 4 / 5 MVP)
+
+- Nested interrupts / priority hardware stack nelimitat
+- Cache, MPU, TLB
+- DMA scatter-gather, descriptor chains
+- IRQ mid-instruction
+- Logică DMA în `cpu-devices.js`
+
+### Documentație
+
+- [cpu.md](../v0_3_2/doc/cpu.md) — IRQ (faza 4)
+- `doc/dma.md` — DMA (faza 5), când există componenta
+- [future-component-ideas.md](../v0_3_2/doc/future-component-ideas.md) — D3 IRQ, D4 DMA
 
 ---
 

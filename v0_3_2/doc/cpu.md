@@ -381,4 +381,5 @@ CPU semantics (`set`, `run`, LOAD/STORE, reload `.u:prog =`) are unchanged; fetc
 
 ## Out of scope (later)
 
-- IRQ/DMA.
+- **IRQ** — plan **faza 4** ([comp_cpu.plan.md](../../.cursor/plans/comp_cpu.plan.md) — „Faza 4: IRQ”).
+- **DMA** — plan **faza 5**, componentă separată `comp [dma]` (fără CPU obligatoriu); același plan, secțiune „Faza 5”.
