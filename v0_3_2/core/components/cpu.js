@@ -35,9 +35,35 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
 
   getSpecialParseAttributes() {
     return {
-      bindingAttrs: ['isa', 'clock', 'output', 'trace'],
+      bindingAttrs: ['isa', 'clock', 'output', 'trace', 'prog', 'ram'],
       nestedBlockAttrs: ['ram', 'prog', 'map'],
     };
+  }
+
+  _hasInternalSpaceSection(attributes, key) {
+    const s = attributes && attributes[key];
+    if (!s || typeof s !== 'object') return false;
+    return s.depth !== undefined || s.length !== undefined || s.initialValue != null;
+  }
+
+  _resolveMemLink(ref, ctx) {
+    if (!ref || !ctx || !ctx.components) {
+      throw Error('CPU memory link requires a component reference');
+    }
+    const comp = ctx.components.get(ref);
+    if (!comp || comp.type !== 'mem') {
+      throw Error(`CPU memory link ${ref} must be comp [mem]`);
+    }
+    if (!comp.deviceIds || !comp.deviceIds[0]) {
+      throw Error(`CPU memory link ${ref} has no device id`);
+    }
+    const depth = comp.attributes.depth !== undefined ? parseInt(comp.attributes.depth, 10) : 4;
+    const length = comp.attributes.length !== undefined ? parseInt(comp.attributes.length, 10) : 3;
+    if (isNaN(depth) || depth < 1 || isNaN(length) || length < 1) {
+      throw Error(`CPU memory link ${ref} has invalid depth/length`);
+    }
+    const readonly = !!(comp.attributes && comp.attributes.readonly);
+    return { memId: comp.deviceIds[0], compRef: ref, depth, length, readonly };
   }
 
   _resolveTerminalId(ref, ctx) {
@@ -102,9 +128,53 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
 
   _loadSpace(comp, space, blob, ctx) {
     const id = this._cpuId(comp);
-    if (space === 'prog' && typeof loadCpuProg === 'function') loadCpuProg(id, blob);
-    else if (space === 'ram' && typeof loadCpuRam === 'function') loadCpuRam(id, blob);
+    if (space === 'prog' && typeof loadCpuProg === 'function') loadCpuProg(id, blob, ctx);
+    else if (space === 'ram' && typeof loadCpuRam === 'function') loadCpuRam(id, blob, ctx);
     if (space === 'prog' && typeof cpuAfterProgReload === 'function') cpuAfterProgReload(id);
+  }
+
+  _resolveMemoryLayout(attributes, ctx) {
+    const progMembers = attributes.progMembers;
+    const ramMembers = attributes.ramMembers;
+    let progLink = null;
+    let ramLink = null;
+
+    if (progMembers && progMembers.length) {
+      if (this._hasInternalSpaceSection(attributes, 'prog')) {
+        throw Error('CPU cannot use prog = .mem together with prog: sub-block');
+      }
+      progLink = this._resolveMemLink(progMembers[0], ctx);
+    }
+    if (ramMembers && ramMembers.length) {
+      if (this._hasInternalSpaceSection(attributes, 'ram')) {
+        throw Error('CPU cannot use ram = .mem together with ram: sub-block');
+      }
+      ramLink = this._resolveMemLink(ramMembers[0], ctx);
+    }
+
+    const ramDefaults = { depth: 8, length: 16 };
+    const progDefaults = { depth: 8, length: 32 };
+    let ram = cpuSection(attributes, 'ram', ramDefaults);
+    let prog = cpuSection(attributes, 'prog', progDefaults);
+
+    if (ramLink) {
+      ram = { depth: ramLink.depth, length: ramLink.length, initialValue: null };
+    }
+    if (progLink) {
+      prog = { depth: progLink.depth, length: progLink.length, initialValue: null };
+    }
+
+    if (ramLink && progLink && ramLink.depth !== progLink.depth) {
+      throw Error(`CPU linked ram depth ${ramLink.depth} must match prog depth ${progLink.depth}`);
+    }
+    if (!ramLink && progLink && ram.depth !== progLink.depth) {
+      throw Error(`CPU internal ram depth ${ram.depth} must match linked prog depth ${progLink.depth}`);
+    }
+    if (ramLink && !progLink && ramLink.depth !== prog.depth) {
+      throw Error(`CPU linked ram depth ${ramLink.depth} must match internal prog depth ${prog.depth}`);
+    }
+
+    return { ram, prog, progLink, ramLink };
   }
 
   getDef(attributes) {
@@ -138,8 +208,8 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         { name: 'trace', value: 'off|on|output|.terminal' },
         { name: 'output', value: '.terminal' },
         { name: 'clock', value: '.component' },
-        { name: 'ram', value: 'block' },
-        { name: 'prog', value: 'block' },
+        { name: 'ram', value: 'block|=.mem' },
+        { name: 'prog', value: 'block|=.mem' },
         { name: 'map', value: 'block' },
       ],
       initValue: null,
@@ -193,8 +263,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   }
 
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
-    const ram = cpuSection(attributes, 'ram', { depth: 8, length: 16 });
-    const prog = cpuSection(attributes, 'prog', { depth: 8, length: 32 });
+    const { ram, prog, progLink, ramLink } = this._resolveMemoryLayout(attributes, ctx);
     const map = attributes.map && typeof attributes.map === 'object' ? attributes.map : {};
     const regCount = this._regCount(attributes);
     const pcInit = attributes.pcInit !== undefined ? parseInt(attributes.pcInit, 10) : 0;
@@ -236,16 +305,25 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         traceMode,
         traceTerminalId,
         outputTerminalId,
+        progMemId: progLink ? progLink.memId : null,
+        ramMemId: ramLink ? ramLink.memId : null,
+        progReadonly: progLink ? progLink.readonly : true,
       });
     }
 
-    const ramInit = ram.initialValue != null ? this._resolveBlob(ram.initialValue, attributes, ctx) : null;
-    const progInit = prog.initialValue != null ? this._resolveBlob(prog.initialValue, attributes, ctx) : null;
+    const ramInit = !ramLink && ram.initialValue != null ? this._resolveBlob(ram.initialValue, attributes, ctx) : null;
+    const progInit = !progLink && prog.initialValue != null ? this._resolveBlob(prog.initialValue, attributes, ctx) : null;
     if (ramInit) this._loadSpace({ deviceIds: [baseId] }, 'ram', ramInit, ctx);
     if (progInit) this._loadSpace({ deviceIds: [baseId] }, 'prog', progInit, ctx);
-    else if (typeof cpuAfterProgReload === 'function') cpuAfterProgReload(baseId);
+    else if (!progLink && typeof cpuAfterProgReload === 'function') cpuAfterProgReload(baseId);
 
-    return { deviceIds: [baseId], ref: null };
+    const compInfo = {
+      deviceIds: [baseId],
+      ref: null,
+      progMemRef: progLink ? progLink.compRef : null,
+      ramMemRef: ramLink ? ramLink.compRef : null,
+    };
+    return compInfo;
   }
 
   _isActive(val) {

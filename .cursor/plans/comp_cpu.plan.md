@@ -610,13 +610,12 @@ La livrare **nu omit** tabelele de valori — același stil ca [terminal.md](../
 - `run` + `maxSteps`; `onReset:`; `clock:` (parse); `map.stack` + PUSH/POP; `trace` / `output = .terminal`
 - `doc(.cpu1)` — parțial în `cpu.md` (runnable `logts-play`)
 
-**Faza 3 — legare memorie per spațiu (plan, neimplementată)**
+**Faza 3 — legare memorie per spațiu** (livrată)
 
-- **`prog = .rom`**, **`ram = .data`** — binding la `comp [mem]`; toate combinațiile intern/extern (fără atribut `mode:`)
-- Backend în `cpu-devices.js`: `readProg` / `writeProg` (reload), `readRam` / `writeRam` — array intern sau delegate la handler `mem`
-- Validare: `mem.depth` compatibil cu ISA / cuvânt instrucțiune; program extern `readonly` la STORE runtime
-- Peek CPU (`prog:get`, `ram:get`) routează prin același backend
-- **Nu** `comp [bus]` dedicat; documentăm contrast cu ZSTATE + board și mini-cpu-v2
+- **`prog = .rom`**, **`ram = .data`** — binding la `comp [mem]`; combinații intern/extern independente
+- `cpu-devices.js`: `getMem` / `setMem` pentru spații legate; intern neschimbat
+- Validare: nu combina sub-bloc + binding; depth prog/ram aliniat
+- Teste **2600–2604** în `test_suite.js`
 
 **Încă out of scope (nu e pe roadmap CPU contained)**
 

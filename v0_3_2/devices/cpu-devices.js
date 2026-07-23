@@ -7,32 +7,92 @@ function dmCpus() {
   return maps.cpus;
 }
 
+function cpuZero(depth) {
+  return '0'.repeat(depth);
+}
+
+function cpuReadRamCell(c, adr) {
+  if (adr < 0 || adr >= c.ramLength) return null;
+  if (c.ramMemId && typeof getMem === 'function') {
+    return getMem(c.ramMemId, adr);
+  }
+  return c.ram[adr];
+}
+
+function cpuWriteRamCell(c, adr, val) {
+  if (adr < 0 || adr >= c.ramLength) {
+    throw Error(`STORE invalid address ${adr}`);
+  }
+  if (c.ramMemId) {
+    if (typeof setMem === 'function') setMem(c.ramMemId, adr, val);
+    return;
+  }
+  c.ram[adr] = val;
+}
+
+function cpuReadProgCell(c, adr) {
+  if (adr < 0 || adr >= c.progLength) return null;
+  if (c.progMemId && typeof getMem === 'function') {
+    return getMem(c.progMemId, adr);
+  }
+  return c.prog[adr];
+}
+
+function cpuWriteProgBlob(c, blob) {
+  const chunks = splitBlob(blob, c.progDepth, c.progLength);
+  const z = cpuZero(c.progDepth);
+  for (let i = 0; i < c.progLength; i++) {
+    const word = i < chunks.length ? chunks[i] : z;
+    if (c.progMemId) {
+      if (typeof setMem === 'function') setMem(c.progMemId, i, word);
+    } else {
+      c.prog[i] = word;
+    }
+  }
+}
+
+function cpuWriteRamBlob(c, blob) {
+  const chunks = splitBlob(blob, c.ramDepth, c.ramLength);
+  const z = cpuZero(c.ramDepth);
+  for (let i = 0; i < c.ramLength; i++) {
+    const word = i < chunks.length ? chunks[i] : z;
+    cpuWriteRamCell(c, i, word);
+  }
+}
+
 function addCpu(id, config) {
   const cpus = dmCpus();
   if (!cpus) return;
   const regCount = config.regCount != null ? config.regCount : 4;
-  const depth = config.ramDepth != null ? config.ramDepth : 8;
+  const ramDepth = config.ramDepth != null ? config.ramDepth : 8;
   const ramLen = config.ramLength != null ? config.ramLength : 16;
   const progDepth = config.progDepth != null ? config.progDepth : 8;
   const progLen = config.progLength != null ? config.progLength : 32;
   const regs = [];
-  for (let i = 0; i < regCount; i++) regs.push('0'.repeat(depth));
+  for (let i = 0; i < regCount; i++) regs.push(cpuZero(ramDepth));
   const ram = [];
   const prog = [];
-  const z = '0'.repeat(depth);
-  const zp = '0'.repeat(progDepth);
-  for (let i = 0; i < ramLen; i++) ram.push(z);
-  for (let i = 0; i < progLen; i++) prog.push(zp);
+  const z = cpuZero(ramDepth);
+  const zp = cpuZero(progDepth);
+  if (!config.ramMemId) {
+    for (let i = 0; i < ramLen; i++) ram.push(z);
+  }
+  if (!config.progMemId) {
+    for (let i = 0; i < progLen; i++) prog.push(zp);
+  }
   cpus.set(id, {
     regCount,
-    regDepth: depth,
-    ramDepth: depth,
+    regDepth: ramDepth,
+    ramDepth,
     ramLength: ramLen,
     progDepth,
     progLength: progLen,
     regs,
     ram,
     prog,
+    ramMemId: config.ramMemId || null,
+    progMemId: config.progMemId || null,
+    progReadonly: config.progReadonly !== false,
     pc: 0,
     pcInit: config.pcInit != null ? config.pcInit : 0,
     halted: 0,
@@ -76,21 +136,13 @@ function splitBlob(value, depth, length) {
 function loadCpuRam(id, blob) {
   const c = getCpu(id);
   if (!c) return;
-  const chunks = splitBlob(blob, c.ramDepth, c.ramLength);
-  const z = '0'.repeat(c.ramDepth);
-  for (let i = 0; i < c.ramLength; i++) {
-    c.ram[i] = i < chunks.length ? chunks[i] : z;
-  }
+  cpuWriteRamBlob(c, blob);
 }
 
 function loadCpuProg(id, blob) {
   const c = getCpu(id);
   if (!c) return;
-  const chunks = splitBlob(blob, c.progDepth, c.progLength);
-  const z = '0'.repeat(c.progDepth);
-  for (let i = 0; i < c.progLength; i++) {
-    c.prog[i] = i < chunks.length ? chunks[i] : z;
-  }
+  cpuWriteProgBlob(c, blob);
   c.pc = c.pcInit;
   c.halted = 0;
 }
@@ -106,13 +158,13 @@ function cpuResetFlags(id, flags) {
   const c = getCpu(id);
   if (!c) return;
   const set = new Set(flags || []);
-  const z = '0'.repeat(c.regDepth);
+  const z = cpuZero(c.regDepth);
   if (set.has('pc')) c.pc = c.pcInit;
   if (set.has('regs')) {
     for (let i = 0; i < c.regCount; i++) c.regs[i] = z;
   }
   if (set.has('ram')) {
-    for (let i = 0; i < c.ramLength; i++) c.ram[i] = z;
+    for (let i = 0; i < c.ramLength; i++) cpuWriteRamCell(c, i, z);
   }
   if (set.has('sp') && c.spReg != null && c.spReg >= 0 && c.spReg < c.regCount) {
     cpuInitSp(c);
@@ -136,7 +188,14 @@ function cpuFetchInstr(c) {
   if (c.pc < 0 || c.pc >= limit) {
     throw Error(`CPU PC ${c.pc} out of ${c.fetchFrom} range 0..${limit - 1}`);
   }
-  return c.fetchFrom === 'ram' ? c.ram[c.pc] : c.prog[c.pc];
+  let word;
+  if (c.fetchFrom === 'ram') {
+    word = cpuReadRamCell(c, c.pc);
+  } else {
+    word = cpuReadProgCell(c, c.pc);
+  }
+  if (word == null) word = cpuZero(c.progDepth);
+  return word;
 }
 
 function cpuSpIndex(c) {
@@ -158,7 +217,7 @@ function cpuPushReg(c, r) {
   if (sp == null) throw Error('PUSH requires sp register');
   sp -= 1;
   if (sp < 0) throw Error(`CPU stack overflow at SP ${sp}`);
-  c.ram[sp] = c.regs[r];
+  cpuWriteRamCell(c, sp, c.regs[r]);
   cpuSetSpIndex(c, sp);
 }
 
@@ -167,7 +226,7 @@ function cpuPopReg(c, r) {
   let sp = cpuSpIndex(c);
   if (sp == null) throw Error('POP requires sp register');
   if (sp > c.stackTop) throw Error('CPU stack underflow');
-  c.regs[r] = c.ram[sp];
+  c.regs[r] = cpuReadRamCell(c, sp);
   sp += 1;
   cpuSetSpIndex(c, sp);
 }
@@ -211,15 +270,15 @@ function cpuStep(id, ctx) {
       const a = parseInt(lo.substring(2, 4), 2);
       if (r < 0 || r >= c.regCount) throw Error(`LOAD invalid register R${r}`);
       if (a < 0 || a >= c.ramLength) throw Error(`LOAD invalid address ${a}`);
-      c.regs[r] = c.ram[a];
+      const cell = cpuReadRamCell(c, a);
+      c.regs[r] = cell != null ? cell : cpuZero(c.ramDepth);
       break;
     }
     case '0010': {
       const r = parseInt(lo.substring(0, 2), 2);
       const a = parseInt(lo.substring(2, 4), 2);
       if (r < 0 || r >= c.regCount) throw Error(`STORE invalid register R${r}`);
-      if (a < 0 || a >= c.ramLength) throw Error(`STORE invalid address ${a}`);
-      c.ram[a] = c.regs[r];
+      cpuWriteRamCell(c, a, c.regs[r]);
       break;
     }
     case '0011': {
@@ -313,13 +372,13 @@ function getCpuReg(id, r) {
 function getCpuRam(id, adr) {
   const c = getCpu(id);
   if (!c || adr < 0 || adr >= c.ramLength) return null;
-  return c.ram[adr];
+  return cpuReadRamCell(c, adr);
 }
 
 function getCpuProg(id, adr) {
   const c = getCpu(id);
   if (!c || adr < 0 || adr >= c.progLength) return null;
-  return c.prog[adr];
+  return cpuReadProgCell(c, adr);
 }
 
 if (typeof module !== 'undefined' && module.exports) {

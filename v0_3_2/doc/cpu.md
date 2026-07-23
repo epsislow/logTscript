@@ -340,6 +340,45 @@ show(sum)
 
 ---
 
+## Phase 3 — linked memory (`prog =` / `ram =`)
+
+Each space is **either** an internal sub-block **or** a binding to `comp [mem]` (not both):
+
+```logts
+comp [mem] .rom:
+  depth: 8
+  length: 32
+  readonly: 1
+  = .cpuisa { LOAD R0 A0; HALT }
+  on: 1
+  :
+
+comp [mem] .data:
+  depth: 8
+  length: 16
+  = ^00
+  on: 1
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  prog = .rom
+  ram = .data
+  :
+```
+
+| Combination | Syntax |
+|-------------|--------|
+| Both internal | `ram:` / `prog:` sub-blocks (default) |
+| Prog external | `prog = .rom` + internal `ram:` |
+| RAM external | `ram = .data` + internal `prog:` |
+| Both external | `prog = .rom` and `ram = .data` |
+
+CPU semantics (`set`, `run`, LOAD/STORE, reload `.u:prog =`) are unchanged; fetch/load/store call `getMem` / `setMem` on the linked device when bound. Init and reload of a linked space use the external `mem` (declare and load `.rom` / `.data` directly, or `.u:prog =` which writes the linked ROM).
+
+---
+
 ## Out of scope (later)
 
-- Legare memorie externă — faza 3 plan: **`prog = .rom`**, **`ram = .data`** (fără `mode:`); IRQ/DMA.
+- IRQ/DMA.

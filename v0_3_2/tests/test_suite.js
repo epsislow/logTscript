@@ -25006,6 +25006,165 @@ comp [cpu] .u:
   h.assert('r0 after countdown', r0.value, '00000000');
 });
 
+reg(2600, 'comp-cpu', 'cpu linked prog internal ram LOAD', function(h, session) {
+  const src = CPU_ISA_MIN + `comp [mem] .rom:
+  depth: 8
+  length: 8
+  readonly:
+  on: 1
+  = .cpuisa {
+    LOAD R0 A0
+    HALT
+  }
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  prog = .rom
+  ram:
+    depth: 8
+    length: 4
+    = ^11
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuRunUntilHalt(session, interp, '.u', 16);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 from internal ram', r0.value, '00010001');
+});
+
+reg(2601, 'comp-cpu', 'cpu linked ram STORE visible on mem', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [mem] .data:
+  depth: 8
+  length: 4
+  on: 1
+  = ^05
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  ram = .data
+  prog:
+    depth: 8
+    length: 12
+    = .cpuisa {
+      LOAD R0 A0
+      STORE R0 A2
+      HALT
+    }
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuRunUntilHalt(session, interp, '.u', 16);
+  const dataComp = interp.components.get('.data');
+  const memId = dataComp.deviceIds[0];
+  h.assert('ext mem A2 holds A0', getMem(memId, 2), '00000101');
+});
+
+reg(2602, 'comp-cpu', 'cpu linked prog and ram', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [mem] .rom:
+  depth: 8
+  length: 16
+  readonly:
+  on: 1
+  = .cpuisa {
+    LOAD R0 A0
+    ADDI R0 A2
+    STORE R0 A1
+    HALT
+  }
+  :
+
+comp [mem] .data:
+  depth: 8
+  length: 4
+  on: 1
+  = ^05
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  prog = .rom
+  ram = .data
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuRunUntilHalt(session, interp, '.u', 24);
+  const dataComp = interp.components.get('.data');
+  const memId = dataComp.deviceIds[0];
+  h.assert('stored sum at A1', getMem(memId, 1), '00000111');
+});
+
+reg(2603, 'comp-cpu', 'cpu linked ram only countdown', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [mem] .data:
+  depth: 8
+  length: 4
+  on: 1
+  = ^02
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  ram = .data
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+    loop:
+      SUBI R0 A1
+      BEQ done
+      JMP loop
+    done:
+      HALT
+    }
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuRunUntilHalt(session, interp, '.u', 32);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 zero after countdown', r0.value, '00000000');
+  const dataComp = interp.components.get('.data');
+  h.assert('ram A0 unchanged', getMem(dataComp.deviceIds[0], 0), '00000010');
+});
+
+reg(2604, 'comp-cpu', 'cpu rejects prog link and prog sub-block', function(h, session) {
+  const src = CPU_ISA_MIN + `comp [mem] .rom:
+  depth: 8
+  length: 4
+  on: 1
+  = .cpuisa { HALT }
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  prog = .rom
+  prog:
+    depth: 8
+    length: 4
+  :
+`;
+  h.assertThrows('conflict', function() {
+    session.run(src);
+  }, 'prog = .mem together with prog:');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,
