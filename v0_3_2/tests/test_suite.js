@@ -24346,6 +24346,7 @@ const CPU_ISA_FULL = `inline [asm] .cpuisa:
   LOAD  : 0001 + R2b + A2b
   STORE : 0010 + R2b + A2b
   ADDI  : 0011 + R2b + A2b
+  SUBI  : 0100 + R2b + A2b
   JMP   : 0101 + A4b
   BEQ   : 0110 + S4b
   HALT  : 0111 + 4b
@@ -24625,6 +24626,111 @@ reg(2589, 'comp-cpu', 'cpu STORE then LOAD roundtrip', function(h, session) {
   const handler = session._ensureRegistry().get('cpu');
   const r1 = handler.evalGetProperty(comp, 'r1', { var: '.u', property: 'r1' }, interp);
   h.assert('r1 from stored word', r1.value, '00000101');
+});
+
+reg(2590, 'comp-cpu', 'cpu SUBI subtracts immediate', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      ADDI R0 A3
+      SUBI R0 A1
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuStepUntilHalt(session, interp, '.u', 8);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 3-1', r0.value, '00000010');
+});
+
+reg(2591, 'comp-cpu', 'cpu countdown loop SUBI BEQ JMP', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^03
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+    loop:
+      SUBI R0 A1
+      BEQ done
+      JMP loop
+    done:
+      HALT
+    }
+  :
+
+`;
+  const { interp } = session.run(src);
+  const steps = cpuStepUntilHalt(session, interp, '.u', 32);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 zero after countdown', r0.value, '00000000');
+  h.assert('steps for 3->0 loop', String(steps), '10');
+});
+
+reg(2592, 'comp-cpu', 'cpu E2E sum in RAM plus counter loop', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^05030000
+  prog:
+    depth: 8
+    length: 32
+    = .cpuisa {
+      LOAD R0 A0
+      ADDI R0 A2
+      STORE R0 A3
+      LOAD R0 A1
+    loop:
+      SUBI R0 A1
+      BEQ done
+      JMP loop
+    done:
+      LOAD R0 A3
+      BEQ oops
+      JMP finish
+    oops:
+      ADDI R0 A3
+    finish:
+      HALT
+    }
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuStepUntilHalt(session, interp, '.u', 48);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 sum 5+2', r0.value, '00000111');
+  if (typeof getCpuRam === 'function') {
+    const id = comp.deviceIds[0];
+    h.assert('ram A3 holds sum', getCpuRam(id, 3), '00000111');
+  }
 });
 
 

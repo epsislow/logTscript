@@ -14,6 +14,7 @@ inline [asm] .cpuisa:
   LOAD  : 0001 + R2b + A2b
   STORE : 0010 + R2b + A2b
   ADDI  : 0011 + R2b + A2b
+  SUBI  : 0100 + R2b + A2b
   JMP   : 0101 + A4b
   BEQ   : 0110 + O4b
   HALT  : 0111 + 4b
@@ -100,8 +101,11 @@ Example — clear RAM and read cell 0:
 | LOAD | `0001` + R2b + A2b | `Rr ← ram[A]` |
 | STORE | `0010` + R2b + A2b | `ram[A] ← Rr` |
 | ADDI | `0011` + R2b + A2b | `Rr ← Rr + imm` (low 2 bits) |
+| SUBI | `0100` + R2b + A2b | `Rr ← Rr - imm` (low 2 bits, unsigned wrap) |
 | JMP | `0101` + A4b | `PC ← A` |
 | BEQ | `0110` + O4b | If `R0 == 0`, `PC ← PC+1+O` (signed 4-bit) |
+
+**Note:** `BEQ` always tests **R0**, not the register used by the previous `SUBI`/`ADDI`. Use `R0` as the loop counter, or `LOAD R0` before `BEQ`.
 | HALT | `0111` + 4b | Stop; PC unchanged |
 
 Address operands `A0`, `A1`, … refer to **RAM word indices**, not register numbers.

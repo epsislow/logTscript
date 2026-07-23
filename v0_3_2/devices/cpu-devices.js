@@ -165,6 +165,16 @@ function cpuStep(id, ctx) {
       c.regs[r] = sum.toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
       break;
     }
+    case '0100': {
+      const r = parseInt(lo.substring(0, 2), 2);
+      const imm = parseInt(lo.substring(2, 4), 2);
+      if (r < 0 || r >= c.regCount) throw Error(`SUBI invalid register R${r}`);
+      const cur = parseInt(c.regs[r], 2);
+      const mask = (1 << c.regDepth) - 1;
+      const diff = (cur - imm) & mask;
+      c.regs[r] = diff.toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
+      break;
+    }
     case '0101': {
       const addr = parseInt(lo, 2);
       if (addr < 0 || addr >= c.progLength) throw Error(`JMP invalid address ${addr}`);
