@@ -3330,9 +3330,9 @@ assignment() {
           this.t.skip();
           const ids = [];
           while (this.c.type !== 'EOF' && this.c.value !== '\n' && this.c.value !== ':') {
-            if (this.c.type === 'ID') {
+            if (this.c.type === 'ID' || this.c.type === 'DEC' || this.c.type === 'BIN') {
               ids.push(this.c.value);
-              this.eat('ID');
+              this.eat(this.c.type);
               this.t.skip();
               if (this.c.type === 'SYM' && this.c.value === ',') {
                 this.eat('SYM', ',');

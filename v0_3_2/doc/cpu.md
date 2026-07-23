@@ -80,6 +80,8 @@ Reload program with **`.u:prog = …`** (not direct assign on the component body
 | `r0`…`rN` | Register peek |
 | `ram:get`, `prog:get` | Read word at `ramAdr` / `progAdr` |
 | `trace:get` | Trace text when `trace: 1` or `output` |
+| `irq`, `irqVec` | IRQ request and vector index (see [Interrupts](#interrupts-irq-phase-4)) |
+| `ie`, `irqPending` | Interrupt enable and masked-pending readout |
 
 Example — two steps then halt:
 
@@ -381,6 +383,78 @@ CPU semantics (`set`, `run`, LOAD/STORE, reload `.u:prog =`) are unchanged; fetc
 
 ## Interrupts (IRQ, phase 4)
 
+An **IRQ** lets something outside the CPU (a wire in your script, a future peripheral) ask the CPU to **run a different piece of code** — an **interrupt handler** — and then **return** to what it was doing. The main program is **not** marked `halted`; execution **branches away** temporarily, like on a small MCU.
+
+### How it works (step by step)
+
+1. The CPU runs your **main** program one instruction at a time (`set` or each step inside `run`).
+2. When that instruction **finishes**, the engine checks IRQ **once** (never in the middle of an instruction).
+3. If **`irq`** is `1` **and** **`ie`** is `1` (interrupts enabled, usually after **`EI`** in ASM), the CPU **serves** the interrupt:
+   - saves **where to resume** (PC of the next main-line instruction) and the old **IE**;
+   - sets **`ie ← 0`** so nested IRQ does not re-enter until you **`RETI`**;
+   - loads a new **PC** from the **vector** (see below) and continues from the **handler**.
+4. The handler runs like normal code (`ADDI`, `OUT`, …). **`RETI`** restores saved PC and IE; execution continues in the main program.
+
+If the CPU is **`halted`** (`HALT` instruction), IRQ is **ignored**. IRQ does **not** clear `halted`.
+
+```text
+  main:  NOP  →  (end of step)  →  irq & ie?  →  handler  →  RETI  →  main continues
+```
+
+### Request and withdraw (`irq` — level, not edge)
+
+`irq` is a **level** signal:
+
+| `irq` | Meaning |
+|-------|---------|
+| `0` | No request (line **withdrawn** / idle). |
+| `1` | Request **active** (something asks for service). |
+
+In a script you **raise** the request (e.g. `irq = 1` in `.u:{ …, set = 1 }`) and **lower** it when the event is done (`irq = 0`) — **withdraw** the request so the source stops asking.
+
+**Why withdraw matters:** after **`RETI`**, **`EI`** is restored to `1`. If **`irq`** is still `1`, the **next** completed instruction can **enter the handler again** immediately. The runnable examples set **`irq = 0`** before the step that executes **`RETI`** so the main loop does not loop inside the handler forever.
+
+There is **no separate edge trigger** in the MVP: the value of **`irq`** (and **`irqVec`**) seen in a property block applies to that **`set`** / **`run`** pulse; during **`run`**, the line stays whatever you last drove until you change it in another block.
+
+### Enable and mask (`ie`, `DI`, `EI`, `irqPending`)
+
+| State | Effect |
+|-------|--------|
+| **`DI`** / `ie = 0` | IRQ **masked**: main code keeps running; a raised **`irq`** does not jump to a handler. |
+| **`EI`** / `ie = 1` | IRQ **unmasked**: after the next completed instruction, an active **`irq`** may be served. |
+| **`irqPending`** | Read-only: `1` when **`irq`** is `1` but **`ie`** is `0` (request waiting). Serving clears pending; **`EI`** can then take the pending IRQ on the following step. |
+
+Typical bring-up: **`DI`** at reset (hardware starts with **`ie = 0`**), init vector table if needed, then **`EI`** before the main loop.
+
+### Vector index vs handler address (`irqVec`)
+
+Two different numbers:
+
+| Name | Role |
+|------|------|
+| **`irq` / `irqVec`** (pins) | **Whether** to interrupt (`irq`) and **which slot** in the vector table (`irqVec` = 0, 1, 2, …). |
+| **Handler PC** | **Where** code runs — a word in **`prog`** (instruction address). |
+
+The CPU does **not** jump to `irqVec` as PC. It uses **`irqVec`** only as an **index**:
+
+- **`vectors: 3, 5`** — vector `0` → PC `3`, vector `1` → PC `5` (fixed at compile time).
+- **`map.vectorBase: 6`** — vector `k` → PC = value of **`ram[6 + k]`** (table in RAM, changeable at runtime).
+
+Use **`4wire`** for **`irqVec`** when the index is not zero (pin is 4 bits wide). Omit **`irqVec`** to use index **0**.
+
+### What “stops” and what does not
+
+| | Behaviour |
+|---|-----------|
+| Main program flow | **Interrupted**: PC jumps to the handler; the instruction you were **about** to run next is delayed until **`RETI`**. |
+| `halted` flag | **Unchanged** by IRQ (unless your handler executes **`HALT`**). |
+| `run` | Still runs instruction-by-instruction; IRQ is checked **after each** instruction inside the loop, same as repeated **`set`**. |
+| Inside handler | Normal execution; use **`RETI`** to return (not **`JMP`** to main unless you know what you are doing). |
+
+So IRQ is **not** “stop the simulator”; it is **redirect PC**, then **resume** — similar to a subroutine call driven by hardware, with **`RETI`** instead of a normal return address on the stack (the CPU keeps saved PC/IE internally).
+
+### Reference (pins and attributes)
+
 IRQ is evaluated **after each completed instruction** (`set` or each step inside `run`), not while an instruction is executing. If the CPU is **halted**, IRQ is ignored.
 
 | Pin / read | Role |
@@ -393,15 +467,76 @@ IRQ is evaluated **after each completed instruction** (`set` or each step inside
 | Attribute | Role |
 |-----------|------|
 | `map.vectorBase` | RAM address of the vector table: `PC ← ram[vectorBase + irqVec]` (word value = new PC). |
-| `vectors:` | Comma list of fixed PC values (e.g. `vectors: 3, 5`) instead of a RAM table. |
+| `vectors:` | Comma list of fixed PC values, e.g. `vectors: 3, 5` (handler entry points). |
 
 On service: save **PC** and **IE**, set **IE ← 0**, jump to the handler PC. **`RETI`** restores PC and IE. Use **`EI`** / **`DI`** in your ISA profile (example opcodes `1100` / `1101` / `1110` in `.cpuisa_irq`).
 
 With **level** `irq`, if the line stays `1` after `RETI` and **IE** is on again, the CPU may enter the handler again on the next step — lower `irq` when the event is done.
 
+Use a **4wire** for `irqVec` when the index is not zero (pin width is 4 bits).
+
+### Triggering from a script (minimal pattern)
+
+```logts
+1wire irqLine = 0
+4wire which = 0000
+
+comp [cpu] .u:
+  vectors: 3, 5
+  ...
+  :
+
+.u:{ set = 1 }                    # e.g. EI in prog
+irqLine = 1
+which = 0001                      # vector 1
+.u:{ irq = irqLine, irqVec = which, set = 1 }   # finish one main insn, then serve
+.u:{ set = 1 }                    # handler instructions...
+irqLine = 0                       # withdraw request
+.u:{ irq = irqLine, set = 1 }     # RETI step (handler), then main continues
+```
+
+**`irq`** and **`irqVec`** in the property block are the values the CPU sees for **that** clock pulse (`set` / start of `run`).
+
+### Runnable IRQ examples (Load / Load & Run)
+
+Shared ISA for the examples below (add to your script or copy from here):
+
 ```logts
 inline [asm] .cpuisa_irq:
-  ...
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  STORE : 0010 + R2b + A2b
+  ADDI  : 0011 + R2b + A2b
+  SUBI  : 0100 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0110 + S4b
+  HALT  : 0111 + 4b
+  PUSH  : 1000 + R2b + 2b
+  POP   : 1001 + R2b + 2b
+  OUT   : 1010 + R2b + 2b
+  EI    : 1100 + 4b
+  DI    : 1101 + 4b
+  RETI  : 1110 + 4b
+  :
+```
+
+#### cpu-irq-vectors-fixed
+
+Two handlers via **`vectors: 3, 5`**: vector **0** runs handler at PC **3** (`ADDI R0 +1`), vector **1** runs PC **5** (`ADDI R0 +2`). After both IRQ pulses, **`R0 = 3`**.
+
+```logts-play
+inline [asm] .cpuisa_irq:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  STORE : 0010 + R2b + A2b
+  ADDI  : 0011 + R2b + A2b
+  SUBI  : 0100 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0110 + S4b
+  HALT  : 0111 + 4b
+  PUSH  : 1000 + R2b + 2b
+  POP   : 1001 + R2b + 2b
+  OUT   : 1010 + R2b + 2b
   EI    : 1100 + 4b
   DI    : 1101 + 4b
   RETI  : 1110 + 4b
@@ -409,16 +544,118 @@ inline [asm] .cpuisa_irq:
 
 comp [cpu] .u:
   isa: .cpuisa_irq
-  vectors: 4
+  registers: 4
   on: 1
-  prog: ...
+  vectors: 3, 5
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa_irq {
+      EI
+    loop:
+      NOP
+      JMP loop
+    h0:
+      ADDI R0 A1
+      RETI
+    h1:
+      ADDI R0 A2
+      RETI
+    }
+  ram:
+    depth: 8
+    length: 8
   :
 
-1wire irqLine = 0
-.u:{ irq = irqLine, set = 1 }
-.u:{ irq = 1, set = 1 }
+4wire vec0 = 0000
+4wire vec1 = 0001
+.u:{ set = 1 }
+.u:{ irq = 1, irqVec = vec0, set = 1 }
+.u:{ set = 1 }
+.u:{ irq = 0, set = 1 }
+.u:{ irq = 1, irqVec = vec1, set = 1 }
+.u:{ set = 1 }
+.u:{ irq = 0, set = 1 }
+8wire r0 = .u:r0
+show(r0)
+```
+
+**Load & Run:** `r0` is `00000011` (decimal 3). Each handler ends with **`irq = 0`** before **`RETI`** so the level line does not re-trigger immediately.
+
+---
+
+#### cpu-irq-vectors-ram-table
+
+Same two handlers, but entry PCs live in **RAM** at **`map.vectorBase: 6`**: `ram[6] → PC 3`, `ram[7] → PC 5`. Handlers print **`A`** then **`B`** (ASCII from `ram[2]` / `ram[3]`) via **`OUT`** to **`.out`**.
+
+```logts-play
+inline [asm] .cpuisa_irq:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  STORE : 0010 + R2b + A2b
+  ADDI  : 0011 + R2b + A2b
+  SUBI  : 0100 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0110 + S4b
+  HALT  : 0111 + 4b
+  PUSH  : 1000 + R2b + 2b
+  POP   : 1001 + R2b + 2b
+  OUT   : 1010 + R2b + 2b
+  EI    : 1100 + 4b
+  DI    : 1101 + 4b
+  RETI  : 1110 + 4b
+  :
+
+comp [terminal] .out:
+  rows: 4
+  columns: 16
+  on: 1
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa_irq
+  registers: 4
+  on: 1
+  output = .out
+  map:
+    vectorBase: 6
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa_irq {
+      EI
+    loop:
+      NOP
+      JMP loop
+    h0:
+      LOAD R1 A2
+      OUT R1
+      RETI
+    h1:
+      LOAD R1 A3
+      OUT R1
+      RETI
+    }
+  ram:
+    depth: 8
+    length: 8
+    = ^0000004142000305
+  :
+
+4wire vec0 = 0000
+4wire vec1 = 0001
+.u:{ set = 1 }
+.u:{ irq = 1, irqVec = vec0, set = 1 }
+.u:{ set = 1 }
+.u:{ irq = 0, set = 1 }
+.u:{ irq = 1, irqVec = vec1, set = 1 }
+.u:{ set = 1 }
 .u:{ irq = 0, set = 1 }
 ```
+
+**Load & Run:** open the **terminal** for `.out` — text **`AB`**. RAM init: bytes at A2/A3 are `'A'`/`'B'`; words at indices **6** and **7** are handler PCs **3** and **5**.
+
+---
 
 Binding `irq = .pic` (interrupt controller) is planned for a later sub-phase.
 

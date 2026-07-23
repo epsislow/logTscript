@@ -39,7 +39,11 @@ function cpuParseVectors(attr) {
     return null;
   }
   if (!parts.length) return null;
-  return parts.map(x => parseInt(x, 10));
+  return parts.map(x => {
+    const n = parseInt(x, 10);
+    if (isNaN(n)) throw Error(`Invalid vectors entry '${x}'`);
+    return n;
+  });
 }
 
 function cpuParseVectorBase(map) {
@@ -57,6 +61,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     return {
       bindingAttrs: ['isa', 'clock', 'output', 'trace', 'prog', 'ram'],
       nestedBlockAttrs: ['ram', 'prog', 'map'],
+      listAttrs: ['vectors'],
     };
   }
 
