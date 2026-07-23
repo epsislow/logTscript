@@ -604,14 +604,13 @@ La livrare **nu omit** tabelele de valori — același stil ca [terminal.md](../
 - **`trace: off | on | output`** + `trace:get`
 - Doc + 6–10 teste (**inclusiv checklist tabele de mai sus în `cpu.md`**)
 
-**Faza 2 — Von Neumann + ergonomie**
+**Faza 2 — Von Neumann + ergonomie** (livrată)
 
-- **`fetch: ram`** — program și în RAM (v2)
-- `run` + `maxSteps`; `onReset:`; `clock: .osc`; `map.stack` + PUSH/POP
-- **`trace: .dbg`**, **`output: .screen`**, hook opțional Signal Trace (`state` lines)
-- `doc(.cpu1)` — layout memorie + registre
+- **`fetch: ram`** (sau `fetch: 1`) — PC citește instrucțiuni din array-ul **intern** `ram[]`, nu din `prog[]` (Von Neumann contained; test 2594)
+- `run` + `maxSteps`; `onReset:`; `clock:` (parse); `map.stack` + PUSH/POP; `trace` / `output = .terminal`
+- `doc(.cpu1)` — parțial în `cpu.md` (runnable `logts-play`)
 
-**Faza 3 — legare memorie per spațiu (opțional)**
+**Faza 3 — legare memorie per spațiu (plan, neimplementată)**
 
 - **`prog = .rom`**, **`ram = .data`** — binding la `comp [mem]`; toate combinațiile intern/extern (fără atribut `mode:`)
 - Backend în `cpu-devices.js`: `readProg` / `writeProg` (reload), `readRam` / `writeRam` — array intern sau delegate la handler `mem`
@@ -619,12 +618,11 @@ La livrare **nu omit** tabelele de valori — același stil ca [terminal.md](../
 - Peek CPU (`prog:get`, `ram:get`) routează prin același backend
 - **Nu** `comp [bus]` dedicat; documentăm contrast cu ZSTATE + board și mini-cpu-v2
 
-**Explicit out of scope (rămâne)**
+**Încă out of scope (nu e pe roadmap CPU contained)**
 
-- `fetch: ram` / execuție din RAM (→ **v2**)
-- `mode: wave` (rămâne `board +[cpu4v2]`)
-- DMA, IRQ
-- Heap cu allocator în CPU
+- **`comp [cpu]` ca CPU „wave/hardware”** — nu există atribut `mode: wave` pe `comp [cpu]`; fetch/decode/execute rămân în interpretor JS. Pentru PC/LUT/mem pe fire la fiecare puls, folosești **`board +[cpu4v2]`** ([mini-cpu-v2.md](../v0_3_2/doc/mini-cpu-v2.md)). Scripturile cu `comp [cpu]` pot rula cu propagare **wave** în editor (ca orice alt `comp`), dar CPU-ul nu devine un board.
+- **DMA, IRQ**
+- **Heap cu allocator în nucleul CPU** (rămâne `comp [heap]` + convenții RAM)
 
 ---
 
