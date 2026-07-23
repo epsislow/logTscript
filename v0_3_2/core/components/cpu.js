@@ -206,8 +206,11 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     let traceMode = traceParsed.mode;
     let traceTerminalId = traceParsed.terminalId;
     const traceMembers = attributes.traceMembers;
-    if (traceParsed.mode === 'terminal' && traceMembers && traceMembers.length) {
+    if (traceMembers && traceMembers.length) {
       traceTerminalId = this._resolveTerminalId(traceMembers[0], ctx);
+    }
+    if (traceTerminalId && traceMode === 'off') {
+      traceMode = 'terminal';
     }
     let outputTerminalId = null;
     const outMembers = attributes.outputMembers;

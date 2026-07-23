@@ -24963,6 +24963,49 @@ comp [cpu] .u:
   h.assert('terminal char', getTerminalText(_termId(interp, '.out')), 'G');
 });
 
+reg(2599, 'comp-cpu', 'cpu run trace lines in terminal', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [terminal] .tr:
+  rows: 20
+  columns: 72
+  on: 1
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  trace = .tr
+  maxSteps: 48
+  ram:
+    depth: 8
+    length: 4
+    = ^03
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+    loop:
+      SUBI R0 A1
+      BEQ done
+      JMP loop
+    done:
+      HALT
+    }
+  :
+
+.u:{ run = 1 }
+`;
+  const { interp } = session.run(src);
+  const text = getTerminalText(_termId(interp, '.tr'));
+  h.assert('terminal has trace steps', String(text.indexOf('# step') >= 0), 'true');
+  h.assert('terminal shows halted', String(text.indexOf('halted=1') >= 0), 'true');
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 after countdown', r0.value, '00000000');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,
