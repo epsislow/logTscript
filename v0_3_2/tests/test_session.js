@@ -4,6 +4,8 @@
 (function () {
   'use strict';
 
+  const _activeTestSessions = new Set();
+
   function createSession(options = {}) {
     const propagation = options.propagation || 'legacy';
     const instanceId = options.instanceId != null ? options.instanceId : 1;
@@ -245,6 +247,7 @@
       },
 
       cleanup() {
+        _activeTestSessions.delete(this);
         if (this.interp && this.interp.oscTimers) {
           for (const tid of this.interp.oscTimers) {
             clearTimeout(tid);
@@ -266,8 +269,19 @@
         this.signalPropagationStrategy = null;
       }
     };
+    _activeTestSessions.add(session);
     return session;
   }
 
-  window.LogTScriptSession = { createSession };
+  function cleanupAllTestSessions() {
+    for (const s of [..._activeTestSessions]) {
+      try {
+        s.cleanup();
+      } catch (e) {
+        /* ignore teardown errors */
+      }
+    }
+  }
+
+  window.LogTScriptSession = { createSession, cleanupAllTestSessions };
 })();

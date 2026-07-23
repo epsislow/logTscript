@@ -71,8 +71,12 @@ console.log('Passed:', passed, 'Failed:', failed, 'Total:', suite.tests.length);
 if (dmErrors.length) {
   console.log('dm is not defined:', dmErrors.length, 'tests — run node node/_gen_test_manifest.js');
 }
+if (sandbox.LogTScriptSession && typeof sandbox.LogTScriptSession.cleanupAllTestSessions === 'function') {
+  sandbox.LogTScriptSession.cleanupAllTestSessions();
+}
 if (failures.length) {
   console.log('Failures:', failures.slice(0, 40).join('\n'));
   if (failures.length > 40) console.log('... and', failures.length - 40, 'more');
   process.exit(1);
 }
+process.exit(0);

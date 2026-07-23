@@ -3389,6 +3389,10 @@ assignment() {
 
         if (attributesWithNoValues.includes(attrName) && this.c.value === ':') {
           this.eat('SYM', ':');
+          this.t.skip();
+          if (this.c.type === 'DEC' || this.c.type === 'BIN') {
+            throw Error(`${attrName} is a flag attribute (no value) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+          }
           attributes[attrName] = true;
           continue;
         }

@@ -2548,7 +2548,7 @@ probe(.n:get)`;
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider'];
+    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'cpu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -20386,7 +20386,7 @@ reg(2240, 'semantic-schemas', 'matrix schema field access and show element', fun
 
 reg(2241, 'semantic-schemas', 'chip body schema literal and re-exec', function(h, session) {
   const { interp } = session.run(OPCODE16_SCHEMA + [
-    'chip +[cpu]:',
+    'chip +[scpu]:',
     '  4pin aluIn',
     '  1pin set',
     '  4pout aluOut',
@@ -20396,7 +20396,7 @@ reg(2241, 'semantic-schemas', 'chip body schema literal and re-exec', function(h
     '  instr:alu = aluIn',
     '  aluOut = instr:alu',
     '  :4bit aluOut',
-    'chip [cpu] .u1::',
+    'chip [scpu] .u1::',
     '.u1:{ aluIn = 0101',
     '  set = 1 }',
   ].join('\n'));
@@ -23696,6 +23696,33 @@ function pulseNetworkChatWave(serverSession, clientSession, n) {
   }
 }
 
+/** În `finally` după `createSession` auxiliar (osc, rețea multi-inst). */
+function cleanupTestSessions() {
+  for (let i = 0; i < arguments.length; i++) {
+    const s = arguments[i];
+    if (s && typeof s.cleanup === 'function') {
+      try {
+        s.cleanup();
+      } catch (e) { /* ignore */ }
+    }
+  }
+}
+
+/**
+ * Două instanțe (implicit 1 și 2); curăță osc timere în finally.
+ * opts: { propagation, instanceId } — al doilea folosește instanceId: 2.
+ */
+function withDualTestSessions(fn, options) {
+  const base = options || {};
+  const s1 = createSession(Object.assign({}, base, { instanceId: base.instanceId != null ? base.instanceId : 1 }));
+  const s2 = createSession(Object.assign({}, base, { instanceId: 2 }));
+  try {
+    return fn(s1, s2);
+  } finally {
+    cleanupTestSessions(s1, s2);
+  }
+}
+
 /** One-shot JOIN packet + openSock (wave tests — avoids set=boot re-fire). */
 function networkChatClientJoinWave(clientSession) {
   clientSession.execStmts(clientSession.interp, `.nc:{
@@ -23785,29 +23812,29 @@ function setupChatUplink(clientSession, serverSession, portBits) {
 }
 
 reg(2528, 'socket-chat', 'SOCKATTACHED connected then unregister', function(h) {
-  const s1 = createSession({ instanceId: 1 });
-  const s2 = createSession({ instanceId: 2 });
-  setupChatUplink(s2, s1);
-  s1.execStmts(s1.interp, '1wire live = SOCKATTACHED(up2)');
-  s2.execStmts(s2.interp, '1wire live = SOCKATTACHED(toSrv)');
-  h.assert('server up', s1.getWire(s1.interp, 'live'), '1');
-  h.assert('client up', s2.getWire(s2.interp, 'live'), '1');
-  unregisterNetworkEndpoints(2);
-  s1.execStmts(s1.interp, '1wire live2 = SOCKATTACHED(up2)');
-  h.assert('server detached', s1.getWire(s1.interp, 'live2'), '0');
+  withDualTestSessions(function(s1, s2) {
+    setupChatUplink(s2, s1);
+    s1.execStmts(s1.interp, '1wire live = SOCKATTACHED(up2)');
+    s2.execStmts(s2.interp, '1wire live = SOCKATTACHED(toSrv)');
+    h.assert('server up', s1.getWire(s1.interp, 'live'), '1');
+    h.assert('client up', s2.getWire(s2.interp, 'live'), '1');
+    unregisterNetworkEndpoints(2);
+    s1.execStmts(s1.interp, '1wire live2 = SOCKATTACHED(up2)');
+    h.assert('server detached', s1.getWire(s1.interp, 'live2'), '0');
+  });
 });
 
 reg(2529, 'socket-chat', 'SOCKATTACHED producer and consumer', function(h) {
-  const s1 = createSession({ instanceId: 1 });
-  const s2 = createSession({ instanceId: 2 });
-  setupChatUplink(s2, s1);
-  s2.execStmts(s2.interp, '1wire live = SOCKATTACHED(toSrv)');
-  s1.execStmts(s1.interp, '1wire live = SOCKATTACHED(up2)');
-  h.assert('client producer', s2.getWire(s2.interp, 'live'), '1');
-  h.assert('server consumer', s1.getWire(s1.interp, 'live'), '1');
-  closeSockNet(s2, s2.interp, '0010');
-  s1.execStmts(s1.interp, '1wire live2 = SOCKATTACHED(up2)');
-  h.assert('server after close', s1.getWire(s1.interp, 'live2'), '0');
+  withDualTestSessions(function(s1, s2) {
+    setupChatUplink(s2, s1);
+    s2.execStmts(s2.interp, '1wire live = SOCKATTACHED(toSrv)');
+    s1.execStmts(s1.interp, '1wire live = SOCKATTACHED(up2)');
+    h.assert('client producer', s2.getWire(s2.interp, 'live'), '1');
+    h.assert('server consumer', s1.getWire(s1.interp, 'live'), '1');
+    closeSockNet(s2, s2.interp, '0010');
+    s1.execStmts(s1.interp, '1wire live2 = SOCKATTACHED(up2)');
+    h.assert('server after close', s1.getWire(s1.interp, 'live2'), '0');
+  });
 });
 
 reg(2530, 'socket-chat', 'chatFrame chatParse round-trip CHAT body', function(h, session) {
@@ -23837,25 +23864,25 @@ reg(2531, 'socket-chat', 'chatParse JOIN frame empty body', function(h, session)
 });
 
 reg(2532, 'socket-chat', 'uplink JOIN frame cross-instance', function(h) {
-  const s1 = createSession({ instanceId: 1 });
-  const s2 = createSession({ instanceId: 2 });
-  s1.run(INLINE_CHAT_UP + '\n' + netSockDef('chat-demo') + 'sock up2\n');
-  setupChatUplink(s2, s1);
-  s2.execStmts(s2.interp, 'toSrv << ' + CHAT_JOIN_PKT);
-  s1.execStmts(s1.interp, '24wire parsed =: .chatParse { data << up2 }\n8wire k = parsed:kind\n8wire c = parsed:clientId');
-  h.assert('kind', s1.getWire(s1.interp, 'k'), '00000001');
-  h.assert('clientId', s1.getWire(s1.interp, 'c'), '00000010');
+  withDualTestSessions(function(s1, s2) {
+    s1.run(INLINE_CHAT_UP + '\n' + netSockDef('chat-demo') + 'sock up2\n');
+    setupChatUplink(s2, s1);
+    s2.execStmts(s2.interp, 'toSrv << ' + CHAT_JOIN_PKT);
+    s1.execStmts(s1.interp, '24wire parsed =: .chatParse { data << up2 }\n8wire k = parsed:kind\n8wire c = parsed:clientId');
+    h.assert('kind', s1.getWire(s1.interp, 'k'), '00000001');
+    h.assert('clientId', s1.getWire(s1.interp, 'c'), '00000010');
+  });
 });
 
 reg(2533, 'socket-chat', 'uplink CHAT hi cross-instance', function(h) {
-  const s1 = createSession({ instanceId: 1 });
-  const s2 = createSession({ instanceId: 2 });
-  s1.run(INLINE_CHAT_UP + '\n' + netSockDef('chat-demo') + 'sock up2\n');
-  setupChatUplink(s2, s1);
-  s2.execStmts(s2.interp, 'toSrv << ' + CHAT_HI_PKT);
-  s1.execStmts(s1.interp, '40wire parsed =: .chatParse { data << up2 }\n8wire k = parsed:kind\n16wire b = parsed:body');
-  h.assert('kind chat', s1.getWire(s1.interp, 'k'), '00000010');
-  h.assert('body', s1.getWire(s1.interp, 'b'), '0110100001101001');
+  withDualTestSessions(function(s1, s2) {
+    s1.run(INLINE_CHAT_UP + '\n' + netSockDef('chat-demo') + 'sock up2\n');
+    setupChatUplink(s2, s1);
+    s2.execStmts(s2.interp, 'toSrv << ' + CHAT_HI_PKT);
+    s1.execStmts(s1.interp, '40wire parsed =: .chatParse { data << up2 }\n8wire k = parsed:kind\n16wire b = parsed:body');
+    h.assert('kind chat', s1.getWire(s1.interp, 'k'), '00000010');
+    h.assert('body', s1.getWire(s1.interp, 'b'), '0110100001101001');
+  });
 });
 
 reg(2535, 'socket-chat', 'chatFrame body from local sock lineBuf', function(h, session) {
@@ -23887,9 +23914,8 @@ toSrv << .chatFrame { kind = \\2;8, clientId = \\2;8, body = lineBuf }`;
 });
 
 reg(2534, 'socket-chat', 'downlink broadcast packet received', function(h) {
-  const s1 = createSession({ instanceId: 1 });
-  const s2 = createSession({ instanceId: 2 });
-  s1.run(`comp [network] .net:
+  withDualTestSessions(function(s1, s2) {
+    s1.run(`comp [network] .net:
   width: 136
   length: 8
   channel: 'chat-demo'
@@ -23897,55 +23923,56 @@ reg(2534, 'socket-chat', 'downlink broadcast packet received', function(h) {
   :
 136wire joinPkt : "*client 2 joined*"
 `);
-  s2.run(`comp [network] .net:
+    s2.run(`comp [network] .net:
   width: 136
   length: 8
   channel: 'chat-demo'
   on: 1
   :
 `);
-  s1.execStmts(s1.interp, '.net:send = joinPkt\n.net:set = 1');
-  h.assert('rx not empty', s2.getCompProperty(s2.interp, '.net', 'empty'), '0');
-  s2.execStmts(s2.interp, '136wire rx = .net:get\n.net:{ pop = 1\n  set = 1 }');
-  h.assert('line starts star', s2.getWire(s2.interp, 'rx').slice(0, 8), '00101010');
+    s1.execStmts(s1.interp, '.net:send = joinPkt\n.net:set = 1');
+    h.assert('rx not empty', s2.getCompProperty(s2.interp, '.net', 'empty'), '0');
+    s2.execStmts(s2.interp, '136wire rx = .net:get\n.net:{ pop = 1\n  set = 1 }');
+    h.assert('line starts star', s2.getWire(s2.interp, 'rx').slice(0, 8), '00101010');
+  });
 });
 
 reg(2569, 'socket-chat', 'wave JOIN packet deferred connSock SOCKATTACHED', function(h) {
-  const s1 = createSession({ instanceId: 1, propagation: 'wave' });
-  const s2 = createSession({ instanceId: 2, propagation: 'wave' });
-  s1.run(NETWORK_CHAT_SERVER_WAVE);
-  s2.run(NETWORK_CHAT_CLIENT_WAVE);
-  networkChatClientJoinWave(s2);
-  pulseNetworkChatWave(s1, s2, 16);
-  s1.execStmts(s1.interp, '1wire live = SOCKATTACHED(up2)');
-  h.assert('server sock live', s1.getWire(s1.interp, 'live'), '1');
-  h.assert('seen client 2', s1.getWire(s1.interp, 'seen2'), '1');
+  withDualTestSessions(function(s1, s2) {
+    s1.run(NETWORK_CHAT_SERVER_WAVE);
+    s2.run(NETWORK_CHAT_CLIENT_WAVE);
+    networkChatClientJoinWave(s2);
+    pulseNetworkChatWave(s1, s2, 16);
+    s1.execStmts(s1.interp, '1wire live = SOCKATTACHED(up2)');
+    h.assert('server sock live', s1.getWire(s1.interp, 'live'), '1');
+    h.assert('seen client 2', s1.getWire(s1.interp, 'seen2'), '1');
+  }, { propagation: 'wave' });
 }, { propagation: 'wave' });
 
 reg(2570, 'socket-chat', 'wave join broadcast server terminal', function(h) {
-  const s1 = createSession({ instanceId: 1, propagation: 'wave' });
-  const s2 = createSession({ instanceId: 2, propagation: 'wave' });
-  s1.run(NETWORK_CHAT_SERVER_WAVE);
-  s2.run(NETWORK_CHAT_CLIENT_WAVE);
-  networkChatClientJoinWave(s2);
-  pulseNetworkChatWave(s1, s2, 16);
-  const text = getTerminalText(_termId(s1.interp, '.term'));
-  h.assert('joined line', String(text.includes('*client 2 joined*')), 'true');
+  withDualTestSessions(function(s1, s2) {
+    s1.run(NETWORK_CHAT_SERVER_WAVE);
+    s2.run(NETWORK_CHAT_CLIENT_WAVE);
+    networkChatClientJoinWave(s2);
+    pulseNetworkChatWave(s1, s2, 16);
+    const text = getTerminalText(_termId(s1.interp, '.term'));
+    h.assert('joined line', String(text.includes('*client 2 joined*')), 'true');
+  }, { propagation: 'wave' });
 }, { propagation: 'wave' });
 
 reg(2571, 'socket-chat', 'wave CHAT hi uplink broadcast chatLine', function(h) {
-  const s1 = createSession({ instanceId: 1, propagation: 'wave' });
-  const s2 = createSession({ instanceId: 2, propagation: 'wave' });
-  s1.run(NETWORK_CHAT_SERVER_WAVE);
-  s2.run(NETWORK_CHAT_CLIENT_WAVE);
-  networkChatClientJoinWave(s2);
-  pulseNetworkChatWave(s1, s2, 16);
-  s2.execStmts(s2.interp, 'toSrv << ' + CHAT_HI_PKT);
-  pulseNetworkChatWave(s1, s2, 20);
-  h.assert('parsed kind CHAT', s1.getWire(s1.interp, 'kind'), '00000010');
-  h.assert('uplink consumed', String(s1.getSockLen(s1.interp, 'up2')), '0');
-  const text = getTerminalText(_termId(s2.interp, '.out'));
-  h.assert('client chat prefix', String(text.includes('client2>')), 'true');
+  withDualTestSessions(function(s1, s2) {
+    s1.run(NETWORK_CHAT_SERVER_WAVE);
+    s2.run(NETWORK_CHAT_CLIENT_WAVE);
+    networkChatClientJoinWave(s2);
+    pulseNetworkChatWave(s1, s2, 16);
+    s2.execStmts(s2.interp, 'toSrv << ' + CHAT_HI_PKT);
+    pulseNetworkChatWave(s1, s2, 20);
+    h.assert('parsed kind CHAT', s1.getWire(s1.interp, 'kind'), '00000010');
+    h.assert('uplink consumed', String(s1.getSockLen(s1.interp, 'up2')), '0');
+    const text = getTerminalText(_termId(s2.interp, '.out'));
+    h.assert('client chat prefix', String(text.includes('client2>')), 'true');
+  }, { propagation: 'wave' });
 }, { propagation: 'wave' });
 
 reg(2537, 'network-sock', 'SOCKMODE local producer consumer', function(h) {
@@ -24744,6 +24771,8 @@ reg(2592, 'comp-cpu', 'cpu E2E sum in RAM plus counter loop', function(h, sessio
     NETWORK_CHAT_CLIENT_WAVE,
     pulseNetworkChatWave,
     networkChatClientJoinWave,
+    cleanupTestSessions,
+    withDualTestSessions,
     huffFsmTick,
     huffBuildCodebookWire,
     huffCodewordsForSource,

@@ -134,6 +134,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)', searchPrimary: 'ZEROS' },
       { file: 'chip-board-execution.md', label: 'Chip and board execution' },
       { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)', searchPrimary: 'on:' },
+      { file: 'cpu.md', label: 'CPU Component (`comp [cpu]`)' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
       { file: 'network-chat.md', label: 'Network chat — socket uplink + packet downlink (wave)' },
