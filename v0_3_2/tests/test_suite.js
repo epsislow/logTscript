@@ -24760,6 +24760,209 @@ reg(2592, 'comp-cpu', 'cpu E2E sum in RAM plus counter loop', function(h, sessio
   }
 });
 
+const CPU_ISA_PHASE2 = `inline [asm] .cpuisa2:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  STORE : 0010 + R2b + A2b
+  ADDI  : 0011 + R2b + A2b
+  SUBI  : 0100 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0110 + S4b
+  HALT  : 0111 + 4b
+  PUSH  : 1000 + R2b + 2b
+  POP   : 1001 + R2b + 2b
+  OUT   : 1010 + R2b + 2b
+  :
+
+`;
+
+function cpuRunUntilHalt(session, interp, compName, maxSteps) {
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get(compName);
+  if (!comp) throw new Error('missing cpu component ' + compName);
+  session.execStmts(interp, compName + ':{ run = 1 }');
+  const halted = handler.evalGetProperty(comp, 'halted', { var: compName, property: 'halted' }, interp);
+  if (!halted || halted.value !== '1') {
+    throw new Error('CPU did not halt within run maxSteps ' + maxSteps);
+  }
+}
+
+reg(2593, 'comp-cpu', 'cpu run pin executes until HALT', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  maxSteps: 32
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      ADDI R0 A3
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuRunUntilHalt(session, interp, '.u', 32);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 after run', r0.value, '00000011');
+});
+
+reg(2594, 'comp-cpu', 'cpu fetch ram von neumann', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  fetch: 1
+  registers: 4
+  on: 1
+  ram:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      ADDI R0 A2
+      HALT
+    }
+  prog:
+    depth: 8
+    length: 4
+    = .cpuisa { HALT }
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuRunUntilHalt(session, interp, '.u', 16);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 from ram program', r0.value, '00000010');
+});
+
+reg(2595, 'comp-cpu', 'cpu PUSH POP stack in RAM', function(h, session) {
+  const src = CPU_ISA_PHASE2 + `comp [cpu] .u:
+  isa: .cpuisa2
+  registers: 4
+  sp: 3
+  on: 1
+  map:
+    stack: 2
+  ram:
+    depth: 8
+    length: 8
+    = ^05000000
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa2 {
+      LOAD R0 A0
+      PUSH R0
+      LOAD R0 A1
+      POP R1
+      HALT
+    }
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuRunUntilHalt(session, interp, '.u', 24);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  const r1 = handler.evalGetProperty(comp, 'r1', { var: '.u', property: 'r1' }, interp);
+  h.assert('r0 cleared', r0.value, '00000000');
+  h.assert('r1 restored', r1.value, '00000101');
+});
+
+reg(2596, 'comp-cpu', 'cpu maxSteps caps run', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  maxSteps: 1
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      ADDI R0 A1
+      ADDI R0 A1
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const { interp } = session.run(src);
+  session.execStmts(interp, '.u:{ run = 1 }');
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('not halted', halted.value, '0');
+  h.assert('one step only', r0.value, '00000001');
+});
+
+reg(2597, 'comp-cpu', 'cpu trace buffer trace:get', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  trace: 1
+  prog:
+    depth: 8
+    length: 4
+    = .cpuisa { HALT }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+.u:{ set = 1 }
+`;
+  const { interp } = session.run(src);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const trace = handler.evalGetProperty(comp, 'trace:get', { var: '.u', property: 'trace:get' }, interp);
+  h.assert('trace mentions halted', String(trace.value.includes('halted=1')), 'true');
+});
+
+reg(2598, 'comp-cpu', 'cpu OUT to terminal via output attr', function(h, session) {
+  const src = CPU_ISA_PHASE2 + `comp [terminal] .out:
+  rows: 3
+  columns: 10
+  on: 1
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa2
+  registers: 4
+  on: 1
+  output = .out
+  prog:
+    depth: 8
+    length: 12
+    = .cpuisa2 {
+      LOAD R0 A0
+      OUT R0
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+    = ^47
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuRunUntilHalt(session, interp, '.u', 16);
+  h.assert('terminal char', getTerminalText(_termId(interp, '.out')), 'G');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

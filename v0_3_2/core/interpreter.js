@@ -491,6 +491,33 @@ class Interpreter {
       && !this.insidePcbBody);
   }
 
+  _cpuAppendTerminal(terminalId, text) {
+    if (!terminalId || !text || typeof getTerminalDevice !== 'function') return;
+    const term = getTerminalDevice(terminalId);
+    if (!term || typeof term.appendBinary !== 'function') return;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text.charCodeAt(i) & 0xff;
+      term.appendBinary(ch.toString(2).padStart(8, '0'));
+    }
+  }
+
+  _cpuTraceOutput(cpuState, text) {
+    if (!cpuState || !text) return;
+    if (cpuState.traceMode === 'output' && this.out) {
+      this.out.push(text);
+    }
+    if (cpuState.traceTerminalId) {
+      this._cpuAppendTerminal(cpuState.traceTerminalId, text);
+    }
+  }
+
+  _cpuProgramOutput(cpuState, text) {
+    if (!cpuState || !text) return;
+    if (cpuState.outputTerminalId) {
+      this._cpuAppendTerminal(cpuState.outputTerminalId, text);
+    }
+  }
+
   getWireStableValue(name) {
     const wire = this.wires.get(name);
     if (!wire || !wire.ref || wire.ref === '&-') return null;
@@ -13863,8 +13890,10 @@ if (s.assignment) {
       // They will be processed in applyComponentProperties when 'set' is executed
       // This avoids double processing (once here, once in applyComponentProperties)
       
-      // If property is 'set', apply the properties
-      if(property === 'set'){
+      // If property is 'set' (or cpu 'run'), apply the properties
+      const compForApply = this.components.get(component);
+      const cpuRunApply = compForApply && compForApply.type === 'cpu' && property === 'run';
+      if(property === 'set' || cpuRunApply){
         const when = value === '~' ? 'next' : 'immediate';
         this.componentPendingSet.set(component, when);
         this.applyComponentProperties(component, when, reEvaluate);

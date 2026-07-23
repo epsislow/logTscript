@@ -69,6 +69,7 @@ Reload program with **`.u:prog = …`** (not direct assign on the component body
 | Pin / property | Role |
 |----------------|------|
 | `set` | One fetch-decode-execute step (clock) |
+| `run` | Run until HALT or `maxSteps` |
 | `reset` | Apply `onReset` flags |
 | `resetPC`, `resetRAM`, `resetRegs`, `resetSP`, `resetHalted` | Granular resets (active `1`) |
 | `ramAdr`, `progAdr` | Address for peek ports |
@@ -112,6 +113,22 @@ Address operands `A0`, `A1`, … refer to **RAM word indices**, not register num
 
 ---
 
-## Out of scope (v1)
+## Phase 2 (contained CPU)
 
-- `fetch: ram` (Von Neumann), `run` loop, external `ram:`/`prog:` links, `clock:`, IRQ/DMA — see project plan faza 2+.
+| Attribute / pin | Description |
+|-----------------|-------------|
+| `fetch:` | `prog` (default) or `ram` / `1` for Von Neumann fetch from internal RAM |
+| `maxSteps` | Cap for `run` (default 10000) |
+| `run` | Run until HALT or `maxSteps` |
+| `output:` | Terminal binding; `OUT` opcode writes low byte of register as ASCII |
+| `trace:` | `on` (buffer), `output` (buffer + interpreter `out`), or `.terminal` |
+| `clock:` | Parsed binding (use `set = .osc:get` for stepping) |
+| `sp` + `map.stack` | Stack top RAM index; `PUSH`/`POP` opcodes (`1000`/`1001`) |
+
+Extra mnemonics when defined in your ISA profile: **PUSH**, **POP**, **OUT** (`1010`).
+
+---
+
+## Out of scope (later)
+
+- External linked `ram:`/`prog:` chips, IRQ/DMA — see project plan.

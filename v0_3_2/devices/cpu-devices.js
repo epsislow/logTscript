@@ -40,12 +40,16 @@ function addCpu(id, config) {
     spReg: config.spReg != null ? config.spReg : null,
     stackTop: config.stackTop != null ? config.stackTop : ramLen - 1,
     onReset: config.onReset || ['pc', 'regs', 'sp', 'halted'],
+    fetchFrom: config.fetchFrom === 'ram' ? 'ram' : 'prog',
+    maxSteps: config.maxSteps != null ? config.maxSteps : 10000,
     traceMode: config.traceMode || 'off',
     traceTerminalId: config.traceTerminalId || null,
+    outputTerminalId: config.outputTerminalId || null,
     traceBuffer: [],
     peekRamAdr: 0,
     peekProgAdr: 0,
   });
+  if (config.spReg != null) cpuInitSp(cpus.get(id));
 }
 
 function getCpu(id) {
@@ -111,8 +115,7 @@ function cpuResetFlags(id, flags) {
     for (let i = 0; i < c.ramLength; i++) c.ram[i] = z;
   }
   if (set.has('sp') && c.spReg != null && c.spReg >= 0 && c.spReg < c.regCount) {
-    const sw = c.stackTop.toString(2).length;
-    c.regs[c.spReg] = c.stackTop.toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
+    cpuInitSp(c);
   }
   if (set.has('halted')) c.halted = 0;
 }
@@ -124,14 +127,77 @@ function s4(bits) {
   return n;
 }
 
+function cpuCodeLimit(c) {
+  return c.fetchFrom === 'ram' ? c.ramLength : c.progLength;
+}
+
+function cpuFetchInstr(c) {
+  const limit = cpuCodeLimit(c);
+  if (c.pc < 0 || c.pc >= limit) {
+    throw Error(`CPU PC ${c.pc} out of ${c.fetchFrom} range 0..${limit - 1}`);
+  }
+  return c.fetchFrom === 'ram' ? c.ram[c.pc] : c.prog[c.pc];
+}
+
+function cpuSpIndex(c) {
+  if (c.spReg == null || c.spReg < 0 || c.spReg >= c.regCount) return null;
+  return parseInt(c.regs[c.spReg], 2);
+}
+
+function cpuSetSpIndex(c, idx) {
+  if (c.spReg == null || c.spReg < 0 || c.spReg >= c.regCount) {
+    throw Error('CPU stack operation requires valid sp register');
+  }
+  const v = idx.toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
+  c.regs[c.spReg] = v;
+}
+
+function cpuPushReg(c, r) {
+  if (r < 0 || r >= c.regCount) throw Error(`PUSH invalid register R${r}`);
+  let sp = cpuSpIndex(c);
+  if (sp == null) throw Error('PUSH requires sp register');
+  sp -= 1;
+  if (sp < 0) throw Error(`CPU stack overflow at SP ${sp}`);
+  c.ram[sp] = c.regs[r];
+  cpuSetSpIndex(c, sp);
+}
+
+function cpuPopReg(c, r) {
+  if (r < 0 || r >= c.regCount) throw Error(`POP invalid register R${r}`);
+  let sp = cpuSpIndex(c);
+  if (sp == null) throw Error('POP requires sp register');
+  if (sp > c.stackTop) throw Error('CPU stack underflow');
+  c.regs[r] = c.ram[sp];
+  sp += 1;
+  cpuSetSpIndex(c, sp);
+}
+
+function cpuEmitOut(c, ctx, r) {
+  if (r < 0 || r >= c.regCount) return;
+  const ch = parseInt(c.regs[r], 2) & 0xff;
+  const text = String.fromCharCode(ch);
+  if (ctx && typeof ctx._cpuProgramOutput === 'function') {
+    ctx._cpuProgramOutput(c, text);
+  }
+}
+
+function cpuTraceStep(c, ctx, instr) {
+  if (!ctx || !c.traceMode || c.traceMode === 'off') return;
+  const line = `# step pc=${c.pc} instr=${instr} halted=${c.halted}`;
+  c.traceBuffer.push(line);
+  if (c.traceMode === 'output' && typeof ctx._cpuTraceOutput === 'function') {
+    ctx._cpuTraceOutput(c, line);
+  }
+  if (c.traceMode === 'terminal' && typeof ctx._cpuTraceOutput === 'function') {
+    ctx._cpuTraceOutput(c, line + '\n');
+  }
+}
+
 function cpuStep(id, ctx) {
   const c = getCpu(id);
   if (!c) return;
   if (c.halted) return;
-  if (c.pc < 0 || c.pc >= c.progLength) {
-    throw Error(`CPU PC ${c.pc} out of program range 0..${c.progLength - 1}`);
-  }
-  const instr = c.prog[c.pc];
+  const instr = cpuFetchInstr(c);
   c.lastInstr = instr;
   const opc = instr.substring(0, 4);
   const lo = instr.substring(4);
@@ -177,17 +243,34 @@ function cpuStep(id, ctx) {
     }
     case '0101': {
       const addr = parseInt(lo, 2);
-      if (addr < 0 || addr >= c.progLength) throw Error(`JMP invalid address ${addr}`);
+      const limit = cpuCodeLimit(c);
+      if (addr < 0 || addr >= limit) throw Error(`JMP invalid address ${addr}`);
       nextPc = addr;
       break;
     }
     case '0110': {
       const off = s4(lo);
       const target = c.pc + 1 + off;
+      const limit = cpuCodeLimit(c);
       if (parseInt(c.regs[0], 2) === 0) {
-        if (target < 0 || target >= c.progLength) throw Error(`BEQ target PC ${target} out of range`);
+        if (target < 0 || target >= limit) throw Error(`BEQ target PC ${target} out of range`);
         nextPc = target;
       }
+      break;
+    }
+    case '1000': {
+      const r = parseInt(lo.substring(0, 2), 2);
+      cpuPushReg(c, r);
+      break;
+    }
+    case '1001': {
+      const r = parseInt(lo.substring(0, 2), 2);
+      cpuPopReg(c, r);
+      break;
+    }
+    case '1010': {
+      const r = parseInt(lo.substring(0, 2), 2);
+      cpuEmitOut(c, ctx, r);
       break;
     }
     case '0111':
@@ -200,13 +283,25 @@ function cpuStep(id, ctx) {
 
   if (opc !== '0111') c.pc = nextPc;
 
-  if (ctx && c.traceMode && c.traceMode !== 'off') {
-    const line = `# step pc=${c.pc} instr=${instr} halted=${c.halted}`;
-    c.traceBuffer.push(line);
-    if (c.traceMode === 'output' && typeof ctx._cpuTraceOutput === 'function') {
-      ctx._cpuTraceOutput(line);
-    }
+  cpuTraceStep(c, ctx, instr);
+}
+
+function cpuRun(id, maxSteps, ctx) {
+  const c = getCpu(id);
+  if (!c || c.halted) return 0;
+  const limit = maxSteps != null ? maxSteps : c.maxSteps;
+  let steps = 0;
+  while (!c.halted && steps < limit) {
+    cpuStep(id, ctx);
+    steps += 1;
   }
+  return steps;
+}
+
+function cpuInitSp(c) {
+  if (c.spReg == null || c.spReg < 0 || c.spReg >= c.regCount) return;
+  const start = Math.min(c.stackTop + 1, c.ramLength);
+  cpuSetSpIndex(c, start);
 }
 
 function getCpuReg(id, r) {
@@ -229,7 +324,7 @@ function getCpuProg(id, adr) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    addCpu, getCpu, loadCpuRam, loadCpuProg, cpuAfterProgReload, cpuResetFlags, cpuStep,
+    addCpu, getCpu, loadCpuRam, loadCpuProg, cpuAfterProgReload, cpuResetFlags, cpuStep, cpuRun,
     getCpuReg, getCpuRam, getCpuProg, splitBlob,
   };
 }

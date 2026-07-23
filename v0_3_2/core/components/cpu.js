@@ -35,9 +35,39 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
 
   getSpecialParseAttributes() {
     return {
-      bindingAttrs: ['isa'],
+      bindingAttrs: ['isa', 'clock', 'output', 'trace'],
       nestedBlockAttrs: ['ram', 'prog', 'map'],
     };
+  }
+
+  _resolveTerminalId(ref, ctx) {
+    if (!ref || !ctx || !ctx.components) return null;
+    const comp = ctx.components.get(ref);
+    if (!comp || comp.type !== 'terminal' || !comp.deviceIds || !comp.deviceIds[0]) return null;
+    return comp.deviceIds[0];
+  }
+
+  _parseFetch(attributes) {
+    const f = attributes.fetch;
+    if (f === 'ram' || f === 1 || f === '1') return 'ram';
+    return 'prog';
+  }
+
+  _parseMaxSteps(attributes) {
+    if (attributes.maxSteps === undefined) return 10000;
+    const n = parseInt(attributes.maxSteps, 10);
+    return isNaN(n) || n < 1 ? 10000 : n;
+  }
+
+  _parseTraceMode(attributes, ctx) {
+    const tr = attributes.trace;
+    if (tr === 'on' || tr === 1 || tr === '1') return { mode: 'on', terminalId: null };
+    if (tr === 'output') return { mode: 'output', terminalId: null };
+    if (tr === 'off' || tr === 0 || tr === '0' || tr == null) return { mode: 'off', terminalId: null };
+    if (typeof tr === 'string' && tr.startsWith('.')) {
+      return { mode: 'terminal', terminalId: this._resolveTerminalId(tr, ctx) };
+    }
+    return { mode: 'off', terminalId: null };
   }
 
   getWidthBits(attributes) {
@@ -103,7 +133,11 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         { name: 'sp', value: 'integer' },
         { name: 'pcInit', value: 'integer' },
         { name: 'onReset', value: 'list' },
+        { name: 'fetch', value: 'prog|ram' },
+        { name: 'maxSteps', value: 'integer' },
         { name: 'trace', value: 'off|on|output|.terminal' },
+        { name: 'output', value: '.terminal' },
+        { name: 'clock', value: '.component' },
         { name: 'ram', value: 'block' },
         { name: 'prog', value: 'block' },
         { name: 'map', value: 'block' },
@@ -111,6 +145,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       initValue: null,
       pins: [
         { bits: '1', name: 'set' },
+        { bits: '1', name: 'run' },
         { bits: '1', name: 'reset' },
         { bits: String(ramAdrBits), name: 'ramAdr' },
         { bits: String(progAdrBits), name: 'progAdr' },
@@ -136,7 +171,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
 
   getSupportedProperties() {
     return ['pc', 'halted', 'instr', 'ram:get', 'prog:get', 'trace:get',
-      'set', 'reset', 'ramAdr', 'progAdr',
+      'set', 'run', 'reset', 'ramAdr', 'progAdr',
       'resetPC', 'resetRAM', 'resetRegs', 'resetSP', 'resetHalted'];
   }
 
@@ -165,10 +200,22 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     const pcInit = attributes.pcInit !== undefined ? parseInt(attributes.pcInit, 10) : 0;
     const spReg = attributes.sp !== undefined ? parseInt(attributes.sp, 10) : null;
     const stackTop = map.stack !== undefined ? parseInt(map.stack, 10) : ram.length - 1;
-    let traceMode = 'off';
-    if (attributes.trace === 'on' || attributes.trace === 1 || attributes.trace === '1') traceMode = 'on';
-    else if (attributes.trace === 'output') traceMode = 'output';
-    else if (attributes.trace === 'off' || attributes.trace === 0 || attributes.trace === '0') traceMode = 'off';
+    const fetchFrom = this._parseFetch(attributes);
+    const maxSteps = this._parseMaxSteps(attributes);
+    const traceParsed = this._parseTraceMode(attributes, ctx);
+    let traceMode = traceParsed.mode;
+    let traceTerminalId = traceParsed.terminalId;
+    const traceMembers = attributes.traceMembers;
+    if (traceParsed.mode === 'terminal' && traceMembers && traceMembers.length) {
+      traceTerminalId = this._resolveTerminalId(traceMembers[0], ctx);
+    }
+    let outputTerminalId = null;
+    const outMembers = attributes.outputMembers;
+    if (outMembers && outMembers.length) {
+      outputTerminalId = this._resolveTerminalId(outMembers[0], ctx);
+    } else if (typeof attributes.output === 'string' && attributes.output.startsWith('.')) {
+      outputTerminalId = this._resolveTerminalId(attributes.output, ctx);
+    }
 
     if (typeof addCpu === 'function') {
       addCpu(baseId, {
@@ -181,7 +228,11 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         spReg,
         stackTop,
         onReset: cpuParseOnReset(attributes.onReset),
+        fetchFrom,
+        maxSteps,
         traceMode,
+        traceTerminalId,
+        outputTerminalId,
       });
     }
 
@@ -234,6 +285,20 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
 
     if (pending.set !== undefined && this._isActive(this.reEvalPendingValue(pending, 'set', reEvaluate, ctx))) {
       if (typeof cpuStep === 'function') cpuStep(id, ctx);
+      if (ctx.deferWirePropagation && ctx.deferWirePropagation() && ctx.signalPropagationStrategy) {
+        const executed = new Set();
+        if (ctx.signalPropagationStrategy._scheduleWiresDependingOnComponent(compName, executed)) {
+          ctx.signalPropagationStrategy.propagate();
+        }
+      } else {
+        ctx.updateComponentConnections(compName);
+      }
+    }
+
+    if (pending.run !== undefined && this._isActive(this.reEvalPendingValue(pending, 'run', reEvaluate, ctx))) {
+      const c = typeof getCpu === 'function' ? getCpu(id) : null;
+      const max = c && c.maxSteps != null ? c.maxSteps : 10000;
+      if (typeof cpuRun === 'function') cpuRun(id, max, ctx);
       if (ctx.deferWirePropagation && ctx.deferWirePropagation() && ctx.signalPropagationStrategy) {
         const executed = new Set();
         if (ctx.signalPropagationStrategy._scheduleWiresDependingOnComponent(compName, executed)) {
