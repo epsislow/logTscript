@@ -29,7 +29,8 @@ function createDeviceMaps() {
     sliders: new Map(),
     sliderValues: new Map(),
     rotaryKnobs: new Map(),
-    rotaryKnobValues: new Map()
+    rotaryKnobValues: new Map(),
+    cpus: new Map()
   };
 }
 

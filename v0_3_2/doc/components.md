@@ -73,6 +73,7 @@ Instant built-in functions (`ADD`, `SUBTRACT`, …) without `comp`: [arithmetic.
 | Name | Shortname | Page |
 |------|-----------|------|
 | `mem` | — | [mem.md](mem.md) |
+| `cpu` | — | [cpu.md](cpu.md) — contained Harvard CPU (`prog` + `ram`, `set` = step) |
 | `asm` | — | [asm.md](asm.md) — declare `inline [asm]`; assemble with `.name { … }` |
 | `lut` | — | [lut.md](lut.md) — `inline [lut]` or `comp [lut]` |
 | `protocol` | — | [protocol.md](protocol.md) — declare `inline [protocol]`; generate with `.name { params }` |

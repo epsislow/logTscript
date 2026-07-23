@@ -3387,6 +3387,34 @@ assignment() {
           this.eat(this.c.type);
         }
 
+        if (attributesWithNoValues.includes(attrName) && this.c.value === ':') {
+          this.eat('SYM', ':');
+          attributes[attrName] = true;
+          continue;
+        }
+
+        let nestedBlockAttrs = [];
+        if (this.componentRegistry) {
+          const nbHandler = this.componentRegistry.get(compType);
+          if (nbHandler && nbHandler.getSpecialParseAttributes) {
+            const sp = nbHandler.getSpecialParseAttributes();
+            if (sp && sp.nestedBlockAttrs) nestedBlockAttrs = sp.nestedBlockAttrs;
+          }
+        }
+        if (nestedBlockAttrs.includes(attrName) && this.c.value === ':') {
+          this.eat('SYM', ':');
+          this.t.skip();
+          while (this.c.type === 'EOL') this.c = this.t.get();
+          if (this.c.type === 'ID' || (this.c.type === 'SYM' && this.c.value === '=')) {
+            attributes[attrName] = this._parseCpuSubSection();
+            continue;
+          }
+          if (this.c.type === 'SYM' && this.c.value === ':') {
+            attributes[attrName] = {};
+            continue;
+          }
+        }
+
         if (this.c.value === ':' && !attributesWithNoValues.includes(attrName)) {
           this.eat('SYM', ':');
 
@@ -3852,6 +3880,126 @@ assignment() {
         }
       };
     }
+
+  _parseCpuInitValue() {
+    if (this.c.type === 'BIN') {
+      const v = this.c.value;
+      this.eat('BIN');
+      return v;
+    }
+    if (this.c.type === 'GLIT') {
+      const v = parseGlitAtom(this.c.value, this.c).bin;
+      this.eat('GLIT');
+      return v;
+    }
+    if (this.c.type === 'HEX') {
+      const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+      const v = WL ? WL.hexDigitsToBin(this.c.value) : this.c.value;
+      this.eat('HEX');
+      return v;
+    }
+    if (this.c.type === 'SYM' && this.c.value === '^') {
+      this.eat('SYM', '^');
+      if (this.c.type === 'HEX') {
+        const WL = typeof LogTScriptWireLiterals !== 'undefined' ? LogTScriptWireLiterals : null;
+        const v = WL ? WL.hexDigitsToBin(this.c.value) : this.c.value;
+        this.eat('HEX');
+        return v;
+      }
+    }
+    if (this.c.type === 'ID') {
+      const bareName = this.parseBareNameRef();
+      this.t.skip();
+      return { varRef: bareName };
+    }
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      const isaRef = this.parseDotComponentRef();
+      this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === '{') {
+        const bracePos = this.t.i - 1;
+        const prog = this.parseAsmProgramRaw(bracePos);
+        prog.isaRef = isaRef;
+        return prog;
+      }
+      throw Error(`Expected '{' after '= ${isaRef}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    throw Error(`Expected program blob after '=' in CPU subsection at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  _parseCpuSubSection() {
+    const sub = {};
+    const cpuSiblingBlocks = ['ram', 'prog', 'map'];
+    for (;;) {
+      while (this.c.type === 'EOL') this.c = this.t.get();
+      this.t.skip();
+      if (this.c.type === 'EOF') break;
+      if (this.c.type === 'SYM' && this.c.value === ':') {
+        break;
+      }
+      if (this.c.type === 'SYM' && this.c.value === '=') {
+        this.eat('SYM', '=');
+        this.t.skip();
+        sub.initialValue = this._parseCpuInitValue();
+        continue;
+      }
+      if (this.c.type === 'ID' && cpuSiblingBlocks.includes(this.c.value)) {
+        const mark = this.t.i;
+        const tok = this.c;
+        this.eat('ID');
+        this.t.skip();
+        if (this.c.type === 'SYM' && this.c.value === ':') {
+          this.t.i = mark;
+          this.c = tok;
+          break;
+        }
+        const key = tok.value;
+        this.t.skip();
+        if (this.c.value === '=') {
+          this.eat('SYM', '=');
+          this.t.skip();
+          sub.initialValue = this._parseCpuInitValue();
+          continue;
+        }
+        if (this.c.value === ':') {
+          this.eat('SYM', ':');
+          this.t.skip();
+          if (this.c.type === 'DEC' || this.c.type === 'BIN') {
+            sub[key] = this.c.value;
+            this.eat(this.c.type);
+          } else if (this.c.type === 'HEX') {
+            sub[key] = this.c.value;
+            this.eat('HEX');
+          }
+          continue;
+        }
+        break;
+      }
+      if (this.c.type !== 'ID') break;
+      const key = this.c.value;
+      this.eat('ID');
+      this.t.skip();
+      if (this.c.value === '=') {
+        this.eat('SYM', '=');
+        this.t.skip();
+        sub.initialValue = this._parseCpuInitValue();
+        continue;
+      }
+      if (this.c.value === ':') {
+        this.eat('SYM', ':');
+        this.t.skip();
+        if (this.c.type === 'DEC' || this.c.type === 'BIN') {
+          sub[key] = this.c.value;
+          this.eat(this.c.type);
+        } else if (this.c.type === 'HEX') {
+          sub[key] = this.c.value;
+          this.eat('HEX');
+        }
+        continue;
+      }
+      break;
+    }
+    return sub;
+  }
 
   expr(){
     const p=[this.atom()];
@@ -4355,8 +4503,16 @@ assignment() {
         throw Error(`Expected property name after ':' at ${this.c.line}:${this.c.col}`);
       }
       
-      const property = this.c.value;
+      let property = this.c.value;
       this.eat('ID');
+      while (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        if (this.c.type !== 'ID') {
+          throw Error(`Expected property name after ':' at ${this.c.line}:${this.c.col}`);
+        }
+        property += ':' + this.c.value;
+        this.eat('ID');
+      }
       
       if (this.c.type === 'SYM' && this.c.value === '.') {
         this.eat('SYM', '.');

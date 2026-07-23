@@ -24333,6 +24333,300 @@ trig = 1`;
   h.assert('block and top-level show', String(lines.length), '2');
 }, { propagation: 'wave' });
 
+const CPU_ISA_MIN = `inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  HALT  : 0111 + 4b
+  :
+
+`;
+
+const CPU_ISA_FULL = `inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  STORE : 0010 + R2b + A2b
+  ADDI  : 0011 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0110 + S4b
+  HALT  : 0111 + 4b
+  :
+
+`;
+
+function cpuStepUntilHalt(session, interp, compName, maxSteps) {
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get(compName);
+  if (!comp) throw new Error('missing cpu component ' + compName);
+  let steps = 0;
+  for (let i = 0; i < maxSteps; i++) {
+    session.execStmts(interp, compName + ':{ set = 1 }');
+    steps++;
+    const halted = handler.evalGetProperty(comp, 'halted', { var: compName, property: 'halted' }, interp);
+    if (halted && halted.value === '1') return steps;
+  }
+  throw new Error('CPU did not halt within ' + maxSteps + ' steps');
+}
+
+reg(2580, 'comp-cpu', 'registry has cpu component', function(h, session) {
+  const registry = session._ensureRegistry();
+  h.assert('has cpu', String(registry.has('cpu')), 'true');
+});
+
+reg(2581, 'comp-cpu', 'cpu LOAD R0 one step then HALT', function(h, session) {
+  const src = CPU_ISA_MIN + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^11
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      LOAD R0 A0
+      HALT
+    }
+  :
+
+.u:{ set = 1 }
+.u:{ set = 1 }
+`;
+  const { interp } = session.run(src);
+  const comp = interp.components.get('.u');
+  h.assert('has component', String(!!comp), 'true');
+  const handler = session._ensureRegistry().get('cpu');
+  const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+  h.assert('halted', halted.value, '1');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 from ram[0]', r0.value, '00010001');
+});
+
+reg(2582, 'comp-cpu', 'cpu prog reload resets PC and halted', function(h, session) {
+  const src = CPU_ISA_MIN + `8wire tiny = .cpuisa { HALT }
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  prog:
+    depth: 8
+    length: 4
+    = .cpuisa { LOAD R0 A0; HALT }
+  ram:
+    depth: 8
+    length: 4
+    = ^00
+  :
+
+.u:{ set = 1 }
+.u:prog = tiny
+`;
+  const { interp } = session.run(src);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const pc = handler.evalGetProperty(comp, 'pc', { var: '.u', property: 'pc' }, interp);
+  h.assert('pc after reload', pc.value, '00');
+  const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+  h.assert('halted cleared', halted.value, '0');
+});
+
+reg(2583, 'comp-cpu', 'cpu resetRAM clears data', function(h, session) {
+  const src = CPU_ISA_MIN + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^ff
+  prog:
+    depth: 8
+    length: 4
+    = .cpuisa { HALT }
+  :
+
+.u:{ resetRAM = 1, ramAdr = 0, set = 1 }
+8wire cell = .u:ram:get
+`;
+  const { interp } = session.run(src);
+  h.assert('run ok', String(!!interp), 'true');
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const cell = handler.evalGetProperty(comp, 'ram:get', { var: '.u', property: 'ram:get' }, interp);
+  h.assert('ram zero', cell.value, '00000000');
+});
+
+reg(2584, 'comp-cpu', 'cpu init from wire myProg', function(h, session) {
+  const src = CPU_ISA_MIN + `8wire myProg = .cpuisa { HALT }
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  prog:
+    depth: 8
+    length: 4
+    = myProg
+  ram:
+    depth: 8
+    length: 4
+  :
+
+.u:{ set = 1 }
+`;
+  const { interp } = session.run(src);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+  h.assert('halted after wire prog', halted.value, '1');
+});
+
+reg(2585, 'comp-cpu', 'cpu ADDI immediate via A3 operand', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      ADDI R0 A3
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuStepUntilHalt(session, interp, '.u', 8);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 after ADDI +3', r0.value, '00000011');
+});
+
+reg(2586, 'comp-cpu', 'cpu JMP skips instruction', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      ADDI R0 A1
+      JMP end
+      ADDI R0 A2
+    end:
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuStepUntilHalt(session, interp, '.u', 12);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 only first ADDI', r0.value, '00000001');
+});
+
+reg(2587, 'comp-cpu', 'cpu BEQ branches when R0 is zero', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^00
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+      BEQ skip
+      ADDI R0 A3
+    skip:
+      HALT
+    }
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuStepUntilHalt(session, interp, '.u', 12);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 unchanged after branch', r0.value, '00000000');
+});
+
+reg(2588, 'comp-cpu', 'cpu BEQ falls through when R0 nonzero', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^01
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+      BEQ skip
+      ADDI R0 A3
+    skip:
+      HALT
+    }
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuStepUntilHalt(session, interp, '.u', 12);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 = 1+3', r0.value, '00000100');
+});
+
+reg(2589, 'comp-cpu', 'cpu STORE then LOAD roundtrip', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 4
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^05
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+      STORE R0 A2
+      LOAD R1 A2
+      HALT
+    }
+  :
+
+`;
+  const { interp } = session.run(src);
+  cpuStepUntilHalt(session, interp, '.u', 12);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r1 = handler.evalGetProperty(comp, 'r1', { var: '.u', property: 'r1' }, interp);
+  h.assert('r1 from stored word', r1.value, '00000101');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,
