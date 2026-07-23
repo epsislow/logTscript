@@ -379,7 +379,52 @@ CPU semantics (`set`, `run`, LOAD/STORE, reload `.u:prog =`) are unchanged; fetc
 
 ---
 
+## Interrupts (IRQ, phase 4)
+
+IRQ is evaluated **after each completed instruction** (`set` or each step inside `run`), not while an instruction is executing. If the CPU is **halted**, IRQ is ignored.
+
+| Pin / read | Role |
+|------------|------|
+| `irq` | Level request (`1` = active). Sampled when the step finishes. |
+| `irqVec` | Vector index (4 bits). Default `0` if omitted. |
+| `ie` | Interrupt enable (`1` = IRQ may be served). |
+| `irqPending` | `1` when `irq` is active but `ie` is `0` (masked). |
+
+| Attribute | Role |
+|-----------|------|
+| `map.vectorBase` | RAM address of the vector table: `PC ← ram[vectorBase + irqVec]` (word value = new PC). |
+| `vectors:` | Comma list of fixed PC values (e.g. `vectors: 3, 5`) instead of a RAM table. |
+
+On service: save **PC** and **IE**, set **IE ← 0**, jump to the handler PC. **`RETI`** restores PC and IE. Use **`EI`** / **`DI`** in your ISA profile (example opcodes `1100` / `1101` / `1110` in `.cpuisa_irq`).
+
+With **level** `irq`, if the line stays `1` after `RETI` and **IE** is on again, the CPU may enter the handler again on the next step — lower `irq` when the event is done.
+
+```logts
+inline [asm] .cpuisa_irq:
+  ...
+  EI    : 1100 + 4b
+  DI    : 1101 + 4b
+  RETI  : 1110 + 4b
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa_irq
+  vectors: 4
+  on: 1
+  prog: ...
+  :
+
+1wire irqLine = 0
+.u:{ irq = irqLine, set = 1 }
+.u:{ irq = 1, set = 1 }
+.u:{ irq = 0, set = 1 }
+```
+
+Binding `irq = .pic` (interrupt controller) is planned for a later sub-phase.
+
+---
+
 ## Out of scope (later)
 
-- **IRQ** — plan **faza 4** ([comp_cpu.plan.md](../../.cursor/plans/comp_cpu.plan.md) — „Faza 4: IRQ”).
+- **PIC / `irq = .component`** — after `comp [pic]` exists (plan faza 4c).
 - **DMA** — plan **faza 5**, componentă separată `comp [dma]` (fără CPU obligatoriu); același plan, secțiune „Faza 5”.

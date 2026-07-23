@@ -19,7 +19,7 @@ todos:
     status: pending
   - id: phase4-irq
     content: "Faza 4: pin irq, IE, vectori RAM, EI/DI/RETI in profil asm, teste handler"
-    status: pending
+    status: completed
   - id: phase5-dma
     content: "Faza 5: comp [dma] standalone (fara CPU obligatoriu); ram=; doc dma.md; integrare optionala cu cpu"
     status: pending
@@ -623,9 +623,11 @@ La livrare **nu omit** tabelele de valori — același stil ca [terminal.md](../
 - Validare: nu combina sub-bloc + binding; depth prog/ram aliniat
 - Teste **2600–2604** în `test_suite.js`
 
-**Faza 4 — IRQ** (plan — nu implementată)
+**Faza 4 — IRQ** (implementată)
 
-Vezi **[Faza 4: IRQ](#faza-4-irq)**.
+- Pini `irq`, `irqVec`; pout `ie`, `irqPending`
+- `map.vectorBase` sau `vectors:`; servire după fiecare `cpuStep`; `EI`/`DI`/`RETI` (opcodes `1100`/`1101`/`1110`)
+- Teste **2605–2608**; [cpu.md](../v0_3_2/doc/cpu.md) secțiune IRQ
 
 **Faza 5 — `comp [dma]`** (plan — nu implementată)
 

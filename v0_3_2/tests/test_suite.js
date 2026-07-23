@@ -25165,6 +25165,182 @@ comp [cpu] .u:
   }, 'prog = .mem together with prog:');
 });
 
+const CPU_ISA_IRQ = `inline [asm] .cpuisa_irq:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  STORE : 0010 + R2b + A2b
+  ADDI  : 0011 + R2b + A2b
+  SUBI  : 0100 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0110 + S4b
+  HALT  : 0111 + 4b
+  PUSH  : 1000 + R2b + 2b
+  POP   : 1001 + R2b + 2b
+  OUT   : 1010 + R2b + 2b
+  EI    : 1100 + 4b
+  DI    : 1101 + 4b
+  RETI  : 1110 + 4b
+  :
+
+`;
+
+reg(2605, 'comp-cpu', 'cpu IRQ masked when IE=0 sets irqPending', function(h, session) {
+  const src = CPU_ISA_IRQ + `comp [cpu] .u:
+  isa: .cpuisa_irq
+  registers: 4
+  on: 1
+  vectors: 3
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa_irq {
+      DI
+    loop:
+      NOP
+      JMP loop
+    handler:
+      ADDI R0 A1
+      RETI
+    }
+  ram:
+    depth: 8
+    length: 8
+  :
+
+.u:{ set = 1 }
+.u:{ irq = 1, set = 1 }
+`;
+  const { interp } = session.run(src);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 not served', r0.value, '00000000');
+  const pend = handler.evalGetProperty(comp, 'irqPending', { var: '.u', property: 'irqPending' }, interp);
+  h.assert('irq pending', pend.value, '1');
+  const ie = handler.evalGetProperty(comp, 'ie', { var: '.u', property: 'ie' }, interp);
+  h.assert('ie still off', ie.value, '0');
+});
+
+reg(2606, 'comp-cpu', 'cpu IRQ after EI runs handler and RETI returns', function(h, session) {
+  const src = CPU_ISA_IRQ + `comp [cpu] .u:
+  isa: .cpuisa_irq
+  registers: 4
+  on: 1
+  vectors: 3
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa_irq {
+      EI
+    loop:
+      NOP
+      JMP loop
+    handler:
+      ADDI R0 A1
+      RETI
+    }
+  ram:
+    depth: 8
+    length: 8
+  :
+
+.u:{ set = 1 }
+.u:{ irq = 1, set = 1 }
+.u:{ set = 1 }
+.u:{ irq = 0, set = 1 }
+`;
+  const { interp } = session.run(src);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('handler incremented r0', r0.value, '00000001');
+  const pc = handler.evalGetProperty(comp, 'pc', { var: '.u', property: 'pc' }, interp);
+  h.assert('pc back after RETI at JMP', pc.value, '0010');
+  const ie = handler.evalGetProperty(comp, 'ie', { var: '.u', property: 'ie' }, interp);
+  h.assert('ie restored', ie.value, '1');
+});
+
+reg(2607, 'comp-cpu', 'cpu IRQ vector table in RAM via map.vectorBase', function(h, session) {
+  const src = CPU_ISA_IRQ + `4wire vecIdx = 0001
+
+comp [cpu] .u:
+  isa: .cpuisa_irq
+  registers: 4
+  on: 1
+  map:
+    vectorBase: 6
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa_irq {
+      EI
+    loop:
+      NOP
+      JMP loop
+    h0:
+      ADDI R0 A1
+      RETI
+    h1:
+      ADDI R0 A2
+      RETI
+    }
+  ram:
+    depth: 8
+    length: 8
+    = ^0000000000000305
+  :
+
+.u:{ set = 1 }
+.u:{ irq = 1, irqVec = vecIdx, set = 1 }
+.u:{ set = 1 }
+.u:{ irq = 0, set = 1 }
+`;
+  const { interp } = session.run(src);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('vector1 adds 2', r0.value, '00000010');
+});
+
+reg(2608, 'comp-cpu', 'cpu EI after masked IRQ serves handler', function(h, session) {
+  const src = CPU_ISA_IRQ + `comp [cpu] .u:
+  isa: .cpuisa_irq
+  registers: 4
+  on: 1
+  vectors: 4
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa_irq {
+      DI
+      NOP
+      EI
+      HALT
+    handler:
+      ADDI R0 A1
+      RETI
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 8
+  :
+
+.u:{ set = 1 }
+.u:{ irq = 1, set = 1 }
+.u:{ set = 1 }
+.u:{ set = 1 }
+.u:{ irq = 0, set = 1 }
+`;
+  const { interp } = session.run(src);
+  const comp = interp.components.get('.u');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('handler ran after EI', r0.value, '00000001');
+  const pend = handler.evalGetProperty(comp, 'irqPending', { var: '.u', property: 'irqPending' }, interp);
+  h.assert('no pending after irq cleared', pend.value, '0');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

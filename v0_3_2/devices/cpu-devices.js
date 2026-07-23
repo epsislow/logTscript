@@ -108,6 +108,14 @@ function addCpu(id, config) {
     traceBuffer: [],
     peekRamAdr: 0,
     peekProgAdr: 0,
+    ie: 0,
+    irqActive: 0,
+    irqVec: 0,
+    irqPending: 0,
+    irqSavedPc: 0,
+    irqSavedIe: 0,
+    vectorBase: config.vectorBase != null ? config.vectorBase : null,
+    fixedVectors: config.fixedVectors || null,
   });
   if (config.spReg != null) cpuInitSp(cpus.get(id));
 }
@@ -170,6 +178,10 @@ function cpuResetFlags(id, flags) {
     cpuInitSp(c);
   }
   if (set.has('halted')) c.halted = 0;
+  if (set.has('pc') || set.has('halted') || set.has('regs')) {
+    c.ie = 0;
+    c.irqPending = 0;
+  }
 }
 
 function s4(bits) {
@@ -240,9 +252,50 @@ function cpuEmitOut(c, ctx, r) {
   }
 }
 
+function cpuResolveIrqTarget(c) {
+  const vec = c.irqVec | 0;
+  if (c.fixedVectors && c.fixedVectors.length) {
+    if (vec < 0 || vec >= c.fixedVectors.length) {
+      throw Error(`IRQ vector ${vec} out of range 0..${c.fixedVectors.length - 1}`);
+    }
+    return c.fixedVectors[vec];
+  }
+  if (c.vectorBase == null) {
+    throw Error('CPU IRQ requires map.vectorBase or vectors: attribute');
+  }
+  const adr = c.vectorBase + vec;
+  if (adr < 0 || adr >= c.ramLength) {
+    throw Error(`IRQ vector table address ${adr} out of RAM`);
+  }
+  const word = cpuReadRamCell(c, adr);
+  return parseInt(word != null ? word : cpuZero(c.ramDepth), 2);
+}
+
+function cpuTryServeIrq(c) {
+  if (c.halted) return;
+  if (!c.irqActive) {
+    c.irqPending = 0;
+    return;
+  }
+  if (!c.ie) {
+    c.irqPending = 1;
+    return;
+  }
+  c.irqPending = 0;
+  const targetPc = cpuResolveIrqTarget(c);
+  const limit = cpuCodeLimit(c);
+  if (targetPc < 0 || targetPc >= limit) {
+    throw Error(`IRQ target PC ${targetPc} out of ${c.fetchFrom} range 0..${limit - 1}`);
+  }
+  c.irqSavedPc = c.pc;
+  c.irqSavedIe = c.ie;
+  c.ie = 0;
+  c.pc = targetPc;
+}
+
 function cpuTraceStep(c, ctx, instr) {
   if (!ctx || !c.traceMode || c.traceMode === 'off') return;
-  const line = `# step pc=${c.pc} instr=${instr} halted=${c.halted}`;
+  const line = `# step pc=${c.pc} instr=${instr} halted=${c.halted} ie=${c.ie}`;
   c.traceBuffer.push(line);
   if (c.traceMode === 'output' && typeof ctx._cpuTraceOutput === 'function') {
     ctx._cpuTraceOutput(c, line);
@@ -332,6 +385,19 @@ function cpuStep(id, ctx) {
       cpuEmitOut(c, ctx, r);
       break;
     }
+    case '1100':
+      c.ie = 1;
+      break;
+    case '1101':
+      c.ie = 0;
+      c.irqPending = c.irqActive ? 1 : 0;
+      break;
+    case '1110':
+      c.pc = c.irqSavedPc;
+      c.ie = c.irqSavedIe;
+      c.irqPending = c.irqActive && !c.ie ? 1 : 0;
+      nextPc = c.pc;
+      break;
     case '0111':
       c.halted = 1;
       nextPc = c.pc;
@@ -340,9 +406,16 @@ function cpuStep(id, ctx) {
       throw Error(`Unknown opcode ${opc} at PC ${c.pc}`);
   }
 
-  if (opc !== '0111') c.pc = nextPc;
+  if (opc !== '0111' && opc !== '1110') c.pc = nextPc;
 
   cpuTraceStep(c, ctx, instr);
+  if (!c.halted) cpuTryServeIrq(c);
+}
+
+function cpuSetIrqPins(c, irqActive, irqVec) {
+  if (!c) return;
+  if (irqActive !== undefined) c.irqActive = irqActive ? 1 : 0;
+  if (irqVec !== undefined) c.irqVec = irqVec | 0;
 }
 
 function cpuRun(id, maxSteps, ctx) {
@@ -384,6 +457,6 @@ function getCpuProg(id, adr) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     addCpu, getCpu, loadCpuRam, loadCpuProg, cpuAfterProgReload, cpuResetFlags, cpuStep, cpuRun,
-    getCpuReg, getCpuRam, getCpuProg, splitBlob,
+    getCpuReg, getCpuRam, getCpuProg, splitBlob, cpuSetIrqPins,
   };
 }

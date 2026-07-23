@@ -28,6 +28,26 @@ function cpuAddrBits(length) {
   return Math.ceil(Math.log2(length));
 }
 
+function cpuParseVectors(attr) {
+  if (attr == null) return null;
+  let parts;
+  if (typeof attr === 'string') {
+    parts = attr.split(/[\s,]+/).map(x => x.trim()).filter(Boolean);
+  } else if (Array.isArray(attr)) {
+    parts = attr.map(x => String(x).trim()).filter(Boolean);
+  } else {
+    return null;
+  }
+  if (!parts.length) return null;
+  return parts.map(x => parseInt(x, 10));
+}
+
+function cpuParseVectorBase(map) {
+  if (!map || map.vectorBase === undefined) return null;
+  const n = parseInt(map.vectorBase, 10);
+  return isNaN(n) ? null : n;
+}
+
 var CpuComponent = class CpuComponent extends BuiltinComponent {
   static get type() { return 'cpu'; }
   static get shortnames() { return {}; }
@@ -188,6 +208,8 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     const pouts = [
       { bits: String(pcBits), name: 'pc' },
       { bits: '1', name: 'halted' },
+      { bits: '1', name: 'ie' },
+      { bits: '1', name: 'irqPending' },
       { bits: String(prog.depth), name: 'instr' },
       { bits: String(ram.depth), name: 'ram:get' },
       { bits: String(prog.depth), name: 'prog:get' },
@@ -211,6 +233,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         { name: 'ram', value: 'block|=.mem' },
         { name: 'prog', value: 'block|=.mem' },
         { name: 'map', value: 'block' },
+        { name: 'vectors', value: 'list' },
       ],
       initValue: null,
       pins: [
@@ -224,6 +247,8 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         { bits: '1', name: 'resetRegs' },
         { bits: '1', name: 'resetSP' },
         { bits: '1', name: 'resetHalted' },
+        { bits: '1', name: 'irq' },
+        { bits: '4', name: 'irqVec' },
       ],
       pouts,
       returns: null,
@@ -231,7 +256,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   }
 
   supportsPropertyName(property, attributes) {
-    if (['pc', 'halted', 'instr', 'ram:get', 'prog:get', 'trace:get'].includes(property)) return true;
+    if (['pc', 'halted', 'ie', 'irqPending', 'instr', 'ram:get', 'prog:get', 'trace:get'].includes(property)) return true;
     if (/^r\d+$/.test(property)) {
       const n = parseInt(property.substring(1), 10);
       return n >= 0 && n < this._regCount(attributes);
@@ -240,13 +265,13 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   }
 
   getSupportedProperties() {
-    return ['pc', 'halted', 'instr', 'ram:get', 'prog:get', 'trace:get',
-      'set', 'run', 'reset', 'ramAdr', 'progAdr',
+    return ['pc', 'halted', 'ie', 'irqPending', 'instr', 'ram:get', 'prog:get', 'trace:get',
+      'set', 'run', 'reset', 'ramAdr', 'progAdr', 'irq', 'irqVec',
       'resetPC', 'resetRAM', 'resetRegs', 'resetSP', 'resetHalted'];
   }
 
   getRedirectProperties() {
-    return ['pc', 'halted', 'instr', 'ram:get', 'prog:get', 'trace:get',
+    return ['pc', 'halted', 'ie', 'irqPending', 'instr', 'ram:get', 'prog:get', 'trace:get',
       'r0', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7'];
   }
 
@@ -265,6 +290,11 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const { ram, prog, progLink, ramLink } = this._resolveMemoryLayout(attributes, ctx);
     const map = attributes.map && typeof attributes.map === 'object' ? attributes.map : {};
+    const vectorBase = cpuParseVectorBase(map);
+    const fixedVectors = cpuParseVectors(attributes.vectors);
+    if (fixedVectors && vectorBase != null) {
+      throw Error('CPU cannot use both vectors: and map.vectorBase');
+    }
     const regCount = this._regCount(attributes);
     const pcInit = attributes.pcInit !== undefined ? parseInt(attributes.pcInit, 10) : 0;
     const spReg = attributes.sp !== undefined ? parseInt(attributes.sp, 10) : null;
@@ -308,6 +338,8 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         progMemId: progLink ? progLink.memId : null,
         ramMemId: ramLink ? ramLink.memId : null,
         progReadonly: progLink ? progLink.readonly : true,
+        vectorBase,
+        fixedVectors,
       });
     }
 
@@ -342,6 +374,23 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     }
   }
 
+  _syncIrqPins(comp, pending, reEvaluate, ctx) {
+    const id = this._cpuId(comp);
+    const c = typeof getCpu === 'function' ? getCpu(id) : null;
+    if (!c || typeof cpuSetIrqPins !== 'function') return;
+    let irqActive;
+    let irqVec;
+    if (pending.irq !== undefined) {
+      irqActive = this._isActive(this.reEvalPendingValue(pending, 'irq', reEvaluate, ctx));
+    }
+    if (pending.irqVec !== undefined) {
+      const v = this.reEvalPendingValue(pending, 'irqVec', reEvaluate, ctx);
+      irqVec = parseInt(v, 2);
+      if (isNaN(irqVec)) irqVec = 0;
+    }
+    cpuSetIrqPins(c, irqActive, irqVec);
+  }
+
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {
     if (when !== 'immediate' || !pending) return;
     const id = this._cpuId(comp);
@@ -365,6 +414,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     }
 
     if (pending.set !== undefined && this._isActive(this.reEvalPendingValue(pending, 'set', reEvaluate, ctx))) {
+      this._syncIrqPins(comp, pending, reEvaluate, ctx);
       if (typeof cpuStep === 'function') cpuStep(id, ctx);
       if (ctx.deferWirePropagation && ctx.deferWirePropagation() && ctx.signalPropagationStrategy) {
         const executed = new Set();
@@ -377,6 +427,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     }
 
     if (pending.run !== undefined && this._isActive(this.reEvalPendingValue(pending, 'run', reEvaluate, ctx))) {
+      this._syncIrqPins(comp, pending, reEvaluate, ctx);
       const c = typeof getCpu === 'function' ? getCpu(id) : null;
       const max = c && c.maxSteps != null ? c.maxSteps : 10000;
       if (typeof cpuRun === 'function') cpuRun(id, max, ctx);
@@ -403,6 +454,12 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     }
     if (property === 'halted') {
       return { value: c.halted ? '1' : '0', ref: null, varName: `${a.var}:halted`, bitWidth: 1 };
+    }
+    if (property === 'ie') {
+      return { value: c.ie ? '1' : '0', ref: null, varName: `${a.var}:ie`, bitWidth: 1 };
+    }
+    if (property === 'irqPending') {
+      return { value: c.irqPending ? '1' : '0', ref: null, varName: `${a.var}:irqPending`, bitWidth: 1 };
     }
     if (property === 'instr') {
       return { value: c.lastInstr, ref: null, varName: `${a.var}:instr`, bitWidth: c.progDepth };
