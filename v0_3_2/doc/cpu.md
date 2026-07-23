@@ -342,4 +342,4 @@ show(sum)
 
 ## Out of scope (later)
 
-- External linked `ram:`/`prog:` chips, IRQ/DMA — see project plan.
+- Legare memorie externă — faza 3 plan: **`prog = .rom`**, **`ram = .data`** (fără `mode:`); IRQ/DMA.

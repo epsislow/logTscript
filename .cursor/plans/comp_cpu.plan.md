@@ -3,7 +3,7 @@ name: Componenta comp cpu
 overview: "Introducere `comp [cpu]` în mod **contained**: un device interpretor (fetch-decode-execute în JS) cu **registre R0..Rn** legate de `inline [asm]` (`R2b`), memorie internă **prog** (ROM la runtime) + **ram**, stack software prin **SP**, fără componentă `bus` în v1. Mini-CPU v2 rămâne calea didactică wave/hardware."
 todos:
   - id: spec-syntax
-    content: "Fixează gramatica comp [cpu]: isa/registers/sp, sub-blocuri ram/prog/map, pins set/reset/run, prog= wire sau asm, clock opțional"
+    content: "Gramatică comp [cpu]: isa/registers/sp; ram/prog intern (sub-bloc) sau extern (prog = .rom, ram = .data); pins set/reset/run; clock opțional"
     status: pending
   - id: cpu-device
     content: "devices/cpu-devices.js: prog[], ram[], RF, PC, step + resetPC/RAM/Regs/SP/Halted, pcInit; reload prog → PC←pcInit obligatoriu"
@@ -25,7 +25,7 @@ isProject: false
 ## Context și decizii
 
 - Ecosistemul actual acoperă deja un CPU „adevărat” ca **board** ([mini-cpu-v2.md](../v0_3_2/doc/mini-cpu-v2.md)): Harvard, `inline [asm]`, `comp [mem]`, LUT, wave la fiecare `set`. [mini-cpu-plan.md](../v0_3_2/doc/mini-cpu-plan.md) spune explicit că **nu e nevoie de tipuri noi** pentru demo — dar tu ai ales **contained + registre**, ceea ce justifică un tip nou: interpretor + stare centralizată, nu alt board de 200+ linii.
-- **Bus separat (`comp [bus]` sau `.cpu1:bus`)**: **nu în v1**. Pentru contained, CPU vorbește direct cu array-urile interne. Pentru legare externă (faza 2), pattern-ul existent e mai bun decât un bus generic: **atribute de legare** ca la [`ioport`](../v0_3_2/core/components/ioport.js) / `alu: lut` — ex. `prog: .extRom`, `ram: .extRam`. Bus-ul tristate rămâne pentru [zstate.md](../v0_3_2/doc/zstate.md) când vrei Von Neumann vizibil, nu pentru interpretorul contained.
+- **Bus separat (`comp [bus]` sau `.cpu1:bus`)**: **nu în v1**. Pentru contained, CPU vorbește direct cu array-urile interne. Pentru legare externă (**faza 3**), pattern-ul existent e mai bun decât un bus generic: **binding** ca la [`ioport`](../v0_3_2/core/components/ioport.js) / `output = .term` — **`prog = .rom`**, **`ram = .data`** (instanțe `comp [mem]`). Bus-ul tristate rămâne pentru [zstate.md](../v0_3_2/doc/zstate.md) când vrei Von Neumann vizibil pe fire, nu în interpretor.
 - **Set de instrucțiuni**: **nu duplicăm** ASM — rămâne [`inline [asm]`](../v0_3_2/doc/asm.md) + atribut `isa: .cpuisa`. Interpretorul citește **opcode layout** din modulul ASM (lățime cuvânt, segmente, mnemonici). `:decode` există deja pe instanța asm — CPU poate expune `decode` ca redirect sau alias `show(.cpu1:decode(ir))` prin `isa`.
 - **„ROM dar nu chiar”**: spațiul **`prog`** e read-only la runtime (ca `readonly` pe [mem.md](../v0_3_2/doc/mem.md)): init/reload prin `=`, fără STORE accidental în prog. **RAM** e pentru date; după rulare inspectezi în principal RAM + registre. Execuția din RAM (Von Neumann) — vezi secțiunea dedicată; **nu** e implicit în v1.
 - **Init `prog` din wire ASM**: același model ca la `comp [mem]` — orice expresie blob e validă la `=`:
@@ -137,9 +137,9 @@ comp [cpu] .cpu1:
 
 (Sintaxa `ram`/`prog` — vezi secțiunea **Decizie sintaxă** mai jos.)
 
-### Decizie sintaxă: `ram:` / `prog:` (încă de confirmat)
+### Decizie sintaxă: `ram:` / `prog:` — **confirmat (faza 1)**
 
-**Varianta A — sub-blocuri imbricate** (preferată în plan, aliniat la `comp [clcd]`):
+**Intern (contained)** — sub-blocuri imbricate (Varianta A, implementată):
 
 ```logts
 comp [cpu] .cpu1:
@@ -159,9 +159,46 @@ comp [cpu] .cpu1:
 ```
 
 - Pro: lizibil, același model mental ca `mem` (depth/length/`=` în același loc).
-- Contra: trebuie extins parserul pentru sub-blocuri pe `comp [cpu]` (pattern existent la `clcd`).
+- Sub-blocurile **nu** creează `comp [mem]` în graf; un device CPU deține `prog[]` / `ram[]` în `cpu-devices.js`.
 
-**Varianta B — atribute plate** (implementare mai rapidă v1):
+**Extern (faza 3)** — binding canonic (fără `mode:` global):
+
+```logts
+comp [mem] .rom:
+  depth: 8
+  length: 64
+  readonly: 1
+  = myProg
+  on: raise
+  :
+
+comp [mem] .data:
+  depth: 8
+  length: 256
+  = ^00
+  on: raise
+  :
+
+comp [cpu] .cpu1:
+  isa: .cpuisa
+  registers: 4
+  prog = .rom
+  ram = .data
+  :
+```
+
+| Regulă | Detaliu |
+|--------|---------|
+| Formă | **`prog = .component`**, **`ram = .component`** (`bindingAttrs`, ca `output = .term`) |
+| Țintă | Obligatoriu **`comp [mem]`** (același API `adr` / `get` / `data` / `write`) |
+| Per spațiu | **Fie** sub-bloc intern (`depth`, `length`, `=` opțional), **fie** binding `= .mem` — **nu ambele**, nu niciunul |
+| Combinații | prog intern + ram intern; prog intern + ram extern; prog extern + ram intern; ambele externe |
+| Semantica CPU | Identică: fetch din spațiul program, LOAD/STORE în spațiul ram, `pcInit`, reload prog, HALT, `set`/`run`, `fetch: ram` |
+| Execuție | În `step`/`run`, interpretorul citește/scrie memoria legată **sincron** (apel handler `mem`), fără a cere wave între instrucțiuni |
+| Reload | `.cpu1:prog = …` rescrie spațiul program (array intern sau delegare la `.rom = …`); **PC ← pcInit**, **halted ← 0** |
+| Init în sub-bloc | Când spațiul e legat extern, **nu** pui `depth`/`length`/`=` pe CPU pentru acel spațiu — init pe instanța `mem` |
+
+**Varianta B — atribute plate** — respinsă (rămâne istoric):
 
 ```logts
 comp [cpu] .cpu1:
@@ -176,11 +213,9 @@ comp [cpu] .cpu1:
 ```
 
 - Pro: fără parser nou pentru imbricare; `=` la nivelul CPU poate însemna doar init prog.
-- Contra: mai puțin elegant; init RAM separat (ex. `.cpu1:ram = ^…` sau property block).
+- Contra: mai puțin elegant — **nefolosit**.
 
-**Recomandare:** **A** — sub-blocurile sunt **config + init**, nu componente `mem` separate.
-
-### Varianta A — cum interacționezi (model)
+### Varianta A (intern) — cum interacționezi
 
 Sub-blocurile **nu** creează `comp [mem]` copii în script. Parserul le transformă în obiecte pe instanța **`.cpu1`** (ex. `attributes.prog.depth`, blob init); **un singur device CPU** deține array-urile `prog[]` și `ram[]` în `cpu-devices.js`.
 
@@ -529,8 +564,10 @@ La livrare **nu omit** tabelele de valori — același stil ca [terminal.md](../
 | **`trace`** | `off` /| `on` /| `output` /| `.terminal` | `off` | **nu e pin**; tabel sink (buffer / Output / terminal) |
 | **`output`** | `.terminal` | — | faza 2; program → terminal |
 | **`fetch`** | `prog` /| `ram` | `prog` | v1 vs v2 Von Neumann |
-| Sub-bloc **`ram:`** | `depth`, `length`, `=` init | — | mirror mem |
-| Sub-bloc **`prog:`** | `depth`, `length`, `=` asm/wire/hex | — | mirror mem readonly |
+| Sub-bloc **`ram:`** | `depth`, `length`, `=` init | — | intern; **sau** omit + **`ram = .data`** (faza 3) |
+| Sub-bloc **`prog:`** | `depth`, `length`, `=` asm/wire/hex | — | intern; **sau** omit + **`prog = .rom`** (faza 3) |
+| **`prog =`** | `.mem` | — | faza 3; binding program → `comp [mem]` |
+| **`ram =`** | `.mem` | — | faza 3; binding date → `comp [mem]` |
 | Sub-bloc **`map:`** | `stack`, etc. | — | convenții adresă |
 
 ### Pini, pout-uri, property block
@@ -574,12 +611,15 @@ La livrare **nu omit** tabelele de valori — același stil ca [terminal.md](../
 - **`trace: .dbg`**, **`output: .screen`**, hook opțional Signal Trace (`state` lines)
 - `doc(.cpu1)` — layout memorie + registre
 
-**Faza 3 — legare externă (opțional)**
+**Faza 3 — legare memorie per spațiu (opțional)**
 
-- `mode: linked` sau atribute `ram: .ext`, `prog: .ext` — interpretorul face property-block echivalent cu fetch/mem write pe componente existente (Harvard extern)
-- **Nu** `comp [bus]` dedicat; documentăm când să folosești ZSTATE + board
+- **`prog = .rom`**, **`ram = .data`** — binding la `comp [mem]`; toate combinațiile intern/extern (fără atribut `mode:`)
+- Backend în `cpu-devices.js`: `readProg` / `writeProg` (reload), `readRam` / `writeRam` — array intern sau delegate la handler `mem`
+- Validare: `mem.depth` compatibil cu ISA / cuvânt instrucțiune; program extern `readonly` la STORE runtime
+- Peek CPU (`prog:get`, `ram:get`) routează prin același backend
+- **Nu** `comp [bus]` dedicat; documentăm contrast cu ZSTATE + board și mini-cpu-v2
 
-**Explicit out of scope v1**
+**Explicit out of scope (rămâne)**
 
 - `fetch: ram` / execuție din RAM (→ **v2**)
 - `mode: wave` (rămâne `board +[cpu4v2]`)
@@ -590,7 +630,7 @@ La livrare **nu omit** tabelele de valori — același stil ca [terminal.md](../
 
 ## Recomandare sintetică la întrebările tale
 
-- **Legare memorie:** v1 totul intern; faza 3 cu `prog:`/`ram:` ca referințe `.component`.
+- **Legare memorie:** faza 1–2 intern (sub-blocuri); faza 3 **`prog = .rom`** / **`ram = .data`** independent per spațiu.
 - **Bus:** intern nu adaugă valoare la contained; extern folosește ZSTATE doar în designuri board, nu în interpretor.
 - **ASM:** suficient ca **definiție + blob**; interpretorul trebuie doar **decode executabil** (și poate reutiliza segment parser din assembler).
 - **Stack:** registru SP + zonă RAM în `map`, nu LIFO hardware în CPU.
