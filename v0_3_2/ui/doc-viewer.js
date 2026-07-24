@@ -92,6 +92,8 @@ const DOC_SECTIONS = [
     title: 'Storage & timing',
     items: [
       { file: 'mem.md', label: 'mem', searchPrimary: 'mem comp.mem doc(comp.mem) depth length on' },
+      { file: 'cpu.md', label: 'CPU Component (`comp [cpu]`)', searchPrimary: 'cpu comp.cpu doc(comp.cpu) registers pcInit onReset trace maxSteps sp', searchExtra: 'harvard prog ram set run irq load store' },
+      { file: 'dma.md', label: 'DMA Component (`comp [dma]`)', searchPrimary: 'dma comp.dma mems copy queue busy done started doc(comp.dma)', searchExtra: 'memcpy bulk transfer slot src dst instant' },
       { file: 'asm.md', label: 'asm', searchPrimary: 'ASM', searchExtra: 'inline assembler isa mnemonic program blob myisa decode disassemble disassembly' },
       { file: 'asm-composition.md', label: 'ASM composition', searchExtra: 'use repeat align base external label multi-isa firmware boot dsp metadata asmModuleId' },
       { file: 'lut.md', label: 'lut', searchPrimary: 'LUT comp.lut doc(comp.lut)', searchExtra: 'inline lookup table decoder comp variableDepth prefixFree Huffman decode isValid' },
@@ -134,7 +136,6 @@ const DOC_SECTIONS = [
       { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)', searchPrimary: 'ZEROS' },
       { file: 'chip-board-execution.md', label: 'Chip and board execution' },
       { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)', searchPrimary: 'on:' },
-      { file: 'cpu.md', label: 'CPU Component (`comp [cpu]`)' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
       { file: 'network-chat.md', label: 'Network chat — socket uplink + packet downlink (wave)' },

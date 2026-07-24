@@ -592,6 +592,8 @@ comp [adder] .name:
 | `doc(comp.shifter)` / `doc(comp.>)` | [shifter.md](shifter.md) |
 | `doc(comp.counter)` / `doc(comp.=)` | [counter.md](counter.md) |
 | `doc(comp.mem)` | [mem.md](mem.md) |
+| `doc(comp.cpu)` | [cpu.md](cpu.md) |
+| `doc(comp.dma)` | [dma.md](dma.md) — type syntax; `doc(.dma)` shows slot map |
 | `doc(comp.lut)` | [lut.md](lut.md) — type syntax; `doc(.inst)` shows mapped table |
 | `doc(comp.reg)` | [reg.md](reg.md) |
 | `doc(comp.osc)` / `doc(comp.~)` | [oscillator.md](oscillator.md) |

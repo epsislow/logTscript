@@ -316,7 +316,7 @@ The `= Xbit` line indicates that `mem` accepts an initializer. The value is spli
 
 ## Multi-port memory (`ports`)
 
-A single physical memory array can expose **1–4 independent ports** in the same simulation step (e.g. Harvard CPU fetch + data access, or CPU + DMA).
+A single physical memory array can expose **1–4 independent ports** in the same simulation step (e.g. Harvard CPU fetch + data access, or CPU + [DMA](dma.md)).
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
@@ -398,5 +398,7 @@ Dual writes in one block (different addresses, no collision): set `write`/`data`
 
 - [asm.md](asm.md) — define ISA and load programs into `mem`
 - [lut.md](lut.md) — combinational lookup (different from sequential `mem`)
+- [dma.md](dma.md) — bulk copy between `comp [mem]` instances (`comp [dma]` `mems:`)
+- [cpu.md](cpu.md) — contained CPU with `ram = .mem` or internal `ram:` block
 - [mini-cpu.md](mini-cpu.md) — teaching CPU using `comp [mem]` for program and data
 - [mini-cpu-v2.md](mini-cpu-v2.md) — full CPU demo with ASM ROM and `BEQ`

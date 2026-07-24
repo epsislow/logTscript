@@ -91,6 +91,8 @@
       "title": "Storage & timing",
       "items": [
         { "file": "mem.md", "label": "mem" },
+        { "file": "cpu.md", "label": "CPU Component (`comp [cpu]`)", "searchExtra": "harvard prog ram set run irq load store" },
+        { "file": "dma.md", "label": "DMA Component (`comp [dma]`)", "searchPrimary": "dma comp.dma mems copy queue busy done started", "searchExtra": "memcpy bulk transfer slot src dst instant" },
         { "file": "asm.md", "label": "asm", "searchExtra": "inline assembler isa mnemonic program blob myisa decode disassemble disassembly" },
         { "file": "asm-composition.md", "label": "ASM composition", "searchExtra": "use repeat align base external label multi-isa firmware boot dsp metadata asmModuleId" },
         { "file": "lut.md", "label": "lut", "searchExtra": "inline lookup table decoder comp variableDepth prefixFree Huffman decode isValid" },

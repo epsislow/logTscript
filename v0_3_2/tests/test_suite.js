@@ -25341,6 +25341,209 @@ reg(2608, 'comp-cpu', 'cpu EI after masked IRQ serves handler', function(h, sess
   h.assert('no pending after irq cleared', pend.value, '0');
 });
 
+const DMA_TWO_MEM_SETUP = `comp [mem] .src:
+  depth: 8
+  length: 8
+  on: 1
+  = ^01020304
+  :
+
+comp [mem] .dst:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .src .dst
+  on: 1
+  :
+`;
+
+function dmaGetProp(session, interp, compName, prop) {
+  const comp = interp.components.get(compName);
+  const handler = session._ensureRegistry().get('dma');
+  const r = handler.evalGetProperty(comp, prop, { var: compName, property: prop }, interp);
+  return r ? r.value : null;
+}
+
+reg(2609, 'comp-dma', 'dma instant copy slot1 to slot2', function(h, session) {
+  const src = DMA_TWO_MEM_SETUP + `
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 100, set = 1 }
+`;
+  const { interp } = session.run(src);
+  const dstId = interp.components.get('.dst').deviceIds[0];
+  h.assert('word0', getMem(dstId, 0), '00000001');
+  h.assert('word1', getMem(dstId, 1), '00000010');
+  h.assert('word2', getMem(dstId, 2), '00000011');
+  h.assert('word3', getMem(dstId, 3), '00000100');
+  h.assert('done', dmaGetProp(session, interp, '.dma', 'done'), '1');
+  h.assert('busy', dmaGetProp(session, interp, '.dma', 'busy'), '0');
+  h.assert('started', dmaGetProp(session, interp, '.dma', 'started'), '1');
+});
+
+reg(2610, 'comp-dma', 'dma memmove overlap same slot', function(h, session) {
+  const src = `comp [mem] .buf:
+  depth: 8
+  length: 8
+  on: 1
+  = ^0102030405060708
+  :
+
+comp [dma] .dma:
+  mems: .buf
+  on: 1
+  :
+
+.dma:{ src = 1, dst = 1, srcAdr = 0, dstAdr = 1, count = 100, set = 1 }
+`;
+  const { interp } = session.run(src);
+  const memId = interp.components.get('.buf').deviceIds[0];
+  h.assert('addr0', getMem(memId, 0), '00000001');
+  h.assert('addr1', getMem(memId, 1), '00000001');
+  h.assert('addr2', getMem(memId, 2), '00000010');
+  h.assert('addr3', getMem(memId, 3), '00000011');
+  h.assert('addr4', getMem(memId, 4), '00000100');
+});
+
+reg(2611, 'comp-dma', 'dma rejects mems depth mismatch', function(h, session) {
+  h.assertThrows('depth mismatch', function() {
+    session.run(`comp [mem] .a:
+  depth: 8
+  length: 4
+  on: 1
+  :
+
+comp [mem] .b:
+  depth: 4
+  length: 4
+  on: 1
+  :
+
+comp [dma] .dma:
+  mems: .a .b
+  on: 1
+  :
+`);
+  }, 'DMA mems depth mismatch');
+});
+
+reg(2612, 'comp-dma', 'dma rejects missing mems', function(h, session) {
+  h.assertThrows('missing mems', function() {
+    session.run(`comp [dma] .dma:
+  on: 1
+  :
+`);
+  }, 'DMA requires mems:');
+});
+
+reg(2613, 'comp-dma', 'dma rejects readonly dst', function(h, session) {
+  h.assertThrows('readonly dst', function() {
+    session.run(`comp [mem] .src:
+  depth: 8
+  length: 4
+  on: 1
+  = ^01
+  :
+
+comp [mem] .rom:
+  depth: 8
+  length: 4
+  readonly: 1
+  on: 1
+  = ^02
+  :
+
+comp [dma] .dma:
+  mems: .src .rom
+  on: 1
+  :
+
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+`);
+  }, 'readonly');
+});
+
+reg(2614, 'comp-dma', 'dma rejects src=0 fill in phase 5a', function(h, session) {
+  h.assertThrows('src=0', function() {
+    session.run(DMA_TWO_MEM_SETUP + `
+.dma:{ src = 0, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+`);
+  }, 'fill');
+});
+
+reg(2615, 'comp-dma', 'dma submit flags and totals', function(h, session) {
+  const { interp } = session.run(DMA_TWO_MEM_SETUP + `
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+`);
+  h.assert('started', dmaGetProp(session, interp, '.dma', 'started'), '1');
+  h.assert('queued', dmaGetProp(session, interp, '.dma', 'queued'), '0');
+  h.assert('rejected', dmaGetProp(session, interp, '.dma', 'rejected'), '0');
+  const st = dmaGetProp(session, interp, '.dma', 'startedTotal');
+  h.assert('startedTotal', parseInt(st, 2), 1);
+  const sq = dmaGetProp(session, interp, '.dma', 'submitSeq');
+  h.assert('submitSeq', parseInt(sq, 2), 1);
+});
+
+reg(2616, 'comp-dma', 'dma queue accepts then rejects when full', function(h, session) {
+  addMem({ id: 'dma_t_m1', length: 4, depth: 8 });
+  addMem({ id: 'dma_t_m2', length: 4, depth: 8 });
+  addDma('dma_t_d1', {
+    memSlots: [
+      { slot: 1, ref: '.m1', memId: 'dma_t_m1', depth: 8, length: 4, readonly: false },
+      { slot: 2, ref: '.m2', memId: 'dma_t_m2', depth: 8, length: 4, readonly: false },
+    ],
+    queueCapacity: 2,
+    depth: 8,
+    maxAddrBits: 2,
+  });
+  const d = getDma('dma_t_d1');
+  const job = { srcMemId: 'dma_t_m1', dstMemId: 'dma_t_m2', srcAdr: 0, dstAdr: 0, count: 1 };
+  d.queue.push(job);
+  dmaUpdateBusy(d);
+  dmaTrySubmit(d, job);
+  h.assert('queued when fifo has room', String(d.queued), '1');
+  d.queue.push(job);
+  dmaTrySubmit(d, job);
+  h.assert('rejected when fifo full', String(d.rejected), '1');
+  h.assert('rejectedTotal', String(d.rejectedTotal), '1');
+});
+
+reg(2617, 'comp-dma', 'dma reset clears counters and queue', function(h, session) {
+  const { interp } = session.run(DMA_TWO_MEM_SETUP + `
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+.dma:{ reset = 1, set = 1 }
+`);
+  h.assert('startedTotal', parseInt(dmaGetProp(session, interp, '.dma', 'startedTotal'), 2), 0);
+  h.assert('submitSeq', parseInt(dmaGetProp(session, interp, '.dma', 'submitSeq'), 2), 0);
+  h.assert('done', dmaGetProp(session, interp, '.dma', 'done'), '0');
+});
+
+reg(2618, 'comp-dma', 'doc(.dma) lists mem slots', function(h, session) {
+  const { out } = session.run(DMA_TWO_MEM_SETUP + 'doc(.dma)');
+  const text = out.join('\n');
+  h.assert('slot 1', String(text.includes('1  .src')), 'true');
+  h.assert('slot 2', String(text.includes('2  .dst')), 'true');
+  h.assert('queue line', String(text.includes('queue: 1')), 'true');
+});
+
+reg(2619, 'comp-dma', 'dma rejects dst=0', function(h, session) {
+  h.assertThrows('dst=0', function() {
+    session.run(DMA_TWO_MEM_SETUP + `
+.dma:{ src = 1, dst = 0, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+`);
+  }, 'dst slot cannot be 0');
+});
+
+reg(2620, 'comp-dma', 'dma rejects transfer out of bounds', function(h, session) {
+  h.assertThrows('bounds', function() {
+    session.run(DMA_TWO_MEM_SETUP + `
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1001, set = 1 }
+`);
+  }, 'exceeds memory bounds');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

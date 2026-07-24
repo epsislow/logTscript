@@ -3317,13 +3317,36 @@ assignment() {
 
         let bindingAttrs = [];
         let listAttrs = [];
+        let refListAttrs = [];
         if (this.componentRegistry) {
           const bindHandler = this.componentRegistry.get(compType);
           if (bindHandler && bindHandler.getSpecialParseAttributes) {
             const special = bindHandler.getSpecialParseAttributes();
             if (special && special.bindingAttrs) bindingAttrs = special.bindingAttrs;
             if (special && special.listAttrs) listAttrs = special.listAttrs;
+            if (special && special.refListAttrs) refListAttrs = special.refListAttrs;
           }
+        }
+        if (refListAttrs.includes(attrName) && this.c.value === ':') {
+          this.eat('SYM', ':');
+          this.t.skip();
+          const refs = [];
+          while (this.c.type !== 'EOF' && this.c.value !== '\n' && this.c.value !== ':') {
+            if (this.c.type === 'SYM' && this.c.value === '.') {
+              refs.push(this.parseDotComponentRef());
+              this.t.skip();
+              continue;
+            }
+            if (this.c.type === 'SYM' && this.c.value === ',') {
+              this.eat('SYM', ',');
+              this.t.skip();
+              continue;
+            }
+            break;
+          }
+          const listKey = attrName + 'Members';
+          attributes[listKey] = refs;
+          continue;
         }
         if (listAttrs.includes(attrName) && this.c.value === ':') {
           this.eat('SYM', ':');

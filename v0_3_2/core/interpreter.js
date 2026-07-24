@@ -12546,6 +12546,7 @@ if (s.assignment) {
         if (result.validRef) compInfo.validRef = result.validRef;
         if (result.keyboardHandler) compInfo.keyboardHandler = result.keyboardHandler;
         if (result.codesAcceptedFilter) compInfo.codesAcceptedFilter = result.codesAcceptedFilter;
+        if (result.dmaMemSlots) compInfo.dmaMemSlots = result.dmaMemSlots;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;

@@ -2,7 +2,7 @@
 
 Contained interpreter CPU (Harvard v1): internal **program** (`prog`) and **data RAM** (`ram`), register file, one instruction per active `set` pulse — or many instructions per **`run`** pulse (see [Run and `maxSteps`](#run-and-maxsteps)). Opcode decoding uses an `inline [asm]` ISA profile (8-bit words in the MVP test profile).
 
-For a board-level stepping demo with external mem chips, see [mini-cpu-v2.md](mini-cpu-v2.md).
+For a board-level stepping demo with external mem chips, see [mini-cpu-v2.md](mini-cpu-v2.md). For bulk memcpy between memory chips (and shared RAM with the CPU), see [dma.md](dma.md).
 
 In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run** (same as [mini-cpu-v2.md](mini-cpu-v2.md)).
 
@@ -664,4 +664,13 @@ Binding `irq = .pic` (interrupt controller) is planned for a later sub-phase.
 ## Out of scope (later)
 
 - **PIC / `irq = .component`** — after `comp [pic]` exists (plan faza 4c).
-- **DMA** — plan **faza 5**, componentă separată `comp [dma]` (fără CPU obligatoriu); același plan, secțiune „Faza 5”.
+- **CPU stall on DMA `busy`** — plan **faza 5c** (`dma = .dma` on CPU). Bulk copy today: [dma.md](dma.md).
+
+---
+
+## Related
+
+- [mem.md](mem.md) — internal `ram:` / `prog:` or `ram = .chip` link
+- [dma.md](dma.md) — `comp [dma]` memcpy between [mem](mem.md) instances; shared `.ram` with `ram =`
+- [asm.md](asm.md) — ISA and program blobs
+- [mini-cpu-v2.md](mini-cpu-v2.md) — external mem stepping demo
