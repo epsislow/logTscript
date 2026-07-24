@@ -570,6 +570,8 @@ comp [adder] .name:
 
 > **Note on `mem`:** `doc(comp.mem)` shows `= Xbit` because `mem` supports initialization with `= literal`, `= ^hex`, `= varName`, or `= .isa { … }` ([inline ASM](asm.md)) in the declaration, and bulk re-initialization via `.mem = value` (or `.mem = .isa { … }`) after declaration. The value is split into `depth`-bit chunks across consecutive addresses. See [mem.md](mem.md) for details.
 
+> **Note on `dma`:** `doc(comp.dma)` shows body attributes **`mems:`** and **`queue:`**, plus transfer pins (`src`, `dst`, `srcAdr`, `dstAdr`, `count`, `set`, `reset`) and status pouts (`busy`, `done`, `started`, `queued`, `rejected`, `*Total`, …). **`doc(.dma)`** prints the **slot → instance** table from your `mems:` list. See [dma.md](dma.md).
+
 ### All available components
 
 | Call | Guide |

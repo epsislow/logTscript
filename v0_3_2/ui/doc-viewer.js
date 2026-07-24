@@ -93,7 +93,7 @@ const DOC_SECTIONS = [
     items: [
       { file: 'mem.md', label: 'mem', searchPrimary: 'mem comp.mem doc(comp.mem) depth length on' },
       { file: 'cpu.md', label: 'CPU Component (`comp [cpu]`)', searchPrimary: 'cpu comp.cpu doc(comp.cpu) registers pcInit onReset trace maxSteps sp', searchExtra: 'harvard prog ram set run irq load store' },
-      { file: 'dma.md', label: 'DMA Component (`comp [dma]`)', searchPrimary: 'dma comp.dma mems copy queue busy done started doc(comp.dma)', searchExtra: 'memcpy bulk transfer slot src dst instant' },
+      { file: 'dma.md', label: 'DMA Component (`comp [dma]`)', searchPrimary: 'dma comp.dma mems copy queue busy done started queued rejected doc(comp.dma)', searchExtra: 'memcpy bulk transfer slot src dst instant wave logts-play doc(.dma) submitSeq' },
       { file: 'asm.md', label: 'asm', searchPrimary: 'ASM', searchExtra: 'inline assembler isa mnemonic program blob myisa decode disassemble disassembly' },
       { file: 'asm-composition.md', label: 'ASM composition', searchExtra: 'use repeat align base external label multi-isa firmware boot dsp metadata asmModuleId' },
       { file: 'lut.md', label: 'lut', searchPrimary: 'LUT comp.lut doc(comp.lut)', searchExtra: 'inline lookup table decoder comp variableDepth prefixFree Huffman decode isValid' },

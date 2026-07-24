@@ -25544,6 +25544,57 @@ reg(2620, 'comp-dma', 'dma rejects transfer out of bounds', function(h, session)
   }, 'exceeds memory bounds');
 });
 
+reg(2621, 'doc-comp', 'doc(comp.dma) first line', function(h, session) {
+  const out = session.runDoc('doc(comp.dma)');
+  h.assert('first line', out[0], 'comp [dma] .name:');
+});
+
+reg(2622, 'doc-comp', 'doc(comp.dma) contains mems attribute', function(h, session) {
+  const out = session.runDoc('doc(comp.dma)');
+  h.assert('mems attr', String(out.some(l => l.includes('mems'))), 'true');
+});
+
+reg(2623, 'doc-comp', 'doc(comp.dma) contains started pout', function(h, session) {
+  const out = session.runDoc('doc(comp.dma)');
+  h.assert('started pout', String(out.some(l => l.includes('started'))), 'true');
+});
+
+reg(2624, 'comp-dma', 'dma wave wire template copy', function(h, session) {
+  const src = `comp [mem] .src:
+  depth: 8
+  length: 4
+  on: 1
+  = ^55
+  :
+
+comp [mem] .dst:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .src .dst
+  on: 1
+  :
+
+2wire si = 01
+2wire di = 10
+4wire n = 0001
+1wire go = 1
+
+.dma:{ src = si, dst = di, srcAdr = 0, dstAdr = 0, count = n, set = go }
+`;
+  const { interp } = session.run(src);
+  const dstId = interp.components.get('.dst').deviceIds[0];
+  h.assert('copied', getMem(dstId, 0), '01010101');
+  const handler = session._ensureRegistry().get('dma');
+  const comp = interp.components.get('.dma');
+  const st = handler.evalGetProperty(comp, 'started', { var: '.dma', property: 'started' }, interp);
+  h.assert('started', st.value, '1');
+}, { propagation: 'wave' });
+
 
   window.LogTScriptTestSuite = {
     tests,

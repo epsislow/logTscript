@@ -10730,8 +10730,8 @@ Values are resolved by the language parser (binary literals, \`\\decimal\`, wire
 | \`busy\` | \`1\` while a job is active or the queue is non-empty |
 | \`done\` | \`1\` after the last completed transfer |
 | \`queueSize\`, \`queueFull\` | Queue status |
-| \`started\`, \`queued\`, \`rejected\` | Result of the **last** submit (one-hot style flags) |
-| \`startedTotal\`, \`queuedTotal\`, \`rejectedTotal\`, \`submitSeq\` | Monotonic counters |
+| \`started\`, \`queued\`, \`rejected\` | Result of the **last** submit (pulse flags — see [Submit flags](#submit-result-flags-started--queued--rejected)) |
+| \`startedTotal\`, \`queuedTotal\`, \`rejectedTotal\`, \`submitSeq\` | Monotonic counters since last \`reset\` |
 
 Example — wire the status flags:
 
@@ -10741,6 +10741,43 @@ Example — wire the status flags:
 show(ok)
 show(go)
 \`\`\`
+
+---
+
+## Submit result flags (\`started\` / \`queued\` / \`rejected\`)
+
+Each successful **\`set = 1\`** with a complete job (\`src\`, \`dst\`, \`count\`) is a **submit**. The DMA records what happened to **that** submit:
+
+| Pout | Meaning |
+|------|---------|
+| **\`started\`** | \`1\` = job ran **immediately** (DMA was idle, FIFO empty) |
+| **\`queued\`** | \`1\` = job was **accepted into the FIFO** (DMA busy or FIFO already had work) |
+| **\`rejected\`** | \`1\` = FIFO **full** — job dropped (no throw; storage unchanged) |
+
+Only **one** of \`started\` / \`queued\` / \`rejected\` is \`1\` for the **last** submit. Earlier submits are **not** kept on these pins — use the counters.
+
+| Counter | Meaning |
+|---------|---------|
+| **\`startedTotal\`** | Jobs that started immediately since \`reset\` |
+| **\`queuedTotal\`** | Jobs accepted into the queue since \`reset\` |
+| **\`rejectedTotal\`** | Jobs rejected since \`reset\` |
+| **\`submitSeq\`** | Total submits with a valid job (\`startedTotal + queuedTotal + rejectedTotal\`) |
+
+### How to read “what happened at this block?”
+
+| Need | Pattern |
+|------|---------|
+| Last block result (panel / live wire) | Wire **\`started\`**, **\`queued\`**, or **\`rejected\`** |
+| History across several blocks | **\`show(.dma:startedTotal)\`** (and siblings), or delta between reads |
+| Wave timeline | Same pouts update when the block’s \`set\` is evaluated in that wave step |
+
+### \`instant\` mode (default) + sequential scripts
+
+In **\`instant\`** mode each job finishes inside the same \`set = 1\` handling. In a **legacy** script that runs top-to-bottom, the FIFO is usually **empty** before each new \`.dma:{ … set = 1 }\` → you typically see **\`started = 1\`** every time and **\`startedTotal\`** incrementing.
+
+**\`queued\`** / **\`rejected\`** matter when a prior job left work in the FIFO at submit time (e.g. **\`mode: paced\`** in phase 5d, or multiple submits batched in one wave step before the DMA drains). The FIFO depth is **\`queue:\`** (default **\`1\`**).
+
+\`reset\` clears flags, counters, latch, and the queue (use **\`reset = 1, set = 1\`** in the same block).
 
 ---
 
@@ -10846,6 +10883,168 @@ show(st)
 show(dn)
 \`\`\`
 
+**Load & Run:** \`st\` = \`1\`, \`dn\` = \`1\`.
+
+---
+
+### dma-submit-totals
+
+Three sequential instant copies; **\`startedTotal\`** reaches 3 (each submit **\`started\`** in legacy order).
+
+\`\`\`logts-play
+comp [mem] .m1:
+  depth: 8
+  length: 4
+  on: 1
+  = ^01
+  :
+
+comp [mem] .m2:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [mem] .m3:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .m1 .m2 .m3
+  queue: 2
+  on: 1
+  :
+
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+.dma:{ src = 1, dst = \\3, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+.dma:{ src = \\2, dst = \\3, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+
+show(.dma:started)
+show(.dma:startedTotal)
+show(.dma:submitSeq)
+\`\`\`
+
+**Load & Run:** \`startedTotal\` / \`submitSeq\` show **3** (binary \`11\`). Last block: \`started = 1\`.
+
+---
+
+### dma-wave-wires
+
+**Wave** template: one property block, parameters on wires (orange **Load** badge = wave propagation). See [signal-propagation.md](signal-propagation.md).
+
+\`\`\`logts-play wave
+comp [mem] .src:
+  depth: 8
+  length: 4
+  on: 1
+  = ^55
+  :
+
+comp [mem] .dst:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .src .dst
+  on: 1
+  :
+
+2wire si = 01
+2wire di = 10
+4wire n = 0001
+1wire go = 1
+
+.dma:{ src = si, dst = di, srcAdr = 0, dstAdr = 0, count = n, set = go }
+
+1wire st = .dma:started
+1wire dn = .dma:done
+.dst:{ adr = 0, set = 1 }
+8wire cell = .dst:get
+show(st)
+show(dn)
+show(cell)
+\`\`\`
+
+**Load & Run (wave):** \`cell\` = \`01010101\` (\`^55\`).
+
+---
+
+### dma-separate-pins
+
+Same transfer as a single block, but **separate pin writes** (useful when each field comes from different logic).
+
+\`\`\`logts-play
+comp [mem] .src:
+  depth: 8
+  length: 4
+  on: 1
+  = ^0c
+  :
+
+comp [mem] .dst:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .src .dst
+  on: 1
+  :
+
+.dma:src = 1
+.dma:dst = \\2
+.dma:srcAdr = 0
+.dma:dstAdr = 0
+.dma:count = 1
+.dma:set = 1
+
+.dst:{ adr = 0, set = 1 }
+8wire w = .dst:get
+show(w)
+show(.dma:done)
+\`\`\`
+
+---
+
+### dma-doc-instance
+
+Live **\`doc(.dma)\`** after declaration (slot map).
+
+\`\`\`logts-play
+comp [mem] .rom:
+  depth: 8
+  length: 8
+  on: 1
+  = ^aa
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .rom .ram
+  queue: 1
+  on: 1
+  :
+
+doc(.dma)
+\`\`\`
+
+**Load & Run:** output lists \`1  .rom\`, \`2  .ram\`, and \`queue: 1\`.
+
 ---
 
 ### dma-cpu-shared-ram
@@ -10949,7 +11148,7 @@ show(w)
 
 ## Separate pin assignments (wave-friendly)
 
-Same semantics as a single block — latch fields until \`set = 1\`:
+Same semantics as a single block — fields are **latched** on each assignment; the job runs when **\`set = 1\`** is active. Runnable version: [dma-separate-pins](#dma-separate-pins).
 
 \`\`\`
 2wire si = 1
@@ -10965,15 +11164,20 @@ Same semantics as a single block — latch fields until \`set = 1\`:
 .dma:set = go
 \`\`\`
 
+Wave example with one combined block: [dma-wave-wires](#dma-wave-wires).
+
 ---
 
-## \`doc(.dma)\` instance map
+## \`doc(comp.dma)\` and \`doc(.dma)\`
 
-\`\`\`
-doc(.dma)
-\`\`\`
+| Call | Output |
+|------|--------|
+| **\`doc(comp.dma)\`** | Type signature (pins, pouts, attributes) — like other \`doc(comp.*)\` |
+| **\`doc(.dma)\`** | **Instance** map: slot → \`comp [mem]\`, plus \`queue:\` |
 
-Example output:
+Runnable: [dma-doc-instance](#dma-doc-instance).
+
+Example **\`doc(.dma)\`** text:
 
 \`\`\`
 .dma (dma)
@@ -10986,6 +11190,15 @@ queue: 1
 \`\`\`
 
 ---
+
+## \`doc()\` in scripts
+
+\`\`\`
+doc(comp.dma)
+doc(.dma)
+\`\`\`
+
+See [doc-function.md](doc-function.md) for the full \`doc()\` index.
 
 ## Not yet implemented
 
@@ -11576,6 +11789,8 @@ comp [adder] .name:
 - \`-> Xbit\` — the return type of the component
 
 > **Note on \`mem\`:** \`doc(comp.mem)\` shows \`= Xbit\` because \`mem\` supports initialization with \`= literal\`, \`= ^hex\`, \`= varName\`, or \`= .isa { … }\` ([inline ASM](asm.md)) in the declaration, and bulk re-initialization via \`.mem = value\` (or \`.mem = .isa { … }\`) after declaration. The value is split into \`depth\`-bit chunks across consecutive addresses. See [mem.md](mem.md) for details.
+
+> **Note on \`dma\`:** \`doc(comp.dma)\` shows body attributes **\`mems:\`** and **\`queue:\`**, plus transfer pins (\`src\`, \`dst\`, \`srcAdr\`, \`dstAdr\`, \`count\`, \`set\`, \`reset\`) and status pouts (\`busy\`, \`done\`, \`started\`, \`queued\`, \`rejected\`, \`*Total\`, …). **\`doc(.dma)\`** prints the **slot → instance** table from your \`mems:\` list. See [dma.md](dma.md).
 
 ### All available components
 

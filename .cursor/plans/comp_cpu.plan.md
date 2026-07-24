@@ -715,7 +715,7 @@ flowchart LR
 | Sub-fază | Scop | Livrabile principale | CPU în teste? | După |
 |----------|------|----------------------|---------------|------|
 | **5a** | Nucleu DMA standalone — **copy** `instant` | `comp [dma]`, `dma-devices.js`, registry; **`mems:`** (min 1, depth egal la declarare); slot **1-based** + `src=0` rezervat fill; **`queue` default 1**; pout-uri **`busy`**, **`done`**, **`queueSize`**, **`queueFull`**, **`started`/`queued`/`rejected`**, **`*Total`**, **`submitSeq`**; pin **`reset`**; asignări **block** + **pin** separate; validare readonly la `dst`; teste **~2609+** **fără CPU** | Nu | — |
-| **5b** | Documentație și exemple runnable | **`doc/dma.md`**, `doc(.dma)` cu **tabel slot→instanță**; exemple **`logts-play`** (instant, coadă, wave); semantica **`started`/`queued`/`rejected`** vs contoare; index în `doc-index` / regenerare viewer | Nu | 5a |
+| **5b** | Documentație și exemple runnable | **`doc/dma.md`**, `doc(.dma)` cu **tabel slot→instanță**; exemple **`logts-play`** (instant, coadă, wave); semantica **`started`/`queued`/`rejected`** vs contoare; index în `doc-index` / regenerare viewer | Nu | 5a | **done** |
 | **5c** | Integrare **CPU ↔ DMA** | Demo **`ram` partajat**; opțional **`dma = .dma`** pe CPU → **stall** cât `busy`; avansat **`comp [mem]` `ports: 2`**; teste CPU+DMA | Da | 5a |
 | **5d** | Transfer **paced** (didactic / osc) | **`mode: paced`**, **`chunk`**, opțional **`clock = .osc`**; pout **`remaining`**; exemple timeline; teste pași manuali + osc | Nu (osc opțional) | 5a |
 | **5e** | **Fill** (memset) | **`src = 0`** + **`value`** + `dst` (slot ≥ 1) / `dstAdr` / `count`; aceeași coadă și pout-uri ca la copy; teste fill | Nu | 5a |
