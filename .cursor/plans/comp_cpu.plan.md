@@ -839,7 +839,7 @@ flowchart LR
 
 | **5d** | Transfer **paced** (didactic / osc) | **`mode: paced`**, **`chunk`**, pout **`remaining`**; continuare cu **`.dma:{ set = 1 }`** sau **`.dma:{ set = .clk:get }`** (fără `clock =` pe corp); exemple timeline; teste pași manuali + osc opțional | Nu (osc opțional în teste) | 5a |
 
-| **5e** | **Fill** (memset) | **`src = 0`** + **`value`** + `dst` (slot ≥ 1) / `dstAdr` / `count`; aceeași coadă și pout-uri ca la copy; teste fill | Nu | 5a |
+| **5e** | **Fill** (memset) | **`src = 0`** + pin **`value`** (lățime = **`depth`** mem) + `dst` (slot ≥ 1) / `dstAdr` / `count`; **`mode: paced`** cu aceleași reguli **`chunk`** / **`remaining`** ca la copy (5d); latch **`value`** la primul submit; teste + `doc/dma.md` | Nu | 5a, 5d |
 
 **Nu sunt sub-faze 5f+** în planul curent. Următorul strat după 5e:
 
@@ -901,7 +901,9 @@ comp [dma] .dma:
 
 **`doc(.dma)`** (ca la alte componente): afișează tabel **slot → instanță** derivat din `mems:` (ordinea listei), plus `queue`, `mode`, stare coadă / contoare dacă există.
 
-**Lățime pini `src` / `dst`:** derivată din `mems.length` — suficient pentru sloturi **0…N** la `src` (fill + N mem) și **1…N** la `dst` (ex. `ceil(log2(N+1))` biți).
+**Lățime pini `src` / `dst`:** `dmaSlotBits(mems.length)` — `max(1, 32 - Math.clz32(max(1, N)))` biți (suficient pentru sloturi **0…N** la `src` și **1…N** la `dst`). **Nu** `Math.ceil(Math.log2(...))` — același pattern ca în `dma-devices.js` / `dma.js`.
+
+**Lățime pin `value` (5e):** egală cu **`depth`** comun al memoriilor din `mems:` (același `depth` validat la declarare).
 
 **Fără aliasuri** pe `mems` (nu `names:`, nu sub-bloc etichetat) — dacă vrei nume în script, folosești **fire** cu valori slot.
 
@@ -1024,8 +1026,14 @@ Exemplele `0`, `1`, `\2`, `100` sunt **ilustrative** — orice formă permisă d
 
 - **`src = 0`** = fill (singura semnificație a lui 0 la sursă).
 - **`dst = \2`** (etc.) = memoria țintă; **`dst = 0`** → **eroare**.
-- **`value`** + **`dstAdr`** + **`count`** obligatorii; **`set`** = trigger.
+- Pin **`value`** + **`dstAdr`** + **`count`** obligatorii la submit fill; **`srcAdr` ignorat**; **`set`** = trigger.
 - `src = 0` fără **`value`** → **eroare**; `src ≥ 1` cu **`value`** în același job → **eroare** (ambiguu).
+- **`value`**: lățime = **`depth`** mem (ca cuvântul scris în RAM); apare în **`getDef`** / pin list ca la `count`, `set`, etc.
+- **Latch `value`:** la primul submit al jobului fill, valoarea de pe pin **`value`** se salvează în job; la continuări **`paced`** (următoarele `set`) rămâne aceeași — nu se re-citește pinul (ca `count` / adrese la copy paced).
+- **`mode: instant`:** scrie **`count`** ori **`value`** la `dstAdr`… într-un singur `set`.
+- **`mode: paced`:** aliniere **5d** — per `set` activ scrie **`min(chunk, remaining)`** cuvinte cu același **`value`**, avansează `dstAdr` intern, **`remaining`** (pout) = lățime pin **`count`**, **`done`** latched la ultimul chunk, **`busy`** între pași.
+- Aceeași coadă, pout-uri (`busy`, `done`, `queueSize`, …) și validări ca la copy (`dst` readonly → eroare la submit).
+- Cod **5a** aruncă la `src=0` — **5e** elimină throw-ul din `dmaResolveSlot` și adaugă ramura fill în `dma-devices.js`.
 
 ### Funcționează fără CPU
 
@@ -1065,7 +1073,7 @@ comp [dma] .dma:
 
 | Per transfer | **`src`**, **`dst`**, adrese, **`count`** — orice expresie permisă de property block; **semantica** slot 1-based / `src=0` fill după rezolvare |
 
-| Pini | `srcAdr`, `dstAdr`, `count`, **`set`**, **`reset`** |
+| Pini | `srcAdr`, `dstAdr`, `count`, **`value`** (fill, lățime `depth`), **`set`**, **`reset`** |
 
 | Pouts | **`busy`**, **`done`**, **`queueSize`**, **`queueFull`**, **`started`**, **`queued`**, **`rejected`**, **`startedTotal`**, **`queuedTotal`**, **`rejectedTotal`**, **`submitSeq`** |
 
@@ -1569,6 +1577,16 @@ comp [cpu] .u:
 - Teste **~2632+**: pași manuali `set`; paced + `count` neîmpărțit la `chunk`; memmove overlap; osc opțional
 - Actualizare **`doc/dma.md`** + exemple `logts-play` paced / osc
 
+#### Livrabile 5e
+
+- `dma-devices.js` + `dma.js`: ramură **fill** (`src = 0`); pin **`value`** în `getDef` / latch la submit; **`dmaFillBlock`** (instant + paced)
+- **`mode: paced`** fill: **`min(chunk, remaining)`**, pout **`remaining`**, latch **`value`**, **`done`** latched — aceeași semantica ca copy **5d**
+- Lățimi: **`src`/`dst`** = `dmaSlotBits` (`clz32`); **`value`** = `depth` mem; **fără** `Math.ceil(Math.log2(...))` în codul DMA nou
+- Teste **~2639+**: fill instant; fill paced + chunk parțial; erori (`value` lipsă, copy+`value`, `dst=0`, readonly dst); opțional osc via `.dma:{ set = .osc:get }`
+- Actualizare **`doc/dma.md`**: secțiune **Fill** — cum funcționează (`src=0`, `value`, `dstAdr`, `count`); exemple **`logts-play`** cu butoane/pin (instant + paced); scoate fill din „Not yet implemented”
+
+**Notă lățimi biți (`clz32` vs `ceil(log2)`):** DMA folosește deja `dmaSlotBits` / `dmaAddrBits` cu **`Math.clz32`**. În restul codebase-ului există încă `Math.ceil(Math.log2(...))` în `mem.js`, `lut.js`, `cpu.js`, `rotary.js`, `interpreter.js`, `test_suite.js` (`ceilLog2Bits`) — **nu** le refactorăm în 5e; doar codul DMA nou / planul rămân pe pattern `clz32`.
+
 ### Wave: un singur block DMA, fără mapă unificată (5a–5d)
 
 **Problema:** în wave nu vrei multe property block-uri `.dma:{…}` diferite, ci **un șablon** pe care CPU (sau fire) îl alimentează la fiecare transfer.
@@ -1694,7 +1712,7 @@ comp [dma] .dma:
 
 | **5d** | **`mode: paced`**, `chunk`, pout **`remaining`**; continuare **`set`** / **`.dma:{ set = .osc:get }`**; memmove paced; **fără** `clock =` pe corp | 5 |
 
-| **5e** | **Fill:** `src = 0` + `value` + `dst` (slot ≥ 1) / `dstAdr` / `count` | 5 |
+| **5e** | **Fill:** `src = 0` + pin `value` (`depth`) + paced ca 5d; teste ~2639+; `doc/dma.md` fill + `logts-play` | 5 |
 
 ### Explicit nu (faza 4 / 5 MVP)
 

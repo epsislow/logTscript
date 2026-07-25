@@ -69,16 +69,34 @@ Each transfer is one property block (or separate pin assignments) ending with **
 
 | Field | Meaning |
 |-------|---------|
-| **`src`** | Source slot **1…N** in `mems` (`\2` = decimal 2). **`src = 0`** reserved for **fill** (memset) — not available yet. |
+| **`src`** | Source slot **1…N** in `mems` (`\2` = decimal 2). **`src = 0`** = **fill** (memset) — write **`value`** to **`dst`** (see [Fill](#fill-memset-src--0)). |
 | **`dst`** | Destination slot **1…N**. **`dst = 0`** → error. |
-| **`srcAdr`**, **`dstAdr`** | Word index inside each [mem](mem.md) (0 … `length−1`). |
-| **`count`** | Number of words to copy. |
+| **`srcAdr`**, **`dstAdr`** | Word index inside each [mem](mem.md) (0 … `length−1`). Ignored for **`srcAdr`** on fill. |
+| **`count`** | Number of words to transfer. |
+| **`value`** | Fill only (`src = 0`): word written **`count`** times (width = **`depth`** of `mems`). |
 | **`set`** | Submit trigger (active `1`). |
 | **`reset`** | Clear queue, latch, counters (use with **`set = 1`** in the same block). |
 
 Values are resolved by the language parser (binary literals, `\decimal`, wires) — DMA receives the resolved bit string.
 
-**Same slot, overlapping regions:** copy uses **memmove** semantics (safe overlap). In **`paced`** mode, overlap with `dstAdr > srcAdr` copies **backward** chunk-by-chunk.
+**Same slot, overlapping regions:** copy uses **memmove** semantics (safe overlap). In **`paced`** mode, overlap with `dstAdr > srcAdr` copies **backward** chunk-by-chunk. Fill has no source memory — only **`dstAdr`** advances.
+
+### Fill (memset, `src = 0`)
+
+| Rule | Detail |
+|------|--------|
+| Trigger | **`src = 0`**, **`value`**, **`dst`** ≥ 1, **`dstAdr`**, **`count`**, **`set = 1`** |
+| **`srcAdr`** | Ignored |
+| **`value`** | Latched on first submit; in **`paced`**, continuation **`set`** steps reuse it |
+| Copy + **`value`** | Error — use **`src = 0`** for fill |
+| **`dst = 0`** | Error |
+| **`mode: paced`** | Same as copy: **`min(chunk, remaining)`** per **`set`**, pout **`remaining`**, **`done`** latched |
+
+```
+.dma:{ src = 0, dst = \2, dstAdr = 0, count = \16, value = ^00, set = 1 }
+```
+
+Writes **`^00`** to 16 consecutive words starting at **`dstAdr`** in slot 2.
 
 ### Transfer modes
 
@@ -103,6 +121,7 @@ Values are resolved by the language parser (binary literals, `\decimal`, wires) 
 |-----|------|
 | `src`, `dst` | Slot indices (width from `mems.length`) |
 | `srcAdr`, `dstAdr`, `count` | Address / length |
+| `value` | Fill word (`src = 0`; width = mem **`depth`**) |
 | `set` | Submit job |
 | `reset` | Reset DMA state |
 
@@ -128,7 +147,7 @@ show(go)
 
 ## Submit result flags (`started` / `queued` / `rejected`)
 
-Each successful **`set = 1`** with a complete job (`src`, `dst`, `count`) is a **submit**. The DMA records what happened to **that** submit:
+Each successful **`set = 1`** with a complete job (`src`, `dst`, `count` — plus **`value`** when `src = 0`) is a **submit**. The DMA records what happened to **that** submit:
 
 | Pout | Meaning |
 |------|---------|
@@ -397,6 +416,115 @@ show(dn)
 ```
 
 **Load & Run:** `st` = `1`, `dn` = `1`.
+
+---
+
+---
+
+### dma-fill-instant
+
+Fill **4 words** in slot 1 with **`^aa`** (`src = 0`). **Load & Run:** all four cells show `10101010`.
+
+```logts-play
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .ram
+  on: 1
+  :
+
+.dma:{ src = 0, dst = 1, dstAdr = 0, count = 100, value = ^aa, set = 1 }
+
+.ram:{ adr = 0, set = 1 }
+8wire w0 = .ram:get
+.ram:{ adr = 1, set = 1 }
+8wire w1 = .ram:get
+show(w0)
+show(w1)
+```
+
+**Load & Run:** `w0` and `w1` = `10101010`.
+
+---
+
+### dma-fill-paced
+
+**`mode: paced`**, **`chunk: 2`**, fill **5 words** with **`^ff`** — three **`set`** steps (`2+2+1`). Use buttons or wire **`set`** to an osc (same pattern as copy paced).
+
+```logts-play
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .ram
+  mode: paced
+  chunk: 2
+  on: 1
+  :
+
+.dma:{ src = 0, dst = 1, dstAdr = 0, count = 101, value = ^ff, set = 1 }
+show(.dma:remaining)
+show(.dma:busy)
+
+.dma:{ set = 1 }
+show(.dma:remaining)
+
+.dma:{ set = 1 }
+show(.dma:done)
+
+.ram:{ adr = 4, set = 1 }
+8wire last = .ram:get
+show(last)
+```
+
+**Load & Run:** after all three submits, `last` = `11111111`; `done` = `1`.
+
+---
+
+### dma-fill-pins
+
+Fill via **separate pin assignments** (wave-friendly): **`src = 0`**, **`value`** on a wire, **`set`** on **`go`**.
+
+```logts-play wave
+comp [mem] .ram:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .ram
+  on: 1
+  :
+
+1wire di = 1
+4wire n = 0010
+8wire v = ^55
+1wire go = 1
+
+.dma:src = 0
+.dma:dst = di
+.dma:dstAdr = 0
+.dma:count = n
+.dma:value = v
+.dma:set = go
+
+.ram:{ adr = 1, set = 1 }
+8wire cell = .ram:get
+show(cell)
+```
+
+**Load & Run (wave):** `cell` = `01010101` (`^55`).
 
 ---
 
@@ -717,7 +845,6 @@ See [doc-function.md](doc-function.md) for the full `doc()` index.
 
 | Feature | Plan |
 |---------|------|
-| **Fill** (`src = 0` + `value`) | Phase 5e |
 | **`mmap =`** unified address space | Phase 6 |
 
 ---

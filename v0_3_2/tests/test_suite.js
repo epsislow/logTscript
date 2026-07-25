@@ -25465,12 +25465,12 @@ comp [dma] .dma:
   }, 'readonly');
 });
 
-reg(2614, 'comp-dma', 'dma rejects src=0 fill in phase 5a', function(h, session) {
-  h.assertThrows('src=0', function() {
+reg(2614, 'comp-dma', 'dma fill requires value when src=0', function(h, session) {
+  h.assertThrows('src=0 no value', function() {
     session.run(DMA_TWO_MEM_SETUP + `
-.dma:{ src = 0, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+.dma:{ src = 0, dst = \\2, dstAdr = 0, count = 1, set = 1 }
 `);
-  }, 'fill');
+  }, 'value');
 });
 
 reg(2615, 'comp-dma', 'dma submit flags and totals', function(h, session) {
@@ -25968,6 +25968,112 @@ reg(2638, 'doc-comp', 'doc(comp.dma) contains paced mode', function(h, session) 
   const out = session.runDoc('doc(comp.dma)');
   h.assert('mode attr', String(out.some(l => l.includes('mode'))), 'true');
   h.assert('remaining pout', String(out.some(l => l.includes('remaining'))), 'true');
+});
+
+reg(2639, 'comp-dma', 'dma fill instant writes value count times', function(h, session) {
+  const { interp } = session.run(DMA_TWO_MEM_SETUP + `
+.dma:{ src = 0, dst = \\2, dstAdr = 0, count = 100, value = ^aa, set = 1 }
+`);
+  const dstId = interp.components.get('.dst').deviceIds[0];
+  h.assert('w0', getMem(dstId, 0), '10101010');
+  h.assert('w1', getMem(dstId, 1), '10101010');
+  h.assert('w2', getMem(dstId, 2), '10101010');
+  h.assert('w3', getMem(dstId, 3), '10101010');
+  h.assert('done', dmaGetProp(session, interp, '.dma', 'done'), '1');
+});
+
+reg(2640, 'comp-dma', 'dma fill paced chunk partial steps', function(h, session) {
+  const { interp } = session.run(`comp [mem] .dst:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .dst
+  mode: paced
+  chunk: 2
+  on: 1
+  :
+
+.dma:{ src = 0, dst = 1, dstAdr = 0, count = 101, value = ^ff, set = 1 }
+`);
+  const dstId = interp.components.get('.dst').deviceIds[0];
+  h.assert('step1 two words', getMem(dstId, 1), '11111111');
+  h.assert('busy', dmaGetProp(session, interp, '.dma', 'busy'), '1');
+  session.execStmts(interp, '.dma:{ set = 1 }');
+  h.assert('step2 four words', getMem(dstId, 3), '11111111');
+  session.execStmts(interp, '.dma:{ set = 1 }');
+  h.assert('step3 five words', getMem(dstId, 4), '11111111');
+  h.assert('done', dmaGetProp(session, interp, '.dma', 'done'), '1');
+});
+
+reg(2641, 'comp-dma', 'dma rejects copy with value pin', function(h, session) {
+  h.assertThrows('copy+value', function() {
+    session.run(DMA_TWO_MEM_SETUP + `
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, value = ^00, set = 1 }
+`);
+  }, 'fill');
+});
+
+reg(2642, 'comp-dma', 'dma fill paced latches value on first submit', function(h, session) {
+  const { interp } = session.run(`comp [mem] .dst:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .dst
+  mode: paced
+  chunk: 1
+  on: 1
+  :
+
+.dma:{ src = 0, dst = 1, dstAdr = 0, count = 10, value = ^aa, set = 1 }
+`);
+  const dstId = interp.components.get('.dst').deviceIds[0];
+  h.assert('first aa', getMem(dstId, 0), '10101010');
+  session.execStmts(interp, '.dma:{ value = ^ff, set = 1 }');
+  h.assert('still aa latched', getMem(dstId, 1), '10101010');
+});
+
+reg(2643, 'comp-dma', 'dma fill separate pins wave template', function(h, session) {
+  const { interp } = session.run(`comp [mem] .ram:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .ram
+  on: 1
+  :
+
+1wire di = 1
+4wire n = 0010
+8wire v = ^55
+1wire go = 1
+
+.dma:src = 0
+.dma:dst = di
+.dma:dstAdr = 0
+.dma:count = n
+.dma:value = v
+.dma:set = go
+`);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  h.assert('w0', getMem(ramId, 0), '01010101');
+  h.assert('w1', getMem(ramId, 1), '01010101');
+  h.assert('started', dmaGetProp(session, interp, '.dma', 'started'), '1');
+});
+
+reg(2644, 'doc-comp', 'doc(comp.dma) contains value pin for fill', function(h, session) {
+  const out = session.runDoc('doc(comp.dma)');
+  h.assert('value pin', String(out.some(l => l.includes('value'))), 'true');
 });
 
 

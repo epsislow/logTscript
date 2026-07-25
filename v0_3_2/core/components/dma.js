@@ -86,6 +86,7 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
     const slotCount = attributes && attributes.memsMembers ? attributes.memsMembers.length : 1;
     const slotBits = dmaSlotBits(slotCount);
     const addrBits = '4';
+    const depthBits = '8';
     const qCap = attributes ? dmaParseQueue(attributes) : 1;
     const qsBits = String(dmaQueueSizeBits(qCap));
     const ctrBits = '16';
@@ -104,6 +105,7 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
         { bits: addrBits, name: 'srcAdr' },
         { bits: addrBits, name: 'dstAdr' },
         { bits: addrBits, name: 'count' },
+        { bits: depthBits, name: 'value' },
         { bits: '1', name: 'set' },
         { bits: '1', name: 'reset' },
       ],
@@ -157,7 +159,7 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
   }
 
   getSupportedProperties() {
-    return ['src', 'dst', 'srcAdr', 'dstAdr', 'count', 'set', 'reset',
+    return ['src', 'dst', 'srcAdr', 'dstAdr', 'count', 'value', 'set', 'reset',
       'busy', 'done', 'queueSize', 'queueFull', 'started', 'queued', 'rejected',
       'startedTotal', 'queuedTotal', 'rejectedTotal', 'submitSeq', 'remaining'];
   }

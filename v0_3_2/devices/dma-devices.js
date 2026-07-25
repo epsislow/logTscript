@@ -37,6 +37,25 @@ function dmaRangesOverlap(srcAdr, dstAdr, count) {
   return !(dstEnd < srcAdr || dstAdr > srcEnd);
 }
 
+function dmaFillBlock(job) {
+  const { dstMemId, dstAdr, count, value } = job;
+  if (count <= 0) return;
+  for (let i = 0; i < count; i++) {
+    setMem(dstMemId, dstAdr + i, value);
+  }
+}
+
+function dmaFillChunk(active, chunkSize) {
+  const remaining = active.total - active.offset;
+  const n = Math.min(chunkSize, remaining);
+  if (n <= 0) return 0;
+  const { dstMemId, dstAdr, value } = active;
+  for (let i = 0; i < n; i++) {
+    setMem(dstMemId, dstAdr + active.offset + i, value);
+  }
+  return n;
+}
+
 function dmaCopyBlock(job) {
   const { srcMemId, dstMemId, srcAdr, dstAdr, count } = job;
   if (count <= 0) return;
@@ -62,6 +81,7 @@ function dmaJobNeedsBackward(job) {
 }
 
 function dmaCopyChunk(active, chunkSize) {
+  if (active.fill) return dmaFillChunk(active, chunkSize);
   const remaining = active.total - active.offset;
   const n = Math.min(chunkSize, remaining);
   if (n <= 0) return 0;
@@ -83,6 +103,17 @@ function dmaCopyChunk(active, chunkSize) {
 }
 
 function dmaStartActiveJob(d, job) {
+  if (job.fill) {
+    d.active = {
+      fill: true,
+      dstMemId: job.dstMemId,
+      dstAdr: job.dstAdr,
+      total: job.count,
+      offset: 0,
+      value: job.value,
+    };
+    return;
+  }
   d.active = {
     srcMemId: job.srcMemId,
     dstMemId: job.dstMemId,
@@ -190,9 +221,6 @@ function dmaQueueFull(d) {
 }
 
 function dmaResolveSlot(d, slot, isSrc) {
-  if (isSrc && slot === 0) {
-    throw Error('DMA fill (src=0) is not available in this phase (use phase 5e)');
-  }
   if (!isSrc && slot === 0) {
     throw Error('DMA dst slot cannot be 0');
   }
@@ -203,19 +231,49 @@ function dmaResolveSlot(d, slot, isSrc) {
 }
 
 function dmaBuildJob(d, latch) {
-  if (latch.src === undefined || latch.dst === undefined || latch.count === undefined) {
+  if (latch.dst === undefined || latch.count === undefined || latch.src === undefined) {
     return null;
   }
   const srcSlot = parseInt(latch.src, 2);
   const dstSlot = parseInt(latch.dst, 2);
-  const srcAdr = latch.srcAdr !== undefined ? parseInt(latch.srcAdr, 2) : 0;
   const dstAdr = latch.dstAdr !== undefined ? parseInt(latch.dstAdr, 2) : 0;
   const count = parseInt(latch.count, 2);
-  if (isNaN(srcSlot) || isNaN(dstSlot) || isNaN(srcAdr) || isNaN(dstAdr) || isNaN(count)) {
+  if (isNaN(srcSlot) || isNaN(dstSlot) || isNaN(dstAdr) || isNaN(count)) {
     throw Error('DMA job parameters must resolve to numeric values');
   }
   if (count <= 0) {
     throw Error('DMA count must be positive');
+  }
+
+  if (srcSlot === 0) {
+    if (latch.value === undefined) {
+      throw Error('DMA fill (src=0) requires value');
+    }
+    const dstEntry = dmaResolveSlot(d, dstSlot, false);
+    if (dstEntry.readonly) {
+      throw Error(`DMA cannot write to readonly memory ${dstEntry.ref}`);
+    }
+    if (dstAdr + count > dstEntry.length) {
+      throw Error('DMA transfer exceeds memory bounds');
+    }
+    return {
+      fill: true,
+      srcSlot,
+      dstSlot,
+      dstMemId: dstEntry.memId,
+      dstAdr,
+      count,
+      value: latch.value,
+    };
+  }
+
+  if (latch.value !== undefined) {
+    throw Error('DMA copy cannot use value (use src=0 for fill)');
+  }
+
+  const srcAdr = latch.srcAdr !== undefined ? parseInt(latch.srcAdr, 2) : 0;
+  if (isNaN(srcAdr)) {
+    throw Error('DMA job parameters must resolve to numeric values');
   }
   const srcEntry = dmaResolveSlot(d, srcSlot, true);
   const dstEntry = dmaResolveSlot(d, dstSlot, false);
@@ -226,6 +284,7 @@ function dmaBuildJob(d, latch) {
     throw Error('DMA transfer exceeds memory bounds');
   }
   return {
+    fill: false,
     srcSlot,
     dstSlot,
     srcMemId: srcEntry.memId,
@@ -237,7 +296,8 @@ function dmaBuildJob(d, latch) {
 }
 
 function dmaRunJob(d, job) {
-  dmaCopyBlock(job);
+  if (job.fill) dmaFillBlock(job);
+  else dmaCopyBlock(job);
   d.done = true;
 }
 
@@ -267,7 +327,7 @@ function dmaTrySubmit(d, job) {
 }
 
 function dmaLatchPins(d, pending, reEvaluate, component, ctx) {
-  const fields = ['src', 'dst', 'srcAdr', 'dstAdr', 'count'];
+  const fields = ['src', 'dst', 'srcAdr', 'dstAdr', 'count', 'value'];
   for (let i = 0; i < fields.length; i++) {
     const f = fields[i];
     if (pending[f] !== undefined) {
