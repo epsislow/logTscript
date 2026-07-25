@@ -3318,6 +3318,7 @@ assignment() {
         let bindingAttrs = [];
         let listAttrs = [];
         let refListAttrs = [];
+        let wireRefAttrs = [];
         if (this.componentRegistry) {
           const bindHandler = this.componentRegistry.get(compType);
           if (bindHandler && bindHandler.getSpecialParseAttributes) {
@@ -3325,6 +3326,7 @@ assignment() {
             if (special && special.bindingAttrs) bindingAttrs = special.bindingAttrs;
             if (special && special.listAttrs) listAttrs = special.listAttrs;
             if (special && special.refListAttrs) refListAttrs = special.refListAttrs;
+            if (special && special.wireRefAttrs) wireRefAttrs = special.wireRefAttrs;
           }
         }
         if (refListAttrs.includes(attrName) && this.c.value === ':') {
@@ -3389,6 +3391,26 @@ assignment() {
           const listKey = attrName + 'Members';
           if (!attributes[listKey]) attributes[listKey] = [];
           attributes[listKey].push(memberRef);
+          continue;
+        }
+        if (wireRefAttrs.includes(attrName) && this.c.value === '=') {
+          this.eat('SYM', '=');
+          this.t.skip();
+          if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+            throw Error(`Expected wire name after '${attrName} =' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+          }
+          attributes[attrName] = this.c.value;
+          this.eat(this.c.type);
+          continue;
+        }
+        if (wireRefAttrs.includes(attrName) && this.c.value === ':') {
+          this.eat('SYM', ':');
+          this.t.skip();
+          if (this.c.type !== 'ID' && this.c.type !== 'SPECIAL') {
+            throw Error(`Expected wire name after '${attrName}:' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+          }
+          attributes[attrName] = this.c.value;
+          this.eat(this.c.type);
           continue;
         }
 

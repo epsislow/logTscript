@@ -82,6 +82,7 @@ Reload program with **`.u:prog = …`** (not direct assign on the component body
 | `trace:get` | Trace text when `trace: 1` or `output` |
 | `irq`, `irqVec` | IRQ request and vector index (see [Interrupts](#interrupts-irq-phase-4)) |
 | `ie`, `irqPending` | Interrupt enable and masked-pending readout |
+| `wait` | Stall when `1` — see [Stall / `wait`](#stall--wait-phase-5c) |
 
 Example — two steps then halt:
 
@@ -109,6 +110,173 @@ Example — clear RAM and read cell 0:
 `maxSteps` is set on the component (not a pin). If the program loops forever, `run` stops after `maxSteps` with `halted` still `0`.
 
 Trace to a [terminal](terminal.md) (`trace = .tr` or `trace: .tr`) is emitted **on every step** inside `run`, not only on `set`.
+
+---
+
+## Stall / `wait` (phase 5c)
+
+When the CPU must not touch shared RAM while [DMA](dma.md) (or another master) is active, bind a **1-bit hold** wire with **`wait`** on the CPU body or drive the **`wait`** pin in a wave block.
+
+| Signal | Effect |
+|--------|--------|
+| `wait = 1` (wire or pin) | **`set`** executes **0** instructions; **`run`** exits immediately with **0** steps |
+| `wait = 0` | Normal stepping |
+| **`run` + `maxSteps`** | Stall **does not** consume the step budget — only executed instructions count |
+| After hold clears | CPU **does not** auto-resume — issue a new **`set`** or **`run`** pulse |
+
+Body binding (wire name):
+
+```
+1wire hold = OR(.dma:busy)
+comp [cpu] .u:
+  wait = hold
+```
+
+Equivalent: `wait: hold`. Per-pulse override in a wave: `.u:{ wait = 1, set = 1 }` (pin wins over body wire).
+
+**Semantics:** PC stays at the last **fully completed** instruction. There is **no** busy-wait loop inside one `run` pulse — if `wait` becomes `1` before the next instruction, `run` **breaks** early.
+
+### cpu-wait-stall
+
+`hold = 1` blocks `set`; after `hold = 0`, one step runs.
+
+```logts-play
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  ADDI  : 0011 + R2b + A2b
+  HALT  : 0111 + 4b
+  :
+
+1wire hold = 1
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  wait = hold
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      ADDI R0 A1
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+.u:{ set = 1 }
+8wire r0 = .u:r0
+show(r0)
+
+hold = 0
+.u:{ set = 1 }
+8wire r0b = .u:r0
+show(r0b)
+```
+
+**Load & Run:** first `show` → `00000000` (stalled); after editing `hold` and stepping, `r0b` → `00000001`.
+
+### cpu-wait-run-resume
+
+`maxSteps: 2` with four `ADDI` — first `run` does two steps; second `run` finishes the program.
+
+```logts-play
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  ADDI  : 0011 + R2b + A2b
+  HALT  : 0111 + 4b
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  maxSteps: 2
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      ADDI R0 A1
+      ADDI R0 A1
+      ADDI R0 A1
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+.u:{ run = 1 }
+8wire r0 = .u:r0
+8wire halted = .u:halted
+show(r0)
+show(halted)
+
+.u:{ run = 1 }
+8wire r0b = .u:r0
+8wire haltedb = .u:halted
+show(r0b)
+show(haltedb)
+```
+
+**Load & Run:** `r0` = `00000010`, `halted` = `0`; then `r0b` = `00000011`, `haltedb` = `1`.
+
+### cpu-dma-wait
+
+DMA copies `^2a` into shared RAM; CPU **LOAD** runs after DMA (`busy` low). Use `wait = OR(.dma:busy)` when CPU and DMA can be pulsed in the same wave.
+
+```logts-play
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  HALT  : 0111 + 4b
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [mem] .rom:
+  depth: 8
+  length: 4
+  on: 1
+  = ^2a
+  :
+
+comp [dma] .dma:
+  mems: .rom .ram
+  on: 1
+  :
+
+1wire hold = OR(.dma:busy)
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram = .ram
+  wait = hold
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      LOAD R0 A0
+      HALT
+    }
+  :
+
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+.u:{ run = 1 }
+8wire r0 = .u:r0
+show(r0)
+```
+
+**Load & Run:** `r0` = `00101010` (42). Order in script: DMA `set`, then CPU `run`.
 
 ---
 
@@ -143,6 +311,7 @@ Optional opcodes when defined in your ISA: **PUSH** (`1000`), **POP** (`1001`), 
 | `output = .terminal` | `OUT` writes low byte of register as ASCII |
 | `trace = .terminal` | Per-step trace lines appended to terminal |
 | `clock:` | Parsed binding (use `set = .osc:get` for stepping) |
+| `wait` / `wait =` wire | Stall when hold wire is `1` ([Stall / `wait`](#stall--wait-phase-5c)) |
 | `sp` + `map.stack` | Stack in RAM; PUSH/POP |
 
 ---
@@ -664,7 +833,7 @@ Binding `irq = .pic` (interrupt controller) is planned for a later sub-phase.
 ## Out of scope (later)
 
 - **PIC / `irq = .component`** — after `comp [pic]` exists (plan faza 4c).
-- **CPU stall on DMA `busy`** — plan **faza 5c** (`dma = .dma` on CPU). Bulk copy today: [dma.md](dma.md).
+- **CPU stall** — plan **faza 5c** (`wait = hold`, ex. `hold = OR(.dma:busy, …)`). Bulk copy today: [dma.md](dma.md).
 
 ---
 

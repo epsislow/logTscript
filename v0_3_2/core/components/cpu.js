@@ -60,6 +60,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   getSpecialParseAttributes() {
     return {
       bindingAttrs: ['isa', 'clock', 'output', 'trace', 'prog', 'ram'],
+      wireRefAttrs: ['wait'],
       nestedBlockAttrs: ['ram', 'prog', 'map'],
       listAttrs: ['vectors'],
     };
@@ -235,6 +236,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         { name: 'trace', value: 'off|on|output|.terminal' },
         { name: 'output', value: '.terminal' },
         { name: 'clock', value: '.component' },
+        { name: 'wait', value: 'wire' },
         { name: 'ram', value: 'block|=.mem' },
         { name: 'prog', value: 'block|=.mem' },
         { name: 'map', value: 'block' },
@@ -254,6 +256,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         { bits: '1', name: 'resetHalted' },
         { bits: '1', name: 'irq' },
         { bits: '4', name: 'irqVec' },
+        { bits: '1', name: 'wait' },
       ],
       pouts,
       returns: null,
@@ -271,7 +274,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
 
   getSupportedProperties() {
     return ['pc', 'halted', 'ie', 'irqPending', 'instr', 'ram:get', 'prog:get', 'trace:get',
-      'set', 'run', 'reset', 'ramAdr', 'progAdr', 'irq', 'irqVec',
+      'set', 'run', 'reset', 'ramAdr', 'progAdr', 'irq', 'irqVec', 'wait',
       'resetPC', 'resetRAM', 'resetRegs', 'resetSP', 'resetHalted'];
   }
 
@@ -367,6 +370,18 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     return val === '1' || (val && val[val.length - 1] === '1');
   }
 
+  _isWaitActive(comp, pending, reEvaluate, ctx) {
+    if (pending && pending.wait !== undefined) {
+      const v = this.reEvalPendingValue(pending, 'wait', reEvaluate, ctx);
+      if (v !== undefined) return this._isActive(v);
+    }
+    const wireName = comp.attributes && comp.attributes.wait;
+    if (!wireName || typeof wireName !== 'string') return false;
+    const val = ctx.getWireEffectiveValue(wireName);
+    if (val === null || val === undefined) return false;
+    return this._isActive(val);
+  }
+
   _applyResets(comp, pending, ctx) {
     const flags = [];
     if (pending.resetPC !== undefined && this._isActive(this.reEvalPendingValue(pending, 'resetPC', false, ctx))) flags.push('pc');
@@ -420,7 +435,9 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
 
     if (pending.set !== undefined && this._isActive(this.reEvalPendingValue(pending, 'set', reEvaluate, ctx))) {
       this._syncIrqPins(comp, pending, reEvaluate, ctx);
-      if (typeof cpuStep === 'function') cpuStep(id, ctx);
+      if (!this._isWaitActive(comp, pending, reEvaluate, ctx) && typeof cpuStep === 'function') {
+        cpuStep(id, ctx);
+      }
       if (ctx.deferWirePropagation && ctx.deferWirePropagation() && ctx.signalPropagationStrategy) {
         const executed = new Set();
         if (ctx.signalPropagationStrategy._scheduleWiresDependingOnComponent(compName, executed)) {
@@ -435,7 +452,11 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       this._syncIrqPins(comp, pending, reEvaluate, ctx);
       const c = typeof getCpu === 'function' ? getCpu(id) : null;
       const max = c && c.maxSteps != null ? c.maxSteps : 10000;
-      if (typeof cpuRun === 'function') cpuRun(id, max, ctx);
+      const self = this;
+      const shouldStall = function() {
+        return self._isWaitActive(comp, pending, true, ctx);
+      };
+      if (typeof cpuRun === 'function') cpuRun(id, max, ctx, shouldStall);
       if (ctx.deferWirePropagation && ctx.deferWirePropagation() && ctx.signalPropagationStrategy) {
         const executed = new Set();
         if (ctx.signalPropagationStrategy._scheduleWiresDependingOnComponent(compName, executed)) {

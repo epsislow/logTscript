@@ -25595,6 +25595,239 @@ comp [dma] .dma:
   h.assert('started', st.value, '1');
 }, { propagation: 'wave' });
 
+reg(2625, 'comp-cpu', 'cpu set stalls when wait=1', function(h, session) {
+  const src = CPU_ISA_FULL + `1wire hold = 1
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  wait: hold
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      ADDI R0 A1
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const { interp } = session.run(src);
+  session.execStmts(interp, '.u:{ set = 1 }');
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 unchanged', r0.value, '00000000');
+  const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+  h.assert('not halted', halted.value, '0');
+});
+
+reg(2626, 'comp-cpu', 'cpu set runs when wait=0', function(h, session) {
+  const src = CPU_ISA_FULL + `1wire hold = 0
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  wait: hold
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      ADDI R0 A1
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const { interp } = session.run(src);
+  session.execStmts(interp, '.u:{ set = 1 }');
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('one step', r0.value, '00000001');
+});
+
+reg(2627, 'comp-cpu', 'cpu wait = wireName parse', function(h, session) {
+  const src = CPU_ISA_FULL + `1wire stallMe = 0
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  wait = stallMe
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      ADDI R0 A1
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const { interp } = session.run(src);
+  const comp = interp.components.get('.u');
+  h.assert('wait attr', comp.attributes.wait, 'stallMe');
+  session.execStmts(interp, '.u:{ set = 1 }');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('step ok', r0.value, '00000001');
+});
+
+reg(2628, 'comp-cpu', 'cpu run stalls without consuming maxSteps', function(h, session) {
+  const cpuBody = `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  wait: hold
+  maxSteps: 2
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      ADDI R0 A1
+      ADDI R0 A1
+      ADDI R0 A1
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const handler = session._ensureRegistry().get('cpu');
+  const stalled = session.run(CPU_ISA_FULL + `2wire hold = 01\n` + cpuBody);
+  session.execStmts(stalled.interp, '.u:{ run = 1 }');
+  let comp = stalled.interp.components.get('.u');
+  let r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, stalled.interp);
+  h.assert('stalled run', r0.value, '00000000');
+  const resumed = session.run(CPU_ISA_FULL + `2wire hold = 00\n` + cpuBody);
+  session.execStmts(resumed.interp, '.u:{ run = 1 }');
+  comp = resumed.interp.components.get('.u');
+  r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, resumed.interp);
+  h.assert('two steps when hold clear', r0.value, '00000010');
+});
+
+reg(2629, 'comp-cpu', 'cpu run resumes PC on second run pulse', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  maxSteps: 2
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      ADDI R0 A1
+      ADDI R0 A1
+      ADDI R0 A1
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const { interp } = session.run(src);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  session.execStmts(interp, '.u:{ run = 1 }');
+  let r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  let halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+  h.assert('first run partial', r0.value, '00000010');
+  h.assert('not halted yet', halted.value, '0');
+  session.execStmts(interp, '.u:{ run = 1 }');
+  r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+  h.assert('second run finishes', r0.value, '00000011');
+  h.assert('halted', halted.value, '1');
+});
+
+reg(2630, 'comp-cpu', 'cpu wait pin overrides body wire in wave', function(h, session) {
+  const src = CPU_ISA_FULL + `1wire hold = 0
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  wait: hold
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      ADDI R0 A1
+      HALT
+    }
+  ram:
+    depth: 8
+    length: 4
+  :
+
+`;
+  const { interp } = session.run(src);
+  session.execStmts(interp, '.u:{ wait = 1, set = 1 }');
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('pin stall', r0.value, '00000000');
+}, { propagation: 'wave' });
+
+reg(2631, 'comp-cpu', 'cpu dma shared ram with wait on busy', function(h, session) {
+  const src = CPU_ISA_FULL + `comp [mem] .ram:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [mem] .rom:
+  depth: 8
+  length: 4
+  on: 1
+  = ^2a
+  :
+
+comp [dma] .dma:
+  mems: .rom .ram
+  on: 1
+  :
+
+1wire hold = OR(.dma:busy)
+
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram = .ram
+  wait = hold
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      LOAD R0 A0
+      HALT
+    }
+  :
+
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+.u:{ run = 1 }
+`;
+  const { interp } = session.run(src);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('loaded after dma', r0.value, '00101010');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

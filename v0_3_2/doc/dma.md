@@ -2,7 +2,7 @@
 
 Standalone **DMA controller** for bulk copy between [mem](mem.md) instances. One `comp [dma]` in a scene; the memory list is declared on the component body (`mems:`); each transfer selects source and destination by **slot index** (1-based) in a property block.
 
-Works **without** a [CPU](cpu.md) — useful for init, memcpy, and teaching bus patterns. Optional CPU integration (shared RAM) is shown in the examples below; CPU stall while `busy` is planned for a later sub-phase.
+Works **without** a [CPU](cpu.md) — useful for init, memcpy, and teaching bus patterns. Optional CPU integration (shared RAM, **`wait = hold`** stall while `busy`) is in [cpu.md — Stall / wait](cpu.md#stall--wait-phase-5c).
 
 In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run** (same as [cpu.md](cpu.md) and [mem.md](mem.md)).
 
@@ -572,7 +572,6 @@ See [doc-function.md](doc-function.md) for the full `doc()` index.
 |---------|------|
 | **Fill** (`src = 0` + `value`) | Phase 5e |
 | **`mode: paced`**, `chunk`, `clock` | Phase 5d |
-| **CPU `dma = .dma` stall** while `busy` | Phase 5c |
 | **`mmap =`** unified address space | Phase 6 |
 
 ---

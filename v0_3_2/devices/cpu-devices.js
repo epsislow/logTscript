@@ -418,12 +418,13 @@ function cpuSetIrqPins(c, irqActive, irqVec) {
   if (irqVec !== undefined) c.irqVec = irqVec | 0;
 }
 
-function cpuRun(id, maxSteps, ctx) {
+function cpuRun(id, maxSteps, ctx, shouldStall) {
   const c = getCpu(id);
   if (!c || c.halted) return 0;
   const limit = maxSteps != null ? maxSteps : c.maxSteps;
   let steps = 0;
   while (!c.halted && steps < limit) {
+    if (typeof shouldStall === 'function' && shouldStall()) break;
     cpuStep(id, ctx);
     steps += 1;
   }
