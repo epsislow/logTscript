@@ -837,7 +837,7 @@ flowchart LR
 
 | **5c** | Integrare **CPU ↔ DMA** + **stall** | Demo **`ram` partajat**; **`wait =`** wire/expresie (inclusiv `OR(.dma:busy, …)`); **fără** `dma = .dma` pe CPU; opțional **`comp [mem] ports: 2**; teste CPU+DMA | Da | 5a |
 
-| **5d** | Transfer **paced** (didactic / osc) | **`mode: paced`**, **`chunk`**, opțional **`clock = .osc`**; pout **`remaining`**; exemple timeline; teste pași manuali + osc | Nu (osc opțional) | 5a |
+| **5d** | Transfer **paced** (didactic / osc) | **`mode: paced`**, **`chunk`**, pout **`remaining`**; continuare cu **`.dma:{ set = 1 }`** sau **`.dma:{ set = .clk:get }`** (fără `clock =` pe corp); exemple timeline; teste pași manuali + osc opțional | Nu (osc opțional în teste) | 5a |
 
 | **5e** | **Fill** (memset) | **`src = 0`** + **`value`** + `dst` (slot ≥ 1) / `dstAdr` / `count`; aceeași coadă și pout-uri ca la copy; teste fill | Nu | 5a |
 
@@ -1083,7 +1083,7 @@ comp [dma] .dma:
 
 |-------|------|-----|
 
-| **A. DMA `mode` + `chunk`** | `comp [dma] `| Cât de mult copiază **per pas** de ceas DMA (`set `sau `clock = .osc`) — control explicit didactic |
+| **A. DMA `mode` + `chunk`** | `comp [dma]` | Cât de mult copiază **per pas** DMA — la fiecare **`set = 1`** activ (manual sau **`.dma:{ set = .osc:get }`**); **fără** atribut `clock =` pe corp |
 
 | **B. `accessLatency` pe `comp [mem]`** | viitor, **nu** în 5a | Fiecare `getMem`/`setMem` pe acel device „costă” timp — simulează RAM lent / backing store; afectează **și CPU** |
 
@@ -1097,7 +1097,7 @@ comp [dma] .dma:
 
 | **`instant`** (default) | La **`set = 1`**: toate cele **`count`** cuvinte într-o execuție; `busy` scurt (sau doar în timpul buclei interne) | `0` la finalul aceluiași `set` |
 
-| **`paced`** | La **`set = 1`**: copiază cel mult **`chunk`** cuvinte, avansează pointeri interni; dacă mai rămân → **`busy = 1`**, așteaptă **următorul** `set` (sau tick de la **`clock = .osc`**) | `1` până la `count` epuizat, apoi **`done`** |
+| **`paced`** | La **`set = 1`**: copiază **`min(chunk, remaining)`** cuvinte, avansează pointeri interni; dacă mai rămân → **`busy = 1`**, așteaptă **următorul** `set` activ | `1` până la `count` epuizat; **`done = 1`** (latched) la ultimul chunk |
 
 Atribute / pini:
 
@@ -1107,11 +1107,11 @@ Atribute / pini:
 
 | `mode:` | `instant` \| `paced` — **omit = `instant`** (nu e nevoie să scrii `mode: instant`) |
 
-| `chunk:` | Cuvinte per pas în `paced` (default `1`; ignorat în `instant`) |
+| `chunk:` | Cuvinte **maxim** per pas în `paced` (default `1`; ignorat în `instant`) |
 
-| `clock:` | Opțional, ca la CPU — `clock = .osc` → fiecare flankă continuă transferul dacă `busy` |
+| `remaining` (pout) | În `paced`: câte cuvinte **mai rămân de copiat** după pasul curent; lățime = pinul **`count`** |
 
-| `remaining` (pout) | Opțional, în `paced`: câte cuvinte au rămas |
+**Ceas / osc (decizie 5d):** **nu** implementăm **`clock = .osc`** pe corpul DMA — e echivalent cu **`.dma:{ set = .osc:get }`** (sau `set = .clk` unde e valid). Pentru un pas la front: **`on: raise`** pe `comp [dma]` + property block cu `set` legat de osc. **`on:`** pe DMA controlează doar **property block-urile** din script, nu un canal „hardware” separat.
 
 #### Exemple complete per mod (plan — `logts-play` la implementare în `doc/dma.md`)
 
@@ -1165,7 +1165,7 @@ set=1  →  [copiază 4 cuvinte intern]  →  done=1, busy=0
 
 ##### `mode: paced` + `chunk` — câte `chunk` cuvinte per pas
 
-Aceeași sursă/destinație, **`count = 4`**, **`chunk = 1`**: fiecare **`set`** (sau tick de la **`clock`**) mută **un** cuvânt. **`busy`** rămâne `1` până la al 4-lea pas.
+Aceeași sursă/destinație, **`count = 4`**, **`chunk = 1`**: fiecare **`set`** activ mută **un** cuvânt. **`busy`** rămâne `1` până la al 4-lea pas.
 
 **Varianta A — pași manuali** (fără osc, pentru teste):
 
@@ -1224,7 +1224,7 @@ set #3                     →  1 cuvânt, busy=1, remaining=1
 set #4                     →  1 cuvânt, busy=0, done=1
 ```
 
-**Varianta B — cu osc** (demo vizual în UI):
+**Varianta B — cu osc** (demo vizual în UI; **fără** `clock =` pe corp):
 
 ```logts
 comp [~] .clk:
@@ -1252,12 +1252,14 @@ comp [dma] .dma:
   # slot 1 = .rom,  slot 2 = .ram
   mode: paced
   chunk: 2
-  clock = .clk
-  on: 1
+  on: raise
   :
 
 .dma:{ src = 1, dst = \2, srcAdr = 0, dstAdr = 10000, count = 1000, set = 1 }
-# .rom → .ram, 8 cuvinte (1000 binar), dstAdr 16 (10000 binar)
+# start job: .rom → .ram, 8 cuvinte (1000 binar), dstAdr 16 (10000 binar)
+
+.dma:{ set = .clk:get }
+# la fiecare rising pe .clk:get (on: raise), avansează până la 2 cuvinte per pas
 
 1wire b = .dma:busy
 1wire d = .dma:done
@@ -1265,7 +1267,7 @@ show(b)
 show(d)
 ```
 
-Cu **`chunk: 2`** și **`count: 8`**: **4** perioade de ceas până la **`done`** (2+2+2+2 cuvinte).
+Cu **`chunk: 2`** și **`count: 8`**: **4** fronturi osc până la **`done`** (2+2+2+2 cuvinte). Același efect ca un hipotetic `clock = .clk`, dar explicit în script.
 
 | Parametru | `instant` | `paced` |
 
@@ -1273,9 +1275,11 @@ Cu **`chunk: 2`** și **`count: 8`**: **4** perioade de ceas până la **`done`*
 
 | `set`-uri pentru `count=4` | **1** (cu parametri) | **4** dacă `chunk=1`, sau **2** dacă `chunk=2` |
 
+| `set`-uri pentru `count=5`, `chunk=2` | **1** | **3** (pași 2+2+**1** — ultimul pas copiază doar ce rămâne) |
+
 | `busy` după primul `set` | `0` | `1` până la final |
 
-| Legare `clock` | inutilă | recomandată pentru demo live |
+| Ceas extern | inutil | **`.dma:{ set = .osc:get }`** + `on: raise` (nu `clock =` pe corp) |
 
 ```mermaid
 stateDiagram-v2
@@ -1291,6 +1295,10 @@ stateDiagram-v2
 **Reguli `paced`:**
 
 - **`chunk: 0`** invalid; **`chunk >= count`** în `paced` ≈ un singur pas (echivalent practic cu instant).
+- **Chunk parțial:** fiecare pas copiază **`min(chunk, remaining)`** — ex. `count=5`, `chunk=2` → pași **2 + 2 + 1** (ultimul pas **nu** copiază 2 dacă a rămas 1).
+- **`done` (latched, ca la `instant`):** `done ← 0` la începutul fiecărui **`set`** cu submit; în `paced`, `done` rămâne **0** pe pașii intermediari; **`done ← 1`** după **ultimul** chunk; rămâne **1** până la următorul submit cu job nou sau **`reset`** (nu e puls de un singur ciclu).
+- **`memmove` + overlap** (același slot, `dstAdr > srcAdr`): chunk-uri **de la coadă** spre început; dacă `dstAdr <= srcAdr` sau sloturi diferite → chunk-uri **înainte** (ca `instant`, dar câte `chunk` cuvinte per pas).
+- **`remaining`:** pout cu **aceeași lățime** ca pinul **`count`**; valoare = cuvinte rămase **după** pasul curent (0 când jobul s-a terminat în acel pas).
 
 #### Concurență și coadă FIFO (decizie)
 
@@ -1553,6 +1561,14 @@ comp [cpu] .u:
 - Teste **~2625+**: `set` stall; `run` oprire la hold + reluare cu al doilea `run`; `maxSteps` numără doar pași executați
 - Actualizare **`doc/cpu.md`** + exemplu `logts-play` CPU+DMA+`wait`
 
+#### Livrabile 5d
+
+- `dma-devices.js` + `dma.js`: **`mode: paced`**, **`chunk`**, progres intern per job, pout **`remaining`**
+- Chunk parțial: **`min(chunk, remaining)`**; **`done`** latched (ca `instant`); memmove overlap: chunk-uri forward/backward
+- **Fără** `clock =` pe corp — documentat pattern **`.dma:{ set = .osc:get }`** + `on: raise`
+- Teste **~2632+**: pași manuali `set`; paced + `count` neîmpărțit la `chunk`; memmove overlap; osc opțional
+- Actualizare **`doc/dma.md`** + exemple `logts-play` paced / osc
+
 ### Wave: un singur block DMA, fără mapă unificată (5a–5d)
 
 **Problema:** în wave nu vrei multe property block-uri `.dma:{…}` diferite, ci **un șablon** pe care CPU (sau fire) îl alimentează la fiecare transfer.
@@ -1676,7 +1692,7 @@ comp [dma] .dma:
 
 | **5c** | CPU + DMA partajat; **`wait =`** stall (`OR(.dma:busy, …)`); opțional `ports: 2` | 5 |
 
-| **5d** | **`mode: paced`**, `chunk`, `clock = .osc`, `remaining` pout | 5 |
+| **5d** | **`mode: paced`**, `chunk`, pout **`remaining`**; continuare **`set`** / **`.dma:{ set = .osc:get }`**; memmove paced; **fără** `clock =` pe corp | 5 |
 
 | **5e** | **Fill:** `src = 0` + `value` + `dst` (slot ≥ 1) / `dstAdr` / `count` | 5 |
 
@@ -1687,6 +1703,7 @@ comp [dma] .dma:
 - Scatter-gather, descriptor chains
 - **Spațiu de adrese unificat / `comp [mmap]` **— faza **6** (vezi secțiunea dedicată)
 - **`accessLatency` pe `comp [mem]`** (disc lent) — strat separat, după 5d dacă e nevoie
+- **`clock = .osc`** pe **`comp [dma]`** — folosește **`.dma:{ set = .osc:get }`** (echivalent semantic)
 - IRQ mid-instruction
 - Logică DMA în `cpu-devices.js`
 
