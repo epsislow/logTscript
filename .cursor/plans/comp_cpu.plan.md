@@ -1621,9 +1621,11 @@ comp [dma] .dma:
 
 ---
 
-## Faza 6 (viitor): spațiu de adrese unificat (`comp [mmap]`)
+## Faza 6: spațiu de adrese unificat (`comp [mmap]`) — **implementat**
 
-**Nume confirmat:** `comp [mmap]`. Plan detaliat: [comp_mmap.plan.md](comp_mmap.plan.md).
+**Nume confirmat:** `comp [mmap]`. Plan detaliat: [comp_mmap.plan.md](comp_mmap.plan.md). Documentație: [mmap.md](../v0_3_2/doc/mmap.md).
+
+**Sub-faze livrate:** 6a (nucleu) … 6e (doc). **`regs:`** amânat în **6f**.
 
 **Problema:** adresa logică **0…N** trebuie decodată: `[0..Y] → .m1`, `[Y+1..Z] → .m2`, regiuni I/O pe fire, etc. Atât **CPU** (LOAD/STORE) cât și **DMA** (copy **și fill**) folosesc **aceeași** mapare.
 

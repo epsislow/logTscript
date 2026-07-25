@@ -13895,6 +13895,18 @@ if (s.assignment) {
         this.applyComponentProperties(component, when, reEvaluate);
       }
     }
+
+    const compAfterBlock = this.components.get(component);
+    if (compAfterBlock && this.componentRegistry) {
+      const blockHandler = this.componentRegistry.get(compAfterBlock.type);
+      if (blockHandler && typeof blockHandler.shouldApplyAfterPropertyBlock === 'function') {
+        const propNames = properties.map(p => p.property);
+        if (blockHandler.shouldApplyAfterPropertyBlock(propNames)) {
+          this.componentPendingSet.set(component, 'immediate');
+          this.applyComponentProperties(component, 'immediate', reEvaluate);
+        }
+      }
+    }
     
     // Process bus redirects: get>, front>, top>, out>, etc.
     for (const prop of properties) {

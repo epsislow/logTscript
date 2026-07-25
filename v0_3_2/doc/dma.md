@@ -841,11 +841,9 @@ doc(.dma)
 
 See [doc-function.md](doc-function.md) for the full `doc()` index.
 
-## Not yet implemented
+## DMA with unified map (phase 6)
 
-| Feature | Plan |
-|---------|------|
-| **`mmap =`** unified address space | Phase 6 |
+See [mmap.md](mmap.md) for **`mmap = .mmap`**, logical `srcAdr`/`dstAdr`, copy/fill across regions, and mutual exclusion with **`mems:`**.
 
 ---
 

@@ -13,6 +13,9 @@ function cpuZero(depth) {
 
 function cpuReadRamCell(c, adr) {
   if (adr < 0 || adr >= c.ramLength) return null;
+  if (c.mmapId && typeof mmapRead === 'function') {
+    return mmapRead(c.mmapId, adr, c._stepCtx || null);
+  }
   if (c.ramMemId && typeof getMem === 'function') {
     return getMem(c.ramMemId, adr);
   }
@@ -22,6 +25,11 @@ function cpuReadRamCell(c, adr) {
 function cpuWriteRamCell(c, adr, val) {
   if (adr < 0 || adr >= c.ramLength) {
     throw Error(`STORE invalid address ${adr}`);
+  }
+  if (c.mmapId && typeof mmapWrite === 'function') {
+    const ctx = c._stepCtx || null;
+    mmapWrite(c.mmapId, adr, val, ctx, ctx && ctx.componentRegistry);
+    return;
   }
   if (c.ramMemId) {
     if (typeof setMem === 'function') setMem(c.ramMemId, adr, val);
@@ -91,6 +99,8 @@ function addCpu(id, config) {
     ram,
     prog,
     ramMemId: config.ramMemId || null,
+    mmapId: config.mmapId || null,
+    mmapRef: config.mmapRef || null,
     progMemId: config.progMemId || null,
     progReadonly: config.progReadonly !== false,
     pc: 0,
@@ -308,6 +318,7 @@ function cpuTraceStep(c, ctx, instr) {
 function cpuStep(id, ctx) {
   const c = getCpu(id);
   if (!c) return;
+  c._stepCtx = ctx || null;
   if (c.halted) return;
   const instr = cpuFetchInstr(c);
   c.lastInstr = instr;

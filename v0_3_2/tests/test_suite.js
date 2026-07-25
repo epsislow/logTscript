@@ -26072,6 +26072,547 @@ reg(2644, 'doc-comp', 'doc(comp.dma) contains value pin for fill', function(h, s
   h.assert('value pin', String(out.some(l => l.includes('value'))), 'true');
 });
 
+const MMAP_ROM_RAM_SETUP = `comp [mem] .rom:
+  depth: 8
+  length: 16
+  readonly
+  on: 1
+  = ^01020304
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, mem: .rom
+    - base: 16, size: 16, mem: .ram
+  on: 1
+  :
+`;
+
+function mmapGetProp(session, interp, compName, prop) {
+  const comp = interp.components.get(compName);
+  const handler = session._ensureRegistry().get('mmap');
+  const r = handler.evalGetProperty(comp, prop, { var: compName, property: prop }, interp);
+  return r ? r.value : null;
+}
+
+reg(2645, 'comp-mmap', 'mmap parses regions mem blocks', function(h, session) {
+  const { interp } = session.run(MMAP_ROM_RAM_SETUP);
+  const comp = interp.components.get('.mmap');
+  h.assert('type', comp.type, 'mmap');
+  h.assert('region count', String((comp.mmapRegions || []).length), '2');
+  h.assert('depth', String(comp.mmapDepth), '8');
+});
+
+reg(2646, 'comp-mmap', 'mmapRead logical rom offset 0', function(h, session) {
+  const { interp } = session.run(MMAP_ROM_RAM_SETUP);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  h.assert('word0', mmapRead(id, 0, interp), '00000001');
+  h.assert('word1', mmapRead(id, 1, interp), '00000010');
+});
+
+reg(2647, 'comp-mmap', 'mmapRead logical ram offset 0 at base 16', function(h, session) {
+  const { interp } = session.run(MMAP_ROM_RAM_SETUP);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  h.assert('ram0', mmapRead(id, 16, interp), '00000000');
+});
+
+reg(2648, 'comp-mmap', 'mmapWrite to ram region', function(h, session) {
+  const { interp } = session.run(MMAP_ROM_RAM_SETUP);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  mmapWrite(id, 17, '10101010', interp, session._ensureRegistry());
+  h.assert('via mmap', mmapRead(id, 17, interp), '10101010');
+  h.assert('via mem', getMem(ramId, 1), '10101010');
+});
+
+reg(2649, 'comp-mmap', 'mmapWrite readonly rom throws', function(h, session) {
+  const { interp } = session.run(MMAP_ROM_RAM_SETUP);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  h.assertThrows('readonly', function() {
+    mmapWrite(id, 0, '11111111', interp, session._ensureRegistry());
+  }, 'readonly');
+});
+
+reg(2650, 'comp-mmap', 'mmap unmapped address error default', function(h, session) {
+  const { interp } = session.run(MMAP_ROM_RAM_SETUP);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  h.assertThrows('unmapped', function() {
+    mmapRead(id, 100, interp);
+  }, 'unmapped');
+});
+
+reg(2651, 'comp-mmap', 'mmap rejects overlapping regions', function(h, session) {
+  h.assertThrows('overlap', function() {
+    session.run(`comp [mem] .a:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 8, mem: .a
+    - base: 4, size: 8, mem: .a
+  on: 1
+  :
+`);
+  }, 'overlap');
+});
+
+reg(2652, 'comp-mmap', 'mmap rejects mem depth mismatch', function(h, session) {
+  h.assertThrows('depth', function() {
+    session.run(`comp [mem] .a:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [mem] .b:
+  depth: 4
+  length: 8
+  on: 1
+  = ^0
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 8, mem: .a
+    - base: 8, size: 8, mem: .b
+  on: 1
+  :
+`);
+  }, 'depth');
+});
+
+reg(2653, 'comp-mmap', 'mmap mmio wire read write', function(h, session) {
+  const src = `8wire busReg = ^aa
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 4, mmio:
+        0: busReg
+  on: 1
+  :
+`;
+  const { interp } = session.run(src);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  h.assert('read wire', mmapRead(id, 0, interp), '10101010');
+  mmapWrite(id, 0, '01010101', interp, session._ensureRegistry());
+  h.assert('after write', mmapRead(id, 0, interp), '01010101');
+});
+
+reg(2654, 'comp-mmap', 'mmap mmio gap read zero write ignored', function(h, session) {
+  const src = `8wire busReg = ^ff
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 4, mmio:
+        0: busReg
+  on: 1
+  :
+`;
+  const { interp } = session.run(src);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  h.assert('gap read', mmapRead(id, 2, interp), '00000000');
+  mmapWrite(id, 2, '11110000', interp, session._ensureRegistry());
+  h.assert('wire unchanged', mmapRead(id, 0, interp), '11111111');
+});
+
+reg(2655, 'comp-mmap', 'mmap rejects narrow wire in mmio', function(h, session) {
+  h.assertThrows('width', function() {
+    session.run(`3wire narrow = 101
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 2, mmio:
+        0: narrow
+  on: 1
+  :
+`);
+  }, 'depth');
+});
+
+reg(2656, 'comp-mmap', 'mmap pin get reads mem via adr', function(h, session) {
+  const { interp } = session.run(MMAP_ROM_RAM_SETUP + `
+5wire adrBus = 00000
+1wire getEn = 1
+.mmap:{ adr = adrBus, get = getEn }
+`);
+  h.assert('read pout', mmapGetProp(session, interp, '.mmap', 'read'), '00000001');
+});
+
+reg(2657, 'comp-mmap', 'mmap pin write updates ram', function(h, session) {
+  const { interp } = session.run(MMAP_ROM_RAM_SETUP + `
+5wire adrBus = 10000
+8wire dataBus = 01010101
+1wire wrEn = 1
+.mmap:{ adr = adrBus, data = dataBus, write = wrEn }
+`);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  h.assert('ram word', getMem(ramId, 0), '01010101');
+});
+
+reg(2658, 'comp-mmap', 'doc(comp.mmap) lists regions attr', function(h, session) {
+  const out = session.runDoc('doc(comp.mmap)');
+  h.assert('regions attr', String(out.some(l => l.includes('regions'))), 'true');
+  h.assert('depth attr', String(out.some(l => l.includes('depth'))), 'true');
+});
+
+reg(2659, 'comp-mmap', 'doc(.mmap) instance regions', function(h, session) {
+  const { out } = session.run(MMAP_ROM_RAM_SETUP + 'doc(.mmap)');
+  h.assert('has rom', String(out.some(l => l.includes('.rom'))), 'true');
+  h.assert('has ram', String(out.some(l => l.includes('.ram'))), 'true');
+});
+
+reg(2660, 'comp-mmap', 'mmap unmapped read0 policy', function(h, session) {
+  const src = MMAP_ROM_RAM_SETUP.replace('comp [mmap]', 'comp [mmap]') + '';
+  const patched = `comp [mem] .rom:
+  depth: 8
+  length: 16
+  readonly
+  on: 1
+  = ^01
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  unmapped: read0
+  regions:
+    - base: 0, size: 4, mem: .rom
+  on: 1
+  :
+`;
+  const { interp } = session.run(patched);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  h.assert('read0', mmapRead(id, 99, interp), '00000000');
+});
+
+reg(2661, 'comp-mmap', 'mmap unmapped ignore write', function(h, session) {
+  const src = `comp [mem] .rom:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  unmapped: ignore
+  regions:
+    - base: 0, size: 4, mem: .rom
+  on: 1
+  :
+`;
+  const { interp } = session.run(src);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  mmapWrite(id, 99, '11111111', interp, session._ensureRegistry());
+  h.assert('no throw', 'ok', 'ok');
+});
+
+reg(2662, 'comp-mmap', 'mmap region size exceeds mem length', function(h, session) {
+  h.assertThrows('exceeds', function() {
+    session.run(`comp [mem] .tiny:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 8, mem: .tiny
+  on: 1
+  :
+`);
+  }, 'exceeds');
+});
+
+reg(2663, 'comp-mmap', 'mmap requires regions', function(h, session) {
+  h.assertThrows('regions', function() {
+    session.run(`comp [mmap] .mmap:
+  depth: 8
+  on: 1
+  :
+`);
+  }, 'regions');
+});
+
+reg(2664, 'comp-mmap', 'mmap hex base address', function(h, session) {
+  const src = `comp [mem] .rom:
+  depth: 8
+  length: 4
+  readonly
+  on: 1
+  = ^aa
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 16, size: 4, mem: .rom
+  on: 1
+  :
+`;
+  const { interp } = session.run(src);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  h.assert('hex base', mmapRead(id, 16, interp), '10101010');
+});
+
+reg(2665, 'comp-mmap', 'mmapResolve hits mem region', function(h, session) {
+  const { interp } = session.run(MMAP_ROM_RAM_SETUP);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  const r = mmapResolve(id, 5);
+  h.assert('kind', r.kind, 'mem');
+  h.assert('local', String(r.local), '5');
+});
+
+reg(2666, 'comp-mmap', 'mmapResolve unmapped flag', function(h, session) {
+  const { interp } = session.run(MMAP_ROM_RAM_SETUP);
+  const id = interp.components.get('.mmap').deviceIds[0];
+  const r = mmapResolve(id, 200);
+  h.assert('unmapped', String(r.unmapped), 'true');
+});
+
+const MMAP_DMA_SETUP = MMAP_ROM_RAM_SETUP + `
+comp [dma] .dma:
+  mmap = .mmap
+  on: 1
+  :
+`;
+
+reg(2667, 'comp-dma-mmap', 'dma mmap copy logical rom to ram', function(h, session) {
+  const { interp } = session.run(MMAP_DMA_SETUP + `
+.dma:{ src = 1, srcAdr = 0, dstAdr = 10000, count = 100, set = 1 }
+`);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  h.assert('word0', getMem(ramId, 0), '00000001');
+  h.assert('word1', getMem(ramId, 1), '00000010');
+  h.assert('done', dmaGetProp(session, interp, '.dma', 'done'), '1');
+});
+
+reg(2668, 'comp-dma-mmap', 'dma mmap fill logical ram', function(h, session) {
+  const { interp } = session.run(MMAP_DMA_SETUP + `
+.dma:{ src = 0, dstAdr = 10000, count = 100, value = ^aa, set = 1 }
+`);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  h.assert('w0', getMem(ramId, 0), '10101010');
+  h.assert('w1', getMem(ramId, 1), '10101010');
+});
+
+reg(2669, 'comp-dma-mmap', 'dma rejects mems and mmap together', function(h, session) {
+  h.assertThrows('mutual', function() {
+    session.run(MMAP_ROM_RAM_SETUP + `
+comp [dma] .dma:
+  mems: .rom .ram
+  mmap = .mmap
+  on: 1
+  :
+`);
+  }, 'together');
+});
+
+reg(2670, 'comp-dma-mmap', 'dma mmap requires mmap or mems', function(h, session) {
+  h.assertThrows('requires', function() {
+    session.run(`comp [dma] .dma:
+  on: 1
+  :
+`);
+  }, 'requires');
+});
+
+reg(2671, 'comp-dma-mmap', 'dma mmap copy cross region single job', function(h, session) {
+  const { interp } = session.run(MMAP_DMA_SETUP + `
+.dma:{ src = 1, srcAdr = 10, dstAdr = 10000, count = 1, set = 1 }
+`);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  h.assert('ram0 from rom2', getMem(ramId, 0), '00000011');
+});
+
+reg(2672, 'comp-dma-mmap', 'doc(.dma) shows mmap binding', function(h, session) {
+  const { out } = session.run(MMAP_DMA_SETUP + 'doc(.dma)');
+  h.assert('mmap line', String(out.some(l => l.includes('.mmap'))), 'true');
+});
+
+const MMAP_CPU_RAM_SETUP = `comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^44
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, mem: .ram
+  on: 1
+  :
+`;
+
+reg(2673, 'comp-cpu-mmap', 'cpu mmap LOAD from logical address', function(h, session) {
+  const src = CPU_ISA_MIN + MMAP_CPU_RAM_SETUP + `
+comp [cpu] .u:
+  isa: .cpuisa
+  mmap = .mmap
+  registers: 4
+  on: 1
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      LOAD R0 A0
+      HALT
+    }
+  :
+
+.u:{ set = 1 }
+`;
+  const { interp } = session.run(src);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 from mmap ram0', r0.value, '01000100');
+});
+
+reg(2674, 'comp-cpu-mmap', 'cpu mmap STORE to logical address', function(h, session) {
+  const src = CPU_ISA_FULL + MMAP_CPU_RAM_SETUP + `
+comp [cpu] .u:
+  isa: .cpuisa
+  mmap = .mmap
+  registers: 4
+  on: 1
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+      STORE R0 A1
+      HALT
+    }
+  :
+
+.u:{ set = 1 }
+.u:{ set = 1 }
+.u:{ set = 1 }
+`;
+  const { interp } = session.run(src);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  h.assert('ram1', getMem(ramId, 1), '01000100');
+});
+
+reg(2675, 'comp-cpu-mmap', 'cpu rejects ram and mmap together', function(h, session) {
+  h.assertThrows('together', function() {
+    session.run(CPU_ISA_MIN + MMAP_CPU_RAM_SETUP + `
+comp [cpu] .u:
+  isa: .cpuisa
+  ram = .ram
+  mmap = .mmap
+  on: 1
+  :
+`);
+  }, 'together');
+});
+
+reg(2676, 'comp-cpu-mmap', 'cpu mmap LOAD from rom region', function(h, session) {
+  const src = CPU_ISA_MIN + MMAP_ROM_RAM_SETUP + `
+comp [cpu] .u:
+  isa: .cpuisa
+  mmap = .mmap
+  registers: 4
+  on: 1
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      LOAD R0 A0
+      HALT
+    }
+  :
+
+.u:{ set = 1 }
+`;
+  const { interp } = session.run(src);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 from rom logical0', r0.value, '00000001');
+});
+
+reg(2677, 'comp-mmap-device', 'mmap device profile read dma busy', function(h, session) {
+  const src = MMAP_ROM_RAM_SETUP + `
+comp [dma] .dma:
+  mems: .rom .ram
+  on: 1
+  :
+
+comp [mmap] .mmio:
+  depth: 8
+  regions:
+    - base: 32, size: 8, device: .dma
+  on: 1
+  :
+`;
+  const { interp } = session.run(src);
+  const id = interp.components.get('.mmio').deviceIds[0];
+  h.assert('busy idle', mmapRead(id, 32, interp), '00000000');
+});
+
+reg(2678, 'comp-mmap-device', 'mmap device profile write dma latch count', function(h, session) {
+  const src = MMAP_ROM_RAM_SETUP + `
+comp [dma] .dma:
+  mems: .rom .ram
+  on: 1
+  :
+
+comp [mmap] .mmio:
+  depth: 8
+  regions:
+    - base: 32, size: 8, device: .dma
+  on: 1
+  :
+`;
+  const { interp } = session.run(src);
+  const mmioId = interp.components.get('.mmio').deviceIds[0];
+  const dmaId = interp.components.get('.dma').deviceIds[0];
+  mmapWrite(mmioId, 33, '00000100', interp, session._ensureRegistry());
+  const d = getDma(dmaId);
+  h.assert('count latched', d.latch.count, '00000100');
+});
+
+reg(2679, 'comp-mmap-device', 'mmap rejects device without profile', function(h, session) {
+  h.assertThrows('profile', function() {
+    session.run(`comp [mem] .m:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 4, device: .m
+  on: 1
+  :
+`);
+  }, 'getMmapProfile');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

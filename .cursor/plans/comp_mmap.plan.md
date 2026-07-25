@@ -7,18 +7,21 @@ todos:
     status: completed
   - id: 6a-mmap-core
     content: "6a: comp [mmap], regions mem+mmio, mmap-devices.js, teste decode/overlap/unmapped"
-    status: pending
+    status: completed
   - id: 6b-dma-mmap
     content: "6b: dma mmap = .mmap, mutual exclusive cu mems:, copy + fill pe adrese logice prin mmapRead/Write"
-    status: pending
+    status: completed
   - id: 6c-cpu-mmap
     content: "6c: cpu mmap = .mmap, LOAD/STORE pe adrese logice, Harvard prog separat"
-    status: pending
+    status: completed
   - id: 6d-device-profiles
     content: "6d: getMmapProfile pentru dma + lcd/clcd, regiune device:"
-    status: pending
+    status: completed
   - id: 6e-doc-demo
     content: "6e: doc/mmap.md, logts-play demo CPU+DMA+VRAM+mmio, actualizare comp_cpu.plan.md"
+    status: completed
+  - id: 6f-regs-region
+    content: "6f: regiune regs: (comp [reg]) — amânat după 6e"
     status: pending
 isProject: false
 ---
@@ -415,6 +418,12 @@ La fiecare `LOAD`, `mmapRead` citește wire-ul **la momentul accesului**; dacă 
 
 - [doc/mmap.md](../v0_3_2/doc/mmap.md), logts-play CPU+DMA+VRAM
 
+### 6f — Regiune `regs:` (amânat după 6e)
+
+- Fereastră în `comp [reg]` multi-word sau banc de registre (similar `mem:`, dar semantic I/O)
+- `mmapRead`/`mmapWrite` pe offset local în regiunea `regs:`
+- **Nu** intră în MVP 6a–6e; implementare separată după documentația și testele fazei 6e
+
 ---
 
 ## Decizii închise (gata de implementare)
@@ -429,7 +438,7 @@ La fiecare `LOAD`, `mmapRead` citește wire-ul **la momentul accesului**; dacă 
 | CPU `ram` vs `mmap` | **mutual exclusive** |
 | Gap-uri în regiune `mmio` | **confirmat:** read `0` (depth biți), write ignorat |
 | Adresare | cuvânt (word), nu byte |
-| MVP regiuni | `mem` + `mmio` (6a); `regs` + `device:` mai târziu |
+| MVP regiuni | `mem` + `mmio` (6a); `device:` în 6d; **`regs:` în 6f** |
 
 ## Opțional / amânat (nu blochează 6a)
 

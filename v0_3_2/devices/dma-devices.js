@@ -38,6 +38,7 @@ function dmaRangesOverlap(srcAdr, dstAdr, count) {
 }
 
 function dmaFillBlock(job) {
+  if (job.mmapId) return dmaMmapFillBlock(job);
   const { dstMemId, dstAdr, count, value } = job;
   if (count <= 0) return;
   for (let i = 0; i < count; i++) {
@@ -45,7 +46,16 @@ function dmaFillBlock(job) {
   }
 }
 
+function dmaMmapFillBlock(job) {
+  const { mmapId, dstAdr, count, value, ctx, registry } = job;
+  if (count <= 0 || !mmapId || typeof mmapWrite !== 'function') return;
+  for (let i = 0; i < count; i++) {
+    mmapWrite(mmapId, dstAdr + i, value, ctx, registry);
+  }
+}
+
 function dmaFillChunk(active, chunkSize) {
+  if (active.mmapId) return dmaMmapFillChunk(active, chunkSize);
   const remaining = active.total - active.offset;
   const n = Math.min(chunkSize, remaining);
   if (n <= 0) return 0;
@@ -56,7 +66,19 @@ function dmaFillChunk(active, chunkSize) {
   return n;
 }
 
+function dmaMmapFillChunk(active, chunkSize) {
+  const remaining = active.total - active.offset;
+  const n = Math.min(chunkSize, remaining);
+  if (n <= 0) return 0;
+  const { mmapId, dstAdr, value, ctx, registry } = active;
+  for (let i = 0; i < n; i++) {
+    mmapWrite(mmapId, dstAdr + active.offset + i, value, ctx, registry);
+  }
+  return n;
+}
+
 function dmaCopyBlock(job) {
+  if (job.mmapId) return dmaMmapCopyBlock(job);
   const { srcMemId, dstMemId, srcAdr, dstAdr, count } = job;
   if (count <= 0) return;
   if (srcMemId === dstMemId && dmaRangesOverlap(srcAdr, dstAdr, count)) {
@@ -74,7 +96,28 @@ function dmaCopyBlock(job) {
   }
 }
 
+function dmaMmapCopyBlock(job) {
+  const { mmapId, srcAdr, dstAdr, count, ctx, registry } = job;
+  if (count <= 0 || !mmapId || typeof mmapRead !== 'function' || typeof mmapWrite !== 'function') return;
+  if (dmaRangesOverlap(srcAdr, dstAdr, count)) {
+    const temp = [];
+    for (let i = 0; i < count; i++) {
+      temp.push(mmapRead(mmapId, srcAdr + i, ctx));
+    }
+    for (let i = 0; i < count; i++) {
+      mmapWrite(mmapId, dstAdr + i, temp[i], ctx, registry);
+    }
+    return;
+  }
+  for (let i = 0; i < count; i++) {
+    mmapWrite(mmapId, dstAdr + i, mmapRead(mmapId, srcAdr + i, ctx), ctx, registry);
+  }
+}
+
 function dmaJobNeedsBackward(job) {
+  if (job.mmapId) {
+    return dmaRangesOverlap(job.srcAdr, job.dstAdr, job.count) && job.dstAdr > job.srcAdr;
+  }
   return job.srcMemId === job.dstMemId
     && dmaRangesOverlap(job.srcAdr, job.dstAdr, job.count)
     && job.dstAdr > job.srcAdr;
@@ -85,6 +128,23 @@ function dmaCopyChunk(active, chunkSize) {
   const remaining = active.total - active.offset;
   const n = Math.min(chunkSize, remaining);
   if (n <= 0) return 0;
+
+  if (active.mmapId) {
+    const { mmapId, srcAdr, dstAdr, ctx, registry } = active;
+    if (active.backward) {
+      const startIdx = active.total - active.offset - n;
+      for (let i = 0; i < n; i++) {
+        const idx = startIdx + i;
+        mmapWrite(mmapId, dstAdr + idx, mmapRead(mmapId, srcAdr + idx, ctx), ctx, registry);
+      }
+    } else {
+      for (let i = 0; i < n; i++) {
+        mmapWrite(mmapId, dstAdr + active.offset + i,
+          mmapRead(mmapId, srcAdr + active.offset + i, ctx), ctx, registry);
+      }
+    }
+    return n;
+  }
 
   const { srcMemId, dstMemId, srcAdr, dstAdr } = active;
 
@@ -106,15 +166,19 @@ function dmaStartActiveJob(d, job) {
   if (job.fill) {
     d.active = {
       fill: true,
+      mmapId: job.mmapId || null,
       dstMemId: job.dstMemId,
       dstAdr: job.dstAdr,
       total: job.count,
       offset: 0,
       value: job.value,
+      ctx: job.ctx || null,
+      registry: job.registry || null,
     };
     return;
   }
   d.active = {
+    mmapId: job.mmapId || null,
     srcMemId: job.srcMemId,
     dstMemId: job.dstMemId,
     srcAdr: job.srcAdr,
@@ -122,6 +186,8 @@ function dmaStartActiveJob(d, job) {
     total: job.count,
     offset: 0,
     backward: dmaJobNeedsBackward(job),
+    ctx: job.ctx || null,
+    registry: job.registry || null,
   };
 }
 
@@ -145,10 +211,11 @@ function dmaGetRemaining(d) {
 
 function addDma(id, config) {
   if (!id) return;
-  const memSlots = config.memSlots || [];
   const queueCapacity = config.queueCapacity != null ? config.queueCapacity : 1;
   dmDma().dmas.set(id, {
-    memSlots,
+    memSlots: config.memSlots || [],
+    mmapId: config.mmapId || null,
+    mmapRef: config.mmapRef || null,
     queueCapacity,
     depth: config.depth || 8,
     maxAddrBits: config.maxAddrBits || 4,
@@ -230,7 +297,32 @@ function dmaResolveSlot(d, slot, isSrc) {
   return d.memSlots[slot - 1];
 }
 
-function dmaBuildJob(d, latch) {
+function dmaBuildMmapJob(d, latch, ctx, registry) {
+  if (latch.count === undefined || latch.src === undefined) return null;
+  const srcMode = parseInt(latch.src, 2);
+  const dstAdr = latch.dstAdr !== undefined ? parseInt(latch.dstAdr, 2) : 0;
+  const count = parseInt(latch.count, 2);
+  if (isNaN(srcMode) || isNaN(dstAdr) || isNaN(count)) {
+    throw Error('DMA job parameters must resolve to numeric values');
+  }
+  if (count <= 0) throw Error('DMA count must be positive');
+  const jobBase = { mmapId: d.mmapId, count, ctx, registry };
+
+  if (srcMode === 0) {
+    if (latch.value === undefined) throw Error('DMA fill (src=0) requires value');
+    return Object.assign({ fill: true, dstAdr, value: latch.value }, jobBase);
+  }
+
+  if (latch.value !== undefined) {
+    throw Error('DMA copy cannot use value (use src=0 for fill)');
+  }
+  const srcAdr = latch.srcAdr !== undefined ? parseInt(latch.srcAdr, 2) : 0;
+  if (isNaN(srcAdr)) throw Error('DMA job parameters must resolve to numeric values');
+  return Object.assign({ fill: false, srcAdr, dstAdr }, jobBase);
+}
+
+function dmaBuildJob(d, latch, ctx, registry) {
+  if (d.mmapId) return dmaBuildMmapJob(d, latch, ctx, registry);
   if (latch.dst === undefined || latch.count === undefined || latch.src === undefined) {
     return null;
   }
@@ -363,7 +455,7 @@ function dmaApplyPins(id, pending, reEvaluate, component, ctx) {
     return;
   }
 
-  const job = dmaBuildJob(d, d.latch);
+  const job = dmaBuildJob(d, d.latch, ctx, ctx && ctx.componentRegistry);
   if (!job) return;
 
   d.done = false;

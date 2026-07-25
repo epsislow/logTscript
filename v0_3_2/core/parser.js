@@ -3320,6 +3320,7 @@ assignment() {
         let refListAttrs = [];
         let wireRefAttrs = [];
         let literalAttrs = [];
+        let regionsBlockAttrs = [];
         if (this.componentRegistry) {
           const bindHandler = this.componentRegistry.get(compType);
           if (bindHandler && bindHandler.getSpecialParseAttributes) {
@@ -3329,6 +3330,7 @@ assignment() {
             if (special && special.refListAttrs) refListAttrs = special.refListAttrs;
             if (special && special.wireRefAttrs) wireRefAttrs = special.wireRefAttrs;
             if (special && special.literalAttrs) literalAttrs = special.literalAttrs;
+            if (special && special.regionsBlockAttrs) regionsBlockAttrs = special.regionsBlockAttrs;
           }
         }
         if (literalAttrs.includes(attrName) && this.c.value === ':') {
@@ -3474,6 +3476,13 @@ assignment() {
             attributes[attrName] = {};
             continue;
           }
+        }
+
+        if (regionsBlockAttrs.includes(attrName) && this.c.value === ':') {
+          this.eat('SYM', ':');
+          this.t.skip();
+          attributes[attrName] = this._parseMmapRegionsBlock();
+          continue;
         }
 
         if (this.c.value === ':' && !attributesWithNoValues.includes(attrName)) {
@@ -4060,6 +4069,126 @@ assignment() {
       break;
     }
     return sub;
+  }
+
+  _mmapSkipWs() {
+    while (this.c.type === 'EOL') this.c = this.t.get();
+    this.t.skip();
+  }
+
+  _mmapParseNumber() {
+    if (this.c.type === 'DEC' || this.c.type === 'BIN') {
+      const v = this.c.value;
+      this.eat(this.c.type);
+      return v;
+    }
+    if (this.c.type === 'HEX' || this.c.type === 'SHEX') {
+      const v = this.c.value;
+      this.eat(this.c.type);
+      return v;
+    }
+    throw Error(`Expected number at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  _mmapEatOptionalComma() {
+    this._mmapSkipWs();
+    if (this.c.type === 'SYM' && this.c.value === ',') {
+      this.eat('SYM', ',');
+      this._mmapSkipWs();
+    }
+  }
+
+  _parseMmapMmioSlots() {
+    const slots = {};
+    this._mmapSkipWs();
+    while (this.c.type !== 'EOF') {
+      if (this.c.type === 'SYM' && this.c.value === '-') break;
+      if (this.c.type === 'SYM' && this.c.value === ':') break;
+      if (this.c.type !== 'DEC' && this.c.type !== 'BIN' && this.c.type !== 'HEX' && this.c.type !== 'SHEX') break;
+      const off = this._mmapParseNumber();
+      this._mmapSkipWs();
+      if (this.c.type !== 'SYM' || this.c.value !== ':') {
+        throw Error(`Expected ':' after mmio offset at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', ':');
+      this._mmapSkipWs();
+      let target;
+      if (this.c.type === 'SYM' && this.c.value === '.') {
+        target = this.parseDotComponentRef();
+        this._mmapSkipWs();
+        if (this.c.type === 'SYM' && this.c.value === ':') {
+          this.eat('SYM', ':');
+          if (this.c.type !== 'ID') {
+            throw Error(`Expected pin after '.comp:' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+          }
+          target += ':' + this.c.value;
+          this.eat('ID');
+        }
+      } else if (this.c.type === 'ID' || this.c.type === 'SPECIAL') {
+        target = this.c.value;
+        this.eat(this.c.type);
+      } else {
+        throw Error(`Expected mmio target at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      slots[String(off)] = target;
+      this._mmapSkipWs();
+    }
+    return slots;
+  }
+
+  _parseMmapRegionEntry() {
+    const entry = {};
+    const regionKeys = ['base', 'size', 'mem', 'mmio', 'device'];
+    this._mmapSkipWs();
+    while (this.c.type !== 'EOF') {
+      if (this.c.type === 'SYM' && this.c.value === '-') break;
+      if (this.c.type === 'SYM' && this.c.value === ':') break;
+      if (this.c.type !== 'ID') break;
+      const key = this.c.value;
+      if (!regionKeys.includes(key)) break;
+      this.eat('ID');
+      this._mmapSkipWs();
+      if (this.c.type !== 'SYM' || this.c.value !== ':') {
+        throw Error(`Expected ':' after '${key}' in mmap region at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', ':');
+      this._mmapSkipWs();
+      if (key === 'base' || key === 'size') {
+        entry[key] = this._mmapParseNumber();
+        this._mmapEatOptionalComma();
+        continue;
+      }
+      if (key === 'mem' || key === 'device') {
+        if (this.c.type !== 'SYM' || this.c.value !== '.') {
+          throw Error(`Expected component ref after '${key}:' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        entry[key] = this.parseDotComponentRef();
+        this._mmapEatOptionalComma();
+        continue;
+      }
+      if (key === 'mmio') {
+        entry.mmio = this._parseMmapMmioSlots();
+        continue;
+      }
+      throw Error(`Unknown mmap region field '${key}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    return entry;
+  }
+
+  _parseMmapRegionsBlock() {
+    const regions = [];
+    this._mmapSkipWs();
+    while (this.c.type !== 'EOF') {
+      if (this.c.type === 'SYM' && this.c.value === ':') break;
+      if (this.c.type === 'SYM' && this.c.value === '-') {
+        this.eat('SYM', '-');
+        regions.push(this._parseMmapRegionEntry());
+        this._mmapSkipWs();
+        continue;
+      }
+      break;
+    }
+    return regions;
   }
 
   expr(){

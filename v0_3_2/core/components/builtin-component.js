@@ -19,6 +19,8 @@ var BuiltinComponent = class BuiltinComponent extends ComponentBase {
 
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {}
 
+  shouldApplyAfterPropertyBlock(propertyNames) { return false; }
+
   updateDisplayValue(comp, value, bitRange) {}
 
   // Returns a structured definition object for doc() display.

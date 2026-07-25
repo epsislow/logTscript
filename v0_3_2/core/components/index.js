@@ -30,6 +30,7 @@ var ClcdComponent = (typeof require !== 'undefined') ? require('./clcd') : ClcdC
 var AluComponent = (typeof require !== 'undefined') ? require('./alu') : AluComponent;
 var CpuComponent = (typeof require !== 'undefined') ? require('./cpu') : CpuComponent;
 var DmaComponent = (typeof require !== 'undefined') ? require('./dma') : DmaComponent;
+var MmapComponent = (typeof require !== 'undefined') ? require('./mmap') : MmapComponent;
 var PcbComponent = (typeof require !== 'undefined') ? require('./pcb-component') : PcbComponent;
 
 function createComponentRegistry() {
@@ -64,6 +65,7 @@ function createComponentRegistry() {
   registry.register(AluComponent);
   registry.register(CpuComponent);
   registry.register(DmaComponent);
+  registry.register(MmapComponent);
   registry.register(ClockDotsComponent);
   return registry;
 }

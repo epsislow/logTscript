@@ -33,12 +33,40 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
   static get isReservedName() { return true; }
 
   getSpecialParseAttributes() {
-    return { refListAttrs: ['mems'], literalAttrs: ['mode'] };
+    return { refListAttrs: ['mems'], bindingAttrs: ['mmap'], literalAttrs: ['mode'] };
   }
 
   getWidthBits(attributes) {
+    if (attributes.mmapMembers && attributes.mmapMembers.length) return 1;
     const slots = attributes.memsMembers ? attributes.memsMembers.length : 1;
     return dmaSlotBits(slots);
+  }
+
+  _resolveMmapLink(attributes, ctx) {
+    const refs = attributes.mmapMembers;
+    if (!refs || !refs.length) return null;
+    if (refs.length > 1) throw Error('DMA mmap = accepts one comp [mmap]');
+    const ref = refs[0];
+    const comp = ctx.components.get(ref);
+    if (!comp || comp.type !== 'mmap') {
+      throw Error(`DMA mmap entry ${ref} must be comp [mmap]`);
+    }
+    if (!comp.deviceIds || !comp.deviceIds[0]) {
+      throw Error(`DMA mmap entry ${ref} has no device id`);
+    }
+    let maxEnd = 32;
+    const regions = comp.mmapRegions || [];
+    for (let i = 0; i < regions.length; i++) {
+      const r = regions[i];
+      if (r.base + r.size > maxEnd) maxEnd = r.base + r.size;
+    }
+    const depth = comp.mmapDepth != null ? comp.mmapDepth : 8;
+    return {
+      ref,
+      mmapId: comp.deviceIds[0],
+      depth,
+      maxAddrBits: dmaAddrBits(maxEnd),
+    };
   }
 
   _resolveMemSlots(attributes, ctx) {
@@ -83,32 +111,49 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
   }
 
   getDef(attributes) {
-    const slotCount = attributes && attributes.memsMembers ? attributes.memsMembers.length : 1;
+    const attrs = attributes || {};
+    const mmapLink = attrs.mmapMembers && attrs.mmapMembers.length;
+    const slotCount = attrs.memsMembers ? attrs.memsMembers.length : 1;
     const slotBits = dmaSlotBits(slotCount);
-    const addrBits = '4';
+    const addrBits = mmapLink ? '16' : '4';
     const depthBits = '8';
-    const qCap = attributes ? dmaParseQueue(attributes) : 1;
+    const qCap = dmaParseQueue(attrs);
     const qsBits = String(dmaQueueSizeBits(qCap));
     const ctrBits = '16';
     const countBits = addrBits;
+    const pinList = mmapLink ? [
+      { bits: '1', name: 'src' },
+      { bits: addrBits, name: 'srcAdr' },
+      { bits: addrBits, name: 'dstAdr' },
+      { bits: addrBits, name: 'count' },
+      { bits: depthBits, name: 'value' },
+      { bits: '1', name: 'set' },
+      { bits: '1', name: 'reset' },
+    ] : [
+      { bits: String(slotBits), name: 'src' },
+      { bits: String(slotBits), name: 'dst' },
+      { bits: addrBits, name: 'srcAdr' },
+      { bits: addrBits, name: 'dstAdr' },
+      { bits: addrBits, name: 'count' },
+      { bits: depthBits, name: 'value' },
+      { bits: '1', name: 'set' },
+      { bits: '1', name: 'reset' },
+    ];
+    const attrList = mmapLink ? [
+      { name: 'mmap', value: '.mmap' },
+      { name: 'queue', value: 'integer (default 1)' },
+      { name: 'mode', value: 'instant|paced' },
+      { name: 'chunk', value: 'integer (default 1, paced only)' },
+    ] : [
+      { name: 'mems', value: '.mem …' },
+      { name: 'queue', value: 'integer (default 1)' },
+      { name: 'mode', value: 'instant|paced' },
+      { name: 'chunk', value: 'integer (default 1, paced only)' },
+    ];
     return {
-      attrs: [
-        { name: 'mems', value: '.mem …' },
-        { name: 'queue', value: 'integer (default 1)' },
-        { name: 'mode', value: 'instant|paced' },
-        { name: 'chunk', value: 'integer (default 1, paced only)' },
-      ],
+      attrs: attrList,
       initValue: null,
-      pins: [
-        { bits: String(slotBits), name: 'src' },
-        { bits: String(slotBits), name: 'dst' },
-        { bits: addrBits, name: 'srcAdr' },
-        { bits: addrBits, name: 'dstAdr' },
-        { bits: addrBits, name: 'count' },
-        { bits: depthBits, name: 'value' },
-        { bits: '1', name: 'set' },
-        { bits: '1', name: 'reset' },
-      ],
+      pins: pinList,
       pouts: [
         { bits: '1', name: 'busy' },
         { bits: '1', name: 'done' },
@@ -127,12 +172,25 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
     };
   }
 
+  static getMmapProfile(comp, depth) {
+    return {
+      slots: [
+        { offset: 0, readPin: 'busy', readOnly: true },
+        { offset: 1, writeLatch: 'count' },
+        { offset: 2, writeLatch: 'dstAdr' },
+        { offset: 3, writePin: 'set' },
+      ],
+    };
+  }
+
   static formatInstanceDoc(alias, comp) {
     const lines = [];
     lines.push(`${alias} (dma)`);
     lines.push('');
     const slots = comp.dmaMemSlots || [];
-    if (slots.length) {
+    if (comp.dmaMmapRef) {
+      lines.push(`mmap: ${comp.dmaMmapRef}`);
+    } else if (slots.length) {
       lines.push('mems (slot → instance):');
       for (let i = 0; i < slots.length; i++) {
         const s = slots[i];
@@ -170,10 +228,37 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
   }
 
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
-    const { slots, depth, maxAddrBits } = this._resolveMemSlots(attributes, ctx);
+    const hasMems = attributes.memsMembers && attributes.memsMembers.length;
+    const hasMmap = attributes.mmapMembers && attributes.mmapMembers.length;
+    if (hasMems && hasMmap) {
+      throw Error('DMA cannot use mems: together with mmap =');
+    }
+    if (!hasMems && !hasMmap) {
+      throw Error('DMA requires mems: or mmap =');
+    }
     const queueCapacity = dmaParseQueue(attributes);
     const mode = dmaParseModeAttr(attributes);
     const chunk = dmaParseChunkAttr(attributes);
+    if (hasMmap) {
+      const link = this._resolveMmapLink(attributes, ctx);
+      if (typeof addDma === 'function') {
+        addDma(baseId, {
+          mmapId: link.mmapId,
+          mmapRef: link.ref,
+          queueCapacity,
+          depth: link.depth,
+          maxAddrBits: link.maxAddrBits,
+          mode,
+          chunk,
+        });
+      }
+      return {
+        deviceIds: [baseId],
+        ref: null,
+        dmaMmapRef: link.ref,
+      };
+    }
+    const { slots, depth, maxAddrBits } = this._resolveMemSlots(attributes, ctx);
     if (typeof addDma === 'function') {
       addDma(baseId, {
         memSlots: slots,
@@ -192,9 +277,10 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
   }
 
   finalizeCompInfo(compInfo, attributes, initialValue, bits) {
-    if (compInfo.dmaMemSlots) return;
+    if (compInfo.dmaMemSlots || compInfo.dmaMmapRef) return;
     const d = typeof getDma === 'function' ? getDma(compInfo.deviceIds[0]) : null;
     if (d && d.memSlots) compInfo.dmaMemSlots = d.memSlots;
+    if (d && d.mmapRef) compInfo.dmaMmapRef = d.mmapRef;
   }
 
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {

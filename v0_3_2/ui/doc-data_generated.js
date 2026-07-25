@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -11644,11 +11644,9 @@ doc(.dma)
 
 See [doc-function.md](doc-function.md) for the full \`doc()\` index.
 
-## Not yet implemented
+## DMA with unified map (phase 6)
 
-| Feature | Plan |
-|---------|------|
-| **\`mmap =\`** unified address space | Phase 6 |
+See [mmap.md](mmap.md) for **\`mmap = .mmap\`**, logical \`srcAdr\`/\`dstAdr\`, copy/fill across regions, and mutual exclusion with **\`mems:\`**.
 
 ---
 
@@ -20080,6 +20078,235 @@ With an interactive panel: \`comp [key]\` on the instance \`.cpu\` \`set\` pin (
 - [mini-cpu-v2.md](mini-cpu-v2.md) — v2 demo (ASM, BEQ, LUT, terminal)
 - Automated tests: \`test_suite_ported.js\` (859–866)
 - Test constants: \`CHIP_ALU4\`, \`BOARD_CPU4\`
+`,
+    'mmap.md': `# Memory map (\`comp [mmap]\`)
+
+**Unified logical address space** for [mem](mem.md), MMIO wires, component pins, and (phase 6d) **\`device:\`** profiles. Masters ([CPU](cpu.md) \`mmap =\`, [DMA](dma.md) \`mmap =\`) use **logical word addresses**; \`comp [mmap]\` decodes each access to the correct target.
+
+Word addressing (not byte). Default **\`unmapped:\`** policy is **\`error\`**.
+
+In the **documentation viewer**, \`logts-play\` blocks open in the script editor with **Load** and **Load & Run**.
+
+---
+
+## Minimal example (ROM + RAM)
+
+\`\`\`logts logts-play
+comp [mem] .rom:
+  depth: 8
+  length: 16
+  readonly
+  on: 1
+  = ^01020304
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, mem: .rom
+    - base: 16, size: 16, mem: .ram
+  on: 1
+  :
+
+# API-level read (tests / devices):
+# mmapRead(.mmap id, 0)  → ROM word 0
+# mmapRead(.mmap id, 16) → RAM word 0
+\`\`\`
+
+| Logical address | Region | Physical target |
+|-----------------|--------|-----------------|
+| \`0\` … \`15\` | \`mem: .rom\` | \`.rom\` offset \`0\` … \`15\` |
+| \`16\` … \`31\` | \`mem: .ram\` | \`.ram\` offset \`0\` … \`15\` |
+
+Formula: find region with \`base ≤ adr < base + size\` → local offset = \`adr − base\`.
+
+---
+
+## Body attributes
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| **\`depth:\`** | \`8\` | Bus word width (bits). All \`mem:\` regions must match. Each \`mmio\` target must be **exactly \`depth\` bits** (no implicit narrow↔wide conversion). |
+| **\`regions:\`** | *(required)* | Ordered list of non-overlapping windows (see below). |
+| **\`unmapped:\`** | \`error\` | \`error\` — throw on access outside all regions. \`read0\` — read returns \`depth\` zero bits. \`ignore\` — writes outside regions are ignored. |
+
+**Gap inside \`mmio:\`** (slot not listed): read → **\`0\`** (\`depth\` bits); write → **ignored**.
+
+---
+
+## Region syntax
+
+\`\`\`
+regions:
+  - base: 0, size: 16, mem: .rom
+  - base: 16, size: 16, mem: .ram
+  - base: 32, size: 8, mmio:
+      0: busReg
+      1: .panel:out
+  - base: 64, size: 8, device: .dma
+\`\`\`
+
+| Field | Meaning |
+|-------|---------|
+| **\`base\`** | First logical address of the window (decimal, \`\\decimal\`, or \`#hex\` where supported). |
+| **\`size\`** | Length in **words** (not bytes). |
+| **\`mem:\`** | Window into \`comp [mem]\`; local offset \`0 … size−1\`. Honors \`readonly\` on the mem. |
+| **\`mmio:\`** | Sub-map: offset → \`Nwire name\` or \`.comp:pin\` / \`.comp:pout\` (exactly **\`depth\`** bits). |
+| **\`device:\`** | MMIO profile from \`getMmapProfile()\` on the target component (see [Device profiles](#device-profiles-6d)). |
+
+**\`regs:\`** (register bank window) is planned for phase **6f** — not in 6a–6e.
+
+---
+
+## MMIO width rule
+
+| Binding | \`depth: 8\` | Result |
+|---------|------------|--------|
+| \`8wire busReg\` | 8 = 8 | OK |
+| \`3wire narrow\` | 3 ≠ 8 | **Error** at declare |
+| \`.dma:busy\` (1 bit) | 1 ≠ 8 | **Error** — compose in script |
+
+**Pattern (narrow → bus width):**
+
+\`\`\`logts logts-play
+1wire busy = 0
+8wire dmaBusy = .dma:busy + 0000000
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 4, mmio:
+        0: dmaBusy
+  on: 1
+  :
+\`\`\`
+
+---
+
+## Optional bus pins
+
+Manual access without CPU/DMA:
+
+| Pin | Role |
+|-----|------|
+| **\`adr\`** | Logical address (width from map span). |
+| **\`data\`** | Write data (\`depth\` bits). |
+| **\`write\`** | \`1\` → \`mmapWrite(adr, data)\`. |
+| **\`get\`** | \`1\` → latch read into pout **\`read\`**. |
+
+Use wires for \`adr\` / \`get\` / \`write\` (avoid naming a wire \`adr\` if you also use property \`adr\`).
+
+---
+
+## DMA with \`mmap =\` ([dma.md](dma.md))
+
+\`\`\`
+comp [dma] .dma:
+  mmap = .mmap
+  on: 1
+  :
+\`\`\`
+
+| | **\`mems:\`** (phase 5) | **\`mmap =\`** (phase 6) |
+|---|----------------------|-------------------------|
+| Addressing | slot + local offset | **logical** \`srcAdr\` / \`dstAdr\` |
+| **\`src\` / \`dst\` pins** | slot index 1…N | **\`src\`**: \`0\` = fill, \`1\` = copy (not a slot) |
+| Cross-region copy | multiple jobs | **one job** — decoder per word |
+
+**Copy:**
+
+\`\`\`logts logts-play
+.dma:{ src = 1, srcAdr = 0, dstAdr = 10000, count = 100, set = 1 }
+\`\`\`
+
+**Fill:**
+
+\`\`\`logts logts-play
+.dma:{ src = 0, dstAdr = 10000, count = 100, value = ^aa, set = 1 }
+\`\`\`
+
+\`mems:\` and \`mmap =\` are **mutually exclusive**.
+
+---
+
+## CPU with \`mmap =\` ([cpu.md](cpu.md))
+
+\`\`\`
+comp [cpu] .u:
+  mmap = .mmap
+  prog:
+    depth: 8
+    length: 32
+    = .cpuisa { … }
+  :
+\`\`\`
+
+- **\`LOAD\` / \`STORE\`** use the same logical addresses as DMA (\`mmapRead\` / \`mmapWrite\`).
+- **\`prog =\` / \`prog:\`** stay Harvard (program fetch separate).
+- **\`ram =\` / \`ram:\`** and **\`mmap =\`** are **mutually exclusive**.
+
+---
+
+## Device profiles (6d)
+
+Components may implement **\`static getMmapProfile(comp, depth)\`**. Region:
+
+\`\`\`
+- base: 32, size: 8, device: .dma
+\`\`\`
+
+**DMA profile (offsets):**
+
+| Offset | Access |
+|--------|--------|
+| \`0\` | Read **\`busy\`** (padded to \`depth\`) |
+| \`1\` | Write latch **\`count\`** |
+| \`2\` | Write latch **\`dstAdr\`** |
+| \`3\` | Write pin **\`set\`** |
+
+---
+
+## API (device layer)
+
+| Function | Role |
+|----------|------|
+| \`mmapResolve(id, adr)\` | \`{ kind, local, unmapped }\` |
+| \`mmapRead(id, adr, ctx)\` | Read word at logical address |
+| \`mmapWrite(id, adr, word, ctx, registry)\` | Write word |
+
+---
+
+## \`doc(comp.mmap)\` / \`doc(.mmap)\`
+
+\`\`\`
+doc(comp.mmap)
+doc(.mmap)
+\`\`\`
+
+**\`doc(.mmap)\`** lists \`depth\`, regions (\`mem\` / \`mmio\` / \`device\`), and span.
+
+---
+
+## Related
+
+- [dma.md](dma.md) — \`mems:\` and \`mmap =\` transfers
+- [cpu.md](cpu.md) — \`ram =\` vs \`mmap =\`, LOAD/STORE
+- [mem.md](mem.md) — backing storage for \`mem:\` regions
+- [doc-function.md](doc-function.md) — \`doc()\` index
+
+## Not in 6a–6e
+
+| Feature | Plan |
+|---------|------|
+| **\`regs:\`** region (\`comp [reg]\`) | Phase **6f** |
+| Implicit narrow MMIO masking | Rejected — use wires + slice |
 `,
     'modes.md': `# Script modes (\`MODE\`)
 

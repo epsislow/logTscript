@@ -59,7 +59,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
 
   getSpecialParseAttributes() {
     return {
-      bindingAttrs: ['isa', 'clock', 'output', 'trace', 'prog', 'ram'],
+      bindingAttrs: ['isa', 'clock', 'output', 'trace', 'prog', 'ram', 'mmap'],
       wireRefAttrs: ['wait'],
       nestedBlockAttrs: ['ram', 'prog', 'map'],
       listAttrs: ['vectors'],
@@ -90,6 +90,27 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     }
     const readonly = !!(comp.attributes && comp.attributes.readonly);
     return { memId: comp.deviceIds[0], compRef: ref, depth, length, readonly };
+  }
+
+  _resolveMmapLink(ref, ctx) {
+    if (!ref || !ctx || !ctx.components) {
+      throw Error('CPU mmap link requires a component reference');
+    }
+    const comp = ctx.components.get(ref);
+    if (!comp || comp.type !== 'mmap') {
+      throw Error(`CPU mmap link ${ref} must be comp [mmap]`);
+    }
+    if (!comp.deviceIds || !comp.deviceIds[0]) {
+      throw Error(`CPU mmap link ${ref} has no device id`);
+    }
+    const depth = comp.mmapDepth != null ? comp.mmapDepth : 8;
+    let maxEnd = 16;
+    const regions = comp.mmapRegions || [];
+    for (let i = 0; i < regions.length; i++) {
+      const r = regions[i];
+      if (r.base + r.size > maxEnd) maxEnd = r.base + r.size;
+    }
+    return { mmapId: comp.deviceIds[0], compRef: ref, depth, length: maxEnd };
   }
 
   _resolveTerminalId(ref, ctx) {
@@ -162,8 +183,20 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   _resolveMemoryLayout(attributes, ctx) {
     const progMembers = attributes.progMembers;
     const ramMembers = attributes.ramMembers;
+    const mmapMembers = attributes.mmapMembers;
     let progLink = null;
     let ramLink = null;
+    let mmapLink = null;
+
+    if (mmapMembers && mmapMembers.length) {
+      if (ramMembers && ramMembers.length) {
+        throw Error('CPU cannot use ram = together with mmap =');
+      }
+      if (this._hasInternalSpaceSection(attributes, 'ram')) {
+        throw Error('CPU cannot use mmap = together with ram: sub-block');
+      }
+      mmapLink = this._resolveMmapLink(mmapMembers[0], ctx);
+    }
 
     if (progMembers && progMembers.length) {
       if (this._hasInternalSpaceSection(attributes, 'prog')) {
@@ -186,6 +219,9 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     if (ramLink) {
       ram = { depth: ramLink.depth, length: ramLink.length, initialValue: null };
     }
+    if (mmapLink) {
+      ram = { depth: mmapLink.depth, length: mmapLink.length, initialValue: null };
+    }
     if (progLink) {
       prog = { depth: progLink.depth, length: progLink.length, initialValue: null };
     }
@@ -200,7 +236,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       throw Error(`CPU linked ram depth ${ramLink.depth} must match internal prog depth ${prog.depth}`);
     }
 
-    return { ram, prog, progLink, ramLink };
+    return { ram, prog, progLink, ramLink, mmapLink };
   }
 
   getDef(attributes) {
@@ -238,6 +274,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         { name: 'clock', value: '.component' },
         { name: 'wait', value: 'wire' },
         { name: 'ram', value: 'block|=.mem' },
+        { name: 'mmap', value: '.mmap' },
         { name: 'prog', value: 'block|=.mem' },
         { name: 'map', value: 'block' },
         { name: 'vectors', value: 'list' },
@@ -296,7 +333,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   }
 
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
-    const { ram, prog, progLink, ramLink } = this._resolveMemoryLayout(attributes, ctx);
+    const { ram, prog, progLink, ramLink, mmapLink } = this._resolveMemoryLayout(attributes, ctx);
     const map = attributes.map && typeof attributes.map === 'object' ? attributes.map : {};
     const vectorBase = cpuParseVectorBase(map);
     const fixedVectors = cpuParseVectors(attributes.vectors);
@@ -345,6 +382,8 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         outputTerminalId,
         progMemId: progLink ? progLink.memId : null,
         ramMemId: ramLink ? ramLink.memId : null,
+        mmapId: mmapLink ? mmapLink.mmapId : null,
+        mmapRef: mmapLink ? mmapLink.compRef : null,
         progReadonly: progLink ? progLink.readonly : true,
         vectorBase,
         fixedVectors,
