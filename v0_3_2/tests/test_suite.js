@@ -26613,6 +26613,121 @@ comp [mmap] .mmap:
   }, 'getMmapProfile');
 });
 
+reg(2680, 'comp-mmap-regs', 'mmap regs region read write', function(h, session) {
+  const src = `comp [reg] .io:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 4, regs: .io
+  on: 1
+  :
+`;
+  const { interp } = session.run(src);
+  const mmapId = interp.components.get('.mmap').deviceIds[0];
+  const regId = interp.components.get('.io').deviceIds[0];
+  mmapWrite(mmapId, 2, '10101010', interp, session._ensureRegistry());
+  h.assert('mmap read', mmapRead(mmapId, 2, interp), '10101010');
+  h.assert('getReg', getReg(regId, 2), '10101010');
+  mmapWrite(mmapId, 0, '11110000', interp, session._ensureRegistry());
+  h.assert('offset0', getReg(regId, 0), '11110000');
+});
+
+reg(2681, 'comp-mmap-regs', 'mmap region size exceeds reg length', function(h, session) {
+  h.assertThrows('exceeds', function() {
+    session.run(`comp [reg] .io:
+  depth: 8
+  length: 2
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 4, regs: .io
+  on: 1
+  :
+`);
+  }, 'exceeds');
+});
+
+reg(2682, 'comp-mmap-regs', 'mmap regs default length 1', function(h, session) {
+  const src = `comp [reg] .r:
+  depth: 8
+  on: 1
+  = ^55
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 1, regs: .r
+  on: 1
+  :
+`;
+  const { interp } = session.run(src);
+  const mmapId = interp.components.get('.mmap').deviceIds[0];
+  h.assert('initial', mmapRead(mmapId, 0, interp), '01010101');
+  mmapWrite(mmapId, 0, '11001100', interp, session._ensureRegistry());
+  h.assert('written', mmapRead(mmapId, 0, interp), '11001100');
+});
+
+reg(2683, 'comp-mmap-regs', 'dma mmap fill regs region', function(h, session) {
+  const src = `comp [reg] .io:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 100, size: 4, regs: .io
+  on: 1
+  :
+
+comp [dma] .dma:
+  mmap = .mmap
+  on: 1
+  :
+`;
+  const { interp } = session.run(src + `
+.dma:{ src = 0, dstAdr = 1100101, count = 10, value = ^aa, set = 1 }
+`);
+  const mmapId = interp.components.get('.mmap').deviceIds[0];
+  const regId = interp.components.get('.io').deviceIds[0];
+  h.assert('fill0', getReg(regId, 0), '00000000');
+  h.assert('fill1', getReg(regId, 1), '10101010');
+  h.assert('fill2', getReg(regId, 2), '10101010');
+  h.assert('via mmap', mmapRead(mmapId, 102, interp), '10101010');
+});
+
+reg(2684, 'comp-mmap-regs', 'doc(.mmap) shows regs region', function(h, session) {
+  const src = `comp [reg] .io:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 100, size: 4, regs: .io
+  on: 1
+  :
+`;
+  const { out } = session.run(src + 'doc(.mmap)');
+  h.assert('regs line', String(out.some(l => l.includes('regs .io'))), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

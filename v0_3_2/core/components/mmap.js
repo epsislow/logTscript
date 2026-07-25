@@ -33,6 +33,19 @@ var MmapComponent = class MmapComponent extends BuiltinComponent {
     return { ref, memId: comp.deviceIds[0], depth, length, readonly };
   }
 
+  _resolveRegsRef(ref, ctx) {
+    const comp = ctx.components.get(ref);
+    if (!comp || comp.type !== 'reg') {
+      throw Error(`mmap regs region ${ref} must be comp [reg]`);
+    }
+    if (!comp.deviceIds || !comp.deviceIds[0]) {
+      throw Error(`mmap regs region ${ref} has no device id`);
+    }
+    const depth = comp.attributes.depth !== undefined ? parseInt(comp.attributes.depth, 10) : 4;
+    const length = comp.attributes.length !== undefined ? parseInt(comp.attributes.length, 10) : 1;
+    return { ref, regsId: comp.deviceIds[0], depth, length };
+  }
+
   _wireBits(ctx, wireName) {
     const wire = ctx.wires.get(wireName);
     if (!wire || !wire.type) return null;
@@ -129,6 +142,22 @@ var MmapComponent = class MmapComponent extends BuiltinComponent {
           memRef: mem.ref,
           readonly: mem.readonly,
         });
+      } else if (r.regs) {
+        const regs = this._resolveRegsRef(r.regs, ctx);
+        if (depth === null) depth = regs.depth;
+        else if (depth !== regs.depth) {
+          throw Error(`mmap regs depth mismatch: expected ${depth}, ${regs.ref} has ${regs.depth}`);
+        }
+        if (size > regs.length) {
+          throw Error(`mmap region size ${size} exceeds reg ${regs.ref} length ${regs.length}`);
+        }
+        built.push({
+          kind: 'regs',
+          base,
+          size,
+          regsId: regs.regsId,
+          regsRef: regs.ref,
+        });
       } else if (r.mmio) {
         if (depth === null) depth = attributes.depth !== undefined ? parseInt(attributes.depth, 10) : 8;
         const slots = [];
@@ -147,7 +176,7 @@ var MmapComponent = class MmapComponent extends BuiltinComponent {
         const slots = this._buildDeviceSlots(r.device, depth, ctx);
         built.push({ kind: 'mmio', base, size, slots });
       } else {
-        throw Error('mmap region requires mem:, mmio:, or device:');
+        throw Error('mmap region requires mem:, regs:, mmio:, or device:');
       }
       if (base + size > maxEnd) maxEnd = base + size;
     }
@@ -216,6 +245,8 @@ var MmapComponent = class MmapComponent extends BuiltinComponent {
       const r = regions[i];
       if (r.kind === 'mem') {
         lines.push(`  ${r.base}..${r.base + r.size - 1}  mem ${r.memRef}`);
+      } else if (r.kind === 'regs') {
+        lines.push(`  ${r.base}..${r.base + r.size - 1}  regs ${r.regsRef}`);
       } else if (r.kind === 'mmio') {
         lines.push(`  ${r.base}..${r.base + r.size - 1}  mmio (${(r.slots || []).length} slots)`);
       }

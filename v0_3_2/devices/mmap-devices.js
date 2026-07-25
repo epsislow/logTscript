@@ -161,6 +161,11 @@ function mmapRead(id, addr, ctx) {
     m.lastRead = mmapPadWord(val, m.depth);
     return m.lastRead;
   }
+  if (region.kind === 'regs') {
+    const val = typeof getReg === 'function' ? getReg(region.regsId, local) : null;
+    m.lastRead = mmapPadWord(val, m.depth);
+    return m.lastRead;
+  }
   if (region.kind === 'mmio') {
     const slot = mmapFindMmioSlot(region, local);
     if (!slot) {
@@ -192,6 +197,13 @@ function mmapWrite(id, addr, word, ctx, componentRegistry) {
   if (region.kind === 'mem') {
     if (region.readonly) throw Error(`mmap cannot write readonly region at ${a}`);
     if (typeof setMem === 'function') setMem(region.memId, local, padded);
+    return;
+  }
+  if (region.kind === 'regs') {
+    if (typeof setReg === 'function') setReg(region.regsId, padded, local);
+    if (ctx && region.regsRef && ctx.updateComponentConnections) {
+      ctx.updateComponentConnections(region.regsRef);
+    }
     return;
   }
   if (region.kind === 'mmio') {

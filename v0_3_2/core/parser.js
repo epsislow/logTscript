@@ -4138,7 +4138,7 @@ assignment() {
 
   _parseMmapRegionEntry() {
     const entry = {};
-    const regionKeys = ['base', 'size', 'mem', 'mmio', 'device'];
+    const regionKeys = ['base', 'size', 'mem', 'regs', 'mmio', 'device'];
     this._mmapSkipWs();
     while (this.c.type !== 'EOF') {
       if (this.c.type === 'SYM' && this.c.value === '-') break;
@@ -4158,7 +4158,7 @@ assignment() {
         this._mmapEatOptionalComma();
         continue;
       }
-      if (key === 'mem' || key === 'device') {
+      if (key === 'mem' || key === 'device' || key === 'regs') {
         if (this.c.type !== 'SYM' || this.c.value !== '.') {
           throw Error(`Expected component ref after '${key}:' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
         }

@@ -13,7 +13,10 @@ var RegComponent = class RegComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'depth', value: 'integer' }],
+      attrs: [
+        { name: 'depth', value: 'integer' },
+        { name: 'length', value: 'integer (default 1)' },
+      ],
       initValue: 'Xbit',
       pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'data' }],
       pouts: [{ bits: 'X', name: 'get' }],
@@ -35,12 +38,14 @@ var RegComponent = class RegComponent extends BuiltinComponent {
 
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const depth = attributes['depth'] !== undefined ? parseInt(attributes['depth'], 10) : 4;
+    const length = attributes['length'] !== undefined ? parseInt(attributes['length'], 10) : 1;
+    if (isNaN(length) || length < 1) throw Error(`Register length must be positive for component ${name}`);
     const defaultValue = initialValue || '0'.repeat(depth);
     if (defaultValue.length !== depth) throw Error(`Register default value length (${defaultValue.length}) must match depth (${depth}) for component ${name}`);
     if (depth <= 0) throw Error(`Register depth must be positive for component ${name}`);
     const regId = baseId;
-    if (typeof addReg === 'function') addReg({ id: regId, depth, default: defaultValue });
-    return { deviceIds: [regId], ref: null };
+    if (typeof addReg === 'function') addReg({ id: regId, depth, length, default: defaultValue });
+    return { deviceIds: [regId], ref: null, regLength: length };
   }
 
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {

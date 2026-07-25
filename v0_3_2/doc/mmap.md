@@ -4,13 +4,17 @@
 
 Word addressing (not byte). Default **`unmapped:`** policy is **`error`**.
 
-In the **documentation viewer**, `logts-play` blocks open in the script editor with **Load** and **Load & Run**.
+In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run** (same as [dma.md](dma.md) and [cpu.md](cpu.md)).
 
 ---
 
-## Minimal example (ROM + RAM)
+## Runnable examples (Load / Load & Run)
 
-```logts logts-play
+### mmap-read-rom-ram
+
+Read **ROM word 0** (logical `0`) and **RAM word 0** (logical `16`) via mmap bus pins. **Load & Run:** first `show` → `00000001`, second → `00000000`.
+
+```logts-play
 comp [mem] .rom:
   depth: 8
   length: 16
@@ -34,9 +38,171 @@ comp [mmap] .mmap:
   on: 1
   :
 
-# API-level read (tests / devices):
-# mmapRead(.mmap id, 0)  → ROM word 0
-# mmapRead(.mmap id, 16) → RAM word 0
+5wire adrRom = 00000
+5wire adrRam = 10000
+1wire getEn = 1
+.mmap:{ adr = adrRom, get = getEn }
+8wire rom0 = .mmap:read
+show(rom0)
+
+.mmap:{ adr = adrRam, get = getEn }
+8wire ram0 = .mmap:read
+show(ram0)
+```
+
+`adrRam = 10000` is binary **16** (start of the RAM region).
+
+---
+
+### mmap-dma-copy-logical
+
+**DMA** with `mmap =` — copy one word from ROM (logical `2`) to RAM (logical `16`). **Load & Run:** `done=1`, RAM offset 0 = `00000011`.
+
+```logts-play
+comp [mem] .rom:
+  depth: 8
+  length: 16
+  readonly
+  on: 1
+  = ^01020304
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, mem: .rom
+    - base: 16, size: 16, mem: .ram
+  on: 1
+  :
+
+comp [dma] .dma:
+  mmap = .mmap
+  on: 1
+  :
+
+.dma:{ src = 1, srcAdr = 10, dstAdr = 10000, count = 1, set = 1 }
+
+1wire done = .dma:done
+.ram:{ adr = 0, set = 1 }
+8wire cell = .ram:get
+show(done)
+show(cell)
+```
+
+`srcAdr = 10` → ROM offset 2 (`^03`). `dstAdr = 10000` → RAM base (logical 16).
+
+---
+
+### mmap-regs-io-bank
+
+**`regs:`** window into a multi-word `comp [reg]`. Write via mmap pins, read back. **Load & Run:** `show` → `10101010`.
+
+```logts-play
+comp [reg] .io:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 100, size: 4, regs: .io
+  on: 1
+  :
+
+7wire adrWr = 1100101
+7wire adrRd = 1100101
+8wire dataBus = 10101010
+1wire wrEn = 1
+.mmap:{ adr = adrWr, data = dataBus, write = wrEn }
+
+1wire getEn = 1
+.mmap:{ adr = adrRd, get = getEn }
+8wire word = .mmap:read
+show(word)
+```
+
+`adrWr` / `adrRd` = `1100101` (binary **101** — region base 100 + offset 1).
+
+---
+
+### mmap-mmio-dma-busy
+
+Read DMA **`busy`** through a **`device:`** MMIO region. **Load & Run:** `show` → `00000000` (DMA idle).
+
+```logts-play
+comp [mem] .rom:
+  depth: 8
+  length: 4
+  readonly
+  on: 1
+  = ^01
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .rom .ram
+  on: 1
+  :
+
+comp [mmap] .mmio:
+  depth: 8
+  regions:
+    - base: 0, size: 4, device: .dma
+  on: 1
+  :
+
+2wire adrBus = 00
+1wire getEn = 1
+.mmio:{ adr = adrBus, get = getEn }
+8wire status = .mmio:read
+show(status)
+```
+
+`adrBus = 00` → logical address **0** (device profile offset `0` = `busy`).
+
+---
+
+## Minimal map layout (ROM + RAM)
+
+```logts
+comp [mem] .rom:
+  depth: 8
+  length: 16
+  readonly
+  on: 1
+  = ^01020304
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^00
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, mem: .rom
+    - base: 16, size: 16, mem: .ram
+  on: 1
+  :
 ```
 
 | Logical address | Region | Physical target |
@@ -70,6 +236,7 @@ regions:
       0: busReg
       1: .panel:out
   - base: 64, size: 8, device: .dma
+  - base: 100, size: 16, regs: .io
 ```
 
 | Field | Meaning |
@@ -77,10 +244,9 @@ regions:
 | **`base`** | First logical address of the window (decimal, `\decimal`, or `#hex` where supported). |
 | **`size`** | Length in **words** (not bytes). |
 | **`mem:`** | Window into `comp [mem]`; local offset `0 … size−1`. Honors `readonly` on the mem. |
+| **`regs:`** | Window into `comp [reg]` register bank; local offset `0 … size−1`. Requires `length` on the reg ≥ region `size`. |
 | **`mmio:`** | Sub-map: offset → `Nwire name` or `.comp:pin` / `.comp:pout` (exactly **`depth`** bits). |
 | **`device:`** | MMIO profile from `getMmapProfile()` on the target component (see [Device profiles](#device-profiles-6d)). |
-
-**`regs:`** (register bank window) is planned for phase **6f** — not in 6a–6e.
 
 ---
 
@@ -92,11 +258,11 @@ regions:
 | `3wire narrow` | 3 ≠ 8 | **Error** at declare |
 | `.dma:busy` (1 bit) | 1 ≠ 8 | **Error** — compose in script |
 
-**Pattern (narrow → bus width):**
+**Pattern (narrow → bus width)** — see runnable example [mmap-mmio-dma-busy](#mmap-mmio-dma-busy) above.
 
-```logts logts-play
-1wire busy = 0
-8wire dmaBusy = .dma:busy + 0000000
+```logts
+1wire busy = .dma:busy
+8wire dmaBusy = busy + 0000000
 
 comp [mmap] .mmap:
   depth: 8
@@ -139,15 +305,15 @@ comp [dma] .dma:
 | **`src` / `dst` pins** | slot index 1…N | **`src`**: `0` = fill, `1` = copy (not a slot) |
 | Cross-region copy | multiple jobs | **one job** — decoder per word |
 
-**Copy:**
+**Copy** (fragment — full script in [mmap-dma-copy-logical](#mmap-dma-copy-logical)):
 
-```logts logts-play
-.dma:{ src = 1, srcAdr = 0, dstAdr = 10000, count = 100, set = 1 }
+```logts
+.dma:{ src = 1, srcAdr = 10, dstAdr = 10000, count = 1, set = 1 }
 ```
 
 **Fill:**
 
-```logts logts-play
+```logts
 .dma:{ src = 0, dstAdr = 10000, count = 100, value = ^aa, set = 1 }
 ```
 
@@ -209,7 +375,7 @@ doc(comp.mmap)
 doc(.mmap)
 ```
 
-**`doc(.mmap)`** lists `depth`, regions (`mem` / `mmio` / `device`), and span.
+**`doc(.mmap)`** lists `depth`, regions (`mem` / `regs` / `mmio` / `device`), and span.
 
 ---
 
@@ -220,9 +386,8 @@ doc(.mmap)
 - [mem.md](mem.md) — backing storage for `mem:` regions
 - [doc-function.md](doc-function.md) — `doc()` index
 
-## Not in 6a–6e
+## Not in MVP
 
 | Feature | Plan |
 |---------|------|
-| **`regs:`** region (`comp [reg]`) | Phase **6f** |
 | Implicit narrow MMIO masking | Rejected — use wires + slice |

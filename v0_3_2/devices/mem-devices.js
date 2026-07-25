@@ -108,7 +108,7 @@ function getMem(id, address) {
 }
 
 
-function addReg({ id, depth = 4, default: defaultValue = null }) {
+function addReg({ id, depth = 4, length = 1, default: defaultValue = null }) {
   if (!id) return;
   
   let defaultBin = defaultValue;
@@ -119,15 +119,21 @@ function addReg({ id, depth = 4, default: defaultValue = null }) {
   if (defaultBin.length !== depth) {
     defaultBin = defaultBin.padStart(depth, '0').substring(0, depth);
   }
+
+  const len = Math.max(1, length);
+  const data = new Map();
+  data.set(0, defaultBin);
   
   dm().registers.set(id, {
     depth: depth,
+    length: len,
     default: defaultBin,
-    value: defaultBin
+    value: defaultBin,
+    data,
   });
 }
 
-function setReg(id, value) {
+function setReg(id, value, offset) {
   const reg = dm().registers.get(id);
   if (!reg) return;
   
@@ -137,15 +143,29 @@ function setReg(id, value) {
   } else if (binValue.length > reg.depth) {
     binValue = binValue.substring(0, reg.depth);
   }
-  
-  reg.value = binValue;
+
+  const off = offset != null ? offset : 0;
+  if (off < 0 || off >= reg.length) {
+    throw Error(`Register offset ${off} out of range (length ${reg.length})`);
+  }
+  if (!reg.data) reg.data = new Map();
+  reg.data.set(off, binValue);
+  if (off === 0) reg.value = binValue;
 }
 
-function getReg(id) {
+function getReg(id, offset) {
   const reg = dm().registers.get(id);
   if (!reg) return null;
-  
-  return reg.value || reg.default;
+
+  const off = offset != null ? offset : 0;
+  if (off < 0 || off >= reg.length) return null;
+  if (reg.data && reg.data.has(off)) return reg.data.get(off);
+  return reg.default || '0'.repeat(reg.depth);
+}
+
+function getRegLength(id) {
+  const reg = dm().registers.get(id);
+  return reg ? reg.length : 0;
 }
 
 

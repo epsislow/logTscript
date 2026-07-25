@@ -22,7 +22,7 @@ todos:
     status: completed
   - id: 6f-regs-region
     content: "6f: regiune regs: (comp [reg]) — amânat după 6e"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -418,11 +418,10 @@ La fiecare `LOAD`, `mmapRead` citește wire-ul **la momentul accesului**; dacă 
 
 - [doc/mmap.md](../v0_3_2/doc/mmap.md), logts-play CPU+DMA+VRAM
 
-### 6f — Regiune `regs:` (amânat după 6e)
+### 6f — Regiune `regs:` (implementat)
 
 - Fereastră în `comp [reg]` multi-word sau banc de registre (similar `mem:`, dar semantic I/O)
 - `mmapRead`/`mmapWrite` pe offset local în regiunea `regs:`
-- **Nu** intră în MVP 6a–6e; implementare separată după documentația și testele fazei 6e
 
 ---
 
