@@ -26728,6 +26728,95 @@ comp [mmap] .mmap:
   h.assert('regs line', String(out.some(l => l.includes('regs .io'))), 'true');
 });
 
+const SHOW_COMP_TAGS_SETUP = `comp [reg] .r:
+  depth: 8
+  on: 1
+  = ^aa
+  :
+
+comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+.r:{ data = 11110000, set = 1 }
+.alu:{ a = 0010, b = 0010, op = 10, set = 1 }
+`;
+
+reg(2685, 'show-tags', 'show(.comp; tag) applies any display tag', function(h, session) {
+  const { out } = session.run(SHOW_COMP_TAGS_SETUP + 'show(.r; dec)');
+  h.assert('formatted', String(out.some(l => /\.r \(8bit\) = \\170/.test(l))), 'true');
+});
+
+reg(2686, 'show-tags', 'show(.comp:pout; tag) applies any display tag', function(h, session) {
+  const { out } = session.run(SHOW_COMP_TAGS_SETUP + 'show(.alu:result; dec)');
+  h.assert('formatted', String(out.some(l => /\.alu:result \(4bit\) = \\2/.test(l))), 'true');
+});
+
+reg(2687, 'show-tags', 'show wire from comp ref still tagged', function(h, session) {
+  const { out } = session.run(SHOW_COMP_TAGS_SETUP + `
+8wire w = .r
+show(w; dec)
+`);
+  h.assert('formatted', String(out.some(l => /w \(8wire\) = \\170/.test(l))), 'true');
+});
+
+reg(2688, 'show-tags', 'peek(.comp:pout; tag) applies any display tag', function(h, session) {
+  const { out } = session.run(SHOW_COMP_TAGS_SETUP + 'peek(.alu:result; dec)');
+  h.assert('formatted', String(out.some(l => /\.alu:result \(4bit\) = \\2/.test(l))), 'true');
+});
+
+reg(2689, 'show-tags', 'peek(.comp; tag) applies any display tag', function(h, session) {
+  const { out } = session.run(SHOW_COMP_TAGS_SETUP + 'peek(.r; dec)');
+  h.assert('formatted', String(out.some(l => /\.r \(8bit\) = \\170/.test(l))), 'true');
+});
+
+reg(2690, 'show-tags', 'peek in property block — component ref + tag', function(h, session) {
+  const { out } = session.run(`comp [reg] .r:
+  depth: 8
+  on: 1
+  = ^aa
+  :
+
+.r:{ data = 11110000, set = 1, peek(.r; dec) }
+`);
+  h.assert('formatted', String(out.some(l => /\.r \(8bit\) = \\170/.test(l))), 'true');
+});
+
+const SHOW_COMP_TAGS_ASCII_SETUP = `comp [reg] .r:
+  depth: 8
+  on: 1
+  = ^41
+  :
+
+comp [alu] .alu:
+  length: 4
+  on: 1
+  :
+
+.r:{ data = 01000001, set = 1 }
+.alu:{ a = 1111, b = 0001, op = 10, set = 1 }
+`;
+
+reg(2691, 'show-tags', 'show/peek(.comp*) — dec ascii bin signed oct b32hex', function(h, session) {
+  const cases = [
+    ['show', '.r', 'dec', /\.r \(8bit\) = \\65/],
+    ['show', '.alu:result', 'ascii', /\.alu:result \(4bit\) = "/],
+    ['show', '.r', 'bin', /\.r \(8bit\) = 01000001/],
+    ['peek', '.alu:result', 'bin', /\.alu:result \(4bit\) = 0001/],
+    ['peek', '.r', 'decSigned', /\.r \(8bit\) = \\65;s8/],
+    ['peek', '.alu:result', 'signed', /\.alu:result \(4bit\) = \\1;s4/],
+    ['show', '.r', 'oct', /\.r \(8bit\) = o\^20 \+ 01/],
+    ['peek', '.alu:result', 'b32hex', /\.alu:result \(4bit\) = 0001/],
+  ];
+  for (let i = 0; i < cases.length; i++) {
+    const c = cases[i];
+    const { out } = session.run(SHOW_COMP_TAGS_ASCII_SETUP + c[0] + '(' + c[1] + '; ' + c[2] + ')');
+    const line = out[out.length - 1] || '';
+    h.assert(c[0] + ' ' + c[1] + ' ' + c[2], String(c[3].test(line)), 'true');
+  }
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

@@ -9824,6 +9824,81 @@ if (this.isBuiltinDEMUX(name)) {
     return false;
   }
 
+  _resolveShowAtomContext(atom, part) {
+    let displayName = null;
+    let displayType = null;
+    let bitWidth = part && part.bitWidth ? part.bitWidth : null;
+
+    if (!atom) {
+      if (part && part.varName) displayName = part.varName;
+      if (bitWidth) displayType = `${bitWidth}bit`;
+      return { displayName, displayType, bitWidth };
+    }
+
+    if (part && part.varName) {
+      displayName = part.varName;
+    } else if (atom.var) {
+      displayName = atom.var;
+      if (atom.property) {
+        displayName = `${atom.var}:${atom.property}`;
+      } else if (atom.bitRange) {
+        const { start, end } = this.resolveBitRange(atom.bitRange);
+        const actualEnd = end !== undefined && end !== null ? end : start;
+        displayName = start === actualEnd ? `${atom.var}.${start}` : `${atom.var}.${start}-${actualEnd}`;
+      }
+    } else if (atom.ref) {
+      displayName = atom.ref;
+    }
+
+    if (atom.var) {
+      const wire = this.wires.get(atom.var);
+      if (wire) {
+        displayType = this.getWireTypeLabel(wire) || wire.type;
+        if (!bitWidth) bitWidth = this.getBitWidth(wire.type);
+        return { displayName, displayType, bitWidth };
+      }
+      if (this.socks.has(atom.var)) {
+        const len = this.getSockRuntimeLength(atom.var);
+        displayType = `${len != null ? len : 0}bit`;
+        if (!bitWidth && len != null) bitWidth = len;
+        return { displayName, displayType, bitWidth };
+      }
+      const varInfo = this.vars.get(atom.var);
+      if (varInfo) {
+        displayType = varInfo.type;
+        if (!bitWidth && varInfo.type) bitWidth = this.getBitWidth(varInfo.type);
+        return { displayName, displayType, bitWidth };
+      }
+      if (atom.var.startsWith('.')) {
+        const comp = this.components.get(atom.var);
+        if (comp) {
+          if (atom.property) {
+            if (!bitWidth) bitWidth = this._getWatchPropertyBitWidth(atom.var, atom.property);
+          } else if (!bitWidth) {
+            bitWidth = this.getComponentBits(comp.type, comp.attributes);
+          }
+          if (bitWidth) displayType = `${bitWidth}bit`;
+        }
+      }
+    } else if (atom.ref) {
+      const wire = this.wires.get(atom.ref);
+      if (wire) {
+        displayType = wire.type;
+        if (!bitWidth) bitWidth = this.getBitWidth(wire.type);
+      } else {
+        const varInfo = this.vars.get(atom.ref);
+        if (varInfo) {
+          displayType = varInfo.type;
+          if (!bitWidth && varInfo.type) bitWidth = this.getBitWidth(varInfo.type);
+        }
+      }
+    }
+
+    if (!bitWidth && part && part.bitWidth) bitWidth = part.bitWidth;
+    if (!displayType && bitWidth) displayType = `${bitWidth}bit`;
+    return { displayName, displayType, bitWidth };
+  }
+
   _execShowImmediate(s, computeRefs = false) {
     const payload = s.show || s.peek;
     if (!payload) return;
@@ -9921,31 +9996,15 @@ if (this.isBuiltinDEMUX(name)) {
           }
         }
       }
-      let varName = null;
-      let varType = null;
       let bitRange = null;
       if (e && e.length === 1 && e[0].var) {
-        varName = e[0].var;
         bitRange = e[0].bitRange;
-        const wire = this.wires.get(varName);
-        if (wire) varType = this.getWireTypeLabel(wire) || wire.type;
-        else if (this.socks.has(varName)) {
-          const len = this.getSockRuntimeLength(varName);
-          varType = `${len != null ? len : 0}bit`;
-        } else {
-          const varInfo = this.vars.get(varName);
-          if (varInfo) varType = varInfo.type;
-        }
-      } else if (e && e.length === 1 && e[0].ref) {
-        varName = e[0].ref;
-        const wire = this.wires.get(varName);
-        if (wire) varType = wire.type;
-        else {
-          const varInfo = this.vars.get(varName);
-          if (varInfo) varType = varInfo.type;
-        }
       }
       const r = this.evalExpr(e, computeRefs);
+      const showCtx = this._resolveShowAtomContext(e && e[0], r && r[0]);
+      let varName = showCtx.displayName;
+      let varType = showCtx.displayType;
+      const ctxBitWidth = showCtx.bitWidth;
       if (e && e.length === 1 && e[0].var && e[0].schemaField) {
         const schemaWire = this.wires.get(e[0].var);
         const part0 = r[0];
@@ -10015,7 +10074,7 @@ if (this.isBuiltinDEMUX(name)) {
       }
       for (const part of r) {
         if (!part) continue;
-        let displayName = part.varName;
+        let displayName = part.varName || varName;
         if (!displayName && varName && bitRange) {
           const { start, end } = bitRange;
           const actualEnd = end !== undefined && end !== null ? end : start;
@@ -10024,11 +10083,12 @@ if (this.isBuiltinDEMUX(name)) {
         if (!displayName) displayName = varName;
         let displayType = varType;
         if (part.bitWidth) displayType = `${part.bitWidth}bit`;
+        const effectiveBitWidth = part.bitWidth || ctxBitWidth;
         if (part.isRef) {
           const v = this.getValueFromRef(part.ref);
           let valueStr = (v == null) ? '-' : v;
           if (valueStr !== '-') {
-            if (part.bitWidth) valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, false, part.bitWidth);
+            if (effectiveBitWidth) valueStr = this._formatShowWireValue(valueStr, effectiveBitWidth, opts, false, effectiveBitWidth);
             else if (displayType) {
               const bw = this.getBitWidth(displayType);
               if (bw) valueStr = this._formatShowWireValue(valueStr, bw, opts, false, bw);
@@ -10056,7 +10116,7 @@ if (this.isBuiltinDEMUX(name)) {
         } else {
           let valueStr = part.value !== null ? part.value : '-';
           if (valueStr !== '-' && !part.isText) {
-            if (part.bitWidth) valueStr = this._formatShowWireValue(valueStr, part.bitWidth, opts, false, part.bitWidth);
+            if (effectiveBitWidth) valueStr = this._formatShowWireValue(valueStr, effectiveBitWidth, opts, false, effectiveBitWidth);
             else if (displayType) {
               const bw = this.getBitWidth(displayType);
               if (bw) valueStr = this._formatShowWireValue(valueStr, bw, opts, false, bw);
