@@ -16,6 +16,20 @@ function dmaAddrBits(length) {
   return 32 - Math.clz32(length - 1);
 }
 
+function dmaParseMode(mode) {
+  if (mode === 'paced' || mode === 1 || mode === '1') return 'paced';
+  return 'instant';
+}
+
+function dmaParseChunk(chunk) {
+  if (chunk === undefined) return 1;
+  const n = parseInt(chunk, 10);
+  if (isNaN(n) || n < 1) {
+    throw Error('DMA chunk must be a positive integer');
+  }
+  return n;
+}
+
 function dmaRangesOverlap(srcAdr, dstAdr, count) {
   if (count <= 0) return false;
   const srcEnd = srcAdr + count - 1;
@@ -41,6 +55,63 @@ function dmaCopyBlock(job) {
   }
 }
 
+function dmaJobNeedsBackward(job) {
+  return job.srcMemId === job.dstMemId
+    && dmaRangesOverlap(job.srcAdr, job.dstAdr, job.count)
+    && job.dstAdr > job.srcAdr;
+}
+
+function dmaCopyChunk(active, chunkSize) {
+  const remaining = active.total - active.offset;
+  const n = Math.min(chunkSize, remaining);
+  if (n <= 0) return 0;
+
+  const { srcMemId, dstMemId, srcAdr, dstAdr } = active;
+
+  if (active.backward) {
+    const startIdx = active.total - active.offset - n;
+    for (let i = 0; i < n; i++) {
+      const idx = startIdx + i;
+      setMem(dstMemId, dstAdr + idx, getMem(srcMemId, srcAdr + idx));
+    }
+  } else {
+    for (let i = 0; i < n; i++) {
+      setMem(dstMemId, dstAdr + active.offset + i, getMem(srcMemId, srcAdr + active.offset + i));
+    }
+  }
+  return n;
+}
+
+function dmaStartActiveJob(d, job) {
+  d.active = {
+    srcMemId: job.srcMemId,
+    dstMemId: job.dstMemId,
+    srcAdr: job.srcAdr,
+    dstAdr: job.dstAdr,
+    total: job.count,
+    offset: 0,
+    backward: dmaJobNeedsBackward(job),
+  };
+}
+
+function dmaStepActive(d) {
+  if (!d.active || d.mode !== 'paced') return;
+  const moved = dmaCopyChunk(d.active, d.chunk);
+  d.active.offset += moved;
+  if (d.active.offset >= d.active.total) {
+    d.active = null;
+    d.done = true;
+  } else {
+    d.done = false;
+  }
+  dmaUpdateBusy(d);
+}
+
+function dmaGetRemaining(d) {
+  if (!d.active || d.mode !== 'paced') return 0;
+  return d.active.total - d.active.offset;
+}
+
 function addDma(id, config) {
   if (!id) return;
   const memSlots = config.memSlots || [];
@@ -50,6 +121,8 @@ function addDma(id, config) {
     queueCapacity,
     depth: config.depth || 8,
     maxAddrBits: config.maxAddrBits || 4,
+    mode: config.mode || 'instant',
+    chunk: config.chunk != null ? config.chunk : 1,
     active: null,
     queue: [],
     latch: {},
@@ -108,7 +181,8 @@ function dmaSetSubmitResult(d, kind) {
 }
 
 function dmaUpdateBusy(d) {
-  d.busy = !!(d.active || d.queue.length > 0);
+  const pacedActive = d.active && d.mode === 'paced' && d.active.offset < d.active.total;
+  d.busy = !!(pacedActive || d.queue.length > 0);
 }
 
 function dmaQueueFull(d) {
@@ -167,10 +241,19 @@ function dmaRunJob(d, job) {
   d.done = true;
 }
 
+function dmaIsPacedInProgress(d) {
+  return !!(d.active && d.mode === 'paced' && d.active.offset < d.active.total);
+}
+
 function dmaTrySubmit(d, job) {
   if (!d.active && d.queue.length === 0) {
     dmaSetSubmitResult(d, 'started');
-    dmaRunJob(d, job);
+    if (d.mode === 'paced') {
+      dmaStartActiveJob(d, job);
+      dmaStepActive(d);
+    } else {
+      dmaRunJob(d, job);
+    }
     dmaUpdateBusy(d);
     return;
   }
@@ -215,14 +298,21 @@ function dmaApplyPins(id, pending, reEvaluate, component, ctx) {
   const sv = component.reEvalPendingValue(pending, 'set', reEvaluate, ctx);
   if (!dmaIsActive(sv)) return;
 
-  d.done = false;
+  if (dmaIsPacedInProgress(d)) {
+    dmaStepActive(d);
+    return;
+  }
+
   const job = dmaBuildJob(d, d.latch);
   if (!job) return;
+
+  d.done = false;
   dmaTrySubmit(d, job);
 }
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    addDma, getDma, dmaResetState, dmaApplyPins, dmaTrySubmit, dmaSlotBits, dmaAddrBits, dmaQueueFull, dmaUpdateBusy,
+    addDma, getDma, dmaResetState, dmaApplyPins, dmaTrySubmit, dmaSlotBits, dmaAddrBits,
+    dmaQueueFull, dmaUpdateBusy, dmaParseMode, dmaParseChunk, dmaGetRemaining, dmaIsPacedInProgress,
   };
 }

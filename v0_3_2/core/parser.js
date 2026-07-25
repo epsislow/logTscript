@@ -3309,16 +3309,17 @@ assignment() {
         break;
       }
 
-      if (this.c.type === 'ID') {
-        const attrName = this.c.value;
+      if (this.c.type === 'ID' || (this.c.type === 'KEYWORD' && this.c.value === 'MODE')) {
+        const attrName = this.c.type === 'KEYWORD' ? 'mode' : this.c.value;
         const isArray = attrNamesArray.includes(attrName);
         let stateNum = 0;
-        this.eat('ID');
+        this.eat(this.c.type);
 
         let bindingAttrs = [];
         let listAttrs = [];
         let refListAttrs = [];
         let wireRefAttrs = [];
+        let literalAttrs = [];
         if (this.componentRegistry) {
           const bindHandler = this.componentRegistry.get(compType);
           if (bindHandler && bindHandler.getSpecialParseAttributes) {
@@ -3327,7 +3328,18 @@ assignment() {
             if (special && special.listAttrs) listAttrs = special.listAttrs;
             if (special && special.refListAttrs) refListAttrs = special.refListAttrs;
             if (special && special.wireRefAttrs) wireRefAttrs = special.wireRefAttrs;
+            if (special && special.literalAttrs) literalAttrs = special.literalAttrs;
           }
+        }
+        if (literalAttrs.includes(attrName) && this.c.value === ':') {
+          this.eat('SYM', ':');
+          this.t.skip();
+          if (this.c.type !== 'ID') {
+            throw Error(`Expected literal after '${attrName}:' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+          }
+          attributes[attrName] = this.c.value;
+          this.eat('ID');
+          continue;
         }
         if (refListAttrs.includes(attrName) && this.c.value === ':') {
           this.eat('SYM', ':');

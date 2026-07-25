@@ -25828,6 +25828,148 @@ comp [cpu] .u:
   h.assert('loaded after dma', r0.value, '00101010');
 });
 
+const DMA_PACED_BODY = `comp [mem] .src:
+  depth: 8
+  length: 8
+  on: 1
+  = ^01020304
+  :
+
+comp [mem] .dst:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .src .dst
+  mode: paced
+  chunk: 1
+  on: 1
+  :
+`;
+
+reg(2632, 'comp-dma', 'dma paced chunk=1 four set steps', function(h, session) {
+  const { interp } = session.run(DMA_PACED_BODY + `
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 100, set = 1 }
+`);
+  const dstId = interp.components.get('.dst').deviceIds[0];
+  h.assert('one word', getMem(dstId, 0), '00000001');
+  h.assert('busy mid', dmaGetProp(session, interp, '.dma', 'busy'), '1');
+  h.assert('not done', dmaGetProp(session, interp, '.dma', 'done'), '0');
+  session.execStmts(interp, '.dma:{ set = 1 }');
+  h.assert('two words', getMem(dstId, 1), '00000010');
+  session.execStmts(interp, '.dma:{ set = 1 }');
+  session.execStmts(interp, '.dma:{ set = 1 }');
+  h.assert('four words', getMem(dstId, 3), '00000100');
+  h.assert('done', dmaGetProp(session, interp, '.dma', 'done'), '1');
+  h.assert('idle', dmaGetProp(session, interp, '.dma', 'busy'), '0');
+});
+
+reg(2633, 'comp-dma', 'dma paced partial last chunk', function(h, session) {
+  const { interp } = session.run(`comp [mem] .src:
+  depth: 8
+  length: 8
+  on: 1
+  = ^0102030405
+  :
+
+comp [mem] .dst:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .src .dst
+  mode: paced
+  chunk: 2
+  on: 1
+  :
+
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 101, set = 1 }
+`);
+  const dstId = interp.components.get('.dst').deviceIds[0];
+  h.assert('after step1', getMem(dstId, 1), '00000010');
+  h.assert('not done yet', dmaGetProp(session, interp, '.dma', 'done'), '0');
+  session.execStmts(interp, '.dma:{ set = 1 }');
+  h.assert('after step2', getMem(dstId, 3), '00000100');
+  session.execStmts(interp, '.dma:{ set = 1 }');
+  h.assert('after step3 last single', getMem(dstId, 4), '00000101');
+  h.assert('done', dmaGetProp(session, interp, '.dma', 'done'), '1');
+});
+
+reg(2634, 'comp-dma', 'dma paced remaining pout', function(h, session) {
+  const { interp } = session.run(DMA_PACED_BODY + `
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 100, set = 1 }
+`);
+  h.assert('remaining after 1', dmaGetProp(session, interp, '.dma', 'remaining'), '011');
+  session.execStmts(interp, '.dma:{ set = 1 }');
+  h.assert('remaining after 2', dmaGetProp(session, interp, '.dma', 'remaining'), '010');
+});
+
+reg(2635, 'comp-dma', 'dma paced continue set does not increment submitSeq', function(h, session) {
+  const { interp } = session.run(DMA_PACED_BODY + `
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 100, set = 1 }
+`);
+  h.assert('submitSeq 1', parseInt(dmaGetProp(session, interp, '.dma', 'submitSeq'), 2), 1);
+  session.execStmts(interp, '.dma:{ set = 1 }');
+  h.assert('submitSeq still 1', parseInt(dmaGetProp(session, interp, '.dma', 'submitSeq'), 2), 1);
+});
+
+reg(2636, 'comp-dma', 'dma paced memmove overlap same slot', function(h, session) {
+  const src = `comp [mem] .buf:
+  depth: 8
+  length: 8
+  on: 1
+  = ^0102030405060708
+  :
+
+comp [dma] .dma:
+  mems: .buf
+  mode: paced
+  chunk: 1
+  on: 1
+  :
+
+.dma:{ src = 1, dst = 1, srcAdr = 0, dstAdr = 1, count = 100, set = 1 }
+`;
+  const { interp } = session.run(src);
+  const memId = interp.components.get('.buf').deviceIds[0];
+  for (let i = 0; i < 3; i++) session.execStmts(interp, '.dma:{ set = 1 }');
+  h.assert('addr0', getMem(memId, 0), '00000001');
+  h.assert('addr1', getMem(memId, 1), '00000001');
+  h.assert('addr2', getMem(memId, 2), '00000010');
+  h.assert('addr3', getMem(memId, 3), '00000011');
+  h.assert('done', dmaGetProp(session, interp, '.dma', 'done'), '1');
+});
+
+reg(2637, 'comp-dma', 'dma rejects chunk zero in paced mode', function(h, session) {
+  h.assertThrows('chunk zero', function() {
+    session.run(`comp [mem] .a:
+  depth: 8
+  length: 4
+  on: 1
+  :
+
+comp [dma] .dma:
+  mems: .a
+  mode: paced
+  chunk: 0
+  on: 1
+  :
+`);
+  }, 'chunk');
+});
+
+reg(2638, 'doc-comp', 'doc(comp.dma) contains paced mode', function(h, session) {
+  const out = session.runDoc('doc(comp.dma)');
+  h.assert('mode attr', String(out.some(l => l.includes('mode'))), 'true');
+  h.assert('remaining pout', String(out.some(l => l.includes('remaining'))), 'true');
+});
+
 
   window.LogTScriptTestSuite = {
     tests,

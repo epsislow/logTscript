@@ -43,6 +43,8 @@ Use **`on: 1`** so property blocks that drive `set` run like other components ([
 |-----------|---------|-------------|
 | **`mems:`** | *(required)* | Ordered list of `comp [mem]` references. **Slot 1** = first entry, **slot 2** = second, … Minimum **one** memory. |
 | **`queue:`** | `1` | FIFO depth for pending jobs (0 = strict: reject when a job cannot start immediately). |
+| **`mode:`** | `instant` | `instant` (default) — all `count` words on one `set`. `paced` — up to **`chunk`** words per `set`. |
+| **`chunk:`** | `1` | Max words per step in **`paced`** mode (must be ≥ 1). Ignored in `instant`. |
 
 **Declaration rules:**
 
@@ -76,9 +78,22 @@ Each transfer is one property block (or separate pin assignments) ending with **
 
 Values are resolved by the language parser (binary literals, `\decimal`, wires) — DMA receives the resolved bit string.
 
-**Same slot, overlapping regions:** copy uses **memmove** semantics (safe overlap).
+**Same slot, overlapping regions:** copy uses **memmove** semantics (safe overlap). In **`paced`** mode, overlap with `dstAdr > srcAdr` copies **backward** chunk-by-chunk.
 
-**Mode:** **`instant`** (default) — all `count` words copy synchronously on `set = 1`.
+### Transfer modes
+
+| `mode` | Behaviour |
+|--------|-----------|
+| **`instant`** (default) | All **`count`** words copy synchronously on the submit `set`. |
+| **`paced`** | Each active **`set`** copies **`min(chunk, remaining)`** words. **`busy = 1`** until finished. Issue **`.dma:{ set = 1 }`** again to continue (same latched job). |
+
+| Pout / pin | `paced` notes |
+|------------|----------------|
+| **`remaining`** | Words left **after** the current step (width = **`count`** pin). `0` when idle. |
+| **`done`** | Stays **`0`** on intermediate steps; **`1`** (latched) after the **last** chunk until the next submit or **`reset`**. |
+| **`started` / `queued` / `*Total`** | Updated only on a **new** job submit — not on continuation **`set`** steps. |
+
+**Clock / osc:** there is **no** `clock =` attribute on DMA. Drive steps with **`.dma:{ set = .clk:get }`** and **`on: raise`** on the DMA (same effect as manual `set` per osc front).
 
 ---
 
@@ -94,7 +109,8 @@ Values are resolved by the language parser (binary literals, `\decimal`, wires) 
 | Pout | Role |
 |------|------|
 | `busy` | `1` while a job is active or the queue is non-empty |
-| `done` | `1` after the last completed transfer |
+| `done` | `1` after the last completed transfer (latched until next submit / `reset`) |
+| `remaining` | In **`paced`**: words still to copy after the current step |
 | `queueSize`, `queueFull` | Queue status |
 | `started`, `queued`, `rejected` | Result of the **last** submit (pulse flags — see [Submit flags](#submit-result-flags-started--queued--rejected)) |
 | `startedTotal`, `queuedTotal`, `rejectedTotal`, `submitSeq` | Monotonic counters since last `reset` |
@@ -141,7 +157,7 @@ Only **one** of `started` / `queued` / `rejected` is `1` for the **last** submit
 
 In **`instant`** mode each job finishes inside the same `set = 1` handling. In a **legacy** script that runs top-to-bottom, the FIFO is usually **empty** before each new `.dma:{ … set = 1 }` → you typically see **`started = 1`** every time and **`startedTotal`** incrementing.
 
-**`queued`** / **`rejected`** matter when a prior job left work in the FIFO at submit time (e.g. **`mode: paced`** in phase 5d, or multiple submits batched in one wave step before the DMA drains). The FIFO depth is **`queue:`** (default **`1`**).
+**`queued`** / **`rejected`** matter when a prior job left work in the FIFO at submit time, or a **`paced`** job is still in progress when another submit arrives. The FIFO depth is **`queue:`** (default **`1`**).
 
 `reset` clears flags, counters, latch, and the queue (use **`reset = 1, set = 1`** in the same block).
 
@@ -214,6 +230,137 @@ show(w)
 ```
 
 **Load & Run:** `w` = `00000001` (old value at address 0).
+
+---
+
+### dma-paced-manual
+
+**`mode: paced`**, **`chunk: 1`**, **`count = 100`** (4 words). First `set` copies one word; three more **`.dma:{ set = 1 }`** lines finish the job.
+
+```logts-play
+comp [mem] .rom:
+  depth: 8
+  length: 8
+  on: 1
+  = ^01020304
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .rom .ram
+  mode: paced
+  chunk: 1
+  on: 1
+  :
+
+.dma:{ src = 1, dst = \2, srcAdr = 0, dstAdr = 0, count = 100, set = 1 }
+.dma:{ set = 1 }
+.dma:{ set = 1 }
+.dma:{ set = 1 }
+
+1wire done = .dma:done
+1wire busy = .dma:busy
+4wire rem = .dma:remaining
+.ram:{ adr = 11, set = 1 }
+8wire w3 = .ram:get
+show(done)
+show(busy)
+show(rem)
+show(w3)
+```
+
+**Load & Run:** `done` = `1`, `busy` = `0`, `rem` = `0000`, `w3` = `00000100` (fourth ROM word in RAM slot 3).
+
+---
+
+### dma-paced-partial-chunk
+
+**`chunk: 2`**, **`count = 101`** (5 words) → steps **2 + 2 + 1** (last step copies only the remainder).
+
+```logts-play
+comp [mem] .src:
+  depth: 8
+  length: 8
+  on: 1
+  = ^0102030405
+  :
+
+comp [mem] .dst:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .src .dst
+  mode: paced
+  chunk: 2
+  on: 1
+  :
+
+.dma:{ src = 1, dst = \2, srcAdr = 0, dstAdr = 0, count = 101, set = 1 }
+.dma:{ set = 1 }
+.dma:{ set = 1 }
+
+1wire done = .dma:done
+.ram:{ adr = 100, set = 1 }
+8wire w4 = .ram:get
+show(done)
+show(w4)
+```
+
+**Load & Run:** `done` = `1`, `w4` = `00000101` (fifth byte/word `^05`).
+
+---
+
+### dma-paced-osc
+
+Continue a paced transfer from an oscillator — **`.dma:{ set = .clk:get }`** with **`on: raise`** (no `clock =` on the DMA body).
+
+```logts-play
+comp [~] .clk:
+  freq: 4
+  on: 1
+  :
+
+comp [mem] .rom:
+  depth: 8
+  length: 8
+  on: 1
+  = ^01020304
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+  :
+
+comp [dma] .dma:
+  mems: .rom .ram
+  mode: paced
+  chunk: 1
+  on: raise
+  :
+
+.dma:{ src = 1, dst = \2, srcAdr = 0, dstAdr = 0, count = 100, set = 1 }
+.dma:{ set = .clk:get }
+
+1wire b = .dma:busy
+1wire d = .dma:done
+show(b)
+show(d)
+```
+
+**Load & Run:** after osc ticks, `b` may still be `1` until enough rising fronts; use **Load** and step osc / blocks, or increase `freq` and wait. Pattern matches manual `set` — one chunk per qualifying `set` pulse.
 
 ---
 
@@ -571,7 +718,6 @@ See [doc-function.md](doc-function.md) for the full `doc()` index.
 | Feature | Plan |
 |---------|------|
 | **Fill** (`src = 0` + `value`) | Phase 5e |
-| **`mode: paced`**, `chunk`, `clock` | Phase 5d |
 | **`mmap =`** unified address space | Phase 6 |
 
 ---

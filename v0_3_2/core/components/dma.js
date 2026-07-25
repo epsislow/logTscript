@@ -7,6 +7,21 @@ function dmaParseQueue(attributes) {
   return n;
 }
 
+function dmaParseModeAttr(attributes) {
+  if (typeof dmaParseMode === 'function') return dmaParseMode(attributes && attributes.mode);
+  const m = attributes && attributes.mode;
+  if (m === 'paced' || m === 1 || m === '1') return 'paced';
+  return 'instant';
+}
+
+function dmaParseChunkAttr(attributes) {
+  if (typeof dmaParseChunk === 'function') return dmaParseChunk(attributes && attributes.chunk);
+  if (attributes && attributes.chunk === undefined) return 1;
+  const n = parseInt(attributes.chunk, 10);
+  if (isNaN(n) || n < 1) throw Error('DMA chunk must be a positive integer');
+  return n;
+}
+
 function dmaQueueSizeBits(capacity) {
   const cap = Math.max(1, capacity);
   return Math.max(1, 32 - Math.clz32(cap));
@@ -18,7 +33,7 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
   static get isReservedName() { return true; }
 
   getSpecialParseAttributes() {
-    return { refListAttrs: ['mems'] };
+    return { refListAttrs: ['mems'], literalAttrs: ['mode'] };
   }
 
   getWidthBits(attributes) {
@@ -74,10 +89,13 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
     const qCap = attributes ? dmaParseQueue(attributes) : 1;
     const qsBits = String(dmaQueueSizeBits(qCap));
     const ctrBits = '16';
+    const countBits = addrBits;
     return {
       attrs: [
         { name: 'mems', value: '.mem …' },
         { name: 'queue', value: 'integer (default 1)' },
+        { name: 'mode', value: 'instant|paced' },
+        { name: 'chunk', value: 'integer (default 1, paced only)' },
       ],
       initValue: null,
       pins: [
@@ -101,6 +119,7 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
         { bits: ctrBits, name: 'queuedTotal' },
         { bits: ctrBits, name: 'rejectedTotal' },
         { bits: ctrBits, name: 'submitSeq' },
+        { bits: countBits, name: 'remaining' },
       ],
       returns: null,
     };
@@ -121,36 +140,46 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
       lines.push('mems: (none)');
     }
     const q = comp.attributes && comp.attributes.queue !== undefined ? comp.attributes.queue : 1;
+    const mode = comp.attributes && comp.attributes.mode ? comp.attributes.mode : 'instant';
+    const chunk = comp.attributes && comp.attributes.chunk !== undefined ? comp.attributes.chunk : 1;
     lines.push('');
     lines.push(`queue: ${q}`);
+    lines.push(`mode: ${mode}`);
+    if (mode === 'paced' || mode === 1 || mode === '1') {
+      lines.push(`chunk: ${chunk}`);
+    }
     return lines;
   }
 
   supportsPropertyName(property) {
     return ['busy', 'done', 'queueSize', 'queueFull', 'started', 'queued', 'rejected',
-      'startedTotal', 'queuedTotal', 'rejectedTotal', 'submitSeq'].includes(property);
+      'startedTotal', 'queuedTotal', 'rejectedTotal', 'submitSeq', 'remaining'].includes(property);
   }
 
   getSupportedProperties() {
     return ['src', 'dst', 'srcAdr', 'dstAdr', 'count', 'set', 'reset',
       'busy', 'done', 'queueSize', 'queueFull', 'started', 'queued', 'rejected',
-      'startedTotal', 'queuedTotal', 'rejectedTotal', 'submitSeq'];
+      'startedTotal', 'queuedTotal', 'rejectedTotal', 'submitSeq', 'remaining'];
   }
 
   getRedirectProperties() {
     return ['busy', 'done', 'queueSize', 'queueFull', 'started', 'queued', 'rejected',
-      'startedTotal', 'queuedTotal', 'rejectedTotal', 'submitSeq'];
+      'startedTotal', 'queuedTotal', 'rejectedTotal', 'submitSeq', 'remaining'];
   }
 
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const { slots, depth, maxAddrBits } = this._resolveMemSlots(attributes, ctx);
     const queueCapacity = dmaParseQueue(attributes);
+    const mode = dmaParseModeAttr(attributes);
+    const chunk = dmaParseChunkAttr(attributes);
     if (typeof addDma === 'function') {
       addDma(baseId, {
         memSlots: slots,
         queueCapacity,
         depth,
         maxAddrBits,
+        mode,
+        chunk,
       });
     }
     return {
@@ -181,6 +210,7 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
     if (!d) return null;
     const qBits = dmaQueueSizeBits(d.queueCapacity);
     const ctrBits = 16;
+    const countBits = d.maxAddrBits || 4;
     let val = null;
     let bitWidth = 1;
     switch (property) {
@@ -222,6 +252,12 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
         val = d.submitSeq.toString(2).padStart(ctrBits, '0');
         bitWidth = ctrBits;
         break;
+      case 'remaining': {
+        const rem = typeof dmaGetRemaining === 'function' ? dmaGetRemaining(d) : 0;
+        val = rem.toString(2).padStart(countBits, '0');
+        bitWidth = countBits;
+        break;
+      }
       default:
         return null;
     }
