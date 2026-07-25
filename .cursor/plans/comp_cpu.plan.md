@@ -1623,7 +1623,38 @@ comp [dma] .dma:
 
 ## Faza 6 (viitor): spațiu de adrese unificat (`comp [mmap]`)
 
-**Problema:** adresa logică **0…N** trebuie decodată: `[0..Y] → .m1`, `[Y+1..Z] → .m2`, etc. Atât **CPU** (LOAD/STORE / I/O mapped) cât și **DMA** trebuie să folosească **aceeași** mapare — altfel firmware-ul duplică logica de decodare.
+**Nume confirmat:** `comp [mmap]`. Plan detaliat: [comp_mmap.plan.md](comp_mmap.plan.md).
+
+**Problema:** adresa logică **0…N** trebuie decodată: `[0..Y] → .m1`, `[Y+1..Z] → .m2`, regiuni I/O pe fire, etc. Atât **CPU** (LOAD/STORE) cât și **DMA** (copy **și fill**) folosesc **aceeași** mapare.
+
+### Sintaxă (rezumat)
+
+| Piesă | Sintaxă | Rol |
+|-------|---------|-----|
+| Harta | `comp [mmap] .mmap:` + `regions:` | Definește adrese logice → mem / mmio / device |
+| Legare DMA | `mmap = .mmap` pe `comp [dma]` | Cu **`=`** (ca `ram = .data`); **fără** `mems:` |
+| Copy | `.dma:{ srcAdr, dstAdr, count, set }` | Adrese **logice**; fără slot `src`/`dst` |
+| Fill | `.dma:{ src = 0, dstAdr, count, value, set }` | `dstAdr` logic; la fel ca 5e dar fără slot `dst` |
+
+**Exemplu:**
+
+```logts
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0,  size: 16, mem: .rom
+    - base: 16, size: 16, mem: .ram
+  :
+
+comp [dma] .dma:
+  mmap = .mmap
+  :
+
+.dma:{ srcAdr = 0, dstAdr = 16, count = 100, set = 1 }           # copy
+.dma:{ src = 0, dstAdr = 16, count = 100, value = ^aa, set = 1 } # fill
+```
+
+DMA cu `mmap` face **copy și fill** pe orice regiune mapată (mem, mmio fire, device) — per cuvânt `mmapRead`/`mmapWrite`; transfer peste granița a două regiuni = **un singur job**.
 
 **Nu intră în faza 5.** Motive:
 
@@ -1642,7 +1673,7 @@ comp [dma] .dma:
 **O singură sursă de adevăr** — `comp [mmap] `(sau extensie `map:` pe un „system” parent):
 
 ```logts
-comp [mmap] .sys:
+comp [mmap] .mmap:
   regions:
  - base: 0,   mem: .rom,  size: 256
  - base: 256, mem: .ram,  size: 256
@@ -1650,25 +1681,25 @@ comp [mmap] .sys:
   :
 
 comp [cpu] .cpu1:
-  mmap = .sys        # LOAD/STORE pe adrese logice (extensie ISA / fetch: ram)
+  mmap = .mmap        # LOAD/STORE pe adrese logice
   prog = .rom        # sau tot prin mmap, dacă Von Neumann unificat
   wait = hold        # stall: OR(.dma:busy, …) în script (faza 5c)
   :
 
 comp [dma] .dma:
-  mmap = .sys        # srcAdr/dstAdr = adrese logice — **fără** mems:
+  mmap = .mmap        # srcAdr/dstAdr = adrese logice — **fără** mems:
   :
 ```
 
-**Faza 6 — `mems:` vs `mmap =`:** pe același `comp [dma]`, **fie** `mems:` (slot + offset local, faza 5), **fie** `mmap = .sys` (adrese logice) — **nu ambele**. La declarare: eroare dacă sunt prezente simultan.
+**Faza 6 — `mems:` vs `mmap =`:** pe același `comp [dma]`, **fie** `mems:` (slot + offset local, faza 5), **fie** `mmap = .mmap` (adrese logice, copy + fill) — **nu ambele**. La declarare: eroare dacă sunt prezente simultan.
 
 | Master | Binding | Semnificație adresă |
 
 |--------|---------|---------------------|
 
-| CPU | `mmap = .sys` | `LOAD R0 A8` → adresă logică în `.sys` |
+| CPU | `mmap = .mmap` | `LOAD R0 A8` → adresă logică în `.mmap` |
 
-| DMA | `mmap = .sys` | `srcAdr`/`dstAdr` logice; copiere word-by-word cu decode |
+| **DMA** | `mmap = .mmap` | `srcAdr`/`dstAdr` logice; **copy + fill**; paced ca 5d/5e |
 
 | Fără mmap | (faza 5) | Indici în **`mems:`** + adrese locale |
 
@@ -1682,13 +1713,15 @@ comp [dma] .dma:
 
 |----------|----------|
 
-| **6a** | `comp [mmap]`, `regions:`, decode `base+offset → mem+localAdr`, teste fără CPU |
+| **6a** | `comp [mmap]`, `regions:` mem + mmio, teste decode fără CPU/DMA |
 
-| **6b** | `dma.mmap = .sys` — adrese logice la submit |
+| **6b** | `dma` **`mmap = .mmap`** — copy + fill pe adrese logice; mutual exclusive cu `mems:` |
 
-| **6c** | `cpu.mmap = .sys` — LOAD/STORE / I/O mapped (posibil schimbare semantica `ram =` vs mmap) |
+| **6c** | `cpu` **`mmap = .mmap`** — LOAD/STORE; **mutual exclusive** cu `ram =` |
 
-| **6d** | Demo CPU + DMA + 3 mem, un block DMA, adrese logice din registre |
+| **6d** | Profile `device:` (lcd, clcd, dma regs) |
+
+| **6e** | Demo CPU + DMA + VRAM + `doc/mmap.md` |
 
 ---
 
