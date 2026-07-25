@@ -97,10 +97,6 @@
     return fill.repeat(n) + data.slice(0, len - n);
   }
 
-  function ceilLog2Bits(n) {
-    if (n <= 1) return 1;
-    return Math.ceil(Math.log2(n + 1));
-  }
 
   function countOnesBin(s) {
     let c = 0;

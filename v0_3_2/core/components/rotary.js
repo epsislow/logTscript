@@ -7,7 +7,7 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
 
   getWidthBits(attributes) {
     const states = attributes['states'] !== undefined ? parseInt(attributes['states'], 10) : 8;
-    return Math.ceil(Math.log2(states));
+    return states <= 1 ? 1 : 32 - Math.clz32(states - 1);
   }
   getSupportedProperties() { return ['get']; }
   getRedirectProperties() { return ['get']; }
@@ -27,7 +27,7 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
     let val = null;
     if (comp.ref) val = ctx.getValueFromRef(comp.ref);
     const states = comp.attributes['states'] !== undefined ? parseInt(comp.attributes['states'], 10) : 8;
-    const calculatedBits = Math.ceil(Math.log2(states));
+    const calculatedBits = states <= 1 ? 1 : 32 - Math.clz32(states - 1);
     if (val === null || val === undefined) {
       val = '0'.repeat(calculatedBits);
     } else {
@@ -46,7 +46,7 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
 
     const forLabels = attributes['for'] || {};
     if (states < 2) throw Error(`Rotary states must be at least 2 for component ${name}`);
-    const calculatedBits = Math.ceil(Math.log2(states));
+    const calculatedBits = states <= 1 ? 1 : 32 - Math.clz32(states - 1);
     const actualBits = bits || calculatedBits;
     const nl = attributes['nl'] || false;
     const rotaryInitialValue = initialValue || '0'.repeat(actualBits);
@@ -59,7 +59,7 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
       if (!compInfo) return;
       if (!compInfo.ref) compInfo.ref = rotaryRef;
       const st = compInfo.attributes['states'] !== undefined ? parseInt(compInfo.attributes['states'], 10) : 8;
-      const cb = Math.ceil(Math.log2(st));
+      const cb = st <= 1 ? 1 : 32 - Math.clz32(st - 1);
       let value = binValue;
       if (value.length < cb) value = value.padStart(cb, '0');
       else if (value.length > cb) value = value.substring(0, cb);

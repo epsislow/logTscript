@@ -2,7 +2,7 @@
 
 function lutAddrBits(length) {
   if (length <= 1) return 1;
-  return Math.ceil(Math.log2(length));
+  return 32 - Math.clz32(length - 1);
 }
 
 function addLut({ id, length = 16, depth = 4, table = null, default: defaultValue = null }) {

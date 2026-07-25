@@ -37,11 +37,6 @@ function memPortsFromAttributes(attributes) {
   return Math.min(4, Math.max(1, p));
 }
 
-function ceilLog2Bits(n) {
-  if (n <= 1) return 1;
-  return Math.ceil(Math.log2(n + 1));
-}
-
 function bitIndexWidth(len) {
   return len <= 1 ? 1 : 32 - Math.clz32(len - 1);
 }
@@ -13100,7 +13095,7 @@ if (s.assignment) {
       }
       
       // Calculate bit width from states
-      const calculatedBits = Math.ceil(Math.log2(states));
+      const calculatedBits = bitIndexWidth(states);
       // Use the bit width from component type if specified, otherwise use calculated
       const actualBits = bits || calculatedBits;
       
@@ -13136,7 +13131,7 @@ if (s.assignment) {
         // Use calculatedBits (number of bits needed to represent states) not componentType bits
         // For states=4, we need 2 bits (00, 01, 10, 11), not 4 bits
         const states = compInfo.attributes['states'] !== undefined ? parseInt(compInfo.attributes['states'], 10) : 8;
-        const calculatedBits = Math.ceil(Math.log2(states));
+        const calculatedBits = bitIndexWidth(states);
         // Always use calculatedBits for the value returned by onChange
         // The componentType is just for storage/display, but the actual value should match the number of states
         const finalBits = calculatedBits;
@@ -15921,7 +15916,7 @@ if (s.assignment) {
       // Handle rotary knob properties: data, set
       const rotaryId = comp.deviceIds[0];
       const states = comp.attributes['states'] !== undefined ? parseInt(comp.attributes['states'], 10) : 8;
-      const calculatedBits = Math.ceil(Math.log2(states));
+      const calculatedBits = bitIndexWidth(states);
       const actualBits = this.getComponentBits(comp.type, comp.attributes);
 
       // Handle :set property

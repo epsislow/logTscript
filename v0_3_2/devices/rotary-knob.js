@@ -14,7 +14,7 @@ class RotaryKnob {
     }
 
     this.states = states;
-    this.bits = Math.ceil(Math.log2(states));
+    this.bits = states <= 1 ? 1 : 32 - Math.clz32(states - 1);
     this.size = size;
     this.activeColor = color;
     this.analog = analog;
