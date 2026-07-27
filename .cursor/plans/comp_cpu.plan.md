@@ -26,6 +26,7 @@ todos:
   - id: phase7-micro-asm
     content: "Faza 7: inline [asm] consts/macros/micro; motor micro CPU; doc(.cpuisa); vezi faza_7_micro_asm.plan.md"
     status: pending
+isProject: false
 ---
 
 # Plan: `comp [cpu]` (contained + registre)

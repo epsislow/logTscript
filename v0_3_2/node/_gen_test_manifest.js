@@ -250,6 +250,22 @@ function syncScriptEditorHtml() {
   console.log('Wrote', SCRIPT_EDITOR_HTML, tail.length, 'pipeline script tags');
 }
 
+function validateScriptEditorHtml() {
+  const scripts = loadTestScripts();
+  const required = scripts.runtime.filter(f =>
+    /^core\/components\/(?!index\.js)/.test(f) ||
+    /^devices\/[a-z]+-devices\.js$/.test(f)
+  );
+  const html = fs.readFileSync(SCRIPT_EDITOR_HTML, 'utf8');
+  const missing = required.filter(f => !html.includes(`src="${f}"`));
+  if (missing.length) {
+    throw new Error(
+      'script_editor_v0_3_2.html missing script tags (add manually):\n  ' + missing.join('\n  ')
+    );
+  }
+}
+
 writeRuntimeBundle();
 syncRunTestsHtml();
 syncScriptEditorHtml();
+validateScriptEditorHtml();
