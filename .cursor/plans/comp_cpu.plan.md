@@ -23,6 +23,9 @@ todos:
   - id: phase5-dma
     content: "Faza 5: comp [dma] standalone (fara CPU obligatoriu); ram=; doc dma.md; integrare optionala cu cpu"
     status: pending
+  - id: phase7-micro-asm
+    content: "Faza 7: inline [asm] consts/macros/micro; motor micro CPU; doc(.cpuisa); vezi faza_7_micro_asm.plan.md"
+    status: pending
 ---
 
 # Plan: `comp [cpu]` (contained + registre)
@@ -1765,6 +1768,47 @@ comp [dma] .dma:
 - [cpu.md](../v0_3_2/doc/cpu.md) — IRQ (faza 4)
 - `doc/dma.md` — DMA (faza 5), când există componenta
 - [future-component-ideas.md](../v0_3_2/doc/future-component-ideas.md) — D3 IRQ, D4 DMA
+
+---
+
+## Faza 7: microcod în `inline [asm]` — **planificată**
+
+Vezi plan dedicat: **[faza_7_micro_asm.plan.md](faza_7_micro_asm.plan.md)**.
+
+### Scop
+
+- **`consts:{ }`** — hartă adrese simbolice (`PC`, `R0`, `MAR`, `ALUOUT`, …)
+- **`macros:{ }`** — secvențe micro reutilizabile (`INC`, `MOV`, …)
+- **Bloc `{ micro }` per opcode** — transfer `dst < src`, `READ`/`WRITE`
+- **CPU:** motor micro pe adrese din `consts`; **dual per opcode** (legacy switch + micro pe opcode-uri noi)
+- **`doc(.cpuisa)`** — toate consts + `pcEffect` per opcode (înainte de rulare program)
+
+### Decizii
+
+| Decizie | Alegere |
+|---------|---------|
+| `set` | Secvență micro completă per impuls (atomică) |
+| Extend ISA | Hibrid: opcode vechi fără micro → switch; opcode nou cu micro → motor |
+| Operanzi | `R`, `A` din decode; `R0`..`Rn` fixe în micro |
+| PC | `pcTouched` runtime + `pcEffect` static (`autoInc` / `seq` / `halt`) |
+
+### Sub-faze
+
+| Sub-fază | Conținut |
+|----------|----------|
+| **7a** | Parser `consts`, `macros`, micro blocks |
+| **7b** | Expandare macros, `pcEffect`, teste unitare |
+| **7c** | Motor micro (adrese, READ/WRITE, ALUOUT handler) |
+| **7d** | `isaRef` pe CPU, routing dual per opcode |
+| **7e** | `doc/asm-microcode.md`, `doc(.cpuisa)`, teste 2692+ |
+| **7f** | (viitor) JMP/BEQ/IRQ pe micro |
+
+### Explicit nu (faza 7 MVP)
+
+- uPC vizibil / multi-cycle per micro-op (faza 8?)
+- Rescriere completă `.cpuisa_irq`
+- Moștenire `consts` între ISA-uri
+- Înlocuire mini-cpu-v2
 
 ---
 
