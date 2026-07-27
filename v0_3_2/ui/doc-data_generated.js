@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -949,6 +949,251 @@ After \`use\`, the composed blob may be longer than a single module — size the
 - [mem.md](mem.md) — storing the final blob
 - [assignment-operators.md](assignment-operators.md) — \`=\`, \`:=\`, \`=:\`
 `,
+    'asm-microcode.md': `# ASM microcode (\`consts\`, \`macros\`, \`{ micro }\`)
+
+Extend an \`inline [asm]\` ISA with a **register address map** (\`consts\`), reusable **micro sequences** (\`macros\`), and per-opcode **micro programs** (\`{ … }\`). When a CPU binds that ISA, opcodes **with** a micro block run on the **micro engine**; opcodes **without** keep the built-in **legacy** interpreter (\`LOAD\`, \`STORE\`, \`JMP\`, …).
+
+For basic ISA syntax see [asm.md](asm.md). For CPU stepping, memory modes, and \`doc(.cpu…)\` see [cpu.md](cpu.md#microcode-dual-execution).
+
+In the **documentation viewer**, blocks marked \`logts-play\` open in the script editor with **Load** and **Load & Run**.
+
+---
+
+## Overview
+
+| Piece | Role |
+|-------|------|
+| \`consts:{ … }\` | Names → slot addresses (\`^02\`) or ALU literals (\`000\`) — **source of truth** for \`doc(.cpuisa)\` |
+| \`macros:{ … }\` | Parameterised micro snippets expanded at parse time |
+| \`MNEMONIC : pattern\` | Opcode **without** \`{ }\` → **legacy** on \`comp [cpu]\` |
+| \`MNEMONIC : pattern { … }\` | Opcode **with** micro block → **micro engine** on \`comp [cpu]\` |
+| \`READ\` / \`WRITE\` | Memory access via \`MAR\` / \`MDR\` consts (internal RAM, external \`mem\`, or \`mmap\`) |
+| \`pcEffect\` | Static hint in \`doc(.cpuisa)\`: \`autoInc\`, \`seq\` (explicit \`PC\` transfer), or \`halt\` |
+
+**Dual per opcode:** one \`.cpuisa\` can mix legacy \`LOAD\` and micro \`FOO\` in the same program.
+
+---
+
+## \`consts\` — address map
+
+\`\`\`logts
+inline [asm] .cpuisa:
+consts:{
+  PC     = ^02
+  R0     = ^20
+  R1     = ^21
+  MAR    = ^10
+  MDR    = ^11
+  ALUA   = ^30
+  ALUB   = ^31
+  ALUOP  = ^32
+  ALUOUT = ^33
+  ADD    = 000
+  SUB    = 001
+}
+  NOP   : 0000 + 4b
+  :
+\`\`\`
+
+| Syntax | Meaning |
+|--------|---------|
+| \`NAME = ^addr\` | Internal micro slot at address \`addr\` (hex-style literal, same as wire \`^02\`) |
+| \`ADD = 000\` | Literal operand for transfers like \`ALUOP < ADD\` |
+
+\`R0\`…\`Rn\` in consts are **architectural** names; decoded operands \`R\` and \`A\` from the instruction pattern are resolved at run time.
+
+\`doc(.cpuisa)\` lists every const. \`doc(.cpuintern)\` (and other CPU instances) copies the same table under **ISA consts:**.
+
+---
+
+## \`macros\` — reusable micro snippets
+
+\`\`\`logts
+macros:{
+  INC reg:{
+    ALUA < reg
+    ALUB < 1
+    ALUOP < ADD
+    reg < ALUOUT
+  }
+}
+\`\`\`
+
+| Rule | Detail |
+|------|--------|
+| Invocation | \`INC PC\` on its own line inside \`{ micro }\` |
+| Parameters | \`reg:reg\` typed params supported; expansion is textual |
+| Recursion | **Error** — \`Recursive macro 'NAME'\` |
+| Depth | Max 64 expansion levels |
+
+---
+
+## Micro operations
+
+Inside \`{ … }\` after an opcode pattern:
+
+| Form | Meaning |
+|------|---------|
+| \`DST < SRC\` | Transfer: write slot/literal/register operand into \`DST\` |
+| \`READ\` | \`mem[MAR] → MDR\` (CPU data space: internal RAM, \`ram = .chip\`, or \`mmap\`) |
+| \`WRITE\` | \`MDR → mem[MAR]\` |
+
+**Operands in transfers:**
+
+| Symbol | Source |
+|--------|--------|
+| \`R\` | Register index from decoded \`R2b\` field |
+| \`A\` | Address index from decoded \`A2b\` field |
+| \`R0\`, \`PC\`, \`MAR\`, … | Names from \`consts\` |
+| \`1\`, \`ADD\`, … | Numeric / const literals |
+
+**\`READ\` is real memory access**, not a register move: the engine reads \`MAR\`, fetches the data word, stores it in \`MDR\`.
+
+### \`pcEffect\` (documentation + static analysis)
+
+Computed when the ISA is parsed:
+
+| \`pcEffect\` | When |
+|------------|------|
+| \`autoInc\` | No \`PC < …\` in the micro program (default) |
+| \`seq\` | Micro program contains \`PC < …\` |
+| \`halt\` | Micro program writes \`HALTED\` (rare; legacy \`HALT\` uses built-in path) |
+
+At run time the CPU still advances PC according to the micro/legacy path; \`pcEffect\` is shown in \`doc(.cpuisa)\` next to each opcode.
+
+---
+
+## Hybrid ISA example (legacy + micro)
+
+\`\`\`logts-play
+inline [asm] .cpuisa:
+consts:{
+  PC = ^02
+  R0 = ^20
+  R1 = ^21
+  MAR = ^10
+  MDR = ^11
+  ALUA = ^30
+  ALUB = ^31
+  ALUOP = ^32
+  ALUOUT = ^33
+  ADD = 000
+}
+macros:{
+  INC reg:{
+    ALUA < reg
+    ALUB < 1
+    ALUOP < ADD
+    reg < ALUOUT
+  }
+}
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  HALT  : 0111 + 4b
+  FOO:
+  1011 + R2b + A2b
+  {
+    INC PC
+    MAR < A
+    READ
+    R < MDR
+  }
+  :
+
+comp [cpu] .cpuintern:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^11
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      FOO R0 A0
+      HALT
+    }
+  :
+
+.cpuintern:{ set = 1 }
+8wire r0 = .cpuintern:r0
+show(r0)
+\`\`\`
+
+**Load & Run:** \`r0\` is \`00010001\` (RAM cell A0 loaded via micro \`FOO\`). \`LOAD\` in the same ISA would still use the legacy path.
+
+---
+
+## \`doc(.cpuisa)\` — ISA reference
+
+\`\`\`logts-play
+inline [asm] .cpuisa:
+consts:{
+  PC = ^02
+  MAR = ^10
+  MDR = ^11
+}
+  LOAD : 0001 + R2b + A2b
+  FOO:
+  1011 + R2b + A2b
+  {
+    MAR < A
+    READ
+    R < MDR
+  }
+  :
+
+doc(.cpuisa)
+\`\`\`
+
+Output includes **consts**, **macros**, each opcode with \`[legacy]\` or \`[micro]\`, and **pcEffect** where applicable.
+
+---
+
+## CPU memory modes and \`doc()\`
+
+| Instance | Typical layout | \`doc()\` shows |
+|----------|----------------|---------------|
+| \`.cpuintern\` | Internal \`ram:\` + \`prog:\` | \`memory: internal\`, \`ISA consts:\` |
+| \`.cpucompexterne\` | \`prog = .rom\`, \`ram = .data\` | \`memory: external\`, \`prog = .rom\`, \`ram = .data\` |
+| \`.cpummap\` | \`mmap = .mmap\` (logical address space) | \`memory: mmap\`, \`mmap = .mmap\` |
+
+Micro \`READ\`/\`WRITE\` use the CPU's configured data backing (internal, linked \`mem\`, or \`mmap\` region).
+
+### Runnable — internal memory (\`doc(.cpuintern)\`)
+
+See [cpu.md](cpu.md#microcode-internal-cpuintern).
+
+### Runnable — external memory (\`doc(.cpucompexterne)\`)
+
+See [cpu.md](cpu.md#microcode-external-cpucompexterne).
+
+### Runnable — mmap (\`doc(.cpummap)\`)
+
+See [cpu.md](cpu.md#microcode-mmap-cpummap) and [mmap.md](mmap.md).
+
+---
+
+## Errors
+
+| Situation | Message (example) |
+|-----------|-------------------|
+| Recursive macro | \`Recursive macro 'A'\` |
+| Unknown macro | \`Unknown macro 'FOO'\` |
+| Missing MAR/MDR on READ | \`Micro READ requires MAR and MDR in ISA consts\` |
+| Duplicate const | \`Duplicate const 'PC'\` |
+
+---
+
+## Related
+
+- [asm.md](asm.md) — ISA declaration and assembly
+- [cpu.md](cpu.md) — \`comp [cpu]\`, \`set\`/\`run\`, linked memory, mmap
+- [mmap.md](mmap.md) — logical address map for CPU/DMA
+- [mem.md](mem.md) — external \`comp [mem]\` chips
+`,
     'asm.md': `# ASM
 
 Define a custom ISA with \`inline [asm]\`, then assemble programs to a **binary blob** with \`.myisa { ... }\` anywhere an expression is allowed.
@@ -1261,6 +1506,7 @@ Assembler errors include the source line and \`^^^\` under the problematic token
 ## Related
 
 - [asm-composition.md](asm-composition.md) — \`use\`, \`repeat\`, \`align\`, \`base:\`, external labels, multi-ISA
+- [asm-microcode.md](asm-microcode.md) — \`consts\`, \`macros\`, per-opcode \`{ micro }\`, \`READ\`/\`WRITE\`, \`doc(.cpuisa)\`
 - [mem.md](mem.md) — store assembled blob
 - [mini-cpu-v2.md](mini-cpu-v2.md) — end-to-end CPU with ASM program and \`BEQ\`
 - [lut.md](lut.md) — lookup tables
@@ -9343,6 +9589,185 @@ Binding \`irq = .pic\` (interrupt controller) is planned for a later sub-phase.
 
 ---
 
+## Microcode (dual execution)
+
+An ISA can define **\`consts\`**, **\`macros\`**, and per-opcode **\`{ micro }\`** blocks. On \`comp [cpu]\`:
+
+| Opcode in ISA | CPU execution |
+|---------------|---------------|
+| Pattern only (\`LOAD : …\`) | **Legacy** built-in (\`cpuStepLegacy\`) |
+| Pattern + \`{ micro }\` | **Micro engine** — transfers, \`READ\`/\`WRITE\` via \`MAR\`/\`MDR\` |
+
+Full syntax: [asm-microcode.md](asm-microcode.md).
+
+### \`doc()\` — ISA and CPU instances
+
+| Call | Shows |
+|------|-------|
+| \`doc(.cpuisa)\` | \`consts\`, \`macros\`, opcodes \`[legacy]\` / \`[micro]\`, \`pcEffect\` |
+| \`doc(.cpuintern)\` | \`memory: internal\`, \`isa: .cpuisa\`, **ISA consts** (address map) |
+| \`doc(.cpucompexterne)\` | \`memory: external\`, \`prog = …\`, \`ram = …\`, **ISA consts** |
+| \`doc(.cpummap)\` | \`memory: mmap\`, \`mmap = .mmap\`, **ISA consts** |
+| \`doc(.mmap)\` | Region table (\`base..end mem .chip\`) — see [mmap.md](mmap.md) |
+
+### Microcode — internal (\`.cpuintern\`)
+
+\`\`\`logts-play
+inline [asm] .cpuisa:
+consts:{
+  PC = ^02
+  R0 = ^20
+  MAR = ^10
+  MDR = ^11
+  ALUA = ^30
+  ALUB = ^31
+  ALUOP = ^32
+  ALUOUT = ^33
+  ADD = 000
+}
+macros:{
+  INC reg:{
+    ALUA < reg
+    ALUB < 1
+    ALUOP < ADD
+    reg < ALUOUT
+  }
+}
+  LOAD : 0001 + R2b + A2b
+  HALT : 0111 + 4b
+  FOO:
+  1011 + R2b + A2b
+  {
+    INC PC
+    MAR < A
+    READ
+    R < MDR
+  }
+  :
+
+comp [cpu] .cpuintern:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^11
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      FOO R0 A0
+      HALT
+    }
+  :
+
+doc(.cpuintern)
+.cpuintern:{ set = 1 }
+8wire r0 = .cpuintern:r0
+show(r0)
+\`\`\`
+
+**Load & Run:** \`doc(.cpuintern)\` lists \`memory: internal\` and consts (\`PC ^02\`, \`MAR ^10\`, …). After one \`set\`, \`r0\` is \`00010001\`.
+
+### Microcode — external memory (\`.cpucompexterne\`)
+
+\`\`\`logts-play
+inline [asm] .cpuisa:
+consts:{
+  PC = ^02
+  MAR = ^10
+  MDR = ^11
+}
+  LOAD : 0001 + R2b + A2b
+  HALT : 0111 + 4b
+  :
+
+comp [mem] .rom:
+  depth: 8
+  length: 8
+  readonly:
+  on: 1
+  = .cpuisa {
+    LOAD R0 A0
+    HALT
+  }
+  :
+
+comp [mem] .data:
+  depth: 8
+  length: 4
+  on: 1
+  = ^11
+  :
+
+comp [cpu] .cpucompexterne:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  prog = .rom
+  ram = .data
+  :
+
+doc(.cpucompexterne)
+.cpucompexterne:{ set = 1 }
+8wire r0 = .cpucompexterne:r0
+show(r0)
+\`\`\`
+
+**Load & Run:** \`doc(.cpucompexterne)\` shows \`memory: external\`, \`prog = .rom\`, \`ram = .data\`. Legacy \`LOAD\` reads external \`.data\` at A0 → \`r0 = 00010001\`.
+
+### Microcode — mmap (\`.cpummap\`)
+
+\`\`\`logts-play
+inline [asm] .cpuisa:
+consts:{
+  MAR = ^10
+  MDR = ^11
+}
+  LOAD : 0001 + R2b + A2b
+  HALT : 0111 + 4b
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^44
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, mem: .ram
+  on: 1
+  :
+
+comp [cpu] .cpummap:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  mmap = .mmap
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      LOAD R0 A0
+      HALT
+    }
+  :
+
+doc(.cpummap)
+doc(.mmap)
+.cpummap:{ set = 1 }
+8wire r0 = .cpummap:r0
+show(r0)
+\`\`\`
+
+**Load & Run:** \`doc(.cpummap)\` shows \`memory: mmap\` and \`mmap = .mmap\`. \`doc(.mmap)\` lists region \`0..15 mem .ram\`. \`LOAD\` via mmap reads logical address 0 → \`r0 = 01000100\` (\`^44\`).
+
+---
+
 ## Out of scope (later)
 
 - **PIC / \`irq = .component\`** — after \`comp [pic]\` exists (plan faza 4c).
@@ -9355,6 +9780,7 @@ Binding \`irq = .pic\` (interrupt controller) is planned for a later sub-phase.
 - [mem.md](mem.md) — internal \`ram:\` / \`prog:\` or \`ram = .chip\` link
 - [dma.md](dma.md) — \`comp [dma]\` memcpy between [mem](mem.md) instances; shared \`.ram\` with \`ram =\`
 - [asm.md](asm.md) — ISA and program blobs
+- [asm-microcode.md](asm-microcode.md) — \`consts\`, \`macros\`, \`{ micro }\`, dual legacy/micro execution
 - [mini-cpu-v2.md](mini-cpu-v2.md) — external mem stepping demo
 `,
     'debug.md': `# Debug output — \`show\`, \`peek\`, \`probe\`, \`watch\`, and boolean LUT utilities

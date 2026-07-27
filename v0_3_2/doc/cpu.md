@@ -830,6 +830,185 @@ Binding `irq = .pic` (interrupt controller) is planned for a later sub-phase.
 
 ---
 
+## Microcode (dual execution)
+
+An ISA can define **`consts`**, **`macros`**, and per-opcode **`{ micro }`** blocks. On `comp [cpu]`:
+
+| Opcode in ISA | CPU execution |
+|---------------|---------------|
+| Pattern only (`LOAD : …`) | **Legacy** built-in (`cpuStepLegacy`) |
+| Pattern + `{ micro }` | **Micro engine** — transfers, `READ`/`WRITE` via `MAR`/`MDR` |
+
+Full syntax: [asm-microcode.md](asm-microcode.md).
+
+### `doc()` — ISA and CPU instances
+
+| Call | Shows |
+|------|-------|
+| `doc(.cpuisa)` | `consts`, `macros`, opcodes `[legacy]` / `[micro]`, `pcEffect` |
+| `doc(.cpuintern)` | `memory: internal`, `isa: .cpuisa`, **ISA consts** (address map) |
+| `doc(.cpucompexterne)` | `memory: external`, `prog = …`, `ram = …`, **ISA consts** |
+| `doc(.cpummap)` | `memory: mmap`, `mmap = .mmap`, **ISA consts** |
+| `doc(.mmap)` | Region table (`base..end mem .chip`) — see [mmap.md](mmap.md) |
+
+### Microcode — internal (`.cpuintern`)
+
+```logts-play
+inline [asm] .cpuisa:
+consts:{
+  PC = ^02
+  R0 = ^20
+  MAR = ^10
+  MDR = ^11
+  ALUA = ^30
+  ALUB = ^31
+  ALUOP = ^32
+  ALUOUT = ^33
+  ADD = 000
+}
+macros:{
+  INC reg:{
+    ALUA < reg
+    ALUB < 1
+    ALUOP < ADD
+    reg < ALUOUT
+  }
+}
+  LOAD : 0001 + R2b + A2b
+  HALT : 0111 + 4b
+  FOO:
+  1011 + R2b + A2b
+  {
+    INC PC
+    MAR < A
+    READ
+    R < MDR
+  }
+  :
+
+comp [cpu] .cpuintern:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^11
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      FOO R0 A0
+      HALT
+    }
+  :
+
+doc(.cpuintern)
+.cpuintern:{ set = 1 }
+8wire r0 = .cpuintern:r0
+show(r0)
+```
+
+**Load & Run:** `doc(.cpuintern)` lists `memory: internal` and consts (`PC ^02`, `MAR ^10`, …). After one `set`, `r0` is `00010001`.
+
+### Microcode — external memory (`.cpucompexterne`)
+
+```logts-play
+inline [asm] .cpuisa:
+consts:{
+  PC = ^02
+  MAR = ^10
+  MDR = ^11
+}
+  LOAD : 0001 + R2b + A2b
+  HALT : 0111 + 4b
+  :
+
+comp [mem] .rom:
+  depth: 8
+  length: 8
+  readonly:
+  on: 1
+  = .cpuisa {
+    LOAD R0 A0
+    HALT
+  }
+  :
+
+comp [mem] .data:
+  depth: 8
+  length: 4
+  on: 1
+  = ^11
+  :
+
+comp [cpu] .cpucompexterne:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  prog = .rom
+  ram = .data
+  :
+
+doc(.cpucompexterne)
+.cpucompexterne:{ set = 1 }
+8wire r0 = .cpucompexterne:r0
+show(r0)
+```
+
+**Load & Run:** `doc(.cpucompexterne)` shows `memory: external`, `prog = .rom`, `ram = .data`. Legacy `LOAD` reads external `.data` at A0 → `r0 = 00010001`.
+
+### Microcode — mmap (`.cpummap`)
+
+```logts-play
+inline [asm] .cpuisa:
+consts:{
+  MAR = ^10
+  MDR = ^11
+}
+  LOAD : 0001 + R2b + A2b
+  HALT : 0111 + 4b
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^44
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, mem: .ram
+  on: 1
+  :
+
+comp [cpu] .cpummap:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  mmap = .mmap
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      LOAD R0 A0
+      HALT
+    }
+  :
+
+doc(.cpummap)
+doc(.mmap)
+.cpummap:{ set = 1 }
+8wire r0 = .cpummap:r0
+show(r0)
+```
+
+**Load & Run:** `doc(.cpummap)` shows `memory: mmap` and `mmap = .mmap`. `doc(.mmap)` lists region `0..15 mem .ram`. `LOAD` via mmap reads logical address 0 → `r0 = 01000100` (`^44`).
+
+---
+
 ## Out of scope (later)
 
 - **PIC / `irq = .component`** — after `comp [pic]` exists (plan faza 4c).
@@ -842,4 +1021,5 @@ Binding `irq = .pic` (interrupt controller) is planned for a later sub-phase.
 - [mem.md](mem.md) — internal `ram:` / `prog:` or `ram = .chip` link
 - [dma.md](dma.md) — `comp [dma]` memcpy between [mem](mem.md) instances; shared `.ram` with `ram =`
 - [asm.md](asm.md) — ISA and program blobs
+- [asm-microcode.md](asm-microcode.md) — `consts`, `macros`, `{ micro }`, dual legacy/micro execution
 - [mini-cpu-v2.md](mini-cpu-v2.md) — external mem stepping demo

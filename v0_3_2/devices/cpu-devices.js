@@ -126,6 +126,8 @@ function addCpu(id, config) {
     irqSavedIe: 0,
     vectorBase: config.vectorBase != null ? config.vectorBase : null,
     fixedVectors: config.fixedVectors || null,
+    isaRef: config.isaRef || null,
+    microSlots: new Map(),
   });
   if (config.spReg != null) cpuInitSp(cpus.get(id));
 }
@@ -315,13 +317,204 @@ function cpuTraceStep(c, ctx, instr) {
   }
 }
 
-function cpuStep(id, ctx) {
-  const c = getCpu(id);
-  if (!c) return;
-  c._stepCtx = ctx || null;
-  if (c.halted) return;
-  const instr = cpuFetchInstr(c);
-  c.lastInstr = instr;
+function cpuConstAddr(consts, name) {
+  if (!consts || consts[name] === undefined) return null;
+  const v = String(consts[name]).trim();
+  if (!v.startsWith('^')) return null;
+  const n = parseInt(v.slice(1), 16);
+  return isNaN(n) ? null : n;
+}
+
+function cpuConstLiteral(consts, name) {
+  if (!consts || consts[name] === undefined) return null;
+  const v = String(consts[name]).trim();
+  if (v.startsWith('^')) return null;
+  if (/^[01]+$/.test(v)) return parseInt(v, 2);
+  if (/^\d+$/.test(v)) return parseInt(v, 10);
+  return null;
+}
+
+function cpuMicroMask(c) {
+  return (1 << c.regDepth) - 1;
+}
+
+function cpuMicroArchRegAddr(consts, idx) {
+  return cpuConstAddr(consts, `R${idx}`);
+}
+
+function cpuMicroReadSlot(c, isaInst, addr) {
+  const consts = isaInst.consts || {};
+  const aluOutAddr = cpuConstAddr(consts, 'ALUOUT');
+  if (aluOutAddr !== null && addr === aluOutAddr) {
+    return cpuMicroAluEval(c, isaInst);
+  }
+  const pcAddr = cpuConstAddr(consts, 'PC');
+  if (pcAddr !== null && addr === pcAddr) return c.pc;
+  for (let i = 0; i < c.regCount; i++) {
+    const ra = cpuMicroArchRegAddr(consts, i);
+    if (ra !== null && ra === addr) return parseInt(c.regs[i], 2);
+  }
+  if (!c.microSlots) c.microSlots = new Map();
+  return c.microSlots.has(addr) ? c.microSlots.get(addr) : 0;
+}
+
+function cpuMicroWriteSlot(c, isaInst, addr, value, pcRef) {
+  const consts = isaInst.consts || {};
+  const masked = value & cpuMicroMask(c);
+  const pcAddr = cpuConstAddr(consts, 'PC');
+  if (pcAddr !== null && addr === pcAddr) {
+    c.pc = masked;
+    if (pcRef) pcRef.touched = true;
+    return;
+  }
+  for (let i = 0; i < c.regCount; i++) {
+    const ra = cpuMicroArchRegAddr(consts, i);
+    if (ra !== null && ra === addr) {
+      c.regs[i] = masked.toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
+      return;
+    }
+  }
+  if (!c.microSlots) c.microSlots = new Map();
+  c.microSlots.set(addr, masked);
+}
+
+function cpuMicroAluEval(c, isaInst) {
+  const consts = isaInst.consts || {};
+  const aAddr = cpuConstAddr(consts, 'ALUA');
+  const bAddr = cpuConstAddr(consts, 'ALUB');
+  const opAddr = cpuConstAddr(consts, 'ALUOP');
+  if (aAddr == null || bAddr == null || opAddr == null) {
+    throw Error('Micro ALU requires ALUA, ALUB, ALUOP in consts');
+  }
+  const a = cpuMicroReadSlot(c, isaInst, aAddr);
+  const b = cpuMicroReadSlot(c, isaInst, bAddr);
+  const opBits = cpuMicroReadSlot(c, isaInst, opAddr);
+  const addLit = cpuConstLiteral(consts, 'ADD');
+  const subLit = cpuConstLiteral(consts, 'SUB');
+  const mask = cpuMicroMask(c);
+  if (addLit !== null && opBits === addLit) return (a + b) & mask;
+  if (subLit !== null && opBits === subLit) return (a - b) & mask;
+  throw Error(`Micro: unsupported ALU operation code ${opBits}`);
+}
+
+function cpuMicroReadValue(c, isaInst, fields, sym) {
+  sym = String(sym).toUpperCase();
+  const consts = isaInst.consts || {};
+
+  if (sym === 'R') {
+    const idx = fields.R;
+    if (idx == null || idx < 0 || idx >= c.regCount) throw Error(`Micro: invalid R field ${idx}`);
+    return parseInt(c.regs[idx], 2);
+  }
+  if (sym === 'A') {
+    if (fields.A == null) throw Error('Micro: missing A field');
+    return fields.A;
+  }
+  const rm = /^R(\d+)$/.exec(sym);
+  if (rm) {
+    const idx = parseInt(rm[1], 10);
+    if (idx < 0 || idx >= c.regCount) throw Error(`Micro: invalid register ${sym}`);
+    return parseInt(c.regs[idx], 2);
+  }
+  if (sym === 'PC') return c.pc;
+  if (/^\d+$/.test(sym)) return parseInt(sym, 10);
+
+  const lit = cpuConstLiteral(consts, sym);
+  if (lit !== null) return lit;
+
+  const addr = cpuConstAddr(consts, sym);
+  if (addr !== null) return cpuMicroReadSlot(c, isaInst, addr);
+
+  throw Error(`Micro: unknown symbol '${sym}'`);
+}
+
+function cpuMicroWriteValue(c, isaInst, fields, sym, value, pcRef) {
+  sym = String(sym).toUpperCase();
+  const consts = isaInst.consts || {};
+  const masked = value & cpuMicroMask(c);
+
+  if (sym === 'R') {
+    const idx = fields.R;
+    if (idx == null || idx < 0 || idx >= c.regCount) throw Error(`Micro: invalid R field ${idx}`);
+    c.regs[idx] = masked.toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
+    return;
+  }
+  if (sym === 'A') throw Error('Micro: cannot write to operand A');
+  const rm = /^R(\d+)$/.exec(sym);
+  if (rm) {
+    const idx = parseInt(rm[1], 10);
+    if (idx < 0 || idx >= c.regCount) throw Error(`Micro: invalid register ${sym}`);
+    c.regs[idx] = masked.toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
+    return;
+  }
+  if (sym === 'PC') {
+    c.pc = masked;
+    if (pcRef) pcRef.touched = true;
+    return;
+  }
+  if (sym === 'HALTED') {
+    c.halted = masked ? 1 : 0;
+    return;
+  }
+
+  const addr = cpuConstAddr(consts, sym);
+  if (addr !== null) {
+    cpuMicroWriteSlot(c, isaInst, addr, masked, pcRef);
+    return;
+  }
+  throw Error(`Micro: cannot write '${sym}'`);
+}
+
+function cpuMicroDoRead(c, isaInst) {
+  const consts = isaInst.consts || {};
+  const marAddr = cpuConstAddr(consts, 'MAR');
+  const mdrAddr = cpuConstAddr(consts, 'MDR');
+  if (marAddr == null || mdrAddr == null) {
+    throw Error('Micro READ requires MAR and MDR in ISA consts');
+  }
+  const memAdr = cpuMicroReadSlot(c, isaInst, marAddr);
+  const cell = cpuReadRamCell(c, memAdr);
+  const val = cell != null ? parseInt(cell, 2) : 0;
+  cpuMicroWriteSlot(c, isaInst, mdrAddr, val, null);
+}
+
+function cpuMicroDoWrite(c, isaInst) {
+  const consts = isaInst.consts || {};
+  const marAddr = cpuConstAddr(consts, 'MAR');
+  const mdrAddr = cpuConstAddr(consts, 'MDR');
+  if (marAddr == null || mdrAddr == null) {
+    throw Error('Micro WRITE requires MAR and MDR in ISA consts');
+  }
+  const memAdr = cpuMicroReadSlot(c, isaInst, marAddr);
+  const val = cpuMicroReadSlot(c, isaInst, mdrAddr);
+  const bits = (val & cpuMicroMask(c)).toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
+  cpuWriteRamCell(c, memAdr, bits);
+}
+
+function cpuRunMicroSequence(c, isaInst, opDef, fields) {
+  const program = opDef.microProgram;
+  if (!program || !program.length) throw Error('Micro: empty microProgram');
+  const pcRef = { touched: false };
+  for (const mic of program) {
+    if (mic.kind === 'read') {
+      cpuMicroDoRead(c, isaInst);
+      continue;
+    }
+    if (mic.kind === 'write') {
+      cpuMicroDoWrite(c, isaInst);
+      continue;
+    }
+    if (mic.kind === 'transfer') {
+      const val = cpuMicroReadValue(c, isaInst, fields, mic.src);
+      cpuMicroWriteValue(c, isaInst, fields, mic.dst, val, pcRef);
+      continue;
+    }
+    throw Error(`Micro: unknown op kind '${mic.kind}'`);
+  }
+  if (!pcRef.touched && opDef.pcEffect === 'autoInc') c.pc += 1;
+}
+
+function cpuStepLegacy(c, ctx, instr) {
   const opc = instr.substring(0, 4);
   const lo = instr.substring(4);
   let nextPc = c.pc + 1;
@@ -418,7 +611,38 @@ function cpuStep(id, ctx) {
   }
 
   if (opc !== '0111' && opc !== '1110') c.pc = nextPc;
+}
 
+function cpuStep(id, ctx) {
+  const c = getCpu(id);
+  if (!c) return;
+  c._stepCtx = ctx || null;
+  if (c.halted) return;
+  const instr = cpuFetchInstr(c);
+  c.lastInstr = instr;
+
+  if (c.isaRef && ctx && ctx.inlineInstances && typeof decodeMnemonicFromBits === 'function') {
+    const isaInst = ctx.inlineInstances.get(c.isaRef);
+    if (isaInst && isaInst.opcodes) {
+      const isa = {
+        opcodes: isaInst.opcodes,
+        wordWidth: isaInst.wordWidth,
+        opcodeOrder: isaInst.opcodeOrder,
+      };
+      const decoded = decodeMnemonicFromBits(isa, instr);
+      if (decoded) {
+        const opDef = isaInst.opcodes[decoded.mnemonic];
+        if (opDef && opDef.microProgram && opDef.microProgram.length) {
+          cpuRunMicroSequence(c, isaInst, opDef, decoded.fields);
+          cpuTraceStep(c, ctx, instr);
+          if (!c.halted) cpuTryServeIrq(c);
+          return;
+        }
+      }
+    }
+  }
+
+  cpuStepLegacy(c, ctx, instr);
   cpuTraceStep(c, ctx, instr);
   if (!c.halted) cpuTryServeIrq(c);
 }

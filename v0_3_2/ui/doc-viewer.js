@@ -95,6 +95,7 @@ const DOC_SECTIONS = [
       { file: 'cpu.md', label: 'CPU Component (`comp [cpu]`)', searchPrimary: 'cpu comp.cpu doc(comp.cpu) registers pcInit onReset trace maxSteps sp', searchExtra: 'harvard prog ram set run irq load store' },
       { file: 'dma.md', label: 'DMA Component (`comp [dma]`)', searchPrimary: 'dma comp.dma mems copy queue busy done started queued rejected doc(comp.dma)', searchExtra: 'memcpy bulk transfer slot src dst instant wave logts-play doc(.dma) submitSeq' },
       { file: 'asm.md', label: 'asm', searchPrimary: 'ASM', searchExtra: 'inline assembler isa mnemonic program blob myisa decode disassemble disassembly' },
+      { file: 'asm-microcode.md', label: 'ASM microcode', searchPrimary: 'consts macros', searchExtra: 'consts macros micro READ WRITE MAR MDR pcEffect legacy dual doc(.cpuisa) doc(.cpuintern) FOO hybrid' },
       { file: 'asm-composition.md', label: 'ASM composition', searchExtra: 'use repeat align base external label multi-isa firmware boot dsp metadata asmModuleId' },
       { file: 'lut.md', label: 'lut', searchPrimary: 'LUT comp.lut doc(comp.lut)', searchExtra: 'inline lookup table decoder comp variableDepth prefixFree Huffman decode isValid' },
       { file: 'boolean-lut.md', label: 'Boolean LUT (lutOf / exprOfLut)', searchPrimary: 'lutOf exprOfLut', searchExtra: 'lutOf exprOfLut description filters inline truth table minimize Quine' },

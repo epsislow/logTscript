@@ -364,6 +364,10 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       outputTerminalId = this._resolveTerminalId(attributes.output, ctx);
     }
 
+    let isaRef = null;
+    const isaMembers = attributes.isaMembers;
+    if (isaMembers && isaMembers.length) isaRef = isaMembers[0];
+
     if (typeof addCpu === 'function') {
       addCpu(baseId, {
         regCount,
@@ -387,6 +391,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         progReadonly: progLink ? progLink.readonly : true,
         vectorBase,
         fixedVectors,
+        isaRef,
       });
     }
 
@@ -401,8 +406,47 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       ref: null,
       progMemRef: progLink ? progLink.compRef : null,
       ramMemRef: ramLink ? ramLink.compRef : null,
+      mmapRef: mmapLink ? mmapLink.compRef : null,
+      isaRef,
+      memoryMode: mmapLink ? 'mmap' : (ramLink || progLink ? 'external' : 'internal'),
+      attributes,
     };
+    if (isaRef && ctx && ctx.inlineInstances) {
+      const isaInst = ctx.inlineInstances.get(isaRef);
+      if (isaInst) {
+        compInfo.isaConsts = isaInst.consts ? { ...isaInst.consts } : {};
+        compInfo.isaMacros = isaInst.macros ? { ...isaInst.macros } : {};
+      }
+    }
     return compInfo;
+  }
+
+  static formatInstanceDoc(alias, comp) {
+    const lines = [];
+    const attrs = comp.attributes || {};
+    const mode = comp.memoryMode || 'internal';
+    lines.push(`${alias} (comp [cpu])`);
+    lines.push('');
+    lines.push(`memory: ${mode}`);
+    if (comp.isaRef) lines.push(`isa: ${comp.isaRef}`);
+    if (comp.progMemRef) lines.push(`prog = ${comp.progMemRef}`);
+    else lines.push('prog: internal');
+    if (comp.mmapRef) lines.push(`mmap = ${comp.mmapRef}`);
+    else if (comp.ramMemRef) lines.push(`ram = ${comp.ramMemRef}`);
+    else lines.push('ram: internal');
+    lines.push(`registers: ${attrs.registers !== undefined ? attrs.registers : 4}`);
+    lines.push('');
+    if (comp.isaConsts && Object.keys(comp.isaConsts).length) {
+      lines.push('ISA consts:');
+      for (const [name, val] of Object.entries(comp.isaConsts)) {
+        lines.push(`  ${name.padEnd(8)} ${val}`);
+      }
+      lines.push('');
+    }
+    lines.push('execution:');
+    lines.push('  legacy switch — opcodes without { micro }');
+    lines.push('  micro engine — opcodes with { micro } use ISA consts address map');
+    return lines;
   }
 
   _isActive(val) {

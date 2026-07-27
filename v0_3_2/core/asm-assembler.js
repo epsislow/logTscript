@@ -33,43 +33,284 @@ function formatAsmError(lineText, col, message) {
   return `${message}\n${lineText}\n${pointer}`;
 }
 
+function parseConstsBody(body, out) {
+  const lines = body.split(/[\n;]+/);
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    const eq = line.indexOf('=');
+    if (eq < 0) throw new Error(`Expected '=' in consts entry: ${line}`);
+    const name = line.slice(0, eq).trim().toUpperCase();
+    const val = line.slice(eq + 1).trim();
+    if (!name) throw new Error(`Missing const name: ${line}`);
+    if (out[name]) throw new Error(`Duplicate const '${name}'`);
+    out[name] = val;
+  }
+}
+
+function parseMacroParamToken(token) {
+  const t = token.trim();
+  if (!t) return null;
+  const colon = t.indexOf(':');
+  if (colon >= 0) return t.slice(0, colon).trim();
+  return t;
+}
+
+function parseMacrosBody(body, out) {
+  let pos = 0;
+  const src = body;
+  while (pos < src.length) {
+    pos = skipWsComments(src, pos);
+    if (pos >= src.length) break;
+    const rest = src.slice(pos);
+    const nameM = /^([A-Za-z_][A-Za-z0-9_]*)\s+/i.exec(rest);
+    if (!nameM) throw new Error(`Expected macro definition near: ${rest.slice(0, 60)}`);
+    const name = nameM[1].toUpperCase();
+    const braceLocal = rest.indexOf('{');
+    if (braceLocal < 0) throw new Error(`Expected "{" in macro '${name}'`);
+    const paramsRaw = rest.slice(nameM[0].length, braceLocal).trim();
+    const params = paramsRaw
+      ? paramsRaw.split(/\s+/).map(parseMacroParamToken).filter(Boolean)
+      : [];
+    const bracePos = pos + braceLocal;
+    const block = parseBraceBlock(src, bracePos);
+    if (out[name]) throw new Error(`Duplicate macro '${name}'`);
+    out[name] = { params, bodyRaw: block.body.trim() };
+    pos = skipWsComments(src, block.pos);
+  }
+}
+
+function splitMicroLines(body) {
+  const lines = [];
+  for (const part of String(body).split(/[\n;]+/)) {
+    const t = part.trim();
+    if (t) lines.push(t);
+  }
+  return lines;
+}
+
+function replaceMacroParam(body, param, arg) {
+  const re = new RegExp(`\\b${param}\\b`, 'gi');
+  return body.replace(re, arg);
+}
+
+function parseMicroLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  const upper = trimmed.toUpperCase();
+  if (upper === 'READ') return { kind: 'read' };
+  if (upper === 'WRITE') return { kind: 'write' };
+  const transfer = /^([A-Za-z_][A-Za-z0-9_]*)\s*<\s*(.+)$/i.exec(trimmed);
+  if (transfer) {
+    return {
+      kind: 'transfer',
+      dst: transfer[1].toUpperCase(),
+      src: transfer[2].trim().toUpperCase(),
+    };
+  }
+  const parts = trimmed.split(/\s+/);
+  const name = parts[0].toUpperCase();
+  return { kind: 'macroCall', name, args: parts.slice(1).map(a => a.toUpperCase()) };
+}
+
+function expandMicroLines(lines, macros, depth, stack) {
+  if (depth > 64) throw new Error('Macro expansion depth exceeded');
+  const out = [];
+  for (const line of lines) {
+    const parsed = parseMicroLine(line);
+    if (!parsed) continue;
+    if (parsed.kind === 'macroCall') {
+      if (stack.has(parsed.name)) throw new Error(`Recursive macro '${parsed.name}'`);
+      const def = macros[parsed.name];
+      if (!def) throw new Error(`Unknown macro '${parsed.name}'`);
+      if (def.params.length !== parsed.args.length) {
+        throw new Error(`Macro '${parsed.name}' expects ${def.params.length} argument(s), got ${parsed.args.length}`);
+      }
+      let body = def.bodyRaw;
+      for (let i = 0; i < def.params.length; i++) {
+        body = replaceMacroParam(body, def.params[i], parsed.args[i]);
+      }
+      const inner = splitMicroLines(body);
+      const newStack = new Set(stack);
+      newStack.add(parsed.name);
+      out.push(...expandMicroLines(inner, macros, depth + 1, newStack));
+    } else {
+      out.push(parsed);
+    }
+  }
+  return out;
+}
+
+function buildMicroProgram(microRaw, macros) {
+  const lines = splitMicroLines(microRaw);
+  return expandMicroLines(lines, macros, 0, new Set());
+}
+
+function computePcEffect(program) {
+  for (const op of program) {
+    if (op.kind === 'transfer' && op.dst === 'PC') return 'seq';
+    if (op.kind === 'transfer' && op.dst === 'HALTED') return 'halt';
+  }
+  return 'autoInc';
+}
+
+function legacyPcEffect(mnemonic) {
+  const m = String(mnemonic).toUpperCase();
+  if (m === 'HALT') return 'halt';
+  if (m === 'JMP' || m === 'BEQ' || m === 'RETI') return 'seq';
+  return 'autoInc';
+}
+
+function parseIsaPatternLine(line) {
+  const parts = line.split('+').map(p => p.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  return parts.map(p => parseFieldToken(p));
+}
+
+function readLogicalLine(rawSource, pos) {
+  pos = skipWsComments(rawSource, pos);
+  if (pos >= rawSource.length) return { done: true, pos };
+  const rest = rawSource.slice(pos);
+  const lineEnd = rest.search(/[\n;#]/);
+  const line = (lineEnd >= 0 ? rest.slice(0, lineEnd) : rest).trim();
+  const nextPos = pos + (lineEnd >= 0 ? lineEnd + 1 : rest.length);
+  return { line, pos: nextPos, done: false };
+}
+
 function parseIsaBody(rawSource) {
+  const consts = {};
+  const macros = {};
   const opcodes = {};
   const opcodeOrder = [];
   let wordWidth = null;
+  let hasAnyMicro = false;
 
-  const lines = rawSource.split('\n');
-  for (let li = 0; li < lines.length; li++) {
-    let line = lines[li];
-    const hash = line.indexOf('#');
-    if (hash >= 0) line = line.slice(0, hash);
-    line = line.trim();
-    if (!line || line === ':') continue;
+  let pos = 0;
+  while (pos < rawSource.length) {
+    pos = skipWsComments(rawSource, pos);
+    if (pos >= rawSource.length) break;
 
-    const colon = line.indexOf(':');
-    if (colon < 0) throw new Error(`Expected ':' in ISA opcode definition at line ${li + 1}: ${line}`);
+    const rest = rawSource.slice(pos);
+    const lineEnd = rest.search(/[\n;#]/);
+    const line = (lineEnd >= 0 ? rest.slice(0, lineEnd) : rest).trim();
+    let nextPos = pos + (lineEnd >= 0 ? lineEnd + 1 : rest.length);
 
-    const mnemonic = line.slice(0, colon).trim().toUpperCase();
-    if (!mnemonic) throw new Error(`Missing mnemonic at line ${li + 1}`);
+    if (!line || line === ':') {
+      pos = nextPos;
+      continue;
+    }
+
+    if (/^consts\s*:/i.test(line)) {
+      const bracePos = rest.indexOf('{');
+      if (bracePos < 0) throw new Error('Expected "{" after consts:');
+      const block = parseBraceBlock(rawSource, pos + bracePos);
+      parseConstsBody(block.body, consts);
+      pos = block.pos;
+      continue;
+    }
+
+    if (/^macros\s*:/i.test(line)) {
+      const bracePos = rest.indexOf('{');
+      if (bracePos < 0) throw new Error('Expected "{" after macros:');
+      const block = parseBraceBlock(rawSource, pos + bracePos);
+      parseMacrosBody(block.body, macros);
+      pos = block.pos;
+      continue;
+    }
+
+    const colonIdx = line.indexOf(':');
+    if (colonIdx < 0) throw new Error(`Expected ':' in ISA definition: ${line}`);
+
+    const mnemonic = line.slice(0, colonIdx).trim().toUpperCase();
+    if (!mnemonic) throw new Error(`Missing mnemonic near: ${line}`);
+    if (!/^[A-Z_][A-Z0-9_]*$/.test(mnemonic)) {
+      throw new Error(`Invalid mnemonic '${mnemonic}'`);
+    }
     if (opcodes[mnemonic]) throw new Error(`Duplicate mnemonic '${mnemonic}' in ISA definition`);
 
-    const rhs = line.slice(colon + 1).trim();
-    const parts = rhs.split('+').map(p => p.trim()).filter(Boolean);
-    if (!parts.length) throw new Error(`ISA opcode '${mnemonic}' has no bit segments`);
+    let patternLine = line.slice(colonIdx + 1).trim();
 
-    const segments = parts.map(p => parseFieldToken(p));
+    if (!patternLine || !patternLine.includes('+')) {
+      pos = skipWsComments(rawSource, nextPos);
+      const peek = readLogicalLine(rawSource, pos);
+      if (!peek.done && peek.line && peek.line.includes('+') && !peek.line.startsWith('{')) {
+        patternLine = peek.line;
+        nextPos = peek.pos;
+      }
+    }
+
+    if (!patternLine) throw new Error(`ISA opcode '${mnemonic}' has no bit segments`);
+
+    const segments = parseIsaPatternLine(patternLine);
+    if (!segments) throw new Error(`ISA opcode '${mnemonic}' has no bit segments`);
     const width = segments.reduce((s, seg) => s + segmentWidth(seg), 0);
     if (wordWidth === null) wordWidth = width;
     else if (wordWidth !== width) {
       throw new Error(`ISA opcode '${mnemonic}' encodes to ${width} bits but wordWidth is ${wordWidth}`);
     }
 
-    opcodes[mnemonic] = { segments, wordWidth: width, sourceLine: line };
+    pos = skipWsComments(rawSource, nextPos);
+    let microRaw = null;
+    let microProgram = null;
+    let pcEffect = legacyPcEffect(mnemonic);
+
+    if (pos < rawSource.length && rawSource[pos] === '{') {
+      const microBlock = parseBraceBlock(rawSource, pos);
+      microRaw = microBlock.body.trim();
+      hasAnyMicro = true;
+      microProgram = buildMicroProgram(microRaw, macros);
+      pcEffect = computePcEffect(microProgram);
+      pos = microBlock.pos;
+    } else {
+      pos = nextPos;
+    }
+
+    opcodes[mnemonic] = {
+      segments,
+      wordWidth: width,
+      sourceLine: patternLine,
+      microRaw,
+      microProgram,
+      pcEffect,
+      execution: microProgram ? 'micro' : 'legacy',
+    };
     opcodeOrder.push(mnemonic);
   }
 
   if (wordWidth === null) throw new Error('ISA definition has no opcodes');
-  return { opcodes, wordWidth, opcodeOrder };
+  return { opcodes, wordWidth, opcodeOrder, consts, macros, hasAnyMicro };
+}
+
+function decodeMnemonicFromBits(isa, bitsStr) {
+  const bits = String(bitsStr);
+  for (const mn of isa.opcodeOrder || Object.keys(isa.opcodes)) {
+    const def = isa.opcodes[mn];
+    if (!def || !def.segments) continue;
+    let pos = 0;
+    let matched = true;
+    const fields = {};
+    for (const seg of def.segments) {
+      const w = segmentWidth(seg);
+      const field = bits.substring(pos, pos + w);
+      if (field.length !== w) { matched = false; break; }
+      pos += w;
+      if (seg.kind === 'literal') {
+        if (field !== seg.bits) { matched = false; break; }
+      } else if (seg.kind === 'reg') {
+        fields.R = parseInt(field, 2);
+      } else if (seg.kind === 'addr') {
+        fields.A = parseInt(field, 2);
+      } else if (seg.kind === 'imm') {
+        let v = parseInt(field, 2);
+        if (seg.signed && field[0] === '1') v -= (1 << seg.width);
+        fields.imm = v;
+      }
+    }
+    if (matched && pos === bits.length) {
+      return { mnemonic: mn, fields };
+    }
+  }
+  return null;
 }
 
 function splitProgramRaw(raw) {
@@ -889,14 +1130,33 @@ function formatInstanceDoc(alias, inst) {
   lines.push('    show()');
   lines.push('    doc()');
   lines.push(`  wordWidth: ${inst.wordWidth}`);
+  if (inst.consts && Object.keys(inst.consts).length) {
+    lines.push('  consts:');
+    for (const [name, val] of Object.entries(inst.consts)) {
+      lines.push(`    ${name.padEnd(8)} ${val}`);
+    }
+  }
+  if (inst.macros && Object.keys(inst.macros).length) {
+    lines.push('  macros:');
+    for (const [name, def] of Object.entries(inst.macros)) {
+      const params = def.params && def.params.length ? `(${def.params.join(', ')})` : '()';
+      lines.push(`    ${name}${params}`);
+    }
+  }
   lines.push('  opcodes:');
   for (const mn of inst.opcodeOrder || Object.keys(inst.opcodes)) {
     const def = inst.opcodes[mn];
-    if (def && def.sourceLine) lines.push(`    ${mn}   : ${def.sourceLine.split(':').slice(1).join(':').trim().replace(/\+/g, ' + ')}`);
-    else if (def) {
-      const segs = def.segments.map(s => s.kind === 'literal' ? s.bits : (s.signed ? 'S' : '') + (s.kind === 'reg' ? 'R' : s.kind === 'addr' ? 'A' : '') + s.width + 'b').join(' + ');
-      lines.push(`    ${mn}   : ${segs}`);
+    if (!def) continue;
+    let pattern = '';
+    if (def.sourceLine) {
+      pattern = def.sourceLine.split(':').slice(1).join(':').trim().replace(/\+/g, ' + ');
+      if (!pattern) pattern = def.sourceLine.replace(/\+/g, ' + ');
+    } else if (def.segments) {
+      pattern = def.segments.map(s => s.kind === 'literal' ? s.bits : (s.signed ? 'S' : '') + (s.kind === 'reg' ? 'R' : s.kind === 'addr' ? 'A' : '') + s.width + 'b').join(' + ');
     }
+    const mode = def.execution || (def.microProgram ? 'micro' : 'legacy');
+    const pcFx = def.pcEffect ? `  pcEffect:${def.pcEffect}` : '';
+    lines.push(`    ${mn.padEnd(6)} ${pattern}  [${mode}]${pcFx}`);
   }
   return lines;
 }
@@ -904,7 +1164,10 @@ function formatInstanceDoc(alias, inst) {
 function formatAsmTypeDoc(typeName, templateIsa) {
   const lines = [];
   lines.push(`inline [${typeName}] .name:`);
-  lines.push('  MNEMONIC : opcode + field + field + ...');
+  lines.push('  consts:{ NAME = ^addr | literal }');
+  lines.push('  macros:{ Name param:{ micro-ops } }');
+  lines.push('  MNEMONIC : opcode + field + field');
+  lines.push('  { micro-instruction block }');
   lines.push('  :');
   if (templateIsa && templateIsa.opcodeOrder) {
     lines.push('');
@@ -934,6 +1197,9 @@ const asmAssemblerExports = {
   packUnsigned,
   expandProgramEntries,
   pass1CollectLabels,
+  buildMicroProgram,
+  decodeMnemonicFromBits,
+  computePcEffect,
 };
 
 if (typeof module !== 'undefined' && module.exports) {

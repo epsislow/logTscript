@@ -310,6 +310,7 @@ Assembler errors include the source line and `^^^` under the problematic token w
 ## Related
 
 - [asm-composition.md](asm-composition.md) — `use`, `repeat`, `align`, `base:`, external labels, multi-ISA
+- [asm-microcode.md](asm-microcode.md) — `consts`, `macros`, per-opcode `{ micro }`, `READ`/`WRITE`, `doc(.cpuisa)`
 - [mem.md](mem.md) — store assembled blob
 - [mini-cpu-v2.md](mini-cpu-v2.md) — end-to-end CPU with ASM program and `BEQ`
 - [lut.md](lut.md) — lookup tables

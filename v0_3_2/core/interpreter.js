@@ -1850,6 +1850,9 @@ class Interpreter {
         opcodes: isa.opcodes,
         wordWidth: isa.wordWidth,
         opcodeOrder: isa.opcodeOrder,
+        consts: isa.consts || {},
+        macros: isa.macros || {},
+        hasAnyMicro: !!isa.hasAnyMicro,
         bodyRaw: inline.bodyRaw,
       });
       return;
@@ -12602,6 +12605,13 @@ if (s.assignment) {
         if (result.keyboardHandler) compInfo.keyboardHandler = result.keyboardHandler;
         if (result.codesAcceptedFilter) compInfo.codesAcceptedFilter = result.codesAcceptedFilter;
         if (result.dmaMemSlots) compInfo.dmaMemSlots = result.dmaMemSlots;
+        if (result.isaRef) compInfo.isaRef = result.isaRef;
+        if (result.memoryMode) compInfo.memoryMode = result.memoryMode;
+        if (result.isaConsts) compInfo.isaConsts = result.isaConsts;
+        if (result.isaMacros) compInfo.isaMacros = result.isaMacros;
+        if (result.mmapRef) compInfo.mmapRef = result.mmapRef;
+        if (result.progMemRef) compInfo.progMemRef = result.progMemRef;
+        if (result.ramMemRef) compInfo.ramMemRef = result.ramMemRef;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;

@@ -26847,5 +26847,292 @@ reg(2691, 'show-tags', 'show/peek(.comp*) — dec ascii bin signed oct b32hex', 
       for (const t of tests) this.runMap.set(t.id, t.run);
     }
   };
+
+/* --- Phase 7: ASM microcode (consts, macros, CPU micro engine) --- */
+
+const CPU_ISA_MICRO_CONSTS = `inline [asm] .cpuisa:
+consts:{
+  PC = ^02
+  R0 = ^20
+  R1 = ^21
+  MAR = ^10
+  MDR = ^11
+  ALUA = ^30
+  ALUB = ^31
+  ALUOP = ^32
+  ALUOUT = ^33
+  ADD = 000
+  SUB = 001
+}
+macros:{
+  INC reg:{
+    ALUA < reg
+    ALUB < 1
+    ALUOP < ADD
+    reg < ALUOUT
+  }
+}
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  STORE : 0010 + R2b + A2b
+  HALT  : 0111 + 4b
+  FOO:
+  1011 + R2b + A2b
+  {
+    INC PC
+    MAR < A
+    READ
+    R < MDR
+  }
+  :
+`;
+
+reg(2692, 'asm-micro', 'parseIsaBody — consts macros micro FOO', function(h, session) {
+  const isa = parseIsaBody(CPU_ISA_MICRO_CONSTS.split('inline [asm] .cpuisa:')[1]);
+  h.assert('has consts PC', String(isa.consts.PC), '^02');
+  h.assert('has macro INC', String(!!isa.macros.INC), 'true');
+  h.assert('FOO micro', String(isa.opcodes.FOO.execution), 'micro');
+  h.assert('LOAD legacy', String(isa.opcodes.LOAD.execution), 'legacy');
+  h.assert('FOO pcEffect seq', String(isa.opcodes.FOO.pcEffect), 'seq');
+});
+
+reg(2693, 'asm-micro', 'INC PC expands to 4 transfers', function(h, session) {
+  const isa = parseIsaBody(CPU_ISA_MICRO_CONSTS.split('inline [asm] .cpuisa:')[1]);
+  const prog = isa.opcodes.FOO.microProgram;
+  h.assert('7 micro ops', String(prog.length), '7');
+  h.assert('first ALUA', String(prog[0].kind === 'transfer' && prog[0].dst === 'ALUA'), 'true');
+  h.assert('has READ', String(prog.some(o => o.kind === 'read')), 'true');
+});
+
+reg(2694, 'asm-micro', 'recursive macro error', function(h, session) {
+  let err = '';
+  try {
+    parseIsaBody('macros:{ A x:{ B x } B x:{ A x } } TRAP :\n1111 + 4b\n{\n  A PC\n}\n:');
+  } catch (e) { err = String(e.message || e); }
+  h.assert('recursive', String(err.includes('Recursive')), 'true');
+});
+
+reg(2695, 'asm-micro', 'CPU hybrid FOO micro LOAD legacy', function(h, session) {
+  const src = CPU_ISA_MICRO_CONSTS + `
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^11
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      FOO R0 A0
+      HALT
+    }
+  :
+`;
+  const { interp } = session.run(src);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  h.assert('isa linked', String(comp.isaRef), '.cpuisa');
+  session.execStmts(interp, '.u:{ set = 1 }');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('FOO loaded R0', r0.value, '00010001');
+  const pc = handler.evalGetProperty(comp, 'pc', { var: '.u', property: 'pc' }, interp);
+  h.assert('pc after FOO', String(parseInt(pc.value, 2)), '1');
+});
+
+reg(2696, 'asm-micro', 'CPU legacy LOAD still works with hybrid ISA', function(h, session) {
+  const src = CPU_ISA_MICRO_CONSTS + `
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^11
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      LOAD R0 A0
+      HALT
+    }
+  :
+`;
+  const { interp } = session.run(src);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  session.execStmts(interp, '.u:{ set = 1 }');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('legacy LOAD', r0.value, '00010001');
+});
+
+reg(2697, 'asm-micro', 'CPU_ISA_MIN regression without micro', function(h, session) {
+  const src = CPU_ISA_MIN + `comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^11
+  prog:
+    depth: 8
+    length: 4
+    = .cpuisa { LOAD R0 A0; HALT }
+  :
+`;
+  const { interp } = session.run(src);
+  cpuStepUntilHalt(session, interp, '.u', 10);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('min isa LOAD', r0.value, '00010001');
+});
+
+reg(2698, 'asm-micro', 'doc(.cpuisa) shows consts and pcEffect', function(h, session) {
+  const out = session.runDoc(CPU_ISA_MICRO_CONSTS + '\ndoc(.cpuisa)');
+  h.assert('consts PC', String(out.some(l => l.includes('PC') && l.includes('^02'))), 'true');
+  h.assert('FOO micro', String(out.some(l => l.includes('FOO') && l.includes('[micro]'))), 'true');
+  h.assert('LOAD legacy', String(out.some(l => l.includes('LOAD') && l.includes('[legacy]'))), 'true');
+  h.assert('pcEffect', String(out.some(l => l.includes('pcEffect'))), 'true');
+});
+
+reg(2699, 'asm-micro', 'doc(.cpuintern) CPU shows isa consts internal memory', function(h, session) {
+  const src = CPU_ISA_MICRO_CONSTS + `
+comp [cpu] .cpuintern:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+  prog:
+    depth: 8
+    length: 4
+  :
+
+doc(.cpuintern)
+`;
+  const out = session.runDoc(src);
+  h.assert('memory internal', String(out.some(l => l.includes('memory: internal'))), 'true');
+  h.assert('isa consts MAR', String(out.some(l => l.includes('MAR') && l.includes('^10'))), 'true');
+});
+
+reg(2700, 'asm-micro', 'doc(.cpucompexterne) external prog and ram', function(h, session) {
+  const src = CPU_ISA_MICRO_CONSTS + `
+comp [mem] .rom:
+  depth: 8
+  length: 8
+  readonly:
+  on: 1
+  = .cpuisa { HALT }
+  :
+
+comp [mem] .data:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+  :
+
+comp [cpu] .cpucompexterne:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  prog = .rom
+  ram = .data
+  :
+
+doc(.cpucompexterne)
+`;
+  const out = session.runDoc(src);
+  h.assert('memory external', String(out.some(l => l.includes('memory: external'))), 'true');
+  h.assert('prog link', String(out.some(l => l.includes('prog = .rom'))), 'true');
+  h.assert('ram link', String(out.some(l => l.includes('ram = .data'))), 'true');
+  h.assert('isa consts PC', String(out.some(l => l.includes('PC') && l.includes('^02'))), 'true');
+});
+
+reg(2701, 'asm-micro', 'doc(.cpummap) mmap binding and doc(.mmap) regions', function(h, session) {
+  const src = CPU_ISA_MICRO_CONSTS + MMAP_CPU_RAM_SETUP + `
+comp [cpu] .cpummap:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  mmap = .mmap
+  prog:
+    depth: 8
+    length: 4
+  :
+
+doc(.cpummap)
+doc(.mmap)
+`;
+  const out = session.runDoc(src);
+  h.assert('memory mmap', String(out.some(l => l.includes('memory: mmap'))), 'true');
+  h.assert('mmap ref', String(out.some(l => l.includes('mmap = .mmap'))), 'true');
+  h.assert('region mem', String(out.some(l => l.includes('mem .ram'))), 'true');
+});
+
+function runMicroCpuFoo(h, session) {
+  const src = CPU_ISA_MICRO_CONSTS + `
+comp [cpu] .u:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^11
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      FOO R0 A0
+      HALT
+    }
+  :
+`;
+  const { interp } = session.run(src);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  session.execStmts(interp, '.u:{ set = 1 }');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('FOO loaded R0', r0.value, '00010001');
+}
+
+reg(2702, 'asm-micro', 'CPU hybrid FOO micro wave', runMicroCpuFoo, { propagation: 'wave' });
+
+reg(2703, 'asm-micro', 'asm-microcode.md logts-play smoke internal', function(h, session) {
+  const src = CPU_ISA_MICRO_CONSTS + `
+comp [cpu] .cpuintern:
+  isa: .cpuisa
+  registers: 2
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+    = ^11
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      FOO R0 A0
+      HALT
+    }
+  :
+.cpuintern:{ set = 1 }
+8wire r0 = .cpuintern:r0
+show(r0)
+`;
+  const { interp } = session.run(src);
+  const comp = interp.components.get('.cpuintern');
+  const handler = session._ensureRegistry().get('cpu');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.cpuintern', property: 'r0' }, interp);
+  h.assert('r0', r0.value, '00010001');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();
