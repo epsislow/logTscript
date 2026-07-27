@@ -340,6 +340,8 @@ const DOCS = DOC_SECTIONS.flatMap(function (section) {
 const DOC_SEARCH_INDEX = DocSearchIndex.buildIndex(DOC_SECTIONS, DOC_SEARCH_ONLY);
 
 let currentDocFile = '';
+let currentDocAnchor = null;
+let currentDocToc = [];
 let lastDocScrollTop = 0;
 let playBlockIndex = 0;
 let docViewerReady = false;
@@ -374,8 +376,43 @@ function docCaptureCurrentPlace() {
   return {
     file: currentDocFile,
     scrollTop: captureDocScroll(),
+    anchor: currentDocAnchor,
     label: docLabelForFile(currentDocFile),
   };
+}
+
+function docPlacesEqual(a, b) {
+  if (a.file !== b.file) return false;
+  if (a.anchor && b.anchor) return a.anchor === b.anchor;
+  if (a.anchor || b.anchor) return false;
+  return Math.abs((a.scrollTop || 0) - (b.scrollTop || 0)) < 2;
+}
+
+function parseDocLocationHash(raw) {
+  if (!raw || raw === 'index' || raw === 'history') {
+    return { file: raw || '', anchor: null };
+  }
+  const tilde = raw.indexOf('~');
+  if (tilde >= 0) {
+    return {
+      file: raw.slice(0, tilde),
+      anchor: raw.slice(tilde + 1) || null,
+    };
+  }
+  return { file: raw, anchor: null };
+}
+
+function buildDocLocationHash(file, anchor) {
+  if (!file) return '#index';
+  if (file === DOC_PAGE_HISTORY) return '#history';
+  return anchor ? '#' + file + '~' + anchor : '#' + file;
+}
+
+function updateDocLocationHash(file, anchor) {
+  const hash = buildDocLocationHash(file, anchor);
+  if (location.hash !== hash) {
+    history.replaceState(null, '', hash);
+  }
 }
 
 function trimDocBackStack() {
@@ -394,6 +431,7 @@ function appendDocNavLog(entry) {
   docNavLog.push({
     file: entry.file,
     scrollTop: entry.scrollTop != null ? entry.scrollTop : 0,
+    anchor: entry.anchor || null,
     label: entry.label || docLabelForFile(entry.file),
     kind: entry.kind || 'nav',
     at: Date.now(),
@@ -437,9 +475,11 @@ function renderDocHistoryHtml() {
       const active = i === currentIdx ? ' doc-history-page-active' : '';
       const prefix = formatDocHistoryKind(entry);
       const meta = formatDocHistoryMeta(entry);
-      const scrollHint = entry.scrollTop > 0
-        ? ' <span class="doc-history-page-scroll">@' + entry.scrollTop + 'px</span>'
-        : '';
+      const scrollHint = entry.anchor
+        ? ' <span class="doc-history-page-anchor">\u00a7' + escapeHtml(entry.anchor) + '</span>'
+        : (entry.scrollTop > 0
+          ? ' <span class="doc-history-page-scroll">@' + entry.scrollTop + 'px</span>'
+          : '');
       return (
         '<li class="doc-history-page-item' + active + '">' +
         '<button type="button" class="doc-history-page-link" data-history-index="' + i + '">' +
@@ -490,6 +530,8 @@ function renderDocHistoryPage(options) {
   const scrollTop = options.scrollTop != null ? options.scrollTop : 0;
 
   currentDocFile = DOC_PAGE_HISTORY;
+  currentDocAnchor = null;
+  currentDocToc = [];
   lastDocScrollTop = scrollTop;
   const el = document.getElementById('docContent');
   if (!el) return;
@@ -499,6 +541,7 @@ function renderDocHistoryPage(options) {
   updateDocToolbar();
   syncDocSearchInput();
   closeDocSearchMenu();
+  closeDocContentsPanel();
 
   if (location.hash !== '#history') {
     history.replaceState(null, '', '#history');
@@ -536,13 +579,14 @@ function navigateDoc(targetFile, options) {
   options = options || {};
   const kind = options.kind || 'nav';
   const scrollTop = options.scrollTop != null ? options.scrollTop : 0;
+  const anchor = options.anchor || null;
   const skipPush = options.skipPush === true || docNavSuppressPush;
   const skipLog = options.skipLog === true;
 
   if (!skipPush && document.body.classList.contains('doc-mode')) {
     const current = docCaptureCurrentPlace();
-    const sameTarget = current.file === targetFile && Math.abs(current.scrollTop - scrollTop) < 2;
-    if (!sameTarget) {
+    const targetPlace = { file: targetFile, scrollTop: scrollTop, anchor: anchor };
+    if (!docPlacesEqual(current, targetPlace)) {
       docBackStack.push(current);
       trimDocBackStack();
     }
@@ -552,6 +596,7 @@ function navigateDoc(targetFile, options) {
     appendDocNavLog({
       file: targetFile,
       scrollTop: scrollTop,
+      anchor: anchor,
       label: options.label || docLabelForFile(targetFile),
       kind: kind,
     });
@@ -560,11 +605,15 @@ function navigateDoc(targetFile, options) {
   docNavSuppressPush = true;
   try {
     if (targetFile === DOC_PAGE_HISTORY) {
-      renderDocHistoryPage({ scrollTop: scrollTop, mobileScroll: scrollTop === 0 });
+      renderDocHistoryPage({ scrollTop: scrollTop, mobileScroll: scrollTop === 0 && !anchor });
     } else if (!targetFile) {
-      renderDocIndexPage({ scrollTop: scrollTop, mobileScroll: scrollTop === 0 });
+      renderDocIndexPage({ scrollTop: scrollTop, mobileScroll: scrollTop === 0 && !anchor });
     } else {
-      renderDocPage(targetFile, { scrollTop: scrollTop, mobileScroll: scrollTop === 0 });
+      renderDocPage(targetFile, {
+        scrollTop: scrollTop,
+        anchor: anchor,
+        mobileScroll: scrollTop === 0 && !anchor,
+      });
     }
   } finally {
     docNavSuppressPush = false;
@@ -583,6 +632,7 @@ function docGoBack() {
     appendDocNavLog({
       file: prev.file,
       scrollTop: prev.scrollTop,
+      anchor: prev.anchor || null,
       label: prev.label,
       kind: 'back',
     });
@@ -591,7 +641,11 @@ function docGoBack() {
     } else if (!prev.file) {
       renderDocIndexPage({ scrollTop: prev.scrollTop, mobileScroll: false });
     } else {
-      renderDocPage(prev.file, { scrollTop: prev.scrollTop, mobileScroll: false });
+      renderDocPage(prev.file, {
+        scrollTop: prev.scrollTop,
+        anchor: prev.anchor || null,
+        mobileScroll: false,
+      });
     }
   } finally {
     docNavSuppressPush = false;
@@ -605,6 +659,7 @@ function gotoDocHistoryEntry(index) {
   if (!entry) return;
   navigateDoc(entry.file, {
     scrollTop: entry.scrollTop,
+    anchor: entry.anchor || null,
     kind: 'history',
     label: entry.label,
   });
@@ -629,6 +684,8 @@ function initDocViewer() {
   }
   initDocSearch();
   initDocHistory();
+  initDocContents();
+  initDocScrollAnchorReset();
 }
 
 function initDocHistory() {
@@ -791,6 +848,14 @@ function updateDocToolbar() {
   if (btn) {
     btn.style.display = isDocIndexPage() ? 'none' : '';
   }
+  const btnContents = document.getElementById('btnDocContents');
+  if (btnContents) {
+    const showContents = currentDocToc.length >= 2 && !isDocIndexPage() && !isDocHistoryPage();
+    btnContents.style.display = showContents ? '' : 'none';
+    if (!showContents) {
+      closeDocContentsPanel();
+    }
+  }
   updateDocNavButtons();
 }
 
@@ -829,24 +894,30 @@ function showDocView() {
       console.error('loadDocHistory failed', e);
       showDocError('', 'Failed to render history: ' + e.message);
     }
-  } else if (hash && hash !== 'index' && window.DOC_CONTENT && window.DOC_CONTENT[hash]) {
-    try {
-      if (currentDocFile === hash) {
-        renderDocPage(hash, { scrollTop: lastDocScrollTop });
-      } else {
-        docNavSuppressPush = true;
-        try {
-          renderDocPage(hash, { scrollTop: 0 });
-          if (!docNavLog.length) {
-            logDocInitialLanding(hash, 0);
+  } else if (hash && hash !== 'index') {
+    const loc = parseDocLocationHash(hash);
+    if (loc.file && window.DOC_CONTENT && window.DOC_CONTENT[loc.file]) {
+      try {
+        if (currentDocFile === loc.file) {
+          renderDocPage(loc.file, {
+            scrollTop: lastDocScrollTop,
+            anchor: loc.anchor || currentDocAnchor,
+          });
+        } else {
+          docNavSuppressPush = true;
+          try {
+            renderDocPage(loc.file, { scrollTop: 0, anchor: loc.anchor });
+            if (!docNavLog.length) {
+              logDocInitialLanding(loc.file, 0);
+            }
+          } finally {
+            docNavSuppressPush = false;
           }
-        } finally {
-          docNavSuppressPush = false;
         }
+      } catch (e) {
+        console.error('loadDoc failed', e);
+        showDocError(loc.file, 'Failed to render doc: ' + e.message);
       }
-    } catch (e) {
-      console.error('loadDoc failed', e);
-      showDocError(hash, 'Failed to render doc: ' + e.message);
     }
   } else if (isDocHistoryPage()) {
     try {
@@ -930,6 +1001,8 @@ function renderDocIndexPage(options) {
   const scrollTop = options.scrollTop != null ? options.scrollTop : 0;
 
   currentDocFile = '';
+  currentDocAnchor = null;
+  currentDocToc = [];
   lastDocScrollTop = scrollTop;
   const el = document.getElementById('docContent');
   if (!el) return;
@@ -937,6 +1010,7 @@ function renderDocIndexPage(options) {
   el.innerHTML = renderDocIndexHtml();
   updateDocToolbar();
   syncDocSearchInput();
+  closeDocContentsPanel();
 
   if (location.hash !== '#index') {
     history.replaceState(null, '', '#index');
@@ -959,6 +1033,8 @@ function renderDocIndexPage(options) {
 function showDocError(filename, message) {
   const el = document.getElementById('docContent');
   if (!el) return;
+  currentDocToc = [];
+  currentDocAnchor = null;
   el.innerHTML =
     '<p class="doc-error">' +
     message +
@@ -1435,17 +1511,180 @@ function enhancePacketLayoutBlocks(container) {
   });
 }
 
+function githubHeadingSlug(text) {
+  let s = String(text).trim().toLowerCase().replace(/`/g, '');
+  s = s.replace(/\s*\/\s*/g, '--');
+  s = s.replace(/[^\w\s-]/g, '');
+  s = s.replace(/\s+/g, '-');
+  return s;
+}
+
+function enhanceHeadingAnchors(container) {
+  const usedIds = Object.create(null);
+  const toc = [];
+
+  container.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(function (heading) {
+    const level = parseInt(heading.tagName.slice(1), 10);
+    let text = heading.textContent || '';
+    let id = null;
+    const custom = text.match(/\s*\{#([a-zA-Z0-9_-]+)\}\s*$/);
+    if (custom) {
+      id = custom[1];
+      text = text.replace(/\s*\{#[a-zA-Z0-9_-]+\}\s*$/, '').trim();
+      heading.textContent = text;
+    } else {
+      id = githubHeadingSlug(text);
+    }
+    if (!id) return;
+
+    let uniqueId = id;
+    let suffix = 1;
+    while (usedIds[uniqueId]) {
+      uniqueId = id + '-' + suffix;
+      suffix += 1;
+    }
+    usedIds[uniqueId] = true;
+    heading.id = uniqueId;
+
+    if (level >= 2 && level <= 3) {
+      toc.push({ level: level, id: uniqueId, label: text });
+    }
+  });
+
+  return toc;
+}
+
+let docScrollAnchorResetTimer = null;
+let docSuppressScrollAnchorReset = false;
+
+function initDocScrollAnchorReset() {
+  const main = document.getElementById('docMain');
+  if (!main) return;
+  main.addEventListener('scroll', function () {
+    if (docSuppressScrollAnchorReset) return;
+    if (!currentDocAnchor) return;
+    if (docScrollAnchorResetTimer) {
+      clearTimeout(docScrollAnchorResetTimer);
+    }
+    docScrollAnchorResetTimer = setTimeout(function () {
+      currentDocAnchor = null;
+    }, 120);
+  }, { passive: true });
+}
+
+function scrollToDocAnchor(anchor, options) {
+  options = options || {};
+  if (!anchor) return false;
+  const target = document.getElementById(anchor);
+  if (!target) return false;
+
+  docSuppressScrollAnchorReset = true;
+  requestAnimationFrame(function () {
+    target.scrollIntoView({
+      block: 'start',
+      behavior: options.smooth ? 'smooth' : 'auto',
+    });
+    currentDocAnchor = anchor;
+    if (currentDocFile && !isDocIndexPage() && !isDocHistoryPage()) {
+      updateDocLocationHash(currentDocFile, anchor);
+    }
+    setTimeout(function () {
+      docSuppressScrollAnchorReset = false;
+    }, 150);
+  });
+  return true;
+}
+
+function closeDocContentsPanel() {
+  const panel = document.getElementById('docContentsPanel');
+  const btn = document.getElementById('btnDocContents');
+  if (panel) panel.hidden = true;
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function renderDocContentsPanel() {
+  const panel = document.getElementById('docContentsPanel');
+  if (!panel) return;
+
+  if (!currentDocToc.length) {
+    panel.innerHTML = '<p class="doc-contents-empty">No sections</p>';
+    return;
+  }
+
+  const items = currentDocToc.map(function (item) {
+    const cls = item.level === 3 ? ' doc-contents-item--h3' : '';
+    return (
+      '<li class="doc-contents-item' + cls + '">' +
+      '<button type="button" class="doc-contents-link" data-doc-anchor="' + escapeHtml(item.id) + '">' +
+      escapeHtml(item.label) +
+      '</button></li>'
+    );
+  }).join('');
+
+  panel.innerHTML = '<ul class="doc-contents-list" role="list">' + items + '</ul>';
+}
+
+function toggleDocContentsPanel() {
+  const panel = document.getElementById('docContentsPanel');
+  const btn = document.getElementById('btnDocContents');
+  if (!panel || !btn) return;
+
+  const open = panel.hidden;
+  if (open) {
+    renderDocContentsPanel();
+    panel.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+  } else {
+    closeDocContentsPanel();
+  }
+}
+
+function initDocContents() {
+  const btn = document.getElementById('btnDocContents');
+  const panel = document.getElementById('docContentsPanel');
+  const wrap = document.getElementById('docContentsWrap');
+  if (!btn || !panel) return;
+
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    toggleDocContentsPanel();
+  });
+
+  panel.addEventListener('click', function (e) {
+    const link = e.target.closest('[data-doc-anchor]');
+    if (!link) return;
+    const anchor = link.getAttribute('data-doc-anchor');
+    if (!anchor) return;
+    scrollToDocAnchor(anchor, { smooth: true });
+    closeDocContentsPanel();
+  });
+
+  document.addEventListener('click', function (e) {
+    if (panel.hidden) return;
+    if (wrap && wrap.contains(e.target)) return;
+    closeDocContentsPanel();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && panel && !panel.hidden) {
+      closeDocContentsPanel();
+    }
+  });
+}
+
 function loadDoc(filename, options) {
   options = options || {};
   if (docNavSuppressPush) {
     renderDocPage(filename, {
       scrollTop: options.scrollTop != null ? options.scrollTop : (options.restoreScroll ? lastDocScrollTop : 0),
+      anchor: options.anchor || null,
     });
     return;
   }
   navigateDoc(filename, {
     kind: options.kind || 'nav',
     scrollTop: options.scrollTop != null ? options.scrollTop : 0,
+    anchor: options.anchor || null,
     label: options.label,
   });
 }
@@ -1453,6 +1692,7 @@ function loadDoc(filename, options) {
 function renderDocPage(filename, options) {
   options = options || {};
   const scrollTop = options.scrollTop != null ? options.scrollTop : 0;
+  const anchor = options.anchor || null;
 
   const content = window.DOC_CONTENT && window.DOC_CONTENT[filename];
   if (!content) {
@@ -1465,27 +1705,36 @@ function renderDocPage(filename, options) {
 
   lastDocScrollTop = scrollTop;
   currentDocFile = filename;
+  currentDocAnchor = anchor;
   const el = document.getElementById('docContent');
   if (typeof marked === 'undefined') {
     showDocError(filename, 'marked.min.js not loaded');
     return;
   }
   el.innerHTML = marked.parse(content, { gfm: true, breaks: false });
+  currentDocToc = enhanceHeadingAnchors(el);
   enhancePlayBlocks(el);
   enhancePacketLayoutBlocks(el);
   enhanceClcdSymbolGallery(el);
   updateDocToolbar();
   syncDocSearchInput();
   closeDocSearchMenu();
+  closeDocContentsPanel();
 
-  const hash = '#' + filename;
-  if (location.hash !== hash) {
-    history.replaceState(null, '', hash);
-  }
+  updateDocLocationHash(filename, anchor);
 
   const main = document.getElementById('docMain');
 
-  if (scrollTop > 0) {
+  if (anchor) {
+    requestAnimationFrame(function () {
+      if (!scrollToDocAnchor(anchor)) {
+        currentDocAnchor = null;
+        updateDocLocationHash(filename, null);
+        el.scrollTop = 0;
+        if (main) main.scrollTop = 0;
+      }
+    });
+  } else if (scrollTop > 0) {
     requestAnimationFrame(function () {
       applyDocScroll(scrollTop);
     });
@@ -1498,14 +1747,24 @@ function renderDocPage(filename, options) {
   }
 }
 
-function resolveMdHref(href) {
+function parseDocHref(href) {
   if (!href || href.startsWith('http://') || href.startsWith('https://')) {
     return null;
   }
-  const base = href.split('#')[0].split('?')[0];
+  const hashIdx = href.indexOf('#');
+  const base = (hashIdx >= 0 ? href.slice(0, hashIdx) : href).split('?')[0];
+  const anchor = hashIdx >= 0 ? decodeURIComponent(href.slice(hashIdx + 1)) : null;
+  if (!anchor && !base) return null;
+
+  if (!base) {
+    if (anchor && currentDocFile && window.DOC_CONTENT && window.DOC_CONTENT[currentDocFile]) {
+      return { file: currentDocFile, anchor: anchor };
+    }
+    return null;
+  }
   if (!base.endsWith('.md')) return null;
   const parts = base.split('/');
-  return parts[parts.length - 1];
+  return { file: parts[parts.length - 1], anchor: anchor || null };
 }
 
 function onDocContentClick(e) {
@@ -1514,13 +1773,32 @@ function onDocContentClick(e) {
   const link = e.target.closest('a');
   if (!link) return;
 
-  const filename = resolveMdHref(link.getAttribute('href'));
-  if (!filename) return;
+  const parsed = parseDocHref(link.getAttribute('href'));
+  if (!parsed) return;
 
-  if (!window.DOC_CONTENT || !window.DOC_CONTENT[filename]) return;
+  if (!window.DOC_CONTENT || !window.DOC_CONTENT[parsed.file]) return;
 
   e.preventDefault();
-  loadDoc(filename, { kind: 'link' });
+  if (parsed.file === currentDocFile && parsed.anchor) {
+    if (!docNavSuppressPush) {
+      const current = docCaptureCurrentPlace();
+      const targetPlace = { file: parsed.file, anchor: parsed.anchor, scrollTop: 0 };
+      if (!docPlacesEqual(current, targetPlace)) {
+        docBackStack.push(current);
+        trimDocBackStack();
+        appendDocNavLog({
+          file: parsed.file,
+          anchor: parsed.anchor,
+          scrollTop: 0,
+          kind: 'link',
+        });
+        updateDocNavButtons();
+      }
+    }
+    scrollToDocAnchor(parsed.anchor, { smooth: true });
+    return;
+  }
+  loadDoc(parsed.file, { kind: 'link', anchor: parsed.anchor });
 }
 
 function openDocViewFromHash() {
@@ -1544,10 +1822,11 @@ function openDocViewFromHash() {
       document.body.classList.add('doc-mode');
       return true;
     }
-    if (hash && window.DOC_CONTENT && window.DOC_CONTENT[hash]) {
-      renderDocPage(hash, { scrollTop: 0 });
+    const loc = parseDocLocationHash(hash);
+    if (loc.file && window.DOC_CONTENT && window.DOC_CONTENT[loc.file]) {
+      renderDocPage(loc.file, { scrollTop: 0, anchor: loc.anchor });
       if (!docNavLog.length) {
-        logDocInitialLanding(hash, 0);
+        logDocInitialLanding(loc.file, 0);
       }
       document.body.classList.add('doc-mode');
       return true;

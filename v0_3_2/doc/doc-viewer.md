@@ -14,11 +14,12 @@ The landing page lists topics grouped by section (**Reference**, **Composite blo
 |---------|--------|
 | **← Back** | Return to the previous page in your session (disabled on the first page) |
 | **History** | List of pages you opened this session — click to jump back |
+| **Contents** | Table of contents for the current page (sections **h2** / **h3**) — click to jump |
 | **Search** | Filter topics by title and **primary keywords** (canonical page for a function/mode/component) plus secondary synonyms; best match appears first (**Enter** to open) |
 
-Internal links (`[label](other-page.md)` or `[label](other-page.md#anchor)`) stay inside the viewer. External `http(s)` links open normally.
+Internal links (`[label](other-page.md)`, `[label](other-page.md#anchor)`, or `[label](#anchor)` on the same page) stay inside the viewer and scroll to the section. External `http(s)` links open normally.
 
-The address bar hash updates to `#filename.md` while you read (e.g. `#editorUI.md`). Refreshing the page with that hash reopens the same document.
+The address bar hash updates to `#filename.md` while you read (e.g. `#editorUI.md`), or `#filename.md~anchor` when you are at a section (e.g. `#cpu.md~run-and-maxsteps`). Refreshing the page with that hash reopens the same document at that section.
 
 ---
 
