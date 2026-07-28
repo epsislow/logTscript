@@ -27706,6 +27706,87 @@ comp [cache] .l1:
   h.assert('capacity', String(doc.includes('capacity: 4')), 'true');
 });
 
+reg(2725, 'comp-cache', 'evictType fifo tag conflict increments evictions', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^01020304
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  evictType: fifo
+  on: 1
+:
+`);
+  const l1Id = interp.components.get('.l1').deviceIds[0];
+  const c = getCache(l1Id);
+  h.assert('policy fifo', c.evictType, 'fifo');
+  getMem(l1Id, 0);
+  getMem(l1Id, 1);
+  h.assert('fifoSeq order across sets', String(c.sets[0].fifoSeq < c.sets[1].fifoSeq), 'true');
+  getMem(l1Id, 4);
+  h.assert('one eviction', cacheProp(session, interp, '.l1', 'evictions'), '0000000000000001');
+  h.assert('tag1 in set0', String(c.sets[0].tag), '1');
+});
+
+reg(2726, 'comp-cache', 'evictType random tag conflict increments evictions', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^0a0b0c0d
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  evictType: random
+  on: 1
+:
+`);
+  const l1Id = interp.components.get('.l1').deviceIds[0];
+  const c = getCache(l1Id);
+  h.assert('policy random', c.evictType, 'random');
+  h.assert('rng seed default', String(c.rngSeed), '1');
+  getMem(l1Id, 0);
+  getMem(l1Id, 4);
+  h.assert('one eviction', cacheProp(session, interp, '.l1', 'evictions'), '0000000000000001');
+  h.assert('tag1 in set0', String(c.sets[0].tag), '1');
+});
+
+reg(2727, 'comp-cache', 'evictType invalid literal defaults to lru', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  evictType: mru
+  on: 1
+:
+`);
+  const l1Id = interp.components.get('.l1').deviceIds[0];
+  h.assert('policy lru fallback', getCache(l1Id).evictType, 'lru');
+});
+
 reg(2721, 'parser', 'cpu on after ram sub-block stays component attribute', function(h, session) {
   const stmts = session.parse(`
 comp [cpu] .u:
