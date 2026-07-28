@@ -1,6 +1,6 @@
 ---
 name: Componenta PLC
-overview: "Plan `inline [plc]` + `comp [plc]`: limbaj logic hardware-independent, mapare I/O, scan cycle. Model paralel cu `inline [asm]` + `comp [cpu]`. Faze amânate P+a (timere), P+b (analog)."
+overview: "Plan `inline [plc]` + `comp [plc]`: limbaj logic hardware-independent, mapare I/O, scan cycle. Model paralel cu `inline [asm]` + `comp [cpu]`. P4 (scanTime/busy) în sub-faze P4.0–P4.3. Faze amânate P+a (timere), P+b (analog)."
 todos:
   - id: p0-decisions
     content: "P0: decizii lățimi, mapare, on: vs comandă, sintaxă START — închise"
@@ -21,7 +21,19 @@ todos:
     content: "P3c (amânat): comp motor, sensor, fan, button — viteză/rotație, vizual diferențiat"
     status: pending
   - id: p4-scantime
-    content: "P4 (opțional): scanTime + osc, busy"
+    content: "P4: scanTime + busy — decizii închise; sub-faze P4.0–P4.3"
+    status: pending
+  - id: p4-0-osc-doc
+    content: "P4.0: doc pattern osc extern (scanTime:0, set=.clk:get) — fără cod nou obligatoriu"
+    status: pending
+  - id: p4-1-auto-scan
+    content: "P4.1: scanTime ms + timer intern auto-scan + busy simulat pe durata scan-ului"
+    status: pending
+  - id: p4-2-external
+    content: "P4.2: mod external explicit (scanTime:0), integrare osc/wave documentată + teste"
+    status: pending
+  - id: p4-3-overrun
+    content: "P4.3 (opțional): strict overrun/miss + overrunCount când execuția depășește scanTime"
     status: pending
   - id: pa-timers
     content: "P+a: biblioteci timere PLC (TON/TOF/CTU) — amânat"
@@ -110,8 +122,14 @@ flowchart TB
 | **P-W5** | Simboluri `>1` bit declarabile în P1; **folosire în logică** doar din **P+b** (`IF TEMP > 50`, atribuiri multi-bit) |
 | **P-MAP1** | Output → asignare directă `.led = val` / wire — **nu** pseudo-pin `:on` |
 | **P-MAP2** | Input → wire sau `:get` componentă (resolver implicit) |
-| **P-SCAN1** | **P2:** scan la `.plc:{ set = 1 }` (`scanTime` omis sau `0`) |
-| **P-SCAN2** | **P4:** `scanTime` + osc — amânat |
+| **P-SCAN1** | **`scanTime` omis sau `0`:** mod **event-driven** — **fără** timer intern; scan la fiecare **`set = 1`** activ; execuție **instant** (`busy = 0`). **Nu** înseamnă „o singură execuție” — câte scan-uri declanșezi, atâtea rulează | **închis** |
+| **P-SCAN2** | **`scanTime: N`** (N > 0, **ms**): mod **auto** — timer intern pe `comp [plc]`; scan periodic la fiecare **~N ms** fără `set` manual | **închis** |
+| **P-SCAN3** | **Un scan** = read inputs → `executePlcScan` → write outputs → `scanCount++` (ca P2); indiferent de `scanTime` | **închis** |
+| **P-SCAN4** | **Master clock:** `scanTime > 0` → ceas **intern**; `scanTime = 0` → trigger **extern** (`set` manual, `osc`, wave). **Nu** amestecăm ambele ca master fără regulă explicită | **închis** |
+| **P-SCAN5** | **`busy`:** `0` când `scanTime = 0`; la **P4.1+** `busy = 1` pe durata execuției **simulate** a scan-ului (durată fixă configurabilă sau derivată) | **închis** |
+| **P-SCAN6** | **`set` în timp ce `busy = 1`:** scan **ignorat** (nu queue — ca PLC real la overrun simplu); opțional pout **`skipped`** în P4.3 | **închis** |
+| **P-SCAN7** | **Pattern osc extern** (fără timer PLC): `scanTime: 0` + `.ctrl:{ set = .clk:get }` + `on: raise` — documentat **P4.0/P4.2**, model DMA | **închis** |
+| **P-SCAN8** | **Overrun/miss** (`strict:`): amânat **P4.3** — dacă durata scan depășește `scanTime`, cicluri ratate + contor | **închis** |
 | **P-IO1** | **Nu** există `comp [button]` — intrări digitale: **`key`**, **`switch`**, **`dip`** (confirmat) |
 | **P-IO2** | **P2/P3:** ieșiri digitale 1-bit: **`led`**, **`reg`**, wires; **nu** mapare directă `comp [plc]` → `clcd` |
 | **P-IO3** | **`clcd`:** doar prin **wires multi-bit** + logică LogTscript în afara PLC (`:get` / bloc `{ value, set }`) |
@@ -310,12 +328,14 @@ flowchart LR
 
 ### `comp [plc]` — atribute (nu keyworduri în program)
 
-| Atribut | Fază |
-|---------|------|
-| `program:` | P2 |
-| `inputs:` / `outputs:` | P2 (mapare) |
-| `on:` | P2 |
-| `scanTime:` | P4 |
+| Atribut | Fază | Descriere |
+|---------|------|-----------|
+| `program:` | P2 | Referință `inline [plc]` |
+| `inputs:` / `outputs:` | P2 | Mapări simbol → wire/comp |
+| `on:` | P2 | Trigger property block (`set`) |
+| `scanTime:` | **P4.1** | `0` sau omis = event-driven instant; `N` ms = auto-scan periodic |
+| `scanDuration:` | **P4.1** (opțional) | Durată simulată execuție scan (ms); default mic (ex. 1) — cât ține `busy = 1` |
+| `strict:` | **P4.3** | `0` (default) = întârzie următorul ciclu; `1` = overrun/miss explicit |
 
 ---
 
@@ -591,16 +611,23 @@ flowchart LR
   P2[P2 comp plc]
   P3[P3 doc I/O]
   P3c[P3c motor sensor]
-  P4[P4 scanTime]
+  P40[P4.0 osc doc]
+  P41[P4.1 auto scanTime]
+  P42[P4.2 external clock]
+  P43[P4.3 overrun]
   Pa[P+a timere]
   Pb[P+b analog]
   P1 --> P2
   P2 --> P3
   P2 --> P3c
-  P2 --> P4
+  P2 --> P40
+  P40 --> P41
+  P41 --> P42
+  P42 --> P43
   P2 --> Pa
   P2 --> Pb
   Pb --> P3c
+  P41 --> Pa
 ```
 
 ### P1 — `inline [plc]` (limbaj + metadata) — **în execuție**
@@ -650,9 +677,133 @@ Vezi secțiunea **Substituenți** și **clcd via wires** de mai sus. Actualizare
 
 Componente dedicate cu UI și semantică proprie. **Motor** nu e boolean simplu — necesită design pentru viteză, direcție, tip actuator, eventual animație rotație. **Sensor** — vizual + digital/analog. Detalii în secțiunea P3c de mai sus.
 
-### P4 — `scanTime` + osc (opțional)
+### P4 — `scanTime`, `busy`, cicluri PLC (decizii închise)
 
-Execuție periodică; pattern DMA paced / osc
+**Scop:** comportament didactic „PLC real” (ritm periodic, `busy` cu sens) + opțiuni avansate, în **sub-faze P4.0–P4.3**. Model paralel cu DMA (`instant` / `paced`) și osc (ceas extern).
+
+#### Ce înseamnă `scanTime` (definiție)
+
+**`scanTime`** = perioada țintă (în **ms**) între două **cicluri complete** de scan:
+
+```text
+read inputs → executePlcScan → write outputs
+```
+
+| Valoare | Mod | Comportament |
+|---------|-----|--------------|
+| **omis** sau **`0`** | **event-driven** | Fără timer intern. Scan la fiecare **`set = 1`** (sau front pe `set` cu `on: raise`). Execuție **instant** — `busy` rămâne `0`. **Nu** = „rulează o singură dată”; = „scanezi când declanșezi, cât de des vrei”. |
+| **`N > 0`** (ms) | **auto** | Timer **intern** pe `comp [plc]`: scan periodic la ~**N ms**, fără `set` manual la fiecare pas. |
+
+**Un scan** = întotdeauna o trecere read → logic → write + `scanCount++` (P-D8). Numărul de scan-uri = câte cicluri s-au completat (auto sau la `set`), nu o limită impusă de `scanTime: 0`.
+
+#### Decizii P-SCAN (rezumat)
+
+Vezi tabelul **P-SCAN1…P-SCAN8** din secțiunea decizii. Principii:
+
+- **Master clock unic:** `scanTime > 0` → intern; `scanTime = 0` → extern (`set`, osc, wave).
+- **Fără queue** de scan-uri la `busy` — scan cerut în `busy` → **ignorat** (opțional `skipped` în P4.3).
+- **Ieșiri** în `busy`: păstrează ultima valoare scrisă (P-D7).
+- **Unități:** milisecunde (aliniat cu familia `osc` / timp real didactic).
+
+---
+
+#### P4.0 — Documentare pattern osc (fără cod obligatoriu)
+
+**Stare:** funcționează **deja** în P2/P3; se documentează explicit în `plc.md`.
+
+```logts
+comp [plc] .ctrl:
+  scanTime: 0          ; sau omis
+  on: raise
+  :
+
+comp [osc] .clk:
+  freq: 10
+  :
+
+.ctrl:{ set = .clk:get }
+```
+
+- Un front de ceas = un scan (cu `on: raise`).
+- Model identic DMA paced + osc ([dma.md](../v0_3_2/doc/dma.md)).
+- **Teste:** exemple `logts-play` + 1–2 teste `comp-plc` (ID 2775+).
+
+**Livrabile:** secțiune „External clock” în `plc.md`; fără modificare `plc.js` obligatorie.
+
+---
+
+#### P4.1 — Auto-scan + `busy` simulat (MVP P4)
+
+**Fișiere:** `plc.js`, `plc-devices.js`, `osc-timing` sau timer intern (reutilizare pattern `osc`)
+
+| Element | Spec |
+|---------|------|
+| **`scanTime: N`** | N ms; N > 0 pornește timer la RUN |
+| **Auto-scan** | La fiecare perioadă: același `_plcScan` ca P2 |
+| **`scanDuration:`** | Opțional; ms simulat cât `busy = 1` per scan (default ex. `1`) |
+| **`busy`** | `1` în `[scanDuration]`; altfel `0` |
+| **`scanTime: 0`** | Comportament P2 neschimbat |
+| **Stop** | La re-RUN / destroy: oprește timer (ca `osc`) |
+
+**Exemplu didactic:**
+
+```logts
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 200
+  scanDuration: 2
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+```
+
+Load & Run → ~5 scan-uri/s; `scanCount` crește; `busy` pulsează scurt.
+
+**Teste:** `comp-plc` — auto-scan incrementează `scanCount`; `busy` pulse; `scanTime: 0` regresie P2.
+
+**Doc:** `logts-play` verificat; `doc(.ctrl)` afișează `scanTime`, `busy`.
+
+---
+
+#### P4.2 — Mod external explicit + integrare wave
+
+**Scop:** clarificare API și teste pentru scenarii sincronizate (CPU, DMA, PLC pe același osc).
+
+| Element | Spec |
+|---------|------|
+| **Mod implicit** | `scanTime: 0` → **external** (nu pornește timer) |
+| **`set` manual** | `.ctrl:{ set = 1 }` — un scan per evaluare (cu `on: 1` / `on: raise`) |
+| **Osc / wave** | `.ctrl:{ set = .clk:get }` documentat ca pattern canonic |
+| **Conflict** | Dacă `scanTime > 0` **și** `set` extern în același script: `set` manual poate forța scan suplimentar **doar dacă nu e busy** (P-SCAN6); timerul rămâne master pentru perioadă |
+
+**Livrabile:** `plc.md` secțiune „Alegerea ceasului”; teste osc + PLC în același script.
+
+---
+
+#### P4.3 — Overrun / miss (opțional, avansat)
+
+**Scop:** lecție „PLC nu e infinit de rapid” — când execuția (reală sau `scanDuration`) depășește `scanTime`.
+
+| Atribut | `strict: 0` (default) | `strict: 1` |
+|---------|----------------------|-------------|
+| Execuție > `scanTime` | Următorul ciclu **întârzie** (stretch) | Ciclu **ratat** (miss) |
+| Pout nou | — | **`overrunCount`** (16 bit) sau `missed` (1 bit) |
+| `busy` | Ca P4.1 | `1` + flag miss la overlap |
+
+**Nu:** queue de scan-uri — la PLC real se pierde ciclul, nu se face FIFO.
+
+**Livrabile:** secțiune avansată `plc.md`; teste cu `scanTime` mic + `scanDuration` mare.
+
+---
+
+#### P4 — ordine implementare recomandată
+
+```text
+P4.0 (doc)  →  P4.1 (auto + busy)  →  P4.2 (teste osc)  →  P4.3 (strict, opțional)
+```
+
+**Legătură P+a:** auto-scan la `scanTime > 0` pregătește terenul pentru timere TON/TOF în program (intrări citite la granița de scan).
 
 ### P+a — Timere (amânat)
 
@@ -668,7 +819,11 @@ TON, TOF, CTU — biblioteci sau extensie `inline [plc]`; **nu** în P1/P2
 
 ## Decizii deschise
 
-**Niciuna** — P-D4, P-D6, P-D7, P-D8, P-D9, P0, lățimi, mapare, I/O substituenți sunt închise. Următorul pas: **implementare P1**.
+**P4 (scanTime / busy / cicluri):** **închis** — P-SCAN1…P-SCAN8, sub-faze P4.0–P4.3.
+
+**Încă deschise / amânate:** P3c (motor/sensor/fan/button), P+a (timere), P+b (analog), P+c/d (ST extins).
+
+**Următorul pas recomandat:** **P4.0** (doc osc) sau direct **P4.1** (auto-scan + busy).
 
 ---
 
@@ -690,6 +845,10 @@ TON, TOF, CTU — biblioteci sau extensie `inline [plc]`; **nu** în P1/P2
 |------|----------------|
 | P1 inline + lățimi | ~80% din cache A |
 | P2 comp + mapare | ~40% |
+| P4.0 doc osc | ~5% |
+| P4.1 auto-scan + busy | ~30% P2 |
+| P4.2 external + teste osc | ~15% P2 |
+| P4.3 overrun (opțional) | ~20% P4.1 |
 | P+a / P+b | fiecare ~50% P1 |
 
 **Risc principal:** parser limbaj PLC (IF/THEN); maparea lățimi e mecanică dacă e strictă de la început.
