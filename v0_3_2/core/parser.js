@@ -4011,7 +4011,7 @@ assignment() {
 
   _parseCpuSubSection() {
     const sub = {};
-    const cpuSiblingBlocks = ['ram', 'prog', 'map'];
+    const cpuSiblingBlocks = ['ram', 'prog', 'map', 'on'];
     for (;;) {
       while (this.c.type === 'EOL') this.c = this.t.get();
       this.t.skip();

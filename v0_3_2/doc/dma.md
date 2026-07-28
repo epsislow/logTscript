@@ -1,6 +1,6 @@
 # DMA Component (`comp [dma]`)
 
-Standalone **DMA controller** for bulk copy between [mem](mem.md) instances. One `comp [dma]` in a scene; the memory list is declared on the component body (`mems:`); each transfer selects source and destination by **slot index** (1-based) in a property block.
+Standalone **DMA controller** for bulk copy between [mem](mem.md) or [cache](cache.md) instances. One `comp [dma]` in a scene; the memory list is declared on the component body (`mems:`); each transfer selects source and destination by **slot index** (1-based) in a property block.
 
 Works **without** a [CPU](cpu.md) — useful for init, memcpy, and teaching bus patterns. Optional CPU integration (shared RAM, **`wait = hold`** stall while `busy`) is in [cpu.md — Stall / wait](cpu.md#stall--wait-phase-5c).
 
@@ -41,7 +41,7 @@ Use **`on: 1`** so property blocks that drive `set` run like other components ([
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
-| **`mems:`** | *(required)* | Ordered list of `comp [mem]` references. **Slot 1** = first entry, **slot 2** = second, … Minimum **one** memory. |
+| **`mems:`** | *(required)* | Ordered list of `comp [mem]` or `comp [cache]` references. **Slot 1** = first entry, **slot 2** = second, … Minimum **one** memory. All entries must share the same `depth`. |
 | **`queue:`** | `1` | FIFO depth for pending jobs (0 = strict: reject when a job cannot start immediately). |
 | **`mode:`** | `instant` | `instant` (default) — all `count` words on one `set`. `paced` — up to **`chunk`** words per `set`. |
 | **`chunk:`** | `1` | Max words per step in **`paced`** mode (must be ≥ 1). Ignored in `instant`. |
@@ -50,7 +50,7 @@ Use **`on: 1`** so property blocks that drive `set` run like other components ([
 
 | Check | Error |
 |-------|-------|
-| `mems:` missing or empty | `DMA requires mems: with at least one comp [mem]` |
+| `mems:` missing or empty | `DMA requires mems: with at least one comp [mem] or comp [cache]` |
 | Different `depth` across listed memories | `DMA mems depth mismatch` |
 | Duplicate entries (`mems: .buf .buf`) | Allowed — two slots, same physical chip |
 | `dst` targets `readonly` memory | Error at **submit** (`set = 1`) |

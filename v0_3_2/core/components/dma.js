@@ -72,35 +72,31 @@ var DmaComponent = class DmaComponent extends BuiltinComponent {
   _resolveMemSlots(attributes, ctx) {
     const refs = attributes.memsMembers;
     if (!refs || !refs.length) {
-      throw Error('DMA requires mems: with at least one comp [mem]');
+      throw Error('DMA requires mems: with at least one comp [mem] or comp [cache]');
     }
     const slots = [];
     let depth = null;
     let maxLen = 1;
     for (let i = 0; i < refs.length; i++) {
       const ref = refs[i];
-      const comp = ctx.components.get(ref);
-      if (!comp || comp.type !== 'mem') {
-        throw Error(`DMA mems entry ${ref} must be comp [mem]`);
+      if (typeof resolveStorageBackend !== 'function') {
+        throw Error('DMA storage resolver unavailable');
       }
-      if (!comp.deviceIds || !comp.deviceIds[0]) {
-        throw Error(`DMA mems entry ${ref} has no device id`);
-      }
-      const d = comp.attributes.depth !== undefined ? parseInt(comp.attributes.depth, 10) : 4;
-      const length = comp.attributes.length !== undefined ? parseInt(comp.attributes.length, 10) : 3;
+      const link = resolveStorageBackend(ref, ctx, 0);
+      const d = link.depth;
+      const length = link.length;
       if (depth === null) depth = d;
       else if (depth !== d) {
         throw Error(`DMA mems depth mismatch: expected ${depth} bits, ${ref} has ${d}`);
       }
       if (length > maxLen) maxLen = length;
-      const readonly = !!(comp.attributes && comp.attributes.readonly);
       slots.push({
         slot: i + 1,
-        ref,
-        memId: comp.deviceIds[0],
+        ref: link.compRef,
+        memId: link.storageId,
         depth: d,
         length,
-        readonly,
+        readonly: link.readonly,
       });
     }
     return { slots, depth, maxAddrBits: dmaAddrBits(maxLen) };

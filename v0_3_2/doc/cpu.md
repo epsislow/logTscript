@@ -545,8 +545,36 @@ comp [cpu] .u:
 | Prog external | `prog = .rom` + internal `ram:` |
 | RAM external | `ram = .data` + internal `prog:` |
 | Both external | `prog = .rom` and `ram = .data` |
+| Through cache | `ram = .l1` or `prog = .icache` where `.l1` / `.icache` are `comp [cache]` |
 
 CPU semantics (`set`, `run`, LOAD/STORE, reload `.u:prog =`) are unchanged; fetch/load/store call `getMem` / `setMem` on the linked device when bound. Init and reload of a linked space use the external `mem` (declare and load `.rom` / `.data` directly, or `.u:prog =` which writes the linked ROM).
+
+### Linked [cache](cache.md) (`ram =` / `prog =`)
+
+`comp [cache]` is a valid target for **`ram =`** and **`prog =`** (same rules as `comp [mem]`): `depth` / `length` must match the CPU space, and the cache’s own `depth` / `length` must match its backing.
+
+```logts
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 256
+  lines: 16
+  lineSize: 4
+  on: 1
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  on: 1
+  ram = .l1
+  prog:
+    depth: 8
+    length: 32
+    = .cpuisa { … }
+  :
+```
+
+Instruction fetch through **`prog = .icache`** works the same way. See [cache.md](cache.md) for write policies, flush, stats (`hits`, `misses`, `hitRate`), and nested L1→L2 chains.
 
 ---
 

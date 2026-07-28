@@ -27194,5 +27194,531 @@ show(x; hex)`);
   h.assert('not binary groups', String(!line.includes('01010001')), 'true');
 });
 
+const CACHE_RAM_CPU_SETUP = `comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^0000000a
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  ram = .l1
+  on: 1
+`;
+
+function cacheProp(session, interp, compName, prop) {
+  const handler = session._ensureRegistry().get('cache');
+  const comp = interp.components.get(compName);
+  return handler.evalGetProperty(comp, prop, { var: compName, property: prop }, interp).value;
+}
+
+reg(2708, 'comp-cache', 'cache read hit and miss counters', function(h, session) {
+  const { interp } = session.run(CPU_ISA_MIN + CACHE_RAM_CPU_SETUP + `
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+      LOAD R1 A0
+      HALT
+    }
+  :
+`);
+  cpuStepUntilHalt(session, interp, '.u', 32);
+  h.assert('hits', cacheProp(session, interp, '.l1', 'hits'), '0000000000000001');
+  h.assert('misses', cacheProp(session, interp, '.l1', 'misses'), '0000000000000001');
+});
+
+reg(2709, 'comp-cache', 'cache writeThrough visible in backing mem', function(h, session) {
+  const { interp } = session.run(CPU_ISA_FULL + `
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^0055
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  writePolicy: writeThrough
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  ram = .l1
+  on: 1
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A1
+      STORE R0 A0
+      HALT
+    }
+  :
+`);
+  cpuStepUntilHalt(session, interp, '.u', 32);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  h.assert('ram updated', getMem(ramId, 0), '01010101');
+});
+
+reg(2710, 'comp-cache', 'cache writeBack needs flush for backing', function(h, session) {
+  const { interp } = session.run(CPU_ISA_FULL + `
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^0a55
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  writePolicy: writeBack
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  ram = .l1
+  on: 1
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A1
+      STORE R0 A0
+      HALT
+    }
+  :
+`);
+  cpuStepUntilHalt(session, interp, '.u', 32);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  h.assert('ram stale before flush', getMem(ramId, 0), '00001010');
+  session.execStmts(interp, '.l1:{ flush = 1, set = 1 }');
+  h.assert('ram after flush', getMem(ramId, 0), '01010101');
+});
+
+reg(2711, 'comp-cache', 'cache noWriteAllocate write bypass', function(h, session) {
+  const { interp } = session.run(CPU_ISA_FULL + `
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  writeAllocate: 0
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  ram = .l1
+  on: 1
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A1
+      STORE R0 A0
+      HALT
+    }
+  :
+`);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  setMem(ramId, 1, '01000010');
+  cpuStepUntilHalt(session, interp, '.u', 32);
+  h.assert('backing has write', getMem(ramId, 0), '01000010');
+  h.assert('no line installed', cacheProp(session, interp, '.l1', 'valid'), '0');
+});
+
+reg(2712, 'comp-cache', 'cache L1 over L2 over RAM', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^07
+:
+
+comp [cache] .l2:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 2
+  on: 1
+:
+
+comp [cache] .l1:
+  mem = .l2
+  depth: 8
+  length: 8
+  lines: 2
+  lineSize: 1
+  on: 1
+:
+`);
+  const l1 = interp.components.get('.l1').deviceIds[0];
+  const l2 = interp.components.get('.l2').deviceIds[0];
+  h.assert('read through L1', getMem(l1, 0), '00000111');
+  h.assert('l1 miss', String(parseInt(cacheProp(session, interp, '.l1', 'misses'), 2) >= 1), 'true');
+  getMem(l1, 0);
+  getMem(l2, 0);
+  h.assert('l2 miss', String(parseInt(cacheProp(session, interp, '.l2', 'misses'), 2) >= 1), 'true');
+});
+
+reg(2713, 'comp-cache', 'cache invalidateAll then miss again', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^42
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+`);
+  const id = interp.components.get('.l1').deviceIds[0];
+  getMem(id, 0);
+  getMem(id, 0);
+  session.execStmts(interp, '.l1:{ invalidateAll = 1, set = 1 }');
+  getMem(id, 0);
+  h.assert('misses after invalidate', cacheProp(session, interp, '.l1', 'misses'), '0000000000000010');
+});
+
+reg(2714, 'comp-cache', 'cache resetStats clears counters', function(h, session) {
+  const { interp } = session.run(CPU_ISA_MIN + CACHE_RAM_CPU_SETUP + `
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+      HALT
+    }
+  :
+`);
+  cpuStepUntilHalt(session, interp, '.u', 32);
+  h.assert('miss before reset', cacheProp(session, interp, '.l1', 'misses'), '0000000000000001');
+  session.execStmts(interp, '.l1:{ resetStats = 1, set = 1 }');
+  h.assert('misses zero', cacheProp(session, interp, '.l1', 'misses'), '0000000000000000');
+  h.assert('hits zero', cacheProp(session, interp, '.l1', 'hits'), '0000000000000000');
+});
+
+reg(2715, 'comp-cache', 'cache rejects depth mismatch', function(h, session) {
+  h.assertThrows('depth mismatch', function() {
+    session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 4
+  length: 16
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+`);
+  }, 'depth');
+});
+
+reg(2716, 'comp-cache', 'cache hitRate 50 percent', function(h, session) {
+  const { interp } = session.run(CPU_ISA_MIN + CACHE_RAM_CPU_SETUP + `
+  prog:
+    depth: 8
+    length: 32
+    = .cpuisa {
+      LOAD R0 A0
+      LOAD R1 A0
+      HALT
+    }
+  :
+`);
+  cpuStepUntilHalt(session, interp, '.u', 32);
+  h.assert('hitRate 50', cacheProp(session, interp, '.l1', 'hitRate'), '0110010');
+});
+
+reg(2717, 'comp-cache', 'dma copy into cache slot', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .rom:
+  depth: 8
+  length: 4
+  on: 1
+  = ^aa
+:
+
+comp [mem] .buf:
+  depth: 8
+  length: 4
+  on: 1
+  = ^00
+:
+
+comp [cache] .l1:
+  mem = .buf
+  depth: 8
+  length: 4
+  lines: 2
+  lineSize: 1
+  on: 1
+:
+
+comp [dma] .dma:
+  mems: .rom .l1
+  on: 1
+:
+
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 1, set = 1 }
+`);
+  h.assert('cached via dma', getMem(interp.components.get('.l1').deviceIds[0], 0), '10101010');
+});
+
+reg(2718, 'comp-cache', 'doc(.cache) lists backing and capacity', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 2
+  on: 1
+:
+`);
+  const handler = session._ensureRegistry().get('cache');
+  const doc = handler.constructor.formatInstanceDoc('.l1', interp.components.get('.l1')).join('\n');
+  h.assert('backing', String(doc.includes('mem = .ram')), 'true');
+  h.assert('capacity', String(doc.includes('capacity: 8')), 'true');
+});
+
+reg(2719, 'comp-cache', 'cpu prog = cache halts', function(h, session) {
+  const { interp } = session.run(CPU_ISA_MIN + `
+comp [mem] .pmem:
+  depth: 8
+  length: 8
+  on: 1
+  = .cpuisa { HALT }
+:
+
+comp [cache] .icache:
+  mem = .pmem
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  prog = .icache
+  on: 1
+  ram:
+    depth: 8
+    length: 4
+  :
+`);
+  cpuStepUntilHalt(session, interp, '.u', 8);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+  h.assert('halted', halted.value, '1');
+  h.assert('icache miss', String(parseInt(cacheProp(session, interp, '.icache', 'misses'), 2) >= 1), 'true');
+});
+
+reg(2720, 'comp-cache', 'cache.md logts-play smoke hits misses', function(h, session) {
+  const src = CPU_ISA_MIN + `
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^0000000a
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  on: 1
+  ram = .l1
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+      LOAD R1 A0
+      HALT
+    }
+  :
+.u:{ run = 1 }
+16wire hits = .l1:hits
+16wire misses = .l1:misses
+show(hits)
+show(misses)
+`;
+  const { interp } = session.run(src);
+  h.assert('hits', cacheProp(session, interp, '.l1', 'hits'), '0000000000000001');
+  h.assert('misses', cacheProp(session, interp, '.l1', 'misses'), '0000000000000001');
+});
+
+reg(2722, 'comp-cache', 'cache.md logts-play smoke icache prog', function(h, session) {
+  const { interp } = session.run(CPU_ISA_MIN + `
+comp [mem] .pmem:
+  depth: 8
+  length: 8
+  on: 1
+  = .cpuisa { HALT }
+:
+
+comp [cache] .icache:
+  mem = .pmem
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  on: 1
+  prog = .icache
+  ram:
+    depth: 8
+    length: 4
+  :
+.u:{ set = 1 }
+`);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+  h.assert('halted', halted.value, '1');
+});
+
+reg(2723, 'comp-cache', 'cache.md logts-play smoke writeBack flush', function(h, session) {
+  const { interp } = session.run(CPU_ISA_FULL + `
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^0a55
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  writePolicy: writeBack
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  on: 1
+  ram = .l1
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A1
+      STORE R0 A0
+      HALT
+    }
+  :
+.u:{ run = 1 }
+`);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  h.assert('before flush', getMem(ramId, 0), '00001010');
+  session.execStmts(interp, '.l1:{ flush = 1, set = 1 }');
+  h.assert('after flush', getMem(ramId, 0), '01010101');
+});
+
+reg(2724, 'comp-cache', 'cache.md logts-play smoke doc instance', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  on: 1
+  :
+`);
+  const handler = session._ensureRegistry().get('cache');
+  const doc = handler.constructor.formatInstanceDoc('.l1', interp.components.get('.l1')).join('\n');
+  h.assert('backing', String(doc.includes('mem = .ram')), 'true');
+  h.assert('capacity', String(doc.includes('capacity: 4')), 'true');
+});
+
+reg(2721, 'parser', 'cpu on after ram sub-block stays component attribute', function(h, session) {
+  const stmts = session.parse(`
+comp [cpu] .u:
+  prog = .icache
+  ram:
+    depth: 8
+    length: 4
+  on: 1
+:
+`);
+  h.assert('on attr', String(stmts[0].comp.attributes.on), '1');
+  h.assert('ram depth', String(stmts[0].comp.attributes.ram.depth), '8');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

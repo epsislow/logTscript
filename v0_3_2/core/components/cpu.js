@@ -73,6 +73,17 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   }
 
   _resolveMemLink(ref, ctx) {
+    if (typeof resolveStorageBackend === 'function') {
+      const link = resolveStorageBackend(ref, ctx, 0);
+      return {
+        memId: link.storageId,
+        compRef: link.compRef,
+        depth: link.depth,
+        length: link.length,
+        readonly: link.readonly,
+        kind: link.kind,
+      };
+    }
     if (!ref || !ctx || !ctx.components) {
       throw Error('CPU memory link requires a component reference');
     }

@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -1202,7 +1202,7 @@ Memory (\`comp [mem]\`) receives the assembled blob unchanged.
 
 There is **no panel UI** in v1 — logic only.
 
-For **composition** (\`use\`, \`repeat\`, \`align\`, \`base:\`, external labels), see [asm-composition.md](asm-composition.md). Wires assembled from programs carry metadata used by \`:decode\`; \`show(wire)\` remains bits-only.
+For **composition** (\`use\`, \`repeat\`, \`align\`, \`base:\`, external labels), see [asm-composition.md](asm-composition.md). Wires assembled from programs carry metadata (\`asmModuleId\`). Use **\`show(wire; asm)\`** to append a decode block when metadata exists, or **\`show(.myisa:decode(wire))\`** for explicit disassembly.
 
 ---
 
@@ -1435,6 +1435,35 @@ comp [mem] .prog:
 8wire slot0 = .prog:get
 show(slot0)
 \`\`\`
+
+---
+
+## \`show(wire; asm)\` — program metadata tag
+
+Assembled program wires store an **AsmModule** (\`asmModuleId\`). Plain **\`show(x)\`** prints bits only. Add the display tag **\`asm\`** to append instruction decode lines:
+
+\`\`\`logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  JMP   : 0101 + A4b
+  :
+
+16wire x = .myisa {
+  JMP there
+there:
+  NOP
+}
+show(x)
+show(x; asm)
+\`\`\`
+
+| Call | Output |
+|------|--------|
+| \`show(x)\` | \`x (16wire) = …\` (bits only) |
+| \`show(x; asm)\` | bits line + \`JMP A1\` / \`NOP 0\` (from stored module) |
+| \`show(raw; asm)\` on a literal wire | bits line + **\`No asm metadata found\`** |
+
+Works in **\`peek\`** too (\`peek(x; asm)\`). For a specific ISA view use **\`:decode\`** (next section).
 
 ---
 
@@ -7008,6 +7037,423 @@ show(a)
 
 [IDENTITY](builtin-IDENTITY.md) · [FILL](builtin-FILL.md)
 `,
+    'cache.md': `# Cache Component (\`comp [cache]\`)
+
+The \`cache\` component implements a **direct-mapped cache** in front of a backing store. Reads and writes go through the cache; the engine tracks **hits**, **misses**, **evictions**, and **hit rate**. Backing can be [mem](mem.md) or another cache (L1 → L2 → RAM).
+
+CPU [\`ram =\`](cpu.md#phase-3--linked-memory-prog---ram--) and [\`prog =\`](cpu.md#phase-3--linked-memory-prog---ram--) accept \`comp [cache]\` the same way as \`comp [mem]\`. [DMA](dma.md) \`mems:\` lists can include caches.
+
+In the **documentation viewer**, blocks marked \`logts-play\` open in the script editor with **Load** and **Load & Run** (same as [cpu.md](cpu.md) and [mem.md](mem.md)).
+
+---
+
+## Syntax
+
+\`\`\`
+comp [mem] .ram:
+  depth: 8
+  length: 256
+  on: 1
+  = ^00
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 256
+  lines: 16
+  lineSize: 4
+  evictType: lru
+  writePolicy: writeBack
+  writeAllocate: 1
+  on: 1
+  :
+\`\`\`
+
+| Rule | Detail |
+|------|--------|
+| **\`mem =\`** | Required. One backing reference: \`comp [mem]\` or \`comp [cache]\`. |
+| **\`depth\` / \`length\`** | Required. Must match the backing store exactly. |
+| **\`lines\` / \`lineSize\`** | Required. Cache geometry (see [Address mapping](#address-mapping)). |
+| **\`on\`** | \`1\` / \`raise\` / \`edge\` — same as other components. Use **\`on: 1\`** for level-triggered property blocks. |
+
+\`doc(.l1)\` prints backing, geometry, policies, and **capacity** (\`lines × lineSize\` addresses).
+
+---
+
+## Address mapping (direct-mapped)
+
+For address \`adr\` (word index, 0 … \`length−1\`):
+
+| Field | Formula |
+|-------|---------|
+| **set index** | \`floor(adr / lineSize) % lines\` |
+| **tag** | \`floor(adr / (lineSize × lines))\` |
+| **offset in line** | \`adr % lineSize\` |
+
+Each **set** holds at most one line: \`{ valid, dirty, tag, data[lineSize] }\`.
+
+**Example:** \`length: 16\`, \`lines: 4\`, \`lineSize: 1\` → 4 sets, 1 word per line, tags distinguish which “row” of the address space is cached.
+
+---
+
+## Attributes
+
+| Attribute | Default | Description |
+|-----------|---------|-------------|
+| **\`mem =\`** | *(required)* | Backing \`comp [mem]\` or \`comp [cache]\`. |
+| **\`depth\`** | — | Bits per word; must equal backing \`depth\`. |
+| **\`length\`** | — | Number of words; must equal backing \`length\`. |
+| **\`lines\`** | — | Number of cache sets (≥ 1). |
+| **\`lineSize\`** | — | Words per line (≥ 1). |
+| **\`evictType\`** | \`lru\` | Replacement on conflict in the same set: \`lru\`, \`fifo\`, or \`random\`. |
+| **\`writePolicy\`** | \`writeBack\` | \`writeBack\` — writes stay in the line until **flush** or dirty eviction. \`writeThrough\` — each write also updates backing immediately. |
+| **\`writeAllocate\`** | \`1\` | \`1\` — write miss loads a line then writes. \`0\` — write miss bypasses cache (write goes straight to backing; line not installed). |
+| **\`on\`** | \`raise\` | Property-block trigger mode (\`1\`, \`raise\`, \`edge\`, …). |
+
+**Validation errors:**
+
+| Check | Error |
+|-------|-------|
+| Missing \`mem =\` | \`cache requires mem = backing comp [mem] or comp [cache]\` |
+| Missing \`depth\` / \`length\` / \`lines\` / \`lineSize\` | \`cache requires …\` |
+| \`depth\` or \`length\` ≠ backing | \`cache depth/length … does not match backing\` |
+
+---
+
+## Behaviour
+
+### Reads (\`getMem\` / CPU LOAD / DMA read)
+
+1. If cache is disabled (\`on: 0\` path — \`enabled\` false at create), pass through to backing.
+2. Compute set from address. If **valid** and **tag** matches → **hit**, return word at offset.
+3. Otherwise **miss**: optionally evict current line (write-back dirty data first), load line from backing, return word.
+
+### Writes (\`setMem\` / CPU STORE / DMA write)
+
+1. If disabled, write backing only.
+2. On **hit**: update line; \`writeThrough\` also writes backing; \`writeBack\` marks line **dirty**.
+3. On **miss** with **\`writeAllocate: 0\`**: write backing only, count miss, no line installed.
+4. On **miss** with **\`writeAllocate: 1\`**: load/evict line, then write as hit.
+
+### Eviction
+
+When a new tag needs a set that already holds a different valid line:
+
+- **\`writeBack\`**: dirty line is written to backing first (**dirtyEvictions** counter).
+- **\`evictType\`**: \`lru\` (least recently used), \`fifo\` (first installed), or \`random\`.
+- **evictions** counter increments.
+
+### Maintenance pins (use with **\`set = 1\`**)
+
+| Pin | Effect |
+|-----|--------|
+| **\`flush\`** | Write all dirty lines to backing (\`writeBack\` only). |
+| **\`invalidate\`** | Drop the line selected by **\`line\`** or **\`adr\`** (no write-back). |
+| **\`invalidateAll\`** | Invalidate every set. |
+| **\`resetStats\`** | Zero hits, misses, evictions, dirtyEvictions (does not change cached data). |
+
+**Inspect** which set is selected for \`invalidate\` / pouts \`valid\`, \`dirty\`, \`tag\`, \`data\`:
+
+- **\`line\`** — set index (binary, \`log2(lines)\` bits).
+- **\`adr\`** — any address; engine maps it to the set index for that address.
+
+---
+
+## Pins and pouts
+
+| Name | Dir | Width | Description |
+|------|-----|-------|-------------|
+| \`flush\` | pin | 1 | With \`set = 1\`: push dirty lines to backing. |
+| \`invalidate\` | pin | 1 | With \`set = 1\`: invalidate inspected set. |
+| \`invalidateAll\` | pin | 1 | With \`set = 1\`: invalidate all sets. |
+| \`resetStats\` | pin | 1 | With \`set = 1\`: clear statistics. |
+| \`line\` | pin | log₂(lines) | Select set for inspect / invalidate. |
+| \`adr\` | pin | log₂(length) | Select set by address (overrides \`line\` when both set in same block). |
+| \`set\` | pin | 1 | Apply maintenance pins in the same block. |
+| \`hits\` | pout | 16 | Hit count (saturates at 65535). |
+| \`misses\` | pout | 16 | Miss count (saturates at 65535). |
+| \`hitRate\` | pout | 7 | Approximate hit percentage 0–100 (\`round(100 × hits / (hits+misses))\`). |
+| \`evictions\` | pout | 16 | Line evictions. |
+| \`dirtyEvictions\` | pout | 16 | Dirty write-backs on eviction. |
+| \`busy\` | pout | 1 | Always \`0\` in Phase A (reserved). |
+| \`valid\` | pout | 1 | Inspected set has a valid line. |
+| \`dirty\` | pout | 1 | Inspected set is dirty. |
+| \`tag\` | pout | tag bits | Tag of inspected set. |
+| \`data\` | pout | depth×lineSize | Concatenated line data (word 0 … word lineSize−1). |
+
+Counters use **saturation** (no wrap). **\`hitRate\`** is \`0\` when \`hits + misses = 0\`.
+
+---
+
+## Using with CPU
+
+### Data cache (\`ram = .l1\`)
+
+\`\`\`logts
+comp [cpu] .u:
+  isa: .cpuisa
+  on: 1
+  ram = .l1
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa { … }
+  :
+\`\`\`
+
+Every LOAD/STORE on the CPU goes through \`.l1\`. Counters update automatically.
+
+### Instruction cache (\`prog = .icache\`)
+
+\`\`\`logts
+comp [cpu] .u:
+  isa: .cpuisa
+  on: 1
+  prog = .icache
+  ram:
+    depth: 8
+    length: 16
+  :
+\`\`\`
+
+Fetch reads go through the cache. Place **\`on: 1\`** on the CPU **before** nested \`ram:\` / \`prog:\` blocks, or **after** them at the same indent — both work.
+
+### Nested caches
+
+\`\`\`
+comp [cache] .l2:
+  mem = .ram
+  …
+:
+
+comp [cache] .l1:
+  mem = .l2
+  …
+:
+
+comp [cpu] .u:
+  ram = .l1
+  …
+:
+\`\`\`
+
+L1 misses pull lines from L2; L2 misses pull from RAM.
+
+---
+
+## Using with DMA
+
+\`mems:\` accepts \`comp [cache]\` entries (same \`depth\` as other slots):
+
+\`\`\`
+comp [dma] .dma:
+  mems: .rom .l1
+  on: 1
+  :
+.dma:{ src = 1, dst = \\2, srcAdr = 0, dstAdr = 0, count = 4, set = 1 }
+\`\`\`
+
+Slot indices are still 1-based. Transfers use \`getMem\` / \`setMem\` on the cache device.
+
+---
+
+## Component type documentation
+
+\`\`\`
+doc(comp.cache)
+\`\`\`
+
+Instance documentation:
+
+\`\`\`
+doc(.l1)
+\`\`\`
+
+---
+
+## Runnable — hit and miss (CPU + data cache)
+
+Two LOADs from the same address: one miss, one hit.
+
+\`\`\`logts-play
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  HALT  : 0111 + 4b
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^0000000a
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  on: 1
+  ram = .l1
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A0
+      LOAD R1 A0
+      HALT
+    }
+  :
+.u:{ run = 1 }
+16wire hits = .l1:hits
+16wire misses = .l1:misses
+show(hits)
+show(misses)
+\`\`\`
+
+**Load & Run:** \`hits\` = \`0000000000000001\`, \`misses\` = \`0000000000000001\`.
+
+---
+
+## Runnable — instruction cache (\`prog = .icache\`)
+
+\`\`\`logts-play
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  HALT  : 0111 + 4b
+  :
+
+comp [mem] .pmem:
+  depth: 8
+  length: 8
+  on: 1
+  = .cpuisa { HALT }
+:
+
+comp [cache] .icache:
+  mem = .pmem
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  on: 1
+  prog = .icache
+  ram:
+    depth: 8
+    length: 4
+  :
+.u:{ set = 1 }
+1wire halted = .u:halted
+show(halted)
+\`\`\`
+
+**Load & Run:** \`halted\` = \`1\` after one step (HALT fetched through the cache).
+
+---
+
+## Runnable — write-back and flush
+
+Store updates the cache line; backing RAM stays stale until **flush**.
+
+\`\`\`logts-play
+inline [asm] .cpuisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  STORE : 0010 + R2b + A2b
+  HALT  : 0111 + 4b
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^0a55
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  writePolicy: writeBack
+  on: 1
+:
+
+comp [cpu] .u:
+  isa: .cpuisa
+  on: 1
+  ram = .l1
+  prog:
+    depth: 8
+    length: 16
+    = .cpuisa {
+      LOAD R0 A1
+      STORE R0 A0
+      HALT
+    }
+  :
+.u:{ run = 1 }
+8wire before = .ram:get
+show(before)
+.l1:{ flush = 1, set = 1 }
+8wire after = .ram:get
+show(after)
+\`\`\`
+
+**Load & Run:** \`before\` = \`00001010\` (address 0 still \`0x0a\` in backing). \`after\` = \`01010101\` (value loaded from A1 and stored to A0, flushed to RAM).
+
+---
+
+## Runnable — \`doc(.l1)\`
+
+\`\`\`logts-play
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  on: 1
+  :
+
+show(doc(.l1))
+\`\`\`
+
+**Load & Run:** output includes \`mem = .ram\` and \`capacity: 4\`.
+
+---
+
+## Phase A scope
+
+| Included | Not yet (later phases) |
+|----------|-------------------------|
+| Direct-mapped cache, \`getMem\` / \`setMem\` | Bus pins on cache |
+| CPU \`ram =\` / \`prog =\` cache | \`mmap\` integration |
+| DMA \`mems:\` with cache | Multi-port cache |
+| Stats, flush, invalidate | |
+
+See [future-component-ideas.md](future-component-ideas.md) for roadmap items.
+`,
     'chip-board-execution.md': `# Chip and board execution
 
 Chip and board instances share the same **two-phase** execution model: **elaboration** when the instance is first created, then **propagation** each time the \`exec\` pin fires. Syntax, property blocks, probes, and pout reads are unchanged — only the internal scheduling is optimized so the body structure is built once and signals flow through a captured wire graph on each exec.
@@ -9304,8 +9750,36 @@ comp [cpu] .u:
 | Prog external | \`prog = .rom\` + internal \`ram:\` |
 | RAM external | \`ram = .data\` + internal \`prog:\` |
 | Both external | \`prog = .rom\` and \`ram = .data\` |
+| Through cache | \`ram = .l1\` or \`prog = .icache\` where \`.l1\` / \`.icache\` are \`comp [cache]\` |
 
 CPU semantics (\`set\`, \`run\`, LOAD/STORE, reload \`.u:prog =\`) are unchanged; fetch/load/store call \`getMem\` / \`setMem\` on the linked device when bound. Init and reload of a linked space use the external \`mem\` (declare and load \`.rom\` / \`.data\` directly, or \`.u:prog =\` which writes the linked ROM).
+
+### Linked [cache](cache.md) (\`ram =\` / \`prog =\`)
+
+\`comp [cache]\` is a valid target for **\`ram =\`** and **\`prog =\`** (same rules as \`comp [mem]\`): \`depth\` / \`length\` must match the CPU space, and the cache’s own \`depth\` / \`length\` must match its backing.
+
+\`\`\`logts
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 256
+  lines: 16
+  lineSize: 4
+  on: 1
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  on: 1
+  ram = .l1
+  prog:
+    depth: 8
+    length: 32
+    = .cpuisa { … }
+  :
+\`\`\`
+
+Instruction fetch through **\`prog = .icache\`** works the same way. See [cache.md](cache.md) for write policies, flush, stats (\`hits\`, \`misses\`, \`hitRate\`), and nested L1→L2 chains.
 
 ---
 
@@ -11229,7 +11703,7 @@ Probe component properties: \`probe(.div:mod)\` — [debug.md](debug.md).
 `,
     'dma.md': `# DMA Component (\`comp [dma]\`)
 
-Standalone **DMA controller** for bulk copy between [mem](mem.md) instances. One \`comp [dma]\` in a scene; the memory list is declared on the component body (\`mems:\`); each transfer selects source and destination by **slot index** (1-based) in a property block.
+Standalone **DMA controller** for bulk copy between [mem](mem.md) or [cache](cache.md) instances. One \`comp [dma]\` in a scene; the memory list is declared on the component body (\`mems:\`); each transfer selects source and destination by **slot index** (1-based) in a property block.
 
 Works **without** a [CPU](cpu.md) — useful for init, memcpy, and teaching bus patterns. Optional CPU integration (shared RAM, **\`wait = hold\`** stall while \`busy\`) is in [cpu.md — Stall / wait](cpu.md#stall--wait-phase-5c).
 
@@ -11270,7 +11744,7 @@ Use **\`on: 1\`** so property blocks that drive \`set\` run like other component
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
-| **\`mems:\`** | *(required)* | Ordered list of \`comp [mem]\` references. **Slot 1** = first entry, **slot 2** = second, … Minimum **one** memory. |
+| **\`mems:\`** | *(required)* | Ordered list of \`comp [mem]\` or \`comp [cache]\` references. **Slot 1** = first entry, **slot 2** = second, … Minimum **one** memory. All entries must share the same \`depth\`. |
 | **\`queue:\`** | \`1\` | FIFO depth for pending jobs (0 = strict: reject when a job cannot start immediately). |
 | **\`mode:\`** | \`instant\` | \`instant\` (default) — all \`count\` words on one \`set\`. \`paced\` — up to **\`chunk\`** words per \`set\`. |
 | **\`chunk:\`** | \`1\` | Max words per step in **\`paced\`** mode (must be ≥ 1). Ignored in \`instant\`. |
@@ -11279,7 +11753,7 @@ Use **\`on: 1\`** so property blocks that drive \`set\` run like other component
 
 | Check | Error |
 |-------|-------|
-| \`mems:\` missing or empty | \`DMA requires mems: with at least one comp [mem]\` |
+| \`mems:\` missing or empty | \`DMA requires mems: with at least one comp [mem] or comp [cache]\` |
 | Different \`depth\` across listed memories | \`DMA mems depth mismatch\` |
 | Duplicate entries (\`mems: .buf .buf\`) | Allowed — two slots, same physical chip |
 | \`dst\` targets \`readonly\` memory | Error at **submit** (\`set = 1\`) |
@@ -12992,11 +13466,12 @@ The landing page lists topics grouped by section (**Reference**, **Composite blo
 |---------|--------|
 | **← Back** | Return to the previous page in your session (disabled on the first page) |
 | **History** | List of pages you opened this session — click to jump back |
+| **Contents** | Table of contents for the current page (sections **h2** / **h3**) — click to jump |
 | **Search** | Filter topics by title and **primary keywords** (canonical page for a function/mode/component) plus secondary synonyms; best match appears first (**Enter** to open) |
 
-Internal links (\`[label](other-page.md)\` or \`[label](other-page.md#anchor)\`) stay inside the viewer. External \`http(s)\` links open normally.
+Internal links (\`[label](other-page.md)\`, \`[label](other-page.md#anchor)\`, or \`[label](#anchor)\` on the same page) stay inside the viewer and scroll to the section. External \`http(s)\` links open normally.
 
-The address bar hash updates to \`#filename.md\` while you read (e.g. \`#editorUI.md\`). Refreshing the page with that hash reopens the same document.
+The address bar hash updates to \`#filename.md\` while you read (e.g. \`#editorUI.md\`), or \`#filename.md~anchor\` when you are at a section (e.g. \`#cpu.md~run-and-maxsteps\`). Refreshing the page with that hash reopens the same document at that section.
 
 ---
 
@@ -18752,6 +19227,8 @@ Pair **\`4wire[N]\`** + **\`4wire[N,1]\`** with **\`; vector\`** on SUM/ADD uses
     'mem.md': `# Memory Component (mem)
 
 The \`mem\` component implements a RAM memory with configurable number of addresses (\`length\`) and bits per address (\`depth\`). Each address stores one binary word of \`depth\` bits.
+
+A [cache](cache.md) can sit in front of \`mem\` (\`mem = .ram\` on the cache). CPU and DMA then talk to the cache; the physical array remains in \`comp [mem]\`.
 
 Program **composition** (\`use\`, \`align\`, \`base:\`, …) is handled when assembling ASM wires; mem receives the final blob unchanged. See [asm-composition.md](asm-composition.md).
 

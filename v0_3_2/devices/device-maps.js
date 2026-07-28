@@ -15,6 +15,7 @@ function createDeviceMaps() {
     clcdDisplays: new Map(),
     alus: new Map(),
     memories: new Map(),
+    caches: new Map(),
     registers: new Map(),
     counters: new Map(),
     adders: new Map(),

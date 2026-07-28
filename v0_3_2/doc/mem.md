@@ -2,6 +2,8 @@
 
 The `mem` component implements a RAM memory with configurable number of addresses (`length`) and bits per address (`depth`). Each address stores one binary word of `depth` bits.
 
+A [cache](cache.md) can sit in front of `mem` (`mem = .ram` on the cache). CPU and DMA then talk to the cache; the physical array remains in `comp [mem]`.
+
 Program **composition** (`use`, `align`, `base:`, …) is handled when assembling ASM wires; mem receives the final blob unchanged. See [asm-composition.md](asm-composition.md).
 
 ---

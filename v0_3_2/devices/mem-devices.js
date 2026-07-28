@@ -75,6 +75,10 @@ function commitAllMemWrites(interpCtx) {
 }
 
 function setMem(id, address, value) {
+  if (typeof isCacheStorage === 'function' && isCacheStorage(id)) {
+    cacheWrite(id, address, value);
+    return;
+  }
   const mem = dm().memories.get(id);
   if (!mem) return;
   
@@ -93,6 +97,9 @@ function setMem(id, address, value) {
 }
 
 function getMem(id, address) {
+  if (typeof isCacheStorage === 'function' && isCacheStorage(id)) {
+    return cacheRead(id, address);
+  }
   const mem = dm().memories.get(id);
   if (!mem) return null;
   
