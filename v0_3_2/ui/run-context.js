@@ -117,6 +117,19 @@ function stopRunContextTimers(ctx) {
     }
     ctx.interp.oscTimers = [];
   }
+  if (ctx.interp && ctx.interp.plcTimers) {
+    for (const tid of ctx.interp.plcTimers) {
+      clearTimeout(tid);
+    }
+    ctx.interp.plcTimers = [];
+  }
+  if (ctx.interp && ctx.interp.components) {
+    for (const comp of ctx.interp.components.values()) {
+      if (comp && comp.type === 'plc') {
+        comp.plcAutoScanActive = false;
+      }
+    }
+  }
 }
 
 function stopInstanceSecUI(ctx) {

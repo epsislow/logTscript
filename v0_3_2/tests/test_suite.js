@@ -28995,5 +28995,248 @@ comp [plc] .ctrl:
   h.assert('led off', interp.getValueFromRef(ledComp.ref), '0');
 });
 
+function plcTestWaitMs(session, interp, ms) {
+  if (session && typeof session.advancePlcTiming === 'function') {
+    session.advancePlcTiming(interp, ms);
+    return;
+  }
+  const end = Date.now() + ms;
+  while (Date.now() < end) { /* fallback */ }
+}
+
+const PLC_TICK_PROG = `
+inline [plc] .machine:
+  inputs: { CLK }
+  outputs: { CNT }
+  IF CLK THEN CNT = 1 ELSE CNT = 0 END_IF
+  :
+`;
+
+reg(2775, 'comp-plc', 'P4.0 external clock — wire pulse scans', function(h, session) {
+  const { interp } = session.run(`${PLC_TICK_PROG}
+1wire clkIn
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 0
+  inputs: { CLK = clkIn }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+`);
+  session.setWire(interp, 'clkIn', '1');
+  session.execStmts(interp, '.ctrl:{ set = clkIn }');
+  h.assert('wire pulse scan', String(interp.components.get('.ctrl').scanCount), '1');
+  session.execStmts(interp, '.ctrl:{ set = 1 }');
+  h.assert('second external trigger', String(interp.components.get('.ctrl').scanCount), '2');
+  h.assert('busy 0 event-driven', session.getCompProperty(interp, '.ctrl', 'busy'), '0');
+});
+
+reg(2776, 'comp-plc', 'parse scanTime scanDuration strict attrs', function(h, session) {
+  const stmts = session.parse(`${PLC_TICK_PROG}
+1wire startIn
+1wire motorOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 200
+  scanDuration: 5
+  strict: 1
+  inputs: { CLK = startIn }
+  outputs: { CNT = motorOut }
+  on: 1
+  :`);
+  const s = stmts.find(st => st.comp && st.comp.name === '.ctrl');
+  h.assert('has comp', String(!!s), 'true');
+  h.assert('scanTime', String(s.comp.attributes.scanTime), '200');
+  h.assert('scanDuration', String(s.comp.attributes.scanDuration), '5');
+  h.assert('strict', String(s.comp.attributes.strict), '1');
+});
+
+reg(2777, 'comp-plc', 'P4.1 auto-scan increments scanCount', function(h, session) {
+  const { interp } = session.run(`${PLC_TICK_PROG}
+comp [switch] .clk:
+  = 1
+  :
+
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 15
+  scanDuration: 1
+  inputs: { CLK = .clk }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+`);
+  h.assert('initial 0', String(interp.components.get('.ctrl').scanCount), '0');
+  plcTestWaitMs(session, interp, 40);
+  const count = interp.components.get('.ctrl').scanCount;
+  h.assert('auto scans', String(count >= 2), 'true');
+});
+
+reg(2778, 'comp-plc', 'P4.1 busy during scanDuration', function(h, session) {
+  const { interp } = session.run(`${PLC_TICK_PROG}
+comp [switch] .clk:
+  = 1
+  :
+
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 200
+  scanDuration: 50
+  inputs: { CLK = .clk }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+`);
+  plcTestWaitMs(session, interp, 210);
+  h.assert('busy during scan', session.getCompProperty(interp, '.ctrl', 'busy'), '1');
+  plcTestWaitMs(session, interp, 50);
+  h.assert('busy cleared', session.getCompProperty(interp, '.ctrl', 'busy'), '0');
+});
+
+reg(2779, 'comp-plc', 'P4.1 scanTime 0 — busy always 0', function(h, session) {
+  const { interp } = session.run(`${PLC_TICK_PROG}
+comp [switch] .clk:
+  = 1
+  :
+
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 0
+  inputs: { CLK = .clk }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('scan ran', String(interp.components.get('.ctrl').scanCount), '1');
+  h.assert('busy 0', session.getCompProperty(interp, '.ctrl', 'busy'), '0');
+});
+
+reg(2780, 'comp-plc', 'P4.2 manual set when scanTime > 0 and not busy', function(h, session) {
+  const { interp } = session.run(`${PLC_TICK_PROG}
+comp [switch] .clk:
+  = 1
+  :
+
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 500
+  scanDuration: 1
+  inputs: { CLK = .clk }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('manual scan', String(interp.components.get('.ctrl').scanCount), '1');
+  h.assert('cnt wire', session.getWire(interp, 'cntOut'), '1');
+});
+
+reg(2781, 'comp-plc', 'P4.2 set during busy — skipped', function(h, session) {
+  const { interp } = session.run(`${PLC_TICK_PROG}
+comp [switch] .clk:
+  = 1
+  :
+
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 10
+  scanDuration: 80
+  inputs: { CLK = .clk }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+`);
+  plcTestWaitMs(session, interp, 15);
+  const before = interp.components.get('.ctrl').scanCount;
+  session.execStmts(interp, '.ctrl:{ set = 1 }');
+  h.assert('skipped flag', session.getCompProperty(interp, '.ctrl', 'skipped'), '1');
+  h.assert('no extra scan', String(interp.components.get('.ctrl').scanCount), String(before));
+});
+
+reg(2782, 'comp-plc', 'P4.3 strict overrun — overrunCount increases', function(h, session) {
+  const { interp } = session.run(`${PLC_TICK_PROG}
+comp [switch] .clk:
+  = 1
+  :
+
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 10
+  scanDuration: 50
+  strict: 1
+  inputs: { CLK = .clk }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+`);
+  plcTestWaitMs(session, interp, 45);
+  const over = parseInt(session.getCompProperty(interp, '.ctrl', 'overrunCount'), 2);
+  h.assert('overrunCount > 0', String(over > 0), 'true');
+});
+
+reg(2783, 'comp-plc', 'P4.3 strict 0 stretch — deferred scan completes', function(h, session) {
+  const { interp } = session.run(`${PLC_TICK_PROG}
+comp [switch] .clk:
+  = 1
+  :
+
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 10
+  scanDuration: 30
+  strict: 0
+  inputs: { CLK = .clk }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+`);
+  plcTestWaitMs(session, interp, 55);
+  h.assert('stretch scans', String(interp.components.get('.ctrl').scanCount >= 1), 'true');
+  h.assert('overrun 0 stretch', session.getCompProperty(interp, '.ctrl', 'overrunCount'), '0000000000000000');
+});
+
+reg(2784, 'comp-plc', 'doc example 13 — dual external trigger in one RUN', function(h, session) {
+  const { interp } = session.run(`${PLC_TICK_PROG}
+1wire clkIn
+1wire cntOut
+
+clkIn = 1
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 0
+  inputs: { CLK = clkIn }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+
+.ctrl:{ set = clkIn }
+.ctrl:{ set = 1 }
+`);
+  h.assert('scanCount 2', String(interp.components.get('.ctrl').scanCount), '2');
+  h.assert('cntOut 1', session.getWire(interp, 'cntOut'), '1');
+  h.assert('busy 0', session.getCompProperty(interp, '.ctrl', 'busy'), '0');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

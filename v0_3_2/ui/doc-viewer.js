@@ -93,7 +93,7 @@ const DOC_SECTIONS = [
     items: [
       { file: 'mem.md', label: 'mem', searchPrimary: 'mem comp.mem doc(comp.mem) depth length on' },
       { file: 'cache.md', label: 'Cache Component (`comp [cache]`)', searchPrimary: 'cache comp.cache doc(comp.cache) lines lineSize evictType writePolicy writeAllocate hitRate flush invalidate', searchExtra: 'lru fifo random writeBack writeThrough L1 L2 backing mem getMem setMem logts-play hits misses dirty valid tag' },
-      { file: 'plc.md', label: 'PLC (`inline [plc]` + `comp [plc]`)', searchPrimary: 'plc inline.plc comp.plc program scan START MOTOR IF THEN ELSIF', searchExtra: 'logts-play scanCount inputs outputs map wire key switch dip reg bar clcd led latch retain busy on raise' },
+      { file: 'plc.md', label: 'PLC (`inline [plc]` + `comp [plc]`)', searchPrimary: 'plc inline.plc comp.plc program scan START MOTOR IF THEN ELSIF', searchExtra: 'logts-play scanTime scanDuration strict busy skipped missed overrunCount auto-scan osc external clock scanCount inputs outputs map wire key switch dip reg bar clcd led latch retain on raise' },
       { file: 'cpu.md', label: 'CPU Component (`comp [cpu]`)', searchPrimary: 'cpu comp.cpu doc(comp.cpu) registers pcInit onReset trace maxSteps sp', searchExtra: 'harvard prog ram set run irq load store cache' },
       { file: 'dma.md', label: 'DMA Component (`comp [dma]`)', searchPrimary: 'dma comp.dma mems copy queue busy done started queued rejected doc(comp.dma)', searchExtra: 'memcpy bulk transfer slot src dst instant wave logts-play doc(.dma) submitSeq cache' },
       { file: 'asm.md', label: 'asm', searchPrimary: 'ASM', searchExtra: 'inline assembler isa mnemonic program blob myisa decode disassemble disassembly' },

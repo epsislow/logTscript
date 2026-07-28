@@ -52,6 +52,16 @@
       },
 
       run(src) {
+        if (this.interp) {
+          if (this.interp.oscTimers) {
+            for (const tid of this.interp.oscTimers) clearTimeout(tid);
+            this.interp.oscTimers = [];
+          }
+          if (this.interp.plcTimers) {
+            for (const tid of this.interp.plcTimers) clearTimeout(tid);
+            this.interp.plcTimers = [];
+          }
+        }
         const processed = preprocessLoop(src);
         const registry = this._ensureRegistry();
         const signalPropagationStrategy = this._ensureSignalPropagationStrategy();
@@ -61,6 +71,7 @@
         this.interp = new Interpreter(p.funcs, this.out, p.pcbs, registry, signalPropagationStrategy, p.chips, p.boards);
         this.interp.bindSchemaRegistry(p.schemaRegistry);
         this.interp._instanceId = instanceId;
+        this.interp._plcVirtualTime = true;
         if (typeof setDeviceOperationInstanceId === 'function') {
           setDeviceOperationInstanceId(instanceId);
         }
@@ -141,6 +152,15 @@
         if (!handler || !handler.evalGetProperty) return null;
         const result = handler.evalGetProperty(comp, property, { var: compName, property }, i);
         return result ? result.value : null;
+      },
+
+      advancePlcTiming(interp, deltaMs) {
+        const i = interp || this.interp;
+        if (!i || !i.componentRegistry) return;
+        const handler = i.componentRegistry.get('plc');
+        if (handler && typeof handler.advancePlcTiming === 'function') {
+          handler.advancePlcTiming(i, deltaMs);
+        }
       },
 
       triggerClcdTouch(interp, compName, opts) {
@@ -253,6 +273,19 @@
             clearTimeout(tid);
           }
           this.interp.oscTimers = [];
+        }
+        if (this.interp && this.interp.plcTimers) {
+          for (const tid of this.interp.plcTimers) {
+            clearTimeout(tid);
+          }
+          this.interp.plcTimers = [];
+        }
+        if (this.interp && this.interp.components) {
+          for (const comp of this.interp.components.values()) {
+            if (comp && comp.type === 'plc') {
+              comp.plcAutoScanActive = false;
+            }
+          }
         }
         if (typeof resetFallbackDeviceMapsForTests === 'function') {
           resetFallbackDeviceMapsForTests();

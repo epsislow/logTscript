@@ -464,6 +464,7 @@ class Interpreter {
 
     // Oscillator timers (for cleanup on re-run)
     this.oscTimers = [];
+    this.plcTimers = [];
     
     // Initialize ~
     this.vars.set('~', {type: '1bit', value: '0', ref: null});
@@ -12653,6 +12654,19 @@ if (s.assignment) {
         if (result.outputMap) compInfo.outputMap = result.outputMap;
         if (result.outputState) compInfo.outputState = result.outputState;
         if (result.scanCount != null) compInfo.scanCount = result.scanCount;
+        if (result.scanTime != null) compInfo.scanTime = result.scanTime;
+        if (result.scanDuration != null) compInfo.scanDuration = result.scanDuration;
+        if (result.strict != null) compInfo.strict = result.strict;
+        if (result.busy != null) compInfo.busy = result.busy;
+        if (result.skipped != null) compInfo.skipped = result.skipped;
+        if (result.missed != null) compInfo.missed = result.missed;
+        if (result.overrunCount != null) compInfo.overrunCount = result.overrunCount;
+        if (result.plcAutoScanActive != null) compInfo.plcAutoScanActive = result.plcAutoScanActive;
+        if (result._pendingTimerScan != null) compInfo._pendingTimerScan = result._pendingTimerScan;
+        if (result._plcVirtual != null) compInfo._plcVirtual = result._plcVirtual;
+        if (result._plcClock != null) compInfo._plcClock = result._plcClock;
+        if (result._plcNextScanAt != null) compInfo._plcNextScanAt = result._plcNextScanAt;
+        if (result._plcBusyUntil != null) compInfo._plcBusyUntil = result._plcBusyUntil;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;

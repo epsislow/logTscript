@@ -21,20 +21,20 @@ todos:
     content: "P3c (amânat): comp motor, sensor, fan, button — viteză/rotație, vizual diferențiat"
     status: pending
   - id: p4-scantime
-    content: "P4: scanTime + busy — decizii închise; sub-faze P4.0–P4.3"
-    status: pending
+    content: "P4: scanTime + busy — P4.0–P4.3 implementate"
+    status: completed
   - id: p4-0-osc-doc
     content: "P4.0: doc pattern osc extern (scanTime:0, set=.clk:get) — fără cod nou obligatoriu"
-    status: pending
+    status: completed
   - id: p4-1-auto-scan
     content: "P4.1: scanTime ms + timer intern auto-scan + busy simulat pe durata scan-ului"
-    status: pending
+    status: completed
   - id: p4-2-external
     content: "P4.2: mod external explicit (scanTime:0), integrare osc/wave documentată + teste"
-    status: pending
+    status: completed
   - id: p4-3-overrun
-    content: "P4.3 (opțional): strict overrun/miss + overrunCount când execuția depășește scanTime"
-    status: pending
+    content: "P4.3: strict overrun/miss + overrunCount când execuția depășește scanTime"
+    status: completed
   - id: pa-timers
     content: "P+a: biblioteci timere PLC (TON/TOF/CTU) — amânat"
     status: pending
@@ -823,7 +823,7 @@ TON, TOF, CTU — biblioteci sau extensie `inline [plc]`; **nu** în P1/P2
 
 **Încă deschise / amânate:** P3c (motor/sensor/fan/button), P+a (timere), P+b (analog), P+c/d (ST extins).
 
-**Următorul pas recomandat:** **P4.0** (doc osc) sau direct **P4.1** (auto-scan + busy).
+**Următorul pas recomandat:** **P+a** (timere) sau **P3c** (motor/sensor).
 
 ---
 

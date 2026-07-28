@@ -23597,7 +23597,8 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Program** | \`inline [plc] .machine:\` with \`inputs:{ }\`, \`outputs:{ }\`, logic body |
 | **Logic (v1)** | \`IF/THEN/ELSE/ELSIF/END_IF\`, \`AND/OR/NOT/XOR\`, \`TRUE\`/\`FALSE\`, \`0\`/\`1\` |
 | **Widths** | \`START\` alone = 1 bit; \`TEMP: 8\` declarable (logic on multi-bit → future P+b) |
-| **Scan** | \`.plc:{ set = 1 }\` with \`on: 1\` runs one program pass on Load & Run |
+| **Scan** | \`.plc:{ set = 1 }\` or **\`scanTime > 0\`** auto-scan; see [Scan timing (P4)](#scan-timing-p4) |
+| **\`busy\`** | \`0\` when \`scanTime: 0\`; pulses during simulated scan when \`scanTime > 0\` |
 | **Outputs** | Retain last value if not assigned this scan (PLC semantics) |
 | **Inputs** | Read-only in program; mapped at \`comp [plc]\` elaboration |
 | **Errors** | Strict mapping at elaboration — no silent fallback to \`0\` |
@@ -23683,6 +23684,9 @@ comp [plc] .ctrl:
 | **\`inputs:\`** | yes* | \`SYM = wire\` or \`SYM = .component\` for every program input |
 | **\`outputs:\`** | yes* | \`SYM = wire\` or \`SYM = .component\` for every program output |
 | **\`on:\`** | optional | How **property blocks** on this component are triggered (see below) |
+| **\`scanTime:\`** | optional | **ms** — \`0\`/omitted = event-driven; **\`N > 0\`** = internal auto-scan every ~N ms |
+| **\`scanDuration:\`** | optional | **ms** simulated execution time per scan (\`busy = 1\`); default **\`1\`** when \`scanTime > 0\` |
+| **\`strict:\`** | optional | **\`0\`** (default) stretch missed ticks; **\`1\`** = overrun/miss (\`overrunCount++\`) |
 
 \\*Every program symbol must appear **exactly once** in the matching map. Missing or extra keys → **elaboration error**.
 
@@ -23703,9 +23707,12 @@ Internal output state (\`outputState\`) persists between scans for latch semanti
 
 | Pin / pout | Bits | Description |
 |------------|------|-------------|
-| **\`set\`** | 1 | In \`.ctrl:{ set = 1 }\` — triggers scan when block executes |
-| **\`scanCount\`** | 16 | Scans completed; read as \`.ctrl:scanCount\` |
-| **\`busy\`** | 1 | Always **\`0\`** in v1 (instant scan; **\`scanTime\`** in P4) |
+| **\`set\`** | 1 | In \`.ctrl:{ set = 1 }\` — triggers one scan when active (ignored while **\`busy\`**) |
+| **\`scanCount\`** | 16 | Scans completed; \`.ctrl:scanCount\` |
+| **\`busy\`** | 1 | **\`0\`** when \`scanTime: 0\`; **\`1\`** during simulated scan when \`scanTime > 0\` |
+| **\`skipped\`** | 1 | **\`1\`** if a manual \`set\` arrived while **\`busy\`** (no queue) |
+| **\`missed\`** | 1 | **\`1\`** after a timer tick was lost (\`strict: 1\`) |
+| **\`overrunCount\`** | 16 | Missed auto-scan ticks since RUN (\`strict: 1\`) |
 
 ### \`on:\` modes (property blocks)
 
@@ -23762,6 +23769,91 @@ comp [plc] .lineB:
 \`\`\`
 
 Only the **maps** change — not the program.
+
+---
+
+## Scan timing (P4)
+
+### What \`scanTime\` means
+
+**\`scanTime\`** is the target interval (**milliseconds**) between complete scan cycles:
+
+\`\`\`text
+read inputs → executePlcScan → write outputs → scanCount++
+\`\`\`
+
+| \`scanTime\` | Mode | Behaviour |
+|------------|------|-----------|
+| **omitted** or **\`0\`** | **Event-driven** | No internal timer. Scan on each active **\`set\`** (manual, wire, or \`osc\`). Execution is **instant** — **\`busy\` stays \`0\`**. Not “run once”; scan as often as you trigger \`set\`. |
+| **\`N > 0\`** | **Auto-scan** | Internal timer fires every ~**N ms**. **\`busy\`** pulses for **\`scanDuration\`** ms per scan. |
+
+### Master clock
+
+| Setup | Who drives scans |
+|-------|------------------|
+| **\`scanTime: 0\`** | **You** — \`.ctrl:{ set = 1 }\`, wire, or **\`comp [osc]\`** (P4.0 / P4.2) |
+| **\`scanTime: N\`** | **PLC timer** — periodic auto-scan; optional extra manual \`set\` if not \`busy\` |
+
+### \`busy\`, \`skipped\`, overrun
+
+| Case | Behaviour |
+|------|-----------|
+| **\`scanTime: 0\`** | \`busy\` always **\`0\`** |
+| **\`scanTime > 0\`** | \`busy = 1\` for **\`scanDuration\`** ms after each scan starts |
+| **\`set\` while \`busy\`** | Scan **ignored**; **\`skipped = 1\`** (no FIFO queue) |
+| **\`strict: 0\`** (default) | Timer tick during \`busy\` → scan **deferred** (stretch) |
+| **\`strict: 1\`** | Timer tick during \`busy\` → cycle **missed**; **\`overrunCount++\`**, **\`missed = 1\`** |
+
+Outputs keep their last written value while \`busy\` (P-D7).
+
+### P4.0 — External clock (\`scanTime: 0\`)
+
+Pattern (same as [DMA paced + osc](dma.md)):
+
+\`\`\`logts
+comp [plc] .ctrl:
+  scanTime: 0
+  on: raise
+  :
+
+comp [osc] .clk:
+  freq: 10
+  :
+
+.ctrl:{ set = .clk:get }
+\`\`\`
+
+One rising edge → one scan. In the browser, \`osc\` runs in real time; use **\`probe(.ctrl:scanCount)\`** to watch live counts.
+
+### P4.1 — Auto-scan
+
+\`\`\`logts
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 200
+  scanDuration: 2
+  ...
+\`\`\`
+
+Load & Run starts the timer; **\`scanCount\`** increases ~5 times per second. Use **\`probe(.ctrl:scanCount)\`** or **\`probe(.ctrl:busy)\`** for live timing.
+
+### P4.2 — Mixing manual \`set\` with auto-scan
+
+With **\`scanTime > 0\`**, \`.ctrl:{ set = 1 }\` still works when **\`busy = 0\`**. If \`busy = 1\`, the request is skipped (\`skipped = 1\`).
+
+### P4.3 — Strict overrun
+
+When **\`scanDuration\`** (simulated work) is longer than **\`scanTime\`** (period), use **\`strict: 1\`** to count missed cycles:
+
+\`\`\`logts
+comp [plc] .ctrl:
+  scanTime: 10
+  scanDuration: 50
+  strict: 1
+  ...
+\`\`\`
+
+Watch **\`overrunCount\`** with **\`probe\`** — pedagogic “PLC too slow for its clock”.
 
 ---
 
@@ -24186,6 +24278,137 @@ comp [plc] .ctrl:
 show(.motorLed:get)
 \`\`\`
 
+### Example 13 — P4.0 external clock wire pulse (test 2775)
+
+\`scanTime: 0\` — scan when external wire drives \`set\`. Load & Run: one scan; second \`set\` via script step adds another (here shown as two triggers in one Run).
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { CLK }
+  outputs: { CNT }
+  IF CLK THEN CNT = 1 ELSE CNT = 0 END_IF
+  :
+
+1wire clkIn
+1wire cntOut
+
+clkIn = 1
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 0
+  inputs: { CLK = clkIn }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+
+.ctrl:{ set = clkIn }
+.ctrl:{ set = 1 }
+
+show(cntOut)
+show(.ctrl:scanCount)
+show(.ctrl:busy)
+\`\`\`
+
+Load & Run: \`scanCount\` is **\`2\`**, \`busy\` is **\`0\`**, \`cntOut\` is **\`1\`**.
+
+### Example 14 — P4.1 manual scan with \`scanTime > 0\` (test 2780)
+
+Auto timer is armed but first scan is manual; \`busy\` clears before \`show\`.
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { CLK }
+  outputs: { CNT }
+  CNT = CLK
+  :
+
+comp [switch] .clk:
+  = 1
+  :
+
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 500
+  scanDuration: 1
+  inputs: { CLK = .clk }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(cntOut)
+show(.ctrl:scanCount)
+show(.ctrl:busy)
+\`\`\`
+
+### Example 15 — P4.2 \`on: raise\` + oscillator (browser)
+
+Use **\`on: raise\`** so each **rising** edge of the oscillator runs one scan. **Load & Run** in the browser — watch **\`scanCount\`** with **\`probe(.ctrl:scanCount)\`** (osc runs in real time).
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { CLK }
+  outputs: { CNT }
+  CNT = CLK
+  :
+
+comp [osc] .tick:
+  freq: 2
+  freqIsSec: 1
+  :
+
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 0
+  inputs: { CLK = .tick }
+  outputs: { CNT = cntOut }
+  on: raise
+  :
+
+.ctrl:{ set = .tick:get }
+
+show(.ctrl:scanCount)
+\`\`\`
+
+After Load & Run, wait ~2 s per osc cycle; \`scanCount\` increases on each rising edge.
+
+### Example 16 — P4.1 event-driven \`busy\` stays 0 (test 2779)
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { CLK }
+  outputs: { CNT }
+  CNT = CLK
+  :
+
+comp [switch] .clk:
+  = 1
+  :
+
+1wire cntOut
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 0
+  inputs: { CLK = .clk }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.ctrl:scanCount)
+show(.ctrl:busy)
+\`\`\`
+
+\`busy\` is **\`0\`** — instant scan with no \`scanTime\` timer.
+
 ---
 
 ## I/O mapping matrix (v1)
@@ -24342,7 +24565,10 @@ Multi-bit status codes (\`8wire statusCode\`) → **P+b** or script logic betwee
 | Pout | Bits | Value | Notes |
 |------|------|-------|-------|
 | **\`scanCount\`** | 16 | Number of completed scans | \`.ctrl:scanCount\` |
-| **\`busy\`** | 1 | Always \`0\` in v1 | Future **P4** (\`scanTime\`) |
+| **\`busy\`** | 1 | \`0\` if \`scanTime:0\`; else \`1\` during \`scanDuration\` | \`.ctrl:busy\` |
+| **\`skipped\`** | 1 | \`1\` if manual \`set\` ignored (busy) | \`.ctrl:skipped\` |
+| **\`missed\`** | 1 | \`1\` after strict overrun tick | \`.ctrl:missed\` |
+| **\`overrunCount\`** | 16 | Missed auto-scan ticks (\`strict:1\`) | \`.ctrl:overrunCount\` |
 
 ### \`on:\` modes — when does scan run?
 
@@ -24375,7 +24601,7 @@ If the program does **not** assign an output in this scan, the **mapped target k
 
 ---
 
-## Runnable examples (verified in tests 2757–2774)
+## Runnable examples (verified in tests 2757–2783)
 
 Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch, and \`doc\`. Examples **7–11** cover the I/O matrix (P3).
 
@@ -24398,11 +24624,11 @@ Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch,
 
 | Phase | Content |
 |-------|---------|
-| **P4** | \`scanTime\` + periodic scan via \`osc\`; \`busy\` during miss-style delay |
 | **P+a** | Timers (\`TON\`, \`TOF\`, \`CTU\`) |
 | **P+b** | Multi-bit logic, comparisons (\`IF TEMP > 50\`) |
 | **P+c** | \`VAR\` / \`END_VAR\`, \`CASE\`, \`RETURN\` |
 | **P+d** | \`FOR\`, \`WHILE\` |
+| **P3c** | \`motor\`, \`sensor\`, \`fan\`, \`button\` components |
 
 ---
 

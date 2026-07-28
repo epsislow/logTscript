@@ -72,6 +72,23 @@ function plcWriteTarget(target, value, width, ctx) {
   }
 }
 
+function plcEnsureTimerList(ctx) {
+  if (!ctx.plcTimers) ctx.plcTimers = [];
+  return ctx.plcTimers;
+}
+
+function plcPushTimer(ctx, tid) {
+  plcEnsureTimerList(ctx).push(tid);
+}
+
+function plcClearTimers(ctx) {
+  if (!ctx.plcTimers) return;
+  for (const tid of ctx.plcTimers) {
+    clearTimeout(tid);
+  }
+  ctx.plcTimers = [];
+}
+
 var PlcComponent = class PlcComponent extends BuiltinComponent {
   static get type() { return 'plc'; }
   static get shortnames() { return {}; }
@@ -87,11 +104,11 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
   getWidthBits() { return 1; }
 
   getSupportedProperties() {
-    return ['scanCount', 'busy'];
+    return ['scanCount', 'busy', 'skipped', 'missed', 'overrunCount'];
   }
 
   getRedirectProperties() {
-    return ['scanCount', 'busy'];
+    return ['scanCount', 'busy', 'skipped', 'missed', 'overrunCount'];
   }
 
   getDef() {
@@ -101,15 +118,53 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
         { name: 'inputs', value: 'map' },
         { name: 'outputs', value: 'map' },
         { name: 'on', value: 'mode' },
+        { name: 'scanTime', value: 'integer (ms, 0 = event-driven)' },
+        { name: 'scanDuration', value: 'integer (ms simulated busy, default 1)' },
+        { name: 'strict', value: '0/1 (overrun miss when 1)' },
       ],
       initValue: '1bit',
       pins: [{ bits: '1', name: 'set' }],
       pouts: [
         { bits: '16', name: 'scanCount' },
         { bits: '1', name: 'busy' },
+        { bits: '1', name: 'skipped' },
+        { bits: '1', name: 'missed' },
+        { bits: '16', name: 'overrunCount' },
       ],
       returns: '1bit',
     };
+  }
+
+  _parseScanTime(attributes) {
+    if (attributes.scanTime === undefined || attributes.scanTime === null) return 0;
+    const n = parseInt(attributes.scanTime, 10);
+    if (isNaN(n) || n < 0) throw Error('plc scanTime must be a non-negative integer (ms)');
+    return n;
+  }
+
+  _parseScanDuration(attributes, scanTime) {
+    if (attributes.scanDuration === undefined || attributes.scanDuration === null) {
+      return scanTime > 0 ? 1 : 0;
+    }
+    const n = parseInt(attributes.scanDuration, 10);
+    if (isNaN(n) || n < 0) throw Error('plc scanDuration must be a non-negative integer (ms)');
+    return n;
+  }
+
+  _parseStrict(attributes) {
+    if (attributes.strict === undefined || attributes.strict === null) return false;
+    const v = attributes.strict;
+    if (v === 1 || v === '1' || v === true) return true;
+    if (v === 0 || v === '0' || v === false) return false;
+    throw Error('plc strict must be 0 or 1');
+  }
+
+  _timingMode(comp) {
+    return (comp.scanTime || 0) > 0 ? 'auto' : 'external';
+  }
+
+  _usesBusy(comp) {
+    return (comp.scanTime || 0) > 0;
   }
 
   _resolveProgram(attributes, ctx) {
@@ -172,92 +227,34 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     }
   }
 
-  createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
-    const { ref, inst } = this._resolveProgram(attributes, ctx);
-    const inputMap = attributes.inputs || {};
-    const outputMap = attributes.outputs || {};
-    this._validateMappings(inst, inputMap, outputMap, name);
-    this._validateWidths(inst, inputMap, outputMap, ctx, name);
-
-    const outputState = {};
-    for (const sym of Object.keys(inst.outputs || {})) {
-      outputState[sym] = '0';
+  _emitPlcProbes(compName, ctx) {
+    if (typeof ctx._emitComputedComponentProbes === 'function') {
+      ctx._emitComputedComponentProbes(compName);
     }
-
-    if (typeof addPlc === 'function') {
-      addPlc(baseId, {
-        programRef: ref,
-        inputMap: { ...inputMap },
-        outputMap: { ...outputMap },
-        outputState,
-        scanCount: 0,
-      });
-    }
-
-    return {
-      deviceIds: [baseId],
-      ref: null,
-      programRef: ref,
-      inputMap,
-      outputMap,
-      outputState,
-      scanCount: 0,
-    };
   }
 
-  finalizeCompInfo(compInfo, attributes) {
-    if (attributes.inputs) compInfo.inputMap = attributes.inputs;
-    if (attributes.outputs) compInfo.outputMap = attributes.outputs;
-    const refs = attributes.programMembers;
-    if (refs && refs.length) compInfo.programRef = refs[0];
-    if (!compInfo.outputState) compInfo.outputState = {};
-    if (compInfo.scanCount == null) compInfo.scanCount = 0;
+  _setBusy(comp, compName, ctx, value) {
+    const next = !!value;
+    if (!!comp.busy === next) return;
+    comp.busy = next;
+    this._emitPlcProbes(compName, ctx);
   }
 
-  static formatInstanceDoc(alias, comp) {
-    const lines = [];
-    lines.push(`${alias} (comp [plc])`);
-    lines.push('');
-    if (comp.programRef) lines.push(`program: ${comp.programRef}`);
-    lines.push('');
-    lines.push('inputs:');
-    const inMap = comp.inputMap || {};
-    const inNames = Object.keys(inMap);
-    if (!inNames.length) lines.push('  (none)');
-    else for (const n of inNames) lines.push(`  ${n} = ${inMap[n]}`);
-    lines.push('');
-    lines.push('outputs:');
-    const outMap = comp.outputMap || {};
-    const outNames = Object.keys(outMap);
-    if (!outNames.length) lines.push('  (none)');
-    else for (const n of outNames) lines.push(`  ${n} = ${outMap[n]}`);
-    lines.push('');
-    lines.push('scan: .plc:{ set = 1 } runs one program pass');
-    lines.push(`scanCount: ${comp.scanCount != null ? comp.scanCount : 0}`);
-    lines.push('busy: 0 (instant scan; scanTime in P4)');
-    if (comp.outputState && Object.keys(comp.outputState).length) {
-      lines.push('');
-      lines.push('outputState (last scan):');
-      for (const [sym, val] of Object.entries(comp.outputState)) {
-        lines.push(`  ${sym} = ${val}`);
+  _onBusyCleared(comp, compName, ctx) {
+    if (comp._pendingTimerScan) {
+      comp._pendingTimerScan = false;
+      if (!comp.busy) {
+        this._runScanWithBusy(comp, compName, ctx, 'timer');
       }
     }
-    return lines;
   }
 
-  evalGetProperty(comp, property, a, ctx) {
-    if (property === 'busy') {
-      return { value: '0', ref: null, varName: `${a.var}:busy`, bitWidth: 1 };
+  _finishBusyWindow(comp, compName, ctx) {
+    this._setBusy(comp, compName, ctx, false);
+    this._onBusyCleared(comp, compName, ctx);
+    if (comp._plcVirtual) {
+      this._processPlcSchedule(comp, compName, ctx);
     }
-    if (property !== 'scanCount') return null;
-    const count = comp.scanCount != null ? comp.scanCount : 0;
-    const bits = '16';
-    const val = count.toString(2).padStart(parseInt(bits, 10), '0');
-    return { value: val, ref: null, varName: `${a.var}:scanCount`, bitWidth: parseInt(bits, 10) };
-  }
-
-  _isActive(val) {
-    return val === '1' || (val && val[val.length - 1] === '1');
   }
 
   _plcScan(comp, compName, ctx) {
@@ -283,9 +280,258 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     if (comp.deviceIds && comp.deviceIds[0] && typeof plcSetScanCount === 'function') {
       plcSetScanCount(comp.deviceIds[0], comp.scanCount);
     }
-    if (typeof ctx._emitComputedComponentProbes === 'function') {
-      ctx._emitComputedComponentProbes(compName);
+    comp.skipped = false;
+    comp.missed = false;
+    this._emitPlcProbes(compName, ctx);
+  }
+
+  _runScanWithBusy(comp, compName, ctx, source) {
+    const useBusy = this._usesBusy(comp);
+    if (useBusy) {
+      this._setBusy(comp, compName, ctx, true);
     }
+    this._plcScan(comp, compName, ctx);
+    const duration = useBusy ? (comp.scanDuration || 0) : 0;
+    if (useBusy && duration > 0 && comp._plcVirtual) {
+      comp._plcBusyUntil = (comp._plcClock || 0) + duration;
+    } else if (useBusy && duration > 0 && typeof setTimeout === 'function') {
+      const tid = setTimeout(() => {
+        this._finishBusyWindow(comp, compName, ctx);
+      }, duration);
+      plcPushTimer(ctx, tid);
+    } else if (useBusy) {
+      this._finishBusyWindow(comp, compName, ctx);
+    }
+  }
+
+  _requestScan(comp, compName, ctx, source) {
+    if (comp.busy) {
+      if (source === 'manual') {
+        comp.skipped = true;
+        this._emitPlcProbes(compName, ctx);
+        return false;
+      }
+      if (comp.strict) {
+        comp.overrunCount = (comp.overrunCount || 0) + 1;
+        comp.missed = true;
+        this._emitPlcProbes(compName, ctx);
+        return false;
+      }
+      comp._pendingTimerScan = true;
+      return false;
+    }
+    this._runScanWithBusy(comp, compName, ctx, source);
+    return true;
+  }
+
+  _processPlcSchedule(comp, compName, ctx) {
+    if (comp._plcBusyUntil != null && (comp._plcClock || 0) >= comp._plcBusyUntil) {
+      comp._plcBusyUntil = null;
+      this._finishBusyWindow(comp, compName, ctx);
+    }
+    if (!comp.plcAutoScanActive || comp._plcNextScanAt == null) return;
+    while ((comp._plcClock || 0) >= comp._plcNextScanAt) {
+      const ran = this._requestScan(comp, compName, ctx, 'timer');
+      if (!ran && !comp.strict) break;
+      comp._plcNextScanAt += comp.scanTime;
+    }
+  }
+
+  advancePlcTiming(ctx, deltaMs) {
+    const steps = deltaMs > 0 ? Math.floor(deltaMs) : 0;
+    for (let s = 0; s < steps; s++) {
+      for (const [, comp] of ctx.components) {
+        if (!comp || comp.type !== 'plc' || !comp._plcVirtual) continue;
+        comp._plcClock = (comp._plcClock || 0) + 1;
+      }
+      for (const [name, comp] of ctx.components) {
+        if (!comp || comp.type !== 'plc' || !comp._plcVirtual) continue;
+        this._processPlcSchedule(comp, name, ctx);
+      }
+    }
+  }
+
+  _autoScanTick(comp, compName, ctx) {
+    if (!comp.plcAutoScanActive || !ctx.components.has(compName)) return;
+    this._requestScan(comp, compName, ctx, 'timer');
+    const tid = setTimeout(() => this._autoScanTick(comp, compName, ctx), comp.scanTime);
+    plcPushTimer(ctx, tid);
+  }
+
+  _startAutoScanWall(comp, compName, ctx) {
+    if (!comp.scanTime || comp.scanTime <= 0) return;
+    comp.plcAutoScanActive = true;
+    if (typeof setTimeout !== 'function') return;
+    const tid = setTimeout(() => this._autoScanTick(comp, compName, ctx), comp.scanTime);
+    plcPushTimer(ctx, tid);
+  }
+
+  _startAutoScanVirtual(comp) {
+    if (!comp.scanTime || comp.scanTime <= 0) return;
+    comp.plcAutoScanActive = true;
+    comp._plcClock = 0;
+    comp._plcNextScanAt = comp.scanTime;
+  }
+
+  _initPlcTiming(comp, ctx) {
+    const virtual = !!(ctx && ctx._plcVirtualTime);
+    comp._plcVirtual = virtual;
+    comp._plcClock = 0;
+    comp._plcBusyUntil = null;
+    comp._plcNextScanAt = null;
+    return virtual;
+  }
+
+  createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
+    const { ref, inst } = this._resolveProgram(attributes, ctx);
+    const inputMap = attributes.inputs || {};
+    const outputMap = attributes.outputs || {};
+    this._validateMappings(inst, inputMap, outputMap, name);
+    this._validateWidths(inst, inputMap, outputMap, ctx, name);
+
+    const scanTime = this._parseScanTime(attributes);
+    const scanDuration = this._parseScanDuration(attributes, scanTime);
+    const strict = this._parseStrict(attributes);
+
+    const outputState = {};
+    for (const sym of Object.keys(inst.outputs || {})) {
+      outputState[sym] = '0';
+    }
+
+    if (typeof addPlc === 'function') {
+      addPlc(baseId, {
+        programRef: ref,
+        inputMap: { ...inputMap },
+        outputMap: { ...outputMap },
+        outputState,
+        scanCount: 0,
+        scanTime,
+        scanDuration,
+        strict,
+      });
+    }
+
+    const compInfo = {
+      deviceIds: [baseId],
+      ref: null,
+      programRef: ref,
+      inputMap,
+      outputMap,
+      outputState,
+      scanCount: 0,
+      scanTime,
+      scanDuration,
+      strict,
+      busy: false,
+      skipped: false,
+      missed: false,
+      overrunCount: 0,
+      plcAutoScanActive: false,
+      _pendingTimerScan: false,
+    };
+
+    const virtual = this._initPlcTiming(compInfo, ctx);
+    if (scanTime > 0) {
+      if (virtual) {
+        this._startAutoScanVirtual(compInfo);
+      } else if (typeof setTimeout === 'function') {
+        const self = this;
+        const startTid = setTimeout(() => {
+          const comp = ctx.components.get(name);
+          if (comp) self._startAutoScanWall(comp, name, ctx);
+        }, 0);
+        plcPushTimer(ctx, startTid);
+      }
+    }
+
+    return compInfo;
+  }
+
+  finalizeCompInfo(compInfo, attributes) {
+    if (attributes.inputs) compInfo.inputMap = attributes.inputs;
+    if (attributes.outputs) compInfo.outputMap = attributes.outputs;
+    const refs = attributes.programMembers;
+    if (refs && refs.length) compInfo.programRef = refs[0];
+    if (!compInfo.outputState) compInfo.outputState = {};
+    if (compInfo.scanCount == null) compInfo.scanCount = 0;
+    if (compInfo.scanTime == null) compInfo.scanTime = this._parseScanTime(attributes);
+    if (compInfo.scanDuration == null) compInfo.scanDuration = this._parseScanDuration(attributes, compInfo.scanTime || 0);
+    if (compInfo.strict == null) compInfo.strict = this._parseStrict(attributes);
+    if (compInfo.busy == null) compInfo.busy = false;
+    if (compInfo.skipped == null) compInfo.skipped = false;
+    if (compInfo.missed == null) compInfo.missed = false;
+    if (compInfo.overrunCount == null) compInfo.overrunCount = 0;
+  }
+
+  static formatInstanceDoc(alias, comp) {
+    const lines = [];
+    lines.push(`${alias} (comp [plc])`);
+    lines.push('');
+    if (comp.programRef) lines.push(`program: ${comp.programRef}`);
+    const scanTime = comp.scanTime != null ? comp.scanTime : 0;
+    lines.push(`scanTime: ${scanTime} ms (${scanTime > 0 ? 'auto-scan' : 'event-driven (external set/osc)'})`);
+    if (scanTime > 0) {
+      lines.push(`scanDuration: ${comp.scanDuration != null ? comp.scanDuration : 1} ms`);
+      lines.push(`strict: ${comp.strict ? 1 : 0}`);
+    }
+    lines.push('');
+    lines.push('inputs:');
+    const inMap = comp.inputMap || {};
+    const inNames = Object.keys(inMap);
+    if (!inNames.length) lines.push('  (none)');
+    else for (const n of inNames) lines.push(`  ${n} = ${inMap[n]}`);
+    lines.push('');
+    lines.push('outputs:');
+    const outMap = comp.outputMap || {};
+    const outNames = Object.keys(outMap);
+    if (!outNames.length) lines.push('  (none)');
+    else for (const n of outNames) lines.push(`  ${n} = ${outMap[n]}`);
+    lines.push('');
+    lines.push('scan: .plc:{ set = 1 } runs one program pass (ignored while busy)');
+    lines.push(`scanCount: ${comp.scanCount != null ? comp.scanCount : 0}`);
+    lines.push(`busy: ${comp.busy ? 1 : 0}`);
+    if (scanTime > 0) {
+      lines.push(`skipped: ${comp.skipped ? 1 : 0}`);
+      lines.push(`missed: ${comp.missed ? 1 : 0}`);
+      lines.push(`overrunCount: ${comp.overrunCount != null ? comp.overrunCount : 0}`);
+    }
+    if (comp.outputState && Object.keys(comp.outputState).length) {
+      lines.push('');
+      lines.push('outputState (last scan):');
+      for (const [sym, val] of Object.entries(comp.outputState)) {
+        lines.push(`  ${sym} = ${val}`);
+      }
+    }
+    return lines;
+  }
+
+  _poutBits16(value) {
+    const n = value != null ? value : 0;
+    return n.toString(2).padStart(16, '0');
+  }
+
+  evalGetProperty(comp, property, a, ctx) {
+    if (property === 'busy') {
+      return { value: comp.busy ? '1' : '0', ref: null, varName: `${a.var}:busy`, bitWidth: 1 };
+    }
+    if (property === 'skipped') {
+      return { value: comp.skipped ? '1' : '0', ref: null, varName: `${a.var}:skipped`, bitWidth: 1 };
+    }
+    if (property === 'missed') {
+      return { value: comp.missed ? '1' : '0', ref: null, varName: `${a.var}:missed`, bitWidth: 1 };
+    }
+    if (property === 'overrunCount') {
+      const val = this._poutBits16(comp.overrunCount);
+      return { value: val, ref: null, varName: `${a.var}:overrunCount`, bitWidth: 16 };
+    }
+    if (property !== 'scanCount') return null;
+    const count = comp.scanCount != null ? comp.scanCount : 0;
+    const val = this._poutBits16(count);
+    return { value: val, ref: null, varName: `${a.var}:scanCount`, bitWidth: 16 };
+  }
+
+  _isActive(val) {
+    return val === '1' || (val && val[val.length - 1] === '1');
   }
 
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {
@@ -293,7 +539,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     if (pending.set !== undefined) {
       const setVal = this.reEvalPendingValue(pending, 'set', reEvaluate, ctx);
       if (this._isActive(setVal)) {
-        this._plcScan(comp, compName, ctx);
+        this._requestScan(comp, compName, ctx, 'manual');
       }
     }
   }
