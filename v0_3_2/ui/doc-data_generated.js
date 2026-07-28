@@ -7443,13 +7443,31 @@ show(doc(.l1))
 
 ---
 
-## Phase A scope
+## Using with mmap (Phase B)
 
-| Included | Not yet (later phases) |
-|----------|-------------------------|
-| Direct-mapped cache, \`getMem\` / \`setMem\` | Bus pins on cache |
-| CPU \`ram =\` / \`prog =\` cache | \`mmap\` integration |
-| DMA \`mems:\` with cache | Multi-port cache |
+A logical address window can target a cache instead of raw \`mem\`:
+
+\`\`\`
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, cache: .l1
+  on: 1
+  :
+\`\`\`
+
+[CPU](cpu.md) \`mmap =\` and [DMA](dma.md) \`mmap =\` accesses go through \`mmapRead\` / \`mmapWrite\` → \`getMem\` / \`setMem\` on the cache device. Stats on \`.l1\` update as usual. See [mmap.md](mmap.md#mmap-cache-region) for a runnable example.
+
+---
+
+## Phase scope
+
+| Included | Later phases |
+|----------|----------------|
+| Direct-mapped cache, \`getMem\` / \`setMem\` | Bus pins on cache (Phase D) |
+| CPU \`ram =\` / \`prog =\` cache | Multi-port cache |
+| DMA \`mems:\` with cache | Associativity, snooping (Phase C) |
+| **\`mmap\` \`cache:\` regions** | |
 | Stats, flush, invalidate | |
 
 See [future-component-ideas.md](future-component-ideas.md) for roadmap items.
@@ -21202,7 +21220,7 @@ Formula: find region with \`base ≤ adr < base + size\` → local offset = \`ad
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
-| **\`depth:\`** | \`8\` | Bus word width (bits). All \`mem:\` regions must match. Each \`mmio\` target must be **exactly \`depth\` bits** (no implicit narrow↔wide conversion). |
+| **\`depth:\`** | \`8\` | Bus word width (bits). All \`mem:\` / \`cache:\` regions must match. Each \`mmio\` target must be **exactly \`depth\` bits** (no implicit narrow↔wide conversion). |
 | **\`regions:\`** | *(required)* | Ordered list of non-overlapping windows (see below). |
 | **\`unmapped:\`** | \`error\` | \`error\` — throw on access outside all regions. \`read0\` — read returns \`depth\` zero bits. \`ignore\` — writes outside regions are ignored. |
 
@@ -21215,7 +21233,7 @@ Formula: find region with \`base ≤ adr < base + size\` → local offset = \`ad
 \`\`\`
 regions:
   - base: 0, size: 16, mem: .rom
-  - base: 16, size: 16, mem: .ram
+  - base: 16, size: 16, cache: .l1
   - base: 32, size: 8, mmio:
       0: busReg
       1: .panel:out
@@ -21228,6 +21246,7 @@ regions:
 | **\`base\`** | First logical address of the window (decimal, \`\\decimal\`, or \`#hex\` where supported). |
 | **\`size\`** | Length in **words** (not bytes). |
 | **\`mem:\`** | Window into \`comp [mem]\`; local offset \`0 … size−1\`. Honors \`readonly\` on the mem. |
+| **\`cache:\`** | Window into \`comp [cache]\`; same addressing as \`mem:\`, but reads/writes go through the cache (\`getMem\` / \`setMem\`). Region \`size\` must not exceed cache \`length\`. See [cache.md](cache.md). |
 | **\`regs:\`** | Window into \`comp [reg]\` register bank; local offset \`0 … size−1\`. Requires \`length\` on the reg ≥ region \`size\`. |
 | **\`mmio:\`** | Sub-map: offset → \`Nwire name\` or \`.comp:pin\` / \`.comp:pout\` (exactly **\`depth\`** bits). |
 | **\`device:\`** | MMIO profile from \`getMmapProfile()\` on the target component (see [Device profiles](#device-profiles-6d)). |
@@ -21359,7 +21378,66 @@ doc(comp.mmap)
 doc(.mmap)
 \`\`\`
 
-**\`doc(.mmap)\`** lists \`depth\`, regions (\`mem\` / \`regs\` / \`mmio\` / \`device\`), and span.
+**\`doc(.mmap)\`** lists \`depth\`, regions (\`mem\` / \`cache\` / \`regs\` / \`mmio\` / \`device\`), and span.
+
+---
+
+### mmap-cache-region
+
+Logical RAM window backed by [cache](cache.md) instead of direct \`mem:\`. **Load & Run:** \`rom0\` = \`00000001\`, \`ram0\` = \`00000000\`, then after write \`cell\` = \`10101010\` in backing RAM.
+
+\`\`\`logts-play
+comp [mem] .rom:
+  depth: 8
+  length: 16
+  readonly
+  on: 1
+  = ^01020304
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^00
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  writePolicy: writeThrough
+  on: 1
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, mem: .rom
+    - base: 16, size: 16, cache: .l1
+  on: 1
+  :
+
+5wire adrRom = 00000
+5wire adrRam = 10000
+1wire getEn = 1
+.mmap:{ adr = adrRom, get = getEn }
+8wire rom0 = .mmap:read
+show(rom0)
+
+.mmap:{ adr = adrRam, get = getEn }
+8wire ram0 = .mmap:read
+show(ram0)
+
+.mmap:{ adr = adrRam, data = 10101010, write = 1 }
+.ram:{ adr = 0, set = 1 }
+8wire cell = .ram:get
+show(cell)
+\`\`\`
+
+With **\`writePolicy: writeBack\`**, flush the cache (\`.l1:{ flush = 1, set = 1 }\`) before reading \`.ram\` directly.
 
 ---
 
@@ -21368,6 +21446,7 @@ doc(.mmap)
 - [dma.md](dma.md) — \`mems:\` and \`mmap =\` transfers
 - [cpu.md](cpu.md) — \`ram =\` vs \`mmap =\`, LOAD/STORE
 - [mem.md](mem.md) — backing storage for \`mem:\` regions
+- [cache.md](cache.md) — \`cache:\` regions (logical window through cache)
 - [doc-function.md](doc-function.md) — \`doc()\` index
 
 ## Not in MVP

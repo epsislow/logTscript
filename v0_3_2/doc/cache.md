@@ -404,13 +404,31 @@ show(doc(.l1))
 
 ---
 
-## Phase A scope
+## Using with mmap (Phase B)
 
-| Included | Not yet (later phases) |
-|----------|-------------------------|
-| Direct-mapped cache, `getMem` / `setMem` | Bus pins on cache |
-| CPU `ram =` / `prog =` cache | `mmap` integration |
-| DMA `mems:` with cache | Multi-port cache |
+A logical address window can target a cache instead of raw `mem`:
+
+```
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, cache: .l1
+  on: 1
+  :
+```
+
+[CPU](cpu.md) `mmap =` and [DMA](dma.md) `mmap =` accesses go through `mmapRead` / `mmapWrite` → `getMem` / `setMem` on the cache device. Stats on `.l1` update as usual. See [mmap.md](mmap.md#mmap-cache-region) for a runnable example.
+
+---
+
+## Phase scope
+
+| Included | Later phases |
+|----------|----------------|
+| Direct-mapped cache, `getMem` / `setMem` | Bus pins on cache (Phase D) |
+| CPU `ram =` / `prog =` cache | Multi-port cache |
+| DMA `mems:` with cache | Associativity, snooping (Phase C) |
+| **`mmap` `cache:` regions** | |
 | Stats, flush, invalidate | |
 
 See [future-component-ideas.md](future-component-ideas.md) for roadmap items.

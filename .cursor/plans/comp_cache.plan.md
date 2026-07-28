@@ -238,7 +238,7 @@ sequenceDiagram
 
 ### Faza B — mmap
 
-`regions: cache: .l1` în mmap.
+`regions: cache: .l1` în mmap. **Done** — parser, `resolveStorageBackend`, teste `comp-mmap-cache` 2728+.
 
 ### Faza C — extensii
 

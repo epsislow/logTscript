@@ -27787,6 +27787,202 @@ comp [cache] .l1:
   h.assert('policy lru fallback', getCache(l1Id).evictType, 'lru');
 });
 
+const MMAP_CACHE_SETUP = `comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^01020304
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  writePolicy: writeThrough
+  on: 1
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, cache: .l1
+  on: 1
+  :
+`;
+
+reg(2728, 'comp-mmap-cache', 'mmap parses cache region', function(h, session) {
+  const { interp } = session.run(MMAP_CACHE_SETUP);
+  const comp = interp.components.get('.mmap');
+  const regions = comp.mmapRegions || [];
+  h.assert('region count', String(regions.length), '1');
+  h.assert('kind cache', regions[0].kind, 'cache');
+  h.assert('cache ref', regions[0].memRef, '.l1');
+});
+
+reg(2729, 'comp-mmap-cache', 'mmapRead through cache hits backing', function(h, session) {
+  const { interp } = session.run(MMAP_CACHE_SETUP);
+  const mmapId = interp.components.get('.mmap').deviceIds[0];
+  h.assert('word0', mmapRead(mmapId, 0, interp), '00000001');
+  h.assert('word1', mmapRead(mmapId, 1, interp), '00000010');
+  h.assert('cache miss', String(parseInt(cacheProp(session, interp, '.l1', 'misses'), 2) >= 2), 'true');
+});
+
+reg(2730, 'comp-mmap-cache', 'mmapWrite writeThrough updates backing', function(h, session) {
+  const { interp } = session.run(MMAP_CACHE_SETUP);
+  const mmapId = interp.components.get('.mmap').deviceIds[0];
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  mmapWrite(mmapId, 2, '10101010', interp, session._ensureRegistry());
+  h.assert('via mmap', mmapRead(mmapId, 2, interp), '10101010');
+  h.assert('via ram', getMem(ramId, 2), '10101010');
+});
+
+reg(2731, 'comp-mmap-cache', 'cpu mmap LOAD through cache region', function(h, session) {
+  const src = CPU_ISA_MIN + `
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^44
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  on: 1
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, cache: .l1
+  on: 1
+  :
+
+comp [cpu] .u:
+  isa: .cpuisa
+  mmap = .mmap
+  registers: 4
+  on: 1
+  prog:
+    depth: 8
+    length: 8
+    = .cpuisa {
+      LOAD R0 A0
+      HALT
+    }
+  :
+.u:{ set = 1 }
+`;
+  const { interp } = session.run(src);
+  const handler = session._ensureRegistry().get('cpu');
+  const comp = interp.components.get('.u');
+  const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+  h.assert('r0 from mmap cache', r0.value, '01000100');
+  h.assert('cache miss', String(parseInt(cacheProp(session, interp, '.l1', 'misses'), 2) >= 1), 'true');
+});
+
+reg(2732, 'comp-mmap-cache', 'dma mmap copy through cache region', function(h, session) {
+  const { interp } = session.run(`comp [mem] .rom:
+  depth: 8
+  length: 16
+  readonly
+  on: 1
+  = ^01020304
+  :
+
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^00
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  writePolicy: writeThrough
+  on: 1
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, mem: .rom
+    - base: 16, size: 16, cache: .l1
+  on: 1
+  :
+
+comp [dma] .dma:
+  mmap = .mmap
+  on: 1
+  :
+.dma:{ src = 1, srcAdr = 0, dstAdr = 10000, count = 1, set = 1 }
+`);
+  const ramId = interp.components.get('.ram').deviceIds[0];
+  h.assert('word0 in ram', getMem(ramId, 0), '00000001');
+  h.assert('done', dmaGetProp(session, interp, '.dma', 'done'), '1');
+});
+
+reg(2733, 'comp-mmap-cache', 'mmap rejects cache depth mismatch', function(h, session) {
+  h.assertThrows('depth', function() {
+    session.run(`comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  on: 1
+  :
+
+comp [mmap] .mmap:
+  depth: 4
+  regions:
+    - base: 0, size: 16, cache: .l1
+  on: 1
+  :
+`);
+  }, 'depth');
+});
+
+reg(2734, 'comp-mmap-cache', 'mmap cache region rejects mem component', function(h, session) {
+  h.assertThrows('cache', function() {
+    session.run(`comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  :
+
+comp [mmap] .mmap:
+  depth: 8
+  regions:
+    - base: 0, size: 16, cache: .ram
+  on: 1
+  :
+`);
+  }, 'cache');
+});
+
+reg(2735, 'comp-mmap-cache', 'doc(.mmap) lists cache region', function(h, session) {
+  const { interp } = session.run(MMAP_CACHE_SETUP);
+  const handler = session._ensureRegistry().get('mmap');
+  const doc = handler.constructor.formatInstanceDoc('.mmap', interp.components.get('.mmap')).join('\n');
+  h.assert('cache line', String(doc.includes('cache .l1')), 'true');
+});
+
 reg(2721, 'parser', 'cpu on after ram sub-block stays component attribute', function(h, session) {
   const stmts = session.parse(`
 comp [cpu] .u:

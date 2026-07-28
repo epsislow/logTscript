@@ -19,6 +19,21 @@ var MmapComponent = class MmapComponent extends BuiltinComponent {
     return 8;
   }
 
+  _resolveStorageRef(ref, ctx) {
+    if (typeof resolveStorageBackend === 'function') {
+      const link = resolveStorageBackend(ref, ctx, 0);
+      return {
+        ref: link.compRef,
+        memId: link.storageId,
+        depth: link.depth,
+        length: link.length,
+        readonly: link.readonly,
+        kind: link.kind,
+      };
+    }
+    return this._resolveMemRef(ref, ctx);
+  }
+
   _resolveMemRef(ref, ctx) {
     const comp = ctx.components.get(ref);
     if (!comp || comp.type !== 'mem') {
@@ -125,22 +140,26 @@ var MmapComponent = class MmapComponent extends BuiltinComponent {
       const base = typeof mmapParseInt === 'function' ? mmapParseInt(r.base) : parseInt(r.base, 10);
       const size = typeof mmapParseInt === 'function' ? mmapParseInt(r.size) : parseInt(r.size, 10);
       if (isNaN(base) || isNaN(size)) throw Error('mmap region base/size must be numeric');
-      if (r.mem) {
-        const mem = this._resolveMemRef(r.mem, ctx);
-        if (depth === null) depth = mem.depth;
-        else if (depth !== mem.depth) {
-          throw Error(`mmap mems depth mismatch: expected ${depth}, ${mem.ref} has ${mem.depth}`);
+      if (r.mem || r.cache) {
+        const ref = r.cache || r.mem;
+        const store = this._resolveStorageRef(ref, ctx);
+        if (r.cache && store.kind !== 'cache') {
+          throw Error(`mmap cache region ${ref} must be comp [cache]`);
         }
-        if (size > mem.length) {
-          throw Error(`mmap region size ${size} exceeds mem ${mem.ref} length ${mem.length}`);
+        if (depth === null) depth = store.depth;
+        else if (depth !== store.depth) {
+          throw Error(`mmap storage depth mismatch: expected ${depth}, ${store.ref} has ${store.depth}`);
+        }
+        if (size > store.length) {
+          throw Error(`mmap region size ${size} exceeds ${store.kind} ${store.ref} length ${store.length}`);
         }
         built.push({
-          kind: 'mem',
+          kind: store.kind === 'cache' ? 'cache' : 'mem',
           base,
           size,
-          memId: mem.memId,
-          memRef: mem.ref,
-          readonly: mem.readonly,
+          memId: store.memId,
+          memRef: store.ref,
+          readonly: store.readonly,
         });
       } else if (r.regs) {
         const regs = this._resolveRegsRef(r.regs, ctx);
@@ -176,7 +195,7 @@ var MmapComponent = class MmapComponent extends BuiltinComponent {
         const slots = this._buildDeviceSlots(r.device, depth, ctx);
         built.push({ kind: 'mmio', base, size, slots });
       } else {
-        throw Error('mmap region requires mem:, regs:, mmio:, or device:');
+        throw Error('mmap region requires mem:, cache:, regs:, mmio:, or device:');
       }
       if (base + size > maxEnd) maxEnd = base + size;
     }
@@ -245,6 +264,8 @@ var MmapComponent = class MmapComponent extends BuiltinComponent {
       const r = regions[i];
       if (r.kind === 'mem') {
         lines.push(`  ${r.base}..${r.base + r.size - 1}  mem ${r.memRef}`);
+      } else if (r.kind === 'cache') {
+        lines.push(`  ${r.base}..${r.base + r.size - 1}  cache ${r.memRef}`);
       } else if (r.kind === 'regs') {
         lines.push(`  ${r.base}..${r.base + r.size - 1}  regs ${r.regsRef}`);
       } else if (r.kind === 'mmio') {

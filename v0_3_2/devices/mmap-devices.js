@@ -156,7 +156,7 @@ function mmapRead(id, addr, ctx) {
     throw Error(`mmap unmapped address ${a}`);
   }
   const { region, local } = hit;
-  if (region.kind === 'mem') {
+  if (region.kind === 'mem' || region.kind === 'cache') {
     const val = typeof getMem === 'function' ? getMem(region.memId, local) : null;
     m.lastRead = mmapPadWord(val, m.depth);
     return m.lastRead;
@@ -194,7 +194,7 @@ function mmapWrite(id, addr, word, ctx, componentRegistry) {
     throw Error(`mmap unmapped address ${a}`);
   }
   const { region, local } = hit;
-  if (region.kind === 'mem') {
+  if (region.kind === 'mem' || region.kind === 'cache') {
     if (region.readonly) throw Error(`mmap cannot write readonly region at ${a}`);
     if (typeof setMem === 'function') setMem(region.memId, local, padded);
     return;
