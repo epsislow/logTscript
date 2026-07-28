@@ -28803,5 +28803,197 @@ comp [plc] .ctrl:
   h.assert('raise skips first RUN', String(interp.components.get('.ctrl').scanCount), '0');
 });
 
+const PLC_DIP_SCRIPT = `
+inline [plc] .machine:
+  inputs: { SEL }
+  outputs: { MOTOR }
+  IF SEL THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+comp [dip] .mode:
+  length: 1
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { SEL = .mode }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`;
+
+reg(2769, 'comp-plc', 'dip length 1 as PLC input', function(h, session) {
+  const { interp } = session.run(PLC_DIP_SCRIPT);
+  const ledComp = interp.components.get('.motorLed');
+  h.assert('led on from dip', interp.getValueFromRef(ledComp.ref), '1');
+  h.assert('scanCount 1', String(interp.components.get('.ctrl').scanCount), '1');
+});
+
+const PLC_REG_SCRIPT = `
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { CMD }
+  IF START AND NOT STOP THEN CMD = 1 ELSE CMD = 0 END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [reg] .cmd:
+  depth: 1
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start, STOP = .stop }
+  outputs: { CMD = .cmd }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`;
+
+reg(2770, 'comp-plc', 'reg depth 1 as PLC output', function(h, session) {
+  const { interp } = session.run(PLC_REG_SCRIPT);
+  h.assert('reg get 1', session.getCompProperty(interp, '.cmd', 'get'), '1');
+  h.assert('scanCount 1', String(interp.components.get('.ctrl').scanCount), '1');
+});
+
+const PLC_BAR_SCRIPT = `
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { STATUS }
+  STATUS = START
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [bar] .status:
+  length: 1
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start }
+  outputs: { STATUS = .status }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`;
+
+reg(2771, 'comp-plc', 'bar length 1 as PLC output', function(h, session) {
+  const { interp } = session.run(PLC_BAR_SCRIPT);
+  h.assert('bar segment 1', interp.components.get('.status').lastSegmentValue, '1');
+});
+
+reg(2772, 'comp-plc', 'key as PLC input (setComp)', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  IF START THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+comp [key] .start:
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+`);
+  session.setComp(interp, '.start', '1');
+  session.execStmts(interp, '.ctrl:{ set = 1 }');
+  const ledComp = interp.components.get('.motorLed');
+  h.assert('led on from key', interp.getValueFromRef(ledComp.ref), '1');
+});
+
+const PLC_CLCD_SCRIPT = `
+inline [plc] .alarm:
+  inputs: { FAULT }
+  outputs: { ALARM }
+  IF FAULT THEN ALARM = 1 ELSE ALARM = 0 END_IF
+  :
+
+comp [switch] .faultSw:
+  = 1
+  :
+
+comp [clcd] .panel:
+  = { warning: x:10 y:10 bit:0 : }
+  on: 1
+  :
+
+1wire alarmCmd
+
+comp [plc] .ctrl:
+  program: .alarm
+  inputs: { FAULT = .faultSw }
+  outputs: { ALARM = alarmCmd }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+.panel:{
+  value = alarmCmd
+  set = 1
+}
+`;
+
+reg(2773, 'comp-plc', 'clcd alarm via wire + panel block', function(h, session) {
+  const { interp } = session.run(PLC_CLCD_SCRIPT);
+  h.assert('alarmCmd wire', session.getWire(interp, 'alarmCmd'), '1');
+  h.assert('panel lastValue', interp.components.get('.panel').lastValue, '1');
+});
+
+reg(2774, 'comp-plc', 'dip off — motor off', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { SEL }
+  outputs: { MOTOR }
+  IF SEL THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+comp [dip] .mode:
+  length: 1
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { SEL = .mode }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  const ledComp = interp.components.get('.motorLed');
+  h.assert('led off', interp.getValueFromRef(ledComp.ref), '0');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

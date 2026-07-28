@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: p3-io
     content: "P3: doc matrice I/O (key/switch/dip/led/clcd-via-wires); motor/sensor/fan/button — amânat P3c"
-    status: pending
+    status: completed
   - id: p3c-actuators
     content: "P3c (amânat): comp motor, sensor, fan, button — viteză/rotație, vizual diferențiat"
     status: pending

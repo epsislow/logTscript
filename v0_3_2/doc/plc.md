@@ -140,7 +140,7 @@ Internal output state (`outputState`) persists between scans for latch semantics
 | Target | Input read | Output write |
 |--------|------------|--------------|
 | **Wire** | Effective wire value | `writeWireStable` + propagation |
-| **Component** | `:get` (implicit) | Storage ref + `updateDisplayValue` (e.g. `led`) |
+| **Component** | `:get` (implicit) | Storage ref + `updateDisplayValue` (`led`, `bar`); `setReg` (`reg`) |
 
 **Width must match** exactly (`1wire` ↔ 1-bit symbol).
 
@@ -406,20 +406,398 @@ doc(.machine)
 doc(.ctrl)
 ```
 
+### Example 7 — `comp [dip]` as 1-bit input (test 2769)
+
+`length: 1` DIP preset `= 1`; motor LED on after scan.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { SEL }
+  outputs: { MOTOR }
+  IF SEL THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+comp [dip] .mode:
+  length: 1
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { SEL = .mode }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+show(.ctrl:scanCount)
+```
+
+### Example 8 — `comp [reg]` as 1-bit output (test 2770)
+
+PLC writes register via scan (`setReg`); read with `:get`.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { CMD }
+  IF START AND NOT STOP THEN CMD = 1 ELSE CMD = 0 END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [reg] .cmd:
+  depth: 1
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start, STOP = .stop }
+  outputs: { CMD = .cmd }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.cmd:get)
+```
+
+### Example 9 — `comp [bar]` length 1 as output (test 2771)
+
+Single-segment bar driven directly by PLC output map.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { STATUS }
+  STATUS = START
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [bar] .status:
+  length: 1
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start }
+  outputs: { STATUS = .status }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.start:get)
+```
+
+### Example 10 — `comp [key]` mapping (test 2772)
+
+Map syntax is identical to switch: `START = .start`. For **Load & Run**, this example uses a **switch** preset (deterministic). With `comp [key]`, load the script, **press the key** in the panel, then run `.ctrl:{ set = 1 }`.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  IF START THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+```
+
+### Example 11 — CLCD alarm via wire (test 2773)
+
+PLC sets `alarmCmd`; CLCD panel updates outside PLC. **`on: 1`** on both PLC and CLCD for deterministic Load & Run.
+
+```logts-play
+inline [plc] .alarm:
+  inputs: { FAULT }
+  outputs: { ALARM }
+  IF FAULT THEN ALARM = 1 ELSE ALARM = 0 END_IF
+  :
+
+comp [switch] .faultSw:
+  = 1
+  :
+
+comp [clcd] .panel:
+  = { warning: x:10 y:10 bit:0 : }
+  on: 1
+  :
+
+1wire alarmCmd
+
+comp [plc] .ctrl:
+  program: .alarm
+  inputs: { FAULT = .faultSw }
+  outputs: { ALARM = alarmCmd }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+.panel:{
+  value = alarmCmd
+  set = 1
+}
+
+show(alarmCmd)
+show(.panel:get)
+```
+
+### Example 12 — DIP off → motor off (test 2774)
+
+Same as example 7 with `= 0` on DIP; LED stays off.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { SEL }
+  outputs: { MOTOR }
+  IF SEL THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+comp [dip] .mode:
+  length: 1
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { SEL = .mode }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+```
+
 ---
 
-## Panel I/O substitutes
+## I/O mapping matrix (v1)
 
-| PLC role | Substituent | Map example |
-|----------|-------------|-------------|
-| Momentary input | `comp [key]` | `START = .start` (press key in UI, or use wire in tests) |
-| Toggle input | `comp [switch]` | `STOP = .stop` — preset with `= 1` in comp body |
-| Parallel input | `comp [dip]` | `SEL = .dip` (width = `length`) |
-| Indicator | `comp [led]` | `MOTOR = .motorLed` or wire → `.motorLed = motorCmd` |
+LogTScript PLC maps **program symbols** to **wires** or **existing panel components**. Width must match exactly. Logic in the program body is **1-bit only** in v1 (`IF`, `AND`, …); multi-bit symbols may be **declared** and **mapped**, but not used in boolean expressions until **P+b**.
 
-Dedicated `button` / `motor` components are planned for a later phase.
+| Role | PLC symbol (example) | Width | LogTScript target | Read / write | v1 logic in program |
+|------|----------------------|-------|-------------------|--------------|---------------------|
+| Momentary input | `START` | 1 | `comp [key]` | `:get` | yes |
+| Toggle input | `STOP`, `ENABLE` | 1 | `comp [switch]` | `:get` | yes |
+| Parallel switches | `SEL` | N | `comp [dip]` | `:get` (width = `length`) | only if N=1 in v1 |
+| Analog input (UI) | `LEVEL` | N | `comp [slider]` | `:get` | **P+b** (doc only) |
+| Port I/O | — | N | `comp [ioport]` | pins/pouts | **P+b** |
+| On/off indicator | `MOTOR`, `ALARM` | 1 | `comp [led]` | write storage + display | yes |
+| Bit storage / command | `CMD` | N | `comp [reg]` | `setReg` on scan | only if N=1 in v1 |
+| LED bar | `STATUS` | N | `comp [bar]` | `setBarState` on scan | only if N=1 in v1 |
+| Bus | `motorCmd` | N | `Nwire` name | wire read/write | yes if N=1 |
+| CLCD display | — | — | **not direct** | via wire + `.panel:{ value, set }` | see below |
+
+**Not in v1:** `comp [button]`, `comp [motor]`, `comp [sensor]`, `comp [fan]` — planned in **P3c**.
 
 ---
+
+## Input targets — behavior and mapping
+
+### `comp [key]` — momentary button
+
+| Topic | Detail |
+|-------|--------|
+| **Map** | `START = .start` → reads `.start:get` |
+| **Width** | 1 bit |
+| **UI** | Press key in panel → `:get` is `1` while held (typically `0` when released) |
+| **Load & Run** | Key is **not** preset — use `comp [switch]` with `= 1`, a wire preset, or press key after **Load** then trigger scan |
+| **Tests** | Test **2772** uses `session.setComp('.start', '1')` before scan |
+
+Program sees the same 1-bit value as a wire or switch.
+
+### `comp [switch]` — toggle
+
+| Topic | Detail |
+|-------|--------|
+| **Map** | `STOP = .stop` |
+| **Width** | 1 bit |
+| **Preset** | `comp [switch] .stop: = 0 :` or `= 1` in component body |
+| **Load & Run** | Deterministic when preset in script (see examples 2, 7–9) |
+
+### `comp [dip]` — parallel DIP switches
+
+| Topic | Detail |
+|-------|--------|
+| **Map** | `SEL = .mode` |
+| **Width** | `length` attribute (e.g. `length: 4` → 4-bit symbol `SEL: 4` in program) |
+| **Preset** | `= 1010` in component body |
+| **v1 logic** | Boolean `IF SEL` requires **1-bit** symbol — use `length: 1` or map only one bit via wire in P+b |
+| **Read** | Full bit pattern via `:get` |
+
+### `comp [slider]` — analog UI (documentation only until P+b)
+
+| Topic | Detail |
+|-------|--------|
+| **Map** | `LEVEL = .slider` with matching `length` |
+| **v1** | Declare and map for elaboration tests; **no** `IF LEVEL > n` in program yet |
+| **Future** | Comparisons and assignments in **P+b** |
+
+### Wires
+
+| Topic | Detail |
+|-------|--------|
+| **Map** | `START = startIn` (wire name, no `.`) |
+| **Width** | `1wire`, `8wire`, … must match symbol width |
+| **Write** | `writeWireStable` + connection update |
+
+---
+
+## Output targets — behavior and mapping
+
+### `comp [led]`
+
+| Topic | Detail |
+|-------|--------|
+| **Map** | `MOTOR = .motorLed` |
+| **Write** | Storage ref + `updateDisplayValue` — LED lights immediately after scan |
+| **Alternative** | `MOTOR = motorCmd` then `.motorLed = motorCmd` outside PLC (example 3) |
+
+### `comp [reg]`
+
+| Topic | Detail |
+|-------|--------|
+| **Map** | `CMD = .cmd` with `depth: N` matching symbol width |
+| **Write** | `setReg` on device (not property block `set`/`data`) |
+| **Read back** | `.cmd:get` reflects value after scan |
+| **Note** | For scripted loads via property block, use `.cmd:{ data = … set = 1 }` separately from PLC scan |
+
+### `comp [bar]`
+
+| Topic | Detail |
+|-------|--------|
+| **Map** | `STATUS = .status` with `length: N` |
+| **Write** | `setBarState` via `updateDisplayValue` |
+| **Read** | `lastSegmentValue` / `:get` (handler may not expose `:get` in all builds — bar state is in device) |
+
+### Wires (outputs)
+
+Same as inputs; PLC drives the wire during scan. Downstream LogTscript (`.led = motorCmd`) runs **after** the scan statement in script order.
+
+### `comp [clcd]` — indirect only
+
+CLCD is **multi-bit** (display bitmap, touch symbols). **Do not** map `OUTPUT = .panel` directly from PLC.
+
+**Recommended pattern:**
+
+1. PLC writes a **1-bit wire** (or `comp [led]`).
+2. Outside PLC: `.panel:{ value = alarmCmd set = 1 }` with `comp [clcd]` **`on: 1`** so the block runs on first Run.
+
+```logts
+1wire alarmCmd
+
+comp [plc] .ctrl:
+  outputs: { ALARM = alarmCmd }
+  ...
+
+comp [clcd] .panel:
+  = { warning: x:10 y:10 bit:0 : }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.panel:{ value = alarmCmd set = 1 }
+```
+
+Multi-bit status codes (`8wire statusCode`) → **P+b** or script logic between PLC and panel.
+
+---
+
+## `comp [plc]` — pins, pouts, and cases
+
+### Attributes (summary)
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| **`program:`** | yes | One `inline [plc]` reference |
+| **`inputs:`** | yes* | Every program input symbol → wire or `.component` |
+| **`outputs:`** | yes* | Every program output symbol → wire or `.component` |
+| **`on:`** | optional | Property-block trigger for `.ctrl:{ set = 1 }` |
+
+### Pins
+
+| Pin | Bits | When active | Effect |
+|-----|------|-------------|--------|
+| **`set`** | 1 | Property block runs with `set = 1` (per `on:`) | One full scan |
+
+### Pouts
+
+| Pout | Bits | Value | Notes |
+|------|------|-------|-------|
+| **`scanCount`** | 16 | Number of completed scans | `.ctrl:scanCount` |
+| **`busy`** | 1 | Always `0` in v1 | Future **P4** (`scanTime`) |
+
+### `on:` modes — when does scan run?
+
+| Mode | First `.ctrl:{ set = 1 }` on Load & Run | Use when |
+|------|----------------------------------------|----------|
+| **`on: 1`** / level | **Scans** | Docs, pedagogy, deterministic examples |
+| **`on: raise`** (default) | **Skips** until `set` goes `0→1` | Pulse / wave / interactive |
+
+Same rules apply to **`comp [clcd]`** property blocks — use **`on: 1`** on CLCD when the panel must update on first Run after PLC scan.
+
+### Scan cycle — step by step
+
+1. Read each **input** map target → build `externalInputs`.
+2. Run **`executePlcScan`** once (updates internal `outputState`).
+3. Write each **output** map target from `outputState`.
+4. Increment **`scanCount`**.
+
+### Output retain (P-D7)
+
+If the program does **not** assign an output in this scan, the **mapped target keeps** the previous physical value; internal `outputState` also retains for use **inside** the same program on the next line.
+
+### Elaboration errors (strict)
+
+| Case | Result |
+|------|--------|
+| Program input not in `inputs:` | Error at `comp [plc]` create |
+| Extra key in `inputs:` / `outputs:` | Error |
+| Width mismatch (e.g. 1-bit symbol → `8wire`) | Error |
+| `program:` not `inline [plc]` | Error |
+
+---
+
+## Runnable examples (verified in tests 2757–2774)
+
+Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch, and `doc`. Examples **7–11** cover the I/O matrix (P3).
+
 
 ## Errors (elaboration and parse)
 

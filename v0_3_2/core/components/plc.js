@@ -41,6 +41,16 @@ function plcWriteTarget(target, value, width, ctx) {
     let out = v;
     if (out.length < bits) out = out.padStart(bits, '0');
     else if (out.length > bits) out = out.slice(-bits);
+    if (comp.type === 'reg' && comp.deviceIds && comp.deviceIds[0] && typeof setReg === 'function') {
+      setReg(comp.deviceIds[0], out);
+      if (typeof ctx.updateComponentConnections === 'function') {
+        ctx.updateComponentConnections(target);
+      }
+      if (typeof ctx._emitComputedComponentProbes === 'function') {
+        ctx._emitComputedComponentProbes(target);
+      }
+      return;
+    }
     if (comp.ref) {
       ctx.setValueAtRef(comp.ref, out);
     } else {
