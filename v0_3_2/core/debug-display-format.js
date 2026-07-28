@@ -429,8 +429,9 @@
       ? displayTags.schemaRef
       : null;
     const schemaSuppress = typeof displayTags === 'object' && displayTags.schemaSuppress === true;
+    const asmMeta = tags.includes('asm');
 
-    if (!tags.length && elRangeSpec == null && elLast == null && maxWidth == null && !schemaRef && !schemaSuppress) return null;
+    if (!tags.length && elRangeSpec == null && elLast == null && maxWidth == null && !schemaRef && !schemaSuppress && !asmMeta) return null;
 
     if (tags.includes('decSigned')) {
       if (!tags.includes('signed')) tags.push('signed');
@@ -483,6 +484,7 @@
       decSigned: hasSigned && hasDec,
       schemaRef,
       schemaSuppress,
+      asm: asmMeta,
     };
   }
 

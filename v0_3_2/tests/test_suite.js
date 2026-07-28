@@ -27134,5 +27134,48 @@ show(r0)
   h.assert('r0', r0.value, '00010001');
 });
 
+reg(2704, 'asm', 'show(x; asm) appends decode when asm module present', function(h, session) {
+  const { out } = session.run(`inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+
+16wire x = .myisa {
+  JMP there
+there:
+  NOP
+}
+show(x; asm)`);
+  const text = out.join('\n');
+  h.assert('wire bits', String(text.includes('x (16wire)')), 'true');
+  h.assert('JMP decode', String(/JMP A1/.test(text)), 'true');
+  h.assert('NOP decode', String(/NOP/.test(text)), 'true');
+});
+
+reg(2705, 'asm', 'show(x) without asm tag — bits only', function(h, session) {
+  const { out } = session.run(`inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  JMP   : 0101 + A4b
+  :
+16wire x = .myisa { JMP there; there: NOP }
+show(x)`);
+  const text = out.join('\n');
+  h.assert('wire line', String(text.includes('x (16wire)')), 'true');
+  h.assert('no JMP line', String(!/JMP A/.test(text)), 'true');
+});
+
+reg(2706, 'asm', 'show(raw; asm) — No asm metadata found', function(h, session) {
+  const { out } = session.run(`inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  :
+8wire raw = 00010111
+show(raw; asm)`);
+  const text = out.join('\n');
+  h.assert('wire line', String(text.includes('raw (8wire)')), 'true');
+  h.assert('no metadata msg', String(text.includes('No asm metadata found')), 'true');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

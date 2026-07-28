@@ -105,6 +105,7 @@ const SHOW_PEEK_DISPLAY_TAGS = new Set([
   'oct', 'b32hex', 'b32c',
   'q4p4', 'q8p8', 'bf16', 'fp16',
   'elAll', 'elNonZero', 'compact', 'elRange', 'elLast', 'maxWidth', 'multiline',
+  'asm',
 ]);
 const PROBE_DISPLAY_TAGS = new Set([
   'dec', 'decSigned', 'hex', 'bin', 'ascii', 'signed', 'hexWide',

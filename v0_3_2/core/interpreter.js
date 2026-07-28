@@ -1338,6 +1338,16 @@ class Interpreter {
     return this.asmModules.get(wire.asmModuleId) || null;
   }
 
+  _formatAsmModuleShowLines(wireName) {
+    const wire = this.wires.get(wireName);
+    if (!wire || wire.asmModuleId == null) return [];
+    const mod = this.asmModules.get(wire.asmModuleId);
+    if (!mod || !mod.instructions || !mod.instructions.length) return [];
+    if (typeof formatModuleDecode !== 'function') return [];
+    const text = formatModuleDecode(mod);
+    return text ? text.split('\n').filter(Boolean) : [];
+  }
+
   _syncAsmModuleMeta(wireOrName, exprResult) {
     const wire = typeof wireOrName === 'string' ? this.wires.get(wireOrName) : wireOrName;
     if (!wire || !exprResult) return;
@@ -9913,6 +9923,7 @@ if (this.isBuiltinDEMUX(name)) {
     this.evalContext = 'show';
     const results = [];
     const vectorLines = [];
+    const asmDecodeLines = [];
     try {
     for (const e of args) {
       if (e && e.length === 1 && e[0].var) {
@@ -10109,6 +10120,11 @@ if (this.isBuiltinDEMUX(name)) {
             } else {
               results.push(line);
             }
+            if (opts && opts.asm && wire && !bitRange) {
+              const decode = this._formatAsmModuleShowLines(displayName);
+              if (decode.length) asmDecodeLines.push(...decode);
+              else asmDecodeLines.push('No asm metadata found');
+            }
           } else {
             if (opts && opts.multiline) {
               this._pushDisplayOutput(results, shown, opts);
@@ -10137,6 +10153,11 @@ if (this.isBuiltinDEMUX(name)) {
             } else {
               results.push(line);
             }
+            if (opts && opts.asm && wire && !bitRange) {
+              const decode = this._formatAsmModuleShowLines(displayName);
+              if (decode.length) asmDecodeLines.push(...decode);
+              else asmDecodeLines.push('No asm metadata found');
+            }
           } else {
             if (opts && opts.multiline) {
               this._pushDisplayOutput(results, shown, opts);
@@ -10155,6 +10176,7 @@ if (this.isBuiltinDEMUX(name)) {
         this.out.push(results.join(', '));
       }
     }
+    for (const line of asmDecodeLines) this.out.push(line);
     } finally {
       this.evalContext = prevCtx;
     }

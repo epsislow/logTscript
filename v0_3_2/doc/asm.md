@@ -6,7 +6,7 @@ Memory (`comp [mem]`) receives the assembled blob unchanged.
 
 There is **no panel UI** in v1 — logic only.
 
-For **composition** (`use`, `repeat`, `align`, `base:`, external labels), see [asm-composition.md](asm-composition.md). Wires assembled from programs carry metadata used by `:decode`; `show(wire)` remains bits-only.
+For **composition** (`use`, `repeat`, `align`, `base:`, external labels), see [asm-composition.md](asm-composition.md). Wires assembled from programs carry metadata (`asmModuleId`). Use **`show(wire; asm)`** to append a decode block when metadata exists, or **`show(.myisa:decode(wire))`** for explicit disassembly.
 
 ---
 
@@ -239,6 +239,35 @@ comp [mem] .prog:
 8wire slot0 = .prog:get
 show(slot0)
 ```
+
+---
+
+## `show(wire; asm)` — program metadata tag
+
+Assembled program wires store an **AsmModule** (`asmModuleId`). Plain **`show(x)`** prints bits only. Add the display tag **`asm`** to append instruction decode lines:
+
+```logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  JMP   : 0101 + A4b
+  :
+
+16wire x = .myisa {
+  JMP there
+there:
+  NOP
+}
+show(x)
+show(x; asm)
+```
+
+| Call | Output |
+|------|--------|
+| `show(x)` | `x (16wire) = …` (bits only) |
+| `show(x; asm)` | bits line + `JMP A1` / `NOP 0` (from stored module) |
+| `show(raw; asm)` on a literal wire | bits line + **`No asm metadata found`** |
+
+Works in **`peek`** too (`peek(x; asm)`). For a specific ISA view use **`:decode`** (next section).
 
 ---
 
