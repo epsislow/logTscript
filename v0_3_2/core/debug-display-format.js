@@ -177,8 +177,21 @@
     const displayStr = normalizeBits(binStr, w);
 
     if (w <= 16) {
-      const groups = displayStr.match(/.{1,8}/g);
-      return groups ? groups.join(' ') : displayStr;
+      const parts = [];
+      let remaining = displayStr;
+      while (remaining.length >= 8) {
+        const chunk = remaining.substring(0, 8);
+        parts.push(`^${parseInt(chunk, 2).toString(16).toUpperCase().padStart(2, '0')}`);
+        remaining = remaining.substring(8);
+      }
+      if (remaining.length > 0) {
+        const tailBits = remaining.length <= 4
+          ? remaining.padEnd(4, '0')
+          : remaining.padEnd(8, '0').substring(0, 8);
+        const tailWidth = remaining.length <= 4 ? 4 : 8;
+        parts.push(`^${parseInt(tailBits, 2).toString(16).toUpperCase().padStart(tailWidth / 4, '0')}`);
+      }
+      return parts.length ? parts.join(' ') : displayStr;
     }
 
     if (w >= 32) {

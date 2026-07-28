@@ -27177,5 +27177,22 @@ show(raw; asm)`);
   h.assert('no metadata msg', String(text.includes('No asm metadata found')), 'true');
 });
 
+reg(2707, 'show-tags', 'show(16wire; hex) — per-byte ^XX not binary groups', function(h, session) {
+  const { out } = session.run(`inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  JMP   : 0101 + A4b
+  :
+16wire x = .myisa {
+  JMP there
+there:
+  NOP
+}
+show(x; hex)`);
+  const line = out.find(l => l.includes('x (16wire)'));
+  h.assert('has line', String(!!line), 'true');
+  h.assert('byte hex', String(line.includes('^51 ^00')), 'true');
+  h.assert('not binary groups', String(!line.includes('01010001')), 'true');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();
