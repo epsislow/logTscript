@@ -1,0 +1,368 @@
+LogTScript Documentation v0.3.2
+PLC Component (comp [plc])
+A programmable logic controller executing an inline [plc] program.
+Unlike comp [cpu], a PLC program is hardware independent. It operates on logical inputs and outputs (START, MOTOR, TEMP, ...) which are mapped to wires or components by comp [plc].
+This allows the same PLC program to control different machines without modification.
+For timers and counters see future PLC libraries. For digital components see button.md, sensor.md, motor.md, fan.md, led.md.
+
+───
+
+Basic example
+logts
+inline [plc] .machine:
+
+inputs:{
+    START
+    STOP
+}
+
+outputs:{
+    MOTOR
+}
+
+IF START AND NOT STOP THEN
+    MOTOR = 1
+ELSE
+    MOTOR = 0
+END_IF
+
+:
+
+logts
+comp [button] .start:
+:
+
+comp [motor] .motor1:
+:
+
+comp [plc] .ctrl:
+    program: .machine
+
+    inputs:{
+        START = .start
+    }
+
+    outputs:{
+        MOTOR = .motor1
+    }
+
+    on: 1
+:
+
+The PLC never accesses .start or .motor1 directly.
+It only knows the symbolic names START and MOTOR.
+
+───
+
+Hardware independence
+Exactly the same PLC program may be reused.
+Machine A
+logts
+inputs:{
+    START = .button1
+}
+
+outputs:{
+    MOTOR = .pumpA
+}
+
+Machine B
+logts
+inputs:{
+    START = .remoteStart
+}
+
+outputs:{
+    MOTOR = .pump17
+}
+
+No PLC code changes are required.
+
+───
+
+Mapping to wires
+Inputs and outputs may also be mapped to wires.
+logts
+1wire startWire
+1wire motorWire
+
+comp [plc] .ctrl:
+
+    program: .machine
+
+    inputs:{
+        START = startWire
+    }
+
+    outputs:{
+        MOTOR = motorWire
+    }
+
+:
+
+External logic may then connect the wires.
+logts
+startWire = .button:get
+
+motorWire -> .motor1
+
+
+───
+
+Why use wires?
+Wire mappings are useful for debugging.
+logts
+probe(startWire)
+probe(motorWire)
+
+show(startWire)
+show(motorWire)
+
+They also allow extra logic outside the PLC.
+logts
+motorWire = AND(motorWire, emergencyOk)
+
+or
+logts
+.motor1 = OR(motorWire, manualOverride)
+
+The PLC program remains unchanged.
+
+───
+
+Mapping to components
+Components expose their default PLC input or output.
+logts
+outputs:{
+    MOTOR = .motor1
+    FAN = .fan1
+    LED = .statusLed
+}
+
+Internally the component receives its primary control signal.
+The exact implementation depends on the component.
+For example
+text
+MOTOR = 1
+
+may internally behave like
+text
+.motor1:on = 1
+
+while
+text
+LED = 1
+
+may become
+text
+.statusLed:on = 1
+
+This keeps PLC programs independent from component implementation details.
+
+───
+
+Mixing wires and components
+Both forms may be mixed freely.
+logts
+outputs:{
+    MOTOR = motorWire
+    FAN = .fan1
+    LED = ledWire
+}
+
+
+───
+
+Input mapping
+Inputs may originate from any source.
+logts
+inputs:{
+    START = .button1
+    STOP = stopWire
+    TEMP = .sensor1
+    LIMIT = limitWire
+}
+
+
+───
+
+Output mapping
+Outputs may drive any destination.
+logts
+outputs:{
+    MOTOR = .motor1
+    FAN = fanWire
+    ALARM = .redLed
+}
+
+
+───
+
+Multiple PLCs
+Several PLCs may execute simultaneously.
+logts
+comp [plc] .machine1:
+...
+
+comp [plc] .machine2:
+...
+
+Each PLC has its own program and mappings.
+
+───
+
+Attributes
+
+Attribute
+Description
+
+program:
+inline [plc] program executed by the PLC
+
+inputs:
+Mapping of symbolic PLC inputs
+
+outputs:
+Mapping of symbolic PLC outputs
+
+scanTime:
+Optional execution period
+
+on:
+Component activation mode
+
+
+
+───
+
+Input mapping
+logts
+inputs:{
+    START = .button1
+    STOP = stopWire
+    TEMP = .sensor1
+}
+
+The PLC reads the mapped values at the beginning of every scan.
+
+───
+
+Output mapping
+logts
+outputs:{
+    MOTOR = .motor1
+    FAN = fanWire
+}
+
+Values produced by the PLC are written after the scan completes.
+
+───
+
+Reusing one PLC program
+logts
+inline [plc] .pumpController:
+...
+:
+
+Plant A
+logts
+comp [plc] .a:
+    program: .pumpController
+
+    inputs:{
+        START = .button1
+    }
+
+    outputs:{
+        MOTOR = .pump1
+    }
+:
+
+Plant B
+logts
+comp [plc] .b:
+    program: .pumpController
+
+    inputs:{
+        START = .remoteSignal
+    }
+
+    outputs:{
+        MOTOR = .pump12
+    }
+:
+
+The same PLC logic controls two completely different installations.
+
+───
+
+Debugging example
+logts
+1wire motorCmd
+
+comp [plc] .ctrl:
+
+    outputs:{
+        MOTOR = motorCmd
+    }
+
+:
+
+logts
+probe(motorCmd)
+
+motorCmd -> .motor1
+
+The wire may be monitored without changing the PLC program.
+
+───
+
+Typical architecture
+text
+Button
+    │
+Sensor
+    │
+    ▼
+comp [plc]
+    │
+    ▼
+Motor
+
+or
+text
+Button
+    │
+    ▼
+PLC
+    │
+motorWire
+    │
+probe()
+    │
+AND(emergency)
+    │
+Motor
+
+
+───
+
+Advantages
+• Hardware-independent PLC programs
+• Reusable logic
+• Easy debugging through wires
+• Components remain fully modular
+• Existing LogTScript wiring model is preserved
+• Easy to replace real hardware with simulated hardware
+
+───
+
+Related
+• button.md
+• sensor.md
+• motor.md
+• fan.md
+• led.md
+• reg.md
+• mem.md
+• cpu.md
