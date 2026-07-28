@@ -3,7 +3,7 @@
 LogTScript PLC support follows the same two-layer model as **`inline [asm]`** + **`comp [cpu]`**:
 
 1. **`inline [plc]`** — hardware-independent program: symbolic inputs/outputs + boolean logic (IEC 61131-3 ST-inspired).
-2. **`comp [plc]`** — runtime: maps symbols to wires or panel components, runs one **scan** per `set = 1`.
+2. **`comp [plc]`** — runtime: maps symbols to wires or panel components, runs one **scan** per triggered `set`.
 
 In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run** (same as [cpu.md](cpu.md) and [cache.md](cache.md)).
 
@@ -16,10 +16,11 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Program** | `inline [plc] .machine:` with `inputs:{ }`, `outputs:{ }`, logic body |
 | **Logic (v1)** | `IF/THEN/ELSE/ELSIF/END_IF`, `AND/OR/NOT/XOR`, `TRUE`/`FALSE`, `0`/`1` |
 | **Widths** | `START` alone = 1 bit; `TEMP: 8` declarable (logic on multi-bit → future P+b) |
-| **Scan** | `.plc:{ set = 1 }` = one sequential pass through the program |
+| **Scan** | `.plc:{ set = 1 }` with `on: 1` runs one program pass on Load & Run |
 | **Outputs** | Retain last value if not assigned this scan (PLC semantics) |
 | **Inputs** | Read-only in program; mapped at `comp [plc]` elaboration |
 | **Errors** | Strict mapping at elaboration — no silent fallback to `0` |
+| **Doc** | `doc(inline.plc)`, `doc(.machine)`, `doc(comp.plc)`, `doc(.ctrl)` |
 
 ---
 
@@ -27,12 +28,12 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 
 ```text
 inline [plc] .machine     comp [plc] .ctrl
-  inputs: { START }  -->    inputs: { START = .key }
+  inputs: { START }  -->    inputs: { START = .start }
   outputs: { MOTOR } -->    outputs: { MOTOR = motorWire }
-  IF ... END_IF             .ctrl:{ set = 1 }  --> scan
+  IF ... END_IF             .ctrl:{ set = 1 }  --> one scan
 ```
 
-The PLC program never names `.key` or `motorWire` — only `START` and `MOTOR`.
+The PLC program never names `.start` or `motorWire` — only `START` and `MOTOR`.
 
 ---
 
@@ -67,48 +68,119 @@ inline [plc] .machine:
 
 | Rule | Behavior |
 |------|----------|
-| **Order** | Top-level assignments and `IF` blocks run **in order** (one list) |
+| **Order** | Top-level assignments and `IF` blocks run **in order** |
 | **Inputs** | Read at scan start; **cannot assign** to inputs (parse error) |
 | **Outputs** | **Readable** in expressions (current value in this scan) |
 | **Unassigned output** | **Keeps** previous value (first scan starts at `0`) |
-| **Multi-bit symbols** | May be declared; using them in `IF`/operators is a **parse error** until analog phase |
+| **Multi-bit symbols** | May be declared; `IF`/operators on them → parse error until P+b |
 
-`doc(.machine)` prints inputs, outputs, and the parsed program.
+`doc(.machine)` / `doc(inline.plc)` print inputs, outputs, and the parsed program.
 
 ---
 
 ## `comp [plc]` — runtime
 
-### Attributes
+### Declaration
+
+```logts
+comp [plc] .ctrl:
+  program: .machine
+  inputs: {
+    START = startIn
+    STOP = .stop
+  }
+  outputs: {
+    MOTOR = motorOut
+  }
+  on: 1
+  :
+```
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
-| **`program:`** | yes | Reference to `inline [plc]` (e.g. `program: .machine`) |
-| **`inputs:`** | yes* | Map each program input: `SYM = wire` or `SYM = .component` |
-| **`outputs:`** | yes* | Map each program output: `SYM = wire` or `SYM = .component` |
-| **`on:`** | optional | Property-block trigger (`1`, `raise`, `edge` — same as other components) |
+| **`program:`** | yes | One `inline [plc]` reference (e.g. `program: .machine` or `program = .machine`) |
+| **`inputs:`** | yes* | `SYM = wire` or `SYM = .component` for every program input |
+| **`outputs:`** | yes* | `SYM = wire` or `SYM = .component` for every program output |
+| **`on:`** | optional | How **property blocks** on this component are triggered (see below) |
 
-\*Every symbol in the program must appear **exactly once** in the matching map. Extra or missing keys → **elaboration error**.
+\*Every program symbol must appear **exactly once** in the matching map. Missing or extra keys → **elaboration error**.
+
+`doc(comp.plc)` shows the component type; `doc(.ctrl)` shows program ref, maps, `scanCount`, and last `outputState`.
+
+### Scan cycle (one pass)
+
+When a property block runs on `.ctrl` and `set` is active (per `on:`):
+
+1. **Read** each mapped input (wire or component `:get`).
+2. **Execute** the `inline [plc]` program once (`executePlcScan`).
+3. **Write** each mapped output (wire or component storage + display).
+4. Increment **`scanCount`**.
+
+Internal output state (`outputState`) persists between scans for latch semantics inside the program.
 
 ### Pins and pouts
 
 | Pin / pout | Bits | Description |
 |------------|------|-------------|
-| **`set`** | 1 | Level or edge (per `on:`) — when active, runs **one scan** |
-| **`scanCount`** | 16 | Number of scans completed (read via `.ctrl:scanCount` or `show`) |
+| **`set`** | 1 | In `.ctrl:{ set = 1 }` — triggers scan when block executes |
+| **`scanCount`** | 16 | Scans completed; read as `.ctrl:scanCount` |
+| **`busy`** | 1 | Always **`0`** in v1 (instant scan; **`scanTime`** in P4) |
 
-### Mapping rules
+### `on:` modes (property blocks)
 
-| Target | Read (input) | Write (output) |
-|--------|--------------|----------------|
-| **Wire** | `getWireEffectiveValue` | `writeWireStable` + propagation |
-| **Component** | `:get` (implicit) | Update storage + `updateDisplayValue` (e.g. `led`) |
+| `on:` | First Load & Run with `.ctrl:{ set = 1 }` | Typical use |
+|-------|-------------------------------------------|-------------|
+| **`1`** / **`level`** | **Runs scan** if `set = 1` | Pedagogic default — one scan per Run |
+| **`raise`** (default if omitted) | **Does not** run on first RUN; waits for `set` **0→1** edge | Pulse-triggered scan in wave / interactive setups |
 
-**Width must match** symbol width exactly (e.g. `1wire` ↔ `START: 1`).
+`on:` on `comp [plc]` controls **when the property block runs**, not the motor command. Use **`on: 1`** in documentation examples so Load & Run performs a scan immediately.
 
-### `on:` vs motor command
+### Mapping targets
 
-`on:` on `comp [plc]` means **when the property block runs** (scan trigger), not “motor on”. Command is the **output symbol value** written to the mapped wire or component.
+| Target | Input read | Output write |
+|--------|------------|--------------|
+| **Wire** | Effective wire value | `writeWireStable` + propagation |
+| **Component** | `:get` (implicit) | Storage ref + `updateDisplayValue` (e.g. `led`) |
+
+**Width must match** exactly (`1wire` ↔ 1-bit symbol).
+
+### Patterns
+
+**Wire command + LED outside PLC** (recommended for indicators):
+
+```logts
+comp [plc] .ctrl:
+  outputs: { MOTOR = motorCmd }
+  ...
+
+.motorLed = motorCmd    ; LogTscript wiring after scan
+```
+
+**Direct LED map** (PLC writes `comp [led]`):
+
+```logts
+outputs: { MOTOR = .motorLed }
+```
+
+### Hardware independence
+
+The same `inline [plc] .machine` can drive two lines:
+
+```logts
+comp [plc] .lineA:
+  program: .machine
+  inputs: { START = startA, STOP = stopA }
+  outputs: { MOTOR = motorA }
+  ...
+
+comp [plc] .lineB:
+  program: .machine
+  inputs: { START = startB, STOP = stopB }
+  outputs: { MOTOR = motorB }
+  ...
+```
+
+Only the **maps** change — not the program.
 
 ---
 
@@ -116,7 +188,7 @@ inline [plc] .machine:
 
 ### Example 1 — START / STOP / MOTOR (wires)
 
-Load & Run: `motorOut` is `1` when `startIn = 1` and `stopIn = 0`.
+Load & Run: `motorOut` is `1` when `startIn = 1` and `stopIn = 0`. `scanCount` is `1`.
 
 ```logts-play
 inline [plc] .machine:
@@ -154,50 +226,133 @@ show(motorOut)
 show(.ctrl:scanCount)
 ```
 
-### Example 2 — ELSIF + TRUE / FALSE
+### Example 2 — Panel: switch + LED
 
-`motorOut` is `0` when `stopIn = 1` (ELSIF branch).
+`comp [switch]` with `= 1` preset; PLC maps to switches and LED. Load & Run: LED on.
 
 ```logts-play
 inline [plc] .machine:
   inputs: { START, STOP }
   outputs: { MOTOR }
   IF START AND NOT STOP THEN
-    MOTOR = TRUE
-  ELSIF STOP THEN
-    MOTOR = FALSE
+    MOTOR = 1
   ELSE
-    MOTOR = FALSE
+    MOTOR = 0
   END_IF
   :
 
-1wire startIn
-1wire stopIn
-1wire motorOut
+comp [switch] .start:
+  = 1
+  :
 
-startIn = 1
-stopIn = 1
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
 
 comp [plc] .ctrl:
   program: .machine
   inputs: {
-    START = startIn
-    STOP = stopIn
+    START = .start
+    STOP = .stop
   }
   outputs: {
-    MOTOR = motorOut
+    MOTOR = .motorLed
   }
   on: 1
   :
 
 .ctrl:{ set = 1 }
 
-show(motorOut)
+show(.motorLed:get)
+show(.ctrl:scanCount)
 ```
 
-### Example 3 — Output retain (latch without VAR)
+### Example 3 — Wire output + external LED
 
-First scan with `startIn = 1` sets `motorOut = 1`. Second scan with `startIn = 0` **keeps** `motorOut = 1` (no `ELSE`).
+PLC drives `motorCmd`; LED follows via LogTscript assignment (separate `on:` on LED).
+
+```logts-play
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+1wire startIn
+1wire stopIn
+1wire motorCmd
+
+comp [led] .motorLed:
+  on: 1
+  :
+
+startIn = 1
+stopIn = 0
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = startIn, STOP = stopIn }
+  outputs: { MOTOR = motorCmd }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.motorLed = motorCmd
+
+show(motorCmd)
+show(.motorLed:get)
+```
+
+### Example 4 — Two machines, one program
+
+`motorA = 1`, `motorB = 0` on Load & Run.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+1wire startA
+1wire stopA
+1wire motorA
+1wire startB
+1wire stopB
+1wire motorB
+
+startA = 1
+stopA = 0
+startB = 0
+stopB = 0
+
+comp [plc] .lineA:
+  program: .machine
+  inputs: { START = startA, STOP = stopA }
+  outputs: { MOTOR = motorA }
+  on: 1
+  :
+
+comp [plc] .lineB:
+  program: .machine
+  inputs: { START = startB, STOP = stopB }
+  outputs: { MOTOR = motorB }
+  on: 1
+  :
+
+.lineA:{ set = 1 }
+.lineB:{ set = 1 }
+
+show(motorA)
+show(motorB)
+```
+
+### Example 5 — Output retain (latch without VAR)
+
+After second scan with `startIn = 0`, `motorOut` stays `1`.
 
 ```logts-play
 inline [plc] .latch:
@@ -227,32 +382,40 @@ startIn = 0
 show(motorOut)
 ```
 
-### Example 4 — Program documentation only
+### Example 6 — `doc(.machine)` and `doc(.ctrl)`
 
 ```logts-play
 inline [plc] .machine:
   inputs: { START, STOP }
   outputs: { MOTOR }
-  IF START AND NOT STOP THEN
-    MOTOR = 1
-  ELSE
-    MOTOR = 0
-  END_IF
+  IF START AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
   :
 
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = startIn, STOP = stopIn }
+  outputs: { MOTOR = motorOut }
+  on: 1
+  :
+
+1wire startIn
+1wire stopIn
+1wire motorOut
+
 doc(.machine)
+doc(.ctrl)
 ```
 
 ---
 
-## Panel I/O substitutes (today)
+## Panel I/O substitutes
 
 | PLC role | Substituent | Map example |
 |----------|-------------|-------------|
-| Momentary input | `comp [key]` | `START = .start` |
-| Toggle input | `comp [switch]` | `STOP = .stop` |
+| Momentary input | `comp [key]` | `START = .start` (press key in UI, or use wire in tests) |
+| Toggle input | `comp [switch]` | `STOP = .stop` — preset with `= 1` in comp body |
 | Parallel input | `comp [dip]` | `SEL = .dip` (width = `length`) |
-| Indicator | `comp [led]` | `MOTOR = .led` or wire → `.led = motorWire` |
+| Indicator | `comp [led]` | `MOTOR = .motorLed` or wire → `.motorLed = motorCmd` |
 
 Dedicated `button` / `motor` components are planned for a later phase.
 
@@ -262,20 +425,21 @@ Dedicated `button` / `motor` components are planned for a later phase.
 
 | Situation | When | Example message |
 |-----------|------|-----------------|
-| Input declared, not mapped | elaboration | `input START declared in program but not mapped` |
-| Extra map key | elaboration | `mapping STOP is not declared in program` |
-| Width mismatch | elaboration | `START width 1 does not match wire bus (8 bits)` |
+| Input declared, not mapped | elaboration | `plc .ctrl: input STOP declared in program but not mapped` |
+| Extra map key | elaboration | `mapping STOP is not declared in program inputs` |
+| Width mismatch | elaboration | `plc .ctrl: START width 1 does not match bus (8 bits)` |
+| Invalid `program:` | elaboration | `plc program .x must be inline [plc]` |
 | Assign to input | parse | `cannot assign to input START` |
 | Unknown symbol | parse | `unknown symbol ALARM` |
 | Multi-bit in `IF` | parse | `IF requires 1-bit symbol, got TEMP (8 bits)` |
 
 ---
 
-## Future phases (not in v1)
+## Future phases
 
 | Phase | Content |
 |-------|---------|
-| **P4** | `scanTime` + periodic scan via `osc` |
+| **P4** | `scanTime` + periodic scan via `osc`; `busy` during miss-style delay |
 | **P+a** | Timers (`TON`, `TOF`, `CTU`) |
 | **P+b** | Multi-bit logic, comparisons (`IF TEMP > 50`) |
 | **P+c** | `VAR` / `END_VAR`, `CASE`, `RETURN` |

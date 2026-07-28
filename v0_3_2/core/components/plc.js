@@ -77,11 +77,11 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
   getWidthBits() { return 1; }
 
   getSupportedProperties() {
-    return ['scanCount'];
+    return ['scanCount', 'busy'];
   }
 
   getRedirectProperties() {
-    return ['scanCount'];
+    return ['scanCount', 'busy'];
   }
 
   getDef() {
@@ -94,7 +94,10 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       ],
       initValue: '1bit',
       pins: [{ bits: '1', name: 'set' }],
-      pouts: [{ bits: '16', name: 'scanCount' }],
+      pouts: [
+        { bits: '16', name: 'scanCount' },
+        { bits: '1', name: 'busy' },
+      ],
       returns: '1bit',
     };
   }
@@ -221,10 +224,21 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     lines.push('');
     lines.push('scan: .plc:{ set = 1 } runs one program pass');
     lines.push(`scanCount: ${comp.scanCount != null ? comp.scanCount : 0}`);
+    lines.push('busy: 0 (instant scan; scanTime in P4)');
+    if (comp.outputState && Object.keys(comp.outputState).length) {
+      lines.push('');
+      lines.push('outputState (last scan):');
+      for (const [sym, val] of Object.entries(comp.outputState)) {
+        lines.push(`  ${sym} = ${val}`);
+      }
+    }
     return lines;
   }
 
   evalGetProperty(comp, property, a, ctx) {
+    if (property === 'busy') {
+      return { value: '0', ref: null, varName: `${a.var}:busy`, bitWidth: 1 };
+    }
     if (property !== 'scanCount') return null;
     const count = comp.scanCount != null ? comp.scanCount : 0;
     const bits = '16';

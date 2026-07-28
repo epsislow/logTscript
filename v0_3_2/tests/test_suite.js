@@ -28576,5 +28576,232 @@ reg(2759, 'comp-plc-lang', 'doc(inline.plc) and doc(.machine)', function(h, sess
   h.assert('instance doc', String(outInst.some(l => l.includes('START'))), 'true');
 });
 
+const PLC_PANEL_SCRIPT = `
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN
+    MOTOR = 1
+  ELSE
+    MOTOR = 0
+  END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: {
+    START = .start
+    STOP = .stop
+  }
+  outputs: {
+    MOTOR = .motorLed
+  }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`;
+
+reg(2760, 'comp-plc', 'panel switch inputs and led output', function(h, session) {
+  const { interp } = session.run(PLC_PANEL_SCRIPT);
+  const ledComp = interp.components.get('.motorLed');
+  h.assert('led on', interp.getValueFromRef(ledComp.ref), '1');
+  h.assert('scanCount 1', String(interp.components.get('.ctrl').scanCount), '1');
+});
+
+reg(2761, 'comp-plc', 'same program two PLCs (hardware independence)', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+1wire startA
+1wire stopA
+1wire motorA
+1wire startB
+1wire stopB
+1wire motorB
+
+startA = 1
+stopA = 0
+startB = 0
+stopB = 0
+
+comp [plc] .lineA:
+  program: .machine
+  inputs: { START = startA, STOP = stopA }
+  outputs: { MOTOR = motorA }
+  on: 1
+  :
+
+comp [plc] .lineB:
+  program: .machine
+  inputs: { START = startB, STOP = stopB }
+  outputs: { MOTOR = motorB }
+  on: 1
+  :
+
+.lineA:{ set = 1 }
+.lineB:{ set = 1 }
+`);
+  h.assert('lineA motor', session.getWire(interp, 'motorA'), '1');
+  h.assert('lineB motor off', session.getWire(interp, 'motorB'), '0');
+});
+
+reg(2762, 'comp-plc', 'width mismatch elaboration error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  MOTOR = START
+  :
+
+8wire bus
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = bus }
+  outputs: { MOTOR = bus }
+  on: 1
+  :
+`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('width error', String(err.includes('width') && err.includes('does not match')), 'true');
+});
+
+reg(2763, 'comp-plc', 'extra mapping key elaboration error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  MOTOR = START
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = startIn, STOP = stopIn }
+  outputs: { MOTOR = motorOut }
+  on: 1
+  :
+
+1wire startIn
+1wire stopIn
+1wire motorOut
+`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('extra STOP', String(err.includes('STOP') && err.includes('not declared')), 'true');
+});
+
+reg(2764, 'comp-plc', 'doc(comp.plc) instance map', function(h, session) {
+  const out = session.runDoc(PLC_PANEL_SCRIPT + '\ndoc(comp.plc)\ndoc(.ctrl)');
+  h.assert('comp.plc type', String(out.some(l => l.includes('comp [plc]'))), 'true');
+  h.assert('instance program', String(out.some(l => l.includes('program: .machine'))), 'true');
+  h.assert('instance START map', String(out.some(l => l.includes('START = .start'))), 'true');
+});
+
+reg(2765, 'comp-plc', 'wire output + external led assignment pattern', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+1wire startIn
+1wire stopIn
+1wire motorCmd
+
+comp [led] .motorLed:
+  on: 1
+  :
+
+startIn = 1
+stopIn = 0
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = startIn, STOP = stopIn }
+  outputs: { MOTOR = motorCmd }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.motorLed = motorCmd
+`);
+  const ledComp = interp.components.get('.motorLed');
+  h.assert('motorCmd', session.getWire(interp, 'motorCmd'), '1');
+  h.assert('led follows wire', interp.getValueFromRef(ledComp.ref), '1');
+});
+
+reg(2766, 'comp-plc', 'busy pout always 0', function(h, session) {
+  const { interp } = session.run(PLC_PANEL_SCRIPT + '\n1wire b = .ctrl:busy');
+  h.assert('busy 0', session.getWire(interp, 'b'), '0');
+});
+
+reg(2767, 'comp-plc', 'on:1 level — scan on first RUN', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { CNT }
+  CNT = START
+  :
+
+1wire startIn
+1wire cntOut
+startIn = 1
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = startIn }
+  outputs: { CNT = cntOut }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('level scan', String(interp.components.get('.ctrl').scanCount), '1');
+});
+
+reg(2768, 'comp-plc', 'on:raise — no scan until set edge', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { CNT }
+  CNT = START
+  :
+
+1wire startIn
+1wire cntOut
+startIn = 1
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = startIn }
+  outputs: { CNT = cntOut }
+  on: raise
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('raise skips first RUN', String(interp.components.get('.ctrl').scanCount), '0');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -10,10 +10,10 @@ todos:
     status: completed
   - id: p2-comp-plc
     content: "P2: comp [plc] — plc.js, plc-devices.js, scan, mapări, teste comp-plc"
-    status: pending
+    status: completed
   - id: p2-doc
     content: "P2: doc/plc.md + logts-play verificate; actualizare comp_plc.txt (-> =)"
-    status: pending
+    status: completed
   - id: p3-io
     content: "P3: doc matrice I/O (key/switch/dip/led/clcd-via-wires); motor/sensor/fan/button — amânat P3c"
     status: pending

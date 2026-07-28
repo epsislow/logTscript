@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -8909,6 +8909,7 @@ Instant built-in functions (\`ADD\`, \`SUBTRACT\`, …) without \`comp\`: [arith
 |------|-----------|------|
 | \`mem\` | — | [mem.md](mem.md) |
 | \`cpu\` | — | [cpu.md](cpu.md) — contained Harvard CPU (\`prog\` + \`ram\`, \`set\` = step) |
+| \`plc\` | — | [plc.md](plc.md) — \`inline [plc]\` program + scan cycle (\`set\` = one scan) |
 | \`dma\` | — | [dma.md](dma.md) — bulk copy between [mem](mem.md) instances (\`mems:\`, slot \`src\`/\`dst\`) |
 | \`asm\` | — | [asm.md](asm.md) — declare \`inline [asm]\`; assemble with \`.name { … }\` |
 | \`lut\` | — | [lut.md](lut.md) — \`inline [lut]\` or \`comp [lut]\` |
@@ -23577,6 +23578,297 @@ See [debug.md](debug.md) for \`:\` (pin/pout) vs \`.\` (internal wire) conventio
 | Use case | Full interactive circuits | Pure reusable logic |
 
 Chip details: [chip.md](chip.md).
+`,
+    'plc.md': `# PLC — \`inline [plc]\` + \`comp [plc]\`
+
+LogTScript PLC support follows the same two-layer model as **\`inline [asm]\`** + **\`comp [cpu]\`**:
+
+1. **\`inline [plc]\`** — hardware-independent program: symbolic inputs/outputs + boolean logic (IEC 61131-3 ST-inspired).
+2. **\`comp [plc]\`** — runtime: maps symbols to wires or panel components, runs one **scan** per \`set = 1\`.
+
+In the **documentation viewer**, blocks marked \`logts-play\` open in the script editor with **Load** and **Load & Run** (same as [cpu.md](cpu.md) and [cache.md](cache.md)).
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Program** | \`inline [plc] .machine:\` with \`inputs:{ }\`, \`outputs:{ }\`, logic body |
+| **Logic (v1)** | \`IF/THEN/ELSE/ELSIF/END_IF\`, \`AND/OR/NOT/XOR\`, \`TRUE\`/\`FALSE\`, \`0\`/\`1\` |
+| **Widths** | \`START\` alone = 1 bit; \`TEMP: 8\` declarable (logic on multi-bit → future P+b) |
+| **Scan** | \`.plc:{ set = 1 }\` = one sequential pass through the program |
+| **Outputs** | Retain last value if not assigned this scan (PLC semantics) |
+| **Inputs** | Read-only in program; mapped at \`comp [plc]\` elaboration |
+| **Errors** | Strict mapping at elaboration — no silent fallback to \`0\` |
+
+---
+
+## Architecture
+
+\`\`\`text
+inline [plc] .machine     comp [plc] .ctrl
+  inputs: { START }  -->    inputs: { START = .key }
+  outputs: { MOTOR } -->    outputs: { MOTOR = motorWire }
+  IF ... END_IF             .ctrl:{ set = 1 }  --> scan
+\`\`\`
+
+The PLC program never names \`.key\` or \`motorWire\` — only \`START\` and \`MOTOR\`.
+
+---
+
+## \`inline [plc]\` — language
+
+### Syntax
+
+\`\`\`logts
+inline [plc] .machine:
+  inputs: { START, STOP: 1 }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN
+    MOTOR = TRUE
+  ELSIF STOP THEN
+    MOTOR = FALSE
+  ELSE
+    MOTOR = FALSE
+  END_IF
+  :
+\`\`\`
+
+| Rule | Detail |
+|------|--------|
+| **\`inputs:\` / \`outputs:\`** | \`{ SYM }\` or \`{ SYM: N }\` — \`SYM\` alone defaults to **1 bit** |
+| **Keywords** | Case-insensitive: \`if\` = \`IF\` |
+| **Assignment** | \`=\` (not \`:=\`) |
+| **Comments** | \`;\` to end of line |
+| **Precedence** | \`NOT\` > \`AND\` > \`OR\` > \`XOR\` |
+| **Closing** | Body ends with a line containing only \`:\` |
+
+### Execution semantics (one scan)
+
+| Rule | Behavior |
+|------|----------|
+| **Order** | Top-level assignments and \`IF\` blocks run **in order** (one list) |
+| **Inputs** | Read at scan start; **cannot assign** to inputs (parse error) |
+| **Outputs** | **Readable** in expressions (current value in this scan) |
+| **Unassigned output** | **Keeps** previous value (first scan starts at \`0\`) |
+| **Multi-bit symbols** | May be declared; using them in \`IF\`/operators is a **parse error** until analog phase |
+
+\`doc(.machine)\` prints inputs, outputs, and the parsed program.
+
+---
+
+## \`comp [plc]\` — runtime
+
+### Attributes
+
+| Attribute | Required | Description |
+|-----------|----------|-------------|
+| **\`program:\`** | yes | Reference to \`inline [plc]\` (e.g. \`program: .machine\`) |
+| **\`inputs:\`** | yes* | Map each program input: \`SYM = wire\` or \`SYM = .component\` |
+| **\`outputs:\`** | yes* | Map each program output: \`SYM = wire\` or \`SYM = .component\` |
+| **\`on:\`** | optional | Property-block trigger (\`1\`, \`raise\`, \`edge\` — same as other components) |
+
+\\*Every symbol in the program must appear **exactly once** in the matching map. Extra or missing keys → **elaboration error**.
+
+### Pins and pouts
+
+| Pin / pout | Bits | Description |
+|------------|------|-------------|
+| **\`set\`** | 1 | Level or edge (per \`on:\`) — when active, runs **one scan** |
+| **\`scanCount\`** | 16 | Number of scans completed (read via \`.ctrl:scanCount\` or \`show\`) |
+
+### Mapping rules
+
+| Target | Read (input) | Write (output) |
+|--------|--------------|----------------|
+| **Wire** | \`getWireEffectiveValue\` | \`writeWireStable\` + propagation |
+| **Component** | \`:get\` (implicit) | Update storage + \`updateDisplayValue\` (e.g. \`led\`) |
+
+**Width must match** symbol width exactly (e.g. \`1wire\` ↔ \`START: 1\`).
+
+### \`on:\` vs motor command
+
+\`on:\` on \`comp [plc]\` means **when the property block runs** (scan trigger), not “motor on”. Command is the **output symbol value** written to the mapped wire or component.
+
+---
+
+## Runnable examples
+
+### Example 1 — START / STOP / MOTOR (wires)
+
+Load & Run: \`motorOut\` is \`1\` when \`startIn = 1\` and \`stopIn = 0\`.
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN
+    MOTOR = 1
+  ELSE
+    MOTOR = 0
+  END_IF
+  :
+
+1wire startIn
+1wire stopIn
+1wire motorOut
+
+startIn = 1
+stopIn = 0
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: {
+    START = startIn
+    STOP = stopIn
+  }
+  outputs: {
+    MOTOR = motorOut
+  }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(motorOut)
+show(.ctrl:scanCount)
+\`\`\`
+
+### Example 2 — ELSIF + TRUE / FALSE
+
+\`motorOut\` is \`0\` when \`stopIn = 1\` (ELSIF branch).
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN
+    MOTOR = TRUE
+  ELSIF STOP THEN
+    MOTOR = FALSE
+  ELSE
+    MOTOR = FALSE
+  END_IF
+  :
+
+1wire startIn
+1wire stopIn
+1wire motorOut
+
+startIn = 1
+stopIn = 1
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: {
+    START = startIn
+    STOP = stopIn
+  }
+  outputs: {
+    MOTOR = motorOut
+  }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(motorOut)
+\`\`\`
+
+### Example 3 — Output retain (latch without VAR)
+
+First scan with \`startIn = 1\` sets \`motorOut = 1\`. Second scan with \`startIn = 0\` **keeps** \`motorOut = 1\` (no \`ELSE\`).
+
+\`\`\`logts-play
+inline [plc] .latch:
+  inputs: { START }
+  outputs: { MOTOR }
+  IF START THEN
+    MOTOR = 1
+  END_IF
+  :
+
+1wire startIn
+1wire motorOut
+
+startIn = 1
+
+comp [plc] .ctrl:
+  program: .latch
+  inputs: { START = startIn }
+  outputs: { MOTOR = motorOut }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+startIn = 0
+.ctrl:{ set = 1 }
+
+show(motorOut)
+\`\`\`
+
+### Example 4 — Program documentation only
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN
+    MOTOR = 1
+  ELSE
+    MOTOR = 0
+  END_IF
+  :
+
+doc(.machine)
+\`\`\`
+
+---
+
+## Panel I/O substitutes (today)
+
+| PLC role | Substituent | Map example |
+|----------|-------------|-------------|
+| Momentary input | \`comp [key]\` | \`START = .start\` |
+| Toggle input | \`comp [switch]\` | \`STOP = .stop\` |
+| Parallel input | \`comp [dip]\` | \`SEL = .dip\` (width = \`length\`) |
+| Indicator | \`comp [led]\` | \`MOTOR = .led\` or wire → \`.led = motorWire\` |
+
+Dedicated \`button\` / \`motor\` components are planned for a later phase.
+
+---
+
+## Errors (elaboration and parse)
+
+| Situation | When | Example message |
+|-----------|------|-----------------|
+| Input declared, not mapped | elaboration | \`input START declared in program but not mapped\` |
+| Extra map key | elaboration | \`mapping STOP is not declared in program\` |
+| Width mismatch | elaboration | \`START width 1 does not match wire bus (8 bits)\` |
+| Assign to input | parse | \`cannot assign to input START\` |
+| Unknown symbol | parse | \`unknown symbol ALARM\` |
+| Multi-bit in \`IF\` | parse | \`IF requires 1-bit symbol, got TEMP (8 bits)\` |
+
+---
+
+## Future phases (not in v1)
+
+| Phase | Content |
+|-------|---------|
+| **P4** | \`scanTime\` + periodic scan via \`osc\` |
+| **P+a** | Timers (\`TON\`, \`TOF\`, \`CTU\`) |
+| **P+b** | Multi-bit logic, comparisons (\`IF TEMP > 50\`) |
+| **P+c** | \`VAR\` / \`END_VAR\`, \`CASE\`, \`RETURN\` |
+| **P+d** | \`FOR\`, \`WHILE\` |
+
+---
+
+## See also
+
+- [cpu.md](cpu.md) — \`inline [asm]\` + \`comp [cpu]\` pattern
+- [conditional-assignment.md](conditional-assignment.md) — LogTscript \`on:\` / property blocks
+- [key.md](key.md), [switch.md](switch.md), [led.md](led.md) — panel I/O for map targets
 `,
     'pocket-calc.md': `# Pocket calculator (keyboard + keys + terminal)
 
