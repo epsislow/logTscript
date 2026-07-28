@@ -16,6 +16,7 @@ function createDeviceMaps() {
     alus: new Map(),
     memories: new Map(),
     caches: new Map(),
+    plcs: new Map(),
     registers: new Map(),
     counters: new Map(),
     adders: new Map(),

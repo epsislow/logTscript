@@ -28423,5 +28423,158 @@ comp [cache] .l1:
   h.assert('l2 missed after ram write', String(parseInt(cacheProp(session, interp, '.l2', 'misses'), 2) >= 1), 'true');
 });
 
+const INLINE_PLC_MACHINE = `inline [plc] .machine:
+  inputs: { START, STOP: 1 }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN
+    MOTOR = TRUE
+  ELSIF STOP THEN
+    MOTOR = FALSE
+  ELSE
+    MOTOR = FALSE
+  END_IF
+  :`;
+
+reg(2750, 'comp-plc-lang', 'parse inline [plc] — inputs outputs IF', function(h, session) {
+  const p = new Parser(new Tokenizer(preprocessLoop(INLINE_PLC_MACHINE)), session._ensureRegistry());
+  const stmts = p.parse();
+  h.assert('inline stmt', String(!!stmts[0].inline), 'true');
+  h.assert('instance name', stmts[0].inline.name, '.machine');
+  h.assert('kind plc', stmts[0].inline.kind, 'plc');
+  const prog = parsePlcBody(stmts[0].inline.bodyRaw);
+  h.assert('START width', String(prog.inputs.START.width), '1');
+  h.assert('STOP width', String(prog.inputs.STOP.width), '1');
+  h.assert('MOTOR width', String(prog.outputs.MOTOR.width), '1');
+  h.assert('has statements', String((prog.statements || []).length > 0), 'true');
+});
+
+reg(2751, 'comp-plc-lang', 'execInline stores plc program', function(h, session) {
+  session.run(INLINE_PLC_MACHINE);
+  const inst = session.interp.inlineInstances.get('.machine');
+  h.assert('kind plc', inst.kind, 'plc');
+  h.assert('has inputs', String(!!inst.inputs.START), 'true');
+  h.assert('has statements', String((inst.statements || []).length > 0), 'true');
+});
+
+reg(2752, 'comp-plc-lang', 'executePlcScan — START on MOTOR on', function(h, session) {
+  session.run(INLINE_PLC_MACHINE);
+  const inst = session.interp.inlineInstances.get('.machine');
+  const out = executePlcScan(inst, { START: '1', STOP: '0' }, {});
+  h.assert('MOTOR=1', out.MOTOR, '1');
+});
+
+reg(2753, 'comp-plc-lang', 'executePlcScan — STOP via ELSIF', function(h, session) {
+  session.run(INLINE_PLC_MACHINE);
+  const inst = session.interp.inlineInstances.get('.machine');
+  const out = executePlcScan(inst, { START: '1', STOP: '1' }, { MOTOR: '1' });
+  h.assert('MOTOR=0 on STOP', out.MOTOR, '0');
+});
+
+reg(2754, 'comp-plc-lang', 'output retains when not assigned', function(h, session) {
+  const src = `inline [plc] .latch:
+  inputs: { START }
+  outputs: { MOTOR }
+  IF START THEN
+    MOTOR = 1
+  END_IF
+  :`;
+  session.run(src);
+  const inst = session.interp.inlineInstances.get('.latch');
+  const out1 = executePlcScan(inst, { START: '1' }, {});
+  h.assert('set', out1.MOTOR, '1');
+  const out2 = executePlcScan(inst, { START: '0' }, out1);
+  h.assert('retain', out2.MOTOR, '1');
+});
+
+reg(2755, 'comp-plc-lang', 'error assign to input', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { START }
+outputs: { MOTOR }
+START = 1`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('assign input error', String(err.includes('cannot assign to input')), 'true');
+});
+
+reg(2756, 'comp-plc-lang', 'error unknown symbol in IF', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { START }
+outputs: { MOTOR }
+IF ALARM THEN
+  MOTOR = 1
+END_IF`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('unknown symbol', String(err.includes('unknown symbol')), 'true');
+});
+
+reg(2757, 'comp-plc', 'START/STOP/MOTOR wire integration', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN
+    MOTOR = 1
+  ELSE
+    MOTOR = 0
+  END_IF
+  :
+
+1wire startIn
+1wire stopIn
+1wire motorOut
+
+startIn = 1
+stopIn = 0
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: {
+    START = startIn
+    STOP = stopIn
+  }
+  outputs: {
+    MOTOR = motorOut
+  }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('motor on', session.getWire(interp, 'motorOut'), '1');
+  h.assert('scanCount', String(interp.components.get('.ctrl').scanCount), '1');
+});
+
+reg(2758, 'comp-plc', 'mapping error — unmapped input', function(h, session) {
+  let err = '';
+  try {
+    session.run(`
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  MOTOR = START
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = startIn }
+  outputs: { MOTOR = motorOut }
+  on: 1
+  :
+
+1wire startIn
+1wire motorOut
+`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('unmapped STOP', String(err.includes('STOP') && err.includes('not mapped')), 'true');
+});
+
+reg(2759, 'comp-plc-lang', 'doc(inline.plc) and doc(.machine)', function(h, session) {
+  const outType = session.runDoc(INLINE_PLC_MACHINE + '\ndoc(inline.plc)');
+  h.assert('type doc', String(outType.some(l => l.includes('inline [plc]'))), 'true');
+  const outInst = session.runDoc(INLINE_PLC_MACHINE + '\ndoc(.machine)');
+  h.assert('instance doc', String(outInst.some(l => l.includes('START'))), 'true');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

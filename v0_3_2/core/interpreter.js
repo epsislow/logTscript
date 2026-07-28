@@ -1934,7 +1934,21 @@ class Interpreter {
       });
       return;
     }
-    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol)`);
+    if (inline.kind === 'plc') {
+      const parsePlcFn = typeof parsePlcBody === 'function' ? parsePlcBody : null;
+      if (!parsePlcFn) throw Error('PLC assembler is not loaded');
+      const prog = parsePlcFn(inline.bodyRaw);
+      this.inlineInstances.set(inline.name, {
+        kind: inline.kind,
+        name: inline.name,
+        inputs: prog.inputs,
+        outputs: prog.outputs,
+        statements: prog.statements,
+        bodyRaw: inline.bodyRaw,
+      });
+      return;
+    }
+    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc)`);
   }
 
   _emitComputedForBodyComponents(internalPrefix) {
@@ -12634,6 +12648,11 @@ if (s.assignment) {
         if (result.mmapRef) compInfo.mmapRef = result.mmapRef;
         if (result.progMemRef) compInfo.progMemRef = result.progMemRef;
         if (result.ramMemRef) compInfo.ramMemRef = result.ramMemRef;
+        if (result.programRef) compInfo.programRef = result.programRef;
+        if (result.inputMap) compInfo.inputMap = result.inputMap;
+        if (result.outputMap) compInfo.outputMap = result.outputMap;
+        if (result.outputState) compInfo.outputState = result.outputState;
+        if (result.scanCount != null) compInfo.scanCount = result.scanCount;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;
@@ -17486,6 +17505,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
         if (kindName === 'protocol' && typeof formatProtocolInstanceDoc === 'function') {
           return formatProtocolInstanceDoc(alias, inst);
         }
+        if (kindName === 'plc' && typeof formatPlcInstanceDoc === 'function') {
+          return formatPlcInstanceDoc(alias, inst);
+        }
       }
     }
     if (inlineInstances) {
@@ -17500,6 +17522,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
           if (kindName === 'protocol' && typeof formatProtocolInstanceDoc === 'function') {
             return formatProtocolInstanceDoc(instName, inst);
           }
+          if (kindName === 'plc' && typeof formatPlcInstanceDoc === 'function') {
+            return formatPlcInstanceDoc(instName, inst);
+          }
         }
       }
     }
@@ -17511,6 +17536,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     }
     if (kindName === 'protocol' && typeof formatProtocolTypeDoc === 'function') {
       return formatProtocolTypeDoc();
+    }
+    if (kindName === 'plc' && typeof formatPlcTypeDoc === 'function') {
+      return formatPlcTypeDoc();
     }
     return [`${name}: (no inline doc available)`];
   }
@@ -17527,6 +17555,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
       }
       if (inst.kind === 'protocol' && typeof formatProtocolInstanceDoc === 'function') {
         return formatProtocolInstanceDoc(name, inst);
+      }
+      if (inst.kind === 'plc' && typeof formatPlcInstanceDoc === 'function') {
+        return formatPlcInstanceDoc(name, inst);
       }
     }
   }

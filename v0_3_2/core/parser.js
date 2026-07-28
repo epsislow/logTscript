@@ -3322,6 +3322,7 @@ assignment() {
         let wireRefAttrs = [];
         let literalAttrs = [];
         let regionsBlockAttrs = [];
+        let plcMappingBlockAttrs = [];
         if (this.componentRegistry) {
           const bindHandler = this.componentRegistry.get(compType);
           if (bindHandler && bindHandler.getSpecialParseAttributes) {
@@ -3332,6 +3333,7 @@ assignment() {
             if (special && special.wireRefAttrs) wireRefAttrs = special.wireRefAttrs;
             if (special && special.literalAttrs) literalAttrs = special.literalAttrs;
             if (special && special.regionsBlockAttrs) regionsBlockAttrs = special.regionsBlockAttrs;
+            if (special && special.plcMappingBlockAttrs) plcMappingBlockAttrs = special.plcMappingBlockAttrs;
           }
         }
         if (literalAttrs.includes(attrName) && this.c.value === ':') {
@@ -3408,7 +3410,7 @@ assignment() {
           attributes[listKey].push(memberRef);
           continue;
         }
-        if (attrName === 'isa' && this.c.value === ':') {
+        if ((attrName === 'isa' || attrName === 'program') && this.c.value === ':') {
           this.eat('SYM', ':');
           this.t.skip();
           if (this.c.type !== 'SYM' || this.c.value !== '.') {
@@ -3489,6 +3491,12 @@ assignment() {
             attributes[attrName] = {};
             continue;
           }
+        }
+
+        if (plcMappingBlockAttrs.includes(attrName) && this.c.value === ':') {
+          this.eat('SYM', ':');
+          attributes[attrName] = this._parsePlcMappingBlock();
+          continue;
         }
 
         if (regionsBlockAttrs.includes(attrName) && this.c.value === ':') {
@@ -4082,6 +4090,57 @@ assignment() {
       break;
     }
     return sub;
+  }
+
+  _parsePlcMappingBlock() {
+    const map = {};
+    this.t.skip();
+    while (this.c.type === 'EOL') this.c = this.t.get();
+    if (!(this.c.type === 'SYM' && this.c.value === '{')) {
+      throw Error(`Expected '{' for PLC I/O map at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    this.eat('SYM', '{');
+    for (;;) {
+      while (this.c.type === 'EOL') this.c = this.t.get();
+      this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === '}') {
+        this.eat('SYM', '}');
+        break;
+      }
+      if (this.c.type === 'EOF') {
+        throw Error(`Unclosed PLC I/O map '{' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      if (this.c.type !== 'ID') {
+        throw Error(`Expected symbol name in PLC map at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const sym = this.c.value;
+      this.eat('ID');
+      this.t.skip();
+      if (!(this.c.type === 'SYM' && this.c.value === '=')) {
+        throw Error(`Expected '=' after '${sym}' in PLC map at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      this.eat('SYM', '=');
+      this.t.skip();
+      let target;
+      if (this.c.type === 'SYM' && this.c.value === '.') {
+        target = this.parseDotComponentRef();
+      } else if (this.c.type === 'ID' || this.c.type === 'SPECIAL') {
+        target = this.c.value;
+        this.eat(this.c.type);
+      } else {
+        throw Error(`Expected wire or component ref after '${sym} =' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      if (map[sym]) {
+        throw Error(`Duplicate PLC map symbol '${sym}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      map[sym] = target;
+      this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        this.eat('SYM', ',');
+        this.t.skip();
+      }
+    }
+    return map;
   }
 
   _mmapSkipWs() {
@@ -5000,8 +5059,8 @@ isBuiltinFunction(name) {
     if (pos >= src.length || src[pos] !== ']') {
       throw Error(`Expected ']' after inline kind at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol') {
-      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol)`);
+    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol' && kind !== 'plc') {
+      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol, plc)`);
     }
     this._syncTokenizerAt(pos + 1);
     const instanceName = this.parseDotComponentRef();
