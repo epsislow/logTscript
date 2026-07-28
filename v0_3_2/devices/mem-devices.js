@@ -94,6 +94,9 @@ function setMem(id, address, value) {
   }
   
   mem.data.set(address, binValue);
+  if (typeof cacheNotifyBackingWrite === 'function') {
+    cacheNotifyBackingWrite(id, address, null);
+  }
 }
 
 function getMem(id, address) {

@@ -59,10 +59,14 @@ var CacheComponent = class CacheComponent extends BuiltinComponent {
     const length = attrs.length !== undefined ? parseInt(attrs.length, 10) : 16;
     const lines = attrs.lines !== undefined ? parseInt(attrs.lines, 10) : 16;
     const lineSize = attrs.lineSize !== undefined ? parseInt(attrs.lineSize, 10) : 1;
+    const ways = attrs.ways !== undefined ? parseInt(attrs.ways, 10) : 1;
     const addrBits = typeof storageAddrBits === 'function'
       ? storageAddrBits(length)
       : (length <= 1 ? 1 : 32 - Math.clz32(length - 1));
     const lineBits = cacheLineBits(Math.max(1, lines));
+    const wayBits = typeof cacheWayBitsCount === 'function'
+      ? cacheWayBitsCount(Math.max(1, ways))
+      : '1';
     const tagBits = typeof cacheTagBits === 'function'
       ? cacheTagBits(Math.max(1, lines), Math.max(1, lineSize), length)
       : addrBits;
@@ -76,6 +80,8 @@ var CacheComponent = class CacheComponent extends BuiltinComponent {
         { name: 'length', value: 'integer' },
         { name: 'lines', value: 'integer' },
         { name: 'lineSize', value: 'integer' },
+        { name: 'ways', value: 'integer' },
+        { name: 'missCycles', value: 'integer' },
         { name: 'evictType', value: 'lru|fifo|random' },
         { name: 'writePolicy', value: 'writeBack|writeThrough' },
         { name: 'writeAllocate', value: '0|1' },
@@ -89,6 +95,7 @@ var CacheComponent = class CacheComponent extends BuiltinComponent {
         { bits: '1', name: 'resetStats' },
         { bits: String(lineBits), name: 'line' },
         { bits: String(addrBits), name: 'adr' },
+        { bits: String(wayBits), name: 'way' },
         { bits: '1', name: 'set' },
       ],
       pouts: [
@@ -112,6 +119,12 @@ var CacheComponent = class CacheComponent extends BuiltinComponent {
     const { depth, length } = this._validateDepthLength(attributes, backing);
     const lines = cacheParsePositiveInt(attributes.lines, 'lines');
     const lineSize = cacheParsePositiveInt(attributes.lineSize, 'lineSize');
+    const ways = attributes.ways !== undefined
+      ? cacheParsePositiveInt(attributes.ways, 'ways')
+      : 1;
+    const missCycles = attributes.missCycles !== undefined
+      ? parseInt(attributes.missCycles, 10)
+      : 0;
     const evictType = attributes.evictType != null ? attributes.evictType : 'lru';
     const writePolicy = attributes.writePolicy != null ? attributes.writePolicy : 'writeBack';
     const writeAllocate = attributes.writeAllocate === undefined
@@ -126,12 +139,14 @@ var CacheComponent = class CacheComponent extends BuiltinComponent {
         length,
         lines,
         lineSize,
+        ways,
         backingId: backing.storageId,
         backingKind: backing.kind,
         evictType,
         writePolicy,
         writeAllocate,
         enabled,
+        missCycles: isNaN(missCycles) ? 0 : Math.max(0, missCycles),
         rngSeed: 1,
       });
     }
@@ -143,6 +158,8 @@ var CacheComponent = class CacheComponent extends BuiltinComponent {
       cacheLength: length,
       cacheLines: lines,
       cacheLineSize: lineSize,
+      cacheWays: ways,
+      cacheMissCycles: isNaN(missCycles) ? 0 : Math.max(0, missCycles),
     };
   }
 
@@ -152,17 +169,22 @@ var CacheComponent = class CacheComponent extends BuiltinComponent {
     const backing = comp.backingRef
       || (attrs.memMembers && attrs.memMembers[0])
       || '(none)';
+    const ways = attrs.ways !== undefined ? parseInt(attrs.ways, 10) : (comp.cacheWays || 1);
+    const lineSize = attrs.lineSize !== undefined ? parseInt(attrs.lineSize, 10) : (comp.cacheLineSize || 1);
+    const cacheLines = attrs.lines !== undefined ? parseInt(attrs.lines, 10) : (comp.cacheLines || 16);
     lines.push(`${alias} (comp [cache])`);
     lines.push('');
     lines.push(`mem = ${backing}`);
     lines.push(`depth: ${attrs.depth !== undefined ? attrs.depth : comp.cacheDepth || 8}`);
     lines.push(`length: ${attrs.length !== undefined ? attrs.length : comp.cacheLength || 16}`);
-    lines.push(`lines: ${attrs.lines !== undefined ? attrs.lines : comp.cacheLines || 16}`);
-    lines.push(`lineSize: ${attrs.lineSize !== undefined ? attrs.lineSize : comp.cacheLineSize || 1}`);
+    lines.push(`lines: ${cacheLines}`);
+    lines.push(`lineSize: ${lineSize}`);
+    lines.push(`ways: ${ways}`);
+    lines.push(`missCycles: ${attrs.missCycles !== undefined ? attrs.missCycles : (comp.cacheMissCycles || 0)}`);
     lines.push(`evictType: ${attrs.evictType || 'lru'}`);
     lines.push(`writePolicy: ${attrs.writePolicy || 'writeBack'}`);
     lines.push(`writeAllocate: ${attrs.writeAllocate !== undefined ? attrs.writeAllocate : 1}`);
-    const cap = (parseInt(attrs.lines, 10) || 0) * (parseInt(attrs.lineSize, 10) || 0);
+    const cap = cacheLines * ways * lineSize;
     if (cap) lines.push(`capacity: ${cap} addresses`);
     return lines;
   }
@@ -180,7 +202,8 @@ var CacheComponent = class CacheComponent extends BuiltinComponent {
   evalGetProperty(comp, property, a, ctx) {
     const c = typeof getCache === 'function' ? getCache(comp.deviceIds[0]) : null;
     if (!c) return null;
-    const set = c.sets[c.inspectSet] || c.sets[0];
+    const wayIndex = c.inspectWay >= 0 ? c.inspectWay : 0;
+    const set = c.sets[c.inspectSet] && c.sets[c.inspectSet][wayIndex];
     let val = null;
     let bitWidth = 1;
     switch (property) {
@@ -205,7 +228,7 @@ var CacheComponent = class CacheComponent extends BuiltinComponent {
         bitWidth = CACHE_COUNTER_BITS;
         break;
       case 'busy':
-        val = '0';
+        val = c.busy ? '1' : '0';
         break;
       case 'valid':
         val = set && set.valid ? '1' : '0';
@@ -214,11 +237,13 @@ var CacheComponent = class CacheComponent extends BuiltinComponent {
         val = set && set.dirty ? '1' : '0';
         break;
       case 'tag':
-        val = set ? set.tag.toString(2).padStart(cacheTagBits(c.lines, c.lineSize, c.length), '0') : '0';
+        val = set && set.valid
+          ? set.tag.toString(2).padStart(cacheTagBits(c.lines, c.lineSize, c.length), '0')
+          : '0'.repeat(cacheTagBits(c.lines, c.lineSize, c.length));
         bitWidth = cacheTagBits(c.lines, c.lineSize, c.length);
         break;
       case 'data':
-        val = cacheInspectLineData(c, c.inspectSet);
+        val = cacheInspectLineData(c, c.inspectSet, c.inspectWay >= 0 ? c.inspectWay : 0);
         bitWidth = c.lineSize * c.depth;
         break;
       default:

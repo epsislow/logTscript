@@ -136,6 +136,8 @@ Equivalent: `wait: hold`. Per-pulse override in a wave: `.u:{ wait = 1, set = 1 
 
 **Semantics:** PC stays at the last **fully completed** instruction. There is **no** busy-wait loop inside one `run` pulse — if `wait` becomes `1` before the next instruction, `run` **breaks** early.
 
+**Cache miss penalty:** bind `wait = .l1:busy` when [`comp [cache]`](cache.md#miss-penalty-misscycles--busy) uses `missCycles > 0` — LOAD still returns data on the miss cycle; `busy` may stall the **next** instruction.
+
 ### cpu-wait-stall
 
 `hold = 1` blocks `set`; after `hold = 0`, one step runs.

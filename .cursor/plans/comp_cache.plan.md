@@ -4,19 +4,22 @@ overview: Plan de implementare pentru `comp [cache]` — strat transparent mem-l
 todos:
   - id: storage-router
     content: Introduce caches Map + getMem/setMem dispatch + resolveStorageBackend helper
-    status: pending
+    status: completed
   - id: cache-device
     content: "Implement cache-devices.js: read/write, policies, flush/invalidate, stats"
-    status: pending
+    status: completed
   - id: cache-component
     content: "Implement cache.js: attrs, pins/pouts, createDevice, applyProperties, evalGetProperty"
-    status: pending
+    status: completed
   - id: master-links
     content: "Generalize CPU _resolveMemLink and DMA mems: to accept mem|cache"
-    status: pending
+    status: completed
   - id: tests-doc
     content: Add comp-cache tests (2708+), cache.md, update cpu/dma/mem docs and script editor
-    status: pending
+    status: completed
+  - id: phase-b-mmap
+    content: "Faza B: mmap regions cache:, teste comp-mmap-cache 2728+"
+    status: completed
 isProject: false
 ---
 
@@ -242,7 +245,9 @@ sequenceDiagram
 
 ### Faza C — extensii
 
-Associativity, miss penalty async, snooping.
+**Plan detaliat:** [comp_cache_phase_C.plan.md](comp_cache_phase_C.plan.md)
+
+Sub-faze: **C1** `ways` (default 1), **C2** `missCycles` + `busy`, **C3** coerență cache-uri frați. Decizii închise: fără bus global, `getMem` sincron, `missCycles: 0` = instant.
 
 ### Faza D — bus pin-level (amanată)
 

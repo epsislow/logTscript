@@ -27730,10 +27730,10 @@ comp [cache] .l1:
   h.assert('policy fifo', c.evictType, 'fifo');
   getMem(l1Id, 0);
   getMem(l1Id, 1);
-  h.assert('fifoSeq order across sets', String(c.sets[0].fifoSeq < c.sets[1].fifoSeq), 'true');
+  h.assert('fifoSeq order across sets', String(c.sets[0][0].fifoSeq < c.sets[1][0].fifoSeq), 'true');
   getMem(l1Id, 4);
   h.assert('one eviction', cacheProp(session, interp, '.l1', 'evictions'), '0000000000000001');
-  h.assert('tag1 in set0', String(c.sets[0].tag), '1');
+  h.assert('tag1 in set0', String(c.sets[0][0].tag), '1');
 });
 
 reg(2726, 'comp-cache', 'evictType random tag conflict increments evictions', function(h, session) {
@@ -27762,7 +27762,7 @@ comp [cache] .l1:
   getMem(l1Id, 0);
   getMem(l1Id, 4);
   h.assert('one eviction', cacheProp(session, interp, '.l1', 'evictions'), '0000000000000001');
-  h.assert('tag1 in set0', String(c.sets[0].tag), '1');
+  h.assert('tag1 in set0', String(c.sets[0][0].tag), '1');
 });
 
 reg(2727, 'comp-cache', 'evictType invalid literal defaults to lru', function(h, session) {
@@ -27995,6 +27995,432 @@ comp [cpu] .u:
 `);
   h.assert('on attr', String(stmts[0].comp.attributes.on), '1');
   h.assert('ram depth', String(stmts[0].comp.attributes.ram.depth), '8');
+});
+
+reg(2736, 'comp-cache-ways', 'ways omitted defaults to 1 (A/B regression)', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+`);
+  const c = getCache(interp.components.get('.l1').deviceIds[0]);
+  h.assert('ways default 1', String(c.ways), '1');
+  h.assert('one way per set', String(c.sets[0].length), '1');
+});
+
+reg(2737, 'comp-cache-ways', 'ways 2 same set two tags no eviction', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^01020304
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  ways: 2
+  on: 1
+:
+`);
+  const id = interp.components.get('.l1').deviceIds[0];
+  getMem(id, 0);
+  getMem(id, 4);
+  h.assert('no eviction yet', cacheProp(session, interp, '.l1', 'evictions'), '0000000000000000');
+  h.assert('both valid', String(getCache(id).sets[0][0].valid && getCache(id).sets[0][1].valid), 'true');
+});
+
+reg(2738, 'comp-cache-ways', 'ways 2 third tag in set evicts', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^0102030405060708
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  ways: 2
+  on: 1
+:
+`);
+  const id = interp.components.get('.l1').deviceIds[0];
+  getMem(id, 0);
+  getMem(id, 4);
+  getMem(id, 8);
+  h.assert('one eviction', cacheProp(session, interp, '.l1', 'evictions'), '0000000000000001');
+});
+
+reg(2739, 'comp-cache-ways', 'lru vs fifo pick different victim', function(h, session) {
+  function snapAfterEvict(policy) {
+    const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^0102030405060708
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  ways: 2
+  evictType: ${policy}
+  on: 1
+:
+`);
+    const id = interp.components.get('.l1').deviceIds[0];
+    getMem(id, 0);
+    getMem(id, 4);
+    getMem(id, 0);
+    getMem(id, 8);
+    const c = getCache(id);
+    const tags = c.sets[0].filter((w) => w.valid).map((w) => w.tag).sort((a, b) => a - b);
+    return tags.join(',');
+  }
+  h.assert('lru keeps tag0 evicts tag1', snapAfterEvict('lru'), '0,2');
+  h.assert('fifo keeps tag1 evicts tag0', snapAfterEvict('fifo'), '1,2');
+});
+
+reg(2740, 'comp-cache-ways', 'doc lists ways and capacity lines*ways*lineSize', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 2
+  ways: 2
+  on: 1
+:
+`);
+  const handler = session._ensureRegistry().get('cache');
+  const doc = handler.constructor.formatInstanceDoc('.l1', interp.components.get('.l1')).join('\n');
+  h.assert('ways line', String(doc.includes('ways: 2')), 'true');
+  h.assert('capacity 16', String(doc.includes('capacity: 16')), 'true');
+});
+
+reg(2741, 'comp-cache-ways', 'pin way invalidate single way vs all set', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^01020304
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  ways: 2
+  on: 1
+:
+`);
+  const id = interp.components.get('.l1').deviceIds[0];
+  getMem(id, 0);
+  getMem(id, 4);
+  getMem(id, 0);
+  session.execStmts(interp, '.l1:{ line = 00, way = 00, invalidate = 1, set = 1 }');
+  getMem(id, 0);
+  h.assert('miss after way0 invalidate', String(parseInt(cacheProp(session, interp, '.l1', 'misses'), 2) >= 2), 'true');
+  getMem(id, 4);
+  const missesAfter4 = parseInt(cacheProp(session, interp, '.l1', 'misses'), 2);
+  getMem(id, 0);
+  getMem(id, 4);
+  session.execStmts(interp, '.l1:{ line = 00, way = \\2, invalidate = 1, set = 1 }');
+  getMem(id, 0);
+  getMem(id, 4);
+  h.assert('misses after set invalidate', String(parseInt(cacheProp(session, interp, '.l1', 'misses'), 2) > missesAfter4), 'true');
+});
+
+reg(2742, 'comp-cache-ways', 'pin way ways+1 inspect first valid', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 16
+  on: 1
+  = ^42
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 16
+  lines: 4
+  lineSize: 1
+  ways: 2
+  on: 1
+:
+`);
+  const id = interp.components.get('.l1').deviceIds[0];
+  getMem(id, 4);
+  session.execStmts(interp, '.l1:{ line = 00, way = \\3, set = 1 }');
+  h.assert('valid first way', cacheProp(session, interp, '.l1', 'valid'), '1');
+  session.execStmts(interp, '.l1:{ line = 00, way = \\2, invalidate = 1, set = 1 }');
+  session.execStmts(interp, '.l1:{ line = 00, way = \\3, set = 1 }');
+  h.assert('no valid after set invalidate', cacheProp(session, interp, '.l1', 'valid'), '0');
+});
+
+reg(2743, 'comp-cache-cycles', 'missCycles 0 busy stays 0', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  missCycles: 0
+  on: 1
+:
+`);
+  const id = interp.components.get('.l1').deviceIds[0];
+  getMem(id, 0);
+  h.assert('busy 0', cacheProp(session, interp, '.l1', 'busy'), '0');
+});
+
+reg(2744, 'comp-cache-cycles', 'missCycles 3 busy until 3 more accesses', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^42
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  missCycles: 3
+  on: 1
+:
+`);
+  const id = interp.components.get('.l1').deviceIds[0];
+  const c = getCache(id);
+  getMem(id, 0);
+  h.assert('busy after miss', cacheProp(session, interp, '.l1', 'busy'), '1');
+  h.assert('remaining 3', String(c.remaining), '3');
+  getMem(id, 0);
+  h.assert('remaining 2', String(c.remaining), '2');
+  getMem(id, 0);
+  h.assert('remaining 1', String(c.remaining), '1');
+  getMem(id, 0);
+  h.assert('remaining 0', String(c.remaining), '0');
+  h.assert('busy clear', cacheProp(session, interp, '.l1', 'busy'), '0');
+});
+
+reg(2745, 'comp-cache-cycles', 'miss does not decrement penalty on same access', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  :
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  missCycles: 2
+  on: 1
+:
+`);
+  const id = interp.components.get('.l1').deviceIds[0];
+  const c = getCache(id);
+  getMem(id, 0);
+  h.assert('remaining full after miss', String(c.remaining), '2');
+});
+
+reg(2746, 'comp-cache-snoop', 'dma write to ram invalidates sibling cache', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^aa
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+
+comp [cache] .l2:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+`);
+  const l1 = interp.components.get('.l1').deviceIds[0];
+  const ram = interp.components.get('.ram').deviceIds[0];
+  getMem(l1, 0);
+  getMem(l1, 0);
+  h.assert('hits before', cacheProp(session, interp, '.l1', 'hits'), '0000000000000001');
+  setMem(ram, 0, '01010101');
+  getMem(l1, 0);
+  h.assert('miss after snoop', String(parseInt(cacheProp(session, interp, '.l1', 'misses'), 2) >= 1), 'true');
+  h.assert('new value', getMem(l1, 0), '01010101');
+});
+
+reg(2747, 'comp-cache-snoop', 'writeThrough sibling invalidates other cache', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^00
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+
+comp [cache] .l2:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  writePolicy: writeThrough
+  on: 1
+:
+`);
+  const l1 = interp.components.get('.l1').deviceIds[0];
+  const l2 = interp.components.get('.l2').deviceIds[0];
+  getMem(l1, 0);
+  setMem(l2, 0, '11110000');
+  getMem(l1, 0);
+  h.assert('l1 miss after l2 writeThrough', String(parseInt(cacheProp(session, interp, '.l1', 'misses'), 2) >= 1), 'true');
+});
+
+reg(2748, 'comp-cache-snoop', 'writeBack without flush does not snoop siblings', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^aa
+:
+
+comp [cache] .l1:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+
+comp [cache] .l2:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  writePolicy: writeBack
+  on: 1
+:
+`);
+  const l1 = interp.components.get('.l1').deviceIds[0];
+  const l2 = interp.components.get('.l2').deviceIds[0];
+  getMem(l1, 0);
+  setMem(l2, 0, '01010101');
+  getMem(l1, 0);
+  h.assert('l1 still hits stale', cacheProp(session, interp, '.l1', 'hits'), '0000000000000001');
+  h.assert('l1 misses unchanged', cacheProp(session, interp, '.l1', 'misses'), '0000000000000001');
+});
+
+reg(2749, 'comp-cache-snoop', 'L1 over L2 not auto-invalidated on ram write', function(h, session) {
+  const { interp } = session.run(`
+comp [mem] .ram:
+  depth: 8
+  length: 8
+  on: 1
+  = ^07
+:
+
+comp [cache] .l2:
+  mem = .ram
+  depth: 8
+  length: 8
+  lines: 4
+  lineSize: 1
+  on: 1
+:
+
+comp [cache] .l1:
+  mem = .l2
+  depth: 8
+  length: 8
+  lines: 2
+  lineSize: 1
+  on: 1
+:
+`);
+  const l1 = interp.components.get('.l1').deviceIds[0];
+  const l2 = interp.components.get('.l2').deviceIds[0];
+  const ram = interp.components.get('.ram').deviceIds[0];
+  getMem(l1, 0);
+  getMem(l1, 0);
+  setMem(ram, 0, '00001111');
+  getMem(l1, 0);
+  h.assert('l1 still hits', cacheProp(session, interp, '.l1', 'hits'), '0000000000000010');
+  getMem(l2, 0);
+  h.assert('l2 missed after ram write', String(parseInt(cacheProp(session, interp, '.l2', 'misses'), 2) >= 1), 'true');
 });
 
   window.LogTScriptTestSuite.finalize();
