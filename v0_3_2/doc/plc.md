@@ -15,11 +15,12 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 |-------|---------|
 | **Language** | Full keyword/syntax reference → [plc-language.md](plc-language.md) |
 | **Program** | `inline [plc] .machine:` with `inputs:{ }`, `outputs:{ }`, logic body |
-| **Logic** | `IF` / `CASE` / `RETURN` / `FOR` / `WHILE` / `REPEAT` / `EXIT`, boolean operators |
+| **Logic** | `IF` / `CASE` / `RETURN` / `FOR` / `WHILE` / `REPEAT` / `EXIT`, boolean operators, comparisons, arithmetic |
+| **Multi-bit** | `TEMP: 8` — comparisons (`IF TEMP > 50`), assign (`SPEED = TEMP`), `+ - * / MOD` |
 | **Internal memory** | `VAR` … `END_VAR` (between scans; reset on re-RUN); `CONST` … `END_CONST` |
 | **Timers** | `TON` / `TOF` blocks; `PT` in scan cycles; read `name.Q` |
 | **Counters** | `CTU` / `CTD` blocks; `PV` preset; read `name.Q`; compare `name.CV >= N` |
-| **Widths** | `START` alone = 1 bit; `TEMP: 8` can be declared and mapped, but current logic examples use 1-bit conditions |
+| **Widths** | `START` alone = 1 bit; `TEMP: 8` = 8-bit unsigned; overflow wraps to symbol width |
 | **Scan** | `.plc:{ set = 1 }` or **`scanTime > 0`** auto-scan; see [Scan timing (P4)](#scan-timing-p4) |
 | **`busy`** | `0` when `scanTime: 0`; pulses during simulated scan when `scanTime > 0` |
 | **Outputs** | Retain last value if not assigned this scan (PLC semantics) |
@@ -1377,23 +1378,132 @@ show(.motorLed:get)
 
 After Load & Run: LED is **`1`**.
 
+### Example 30 — slider thermostat (`TEMP > 50`)
+
+`comp [slider]` provides an 8-bit value on `:get` (0…255). When the value is above 50, `HEATER` turns on.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { TEMP: 8 }
+  outputs: { HEATER }
+  IF TEMP > 50 THEN
+    HEATER = 1
+  ELSE
+    HEATER = 0
+  END_IF
+  :
+
+comp [slider] .tempSlider:
+  length: 8
+  :
+
+comp [led] .heatLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { TEMP = .tempSlider }
+  outputs: { HEATER = .heatLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+```
+
+After **Load & Run** with slider at 0: LED is **`0`**. Drag the slider above halfway (~>50) and trigger another scan — LED becomes **`1`**.
+
+### Example 31 — scale input to `comp [bar]`
+
+Copy and scale a multi-bit input to an 8-segment bar display.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { TEMP: 8 }
+  outputs: { LEVEL: 8 }
+  LEVEL = (TEMP * 2) / 10
+  :
+
+comp [slider] .tempSlider:
+  length: 8
+  :
+
+comp [bar] .levelBar:
+  length: 8
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { TEMP = .tempSlider }
+  outputs: { LEVEL = .levelBar }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+```
+
+With `TEMP = 80` (binary `01010000`): `LEVEL = (80 * 2) / 10 = 16` — bar shows 16 lit segments pattern on `:get`.
+
+### Example 32 — `CASE` on multi-bit mode
+
+```logts-play
+inline [plc] .machine:
+  inputs: { MODE: 8 }
+  outputs: { OUT_A, OUT_B }
+  CASE MODE OF
+    0:
+      OUT_A = 1
+      OUT_B = 0
+    50:
+      OUT_A = 0
+      OUT_B = 1
+    ELSE
+      OUT_A = 0
+      OUT_B = 0
+  END_CASE
+  :
+
+comp [slider] .modeSlider:
+  length: 8
+  :
+
+comp [led] .aLed:
+  :
+
+comp [led] .bLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { MODE = .modeSlider }
+  outputs: { OUT_A = .aLed, OUT_B = .bLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.aLed:get)
+show(.bLed:get)
+```
+
+Set slider to value **50**: **OUT_A = 0**, **OUT_B = 1**.
+
 ---
 
 ## I/O mapping matrix
 
-LogTScript PLC maps **program symbols** to **wires** or **existing panel components**. Width must match exactly. The logic shown on this page uses **1-bit** conditions (`IF`, `AND`, …). Multi-bit symbols may be declared and mapped, but are not used in these boolean examples.
+LogTScript PLC maps **program symbols** to **wires** or **existing panel components**. Width must match exactly. Programs may use **1-bit boolean logic** or **multi-bit comparisons and arithmetic** on mapped symbols.
 
-| Role | PLC symbol (example) | Width | LogTScript target | Read / write | Logic in current examples |
-|------|----------------------|-------|-------------------|--------------|---------------------------|
-| Momentary input | `START` | 1 | `comp [key]` | `:get` | yes |
-| Toggle input | `STOP`, `ENABLE` | 1 | `comp [switch]` | `:get` | yes |
-| Parallel switches | `SEL` | N | `comp [dip]` | `:get` (width = `length`) | use as 1-bit in current examples |
-| Analog input (UI) | `LEVEL` | N | `comp [slider]` | `:get` | declare/map only on this page |
-| Port I/O | — | N | `comp [ioport]` | pins/pouts | width-based mapping rules apply |
-| On/off indicator | `MOTOR`, `ALARM` | 1 | `comp [led]` | write storage + display | yes |
-| Bit storage / command | `CMD` | N | `comp [reg]` | `setReg` on scan | current examples use 1-bit |
-| LED bar | `STATUS` | N | `comp [bar]` | `setBarState` on scan | current examples use 1-bit |
-| Bus | `motorCmd` | N | `Nwire` name | wire read/write | current examples use 1-bit |
+| Role | PLC symbol (example) | Width | LogTscript target | Read / write | Typical logic |
+|------|----------------------|-------|-------------------|--------------|---------------|
+| Momentary input | `START` | 1 | `comp [key]` | `:get` | `IF START` |
+| Toggle input | `STOP`, `ENABLE` | 1 | `comp [switch]` | `:get` | `IF NOT STOP` |
+| Parallel switches | `SEL` | N | `comp [dip]` | `:get` (width = `length`) | `CASE SEL OF` (1-bit) or map as N-bit |
+| Analog input (UI) | `TEMP`, `LEVEL` | N | `comp [slider]` | `:get` | `IF TEMP > 50`, `SPEED = TEMP` |
+| Port I/O | — | N | `comp [ioport]` | pins/pouts | width-based mapping |
+| On/off indicator | `MOTOR`, `ALARM` | 1 | `comp [led]` | write storage + display | `MOTOR = 1` |
+| Bit storage / command | `CMD` | N | `comp [reg]` | `setReg` on scan | multi-bit assign |
+| LED bar | `STATUS` | N | `comp [bar]` | `setBarState` on scan | `LEVEL = (TEMP * 2) / 10` |
+| Bus | `motorCmd` | N | `Nwire` name | wire read/write | any width |
 | CLCD display | — | — | **not direct** | via wire + `.panel:{ value, set }` | see below |
 
 ## Input targets — behavior and mapping
@@ -1426,15 +1536,18 @@ Program sees the same 1-bit value as a wire or switch.
 | **Map** | `SEL = .mode` |
 | **Width** | `length` attribute (e.g. `length: 4` → 4-bit symbol `SEL: 4` in program) |
 | **Preset** | `= 1010` in component body |
-| **Logic** | Boolean `IF SEL` requires a **1-bit** symbol in the current PLC language examples |
+| **Logic** | Boolean `IF SEL` on 1-bit; or map N-bit dip and use `CASE` / comparisons |
 | **Read** | Full bit pattern via `:get` |
 
 ### `comp [slider]` — analog UI
 
 | Topic | Detail |
 |-------|--------|
-| **Map** | `LEVEL = .slider` with matching `length` |
-| **Current use** | Declare and map with matching width; current examples do not use numeric comparisons in PLC conditions |
+| **Map** | `TEMP = .tempSlider` with matching `length` (e.g. `TEMP: 8` ↔ `length: 8`) |
+| **Value range** | `0` … `2^length − 1` as binary on `:get` |
+| **Logic** | `IF TEMP > 50`, `LEVEL = (TEMP * 2) / 10`, `CASE TEMP OF` |
+| **Preset** | Drag in panel after Load, or `session.setComp('.tempSlider', '01100100')` in tests |
+| **Example** | Example 30 — thermostat; Example 31 — bar scaling |
 
 ### Wires
 
@@ -1579,7 +1692,7 @@ Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch,
 | Invalid `program:` | elaboration | `plc program .x must be inline [plc]` |
 | Assign to input | parse | `cannot assign to input START` |
 | Unknown symbol | parse | `unknown symbol ALARM` |
-| Multi-bit in `IF` | parse | `IF requires 1-bit symbol, got TEMP (8 bits)` |
+| Multi-bit in `AND`/`OR` | parse | `expression requires 1-bit symbol, got TEMP (8 bits)` |
 
 ---
 

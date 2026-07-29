@@ -15,6 +15,7 @@ const PLC_KEYWORDS = new Set([
   'CTU', 'CTD',
   'IN', 'PT',
   'CU', 'CD', 'PV',
+  'MOD',
   // R and LD are recognized contextually in parseCounterCall, not as global keywords
 ]);
 
@@ -67,6 +68,19 @@ function plcTokenize(src) {
     if (ch === '=' && src[i + 1] === '=') {
       tokens.push({ type: 'CMP', value: '==', line });
       i += 2;
+      continue;
+    }
+    if (ch === '!') {
+      if (src[i + 1] === '=') {
+        tokens.push({ type: 'CMP', value: '!=', line });
+        i += 2;
+        continue;
+      }
+      plcError(`unexpected character '${ch}'`, line);
+    }
+    if (ch === '*' || ch === '/' || ch === '+' || ch === '-') {
+      tokens.push({ type: 'SYM', value: ch, line });
+      i++;
       continue;
     }
     if (ch === '{' || ch === '}' || ch === ':' || ch === '=' || ch === '(' || ch === ')' || ch === '.') {
@@ -182,6 +196,10 @@ class PlcParser {
     if (this.peek().type === 'KW' && this.peek().value === 'VAR') {
       plcError('VAR must appear before CONST (order: inputs, outputs, VAR, CONST, body)', this.peek().line);
     }
+    this.programInputs = inputs;
+    this.programOutputs = outputs;
+    this.programVars = vars || {};
+    this.programConsts = consts || {};
     const statements = this.parseStmtList();
     if (!this.match('EOF')) {
       plcError(`unexpected token '${this.peek().value}'`, this.peek().line);
@@ -281,24 +299,28 @@ class PlcParser {
     const targetTok = this.eat('ID');
     const target = targetTok.value;
     this.eat('SYM', '=');
-    const expr = this.parseExpr();
+    const expr = this.parseAssignExpr(target);
     return { type: 'assign', target, expr, line: targetTok.line };
   }
 
+  symbolWidth(name) {
+    const i = this.programInputs && this.programInputs[name];
+    if (i) return i.width;
+    const o = this.programOutputs && this.programOutputs[name];
+    if (o) return o.width;
+    const v = this.programVars && this.programVars[name];
+    if (v) return v.width;
+    return 1;
+  }
+
+  parseAssignExpr(target) {
+    const w = this.symbolWidth(target);
+    if (w > 1) return this.parseAdd();
+    return this.parseExpr();
+  }
+
   parseForBound() {
-    if (this.peek().type === 'NUM') {
-      const n = this.eat('NUM');
-      return { type: 'num', value: n.value, line: n.line };
-    }
-    const nameTok = this.eat('ID');
-    if (this.match('SYM', '.')) {
-      const fieldTok = this.eat('ID');
-      if (fieldTok.value !== 'CV') {
-        plcError(`FOR bound member must be .CV, got .${fieldTok.value}`, fieldTok.line);
-      }
-      return { type: 'member', base: nameTok.value, field: 'CV', line: nameTok.line };
-    }
-    return { type: 'symbol', name: nameTok.value, line: nameTok.line };
+    return this.parseAdd();
   }
 
   parseFor() {
@@ -456,7 +478,8 @@ class PlcParser {
   parseOr() {
     let left = this.parseXor();
     while (this.match('KW', 'OR')) {
-      left = { type: 'binary', op: 'OR', left, right: this.parseXor() };
+      const line = this.tokens[this.pos - 1].line;
+      left = { type: 'binary', op: 'OR', left, right: this.parseXor(), line };
     }
     return left;
   }
@@ -464,57 +487,100 @@ class PlcParser {
   parseXor() {
     let left = this.parseAnd();
     while (this.match('KW', 'XOR')) {
-      left = { type: 'binary', op: 'XOR', left, right: this.parseAnd() };
+      const line = this.tokens[this.pos - 1].line;
+      left = { type: 'binary', op: 'XOR', left, right: this.parseAnd(), line };
     }
     return left;
   }
 
   parseAnd() {
-    let left = this.parseNot();
+    let left = this.parseCmp();
     while (this.match('KW', 'AND')) {
-      left = { type: 'binary', op: 'AND', left, right: this.parseNot() };
+      const line = this.tokens[this.pos - 1].line;
+      left = { type: 'binary', op: 'AND', left, right: this.parseCmp(), line };
     }
     return left;
   }
 
-  parseNot() {
+  parseCmp() {
+    let left = this.parseAdd();
+    if (this.peek().type === 'CMP') {
+      const op = this.eat('CMP').value;
+      const right = this.parseAdd();
+      const line = left.line || right.line;
+      left = { type: 'cmp', op, left, right, line };
+    }
+    return left;
+  }
+
+  parseAdd() {
+    let left = this.parseMul();
+    while (this.peek().type === 'SYM' && (this.peek().value === '+' || this.peek().value === '-')) {
+      const op = this.eat('SYM').value;
+      const line = this.tokens[this.pos - 1].line;
+      left = { type: 'binary', op, left, right: this.parseMul(), line };
+    }
+    return left;
+  }
+
+  parseMul() {
+    let left = this.parseUnary();
+    while (
+      (this.peek().type === 'SYM' && (this.peek().value === '*' || this.peek().value === '/')) ||
+      (this.peek().type === 'KW' && this.peek().value === 'MOD')
+    ) {
+      let op;
+      if (this.peek().type === 'KW') {
+        this.eat('KW', 'MOD');
+        op = 'MOD';
+      } else {
+        op = this.eat('SYM').value;
+      }
+      const line = this.tokens[this.pos - 1].line;
+      left = { type: 'binary', op, left, right: this.parseUnary(), line };
+    }
+    return left;
+  }
+
+  parseUnary() {
     if (this.match('KW', 'NOT')) {
-      return { type: 'unary', op: 'NOT', arg: this.parseNot() };
+      const line = this.tokens[this.pos - 1].line;
+      return { type: 'unary', op: 'NOT', arg: this.parseUnary(), line };
+    }
+    if (this.peek().type === 'SYM' && this.peek().value === '-') {
+      this.eat('SYM', '-');
+      const line = this.tokens[this.pos - 1].line;
+      return { type: 'unary', op: 'NEG', arg: this.parseUnary(), line };
     }
     return this.parsePrimary();
   }
 
   parsePrimary() {
     if (this.match('SYM', '(')) {
-      const e = this.parseExpr();
+      const e = this.parseOr();
       this.eat('SYM', ')');
       return e;
     }
     if (this.match('KW', 'TRUE')) {
-      return { type: 'literal', value: '1' };
+      const line = this.tokens[this.pos - 1].line;
+      return { type: 'num', value: 1, line };
     }
     if (this.match('KW', 'FALSE')) {
-      return { type: 'literal', value: '0' };
+      const line = this.tokens[this.pos - 1].line;
+      return { type: 'num', value: 0, line };
     }
-    if (this.peek().type === 'NUM' && (this.peek().value === 0 || this.peek().value === 1)) {
-      const v = this.eat('NUM').value;
-      return { type: 'literal', value: String(v) };
+    if (this.peek().type === 'NUM') {
+      const n = this.eat('NUM');
+      return { type: 'num', value: n.value, line: n.line };
     }
     if (this.peek().type === 'ID') {
-      const base = this.eat('ID').value;
+      const nameTok = this.eat('ID');
+      const base = nameTok.value;
       if (this.match('SYM', '.')) {
         const fieldTok = this.eat('ID');
-        const field = fieldTok.value;
-        const node = { type: 'member', base, field, line: fieldTok.line };
-        // .CV comparisons: name.CV >= n / <= n / == n / > n / < n
-        if (field === 'CV' && this.peek().type === 'CMP') {
-          const op = this.eat('CMP').value;
-          const numTok = this.eat('NUM');
-          return { type: 'cvCmp', base, op, rhs: numTok.value, line: fieldTok.line };
-        }
-        return node;
+        return { type: 'member', base, field: fieldTok.value, line: fieldTok.line };
       }
-      return { type: 'symbol', name: base };
+      return { type: 'symbol', name: base, line: nameTok.line };
     }
     plcError(`expected expression, got ${this.peek().type}`, this.peek().line);
   }
@@ -524,7 +590,10 @@ function plcCollectSymbols(expr, out) {
   if (!expr) return;
   if (expr.type === 'symbol') out.add(expr.name);
   else if (expr.type === 'member') out.add(expr.base);
-  else if (expr.type === 'unary') plcCollectSymbols(expr.arg, out);
+  else if (expr.type === 'cmp') {
+    plcCollectSymbols(expr.left, out);
+    plcCollectSymbols(expr.right, out);
+  } else if (expr.type === 'unary') plcCollectSymbols(expr.arg, out);
   else if (expr.type === 'binary') {
     plcCollectSymbols(expr.left, out);
     plcCollectSymbols(expr.right, out);
@@ -611,11 +680,34 @@ function plcValidateProgram(parsed) {
     }
   }
 
-  function checkExpr1Bit(expr, ctx) {
+  function checkExprBool(expr, ctx) {
+    if (!expr) return;
+    if (expr.type === 'cmp') {
+      checkExprNum(expr.left, ctx);
+      checkExprNum(expr.right, ctx);
+      return;
+    }
+    if (expr.type === 'num') return;
+    if (expr.type === 'unary' && expr.op === 'NOT') {
+      checkExprBool(expr.arg, ctx);
+      return;
+    }
+    if (expr.type === 'unary' && expr.op === 'NEG') {
+      plcError('unary minus not allowed in boolean expression', ctx);
+    }
+    if (expr.type === 'binary') {
+      if (expr.op === '+' || expr.op === '-' || expr.op === '*' || expr.op === '/' || expr.op === 'MOD') {
+        plcError(`arithmetic ${expr.op} not allowed in boolean expression`, ctx);
+      }
+      checkExprBool(expr.left, ctx);
+      checkExprBool(expr.right, ctx);
+      return;
+    }
     if (expr.type === 'member') {
       if (expr.field === 'Q') {
-        if (!timers.has(expr.base) && !counters.has(expr.base))
+        if (!timers.has(expr.base) && !counters.has(expr.base)) {
           plcError(`unknown timer/counter ${expr.base} in .Q`, ctx);
+        }
         return;
       }
       if (expr.field === 'CV') {
@@ -623,23 +715,67 @@ function plcValidateProgram(parsed) {
       }
       plcError(`unknown member field '${expr.field}'`, ctx);
     }
-    if (expr.type === 'cvCmp') {
-      if (!counters.has(expr.base)) plcError(`unknown counter '${expr.base}' in .CV`, ctx);
+    if (expr.type === 'symbol') {
+      const info = symInfo(expr.name);
+      if (!info) plcError(`unknown symbol ${expr.name}`, ctx);
+      if (info.kind === 'const' && info.constValue !== 0 && info.constValue !== 1) {
+        plcError(`CONST '${expr.name}' value ${info.constValue} cannot be used in 1-bit expression`, ctx);
+      }
+      if (info.kind === 'timer' || info.kind === 'counter') {
+        plcError(`symbol '${expr.name}' cannot be used directly as boolean`, ctx);
+      }
+      if (info.width !== 1) {
+        plcError(`expression requires 1-bit symbol, got ${expr.name} (${info.width} bits)`, ctx);
+      }
+    }
+  }
+
+  function checkExprNum(expr, ctx) {
+    if (!expr) return;
+    if (expr.type === 'num') return;
+    if (expr.type === 'cmp') {
+      plcError('comparison not allowed in numeric expression', ctx);
+    }
+    if (expr.type === 'unary') {
+      if (expr.op === 'NOT') plcError('NOT not allowed in numeric expression', ctx);
+      checkExprNum(expr.arg, ctx);
       return;
     }
-    const used = new Set();
-    plcCollectSymbols(expr, used);
-    for (const n of used) {
-      if (timers.has(n) || counters.has(n)) continue;
-      const info = symInfo(n);
-      if (!info) plcError(`unknown symbol ${n}`, ctx);
-      if (info.kind === 'const') {
-        if (info.constValue !== 0 && info.constValue !== 1) {
-          plcError(`CONST '${n}' value ${info.constValue} cannot be used in 1-bit expression`, ctx);
-        }
-        continue;
+    if (expr.type === 'binary') {
+      if (expr.op === 'AND' || expr.op === 'OR' || expr.op === 'XOR') {
+        plcError(`${expr.op} not allowed in numeric expression`, ctx);
       }
-      if (info.width !== 1) plcError(`expression requires 1-bit symbol, got ${n} (${info.width} bits)`, ctx);
+      checkExprNum(expr.left, ctx);
+      checkExprNum(expr.right, ctx);
+      return;
+    }
+    if (expr.type === 'member') {
+      if (expr.field === 'CV') {
+        if (!counters.has(expr.base)) plcError(`unknown counter '${expr.base}' in .CV`, ctx);
+        return;
+      }
+      if (expr.field === 'Q') {
+        plcError('.Q cannot be used in numeric expression', ctx);
+      }
+      plcError(`unknown member field '${expr.field}'`, ctx);
+    }
+    if (expr.type === 'symbol') {
+      const info = symInfo(expr.name);
+      if (!info) plcError(`unknown symbol ${expr.name}`, ctx);
+      if (info.kind === 'timer' || info.kind === 'counter') {
+        plcError(`'${expr.name}' cannot be used in numeric expression`, ctx);
+      }
+    }
+  }
+
+  function checkAssignSymbolWidth(expr, targetWidth, ctx) {
+    if (expr.type === 'symbol') {
+      const info = symInfo(expr.name);
+      if (info && info.kind !== 'const' && info.kind !== 'timer' && info.kind !== 'counter') {
+        if (info.width !== targetWidth) {
+          plcError(`width mismatch: ${expr.name} (${info.width} bits) cannot assign to ${targetWidth}-bit target`, ctx);
+        }
+      }
     }
   }
 
@@ -652,13 +788,10 @@ function plcValidateProgram(parsed) {
       const info = symInfo(sel.name);
       if (!info) plcError(`unknown symbol ${sel.name} in CASE selector`, ctx);
       if (info.kind === 'const') {
-        plcError(`CONST cannot be CASE selector; use 1-bit symbol or name.CV`, ctx);
+        plcError(`CONST cannot be CASE selector; use symbol or name.CV`, ctx);
       }
       if (info.kind === 'timer' || info.kind === 'counter') {
-        plcError(`CASE selector must be 1-bit symbol or name.CV`, ctx);
-      }
-      if (info.width !== 1) {
-        plcError(`CASE selector requires 1-bit symbol, got ${sel.name} (${info.width} bits)`, ctx);
+        plcError(`CASE selector must be symbol or name.CV`, ctx);
       }
       return;
     }
@@ -667,20 +800,7 @@ function plcValidateProgram(parsed) {
 
   function checkForBound(bound, ctx) {
     if (!bound) return;
-    if (bound.type === 'num') return;
-    if (bound.type === 'member' && bound.field === 'CV') {
-      if (!counters.has(bound.base)) plcError(`unknown counter '${bound.base}' in FOR bound`, ctx);
-      return;
-    }
-    if (bound.type === 'symbol') {
-      const info = symInfo(bound.name);
-      if (!info) plcError(`unknown symbol ${bound.name} in FOR bound`, ctx);
-      if (info.kind === 'timer' || info.kind === 'counter') {
-        plcError(`FOR bound must be number, VAR/CONST, or name.CV`, ctx);
-      }
-      return;
-    }
-    plcError('invalid FOR bound', ctx);
+    checkExprNum(bound, ctx);
   }
 
   function checkStmt(stmt, loopDepth) {
@@ -692,20 +812,22 @@ function plcValidateProgram(parsed) {
       if (targetInfo.kind === 'const') plcError(`cannot assign to CONST ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'timer') plcError(`cannot assign to timer ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'counter') plcError(`cannot assign to counter ${stmt.target}`, stmt.line);
-      if (targetInfo.width !== 1) {
-        plcError(`assignment requires 1-bit symbol, got ${stmt.target} (${targetInfo.width} bits)`, stmt.line);
+      if (targetInfo.width > 1) {
+        checkExprNum(stmt.expr, stmt.line);
+        checkAssignSymbolWidth(stmt.expr, targetInfo.width, stmt.line);
+      } else {
+        checkExprBool(stmt.expr, stmt.line);
       }
-      checkExpr1Bit(stmt.expr, stmt.line);
     } else if (stmt.type === 'ton' || stmt.type === 'tof') {
-      checkExpr1Bit(stmt.inExpr, stmt.line);
+      checkExprBool(stmt.inExpr, stmt.line);
     } else if (stmt.type === 'ctu' || stmt.type === 'ctd') {
-      checkExpr1Bit(stmt.pulseExpr, stmt.line);
-      checkExpr1Bit(stmt.resetExpr, stmt.line);
+      checkExprBool(stmt.pulseExpr, stmt.line);
+      checkExprBool(stmt.resetExpr, stmt.line);
     } else if (stmt.type === 'if') {
-      checkExpr1Bit(stmt.cond, stmt.line);
+      checkExprBool(stmt.cond, stmt.line);
       for (const s of stmt.thenBody) checkStmt(s, depth);
       for (const e of stmt.elsif || []) {
-        checkExpr1Bit(e.cond, stmt.line);
+        checkExprBool(e.cond, stmt.line);
         for (const s of e.body) checkStmt(s, depth);
       }
       for (const s of stmt.elseBody || []) checkStmt(s, depth);
@@ -725,10 +847,10 @@ function plcValidateProgram(parsed) {
       checkForBound(stmt.step, stmt.line);
       for (const s of stmt.body || []) checkStmt(s, depth + 1);
     } else if (stmt.type === 'while') {
-      checkExpr1Bit(stmt.cond, stmt.line);
+      checkExprBool(stmt.cond, stmt.line);
       for (const s of stmt.body || []) checkStmt(s, depth + 1);
     } else if (stmt.type === 'repeat') {
-      checkExpr1Bit(stmt.cond, stmt.line);
+      checkExprBool(stmt.cond, stmt.line);
       for (const s of stmt.body || []) checkStmt(s, depth + 1);
     } else if (stmt.type === 'return') {
       /* ok */
@@ -792,41 +914,86 @@ function plcCounterCV(counterState, name) {
   return st ? st.cv : 0;
 }
 
-function plcEvalExpr(expr, env, timerState, counterState) {
-  if (expr.type === 'literal') return expr.value;
+function plcEvalInt(expr, env, timerState, counterState, consts, line) {
+  if (!expr) return 0;
+  const errLine = line || expr.line;
+  if (expr.type === 'num') return expr.value >>> 0;
   if (expr.type === 'symbol') {
-    if (!env.has(expr.name)) return '0';
-    return plcBit(env.get(expr.name));
+    if (consts && consts[expr.name] != null) return consts[expr.name].value >>> 0;
+    return plcBitsToInt(env.get(expr.name)) >>> 0;
   }
-  if (expr.type === 'member') {
-    if (expr.field === 'Q') {
-      const tq = plcTimerQ(timerState, expr.base);
-      if (tq !== '0') return tq;
-      return plcCounterQ(counterState, expr.base);
-    }
-    return '0';
+  if (expr.type === 'member' && expr.field === 'CV') {
+    return plcCounterCV(counterState, expr.base) >>> 0;
   }
-  if (expr.type === 'cvCmp') {
-    const cv = plcCounterCV(counterState, expr.base);
-    const r = expr.rhs;
-    if (expr.op === '>=') return cv >= r ? '1' : '0';
-    if (expr.op === '<=') return cv <= r ? '1' : '0';
-    if (expr.op === '>') return cv > r ? '1' : '0';
-    if (expr.op === '<') return cv < r ? '1' : '0';
-    if (expr.op === '==') return cv === r ? '1' : '0';
-    return '0';
-  }
-  if (expr.type === 'unary' && expr.op === 'NOT') {
-    return plcEvalExpr(expr.arg, env, timerState, counterState) === '1' ? '0' : '1';
+  if (expr.type === 'unary' && expr.op === 'NEG') {
+    const v = plcEvalInt(expr.arg, env, timerState, counterState, consts, errLine);
+    return (0 - v) >>> 0;
   }
   if (expr.type === 'binary') {
-    const a = plcEvalExpr(expr.left, env, timerState, counterState) === '1';
-    const b = plcEvalExpr(expr.right, env, timerState, counterState) === '1';
+    if (expr.op === 'AND' || expr.op === 'OR' || expr.op === 'XOR') {
+      return plcEvalBool(expr, env, timerState, counterState, consts, errLine) === '1' ? 1 : 0;
+    }
+    const a = plcEvalInt(expr.left, env, timerState, counterState, consts, errLine) >>> 0;
+    const b = plcEvalInt(expr.right, env, timerState, counterState, consts, errLine) >>> 0;
+    if (expr.op === '+') return (a + b) >>> 0;
+    if (expr.op === '-') return (a - b) >>> 0;
+    if (expr.op === '*') return (a * b) >>> 0;
+    if (expr.op === '/') {
+      if (b === 0) plcError('division by zero', errLine);
+      return Math.floor(a / b) >>> 0;
+    }
+    if (expr.op === 'MOD') {
+      if (b === 0) plcError('MOD by zero', errLine);
+      return (a % b) >>> 0;
+    }
+  }
+  if (expr.type === 'cmp') {
+    return plcEvalBool(expr, env, timerState, counterState, consts, errLine) === '1' ? 1 : 0;
+  }
+  if (expr.type === 'unary' && expr.op === 'NOT') {
+    return plcEvalBool(expr, env, timerState, counterState, consts, errLine) === '1' ? 1 : 0;
+  }
+  return 0;
+}
+
+function plcEvalBool(expr, env, timerState, counterState, consts, line) {
+  if (!expr) return '0';
+  if (expr.type === 'cmp') {
+    const l = plcEvalInt(expr.left, env, timerState, counterState, consts, line || expr.line);
+    const r = plcEvalInt(expr.right, env, timerState, counterState, consts, line || expr.line);
+    const op = expr.op;
+    if (op === '>=') return l >= r ? '1' : '0';
+    if (op === '<=') return l <= r ? '1' : '0';
+    if (op === '>') return l > r ? '1' : '0';
+    if (op === '<') return l < r ? '1' : '0';
+    if (op === '==') return l === r ? '1' : '0';
+    if (op === '!=') return l !== r ? '1' : '0';
+    return '0';
+  }
+  if (expr.type === 'num') return expr.value ? '1' : '0';
+  if (expr.type === 'symbol') {
+    return plcBit(env.get(expr.name));
+  }
+  if (expr.type === 'member' && expr.field === 'Q') {
+    const tq = plcTimerQ(timerState, expr.base);
+    if (tq !== '0') return tq;
+    return plcCounterQ(counterState, expr.base);
+  }
+  if (expr.type === 'unary' && expr.op === 'NOT') {
+    return plcEvalBool(expr.arg, env, timerState, counterState, consts, line) === '1' ? '0' : '1';
+  }
+  if (expr.type === 'binary') {
+    const a = plcEvalBool(expr.left, env, timerState, counterState, consts, line) === '1';
+    const b = plcEvalBool(expr.right, env, timerState, counterState, consts, line) === '1';
     if (expr.op === 'AND') return (a && b) ? '1' : '0';
     if (expr.op === 'OR') return (a || b) ? '1' : '0';
     if (expr.op === 'XOR') return (a !== b) ? '1' : '0';
   }
   return '0';
+}
+
+function plcEvalExpr(expr, env, timerState, counterState, consts, line) {
+  return plcEvalBool(expr, env, timerState, counterState, consts, line);
 }
 
 function plcEnsureTimerState(timerState, name) {
@@ -839,8 +1006,8 @@ function plcEnsureCounterState(counterState, name) {
   return counterState[name];
 }
 
-function plcExecTon(stmt, env, timerState, counterState) {
-  const inVal = plcEvalExpr(stmt.inExpr, env, timerState, counterState) === '1';
+function plcExecTon(stmt, env, timerState, counterState, consts) {
+  const inVal = plcEvalBool(stmt.inExpr, env, timerState, counterState, consts, stmt.line) === '1';
   const st = plcEnsureTimerState(timerState, stmt.name);
   if (inVal) {
     st.et += 1;
@@ -851,8 +1018,8 @@ function plcExecTon(stmt, env, timerState, counterState) {
   }
 }
 
-function plcExecTof(stmt, env, timerState, counterState) {
-  const inVal = plcEvalExpr(stmt.inExpr, env, timerState, counterState) === '1';
+function plcExecTof(stmt, env, timerState, counterState, consts) {
+  const inVal = plcEvalBool(stmt.inExpr, env, timerState, counterState, consts, stmt.line) === '1';
   const st = plcEnsureTimerState(timerState, stmt.name);
   if (inVal) {
     st.et = 0;
@@ -866,9 +1033,9 @@ function plcExecTof(stmt, env, timerState, counterState) {
   }
 }
 
-function plcExecCtu(stmt, env, timerState, counterState) {
-  const cuVal = plcEvalExpr(stmt.pulseExpr, env, timerState, counterState);
-  const rVal = plcEvalExpr(stmt.resetExpr, env, timerState, counterState) === '1';
+function plcExecCtu(stmt, env, timerState, counterState, consts) {
+  const cuVal = plcEvalBool(stmt.pulseExpr, env, timerState, counterState, consts, stmt.line);
+  const rVal = plcEvalBool(stmt.resetExpr, env, timerState, counterState, consts, stmt.line) === '1';
   const st = plcEnsureCounterState(counterState, stmt.name);
   // R has priority over CU (IEC 61131)
   if (rVal) {
@@ -883,9 +1050,9 @@ function plcExecCtu(stmt, env, timerState, counterState) {
   st.q = (st.cv >= stmt.pv) ? '1' : '0';
 }
 
-function plcExecCtd(stmt, env, timerState, counterState) {
-  const cdVal = plcEvalExpr(stmt.pulseExpr, env, timerState, counterState);
-  const ldVal = plcEvalExpr(stmt.resetExpr, env, timerState, counterState) === '1';
+function plcExecCtd(stmt, env, timerState, counterState, consts) {
+  const cdVal = plcEvalBool(stmt.pulseExpr, env, timerState, counterState, consts, stmt.line);
+  const ldVal = plcEvalBool(stmt.resetExpr, env, timerState, counterState, consts, stmt.line) === '1';
   const st = plcEnsureCounterState(counterState, stmt.name);
   // LD has priority over CD (IEC 61131)
   if (ldVal) {
@@ -905,6 +1072,8 @@ function plcEvalCaseSelector(sel, env, counterState) {
     return plcCounterCV(counterState, sel.base);
   }
   if (sel.type === 'symbol') {
+    const w = env.get(sel.name);
+    if (w != null && String(w).length > 1) return plcBitsToInt(w);
     return plcBit(env.get(sel.name)) === '1' ? 1 : 0;
   }
   return 0;
@@ -924,17 +1093,9 @@ function plcIntToBits(n, width) {
   return plcNormalizeBits(s, w);
 }
 
-function plcEvalBound(bound, env, counterState, consts) {
+function plcEvalBound(bound, env, timerState, counterState, consts, line) {
   if (!bound) return 0;
-  if (bound.type === 'num') return bound.value;
-  if (bound.type === 'member' && bound.field === 'CV') {
-    return plcCounterCV(counterState, bound.base);
-  }
-  if (bound.type === 'symbol') {
-    if (consts && consts[bound.name] != null) return consts[bound.name].value;
-    return plcBitsToInt(env.get(bound.name));
-  }
-  return 0;
+  return plcEvalInt(bound, env, timerState, counterState, consts, line);
 }
 
 function plcExecStmtList(stmts, env, timerState, counterState, flow, consts, varWidths) {
@@ -955,32 +1116,38 @@ function plcExecStmt(stmt, env, timerState, counterState, flow, consts, varWidth
     return;
   }
   if (stmt.type === 'assign') {
-    env.set(stmt.target, plcEvalExpr(stmt.expr, env, timerState, counterState));
+    const tw = (varWidths && varWidths[stmt.target]) || 1;
+    if (tw > 1) {
+      const n = plcEvalInt(stmt.expr, env, timerState, counterState, consts, stmt.line);
+      env.set(stmt.target, plcIntToBits(n, tw));
+    } else {
+      env.set(stmt.target, plcEvalBool(stmt.expr, env, timerState, counterState, consts, stmt.line));
+    }
     return;
   }
   if (stmt.type === 'ton') {
-    plcExecTon(stmt, env, timerState, counterState);
+    plcExecTon(stmt, env, timerState, counterState, consts);
     return;
   }
   if (stmt.type === 'tof') {
-    plcExecTof(stmt, env, timerState, counterState);
+    plcExecTof(stmt, env, timerState, counterState, consts);
     return;
   }
   if (stmt.type === 'ctu') {
-    plcExecCtu(stmt, env, timerState, counterState);
+    plcExecCtu(stmt, env, timerState, counterState, consts);
     return;
   }
   if (stmt.type === 'ctd') {
-    plcExecCtd(stmt, env, timerState, counterState);
+    plcExecCtd(stmt, env, timerState, counterState, consts);
     return;
   }
   if (stmt.type === 'if') {
-    if (plcEvalExpr(stmt.cond, env, timerState, counterState) === '1') {
+    if (plcEvalBool(stmt.cond, env, timerState, counterState, consts, stmt.line) === '1') {
       plcExecStmtList(stmt.thenBody, env, timerState, counterState, flow, consts, varWidths);
       return;
     }
     for (const e of stmt.elsif || []) {
-      if (plcEvalExpr(e.cond, env, timerState, counterState) === '1') {
+      if (plcEvalBool(e.cond, env, timerState, counterState, consts, stmt.line) === '1') {
         plcExecStmtList(e.body, env, timerState, counterState, flow, consts, varWidths);
         return;
       }
@@ -1000,9 +1167,9 @@ function plcExecStmt(stmt, env, timerState, counterState, flow, consts, varWidth
     return;
   }
   if (stmt.type === 'for') {
-    const start = plcEvalBound(stmt.start, env, counterState, consts);
-    const end = plcEvalBound(stmt.end, env, counterState, consts);
-    const step = plcEvalBound(stmt.step, env, counterState, consts);
+    const start = plcEvalBound(stmt.start, env, timerState, counterState, consts, stmt.line);
+    const end = plcEvalBound(stmt.end, env, timerState, counterState, consts, stmt.line);
+    const step = plcEvalBound(stmt.step, env, timerState, counterState, consts, stmt.line);
     if (step === 0) plcError('FOR BY step must not be 0', stmt.line);
     const width = (varWidths && varWidths[stmt.control]) || 1;
     let iters = 0;
@@ -1029,7 +1196,7 @@ function plcExecStmt(stmt, env, timerState, counterState, flow, consts, varWidth
   }
   if (stmt.type === 'while') {
     let iters = 0;
-    while (plcEvalExpr(stmt.cond, env, timerState, counterState) === '1') {
+    while (plcEvalBool(stmt.cond, env, timerState, counterState, consts, stmt.line) === '1') {
       plcExecStmtList(stmt.body, env, timerState, counterState, flow, consts, varWidths);
       if (flow && flow.returned) return;
       if (flow && flow.exited) { flow.exited = false; break; }
@@ -1046,7 +1213,7 @@ function plcExecStmt(stmt, env, timerState, counterState, flow, consts, varWidth
       if (flow && flow.exited) { flow.exited = false; break; }
       iters++;
       if (iters > PLC_LOOP_MAX_ITERS) plcError('loop iteration limit exceeded', stmt.line);
-    } while (plcEvalExpr(stmt.cond, env, timerState, counterState) !== '1');
+    } while (plcEvalBool(stmt.cond, env, timerState, counterState, consts, stmt.line) !== '1');
   }
 }
 
@@ -1061,6 +1228,7 @@ function executePlcScan(inst, externalInputs, outputState, timerState, counterSt
   const vstate = varState || {};
   const varWidths = {};
   for (const name of Object.keys(vars)) varWidths[name] = vars[name].width || 1;
+  for (const name of Object.keys(outputs)) varWidths[name] = outputs[name].width || 1;
 
   for (const name of Object.keys(outputs)) {
     const prev = outputState && outputState[name] != null ? outputState[name] : '0';
@@ -1099,11 +1267,12 @@ function executePlcScan(inst, externalInputs, outputState, timerState, counterSt
 
 function formatPlcExpr(expr) {
   if (!expr) return '';
-  if (expr.type === 'literal') return expr.value === '1' ? 'TRUE' : 'FALSE';
+  if (expr.type === 'num') return String(expr.value);
   if (expr.type === 'symbol') return expr.name;
   if (expr.type === 'member') return `${expr.base}.${expr.field}`;
-  if (expr.type === 'cvCmp') return `${expr.base}.CV ${expr.op} ${expr.rhs}`;
-  if (expr.type === 'unary') return `NOT ${formatPlcExpr(expr.arg)}`;
+  if (expr.type === 'cmp') return `${formatPlcExpr(expr.left)} ${expr.op} ${formatPlcExpr(expr.right)}`;
+  if (expr.type === 'unary' && expr.op === 'NOT') return `NOT ${formatPlcExpr(expr.arg)}`;
+  if (expr.type === 'unary' && expr.op === 'NEG') return `- ${formatPlcExpr(expr.arg)}`;
   if (expr.type === 'binary') return `${formatPlcExpr(expr.left)} ${expr.op} ${formatPlcExpr(expr.right)}`;
   return '?';
 }
@@ -1164,10 +1333,6 @@ function formatPlcStmt(stmt, indent) {
     return lines.join('\n');
   }
   if (stmt.type === 'for') {
-    const stepStr = (stmt.step && !(stmt.step.type === 'num' && stmt.step.value === 1))
-      ? ` BY ${formatPlcExpr(stmt.step.type === 'num' ? { type: 'literal', value: String(stmt.step.value) } : stmt.step)}`
-      : '';
-    // format bounds specially
     const fmtB = (b) => {
       if (!b) return '?';
       if (b.type === 'num') return String(b.value);
@@ -1295,11 +1460,13 @@ function formatPlcTypeDoc() {
     'Keywords: IF THEN ELSE ELSIF END_IF CASE OF END_CASE RETURN',
     '          FOR TO BY DO END_FOR WHILE END_WHILE REPEAT UNTIL END_REPEAT EXIT',
     '          VAR END_VAR CONST END_CONST AND OR NOT XOR TRUE FALSE',
+    '          MOD + - * / comparisons > < >= <= == !=',
     '          TON TOF CTU CTD',
     'Timers: PT = preset in scan cycles; read Q as name.Q',
     'Counters: PV = preset; read Q as name.Q; compare CV as name.CV >= N',
+    'Multi-bit: unsigned integers; arithmetic + - * / MOD; overflow wraps to symbol width',
     'VAR: internal memory between scans (reset on re-RUN); CONST: read-only',
-    'CASE: selector is 1-bit symbol or name.CV; first matching label wins',
+    'CASE: selector is symbol (any width) or name.CV; first matching label wins',
     'Loops: FOR/WHILE/REPEAT run fully in one scan; EXIT leaves innermost loop; max 65535 iters',
     'RETURN: stop remaining statements in this scan',
     'Bind with comp [plc] program: .name and I/O map (see doc/plc.md and doc/plc-language.md)',

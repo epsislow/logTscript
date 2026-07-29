@@ -30280,5 +30280,149 @@ comp [plc] .ctrl:
   h.assert('ton after 2 iters', interp.getValueFromRef(interp.components.get('.outLed').ref), '1');
 });
 
+reg(2831, 'comp-plc-lang', 'P+b parse comparisons and arithmetic', function(h, session) {
+  const p = parsePlcBody(`inputs: { TEMP: 8, SETPOINT: 8 }
+outputs: { HEATER, SPEED: 8 }
+CONST
+  GAIN = 2
+END_CONST
+IF TEMP > SETPOINT THEN HEATER = 1 END_IF
+SPEED = (TEMP * GAIN) / 10`);
+  h.assert('if cond cmp', String(p.statements[0].cond.type), 'cmp');
+  h.assert('speed assign', String(p.statements[1].type), 'assign');
+});
+
+reg(2832, 'comp-plc-lang', 'P+b IF TEMP > 50', function(h, session) {
+  const inst = parsePlcBody(`inputs: { TEMP: 8 } outputs: { HEATER }
+IF TEMP > 50 THEN HEATER = 1 ELSE HEATER = 0 END_IF`);
+  const out = {};
+  executePlcScan(inst, { TEMP: '01100100' }, out, {}, {});
+  h.assert('heater on 100', out.HEATER, '1');
+  executePlcScan(inst, { TEMP: '00001010' }, out, {}, {});
+  h.assert('heater off 10', out.HEATER, '0');
+});
+
+reg(2833, 'comp-plc-lang', 'P+b multi-bit copy assign', function(h, session) {
+  const inst = parsePlcBody(`inputs: { TEMP: 8 } outputs: { SPEED: 8 }
+SPEED = TEMP`);
+  const out = {};
+  executePlcScan(inst, { TEMP: '00010101' }, out, {}, {});
+  h.assert('speed copy', out.SPEED, '00010101');
+});
+
+reg(2834, 'comp-plc-lang', 'P+b arithmetic expression', function(h, session) {
+  const inst = parsePlcBody(`inputs: { TEMP: 8 } outputs: { SPEED: 8 }
+SPEED = (TEMP * 2) / 4`);
+  const out = {};
+  executePlcScan(inst, { TEMP: '00010000' }, out, {}, {});
+  h.assert('scaled', out.SPEED, '00001000');
+});
+
+reg(2835, 'comp-plc-lang', 'P+b overflow wrap and MOD', function(h, session) {
+  const instWrap = parsePlcBody(`outputs: { S: 8 } S = 300`);
+  const outW = {};
+  executePlcScan(instWrap, {}, outW, {}, {});
+  h.assert('wrap 300', outW.S, '00101100');
+  const instMod = parsePlcBody(`outputs: { S: 8 } S = (10 * 3) MOD 7`);
+  const outM = {};
+  executePlcScan(instMod, {}, outM, {}, {});
+  h.assert('mod 30%7', outM.S, '00000010');
+});
+
+reg(2836, 'comp-plc-lang', 'P+b width mismatch error', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { A: 4 } outputs: { B: 8 } B = A`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('width err', String(err.includes('width mismatch')), 'true');
+});
+
+reg(2837, 'comp-plc-lang', 'P+b division by zero runtime', function(h, session) {
+  const inst = parsePlcBody(`outputs: { Y: 8 } Y = 10 / 0`);
+  let err = '';
+  try {
+    executePlcScan(inst, {}, {}, {}, {});
+  } catch (e) { err = String(e.message || e); }
+  h.assert('div0', String(err.includes('division by zero')), 'true');
+});
+
+reg(2838, 'comp-plc-lang', 'P+b CASE multi-bit selector', function(h, session) {
+  const inst = parsePlcBody(`inputs: { MODE: 8 } outputs: { OUT }
+CASE MODE OF
+  0:
+    OUT = 0
+  50:
+    OUT = 1
+  ELSE
+    OUT = 0
+END_CASE`);
+  const out = {};
+  executePlcScan(inst, { MODE: '00110010' }, out, {}, {});
+  h.assert('case 50', out.OUT, '1');
+  executePlcScan(inst, { MODE: '00000000' }, out, {}, {});
+  h.assert('case 0', out.OUT, '0');
+});
+
+reg(2839, 'comp-plc', 'P+b slider input thermostat', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { TEMP: 8 }
+  outputs: { HEATER }
+  IF TEMP > 50 THEN HEATER = 1 ELSE HEATER = 0 END_IF
+  :
+
+comp [slider] .tempSlider:
+  length: 8
+  :
+
+comp [led] .heatLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { TEMP = .tempSlider }
+  outputs: { HEATER = .heatLed }
+  on: 1
+  :
+`);
+  session.setComp(interp, '.tempSlider', '01100100');
+  session.execStmts(interp, '.ctrl:{ set = 1 }');
+  h.assert('heat on', interp.getValueFromRef(interp.components.get('.heatLed').ref), '1');
+  session.setComp(interp, '.tempSlider', '00001010');
+  session.execStmts(interp, '.ctrl:{ set = 1 }');
+  h.assert('heat off', interp.getValueFromRef(interp.components.get('.heatLed').ref), '0');
+});
+
+reg(2840, 'comp-plc-lang', 'doc example 30 — slider thermostat logts-play', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX30);
+  session.setComp(interp, '.tempSlider', '01100100');
+  session.execStmts(interp, '.ctrl:{ set = 1 }');
+  h.assert('ex30 heat on', interp.getValueFromRef(interp.components.get('.heatLed').ref), '1');
+});
+
+const PLC_DOC_EX30 = `
+inline [plc] .machine:
+  inputs: { TEMP: 8 }
+  outputs: { HEATER }
+  IF TEMP > 50 THEN HEATER = 1 ELSE HEATER = 0 END_IF
+  :
+
+comp [slider] .tempSlider:
+  length: 8
+  :
+
+comp [led] .heatLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { TEMP = .tempSlider }
+  outputs: { HEATER = .heatLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`;
+
   window.LogTScriptTestSuite.finalize();
 })();

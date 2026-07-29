@@ -1,6 +1,6 @@
 ---
 name: Componenta PLC
-overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P5.2b done. P+c și P+d decizii închise — următor implementare P+c. Apoi P+d, P+b. Amânate: P3c, P5.2c, P6–P8."
+overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P5.2b, P+c, P+d, P+b done. Amânate: P3c, P5.2c, P6–P8."
 todos:
   - id: p0-decisions
     content: "P0: decizii lățimi, mapare, on: vs comandă, sintaxă START — închise"
@@ -69,7 +69,8 @@ todos:
     content: "P8 (amânat): comunicare inter-PLC prin comp [network]/sock — fieldbus didactic"
     status: pending
   - id: pb-analog
-    content: "P+b: logică multi-bit — comparații (IF TEMP > 50), atribuiri N-bit, slider/senzori în program"
+    content: "P+b: logică multi-bit — comparații, aritmetică, slider/senzori — implementat"
+    status: completed
     status: pending
 isProject: false
 ---
@@ -602,7 +603,23 @@ SPEED = TEMP
 
 **Nu în P+b (faze ulterioare):** `motor`/`sensor` componente dedicate (**P3c**); rețea (**P8**); globals (**P7**).
 
-**Status:** fază planificată, **neimplementată** — la același nivel ca P+c/P+d, dar **amânată** în roadmap (după ST extins).
+**Status:** **implementat** — decizii P-ABIT0…P-ABIT9 închise.
+
+| ID | Decizie |
+|----|---------|
+| **P-ABIT0** | P+b fază unică (fără P+b.x) |
+| **P-ABIT1** | N-bit = unsigned; comparații ca întreg |
+| **P-ABIT2** | Nucleu: comparații + atribuiri copie/literal + aritmetică |
+| **P-ABIT3** | Aritmetică: `+`, `-`, `*`, `/`, `MOD`; paranteze; precedență ST |
+| **P-ABIT3b** | `/ 0` și `MOD 0` → eroare runtime |
+| **P-ABIT4** | `VAR` multi-bit în logică; reset la re-RUN |
+| **P-ABIT5** | `CASE` multi-bit cu label-uri întregi |
+| **P-ABIT6** | `WHILE`/`UNTIL`/`FOR` bounds cu expresii numerice |
+| **P-ABIT7** | Overflow la atribuire → truncare/wrap; width mismatch simbol↔simbol → eroare |
+| **P-ABIT8** | Unificare `name.CV` cu comparații generale |
+| **P-ABIT9** | Fără shift bitwise; fără signed/float |
+
+**Nu în P+b (faze ulterioare):** `motor`/`sensor` componente dedicate (**P3c**); rețea (**P8**); globals (**P7**).
 
 ### Operatori și precedență (P1/P2+)
 
@@ -1543,13 +1560,15 @@ comp [plc] .ctrlB:
 
 **P+c (`VAR` / `CONST` / `CASE` / `RETURN`):** decizii **închise** — P-VAR1…P-VAR-R3, P-CASE1…P-CASE6, P-RET-ST1…P-RET-ST3; **următor pas de implementare**.
 
-**P+d (`FOR` / `WHILE` / `REPEAT` / `EXIT`):** decizii **închise** — P-LOOP0…P-EXIT3, P-PLC3-6; **fără CONTINUE**; după P+c.
+**P+d (`FOR` / `WHILE` / `REPEAT` / `EXIT`):** **done**.
+
+**P+b (logică multi-bit / analog):** **done** — P-ABIT0…P-ABIT9.
 
 **P5.3 (plasare IEC):** **închis** — CASE (P+c) + bucle (P+d, P-PLC3-6).
 
-**Încă deschise / amânate:** P3c, **P+b**, **P5.2c** (retain+VAR), **P6**, **P7**, **P8**.
+**Încă deschise / amânate:** P3c, **P5.2c** (retain+VAR), **P6**, **P7**, **P8**.
 
-**Următorul pas recomandat:** **implementare P+c** → **P+d** → **P+b**.
+**Următorul pas recomandat:** **P3c** sau **P5.2c** sau **P6** (la alegere).
 
 ---
 

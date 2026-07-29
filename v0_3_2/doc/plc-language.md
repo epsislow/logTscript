@@ -71,7 +71,7 @@ inputs: { TEMP: 8 }
 **Rules**
 
 - Assigning to an input in the program body → **parse error**
-- Multi-bit inputs may be **declared** and **mapped**, but boolean logic on them is not supported here
+- Multi-bit inputs may be used in **comparisons** and **arithmetic** (see [Multi-bit values](#multi-bit-values-comparisons-and-arithmetic))
 
 ### `outputs:`
 
@@ -103,7 +103,7 @@ END_VAR
 | Rule | Detail |
 |------|--------|
 | Placement | After `inputs`/`outputs`, **before** the program body (and before `CONST`) |
-| Width | `name` or `name: N` (default **1**). Boolean logic uses **1-bit** VAR |
+| Width | `name` or `name: N` (default **1**). Any width in comparisons and arithmetic |
 | Read / write | Readable and writable in the body like outputs |
 | First scan | Each VAR starts at **`0`** |
 | Names | Must not conflict with inputs, outputs, CONST, timers, or counters |
@@ -164,7 +164,7 @@ END_IF
 
 | Keyword | Role |
 |---------|------|
-| **`IF`** | Start conditional; condition is a **1-bit expression** |
+| **`IF`** | Start conditional; condition is a **boolean** or **comparison** expression |
 | **`THEN`** | Statements when condition is true |
 | **`ELSIF`** | Else-if branch (repeatable) |
 | **`ELSE`** | Optional final branch |
@@ -174,7 +174,7 @@ END_IF
 
 ### `CASE` … `OF` … `END_CASE`
 
-Selects the **first** matching label. Selector is a **1-bit symbol** (0 or 1) or a counter **`name.CV`** (integer).
+Selects the **first** matching label. Selector is any-width **symbol**, or counter **`name.CV`** (integer).
 
 ```logts
 CASE SEL OF
@@ -192,7 +192,7 @@ END_CASE
 
 | Part | Rule |
 |------|------|
-| **Selector** | 1-bit input/output/VAR, or `counter.CV` |
+| **Selector** | Input/output/VAR symbol (any width), or `counter.CV` |
 | **Labels** | Integer literals (`0:`, `1:`, `2:` …) |
 | **Match** | First label equal to selector value; no fall-through |
 | **`ELSE`** | Optional default branch |
@@ -221,7 +221,7 @@ Loops run **to completion inside a single scan** (then the scan continues after 
 
 #### `FOR` … `TO` … `BY` … `DO` … `END_FOR`
 
-Control variable must be declared in **`VAR`**. Bounds are integer literals, a VAR/CONST name, or `counter.CV`. **`BY`** is optional (default **1**).
+Control variable must be declared in **`VAR`**. Bounds are **numeric expressions** (literals, symbols, `counter.CV`, arithmetic). **`BY`** is optional (default **1**).
 
 ```logts
 VAR
@@ -240,7 +240,7 @@ END_FOR
 
 #### `WHILE` … `DO` … `END_WHILE`
 
-Condition is a **1-bit** expression. May run **zero** times if already false.
+Condition is a **boolean** or **comparison** expression. May run **zero** times if already false.
 
 ```logts
 WHILE RUN DO
@@ -300,7 +300,64 @@ This page documents only the statements and keywords currently available.
 IF START AND NOT STOP OR E_STOP THEN   ; = START AND (NOT STOP) OR E_STOP
 ```
 
-All operands in `IF` and boolean assigns must be **1-bit** (symbols declared width 1, literals, or `.Q` members).
+All operands in pure boolean sub-expressions (`AND` / `OR` / `NOT` / `XOR`) must be **1-bit** (symbols width 1, literals `0`/`1`, or `.Q` members). **Comparisons** (`TEMP > 50`, `cnt.CV >= 3`) produce a boolean result and may mix with `AND` / `OR`.
+
+---
+
+## Multi-bit values, comparisons, and arithmetic
+
+Symbols declared with width **> 1** hold **unsigned integers** in the range **0 … 2^N − 1**. Values are stored as binary strings on wires and components; the program treats them as integers.
+
+### Comparisons
+
+| Operator | Meaning |
+|----------|---------|
+| `>`, `<`, `>=`, `<=`, `==`, `!=` | Compare two numeric expressions |
+
+Operands: symbol (any width), integer literal, `CONST`, `counter.CV`, or arithmetic sub-expression.
+
+```logts
+IF TEMP > 50 THEN HEATER = 1 END_IF
+IF TEMP > SETPOINT - 5 THEN HEATER = 0 END_IF
+WHILE LEVEL < MAX DO ... END_WHILE
+```
+
+### Arithmetic
+
+| Operator | Precedence | Meaning |
+|----------|------------|---------|
+| `*` `/` `MOD` | higher | multiply, integer divide, remainder |
+| `+` `-` | lower | add, subtract |
+| `( … )` | highest | grouping |
+
+```logts
+SPEED = TEMP
+LEVEL = (TEMP * GAIN) / 10
+REM = VALUE MOD 16
+```
+
+| Rule | Detail |
+|------|--------|
+| **Unsigned** | All values are unsigned integers |
+| **Overflow** | Result truncated to target symbol width (wrap, like IEC unsigned) |
+| **Divide / MOD by 0** | **Runtime error** |
+| **Width mismatch** | Direct copy `OUT = IN` requires equal widths — else parse error |
+| **Boolean ops** | `AND` / `OR` / `NOT` / `XOR` only on 1-bit operands — not on multi-bit symbols directly |
+
+### Multi-bit `CASE`
+
+```logts
+CASE MODE OF
+  0:
+    OUT_A = 1
+  50:
+    OUT_B = 1
+  ELSE
+    OUT_A = 0
+END_CASE
+```
+
+Selector may be any-width symbol or `counter.CV`. Labels are integer literals.
 
 ---
 
@@ -679,7 +736,7 @@ Instance **`name`** must match a `TON`/`TOF`/`CTU`/`CTD` declaration in the same
 |---------------------|-------|
 | `cannot assign to input START` | Wrote to an input symbol |
 | `unknown symbol ALARM` | Name not in `inputs`/`outputs` |
-| `IF requires 1-bit symbol, got TEMP (8 bits)` | Multi-bit symbol in boolean expr |
+| `expression requires 1-bit symbol, got TEMP (8 bits)` | Multi-bit symbol used directly in `AND`/`OR`/`NOT` (use comparison instead) |
 | `duplicate timer 't'` | Two timers same name |
 | `duplicate counter 'c'` | Two counters same name |
 | `timer name 'MOTOR' conflicts with I/O` | Timer name collides with symbol |
