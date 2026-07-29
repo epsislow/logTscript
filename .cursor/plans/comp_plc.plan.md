@@ -1,6 +1,6 @@
 ---
 name: Componenta PLC
-overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P5.2c, P+c, P+d, P+b, P6.0–P6.2+P6.4 done. Amânate: P3c, P6.3, P7, P8."
+overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P7.2 done. Amânate: P3c, P6.3, P8."
 todos:
   - id: p0-decisions
     content: "P0: decizii lățimi, mapare, on: vs comandă, sintaxă START — închise"
@@ -78,8 +78,8 @@ todos:
     content: "P6.3 (amânat): retain/strict per slot — P-MP-ST3"
     status: pending
   - id: p7-globals
-    content: "P7 (amânat): memorie partajată între programe — VAR_GLOBAL (GVL), zone M (flags interne)"
-    status: pending
+    content: "P7: globals: pe comp [plc] + globalState + retainVar — done (P7.0–P7.2)"
+    status: completed
   - id: p8-plc-network
     content: "P8 (amânat): comunicare inter-PLC prin comp [network]/sock — fieldbus didactic"
     status: pending
@@ -129,7 +129,7 @@ Model plan: [comp_cache.plan.md](comp_cache.plan.md), [comp_cpu.plan.md](comp_cp
 | Scan | `scanTime: 0` — declanșare manuală / osc | `scanTime: N` ms — auto-scan periodic |
 | Execuție scan | Instant (`busy = 0`) | `scanDuration` + `busy` simulat |
 | Overrun | `strict: 0` — stretch | `strict: 1` — `missed`, `overrunCount` |
-| Memorie internă | `VAR` reset la re-RUN | (viitor: extindere `retain` sau P7 globals) |
+| Memorie internă | `VAR` reset la re-RUN | `retainVar: 1` — VAR + globals; **`globals:`** opt-in pe `comp [plc]` (P7) |
 | Limbaj | BOOL + IF + FB statements | P+c/d/b — ST extins (`CASE`, `FOR`, comparații analog) |
 
 ### Implicații pentru fazele următoare
@@ -1769,25 +1769,87 @@ Exemple: pipeline `program: .init .main`; două perioade `scanTime: 10, 100`.
 
 ---
 
-### P7 — Memorie partajată între programe (amânat)
+### P7 — Memorie partajată între programe (**done** — P7.0–P7.2)
 
-**Motivație IEC:** programe pe același PLC comunică prin:
-- **`VAR_GLOBAL` / GVL** — variabile globale declarate o dată, accesibile din orice program
-- **Zone M (memorie internă)** — flags/registre interne, echivalent cu releu intern (nu hardware)
-- **Instanțe FB reutilizate** — același bloc de date (instanță) apelat din programe diferite
+**Motivație IEC:** programe pe același PLC comunică prin **GVL** (`VAR_GLOBAL`) și flags interne (zone M) — **nu** prin mapă hardware duplicată.
 
-**Scop LogTscript:**
-- Declarare `var_global:` (sau bloc dedicat) — simbol vizibil în mai multe `inline [plc]`
-- Acces din program: citire/scriere ca orice simbol intern
-- Nu mapabil pe `inputs:`/`outputs:` hardware — memoria internă nu are pin extern
+**Aliniere P-PHIL:** globals = **opt-in explicit** (`globals:` pe componentă); fără bloc → comportament P6 actual (didactic implicit). Politica retain pe **componentă** (`retainVar`), nu keyword în `inline [plc]`.
 
-**Decizii de luat la deschidere:**
-- Scope: global per script sau per `comp [plc]`?
-- Sintaxă: bloc `VAR_GLOBAL` în `inline [plc]`, sau atribut `globals:` pe `comp [plc]`?
-- Lățimi: 1 bit (flag M) sau multi-bit (P+b)?
-- Sincronizare (dacă P6 tasks): ultima scriere câștigă sau ordine definită?
+#### Decizii P-GVL* — **închise**
 
-**Dependențe:** P+c (`VAR` intern) ca precursor — globals = extensie a mecanismului VAR.
+| ID | Decizie | Status |
+|----|---------|--------|
+| **P-GVL-PHIL1** | **Default didactic:** un program / P6 fără `globals:` — **zero** schimbare; globals doar când utilizator adaugă bloc explicit | **închis** |
+| **P-GVL-SCOPE1** | Scope **per `comp [plc]`** — nu script-wide, nu per `inline` izolat | **închis** |
+| **P-GVL-SYN1** | Sintaxă: bloc **`globals:`** pe `comp [plc]` (ca `inputs:` / `outputs:`), **nu** `VAR_GLOBAL` în corpul `inline [plc]` | **închis** |
+| **P-GVL-SYN2** | Formă: `SYM` (1 bit) sau `SYM: N` (multi-bit) — aceleași reguli ca `VAR` (P+b) | **închis** |
+| **P-GVL-SYN3** | **Fără** prefix `GVL.` în MVP — simbol simplu `READY` (didactic); prefix opțional **amânat** | **închis** |
+| **P-GVL-HW0** | Globals **nu** apar în `inputs:` / `outputs:` — **nu** mapabile pe hardware (memorie internă) | **închis** |
+| **P-GVL-MAP1** | **Cu** `globals:`: fiecare program declara **subset** de `inputs`/`outputs`; **union** tuturor programelor = exact simbolurile din mapa hardware (relaxare P-MP-IO5) | **închis** |
+| **P-GVL-MAP2** | **Fără** `globals:` (sau bloc gol): P-MP-IO5 rămâne — interfețe **identice** între programe | **închis** |
+| **P-GVL-ST1** | Stare: **`globalState`** pe componentă — un mapă partajată, actualizată la execuția fiecărui program | **închis** |
+| **P-GVL-ST2** | `VAR` per program rămâne **local** (per slot P6); globals ≠ VAR — conflict de nume → eroare elaborare | **închis** |
+| **P-GVL-SYNC1** | Conflict pe același global în același super-scan → **ultimul program din listă** câștigă (ca P-MP-OUT) | **închis** |
+| **P-GVL-SYNC2** | Multi-rate (P6.2): global actualizat la fiecare scan de slot; citire în scanul următor al altui program (ca VAR între scan-uri) | **închis** |
+| **P-GVL-RET1** | **`retainVar: 1`** pe componentă păstrează și **`globalState`** (aceeași politică ca VAR local) — **fără** `retainGlobal` separat în MVP | **închis** |
+| **P-GVL-RET2** | `retainVar: 0` → reset `globalState` la re-RUN (ca VAR) | **închis** |
+| **P-GVL-FB0** | **Fără** instanțe FB partajate între programe în MVP (TON/CTU rămân per program/slot) | **închis** |
+| **P-GVL-M1** | „Zone M” / flags interne = globals **1-bit** — **fără** sintaxă `M:` separată în MVP | **închis** |
+| **P-GVL-DOC1** | `doc(.ctrl)` listează `globals:` și `globalState` (ultima valoare) | **închis** |
+| **P-GVL-P6** | P6.1 livrabil **fără** P7; globals = calea IEC când interfețele programelor **diferă** | **închis** (=P-MP-P7) |
+
+#### Sintaxă recomandată (MVP)
+
+```logts
+inline [plc] .init:
+  inputs: { START }
+  outputs: { }
+  IF START THEN READY = 1 ELSE READY = 0 END_IF
+  :
+
+inline [plc] .main:
+  inputs: { STOP }
+  outputs: { MOTOR }
+  IF READY AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .init .main
+  scanTime: 0
+  globals: {
+    READY: 1
+  }
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+```
+
+**Regulă didactică:** `READY` = global intern (`.init` scrie, `.main` citește). `START` / `STOP` = **inputs hardware** mapate — `.main` citește `STOP` din `inputs:` program, **nu** din globals. Globals și inputs/outputs hardware **nu** se suprapun (P-GVL-HW0, P-GVL-ST2). Sintaxă: **`globals: { SYM }` / `{ SYM: N }`** (acolade, ca `inputs:`/`outputs:`).
+
+#### Sub-faze P7
+
+| Sub-fază | Conținut | Status |
+|----------|----------|--------|
+| **P7.0** | Decizii P-GVL* + doc pattern | **done** |
+| **P7.1** | Parser `globals:` + `globalState` + exec + relaxare P-MP-IO5 | **done** |
+| **P7.2** | `retainVar` + cache globalState; teste + `logts-play` | **done** |
+| **P7.3** (opțional) | Prefix `GVL.` / zone M dedicate | **amânat** |
+
+**Dependențe:** P+c (`VAR`), P6 (multi-program, process image). **Nu** depinde de P6.3.
+
+**Nu în P7 MVP:** FB partajat, `retainGlobal` separat, globals script-wide, mapare hardware pe globals, sintaxă `VAR_GLOBAL` în `inline [plc]`.
 
 ---
 
@@ -1846,9 +1908,11 @@ comp [plc] .ctrlB:
 
 **P6 (decizii):** **închis** — P-MP-IO0…P-MP-DEL (implementare P6.0→P6.1→P6.4→P6.2; P6.3/P-MP-ST3 amânat).
 
-**Încă deschise / amânate:** P3c, **P6 implementare**, **P7**, **P8**.
+**P7 (globals):** **done** — P-GVL* + P7.0–P7.2 (`globals:`, `globalState`, `retainVar`).
 
-**Următorul pas recomandat:** **P6.0** (doc) apoi **P6.1** implementare — sau **P3c** dacă prioritate actuators.
+**Încă deschise / amânate:** P3c, P6.3, **P8**.
+
+**Următorul pas recomandat:** **P8** (rețea) sau **P6.3** (retain per slot) sau **P3c** actuators.
 
 ---
 

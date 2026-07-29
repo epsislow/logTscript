@@ -141,6 +141,7 @@ function plcRetainSaveFromContext(ctx) {
       for (const slot of slots) {
         if (slot && slot.ref) cache.delete(_plcRetainSlotKey(compName, slot.ref));
       }
+      cache.delete(_plcRetainSlotKey(compName, '@globals'));
       cache.delete(compName);
       continue;
     }
@@ -165,11 +166,32 @@ function plcRetainSaveFromContext(ctx) {
       }
       cache.set(key, entry);
     }
+    if (comp.retainVar === 1 && comp.globals && Object.keys(comp.globals).length) {
+      const gKey = _plcRetainSlotKey(compName, '@globals');
+      const gFp = plcFingerprintGlobals(comp.globals);
+      cache.set(gKey, {
+        fingerprint: gFp,
+        globalState: plcCloneVarState(comp.globalState),
+      });
+    } else {
+      cache.delete(_plcRetainSlotKey(compName, '@globals'));
+    }
   }
+}
+
+function plcFingerprintGlobals(globals) {
+  if (!globals) return '';
+  return Object.keys(globals).sort().map((k) => `${k}:${globals[k].width || 1}`).join('|');
 }
 
 function plcRetainRestore(instanceId, compName, slotRef, fingerprint, opts) {
   const cache = _plcRetainCacheFor(instanceId);
+  if (opts && opts.globals) {
+    const entry = cache.get(_plcRetainSlotKey(compName, '@globals'));
+    if (!entry || entry.fingerprint !== fingerprint) return null;
+    if (!entry.globalState) return null;
+    return { globalState: plcCloneVarState(entry.globalState) };
+  }
   let entry = cache.get(_plcRetainSlotKey(compName, slotRef));
   if (!entry && slotRef) entry = cache.get(compName);
   if (!entry || entry.fingerprint !== fingerprint) return null;
@@ -203,6 +225,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       refListAttrs: ['program'],
       listAttrs: ['scanTime'],
       plcMappingBlockAttrs: ['inputs', 'outputs'],
+      plcGlobalsBlockAttrs: ['globals'],
     };
   }
 
@@ -222,12 +245,13 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
         { name: 'program', value: '.inlinePlc (.a .b …)' },
         { name: 'inputs', value: 'map' },
         { name: 'outputs', value: 'map' },
+        { name: 'globals', value: 'SYM / SYM: N (internal shared memory)' },
         { name: 'on', value: 'mode' },
         { name: 'scanTime', value: 'ms list (0 = event / super-scan; N values = per slot)' },
         { name: 'scanDuration', value: 'integer (ms simulated busy, default 1)' },
         { name: 'strict', value: '0/1 (overrun miss when 1)' },
         { name: 'retain', value: '0/1 (default 0, preserve FB state on re-RUN)' },
-        { name: 'retainVar', value: '0/1 (default 0, preserve VAR state on re-RUN)' },
+        { name: 'retainVar', value: '0/1 (default 0, preserve VAR and globals on re-RUN)' },
       ],
       initValue: '1bit',
       pins: [{ bits: '1', name: 'set' }],
@@ -344,15 +368,95 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       }
       programs.push({ ref, inst });
     }
-    if (programs.length > 1) {
-      const base = plcIfaceKey(programs[0].inst);
-      for (let i = 1; i < programs.length; i++) {
-        if (plcIfaceKey(programs[i].inst) !== base) {
-          throw Error(`plc ${compName}: all programs must declare identical inputs/outputs (widths included); ${programs[0].ref} vs ${programs[i].ref}`);
+    return programs;
+  }
+
+  _parseGlobals(attributes) {
+    const raw = attributes.globals;
+    if (!raw || typeof raw !== 'object') return {};
+    const out = {};
+    for (const [name, meta] of Object.entries(raw)) {
+      if (meta && typeof meta === 'object' && meta.width != null) {
+        out[name] = { name, width: meta.width || 1 };
+      } else {
+        const w = parseInt(meta, 10);
+        out[name] = { name, width: isNaN(w) || w < 1 ? 1 : w };
+      }
+    }
+    return out;
+  }
+
+  _hasGlobals(globals) {
+    return globals && Object.keys(globals).length > 0;
+  }
+
+  _bindAndValidateGlobals(programs, globals, compName) {
+    for (const { ref, inst } of programs) {
+      for (const name of Object.keys(inst.inputs || {})) {
+        if (globals[name]) {
+          throw Error(`plc ${compName}: global '${name}' conflicts with input in ${ref}`);
+        }
+      }
+      for (const name of Object.keys(inst.outputs || {})) {
+        if (globals[name]) {
+          throw Error(`plc ${compName}: global '${name}' conflicts with output in ${ref}`);
+        }
+      }
+      for (const name of Object.keys(inst.vars || {})) {
+        if (globals[name]) {
+          throw Error(`plc ${compName}: global '${name}' conflicts with VAR in ${ref}`);
+        }
+      }
+      const unbound = inst.unboundSymbols || {};
+      for (const [name, meta] of Object.entries(unbound)) {
+        if (!globals[name]) {
+          throw Error(`plc ${compName}: unknown symbol ${name} in ${ref} (declare in VAR or add to globals:)`);
+        }
+        const w = globals[name].width || 1;
+        if (meta.asBool && w !== 1) {
+          throw Error(`plc ${compName}: global '${name}' is ${w} bits but used as 1-bit in ${ref}`);
         }
       }
     }
-    return programs;
+    if (!this._hasGlobals(globals)) {
+      for (const { ref, inst } of programs) {
+        const unbound = inst.unboundSymbols || {};
+        const names = Object.keys(unbound);
+        if (names.length) {
+          throw Error(`plc ${compName}: unknown symbol ${names[0]} in ${ref} (declare in VAR or add globals: on comp [plc])`);
+        }
+      }
+    }
+  }
+
+  _validateIdenticalInterfaces(programs, compName) {
+    if (programs.length <= 1) return;
+    const base = plcIfaceKey(programs[0].inst);
+    for (let i = 1; i < programs.length; i++) {
+      if (plcIfaceKey(programs[i].inst) !== base) {
+        throw Error(`plc ${compName}: all programs must declare identical inputs/outputs (widths included); ${programs[0].ref} vs ${programs[i].ref}`);
+      }
+    }
+  }
+
+  _unionIo(programs) {
+    const inputs = {};
+    const outputs = {};
+    for (const { inst } of programs) {
+      for (const [name, meta] of Object.entries(inst.inputs || {})) {
+        if (inputs[name] && inputs[name].width !== meta.width) {
+          throw Error(`plc input '${name}' width mismatch across programs (${inputs[name].width} vs ${meta.width})`);
+        }
+        inputs[name] = meta;
+      }
+      for (const [name, meta] of Object.entries(inst.outputs || {})) {
+        if (outputs[name] && outputs[name].width !== meta.width) {
+          throw Error(`plc output '${name}' width mismatch across programs (${outputs[name].width} vs ${meta.width})`);
+        }
+        outputs[name] = meta;
+      }
+    }
+    return { inputs, outputs };
   }
 
   _validateMappings(prog, inputMap, outputMap, compName) {
@@ -384,21 +488,54 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     }
   }
 
-  _validateWidths(prog, inputMap, outputMap, ctx, compName) {
+  _validateMappingsUnion(programs, inputMap, outputMap, compName) {
+    const { inputs, outputs } = this._unionIo(programs);
+    for (const name of Object.keys(inputs)) {
+      if (!inputMap || inputMap[name] == null) {
+        throw Error(`plc ${compName}: input ${name} declared in program but not mapped`);
+      }
+    }
+    for (const name of Object.keys(outputs)) {
+      if (!outputMap || outputMap[name] == null) {
+        throw Error(`plc ${compName}: output ${name} declared in program but not mapped`);
+      }
+    }
+    if (inputMap) {
+      for (const name of Object.keys(inputMap)) {
+        if (!inputs[name]) {
+          throw Error(`plc ${compName}: mapping ${name} is not declared in any program inputs`);
+        }
+      }
+    }
+    if (outputMap) {
+      for (const name of Object.keys(outputMap)) {
+        if (!outputs[name]) {
+          throw Error(`plc ${compName}: mapping ${name} is not declared in any program outputs`);
+        }
+      }
+    }
+    return { inputs, outputs };
+  }
+
+  _validateWidthsFromDecls(declsInputs, declsOutputs, inputMap, outputMap, ctx, compName) {
     for (const [sym, target] of Object.entries(inputMap || {})) {
-      const symW = prog.inputs[sym].width;
+      const symW = declsInputs[sym].width;
       const tgtW = plcResolveTargetWidth(target, ctx);
       if (symW !== tgtW) {
         throw Error(`plc ${compName}: ${sym} width ${symW} does not match ${target} (${tgtW} bits)`);
       }
     }
     for (const [sym, target] of Object.entries(outputMap || {})) {
-      const symW = prog.outputs[sym].width;
+      const symW = declsOutputs[sym].width;
       const tgtW = plcResolveTargetWidth(target, ctx);
       if (symW !== tgtW) {
         throw Error(`plc ${compName}: ${sym} width ${symW} does not match ${target} (${tgtW} bits)`);
       }
     }
+  }
+
+  _validateWidths(prog, inputMap, outputMap, ctx, compName) {
+    this._validateWidthsFromDecls(prog.inputs || {}, prog.outputs || {}, inputMap, outputMap, ctx, compName);
   }
 
   _emitPlcProbes(compName, ctx) {
@@ -427,8 +564,10 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
 
   _readExternalInputs(comp, inst, ctx) {
     const externalInputs = {};
-    for (const [sym, target] of Object.entries(comp.inputMap || {})) {
-      const w = inst.inputs[sym].width;
+    for (const [sym, meta] of Object.entries(inst.inputs || {})) {
+      const target = (comp.inputMap || {})[sym];
+      if (target == null) continue;
+      const w = meta.width;
       externalInputs[sym] = plcReadTarget(target, w, ctx);
     }
     return externalInputs;
@@ -436,8 +575,12 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
 
   _writeOutputs(comp, inst, ctx) {
     const outputState = comp.outputState || {};
+    const outs = inst && inst.outputs ? inst.outputs : null;
     for (const [sym, target] of Object.entries(comp.outputMap || {})) {
-      const w = inst.outputs[sym].width;
+      const w = outs && outs[sym]
+        ? outs[sym].width
+        : (comp._unionOutputs && comp._unionOutputs[sym] ? comp._unionOutputs[sym].width : 1);
+      if (outputState[sym] == null) continue;
       plcWriteTarget(target, outputState[sym], w, ctx);
     }
   }
@@ -453,8 +596,17 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     if (!slot.timerState) slot.timerState = {};
     if (!slot.counterState) slot.counterState = {};
     if (!slot.varState) slot.varState = {};
-    // Shared process-image outputState so programs in a super-scan can read each other's outputs
-    execFn(inst, externalInputs, comp.outputState, slot.timerState, slot.counterState, slot.varState);
+    if (!comp.globalState) comp.globalState = {};
+    execFn(
+      inst,
+      externalInputs,
+      comp.outputState,
+      slot.timerState,
+      slot.counterState,
+      slot.varState,
+      comp.globalState,
+      comp.globals || {}
+    );
     return inst;
   }
 
@@ -716,12 +868,46 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     return outputState;
   }
 
+  _emptyOutputStateFromDecls(outputs) {
+    const outputState = {};
+    for (const sym of Object.keys(outputs || {})) {
+      outputState[sym] = '0';
+    }
+    return outputState;
+  }
+
+  _emptyGlobalState(globals) {
+    const state = {};
+    for (const [name, meta] of Object.entries(globals || {})) {
+      const w = meta.width || 1;
+      state[name] = '0'.repeat(w);
+    }
+    return state;
+  }
+
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const programs = this._resolvePrograms(attributes, ctx, name);
     const inputMap = attributes.inputs || {};
     const outputMap = attributes.outputs || {};
-    this._validateMappings(programs[0].inst, inputMap, outputMap, name);
-    this._validateWidths(programs[0].inst, inputMap, outputMap, ctx, name);
+    const globals = this._parseGlobals(attributes);
+    const useGlobals = this._hasGlobals(globals);
+
+    this._bindAndValidateGlobals(programs, globals, name);
+
+    let unionInputs;
+    let unionOutputs;
+    if (useGlobals) {
+      const union = this._validateMappingsUnion(programs, inputMap, outputMap, name);
+      unionInputs = union.inputs;
+      unionOutputs = union.outputs;
+      this._validateWidthsFromDecls(unionInputs, unionOutputs, inputMap, outputMap, ctx, name);
+    } else {
+      this._validateIdenticalInterfaces(programs, name);
+      this._validateMappings(programs[0].inst, inputMap, outputMap, name);
+      this._validateWidths(programs[0].inst, inputMap, outputMap, ctx, name);
+      unionInputs = programs[0].inst.inputs || {};
+      unionOutputs = programs[0].inst.outputs || {};
+    }
 
     const { times, broadcast } = this._parseScanTimes(attributes, programs.length, name);
     const scanMode = this._detectScanMode(programs.length, times, broadcast);
@@ -734,7 +920,16 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     const instanceId = ctx && ctx._instanceId != null ? ctx._instanceId : 1;
     const fpFn = typeof plcFingerprintProgram === 'function' ? plcFingerprintProgram : null;
 
-    const sharedOutputState = this._emptyOutputState(programs[0].inst);
+    const sharedOutputState = this._emptyOutputStateFromDecls(unionOutputs);
+    let globalState = this._emptyGlobalState(globals);
+    if (retainVar === 1 && useGlobals) {
+      const restoredG = plcRetainRestore(instanceId, name, '@globals', plcFingerprintGlobals(globals), { globals: true });
+      if (restoredG && restoredG.globalState) {
+        for (const [k, v] of Object.entries(restoredG.globalState)) {
+          if (globalState[k] != null) globalState[k] = v;
+        }
+      }
+    }
 
     const programSlots = programs.map((p, idx) => {
       const timerState = {};
@@ -770,6 +965,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       for (const slot of programSlots) {
         _plcRetainCacheFor(instanceId).delete(_plcRetainSlotKey(name, slot.ref));
       }
+      _plcRetainCacheFor(instanceId).delete(_plcRetainSlotKey(name, '@globals'));
       _plcRetainCacheFor(instanceId).delete(name);
     }
 
@@ -784,6 +980,8 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
         timerState: first.timerState,
         counterState: first.counterState,
         varState: first.varState,
+        globalState,
+        globals,
         scanCount: 0,
         scanTime,
         scanTimes: times.slice(),
@@ -808,6 +1006,9 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       timerState: first.timerState,
       counterState: first.counterState,
       varState: first.varState,
+      globalState,
+      globals,
+      _unionOutputs: unionOutputs,
       scanCount: 0,
       scanTime,
       scanDuration,
@@ -848,6 +1049,10 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
   finalizeCompInfo(compInfo, attributes) {
     if (attributes.inputs) compInfo.inputMap = attributes.inputs;
     if (attributes.outputs) compInfo.outputMap = attributes.outputs;
+    if (attributes.globals && !compInfo.globals) {
+      compInfo.globals = this._parseGlobals(attributes);
+    }
+    if (!compInfo.globalState) compInfo.globalState = {};
     const refs = attributes.programMembers;
     if (refs && refs.length) {
       compInfo.programRef = refs[0];
@@ -930,6 +1135,16 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     const outNames = Object.keys(outMap);
     if (!outNames.length) lines.push('  (none)');
     else for (const n of outNames) lines.push(`  ${n} = ${outMap[n]}`);
+    const gDefs = comp.globals || {};
+    const gNames = Object.keys(gDefs);
+    if (gNames.length) {
+      lines.push('');
+      lines.push('globals:');
+      for (const n of gNames) {
+        const w = gDefs[n].width || 1;
+        lines.push(`  ${n}: ${w}`);
+      }
+    }
     lines.push('');
     if (comp.scanMode === 'super-scan') {
       lines.push('scan: .plc:{ set = 1 } runs all programs in list order (one super-scan)');
@@ -955,6 +1170,14 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       lines.push('');
       lines.push('outputState (last scan):');
       for (const [sym, val] of Object.entries(outState)) {
+        lines.push(`  ${sym} = ${val}`);
+      }
+    }
+    const gState = comp.globalState;
+    if (gState && Object.keys(gState).length) {
+      lines.push('');
+      lines.push('globalState (last scan):');
+      for (const [sym, val] of Object.entries(gState)) {
         lines.push(`  ${sym} = ${val}`);
       }
     }

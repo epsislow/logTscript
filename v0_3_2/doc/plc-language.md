@@ -735,7 +735,7 @@ Instance **`name`** must match a `TON`/`TOF`/`CTU`/`CTD` declaration in the same
 | Message (example) | Cause |
 |---------------------|-------|
 | `cannot assign to input START` | Wrote to an input symbol |
-| `unknown symbol ALARM` | Name not in `inputs`/`outputs` |
+| `unknown symbol ALARM` | Name not in `inputs`/`outputs`/`VAR`, and not bound via `globals:` on `comp [plc]` (see [plc.md — Internal globals](plc.md#internal-globals-shared-memory)) |
 | `expression requires 1-bit symbol, got TEMP (8 bits)` | Multi-bit symbol used directly in `AND`/`OR`/`NOT` (use comparison instead) |
 | `duplicate timer 't'` | Two timers same name |
 | `duplicate counter 'c'` | Two counters same name |

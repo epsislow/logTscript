@@ -28497,13 +28497,33 @@ START = 1`);
 });
 
 reg(2756, 'comp-plc-lang', 'error unknown symbol in IF', function(h, session) {
-  let err = '';
-  try {
-    parsePlcBody(`inputs: { START }
+  const prog = parsePlcBody(`inputs: { START }
 outputs: { MOTOR }
 IF ALARM THEN
   MOTOR = 1
 END_IF`);
+  h.assert('unbound ALARM recorded', String(!!(prog.unboundSymbols && prog.unboundSymbols.ALARM)), 'true');
+  let err = '';
+  try {
+    session.run(`
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  IF ALARM THEN
+    MOTOR = 1
+  END_IF
+  :
+
+1wire startIn
+1wire motorOut
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = startIn }
+  outputs: { MOTOR = motorOut }
+  on: 1
+  :
+`);
   } catch (e) { err = String(e.message || e); }
   h.assert('unknown symbol', String(err.includes('unknown symbol')), 'true');
 });
@@ -31003,6 +31023,190 @@ comp [plc] .ctrl:
   const slots = interp.components.get('.ctrl').programSlots;
   h.assert('left n', String(parseInt(slots[0].varState.n, 2)), '2');
   h.assert('right n', String(parseInt(slots[1].varState.n, 2)), '0');
+});
+
+const PLC_DOC_EX37 = `
+inline [plc] .init:
+  inputs: { START }
+  outputs: { }
+  IF START THEN READY = 1 ELSE READY = 0 END_IF
+  :
+
+inline [plc] .main:
+  inputs: { STOP }
+  outputs: { MOTOR }
+  IF READY AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .init .main
+  scanTime: 0
+  globals: {
+    READY: 1
+  }
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`;
+
+const PLC_DOC_EX38_SETUP = (retainVarLine, startPreset) => `
+inline [plc] .init:
+  inputs: { START }
+  outputs: { }
+  IF START THEN READY = 1 END_IF
+  :
+
+inline [plc] .main:
+  inputs: { STOP }
+  outputs: { MOTOR }
+  MOTOR = READY
+  :
+
+comp [switch] .start:
+  = ${startPreset != null ? startPreset : 1}
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .init .main
+  scanTime: 0
+  ${retainVarLine}
+  globals: {
+    READY: 1
+  }
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+`;
+
+reg(2861, 'comp-plc', 'globals pipeline init/main', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX37);
+  const ctrl = interp.components.get('.ctrl');
+  h.assert('ready global', ctrl.globalState.READY, '1');
+  h.assert('motor', interp.getValueFromRef(interp.components.get('.motorLed').ref), '1');
+  h.assert('scanCount', String(ctrl.scanCount), '1');
+});
+
+reg(2862, 'comp-plc-lang', 'doc example 37 — globals pipeline logts-play', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX37);
+  h.assert('ex37 motor', interp.getValueFromRef(interp.components.get('.motorLed').ref), '1');
+  h.assert('ex37 ready', interp.components.get('.ctrl').globalState.READY, '1');
+});
+
+reg(2863, 'comp-plc', 'globals relaxes identical interface', function(h, session) {
+  let err = '';
+  try {
+    session.run(PLC_DOC_EX37);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('no iface error', String(err.includes('identical inputs/outputs')), 'false');
+});
+
+reg(2864, 'comp-plc', 'globals conflict with VAR error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  VAR
+    READY: 1
+  END_VAR
+  READY = START
+  MOTOR = READY
+  :
+1wire startIn
+1wire motorOut
+comp [plc] .ctrl:
+  program: .machine
+  globals: {
+    READY: 1
+  }
+  inputs: { START = startIn }
+  outputs: { MOTOR = motorOut }
+  on: 1
+  :
+`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('conflict VAR', String(err.includes('conflicts with VAR')), 'true');
+});
+
+reg(2865, 'comp-plc', 'globals last writer wins in super-scan', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .first:
+  inputs: { }
+  outputs: { }
+  FLAG = 1
+  :
+inline [plc] .second:
+  inputs: { }
+  outputs: { OUT }
+  FLAG = 0
+  OUT = FLAG
+  :
+1wire outW
+comp [plc] .ctrl:
+  program: .first .second
+  scanTime: 0
+  globals: {
+    FLAG: 1
+  }
+  inputs: { }
+  outputs: { OUT = outW }
+  on: 1
+  :
+.ctrl:{ set = 1 }
+`);
+  h.assert('flag last', interp.components.get('.ctrl').globalState.FLAG, '0');
+  h.assert('out', session.getWire(interp, 'outW'), '0');
+});
+
+reg(2866, 'comp-plc', 'retainVar:0 resets globalState on re-RUN', function(h, session) {
+  session.run(PLC_DOC_EX38_SETUP('retainVar: 0', 1) + '\n.ctrl:{ set = 1 }');
+  h.assert('before', session.interp.components.get('.ctrl').globalState.READY, '1');
+  session.run(PLC_DOC_EX38_SETUP('retainVar: 0', 0) + '\n.ctrl:{ set = 1 }');
+  h.assert('after', session.interp.components.get('.ctrl').globalState.READY, '0');
+});
+
+reg(2867, 'comp-plc', 'retainVar:1 preserves globalState on re-RUN', function(h, session) {
+  session.run(PLC_DOC_EX38_SETUP('retainVar: 1', 1) + '\n.ctrl:{ set = 1 }');
+  h.assert('before', session.interp.components.get('.ctrl').globalState.READY, '1');
+  session.run(PLC_DOC_EX38_SETUP('retainVar: 1', 0) + '\n.ctrl:{ set = 1 }');
+  h.assert('after', session.interp.components.get('.ctrl').globalState.READY, '1');
+  h.assert('motor', session.interp.getValueFromRef(session.interp.components.get('.motorLed').ref), '1');
+});
+
+reg(2868, 'comp-plc-lang', 'doc example 38 — retainVar globals logts-play', function(h, session) {
+  session.run(PLC_DOC_EX38_SETUP('retainVar: 1', 1) + '\n.ctrl:{ set = 1 }');
+  session.run(PLC_DOC_EX38_SETUP('retainVar: 1', 0) + '\n.ctrl:{ set = 1 }');
+  h.assert('ex38 ready', session.interp.components.get('.ctrl').globalState.READY, '1');
+});
+
+reg(2869, 'comp-plc', 'doc(.ctrl) shows globals', function(h, session) {
+  const out = session.runDoc(PLC_DOC_EX37 + '\ndoc(.ctrl)');
+  h.assert('globals header', String(out.some(l => l.includes('globals:'))), 'true');
+  h.assert('READY decl', String(out.some(l => /READY:\s*1/.test(l))), 'true');
+  h.assert('globalState', String(out.some(l => l.includes('globalState'))), 'true');
 });
 
   window.LogTScriptTestSuite.finalize();

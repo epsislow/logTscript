@@ -24317,7 +24317,7 @@ Instance **\`name\`** must match a \`TON\`/\`TOF\`/\`CTU\`/\`CTD\` declaration i
 | Message (example) | Cause |
 |---------------------|-------|
 | \`cannot assign to input START\` | Wrote to an input symbol |
-| \`unknown symbol ALARM\` | Name not in \`inputs\`/\`outputs\` |
+| \`unknown symbol ALARM\` | Name not in \`inputs\`/\`outputs\`/\`VAR\`, and not bound via \`globals:\` on \`comp [plc]\` (see [plc.md — Internal globals](plc.md#internal-globals-shared-memory)) |
 | \`expression requires 1-bit symbol, got TEMP (8 bits)\` | Multi-bit symbol used directly in \`AND\`/\`OR\`/\`NOT\` (use comparison instead) |
 | \`duplicate timer 't'\` | Two timers same name |
 | \`duplicate counter 'c'\` | Two counters same name |
@@ -24397,6 +24397,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Widths** | \`START\` alone = 1 bit; \`TEMP: 8\` = 8-bit unsigned; overflow wraps to symbol width |
 | **Scan** | \`.plc:{ set = 1 }\` or **\`scanTime > 0\`** auto-scan; see [Scan timing](#scan-timing) |
 | **Multi-program** | \`program: .init .main\` — one \`comp [plc]\`, shared I/O map; see [Multiple programs](#multiple-programs-on-one-comp-plc) |
+| **Globals** | \`globals: { READY: 1 }\` — internal shared memory between programs; see [Internal globals](#internal-globals-shared-memory) |
 | **\`busy\`** | \`0\` when all \`scanTime\` values are \`0\`; pulses during simulated scan when any period \`> 0\` |
 | **Outputs** | Retain last value if not assigned this scan (PLC semantics) |
 | **Inputs** | Read-only in program; mapped at \`comp [plc]\` elaboration |
@@ -24470,18 +24471,19 @@ comp [plc] .ctrl:
 | **\`program:\`** | yes | One or more \`inline [plc]\` refs (e.g. \`program: .machine\` or \`program: .init .main\`). Order = execution order when run together. |
 | **\`inputs:\`** | yes* | \`SYM = wire\` or \`SYM = .component\` for every program input (one shared map for all programs) |
 | **\`outputs:\`** | yes* | \`SYM = wire\` or \`SYM = .component\` for every program output (one shared map) |
+| **\`globals:\`** | optional | Internal shared symbols \`{ READY }\` or \`{ READY: 1, STEP: 8 }\` — not mapped to hardware; see [Internal globals](#internal-globals-shared-memory) |
 | **\`on:\`** | optional | How **property blocks** on this component are triggered (see below) |
 | **\`scanTime:\`** | optional† | **ms** — one value (broadcast) or comma-separated per program (\`10, 100\`); see [Scan timing](#scan-timing) and [Multiple programs](#multiple-programs-on-one-comp-plc) |
 | **\`scanDuration:\`** | optional | **ms** simulated execution time per scan (\`busy = 1\`); default **\`1\`** when any \`scanTime > 0\` |
 | **\`strict:\`** | optional | **\`0\`** (default) stretch missed ticks; **\`1\`** = overrun/miss (\`overrunCount++\`) |
 | **\`retain:\`** | optional | **\`0\`** (default) reset timer/counter FB state on re-RUN; **\`1\`** preserve FB state in same session (per program) |
-| **\`retainVar:\`** | optional | **\`0\`** (default) reset **\`VAR\`** on re-RUN; **\`1\`** preserve \`varState\` in same session (per program) |
+| **\`retainVar:\`** | optional | **\`0\`** (default) reset **\`VAR\`** and **\`globals\`** on re-RUN; **\`1\`** preserve them in same session |
 
-\\*Every program symbol must appear **exactly once** in the matching map. Missing or extra keys → **elaboration error**. With several programs, all must declare the **same** \`inputs\`/\`outputs\` (names and widths).
+\\*Every program symbol must appear **exactly once** in the matching map. Missing or extra keys → **elaboration error**. Without \`globals:\`, all programs must declare the **same** \`inputs\`/\`outputs\` (names and widths). With \`globals:\`, each program may declare a **subset**; the **union** of all programs must match the component map exactly.
 
 †With **more than one** program, **\`scanTime:\`** is **required** (use \`scanTime: 0\` for sequential event-driven scans).
 
-\`doc(comp.plc)\` shows the component type; \`doc(.ctrl)\` shows program ref(s), **\`retain\`**, **\`retainVar\`**, maps, \`scanCount\` (and per-program counts when multi-rate), and last \`outputState\`.
+\`doc(comp.plc)\` shows the component type; \`doc(.ctrl)\` shows program ref(s), **\`retain\`**, **\`retainVar\`**, maps, **\`globals\`**, \`scanCount\`, last \`outputState\`, and last \`globalState\`.
 
 ### Scan cycle (one pass)
 
@@ -24590,10 +24592,11 @@ comp [plc] .ctrl:
 | Rule | Behaviour |
 |------|-----------|
 | **Shared map** | One \`inputs:\` / \`outputs:\` for the component — all programs share it |
-| **Identical interface** | Every program must declare the **same** input/output symbols and widths |
+| **Identical interface** | Without \`globals:\`: every program must declare the **same** input/output symbols and widths |
+| **Different interfaces** | With \`globals: { … }\`: each program may declare a **subset** of I/O; union must match the component map |
 | **Order** | List order is execution order when programs run in one super-scan |
 | **Shared outputs** | All programs share one \`outputState\` (process image). A later program in a super-scan can **read** outputs written by an earlier one |
-| **State** | Timers, counters, and \`VAR\` are **per program**; \`retain\` / \`retainVar\` apply to the whole component |
+| **State** | Timers, counters, and \`VAR\` are **per program**; **\`globals\`** are shared on the component; \`retain\` / \`retainVar\` apply to the whole component |
 | **\`scanTime:\` required** | With 2+ programs you must write \`scanTime:\` explicitly (e.g. \`0\`, \`50\`, or \`10 100\`) |
 | **Duplicate ref** | \`program: .a .a\` → elaboration error |
 
@@ -24609,6 +24612,52 @@ comp [plc] .ctrl:
 Manual \`.ctrl:{ set = 1 }\` with multi-rate still runs **all** programs once (same as a one-shot super-scan), which keeps Load & Run examples deterministic.
 
 \`doc(.ctrl)\` lists each program and, for multi-rate, each program’s \`scanCount\`. The pout **\`scanCount\`** is the component total (sum of program scans in multi-rate; one per super-scan when \`scanTime: 0\`).
+
+---
+
+## Internal globals (shared memory)
+
+**\`globals:\`** on \`comp [plc]\` declares **internal** symbols shared by all programs on that component — like PLC marker/flag memory (zone M), not rack I/O.
+
+\`\`\`logts
+comp [plc] .ctrl:
+  program: .init .main
+  scanTime: 0
+  globals: {
+    READY: 1
+  }
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+\`\`\`
+
+### When to use
+
+| Need | Use |
+|------|-----|
+| Same I/O interface on every program | Shared \`outputState\` in a super-scan (no \`globals:\` needed) |
+| Programs with **different** \`inputs\`/\`outputs\` lists | **\`globals:\`** for cross-program flags / internal state |
+| Persist a flag across re-RUN | \`retainVar: 1\` (covers both \`VAR\` and globals) |
+
+### Rules
+
+| Rule | Behaviour |
+|------|-----------|
+| **Opt-in** | Omit \`globals:\` → previous behaviour unchanged |
+| **Scope** | One \`globalState\` per \`comp [plc]\` (not script-wide) |
+| **Not hardware** | Global names must **not** appear in \`inputs:\` / \`outputs:\` maps |
+| **Not \`VAR\`** | Same name as a program \`VAR\` → elaboration error |
+| **Use in programs** | Read/write like \`VAR\` / outputs (e.g. \`READY = 1\`, \`IF READY THEN …\`) — no separate declaration inside \`inline [plc]\` |
+| **Widths** | \`SYM\` = 1 bit; \`SYM: N\` = N bits |
+| **Conflict** | Same global written by two programs in one super-scan → **last program in the list** wins |
+| **Multi-rate** | Each slot scan updates \`globalState\`; other programs see it on their next run |
+| **\`retainVar: 0\`** (default) | \`globalState\` resets to 0 on re-RUN |
+| **\`retainVar: 1\`** | \`globalState\` preserved in the same session (with \`VAR\`) |
+
+### Pins / pouts
+
+Globals have **no** pins or pouts. Inspect them with **\`doc(.ctrl)\`** (\`globalState\` section).
 
 ---
 
@@ -26105,6 +26154,99 @@ show(slowOut)
 
 After Load & Run the outputs are still \`0\` until auto-scan ticks (or a manual \`.ctrl:{ set = 1 }\`, which runs both once). Use **\`probe(.ctrl:scanCount)\`** in the browser to watch counts grow. With \`scanDuration: 1\`, allow a little more than the slow period so both programs have run (busy windows can defer a tick by 1 ms).
 
+### Example 37 — Globals: \`.init\` / \`.main\` with different I/O
+
+\`.init\` only has \`START\`; \`.main\` only has \`STOP\` / \`MOTOR\`. They share internal flag **\`READY\`** via \`globals:\`.
+
+Load & Run: \`READY = 1\`, motor LED on.
+
+\`\`\`logts-play
+inline [plc] .init:
+  inputs: { START }
+  outputs: { }
+  IF START THEN READY = 1 ELSE READY = 0 END_IF
+  :
+
+inline [plc] .main:
+  inputs: { STOP }
+  outputs: { MOTOR }
+  IF READY AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .init .main
+  scanTime: 0
+  globals: {
+    READY: 1
+  }
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+\`\`\`
+
+### Example 38 — \`retainVar: 1\` preserves globals on re-RUN
+
+First Run sets \`READY\` with \`START = 1\`. Second Run (same session) uses \`START = 0\` but **\`retainVar: 1\`** keeps \`READY\`, so \`MOTOR\` stays on.
+
+\`\`\`logts-play
+inline [plc] .init:
+  inputs: { START }
+  outputs: { }
+  IF START THEN READY = 1 END_IF
+  :
+
+inline [plc] .main:
+  inputs: { STOP }
+  outputs: { MOTOR }
+  MOTOR = READY
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .init .main
+  scanTime: 0
+  retainVar: 1
+  globals: {
+    READY: 1
+  }
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+\`\`\`
+
+After first Load & Run the LED is on. Change \`.start\` to \`= 0\` and Run again (without clearing session): LED stays on because \`READY\` was retained. With \`retainVar: 0\`, the second Run would leave \`READY = 0\` and the LED off.
+
 ---
 
 ## I/O mapping matrix
@@ -26245,12 +26387,13 @@ For multi-bit status codes, use script logic between PLC output wires and the pa
 | **\`program:\`** | yes | One or more \`inline [plc]\` refs (\`program: .a\` or \`program: .a .b\`) |
 | **\`inputs:\`** | yes* | Every program input symbol → wire or \`.component\` (shared map) |
 | **\`outputs:\`** | yes* | Every program output symbol → wire or \`.component\` (shared map) |
+| **\`globals:\`** | optional | Internal shared symbols \`{ READY }\` / \`{ READY: N }\` — not hardware-mapped |
 | **\`on:\`** | optional | Property-block trigger for \`.ctrl:{ set = 1 }\` |
 | **\`scanTime:\`** | optional† | **ms** list — \`0\`/omitted (one program) = event-driven; broadcast or per-program periods |
 | **\`scanDuration:\`** | optional | **ms** simulated execution per scan (\`busy\`); default **\`1\`** when any period \`> 0\` |
 | **\`strict:\`** | optional | **\`0\`** stretch missed ticks; **\`1\`** = overrun/miss (\`overrunCount++\`) |
 | **\`retain:\`** | optional | **\`0\`** reset timer/counter FB on re-RUN; **\`1\`** preserve FB state in session (per program) |
-| **\`retainVar:\`** | optional | **\`0\`** reset \`VAR\` on re-RUN; **\`1\`** preserve \`varState\` in session (per program) |
+| **\`retainVar:\`** | optional | **\`0\`** reset \`VAR\` and globals on re-RUN; **\`1\`** preserve them in session |
 
 †Required when \`program:\` lists more than one reference.
 
@@ -26281,9 +26424,9 @@ Same rules apply to **\`comp [clcd]\`** property blocks — use **\`on: 1\`** on
 
 ### Scan cycle — step by step
 
-1. Read each **input** map target → build \`externalInputs\` (once per trigger).
-2. Run **\`executePlcScan\`** for each program that participates (one program, or all in list order for a super-scan / manual \`set\`).
-3. Write each **output** map target from the last program’s \`outputState\` (last writer wins on conflicts).
+1. Read each **input** declared by the program(s) from the map → \`externalInputs\`.
+2. Run **\`executePlcScan\`** for each participating program (shared \`outputState\` + shared \`globalState\` when \`globals:\` is set).
+3. Write each **output** map target from \`outputState\` (last writer wins on conflicts).
 4. Update **\`scanCount\`**.
 
 ### Output retain
@@ -26299,9 +26442,11 @@ If the program does **not** assign an output in this scan, the **mapped target k
 | Width mismatch (e.g. 1-bit symbol → \`8wire\`) | Error |
 | \`program:\` not \`inline [plc]\` | Error |
 | Duplicate ref in \`program:\` list | Error |
-| Programs with different \`inputs\`/\`outputs\` | Error |
+| Programs with different \`inputs\`/\`outputs\` (no \`globals:\`) | Error |
 | Several programs without \`scanTime:\` | Error |
 | \`scanTime:\` list length not 1 and not N | Error |
+| Unknown symbol (not I/O, not \`VAR\`, not in \`globals:\`) | Error |
+| Global name conflicts with program \`VAR\` / I/O | Error |
 
 ---
 
@@ -26315,11 +26460,12 @@ If the program does **not** assign an output in this scan, the **mapped target k
 | Map symbol is LogTscript keyword | parse | \`Expected symbol name in PLC map\` (e.g. **\`MODE\`** in \`inputs: { MODE = … }\` — use another name like \`MSEL\`) |
 | Invalid \`program:\` | elaboration | \`plc program .x must be inline [plc]\` |
 | Duplicate program ref | elaboration | \`plc .ctrl: duplicate program reference .a\` |
-| Different program interfaces | elaboration | \`all programs must declare identical inputs/outputs\` |
+| Different program interfaces (no \`globals:\`) | elaboration | \`all programs must declare identical inputs/outputs\` |
 | Multi-program without \`scanTime:\` | elaboration | \`multiple programs require explicit scanTime:\` |
 | Bad \`scanTime:\` list length | elaboration | \`scanTime list length … must be 1 (broadcast) or N\` |
+| Unknown symbol / missing from \`globals:\` | elaboration | \`unknown symbol ALARM … (declare in VAR or add to globals:)\` |
+| Global conflicts with \`VAR\` | elaboration | \`global 'READY' conflicts with VAR in .machine\` |
 | Assign to input | parse | \`cannot assign to input START\` |
-| Unknown symbol | parse | \`unknown symbol ALARM\` |
 | Multi-bit in \`AND\`/\`OR\` | parse | \`expression requires 1-bit symbol, got TEMP (8 bits)\` |
 
 ---

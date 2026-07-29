@@ -1949,6 +1949,7 @@ class Interpreter {
         statements: prog.statements,
         timers: prog.timers,
         counters: prog.counters,
+        unboundSymbols: prog.unboundSymbols || {},
         bodyRaw: inline.bodyRaw,
       });
       return;
@@ -12678,6 +12679,8 @@ if (s.assignment) {
         if (result.timerState) compInfo.timerState = result.timerState;
         if (result.counterState) compInfo.counterState = result.counterState;
         if (result.varState) compInfo.varState = result.varState;
+        if (result.globalState) compInfo.globalState = result.globalState;
+        if (result.globals) compInfo.globals = result.globals;
         if (result.retain != null) compInfo.retain = result.retain;
         if (result.retainVar != null) compInfo.retainVar = result.retainVar;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){

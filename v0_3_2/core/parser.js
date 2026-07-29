@@ -3323,6 +3323,7 @@ assignment() {
         let literalAttrs = [];
         let regionsBlockAttrs = [];
         let plcMappingBlockAttrs = [];
+        let plcGlobalsBlockAttrs = [];
         if (this.componentRegistry) {
           const bindHandler = this.componentRegistry.get(compType);
           if (bindHandler && bindHandler.getSpecialParseAttributes) {
@@ -3334,6 +3335,7 @@ assignment() {
             if (special && special.literalAttrs) literalAttrs = special.literalAttrs;
             if (special && special.regionsBlockAttrs) regionsBlockAttrs = special.regionsBlockAttrs;
             if (special && special.plcMappingBlockAttrs) plcMappingBlockAttrs = special.plcMappingBlockAttrs;
+            if (special && special.plcGlobalsBlockAttrs) plcGlobalsBlockAttrs = special.plcGlobalsBlockAttrs;
           }
         }
         if (literalAttrs.includes(attrName) && this.c.value === ':') {
@@ -3494,6 +3496,12 @@ assignment() {
         if (plcMappingBlockAttrs.includes(attrName) && this.c.value === ':') {
           this.eat('SYM', ':');
           attributes[attrName] = this._parsePlcMappingBlock();
+          continue;
+        }
+
+        if (plcGlobalsBlockAttrs.includes(attrName) && this.c.value === ':') {
+          this.eat('SYM', ':');
+          attributes[attrName] = this._parsePlcGlobalsBlock();
           continue;
         }
 
@@ -4088,6 +4096,56 @@ assignment() {
       break;
     }
     return sub;
+  }
+
+  _parsePlcGlobalsBlock() {
+    const decls = {};
+    this.t.skip();
+    while (this.c.type === 'EOL') this.c = this.t.get();
+    if (!(this.c.type === 'SYM' && this.c.value === '{')) {
+      throw Error(`Expected '{' for PLC globals at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    this.eat('SYM', '{');
+    for (;;) {
+      while (this.c.type === 'EOL') this.c = this.t.get();
+      this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === '}') {
+        this.eat('SYM', '}');
+        break;
+      }
+      if (this.c.type === 'EOF') {
+        throw Error(`Unclosed PLC globals '{' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      if (this.c.type !== 'ID') {
+        throw Error(`Expected symbol name in PLC globals at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const sym = this.c.value;
+      this.eat('ID');
+      this.t.skip();
+      let width = 1;
+      if (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        this.t.skip();
+        if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+          throw Error(`Expected width after '${sym}:' in PLC globals at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        width = parseInt(this.c.value, 10);
+        this.eat(this.c.type);
+        if (isNaN(width) || width < 1) {
+          throw Error(`PLC global '${sym}' width must be >= 1 at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        this.t.skip();
+      }
+      if (decls[sym]) {
+        throw Error(`Duplicate PLC global '${sym}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      decls[sym] = { name: sym, width };
+      if (this.c.type === 'SYM' && this.c.value === ',') {
+        this.eat('SYM', ',');
+        this.t.skip();
+      }
+    }
+    return decls;
   }
 
   _parsePlcMappingBlock() {

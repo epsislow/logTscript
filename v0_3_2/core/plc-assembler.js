@@ -645,6 +645,17 @@ function plcValidateProgram(parsed) {
   const consts = parsed.consts || {};
   const timers = plcCollectTimerDefs(parsed);
   const counters = plcCollectCounterDefs(parsed);
+  const unbound = {};
+
+  function noteUnbound(name, line, flags) {
+    if (!unbound[name]) {
+      unbound[name] = { name, line, asBool: false, asNum: false, asAssign: false };
+    }
+    if (flags && flags.asBool) unbound[name].asBool = true;
+    if (flags && flags.asNum) unbound[name].asNum = true;
+    if (flags && flags.asAssign) unbound[name].asAssign = true;
+    if (line != null && unbound[name].line == null) unbound[name].line = line;
+  }
 
   function symInfo(name) {
     if (inputs[name]) return { kind: 'input', width: inputs[name].width };
@@ -653,6 +664,9 @@ function plcValidateProgram(parsed) {
     if (consts[name]) return { kind: 'const', width: 1, constValue: consts[name].value };
     if (timers.has(name)) return { kind: 'timer', width: 1 };
     if (counters.has(name)) return { kind: 'counter', width: 1 };
+    if (unbound[name]) {
+      return { kind: 'unbound', width: unbound[name].asBool && !unbound[name].asNum ? 1 : 0 };
+    }
     return null;
   }
 
@@ -716,8 +730,13 @@ function plcValidateProgram(parsed) {
       plcError(`unknown member field '${expr.field}'`, ctx);
     }
     if (expr.type === 'symbol') {
-      const info = symInfo(expr.name);
+      let info = symInfo(expr.name);
+      if (!info) {
+        noteUnbound(expr.name, ctx, { asBool: true });
+        info = symInfo(expr.name);
+      }
       if (!info) plcError(`unknown symbol ${expr.name}`, ctx);
+      if (info.kind === 'unbound') return;
       if (info.kind === 'const' && info.constValue !== 0 && info.constValue !== 1) {
         plcError(`CONST '${expr.name}' value ${info.constValue} cannot be used in 1-bit expression`, ctx);
       }
@@ -760,7 +779,11 @@ function plcValidateProgram(parsed) {
       plcError(`unknown member field '${expr.field}'`, ctx);
     }
     if (expr.type === 'symbol') {
-      const info = symInfo(expr.name);
+      let info = symInfo(expr.name);
+      if (!info) {
+        noteUnbound(expr.name, ctx, { asNum: true });
+        info = symInfo(expr.name);
+      }
       if (!info) plcError(`unknown symbol ${expr.name}`, ctx);
       if (info.kind === 'timer' || info.kind === 'counter') {
         plcError(`'${expr.name}' cannot be used in numeric expression`, ctx);
@@ -785,7 +808,11 @@ function plcValidateProgram(parsed) {
       return;
     }
     if (sel.type === 'symbol') {
-      const info = symInfo(sel.name);
+      let info = symInfo(sel.name);
+      if (!info) {
+        noteUnbound(sel.name, ctx, { asNum: true });
+        info = symInfo(sel.name);
+      }
       if (!info) plcError(`unknown symbol ${sel.name} in CASE selector`, ctx);
       if (info.kind === 'const') {
         plcError(`CONST cannot be CASE selector; use symbol or name.CV`, ctx);
@@ -806,13 +833,21 @@ function plcValidateProgram(parsed) {
   function checkStmt(stmt, loopDepth) {
     const depth = loopDepth || 0;
     if (stmt.type === 'assign') {
-      const targetInfo = symInfo(stmt.target);
+      let targetInfo = symInfo(stmt.target);
+      if (!targetInfo) {
+        noteUnbound(stmt.target, stmt.line, { asAssign: true });
+        targetInfo = symInfo(stmt.target);
+      }
       if (!targetInfo) plcError(`unknown symbol ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'input') plcError(`cannot assign to input ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'const') plcError(`cannot assign to CONST ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'timer') plcError(`cannot assign to timer ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'counter') plcError(`cannot assign to counter ${stmt.target}`, stmt.line);
-      if (targetInfo.width > 1) {
+      if (targetInfo.kind === 'unbound') {
+        // Width known only after globals bind on comp [plc]
+        checkExprBool(stmt.expr, stmt.line);
+        noteUnbound(stmt.target, stmt.line, { asAssign: true, asBool: true });
+      } else if (targetInfo.width > 1) {
         checkExprNum(stmt.expr, stmt.line);
         checkAssignSymbolWidth(stmt.expr, targetInfo.width, stmt.line);
       } else {
@@ -862,6 +897,7 @@ function plcValidateProgram(parsed) {
   for (const stmt of parsed.statements || []) checkStmt(stmt, 0);
   parsed.timers = timers;
   parsed.counters = counters;
+  parsed.unboundSymbols = unbound;
   return parsed;
 }
 
@@ -880,6 +916,7 @@ function parsePlcBody(bodyRaw) {
     statements: parsed.statements,
     timers: parsed.timers,
     counters: parsed.counters,
+    unboundSymbols: parsed.unboundSymbols || {},
     bodyRaw,
   };
 }
@@ -1217,18 +1254,21 @@ function plcExecStmt(stmt, env, timerState, counterState, flow, consts, varWidth
   }
 }
 
-function executePlcScan(inst, externalInputs, outputState, timerState, counterState, varState) {
+function executePlcScan(inst, externalInputs, outputState, timerState, counterState, varState, globalState, globalDefs) {
   const inputs = inst.inputs || {};
   const outputs = inst.outputs || {};
   const vars = inst.vars || {};
   const consts = inst.consts || {};
+  const globals = globalDefs || {};
   const env = new Map();
   const timers = timerState || {};
   const counters = counterState || {};
   const vstate = varState || {};
+  const gstate = globalState || {};
   const varWidths = {};
   for (const name of Object.keys(vars)) varWidths[name] = vars[name].width || 1;
   for (const name of Object.keys(outputs)) varWidths[name] = outputs[name].width || 1;
+  for (const name of Object.keys(globals)) varWidths[name] = globals[name].width || 1;
 
   for (const name of Object.keys(outputs)) {
     const prev = outputState && outputState[name] != null ? outputState[name] : '0';
@@ -1243,6 +1283,12 @@ function executePlcScan(inst, externalInputs, outputState, timerState, counterSt
   for (const name of Object.keys(vars)) {
     const w = vars[name].width;
     let val = vstate[name];
+    if (val == null) val = '0'.repeat(w);
+    env.set(name, plcNormalizeBits(val, w));
+  }
+  for (const name of Object.keys(globals)) {
+    const w = globals[name].width || 1;
+    let val = gstate[name];
     if (val == null) val = '0'.repeat(w);
     env.set(name, plcNormalizeBits(val, w));
   }
@@ -1261,6 +1307,10 @@ function executePlcScan(inst, externalInputs, outputState, timerState, counterSt
   for (const name of Object.keys(vars)) {
     const w = vars[name].width;
     vstate[name] = plcNormalizeBits(env.get(name), w);
+  }
+  for (const name of Object.keys(globals)) {
+    const w = globals[name].width || 1;
+    gstate[name] = plcNormalizeBits(env.get(name), w);
   }
   return out;
 }
