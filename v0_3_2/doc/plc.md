@@ -2,7 +2,7 @@
 
 LogTScript PLC support follows the same two-layer model as **`inline [asm]`** + **`comp [cpu]`**:
 
-1. **`inline [plc]`** — hardware-independent program: symbolic inputs/outputs + boolean logic (IEC 61131-3 ST-inspired).
+1. **`inline [plc]`** — hardware-independent program: symbolic inputs/outputs + boolean logic (IEC 61131-3 ST-inspired). **Language reference:** [plc-language.md](plc-language.md).
 2. **`comp [plc]`** — runtime: maps symbols to wires or panel components, runs one **scan** per triggered `set`.
 
 In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run** (same as [cpu.md](cpu.md) and [cache.md](cache.md)).
@@ -13,8 +13,10 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 
 | Topic | Summary |
 |-------|---------|
+| **Language** | Full keyword/syntax reference → [plc-language.md](plc-language.md) |
 | **Program** | `inline [plc] .machine:` with `inputs:{ }`, `outputs:{ }`, logic body |
 | **Logic (v1)** | `IF/THEN/ELSE/ELSIF/END_IF`, `AND/OR/NOT/XOR`, `TRUE`/`FALSE`, `0`/`1` |
+| **Timers (P5)** | `TON` / `TOF` blocks; `PT` in scan cycles; read `name.Q` |
 | **Widths** | `START` alone = 1 bit; `TEMP: 8` declarable (logic on multi-bit → future P+b) |
 | **Scan** | `.plc:{ set = 1 }` or **`scanTime > 0`** auto-scan; see [Scan timing (P4)](#scan-timing-p4) |
 | **`busy`** | `0` when `scanTime: 0`; pulses during simulated scan when `scanTime > 0` |
@@ -40,7 +42,9 @@ The PLC program never names `.start` or `motorWire` — only `START` and `MOTOR`
 
 ## `inline [plc]` — language
 
-### Syntax
+**Full reference:** [plc-language.md](plc-language.md) — every keyword, timer/counter syntax, execution model, errors, and placement rules.
+
+Summary:
 
 ```logts
 inline [plc] .machine:
@@ -56,26 +60,12 @@ inline [plc] .machine:
   :
 ```
 
-| Rule | Detail |
-|------|--------|
-| **`inputs:` / `outputs:`** | `{ SYM }` or `{ SYM: N }` — `SYM` alone defaults to **1 bit** |
-| **Keywords** | Case-insensitive: `if` = `IF` |
-| **Assignment** | `=` (not `:=`) |
-| **Comments** | `;` to end of line |
-| **Precedence** | `NOT` > `AND` > `OR` > `XOR` |
-| **Closing** | Body ends with a line containing only `:` |
-
-### Execution semantics (one scan)
-
-| Rule | Behavior |
-|------|----------|
-| **Order** | Top-level assignments and `IF` blocks run **in order** |
-| **Inputs** | Read at scan start; **cannot assign** to inputs (parse error) |
-| **Outputs** | **Readable** in expressions (current value in this scan) |
-| **Unassigned output** | **Keeps** previous value (first scan starts at `0`) |
-| **Multi-bit symbols** | May be declared; `IF`/operators on them → parse error until P+b |
-
-`doc(.machine)` / `doc(inline.plc)` print inputs, outputs, and the parsed program.
+| Topic | Where |
+|-------|-------|
+| Declarations, `IF`, booleans, precedence | [plc-language.md](plc-language.md) |
+| `TON` / `TOF` | [plc-language.md — Timers](plc-language.md#timers--ton--tof-p51) |
+| `CTU` / `CTD` (planned) | [plc-language.md — Counters](plc-language.md#counters--ctu--ctd-p52--planned) |
+| `doc(inline.plc)`, `doc(.machine)` | [plc-language.md — doc()](plc-language.md#doc-helpers) |
 
 ---
 
@@ -830,6 +820,129 @@ show(.ctrl:busy)
 
 ---
 
+## Timers TON / TOF (P5)
+
+Language specification: [plc-language.md — TON / TOF](plc-language.md#timers--ton--tof-p51). Below: **integration examples** with `comp [plc]` and `logts-play`. — TON on-delay (test 2794 / 2796)
+
+**START** held on (`comp [switch] = 1`). Three scans (`PT := 3`) before **MOTOR** and **READY** turn on. Load & Run runs three `.ctrl:{ set = 1 }` in one script.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR, READY }
+  TON startDelay(IN := START, PT := 3)
+  READY = startDelay.Q
+  IF startDelay.Q THEN
+    MOTOR = 1
+  ELSE
+    MOTOR = 0
+  END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [led] .readyLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed, READY = .readyLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+show(.readyLed:get)
+show(.ctrl:scanCount)
+```
+
+After Load & Run: **`scanCount` = 3**, both LEDs **`1`**.
+
+### Example 18 — TOF off-delay (test 2795 / 2797)
+
+**RUN** starts on; first scan latches motor on. Script turns **RUN** off, then two more scans (`PT := 2`) before motor releases.
+
+```logts-play
+inline [plc] .hold:
+  inputs: { RUN }
+  outputs: { MOTOR }
+  TOF runOff(IN := RUN, PT := 2)
+  MOTOR = runOff.Q
+  :
+
+comp [switch] .run:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .hold
+  inputs: { RUN = .run }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+.run = 0
+
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+show(.ctrl:scanCount)
+```
+
+After Load & Run: **`scanCount` = 3**, **motor LED `0`** (held one scan after RUN off, then off).
+
+### Example 19 — TON with auto-scan (`scanTime`)
+
+Same TON logic; internal PLC timer fires scans every **100 ms**. Load & Run in browser — wait ~300 ms for `PT := 3`.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  TON startDelay(IN := START, PT := 3)
+  MOTOR = startDelay.Q
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 100
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+probe(.motorLed:get)
+probe(.ctrl:scanCount)
+```
+
+Use **probe** and wait in the browser; motor turns on after ~3 auto-scans.
+
+---
+
 ## I/O mapping matrix (v1)
 
 LogTScript PLC maps **program symbols** to **wires** or **existing panel components**. Width must match exactly. Logic in the program body is **1-bit only** in v1 (`IF`, `AND`, …); multi-bit symbols may be **declared** and **mapped**, but not used in boolean expressions until **P+b**.
@@ -1043,7 +1156,7 @@ Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch,
 
 | Phase | Content |
 |-------|---------|
-| **P5** | Timers (`TON`, `TOF`) in `inline [plc]` — **P5.2**: `CTU`/`CTD` |
+| **P5** | Timers (`TON`, `TOF`) in `inline [plc]` — **P5.2**: `CTU`/`CTD`; **P5.3**: full IEC placement in `CASE`/`FOR`/`WHILE` |
 | **P+b** | Multi-bit logic, comparisons (`IF TEMP > 50`) |
 | **P+c** | `VAR` / `END_VAR`, `CASE`, `RETURN` |
 | **P+d** | `FOR`, `WHILE` |
@@ -1053,6 +1166,7 @@ Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch,
 
 ## See also
 
+- [plc-language.md](plc-language.md) — **PLC language** (keywords, syntax, timers)
 - [cpu.md](cpu.md) — `inline [asm]` + `comp [cpu]` pattern
 - [conditional-assignment.md](conditional-assignment.md) — LogTscript `on:` / property blocks
 - [key.md](key.md), [switch.md](switch.md), [led.md](led.md) — panel I/O for map targets

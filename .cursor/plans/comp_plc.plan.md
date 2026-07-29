@@ -37,12 +37,18 @@ todos:
     status: completed
   - id: p5-timers
     content: "P5: TON/TOF ca blocuri keyword în inline [plc] (fără comp separate)"
-    status: pending
+    status: completed
   - id: p5-1-ton-tof
     content: "P5.1: parser + IR + exec TON/TOF; teste comp-plc-lang; doc + logts-play"
-    status: pending
+    status: completed
   - id: p5-3-iec-placement
     content: "P5.3 (amânat): plasare completă IEC/ST — TON/TOF oriunde e permis un statement (CASE/FOR/WHILE cu P+c/P+d)"
+    status: pending
+  - id: p5-2-ctu-ctd
+    content: "P5.2: CTU+CTD IEC/ST în inline [plc]; .Q și .CV; teste + doc logts-play"
+    status: pending
+  - id: p5-2b-retain
+    content: "P5.2b (amânat): RETAIN stare timere/contoare la re-RUN"
     status: pending
   - id: pb-analog
     content: "P+b: I/O multi-bit, comparații analog, senzori — amânat"
@@ -139,7 +145,7 @@ flowchart TB
 | **P-TMR1** | **TON / TOF** doar în **`inline [plc]`** — blocuri keyword în corpul programului; **fără** `comp [ton]` / `comp [tof]` separate | **închis** |
 | **P-TMR2** | Timerele **nu** sunt I/O mapabil pe `comp [plc]`; rulează în **`executePlcScan`** cu stare persistentă între scan-uri | **închis** |
 | **P-TMR3** | Avans timere la **granița de scan** (un tick TON/TOF per scan PLC) — nu timp real independent de PLC | **închis** |
-| **P-TMR4** | **MVP P5:** **TON** + **TOF**; **CTU/CTD** amânat **P5.2** | **închis** |
+| **P-TMR4** | **P5.1:** **TON** + **TOF** ✓; **P5.2:** **CTU** + **CTD** | **închis** |
 | **P-TMR5** | **`PT` în scan-uri** (număr întreg de cicluri); doc: echivalent ms ≈ `PT × scanTime` când `scanTime > 0` | **închis** |
 | **P-TMR6** | La **`scanTime: 0`**: `PT` = scan-uri la fiecare `set` activ (osc/manual) — **permis** | **închis** |
 | **P-TMR7** | La **re-RUN**: stare timere **reset** (fără RETAIN în P5.1) | **închis** |
@@ -149,6 +155,16 @@ flowchart TB
 | **P-TMR10** | **P5.1:** doar **`name.Q`** expus; **fără** `ET`, **fără** `R` (reset explicit) | **închis** |
 | **P-TMR11** | **`PT` ≥ 1** — `PT = 0` → eroare parse | **închis** |
 | **P-TMR12** | **`IN`** = expresie 1-bit completă; **`name.Q`** read-only (atribuire → eroare); **nume timer unic** (duplicat → eroare parse) | **închis** |
+| **P-CTR1** | **P5.2:** **CTU** + **CTD** în **`inline [plc]`** — același model ca TON/TOF (fără `comp` separate) | **închis** |
+| **P-CTR2** | **RETAIN** amânat **P5.2b** — la re-RUN stare contoare/timere **reset** (ca P5.1) până atunci | **închis** |
+| **P-CTR3** | **CTU:** `CTU name(CU := expr, R := expr, PV := n)` — sintaxă confirmată | **închis** |
+| **P-CTR4** | **CTD:** `CTD name(CD := expr, LD := expr, PV := n)` — model IEC (load `LD`, nu `R`) | **închis** |
+| **P-CTR5** | **`CU` / `CD`:** numără la **front rising 0→1** între scan-uri (IEC), nu la nivel `1` continuu | **închis** |
+| **P-CTR6** | **CTU:** `R = 1` → `CV := 0`, `Q := 0` (prioritar, ignoră `CU` în același scan); altfel front `CU` → `CV++`; `Q := (CV >= PV)` | **închis** |
+| **P-CTR7** | **CTD:** `LD = 1` → `CV := PV` (prioritar); altfel front `CD` → `CV--` dacă `CV > 0`; `Q := (CV <= 0)` | **închis** |
+| **P-CTR8** | **`PV` ≥ 1** — `PV = 0` → eroare parse | **închis** |
+| **P-CTR9** | Expunere **`name.Q`** (1-bit) și **`name.CV`** (întreg); **`.CV`** comparabil cu **literal numeric** în `IF` (`>=`, `<=`, `==`, `>`, `<`) — extensie minimă P5.2, nu deschide P+b complet | **închis** |
+| **P-CTR10** | Plasare ca P5.1 (top-level + `IF`); **`counterState`** per `comp [plc]`; nume unice (fără conflict I/O / timere / contoare); **`.Q` / `.CV`** read-only | **închis** |
 | **P-IO1** | **Nu** există `comp [button]` — intrări digitale: **`key`**, **`switch`**, **`dip`** (confirmat) |
 | **P-IO2** | **P2/P3:** ieșiri digitale 1-bit: **`led`**, **`reg`**, wires; **nu** mapare directă `comp [plc]` → `clcd` |
 | **P-IO3** | **`clcd`:** doar prin **wires multi-bit** + logică LogTscript în afara PLC (`:get` / bloc `{ value, set }`) |
@@ -239,7 +255,9 @@ Lista completă țintă vs ce implementăm per fază. Modelul ST (Structured Tex
 | **`FOR`** … **`TO`** … **`BY`** … **`DO`** … **`END_FOR`** | Buclă numărată | **P+d** |
 | **`WHILE`** … **`DO`** … **`END_WHILE`** | Buclă condiționată | **P+d** |
 | **`>`**, **`<`**, **`==`**, … | Comparații | **P+b** (analog) |
-| **`TON`**, **`TOF`**, … | Timere (blocuri în corp `inline [plc]`) | **P5** — **nu** `comp` separate |
+| **`TON`**, **`TOF`** | Timere on/off-delay | **P5.1** ✓ |
+| **`CTU`**, **`CTD`** | Contoare up/down (IEC FB) | **P5.2** |
+| **`>=`**, **`<=`**, **`==`**, … pe **`.CV`** | Comparații contor ↔ literal | **P5.2** (minim); restul analog → **P+b** |
 
 **Nu în plan (ST are, amânăm):** `REPEAT`/`UNTIL`, `EXIT`, `VAR_INPUT`/`VAR_OUTPUT` separate — la noi `inputs:`/`outputs:` acoperă interfața.
 
@@ -906,15 +924,74 @@ END_IF
 - **Nume:** fiecare instanță timer are identificator **unic** în program.
 - **P5.1:** fără `ET`, fără `R`; reset doar la re-RUN (P-TMR7).
 
-#### Sub-faze
+#### Sub-faze P5
 
-| Fază | Conținut |
-|------|----------|
-| **P5.1** | Parser + IR + exec **TON** + **TOF**; plasare **top-level** + în **`IF`**; teste `comp-plc-lang`; doc + `logts-play` |
-| **P5.2** | **CTU** / **CTD** (opțional); RETAIN (opțional) |
-| **P5.3** *(amânat)* | **Plasare completă IEC/ST:** TON/TOF oriunde e permis un **statement** — extins la `CASE` (**P+c**), `FOR`/`WHILE` (**P+d**) |
+| Fază | Conținut | Status |
+|------|----------|--------|
+| **P5.1** | **TON** + **TOF**; plasare top-level + `IF`; teste; doc `logts-play` | **done** |
+| **P5.2** | **CTU** + **CTD** (IEC/ST); `.Q` + `.CV`; comparații `CV` ↔ literal; teste; doc | **următor** |
+| **P5.2b** *(amânat)* | **RETAIN** — stare timere/contoare supraviețuiește re-RUN | planificat |
+| **P5.3** *(amânat)* | Plasare completă IEC/ST pentru toate FB-urile (`CASE` / `FOR` / `WHILE` cu **P+c** / **P+d**) | planificat |
 
-#### Dependențe
+#### P5.2 — Contoare CTU / CTD (decizii închise)
+
+**Scope:** **CTU** + **CTD** în aceeași fază; **RETAIN** → **P5.2b** (nu în P5.2).
+
+**Orientare:** didactic + apropiat de **IEC 61131-3** (function blocks), fără componente pe panou.
+
+##### Sintaxă
+
+```logts
+CTU pieceCount(CU := SENSOR_PULSE, R := RESET, PV := 10)
+CTD stepsLeft(CD := TICK, LD := LOAD, PV := 5)
+IF pieceCount.Q THEN
+  FULL = 1
+ELSIF stepsLeft.CV <= 0 THEN
+  DONE = 1
+END_IF
+```
+
+| Bloc | Parametri | Rol IEC |
+|------|-----------|---------|
+| **CTU** | `CU`, `R`, `PV` | Count **up** — front pe `CU`; **reset** sincron pe `R` |
+| **CTD** | `CD`, `LD`, `PV` | Count **down** — front pe `CD`; **load** preset pe `LD` |
+
+##### Semantica execuție (per scan, ordine program)
+
+**CTU** (prioritate ca la PLC real):
+
+1. Dacă **`R = 1`** → `CV := 0`, `Q := 0` (nu procesa `CU` în același scan).
+2. Altfel, dacă **`CU`** are **front 0→1** față de scan-ul anterior → `CV := CV + 1`.
+3. **`Q := (CV >= PV)`**.
+
+**CTD:**
+
+1. Dacă **`LD = 1`** → `CV := PV` (reîncarcă preset; prioritar față de `CD` în același scan).
+2. Altfel, dacă **`CD`** are **front 0→1** și **`CV > 0`** → `CV := CV - 1`.
+3. **`Q := (CV <= 0)`** (țintă atinsă / sub zero).
+
+**Stare:** `counterState` pe fiecare `comp [plc]` (`cv`, `q`, `prevCU`, `prevCD`) — independentă între două PLC-uri cu același program.
+
+##### Ce e expus în program (P5.2)
+
+| Membru | Tip | Utilizare |
+|--------|-----|-----------|
+| **`name.Q`** | 1-bit | `IF`, `AND`, atribuiri booleene |
+| **`name.CV`** | întreg ≥ 0 | **`IF name.CV >= 10`**, `==`, `<=`, … cu **literal** (extensie minimă față de P1/P2) |
+
+**Nu în P5.2:** `ET` la timere; RETAIN; comparații între simboluri multi-bit arbitrare (**P+b**).
+
+##### Plasare
+
+Identic **P5.1** / **P-TMR9:** top-level și în ramuri `IF`. **P5.3** extinde la `CASE`/`FOR`/`WHILE`.
+
+##### P5.2b — RETAIN (amânat, de detaliat la deschidere)
+
+- Păstrare `CV` / stare timere la re-RUN
+- Sintaxă de declarat la implementare (atribut `comp [plc]` sau keyword program)
+- **Nu** blochează P5.2
+
+#### Dependențe P5
 
 - **P4** (scan / `scanTime`) — recomandat pentru exemple didactice cu timp real
 - **Nu** necesită **P+c `VAR`** — timerele au stare proprie în IR (separată de `VAR` din P+c)
@@ -933,11 +1010,13 @@ END_IF
 
 **P4 (scanTime / busy / cicluri):** **închis** — P-SCAN1…P-SCAN8, sub-faze P4.0–P4.3.
 
-**P5 (timere TON/TOF):** **închis** — P-TMR1…P-TMR13; sub-faze **P5.1** (implementare) / **P5.2** (CTU) / **P5.3** *(amânat, plasare IEC/ST completă)*.
+**P5.1 (TON/TOF):** **done**.
 
-**Încă deschise / amânate:** P3c, **P5.3**, P+b, P+c/d.
+**P5.2 (CTU/CTD):** **închis** — P-CTR1…P-CTR10; **RETAIN** → **P5.2b**.
 
-**Următorul pas recomandat:** **P5.1** (implementare TON/TOF în `plc-assembler.js`).
+**Încă deschise / amânate:** P3c, **P5.2b**, **P5.3**, P+b, P+c/d.
+
+**Următorul pas recomandat:** **P5.2** (implementare CTU/CTD).
 
 ---
 

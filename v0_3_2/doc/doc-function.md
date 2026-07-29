@@ -523,7 +523,7 @@ comp.osc, comp.~
 doc(inline)
 ```
 
-Lists every `inline [asm]` / `inline [lut]` / `inline [protocol]` instance in the script (e.g. `.myisa (inline [asm])`). Kinds: `inline.asm`, `inline.lut`, `inline.protocol`.
+Lists every `inline [asm]` / `inline [lut]` / `inline [protocol]` / `inline [plc]` instance in the script (e.g. `.myisa (inline [asm])`). Kinds: `inline.asm`, `inline.lut`, `inline.protocol`, `inline.plc`.
 
 ### doc(inline.kind) — declaration template
 
@@ -532,10 +532,11 @@ Lists every `inline [asm]` / `inline [lut]` / `inline [protocol]` instance in th
 | `doc(inline.asm)` | asm | [asm.md](asm.md) |
 | `doc(inline.lut)` | lut | [lut.md](lut.md) |
 | `doc(inline.protocol)` | protocol | [protocol.md](protocol.md) |
+| `doc(inline.plc)` | plc | [plc-language.md](plc-language.md) |
 
 ### doc(.name) — specific inline instance
 
-After `inline [asm] .myisa:`, `inline [lut] .decoder:`, or `inline [protocol] .uart8n1:`, `doc(.myisa)` / `doc(.decoder)` / `doc(.uart8n1)` shows opcodes, LUT map, or protocol channels for that instance. See [asm.md](asm.md), [lut.md](lut.md), and [protocol.md](protocol.md).
+After `inline [asm] .myisa:`, `inline [lut] .decoder:`, `inline [protocol] .uart8n1:`, or `inline [plc] .machine:`, `doc(.myisa)` / `doc(.decoder)` / `doc(.uart8n1)` / `doc(.machine)` shows opcodes, LUT map, protocol channels, or PLC program for that instance. See [asm.md](asm.md), [lut.md](lut.md), [protocol.md](protocol.md), and [plc-language.md](plc-language.md).
 
 ### doc(comp.type) — syntax of a component
 

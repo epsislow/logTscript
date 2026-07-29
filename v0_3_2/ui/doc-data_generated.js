@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -8909,7 +8909,7 @@ Instant built-in functions (\`ADD\`, \`SUBTRACT\`, …) without \`comp\`: [arith
 |------|-----------|------|
 | \`mem\` | — | [mem.md](mem.md) |
 | \`cpu\` | — | [cpu.md](cpu.md) — contained Harvard CPU (\`prog\` + \`ram\`, \`set\` = step) |
-| \`plc\` | — | [plc.md](plc.md) — \`inline [plc]\` program + scan cycle (\`set\` = one scan) |
+| \`plc\` | — | [plc.md](plc.md) — \`comp [plc]\` runtime; [plc-language.md](plc-language.md) — program language |
 | \`dma\` | — | [dma.md](dma.md) — bulk copy between [mem](mem.md) instances (\`mems:\`, slot \`src\`/\`dst\`) |
 | \`asm\` | — | [asm.md](asm.md) — declare \`inline [asm]\`; assemble with \`.name { … }\` |
 | \`lut\` | — | [lut.md](lut.md) — \`inline [lut]\` or \`comp [lut]\` |
@@ -13301,7 +13301,7 @@ comp.osc, comp.~
 doc(inline)
 \`\`\`
 
-Lists every \`inline [asm]\` / \`inline [lut]\` / \`inline [protocol]\` instance in the script (e.g. \`.myisa (inline [asm])\`). Kinds: \`inline.asm\`, \`inline.lut\`, \`inline.protocol\`.
+Lists every \`inline [asm]\` / \`inline [lut]\` / \`inline [protocol]\` / \`inline [plc]\` instance in the script (e.g. \`.myisa (inline [asm])\`). Kinds: \`inline.asm\`, \`inline.lut\`, \`inline.protocol\`, \`inline.plc\`.
 
 ### doc(inline.kind) — declaration template
 
@@ -13310,10 +13310,11 @@ Lists every \`inline [asm]\` / \`inline [lut]\` / \`inline [protocol]\` instance
 | \`doc(inline.asm)\` | asm | [asm.md](asm.md) |
 | \`doc(inline.lut)\` | lut | [lut.md](lut.md) |
 | \`doc(inline.protocol)\` | protocol | [protocol.md](protocol.md) |
+| \`doc(inline.plc)\` | plc | [plc-language.md](plc-language.md) |
 
 ### doc(.name) — specific inline instance
 
-After \`inline [asm] .myisa:\`, \`inline [lut] .decoder:\`, or \`inline [protocol] .uart8n1:\`, \`doc(.myisa)\` / \`doc(.decoder)\` / \`doc(.uart8n1)\` shows opcodes, LUT map, or protocol channels for that instance. See [asm.md](asm.md), [lut.md](lut.md), and [protocol.md](protocol.md).
+After \`inline [asm] .myisa:\`, \`inline [lut] .decoder:\`, \`inline [protocol] .uart8n1:\`, or \`inline [plc] .machine:\`, \`doc(.myisa)\` / \`doc(.decoder)\` / \`doc(.uart8n1)\` / \`doc(.machine)\` shows opcodes, LUT map, protocol channels, or PLC program for that instance. See [asm.md](asm.md), [lut.md](lut.md), [protocol.md](protocol.md), and [plc-language.md](plc-language.md).
 
 ### doc(comp.type) — syntax of a component
 
@@ -23579,11 +23580,431 @@ See [debug.md](debug.md) for \`:\` (pin/pout) vs \`.\` (internal wire) conventio
 
 Chip details: [chip.md](chip.md).
 `,
+    'plc-language.md': `# PLC language
+
+Keywords, syntax, and execution semantics for programs in **\`inline [plc]\`** — an IEC 61131-3 **Structured Text–inspired** dialect (boolean logic, timers, counters).
+
+| Layer | Role | Documentation |
+|-------|------|----------------|
+| **Language** (this page) | Keywords, grammar, timers, errors | **plc-language.md** |
+| **\`inline [plc]\`** | Where programs are written (\`.machine:\` … \`:\`) | syntax below |
+| **\`comp [plc]\`** | Runtime: I/O map, scan, \`scanTime\` | [plc.md](plc.md) |
+
+Use **\`doc(inline.plc)\`** for a declaration template and **\`doc(.machine)\`** for a parsed instance (inputs, outputs, timers, program body).
+
+---
+
+## Program shape
+
+Every program is an **inline instance** with a name starting with \`.\`:
+
+\`\`\`logts
+inline [plc] .machine:
+  inputs: { START, STOP: 1 }
+  outputs: { MOTOR, ALARM }
+  ; ... statements ...
+  :
+\`\`\`
+
+| Part | Rule |
+|------|------|
+| **Header** | \`inline [plc] .name:\` — \`.name\` is required (same as \`inline [asm]\`) |
+| **Interface** | Optional \`inputs:\` and \`outputs:\` blocks (order: inputs first, then outputs) |
+| **Body** | Sequential **statements** — assignments, \`IF\`, timers, (future: counters) |
+| **Closing** | Body ends with a line containing only **\`:\`** |
+
+The program body does **not** reference wires or panel components — only symbolic names (\`START\`, \`MOTOR\`). Mapping happens on \`comp [plc]\` — see [plc.md](plc.md).
+
+---
+
+## Lexical rules
+
+| Rule | Detail |
+|------|--------|
+| **Keywords** | Case-insensitive: \`if\`, \`IF\`, \`If\` are the same |
+| **Identifiers** | Letters, digits, \`_\` — \`START\`, \`motor_cmd\`, \`step1\` |
+| **Comments** | \`;\` to end of line |
+| **Assignment in body** | \`=\` (outputs and internal assigns) |
+| **Timer/counter args** | \`:=\` (IEC style) — \`IN := START\`, \`PT := 10\` |
+| **Bit literals** | \`0\`, \`1\`, \`TRUE\`, \`FALSE\` |
+
+**Reserved words** cannot be used as symbol names when they are parsed as keywords (e.g. \`IF\`, \`TON\`, \`IN\`, \`PT\`, \`CU\`, \`R\`).
+
+---
+
+## Declaration keywords
+
+### \`inputs:\`
+
+Read-only symbols filled from \`comp [plc]\` at scan start.
+
+\`\`\`logts
+inputs: { START }
+inputs: { START, STOP: 1 }
+inputs: { TEMP: 8 }
+\`\`\`
+
+| Form | Width |
+|------|-------|
+| \`SYM\` | **1 bit** (default) |
+| \`SYM: N\` | **N bits** (\`N ≥ 1\`) |
+
+**Rules**
+
+- Assigning to an input in the program body → **parse error**
+- Multi-bit inputs may be **declared** and **mapped**; boolean logic on them → error until [P+b](plc.md#future-phases) (analog)
+
+### \`outputs:\`
+
+Writable symbols written to the map at scan end.
+
+\`\`\`logts
+outputs: { MOTOR }
+outputs: { SPEED: 8 }
+\`\`\`
+
+Same width rules as \`inputs:\`.
+
+**Rules**
+
+- Outputs are **readable** in expressions during the same scan (value seen so far in this pass)
+- If an output is **not assigned** in a scan, it **keeps** the previous value (PLC latch semantics; first scan starts at \`0\`)
+
+---
+
+## Assignment (\`=\`)
+
+\`\`\`logts
+MOTOR = START AND NOT STOP
+ALARM = FALSE
+READY = startDelay.Q
+\`\`\`
+
+| Target | Allowed |
+|--------|---------|
+| **Output symbol** | ✓ |
+| **Input symbol** | ✗ parse error |
+| **\`timer.Q\`** | ✗ read-only |
+| **\`counter.Q\` / \`.CV\`** | ✗ read-only (P5.2) |
+
+---
+
+## Control flow
+
+### \`IF\` … \`THEN\` … \`ELSE\` … \`ELSIF\` … \`END_IF\`
+
+\`\`\`logts
+IF START AND NOT STOP THEN
+  MOTOR = TRUE
+ELSIF STOP THEN
+  MOTOR = FALSE
+ELSE
+  MOTOR = FALSE
+END_IF
+\`\`\`
+
+| Keyword | Role |
+|---------|------|
+| **\`IF\`** | Start conditional; condition is a **1-bit expression** |
+| **\`THEN\`** | Statements when condition is true |
+| **\`ELSIF\`** | Else-if branch (repeatable) |
+| **\`ELSE\`** | Optional final branch |
+| **\`END_IF\`** | Close the block |
+
+**Nesting:** \`IF\` blocks may contain other \`IF\` blocks and timer statements.
+
+**Not implemented yet:** \`CASE\`, \`FOR\`, \`WHILE\`, \`RETURN\` — planned in future phases (see [Future keywords](#future-keywords-planned)).
+
+---
+
+## Boolean expressions
+
+### Literals
+
+| Literal | Value |
+|---------|-------|
+| \`TRUE\`, \`1\` | logic 1 |
+| \`FALSE\`, \`0\` | logic 0 |
+
+### Operators
+
+| Operator | Arity | Meaning |
+|----------|-------|---------|
+| **\`NOT\`** | unary | inversion |
+| **\`AND\`** | binary | conjunction |
+| **\`OR\`** | binary | disjunction |
+| **\`XOR\`** | binary | exclusive or |
+| **\`( … )\`** | grouping | override precedence |
+
+**Precedence** (highest first): \`NOT\` → \`AND\` → \`OR\` → \`XOR\`
+
+\`\`\`logts
+IF START AND NOT STOP OR E_STOP THEN   ; = START AND (NOT STOP) OR E_STOP
+\`\`\`
+
+All operands in \`IF\` and boolean assigns must be **1-bit** (symbols declared width 1, literals, or \`.Q\` members).
+
+---
+
+## One scan — execution model
+
+A **scan** is one sequential pass through the program body:
+
+\`\`\`text
+read inputs → execute statements in order → write outputs
+\`\`\`
+
+| Topic | Behaviour |
+|-------|-----------|
+| **Statement order** | Matters — later assigns to the same output win |
+| **Timers / counters** | Execute in place; outputs (\`.Q\`) visible to following statements in the **same** scan |
+| **State** | Timer/counter internal state persists on \`comp [plc]\` between scans |
+| **Re-RUN** | New run resets timer state (RETAIN → future P5.2b) |
+
+Triggering scans: \`.ctrl:{ set = 1 }\`, \`scanTime\`, external clock — [plc.md — Scan timing](plc.md#scan-timing-p4).
+
+---
+
+## Timers — \`TON\` / \`TOF\` (P5.1)
+
+Function-block style **statements** (not mappable I/O). Each instance has a **name** and persistent state per \`comp [plc]\`.
+
+### \`TON\` — on-delay
+
+\`\`\`logts
+TON startDelay(IN := START, PT := 50)
+\`\`\`
+
+| Parameter | Type | Meaning |
+|-----------|------|---------|
+| **\`IN\`** | 1-bit expr | While \`1\`, timer counts toward preset |
+| **\`PT\`** | integer ≥ 1 | Preset in **scan cycles** (not ms) |
+
+**Behaviour (per scan, IEC-style)**
+
+1. If \`IN = 0\` → internal count resets, **\`Q = 0\`**
+2. If \`IN = 1\` → count increases by one per scan
+3. **\`Q = 1\`** when count ≥ \`PT\`
+
+**Reading:** \`startDelay.Q\` in expressions (read-only).
+
+**Real time:** with \`scanTime: N\` ms on \`comp [plc]\`, delay ≈ **\`PT × N\` ms**. With \`scanTime: 0\`, each manual \`set\` is one scan.
+
+### \`TOF\` — off-delay
+
+\`\`\`logts
+TOF coolOff(IN := RUN, PT := 30)
+\`\`\`
+
+| Parameter | Meaning |
+|-----------|---------|
+| **\`IN\`** | While \`1\`, **\`Q = 1\`** and count held at 0 |
+| **\`PT\`** | After \`IN\` goes \`0\`, **\`Q\` stays 1** for \`PT\` scans, then **\`Q = 0\`** |
+
+**Behaviour**
+
+1. \`IN = 1\` → \`Q = 1\`, count reset
+2. \`IN = 0\` and \`Q\` was \`1\` → count up each scan; when count ≥ \`PT\`, \`Q = 0\`
+3. \`IN = 0\` and \`Q\` was already \`0\` → stays off
+
+### Timer placement (P5.1)
+
+| Location | Allowed |
+|----------|---------|
+| Top-level in program body | ✓ |
+| Inside \`IF\` / \`THEN\` / \`ELSE\` / \`ELSIF\` | ✓ |
+| Inside \`CASE\` / \`FOR\` / \`WHILE\` | future **P5.3** |
+
+### Timer errors
+
+| Case | Result |
+|------|--------|
+| \`PT < 1\` | parse error |
+| Duplicate timer name | parse error |
+| Timer name = I/O symbol | parse error |
+| Unknown \`foo.Q\` | parse error |
+| \`timer.Q = 1\` | parse error |
+
+**Not exposed in v1:** \`ET\` (elapsed time), explicit reset pin on timers.
+
+### Runnable — minimal TON
+
+\`\`\`logts-play
+inline [plc] .demo:
+  inputs: { START }
+  outputs: { OUT }
+  TON t(IN := START, PT := 2)
+  OUT = t.Q
+  :
+
+; parse-only — use with comp [plc] for scans (see plc.md example 17)
+doc(.demo)
+\`\`\`
+
+---
+
+## Counters — \`CTU\` / \`CTD\` (P5.2 — planned)
+
+> **Status:** specified in the implementation plan; not yet in the runtime. Documented here for a stable target syntax.
+
+### \`CTU\` — count up
+
+\`\`\`logts
+CTU pieceCount(CU := SENSOR, R := RESET, PV := 10)
+\`\`\`
+
+| Parameter | Meaning |
+|-----------|---------|
+| **\`CU\`** | Count input — **rising edge** (0→1 between scans) increments \`CV\` |
+| **\`R\`** | Reset — when \`1\`, \`CV := 0\`, \`Q := 0\` (priority over \`CU\` same scan) |
+| **\`PV\`** | Preset (integer ≥ 1) |
+| **\`pieceCount.Q\`** | \`1\` when **\`CV >= PV\`** |
+| **\`pieceCount.CV\`** | Current count (integer, read-only) |
+
+### \`CTD\` — count down
+
+\`\`\`logts
+CTD stepsLeft(CD := TICK, LD := LOAD, PV := 5)
+\`\`\`
+
+| Parameter | Meaning |
+|-----------|---------|
+| **\`CD\`** | **Rising edge** decrements \`CV\` when \`CV > 0\` |
+| **\`LD\`** | Load — when \`1\`, \`CV := PV\` (priority over \`CD\` same scan) |
+| **\`PV\`** | Preset |
+| **\`stepsLeft.Q\`** | \`1\` when **\`CV <= 0\`** |
+| **\`stepsLeft.CV\`** | Current count |
+
+### Comparisons on \`.CV\` (P5.2)
+
+Planned minimal extension for didactic use:
+
+\`\`\`logts
+IF pieceCount.CV >= 5 THEN
+  WARN = 1
+END_IF
+\`\`\`
+
+Comparisons **\`>=\` \`<=\` \`==\` \`>\` \`<\`** with an **integer literal** on \`.CV\` only — full analog comparisons remain **P+b**.
+
+---
+
+## Member access (\`.Q\`, \`.CV\`)
+
+| Form | Type | Use |
+|------|------|-----|
+| **\`name.Q\`** | 1-bit | \`IF\`, \`AND\`, assigns to outputs |
+| **\`name.CV\`** | integer | comparisons with literals (P5.2) |
+
+Instance **\`name\`** must match a \`TON\`/\`TOF\`/\`CTU\`/\`CTD\` declaration in the same program.
+
+---
+
+## Statement placement summary
+
+| Statement kind | Top-level | Inside \`IF\` | \`CASE\`/\`FOR\`/\`WHILE\` |
+|----------------|-----------|-------------|----------------------|
+| Assignment \`=\` | ✓ | ✓ | future |
+| \`IF\` … \`END_IF\` | ✓ | ✓ (nested) | future |
+| \`TON\` / \`TOF\` | ✓ | ✓ | P5.3 |
+| \`CTU\` / \`CTD\` | ✓ (P5.2) | ✓ (P5.2) | P5.3 |
+
+---
+
+## Keyword reference
+
+### Implemented (P1 + P5.1)
+
+| Keyword | Category | Summary |
+|---------|----------|---------|
+| **\`inputs:\`** | Declaration | Input symbol table \`{ … }\` |
+| **\`outputs:\`** | Declaration | Output symbol table \`{ … }\` |
+| **\`IF\`** | Control | Conditional |
+| **\`THEN\`** | Control | True branch |
+| **\`ELSIF\`** | Control | Else-if branch |
+| **\`ELSE\`** | Control | False branch |
+| **\`END_IF\`** | Control | End conditional |
+| **\`AND\` \`OR\` \`NOT\` \`XOR\`** | Operator | Boolean |
+| **\`TRUE\` \`FALSE\`** | Literal | Boolean |
+| **\`=\`** | Assignment | Output assign |
+| **\`TON\`** | Timer FB | On-delay; \`IN\`, \`PT\` |
+| **\`TOF\`** | Timer FB | Off-delay; \`IN\`, \`PT\` |
+| **\`IN\` \`PT\`** | Timer arg | Only inside \`TON\`/\`TOF\` argument lists |
+
+### Future keywords (planned)
+
+| Keyword | Phase | Summary |
+|---------|-------|---------|
+| **\`CTU\` \`CTD\`** | P5.2 | Up/down counters |
+| **\`CU\` \`R\` \`CD\` \`LD\` \`PV\`** | P5.2 | Counter arguments |
+| **\`VAR\` \`END_VAR\`** | P+c | Internal memory |
+| **\`CONST\` \`END_CONST\`** | P+c | Constants |
+| **\`CASE\` \`OF\` \`END_CASE\`** | P+c | Selection |
+| **\`RETURN\`** | P+c | Early exit from body |
+| **\`FOR\` \`TO\` \`BY\` \`DO\` \`END_FOR\`** | P+d | Counted loop |
+| **\`WHILE\` \`END_WHILE\`** | P+d | Conditional loop |
+| **\`>\` \`<\` \`>=\` \`<=\` \`==\`** | P+b / P5.2 | General comparisons |
+
+---
+
+## Common errors
+
+| Message (example) | Cause |
+|---------------------|-------|
+| \`cannot assign to input START\` | Wrote to an input symbol |
+| \`unknown symbol ALARM\` | Name not in \`inputs\`/\`outputs\` |
+| \`IF requires 1-bit symbol, got TEMP (8 bits)\` | Multi-bit symbol in boolean expr |
+| \`duplicate timer 't'\` | Two timers same name |
+| \`timer name 'MOTOR' conflicts with I/O\` | Timer name collides with symbol |
+| \`PT must be >= 1\` | Invalid preset |
+| \`timer field must be Q\` | Used \`.ET\` or unknown field |
+
+Mapping errors (\`not mapped\`, width mismatch) happen at **\`comp [plc]\`** elaboration — [plc.md — Errors](plc.md#errors).
+
+---
+
+## \`doc()\` helpers
+
+| Command | Output |
+|---------|--------|
+| \`doc(inline.plc)\` | Type template + keyword summary |
+| \`doc(inline)\` | Lists all inline instances |
+| \`doc(.machine)\` | Inputs, outputs, timers, parsed program |
+
+---
+
+## Runnable — START / STOP (language only)
+
+Boolean logic without timers — pair with [plc.md example 1](plc.md) for full \`comp [plc]\` wiring.
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  IF START AND NOT STOP THEN
+    MOTOR = TRUE
+  ELSE
+    MOTOR = FALSE
+  END_IF
+  :
+
+doc(.machine)
+\`\`\`
+
+---
+
+## See also
+
+- [plc.md](plc.md) — \`comp [plc]\`, scan cycle, \`scanTime\`, I/O matrix, \`logts-play\` integration examples
+- [cpu.md](cpu.md) — parallel two-layer model (\`inline [asm]\` + \`comp [cpu]\`)
+- [components.md](components.md) — \`doc(comp.plc)\`
+- [conditional-assignment.md](conditional-assignment.md) — LogTscript \`on:\` outside PLC programs
+`,
     'plc.md': `# PLC — \`inline [plc]\` + \`comp [plc]\`
 
 LogTScript PLC support follows the same two-layer model as **\`inline [asm]\`** + **\`comp [cpu]\`**:
 
-1. **\`inline [plc]\`** — hardware-independent program: symbolic inputs/outputs + boolean logic (IEC 61131-3 ST-inspired).
+1. **\`inline [plc]\`** — hardware-independent program: symbolic inputs/outputs + boolean logic (IEC 61131-3 ST-inspired). **Language reference:** [plc-language.md](plc-language.md).
 2. **\`comp [plc]\`** — runtime: maps symbols to wires or panel components, runs one **scan** per triggered \`set\`.
 
 In the **documentation viewer**, blocks marked \`logts-play\` open in the script editor with **Load** and **Load & Run** (same as [cpu.md](cpu.md) and [cache.md](cache.md)).
@@ -23594,8 +24015,10 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 
 | Topic | Summary |
 |-------|---------|
+| **Language** | Full keyword/syntax reference → [plc-language.md](plc-language.md) |
 | **Program** | \`inline [plc] .machine:\` with \`inputs:{ }\`, \`outputs:{ }\`, logic body |
 | **Logic (v1)** | \`IF/THEN/ELSE/ELSIF/END_IF\`, \`AND/OR/NOT/XOR\`, \`TRUE\`/\`FALSE\`, \`0\`/\`1\` |
+| **Timers (P5)** | \`TON\` / \`TOF\` blocks; \`PT\` in scan cycles; read \`name.Q\` |
 | **Widths** | \`START\` alone = 1 bit; \`TEMP: 8\` declarable (logic on multi-bit → future P+b) |
 | **Scan** | \`.plc:{ set = 1 }\` or **\`scanTime > 0\`** auto-scan; see [Scan timing (P4)](#scan-timing-p4) |
 | **\`busy\`** | \`0\` when \`scanTime: 0\`; pulses during simulated scan when \`scanTime > 0\` |
@@ -23621,7 +24044,9 @@ The PLC program never names \`.start\` or \`motorWire\` — only \`START\` and \
 
 ## \`inline [plc]\` — language
 
-### Syntax
+**Full reference:** [plc-language.md](plc-language.md) — every keyword, timer/counter syntax, execution model, errors, and placement rules.
+
+Summary:
 
 \`\`\`logts
 inline [plc] .machine:
@@ -23637,26 +24062,12 @@ inline [plc] .machine:
   :
 \`\`\`
 
-| Rule | Detail |
-|------|--------|
-| **\`inputs:\` / \`outputs:\`** | \`{ SYM }\` or \`{ SYM: N }\` — \`SYM\` alone defaults to **1 bit** |
-| **Keywords** | Case-insensitive: \`if\` = \`IF\` |
-| **Assignment** | \`=\` (not \`:=\`) |
-| **Comments** | \`;\` to end of line |
-| **Precedence** | \`NOT\` > \`AND\` > \`OR\` > \`XOR\` |
-| **Closing** | Body ends with a line containing only \`:\` |
-
-### Execution semantics (one scan)
-
-| Rule | Behavior |
-|------|----------|
-| **Order** | Top-level assignments and \`IF\` blocks run **in order** |
-| **Inputs** | Read at scan start; **cannot assign** to inputs (parse error) |
-| **Outputs** | **Readable** in expressions (current value in this scan) |
-| **Unassigned output** | **Keeps** previous value (first scan starts at \`0\`) |
-| **Multi-bit symbols** | May be declared; \`IF\`/operators on them → parse error until P+b |
-
-\`doc(.machine)\` / \`doc(inline.plc)\` print inputs, outputs, and the parsed program.
+| Topic | Where |
+|-------|-------|
+| Declarations, \`IF\`, booleans, precedence | [plc-language.md](plc-language.md) |
+| \`TON\` / \`TOF\` | [plc-language.md — Timers](plc-language.md#timers--ton--tof-p51) |
+| \`CTU\` / \`CTD\` (planned) | [plc-language.md — Counters](plc-language.md#counters--ctu--ctd-p52--planned) |
+| \`doc(inline.plc)\`, \`doc(.machine)\` | [plc-language.md — doc()](plc-language.md#doc-helpers) |
 
 ---
 
@@ -24411,6 +24822,129 @@ show(.ctrl:busy)
 
 ---
 
+## Timers TON / TOF (P5)
+
+Language specification: [plc-language.md — TON / TOF](plc-language.md#timers--ton--tof-p51). Below: **integration examples** with \`comp [plc]\` and \`logts-play\`. — TON on-delay (test 2794 / 2796)
+
+**START** held on (\`comp [switch] = 1\`). Three scans (\`PT := 3\`) before **MOTOR** and **READY** turn on. Load & Run runs three \`.ctrl:{ set = 1 }\` in one script.
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR, READY }
+  TON startDelay(IN := START, PT := 3)
+  READY = startDelay.Q
+  IF startDelay.Q THEN
+    MOTOR = 1
+  ELSE
+    MOTOR = 0
+  END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [led] .readyLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed, READY = .readyLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+show(.readyLed:get)
+show(.ctrl:scanCount)
+\`\`\`
+
+After Load & Run: **\`scanCount\` = 3**, both LEDs **\`1\`**.
+
+### Example 18 — TOF off-delay (test 2795 / 2797)
+
+**RUN** starts on; first scan latches motor on. Script turns **RUN** off, then two more scans (\`PT := 2\`) before motor releases.
+
+\`\`\`logts-play
+inline [plc] .hold:
+  inputs: { RUN }
+  outputs: { MOTOR }
+  TOF runOff(IN := RUN, PT := 2)
+  MOTOR = runOff.Q
+  :
+
+comp [switch] .run:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .hold
+  inputs: { RUN = .run }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+.run = 0
+
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+show(.ctrl:scanCount)
+\`\`\`
+
+After Load & Run: **\`scanCount\` = 3**, **motor LED \`0\`** (held one scan after RUN off, then off).
+
+### Example 19 — TON with auto-scan (\`scanTime\`)
+
+Same TON logic; internal PLC timer fires scans every **100 ms**. Load & Run in browser — wait ~300 ms for \`PT := 3\`.
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  TON startDelay(IN := START, PT := 3)
+  MOTOR = startDelay.Q
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 100
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+probe(.motorLed:get)
+probe(.ctrl:scanCount)
+\`\`\`
+
+Use **probe** and wait in the browser; motor turns on after ~3 auto-scans.
+
+---
+
 ## I/O mapping matrix (v1)
 
 LogTScript PLC maps **program symbols** to **wires** or **existing panel components**. Width must match exactly. Logic in the program body is **1-bit only** in v1 (\`IF\`, \`AND\`, …); multi-bit symbols may be **declared** and **mapped**, but not used in boolean expressions until **P+b**.
@@ -24624,7 +25158,7 @@ Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch,
 
 | Phase | Content |
 |-------|---------|
-| **P+a** | Timers (\`TON\`, \`TOF\`, \`CTU\`) |
+| **P5** | Timers (\`TON\`, \`TOF\`) in \`inline [plc]\` — **P5.2**: \`CTU\`/\`CTD\`; **P5.3**: full IEC placement in \`CASE\`/\`FOR\`/\`WHILE\` |
 | **P+b** | Multi-bit logic, comparisons (\`IF TEMP > 50\`) |
 | **P+c** | \`VAR\` / \`END_VAR\`, \`CASE\`, \`RETURN\` |
 | **P+d** | \`FOR\`, \`WHILE\` |
@@ -24634,6 +25168,7 @@ Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch,
 
 ## See also
 
+- [plc-language.md](plc-language.md) — **PLC language** (keywords, syntax, timers)
 - [cpu.md](cpu.md) — \`inline [asm]\` + \`comp [cpu]\` pattern
 - [conditional-assignment.md](conditional-assignment.md) — LogTscript \`on:\` / property blocks
 - [key.md](key.md), [switch.md](switch.md), [led.md](led.md) — panel I/O for map targets

@@ -29238,5 +29238,255 @@ comp [plc] .ctrl:
   h.assert('busy 0', session.getCompProperty(interp, '.ctrl', 'busy'), '0');
 });
 
+const PLC_TON_PROG = `inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  TON startDelay(IN := START, PT := 3)
+  IF startDelay.Q THEN
+    MOTOR = 1
+  ELSE
+    MOTOR = 0
+  END_IF
+  :`;
+
+const PLC_TOF_PROG = `inline [plc] .hold:
+  inputs: { RUN }
+  outputs: { MOTOR }
+  TOF runOff(IN := RUN, PT := 2)
+  MOTOR = runOff.Q
+  :`;
+
+const PLC_TON_IF_PROG = `inline [plc] .gate:
+  inputs: { ENABLE, STEP }
+  outputs: { OUT }
+  IF ENABLE THEN
+    TON stepDelay(IN := STEP, PT := 2)
+    OUT = stepDelay.Q
+  ELSE
+    OUT = 0
+  END_IF
+  :`;
+
+const PLC_DOC_TON_EX17 = `
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR, READY }
+  TON startDelay(IN := START, PT := 3)
+  READY = startDelay.Q
+  IF startDelay.Q THEN
+    MOTOR = 1
+  ELSE
+    MOTOR = 0
+  END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [led] .readyLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed, READY = .readyLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+show(.readyLed:get)
+show(.ctrl:scanCount)
+`;
+
+const PLC_DOC_TOF_EX18 = `
+inline [plc] .hold:
+  inputs: { RUN }
+  outputs: { MOTOR }
+  TOF runOff(IN := RUN, PT := 2)
+  MOTOR = runOff.Q
+  :
+
+comp [switch] .run:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .hold
+  inputs: { RUN = .run }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+.run = 0
+
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+show(.ctrl:scanCount)
+`;
+
+function plcExecScans(inst, inputs, outputState, timerState, count) {
+  const ts = timerState || {};
+  const out = outputState || {};
+  for (let i = 0; i < count; i++) executePlcScan(inst, inputs, out, ts);
+  return { out, timerState: ts };
+}
+
+reg(2785, 'comp-plc-lang', 'P5.1 parse TON TOF and timer.Q', function(h, session) {
+  const full = parsePlcBody(`inputs: { START }
+outputs: { MOTOR }
+TON startDelay(IN := START, PT := 3)
+IF startDelay.Q THEN MOTOR = 1 ELSE MOTOR = 0 END_IF`);
+  h.assert('has ton stmt', String(full.statements.some(s => s.type === 'ton')), 'true');
+  h.assert('ton name', full.statements[0].name, 'startDelay');
+  h.assert('ton pt', String(full.statements[0].pt), '3');
+  const tof = parsePlcBody(`inputs: { RUN }
+outputs: { MOTOR }
+TOF runOff(IN := RUN, PT := 2)
+MOTOR = runOff.Q`);
+  h.assert('has tof', String(tof.statements.some(s => s.type === 'tof')), 'true');
+});
+
+reg(2786, 'comp-plc-lang', 'P5.1 TON — Q after PT scans', function(h, session) {
+  session.run(PLC_TON_PROG);
+  const inst = session.interp.inlineInstances.get('.machine');
+  const ts = {};
+  const out = {};
+  plcExecScans(inst, { START: '1' }, out, ts, 2);
+  h.assert('scan2 Q off', plcTimerQ(ts, 'startDelay'), '0');
+  h.assert('scan2 motor off', out.MOTOR, '0');
+  plcExecScans(inst, { START: '1' }, out, ts, 1);
+  h.assert('scan3 Q on', plcTimerQ(ts, 'startDelay'), '1');
+  h.assert('scan3 motor on', out.MOTOR, '1');
+});
+
+function plcTimerQ(timerState, name) {
+  const st = timerState && timerState[name];
+  return st && st.q === '1' ? '1' : '0';
+}
+
+reg(2787, 'comp-plc-lang', 'P5.1 TON — IN off resets Q', function(h, session) {
+  session.run(PLC_TON_PROG);
+  const inst = session.interp.inlineInstances.get('.machine');
+  const ts = {};
+  const out = {};
+  plcExecScans(inst, { START: '1' }, out, ts, 3);
+  h.assert('Q was on', plcTimerQ(ts, 'startDelay'), '1');
+  executePlcScan(inst, { START: '0' }, out, ts);
+  h.assert('Q reset', plcTimerQ(ts, 'startDelay'), '0');
+  h.assert('motor off', out.MOTOR, '0');
+});
+
+reg(2788, 'comp-plc-lang', 'P5.1 TOF — Q holds after IN off', function(h, session) {
+  session.run(PLC_TOF_PROG);
+  const inst = session.interp.inlineInstances.get('.hold');
+  const ts = {};
+  const out = {};
+  executePlcScan(inst, { RUN: '1' }, out, ts);
+  h.assert('run on', out.MOTOR, '1');
+  executePlcScan(inst, { RUN: '0' }, out, ts);
+  h.assert('hold scan1', out.MOTOR, '1');
+  executePlcScan(inst, { RUN: '0' }, out, ts);
+  h.assert('off scan2 PT=2', out.MOTOR, '0');
+});
+
+reg(2789, 'comp-plc-lang', 'P5.1 TOF — IN on cancels delay', function(h, session) {
+  session.run(PLC_TOF_PROG);
+  const inst = session.interp.inlineInstances.get('.hold');
+  const ts = {};
+  const out = {};
+  executePlcScan(inst, { RUN: '1' }, out, ts);
+  executePlcScan(inst, { RUN: '0' }, out, ts);
+  executePlcScan(inst, { RUN: '1' }, out, ts);
+  h.assert('back on', out.MOTOR, '1');
+  executePlcScan(inst, { RUN: '0' }, out, ts);
+  h.assert('hold again', out.MOTOR, '1');
+});
+
+reg(2790, 'comp-plc-lang', 'P5.1 TON inside IF branch', function(h, session) {
+  session.run(PLC_TON_IF_PROG);
+  const inst = session.interp.inlineInstances.get('.gate');
+  const ts = {};
+  const out = {};
+  plcExecScans(inst, { ENABLE: '1', STEP: '1' }, out, ts, 1);
+  h.assert('scan1 out off', out.OUT, '0');
+  plcExecScans(inst, { ENABLE: '1', STEP: '1' }, out, ts, 1);
+  h.assert('scan2 out on', out.OUT, '1');
+  executePlcScan(inst, { ENABLE: '0', STEP: '0' }, out, ts);
+  h.assert('disabled', out.OUT, '0');
+});
+
+reg(2791, 'comp-plc-lang', 'P5.1 error PT < 1', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { START }
+outputs: { MOTOR }
+TON t(IN := START, PT := 0)
+MOTOR = t.Q`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('pt error', String(err.includes('PT must be')), 'true');
+});
+
+reg(2792, 'comp-plc-lang', 'P5.1 error duplicate timer name', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { START }
+outputs: { MOTOR }
+TON a(IN := START, PT := 1)
+TON a(IN := START, PT := 2)
+MOTOR = a.Q`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('dup timer', String(err.includes('duplicate timer')), 'true');
+});
+
+reg(2793, 'comp-plc-lang', 'P5.1 error timer name conflicts with I/O', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { START }
+outputs: { MOTOR }
+TON MOTOR(IN := START, PT := 1)
+MOTOR = MOTOR.Q`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('conflict', String(err.includes('conflicts')), 'true');
+});
+
+reg(2794, 'comp-plc', 'P5.1 TON panel — 3 scans delay', function(h, session) {
+  const { interp } = session.run(PLC_DOC_TON_EX17);
+  h.assert('motor on', interp.getValueFromRef(interp.components.get('.motorLed').ref), '1');
+  h.assert('ready on', interp.getValueFromRef(interp.components.get('.readyLed').ref), '1');
+  h.assert('scanCount 3', String(interp.components.get('.ctrl').scanCount), '3');
+});
+
+reg(2795, 'comp-plc', 'P5.1 TOF panel — hold then release', function(h, session) {
+  const { interp } = session.run(PLC_DOC_TOF_EX18);
+  h.assert('motor off after PT', interp.getValueFromRef(interp.components.get('.motorLed').ref), '0');
+  h.assert('scanCount 3', String(interp.components.get('.ctrl').scanCount), '3');
+});
+
+reg(2796, 'comp-plc-lang', 'doc example 17 — TON logts-play', function(h, session) {
+  const { interp } = session.run(PLC_DOC_TON_EX17);
+  h.assert('ex17 motor', interp.getValueFromRef(interp.components.get('.motorLed').ref), '1');
+  h.assert('ex17 ready', interp.getValueFromRef(interp.components.get('.readyLed').ref), '1');
+});
+
+reg(2797, 'comp-plc-lang', 'doc example 18 — TOF logts-play', function(h, session) {
+  const { interp } = session.run(PLC_DOC_TOF_EX18);
+  h.assert('ex18 motor off', interp.getValueFromRef(interp.components.get('.motorLed').ref), '0');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();
