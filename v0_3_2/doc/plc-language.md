@@ -177,7 +177,7 @@ read inputs → execute statements in order → write outputs
 | **Statement order** | Matters — later assigns to the same output win |
 | **Timers / counters** | Execute in place; outputs (`.Q`) visible to following statements in the **same** scan |
 | **State** | Timer/counter internal state persists on `comp [plc]` between scans |
-| **Re-RUN** | New run resets timer and counter state |
+| **Re-RUN** | Default (`retain: 0` on `comp [plc]`): timer/counter state resets. With `retain: 1`, FB state survives re-RUN in the same session — see [plc.md](plc.md) |
 
 Triggering scans: `.ctrl:{ set = 1 }`, `scanTime`, external clock — [plc.md — Scan timing](plc.md#scan-timing-p4).
 

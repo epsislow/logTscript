@@ -52,7 +52,7 @@ todos:
     status: completed
   - id: p5-2b-retain
     content: "P5.2b: retain:0/1 pe comp [plc] — păstrare timerState/counterState la re-RUN"
-    status: pending
+    status: completed
   - id: pc-st-control
     content: "P+c: VAR/END_VAR, CONST, CASE/OF, RETURN — limbaj ST extins"
     status: pending

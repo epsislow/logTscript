@@ -53,6 +53,9 @@
 
       run(src) {
         if (this.interp) {
+          if (typeof plcRetainSaveFromContext === 'function') {
+            plcRetainSaveFromContext(this.interp);
+          }
           if (this.interp.oscTimers) {
             for (const tid of this.interp.oscTimers) clearTimeout(tid);
             this.interp.oscTimers = [];
@@ -295,6 +298,9 @@
         }
         if (typeof setDeviceOperationInstanceId === 'function') {
           setDeviceOperationInstanceId(null);
+        }
+        if (typeof plcRetainClearInstance === 'function') {
+          plcRetainClearInstance(this.instanceId);
         }
         this.interp = null;
         this.out = [];

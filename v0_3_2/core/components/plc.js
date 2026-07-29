@@ -89,6 +89,62 @@ function plcClearTimers(ctx) {
   ctx.plcTimers = [];
 }
 
+const _plcRetainCaches = new Map();
+
+function _plcRetainCacheFor(instanceId) {
+  const id = instanceId != null ? instanceId : 1;
+  if (!_plcRetainCaches.has(id)) _plcRetainCaches.set(id, new Map());
+  return _plcRetainCaches.get(id);
+}
+
+function plcCloneFbState(state) {
+  if (!state) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(state)) {
+    out[k] = Object.assign({}, v);
+  }
+  return out;
+}
+
+function plcRetainSaveFromContext(ctx) {
+  if (!ctx || !ctx.components) return;
+  const instanceId = ctx._instanceId != null ? ctx._instanceId : 1;
+  const cache = _plcRetainCacheFor(instanceId);
+  const fpFn = typeof plcFingerprintProgram === 'function' ? plcFingerprintProgram : null;
+  for (const [compName, comp] of ctx.components) {
+    if (!comp || comp.type !== 'plc') continue;
+    if (comp.retain !== 1) {
+      cache.delete(compName);
+      continue;
+    }
+    const inst = ctx.inlineInstances && comp.programRef ? ctx.inlineInstances.get(comp.programRef) : null;
+    const fingerprint = inst && fpFn ? fpFn(inst) : '';
+    cache.set(compName, {
+      fingerprint,
+      timerState: plcCloneFbState(comp.timerState),
+      counterState: plcCloneFbState(comp.counterState),
+    });
+  }
+}
+
+function plcRetainRestore(instanceId, compName, fingerprint) {
+  const entry = _plcRetainCacheFor(instanceId).get(compName);
+  if (!entry || entry.fingerprint !== fingerprint) return null;
+  return {
+    timerState: plcCloneFbState(entry.timerState),
+    counterState: plcCloneFbState(entry.counterState),
+  };
+}
+
+function plcRetainClearInstance(instanceId) {
+  _plcRetainCaches.delete(instanceId != null ? instanceId : 1);
+}
+
+if (typeof globalThis !== 'undefined') {
+  globalThis.plcRetainSaveFromContext = plcRetainSaveFromContext;
+  globalThis.plcRetainClearInstance = plcRetainClearInstance;
+}
+
 var PlcComponent = class PlcComponent extends BuiltinComponent {
   static get type() { return 'plc'; }
   static get shortnames() { return {}; }
@@ -121,6 +177,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
         { name: 'scanTime', value: 'integer (ms, 0 = event-driven)' },
         { name: 'scanDuration', value: 'integer (ms simulated busy, default 1)' },
         { name: 'strict', value: '0/1 (overrun miss when 1)' },
+        { name: 'retain', value: '0/1 (default 0, preserve FB state on re-RUN)' },
       ],
       initValue: '1bit',
       pins: [{ bits: '1', name: 'set' }],
@@ -157,6 +214,14 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     if (v === 1 || v === '1' || v === true) return true;
     if (v === 0 || v === '0' || v === false) return false;
     throw Error('plc strict must be 0 or 1');
+  }
+
+  _parseRetain(attributes, compName) {
+    if (attributes.retain === undefined || attributes.retain === null) return 0;
+    const v = attributes.retain;
+    if (v === 0 || v === '0' || v === false) return 0;
+    if (v === 1 || v === '1' || v === true) return 1;
+    throw Error(`plc ${compName}: invalid retain value, expected 0 or 1`);
   }
 
   _timingMode(comp) {
@@ -394,6 +459,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     const scanTime = this._parseScanTime(attributes);
     const scanDuration = this._parseScanDuration(attributes, scanTime);
     const strict = this._parseStrict(attributes);
+    const retain = this._parseRetain(attributes, name);
 
     const outputState = {};
     for (const sym of Object.keys(inst.outputs || {})) {
@@ -401,6 +467,19 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     }
     const timerState = {};
     const counterState = {};
+
+    const instanceId = ctx && ctx._instanceId != null ? ctx._instanceId : 1;
+    const fpFn = typeof plcFingerprintProgram === 'function' ? plcFingerprintProgram : null;
+    const fingerprint = fpFn ? fpFn(inst) : '';
+    if (retain === 1) {
+      const restored = plcRetainRestore(instanceId, name, fingerprint);
+      if (restored) {
+        Object.assign(timerState, restored.timerState);
+        Object.assign(counterState, restored.counterState);
+      }
+    } else {
+      _plcRetainCacheFor(instanceId).delete(name);
+    }
 
     if (typeof addPlc === 'function') {
       addPlc(baseId, {
@@ -414,6 +493,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
         scanTime,
         scanDuration,
         strict,
+        retain,
       });
     }
 
@@ -430,6 +510,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       scanTime,
       scanDuration,
       strict,
+      retain,
       busy: false,
       skipped: false,
       missed: false,
@@ -465,6 +546,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     if (compInfo.scanTime == null) compInfo.scanTime = this._parseScanTime(attributes);
     if (compInfo.scanDuration == null) compInfo.scanDuration = this._parseScanDuration(attributes, compInfo.scanTime || 0);
     if (compInfo.strict == null) compInfo.strict = this._parseStrict(attributes);
+    if (compInfo.retain == null) compInfo.retain = this._parseRetain(attributes, compInfo.name || '.plc');
     if (compInfo.busy == null) compInfo.busy = false;
     if (compInfo.skipped == null) compInfo.skipped = false;
     if (compInfo.missed == null) compInfo.missed = false;
@@ -476,6 +558,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     lines.push(`${alias} (comp [plc])`);
     lines.push('');
     if (comp.programRef) lines.push(`program: ${comp.programRef}`);
+    lines.push(`retain: ${comp.retain != null ? comp.retain : 0}`);
     const scanTime = comp.scanTime != null ? comp.scanTime : 0;
     lines.push(`scanTime: ${scanTime} ms (${scanTime > 0 ? 'auto-scan' : 'event-driven (external set/osc)'})`);
     if (scanTime > 0) {
@@ -553,4 +636,8 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
   }
 };
 
-if (typeof module !== 'undefined' && module.exports) { module.exports = PlcComponent; }
+if (typeof module !== 'undefined' && module.exports) {
+  PlcComponent.plcRetainSaveFromContext = plcRetainSaveFromContext;
+  PlcComponent.plcRetainClearInstance = plcRetainClearInstance;
+  module.exports = PlcComponent;
+}

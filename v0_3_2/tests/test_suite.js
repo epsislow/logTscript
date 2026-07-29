@@ -29782,5 +29782,120 @@ reg(2812, 'comp-plc', 'P5.2 CTD panel — 3 steps count down', function(h, sessi
   h.assert('scanCount 5', String(interp.components.get('.ctrl').scanCount), '5');
 });
 
+const PLC_RETAIN_SETUP = (retainLine) => `
+inline [plc] .counter:
+  inputs: { PULSE, RESET }
+  outputs: { FULL }
+  CTU cnt(CU := PULSE, R := RESET, PV := 10)
+  FULL = cnt.Q
+  :
+
+comp [switch] .pulse:
+  = 0
+  :
+
+comp [switch] .reset:
+  = 0
+  :
+
+comp [led] .full:
+  :
+
+comp [plc] .ctrl:
+  program: .counter
+  ${retainLine}
+  inputs: { PULSE = .pulse, RESET = .reset }
+  outputs: { FULL = .full }
+  on: 1
+  :
+`;
+
+const PLC_TWO_PULSES = `
+.pulse = 1
+.ctrl:{ set = 1 }
+.pulse = 0
+.ctrl:{ set = 1 }
+.pulse = 1
+.ctrl:{ set = 1 }
+.pulse = 0
+.ctrl:{ set = 1 }
+`;
+
+const PLC_ONE_PULSE = `
+.pulse = 1
+.ctrl:{ set = 1 }
+.pulse = 0
+.ctrl:{ set = 1 }
+`;
+
+function plcCntCv(interp, counterName) {
+  const st = interp.components.get('.ctrl').counterState;
+  const name = counterName || 'cnt';
+  return st && st[name] ? st[name].cv : 0;
+}
+
+reg(2813, 'comp-plc', 'P5.2b retain:0 resets counter state on re-RUN', function(h, session) {
+  session.run(PLC_RETAIN_SETUP('retain: 0') + PLC_TWO_PULSES);
+  h.assert('cv before rerun', String(plcCntCv(session.interp)), '2');
+  session.run(PLC_RETAIN_SETUP('retain: 0') + PLC_ONE_PULSE);
+  h.assert('cv after rerun', String(plcCntCv(session.interp)), '1');
+});
+
+reg(2814, 'comp-plc', 'P5.2b retain:1 preserves counter state on re-RUN', function(h, session) {
+  session.run(PLC_RETAIN_SETUP('retain: 1') + PLC_TWO_PULSES);
+  h.assert('cv before rerun', String(plcCntCv(session.interp)), '2');
+  session.run(PLC_RETAIN_SETUP('retain: 1') + PLC_ONE_PULSE);
+  h.assert('cv after rerun', String(plcCntCv(session.interp)), '3');
+});
+
+reg(2815, 'comp-plc', 'P5.2b retain:2 elaboration error', function(h, session) {
+  let err = '';
+  try {
+    session.run(PLC_RETAIN_SETUP('retain: 2'));
+  } catch (e) { err = String(e.message || e); }
+  h.assert('invalid retain', String(err.includes('invalid retain value')), 'true');
+});
+
+reg(2816, 'comp-plc', 'P5.2b doc shows retain attribute', function(h, session) {
+  const out = session.runDoc(PLC_RETAIN_SETUP('retain: 1') + '\ndoc(comp.plc)\ndoc(.ctrl)');
+  h.assert('type retain', String(out.some(l => l.includes('retain') && l.includes('0/1'))), 'true');
+  h.assert('instance retain', String(out.some(l => l.includes('retain: 1'))), 'true');
+});
+
+reg(2817, 'comp-plc', 'P5.2b program change invalidates retained state', function(h, session) {
+  const setupV1 = PLC_RETAIN_SETUP('retain: 1');
+  const setupV2 = `
+inline [plc] .counter:
+  inputs: { PULSE, RESET }
+  outputs: { FULL }
+  CTU tally(CU := PULSE, R := RESET, PV := 10)
+  FULL = tally.Q
+  :
+
+comp [switch] .pulse:
+  = 0
+  :
+
+comp [switch] .reset:
+  = 0
+  :
+
+comp [led] .full:
+  :
+
+comp [plc] .ctrl:
+  program: .counter
+  retain: 1
+  inputs: { PULSE = .pulse, RESET = .reset }
+  outputs: { FULL = .full }
+  on: 1
+  :
+`;
+  session.run(setupV1 + PLC_TWO_PULSES);
+  h.assert('cv before change', String(plcCntCv(session.interp)), '2');
+  session.run(setupV2 + PLC_ONE_PULSE);
+  h.assert('cv after program change', String(plcCntCv(session.interp, 'tally')), '1');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

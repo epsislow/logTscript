@@ -400,6 +400,9 @@ function preemptInstanceForRun(instanceId, newOwnerTabId) {
   }
 
   stopRunContextTimers(ctx);
+  if (ctx.interp && typeof plcRetainSaveFromContext === 'function') {
+    plcRetainSaveFromContext(ctx.interp);
+  }
   setInstanceOwner(id, newOwnerTabId);
 
   if (ctx.deviceMaps && typeof clearDeviceMaps === 'function') {
@@ -426,6 +429,9 @@ function preemptInstanceForRun(instanceId, newOwnerTabId) {
 
 function releaseRunContext(instanceId) {
   const id = clampInstance(instanceId);
+  if (typeof plcRetainClearInstance === 'function') {
+    plcRetainClearInstance(id);
+  }
   if (typeof unregisterNetworkEndpoints === 'function') {
     unregisterNetworkEndpoints(id);
   }

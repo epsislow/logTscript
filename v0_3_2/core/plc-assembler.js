@@ -808,6 +808,17 @@ function formatPlcInstanceDoc(alias, inst) {
   return lines;
 }
 
+function plcFingerprintProgram(inst) {
+  const items = [];
+  plcWalkStatements(inst && inst.statements, (stmt) => {
+    if (stmt.type === 'ton' || stmt.type === 'tof' || stmt.type === 'ctu' || stmt.type === 'ctd') {
+      items.push(`${stmt.name}:${stmt.type}`);
+    }
+  });
+  items.sort();
+  return items.join('|');
+}
+
 function formatPlcTypeDoc() {
   return [
     'inline [plc] .name:',
@@ -825,6 +836,7 @@ function formatPlcTypeDoc() {
     'Timers: PT = preset in scan cycles; read Q as name.Q',
     'Counters: PV = preset; read Q as name.Q; compare CV as name.CV >= N',
     'Bind with comp [plc] program: .name and I/O map (see doc/plc.md and doc/plc-language.md)',
+    'comp [plc] retain: 0/1 (default 0) — preserve timer/counter FB state on re-RUN in same session',
   ];
 }
 
@@ -833,6 +845,7 @@ const plcAssemblerExports = {
   executePlcScan,
   formatPlcInstanceDoc,
   formatPlcTypeDoc,
+  plcFingerprintProgram,
   plcBit,
   plcNormalizeBits,
   plcTimerQ,
@@ -849,6 +862,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.executePlcScan = executePlcScan;
   globalThis.formatPlcInstanceDoc = formatPlcInstanceDoc;
   globalThis.formatPlcTypeDoc = formatPlcTypeDoc;
+  globalThis.plcFingerprintProgram = plcFingerprintProgram;
   globalThis.plcTimerQ = plcTimerQ;
   globalThis.plcCounterQ = plcCounterQ;
   globalThis.plcCounterCV = plcCounterCV;

@@ -97,10 +97,11 @@ comp [plc] .ctrl:
 | **`scanTime:`** | optional | **ms** — `0`/omitted = event-driven; **`N > 0`** = internal auto-scan every ~N ms |
 | **`scanDuration:`** | optional | **ms** simulated execution time per scan (`busy = 1`); default **`1`** when `scanTime > 0` |
 | **`strict:`** | optional | **`0`** (default) stretch missed ticks; **`1`** = overrun/miss (`overrunCount++`) |
+| **`retain:`** | optional | **`0`** (default) reset timer/counter FB state on re-RUN; **`1`** preserve FB state in same session |
 
 \*Every program symbol must appear **exactly once** in the matching map. Missing or extra keys → **elaboration error**.
 
-`doc(comp.plc)` shows the component type; `doc(.ctrl)` shows program ref, maps, `scanCount`, and last `outputState`.
+`doc(comp.plc)` shows the component type; `doc(.ctrl)` shows program ref, **`retain`**, maps, `scanCount`, and last `outputState`.
 
 ### Scan cycle (one pass)
 
@@ -1057,6 +1058,92 @@ show(.ctrl:scanCount)
 ```
 
 After Load & Run: **`scanCount` = 7** (1 load + 6 scan pairs), **DONE LED `1`** (CV decremented to 0).
+
+### Example 22 — `retain: 0` (reset FB state on re-RUN)
+
+Default behaviour: timer and counter internal state (`timerState`, `counterState`) is cleared when you **Load & Run** again in the same browser session.
+
+```logts-play
+inline [plc] .counter:
+  inputs: { PULSE, RESET }
+  outputs: { FULL }
+  CTU cnt(CU := PULSE, R := RESET, PV := 10)
+  FULL = cnt.Q
+  :
+
+comp [switch] .pulse:
+  = 0
+  :
+
+comp [switch] .reset:
+  = 0
+  :
+
+comp [led] .full:
+  :
+
+comp [plc] .ctrl:
+  program: .counter
+  retain: 0
+  inputs: { PULSE = .pulse, RESET = .reset }
+  outputs: { FULL = .full }
+  on: 1
+  :
+
+.pulse = 1
+.ctrl:{ set = 1 }
+.pulse = 0
+.ctrl:{ set = 1 }
+.pulse = 1
+.ctrl:{ set = 1 }
+.pulse = 0
+.ctrl:{ set = 1 }
+```
+
+Run twice (second Run adds one more pulse): with **`retain: 0`**, CV after the extra pulse is **`1`**, not **`3`**.
+
+### Example 23 — `retain: 1` (preserve FB state on re-RUN)
+
+With **`retain: 1`**, `timerState` and `counterState` survive **re-RUN in the same session** if the program FB layout is unchanged. `outputState`, `scanCount`, and `busy` are **not** retained.
+
+```logts-play
+inline [plc] .counter:
+  inputs: { PULSE, RESET }
+  outputs: { FULL }
+  CTU cnt(CU := PULSE, R := RESET, PV := 10)
+  FULL = cnt.Q
+  :
+
+comp [switch] .pulse:
+  = 0
+  :
+
+comp [switch] .reset:
+  = 0
+  :
+
+comp [led] .full:
+  :
+
+comp [plc] .ctrl:
+  program: .counter
+  retain: 1
+  inputs: { PULSE = .pulse, RESET = .reset }
+  outputs: { FULL = .full }
+  on: 1
+  :
+
+.pulse = 1
+.ctrl:{ set = 1 }
+.pulse = 0
+.ctrl:{ set = 1 }
+.pulse = 1
+.ctrl:{ set = 1 }
+.pulse = 0
+.ctrl:{ set = 1 }
+```
+
+After two Runs (second adds one pulse): CV is **`3`** (2 preserved + 1 new). Changing timer/counter names or types in the program invalidates retained state.
 
 ---
 

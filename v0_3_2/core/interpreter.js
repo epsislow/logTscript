@@ -12667,6 +12667,9 @@ if (s.assignment) {
         if (result._plcClock != null) compInfo._plcClock = result._plcClock;
         if (result._plcNextScanAt != null) compInfo._plcNextScanAt = result._plcNextScanAt;
         if (result._plcBusyUntil != null) compInfo._plcBusyUntil = result._plcBusyUntil;
+        if (result.timerState) compInfo.timerState = result.timerState;
+        if (result.counterState) compInfo.counterState = result.counterState;
+        if (result.retain != null) compInfo.retain = result.retain;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;
