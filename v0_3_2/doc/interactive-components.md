@@ -1,8 +1,8 @@
 # Interactive components
 
-Per-component pages: [switch.md](switch.md), [key.md](key.md), [keyboard.md](keyboard.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md), [clcd.md](clcd.md). Full catalog: [components.md](components.md).
+Per-component pages: [switch.md](switch.md), [key.md](key.md), [keyboard.md](keyboard.md), [dip.md](dip.md), [rotary.md](rotary.md), [slider.md](slider.md), [sensor.md](sensor.md), [clcd.md](clcd.md). Full catalog: [components.md](components.md).
 
-**Switch**, **key**, **keyboard**, **dip**, **rotary**, and **slider** are input components you control from the devices panel while the program is running.
+**Switch**, **key**, **keyboard**, **dip**, **rotary**, **slider**, and **sensor** are input components you control from the devices panel while the program is running.
 
 See [signal-propagation.md](signal-propagation.md) for how those updates spread through your circuit.
 
@@ -24,6 +24,7 @@ Inside the engine, each panel control uses a small callback when you interact wi
 | `dip` | `onChange` | Each time you flip one DIP position (`index`, `checked`) |
 | `rotary` | `onChange` | When the selected **state** changes (drag or step the knob) |
 | `slider` | `onChange` | When the scalar **value** changes (drag thumb or click track) |
+| `sensor` | `onChange` | Digital: toggle (like switch). Analog: track value changes (like slider) |
 
 **`key` and `clcd` (with `touch: 1`) use `onPress` / `onRelease`.** All other panel inputs above use `onChange` (or, for the oscillator, automatic HIGH/LOW transitions — not user clicks).
 

@@ -30,6 +30,7 @@ function createDeviceMaps() {
     panelKeys: new Map(),
     sliders: new Map(),
     sliderValues: new Map(),
+    sensors: new Map(),
     rotaryKnobs: new Map(),
     rotaryKnobValues: new Map(),
     cpus: new Map()
@@ -133,6 +134,7 @@ function publishWindowDeviceAliases(maps) {
   window.panelKeys = maps.panelKeys;
   window.sliders = maps.sliders;
   window.sliderValues = maps.sliderValues;
+  window.sensors = maps.sensors;
   window.rotaryKnobs = maps.rotaryKnobs;
   window.rotaryKnobValues = maps.rotaryKnobValues;
   try {

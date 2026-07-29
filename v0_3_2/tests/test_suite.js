@@ -2544,7 +2544,7 @@ probe(.n:get)`;
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'cpu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider'];
+    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'cpu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider', 'sensor'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -2567,6 +2567,8 @@ probe(.n:get)`;
     h.assert('rotary 4 states', String(registry.get('rotary').getWidthBits({states: '4'})), '2');
     h.assert('slider default bits', String(registry.get('slider').getWidthBits({})), '4');
     h.assert('slider length 8', String(registry.get('slider').getWidthBits({length: '8'})), '8');
+    h.assert('sensor default proximity', String(registry.get('sensor').getWidthBits({})), '1');
+    h.assert('sensor temperature', String(registry.get('sensor').getWidthBits({kind: 'temperature'})), '8');
     h.assert('clcd default bits', String(registry.get('clcd').getWidthBits({})), '1');
     h.assert('clcd 3 symbols', String(registry.get('clcd').getWidthBits({clcdSymbols: [
       { bit: 0 }, { bit: 1 }, { bit: 2 }
@@ -31207,6 +31209,338 @@ reg(2869, 'comp-plc', 'doc(.ctrl) shows globals', function(h, session) {
   h.assert('globals header', String(out.some(l => l.includes('globals:'))), 'true');
   h.assert('READY decl', String(out.some(l => /READY:\s*1/.test(l))), 'true');
   h.assert('globalState', String(out.some(l => l.includes('globalState'))), 'true');
+});
+
+/* ========== comp [sensor] ========== */
+
+reg(2870, 'sensor', 'registry + doc(comp.sensor)', function(h, session) {
+  const registry = session._ensureRegistry();
+  h.assert('sensor registered', String(registry.has('sensor')), 'true');
+  const out = session.runDoc('doc(comp.sensor)');
+  h.assert('doc first line', out[0], 'comp [sensor] .name:');
+  h.assert('doc kind', String(out.some(l => l.includes('kind: string'))), 'true');
+});
+
+reg(2871, 'sensor', 'digital default proximity 1wire', function(h, session) {
+  const { interp } = session.run(`comp [sensor] .prox::
+
+1wire p = .prox:get`);
+  h.assert('initial 0', session.getWire(interp, 'p'), '0');
+  session.setComp(interp, '.prox', '1');
+  h.assert('after 1', session.getWire(interp, 'p'), '1');
+});
+
+reg(2872, 'sensor', 'digital kinds motion limit beam float', function(h, session) {
+  for (const kind of ['motion', 'limit', 'beam', 'float']) {
+    const { interp } = session.run(`comp [sensor] .s:
+  kind: ${kind}
+  text: 'X'
+  :
+
+1wire v = .s:get`);
+    h.assert(kind + ' width', String(interp.components.get('.s') && 1), '1');
+    session.setComp(interp, '.s', '1');
+    h.assert(kind + ' on', session.getWire(interp, 'v'), '1');
+  }
+});
+
+reg(2873, 'sensor', 'digital inverted writes inverted storage', function(h, session) {
+  const { interp } = session.run(`comp [sensor] .prox:
+  kind: proximity
+  inverted
+  on: 1
+  :
+
+1wire p = .prox:get
+.prox:{ data = 1, set = 1 }`);
+  h.assert('forced 1', session.getWire(interp, 'p'), '1');
+});
+
+reg(2874, 'sensor', 'digital unknown kind error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`comp [sensor] .bad:
+  kind: banana
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('unknown kind', String(/Unknown sensor kind/.test(err)), 'true');
+});
+
+reg(2875, 'sensor', 'digital step forbidden', function(h, session) {
+  let err = '';
+  try {
+    session.run(`comp [sensor] .bad:
+  kind: proximity
+  step: 1
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('step error', String(/step is not allowed/.test(err)), 'true');
+});
+
+reg(2876, 'sensor', 'analog temperature defaults + wire width 8', function(h, session) {
+  const { interp } = session.run(`comp [sensor] .temp:
+  kind: temperature
+  :
+
+8wire t = .temp:get`);
+  const cfg = SensorComponent.resolveConfig({ kind: 'temperature' });
+  const idx = SensorComponent.rawToIndex(20, cfg);
+  const bin = SensorComponent.indexToBin(idx, 8);
+  h.assert('default ~20C bin', session.getWire(interp, 't'), bin);
+});
+
+reg(2877, 'sensor', 'analog mag positive display math', function(h, session) {
+  const cfg = SensorComponent.resolveConfig({ kind: 'distance', min: 0, max: 400, mag: 2, default: 100 });
+  h.assert('display 1.00', SensorComponent.formatDisplay(100, 2, 'cm', null, 0).replace(' cm', ''), '1.00');
+  h.assert('min display', SensorComponent.formatDisplay(0, 2, 'cm', null, 0), '0.00 cm');
+  h.assert('max display', SensorComponent.formatDisplay(400, 2, 'cm', null, 0), '4.00 cm');
+});
+
+reg(2878, 'sensor', 'analog mag negative', function(h, session) {
+  h.assert('mag-2', SensorComponent.formatDisplay(4, -2, 'cm', null, 0), '400 cm');
+});
+
+reg(2879, 'sensor', 'analog Kelvin defaults', function(h, session) {
+  const cfg = SensorComponent.resolveConfig({ kind: 'temperature', unit: 'K' });
+  h.assert('min', String(cfg.min), '233');
+  h.assert('max', String(cfg.max), '398');
+  h.assert('default', String(cfg.default), '293');
+  const { interp } = session.run(`comp [sensor] .tk:
+  kind: temperature
+  unit: 'K'
+  :
+
+8wire t = .tk:get`);
+  const idx = SensorComponent.rawToIndex(293, cfg);
+  h.assert('bin', session.getWire(interp, 't'), SensorComponent.indexToBin(idx, 8));
+});
+
+reg(2880, 'sensor', 'analog humidity bounds + step', function(h, session) {
+  const cfg = SensorComponent.resolveConfig({ kind: 'humidity', step: 10 });
+  h.assert('positions', String(cfg.positions), '11');
+  h.assert('auto length', String(cfg.length), '4');
+  const { interp } = session.run(`comp [sensor] .rh:
+  kind: humidity
+  step: 10
+  :
+
+4wire h = .rh:get`);
+  const idx = SensorComponent.rawToIndex(50, cfg);
+  h.assert('default 50', session.getWire(interp, 'h'), SensorComponent.indexToBin(idx, cfg.length));
+});
+
+reg(2881, 'sensor', 'analog step not divisible error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`comp [sensor] .bad:
+  kind: humidity
+  min: 0
+  max: 100
+  step: 3
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('divisible', String(/divisible by step/.test(err)), 'true');
+});
+
+reg(2882, 'sensor', 'analog set/data forces bin', function(h, session) {
+  const { interp } = session.run(`comp [sensor] .temp:
+  kind: temperature
+  on: 1
+  :
+
+8wire t = .temp:get
+.temp:{ data = 11111111, set = 1 }`);
+  h.assert('max bin', session.getWire(interp, 't'), '11111111');
+});
+
+reg(2883, 'sensor', 'analog negative min temperature', function(h, session) {
+  const cfg = SensorComponent.resolveConfig({ kind: 'temperature', min: -20, max: 40, default: 0 });
+  h.assert('raw0 index mid-ish', String(SensorComponent.rawToIndex(0, cfg) > 0), 'true');
+  h.assert('raw-20 is 0', String(SensorComponent.rawToIndex(-20, cfg)), '0');
+});
+
+const SENSOR_DOC_PROX = `
+comp [sensor] .prox:
+  kind: proximity
+  text: 'IN'
+  nl
+  :
+
+1wire p = .prox:get
+show(p)
+`;
+
+const SENSOR_DOC_TEMP = `
+comp [sensor] .temp:
+  kind: temperature
+  text: 'T'
+  nl
+  :
+
+8wire t = .temp:get
+show(t)
+`;
+
+const SENSOR_DOC_KELVIN = `
+comp [sensor] .tempK:
+  kind: temperature
+  unit: 'K'
+  text: 'Tk'
+  nl
+  :
+
+8wire k = .tempK:get
+show(k)
+`;
+
+const SENSOR_DOC_MAG_POS = `
+comp [sensor] .distFine:
+  kind: distance
+  min: 0
+  max: 400
+  mag: 2
+  default: 100
+  text: 'd'
+  nl
+  :
+
+8wire d = .distFine:get
+show(d)
+`;
+
+const SENSOR_DOC_MAG_NEG = `
+comp [sensor] .coarse:
+  kind: distance
+  min: 1
+  max: 4
+  mag: -2
+  default: 2
+  unit: 'cm'
+  text: 'D'
+  nl
+  :
+
+8wire x = .coarse:get
+show(x)
+`;
+
+const SENSOR_DOC_RH_STEP = `
+comp [sensor] .rh:
+  kind: humidity
+  step: 10
+  text: 'RH'
+  nl
+  :
+
+4wire h = .rh:get
+show(h)
+`;
+
+const SENSOR_DOC_FORCE = `
+comp [sensor] .temp:
+  kind: temperature
+  on: 1
+  nl
+  :
+
+8wire t = .temp:get
+.temp:{ data = 11111111, set = 1 }
+show(t)
+`;
+
+const SENSOR_DOC_PLC = `
+inline [plc] .machine:
+  inputs: { PROX }
+  outputs: { ALARM }
+  IF PROX THEN ALARM = 1 ELSE ALARM = 0 END_IF
+  :
+
+comp [sensor] .prox:
+  kind: proximity
+  = 1
+  nl
+  :
+
+comp [led] .alarmLed:
+  color: ^f00
+  on: 1
+  nl
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 0
+  inputs: { PROX = .prox }
+  outputs: { ALARM = .alarmLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+show(.alarmLed:get)
+`;
+
+reg(2884, 'sensor', 'doc play — proximity initial 0', function(h, session) {
+  const { interp } = session.run(SENSOR_DOC_PROX);
+  h.assert('p', session.getWire(interp, 'p'), '0');
+});
+
+reg(2885, 'sensor', 'doc play — temperature default ~20C', function(h, session) {
+  const { interp } = session.run(SENSOR_DOC_TEMP);
+  const cfg = SensorComponent.resolveConfig({ kind: 'temperature' });
+  const bin = SensorComponent.indexToBin(SensorComponent.rawToIndex(20, cfg), 8);
+  h.assert('t', session.getWire(interp, 't'), bin);
+});
+
+reg(2886, 'sensor', 'doc play — Kelvin default 293', function(h, session) {
+  const { interp } = session.run(SENSOR_DOC_KELVIN);
+  const cfg = SensorComponent.resolveConfig({ kind: 'temperature', unit: 'K' });
+  const bin = SensorComponent.indexToBin(SensorComponent.rawToIndex(293, cfg), 8);
+  h.assert('k', session.getWire(interp, 'k'), bin);
+});
+
+reg(2887, 'sensor', 'doc play — mag +2 distance', function(h, session) {
+  const { interp } = session.run(SENSOR_DOC_MAG_POS);
+  const cfg = SensorComponent.resolveConfig({ kind: 'distance', min: 0, max: 400, mag: 2, default: 100 });
+  h.assert('d', session.getWire(interp, 'd'), SensorComponent.indexToBin(SensorComponent.rawToIndex(100, cfg), 8));
+  h.assert('panel math', SensorComponent.formatDisplay(100, 2, 'cm', null, 0), '1.00 cm');
+});
+
+reg(2888, 'sensor', 'doc play — mag -2 distance', function(h, session) {
+  const { interp } = session.run(SENSOR_DOC_MAG_NEG);
+  const cfg = SensorComponent.resolveConfig({ kind: 'distance', min: 1, max: 4, mag: -2, default: 2, unit: 'cm' });
+  h.assert('x', session.getWire(interp, 'x'), SensorComponent.indexToBin(SensorComponent.rawToIndex(2, cfg), 8));
+  h.assert('panel', SensorComponent.formatDisplay(2, -2, 'cm', null, 0), '200 cm');
+});
+
+reg(2889, 'sensor', 'doc play — humidity step 10', function(h, session) {
+  const { interp } = session.run(SENSOR_DOC_RH_STEP);
+  const cfg = SensorComponent.resolveConfig({ kind: 'humidity', step: 10 });
+  h.assert('h', session.getWire(interp, 'h'), SensorComponent.indexToBin(SensorComponent.rawToIndex(50, cfg), cfg.length));
+});
+
+reg(2890, 'sensor', 'doc play — force max bin', function(h, session) {
+  const { interp } = session.run(SENSOR_DOC_FORCE);
+  h.assert('t', session.getWire(interp, 't'), '11111111');
+});
+
+reg(2891, 'sensor', 'doc play — PLC proximity alarm', function(h, session) {
+  const { interp } = session.run(SENSOR_DOC_PLC);
+  h.assert('alarm', interp.getValueFromRef(interp.components.get('.alarmLed').ref), '1');
+});
+
+reg(2892, 'sensor', 'doc play — cold negative default', function(h, session) {
+  const { interp } = session.run(`comp [sensor] .cold:
+  kind: temperature
+  unit: 'C'
+  min: -20
+  max: 40
+  default: -5
+  nl
+  :
+
+8wire c = .cold:get`);
+  const cfg = SensorComponent.resolveConfig({ kind: 'temperature', unit: 'C', min: -20, max: 40, default: -5 });
+  h.assert('c', session.getWire(interp, 'c'), SensorComponent.indexToBin(SensorComponent.rawToIndex(-5, cfg), 8));
 });
 
   window.LogTScriptTestSuite.finalize();

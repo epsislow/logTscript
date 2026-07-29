@@ -3443,7 +3443,7 @@ assignment() {
           continue;
         }
 
-        const attributesWithNoValues = ['square', 'nl', 'circular', 'glow', 'rgb', 'noLabels', 'noTrans', 'readonly', 'reversed', 'onlyDigits', 'allowEnter', 'allowBackspace', 'allowArrows', 'allowDelete', 'afterSettle'];
+        const attributesWithNoValues = ['square', 'nl', 'circular', 'glow', 'rgb', 'noLabels', 'noTrans', 'readonly', 'reversed', 'onlyDigits', 'allowEnter', 'allowBackspace', 'allowArrows', 'allowDelete', 'afterSettle', 'inverted'];
         
         
         if (attrNamesArray.includes(attrName) && this.c.type === 'SYM' && this.c.value === '.') {
@@ -3582,15 +3582,23 @@ assignment() {
               continue;
             }
             
-            if (checkI < this.t.src.length && /[0-9]/.test(this.t.src[checkI])) {
+            if (checkI < this.t.src.length && (this.t.src[checkI] === '-' || /[0-9]/.test(this.t.src[checkI]))) {
               let numStr = '';
+              if (this.t.src[checkI] === '-') {
+                numStr += '-';
+                checkI++;
+              }
               while (checkI < this.t.src.length && /[0-9]/.test(this.t.src[checkI])) {
                 numStr += this.t.src[checkI];
                 checkI++;
               }
+              if (numStr === '-' || numStr === '') {
+                this.c = this.t.get();
+              } else {
               
               let tokenType = 'DEC';
-              if (/^[01]+$/.test(numStr)) {
+              const digitsOnly = numStr.charAt(0) === '-' ? numStr.slice(1) : numStr;
+              if (/^[01]+$/.test(digitsOnly) && numStr.charAt(0) !== '-') {
                 tokenType = 'BIN';
               }
               
@@ -3604,6 +3612,7 @@ assignment() {
               
               this.t.i = checkI;
               this.t.col = this.c.col + numStr.length;
+              }
             } else if (checkI < this.t.src.length && this.t.src[checkI] === '^') {
               this.t.i = checkI;
               this.c = this.t.get();
@@ -3676,6 +3685,21 @@ assignment() {
               attributes[attrName] = '#' + this.c.value;
             }
             this.eat('HEX');
+          } else if (this.c.type === 'SYM' && this.c.value === '-' &&
+                     this.t.i < this.t.src.length && /[0-9]/.test(this.t.src[this.t.i])) {
+            this.eat('SYM', '-');
+            this.t.skip();
+            if (this.c.type !== 'BIN' && this.c.type !== 'DEC') {
+              throw Error(`Expected number after '-' in attribute '${attrName}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+            }
+            const negVal = '-' + this.c.value;
+            if (isArray) {
+              if (!attributes[attrName]) attributes[attrName] = {};
+              attributes[attrName][stateNum] = negVal;
+            } else {
+              attributes[attrName] = negVal;
+            }
+            this.eat(this.c.type);
           } else if (this.c.type === 'BIN' || this.c.type === 'DEC') {
             if(isArray) {
               if (!attributes[attrName]) {

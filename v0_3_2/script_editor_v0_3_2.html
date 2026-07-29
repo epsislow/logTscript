@@ -1417,6 +1417,118 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   min-width: 3ch;
 }
 
+.sensor-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 8px 4px 0;
+  vertical-align: middle;
+}
+
+.sensor-wrapper.sensor-vertical {
+  flex-direction: column;
+  align-items: center;
+}
+
+.sensor-kind {
+  font-family: monospace;
+  font-size: 0.7rem;
+  min-width: 2ch;
+  color: #6dff9c;
+}
+
+.sensor-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 5ch;
+  text-align: right;
+  color: #bdbdbd;
+}
+
+.sensor-track {
+  position: relative;
+  width: 140px;
+  height: 20px;
+  background: #1a1a1a;
+  border: 1px inset #2a2a2a;
+  border-radius: 6px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.sensor-track-vertical {
+  width: 20px;
+  height: 140px;
+}
+
+.sensor-thumb {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  bottom: 2px;
+  left: 2px;
+  border-radius: 4px;
+  background: var(--sensor-color, #6dff9c);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--sensor-color, #6dff9c) 50%, transparent);
+  pointer-events: none;
+}
+
+.sensor-thumb.active {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--sensor-color, #6dff9c) 70%, transparent);
+}
+
+.sensor-track-vertical .sensor-thumb {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.sensor-value {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #6dff9c;
+  min-width: 4ch;
+}
+
+.sensor-digital-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 8px 4px 0;
+  vertical-align: middle;
+}
+
+.sensor-digital-icon {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #6dff9c;
+}
+
+.sensor-digital-label {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #bdbdbd;
+  max-width: 6ch;
+  overflow: hidden;
+}
+
+.sensor-digital-toggle {
+  font-family: monospace;
+  font-size: 0.75rem;
+  min-width: 2.2rem;
+  padding: 4px 8px;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: #888;
+  cursor: pointer;
+}
+
+.sensor-digital-toggle.on {
+  border-color: var(--sensor-color, #6dff9c);
+  color: var(--sensor-color, #6dff9c);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--sensor-color, #6dff9c) 40%, transparent);
+}
+
 .clcd-wrapper {
   display: inline-block;
   margin: 4px 8px 4px 0;
@@ -3230,6 +3342,7 @@ show(a,b,c)
 <script src="core/components/osc.js"></script>
 <script src="core/components/rotary.js"></script>
 <script src="core/components/slider.js"></script>
+<script src="core/components/sensor.js"></script>
 <script src="devices/clcd-symbols_generated.js"></script>
 <script src="core/components/clcd.js"></script>
 <script src="core/components/alu.js"></script>
@@ -3300,6 +3413,7 @@ show(a,b,c)
 <script src="devices/panel-keyboard.js"></script>
 <script src="devices/rotary-knob.js"></script>
 <script src="devices/slider-widget.js"></script>
+<script src="devices/sensor-widget.js"></script>
 <script src="devices/clcd-widget.js"></script>
 <script src="devices/alu-devices.js"></script>
 <script src="devices/cpu-devices.js"></script>

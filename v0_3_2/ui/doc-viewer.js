@@ -59,7 +59,9 @@ const DOC_SECTIONS = [
       { file: 'keyboard.md', label: 'keyboard', searchPrimary: 'KEYBOARD comp.keyboard doc(comp.keyboard) label color bgColor focusColor focusBgColor onlyDigits allowEnter allowBackspace allowArrows allowDelete codesAccepted showCode pulseColor nl', searchExtra: 'input ASCII onlyDigits allowEnter allowBackspace valid focus UART RX' },
       { file: 'dip.md', label: 'dip', searchPrimary: 'dip comp.dip doc(comp.dip) length text color colorFor visual noLabels noTrans nl' },
       { file: 'ioport.md', label: 'ioport', searchPrimary: 'IOPORT comp.ioport doc(comp.ioport)', searchExtra: 'I/O port gpio aggregation in out bus' },
-      { file: 'rotary.md', label: 'rotary', searchPrimary: 'rotary comp.rotary doc(comp.rotary) states text color for nl' }
+      { file: 'rotary.md', label: 'rotary', searchPrimary: 'rotary comp.rotary doc(comp.rotary) states text color for nl' },
+      { file: 'slider.md', label: 'slider', searchPrimary: 'slider comp.slider doc(comp.slider) length text color orientation reversed size for nl', searchExtra: 'panel slider length orientation reversed size N-bit' },
+      { file: 'sensor.md', label: 'sensor', searchExtra: 'proximity temperature humidity distance mag step Kelvin Celsius analog digital' }
     ],
   },
   {
@@ -144,7 +146,6 @@ const DOC_SECTIONS = [
       { file: 'meta-constants.md', label: 'Meta constants' },
       { file: 'mmap.md', label: 'Memory map (`comp [mmap]`)' },
       { file: 'network-chat.md', label: 'Network chat — socket uplink + packet downlink (wave)' },
-      { file: 'slider.md', label: 'Slider component', searchPrimary: 'slider comp.slider doc(comp.slider) length text color orientation reversed size for nl' },
       { file: 'sock.md', label: 'Socket (`sock`) — dynamic bit stream', searchPrimary: 'sock' }
     ],
   }

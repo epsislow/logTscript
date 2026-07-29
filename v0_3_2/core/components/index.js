@@ -26,6 +26,7 @@ var NetworkComponent = (typeof require !== 'undefined') ? require('./network') :
 var OscComponent = (typeof require !== 'undefined') ? require('./osc') : OscComponent;
 var RotaryComponent = (typeof require !== 'undefined') ? require('./rotary') : RotaryComponent;
 var SliderComponent = (typeof require !== 'undefined') ? require('./slider') : SliderComponent;
+var SensorComponent = (typeof require !== 'undefined') ? require('./sensor') : SensorComponent;
 var ClcdComponent = (typeof require !== 'undefined') ? require('./clcd') : ClcdComponent;
 var AluComponent = (typeof require !== 'undefined') ? require('./alu') : AluComponent;
 var CpuComponent = (typeof require !== 'undefined') ? require('./cpu') : CpuComponent;
@@ -63,6 +64,7 @@ function createComponentRegistry() {
   registry.register(OscComponent);
   registry.register(RotaryComponent);
   registry.register(SliderComponent);
+  registry.register(SensorComponent);
   registry.register(ClcdComponent);
   registry.register(AluComponent);
   registry.register(CpuComponent);

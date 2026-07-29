@@ -32,6 +32,7 @@ LogTscript includes built-in **components** (`comp`), **inline** declarations (`
 | `ioport` | — | [ioport.md](ioport.md) |
 | `rotary` | — | [rotary.md](rotary.md) |
 | `slider` | — | [slider.md](slider.md) |
+| `sensor` | — | [sensor.md](sensor.md) |
 
 Overview (panel callbacks, common patterns): [interactive-components.md](interactive-components.md).
 

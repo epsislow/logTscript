@@ -1884,7 +1884,8 @@ LogTScript PLC maps **program symbols** to **wires** or **existing panel compone
 | Momentary input | `START` | 1 | `comp [key]` | `:get` | `IF START` |
 | Toggle input | `STOP`, `ENABLE` | 1 | `comp [switch]` | `:get` | `IF NOT STOP` |
 | Parallel switches | `SEL` | N | `comp [dip]` | `:get` (width = `length`) | `CASE SEL OF` (1-bit) or map as N-bit |
-| Analog input (UI) | `TEMP`, `LEVEL` | N | `comp [slider]` | `:get` | `IF TEMP > 50`, `SPEED = TEMP` |
+| Analog input (UI) | `TEMP`, `LEVEL` | N | `comp [slider]` or `comp [sensor]` | `:get` | `IF TEMP > 50`, `SPEED = TEMP` |
+| Sensor digital | `PROX`, `LIMIT` | 1 | `comp [sensor]` | `:get` | `IF PROX THEN …` |
 | Port I/O | — | N | `comp [ioport]` | pins/pouts | width-based mapping |
 | On/off indicator | `MOTOR`, `ALARM` | 1 | `comp [led]` | write storage + display | `MOTOR = 1` |
 | Bit storage / command | `CMD` | N | `comp [reg]` | `setReg` on scan | multi-bit assign |
@@ -1925,6 +1926,8 @@ Program sees the same 1-bit value as a wire or switch.
 | **Read** | Full bit pattern via `:get` |
 
 ### `comp [slider]` — analog UI
+
+Generic N-bit panel slider. For named scales (temperature, humidity, `mag`, units), prefer **`comp [sensor]`** — [sensor.md](sensor.md).
 
 | Topic | Detail |
 |-------|--------|

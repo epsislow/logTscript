@@ -58,7 +58,9 @@
         { "file": "keyboard.md", "label": "keyboard", "searchExtra": "input ASCII onlyDigits allowEnter allowBackspace valid focus UART RX" },
         { "file": "dip.md", "label": "dip" },
         { "file": "ioport.md", "label": "ioport", "searchExtra": "I/O port gpio port aggregation in out bus" },
-        { "file": "rotary.md", "label": "rotary" }
+        { "file": "rotary.md", "label": "rotary" },
+        { "file": "slider.md", "label": "slider", "searchExtra": "panel slider length orientation reversed size N-bit" },
+        { "file": "sensor.md", "label": "sensor", "searchExtra": "proximity temperature humidity distance mag step Kelvin Celsius analog digital" }
       ]
     },
     {

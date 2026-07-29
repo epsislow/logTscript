@@ -1,6 +1,6 @@
 ---
 name: Componenta PLC
-overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P7.2 done. Amânate: P3c, P6.3, P8."
+overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P7.2 done. P3c deschis (decizii P-ACT*). Amânate: P6.3, P8."
 todos:
   - id: p0-decisions
     content: "P0: decizii lățimi, mapare, on: vs comandă, sintaxă START — închise"
@@ -18,7 +18,10 @@ todos:
     content: "P3: doc matrice I/O (key/switch/dip/led/clcd-via-wires); motor/sensor/fan/button — amânat P3c"
     status: completed
   - id: p3c-actuators
-    content: "P3c (amânat): comp motor, sensor, fan, button — viteză/rotație, vizual diferențiat"
+    content: "P3c: sensor → plan dedicat comp_sensor_universal.plan.md; motor/fan încă deschise"
+    status: in_progress
+  - id: p3c-sensor
+    content: "P3c sensor: vezi .cursor/plans/comp_sensor_universal.plan.md (S0–S3)"
     status: pending
   - id: p4-scantime
     content: "P4: scanTime + busy — P4.0–P4.3 implementate"
@@ -304,7 +307,7 @@ flowchart TB
 | **P-IO1** | **Nu** există `comp [button]` — intrări digitale: **`key`**, **`switch`**, **`dip`** (confirmat) |
 | **P-IO2** | **P2/P3:** ieșiri digitale 1-bit: **`led`**, **`reg`**, wires; **nu** mapare directă `comp [plc]` → `clcd` |
 | **P-IO3** | **`clcd`:** doar prin **wires multi-bit** + logică LogTscript în afara PLC (`:get` / bloc `{ value, set }`) |
-| **P-IO4** | **`motor`**, **`sensor`**, **`fan`**, alias **`button`** — **amânat P3c** (complexitate motor: viteză, tip, rotație) |
+| **P-IO4** | **`motor`**, **`sensor`**, **`fan`**, alias **`button`** — **deschis P3c** (vezi P-ACT*) |
 | **P-D4** | Operatori / control v1 | **P1/P2:** `IF/THEN/ELSE/ELSIF/END_IF`, `AND/OR/NOT/XOR`, `TRUE/FALSE`; **P+c/d:** restul ST |
 | **P-D6** | Validare mapări: **eroare strictă** la elaborare `comp [plc]` | **închis** |
 | **P-D7** | Output neasignat în scan: **păstrează ultima valoare** (ca PLC real) | **închis** |
@@ -920,36 +923,52 @@ Pentru text/status pe display: wires multi-bit (`8wire statusCode`) mapate în P
 - Exemple `logts-play`: START/STOP/MOTOR cu substituenți reali
 - **Nu** implementăm `comp [button]` ca alias — opțional foarte târziu în P3c
 
-### P3c — Componente dedicate actuator/senzor (amânat)
+### P3c — Componente dedicate actuator/senzor (**deschis** — 2026-07-29)
 
-Schița și cerința utilizator: **`motor`**, **`sensor`**, eventual **`fan`**, **`button`** (alias pedagogic).
+**Sensor:** plan complet → **[comp_sensor_universal.plan.md](comp_sensor_universal.plan.md)** (`comp [sensor]` ca input LogTscript; PLC opțional).
 
-**De ce amânat (nu P2/P3):**
+**Motor / fan:** încă pe P-ACT* de mai jos (după senzor).
 
-| Componentă | Complexitate | Note design viitoare |
-|------------|--------------|----------------------|
-| **`button`** | Mică | Alias peste `key` — prioritate scăzută |
-| **`fan`** | Medie | On/off + eventual viteză PWM (legat de P+b) |
-| **`sensor`** | Medie–mare | Vizual diferit; digital 1-bit vs analog multi-bit (`TEMP:8`) |
-| **`motor`** | **Mare** | Nu e doar 0/1: **viteză**, direcție, tip motor (DC servo, stepper, „rotire vizuală”), rampă, poziție — depinde de P+b și poate componentă vizuală separată |
+Schița: **`motor`**, **`sensor`**, **`fan`**. Prerequisite: **P2** + **P+b** + **P5** deja livrate.
 
-**Propunere P3c (când se deschide faza):**
-- Sub-faze: **P3c-digital** (motor on/off simplu, senzor digital) apoi **P3c-motion** (viteză, RPM, tipuri motor)
-- Mapare PLC: simboluri cu lățime potrivită (`MOTOR:1` run, `SPEED:8` în P+b)
-- Vizual: motor/sensor ca componente UI proprii (nu doar LED)
-- Integrare PLC: același model `outputs:{ MOTOR = .m1 }` cu resolver pe componentă
+#### Decizii P-ACT* (propuse — de confirmat)
 
-**Legătură faze:** P3c după **P2** stabil; **P+b** pentru analog/viteză; **P5** pentru timere motor (TON pornire întârziată etc.)
+Aliniere **P-PHIL:** didactic implicit (on/off, UI clar) + opt-in ulterior pentru motion/viteză.
+
+| ID | Propunere | Status |
+|----|-----------|--------|
+| **P-ACT0** | P3c livrat pe **sub-faze**: **P3c.0** decizii+doc-schelet → **P3c.1** `motor` digital → **P3c.2** `sensor` digital → **P3c.3** `fan` digital → **P3c.4** doc `plc.md` + `logts-play` + teste; **P3c.m** motion (viteză/RPM/direcție) **amânat** | **propus** |
+| **P-ACT1** | **`comp [motor]`** MVP = **1-bit** run/stop (ca `led` ca I/O, UI diferit: icon motor / rotație vizuală când `1`) — **nu** viteză în MVP | **propus** |
+| **P-ACT2** | **`comp [sensor]`** MVP = **1-bit** digital (proximitate/limită didactică); citire ca `key`/`switch` (`:get`, mapare `inputs:`) — UI distinct de `key` | **propus** |
+| **P-ACT3** | **`comp [fan]`** MVP = **1-bit** on/off; UI ventilator (nu LED); același contract `value`/`set`/`get` ca `led` | **propus** |
+| **P-ACT4** | **`comp [button]`** — **nu** în P3c (și nu ulterior prioritar): intrări = **`key`**, **`switch`**, **`dip`**, touch **`clcd`** (P-IO1) | **închis** |
+| **P-ACT5** | Contract I/O = **același model ca `led`**: atribuire directă `.m = 1`, bloc `{ value, set }`, pout `:get`; **`on:`** = când se aplică pinii — **nu** semnal de comandă (**P-FIX2**) | **propus** |
+| **P-ACT6** | Mapare PLC: `outputs: { MOTOR = .m1 }` / `inputs: { PROX = .s1 }` — același resolver ca pentru `led`/`key` (fără API PLC nou) | **propus** |
+| **P-ACT7** | Multi-bit / viteză (`SPEED:8`, PWM, direcție) → **doar P3c.m** (după MVP digital); până atunci `led`/`reg`/`slider` rămân substituenți pentru multi-bit | **propus** |
+| **P-ACT8** | Vizual: componente UI **proprii** (nu recolorare LED); animație minimală (motor rotire / fan pale când on) — fără tipuri industriale (servo/stepper) în MVP | **propus** |
+| **P-ACT9** | Doc utilizator: doar ce există; **fără** nume de faze / „ce urmează”; exemple `logts-play` cu Load / Load & Run | **propus** |
+
+#### Sub-faze P3c
+
+| Sub-fază | Conținut | Status |
+|----------|----------|--------|
+| **P3c.0** | Închidere P-ACT* + schelet plan/doc | **în curs** |
+| **P3c.1** | `comp [motor]` 1-bit + UI + teste unitare | pending |
+| **P3c.2** | `comp [sensor]` 1-bit + UI + teste | pending |
+| **P3c.3** | `comp [fan]` 1-bit + UI + teste | pending |
+| **P3c.4** | `plc.md` matrice + exemple PLC mapate + suite verde | pending |
+| **P3c.m** | Motion: viteză, direcție, tipuri — **amânat** | amânat |
 
 ```mermaid
 flowchart LR
-  P2[P2 comp plc]
-  P3[P3 doc I/O matrix]
-  P3c[P3c motor sensor fan]
-  Pb[P+b analog speed]
-  P2 --> P3
-  P2 --> P3c
-  Pb --> P3c
+  P3c0[P3c.0 decisions]
+  P3c1[P3c.1 motor]
+  P3c2[P3c.2 sensor]
+  P3c3[P3c.3 fan]
+  P3c4[P3c.4 doc play]
+  P3cm[P3c.m motion later]
+  P3c0 --> P3c1 --> P3c2 --> P3c3 --> P3c4
+  P3c4 -.-> P3cm
 ```
 
 ---
@@ -1038,9 +1057,9 @@ Vezi secțiunea **Substituenți** și **clcd via wires** de mai sus. Actualizare
 
 **Nu** implementare obligatorie de componente noi în P3.
 
-### P3c — `motor`, `sensor`, `fan`, `button` (amânat)
+### P3c — `motor`, `sensor`, `fan` (**deschis** — decizii P-ACT*)
 
-Componente dedicate cu UI și semantică proprie. **Motor** nu e boolean simplu — necesită design pentru viteză, direcție, tip actuator, eventual animație rotație. **Sensor** — vizual + digital/analog. Detalii în secțiunea P3c de mai sus.
+MVP digital 1-bit; motion amânat (P3c.m). `button` nu în MVP (P-ACT4). Detalii: secțiunea P3c + tabel P-ACT*.
 
 ### P4 — `scanTime`, `busy`, cicluri PLC (decizii închise)
 
@@ -1910,9 +1929,11 @@ comp [plc] .ctrlB:
 
 **P7 (globals):** **done** — P-GVL* + P7.0–P7.2 (`globals:`, `globalState`, `retainVar`).
 
-**Încă deschise / amânate:** P3c, P6.3, **P8**.
+**P3c / sensor:** plan dedicat **[comp_sensor_universal.plan.md](comp_sensor_universal.plan.md)** (input LogTscript universal, S0–S3). Motor/fan rămân P3c separat.
 
-**Următorul pas recomandat:** **P8** (rețea) sau **P6.3** (retain per slot) sau **P3c** actuators.
+**Încă amânate:** P6.3, **P8**, **P3c.m** (motion motor).
+
+**Următorul pas recomandat:** implementare **comp [sensor]** după [comp_sensor_universal.plan.md](comp_sensor_universal.plan.md).
 
 ---
 
