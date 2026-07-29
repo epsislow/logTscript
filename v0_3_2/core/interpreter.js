@@ -12654,6 +12654,10 @@ if (s.assignment) {
         if (result.progMemRef) compInfo.progMemRef = result.progMemRef;
         if (result.ramMemRef) compInfo.ramMemRef = result.ramMemRef;
         if (result.programRef) compInfo.programRef = result.programRef;
+        if (result.programSlots) compInfo.programSlots = result.programSlots;
+        if (result.scanMode) compInfo.scanMode = result.scanMode;
+        if (result.scanTimes) compInfo.scanTimes = result.scanTimes;
+        if (result._plcSlotNextScanAt != null) compInfo._plcSlotNextScanAt = result._plcSlotNextScanAt;
         if (result.inputMap) compInfo.inputMap = result.inputMap;
         if (result.outputMap) compInfo.outputMap = result.outputMap;
         if (result.outputState) compInfo.outputState = result.outputState;

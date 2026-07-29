@@ -30694,5 +30694,316 @@ comp [plc] .ctrl:
 .ctrl:{ set = 1 }
 `;
 
+const PLC_DOC_EX34 = `
+inline [plc] .init:
+  inputs: { START, STOP }
+  outputs: { READY, MOTOR }
+  IF START THEN READY = 1 ELSE READY = 0 END_IF
+  :
+
+inline [plc] .main:
+  inputs: { START, STOP }
+  outputs: { READY, MOTOR }
+  IF READY AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+1wire startIn
+1wire stopIn
+1wire readyOut
+1wire motorOut
+
+startIn = 1
+stopIn = 0
+
+comp [plc] .ctrl:
+  program: .init .main
+  scanTime: 0
+  inputs: { START = startIn, STOP = stopIn }
+  outputs: { READY = readyOut, MOTOR = motorOut }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`;
+
+const PLC_DOC_EX35 = `
+inline [plc] .first:
+  inputs: { START }
+  outputs: { MOTOR }
+  MOTOR = 1
+  :
+
+inline [plc] .second:
+  inputs: { START }
+  outputs: { MOTOR }
+  MOTOR = 0
+  :
+
+1wire startIn
+1wire motorOut
+startIn = 1
+
+comp [plc] .ctrl:
+  program: .first .second
+  scanTime: 0
+  inputs: { START = startIn }
+  outputs: { MOTOR = motorOut }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`;
+
+const PLC_DOC_EX36 = `
+inline [plc] .fastProg:
+  inputs: { EN }
+  outputs: { FAST, SLOW }
+  IF EN THEN FAST = 1 ELSE FAST = 0 END_IF
+  :
+
+inline [plc] .slowProg:
+  inputs: { EN }
+  outputs: { FAST, SLOW }
+  IF EN THEN SLOW = 1 ELSE SLOW = 0 END_IF
+  :
+
+comp [switch] .en:
+  = 1
+  :
+
+1wire fastOut
+1wire slowOut
+
+comp [plc] .ctrl:
+  program: .fastProg .slowProg
+  scanTime: 10, 100
+  scanDuration: 1
+  inputs: { EN = .en }
+  outputs: { FAST = fastOut, SLOW = slowOut }
+  on: 1
+  :
+`;
+
+reg(2849, 'comp-plc', 'multi-program pipeline super-scan', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX34);
+  h.assert('ready', session.getWire(interp, 'readyOut'), '1');
+  h.assert('motor', session.getWire(interp, 'motorOut'), '1');
+  h.assert('scanCount', String(interp.components.get('.ctrl').scanCount), '1');
+  h.assert('mode', interp.components.get('.ctrl').scanMode, 'super-scan');
+});
+
+reg(2850, 'comp-plc-lang', 'doc example 34 — pipeline logts-play', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX34);
+  h.assert('ex34 ready', session.getWire(interp, 'readyOut'), '1');
+  h.assert('ex34 motor', session.getWire(interp, 'motorOut'), '1');
+});
+
+reg(2851, 'comp-plc', 'multi-program output conflict last wins', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX35);
+  h.assert('motor last wins', session.getWire(interp, 'motorOut'), '0');
+});
+
+reg(2852, 'comp-plc-lang', 'doc example 35 — conflict logts-play', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX35);
+  h.assert('ex35 motor', session.getWire(interp, 'motorOut'), '0');
+});
+
+reg(2853, 'comp-plc', 'multi-program duplicate ref error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`
+inline [plc] .a:
+  inputs: { X }
+  outputs: { Y }
+  Y = X
+  :
+1wire x
+1wire y
+comp [plc] .ctrl:
+  program: .a .a
+  scanTime: 0
+  inputs: { X = x }
+  outputs: { Y = y }
+  on: 1
+  :
+`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('dup ref', String(err.includes('duplicate program reference')), 'true');
+});
+
+reg(2854, 'comp-plc', 'multi-program interface mismatch error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`
+inline [plc] .a:
+  inputs: { START }
+  outputs: { MOTOR }
+  MOTOR = START
+  :
+inline [plc] .b:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  MOTOR = START
+  :
+1wire startIn
+1wire stopIn
+1wire motorOut
+comp [plc] .ctrl:
+  program: .a .b
+  scanTime: 0
+  inputs: { START = startIn, STOP = stopIn }
+  outputs: { MOTOR = motorOut }
+  on: 1
+  :
+`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('iface', String(err.includes('identical inputs/outputs')), 'true');
+});
+
+reg(2855, 'comp-plc', 'multi-program requires scanTime', function(h, session) {
+  let err = '';
+  try {
+    session.run(`
+inline [plc] .a:
+  inputs: { X }
+  outputs: { Y }
+  Y = X
+  :
+inline [plc] .b:
+  inputs: { X }
+  outputs: { Y }
+  Y = X
+  :
+1wire x
+1wire y
+comp [plc] .ctrl:
+  program: .a .b
+  inputs: { X = x }
+  outputs: { Y = y }
+  on: 1
+  :
+`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('need scanTime', String(err.includes('require explicit scanTime')), 'true');
+});
+
+reg(2856, 'comp-plc', 'multi-program scanTime length error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`
+inline [plc] .a:
+  inputs: { X }
+  outputs: { Y }
+  Y = X
+  :
+inline [plc] .b:
+  inputs: { X }
+  outputs: { Y }
+  Y = X
+  :
+1wire x
+1wire y
+comp [plc] .ctrl:
+  program: .a .b
+  scanTime: 10, 20, 30
+  inputs: { X = x }
+  outputs: { Y = y }
+  on: 1
+  :
+`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('bad length', String(err.includes('scanTime list length')), 'true');
+});
+
+reg(2857, 'comp-plc', 'multi-rate independent scanTimes', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX36);
+  const ctrl = interp.components.get('.ctrl');
+  h.assert('mode', ctrl.scanMode, 'independent');
+  h.assert('times', String(ctrl.scanTimes.join(',')), '10,100');
+  session.advancePlcTiming(interp, 110);
+  const slots = ctrl.programSlots;
+  h.assert('fast more', String(slots[0].scanCount > slots[1].scanCount), 'true');
+  h.assert('slow at least 1', String(slots[1].scanCount >= 1), 'true');
+  h.assert('fastOut', session.getWire(interp, 'fastOut'), '1');
+  h.assert('slowOut', session.getWire(interp, 'slowOut'), '1');
+});
+
+reg(2858, 'comp-plc-lang', 'doc example 36 — multi-rate logts-play', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX36);
+  session.advancePlcTiming(interp, 110);
+  h.assert('ex36 fast', session.getWire(interp, 'fastOut'), '1');
+  h.assert('ex36 slow', session.getWire(interp, 'slowOut'), '1');
+});
+
+reg(2859, 'comp-plc', 'multi-program broadcast K parallel timers', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .a:
+  inputs: { EN }
+  outputs: { A, B }
+  IF EN THEN A = 1 ELSE A = 0 END_IF
+  :
+inline [plc] .b:
+  inputs: { EN }
+  outputs: { A, B }
+  IF EN THEN B = 1 ELSE B = 0 END_IF
+  :
+comp [switch] .en:
+  = 1
+  :
+1wire aOut
+1wire bOut
+comp [plc] .ctrl:
+  program: .a .b
+  scanTime: 20
+  scanDuration: 1
+  inputs: { EN = .en }
+  outputs: { A = aOut, B = bOut }
+  on: 1
+  :
+`);
+  const ctrl = interp.components.get('.ctrl');
+  h.assert('mode', ctrl.scanMode, 'parallel-broadcast');
+  session.advancePlcTiming(interp, 40);
+  h.assert('slot0', String(ctrl.programSlots[0].scanCount >= 1), 'true');
+  h.assert('slot1', String(ctrl.programSlots[1].scanCount >= 1), 'true');
+});
+
+reg(2860, 'comp-plc', 'multi-program VAR state per slot', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .left:
+  inputs: { PULSE }
+  outputs: { OUT }
+  VAR
+    n: 8
+  END_VAR
+  IF PULSE THEN n = n + 1 END_IF
+  OUT = 0
+  :
+inline [plc] .right:
+  inputs: { PULSE }
+  outputs: { OUT }
+  VAR
+    n: 8
+  END_VAR
+  OUT = 0
+  :
+1wire pulse
+1wire outW
+pulse = 1
+comp [plc] .ctrl:
+  program: .left .right
+  scanTime: 0
+  inputs: { PULSE = pulse }
+  outputs: { OUT = outW }
+  on: 1
+  :
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+`);
+  const slots = interp.components.get('.ctrl').programSlots;
+  h.assert('left n', String(parseInt(slots[0].varState.n, 2)), '2');
+  h.assert('right n', String(parseInt(slots[1].varState.n, 2)), '0');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -3379,9 +3379,8 @@ assignment() {
               if (this.c.type === 'SYM' && this.c.value === ',') {
                 this.eat('SYM', ',');
                 this.t.skip();
-                continue;
               }
-              break;
+              continue;
             }
             if (this.c.type === 'SYM' && this.c.value === ',') {
               this.eat('SYM', ',');
@@ -3410,16 +3409,15 @@ assignment() {
           attributes[listKey].push(memberRef);
           continue;
         }
-        if ((attrName === 'isa' || attrName === 'program') && this.c.value === ':') {
+        if (attrName === 'isa' && this.c.value === ':') {
           this.eat('SYM', ':');
           this.t.skip();
           if (this.c.type !== 'SYM' || this.c.value !== '.') {
-            throw Error(`Expected component reference after '${attrName}:' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+            throw Error(`Expected component reference after 'isa:' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
           }
           const memberRef = this.parseDotComponentRef();
-          const listKey = attrName + 'Members';
-          if (!attributes[listKey]) attributes[listKey] = [];
-          attributes[listKey].push(memberRef);
+          if (!attributes.isaMembers) attributes.isaMembers = [];
+          attributes.isaMembers.push(memberRef);
           continue;
         }
         if (wireRefAttrs.includes(attrName) && this.c.value === '=') {

@@ -1,6 +1,6 @@
 ---
 name: Componenta PLC
-overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P5.2c, P+c, P+d, P+b done. Amânate: P3c, P6–P8."
+overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P5.2c, P+c, P+d, P+b, P6.0–P6.2+P6.4 done. Amânate: P3c, P6.3, P7, P8."
 todos:
   - id: p0-decisions
     content: "P0: decizii lățimi, mapare, on: vs comandă, sintaxă START — închise"
@@ -60,7 +60,22 @@ todos:
     content: "P+d: FOR/WHILE/REPEAT/EXIT + FB în bucle — implementat"
     status: completed
   - id: p6-multi-program
-    content: "P6 (amânat): un comp [plc] cu mai multe programe (tasks); ordine execuție, prioritate"
+    content: "P6: decizii P-MP* închise — program:/scanTime: liste ca mems:"
+    status: completed
+  - id: p6-0-doc
+    content: "P6.0: doc Example4 vs program:.a.b + tabele P-MP în plc.md"
+    status: completed
+  - id: p6-1-sequential
+    content: "P6.1: program: .a .b + scanTime:0 super-scan, mapă comună, teste"
+    status: completed
+  - id: p6-4-doc-tests
+    content: "P6.4: logts-play + teste exemple pipeline"
+    status: completed
+  - id: p6-2-multirate
+    content: "P6.2: scanTime: t1, t2 timere independente per slot (virgule — tokenizer unește 10 100)"
+    status: completed
+  - id: p6-3-per-slot
+    content: "P6.3 (amânat): retain/strict per slot — P-MP-ST3"
     status: pending
   - id: p7-globals
     content: "P7 (amânat): memorie partajată între programe — VAR_GLOBAL (GVL), zone M (flags interne)"
@@ -295,6 +310,25 @@ flowchart TB
 | **P-D7** | Output neasignat în scan: **păstrează ultima valoare** (ca PLC real) | **închis** |
 | **P-D8** | Corp program: **listă secvențială** — atribuiri top-level + `IF`-uri multiple, o trecere per scan | **închis** |
 | **P-D9** | `inputs` **read-only**; `outputs` **citibile** în expresii (valoare curentă din scan, ca ST) | **închis** |
+| **P-MP-IO0** | P6: **mapă I/O comună** pe `comp [plc]` — un singur `inputs:` / `outputs:` pentru toate sloturile `program:` (model process image IEC) | **închis** |
+| **P-MP-IO5** | P6: toate `inline [plc]` din `program:` declară **aceeași interfață** `inputs`/`outputs` (simboluri + lățimi identice) | **închis** |
+| **P-MP-S4** | P6: **doar** atributele **`program:`** și **`scanTime:`** (singular) — **fără** `programs:` / `scanTimes:`; fiecare acceptă **una sau mai multe valori** în listă (ca `mems:`) | **închis** |
+| **P-MP-S2** | P6: **nu** sintaxă array `program: [ … ]` | **respins / închis** |
+| **P-MP-S3** | P6: **nu** bloc `tasks:` — slot index + liste | **respins / închis** |
+| **P-MP-ORD** | Ordinea listei **`program:`** = ordinea execuției (P6.1 super-scan) | **închis** |
+| **P-MP-OUT** | Conflict output același super-scan → **ultimul slot** din listă câștigă la write fizic | **închis** |
+| **P-MP-SCAN1** | **`scanTime:`**: 1 valoare = **broadcast**; N valori = **per slot**; altfel **eroare elaborare** | **închis** |
+| **P-MP-SCAN2** | `program: .a .b` + **`scanTime: 0`** (broadcast) → **P6.1** super-scan secvențial la același trigger | **închis** |
+| **P-MP-SCAN3** | **`scanTime: N M …`** (N valori = N programe) → **P6.2** timere **independente** per slot | **închis** |
+| **P-MP-SCAN4** | Broadcast **`scanTime: K`** (K>0) + N programe → **N timere paralele** la K ms, fiecare slot rulează **singur** (nu super-scan) | **închis** |
+| **P-MP-ST1** | `timerState` / `counterState` / `varState` **per slot** (programRef) | **închis** |
+| **P-MP-ST2** | **`retain`** / **`retainVar`** la **nivel componentă**; cache keyed by `(instanceId, slot, fingerprint)` | **închis** |
+| **P-MP-ST3** | `retain` / `scanDuration` / `strict` **per slot** | **amânat P6.3** |
+| **P-MP-CNT1** | P6.1: **un** `scanCount` pe componentă; P6.2: **`scanCount` per slot** în `doc()` (pout indexat opțional) | **închis** |
+| **P-MP-ERR1** | `program:` cu **ref duplicat** (ex. `.a .a`) → eroare elaborare | **închis** |
+| **P-MP-ERR2** | N programe fără **`scanTime:`** explicit → eroare elaborare | **închis** |
+| **P-MP-P7** | P6.1 livrabil **fără P7**; comunicare între sloturi via outputs + ordine super-scan | **închis** |
+| **P-MP-DEL** | Ordine livrare: **P6.0 → P6.1 → P6.4 → P6.2**; P6.3 opțional după | **închis** |
 
 ---
 
@@ -1481,17 +1515,257 @@ END_FOR
 
 ### P6 — Mai multe programe pe un `comp [plc]` (amânat)
 
-**Motivație IEC:** un PLC real are **task-uri** cu **programe** diferite (ex. ciclic rapid 10 ms + ciclic lent 100 ms + event-driven). Fiecare program e un POU separat, dar toate rulează pe **același CPU** și pot partaja memorie.
+**Motivație IEC:** un PLC real poate avea mai multe **POU** (programe) și, opțional, **task-uri ciclice** la perioade diferite (ex. 10 ms + 100 ms). În LogTscript, modelul de referință pentru **listă ordonată de referințe** este deja **`mems:`** pe `comp [dma]` — nu inventăm sintaxă nouă cu `[ ]`.
 
-**Scop LogTscript:** un singur `comp [plc]` să accepte **mai multe `program:`-uri** cu scan-uri independente sau coordonate.
+**Scop LogTscript:** un singur `comp [plc]` să ruleze **mai multe `inline [plc]`** fie **în secvență** (același trigger de scan), fie cu **perioade proprii** (opt-in, P6.2).
 
-**Decizii de luat la deschidere:**
-- Sintaxă: `programs: [ .fast, .slow ]` sau atribut `task:` multiplu?
-- Ordinea execuției: secvențial în scan sau task-uri cu `scanTime` propriu?
-- Izolare stare: timer/counter per program sau global pe componentă?
-- `doc(.ctrl)` ce afișează?
+**Nu înlocuiește Example 4** (două `comp [plc]`, același program, mapări diferite) — acolo sunt **două PLC-uri logice** pe hardware diferit. P6 = **un PLC**, mai multe programe pe **aceeași mapă I/O**.
 
-**Dependențe:** P+c (`VAR`), P7 (globals) — programele trebuie să poată comunica ceva dacă rulează separat.
+---
+
+#### Cum e la un PLC real (IEC 61131-3) — I/O vs programe
+
+La un PLC industrial, **hardware-ul I/O** și **programele** sunt straturi diferite:
+
+```mermaid
+flowchart TB
+  subgraph hw [Hardware rack]
+    DI[Digital inputs]
+    DO[Digital outputs]
+  end
+  subgraph image [Process image — per PLC]
+    IN_IMG[Input image snapshot]
+    OUT_IMG[Output image]
+  end
+  subgraph pou [POU-uri / programe]
+    P1[PROGRAM FastCtrl]
+    P2[PROGRAM SlowCtrl]
+    GVL[VAR_GLOBAL GVL]
+  end
+  subgraph tasks [Task scheduler]
+    T1[Task 10ms]
+    T2[Task 100ms]
+  end
+  DI --> IN_IMG
+  OUT_IMG --> DO
+  IN_IMG --> P1
+  IN_IMG --> P2
+  GVL --> P1
+  GVL --> P2
+  P1 --> OUT_IMG
+  P2 --> OUT_IMG
+  P1 --> GVL
+  P2 --> GVL
+  T1 --> P1
+  T2 --> P2
+```
+
+| Concept IEC | Ce înseamnă |
+|-------------|-------------|
+| **I/O hardware** | Module fizice DI/DO/AI/AO pe rack — adrese `%IX`, `%QX` sau simboluri globale |
+| **Process image** | La scan: **citești toate intrările** într-o imagine; **scrii toate ieșirile** din imagine — **una per PLC**, nu per program |
+| **PROGRAM (POU)** | Unitate de logică (ST/LD/FBD); poate avea `VAR_INPUT` / `VAR_OUTPUT` locale, dar în practică accesează des **simboluri globale** și I/O mapate global |
+| **VAR_GLOBAL (GVL)** | Variabile partajate între toate programele — **canalul principal** de comunicare între POU-uri |
+| **TASK** | Scheduler: „rulează PROGRAM X la fiecare **N ms**”, cu **prioritate** dacă se suprapun |
+| **M / flags interne** | Memorie internă (relee), nu pinuri — tot **partajată** sau în GVL |
+
+**Ce nu face PLC-ul real (simplificat):**
+- Nu pune de obicei **mapă hardware separată per program** — toate programele „ved” aceeași imagine I/O și aceleași globale.
+- Un program cu **doar** `READY` și altul cu **doar** `MOTOR` ca interfețe izolate → în practică folosești **GVL** (`GVL.Ready`, `GVL.Motor`) sau simboluri I/O globale, nu două tabele de mapare hardware.
+
+**Conflict ieșiri:** dacă două task-uri scriu aceeași ieșire fizică în același interval → **prioritate task** + ordine definită de vendor; pedagogic: **ultima execuție câștigă** înainte de write la hardware.
+
+**Comparație LogTscript:**
+
+| PLC real | LogTscript astăzi / P6 |
+|----------|-------------------------|
+| I/O hardware global | `comp [plc]` `inputs:` / `outputs:` — **o mapă** pe componentă |
+| Un program, un scan simplu | `program: .machine` |
+| Mai multe POU, același I/O | P6 `program: .a .b` + mapă comună |
+| GVL / M între programe | **P7** (`VAR_GLOBAL`) — mai autentic IEC decât interfețe diferite per program |
+| Task 10 ms vs 100 ms | P6.2 `scanTime: 10, 100` (virgule; spațiu unește literele 0/1 în tokenizer) |
+| Două linii fizice diferite | Example 4 — **două** `comp [plc]` |
+
+**Concluzie pentru P6:** mapă I/O **comună** nu e ciudată — e **mai aproape de PLC real** decât mapă per program. Regula P-MP-IO5 (interfață `inline` identică) e o **simplificare LogTscript** pentru elaborare strictă; IEC permite interfețe POU diferite, dar comunicarea reală trece prin **globale**, nu prin mapări hardware duplicate.
+
+---
+
+#### Sintaxă — `program:` și `scanTime:` (singular, valori multiple)
+
+**Decizie P-MP-S4 (închisă):** nu există `programs:` / `scanTimes:` — extindem atributele **existente** ca la `mems:` pe DMA: **listă ordonată** pe același nume de atribut.
+
+```logts
+; un program (comportament actual P2/P4 — neschimbat)
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 0
+  :
+
+; mai multe programe, același trigger secvențial (P6.1)
+comp [plc] .ctrl:
+  program: .init .main
+  scanTime: 0
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed, READY = .readyLed }
+  on: 1
+  :
+
+; mai multe programe, perioade diferite per slot (P6.2)
+comp [plc] .ctrl:
+  program: .fastProg .slowProg
+  scanTime: 10, 100
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+```
+
+| Atribut | Formă | Regulă |
+|---------|-------|--------|
+| **`program:`** | `.a` sau `.a .b .c` | Listă ordonată de `inline [plc]` — ca `mems: .rom .ram` ([dma.md](../v0_3_2/doc/dma.md)) |
+| **`scanTime:`** | `0` sau `10 100 …` | Listă de **ms** (non-negative integers), aliniată la sloturi |
+| **Un singur program** | `program: .machine` | Comportament **identic** cu P2/P4 (retrocompat) |
+| **Un singur `scanTime:`** | `scanTime: 200` | Comportament **identic** cu P4.1 (retrocompat) |
+
+**Respins:** `programs:`, `scanTimes:`, `program: [ … ]` — plural separat sau array.
+
+**Aliniere `scanTime:` ↔ slot `program:`:**
+
+| `program:` | `scanTime:` | Comportament |
+|------------|-------------|--------------|
+| 1 ref | 1 valoare | **P2/P4** — un program, o politică scan (neschimbat) |
+| N refs | **1 valoare** | **Broadcast** — aceeași perioadă/trigger pentru **toate** sloturile |
+| N refs | **N valori** | **Per slot** — slot *i* folosește `scanTime[i]` |
+| N refs | M valori, M≠1 și M≠N | **eroare elaborare** |
+
+**Moduri (P-MP-SCAN2…4 — închise):**
+
+| Config | Mod |
+|--------|-----|
+| N programe + **`scanTime: 0`** (broadcast) | **P6.1** — super-scan secvențial la același trigger |
+| N programe + **`scanTime: K`** (broadcast, K>0) | **P6.2** — N timere **paralele** la K ms; fiecare slot rulează **doar programul lui** |
+| N programe + **`scanTime: t1 t2 …`** (N valori) | **P6.2** — timere **independente** per slot |
+
+**`doc(.ctrl)`** — tabel slot (ca `doc(.dma)`):
+
+```text
+program:
+  [1] .init     scanTime: 0 ms
+  [2] .main     scanTime: 0 ms
+```
+
+Identificare runtime: **index 1-based** + nume `inline` (`.init`) — **fără** labeluri `fast`/`slow` în sintaxă.
+
+#### Ordinea contează?
+
+**Da** — la fel ca sloturile DMA:
+
+| Mod | Ordinea listei `program:` |
+|-----|---------------------------|
+| **P6.1 secvențial** | La fiecare super-scan: rulează **slot 1**, apoi **slot 2**, … în ordinea listei |
+| **P6.2 multi-rate** | Fiecare slot are **timer propriu**; ordinea în listă = ordine în `doc` / mesaje eroare; **nu** definește prioritate între task-uri paralele |
+
+Dacă două programe atribuie **același output** în același super-scan (P6.1), **ultimul slot din listă câștigă** la scriere fizică — documentat explicit (predictibil, didactic).
+
+---
+
+#### „Toate au același input și output?” — de ce nu e ciudat
+
+Observația e validă: **o singură mapă** `inputs:` / `outputs:` pe componentă (ca astăzi) înseamnă **o imagine I/O hardware** partajată — exact ca un PLC real cu mai multe POUs pe același rack.
+
+**Regulă P-MP-IO5 (elaboration) — închisă:** toate programele din `program:` trebuie să declare **aceeași listă** de simboluri `inputs:` și `outputs:` cu **aceleași lățimi** (interfață identică). Corpul fiecărui program poate folosi doar o parte, dar declarația trebuie să coincidă.
+
+**Mapă I/O comună (P-MP-IO0) — închisă:** un singur `inputs:` / `outputs:` pe componentă; **nu** mapă per slot/program.
+
+Motiv:
+- elimină ambiguitatea la mapare;
+- explică clar: „mai multe bucăți de cod, **aceeași fațadă** I/O”;
+- comunicare între programe în P6.1 fără P7: prin **outputs citibile în același super-scan** (`.init` scrie `READY`, `.main` citește `READY` în scanul următor din listă) sau prin **ordinea** atribuirilor.
+
+**Dacă interfețele diferă** (ex. `.init` doar `READY`, `.main` doar `MOTOR`) → nu P6.1; folosești **Example 4** (două `comp [plc]`) sau aștepți **P7** (globals).
+
+---
+
+#### Sub-faze P6.0 – P6.4 (fără bloc `tasks:`)
+
+##### P6.0 — Decizii + doc pattern (fără cod obligatoriu)
+
+- Închide tabelele P-MP* de mai jos.
+- Secțiune în `plc.md`: Example 4 vs `program: .a .b` vs P7.
+
+##### P6.1 — Secvențial (MVP)
+
+Un trigger (`set`, osc, sau `scanTime` al componentei) → **toate sloturile în ordine** → un `scanCount++`.
+
+```text
+read inputs (o dată)
+→ executePlcScan(slot 1)
+→ executePlcScan(slot 2)
+→ …
+→ write outputs (o dată)
+→ scanCount++
+```
+
+- `on:` / `retain` / `retainVar` la **nivel componentă** (P-MP-ST2); `timerState` / `counterState` / `varState` — **per slot** (P-MP-ST1).
+- **`scanCount++`** o dată per super-scan (P-MP-CNT1).
+
+##### P6.2 — Multi-rate (opt-in IEC)
+
+**Fără** atribute plural sau bloc `tasks:` — doar **`program:`** + **`scanTime:`** cu liste paralele.
+
+```logts
+comp [plc] .ctrl:
+  program: .fastProg .slowProg
+  scanTime: 10, 100
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+```
+
+| `scanTime:` | Comportament |
+|-------------|--------------|
+| **o valoare** | Broadcast — toate sloturile aceeași perioadă |
+| **N valori** (= N programe) | Slot *i* → timer la `scanTime[i]` ms |
+| lungime invalidă | **eroare elaborare** |
+
+**Pouts (P-MP-CNT1):** `scanCount` **per slot** în `doc()`; `busy` agregat pe componentă.
+
+##### P6.3 — Retain / strict per slot (amânat — P-MP-ST3)
+
+`retain`, `scanDuration`, `strict` **per slot** — **nu** în P6.1/P6.2; politici globale pe componentă (P-MP-ST2).
+
+##### P6.4 — Doc + `logts-play` + teste
+
+Exemple: pipeline `program: .init .main`; două perioade `scanTime: 10, 100`.
+
+---
+
+#### Decizii P-MP* — **închise** (confirmare user)
+
+| ID | Decizie | Status |
+|----|---------|--------|
+| **P-MP-IO0** | Mapă I/O **comună** | **închis** |
+| **P-MP-IO5** | Interfață **identică** între programe | **închis** |
+| **P-MP-S4** | **`program:`** / **`scanTime:`** singular, valori multiple | **închis** |
+| **P-MP-S2** | Nu array `[ … ]` | respins |
+| **P-MP-S3** | Nu bloc `tasks:` | respins |
+| **P-MP-ORD** | Ordinea listei = execuție (P6.1) | **închis** |
+| **P-MP-OUT** | Conflict output → ultimul slot câștigă | **închis** |
+| **P-MP-SCAN1** | 1 `scanTime` = broadcast; N = per slot | **închis** |
+| **P-MP-SCAN2** | broadcast `0` → P6.1 super-scan | **închis** |
+| **P-MP-SCAN3** | N valori `scanTime` → P6.2 independent | **închis** |
+| **P-MP-SCAN4** | broadcast K>0 → N timere paralele | **închis** |
+| **P-MP-ST1** | FB/VAR state per slot | **închis** |
+| **P-MP-ST2** | retain/retainVar pe componentă, cache per slot | **închis** |
+| **P-MP-ST3** | retain/strict per slot | **amânat P6.3** |
+| **P-MP-CNT1** | scanCount: unul (P6.1) / per slot doc (P6.2) | **închis** |
+| **P-MP-ERR1** | ref duplicat în `program:` → eroare | **închis** |
+| **P-MP-ERR2** | N programe fără `scanTime:` → eroare | **închis** |
+| **P-MP-P7** | P6.1 fără P7 | **închis** |
+| **P-MP-DEL** | Livrare: P6.0 → P6.1 → P6.4 → P6.2 | **închis** |
+
+**Dependențe:** P+c (`VAR`); P7 separat; P6.2 după P6.1 + P6.4.
 
 ---
 
@@ -1570,9 +1844,11 @@ comp [plc] .ctrlB:
 
 **P5.2c (`retainVar`):** **done** — P-RET-VAR0…P-RET-VAR5.
 
-**Încă deschise / amânate:** P3c, **P6**, **P7**, **P8**.
+**P6 (decizii):** **închis** — P-MP-IO0…P-MP-DEL (implementare P6.0→P6.1→P6.4→P6.2; P6.3/P-MP-ST3 amânat).
 
-**Următorul pas recomandat:** **P3c** sau **P6** (la alegere).
+**Încă deschise / amânate:** P3c, **P6 implementare**, **P7**, **P8**.
+
+**Următorul pas recomandat:** **P6.0** (doc) apoi **P6.1** implementare — sau **P3c** dacă prioritate actuators.
 
 ---
 

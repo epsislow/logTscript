@@ -23673,7 +23673,7 @@ Same width rules as \`inputs:\`.
 
 ### \`VAR\` … \`END_VAR\`
 
-Internal memory (relay flags) — **not** mapped on \`comp [plc]\`. Values persist **between scans** on the same run; they **reset to \`0\`** on a new Load & Run.
+Internal memory (relay flags) — **not** mapped on \`comp [plc]\`. Values persist **between scans** on the same run; they **reset to \`0\`** on a new Load & Run unless **\`retainVar: 1\`** on \`comp [plc]\` (see [plc.md](plc.md)).
 
 \`\`\`logts
 VAR
@@ -23687,7 +23687,7 @@ END_VAR
 | Placement | After \`inputs\`/\`outputs\`, **before** the program body (and before \`CONST\`) |
 | Width | \`name\` or \`name: N\` (default **1**). Any width in comparisons and arithmetic |
 | Read / write | Readable and writable in the body like outputs |
-| First scan | Each VAR starts at **\`0\`** |
+| First scan | Each VAR starts at **\`0\`** (or restored from cache when \`retainVar: 1\`) |
 | Names | Must not conflict with inputs, outputs, CONST, timers, or counters |
 
 Typical use: set-reset latch without relying only on output retain.
@@ -24026,7 +24026,7 @@ TOF coolOff(IN := RUN, PT := 30)
 | Unknown \`foo.Q\` | parse error |
 | \`timer.Q = 1\` | parse error |
 
-**Not exposed in v1:** \`ET\` (elapsed time), explicit reset pin on timers.
+**Not available:** \`ET\` (elapsed time), explicit reset pin on timers.
 
 ### Runnable — minimal TON
 
@@ -24395,8 +24395,9 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Timers** | \`TON\` / \`TOF\` blocks; \`PT\` in scan cycles; read \`name.Q\` |
 | **Counters** | \`CTU\` / \`CTD\` blocks; \`PV\` preset; read \`name.Q\`; compare \`name.CV >= N\` |
 | **Widths** | \`START\` alone = 1 bit; \`TEMP: 8\` = 8-bit unsigned; overflow wraps to symbol width |
-| **Scan** | \`.plc:{ set = 1 }\` or **\`scanTime > 0\`** auto-scan; see [Scan timing (P4)](#scan-timing-p4) |
-| **\`busy\`** | \`0\` when \`scanTime: 0\`; pulses during simulated scan when \`scanTime > 0\` |
+| **Scan** | \`.plc:{ set = 1 }\` or **\`scanTime > 0\`** auto-scan; see [Scan timing](#scan-timing) |
+| **Multi-program** | \`program: .init .main\` — one \`comp [plc]\`, shared I/O map; see [Multiple programs](#multiple-programs-on-one-comp-plc) |
+| **\`busy\`** | \`0\` when all \`scanTime\` values are \`0\`; pulses during simulated scan when any period \`> 0\` |
 | **Outputs** | Retain last value if not assigned this scan (PLC semantics) |
 | **Inputs** | Read-only in program; mapped at \`comp [plc]\` elaboration |
 | **Errors** | Strict mapping at elaboration — no silent fallback to \`0\` |
@@ -24466,29 +24467,32 @@ comp [plc] .ctrl:
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
-| **\`program:\`** | yes | One \`inline [plc]\` reference (e.g. \`program: .machine\` or \`program = .machine\`) |
-| **\`inputs:\`** | yes* | \`SYM = wire\` or \`SYM = .component\` for every program input |
-| **\`outputs:\`** | yes* | \`SYM = wire\` or \`SYM = .component\` for every program output |
+| **\`program:\`** | yes | One or more \`inline [plc]\` refs (e.g. \`program: .machine\` or \`program: .init .main\`). Order = execution order when run together. |
+| **\`inputs:\`** | yes* | \`SYM = wire\` or \`SYM = .component\` for every program input (one shared map for all programs) |
+| **\`outputs:\`** | yes* | \`SYM = wire\` or \`SYM = .component\` for every program output (one shared map) |
 | **\`on:\`** | optional | How **property blocks** on this component are triggered (see below) |
-| **\`scanTime:\`** | optional | **ms** — \`0\`/omitted = event-driven; **\`N > 0\`** = internal auto-scan every ~N ms |
-| **\`scanDuration:\`** | optional | **ms** simulated execution time per scan (\`busy = 1\`); default **\`1\`** when \`scanTime > 0\` |
+| **\`scanTime:\`** | optional† | **ms** — one value (broadcast) or comma-separated per program (\`10, 100\`); see [Scan timing](#scan-timing) and [Multiple programs](#multiple-programs-on-one-comp-plc) |
+| **\`scanDuration:\`** | optional | **ms** simulated execution time per scan (\`busy = 1\`); default **\`1\`** when any \`scanTime > 0\` |
 | **\`strict:\`** | optional | **\`0\`** (default) stretch missed ticks; **\`1\`** = overrun/miss (\`overrunCount++\`) |
-| **\`retain:\`** | optional | **\`0\`** (default) reset timer/counter FB state on re-RUN; **\`1\`** preserve FB state in same session |
+| **\`retain:\`** | optional | **\`0\`** (default) reset timer/counter FB state on re-RUN; **\`1\`** preserve FB state in same session (per program) |
+| **\`retainVar:\`** | optional | **\`0\`** (default) reset **\`VAR\`** on re-RUN; **\`1\`** preserve \`varState\` in same session (per program) |
 
-\\*Every program symbol must appear **exactly once** in the matching map. Missing or extra keys → **elaboration error**.
+\\*Every program symbol must appear **exactly once** in the matching map. Missing or extra keys → **elaboration error**. With several programs, all must declare the **same** \`inputs\`/\`outputs\` (names and widths).
 
-\`doc(comp.plc)\` shows the component type; \`doc(.ctrl)\` shows program ref, **\`retain\`**, maps, \`scanCount\`, and last \`outputState\`.
+†With **more than one** program, **\`scanTime:\`** is **required** (use \`scanTime: 0\` for sequential event-driven scans).
+
+\`doc(comp.plc)\` shows the component type; \`doc(.ctrl)\` shows program ref(s), **\`retain\`**, **\`retainVar\`**, maps, \`scanCount\` (and per-program counts when multi-rate), and last \`outputState\`.
 
 ### Scan cycle (one pass)
 
 When a property block runs on \`.ctrl\` and \`set\` is active (per \`on:\`):
 
-1. **Read** each mapped input (wire or component \`:get\`).
-2. **Execute** the \`inline [plc]\` program once (\`executePlcScan\`).
-3. **Write** each mapped output (wire or component storage + display).
-4. Increment **\`scanCount\`**.
+1. **Read** each mapped input (wire or component \`:get\`) — once per trigger.
+2. **Execute** the \`inline [plc]\` program(s) (\`executePlcScan\`). With several programs and \`scanTime: 0\`, all run **in list order** (super-scan).
+3. **Write** each mapped output (wire or component storage + display) — once; if several programs assign the same output, the **last** program in the list wins.
+4. Increment **\`scanCount\`** (once per super-scan when programs share one trigger).
 
-Internal output state (\`outputState\`) persists between scans for latch semantics inside the program.
+Internal output state (\`outputState\`) persists between scans for latch semantics inside each program.
 
 ### Pins and pouts
 
@@ -24528,7 +24532,7 @@ comp [plc] .ctrl:
   outputs: { MOTOR = motorCmd }
   ...
 
-.motorLed = motorCmd    ; LogTscript wiring after scan
+.motorLed = motorCmd    # LogTscript wiring after scan
 \`\`\`
 
 **Direct LED map** (PLC writes \`comp [led]\`):
@@ -24559,20 +24563,74 @@ Only the **maps** change — not the program.
 
 ---
 
+## Multiple programs on one \`comp [plc]\`
+
+A single \`comp [plc]\` can list several \`inline [plc]\` programs:
+
+\`\`\`logts
+comp [plc] .ctrl:
+  program: .init .main
+  scanTime: 0
+  inputs: { START = .start, STOP = .stop }
+  outputs: { READY = readyWire, MOTOR = motorOut }
+  on: 1
+  :
+\`\`\`
+
+### One program vs several programs vs two components
+
+| Pattern | When to use |
+|---------|-------------|
+| **\`program: .machine\`** (one ref) | Default — one logic body, one map |
+| **Two \`comp [plc]\`** ([Example 4](#example-4--two-machines-one-program)) | Different I/O maps, independent scans, or different interfaces |
+| **\`program: .a .b\`** on one component | Same I/O interface; shared process image; sequential or multi-rate execution |
+
+### Rules
+
+| Rule | Behaviour |
+|------|-----------|
+| **Shared map** | One \`inputs:\` / \`outputs:\` for the component — all programs share it |
+| **Identical interface** | Every program must declare the **same** input/output symbols and widths |
+| **Order** | List order is execution order when programs run in one super-scan |
+| **Shared outputs** | All programs share one \`outputState\` (process image). A later program in a super-scan can **read** outputs written by an earlier one |
+| **State** | Timers, counters, and \`VAR\` are **per program**; \`retain\` / \`retainVar\` apply to the whole component |
+| **\`scanTime:\` required** | With 2+ programs you must write \`scanTime:\` explicitly (e.g. \`0\`, \`50\`, or \`10 100\`) |
+| **Duplicate ref** | \`program: .a .a\` → elaboration error |
+
+### How \`scanTime:\` works with several programs
+
+| \`scanTime:\` | Behaviour |
+|-------------|-----------|
+| **One value \`0\`** (e.g. \`scanTime: 0\`) | **Super-scan**: each \`set\` (or external pulse) runs **all** programs in order, one input read, one output write, \`scanCount++\` once |
+| **One value \`K > 0\`** (e.g. \`scanTime: 50\`) | **Parallel timers**: each program gets its own timer at **K ms**; each tick runs **only that** program |
+| **N values** (e.g. \`scanTime: 10, 100\`) | **Independent periods**: program *i* auto-scans every \`scanTime[i]\` ms |
+| **Wrong length** | Not 1 and not N → elaboration error |
+
+Manual \`.ctrl:{ set = 1 }\` with multi-rate still runs **all** programs once (same as a one-shot super-scan), which keeps Load & Run examples deterministic.
+
+\`doc(.ctrl)\` lists each program and, for multi-rate, each program’s \`scanCount\`. The pout **\`scanCount\`** is the component total (sum of program scans in multi-rate; one per super-scan when \`scanTime: 0\`).
+
+---
+
 ## Scan timing
 
 ### What \`scanTime\` means
 
-**\`scanTime\`** is the target interval (**milliseconds**) between complete scan cycles:
+**\`scanTime\`** is the target interval (**milliseconds**) between scan cycles. It accepts **one** value or a **comma-separated list**:
 
 \`\`\`text
-read inputs → executePlcScan → write outputs → scanCount++
+read inputs → executePlcScan (one or more programs) → write outputs → update scanCount
 \`\`\`
 
 | \`scanTime\` | Mode | Behaviour |
 |------------|------|-----------|
-| **omitted** or **\`0\`** | **Event-driven** | No internal timer. Scan on each active **\`set\`** (manual, wire, or \`osc\`). Execution is **instant** — **\`busy\` stays \`0\`**. Not “run once”; scan as often as you trigger \`set\`. |
-| **\`N > 0\`** | **Auto-scan** | Internal timer fires every ~**N ms**. **\`busy\`** pulses for **\`scanDuration\`** ms per scan. |
+| **omitted** or **\`0\`** (single program) | **Event-driven** | No internal timer. Scan on each active **\`set\`**. Execution is **instant** — **\`busy\` stays \`0\`**. |
+| **\`N > 0\`** (one value, one program) | **Auto-scan** | Internal timer every ~**N ms**. **\`busy\`** pulses for **\`scanDuration\`** ms. |
+| **\`0\`** with several programs | **Super-scan** | Each trigger runs all programs in order (see [Multiple programs](#multiple-programs-on-one-comp-plc)). |
+| **\`K > 0\`** broadcast with several programs | **Parallel auto-scan** | Each program has a timer at **K ms**. |
+| **\`t1, t2, …\`** (one per program) | **Independent rates** | Program *i* period = \`ti\` ms. |
+
+List several periods with **commas** (e.g. \`scanTime: 10, 100\`). A bare space between digits like \`0\`/\`1\` is treated as one binary-style literal by the tokenizer.
 
 ### Master clock
 
@@ -24591,7 +24649,7 @@ read inputs → executePlcScan → write outputs → scanCount++
 | **\`strict: 0\`** (default) | Timer tick during \`busy\` → scan **deferred** (stretch) |
 | **\`strict: 1\`** | Timer tick during \`busy\` → cycle **missed**; **\`overrunCount++\`**, **\`missed = 1\`** |
 
-Outputs keep their last written value while \`busy\` (P-D7).
+Outputs keep their last written value while \`busy\`.
 
 ### External clock (\`scanTime: 0\`)
 
@@ -24645,6 +24703,8 @@ Watch **\`overrunCount\`** with **\`probe\`** — pedagogic “PLC too slow for 
 ---
 
 ## Runnable examples
+
+Every block below uses **\`logts-play\`**: **Load** opens the script in the editor; **Load & Run** executes it (same as [cpu.md](cpu.md)). Where noted, the expected result after **Load & Run** is deterministic from presets in the script.
 
 ### Example 1 — START / STOP / MOTOR (wires)
 
@@ -24866,7 +24926,7 @@ doc(.machine)
 doc(.ctrl)
 \`\`\`
 
-### Example 7 — \`comp [dip]\` as 1-bit input (test 2769)
+### Example 7 — \`comp [dip]\` as 1-bit input
 
 \`length: 1\` DIP preset \`= 1\`; motor LED on after scan.
 
@@ -24898,7 +24958,7 @@ show(.motorLed:get)
 show(.ctrl:scanCount)
 \`\`\`
 
-### Example 8 — \`comp [reg]\` as 1-bit output (test 2770)
+### Example 8 — \`comp [reg]\` as 1-bit output
 
 PLC writes register via scan (\`setReg\`); read with \`:get\`.
 
@@ -24933,7 +24993,7 @@ comp [plc] .ctrl:
 show(.cmd:get)
 \`\`\`
 
-### Example 9 — \`comp [bar]\` length 1 as output (test 2771)
+### Example 9 — \`comp [bar]\` length 1 as output
 
 Single-segment bar driven directly by PLC output map.
 
@@ -24964,7 +25024,7 @@ comp [plc] .ctrl:
 show(.start:get)
 \`\`\`
 
-### Example 10 — \`comp [key]\` mapping (test 2772)
+### Example 10 — \`comp [key]\` mapping
 
 Map syntax is identical to switch: \`START = .start\`. For **Load & Run**, this example uses a **switch** preset (deterministic). With \`comp [key]\`, load the script, **press the key** in the panel, then run \`.ctrl:{ set = 1 }\`.
 
@@ -24994,7 +25054,7 @@ comp [plc] .ctrl:
 show(.motorLed:get)
 \`\`\`
 
-### Example 11 — CLCD alarm via wire (test 2773)
+### Example 11 — CLCD alarm via wire
 
 PLC sets \`alarmCmd\`; CLCD panel updates outside PLC. **\`on: 1\`** on both PLC and CLCD for deterministic Load & Run.
 
@@ -25034,7 +25094,7 @@ show(alarmCmd)
 show(.panel:get)
 \`\`\`
 
-### Example 12 — DIP off → motor off (test 2774)
+### Example 12 — DIP off → motor off
 
 Same as example 7 with \`= 0\` on DIP; LED stays off.
 
@@ -25065,7 +25125,7 @@ comp [plc] .ctrl:
 show(.motorLed:get)
 \`\`\`
 
-### Example 13 — External clock wire pulse (test 2775)
+### Example 13 — External clock wire pulse
 
 \`scanTime: 0\` — scan when external wire drives \`set\`. Load & Run: one scan; second \`set\` via script step adds another (here shown as two triggers in one Run).
 
@@ -25099,7 +25159,7 @@ show(.ctrl:busy)
 
 Load & Run: \`scanCount\` is **\`2\`**, \`busy\` is **\`0\`**, \`cntOut\` is **\`1\`**.
 
-### Example 14 — Manual scan with \`scanTime > 0\` (test 2780)
+### Example 14 — Manual scan with \`scanTime > 0\`
 
 Auto timer is armed but first scan is manual; \`busy\` clears before \`show\`.
 
@@ -25165,7 +25225,7 @@ show(.ctrl:scanCount)
 
 After Load & Run, wait ~2 s per osc cycle; \`scanCount\` increases on each rising edge.
 
-### Example 16 — Event-driven \`busy\` stays 0 (test 2779)
+### Example 16 — Event-driven \`busy\` stays 0
 
 \`\`\`logts-play
 inline [plc] .machine:
@@ -25201,6 +25261,8 @@ show(.ctrl:busy)
 ## Timers TON / TOF
 
 Language specification: [plc-language.md — TON / TOF](plc-language.md#timers--ton--tof). Below are integration examples with \`comp [plc]\` and \`logts-play\`.
+
+### Example 17 — TON on-delay
 
 **START** held on (\`comp [switch] = 1\`). Three scans (\`PT := 3\`) before **MOTOR** and **READY** turn on. Load & Run runs three \`.ctrl:{ set = 1 }\` in one script.
 
@@ -25245,7 +25307,7 @@ show(.ctrl:scanCount)
 
 After Load & Run: **\`scanCount\` = 3**, both LEDs **\`1\`**.
 
-### Example 18 — TOF off-delay (test 2795 / 2797)
+### Example 18 — TOF off-delay
 
 **RUN** starts on; first scan latches motor on. Script turns **RUN** off, then two more scans (\`PT := 2\`) before motor releases.
 
@@ -25323,7 +25385,7 @@ Use **probe** and wait in the browser; motor turns on after ~3 auto-scans.
 
 ## Counters CTU / CTD
 
-### Example 20 — CTU count-up (test 2811)
+### Example 20 — CTU count-up
 
 **SENSOR** pulsed 5 times; \`PV := 5\`; **FULL** LED activates when \`CV >= 5\`.
 
@@ -25380,7 +25442,7 @@ show(.ctrl:scanCount)
 
 After Load & Run: **\`scanCount\` = 10**, **FULL LED \`1\`** (5 complete rising edges counted).
 
-### Example 21 — CTD count-down (test 2812)
+### Example 21 — CTD count-down
 
 \`PV := 3\`; the script sends one load pulse first, then three rising edges on \`TICK\`.
 
@@ -25410,12 +25472,12 @@ comp [plc] .ctrl:
   on: 1
   :
 
-; load preset first
+# load preset first
 .reload = 1
 .ctrl:{ set = 1 }
 .reload = 0
 
-; 3 rising edges to count down
+# 3 rising edges to count down
 .tick = 1
 .ctrl:{ set = 1 }
 .tick = 0
@@ -25521,6 +25583,19 @@ comp [plc] .ctrl:
 
 After two Runs (second adds one pulse): CV is **\`3\`** (2 preserved + 1 new). Changing timer/counter names or types in the program invalidates retained state.
 
+### \`retainVar:\` — preserve \`VAR\` on re-RUN
+
+| \`retainVar\` | On re-RUN (same browser session) |
+|-------------|----------------------------------|
+| **\`0\`** (default) | Every \`VAR\` resets to **\`0\`** |
+| **\`1\`** | \`varState\` is restored if the program fingerprint still matches |
+
+**Independent from \`retain:\`** — you can keep FB state without VAR (\`retain: 1\`, \`retainVar: 0\`), or VAR without FB (\`retain: 0\`, \`retainVar: 1\`), or both (\`retain: 1\`, \`retainVar: 1\`).
+
+**Not retained** (even with \`retainVar: 1\`): mapped **outputs**, \`scanCount\`, \`busy\`, inputs from the panel. **Not saved to disk** — reload page or new session clears the cache.
+
+**Invalidation:** same rules as \`retain:\` — program change (including \`VAR\` list), new session, or setting \`retainVar: 0\`.
+
 ### Example 24 — \`VAR\` latch (set-reset)
 
 Internal \`latch\` remembers START until STOP. Second scan with START = 0 still keeps MOTOR on.
@@ -25564,7 +25639,51 @@ show(.motorLed:get)
 
 After Load & Run: LED is **\`1\`** (latched).
 
-### Example 25 — \`CASE\` mode select
+### Example 25 — \`retainVar: 1\` (VAR latch survives re-RUN)
+
+Same latch program as Example 24, but \`retainVar: 1\` keeps internal \`latch\` after **Run** again without pressing START.
+
+\`\`\`logts-play
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  VAR
+    latch: 1
+  END_VAR
+  IF START AND NOT latch THEN latch = 1 END_IF
+  IF STOP THEN latch = 0 END_IF
+  MOTOR = latch
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  retainVar: 1
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.start = 0
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+\`\`\`
+
+After Load & Run: LED **\`1\`**. Press **Run** again (without toggling START): LED stays **\`1\`** because \`latch\` was restored. With \`retainVar: 0\`, a second Run would show **\`0\`**.
+
+### Example 26 — \`CASE\` mode select
 
 \`\`\`logts-play
 inline [plc] .machine:
@@ -25608,7 +25727,7 @@ show(.bLed:get)
 
 With \`SEL = 1\`: **OUT_A = 0**, **OUT_B = 1**.
 
-### Example 26 — \`RETURN\` early exit
+### Example 27 — \`RETURN\` early exit
 
 When ENABLE = 0, \`RETURN\` skips the assign that would turn MOTOR on.
 
@@ -25644,7 +25763,7 @@ show(.motorLed:get)
 
 After Load & Run: LED is **\`0\`**.
 
-### Example 27 — \`FOR\` in one scan
+### Example 28 — \`FOR\` in one scan
 
 \`\`\`logts-play
 inline [plc] .machine:
@@ -25682,7 +25801,7 @@ show(.hitLed:get)
 
 After Load & Run: LED is **\`1\`** (loop reached \`i = 1\` in the same scan).
 
-### Example 28 — \`WHILE\` + \`EXIT\`
+### Example 29 — \`WHILE\` + \`EXIT\`
 
 \`\`\`logts-play
 inline [plc] .machine:
@@ -25716,7 +25835,7 @@ show(.motorLed:get)
 
 \`EXIT\` leaves the loop after one pass — LED is **\`1\`**, scan does not hang.
 
-### Example 29 — \`REPEAT\` … \`UNTIL\`
+### Example 30 — \`REPEAT\` … \`UNTIL\`
 
 Body runs once even when \`STOP\` is already 1.
 
@@ -25752,7 +25871,7 @@ show(.motorLed:get)
 
 After Load & Run: LED is **\`1\`**.
 
-### Example 30 — slider thermostat (\`TEMP > 50\`)
+### Example 31 — slider thermostat (\`TEMP > 50\`)
 
 \`comp [slider]\` provides an 8-bit value on \`:get\` (0…255). When the value is above 50, \`HEATER\` turns on.
 
@@ -25786,7 +25905,7 @@ comp [plc] .ctrl:
 
 After **Load & Run** with slider at 0: LED is **\`0\`**. Drag the slider above halfway (~>50) and trigger another scan — LED becomes **\`1\`**.
 
-### Example 31 — scale input to \`comp [bar]\`
+### Example 32 — scale input to \`comp [bar]\`
 
 Copy and scale a multi-bit input to an 8-segment bar display.
 
@@ -25799,6 +25918,7 @@ inline [plc] .machine:
 
 comp [slider] .tempSlider:
   length: 8
+  on: 1
   :
 
 comp [bar] .levelBar:
@@ -25812,18 +25932,23 @@ comp [plc] .ctrl:
   on: 1
   :
 
+.tempSlider:{ data = 01010000 set = 1 }
 .ctrl:{ set = 1 }
+
+show(.levelBar:get)
 \`\`\`
 
-With \`TEMP = 80\` (binary \`01010000\`): \`LEVEL = (80 * 2) / 10 = 16\` — bar shows 16 lit segments pattern on \`:get\`.
+After Load & Run: \`TEMP = 80\`, \`LEVEL = (80 * 2) / 10 = **16**\` (\`00010000\` on \`:get\`).
 
-### Example 32 — \`CASE\` on multi-bit mode
+### Example 33 — \`CASE\` on multi-bit mode
+
+Use symbol **\`MSEL\`** (not \`MODE\` — \`MODE\` is a LogTscript keyword in component maps).
 
 \`\`\`logts-play
 inline [plc] .machine:
-  inputs: { MODE: 8 }
+  inputs: { MSEL: 8 }
   outputs: { OUT_A, OUT_B }
-  CASE MODE OF
+  CASE MSEL OF
     0:
       OUT_A = 1
       OUT_B = 0
@@ -25838,6 +25963,7 @@ inline [plc] .machine:
 
 comp [slider] .modeSlider:
   length: 8
+  on: 1
   :
 
 comp [led] .aLed:
@@ -25848,18 +25974,136 @@ comp [led] .bLed:
 
 comp [plc] .ctrl:
   program: .machine
-  inputs: { MODE = .modeSlider }
+  inputs: { MSEL = .modeSlider }
   outputs: { OUT_A = .aLed, OUT_B = .bLed }
   on: 1
   :
 
+.modeSlider:{ data = 00110010 set = 1 }
 .ctrl:{ set = 1 }
 
 show(.aLed:get)
 show(.bLed:get)
 \`\`\`
 
-Set slider to value **50**: **OUT_A = 0**, **OUT_B = 1**.
+After Load & Run with \`MSEL = 50\`: **OUT_A = 0**, **OUT_B = 1**.
+
+### Example 34 — Pipeline: \`program: .init .main\` (super-scan)
+
+Two programs, shared I/O, \`scanTime: 0\`. One \`set\` runs \`.init\` then \`.main\`. \`.init\` sets \`READY\`; \`.main\` turns \`MOTOR\` on when \`READY\` is true.
+
+Load & Run: \`readyOut = 1\`, \`motorOut = 1\`, \`scanCount = 1\`.
+
+\`\`\`logts-play
+inline [plc] .init:
+  inputs: { START, STOP }
+  outputs: { READY, MOTOR }
+  IF START THEN READY = 1 ELSE READY = 0 END_IF
+  :
+
+inline [plc] .main:
+  inputs: { START, STOP }
+  outputs: { READY, MOTOR }
+  IF READY AND NOT STOP THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+1wire startIn
+1wire stopIn
+1wire readyOut
+1wire motorOut
+
+startIn = 1
+stopIn = 0
+
+comp [plc] .ctrl:
+  program: .init .main
+  scanTime: 0
+  inputs: { START = startIn, STOP = stopIn }
+  outputs: { READY = readyOut, MOTOR = motorOut }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(readyOut)
+show(motorOut)
+show(.ctrl:scanCount)
+\`\`\`
+
+### Example 35 — Output conflict: last program wins
+
+Both programs assign \`MOTOR\` in the same super-scan. The second program’s value is written.
+
+Load & Run: \`motorOut = 0\` (\`.second\` wins).
+
+\`\`\`logts-play
+inline [plc] .first:
+  inputs: { START }
+  outputs: { MOTOR }
+  MOTOR = 1
+  :
+
+inline [plc] .second:
+  inputs: { START }
+  outputs: { MOTOR }
+  MOTOR = 0
+  :
+
+1wire startIn
+1wire motorOut
+startIn = 1
+
+comp [plc] .ctrl:
+  program: .first .second
+  scanTime: 0
+  inputs: { START = startIn }
+  outputs: { MOTOR = motorOut }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(motorOut)
+\`\`\`
+
+### Example 36 — Multi-rate: \`scanTime: 10, 100\`
+
+Two programs with independent periods. After ~100 ms of virtual time, the fast program has more scans than the slow one.
+
+\`\`\`logts-play
+inline [plc] .fastProg:
+  inputs: { EN }
+  outputs: { FAST, SLOW }
+  IF EN THEN FAST = 1 ELSE FAST = 0 END_IF
+  :
+
+inline [plc] .slowProg:
+  inputs: { EN }
+  outputs: { FAST, SLOW }
+  IF EN THEN SLOW = 1 ELSE SLOW = 0 END_IF
+  :
+
+comp [switch] .en:
+  = 1
+  :
+
+1wire fastOut
+1wire slowOut
+
+comp [plc] .ctrl:
+  program: .fastProg .slowProg
+  scanTime: 10, 100
+  scanDuration: 1
+  inputs: { EN = .en }
+  outputs: { FAST = fastOut, SLOW = slowOut }
+  on: 1
+  :
+
+show(fastOut)
+show(slowOut)
+\`\`\`
+
+After Load & Run the outputs are still \`0\` until auto-scan ticks (or a manual \`.ctrl:{ set = 1 }\`, which runs both once). Use **\`probe(.ctrl:scanCount)\`** in the browser to watch counts grow. With \`scanDuration: 1\`, allow a little more than the slow period so both programs have run (busy windows can defer a tick by 1 ms).
 
 ---
 
@@ -25890,7 +26134,6 @@ LogTScript PLC maps **program symbols** to **wires** or **existing panel compone
 | **Width** | 1 bit |
 | **UI** | Press key in panel → \`:get\` is \`1\` while held (typically \`0\` when released) |
 | **Load & Run** | Key is **not** preset — use \`comp [switch]\` with \`= 1\`, a wire preset, or press key after **Load** then trigger scan |
-| **Tests** | Test **2772** uses \`session.setComp('.start', '1')\` before scan |
 
 Program sees the same 1-bit value as a wire or switch.
 
@@ -25920,8 +26163,8 @@ Program sees the same 1-bit value as a wire or switch.
 | **Map** | \`TEMP = .tempSlider\` with matching \`length\` (e.g. \`TEMP: 8\` ↔ \`length: 8\`) |
 | **Value range** | \`0\` … \`2^length − 1\` as binary on \`:get\` |
 | **Logic** | \`IF TEMP > 50\`, \`LEVEL = (TEMP * 2) / 10\`, \`CASE TEMP OF\` |
-| **Preset** | Drag in panel after Load, or \`session.setComp('.tempSlider', '01100100')\` in tests |
-| **Example** | Example 30 — thermostat; Example 31 — bar scaling |
+| **Preset** | Drag in panel after Load, or \`.tempSlider:{ data = 01100100 set = 1 }\` with \`on: 1\` on the slider |
+| **Example** | Example 31 — thermostat; Example 32 — bar scaling |
 
 ### Wires
 
@@ -25999,10 +26242,17 @@ For multi-bit status codes, use script logic between PLC output wires and the pa
 
 | Attribute | Required | Description |
 |-----------|----------|-------------|
-| **\`program:\`** | yes | One \`inline [plc]\` reference |
-| **\`inputs:\`** | yes* | Every program input symbol → wire or \`.component\` |
-| **\`outputs:\`** | yes* | Every program output symbol → wire or \`.component\` |
+| **\`program:\`** | yes | One or more \`inline [plc]\` refs (\`program: .a\` or \`program: .a .b\`) |
+| **\`inputs:\`** | yes* | Every program input symbol → wire or \`.component\` (shared map) |
+| **\`outputs:\`** | yes* | Every program output symbol → wire or \`.component\` (shared map) |
 | **\`on:\`** | optional | Property-block trigger for \`.ctrl:{ set = 1 }\` |
+| **\`scanTime:\`** | optional† | **ms** list — \`0\`/omitted (one program) = event-driven; broadcast or per-program periods |
+| **\`scanDuration:\`** | optional | **ms** simulated execution per scan (\`busy\`); default **\`1\`** when any period \`> 0\` |
+| **\`strict:\`** | optional | **\`0\`** stretch missed ticks; **\`1\`** = overrun/miss (\`overrunCount++\`) |
+| **\`retain:\`** | optional | **\`0\`** reset timer/counter FB on re-RUN; **\`1\`** preserve FB state in session (per program) |
+| **\`retainVar:\`** | optional | **\`0\`** reset \`VAR\` on re-RUN; **\`1\`** preserve \`varState\` in session (per program) |
+
+†Required when \`program:\` lists more than one reference.
 
 ### Pins
 
@@ -26031,10 +26281,10 @@ Same rules apply to **\`comp [clcd]\`** property blocks — use **\`on: 1\`** on
 
 ### Scan cycle — step by step
 
-1. Read each **input** map target → build \`externalInputs\`.
-2. Run **\`executePlcScan\`** once (updates internal \`outputState\`).
-3. Write each **output** map target from \`outputState\`.
-4. Increment **\`scanCount\`**.
+1. Read each **input** map target → build \`externalInputs\` (once per trigger).
+2. Run **\`executePlcScan\`** for each program that participates (one program, or all in list order for a super-scan / manual \`set\`).
+3. Write each **output** map target from the last program’s \`outputState\` (last writer wins on conflicts).
+4. Update **\`scanCount\`**.
 
 ### Output retain
 
@@ -26048,13 +26298,12 @@ If the program does **not** assign an output in this scan, the **mapped target k
 | Extra key in \`inputs:\` / \`outputs:\` | Error |
 | Width mismatch (e.g. 1-bit symbol → \`8wire\`) | Error |
 | \`program:\` not \`inline [plc]\` | Error |
+| Duplicate ref in \`program:\` list | Error |
+| Programs with different \`inputs\`/\`outputs\` | Error |
+| Several programs without \`scanTime:\` | Error |
+| \`scanTime:\` list length not 1 and not N | Error |
 
 ---
-
-## Runnable examples (verified in tests 2757–2783)
-
-Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch, and \`doc\`. Examples **7–11** cover the I/O matrix (P3).
-
 
 ## Errors (elaboration and parse)
 
@@ -26063,7 +26312,12 @@ Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch,
 | Input declared, not mapped | elaboration | \`plc .ctrl: input STOP declared in program but not mapped\` |
 | Extra map key | elaboration | \`mapping STOP is not declared in program inputs\` |
 | Width mismatch | elaboration | \`plc .ctrl: START width 1 does not match bus (8 bits)\` |
+| Map symbol is LogTscript keyword | parse | \`Expected symbol name in PLC map\` (e.g. **\`MODE\`** in \`inputs: { MODE = … }\` — use another name like \`MSEL\`) |
 | Invalid \`program:\` | elaboration | \`plc program .x must be inline [plc]\` |
+| Duplicate program ref | elaboration | \`plc .ctrl: duplicate program reference .a\` |
+| Different program interfaces | elaboration | \`all programs must declare identical inputs/outputs\` |
+| Multi-program without \`scanTime:\` | elaboration | \`multiple programs require explicit scanTime:\` |
+| Bad \`scanTime:\` list length | elaboration | \`scanTime list length … must be 1 (broadcast) or N\` |
 | Assign to input | parse | \`cannot assign to input START\` |
 | Unknown symbol | parse | \`unknown symbol ALARM\` |
 | Multi-bit in \`AND\`/\`OR\` | parse | \`expression requires 1-bit symbol, got TEMP (8 bits)\` |
