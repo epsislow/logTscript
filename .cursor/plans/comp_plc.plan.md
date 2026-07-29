@@ -1,6 +1,6 @@
 ---
 name: Componenta PLC
-overview: "Plan `inline [plc]` + `comp [plc]`: limbaj logic hardware-independent, mapare I/O, scan cycle. Model paralel cu `inline [asm]` + `comp [cpu]`. P4 (scanTime/busy) P4.0–P4.3. P5 timere TON/TOF. Faze amânate: P+b (analog), P+c/d (ST extins)."
+overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P5.2b done. P+c și P+d decizii închise — următor implementare P+c. Apoi P+d, P+b. Amânate: P3c, P5.2c, P6–P8."
 todos:
   - id: p0-decisions
     content: "P0: decizii lățimi, mapare, on: vs comandă, sintaxă START — închise"
@@ -45,8 +45,8 @@ todos:
     content: "P5.1: doc/plc-language.md — referință completă limbaj inline [plc] (keyworduri, sintaxă, timere, erori)"
     status: completed
   - id: p5-3-iec-placement
-    content: "P5.3 (amânat): plasare completă IEC/ST — TON/TOF oriunde e permis un statement (CASE/FOR/WHILE cu P+c/P+d)"
-    status: pending
+    content: "P5.3: plasare FB în CASE/FOR/WHILE/REPEAT — livrat cu P+c/P+d"
+    status: completed
   - id: p5-2-ctu-ctd
     content: "P5.2: CTU+CTD IEC/ST în inline [plc]; .Q și .CV; teste + doc logts-play"
     status: completed
@@ -54,11 +54,11 @@ todos:
     content: "P5.2b: retain:0/1 pe comp [plc] — păstrare timerState/counterState la re-RUN"
     status: completed
   - id: pc-st-control
-    content: "P+c: VAR/END_VAR, CONST, CASE/OF, RETURN — limbaj ST extins"
-    status: pending
+    content: "P+c: VAR/CONST/CASE/RETURN + FB în CASE — implementat"
+    status: completed
   - id: pd-st-loops
-    content: "P+d: FOR/TO/BY/DO, WHILE/END_WHILE — bucle per scan"
-    status: pending
+    content: "P+d: FOR/WHILE/REPEAT/EXIT + FB în bucle — implementat"
+    status: completed
   - id: p6-multi-program
     content: "P6 (amânat): un comp [plc] cu mai multe programe (tasks); ordine execuție, prioritate"
     status: pending
@@ -69,7 +69,7 @@ todos:
     content: "P8 (amânat): comunicare inter-PLC prin comp [network]/sock — fieldbus didactic"
     status: pending
   - id: pb-analog
-    content: "P+b (amânat): I/O multi-bit în logică, comparații analog (IF TEMP > 50), atribuiri multi-bit, senzori"
+    content: "P+b: logică multi-bit — comparații (IF TEMP > 50), atribuiri N-bit, slider/senzori în program"
     status: pending
 isProject: false
 ---
@@ -79,6 +79,49 @@ isProject: false
 Sursă idei: [comp_plc.txt](../my_ideas/comp_plc.txt)
 
 Model plan: [comp_cache.plan.md](comp_cache.plan.md), [comp_cpu.plan.md](comp_cpu.plan.md)
+
+---
+
+## Filozofie de direcție (P-PHIL) — didactic implicit, opțiuni spre PLC real
+
+**Aceasta este axa de produs pentru tot planul `inline [plc]` + `comp [plc]`.** Orice fază nouă (P+c, P+d, P+b, P6…) se judecă față de ea.
+
+### Ce vrem
+
+| Pol | Conținut |
+|-----|----------|
+| **Didactic** | Comportament **implicit simplu**, ușor de explica în clasă și în doc: reset la re-RUN, latch explicit, un scan = o trecere secvențială, erori clare la elaborare. |
+| **Mai mult (opțional)** | **Atribute și moduri** pe `comp [plc]` (și extensii de limbaj când merită) care apropie comportamentul de un **PLC real IEC 61131-3 / ST** — fără a obliga utilizatorul să le folosească. |
+| **IEC/ST ca reper** | Keyworduri, FB (`TON`/`CTU`…), scan cycle, outputs care rețin valoarea, `VAR` intern — nu inventăm un PLC paralel, **urmăm ST** unde e fezabil. |
+
+### Reguli de design
+
+1. **Default = didactic** — dacă nu configurezi nimic special, obții varianta ușor de înțeleles (ex. `retain: 0`, `scanTime: 0` event-driven, `VAR` reset la re-RUN).
+2. **Opt-in = mai real** — utilizatorul **alege explicit** opțiuni (ex. `retain: 1`, `scanTime: N`, `strict: 1`, auto-scan, overrun) când vrea comportament mai apropiat de industrie.
+3. **Nu keyword-uri de runtime în limbaj** când e mai clar pe componentă — ex. **RETAIN** pe `comp [plc]`, nu în `inline [plc]` (P-RET1).
+4. **Creștere incrementală** — nu livrăm tot ST dintr-o dată; fiecare fază adaugă o fâșie autentică (IF → timere → contoare → VAR/CASE → bucle → analog).
+5. **Strict la mapare și lățimi** — ca la PLC real: mismatch = eroare, nu „merge cu 0”.
+6. **Două straturi** — program hardware-independent (`inline [plc]`) + runtime cu mapare și politici (`comp [plc]`), model **ASM + CPU**.
+
+### Exemple: didactic vs opțional mai real
+
+| Topic | Didactic (default) | Opțional mai real |
+|-------|-------------------|-------------------|
+| Re-RUN | Stare FB reset (`retain: 0`) | `retain: 1` — păstrează `timerState`/`counterState` în sesiune |
+| Scan | `scanTime: 0` — declanșare manuală / osc | `scanTime: N` ms — auto-scan periodic |
+| Execuție scan | Instant (`busy = 0`) | `scanDuration` + `busy` simulat |
+| Overrun | `strict: 0` — stretch | `strict: 1` — `missed`, `overrunCount` |
+| Memorie internă | `VAR` reset la re-RUN | (viitor: extindere `retain` sau P7 globals) |
+| Limbaj | BOOL + IF + FB statements | P+c/d/b — ST extins (`CASE`, `FOR`, comparații analog) |
+
+### Implicații pentru fazele următoare
+
+- **P+c** (`VAR`, `CASE`, `RETURN`): memorie și control ST clasic; default simplu (VAR la 0, reset la re-RUN).
+- **P+d** (`FOR`, `WHILE`, `REPEAT`/`UNTIL`, `EXIT`): bucle ST; limită iterații; **fără CONTINUE**; P5.3 FB în corp.
+- **P+b**: analog multi-bit — extinde limbajul spre PLC real, nu doar panou 1-bit.
+- **P6–P8**: task-uri, globals, rețea — opțional avansat, nu în calea exercițiilor de bază.
+
+**Decizie închisă (P-PHIL1):** direcția produs = **didactic implicit + opțiuni explicite spre IEC/ST real**; nu un singur mod „industrial” forțat.
 
 ---
 
@@ -135,6 +178,7 @@ flowchart TB
 
 | ID | Decizie |
 |----|---------|
+| **P-PHIL1** | **Filozofie de direcție:** didactic **implicit** (default simplu, ușor de explica) + **opțiuni explicite** pe `comp [plc]` / extensii limbaj pentru comportament **mai apropiat de PLC real IEC/ST** — vezi secțiunea [Filozofie de direcție](#filozofie-de-direcție-p-phil--didactic-implicit-opțiuni-spre-plc-real) | **închis** |
 | **P-FIX1** | În toate exemplele/doc: **`motorWire -> .motor1` greșit** → **`.motor1 = motorWire`** (sau bloc `{ value, set }`) |
 | **P-FIX2** | **`comp [plc]` canonic LogTscript** — **nu** pin `:on` pentru comandă motor; output = asignare directă / wire (confirmat) |
 | **P-ARCH1** | Implementare: **P1 `inline [plc]`** apoi **P2 `comp [plc]`** |
@@ -163,7 +207,7 @@ flowchart TB
 | **P-TMR7** | La **re-RUN**: stare timere **reset** când **`retain: 0`** (default); păstrare când **`retain: 1`** — **P5.2b** | **închis** |
 | **P-TMR8** | **Ordine evaluare IEC/ST:** blocurile TON/TOF rulează **în ordinea din corp**; `Q` actualizat înainte ca statement-urile următoare să-l citească în **același scan** | **închis** |
 | **P-TMR9** | **P5.1 (MVP plasare):** TON/TOF ca statements **top-level** și în corpul **`IF`/`THEN`/`ELSE`/`ELSIF`** | **închis** |
-| **P-TMR13** | **Fază amânată P5.3:** extindere **plasare completă IEC/ST** — TON/TOF **oriunde e permis un statement** în corpul programului (inclusiv în `CASE`/`FOR`/`WHILE` odată cu **P+c**/**P+d**) | **închis** (țintă) |
+| **P-TMR13** | **P5.3:** plasare FB în `CASE` (**P+c**) și `FOR`/`WHILE`/`REPEAT` (**P+d**, P-PLC3-6 ✓) | **închis** |
 | **P-TMR10** | **P5.1:** doar **`name.Q`** expus; **fără** `ET`, **fără** `R` (reset explicit) | **închis** |
 | **P-TMR11** | **`PT` ≥ 1** — `PT = 0` → eroare parse | **închis** |
 | **P-TMR12** | **`IN`** = expresie 1-bit completă; **`name.Q`** read-only (atribuire → eroare); **nume timer unic** (duplicat → eroare parse) | **închis** |
@@ -185,6 +229,60 @@ flowchart TB
 | **P-RET6** | **Default** rămâne **`retain: 0`**; comportamentul actual (reset stare la re-RUN) rămâne varianta didactică implicită | **închis** |
 | **P-RET7** | **`retain`** acceptă strict **`0`** sau **`1`**; orice altă valoare → eroare elaborare, ex. `plc .ctrl: invalid retain value, expected 0 or 1` | **închis** |
 | **P-RET8** | **`doc(comp.plc)`** și **`doc(.myPlc)`** afișează **`retain: 0/1`** (implicit **`0`** dacă lipsește) | **închis** |
+| **P-VAR1** | Ordine program: **`inputs:` → `outputs:` → `VAR` → `CONST` → corp** | **închis** |
+| **P-VAR2** | **`VAR` / `CONST` doar în header**, nu în corpul statements | **închis** |
+| **P-VAR3** | **Un singur** bloc `VAR` și **un singur** bloc `CONST` per program | **închis** |
+| **P-VAR4** | **Logică 1-bit** în P+c; declarare `name: N` permisă; **folosire N-bit în logică** → **P+b** | **închis** |
+| **P-VAR5** | La **primul scan**, fiecare `VAR` pornește la **`0` / FALSE** | **închis** |
+| **P-VAR6** | **Fără** init `name := val` în declarație `VAR` în P+c v1 | **închis** |
+| **P-VAR7** | **`retain: 1` NU include `varState`** — reset la re-RUN mereu (extensie viitoare **P5.2c**) | **închis** |
+| **P-VAR8** | Schimbare program / fingerprint → **`varState` reset** (ca P-RET5) | **închis** |
+| **P-VAR9** | Nume **`VAR` unice** — conflict cu `inputs`/`outputs`/FB → eroare parse | **închis** |
+| **P-VAR10** | Convenție doc: lowercase în `VAR`, majuscule I/O — **nu** impusă în parser | **închis** |
+| **P-VAR11** | **`CONST` în P+c**, minimal: 1-bit + **întregi** pentru `CASE` | **închis** |
+| **P-VAR12** | **`CONST` read-only** — atribuire → eroare parse | **închis** |
+| **P-CASE1** | Selector P+c: simbol **1-bit** sau **`.CV`** contor | **închis** |
+| **P-CASE2** | Label-uri **`0:`**, **`1:`**, … + **`ELSE:`** opțional | **închis** |
+| **P-CASE3** | **Prima potrivire**; fără fall-through IEC | **închis** |
+| **P-CASE4** | FB în ramuri `CASE` — **`parseStmtList`** (P5.3 integrat în P+c) | **închis** |
+| **P-CASE5** | **`CASE` / `IF` nesting** liber | **închis** |
+| **P-CASE6** | **`CASE` selector multi-bit** (ex. `CASE TEMP OF`) → **P+b**, nu P+c | **închis** |
+| **P-RET-ST1** | **`RETURN`** oprește restul corpului în scan; outputs deja scrise rămân (P-D7) | **închis** |
+| **P-RET-ST2** | **`RETURN` fără expresie** — program PLC, nu funcție | **închis** |
+| **P-RET-ST3** | Statements (inclusiv FB) **după `RETURN`** nu rulează în același scan | **închis** |
+| **P-VAR-R1** | **`varState`** pe instanța **`comp [plc]`** (ca `timerState` / `counterState`) | **închis** |
+| **P-VAR-R2** | Fingerprint program include simboluri **`VAR`** | **închis** |
+| **P-VAR-R3** | **`doc(.ctrl)`** nu listează `varState` în v1; **`doc(.program)`** poate lista VAR declarate | **închis** |
+| **P-PLC3-1** | P5.3 **nu standalone** — integrat în **P+c** (`CASE`) și **P+d** (bucle) | **închis** |
+| **P-PLC3-2** | P5.3 scope FB: **TON, TOF, CTU, CTD** | **închis** |
+| **P-PLC3-3** | **Nu** FB în expresii; doar **`name.Q`** / **`name.CV`** | **închis** |
+| **P-PLC3-4** | FB **nu** în blocul `VAR` — doar declarații acolo | **închis** |
+| **P-PLC3-5** | **`CASE`:** fiecare ramură `OF` = **`parseStmtList`**; FB permis | **închis** |
+| **P-PLC3-6** | **`FOR`/`WHILE`/`REPEAT`:** corp = **`parseStmtList`**; FB apelat **N ori** dacă bucla iterează N — **ET/CV evoluează per iterație** în același scan | **închis** |
+| **P-PLC3-7** | **`RETURN`** oprește execuția; FB după `RETURN` nu rulează | **închis** |
+| **P-PLC3-8** | **`retain`** rămâne pe **`comp [plc]`** — P5.3 / P+c nu adaugă RETAIN în limbaj | **închis** |
+| **P-PLC3-9** | Ordine: **P+c + P5.3 CASE** → **P+d + P5.3 bucle** → **P+b** | **închis** |
+| **P-LOOP0** | **P+d** fază **unică** (fără P+d.x): `FOR` + `WHILE` + `REPEAT`/`UNTIL` + `EXIT` + P5.3; **fără `CONTINUE`** | **închis** |
+| **P-LOOP1** | P+d **după P+c** — depinde de `VAR`, `RETURN`, `parseStmtList` | **închis** |
+| **P-LOOP2** | **`CONTINUE` nu** în P+d (nu e ST clasic); skip restul iterației = `IF` nesting | **închis** |
+| **P-LOOP3** | Condiții `WHILE` / `UNTIL` = expresie **1-bit**; multi-bit / comparații → **P+b** | **închis** |
+| **P-LOOP-LIM1** | Limită max **65535** iterații per buclă (`FOR`/`WHILE`/`REPEAT`) | **închis** |
+| **P-LOOP-LIM2** | Depășire limită → **eroare runtime** (nu tăiere silențioasă) | **închis** |
+| **P-FOR1** | Sintaxă: **`FOR i := start TO end BY step DO`** … **`END_FOR`** | **închis** |
+| **P-FOR2** | **`BY` opțional** — default **`1`** | **închis** |
+| **P-FOR3** | `start`/`end`/`step` = **literal întreg** sau **`.CV`** sau simbol **`VAR`**; fără expresii generale → P+b | **închis** |
+| **P-FOR4** | Variabila de control **declarată în `VAR`** | **închis** |
+| **P-FOR5** | Bucla rulează **complet în același scan**; la final `i` = ultima valoare | **închis** |
+| **P-FOR6** | **`step ≠ 0`** — altfel eroare parse | **închis** |
+| **P-FOR7** | Direcție ST: `start<=end` cu `step>0`; `start>=end` cu `step<0`; altfel **0 iterații** | **închis** |
+| **P-FOR8** | **`FOR` imbricat** permis | **închis** |
+| **P-WHL1** | **`WHILE cond DO`** … **`END_WHILE`**; `cond` 1-bit | **închis** |
+| **P-WHL2** | **`WHILE` imbricat** permis | **închis** |
+| **P-REP1** | **`REPEAT`** … **`UNTIL cond`** … **`END_REPEAT`**; `cond` 1-bit; **≥1 iterație** | **închis** |
+| **P-REP2** | **`REPEAT` imbricat** permis | **închis** |
+| **P-EXIT1** | **`EXIT`** iese din bucla **cea mai interioară** (`FOR`/`WHILE`/`REPEAT`) | **închis** |
+| **P-EXIT2** | **`EXIT` în afara buclei** → eroare parse | **închis** |
+| **P-EXIT3** | **`RETURN` în buclă** oprește **tot** corpul scan (P-RET-ST1), nu doar bucla | **închis** |
 | **P-IO1** | **Nu** există `comp [button]` — intrări digitale: **`key`**, **`switch`**, **`dip`** (confirmat) |
 | **P-IO2** | **P2/P3:** ieșiri digitale 1-bit: **`led`**, **`reg`**, wires; **nu** mapare directă `comp [plc]` → `clcd` |
 | **P-IO3** | **`clcd`:** doar prin **wires multi-bit** + logică LogTscript în afara PLC (`:get` / bloc `{ value, set }`) |
@@ -243,7 +341,8 @@ Ordinea contează: ultima atribuire la același simbol câștigă în acel scan.
 |--------|-------------------|-----------|
 | **input** | da (valoare citită la începutul scan-ului) | **eroare** la parse |
 | **output** | da (valoare curentă din scan — ce s-a scris deja) | da |
-| **input în P+c `VAR`** | — | amânat P+c |
+| **VAR** (P+c) | da | da (persistă între scan-uri; reset la re-RUN — P-VAR7) |
+| **CONST** (P+c) | da | **eroare** la parse (P-VAR12) |
 
 Eroare parse (ex.): `plc program: cannot assign to input START`.
 
@@ -274,12 +373,14 @@ Lista completă țintă vs ce implementăm per fază. Modelul ST (Structured Tex
 | **`RETURN`** | Ieșire timpurie din corp program (sfârșit scan logic) | **P+c** |
 | **`FOR`** … **`TO`** … **`BY`** … **`DO`** … **`END_FOR`** | Buclă numărată | **P+d** |
 | **`WHILE`** … **`DO`** … **`END_WHILE`** | Buclă condiționată | **P+d** |
+| **`REPEAT`** … **`UNTIL`** … **`END_REPEAT`** | Buclă post-test (≥1 iterație) | **P+d** |
+| **`EXIT`** | Ieșire din bucla interioară | **P+d** |
 | **`>`**, **`<`**, **`==`**, … | Comparații | **P+b** (analog) |
 | **`TON`**, **`TOF`** | Timere on/off-delay | **P5.1** ✓ |
 | **`CTU`**, **`CTD`** | Contoare up/down (IEC FB) | **P5.2** |
 | **`>=`**, **`<=`**, **`==`**, … pe **`.CV`** | Comparații contor ↔ literal | **P5.2** (minim); restul analog → **P+b** |
 
-**Nu în plan (ST are, amânăm):** `REPEAT`/`UNTIL`, `EXIT`, `VAR_INPUT`/`VAR_OUTPUT` separate — la noi `inputs:`/`outputs:` acoperă interfața.
+**Nu în plan (ST are / nu e ST):** `CONTINUE` (nu e ST clasic — P-LOOP2); `VAR_INPUT`/`VAR_OUTPUT` separate — la noi `inputs:`/`outputs:` acoperă interfața.
 
 ### P1/P2 — nucleu (primul program rulabil)
 
@@ -307,9 +408,25 @@ inline [plc] .machine:
 
 **Semantica scan (P-D7–P-D9):** un impuls `set` = o trecere secvențială prin corp; outputs păstrează valoarea dacă nu sunt atribuite; inputs read-only; outputs citibile în același scan.
 
-### P+c — memorie internă + control (după P2 stabil)
+### P+c — memorie internă + control (decizii închise: P-VAR, P-CASE, P-RET-ST)
 
-**`VAR` / `END_VAR`** — variabile **nu** mapate la hardware; persistă între scan-uri (relee interne, tip `M0`):
+**Fază unică** — **fără** sub-faze P+c.x. Aliniat **P-PHIL:** didactic implicit (VAR=0, reset la re-RUN) + limbaj **IEC/ST** autentic (VAR, CASE, RETURN).
+
+**Scope P+c (implementare):**
+
+| Feature | În P+c |
+|---------|--------|
+| `VAR` / `END_VAR` | ✓ logică 1-bit |
+| `CONST` / `END_CONST` | ✓ minimal (1-bit + întregi pentru CASE) |
+| `CASE` / `END_CASE` | ✓ selector 1-bit sau `.CV`; label-uri `0:`, `1:`… |
+| `RETURN` | ✓ |
+| P5.3 parțial | ✓ FB în ramuri `CASE` |
+| `FOR` / `WHILE` | ✗ → **P+d** |
+| `CASE TEMP OF` multi-bit, `IF TEMP > 50` | ✗ → **P+b** |
+| `retain:1` pentru `VAR` | ✗ → **P5.2c** (viitor) |
+| `VAR name := init` | ✗ → extensie viitoare (fără sub-fază P+c.x) |
+
+**`VAR` / `END_VAR`** — variabile **nu** mapate la hardware; persistă **între scan-uri**; reset la **re-RUN** (P-VAR7):
 
 ```logts
 VAR
@@ -323,35 +440,169 @@ END_IF
 MOTOR = latch AND NOT STOP
 ```
 
-| Keyword | Notă |
-|---------|------|
-| `VAR` / `END_VAR` | Declarație cu lățime (`name: N` sau default 1) |
-| `CONST` / `END_CONST` | Valori fixe în program (`MAX: 8 = 100` în P+b) |
-| `CASE expr OF` … `END_CASE` | `expr` 1-bit sau multi-bit (P+b); ramuri `1:`, `2:`, `ELSE:` |
-| `RETURN` | Oprește execuția corpului în **acest scan** (outputs deja setate rămân) |
-
-**Diferență față de `inputs`/`outputs`:** `inputs`/`outputs` = interfață spre hardware (mapare obligatorie pe `comp [plc]`); `VAR` = stare internă PLC.
-
-### P+d — bucle (după P+c)
-
-Într-un **singur scan**, bucla rulează complet (ca ST), cu **limită de iterații** la implementare (protecție buclă infinită, ex. max 65535).
+**`CASE` — exemplu didactic:**
 
 ```logts
-FOR i := 1 TO 4 BY 1 DO
-  ; corp — util mai mult cu array / multi-bit (P+b)
+VAR
+  step: 1
+END_VAR
+CASE step OF
+  0:
+    MOTOR = 0
+  1:
+    MOTOR = START AND NOT STOP
+  ELSE
+    MOTOR = 0
+END_CASE
+```
+
+**`RETURN` — exemplu:**
+
+```logts
+IF NOT ENABLE THEN
+  RETURN
+END_IF
+MOTOR = START
+; liniile de mai jos nu rulează dacă ENABLE = 0
+```
+
+| Keyword | Reguli (închis) |
+|---------|-----------------|
+| `VAR` / `END_VAR` | Header după I/O; lățime `name: N` sau default 1; logică 1-bit în P+c |
+| `CONST` / `END_CONST` | Read-only; întregi + 1-bit; multi-bit bogat → P+b |
+| `CASE expr OF` … `END_CASE` | Selector 1-bit sau `.CV`; ramuri cu `parseStmtList`; FB permis |
+| `RETURN` | Fără expresie; oprește corpul scan-ului curent |
+
+**Diferență față de `inputs`/`outputs`:** `inputs`/`outputs` = interfață hardware (mapare obligatorie); `VAR` = relee interne M.
+
+##### Livrabile P+c
+
+| # | Task |
+|---|------|
+| 1 | **`plc-assembler.js`:** parse `VAR`/`CONST` header; `CASE`/`RETURN`; env + `varState` |
+| 2 | **`plc-assembler.js`:** exec `CASE` (prima potrivire), `RETURN`; `parseStmtList` în ramuri + FB |
+| 3 | **`plc.js`:** `varState` pe `comp [plc]`; fingerprint include VAR; reset la re-RUN / schimbare program |
+| 4 | **`test_suite.js`:** latch VAR, CASE mode, RETURN early exit, FB în CASE, conflicte nume |
+| 5 | **`plc-language.md` + `plc.md`:** secțiune P+c; exemple `logts-play` |
+
+**Fișiere:** `plc-assembler.js`, `plc.js`, `plc-language.md`, `plc.md`, `test_suite.js`.
+
+##### Extensii „mai real” — nu P+c.x (faze / runtime separate)
+
+| ID viitor | Conținut | Unde |
+|-----------|----------|------|
+| **P5.2c** | `retain` extins sau atribut care păstrează și **`varState`** la re-RUN | `comp [plc]` opt-in |
+| **P+c.b** *(opțional)* | Init **`VAR name := val`** la declarare | limbaj, dacă cerință didactică |
+| **P+b** | `CASE` multi-bit, comparații analog, atribuiri N-bit | limbaj |
+| **P7** | **`VAR_GLOBAL`** / memorie între programe | P+c + P6 |
+
+### P+d — bucle (decizii închise: P-LOOP, P-FOR, P-WHL, P-REP, P-EXIT)
+
+**Fază unică** — **fără** P+d.x. Aliniat **P-PHIL:** bucle ST autentice (`FOR`/`WHILE`/`REPEAT`/`EXIT`); **fără `CONTINUE`** (nu e ST clasic). Limită iterații = siguranță didactică.
+
+**Scope P+d (implementare, după P+c):**
+
+| Feature | În P+d |
+|---------|--------|
+| `FOR` / `TO` / `BY` / `DO` / `END_FOR` | ✓ |
+| `WHILE` / `DO` / `END_WHILE` | ✓ condiție 1-bit |
+| `REPEAT` / `UNTIL` / `END_REPEAT` | ✓ ≥1 iterație; condiție 1-bit |
+| `EXIT` | ✓ din bucla interioară |
+| P5.3 | ✓ FB în corpuri de buclă (N apeluri / scan) |
+| `CONTINUE` | ✗ — nu e ST clasic (P-LOOP2) |
+| `WHILE TEMP > 50` | ✗ → **P+b** |
+| Limită iterații | ✓ 65535 + eroare runtime |
+
+```logts
+VAR
+  i: 1
+END_VAR
+
+FOR i := 1 TO 3 BY 1 DO
+  TON t(IN := 1, PT := 1)
+  IF t.Q THEN EXIT END_IF
 END_FOR
 
-WHILE condition DO
-  ...
+REPEAT
+  MOTOR = START
+UNTIL STOP
+END_REPEAT
+
+WHILE ENABLE DO
+  MOTOR = 1
+  IF STOP THEN EXIT END_IF
 END_WHILE
 ```
 
-| Keyword | Fază |
-|---------|------|
-| `FOR`, `TO`, `BY`, `DO`, `END_FOR` | P+d |
-| `WHILE`, `DO`, `END_WHILE` | P+d |
+| Keyword | Reguli (închis) |
+|---------|-----------------|
+| `FOR` | Control var în `VAR`; `BY` default 1; bounds = literal / `.CV` / `VAR` |
+| `WHILE` | Cond 1-bit; 0+ iterații în același scan |
+| `REPEAT`/`UNTIL` | Cond 1-bit pe `UNTIL`; ≥1 iterație |
+| `EXIT` | Doar în buclă; iese din cea mai interioară |
+| `RETURN` în buclă | Oprește **tot** corpul scan (nu doar bucla) |
 
-**Didactic P1/P2:** buclele sunt **rare** în PLC clasic (logică combinațională per scan); le amânăm intenționat.
+**Contrast didactic:** `EXIT` = ieși din buclă; `RETURN` = ieși din restul programului în scan.
+
+##### Livrabile P+d
+
+| # | Task |
+|---|------|
+| 1 | **`plc-assembler.js`:** parse `FOR`/`WHILE`/`REPEAT`/`EXIT` |
+| 2 | **`plc-assembler.js`:** exec bucle + limită 65535; `parseStmtList` în corp + FB |
+| 3 | **`test_suite.js`:** FOR/WHILE/REPEAT, EXIT, FB N×, overrun limit, EXIT în afara buclei |
+| 4 | **`plc-language.md` + `plc.md`:** bucle ST; contrast EXIT vs RETURN; fără CONTINUE |
+
+**Fișiere:** `plc-assembler.js`, `plc-language.md`, `plc.md`, `test_suite.js`.
+
+##### Extensii „mai real” — nu P+d.x
+
+| ID viitor | Conținut | Unde |
+|-----------|----------|------|
+| **P+b** | `WHILE TEMP > 50`, bounds multi-bit | limbaj |
+| *(opțional)* | `CONTINUE` ca extensie | **nu** în plan (P-LOOP2) |
+
+### P+b — logică analog / multi-bit (după P+c/P+d)
+
+**Scop:** folosirea simbolurilor **`>1` bit** în **corpul programului** — nu doar declarare și mapare (asta merge din P1/P2), ci **logică**:
+
+```logts
+inputs: { TEMP: 8, SETPOINT: 8 }
+outputs: { HEATER, SPEED: 8 }
+
+IF TEMP > SETPOINT THEN
+  HEATER = 0
+ELSIF TEMP < SETPOINT - 5 THEN
+  HEATER = 1
+END_IF
+
+SPEED = TEMP
+```
+
+| Topic | P1/P2 (astăzi) | P+b |
+|-------|----------------|-----|
+| Declarare `TEMP: 8` în `inputs:`/`outputs:` | ✓ | — |
+| Mapare `TEMP = .slider` pe `comp [plc]` | ✓ | — |
+| **`IF TEMP > 50`** (comparație numerică) | ✗ | **P+b** |
+| **`SPEED = TEMP`** (atribuire multi-bit) | ✗ | **P+b** |
+| **`CASE TEMP OF`** cu valori multi-bit | ✗ (1-bit only) | **P+b** |
+| **`WHILE LEVEL > 10 DO`** | ✗ | **P+b** |
+| `.CV >= N` la contoare | ✓ P5.2 (minim) | restul comparații → P+b |
+
+| Operator / feature | Fază |
+|--------------------|------|
+| **`>`**, **`<`**, **`>=`**, **`<=`**, **`==`**, **`!=`** pe simboluri N-bit | **P+b** |
+| Literali numerici în comparații (`50`, nu doar `0`/`1`) | **P+b** |
+| Atribuiri `OUT = IN`, `OUT = literal` pe lățimi >1 | **P+b** |
+| Doc: `slider`, wires `8wire`, pattern senzori | **P+b** |
+
+**Diferență față de P5.2:** P5.2 permite **`cnt.CV >= 3`** (contor ↔ literal). P+b generalizează la **orice simbol multi-bit** și **orice comparație**.
+
+**Dependențe:** P1/P2 (declarare lățimi, mapare). **Recomandat după P+c/P+d** — `CASE`/`WHILE` devin utile cu comparații analogice; nu e blocant pentru P+c minim 1-bit.
+
+**Nu în P+b (faze ulterioare):** `motor`/`sensor` componente dedicate (**P3c**); rețea (**P8**); globals (**P7**).
+
+**Status:** fază planificată, **neimplementată** — la același nivel ca P+c/P+d, dar **amânată** în roadmap (după ST extins).
 
 ### Operatori și precedență (P1/P2+)
 
@@ -375,12 +626,16 @@ Simboluri `START`, `MOTOR`, `latch` — nu pot fi keyworduri rezervate. Propuner
 flowchart LR
   P12[P1/P2 IF ELSIF BOOL]
   Pc[P+c VAR CASE RETURN]
-  Pd[P+d FOR WHILE]
-  P5[P5 timere TON TOF]
-  Pb[P+b comparatii analog]
+  Pd[P+d FOR WHILE REPEAT EXIT]
+  P53[P5.3 FB în CASE/bucle]
+  Pb[P+b analog multi-bit]
+  P5[P5 TON TOF CTU CTD retain]
   P12 --> Pc --> Pd
+  Pc --> P53
+  Pd --> P53
   P12 --> P5
   Pc --> Pb
+  Pd --> Pb
 ```
 
 ### `comp [plc]` — atribute (nu keyworduri în program)
@@ -916,11 +1171,11 @@ inline [plc] .machine:
 |---------|--------|------------|
 | Top-level (secvențial, între `IF`-uri) | ✓ | **P5.1** ✓ |
 | În `THEN` / `ELSE` / `ELSIF` | ✓ | **P5.1** ✓ |
-| În `CASE` … `OF` | ✓ | **P5.3** (amânat, cu **P+c**) |
-| În `FOR` / `WHILE` | ✓ | **P5.3** (amânat, cu **P+d**) |
+| În `CASE` … `OF` | ✓ | **P5.3** (cu **P+c**) |
+| În `FOR` / `WHILE` | ✓ | **P5.3** (cu **P+d**) |
 | În expresii (`IF TON(...)` inline) | ✗ | ✗ — folosești `name.Q` |
 
-**P5.3 (fază amânată):** când **P+c** / **P+d** adaugă `CASE`, `FOR`, `WHILE`, extindem parserul și execuția astfel încât **TON/TOF să fie permise în aceleași locuri ca în ST** — fără restricții artificiale suplimentare față de „oriunde e statement”.
+**P5.3:** când **P+c** / **P+d** adaugă `CASE`, `FOR`, `WHILE`, parserul și execuția folosesc aceeași **`parseStmtList` / `plcExecStmt`** ca la `IF` — **TON/TOF/CTU/CTD** permise în aceleași locuri ca în ST, fără restricții artificiale suplimentare față de „oriunde e statement”. **Dependență:** gramatica **P+c**/**P+d** trebuie să existe; partea `IF` e deja **done** (P5.1/P5.2).
 
 **Exemplu valid P5.1** (timer în `IF`, ca în ST):
 
@@ -950,8 +1205,8 @@ END_IF
 |------|----------|--------|
 | **P5.1** | **TON** + **TOF**; plasare top-level + `IF`; teste; doc `logts-play`; **`plc-language.md`** (referință limbaj) | **done** |
 | **P5.2** | **CTU** + **CTD** (IEC/ST); `.Q` + `.CV`; comparații `CV` ↔ literal; teste; doc | **done** |
-| **P5.2b** | **`retain: 0/1`** pe `comp [plc]` — stare timere/contoare la re-RUN | **următor** |
-| **P5.3** *(amânat)* | Plasare completă IEC/ST pentru toate FB-urile (`CASE` / `FOR` / `WHILE` cu **P+c** / **P+d**) | planificat |
+| **P5.2b** | **`retain: 0/1`** pe `comp [plc]` — stare timere/contoare la re-RUN | **done** |
+| **P5.3** | Plasare completă IEC/ST pentru toate FB-urile în `CASE` / `FOR` / `WHILE` (cu **P+c** / **P+d**) | **următor** (decizii P-PLC3) |
 
 #### P5.2 — Contoare CTU / CTD (decizii închise)
 
@@ -1114,6 +1369,75 @@ Chiar dacă `retain: 1`, starea FB se **șterge** când:
 
 **Fișiere:** `plc.js`, `plc.md`, `plc-language.md`, `test_suite.js` (grup `comp-plc`).
 
+#### P5.3 — Plasare completă IEC/ST (decizii deschise: P-PLC3)
+
+**Filozofie (ca la P5.1/P5.2):** urmăm **IEC 61131-3 ST** — apelurile FB sunt **statements**, nu expresii. Programatorul citește **`name.Q`** / **`name.CV`**; **nu** `IF TON(...) THEN`. Limbaj **hardware-independent** (`inline [plc]`); runtime separat (`comp [plc]`). Un scan = o trecere secvențială; ordinea contează.
+
+**Ce înseamnă P5.3 concret:** extinderea gramaticii astfel încât **TON / TOF / CTU / CTD** pot apărea în **orice context unde parserul acceptă deja statements** — nu doar top-level și `IF`, ci și:
+
+| Context statement | Status astăzi | P5.3 |
+|-------------------|---------------|------|
+| Top-level secvențial | ✓ P5.1/P5.2 | — |
+| `IF` / `THEN` / `ELSE` / `ELSIF` | ✓ P5.1/P5.2 | — |
+| `CASE` … `OF` … `ELSE` | ✗ (nu există) | **P+c + P5.3** |
+| `FOR` … `DO` | ✗ | **P+d + P5.3** |
+| `WHILE` … `DO` | ✗ | **P+d + P5.3** |
+| `REPEAT` … `UNTIL` | ✗ | **P+d + P5.3** |
+| În expresii (`IF TON(...)`) | ✗ | **rămâne ✗** (ST) |
+
+**Important:** P5.3 **nu e fază de limbaj nouă** — e **regula de plasare** aplicată când adăugăm **P+c** (`CASE`, `RETURN`) și **P+d** (`FOR`, `WHILE`, `REPEAT`). Implementarea naturală: **`parseStmtList()`** și **`plcExecStmt`** reutilizate în corpul `CASE` / `FOR` / `WHILE` / `REPEAT` (deja folosite în `IF`).
+
+##### Decizii P-PLC3 (închise)
+
+| ID | Propunere | Status |
+|----|-----------|--------|
+| **P-PLC3-1** | **P5.3 nu se livrează standalone** — vine **împreună** cu gramatica care deschide contextul: **P+c** (CASE) și **P+d** (FOR/WHILE/REPEAT) | **închis** |
+| **P-PLC3-2** | Scope FB: **toate** FB-urile existente (**TON, TOF, CTU, CTD**) — nu doar timere | **închis** |
+| **P-PLC3-3** | **Nu** FB în expresii; doar **`name.Q`**, **`name.CV`** — ca P5.1/P5.2 | **închis** |
+| **P-PLC3-4** | FB **nu** în `VAR`/`END_VAR` — doar declarații în VAR; FB în corpul programului | **închis** |
+| **P-PLC3-5** | **`CASE`:** o ramură `OF` = **`parseStmtList`**; FB permis în fiecare ramură + `ELSE` | **închis** |
+| **P-PLC3-6** | **`FOR`/`WHILE`/`REPEAT`:** buclă rulează **complet într-un singur scan** (ST); FB din corp poate fi apelat **N ori** — **ET/CV evoluează per iterație** | **închis** |
+| **P-PLC3-7** | **`RETURN`:** oprește execuția corpului; FB **după** `RETURN` nu rulează; FB **înainte** de `RETURN` au rulat deja | **închis** |
+| **P-PLC3-8** | **`retain`** rămâne pe **`comp [plc]`** (P5.2b) — P5.3 nu adaugă RETAIN în limbaj | **închis** |
+| **P-PLC3-9** | Ordine livrare: **P+c + P5.3 CASE** → **P+d + P5.3 bucle** → **P+b** | **închis** |
+
+##### Exemplu țintă (CASE + FB)
+
+```logts
+CASE mode OF
+  1:
+    TON step(IN := TICK, PT := 5)
+    OUT = step.Q
+  2:
+    CTU cnt(CU := TICK, R := RESET, PV := 3)
+    OUT = cnt.Q
+  ELSE
+    OUT = 0
+END_CASE
+```
+
+##### Exemplu didactic (FOR + FB — semantica P-PLC3-6)
+
+```logts
+FOR i := 1 TO 3 DO
+  TON t(IN := 1, PT := 1)
+END_FOR
+; după buclă: t a fost apelat 3× în același scan — ET/Q conform IEC per apel secvențial
+```
+
+##### Livrabile P5.3
+
+| # | Task |
+|---|------|
+| 1 | **P+c:** `CASE`/`RETURN` — parser + exec |
+| 2 | **P+d:** `FOR`/`WHILE` — parser + exec + limită iterații |
+| 3 | **`plc-assembler.js`:** `parseStmtList` în corp `CASE`/`FOR`/`WHILE` |
+| 4 | **`plc-assembler.js`:** `plcExecStmt` recursiv în noile structuri |
+| 5 | **Teste:** FB în `CASE`; FB în `FOR`/`WHILE`; `RETURN` oprește FB ulterior |
+| 6 | **Doc:** `plc-language.md` tabel plasare; exemple `logts-play` |
+
+**Fișiere:** `plc-assembler.js`, `plc-language.md`, `test_suite.js` (`comp-plc-lang`).
+
 #### Dependențe P5
 
 - **P4** (scan / `scanTime`) — recomandat pentru exemple didactice cu timp real
@@ -1121,11 +1445,18 @@ Chiar dacă `retain: 1`, starea FB se **șterge** când:
 
 **Fișiere:** `plc-assembler.js`, `plc.md`, `plc-language.md`, `test_suite.js` (grup `comp-plc-lang` / `comp-plc`)
 
-### P+b — Analog (amânat)
+### P+b — Analog / multi-bit (planificat, după P+c/P+d)
 
-- Logică pe simboluri `>1` bit: **`IF TEMP > 50`**, comparații, praguri
-- Atribuiri multi-bit (`SPEED = TEMP`, etc.)
-- Senzori, `comp [slider]`, doc surse analogice
+**Scope:** comparații numerice, atribuiri multi-bit, exemple `slider`/senzori — vezi secțiunea **P+b** în [Lexicon / roadmap](#p+b--logică-analog--multi-bit-după-pcpd).
+
+| Livrabil | Detaliu |
+|----------|---------|
+| Parser | `IF expr op expr`, atribuiri N-bit, literali numerici |
+| Exec | evaluare integer pe biți mapați |
+| Doc | `plc-language.md`, `plc.md` — matrice slider, exemple `logts-play` |
+| Teste | `comp-plc-lang` — comparații, atribuiri, width mismatch |
+
+**Dependențe:** P1/P2; recomandat după P+c/P+d (CASE/WHILE bogate).
 
 ---
 
@@ -1208,11 +1539,17 @@ comp [plc] .ctrlB:
 
 **P5.2 (CTU/CTD):** **done** — P-CTR1…P-CTR10.
 
-**P5.2b (`retain`):** decizii **închise** — P-RET1…P-RET8; **următor pas de implementare**.
+**P5.2b (`retain`):** **done** — P-RET1…P-RET8.
 
-**Încă deschise / amânate:** P3c, **P5.3**, P+b, P+c/d, **P6** (multi-program), **P7** (globals/memorie partajată), **P8** (inter-PLC rețea).
+**P+c (`VAR` / `CONST` / `CASE` / `RETURN`):** decizii **închise** — P-VAR1…P-VAR-R3, P-CASE1…P-CASE6, P-RET-ST1…P-RET-ST3; **următor pas de implementare**.
 
-**Următorul pas recomandat:** **P5.2b** (implementare `retain: 0/1` pe `comp [plc]`).
+**P+d (`FOR` / `WHILE` / `REPEAT` / `EXIT`):** decizii **închise** — P-LOOP0…P-EXIT3, P-PLC3-6; **fără CONTINUE**; după P+c.
+
+**P5.3 (plasare IEC):** **închis** — CASE (P+c) + bucle (P+d, P-PLC3-6).
+
+**Încă deschise / amânate:** P3c, **P+b**, **P5.2c** (retain+VAR), **P6**, **P7**, **P8**.
+
+**Următorul pas recomandat:** **implementare P+c** → **P+d** → **P+b**.
 
 ---
 

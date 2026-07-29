@@ -338,7 +338,8 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     if (!comp.outputState) comp.outputState = {};
     if (!comp.timerState) comp.timerState = {};
     if (!comp.counterState) comp.counterState = {};
-    execFn(inst, externalInputs, comp.outputState, comp.timerState, comp.counterState);
+    if (!comp.varState) comp.varState = {};
+    execFn(inst, externalInputs, comp.outputState, comp.timerState, comp.counterState, comp.varState);
     for (const [sym, target] of Object.entries(comp.outputMap || {})) {
       const w = inst.outputs[sym].width;
       plcWriteTarget(target, comp.outputState[sym], w, ctx);
@@ -467,6 +468,11 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     }
     const timerState = {};
     const counterState = {};
+    const varState = {};
+    for (const name of Object.keys(inst.vars || {})) {
+      const w = inst.vars[name].width || 1;
+      varState[name] = '0'.repeat(w);
+    }
 
     const instanceId = ctx && ctx._instanceId != null ? ctx._instanceId : 1;
     const fpFn = typeof plcFingerprintProgram === 'function' ? plcFingerprintProgram : null;
@@ -489,6 +495,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
         outputState,
         timerState,
         counterState,
+        varState,
         scanCount: 0,
         scanTime,
         scanDuration,
@@ -506,6 +513,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       outputState,
       timerState,
       counterState,
+      varState,
       scanCount: 0,
       scanTime,
       scanDuration,

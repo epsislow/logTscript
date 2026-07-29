@@ -27,8 +27,9 @@ inline [plc] .machine:
 | Part | Rule |
 |------|------|
 | **Header** | `inline [plc] .name:` — `.name` is required (same as `inline [asm]`) |
-| **Interface** | Optional `inputs:` and `outputs:` blocks (order: inputs first, then outputs) |
-| **Body** | Sequential **statements** — assignments, `IF`, timers, counters |
+| **Interface** | Optional `inputs:` and `outputs:` (inputs first, then outputs) |
+| **Memory** | Optional `VAR` … `END_VAR`, then optional `CONST` … `END_CONST` |
+| **Body** | Sequential **statements** — assignments, `IF`, `CASE`, `RETURN`, `FOR`/`WHILE`/`REPEAT`, `EXIT`, timers, counters |
 | **Closing** | Body ends with a line containing only **`:`** |
 
 The program body does **not** reference wires or panel components — only symbolic names (`START`, `MOTOR`). Mapping happens on `comp [plc]` — see [plc.md](plc.md).
@@ -88,6 +89,44 @@ Same width rules as `inputs:`.
 - Outputs are **readable** in expressions during the same scan (value seen so far in this pass)
 - If an output is **not assigned** in a scan, it **keeps** the previous value (PLC latch semantics; first scan starts at `0`)
 
+### `VAR` … `END_VAR`
+
+Internal memory (relay flags) — **not** mapped on `comp [plc]`. Values persist **between scans** on the same run; they **reset to `0`** on a new Load & Run.
+
+```logts
+VAR
+  latch: 1
+  step: 1
+END_VAR
+```
+
+| Rule | Detail |
+|------|--------|
+| Placement | After `inputs`/`outputs`, **before** the program body (and before `CONST`) |
+| Width | `name` or `name: N` (default **1**). Boolean logic uses **1-bit** VAR |
+| Read / write | Readable and writable in the body like outputs |
+| First scan | Each VAR starts at **`0`** |
+| Names | Must not conflict with inputs, outputs, CONST, timers, or counters |
+
+Typical use: set-reset latch without relying only on output retain.
+
+### `CONST` … `END_CONST`
+
+Read-only named constants (integers). Values **0** and **1** may be used in 1-bit expressions.
+
+```logts
+CONST
+  FLAG_ON = 1
+  FLAG_OFF = 0
+END_CONST
+```
+
+| Rule | Detail |
+|------|--------|
+| Placement | After `VAR` (if any), before the body |
+| Form | `NAME = integer` |
+| Assign | **Parse error** — CONST is read-only |
+
 ---
 
 ## Assignment (`=`)
@@ -101,7 +140,9 @@ READY = startDelay.Q
 | Target | Allowed |
 |--------|---------|
 | **Output symbol** | ✓ |
+| **VAR symbol** | ✓ |
 | **Input symbol** | ✗ parse error |
+| **CONST** | ✗ parse error |
 | **`timer.Q`** | ✗ read-only |
 | **`counter.Q` / `.CV`** | ✗ read-only |
 
@@ -129,7 +170,106 @@ END_IF
 | **`ELSE`** | Optional final branch |
 | **`END_IF`** | Close the block |
 
-**Nesting:** `IF` blocks may contain other `IF` blocks and timer statements.
+**Nesting:** `IF` may contain other `IF` / `CASE` blocks, `RETURN`, and timer/counter statements.
+
+### `CASE` … `OF` … `END_CASE`
+
+Selects the **first** matching label. Selector is a **1-bit symbol** (0 or 1) or a counter **`name.CV`** (integer).
+
+```logts
+CASE SEL OF
+  0:
+    OUT_A = 1
+    OUT_B = 0
+  1:
+    OUT_A = 0
+    OUT_B = 1
+  ELSE
+    OUT_A = 0
+    OUT_B = 0
+END_CASE
+```
+
+| Part | Rule |
+|------|------|
+| **Selector** | 1-bit input/output/VAR, or `counter.CV` |
+| **Labels** | Integer literals (`0:`, `1:`, `2:` …) |
+| **Match** | First label equal to selector value; no fall-through |
+| **`ELSE`** | Optional default branch |
+| **Body** | Full statement list (including timers/counters) |
+
+### `RETURN`
+
+Stops the rest of the program body for **this scan**. Outputs and VAR already written in this scan **keep** their values.
+
+```logts
+IF NOT ENABLE THEN
+  RETURN
+END_IF
+MOTOR = START
+```
+
+| Rule | Detail |
+|------|--------|
+| Form | `RETURN` alone (no expression) |
+| Effect | Remaining statements (including FB calls) do **not** run |
+| Contrast | Does not reset outputs — only skips later logic |
+
+### Loops — `FOR` / `WHILE` / `REPEAT` / `EXIT`
+
+Loops run **to completion inside a single scan** (then the scan continues after the loop). A hard limit of **65535** iterations per loop raises a runtime error if exceeded.
+
+#### `FOR` … `TO` … `BY` … `DO` … `END_FOR`
+
+Control variable must be declared in **`VAR`**. Bounds are integer literals, a VAR/CONST name, or `counter.CV`. **`BY`** is optional (default **1**).
+
+```logts
+VAR
+  i: 1
+END_VAR
+FOR i := 0 TO 1 DO
+  IF i THEN HIT = 1 END_IF
+END_FOR
+```
+
+| Rule | Detail |
+|------|--------|
+| Direction | `step > 0`: `start` … `end` ascending; `step < 0`: descending; `step = 0` → parse error |
+| Empty range | e.g. `1 TO 0` with `BY 1` → **zero** iterations |
+| After loop | Control VAR holds the last assigned index |
+
+#### `WHILE` … `DO` … `END_WHILE`
+
+Condition is a **1-bit** expression. May run **zero** times if already false.
+
+```logts
+WHILE RUN DO
+  MOTOR = 1
+  EXIT
+END_WHILE
+```
+
+#### `REPEAT` … `UNTIL` … `END_REPEAT`
+
+Body runs **at least once**; then `UNTIL` is tested (exit when condition is **true**).
+
+```logts
+REPEAT
+  MOTOR = 1
+UNTIL STOP
+END_REPEAT
+```
+
+#### `EXIT`
+
+Leaves the **innermost** `FOR` / `WHILE` / `REPEAT`. Outside a loop → **parse error**.
+
+| Keyword | Scope |
+|---------|-------|
+| **`EXIT`** | Innermost loop only |
+| **`RETURN`** | Entire remaining program body for this scan |
+
+Timers and counters may appear **inside** loop bodies; if the loop iterates *N* times in one scan, the FB is executed *N* times in that scan.
 
 This page documents only the statements and keywords currently available.
 
@@ -174,10 +314,12 @@ read inputs → execute statements in order → write outputs
 
 | Topic | Behaviour |
 |-------|-----------|
-| **Statement order** | Matters — later assigns to the same output win |
+| **Statement order** | Matters — later assigns to the same output/VAR win |
 | **Timers / counters** | Execute in place; outputs (`.Q`) visible to following statements in the **same** scan |
-| **State** | Timer/counter internal state persists on `comp [plc]` between scans |
-| **Re-RUN** | Default (`retain: 0` on `comp [plc]`): timer/counter state resets. With `retain: 1`, FB state survives re-RUN in the same session — see [plc.md](plc.md) |
+| **VAR** | Persists between scans; resets to `0` on re-RUN |
+| **State (FB)** | Timer/counter internal state persists on `comp [plc]` between scans |
+| **Re-RUN** | Default (`retain: 0` on `comp [plc]`): timer/counter state resets. With `retain: 1`, FB state survives re-RUN in the same session — see [plc.md](plc.md). VAR always resets. |
+| **RETURN** | Ends the remaining body of this scan |
 
 Triggering scans: `.ctrl:{ set = 1 }`, `scanTime`, external clock — [plc.md — Scan timing](plc.md#scan-timing-p4).
 
@@ -231,7 +373,9 @@ TOF coolOff(IN := RUN, PT := 30)
 |----------|---------|
 | Top-level in program body | ✓ |
 | Inside `IF` / `THEN` / `ELSE` / `ELSIF` | ✓ |
-| Inside `CASE` / `FOR` / `WHILE` | not supported |
+| Inside `CASE` branches | ✓ |
+| Inside `FOR` / `WHILE` / `REPEAT` bodies | ✓ |
+| As an expression (`IF TON(...)` / similar) | ✗ — use `name.Q` |
 
 ### Timer errors
 
@@ -359,7 +503,9 @@ Only **`name.CV op number`** is supported — literal on the right side.
 |----------|---------|
 | Top-level in program body | ✓ |
 | Inside `IF` / `THEN` / `ELSE` / `ELSIF` | ✓ |
-| Inside `CASE` / `FOR` / `WHILE` | not supported |
+| Inside `CASE` branches | ✓ |
+| Inside `FOR` / `WHILE` / `REPEAT` bodies | ✓ |
+| As an expression (`IF TON(...)` / similar) | ✗ — use `name.Q` |
 
 ### Counter errors
 

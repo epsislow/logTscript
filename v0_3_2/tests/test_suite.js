@@ -29897,5 +29897,388 @@ comp [plc] .ctrl:
   h.assert('cv after program change', String(plcCntCv(session.interp, 'tally')), '1');
 });
 
+/* ---- P+c VAR / CONST / CASE / RETURN ---- */
+
+reg(2818, 'comp-plc-lang', 'P+c parse VAR CONST CASE RETURN', function(h, session) {
+  const prog = parsePlcBody(`inputs: { START }
+outputs: { MOTOR }
+VAR
+  latch: 1
+END_VAR
+CONST
+  FLAG = 1
+END_CONST
+IF START AND NOT latch THEN latch = FLAG END_IF
+CASE latch OF
+  0: MOTOR = 0
+  1: MOTOR = 1
+  ELSE MOTOR = 0
+END_CASE
+RETURN
+MOTOR = latch`);
+  h.assert('has var', String(!!prog.vars.latch), 'true');
+  h.assert('has const', String(prog.consts.FLAG.value), '1');
+  h.assert('has case', String(prog.statements.some(s => s.type === 'case')), 'true');
+  h.assert('has return', String(prog.statements.some(s => s.type === 'return')), 'true');
+});
+
+reg(2819, 'comp-plc', 'P+c VAR latch persists across scans', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  VAR
+    latch: 1
+  END_VAR
+  IF START AND NOT latch THEN latch = 1 END_IF
+  IF STOP THEN latch = 0 END_IF
+  MOTOR = latch
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.start = 0
+.ctrl:{ set = 1 }
+`);
+  h.assert('latched on', interp.getValueFromRef(interp.components.get('.motorLed').ref), '1');
+  h.assert('var latch', String(interp.components.get('.ctrl').varState.latch), '1');
+});
+
+reg(2820, 'comp-plc', 'P+c CASE selects branch', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { SEL }
+  outputs: { OUT_A, OUT_B }
+  CASE SEL OF
+    0:
+      OUT_A = 1
+      OUT_B = 0
+    1:
+      OUT_A = 0
+      OUT_B = 1
+    ELSE
+      OUT_A = 0
+      OUT_B = 0
+  END_CASE
+  :
+
+comp [switch] .sel:
+  = 1
+  :
+
+comp [led] .aLed:
+  :
+
+comp [led] .bLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { SEL = .sel }
+  outputs: { OUT_A = .aLed, OUT_B = .bLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('OUT_A off', interp.getValueFromRef(interp.components.get('.aLed').ref), '0');
+  h.assert('OUT_B on', interp.getValueFromRef(interp.components.get('.bLed').ref), '1');
+});
+
+reg(2821, 'comp-plc', 'P+c RETURN skips later statements', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { ENABLE }
+  outputs: { MOTOR }
+  MOTOR = 0
+  IF NOT ENABLE THEN
+    RETURN
+  END_IF
+  MOTOR = 1
+  :
+
+comp [switch] .enable:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { ENABLE = .enable }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('motor off after return', interp.getValueFromRef(interp.components.get('.motorLed').ref), '0');
+});
+
+reg(2822, 'comp-plc-lang', 'P+c error assign to CONST', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { IN1 } outputs: { OUT1 }
+CONST
+  C = 1
+END_CONST
+C = IN1
+OUT1 = C`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('const assign', String(err.includes('cannot assign to CONST')), 'true');
+});
+
+reg(2823, 'comp-plc', 'P+c FB in CASE branch', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { SEL, TICK }
+  outputs: { OUT }
+  CASE SEL OF
+    1:
+      TON t(IN := TICK, PT := 2)
+      OUT = t.Q
+    ELSE
+      OUT = 0
+  END_CASE
+  :
+
+comp [switch] .sel:
+  = 1
+  :
+
+comp [switch] .tick:
+  = 1
+  :
+
+comp [led] .outLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { SEL = .sel, TICK = .tick }
+  outputs: { OUT = .outLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.ctrl:{ set = 1 }
+`);
+  h.assert('ton q after 2', interp.getValueFromRef(interp.components.get('.outLed').ref), '1');
+});
+
+reg(2824, 'comp-plc', 'P+c doc shows VAR', function(h, session) {
+  const out = session.runDoc(`
+inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  VAR
+    latch: 1
+  END_VAR
+  MOTOR = latch
+  :
+
+comp [switch] .start:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+doc(.machine)
+doc(inline.plc)
+`);
+  h.assert('instance VAR', String(out.some(l => l.includes('latch'))), 'true');
+  h.assert('type CASE', String(out.some(l => l.includes('CASE'))), 'true');
+});
+
+/* ---- P+d FOR / WHILE / REPEAT / EXIT ---- */
+
+reg(2825, 'comp-plc-lang', 'P+d parse FOR WHILE REPEAT EXIT', function(h, session) {
+  const prog = parsePlcBody(`inputs: { ENABLE }
+outputs: { MOTOR }
+VAR
+  i: 1
+END_VAR
+FOR i := 0 TO 1 DO
+  MOTOR = i
+END_FOR
+WHILE ENABLE DO
+  MOTOR = 1
+  EXIT
+END_WHILE
+REPEAT
+  MOTOR = 0
+UNTIL ENABLE
+END_REPEAT`);
+  h.assert('for', String(prog.statements.some(s => s.type === 'for')), 'true');
+  h.assert('while', String(prog.statements.some(s => s.type === 'while')), 'true');
+  h.assert('repeat', String(prog.statements.some(s => s.type === 'repeat')), 'true');
+});
+
+reg(2826, 'comp-plc', 'P+d FOR runs body in one scan', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { DUMMY }
+  outputs: { HIT }
+  VAR
+    i: 1
+    hit: 1
+  END_VAR
+  hit = 0
+  FOR i := 0 TO 1 DO
+    IF i THEN hit = 1 END_IF
+  END_FOR
+  HIT = hit
+  :
+
+comp [switch] .dummy:
+  = 0
+  :
+
+comp [led] .hitLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { DUMMY = .dummy }
+  outputs: { HIT = .hitLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('hit', interp.getValueFromRef(interp.components.get('.hitLed').ref), '1');
+});
+
+reg(2827, 'comp-plc', 'P+d WHILE EXIT leaves loop', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { RUN }
+  outputs: { MOTOR }
+  MOTOR = 0
+  WHILE RUN DO
+    MOTOR = 1
+    EXIT
+  END_WHILE
+  :
+
+comp [switch] .run:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { RUN = .run }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('motor once', interp.getValueFromRef(interp.components.get('.motorLed').ref), '1');
+});
+
+reg(2828, 'comp-plc', 'P+d REPEAT runs at least once', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { STOP }
+  outputs: { MOTOR }
+  MOTOR = 0
+  REPEAT
+    MOTOR = 1
+  UNTIL STOP
+  END_REPEAT
+  :
+
+comp [switch] .stop:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('ran once', interp.getValueFromRef(interp.components.get('.motorLed').ref), '1');
+});
+
+reg(2829, 'comp-plc-lang', 'P+d EXIT outside loop error', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { A } outputs: { B }
+EXIT
+B = A`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('exit err', String(err.includes('EXIT outside loop')), 'true');
+});
+
+reg(2830, 'comp-plc', 'P+d FB in FOR body N times', function(h, session) {
+  const { interp } = session.run(`
+inline [plc] .machine:
+  inputs: { DUMMY }
+  outputs: { OUT }
+  VAR
+    i: 1
+  END_VAR
+  FOR i := 1 TO 2 DO
+    TON t(IN := 1, PT := 2)
+  END_FOR
+  OUT = t.Q
+  :
+
+comp [switch] .dummy:
+  = 0
+  :
+
+comp [led] .outLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { DUMMY = .dummy }
+  outputs: { OUT = .outLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  h.assert('ton after 2 iters', interp.getValueFromRef(interp.components.get('.outLed').ref), '1');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

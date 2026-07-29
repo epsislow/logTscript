@@ -1944,7 +1944,11 @@ class Interpreter {
         name: inline.name,
         inputs: prog.inputs,
         outputs: prog.outputs,
+        vars: prog.vars || {},
+        consts: prog.consts || {},
         statements: prog.statements,
+        timers: prog.timers,
+        counters: prog.counters,
         bodyRaw: inline.bodyRaw,
       });
       return;
@@ -12669,6 +12673,7 @@ if (s.assignment) {
         if (result._plcBusyUntil != null) compInfo._plcBusyUntil = result._plcBusyUntil;
         if (result.timerState) compInfo.timerState = result.timerState;
         if (result.counterState) compInfo.counterState = result.counterState;
+        if (result.varState) compInfo.varState = result.varState;
         if (result.retain != null) compInfo.retain = result.retain;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);

@@ -15,7 +15,8 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 |-------|---------|
 | **Language** | Full keyword/syntax reference → [plc-language.md](plc-language.md) |
 | **Program** | `inline [plc] .machine:` with `inputs:{ }`, `outputs:{ }`, logic body |
-| **Logic** | `IF/THEN/ELSE/ELSIF/END_IF`, `AND/OR/NOT/XOR`, `TRUE`/`FALSE`, `0`/`1` |
+| **Logic** | `IF` / `CASE` / `RETURN` / `FOR` / `WHILE` / `REPEAT` / `EXIT`, boolean operators |
+| **Internal memory** | `VAR` … `END_VAR` (between scans; reset on re-RUN); `CONST` … `END_CONST` |
 | **Timers** | `TON` / `TOF` blocks; `PT` in scan cycles; read `name.Q` |
 | **Counters** | `CTU` / `CTD` blocks; `PV` preset; read `name.Q`; compare `name.CV >= N` |
 | **Widths** | `START` alone = 1 bit; `TEMP: 8` can be declared and mapped, but current logic examples use 1-bit conditions |
@@ -1144,6 +1145,237 @@ comp [plc] .ctrl:
 ```
 
 After two Runs (second adds one pulse): CV is **`3`** (2 preserved + 1 new). Changing timer/counter names or types in the program invalidates retained state.
+
+### Example 24 — `VAR` latch (set-reset)
+
+Internal `latch` remembers START until STOP. Second scan with START = 0 still keeps MOTOR on.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  VAR
+    latch: 1
+  END_VAR
+  IF START AND NOT latch THEN latch = 1 END_IF
+  IF STOP THEN latch = 0 END_IF
+  MOTOR = latch
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.start = 0
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+```
+
+After Load & Run: LED is **`1`** (latched).
+
+### Example 25 — `CASE` mode select
+
+```logts-play
+inline [plc] .machine:
+  inputs: { SEL }
+  outputs: { OUT_A, OUT_B }
+  CASE SEL OF
+    0:
+      OUT_A = 1
+      OUT_B = 0
+    1:
+      OUT_A = 0
+      OUT_B = 1
+    ELSE
+      OUT_A = 0
+      OUT_B = 0
+  END_CASE
+  :
+
+comp [switch] .sel:
+  = 1
+  :
+
+comp [led] .aLed:
+  :
+
+comp [led] .bLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { SEL = .sel }
+  outputs: { OUT_A = .aLed, OUT_B = .bLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.aLed:get)
+show(.bLed:get)
+```
+
+With `SEL = 1`: **OUT_A = 0**, **OUT_B = 1**.
+
+### Example 26 — `RETURN` early exit
+
+When ENABLE = 0, `RETURN` skips the assign that would turn MOTOR on.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { ENABLE }
+  outputs: { MOTOR }
+  MOTOR = 0
+  IF NOT ENABLE THEN
+    RETURN
+  END_IF
+  MOTOR = 1
+  :
+
+comp [switch] .enable:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { ENABLE = .enable }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+```
+
+After Load & Run: LED is **`0`**.
+
+### Example 27 — `FOR` in one scan
+
+```logts-play
+inline [plc] .machine:
+  inputs: { DUMMY }
+  outputs: { HIT }
+  VAR
+    i: 1
+    hit: 1
+  END_VAR
+  hit = 0
+  FOR i := 0 TO 1 DO
+    IF i THEN hit = 1 END_IF
+  END_FOR
+  HIT = hit
+  :
+
+comp [switch] .dummy:
+  = 0
+  :
+
+comp [led] .hitLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { DUMMY = .dummy }
+  outputs: { HIT = .hitLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.hitLed:get)
+```
+
+After Load & Run: LED is **`1`** (loop reached `i = 1` in the same scan).
+
+### Example 28 — `WHILE` + `EXIT`
+
+```logts-play
+inline [plc] .machine:
+  inputs: { RUN }
+  outputs: { MOTOR }
+  MOTOR = 0
+  WHILE RUN DO
+    MOTOR = 1
+    EXIT
+  END_WHILE
+  :
+
+comp [switch] .run:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { RUN = .run }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+```
+
+`EXIT` leaves the loop after one pass — LED is **`1`**, scan does not hang.
+
+### Example 29 — `REPEAT` … `UNTIL`
+
+Body runs once even when `STOP` is already 1.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { STOP }
+  outputs: { MOTOR }
+  MOTOR = 0
+  REPEAT
+    MOTOR = 1
+  UNTIL STOP
+  END_REPEAT
+  :
+
+comp [switch] .stop:
+  = 1
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+```
+
+After Load & Run: LED is **`1`**.
 
 ---
 

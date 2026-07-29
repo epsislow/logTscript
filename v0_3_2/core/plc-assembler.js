@@ -5,12 +5,20 @@ const PLC_KEYWORDS = new Set([
   'AND', 'OR', 'NOT', 'XOR',
   'TRUE', 'FALSE',
   'INPUTS', 'OUTPUTS',
+  'VAR', 'END_VAR', 'CONST', 'END_CONST',
+  'CASE', 'OF', 'END_CASE', 'RETURN',
+  'FOR', 'TO', 'BY', 'DO', 'END_FOR',
+  'WHILE', 'END_WHILE',
+  'REPEAT', 'UNTIL', 'END_REPEAT',
+  'EXIT',
   'TON', 'TOF',
   'CTU', 'CTD',
   'IN', 'PT',
   'CU', 'CD', 'PV',
   // R and LD are recognized contextually in parseCounterCall, not as global keywords
 ]);
+
+const PLC_LOOP_MAX_ITERS = 65535;
 
 function plcError(msg, line) {
   if (line != null) throw new Error(`plc program line ${line}: ${msg}`);
@@ -89,7 +97,7 @@ function plcTokenize(src) {
         i++;
       }
       const upper = id.toUpperCase();
-      if (upper === 'END_IF' || PLC_KEYWORDS.has(upper)) {
+      if (PLC_KEYWORDS.has(upper)) {
         tokens.push({ type: 'KW', value: upper, line: startLine });
       } else {
         tokens.push({ type: 'ID', value: id, line: startLine });
@@ -163,11 +171,59 @@ class PlcParser {
         target[k] = v;
       }
     }
+    let vars = null;
+    let consts = null;
+    if (this.peek().type === 'KW' && this.peek().value === 'VAR') {
+      vars = this.parseVarBlock();
+    }
+    if (this.peek().type === 'KW' && this.peek().value === 'CONST') {
+      consts = this.parseConstBlock();
+    }
+    if (this.peek().type === 'KW' && this.peek().value === 'VAR') {
+      plcError('VAR must appear before CONST (order: inputs, outputs, VAR, CONST, body)', this.peek().line);
+    }
     const statements = this.parseStmtList();
     if (!this.match('EOF')) {
       plcError(`unexpected token '${this.peek().value}'`, this.peek().line);
     }
-    return { inputs, outputs, statements };
+    return { inputs, outputs, vars: vars || {}, consts: consts || {}, statements };
+  }
+
+  parseVarBlock() {
+    const line = this.peek().line;
+    this.eat('KW', 'VAR');
+    const decls = {};
+    while (!this.match('KW', 'END_VAR')) {
+      if (this.peek().type === 'EOF') plcError('expected END_VAR', line);
+      const nameTok = this.eat('ID');
+      const name = nameTok.value;
+      let width = 1;
+      if (this.match('SYM', ':')) {
+        width = this.eat('NUM').value;
+        if (width < 1) plcError('VAR width must be >= 1', nameTok.line);
+      }
+      if (decls[name]) plcError(`duplicate VAR '${name}'`, nameTok.line);
+      decls[name] = { name, width, line: nameTok.line };
+      this.match('COMMA');
+    }
+    return decls;
+  }
+
+  parseConstBlock() {
+    const line = this.peek().line;
+    this.eat('KW', 'CONST');
+    const decls = {};
+    while (!this.match('KW', 'END_CONST')) {
+      if (this.peek().type === 'EOF') plcError('expected END_CONST', line);
+      const nameTok = this.eat('ID');
+      const name = nameTok.value;
+      this.eat('SYM', '=');
+      const valTok = this.eat('NUM');
+      if (decls[name]) plcError(`duplicate CONST '${name}'`, nameTok.line);
+      decls[name] = { name, value: valTok.value, line: nameTok.line };
+      this.match('COMMA');
+    }
+    return decls;
   }
 
   parseStmtList() {
@@ -180,13 +236,35 @@ class PlcParser {
 
   isStatementStart() {
     const t = this.peek();
-    if (t.type === 'KW' && (t.value === 'IF' || t.value === 'TON' || t.value === 'TOF' || t.value === 'CTU' || t.value === 'CTD')) return true;
+    if (t.type === 'KW' && (
+      t.value === 'IF' || t.value === 'TON' || t.value === 'TOF' ||
+      t.value === 'CTU' || t.value === 'CTD' || t.value === 'CASE' || t.value === 'RETURN' ||
+      t.value === 'FOR' || t.value === 'WHILE' || t.value === 'REPEAT' || t.value === 'EXIT'
+    )) return true;
     return t.type === 'ID';
   }
 
   parseStatement() {
     if (this.match('KW', 'IF')) {
       return this.parseIf();
+    }
+    if (this.match('KW', 'CASE')) {
+      return this.parseCase();
+    }
+    if (this.match('KW', 'FOR')) {
+      return this.parseFor();
+    }
+    if (this.match('KW', 'WHILE')) {
+      return this.parseWhile();
+    }
+    if (this.match('KW', 'REPEAT')) {
+      return this.parseRepeat();
+    }
+    if (this.match('KW', 'RETURN')) {
+      return { type: 'return', line: this.tokens[this.pos - 1].line };
+    }
+    if (this.match('KW', 'EXIT')) {
+      return { type: 'exit', line: this.tokens[this.pos - 1].line };
     }
     if (this.match('KW', 'TON')) {
       return this.parseTimerCall('ton');
@@ -205,6 +283,89 @@ class PlcParser {
     this.eat('SYM', '=');
     const expr = this.parseExpr();
     return { type: 'assign', target, expr, line: targetTok.line };
+  }
+
+  parseForBound() {
+    if (this.peek().type === 'NUM') {
+      const n = this.eat('NUM');
+      return { type: 'num', value: n.value, line: n.line };
+    }
+    const nameTok = this.eat('ID');
+    if (this.match('SYM', '.')) {
+      const fieldTok = this.eat('ID');
+      if (fieldTok.value !== 'CV') {
+        plcError(`FOR bound member must be .CV, got .${fieldTok.value}`, fieldTok.line);
+      }
+      return { type: 'member', base: nameTok.value, field: 'CV', line: nameTok.line };
+    }
+    return { type: 'symbol', name: nameTok.value, line: nameTok.line };
+  }
+
+  parseFor() {
+    const line = this.tokens[this.pos - 1].line;
+    const varTok = this.eat('ID');
+    this.eat('SYM', ':=');
+    const start = this.parseForBound();
+    this.eat('KW', 'TO');
+    const end = this.parseForBound();
+    let step = { type: 'num', value: 1, line };
+    if (this.match('KW', 'BY')) {
+      step = this.parseForBound();
+    }
+    this.eat('KW', 'DO');
+    const body = this.parseStmtList();
+    this.eat('KW', 'END_FOR');
+    return { type: 'for', control: varTok.value, start, end, step, body, line: varTok.line };
+  }
+
+  parseWhile() {
+    const line = this.tokens[this.pos - 1].line;
+    const cond = this.parseExpr();
+    this.eat('KW', 'DO');
+    const body = this.parseStmtList();
+    this.eat('KW', 'END_WHILE');
+    return { type: 'while', cond, body, line };
+  }
+
+  parseRepeat() {
+    const line = this.tokens[this.pos - 1].line;
+    const body = this.parseStmtList();
+    this.eat('KW', 'UNTIL');
+    const cond = this.parseExpr();
+    this.eat('KW', 'END_REPEAT');
+    return { type: 'repeat', body, cond, line };
+  }
+
+  parseCase() {
+    const line = this.tokens[this.pos - 1].line;
+    const selector = this.parseCaseSelector();
+    this.eat('KW', 'OF');
+    const branches = [];
+    while (this.peek().type === 'NUM') {
+      const valTok = this.eat('NUM');
+      this.eat('SYM', ':');
+      const body = this.parseStmtList();
+      branches.push({ value: valTok.value, body, line: valTok.line });
+    }
+    let elseBody = [];
+    if (this.match('KW', 'ELSE')) {
+      elseBody = this.parseStmtList();
+    }
+    this.eat('KW', 'END_CASE');
+    return { type: 'case', selector, branches, elseBody, line };
+  }
+
+  parseCaseSelector() {
+    const nameTok = this.eat('ID');
+    const name = nameTok.value;
+    if (this.match('SYM', '.')) {
+      const fieldTok = this.eat('ID');
+      if (fieldTok.value !== 'CV') {
+        plcError(`CASE selector member must be .CV, got .${fieldTok.value}`, fieldTok.line);
+      }
+      return { type: 'member', base: name, field: 'CV', line: nameTok.line };
+    }
+    return { type: 'symbol', name, line: nameTok.line };
   }
 
   parseTimerCall(kind) {
@@ -377,6 +538,11 @@ function plcWalkStatements(stmts, fn) {
       for (const s of stmt.thenBody || []) plcWalkStatements([s], fn);
       for (const e of stmt.elsif || []) plcWalkStatements(e.body, fn);
       for (const s of stmt.elseBody || []) plcWalkStatements([s], fn);
+    } else if (stmt.type === 'case') {
+      for (const b of stmt.branches || []) plcWalkStatements(b.body, fn);
+      for (const s of stmt.elseBody || []) plcWalkStatements([s], fn);
+    } else if (stmt.type === 'for' || stmt.type === 'while' || stmt.type === 'repeat') {
+      plcWalkStatements(stmt.body, fn);
     }
   }
 }
@@ -406,26 +572,42 @@ function plcCollectCounterDefs(parsed) {
 function plcValidateProgram(parsed) {
   const inputs = parsed.inputs || {};
   const outputs = parsed.outputs || {};
+  const vars = parsed.vars || {};
+  const consts = parsed.consts || {};
   const timers = plcCollectTimerDefs(parsed);
   const counters = plcCollectCounterDefs(parsed);
 
   function symInfo(name) {
     if (inputs[name]) return { kind: 'input', width: inputs[name].width };
     if (outputs[name]) return { kind: 'output', width: outputs[name].width };
+    if (vars[name]) return { kind: 'var', width: vars[name].width };
+    if (consts[name]) return { kind: 'const', width: 1, constValue: consts[name].value };
     if (timers.has(name)) return { kind: 'timer', width: 1 };
     if (counters.has(name)) return { kind: 'counter', width: 1 };
     return null;
   }
 
-  for (const [name] of timers) {
+  for (const name of Object.keys(vars)) {
     if (inputs[name] || outputs[name]) {
-      plcError(`timer name '${name}' conflicts with I/O symbol`, timers.get(name).line);
+      plcError(`VAR '${name}' conflicts with I/O symbol`, vars[name].line);
+    }
+    if (consts[name]) plcError(`VAR '${name}' conflicts with CONST`, vars[name].line);
+  }
+  for (const name of Object.keys(consts)) {
+    if (inputs[name] || outputs[name]) {
+      plcError(`CONST '${name}' conflicts with I/O symbol`, consts[name].line);
+    }
+  }
+
+  for (const [name] of timers) {
+    if (inputs[name] || outputs[name] || vars[name] || consts[name]) {
+      plcError(`timer name '${name}' conflicts with I/O or VAR/CONST`, timers.get(name).line);
     }
     if (counters.has(name)) plcError(`timer name '${name}' conflicts with counter`, timers.get(name).line);
   }
   for (const [name] of counters) {
-    if (inputs[name] || outputs[name]) {
-      plcError(`counter name '${name}' conflicts with I/O symbol`, counters.get(name).line);
+    if (inputs[name] || outputs[name] || vars[name] || consts[name]) {
+      plcError(`counter name '${name}' conflicts with I/O or VAR/CONST`, counters.get(name).line);
     }
   }
 
@@ -451,15 +633,63 @@ function plcValidateProgram(parsed) {
       if (timers.has(n) || counters.has(n)) continue;
       const info = symInfo(n);
       if (!info) plcError(`unknown symbol ${n}`, ctx);
+      if (info.kind === 'const') {
+        if (info.constValue !== 0 && info.constValue !== 1) {
+          plcError(`CONST '${n}' value ${info.constValue} cannot be used in 1-bit expression`, ctx);
+        }
+        continue;
+      }
       if (info.width !== 1) plcError(`expression requires 1-bit symbol, got ${n} (${info.width} bits)`, ctx);
     }
   }
 
-  function checkStmt(stmt) {
+  function checkCaseSelector(sel, ctx) {
+    if (sel.type === 'member' && sel.field === 'CV') {
+      if (!counters.has(sel.base)) plcError(`unknown counter '${sel.base}' in CASE selector`, ctx);
+      return;
+    }
+    if (sel.type === 'symbol') {
+      const info = symInfo(sel.name);
+      if (!info) plcError(`unknown symbol ${sel.name} in CASE selector`, ctx);
+      if (info.kind === 'const') {
+        plcError(`CONST cannot be CASE selector; use 1-bit symbol or name.CV`, ctx);
+      }
+      if (info.kind === 'timer' || info.kind === 'counter') {
+        plcError(`CASE selector must be 1-bit symbol or name.CV`, ctx);
+      }
+      if (info.width !== 1) {
+        plcError(`CASE selector requires 1-bit symbol, got ${sel.name} (${info.width} bits)`, ctx);
+      }
+      return;
+    }
+    plcError('invalid CASE selector', ctx);
+  }
+
+  function checkForBound(bound, ctx) {
+    if (!bound) return;
+    if (bound.type === 'num') return;
+    if (bound.type === 'member' && bound.field === 'CV') {
+      if (!counters.has(bound.base)) plcError(`unknown counter '${bound.base}' in FOR bound`, ctx);
+      return;
+    }
+    if (bound.type === 'symbol') {
+      const info = symInfo(bound.name);
+      if (!info) plcError(`unknown symbol ${bound.name} in FOR bound`, ctx);
+      if (info.kind === 'timer' || info.kind === 'counter') {
+        plcError(`FOR bound must be number, VAR/CONST, or name.CV`, ctx);
+      }
+      return;
+    }
+    plcError('invalid FOR bound', ctx);
+  }
+
+  function checkStmt(stmt, loopDepth) {
+    const depth = loopDepth || 0;
     if (stmt.type === 'assign') {
       const targetInfo = symInfo(stmt.target);
       if (!targetInfo) plcError(`unknown symbol ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'input') plcError(`cannot assign to input ${stmt.target}`, stmt.line);
+      if (targetInfo.kind === 'const') plcError(`cannot assign to CONST ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'timer') plcError(`cannot assign to timer ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'counter') plcError(`cannot assign to counter ${stmt.target}`, stmt.line);
       if (targetInfo.width !== 1) {
@@ -473,16 +703,41 @@ function plcValidateProgram(parsed) {
       checkExpr1Bit(stmt.resetExpr, stmt.line);
     } else if (stmt.type === 'if') {
       checkExpr1Bit(stmt.cond, stmt.line);
-      for (const s of stmt.thenBody) checkStmt(s);
+      for (const s of stmt.thenBody) checkStmt(s, depth);
       for (const e of stmt.elsif || []) {
         checkExpr1Bit(e.cond, stmt.line);
-        for (const s of e.body) checkStmt(s);
+        for (const s of e.body) checkStmt(s, depth);
       }
-      for (const s of stmt.elseBody || []) checkStmt(s);
+      for (const s of stmt.elseBody || []) checkStmt(s, depth);
+    } else if (stmt.type === 'case') {
+      checkCaseSelector(stmt.selector, stmt.line);
+      for (const b of stmt.branches || []) {
+        for (const s of b.body) checkStmt(s, depth);
+      }
+      for (const s of stmt.elseBody || []) checkStmt(s, depth);
+    } else if (stmt.type === 'for') {
+      const ctrl = symInfo(stmt.control);
+      if (!ctrl || ctrl.kind !== 'var') {
+        plcError(`FOR control '${stmt.control}' must be declared in VAR`, stmt.line);
+      }
+      checkForBound(stmt.start, stmt.line);
+      checkForBound(stmt.end, stmt.line);
+      checkForBound(stmt.step, stmt.line);
+      for (const s of stmt.body || []) checkStmt(s, depth + 1);
+    } else if (stmt.type === 'while') {
+      checkExpr1Bit(stmt.cond, stmt.line);
+      for (const s of stmt.body || []) checkStmt(s, depth + 1);
+    } else if (stmt.type === 'repeat') {
+      checkExpr1Bit(stmt.cond, stmt.line);
+      for (const s of stmt.body || []) checkStmt(s, depth + 1);
+    } else if (stmt.type === 'return') {
+      /* ok */
+    } else if (stmt.type === 'exit') {
+      if (depth < 1) plcError('EXIT outside loop', stmt.line);
     }
   }
 
-  for (const stmt of parsed.statements || []) checkStmt(stmt);
+  for (const stmt of parsed.statements || []) checkStmt(stmt, 0);
   parsed.timers = timers;
   parsed.counters = counters;
   return parsed;
@@ -498,6 +753,8 @@ function parsePlcBody(bodyRaw) {
   return {
     inputs: parsed.inputs,
     outputs: parsed.outputs,
+    vars: parsed.vars,
+    consts: parsed.consts,
     statements: parsed.statements,
     timers: parsed.timers,
     counters: parsed.counters,
@@ -643,7 +900,60 @@ function plcExecCtd(stmt, env, timerState, counterState) {
   st.q = (st.cv <= 0) ? '1' : '0';
 }
 
-function plcExecStmt(stmt, env, timerState, counterState) {
+function plcEvalCaseSelector(sel, env, counterState) {
+  if (sel.type === 'member' && sel.field === 'CV') {
+    return plcCounterCV(counterState, sel.base);
+  }
+  if (sel.type === 'symbol') {
+    return plcBit(env.get(sel.name)) === '1' ? 1 : 0;
+  }
+  return 0;
+}
+
+function plcBitsToInt(v) {
+  if (v == null || v === '') return 0;
+  const s = String(v);
+  if (/^[01]+$/.test(s)) return parseInt(s, 2) || 0;
+  const n = parseInt(s, 10);
+  return isNaN(n) ? 0 : n;
+}
+
+function plcIntToBits(n, width) {
+  const w = width > 0 ? width : 1;
+  let s = (n >>> 0).toString(2);
+  return plcNormalizeBits(s, w);
+}
+
+function plcEvalBound(bound, env, counterState, consts) {
+  if (!bound) return 0;
+  if (bound.type === 'num') return bound.value;
+  if (bound.type === 'member' && bound.field === 'CV') {
+    return plcCounterCV(counterState, bound.base);
+  }
+  if (bound.type === 'symbol') {
+    if (consts && consts[bound.name] != null) return consts[bound.name].value;
+    return plcBitsToInt(env.get(bound.name));
+  }
+  return 0;
+}
+
+function plcExecStmtList(stmts, env, timerState, counterState, flow, consts, varWidths) {
+  for (const s of stmts || []) {
+    plcExecStmt(s, env, timerState, counterState, flow, consts, varWidths);
+    if (flow && (flow.returned || flow.exited)) return;
+  }
+}
+
+function plcExecStmt(stmt, env, timerState, counterState, flow, consts, varWidths) {
+  if (flow && (flow.returned || flow.exited)) return;
+  if (stmt.type === 'return') {
+    if (flow) flow.returned = true;
+    return;
+  }
+  if (stmt.type === 'exit') {
+    if (flow) flow.exited = true;
+    return;
+  }
   if (stmt.type === 'assign') {
     env.set(stmt.target, plcEvalExpr(stmt.expr, env, timerState, counterState));
     return;
@@ -666,25 +976,91 @@ function plcExecStmt(stmt, env, timerState, counterState) {
   }
   if (stmt.type === 'if') {
     if (plcEvalExpr(stmt.cond, env, timerState, counterState) === '1') {
-      for (const s of stmt.thenBody) plcExecStmt(s, env, timerState, counterState);
+      plcExecStmtList(stmt.thenBody, env, timerState, counterState, flow, consts, varWidths);
       return;
     }
     for (const e of stmt.elsif || []) {
       if (plcEvalExpr(e.cond, env, timerState, counterState) === '1') {
-        for (const s of e.body) plcExecStmt(s, env, timerState, counterState);
+        plcExecStmtList(e.body, env, timerState, counterState, flow, consts, varWidths);
         return;
       }
     }
-    for (const s of stmt.elseBody || []) plcExecStmt(s, env, timerState, counterState);
+    plcExecStmtList(stmt.elseBody, env, timerState, counterState, flow, consts, varWidths);
+    return;
+  }
+  if (stmt.type === 'case') {
+    const selVal = plcEvalCaseSelector(stmt.selector, env, counterState);
+    for (const b of stmt.branches || []) {
+      if (b.value === selVal) {
+        plcExecStmtList(b.body, env, timerState, counterState, flow, consts, varWidths);
+        return;
+      }
+    }
+    plcExecStmtList(stmt.elseBody, env, timerState, counterState, flow, consts, varWidths);
+    return;
+  }
+  if (stmt.type === 'for') {
+    const start = plcEvalBound(stmt.start, env, counterState, consts);
+    const end = plcEvalBound(stmt.end, env, counterState, consts);
+    const step = plcEvalBound(stmt.step, env, counterState, consts);
+    if (step === 0) plcError('FOR BY step must not be 0', stmt.line);
+    const width = (varWidths && varWidths[stmt.control]) || 1;
+    let iters = 0;
+    if (step > 0) {
+      for (let i = start; i <= end; i += step) {
+        env.set(stmt.control, plcIntToBits(i, width));
+        plcExecStmtList(stmt.body, env, timerState, counterState, flow, consts, varWidths);
+        if (flow && flow.returned) return;
+        if (flow && flow.exited) { flow.exited = false; break; }
+        iters++;
+        if (iters > PLC_LOOP_MAX_ITERS) plcError('loop iteration limit exceeded', stmt.line);
+      }
+    } else {
+      for (let i = start; i >= end; i += step) {
+        env.set(stmt.control, plcIntToBits(i, width));
+        plcExecStmtList(stmt.body, env, timerState, counterState, flow, consts, varWidths);
+        if (flow && flow.returned) return;
+        if (flow && flow.exited) { flow.exited = false; break; }
+        iters++;
+        if (iters > PLC_LOOP_MAX_ITERS) plcError('loop iteration limit exceeded', stmt.line);
+      }
+    }
+    return;
+  }
+  if (stmt.type === 'while') {
+    let iters = 0;
+    while (plcEvalExpr(stmt.cond, env, timerState, counterState) === '1') {
+      plcExecStmtList(stmt.body, env, timerState, counterState, flow, consts, varWidths);
+      if (flow && flow.returned) return;
+      if (flow && flow.exited) { flow.exited = false; break; }
+      iters++;
+      if (iters > PLC_LOOP_MAX_ITERS) plcError('loop iteration limit exceeded', stmt.line);
+    }
+    return;
+  }
+  if (stmt.type === 'repeat') {
+    let iters = 0;
+    do {
+      plcExecStmtList(stmt.body, env, timerState, counterState, flow, consts, varWidths);
+      if (flow && flow.returned) return;
+      if (flow && flow.exited) { flow.exited = false; break; }
+      iters++;
+      if (iters > PLC_LOOP_MAX_ITERS) plcError('loop iteration limit exceeded', stmt.line);
+    } while (plcEvalExpr(stmt.cond, env, timerState, counterState) !== '1');
   }
 }
 
-function executePlcScan(inst, externalInputs, outputState, timerState, counterState) {
+function executePlcScan(inst, externalInputs, outputState, timerState, counterState, varState) {
   const inputs = inst.inputs || {};
   const outputs = inst.outputs || {};
+  const vars = inst.vars || {};
+  const consts = inst.consts || {};
   const env = new Map();
   const timers = timerState || {};
   const counters = counterState || {};
+  const vstate = varState || {};
+  const varWidths = {};
+  for (const name of Object.keys(vars)) varWidths[name] = vars[name].width || 1;
 
   for (const name of Object.keys(outputs)) {
     const prev = outputState && outputState[name] != null ? outputState[name] : '0';
@@ -696,14 +1072,27 @@ function executePlcScan(inst, externalInputs, outputState, timerState, counterSt
     if (val == null) val = '0'.repeat(w);
     env.set(name, plcNormalizeBits(val, w));
   }
-
-  for (const stmt of inst.statements || []) {
-    plcExecStmt(stmt, env, timers, counters);
+  for (const name of Object.keys(vars)) {
+    const w = vars[name].width;
+    let val = vstate[name];
+    if (val == null) val = '0'.repeat(w);
+    env.set(name, plcNormalizeBits(val, w));
   }
+  for (const name of Object.keys(consts)) {
+    const v = consts[name].value;
+    if (v === 0 || v === 1) env.set(name, String(v));
+  }
+
+  const flow = { returned: false, exited: false };
+  plcExecStmtList(inst.statements, env, timers, counters, flow, consts, varWidths);
 
   const out = outputState || {};
   for (const name of Object.keys(outputs)) {
     out[name] = env.get(name) || '0';
+  }
+  for (const name of Object.keys(vars)) {
+    const w = vars[name].width;
+    vstate[name] = plcNormalizeBits(env.get(name), w);
   }
   return out;
 }
@@ -738,6 +1127,9 @@ function formatPlcStmt(stmt, indent) {
   if (stmt.type === 'assign') {
     return `${pad}${stmt.target} = ${formatPlcExpr(stmt.expr)}`;
   }
+  if (stmt.type === 'return') {
+    return `${pad}RETURN`;
+  }
   if (stmt.type === 'ton' || stmt.type === 'tof') {
     return formatPlcTimerCall(stmt, indent);
   }
@@ -757,6 +1149,52 @@ function formatPlcStmt(stmt, indent) {
     }
     lines.push(`${pad}END_IF`);
     return lines.join('\n');
+  }
+  if (stmt.type === 'case') {
+    const lines = [`${pad}CASE ${formatPlcExpr(stmt.selector)} OF`];
+    for (const b of stmt.branches || []) {
+      lines.push(`${pad}  ${b.value}:`);
+      for (const s of b.body) lines.push(formatPlcStmt(s, indent + 2));
+    }
+    if (stmt.elseBody && stmt.elseBody.length) {
+      lines.push(`${pad}  ELSE`);
+      for (const s of stmt.elseBody) lines.push(formatPlcStmt(s, indent + 2));
+    }
+    lines.push(`${pad}END_CASE`);
+    return lines.join('\n');
+  }
+  if (stmt.type === 'for') {
+    const stepStr = (stmt.step && !(stmt.step.type === 'num' && stmt.step.value === 1))
+      ? ` BY ${formatPlcExpr(stmt.step.type === 'num' ? { type: 'literal', value: String(stmt.step.value) } : stmt.step)}`
+      : '';
+    // format bounds specially
+    const fmtB = (b) => {
+      if (!b) return '?';
+      if (b.type === 'num') return String(b.value);
+      return formatPlcExpr(b);
+    };
+    const byPart = (stmt.step && !(stmt.step.type === 'num' && stmt.step.value === 1))
+      ? ` BY ${fmtB(stmt.step)}` : '';
+    const lines = [`${pad}FOR ${stmt.control} := ${fmtB(stmt.start)} TO ${fmtB(stmt.end)}${byPart} DO`];
+    for (const s of stmt.body || []) lines.push(formatPlcStmt(s, indent + 1));
+    lines.push(`${pad}END_FOR`);
+    return lines.join('\n');
+  }
+  if (stmt.type === 'while') {
+    const lines = [`${pad}WHILE ${formatPlcExpr(stmt.cond)} DO`];
+    for (const s of stmt.body || []) lines.push(formatPlcStmt(s, indent + 1));
+    lines.push(`${pad}END_WHILE`);
+    return lines.join('\n');
+  }
+  if (stmt.type === 'repeat') {
+    const lines = [`${pad}REPEAT`];
+    for (const s of stmt.body || []) lines.push(formatPlcStmt(s, indent + 1));
+    lines.push(`${pad}UNTIL ${formatPlcExpr(stmt.cond)}`);
+    lines.push(`${pad}END_REPEAT`);
+    return lines.join('\n');
+  }
+  if (stmt.type === 'exit') {
+    return `${pad}EXIT`;
   }
   return `${pad}?`;
 }
@@ -781,6 +1219,11 @@ function formatPlcInstanceDoc(alias, inst) {
   lines.push('');
   lines.push(...formatPlcSymbolTable('inputs', inst.inputs));
   lines.push(...formatPlcSymbolTable('outputs', inst.outputs));
+  lines.push(...formatPlcSymbolTable('VAR', inst.vars));
+  const constNames = Object.keys(inst.consts || {});
+  lines.push('  CONST:');
+  if (!constNames.length) lines.push('    (none)');
+  else for (const n of constNames) lines.push(`    ${n} = ${(inst.consts[n].value)}`);
   const timerNames = [];
   const counterNames = [];
   plcWalkStatements(inst.statements, (stmt) => {
@@ -802,7 +1245,9 @@ function formatPlcInstanceDoc(alias, inst) {
   lines.push('  execution:');
   lines.push('    one scan = sequential pass through program');
   lines.push('    outputs retain value if not assigned (PLC semantics)');
-  lines.push('    inputs read-only; outputs readable in same scan');
+  lines.push('    inputs read-only; outputs and VAR readable/writable in same scan');
+  lines.push('    VAR persists between scans; resets on re-RUN');
+  lines.push('    CONST read-only; CASE first match; RETURN ends scan body');
   lines.push('    TON/TOF advance once per scan; PT is scan count');
   lines.push('    CTU/CTD count rising edges per scan; PV is preset');
   return lines;
@@ -810,6 +1255,12 @@ function formatPlcInstanceDoc(alias, inst) {
 
 function plcFingerprintProgram(inst) {
   const items = [];
+  for (const n of Object.keys(inst && inst.vars || {}).sort()) {
+    items.push(`v:${n}:${(inst.vars[n].width || 1)}`);
+  }
+  for (const n of Object.keys(inst && inst.consts || {}).sort()) {
+    items.push(`c:${n}:${inst.consts[n].value}`);
+  }
   plcWalkStatements(inst && inst.statements, (stmt) => {
     if (stmt.type === 'ton' || stmt.type === 'tof' || stmt.type === 'ctu' || stmt.type === 'ctd') {
       items.push(`${stmt.name}:${stmt.type}`);
@@ -824,17 +1275,33 @@ function formatPlcTypeDoc() {
     'inline [plc] .name:',
     '  inputs: { START, STOP: 1 }',
     '  outputs: { MOTOR }',
+    '  VAR',
+    '    latch: 1',
+    '  END_VAR',
+    '  CONST',
+    '    MODE_RUN = 1',
+    '  END_CONST',
     '  TON startDelay(IN := START, PT := 50)',
-    '  IF startDelay.Q THEN',
-    '    MOTOR = TRUE',
-    '  ELSE',
-    '    MOTOR = FALSE',
-    '  END_IF',
+    '  CASE latch OF',
+    '    0:',
+    '      MOTOR = FALSE',
+    '    1:',
+    '      MOTOR = TRUE',
+    '    ELSE',
+    '      MOTOR = FALSE',
+    '  END_CASE',
     '  :',
     '',
-    'Keywords: IF THEN ELSE ELSIF END_IF AND OR NOT XOR TRUE FALSE TON TOF CTU CTD',
+    'Keywords: IF THEN ELSE ELSIF END_IF CASE OF END_CASE RETURN',
+    '          FOR TO BY DO END_FOR WHILE END_WHILE REPEAT UNTIL END_REPEAT EXIT',
+    '          VAR END_VAR CONST END_CONST AND OR NOT XOR TRUE FALSE',
+    '          TON TOF CTU CTD',
     'Timers: PT = preset in scan cycles; read Q as name.Q',
     'Counters: PV = preset; read Q as name.Q; compare CV as name.CV >= N',
+    'VAR: internal memory between scans (reset on re-RUN); CONST: read-only',
+    'CASE: selector is 1-bit symbol or name.CV; first matching label wins',
+    'Loops: FOR/WHILE/REPEAT run fully in one scan; EXIT leaves innermost loop; max 65535 iters',
+    'RETURN: stop remaining statements in this scan',
     'Bind with comp [plc] program: .name and I/O map (see doc/plc.md and doc/plc-language.md)',
     'comp [plc] retain: 0/1 (default 0) — preserve timer/counter FB state on re-RUN in same session',
   ];
