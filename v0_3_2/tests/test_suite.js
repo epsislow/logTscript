@@ -30393,7 +30393,7 @@ comp [plc] .ctrl:
   h.assert('heat off', interp.getValueFromRef(interp.components.get('.heatLed').ref), '0');
 });
 
-reg(2840, 'comp-plc-lang', 'doc example 30 — slider thermostat logts-play', function(h, session) {
+reg(2840, 'comp-plc-lang', 'doc example 31 — slider thermostat logts-play', function(h, session) {
   const { interp } = session.run(PLC_DOC_EX30);
   session.setComp(interp, '.tempSlider', '01100100');
   session.execStmts(interp, '.ctrl:{ set = 1 }');
@@ -30418,6 +30418,276 @@ comp [plc] .ctrl:
   program: .machine
   inputs: { TEMP = .tempSlider }
   outputs: { HEATER = .heatLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`;
+
+reg(2841, 'comp-plc', 'P5.2c retainVar:0 resets VAR on re-RUN', function(h, session) {
+  session.run(PLC_VAR_RETAIN_SETUP('retainVar: 0', 1) + PLC_VAR_LATCH_SCANS);
+  h.assert('latch before', plcVarLatch(session.interp), '1');
+  session.run(PLC_VAR_RETAIN_SETUP('retainVar: 0', 0) + '\n.ctrl:{ set = 1 }');
+  h.assert('latch after rerun', plcVarLatch(session.interp), '0');
+});
+
+reg(2842, 'comp-plc', 'P5.2c retainVar:1 preserves VAR on re-RUN', function(h, session) {
+  session.run(PLC_VAR_RETAIN_SETUP('retainVar: 1', 1) + PLC_VAR_LATCH_SCANS);
+  h.assert('latch before', plcVarLatch(session.interp), '1');
+  session.run(PLC_VAR_RETAIN_SETUP('retainVar: 1', 0) + '\n.ctrl:{ set = 1 }');
+  h.assert('latch after rerun', plcVarLatch(session.interp), '1');
+});
+
+reg(2843, 'comp-plc', 'P5.2c retainVar:2 elaboration error', function(h, session) {
+  let err = '';
+  try {
+    session.run(PLC_VAR_RETAIN_SETUP('retainVar: 2'));
+  } catch (e) { err = String(e.message || e); }
+  h.assert('invalid retainVar', String(err.includes('invalid retainVar value')), 'true');
+});
+
+reg(2844, 'comp-plc', 'P5.2c retain:0 retainVar:1 — FB resets VAR kept', function(h, session) {
+  session.run(PLC_VAR_RETAIN_FB_SETUP('retain: 0', 'retainVar: 1', 1) + PLC_VAR_LATCH_SCANS);
+  h.assert('latch kept', plcVarLatch(session.interp), '1');
+  h.assert('cv before', String(plcCntCv(session.interp)), '0');
+  session.run(PLC_VAR_RETAIN_FB_SETUP('retain: 0', 'retainVar: 1', 0) + PLC_ONE_PULSE);
+  h.assert('latch after', plcVarLatch(session.interp), '1');
+  h.assert('cv reset', String(plcCntCv(session.interp)), '1');
+});
+
+reg(2845, 'comp-plc', 'P5.2c doc shows retainVar', function(h, session) {
+  const out = session.runDoc(PLC_VAR_RETAIN_SETUP('retainVar: 1') + '\ndoc(comp.plc)\ndoc(.ctrl)');
+  h.assert('type retainVar', String(out.some(l => l.includes('retainVar') && l.includes('0/1'))), 'true');
+  h.assert('instance retainVar', String(out.some(l => l.includes('retainVar: 1'))), 'true');
+});
+
+reg(2846, 'comp-plc-lang', 'doc example 25 — retainVar latch logts-play', function(h, session) {
+  session.run(PLC_DOC_EX25 + PLC_VAR_LATCH_SCANS);
+  session.run(PLC_DOC_EX25_RERUN);
+  h.assert('ex25 latch', plcVarLatch(session.interp), '1');
+  h.assert('ex25 motor', session.interp.getValueFromRef(session.interp.components.get('.motorLed').ref), '1');
+});
+
+const PLC_VAR_LATCH_SCANS = `
+.ctrl:{ set = 1 }
+.start = 0
+.ctrl:{ set = 1 }
+`;
+
+const PLC_VAR_RETAIN_SETUP = (retainVarLine, startPreset) => `
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  VAR
+    latch: 1
+  END_VAR
+  IF START AND NOT latch THEN latch = 1 END_IF
+  IF STOP THEN latch = 0 END_IF
+  MOTOR = latch
+  :
+
+comp [switch] .start:
+  = ${startPreset != null ? startPreset : 1}
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  ${retainVarLine}
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+`;
+
+const PLC_VAR_RETAIN_FB_SETUP = (retainLine, retainVarLine, startPreset) => `
+inline [plc] .machine:
+  inputs: { START, STOP, PULSE }
+  outputs: { MOTOR }
+  VAR
+    latch: 1
+  END_VAR
+  IF START AND NOT latch THEN latch = 1 END_IF
+  IF STOP THEN latch = 0 END_IF
+  MOTOR = latch
+  CTU cnt(CU := PULSE, R := 0, PV := 10)
+  :
+
+comp [switch] .start:
+  = ${startPreset != null ? startPreset : 1}
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [switch] .pulse:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  ${retainLine}
+  ${retainVarLine}
+  inputs: { START = .start, STOP = .stop, PULSE = .pulse }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+`;
+
+function plcVarLatch(interp) {
+  const st = interp.components.get('.ctrl').varState;
+  return st && st.latch != null ? st.latch : '0';
+}
+
+const PLC_DOC_EX25 = `
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  VAR
+    latch: 1
+  END_VAR
+  IF START AND NOT latch THEN latch = 1 END_IF
+  IF STOP THEN latch = 0 END_IF
+  MOTOR = latch
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  retainVar: 1
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`;
+
+reg(2847, 'comp-plc-lang', 'doc example 32 — bar scaling logts-play', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX32);
+  h.assert('ex32 level', interp.components.get('.levelBar').lastSegmentValue, '00010000');
+});
+
+reg(2848, 'comp-plc-lang', 'doc example 33 — CASE multi-bit logts-play', function(h, session) {
+  const { interp } = session.run(PLC_DOC_EX33);
+  h.assert('ex33 a', interp.getValueFromRef(interp.components.get('.aLed').ref), '0');
+  h.assert('ex33 b', interp.getValueFromRef(interp.components.get('.bLed').ref), '1');
+});
+
+const PLC_DOC_EX32 = `
+inline [plc] .machine:
+  inputs: { TEMP: 8 }
+  outputs: { LEVEL: 8 }
+  LEVEL = (TEMP * 2) / 10
+  :
+
+comp [slider] .tempSlider:
+  length: 8
+  on: 1
+  :
+
+comp [bar] .levelBar:
+  length: 8
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { TEMP = .tempSlider }
+  outputs: { LEVEL = .levelBar }
+  on: 1
+  :
+
+.tempSlider:{ data = 01010000 set = 1 }
+.ctrl:{ set = 1 }
+`;
+
+const PLC_DOC_EX33 = `
+inline [plc] .machine:
+  inputs: { MSEL: 8 }
+  outputs: { OUT_A, OUT_B }
+  CASE MSEL OF
+    0:
+      OUT_A = 1
+      OUT_B = 0
+    50:
+      OUT_A = 0
+      OUT_B = 1
+    ELSE
+      OUT_A = 0
+      OUT_B = 0
+  END_CASE
+  :
+
+comp [slider] .modeSlider:
+  length: 8
+  on: 1
+  :
+
+comp [led] .aLed:
+  :
+
+comp [led] .bLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  inputs: { MSEL = .modeSlider }
+  outputs: { OUT_A = .aLed, OUT_B = .bLed }
+  on: 1
+  :
+
+.modeSlider:{ data = 00110010 set = 1 }
+.ctrl:{ set = 1 }
+`;
+
+const PLC_DOC_EX25_RERUN = `
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  VAR
+    latch: 1
+  END_VAR
+  IF START AND NOT latch THEN latch = 1 END_IF
+  IF STOP THEN latch = 0 END_IF
+  MOTOR = latch
+  :
+
+comp [switch] .start:
+  = 0
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  retainVar: 1
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
   on: 1
   :
 

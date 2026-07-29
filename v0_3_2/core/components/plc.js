@@ -106,6 +106,15 @@ function plcCloneFbState(state) {
   return out;
 }
 
+function plcCloneVarState(state) {
+  if (!state) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(state)) {
+    out[k] = v == null ? '0' : String(v);
+  }
+  return out;
+}
+
 function plcRetainSaveFromContext(ctx) {
   if (!ctx || !ctx.components) return;
   const instanceId = ctx._instanceId != null ? ctx._instanceId : 1;
@@ -113,27 +122,41 @@ function plcRetainSaveFromContext(ctx) {
   const fpFn = typeof plcFingerprintProgram === 'function' ? plcFingerprintProgram : null;
   for (const [compName, comp] of ctx.components) {
     if (!comp || comp.type !== 'plc') continue;
-    if (comp.retain !== 1) {
+    const inst = ctx.inlineInstances && comp.programRef ? ctx.inlineInstances.get(comp.programRef) : null;
+    const fingerprint = inst && fpFn ? fpFn(inst) : '';
+    if (comp.retain !== 1 && comp.retainVar !== 1) {
       cache.delete(compName);
       continue;
     }
-    const inst = ctx.inlineInstances && comp.programRef ? ctx.inlineInstances.get(comp.programRef) : null;
-    const fingerprint = inst && fpFn ? fpFn(inst) : '';
-    cache.set(compName, {
-      fingerprint,
-      timerState: plcCloneFbState(comp.timerState),
-      counterState: plcCloneFbState(comp.counterState),
-    });
+    const entry = cache.get(compName) || { fingerprint };
+    entry.fingerprint = fingerprint;
+    if (comp.retain === 1) {
+      entry.timerState = plcCloneFbState(comp.timerState);
+      entry.counterState = plcCloneFbState(comp.counterState);
+    } else {
+      delete entry.timerState;
+      delete entry.counterState;
+    }
+    if (comp.retainVar === 1) {
+      entry.varState = plcCloneVarState(comp.varState);
+    } else {
+      delete entry.varState;
+    }
+    cache.set(compName, entry);
   }
 }
 
-function plcRetainRestore(instanceId, compName, fingerprint) {
+function plcRetainRestore(instanceId, compName, fingerprint, opts) {
   const entry = _plcRetainCacheFor(instanceId).get(compName);
   if (!entry || entry.fingerprint !== fingerprint) return null;
-  return {
-    timerState: plcCloneFbState(entry.timerState),
-    counterState: plcCloneFbState(entry.counterState),
-  };
+  const wantFb = opts && opts.fb;
+  const wantVar = opts && opts.var;
+  const out = {};
+  if (wantFb && entry.timerState) out.timerState = plcCloneFbState(entry.timerState);
+  if (wantFb && entry.counterState) out.counterState = plcCloneFbState(entry.counterState);
+  if (wantVar && entry.varState) out.varState = plcCloneVarState(entry.varState);
+  if (!out.timerState && !out.counterState && !out.varState) return null;
+  return out;
 }
 
 function plcRetainClearInstance(instanceId) {
@@ -178,6 +201,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
         { name: 'scanDuration', value: 'integer (ms simulated busy, default 1)' },
         { name: 'strict', value: '0/1 (overrun miss when 1)' },
         { name: 'retain', value: '0/1 (default 0, preserve FB state on re-RUN)' },
+        { name: 'retainVar', value: '0/1 (default 0, preserve VAR state on re-RUN)' },
       ],
       initValue: '1bit',
       pins: [{ bits: '1', name: 'set' }],
@@ -222,6 +246,14 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     if (v === 0 || v === '0' || v === false) return 0;
     if (v === 1 || v === '1' || v === true) return 1;
     throw Error(`plc ${compName}: invalid retain value, expected 0 or 1`);
+  }
+
+  _parseRetainVar(attributes, compName) {
+    if (attributes.retainVar === undefined || attributes.retainVar === null) return 0;
+    const v = attributes.retainVar;
+    if (v === 0 || v === '0' || v === false) return 0;
+    if (v === 1 || v === '1' || v === true) return 1;
+    throw Error(`plc ${compName}: invalid retainVar value, expected 0 or 1`);
   }
 
   _timingMode(comp) {
@@ -461,6 +493,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     const scanDuration = this._parseScanDuration(attributes, scanTime);
     const strict = this._parseStrict(attributes);
     const retain = this._parseRetain(attributes, name);
+    const retainVar = this._parseRetainVar(attributes, name);
 
     const outputState = {};
     for (const sym of Object.keys(inst.outputs || {})) {
@@ -478,12 +511,21 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     const fpFn = typeof plcFingerprintProgram === 'function' ? plcFingerprintProgram : null;
     const fingerprint = fpFn ? fpFn(inst) : '';
     if (retain === 1) {
-      const restored = plcRetainRestore(instanceId, name, fingerprint);
+      const restored = plcRetainRestore(instanceId, name, fingerprint, { fb: true });
       if (restored) {
-        Object.assign(timerState, restored.timerState);
-        Object.assign(counterState, restored.counterState);
+        Object.assign(timerState, restored.timerState || {});
+        Object.assign(counterState, restored.counterState || {});
       }
-    } else {
+    }
+    if (retainVar === 1) {
+      const restored = plcRetainRestore(instanceId, name, fingerprint, { var: true });
+      if (restored && restored.varState) {
+        for (const [k, v] of Object.entries(restored.varState)) {
+          if (varState[k] != null) varState[k] = v;
+        }
+      }
+    }
+    if (retain !== 1 && retainVar !== 1) {
       _plcRetainCacheFor(instanceId).delete(name);
     }
 
@@ -501,6 +543,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
         scanDuration,
         strict,
         retain,
+        retainVar,
       });
     }
 
@@ -519,6 +562,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       scanDuration,
       strict,
       retain,
+      retainVar,
       busy: false,
       skipped: false,
       missed: false,
@@ -555,6 +599,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     if (compInfo.scanDuration == null) compInfo.scanDuration = this._parseScanDuration(attributes, compInfo.scanTime || 0);
     if (compInfo.strict == null) compInfo.strict = this._parseStrict(attributes);
     if (compInfo.retain == null) compInfo.retain = this._parseRetain(attributes, compInfo.name || '.plc');
+    if (compInfo.retainVar == null) compInfo.retainVar = this._parseRetainVar(attributes, compInfo.name || '.plc');
     if (compInfo.busy == null) compInfo.busy = false;
     if (compInfo.skipped == null) compInfo.skipped = false;
     if (compInfo.missed == null) compInfo.missed = false;
@@ -567,6 +612,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     lines.push('');
     if (comp.programRef) lines.push(`program: ${comp.programRef}`);
     lines.push(`retain: ${comp.retain != null ? comp.retain : 0}`);
+    lines.push(`retainVar: ${comp.retainVar != null ? comp.retainVar : 0}`);
     const scanTime = comp.scanTime != null ? comp.scanTime : 0;
     lines.push(`scanTime: ${scanTime} ms (${scanTime > 0 ? 'auto-scan' : 'event-driven (external set/osc)'})`);
     if (scanTime > 0) {

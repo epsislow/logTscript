@@ -1,6 +1,6 @@
 ---
 name: Componenta PLC
-overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P5.2b, P+c, P+d, P+b done. Amânate: P3c, P5.2c, P6–P8."
+overview: "Plan inline [plc] + comp [plc]: didactic + IEC/ST. P4–P5.2c, P+c, P+d, P+b done. Amânate: P3c, P6–P8."
 todos:
   - id: p0-decisions
     content: "P0: decizii lățimi, mapare, on: vs comandă, sintaxă START — închise"
@@ -71,7 +71,9 @@ todos:
   - id: pb-analog
     content: "P+b: logică multi-bit — comparații, aritmetică, slider/senzori — implementat"
     status: completed
-    status: pending
+  - id: p5-2c-retain-var
+    content: "P5.2c: retainVar:0/1 pe comp [plc] — păstrare varState la re-RUN"
+    status: completed
 isProject: false
 ---
 
@@ -236,7 +238,7 @@ flowchart TB
 | **P-VAR4** | **Logică 1-bit** în P+c; declarare `name: N` permisă; **folosire N-bit în logică** → **P+b** | **închis** |
 | **P-VAR5** | La **primul scan**, fiecare `VAR` pornește la **`0` / FALSE** | **închis** |
 | **P-VAR6** | **Fără** init `name := val` în declarație `VAR` în P+c v1 | **închis** |
-| **P-VAR7** | **`retain: 1` NU include `varState`** — reset la re-RUN mereu (extensie viitoare **P5.2c**) | **închis** |
+| **P-VAR7** | **`retain: 1` NU include `varState`** — reset la re-RUN; **`retainVar: 1`** → **P5.2c** | **închis** |
 | **P-VAR8** | Schimbare program / fingerprint → **`varState` reset** (ca P-RET5) | **închis** |
 | **P-VAR9** | Nume **`VAR` unice** — conflict cu `inputs`/`outputs`/FB → eroare parse | **închis** |
 | **P-VAR10** | Convenție doc: lowercase în `VAR`, majuscule I/O — **nu** impusă în parser | **închis** |
@@ -492,7 +494,7 @@ MOTOR = START
 
 | ID viitor | Conținut | Unde |
 |-----------|----------|------|
-| **P5.2c** | `retain` extins sau atribut care păstrează și **`varState`** la re-RUN | `comp [plc]` opt-in |
+| **P5.2c** | **`retainVar: 0/1`** pe `comp [plc]` — păstrează **`varState`** la re-RUN | **done** |
 | **P+c.b** *(opțional)* | Init **`VAR name := val`** la declarare | limbaj, dacă cerință didactică |
 | **P+b** | `CASE` multi-bit, comparații analog, atribuiri N-bit | limbaj |
 | **P7** | **`VAR_GLOBAL`** / memorie între programe | P+c + P6 |
@@ -1566,9 +1568,11 @@ comp [plc] .ctrlB:
 
 **P5.3 (plasare IEC):** **închis** — CASE (P+c) + bucle (P+d, P-PLC3-6).
 
-**Încă deschise / amânate:** P3c, **P5.2c** (retain+VAR), **P6**, **P7**, **P8**.
+**P5.2c (`retainVar`):** **done** — P-RET-VAR0…P-RET-VAR5.
 
-**Următorul pas recomandat:** **P3c** sau **P5.2c** sau **P6** (la alegere).
+**Încă deschise / amânate:** P3c, **P6**, **P7**, **P8**.
+
+**Următorul pas recomandat:** **P3c** sau **P6** (la alegere).
 
 ---
 

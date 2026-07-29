@@ -21,7 +21,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Timers** | `TON` / `TOF` blocks; `PT` in scan cycles; read `name.Q` |
 | **Counters** | `CTU` / `CTD` blocks; `PV` preset; read `name.Q`; compare `name.CV >= N` |
 | **Widths** | `START` alone = 1 bit; `TEMP: 8` = 8-bit unsigned; overflow wraps to symbol width |
-| **Scan** | `.plc:{ set = 1 }` or **`scanTime > 0`** auto-scan; see [Scan timing (P4)](#scan-timing-p4) |
+| **Scan** | `.plc:{ set = 1 }` or **`scanTime > 0`** auto-scan; see [Scan timing](#scan-timing) |
 | **`busy`** | `0` when `scanTime: 0`; pulses during simulated scan when `scanTime > 0` |
 | **Outputs** | Retain last value if not assigned this scan (PLC semantics) |
 | **Inputs** | Read-only in program; mapped at `comp [plc]` elaboration |
@@ -100,10 +100,11 @@ comp [plc] .ctrl:
 | **`scanDuration:`** | optional | **ms** simulated execution time per scan (`busy = 1`); default **`1`** when `scanTime > 0` |
 | **`strict:`** | optional | **`0`** (default) stretch missed ticks; **`1`** = overrun/miss (`overrunCount++`) |
 | **`retain:`** | optional | **`0`** (default) reset timer/counter FB state on re-RUN; **`1`** preserve FB state in same session |
+| **`retainVar:`** | optional | **`0`** (default) reset **`VAR`** on re-RUN; **`1`** preserve `varState` in same session |
 
 \*Every program symbol must appear **exactly once** in the matching map. Missing or extra keys → **elaboration error**.
 
-`doc(comp.plc)` shows the component type; `doc(.ctrl)` shows program ref, **`retain`**, maps, `scanCount`, and last `outputState`.
+`doc(comp.plc)` shows the component type; `doc(.ctrl)` shows program ref, **`retain`**, **`retainVar`**, maps, `scanCount`, and last `outputState`.
 
 ### Scan cycle (one pass)
 
@@ -217,7 +218,7 @@ read inputs → executePlcScan → write outputs → scanCount++
 | **`strict: 0`** (default) | Timer tick during `busy` → scan **deferred** (stretch) |
 | **`strict: 1`** | Timer tick during `busy` → cycle **missed**; **`overrunCount++`**, **`missed = 1`** |
 
-Outputs keep their last written value while `busy` (P-D7).
+Outputs keep their last written value while `busy`.
 
 ### External clock (`scanTime: 0`)
 
@@ -271,6 +272,8 @@ Watch **`overrunCount`** with **`probe`** — pedagogic “PLC too slow for its 
 ---
 
 ## Runnable examples
+
+Every block below uses **`logts-play`**: **Load** opens the script in the editor; **Load & Run** executes it (same as [cpu.md](cpu.md)). Where noted, the expected result after **Load & Run** is deterministic from presets in the script.
 
 ### Example 1 — START / STOP / MOTOR (wires)
 
@@ -492,7 +495,7 @@ doc(.machine)
 doc(.ctrl)
 ```
 
-### Example 7 — `comp [dip]` as 1-bit input (test 2769)
+### Example 7 — `comp [dip]` as 1-bit input
 
 `length: 1` DIP preset `= 1`; motor LED on after scan.
 
@@ -524,7 +527,7 @@ show(.motorLed:get)
 show(.ctrl:scanCount)
 ```
 
-### Example 8 — `comp [reg]` as 1-bit output (test 2770)
+### Example 8 — `comp [reg]` as 1-bit output
 
 PLC writes register via scan (`setReg`); read with `:get`.
 
@@ -559,7 +562,7 @@ comp [plc] .ctrl:
 show(.cmd:get)
 ```
 
-### Example 9 — `comp [bar]` length 1 as output (test 2771)
+### Example 9 — `comp [bar]` length 1 as output
 
 Single-segment bar driven directly by PLC output map.
 
@@ -590,7 +593,7 @@ comp [plc] .ctrl:
 show(.start:get)
 ```
 
-### Example 10 — `comp [key]` mapping (test 2772)
+### Example 10 — `comp [key]` mapping
 
 Map syntax is identical to switch: `START = .start`. For **Load & Run**, this example uses a **switch** preset (deterministic). With `comp [key]`, load the script, **press the key** in the panel, then run `.ctrl:{ set = 1 }`.
 
@@ -620,7 +623,7 @@ comp [plc] .ctrl:
 show(.motorLed:get)
 ```
 
-### Example 11 — CLCD alarm via wire (test 2773)
+### Example 11 — CLCD alarm via wire
 
 PLC sets `alarmCmd`; CLCD panel updates outside PLC. **`on: 1`** on both PLC and CLCD for deterministic Load & Run.
 
@@ -660,7 +663,7 @@ show(alarmCmd)
 show(.panel:get)
 ```
 
-### Example 12 — DIP off → motor off (test 2774)
+### Example 12 — DIP off → motor off
 
 Same as example 7 with `= 0` on DIP; LED stays off.
 
@@ -691,7 +694,7 @@ comp [plc] .ctrl:
 show(.motorLed:get)
 ```
 
-### Example 13 — External clock wire pulse (test 2775)
+### Example 13 — External clock wire pulse
 
 `scanTime: 0` — scan when external wire drives `set`. Load & Run: one scan; second `set` via script step adds another (here shown as two triggers in one Run).
 
@@ -725,7 +728,7 @@ show(.ctrl:busy)
 
 Load & Run: `scanCount` is **`2`**, `busy` is **`0`**, `cntOut` is **`1`**.
 
-### Example 14 — Manual scan with `scanTime > 0` (test 2780)
+### Example 14 — Manual scan with `scanTime > 0`
 
 Auto timer is armed but first scan is manual; `busy` clears before `show`.
 
@@ -791,7 +794,7 @@ show(.ctrl:scanCount)
 
 After Load & Run, wait ~2 s per osc cycle; `scanCount` increases on each rising edge.
 
-### Example 16 — Event-driven `busy` stays 0 (test 2779)
+### Example 16 — Event-driven `busy` stays 0
 
 ```logts-play
 inline [plc] .machine:
@@ -827,6 +830,8 @@ show(.ctrl:busy)
 ## Timers TON / TOF
 
 Language specification: [plc-language.md — TON / TOF](plc-language.md#timers--ton--tof). Below are integration examples with `comp [plc]` and `logts-play`.
+
+### Example 17 — TON on-delay
 
 **START** held on (`comp [switch] = 1`). Three scans (`PT := 3`) before **MOTOR** and **READY** turn on. Load & Run runs three `.ctrl:{ set = 1 }` in one script.
 
@@ -871,7 +876,7 @@ show(.ctrl:scanCount)
 
 After Load & Run: **`scanCount` = 3**, both LEDs **`1`**.
 
-### Example 18 — TOF off-delay (test 2795 / 2797)
+### Example 18 — TOF off-delay
 
 **RUN** starts on; first scan latches motor on. Script turns **RUN** off, then two more scans (`PT := 2`) before motor releases.
 
@@ -949,7 +954,7 @@ Use **probe** and wait in the browser; motor turns on after ~3 auto-scans.
 
 ## Counters CTU / CTD
 
-### Example 20 — CTU count-up (test 2811)
+### Example 20 — CTU count-up
 
 **SENSOR** pulsed 5 times; `PV := 5`; **FULL** LED activates when `CV >= 5`.
 
@@ -1006,7 +1011,7 @@ show(.ctrl:scanCount)
 
 After Load & Run: **`scanCount` = 10**, **FULL LED `1`** (5 complete rising edges counted).
 
-### Example 21 — CTD count-down (test 2812)
+### Example 21 — CTD count-down
 
 `PV := 3`; the script sends one load pulse first, then three rising edges on `TICK`.
 
@@ -1147,6 +1152,19 @@ comp [plc] .ctrl:
 
 After two Runs (second adds one pulse): CV is **`3`** (2 preserved + 1 new). Changing timer/counter names or types in the program invalidates retained state.
 
+### `retainVar:` — preserve `VAR` on re-RUN
+
+| `retainVar` | On re-RUN (same browser session) |
+|-------------|----------------------------------|
+| **`0`** (default) | Every `VAR` resets to **`0`** |
+| **`1`** | `varState` is restored if the program fingerprint still matches |
+
+**Independent from `retain:`** — you can keep FB state without VAR (`retain: 1`, `retainVar: 0`), or VAR without FB (`retain: 0`, `retainVar: 1`), or both (`retain: 1`, `retainVar: 1`).
+
+**Not retained** (even with `retainVar: 1`): mapped **outputs**, `scanCount`, `busy`, inputs from the panel. **Not saved to disk** — reload page or new session clears the cache.
+
+**Invalidation:** same rules as `retain:` — program change (including `VAR` list), new session, or setting `retainVar: 0`.
+
 ### Example 24 — `VAR` latch (set-reset)
 
 Internal `latch` remembers START until STOP. Second scan with START = 0 still keeps MOTOR on.
@@ -1190,7 +1208,51 @@ show(.motorLed:get)
 
 After Load & Run: LED is **`1`** (latched).
 
-### Example 25 — `CASE` mode select
+### Example 25 — `retainVar: 1` (VAR latch survives re-RUN)
+
+Same latch program as Example 24, but `retainVar: 1` keeps internal `latch` after **Run** again without pressing START.
+
+```logts-play
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  VAR
+    latch: 1
+  END_VAR
+  IF START AND NOT latch THEN latch = 1 END_IF
+  IF STOP THEN latch = 0 END_IF
+  MOTOR = latch
+  :
+
+comp [switch] .start:
+  = 1
+  :
+
+comp [switch] .stop:
+  = 0
+  :
+
+comp [led] .motorLed:
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  retainVar: 1
+  inputs: { START = .start, STOP = .stop }
+  outputs: { MOTOR = .motorLed }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+.start = 0
+.ctrl:{ set = 1 }
+
+show(.motorLed:get)
+```
+
+After Load & Run: LED **`1`**. Press **Run** again (without toggling START): LED stays **`1`** because `latch` was restored. With `retainVar: 0`, a second Run would show **`0`**.
+
+### Example 26 — `CASE` mode select
 
 ```logts-play
 inline [plc] .machine:
@@ -1234,7 +1296,7 @@ show(.bLed:get)
 
 With `SEL = 1`: **OUT_A = 0**, **OUT_B = 1**.
 
-### Example 26 — `RETURN` early exit
+### Example 27 — `RETURN` early exit
 
 When ENABLE = 0, `RETURN` skips the assign that would turn MOTOR on.
 
@@ -1270,7 +1332,7 @@ show(.motorLed:get)
 
 After Load & Run: LED is **`0`**.
 
-### Example 27 — `FOR` in one scan
+### Example 28 — `FOR` in one scan
 
 ```logts-play
 inline [plc] .machine:
@@ -1308,7 +1370,7 @@ show(.hitLed:get)
 
 After Load & Run: LED is **`1`** (loop reached `i = 1` in the same scan).
 
-### Example 28 — `WHILE` + `EXIT`
+### Example 29 — `WHILE` + `EXIT`
 
 ```logts-play
 inline [plc] .machine:
@@ -1342,7 +1404,7 @@ show(.motorLed:get)
 
 `EXIT` leaves the loop after one pass — LED is **`1`**, scan does not hang.
 
-### Example 29 — `REPEAT` … `UNTIL`
+### Example 30 — `REPEAT` … `UNTIL`
 
 Body runs once even when `STOP` is already 1.
 
@@ -1378,7 +1440,7 @@ show(.motorLed:get)
 
 After Load & Run: LED is **`1`**.
 
-### Example 30 — slider thermostat (`TEMP > 50`)
+### Example 31 — slider thermostat (`TEMP > 50`)
 
 `comp [slider]` provides an 8-bit value on `:get` (0…255). When the value is above 50, `HEATER` turns on.
 
@@ -1412,7 +1474,7 @@ comp [plc] .ctrl:
 
 After **Load & Run** with slider at 0: LED is **`0`**. Drag the slider above halfway (~>50) and trigger another scan — LED becomes **`1`**.
 
-### Example 31 — scale input to `comp [bar]`
+### Example 32 — scale input to `comp [bar]`
 
 Copy and scale a multi-bit input to an 8-segment bar display.
 
@@ -1425,6 +1487,7 @@ inline [plc] .machine:
 
 comp [slider] .tempSlider:
   length: 8
+  on: 1
   :
 
 comp [bar] .levelBar:
@@ -1438,18 +1501,23 @@ comp [plc] .ctrl:
   on: 1
   :
 
+.tempSlider:{ data = 01010000 set = 1 }
 .ctrl:{ set = 1 }
+
+show(.levelBar:get)
 ```
 
-With `TEMP = 80` (binary `01010000`): `LEVEL = (80 * 2) / 10 = 16` — bar shows 16 lit segments pattern on `:get`.
+After Load & Run: `TEMP = 80`, `LEVEL = (80 * 2) / 10 = **16**` (`00010000` on `:get`).
 
-### Example 32 — `CASE` on multi-bit mode
+### Example 33 — `CASE` on multi-bit mode
+
+Use symbol **`MSEL`** (not `MODE` — `MODE` is a LogTscript keyword in component maps).
 
 ```logts-play
 inline [plc] .machine:
-  inputs: { MODE: 8 }
+  inputs: { MSEL: 8 }
   outputs: { OUT_A, OUT_B }
-  CASE MODE OF
+  CASE MSEL OF
     0:
       OUT_A = 1
       OUT_B = 0
@@ -1464,6 +1532,7 @@ inline [plc] .machine:
 
 comp [slider] .modeSlider:
   length: 8
+  on: 1
   :
 
 comp [led] .aLed:
@@ -1474,18 +1543,19 @@ comp [led] .bLed:
 
 comp [plc] .ctrl:
   program: .machine
-  inputs: { MODE = .modeSlider }
+  inputs: { MSEL = .modeSlider }
   outputs: { OUT_A = .aLed, OUT_B = .bLed }
   on: 1
   :
 
+.modeSlider:{ data = 00110010 set = 1 }
 .ctrl:{ set = 1 }
 
 show(.aLed:get)
 show(.bLed:get)
 ```
 
-Set slider to value **50**: **OUT_A = 0**, **OUT_B = 1**.
+After Load & Run with `MSEL = 50`: **OUT_A = 0**, **OUT_B = 1**.
 
 ---
 
@@ -1516,7 +1586,6 @@ LogTScript PLC maps **program symbols** to **wires** or **existing panel compone
 | **Width** | 1 bit |
 | **UI** | Press key in panel → `:get` is `1` while held (typically `0` when released) |
 | **Load & Run** | Key is **not** preset — use `comp [switch]` with `= 1`, a wire preset, or press key after **Load** then trigger scan |
-| **Tests** | Test **2772** uses `session.setComp('.start', '1')` before scan |
 
 Program sees the same 1-bit value as a wire or switch.
 
@@ -1546,8 +1615,8 @@ Program sees the same 1-bit value as a wire or switch.
 | **Map** | `TEMP = .tempSlider` with matching `length` (e.g. `TEMP: 8` ↔ `length: 8`) |
 | **Value range** | `0` … `2^length − 1` as binary on `:get` |
 | **Logic** | `IF TEMP > 50`, `LEVEL = (TEMP * 2) / 10`, `CASE TEMP OF` |
-| **Preset** | Drag in panel after Load, or `session.setComp('.tempSlider', '01100100')` in tests |
-| **Example** | Example 30 — thermostat; Example 31 — bar scaling |
+| **Preset** | Drag in panel after Load, or `.tempSlider:{ data = 01100100 set = 1 }` with `on: 1` on the slider |
+| **Example** | Example 31 — thermostat; Example 32 — bar scaling |
 
 ### Wires
 
@@ -1629,6 +1698,11 @@ For multi-bit status codes, use script logic between PLC output wires and the pa
 | **`inputs:`** | yes* | Every program input symbol → wire or `.component` |
 | **`outputs:`** | yes* | Every program output symbol → wire or `.component` |
 | **`on:`** | optional | Property-block trigger for `.ctrl:{ set = 1 }` |
+| **`scanTime:`** | optional | **ms** — `0`/omitted = event-driven; **`N > 0`** = internal auto-scan |
+| **`scanDuration:`** | optional | **ms** simulated execution per scan (`busy`); default **`1`** when `scanTime > 0` |
+| **`strict:`** | optional | **`0`** stretch missed ticks; **`1`** = overrun/miss (`overrunCount++`) |
+| **`retain:`** | optional | **`0`** reset timer/counter FB on re-RUN; **`1`** preserve FB state in session |
+| **`retainVar:`** | optional | **`0`** reset `VAR` on re-RUN; **`1`** preserve `varState` in session |
 
 ### Pins
 
@@ -1677,11 +1751,6 @@ If the program does **not** assign an output in this scan, the **mapped target k
 
 ---
 
-## Runnable examples (verified in tests 2757–2783)
-
-Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch, and `doc`. Examples **7–11** cover the I/O matrix (P3).
-
-
 ## Errors (elaboration and parse)
 
 | Situation | When | Example message |
@@ -1689,6 +1758,7 @@ Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch,
 | Input declared, not mapped | elaboration | `plc .ctrl: input STOP declared in program but not mapped` |
 | Extra map key | elaboration | `mapping STOP is not declared in program inputs` |
 | Width mismatch | elaboration | `plc .ctrl: START width 1 does not match bus (8 bits)` |
+| Map symbol is LogTscript keyword | parse | `Expected symbol name in PLC map` (e.g. **`MODE`** in `inputs: { MODE = … }` — use another name like `MSEL`) |
 | Invalid `program:` | elaboration | `plc program .x must be inline [plc]` |
 | Assign to input | parse | `cannot assign to input START` |
 | Unknown symbol | parse | `unknown symbol ALARM` |

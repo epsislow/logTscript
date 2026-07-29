@@ -91,7 +91,7 @@ Same width rules as `inputs:`.
 
 ### `VAR` … `END_VAR`
 
-Internal memory (relay flags) — **not** mapped on `comp [plc]`. Values persist **between scans** on the same run; they **reset to `0`** on a new Load & Run.
+Internal memory (relay flags) — **not** mapped on `comp [plc]`. Values persist **between scans** on the same run; they **reset to `0`** on a new Load & Run unless **`retainVar: 1`** on `comp [plc]` (see [plc.md](plc.md)).
 
 ```logts
 VAR
@@ -105,7 +105,7 @@ END_VAR
 | Placement | After `inputs`/`outputs`, **before** the program body (and before `CONST`) |
 | Width | `name` or `name: N` (default **1**). Any width in comparisons and arithmetic |
 | Read / write | Readable and writable in the body like outputs |
-| First scan | Each VAR starts at **`0`** |
+| First scan | Each VAR starts at **`0`** (or restored from cache when `retainVar: 1`) |
 | Names | Must not conflict with inputs, outputs, CONST, timers, or counters |
 
 Typical use: set-reset latch without relying only on output retain.
@@ -444,7 +444,7 @@ TOF coolOff(IN := RUN, PT := 30)
 | Unknown `foo.Q` | parse error |
 | `timer.Q = 1` | parse error |
 
-**Not exposed in v1:** `ET` (elapsed time), explicit reset pin on timers.
+**Not available:** `ET` (elapsed time), explicit reset pin on timers.
 
 ### Runnable — minimal TON
 

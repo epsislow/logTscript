@@ -12675,6 +12675,7 @@ if (s.assignment) {
         if (result.counterState) compInfo.counterState = result.counterState;
         if (result.varState) compInfo.varState = result.varState;
         if (result.retain != null) compInfo.retain = result.retain;
+        if (result.retainVar != null) compInfo.retainVar = result.retainVar;
         if(!compInfo.ref && initialValue && !result.ref && typeof initialValue === 'string'){
           const storageIdx = this.storeValue(initialValue);
           compInfo.ref = `&${storageIdx}`;

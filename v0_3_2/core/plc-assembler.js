@@ -1471,6 +1471,7 @@ function formatPlcTypeDoc() {
     'RETURN: stop remaining statements in this scan',
     'Bind with comp [plc] program: .name and I/O map (see doc/plc.md and doc/plc-language.md)',
     'comp [plc] retain: 0/1 (default 0) — preserve timer/counter FB state on re-RUN in same session',
+    'comp [plc] retainVar: 0/1 (default 0) — preserve VAR state on re-RUN in same session',
   ];
 }
 
