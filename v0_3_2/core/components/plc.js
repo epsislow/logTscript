@@ -272,7 +272,8 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
     }
     if (!comp.outputState) comp.outputState = {};
     if (!comp.timerState) comp.timerState = {};
-    execFn(inst, externalInputs, comp.outputState, comp.timerState);
+    if (!comp.counterState) comp.counterState = {};
+    execFn(inst, externalInputs, comp.outputState, comp.timerState, comp.counterState);
     for (const [sym, target] of Object.entries(comp.outputMap || {})) {
       const w = inst.outputs[sym].width;
       plcWriteTarget(target, comp.outputState[sym], w, ctx);
@@ -399,6 +400,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       outputState[sym] = '0';
     }
     const timerState = {};
+    const counterState = {};
 
     if (typeof addPlc === 'function') {
       addPlc(baseId, {
@@ -407,6 +409,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
         outputMap: { ...outputMap },
         outputState,
         timerState,
+        counterState,
         scanCount: 0,
         scanTime,
         scanDuration,
@@ -422,6 +425,7 @@ var PlcComponent = class PlcComponent extends BuiltinComponent {
       outputMap,
       outputState,
       timerState,
+      counterState,
       scanCount: 0,
       scanTime,
       scanDuration,

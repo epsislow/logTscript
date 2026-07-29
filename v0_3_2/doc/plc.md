@@ -16,7 +16,8 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | **Language** | Full keyword/syntax reference → [plc-language.md](plc-language.md) |
 | **Program** | `inline [plc] .machine:` with `inputs:{ }`, `outputs:{ }`, logic body |
 | **Logic (v1)** | `IF/THEN/ELSE/ELSIF/END_IF`, `AND/OR/NOT/XOR`, `TRUE`/`FALSE`, `0`/`1` |
-| **Timers (P5)** | `TON` / `TOF` blocks; `PT` in scan cycles; read `name.Q` |
+| **Timers (P5.1)** | `TON` / `TOF` blocks; `PT` in scan cycles; read `name.Q` |
+| **Counters (P5.2)** | `CTU` / `CTD` blocks; `PV` preset; read `name.Q`; compare `name.CV >= N` |
 | **Widths** | `START` alone = 1 bit; `TEMP: 8` declarable (logic on multi-bit → future P+b) |
 | **Scan** | `.plc:{ set = 1 }` or **`scanTime > 0`** auto-scan; see [Scan timing (P4)](#scan-timing-p4) |
 | **`busy`** | `0` when `scanTime: 0`; pulses during simulated scan when `scanTime > 0` |
@@ -940,6 +941,114 @@ probe(.ctrl:scanCount)
 ```
 
 Use **probe** and wait in the browser; motor turns on after ~3 auto-scans.
+
+---
+
+## Timers and Counters (P5)
+
+### Example 20 — CTU count-up (test 2811)
+
+**SENSOR** pulsed 5 times; `PV := 5`; **FULL** LED activates when `CV >= 5`. Script sends 5 rising edges via sensor wire + manual scans.
+
+```logts-play
+inline [plc] .boxCounter:
+  inputs: { SENSOR, RESET }
+  outputs: { FULL }
+  CTU cnt(CU := SENSOR, R := RESET, PV := 5)
+  FULL = cnt.Q
+  :
+
+wire [1] .sensor:
+  :
+
+comp [led] .fullLed:
+  :
+
+comp [plc] .ctrl:
+  program: .boxCounter
+  inputs: { SENSOR = .sensor, RESET = 0 }
+  outputs: { FULL = .fullLed }
+  on: 1
+  :
+
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+
+show(.fullLed:get)
+show(.ctrl:scanCount)
+```
+
+After Load & Run: **`scanCount` = 10**, **FULL LED `1`** (5 complete rising edges counted).
+
+### Example 21 — CTD count-down (test 2812)
+
+`PV := 3`; `RELOAD` pin held at `0`; first scan `CV = 0` (`Q = 1` immediately). To start from PV, send a load pulse first.
+
+```logts-play
+inline [plc] .mission:
+  inputs: { TICK, RELOAD }
+  outputs: { DONE }
+  CTD cnt(CD := TICK, LD := RELOAD, PV := 3)
+  DONE = cnt.Q
+  :
+
+wire [1] .tick:
+  :
+wire [1] .reload:
+  :
+
+comp [led] .doneLed:
+  :
+
+comp [plc] .ctrl:
+  program: .mission
+  inputs: { TICK = .tick, RELOAD = .reload }
+  outputs: { DONE = .doneLed }
+  on: 1
+  :
+
+; load preset first
+.reload = 1
+.ctrl:{ set = 1 }
+.reload = 0
+
+; 3 rising edges to count down
+.tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
+.ctrl:{ set = 1 }
+.tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
+.ctrl:{ set = 1 }
+.tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
+.ctrl:{ set = 1 }
+
+show(.doneLed:get)
+show(.ctrl:scanCount)
+```
+
+After Load & Run: **`scanCount` = 7** (1 load + 6 scan pairs), **DONE LED `1`** (CV decremented to 0).
 
 ---
 

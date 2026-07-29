@@ -41,12 +41,15 @@ todos:
   - id: p5-1-ton-tof
     content: "P5.1: parser + IR + exec TON/TOF; teste comp-plc-lang; doc + logts-play"
     status: completed
+  - id: p5-1-lang-doc
+    content: "P5.1: doc/plc-language.md — referință completă limbaj inline [plc] (keyworduri, sintaxă, timere, erori)"
+    status: completed
   - id: p5-3-iec-placement
     content: "P5.3 (amânat): plasare completă IEC/ST — TON/TOF oriunde e permis un statement (CASE/FOR/WHILE cu P+c/P+d)"
     status: pending
   - id: p5-2-ctu-ctd
     content: "P5.2: CTU+CTD IEC/ST în inline [plc]; .Q și .CV; teste + doc logts-play"
-    status: pending
+    status: completed
   - id: p5-2b-retain
     content: "P5.2b (amânat): RETAIN stare timere/contoare la re-RUN"
     status: pending
@@ -937,7 +940,7 @@ END_IF
 
 | Fază | Conținut | Status |
 |------|----------|--------|
-| **P5.1** | **TON** + **TOF**; plasare top-level + `IF`; teste; doc `logts-play` | **done** |
+| **P5.1** | **TON** + **TOF**; plasare top-level + `IF`; teste; doc `logts-play`; **`plc-language.md`** (referință limbaj) | **done** |
 | **P5.2** | **CTU** + **CTD** (IEC/ST); `.Q` + `.CV`; comparații `CV` ↔ literal; teste; doc | **următor** |
 | **P5.2b** *(amânat)* | **RETAIN** — stare timere/contoare supraviețuiește re-RUN | planificat |
 | **P5.3** *(amânat)* | Plasare completă IEC/ST pentru toate FB-urile (`CASE` / `FOR` / `WHILE` cu **P+c** / **P+d**) | planificat |
@@ -1005,7 +1008,7 @@ Identic **P5.1** / **P-TMR9:** top-level și în ramuri `IF`. **P5.3** extinde l
 - **P4** (scan / `scanTime`) — recomandat pentru exemple didactice cu timp real
 - **Nu** necesită **P+c `VAR`** — timerele au stare proprie în IR (separată de `VAR` din P+c)
 
-**Fișiere:** `plc-assembler.js`, `plc.md`, `test_suite.js` (grup `comp-plc-lang` / `comp-plc`)
+**Fișiere:** `plc-assembler.js`, `plc.md`, `plc-language.md`, `test_suite.js` (grup `comp-plc-lang` / `comp-plc`)
 
 ### P+b — Analog (amânat)
 

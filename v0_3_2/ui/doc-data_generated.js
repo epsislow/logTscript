@@ -23843,9 +23843,9 @@ doc(.demo)
 
 ---
 
-## Counters — \`CTU\` / \`CTD\` (P5.2 — planned)
+## Counters — \`CTU\` / \`CTD\` (P5.2)
 
-> **Status:** specified in the implementation plan; not yet in the runtime. Documented here for a stable target syntax.
+Function-block style **statements**, similar to timers. Each instance has a **name** and persistent state per \`comp [plc]\`.
 
 ### \`CTU\` — count up
 
@@ -23853,13 +23853,36 @@ doc(.demo)
 CTU pieceCount(CU := SENSOR, R := RESET, PV := 10)
 \`\`\`
 
-| Parameter | Meaning |
-|-----------|---------|
-| **\`CU\`** | Count input — **rising edge** (0→1 between scans) increments \`CV\` |
-| **\`R\`** | Reset — when \`1\`, \`CV := 0\`, \`Q := 0\` (priority over \`CU\` same scan) |
-| **\`PV\`** | Preset (integer ≥ 1) |
-| **\`pieceCount.Q\`** | \`1\` when **\`CV >= PV\`** |
-| **\`pieceCount.CV\`** | Current count (integer, read-only) |
+| Parameter | Type | Meaning |
+|-----------|------|---------|
+| **\`CU\`** | 1-bit expr | Count input — **rising edge** (0→1) increments \`CV\` |
+| **\`R\`** | 1-bit expr | Reset — when \`1\`, \`CV := 0\`, \`Q := 0\` (**priority over \`CU\`** in same scan) |
+| **\`PV\`** | integer ≥ 1 | Preset value |
+| **\`pieceCount.Q\`** | 1-bit | \`1\` when **\`CV >= PV\`**; \`0\` otherwise |
+| **\`pieceCount.CV\`** | integer | Current count (read via \`.CV >= N\` comparisons) |
+
+**Behaviour (per scan, IEC-style)**
+
+1. If \`R = 1\` → \`CV := 0\`, \`Q := 0\` (reset wins, CU ignored)
+2. Else if **rising edge** on \`CU\` (was \`0\` in previous scan, now \`1\`) → \`CV += 1\`
+3. Holding \`CU = 1\` across multiple scans counts as **only one** edge
+4. \`Q = 1\` when \`CV >= PV\`; \`Q\` stays \`1\` even if \`CU\` goes low (until \`R = 1\`)
+
+**Reading counter values:**
+- \`pieceCount.Q\` — output bit, usable in \`IF\` and assign
+- \`pieceCount.CV >= N\` — comparison in \`IF\` condition (see [.CV comparisons](#comparisons-on-cv))
+
+**Example — count 5 sensor pulses then activate alarm:**
+
+\`\`\`logts
+CTU pieceCount(CU := SENSOR, R := RESET, PV := 5)
+FULL = pieceCount.Q
+IF pieceCount.CV >= 3 THEN
+  WARN = 1
+ELSE
+  WARN = 0
+END_IF
+\`\`\`
 
 ### \`CTD\` — count down
 
@@ -23867,25 +23890,159 @@ CTU pieceCount(CU := SENSOR, R := RESET, PV := 10)
 CTD stepsLeft(CD := TICK, LD := LOAD, PV := 5)
 \`\`\`
 
-| Parameter | Meaning |
-|-----------|---------|
-| **\`CD\`** | **Rising edge** decrements \`CV\` when \`CV > 0\` |
-| **\`LD\`** | Load — when \`1\`, \`CV := PV\` (priority over \`CD\` same scan) |
-| **\`PV\`** | Preset |
-| **\`stepsLeft.Q\`** | \`1\` when **\`CV <= 0\`** |
-| **\`stepsLeft.CV\`** | Current count |
+| Parameter | Type | Meaning |
+|-----------|------|---------|
+| **\`CD\`** | 1-bit expr | Count-down input — **rising edge** decrements \`CV\` when \`CV > 0\` |
+| **\`LD\`** | 1-bit expr | Load — when \`1\`, \`CV := PV\` (**priority over \`CD\`** in same scan) |
+| **\`PV\`** | integer ≥ 1 | Preset (loaded into \`CV\` on \`LD = 1\`) |
+| **\`stepsLeft.Q\`** | 1-bit | \`1\` when **\`CV <= 0\`**; \`0\` otherwise |
+| **\`stepsLeft.CV\`** | integer | Current count |
 
-### Comparisons on \`.CV\` (P5.2)
+**Behaviour (per scan, IEC-style)**
 
-Planned minimal extension for didactic use:
+1. If \`LD = 1\` → \`CV := PV\` (load wins, CD ignored)
+2. Else if **rising edge** on \`CD\` (0→1) and \`CV > 0\` → \`CV -= 1\`
+3. \`CV\` never goes below \`0\`
+4. \`Q = 1\` when \`CV <= 0\`
+
+**Example — countdown to zero, then signal done:**
 
 \`\`\`logts
-IF pieceCount.CV >= 5 THEN
+CTD stepsLeft(CD := TICK, LD := RELOAD, PV := 10)
+DONE = stepsLeft.Q
+IF stepsLeft.CV <= 3 THEN
   WARN = 1
 END_IF
 \`\`\`
 
-Comparisons **\`>=\` \`<=\` \`==\` \`>\` \`<\`** with an **integer literal** on \`.CV\` only — full analog comparisons remain **P+b**.
+### Comparisons on \`.CV\`
+
+Inside \`IF\` conditions, counter current values can be compared against integer literals:
+
+\`\`\`logts
+IF pieceCount.CV >= 5 THEN  WARN = 1  ELSE  WARN = 0  END_IF
+IF stepsLeft.CV <= 2 THEN   ALARM = 1  END_IF
+IF pieceCount.CV == 10 THEN FULL = 1  END_IF
+\`\`\`
+
+| Operator | Meaning |
+|----------|---------|
+| \`>=\` | CV greater or equal |
+| \`<=\` | CV less or equal |
+| \`>\` | CV strictly greater |
+| \`<\` | CV strictly less |
+| \`==\` | CV equal |
+
+Only **\`name.CV op number\`** is supported — literal on the right side. Full analog comparisons remain **P+b**.
+
+### Counter placement (P5.2)
+
+| Location | Allowed |
+|----------|---------|
+| Top-level in program body | ✓ |
+| Inside \`IF\` / \`THEN\` / \`ELSE\` / \`ELSIF\` | ✓ |
+| Inside \`CASE\` / \`FOR\` / \`WHILE\` | future **P5.3** |
+
+### Counter errors
+
+| Case | Result |
+|------|--------|
+| \`PV < 1\` | parse error |
+| Duplicate counter name | parse error |
+| Counter name = I/O symbol | parse error |
+| Counter name = timer name | parse error |
+| Unknown \`foo.Q\` | parse error |
+| \`.CV\` used without comparison | parse error |
+| \`counter.Q = 1\` | parse error |
+
+### Runnable — CTU count-up example
+
+\`\`\`logts-play
+inline [plc] .boxCounter:
+  inputs: { SENSOR, RESET }
+  outputs: { FULL, WARN }
+  CTU cnt(CU := SENSOR, R := RESET, PV := 5)
+  FULL = cnt.Q
+  IF cnt.CV >= 3 THEN WARN = 1 ELSE WARN = 0 END_IF
+  :
+
+wire [1] .sensor:
+  :
+wire [1] .reset:
+  :
+
+comp [led] .fullLed:
+  :
+comp [led] .warnLed:
+  :
+
+comp [plc] .ctrl:
+  program: .boxCounter
+  inputs: { SENSOR = .sensor, RESET = .reset }
+  outputs: { FULL = .fullLed, WARN = .warnLed }
+  on: 1
+  :
+
+; 3 rising edges — WARN on (cv>=3), FULL off (cv<5)
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+
+show(.warnLed:get)
+show(.fullLed:get)
+show(.ctrl:scanCount)
+\`\`\`
+
+### Runnable — CTD count-down example
+
+\`\`\`logts-play
+inline [plc] .mission:
+  inputs: { TICK, RELOAD }
+  outputs: { DONE }
+  CTD cnt(CD := TICK, LD := RELOAD, PV := 3)
+  DONE = cnt.Q
+  :
+
+wire [1] .tick:
+  :
+
+comp [led] .doneLed:
+  :
+
+comp [plc] .ctrl:
+  program: .mission
+  inputs: { TICK = .tick, RELOAD = 0 }
+  outputs: { DONE = .doneLed }
+  on: 1
+  :
+
+; load preset, then 3 steps → DONE on
+.ctrl:{ set = 1 }
+.tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
+.ctrl:{ set = 1 }
+.tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
+.ctrl:{ set = 1 }
+.tick = 1
+.ctrl:{ set = 1 }
+
+show(.doneLed:get)
+show(.ctrl:scanCount)
+\`\`\`
+
+**Note:** CTD starts with \`CV = 0\` (not loaded). To start from \`PV\`, send \`RELOAD = 1\` for one scan first — or connect \`RELOAD\` to a momentary key.
 
 ---
 
@@ -23893,8 +24050,8 @@ Comparisons **\`>=\` \`<=\` \`==\` \`>\` \`<\`** with an **integer literal** on 
 
 | Form | Type | Use |
 |------|------|-----|
-| **\`name.Q\`** | 1-bit | \`IF\`, \`AND\`, assigns to outputs |
-| **\`name.CV\`** | integer | comparisons with literals (P5.2) |
+| **\`name.Q\`** | 1-bit | \`IF\`, \`AND\`, assigns to outputs — timers & counters |
+| **\`name.CV\`** | integer | comparisons with literals (\`name.CV >= N\`) — counters only |
 
 Instance **\`name\`** must match a \`TON\`/\`TOF\`/\`CTU\`/\`CTD\` declaration in the same program.
 
@@ -23913,7 +24070,7 @@ Instance **\`name\`** must match a \`TON\`/\`TOF\`/\`CTU\`/\`CTD\` declaration i
 
 ## Keyword reference
 
-### Implemented (P1 + P5.1)
+### Implemented (P1 + P5.1 + P5.2)
 
 | Keyword | Category | Summary |
 |---------|----------|---------|
@@ -23930,20 +24087,24 @@ Instance **\`name\`** must match a \`TON\`/\`TOF\`/\`CTU\`/\`CTD\` declaration i
 | **\`TON\`** | Timer FB | On-delay; \`IN\`, \`PT\` |
 | **\`TOF\`** | Timer FB | Off-delay; \`IN\`, \`PT\` |
 | **\`IN\` \`PT\`** | Timer arg | Only inside \`TON\`/\`TOF\` argument lists |
+| **\`CTU\`** | Counter FB | Count-up; \`CU\`, \`R\`, \`PV\` |
+| **\`CTD\`** | Counter FB | Count-down; \`CD\`, \`LD\`, \`PV\` |
+| **\`CU\` \`CD\`** | Counter arg | Pulse input (inside \`CTU\`/\`CTD\`) |
+| **\`PV\`** | Counter arg | Preset value |
+| **\`R\`** | Counter arg | Reset (inside \`CTU\`) |
+| **\`LD\`** | Counter arg | Load preset (inside \`CTD\`) |
+| **\`>=\` \`<=\` \`>\` \`<\` \`==\`** | Comparison | \`.CV\` comparisons only |
 
 ### Future keywords (planned)
 
 | Keyword | Phase | Summary |
 |---------|-------|---------|
-| **\`CTU\` \`CTD\`** | P5.2 | Up/down counters |
-| **\`CU\` \`R\` \`CD\` \`LD\` \`PV\`** | P5.2 | Counter arguments |
 | **\`VAR\` \`END_VAR\`** | P+c | Internal memory |
 | **\`CONST\` \`END_CONST\`** | P+c | Constants |
 | **\`CASE\` \`OF\` \`END_CASE\`** | P+c | Selection |
 | **\`RETURN\`** | P+c | Early exit from body |
 | **\`FOR\` \`TO\` \`BY\` \`DO\` \`END_FOR\`** | P+d | Counted loop |
 | **\`WHILE\` \`END_WHILE\`** | P+d | Conditional loop |
-| **\`>\` \`<\` \`>=\` \`<=\` \`==\`** | P+b / P5.2 | General comparisons |
 
 ---
 
@@ -23955,9 +24116,16 @@ Instance **\`name\`** must match a \`TON\`/\`TOF\`/\`CTU\`/\`CTD\` declaration i
 | \`unknown symbol ALARM\` | Name not in \`inputs\`/\`outputs\` |
 | \`IF requires 1-bit symbol, got TEMP (8 bits)\` | Multi-bit symbol in boolean expr |
 | \`duplicate timer 't'\` | Two timers same name |
+| \`duplicate counter 'c'\` | Two counters same name |
 | \`timer name 'MOTOR' conflicts with I/O\` | Timer name collides with symbol |
-| \`PT must be >= 1\` | Invalid preset |
-| \`timer field must be Q\` | Used \`.ET\` or unknown field |
+| \`counter name 'MOTOR' conflicts with I/O\` | Counter name collides with symbol |
+| \`PT must be >= 1\` | Invalid timer preset |
+| \`PV must be >= 1\` | Invalid counter preset |
+| \`CTU requires CU\` | Missing CU argument |
+| \`CTD requires CD\` | Missing CD argument |
+| \`CTU requires R\` | Missing R argument |
+| \`CTD requires LD\` | Missing LD argument |
+| \`.CV cannot be used directly as 1-bit\` | Used \`name.CV\` alone in bool expr |
 
 Mapping errors (\`not mapped\`, width mismatch) happen at **\`comp [plc]\`** elaboration — [plc.md — Errors](plc.md#errors).
 
@@ -24018,7 +24186,8 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | **Language** | Full keyword/syntax reference → [plc-language.md](plc-language.md) |
 | **Program** | \`inline [plc] .machine:\` with \`inputs:{ }\`, \`outputs:{ }\`, logic body |
 | **Logic (v1)** | \`IF/THEN/ELSE/ELSIF/END_IF\`, \`AND/OR/NOT/XOR\`, \`TRUE\`/\`FALSE\`, \`0\`/\`1\` |
-| **Timers (P5)** | \`TON\` / \`TOF\` blocks; \`PT\` in scan cycles; read \`name.Q\` |
+| **Timers (P5.1)** | \`TON\` / \`TOF\` blocks; \`PT\` in scan cycles; read \`name.Q\` |
+| **Counters (P5.2)** | \`CTU\` / \`CTD\` blocks; \`PV\` preset; read \`name.Q\`; compare \`name.CV >= N\` |
 | **Widths** | \`START\` alone = 1 bit; \`TEMP: 8\` declarable (logic on multi-bit → future P+b) |
 | **Scan** | \`.plc:{ set = 1 }\` or **\`scanTime > 0\`** auto-scan; see [Scan timing (P4)](#scan-timing-p4) |
 | **\`busy\`** | \`0\` when \`scanTime: 0\`; pulses during simulated scan when \`scanTime > 0\` |
@@ -24942,6 +25111,114 @@ probe(.ctrl:scanCount)
 \`\`\`
 
 Use **probe** and wait in the browser; motor turns on after ~3 auto-scans.
+
+---
+
+## Timers and Counters (P5)
+
+### Example 20 — CTU count-up (test 2811)
+
+**SENSOR** pulsed 5 times; \`PV := 5\`; **FULL** LED activates when \`CV >= 5\`. Script sends 5 rising edges via sensor wire + manual scans.
+
+\`\`\`logts-play
+inline [plc] .boxCounter:
+  inputs: { SENSOR, RESET }
+  outputs: { FULL }
+  CTU cnt(CU := SENSOR, R := RESET, PV := 5)
+  FULL = cnt.Q
+  :
+
+wire [1] .sensor:
+  :
+
+comp [led] .fullLed:
+  :
+
+comp [plc] .ctrl:
+  program: .boxCounter
+  inputs: { SENSOR = .sensor, RESET = 0 }
+  outputs: { FULL = .fullLed }
+  on: 1
+  :
+
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+
+show(.fullLed:get)
+show(.ctrl:scanCount)
+\`\`\`
+
+After Load & Run: **\`scanCount\` = 10**, **FULL LED \`1\`** (5 complete rising edges counted).
+
+### Example 21 — CTD count-down (test 2812)
+
+\`PV := 3\`; \`RELOAD\` pin held at \`0\`; first scan \`CV = 0\` (\`Q = 1\` immediately). To start from PV, send a load pulse first.
+
+\`\`\`logts-play
+inline [plc] .mission:
+  inputs: { TICK, RELOAD }
+  outputs: { DONE }
+  CTD cnt(CD := TICK, LD := RELOAD, PV := 3)
+  DONE = cnt.Q
+  :
+
+wire [1] .tick:
+  :
+wire [1] .reload:
+  :
+
+comp [led] .doneLed:
+  :
+
+comp [plc] .ctrl:
+  program: .mission
+  inputs: { TICK = .tick, RELOAD = .reload }
+  outputs: { DONE = .doneLed }
+  on: 1
+  :
+
+; load preset first
+.reload = 1
+.ctrl:{ set = 1 }
+.reload = 0
+
+; 3 rising edges to count down
+.tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
+.ctrl:{ set = 1 }
+.tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
+.ctrl:{ set = 1 }
+.tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
+.ctrl:{ set = 1 }
+
+show(.doneLed:get)
+show(.ctrl:scanCount)
+\`\`\`
+
+After Load & Run: **\`scanCount\` = 7** (1 load + 6 scan pairs), **DONE LED \`1\`** (CV decremented to 0).
 
 ---
 

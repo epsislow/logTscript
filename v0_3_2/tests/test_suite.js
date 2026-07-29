@@ -29346,6 +29346,125 @@ function plcExecScans(inst, inputs, outputState, timerState, count) {
   return { out, timerState: ts };
 }
 
+function plcExecScansCS(inst, inputs, outputState, timerState, counterState, count) {
+  const ts = timerState || {};
+  const cs = counterState || {};
+  const out = outputState || {};
+  for (let i = 0; i < count; i++) executePlcScan(inst, inputs, out, ts, cs);
+  return { out, timerState: ts, counterState: cs };
+}
+
+const PLC_CTU_PROG = `
+inline [plc] .counter:
+  inputs: { PULSE, RESET }
+  outputs: { FULL, ALARM }
+  CTU cnt(CU := PULSE, R := RESET, PV := 3)
+  FULL = cnt.Q
+  IF cnt.CV >= 2 THEN ALARM = 1 ELSE ALARM = 0 END_IF
+  :
+`;
+
+const PLC_CTD_PROG = `
+inline [plc] .countdown:
+  inputs: { STEP, LOAD }
+  outputs: { DONE }
+  CTD cnt(CD := STEP, LD := LOAD, PV := 3)
+  DONE = cnt.Q
+  :
+`;
+
+const PLC_DOC_CTU_EX20 = `
+inline [plc] .boxCounter:
+  inputs: { SENSOR, RESET }
+  outputs: { FULL }
+  CTU cnt(CU := SENSOR, R := RESET, PV := 5)
+  FULL = cnt.Q
+  :
+
+comp [switch] .sensor:
+  = 0
+  :
+
+comp [switch] .reset:
+  = 0
+  :
+
+comp [led] .fullLed:
+  :
+
+comp [plc] .ctrl:
+  program: .boxCounter
+  inputs: { SENSOR = .sensor, RESET = .reset }
+  outputs: { FULL = .fullLed }
+  on: 1
+  :
+
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+.sensor = 1
+.ctrl:{ set = 1 }
+.sensor = 0
+.ctrl:{ set = 1 }
+
+show(.fullLed:get)
+show(.ctrl:scanCount)
+`;
+
+const PLC_DOC_CTD_EX21 = `
+inline [plc] .step3:
+  inputs: { TICK, RELOAD }
+  outputs: { DONE }
+  CTD cnt(CD := TICK, LD := RELOAD, PV := 3)
+  DONE = cnt.Q
+  :
+
+comp [switch] .tick:
+  = 0
+  :
+
+comp [switch] .reload:
+  = 0
+  :
+
+comp [led] .doneLed:
+  :
+
+comp [plc] .ctrl:
+  program: .step3
+  inputs: { TICK = .tick, RELOAD = .reload }
+  outputs: { DONE = .doneLed }
+  on: 1
+  :
+
+.tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
+.ctrl:{ set = 1 }
+.tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
+.ctrl:{ set = 1 }
+.tick = 1
+.ctrl:{ set = 1 }
+
+show(.doneLed:get)
+show(.ctrl:scanCount)
+`;
+
 reg(2785, 'comp-plc-lang', 'P5.1 parse TON TOF and timer.Q', function(h, session) {
   const full = parsePlcBody(`inputs: { START }
 outputs: { MOTOR }
@@ -29486,6 +29605,181 @@ reg(2796, 'comp-plc-lang', 'doc example 17 — TON logts-play', function(h, sess
 reg(2797, 'comp-plc-lang', 'doc example 18 — TOF logts-play', function(h, session) {
   const { interp } = session.run(PLC_DOC_TOF_EX18);
   h.assert('ex18 motor off', interp.getValueFromRef(interp.components.get('.motorLed').ref), '0');
+});
+
+/* ---- P5.2 CTU/CTD tests ---- */
+
+reg(2798, 'comp-plc-lang', 'P5.2 parse CTU', function(h, session) {
+  const prog = parsePlcBody(`inputs: { PULSE, RESET }
+outputs: { FULL }
+CTU cnt(CU := PULSE, R := RESET, PV := 5)
+FULL = cnt.Q`);
+  h.assert('has ctu', String(prog.statements.some(s => s.type === 'ctu')), 'true');
+  h.assert('ctu name', prog.statements[0].name, 'cnt');
+  h.assert('ctu pv', String(prog.statements[0].pv), '5');
+});
+
+reg(2799, 'comp-plc-lang', 'P5.2 parse CTD', function(h, session) {
+  const prog = parsePlcBody(`inputs: { TICK, RELOAD }
+outputs: { DONE }
+CTD cnt(CD := TICK, LD := RELOAD, PV := 3)
+DONE = cnt.Q`);
+  h.assert('has ctd', String(prog.statements.some(s => s.type === 'ctd')), 'true');
+  h.assert('ctd pv', String(prog.statements[0].pv), '3');
+});
+
+reg(2800, 'comp-plc-lang', 'P5.2 CTU — counts rising edges, Q when CV>=PV', function(h, session) {
+  session.run(PLC_CTU_PROG);
+  const inst = session.interp.inlineInstances.get('.counter');
+  const ts = {}, cs = {}, out = {};
+  // pulse 1
+  executePlcScan(inst, { PULSE: '1', RESET: '0' }, out, ts, cs);
+  h.assert('cv1 full off', out.FULL, '0');
+  executePlcScan(inst, { PULSE: '0', RESET: '0' }, out, ts, cs);
+  // pulse 2
+  executePlcScan(inst, { PULSE: '1', RESET: '0' }, out, ts, cs);
+  executePlcScan(inst, { PULSE: '0', RESET: '0' }, out, ts, cs);
+  // pulse 3
+  executePlcScan(inst, { PULSE: '1', RESET: '0' }, out, ts, cs);
+  h.assert('cv3 full on', out.FULL, '1');
+});
+
+reg(2801, 'comp-plc-lang', 'P5.2 CTU — rising edge only, same pulse held no extra count', function(h, session) {
+  session.run(PLC_CTU_PROG);
+  const inst = session.interp.inlineInstances.get('.counter');
+  const ts = {}, cs = {}, out = {};
+  // hold PULSE = 1 for 5 scans — should count only 1
+  for (let i = 0; i < 5; i++) executePlcScan(inst, { PULSE: '1', RESET: '0' }, out, ts, cs);
+  h.assert('held pulse still off', out.FULL, '0');
+  h.assert('cv 1 not 5', String(cs.cnt.cv), '1');
+});
+
+reg(2802, 'comp-plc-lang', 'P5.2 CTU — R resets CV and Q', function(h, session) {
+  session.run(PLC_CTU_PROG);
+  const inst = session.interp.inlineInstances.get('.counter');
+  const ts = {}, cs = {}, out = {};
+  // 3 rising edges → Q=1
+  for (let i = 0; i < 3; i++) {
+    executePlcScan(inst, { PULSE: '1', RESET: '0' }, out, ts, cs);
+    executePlcScan(inst, { PULSE: '0', RESET: '0' }, out, ts, cs);
+  }
+  h.assert('before reset Q on', out.FULL, '1');
+  executePlcScan(inst, { PULSE: '0', RESET: '1' }, out, ts, cs);
+  h.assert('after reset Q off', out.FULL, '0');
+  h.assert('after reset cv 0', String(cs.cnt.cv), '0');
+});
+
+reg(2803, 'comp-plc-lang', 'P5.2 CTU — R priority over CU', function(h, session) {
+  session.run(PLC_CTU_PROG);
+  const inst = session.interp.inlineInstances.get('.counter');
+  const ts = {}, cs = {}, out = {};
+  executePlcScan(inst, { PULSE: '1', RESET: '0' }, out, ts, cs);
+  executePlcScan(inst, { PULSE: '0', RESET: '0' }, out, ts, cs);
+  // both R=1 and CU rising — R wins
+  executePlcScan(inst, { PULSE: '1', RESET: '1' }, out, ts, cs);
+  h.assert('R wins cv 0', String(cs.cnt.cv), '0');
+});
+
+reg(2804, 'comp-plc-lang', 'P5.2 CTU — CV comparison alarm', function(h, session) {
+  session.run(PLC_CTU_PROG);
+  const inst = session.interp.inlineInstances.get('.counter');
+  const ts = {}, cs = {}, out = {};
+  // 1 pulse: cv=1, ALARM off (need cv>=2)
+  executePlcScan(inst, { PULSE: '1', RESET: '0' }, out, ts, cs);
+  executePlcScan(inst, { PULSE: '0', RESET: '0' }, out, ts, cs);
+  h.assert('cv1 alarm off', out.ALARM, '0');
+  // 2nd pulse: cv=2
+  executePlcScan(inst, { PULSE: '1', RESET: '0' }, out, ts, cs);
+  h.assert('cv2 alarm on', out.ALARM, '1');
+});
+
+reg(2805, 'comp-plc-lang', 'P5.2 CTD — LD loads PV, CD decrements', function(h, session) {
+  session.run(PLC_CTD_PROG);
+  const inst = session.interp.inlineInstances.get('.countdown');
+  const ts = {}, cs = {}, out = {};
+  // load
+  executePlcScan(inst, { STEP: '0', LOAD: '1' }, out, ts, cs);
+  h.assert('loaded cv=3', String(cs.cnt.cv), '3');
+  h.assert('done off', out.DONE, '0');
+  // step 1
+  executePlcScan(inst, { STEP: '1', LOAD: '0' }, out, ts, cs);
+  executePlcScan(inst, { STEP: '0', LOAD: '0' }, out, ts, cs);
+  h.assert('cv2', String(cs.cnt.cv), '2');
+  // step 2
+  executePlcScan(inst, { STEP: '1', LOAD: '0' }, out, ts, cs);
+  executePlcScan(inst, { STEP: '0', LOAD: '0' }, out, ts, cs);
+  // step 3
+  executePlcScan(inst, { STEP: '1', LOAD: '0' }, out, ts, cs);
+  h.assert('cv0 done on', out.DONE, '1');
+});
+
+reg(2806, 'comp-plc-lang', 'P5.2 CTD — LD priority over CD', function(h, session) {
+  session.run(PLC_CTD_PROG);
+  const inst = session.interp.inlineInstances.get('.countdown');
+  const ts = {}, cs = {}, out = {};
+  executePlcScan(inst, { STEP: '0', LOAD: '1' }, out, ts, cs);
+  // decrement to 2
+  executePlcScan(inst, { STEP: '1', LOAD: '0' }, out, ts, cs);
+  executePlcScan(inst, { STEP: '0', LOAD: '0' }, out, ts, cs);
+  h.assert('cv2', String(cs.cnt.cv), '2');
+  // LD=1 and CD rising — LD wins
+  executePlcScan(inst, { STEP: '1', LOAD: '1' }, out, ts, cs);
+  h.assert('LD wins cv=3', String(cs.cnt.cv), '3');
+});
+
+reg(2807, 'comp-plc-lang', 'P5.2 CTD — does not decrement below 0', function(h, session) {
+  session.run(PLC_CTD_PROG);
+  const inst = session.interp.inlineInstances.get('.countdown');
+  const ts = {}, cs = {}, out = {};
+  executePlcScan(inst, { STEP: '0', LOAD: '1' }, out, ts, cs);
+  // 5 pulses but PV=3
+  for (let i = 0; i < 5; i++) {
+    executePlcScan(inst, { STEP: '1', LOAD: '0' }, out, ts, cs);
+    executePlcScan(inst, { STEP: '0', LOAD: '0' }, out, ts, cs);
+  }
+  h.assert('cv never below 0', String(cs.cnt.cv), '0');
+  h.assert('done on', out.DONE, '1');
+});
+
+reg(2808, 'comp-plc-lang', 'P5.2 error — PV < 1 for CTU', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { P, R } outputs: { Q } CTU c(CU := P, R := R, PV := 0) Q = c.Q`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('pv error', String(err.includes('PV must be')), 'true');
+});
+
+reg(2809, 'comp-plc-lang', 'P5.2 error — duplicate counter name', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { P, R } outputs: { Q }
+CTU c(CU := P, R := R, PV := 1)
+CTU c(CU := P, R := R, PV := 2)
+Q = c.Q`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('dup', String(err.includes("duplicate counter 'c'")), 'true');
+});
+
+reg(2810, 'comp-plc-lang', 'P5.2 error — counter name conflicts with I/O', function(h, session) {
+  let err = '';
+  try {
+    parsePlcBody(`inputs: { P } outputs: { Q }
+CTU Q(CU := P, R := FALSE, PV := 1)
+Q = Q.Q`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('conflict', String(err.includes('conflicts')), 'true');
+});
+
+reg(2811, 'comp-plc', 'P5.2 CTU panel — 5 pulses fill box counter', function(h, session) {
+  const { interp } = session.run(PLC_DOC_CTU_EX20);
+  h.assert('full on', interp.getValueFromRef(interp.components.get('.fullLed').ref), '1');
+  h.assert('scanCount 10', String(interp.components.get('.ctrl').scanCount), '10');
+});
+
+reg(2812, 'comp-plc', 'P5.2 CTD panel — 3 steps count down', function(h, session) {
+  const { interp } = session.run(PLC_DOC_CTD_EX21);
+  h.assert('done on', interp.getValueFromRef(interp.components.get('.doneLed').ref), '1');
+  h.assert('scanCount 5', String(interp.components.get('.ctrl').scanCount), '5');
 });
 
   window.LogTScriptTestSuite.finalize();

@@ -6,7 +6,10 @@ const PLC_KEYWORDS = new Set([
   'TRUE', 'FALSE',
   'INPUTS', 'OUTPUTS',
   'TON', 'TOF',
+  'CTU', 'CTD',
   'IN', 'PT',
+  'CU', 'CD', 'PV',
+  // R and LD are recognized contextually in parseCounterCall, not as global keywords
 ]);
 
 function plcError(msg, line) {
@@ -43,6 +46,18 @@ function plcTokenize(src) {
     }
     if (ch === ':' && src[i + 1] === '=') {
       tokens.push({ type: 'SYM', value: ':=', line });
+      i += 2;
+      continue;
+    }
+    if (ch === '<' || ch === '>') {
+      let op = ch;
+      if (src[i + 1] === '=') { op += '='; i++; }
+      tokens.push({ type: 'CMP', value: op, line });
+      i++;
+      continue;
+    }
+    if (ch === '=' && src[i + 1] === '=') {
+      tokens.push({ type: 'CMP', value: '==', line });
       i += 2;
       continue;
     }
@@ -165,7 +180,7 @@ class PlcParser {
 
   isStatementStart() {
     const t = this.peek();
-    if (t.type === 'KW' && (t.value === 'IF' || t.value === 'TON' || t.value === 'TOF')) return true;
+    if (t.type === 'KW' && (t.value === 'IF' || t.value === 'TON' || t.value === 'TOF' || t.value === 'CTU' || t.value === 'CTD')) return true;
     return t.type === 'ID';
   }
 
@@ -178,6 +193,12 @@ class PlcParser {
     }
     if (this.match('KW', 'TOF')) {
       return this.parseTimerCall('tof');
+    }
+    if (this.match('KW', 'CTU')) {
+      return this.parseCounterCall('ctu');
+    }
+    if (this.match('KW', 'CTD')) {
+      return this.parseCounterCall('ctd');
     }
     const targetTok = this.eat('ID');
     const target = targetTok.value;
@@ -202,6 +223,50 @@ class PlcParser {
     if (pt < 1) plcError('PT must be >= 1', ptTok.line);
     this.eat('SYM', ')');
     return { type: kind, name, inExpr, pt, line: nameTok.line };
+  }
+
+  parseCounterCall(kind) {
+    const line = this.peek().line;
+    const nameTok = this.eat('ID');
+    const name = nameTok.value;
+    this.eat('SYM', '(');
+    let pulseArg, resetArg, pvArg;
+    const argsDone = new Set();
+    for (let i = 0; i < 3; i++) {
+      const tok = this.peek();
+      // CU / CD are keywords; R and LD are IDs (not global keywords)
+      if (kind === 'ctu' && tok.type === 'KW' && tok.value === 'CU') {
+        this.eat('KW', 'CU'); this.eat('SYM', ':=');
+        pulseArg = this.parseExpr();
+        argsDone.add('pulse');
+      } else if (kind === 'ctd' && tok.type === 'KW' && tok.value === 'CD') {
+        this.eat('KW', 'CD'); this.eat('SYM', ':=');
+        pulseArg = this.parseExpr();
+        argsDone.add('pulse');
+      } else if (kind === 'ctu' && tok.type === 'ID' && tok.value.toUpperCase() === 'R') {
+        this.eat('ID'); this.eat('SYM', ':=');
+        resetArg = this.parseExpr();
+        argsDone.add('reset');
+      } else if (kind === 'ctd' && tok.type === 'ID' && tok.value.toUpperCase() === 'LD') {
+        this.eat('ID'); this.eat('SYM', ':=');
+        resetArg = this.parseExpr();
+        argsDone.add('reset');
+      } else if (tok.type === 'KW' && tok.value === 'PV') {
+        this.eat('KW', 'PV'); this.eat('SYM', ':=');
+        const pvTok = this.eat('NUM');
+        if (pvTok.value < 1) plcError('PV must be >= 1', pvTok.line);
+        pvArg = pvTok.value;
+        argsDone.add('pv');
+      } else {
+        break;
+      }
+      if (!this.match('COMMA')) break;
+    }
+    if (!argsDone.has('pulse')) plcError(`${kind.toUpperCase()} requires ${kind === 'ctu' ? 'CU' : 'CD'}`, line);
+    if (!argsDone.has('reset')) plcError(`${kind.toUpperCase()} requires ${kind === 'ctu' ? 'R' : 'LD'}`, line);
+    if (!argsDone.has('pv')) plcError(`${kind.toUpperCase()} requires PV`, line);
+    this.eat('SYM', ')');
+    return { type: kind, name, pulseExpr: pulseArg, resetExpr: resetArg, pv: pvArg, line: nameTok.line };
   }
 
   parseIf() {
@@ -279,7 +344,14 @@ class PlcParser {
       if (this.match('SYM', '.')) {
         const fieldTok = this.eat('ID');
         const field = fieldTok.value;
-        return { type: 'member', base, field, line: fieldTok.line };
+        const node = { type: 'member', base, field, line: fieldTok.line };
+        // .CV comparisons: name.CV >= n / <= n / == n / > n / < n
+        if (field === 'CV' && this.peek().type === 'CMP') {
+          const op = this.eat('CMP').value;
+          const numTok = this.eat('NUM');
+          return { type: 'cvCmp', base, op, rhs: numTok.value, line: fieldTok.line };
+        }
+        return node;
       }
       return { type: 'symbol', name: base };
     }
@@ -320,15 +392,28 @@ function plcCollectTimerDefs(parsed) {
   return timers;
 }
 
+function plcCollectCounterDefs(parsed) {
+  const counters = new Map();
+  plcWalkStatements(parsed.statements, (stmt) => {
+    if (stmt.type === 'ctu' || stmt.type === 'ctd') {
+      if (counters.has(stmt.name)) plcError(`duplicate counter '${stmt.name}'`, stmt.line);
+      counters.set(stmt.name, stmt);
+    }
+  });
+  return counters;
+}
+
 function plcValidateProgram(parsed) {
   const inputs = parsed.inputs || {};
   const outputs = parsed.outputs || {};
   const timers = plcCollectTimerDefs(parsed);
+  const counters = plcCollectCounterDefs(parsed);
 
   function symInfo(name) {
     if (inputs[name]) return { kind: 'input', width: inputs[name].width };
     if (outputs[name]) return { kind: 'output', width: outputs[name].width };
     if (timers.has(name)) return { kind: 'timer', width: 1 };
+    if (counters.has(name)) return { kind: 'counter', width: 1 };
     return null;
   }
 
@@ -336,18 +421,34 @@ function plcValidateProgram(parsed) {
     if (inputs[name] || outputs[name]) {
       plcError(`timer name '${name}' conflicts with I/O symbol`, timers.get(name).line);
     }
+    if (counters.has(name)) plcError(`timer name '${name}' conflicts with counter`, timers.get(name).line);
+  }
+  for (const [name] of counters) {
+    if (inputs[name] || outputs[name]) {
+      plcError(`counter name '${name}' conflicts with I/O symbol`, counters.get(name).line);
+    }
   }
 
   function checkExpr1Bit(expr, ctx) {
     if (expr.type === 'member') {
-      if (expr.field !== 'Q') plcError(`timer field must be Q, got ${expr.field}`, ctx);
-      if (!timers.has(expr.base)) plcError(`unknown timer ${expr.base}`, ctx);
+      if (expr.field === 'Q') {
+        if (!timers.has(expr.base) && !counters.has(expr.base))
+          plcError(`unknown timer/counter ${expr.base} in .Q`, ctx);
+        return;
+      }
+      if (expr.field === 'CV') {
+        plcError(`.CV cannot be used directly as 1-bit; use name.CV >= N comparison`, ctx);
+      }
+      plcError(`unknown member field '${expr.field}'`, ctx);
+    }
+    if (expr.type === 'cvCmp') {
+      if (!counters.has(expr.base)) plcError(`unknown counter '${expr.base}' in .CV`, ctx);
       return;
     }
     const used = new Set();
     plcCollectSymbols(expr, used);
     for (const n of used) {
-      if (timers.has(n)) continue;
+      if (timers.has(n) || counters.has(n)) continue;
       const info = symInfo(n);
       if (!info) plcError(`unknown symbol ${n}`, ctx);
       if (info.width !== 1) plcError(`expression requires 1-bit symbol, got ${n} (${info.width} bits)`, ctx);
@@ -360,12 +461,16 @@ function plcValidateProgram(parsed) {
       if (!targetInfo) plcError(`unknown symbol ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'input') plcError(`cannot assign to input ${stmt.target}`, stmt.line);
       if (targetInfo.kind === 'timer') plcError(`cannot assign to timer ${stmt.target}`, stmt.line);
+      if (targetInfo.kind === 'counter') plcError(`cannot assign to counter ${stmt.target}`, stmt.line);
       if (targetInfo.width !== 1) {
         plcError(`assignment requires 1-bit symbol, got ${stmt.target} (${targetInfo.width} bits)`, stmt.line);
       }
       checkExpr1Bit(stmt.expr, stmt.line);
     } else if (stmt.type === 'ton' || stmt.type === 'tof') {
       checkExpr1Bit(stmt.inExpr, stmt.line);
+    } else if (stmt.type === 'ctu' || stmt.type === 'ctd') {
+      checkExpr1Bit(stmt.pulseExpr, stmt.line);
+      checkExpr1Bit(stmt.resetExpr, stmt.line);
     } else if (stmt.type === 'if') {
       checkExpr1Bit(stmt.cond, stmt.line);
       for (const s of stmt.thenBody) checkStmt(s);
@@ -379,6 +484,7 @@ function plcValidateProgram(parsed) {
 
   for (const stmt of parsed.statements || []) checkStmt(stmt);
   parsed.timers = timers;
+  parsed.counters = counters;
   return parsed;
 }
 
@@ -394,6 +500,7 @@ function parsePlcBody(bodyRaw) {
     outputs: parsed.outputs,
     statements: parsed.statements,
     timers: parsed.timers,
+    counters: parsed.counters,
     bodyRaw,
   };
 }
@@ -418,22 +525,46 @@ function plcTimerQ(timerState, name) {
   return st && st.q === '1' ? '1' : '0';
 }
 
-function plcEvalExpr(expr, env, timerState) {
+function plcCounterQ(counterState, name) {
+  const st = counterState && counterState[name];
+  return st && st.q === '1' ? '1' : '0';
+}
+
+function plcCounterCV(counterState, name) {
+  const st = counterState && counterState[name];
+  return st ? st.cv : 0;
+}
+
+function plcEvalExpr(expr, env, timerState, counterState) {
   if (expr.type === 'literal') return expr.value;
   if (expr.type === 'symbol') {
     if (!env.has(expr.name)) return '0';
     return plcBit(env.get(expr.name));
   }
   if (expr.type === 'member') {
-    if (expr.field === 'Q') return plcTimerQ(timerState, expr.base);
+    if (expr.field === 'Q') {
+      const tq = plcTimerQ(timerState, expr.base);
+      if (tq !== '0') return tq;
+      return plcCounterQ(counterState, expr.base);
+    }
+    return '0';
+  }
+  if (expr.type === 'cvCmp') {
+    const cv = plcCounterCV(counterState, expr.base);
+    const r = expr.rhs;
+    if (expr.op === '>=') return cv >= r ? '1' : '0';
+    if (expr.op === '<=') return cv <= r ? '1' : '0';
+    if (expr.op === '>') return cv > r ? '1' : '0';
+    if (expr.op === '<') return cv < r ? '1' : '0';
+    if (expr.op === '==') return cv === r ? '1' : '0';
     return '0';
   }
   if (expr.type === 'unary' && expr.op === 'NOT') {
-    return plcEvalExpr(expr.arg, env, timerState) === '1' ? '0' : '1';
+    return plcEvalExpr(expr.arg, env, timerState, counterState) === '1' ? '0' : '1';
   }
   if (expr.type === 'binary') {
-    const a = plcEvalExpr(expr.left, env, timerState) === '1';
-    const b = plcEvalExpr(expr.right, env, timerState) === '1';
+    const a = plcEvalExpr(expr.left, env, timerState, counterState) === '1';
+    const b = plcEvalExpr(expr.right, env, timerState, counterState) === '1';
     if (expr.op === 'AND') return (a && b) ? '1' : '0';
     if (expr.op === 'OR') return (a || b) ? '1' : '0';
     if (expr.op === 'XOR') return (a !== b) ? '1' : '0';
@@ -446,8 +577,13 @@ function plcEnsureTimerState(timerState, name) {
   return timerState[name];
 }
 
-function plcExecTon(stmt, env, timerState) {
-  const inVal = plcEvalExpr(stmt.inExpr, env, timerState) === '1';
+function plcEnsureCounterState(counterState, name) {
+  if (!counterState[name]) counterState[name] = { cv: 0, q: '0', prevPulse: '0' };
+  return counterState[name];
+}
+
+function plcExecTon(stmt, env, timerState, counterState) {
+  const inVal = plcEvalExpr(stmt.inExpr, env, timerState, counterState) === '1';
   const st = plcEnsureTimerState(timerState, stmt.name);
   if (inVal) {
     st.et += 1;
@@ -458,8 +594,8 @@ function plcExecTon(stmt, env, timerState) {
   }
 }
 
-function plcExecTof(stmt, env, timerState) {
-  const inVal = plcEvalExpr(stmt.inExpr, env, timerState) === '1';
+function plcExecTof(stmt, env, timerState, counterState) {
+  const inVal = plcEvalExpr(stmt.inExpr, env, timerState, counterState) === '1';
   const st = plcEnsureTimerState(timerState, stmt.name);
   if (inVal) {
     st.et = 0;
@@ -473,39 +609,82 @@ function plcExecTof(stmt, env, timerState) {
   }
 }
 
-function plcExecStmt(stmt, env, timerState) {
+function plcExecCtu(stmt, env, timerState, counterState) {
+  const cuVal = plcEvalExpr(stmt.pulseExpr, env, timerState, counterState);
+  const rVal = plcEvalExpr(stmt.resetExpr, env, timerState, counterState) === '1';
+  const st = plcEnsureCounterState(counterState, stmt.name);
+  // R has priority over CU (IEC 61131)
+  if (rVal) {
+    st.cv = 0;
+  } else {
+    const rising = (cuVal === '1' && st.prevPulse === '0');
+    if (rising) {
+      st.cv += 1;
+    }
+  }
+  st.prevPulse = cuVal;
+  st.q = (st.cv >= stmt.pv) ? '1' : '0';
+}
+
+function plcExecCtd(stmt, env, timerState, counterState) {
+  const cdVal = plcEvalExpr(stmt.pulseExpr, env, timerState, counterState);
+  const ldVal = plcEvalExpr(stmt.resetExpr, env, timerState, counterState) === '1';
+  const st = plcEnsureCounterState(counterState, stmt.name);
+  // LD has priority over CD (IEC 61131)
+  if (ldVal) {
+    st.cv = stmt.pv;
+  } else {
+    const rising = (cdVal === '1' && st.prevPulse === '0');
+    if (rising && st.cv > 0) {
+      st.cv -= 1;
+    }
+  }
+  st.prevPulse = cdVal;
+  st.q = (st.cv <= 0) ? '1' : '0';
+}
+
+function plcExecStmt(stmt, env, timerState, counterState) {
   if (stmt.type === 'assign') {
-    env.set(stmt.target, plcEvalExpr(stmt.expr, env, timerState));
+    env.set(stmt.target, plcEvalExpr(stmt.expr, env, timerState, counterState));
     return;
   }
   if (stmt.type === 'ton') {
-    plcExecTon(stmt, env, timerState);
+    plcExecTon(stmt, env, timerState, counterState);
     return;
   }
   if (stmt.type === 'tof') {
-    plcExecTof(stmt, env, timerState);
+    plcExecTof(stmt, env, timerState, counterState);
+    return;
+  }
+  if (stmt.type === 'ctu') {
+    plcExecCtu(stmt, env, timerState, counterState);
+    return;
+  }
+  if (stmt.type === 'ctd') {
+    plcExecCtd(stmt, env, timerState, counterState);
     return;
   }
   if (stmt.type === 'if') {
-    if (plcEvalExpr(stmt.cond, env, timerState) === '1') {
-      for (const s of stmt.thenBody) plcExecStmt(s, env, timerState);
+    if (plcEvalExpr(stmt.cond, env, timerState, counterState) === '1') {
+      for (const s of stmt.thenBody) plcExecStmt(s, env, timerState, counterState);
       return;
     }
     for (const e of stmt.elsif || []) {
-      if (plcEvalExpr(e.cond, env, timerState) === '1') {
-        for (const s of e.body) plcExecStmt(s, env, timerState);
+      if (plcEvalExpr(e.cond, env, timerState, counterState) === '1') {
+        for (const s of e.body) plcExecStmt(s, env, timerState, counterState);
         return;
       }
     }
-    for (const s of stmt.elseBody || []) plcExecStmt(s, env, timerState);
+    for (const s of stmt.elseBody || []) plcExecStmt(s, env, timerState, counterState);
   }
 }
 
-function executePlcScan(inst, externalInputs, outputState, timerState) {
+function executePlcScan(inst, externalInputs, outputState, timerState, counterState) {
   const inputs = inst.inputs || {};
   const outputs = inst.outputs || {};
   const env = new Map();
   const timers = timerState || {};
+  const counters = counterState || {};
 
   for (const name of Object.keys(outputs)) {
     const prev = outputState && outputState[name] != null ? outputState[name] : '0';
@@ -519,7 +698,7 @@ function executePlcScan(inst, externalInputs, outputState, timerState) {
   }
 
   for (const stmt of inst.statements || []) {
-    plcExecStmt(stmt, env, timers);
+    plcExecStmt(stmt, env, timers, counters);
   }
 
   const out = outputState || {};
@@ -534,6 +713,7 @@ function formatPlcExpr(expr) {
   if (expr.type === 'literal') return expr.value === '1' ? 'TRUE' : 'FALSE';
   if (expr.type === 'symbol') return expr.name;
   if (expr.type === 'member') return `${expr.base}.${expr.field}`;
+  if (expr.type === 'cvCmp') return `${expr.base}.CV ${expr.op} ${expr.rhs}`;
   if (expr.type === 'unary') return `NOT ${formatPlcExpr(expr.arg)}`;
   if (expr.type === 'binary') return `${formatPlcExpr(expr.left)} ${expr.op} ${formatPlcExpr(expr.right)}`;
   return '?';
@@ -545,6 +725,14 @@ function formatPlcTimerCall(stmt, indent) {
   return `${pad}${kw} ${stmt.name}(IN := ${formatPlcExpr(stmt.inExpr)}, PT := ${stmt.pt})`;
 }
 
+function formatPlcCounterCall(stmt, indent) {
+  const pad = '  '.repeat(indent);
+  if (stmt.type === 'ctu') {
+    return `${pad}CTU ${stmt.name}(CU := ${formatPlcExpr(stmt.pulseExpr)}, R := ${formatPlcExpr(stmt.resetExpr)}, PV := ${stmt.pv})`;
+  }
+  return `${pad}CTD ${stmt.name}(CD := ${formatPlcExpr(stmt.pulseExpr)}, LD := ${formatPlcExpr(stmt.resetExpr)}, PV := ${stmt.pv})`;
+}
+
 function formatPlcStmt(stmt, indent) {
   const pad = '  '.repeat(indent);
   if (stmt.type === 'assign') {
@@ -552,6 +740,9 @@ function formatPlcStmt(stmt, indent) {
   }
   if (stmt.type === 'ton' || stmt.type === 'tof') {
     return formatPlcTimerCall(stmt, indent);
+  }
+  if (stmt.type === 'ctu' || stmt.type === 'ctd') {
+    return formatPlcCounterCall(stmt, indent);
   }
   if (stmt.type === 'if') {
     const lines = [`${pad}IF ${formatPlcExpr(stmt.cond)} THEN`];
@@ -591,12 +782,17 @@ function formatPlcInstanceDoc(alias, inst) {
   lines.push(...formatPlcSymbolTable('inputs', inst.inputs));
   lines.push(...formatPlcSymbolTable('outputs', inst.outputs));
   const timerNames = [];
+  const counterNames = [];
   plcWalkStatements(inst.statements, (stmt) => {
     if (stmt.type === 'ton' || stmt.type === 'tof') timerNames.push(stmt.name);
+    if (stmt.type === 'ctu' || stmt.type === 'ctd') counterNames.push(stmt.name);
   });
   lines.push('  timers:');
   if (!timerNames.length) lines.push('    (none)');
   else for (const n of timerNames) lines.push(`    ${n}`);
+  lines.push('  counters:');
+  if (!counterNames.length) lines.push('    (none)');
+  else for (const n of counterNames) lines.push(`    ${n}`);
   lines.push('');
   lines.push('  program:');
   for (const stmt of inst.statements || []) {
@@ -608,6 +804,7 @@ function formatPlcInstanceDoc(alias, inst) {
   lines.push('    outputs retain value if not assigned (PLC semantics)');
   lines.push('    inputs read-only; outputs readable in same scan');
   lines.push('    TON/TOF advance once per scan; PT is scan count');
+  lines.push('    CTU/CTD count rising edges per scan; PV is preset');
   return lines;
 }
 
@@ -624,8 +821,9 @@ function formatPlcTypeDoc() {
     '  END_IF',
     '  :',
     '',
-    'Keywords: IF THEN ELSE ELSIF END_IF AND OR NOT XOR TRUE FALSE TON TOF',
+    'Keywords: IF THEN ELSE ELSIF END_IF AND OR NOT XOR TRUE FALSE TON TOF CTU CTD',
     'Timers: PT = preset in scan cycles; read Q as name.Q',
+    'Counters: PV = preset; read Q as name.Q; compare CV as name.CV >= N',
     'Bind with comp [plc] program: .name and I/O map (see doc/plc.md and doc/plc-language.md)',
   ];
 }
@@ -637,6 +835,9 @@ const plcAssemblerExports = {
   formatPlcTypeDoc,
   plcBit,
   plcNormalizeBits,
+  plcTimerQ,
+  plcCounterQ,
+  plcCounterCV,
 };
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -648,4 +849,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.executePlcScan = executePlcScan;
   globalThis.formatPlcInstanceDoc = formatPlcInstanceDoc;
   globalThis.formatPlcTypeDoc = formatPlcTypeDoc;
+  globalThis.plcTimerQ = plcTimerQ;
+  globalThis.plcCounterQ = plcCounterQ;
+  globalThis.plcCounterCV = plcCounterCV;
 }
