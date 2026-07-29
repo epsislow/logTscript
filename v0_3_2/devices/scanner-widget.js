@@ -5,6 +5,7 @@ function addScanner({
   text = '',
   length = 8,
   width = null,
+  scanText = 'Scan',
   color = '#808080',
   bgColor = '#101010',
   focusColor = '#2ecc71',
@@ -63,7 +64,8 @@ function addScanner({
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'scanner-btn';
-  btn.textContent = 'Scan';
+  const btnLabel = scanText != null && String(scanText) !== '' ? String(scanText) : 'Scan';
+  btn.textContent = btnLabel.slice(0, 12);
   btn.style.borderColor = color;
   btn.style.color = color;
   btn.style.background = bgColor;

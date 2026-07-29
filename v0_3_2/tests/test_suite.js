@@ -32050,5 +32050,12 @@ reg(2928, 'scanner', 'width display attr optional', function(h, session) {
   h.assert('cfg', String(interp.components.get('.scan').attributes.width), '18');
 });
 
+reg(2929, 'scanner', 'scanText attr', function(h, session) {
+  const cfg = ScannerComponent.resolveConfig({ length: 4, scanText: '>' });
+  h.assert('scanText', cfg.scanText, '>');
+  const def = ScannerComponent.resolveConfig({ length: 4 });
+  h.assert('default', def.scanText, 'Scan');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

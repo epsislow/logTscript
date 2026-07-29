@@ -29458,6 +29458,7 @@ comp [scanner] .name:
   length: 8
   width: 12
   text: 'BC'
+  scanText: 'Scan'
   color: ^808080
   bgColor: ^101010
   focusColor: ^2ecc71
@@ -29516,6 +29517,7 @@ When set, non-digit characters are stripped from the field (and on commit). Digi
 | \`length\` | integer | \`8\` | Max characters (\`1…32\`). \`:get\` width = \`length×8\` |
 | \`width\` | integer | (flex \`6…24ch\`) | **Panel only** — fixed field width in character cells (\`4…40\`). Omit for the default flexible look |
 | \`text\` | string | \`''\` | Panel label |
+| \`scanText\` | string | \`'Scan'\` | Label on the commit button (e.g. \`'>'\`, \`'OK'\`) |
 | \`color\` | hex | \`^808080\` | Border / label when unfocused (same idea as keyboard) |
 | \`bgColor\` | hex | \`^101010\` | Panel / field background when unfocused |
 | \`focusColor\` | hex | \`^2ecc71\` | Border when the field is focused |
@@ -29670,12 +29672,14 @@ comp [scanner] .narrow:
   length: 8
   width: 4
   text: 'N'
+  scanText: '>'
   :
 
 comp [scanner] .wide:
   length: 8
   width: 24
   text: 'W'
+  scanText: 'OK'
   nl
   :
 
@@ -29687,7 +29691,7 @@ show(sa)
 show(sb)
 \`\`\`
 
-Same capacity (\`length: 8\`); only the **on-screen** field width differs.
+Same capacity (\`length: 8\`); only the **on-screen** field width and button labels differ.
 
 ### Feed a FIFO on \`:valid\`
 
