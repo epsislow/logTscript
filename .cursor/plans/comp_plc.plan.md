@@ -51,7 +51,7 @@ todos:
     content: "P5.2: CTU+CTD IEC/ST în inline [plc]; .Q și .CV; teste + doc logts-play"
     status: completed
   - id: p5-2b-retain
-    content: "P5.2b (amânat): RETAIN stare timere/contoare la re-RUN"
+    content: "P5.2b: retain:0/1 pe comp [plc] — păstrare timerState/counterState la re-RUN"
     status: pending
   - id: pc-st-control
     content: "P+c: VAR/END_VAR, CONST, CASE/OF, RETURN — limbaj ST extins"
@@ -160,7 +160,7 @@ flowchart TB
 | **P-TMR4** | **P5.1:** **TON** + **TOF** ✓; **P5.2:** **CTU** + **CTD** | **închis** |
 | **P-TMR5** | **`PT` în scan-uri** (număr întreg de cicluri); doc: echivalent ms ≈ `PT × scanTime` când `scanTime > 0` | **închis** |
 | **P-TMR6** | La **`scanTime: 0`**: `PT` = scan-uri la fiecare `set` activ (osc/manual) — **permis** | **închis** |
-| **P-TMR7** | La **re-RUN**: stare timere **reset** (fără RETAIN în P5.1) | **închis** |
+| **P-TMR7** | La **re-RUN**: stare timere **reset** când **`retain: 0`** (default); păstrare când **`retain: 1`** — **P5.2b** | **închis** |
 | **P-TMR8** | **Ordine evaluare IEC/ST:** blocurile TON/TOF rulează **în ordinea din corp**; `Q` actualizat înainte ca statement-urile următoare să-l citească în **același scan** | **închis** |
 | **P-TMR9** | **P5.1 (MVP plasare):** TON/TOF ca statements **top-level** și în corpul **`IF`/`THEN`/`ELSE`/`ELSIF`** | **închis** |
 | **P-TMR13** | **Fază amânată P5.3:** extindere **plasare completă IEC/ST** — TON/TOF **oriunde e permis un statement** în corpul programului (inclusiv în `CASE`/`FOR`/`WHILE` odată cu **P+c**/**P+d**) | **închis** (țintă) |
@@ -168,7 +168,7 @@ flowchart TB
 | **P-TMR11** | **`PT` ≥ 1** — `PT = 0` → eroare parse | **închis** |
 | **P-TMR12** | **`IN`** = expresie 1-bit completă; **`name.Q`** read-only (atribuire → eroare); **nume timer unic** (duplicat → eroare parse) | **închis** |
 | **P-CTR1** | **P5.2:** **CTU** + **CTD** în **`inline [plc]`** — același model ca TON/TOF (fără `comp` separate) | **închis** |
-| **P-CTR2** | **RETAIN** amânat **P5.2b** — la re-RUN stare contoare/timere **reset** (ca P5.1) până atunci | **închis** |
+| **P-CTR2** | Fără **`retain`** (default **`0`**): la re-RUN, **`timerState`** / **`counterState`** se **resetează**; cu **`retain: 1`** → **P5.2b** / **P-RET1…P-RET6** | **închis** |
 | **P-CTR3** | **CTU:** `CTU name(CU := expr, R := expr, PV := n)` — sintaxă confirmată | **închis** |
 | **P-CTR4** | **CTD:** `CTD name(CD := expr, LD := expr, PV := n)` — model IEC (load `LD`, nu `R`) | **închis** |
 | **P-CTR5** | **`CU` / `CD`:** numără la **front rising 0→1** între scan-uri (IEC), nu la nivel `1` continuu | **închis** |
@@ -177,6 +177,14 @@ flowchart TB
 | **P-CTR8** | **`PV` ≥ 1** — `PV = 0` → eroare parse | **închis** |
 | **P-CTR9** | Expunere **`name.Q`** (1-bit) și **`name.CV`** (întreg); **`.CV`** comparabil cu **literal numeric** în `IF` (`>=`, `<=`, `==`, `>`, `<`) — extensie minimă P5.2, nu deschide P+b complet | **închis** |
 | **P-CTR10** | Plasare ca P5.1 (top-level + `IF`); **`counterState`** per `comp [plc]`; nume unice (fără conflict I/O / timere / contoare); **`.Q` / `.CV`** read-only | **închis** |
+| **P-RET1** | **P5.2b:** **RETAIN** se declară ca atribut **`retain: 0/1`** pe **`comp [plc]`** (default **`0`**), nu ca keyword în limbajul `inline [plc]` | **închis** |
+| **P-RET2** | **RETAIN** v1 este **global pe instanța `comp [plc]`** (nu selectiv pe timer/counter individual) | **închis** |
+| **P-RET3** | Cu **RETAIN** activ se păstrează **toată starea internă relevantă** a timerelor și contoarelor (`et/q` la timere, `cv/q/edge-state` la contoare), nu doar `CV` | **închis** |
+| **P-RET4** | Persistența **RETAIN** este doar la **re-RUN în aceeași sesiune**; **nu** implică salvare pe disc / reload complet / persistență între sesiuni | **închis** |
+| **P-RET5** | Dacă se schimbă **programul PLC** (sursa / structura / numele instanțelor timer-coun­ter), starea **RETAIN** se **invalidează / resetează** | **închis** |
+| **P-RET6** | **Default** rămâne **`retain: 0`**; comportamentul actual (reset stare la re-RUN) rămâne varianta didactică implicită | **închis** |
+| **P-RET7** | **`retain`** acceptă strict **`0`** sau **`1`**; orice altă valoare → eroare elaborare, ex. `plc .ctrl: invalid retain value, expected 0 or 1` | **închis** |
+| **P-RET8** | **`doc(comp.plc)`** și **`doc(.myPlc)`** afișează **`retain: 0/1`** (implicit **`0`** dacă lipsește) | **închis** |
 | **P-IO1** | **Nu** există `comp [button]` — intrări digitale: **`key`**, **`switch`**, **`dip`** (confirmat) |
 | **P-IO2** | **P2/P3:** ieșiri digitale 1-bit: **`led`**, **`reg`**, wires; **nu** mapare directă `comp [plc]` → `clcd` |
 | **P-IO3** | **`clcd`:** doar prin **wires multi-bit** + logică LogTscript în afara PLC (`:get` / bloc `{ value, set }`) |
@@ -941,8 +949,8 @@ END_IF
 | Fază | Conținut | Status |
 |------|----------|--------|
 | **P5.1** | **TON** + **TOF**; plasare top-level + `IF`; teste; doc `logts-play`; **`plc-language.md`** (referință limbaj) | **done** |
-| **P5.2** | **CTU** + **CTD** (IEC/ST); `.Q` + `.CV`; comparații `CV` ↔ literal; teste; doc | **următor** |
-| **P5.2b** *(amânat)* | **RETAIN** — stare timere/contoare supraviețuiește re-RUN | planificat |
+| **P5.2** | **CTU** + **CTD** (IEC/ST); `.Q` + `.CV`; comparații `CV` ↔ literal; teste; doc | **done** |
+| **P5.2b** | **`retain: 0/1`** pe `comp [plc]` — stare timere/contoare la re-RUN | **următor** |
 | **P5.3** *(amânat)* | Plasare completă IEC/ST pentru toate FB-urile (`CASE` / `FOR` / `WHILE` cu **P+c** / **P+d**) | planificat |
 
 #### P5.2 — Contoare CTU / CTD (decizii închise)
@@ -997,11 +1005,114 @@ END_IF
 
 Identic **P5.1** / **P-TMR9:** top-level și în ramuri `IF`. **P5.3** extinde la `CASE`/`FOR`/`WHILE`.
 
-##### P5.2b — RETAIN (amânat, de detaliat la deschidere)
+#### P5.2b — `retain` pe `comp [plc]` (decizii închise: P-RET1…P-RET8)
 
-- Păstrare `CV` / stare timere la re-RUN
-- Sintaxă de declarat la implementare (atribut `comp [plc]` sau keyword program)
-- **Nu** blochează P5.2
+**Filozofie:** didactic implicit (`retain: 0` = reset la re-RUN, ușor de explicat); opțional **`retain: 1`** pentru comportament mai apropiat de memorie reținută la PLC real — fără keyword în limbaj, fără persistență pe disc.
+
+**Scope:** doar **starea internă** a blocurilor **TON / TOF / CTU / CTD** pe instanța `comp [plc]`. **Nu** include: `outputState`, `scanCount`, mapări I/O, simboluri program, **VAR** (P+c).
+
+##### Sintaxă runtime
+
+```logts
+comp [plc] .ctrl:
+  program: .counterProg
+  retain: 0          ; default — reset stare FB la re-RUN
+  inputs: { PULSE = .pulse, RESET = .reset }
+  outputs: { FULL = .fullLed }
+  on: 1
+  :
+
+comp [plc] .ctrlRetain:
+  program: .counterProg
+  retain: 1          ; păstrează timerState + counterState la re-RUN
+  inputs: { PULSE = .pulse, RESET = .reset }
+  outputs: { FULL = .fullLed2 }
+  on: 1
+  :
+```
+
+| Atribut | Valori | Default | Efect |
+|---------|--------|---------|-------|
+| **`retain:`** | **`0`** sau **`1`** | **`0`** | **`0`**: la re-RUN, `timerState` și `counterState` goale (comportament actual). **`1`**: la re-RUN în aceeași sesiune, starea FB supraviețuiește. |
+
+**Nu** în P5.2b: `retain: N` cu N≠0/1 (→ eroare **P-RET7**); RETAIN per instanță FB; keyword `RETAIN` în `inline [plc]`; salvare între sesiuni / reload script.
+
+##### Validare `retain` (P-RET7)
+
+| Valoare | Rezultat |
+|---------|----------|
+| omis | **`0`** (default) |
+| **`0`** | fără retenție la re-RUN |
+| **`1`** | retenție `timerState` / `counterState` la re-RUN |
+| **`2`**, **`-1`**, non-numeric | **eroare elaborare** — mesaj tip: `plc .ctrl: invalid retain value, expected 0 or 1` |
+
+##### `doc()` — afișare `retain` (P-RET8)
+
+| Comandă | Unde se actualizează | Ce afișează |
+|---------|----------------------|-------------|
+| **`doc(comp.plc)`** | `getDef()` attrs în **`plc.js`** + eventual **`formatPlcTypeDoc()`** | `retain: 0/1 (default 0)` în lista de atribute |
+| **`doc(.myPlc)`** | **`PlcComponent.formatInstanceDoc()`** în **`plc.js`** | linie `retain: 0` sau `retain: 1` lângă `scanTime`, `program`, mapări |
+
+Exemplu `doc(.ctrlRetain)` așteptat:
+
+```text
+.ctrlRetain (comp [plc])
+
+program: .counterProg
+retain: 1
+scanTime: 0 ms (event-driven (external set/osc))
+...
+```
+
+##### Ce se păstrează (`retain: 1`)
+
+| Stare | Câmpuri | Note |
+|-------|---------|------|
+| **`timerState[name]`** | `et`, `q` | TON/TOF continuă de unde era |
+| **`counterState[name]`** | `cv`, `q`, `prevPulse` | CTU/CTD + detecție front corectă după re-RUN |
+
+**Nu se păstrează** (chiar cu `retain: 1`):
+
+| Stare | La re-RUN |
+|-------|-----------|
+| **`outputState`** | reset la valori inițiale / primul scan recalculează |
+| **`scanCount`** | reset **`0`** |
+| **`busy`**, **`skipped`**, **`missed`**, **`overrunCount`** | reset conform politicii P4 existente |
+
+##### Când se invalidează starea reținută
+
+Chiar dacă `retain: 1`, starea FB se **șterge** când:
+
+1. Se schimbă **`program:`** (alt `inline [plc]` sau același nume cu corp modificat)
+2. Se schimbă **identitatea FB** în program (nume timer/counter adăugat, șters sau redenumit față de run-ul anterior)
+3. **Reload complet** al scriptului / sesiune nouă / reconstrucție `comp [plc]`
+4. Utilizatorul setează explicit **`retain: 0`** (dacă re-elaborează componenta)
+
+**Implementare recomandată:** fingerprint program (hash sau listă ordonată nume FB + tip) stocat pe `comp`; la mismatch → reset `timerState` / `counterState` indiferent de `retain`.
+
+##### Semantica re-RUN (aceeași sesiune, același program)
+
+| `retain` | Înainte de re-RUN | După re-RUN |
+|----------|-------------------|-------------|
+| **`0`** | ex. `cnt.cv = 3` | `cnt.cv = 0`, `cnt.q = 0`, `prevPulse = 0` |
+| **`1`** | ex. `cnt.cv = 3`, `cnt.q = 0` | aceleași valori; primul scan continuă logica IEC |
+
+**Didactic:** exemplu paralel — două `comp [plc]` cu același `inline [plc]`, unul `retain: 0`, unul `retain: 1`; după câteva scan-uri + re-RUN, doar al doilea păstrează `CV`.
+
+##### Livrabile P5.2b
+
+| # | Task |
+|---|------|
+| 1 | **`plc.js`**: parse **`retain: 0/1`**; default `0`; invalid → eroare **P-RET7** |
+| 2 | **`plc.js`**: la re-RUN, păstrare condiționată `timerState` / `counterState` |
+| 3 | **`plc.js`**: invalidare stare la schimbare program / fingerprint FB |
+| 4 | **`plc.js`**: **`doc(comp.plc)`** + **`doc(.myPlc)`** — afișare `retain` (**P-RET8**) |
+| 5 | **`test_suite.js`**: CTU/TON cu `retain:0` vs `retain:1`; invalidare la schimbare program; test `retain:2` → eroare |
+| 6 | **`test_suite.js`**: `doc(comp.plc)` / `doc(.ctrl)` conțin `retain` |
+| 7 | **`plc.md`**: atribut în tabel, 2 exemple `logts-play` (cu/fără retain), comportament |
+| 8 | **`plc-language.md`**: notă scurtă — RETAIN e runtime pe `comp [plc]`, nu keyword limbaj |
+
+**Fișiere:** `plc.js`, `plc.md`, `plc-language.md`, `test_suite.js` (grup `comp-plc`).
 
 #### Dependențe P5
 
@@ -1095,11 +1206,13 @@ comp [plc] .ctrlB:
 
 **P5.1 (TON/TOF):** **done**.
 
-**P5.2 (CTU/CTD):** **închis** — P-CTR1…P-CTR10; **RETAIN** → **P5.2b**.
+**P5.2 (CTU/CTD):** **done** — P-CTR1…P-CTR10.
 
-**Încă deschise / amânate:** P3c, **P5.2b**, **P5.3**, P+b, P+c/d, **P6** (multi-program), **P7** (globals/memorie partajată), **P8** (inter-PLC rețea).
+**P5.2b (`retain`):** decizii **închise** — P-RET1…P-RET8; **următor pas de implementare**.
 
-**Următorul pas recomandat:** **P5.2** (implementare CTU/CTD).
+**Încă deschise / amânate:** P3c, **P5.3**, P+b, P+c/d, **P6** (multi-program), **P7** (globals/memorie partajată), **P8** (inter-PLC rețea).
+
+**Următorul pas recomandat:** **P5.2b** (implementare `retain: 0/1` pe `comp [plc]`).
 
 ---
 
@@ -1125,6 +1238,8 @@ comp [plc] .ctrlB:
 | P4.1 auto-scan + busy | ~30% P2 |
 | P4.2 external + teste osc | ~15% P2 |
 | P4.3 overrun (opțional) | ~20% P4.1 |
-| P5 / P+b | fiecare ~50% P1 |
+| P5.1 / P5.2 | ~50% P1 fiecare |
+| P5.2b retain | ~15% P2 |
+| P+b | ~50% P1 |
 
 **Risc principal:** parser limbaj PLC (IF/THEN); maparea lățimi e mecanică dacă e strictă de la început.
