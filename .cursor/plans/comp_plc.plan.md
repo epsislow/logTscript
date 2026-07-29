@@ -50,14 +50,23 @@ todos:
   - id: p5-2b-retain
     content: "P5.2b (amânat): RETAIN stare timere/contoare la re-RUN"
     status: pending
-  - id: pb-analog
-    content: "P+b: I/O multi-bit, comparații analog, senzori — amânat"
-    status: pending
   - id: pc-st-control
     content: "P+c: VAR/END_VAR, CONST, CASE/OF, RETURN — limbaj ST extins"
     status: pending
   - id: pd-st-loops
     content: "P+d: FOR/TO/BY/DO, WHILE/END_WHILE — bucle per scan"
+    status: pending
+  - id: p6-multi-program
+    content: "P6 (amânat): un comp [plc] cu mai multe programe (tasks); ordine execuție, prioritate"
+    status: pending
+  - id: p7-globals
+    content: "P7 (amânat): memorie partajată între programe — VAR_GLOBAL (GVL), zone M (flags interne)"
+    status: pending
+  - id: p8-plc-network
+    content: "P8 (amânat): comunicare inter-PLC prin comp [network]/sock — fieldbus didactic"
+    status: pending
+  - id: pb-analog
+    content: "P+b (amânat): I/O multi-bit în logică, comparații analog (IF TEMP > 50), atribuiri multi-bit, senzori"
     status: pending
 isProject: false
 ---
@@ -1006,6 +1015,77 @@ Identic **P5.1** / **P-TMR9:** top-level și în ramuri `IF`. **P5.3** extinde l
 
 ---
 
+### P6 — Mai multe programe pe un `comp [plc]` (amânat)
+
+**Motivație IEC:** un PLC real are **task-uri** cu **programe** diferite (ex. ciclic rapid 10 ms + ciclic lent 100 ms + event-driven). Fiecare program e un POU separat, dar toate rulează pe **același CPU** și pot partaja memorie.
+
+**Scop LogTscript:** un singur `comp [plc]` să accepte **mai multe `program:`-uri** cu scan-uri independente sau coordonate.
+
+**Decizii de luat la deschidere:**
+- Sintaxă: `programs: [ .fast, .slow ]` sau atribut `task:` multiplu?
+- Ordinea execuției: secvențial în scan sau task-uri cu `scanTime` propriu?
+- Izolare stare: timer/counter per program sau global pe componentă?
+- `doc(.ctrl)` ce afișează?
+
+**Dependențe:** P+c (`VAR`), P7 (globals) — programele trebuie să poată comunica ceva dacă rulează separat.
+
+---
+
+### P7 — Memorie partajată între programe (amânat)
+
+**Motivație IEC:** programe pe același PLC comunică prin:
+- **`VAR_GLOBAL` / GVL** — variabile globale declarate o dată, accesibile din orice program
+- **Zone M (memorie internă)** — flags/registre interne, echivalent cu releu intern (nu hardware)
+- **Instanțe FB reutilizate** — același bloc de date (instanță) apelat din programe diferite
+
+**Scop LogTscript:**
+- Declarare `var_global:` (sau bloc dedicat) — simbol vizibil în mai multe `inline [plc]`
+- Acces din program: citire/scriere ca orice simbol intern
+- Nu mapabil pe `inputs:`/`outputs:` hardware — memoria internă nu are pin extern
+
+**Decizii de luat la deschidere:**
+- Scope: global per script sau per `comp [plc]`?
+- Sintaxă: bloc `VAR_GLOBAL` în `inline [plc]`, sau atribut `globals:` pe `comp [plc]`?
+- Lățimi: 1 bit (flag M) sau multi-bit (P+b)?
+- Sincronizare (dacă P6 tasks): ultima scriere câștigă sau ordine definită?
+
+**Dependențe:** P+c (`VAR` intern) ca precursor — globals = extensie a mecanismului VAR.
+
+---
+
+### P8 — Comunicare inter-PLC prin rețea (amânat)
+
+**Motivație IEC:** comunicarea între PLC-uri fizice se face prin **fieldbus** (PROFINET, EtherCAT, Modbus, CANopen) sau **rețele industriale** — nu prin memorie partajată directă.
+
+**LogTscript are deja:**
+- `comp [network]` + `sock` + **packets** — comunicare între scripturi (modele existente)
+- Baza pentru un **fieldbus didactic** PLC-to-PLC
+
+**Scop:** un `comp [plc]` să poată **publica / consuma** variabile prin rețea:
+
+```logts
+; PLC A — publică
+comp [plc] .ctrlA:
+  program: .machineA
+  publish: { MOTOR = plcBus.motor }   ; trimite pe rețea
+
+; PLC B — consumă
+comp [plc] .ctrlB:
+  program: .machineB
+  subscribe: { EXT_MOTOR = plcBus.motor }  ; primește de pe rețea
+```
+
+**Decizii de luat la deschidere:**
+- Folosim `comp [network]` existent sau model nou `plc-bus`?
+- Sincronizare cu scan: citire la start scan / scriere la final scan (ca I/O image)?
+- Lățimi: 1 bit (digital) sau multi-bit (analog, P+b)?
+- Latență: didactic instant (ca wires) sau simulat async (mai realist)?
+- Vizibilitate: `publish`/`subscribe` vs `inputs:`/`outputs:` de rețea (nu hardware)?
+
+**Dependențe:** `comp [network]` + `sock` (existente), P+b (pentru analog), P7 (globals — opțional pentru cache local).
+
+---
+
 ## Decizii deschise
 
 **P4 (scanTime / busy / cicluri):** **închis** — P-SCAN1…P-SCAN8, sub-faze P4.0–P4.3.
@@ -1014,7 +1094,7 @@ Identic **P5.1** / **P-TMR9:** top-level și în ramuri `IF`. **P5.3** extinde l
 
 **P5.2 (CTU/CTD):** **închis** — P-CTR1…P-CTR10; **RETAIN** → **P5.2b**.
 
-**Încă deschise / amânate:** P3c, **P5.2b**, **P5.3**, P+b, P+c/d.
+**Încă deschise / amânate:** P3c, **P5.2b**, **P5.3**, P+b, P+c/d, **P6** (multi-program), **P7** (globals/memorie partajată), **P8** (inter-PLC rețea).
 
 **Următorul pas recomandat:** **P5.2** (implementare CTU/CTD).
 
