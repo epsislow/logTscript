@@ -4,6 +4,7 @@ function addScanner({
   id,
   text = '',
   length = 8,
+  width = null,
   color = '#808080',
   bgColor = '#101010',
   focusColor = '#2ecc71',
@@ -46,6 +47,18 @@ function addScanner({
   input.style.borderColor = color;
   input.style.background = bgColor;
   input.style.color = '#ddd';
+
+  // Optional fixed field width (ch). When omitted, CSS flex 6ch…24ch applies (original look).
+  if (width != null && width !== '') {
+    let fieldCh = parseInt(width, 10);
+    if (!isNaN(fieldCh)) {
+      fieldCh = Math.max(4, Math.min(40, fieldCh));
+      input.style.width = `${fieldCh}ch`;
+      input.style.minWidth = `${fieldCh}ch`;
+      input.style.maxWidth = `${fieldCh}ch`;
+      input.style.flex = '0 0 auto';
+    }
+  }
 
   const btn = document.createElement('button');
   btn.type = 'button';

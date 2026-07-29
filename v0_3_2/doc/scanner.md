@@ -11,6 +11,7 @@ Signature: `doc(comp.scanner)`. See also [keyboard.md](keyboard.md) (per-key 8-b
 ```
 comp [scanner] .name:
   length: 8
+  width: 12
   text: 'BC'
   color: ^808080
   bgColor: ^101010
@@ -68,6 +69,7 @@ When set, non-digit characters are stripped from the field (and on commit). Digi
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `length` | integer | `8` | Max characters (`1…32`). `:get` width = `length×8` |
+| `width` | integer | (flex `6…24ch`) | **Panel only** — fixed field width in character cells (`4…40`). Omit for the default flexible look |
 | `text` | string | `''` | Panel label |
 | `color` | hex | `^808080` | Border / label when unfocused (same idea as keyboard) |
 | `bgColor` | hex | `^101010` | Panel / field background when unfocused |
@@ -200,6 +202,7 @@ Press **Scan** with an empty field: `code` stays all zeros, `n` is `00`.
 ```logts-play
 comp [scanner] .scan:
   length: 8
+  width: 16
   text: 'Tag'
   color: ^0af
   bgColor: ^111
@@ -213,7 +216,33 @@ comp [scanner] .scan:
 show(n)
 ```
 
-Load & Run: `n` is `0000`. Focus the field to see focus colours; Scan after typing to update `code` / `n`.
+Load & Run: `n` is `0000`. `width: 16` fixes the field at 16 character cells (omit `width` for the default flexible `6…24ch` field). Focus the field to see focus colours; Scan after typing to update `code` / `n`.
+
+### Narrow vs wide field
+
+```logts-play
+comp [scanner] .narrow:
+  length: 8
+  width: 4
+  text: 'N'
+  :
+
+comp [scanner] .wide:
+  length: 8
+  width: 24
+  text: 'W'
+  nl
+  :
+
+64wire a = .narrow:get
+64wire b = .wide:get
+4wire sa = .narrow:size
+4wire sb = .wide:size
+show(sa)
+show(sb)
+```
+
+Same capacity (`length: 8`); only the **on-screen** field width differs.
 
 ### Feed a FIFO on `:valid`
 

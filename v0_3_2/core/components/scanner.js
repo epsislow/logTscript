@@ -30,8 +30,18 @@ var ScannerComponent = class ScannerComponent extends BuiltinComponent {
     if (length < 1 || length > 32) {
       throw Error(`scanner length must be 1..32${name ? ` for ${name}` : ''}`);
     }
+    let width = null;
+    if (attributes && attributes.width !== undefined && attributes.width !== null && attributes.width !== '') {
+      width = ScannerComponent.parseIntAttr(attributes.width, null);
+      if (width == null || isNaN(width)) width = null;
+      else {
+        if (width < 4) width = 4;
+        if (width > 40) width = 40;
+      }
+    }
     return {
       length,
+      width,
       text: attributes && attributes.text !== undefined ? String(attributes.text) : '',
       color: ScannerComponent.normalizeColor(attributes && attributes.color, '#808080'),
       bgColor: ScannerComponent.normalizeColor(attributes && attributes.bgColor, '#101010'),
@@ -137,6 +147,7 @@ var ScannerComponent = class ScannerComponent extends BuiltinComponent {
     return {
       attrs: [
         { name: 'length', value: 'integer' },
+        { name: 'width', value: 'integer' },
         { name: 'text', value: 'string' },
         { name: 'color', value: 'string' },
         { name: 'bgColor', value: 'string' },
@@ -204,6 +215,7 @@ var ScannerComponent = class ScannerComponent extends BuiltinComponent {
         id: baseId,
         text: cfg.text,
         length: cfg.length,
+        width: cfg.width,
         color: cfg.color,
         bgColor: cfg.bgColor,
         focusColor: cfg.focusColor,

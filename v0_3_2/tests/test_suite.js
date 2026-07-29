@@ -32034,5 +32034,21 @@ comp [queue] .q:
   h.assert('one', session.getWire(interp, 'used'), '001');
 });
 
+reg(2928, 'scanner', 'width display attr optional', function(h, session) {
+  const a = ScannerComponent.resolveConfig({ length: 8 });
+  h.assert('default null', String(a.width), 'null');
+  const b = ScannerComponent.resolveConfig({ length: 8, width: 20 });
+  h.assert('custom', String(b.width), '20');
+  const c = ScannerComponent.resolveConfig({ length: 8, width: 2 });
+  h.assert('clamp min', String(c.width), '4');
+  const { interp } = session.run(`comp [scanner] .scan:
+  length: 5
+  width: 18
+  :
+
+40wire code = .scan:get`);
+  h.assert('cfg', String(interp.components.get('.scan').attributes.width), '18');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();
