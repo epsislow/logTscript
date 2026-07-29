@@ -39,6 +39,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/components/rotary.js",
   "core/components/slider.js",
   "core/components/sensor.js",
+  "core/components/motor.js",
   "devices/clcd-symbols_generated.js",
   "core/components/clcd.js",
   "core/components/alu.js",

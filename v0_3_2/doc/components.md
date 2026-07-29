@@ -51,6 +51,7 @@ Overview (panel callbacks, common patterns): [interactive-components.md](interac
 | `alu` | — | [alu.md](alu.md) |
 | `terminal` | — | [terminal.md](terminal.md) |
 | `dots` (clock colon) | `:` | [dots.md](dots.md) |
+| `motor` | — | [motor.md](motor.md) |
 
 ---
 

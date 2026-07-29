@@ -61,7 +61,7 @@ const DOC_SECTIONS = [
       { file: 'ioport.md', label: 'ioport', searchPrimary: 'IOPORT comp.ioport doc(comp.ioport)', searchExtra: 'I/O port gpio aggregation in out bus' },
       { file: 'rotary.md', label: 'rotary', searchPrimary: 'rotary comp.rotary doc(comp.rotary) states text color for nl' },
       { file: 'slider.md', label: 'slider', searchPrimary: 'slider comp.slider doc(comp.slider) length text color orientation reversed size for nl', searchExtra: 'panel slider length orientation reversed size N-bit' },
-      { file: 'sensor.md', label: 'sensor', searchExtra: 'proximity temperature humidity distance mag step Kelvin Celsius analog digital' }
+      { file: 'sensor.md', label: 'sensor', searchExtra: 'proximity temperature humidity distance mag step Kelvin Celsius analog digital wheel' }
     ],
   },
   {
@@ -76,7 +76,8 @@ const DOC_SECTIONS = [
       { file: 'clcd-symbols.md', label: 'CLCD symbols', searchExtra: 'catalog icon font awesome search symbol style' },
       { file: 'alu.md', label: 'alu', searchPrimary: 'alu comp.alu doc(comp.alu) length on extraOp extraFlags lut' },
       { file: 'terminal.md', label: 'terminal', searchPrimary: 'terminal comp.terminal doc(comp.terminal)' },
-      { file: 'dots.md', label: 'dots', searchPrimary: 'dots comp.dots doc(comp.dots) : comp.: doc(comp.:)' }
+      { file: 'dots.md', label: 'dots', searchPrimary: 'dots comp.dots doc(comp.dots) : comp.: doc(comp.:)' },
+      { file: 'motor.md', label: 'motor', searchExtra: 'actuator spin speed animation rotor fan pump rate dir panel output' }
     ],
   },
   {

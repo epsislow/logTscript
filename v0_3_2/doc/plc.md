@@ -1957,6 +1957,14 @@ Generic N-bit panel slider. For named scales (temperature, humidity, `mag`, unit
 | **Write** | Storage ref + `updateDisplayValue` — LED lights immediately after scan |
 | **Alternative** | `MOTOR = motorCmd` then `.motorLed = motorCmd` outside PLC (example 3) |
 
+### `comp [motor]`
+
+| Topic | Detail |
+|-------|--------|
+| **Map** | `MOTOR = .drive` — symbol width must match motor `length` |
+| **Write** | Storage + spinning panel (`updateDisplayValue`); speed = full unsigned value |
+| **Guide** | [motor.md](motor.md) |
+
 ### `comp [reg]`
 
 | Topic | Detail |
@@ -2104,4 +2112,4 @@ If the program does **not** assign an output in this scan, the **mapped target k
 - [plc-language.md](plc-language.md) — **PLC language** (keywords, syntax, timers)
 - [cpu.md](cpu.md) — `inline [asm]` + `comp [cpu]` pattern
 - [conditional-assignment.md](conditional-assignment.md) — LogTscript `on:` / property blocks
-- [key.md](key.md), [switch.md](switch.md), [led.md](led.md) — panel I/O for map targets
+- [key.md](key.md), [switch.md](switch.md), [led.md](led.md), [motor.md](motor.md), [sensor.md](sensor.md) — panel I/O for map targets

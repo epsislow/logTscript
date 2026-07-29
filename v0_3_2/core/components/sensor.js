@@ -16,6 +16,7 @@ var SensorComponent = class SensorComponent extends BuiltinComponent {
       light: { unit: 'lux', min: 0, max: 1000, default: 200, mag: 0, length: 8 },
       pressure: { unit: 'bar', min: 0, max: 10, default: 1, mag: 0, length: 8 },
       distance: { unit: 'cm', min: 0, max: 400, default: 100, mag: 0, length: 8 },
+      wheel: { unit: '', min: 0, max: 255, default: 0, mag: 0, length: 8 },
     };
   }
 
@@ -35,6 +36,7 @@ var SensorComponent = class SensorComponent extends BuiltinComponent {
       light: '☼',
       pressure: 'Pr',
       distance: 'D',
+      wheel: 'W',
     };
   }
 

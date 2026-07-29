@@ -923,53 +923,27 @@ Pentru text/status pe display: wires multi-bit (`8wire statusCode`) mapate în P
 - Exemple `logts-play`: START/STOP/MOTOR cu substituenți reali
 - **Nu** implementăm `comp [button]` ca alias — opțional foarte târziu în P3c
 
-### P3c — Componente dedicate actuator/senzor (**deschis** — 2026-07-29)
+### P3c — Componente dedicate actuator/senzor
 
-**Sensor:** plan complet → **[comp_sensor_universal.plan.md](comp_sensor_universal.plan.md)** (`comp [sensor]` ca input LogTscript; PLC opțional).
+**Sensor:** livrat — [comp_sensor_universal.plan.md](comp_sensor_universal.plan.md) (`comp [sensor]`; PLC opțional).
 
-**Motor / fan:** încă pe P-ACT* de mai jos (după senzor).
+**Motor:** livrat — [comp_motor_universal.plan.md](comp_motor_universal.plan.md) (`comp [motor]` output animat; `kind` rotor/fan/pump; viteză N-bit; PLC opțional). Fan = `kind: fan` pe motor (nu componentă separată). `button` — **nu** (P-ACT4).
 
-Schița: **`motor`**, **`sensor`**, **`fan`**. Prerequisite: **P2** + **P+b** + **P5** deja livrate.
+#### Decizii P-ACT* (închise via plan motor)
 
-#### Decizii P-ACT* (propuse — de confirmat)
-
-Aliniere **P-PHIL:** didactic implicit (on/off, UI clar) + opt-in ulterior pentru motion/viteză.
-
-| ID | Propunere | Status |
-|----|-----------|--------|
-| **P-ACT0** | P3c livrat pe **sub-faze**: **P3c.0** decizii+doc-schelet → **P3c.1** `motor` digital → **P3c.2** `sensor` digital → **P3c.3** `fan` digital → **P3c.4** doc `plc.md` + `logts-play` + teste; **P3c.m** motion (viteză/RPM/direcție) **amânat** | **propus** |
-| **P-ACT1** | **`comp [motor]`** MVP = **1-bit** run/stop (ca `led` ca I/O, UI diferit: icon motor / rotație vizuală când `1`) — **nu** viteză în MVP | **propus** |
-| **P-ACT2** | **`comp [sensor]`** MVP = **1-bit** digital (proximitate/limită didactică); citire ca `key`/`switch` (`:get`, mapare `inputs:`) — UI distinct de `key` | **propus** |
-| **P-ACT3** | **`comp [fan]`** MVP = **1-bit** on/off; UI ventilator (nu LED); același contract `value`/`set`/`get` ca `led` | **propus** |
-| **P-ACT4** | **`comp [button]`** — **nu** în P3c (și nu ulterior prioritar): intrări = **`key`**, **`switch`**, **`dip`**, touch **`clcd`** (P-IO1) | **închis** |
-| **P-ACT5** | Contract I/O = **același model ca `led`**: atribuire directă `.m = 1`, bloc `{ value, set }`, pout `:get`; **`on:`** = când se aplică pinii — **nu** semnal de comandă (**P-FIX2**) | **propus** |
-| **P-ACT6** | Mapare PLC: `outputs: { MOTOR = .m1 }` / `inputs: { PROX = .s1 }` — același resolver ca pentru `led`/`key` (fără API PLC nou) | **propus** |
-| **P-ACT7** | Multi-bit / viteză (`SPEED:8`, PWM, direcție) → **doar P3c.m** (după MVP digital); până atunci `led`/`reg`/`slider` rămân substituenți pentru multi-bit | **propus** |
-| **P-ACT8** | Vizual: componente UI **proprii** (nu recolorare LED); animație minimală (motor rotire / fan pale când on) — fără tipuri industriale (servo/stepper) în MVP | **propus** |
-| **P-ACT9** | Doc utilizator: doar ce există; **fără** nume de faze / „ce urmează”; exemple `logts-play` cu Load / Load & Run | **propus** |
+| ID | Decizie | Status |
+|----|---------|--------|
+| **P-ACT4** | fără `button` | închis |
+| **P-ACT5** | contract ca `led`: `value`/`set`/`get`; `on:` ≠ comandă | închis |
+| **P-ACT6** | `outputs: { MOTOR = .m }` | închis |
+| **P-ACT*** | viteză = valoarea întreagă; `rate` întreg→float intern; `dir`/`reversed` | închis |
 
 #### Sub-faze P3c
 
 | Sub-fază | Conținut | Status |
 |----------|----------|--------|
-| **P3c.0** | Închidere P-ACT* + schelet plan/doc | **în curs** |
-| **P3c.1** | `comp [motor]` 1-bit + UI + teste unitare | pending |
-| **P3c.2** | `comp [sensor]` 1-bit + UI + teste | pending |
-| **P3c.3** | `comp [fan]` 1-bit + UI + teste | pending |
-| **P3c.4** | `plc.md` matrice + exemple PLC mapate + suite verde | pending |
-| **P3c.m** | Motion: viteză, direcție, tipuri — **amânat** | amânat |
-
-```mermaid
-flowchart LR
-  P3c0[P3c.0 decisions]
-  P3c1[P3c.1 motor]
-  P3c2[P3c.2 sensor]
-  P3c3[P3c.3 fan]
-  P3c4[P3c.4 doc play]
-  P3cm[P3c.m motion later]
-  P3c0 --> P3c1 --> P3c2 --> P3c3 --> P3c4
-  P3c4 -.-> P3cm
-```
+| Sensor S0–S3 | `comp [sensor]` | **done** |
+| Motor M0–M3 | `comp [motor]` + docs | **done** |
 
 ---
 

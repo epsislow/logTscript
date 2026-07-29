@@ -51,6 +51,7 @@ comp [sensor] .prox::
 | `light` | analog | 8 | Light level |
 | `pressure` | analog | 8 | Pressure |
 | `distance` | analog | 8 | Distance / ultrasonic |
+| `wheel` | analog | 8 | Speed dial / command wheel (`0…255`) |
 
 Unknown `kind` → elaboration error.
 
@@ -373,6 +374,25 @@ Load & Run: proximity preset on → alarm LED **`1`**.
 
 ---
 
+## Wheel (speed dial)
+
+`kind: wheel` is an 8-bit analog input (`0…255`) for commanding actuators such as [`comp [motor]`](motor.md).
+
+```logts-play
+comp [sensor] .wheel:
+  kind: wheel
+  text: 'W'
+  nl
+  :
+
+8wire cmd = .wheel:get
+show(cmd)
+```
+
+Load & Run: initial `cmd` is `00000000` (default raw 0).
+
+---
+
 ## Compared to slider / switch
 
 | Control | Best for |
@@ -381,6 +401,7 @@ Load & Run: proximity preset on → alarm LED **`1`**.
 | **`sensor` (digital)** | Named sensor semantics + icons |
 | **`slider`** | Generic N-bit numeric UI |
 | **`sensor` (analog)** | Named scale, units, `mag`, `step`, kind defaults |
+| **`sensor` (`wheel`)** | 8-bit speed / command dial for motors |
 
 ---
 

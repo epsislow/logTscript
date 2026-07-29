@@ -2544,7 +2544,7 @@ probe(.n:get)`;
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'cpu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider', 'sensor'];
+    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'cpu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider', 'sensor', 'motor'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -31541,6 +31541,308 @@ reg(2892, 'sensor', 'doc play — cold negative default', function(h, session) {
 8wire c = .cold:get`);
   const cfg = SensorComponent.resolveConfig({ kind: 'temperature', unit: 'C', min: -20, max: 40, default: -5 });
   h.assert('c', session.getWire(interp, 'c'), SensorComponent.indexToBin(SensorComponent.rawToIndex(-5, cfg), 8));
+});
+
+reg(2893, 'motor', 'registry + doc(comp.motor)', function(h, session) {
+  const registry = session._ensureRegistry();
+  h.assert('motor registered', String(registry.has('motor')), 'true');
+  const out = session.runDoc('doc(comp.motor)');
+  h.assert('doc first line', out[0], 'comp [motor] .name:');
+  h.assert('doc kind', String(out.some(l => l.includes('kind: string'))), 'true');
+  h.assert('doc rate', String(out.some(l => l.includes('rate: integer'))), 'true');
+});
+
+reg(2894, 'motor', '1-bit assign run stop + get', function(h, session) {
+  const { interp } = session.run(`comp [motor] .m:
+  kind: rotor
+  text: 'M'
+  on: 1
+  :
+
+.m = 1
+1wire s = .m:get`);
+  h.assert('on', session.getWire(interp, 's'), '1');
+  session.execStmts(interp, `.m = 0`);
+  h.assert('off', interp.getValueFromRef(interp.components.get('.m').ref), '0');
+});
+
+reg(2895, 'motor', 'kinds fan pump + unknown kind', function(h, session) {
+  for (const kind of ['fan', 'pump']) {
+    const { interp } = session.run(`comp [motor] .m:
+  kind: ${kind}
+  :
+
+.m = 1
+1wire v = .m:get`);
+    h.assert(kind, session.getWire(interp, 'v'), '1');
+  }
+  let err = '';
+  try {
+    session.run(`comp [motor] .bad:
+  kind: servo
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('unknown', String(/Unknown motor kind/.test(err)), 'true');
+});
+
+reg(2896, 'motor', 'property block value set', function(h, session) {
+  const { interp } = session.run(`comp [motor] .m:
+  on: 1
+  :
+
+.m:{ value = 1, set = 1 }
+1wire s = .m:get`);
+  h.assert('set', session.getWire(interp, 's'), '1');
+});
+
+reg(2897, 'motor', 'animationPeriod mapping + rate tenths', function(h, session) {
+  h.assert('stopped', String(MotorComponent.animationPeriod(0, 8, 10)), 'null');
+  const p1 = MotorComponent.animationPeriod(1, 8, 10);
+  const pMax = MotorComponent.animationPeriod(255, 8, 10);
+  h.assert('slow > fast', String(p1 > pMax), 'true');
+  const slowRate = MotorComponent.animationPeriod(128, 8, 3);
+  const fastRate = MotorComponent.animationPeriod(128, 8, 20);
+  h.assert('rate slows', String(slowRate > fastRate), 'true');
+  const oneBit = MotorComponent.animationPeriod(1, 1, 10);
+  h.assert('1bit on', String(oneBit != null && oneBit > 0), 'true');
+});
+
+reg(2898, 'motor', 'length 8 speed whole value + get', function(h, session) {
+  const { interp } = session.run(`comp [motor] .drive:
+  length: 8
+  kind: rotor
+  on: 1
+  :
+
+8wire cmd = 10101010
+.drive:{ value = cmd, set = 1 }
+8wire out = .drive:get`);
+  h.assert('speed', session.getWire(interp, 'out'), '10101010');
+  h.assert('unsigned', String(MotorComponent.binToUnsigned('10101010')), '170');
+});
+
+reg(2899, 'motor', 'slider wire to motor same width', function(h, session) {
+  const { interp } = session.run(`comp [slider] .wheel:
+  length: 8
+  text: 'W'
+  on: 1
+  :
+
+comp [motor] .drive:
+  kind: rotor
+  length: 8
+  on: 1
+  :
+
+.wheel:{ data = 00110011, set = 1 }
+8wire cmd = .wheel:get
+.drive:{ value = cmd, set = 1 }
+8wire out = .drive:get`);
+  h.assert('linked', session.getWire(interp, 'out'), '00110011');
+});
+
+reg(2900, 'motor', 'dir pin + reversed attribute period still from value', function(h, session) {
+  const { interp } = session.run(`comp [motor] .m:
+  length: 4
+  reversed
+  on: 1
+  :
+
+.m:{ value = 0101, dir = 1, set = 1 }
+4wire v = .m:get`);
+  h.assert('get is speed', session.getWire(interp, 'v'), '0101');
+});
+
+reg(2901, 'motor', 'rate size rotate attrs accepted', function(h, session) {
+  const { interp } = session.run(`comp [motor] .m:
+  kind: fan
+  length: 4
+  size: 14
+  rate: 3
+  rotate: 90
+  flip
+  color: ^0f9
+  text: 'F1'
+  nl
+  on: 1
+  :
+
+.m = 1111
+4wire v = .m:get`);
+  h.assert('v', session.getWire(interp, 'v'), '1111');
+  const cfg = MotorComponent.resolveConfig(interp.components.get('.m').attributes);
+  h.assert('rate', String(cfg.rate), '3');
+  h.assert('size', String(cfg.size), '14');
+  h.assert('rotate', String(cfg.rotate), '90');
+  h.assert('flip', String(!!cfg.flip), 'true');
+});
+
+reg(2902, 'motor', 'PLC outputs map to motor', function(h, session) {
+  const { interp } = session.run(`inline [plc] .machine:
+  inputs: { START }
+  outputs: { MOTOR }
+  IF START THEN MOTOR = 1 ELSE MOTOR = 0 END_IF
+  :
+
+comp [switch] .start:
+  = 1
+  nl
+  :
+
+comp [motor] .drive:
+  kind: fan
+  on: 1
+  nl
+  :
+
+comp [plc] .ctrl:
+  program: .machine
+  scanTime: 0
+  inputs: { START = .start }
+  outputs: { MOTOR = .drive }
+  on: 1
+  :
+
+.ctrl:{ set = 1 }
+`);
+  const drive = interp.components.get('.drive');
+  h.assert('motor on', interp.getValueFromRef(drive.ref), '1');
+});
+
+reg(2903, 'motor', 'direct assign multi-bit', function(h, session) {
+  const { interp } = session.run(`comp [motor] .m:
+  length: 8
+  :
+
+.m = 00001111
+8wire o = .m:get`);
+  h.assert('o', session.getWire(interp, 'o'), '00001111');
+});
+
+reg(2904, 'motor', 'length bounds error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`comp [motor] .bad:
+  length: 9
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('len', String(/length must be 1\.\.8/.test(err)), 'true');
+});
+
+reg(2905, 'motor', 'doc play — 1bit on', function(h, session) {
+  const src = `comp [motor] .m1:
+  kind: rotor
+  text: 'M1'
+  color: ^6dff9c
+  nl
+  :
+
+.m1 = 1
+1wire s = .m1:get
+show(s)`;
+  const { interp } = session.run(src);
+  h.assert('s', session.getWire(interp, 's'), '1');
+});
+
+reg(2906, 'motor', 'doc play — fan stop', function(h, session) {
+  const { interp } = session.run(`comp [motor] .fan1:
+  kind: fan
+  text: 'Fan'
+  on: 1
+  nl
+  :
+
+.fan1:{ value = 1, set = 1 }
+.fan1:{ value = 0, set = 1 }
+1wire s = .fan1:get`);
+  h.assert('stopped', session.getWire(interp, 's'), '0');
+});
+
+reg(2907, 'motor', 'doc play — 8bit slider drive', function(h, session) {
+  const { interp } = session.run(`comp [slider] .spd:
+  length: 8
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [motor] .pump1:
+  kind: pump
+  length: 8
+  size: 12
+  rate: 10
+  on: 1
+  nl
+  :
+
+.spd:{ data = 11000000, set = 1 }
+8wire cmd = .spd:get
+.pump1:{ value = cmd, set = 1 }
+8wire out = .pump1:get
+show(out)`);
+  h.assert('out', session.getWire(interp, 'out'), '11000000');
+});
+
+reg(2908, 'motor', 'doc play — rate slow visual factor', function(h, session) {
+  const p = MotorComponent.animationPeriod(200, 8, 3);
+  const q = MotorComponent.animationPeriod(200, 8, 10);
+  h.assert('rate3 slower', String(p > q), 'true');
+});
+
+reg(2910, 'motor', 'doc play — wheel sensor to motor', function(h, session) {
+  const { interp } = session.run(`comp [sensor] .wheel:
+  kind: wheel
+  text: 'W'
+  on: 1
+  nl
+  :
+
+comp [motor] .drive:
+  kind: rotor
+  length: 8
+  size: 14
+  on: 1
+  nl
+  :
+
+.wheel:{ data = 01000000, set = 1 }
+8wire cmd = .wheel:get
+.drive:{ value = cmd, set = 1 }
+8wire out = .drive:get`);
+  h.assert('out', session.getWire(interp, 'out'), '01000000');
+});
+
+reg(2911, 'motor', 'doc play — three kinds on', function(h, session) {
+  const { interp } = session.run(`comp [motor] .r:
+  kind: rotor
+  on: 1
+  :
+
+comp [motor] .f:
+  kind: fan
+  on: 1
+  :
+
+comp [motor] .p:
+  kind: pump
+  on: 1
+  :
+
+.r = 1
+.f = 1
+.p = 1`);
+  h.assert('r', interp.getValueFromRef(interp.components.get('.r').ref), '1');
+  h.assert('f', interp.getValueFromRef(interp.components.get('.f').ref), '1');
+  h.assert('p', interp.getValueFromRef(interp.components.get('.p').ref), '1');
+});
+
+reg(2912, 'sensor', 'wheel kind defaults 8bit zero', function(h, session) {
+  const { interp } = session.run(`comp [sensor] .wheel:
+  kind: wheel
+  :
+
+8wire cmd = .wheel:get`);
+  h.assert('zero', session.getWire(interp, 'cmd'), '00000000');
 });
 
   window.LogTScriptTestSuite.finalize();
