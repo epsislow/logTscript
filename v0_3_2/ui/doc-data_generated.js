@@ -23610,7 +23610,7 @@ inline [plc] .machine:
 |------|------|
 | **Header** | \`inline [plc] .name:\` — \`.name\` is required (same as \`inline [asm]\`) |
 | **Interface** | Optional \`inputs:\` and \`outputs:\` blocks (order: inputs first, then outputs) |
-| **Body** | Sequential **statements** — assignments, \`IF\`, timers, (future: counters) |
+| **Body** | Sequential **statements** — assignments, \`IF\`, timers, counters |
 | **Closing** | Body ends with a line containing only **\`:\`** |
 
 The program body does **not** reference wires or panel components — only symbolic names (\`START\`, \`MOTOR\`). Mapping happens on \`comp [plc]\` — see [plc.md](plc.md).
@@ -23652,7 +23652,7 @@ inputs: { TEMP: 8 }
 **Rules**
 
 - Assigning to an input in the program body → **parse error**
-- Multi-bit inputs may be **declared** and **mapped**; boolean logic on them → error until [P+b](plc.md#future-phases) (analog)
+- Multi-bit inputs may be **declared** and **mapped**, but boolean logic on them is not supported here
 
 ### \`outputs:\`
 
@@ -23685,7 +23685,7 @@ READY = startDelay.Q
 | **Output symbol** | ✓ |
 | **Input symbol** | ✗ parse error |
 | **\`timer.Q\`** | ✗ read-only |
-| **\`counter.Q\` / \`.CV\`** | ✗ read-only (P5.2) |
+| **\`counter.Q\` / \`.CV\`** | ✗ read-only |
 
 ---
 
@@ -23713,7 +23713,7 @@ END_IF
 
 **Nesting:** \`IF\` blocks may contain other \`IF\` blocks and timer statements.
 
-**Not implemented yet:** \`CASE\`, \`FOR\`, \`WHILE\`, \`RETURN\` — planned in future phases (see [Future keywords](#future-keywords-planned)).
+This page documents only the statements and keywords currently available.
 
 ---
 
@@ -23759,13 +23759,13 @@ read inputs → execute statements in order → write outputs
 | **Statement order** | Matters — later assigns to the same output win |
 | **Timers / counters** | Execute in place; outputs (\`.Q\`) visible to following statements in the **same** scan |
 | **State** | Timer/counter internal state persists on \`comp [plc]\` between scans |
-| **Re-RUN** | New run resets timer state (RETAIN → future P5.2b) |
+| **Re-RUN** | New run resets timer and counter state |
 
 Triggering scans: \`.ctrl:{ set = 1 }\`, \`scanTime\`, external clock — [plc.md — Scan timing](plc.md#scan-timing-p4).
 
 ---
 
-## Timers — \`TON\` / \`TOF\` (P5.1)
+## Timers — \`TON\` / \`TOF\`
 
 Function-block style **statements** (not mappable I/O). Each instance has a **name** and persistent state per \`comp [plc]\`.
 
@@ -23807,13 +23807,13 @@ TOF coolOff(IN := RUN, PT := 30)
 2. \`IN = 0\` and \`Q\` was \`1\` → count up each scan; when count ≥ \`PT\`, \`Q = 0\`
 3. \`IN = 0\` and \`Q\` was already \`0\` → stays off
 
-### Timer placement (P5.1)
+### Timer placement
 
 | Location | Allowed |
 |----------|---------|
 | Top-level in program body | ✓ |
 | Inside \`IF\` / \`THEN\` / \`ELSE\` / \`ELSIF\` | ✓ |
-| Inside \`CASE\` / \`FOR\` / \`WHILE\` | future **P5.3** |
+| Inside \`CASE\` / \`FOR\` / \`WHILE\` | not supported |
 
 ### Timer errors
 
@@ -23843,7 +23843,7 @@ doc(.demo)
 
 ---
 
-## Counters — \`CTU\` / \`CTD\` (P5.2)
+## Counters — \`CTU\` / \`CTD\`
 
 Function-block style **statements**, similar to timers. Each instance has a **name** and persistent state per \`comp [plc]\`.
 
@@ -23933,15 +23933,15 @@ IF pieceCount.CV == 10 THEN FULL = 1  END_IF
 | \`<\` | CV strictly less |
 | \`==\` | CV equal |
 
-Only **\`name.CV op number\`** is supported — literal on the right side. Full analog comparisons remain **P+b**.
+Only **\`name.CV op number\`** is supported — literal on the right side.
 
-### Counter placement (P5.2)
+### Counter placement
 
 | Location | Allowed |
 |----------|---------|
 | Top-level in program body | ✓ |
 | Inside \`IF\` / \`THEN\` / \`ELSE\` / \`ELSIF\` | ✓ |
-| Inside \`CASE\` / \`FOR\` / \`WHILE\` | future **P5.3** |
+| Inside \`CASE\` / \`FOR\` / \`WHILE\` | not supported |
 
 ### Counter errors
 
@@ -23966,9 +23966,12 @@ inline [plc] .boxCounter:
   IF cnt.CV >= 3 THEN WARN = 1 ELSE WARN = 0 END_IF
   :
 
-wire [1] .sensor:
+comp [switch] .sensor:
+  = 0
   :
-wire [1] .reset:
+
+comp [switch] .reset:
+  = 0
   :
 
 comp [led] .fullLed:
@@ -24012,7 +24015,12 @@ inline [plc] .mission:
   DONE = cnt.Q
   :
 
-wire [1] .tick:
+comp [switch] .tick:
+  = 0
+  :
+
+comp [switch] .reload:
+  = 0
   :
 
 comp [led] .doneLed:
@@ -24020,13 +24028,17 @@ comp [led] .doneLed:
 
 comp [plc] .ctrl:
   program: .mission
-  inputs: { TICK = .tick, RELOAD = 0 }
+  inputs: { TICK = .tick, RELOAD = .reload }
   outputs: { DONE = .doneLed }
   on: 1
   :
 
-; load preset, then 3 steps → DONE on
+; load preset first
+.reload = 1
 .ctrl:{ set = 1 }
+.reload = 0
+
+; 3 rising edges to count down
 .tick = 1
 .ctrl:{ set = 1 }
 .tick = 0
@@ -24036,6 +24048,8 @@ comp [plc] .ctrl:
 .tick = 0
 .ctrl:{ set = 1 }
 .tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
 .ctrl:{ set = 1 }
 
 show(.doneLed:get)
@@ -24061,16 +24075,16 @@ Instance **\`name\`** must match a \`TON\`/\`TOF\`/\`CTU\`/\`CTD\` declaration i
 
 | Statement kind | Top-level | Inside \`IF\` | \`CASE\`/\`FOR\`/\`WHILE\` |
 |----------------|-----------|-------------|----------------------|
-| Assignment \`=\` | ✓ | ✓ | future |
-| \`IF\` … \`END_IF\` | ✓ | ✓ (nested) | future |
-| \`TON\` / \`TOF\` | ✓ | ✓ | P5.3 |
-| \`CTU\` / \`CTD\` | ✓ (P5.2) | ✓ (P5.2) | P5.3 |
+| Assignment \`=\` | ✓ | ✓ | not supported |
+| \`IF\` … \`END_IF\` | ✓ | ✓ (nested) | not supported |
+| \`TON\` / \`TOF\` | ✓ | ✓ | not supported |
+| \`CTU\` / \`CTD\` | ✓ | ✓ | not supported |
 
 ---
 
 ## Keyword reference
 
-### Implemented (P1 + P5.1 + P5.2)
+### Available keywords
 
 | Keyword | Category | Summary |
 |---------|----------|---------|
@@ -24094,19 +24108,6 @@ Instance **\`name\`** must match a \`TON\`/\`TOF\`/\`CTU\`/\`CTD\` declaration i
 | **\`R\`** | Counter arg | Reset (inside \`CTU\`) |
 | **\`LD\`** | Counter arg | Load preset (inside \`CTD\`) |
 | **\`>=\` \`<=\` \`>\` \`<\` \`==\`** | Comparison | \`.CV\` comparisons only |
-
-### Future keywords (planned)
-
-| Keyword | Phase | Summary |
-|---------|-------|---------|
-| **\`VAR\` \`END_VAR\`** | P+c | Internal memory |
-| **\`CONST\` \`END_CONST\`** | P+c | Constants |
-| **\`CASE\` \`OF\` \`END_CASE\`** | P+c | Selection |
-| **\`RETURN\`** | P+c | Early exit from body |
-| **\`FOR\` \`TO\` \`BY\` \`DO\` \`END_FOR\`** | P+d | Counted loop |
-| **\`WHILE\` \`END_WHILE\`** | P+d | Conditional loop |
-
----
 
 ## Common errors
 
@@ -24185,10 +24186,10 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 |-------|---------|
 | **Language** | Full keyword/syntax reference → [plc-language.md](plc-language.md) |
 | **Program** | \`inline [plc] .machine:\` with \`inputs:{ }\`, \`outputs:{ }\`, logic body |
-| **Logic (v1)** | \`IF/THEN/ELSE/ELSIF/END_IF\`, \`AND/OR/NOT/XOR\`, \`TRUE\`/\`FALSE\`, \`0\`/\`1\` |
-| **Timers (P5.1)** | \`TON\` / \`TOF\` blocks; \`PT\` in scan cycles; read \`name.Q\` |
-| **Counters (P5.2)** | \`CTU\` / \`CTD\` blocks; \`PV\` preset; read \`name.Q\`; compare \`name.CV >= N\` |
-| **Widths** | \`START\` alone = 1 bit; \`TEMP: 8\` declarable (logic on multi-bit → future P+b) |
+| **Logic** | \`IF/THEN/ELSE/ELSIF/END_IF\`, \`AND/OR/NOT/XOR\`, \`TRUE\`/\`FALSE\`, \`0\`/\`1\` |
+| **Timers** | \`TON\` / \`TOF\` blocks; \`PT\` in scan cycles; read \`name.Q\` |
+| **Counters** | \`CTU\` / \`CTD\` blocks; \`PV\` preset; read \`name.Q\`; compare \`name.CV >= N\` |
+| **Widths** | \`START\` alone = 1 bit; \`TEMP: 8\` can be declared and mapped, but current logic examples use 1-bit conditions |
 | **Scan** | \`.plc:{ set = 1 }\` or **\`scanTime > 0\`** auto-scan; see [Scan timing (P4)](#scan-timing-p4) |
 | **\`busy\`** | \`0\` when \`scanTime: 0\`; pulses during simulated scan when \`scanTime > 0\` |
 | **Outputs** | Retain last value if not assigned this scan (PLC semantics) |
@@ -24234,8 +24235,8 @@ inline [plc] .machine:
 | Topic | Where |
 |-------|-------|
 | Declarations, \`IF\`, booleans, precedence | [plc-language.md](plc-language.md) |
-| \`TON\` / \`TOF\` | [plc-language.md — Timers](plc-language.md#timers--ton--tof-p51) |
-| \`CTU\` / \`CTD\` (planned) | [plc-language.md — Counters](plc-language.md#counters--ctu--ctd-p52--planned) |
+| \`TON\` / \`TOF\` | [plc-language.md — Timers](plc-language.md#timers--ton--tof) |
+| \`CTU\` / \`CTD\` | [plc-language.md — Counters](plc-language.md#counters--ctu--ctd) |
 | \`doc(inline.plc)\`, \`doc(.machine)\` | [plc-language.md — doc()](plc-language.md#doc-helpers) |
 
 ---
@@ -24352,7 +24353,7 @@ Only the **maps** change — not the program.
 
 ---
 
-## Scan timing (P4)
+## Scan timing
 
 ### What \`scanTime\` means
 
@@ -24371,7 +24372,7 @@ read inputs → executePlcScan → write outputs → scanCount++
 
 | Setup | Who drives scans |
 |-------|------------------|
-| **\`scanTime: 0\`** | **You** — \`.ctrl:{ set = 1 }\`, wire, or **\`comp [osc]\`** (P4.0 / P4.2) |
+| **\`scanTime: 0\`** | **You** — \`.ctrl:{ set = 1 }\`, wire, or **\`comp [osc]\`** |
 | **\`scanTime: N\`** | **PLC timer** — periodic auto-scan; optional extra manual \`set\` if not \`busy\` |
 
 ### \`busy\`, \`skipped\`, overrun
@@ -24386,7 +24387,7 @@ read inputs → executePlcScan → write outputs → scanCount++
 
 Outputs keep their last written value while \`busy\` (P-D7).
 
-### P4.0 — External clock (\`scanTime: 0\`)
+### External clock (\`scanTime: 0\`)
 
 Pattern (same as [DMA paced + osc](dma.md)):
 
@@ -24405,7 +24406,7 @@ comp [osc] .clk:
 
 One rising edge → one scan. In the browser, \`osc\` runs in real time; use **\`probe(.ctrl:scanCount)\`** to watch live counts.
 
-### P4.1 — Auto-scan
+### Auto-scan
 
 \`\`\`logts
 comp [plc] .ctrl:
@@ -24417,11 +24418,11 @@ comp [plc] .ctrl:
 
 Load & Run starts the timer; **\`scanCount\`** increases ~5 times per second. Use **\`probe(.ctrl:scanCount)\`** or **\`probe(.ctrl:busy)\`** for live timing.
 
-### P4.2 — Mixing manual \`set\` with auto-scan
+### Mixing manual \`set\` with auto-scan
 
 With **\`scanTime > 0\`**, \`.ctrl:{ set = 1 }\` still works when **\`busy = 0\`**. If \`busy = 1\`, the request is skipped (\`skipped = 1\`).
 
-### P4.3 — Strict overrun
+### Strict overrun
 
 When **\`scanDuration\`** (simulated work) is longer than **\`scanTime\`** (period), use **\`strict: 1\`** to count missed cycles:
 
@@ -24858,7 +24859,7 @@ comp [plc] .ctrl:
 show(.motorLed:get)
 \`\`\`
 
-### Example 13 — P4.0 external clock wire pulse (test 2775)
+### Example 13 — External clock wire pulse (test 2775)
 
 \`scanTime: 0\` — scan when external wire drives \`set\`. Load & Run: one scan; second \`set\` via script step adds another (here shown as two triggers in one Run).
 
@@ -24892,7 +24893,7 @@ show(.ctrl:busy)
 
 Load & Run: \`scanCount\` is **\`2\`**, \`busy\` is **\`0\`**, \`cntOut\` is **\`1\`**.
 
-### Example 14 — P4.1 manual scan with \`scanTime > 0\` (test 2780)
+### Example 14 — Manual scan with \`scanTime > 0\` (test 2780)
 
 Auto timer is armed but first scan is manual; \`busy\` clears before \`show\`.
 
@@ -24925,7 +24926,7 @@ show(.ctrl:scanCount)
 show(.ctrl:busy)
 \`\`\`
 
-### Example 15 — P4.2 \`on: raise\` + oscillator (browser)
+### Example 15 — \`on: raise\` + oscillator (browser)
 
 Use **\`on: raise\`** so each **rising** edge of the oscillator runs one scan. **Load & Run** in the browser — watch **\`scanCount\`** with **\`probe(.ctrl:scanCount)\`** (osc runs in real time).
 
@@ -24958,7 +24959,7 @@ show(.ctrl:scanCount)
 
 After Load & Run, wait ~2 s per osc cycle; \`scanCount\` increases on each rising edge.
 
-### Example 16 — P4.1 event-driven \`busy\` stays 0 (test 2779)
+### Example 16 — Event-driven \`busy\` stays 0 (test 2779)
 
 \`\`\`logts-play
 inline [plc] .machine:
@@ -24991,9 +24992,9 @@ show(.ctrl:busy)
 
 ---
 
-## Timers TON / TOF (P5)
+## Timers TON / TOF
 
-Language specification: [plc-language.md — TON / TOF](plc-language.md#timers--ton--tof-p51). Below: **integration examples** with \`comp [plc]\` and \`logts-play\`. — TON on-delay (test 2794 / 2796)
+Language specification: [plc-language.md — TON / TOF](plc-language.md#timers--ton--tof). Below are integration examples with \`comp [plc]\` and \`logts-play\`.
 
 **START** held on (\`comp [switch] = 1\`). Three scans (\`PT := 3\`) before **MOTOR** and **READY** turn on. Load & Run runs three \`.ctrl:{ set = 1 }\` in one script.
 
@@ -25114,11 +25115,11 @@ Use **probe** and wait in the browser; motor turns on after ~3 auto-scans.
 
 ---
 
-## Timers and Counters (P5)
+## Counters CTU / CTD
 
 ### Example 20 — CTU count-up (test 2811)
 
-**SENSOR** pulsed 5 times; \`PV := 5\`; **FULL** LED activates when \`CV >= 5\`. Script sends 5 rising edges via sensor wire + manual scans.
+**SENSOR** pulsed 5 times; \`PV := 5\`; **FULL** LED activates when \`CV >= 5\`.
 
 \`\`\`logts-play
 inline [plc] .boxCounter:
@@ -25128,7 +25129,12 @@ inline [plc] .boxCounter:
   FULL = cnt.Q
   :
 
-wire [1] .sensor:
+comp [switch] .sensor:
+  = 0
+  :
+
+comp [switch] .reset:
+  = 0
   :
 
 comp [led] .fullLed:
@@ -25136,7 +25142,7 @@ comp [led] .fullLed:
 
 comp [plc] .ctrl:
   program: .boxCounter
-  inputs: { SENSOR = .sensor, RESET = 0 }
+  inputs: { SENSOR = .sensor, RESET = .reset }
   outputs: { FULL = .fullLed }
   on: 1
   :
@@ -25170,7 +25176,7 @@ After Load & Run: **\`scanCount\` = 10**, **FULL LED \`1\`** (5 complete rising 
 
 ### Example 21 — CTD count-down (test 2812)
 
-\`PV := 3\`; \`RELOAD\` pin held at \`0\`; first scan \`CV = 0\` (\`Q = 1\` immediately). To start from PV, send a load pulse first.
+\`PV := 3\`; the script sends one load pulse first, then three rising edges on \`TICK\`.
 
 \`\`\`logts-play
 inline [plc] .mission:
@@ -25180,9 +25186,12 @@ inline [plc] .mission:
   DONE = cnt.Q
   :
 
-wire [1] .tick:
+comp [switch] .tick:
+  = 0
   :
-wire [1] .reload:
+
+comp [switch] .reload:
+  = 0
   :
 
 comp [led] .doneLed:
@@ -25222,26 +25231,22 @@ After Load & Run: **\`scanCount\` = 7** (1 load + 6 scan pairs), **DONE LED \`1\
 
 ---
 
-## I/O mapping matrix (v1)
+## I/O mapping matrix
 
-LogTScript PLC maps **program symbols** to **wires** or **existing panel components**. Width must match exactly. Logic in the program body is **1-bit only** in v1 (\`IF\`, \`AND\`, …); multi-bit symbols may be **declared** and **mapped**, but not used in boolean expressions until **P+b**.
+LogTScript PLC maps **program symbols** to **wires** or **existing panel components**. Width must match exactly. The logic shown on this page uses **1-bit** conditions (\`IF\`, \`AND\`, …). Multi-bit symbols may be declared and mapped, but are not used in these boolean examples.
 
-| Role | PLC symbol (example) | Width | LogTScript target | Read / write | v1 logic in program |
-|------|----------------------|-------|-------------------|--------------|---------------------|
+| Role | PLC symbol (example) | Width | LogTScript target | Read / write | Logic in current examples |
+|------|----------------------|-------|-------------------|--------------|---------------------------|
 | Momentary input | \`START\` | 1 | \`comp [key]\` | \`:get\` | yes |
 | Toggle input | \`STOP\`, \`ENABLE\` | 1 | \`comp [switch]\` | \`:get\` | yes |
-| Parallel switches | \`SEL\` | N | \`comp [dip]\` | \`:get\` (width = \`length\`) | only if N=1 in v1 |
-| Analog input (UI) | \`LEVEL\` | N | \`comp [slider]\` | \`:get\` | **P+b** (doc only) |
-| Port I/O | — | N | \`comp [ioport]\` | pins/pouts | **P+b** |
+| Parallel switches | \`SEL\` | N | \`comp [dip]\` | \`:get\` (width = \`length\`) | use as 1-bit in current examples |
+| Analog input (UI) | \`LEVEL\` | N | \`comp [slider]\` | \`:get\` | declare/map only on this page |
+| Port I/O | — | N | \`comp [ioport]\` | pins/pouts | width-based mapping rules apply |
 | On/off indicator | \`MOTOR\`, \`ALARM\` | 1 | \`comp [led]\` | write storage + display | yes |
-| Bit storage / command | \`CMD\` | N | \`comp [reg]\` | \`setReg\` on scan | only if N=1 in v1 |
-| LED bar | \`STATUS\` | N | \`comp [bar]\` | \`setBarState\` on scan | only if N=1 in v1 |
-| Bus | \`motorCmd\` | N | \`Nwire\` name | wire read/write | yes if N=1 |
+| Bit storage / command | \`CMD\` | N | \`comp [reg]\` | \`setReg\` on scan | current examples use 1-bit |
+| LED bar | \`STATUS\` | N | \`comp [bar]\` | \`setBarState\` on scan | current examples use 1-bit |
+| Bus | \`motorCmd\` | N | \`Nwire\` name | wire read/write | current examples use 1-bit |
 | CLCD display | — | — | **not direct** | via wire + \`.panel:{ value, set }\` | see below |
-
-**Not in v1:** \`comp [button]\`, \`comp [motor]\`, \`comp [sensor]\`, \`comp [fan]\` — planned in **P3c**.
-
----
 
 ## Input targets — behavior and mapping
 
@@ -25273,16 +25278,15 @@ Program sees the same 1-bit value as a wire or switch.
 | **Map** | \`SEL = .mode\` |
 | **Width** | \`length\` attribute (e.g. \`length: 4\` → 4-bit symbol \`SEL: 4\` in program) |
 | **Preset** | \`= 1010\` in component body |
-| **v1 logic** | Boolean \`IF SEL\` requires **1-bit** symbol — use \`length: 1\` or map only one bit via wire in P+b |
+| **Logic** | Boolean \`IF SEL\` requires a **1-bit** symbol in the current PLC language examples |
 | **Read** | Full bit pattern via \`:get\` |
 
-### \`comp [slider]\` — analog UI (documentation only until P+b)
+### \`comp [slider]\` — analog UI
 
 | Topic | Detail |
 |-------|--------|
 | **Map** | \`LEVEL = .slider\` with matching \`length\` |
-| **v1** | Declare and map for elaboration tests; **no** \`IF LEVEL > n\` in program yet |
-| **Future** | Comparisons and assignments in **P+b** |
+| **Current use** | Declare and map with matching width; current examples do not use numeric comparisons in PLC conditions |
 
 ### Wires
 
@@ -25350,7 +25354,7 @@ comp [clcd] .panel:
 .panel:{ value = alarmCmd set = 1 }
 \`\`\`
 
-Multi-bit status codes (\`8wire statusCode\`) → **P+b** or script logic between PLC and panel.
+For multi-bit status codes, use script logic between PLC output wires and the panel.
 
 ---
 
@@ -25397,7 +25401,7 @@ Same rules apply to **\`comp [clcd]\`** property blocks — use **\`on: 1\`** on
 3. Write each **output** map target from \`outputState\`.
 4. Increment **\`scanCount\`**.
 
-### Output retain (P-D7)
+### Output retain
 
 If the program does **not** assign an output in this scan, the **mapped target keeps** the previous physical value; internal \`outputState\` also retains for use **inside** the same program on the next line.
 
@@ -25428,18 +25432,6 @@ Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch,
 | Assign to input | parse | \`cannot assign to input START\` |
 | Unknown symbol | parse | \`unknown symbol ALARM\` |
 | Multi-bit in \`IF\` | parse | \`IF requires 1-bit symbol, got TEMP (8 bits)\` |
-
----
-
-## Future phases
-
-| Phase | Content |
-|-------|---------|
-| **P5** | Timers (\`TON\`, \`TOF\`) in \`inline [plc]\` — **P5.2**: \`CTU\`/\`CTD\`; **P5.3**: full IEC placement in \`CASE\`/\`FOR\`/\`WHILE\` |
-| **P+b** | Multi-bit logic, comparisons (\`IF TEMP > 50\`) |
-| **P+c** | \`VAR\` / \`END_VAR\`, \`CASE\`, \`RETURN\` |
-| **P+d** | \`FOR\`, \`WHILE\` |
-| **P3c** | \`motor\`, \`sensor\`, \`fan\`, \`button\` components |
 
 ---
 

@@ -28,7 +28,7 @@ inline [plc] .machine:
 |------|------|
 | **Header** | `inline [plc] .name:` — `.name` is required (same as `inline [asm]`) |
 | **Interface** | Optional `inputs:` and `outputs:` blocks (order: inputs first, then outputs) |
-| **Body** | Sequential **statements** — assignments, `IF`, timers, (future: counters) |
+| **Body** | Sequential **statements** — assignments, `IF`, timers, counters |
 | **Closing** | Body ends with a line containing only **`:`** |
 
 The program body does **not** reference wires or panel components — only symbolic names (`START`, `MOTOR`). Mapping happens on `comp [plc]` — see [plc.md](plc.md).
@@ -70,7 +70,7 @@ inputs: { TEMP: 8 }
 **Rules**
 
 - Assigning to an input in the program body → **parse error**
-- Multi-bit inputs may be **declared** and **mapped**; boolean logic on them → error until [P+b](plc.md#future-phases) (analog)
+- Multi-bit inputs may be **declared** and **mapped**, but boolean logic on them is not supported here
 
 ### `outputs:`
 
@@ -103,7 +103,7 @@ READY = startDelay.Q
 | **Output symbol** | ✓ |
 | **Input symbol** | ✗ parse error |
 | **`timer.Q`** | ✗ read-only |
-| **`counter.Q` / `.CV`** | ✗ read-only (P5.2) |
+| **`counter.Q` / `.CV`** | ✗ read-only |
 
 ---
 
@@ -131,7 +131,7 @@ END_IF
 
 **Nesting:** `IF` blocks may contain other `IF` blocks and timer statements.
 
-**Not implemented yet:** `CASE`, `FOR`, `WHILE`, `RETURN` — planned in future phases (see [Future keywords](#future-keywords-planned)).
+This page documents only the statements and keywords currently available.
 
 ---
 
@@ -177,13 +177,13 @@ read inputs → execute statements in order → write outputs
 | **Statement order** | Matters — later assigns to the same output win |
 | **Timers / counters** | Execute in place; outputs (`.Q`) visible to following statements in the **same** scan |
 | **State** | Timer/counter internal state persists on `comp [plc]` between scans |
-| **Re-RUN** | New run resets timer state (RETAIN → future P5.2b) |
+| **Re-RUN** | New run resets timer and counter state |
 
 Triggering scans: `.ctrl:{ set = 1 }`, `scanTime`, external clock — [plc.md — Scan timing](plc.md#scan-timing-p4).
 
 ---
 
-## Timers — `TON` / `TOF` (P5.1)
+## Timers — `TON` / `TOF`
 
 Function-block style **statements** (not mappable I/O). Each instance has a **name** and persistent state per `comp [plc]`.
 
@@ -225,13 +225,13 @@ TOF coolOff(IN := RUN, PT := 30)
 2. `IN = 0` and `Q` was `1` → count up each scan; when count ≥ `PT`, `Q = 0`
 3. `IN = 0` and `Q` was already `0` → stays off
 
-### Timer placement (P5.1)
+### Timer placement
 
 | Location | Allowed |
 |----------|---------|
 | Top-level in program body | ✓ |
 | Inside `IF` / `THEN` / `ELSE` / `ELSIF` | ✓ |
-| Inside `CASE` / `FOR` / `WHILE` | future **P5.3** |
+| Inside `CASE` / `FOR` / `WHILE` | not supported |
 
 ### Timer errors
 
@@ -261,7 +261,7 @@ doc(.demo)
 
 ---
 
-## Counters — `CTU` / `CTD` (P5.2)
+## Counters — `CTU` / `CTD`
 
 Function-block style **statements**, similar to timers. Each instance has a **name** and persistent state per `comp [plc]`.
 
@@ -351,15 +351,15 @@ IF pieceCount.CV == 10 THEN FULL = 1  END_IF
 | `<` | CV strictly less |
 | `==` | CV equal |
 
-Only **`name.CV op number`** is supported — literal on the right side. Full analog comparisons remain **P+b**.
+Only **`name.CV op number`** is supported — literal on the right side.
 
-### Counter placement (P5.2)
+### Counter placement
 
 | Location | Allowed |
 |----------|---------|
 | Top-level in program body | ✓ |
 | Inside `IF` / `THEN` / `ELSE` / `ELSIF` | ✓ |
-| Inside `CASE` / `FOR` / `WHILE` | future **P5.3** |
+| Inside `CASE` / `FOR` / `WHILE` | not supported |
 
 ### Counter errors
 
@@ -384,9 +384,12 @@ inline [plc] .boxCounter:
   IF cnt.CV >= 3 THEN WARN = 1 ELSE WARN = 0 END_IF
   :
 
-wire [1] .sensor:
+comp [switch] .sensor:
+  = 0
   :
-wire [1] .reset:
+
+comp [switch] .reset:
+  = 0
   :
 
 comp [led] .fullLed:
@@ -430,7 +433,12 @@ inline [plc] .mission:
   DONE = cnt.Q
   :
 
-wire [1] .tick:
+comp [switch] .tick:
+  = 0
+  :
+
+comp [switch] .reload:
+  = 0
   :
 
 comp [led] .doneLed:
@@ -438,13 +446,17 @@ comp [led] .doneLed:
 
 comp [plc] .ctrl:
   program: .mission
-  inputs: { TICK = .tick, RELOAD = 0 }
+  inputs: { TICK = .tick, RELOAD = .reload }
   outputs: { DONE = .doneLed }
   on: 1
   :
 
-; load preset, then 3 steps → DONE on
+; load preset first
+.reload = 1
 .ctrl:{ set = 1 }
+.reload = 0
+
+; 3 rising edges to count down
 .tick = 1
 .ctrl:{ set = 1 }
 .tick = 0
@@ -454,6 +466,8 @@ comp [plc] .ctrl:
 .tick = 0
 .ctrl:{ set = 1 }
 .tick = 1
+.ctrl:{ set = 1 }
+.tick = 0
 .ctrl:{ set = 1 }
 
 show(.doneLed:get)
@@ -479,16 +493,16 @@ Instance **`name`** must match a `TON`/`TOF`/`CTU`/`CTD` declaration in the same
 
 | Statement kind | Top-level | Inside `IF` | `CASE`/`FOR`/`WHILE` |
 |----------------|-----------|-------------|----------------------|
-| Assignment `=` | ✓ | ✓ | future |
-| `IF` … `END_IF` | ✓ | ✓ (nested) | future |
-| `TON` / `TOF` | ✓ | ✓ | P5.3 |
-| `CTU` / `CTD` | ✓ (P5.2) | ✓ (P5.2) | P5.3 |
+| Assignment `=` | ✓ | ✓ | not supported |
+| `IF` … `END_IF` | ✓ | ✓ (nested) | not supported |
+| `TON` / `TOF` | ✓ | ✓ | not supported |
+| `CTU` / `CTD` | ✓ | ✓ | not supported |
 
 ---
 
 ## Keyword reference
 
-### Implemented (P1 + P5.1 + P5.2)
+### Available keywords
 
 | Keyword | Category | Summary |
 |---------|----------|---------|
@@ -512,19 +526,6 @@ Instance **`name`** must match a `TON`/`TOF`/`CTU`/`CTD` declaration in the same
 | **`R`** | Counter arg | Reset (inside `CTU`) |
 | **`LD`** | Counter arg | Load preset (inside `CTD`) |
 | **`>=` `<=` `>` `<` `==`** | Comparison | `.CV` comparisons only |
-
-### Future keywords (planned)
-
-| Keyword | Phase | Summary |
-|---------|-------|---------|
-| **`VAR` `END_VAR`** | P+c | Internal memory |
-| **`CONST` `END_CONST`** | P+c | Constants |
-| **`CASE` `OF` `END_CASE`** | P+c | Selection |
-| **`RETURN`** | P+c | Early exit from body |
-| **`FOR` `TO` `BY` `DO` `END_FOR`** | P+d | Counted loop |
-| **`WHILE` `END_WHILE`** | P+d | Conditional loop |
-
----
 
 ## Common errors
 
