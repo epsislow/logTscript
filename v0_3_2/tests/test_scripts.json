@@ -36,6 +36,7 @@
     "core/components/slider.js",
     "core/components/sensor.js",
     "core/components/motor.js",
+    "core/components/scanner.js",
     "devices/clcd-symbols_generated.js",
     "core/components/clcd.js",
     "core/components/alu.js",

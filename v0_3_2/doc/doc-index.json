@@ -60,7 +60,8 @@
         { "file": "ioport.md", "label": "ioport", "searchExtra": "I/O port gpio port aggregation in out bus" },
         { "file": "rotary.md", "label": "rotary" },
         { "file": "slider.md", "label": "slider", "searchExtra": "panel slider length orientation reversed size N-bit" },
-        { "file": "sensor.md", "label": "sensor", "searchExtra": "proximity temperature humidity distance mag step Kelvin Celsius analog digital wheel" }
+        { "file": "sensor.md", "label": "sensor", "searchExtra": "proximity temperature humidity distance mag step Kelvin Celsius analog digital wheel" },
+        { "file": "scanner.md", "label": "scanner", "searchExtra": "barcode ASCII string Scan Enter valid size maxlength length onlyDigits keyboard buffer" }
       ]
     },
     {

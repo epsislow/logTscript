@@ -61,7 +61,8 @@ const DOC_SECTIONS = [
       { file: 'ioport.md', label: 'ioport', searchPrimary: 'IOPORT comp.ioport doc(comp.ioport)', searchExtra: 'I/O port gpio aggregation in out bus' },
       { file: 'rotary.md', label: 'rotary', searchPrimary: 'rotary comp.rotary doc(comp.rotary) states text color for nl' },
       { file: 'slider.md', label: 'slider', searchPrimary: 'slider comp.slider doc(comp.slider) length text color orientation reversed size for nl', searchExtra: 'panel slider length orientation reversed size N-bit' },
-      { file: 'sensor.md', label: 'sensor', searchExtra: 'proximity temperature humidity distance mag step Kelvin Celsius analog digital wheel' }
+      { file: 'sensor.md', label: 'sensor', searchExtra: 'proximity temperature humidity distance mag step Kelvin Celsius analog digital wheel' },
+      { file: 'scanner.md', label: 'scanner', searchExtra: 'barcode ASCII string Scan Enter valid size maxlength length onlyDigits keyboard buffer' }
     ],
   },
   {

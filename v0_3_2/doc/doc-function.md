@@ -584,6 +584,7 @@ comp [adder] .name:
 | `doc(comp.rotary)` | [rotary.md](rotary.md) |
 | `doc(comp.slider)` | [slider.md](slider.md) |
 | `doc(comp.sensor)` | [sensor.md](sensor.md) |
+| `doc(comp.scanner)` | [scanner.md](scanner.md) |
 | `doc(comp.motor)` | [motor.md](motor.md) |
 | `doc(comp.bar)` | [led-bar.md](led-bar.md) |
 | `doc(comp.7seg)` / `doc(comp.7)` | [seven-seg.md](seven-seg.md) |

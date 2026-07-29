@@ -28,6 +28,7 @@ var RotaryComponent = (typeof require !== 'undefined') ? require('./rotary') : R
 var SliderComponent = (typeof require !== 'undefined') ? require('./slider') : SliderComponent;
 var SensorComponent = (typeof require !== 'undefined') ? require('./sensor') : SensorComponent;
 var MotorComponent = (typeof require !== 'undefined') ? require('./motor') : MotorComponent;
+var ScannerComponent = (typeof require !== 'undefined') ? require('./scanner') : ScannerComponent;
 var ClcdComponent = (typeof require !== 'undefined') ? require('./clcd') : ClcdComponent;
 var AluComponent = (typeof require !== 'undefined') ? require('./alu') : AluComponent;
 var CpuComponent = (typeof require !== 'undefined') ? require('./cpu') : CpuComponent;
@@ -67,6 +68,7 @@ function createComponentRegistry() {
   registry.register(SliderComponent);
   registry.register(SensorComponent);
   registry.register(MotorComponent);
+  registry.register(ScannerComponent);
   registry.register(ClcdComponent);
   registry.register(AluComponent);
   registry.register(CpuComponent);

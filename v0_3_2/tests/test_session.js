@@ -211,6 +211,16 @@
         return false;
       },
 
+      triggerScannerCommit(interp, compName, text) {
+        const i = interp || this.interp;
+        if (!i) return null;
+        const comp = i.components.get(compName);
+        if (!comp || !comp.scannerHandler || typeof comp.scannerHandler.onCommit !== 'function') {
+          return null;
+        }
+        return comp.scannerHandler.onCommit(text);
+      },
+
       setComp(interp, name, val) {
         const i = interp || this.interp;
         if (!i) return;

@@ -2544,7 +2544,7 @@ probe(.n:get)`;
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'cpu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider', 'sensor', 'motor'];
+    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'cpu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider', 'sensor', 'motor', 'scanner'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -31843,6 +31843,195 @@ reg(2912, 'sensor', 'wheel kind defaults 8bit zero', function(h, session) {
 
 8wire cmd = .wheel:get`);
   h.assert('zero', session.getWire(interp, 'cmd'), '00000000');
+});
+
+reg(2913, 'scanner', 'registry + doc(comp.scanner)', function(h, session) {
+  const registry = session._ensureRegistry();
+  h.assert('scanner registered', String(registry.has('scanner')), 'true');
+  const out = session.runDoc('doc(comp.scanner)');
+  h.assert('doc first line', out[0], 'comp [scanner] .name:');
+  h.assert('doc length', String(out.some(l => l.includes('length: integer'))), 'true');
+  h.assert('doc get', String(out.some(l => l.includes('get'))), 'true');
+  h.assert('doc size', String(out.some(l => l.includes('size'))), 'true');
+  h.assert('doc valid', String(out.some(l => l.includes('valid'))), 'true');
+});
+
+reg(2914, 'scanner', 'sizeWidthBits uses clz32', function(h, session) {
+  h.assert('len5', String(ScannerComponent.sizeWidthBits(5)), '3');
+  h.assert('len8', String(ScannerComponent.sizeWidthBits(8)), '4');
+  h.assert('len1', String(ScannerComponent.sizeWidthBits(1)), '1');
+  h.assert('len32', String(ScannerComponent.sizeWidthBits(32)), '6');
+});
+
+reg(2915, 'scanner', 'pack Hello length 5', function(h, session) {
+  const packed = ScannerComponent.packPayload('Hello', 5);
+  const expected = (typeof wireStringToBin === 'function' ? wireStringToBin('Hello') : null)
+    || '0100100001100101011011000110110001101111';
+  h.assert('bin', packed.bin, expected);
+  h.assert('size', String(packed.size), '5');
+});
+
+reg(2916, 'scanner', 'pack AB pad NUL length 5', function(h, session) {
+  const packed = ScannerComponent.packPayload('AB', 5);
+  const ab = (typeof wireStringToBin === 'function' ? wireStringToBin('AB') : '0100000101000010');
+  h.assert('bin', packed.bin, ab + '00000000'.repeat(3));
+  h.assert('size', String(packed.size), '2');
+});
+
+reg(2917, 'scanner', 'commit Hello + get size', function(h, session) {
+  const { interp } = session.run(`comp [scanner] .scan:
+  length: 5
+  text: 'BC'
+  :
+
+40wire code = .scan:get
+3wire n = .scan:size
+1wire v = .scan:valid`);
+  h.assert('initial get', session.getWire(interp, 'code'), '0'.repeat(40));
+  h.assert('initial size', session.getWire(interp, 'n'), '000');
+  const r = session.triggerScannerCommit(interp, '.scan', 'Hello');
+  h.assert('ok', String(!!(r && r.ok)), 'true');
+  h.assert('get', session.getWire(interp, 'code'), ScannerComponent.packPayload('Hello', 5).bin);
+  h.assert('size', session.getWire(interp, 'n'), '101');
+  h.assert('valid after pulse', session.getWire(interp, 'v'), '0');
+});
+
+reg(2918, 'scanner', 'commit short AB pad', function(h, session) {
+  const { interp } = session.run(`comp [scanner] .scan:
+  length: 5
+  :
+
+40wire code = .scan:get
+3wire n = .scan:size`);
+  session.triggerScannerCommit(interp, '.scan', 'AB');
+  h.assert('get', session.getWire(interp, 'code'), ScannerComponent.packPayload('AB', 5).bin);
+  h.assert('size', session.getWire(interp, 'n'), '010');
+});
+
+reg(2919, 'scanner', 'onlyDigits strips letters on commit', function(h, session) {
+  const { interp } = session.run(`comp [scanner] .scan:
+  length: 4
+  onlyDigits
+  :
+
+32wire code = .scan:get
+3wire n = .scan:size`);
+  session.triggerScannerCommit(interp, '.scan', 'A12B3');
+  h.assert('get', session.getWire(interp, 'code'), ScannerComponent.packPayload('123', 4).bin);
+  h.assert('size', session.getWire(interp, 'n'), '011');
+});
+
+reg(2920, 'scanner', 'length bounds error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`comp [scanner] .bad:
+  length: 40
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('err', String(/length must be 1\.\.32/.test(err)), 'true');
+});
+
+reg(2921, 'scanner', 'default length 8 empty', function(h, session) {
+  const { interp } = session.run(`comp [scanner] .scan::
+
+64wire code = .scan:get
+4wire n = .scan:size`);
+  h.assert('get', session.getWire(interp, 'code'), '0'.repeat(64));
+  h.assert('size', session.getWire(interp, 'n'), '0000');
+});
+
+reg(2922, 'scanner', 'doc play — Hello barcode', function(h, session) {
+  const { interp } = session.run(`comp [scanner] .scan:
+  length: 5
+  text: 'BC'
+  color: ^808080
+  bgColor: ^101010
+  nl
+  :
+
+40wire code = .scan:get
+3wire n = .scan:size
+show(code)
+show(n)`);
+  session.triggerScannerCommit(interp, '.scan', 'Hello');
+  h.assert('code', session.getWire(interp, 'code'), ScannerComponent.packPayload('Hello', 5).bin);
+  h.assert('n', session.getWire(interp, 'n'), '101');
+});
+
+reg(2923, 'scanner', 'doc play — short pad', function(h, session) {
+  const { interp } = session.run(`comp [scanner] .scan:
+  length: 5
+  :
+
+40wire code = .scan:get
+3wire n = .scan:size`);
+  session.triggerScannerCommit(interp, '.scan', 'Hi');
+  h.assert('code', session.getWire(interp, 'code'), ScannerComponent.packPayload('Hi', 5).bin);
+  h.assert('n', session.getWire(interp, 'n'), '010');
+});
+
+reg(2924, 'scanner', 'doc play — digits PIN', function(h, session) {
+  const { interp } = session.run(`comp [scanner] .pin:
+  length: 4
+  onlyDigits
+  text: 'PIN'
+  :
+
+32wire code = .pin:get
+3wire n = .pin:size`);
+  session.triggerScannerCommit(interp, '.pin', '9081');
+  h.assert('code', session.getWire(interp, 'code'), ScannerComponent.packPayload('9081', 4).bin);
+  h.assert('n', session.getWire(interp, 'n'), '100');
+});
+
+reg(2925, 'scanner', 'doc play — empty commit size 0', function(h, session) {
+  const { interp } = session.run(`comp [scanner] .scan:
+  length: 3
+  :
+
+24wire code = .scan:get
+2wire n = .scan:size`);
+  session.triggerScannerCommit(interp, '.scan', '');
+  h.assert('code', session.getWire(interp, 'code'), '0'.repeat(24));
+  h.assert('n', session.getWire(interp, 'n'), '00');
+});
+
+reg(2926, 'scanner', 'headless maxlen defense slices', function(h, session) {
+  const { interp } = session.run(`comp [scanner] .scan:
+  length: 3
+  :
+
+24wire code = .scan:get
+2wire n = .scan:size`);
+  session.triggerScannerCommit(interp, '.scan', 'ABCD');
+  h.assert('code', session.getWire(interp, 'code'), ScannerComponent.packPayload('ABC', 3).bin);
+  h.assert('n', session.getWire(interp, 'n'), '11');
+});
+
+reg(2927, 'scanner', 'doc play — queue on valid', function(h, session) {
+  const { interp } = session.run(`comp [scanner] .scan:
+  length: 4
+  text: 'In'
+  nl
+  :
+
+comp [queue] .q:
+  width: 32
+  length: 4
+  on: 1
+  nl
+  :
+
+32wire payload = .scan:get
+.q:{
+  push = payload
+  set = .scan:valid
+}
+
+3wire used = .q:size`);
+  h.assert('empty', session.getWire(interp, 'used'), '000');
+  session.triggerScannerCommit(interp, '.scan', 'AB');
+  h.assert('one', session.getWire(interp, 'used'), '001');
 });
 
   window.LogTScriptTestSuite.finalize();
