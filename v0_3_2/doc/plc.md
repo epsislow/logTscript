@@ -1043,7 +1043,7 @@ Examples **1–6** cover wires, panel switch+LED, external LED, two PLCs, latch,
 
 | Phase | Content |
 |-------|---------|
-| **P+a** | Timers (`TON`, `TOF`, `CTU`) |
+| **P5** | Timers (`TON`, `TOF`) in `inline [plc]` — **P5.2**: `CTU`/`CTD` |
 | **P+b** | Multi-bit logic, comparisons (`IF TEMP > 50`) |
 | **P+c** | `VAR` / `END_VAR`, `CASE`, `RETURN` |
 | **P+d** | `FOR`, `WHILE` |

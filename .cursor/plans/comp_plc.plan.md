@@ -1,6 +1,6 @@
 ---
 name: Componenta PLC
-overview: "Plan `inline [plc]` + `comp [plc]`: limbaj logic hardware-independent, mapare I/O, scan cycle. Model paralel cu `inline [asm]` + `comp [cpu]`. P4 (scanTime/busy) în sub-faze P4.0–P4.3. Faze amânate P+a (timere), P+b (analog)."
+overview: "Plan `inline [plc]` + `comp [plc]`: limbaj logic hardware-independent, mapare I/O, scan cycle. Model paralel cu `inline [asm]` + `comp [cpu]`. P4 (scanTime/busy) P4.0–P4.3. P5 timere TON/TOF. Faze amânate: P+b (analog), P+c/d (ST extins)."
 todos:
   - id: p0-decisions
     content: "P0: decizii lățimi, mapare, on: vs comandă, sintaxă START — închise"
@@ -35,8 +35,14 @@ todos:
   - id: p4-3-overrun
     content: "P4.3: strict overrun/miss + overrunCount când execuția depășește scanTime"
     status: completed
-  - id: pa-timers
-    content: "P+a: biblioteci timere PLC (TON/TOF/CTU) — amânat"
+  - id: p5-timers
+    content: "P5: TON/TOF ca blocuri keyword în inline [plc] (fără comp separate)"
+    status: pending
+  - id: p5-1-ton-tof
+    content: "P5.1: parser + IR + exec TON/TOF; teste comp-plc-lang; doc + logts-play"
+    status: pending
+  - id: p5-3-iec-placement
+    content: "P5.3 (amânat): plasare completă IEC/ST — TON/TOF oriunde e permis un statement (CASE/FOR/WHILE cu P+c/P+d)"
     status: pending
   - id: pb-analog
     content: "P+b: I/O multi-bit, comparații analog, senzori — amânat"
@@ -114,7 +120,7 @@ flowchart TB
 | **P-FIX1** | În toate exemplele/doc: **`motorWire -> .motor1` greșit** → **`.motor1 = motorWire`** (sau bloc `{ value, set }`) |
 | **P-FIX2** | **`comp [plc]` canonic LogTscript** — **nu** pin `:on` pentru comandă motor; output = asignare directă / wire (confirmat) |
 | **P-ARCH1** | Implementare: **P1 `inline [plc]`** apoi **P2 `comp [plc]`** |
-| **P-ARCH2** | Faze amânate: **P+a** timere, **P+b** analog |
+| **P-ARCH2** | **P5** timere TON/TOF — fază activă; **P+b** analog — amânat |
 | **P-W1** | Declarație simbol: **`START: 1`** sau **`START`** (alone) — ambele valide |
 | **P-W2** | **P1/P2:** logică (`IF`, `AND`, `OR`, `NOT`, `XOR`) **doar pe simboluri 1 bit** (confirmat) |
 | **P-W3** | Mapare `comp [plc]`: **lățime strictă** simbol ↔ wire/comp (confirmat) |
@@ -130,6 +136,19 @@ flowchart TB
 | **P-SCAN6** | **`set` în timp ce `busy = 1`:** scan **ignorat** (nu queue — ca PLC real la overrun simplu); opțional pout **`skipped`** în P4.3 | **închis** |
 | **P-SCAN7** | **Pattern osc extern** (fără timer PLC): `scanTime: 0` + `.ctrl:{ set = .clk:get }` + `on: raise` — documentat **P4.0/P4.2**, model DMA | **închis** |
 | **P-SCAN8** | **Overrun/miss** (`strict:`): amânat **P4.3** — dacă durata scan depășește `scanTime`, cicluri ratate + contor | **închis** |
+| **P-TMR1** | **TON / TOF** doar în **`inline [plc]`** — blocuri keyword în corpul programului; **fără** `comp [ton]` / `comp [tof]` separate | **închis** |
+| **P-TMR2** | Timerele **nu** sunt I/O mapabil pe `comp [plc]`; rulează în **`executePlcScan`** cu stare persistentă între scan-uri | **închis** |
+| **P-TMR3** | Avans timere la **granița de scan** (un tick TON/TOF per scan PLC) — nu timp real independent de PLC | **închis** |
+| **P-TMR4** | **MVP P5:** **TON** + **TOF**; **CTU/CTD** amânat **P5.2** | **închis** |
+| **P-TMR5** | **`PT` în scan-uri** (număr întreg de cicluri); doc: echivalent ms ≈ `PT × scanTime` când `scanTime > 0` | **închis** |
+| **P-TMR6** | La **`scanTime: 0`**: `PT` = scan-uri la fiecare `set` activ (osc/manual) — **permis** | **închis** |
+| **P-TMR7** | La **re-RUN**: stare timere **reset** (fără RETAIN în P5.1) | **închis** |
+| **P-TMR8** | **Ordine evaluare IEC/ST:** blocurile TON/TOF rulează **în ordinea din corp**; `Q` actualizat înainte ca statement-urile următoare să-l citească în **același scan** | **închis** |
+| **P-TMR9** | **P5.1 (MVP plasare):** TON/TOF ca statements **top-level** și în corpul **`IF`/`THEN`/`ELSE`/`ELSIF`** | **închis** |
+| **P-TMR13** | **Fază amânată P5.3:** extindere **plasare completă IEC/ST** — TON/TOF **oriunde e permis un statement** în corpul programului (inclusiv în `CASE`/`FOR`/`WHILE` odată cu **P+c**/**P+d**) | **închis** (țintă) |
+| **P-TMR10** | **P5.1:** doar **`name.Q`** expus; **fără** `ET`, **fără** `R` (reset explicit) | **închis** |
+| **P-TMR11** | **`PT` ≥ 1** — `PT = 0` → eroare parse | **închis** |
+| **P-TMR12** | **`IN`** = expresie 1-bit completă; **`name.Q`** read-only (atribuire → eroare); **nume timer unic** (duplicat → eroare parse) | **închis** |
 | **P-IO1** | **Nu** există `comp [button]` — intrări digitale: **`key`**, **`switch`**, **`dip`** (confirmat) |
 | **P-IO2** | **P2/P3:** ieșiri digitale 1-bit: **`led`**, **`reg`**, wires; **nu** mapare directă `comp [plc]` → `clcd` |
 | **P-IO3** | **`clcd`:** doar prin **wires multi-bit** + logică LogTscript în afara PLC (`:get` / bloc `{ value, set }`) |
@@ -220,7 +239,7 @@ Lista completă țintă vs ce implementăm per fază. Modelul ST (Structured Tex
 | **`FOR`** … **`TO`** … **`BY`** … **`DO`** … **`END_FOR`** | Buclă numărată | **P+d** |
 | **`WHILE`** … **`DO`** … **`END_WHILE`** | Buclă condiționată | **P+d** |
 | **`>`**, **`<`**, **`==`**, … | Comparații | **P+b** (analog) |
-| **`TON`**, **`TOF`**, … | Timere | **P+a** (biblioteci) |
+| **`TON`**, **`TOF`**, … | Timere (blocuri în corp `inline [plc]`) | **P5** — **nu** `comp` separate |
 
 **Nu în plan (ST are, amânăm):** `REPEAT`/`UNTIL`, `EXIT`, `VAR_INPUT`/`VAR_OUTPUT` separate — la noi `inputs:`/`outputs:` acoperă interfața.
 
@@ -319,10 +338,10 @@ flowchart LR
   P12[P1/P2 IF ELSIF BOOL]
   Pc[P+c VAR CASE RETURN]
   Pd[P+d FOR WHILE]
-  Pa[P+a timere]
+  P5[P5 timere TON TOF]
   Pb[P+b comparatii analog]
   P12 --> Pc --> Pd
-  Pc --> Pa
+  P12 --> P5
   Pc --> Pb
 ```
 
@@ -574,7 +593,7 @@ Schița și cerința utilizator: **`motor`**, **`sensor`**, eventual **`fan`**, 
 - Vizual: motor/sensor ca componente UI proprii (nu doar LED)
 - Integrare PLC: același model `outputs:{ MOTOR = .m1 }` cu resolver pe componentă
 
-**Legătură faze:** P3c după **P2** stabil; **P+b** pentru analog/viteză; **P+a** pentru timere motor (TON pornire întârziată etc.)
+**Legătură faze:** P3c după **P2** stabil; **P+b** pentru analog/viteză; **P5** pentru timere motor (TON pornire întârziată etc.)
 
 ```mermaid
 flowchart LR
@@ -596,7 +615,7 @@ flowchart LR
 | 1 | `->` → `=` | **P-FIX1** închis |
 | 2 | Clarificare `on:` vs comandă | secțiune de mai sus + exemplu |
 | 3 | Exemplu complet | secțiune de mai sus |
-| 4 | Limitări v1 + faze P+a/P+b | mai jos |
+| 4 | Limitări v1 + faze P5/P+b | mai jos |
 | 5 | Substituenți + lățimi | secțiune lățimi |
 | 6 | Erori documentate | P2 teste |
 | 7 | Legătură `on:raise` vs PLC | doc plc.md |
@@ -615,7 +634,7 @@ flowchart LR
   P41[P4.1 auto scanTime]
   P42[P4.2 external clock]
   P43[P4.3 overrun]
-  Pa[P+a timere]
+  P5[P5 timere TON TOF]
   Pb[P+b analog]
   P1 --> P2
   P2 --> P3
@@ -624,10 +643,10 @@ flowchart LR
   P40 --> P41
   P41 --> P42
   P42 --> P43
-  P2 --> Pa
+  P2 --> P5
   P2 --> Pb
   Pb --> P3c
-  P41 --> Pa
+  P41 --> P5
 ```
 
 ### P1 — `inline [plc]` (limbaj + metadata) — **în execuție**
@@ -803,11 +822,104 @@ Load & Run → ~5 scan-uri/s; `scanCount` crește; `busy` pulsează scurt.
 P4.0 (doc)  →  P4.1 (auto + busy)  →  P4.2 (teste osc)  →  P4.3 (strict, opțional)
 ```
 
-**Legătură P+a:** auto-scan la `scanTime > 0` pregătește terenul pentru timere TON/TOF în program (intrări citite la granița de scan).
+**Legătură P5:** auto-scan la `scanTime > 0` pregătește terenul pentru timere TON/TOF în program (intrări citite la granița de scan).
 
-### P+a — Timere (amânat)
+### P5 — Timere TON / TOF (fază activă — decizii închise)
 
-TON, TOF, CTU — biblioteci sau extensie `inline [plc]`; **nu** în P1/P2
+**Decizie:** timerele sunt **doar în limbajul `inline [plc]`** — keyworduri / blocuri, **nu** componente LogTscript separate pe panou.
+
+#### De ce nu `comp [ton]`
+
+| Aspect | `inline [plc]` | `comp [ton]` separat |
+|--------|----------------|----------------------|
+| Model IEC/ST | ✓ FB în program PLC | ✗ widget extern, necesită ceas + wiring |
+| Stare între scan-uri | ✓ în `plc-assembler` / IR | duplicare cu runtime PLC |
+| Didactic | un program, un scan | două lumi (PLC + timer chip) |
+
+#### Unde rulează
+
+- Parser + IR în **`plc-assembler.js`**
+- Execuție în **`executePlcScan`** — la fiecare scan: eval statements + **tick blocuri TON/TOF**
+- **Fără** mapare `inputs:`/`outputs:` pentru timere; **`Q`** citibil în expresii (ex. `delay1.Q`)
+
+#### Sintaxă țintă (P5.1)
+
+```logts
+inline [plc] .machine:
+  inputs: { START, STOP }
+  outputs: { MOTOR }
+  TON startDelay(IN := START, PT := 50)
+  TOF coolOff(IN := STOP, PT := 30)
+  IF startDelay.Q AND NOT coolOff.Q THEN
+    MOTOR = 1
+  ELSE
+    MOTOR = 0
+  END_IF
+  :
+```
+
+| Element | Semnificație |
+|---------|--------------|
+| **`TON name(...)`** | On-delay — `Q = 1` după `PT` scan-uri cu `IN = 1` |
+| **`TOF name(...)`** | Off-delay — `Q` rămâne 1 încă `PT` scan-uri după `IN = 0` |
+| **`PT`** | Preset în **număr de scan-uri** (întreg ≥ 1) |
+| **`IN`** | Expresie 1-bit (simbol input, output sau `.Q` altui timer) |
+| **`name.Q`** | Ieșirea timerului în același scan |
+
+#### Plasare în corp — IEC 61131-3 ST (P-TMR9, P-TMR13)
+
+În **IEC/ST real**, apelurile FB (`TON`, `TOF`, …) sunt **statements**. Regula generală ST: pot sta **oriunde e permis un statement** în corpul programului (top-level, în ramuri `IF`, `CASE`, `FOR`, `WHILE`, etc.) — **nu** în expresii inline (`IF TON(...)`); se folosește `name.Q`.
+
+**Țintă pe termen lung (P-TMR13):** urmăm această regulă **complet** — plasare liberă a TON/TOF în orice context statement din gramatică.
+
+**P5.1 (MVP):** implementăm doar unde gramatica **P1/P2** permite statements astăzi:
+
+| Locație | IEC/ST | LogTscript |
+|---------|--------|------------|
+| Top-level (secvențial, între `IF`-uri) | ✓ | **P5.1** ✓ |
+| În `THEN` / `ELSE` / `ELSIF` | ✓ | **P5.1** ✓ |
+| În `CASE` … `OF` | ✓ | **P5.3** (amânat, cu **P+c**) |
+| În `FOR` / `WHILE` | ✓ | **P5.3** (amânat, cu **P+d**) |
+| În expresii (`IF TON(...)` inline) | ✗ | ✗ — folosești `name.Q` |
+
+**P5.3 (fază amânată):** când **P+c** / **P+d** adaugă `CASE`, `FOR`, `WHILE`, extindem parserul și execuția astfel încât **TON/TOF să fie permise în aceleași locuri ca în ST** — fără restricții artificiale suplimentare față de „oriunde e statement”.
+
+**Exemplu valid P5.1** (timer în `IF`, ca în ST):
+
+```logts
+IF ENABLE THEN
+  TON stepDelay(IN := STEP, PT := 10)
+  OUT = stepDelay.Q
+ELSE
+  OUT = 0
+END_IF
+```
+
+**Nu** în `inputs:` / `outputs:` — timerele nu sunt pinuri I/O mapabile.
+
+#### Semantica execuție (P-TMR8…P-TMR12)
+
+- **Ordine:** la fiecare scan, statement-urile (inclusiv TON/TOF) rulează **în ordinea listei**; `Q` e vizibil imediat pentru ce urmează în același scan (IEC).
+- **`PT`:** întreg **≥ 1**; `PT = 0` → eroare parse.
+- **`IN`:** orice expresie 1-bit validă (`START AND NOT STOP`, alt `.Q`, …).
+- **`name.Q`:** read-only; `startDelay.Q = 1` → eroare parse.
+- **Nume:** fiecare instanță timer are identificator **unic** în program.
+- **P5.1:** fără `ET`, fără `R`; reset doar la re-RUN (P-TMR7).
+
+#### Sub-faze
+
+| Fază | Conținut |
+|------|----------|
+| **P5.1** | Parser + IR + exec **TON** + **TOF**; plasare **top-level** + în **`IF`**; teste `comp-plc-lang`; doc + `logts-play` |
+| **P5.2** | **CTU** / **CTD** (opțional); RETAIN (opțional) |
+| **P5.3** *(amânat)* | **Plasare completă IEC/ST:** TON/TOF oriunde e permis un **statement** — extins la `CASE` (**P+c**), `FOR`/`WHILE` (**P+d**) |
+
+#### Dependențe
+
+- **P4** (scan / `scanTime`) — recomandat pentru exemple didactice cu timp real
+- **Nu** necesită **P+c `VAR`** — timerele au stare proprie în IR (separată de `VAR` din P+c)
+
+**Fișiere:** `plc-assembler.js`, `plc.md`, `test_suite.js` (grup `comp-plc-lang` / `comp-plc`)
 
 ### P+b — Analog (amânat)
 
@@ -821,9 +933,11 @@ TON, TOF, CTU — biblioteci sau extensie `inline [plc]`; **nu** în P1/P2
 
 **P4 (scanTime / busy / cicluri):** **închis** — P-SCAN1…P-SCAN8, sub-faze P4.0–P4.3.
 
-**Încă deschise / amânate:** P3c (motor/sensor/fan/button), P+a (timere), P+b (analog), P+c/d (ST extins).
+**P5 (timere TON/TOF):** **închis** — P-TMR1…P-TMR13; sub-faze **P5.1** (implementare) / **P5.2** (CTU) / **P5.3** *(amânat, plasare IEC/ST completă)*.
 
-**Următorul pas recomandat:** **P+a** (timere) sau **P3c** (motor/sensor).
+**Încă deschise / amânate:** P3c, **P5.3**, P+b, P+c/d.
+
+**Următorul pas recomandat:** **P5.1** (implementare TON/TOF în `plc-assembler.js`).
 
 ---
 
@@ -849,6 +963,6 @@ TON, TOF, CTU — biblioteci sau extensie `inline [plc]`; **nu** în P1/P2
 | P4.1 auto-scan + busy | ~30% P2 |
 | P4.2 external + teste osc | ~15% P2 |
 | P4.3 overrun (opțional) | ~20% P4.1 |
-| P+a / P+b | fiecare ~50% P1 |
+| P5 / P+b | fiecare ~50% P1 |
 
 **Risc principal:** parser limbaj PLC (IF/THEN); maparea lățimi e mecanică dacă e strictă de la început.
