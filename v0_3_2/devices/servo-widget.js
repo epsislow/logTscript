@@ -220,7 +220,7 @@ function servoBuildValveGlyph() {
   return { svg, mover: discGroup };
 }
 
-function servoBuildGaugeGlyph() {
+function servoBuildGaugeGlyph(minAngle, maxAngle) {
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('viewBox', '0 0 40 40');
@@ -235,12 +235,16 @@ function servoBuildGaugeGlyph() {
   face.setAttribute('stroke-width', '2');
   svg.appendChild(face);
 
-  const tickAngles = [-60, -30, 0, 30, 60];
-  for (let i = 0; i < tickAngles.length; i++) {
-    const a = (tickAngles[i] * Math.PI) / 180;
+  let a0 = minAngle !== undefined ? (minAngle | 0) : 0;
+  let a1 = maxAngle !== undefined ? (maxAngle | 0) : 180;
+  if (!(a0 < a1)) { a0 = 0; a1 = 180; }
+  const tickCount = 5;
+  for (let i = 0; i < tickCount; i++) {
+    const deg = a0 + ((a1 - a0) * i) / (tickCount - 1);
+    const a = (deg * Math.PI) / 180;
     const tick = document.createElementNS(svgNS, 'line');
-    tick.setAttribute('x1', String(20 + Math.sin(a) * 12));
-    tick.setAttribute('y1', String(20 - Math.cos(a) * 12));
+    tick.setAttribute('x1', String(20 + Math.sin(a) * 11));
+    tick.setAttribute('y1', String(20 - Math.cos(a) * 11));
     tick.setAttribute('x2', String(20 + Math.sin(a) * 15));
     tick.setAttribute('y2', String(20 - Math.cos(a) * 15));
     tick.setAttribute('stroke', 'currentColor');
@@ -256,9 +260,9 @@ function servoBuildGaugeGlyph() {
 
   const needle = document.createElementNS(svgNS, 'line');
   needle.setAttribute('x1', '0');
-  needle.setAttribute('y1', '0');
+  needle.setAttribute('y1', '2');
   needle.setAttribute('x2', '0');
-  needle.setAttribute('y2', '-13');
+  needle.setAttribute('y2', '-12');
   needle.setAttribute('stroke', 'currentColor');
   needle.setAttribute('stroke-width', '2.5');
   needle.setAttribute('stroke-linecap', 'round');
@@ -334,15 +338,13 @@ function servoApplyVisual(state, instant) {
     state.moverEl.style.transform = `translateX(${t * stroke}px)`;
     return;
   }
-  if (display === 'valve') {
-    const t = state.fraction;
-    state.moverEl.style.transformOrigin = '0px 0px';
-    state.moverEl.style.transform = `rotate(${t * 90}deg)`;
+  if (display === 'gauge') {
+    state.moverEl.style.transform = `rotate(${state.armRotationDeg}deg)`;
     return;
   }
-  if (display === 'gauge') {
-    state.moverEl.style.transformOrigin = '0px 0px';
-    state.moverEl.style.transform = `rotate(${state.armRotationDeg}deg)`;
+  if (display === 'valve') {
+    const t = state.fraction;
+    state.moverEl.style.transform = `rotate(${t * 90}deg)`;
     return;
   }
   state.moverEl.style.transform = `rotate(${state.armRotationDeg}deg)`;
@@ -409,7 +411,7 @@ function addServo({
     moverEl = built.mover;
     wrapper.appendChild(body);
   } else if (disp === 'gauge') {
-    const built = servoBuildGaugeGlyph();
+    const built = servoBuildGaugeGlyph(minAngle, maxAngle);
     body.appendChild(built.svg);
     moverEl = built.mover;
     wrapper.appendChild(body);
@@ -511,7 +513,10 @@ function setServo(id, opts) {
   state.pendingDurationMs = duration;
   state.fraction = servoFractionFromPosition(state, toPos);
 
-  if (servoIsRotary(state)) {
+  if (state.display === 'gauge') {
+    // Absolute dial angle — avoids pivot drift; CSS transitions between angles
+    state.armRotationDeg = servoAngleFromPosition(state, toPos);
+  } else if (servoIsRotary(state)) {
     const deltaDeg = servoTravelDegrees(state, fromPos, toPos, path);
     state.armRotationDeg += deltaDeg;
   } else {
