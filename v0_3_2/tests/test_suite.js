@@ -32511,5 +32511,272 @@ show(mv)`);
   h.assert('mv', session.getWire(interp, 'mv'), '1');
 });
 
+reg(2959, 'servo', 'display default servo and resolveDisplay', function(h, session) {
+  const cfg = ServoComponent.resolveConfig({ length: 8 });
+  h.assert('default', cfg.display, 'servo');
+  h.assert('rotary', String(ServoComponent.isRotaryDisplay('servo')), 'true');
+  h.assert('piston linear', String(ServoComponent.isRotaryDisplay('piston')), 'false');
+  h.assert('valve linear', String(ServoComponent.isRotaryDisplay('valve')), 'false');
+  let threw = false;
+  try { ServoComponent.resolveDisplay('gate'); } catch (_) { threw = true; }
+  h.assert('bad display', String(threw), 'true');
+});
+
+reg(2960, 'servo', 'piston absolute travel ignores short/long arc choice', function(h, session) {
+  const cfg = { length: 8, minAngle: 0, maxAngle: 100, display: 'piston' };
+  const shortT = ServoComponent.travelStepsForMove(0, 200, 'short', false, 0, cfg);
+  const longT = ServoComponent.travelStepsForMove(0, 200, 'long', false, 0, cfg);
+  h.assert('short', String(shortT), '200');
+  h.assert('long same', String(longT), '200');
+});
+
+reg(2961, 'servo', 'rotary wrap still uses short vs long', function(h, session) {
+  const cfg = { length: 8, minAngle: 0, maxAngle: 360, display: 'servo' };
+  const shortT = ServoComponent.travelStepsForMove(250, 5, 'short', false, 0, cfg);
+  const longT = ServoComponent.travelStepsForMove(250, 5, 'long', false, 0, cfg);
+  h.assert('short', String(shortT), '11');
+  h.assert('long', String(longT), '245');
+});
+
+reg(2962, 'servo', 'piston relative cw clamp no wrap at 360 span', function(h, session) {
+  const { interp } = session.run(`comp [servo] .cyl:
+  display: piston
+  length: 8
+  minAngle: 0
+  maxAngle: 360
+  on: 1
+  :
+
+.cyl:{ value = 11111111, set = 1 }
+.cyl:{ value = 00000001, path = 10, rel = 1, set = 1 }
+8wire p = .cyl:get`);
+  h.assert('p', session.getWire(interp, 'p'), '11111111');
+});
+
+reg(2963, 'servo', 'doc play — display servo', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  display: servo
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'Arm'
+  nl
+  :
+
+.arm = 10000000
+8wire p = .arm:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '10000000');
+});
+
+reg(2964, 'servo', 'doc play — display piston assign', function(h, session) {
+  const { interp } = session.run(`comp [servo] .cyl:
+  display: piston
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  text: 'Cyl'
+  speed: 10
+  nl
+  :
+
+.cyl = 11111111
+8wire p = .cyl:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '11111111');
+  const cfg = ServoComponent.resolveConfig(interp.components.get('.cyl').attributes);
+  h.assert('display', cfg.display, 'piston');
+});
+
+reg(2965, 'servo', 'doc play — display valve 1bit', function(h, session) {
+  const { interp } = session.run(`comp [servo] .v1:
+  display: valve
+  length: 1
+  text: 'V'
+  nl
+  :
+
+.v1 = 1
+1wire p = .v1:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '1');
+});
+
+reg(2966, 'servo', 'doc play — piston absolute two blocks', function(h, session) {
+  const { interp } = session.run(`comp [servo] .cyl:
+  display: piston
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  on: 1
+  nl
+  :
+
+.cyl:{ value = 00000000, set = 1 }
+.cyl:{ value = 11111111, set = 1 }
+8wire p = .cyl:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '11111111');
+});
+
+reg(2967, 'servo', 'doc play — piston relative cw', function(h, session) {
+  const { interp } = session.run(`comp [servo] .cyl:
+  display: piston
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  on: 1
+  nl
+  :
+
+.cyl:{ value = 01000000, set = 1 }
+.cyl:{ value = 00010000, path = 10, rel = 1, set = 1 }
+8wire p = .cyl:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '01010000');
+});
+
+reg(2968, 'servo', 'doc play — valve relative ccw', function(h, session) {
+  const { interp } = session.run(`comp [servo] .v1:
+  display: valve
+  length: 8
+  on: 1
+  nl
+  :
+
+.v1:{ value = 11111111, set = 1 }
+.v1:{ value = 00000010, path = 11, rel = 1, set = 1 }
+8wire p = .v1:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '11111101');
+});
+
+reg(2969, 'servo', 'doc play — piston moving high', function(h, session) {
+  const { interp } = session.run(`comp [servo] .cyl:
+  display: piston
+  length: 8
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.cyl:{ value = 11111111, set = 1 }
+1wire mv = .cyl:moving
+show(mv)`);
+  h.assert('mv', session.getWire(interp, 'mv'), '1');
+});
+
+reg(2970, 'servo', 'doc play — slider piston', function(h, session) {
+  const { interp } = session.run(`comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [servo] .cyl:
+  display: piston
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  text: 'Cyl'
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.pos:{ data = 11000000, set = 1 }
+.spd:{ data = 0010100, set = 1 }
+8wire cmd = .pos:get
+7wire spd = .spd:get
+.cyl:{ value = cmd, speed = spd, set = 1 }
+8wire out = .cyl:get
+show(out)`);
+  h.assert('out', session.getWire(interp, 'out'), '11000000');
+});
+
+reg(2971, 'servo', 'doc play — slider valve', function(h, session) {
+  const { interp } = session.run(`comp [slider] .open:
+  length: 8
+  text: 'Open'
+  on: 1
+  nl
+  :
+
+comp [servo] .v1:
+  display: valve
+  length: 8
+  minAngle: 0
+  maxAngle: 90
+  text: 'Vlv'
+  on: 1
+  nl
+  :
+
+.open:{ data = 10000000, set = 1 }
+8wire cmd = .open:get
+.v1:{ value = cmd, set = 1 }
+8wire out = .v1:get
+show(out)`);
+  h.assert('out', session.getWire(interp, 'out'), '10000000');
+});
+
+reg(2972, 'servo', 'doc play — three displays one slider', function(h, session) {
+  const { interp } = session.run(`comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [servo] .arm:
+  display: servo
+  length: 8
+  text: 'Arm'
+  on: 1
+  nl
+  :
+
+comp [servo] .cyl:
+  display: piston
+  length: 8
+  text: 'Cyl'
+  on: 1
+  nl
+  :
+
+comp [servo] .v1:
+  display: valve
+  length: 8
+  text: 'Vlv'
+  on: 1
+  nl
+  :
+
+.pos:{ data = 01000000, set = 1 }
+8wire cmd = .pos:get
+.arm:{ value = cmd, set = 1 }
+.cyl:{ value = cmd, set = 1 }
+.v1:{ value = cmd, set = 1 }
+8wire a = .arm:get
+8wire c = .cyl:get
+8wire v = .v1:get
+show(a)
+show(c)
+show(v)`);
+  h.assert('a', session.getWire(interp, 'a'), '01000000');
+  h.assert('c', session.getWire(interp, 'c'), '01000000');
+  h.assert('v', session.getWire(interp, 'v'), '01000000');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

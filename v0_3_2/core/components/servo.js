@@ -9,6 +9,10 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
     return { short: 1, long: 1, cw: 1, ccw: 1 };
   }
 
+  static get DISPLAYS() {
+    return { servo: 1, piston: 1, valve: 1 };
+  }
+
   static parseIntAttr(v, fallback) {
     if (v === undefined || v === null || v === '') return fallback;
     const n = parseInt(v, 10);
@@ -21,6 +25,18 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
       throw Error(`Unknown servo path '${p}'`);
     }
     return p;
+  }
+
+  static resolveDisplay(display) {
+    const d = display !== undefined ? String(display) : 'servo';
+    if (!ServoComponent.DISPLAYS[d]) {
+      throw Error(`Unknown servo display '${d}'`);
+    }
+    return d;
+  }
+
+  static isRotaryDisplay(display) {
+    return ServoComponent.resolveDisplay(display) === 'servo';
   }
 
   static resolveConfig(attributes, name) {
@@ -53,6 +69,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
       throw Error(`servo rotate must be 0|90|180|270${name ? ` for ${name}` : ''}`);
     }
     const path = ServoComponent.resolvePath(attributes && attributes.path);
+    const display = ServoComponent.resolveDisplay(attributes && attributes.display);
     let angleAttr = null;
     if (attributes && attributes.angle !== undefined && attributes.angle !== null && attributes.angle !== '') {
       angleAttr = ServoComponent.parseIntAttr(attributes.angle, 0);
@@ -66,6 +83,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
       maxAngle,
       angle: angleAttr,
       path,
+      display,
       text: attributes && attributes.text !== undefined ? String(attributes.text) : '',
       color: (attributes && attributes.color) || '#6dff9c',
       size,
@@ -208,7 +226,14 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
 
   static travelDegrees(fromSteps, toSteps, path, cfg) {
     const vmax = ServoComponent.vmaxForLength(cfg.length);
-    const wrap = ServoComponent.isWrap360(cfg);
+    const rotary = ServoComponent.isRotaryDisplay(cfg.display);
+    const wrap = rotary && ServoComponent.isWrap360(cfg);
+    if (!rotary) {
+      const delta = (toSteps | 0) - (fromSteps | 0);
+      const span = cfg.maxAngle - cfg.minAngle;
+      if (vmax <= 0) return 0;
+      return delta * (span / vmax);
+    }
     const { travel, sign } = ServoComponent.resolveTravelSteps(fromSteps, toSteps, path, vmax, wrap);
     const span = cfg.maxAngle - cfg.minAngle;
     if (vmax <= 0 || travel <= 0) return 0;
@@ -217,9 +242,20 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
 
   static travelStepsForMove(fromPos, toPos, path, rel, magnitude, cfg) {
     const vmax = ServoComponent.vmaxForLength(cfg.length);
-    const wrap360 = ServoComponent.isWrap360(cfg);
+    const rotary = ServoComponent.isRotaryDisplay(cfg.display);
+    const wrap360 = rotary && ServoComponent.isWrap360(cfg);
     if (rel) return Math.abs(magnitude | 0);
+    if (!rotary) return Math.abs((toPos | 0) - (fromPos | 0));
     return ServoComponent.resolveTravelSteps(fromPos, toPos, path, vmax, wrap360).travel;
+  }
+
+  /** Fraction 0..1 along travel A→B after reversed mapping. */
+  static fractionFromValue(position, cfg) {
+    const vmax = ServoComponent.vmaxForLength(cfg.length);
+    let v = Math.max(0, Math.min(vmax, position | 0));
+    if (cfg.reversed) v = vmax - v;
+    if (vmax <= 0) return 0;
+    return v / vmax;
   }
 
   static propagateOutput(ctx, compName) {
@@ -241,7 +277,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
   }
 
   getSpecialParseAttributes() {
-    return { literalAttrs: ['path'] };
+    return { literalAttrs: ['path', 'display'] };
   }
 
   getWidthBits(attributes) {
@@ -341,6 +377,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         minAngle: cfg.minAngle,
         maxAngle: cfg.maxAngle,
         path: cfg.path,
+        display: cfg.display,
         position,
         nl: cfg.nl,
         onMovingChange,
@@ -360,7 +397,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
     const cfg = ServoComponent.resolveConfig(comp.attributes || {}, compName);
     const bits = cfg.length;
     const vmax = ServoComponent.vmaxForLength(bits);
-    const wrap360 = ServoComponent.isWrap360(cfg);
+    const wrap360 = ServoComponent.isRotaryDisplay(cfg.display) && ServoComponent.isWrap360(cfg);
 
     let fromPos = 0;
     if (comp.ref) {
@@ -420,6 +457,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         { name: 'minAngle', value: 'integer' },
         { name: 'maxAngle', value: 'integer' },
         { name: 'angle', value: 'integer' },
+        { name: 'display', value: 'string' },
         { name: 'path', value: 'string' },
         { name: 'text', value: 'string' },
         { name: 'color', value: 'string' },

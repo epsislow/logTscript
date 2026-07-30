@@ -31465,7 +31465,7 @@ Load & Run: initial \`cmd\` is \`00000000\` (default raw 0).
 `,
     'servo.md': `# Servo component
 
-\`comp [servo]\` is a **panel output** that shows a positional actuator (horn on a base). You drive it from LogTscript with wires and assignments (same I/O style as \`led\` / \`motor\`). Mapping it into \`comp [plc]\` \`outputs:\` is optional — see [plc.md](plc.md).
+\`comp [servo]\` is a **panel output** that shows a positional actuator. You drive it from LogTscript with wires and assignments (same I/O style as \`led\` / \`motor\`). Mapping it into \`comp [plc]\` \`outputs:\` is optional — see [plc.md](plc.md).
 
 Signature: \`doc(comp.servo)\`.
 
@@ -31477,7 +31477,7 @@ The stored value is an **unsigned N-bit step index** on a travel range — **not
 | \`2^N−1\` | The other end (\`maxAngle\`) |
 | between | Linearly mapped position on the range |
 
-Attributes \`minAngle\` / \`maxAngle\` define the travel in **degrees** for the panel only. The wire always carries **steps**.
+Attributes \`minAngle\` / \`maxAngle\` define the travel ends for the panel. Names are historical (degrees for a rotary horn). The wire always carries **steps**. Attribute \`display\` chooses the **skin and how absolute moves animate** on the panel (\`servo\`, \`piston\`, or \`valve\`). Pins, pouts, and step storage stay the same for all three.
 
 ---
 
@@ -31486,6 +31486,7 @@ Attributes \`minAngle\` / \`maxAngle\` define the travel in **degrees** for the 
 \`\`\`
 comp [servo] .name:
   length: 8
+  display: servo
   minAngle: 0
   maxAngle: 180
   angle: 90
@@ -31503,7 +31504,7 @@ comp [servo] .name:
   :
 \`\`\`
 
-Minimal (8-bit, \`0…180°\`, default path):
+Minimal (rotary horn, 8-bit, \`0…180°\`, default path):
 
 \`\`\`
 comp [servo] .arm::
@@ -31516,10 +31517,11 @@ comp [servo] .arm::
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | \`length\` | integer | \`8\` | Wire width \`1…16\`. Value = step index \`0…2^N−1\` |
-| \`minAngle\` | integer | \`0\` | Travel start in degrees (\`-360…360\`) |
-| \`maxAngle\` | integer | \`180\` | Travel end in degrees; must be \`> minAngle\`, span \`≤ 360\` |
-| \`angle\` | integer | *(none)* | Initial horn angle in degrees → quantized to steps at create |
-| \`path\` | id | \`short\` | Default arc for absolute moves: \`short\`, \`long\`, \`cw\`, \`ccw\` |
+| \`display\` | id | \`servo\` | Panel skin + absolute kinematics: \`servo\`, \`piston\`, \`valve\` |
+| \`minAngle\` | integer | \`0\` | Travel start (\`-360…360\`) — mapped to step \`0\` |
+| \`maxAngle\` | integer | \`180\` | Travel end; must be \`> minAngle\`, span \`≤ 360\` — mapped to step \`2^N−1\` |
+| \`angle\` | integer | *(none)* | Initial position on the travel range → quantized to steps at create |
+| \`path\` | id | \`short\` | Default direction for moves: \`short\`, \`long\`, \`cw\`, \`ccw\` (see Display) |
 | \`text\` | string | \`''\` | Panel label (up to 5 characters shown) |
 | \`color\` | hex | \`#6dff9c\` | Accent color |
 | \`size\` | integer | \`10\` | Glyph size (\`1…20\`) |
@@ -31530,6 +31532,73 @@ comp [servo] .arm::
 | \`reversed\` | flag | off | Swap which step index maps to which end of the range |
 | \`nl\` | flag | off | Newline after the control |
 | \`on\` | mode | \`raise\` | When property blocks run: \`raise\`, \`edge\`, \`1\`, \`0\` — **not** the position command |
+
+### \`display\` — skin and absolute travel
+
+| \`display\` | Panel look | Absolute move (\`rel = 0\`) | Relative move (\`rel = 1\`) |
+|-----------|------------|---------------------------|---------------------------|
+| \`servo\` (default) | Rotary horn on a base | Arc on the angle range; on a full circle (\`span = 360\`) \`path\` can pick **short / long / cw / ccw** | \`path\` must be \`cw\` or \`ccw\`; ±steps; wrap if span 360, else clamp |
+| \`piston\` | Cylinder + rod | **One** path along the segment (retract ↔ extend); \`short\` / \`long\` do **not** change the route | Same: \`cw\` / \`ccw\` = + / − steps on the segment, then **clamp** |
+| \`valve\` | Pipe body + disc | **One** path (closed ↔ open); \`short\` / \`long\` ignored for routing | Same as piston |
+
+\`minAngle\` / \`maxAngle\` still mark the two ends for every display (historical names):
+
+| End | Rotary (\`servo\`) | \`piston\` | \`valve\` |
+|-----|------------------|----------|---------|
+| \`minAngle\` | start angle | retracted | closed |
+| \`maxAngle\` | end angle | extended | open |
+
+You may still set \`path: short\` (or pass the \`path\` pin) on a piston/valve absolute move: it is **accepted** and does not error; absolute animation uses the single segment path. For relative moves, \`cw\` / \`ccw\` remain required on all displays.
+
+\`\`\`logts-play
+comp [servo] .arm:
+  display: servo
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'Arm'
+  nl
+  :
+
+.arm = 10000000
+8wire p = .arm:get
+show(p)
+\`\`\`
+
+Load & Run: rotary default skin; \`p\` is \`10000000\`.
+
+\`\`\`logts-play
+comp [servo] .cyl:
+  display: piston
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  text: 'Cyl'
+  speed: 10
+  nl
+  :
+
+.cyl = 11111111
+8wire p = .cyl:get
+show(p)
+\`\`\`
+
+Load & Run: piston fully extended (max step); \`p\` is \`11111111\`.
+
+\`\`\`logts-play
+comp [servo] .v1:
+  display: valve
+  length: 1
+  text: 'V'
+  nl
+  :
+
+.v1 = 1
+1wire p = .v1:get
+show(p)
+\`\`\`
+
+Load & Run: 1-bit valve open; \`p\` is \`1\`.
 
 ### Steps vs degrees
 
@@ -31544,7 +31613,7 @@ To command “about 90°” on \`0…180\` / \`length: 8\`, use step \`128\` (\`
 
 ### \`speed\` and \`rate\` (panel move only)
 
-Two separate controls for how fast the horn **moves on the panel**. Neither changes stored steps, wires, PLC, or \`:get\`.
+Two separate controls for how fast the actuator **moves on the panel**. Neither changes stored steps, wires, PLC, or \`:get\`.
 
 | | \`speed\` | \`rate\` |
 |--|---------|--------|
@@ -31558,7 +31627,7 @@ Effective panel factor:
 factor = speed × (rate / 10)
 \`\`\`
 
-Slew duration is proportional to \`arc steps / factor\`.
+Slew duration is proportional to \`travel steps / factor\`.
 
 | \`speed\` | \`rate\` | Factor | Effect |
 |---------|--------|--------|--------|
@@ -31578,13 +31647,13 @@ Compare with \`motor\`: there \`value\` is the speed command; on servo \`value\`
 |------|-------|------|
 | \`set\` | 1 | Enable a property-block write when \`1\` |
 | \`value\` | \`length\` | Step magnitude — meaning depends on \`rel\` |
-| \`path\` | 2 | Arc override for this move only (see below) |
+| \`path\` | 2 | Direction / arc for this move (see Absolute / Relative / Display) |
 | \`rel\` | 1 | \`0\` = absolute (default), \`1\` = relative |
 | \`speed\` | 7 | Move-speed override for this move only (\`0…127\` → clamp \`1…100\`) |
-| \`moving\` | 1 | \`1\` while the horn is still moving on the panel; \`0\` when the current move has finished |
+| \`moving\` | 1 | \`1\` while the panel glyph is still moving; \`0\` when the current move has finished |
 | \`get\` | \`length\` | Read back stored **position in steps** |
 
-Direct assignment \`.arm = expr\` writes an **absolute** step index (same width as \`length\`). Default arc = attribute \`path\`.
+Direct assignment \`.arm = expr\` writes an **absolute** step index (same width as \`length\`). Default arc / direction = attribute \`path\`.
 
 Property block:
 
@@ -31602,21 +31671,21 @@ For **two commands** in one Load & Run, use two property blocks (or \`session.ex
 
 \`moving\` is a **state pout** for the panel animation:
 
-- \`1\` while the horn is still slewing toward its current target
-- \`0\` when the servo has visually stopped
+- \`1\` while the glyph is still slewing toward its current target
+- \`0\` when the actuator has visually stopped
 
-\`moving\` does **not** block new commands. If a new command arrives while the servo is already moving, behaviour stays the same as before; the target updates and \`moving\` stays \`1\` until the last move finishes.
+\`moving\` does **not** block new commands. If a new command arrives while already moving, the target updates and \`moving\` stays \`1\` until the last move finishes.
 
-If a command causes **no effective movement** (same stored position), \`moving\` stays \`0\`.
+If a command causes **no effective movement** (same stored position / zero travel), \`moving\` stays \`0\`.
 
 ### Pin \`path\` encoding
 
 | Binary | Mode |
 |--------|------|
-| \`00\` | \`short\` — shortest arc (default attribute) |
-| \`01\` | \`long\` — longest arc |
-| \`10\` | \`cw\` — clockwise forced |
-| \`11\` | \`ccw\` — counter-clockwise forced |
+| \`00\` | \`short\` — shortest arc (rotary absolute on a full circle) |
+| \`01\` | \`long\` — longest arc (rotary absolute on a full circle) |
+| \`10\` | \`cw\` — clockwise (rotary) or **+steps** (relative / linear sense) |
+| \`11\` | \`ccw\` — counter-clockwise (rotary) or **−steps** (relative / linear sense) |
 
 If the \`path\` pin is omitted in a block, the attribute \`path\` is used. The override applies to **one move** only.
 
@@ -31626,15 +31695,18 @@ If the \`path\` pin is omitted in a block, the attribute \`path\` is used. The o
 
 \`value\` = target step index \`0…2^N−1\`.
 
-On a **segment** (\`maxAngle − minAngle < 360\`), there is only one path along the range; \`short\` / \`long\` behave the same.
+**Rotary (\`display: servo\`):**
 
-On a **full circle** (\`maxAngle − minAngle = 360\`, e.g. \`0…360\`), two arcs exist between any two positions:
+- On a **segment** (\`maxAngle − minAngle < 360\`), there is only one path along the range; \`short\` / \`long\` behave the same.
+- On a **full circle** (\`maxAngle − minAngle = 360\`, e.g. \`0…360\`), two arcs exist between any two positions:
 
 | \`path\` | Example \`250 → 5\` (on 256 steps) |
 |--------|----------------------------------|
 | \`short\` | 11 steps forward |
 | \`long\` | 245 steps backward |
 | \`cw\` / \`ccw\` | forced direction |
+
+**Linear (\`display: piston\` or \`valve\`):** there is always **one** path from the current step to the target along the segment. Travel distance for animation is \`|target − current|\`. Attribute/pin \`short\` / \`long\` do not pick a second route.
 
 \`\`\`logts-play
 comp [servo] .yaw:
@@ -31672,6 +31744,24 @@ show(p)
 
 Load & Run: first block moves to step \`250\`; second uses pin \`path = 01\` (\`long\`) to reach step \`5\`; \`p\` is \`00000101\`.
 
+\`\`\`logts-play
+comp [servo] .cyl:
+  display: piston
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  on: 1
+  nl
+  :
+
+.cyl:{ value = 00000000, set = 1 }
+.cyl:{ value = 11111111, set = 1 }
+8wire p = .cyl:get
+show(p)
+\`\`\`
+
+Load & Run: piston retracts then extends to max step; \`p\` is \`11111111\`.
+
 ---
 
 ## Relative moves (\`rel = 1\`)
@@ -31685,8 +31775,8 @@ Load & Run: first block moves to step \`250\`; second uses pin \`path = 01\` (\`
 
 After the math:
 
-- **Span 360°** → wrap step index modulo \`2^N\`
-- **Segment** → clamp to \`0…2^N−1\`
+- **Rotary + span 360°** → wrap step index modulo \`2^N\`
+- **Rotary segment, or any piston/valve** → clamp to \`0…2^N−1\`
 
 \`:get\` returns the new absolute step index.
 
@@ -31740,9 +31830,43 @@ show(p)
 
 Load & Run: from step \`255\`, \`+1\` step cw wraps to \`0\`; \`p\` is \`00000000\`.
 
+\`\`\`logts-play
+comp [servo] .cyl:
+  display: piston
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  on: 1
+  nl
+  :
+
+.cyl:{ value = 01000000, set = 1 }
+.cyl:{ value = 00010000, path = 10, rel = 1, set = 1 }
+8wire p = .cyl:get
+show(p)
+\`\`\`
+
+Load & Run: from step \`64\`, \`+16\` steps; \`p\` is \`01010000\`.
+
+\`\`\`logts-play
+comp [servo] .v1:
+  display: valve
+  length: 8
+  on: 1
+  nl
+  :
+
+.v1:{ value = 11111111, set = 1 }
+.v1:{ value = 00000010, path = 11, rel = 1, set = 1 }
+8wire p = .v1:get
+show(p)
+\`\`\`
+
+Load & Run: from max open, \`−2\` steps; \`p\` is \`11111101\`.
+
 ---
 
-## \`:moving\` while the servo is travelling
+## \`:moving\` while travelling
 
 \`\`\`logts-play
 comp [servo] .arm:
@@ -31795,6 +31919,23 @@ show(mv)
 \`\`\`
 
 Load & Run: target equals the current stored position, so there is no visible move and \`mv\` stays \`0\`.
+
+\`\`\`logts-play
+comp [servo] .cyl:
+  display: piston
+  length: 8
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.cyl:{ value = 11111111, set = 1 }
+1wire mv = .cyl:moving
+show(mv)
+\`\`\`
+
+Load & Run: piston starts extending; \`mv\` is \`1\`.
 
 ---
 
@@ -31945,6 +32086,124 @@ show(out)
 
 Load & Run: slider step \`128\` drives the servo; \`out\` is \`10000000\`. Speed = attribute defaults (\`speed: 10\`, \`rate: 10\`).
 
+## Slider → piston
+
+\`\`\`logts-play
+comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [servo] .cyl:
+  display: piston
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  text: 'Cyl'
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.pos:{ data = 11000000, set = 1 }
+.spd:{ data = 0010100, set = 1 }
+8wire cmd = .pos:get
+7wire spd = .spd:get
+.cyl:{ value = cmd, speed = spd, set = 1 }
+8wire out = .cyl:get
+show(out)
+\`\`\`
+
+Load & Run: piston to step \`192\`; move speed pin \`20\`; \`out\` is \`11000000\`.
+
+## Slider → valve
+
+\`\`\`logts-play
+comp [slider] .open:
+  length: 8
+  text: 'Open'
+  on: 1
+  nl
+  :
+
+comp [servo] .v1:
+  display: valve
+  length: 8
+  minAngle: 0
+  maxAngle: 90
+  text: 'Vlv'
+  on: 1
+  nl
+  :
+
+.open:{ data = 10000000, set = 1 }
+8wire cmd = .open:get
+.v1:{ value = cmd, set = 1 }
+8wire out = .v1:get
+show(out)
+\`\`\`
+
+Load & Run: valve disc to mid travel (step \`128\`); \`out\` is \`10000000\`.
+
+## Three displays side by side
+
+\`\`\`logts-play
+comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [servo] .arm:
+  display: servo
+  length: 8
+  text: 'Arm'
+  on: 1
+  nl
+  :
+
+comp [servo] .cyl:
+  display: piston
+  length: 8
+  text: 'Cyl'
+  on: 1
+  nl
+  :
+
+comp [servo] .v1:
+  display: valve
+  length: 8
+  text: 'Vlv'
+  on: 1
+  nl
+  :
+
+.pos:{ data = 01000000, set = 1 }
+8wire cmd = .pos:get
+.arm:{ value = cmd, set = 1 }
+.cyl:{ value = cmd, set = 1 }
+.v1:{ value = cmd, set = 1 }
+8wire a = .arm:get
+8wire c = .cyl:get
+8wire v = .v1:get
+show(a)
+show(c)
+show(v)
+\`\`\`
+
+Load & Run: one slider drives all three skins to step \`64\`; \`a\`, \`c\`, and \`v\` are \`01000000\`.
+
 ## Slow moves (\`rate\` attribute)
 
 \`\`\`logts-play
@@ -32040,7 +32299,6 @@ show(p)
 Load & Run: step \`0\` maps to the **maxAngle** side of the range on the panel; \`p\` is still \`00000000\`.
 
 ---
-
 
 ## 16-bit bus
 

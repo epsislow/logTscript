@@ -235,9 +235,15 @@ API: `setServo({ position, path?, rel?, speed? })` — `rate` din state componen
 
 Helpers: `slewDurationMs(travelSteps, speed, rate)`.
 
+## Extindere `display` (plan separat)
+
+Skinuri + cinematică panel: `servo` (rotary) / `piston` / `valve` (linear).  
+Vezi [comp_servo_display.plan.md](comp_servo_display.plan.md).
+
 ## Ce nu facem
 
 - Pin `rate` (rămâne doar atribut, ca motor)
 - `:speed` / `:rate` pout
 - `speed` confundat cu poziția pe `value`
 - PWM real; float în limbaj
+- Multiple kinds vizuale în planul de bază — mutate în planul `display`
