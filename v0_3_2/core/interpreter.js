@@ -12645,6 +12645,7 @@ if (s.assignment) {
         if (result.keyHandler) compInfo.keyHandler = result.keyHandler;
         if (result.validRef) compInfo.validRef = result.validRef;
         if (result.sizeRef) compInfo.sizeRef = result.sizeRef;
+        if (result.movingRef) compInfo.movingRef = result.movingRef;
         if (result.keyboardHandler) compInfo.keyboardHandler = result.keyboardHandler;
         if (result.scannerHandler) compInfo.scannerHandler = result.scannerHandler;
         if (result.codesAcceptedFilter) compInfo.codesAcceptedFilter = result.codesAcceptedFilter;

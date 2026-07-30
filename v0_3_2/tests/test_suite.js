@@ -32065,6 +32065,7 @@ reg(2930, 'servo', 'registry + doc(comp.servo)', function(h, session) {
   h.assert('doc path', String(out.some(l => l.includes('path: string'))), 'true');
   h.assert('doc speed', String(out.some(l => l.includes('speed: integer'))), 'true');
   h.assert('doc rate', String(out.some(l => l.includes('rate: integer'))), 'true');
+  h.assert('doc moving', String(out.some(l => l.includes('moving'))), 'true');
 });
 
 reg(2931, 'servo', 'steps map angle valueFromAngle angleFromValue', function(h, session) {
@@ -32461,6 +32462,53 @@ show(p)`);
   h.assert('p', session.getWire(interp, 'p'), '11111111');
   const cfg = ServoComponent.resolveConfig(interp.components.get('.arm').attributes);
   h.assert('rate', String(cfg.rate), '3');
+});
+
+reg(2956, 'servo', 'moving pout goes high on motion', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  speed: 10
+  rate: 10
+  on: 1
+  :
+
+.arm:{ value = 10000000, set = 1 }
+1wire mv = .arm:moving
+show(mv)`);
+  h.assert('moving', session.getWire(interp, 'mv'), '1');
+});
+
+reg(2957, 'servo', 'moving stays low when no motion', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  angle: 90
+  on: 1
+  :
+
+.arm:{ value = 10000000, set = 1 }
+1wire mv = .arm:moving`);
+  h.assert('moving', session.getWire(interp, 'mv'), '0');
+});
+
+reg(2958, 'servo', 'doc play — moving high during slew', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.arm:{ value = 11111111, set = 1 }
+1wire mv = .arm:moving
+show(mv)`);
+  h.assert('mv', session.getWire(interp, 'mv'), '1');
 });
 
   window.LogTScriptTestSuite.finalize();

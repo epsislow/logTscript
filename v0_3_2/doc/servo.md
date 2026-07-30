@@ -116,6 +116,7 @@ Compare with `motor`: there `value` is the speed command; on servo `value` is **
 | `path` | 2 | Arc override for this move only (see below) |
 | `rel` | 1 | `0` = absolute (default), `1` = relative |
 | `speed` | 7 | Move-speed override for this move only (`0…127` → clamp `1…100`) |
+| `moving` | 1 | `1` while the horn is still moving on the panel; `0` when the current move has finished |
 | `get` | `length` | Read back stored **position in steps** |
 
 Direct assignment `.arm = expr` writes an **absolute** step index (same width as `length`). Default arc = attribute `path`.
@@ -131,6 +132,17 @@ If `path` or `speed` is omitted in a block, the component attribute is used for 
 `on:` on the component only controls **when** the block applies — not the target position.
 
 For **two commands** in one Load & Run, use two property blocks (or `session.execStmts` from tests). A direct assignment `.arm = …` in the same script does not run a following `{ … set = 1 }` block on that component.
+
+### `:moving`
+
+`moving` is a **state pout** for the panel animation:
+
+- `1` while the horn is still slewing toward its current target
+- `0` when the servo has visually stopped
+
+`moving` does **not** block new commands. If a new command arrives while the servo is already moving, behaviour stays the same as before; the target updates and `moving` stays `1` until the last move finishes.
+
+If a command causes **no effective movement** (same stored position), `moving` stays `0`.
 
 ### Pin `path` encoding
 
@@ -262,6 +274,62 @@ show(p)
 ```
 
 Load & Run: from step `255`, `+1` step cw wraps to `0`; `p` is `00000000`.
+
+---
+
+## `:moving` while the servo is travelling
+
+```logts-play
+comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.arm:{ value = 11111111, set = 1 }
+1wire mv = .arm:moving
+show(mv)
+```
+
+Load & Run: `mv` is `1` because the horn has started moving toward the new target.
+
+```logts-play
+comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.arm:{ value = 11111111, set = 1 }
+probe(.arm:moving)
+```
+
+Load & Run: `probe` first shows `1`, then returns to `0` after the panel animation completes.
+
+```logts-play
+comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  angle: 90
+  on: 1
+  nl
+  :
+
+.arm:{ value = 10000000, set = 1 }
+1wire mv = .arm:moving
+show(mv)
+```
+
+Load & Run: target equals the current stored position, so there is no visible move and `mv` stays `0`.
 
 ---
 

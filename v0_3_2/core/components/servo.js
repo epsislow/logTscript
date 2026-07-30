@@ -215,6 +215,31 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
     return sign * travel * (span / vmax);
   }
 
+  static travelStepsForMove(fromPos, toPos, path, rel, magnitude, cfg) {
+    const vmax = ServoComponent.vmaxForLength(cfg.length);
+    const wrap360 = ServoComponent.isWrap360(cfg);
+    if (rel) return Math.abs(magnitude | 0);
+    return ServoComponent.resolveTravelSteps(fromPos, toPos, path, vmax, wrap360).travel;
+  }
+
+  static propagateOutput(ctx, compName) {
+    if (ctx.deferWirePropagation && ctx.deferWirePropagation() && ctx.signalPropagationStrategy) {
+      const executed = new Set();
+      const scheduled = ctx.signalPropagationStrategy._scheduleWiresDependingOnComponent(compName, executed);
+      if (scheduled) {
+        ctx.signalPropagationStrategy.propagate();
+      }
+      ctx.updateComponentConnections(compName);
+      ctx._notifyIoportMemberChange(compName);
+    } else {
+      ctx.updateComponentConnections(compName);
+      if (typeof showVars === 'function') showVars(ctx);
+    }
+    if (typeof ctx._emitComputedComponentProbes === 'function') {
+      ctx._emitComputedComponentProbes(compName);
+    }
+  }
+
   getSpecialParseAttributes() {
     return { literalAttrs: ['path'] };
   }
@@ -230,22 +255,31 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
     }
   }
 
-  getSupportedProperties() { return ['get']; }
+  getSupportedProperties() { return ['get', 'moving']; }
   getRedirectProperties() { return ['get']; }
 
   evalGetProperty(comp, property, a, ctx) {
-    if (property !== 'get') return null;
-    let val = null;
-    if (comp.ref && comp.ref !== '&-') {
-      val = ctx.getValueFromRef(comp.ref);
+    if (property === 'get') {
+      let val = null;
+      if (comp.ref && comp.ref !== '&-') {
+        val = ctx.getValueFromRef(comp.ref);
+      }
+      const bits = ctx.getComponentBits(comp.type, comp.attributes) || 8;
+      if (val === null || val === undefined) {
+        val = comp.initialValue || '0'.repeat(bits);
+      }
+      const br = this.handleBitRange(a, val, a.var, 'get', ctx);
+      if (br) return br;
+      return { value: val, ref: null, varName: `${a.var}:get`, bitWidth: bits };
     }
-    const bits = ctx.getComponentBits(comp.type, comp.attributes) || 8;
-    if (val === null || val === undefined) {
-      val = comp.initialValue || '0'.repeat(bits);
+    if (property === 'moving') {
+      let val = '0';
+      if (comp.movingRef && comp.movingRef !== '&-') {
+        val = ctx.getValueFromRef(comp.movingRef) || '0';
+      }
+      return { value: val, ref: null, varName: `${a.var}:moving`, bitWidth: 1 };
     }
-    const br = this.handleBitRange(a, val, a.var, 'get', ctx);
-    if (br) return br;
-    return { value: val, ref: null, varName: `${a.var}:get`, bitWidth: bits };
+    return null;
   }
 
   _resolveMovePath(pending, cfg, reEvaluate, ctx) {
@@ -282,6 +316,15 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
       position = ServoComponent.binToUnsigned(norm);
     }
     const value = ServoComponent.unsignedToBin(position, cfg.length);
+    const movingIdx = ctx.storeValue('0');
+    const movingRef = `&${movingIdx}`;
+
+    const onMovingChange = (moving) => {
+      ctx.runSafely(() => {
+        ctx.setValueAtRef(movingRef, moving ? '1' : '0');
+        ServoComponent.propagateOutput(ctx, name);
+      });
+    };
 
     if (typeof addServo === 'function') {
       addServo({
@@ -300,11 +343,12 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         path: cfg.path,
         position,
         nl: cfg.nl,
+        onMovingChange,
       });
     }
 
     const storageIdx = ctx.storeValue(value);
-    return { deviceIds: [baseId], ref: `&${storageIdx}` };
+    return { deviceIds: [baseId], ref: `&${storageIdx}`, movingRef };
   }
 
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {
@@ -343,6 +387,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
     } else {
       toPos = Math.max(0, Math.min(vmax, magnitude));
     }
+    const travelSteps = ServoComponent.travelStepsForMove(fromPos, toPos, path, rel, magnitude, cfg);
 
     const bin = ServoComponent.unsignedToBin(toPos, bits);
     if (comp.ref) {
@@ -360,7 +405,10 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         path,
         rel,
         speed: moveSpeed,
+        valueMagnitude: magnitude,
       });
+    } else if (comp.movingRef && comp.movingRef !== '&-') {
+      ctx.setValueAtRef(comp.movingRef, travelSteps > 0 ? '1' : '0');
     }
     comp._servoLastPos = toPos;
   }
@@ -391,7 +439,10 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         { bits: '1', name: 'rel' },
         { bits: '7', name: 'speed' },
       ],
-      pouts: [{ bits: 'X', name: 'get' }],
+      pouts: [
+        { bits: 'X', name: 'get' },
+        { bits: '1', name: 'moving' },
+      ],
       returns: 'Xbit',
     };
   }

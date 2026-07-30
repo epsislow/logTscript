@@ -125,6 +125,7 @@ function addServo({
   path = 'short',
   position = 0,
   nl = false,
+  onMovingChange = null,
 }) {
   const container = typeof getDevicesContainer === 'function' ? getDevicesContainer() : null;
   if (!container || !id) return;
@@ -185,6 +186,9 @@ function addServo({
     position: pos,
     armRotationDeg: startDeg,
     pendingDurationMs: 0,
+    moving: false,
+    onMovingChange,
+    movingTimer: null,
   };
 
   servoApplyArm(state, true);
@@ -209,10 +213,9 @@ function setServo(id, opts) {
 
   let travelSteps;
   if (rel) {
-    travelSteps = Math.abs(toPos - fromPos);
-    if (travelSteps === 0 && opts && opts.valueMagnitude !== undefined) {
-      travelSteps = opts.valueMagnitude | 0;
-    }
+    travelSteps = opts && opts.valueMagnitude !== undefined
+      ? Math.abs(opts.valueMagnitude | 0)
+      : Math.abs(toPos - fromPos);
   } else {
     travelSteps = servoTravelStepsCount(state, fromPos, toPos, path);
   }
@@ -221,9 +224,29 @@ function setServo(id, opts) {
   const moveSpeed = (opts && opts.speed !== undefined) ? (opts.speed | 0) : state.speed;
   const duration = servoSlewDurationMs(travelSteps, moveSpeed, state.rate);
 
+  if (state.movingTimer) {
+    clearTimeout(state.movingTimer);
+    state.movingTimer = null;
+  }
+
   state.position = toPos;
   state.path = path;
   state.pendingDurationMs = duration;
   state.armRotationDeg += deltaDeg;
   servoApplyArm(state, duration <= 0);
+
+  const movingNow = duration > 0 && travelSteps > 0;
+  state.moving = movingNow;
+  if (typeof state.onMovingChange === 'function') {
+    state.onMovingChange(movingNow ? 1 : 0);
+  }
+  if (movingNow) {
+    state.movingTimer = setTimeout(() => {
+      state.movingTimer = null;
+      state.moving = false;
+      if (typeof state.onMovingChange === 'function') {
+        state.onMovingChange(0);
+      }
+    }, duration);
+  }
 }
