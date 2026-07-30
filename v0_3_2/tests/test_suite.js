@@ -32063,7 +32063,8 @@ reg(2930, 'servo', 'registry + doc(comp.servo)', function(h, session) {
   const out = session.runDoc('doc(comp.servo)');
   h.assert('doc first line', out[0], 'comp [servo] .name:');
   h.assert('doc path', String(out.some(l => l.includes('path: string'))), 'true');
-  h.assert('doc rel pin', String(out.some(l => l.includes('rel'))), 'true');
+  h.assert('doc speed', String(out.some(l => l.includes('speed: integer'))), 'true');
+  h.assert('doc rate', String(out.some(l => l.includes('rate: integer'))), 'true');
 });
 
 reg(2931, 'servo', 'steps map angle valueFromAngle angleFromValue', function(h, session) {
@@ -32230,10 +32231,14 @@ comp [servo] .arm:
   h.assert('out', session.getWire(interp, 'out'), '10000000');
 });
 
-reg(2944, 'servo', 'slewDurationMs rate scaling', function(h, session) {
-  const slow = ServoComponent.slewDurationMs(50, 3);
-  const fast = ServoComponent.slewDurationMs(50, 30);
-  h.assert('slow > fast', String(slow > fast), 'true');
+reg(2944, 'servo', 'slewDurationMs speed and rate scaling', function(h, session) {
+  const base = ServoComponent.slewDurationMs(50, 10, 10);
+  const slowRate = ServoComponent.slewDurationMs(50, 10, 3);
+  const slowSpeed = ServoComponent.slewDurationMs(50, 3, 10);
+  const fastSpeed = ServoComponent.slewDurationMs(50, 50, 10);
+  h.assert('slow rate', String(slowRate > base), 'true');
+  h.assert('slow speed', String(slowSpeed > base), 'true');
+  h.assert('fast speed', String(fastSpeed < base), 'true');
 });
 
 reg(2945, 'servo', 'doc play — 180 assign', function(h, session) {
@@ -32308,22 +32313,24 @@ show(pos)`);
   h.assert('pos', session.getWire(interp, 'pos'), '01111111');
 });
 
-reg(2949, 'servo', 'doc play — rate display attrs', function(h, session) {
+reg(2949, 'servo', 'doc play — speed and rate attrs', function(h, session) {
   const { interp } = session.run(`comp [servo] .arm:
   length: 8
   minAngle: 0
   maxAngle: 180
   size: 14
+  speed: 20
   rate: 5
   color: ^6dff9c
   rotate: 90
   on: 1
   :
 
-.arm = 11111111
+.arm:{ value = 11111111, set = 1 }
 8wire p = .arm:get`);
   const cfg = ServoComponent.resolveConfig(interp.components.get('.arm').attributes);
   h.assert('size', String(cfg.size), '14');
+  h.assert('speed', String(cfg.speed), '20');
   h.assert('rate', String(cfg.rate), '5');
   h.assert('p', session.getWire(interp, 'p'), '11111111');
 });
@@ -32337,10 +32344,123 @@ reg(2950, 'servo', 'doc play — reversed segment', function(h, session) {
   on: 1
   :
 
-.arm = 00000000
+.arm:{ value = 00000000, set = 1 }
 8wire p = .arm:get
 show(p)`);
   h.assert('p', session.getWire(interp, 'p'), '00000000');
+});
+
+reg(2951, 'servo', 'speed attr default and speedFromBin', function(h, session) {
+  const cfg = ServoComponent.resolveConfig({ length: 8 });
+  h.assert('default', String(cfg.speed), '10');
+  h.assert('bin3', String(ServoComponent.speedFromBin('0000011')), '3');
+  h.assert('bin127', String(ServoComponent.speedFromBin('1111111')), '100');
+});
+
+reg(2952, 'servo', 'speed pin override on property block', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  speed: 10
+  on: 1
+  :
+
+.arm:{ value = 00010000, speed = 0001010, set = 1 }
+8wire p = .arm:get`);
+  h.assert('p', session.getWire(interp, 'p'), '00010000');
+  const cfg = ServoComponent.resolveConfig(interp.components.get('.arm').attributes);
+  h.assert('attr unchanged', String(cfg.speed), '10');
+});
+
+reg(2953, 'servo', 'dual sliders value and speed', function(h, session) {
+  const { interp } = session.run(`comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.pos:{ data = 10000000, set = 1 }
+.spd:{ data = 0001010, set = 1 }
+8wire cmd = .pos:get
+7wire spd = .spd:get
+.arm:{ value = cmd, speed = spd, set = 1 }
+8wire out = .arm:get`);
+  h.assert('out', session.getWire(interp, 'out'), '10000000');
+  h.assert('spd pin', session.getWire(interp, 'spd'), '0001010');
+});
+
+reg(2954, 'servo', 'doc play — dual sliders pos and speed', function(h, session) {
+  const { interp } = session.run(`comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  speed: 10
+  rate: 5
+  text: 'Arm'
+  on: 1
+  nl
+  :
+
+.pos:{ data = 01000000, set = 1 }
+.spd:{ data = 0001100, set = 1 }
+8wire cmd = .pos:get
+7wire spd = .spd:get
+.arm:{ value = cmd, speed = spd, set = 1 }
+8wire out = .arm:get
+show(out)
+show(spd)`);
+  h.assert('out', session.getWire(interp, 'out'), '01000000');
+  h.assert('spd', session.getWire(interp, 'spd'), '0001100');
+});
+
+reg(2955, 'servo', 'doc play — slow rate attribute', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  speed: 10
+  rate: 3
+  on: 1
+  nl
+  :
+
+.arm:{ value = 11111111, set = 1 }
+8wire p = .arm:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '11111111');
+  const cfg = ServoComponent.resolveConfig(interp.components.get('.arm').attributes);
+  h.assert('rate', String(cfg.rate), '3');
 });
 
   window.LogTScriptTestSuite.finalize();

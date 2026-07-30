@@ -19,14 +19,16 @@ function servoPxFromSize(size) {
   );
 }
 
-function servoSlewDurationMs(travelSteps, rate) {
+function servoSlewDurationMs(travelSteps, speed, rate) {
   if (typeof ServoComponent !== 'undefined' && ServoComponent.slewDurationMs) {
-    return ServoComponent.slewDurationMs(travelSteps, rate);
+    return ServoComponent.slewDurationMs(travelSteps, speed, rate);
   }
   const steps = Math.abs(travelSteps | 0);
   if (steps <= 0) return 0;
-  const factor = Math.max(0.1, Math.min(10, (rate || 10) / 10));
-  return Math.max(40, Math.min(5000, (steps * 24) / factor));
+  const sp = Math.max(1, Math.min(100, speed || 10));
+  const rt = Math.max(1, Math.min(100, rate || 10));
+  const eff = Math.max(0.1, sp * (rt / 10));
+  return Math.max(40, Math.min(5000, (steps * 24) / eff));
 }
 
 function servoBuildGlyph(color) {
@@ -112,6 +114,7 @@ function addServo({
   text = '',
   color = '#6dff9c',
   size = 10,
+  speed = 10,
   rate = 10,
   rotate = 0,
   flip = false,
@@ -171,6 +174,7 @@ function addServo({
     armEl,
     wrapper,
     color,
+    speed,
     rate,
     length: bits,
     minAngle,
@@ -214,7 +218,8 @@ function setServo(id, opts) {
   }
 
   const deltaDeg = servoTravelDegrees(state, fromPos, toPos, path);
-  const duration = servoSlewDurationMs(travelSteps, state.rate);
+  const moveSpeed = (opts && opts.speed !== undefined) ? (opts.speed | 0) : state.speed;
+  const duration = servoSlewDurationMs(travelSteps, moveSpeed, state.rate);
 
   state.position = toPos;
   state.path = path;

@@ -1,6 +1,6 @@
 ---
 name: comp servo universal
-overview: "comp [servo] = output pozițional: value = pași (index); absolut (rel=0) + path short/long/cw/ccw; relativ (rel=1) + path cw/ccw; slew cu rate; length 1…16."
+overview: "comp [servo] = output pozițional: value = pași; path + rel; speed = viteză clară (atribut + pin); rate = scale ca la motor; length 1…16."
 todos:
   - id: s0
     content: "S0: plan în .cursor/plans/comp_servo_universal.plan.md + note motor/plc"
@@ -10,6 +10,9 @@ todos:
     status: completed
   - id: s2
     content: "S2: servo.md + logts-play (absolut+relativ+360) + catalog; suite verde"
+    status: completed
+  - id: s3
+    content: "S3: speed atribut+pin 7-bit + rate scale; doc/teste; suite verde"
     status: completed
 isProject: false
 ---
@@ -26,11 +29,41 @@ Include și servo **0…360°**: tot poziție absolută; diferența e că pe cer
 
 | | `motor` | `servo` |
 |--|---------|---------|
-| Valoare | viteză (`0` = stop) | **pași** (index `0…vmax`) → unghi pe cursă |
+| Comandă (`value`) | viteză spin (`0` = stop) | **pași** (poziție pe cursă) |
 | Animație | rotație continuă | braț spre țintă, apoi stă |
-| `rate` | factor viteză spin | **slew** pe arcul ales (`rate` mare ≈ instant) |
+| **`speed`** | — | viteză clară de mișcare (atribut + pin) |
+| **`rate`** | scale animație spin (`factor = rate/10`) | scale animație slew (**același model**) |
 | Mod | — | pin **`rel`**: `0` absolut, `1` relativ (Δ pași) |
-| Sens / arc | pin `dir` + `reversed` | pin **`path`** 2-bit (+ atribut default); la `rel=1` doar **`cw`/`ccw`** |
+| Sens / arc | pin `dir` + `reversed` | pin **`path`** 2-bit (+ atribut default) |
+
+### `speed` vs `rate` (închis)
+
+Două roluri separate — **nu** înlocuim unul pe altul:
+
+| | `speed` | `rate` |
+|--|---------|--------|
+| **Ce e** | viteză de mișcare (clară, „cât de repede mergi”) | **multiplicator** / scale (ca la motor) |
+| **Unde** | atribut **+ pin** 7-bit (override per mutare) | **doar atribut** (ca motor) |
+| **Interval** | `1…100` (default `10`) | `1…100` (default `10`) |
+| **Model** | valoare directă | `scale = rate / 10` |
+
+**Viteză efectivă panel** (fără float în limbaj):
+
+```
+factor = speed * (rate / 10)
+durată slew ∝ (pași pe arc) / factor
+```
+
+| `speed` | `rate` | Factor efectiv | Efect |
+|---------|--------|----------------|--------|
+| `10` | `10` | `10 × 1.0 = 10` | normal (default) |
+| `5` | `10` | `5` | mai lent (viteză mică) |
+| `10` | `5` | `5` | mai lent (scale 0.5×) |
+| `10` | `20` | `20` | mai rapid (scale 2×) |
+| `50` | `10` | `50` | aproape instant |
+
+- **`speed` / `rate` nu schimbă** poziția stocată, wires, PLC sau `:get` — doar animația.
+- La create: brațul pornește la unghiul inițial **fără** slew.
 
 ```logts
 comp [servo] .arm1:
@@ -39,164 +72,111 @@ comp [servo] .arm1:
   maxAngle: 360
   angle: 355
   path: short
-  size: 14
+  speed: 10
   rate: 10
+  size: 14
   color: '#6dff9c'
   text: 'Arm'
   :
 ```
 
-Exemplu: la `355°` → țintă `0°`:
-
-- `path: short` → ~5° (prin 360)
-- `path: long` → ~355°
-- `path: cw` / `path: ccw` → sens forțat (lungimea = arcul în acel sens)
-
 ## Contract I/O
 
-Ca `motor`, cu `path` + `rel`:
+Ca `motor`, cu `path` + `rel` + **`speed`** + **`rate`**:
 
-- **`value` = mereu pași** (index pe grila `length`), **niciodată grade** — nici absolut, nici relativ
-- **asignare** `.arm1 = expr` — poziție absolută (pași); arc = atributul `path`; `rel` implicit `0`
-- **`{ value, set }`** — absolut; arc = atribut
-- **`{ value, path, set }`** — absolut + override arc (doar mutarea asta)
-- **`{ value, path, rel, set }`** — cu `rel = 1`: mutare **relativă** cu `|value|` pași; `path` **obligatoriu** `cw` sau `ccw`
-- **`:get`** — poziția stocată (pași, `length` biți); nu `path`, nu `rel`
+- **`value` = mereu pași** (index), **niciodată grade**
+- **asignare** `.arm1 = expr` — absolut; `path` / `speed` / `rate` = atributele componentei
+- **`{ value, set }`** — absolut; `path`, `speed`, `rate` = atribute
+- **`{ value, speed, set }`** — override **viteză** doar pentru mutarea asta
+- **`{ value, path, speed, rel, set }`** — override `path` și/sau `speed` per mutare
+- **`:get`** — poziția stocată (pași); nu `path`, `rel`, `speed`, `rate`
 
-`length`: **`1…16`**. Index unsigned `0…vmax` (`vmax = 2^length − 1`).
+`length`: **`1…16`**.
 
-**Override `path`:** dacă pinul `path` lipsește la `set` → atributul `path`. Per comandă, nu sticky.
+**Override per comandă (închis):**
 
-### Mod absolut (`rel = 0`, default)
+| Pin | Dacă lipsește la `set` |
+|-----|-------------------------|
+| `path` | atributul `path` |
+| `speed` | atributul `speed` |
+| `rate` | atributul `rate` (fără pin — mereu atribut) |
 
-- `value` = poziție țintă în **pași** (`0…vmax`)
-- `path` = `short` | `long` | `cw` | `ccw` (atribut sau pin) — alegerea **arcului** spre țintă (relevant pe span 360°)
+Nu sticky.
 
-### Mod relativ (`rel = 1`)
+### Mod absolut / relativ
 
-- `value` = **|Δ pași|** (magnitudine, nu grade)
-- `path` = **`cw`** sau **`ccw`** singure valori valide (`10` / `11` pe pin)
-  - `cw` → `poziție_nouă = poziție_curentă + value` (în pași)
-  - `ccw` → `poziție_nouă = poziție_curentă − value`
-- `short` / `long` cu `rel = 1` → **eroare** la elaborare/aplicare
-- După calcul: pe span **360°** → wrap index modulo `vmax + 1`; pe span **&lt; 360** → **clamp** `0…vmax`
-- Animația: slew pe arcul efectiv (|Δ| pași în sensul ales); durată ∝ pași / `rate`
-- `:get` după `set`: poziția absolută rezultată (pași)
+(neschimbat față de planul anterior — `rel`, `path`, pași, wrap/clamp)
 
-**Fără** pin `delta` în grade; conversia grade→pași rămâne în logica userului dacă e nevoie.
+Animația: durată ∝ `travelSteps / (speed × rate/10)`.
 
-### `length` vs grade (închis)
+### `length` vs grade
 
-Două axe separate — **nu** există „lățime în biți a unghiului în grade”:
-
-| Ce | Unde | Unitate |
-|----|------|---------|
-| Lățime comandă / wire / `:get` | atribut **`length`** | biți **`1…16`** |
-| Comandă | pin **`value`** | **pași** (index), absolut sau Δ pași dacă `rel=1` |
-| Cursa mecanică | **`minAngle`…`maxAngle`** | grade (întregi) |
-| Poziție start (opțional) | **`angle`** | grade → cuantizat la pași la create |
-
-**Rezoluție:** `pas ≈ (maxAngle − minAngle) / vmax`, cu `vmax = 2^length − 1`.
-
-| `length` | `vmax` | pe cursă 0…180 | pe cursă 0…360 |
-|----------|--------|-----------------|-----------------|
-| `1` | 1 | 0° sau 180° | 0° sau 360° |
-| `8` | 255 | ~0.7° / pas | ~1.4° / pas |
-| `9` | 511 | ~0.35° / pas | ~0.7° / pas |
-| `16` | 65535 | fin didactic | fin didactic |
-
-Wire-ul rămâne binar (ex. `16wire cmd = .yaw:get`) — tot **pași**, nu grade.
-
-Plafon **16** (nu 32/64): destul pentru bus-uri uzuale.
-
-### Mapare pași ↔ unghi (afișaj)
-
-- `v = 0` → `minAngle`
-- `v = vmax` → `maxAngle`
-- intermediar: `θ = minAngle + (v / vmax) * (maxAngle − minAngle)`
-
-**`reversed`**: inversează maparea valoare↔unghi; `:get` rămâne bin-ul stocat.
+(neschimbat)
 
 ### Cursă, wrap, start
 
 | Atribut | Tip | Default | Rol |
 |---------|-----|---------|-----|
 | `minAngle` | integer | `0` | Capăt cursă (grade) |
-| `maxAngle` | integer | `180` | Capăt cursă; **`minAngle < maxAngle`**, span **`≤ 360`** |
-| `angle` | integer | *(absent)* | Poziție inițială în grade → cuantizată la create |
-| `path` | string | `short` | Arc de mers spre țintă — vezi mai jos |
+| `maxAngle` | integer | `180` | Capăt cursă |
+| `angle` | integer | *(absent)* | Start în grade → pași la create |
+| `path` | string | `short` | Arc default |
+| `speed` | integer | `10` | Viteză mișcare default |
+| `rate` | integer | `10` | Scale default (`rate/10`) |
 
-Interval grade: **`-360…360`** pentru `minAngle` / `maxAngle` / `angle`. `angle` clampează pe `[minAngle, maxAngle]` apoi cuantizează.
+### `path` — arc / sens
 
-**Wrap (cerc):** activ **doar** când `maxAngle - minAngle === 360` (ex. `0…360`). Atunci `0°` și `360°` sunt același punct pe cerc; există două arce între orice pereche de unghiuri distincte.
+(neschimbat: pin 2-bit, `rel` 1-bit)
 
-**Span &lt; 360** (ex. `0…180`): un singur drum pe segment; `path` e acceptat dar `short`/`long` coincid; `cw`/`ccw` care ar ieși din cursă → se folosește unicul drum valid (doc + test).
+### `speed` — viteză mișcare
 
-Precedență create: `angle` dacă e prezent → bin; altfel `initialValue` (default zeros → `minAngle`).
-
-### `path` — arc (absolut) sau sens (relativ)
-
-Nume: **`short`** | **`long`** | **`cw`** | **`ccw`**.
-
-| Mod | `rel` | `path` permis | Rol |
-|-----|-------|---------------|-----|
-| absolut | `0` | toate | arc spre țintă (wrap 360°) |
-| relativ | `1` | **`cw`**, **`ccw` only** | sens ±Δ pași |
-
-| `path` | Comportament (`rel=0`, span 360°) |
-|--------|-----------------------------------|
-| `short` (**default atribut**) | arcul minim în pași |
-| `long` | arcul maxim |
-| `cw` / `ccw` | sens forțat |
-
-**Atribut** `path:` — string; default `short` (folosit la absolut când pinul lipsește).
-
-**Pin** `path` — **2 biți**:
-
-| Bin | Mod |
-|-----|-----|
-| `00` | `short` |
-| `01` | `long` |
-| `10` | `cw` |
-| `11` | `ccw` |
-
-**Pin** `rel` — **1 bit**: `0` absolut (default), `1` relativ.
+| Unde | Tip | Rol |
+|------|-----|-----|
+| **Atribut** `speed:` | integer `1…100` | Viteză default |
+| **Pin** `speed` | **7 biți** → clamp `1…100` | Override **per mutare** |
 
 ```logts
-# absolut — pași țintă, arc scurt
-.yaw:{ value = cmd, set = 1 }
+# default speed + rate din atribute
+.arm:{ value = cmd, set = 1 }
 
-# absolut — override arc
-.yaw:{ value = cmd, path = 10, set = 1 }
+# mutare lentă — speed mic pe pin
+.arm:{ value = cmd, speed = 0000011, set = 1 }    # speed 3, rate tot din atribut
 
-# relativ — +14 pași (cw); value = magnitudine în pași, NU grade
-.yaw:{ value = 00001110, path = 10, rel = 1, set = 1 }
-
-# relativ — −14 pași (ccw)
-.yaw:{ value = 00001110, path = 11, rel = 1, set = 1 }
+# componentă cu rate lent global
+comp [servo] .arm:
+  speed: 10
+  rate: 3
+  :
 ```
 
-- `getDef` pins: `set` (1), `value` (X), `path` (2), `rel` (1); pout: `get` (X).
+### `rate` — scale (ca motor)
 
-### `rate` (slew)
+| Unde | Tip | Rol |
+|------|-----|-----|
+| **Atribut** `rate:` | integer `1…100` (default `10`) | `scale = rate / 10` |
+| **Pin** | — | **nu** (ca la motor) |
 
-Întreg `1…100` (default `10`); `factor = rate / 10`.
+```logts
+comp [servo] .arm:
+  speed: 10
+  rate: 3      # toate mutările ~3× mai lente vizual (scale 0.3)
+  :
 
-- Durată ∝ `(lungime arc) / factor`.
-- `rate` mare → aproape instant.
-- Nu schimbă stocare / wires / PLC / `:get`.
+comp [servo] .fast:
+  speed: 10
+  rate: 25     # scale 2.5× pe viteza de bază
+  :
+```
 
-La create: brațul pornește la unghiul inițial **fără** slew de la 0.
+**`getDef` pins:** `set` (1), `value` (X), `path` (2), `rel` (1), **`speed` (7)**; pout: `get` (X).
 
 ## Afișaj panel
 
-Clase `.servo-*`, accent `#6dff9c`, glyph **bază + braț/horn**; fără kinds în v1.
-
-Atribute afișaj: `text`, `color`, `size` (`1…20`), `rate`, `rotate` (`0|90|180|270`), `flip`, `nl`, `reversed`, plus `path` / `minAngle` / `maxAngle` / `angle`.
+Atribute: `text`, `color`, `size`, **`speed`**, **`rate`**, `rotate`, `flip`, `nl`, `reversed`, `path`, `minAngle`, `maxAngle`, `angle`.
 
 ## Exemple
 
-**Clasic 180°:**
+**180° + speed + rate:**
 
 ```logts
 comp [servo] .arm1:
@@ -204,69 +184,60 @@ comp [servo] .arm1:
   minAngle: 0
   maxAngle: 180
   angle: 90
+  speed: 10
   rate: 10
   :
 ```
 
-**Full circle — absolut + relativ:**
+**Speed dinamic pe mutare + rate fix pe componentă:**
 
 ```logts
 comp [slider] .pos:
   length: 8
   :
 
-comp [dip] .pathSel:
-  length: 2
-  text: 'Path'
-  :
-
-comp [switch] .relOn:
-  text: 'Rel'
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
   :
 
 comp [servo] .yaw:
   length: 8
   minAngle: 0
   maxAngle: 360
-  angle: 355
-  path: short
-  rate: 10
+  speed: 10
+  rate: 5
+  on: 1
   :
 
 8wire cmd = .pos:get
-2wire p = .pathSel:get
-1wire r = .relOn:get
-
-# absolut: țintă în pași din slider, arc din dip
-.yaw:{ value = cmd, path = p, rel = 0, set = 1 }
-
-# relativ: +N pași cw (N în value, ex. 14 pași ≈ ~20° pe cursă 360/255)
-.yaw:{ value = 00001110, path = 10, rel = 1, set = 1 }
+7wire spd = .spd:get
+.yaw:{ value = cmd, speed = spd, set = 1 }
 ```
 
-PLC opțional: `outputs: { ARM = .arm1 }` — aceeași lățime.
+Load & Run: poziția vine din slider; viteza mutării din pin `speed`; `rate: 5` scalează global (factor 0.5).
 
 ## Livrare
 
 | Sub-fază | Conținut |
 |----------|----------|
-| **S0** | Plan în [`.cursor/plans/comp_servo_universal.plan.md`](.cursor/plans/comp_servo_universal.plan.md) + notă motor/plc (servo pozițional ≠ motor continuu) |
-| **S1** | Core + widget + registry/CSS + teste: pași↔unghi, `angle`, wrap/clamp, `path` absolut, `rel`+`path` cw/ccw, slew, wires; suite verde |
-| **S2** | `servo.md` + `logts-play` (180 + 360/path) + catalog; suite verde |
+| **S0–S2** | (livrat) |
+| **S3** | Adaugă **`speed`** atribut + pin; **păstrează `rate`** scale; `slewDurationMs(steps, speed, rate)`; doc + teste; suite verde |
 
-## Fișiere
+## Fișiere (S3)
 
-- Nou: [`v0_3_2/core/components/servo.js`](v0_3_2/core/components/servo.js), [`v0_3_2/devices/servo-widget.js`](v0_3_2/devices/servo-widget.js), [`v0_3_2/doc/servo.md`](v0_3_2/doc/servo.md)
-- Register + CSS + device-maps + teste + generatoare doc/manifest
+- `servo.js` — `speed` în config/pins/applyProperties; `rate` rămâne
+- `servo-widget.js` — `factor = speed * (rate/10)`
+- `servo.md` — secțiuni separate `speed` vs `rate` (ca motor pentru rate)
+- teste — pin speed, combinații speed+rate
 
-API: `addServo` / `setServo({ position, path?, rel? })`.
+API: `setServo({ position, path?, rel?, speed? })` — `rate` din state componentă (atribut).
 
-Helpers pure: `angleFromValue`, `valueFromAngle`, `pathFromBin` / `binFromPath`, `resolveTravelSteps(from, to, path, wrap)`, `applyRelative(from, deltaSteps, path, vmax, wrap)`, `slewDurationMs(travelSteps, rate)`.
+Helpers: `slewDurationMs(travelSteps, speed, rate)`.
 
-## Ce nu facem în v1
+## Ce nu facem
 
-- Rotație continuă; `kind: continuous`
-- Pin `dir`; pin **`delta`** în grade; `value` ca grade
-- `:path` / `:rel` pout; sticky rewrite atribut din pin
-- PWM real; float; pout `:angle` în grade
-- Multiple kinds vizuale
+- Pin `rate` (rămâne doar atribut, ca motor)
+- `:speed` / `:rate` pout
+- `speed` confundat cu poziția pe `value`
+- PWM real; float în limbaj

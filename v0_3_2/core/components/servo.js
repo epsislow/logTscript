@@ -45,6 +45,9 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
     let rate = ServoComponent.parseIntAttr(attributes && attributes.rate, 10);
     if (rate < 1) rate = 1;
     if (rate > 100) rate = 100;
+    let speed = ServoComponent.parseIntAttr(attributes && attributes.speed, 10);
+    if (speed < 1) speed = 1;
+    if (speed > 100) speed = 100;
     let rotate = ServoComponent.parseIntAttr(attributes && attributes.rotate, 0);
     if (rotate !== 0 && rotate !== 90 && rotate !== 180 && rotate !== 270) {
       throw Error(`servo rotate must be 0|90|180|270${name ? ` for ${name}` : ''}`);
@@ -66,6 +69,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
       text: attributes && attributes.text !== undefined ? String(attributes.text) : '',
       color: (attributes && attributes.color) || '#6dff9c',
       size,
+      speed,
       rate,
       rotate,
       flip: !!(attributes && attributes.flip),
@@ -180,11 +184,26 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
     return Math.min(vmax, from + delta);
   }
 
-  static slewDurationMs(travelSteps, rate) {
+  static clampSpeed(n) {
+    let s = n !== undefined && n !== null ? parseInt(n, 10) : 10;
+    if (isNaN(s)) s = 10;
+    if (s < 1) s = 1;
+    if (s > 100) s = 100;
+    return s;
+  }
+
+  static speedFromBin(bin) {
+    return ServoComponent.clampSpeed(ServoComponent.binToUnsigned(bin));
+  }
+
+  static slewDurationMs(travelSteps, speed, rate) {
     const steps = Math.abs(travelSteps | 0);
     if (steps <= 0) return 0;
-    const factor = Math.max(0.1, Math.min(10, (rate || 10) / 10));
-    return Math.max(40, Math.min(5000, (steps * 24) / factor));
+    const sp = ServoComponent.clampSpeed(speed);
+    const rt = ServoComponent.clampSpeed(rate);
+    const factor = sp * (rt / 10);
+    const eff = Math.max(0.1, Math.min(1000, factor));
+    return Math.max(40, Math.min(5000, (steps * 24) / eff));
   }
 
   static travelDegrees(fromSteps, toSteps, path, cfg) {
@@ -238,6 +257,15 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
     return cfg.path;
   }
 
+  _resolveMoveSpeed(pending, cfg, reEvaluate, ctx) {
+    if (pending.speed !== undefined) {
+      return ServoComponent.speedFromBin(
+        this.reEvalPendingValue(pending, 'speed', reEvaluate, ctx)
+      );
+    }
+    return cfg.speed;
+  }
+
   _isRelBit(pending, reEvaluate, ctx) {
     if (pending.rel === undefined) return false;
     const relVal = this.reEvalPendingValue(pending, 'rel', reEvaluate, ctx);
@@ -261,6 +289,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         text: cfg.text,
         color: cfg.color,
         size: cfg.size,
+        speed: cfg.speed,
         rate: cfg.rate,
         rotate: cfg.rotate,
         flip: cfg.flip,
@@ -296,6 +325,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
 
     const rel = this._isRelBit(pending, reEvaluate, ctx);
     const path = this._resolveMovePath(pending, cfg, reEvaluate, ctx);
+    const moveSpeed = this._resolveMoveSpeed(pending, cfg, reEvaluate, ctx);
 
     if (rel && path !== 'cw' && path !== 'ccw') {
       throw Error(`servo relative move requires path cw or ccw${compName ? ` for ${compName}` : ''}`);
@@ -329,6 +359,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         fromPosition: fromPos,
         path,
         rel,
+        speed: moveSpeed,
       });
     }
     comp._servoLastPos = toPos;
@@ -345,6 +376,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         { name: 'text', value: 'string' },
         { name: 'color', value: 'string' },
         { name: 'size', value: 'integer' },
+        { name: 'speed', value: 'integer' },
         { name: 'rate', value: 'integer' },
         { name: 'rotate', value: 'integer' },
         { name: 'flip', value: null },
@@ -357,6 +389,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         { bits: 'X', name: 'value' },
         { bits: '2', name: 'path' },
         { bits: '1', name: 'rel' },
+        { bits: '7', name: 'speed' },
       ],
       pouts: [{ bits: 'X', name: 'get' }],
       returns: 'Xbit',
@@ -382,6 +415,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         fromPosition: fromPos,
         path: cfg.path,
         rel: false,
+        speed: cfg.speed,
       });
     }
   }

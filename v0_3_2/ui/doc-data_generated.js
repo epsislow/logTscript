@@ -31493,6 +31493,7 @@ comp [servo] .name:
   text: 'Arm'
   color: ^6dff9c
   size: 12
+  speed: 10
   rate: 10
   rotate: 0
   flip
@@ -31522,7 +31523,8 @@ comp [servo] .arm::
 | \`text\` | string | \`''\` | Panel label (up to 5 characters shown) |
 | \`color\` | hex | \`#6dff9c\` | Accent color |
 | \`size\` | integer | \`10\` | Glyph size (\`1…20\`) |
-| \`rate\` | integer | \`10\` | Move speed in **tenths** — see below |
+| \`speed\` | integer | \`10\` | Move speed on the panel (\`1…100\`) — see below |
+| \`rate\` | integer | \`10\` | Speed scale in **tenths** (like \`motor\`) — see below |
 | \`rotate\` | integer | \`0\` | Widget orientation: \`0\`, \`90\`, \`180\`, \`270\` |
 | \`flip\` | flag | off | Mirror the glyph horizontally |
 | \`reversed\` | flag | off | Swap which step index maps to which end of the range |
@@ -31540,17 +31542,33 @@ Resolution on the panel: \`step size ≈ (maxAngle − minAngle) / (2^length −
 
 To command “about 90°” on \`0…180\` / \`length: 8\`, use step \`128\` (\`10000000\`), not the literal \`90\` on the wire.
 
-### \`rate\` (panel move speed only)
+### \`speed\` and \`rate\` (panel move only)
 
-You write an **integer**; the panel uses \`factor = rate / 10\`.
+Two separate controls for how fast the horn **moves on the panel**. Neither changes stored steps, wires, PLC, or \`:get\`.
 
-| Syntax | Factor | Effect |
-|--------|--------|--------|
-| \`rate: 3\` | \`0.3\` | ~3× slower slew |
-| \`rate: 10\` (default) | \`1.0\` | Normal speed |
-| \`rate: 50\` | \`5.0\` | ~5× faster (nearly instant) |
+| | \`speed\` | \`rate\` |
+|--|---------|--------|
+| **Role** | clear move speed | scale multiplier (same idea as \`motor\`) |
+| **Attribute** | yes (\`1…100\`, default \`10\`) | yes (\`1…100\`, default \`10\`) |
+| **Pin** | yes — **7 bits**, override per move | no (attribute only) |
 
-Allowed: \`1…100\`. **\`rate\` does not change** stored steps, wires, PLC, or \`:get\`.
+Effective panel factor:
+
+\`\`\`
+factor = speed × (rate / 10)
+\`\`\`
+
+Slew duration is proportional to \`arc steps / factor\`.
+
+| \`speed\` | \`rate\` | Factor | Effect |
+|---------|--------|--------|--------|
+| \`10\` | \`10\` | \`10\` | normal (defaults) |
+| \`5\` | \`10\` | \`5\` | slower (lower speed) |
+| \`10\` | \`5\` | \`5\` | slower (scale 0.5×) |
+| \`10\` | \`20\` | \`20\` | faster (scale 2×) |
+| \`50\` | \`10\` | \`50\` | much faster (nearly instant) |
+
+Compare with \`motor\`: there \`value\` is the speed command; on servo \`value\` is **position** and \`speed\` is the move-speed analogue.
 
 ---
 
@@ -31562,6 +31580,7 @@ Allowed: \`1…100\`. **\`rate\` does not change** stored steps, wires, PLC, or 
 | \`value\` | \`length\` | Step magnitude — meaning depends on \`rel\` |
 | \`path\` | 2 | Arc override for this move only (see below) |
 | \`rel\` | 1 | \`0\` = absolute (default), \`1\` = relative |
+| \`speed\` | 7 | Move-speed override for this move only (\`0…127\` → clamp \`1…100\`) |
 | \`get\` | \`length\` | Read back stored **position in steps** |
 
 Direct assignment \`.arm = expr\` writes an **absolute** step index (same width as \`length\`). Default arc = attribute \`path\`.
@@ -31569,8 +31588,10 @@ Direct assignment \`.arm = expr\` writes an **absolute** step index (same width 
 Property block:
 
 \`\`\`
-.arm:{ value = posWire, path = pathWire, rel = relBit, set = 1 }
+.arm:{ value = posWire, path = pathWire, speed = speedWire, rel = relBit, set = 1 }
 \`\`\`
+
+If \`path\` or \`speed\` is omitted in a block, the component attribute is used for that move only (not sticky).
 
 \`on:\` on the component only controls **when** the block applies — not the target position.
 
@@ -31748,7 +31769,87 @@ Load & Run: \`p\` is \`10000000\`. Arc = attribute \`path\`.
 
 ---
 
-## Slider → servo (same width)
+## Slider → servo (position + speed)
+
+Two sliders: one for **target steps**, one for **move speed** on the panel.
+
+\`\`\`logts-play
+comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  speed: 10
+  rate: 10
+  text: 'Arm'
+  on: 1
+  nl
+  :
+
+.pos:{ data = 10000000, set = 1 }
+.spd:{ data = 0001010, set = 1 }
+8wire cmd = .pos:get
+7wire spd = .spd:get
+.arm:{ value = cmd, speed = spd, set = 1 }
+8wire out = .arm:get
+show(out)
+show(spd)
+\`\`\`
+
+Load & Run: horn moves to step \`128\` (\`10000000\`); panel slew uses pin \`speed = 10\` (\`0001010\`); \`out\` is \`10000000\`.
+
+\`\`\`logts-play
+comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  speed: 10
+  rate: 5
+  text: 'Arm'
+  on: 1
+  nl
+  :
+
+.pos:{ data = 01000000, set = 1 }
+.spd:{ data = 0001100, set = 1 }
+8wire cmd = .pos:get
+7wire spd = .spd:get
+.arm:{ value = cmd, speed = spd, set = 1 }
+8wire out = .arm:get
+show(out)
+show(spd)
+\`\`\`
+
+Load & Run: position step \`64\` (\`01000000\`); move speed pin \`12\` (\`0001100\`); global \`rate: 5\` scales all moves on this component (factor 0.5×).
+
+## Slider → servo (position only)
 
 \`\`\`logts-play
 comp [slider] .pos:
@@ -31774,7 +31875,50 @@ comp [servo] .arm:
 show(out)
 \`\`\`
 
-Load & Run: slider step \`128\` drives the servo; \`out\` is \`10000000\`.
+Load & Run: slider step \`128\` drives the servo; \`out\` is \`10000000\`. Speed = attribute defaults (\`speed: 10\`, \`rate: 10\`).
+
+## Slow moves (\`rate\` attribute)
+
+\`\`\`logts-play
+comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  speed: 10
+  rate: 3
+  on: 1
+  nl
+  :
+
+.arm:{ value = 11111111, set = 1 }
+8wire p = .arm:get
+show(p)
+\`\`\`
+
+Load & Run: \`p\` is \`11111111\` (max step). \`rate: 3\` only slows the **panel** (scale 0.3×); the stored command is unchanged.
+
+## Display helpers (\`size\`, \`speed\`, \`rate\`, \`rotate\`, \`color\`)
+
+\`\`\`logts-play
+comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  size: 14
+  speed: 20
+  rate: 5
+  color: ^6dff9c
+  rotate: 90
+  on: 1
+  nl
+  :
+
+.arm:{ value = 11111111, set = 1 }
+8wire p = .arm:get
+show(p)
+\`\`\`
+
+Load & Run: \`p\` is \`11111111\`. \`speed: 20\` and \`rate: 5\` affect panel slew only.
 
 ---
 
@@ -31829,29 +31973,6 @@ Load & Run: step \`0\` maps to the **maxAngle** side of the range on the panel; 
 
 ---
 
-## Display helpers (\`size\`, \`rate\`, \`rotate\`, \`color\`)
-
-\`\`\`logts-play
-comp [servo] .arm:
-  length: 8
-  minAngle: 0
-  maxAngle: 180
-  size: 14
-  rate: 5
-  color: ^6dff9c
-  rotate: 90
-  on: 1
-  nl
-  :
-
-.arm = 11111111
-8wire p = .arm:get
-show(p)
-\`\`\`
-
-Load & Run: \`p\` is \`11111111\` (max step). \`rate: 5\` only slows the **panel slew**; the command stays \`11111111\`.
-
----
 
 ## 16-bit bus
 
