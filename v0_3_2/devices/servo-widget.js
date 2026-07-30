@@ -45,7 +45,8 @@ function servoIsRotary(state) {
   if (typeof ServoComponent !== 'undefined' && ServoComponent.isRotaryDisplay) {
     return ServoComponent.isRotaryDisplay(state.display || 'servo');
   }
-  return (state.display || 'servo') === 'servo';
+  const d = state.display || 'servo';
+  return d === 'servo' || d === 'gauge';
 }
 
 function servoFractionFromPosition(state, position) {
@@ -219,6 +220,107 @@ function servoBuildValveGlyph() {
   return { svg, mover: discGroup };
 }
 
+function servoBuildGaugeGlyph() {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 40 40');
+  svg.setAttribute('class', 'servo-glyph servo-glyph--gauge');
+
+  const face = document.createElementNS(svgNS, 'circle');
+  face.setAttribute('cx', '20');
+  face.setAttribute('cy', '20');
+  face.setAttribute('r', '16');
+  face.setAttribute('fill', 'none');
+  face.setAttribute('stroke', 'currentColor');
+  face.setAttribute('stroke-width', '2');
+  svg.appendChild(face);
+
+  const tickAngles = [-60, -30, 0, 30, 60];
+  for (let i = 0; i < tickAngles.length; i++) {
+    const a = (tickAngles[i] * Math.PI) / 180;
+    const tick = document.createElementNS(svgNS, 'line');
+    tick.setAttribute('x1', String(20 + Math.sin(a) * 12));
+    tick.setAttribute('y1', String(20 - Math.cos(a) * 12));
+    tick.setAttribute('x2', String(20 + Math.sin(a) * 15));
+    tick.setAttribute('y2', String(20 - Math.cos(a) * 15));
+    tick.setAttribute('stroke', 'currentColor');
+    tick.setAttribute('stroke-width', '1.5');
+    svg.appendChild(tick);
+  }
+
+  const pivot = document.createElementNS(svgNS, 'g');
+  pivot.setAttribute('transform', 'translate(20 20)');
+
+  const needleGroup = document.createElementNS(svgNS, 'g');
+  needleGroup.setAttribute('class', 'servo-gauge-needle');
+
+  const needle = document.createElementNS(svgNS, 'line');
+  needle.setAttribute('x1', '0');
+  needle.setAttribute('y1', '0');
+  needle.setAttribute('x2', '0');
+  needle.setAttribute('y2', '-13');
+  needle.setAttribute('stroke', 'currentColor');
+  needle.setAttribute('stroke-width', '2.5');
+  needle.setAttribute('stroke-linecap', 'round');
+  needleGroup.appendChild(needle);
+
+  const hub = document.createElementNS(svgNS, 'circle');
+  hub.setAttribute('cx', '0');
+  hub.setAttribute('cy', '0');
+  hub.setAttribute('r', '2.5');
+  hub.setAttribute('fill', 'currentColor');
+  needleGroup.appendChild(hub);
+
+  pivot.appendChild(needleGroup);
+  svg.appendChild(pivot);
+
+  return { svg, mover: needleGroup };
+}
+
+function servoBuildSlideGlyph() {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', '0 0 48 32');
+  svg.setAttribute('class', 'servo-glyph servo-glyph--slide');
+
+  const frame = document.createElementNS(svgNS, 'rect');
+  frame.setAttribute('x', '4');
+  frame.setAttribute('y', '4');
+  frame.setAttribute('width', '40');
+  frame.setAttribute('height', '24');
+  frame.setAttribute('rx', '1');
+  frame.setAttribute('fill', 'none');
+  frame.setAttribute('stroke', 'currentColor');
+  frame.setAttribute('stroke-width', '2');
+  svg.appendChild(frame);
+
+  const rail = document.createElementNS(svgNS, 'line');
+  rail.setAttribute('x1', '6');
+  rail.setAttribute('y1', '28');
+  rail.setAttribute('x2', '42');
+  rail.setAttribute('y2', '28');
+  rail.setAttribute('stroke', 'currentColor');
+  rail.setAttribute('stroke-width', '1');
+  rail.setAttribute('opacity', '0.5');
+  svg.appendChild(rail);
+
+  const panelGroup = document.createElementNS(svgNS, 'g');
+  panelGroup.setAttribute('class', 'servo-slide-panel');
+
+  const panel = document.createElementNS(svgNS, 'rect');
+  panel.setAttribute('x', '6');
+  panel.setAttribute('y', '6');
+  panel.setAttribute('width', '18');
+  panel.setAttribute('height', '20');
+  panel.setAttribute('rx', '1');
+  panel.setAttribute('fill', 'currentColor');
+  panel.setAttribute('opacity', '0.85');
+  panelGroup.appendChild(panel);
+
+  svg.appendChild(panelGroup);
+  return { svg, mover: panelGroup };
+}
+
 function servoApplyVisual(state, instant) {
   if (!state || !state.moverEl) return;
   const dur = instant ? 0 : state.pendingDurationMs;
@@ -226,7 +328,7 @@ function servoApplyVisual(state, instant) {
   state.moverEl.style.transition = transition;
 
   const display = state.display || 'servo';
-  if (display === 'piston') {
+  if (display === 'piston' || display === 'slide') {
     const stroke = Math.max(8, (state.px || 48) * 0.35);
     const t = state.fraction;
     state.moverEl.style.transform = `translateX(${t * stroke}px)`;
@@ -234,9 +336,13 @@ function servoApplyVisual(state, instant) {
   }
   if (display === 'valve') {
     const t = state.fraction;
-    // SVG translate(20 20) is on the group; CSS rotate around local origin
     state.moverEl.style.transformOrigin = '0px 0px';
     state.moverEl.style.transform = `rotate(${t * 90}deg)`;
+    return;
+  }
+  if (display === 'gauge') {
+    state.moverEl.style.transformOrigin = '0px 0px';
+    state.moverEl.style.transform = `rotate(${state.armRotationDeg}deg)`;
     return;
   }
   state.moverEl.style.transform = `rotate(${state.armRotationDeg}deg)`;
@@ -296,10 +402,22 @@ function addServo({
     const built = servoBuildPistonGlyph();
     body.appendChild(built.svg);
     moverEl = built.mover;
+    wrapper.appendChild(body);
   } else if (disp === 'valve') {
     const built = servoBuildValveGlyph();
     body.appendChild(built.svg);
     moverEl = built.mover;
+    wrapper.appendChild(body);
+  } else if (disp === 'gauge') {
+    const built = servoBuildGaugeGlyph();
+    body.appendChild(built.svg);
+    moverEl = built.mover;
+    wrapper.appendChild(body);
+  } else if (disp === 'slide') {
+    const built = servoBuildSlideGlyph();
+    body.appendChild(built.svg);
+    moverEl = built.mover;
+    wrapper.appendChild(body);
   } else {
     body.appendChild(servoBuildRotaryGlyph());
     const armEl = document.createElement('div');
@@ -307,10 +425,6 @@ function addServo({
     armEl.appendChild(body);
     wrapper.appendChild(armEl);
     moverEl = armEl;
-  }
-
-  if (disp === 'piston' || disp === 'valve') {
-    wrapper.appendChild(body);
   }
 
   container.appendChild(wrapper);

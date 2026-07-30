@@ -32515,8 +32515,10 @@ reg(2959, 'servo', 'display default servo and resolveDisplay', function(h, sessi
   const cfg = ServoComponent.resolveConfig({ length: 8 });
   h.assert('default', cfg.display, 'servo');
   h.assert('rotary', String(ServoComponent.isRotaryDisplay('servo')), 'true');
+  h.assert('gauge rotary', String(ServoComponent.isRotaryDisplay('gauge')), 'true');
   h.assert('piston linear', String(ServoComponent.isRotaryDisplay('piston')), 'false');
   h.assert('valve linear', String(ServoComponent.isRotaryDisplay('valve')), 'false');
+  h.assert('slide linear', String(ServoComponent.isRotaryDisplay('slide')), 'false');
   let threw = false;
   try { ServoComponent.resolveDisplay('gate'); } catch (_) { threw = true; }
   h.assert('bad display', String(threw), 'true');
@@ -32776,6 +32778,227 @@ show(v)`);
   h.assert('a', session.getWire(interp, 'a'), '01000000');
   h.assert('c', session.getWire(interp, 'c'), '01000000');
   h.assert('v', session.getWire(interp, 'v'), '01000000');
+});
+
+reg(2973, 'servo', 'gauge short vs long like rotary', function(h, session) {
+  const cfg = { length: 8, minAngle: 0, maxAngle: 360, display: 'gauge' };
+  const shortT = ServoComponent.travelStepsForMove(250, 5, 'short', false, 0, cfg);
+  const longT = ServoComponent.travelStepsForMove(250, 5, 'long', false, 0, cfg);
+  h.assert('short', String(shortT), '11');
+  h.assert('long', String(longT), '245');
+});
+
+reg(2974, 'servo', 'slide absolute travel ignores short/long', function(h, session) {
+  const cfg = { length: 8, minAngle: 0, maxAngle: 100, display: 'slide' };
+  const shortT = ServoComponent.travelStepsForMove(10, 200, 'short', false, 0, cfg);
+  const longT = ServoComponent.travelStepsForMove(10, 200, 'long', false, 0, cfg);
+  h.assert('short', String(shortT), '190');
+  h.assert('long same', String(longT), '190');
+});
+
+reg(2975, 'servo', 'doc play — display gauge assign', function(h, session) {
+  const { interp } = session.run(`comp [servo] .g1:
+  display: gauge
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'G'
+  nl
+  :
+
+.g1 = 10000000
+8wire p = .g1:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '10000000');
+  const cfg = ServoComponent.resolveConfig(interp.components.get('.g1').attributes);
+  h.assert('display', cfg.display, 'gauge');
+});
+
+reg(2976, 'servo', 'doc play — display slide assign', function(h, session) {
+  const { interp } = session.run(`comp [servo] .s1:
+  display: slide
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  text: 'Sld'
+  nl
+  :
+
+.s1 = 11111111
+8wire p = .s1:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '11111111');
+  const cfg = ServoComponent.resolveConfig(interp.components.get('.s1').attributes);
+  h.assert('display', cfg.display, 'slide');
+});
+
+reg(2977, 'servo', 'doc play — slide vertical rotate', function(h, session) {
+  const { interp } = session.run(`comp [servo] .sVert:
+  display: slide
+  length: 8
+  rotate: 90
+  text: 'Up'
+  nl
+  :
+
+.sVert = 10000000
+8wire p = .sVert:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '10000000');
+  const cfg = ServoComponent.resolveConfig(interp.components.get('.sVert').attributes);
+  h.assert('rotate', String(cfg.rotate), '90');
+});
+
+reg(2978, 'servo', 'doc play — slider gauge', function(h, session) {
+  const { interp } = session.run(`comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [servo] .g1:
+  display: gauge
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'G'
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.pos:{ data = 11000000, set = 1 }
+.spd:{ data = 0001111, set = 1 }
+8wire cmd = .pos:get
+7wire spd = .spd:get
+.g1:{ value = cmd, speed = spd, set = 1 }
+8wire out = .g1:get
+show(out)`);
+  h.assert('out', session.getWire(interp, 'out'), '11000000');
+});
+
+reg(2979, 'servo', 'doc play — slider slide', function(h, session) {
+  const { interp } = session.run(`comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [servo] .s1:
+  display: slide
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  text: 'Sld'
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.pos:{ data = 01000000, set = 1 }
+.spd:{ data = 0010100, set = 1 }
+8wire cmd = .pos:get
+7wire spd = .spd:get
+.s1:{ value = cmd, speed = spd, set = 1 }
+8wire out = .s1:get
+show(out)`);
+  h.assert('out', session.getWire(interp, 'out'), '01000000');
+});
+
+reg(2980, 'servo', 'doc play — slider slide vertical', function(h, session) {
+  const { interp } = session.run(`comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [servo] .sVert:
+  display: slide
+  length: 8
+  rotate: 90
+  text: 'Up'
+  on: 1
+  nl
+  :
+
+.pos:{ data = 11110000, set = 1 }
+8wire cmd = .pos:get
+.sVert:{ value = cmd, set = 1 }
+8wire out = .sVert:get
+show(out)`);
+  h.assert('out', session.getWire(interp, 'out'), '11110000');
+});
+
+reg(2981, 'servo', 'doc play — gauge and slide one slider', function(h, session) {
+  const { interp } = session.run(`comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [servo] .g1:
+  display: gauge
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'G'
+  on: 1
+  nl
+  :
+
+comp [servo] .s1:
+  display: slide
+  length: 8
+  text: 'Sld'
+  on: 1
+  nl
+  :
+
+.pos:{ data = 10000000, set = 1 }
+8wire cmd = .pos:get
+.g1:{ value = cmd, set = 1 }
+.s1:{ value = cmd, set = 1 }
+8wire g = .g1:get
+8wire s = .s1:get
+show(g)
+show(s)`);
+  h.assert('g', session.getWire(interp, 'g'), '10000000');
+  h.assert('s', session.getWire(interp, 's'), '10000000');
+});
+
+reg(2982, 'servo', 'slide relative clamp no wrap', function(h, session) {
+  const { interp } = session.run(`comp [servo] .s1:
+  display: slide
+  length: 8
+  minAngle: 0
+  maxAngle: 360
+  on: 1
+  :
+
+.s1:{ value = 11111111, set = 1 }
+.s1:{ value = 00000001, path = 10, rel = 1, set = 1 }
+8wire p = .s1:get`);
+  h.assert('p', session.getWire(interp, 'p'), '11111111');
 });
 
   window.LogTScriptTestSuite.finalize();

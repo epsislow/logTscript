@@ -132,3 +132,14 @@ Nume istoric (de la unghi). Pe toate display-urile: `v=0` → capăt A, `v=vmax`
 - Wrap „circular” pe piston/valve
 - Eroare hard dacă `path` e setat pe linear la absolut (accept + ignore; doc clar)
 - Float / PWM / skinuri extra (clamp/gate rămân backlog, nu v1)
+- `display: needle` — respins; folosim `gauge`
+- `display: door` — respins (sugerează balama/rotație); folosim `slide`
+
+## Backlog display (neimplementat)
+
+| `display` | Tip | Skin | Status |
+|-----------|-----|------|--------|
+| `gauge` | rotary (= `servo`) | cadran + ac | **implementat** |
+| `slide` | linear (= `piston`) | cadru + panou culisant; LR/UD via `rotate` 0/90 | **implementat** |
+
+Când se implementează: `DISPLAYS` + glyph + animație + `logts-play` + teste; doc publică doar după ce există în runtime.

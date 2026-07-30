@@ -10,7 +10,7 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
   }
 
   static get DISPLAYS() {
-    return { servo: 1, piston: 1, valve: 1 };
+    return { servo: 1, piston: 1, valve: 1, gauge: 1, slide: 1 };
   }
 
   static parseIntAttr(v, fallback) {
@@ -36,7 +36,8 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
   }
 
   static isRotaryDisplay(display) {
-    return ServoComponent.resolveDisplay(display) === 'servo';
+    const d = ServoComponent.resolveDisplay(display);
+    return d === 'servo' || d === 'gauge';
   }
 
   static resolveConfig(attributes, name) {

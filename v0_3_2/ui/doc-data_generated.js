@@ -31477,7 +31477,7 @@ The stored value is an **unsigned N-bit step index** on a travel range — **not
 | \`2^N−1\` | The other end (\`maxAngle\`) |
 | between | Linearly mapped position on the range |
 
-Attributes \`minAngle\` / \`maxAngle\` define the travel ends for the panel. Names are historical (degrees for a rotary horn). The wire always carries **steps**. Attribute \`display\` chooses the **skin and how absolute moves animate** on the panel (\`servo\`, \`piston\`, or \`valve\`). Pins, pouts, and step storage stay the same for all three.
+Attributes \`minAngle\` / \`maxAngle\` define the travel ends for the panel. Names are historical (degrees for a rotary horn). The wire always carries **steps**. Attribute \`display\` chooses the **skin and how absolute moves animate** on the panel (\`servo\`, \`gauge\`, \`piston\`, \`valve\`, or \`slide\`). Pins, pouts, and step storage stay the same for all of them.
 
 ---
 
@@ -31517,7 +31517,7 @@ comp [servo] .arm::
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | \`length\` | integer | \`8\` | Wire width \`1…16\`. Value = step index \`0…2^N−1\` |
-| \`display\` | id | \`servo\` | Panel skin + absolute kinematics: \`servo\`, \`piston\`, \`valve\` |
+| \`display\` | id | \`servo\` | Panel skin + absolute kinematics: \`servo\`, \`gauge\`, \`piston\`, \`valve\`, \`slide\` |
 | \`minAngle\` | integer | \`0\` | Travel start (\`-360…360\`) — mapped to step \`0\` |
 | \`maxAngle\` | integer | \`180\` | Travel end; must be \`> minAngle\`, span \`≤ 360\` — mapped to step \`2^N−1\` |
 | \`angle\` | integer | *(none)* | Initial position on the travel range → quantized to steps at create |
@@ -31535,20 +31535,35 @@ comp [servo] .arm::
 
 ### \`display\` — skin and absolute travel
 
-| \`display\` | Panel look | Absolute move (\`rel = 0\`) | Relative move (\`rel = 1\`) |
-|-----------|------------|---------------------------|---------------------------|
-| \`servo\` (default) | Rotary horn on a base | Arc on the angle range; on a full circle (\`span = 360\`) \`path\` can pick **short / long / cw / ccw** | \`path\` must be \`cw\` or \`ccw\`; ±steps; wrap if span 360, else clamp |
-| \`piston\` | Cylinder + rod | **One** path along the segment (retract ↔ extend); \`short\` / \`long\` do **not** change the route | Same: \`cw\` / \`ccw\` = + / − steps on the segment, then **clamp** |
-| \`valve\` | Pipe body + disc | **One** path (closed ↔ open); \`short\` / \`long\` ignored for routing | Same as piston |
+Two **kinematics families**; skins differ only in how the panel looks:
 
-\`minAngle\` / \`maxAngle\` still mark the two ends for every display (historical names):
+| Family | Displays | Absolute travel |
+|--------|----------|-----------------|
+| **Rotary** | \`servo\`, \`gauge\` | Arc on the angle range; on a full circle (\`span = 360\`) \`path\` can pick **short / long / cw / ccw** |
+| **Linear** | \`piston\`, \`valve\`, \`slide\` | **One** path along the segment; \`short\` / \`long\` do **not** change the route |
 
-| End | Rotary (\`servo\`) | \`piston\` | \`valve\` |
-|-----|------------------|----------|---------|
-| \`minAngle\` | start angle | retracted | closed |
-| \`maxAngle\` | end angle | extended | open |
+| \`display\` | Panel look | Same kinematics as | Typical use |
+|-----------|------------|--------------------|-------------|
+| \`servo\` (default) | Horn on a base | rotary | Actuator / arm you command |
+| \`gauge\` | Dial face + needle | rotary (\`servo\`) | Indicator / setpoint on a scale |
+| \`piston\` | Cylinder + rod | linear | Hydraulic / pneumatic travel |
+| \`valve\` | Pipe body + disc | linear | Open ↔ closed flow |
+| \`slide\` | Frame + sliding panel | linear (\`piston\`) | Panel that **translates** (not a hinged door) |
 
-You may still set \`path: short\` (or pass the \`path\` pin) on a piston/valve absolute move: it is **accepted** and does not error; absolute animation uses the single segment path. For relative moves, \`cw\` / \`ccw\` remain required on all displays.
+Relative moves (\`rel = 1\`) are the same on every display: \`path\` must be \`cw\` or \`ccw\` → ±steps; wrap only for **rotary + span 360**, otherwise **clamp**.
+
+**\`servo\` vs \`gauge\`:** same step math and arcs; \`servo\` looks like a horn actuator, \`gauge\` like an instrument needle on a dial.
+
+**\`piston\` vs \`valve\` vs \`slide\`:** same linear step math; glyphs differ — rod in a barrel, butterfly disc, or a panel that slides in a frame. Use \`rotate: 90\` on \`slide\` for vertical travel (left–right by default).
+
+\`minAngle\` / \`maxAngle\` still mark the two ends (historical names):
+
+| End | \`servo\` / \`gauge\` | \`piston\` | \`valve\` | \`slide\` |
+|-----|-------------------|----------|---------|---------|
+| \`minAngle\` | start on dial / horn | retracted | closed | panel covering the opening |
+| \`maxAngle\` | end on dial / horn | extended | open | panel retracted |
+
+You may still set \`path: short\` (or pass the \`path\` pin) on a linear absolute move: it is **accepted** and does not error; absolute animation uses the single segment path. For relative moves, \`cw\` / \`ccw\` remain required on all displays.
 
 \`\`\`logts-play
 comp [servo] .arm:
@@ -31565,7 +31580,24 @@ comp [servo] .arm:
 show(p)
 \`\`\`
 
-Load & Run: rotary default skin; \`p\` is \`10000000\`.
+Load & Run: rotary horn skin; \`p\` is \`10000000\`.
+
+\`\`\`logts-play
+comp [servo] .g1:
+  display: gauge
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'G'
+  nl
+  :
+
+.g1 = 10000000
+8wire p = .g1:get
+show(p)
+\`\`\`
+
+Load & Run: dial needle at mid travel; \`p\` is \`10000000\`.
 
 \`\`\`logts-play
 comp [servo] .cyl:
@@ -31599,6 +31631,39 @@ show(p)
 \`\`\`
 
 Load & Run: 1-bit valve open; \`p\` is \`1\`.
+
+\`\`\`logts-play
+comp [servo] .s1:
+  display: slide
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  text: 'Sld'
+  nl
+  :
+
+.s1 = 11111111
+8wire p = .s1:get
+show(p)
+\`\`\`
+
+Load & Run: sliding panel fully open (max step); \`p\` is \`11111111\`.
+
+\`\`\`logts-play
+comp [servo] .sVert:
+  display: slide
+  length: 8
+  rotate: 90
+  text: 'Up'
+  nl
+  :
+
+.sVert = 10000000
+8wire p = .sVert:get
+show(p)
+\`\`\`
+
+Load & Run: same \`slide\` skin, \`rotate: 90\` makes travel look vertical; \`p\` is \`10000000\`.
 
 ### Steps vs degrees
 
@@ -31695,7 +31760,7 @@ If the \`path\` pin is omitted in a block, the attribute \`path\` is used. The o
 
 \`value\` = target step index \`0…2^N−1\`.
 
-**Rotary (\`display: servo\`):**
+**Rotary (\`display: servo\` or \`gauge\`):**
 
 - On a **segment** (\`maxAngle − minAngle < 360\`), there is only one path along the range; \`short\` / \`long\` behave the same.
 - On a **full circle** (\`maxAngle − minAngle = 360\`, e.g. \`0…360\`), two arcs exist between any two positions:
@@ -31706,7 +31771,7 @@ If the \`path\` pin is omitted in a block, the attribute \`path\` is used. The o
 | \`long\` | 245 steps backward |
 | \`cw\` / \`ccw\` | forced direction |
 
-**Linear (\`display: piston\` or \`valve\`):** there is always **one** path from the current step to the target along the segment. Travel distance for animation is \`|target − current|\`. Attribute/pin \`short\` / \`long\` do not pick a second route.
+**Linear (\`display: piston\`, \`valve\`, or \`slide\`):** there is always **one** path from the current step to the target along the segment. Travel distance for animation is \`|target − current|\`. Attribute/pin \`short\` / \`long\` do not pick a second route.
 
 \`\`\`logts-play
 comp [servo] .yaw:
@@ -31776,7 +31841,7 @@ Load & Run: piston retracts then extends to max step; \`p\` is \`11111111\`.
 After the math:
 
 - **Rotary + span 360°** → wrap step index modulo \`2^N\`
-- **Rotary segment, or any piston/valve** → clamp to \`0…2^N−1\`
+- **Rotary segment, or any linear display** (\`piston\` / \`valve\` / \`slide\`) → clamp to \`0…2^N−1\`
 
 \`:get\` returns the new absolute step index.
 
@@ -32155,6 +32220,114 @@ show(out)
 
 Load & Run: valve disc to mid travel (step \`128\`); \`out\` is \`10000000\`.
 
+## Slider → gauge
+
+\`\`\`logts-play
+comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [servo] .g1:
+  display: gauge
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'G'
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.pos:{ data = 11000000, set = 1 }
+.spd:{ data = 0001111, set = 1 }
+8wire cmd = .pos:get
+7wire spd = .spd:get
+.g1:{ value = cmd, speed = spd, set = 1 }
+8wire out = .g1:get
+show(out)
+\`\`\`
+
+Load & Run: needle to step \`192\`; move speed pin \`15\`; \`out\` is \`11000000\`.
+
+## Slider → slide
+
+\`\`\`logts-play
+comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [slider] .spd:
+  length: 7
+  text: 'Spd'
+  on: 1
+  nl
+  :
+
+comp [servo] .s1:
+  display: slide
+  length: 8
+  minAngle: 0
+  maxAngle: 100
+  text: 'Sld'
+  speed: 10
+  rate: 10
+  on: 1
+  nl
+  :
+
+.pos:{ data = 01000000, set = 1 }
+.spd:{ data = 0010100, set = 1 }
+8wire cmd = .pos:get
+7wire spd = .spd:get
+.s1:{ value = cmd, speed = spd, set = 1 }
+8wire out = .s1:get
+show(out)
+\`\`\`
+
+Load & Run: panel to step \`64\`; move speed pin \`20\`; \`out\` is \`01000000\`.
+
+## Slider → slide (vertical via \`rotate\`)
+
+\`\`\`logts-play
+comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [servo] .sVert:
+  display: slide
+  length: 8
+  rotate: 90
+  text: 'Up'
+  on: 1
+  nl
+  :
+
+.pos:{ data = 11110000, set = 1 }
+8wire cmd = .pos:get
+.sVert:{ value = cmd, set = 1 }
+8wire out = .sVert:get
+show(out)
+\`\`\`
+
+Load & Run: vertical sliding panel to step \`240\`; \`out\` is \`11110000\`.
+
 ## Three displays side by side
 
 \`\`\`logts-play
@@ -32202,7 +32375,47 @@ show(c)
 show(v)
 \`\`\`
 
-Load & Run: one slider drives all three skins to step \`64\`; \`a\`, \`c\`, and \`v\` are \`01000000\`.
+Load & Run: one slider drives horn, piston, and valve to step \`64\`; \`a\`, \`c\`, and \`v\` are \`01000000\`.
+
+## Gauge and slide with one slider
+
+\`\`\`logts-play
+comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [servo] .g1:
+  display: gauge
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'G'
+  on: 1
+  nl
+  :
+
+comp [servo] .s1:
+  display: slide
+  length: 8
+  text: 'Sld'
+  on: 1
+  nl
+  :
+
+.pos:{ data = 10000000, set = 1 }
+8wire cmd = .pos:get
+.g1:{ value = cmd, set = 1 }
+.s1:{ value = cmd, set = 1 }
+8wire g = .g1:get
+8wire s = .s1:get
+show(g)
+show(s)
+\`\`\`
+
+Load & Run: same step drives dial needle and sliding panel; \`g\` and \`s\` are \`10000000\`.
 
 ## Slow moves (\`rate\` attribute)
 
