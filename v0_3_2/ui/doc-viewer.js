@@ -148,6 +148,7 @@ const DOC_SECTIONS = [
       { file: 'meta-constants.md', label: 'Meta constants' },
       { file: 'mmap.md', label: 'Memory map (`comp [mmap]`)' },
       { file: 'network-chat.md', label: 'Network chat — socket uplink + packet downlink (wave)' },
+      { file: 'servo.md', label: 'Servo component' },
       { file: 'sock.md', label: 'Socket (`sock`) — dynamic bit stream', searchPrimary: 'sock' }
     ],
   }

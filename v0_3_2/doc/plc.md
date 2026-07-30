@@ -1965,6 +1965,14 @@ Generic N-bit panel slider. For named scales (temperature, humidity, `mag`, unit
 | **Write** | Storage + spinning panel (`updateDisplayValue`); speed = full unsigned value |
 | **Guide** | [motor.md](motor.md) |
 
+### `comp [servo]`
+
+| Topic | Detail |
+|-------|--------|
+| **Map** | `ARM = .arm` — symbol width must match servo `length` |
+| **Write** | Storage + positional panel (`updateDisplayValue`); value = step index |
+| **Guide** | [servo.md](servo.md) |
+
 ### `comp [reg]`
 
 | Topic | Detail |

@@ -32,6 +32,7 @@ function createDeviceMaps() {
     sliderValues: new Map(),
     sensors: new Map(),
     motors: new Map(),
+    servos: new Map(),
     scanners: new Map(),
     rotaryKnobs: new Map(),
     rotaryKnobValues: new Map(),
@@ -138,6 +139,7 @@ function publishWindowDeviceAliases(maps) {
   window.sliderValues = maps.sliderValues;
   window.sensors = maps.sensors;
   window.motors = maps.motors;
+  window.servos = maps.servos;
   window.scanners = maps.scanners;
   window.rotaryKnobs = maps.rotaryKnobs;
   window.rotaryKnobValues = maps.rotaryKnobValues;

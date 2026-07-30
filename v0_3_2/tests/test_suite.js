@@ -2544,7 +2544,7 @@ probe(.n:get)`;
 
   reg(200, 'registry', 'Component Registry — all types registered', function(h, session) {
     const registry = session._ensureRegistry();
-    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'cpu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider', 'sensor', 'motor', 'scanner'];
+    const expectedTypes = ['led', 'switch', 'key', 'keyboard', 'dip', 'ioport', '7seg', 'lcd', 'clcd', 'alu', 'cpu', 'terminal', 'adder', 'subtract', 'multiplier', 'divider', 'shifter', 'mem', 'reg', 'counter', 'queue', 'stack', 'osc', 'rotary', 'slider', 'sensor', 'motor', 'servo', 'scanner'];
     for (const t of expectedTypes) {
       h.assert('registry has ' + t, String(registry.has(t)), 'true');
     }
@@ -32055,6 +32055,292 @@ reg(2929, 'scanner', 'scanText attr', function(h, session) {
   h.assert('scanText', cfg.scanText, '>');
   const def = ScannerComponent.resolveConfig({ length: 4 });
   h.assert('default', def.scanText, 'Scan');
+});
+
+reg(2930, 'servo', 'registry + doc(comp.servo)', function(h, session) {
+  const registry = session._ensureRegistry();
+  h.assert('servo registered', String(registry.has('servo')), 'true');
+  const out = session.runDoc('doc(comp.servo)');
+  h.assert('doc first line', out[0], 'comp [servo] .name:');
+  h.assert('doc path', String(out.some(l => l.includes('path: string'))), 'true');
+  h.assert('doc rel pin', String(out.some(l => l.includes('rel'))), 'true');
+});
+
+reg(2931, 'servo', 'steps map angle valueFromAngle angleFromValue', function(h, session) {
+  const cfg = ServoComponent.resolveConfig({ length: 8, minAngle: 0, maxAngle: 180 });
+  h.assert('min', String(ServoComponent.angleFromValue(0, cfg)), '0');
+  h.assert('max', String(ServoComponent.angleFromValue(255, cfg)), '180');
+  h.assert('mid', String(ServoComponent.valueFromAngle(90, cfg)), '128');
+  h.assert('round trip', String(Math.round(ServoComponent.angleFromValue(128, cfg))), '90');
+});
+
+reg(2932, 'servo', 'angle attr initial position', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  angle: 90
+  :
+
+8wire p = .arm:get`);
+  h.assert('p', session.getWire(interp, 'p'), '10000000');
+});
+
+reg(2933, 'servo', 'absolute assign and get', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  on: 1
+  :
+
+.arm = 00010100
+8wire p = .arm:get`);
+  h.assert('p', session.getWire(interp, 'p'), '00010100');
+});
+
+reg(2934, 'servo', 'path short vs long on 360 span', function(h, session) {
+  const cfg = ServoComponent.resolveConfig({ length: 8, minAngle: 0, maxAngle: 360 });
+  const shortT = ServoComponent.resolveTravelSteps(250, 5, 'short', 255, true);
+  const longT = ServoComponent.resolveTravelSteps(250, 5, 'long', 255, true);
+  h.assert('short travel', String(shortT.travel), '11');
+  h.assert('long travel', String(longT.travel), '245');
+  h.assert('short sign', String(shortT.sign), '1');
+  h.assert('long sign', String(longT.sign), '-1');
+});
+
+reg(2935, 'servo', 'relative cw steps', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  on: 1
+  :
+
+.arm:{ value = 00001110, path = 10, rel = 1, set = 1 }
+8wire p = .arm:get`);
+  h.assert('p', session.getWire(interp, 'p'), ServoComponent.unsignedToBin(14, 8));
+});
+
+reg(2936, 'servo', 'relative ccw clamp on segment', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  on: 1
+  :
+
+.arm:{ value = 00001010, set = 1 }
+.arm:{ value = 00010000, path = 11, rel = 1, set = 1 }
+8wire p = .arm:get`);
+  h.assert('p', session.getWire(interp, 'p'), '00000000');
+});
+
+reg(2937, 'servo', 'relative requires cw or ccw path', function(h, session) {
+  let err = '';
+  try {
+    session.run(`comp [servo] .arm:
+  length: 8
+  on: 1
+  :
+
+.arm:{ value = 1, path = 00, rel = 1, set = 1 }`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('err', String(/relative move requires path cw or ccw/.test(err)), 'true');
+});
+
+reg(2938, 'servo', 'path pin override long', function(h, session) {
+  const { interp } = session.run(`comp [servo] .yaw:
+  length: 8
+  minAngle: 0
+  maxAngle: 360
+  path: short
+  on: 1
+  :
+
+.yaw:{ value = 11111010, set = 1 }
+.yaw:{ value = 00000101, path = 01, set = 1 }
+8wire p = .yaw:get`);
+  h.assert('p', session.getWire(interp, 'p'), '00000101');
+});
+
+reg(2939, 'servo', 'length 16 wire', function(h, session) {
+  const { interp } = session.run(`comp [servo] .s:
+  length: 16
+  minAngle: 0
+  maxAngle: 360
+  on: 1
+  :
+
+16wire cmd = 0000000000001000
+.s:{ value = cmd, set = 1 }
+16wire p = .s:get`);
+  h.assert('p', session.getWire(interp, 'p'), '0000000000001000');
+});
+
+reg(2940, 'servo', 'length bounds error', function(h, session) {
+  let err = '';
+  try {
+    session.run(`comp [servo] .bad:
+  length: 17
+  :`);
+  } catch (e) { err = String(e.message || e); }
+  h.assert('len', String(/length must be 1\.\.16/.test(err)), 'true');
+});
+
+reg(2941, 'servo', 'reversed value mapping', function(h, session) {
+  const cfg = ServoComponent.resolveConfig({ length: 8, minAngle: 0, maxAngle: 180, reversed: true });
+  h.assert('v0', String(ServoComponent.angleFromValue(0, cfg)), '180');
+  h.assert('vmax', String(ServoComponent.angleFromValue(255, cfg)), '0');
+});
+
+reg(2942, 'servo', 'relative wrap on 360', function(h, session) {
+  const { interp } = session.run(`comp [servo] .yaw:
+  length: 8
+  minAngle: 0
+  maxAngle: 360
+  on: 1
+  :
+
+.yaw:{ value = 11111111, set = 1 }
+.yaw:{ value = 00000001, path = 10, rel = 1, set = 1 }
+8wire p = .yaw:get`);
+  h.assert('p', session.getWire(interp, 'p'), '00000000');
+});
+
+reg(2943, 'servo', 'slider to servo same width', function(h, session) {
+  const { interp } = session.run(`comp [slider] .pos:
+  length: 8
+  text: 'Pos'
+  on: 1
+  nl
+  :
+
+comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'Arm'
+  on: 1
+  nl
+  :
+
+.pos:{ data = 10000000, set = 1 }
+8wire cmd = .pos:get
+.arm:{ value = cmd, set = 1 }
+8wire out = .arm:get`);
+  h.assert('out', session.getWire(interp, 'out'), '10000000');
+});
+
+reg(2944, 'servo', 'slewDurationMs rate scaling', function(h, session) {
+  const slow = ServoComponent.slewDurationMs(50, 3);
+  const fast = ServoComponent.slewDurationMs(50, 30);
+  h.assert('slow > fast', String(slow > fast), 'true');
+});
+
+reg(2945, 'servo', 'doc play — 180 assign', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm1:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  angle: 90
+  text: 'Arm'
+  nl
+  :
+
+.arm1 = 10000000
+8wire p = .arm1:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '10000000');
+});
+
+reg(2946, 'servo', 'doc play — 360 short path move', function(h, session) {
+  const { interp } = session.run(`comp [servo] .yaw:
+  length: 8
+  minAngle: 0
+  maxAngle: 360
+  angle: 355
+  path: short
+  on: 1
+  nl
+  :
+
+.yaw:{ value = 00000000, set = 1 }
+8wire p = .yaw:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '00000000');
+});
+
+reg(2947, 'servo', 'doc play — relative cw', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  on: 1
+  :
+
+.arm:{ value = 00001110, path = 10, rel = 1, set = 1 }
+8wire p = .arm:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), ServoComponent.unsignedToBin(14, 8));
+});
+
+reg(2948, 'servo', 'doc play — path pin from dip', function(h, session) {
+  const { interp } = session.run(`comp [dip] .pathSel:
+  length: 2
+  text: 'P'
+  on: 1
+  nl
+  :
+
+comp [servo] .yaw:
+  length: 8
+  minAngle: 0
+  maxAngle: 360
+  path: short
+  on: 1
+  nl
+  :
+
+.pathSel:{ data = 10, set = 1 }
+2wire pth = .pathSel:get
+.yaw:{ value = 01111111, path = pth, set = 1 }
+8wire pos = .yaw:get
+show(pos)`);
+  h.assert('pos', session.getWire(interp, 'pos'), '01111111');
+});
+
+reg(2949, 'servo', 'doc play — rate display attrs', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  size: 14
+  rate: 5
+  color: ^6dff9c
+  rotate: 90
+  on: 1
+  :
+
+.arm = 11111111
+8wire p = .arm:get`);
+  const cfg = ServoComponent.resolveConfig(interp.components.get('.arm').attributes);
+  h.assert('size', String(cfg.size), '14');
+  h.assert('rate', String(cfg.rate), '5');
+  h.assert('p', session.getWire(interp, 'p'), '11111111');
+});
+
+reg(2950, 'servo', 'doc play — reversed segment', function(h, session) {
+  const { interp } = session.run(`comp [servo] .arm:
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  reversed
+  on: 1
+  :
+
+.arm = 00000000
+8wire p = .arm:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '00000000');
 });
 
   window.LogTScriptTestSuite.finalize();

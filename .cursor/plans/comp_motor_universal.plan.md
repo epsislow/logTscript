@@ -158,6 +158,6 @@ După fiecare fază: suite verde. Doc fără nume de faze.
 ## Ce nu facem în v1
 
 - Împachetare MSB/LSB run+speed
-- Servo / stepper / encoder
+- Servo / stepper / encoder (use `comp [servo]` for positional output)
 - `comp [fan]` separat
 - Float RPM în limbaj

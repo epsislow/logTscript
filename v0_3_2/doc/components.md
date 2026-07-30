@@ -53,6 +53,7 @@ Overview (panel callbacks, common patterns): [interactive-components.md](interac
 | `terminal` | — | [terminal.md](terminal.md) |
 | `dots` (clock colon) | `:` | [dots.md](dots.md) |
 | `motor` | — | [motor.md](motor.md) |
+| `servo` | — | [servo.md](servo.md) |
 
 ---
 
