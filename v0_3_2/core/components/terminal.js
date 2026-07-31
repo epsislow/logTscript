@@ -24,7 +24,7 @@ var TerminalComponent = class TerminalComponent extends BuiltinComponent {
         { name: 'wordWrap', value: 'integer' },
         { name: 'lineNumbers', value: 'integer' },
         { name: 'cursorStyle', value: 'integer' },
-        { name: 'color', value: 'string' },
+        { name: 'color', value: 'color' },
         { name: 'nl', value: null }
       ],
       initValue: null,

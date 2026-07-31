@@ -90,7 +90,7 @@ var LedComponent = class LedComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'length', value: 'integer' }, { name: 'text', value: 'string' }, { name: 'color', value: 'string' }, { name: 'square', value: null }, { name: 'nl', value: null }],
+      attrs: [{ name: 'length', value: 'integer' }, { name: 'text', value: 'string' }, { name: 'color', value: 'color' }, { name: 'square', value: null }, { name: 'nl', value: null }],
       initValue: 'Xbit',
       pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'value' }],
       pouts: [{ bits: 'X', name: 'get' }],

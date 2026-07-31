@@ -57,7 +57,7 @@ var SliderComponent = class SliderComponent extends BuiltinComponent {
       attrs: [
         { name: 'length', value: 'integer' },
         { name: 'text', value: 'string' },
-        { name: 'color', value: 'string' },
+        { name: 'color', value: 'color' },
         { name: 'orientation', value: '0/1' },
         { name: 'reversed', value: null },
         { name: 'size', value: 'integer' },

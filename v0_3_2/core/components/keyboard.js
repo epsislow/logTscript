@@ -281,10 +281,10 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
     return {
       attrs: [
         { name: 'label', value: 'string' },
-        { name: 'color', value: 'string' },
-        { name: 'bgColor', value: 'string' },
-        { name: 'focusColor', value: 'string' },
-        { name: 'focusBgColor', value: 'string' },
+        { name: 'color', value: 'color' },
+        { name: 'bgColor', value: 'color' },
+        { name: 'focusColor', value: 'color' },
+        { name: 'focusBgColor', value: 'color' },
         { name: 'onlyDigits', value: null },
         { name: 'allowEnter', value: null },
         { name: 'allowBackspace', value: null },
@@ -292,7 +292,7 @@ var KeyboardComponent = class KeyboardComponent extends BuiltinComponent {
         { name: 'allowDelete', value: null },
         { name: 'codesAccepted', value: '.component (lut)' },
         { name: 'showCode', value: 'integer' },
-        { name: 'pulseColor', value: 'string' },
+        { name: 'pulseColor', value: 'color' },
         { name: 'nl', value: null },
       ],
       initValue: '8bit',

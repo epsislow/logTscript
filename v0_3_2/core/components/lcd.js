@@ -20,7 +20,8 @@ var LcdComponent = class LcdComponent extends BuiltinComponent {
         { name: 'pixelGap', value: 'integer' },
         { name: 'pixelGapX', value: 'integer' },
         { name: 'pixelGapY', value: 'integer' },
-        { name: 'color', value: 'string' },
+        { name: 'color', value: 'color' },
+        { name: 'pixelOnColor', value: 'color' },
         { name: 'nl', value: null },
         { name: 'rgb', value: null }
       ],

@@ -257,7 +257,7 @@ var SensorComponent = class SensorComponent extends BuiltinComponent {
       attrs: [
         { name: 'kind', value: 'string' },
         { name: 'text', value: 'string' },
-        { name: 'color', value: 'string' },
+        { name: 'color', value: 'color' },
         { name: 'length', value: 'integer' },
         { name: 'inverted', value: null },
         { name: 'unit', value: 'string' },

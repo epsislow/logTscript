@@ -14,7 +14,7 @@ var RotaryComponent = class RotaryComponent extends BuiltinComponent {
 
   getDef() {
     return {
-      attrs: [{ name: 'text', value: 'string' }, { name: 'states', value: 'integer' }, { name: 'color', value: 'string' },  { name: 'for', type: 'array', value: 'string' }, { name: 'nl', value: null }],
+      attrs: [{ name: 'text', value: 'string' }, { name: 'states', value: 'integer' }, { name: 'color', value: 'color' },  { name: 'for', type: 'array', value: 'string' }, { name: 'nl', value: null }],
       initValue: 'Xbit',
       pins: [{ bits: '1', name: 'set' }, { bits: 'X', name: 'data' }],
       pouts: [{ bits: 'X', name: 'get' }],

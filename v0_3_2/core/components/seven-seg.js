@@ -14,9 +14,9 @@ var SevenSegComponent = class SevenSegComponent extends BuiltinComponent {
     return {
       attrs: [
         { name: 'text', value: 'string' },
-        { name: 'color', value: 'string' },
-        { name: 'bgColor', value: 'string' },
-        { name: 'lgColor', value: 'string' },
+        { name: 'color', value: 'color' },
+        { name: 'bgColor', value: 'color' },
+        { name: 'lgColor', value: 'color' },
         { name: 'tranSec', value: 'integer' },
         { name: 'scale', value: 'integer' },
         { name: 'nl', value: null }

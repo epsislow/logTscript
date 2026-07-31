@@ -12608,6 +12608,11 @@ if (s.assignment) {
         throw Error(`Undefined variable '${varName}' used in component declaration '${name}'`);
       }
     }
+
+    const CWR = typeof LogTScriptColorWireResolve !== 'undefined' ? LogTScriptColorWireResolve : null;
+    if (CWR && this.componentRegistry && attributes) {
+      CWR.resolveColorAttributesForComp(type, attributes, this, this.componentRegistry);
+    }
     
     // Calculate bits from component type and attributes (componentType is now null)
     const bits = this.getComponentBits(type, attributes);

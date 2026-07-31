@@ -3165,6 +3165,7 @@ assignment() {
     this.eat('SYM', ']');
     
     let attrNamesArray = [];
+    let colorAttrNames = [];
     let def = null;
     
     if (this.componentRegistry) {
@@ -3175,6 +3176,9 @@ assignment() {
             const defAttrs = def.attrs ? def.attrs : [];
             attrNamesArray = defAttrs
               .filter(attr => attr.type === 'array')
+              .map(attr => attr.name);
+            colorAttrNames = defAttrs
+              .filter(attr => attr.value === 'color')
               .map(attr => attr.name);
         }
       }
@@ -3671,6 +3675,7 @@ assignment() {
               this.c = this.t.get();
               continue;
             } else {
+              this.t.i = checkI;
               this.c = this.t.get();
             }
           }
@@ -3801,13 +3806,17 @@ assignment() {
                   }
                 }
                 if (strValue) {
+                  const trimmed = strValue.trim();
+                  const colorVal = colorAttrNames.includes(attrName)
+                    ? { wireRef: trimmed }
+                    : trimmed;
                   if(isArray) {
                     if (!attributes[attrName]) {
                       attributes[attrName] = {};
                     }
-                    attributes[attrName][stateNum] = strValue.trim();
+                    attributes[attrName][stateNum] = colorVal;
                   } else {
-                    attributes[attrName] = strValue.trim();
+                    attributes[attrName] = colorVal;
                   }
                 }
               }

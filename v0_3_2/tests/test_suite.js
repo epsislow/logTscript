@@ -33071,5 +33071,68 @@ show(s)`);
   h.assert('bg', cfg.bgColor, '#1a1a1a');
 });
 
+  reg(2987, 'servo', 'color attrs from wire refs at comp creation', function(h, session) {
+    const { interp } = session.run(`24wire bgC = ^ffff00
+24wire myColor = ^888888
+
+comp [servo] .arm:
+  display: servo
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'Arm'
+  frameColor: myColor
+  bgColor: bgC
+  on: 1
+  :
+
+.arm = 10000000
+8wire p = .arm:get`);
+    const cfg = ServoComponent.resolveConfig(interp.components.get('.arm').attributes);
+    h.assert('frame from wire', cfg.frameColor, '#888888');
+    h.assert('bg from wire', cfg.bgColor, '#ffff00');
+  });
+
+  reg(2988, 'color-wire', 'undefined color wire throws at comp creation', function(h, session) {
+    h.assertThrows('missing wire', function() {
+      session.run(`comp [led] .x:
+  color: noSuchWire
+  :
+`);
+    }, 'Undefined wire');
+  });
+
+  reg(2989, 'color-wire', 'color wire snapshot — later wire change ignored', function(h, session) {
+    const { interp } = session.run(`MODE WIREWRITE
+24wire theme = ^aabbcc
+
+comp [led] .l:
+  color: theme
+  :
+
+theme = ^112233`);
+    const attrs = interp.components.get('.l').attributes;
+    h.assert('snapshot color', attrs.color, '#aabbcc');
+  });
+
+  reg(2990, 'dip', 'colorFor from wire ref', function(h, session) {
+    const { interp } = session.run(`24wire swatch = ^ff0000
+
+comp [dip] .d:
+  length: 4
+  colorFor.2: swatch
+  :
+
+4wire v = .d:get`);
+    const colorFor = interp.components.get('.d').attributes.colorFor;
+    h.assert('colorFor.2', colorFor['2'], '#ff0000');
+  });
+
+  reg(2991, 'color-wire', 'wireBinToCssHex unit', function(h, session) {
+    const CWR = LogTScriptColorWireResolve;
+    h.assert('24bit ffff00', CWR.wireBinToCssHex('111111111111111100000000', 24), '#ffff00');
+    h.assert('12bit 888', CWR.wireBinToCssHex('100010001000', 12), '#888');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();
