@@ -1605,32 +1605,9 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   overflow: hidden;
 }
 
-.motor-rotor {
-  width: var(--motor-size, 40px);
-  height: var(--motor-size, 40px);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--motor-color, #6dff9c);
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--motor-color, #6dff9c) 45%, transparent));
-}
-
-.motor-glyph {
-  width: 100%;
-  height: 100%;
+.motor-canvas {
   display: block;
-}
-
-.motor-rotor.motor-spinning {
-  animation-name: motor-spin;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-duration: var(--motor-period, 1s);
-}
-
-@keyframes motor-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  vertical-align: middle;
 }
 
 .servo-wrapper {
@@ -1650,59 +1627,9 @@ pre { background:#000; padding:10px; max-height:260px; overflow:auto }
   overflow: hidden;
 }
 
-.servo-arm {
-  width: var(--servo-size, 40px);
-  height: var(--servo-size, 40px);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transform-origin: 50% 70%;
-  color: var(--servo-color, #6dff9c);
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--servo-color, #6dff9c) 45%, transparent));
-}
-
-.servo-body {
-  width: 100%;
-  height: 100%;
+.servo-canvas {
   display: block;
-}
-
-.servo-wrapper--piston .servo-body,
-.servo-wrapper--valve .servo-body,
-.servo-wrapper--gauge .servo-body,
-.servo-wrapper--slide .servo-body {
-  width: var(--servo-size, 40px);
-  height: var(--servo-size, 40px);
-  color: var(--servo-color, #6dff9c);
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--servo-color, #6dff9c) 45%, transparent));
-}
-
-.servo-wrapper--piston .servo-body {
-  height: calc(var(--servo-size, 40px) * 0.65);
-  width: calc(var(--servo-size, 40px) * 1.15);
-}
-
-.servo-wrapper--slide .servo-body {
-  height: calc(var(--servo-size, 40px) * 0.7);
-  width: calc(var(--servo-size, 40px) * 1.2);
-}
-
-.servo-glyph {
-  width: 100%;
-  height: 100%;
-  display: block;
-  overflow: visible;
-}
-
-.servo-piston-rod,
-.servo-slide-panel {
-  transform-box: fill-box;
-}
-
-.servo-gauge-needle,
-.servo-valve-disc {
-  transform-box: view-box;
-  transform-origin: 0 0;
+  vertical-align: middle;
 }
 
 .clcd-wrapper {
@@ -3593,6 +3520,7 @@ show(a,b,c)
 <script src="devices/rotary-knob.js"></script>
 <script src="devices/slider-widget.js"></script>
 <script src="devices/sensor-widget.js"></script>
+<script src="devices/panel-anim-raf.js"></script>
 <script src="devices/motor-widget.js"></script>
 <script src="devices/servo-widget.js"></script>
 <script src="devices/scanner-widget.js"></script>

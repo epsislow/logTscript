@@ -1,10 +1,12 @@
-/* ================= SERVO WIDGET (servo / piston / valve skins) ================= */
+/* ================= SERVO WIDGET (Canvas 2D) ================= */
 
 const SERVO_SIZE_DEFAULT = 10;
 const SERVO_SIZE_MIN = 1;
 const SERVO_SIZE_MAX = 20;
 const SERVO_PX_MIN = 32;
 const SERVO_PX_MAX = 76;
+const SERVO_GLOW_BLUR = 10;
+const SERVO_CANVAS_PAD = 4;
 
 function clampServoSize(size) {
   let s = size !== undefined ? parseInt(size, 10) : SERVO_SIZE_DEFAULT;
@@ -89,265 +91,238 @@ function servoTravelStepsCount(state, fromSteps, toSteps, path) {
   return Math.abs(toSteps - fromSteps);
 }
 
-function servoBuildRotaryGlyph() {
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '0 0 40 40');
-  svg.setAttribute('class', 'servo-glyph servo-glyph--rotary');
-
-  const base = document.createElementNS(svgNS, 'path');
-  base.setAttribute('d', 'M8 28 A12 12 0 0 1 32 28 L32 34 L8 34 Z');
-  base.setAttribute('fill', 'none');
-  base.setAttribute('stroke', 'currentColor');
-  base.setAttribute('stroke-width', '2');
-  svg.appendChild(base);
-
-  const hub = document.createElementNS(svgNS, 'circle');
-  hub.setAttribute('cx', '20');
-  hub.setAttribute('cy', '28');
-  hub.setAttribute('r', '4');
-  hub.setAttribute('fill', 'currentColor');
-  svg.appendChild(hub);
-
-  const arm = document.createElementNS(svgNS, 'line');
-  arm.setAttribute('class', 'servo-horn-line');
-  arm.setAttribute('x1', '20');
-  arm.setAttribute('y1', '28');
-  arm.setAttribute('x2', '20');
-  arm.setAttribute('y2', '8');
-  arm.setAttribute('stroke', 'currentColor');
-  arm.setAttribute('stroke-width', '3');
-  arm.setAttribute('stroke-linecap', 'round');
-  svg.appendChild(arm);
-
-  return svg;
+function servoSetupCanvas(canvas, cssW, cssH) {
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  canvas.width = Math.max(1, Math.round(cssW * dpr));
+  canvas.height = Math.max(1, Math.round(cssH * dpr));
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
+  const ctx = canvas.getContext('2d');
+  if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return ctx;
 }
 
-function servoBuildPistonGlyph() {
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '0 0 48 28');
-  svg.setAttribute('class', 'servo-glyph servo-glyph--piston');
-
-  const barrel = document.createElementNS(svgNS, 'rect');
-  barrel.setAttribute('x', '4');
-  barrel.setAttribute('y', '6');
-  barrel.setAttribute('width', '28');
-  barrel.setAttribute('height', '16');
-  barrel.setAttribute('rx', '2');
-  barrel.setAttribute('fill', 'none');
-  barrel.setAttribute('stroke', 'currentColor');
-  barrel.setAttribute('stroke-width', '2');
-  svg.appendChild(barrel);
-
-  const rodGroup = document.createElementNS(svgNS, 'g');
-  rodGroup.setAttribute('class', 'servo-piston-rod');
-
-  const piston = document.createElementNS(svgNS, 'rect');
-  piston.setAttribute('x', '8');
-  piston.setAttribute('y', '9');
-  piston.setAttribute('width', '6');
-  piston.setAttribute('height', '10');
-  piston.setAttribute('rx', '1');
-  piston.setAttribute('fill', 'currentColor');
-  rodGroup.appendChild(piston);
-
-  const rod = document.createElementNS(svgNS, 'rect');
-  rod.setAttribute('x', '14');
-  rod.setAttribute('y', '12');
-  rod.setAttribute('width', '26');
-  rod.setAttribute('height', '4');
-  rod.setAttribute('fill', 'currentColor');
-  rodGroup.appendChild(rod);
-
-  svg.appendChild(rodGroup);
-  return { svg, mover: rodGroup };
+function servoGlow(ctx, color, drawFn) {
+  if (typeof PanelAnimRaf !== 'undefined' && PanelAnimRaf.withGlow) {
+    PanelAnimRaf.withGlow(ctx, color, SERVO_GLOW_BLUR, drawFn);
+  } else {
+    drawFn();
+  }
 }
 
-function servoBuildValveGlyph() {
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '0 0 40 40');
-  svg.setAttribute('class', 'servo-glyph servo-glyph--valve');
+function servoDrawRotary(ctx, state, ox, oy, scale) {
+  const color = state.color || '#6dff9c';
+  const deg = state.visualAngleDeg;
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(scale, scale);
 
-  const pipeL = document.createElementNS(svgNS, 'rect');
-  pipeL.setAttribute('x', '2');
-  pipeL.setAttribute('y', '16');
-  pipeL.setAttribute('width', '12');
-  pipeL.setAttribute('height', '8');
-  pipeL.setAttribute('fill', 'none');
-  pipeL.setAttribute('stroke', 'currentColor');
-  pipeL.setAttribute('stroke-width', '2');
-  svg.appendChild(pipeL);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
 
-  const pipeR = document.createElementNS(svgNS, 'rect');
-  pipeR.setAttribute('x', '26');
-  pipeR.setAttribute('y', '16');
-  pipeR.setAttribute('width', '12');
-  pipeR.setAttribute('height', '8');
-  pipeR.setAttribute('fill', 'none');
-  pipeR.setAttribute('stroke', 'currentColor');
-  pipeR.setAttribute('stroke-width', '2');
-  svg.appendChild(pipeR);
+  // base: M8 28 A12 12 0 0 1 32 28 L32 34 L8 34 Z
+  ctx.beginPath();
+  ctx.moveTo(8, 28);
+  ctx.arc(20, 28, 12, Math.PI, 0, false);
+  ctx.lineTo(32, 34);
+  ctx.lineTo(8, 34);
+  ctx.closePath();
+  servoGlow(ctx, color, () => ctx.stroke());
 
-  const body = document.createElementNS(svgNS, 'circle');
-  body.setAttribute('cx', '20');
-  body.setAttribute('cy', '20');
-  body.setAttribute('r', '9');
-  body.setAttribute('fill', 'none');
-  body.setAttribute('stroke', 'currentColor');
-  body.setAttribute('stroke-width', '2');
-  svg.appendChild(body);
+  ctx.beginPath();
+  ctx.arc(20, 28, 4, 0, Math.PI * 2);
+  servoGlow(ctx, color, () => ctx.fill());
 
-  const pivot = document.createElementNS(svgNS, 'g');
-  pivot.setAttribute('transform', 'translate(20 20)');
+  ctx.save();
+  ctx.translate(20, 28);
+  ctx.rotate((deg * Math.PI) / 180);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -20);
+  servoGlow(ctx, color, () => ctx.stroke());
+  ctx.restore();
 
-  const discGroup = document.createElementNS(svgNS, 'g');
-  discGroup.setAttribute('class', 'servo-valve-disc');
-
-  const disc = document.createElementNS(svgNS, 'line');
-  disc.setAttribute('x1', '0');
-  disc.setAttribute('y1', '-8');
-  disc.setAttribute('x2', '0');
-  disc.setAttribute('y2', '8');
-  disc.setAttribute('stroke', 'currentColor');
-  disc.setAttribute('stroke-width', '3');
-  disc.setAttribute('stroke-linecap', 'round');
-  discGroup.appendChild(disc);
-  pivot.appendChild(discGroup);
-  svg.appendChild(pivot);
-
-  return { svg, mover: discGroup };
+  ctx.restore();
 }
 
-function servoBuildGaugeGlyph(minAngle, maxAngle) {
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '0 0 40 40');
-  svg.setAttribute('class', 'servo-glyph servo-glyph--gauge');
-
-  const face = document.createElementNS(svgNS, 'circle');
-  face.setAttribute('cx', '20');
-  face.setAttribute('cy', '20');
-  face.setAttribute('r', '16');
-  face.setAttribute('fill', 'none');
-  face.setAttribute('stroke', 'currentColor');
-  face.setAttribute('stroke-width', '2');
-  svg.appendChild(face);
-
-  let a0 = minAngle !== undefined ? (minAngle | 0) : 0;
-  let a1 = maxAngle !== undefined ? (maxAngle | 0) : 180;
+function servoDrawGauge(ctx, state, ox, oy, scale) {
+  const color = state.color || '#6dff9c';
+  const deg = state.visualAngleDeg;
+  let a0 = state.minAngle | 0;
+  let a1 = state.maxAngle | 0;
   if (!(a0 < a1)) { a0 = 0; a1 = 180; }
-  const tickCount = 5;
-  for (let i = 0; i < tickCount; i++) {
-    const deg = a0 + ((a1 - a0) * i) / (tickCount - 1);
-    const a = (deg * Math.PI) / 180;
-    const tick = document.createElementNS(svgNS, 'line');
-    tick.setAttribute('x1', String(20 + Math.sin(a) * 11));
-    tick.setAttribute('y1', String(20 - Math.cos(a) * 11));
-    tick.setAttribute('x2', String(20 + Math.sin(a) * 15));
-    tick.setAttribute('y2', String(20 - Math.cos(a) * 15));
-    tick.setAttribute('stroke', 'currentColor');
-    tick.setAttribute('stroke-width', '1.5');
-    svg.appendChild(tick);
+
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+
+  ctx.beginPath();
+  ctx.arc(20, 20, 16, 0, Math.PI * 2);
+  servoGlow(ctx, color, () => ctx.stroke());
+
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 5; i++) {
+    const tickDeg = a0 + ((a1 - a0) * i) / 4;
+    const a = (tickDeg * Math.PI) / 180;
+    ctx.beginPath();
+    ctx.moveTo(20 + Math.sin(a) * 11, 20 - Math.cos(a) * 11);
+    ctx.lineTo(20 + Math.sin(a) * 15, 20 - Math.cos(a) * 15);
+    ctx.stroke();
   }
 
-  const pivot = document.createElementNS(svgNS, 'g');
-  pivot.setAttribute('transform', 'translate(20 20)');
+  ctx.save();
+  ctx.translate(20, 20);
+  ctx.rotate((deg * Math.PI) / 180);
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(0, 2);
+  ctx.lineTo(0, -12);
+  servoGlow(ctx, color, () => ctx.stroke());
+  ctx.beginPath();
+  ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
+  servoGlow(ctx, color, () => ctx.fill());
+  ctx.restore();
 
-  const needleGroup = document.createElementNS(svgNS, 'g');
-  needleGroup.setAttribute('class', 'servo-gauge-needle');
-
-  const needle = document.createElementNS(svgNS, 'line');
-  needle.setAttribute('x1', '0');
-  needle.setAttribute('y1', '2');
-  needle.setAttribute('x2', '0');
-  needle.setAttribute('y2', '-12');
-  needle.setAttribute('stroke', 'currentColor');
-  needle.setAttribute('stroke-width', '2.5');
-  needle.setAttribute('stroke-linecap', 'round');
-  needleGroup.appendChild(needle);
-
-  const hub = document.createElementNS(svgNS, 'circle');
-  hub.setAttribute('cx', '0');
-  hub.setAttribute('cy', '0');
-  hub.setAttribute('r', '2.5');
-  hub.setAttribute('fill', 'currentColor');
-  needleGroup.appendChild(hub);
-
-  pivot.appendChild(needleGroup);
-  svg.appendChild(pivot);
-
-  return { svg, mover: needleGroup };
+  ctx.restore();
 }
 
-function servoBuildSlideGlyph() {
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '0 0 48 32');
-  svg.setAttribute('class', 'servo-glyph servo-glyph--slide');
+function servoDrawPiston(ctx, state, ox, oy, scale) {
+  const color = state.color || '#6dff9c';
+  const t = state.visualFraction;
+  const stroke = 16;
 
-  const frame = document.createElementNS(svgNS, 'rect');
-  frame.setAttribute('x', '4');
-  frame.setAttribute('y', '4');
-  frame.setAttribute('width', '40');
-  frame.setAttribute('height', '24');
-  frame.setAttribute('rx', '1');
-  frame.setAttribute('fill', 'none');
-  frame.setAttribute('stroke', 'currentColor');
-  frame.setAttribute('stroke-width', '2');
-  svg.appendChild(frame);
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
 
-  const rail = document.createElementNS(svgNS, 'line');
-  rail.setAttribute('x1', '6');
-  rail.setAttribute('y1', '28');
-  rail.setAttribute('x2', '42');
-  rail.setAttribute('y2', '28');
-  rail.setAttribute('stroke', 'currentColor');
-  rail.setAttribute('stroke-width', '1');
-  rail.setAttribute('opacity', '0.5');
-  svg.appendChild(rail);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(4, 6, 28, 16, 2);
+  else {
+    ctx.rect(4, 6, 28, 16);
+  }
+  servoGlow(ctx, color, () => ctx.stroke());
 
-  const panelGroup = document.createElementNS(svgNS, 'g');
-  panelGroup.setAttribute('class', 'servo-slide-panel');
+  ctx.save();
+  ctx.translate(t * stroke, 0);
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(8, 9, 6, 10, 1);
+  else ctx.rect(8, 9, 6, 10);
+  servoGlow(ctx, color, () => ctx.fill());
+  ctx.fillRect(14, 12, 26, 4);
+  ctx.restore();
 
-  const panel = document.createElementNS(svgNS, 'rect');
-  panel.setAttribute('x', '6');
-  panel.setAttribute('y', '6');
-  panel.setAttribute('width', '18');
-  panel.setAttribute('height', '20');
-  panel.setAttribute('rx', '1');
-  panel.setAttribute('fill', 'currentColor');
-  panel.setAttribute('opacity', '0.85');
-  panelGroup.appendChild(panel);
-
-  svg.appendChild(panelGroup);
-  return { svg, mover: panelGroup };
+  ctx.restore();
 }
 
-function servoApplyVisual(state, instant) {
-  if (!state || !state.moverEl) return;
-  const dur = instant ? 0 : state.pendingDurationMs;
-  const transition = dur > 0 ? `transform ${dur}ms ease-out` : 'none';
-  state.moverEl.style.transition = transition;
+function servoDrawValve(ctx, state, ox, oy, scale) {
+  const color = state.color || '#6dff9c';
+  const t = state.visualFraction;
 
-  const display = state.display || 'servo';
-  if (display === 'piston' || display === 'slide') {
-    const stroke = Math.max(8, (state.px || 48) * 0.35);
-    const t = state.fraction;
-    state.moverEl.style.transform = `translateX(${t * stroke}px)`;
-    return;
-  }
-  if (display === 'gauge') {
-    state.moverEl.style.transform = `rotate(${state.armRotationDeg}deg)`;
-    return;
-  }
-  if (display === 'valve') {
-    const t = state.fraction;
-    state.moverEl.style.transform = `rotate(${t * 90}deg)`;
-    return;
-  }
-  state.moverEl.style.transform = `rotate(${state.armRotationDeg}deg)`;
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+
+  ctx.strokeRect(2, 16, 12, 8);
+  ctx.strokeRect(26, 16, 12, 8);
+  ctx.beginPath();
+  ctx.arc(20, 20, 9, 0, Math.PI * 2);
+  servoGlow(ctx, color, () => ctx.stroke());
+
+  ctx.save();
+  ctx.translate(20, 20);
+  ctx.rotate((t * 90 * Math.PI) / 180);
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(0, -8);
+  ctx.lineTo(0, 8);
+  servoGlow(ctx, color, () => ctx.stroke());
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function servoDrawSlide(ctx, state, ox, oy, scale) {
+  const color = state.color || '#6dff9c';
+  const t = state.visualFraction;
+  const stroke = 16;
+
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(4, 4, 40, 24, 1);
+  else ctx.rect(4, 4, 40, 24);
+  servoGlow(ctx, color, () => ctx.stroke());
+
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(6, 28);
+  ctx.lineTo(42, 28);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  ctx.save();
+  ctx.translate(t * stroke, 0);
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(6, 6, 18, 20, 1);
+  else ctx.rect(6, 6, 18, 20);
+  servoGlow(ctx, color, () => ctx.fill());
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function servoViewBoxForDisplay(display) {
+  if (display === 'piston') return { vw: 48, vh: 28 };
+  if (display === 'slide') return { vw: 48, vh: 32 };
+  return { vw: 40, vh: 40 };
+}
+
+function servoPaint(state) {
+  if (!state || !state.ctx || !state.canvas) return;
+  const { vw, vh } = servoViewBoxForDisplay(state.display);
+  const pad = SERVO_CANVAS_PAD;
+  const cssW = state.cssW;
+  const cssH = state.cssH;
+  const ctx = state.ctx;
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const innerW = cssW - pad * 2;
+  const innerH = cssH - pad * 2;
+  const scale = Math.min(innerW / vw, innerH / vh);
+  const ox = pad + (innerW - vw * scale) / 2;
+  const oy = pad + (innerH - vh * scale) / 2;
+
+  const d = state.display || 'servo';
+  if (d === 'gauge') servoDrawGauge(ctx, state, ox, oy, scale);
+  else if (d === 'piston') servoDrawPiston(ctx, state, ox, oy, scale);
+  else if (d === 'valve') servoDrawValve(ctx, state, ox, oy, scale);
+  else if (d === 'slide') servoDrawSlide(ctx, state, ox, oy, scale);
+  else servoDrawRotary(ctx, state, ox, oy, scale);
+}
+
+function servoAnimId(id) {
+  return `servo:${id}`;
 }
 
 function addServo({
@@ -370,7 +345,7 @@ function addServo({
   onMovingChange = null,
 }) {
   const container = typeof getDevicesContainer === 'function' ? getDevicesContainer() : null;
-  if (!container || !id) return;
+  if (!container || !id || typeof document === 'undefined') return;
   if (typeof showDevices === 'function') showDevices();
 
   const px = servoPxFromSize(size);
@@ -378,6 +353,10 @@ function addServo({
   const vmax = bits >= 31 ? 0x7FFFFFFF : ((1 << bits) - 1);
   const pos = Math.max(0, Math.min(vmax, position | 0));
   const disp = display || 'servo';
+  const { vw, vh } = servoViewBoxForDisplay(disp);
+  const aspect = vh / vw;
+  const cssW = px + SERVO_CANVAS_PAD * 2;
+  const cssH = Math.round(px * aspect) + SERVO_CANVAS_PAD * 2;
 
   const wrapper = document.createElement('div');
   wrapper.className = `servo-wrapper servo-wrapper--${disp}`;
@@ -396,39 +375,10 @@ function addServo({
     wrapper.appendChild(label);
   }
 
-  const body = document.createElement('div');
-  body.className = 'servo-body';
-
-  let moverEl;
-  if (disp === 'piston') {
-    const built = servoBuildPistonGlyph();
-    body.appendChild(built.svg);
-    moverEl = built.mover;
-    wrapper.appendChild(body);
-  } else if (disp === 'valve') {
-    const built = servoBuildValveGlyph();
-    body.appendChild(built.svg);
-    moverEl = built.mover;
-    wrapper.appendChild(body);
-  } else if (disp === 'gauge') {
-    const built = servoBuildGaugeGlyph(minAngle, maxAngle);
-    body.appendChild(built.svg);
-    moverEl = built.mover;
-    wrapper.appendChild(body);
-  } else if (disp === 'slide') {
-    const built = servoBuildSlideGlyph();
-    body.appendChild(built.svg);
-    moverEl = built.mover;
-    wrapper.appendChild(body);
-  } else {
-    body.appendChild(servoBuildRotaryGlyph());
-    const armEl = document.createElement('div');
-    armEl.className = 'servo-arm';
-    armEl.appendChild(body);
-    wrapper.appendChild(armEl);
-    moverEl = armEl;
-  }
-
+  const canvas = document.createElement('canvas');
+  canvas.className = 'servo-canvas';
+  const ctx = servoSetupCanvas(canvas, cssW, cssH);
+  wrapper.appendChild(canvas);
   container.appendChild(wrapper);
 
   if (nl) {
@@ -449,7 +399,11 @@ function addServo({
   const startFrac = servoFractionFromPosition(baseState, pos);
 
   const state = {
-    moverEl,
+    id,
+    canvas,
+    ctx,
+    cssW,
+    cssH,
     wrapper,
     color,
     speed,
@@ -463,15 +417,15 @@ function addServo({
     path,
     display: disp,
     position: pos,
+    visualAngleDeg: startDeg,
+    visualFraction: startFrac,
     armRotationDeg: startDeg,
     fraction: startFrac,
-    pendingDurationMs: 0,
     moving: false,
     onMovingChange,
-    movingTimer: null,
   };
 
-  servoApplyVisual(state, true);
+  servoPaint(state);
 
   const maps = typeof dm === 'function' ? dm() : null;
   if (maps) {
@@ -503,40 +457,62 @@ function setServo(id, opts) {
   const moveSpeed = (opts && opts.speed !== undefined) ? (opts.speed | 0) : state.speed;
   const duration = servoSlewDurationMs(travelSteps, moveSpeed, state.rate);
 
-  if (state.movingTimer) {
-    clearTimeout(state.movingTimer);
-    state.movingTimer = null;
+  const fromFrac = state.visualFraction;
+  const toFrac = servoFractionFromPosition(state, toPos);
+  const fromDeg = state.visualAngleDeg;
+  let toDeg;
+  if (state.display === 'gauge') {
+    toDeg = servoAngleFromPosition(state, toPos);
+  } else if (servoIsRotary(state) && state.display !== 'gauge') {
+    toDeg = fromDeg + servoTravelDegrees(state, fromPos, toPos, path);
+  } else {
+    toDeg = servoAngleFromPosition(state, toPos);
   }
 
   state.position = toPos;
   state.path = path;
-  state.pendingDurationMs = duration;
-  state.fraction = servoFractionFromPosition(state, toPos);
+  state.fraction = toFrac;
+  state.armRotationDeg = toDeg;
 
-  if (state.display === 'gauge') {
-    // Absolute dial angle — avoids pivot drift; CSS transitions between angles
-    state.armRotationDeg = servoAngleFromPosition(state, toPos);
-  } else if (servoIsRotary(state)) {
-    const deltaDeg = servoTravelDegrees(state, fromPos, toPos, path);
-    state.armRotationDeg += deltaDeg;
-  } else {
-    state.armRotationDeg = servoAngleFromPosition(state, toPos);
+  if (typeof PanelAnimRaf !== 'undefined') {
+    PanelAnimRaf.stop(servoAnimId(id));
   }
-
-  servoApplyVisual(state, duration <= 0);
 
   const movingNow = duration > 0 && travelSteps > 0;
   state.moving = movingNow;
   if (typeof state.onMovingChange === 'function') {
     state.onMovingChange(movingNow ? 1 : 0);
   }
-  if (movingNow) {
-    state.movingTimer = setTimeout(() => {
-      state.movingTimer = null;
+
+  if (!movingNow || !state.ctx) {
+    state.visualFraction = toFrac;
+    state.visualAngleDeg = toDeg;
+    servoPaint(state);
+    return;
+  }
+
+  const t0 = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now()
+    : Date.now();
+  const ease = (typeof PanelAnimRaf !== 'undefined' && PanelAnimRaf.easeOutCubic)
+    ? PanelAnimRaf.easeOutCubic
+    : (t) => t;
+
+  PanelAnimRaf.start(servoAnimId(id), (now) => {
+    const u = ease((now - t0) / duration);
+    state.visualFraction = fromFrac + (toFrac - fromFrac) * u;
+    state.visualAngleDeg = fromDeg + (toDeg - fromDeg) * u;
+    servoPaint(state);
+    if (u >= 1) {
+      state.visualFraction = toFrac;
+      state.visualAngleDeg = toDeg;
       state.moving = false;
+      servoPaint(state);
       if (typeof state.onMovingChange === 'function') {
         state.onMovingChange(0);
       }
-    }, duration);
-  }
+      return false;
+    }
+    return true;
+  });
 }

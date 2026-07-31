@@ -1,10 +1,12 @@
-/* ================= MOTOR WIDGET ================= */
+/* ================= MOTOR WIDGET (Canvas 2D) ================= */
 
 const MOTOR_SIZE_DEFAULT = 10;
 const MOTOR_SIZE_MIN = 1;
 const MOTOR_SIZE_MAX = 20;
 const MOTOR_PX_MIN = 28;
 const MOTOR_PX_MAX = 72;
+const MOTOR_GLOW_BLUR = 10;
+const MOTOR_CANVAS_PAD = 4;
 
 function clampMotorSize(size) {
   let s = size !== undefined ? parseInt(size, 10) : MOTOR_SIZE_DEFAULT;
@@ -31,62 +33,133 @@ function motorPeriodSeconds(speed, length, rate) {
   return Math.max(0.08, base / factor);
 }
 
-function motorBuildGlyph(kind, color) {
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '0 0 40 40');
-  svg.setAttribute('class', 'motor-glyph');
-  svg.style.setProperty('--motor-color', color);
+function motorSetupCanvas(canvas, cssW, cssH) {
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  canvas.width = Math.max(1, Math.round(cssW * dpr));
+  canvas.height = Math.max(1, Math.round(cssH * dpr));
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
+  const ctx = canvas.getContext('2d');
+  if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return ctx;
+}
 
-  const ring = document.createElementNS(svgNS, 'circle');
-  ring.setAttribute('cx', '20');
-  ring.setAttribute('cy', '20');
-  ring.setAttribute('r', '15');
-  ring.setAttribute('fill', 'none');
-  ring.setAttribute('stroke', 'currentColor');
-  ring.setAttribute('stroke-width', '2');
-  svg.appendChild(ring);
+function motorGlow(ctx, color, drawFn) {
+  if (typeof PanelAnimRaf !== 'undefined' && PanelAnimRaf.withGlow) {
+    PanelAnimRaf.withGlow(ctx, color, MOTOR_GLOW_BLUR, drawFn);
+  } else {
+    drawFn();
+  }
+}
+
+function motorAnimId(id) {
+  return `motor:${id}`;
+}
+
+function motorPaint(state) {
+  if (!state || !state.ctx || !state.canvas) return;
+  const pad = MOTOR_CANVAS_PAD;
+  const cssW = state.cssW;
+  const cssH = state.cssH;
+  const ctx = state.ctx;
+  const color = state.color || '#6dff9c';
+  const kind = state.kind || 'rotor';
+
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const inner = Math.min(cssW, cssH) - pad * 2;
+  const scale = inner / 40;
+  const ox = (cssW - 40 * scale) / 2;
+  const oy = (cssH - 40 * scale) / 2;
+
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(scale, scale);
+  ctx.translate(20, 20);
+  ctx.rotate((state.spinDeg * Math.PI) / 180);
+  ctx.translate(-20, -20);
+
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.arc(20, 20, 15, 0, Math.PI * 2);
+  motorGlow(ctx, color, () => ctx.stroke());
 
   if (kind === 'fan') {
     for (let i = 0; i < 3; i++) {
-      const blade = document.createElementNS(svgNS, 'ellipse');
-      blade.setAttribute('cx', '20');
-      blade.setAttribute('cy', '11');
-      blade.setAttribute('rx', '4');
-      blade.setAttribute('ry', '9');
-      blade.setAttribute('fill', 'currentColor');
-      blade.setAttribute('opacity', '0.85');
-      blade.setAttribute('transform', `rotate(${i * 120} 20 20)`);
-      svg.appendChild(blade);
+      ctx.save();
+      ctx.translate(20, 20);
+      ctx.rotate((i * 120 * Math.PI) / 180);
+      ctx.translate(-20, -20);
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.ellipse(20, 11, 4, 9, 0, 0, Math.PI * 2);
+      motorGlow(ctx, color, () => ctx.fill());
+      ctx.restore();
     }
   } else if (kind === 'pump') {
     for (let i = 0; i < 6; i++) {
-      const vane = document.createElementNS(svgNS, 'path');
-      vane.setAttribute('d', 'M20 20 L22 8 Q20 6 18 8 Z');
-      vane.setAttribute('fill', 'currentColor');
-      vane.setAttribute('opacity', '0.9');
-      vane.setAttribute('transform', `rotate(${i * 60} 20 20)`);
-      svg.appendChild(vane);
+      ctx.save();
+      ctx.translate(20, 20);
+      ctx.rotate((i * 60 * Math.PI) / 180);
+      ctx.translate(-20, -20);
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(20, 20);
+      ctx.lineTo(22, 8);
+      ctx.quadraticCurveTo(20, 6, 18, 8);
+      ctx.closePath();
+      motorGlow(ctx, color, () => ctx.fill());
+      ctx.restore();
     }
   } else {
-    const notch = document.createElementNS(svgNS, 'rect');
-    notch.setAttribute('x', '18');
-    notch.setAttribute('y', '6');
-    notch.setAttribute('width', '4');
-    notch.setAttribute('height', '14');
-    notch.setAttribute('rx', '1');
-    notch.setAttribute('fill', 'currentColor');
-    svg.appendChild(notch);
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(18, 6, 4, 14, 1);
+    else ctx.rect(18, 6, 4, 14);
+    motorGlow(ctx, color, () => ctx.fill());
   }
 
-  const hub = document.createElementNS(svgNS, 'circle');
-  hub.setAttribute('cx', '20');
-  hub.setAttribute('cy', '20');
-  hub.setAttribute('r', '3.5');
-  hub.setAttribute('fill', 'currentColor');
-  svg.appendChild(hub);
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(20, 20, 3.5, 0, Math.PI * 2);
+  motorGlow(ctx, color, () => ctx.fill());
 
-  return svg;
+  ctx.restore();
+}
+
+function motorSyncSpinLoop(state) {
+  if (!state || !state.id) return;
+
+  if (typeof PanelAnimRaf !== 'undefined') {
+    PanelAnimRaf.stop(motorAnimId(state.id));
+  }
+
+  const period = motorPeriodSeconds(state.speed, state.length, state.rate);
+  if (period == null || !state.ctx) {
+    motorPaint(state);
+    return;
+  }
+
+  let last = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now()
+    : Date.now();
+
+  PanelAnimRaf.start(motorAnimId(state.id), (now) => {
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+    last = now;
+    const p = motorPeriodSeconds(state.speed, state.length, state.rate);
+    if (p == null) {
+      motorPaint(state);
+      return false;
+    }
+    const xor = (state.reversed ? 1 : 0) ^ (state.dir ? 1 : 0);
+    const sign = xor ? -1 : 1;
+    state.spinDeg = (state.spinDeg + sign * 360 * (dt / p)) % 360;
+    motorPaint(state);
+    return true;
+  });
 }
 
 function addMotor({
@@ -105,10 +178,13 @@ function addMotor({
   nl = false,
 }) {
   const container = typeof getDevicesContainer === 'function' ? getDevicesContainer() : null;
-  if (!container || !id) return;
+  if (!container || !id || typeof document === 'undefined') return;
   if (typeof showDevices === 'function') showDevices();
 
   const px = motorPxFromSize(size);
+  const cssW = px + MOTOR_CANVAS_PAD * 2;
+  const cssH = px + MOTOR_CANVAS_PAD * 2;
+
   const wrapper = document.createElement('div');
   wrapper.className = 'motor-wrapper';
   wrapper.style.setProperty('--motor-color', color);
@@ -126,11 +202,10 @@ function addMotor({
     wrapper.appendChild(label);
   }
 
-  const rotor = document.createElement('div');
-  rotor.className = 'motor-rotor';
-  rotor.appendChild(motorBuildGlyph(kind, color));
-  wrapper.appendChild(rotor);
-
+  const canvas = document.createElement('canvas');
+  canvas.className = 'motor-canvas';
+  const ctx = motorSetupCanvas(canvas, cssW, cssH);
+  wrapper.appendChild(canvas);
   container.appendChild(wrapper);
 
   if (nl) {
@@ -140,7 +215,11 @@ function addMotor({
   }
 
   const state = {
-    el: rotor,
+    id,
+    canvas,
+    ctx,
+    cssW,
+    cssH,
     wrapper,
     kind,
     color,
@@ -149,6 +228,7 @@ function addMotor({
     reversed: !!reversed,
     dir: dir ? 1 : 0,
     speed: speed | 0,
+    spinDeg: 0,
   };
 
   const maps = typeof dm === 'function' ? dm() : null;
@@ -157,23 +237,7 @@ function addMotor({
     maps.motors.set(id, state);
   }
 
-  motorApplyAnimation(state);
-}
-
-function motorApplyAnimation(state) {
-  if (!state || !state.el) return;
-  const period = motorPeriodSeconds(state.speed, state.length, state.rate);
-  const xorRev = (state.reversed ? 1 : 0) ^ (state.dir ? 1 : 0);
-  state.el.style.animationDirection = xorRev ? 'reverse' : 'normal';
-  if (period == null) {
-    state.el.classList.remove('motor-spinning');
-    state.el.style.animationDuration = '';
-    state.el.style.setProperty('--motor-period', '0s');
-  } else {
-    state.el.style.setProperty('--motor-period', `${period}s`);
-    state.el.style.animationDuration = `${period}s`;
-    state.el.classList.add('motor-spinning');
-  }
+  motorSyncSpinLoop(state);
 }
 
 function setMotor(id, opts) {
@@ -184,5 +248,5 @@ function setMotor(id, opts) {
   if (opts && opts.speed !== undefined) state.speed = opts.speed | 0;
   if (opts && opts.dir !== undefined) state.dir = opts.dir ? 1 : 0;
   if (opts && opts.rate !== undefined) state.rate = opts.rate;
-  motorApplyAnimation(state);
+  motorSyncSpinLoop(state);
 }
