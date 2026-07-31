@@ -363,11 +363,6 @@ function addServo({
   wrapper.style.setProperty('--servo-color', color);
   wrapper.style.setProperty('--servo-size', `${px}px`);
 
-  const transforms = [];
-  if (rotate) transforms.push(`rotate(${rotate}deg)`);
-  if (flip) transforms.push('scaleX(-1)');
-  if (transforms.length) wrapper.style.transform = transforms.join(' ');
-
   if (text) {
     const label = document.createElement('span');
     label.className = 'servo-label';
@@ -378,6 +373,10 @@ function addServo({
   const canvas = document.createElement('canvas');
   canvas.className = 'servo-canvas';
   const ctx = servoSetupCanvas(canvas, cssW, cssH);
+  const transforms = [];
+  if (rotate) transforms.push(`rotate(${rotate}deg)`);
+  if (flip) transforms.push('scaleX(-1)');
+  if (transforms.length) canvas.style.transform = transforms.join(' ');
   wrapper.appendChild(canvas);
   container.appendChild(wrapper);
 

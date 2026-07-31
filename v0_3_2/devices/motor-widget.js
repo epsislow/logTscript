@@ -190,11 +190,6 @@ function addMotor({
   wrapper.style.setProperty('--motor-color', color);
   wrapper.style.setProperty('--motor-size', `${px}px`);
 
-  const transforms = [];
-  if (rotate) transforms.push(`rotate(${rotate}deg)`);
-  if (flip) transforms.push('scaleX(-1)');
-  if (transforms.length) wrapper.style.transform = transforms.join(' ');
-
   if (text) {
     const label = document.createElement('span');
     label.className = 'motor-label';
@@ -205,6 +200,10 @@ function addMotor({
   const canvas = document.createElement('canvas');
   canvas.className = 'motor-canvas';
   const ctx = motorSetupCanvas(canvas, cssW, cssH);
+  const transforms = [];
+  if (rotate) transforms.push(`rotate(${rotate}deg)`);
+  if (flip) transforms.push('scaleX(-1)');
+  if (transforms.length) canvas.style.transform = transforms.join(' ');
   wrapper.appendChild(canvas);
   container.appendChild(wrapper);
 
