@@ -4,46 +4,50 @@ overview: Permite atributelor de tip culoare (color, frameColor, bgColor etc.) s
 todos:
   - id: util-color-resolve
     content: Creează color-wire-resolve.js cu wireBinToCssHex și resolveColorAttributesForComp
-    status: pending
+    status: completed
   - id: getdef-color-type
     content: "Actualizează getDef() în toate componentele UI: value: 'color' pentru atributele de culoare"
-    status: pending
+    status: completed
   - id: parser-wireref-marker
     content: "Parser parseComp: colorAttrNames + stocare { wireRef } pentru ID pe atribute color/array"
-    status: pending
+    status: completed
   - id: interpreter-snapshot
     content: "execComp: apelează resolveColorAttributesForComp înainte de createDevice (inclusiv legacy path)"
-    status: pending
+    status: completed
   - id: tests-phase1
     content: "Teste: exemplu servo, snapshot imutabil, colorFor, regresie ^hex"
-    status: pending
+    status: completed
   - id: docs-phase1
-    content: "Documentație: pagină centrală component-color-attributes.md + note per-component + doc-index + regen bundle"
-    status: pending
+    content: "Doc user-facing Faza 1: hub + note per-component + doc-index + wire-literals + regen bundle"
+    status: completed
   - id: phase2-clcd-symbols
     content: (Faza 2) Extinde readHexColor în blocuri CLCD symbol + rezolvare la createDevice
     status: pending
   - id: docs-phase2
-    content: "(Faza 2) Documentează culori wire-ref în clcd.md și clcd-symbols.md"
+    content: "Doc user-facing Faza 2: clcd.md + clcd-symbols.md + secțiune hub CLCD symbols"
     status: pending
+  - id: docs-regen
+    content: "Regenerează doc bundle (node _gen_doc_data.js) și verifică în doc viewer"
+    status: completed
 isProject: false
 ---
 
 # Plan: atribute culoare din wire-uri (snapshot la creare)
 
-## Context actual
+## Stare implementare
 
-Astăzi, culorile în definițiile `comp` acceptă doar literali `^hex` (parsați ca `#hex`):
+| Parte | Status |
+|-------|--------|
+| **Faza 1 — cod** (`color-wire-resolve.js`, parser, interpreter, `getDef`, teste 2987–2991) | ✅ făcut |
+| **Faza 1 — doc user-facing** | ✅ făcut |
+| **Faza 2 — cod** (CLCD symbol `color` / `bgColor` din wire) | ⏳ de făcut |
+| **Faza 2 — doc user-facing** | ⏳ de făcut (după cod Faza 2) |
 
-```3678:3686:v0_3_2/core/parser.js
-          if (this.c.type === 'HEX') {
-            // ...
-              attributes[attrName] = '#' + this.c.value;
-```
+---
 
-Dacă scrii `frameColor: myColor`, parserul stochează stringul `"myColor"` (token `ID`), iar `resolveColorAttr` îl transformă greșit în `#mycolor`.
+## Context
 
-Există deja un pattern **one-shot** pentru valori din wire la declarare — `initialValue.varRef` în [`v0_3_2/core/interpreter.js`](v0_3_2/core/interpreter.js) (l.12599–12609). Trebuie urmat același model, **nu** `wireRefAttrs` din CPU (`wait:`), care rămâne reactiv la runtime.
+Culorile la `comp` acceptau doar literali `^hex`. Acum un atribut `color` poate fi și **nume de wire**; valoarea se citește **o singură dată** la declarare (snapshot), nu reactiv ca `cpu.wait:`.
 
 ```mermaid
 flowchart LR
@@ -64,181 +68,152 @@ flowchart LR
   end
 ```
 
-## Componente afectate (faza 1)
+Fișiere cod Faza 1: [`v0_3_2/core/color-wire-resolve.js`](v0_3_2/core/color-wire-resolve.js), [`parser.js`](v0_3_2/core/parser.js), [`interpreter.js`](v0_3_2/core/interpreter.js), componente în [`v0_3_2/core/components/`](v0_3_2/core/components/).
 
-| Componentă | Atribute culoare |
-|------------|------------------|
+---
+
+## Faza 1 — cod (finalizată)
+
+### Componente cu atribute `color`
+
+| Componentă | Atribute |
+|------------|----------|
 | motor, servo | `color`, `frameColor`, `bgColor` |
 | sensor, led, slider, rotary, terminal | `color` |
-| scanner, keyboard | `color`, `bgColor`, `focusColor`, `focusBgColor` (+ `pulseColor` keyboard) |
+| scanner, keyboard | `color`, `bgColor`, `focusColor`, `focusBgColor` (+ `pulseColor`) |
 | clcd | `color`, `bgColor`, `bgColorSym`, `touchColor` |
 | ledBar, 7seg, 14seg, dots | `color`, `bgColor`, `lgColor` |
-| dip | `color`, `colorFor` (array indexat) |
-| lcd | `color`, `pixelOnColor`, `bg`, `backgroundColor` |
+| dip | `color`, `colorFor` |
+| lcd | `color`, `pixelOnColor` (`bg` / `transparent` rămân string literal) |
 
-Normalizarea existentă (`resolveColorAttr`, `normalizeColor`) rămâne în componente; după snapshot, ele primesc deja `#hex` valid.
+### Teste (2987–2991)
 
-## Arhitectură propusă
+Rulate cu succes în suite-ul complet (2437/2437).
 
-### 1. Metadata în `getDef()` — tip `color`
+---
 
-Standardizăm atributele de culoare cu `value: 'color'` (CLCD le are deja). Parserul citește din `getDef().attrs` lista `colorAttrNames`, similar cu `attrNamesArray` pentru `type: 'array'`.
+## Documentație user-facing
 
-Fișiere: toate componentele din tabelul de mai sus în [`v0_3_2/core/components/`](v0_3_2/core/components/).
+**Ce înseamnă:** paginile Markdown din [`v0_3_2/doc/`](v0_3_2/doc/) afișate în **Doc viewer** din editor (`script_editor_v0_3_2.html` → Search / Index). Nu planul din `.cursor/plans/`, nu comentarii în cod.
 
-### 2. Parser — marchează referința wire
+**Principiu:** un **hub central** cu regulile complete; paginile per-componentă doar **1–2 rânduri + link**, fără duplicare.
 
-În [`v0_3_2/core/parser.js`](v0_3_2/core/parser.js), în `parseComp()`:
+**Limba doc:** engleză (ca restul doc-urilor existente, ex. [`servo.md`](v0_3_2/doc/servo.md)).
 
-- La început, alături de `attrNamesArray`, calculează `colorAttrNames` din `def.attrs` unde `value === 'color'`.
-- Când un atribut din `colorAttrNames` primește token `ID` (nu `HEX`, nu string quoted), stochează:
-  ```js
-  attributes[attrName] = { wireRef: 'myColor' };
-  ```
-- Pentru array-uri (`colorFor.3: myWire`), același marker în `attributes.colorFor[stateNum]`.
-- Literali `^hex` și `#hex` rămân neschimbați.
-
-**Important:** markerul `{ wireRef }` elimină ambiguitatea față de un string literal care ar putea coincide cu un nume de wire.
-
-### 3. Utilitar comun — conversie wire binar → CSS hex
-
-Fișier nou: [`v0_3_2/core/color-wire-resolve.js`](v0_3_2/core/color-wire-resolve.js)
-
-Funcții:
-
-- `isColorWireRef(v)` — detectează `{ wireRef: string }`
-- `wireBinToCssHex(binStr, bitWidth)` — convertește valoarea wire la `#rrggbb`
-  - strip caractere non-`01` (sau eroare dacă conține X/Z)
-  - `parseInt(bin, 2).toString(16)`
-  - pentru lățimi > 24 biți: folosește ultimii 24 biți (RGB)
-  - pentru lățimi < 24: pad la 3 sau 6 cifre hex după convenția existentă din LCD `:rgb` (l.16780–16798 din interpreter)
-- `resolveColorWireRef(wireRef, ctx, contextLabel)` — citește wire o dată via `ctx.getWireEffectiveValue()`, convertește, returnează `#hex` lowercase
-  - eroare clară dacă wire-ul nu există sau nu are valoare (ca la `initialValue.varRef`)
-- `resolveColorAttributesForComp(type, attributes, ctx, registry)` — parcurge toate atributele `color` din `getDef()`, inclusiv obiecte array (`colorFor`)
-
-### 4. Interpreter — snapshot înainte de `createDevice`
-
-În [`v0_3_2/core/interpreter.js`](v0_3_2/core/interpreter.js), în `execComp()`, imediat după rezolvarea `initialValue.varRef` și înainte de `handler.createDevice()`:
-
-```js
-if (this.componentRegistry) {
-  resolveColorAttributesForComp(type, attributes, this, this.componentRegistry);
-}
-```
-
-Aceasta **înlocuiește** `{ wireRef }` cu stringul `#hex` final în `attributes`. Device-ul și `compInfo.attributes` păstrează valoarea snapshot — schimbările ulterioare ale wire-ului nu au efect (cerința explicită).
-
-Fallback legacy din `execComp` (led/dip/lcd inline, l.12702+) primește același apel pentru consistență.
-
-### 5. Fără modificări reactive
-
-- **NU** adăugăm atributele de culoare în `wireRefAttrs` (pattern CPU `wait`).
-- **NU** legăm device-ul de wire după creare.
-- **NU** re-evaluăm culorile în `applyProperties` / wave propagation.
-
-### 6. Teste
-
-Adăugăm în [`v0_3_2/tests/test_suite.js`](v0_3_2/tests/test_suite.js):
-
-1. **Exemplul servo** — `frameColor: myColor`, `bgColor: bgC` din `24wire`
-2. **Ordine declarare** — eroare dacă wire-ul nu e definit încă la `comp`
-3. **Snapshot** — după creare, modificăm wire-ul; `resolveConfig` / widget-ul rămân cu culoarea inițială
-4. **colorFor** — `colorFor.3: myWire` pe dip
-5. **Regresie** — literali `^hex` existente (teste 2983–2986 motor/servo) rămân verzi
-6. **Unit** — `wireBinToCssHex` pentru `^ffff00` pe 24wire, `^888` pe 12wire
-
-### 7. Documentație (faza 1 — obligatoriu)
-
-Propunere **hub + note locale**, aliniată cu structura existentă din [`v0_3_2/doc/`](v0_3_2/doc/) și [`v0_3_2/doc/doc-index.json`](v0_3_2/doc/doc-index.json):
-
-#### A. Pagină centrală nouă (sursă de adevăr)
-
-Fișier nou: [`v0_3_2/doc/component-color-attributes.md`](v0_3_2/doc/component-color-attributes.md)
-
-Secțiune **Reference** în doc viewer, lângă `wire-literals.md` și `components.md`.
-
-Conținut:
-
-- **Ce acceptă un atribut `color`:** literal `^hex` **sau** nume de wire (ex. `bgColor: bgC`)
-- **Regula snapshot:** valoarea wire-ului se citește **o singură dată** la declararea `comp`; schimbările ulterioare ale wire-ului **nu** actualizează widget-ul (diferit de `cpu.wait:` sau propagarea wave)
-- **Ordinea scriptului:** wire-ul trebuie declarat/asignat **înainte** de `comp` (ca la `comp [...] .x = myWire`)
-- **Conversie:** wire binar → `#rrggbb` (24wire `^ffff00` → `#ffff00`; wire > 24 biți → ultimii 24 biți RGB)
-- **Erori:** wire nedefinit, fără valoare, sau biți X/Z la creare
-- **Exemplu complet**, cu bloc `logts-play` runnable:
-
-```logts-play
-24wire bgC = ^ffff00
-24wire myColor = ^888888
-
-comp [servo] .arm:
-  display: servo
-  length: 8
-  minAngle: 0
-  maxAngle: 180
-  text: 'Arm'
-  frameColor: myColor
-  bgColor: bgC
-  on: 1
-  :
-```
-
-- **Tabel componente → atribute color** (din secțiunea „Componente afectate” de mai sus)
-- **Diferență față de `^` pe wire:** în `24wire x = ^ffff00`, `^` e literal de inițializare wire; în `color: ^ffff00`, `^` e literal CSS direct — link către [`v0_3_2/doc/wire-literals.md`](v0_3_2/doc/wire-literals.md) pentru context
-
-#### B. Note scurte în paginile per-componentă (fără duplicare reguli)
-
-În secțiunile „Colors” / tabelele de atribute din paginile care au deja culori documentate, adăugăm **1–2 rânduri + link**:
-
-| Fișier | Modificare |
-|--------|------------|
-| [`servo.md`](v0_3_2/doc/servo.md), [`motor.md`](v0_3_2/doc/motor.md) | În tabelul `color` / `frameColor` / `bgColor`: tip `hex \| wire` + link hub; opțional înlocuim un exemplu cu varianta wire-ref |
-| [`keyboard.md`](v0_3_2/doc/keyboard.md), [`scanner.md`](v0_3_2/doc/scanner.md) | Idem pentru `focusColor`, `pulseColor` etc. |
-| [`dip.md`](v0_3_2/doc/dip.md) | Mențiune `colorFor.N: myWire` |
-| led, seven-seg, led-bar, dots, 14seg, slider, rotary, sensor, terminal, lcd, clcd | O linie „Color attributes accept wire refs — see [component-color-attributes.md](component-color-attributes.md)” |
-
-**Nu** duplicăm regulile snapshot/conversie în fiecare pagină — doar link către hub.
-
-#### C. Index și catalog
-
-- [`doc-index.json`](v0_3_2/doc/doc-index.json): intrare nouă în secțiunea **Reference**:
-  ```json
-  { "file": "component-color-attributes.md", "label": "Component color attributes", "searchExtra": "color frameColor bgColor wire ref snapshot hex theme palette" }
-  ```
-- [`components.md`](v0_3_2/doc/components.md): un rând în introducere sau sub „Displays” — link la pagina hub
-- [`wire-literals.md`](v0_3_2/doc/wire-literals.md): paragraf scurt „Using a wire's value as a component color” → link hub (clarifică confuzia `^` wire vs `^` atribut)
-
-#### D. Regenerare bundle doc
-
-După editarea `.md`:
+**Pipeline după editare:**
 
 ```bash
 node v0_3_2/node/_gen_doc_data.js
 ```
 
-Actualizează [`v0_3_2/ui/doc-data_generated.js`](v0_3_2/ui/doc-data_generated.js) pentru doc viewer.
+Regenerează [`v0_3_2/ui/doc-data_generated.js`](v0_3_2/ui/doc-data_generated.js) și secțiunile din [`doc-viewer.js`](v0_3_2/ui/doc-viewer.js).
 
-#### E. `doc(comp.*)` în editor (opțional, mic)
-
-După ce `getDef()` folosește `value: 'color'`, putem extinde afișarea `doc(comp.servo)` astfel încât coloana tip să arate `color` (sau `hex | wire`) în loc de `string` — ajută la discoverability fără a citi manual pagina hub. Dacă e prea mult scope, rămâne doar documentația markdown.
-
-#### F. Faza 2 doc (CLCD symbols)
-
-Când implementăm wire-ref în blocuri `= { ... }`:
-
-- [`clcd.md`](v0_3_2/doc/clcd.md) + [`clcd-symbols.md`](v0_3_2/doc/clcd-symbols.md): `color: myWire` / `bgColor: myWire` în exemple symbol
-- Secțiune scurtă în hub-ul central, sub „CLCD symbol blocks”
+**Verificare manuală:** deschide editorul → Doc → caută „component color” / „wire ref” → rulează un bloc `logts-play` de pe pagina hub.
 
 ---
 
-## Faza 2 (ulterior): culori CLCD symbol
+### Pas 1 — Pagină hub nouă (sursă de adevăr)
 
-Blocurile `= { icon: color: ^fff ... }` folosesc `readHexColor()` în parser (l.5460), care acceptă doar `^` / `#`.
+**Fișier:** [`v0_3_2/doc/component-color-attributes.md`](v0_3_2/doc/component-color-attributes.md) *(de creat)*
 
-Modificări viitoare:
+**Poziție în index:** secțiunea **Reference**, imediat după `wire-literals.md`.
 
-- Extinde `readHexColor()` → `readColorValue()` cu suport ident → `{ wireRef }`
-- În `execComp` sau `ClcdComponent.createDevice`, rezolvă `attributes.clcdSymbols[].color` / `.bgColor` cu același utilitar
+**Structură propusă:**
+
+1. **Titlu + one-liner** — atributele `color` acceptă `^hex` sau nume wire
+2. **Syntax** — exemplu minimal + exemplul servo cu `frameColor: myColor`, `bgColor: bgC`
+3. **Snapshot rule** — citire unică la `comp`; schimbări ulterioare ale wire-ului nu actualizează widget-ul; contrast cu `cpu.wait:` (reactiv)
+4. **Declaration order** — wire-ul trebuie definit/asignat **înainte** de `comp`
+5. **Wire → CSS conversion** — `24wire` + `^ffff00` → `#ffff00`; wire > 24 biți → ultimii 24 biți RGB; erori X/Z
+6. **Literal forms** — tabel: `color: ^aabbcc` | `color: myWire` | `colorFor.3: swatch` (dip)
+7. **Component table** — lista din secțiunea Faza 1 (atribute per componentă)
+8. **vs wire literals** — link la [`wire-literals.md`](v0_3_2/doc/wire-literals.md): `^` la inițializare wire ≠ `^` în atribut
+9. **`logts-play` runnable** — același script ca testul 2987 (servo + două wire-uri)
+10. **See also** — linkuri către motor, servo, keyboard, clcd, dip
+
+**`doc-index.json`** — intrare nouă:
+
+```json
+{
+  "file": "component-color-attributes.md",
+  "label": "Component color attributes",
+  "searchExtra": "color frameColor bgColor wire ref snapshot hex theme palette myColor bgC colorFor"
+}
+```
+
+---
+
+### Pas 2 — Legături în catalog și referințe transversale
+
+| Fișier | Modificare |
+|--------|------------|
+| [`components.md`](v0_3_2/doc/components.md) | Paragraf scurt după introducere sau sub „Displays”: *Color attributes can use wire refs — see [component-color-attributes.md](component-color-attributes.md)* |
+| [`wire-literals.md`](v0_3_2/doc/wire-literals.md) | Secțiune nouă „Using a wire value as a component color” (3–5 rânduri) + link hub |
+
+---
+
+### Pas 3 — Note locale per componentă (fără duplicare reguli)
+
+În **tabelele de atribute** existente, schimbăm tipul `hex` → `hex \| wire` și adăugăm footnote sau rând:
+
+> Wire name: value read once at declaration. See [component-color-attributes.md](component-color-attributes.md).
+
+| Prioritate | Fișier | Detaliu extra |
+|------------|--------|----------------|
+| P1 | [`servo.md`](v0_3_2/doc/servo.md), [`motor.md`](v0_3_2/doc/motor.md) | Secțiunea „Colors”: un exemplu `logts-play` cu wire-uri (lângă exemplul existent cu `^hex`) |
+| P1 | [`keyboard.md`](v0_3_2/doc/keyboard.md), [`scanner.md`](v0_3_2/doc/scanner.md) | Tabele `focusColor`, `pulseColor` etc. |
+| P1 | [`dip.md`](v0_3_2/doc/dip.md) | `colorFor.N: myWire` |
+| P2 | [`led.md`](v0_3_2/doc/led.md), [`seven-seg.md`](v0_3_2/doc/seven-seg.md), [`led-bar.md`](v0_3_2/doc/led-bar.md), [`14seg.md`](v0_3_2/doc/14seg.md), [`dots.md`](v0_3_2/doc/dots.md) | O linie + link hub |
+| P2 | [`slider.md`](v0_3_2/doc/slider.md), [`rotary.md`](v0_3_2/doc/rotary.md), [`sensor.md`](v0_3_2/doc/sensor.md), [`terminal.md`](v0_3_2/doc/terminal.md), [`lcd.md`](v0_3_2/doc/lcd.md) | Idem |
+| P2 | [`clcd.md`](v0_3_2/doc/clcd.md) | Atribute `comp` (Faza 1); symbol blocks — Pas 5 după cod Faza 2 |
+
+**Nu** copiem regulile snapshot/conversie în fiecare pagină.
+
+---
+
+### Pas 4 — Regenerare și verificare
+
+1. `node v0_3_2/node/_gen_doc_data.js`
+2. Commit include `doc/*.md`, `doc-index.json`, `ui/doc-data_generated.js` (și `doc-viewer.js` dacă s-a modificat)
+3. Smoke test în doc viewer: pagina hub, link din `servo.md`, search „wire ref color”
+
+---
+
+### Pas 5 — Doc Faza 2 (după implementare CLCD symbol wire-ref)
+
+**Cod Faza 2** (prerequisite pentru doc):
+
+- `readHexColor()` → `readColorValue()` cu suport ident → `{ wireRef }` în parser (bloc `= { ... }`)
+- Rezolvare în `resolveColorAttributesForComp` sau helper dedicat pentru `attributes.clcdSymbols[].color` / `.bgColor`
+- Test în `test_suite.js`
+
+**Doc Faza 2:**
+
+| Fișier | Modificare |
+|--------|------------|
+| [`component-color-attributes.md`](v0_3_2/doc/component-color-attributes.md) | Secțiune nouă **CLCD symbol blocks** cu exemplu `color: symFg` în `= { warning: ... }` |
+| [`clcd.md`](v0_3_2/doc/clcd.md) | Tabel symbol fields: `color` / `bgColor` → `hex \| wire`; exemplu în syntax-ul de la început |
+| [`clcd-symbols.md`](v0_3_2/doc/clcd-symbols.md) | 1 exemplu symbol cu wire ref + mențiune snapshot |
+| `doc-index.json` | Opțional: `searchExtra` pe intrarea `clcd.md` / hub — cuvinte `symbol color wire` |
+
+Apoi din nou Pas 4 (regen bundle).
+
+---
+
+### Pas 6 — Opțional (discoverability în editor)
+
+Extinde output-ul `doc(comp.servo)` astfel încât atributele cu `value: 'color'` în `getDef()` să apară ca tip `color` (sau `hex | wire`) în loc de `string`. Mică modificare în generatorul `doc()` — **nu blochează** livrarea doc Markdown.
+
+---
+
+## Faza 2 — cod CLCD symbol (de făcut)
+
+Blocurile `= { icon: color: ^fff ... }` folosesc `readHexColor()` în [`parser.js`](v0_3_2/core/parser.js) (l.5460), care acceptă doar `^` / `#`.
+
+- Extinde parser symbol → `{ wireRef }` pentru `color` / `bgColor`
+- Rezolvare snapshot cu [`color-wire-resolve.js`](v0_3_2/core/color-wire-resolve.js)
 - Test dedicat CLCD symbol cu wire ref
+- Apoi **Pas 5** documentație de mai sus
 
 ---
 
@@ -246,12 +221,16 @@ Modificări viitoare:
 
 | Subiect | Decizie |
 |---------|---------|
-| Lățime wire | Orice lățime; pentru UI color folosim ultimii 24 biți dacă wire > 24 |
-| Valori X/Z în wire | Eroare la creare (culoare invalidă) |
-| `transparent` (lcd bg) | Rămâne literal string; nu e atribut `color` în metadata |
-| Performanță | Neglijabilă — o citire per atribut, doar la declarare |
+| Lățime wire | Ultimii 24 biți RGB dacă wire > 24 |
+| Valori X/Z | Eroare la creare |
+| `transparent` (lcd `bg`) | Rămâne string literal, nu `value: 'color'` |
+| Reassign wire în test snapshot | Doc exemplu: menționează `MODE WIREWRITE` dacă arătăm modificare wire după `comp` |
+| Ordine livrare doc | Hub + note Faza 1 **pot** fi făcute acum; secțiunea CLCD symbol **după** cod Faza 2 |
 
-## Estimare efort
+## Estimare efort rămas
 
-- **Faza 1:** ~6–8 fișiere cod + 1 pagină doc hub + note în ~12 pagini componentă + regen doc bundle + teste
-- **Faza 2:** parser CLCD symbol + clcd.js + doc clcd + 1–2 teste
+| Task | Efort |
+|------|-------|
+| Doc Faza 1 (hub + ~12 pagini note + index + regen) | ~1–2h |
+| Cod Faza 2 CLCD symbol | ~2–3h |
+| Doc Faza 2 (clcd + hub section) | ~30–45 min |

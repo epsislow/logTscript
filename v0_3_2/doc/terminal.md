@@ -31,8 +31,10 @@ comp [terminal] .name:
 | `wordWrap` | 0/1 | 1 | Wrap text when reaching column limit |
 | `lineNumbers` | 0/1 | 0 | Show line numbers (visual only) |
 | `cursorStyle` | 0/1/2 | 0 | Cursor display mode (see below) |
-| `color` | hex | `#0f0` | Text (and cursor) color |
+| `color` | hex \| wire | `#0f0` | Text (and cursor) color |
 | `nl` | flag | off | Line break after terminal in devices panel |
+
+`color`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
 
 ### `cursorStyle`
 

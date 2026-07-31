@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -11,6 +11,8 @@
 \`comp [14seg]\` (shortname \`comp [14]\`) renders an **alphanumeric 14-segment display** (15 bits including decimal point).
 
 Signature: \`doc(comp.14seg)\` or \`doc(comp.14)\`.
+
+\`color\`, \`bgColor\`, \`lgColor\`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
 
 ---
 
@@ -8357,6 +8359,8 @@ comp [clcd] .panel::
 | \`touchPadding\` | \`0\` | Default padding (px) for symbol touch rects when \`padding\` is omitted |
 | \`nl\` | off | Newline after display |
 
+Component-level \`color\`, \`bgColor\`, \`bgColorSym\`, and \`touchColor\` accept hex \`^RRGGBB\` or a wire name (snapshot at declaration). Symbol fields \`color\` / \`bgColor\` inside \`= { … }\` still use \`^hex\` only. See [component-color-attributes.md](component-color-attributes.md).
+
 ## Symbol fields (\`= { … }\`)
 
 | Field | Required | Description |
@@ -8833,11 +8837,163 @@ peek(touchOut)
 - [seven-seg.md](seven-seg.md) — 7-segment component
 - [components.md](components.md)
 `,
+    'component-color-attributes.md': `# Component color attributes
+
+Panel components expose **color attributes** (\`color\`, \`frameColor\`, \`bgColor\`, \`focusColor\`, \`colorFor\`, …) to style glyphs on the devices panel. Each attribute accepts either:
+
+- a **hex literal** — \`^RRGGBB\` or \`^RGB\` (same as before), or
+- a **wire name** — the wire’s current value is read **once** when the \`comp\` line is elaborated.
+
+Related: [wire literals](wire-literals.md) (hex on wires), [components](components.md) (catalog), [modes](modes.md) (\`MODE STRICT\` / \`WIREWRITE\`).
+
+---
+
+## Syntax
+
+### Hex literal (unchanged)
+
+\`\`\`logts
+comp [servo] .arm:
+  color: ^6dff9c
+  frameColor: ^888888
+  bgColor: ^222222
+  :
+\`\`\`
+
+### Wire reference (snapshot)
+
+\`\`\`logts
+24wire bgC = ^ffff00
+24wire myColor = ^888888
+
+comp [servo] .arm:
+  display: servo
+  length: 8
+  frameColor: myColor
+  bgColor: bgC
+  :
+\`\`\`
+
+The wire must be **declared and assigned before** the \`comp\` line (same rule as \`comp [...] .x = myWire\` for initial value).
+
+---
+
+## Snapshot rule (not reactive)
+
+| When | What happens |
+|------|----------------|
+| \`comp\` elaboration | Each color attribute that names a wire reads \`getWireEffectiveValue()\` **once** and stores the resulting \`#hex\` string on the component |
+| After \`RUN\` | Changing the wire in script or via propagation **does not** update the panel colors |
+
+This is intentional: the component is defined once; only the value at creation time matters. It is **not** like \`cpu.wait:\` (a live wire name evaluated every step) or wave-driven property blocks.
+
+To prove the snapshot in a script that reassigns wires, use \`MODE WIREWRITE\` (see [modes](modes.md)).
+
+---
+
+## Wire → CSS color conversion
+
+| Wire init | Typical width | Panel color |
+|-----------|---------------|-------------|
+| \`24wire c = ^ffff00\` | 24 bits | \`#ffff00\` |
+| \`12wire c = ^888\` | 12 bits | \`#888\` |
+| \`32wire c = ^AABBCCDD\` | 32 bits | lower 24 bits → \`#aabbcc\` |
+
+Rules:
+
+- Wire binary is interpreted as an unsigned integer, then formatted as \`#rrggbb\` (3- or 6-digit hex).
+- Bits \`X\` / \`Z\` in the wire at elaboration time → error.
+- Undefined wire or wire with no value yet → error.
+
+---
+
+## Literal forms
+
+| Form | Example | Notes |
+|------|---------|-------|
+| Hex on attribute | \`color: ^ff0000\` | Parsed directly as CSS hex |
+| Wire on attribute | \`bgColor: theme\` | \`theme\` must be an existing wire |
+| Indexed array (dip) | \`colorFor.3: swatch\` | Per-position color; wire or hex |
+| Hex on wire init | \`24wire t = ^aabbcc\` | \`^\` is a **wire literal**, not an attribute — see [wire literals](wire-literals.md) |
+
+---
+
+## Components and attributes
+
+| Component | Color attributes |
+|-----------|------------------|
+| \`motor\`, \`servo\` | \`color\`, \`frameColor\`, \`bgColor\` |
+| \`led\`, \`slider\`, \`rotary\`, \`sensor\`, \`terminal\` | \`color\` |
+| \`scanner\`, \`keyboard\` | \`color\`, \`bgColor\`, \`focusColor\`, \`focusBgColor\` (+ \`pulseColor\` on keyboard) |
+| \`clcd\` | \`color\`, \`bgColor\`, \`bgColorSym\`, \`touchColor\` (component level) |
+| \`bar\` / \`ledBar\` | \`color\`, \`bgColor\`, \`lgColor\` |
+| \`7seg\`, \`14seg\`, \`dots\` | \`color\`, \`bgColor\`, \`lgColor\` |
+| \`dip\` | \`color\`, \`colorFor.N\` |
+| \`lcd\` | \`color\`, \`pixelOnColor\` (\`bg\` / \`backgroundColor\` stay plain strings, e.g. \`transparent\`) |
+
+Per-component pages link here for details and examples.
+
+---
+
+## Runnable example
+
+\`\`\`logts-play
+24wire bgC = ^ffff00
+24wire myColor = ^888888
+
+comp [servo] .arm:
+  display: servo
+  length: 8
+  minAngle: 0
+  maxAngle: 180
+  text: 'Arm'
+  frameColor: myColor
+  bgColor: bgC
+  on: 1
+  :
+
+.arm = 10000000
+8wire p = .arm:get
+show(p)
+\`\`\`
+
+Load & Run: grey frame (\`#888888\`), yellow interior fill (\`#ffff00\`); \`p\` is \`10000000\`.
+
+---
+
+## DIP — \`colorFor\` with a wire
+
+\`\`\`logts-play
+24wire onColor = ^ff0000
+
+comp [dip] .sw:
+  length: 4
+  color: ^2ecc71
+  colorFor.2: onColor
+  :
+
+4wire mode = .sw:get
+show(mode)
+\`\`\`
+
+Position \`2\` uses red when on; other positions use the default \`color\`.
+
+---
+
+## See also
+
+- [motor.md](motor.md) · [servo.md](servo.md) — three-color actuators
+- [keyboard.md](keyboard.md) · [scanner.md](scanner.md) — focus colors
+- [dip.md](dip.md) — \`colorFor\`
+- [clcd.md](clcd.md) — canvas defaults (symbol-level colors in \`= { … }\` still use \`^hex\` only until a future update)
+`,
     'components.md': `# Component index
 
 LogTscript includes built-in **components** (\`comp\`), **inline** declarations (\`inline [asm]\`, \`inline [lut]\`), reusable **board** blocks (\`board\`), lightweight **chip** blocks (\`chip\`), and legacy **PCB** (\`pcb\`). Use \`doc(comp)\`, \`doc(inline)\`, \`doc(board)\`, \`doc(chip)\`, or \`doc(pcb)\` in the editor for live signatures.
 
 **Global refs in composite bodies:** inside \`board\` / \`chip\` / \`pcb\`, prefix a top-level inline or component name with \`^\` to skip instance renaming — e.g. \`^.myisa { … }\`, \`^.ctl:LOAD\`, \`doc(^.ctl)\`. Details: [lut.md](lut.md#global-reference-name).
+
+**Component colors from wires:** color attributes (\`color\`, \`frameColor\`, \`bgColor\`, …) accept a hex literal or a wire name (read once at declaration). See [component-color-attributes.md](component-color-attributes.md).
 
 ---
 
@@ -11810,12 +11966,14 @@ comp [dip] .name::
 |------------|---------|-----------|-------------|
 | \`length\`   | integer | \`4\`       | Number of DIP positions (bits) |
 | \`text\`     | string  | \`''\`      | Group label |
-| \`color\`    | hex     | \`#2ecc71\` | Color when a position is on |
-| \`colorFor\` | array   | —         | Per-position colors |
+| \`color\`    | hex \\| wire | \`#2ecc71\` | Color when a position is on |
+| \`colorFor\` | hex \\| wire (array) | —         | Per-position colors (\`colorFor.3: swatch\` or \`colorFor.3: ^ff0\`) |
 | \`visual\`   | \`0\`/\`1\` | \`0\`       | Show \`0\`/\`1\` on each position |
 | \`noLabels\` | flag    | (no)      | Hide position labels |
 | \`noTrans\`  | flag    | —         | Disable transition animation |
 | \`nl\`       | flag    | (no)      | Newline after the control |
+
+See [component-color-attributes.md](component-color-attributes.md) for wire-backed colors and \`colorFor\` examples.
 
 ---
 
@@ -13758,6 +13916,8 @@ Programmatic help from scripts uses the \`doc()\` function — see [doc-function
 \`comp [dots]\` (shortname \`comp [:]\`) renders a **two-dot colon** (clock separator). Output is **2 bits** (\`up\`, \`down\`).
 
 Signature: \`doc(comp.dots)\` or \`doc(comp.:)\`.
+
+\`color\`, \`bgColor\`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
 
 ---
 
@@ -17296,10 +17456,10 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | \`label\` | string | \`Keyboard\` | Display label |
-| \`color\` | color | \`^808080\` | Border when unfocused |
-| \`bgColor\` | color | \`^101010\` | Background when unfocused |
-| \`focusColor\` | color | \`^2ecc71\` | Border when focused |
-| \`focusBgColor\` | color | \`^181818\` | Background when focused |
+| \`color\` | hex \\| wire | \`^808080\` | Border when unfocused |
+| \`bgColor\` | hex \\| wire | \`^101010\` | Background when unfocused |
+| \`focusColor\` | hex \\| wire | \`^2ecc71\` | Border when focused |
+| \`focusBgColor\` | hex \\| wire | \`^181818\` | Background when focused |
 | \`onlyDigits\` | flag | (no) | Accept only \`0\`–\`9\` (still emits 8-bit ASCII); mobile \`inputmode=numeric\` |
 | \`allowEnter\` | flag | (no) | Accept Enter (LF, code 10); mobile uses \`<textarea>\` with return key |
 | \`allowBackspace\` | flag | (no) | Accept Backspace (BS, code 8) |
@@ -17307,8 +17467,10 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | \`allowDelete\` | flag | (no) | Accept forward Delete (code 132 on \`:get\`) |
 | \`codesAccepted\` | LUT ref | (no) | Whitelist of allowed keys via \`comp [lut]\` (\`codesAccepted = .lut\`) |
 | \`showCode\` | integer | \`0\` | Display last \`:get\` code next to label (\`0\` off, \`1\` hex, \`2\` decimal) |
-| \`pulseColor\` | color | (no) | Brief color flash on border/label after each accepted key |
+| \`pulseColor\` | hex \\| wire | (no) | Brief color flash on border/label after each accepted key |
 | \`nl\` | flag | (no) | New line after component |
+
+Color attributes: hex \`^RRGGBB\` or wire name (snapshot). See [component-color-attributes.md](component-color-attributes.md).
 
 ---
 
@@ -17563,7 +17725,7 @@ comp [lcd] .name:
 | \`pixelSize\` | 10 | Square pixel size (px) |
 | \`pixelSizeX\`, \`pixelSizeY\` | from \`pixelSize\` | Non-square pixels |
 | \`pixelGap\` | 3 | Gap between pixels |
-| \`color\` | green | Monochrome color (without \`rgb\`) |
+| \`color\` | green | Monochrome color (without \`rgb\`); hex literal or wire — [component-color-attributes.md](component-color-attributes.md) |
 | \`rgb\` | off | Enable RGB mode |
 
 ---
@@ -17618,6 +17780,8 @@ comp [lcd] .screen:
 \`comp [bar]\` (parser alias \`ledBar\`) shows a **horizontal or vertical bar graph** of LEDs. Width follows \`length\` (default 8).
 
 Signature: \`doc(comp.bar)\`.
+
+\`color\`, \`bgColor\`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
 
 ---
 
@@ -17721,10 +17885,12 @@ comp [led] .name::
 |-----------|---------|-----------|-------------|
 | \`length\`  | integer | \`1\`       | Number of LEDs (bits). \`1\` = single LED, \`4\` = group of 4 LEDs |
 | \`text\`    | string  | \`''\`      | Label displayed next to the first LED |
-| \`color\`   | hex     | \`^f00\`    | LED color as a 3 or 6 digit hex value (e.g. \`^0f9\`, \`^21f\`, \`^ff0000\`) |
+| \`color\`   | hex \\| wire | \`^f00\`    | LED color as a 3 or 6 digit hex value (e.g. \`^0f9\`, \`^21f\`, \`^ff0000\`) |
 | \`square\`  | flag    | (round)   | Renders the LED as a square instead of a circle |
 | \`nl\`      | flag    | (no)      | Adds a newline after the last LED in the group |
 | \`on\`      | mode    | \`raise\`   | Trigger mode for property blocks: \`raise\`, \`edge\`, \`1\`, \`0\` |
+
+\`color\` accepts a hex literal or wire name — [component-color-attributes.md](component-color-attributes.md).
 
 ---
 
@@ -21868,9 +22034,9 @@ The **ring (and hub) stay fixed**; only the notch / blades / vanes spin.
 | \`kind\` | id | \`rotor\` | Visual skin (\`rotor\`, \`fan\`, \`pump\`) — unquoted, e.g. \`kind: fan\` |
 | \`length\` | integer | \`1\` | Wire width \`1…8\`. \`1\` = on/off; \`N>1\` = speed \`0…2^N−1\` |
 | \`text\` | string | \`''\` | Panel label (up to 5 characters shown) |
-| \`color\` | hex | \`#6dff9c\` | Moving part (notch / blades / vanes) |
-| \`frameColor\` | hex | *(= \`color\`)* | Fixed ring + hub outline/fill accent |
-| \`bgColor\` | hex | *(soft from \`frameColor\`)* | Fill inside the fixed ring — not the whole canvas |
+| \`color\` | hex \\| wire | \`#6dff9c\` | Moving part (notch / blades / vanes) |
+| \`frameColor\` | hex \\| wire | *(= \`color\`)* | Fixed ring + hub outline/fill accent |
+| \`bgColor\` | hex \\| wire | *(soft from \`frameColor\`)* | Fill inside the fixed ring — not the whole canvas |
 | \`size\` | integer | \`10\` | Glyph size on the panel (\`1…20\`) |
 | \`rate\` | integer | \`10\` | Visual animation factor in **tenths** — see below |
 | \`rotate\` | integer | \`0\` | Widget orientation: \`0\`, \`90\`, \`180\`, or \`270\` degrees |
@@ -21880,6 +22046,8 @@ The **ring (and hub) stay fixed**; only the notch / blades / vanes spin.
 | \`on\` | mode | \`raise\` | When property blocks run: \`raise\`, \`edge\`, \`1\`, \`0\` — **not** the motor command |
 
 ### Colors
+
+Hex literal or wire name — [component-color-attributes.md](component-color-attributes.md).
 
 \`\`\`logts-play
 comp [motor] .fan1:
@@ -29418,9 +29586,11 @@ comp [rotary] .name::
 |-----------|---------|---------|-------------|
 | \`states\`  | integer | \`8\`     | Number of positions (≥ 2) |
 | \`text\`    | string  | \`''\`    | Label |
-| \`color\`   | hex     | —       | Knob accent color |
+| \`color\`   | hex \\| wire | —       | Knob accent color |
 | \`for\`     | array   | —       | Optional label per state |
 | \`nl\`      | flag    | (no)    | Newline after control |
+
+\`color\`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
 
 ---
 
@@ -29554,12 +29724,14 @@ When set, non-digit characters are stripped from the field (and on commit). Digi
 | \`width\` | integer | (flex \`6…24ch\`) | **Panel only** — fixed field width in character cells (\`4…40\`). Omit for the default flexible look |
 | \`text\` | string | \`''\` | Panel label |
 | \`scanText\` | string | \`'Scan'\` | Label on the commit button (e.g. \`'>'\`, \`'OK'\`) |
-| \`color\` | hex | \`^808080\` | Border / label when unfocused (same idea as keyboard) |
-| \`bgColor\` | hex | \`^101010\` | Panel / field background when unfocused |
-| \`focusColor\` | hex | \`^2ecc71\` | Border when the field is focused |
-| \`focusBgColor\` | hex | \`^181818\` | Background when focused |
+| \`color\` | hex \\| wire | \`^808080\` | Border / label when unfocused (same idea as keyboard) |
+| \`bgColor\` | hex \\| wire | \`^101010\` | Panel / field background when unfocused |
+| \`focusColor\` | hex \\| wire | \`^2ecc71\` | Border when the field is focused |
+| \`focusBgColor\` | hex \\| wire | \`^181818\` | Background when focused |
 | \`onlyDigits\` | flag | off | Accept digits only |
 | \`nl\` | flag | off | Newline after the control |
+
+Color attributes: hex or wire name — [component-color-attributes.md](component-color-attributes.md).
 
 ---
 
@@ -31143,11 +31315,13 @@ Unknown \`kind\` → elaboration error.
 |-----------|------|---------|-------------|
 | \`kind\` | id | \`proximity\` | Sensor type (unquoted id, e.g. \`kind: temperature\`) |
 | \`text\` | string | \`''\` | Panel label (up to 5 characters shown) |
-| \`color\` | hex | \`#6dff9c\` | Accent color |
+| \`color\` | hex \\| wire | \`#6dff9c\` | Accent color |
 | \`length\` | integer | from kind | Wire width \`1…8\` (\`Nwire\` must match) |
 | \`nl\` | flag | off | Newline after the control |
 | \`on\` | mode | \`raise\` | When property blocks run: \`raise\`, \`edge\`, \`1\`, \`0\` |
 | \`inverted\` | flag | off | **Digital only** — invert bit written to storage |
+
+\`color\`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
 
 ### Analog scale
 
@@ -31551,9 +31725,9 @@ comp [servo] .arm::
 | \`angle\` | integer | *(none)* | Initial position on the travel range → quantized to steps at create |
 | \`path\` | id | \`short\` | Default direction for moves: \`short\`, \`long\`, \`cw\`, \`ccw\` (see Display) |
 | \`text\` | string | \`''\` | Panel label (up to 5 characters shown) |
-| \`color\` | hex | \`#6dff9c\` | Moving part (horn, needle, rod, disc, slide panel) |
-| \`frameColor\` | hex | *(= \`color\`)* | Outline of the fixed part (base, dial, barrel, frame, …) |
-| \`bgColor\` | hex | *(soft from \`frameColor\`)* | Fill inside the fixed part — not the whole canvas |
+| \`color\` | hex \\| wire | \`#6dff9c\` | Moving part (horn, needle, rod, disc, slide panel) |
+| \`frameColor\` | hex \\| wire | *(= \`color\`)* | Outline of the fixed part (base, dial, barrel, frame, …) |
+| \`bgColor\` | hex \\| wire | *(soft from \`frameColor\`)* | Fill inside the fixed part — not the whole canvas |
 | \`size\` | integer | \`10\` | Glyph size (\`1…20\`) |
 | \`speed\` | integer | \`10\` | Move speed on the panel (\`1…100\`) — see below |
 | \`rate\` | integer | \`10\` | Speed scale in **tenths** (like \`motor\`) — see below |
@@ -31597,6 +31771,8 @@ You may still set \`path: short\` (or pass the \`path\` pin) on a linear absolut
 
 ### Colors (\`color\`, \`frameColor\`, \`bgColor\`)
 
+Hex literal \`^RRGGBB\` or a **wire name** (snapshot at declaration). See [component-color-attributes.md](component-color-attributes.md).
+
 Three panel colors (glyph only — the canvas stays transparent to the panel):
 
 | Attribute | Role |
@@ -31630,6 +31806,26 @@ show(p)
 \`\`\`
 
 Load & Run: green rod on a grey barrel with dark fill; \`p\` is \`10000000\`.
+
+\`\`\`logts-play
+24wire bgC = ^ffff00
+24wire myColor = ^888888
+
+comp [servo] .arm:
+  display: servo
+  length: 8
+  text: 'Arm'
+  frameColor: myColor
+  bgColor: bgC
+  nl
+  :
+
+.arm = 10000000
+8wire p = .arm:get
+show(p)
+\`\`\`
+
+Load & Run: frame \`#888888\`, fill \`#ffff00\` (wire snapshot at declaration).
 
 \`\`\`logts-play
 comp [servo] .arm:
@@ -32645,6 +32841,8 @@ Load & Run: with START on, PLC writes the servo output symbol; width must match 
 \`comp [7seg]\` (shortname \`comp [7]\`) renders a **7-segment (+ decimal point) display**. Segment pattern is 8 bits: \`a\`–\`g\` plus \`h\` (DP).
 
 Signature: \`doc(comp.7seg)\` or \`doc(comp.7)\`.
+
+\`color\`, \`bgColor\`, \`lgColor\`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
 
 ---
 
@@ -33663,12 +33861,14 @@ comp [slider] .name::
 |---------------|---------|-----------|-------------|
 | \`length\`      | integer | \`4\`       | Output width in bits (\`Nwire\`) |
 | \`text\`        | string  | \`''\`      | Panel label (max 5 chars displayed) |
-| \`color\`       | hex     | \`#6dff9c\` | Thumb and value accent color |
+| \`color\`       | hex \\| wire | \`#6dff9c\` | Thumb and value accent color |
 | \`orientation\` | \`0\`/\`1\` | \`0\`       | \`0\` horizontal (min left), \`1\` vertical (min bottom) |
 | \`reversed\`    | flag    | (no)      | Swap which **value** sits at each end; drag direction unchanged. Default \`0\` appears at the opposite end (right / top) |
 | \`size\`        | integer | \`10\`      | Track length \`1…20\` (panel only); \`1\` = 3× thumb, \`10\` = default |
 | \`for\`         | array   | —         | Optional label per step index (shown in panel instead of decimal) |
 | \`nl\`          | flag    | (no)      | Newline after the control |
+
+Color attributes: [component-color-attributes.md](component-color-attributes.md).
 
 **Steps:** \`2^length\` (e.g. \`length: 8\` → 256 positions, \`00000000\` … \`11111111\`).
 
@@ -34371,8 +34571,10 @@ comp [terminal] .name:
 | \`wordWrap\` | 0/1 | 1 | Wrap text when reaching column limit |
 | \`lineNumbers\` | 0/1 | 0 | Show line numbers (visual only) |
 | \`cursorStyle\` | 0/1/2 | 0 | Cursor display mode (see below) |
-| \`color\` | hex | \`#0f0\` | Text (and cursor) color |
+| \`color\` | hex \\| wire | \`#0f0\` | Text (and cursor) color |
 | \`nl\` | flag | off | Line break after terminal in devices panel |
+
+\`color\`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
 
 ### \`cursorStyle\`
 
@@ -35380,7 +35582,7 @@ Literals are fixed bit patterns written directly in expressions and assignments.
 
 This page lists **every literal form** accepted on the right-hand side of wire assignments and in expression atoms (\`show\`, \`peek\`, function arguments, vector \`+\`, etc.).
 
-Related: [assignment operators](assignment-operators.md) (\`=\`, \`:=\`, \`=:\`), [short notation](short-notation.md) (literals inside backticks), [debug output](debug.md) (\`show\` display tags including \`ascii\`), [MODE ZSTATE](zstate.md) (logic literals).
+Related: [assignment operators](assignment-operators.md) (\`=\`, \`:=\`, \`=:\`), [short notation](short-notation.md) (literals inside backticks), [debug output](debug.md) (\`show\` display tags including \`ascii\`), [MODE ZSTATE](zstate.md) (logic literals), [component color attributes](component-color-attributes.md) (using a wire value as a panel color).
 
 ---
 
@@ -35725,6 +35927,20 @@ Slash-wrapped names refer to compile-time meta constants (e.g. \`/instance/\` fo
 \`\`\`
 
 Only in specific contexts (top-level wire init, some attributes). See component and meta-constant documentation.
+
+---
+
+## Using a wire value as a component color
+
+Wire literals (\`^FF\`, \`24wire theme = ^aabbcc\`, …) initialize **wires**. Panel **color attributes** on \`comp\` are different: you can write \`color: theme\` where \`theme\` is a wire name. The engine reads the wire **once** at \`comp\` declaration and stores \`#hex\` on the component — later wire changes do not repaint the widget.
+
+| Context | Example | When value is fixed |
+|---------|---------|---------------------|
+| Wire init | \`24wire c = ^ffff00\` | At wire declaration |
+| Comp color attr | \`color: c\` | At \`comp\` declaration (snapshot) |
+| Comp color literal | \`color: ^ffff00\` | At parse time (static hex) |
+
+Full rules, component list, and examples: [component-color-attributes.md](component-color-attributes.md).
 
 ---
 

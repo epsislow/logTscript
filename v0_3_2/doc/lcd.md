@@ -27,7 +27,7 @@ comp [lcd] .name:
 | `pixelSize` | 10 | Square pixel size (px) |
 | `pixelSizeX`, `pixelSizeY` | from `pixelSize` | Non-square pixels |
 | `pixelGap` | 3 | Gap between pixels |
-| `color` | green | Monochrome color (without `rgb`) |
+| `color` | green | Monochrome color (without `rgb`); hex literal or wire — [component-color-attributes.md](component-color-attributes.md) |
 | `rgb` | off | Enable RGB mode |
 
 ---

@@ -65,11 +65,13 @@ Unknown `kind` → elaboration error.
 |-----------|------|---------|-------------|
 | `kind` | id | `proximity` | Sensor type (unquoted id, e.g. `kind: temperature`) |
 | `text` | string | `''` | Panel label (up to 5 characters shown) |
-| `color` | hex | `#6dff9c` | Accent color |
+| `color` | hex \| wire | `#6dff9c` | Accent color |
 | `length` | integer | from kind | Wire width `1…8` (`Nwire` must match) |
 | `nl` | flag | off | Newline after the control |
 | `on` | mode | `raise` | When property blocks run: `raise`, `edge`, `1`, `0` |
 | `inverted` | flag | off | **Digital only** — invert bit written to storage |
+
+`color`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
 
 ### Analog scale
 

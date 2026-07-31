@@ -34,12 +34,14 @@ comp [slider] .name::
 |---------------|---------|-----------|-------------|
 | `length`      | integer | `4`       | Output width in bits (`Nwire`) |
 | `text`        | string  | `''`      | Panel label (max 5 chars displayed) |
-| `color`       | hex     | `#6dff9c` | Thumb and value accent color |
+| `color`       | hex \| wire | `#6dff9c` | Thumb and value accent color |
 | `orientation` | `0`/`1` | `0`       | `0` horizontal (min left), `1` vertical (min bottom) |
 | `reversed`    | flag    | (no)      | Swap which **value** sits at each end; drag direction unchanged. Default `0` appears at the opposite end (right / top) |
 | `size`        | integer | `10`      | Track length `1…20` (panel only); `1` = 3× thumb, `10` = default |
 | `for`         | array   | —         | Optional label per step index (shown in panel instead of decimal) |
 | `nl`          | flag    | (no)      | Newline after the control |
+
+Color attributes: [component-color-attributes.md](component-color-attributes.md).
 
 **Steps:** `2^length` (e.g. `length: 8` → 256 positions, `00000000` … `11111111`).
 

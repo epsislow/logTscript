@@ -33,12 +33,14 @@ comp [dip] .name::
 |------------|---------|-----------|-------------|
 | `length`   | integer | `4`       | Number of DIP positions (bits) |
 | `text`     | string  | `''`      | Group label |
-| `color`    | hex     | `#2ecc71` | Color when a position is on |
-| `colorFor` | array   | —         | Per-position colors |
+| `color`    | hex \| wire | `#2ecc71` | Color when a position is on |
+| `colorFor` | hex \| wire (array) | —         | Per-position colors (`colorFor.3: swatch` or `colorFor.3: ^ff0`) |
 | `visual`   | `0`/`1` | `0`       | Show `0`/`1` on each position |
 | `noLabels` | flag    | (no)      | Hide position labels |
 | `noTrans`  | flag    | —         | Disable transition animation |
 | `nl`       | flag    | (no)      | Newline after the control |
+
+See [component-color-attributes.md](component-color-attributes.md) for wire-backed colors and `colorFor` examples.
 
 ---
 

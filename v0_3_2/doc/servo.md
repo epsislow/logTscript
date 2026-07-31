@@ -60,9 +60,9 @@ comp [servo] .arm::
 | `angle` | integer | *(none)* | Initial position on the travel range → quantized to steps at create |
 | `path` | id | `short` | Default direction for moves: `short`, `long`, `cw`, `ccw` (see Display) |
 | `text` | string | `''` | Panel label (up to 5 characters shown) |
-| `color` | hex | `#6dff9c` | Moving part (horn, needle, rod, disc, slide panel) |
-| `frameColor` | hex | *(= `color`)* | Outline of the fixed part (base, dial, barrel, frame, …) |
-| `bgColor` | hex | *(soft from `frameColor`)* | Fill inside the fixed part — not the whole canvas |
+| `color` | hex \| wire | `#6dff9c` | Moving part (horn, needle, rod, disc, slide panel) |
+| `frameColor` | hex \| wire | *(= `color`)* | Outline of the fixed part (base, dial, barrel, frame, …) |
+| `bgColor` | hex \| wire | *(soft from `frameColor`)* | Fill inside the fixed part — not the whole canvas |
 | `size` | integer | `10` | Glyph size (`1…20`) |
 | `speed` | integer | `10` | Move speed on the panel (`1…100`) — see below |
 | `rate` | integer | `10` | Speed scale in **tenths** (like `motor`) — see below |
@@ -106,6 +106,8 @@ You may still set `path: short` (or pass the `path` pin) on a linear absolute mo
 
 ### Colors (`color`, `frameColor`, `bgColor`)
 
+Hex literal `^RRGGBB` or a **wire name** (snapshot at declaration). See [component-color-attributes.md](component-color-attributes.md).
+
 Three panel colors (glyph only — the canvas stays transparent to the panel):
 
 | Attribute | Role |
@@ -139,6 +141,26 @@ show(p)
 ```
 
 Load & Run: green rod on a grey barrel with dark fill; `p` is `10000000`.
+
+```logts-play
+24wire bgC = ^ffff00
+24wire myColor = ^888888
+
+comp [servo] .arm:
+  display: servo
+  length: 8
+  text: 'Arm'
+  frameColor: myColor
+  bgColor: bgC
+  nl
+  :
+
+.arm = 10000000
+8wire p = .arm:get
+show(p)
+```
+
+Load & Run: frame `#888888`, fill `#ffff00` (wire snapshot at declaration).
 
 ```logts-play
 comp [servo] .arm:

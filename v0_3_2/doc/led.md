@@ -31,10 +31,12 @@ comp [led] .name::
 |-----------|---------|-----------|-------------|
 | `length`  | integer | `1`       | Number of LEDs (bits). `1` = single LED, `4` = group of 4 LEDs |
 | `text`    | string  | `''`      | Label displayed next to the first LED |
-| `color`   | hex     | `^f00`    | LED color as a 3 or 6 digit hex value (e.g. `^0f9`, `^21f`, `^ff0000`) |
+| `color`   | hex \| wire | `^f00`    | LED color as a 3 or 6 digit hex value (e.g. `^0f9`, `^21f`, `^ff0000`) |
 | `square`  | flag    | (round)   | Renders the LED as a square instead of a circle |
 | `nl`      | flag    | (no)      | Adds a newline after the last LED in the group |
 | `on`      | mode    | `raise`   | Trigger mode for property blocks: `raise`, `edge`, `1`, `0` |
+
+`color` accepts a hex literal or wire name — [component-color-attributes.md](component-color-attributes.md).
 
 ---
 

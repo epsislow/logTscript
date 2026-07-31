@@ -73,12 +73,14 @@ When set, non-digit characters are stripped from the field (and on commit). Digi
 | `width` | integer | (flex `6…24ch`) | **Panel only** — fixed field width in character cells (`4…40`). Omit for the default flexible look |
 | `text` | string | `''` | Panel label |
 | `scanText` | string | `'Scan'` | Label on the commit button (e.g. `'>'`, `'OK'`) |
-| `color` | hex | `^808080` | Border / label when unfocused (same idea as keyboard) |
-| `bgColor` | hex | `^101010` | Panel / field background when unfocused |
-| `focusColor` | hex | `^2ecc71` | Border when the field is focused |
-| `focusBgColor` | hex | `^181818` | Background when focused |
+| `color` | hex \| wire | `^808080` | Border / label when unfocused (same idea as keyboard) |
+| `bgColor` | hex \| wire | `^101010` | Panel / field background when unfocused |
+| `focusColor` | hex \| wire | `^2ecc71` | Border when the field is focused |
+| `focusBgColor` | hex \| wire | `^181818` | Background when focused |
 | `onlyDigits` | flag | off | Accept digits only |
 | `nl` | flag | off | Newline after the control |
+
+Color attributes: hex or wire name — [component-color-attributes.md](component-color-attributes.md).
 
 ---
 

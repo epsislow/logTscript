@@ -52,6 +52,8 @@ comp [clcd] .panel::
 | `touchPadding` | `0` | Default padding (px) for symbol touch rects when `padding` is omitted |
 | `nl` | off | Newline after display |
 
+Component-level `color`, `bgColor`, `bgColorSym`, and `touchColor` accept hex `^RRGGBB` or a wire name (snapshot at declaration). Symbol fields `color` / `bgColor` inside `= { … }` still use `^hex` only. See [component-color-attributes.md](component-color-attributes.md).
+
 ## Symbol fields (`= { … }`)
 
 | Field | Required | Description |

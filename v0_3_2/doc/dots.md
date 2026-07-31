@@ -4,6 +4,8 @@
 
 Signature: `doc(comp.dots)` or `doc(comp.:)`.
 
+`color`, `bgColor`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
+
 ---
 
 ## Syntax

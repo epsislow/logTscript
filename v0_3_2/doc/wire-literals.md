@@ -4,7 +4,7 @@ Literals are fixed bit patterns written directly in expressions and assignments.
 
 This page lists **every literal form** accepted on the right-hand side of wire assignments and in expression atoms (`show`, `peek`, function arguments, vector `+`, etc.).
 
-Related: [assignment operators](assignment-operators.md) (`=`, `:=`, `=:`), [short notation](short-notation.md) (literals inside backticks), [debug output](debug.md) (`show` display tags including `ascii`), [MODE ZSTATE](zstate.md) (logic literals).
+Related: [assignment operators](assignment-operators.md) (`=`, `:=`, `=:`), [short notation](short-notation.md) (literals inside backticks), [debug output](debug.md) (`show` display tags including `ascii`), [MODE ZSTATE](zstate.md) (logic literals), [component color attributes](component-color-attributes.md) (using a wire value as a panel color).
 
 ---
 
@@ -349,6 +349,20 @@ Slash-wrapped names refer to compile-time meta constants (e.g. `/instance/` for 
 ```
 
 Only in specific contexts (top-level wire init, some attributes). See component and meta-constant documentation.
+
+---
+
+## Using a wire value as a component color
+
+Wire literals (`^FF`, `24wire theme = ^aabbcc`, …) initialize **wires**. Panel **color attributes** on `comp` are different: you can write `color: theme` where `theme` is a wire name. The engine reads the wire **once** at `comp` declaration and stores `#hex` on the component — later wire changes do not repaint the widget.
+
+| Context | Example | When value is fixed |
+|---------|---------|---------------------|
+| Wire init | `24wire c = ^ffff00` | At wire declaration |
+| Comp color attr | `color: c` | At `comp` declaration (snapshot) |
+| Comp color literal | `color: ^ffff00` | At parse time (static hex) |
+
+Full rules, component list, and examples: [component-color-attributes.md](component-color-attributes.md).
 
 ---
 

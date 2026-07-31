@@ -20,6 +20,7 @@ const DOC_SECTIONS = [
       { file: 'loop.md', label: 'Loop preprocessor (loop N..M[)', searchPrimary: 'loop', searchExtra: 'repeat placeholder ?N deduplicate nested expand preprocessor' },
       { file: 'assignment-operators.md', label: 'Assignment operators (=, =:, :=)', searchExtra: 'right pad left wire assignment initial vector element slice' },
       { file: 'wire-literals.md', label: 'Wire literals', searchExtra: 'binary decimal hex signed \\-N;W ^-HEX;W string Hello ascii quotes escape \\n \\s \\0 padding bit range literal' },
+      { file: 'component-color-attributes.md', label: 'Component color attributes', searchExtra: 'color frameColor bgColor focusColor pulseColor colorFor wire ref snapshot hex theme palette myColor name comp attribute' },
       { file: 'semantic-schemas.md', label: 'Semantic schemas', searchExtra: 'schema field opcode wire literal show auto width mismatch instr:alu vector matrix pack extract logts-play Load and Run overview hub' },
       { file: 'schema-field-arrays.md', label: 'Schema field arrays (fixed)', searchExtra: 'cells grid slots tiles 8[3] 4[2,2] opcode array slice row column grouped schema literal has shape length' },
       { file: 'schema-variable-arrays.md', label: 'Variable arrays in schema (1D)', searchExtra: 'varArrayCounts 8[1-3] 8[1-] 8+ package2 package3 flat ambiguous has length BITSIZE WWIDTH' },

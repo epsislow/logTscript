@@ -66,9 +66,9 @@ The **ring (and hub) stay fixed**; only the notch / blades / vanes spin.
 | `kind` | id | `rotor` | Visual skin (`rotor`, `fan`, `pump`) — unquoted, e.g. `kind: fan` |
 | `length` | integer | `1` | Wire width `1…8`. `1` = on/off; `N>1` = speed `0…2^N−1` |
 | `text` | string | `''` | Panel label (up to 5 characters shown) |
-| `color` | hex | `#6dff9c` | Moving part (notch / blades / vanes) |
-| `frameColor` | hex | *(= `color`)* | Fixed ring + hub outline/fill accent |
-| `bgColor` | hex | *(soft from `frameColor`)* | Fill inside the fixed ring — not the whole canvas |
+| `color` | hex \| wire | `#6dff9c` | Moving part (notch / blades / vanes) |
+| `frameColor` | hex \| wire | *(= `color`)* | Fixed ring + hub outline/fill accent |
+| `bgColor` | hex \| wire | *(soft from `frameColor`)* | Fill inside the fixed ring — not the whole canvas |
 | `size` | integer | `10` | Glyph size on the panel (`1…20`) |
 | `rate` | integer | `10` | Visual animation factor in **tenths** — see below |
 | `rotate` | integer | `0` | Widget orientation: `0`, `90`, `180`, or `270` degrees |
@@ -78,6 +78,8 @@ The **ring (and hub) stay fixed**; only the notch / blades / vanes spin.
 | `on` | mode | `raise` | When property blocks run: `raise`, `edge`, `1`, `0` — **not** the motor command |
 
 ### Colors
+
+Hex literal or wire name — [component-color-attributes.md](component-color-attributes.md).
 
 ```logts-play
 comp [motor] .fan1:

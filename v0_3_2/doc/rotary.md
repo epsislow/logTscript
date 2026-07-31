@@ -32,9 +32,11 @@ comp [rotary] .name::
 |-----------|---------|---------|-------------|
 | `states`  | integer | `8`     | Number of positions (≥ 2) |
 | `text`    | string  | `''`    | Label |
-| `color`   | hex     | —       | Knob accent color |
+| `color`   | hex \| wire | —       | Knob accent color |
 | `for`     | array   | —       | Optional label per state |
 | `nl`      | flag    | (no)    | Newline after control |
+
+`color`: hex or wire — [component-color-attributes.md](component-color-attributes.md).
 
 ---
 

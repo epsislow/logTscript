@@ -77,10 +77,10 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `label` | string | `Keyboard` | Display label |
-| `color` | color | `^808080` | Border when unfocused |
-| `bgColor` | color | `^101010` | Background when unfocused |
-| `focusColor` | color | `^2ecc71` | Border when focused |
-| `focusBgColor` | color | `^181818` | Background when focused |
+| `color` | hex \| wire | `^808080` | Border when unfocused |
+| `bgColor` | hex \| wire | `^101010` | Background when unfocused |
+| `focusColor` | hex \| wire | `^2ecc71` | Border when focused |
+| `focusBgColor` | hex \| wire | `^181818` | Background when focused |
 | `onlyDigits` | flag | (no) | Accept only `0`–`9` (still emits 8-bit ASCII); mobile `inputmode=numeric` |
 | `allowEnter` | flag | (no) | Accept Enter (LF, code 10); mobile uses `<textarea>` with return key |
 | `allowBackspace` | flag | (no) | Accept Backspace (BS, code 8) |
@@ -88,8 +88,10 @@ In **Wave** propagation, after each accepted key the engine always re-evaluates 
 | `allowDelete` | flag | (no) | Accept forward Delete (code 132 on `:get`) |
 | `codesAccepted` | LUT ref | (no) | Whitelist of allowed keys via `comp [lut]` (`codesAccepted = .lut`) |
 | `showCode` | integer | `0` | Display last `:get` code next to label (`0` off, `1` hex, `2` decimal) |
-| `pulseColor` | color | (no) | Brief color flash on border/label after each accepted key |
+| `pulseColor` | hex \| wire | (no) | Brief color flash on border/label after each accepted key |
 | `nl` | flag | (no) | New line after component |
+
+Color attributes: hex `^RRGGBB` or wire name (snapshot). See [component-color-attributes.md](component-color-attributes.md).
 
 ---
 

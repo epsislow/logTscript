@@ -4,6 +4,8 @@ LogTscript includes built-in **components** (`comp`), **inline** declarations (`
 
 **Global refs in composite bodies:** inside `board` / `chip` / `pcb`, prefix a top-level inline or component name with `^` to skip instance renaming — e.g. `^.myisa { … }`, `^.ctl:LOAD`, `doc(^.ctl)`. Details: [lut.md](lut.md#global-reference-name).
 
+**Component colors from wires:** color attributes (`color`, `frameColor`, `bgColor`, …) accept a hex literal or a wire name (read once at declaration). See [component-color-attributes.md](component-color-attributes.md).
+
 ---
 
 ## Composite blocks
