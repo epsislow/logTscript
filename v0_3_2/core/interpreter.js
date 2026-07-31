@@ -12612,6 +12612,9 @@ if (s.assignment) {
     const CWR = typeof LogTScriptColorWireResolve !== 'undefined' ? LogTScriptColorWireResolve : null;
     if (CWR && this.componentRegistry && attributes) {
       CWR.resolveColorAttributesForComp(type, attributes, this, this.componentRegistry);
+      if (attributes.clcdSymbols) {
+        CWR.resolveClcdSymbolColorRefs(attributes.clcdSymbols, this, name);
+      }
     }
     
     // Calculate bits from component type and attributes (componentType is now null)

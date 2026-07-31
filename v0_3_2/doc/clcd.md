@@ -52,7 +52,7 @@ comp [clcd] .panel::
 | `touchPadding` | `0` | Default padding (px) for symbol touch rects when `padding` is omitted |
 | `nl` | off | Newline after display |
 
-Component-level `color`, `bgColor`, `bgColorSym`, and `touchColor` accept hex `^RRGGBB` or a wire name (snapshot at declaration). Symbol fields `color` / `bgColor` inside `= { … }` still use `^hex` only. See [component-color-attributes.md](component-color-attributes.md).
+Component-level and per-symbol `color` / `bgColor` accept hex `^RRGGBB` or a wire name (snapshot at declaration). See [component-color-attributes.md](component-color-attributes.md).
 
 ## Symbol fields (`= { … }`)
 
@@ -65,8 +65,8 @@ Component-level `color`, `bgColor`, `bgColorSym`, and `touchColor` accept hex `^
 | `touchType` | with `bitOut` | `1` momentary (default), `2` pulse, `3` latch/toggle |
 | `width`, `height` | no | Touch hit box size (px); defaults from `size` or per kind (FA 22×22, `digit7` 28×44, …) |
 | `padding` | no | Extra margin (px) around hit box; defaults to `touchPadding` or `0` |
-| `color` | no | Override ON color for this symbol |
-| `bgColor` | no | Override OFF color for this symbol |
+| `color` | no | Override ON color for this symbol (`^hex` or wire name) |
+| `bgColor` | no | Override OFF color for this symbol (`^hex` or wire name) |
 | `style` | no | FA icon style: `1` solid (default), `2` regular, `3` brands — only on FA symbols; not on canvas or `label` |
 | `size` | no | Display size in px (target height). **FA** icons: font size, default **22**, range 8–64. **Canvas** (`digit7`, `dp`, …): uniform scale to target height, defaults **44** / **8** / **32**, range 8–120. **`label`**: font size, default **14**, range 6–48. Touch hit box follows `size` when `width`/`height` are omitted |
 

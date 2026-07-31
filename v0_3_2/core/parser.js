@@ -5466,7 +5466,7 @@ isBuiltinFunction(name) {
       return parseInt(num, 10);
     };
 
-    const readHexColor = () => {
+    const readColorValue = () => {
       skipWS();
       if (pos < src.length && src[pos] === '^') {
         pos++;
@@ -5486,6 +5486,12 @@ isBuiltinFunction(name) {
           pos++;
         }
         return '#' + hex;
+      }
+      const start = pos;
+      if (pos < src.length && /[A-Za-z_]/.test(src[pos])) {
+        pos++;
+        while (pos < src.length && /[A-Za-z0-9_]/.test(src[pos])) pos++;
+        return { wireRef: src.substring(start, pos) };
       }
       throw Error(`Expected color at ${this.c.line}:${this.c.col}`);
     };
@@ -5572,8 +5578,8 @@ isBuiltinFunction(name) {
           sym.bitsStart = startBit;
           sym.bitsEnd = endBit;
           hasBits = true;
-        } else if (key === 'color') sym.color = readHexColor();
-        else if (key === 'bgColor') sym.bgColor = readHexColor();
+        } else if (key === 'color') sym.color = readColorValue();
+        else if (key === 'bgColor') sym.bgColor = readColorValue();
         else if (key === 'style') {
           const styleNum = readInt();
           if (styleNum !== 1 && styleNum !== 2 && styleNum !== 3) {

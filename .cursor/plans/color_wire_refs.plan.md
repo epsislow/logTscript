@@ -22,10 +22,10 @@ todos:
     status: completed
   - id: phase2-clcd-symbols
     content: (Faza 2) Extinde readHexColor în blocuri CLCD symbol + rezolvare la createDevice
-    status: pending
+    status: completed
   - id: docs-phase2
     content: "Doc user-facing Faza 2: clcd.md + clcd-symbols.md + secțiune hub CLCD symbols"
-    status: pending
+    status: completed
   - id: docs-regen
     content: "Regenerează doc bundle (node _gen_doc_data.js) și verifică în doc viewer"
     status: completed
@@ -40,8 +40,8 @@ isProject: false
 |-------|--------|
 | **Faza 1 — cod** (`color-wire-resolve.js`, parser, interpreter, `getDef`, teste 2987–2991) | ✅ făcut |
 | **Faza 1 — doc user-facing** | ✅ făcut |
-| **Faza 2 — cod** (CLCD symbol `color` / `bgColor` din wire) | ⏳ de făcut |
-| **Faza 2 — doc user-facing** | ⏳ de făcut (după cod Faza 2) |
+| **Faza 2 — cod** (CLCD symbol `color` / `bgColor` din wire) | ✅ făcut |
+| **Faza 2 — doc user-facing** | ✅ făcut |
 
 ---
 

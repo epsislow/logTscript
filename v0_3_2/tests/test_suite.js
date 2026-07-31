@@ -33134,5 +33134,67 @@ comp [dip] .d:
     h.assert('12bit 888', CWR.wireBinToCssHex('100010001000', 12), '#888');
   });
 
+  reg(2992, 'clcd', 'per-symbol color wire ref parse', function(h, session) {
+    const stmts = session.parse(`comp [clcd] .status:
+  = {
+    warning:
+      x: 90
+      y: 10
+      bit: 0
+      color: symFg
+      bgColor: symBg
+    :
+  }
+  :`);
+    const w = stmts[0].comp.initialValue.symbols.find(s => s.name === 'warning');
+    h.assert('color wireRef', JSON.stringify(w.color), JSON.stringify({ wireRef: 'symFg' }));
+    h.assert('bg wireRef', JSON.stringify(w.bgColor), JSON.stringify({ wireRef: 'symBg' }));
+  });
+
+  reg(2993, 'clcd', 'per-symbol color from wire refs at comp creation', function(h, session) {
+    const { interp } = session.run(`24wire symFg = ^ffaa00
+24wire symBg = ^332200
+
+comp [clcd] .panel:
+  = {
+    warning:
+      x: 10
+      y: 10
+      bit: 0
+      color: symFg
+      bgColor: symBg
+    :
+  }
+  :
+`);
+    const sym = interp.components.get('.panel').clcdSymbols.find(s => s.name === 'warning');
+    h.assert('sym color', sym.color, '#ffaa00');
+    h.assert('sym bg', sym.bgColor, '#332200');
+  });
+
+  reg(2994, 'clcd', 'symbol color wire snapshot — later wire change ignored', function(h, session) {
+    const { interp } = session.run(`MODE WIREWRITE
+24wire symFg = ^ffaa00
+
+comp [clcd] .panel:
+  = {
+    warning: x: 10 y: 10 bit: 0 color: symFg :
+  }
+  :
+
+symFg = ^112233`);
+    const sym = interp.components.get('.panel').clcdSymbols.find(s => s.name === 'warning');
+    h.assert('snapshot sym color', sym.color, '#ffaa00');
+  });
+
+  reg(2995, 'color-wire', 'undefined symbol color wire throws at comp creation', function(h, session) {
+    h.assertThrows('missing wire', function() {
+      session.run(`comp [clcd] .x:
+  = { warning: x: 10 y: 10 bit: 0 color: noSuch : }
+  :
+`);
+    });
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

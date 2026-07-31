@@ -79,12 +79,28 @@
     }
   }
 
+  function resolveClcdSymbolColorRefs(symbols, ctx, compLabel) {
+    if (!symbols || !Array.isArray(symbols)) return;
+    const prefix = compLabel || 'clcd';
+    for (let i = 0; i < symbols.length; i++) {
+      const sym = symbols[i];
+      const symName = sym.name || String(i);
+      if (sym.color !== undefined && sym.color !== null && sym.color !== '') {
+        sym.color = resolveColorValue(sym.color, ctx, `${prefix} symbol '${symName}' color`);
+      }
+      if (sym.bgColor !== undefined && sym.bgColor !== null && sym.bgColor !== '') {
+        sym.bgColor = resolveColorValue(sym.bgColor, ctx, `${prefix} symbol '${symName}' bgColor`);
+      }
+    }
+  }
+
   const api = {
     isColorWireRef,
     wireBinToCssHex,
     resolveColorWireRef,
     resolveColorValue,
     resolveColorAttributesForComp,
+    resolveClcdSymbolColorRefs,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

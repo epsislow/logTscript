@@ -86,7 +86,7 @@ Rules:
 | `motor`, `servo` | `color`, `frameColor`, `bgColor` |
 | `led`, `slider`, `rotary`, `sensor`, `terminal` | `color` |
 | `scanner`, `keyboard` | `color`, `bgColor`, `focusColor`, `focusBgColor` (+ `pulseColor` on keyboard) |
-| `clcd` | `color`, `bgColor`, `bgColorSym`, `touchColor` (component level) |
+| `clcd` | `color`, `bgColor`, `bgColorSym`, `touchColor` (component level); per-symbol `color` / `bgColor` in `= { … }` |
 | `bar` / `ledBar` | `color`, `bgColor`, `lgColor` |
 | `7seg`, `14seg`, `dots` | `color`, `bgColor`, `lgColor` |
 | `dip` | `color`, `colorFor.N` |
@@ -141,9 +141,42 @@ Position `2` uses red when on; other positions use the default `color`.
 
 ---
 
+## CLCD — symbol block colors
+
+Inside `comp [clcd] … = { … }`, each symbol entry may set `color` and `bgColor` with the same rules as component-level attributes: `^hex` or a wire name (snapshot at `comp` elaboration).
+
+```logts-play
+24wire symFg = ^ffaa00
+24wire symBg = ^332200
+
+comp [clcd] .status:
+  color: ^00ff00
+  bgColor: ^001000
+  = {
+    warning:
+      x: 90
+      y: 10
+      bit: 2
+      color: symFg
+      bgColor: symBg
+    :
+    power: x:10 y:10 bit:0 :
+  }
+  :
+
+3wire flags = 101
+.status = flags
+```
+
+When bit `2` is on, the `warning` icon uses `#ffaa00` on `#332200`; other symbols use the component defaults. Changing `symFg` after the `comp` line does **not** update the symbol colors.
+
+See [clcd.md](clcd.md) for the full symbol catalog and syntax.
+
+---
+
 ## See also
 
 - [motor.md](motor.md) · [servo.md](servo.md) — three-color actuators
 - [keyboard.md](keyboard.md) · [scanner.md](scanner.md) — focus colors
 - [dip.md](dip.md) — `colorFor`
-- [clcd.md](clcd.md) — canvas defaults (symbol-level colors in `= { … }` still use `^hex` only until a future update)
+- [clcd.md](clcd.md) — component and per-symbol colors on the canvas

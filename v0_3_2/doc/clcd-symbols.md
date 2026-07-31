@@ -6,5 +6,7 @@ Canvas-drawn symbols (`digit7`, `digit14`, `dp`, `colon`) and the text symbol **
 
 See also [`clcd.md`](clcd.md) for component syntax and runnable examples.
 
+Per-symbol `color` and `bgColor` accept a hex literal (`^RRGGBB`) or a wire name (snapshot at `comp` declaration). See [component-color-attributes.md](component-color-attributes.md#clcd--symbol-block-colors).
+
 ```clcd-symbol-gallery
 ```

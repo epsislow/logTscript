@@ -8302,6 +8302,8 @@ Canvas-drawn symbols (\`digit7\`, \`digit14\`, \`dp\`, \`colon\`) and the text s
 
 See also [\`clcd.md\`](clcd.md) for component syntax and runnable examples.
 
+Per-symbol \`color\` and \`bgColor\` accept a hex literal (\`^RRGGBB\`) or a wire name (snapshot at \`comp\` declaration). See [component-color-attributes.md](component-color-attributes.md#clcd--symbol-block-colors).
+
 \`\`\`clcd-symbol-gallery
 \`\`\`
 `,
@@ -8359,7 +8361,7 @@ comp [clcd] .panel::
 | \`touchPadding\` | \`0\` | Default padding (px) for symbol touch rects when \`padding\` is omitted |
 | \`nl\` | off | Newline after display |
 
-Component-level \`color\`, \`bgColor\`, \`bgColorSym\`, and \`touchColor\` accept hex \`^RRGGBB\` or a wire name (snapshot at declaration). Symbol fields \`color\` / \`bgColor\` inside \`= { … }\` still use \`^hex\` only. See [component-color-attributes.md](component-color-attributes.md).
+Component-level and per-symbol \`color\` / \`bgColor\` accept hex \`^RRGGBB\` or a wire name (snapshot at declaration). See [component-color-attributes.md](component-color-attributes.md).
 
 ## Symbol fields (\`= { … }\`)
 
@@ -8372,8 +8374,8 @@ Component-level \`color\`, \`bgColor\`, \`bgColorSym\`, and \`touchColor\` accep
 | \`touchType\` | with \`bitOut\` | \`1\` momentary (default), \`2\` pulse, \`3\` latch/toggle |
 | \`width\`, \`height\` | no | Touch hit box size (px); defaults from \`size\` or per kind (FA 22×22, \`digit7\` 28×44, …) |
 | \`padding\` | no | Extra margin (px) around hit box; defaults to \`touchPadding\` or \`0\` |
-| \`color\` | no | Override ON color for this symbol |
-| \`bgColor\` | no | Override OFF color for this symbol |
+| \`color\` | no | Override ON color for this symbol (\`^hex\` or wire name) |
+| \`bgColor\` | no | Override OFF color for this symbol (\`^hex\` or wire name) |
 | \`style\` | no | FA icon style: \`1\` solid (default), \`2\` regular, \`3\` brands — only on FA symbols; not on canvas or \`label\` |
 | \`size\` | no | Display size in px (target height). **FA** icons: font size, default **22**, range 8–64. **Canvas** (\`digit7\`, \`dp\`, …): uniform scale to target height, defaults **44** / **8** / **32**, range 8–120. **\`label\`**: font size, default **14**, range 6–48. Touch hit box follows \`size\` when \`width\`/\`height\` are omitted |
 
@@ -8925,7 +8927,7 @@ Rules:
 | \`motor\`, \`servo\` | \`color\`, \`frameColor\`, \`bgColor\` |
 | \`led\`, \`slider\`, \`rotary\`, \`sensor\`, \`terminal\` | \`color\` |
 | \`scanner\`, \`keyboard\` | \`color\`, \`bgColor\`, \`focusColor\`, \`focusBgColor\` (+ \`pulseColor\` on keyboard) |
-| \`clcd\` | \`color\`, \`bgColor\`, \`bgColorSym\`, \`touchColor\` (component level) |
+| \`clcd\` | \`color\`, \`bgColor\`, \`bgColorSym\`, \`touchColor\` (component level); per-symbol \`color\` / \`bgColor\` in \`= { … }\` |
 | \`bar\` / \`ledBar\` | \`color\`, \`bgColor\`, \`lgColor\` |
 | \`7seg\`, \`14seg\`, \`dots\` | \`color\`, \`bgColor\`, \`lgColor\` |
 | \`dip\` | \`color\`, \`colorFor.N\` |
@@ -8980,12 +8982,45 @@ Position \`2\` uses red when on; other positions use the default \`color\`.
 
 ---
 
+## CLCD — symbol block colors
+
+Inside \`comp [clcd] … = { … }\`, each symbol entry may set \`color\` and \`bgColor\` with the same rules as component-level attributes: \`^hex\` or a wire name (snapshot at \`comp\` elaboration).
+
+\`\`\`logts-play
+24wire symFg = ^ffaa00
+24wire symBg = ^332200
+
+comp [clcd] .status:
+  color: ^00ff00
+  bgColor: ^001000
+  = {
+    warning:
+      x: 90
+      y: 10
+      bit: 2
+      color: symFg
+      bgColor: symBg
+    :
+    power: x:10 y:10 bit:0 :
+  }
+  :
+
+3wire flags = 101
+.status = flags
+\`\`\`
+
+When bit \`2\` is on, the \`warning\` icon uses \`#ffaa00\` on \`#332200\`; other symbols use the component defaults. Changing \`symFg\` after the \`comp\` line does **not** update the symbol colors.
+
+See [clcd.md](clcd.md) for the full symbol catalog and syntax.
+
+---
+
 ## See also
 
 - [motor.md](motor.md) · [servo.md](servo.md) — three-color actuators
 - [keyboard.md](keyboard.md) · [scanner.md](scanner.md) — focus colors
 - [dip.md](dip.md) — \`colorFor\`
-- [clcd.md](clcd.md) — canvas defaults (symbol-level colors in \`= { … }\` still use \`^hex\` only until a future update)
+- [clcd.md](clcd.md) — component and per-symbol colors on the canvas
 `,
     'components.md': `# Component index
 
