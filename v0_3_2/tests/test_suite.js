@@ -33001,5 +33001,75 @@ reg(2982, 'servo', 'slide relative clamp no wrap', function(h, session) {
   h.assert('p', session.getWire(interp, 'p'), '11111111');
 });
 
+reg(2983, 'servo', 'frameColor bgColor defaults and resolve', function(h, session) {
+  const a = ServoComponent.resolveConfig({ length: 8, color: '#6dff9c' });
+  h.assert('color', a.color, '#6dff9c');
+  h.assert('frame default', a.frameColor, '#6dff9c');
+  h.assert('bg null', String(a.bgColor), 'null');
+  const b = ServoComponent.resolveConfig({
+    length: 8,
+    color: '^aabbcc',
+    frameColor: '^112233',
+    bgColor: '^010101',
+  });
+  h.assert('color caret', b.color, '#aabbcc');
+  h.assert('frame', b.frameColor, '#112233');
+  h.assert('bg', b.bgColor, '#010101');
+});
+
+reg(2984, 'servo', 'doc play — piston three colors', function(h, session) {
+  const { interp } = session.run(`comp [servo] .cyl:
+  display: piston
+  length: 8
+  color: ^6dff9c
+  frameColor: ^888888
+  bgColor: ^222222
+  text: 'Cyl'
+  nl
+  :
+
+.cyl = 10000000
+8wire p = .cyl:get
+show(p)`);
+  h.assert('p', session.getWire(interp, 'p'), '10000000');
+  const cfg = ServoComponent.resolveConfig(interp.components.get('.cyl').attributes);
+  h.assert('frame', cfg.frameColor, '#888888');
+  h.assert('bg', cfg.bgColor, '#222222');
+});
+
+reg(2985, 'motor', 'frameColor bgColor resolve', function(h, session) {
+  const a = MotorComponent.resolveConfig({ kind: 'fan', color: '#6dff9c' });
+  h.assert('frame default', a.frameColor, '#6dff9c');
+  h.assert('bg null', String(a.bgColor), 'null');
+  const b = MotorComponent.resolveConfig({
+    kind: 'fan',
+    color: '^6dff9c',
+    frameColor: '^888888',
+    bgColor: '^1a1a1a',
+  });
+  h.assert('frame', b.frameColor, '#888888');
+  h.assert('bg', b.bgColor, '#1a1a1a');
+});
+
+reg(2986, 'motor', 'doc play — fan three colors', function(h, session) {
+  const { interp } = session.run(`comp [motor] .fan1:
+  kind: fan
+  length: 1
+  color: ^6dff9c
+  frameColor: ^888888
+  bgColor: ^1a1a1a
+  text: 'Fan'
+  nl
+  :
+
+.fan1 = 1
+1wire s = .fan1:get
+show(s)`);
+  h.assert('s', session.getWire(interp, 's'), '1');
+  const cfg = MotorComponent.resolveConfig(interp.components.get('.fan1').attributes);
+  h.assert('frame', cfg.frameColor, '#888888');
+  h.assert('bg', cfg.bgColor, '#1a1a1a');
+});
+
   window.LogTScriptTestSuite.finalize();
 })();

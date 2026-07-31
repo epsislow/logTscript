@@ -21825,6 +21825,8 @@ comp [motor] .name:
   length: 8
   text: 'M1'
   color: ^6dff9c
+  frameColor: ^4a9e6a
+  bgColor: ^0d2818
   size: 12
   rate: 10
   rotate: 0
@@ -21855,6 +21857,8 @@ comp [motor] .m::
 
 Unknown \`kind\` → elaboration error.
 
+The **ring (and hub) stay fixed**; only the notch / blades / vanes spin.
+
 ---
 
 ## Attributes
@@ -21864,7 +21868,9 @@ Unknown \`kind\` → elaboration error.
 | \`kind\` | id | \`rotor\` | Visual skin (\`rotor\`, \`fan\`, \`pump\`) — unquoted, e.g. \`kind: fan\` |
 | \`length\` | integer | \`1\` | Wire width \`1…8\`. \`1\` = on/off; \`N>1\` = speed \`0…2^N−1\` |
 | \`text\` | string | \`''\` | Panel label (up to 5 characters shown) |
-| \`color\` | hex | \`#6dff9c\` | Accent color for the glyph |
+| \`color\` | hex | \`#6dff9c\` | Moving part (notch / blades / vanes) |
+| \`frameColor\` | hex | *(= \`color\`)* | Fixed ring + hub outline/fill accent |
+| \`bgColor\` | hex | *(soft from \`frameColor\`)* | Fill inside the fixed ring — not the whole canvas |
 | \`size\` | integer | \`10\` | Glyph size on the panel (\`1…20\`) |
 | \`rate\` | integer | \`10\` | Visual animation factor in **tenths** — see below |
 | \`rotate\` | integer | \`0\` | Widget orientation: \`0\`, \`90\`, \`180\`, or \`270\` degrees |
@@ -21872,6 +21878,26 @@ Unknown \`kind\` → elaboration error.
 | \`reversed\` | flag | off | Invert the spin direction (CW ↔ CCW) |
 | \`nl\` | flag | off | Newline after the control |
 | \`on\` | mode | \`raise\` | When property blocks run: \`raise\`, \`edge\`, \`1\`, \`0\` — **not** the motor command |
+
+### Colors
+
+\`\`\`logts-play
+comp [motor] .fan1:
+  kind: fan
+  length: 1
+  color: ^6dff9c
+  frameColor: ^888888
+  bgColor: ^1a1a1a
+  text: 'Fan'
+  nl
+  :
+
+.fan1 = 1
+1wire s = .fan1:get
+show(s)
+\`\`\`
+
+Load & Run: green blades inside a grey ring with dark fill; \`s\` is \`1\`.
 
 ### \`rate\` (animation only)
 
@@ -31493,6 +31519,8 @@ comp [servo] .name:
   path: short
   text: 'Arm'
   color: ^6dff9c
+  frameColor: ^4a9e6a
+  bgColor: ^0d2818
   size: 12
   speed: 10
   rate: 10
@@ -31523,7 +31551,9 @@ comp [servo] .arm::
 | \`angle\` | integer | *(none)* | Initial position on the travel range → quantized to steps at create |
 | \`path\` | id | \`short\` | Default direction for moves: \`short\`, \`long\`, \`cw\`, \`ccw\` (see Display) |
 | \`text\` | string | \`''\` | Panel label (up to 5 characters shown) |
-| \`color\` | hex | \`#6dff9c\` | Accent color |
+| \`color\` | hex | \`#6dff9c\` | Moving part (horn, needle, rod, disc, slide panel) |
+| \`frameColor\` | hex | *(= \`color\`)* | Outline of the fixed part (base, dial, barrel, frame, …) |
+| \`bgColor\` | hex | *(soft from \`frameColor\`)* | Fill inside the fixed part — not the whole canvas |
 | \`size\` | integer | \`10\` | Glyph size (\`1…20\`) |
 | \`speed\` | integer | \`10\` | Move speed on the panel (\`1…100\`) — see below |
 | \`rate\` | integer | \`10\` | Speed scale in **tenths** (like \`motor\`) — see below |
@@ -31564,6 +31594,42 @@ Relative moves (\`rel = 1\`) are the same on every display: \`path\` must be \`c
 | \`maxAngle\` | end on dial / horn | extended | open | panel retracted |
 
 You may still set \`path: short\` (or pass the \`path\` pin) on a linear absolute move: it is **accepted** and does not error; absolute animation uses the single segment path. For relative moves, \`cw\` / \`ccw\` remain required on all displays.
+
+### Colors (\`color\`, \`frameColor\`, \`bgColor\`)
+
+Three panel colors (glyph only — the canvas stays transparent to the panel):
+
+| Attribute | Role |
+|-----------|------|
+| \`color\` | Moving piece |
+| \`frameColor\` | Fixed outline (defaults to \`color\` if omitted) |
+| \`bgColor\` | Fixed interior fill; if omitted, a soft tint of \`frameColor\` is used |
+
+| \`display\` | \`color\` | \`frameColor\` | \`bgColor\` |
+|-----------|---------|--------------|-----------|
+| \`servo\` | horn | base + hub | base fill |
+| \`gauge\` | needle | dial + ticks | dial face |
+| \`piston\` | piston + rod | barrel | barrel interior |
+| \`valve\` | disc | pipes + body | body interior |
+| \`slide\` | panel | frame | frame interior |
+
+\`\`\`logts-play
+comp [servo] .cyl:
+  display: piston
+  length: 8
+  color: ^6dff9c
+  frameColor: ^888888
+  bgColor: ^222222
+  text: 'Cyl'
+  nl
+  :
+
+.cyl = 10000000
+8wire p = .cyl:get
+show(p)
+\`\`\`
+
+Load & Run: green rod on a grey barrel with dark fill; \`p\` is \`10000000\`.
 
 \`\`\`logts-play
 comp [servo] .arm:

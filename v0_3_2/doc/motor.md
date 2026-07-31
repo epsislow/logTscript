@@ -23,6 +23,8 @@ comp [motor] .name:
   length: 8
   text: 'M1'
   color: ^6dff9c
+  frameColor: ^4a9e6a
+  bgColor: ^0d2818
   size: 12
   rate: 10
   rotate: 0
@@ -53,6 +55,8 @@ comp [motor] .m::
 
 Unknown `kind` → elaboration error.
 
+The **ring (and hub) stay fixed**; only the notch / blades / vanes spin.
+
 ---
 
 ## Attributes
@@ -62,7 +66,9 @@ Unknown `kind` → elaboration error.
 | `kind` | id | `rotor` | Visual skin (`rotor`, `fan`, `pump`) — unquoted, e.g. `kind: fan` |
 | `length` | integer | `1` | Wire width `1…8`. `1` = on/off; `N>1` = speed `0…2^N−1` |
 | `text` | string | `''` | Panel label (up to 5 characters shown) |
-| `color` | hex | `#6dff9c` | Accent color for the glyph |
+| `color` | hex | `#6dff9c` | Moving part (notch / blades / vanes) |
+| `frameColor` | hex | *(= `color`)* | Fixed ring + hub outline/fill accent |
+| `bgColor` | hex | *(soft from `frameColor`)* | Fill inside the fixed ring — not the whole canvas |
 | `size` | integer | `10` | Glyph size on the panel (`1…20`) |
 | `rate` | integer | `10` | Visual animation factor in **tenths** — see below |
 | `rotate` | integer | `0` | Widget orientation: `0`, `90`, `180`, or `270` degrees |
@@ -70,6 +76,26 @@ Unknown `kind` → elaboration error.
 | `reversed` | flag | off | Invert the spin direction (CW ↔ CCW) |
 | `nl` | flag | off | Newline after the control |
 | `on` | mode | `raise` | When property blocks run: `raise`, `edge`, `1`, `0` — **not** the motor command |
+
+### Colors
+
+```logts-play
+comp [motor] .fan1:
+  kind: fan
+  length: 1
+  color: ^6dff9c
+  frameColor: ^888888
+  bgColor: ^1a1a1a
+  text: 'Fan'
+  nl
+  :
+
+.fan1 = 1
+1wire s = .fan1:get
+show(s)
+```
+
+Load & Run: green blades inside a grey ring with dark fill; `s` is `1`.
 
 ### `rate` (animation only)
 

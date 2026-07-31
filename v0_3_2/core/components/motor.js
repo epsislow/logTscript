@@ -23,6 +23,15 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
     return kind;
   }
 
+  static resolveColorAttr(v, fallback) {
+    if (v === undefined || v === null || v === '') return fallback;
+    let s = String(v).trim();
+    if (!s) return fallback;
+    if (s[0] === '^') s = s.slice(1);
+    if (s[0] !== '#') s = '#' + s;
+    return s.toLowerCase();
+  }
+
   static resolveConfig(attributes, name) {
     const kind = MotorComponent.resolveKind(attributes || {});
     let length = MotorComponent.parseIntAttr(attributes && attributes.length, 1);
@@ -39,11 +48,22 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
     if (rotate !== 0 && rotate !== 90 && rotate !== 180 && rotate !== 270) {
       throw Error(`motor rotate must be 0|90|180|270${name ? ` for ${name}` : ''}`);
     }
+    const color = MotorComponent.resolveColorAttr(attributes && attributes.color, '#6dff9c');
+    const frameColor = MotorComponent.resolveColorAttr(
+      attributes && attributes.frameColor,
+      color
+    );
+    const bgColorRaw = attributes && attributes.bgColor;
+    const bgColor = (bgColorRaw !== undefined && bgColorRaw !== null && bgColorRaw !== '')
+      ? MotorComponent.resolveColorAttr(bgColorRaw, null)
+      : null;
     return {
       kind,
       length,
       text: attributes && attributes.text !== undefined ? String(attributes.text) : '',
-      color: (attributes && attributes.color) || '#6dff9c',
+      color,
+      frameColor,
+      bgColor,
       size,
       rate,
       rotate,
@@ -133,6 +153,8 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
         kind: cfg.kind,
         text: cfg.text,
         color: cfg.color,
+        frameColor: cfg.frameColor,
+        bgColor: cfg.bgColor,
         size: cfg.size,
         rate: cfg.rate,
         rotate: cfg.rotate,
@@ -203,6 +225,8 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
         { name: 'length', value: 'integer' },
         { name: 'text', value: 'string' },
         { name: 'color', value: 'string' },
+        { name: 'frameColor', value: 'string' },
+        { name: 'bgColor', value: 'string' },
         { name: 'size', value: 'integer' },
         { name: 'rate', value: 'integer' },
         { name: 'rotate', value: 'integer' },

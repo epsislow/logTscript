@@ -40,6 +40,15 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
     return d === 'servo' || d === 'gauge';
   }
 
+  static resolveColorAttr(v, fallback) {
+    if (v === undefined || v === null || v === '') return fallback;
+    let s = String(v).trim();
+    if (!s) return fallback;
+    if (s[0] === '^') s = s.slice(1);
+    if (s[0] !== '#') s = '#' + s;
+    return s.toLowerCase();
+  }
+
   static resolveConfig(attributes, name) {
     let length = ServoComponent.parseIntAttr(attributes && attributes.length, 8);
     if (isNaN(length) || length < 1 || length > 16) {
@@ -78,6 +87,15 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         throw Error(`servo angle must be -360..360${name ? ` for ${name}` : ''}`);
       }
     }
+    const color = ServoComponent.resolveColorAttr(attributes && attributes.color, '#6dff9c');
+    const frameColor = ServoComponent.resolveColorAttr(
+      attributes && attributes.frameColor,
+      color
+    );
+    const bgColorRaw = attributes && attributes.bgColor;
+    const bgColor = (bgColorRaw !== undefined && bgColorRaw !== null && bgColorRaw !== '')
+      ? ServoComponent.resolveColorAttr(bgColorRaw, null)
+      : null;
     return {
       length,
       minAngle,
@@ -86,7 +104,9 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
       path,
       display,
       text: attributes && attributes.text !== undefined ? String(attributes.text) : '',
-      color: (attributes && attributes.color) || '#6dff9c',
+      color,
+      frameColor,
+      bgColor,
       size,
       speed,
       rate,
@@ -368,6 +388,8 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         id: baseId,
         text: cfg.text,
         color: cfg.color,
+        frameColor: cfg.frameColor,
+        bgColor: cfg.bgColor,
         size: cfg.size,
         speed: cfg.speed,
         rate: cfg.rate,
@@ -462,6 +484,8 @@ var ServoComponent = class ServoComponent extends BuiltinComponent {
         { name: 'path', value: 'string' },
         { name: 'text', value: 'string' },
         { name: 'color', value: 'string' },
+        { name: 'frameColor', value: 'string' },
+        { name: 'bgColor', value: 'string' },
         { name: 'size', value: 'integer' },
         { name: 'speed', value: 'integer' },
         { name: 'rate', value: 'integer' },

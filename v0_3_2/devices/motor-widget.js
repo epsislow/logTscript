@@ -63,6 +63,8 @@ function motorPaint(state) {
   const cssH = state.cssH;
   const ctx = state.ctx;
   const color = state.color || '#6dff9c';
+  const frameColor = state.frameColor || color;
+  const bgColor = state.bgColor || null;
   const kind = state.kind || 'rotor';
 
   ctx.clearRect(0, 0, cssW, cssH);
@@ -75,17 +77,30 @@ function motorPaint(state) {
   ctx.save();
   ctx.translate(ox, oy);
   ctx.scale(scale, scale);
+
+  // Fixed disc fill + ring (do not spin)
+  ctx.beginPath();
+  ctx.arc(20, 20, 15, 0, Math.PI * 2);
+  if (bgColor) {
+    ctx.fillStyle = bgColor;
+    ctx.fill();
+  } else {
+    ctx.fillStyle = frameColor;
+    ctx.globalAlpha = 0.18;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.strokeStyle = frameColor;
+  ctx.lineWidth = 2;
+  motorGlow(ctx, frameColor, () => ctx.stroke());
+
+  // Spinning rotor only
+  ctx.save();
   ctx.translate(20, 20);
   ctx.rotate((state.spinDeg * Math.PI) / 180);
   ctx.translate(-20, -20);
-
-  ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = 2;
-
-  ctx.beginPath();
-  ctx.arc(20, 20, 15, 0, Math.PI * 2);
-  motorGlow(ctx, color, () => ctx.stroke());
+  ctx.strokeStyle = color;
 
   if (kind === 'fan') {
     for (let i = 0; i < 3; i++) {
@@ -120,11 +135,14 @@ function motorPaint(state) {
     else ctx.rect(18, 6, 4, 14);
     motorGlow(ctx, color, () => ctx.fill());
   }
+  ctx.restore();
 
+  // Fixed hub on top
   ctx.globalAlpha = 1;
+  ctx.fillStyle = frameColor;
   ctx.beginPath();
   ctx.arc(20, 20, 3.5, 0, Math.PI * 2);
-  motorGlow(ctx, color, () => ctx.fill());
+  motorGlow(ctx, frameColor, () => ctx.fill());
 
   ctx.restore();
 }
@@ -167,6 +185,8 @@ function addMotor({
   kind = 'rotor',
   text = '',
   color = '#6dff9c',
+  frameColor = null,
+  bgColor = null,
   size = 10,
   rate = 10,
   rotate = 0,
@@ -222,6 +242,8 @@ function addMotor({
     wrapper,
     kind,
     color,
+    frameColor: frameColor || color,
+    bgColor: bgColor || null,
     rate,
     length,
     reversed: !!reversed,

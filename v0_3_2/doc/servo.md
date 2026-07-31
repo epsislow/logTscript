@@ -28,6 +28,8 @@ comp [servo] .name:
   path: short
   text: 'Arm'
   color: ^6dff9c
+  frameColor: ^4a9e6a
+  bgColor: ^0d2818
   size: 12
   speed: 10
   rate: 10
@@ -58,7 +60,9 @@ comp [servo] .arm::
 | `angle` | integer | *(none)* | Initial position on the travel range → quantized to steps at create |
 | `path` | id | `short` | Default direction for moves: `short`, `long`, `cw`, `ccw` (see Display) |
 | `text` | string | `''` | Panel label (up to 5 characters shown) |
-| `color` | hex | `#6dff9c` | Accent color |
+| `color` | hex | `#6dff9c` | Moving part (horn, needle, rod, disc, slide panel) |
+| `frameColor` | hex | *(= `color`)* | Outline of the fixed part (base, dial, barrel, frame, …) |
+| `bgColor` | hex | *(soft from `frameColor`)* | Fill inside the fixed part — not the whole canvas |
 | `size` | integer | `10` | Glyph size (`1…20`) |
 | `speed` | integer | `10` | Move speed on the panel (`1…100`) — see below |
 | `rate` | integer | `10` | Speed scale in **tenths** (like `motor`) — see below |
@@ -99,6 +103,42 @@ Relative moves (`rel = 1`) are the same on every display: `path` must be `cw` or
 | `maxAngle` | end on dial / horn | extended | open | panel retracted |
 
 You may still set `path: short` (or pass the `path` pin) on a linear absolute move: it is **accepted** and does not error; absolute animation uses the single segment path. For relative moves, `cw` / `ccw` remain required on all displays.
+
+### Colors (`color`, `frameColor`, `bgColor`)
+
+Three panel colors (glyph only — the canvas stays transparent to the panel):
+
+| Attribute | Role |
+|-----------|------|
+| `color` | Moving piece |
+| `frameColor` | Fixed outline (defaults to `color` if omitted) |
+| `bgColor` | Fixed interior fill; if omitted, a soft tint of `frameColor` is used |
+
+| `display` | `color` | `frameColor` | `bgColor` |
+|-----------|---------|--------------|-----------|
+| `servo` | horn | base + hub | base fill |
+| `gauge` | needle | dial + ticks | dial face |
+| `piston` | piston + rod | barrel | barrel interior |
+| `valve` | disc | pipes + body | body interior |
+| `slide` | panel | frame | frame interior |
+
+```logts-play
+comp [servo] .cyl:
+  display: piston
+  length: 8
+  color: ^6dff9c
+  frameColor: ^888888
+  bgColor: ^222222
+  text: 'Cyl'
+  nl
+  :
+
+.cyl = 10000000
+8wire p = .cyl:get
+show(p)
+```
+
+Load & Run: green rod on a grey barrel with dark fill; `p` is `10000000`.
 
 ```logts-play
 comp [servo] .arm:

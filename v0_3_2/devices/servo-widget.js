@@ -110,34 +110,59 @@ function servoGlow(ctx, color, drawFn) {
   }
 }
 
-function servoDrawRotary(ctx, state, ox, oy, scale) {
+function servoColors(state) {
   const color = state.color || '#6dff9c';
+  const frameColor = state.frameColor || color;
+  const bgColor = state.bgColor || null;
+  return { color, frameColor, bgColor };
+}
+
+function servoFillBg(ctx, bgColor, frameColor) {
+  if (bgColor) {
+    ctx.fillStyle = bgColor;
+    return true;
+  }
+  if (frameColor) {
+    ctx.fillStyle = frameColor;
+    ctx.globalAlpha = 0.18;
+    return true;
+  }
+  return false;
+}
+
+function servoDrawRotary(ctx, state, ox, oy, scale) {
+  const { color, frameColor, bgColor } = servoColors(state);
   const deg = state.visualAngleDeg;
   ctx.save();
   ctx.translate(ox, oy);
   ctx.scale(scale, scale);
-
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';
 
-  // base: M8 28 A12 12 0 0 1 32 28 L32 34 L8 34 Z
   ctx.beginPath();
   ctx.moveTo(8, 28);
   ctx.arc(20, 28, 12, Math.PI, 0, false);
   ctx.lineTo(32, 34);
   ctx.lineTo(8, 34);
   ctx.closePath();
-  servoGlow(ctx, color, () => ctx.stroke());
+  ctx.save();
+  if (servoFillBg(ctx, bgColor, frameColor)) {
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  ctx.strokeStyle = frameColor;
+  servoGlow(ctx, frameColor, () => ctx.stroke());
 
+  ctx.fillStyle = frameColor;
   ctx.beginPath();
   ctx.arc(20, 28, 4, 0, Math.PI * 2);
-  servoGlow(ctx, color, () => ctx.fill());
+  servoGlow(ctx, frameColor, () => ctx.fill());
 
   ctx.save();
   ctx.translate(20, 28);
   ctx.rotate((deg * Math.PI) / 180);
+  ctx.strokeStyle = color;
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(0, 0);
@@ -149,7 +174,7 @@ function servoDrawRotary(ctx, state, ox, oy, scale) {
 }
 
 function servoDrawGauge(ctx, state, ox, oy, scale) {
-  const color = state.color || '#6dff9c';
+  const { color, frameColor, bgColor } = servoColors(state);
   const deg = state.visualAngleDeg;
   let a0 = state.minAngle | 0;
   let a1 = state.maxAngle | 0;
@@ -158,15 +183,21 @@ function servoDrawGauge(ctx, state, ox, oy, scale) {
   ctx.save();
   ctx.translate(ox, oy);
   ctx.scale(scale, scale);
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 2;
   ctx.lineCap = 'round';
 
   ctx.beginPath();
   ctx.arc(20, 20, 16, 0, Math.PI * 2);
-  servoGlow(ctx, color, () => ctx.stroke());
+  ctx.save();
+  if (servoFillBg(ctx, bgColor, frameColor)) {
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  ctx.strokeStyle = frameColor;
+  ctx.lineWidth = 2;
+  servoGlow(ctx, frameColor, () => ctx.stroke());
 
+  ctx.strokeStyle = frameColor;
   ctx.lineWidth = 1.5;
   for (let i = 0; i < 5; i++) {
     const tickDeg = a0 + ((a1 - a0) * i) / 4;
@@ -180,6 +211,8 @@ function servoDrawGauge(ctx, state, ox, oy, scale) {
   ctx.save();
   ctx.translate(20, 20);
   ctx.rotate((deg * Math.PI) / 180);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
   ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.moveTo(0, 2);
@@ -194,26 +227,30 @@ function servoDrawGauge(ctx, state, ox, oy, scale) {
 }
 
 function servoDrawPiston(ctx, state, ox, oy, scale) {
-  const color = state.color || '#6dff9c';
+  const { color, frameColor, bgColor } = servoColors(state);
   const t = state.visualFraction;
   const stroke = 16;
 
   ctx.save();
   ctx.translate(ox, oy);
   ctx.scale(scale, scale);
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
   ctx.lineWidth = 2;
 
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(4, 6, 28, 16, 2);
-  else {
-    ctx.rect(4, 6, 28, 16);
+  else ctx.rect(4, 6, 28, 16);
+  ctx.save();
+  if (servoFillBg(ctx, bgColor, frameColor)) {
+    ctx.fill();
+    ctx.globalAlpha = 1;
   }
-  servoGlow(ctx, color, () => ctx.stroke());
+  ctx.restore();
+  ctx.strokeStyle = frameColor;
+  servoGlow(ctx, frameColor, () => ctx.stroke());
 
   ctx.save();
   ctx.translate(t * stroke, 0);
+  ctx.fillStyle = color;
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(8, 9, 6, 10, 1);
   else ctx.rect(8, 9, 6, 10);
@@ -225,26 +262,33 @@ function servoDrawPiston(ctx, state, ox, oy, scale) {
 }
 
 function servoDrawValve(ctx, state, ox, oy, scale) {
-  const color = state.color || '#6dff9c';
+  const { color, frameColor, bgColor } = servoColors(state);
   const t = state.visualFraction;
 
   ctx.save();
   ctx.translate(ox, oy);
   ctx.scale(scale, scale);
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = 2;
   ctx.lineCap = 'round';
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = frameColor;
 
   ctx.strokeRect(2, 16, 12, 8);
   ctx.strokeRect(26, 16, 12, 8);
+
   ctx.beginPath();
   ctx.arc(20, 20, 9, 0, Math.PI * 2);
-  servoGlow(ctx, color, () => ctx.stroke());
+  ctx.save();
+  if (servoFillBg(ctx, bgColor, frameColor)) {
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  servoGlow(ctx, frameColor, () => ctx.stroke());
 
   ctx.save();
   ctx.translate(20, 20);
   ctx.rotate((t * 90 * Math.PI) / 180);
+  ctx.strokeStyle = color;
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(0, -8);
@@ -256,22 +300,28 @@ function servoDrawValve(ctx, state, ox, oy, scale) {
 }
 
 function servoDrawSlide(ctx, state, ox, oy, scale) {
-  const color = state.color || '#6dff9c';
+  const { color, frameColor, bgColor } = servoColors(state);
   const t = state.visualFraction;
   const stroke = 16;
 
   ctx.save();
   ctx.translate(ox, oy);
   ctx.scale(scale, scale);
-  ctx.strokeStyle = color;
-  ctx.fillStyle = color;
   ctx.lineWidth = 2;
 
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(4, 4, 40, 24, 1);
   else ctx.rect(4, 4, 40, 24);
-  servoGlow(ctx, color, () => ctx.stroke());
+  ctx.save();
+  if (servoFillBg(ctx, bgColor, frameColor)) {
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  ctx.strokeStyle = frameColor;
+  servoGlow(ctx, frameColor, () => ctx.stroke());
 
+  ctx.strokeStyle = frameColor;
   ctx.globalAlpha = 0.5;
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -282,7 +332,8 @@ function servoDrawSlide(ctx, state, ox, oy, scale) {
 
   ctx.save();
   ctx.translate(t * stroke, 0);
-  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.9;
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(6, 6, 18, 20, 1);
   else ctx.rect(6, 6, 18, 20);
@@ -329,6 +380,8 @@ function addServo({
   id,
   text = '',
   color = '#6dff9c',
+  frameColor = null,
+  bgColor = null,
   size = 10,
   speed = 10,
   rate = 10,
@@ -405,6 +458,8 @@ function addServo({
     cssH,
     wrapper,
     color,
+    frameColor: frameColor || color,
+    bgColor: bgColor || null,
     speed,
     rate,
     px,
