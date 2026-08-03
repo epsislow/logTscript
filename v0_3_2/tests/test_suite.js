@@ -33581,5 +33581,64 @@ show(a0, b1)`;
     h.assert('count 15', session.getWire(interp, 'n'), '0000000000001111');
   });
 
+  const PHZ_SHOW_INSIDE = `phz [cont] .bag:
+  max: 30
+  :
+phz [gen] .mkA:
+  type: obj
+  onlyA: 1
+  :
+phz [gen] .mkB:
+  type: obj
+  onlyB: 1
+  :
+.mkA:{
+  add = 1
+  inside = .bag
+  set = 1
+}
+.mkB:{
+  add = 1
+  inside = .bag
+  set = 1
+}
+show(.bag:inside)
+show(.bag:inside:0)`;
+
+  reg(3130, 'phz', 'show(:inside) vector-like list', function(h, session) {
+    const { out } = session.run(PHZ_SHOW_INSIDE);
+    h.assert('header', String(out.some(l => l.trim() === '.bag:inside')), 'true');
+    h.assert(':0 line', String(out.some(l => /:0 = \{.*onlyA=1/.test(l))), 'true');
+    h.assert(':1 line', String(out.some(l => /:1 = \{.*onlyB=1/.test(l))), 'true');
+    h.assert('length', String(out.some(l => l.includes('.bag:inside has length [2]'))), 'true');
+    h.assert('no hex dump', String(out.every(l => !/\^5B30/.test(l))), 'true');
+  });
+
+  reg(3131, 'phz', 'show(:inside:0) expands fields', function(h, session) {
+    const { out } = session.run(PHZ_SHOW_INSIDE);
+    h.assert('obj header', String(out.some(l => l.includes('.bag:inside:0 = {') && l.includes('onlyA=1'))), 'true');
+    h.assert('id field', String(out.some(l => /^\s+id = /.test(l) && l.includes('(16bit)'))), 'true');
+    h.assert('onlyA field', String(out.some(l => /^\s+onlyA = 1 \(1bit\)/.test(l))), 'true');
+  });
+
+  reg(3132, 'phz', ':inside list display-only (no wire assign)', function(h, session) {
+    const { out } = session.run(`phz [cont] .bag::
+phz [gen] .mk:
+  type: obj
+  :
+.mk:{
+  add = 1
+  inside = .bag
+  set = 1
+}
+8wire x = .bag:inside`);
+    h.assert('display-only', String(out.some(l => /display-only/i.test(l))), 'true');
+  });
+
+  regPhzWave(3133, 'show(:inside) vector-like list', function(h, session) {
+    const { out } = session.run(PHZ_SHOW_INSIDE);
+    h.assert('length wave', String(out.some(l => l.includes('.bag:inside has length [2]'))), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

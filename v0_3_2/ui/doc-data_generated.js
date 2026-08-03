@@ -24532,7 +24532,52 @@ phz [cont] .room:
 
 There is **no** \`.c:count\` — use \`.c:inside:count\`.
 
-Missing attribute on that object → \`missing attribute named …\`.
+\`show(.c:inside)\` and \`show(.c:inside:N)\` are **display-only** (like ASM decode text): they cannot be assigned to wires. Read \`:count\`, \`:empty\`, or \`:N:attr\` for bit values.
+
+**Load & Run** — list like a vector (\`:0\` / \`:1\` + \`has length\`); one object expands fields.
+
+\`\`\`logts-play wave
+phz [cont] .bag:
+  max: 30
+  :
+phz [gen] .mkA:
+  type: obj
+  onlyA: 1
+  :
+phz [gen] .mkB:
+  type: obj
+  onlyB: 1
+  :
+.mkA:{
+  add = 1
+  inside = .bag
+  set = 1
+}
+.mkB:{
+  add = 1
+  inside = .bag
+  set = 1
+}
+show(.bag:inside)
+show(.bag:inside:0)
+\`\`\`
+
+Expected shape:
+
+\`\`\`text
+.bag:inside
+:0 = {id=0000000000000001, floor=00000000, onlyA=1}
+:1 = {id=0000000000000010, floor=00000000, onlyB=1}
+.bag:inside has length [2]
+.bag:inside:0 = {id=0000000000000001, floor=00000000, onlyA=1}
+  id = 0000000000000001 (16bit)
+  floor = 00000000 (8bit)
+  onlyA = 1 (1bit)
+\`\`\`
+
+Use \`show(.bag:inside; elAll)\` for long lists (same truncation rules as vectors: default shows first three + last when \`N > 5\`).
+
+Missing attribute on that object → \`missing attribute named …\`. There is **no** unified schema that merges all attributes of every object in a container.
 
 **Load & Run** — three spawned objs; first id \`1\`, last id \`3\`.
 

@@ -315,13 +315,34 @@
     }
   };
 
-  PhzEngine.prototype._formatObjectAttrs = function (obj) {
-    var parts = [];
+  PhzEngine.prototype._listObjectAttrs = function (obj) {
+    var attrs = [];
+    if (!obj || !obj.attributes) return attrs;
     for (var [k, slot] of obj.attributes) {
       var val = this.interp.getValueFromRef(slot.ref);
-      parts.push(k + '=' + val);
+      attrs.push({ name: k, value: val, bits: slot.bits });
     }
+    return attrs;
+  };
+
+  PhzEngine.prototype._formatObjectAttrs = function (obj) {
+    var attrs = this._listObjectAttrs(obj);
+    var parts = attrs.map(function (a) { return a.name + '=' + a.value; });
     return '{' + parts.join(', ') + '}';
+  };
+
+  PhzEngine.prototype._objectShowPayload = function (obj) {
+    var attrs = this._listObjectAttrs(obj);
+    var dump = '{' + attrs.map(function (a) { return a.name + '=' + a.value; }).join(', ') + '}';
+    return {
+      value: null,
+      ref: null,
+      bitWidth: 0,
+      isText: true,
+      displayText: dump,
+      phzObjectDump: true,
+      phzAttrs: attrs,
+    };
   };
 
   /**
@@ -361,19 +382,25 @@
     var count = contents.length;
 
     if (rest.length === 0) {
-      // show all objects
-      var lines = contents.map(function (obj, idx) {
-        return '[' + idx + '] ' + this._formatObjectAttrs(obj);
+      var objects = contents.map(function (obj, idx) {
+        var attrs = this._listObjectAttrs(obj);
+        return {
+          index: idx,
+          dump: this._formatObjectAttrs(obj),
+          attrs: attrs,
+        };
       }.bind(this));
-      var text = lines.join('; ');
-      // Represent as ascii-ish display payload for show — use a synthetic binary of string
-      var encoded = getWidth().stringToBits(text || '(empty)');
+      var text = objects.length
+        ? objects.map(function (o) { return ':' + o.index + ' = ' + o.dump; }).join('; ')
+        : '(empty)';
       return {
-        value: encoded.bin,
+        value: null,
         ref: null,
-        bitWidth: encoded.bits,
-        displayText: text || '(empty)',
+        bitWidth: 0,
+        isText: true,
+        displayText: text,
         phzInsideList: true,
+        phzObjects: objects,
       };
     }
 
@@ -407,15 +434,7 @@
     var obj = contents[index];
     var attrParts = rest.slice(1);
     if (attrParts.length === 0) {
-      var dump = this._formatObjectAttrs(obj);
-      var enc = W.stringToBits(dump);
-      return {
-        value: enc.bin,
-        ref: null,
-        bitWidth: enc.bits,
-        displayText: dump,
-        phzObjectDump: true,
-      };
+      return this._objectShowPayload(obj);
     }
 
     if (attrParts.length !== 1) {

@@ -6670,6 +6670,10 @@ class Interpreter {
           }
           const phzResult = this.phzEngine.resolveProperty(a.var, a.property);
           if (phzResult) {
+            if ((phzResult.phzInsideList || phzResult.phzObjectDump)
+                && this.evalContext !== 'show' && this.evalContext !== 'doc') {
+              throw Error(`PHZ ${a.var}:${a.property} is display-only; use show(...) or read :inside:N:attr / :count / :empty`);
+            }
             let val = phzResult.value;
             if (a.pad && val) val = this.applyPad(val, a.pad);
             return {
@@ -6678,6 +6682,11 @@ class Interpreter {
               varName: `${a.var}:${a.property}`,
               bitWidth: phzResult.bitWidth || (val ? val.length : 0),
               displayText: phzResult.displayText,
+              isText: !!phzResult.isText,
+              phzInsideList: !!phzResult.phzInsideList,
+              phzObjectDump: !!phzResult.phzObjectDump,
+              phzObjects: phzResult.phzObjects || null,
+              phzAttrs: phzResult.phzAttrs || null,
             };
           }
         }
@@ -9841,6 +9850,56 @@ if (this.isBuiltinDEMUX(name)) {
     return lines;
   }
 
+  _formatPhzInsideShowLines(part, opts) {
+    if (!part) return null;
+    const name = part.varName || '.phz';
+    const lines = [];
+
+    if (part.phzInsideList) {
+      const objs = part.phzObjects || [];
+      if (opts && opts.compact) {
+        lines.push(`${name} has length [${objs.length}]`);
+        return lines;
+      }
+      this._pushDisplayOutput(lines, `${name}`, opts);
+      if (objs.length === 0) {
+        lines.push('(empty)');
+        lines.push(`${name} has length [0]`);
+        return lines;
+      }
+      const indices = this._resolveVectorElementIndices(opts, objs.length);
+      for (const i of indices) {
+        if (i === '..') {
+          lines.push('..');
+          continue;
+        }
+        const obj = objs[i];
+        if (!obj) continue;
+        this._pushDisplayOutput(lines, `:${obj.index} = ${obj.dump}`, opts);
+      }
+      lines.push(`${name} has length [${objs.length}]`);
+      return lines;
+    }
+
+    if (part.phzObjectDump) {
+      const attrs = part.phzAttrs || [];
+      const dump = part.displayText || '{}';
+      this._pushDisplayOutput(lines, `${name} = ${dump}`, opts);
+      for (const a of attrs) {
+        let formatted = a.value == null ? '-' : String(a.value);
+        if (formatted !== '-' && this._hasShowFormatOpts(opts)) {
+          formatted = this._formatShowWireValue(formatted, a.bits, opts, true, a.bits);
+        } else if (formatted !== '-') {
+          formatted = this.formatValue(formatted, a.bits);
+        }
+        this._pushDisplayOutput(lines, `  ${a.name} = ${formatted} (${a.bits}bit)`, opts);
+      }
+      return lines;
+    }
+
+    return null;
+  }
+
   _formatVectorShowLines(wireName, valueStr, opts) {
     const wire = this.wires.get(wireName);
     if (!wire || !wire.vector) return null;
@@ -10003,6 +10062,16 @@ if (this.isBuiltinDEMUX(name)) {
     const asmDecodeLines = [];
     try {
     for (const e of args) {
+      if (e && e.length === 1 && e[0].var && e[0].property
+          && this.phzEngine && this.phzEngine.getNamed(e[0].var)) {
+        const r = this.evalExpr(e, computeRefs);
+        const part = r && r[0];
+        const phzLines = this._formatPhzInsideShowLines(part, opts);
+        if (phzLines) {
+          vectorLines.push(...phzLines);
+          continue;
+        }
+      }
       if (e && e.length === 1 && e[0].var) {
         const atom = e[0];
         const wire = this.wires.get(atom.var);
