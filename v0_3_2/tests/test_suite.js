@@ -33207,5 +33207,53 @@ symFg = ^112233`);
     });
   });
 
+  reg(3001, 'allow-notallow', 'NotAllow ADD blocks after statement', function(h, session) {
+    h.assertThrows('ADD blocked', function() {
+      session.run(`4wire x = 0011
+4wire y = 0001
+4wire a = ADD(x, y)
+NotAllow ADD
+4wire z = 0010
+4wire w = 0001
+4wire b = ADD(z, w)`);
+    });
+  });
+
+  reg(3002, 'allow-notallow', 'Allow NONE ADD — only ADD builtin', function(h, session) {
+    const { interp } = session.run(`Allow NONE ADD
+4wire x = 0011
+4wire y = 0001
+4wire a, 1wire c = ADD(x, y)
+show(a)`);
+    h.assert('ADD ok', session.getWire(interp, 'a'), '0100');
+    const orOut = session.run(`Allow NONE ADD
+4wire p = 0001
+4wire q = 0000
+4wire r = OR(p, q)`).out;
+    h.assert('OR blocked', orOut.some(l => l.includes('Built-in OR is not allowed')), true);
+  });
+
+  reg(3003, 'allow-notallow', 'NotAllow comp.type{led}', function(h, session) {
+    h.assertThrows('led comp blocked', function() {
+      session.run(`NotAllow comp.type{led}
+comp [led] .l:`);
+    });
+  });
+
+  reg(3004, 'allow-notallow', 'doc(Allow) shows policy', function(h, session) {
+    const out = session.runDoc('Allow NONE ADD\ndoc(Allow)');
+    h.assert('doc Allow header', out.some(l => l.includes('Allow policy:')), true);
+    h.assert('doc builtIn ADD', out.some(l => l.includes('ADD')), true);
+  });
+
+  reg(3005, 'allow-notallow', 'NotAllow def blocks parse', function(h, session) {
+    h.assertThrows('def blocked', function() {
+      session.parse(`NotAllow def
+def foo(1bit a):
+  :
+`);
+    });
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

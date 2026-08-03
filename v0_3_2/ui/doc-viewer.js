@@ -127,6 +127,7 @@ const DOC_SECTIONS = [
   {
     title: 'Other',
     items: [
+      { file: 'allow-notallow.md', label: 'Allow / NotAllow' },
       { file: 'builtin-DIAG.md', label: 'DIAG (diagonal matrix)', searchPrimary: 'DIAG' },
       { file: 'builtin-FLIPLR.md', label: 'FLIPLR (flip columns)', searchPrimary: 'FLIPLR' },
       { file: 'builtin-FLIPUD.md', label: 'FLIPUD (flip rows)', searchPrimary: 'FLIPUD' },

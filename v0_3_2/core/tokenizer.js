@@ -575,7 +575,7 @@ pushSource({ src, alias }) {
     if (v === 'sock') {
       return this.token('TYPE', '65536sock');
     }
-    if (['def', 'show', 'peek', 'probe', 'deps', 'lutOf', 'exprOfLut', 'useLutAs', 'useExpr', 'truthTableOf', 'simplify', 'equivalent', 'inputsOf', 'costOf', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'ZSTATE', 'ZRELEASE', 'Zlist', 'comp', 'pcb', 'chip', 'board', 'inline', 'doc', 'watch'].includes(v)) {
+    if (['def', 'show', 'peek', 'probe', 'deps', 'lutOf', 'exprOfLut', 'useLutAs', 'useExpr', 'truthTableOf', 'simplify', 'equivalent', 'inputsOf', 'costOf', 'NEXT', 'TEST', 'MODE', 'STRICT', 'WIREWRITE', 'ZSTATE', 'ZRELEASE', 'Zlist', 'comp', 'pcb', 'chip', 'board', 'inline', 'doc', 'watch', 'Allow', 'NotAllow'].includes(v)) {
       return this.token('KEYWORD', v);
     }
     if (/^REG$/.test(v)) {

@@ -131,6 +131,16 @@ class Parser {
     this.componentRegistry = componentRegistry || null;
     this.metaConstantsScope = 'top';
     this.schemaRegistry = new Map();
+    this.policyTypeModules = typeof createDefaultPolicyTypeModules === 'function'
+      ? createDefaultPolicyTypeModules({ componentRegistry: this.componentRegistry })
+      : null;
+    this.usagePolicy = typeof UsagePolicy !== 'undefined'
+      ? new UsagePolicy(this.policyTypeModules)
+      : null;
+  }
+
+  getUsagePolicySnapshot() {
+    return this.usagePolicy ? this.usagePolicy.snapshot() : null;
   }
 
   parseSchemaRef() {
@@ -1149,6 +1159,12 @@ parseLoad() {
 }
 
 parseDef() {
+  if (this.usagePolicy) {
+    const defCheck = this.usagePolicy.isDefAllowed();
+    if (!defCheck.allowed) {
+      throw Error(`def is not allowed (${defCheck.reason} policy) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+  }
   this.eat('KEYWORD', 'def');
   
   const name = this.c.value;
@@ -1440,6 +1456,13 @@ parsePcbDefinition() {
   
   const name = this.c.value;
   this.eat('ID');
+
+  if (this.usagePolicy) {
+    const chk = this.usagePolicy.isModuleAllowed('pcb', name);
+    if (!chk.allowed) {
+      throw Error(`PCB '${name}' is not allowed (${chk.reason} policy) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+  }
   
   const reserved = this.componentRegistry ? this.componentRegistry.getReservedNames() : ['led', 'switch', 'dots', '7seg', '14seg', 'dip', 'mem', 'counter', 'adder', 'subtract', 'divider', 'multiplier', 'shifter', 'rotary', 'lcd'];
   if (reserved.includes(name)) {
@@ -1669,6 +1692,13 @@ parseChipDefinition() {
   const name = this.c.value;
   this.eat('ID');
 
+  if (this.usagePolicy) {
+    const chk = this.usagePolicy.isModuleAllowed('chip', name);
+    if (!chk.allowed) {
+      throw Error(`Chip '${name}' is not allowed (${chk.reason} policy) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+  }
+
   const reserved = this.componentRegistry ? this.componentRegistry.getReservedNames() : [];
   if (reserved.includes(name) || name === 'chip') {
     throw Error(`Chip name '${name}' is reserved at ${this.c.file}: ${this.c.line}:${this.c.col}`);
@@ -1829,6 +1859,13 @@ parseBoardDefinition() {
 
   const name = this.c.value;
   this.eat('ID');
+
+  if (this.usagePolicy) {
+    const chk = this.usagePolicy.isModuleAllowed('board', name);
+    if (!chk.allowed) {
+      throw Error(`Board '${name}' is not allowed (${chk.reason} policy) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+  }
 
   const reserved = this.componentRegistry ? this.componentRegistry.getReservedNames() : [];
   if (reserved.includes(name) || name === 'board') {
@@ -5153,6 +5190,12 @@ isBuiltinFunction(name) {
     if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol' && kind !== 'plc') {
       throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol, plc)`);
     }
+    if (this.usagePolicy) {
+      const chk = this.usagePolicy.isModuleAllowed('inline', kind);
+      if (!chk.allowed) {
+        throw Error(`inline [${kind}] is not allowed (${chk.reason} policy) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+    }
     this._syncTokenizerAt(pos + 1);
     const instanceName = this.parseDotComponentRef();
     this.eat('SYM', ':');
@@ -5748,6 +5791,147 @@ isBuiltinFunction(name) {
     return { compInvoke: invoke };
   }
 
+  _peekModuleTypeAfterId() {
+    let i = this.t.i;
+    const src = this.t.src;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (src[i] !== '.') return false;
+    i++;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (src.substr(i, 4) !== 'type') return false;
+    i += 4;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    return src[i] === '{';
+  }
+
+  _parseModuleTypeTokens(moduleName) {
+    const mod = this.policyTypeModules ? this.policyTypeModules.get(moduleName) : null;
+    const types = [];
+    this.eat('SYM', '{');
+    this.t.skip();
+    while (!(this.c.type === 'SYM' && this.c.value === '}')) {
+      if (this.c.type === 'EOF') {
+        throw Error(`Expected '}' in ${moduleName}.type{} at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      while (this.c.type === 'EOL') this.c = this.t.get();
+      if (this.c.type === 'SYM' && this.c.value === '}') break;
+      let token = null;
+      if (this.c.type === 'ID' || this.c.type === 'SYM' || this.c.type === 'SPECIAL' || this.c.type === 'DEC') {
+        token = this.c.value;
+        this.eat(this.c.type);
+      } else {
+        throw Error(`Unknown entry '${this.c.value}' in ${moduleName}.type{} at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      let resolved = token;
+      if (mod && mod.resolveTypeToken) {
+        try {
+          resolved = mod.resolveTypeToken(token, { componentRegistry: this.componentRegistry });
+        } catch (e) {
+          const msg = (e && e.message) ? e.message : String(e);
+          throw Error(msg + ` at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+      }
+      types.push(resolved);
+      this.t.skip();
+    }
+    this.eat('SYM', '}');
+    return types;
+  }
+
+  _parsePolicyEntries() {
+    const entries = [];
+    const builtinNames = typeof collectBuiltinNamesForPolicy === 'function'
+      ? collectBuiltinNamesForPolicy() : new Set();
+    const moduleNames = this.policyTypeModules ? this.policyTypeModules.moduleNames() : [];
+
+    while (this.c.type !== 'EOL' && this.c.type !== 'EOF') {
+      if (this.c.type === 'REG') {
+        const name = this.c.value;
+        this.eat('REG');
+        entries.push({ kind: 'builtin', name });
+        this.t.skip();
+        continue;
+      }
+      if (this.c.type === 'MUX' || this.c.type === 'DEMUX') {
+        const name = this.c.value;
+        this.eat(this.c.type);
+        entries.push({ kind: 'builtin', name });
+        this.t.skip();
+        continue;
+      }
+      if (this.c.type === 'ID') {
+        const id = this.c.value;
+        if (id === 'ALL' || id === 'NONE') {
+          this.eat('ID');
+          entries.push({ kind: 'meta', value: id });
+          this.t.skip();
+          continue;
+        }
+        if (id === 'builtIn') {
+          this.eat('ID');
+          entries.push({ kind: 'category', target: 'builtIn' });
+          this.t.skip();
+          continue;
+        }
+        if (id === 'func') {
+          this.eat('ID');
+          entries.push({ kind: 'category', target: 'userFunc' });
+          this.t.skip();
+          continue;
+        }
+        if (id === 'def') {
+          this.eat('ID');
+          entries.push({ kind: 'category', target: 'def' });
+          this.t.skip();
+          continue;
+        }
+        if (moduleNames.includes(id)) {
+          this.eat('ID');
+          if (this._peekModuleTypeAfterId()) {
+            this.eat('SYM', '.');
+            this.eat('ID', 'type');
+            const types = this._parseModuleTypeTokens(id);
+            entries.push({ kind: 'moduleType', moduleName: id, types });
+          } else {
+            entries.push({ kind: 'category', target: 'module', moduleName: id });
+          }
+          this.t.skip();
+          continue;
+        }
+        if (builtinNames.has(id)) {
+          this.eat('ID');
+          entries.push({ kind: 'builtin', name: id });
+          this.t.skip();
+          continue;
+        }
+        this.eat('ID');
+        entries.push({ kind: 'userFunc', name: id });
+        this.t.skip();
+        continue;
+      }
+      break;
+    }
+    return entries;
+  }
+
+  allow() {
+    const stmtLine = this.c.line;
+    const stmtCol = tokenStartCol(this.c);
+    this.eat('KEYWORD', 'Allow');
+    const entries = this._parsePolicyEntries();
+    if (this.usagePolicy) this.usagePolicy.applyAllow(entries);
+    return { allow: { entries }, line: stmtLine, col: stmtCol };
+  }
+
+  notAllow() {
+    const stmtLine = this.c.line;
+    const stmtCol = tokenStartCol(this.c);
+    this.eat('KEYWORD', 'NotAllow');
+    const entries = this._parsePolicyEntries();
+    if (this.usagePolicy) this.usagePolicy.applyNotAllow(entries);
+    return { notAllow: { entries }, line: stmtLine, col: stmtCol };
+  }
+
 }
 
 Parser.KEYWORD_HANDLERS = {
@@ -5767,6 +5951,8 @@ Parser.KEYWORD_HANDLERS = {
   NEXT: 'next',
   TEST: 'test',
   MODE: 'mode',
+  Allow: 'allow',
+  NotAllow: 'notAllow',
   ZRELEASE: 'zRelease',
   deps: 'deps',
   Zlist: 'zList',

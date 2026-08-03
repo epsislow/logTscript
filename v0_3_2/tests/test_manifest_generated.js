@@ -2447,13 +2447,19 @@
       {"id":2993,"group":"clcd","title":"per-symbol color from wire refs at comp creation","detail":{"scripts":["24wire symFg = ^ffaa00\n24wire symBg = ^332200\n\ncomp [clcd] .panel:\n  = {\n    warning:\n      x: 10\n      y: 10\n      bit: 0\n      color: symFg\n      bgColor: symBg\n    :\n  }\n  :"],"steps":[],"assertions":["sym color","sym bg"]}},
       {"id":2994,"group":"clcd","title":"symbol color wire snapshot — later wire change ignored","detail":{"scripts":["MODE WIREWRITE\n24wire symFg = ^ffaa00\n\ncomp [clcd] .panel:\n  = {\n    warning: x: 10 y: 10 bit: 0 color: symFg :\n  }\n  :\n\nsymFg = ^112233"],"steps":[],"assertions":["snapshot sym color"]}},
       {"id":2995,"group":"color-wire","title":"undefined symbol color wire throws at comp creation","detail":{"scripts":["comp [clcd] .x:\n  = { warning: x: 10 y: 10 bit: 0 color: noSuch : }\n  :"],"steps":[],"assertions":["missing wire"]}},
-      {"id":2996,"group":"user-def","title":"def isZero — doc runnable example (wave)","detail":{"scripts":["def isZero(4bit n):\n  :1bit !OR(n)\n\n4wire x = 0010\n1wire z = isZero(x)\nshow(x)"],"steps":[],"assertions":["isZero(0010) wave","show(x) wave"]}}
+      {"id":2996,"group":"user-def","title":"def isZero — doc runnable example (wave)","detail":{"scripts":["def isZero(4bit n):\n  :1bit !OR(n)\n\n4wire x = 0010\n1wire z = isZero(x)\nshow(x)"],"steps":[],"assertions":["isZero(0010) wave","show(x) wave"]}},
+      {"id":3001,"group":"allow-notallow","title":"NotAllow ADD blocks after statement","detail":{"scripts":["4wire x = 0011\n4wire y = 0001\n4wire a = ADD(x, y)\nNotAllow ADD\n4wire z = 0010\n4wire w = 0001\n4wire b = ADD(z, w)"],"steps":[],"assertions":["ADD blocked"]}},
+      {"id":3002,"group":"allow-notallow","title":"Allow NONE ADD — only ADD builtin","detail":{"scripts":["Allow NONE ADD\n4wire x = 0011\n4wire y = 0001\n4wire a, 1wire c = ADD(x, y)\nshow(a)"],"steps":[],"assertions":["ADD ok","OR blocked"]}},
+      {"id":3003,"group":"allow-notallow","title":"NotAllow comp.type{led}","detail":{"scripts":["NotAllow comp.type{led}\ncomp [led] .l:"],"steps":[],"assertions":["led comp blocked"]}},
+      {"id":3004,"group":"allow-notallow","title":"doc(Allow) shows policy","detail":{"scripts":["Allow NONE ADD\ndoc(Allow)"],"steps":[],"assertions":["doc Allow header","doc builtIn ADD"]}},
+      {"id":3005,"group":"allow-notallow","title":"NotAllow def blocks parse","detail":{"scripts":["NotAllow def\ndef foo(1bit a):\n  :"],"steps":[],"assertions":["def blocked"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
       { id: 'left-pad-assign', label: ':= left-pad assignment', rangeLabel: '246–248, 1008, 1011–1013, 1018', testIds: [246, 247, 248, 1008, 1011, 1012, 1013, 1018] },
       { id: 'strict-assign', label: '= strict assignment', rangeLabel: '249–250, 1014–1017', testIds: [249, 250, 1014, 1015, 1016, 1017] },
       { id: 'right-pad-assign', label: '=: right-pad assignment', rangeLabel: '235–245, 1000–1007, 1009–1010', testIds: [235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1009, 1010] },
+      { id: 'allow-notallow', label: 'allow-notallow', rangeLabel: '3001–3005', testIds: [3001, 3002, 3003, 3004, 3005] },
       { id: 'alu', label: 'ALU component', rangeLabel: '1353–1382', testIds: [1353, 1354, 1355, 1356, 1357, 1358, 1359, 1360, 1361, 1362, 1363, 1364, 1365, 1366, 1367, 1368, 1369, 1370, 1371, 1372, 1373, 1374, 1375, 1376, 1377, 1378, 1379, 1380, 1381, 1382] },
       { id: 'arithmetic', label: 'arithmetic', rangeLabel: '1680–1683', testIds: [1680, 1681, 1682, 1683] },
       { id: 'asm-decode', label: 'ASM disassemble / decode', rangeLabel: '947–948, 1740, 1762', testIds: [947, 948, 1740, 1762] },

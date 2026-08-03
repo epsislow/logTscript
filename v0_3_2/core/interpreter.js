@@ -434,6 +434,14 @@ class Interpreter {
     this.insideBoardBody = false;
     this.currentBoardInstance = null;
 
+    this.policyTypeModules = typeof createDefaultPolicyTypeModules === 'function'
+      ? createDefaultPolicyTypeModules({ componentRegistry })
+      : null;
+    this.usagePolicy = typeof UsagePolicy !== 'undefined'
+      ? new UsagePolicy(this.policyTypeModules)
+      : null;
+    this._usagePolicyStack = [];
+
     // Inline definitions (e.g. inline [asm] .myisa:)
     this.inlineInstances = new Map();
 
@@ -1851,6 +1859,13 @@ class Interpreter {
   }
 
   execInline(inline) {
+    if (this.usagePolicy) {
+      const chk = this.usagePolicy.isModuleAllowed('inline', inline.kind);
+      if (!chk.allowed) {
+        const pol = chk.reason === 'NotAllow' ? 'NotAllow policy' : 'Allow policy';
+        throw Error(`inline [${inline.kind}] is not allowed (${pol})`);
+      }
+    }
     if (inline.kind === 'asm') {
       const parseIsaFn = typeof parseIsaBody === 'function' ? parseIsaBody : null;
       if (!parseIsaFn) throw Error('ASM assembler is not loaded');
@@ -7059,6 +7074,14 @@ const idx = parseInt(
   const { name, alias } = fn;
   const fail = (msg, len) => this._throwRuntime(msg, fn, len != null ? len : name.length);
 
+  if (this.usagePolicy && this.isBuiltinFunction(name)) {
+    const chk = this.usagePolicy.isBuiltInAllowed(name);
+    if (!chk.allowed) {
+      const pol = chk.reason === 'NotAllow' ? 'NotAllow policy' : 'Allow policy';
+      fail(`Built-in ${name} is not allowed (${pol})`);
+    }
+  }
+
   const SA = typeof LogTScriptSignedArithmetic !== 'undefined' ? LogTScriptSignedArithmetic : null;
   const NF = typeof LogTScriptNumericFormats !== 'undefined' ? LogTScriptNumericFormats : null;
   let signedMode = false;
@@ -9468,6 +9491,14 @@ if (this.isBuiltinDEMUX(name)) {
     fail(`Function ${name} is not local; use ${name}@alias(...)`);
   }
 
+  if (this.usagePolicy) {
+    const chk = this.usagePolicy.isUserFuncCallAllowed(name);
+    if (!chk.allowed) {
+      const pol = chk.reason === 'NotAllow' ? 'NotAllow policy' : 'Allow policy';
+      fail(`Function ${name} is not allowed (${pol})`);
+    }
+  }
+
   const groupEntry = funcs.get(name);
   const ufo = typeof UserFuncOverloads !== 'undefined' ? UserFuncOverloads : null;
   const group = ufo ? ufo.ensureGroup(groupEntry) : groupEntry;
@@ -9493,6 +9524,8 @@ if (this.isBuiltinDEMUX(name)) {
   local.storage = this.storage;
   local.nextIndex = this.nextIndex;
   local.pcbInstances = this.pcbInstances;
+  if (this.usagePolicy) local.usagePolicy = this.usagePolicy.clone();
+  if (this.policyTypeModules) local.policyTypeModules = this.policyTypeModules;
 
   group.params.forEach((p, i) => {
     local.vars.set(p.id, {
@@ -10410,6 +10443,13 @@ if (this.isBuiltinDEMUX(name)) {
       }
       let name = s.doc;
       let alias = '.name';
+      if (name === 'Allow' || name === 'NotAllow') {
+        const lines = this.usagePolicy
+          ? this.usagePolicy.formatDocLines(name)
+          : [`${name} policy: (not available)`];
+        for (const line of lines) this.out.push(line);
+        return;
+      }
       const comp = this.components.get(name);
       if(comp) {
         alias = name;
@@ -10564,6 +10604,16 @@ if (this.isBuiltinDEMUX(name)) {
 
     if (s.costOf) {
       this._execCostOf(s);
+      return;
+    }
+
+    if (s.allow) {
+      if (this.usagePolicy) this.usagePolicy.applyAllow(s.allow.entries);
+      return;
+    }
+
+    if (s.notAllow) {
+      if (this.usagePolicy) this.usagePolicy.applyNotAllow(s.notAllow.entries);
       return;
     }
 
@@ -12585,6 +12635,13 @@ if (s.assignment) {
   execComp(comp){
     // Execute component declaration: comp [led] .power: ...
     const {type, componentType, name, attributes, returnType} = comp;
+    if (this.usagePolicy) {
+      const chk = this.usagePolicy.isModuleAllowed('comp', type);
+      if (!chk.allowed) {
+        const pol = chk.reason === 'NotAllow' ? 'NotAllow policy' : 'Allow policy';
+        this._throwRuntime(`Component type '${type}' is not allowed (${pol})`, comp, type.length);
+      }
+    }
     let initialValue = comp.initialValue;
     let dipRef = null; // For DIP switches
     let switchRef = null; // For switches, store the output reference
@@ -13433,6 +13490,14 @@ if (s.assignment) {
   execPcbInstance(inst){
     // Execute PCB instance: pcb [name] .var::
     const { pcbName, instanceName } = inst;
+
+    if (this.usagePolicy) {
+      const chk = this.usagePolicy.isModuleAllowed('pcb', pcbName);
+      if (!chk.allowed) {
+        const pol = chk.reason === 'NotAllow' ? 'NotAllow policy' : 'Allow policy';
+        throw Error(`PCB '${pcbName}' is not allowed (${pol})`);
+      }
+    }
     
     // Get PCB definition
     const def = this.pcbDefinitions.get(pcbName);
@@ -13498,6 +13563,7 @@ if (s.assignment) {
     const savedComponents = new Map(this.components);
     const savedInsidePcbBody = this.insidePcbBody;
     const savedCurrentPcbInstance = this.currentPcbInstance;
+    const savedUsagePolicy = this.usagePolicy ? this.usagePolicy.snapshot() : null;
     
     // Mark that we're inside PCB body
     this.insidePcbBody = true;
@@ -13603,6 +13669,7 @@ if (s.assignment) {
     this.components = savedComponents;
     this.insidePcbBody = savedInsidePcbBody;
     this.currentPcbInstance = savedCurrentPcbInstance;
+    if (savedUsagePolicy && this.usagePolicy) this.usagePolicy.restore(savedUsagePolicy);
   }
   
   renamePcbStatement(stmt, prefix){
@@ -14832,6 +14899,7 @@ if (s.assignment) {
     const savedComponents = new Map(this.components);
     const savedChipInstances = new Map(this.chipInstances);
     const savedBoardInstances = new Map(this.boardInstances);
+    const savedUsagePolicy = this.usagePolicy ? this.usagePolicy.snapshot() : null;
 
     if (kind === 'chip') {
       this.insideChipBody = true;
@@ -14849,6 +14917,7 @@ if (s.assignment) {
       this._syncCompositePouts(instance);
       this._finalizeCompositeBodyContext(kind, instanceName, instance, savedVars, savedWires,
         savedComponents, savedChipInstances, savedBoardInstances, internalPrefix, pinStorage, poutStorage);
+      if (savedUsagePolicy && this.usagePolicy) this.usagePolicy.restore(savedUsagePolicy);
       return;
     }
 
@@ -14873,10 +14942,18 @@ if (s.assignment) {
 
     this._finalizeCompositeBodyContext(kind, instanceName, instance, savedVars, savedWires,
       savedComponents, savedChipInstances, savedBoardInstances, internalPrefix, pinStorage, poutStorage);
+    if (savedUsagePolicy && this.usagePolicy) this.usagePolicy.restore(savedUsagePolicy);
   }
 
   execChipInstance(inst) {
     const { chipName, instanceName } = inst;
+    if (this.usagePolicy) {
+      const chk = this.usagePolicy.isModuleAllowed('chip', chipName);
+      if (!chk.allowed) {
+        const pol = chk.reason === 'NotAllow' ? 'NotAllow policy' : 'Allow policy';
+        throw Error(`Chip '${chipName}' is not allowed (${pol})`);
+      }
+    }
     const def = this.chipDefinitions.get(chipName);
     if (!def) {
       throw Error(`Chip '${chipName}' is not defined. Available chips: ${[...this.chipDefinitions.keys()].join(', ')}`);
@@ -15039,6 +15116,13 @@ if (s.assignment) {
 
   execBoardInstance(inst) {
     const { boardName, instanceName } = inst;
+    if (this.usagePolicy) {
+      const chk = this.usagePolicy.isModuleAllowed('board', boardName);
+      if (!chk.allowed) {
+        const pol = chk.reason === 'NotAllow' ? 'NotAllow policy' : 'Allow policy';
+        throw Error(`Board '${boardName}' is not allowed (${pol})`);
+      }
+    }
     const def = this.boardDefinitions.get(boardName);
     if (!def) {
       throw Error(`Board '${boardName}' is not defined. Available boards: ${[...this.boardDefinitions.keys()].join(', ')}`);
@@ -17296,6 +17380,7 @@ Interpreter.getDocIndexLines = function() {
     '  Name — builtin or user function (OR, ADD, myFunc, …)',
     '  sockName — sock instance (e.g. doc(rx)); doc(sock) — list declared socks',
     '  show, peek, probe, watch, Zlist, deps — debug statements',
+    '  Allow, NotAllow — usage policy (doc(Allow), doc(NotAllow))',
   ];
 };
 
