@@ -1,4 +1,4 @@
-/** Run all tests in Node (same suite as run_tests.html). */
+/** Run all tests in Node (same suite as run_tests.html). Use -v / --verbose for runtime console output. */
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
@@ -6,15 +6,19 @@ const { ROOT } = require('./js/paths');
 const { TEST_RUNTIME_SCRIPTS } = require(path.join(ROOT, 'tests', 'test_runtime_bundle_generated.js'));
 const { createTestNodeSandbox } = require('./js/test_node_sandbox');
 
+const verbose = process.argv.includes('-v') || process.argv.includes('--verbose');
+
 let src = '';
 for (const f of TEST_RUNTIME_SCRIPTS) {
   src += fs.readFileSync(path.join(ROOT, f), 'utf8') + '\n';
 }
 
-const sandbox = createTestNodeSandbox();
+const sandbox = createTestNodeSandbox({ verbose });
 vm.runInNewContext(src, sandbox);
 
 const suite = sandbox.LogTScriptTestSuite;
+const testCount = suite.tests.length;
+console.log('Running', testCount, 'tests...');
 
 function createHarness() {
   const assertions = [];

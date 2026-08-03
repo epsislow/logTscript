@@ -1,7 +1,27 @@
 /**
  * Minimal browser-like globals for Node test runners (no real DOM).
+ * @param {{ verbose?: boolean }} [options] — verbose: true uses real console; default is quiet (no-op console).
  */
-function createTestNodeSandbox() {
+function createTestNodeSandbox(options = {}) {
+  const verbose = !!options.verbose;
+  const noopConsole = {
+    log() {},
+    error() {},
+    warn() {},
+    info() {},
+    debug() {},
+    trace() {},
+    dir() {},
+    table() {},
+    group() {},
+    groupCollapsed() {},
+    groupEnd() {},
+    time() {},
+    timeEnd() {},
+    count() {},
+    assert() {},
+  };
+  const sandboxConsole = verbose ? console : noopConsole;
   function makeEl() {
     return {
       className: '',
@@ -72,7 +92,7 @@ function createTestNodeSandbox() {
     Set,
     Map,
     RegExp,
-    console,
+    console: sandboxConsole,
     Object,
     Math,
     JSON,
