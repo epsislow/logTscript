@@ -116,6 +116,20 @@ function createDefaultPolicyTypeModules(ctx) {
     },
   });
 
+  registry.register({
+    moduleName: 'phz',
+    docLabel: 'phz kinds',
+    resolveTypeToken(token) {
+      if (!['obj', 'gen', 'cont'].includes(token)) {
+        throw new Error(`Unknown entry '${token}' in phz.type{}`);
+      }
+      return token;
+    },
+    getRuntimeId(stmt) {
+      return stmt && stmt.phz && stmt.phz.kind;
+    },
+  });
+
   return registry;
 }
 

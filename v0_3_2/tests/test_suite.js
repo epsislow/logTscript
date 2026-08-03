@@ -33255,5 +33255,331 @@ def foo(1bit a):
     });
   });
 
+  // ——— PHZ faza 1 ———
+
+  function runPhzObjShortForm(h, session) {
+    const { interp } = session.run(`phz [obj] .o2::
+16wire id = .o2:id
+8wire fl = .o2:floor`);
+    h.assert('id=1', session.getWire(interp, 'id'), '0000000000000001');
+    h.assert('floor=0', session.getWire(interp, 'fl'), '00000000');
+  }
+
+  function runPhzObjAttrs(h, session) {
+    const { interp } = session.run(`phz [obj] .o:
+  myAttribute: 3
+  myAttribute2: 3 (8)
+  label: "ABC"
+  :
+2wire a = .o:myAttribute
+8wire b = .o:myAttribute2
+24wire c = .o:label`);
+    h.assert('attr 3 → 11', session.getWire(interp, 'a'), '11');
+    h.assert('3 (8)', session.getWire(interp, 'b'), '00000011');
+    h.assert('ABC bits len', String(session.getWire(interp, 'c').length), '24');
+  }
+
+  function runPhzSpawnCount(h, session) {
+    const { interp } = session.run(`phz [cont] .c1:
+  max: 30
+  :
+phz [gen] .g1:
+  type: obj
+  floor: 0
+  flag: 1
+  :
+.g1:{
+  add: 10
+  inside: .c1
+  set: 1
+}
+16wire n = .c1:inside:count
+1wire e = .c1:inside:empty
+16wire id0 = .c1:inside:0:id
+1wire f0 = .c1:inside:0:flag`);
+    h.assert('count 10', session.getWire(interp, 'n'), '0000000000001010');
+    h.assert('not empty', session.getWire(interp, 'e'), '0');
+    h.assert('first id 1', session.getWire(interp, 'id0'), '0000000000000001');
+    h.assert('flag', session.getWire(interp, 'f0'), '1');
+  }
+
+  function runPhzRespawn(h, session) {
+    const { interp } = session.run(`phz [cont] .c1:
+  max: 30
+  :
+phz [gen] .g1:
+  type: obj
+  :
+.g1:{
+  add: 10
+  inside: .c1
+  set: 1
+}
+.g1:{
+  add: \\5
+  inside: .c1
+  set: 1
+}
+16wire n = .c1:inside:count`);
+    h.assert('count 15', session.getWire(interp, 'n'), '0000000000001111');
+  }
+
+  function runPhzOverflow(h, session) {
+    h.assertThrows('overflow', function() {
+      session.run(`phz [cont] .c1:
+  max: 3
+  :
+phz [gen] .g1:
+  type: obj
+  :
+.g1:{
+  add: \\4
+  inside: .c1
+  set: 1
+}`);
+    }, 'overflow');
+  }
+
+  function runPhzMissingAttr(h, session) {
+    h.assertThrows('missing attr', function() {
+      const { interp } = session.run(`phz [cont] .c1:
+  max: 30
+  :
+phz [gen] .gA:
+  type: obj
+  onlyA: 1
+  :
+phz [gen] .gB:
+  type: obj
+  onlyB: 1
+  :
+.gA:{
+  add: 1
+  inside: .c1
+  set: 1
+}
+.gB:{
+  add: 1
+  inside: .c1
+  set: 1
+}`);
+      interp.phzEngine.resolveProperty('.c1', 'inside:1:onlyA');
+    }, 'missing attribute');
+  }
+
+  function runPhzGenNeedsType(h, session) {
+    h.assertThrows('type required', function() {
+      session.parse(`phz [gen] .g:
+  floor: 0
+  :
+`);
+    }, 'type: obj');
+  }
+
+  function runPhzContReserved(h, session) {
+    h.assertThrows('reserved', function() {
+      session.parse(`phz [cont] .c:
+  inside: 1
+  :
+`);
+    }, 'reserved');
+  }
+
+  function runPhzFloorWidthForbidden(h, session) {
+    h.assertThrows('no width', function() {
+      session.parse(`phz [obj] .o:
+  floor: 1 (4)
+  :
+`);
+    }, 'does not allow');
+  }
+
+  function runPhzFirstLast(h, session) {
+    const { interp } = session.run(`phz [cont] .c1::
+phz [gen] .g1:
+  type: obj
+  :
+.g1:{
+  add: \\3
+  inside: .c1
+  set: 1
+}
+16wire a = .c1:inside:first:id
+16wire b = .c1:inside:last:id`);
+    h.assert('first id 1', session.getWire(interp, 'a'), '0000000000000001');
+    h.assert('last id 3', session.getWire(interp, 'b'), '0000000000000011');
+  }
+
+  reg(3100, 'phz', 'obj short form id auto + floor 0', runPhzObjShortForm);
+  reg(3101, 'phz', 'obj attributes decimal string pad', runPhzObjAttrs);
+  reg(3102, 'phz', 'gen spawn into cont + inside:count', runPhzSpawnCount);
+  reg(3103, 'phz', 're-spawn appends', runPhzRespawn);
+  reg(3104, 'phz', 'overflow errors', runPhzOverflow);
+  reg(3105, 'phz', 'missing attribute on heterogeneous obj', runPhzMissingAttr);
+  reg(3106, 'phz', 'gen requires type obj', runPhzGenNeedsType);
+  reg(3107, 'phz', 'cont reserved inside attr', runPhzContReserved);
+  reg(3108, 'phz', 'floor (W) forbidden', runPhzFloorWidthForbidden);
+  reg(3109, 'phz', 'inside first last', runPhzFirstLast);
+
+  function regPhzWave(id, title, run) {
+    reg(id, 'phz', title + ' (wave)', run, { propagation: 'wave' });
+  }
+  const _phzWavePairs = [
+    [3100, 3110], [3101, 3111], [3102, 3112], [3103, 3113], [3104, 3114],
+    [3105, 3115], [3106, 3116], [3107, 3117], [3108, 3118], [3109, 3119]
+  ];
+  for (const [legacyId, waveId] of _phzWavePairs) {
+    const t = tests.find(x => x.id === legacyId);
+    if (t) regPhzWave(waveId, t.title, t.run);
+  }
+
+  // Doc logts-play smoke (keep in sync with doc/phz.md runnable blocks)
+  const PHZ_DOC_SHORT = `phz [obj] .o2::
+16wire id = .o2:id
+8wire fl = .o2:floor
+show(id, fl)`;
+
+  const PHZ_DOC_ATTRS = `phz [obj] .crate:
+  weight: 3
+  weightPad: 3 (8)
+  label: "ABC"
+  :
+2wire w = .crate:weight
+8wire wp = .crate:weightPad
+24wire lab = .crate:label
+show(w, wp, lab)`;
+
+  const PHZ_DOC_SPAWN = `phz [cont] .room:
+  max: 30
+  :
+phz [gen] .factory:
+  type: obj
+  floor: 0
+  flag: 1
+  :
+.factory:{
+  add = 10
+  inside = .room
+  set = 1
+}
+16wire n = .room:inside:count
+1wire empty = .room:inside:empty
+16wire id0 = .room:inside:0:id
+1wire f0 = .room:inside:0:flag
+show(n, empty, id0, f0)`;
+
+  const PHZ_DOC_RESPAWN = `phz [cont] .bin:
+  max: 30
+  :
+phz [gen] .mk:
+  type: obj
+  :
+.mk:{
+  add = 10
+  inside = .bin
+  set = 1
+}
+.mk:{
+  add = \\5
+  inside = .bin
+  set = 1
+}
+16wire n = .bin:inside:count
+show(n)`;
+
+  const PHZ_DOC_FIRST_LAST = `phz [cont] .slot::
+phz [gen] .mk:
+  type: obj
+  :
+.mk:{
+  add = \\3
+  inside = .slot
+  set = 1
+}
+16wire firstId = .slot:inside:first:id
+16wire lastId = .slot:inside:last:id
+show(firstId, lastId)`;
+
+  const PHZ_DOC_WRITE = `phz [obj] .box:
+  flag: 0
+  :
+.box:{
+  flag = 1
+}
+1wire f = .box:flag
+show(f)`;
+
+  const PHZ_DOC_HETERO = `phz [cont] .bag:
+  max: 30
+  :
+phz [gen] .mkA:
+  type: obj
+  onlyA: 1
+  :
+phz [gen] .mkB:
+  type: obj
+  onlyB: 1
+  :
+.mkA:{
+  add = 1
+  inside = .bag
+  set = 1
+}
+.mkB:{
+  add = 1
+  inside = .bag
+  set = 1
+}
+1wire a0 = .bag:inside:0:onlyA
+1wire b1 = .bag:inside:1:onlyB
+show(a0, b1)`;
+
+  reg(3120, 'phz', 'phz.md logts-play smoke — short obj', function(h, session) {
+    const { interp } = session.run(PHZ_DOC_SHORT);
+    h.assert('id', session.getWire(interp, 'id'), '0000000000000001');
+    h.assert('floor', session.getWire(interp, 'fl'), '00000000');
+  });
+  reg(3121, 'phz', 'phz.md logts-play smoke — attrs', function(h, session) {
+    const { interp } = session.run(PHZ_DOC_ATTRS);
+    h.assert('weight', session.getWire(interp, 'w'), '11');
+    h.assert('pad', session.getWire(interp, 'wp'), '00000011');
+  });
+  reg(3122, 'phz', 'phz.md logts-play smoke — spawn', function(h, session) {
+    const { interp } = session.run(PHZ_DOC_SPAWN);
+    h.assert('count', session.getWire(interp, 'n'), '0000000000001010');
+    h.assert('flag', session.getWire(interp, 'f0'), '1');
+  });
+  reg(3123, 'phz', 'phz.md logts-play smoke — respawn', function(h, session) {
+    const { interp } = session.run(PHZ_DOC_RESPAWN);
+    h.assert('count 15', session.getWire(interp, 'n'), '0000000000001111');
+  });
+  reg(3124, 'phz', 'phz.md logts-play smoke — first/last', function(h, session) {
+    const { interp } = session.run(PHZ_DOC_FIRST_LAST);
+    h.assert('first', session.getWire(interp, 'firstId'), '0000000000000001');
+    h.assert('last', session.getWire(interp, 'lastId'), '0000000000000011');
+  });
+  reg(3125, 'phz', 'phz.md logts-play smoke — runtime write', function(h, session) {
+    const { interp } = session.run(PHZ_DOC_WRITE);
+    h.assert('flag', session.getWire(interp, 'f'), '1');
+  });
+  reg(3126, 'phz', 'phz.md logts-play smoke — heterogeneous', function(h, session) {
+    const { interp } = session.run(PHZ_DOC_HETERO);
+    h.assert('onlyA', session.getWire(interp, 'a0'), '1');
+    h.assert('onlyB', session.getWire(interp, 'b1'), '1');
+  });
+
+  regPhzWave(3127, 'phz.md logts-play smoke — short obj', function(h, session) {
+    const { interp } = session.run(PHZ_DOC_SHORT);
+    h.assert('id', session.getWire(interp, 'id'), '0000000000000001');
+  });
+  regPhzWave(3128, 'phz.md logts-play smoke — spawn', function(h, session) {
+    const { interp } = session.run(PHZ_DOC_SPAWN);
+    h.assert('count', session.getWire(interp, 'n'), '0000000000001010');
+  });
+  regPhzWave(3129, 'phz.md logts-play smoke — respawn', function(h, session) {
+    const { interp } = session.run(PHZ_DOC_RESPAWN);
+    h.assert('count 15', session.getWire(interp, 'n'), '0000000000001111');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -44,6 +44,7 @@ const DOC_SECTIONS = [
     items: [
       { file: 'board.md', label: 'Board' },
       { file: 'chip.md', label: 'Chip' },
+      { file: 'phz.md', label: 'PHZ (obj / gen / cont)', searchExtra: 'phz object generator container inside floor max spawn physical zone topology ownership philosophy Load and Run logts-play wave gen obj cont' },
       { file: 'mini-cpu.md', label: 'Mini CPU demo', searchExtra: 'harvard alu cpu4 step' },
       { file: 'mini-cpu-v2.md', label: 'Mini CPU v2 demo', searchExtra: 'asm beq lut terminal cpu4v2' },
       { file: 'pocket-calc.md', label: 'Pocket calculator demo', searchExtra: 'keyboard calc terminal divider toAscii onlyDigits' },

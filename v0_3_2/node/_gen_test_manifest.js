@@ -45,6 +45,7 @@ const GROUP_META = [
   { id: 'doc', label: 'doc() tests' },
   { id: 'doc-comp', label: 'Doc for body comps' },
   { id: 'chip', label: 'Chip component' },
+  { id: 'phz', label: 'PHZ (obj/gen/cont)' },
   { id: 'board', label: 'Board component' },
   { id: 'mini-cpu-v2', label: 'Mini CPU v2 demo' },
   { id: 'lut', label: 'LUT lookup table' },

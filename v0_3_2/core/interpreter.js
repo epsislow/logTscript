@@ -445,6 +445,11 @@ class Interpreter {
     // Inline definitions (e.g. inline [asm] .myisa:)
     this.inlineInstances = new Map();
 
+    // PHZ physical zone framework
+    this.phzEngine = typeof LogTScriptPhzEngine !== 'undefined'
+      ? new LogTScriptPhzEngine(this)
+      : null;
+
     // ASM composition modules (blob metadata for use / decode)
     this.asmModules = new Map();
     this.nextAsmModuleId = 1;
@@ -6659,6 +6664,24 @@ class Interpreter {
           if (compositeResult) return compositeResult;
         }
 
+        if (this.phzEngine && this.phzEngine.getNamed(a.var)) {
+          if (!a.property) {
+            throw Error(`Cannot read PHZ instance ${a.var} without a property`);
+          }
+          const phzResult = this.phzEngine.resolveProperty(a.var, a.property);
+          if (phzResult) {
+            let val = phzResult.value;
+            if (a.pad && val) val = this.applyPad(val, a.pad);
+            return {
+              value: val,
+              ref: phzResult.ref || null,
+              varName: `${a.var}:${a.property}`,
+              bitWidth: phzResult.bitWidth || (val ? val.length : 0),
+              displayText: phzResult.displayText,
+            };
+          }
+        }
+
         const inlineInst = this.inlineInstances.get(a.var);
         if (inlineInst && a.property && inlineInst.labelMap && inlineInst.labelMap[a.property]) {
           const entry = inlineInst.labelMap[a.property];
@@ -10678,6 +10701,11 @@ if (this.isBuiltinDEMUX(name)) {
       return;
     }
 
+    if (s.phz) {
+      this.execPhz(s.phz);
+      return;
+    }
+
     if(s.probe){
       return;
     }
@@ -10762,6 +10790,7 @@ if (this.isBuiltinDEMUX(name)) {
       const pcbInst = this.pcbInstances ? this.pcbInstances.get(component) : null;
       const chipInst = this.chipInstances ? this.chipInstances.get(component) : null;
       const boardInst = this.boardInstances ? this.boardInstances.get(component) : null;
+      const phzNamed = this.phzEngine ? this.phzEngine.getNamed(component) : null;
       const onMode = (comp && comp.attributes && comp.attributes.on)
         ? String(comp.attributes.on)
         : (pcbInst && pcbInst.def && pcbInst.def.on)
@@ -10770,7 +10799,7 @@ if (this.isBuiltinDEMUX(name)) {
             ? String(chipInst.def.on)
             : (boardInst && boardInst.def && boardInst.def.on)
               ? String(boardInst.def.on)
-              : 'raise';
+              : (phzNamed ? '1' : 'raise');
       
       // Store the block for re-execution when dependencies change
       // BUT NOT when we're inside a PCB/chip/body body (internal blocks are executed inline)
@@ -11505,6 +11534,19 @@ if (s.assignment) {
       throw Error(`Unknown property '${property}' for board instance ${name}`);
     }
     throw Error(`Cannot assign directly to board instance ${name}. Use ${name}:pinName = value`);
+  }
+
+  if (this.phzEngine && this.phzEngine.getNamed(name)) {
+    const inst = this.phzEngine.getNamed(name);
+    if (!property) {
+      throw Error(`Cannot assign directly to PHZ instance ${name}`);
+    }
+    if (String(property).indexOf('inside') === 0 || String(property).indexOf(':') >= 0) {
+      throw Error(`PHZ :inside path is read-only (cannot write '${property}')`);
+    }
+    const value = this._evalExprToBin(expr);
+    this.phzEngine.setAttrValue(inst, property, value);
+    return;
   }
 
   // Check if it's a component first
@@ -13956,6 +13998,10 @@ if (s.assignment) {
       return this.executeBoardPropertyBlock(component, boardInstance, properties, reEvaluate, block);
     }
 
+    if (this.phzEngine && this.phzEngine.getNamed(component)) {
+      return this.executePhzPropertyBlock(component, properties, reEvaluate, block);
+    }
+
     const comp = this.components.get(component);
     if(!comp){
       return;
@@ -14986,6 +15032,108 @@ if (s.assignment) {
     };
     this.chipInstances.set(instanceName, instanceInfo);
     this.executeCompositeBody('chip', instanceName, def.body);
+  }
+
+  execPhz(phz) {
+    if (!this.phzEngine) {
+      throw Error('PHZ engine is not available');
+    }
+    if (this.usagePolicy) {
+      const chk = this.usagePolicy.isModuleAllowed('phz', phz.kind);
+      if (!chk.allowed) {
+        const pol = chk.reason === 'NotAllow' ? 'NotAllow policy' : 'Allow policy';
+        throw Error(`PHZ '${phz.kind}' is not allowed (${pol})`);
+      }
+    }
+    if (phz.kind === 'obj') this.phzEngine.createObj(phz.name, phz.attributes);
+    else if (phz.kind === 'gen') this.phzEngine.createGen(phz.name, phz.attributes);
+    else if (phz.kind === 'cont') this.phzEngine.createCont(phz.name, phz.attributes);
+    else throw Error(`Unknown PHZ kind '${phz.kind}'`);
+  }
+
+  _evalExprToBin(expr) {
+    let value = '';
+    const exprResult = this.evalExpr(expr, false);
+    for (const part of exprResult) {
+      if (part.value && part.value !== '-') value += part.value;
+      else if (part.ref && part.ref !== '&-') {
+        const val = this.getValueFromRef(part.ref);
+        if (val) value += val;
+      }
+    }
+    return value;
+  }
+
+  executePhzPropertyBlock(component, properties, reEvaluate, block) {
+    const inst = this.phzEngine.getNamed(component);
+    if (!inst) return;
+
+    if (inst.kind === 'gen') {
+      let addVal = null;
+      let insideName = null;
+      let floorOverride = null;
+      let shouldSpawn = false;
+
+      for (const prop of properties) {
+        if (this._execPropertyBlockDebugItem(prop)) continue;
+        const property = prop.property;
+        if (property === 'add') {
+          const expr = prop.expr;
+          if (expr && expr.length === 1 && (expr[0].dec != null || expr[0].sdec != null || expr[0].bin != null)) {
+            const atom = expr[0];
+            if (atom.dec != null) addVal = parseInt(atom.dec, 10);
+            else if (atom.sdec != null) addVal = parseInt(String(atom.sdec), 10);
+            else addVal = parseInt(atom.bin, 10); // PHZ: digit string as decimal (add: 10 → 10)
+          } else {
+            const bin = this._evalExprToBin(expr);
+            addVal = parseInt(bin || '0', 2);
+          }
+        } else if (property === 'inside') {
+          const expr = prop.expr;
+          if (!expr || expr.length !== 1 || !expr[0].var || !String(expr[0].var).startsWith('.')) {
+            throw Error(`PHZ gen inside expects .<cont> reference`);
+          }
+          insideName = expr[0].var;
+        } else if (property === 'floor') {
+          const expr = prop.expr;
+          if (expr && expr.length === 1 && expr[0].var && !String(expr[0].var).startsWith('.')) {
+            floorOverride = { wireName: expr[0].var };
+          } else if (expr && expr.length === 1 && (expr[0].dec != null || expr[0].sdec != null || expr[0].bin != null)) {
+            const atom = expr[0];
+            if (atom.dec != null) floorOverride = parseInt(atom.dec, 10);
+            else if (atom.sdec != null) floorOverride = parseInt(String(atom.sdec), 10);
+            else floorOverride = parseInt(atom.bin, 10);
+          } else {
+            const bin = this._evalExprToBin(expr);
+            floorOverride = parseInt(bin || '0', 2);
+          }
+        } else if (property === 'set') {
+          const bin = this._evalExprToBin(prop.expr);
+          const bit = bin.length ? bin[bin.length - 1] : '0';
+          if (bit === '1') shouldSpawn = true;
+        } else {
+          throw Error(`Unknown property '${property}' for PHZ gen ${component}`);
+        }
+      }
+
+      if (shouldSpawn) {
+        if (insideName == null) throw Error(`PHZ gen ${component} spawn requires inside: .<cont>`);
+        if (addVal == null) throw Error(`PHZ gen ${component} spawn requires add`);
+        this.phzEngine.spawn(component, addVal, insideName, floorOverride);
+      }
+      return;
+    }
+
+    // obj / cont attribute writes (wireLiterals via evalExpr)
+    for (const prop of properties) {
+      if (this._execPropertyBlockDebugItem(prop)) continue;
+      const property = prop.property;
+      if (property.indexOf(':') >= 0 || property === 'inside') {
+        throw Error(`PHZ :inside path is read-only (cannot write '${property}')`);
+      }
+      const value = this._evalExprToBin(prop.expr);
+      this.phzEngine.setAttrValue(inst, property, value);
+    }
   }
 
   executeChipBody(instanceName, statements) {

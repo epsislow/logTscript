@@ -95,6 +95,8 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/debug-display-format.js",
   "core/probe-cause.js",
   "core/wire-literals.js",
+  "core/phz-width.js",
+  "core/phz-engine.js",
   "core/color-wire-resolve.js",
   "core/policy-type-modules.js",
   "core/usage-policy.js",

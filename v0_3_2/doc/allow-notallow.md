@@ -16,13 +16,13 @@ Default: everything allowed (`Allow ALL` implicit), nothing blocked (`NotAllow N
 - `builtIn` — all builtin functions
 - `func` — all user function calls
 - `def` — defining functions with `def`
-- `comp`, `chip`, `board`, `pcb`, `inline` — all items in that module
+- `comp`, `chip`, `board`, `pcb`, `inline`, `phz` — all items in that module
 
 ## Typed lists (`module.type{}`)
 
 - `comp.type{reg key ~ +}` — specific component types (shortcuts as in `comp [+]`)
 - `chip.type{myChip}` — specific chip definitions
-- `board.type{myBoard}`, `pcb.type{myPcb}`, `inline.type{asm protocol}`
+- `board.type{myBoard}`, `pcb.type{myPcb}`, `inline.type{asm protocol}`, `phz.type{obj gen cont}`
 
 Bare IDs like `led` or `asm` refer to **user function names**, not comp/inline types. Use `comp.type{led}` for component types.
 

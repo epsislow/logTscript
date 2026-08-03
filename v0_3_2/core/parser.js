@@ -1065,6 +1065,11 @@ parse() {
       continue;
     }
 
+    if (this.c.type === 'KEYWORD' && this.c.value === 'phz') {
+      stmts.push(this.parsePhz());
+      continue;
+    }
+
     if (this.c.type === 'KEYWORD' && this.c.value === 'inline') {
       stmts.push(this.parseInline());
       continue;
@@ -2342,7 +2347,11 @@ parseBoardInstance() {
       return { property: 'pout>', poutName: propName, target: targetAtom, expr: null, ...enableSuffix };
     }
 
-    this.eat('SYM', '=');
+    if (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+    } else {
+      this.eat('SYM', '=');
+    }
 
     const expr = this.expr();
 
@@ -4889,19 +4898,14 @@ assignment() {
     if (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
       
-      if (this.c.type !== 'ID') {
+      if (this.c.type !== 'ID' && this.c.type !== 'DEC' && this.c.type !== 'BIN') {
         throw Error(`Expected property name after ':' at ${this.c.line}:${this.c.col}`);
       }
       
-      let property = this.c.value;
-      this.eat('ID');
+      let property = this._eatPropertyPathSegment();
       while (this.c.type === 'SYM' && this.c.value === ':') {
         this.eat('SYM', ':');
-        if (this.c.type !== 'ID') {
-          throw Error(`Expected property name after ':' at ${this.c.line}:${this.c.col}`);
-        }
-        property += ':' + this.c.value;
-        this.eat('ID');
+        property += ':' + this._eatPropertyPathSegment();
       }
       
       if (this.c.type === 'SYM' && this.c.value === '.') {
@@ -5930,6 +5934,166 @@ isBuiltinFunction(name) {
     const entries = this._parsePolicyEntries();
     if (this.usagePolicy) this.usagePolicy.applyNotAllow(entries);
     return { notAllow: { entries }, line: stmtLine, col: stmtCol };
+  }
+
+  _eatPropertyPathSegment() {
+    if (this.c.type === 'ID' || this.c.type === 'DEC' || this.c.type === 'BIN') {
+      const v = this.c.value;
+      this.eat(this.c.type);
+      return v;
+    }
+    throw Error(`Expected property path segment after ':' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  _parsePhzAttrValue() {
+    this.t.skip();
+
+    if (this.c.type === 'WSTR') {
+      const strValue = this.c.value;
+      this.eat('WSTR');
+      let width = null;
+      this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === '(') {
+        this.eat('SYM', '(');
+        this.t.skip();
+        if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+          throw Error(`Expected width in PHZ string (W) at ${this.c.line}:${this.c.col}`);
+        }
+        width = parseInt(this.c.value, 10);
+        this.eat(this.c.type);
+        this.eat('SYM', ')');
+      }
+      return { kind: 'string', value: strValue, width };
+    }
+
+    // decimal / numeric (BIN digits treated as decimal text per PHZ rules)
+    if (this.c.type === 'DEC' || this.c.type === 'BIN' || this.c.type === 'SDEC') {
+      const numStr = this.c.value;
+      this.eat(this.c.type);
+      let width = null;
+      this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === '(') {
+        this.eat('SYM', '(');
+        this.t.skip();
+        if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+          throw Error(`Expected width in PHZ (W) at ${this.c.line}:${this.c.col}`);
+        }
+        width = parseInt(this.c.value, 10);
+        this.eat(this.c.type);
+        this.eat('SYM', ')');
+      }
+      return { kind: 'decimal', value: numStr, width };
+    }
+
+    if (this.c.type === 'ID') {
+      const id = this.c.value;
+      this.eat('ID');
+      return { kind: 'wire', value: id };
+    }
+
+    throw Error(`Expected PHZ attribute value at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+
+  parsePhz() {
+    const stmtLine = this.c.line;
+    const stmtCol = tokenStartCol(this.c);
+    this.eat('KEYWORD', 'phz');
+    this.eat('SYM', '[');
+
+    if (this.c.type !== 'ID') {
+      throw Error(`Expected phz kind obj|gen|cont at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const kind = this.c.value;
+    this.eat('ID');
+    if (kind !== 'obj' && kind !== 'gen' && kind !== 'cont') {
+      throw Error(`Unknown phz kind '${kind}' (expected obj, gen, or cont) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    this.eat('SYM', ']');
+
+    if (this.usagePolicy) {
+      const chk = this.usagePolicy.isModuleAllowed('phz', kind);
+      if (!chk.allowed) {
+        throw Error(`PHZ '${kind}' is not allowed (${chk.reason} policy) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+    }
+
+    if (this.c.value !== '.') {
+      throw Error(`Expected instance name starting with '.' after phz [${kind}] at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    this.eat('SYM', '.');
+    if (this.c.type !== 'ID') {
+      throw Error(`Expected instance name after '.' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const name = '.' + this.c.value;
+    this.eat('ID');
+
+    this.t.skip();
+    this.eat('SYM', ':');
+
+    // short form ::
+    if (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+      if (kind === 'gen') {
+        throw Error(`PHZ gen '${name}' requires a body with type: obj at ${this.c.file}: ${stmtLine}:${stmtCol}`);
+      }
+      return { phz: { kind, name, attributes: {} }, line: stmtLine, col: stmtCol };
+    }
+
+    const attributes = {};
+    while (this.c.type !== 'EOF') {
+      if (this.c.type === 'EOL') {
+        this.c = this.t.get();
+        continue;
+      }
+      this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        break;
+      }
+      if (this.c.type !== 'ID') {
+        throw Error(`Expected attribute name or closing ':' in phz [${kind}] ${name} at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const attrName = this.c.value;
+      this.eat('ID');
+      this.t.skip();
+      this.eat('SYM', ':');
+      this.t.skip();
+
+      if (attrName === 'type') {
+        if (kind !== 'gen') {
+          throw Error(`PHZ attribute 'type' is only allowed on gen at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        if (this.c.type !== 'ID') {
+          throw Error(`Expected type name after type: at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+        const typeVal = this.c.value;
+        this.eat('ID');
+        attributes.type = { kind: 'type', value: typeVal };
+        continue;
+      }
+
+      if (kind === 'cont' && (attrName === 'inside' || attrName === 'count' || attrName === 'empty')) {
+        throw Error(`PHZ cont attribute '${attrName}' is reserved at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      if (kind === 'gen' && attrName === 'id') {
+        throw Error(`PHZ gen cannot define 'id' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+
+      const val = this._parsePhzAttrValue();
+      if ((attrName === 'id' || attrName === 'floor' || attrName === 'max') && val.width != null) {
+        throw Error(`PHZ ${attrName} does not allow (W) width suffix at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      if (attrName === 'id' && val.kind === 'wire') {
+        throw Error(`PHZ id does not allow wire reference at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      attributes[attrName] = val;
+    }
+
+    if (kind === 'gen' && (!attributes.type || attributes.type.value !== 'obj')) {
+      throw Error(`PHZ gen '${name}' requires type: obj at ${this.c.file}: ${stmtLine}:${stmtCol}`);
+    }
+
+    return { phz: { kind, name, attributes }, line: stmtLine, col: stmtCol };
   }
 
 }
