@@ -1,9 +1,10 @@
 /**
  * Minimal browser-like globals for Node test runners (no real DOM).
- * @param {{ verbose?: boolean }} [options] — verbose: true uses real console; default is quiet (no-op console).
+ * @param {{ verbose?: boolean, veryVerbose?: boolean }} [options]
+ *   veryVerbose / verbose: true uses real console; default is quiet (no-op console).
  */
 function createTestNodeSandbox(options = {}) {
-  const verbose = !!options.verbose;
+  const veryVerbose = !!(options.veryVerbose || options.verbose);
   const noopConsole = {
     log() {},
     error() {},
@@ -21,7 +22,7 @@ function createTestNodeSandbox(options = {}) {
     count() {},
     assert() {},
   };
-  const sandboxConsole = verbose ? console : noopConsole;
+  const sandboxConsole = veryVerbose ? console : noopConsole;
   function makeEl() {
     return {
       className: '',
