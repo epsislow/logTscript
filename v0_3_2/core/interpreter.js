@@ -9487,7 +9487,8 @@ if (this.isBuiltinDEMUX(name)) {
     f = groupEntry;
   }
 
-  const local = new Interpreter(this.funcs, this.out, this.pcbDefinitions, this.componentRegistry, this.signalPropagationStrategy);
+  // Ephemeral scope: do not bind the parent wave strategy (shared bind() would steal interp).
+  const local = new Interpreter(this.funcs, this.out, this.pcbDefinitions, this.componentRegistry, null);
   local.aliases = this.aliases;
   local.storage = this.storage;
   local.nextIndex = this.nextIndex;

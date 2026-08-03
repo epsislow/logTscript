@@ -2446,7 +2446,8 @@
       {"id":2992,"group":"clcd","title":"per-symbol color wire ref parse","detail":{"scripts":["comp [clcd] .status:\n  = {\n    warning:\n      x: 90\n      y: 10\n      bit: 0\n      color: symFg\n      bgColor: symBg\n    :\n  }\n  :"],"steps":[],"assertions":["color wireRef","bg wireRef"]}},
       {"id":2993,"group":"clcd","title":"per-symbol color from wire refs at comp creation","detail":{"scripts":["24wire symFg = ^ffaa00\n24wire symBg = ^332200\n\ncomp [clcd] .panel:\n  = {\n    warning:\n      x: 10\n      y: 10\n      bit: 0\n      color: symFg\n      bgColor: symBg\n    :\n  }\n  :"],"steps":[],"assertions":["sym color","sym bg"]}},
       {"id":2994,"group":"clcd","title":"symbol color wire snapshot — later wire change ignored","detail":{"scripts":["MODE WIREWRITE\n24wire symFg = ^ffaa00\n\ncomp [clcd] .panel:\n  = {\n    warning: x: 10 y: 10 bit: 0 color: symFg :\n  }\n  :\n\nsymFg = ^112233"],"steps":[],"assertions":["snapshot sym color"]}},
-      {"id":2995,"group":"color-wire","title":"undefined symbol color wire throws at comp creation","detail":{"scripts":["comp [clcd] .x:\n  = { warning: x: 10 y: 10 bit: 0 color: noSuch : }\n  :"],"steps":[],"assertions":["missing wire"]}}
+      {"id":2995,"group":"color-wire","title":"undefined symbol color wire throws at comp creation","detail":{"scripts":["comp [clcd] .x:\n  = { warning: x: 10 y: 10 bit: 0 color: noSuch : }\n  :"],"steps":[],"assertions":["missing wire"]}},
+      {"id":2996,"group":"user-def","title":"def isZero — doc runnable example (wave)","detail":{"scripts":["def isZero(4bit n):\n  :1bit !OR(n)\n\n4wire x = 0010\n1wire z = isZero(x)\nshow(x)"],"steps":[],"assertions":["isZero(0010) wave","show(x) wave"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -2561,7 +2562,7 @@
       { id: 'socket-chat', label: 'socket-chat', rangeLabel: '2528–2536, 2569–2571', testIds: [2528, 2529, 2530, 2531, 2532, 2533, 2534, 2535, 2536, 2569, 2570, 2571] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983, 1571–1574, 1643–1653, 1661, 1663', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 1571, 1572, 1573, 1574, 1643, 1644, 1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1661, 1663] },
       { id: 'unsigned-width-tags', label: 'unsigned-width-tags', rangeLabel: '2410–2419', testIds: [2410, 2411, 2412, 2413, 2414, 2415, 2416, 2417, 2418, 2419] },
-      { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775] },
+      { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775, 2996', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775, 2996] },
       { id: 'user-def-tags', label: 'user-def-tags', rangeLabel: '1776–1781', testIds: [1776, 1777, 1778, 1779, 1780, 1781] },
       { id: 'vector-reduction', label: 'vector-reduction', rangeLabel: '1715–1734, 1797', testIds: [1715, 1716, 1717, 1718, 1719, 1720, 1721, 1722, 1723, 1724, 1725, 1726, 1727, 1728, 1729, 1730, 1731, 1732, 1733, 1734, 1797] },
       { id: 'wave-debug', label: 'wave-debug', rangeLabel: '2200–2218, 2268–2275', testIds: [2200, 2201, 2202, 2203, 2204, 2205, 2206, 2207, 2208, 2209, 2210, 2211, 2212, 2213, 2214, 2215, 2216, 2217, 2218, 2268, 2269, 2270, 2271, 2272, 2273, 2274, 2275] },

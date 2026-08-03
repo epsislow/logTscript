@@ -15067,6 +15067,17 @@ show(z)`);
   h.assert('isZero(0000)', session.getWire(r2.interp, 'z'), '1');
 });
 
+reg(2996, 'user-def', 'def isZero — doc runnable example (wave)', function(h, session) {
+  const { interp, out } = session.run(`def isZero(4bit n):
+  :1bit !OR(n)
+
+4wire x = 0010
+1wire z = isZero(x)
+show(x)`);
+  h.assert('isZero(0010) wave', session.getWire(interp, 'z'), '0');
+  h.assert('show(x) wave', String(out.some(l => l.includes('x (4wire) = 0010'))), 'true');
+}, { propagation: 'wave' });
+
 reg(1765, 'user-def', 'def eq4 — body wires then return', function(h, session) {
   const { interp } = session.run(`def eq4(4bit a, 4bit b):
   1bit r0 = !XOR(a.0, b.0)
