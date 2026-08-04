@@ -1,0 +1,223 @@
+PHZ — Collection Iteration ("each")
+
+PHZ does not provide language constructs such as:
+
+- "for"
+- "while"
+- "foreach"
+
+Collection iteration is performed internally by the PHZ engine.
+
+Scripts only describe what should happen.
+
+---
+
+The "each" Placeholder
+
+"each" represents the current object while the PHZ engine iterates through a collection.
+
+It is not a variable.
+
+It is not stored inside the container.
+
+It exists only while a PHZ execution property block is running.
+
+Example:
+
+.container:{
+
+    move = :inside:each
+
+    to = .container2
+
+    set = 1
+
+}
+
+Meaning:
+
+For every object inside ".container:inside",
+
+move that object into ".container2".
+
+The iteration itself is performed by the PHZ engine.
+
+---
+
+Relative Collections
+
+Inside a PHZ execution block,
+
+:inside
+
+always refers to the current container.
+
+Example:
+
+.room:{
+
+    move = :inside:each
+
+    to = .storage
+
+    set = 1
+
+}
+
+is equivalent to iterating over
+
+.room:inside
+
+---
+
+Filtering Objects
+
+"each" may be used inside expressions.
+
+Example:
+
+.room:{
+
+    move = :inside:each
+
+    to = .parking
+
+    set = EQ(:inside:each:type, "car")
+
+}
+
+Only objects whose "type" equals ""car"" are moved.
+
+All other objects remain unchanged.
+
+---
+
+Modifying Attributes
+
+"each" may also be used as the target of an assignment.
+
+Example:
+
+.room:{
+
+    :inside:each:km =
+        ADD(:inside:each:km,\1)
+
+    set = EQ(:inside:each:type,"truck")
+
+}
+
+Only matching objects are modified.
+
+Objects that do not satisfy the condition remain unchanged.
+
+---
+
+Multiple Operations
+
+A single PHZ execution block may perform several operations for the same object.
+
+Example:
+
+.room:{
+
+    :inside:each:processed = 1
+
+    move = :inside:each
+
+    to = .finished
+
+    set = EQ(:inside:each:status,"ready")
+
+}
+
+For every object whose status is ""ready"",
+
+1. set "processed = 1"
+2. move the object into ".finished"
+
+Both operations are performed during the same iteration.
+
+---
+
+Using "each" with LogTScript
+
+PHZ execution blocks are executed only when their own "set" input evaluates to "1".
+
+The "set" signal may be generated anywhere in LogTScript.
+
+Example:
+
+1wire moveReady = EQ(.motor:laps,\1)
+
+.room:{
+
+    move = :inside:each
+
+    to = .storage
+
+    set = moveReady
+
+}
+
+The PHZ engine begins iterating only when "moveReady" becomes "1".
+
+---
+
+"each" and "on" Blocks
+
+"each" is not available inside "on" blocks.
+
+This is not valid:
+
+on:1{
+
+    show(:inside:each:id)
+
+}
+
+because "on" blocks contain only assignments.
+
+They do not execute PHZ property blocks.
+
+Instead, an "on" block should generate signals that later activate PHZ execution blocks.
+
+Example:
+
+on:1{
+
+    moveReady = EQ(.motor:laps,\1)
+
+}
+
+Later,
+
+.room:{
+
+    move = :inside:each
+
+    to = .storage
+
+    set = moveReady
+
+}
+
+When "moveReady" becomes "1", the PHZ engine executes the property block and creates the temporary "each" placeholder.
+
+---
+
+Design Notes
+
+"each" is intentionally not part of the LogTScript language.
+
+It is a temporary execution context created by the PHZ engine.
+
+Because of this:
+
+- "each" cannot be assigned to wires.
+- "each" cannot be stored.
+- "each" cannot be accessed outside a PHZ execution property block.
+- "each" exists only while the corresponding PHZ property block is executing.
+- "each" is recreated for every object processed during the iteration.
+
+This design keeps PHZ fully declarative while remaining consistent with the LogTScript execution model.
