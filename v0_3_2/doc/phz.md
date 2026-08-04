@@ -462,15 +462,71 @@ show(fl)
 
 ---
 
-## each + self-relative paths
+## Collection iteration (`each`)
 
-In a PHZ property block, paths starting with `:` are **self-relative** to the instance that owns the block (`:inside:0` ≈ vector index on that instance’s `inside`).
+PHZ does **not** provide language loops such as `for`, `while`, or `foreach`.  
+Collection iteration is performed **internally** by the PHZ engine. Scripts only describe **what** should happen to each matching object.
 
-With `each`: the engine takes a **snapshot** of the collection, then for each element binds `each`, evaluates `set`, and if `1` applies `move` / assignments for that element.
+### The `each` placeholder
 
-`:type` is the PHZ runtime type (ASCII), not a normal user attribute named `type`.
+`each` represents the **current object** while the engine walks a collection snapshot.
 
-**Load & Run** — only the truck moves from `conv1` to `conv2`.
+- It is **not** a variable and is **not** stored in the container.
+- It exists **only** while a PHZ property block is executing.
+- It is recreated for every object in the snapshot.
+
+Destination collections always use an explicit path, e.g. `to = .storage:inside` (not bare `.storage`).
+
+### Relative collections
+
+Inside a PHZ property block, paths starting with `:` are **self-relative** to the instance that owns the block. So `:inside` means that instance’s default collection (same idea as vector indexing: `:inside:0`).
+
+```
+.room:{
+  move = :inside:each
+  to = .storage:inside
+  set = 1
+}
+```
+
+is iteration over `.room:inside`.
+
+`:type` on an object is the PHZ **runtime type** (readable name / ASCII), not a normal user attribute named `type`.
+
+### Move every object
+
+**Load & Run** — both objects leave `.src` and enter `.dst` (`nSrc = 0`, `nDst = 2`).
+
+```logts-play wave
+phz [cont] .src:
+  max: 30
+  :
+phz [cont] .dst:
+  max: 30
+  :
+phz [gen] .mk:
+  type: obj
+  :
+.mk:{
+  add = \2
+  inside = .src
+  set = 1
+}
+.src:{
+  move = :inside:each
+  to = .dst:inside
+  set = 1
+}
+16wire nSrc = .src:inside:count
+16wire nDst = .dst:inside:count
+show(nSrc, nDst)
+```
+
+### Filtering with `set`
+
+`each` may appear inside the `set` expression. Only objects for which `set` evaluates to `1` are affected; others stay put.
+
+**Load & Run** — only the truck moves; `a = 1` (obj left), `b = 1` (truck arrived).
 
 ```logts-play wave
 phz +[truck < obj]:
@@ -507,7 +563,160 @@ phz [gen] .go:
 show(a, b)
 ```
 
-Conveyors / elevators are **user** types (e.g. `phz +[conveyor < cont]:`), not built-in PHZ kinds. Pair them with [`motor.md`](motor.md) `maxDistance` / `:distance` / `:laps` when you need shaft travel on the panel.
+### Modifying attributes
+
+`each` may also be the target of an assignment. The RHS may read the current object via `:inside:each:…`.
+
+**Load & Run** — trucks get `km = 1`; plain `obj` stays at `0`. Expect `k0 = 1`, `k1 = 0` (truck spawned first).
+
+```logts-play wave
+phz +[truck < obj]:
+  :
+phz [cont] .yard:
+  max: 30
+  :
+phz [gen] .gt:
+  type: truck
+  km: 0 (2)
+  :
+phz [gen] .go:
+  type: obj
+  km: 0 (2)
+  :
+.gt:{
+  add = 1
+  inside = .yard
+  set = 1
+}
+.go:{
+  add = 1
+  inside = .yard
+  set = 1
+}
+.yard:{
+  :inside:each:km = \1
+  set = EQ(:inside:each:type, "truck")
+}
+2wire k0 = .yard:inside:0:km
+2wire k1 = .yard:inside:1:km
+show(k0, k1; dec)
+```
+
+You can also compute on the current object, e.g. `:inside:each:km = ADD(:inside:each:km, \1)`, as long as widths match the attribute.
+
+### Multiple operations in one block
+
+One property block may update attributes **and** move the same matching object in a single iteration.
+
+**Load & Run** — ready item is marked `processed = 1` and moved to `.finished`; the other stays. Expect `nY = 1`, `nF = 1`, `p = 1`.
+
+```logts-play wave
+phz [cont] .yard:
+  max: 30
+  :
+phz [cont] .finished:
+  max: 30
+  :
+phz [gen] .ready:
+  type: obj
+  status: "ready"
+  processed: 0
+  :
+phz [gen] .wait:
+  type: obj
+  status: "wait"
+  processed: 0
+  :
+.ready:{
+  add = 1
+  inside = .yard
+  set = 1
+}
+.wait:{
+  add = 1
+  inside = .yard
+  set = 1
+}
+.yard:{
+  :inside:each:processed = 1
+  move = :inside:each
+  to = .finished:inside
+  set = EQ(:inside:each:status, "ready")
+}
+16wire nY = .yard:inside:count
+16wire nF = .finished:inside:count
+1wire p = .finished:inside:0:processed
+show(nY, nF, p)
+```
+
+### Driving `set` from LogTScript
+
+The block runs when its own `set` evaluates to `1`. That signal may come from any wire.
+
+**Load & Run** — `moveReady` is `1`, so both objects move to `.storage`.
+
+```logts-play wave
+phz [cont] .room:
+  max: 30
+  :
+phz [cont] .storage:
+  max: 30
+  :
+phz [gen] .mk:
+  type: obj
+  :
+.mk:{
+  add = \2
+  inside = .room
+  set = 1
+}
+1wire moveReady = 1
+.room:{
+  move = :inside:each
+  to = .storage:inside
+  set = moveReady
+}
+16wire nRoom = .room:inside:count
+16wire nStore = .storage:inside:count
+show(nRoom, nStore, moveReady)
+```
+
+A typical pattern with motors is `1wire moveReady = EQ(.motor:laps, \1)` — see [motor.md](motor.md).
+
+### `each` and `on:` blocks
+
+`each` is **not** available inside `on:` blocks. Those blocks only hold ordinary assignments; they do not run PHZ property-block iteration.
+
+Invalid idea:
+
+```
+on:1 {
+  show(:inside:each:id)
+}
+```
+
+Instead, an `on:` block (or any script) should produce a signal that later activates a PHZ property block:
+
+```
+1wire moveReady = EQ(.motor:laps, \1)
+
+.room:{
+  move = :inside:each
+  to = .storage:inside
+  set = moveReady
+}
+```
+
+When `moveReady` becomes `1`, the engine executes the property block and creates the temporary `each` binding.
+
+### Design notes
+
+- `each` is intentionally **not** part of the core LogTScript language — it is a temporary execution context of the PHZ engine.
+- You cannot assign `each` to a wire or store it.
+- You cannot use `each` outside an active PHZ property block.
+- Iteration uses a **snapshot** of the collection at the start of the block so moves during the pass do not double-visit or skip wrongly.
+
+Conveyors / elevators remain **user** types (e.g. `phz +[conveyor < cont]:`), not built-in PHZ kinds. Pair them with [`motor.md`](motor.md) `maxDistance` / `:distance` / `:laps` when you need shaft travel on the panel.
 
 ---
 
