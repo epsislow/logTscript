@@ -11,6 +11,8 @@ doc(board)
 doc(board.type)
 doc(pcb)
 doc(pcb.type)
+doc(phz)
+doc(phz.type)
 doc(show)          # debug keywords: show, peek, probe, watch, Zlist
 ```
 
@@ -25,6 +27,7 @@ doc(show)          # debug keywords: show, peek, probe, watch, Zlist
 - `def` — built-in, debug, and user-defined function names (see [user-functions.md](user-functions.md))
 - `comp`, `comp.type` — components
 - `pcb`, `chip`, `board`, `inline`, `.inst` — hierarchical types
+- `phz`, `phz.type`, `.phzInst` — Physical Zone kinds, user types, named instances ([phz.md](phz.md))
 - function name — e.g. `OR`, `ADD`, `myFunc`
 - `show`, `peek`, `probe`, `watch`, `Zlist` — debug statements
 
@@ -632,6 +635,53 @@ doc(board)
 ```
 doc(board.halfAdd)
 ```
+
+---
+
+## PHZ (physical zones)
+
+User guide: **[phz.md](phz.md)**.
+
+### doc(phz) — kinds, user types, named instances, anonymous counts
+
+```
+doc(phz)
+```
+
+Example output:
+
+```
+phz.obj
+phz.gen
+phz.cont
+phz.[wheel < obj]
+
+User defined phz:
+.container1 (phz.cont)
+.wheel1 (phz.[wheel < obj])
+.gw (phz.gen)
+
+2x (phz.[wheel < obj])
+```
+
+Anonymous spawned objects appear only as **counts per type** (`Nx (phz…)`), not as a name list.
+
+### doc(phz.type) — type template
+
+```
+doc(phz.obj)
+doc(phz.car)
+```
+
+Built-ins (`obj` / `gen` / `cont`) show the declaration skeleton. User types show `phz +[Name < Base]:` with collections.
+
+### doc(.name) — named PHZ instance
+
+```
+doc(.container1)
+```
+
+Shows attributes (widths + current values). Auto-allocated identity is `id: auto`. Typed collections appear as `wheels: wheel[4]`.
 
 ---
 

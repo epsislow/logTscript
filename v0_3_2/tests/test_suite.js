@@ -13165,6 +13165,7 @@ reg(1597, 'doc', 'doc() — index of available forms', function(h, session) {
   h.assert('header', out[0], 'doc() — call with one argument:');
   h.assert('def line', String(out.some(l => l.includes('def'))), 'true');
   h.assert('comp line', String(out.some(l => l.includes('comp'))), 'true');
+  h.assert('phz line', String(out.some(l => l.includes('phz'))), 'true');
   h.assert('debug keywords', String(out.some(l => l.includes('show, peek, probe'))), 'true');
 });
 
@@ -33811,6 +33812,73 @@ show(.c1:wheels)`);
   regPhzWave(3148, 'move named + remove + reassign', runPhzMoveRemove);
   regPhzWave(3149, 'each filters by PHZ type', runPhzEachFilter);
   regPhzWave(3150, 'motor distance wrap increments laps', runPhzMotorLaps);
+
+  // ——— PHZ doc() ———
+
+  function runPhzDocIndex(h, session) {
+    const out = session.runDoc(`phz +[wheel < obj]:
+  :
+phz [cont] .container1:
+  max: 30
+  :
+phz [wheel] .wheel1::
+phz [gen] .gw:
+  type: wheel
+  :
+.gw:{
+  add = \\2
+  inside = .container1
+  set = 1
+}
+doc(phz)`);
+    h.assert('has phz.obj', String(out.some(l => l === 'phz.obj')), 'true');
+    h.assert('has phz.gen', String(out.some(l => l === 'phz.gen')), 'true');
+    h.assert('has phz.cont', String(out.some(l => l === 'phz.cont')), 'true');
+    h.assert('user type tag', String(out.some(l => l === 'phz.[wheel < obj]')), 'true');
+    h.assert('user header', String(out.some(l => l === 'User defined phz:')), 'true');
+    h.assert('named cont', String(out.some(l => l === '.container1 (phz.cont)')), 'true');
+    h.assert('named wheel', String(out.some(l => l === '.wheel1 (phz.[wheel < obj])')), 'true');
+    h.assert('named gen', String(out.some(l => l === '.gw (phz.gen)')), 'true');
+    h.assert('anon count', String(out.some(l => l === '2x (phz.[wheel < obj])')), 'true');
+  }
+
+  function runPhzDocInstance(h, session) {
+    const out = session.runDoc(`phz [cont] .container1:
+  max: 30
+  :
+doc(.container1)`);
+    h.assert('header', out[0], 'phz [cont] .container1:');
+    h.assert('floor', String(out.some(l => /^\s+floor: 0 \(8bit\)$/.test(l))), 'true');
+    h.assert('max', String(out.some(l => /^\s+max: 30 \(16bit\)$/.test(l))), 'true');
+    h.assert('inside coll', String(out.some(l => /^\s+inside: obj\[30\]$/.test(l))), 'true');
+  }
+
+  function runPhzDocObjAutoId(h, session) {
+    const out = session.runDoc(`phz [obj] .box1::
+doc(.box1)`);
+    h.assert('header', out[0], 'phz [obj] .box1:');
+    h.assert('id auto', String(out.some(l => /^\s+id: auto$/.test(l))), 'true');
+  }
+
+  function runPhzDocType(h, session) {
+    const out = session.runDoc(`phz +[wheel < obj]:
+  :
+phz +[car < cont]:
+  wheels: wheel[4]
+  :
+doc(phz.car)`);
+    h.assert('typedef header', out[0], 'phz +[car < cont]:');
+    h.assert('wheels coll', String(out.some(l => /^\s+wheels: wheel\[4\]$/.test(l))), 'true');
+    h.assert('inside default', String(out.some(l => /^\s+inside: obj\[/.test(l))), 'true');
+  }
+
+  reg(3151, 'phz', 'doc(phz) lists types, named, anon counts', runPhzDocIndex);
+  reg(3152, 'phz', 'doc(.container1) shows attrs', runPhzDocInstance);
+  reg(3153, 'phz', 'doc(.box1) id auto', runPhzDocObjAutoId);
+  reg(3154, 'phz', 'doc(phz.car) typedef', runPhzDocType);
+
+  regPhzWave(3155, 'doc(phz) lists types, named, anon counts', runPhzDocIndex);
+  regPhzWave(3156, 'doc(.container1) shows attrs', runPhzDocInstance);
 
   window.LogTScriptTestSuite.finalize();
 })();

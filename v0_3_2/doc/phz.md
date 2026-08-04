@@ -359,6 +359,8 @@ Declare with `phz +[Name < obj]` or `phz +[Name < cont]`. On a `cont` base, coll
 
 Redeclaring `inside: person[4]` on a derived type **replaces** the default `inside` element type and capacity.
 
+Live docs: `doc(phz)` lists built-ins, user types (`phz.[wheel < obj]`), named instances, then anonymous spawn counts (`2x (phz.[wheel < obj])`). `doc(phz.car)` shows a typedef; `doc(.container1)` shows that instance’s attributes (`id: auto` when identity was allocated automatically).
+
 **Load & Run** — two wheels in `.c1:wheels`; count is `2`.
 
 ```logts-play wave
@@ -526,6 +528,7 @@ flowchart LR
 
 ## See also
 
+- `doc(phz)` / `doc(phz.type)` / `doc(.inst)` — live signatures in the editor (see [doc-function.md](doc-function.md))
 - [motor.md](motor.md) — `maxDistance`, `:distance`, `:laps`
 - [allow-notallow.md](allow-notallow.md) — restricting `phz` kinds / user types
 - [doc-viewer.md](doc-viewer.md) — how **Load** / **Load & Run** work

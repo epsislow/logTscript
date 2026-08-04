@@ -15,6 +15,10 @@
     this.gens = new Map();
     this.conts = new Map();
     this.types = new Map();
+    /** @type {Map<string, number>} anonymous spawn counts by phzType */
+    this.anonCounts = new Map();
+    /** Named instance names in declaration order (for doc). */
+    this.namedOrder = [];
     this.nextId = 1;
     this._eachCurrent = null;
     this._selfName = null;
@@ -25,9 +29,34 @@
     this.gens = new Map();
     this.conts = new Map();
     this.types = new Map();
+    this.anonCounts = new Map();
+    this.namedOrder = [];
     this.nextId = 1;
     this._eachCurrent = null;
     this._selfName = null;
+  };
+
+  PhzEngine.prototype._incAnonCount = function (phzType) {
+    var t = phzType || 'obj';
+    this.anonCounts.set(t, (this.anonCounts.get(t) || 0) + 1);
+  };
+
+  /** Display tag: `phz.obj` or `phz.[wheel < obj]`. */
+  PhzEngine.prototype.formatTypeTag = function (typeName) {
+    var t = typeName || 'obj';
+    if (t === 'obj' || t === 'gen' || t === 'cont') return 'phz.' + t;
+    var def = this.types.get(t);
+    if (!def) return 'phz.' + t;
+    return 'phz.[' + t + ' < ' + def.base + ']';
+  };
+
+  /** Header kind fragment: `obj` or `wheel < obj`. */
+  PhzEngine.prototype.formatTypeKind = function (typeName) {
+    var t = typeName || 'obj';
+    if (t === 'obj' || t === 'gen' || t === 'cont') return t;
+    var def = this.types.get(t);
+    if (!def) return t;
+    return t + ' < ' + def.base;
   };
 
   PhzEngine.prototype.allocId = function () {
@@ -288,6 +317,7 @@
   PhzEngine.prototype.createObj = function (name, attributes, phzType) {
     if (this.getNamed(name)) throw new Error("PHZ instance '" + name + "' already exists");
     var typeName = phzType || 'obj';
+    var idProvided = !!(attributes && attributes.id);
     var attrMap = this._buildAttrMap('obj', attributes);
     var inst = {
       kind: 'obj',
@@ -295,9 +325,11 @@
       name: name,
       attributes: attrMap,
       named: true,
+      idAuto: !idProvided,
       membership: null,
     };
     this.objs.set(name, inst);
+    this.namedOrder.push(name);
     return inst;
   };
 
@@ -327,6 +359,7 @@
       phzType: 'gen',
     };
     this.gens.set(name, inst);
+    this.namedOrder.push(name);
     return inst;
   };
 
@@ -365,6 +398,7 @@
       enumerable: true,
     });
     this.conts.set(name, inst);
+    this.namedOrder.push(name);
     return inst;
   };
 
@@ -550,8 +584,10 @@
           "PHZ spawn type '" + obj.phzType + "' incompatible with '" + coll.elementType + "'"
         );
       }
+      obj.idAuto = true;
       coll.items.push(obj);
       obj.membership = { owner: owner, collName: ref.collName };
+      this._incAnonCount(obj.phzType);
     }
   };
 
@@ -737,6 +773,167 @@
     var selfName = this._selfName;
     if (!selfName) throw new Error('PHZ self-relative path requires an active property block');
     return this.resolveProperty(selfName, property);
+  };
+
+  PhzEngine.prototype._formatAttrDocValue = function (slot) {
+    if (!slot) return '?';
+    var bin = this.interp.getValueFromRef(slot.ref);
+    var bits = slot.bits || (bin ? bin.length : 0);
+    var dec = parseInt(String(bin || '0').replace(/[^01]/g, '') || '0', 2);
+    if (!Number.isFinite(dec)) dec = 0;
+    return dec + ' (' + bits + 'bit)';
+  };
+
+  PhzEngine.prototype._pushCollectionDocLines = function (lines, collections) {
+    if (!collections) return;
+    for (var [collName, coll] of collections) {
+      if (collName === 'inside' && coll.elementType === 'obj') {
+        // default inside shown via max attr; still list if non-default element type handled below
+      }
+      lines.push('  ' + collName + ': ' + coll.elementType + '[' + coll.max + ']');
+    }
+  };
+
+  PhzEngine.prototype._pushAttrDocLines = function (lines, inst) {
+    if (!inst || !inst.attributes) return;
+    var order = [];
+    if (inst.attributes.has('id')) order.push('id');
+    if (inst.attributes.has('floor')) order.push('floor');
+    if (inst.kind === 'gen') order.push('type');
+    for (var [k] of inst.attributes) {
+      if (k === 'id' || k === 'floor') continue;
+      order.push(k);
+    }
+    var seen = {};
+    for (var i = 0; i < order.length; i++) {
+      var name = order[i];
+      if (seen[name]) continue;
+      seen[name] = true;
+      if (name === 'type' && inst.kind === 'gen') {
+        lines.push('  type: ' + (inst.type || 'obj'));
+        continue;
+      }
+      if (!inst.attributes.has(name)) continue;
+      if (name === 'id' && inst.idAuto) {
+        lines.push('  id: auto');
+        continue;
+      }
+      lines.push('  ' + name + ': ' + this._formatAttrDocValue(inst.attributes.get(name)));
+    }
+  };
+
+  /** doc(phz) — builtins, user types, named instances, anonymous counts. */
+  PhzEngine.prototype.formatPhzIndexDoc = function () {
+    var lines = ['phz.obj', 'phz.gen', 'phz.cont'];
+    for (var [typeName] of this.types) {
+      lines.push(this.formatTypeTag(typeName));
+    }
+
+    var named = [];
+    for (var ni = 0; ni < this.namedOrder.length; ni++) {
+      var nInst = this.getNamed(this.namedOrder[ni]);
+      if (nInst) named.push(nInst);
+    }
+
+    lines.push('');
+    if (named.length === 0) {
+      lines.push('(no user defined phz)');
+    } else {
+      lines.push('User defined phz:');
+      for (var i = 0; i < named.length; i++) {
+        var inst = named[i];
+        var tag = this.formatTypeTag(inst.phzType || inst.kind);
+        lines.push(inst.name + ' (' + tag + ')');
+      }
+    }
+
+    if (this.anonCounts.size > 0) {
+      lines.push('');
+      for (var [anonType, count] of this.anonCounts) {
+        lines.push(count + 'x (' + this.formatTypeTag(anonType) + ')');
+      }
+    }
+    return lines;
+  };
+
+  /** doc(phz.obj) / doc(phz.wheel) — type template. */
+  PhzEngine.prototype.formatTypeDoc = function (typeName) {
+    var t = typeName || '';
+    if (t === 'obj') {
+      return [
+        'phz [obj] .name:',
+        '  id: auto',
+        '  floor: 0 (8bit)',
+        '  …attrs…',
+        '  :',
+      ];
+    }
+    if (t === 'gen') {
+      return [
+        'phz [gen] .name:',
+        '  type: obj|Type',
+        '  floor: 0 (8bit)',
+        '  …template attrs…',
+        '  :',
+        '  :{',
+        '    add',
+        '    inside',
+        '    set',
+        '    floor?',
+        '  }',
+      ];
+    }
+    if (t === 'cont') {
+      return [
+        'phz [cont] .name:',
+        '  floor: 0 (8bit)',
+        '  max: 16 (16bit)',
+        '  inside: obj[16]',
+        '  :',
+      ];
+    }
+    var def = this.types.get(t);
+    if (!def) return ['phz.' + t + ': undefined PHZ type'];
+    var lines = ['phz +[' + t + ' < ' + def.base + ']:'];
+    if (def.rootKind === 'cont' && def.collections) {
+      Object.keys(def.collections).forEach(function (collName) {
+        var coll = def.collections[collName];
+        lines.push('  ' + collName + ': ' + coll.elementType + '[' + coll.max + ']');
+      });
+    }
+    if (def.attrDefs) {
+      Object.keys(def.attrDefs).forEach(function (attrName) {
+        if (def.attrDefs[attrName] && def.attrDefs[attrName].kind === 'collection') return;
+        lines.push('  ' + attrName + ': …');
+      });
+    }
+    lines.push('  :');
+    return lines;
+  };
+
+  /** doc(.inst) — named PHZ instance attributes / collections. */
+  PhzEngine.prototype.formatInstanceDoc = function (inst) {
+    if (!inst) return ['(no PHZ instance)'];
+    var kind = this.formatTypeKind(inst.phzType || inst.kind);
+    var lines = ['phz [' + kind + '] ' + (inst.name || '.anon') + ':'];
+    this._pushAttrDocLines(lines, inst);
+    if (inst.collections) {
+      this._pushCollectionDocLines(lines, inst.collections);
+    }
+    lines.push('  :');
+    return lines;
+  };
+
+  /**
+   * doc(phz) / doc(phz.type).
+   * @param {string} name e.g. 'phz' or 'phz.wheel'
+   */
+  PhzEngine.prototype.formatDocLines = function (name) {
+    if (name === 'phz') return this.formatPhzIndexDoc();
+    if (typeof name === 'string' && name.startsWith('phz.')) {
+      return this.formatTypeDoc(name.slice(4));
+    }
+    return [String(name) + ': unknown PHZ doc'];
   };
 
   if (typeof module !== 'undefined' && module.exports) {

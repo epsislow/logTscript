@@ -10596,6 +10596,21 @@ if (this.isBuiltinDEMUX(name)) {
         name = 'inline.' + inlineInst.kind;
       }
 
+      const phzNamed = this.phzEngine ? this.phzEngine.getNamed(name) : null;
+      if (phzNamed) {
+        const phzInstLines = this.phzEngine.formatInstanceDoc(phzNamed);
+        for (const line of phzInstLines) this.out.push(line);
+        return;
+      }
+
+      if (name === 'phz' || (typeof name === 'string' && name.startsWith('phz.'))) {
+        const phzLines = this.phzEngine
+          ? this.phzEngine.formatDocLines(name)
+          : ['(no PHZ engine available)'];
+        for (const line of phzLines) this.out.push(line);
+        return;
+      }
+
       if (name === 'sock' || (this.isSock(name) && !this.socks.has(name))) {
         const sockLines = this._getSockListDocLines();
         for (const line of sockLines) {
@@ -17803,6 +17818,7 @@ Interpreter.getDocIndexLines = function() {
     '  chip — chip types; chip.name — syntax',
     '  board — board types; board.name — syntax',
     '  inline — inline instances; inline.kind — template (asm, lut, protocol)',
+    '  phz — PHZ kinds/types; phz.type — template; .inst — named PHZ instance',
     '  schema — semantic schemas; schema.name — definition (e.g. schema.opcode)',
     '  .inst — inline instance (e.g. .myisa)',
     '  Name — builtin or user function (OR, ADD, myFunc, …)',
