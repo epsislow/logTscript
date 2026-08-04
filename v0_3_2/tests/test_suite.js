@@ -33880,5 +33880,65 @@ doc(phz.car)`);
   regPhzWave(3155, 'doc(phz) lists types, named, anon counts', runPhzDocIndex);
   regPhzWave(3156, 'doc(.container1) shows attrs', runPhzDocInstance);
 
+  function runPhzShowInstanceDec(h, session) {
+    const { out } = session.run(`phz [cont] .container1:
+  max: 30
+  :
+phz [gen] .mk:
+  type: obj
+  weight: 3
+  :
+.mk:{
+  add = 1
+  inside = .container1
+  set = 1
+}
+show(.container1; dec)`);
+    h.assert('header dec max', String(out.some(l => l.includes('.container1 = {') && l.includes('max=\\30'))), 'true');
+    h.assert('max field', String(out.some(l => /^\s+max = \\30 \(16bit\)$/.test(l))), 'true');
+    h.assert('type readable', String(out.some(l => /^\s+type = cont$/.test(l))), 'true');
+    h.assert('inside length', String(out.some(l => l.includes('.container1:inside has length [1]'))), 'true');
+  }
+
+  function runPhzShowInsideDec(h, session) {
+    const { out } = session.run(`phz [cont] .bag:
+  max: 30
+  :
+phz [gen] .mk:
+  type: obj
+  weight: 3
+  :
+.mk:{
+  add = \\2
+  inside = .bag
+  set = 1
+}
+show(.bag:inside; dec)`);
+    h.assert(':0 dec', String(out.some(l => /:0 = \{.*id=\\1.*weight=\\3/.test(l))), 'true');
+    h.assert(':1 dec', String(out.some(l => /:1 = \{.*id=\\2/.test(l))), 'true');
+    h.assert('type name', String(out.some(l => /:0 = \{.*type=obj/.test(l))), 'true');
+  }
+
+  function runPhzShowObjHex(h, session) {
+    const { out } = session.run(`phz [cont] .bag::
+phz [gen] .mk:
+  type: obj
+  :
+.mk:{
+  add = 1
+  inside = .bag
+  set = 1
+}
+show(.bag:inside:0; hex)`);
+    h.assert('id hex', String(out.some(l => /^\s+id = /.test(l) && l.includes('^'))), 'true');
+    h.assert('type not hex', String(out.some(l => /^\s+type = obj$/.test(l))), 'true');
+  }
+
+  reg(3157, 'phz', 'show(.container1; dec) formats attrs', runPhzShowInstanceDec);
+  reg(3158, 'phz', 'show(:inside; dec) formats dumps', runPhzShowInsideDec);
+  reg(3159, 'phz', 'show(:0; hex) keeps type name', runPhzShowObjHex);
+  regPhzWave(3160, 'show(.container1; dec) formats attrs', runPhzShowInstanceDec);
+  regPhzWave(3161, 'show(:inside; dec) formats dumps', runPhzShowInsideDec);
+
   window.LogTScriptTestSuite.finalize();
 })();

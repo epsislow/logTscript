@@ -6694,6 +6694,24 @@ class Interpreter {
 
         if (this.phzEngine && this.phzEngine.getNamed(a.var)) {
           if (!a.property) {
+            if (this.evalContext === 'show' || this.evalContext === 'doc') {
+              const bare = this.phzEngine.instanceShowPayload(a.var);
+              if (bare) {
+                return {
+                  value: bare.value,
+                  ref: bare.ref || null,
+                  varName: a.var,
+                  bitWidth: 0,
+                  displayText: bare.displayText,
+                  isText: true,
+                  phzInsideList: false,
+                  phzObjectDump: true,
+                  phzObjects: null,
+                  phzAttrs: bare.phzAttrs || null,
+                  phzCollections: bare.phzCollections || null,
+                };
+              }
+            }
             throw Error(`Cannot read PHZ instance ${a.var} without a property`);
           }
           const phzResult = this.phzEngine.resolveProperty(a.var, a.property);
@@ -6715,6 +6733,7 @@ class Interpreter {
               phzObjectDump: !!phzResult.phzObjectDump,
               phzObjects: phzResult.phzObjects || null,
               phzAttrs: phzResult.phzAttrs || null,
+              phzCollections: phzResult.phzCollections || null,
             };
           }
         }
@@ -9878,6 +9897,36 @@ if (this.isBuiltinDEMUX(name)) {
     return lines;
   }
 
+  _formatPhzAttrDisplay(bin, bits, opts, attrName, isPhzType) {
+    if (attrName === 'type' || isPhzType) {
+      if (this.phzEngine && this.phzEngine._typeBitsToName) {
+        return this.phzEngine._typeBitsToName(bin);
+      }
+      return String(bin || '');
+    }
+    let formatted = bin == null ? '-' : String(bin);
+    if (formatted === '-') return formatted;
+    if (this._hasShowFormatOpts(opts)) {
+      return this._formatShowWireValue(formatted, bits, opts, true, bits);
+    }
+    return this.formatValue(formatted, bits);
+  }
+
+  _formatPhzAttrsDump(attrs, opts) {
+    if (this.phzEngine && this.phzEngine._formatAttrsDump) {
+      return this.phzEngine._formatAttrsDump(attrs, (bin, bits, name) => {
+        if (name === 'type') {
+          return this.phzEngine._typeBitsToName(bin);
+        }
+        if (this._hasShowFormatOpts(opts)) {
+          return this._formatShowWireValue(bin, bits, opts, true, bits);
+        }
+        return bin;
+      });
+    }
+    return '{}';
+  }
+
   _formatPhzInsideShowLines(part, opts) {
     if (!part) return null;
     const name = part.varName || '.phz';
@@ -9903,7 +9952,10 @@ if (this.isBuiltinDEMUX(name)) {
         }
         const obj = objs[i];
         if (!obj) continue;
-        this._pushDisplayOutput(lines, `:${obj.index} = ${obj.dump}`, opts);
+        const dump = obj.attrs
+          ? this._formatPhzAttrsDump(obj.attrs, opts)
+          : obj.dump;
+        this._pushDisplayOutput(lines, `:${obj.index} = ${dump}`, opts);
       }
       lines.push(`${name} has length [${objs.length}]`);
       return lines;
@@ -9911,16 +9963,20 @@ if (this.isBuiltinDEMUX(name)) {
 
     if (part.phzObjectDump) {
       const attrs = part.phzAttrs || [];
-      const dump = part.displayText || '{}';
+      const dump = this._formatPhzAttrsDump(attrs, opts);
       this._pushDisplayOutput(lines, `${name} = ${dump}`, opts);
       for (const a of attrs) {
-        let formatted = a.value == null ? '-' : String(a.value);
-        if (formatted !== '-' && this._hasShowFormatOpts(opts)) {
-          formatted = this._formatShowWireValue(formatted, a.bits, opts, true, a.bits);
-        } else if (formatted !== '-') {
-          formatted = this.formatValue(formatted, a.bits);
+        const isType = a.name === 'type' || a.isPhzType;
+        const formatted = this._formatPhzAttrDisplay(a.value, a.bits, opts, a.name, isType);
+        if (isType) {
+          this._pushDisplayOutput(lines, `  ${a.name} = ${formatted}`, opts);
+        } else {
+          this._pushDisplayOutput(lines, `  ${a.name} = ${formatted} (${a.bits}bit)`, opts);
         }
-        this._pushDisplayOutput(lines, `  ${a.name} = ${formatted} (${a.bits}bit)`, opts);
+      }
+      const colls = part.phzCollections || [];
+      for (const c of colls) {
+        lines.push(`${name}:${c.name} has length [${c.count}]`);
       }
       return lines;
     }
@@ -10090,7 +10146,7 @@ if (this.isBuiltinDEMUX(name)) {
     const asmDecodeLines = [];
     try {
     for (const e of args) {
-      if (e && e.length === 1 && e[0].var && e[0].property
+      if (e && e.length === 1 && e[0].var
           && this.phzEngine && this.phzEngine.getNamed(e[0].var)) {
         const r = this.evalExpr(e, computeRefs);
         const part = r && r[0];

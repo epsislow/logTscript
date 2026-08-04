@@ -256,6 +256,10 @@ There is **no** `.c:count` — use `.c:inside:count`.
 
 `show(.c:inside)` and `show(.c:inside:N)` are **display-only** (like ASM decode text): they cannot be assigned to wires. Read `:count`, `:empty`, or `:N:attr` for bit values.
 
+Display tags work the same as for wires / vectors: `show(.container1; dec)`, `show(.bag:inside; hex)`, `show(.bag:inside:0; ascii)`, plus `elAll` / `elRange=` / `compact` on collection lists. Attribute bits are reformatted; the synthetic `type` field stays a readable name (`obj`, `cont`, `wheel`, …).
+
+Bare `show(.container1)` dumps that instance’s attributes (and collection length lines). `show(.container1; dec)` applies decimal formatting to those attributes.
+
 **Load & Run** — list like a vector (`:0` / `:1` + `has length`); one object expands fields.
 
 ```logts-play wave

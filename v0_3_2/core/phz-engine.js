@@ -629,6 +629,19 @@
     this.setAttrValue(obj, 'floor', bin);
   };
 
+  PhzEngine.prototype._typeBitsToName = function (bin) {
+    try {
+      var chars = [];
+      var b = String(bin || '');
+      for (var i = 0; i + 8 <= b.length; i += 8) {
+        chars.push(String.fromCharCode(parseInt(b.substring(i, i + 8), 2)));
+      }
+      return chars.join('');
+    } catch (e) {
+      return String(bin || '');
+    }
+  };
+
   PhzEngine.prototype._listObjectAttrs = function (obj) {
     var attrs = [];
     if (!obj || !obj.attributes) return attrs;
@@ -636,28 +649,29 @@
       attrs.push({ name: k, value: this.interp.getValueFromRef(slot.ref), bits: slot.bits });
     }
     var enc = this._asciiTypeBits(obj.phzType || obj.kind);
-    attrs.push({ name: 'type', value: enc.bin, bits: enc.bits });
+    attrs.push({ name: 'type', value: enc.bin, bits: enc.bits, isPhzType: true });
     return attrs;
   };
 
-  PhzEngine.prototype._formatObjectAttrs = function (obj) {
-    var attrs = this._listObjectAttrs(obj);
-    return '{' + attrs.map(function (a) {
-      if (a.name === 'type') {
-        var W = getWidth();
-        // show type as readable name in dump
-        try {
-          var chars = [];
-          var b = a.value;
-          for (var i = 0; i + 8 <= b.length; i += 8) {
-            chars.push(String.fromCharCode(parseInt(b.substring(i, i + 8), 2)));
-          }
-          return 'type=' + chars.join('');
-        } catch (e) {
-          return a.name + '=' + a.value;
-        }
+  /**
+   * @param {object} obj
+   * @param {(bin:string, bits:number, name:string)=>string} [formatValue]
+   */
+  PhzEngine.prototype._formatObjectAttrs = function (obj, formatValue) {
+    return this._formatAttrsDump(this._listObjectAttrs(obj), formatValue);
+  };
+
+  PhzEngine.prototype._formatAttrsDump = function (attrs, formatValue) {
+    var self = this;
+    return '{' + (attrs || []).map(function (a) {
+      if (a.name === 'type' || a.isPhzType) {
+        return 'type=' + self._typeBitsToName(a.value);
       }
-      return a.name + '=' + a.value;
+      var v = a.value;
+      if (typeof formatValue === 'function') {
+        v = formatValue(a.value, a.bits, a.name);
+      }
+      return a.name + '=' + v;
     }).join(', ') + '}';
   };
 
@@ -668,9 +682,45 @@
       ref: null,
       bitWidth: 0,
       isText: true,
-      displayText: this._formatObjectAttrs(obj),
+      displayText: this._formatAttrsDump(attrs),
       phzObjectDump: true,
       phzAttrs: attrs,
+    };
+  };
+
+  /** show(.inst) — named instance attributes (+ collection length hints). */
+  PhzEngine.prototype.instanceShowPayload = function (name) {
+    var inst = this.getNamed(name);
+    if (!inst) return null;
+    var attrs = this._listObjectAttrs(inst);
+    // gen: expose produced type as readable attr (not ASCII bits of "gen" only)
+    if (inst.kind === 'gen') {
+      attrs = attrs.filter(function (a) { return a.name !== 'type'; });
+      var prod = String(inst.type || 'obj');
+      var W = getWidth();
+      var enc = W.stringToBits(prod);
+      attrs.push({ name: 'type', value: enc.bin, bits: enc.bits, isPhzType: true });
+    }
+    var collHints = [];
+    if (inst.collections) {
+      for (var [collName, coll] of inst.collections) {
+        collHints.push({
+          name: collName,
+          count: coll.items.length,
+          max: coll.max,
+          elementType: coll.elementType,
+        });
+      }
+    }
+    return {
+      value: null,
+      ref: null,
+      bitWidth: 0,
+      isText: true,
+      displayText: this._formatAttrsDump(attrs),
+      phzObjectDump: true,
+      phzAttrs: attrs,
+      phzCollections: collHints,
     };
   };
 
