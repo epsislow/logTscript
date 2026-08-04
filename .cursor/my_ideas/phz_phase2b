@@ -221,3 +221,46 @@ Because of this:
 - "each" is recreated for every object processed during the iteration.
 
 This design keeps PHZ fully declarative while remaining consistent with the LogTScript execution model.
+
+
+======
+Optiuni nedecise:
+O1) ok O1a sau O1c nu prea vad diferenta. dupa exprimare mai mult O1a, adica e ok sa nu putem extinde gen si sa putem extinde doar obj sau cont
+O2 explica optiunile cu exemple
+O3 remove doar inseamna ca iese din ownershipul containerelor, daca inca mai exista box1 atunci da poate box1 inca mai poate sa fie apelat, posibil sa poata fi asociat la un alt contianer, nu inseamna destroy. deci O3c
+O4 da apartenenta unica, un obiect nu poate fi asociat in mai multe colectii, o mutare inseamna ca isi schimba apartententa la o destinatie noua deci O4a
+O5 poate tintii orice colectie dar si dar si cand se spawneaza va intra in liste de colectii wheel[] sau ce sub colectie este wheel daca wheel < cont atunci poate tintii si colecti cu cont[],
+O6 in acest exemplu type era exact fix tipul PHZ definit care vine din atributul gen type sau din definitia data
+phz [truck < cont] .truck1:
+  ..
+
+sau din 
+phz [gen] .myGen:
+  type: truck # OBLIGATORIU
+  floor: 0
+  someAttr: 1        # template — pe obiectele generate
+  # id INTERZIS
+  :
+
+care inseamna ca generatorul genereaza obiecte de tip truck 
+
+dar acolo putea fi un atribut diferit de type:   EQ(:inside:each:lot,"ABC")  atunci vorbim de tipul string/ASCII de pe atributele definite de user pe obiect
+sau poate fi 
+EQ(:inside:each:floor, \2)  
+sau 
+EQ(:inside:each:id, \203)
+
+O7 O7a cred, ma gandesc ca set este verificat si atunci cand devine 1, atunci aplica celelate asignari move cu each legat de elementul curent, dar nu imi dau seama O7b ce inseamna, poti sa imi dai un exemplu pentru O7b cum ar functiona ?
+
+O8 da O8b nu inteleg wire :bit, poate te referi la wire ca vector cu :0 da inteleg dar tot nu inteleg legatura dat fiind ca este :inside:0 incepe cu : insemana ca e self referenced "inside" si inside este de tip vector sau cum e acum si :0 inseamna ce este la indexul 0 deci ca la wire aici
+O9 da O9a 
+O10 nu facem nimic pentru phz [conveyor] este un tip defiinit de user da O10a
+O11 da :wheels afisat ca la :inside adica vector-like 
+O12 nu exista Breaking changes, nu foloseste nimeni phz, explica totusi ce inseamna noua versus vechea
+
+
+
+
+
+
+
