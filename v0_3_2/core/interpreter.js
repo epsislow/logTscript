@@ -6624,6 +6624,34 @@ class Interpreter {
       }
       return {value: binStr, ref: null, varName: null};
     }
+    if (a.phzSelf && a.property) {
+      if (!this.phzEngine) throw Error('PHZ engine is not available');
+      if (!this.phzEngine._selfName) {
+        // Outside an active PHZ property block (e.g. initial setExpr probe): treat as 0
+        return { value: '0', ref: null, varName: `:${a.property}`, bitWidth: 1 };
+      }
+      const phzResult = this.phzEngine.resolveSelfProperty(a.property);
+      if (phzResult) {
+        if ((phzResult.phzInsideList || phzResult.phzObjectDump)
+            && this.evalContext !== 'show' && this.evalContext !== 'doc') {
+          throw Error(`PHZ self path :${a.property} is display-only; use show(...) or read attrs`);
+        }
+        let val = phzResult.value;
+        if (a.pad && val) val = this.applyPad(val, a.pad);
+        return {
+          value: val,
+          ref: phzResult.ref || null,
+          varName: `:${a.property}`,
+          bitWidth: phzResult.bitWidth || (val ? val.length : 0),
+          displayText: phzResult.displayText,
+          isText: !!phzResult.isText,
+          phzInsideList: !!phzResult.phzInsideList,
+          phzObjectDump: !!phzResult.phzObjectDump,
+          phzObjects: phzResult.phzObjects || null,
+          phzAttrs: phzResult.phzAttrs || null,
+        };
+      }
+    }
     if(a.var){
       if(a.var === '~'){
         return {value: '1', ref: null, varName: '~'}; // ~ is always 1 during execution
@@ -10924,6 +10952,12 @@ if (this.isBuiltinDEMUX(name)) {
         // Edge triggered (raise/edge): don't execute on first run, wait for edge
         shouldExecuteFirstRun = false;
       }
+
+      // PHZ blocks whose set/move use self-relative :each need the block body to run;
+      // the set predicate is evaluated per element inside executePhzPropertyBlock.
+      if (phzNamed && setExpr && /"phzSelf"\s*:\s*true/.test(JSON.stringify(setExpr))) {
+        shouldExecuteFirstRun = true;
+      }
       
       if(shouldExecuteFirstRun){
         this.executePropertyBlock(component, properties, false);
@@ -12823,6 +12857,9 @@ if (s.assignment) {
         if (result.validRef) compInfo.validRef = result.validRef;
         if (result.sizeRef) compInfo.sizeRef = result.sizeRef;
         if (result.movingRef) compInfo.movingRef = result.movingRef;
+        if (result.motorDistance !== undefined) compInfo.motorDistance = result.motorDistance;
+        if (result.motorLaps !== undefined) compInfo.motorLaps = result.motorLaps;
+        if (result.motorMaxDistance !== undefined) compInfo.motorMaxDistance = result.motorMaxDistance;
         if (result.keyboardHandler) compInfo.keyboardHandler = result.keyboardHandler;
         if (result.scannerHandler) compInfo.scannerHandler = result.scannerHandler;
         if (result.codesAcceptedFilter) compInfo.codesAcceptedFilter = result.codesAcceptedFilter;
@@ -15107,6 +15144,16 @@ if (s.assignment) {
     if (!this.phzEngine) {
       throw Error('PHZ engine is not available');
     }
+    if (phz.kind === 'typedef') {
+      if (this.usagePolicy) {
+        const chk = this.usagePolicy.isModuleAllowed('phz', phz.typeName);
+        if (!chk.allowed) {
+          throw Error(`PHZ '${phz.typeName}' is not allowed`);
+        }
+      }
+      this.phzEngine.registerType(phz.typeName, phz.base, phz.collections, phz.attributes);
+      return;
+    }
     if (this.usagePolicy) {
       const chk = this.usagePolicy.isModuleAllowed('phz', phz.kind);
       if (!chk.allowed) {
@@ -15114,7 +15161,9 @@ if (s.assignment) {
         throw Error(`PHZ '${phz.kind}' is not allowed (${pol})`);
       }
     }
-    if (phz.kind === 'obj') this.phzEngine.createObj(phz.name, phz.attributes);
+    if (phz.userType || (phz.kind !== 'obj' && phz.kind !== 'gen' && phz.kind !== 'cont')) {
+      this.phzEngine.createFromType(phz.kind, phz.name, phz.attributes);
+    } else if (phz.kind === 'obj') this.phzEngine.createObj(phz.name, phz.attributes);
     else if (phz.kind === 'gen') this.phzEngine.createGen(phz.name, phz.attributes);
     else if (phz.kind === 'cont') this.phzEngine.createCont(phz.name, phz.attributes);
     else throw Error(`Unknown PHZ kind '${phz.kind}'`);
@@ -15133,75 +15182,237 @@ if (s.assignment) {
     return value;
   }
 
+  _phzAtomToRef(atom) {
+    if (!atom) return null;
+    if (atom.phzSelf && atom.property) {
+      // :inside:each → each current when property ends with each or contains :each
+      if (atom.property === 'inside:each' || atom.property.endsWith(':each') || atom.property === 'each') {
+        return this.phzEngine._eachCurrent;
+      }
+      // :inside:0 etc. — resolve to object if path is collection index only
+      const res = this.phzEngine.resolveSelfProperty(atom.property);
+      return null; // value paths handled elsewhere
+    }
+    if (atom.var && String(atom.var).startsWith('.')) {
+      // .box1 or .car:wheels dest
+      if (atom.property) return `${atom.var}:${atom.property}`;
+      return atom.var;
+    }
+    return null;
+  }
+
+  _phzEvalMoveTarget(expr) {
+    if (!expr || expr.length !== 1) throw Error('PHZ move/to expects a single reference');
+    const a = expr[0];
+    if (a.phzSelf && a.property) {
+      const parts = a.property.split(':');
+      if (parts[parts.length - 1] === 'each') {
+        return { kind: 'each', collPath: parts.slice(0, -1).join(':') || 'inside' };
+      }
+      // :inside:0 → object at index
+      if (parts.length >= 2 && /^\d+$/.test(parts[parts.length - 1])) {
+        const coll = parts.slice(0, -1).join(':');
+        const idx = parseInt(parts[parts.length - 1], 10);
+        const self = this.phzEngine.getNamed(this.phzEngine._selfName);
+        const collObj = this.phzEngine._getCollection(self, coll);
+        return { kind: 'object', obj: collObj.items[idx] };
+      }
+      return { kind: 'selfPath', property: a.property };
+    }
+    if (a.var && String(a.var).startsWith('.')) {
+      if (a.property) return { kind: 'dest', ref: `${a.var}:${a.property}` };
+      const named = this.phzEngine.getNamed(a.var);
+      if (named) return { kind: 'object', obj: named, ref: a.var };
+      return { kind: 'dest', ref: a.var };
+    }
+    throw Error('PHZ move/to: invalid reference');
+  }
+
+  _phzDestRef(expr) {
+    if (!expr || expr.length !== 1) throw Error('PHZ to expects .<cont> or .<cont>:coll');
+    const a = expr[0];
+    if (a.var && String(a.var).startsWith('.')) {
+      return a.property ? `${a.var}:${a.property}` : a.var;
+    }
+    if (a.phzSelf && a.property) {
+      // to = :inside → self:inside
+      return `${this.phzEngine._selfName}:${a.property}`;
+    }
+    throw Error('PHZ to expects container collection reference');
+  }
+
   executePhzPropertyBlock(component, properties, reEvaluate, block) {
-    const inst = this.phzEngine.getNamed(component);
+    const eng = this.phzEngine;
+    const inst = eng.getNamed(component);
     if (!inst) return;
 
-    if (inst.kind === 'gen') {
-      let addVal = null;
-      let insideName = null;
-      let floorOverride = null;
-      let shouldSpawn = false;
+    const prevSelf = eng._selfName;
+    eng._selfName = component;
+    try {
+      if (inst.kind === 'gen') {
+        let addVal = null;
+        let insideName = null;
+        let floorOverride = null;
+        let shouldSpawn = false;
+
+        for (const prop of properties) {
+          if (this._execPropertyBlockDebugItem(prop)) continue;
+          const property = prop.property;
+          if (property === 'add') {
+            const expr = prop.expr;
+            if (expr && expr.length === 1 && (expr[0].dec != null || expr[0].sdec != null || expr[0].bin != null)) {
+              const atom = expr[0];
+              if (atom.dec != null) addVal = parseInt(atom.dec, 10);
+              else if (atom.sdec != null) addVal = parseInt(String(atom.sdec), 10);
+              else addVal = parseInt(atom.bin, 10);
+            } else {
+              addVal = parseInt(this._evalExprToBin(expr) || '0', 2);
+            }
+          } else if (property === 'inside') {
+            const expr = prop.expr;
+            if (!expr || expr.length !== 1) throw Error(`PHZ gen inside expects .<cont> or .<cont>:coll`);
+            const a = expr[0];
+            if (!a.var || !String(a.var).startsWith('.')) {
+              throw Error(`PHZ gen inside expects .<cont> reference`);
+            }
+            insideName = a.property ? `${a.var}:${a.property}` : a.var;
+          } else if (property === 'floor') {
+            const expr = prop.expr;
+            if (expr && expr.length === 1 && expr[0].var && !String(expr[0].var).startsWith('.')) {
+              floorOverride = { wireName: expr[0].var };
+            } else if (expr && expr.length === 1 && (expr[0].dec != null || expr[0].sdec != null || expr[0].bin != null)) {
+              const atom = expr[0];
+              if (atom.dec != null) floorOverride = parseInt(atom.dec, 10);
+              else if (atom.sdec != null) floorOverride = parseInt(String(atom.sdec), 10);
+              else floorOverride = parseInt(atom.bin, 10);
+            } else {
+              floorOverride = parseInt(this._evalExprToBin(expr) || '0', 2);
+            }
+          } else if (property === 'set') {
+            const bin = this._evalExprToBin(prop.expr);
+            if ((bin.length ? bin[bin.length - 1] : '0') === '1') shouldSpawn = true;
+          } else {
+            throw Error(`Unknown property '${property}' for PHZ gen ${component}`);
+          }
+        }
+
+        if (shouldSpawn) {
+          if (insideName == null) throw Error(`PHZ gen ${component} spawn requires inside`);
+          if (addVal == null) throw Error(`PHZ gen ${component} spawn requires add`);
+          eng.spawn(component, addVal, insideName, floorOverride);
+        }
+        return;
+      }
+
+      // Cont-like / obj: move, remove, toFloor, each, attr writes
+      const hasEach = properties.some(p => {
+        if (!p.expr) return false;
+        const s = JSON.stringify(p.expr);
+        return s.includes('"phzSelf":true') && s.includes('each');
+      }) || properties.some(p => p.property && p.property.includes('each'));
+
+      let moveExpr = null;
+      let toExpr = null;
+      let toFloorExpr = null;
+      let removeExpr = null;
+      let setExpr = null;
+      const selfAssigns = [];
+      const plainAssigns = [];
 
       for (const prop of properties) {
         if (this._execPropertyBlockDebugItem(prop)) continue;
         const property = prop.property;
-        if (property === 'add') {
-          const expr = prop.expr;
-          if (expr && expr.length === 1 && (expr[0].dec != null || expr[0].sdec != null || expr[0].bin != null)) {
-            const atom = expr[0];
-            if (atom.dec != null) addVal = parseInt(atom.dec, 10);
-            else if (atom.sdec != null) addVal = parseInt(String(atom.sdec), 10);
-            else addVal = parseInt(atom.bin, 10); // PHZ: digit string as decimal (add: 10 → 10)
-          } else {
-            const bin = this._evalExprToBin(expr);
-            addVal = parseInt(bin || '0', 2);
-          }
-        } else if (property === 'inside') {
-          const expr = prop.expr;
-          if (!expr || expr.length !== 1 || !expr[0].var || !String(expr[0].var).startsWith('.')) {
-            throw Error(`PHZ gen inside expects .<cont> reference`);
-          }
-          insideName = expr[0].var;
-        } else if (property === 'floor') {
-          const expr = prop.expr;
-          if (expr && expr.length === 1 && expr[0].var && !String(expr[0].var).startsWith('.')) {
-            floorOverride = { wireName: expr[0].var };
-          } else if (expr && expr.length === 1 && (expr[0].dec != null || expr[0].sdec != null || expr[0].bin != null)) {
-            const atom = expr[0];
-            if (atom.dec != null) floorOverride = parseInt(atom.dec, 10);
-            else if (atom.sdec != null) floorOverride = parseInt(String(atom.sdec), 10);
-            else floorOverride = parseInt(atom.bin, 10);
-          } else {
-            const bin = this._evalExprToBin(expr);
-            floorOverride = parseInt(bin || '0', 2);
-          }
-        } else if (property === 'set') {
-          const bin = this._evalExprToBin(prop.expr);
-          const bit = bin.length ? bin[bin.length - 1] : '0';
-          if (bit === '1') shouldSpawn = true;
+        if (property === 'move') moveExpr = prop.expr;
+        else if (property === 'to') toExpr = prop.expr;
+        else if (property === 'toFloor') toFloorExpr = prop.expr;
+        else if (property === 'remove') removeExpr = prop.expr;
+        else if (property === 'set') setExpr = prop.expr;
+        else if (prop.phzSelf || (property && property.indexOf(':') >= 0)) {
+          selfAssigns.push(prop);
+        } else if (property === 'inside' || property === 'count' || property === 'empty') {
+          throw Error(`PHZ :${property} path is reserved`);
         } else {
-          throw Error(`Unknown property '${property}' for PHZ gen ${component}`);
+          plainAssigns.push(prop);
         }
       }
 
-      if (shouldSpawn) {
-        if (insideName == null) throw Error(`PHZ gen ${component} spawn requires inside: .<cont>`);
-        if (addVal == null) throw Error(`PHZ gen ${component} spawn requires add`);
-        this.phzEngine.spawn(component, addVal, insideName, floorOverride);
-      }
-      return;
-    }
+      const runOne = (eachObj) => {
+        eng._eachCurrent = eachObj || null;
+        try {
+          if (setExpr) {
+            const bin = this._evalExprToBin(setExpr);
+            if ((bin.length ? bin[bin.length - 1] : '0') !== '1') return;
+          } else if (moveExpr || removeExpr || toFloorExpr) {
+            // require set for move/remove unless absent — sketch always has set
+          }
 
-    // obj / cont attribute writes (wireLiterals via evalExpr)
-    for (const prop of properties) {
-      if (this._execPropertyBlockDebugItem(prop)) continue;
-      const property = prop.property;
-      if (property.indexOf(':') >= 0 || property === 'inside') {
-        throw Error(`PHZ :inside path is read-only (cannot write '${property}')`);
+          if (removeExpr) {
+            const tgt = this._phzEvalMoveTarget(removeExpr);
+            if (tgt.kind === 'each') eng.removeObject(eachObj);
+            else if (tgt.kind === 'object') eng.removeObject(tgt.obj);
+            else throw Error('PHZ remove: invalid target');
+          }
+
+          if (toFloorExpr && moveExpr) {
+            const tgt = this._phzEvalMoveTarget(moveExpr);
+            let floorVal;
+            const fe = toFloorExpr;
+            if (fe.length === 1 && (fe[0].dec != null || fe[0].sdec != null || fe[0].bin != null)) {
+              const atom = fe[0];
+              floorVal = atom.dec != null ? parseInt(atom.dec, 10)
+                : atom.sdec != null ? parseInt(String(atom.sdec), 10)
+                : parseInt(atom.bin, 10);
+            } else {
+              floorVal = parseInt(this._evalExprToBin(fe) || '0', 2);
+            }
+            const obj = tgt.kind === 'each' ? eachObj : tgt.obj;
+            eng.toFloor(obj, floorVal);
+          } else if (moveExpr && toExpr) {
+            const tgt = this._phzEvalMoveTarget(moveExpr);
+            const dest = this._phzDestRef(toExpr);
+            const obj = tgt.kind === 'each' ? eachObj : tgt.obj;
+            eng.moveObject(obj, dest);
+          }
+
+          for (const prop of selfAssigns) {
+            const parts = prop.property.split(':');
+            if (parts.includes('each') && eachObj) {
+              const attr = parts[parts.length - 1];
+              if (attr === 'each') continue;
+              const value = this._evalExprToBin(prop.expr);
+              eng.setAttrValue(eachObj, attr, value);
+            }
+          }
+
+          for (const prop of plainAssigns) {
+            const value = this._evalExprToBin(prop.expr);
+            eng.setAttrValue(inst, prop.property, value);
+          }
+        } finally {
+          eng._eachCurrent = null;
+        }
+      };
+
+      if (hasEach && (moveExpr || removeExpr || toFloorExpr || selfAssigns.length)) {
+        // Determine collection for snapshot
+        let collName = 'inside';
+        const scan = moveExpr || removeExpr;
+        if (scan && scan[0] && scan[0].phzSelf && scan[0].property) {
+          const p = scan[0].property.split(':');
+          const ei = p.indexOf('each');
+          if (ei > 0) collName = p.slice(0, ei).join(':');
+          else if (ei === 0) collName = 'inside';
+        }
+        if (!eng._isContLike(inst)) throw Error('PHZ each requires a container');
+        const coll = eng._getCollection(inst, collName);
+        const snapshot = coll.items.slice();
+        for (const obj of snapshot) runOne(obj);
+      } else {
+        runOne(null);
       }
-      const value = this._evalExprToBin(prop.expr);
-      this.phzEngine.setAttrValue(inst, property, value);
+    } finally {
+      eng._selfName = prevSelf;
+      eng._eachCurrent = null;
     }
   }
 

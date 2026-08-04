@@ -48,6 +48,10 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
     if (rotate !== 0 && rotate !== 90 && rotate !== 180 && rotate !== 270) {
       throw Error(`motor rotate must be 0|90|180|270${name ? ` for ${name}` : ''}`);
     }
+    let maxDistance = MotorComponent.parseIntAttr(attributes && attributes.maxDistance, 100);
+    if (isNaN(maxDistance) || maxDistance < 1 || maxDistance > 65535) {
+      throw Error(`motor maxDistance must be 1..65535${name ? ` for ${name}` : ''}`);
+    }
     const color = MotorComponent.resolveColorAttr(attributes && attributes.color, '#6dff9c');
     const frameColor = MotorComponent.resolveColorAttr(
       attributes && attributes.frameColor,
@@ -60,6 +64,7 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
     return {
       kind,
       length,
+      maxDistance,
       text: attributes && attributes.text !== undefined ? String(attributes.text) : '',
       color,
       frameColor,
@@ -71,6 +76,13 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
       reversed: !!(attributes && attributes.reversed),
       nl: !!(attributes && attributes.nl),
     };
+  }
+
+  static distanceBits(maxDistance) {
+    let bits = 1;
+    let v = maxDistance;
+    while (v > 1) { v >>= 1; bits++; }
+    return Math.min(16, Math.max(8, bits));
   }
 
   static binToUnsigned(bin) {
@@ -124,28 +136,43 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
     }
   }
 
-  getSupportedProperties() { return ['get']; }
-  getRedirectProperties() { return ['get']; }
+  getSupportedProperties() { return ['get', 'distance', 'laps']; }
+  getRedirectProperties() { return ['get', 'distance', 'laps']; }
 
   evalGetProperty(comp, property, a, ctx) {
-    if (property !== 'get') return null;
-    let val = null;
-    if (comp.ref && comp.ref !== '&-') {
-      val = ctx.getValueFromRef(comp.ref);
+    if (property === 'get') {
+      let val = null;
+      if (comp.ref && comp.ref !== '&-') {
+        val = ctx.getValueFromRef(comp.ref);
+      }
+      const bits = ctx.getComponentBits(comp.type, comp.attributes) || 1;
+      if (val === null || val === undefined) {
+        val = comp.initialValue || '0'.repeat(bits);
+      }
+      const br = this.handleBitRange(a, val, a.var, 'get', ctx);
+      if (br) return br;
+      return { value: val, ref: null, varName: `${a.var}:get`, bitWidth: bits };
     }
-    const bits = ctx.getComponentBits(comp.type, comp.attributes) || 1;
-    if (val === null || val === undefined) {
-      val = comp.initialValue || '0'.repeat(bits);
+    if (property === 'distance') {
+      const cfg = MotorComponent.resolveConfig(comp.attributes || {}, a.var);
+      const db = MotorComponent.distanceBits(cfg.maxDistance);
+      let val = comp.motorDistance;
+      if (val == null) val = '0'.repeat(db);
+      return { value: val, ref: null, varName: `${a.var}:distance`, bitWidth: db };
     }
-    const br = this.handleBitRange(a, val, a.var, 'get', ctx);
-    if (br) return br;
-    return { value: val, ref: null, varName: `${a.var}:get`, bitWidth: bits };
+    if (property === 'laps') {
+      let val = comp.motorLaps;
+      if (val == null) val = '0'.repeat(16);
+      return { value: val, ref: null, varName: `${a.var}:laps`, bitWidth: 16 };
+    }
+    return null;
   }
 
   createDevice(name, baseId, bits, attributes, initialValue, returnType, ctx) {
     const cfg = MotorComponent.resolveConfig(attributes || {}, name);
     const value = MotorComponent.normalizeBin(initialValue || '0'.repeat(cfg.length), cfg.length);
     const speed = MotorComponent.binToUnsigned(value);
+    const db = MotorComponent.distanceBits(cfg.maxDistance);
 
     if (typeof addMotor === 'function') {
       addMotor({
@@ -168,7 +195,13 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
     }
 
     const storageIdx = ctx.storeValue(value);
-    return { deviceIds: [baseId], ref: `&${storageIdx}` };
+    return {
+      deviceIds: [baseId],
+      ref: `&${storageIdx}`,
+      motorDistance: '0'.repeat(db),
+      motorLaps: '0'.repeat(16),
+      motorMaxDistance: cfg.maxDistance,
+    };
   }
 
   applyProperties(comp, compName, pending, when, reEvaluate, ctx) {
@@ -178,6 +211,8 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
     if (!(setValue === '1' || setValue[setValue.length - 1] === '1')) return;
 
     const bits = ctx.getComponentBits(comp.type, comp.attributes) || 1;
+    const cfg = MotorComponent.resolveConfig(comp.attributes || {}, compName);
+    const db = MotorComponent.distanceBits(cfg.maxDistance);
     let changed = false;
     let motorValue = null;
 
@@ -193,14 +228,19 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
       changed = true;
     }
 
+    if (pending.distance !== undefined) {
+      let dVal = this.reEvalPendingValue(pending, 'distance', reEvaluate, ctx);
+      dVal = MotorComponent.normalizeBin(dVal, db);
+      comp.motorDistance = dVal;
+      changed = true;
+    }
+
     let dirBit = null;
     if (pending.dir !== undefined) {
       let dirVal = this.reEvalPendingValue(pending, 'dir', reEvaluate, ctx);
       dirBit = (dirVal === '1' || (dirVal && dirVal[dirVal.length - 1] === '1')) ? 1 : 0;
       changed = true;
     }
-
-    if (!changed) return;
 
     if (motorValue === null && comp.ref) {
       motorValue = ctx.getValueFromRef(comp.ref);
@@ -210,6 +250,23 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
     }
 
     const speed = MotorComponent.binToUnsigned(motorValue);
+
+    // Advance shaft distance when set=1 and speed != 0 (after optional distance write)
+    if (speed !== 0) {
+      let dist = MotorComponent.binToUnsigned(comp.motorDistance || '0');
+      let laps = MotorComponent.binToUnsigned(comp.motorLaps || '0');
+      dist += 1;
+      if (dist > cfg.maxDistance) {
+        dist = 0;
+        laps = (laps + 1) & 0xffff;
+      }
+      comp.motorDistance = MotorComponent.normalizeBin(dist.toString(2), db);
+      comp.motorLaps = MotorComponent.normalizeBin(laps.toString(2), 16);
+      changed = true;
+    }
+
+    if (!changed) return;
+
     const id = comp.deviceIds && comp.deviceIds[0];
     if (id && typeof setMotor === 'function') {
       const opts = { speed };
@@ -223,6 +280,7 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
       attrs: [
         { name: 'kind', value: 'string' },
         { name: 'length', value: 'integer' },
+        { name: 'maxDistance', value: 'integer' },
         { name: 'text', value: 'string' },
         { name: 'color', value: 'color' },
         { name: 'frameColor', value: 'color' },
@@ -239,8 +297,13 @@ var MotorComponent = class MotorComponent extends BuiltinComponent {
         { bits: '1', name: 'set' },
         { bits: 'X', name: 'value' },
         { bits: '1', name: 'dir' },
+        { bits: 'N', name: 'distance' },
       ],
-      pouts: [{ bits: 'X', name: 'get' }],
+      pouts: [
+        { bits: 'X', name: 'get' },
+        { bits: 'N', name: 'distance' },
+        { bits: '16', name: 'laps' },
+      ],
       returns: 'Xbit',
     };
   }

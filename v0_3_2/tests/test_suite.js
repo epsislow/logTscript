@@ -33373,7 +33373,7 @@ phz [gen] .gB:
   floor: 0
   :
 `);
-    }, 'type: obj');
+    }, 'type:');
   }
 
   function runPhzContReserved(h, session) {
@@ -33639,6 +33639,178 @@ phz [gen] .mk:
     const { out } = session.run(PHZ_SHOW_INSIDE);
     h.assert('length wave', String(out.some(l => l.includes('.bag:inside has length [2]'))), 'true');
   });
+
+  // ——— PHZ faza 2 ———
+
+  function runPhzTypedefCar(h, session) {
+    const { interp } = session.run(`phz +[wheel < obj]:
+  :
+phz +[car < cont]:
+  wheels: wheel[4]
+  :
+phz [car] .c1::
+phz [gen] .gw:
+  type: wheel
+  :
+.gw:{
+  add = \\2
+  inside = .c1:wheels
+  set = 1
+}
+16wire n = .c1:wheels:count`);
+    h.assert('wheels count 2', session.getWire(interp, 'n'), '0000000000000010');
+  }
+
+  function runPhzTypeMismatch(h, session) {
+    h.assertThrows('incompatible', function() {
+      session.run(`phz +[wheel < obj]:
+  :
+phz +[car < cont]:
+  wheels: wheel[4]
+  :
+phz [car] .c1::
+phz [gen] .go:
+  type: obj
+  :
+.go:{
+  add = 1
+  inside = .c1:wheels
+  set = 1
+}`);
+    }, 'incompatible');
+  }
+
+  function runPhzMoveRemove(h, session) {
+    const { interp } = session.run(`phz [obj] .box1::
+phz [cont] .room::
+phz [cont] .yard::
+.room:{
+  move = .box1
+  to = .room:inside
+  set = 1
+}
+16wire n1 = .room:inside:count
+.room:{
+  remove = .box1
+  set = 1
+}
+16wire n0 = .room:inside:count
+.yard:{
+  move = .box1
+  to = .yard:inside
+  set = 1
+}
+16wire n2 = .yard:inside:count
+16wire id = .box1:id`);
+    h.assert('in room', session.getWire(interp, 'n1'), '0000000000000001');
+    h.assert('removed', session.getWire(interp, 'n0'), '0000000000000000');
+    h.assert('in yard', session.getWire(interp, 'n2'), '0000000000000001');
+    h.assert('box still named', session.getWire(interp, 'id'), '0000000000000001');
+  }
+
+  function runPhzToFloor(h, session) {
+    const { interp } = session.run(`phz [obj] .box1::
+phz [cont] .lift::
+.lift:{
+  move = .box1
+  to = .lift:inside
+  set = 1
+}
+.lift:{
+  move = .box1
+  toFloor = \\2
+  set = 1
+}
+8wire fl = .box1:floor`);
+    h.assert('floor 2', session.getWire(interp, 'fl'), '00000010');
+  }
+
+  function runPhzEachFilter(h, session) {
+    const { interp } = session.run(`phz +[truck < obj]:
+  :
+phz [cont] .conv1:
+  max: 30
+  :
+phz [cont] .conv2:
+  max: 30
+  :
+phz [gen] .gt:
+  type: truck
+  :
+phz [gen] .go:
+  type: obj
+  :
+.gt:{
+  add = 1
+  inside = .conv1
+  set = 1
+}
+.go:{
+  add = 1
+  inside = .conv1
+  set = 1
+}
+.conv1:{
+  move = :inside:each
+  to = .conv2:inside
+  set = EQ(:inside:each:type, "truck")
+}
+16wire a = .conv1:inside:count
+16wire b = .conv2:inside:count`);
+    h.assert('conv1 left 1', session.getWire(interp, 'a'), '0000000000000001');
+    h.assert('conv2 got truck', session.getWire(interp, 'b'), '0000000000000001');
+  }
+
+  function runPhzShowWheels(h, session) {
+    const { out } = session.run(`phz +[wheel < obj]:
+  :
+phz +[car < cont]:
+  wheels: wheel[4]
+  :
+phz [car] .c1::
+phz [gen] .gw:
+  type: wheel
+  :
+.gw:{
+  add = 1
+  inside = .c1:wheels
+  set = 1
+}
+show(.c1:wheels)`);
+    h.assert('header', String(out.some(l => l.trim() === '.c1:wheels')), 'true');
+    h.assert('length', String(out.some(l => l.includes('.c1:wheels has length [1]'))), 'true');
+  }
+
+  function runPhzMotorLaps(h, session) {
+    // on:1 so the property block applies on RUN (default raise needs an edge)
+    const { interp } = session.run(`comp [motor] .m:
+  length: 4
+  maxDistance: 3
+  on: 1
+  :
+.m:{
+  value = 0001
+  distance = 00000011
+  set = 1
+}
+8wire d = .m:distance
+16wire L = .m:laps`);
+    h.assert('distance wrapped', session.getWire(interp, 'd'), '00000000');
+    h.assert('laps 1', session.getWire(interp, 'L'), '0000000000000001');
+  }
+
+  reg(3140, 'phz', 'typedef car + spawn into wheels', runPhzTypedefCar);
+  reg(3141, 'phz', 'typed collection rejects incompatible', runPhzTypeMismatch);
+  reg(3142, 'phz', 'move named + remove + reassign', runPhzMoveRemove);
+  reg(3143, 'phz', 'toFloor keeps ownership', runPhzToFloor);
+  reg(3144, 'phz', 'each filters by PHZ type', runPhzEachFilter);
+  reg(3145, 'phz', 'show(:wheels) vector-like', runPhzShowWheels);
+  reg(3146, 'phz', 'motor distance wrap increments laps', runPhzMotorLaps);
+
+  regPhzWave(3147, 'typedef car + spawn into wheels', runPhzTypedefCar);
+  regPhzWave(3148, 'move named + remove + reassign', runPhzMoveRemove);
+  regPhzWave(3149, 'each filters by PHZ type', runPhzEachFilter);
+  regPhzWave(3150, 'motor distance wrap increments laps', runPhzMotorLaps);
 
   window.LogTScriptTestSuite.finalize();
 })();

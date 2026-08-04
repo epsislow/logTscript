@@ -22072,6 +22072,7 @@ There is **no** packing of “run bit + speed” inside one word. An 8-bit sourc
 comp [motor] .name:
   kind: rotor
   length: 8
+  maxDistance: 100
   text: 'M1'
   color: ^6dff9c
   frameColor: ^4a9e6a
@@ -22116,6 +22117,7 @@ The **ring (and hub) stay fixed**; only the notch / blades / vanes spin.
 |-----------|------|---------|-------------|
 | \`kind\` | id | \`rotor\` | Visual skin (\`rotor\`, \`fan\`, \`pump\`) — unquoted, e.g. \`kind: fan\` |
 | \`length\` | integer | \`1\` | Wire width \`1…8\`. \`1\` = on/off; \`N>1\` = speed \`0…2^N−1\` |
+| \`maxDistance\` | integer | \`100\` | Shaft travel ceiling \`1…65535\` before wrap → lap (see below) |
 | \`text\` | string | \`''\` | Panel label (up to 5 characters shown) |
 | \`color\` | hex \\| wire | \`#6dff9c\` | Moving part (notch / blades / vanes) |
 | \`frameColor\` | hex \\| wire | *(= \`color\`)* | Fixed ring + hub outline/fill accent |
@@ -22171,7 +22173,9 @@ Allowed range: \`1…100\` (factor \`0.1…10\`). **\`rate\` does not change** t
 | \`set\` | 1 | Enable a property-block write when \`1\` |
 | \`value\` | \`length\` | Speed command to store |
 | \`dir\` | 1 | Dynamic direction: \`1\` flips sense relative to \`reversed\` |
+| \`distance\` | N (8…16) | Write / read shaft position (\`0…maxDistance\`) |
 | \`get\` | \`length\` | Read back the **speed** (not direction) |
+| \`laps\` | 16 | Read-only lap counter (increments on wrap) |
 
 Direct assignment \`.m = expr\` writes the speed (same width as \`length\`).
 
@@ -22181,7 +22185,35 @@ Property block:
 .m:{ value = speedWire, dir = dirWire, set = 1 }
 \`\`\`
 
-\`on:\` on the component only controls **when** that block applies — it is **not** the run command (same rule as \`led\`).
+\`on:\` on the component only controls **when** that block applies — it is **not** the run command (same rule as \`led\`). Use \`on: 1\` when a constant \`set = 1\` must apply on the first RUN (default \`raise\` needs an edge).
+
+### Shaft distance and laps
+
+When a property block applies with \`set = 1\` and speed ≠ \`0\`, the motor advances \`:distance\` by one after any optional \`distance = …\` write in the same block.
+
+- If the new distance is **greater than** \`maxDistance\`, it wraps to \`0\` and \`:laps\` increments (16-bit).
+- Width of \`:distance\` is derived from \`maxDistance\` (at least 8 bits).
+- \`:get\` stays the speed command; it is unrelated to distance.
+
+Useful next to PHZ user conveyors / elevators — see [phz.md](phz.md).
+
+**Load & Run** — write distance at max (\`3\`), advance once → distance \`0\`, laps \`1\`.
+
+\`\`\`logts-play wave
+comp [motor] .m:
+  length: 4
+  maxDistance: 3
+  on: 1
+  :
+.m:{
+  value = 0001
+  distance = 00000011
+  set = 1
+}
+8wire d = .m:distance
+16wire L = .m:laps
+show(d, L)
+\`\`\`
 
 ---
 
@@ -24285,61 +24317,15 @@ See [debug.md](debug.md) for \`:\` (pin/pout) vs \`.\` (internal wire) conventio
 
 Chip details: [chip.md](chip.md).
 `,
-    'phz.md': `# PHZ — Physical Zone Framework (phase 1)
+    'phz.md': `# PHZ — Physical Zone Framework
 
-PHZ is a LogTScript **language module** for **physical logic**: topology, ownership, identity, and capacity. It is **not** a continuous physics engine (no forces, velocities, collisions, or time integration).
+PHZ is a LogTScript **language module** for **physical logic**: topology, ownership, identity, capacity, typed collections, and membership moves. It is **not** a continuous physics engine (no forces, velocities, collisions, or time integration).
 
-Related policy: [allow-notallow.md](allow-notallow.md) — \`phz.type{obj gen cont}\`.
+Related policy: [allow-notallow.md](allow-notallow.md) — \`phz.type{…}\` (built-ins plus user type names).
 
-Signature: think in **zones and things**, not in gates. Attributes are ordinary bit wires (pouts). Containers hold anonymous spawned objects. Generators are templates that append into a container when you pulse \`set\`.
+Signature: think in **zones and things**, not in gates. Attributes are ordinary bit wires (pouts). Containers and user \`cont\`-derived types hold typed collections. Generators are templates that append into a collection when you pulse \`set\`.
 
----
-
-## Philosophy
-
-### What problem PHZ solves
-
-Digital scripts often need a **world model** that is still fully digital:
-
-- “This box is on floor 2 and weighs 3.”
-- “This room can hold at most 30 items.”
-- “Spawn ten copies of a template into the room.”
-- “Ask how many objects are inside, or read the first / last one’s \`id\`.”
-
-That is **physical logic**: discrete facts about place, ownership, and identity — encoded as bits LogTScript already understands.
-
-### What PHZ deliberately is not
-
-| Not this | Instead |
-|----------|---------|
-| Rigid-body / continuous physics | Discrete attributes + list membership |
-| Named instances for every spawned item | Anonymous objects only inside a \`cont\` list |
-| A unified schema for all objects in a container | Per-object attributes; missing attr → error |
-| Filling containers by hand assignment | Phase 1 fill is **only** via \`gen\` spawn |
-| \`.c:count\` shortcut | Always \`.c:inside:count\` (ownership path) |
-
-### Core metaphor
-
-\`\`\`text
-  named obj ──────────► a thing you can address (.box:flag)
-  named gen ──────────► a stamp / factory (template attrs)
-  named cont ─────────► a zone / bag with capacity (max)
-       │
-       └── :inside ───► anonymous spawned objs (read-only path)
-\`\`\`
-
-- **\`floor\`** — zoning layer (8-bit), not a physics height.
-- **\`id\`** — global 16-bit identity (script-wide autoincrement), not a memory address.
-- **\`max\` / \`count\`** — capacity and occupancy of a container list.
-- **Spawn** — \`gen\` copies its template attributes onto new anonymous objs and appends them to \`cont\`.
-
-### Design invariants (phase 1)
-
-1. **Bits everywhere** — every readable field is a pout-width bit string.
-2. **Ownership path** — container contents are reached only through \`:inside…\`.
-3. **Heterogeneous OK** — two gens may spawn different attribute sets into the same cont; reading a missing attr on one object fails for that object only.
-4. **Re-spawn appends** — \`on:1\` is hardcoded on gen; every property block with \`set = 1\` spawns again.
-5. **Overflow is an error** — \`count + add > max\` does not wrap.
+Shaft travel for panel motors (\`maxDistance\`, \`:distance\`, \`:laps\`) lives on [\`motor.md\`](motor.md) — often used next to PHZ conveyors/elevators as **user** types.
 
 ---
 
@@ -24358,15 +24344,68 @@ Blocks use \`logts-play wave\` (wave propagation in the new tab).
 
 ---
 
-## Kinds
+## Philosophy
+
+### What problem PHZ solves
+
+Digital scripts often need a **world model** that is still fully digital:
+
+- “This box is on floor 2 and weighs 3.”
+- “This room can hold at most 30 items.”
+- “Spawn ten copies of a template into the room.”
+- “Move only trucks from conveyor A to B.”
+- “Ask how many objects are inside, or read the first / last one’s \`id\`.”
+
+That is **physical logic**: discrete facts about place, ownership, and identity — encoded as bits LogTScript already understands.
+
+### What PHZ deliberately is not
+
+| Not this | Instead |
+|----------|---------|
+| Rigid-body / continuous physics | Discrete attributes + list membership |
+| Built-in conveyor / elevator kinds | User types: \`phz +[conveyor < cont]: …\` |
+| A unified schema for all objects in a container | Per-object attributes; missing attr → error |
+| Destroy-on-remove | \`remove\` only detaches (object may stay named / uncontained) |
+| \`.c:count\` shortcut | Always \`.c:inside:count\` (or \`:wheels:count\` on a named collection) |
+
+### Core metaphor
+
+\`\`\`text
+  named obj / user-obj ──► a thing you can address (.box:flag)
+  named gen ─────────────► a stamp / factory (template attrs)
+  named cont / user-cont ► zone with one or more typed collections
+       │
+       ├── :inside ──────► default list (obj by default)
+       └── :wheels ──────► extra typed collection (user typedef)
+\`\`\`
+
+- **\`floor\`** — zoning layer (8-bit), not a physics height.
+- **\`id\`** — global 16-bit identity (script-wide autoincrement), not a memory address.
+- **\`max\` / \`count\`** — capacity (alias of default \`inside\` capacity) and occupancy of a collection.
+- **Spawn** — \`gen\` copies its template attributes onto new objs and appends them to a collection path.
+- **Membership** — at most one collection at a time; \`move\` / \`remove\` / \`toFloor\` change place or floor without physics.
+
+### Design invariants
+
+1. **Bits everywhere** — every readable field is a pout-width bit string.
+2. **Ownership path** — contents are reached through collection paths (\`:inside…\`, \`:wheels…\`).
+3. **Heterogeneous OK** on \`obj\` lists — different gens may spawn different attribute sets; reading a missing attr fails for that object only. Typed collections enforce **element type** compatibility.
+4. **Re-spawn appends** — \`on:1\` is hardcoded on gen; every property block with \`set = 1\` spawns again.
+5. **Overflow is an error** — \`count + add > max\` does not wrap.
+6. **Unique membership** — one object in at most one collection; \`remove\` → uncontained (not destroyed).
+
+---
+
+## Kinds and user types
 
 | Kind | Syntax | Role |
 |------|--------|------|
 | \`obj\` | \`phz [obj] .o:\` | Named object; attributes → pouts |
-| \`gen\` | \`phz [gen] .g:\` | Template + spawn into a container |
-| \`cont\` | \`phz [cont] .c:\` | Container with \`max\` and internal list |
+| \`gen\` | \`phz [gen] .g:\` | Template + spawn into a collection (**not** extensible) |
+| \`cont\` | \`phz [cont] .c:\` | Container with default \`inside\` list |
+| user | \`phz +[T < obj\\|cont]:\` then \`phz [T] .x:\` | Custom type; collections only on \`cont\` base |
 
-Policy type set: \`phz.type{obj gen cont}\`.
+Policy: built-ins \`obj gen cont\` plus registered user names in \`phz.type{…}\`.
 
 ---
 
@@ -24415,7 +24454,7 @@ show(w, wp, lab)
 
 ### Runtime writes (named obj / cont)
 
-RHS uses normal LogTScript wireLiterals (\`=\` or property block). PHZ named instances use **\`on:1\`** for property blocks (same as gen), so writes run on the first pass without an edge. Writing through \`:inside\` is **not** supported in phase 1.
+RHS uses normal LogTScript wireLiterals (\`=\` or property block). PHZ named instances use **\`on:1\`** for property blocks (same as gen), so writes run on the first pass without an edge.
 
 **Load & Run** — \`flag\` becomes \`1\`.
 
@@ -24434,7 +24473,7 @@ show(f)
 
 ## Generator
 
-A gen is a **template**, not an instance in a container.
+A gen is a **template**, not an instance in a container. **\`gen\` cannot be subclassed** (\`phz +[T < gen]\` is invalid).
 
 \`\`\`
 phz [gen] .factory:
@@ -24446,12 +24485,12 @@ phz [gen] .factory:
 
 Rules:
 
-- \`type: obj\` is **required**
+- \`type:\` is **required** — built-in \`obj\` or any registered user type compatible with the target collection
 - \`id\` is **forbidden** on gen (ids are allocated at spawn)
 - Property-block fields for spawn: \`add\`, \`inside\`, \`set\`, optional \`floor\`
 - \`on:1\` is hardcoded — every block with \`set = 1\` **spawns again** (appends)
-- \`inside\` is required and must name a \`cont\`
-- Cont fill in phase 1 is **only** from gen
+- \`inside\` is required and may name a **cont** or a **collection path** (\`.car:wheels\`)
+- Spawned objects may be anonymous (path / \`each\` only) unless you create named instances and \`move\` them
 
 ### Spawn into a container
 
@@ -24514,12 +24553,13 @@ phz [cont] .room:
   :
 \`\`\`
 
-- \`max\` is 16 bits; default value **16** if omitted
+- Default collection: \`inside: obj[16]\` (capacity 16 if \`max\` omitted)
+- Attribute pout \`max\` (16 bits) is an **alias** of the default \`inside\` capacity
 - overflow (\`count + add > max\`) → error
 - reserved top-level attribute names: \`inside\`, \`count\`, \`empty\`  
   (\`first\` / \`last\` are allowed as normal attrs on the cont itself; they are **not** the same as \`:inside:first\`)
 
-### \`:inside\` API (read-only)
+### \`:inside\` API (read-only membership paths)
 
 | Path | Meaning |
 |------|---------|
@@ -24527,6 +24567,7 @@ phz [cont] .room:
 | \`.c:inside:empty\` | \`1\` if empty else \`0\` |
 | \`.c:inside:0\` | dump attributes of object 0 (show UX) |
 | \`.c:inside:0:id\` | attribute pout |
+| \`.c:inside:0:type\` | PHZ runtime type (ASCII bits) |
 | \`.c:inside:first\` / \`:last\` | first / last object |
 | \`.c:inside\` | list display (show UX) |
 
@@ -24598,7 +24639,7 @@ show(firstId, lastId)
 
 ### Heterogeneous gens in one container
 
-Different templates may contribute different attributes. Reading an attribute that exists only on another object fails.
+Different templates may contribute different attributes on an \`obj\` list. Reading an attribute that exists only on another object fails.
 
 **Load & Run** — index \`0\` has \`onlyA\`, index \`1\` has \`onlyB\`.
 
@@ -24629,7 +24670,157 @@ phz [gen] .mkB:
 show(a0, b1)
 \`\`\`
 
-\`show(.c:inside)\` is display UX only — there is **no** unified schema that merges all attributes of every object.
+---
+
+## User types and typed collections
+
+Declare with \`phz +[Name < obj]\` or \`phz +[Name < cont]\`. On a \`cont\` base, collection fields use \`name: ElementType[max]\`.
+
+Redeclaring \`inside: person[4]\` on a derived type **replaces** the default \`inside\` element type and capacity.
+
+**Load & Run** — two wheels in \`.c1:wheels\`; count is \`2\`.
+
+\`\`\`logts-play wave
+phz +[wheel < obj]:
+  :
+phz +[car < cont]:
+  wheels: wheel[4]
+  :
+phz [car] .c1::
+phz [gen] .gw:
+  type: wheel
+  :
+.gw:{
+  add = \\2
+  inside = .c1:wheels
+  set = 1
+}
+16wire n = .c1:wheels:count
+show(n)
+show(.c1:wheels)
+\`\`\`
+
+Type check: spawning \`obj\` into \`wheels: wheel[4]\` fails (\`incompatible\`). A collection \`trunk: obj[100]\` accepts any type that derives from \`obj\`.
+
+\`show(.c1:wheels)\` is vector-like — same rules as \`show(.c:inside)\`.
+
+### Capacity: old \`max\` vs \`inside: Type[N]\`
+
+| Form | Meaning |
+|------|---------|
+| \`phz [cont] .c: max: 30\` | sets default \`inside\` capacity to 30; pout \`:max\` mirrors it |
+| \`inside: obj[16]\` (default) | same capacity semantics as phase‑1 default \`max\` |
+| \`wheels: wheel[4]\` | separate list; capacity 4; not reflected in cont \`:max\` |
+
+---
+
+## Move, remove, toFloor
+
+Property block on a container / collection owner:
+
+| Field | Role |
+|-------|------|
+| \`move\` | object ref (\`.box1\` or \`:inside:each\` under \`each\`) |
+| \`to\` | destination collection (\`.room:inside\`, \`.yard:inside\`, …) |
+| \`toFloor\` | set \`floor\` on the moved object (ownership unchanged) |
+| \`remove\` | detach only — object becomes **uncontained** |
+| \`set\` | enable the operation (\`1\` or a predicate with \`each\`) |
+
+Named objects stay addressable after \`remove\` / \`move\`.
+
+**Load & Run** — box enters room, is removed, then enters yard; \`id\` stays \`1\`.
+
+\`\`\`logts-play wave
+phz [obj] .box1::
+phz [cont] .room::
+phz [cont] .yard::
+.room:{
+  move = .box1
+  to = .room:inside
+  set = 1
+}
+.room:{
+  remove = .box1
+  set = 1
+}
+.yard:{
+  move = .box1
+  to = .yard:inside
+  set = 1
+}
+16wire nRoom = .room:inside:count
+16wire nYard = .yard:inside:count
+16wire id = .box1:id
+show(nRoom, nYard, id)
+\`\`\`
+
+**Load & Run** — \`toFloor\` sets floor while still inside the lift.
+
+\`\`\`logts-play wave
+phz [obj] .box1::
+phz [cont] .lift::
+.lift:{
+  move = .box1
+  to = .lift:inside
+  set = 1
+}
+.lift:{
+  move = .box1
+  toFloor = \\2
+  set = 1
+}
+8wire fl = .box1:floor
+show(fl)
+\`\`\`
+
+---
+
+## each + self-relative paths
+
+In a PHZ property block, paths starting with \`:\` are **self-relative** to the instance that owns the block (\`:inside:0\` ≈ vector index on that instance’s \`inside\`).
+
+With \`each\`: the engine takes a **snapshot** of the collection, then for each element binds \`each\`, evaluates \`set\`, and if \`1\` applies \`move\` / assignments for that element.
+
+\`:type\` is the PHZ runtime type (ASCII), not a normal user attribute named \`type\`.
+
+**Load & Run** — only the truck moves from \`conv1\` to \`conv2\`.
+
+\`\`\`logts-play wave
+phz +[truck < obj]:
+  :
+phz [cont] .conv1:
+  max: 30
+  :
+phz [cont] .conv2:
+  max: 30
+  :
+phz [gen] .gt:
+  type: truck
+  :
+phz [gen] .go:
+  type: obj
+  :
+.gt:{
+  add = 1
+  inside = .conv1
+  set = 1
+}
+.go:{
+  add = 1
+  inside = .conv1
+  set = 1
+}
+.conv1:{
+  move = :inside:each
+  to = .conv2:inside
+  set = EQ(:inside:each:type, "truck")
+}
+16wire a = .conv1:inside:count
+16wire b = .conv2:inside:count
+show(a, b)
+\`\`\`
+
+Conveyors / elevators are **user** types (e.g. \`phz +[conveyor < cont]:\`), not built-in PHZ kinds. Pair them with [\`motor.md\`](motor.md) \`maxDistance\` / \`:distance\` / \`:laps\` when you need shaft travel on the panel.
 
 ---
 
@@ -24638,28 +24829,24 @@ show(a0, b1)
 \`\`\`mermaid
 flowchart LR
   genNode[named gen template]
-  contNode[named cont]
-  listNode[anonymous objs in list]
+  typed[user types obj or cont]
+  collNode[typed collections]
+  namedNode[named instances]
+  ops[move remove each toFloor]
   wiresNode[wires via colon paths]
-  genNode -->|"spawn add set"| contNode
-  contNode --> listNode
-  listNode -->|"inside N attr"| wiresNode
+  genNode -->|"spawn add set"| collNode
+  typed --> collNode
+  namedNode --> ops
+  ops --> collNode
+  collNode -->|"inside N attr type"| wiresNode
 \`\`\`
-
----
-
-## Phase 1 limits
-
-- No write through \`:inside\` (move / mutate spawned objs later).
-- No fill of \`cont\` except via \`gen\`.
-- No continuous physics.
-- Generated objects have **no** visible \`.name\` — only list indices / first / last.
 
 ---
 
 ## See also
 
-- [allow-notallow.md](allow-notallow.md) — restricting \`phz\` kinds
+- [motor.md](motor.md) — \`maxDistance\`, \`:distance\`, \`:laps\`
+- [allow-notallow.md](allow-notallow.md) — restricting \`phz\` kinds / user types
 - [doc-viewer.md](doc-viewer.md) — how **Load** / **Load & Run** work
 - [chip-board-execution.md](chip-board-execution.md) — another module with runnable \`logts-play\` demos
 `,

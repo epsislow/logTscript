@@ -120,13 +120,16 @@ function createDefaultPolicyTypeModules(ctx) {
     moduleName: 'phz',
     docLabel: 'phz kinds',
     resolveTypeToken(token) {
-      if (!['obj', 'gen', 'cont'].includes(token)) {
+      // Built-ins + any user-defined type name (validated at exec against engine.types)
+      if (typeof token !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(token)) {
         throw new Error(`Unknown entry '${token}' in phz.type{}`);
       }
       return token;
     },
     getRuntimeId(stmt) {
-      return stmt && stmt.phz && stmt.phz.kind;
+      if (!stmt || !stmt.phz) return null;
+      if (stmt.phz.kind === 'typedef') return stmt.phz.typeName;
+      return stmt.phz.kind;
     },
   });
 

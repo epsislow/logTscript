@@ -21,6 +21,7 @@ There is **no** packing of “run bit + speed” inside one word. An 8-bit sourc
 comp [motor] .name:
   kind: rotor
   length: 8
+  maxDistance: 100
   text: 'M1'
   color: ^6dff9c
   frameColor: ^4a9e6a
@@ -65,6 +66,7 @@ The **ring (and hub) stay fixed**; only the notch / blades / vanes spin.
 |-----------|------|---------|-------------|
 | `kind` | id | `rotor` | Visual skin (`rotor`, `fan`, `pump`) — unquoted, e.g. `kind: fan` |
 | `length` | integer | `1` | Wire width `1…8`. `1` = on/off; `N>1` = speed `0…2^N−1` |
+| `maxDistance` | integer | `100` | Shaft travel ceiling `1…65535` before wrap → lap (see below) |
 | `text` | string | `''` | Panel label (up to 5 characters shown) |
 | `color` | hex \| wire | `#6dff9c` | Moving part (notch / blades / vanes) |
 | `frameColor` | hex \| wire | *(= `color`)* | Fixed ring + hub outline/fill accent |
@@ -120,7 +122,9 @@ Allowed range: `1…100` (factor `0.1…10`). **`rate` does not change** the sto
 | `set` | 1 | Enable a property-block write when `1` |
 | `value` | `length` | Speed command to store |
 | `dir` | 1 | Dynamic direction: `1` flips sense relative to `reversed` |
+| `distance` | N (8…16) | Write / read shaft position (`0…maxDistance`) |
 | `get` | `length` | Read back the **speed** (not direction) |
+| `laps` | 16 | Read-only lap counter (increments on wrap) |
 
 Direct assignment `.m = expr` writes the speed (same width as `length`).
 
@@ -130,7 +134,35 @@ Property block:
 .m:{ value = speedWire, dir = dirWire, set = 1 }
 ```
 
-`on:` on the component only controls **when** that block applies — it is **not** the run command (same rule as `led`).
+`on:` on the component only controls **when** that block applies — it is **not** the run command (same rule as `led`). Use `on: 1` when a constant `set = 1` must apply on the first RUN (default `raise` needs an edge).
+
+### Shaft distance and laps
+
+When a property block applies with `set = 1` and speed ≠ `0`, the motor advances `:distance` by one after any optional `distance = …` write in the same block.
+
+- If the new distance is **greater than** `maxDistance`, it wraps to `0` and `:laps` increments (16-bit).
+- Width of `:distance` is derived from `maxDistance` (at least 8 bits).
+- `:get` stays the speed command; it is unrelated to distance.
+
+Useful next to PHZ user conveyors / elevators — see [phz.md](phz.md).
+
+**Load & Run** — write distance at max (`3`), advance once → distance `0`, laps `1`.
+
+```logts-play wave
+comp [motor] .m:
+  length: 4
+  maxDistance: 3
+  on: 1
+  :
+.m:{
+  value = 0001
+  distance = 00000011
+  set = 1
+}
+8wire d = .m:distance
+16wire L = .m:laps
+show(d, L)
+```
 
 ---
 

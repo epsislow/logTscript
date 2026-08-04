@@ -10,22 +10,22 @@ todos:
     status: completed
   - id: w1-types
     content: "W1: parser/registry phz +[Type < Base] doar Base=obj|cont + colecții tipate"
-    status: pending
+    status: completed
   - id: w2-membership
     content: "W2: membership unică + named în colecții (O2a) + uncontained după remove"
-    status: pending
+    status: completed
   - id: w3-move
     content: "W3: move/to/toFloor/remove + type-check cu subtipuri + spawn către orice colecție"
-    status: pending
+    status: completed
   - id: w4-each
     content: "W4: each per-element (O7a) + path relativ :… (O8b) + snapshot"
-    status: pending
+    status: completed
   - id: w5-motor
     content: "W5: motor maxDistance + :distance/:laps (O9a); conveyor/elevator = tipuri user (O10a)"
-    status: pending
+    status: completed
   - id: w6-doc-tests
     content: "W6: phz.md faza 2 + show vector pe :wheels + teste/wave"
-    status: pending
+    status: completed
 isProject: false
 ---
 

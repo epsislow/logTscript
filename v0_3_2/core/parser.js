@@ -2262,13 +2262,36 @@ parseBoardInstance() {
       if (this.c.value === 'peek') return this.peek();
     }
 
+    // Self-relative PHZ LHS: :inside:each:km = …
+    if (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+      let property = this._eatPropertyPathSegment();
+      while (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        property += ':' + this._eatPropertyPathSegment();
+      }
+      if (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+      } else {
+        this.eat('SYM', '=');
+      }
+      const expr = this.expr();
+      return { property, expr, phzSelf: true };
+    }
+
     if (this.c.type !== 'ID') {
       throw Error(`Expected property name in property block at ${this.c.line}:${this.c.col}, got ${this.c.type} '${this.c.value}'`);
     }
 
-    const propName = this.c.value;
+    let propName = this.c.value;
     this.eat('ID');
-
+    while (this.c.type === 'SYM' && this.c.value === ':') {
+      const next = this.t.peekToken();
+      // `prop: value` uses colon as separator — if next is not a path segment start for multi-prop, break
+      // Multi-segment property names: move stays single; path assigns use leading `:` form above.
+      // Keep single ID properties (add, inside, set, move, to, …).
+      break;
+    }
     if (propName === 'openSock' && this.c.type === 'SYM' && this.c.value === '<-') {
       this.eat('SYM', '<-');
       const targetAtom = this.atom();
@@ -2378,6 +2401,7 @@ parseBoardInstance() {
         continue;
       }
       if (this.c.type === 'ID') continue;
+      if (this.c.type === 'SYM' && this.c.value === ':') continue;
       if (this.c.type === 'KEYWORD' && (this.c.value === 'show' || this.c.value === 'peek')) continue;
       throw Error(`Expected ',' or '}' in property block for ${componentName} at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
@@ -4542,6 +4566,17 @@ assignment() {
       return addNot({ group: inner });
     }
 
+    // Self-relative PHZ path: :inside:each:type
+    if (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+      let property = this._eatPropertyPathSegment();
+      while (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        property += ':' + this._eatPropertyPathSegment();
+      }
+      return addNot({ var: null, property, phzSelf: true });
+    }
+
     if (this.c.type === 'SYM' && this.c.value === '{') {
       return addNot(this.parseSchemaLiteralAtom());
     }
@@ -5998,19 +6033,31 @@ isBuiltinFunction(name) {
     const stmtLine = this.c.line;
     const stmtCol = tokenStartCol(this.c);
     this.eat('KEYWORD', 'phz');
+
+    // phz +[Type < Base]: … :
+    if (this.c.type === 'SYM' && this.c.value === '+') {
+      return this._parsePhzTypeDef(stmtLine, stmtCol);
+    }
+
     this.eat('SYM', '[');
 
     if (this.c.type !== 'ID') {
-      throw Error(`Expected phz kind obj|gen|cont at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      throw Error(`Expected phz kind/type at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     const kind = this.c.value;
     this.eat('ID');
-    if (kind !== 'obj' && kind !== 'gen' && kind !== 'cont') {
-      throw Error(`Unknown phz kind '${kind}' (expected obj, gen, or cont) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
-    }
     this.eat('SYM', ']');
 
-    if (this.usagePolicy) {
+    const builtin = kind === 'obj' || kind === 'gen' || kind === 'cont';
+    if (!builtin) {
+      // user type instance — validated at exec against engine.types
+      if (this.usagePolicy) {
+        const chk = this.usagePolicy.isModuleAllowed('phz', kind);
+        if (!chk.allowed) {
+          throw Error(`PHZ '${kind}' is not allowed (${chk.reason} policy) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+        }
+      }
+    } else if (this.usagePolicy) {
       const chk = this.usagePolicy.isModuleAllowed('phz', kind);
       if (!chk.allowed) {
         throw Error(`PHZ '${kind}' is not allowed (${chk.reason} policy) at ${this.c.file}: ${this.c.line}:${this.c.col}`);
@@ -6030,13 +6077,12 @@ isBuiltinFunction(name) {
     this.t.skip();
     this.eat('SYM', ':');
 
-    // short form ::
     if (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
       if (kind === 'gen') {
-        throw Error(`PHZ gen '${name}' requires a body with type: obj at ${this.c.file}: ${stmtLine}:${stmtCol}`);
+        throw Error(`PHZ gen '${name}' requires a body with type: … at ${this.c.file}: ${stmtLine}:${stmtCol}`);
       }
-      return { phz: { kind, name, attributes: {} }, line: stmtLine, col: stmtCol };
+      return { phz: { kind, name, attributes: {}, userType: !builtin }, line: stmtLine, col: stmtCol };
     }
 
     const attributes = {};
@@ -6072,11 +6118,34 @@ isBuiltinFunction(name) {
         continue;
       }
 
-      if (kind === 'cont' && (attrName === 'inside' || attrName === 'count' || attrName === 'empty')) {
-        throw Error(`PHZ cont attribute '${attrName}' is reserved at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      // Collection declaration only on type defs; on cont instance, inside/count/empty reserved
+      if ((kind === 'cont' || !builtin) && (attrName === 'count' || attrName === 'empty')) {
+        throw Error(`PHZ attribute '${attrName}' is reserved at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      if (kind === 'cont' && attrName === 'inside') {
+        throw Error(`PHZ cont attribute 'inside' is reserved at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
       if (kind === 'gen' && attrName === 'id') {
         throw Error(`PHZ gen cannot define 'id' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+
+      // Collection form Type[max] (allowed in type defs; on instances only via typedef)
+      if (this.c.type === 'ID') {
+        const next = this.t.peekToken();
+        if (next && next.type === 'SYM' && next.value === '[') {
+          const elemType = this.c.value;
+          this.eat('ID');
+          this.eat('SYM', '[');
+          this.t.skip();
+          if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+            throw Error(`Expected max in Type[max] at ${this.c.line}:${this.c.col}`);
+          }
+          const maxN = parseInt(this.c.value, 10);
+          this.eat(this.c.type);
+          this.eat('SYM', ']');
+          attributes[attrName] = { kind: 'collection', elementType: elemType, max: maxN };
+          continue;
+        }
       }
 
       const val = this._parsePhzAttrValue();
@@ -6089,14 +6158,97 @@ isBuiltinFunction(name) {
       attributes[attrName] = val;
     }
 
-    if (kind === 'gen' && (!attributes.type || attributes.type.value !== 'obj')) {
-      throw Error(`PHZ gen '${name}' requires type: obj at ${this.c.file}: ${stmtLine}:${stmtCol}`);
+    if (kind === 'gen' && !attributes.type) {
+      throw Error(`PHZ gen '${name}' requires type: <Type> (e.g. type: obj) at ${this.c.file}: ${stmtLine}:${stmtCol}`);
     }
 
-    return { phz: { kind, name, attributes }, line: stmtLine, col: stmtCol };
+    return { phz: { kind, name, attributes, userType: !builtin }, line: stmtLine, col: stmtCol };
+  }
+
+  _parsePhzTypeDef(stmtLine, stmtCol) {
+    this.eat('SYM', '+');
+    this.eat('SYM', '[');
+    if (this.c.type !== 'ID') {
+      throw Error(`Expected type name in phz +[…] at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const typeName = this.c.value;
+    this.eat('ID');
+    this.t.skip();
+    if (!(this.c.type === 'SYM' && this.c.value === '<')) {
+      throw Error(`Expected '<' in phz +[${typeName} < Base] at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    this.eat('SYM', '<');
+    this.t.skip();
+    if (this.c.type !== 'ID') {
+      throw Error(`Expected base type after '<' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    const base = this.c.value;
+    this.eat('ID');
+    if (base === 'gen') {
+      throw Error(`PHZ types cannot extend gen at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+    }
+    this.eat('SYM', ']');
+    this.t.skip();
+    this.eat('SYM', ':');
+
+    const collections = {};
+    const attributes = {};
+    while (this.c.type !== 'EOF') {
+      if (this.c.type === 'EOL') {
+        this.c = this.t.get();
+        continue;
+      }
+      this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        break;
+      }
+      if (this.c.type !== 'ID') {
+        throw Error(`Expected member in phz +[${typeName}] at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      }
+      const attrName = this.c.value;
+      this.eat('ID');
+      this.t.skip();
+      this.eat('SYM', ':');
+      this.t.skip();
+
+      if (this.c.type === 'ID') {
+        const next = this.t.peekToken();
+        if (next && next.type === 'SYM' && next.value === '[') {
+          const elemType = this.c.value;
+          this.eat('ID');
+          this.eat('SYM', '[');
+          this.t.skip();
+          if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+            throw Error(`Expected max in Type[max] at ${this.c.line}:${this.c.col}`);
+          }
+          const maxN = parseInt(this.c.value, 10);
+          this.eat(this.c.type);
+          this.eat('SYM', ']');
+          collections[attrName] = { elementType: elemType, max: maxN };
+          continue;
+        }
+      }
+
+      const val = this._parsePhzAttrValue();
+      attributes[attrName] = val;
+    }
+
+    return {
+      phz: {
+        kind: 'typedef',
+        typeName,
+        base,
+        collections,
+        attributes,
+      },
+      line: stmtLine,
+      col: stmtCol,
+    };
   }
 
 }
+
 
 Parser.KEYWORD_HANDLERS = {
   doc: 'doc',
