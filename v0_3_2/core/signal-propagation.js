@@ -183,6 +183,28 @@ class SignalPropagationStrategy {
     interp.emitWaveListenLine(payload, 'state');
   }
 
+  /** PHZ ownership events (spawn / move / remove). Category filter: phz. */
+  emitListenPhz(listenText, expandLines, minLevel = 2) {
+    if (this.debugLevel < minLevel) return;
+    const interp = this.interp;
+    if (!interp || !interp.waveListenActive) return;
+    if (typeof interp.emitWaveListenLine !== 'function') return;
+    let text = String(listenText || '');
+    if (this._isLegacyListen()) {
+      const step = this._currentLegacyStep() || this._legacyCascadeStep();
+      text = `[step ${step}] ${text}`;
+    } else {
+      const wave = this._listenWaveIndex != null ? this._listenWaveIndex : 0;
+      text = `[wave ${wave}] ${text}`;
+    }
+    const payload = {
+      listenText: text,
+      traceCategory: 'phz',
+      phzExpandLines: expandLines && expandLines.length ? expandLines : null,
+    };
+    interp.emitWaveListenLine(payload, 'phz');
+  }
+
   _emitWaveListen(text, kind, minLevel = 1, traceCategory) {
     this._emitListenText(text, kind, minLevel, traceCategory);
   }

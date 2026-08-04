@@ -4,7 +4,7 @@ const WAVE_LISTEN_ARMED_KEY = 'prog/waveListenArmed';
 const WAVE_LISTEN_LEVEL_KEY = 'prog/waveListenLevel';
 const WAVE_LISTEN_FMT_KEY = 'prog/waveListenFmt';
 const SIGNAL_TRACE_FILTER_KEY = 'prog/signalTraceFilter';
-const SIGNAL_TRACE_FILTER_OPTIONS = ['all', 'wires', 'components', 'internals'];
+const SIGNAL_TRACE_FILTER_OPTIONS = ['all', 'wires', 'components', 'internals', 'phz'];
 const WAVE_LISTEN_MAX_LINES = 2000;
 
 const _waveListenState = {
@@ -96,6 +96,7 @@ function loadWaveListenPreferences() {
 function _inferTraceCategory(entry) {
   if (entry.traceCategory) return entry.traceCategory;
   const kind = entry.kind || 'trace';
+  if (kind === 'phz') return 'phz';
   if (kind === 'lut-mut' || kind === 'prop' || kind === 'connect') return 'component';
   if (kind === 'state' || kind === 'eval' || kind === 'schedule') return 'internal';
   if (entry.label === 'commit component' || entry.isComponent) return 'component';
@@ -124,6 +125,9 @@ function waveListenEntryMatchesFilter(entry, filter) {
     if (cat === 'internal') return true;
     if (kind === 'schedule' || kind === 'eval' || kind === 'state') return true;
     return false;
+  }
+  if (filter === 'phz') {
+    return cat === 'phz' || kind === 'phz';
   }
   return true;
 }
@@ -195,6 +199,7 @@ function appendWaveListenPanelLine(instanceId, payload, kind) {
       text: prefix + payload.listenText,
       kind: kind || 'trace',
       traceCategory: payload.traceCategory || 'wire',
+      phzExpandLines: payload.phzExpandLines || null,
       instanceId,
     };
   } else {
@@ -358,6 +363,7 @@ function _waveListenLineClass(kind) {
     case 'prop': return 'wave-listen-line--prop';
     case 'connect': return 'wave-listen-line--connect';
     case 'state': return 'wave-listen-line--state';
+    case 'phz': return 'wave-listen-line--state';
     case 'schedule': return 'wave-listen-line--commit';
     default: return 'wave-listen-line--trace';
   }
@@ -429,6 +435,41 @@ function _waveListenAddActionBtn(main, className, label, title, onClick) {
   btn.addEventListener('click', onClick);
   main.appendChild(btn);
   return btn;
+}
+
+function _renderWaveListenPhzRow(entry, out) {
+  const wrap = document.createElement('div');
+  wrap.className = 'wave-listen-line ' + _waveListenLineClass(entry.kind || 'phz');
+
+  const main = document.createElement('div');
+  main.className = 'wave-listen-row-main';
+
+  const expandBtn = document.createElement('button');
+  expandBtn.type = 'button';
+  expandBtn.className = 'wave-listen-expand-btn';
+  const open = _waveListenState.expanded.has(entry.id);
+  expandBtn.textContent = open ? '[-]' : '[+]';
+  expandBtn.title = open ? 'Collapse PHZ attributes' : 'Expand PHZ attributes';
+  expandBtn.addEventListener('click', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    _toggleWaveListenExpand(entry.id);
+  });
+  main.appendChild(expandBtn);
+
+  const textSpan = document.createElement('span');
+  textSpan.className = 'wave-listen-value';
+  textSpan.textContent = (entry.instPrefix || '') + entry.text;
+  main.appendChild(textSpan);
+  wrap.appendChild(main);
+
+  if (open) {
+    const expand = document.createElement('pre');
+    expand.className = 'wave-listen-row-expand';
+    expand.textContent = entry.phzExpandLines.join('\n');
+    wrap.appendChild(expand);
+  }
+  out.appendChild(wrap);
 }
 
 function _renderWaveListenValueRow(entry, out) {
@@ -512,6 +553,10 @@ function renderWaveListenPanel() {
     if (!waveListenEntryMatchesFilter(entry, filter)) continue;
     if (_isWaveListenValuePayload(entry)) {
       _renderWaveListenValueRow(entry, out);
+      continue;
+    }
+    if (entry.phzExpandLines && entry.phzExpandLines.length) {
+      _renderWaveListenPhzRow(entry, out);
       continue;
     }
     const div = document.createElement('div');

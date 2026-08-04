@@ -501,6 +501,7 @@ When an element is itself cont-like, paths may continue into its collections:
 
 - `.w:inside:0:inside:count` — count inside the first child container of `.w:inside`
 - `.w:cars:0:wheels:count` — wheels on the first car in `.w:cars`
+- `to = .belt:start:0:inside` — move destination may be a collection on an **anonymous** child cont (not only a named `.cont:coll`)
 
 (Index / `first` / `last`, then another collection name, then `count` / `empty` / attrs / further nesting.)
 
@@ -728,6 +729,8 @@ When `moveReady` becomes `1`, the engine executes the property block and creates
 - Iteration uses a **snapshot** of the collection at the start of the block so moves during the pass do not double-visit or skip wrongly.
 
 Conveyors / elevators remain **user** types (e.g. `phz +[conveyor < cont]:`), not built-in PHZ kinds. Pair them with [`motor.md`](motor.md) `maxDistance` / `:distance` / `:laps` when you need shaft travel on the panel.
+
+**Signal Trace:** with the panel armed (L2+), PHZ emits `phz spawn` / `phz move` / `phz remove` lines (filter **PHZ**). Spawn shows `id` + `floor` inline; other attributes expand under **`[+]`** at L3. See [debug.md](debug.md).
 
 ---
 

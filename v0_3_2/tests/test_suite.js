@@ -34033,5 +34033,164 @@ phz [gen] .gw:
   regPhzWave(3165, 'each on :wheels:each attr assign', runPhzEachWheelsAttr);
   regPhzWave(3166, 'nested path :cars:0:wheels:count', runPhzNestedCarsWheels);
 
+  function _phzTraceLines(session, src, level) {
+    const processed = preprocessLoop(src);
+    const registry = session._ensureRegistry();
+    const strategy = session._ensureSignalPropagationStrategy();
+    strategy.setDebugLevel(level);
+    const p = new Parser(new Tokenizer(processed), registry);
+    const stmts = p.parse();
+    const lines = [];
+    const expands = [];
+    const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
+    interp.waveListenActive = true;
+    interp.onWaveListenLine = function (payload) {
+      if (payload && payload.listenText != null) {
+        lines.push(payload.listenText);
+        if (payload.phzExpandLines) expands.push(payload.phzExpandLines);
+      } else {
+        lines.push(String(payload));
+      }
+    };
+    for (const s of stmts) interp.exec(s);
+    interp.postExecSrc();
+    return { lines, expands, interp };
+  }
+
+  reg(3167, 'phz', 'Signal Trace — spawn move remove L2', function(h, session) {
+    const { lines } = _phzTraceLines(session, `phz [cont] .room:
+  max: 30
+  :
+phz [cont] .yard:
+  max: 30
+  :
+phz [gen] .mk:
+  type: obj
+  flag: 1
+  :
+.mk:{
+  add = 1
+  inside = .room
+  set = 1
+}
+.room:{
+  move = :inside:0
+  to = .yard:inside
+  set = 1
+}
+.yard:{
+  remove = :inside:0
+  set = 1
+}`, 2);
+    h.assert('spawn line', String(lines.some(l => /phz spawn phz\[obj\] id=\\1 floor=\\0/.test(l) && l.includes('.room:inside (count 1)'))), 'true');
+    h.assert('no flag on L2 line', String(lines.filter(l => /phz spawn/.test(l)).every(l => !/\bflag\b/.test(l))), 'true');
+    h.assert('move line', String(lines.some(l => /phz move phz\[obj\] id=\\1/.test(l) && l.includes('.yard:inside (count 1)'))), 'true');
+    h.assert('remove line', String(lines.some(l => /phz remove phz\[obj\] id=\\1/.test(l) && l.includes('uncontained'))), 'true');
+  }, { propagation: 'legacy' });
+
+  reg(3168, 'phz', 'Signal Trace — spawn L3 expand attrs', function(h, session) {
+    const { lines, expands } = _phzTraceLines(session, `phz [cont] .room:
+  max: 30
+  :
+phz [gen] .mk:
+  type: obj
+  flag: 1
+  :
+.mk:{
+  add = 1
+  inside = .room
+  set = 1
+}`, 3);
+    h.assert('spawn L3', String(lines.some(l => /phz spawn phz\[obj\] id=\\1 floor=\\0/.test(l))), 'true');
+    h.assert('expand has flag', String(expands.some(arr => arr.some(x => /flag = \\1/.test(x)))), 'true');
+    h.assert('expand omits id', String(expands.every(arr => arr.every(x => !/^\s+id =/.test(x)))), 'true');
+  }, { propagation: 'legacy' });
+
+  regPhzWave(3169, 'Signal Trace — spawn move remove L2', function(h, session) {
+    const { lines } = _phzTraceLines(session, `phz [cont] .room::
+phz [gen] .mk:
+  type: obj
+  :
+.mk:{ add = 1, inside = .room, set = 1 }`, 2);
+    h.assert('spawn wave', String(lines.some(l => /phz spawn/.test(l))), 'true');
+  });
+
+  function runPhzNestedToAnon(h, session) {
+    const { interp } = session.run(`phz +[bin < cont]:
+  :
+phz +[belt < cont]:
+  start: bin[4]
+  :
+phz [belt] .belt::
+phz [cont] .robot::
+phz [gen] .mkBin:
+  type: bin
+  :
+phz [gen] .mkObj:
+  type: obj
+  :
+.mkBin:{
+  add = 1
+  inside = .belt:start
+  set = 1
+}
+.mkObj:{
+  add = 1
+  inside = .robot
+  set = 1
+}
+.robot:{
+  move = :inside:0
+  to = .belt:start:0:inside
+  set = 1
+}
+16wire nR = .robot:inside:count
+16wire nB = .belt:start:0:inside:count`);
+    h.assert('robot empty', session.getWire(interp, 'nR'), '0000000000000000');
+    h.assert('in anon bin', session.getWire(interp, 'nB'), '0000000000000001');
+  }
+
+  reg(3170, 'phz', 'nested to = .belt:start:0:inside (anon dest)', runPhzNestedToAnon, { propagation: 'legacy' });
+  regPhzWave(3171, 'nested to = .belt:start:0:inside (anon dest)', runPhzNestedToAnon);
+
+  reg(3172, 'phz', 'Signal Trace — move into anon cont destination', function(h, session) {
+    const { lines } = _phzTraceLines(session, `phz +[bin < cont]:
+  :
+phz +[belt < cont]:
+  start: bin[4]
+  :
+phz [belt] .belt::
+phz [cont] .robot::
+phz [gen] .mkBin:
+  type: bin
+  :
+phz [gen] .mkObj:
+  type: obj
+  :
+.mkBin:{
+  add = 1
+  inside = .belt:start
+  set = 1
+}
+.mkObj:{
+  add = 1
+  inside = .robot
+  set = 1
+}
+.robot:{
+  move = :inside:0
+  to = .belt:start:0:inside
+  set = 1
+}`, 2);
+    h.assert(
+      'move to anon bin',
+      String(lines.some(l =>
+        /phz move phz\[obj\] id=\\2/.test(l)
+        && /phz\.\[bin < cont\]:inside id=\\1 \(count 1\)/.test(l)
+      )),
+      'true'
+    );
+  }, { propagation: 'legacy' });
+
   window.LogTScriptTestSuite.finalize();
 })();

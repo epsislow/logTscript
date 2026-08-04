@@ -50,6 +50,107 @@
     return 'phz.[' + t + ' < ' + def.base + ']';
   };
 
+  /** Trace label: `phz[obj]` or `phz.[wheel < obj]`. */
+  PhzEngine.prototype.formatTraceType = function (typeName) {
+    var t = typeName || 'obj';
+    if (t === 'obj' || t === 'gen' || t === 'cont') return 'phz[' + t + ']';
+    return this.formatTypeTag(t);
+  };
+
+  PhzEngine.prototype._attrDecLiteral = function (slot) {
+    if (!slot) return '\\0';
+    var bin = this.interp.getValueFromRef(slot.ref);
+    var dec = parseInt(String(bin || '0').replace(/[^01]/g, '') || '0', 2);
+    if (!Number.isFinite(dec)) dec = 0;
+    return '\\' + dec;
+  };
+
+  /** Object identity for traces: type + id when present (named and anon alike). */
+  PhzEngine.prototype.formatTraceObject = function (obj) {
+    if (!obj) return 'phz[?]';
+    var type = this.formatTraceType(obj.phzType || obj.kind);
+    if (obj.attributes && obj.attributes.has('id')) {
+      return type + ' id=' + this._attrDecLiteral(obj.attributes.get('id'));
+    }
+    return type;
+  };
+
+  PhzEngine.prototype.formatTraceLocation = function (owner, collName, count) {
+    var cname = collName || 'inside';
+    var cnt = count;
+    if (cnt == null && owner && owner.collections && owner.collections.get(cname)) {
+      cnt = owner.collections.get(cname).items.length;
+    }
+    if (cnt == null) cnt = 0;
+    // Named instances keep `.name:coll`; anonymous owners show type + id
+    // e.g. phz.[car < cont]:wheels id=\5 (count 3)
+    if (owner && owner.name) {
+      return owner.name + ':' + cname + ' (count ' + cnt + ')';
+    }
+    var type = this.formatTraceType(owner && (owner.phzType || owner.kind));
+    if (owner && owner.attributes && owner.attributes.has('id')) {
+      return type + ':' + cname + ' id=' + this._attrDecLiteral(owner.attributes.get('id'))
+        + ' (count ' + cnt + ')';
+    }
+    return type + ':' + cname + ' (count ' + cnt + ')';
+  };
+
+  PhzEngine.prototype._spawnExpandLines = function (obj) {
+    var lines = [];
+    if (!obj || !obj.attributes) return lines;
+    for (var [k, slot] of obj.attributes) {
+      if (k === 'id' || k === 'floor') continue;
+      var bits = slot.bits || 0;
+      lines.push('  ' + k + ' = ' + this._attrDecLiteral(slot) + ' (' + bits + 'bit)');
+    }
+    return lines;
+  };
+
+  PhzEngine.prototype._emitPhzTrace = function (listenText, expandLines, minLevel) {
+    var interp = this.interp;
+    if (!interp || !interp.waveListenActive) return;
+    var strat = interp.signalPropagationStrategy;
+    if (!strat || typeof strat.emitListenPhz !== 'function') return;
+    strat.emitListenPhz(listenText, expandLines, minLevel == null ? 2 : minLevel);
+  };
+
+  PhzEngine.prototype._traceSpawn = function (obj, owner, collName) {
+    if (!obj || !owner) return;
+    var coll = this._getCollection(owner, collName);
+    var loc = this.formatTraceLocation(owner, collName, coll.items.length);
+    var floorLit = obj.attributes && obj.attributes.has('floor')
+      ? this._attrDecLiteral(obj.attributes.get('floor'))
+      : '\\0';
+    var line = 'phz spawn ' + this.formatTraceObject(obj) + ' floor=' + floorLit + ' → ' + loc;
+    var expand = null;
+    var strat = this.interp && this.interp.signalPropagationStrategy;
+    if (strat && strat.debugLevel >= 3) {
+      expand = this._spawnExpandLines(obj);
+      if (!expand.length) expand = null;
+    }
+    this._emitPhzTrace(line, expand, 2);
+  };
+
+  PhzEngine.prototype._traceMove = function (obj, owner, collName) {
+    if (!obj || !owner) return;
+    var coll = this._getCollection(owner, collName);
+    var loc = this.formatTraceLocation(owner, collName, coll.items.length);
+    this._emitPhzTrace('phz move ' + this.formatTraceObject(obj) + ' → ' + loc, null, 2);
+  };
+
+  PhzEngine.prototype._traceRemove = function (obj, fromOwner, fromColl, countAfter) {
+    if (!obj) return;
+    var from = '(nowhere)';
+    if (fromOwner) {
+      from = this.formatTraceLocation(fromOwner, fromColl, countAfter);
+    }
+    this._emitPhzTrace(
+      'phz remove ' + this.formatTraceObject(obj) + ' from ' + from + ' → uncontained',
+      null,
+      2
+    );
+  };
+
   /** Header kind fragment: `obj` or `wheel < obj`. */
   PhzEngine.prototype.formatTypeKind = function (typeName) {
     var t = typeName || 'obj';
@@ -391,6 +492,7 @@
       name: name,
       attributes: attrMap,
       collections: collections,
+      named: true,
       membership: null,
     };
     Object.defineProperty(inst, 'contents', {
@@ -486,16 +588,84 @@
     return obj;
   };
 
-  /** Parse inside target: ".room" or ".car:wheels" → {ownerName, collName} */
-  PhzEngine.prototype.parseCollectionRef = function (ref) {
+  /**
+   * Resolve move/spawn destination:
+   *   ".room" | ".room:inside" | ".car:wheels"
+   *   ".belt:start:0:inside"  (nested: named → coll → index → … → final coll)
+   * Returns {owner, collName}. Owner may be anonymous (no .name).
+   */
+  PhzEngine.prototype.resolveCollectionDest = function (ref) {
     if (!ref) throw new Error('PHZ collection reference required');
     var s = String(ref);
     if (s[0] !== '.') throw new Error("PHZ collection ref must start with '.'");
-    var body = s.slice(1);
-    var parts = body.split(':');
-    var ownerName = '.' + parts[0];
-    var collName = parts.length > 1 ? parts.slice(1).join(':') : 'inside';
-    return { ownerName: ownerName, collName: collName };
+    var parts = s.slice(1).split(':').filter(function (p) { return p.length > 0; });
+    if (parts.length === 0) throw new Error('PHZ collection reference required');
+
+    var owner = this.getNamed('.' + parts[0]);
+    if (!owner || !this._isContLike(owner)) {
+      throw new Error("PHZ cont '." + parts[0] + "' is not defined");
+    }
+    if (parts.length === 1) {
+      return { owner: owner, collName: 'inside' };
+    }
+
+    var i = 1;
+    while (i < parts.length) {
+      var collName = parts[i];
+      if (i === parts.length - 1) {
+        this._getCollection(owner, collName);
+        return { owner: owner, collName: collName };
+      }
+
+      var coll = this._getCollection(owner, collName);
+      i++;
+      if (i >= parts.length) {
+        throw new Error(
+          "PHZ dest path incomplete after ':" + collName + "' (need index, or end on a collection)"
+        );
+      }
+      var head = parts[i];
+      var count = coll.items.length;
+      var index;
+      if (head === 'first') {
+        if (count === 0) {
+          throw new Error('PHZ :' + collName + ':first on empty ' + (owner.name || 'anon'));
+        }
+        index = 0;
+      } else if (head === 'last') {
+        if (count === 0) {
+          throw new Error('PHZ :' + collName + ':last on empty ' + (owner.name || 'anon'));
+        }
+        index = count - 1;
+      } else if (/^\d+$/.test(head)) {
+        index = parseInt(head, 10);
+        if (index < 0 || index >= count) {
+          throw new Error(
+            'PHZ :' + collName + ' index ' + index + ' out of range (count=' + count + ')'
+          );
+        }
+      } else {
+        throw new Error("PHZ dest expected index after ':" + collName + "', got '" + head + "'");
+      }
+
+      var obj = coll.items[index];
+      if (!this._isContLike(obj)) {
+        throw new Error('PHZ dest path :' + collName + ':' + head + ' is not a container');
+      }
+      owner = obj;
+      i++;
+    }
+    return { owner: owner, collName: 'inside' };
+  };
+
+  /** @deprecated Prefer resolveCollectionDest — kept for simple ".name[:coll]" parsing. */
+  PhzEngine.prototype.parseCollectionRef = function (ref) {
+    var dest = this.resolveCollectionDest(ref);
+    return {
+      ownerName: dest.owner && dest.owner.name ? dest.owner.name : null,
+      collName: dest.collName,
+      owner: dest.owner,
+    };
   };
 
   PhzEngine.prototype._getCollection = function (owner, collName) {
@@ -511,12 +681,16 @@
     if (!obj || !obj.membership) return;
     var m = obj.membership;
     var owner = m.owner;
-    var coll = owner.collections.get(m.collName);
+    var collName = m.collName;
+    var coll = owner.collections.get(collName);
+    var countAfter = 0;
     if (coll) {
       var idx = coll.items.indexOf(obj);
       if (idx >= 0) coll.items.splice(idx, 1);
+      countAfter = coll.items.length;
     }
     obj.membership = null;
+    return { owner: owner, collName: collName, countAfter: countAfter };
   };
 
   PhzEngine.prototype._insert = function (obj, owner, collName) {
@@ -542,20 +716,18 @@
     var W = getWidth();
     var gen = this.gens.get(genName);
     if (!gen) throw new Error("PHZ gen '" + genName + "' is not defined");
-    var ref = this.parseCollectionRef(destRef);
-    var owner = this.getNamed(ref.ownerName);
-    if (!owner || !this._isContLike(owner)) {
-      throw new Error("PHZ cont '" + ref.ownerName + "' is not defined");
-    }
-    var coll = this._getCollection(owner, ref.collName);
+    var dest = this.resolveCollectionDest(destRef);
+    var owner = dest.owner;
+    var coll = this._getCollection(owner, dest.collName);
 
     var add = Number(addCount);
     if (!Number.isFinite(add) || add < 0 || Math.floor(add) !== add) {
       throw new Error('PHZ gen add must be a non-negative integer');
     }
     if (coll.items.length + add > coll.max) {
+      var ownerLabel = owner.name || this.formatTraceObject(owner);
       throw new Error(
-        'PHZ cont ' + ref.ownerName + (ref.collName !== 'inside' ? ':' + ref.collName : '') +
+        'PHZ cont ' + ownerLabel + (dest.collName !== 'inside' ? ':' + dest.collName : '') +
         ' overflow: count ' + coll.items.length + ' + add ' + add + ' > max ' + coll.max
       );
     }
@@ -586,8 +758,9 @@
       }
       obj.idAuto = true;
       coll.items.push(obj);
-      obj.membership = { owner: owner, collName: ref.collName };
+      obj.membership = { owner: owner, collName: dest.collName };
       this._incAnonCount(obj.phzType);
+      this._traceSpawn(obj, owner, dest.collName);
     }
   };
 
@@ -607,18 +780,20 @@
     var obj = this.resolveObjectRef(objOrRef);
     if (!obj) throw new Error('PHZ move: object not found');
     if (obj.kind === 'gen') throw new Error('Cannot move a gen');
-    var dest = this.parseCollectionRef(destRef);
-    var owner = this.getNamed(dest.ownerName);
-    if (!owner || !this._isContLike(owner)) {
-      throw new Error("PHZ move destination '" + dest.ownerName + "' is not a container");
-    }
-    this._insert(obj, owner, dest.collName);
+    var dest = this.resolveCollectionDest(destRef);
+    this._insert(obj, dest.owner, dest.collName);
+    this._traceMove(obj, dest.owner, dest.collName);
   };
 
   PhzEngine.prototype.removeObject = function (objOrRef) {
     var obj = this.resolveObjectRef(objOrRef);
     if (!obj) throw new Error('PHZ remove: object not found');
-    this._detach(obj);
+    var info = this._detach(obj);
+    if (info) {
+      this._traceRemove(obj, info.owner, info.collName, info.countAfter);
+    } else {
+      this._traceRemove(obj, null, null, 0);
+    }
   };
 
   PhzEngine.prototype.toFloor = function (objOrRef, floorVal) {

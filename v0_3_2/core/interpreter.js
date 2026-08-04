@@ -15346,7 +15346,9 @@ if (s.assignment) {
   }
 
   _phzDestRef(expr) {
-    if (!expr || expr.length !== 1) throw Error('PHZ to expects .<cont> or .<cont>:coll');
+    if (!expr || expr.length !== 1) {
+      throw Error('PHZ to expects .<cont>[:coll] or nested .<cont>:coll:N:coll');
+    }
     const a = expr[0];
     if (a.var && String(a.var).startsWith('.')) {
       return a.property ? `${a.var}:${a.property}` : a.var;
