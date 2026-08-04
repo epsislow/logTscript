@@ -24433,7 +24433,7 @@ That is **physical logic**: discrete facts about place, ownership, and identity 
 \`\`\`
 
 - **\`floor\`** — zoning layer (8-bit), not a physics height.
-- **\`id\`** — global 16-bit identity (script-wide autoincrement), not a memory address.
+- **\`id\`** — global 16-bit identity on every **obj** / **cont** instance (named and anonymous; script-wide autoincrement). Only **\`gen\`** has no \`id\`.
 - **\`max\` / \`count\`** — capacity (alias of default \`inside\` capacity) and occupancy of a collection.
 - **Spawn** — \`gen\` copies its template attributes onto new objs and appends them to a collection path.
 - **Membership** — at most one collection at a time; \`move\` / \`remove\` / \`toFloor\` change place or floor without physics.
@@ -24547,7 +24547,7 @@ Rules:
 
 ### Spawn into a container
 
-**Load & Run** — ten objects; \`n = 0000000000001010\`, \`empty = 0\`, first \`id = 1\`, \`flag = 1\`.
+**Load & Run** — ten objects; \`n = 0000000000001010\`, \`empty = 0\`, first spawn \`id = 2\` (\`.room\` took \`1\`), \`flag = 1\`.
 
 \`\`\`logts-play wave
 phz [cont] .room:
@@ -24599,6 +24599,8 @@ show(n)
 
 ## Container
 
+Creates \`id\` (global autoincrement) and \`floor: 0\`, plus the default \`inside\` collection.
+
 \`\`\`
 phz [cont] .room:
   floor: 0
@@ -24611,6 +24613,7 @@ phz [cont] .room:
 - overflow (\`count + add > max\`) → error
 - reserved top-level attribute names: \`inside\`, \`count\`, \`empty\`  
   (\`first\` / \`last\` are allowed as normal attrs on the cont itself; they are **not** the same as \`:inside:first\`)
+- \`id\` optional at definition (same rules as obj); otherwise autoincrement shared with all obj/cont instances
 
 ### \`:inside\` API (read-only membership paths)
 
@@ -24664,11 +24667,11 @@ Expected shape:
 
 \`\`\`text
 .bag:inside
-:0 = {id=0000000000000001, floor=00000000, onlyA=1}
-:1 = {id=0000000000000010, floor=00000000, onlyB=1}
+:0 = {id=0000000000000010, floor=00000000, onlyA=1}
+:1 = {id=0000000000000011, floor=00000000, onlyB=1}
 .bag:inside has length [2]
-.bag:inside:0 = {id=0000000000000001, floor=00000000, onlyA=1}
-  id = 0000000000000001 (16bit)
+.bag:inside:0 = {id=0000000000000010, floor=00000000, onlyA=1}
+  id = 0000000000000010 (16bit)
   floor = 00000000 (8bit)
   onlyA = 1 (1bit)
 \`\`\`
@@ -24677,7 +24680,7 @@ Use \`show(.bag:inside; elAll)\` for long lists (same truncation rules as vector
 
 Missing attribute on that object → \`missing attribute named …\`. There is **no** unified schema that merges all attributes of every object in a container.
 
-**Load & Run** — three spawned objs; first id \`1\`, last id \`3\`.
+**Load & Run** — three spawned objs; \`.slot\` is id \`1\`, first spawn id \`2\`, last id \`4\`.
 
 \`\`\`logts-play wave
 phz [cont] .slot::

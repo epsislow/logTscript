@@ -33300,7 +33300,7 @@ phz [gen] .g1:
 1wire f0 = .c1:inside:0:flag`);
     h.assert('count 10', session.getWire(interp, 'n'), '0000000000001010');
     h.assert('not empty', session.getWire(interp, 'e'), '0');
-    h.assert('first id 1', session.getWire(interp, 'id0'), '0000000000000001');
+    h.assert('first id 2', session.getWire(interp, 'id0'), '0000000000000010');
     h.assert('flag', session.getWire(interp, 'f0'), '1');
   }
 
@@ -33407,8 +33407,8 @@ phz [gen] .g1:
 }
 16wire a = .c1:inside:first:id
 16wire b = .c1:inside:last:id`);
-    h.assert('first id 1', session.getWire(interp, 'a'), '0000000000000001');
-    h.assert('last id 3', session.getWire(interp, 'b'), '0000000000000011');
+    h.assert('first id 2', session.getWire(interp, 'a'), '0000000000000010');
+    h.assert('last id 4', session.getWire(interp, 'b'), '0000000000000100');
   }
 
   reg(3100, 'phz', 'obj short form id auto + floor 0', runPhzObjShortForm);
@@ -33556,8 +33556,8 @@ show(a0, b1)`;
   });
   reg(3124, 'phz', 'phz.md logts-play smoke — first/last', function(h, session) {
     const { interp } = session.run(PHZ_DOC_FIRST_LAST);
-    h.assert('first', session.getWire(interp, 'firstId'), '0000000000000001');
-    h.assert('last', session.getWire(interp, 'lastId'), '0000000000000011');
+    h.assert('first', session.getWire(interp, 'firstId'), '0000000000000010');
+    h.assert('last', session.getWire(interp, 'lastId'), '0000000000000100');
   });
   reg(3125, 'phz', 'phz.md logts-play smoke — runtime write', function(h, session) {
     const { interp } = session.run(PHZ_DOC_WRITE);
@@ -33848,6 +33848,7 @@ doc(phz)`);
   :
 doc(.container1)`);
     h.assert('header', out[0], 'phz [cont] .container1:');
+    h.assert('id auto', String(out.some(l => /^\s+id: auto$/.test(l))), 'true');
     h.assert('floor', String(out.some(l => /^\s+floor: 0 \(8bit\)$/.test(l))), 'true');
     h.assert('max', String(out.some(l => /^\s+max: 30 \(16bit\)$/.test(l))), 'true');
     h.assert('inside coll', String(out.some(l => /^\s+inside: obj\[30\]$/.test(l))), 'true');
@@ -33914,8 +33915,8 @@ phz [gen] .mk:
   set = 1
 }
 show(.bag:inside; dec)`);
-    h.assert(':0 dec', String(out.some(l => /:0 = \{.*id=\\1.*weight=\\3/.test(l))), 'true');
-    h.assert(':1 dec', String(out.some(l => /:1 = \{.*id=\\2/.test(l))), 'true');
+    h.assert(':0 dec', String(out.some(l => /:0 = \{.*id=\\2.*weight=\\3/.test(l))), 'true');
+    h.assert(':1 dec', String(out.some(l => /:1 = \{.*id=\\3/.test(l))), 'true');
     h.assert('type name', String(out.some(l => /:0 = \{.*type=obj/.test(l))), 'true');
   }
 
@@ -34082,10 +34083,10 @@ phz [gen] .mk:
   remove = :inside:0
   set = 1
 }`, 2);
-    h.assert('spawn line', String(lines.some(l => /phz spawn phz\[obj\] id=\\1 floor=\\0/.test(l) && l.includes('.room:inside (count 1)'))), 'true');
+    h.assert('spawn line', String(lines.some(l => /phz spawn phz\[obj\] id=\\3 floor=\\0/.test(l) && l.includes('.room:inside (count 1)'))), 'true');
     h.assert('no flag on L2 line', String(lines.filter(l => /phz spawn/.test(l)).every(l => !/\bflag\b/.test(l))), 'true');
-    h.assert('move line', String(lines.some(l => /phz move phz\[obj\] id=\\1/.test(l) && l.includes('.yard:inside (count 1)'))), 'true');
-    h.assert('remove line', String(lines.some(l => /phz remove phz\[obj\] id=\\1/.test(l) && l.includes('uncontained'))), 'true');
+    h.assert('move line', String(lines.some(l => /phz move phz\[obj\] id=\\3/.test(l) && l.includes('.yard:inside (count 1)'))), 'true');
+    h.assert('remove line', String(lines.some(l => /phz remove phz\[obj\] id=\\3/.test(l) && l.includes('uncontained'))), 'true');
   }, { propagation: 'legacy' });
 
   reg(3168, 'phz', 'Signal Trace — spawn L3 expand attrs', function(h, session) {
@@ -34101,7 +34102,7 @@ phz [gen] .mk:
   inside = .room
   set = 1
 }`, 3);
-    h.assert('spawn L3', String(lines.some(l => /phz spawn phz\[obj\] id=\\1 floor=\\0/.test(l))), 'true');
+    h.assert('spawn L3', String(lines.some(l => /phz spawn phz\[obj\] id=\\2 floor=\\0/.test(l))), 'true');
     h.assert('expand has flag', String(expands.some(arr => arr.some(x => /flag = \\1/.test(x)))), 'true');
     h.assert('expand omits id', String(expands.every(arr => arr.every(x => !/^\s+id =/.test(x)))), 'true');
   }, { propagation: 'legacy' });
@@ -34185,11 +34186,26 @@ phz [gen] .mkObj:
     h.assert(
       'move to anon bin',
       String(lines.some(l =>
-        /phz move phz\[obj\] id=\\2/.test(l)
-        && /phz\.\[bin < cont\]:inside id=\\1 \(count 1\)/.test(l)
+        /phz move phz\[obj\] id=\\4/.test(l)
+        && /phz\.\[bin < cont\]:inside id=\\3 \(count 1\)/.test(l)
       )),
       'true'
     );
+  }, { propagation: 'legacy' });
+
+  reg(3173, 'phz', 'named cont gets autoincrement id; gen has none', function(h, session) {
+    const { interp } = session.run(`phz [cont] .room::
+phz [obj] .box::
+phz [gen] .mk:
+  type: obj
+  :
+16wire roomId = .room:id
+16wire boxId = .box:id`);
+    h.assert('room id 1', session.getWire(interp, 'roomId'), '0000000000000001');
+    h.assert('box id 2', session.getWire(interp, 'boxId'), '0000000000000010');
+    h.assertThrows('gen has no id', function() {
+      interp.phzEngine.resolveProperty('.mk', 'id');
+    }, 'missing attribute');
   }, { propagation: 'legacy' });
 
   window.LogTScriptTestSuite.finalize();

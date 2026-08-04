@@ -274,9 +274,7 @@
     if (attrAst.kind === 'type') return { special: 'type', value: attrAst.value };
 
     if (name === 'id') {
-      if (kind !== 'obj' && this._rootKind(kind) !== 'obj') {
-        // id only on obj-rooted instances
-      }
+      // id on obj/cont (named + anon); gen forbids id earlier in _buildAttrMap
       if (attrAst.kind !== 'decimal') throw new Error("PHZ id expects decimal value");
       if (attrAst.width != null) throw new Error("PHZ id does not allow (W) width suffix");
       return this._storeAttr(W.encodeId(attrAst.value), W.ID_BITS);
@@ -357,19 +355,14 @@
       if (v.deferred) map.set(k, this._resolveDeferred(v));
     }
 
-    if (kindRoot === 'obj') {
+    // Every obj/cont instance gets a global id (named and anonymous). Only gen has no id.
+    if (kindRoot === 'obj' || kindRoot === 'cont') {
       if (!map.has('id')) {
         map.set('id', this._storeAttr(W.encodeId(this.allocId()), W.ID_BITS));
       } else {
         var idVal = parseInt(this.interp.getValueFromRef(map.get('id').ref), 2);
         if (idVal >= this.nextId) this.nextId = idVal + 1;
       }
-      if (!map.has('floor')) {
-        map.set('floor', this._storeAttr(W.encodeFloor(0), W.FLOOR_BITS));
-      }
-    }
-
-    if (kindRoot === 'cont') {
       if (!map.has('floor')) {
         map.set('floor', this._storeAttr(W.encodeFloor(0), W.FLOOR_BITS));
       }
@@ -475,6 +468,7 @@
       maxOverride = parseInt(attributes.max.value, 10);
     }
 
+    var idProvided = !!(attributes && attributes.id);
     var attrMap = this._buildAttrMap('cont', attributes, true);
     var collections = this._initCollections(collDefs, maxOverride);
     if (!attrMap.has('max')) {
@@ -493,6 +487,7 @@
       attributes: attrMap,
       collections: collections,
       named: true,
+      idAuto: !idProvided,
       membership: null,
     };
     Object.defineProperty(inst, 'contents', {
@@ -1119,6 +1114,7 @@
     if (t === 'cont') {
       return [
         'phz [cont] .name:',
+        '  id: auto',
         '  floor: 0 (8bit)',
         '  max: 16 (16bit)',
         '  inside: obj[16]',
