@@ -33940,5 +33940,98 @@ show(.bag:inside:0; hex)`);
   regPhzWave(3160, 'show(.container1; dec) formats attrs', runPhzShowInstanceDec);
   regPhzWave(3161, 'show(:inside; dec) formats dumps', runPhzShowInsideDec);
 
+  function runPhzEachWheelsAttr(h, session) {
+    const { interp } = session.run(`phz +[wheel < obj]:
+  :
+phz +[car < cont]:
+  wheels: wheel[4]
+  :
+phz [car] .car1::
+phz [obj] .box1::
+phz [gen] .gw:
+  type: wheel
+  flag: 0
+  :
+.car1:{
+  move = .box1
+  to = .car1:inside
+  set = 1
+}
+.gw:{
+  add = \\2
+  inside = .car1:wheels
+  set = 1
+}
+.car1:{
+  :wheels:each:flag = 1
+  set = 1
+}
+1wire f0 = .car1:wheels:0:flag
+1wire f1 = .car1:wheels:1:flag
+16wire nIn = .car1:inside:count`);
+    h.assert('wheel0 flag', session.getWire(interp, 'f0'), '1');
+    h.assert('wheel1 flag', session.getWire(interp, 'f1'), '1');
+    h.assert('inside still has box', session.getWire(interp, 'nIn'), '0000000000000001');
+  }
+
+  function runPhzNestedPathCount(h, session) {
+    const { interp } = session.run(`phz +[crate < cont]:
+  :
+phz +[warehouse < cont]:
+  inside: crate[8]
+  :
+phz [warehouse] .w::
+phz [crate] .c1::
+phz [gen] .go:
+  type: obj
+  :
+.w:{
+  move = .c1
+  to = .w:inside
+  set = 1
+}
+.go:{
+  add = \\3
+  inside = .c1
+  set = 1
+}
+16wire n = .w:inside:0:inside:count`);
+    h.assert('nested inside count 3', session.getWire(interp, 'n'), '0000000000000011');
+  }
+
+  function runPhzNestedCarsWheels(h, session) {
+    const { interp } = session.run(`phz +[wheel < obj]:
+  :
+phz +[car < cont]:
+  wheels: wheel[4]
+  :
+phz +[lot < cont]:
+  cars: car[4]
+  :
+phz [lot] .w::
+phz [car] .c1::
+phz [gen] .gw:
+  type: wheel
+  :
+.w:{
+  move = .c1
+  to = .w:cars
+  set = 1
+}
+.gw:{
+  add = \\2
+  inside = .c1:wheels
+  set = 1
+}
+16wire n = .w:cars:0:wheels:count`);
+    h.assert('cars0 wheels count 2', session.getWire(interp, 'n'), '0000000000000010');
+  }
+
+  reg(3162, 'phz', 'each on :wheels:each attr assign', runPhzEachWheelsAttr);
+  reg(3163, 'phz', 'nested path :inside:0:inside:count', runPhzNestedPathCount);
+  reg(3164, 'phz', 'nested path :cars:0:wheels:count', runPhzNestedCarsWheels);
+  regPhzWave(3165, 'each on :wheels:each attr assign', runPhzEachWheelsAttr);
+  regPhzWave(3166, 'nested path :cars:0:wheels:count', runPhzNestedCarsWheels);
+
   window.LogTScriptTestSuite.finalize();
 })();

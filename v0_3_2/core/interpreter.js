@@ -15253,6 +15253,52 @@ if (s.assignment) {
     return value;
   }
 
+  _phzCollNameFromEachPath(property) {
+    if (!property || String(property).indexOf('each') < 0) return null;
+    const p = String(property).split(':').filter((s) => s.length > 0);
+    const ei = p.indexOf('each');
+    if (ei < 0) return null;
+    if (ei === 0) return 'inside';
+    return p.slice(0, ei).join(':');
+  }
+
+  _phzFindEachCollInAtom(atom) {
+    if (!atom || typeof atom !== 'object') return null;
+    if (atom.phzSelf && atom.property) {
+      const c = this._phzCollNameFromEachPath(atom.property);
+      if (c) return c;
+    }
+    if (atom.property && !atom.var && String(atom.property).includes('each')) {
+      const c = this._phzCollNameFromEachPath(atom.property);
+      if (c) return c;
+    }
+    if (Array.isArray(atom.args)) {
+      for (const arg of atom.args) {
+        if (Array.isArray(arg)) {
+          const c = this._phzFindEachCollInExpr(arg);
+          if (c) return c;
+        } else {
+          const c = this._phzFindEachCollInAtom(arg);
+          if (c) return c;
+        }
+      }
+    }
+    if (Array.isArray(atom.expr)) {
+      const c = this._phzFindEachCollInExpr(atom.expr);
+      if (c) return c;
+    }
+    return null;
+  }
+
+  _phzFindEachCollInExpr(expr) {
+    if (!expr || !Array.isArray(expr)) return null;
+    for (const atom of expr) {
+      const c = this._phzFindEachCollInAtom(atom);
+      if (c) return c;
+    }
+    return null;
+  }
+
   _phzAtomToRef(atom) {
     if (!atom) return null;
     if (atom.phzSelf && atom.property) {
@@ -15465,14 +15511,21 @@ if (s.assignment) {
       };
 
       if (hasEach && (moveExpr || removeExpr || toFloorExpr || selfAssigns.length)) {
-        // Determine collection for snapshot
+        // Determine collection for snapshot (:wheels:each → wheels, default inside)
         let collName = 'inside';
-        const scan = moveExpr || removeExpr;
-        if (scan && scan[0] && scan[0].phzSelf && scan[0].property) {
-          const p = scan[0].property.split(':');
-          const ei = p.indexOf('each');
-          if (ei > 0) collName = p.slice(0, ei).join(':');
-          else if (ei === 0) collName = 'inside';
+        const fromMove = this._phzFindEachCollInExpr(moveExpr)
+          || this._phzFindEachCollInExpr(removeExpr);
+        if (fromMove) {
+          collName = fromMove;
+        } else {
+          for (const prop of selfAssigns) {
+            const c = this._phzCollNameFromEachPath(prop.property);
+            if (c) { collName = c; break; }
+          }
+          if (collName === 'inside') {
+            const fromSet = this._phzFindEachCollInExpr(setExpr);
+            if (fromSet) collName = fromSet;
+          }
         }
         if (!eng._isContLike(inst)) throw Error('PHZ each requires a container');
         const coll = eng._getCollection(inst, collName);

@@ -491,7 +491,18 @@ Inside a PHZ property block, paths starting with `:` are **self-relative** to th
 
 is iteration over `.room:inside`.
 
+The same form works for **any** collection on that instance: `:wheels:each`, `:cars:each`, etc. Attribute-only blocks such as `:wheels:each:flag = 1` iterate that named collection (not default `inside`).
+
 `:type` on an object is the PHZ **runtime type** (readable name / ASCII), not a normal user attribute named `type`.
+
+### Nested collection paths
+
+When an element is itself cont-like, paths may continue into its collections:
+
+- `.w:inside:0:inside:count` — count inside the first child container of `.w:inside`
+- `.w:cars:0:wheels:count` — wheels on the first car in `.w:cars`
+
+(Index / `first` / `last`, then another collection name, then `count` / `empty` / attrs / further nesting.)
 
 ### Move every object
 

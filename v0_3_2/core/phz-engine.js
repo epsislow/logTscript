@@ -766,16 +766,20 @@
       if (!this._eachCurrent) throw new Error('PHZ :each is only valid during property-block iteration');
       var eachRest = rest.slice(1);
       if (eachRest.length === 0) return this._objectShowPayload(this._eachCurrent);
+      if (this._isContLike(this._eachCurrent) && this._eachCurrent.collections
+          && this._eachCurrent.collections.has(eachRest[0])) {
+        return this._resolveCollectionPath(this._eachCurrent, eachRest[0], eachRest.slice(1));
+      }
       if (eachRest.length === 1) return this.getAttrValue(this._eachCurrent, eachRest[0]);
       throw new Error("Invalid PHZ :each path");
     }
 
     var index;
     if (head === 'first') {
-      if (count === 0) throw new Error('PHZ :' + collName + ':first on empty ' + owner.name);
+      if (count === 0) throw new Error('PHZ :' + collName + ':first on empty ' + (owner.name || 'anon'));
       index = 0;
     } else if (head === 'last') {
-      if (count === 0) throw new Error('PHZ :' + collName + ':last on empty ' + owner.name);
+      if (count === 0) throw new Error('PHZ :' + collName + ':last on empty ' + (owner.name || 'anon'));
       index = count - 1;
     } else if (/^\d+$/.test(head)) {
       index = parseInt(head, 10);
@@ -789,10 +793,14 @@
     var obj = contents[index];
     var attrParts = rest.slice(1);
     if (attrParts.length === 0) return this._objectShowPayload(obj);
-    if (attrParts.length !== 1) {
-      throw new Error("Invalid PHZ collection attribute path");
+    // Nested cont-like: .w:inside:0:inside:count or .w:cars:0:wheels:count
+    if (this._isContLike(obj) && obj.collections && obj.collections.has(attrParts[0])) {
+      return this._resolveCollectionPath(obj, attrParts[0], attrParts.slice(1));
     }
-    return this.getAttrValue(obj, attrParts[0]);
+    if (attrParts.length === 1) {
+      return this.getAttrValue(obj, attrParts[0]);
+    }
+    throw new Error("Invalid PHZ collection attribute path '" + attrParts.join(':') + "'");
   };
 
   PhzEngine.prototype.resolveProperty = function (instanceName, property) {
