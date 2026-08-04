@@ -1,0 +1,463 @@
+PHZ Phase 2 — Custom Types, Collections and Object Movement
+
+Phase 2 extends the PHZ object model with inheritance, typed collections and object movement.
+
+Unlike a physics engine, PHZ still does not simulate continuous movement or collisions.
+
+Instead, PHZ modifies ownership, membership, and attributes using ordinary LogTScript property blocks.
+
+---
+
+Overview
+
+New features introduced in Phase 2:
+
+- custom PHZ types
+- inheritance
+- multiple typed collections
+- object movement between containers
+- object removal from containers
+- collection iteration using "each"
+- motor "distance" and "laps"
+
+These additions allow higher level physical systems such as conveyors, elevators, robots and warehouses to be described without introducing loops or scripting constructs.
+
+---
+
+Custom Types
+
+New PHZ types may inherit from existing types.
+
+Syntax:
+
+phz +[car < cont]:
+:
+
+General form:
+
+phz +[NewType < BaseType]:
+:
+
+Examples:
+
+phz +[wheel < obj]:
+:
+
+phz +[robot < cont]:
+:
+
+phz +[warehouse < cont]:
+:
+
+Current built-in hierarchy:
+
+obj
+├── gen
+└── cont
+
+Every user defined PHZ type ultimately derives from "obj".
+
+---
+
+Multiple Collections
+
+Containers are no longer limited to a single collection.
+
+Additional typed collections may be declared.
+
+Example:
+
+phz +[car < cont]:
+
+    inside: person[5]
+
+    wheels: wheel[4]
+
+    trunk: obj[100]
+
+:
+
+Collection syntax:
+
+collectionName : Type[max]
+
+where
+
+- "Type" is any PHZ type
+- "max" is the maximum number of elements
+
+Examples:
+
+robots: robot[20]
+
+products: obj[1000]
+
+tools: tool[16]
+
+The default collection inherited from "cont" is "inside".
+
+A derived container may redefine it:
+
+inside: person[4]
+
+instead of the generic
+
+inside: obj[16]
+
+---
+
+Typed Collections
+
+Only compatible object types may be inserted into a typed collection.
+
+Example:
+
+wheels: wheel[4]
+
+accepts
+
+wheel
+
+but rejects
+
+scanner
+
+Type checking occurs when objects are moved or spawned.
+
+---
+
+Object Movement
+
+Objects are moved using ordinary property blocks.
+
+There are no dedicated movement statements.
+
+Example:
+
+.conveyor1:{
+
+    move = .box1
+
+    to = .conveyor2
+
+    set = 1
+
+}
+
+When executed,
+
+1. the object is removed from the current collection
+2. it is inserted into the destination collection
+
+The object identity remains unchanged.
+
+---
+
+Moving to Custom Collections
+
+Destination may reference any collection.
+
+Example:
+
+.robot:{
+
+    move = .wheel1
+
+    to = .car1:wheels
+
+    set = 1
+
+}
+
+or
+
+.personLoader:{
+
+    move = .person1
+
+    to = .car1:inside
+
+    set = 1
+
+}
+
+---
+
+Moving Between Floors
+
+Objects may change floor without changing ownership.
+
+Example:
+
+.elevator:{
+
+    move = .box1
+
+    toFloor = 2
+
+    set = 1
+
+}
+
+The object remains inside the same container.
+
+Only its "floor" attribute changes.
+
+Typical use cases:
+
+- elevators
+- vertical conveyors
+- cranes
+- storage systems
+
+---
+
+Removing Objects
+
+Removing an object only removes the ownership relation.
+
+Example:
+
+.room:{
+
+    remove = .box1
+
+    set = 1
+
+}
+
+After execution,
+
+.box1
+
+still exists.
+
+It simply no longer belongs to that container.
+
+Removal is not object destruction.
+
+---
+
+Collection Iteration
+
+PHZ intentionally does not introduce
+
+- for
+- while
+- foreach
+
+Instead, collections expose a temporary iteration placeholder.
+
+each
+
+"each" exists only while a property block is executing.
+
+Example:
+
+.conveyor1:{
+
+    move = :inside:each
+
+    to = .conveyor2
+
+    set = EQ(:inside:each:type,"truck")
+
+}
+
+Meaning:
+
+For every object inside the current container,
+
+if
+
+type == "truck"
+
+move that object into
+
+.conveyor2
+
+The iteration itself is performed internally by the PHZ engine.
+
+No explicit loop exists in the language.
+
+---
+
+Modifying Objects During Iteration
+
+Attributes may also be modified.
+
+Example:
+
+.conveyor1:{
+
+    :inside:each:km =
+        ADD(:inside:each:km,\1)
+
+    set = EQ(:inside:each:type,"truck")
+
+}
+
+Only matching objects are modified.
+
+---
+
+Relative Collections
+
+Inside a property block,
+
+:inside
+
+always refers to the current container.
+
+Example:
+
+.conveyor1:{
+
+    move = :inside:each
+
+    to = .warehouse
+
+    set = 1
+
+}
+
+is equivalent to
+
+.conveyor1:inside
+
+Outside the block, the full object path is used.
+
+---
+
+Motor Distance
+
+Motors expose two movement counters.
+
+value
+
+Current shaft position.
+
+Used for servo positioning.
+
+distance
+
+Distance travelled since the previous revolution.
+
+Example:
+
+0
+
+1
+
+2
+
+...
+
+99
+
+100
+
+0
+
+1
+
+When the maximum value is reached,
+
+distance wraps back to zero.
+
+---
+
+Motor Laps
+
+Every time "distance" wraps,
+
+"laps" increases.
+
+Example:
+
+distance
+
+0 → 100 → 0
+
+results in
+
+laps
+
+0 → 1
+
+This makes conveyors and rotary systems easy to synchronize.
+
+---
+
+Conveyor Example
+
+comp [motor] .motor:
+    maxDistance: 100
+:
+
+phz [conveyor] .conv1:
+    motor: .motor
+:
+
+.conv1:{
+
+    move = :inside:each
+
+    to = .conv2
+
+    set = EQ(.motor:distance,100)
+
+}
+
+Whenever the conveyor completes one travel distance,
+
+all matching objects may be transferred.
+
+---
+
+Elevator Example
+
+comp [servo] .servo:
+:
+
+phz [elevator] .lift:
+    motor: .servo
+:
+
+.lift:{
+
+    move = :inside:each
+
+    toFloor = 2
+
+    set = EQ(.servo:value,100)
+
+}
+
+The elevator does not physically animate objects.
+
+Instead, their "floor" attribute changes when the servo reaches its destination.
+
+---
+
+Design Philosophy
+
+Movement in PHZ is logical rather than physical.
+
+A move operation changes relationships.
+
+It does not simulate trajectories.
+
+Likewise,
+
+typed collections describe ownership,
+
+not geometry.
+
+The PHZ engine determines how iteration is performed.
+
+Scripts only describe what should happen,
+
+never how to iterate through objects.
+
+This keeps PHZ deterministic, declarative, and fully compatible with the LogTScript execution model.
