@@ -731,9 +731,203 @@ When `moveReady` becomes `1`, the engine executes the property block and creates
 - You cannot use `each` outside an active PHZ property block.
 - Iteration uses a **snapshot** of the collection at the start of the block so moves during the pass do not double-visit or skip wrongly.
 
-Conveyors / elevators remain **user** types (e.g. `phz +[conveyor < cont]:`), not built-in PHZ kinds. Pair them with [`motor.md`](motor.md) `maxDistance` / `:distance` / `:laps` when you need shaft travel on the panel.
+Conveyors / elevators remain **user** types (e.g. `phz +[conveyor < cont]:`), not built-in PHZ kinds. Pair them with [`motor.md`](motor.md) `maxDistance` / `:distance` / `:laps`, or with [`servo.md`](servo.md) for positional travel — see [Example: Elevator](#example-elevator).
 
 **Signal Trace:** with the panel armed (L2+), PHZ emits `phz spawn` / `phz move` / `phz remove` lines (filter **PHZ**). Spawn shows `id` + `floor` inline; other attributes expand under **`[+]`** at L3. See [debug.md](debug.md).
+
+---
+
+## Example: Elevator
+
+An elevator is ordinary PHZ plus an ordinary LogTScript actuator. PHZ does **not** need a special movement mechanism: the servo (or motor, robot, …) decides *when* travel finishes; PHZ only updates logical `floor` and membership.
+
+Primitives used: `cont`, `inside`, `floor`, `move`, `toFloor`, `each`, and normal wires / property blocks.
+
+### Elevator type
+
+An elevator is a container because it holds objects:
+
+```logts
+phz +[elevator < cont]:
+  inside: obj[4]
+  :
+```
+
+Instance on floor `0`, with a user attribute for the requested destination (same width as the servo wire — here 8 bits):
+
+```logts
+phz [elevator] .e1:
+  floor: 0
+  targetFloor: 0 (8)
+  :
+```
+
+Contents are `.e1:inside`.
+
+### Servo (independent)
+
+The servo is a normal panel component ([servo.md](servo.md)). The elevator type does not know that `.s1` is a servo — LogTScript connects them.
+
+```logts
+comp [servo] .s1:
+  length: 8
+  display: piston
+  text: 'Lift'
+  on: 1
+  :
+```
+
+### Requesting floor 2
+
+Command the servo and record the destination on the elevator:
+
+```logts
+.s1:{
+  value = 00000010
+  set = 1
+}
+.e1:{
+  targetFloor = 00000010
+  set = 1
+}
+```
+
+Logical state after the request:
+
+```text
+current floor  = 0
+target floor   = 2
+servo target   = 2
+```
+
+### Waiting for the servo
+
+PHZ does not simulate travel. The servo exposes `:moving` / `:value`. When travel is finished, a live program can enable PHZ updates with:
+
+```logts
+AND(
+  EQ(.s1:moving, 0),
+  EQ(.s1:value, .e1:targetFloor)
+)
+```
+
+Then update the elevator’s own floor:
+
+```logts
+.e1:{
+  floor = .e1:targetFloor
+  set = AND(
+    EQ(.s1:moving, 0),
+    EQ(.s1:value, .e1:targetFloor)
+  )
+}
+```
+
+### Objects follow the elevator floor
+
+Objects inside must track the elevator. PHZ walks the collection with `each` (no LogTScript loop):
+
+```logts
+.e1:{
+  move = :inside:each
+  toFloor = .e1:targetFloor
+  set = AND(
+    EQ(.s1:moving, 0),
+    EQ(.s1:value, .e1:targetFloor)
+  )
+}
+```
+
+For each object in `.e1:inside`, PHZ sets `object.floor = elevator.targetFloor`. Ownership stays `.e1:inside`.
+
+### Complete concept
+
+```text
+        LogTScript
+             │
+             ├── targetFloor = 2
+             │
+             ↓
+          Servo .s1
+             │
+             │ moving / value
+             ↓
+       movement finished
+             │
+             ↓
+        PHZ Elevator .e1
+             │
+          floor = 2
+             │
+             ↓
+       :inside:each + toFloor
+             │
+             ├── object → floor 2
+             └── …
+```
+
+The servo does not know it drives an elevator. The elevator does not know `.s1` is a servo. LogTScript ties them with signals and property blocks.
+
+### Load & Run demo
+
+**Load & Run** cannot wait for panel animation, so this demo pulses an `arrived` wire after commanding the servo. That stands in for `AND(EQ(.s1:moving,0), EQ(.s1:value,.e1:targetFloor))` on a live panel. Expect `eFl`, `o0`, and `o1` all `00000010` (floor 2).
+
+```logts-play wave
+phz +[elevator < cont]:
+  inside: obj[4]
+  :
+phz [elevator] .e1:
+  floor: 0
+  targetFloor: 0 (8)
+  :
+comp [servo] .s1:
+  length: 8
+  display: piston
+  text: 'Lift'
+  on: 1
+  :
+phz [gen] .mk:
+  type: obj
+  :
+.mk:{
+  add = \2
+  inside = .e1
+  set = 1
+}
+.e1:{
+  targetFloor = 00000010
+  set = 1
+}
+.s1:{
+  value = 00000010
+  set = 1
+}
+1wire arrived = 1
+.e1:{
+  floor = .e1:targetFloor
+  set = arrived
+}
+.e1:{
+  move = :inside:each
+  toFloor = .e1:targetFloor
+  set = arrived
+}
+8wire eFl = .e1:floor
+8wire o0 = .e1:inside:0:floor
+8wire o1 = .e1:inside:1:floor
+show(eFl, o0, o1)
+```
+
+### Why this model is useful
+
+The same PHZ pattern works when travel is driven by a servo, a motor, a robot, or another mechanism. PHZ only needs the resulting state (`floor`) and the operation:
+
+```logts
+move = :inside:each
+toFloor = …
+```
+
+The physical driver stays outside the PHZ core.
 
 ---
 
@@ -760,6 +954,7 @@ flowchart LR
 
 - `doc(phz)` / `doc(phz.type)` / `doc(.inst)` — live signatures in the editor (see [doc-function.md](doc-function.md))
 - [motor.md](motor.md) — `maxDistance`, `:distance`, `:laps`
+- [servo.md](servo.md) — positional actuator used in the [elevator example](#example-elevator)
 - [allow-notallow.md](allow-notallow.md) — restricting `phz` kinds / user types
 - [doc-viewer.md](doc-viewer.md) — how **Load** / **Load & Run** work
 - [chip-board-execution.md](chip-board-execution.md) — another module with runnable `logts-play` demos

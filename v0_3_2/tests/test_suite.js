@@ -34208,5 +34208,59 @@ phz [gen] .mk:
     }, 'missing attribute');
   }, { propagation: 'legacy' });
 
+  const PHZ_DOC_ELEVATOR = `phz +[elevator < cont]:
+  inside: obj[4]
+  :
+phz [elevator] .e1:
+  floor: 0
+  targetFloor: 0 (8)
+  :
+comp [servo] .s1:
+  length: 8
+  display: piston
+  text: 'Lift'
+  on: 1
+  :
+phz [gen] .mk:
+  type: obj
+  :
+.mk:{
+  add = \\2
+  inside = .e1
+  set = 1
+}
+.e1:{
+  targetFloor = 00000010
+  set = 1
+}
+.s1:{
+  value = 00000010
+  set = 1
+}
+1wire arrived = 1
+.e1:{
+  floor = .e1:targetFloor
+  set = arrived
+}
+.e1:{
+  move = :inside:each
+  toFloor = .e1:targetFloor
+  set = arrived
+}
+8wire eFl = .e1:floor
+8wire o0 = .e1:inside:0:floor
+8wire o1 = .e1:inside:1:floor
+show(eFl, o0, o1)`;
+
+  function runPhzDocElevator(h, session) {
+    const { interp } = session.run(PHZ_DOC_ELEVATOR);
+    h.assert('elevator floor 2', session.getWire(interp, 'eFl'), '00000010');
+    h.assert('obj0 floor 2', session.getWire(interp, 'o0'), '00000010');
+    h.assert('obj1 floor 2', session.getWire(interp, 'o1'), '00000010');
+  }
+
+  reg(3174, 'phz', 'phz.md logts-play smoke — elevator + servo toFloor', runPhzDocElevator, { propagation: 'legacy' });
+  regPhzWave(3175, 'phz.md logts-play smoke — elevator + servo toFloor', runPhzDocElevator);
+
   window.LogTScriptTestSuite.finalize();
 })();
