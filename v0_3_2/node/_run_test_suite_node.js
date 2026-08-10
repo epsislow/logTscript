@@ -19,16 +19,17 @@ Options:
   -h, --help                      show this help and exit
   -v, --verbose                   extra runner messages (e.g. unknown test ids)
   -vv, --very-verbose             runtime console output and exceptions from tests
-  -t, --tests                     progress output (: = ok group, F = failed group)
+  -t, --tests                     progress output (: = ok group, F = failed group) [default]
+  -q, --quiet                     disable progress output
   -n, --progress-tests-per-char N tests aggregated per progress character (default: 2)
   -w, --progress-width N          max progress characters per line (default: 50)
   -i, --id SPEC                   run only test ids (comma-separated, ranges: 1-100,3,600-800)
 
 Examples:
   node node/_run_test_suite_node.js
-  node node/_run_test_suite_node.js -t
-  node node/_run_test_suite_node.js -t -n 1 -w 10
-  node node/_run_test_suite_node.js -t --progress-tests-per-char=4 --progress-width=40
+  node node/_run_test_suite_node.js -q
+  node node/_run_test_suite_node.js -n 1 -w 10
+  node node/_run_test_suite_node.js --progress-tests-per-char=4 --progress-width=40
   node node/_run_test_suite_node.js -i 6,7,10
   node node/_run_test_suite_node.js -i=1-100,600-800
   node node/_run_test_suite_node.js -v
@@ -89,7 +90,7 @@ function parseArgs(argv) {
     help: false,
     verbose: false,
     veryVerbose: false,
-    progress: false,
+    progress: true,
     progressTestsPerChar: 2,
     progressWidth: 50,
     testIdSpec: null,
@@ -106,6 +107,8 @@ function parseArgs(argv) {
       opts.verbose = true;
     } else if (arg === '-t' || arg === '--tests') {
       opts.progress = true;
+    } else if (arg === '-q' || arg === '--quiet') {
+      opts.progress = false;
     } else if (
       arg === '-n' || arg === '--progress-tests-per-char' ||
       arg.startsWith('--progress-tests-per-char=')
@@ -159,21 +162,25 @@ function createProgressReporter(total, testsPerChar, width) {
   let charsOnLine = 0;
   let groupFailed = false;
   let groupCount = 0;
+  const useColor = !!(process.stdout.isTTY);
+  // ANSI bright green / bright red — reliable on Windows terminals (truecolor can look cyan)
+  const OK = useColor ? '\x1b[92m:\x1b[0m' : ':';
+  const FAIL = useColor ? '\x1b[91mF\x1b[0m' : 'F';
 
   function endLine() {
     process.stdout.write(` (${testsRun}/${total})\n`);
     charsOnLine = 0;
   }
 
-  function emitSymbol(symbol) {
-    process.stdout.write(symbol);
+  function emitSymbol(colored) {
+    process.stdout.write(colored);
     charsOnLine++;
     if (charsOnLine >= width) endLine();
   }
 
   function flushGroup() {
     if (groupCount === 0) return;
-    emitSymbol(groupFailed ? 'F' : ':');
+    emitSymbol(groupFailed ? FAIL : OK);
     groupFailed = false;
     groupCount = 0;
   }
