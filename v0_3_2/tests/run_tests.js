@@ -742,6 +742,7 @@
 
       const header = document.createElement('div');
       header.className = 'group-header';
+      header.title = group.label + ' (' + group.rangeLabel + ')';
       groupHeaderById.set(group.id, header);
 
       const main = document.createElement('div');
@@ -763,7 +764,7 @@
 
       titleLine.appendChild(toggle);
       titleLine.appendChild(title);
-     // titleLine.appendChild(range);
+      titleLine.appendChild(range);
       if (groupPropMode) {
      //   titleLine.appendChild(createPropBadge(groupPropMode));
       }
