@@ -130,6 +130,75 @@ body {
   color: #aaa;
   font-size: 13px;
 }
+.test-filters {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  font-size: 13px;
+}
+.test-filter-sep {
+  color: #444;
+  user-select: none;
+  pointer-events: none;
+}
+.test-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding: 3px 9px;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.2;
+  color: #aaa;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.test-filter:hover {
+  background: #1c1c1c;
+  border-color: #333;
+}
+.test-filter.is-active {
+  background: #1a1a1a;
+}
+.test-filter--pass.is-active {
+  color: #6e6;
+  border-color: #3a5a3a;
+}
+.test-filter--fail.is-active {
+  color: #f66;
+  border-color: #5a3030;
+}
+.test-filter--pending.is-active {
+  color: #ccc;
+  border-color: #444;
+}
+.test-filter--legacy.is-active {
+  color: #5c8;
+  border-color: #3a5a3a;
+}
+.test-filter--wave.is-active {
+  color: #fa0;
+  border-color: #5a4018;
+}
+.test-filter--mixed.is-active {
+  color: #5ce;
+  border-color: #2a5a66;
+}
+.test-filter-count {
+  font-variant-numeric: tabular-nums;
+}
+.test-group.filter-hidden {
+  display: none;
+}
+#filterHint {
+  font-size: 12px;
+  color: #666;
+}
 .btn {
   display: inline-flex;
   align-items: center;
@@ -348,10 +417,8 @@ body {
   color: #888;
   margin-left: 4px;
 }
-.prop-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.prop-legend-swatch {
+  flex-shrink: 0;
 }
 .prop-legend-swatch {
   width: 10px;
@@ -536,12 +603,18 @@ body {
   <p id="subtitle" style="color:#888;font-size:13px;margin:0 0 12px 0"></p>
   <div id="toolbar">
     <button type="button" id="btnRunAll" class="btn btn--primary">Run All</button>
-    <span id="summary">Passed: 0 | Failed: 0 | Pending: 0</span>
-    <span class="prop-legend" aria-label="Propagation mode legend">
-      <span class="prop-legend-item"><span class="prop-legend-swatch prop-legend-swatch--legacy"></span>legacy</span>
-      <span class="prop-legend-item"><span class="prop-legend-swatch prop-legend-swatch--wave"></span>wave</span>
-      <span class="prop-legend-item"><span class="prop-legend-swatch prop-legend-swatch--mixed"></span>mixed</span>
-    </span>
+    <div id="summary" class="test-filters" role="group" aria-label="Filter test groups">
+      <button type="button" class="test-filter test-filter--pass" data-filter="pass" aria-pressed="false">Passed: <span class="test-filter-count" data-count="pass">0</span></button>
+      <span class="test-filter-sep">|</span>
+      <button type="button" class="test-filter test-filter--fail" data-filter="fail" aria-pressed="false">Failed: <span class="test-filter-count" data-count="fail">0</span></button>
+      <span class="test-filter-sep">|</span>
+      <button type="button" class="test-filter test-filter--pending" data-filter="pending" aria-pressed="false">Pending: <span class="test-filter-count" data-count="pending">0</span></button>
+      <span class="test-filter-sep">|</span>
+      <button type="button" class="test-filter test-filter--legacy" data-filter="legacy" aria-pressed="false"><span class="prop-legend-swatch prop-legend-swatch--legacy" aria-hidden="true"></span>legacy</button>
+      <button type="button" class="test-filter test-filter--wave" data-filter="wave" aria-pressed="false"><span class="prop-legend-swatch prop-legend-swatch--wave" aria-hidden="true"></span>wave</button>
+      <button type="button" class="test-filter test-filter--mixed" data-filter="mixed" aria-pressed="false"><span class="prop-legend-swatch prop-legend-swatch--mixed" aria-hidden="true"></span>mixed</button>
+    </div>
+    <span id="filterHint" hidden></span>
   </div>
   <div id="testList"></div>
 </div>

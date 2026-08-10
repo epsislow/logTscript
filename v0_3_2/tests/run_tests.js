@@ -14,7 +14,6 @@
   }
 
   const testListEl = document.getElementById('testList');
-  const summaryEl = document.getElementById('summary');
   const subtitleEl = document.getElementById('subtitle');
   const btnRunAll = document.getElementById('btnRunAll');
 
@@ -27,7 +26,14 @@
   const rowUiById = new Map();
   const groupSummaryById = new Map();
   const groupHeaderById = new Map();
+  const groupSectionById = new Map();
+  const groupPropModeById = new Map();
   const GROUP_RUN_CLASSES = ['tests-running', 'tests-success', 'tests-error'];
+  const STATUS_FILTERS = ['pass', 'fail', 'pending'];
+  const PROP_FILTERS = ['legacy', 'wave', 'mixed'];
+  const activeGroupFilters = new Set();
+  const summaryEl = document.getElementById('summary');
+  const filterHintEl = document.getElementById('filterHint');
   const groups = [...manifest.groups].sort((a, b) => {
     const cmp = (a.label || a.id).localeCompare(b.label || b.id, undefined, { sensitivity: 'base' });
     return cmp !== 0 ? cmp : a.id.localeCompare(b.id);
@@ -136,6 +142,92 @@
     return 'Passed: ' + counts.passed + ' | Failed: ' + counts.failed + ' | Pending: ' + counts.pending;
   }
 
+  function setFilterCount(name, value) {
+    if (!summaryEl) return;
+    const el = summaryEl.querySelector('[data-count="' + name + '"]');
+    if (el) el.textContent = value;
+  }
+
+  function groupMatchesActiveFilters(groupId) {
+    if (!activeGroupFilters.size) return true;
+
+    const activeStatus = STATUS_FILTERS.filter(f => activeGroupFilters.has(f));
+    const activeProp = PROP_FILTERS.filter(f => activeGroupFilters.has(f));
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return false;
+
+    const counts = countStatuses(group.testIds);
+    const propMode = groupPropModeById.get(groupId) || null;
+
+    let statusOk = !activeStatus.length;
+    if (!statusOk) {
+      statusOk = activeStatus.some(function (f) {
+        if (f === 'pass') return counts.passed > 0;
+        if (f === 'fail') return counts.failed > 0;
+        return counts.pending > 0;
+      });
+    }
+
+    let propOk = !activeProp.length;
+    if (!propOk) {
+      propOk = activeProp.some(function (f) {
+        return propMode === f;
+      });
+    }
+
+    return statusOk && propOk;
+  }
+
+  function applyGroupFilters() {
+    let visible = 0;
+    for (const group of groups) {
+      const section = groupSectionById.get(group.id);
+      if (!section) continue;
+      const show = groupMatchesActiveFilters(group.id);
+      section.classList.toggle('filter-hidden', !show);
+      if (show) visible++;
+    }
+
+    if (filterHintEl) {
+      if (activeGroupFilters.size) {
+        filterHintEl.hidden = false;
+        filterHintEl.textContent = visible + ' / ' + groups.length + ' groups';
+      } else {
+        filterHintEl.hidden = true;
+        filterHintEl.textContent = '';
+      }
+    }
+  }
+
+  function syncFilterButtons() {
+    if (!summaryEl) return;
+    summaryEl.querySelectorAll('.test-filter[data-filter]').forEach(function (btn) {
+      const filterId = btn.getAttribute('data-filter');
+      const active = activeGroupFilters.has(filterId);
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  function toggleGroupFilter(filterId) {
+    if (activeGroupFilters.has(filterId)) {
+      activeGroupFilters.delete(filterId);
+    } else {
+      activeGroupFilters.add(filterId);
+    }
+    syncFilterButtons();
+    applyGroupFilters();
+  }
+
+  function initGroupFilters() {
+    if (!summaryEl) return;
+    summaryEl.querySelectorAll('.test-filter[data-filter]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        toggleGroupFilter(btn.getAttribute('data-filter'));
+      });
+    });
+  }
+
   function updateSummary() {
     let passed = 0;
     let failed = 0;
@@ -146,9 +238,9 @@
       else if (s === 'fail') failed++;
       else pending++;
     }
-    summaryEl.textContent =
-      'Passed: ' + passed + ' | Failed: ' + failed + ' | Pending: ' + pending;
-    // +' | Not ported: ' + notPorted;
+    setFilterCount('pass', passed);
+    setFilterCount('fail', failed);
+    setFilterCount('pending', pending);
 
     for (const group of groups) {
       const el = groupSummaryById.get(group.id);
@@ -156,6 +248,8 @@
         el.textContent = formatStatusCounts(countStatuses(group.testIds));
       }
     }
+
+    applyGroupFilters();
   }
 
   function setRunningUI(isRunning) {
@@ -739,6 +833,11 @@
       const section = document.createElement('div');
       section.className = 'test-group collapsed';
       section.dataset.group = group.id;
+      groupSectionById.set(group.id, section);
+      if (groupPropMode) {
+        groupPropModeById.set(group.id, groupPropMode);
+        section.dataset.propMode = groupPropMode;
+      }
 
       const header = document.createElement('div');
       header.className = 'group-header';
@@ -897,6 +996,7 @@
   });
 
   buildUI();
+  initGroupFilters();
   testSearchIndex = buildTestSearchIndex();
   initTestSearch();
 })();
