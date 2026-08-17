@@ -34262,5 +34262,127 @@ show(eFl, o0, o1)`;
   reg(3174, 'phz', 'phz.md logts-play smoke — elevator + servo toFloor', runPhzDocElevator, { propagation: 'legacy' });
   regPhzWave(3175, 'phz.md logts-play smoke — elevator + servo toFloor', runPhzDocElevator);
 
+  reg(3176, 'asm-set', 'set: generic implicit — backward compat NOP', function(h, session) {
+    const { interp } = session.run(INLINE_ASM_ISA + '\n8wire x = .myisa { NOP }');
+    h.assert('NOP 8b', session.getWire(interp, 'x'), '00000000');
+  });
+
+  reg(3177, 'asm-set', 'set: riscv32 empty preset body', function(h, session) {
+    const src = `inline [asm] .rv:
+  set: riscv32
+  :
+32wire p = .rv { addi x1, x0, 5 }`;
+    const { interp } = session.run(src);
+    h.assert('32 bits', String(session.getWire(interp, 'p').length), '32');
+  });
+
+  reg(3178, 'asm-set', 'riscv32 addi encode known pattern', function(h, session) {
+    const src = `inline [asm] .rv:
+  set: riscv32
+  :
+32wire p = .rv { addi x1, x0, 5 }`;
+    const { interp } = session.run(src);
+    const w = session.getWire(interp, 'p');
+    h.assert('addi x1 x0 5', w, '00000000010100000000000010010011');
+  });
+
+  reg(3179, 'asm-set', 'riscv32 show decode round-trip', function(h, session) {
+    const src = `inline [asm] .rv:
+  set: riscv32
+  :
+96wire p = .rv {
+  addi x1, x0, 5
+  addi x2, x0, 3
+  add x3, x1, x2
+}`;
+    const { interp, out } = session.run(src + '\nshow(p; asm)');
+    const decodeLine = out.find(l => l.includes('addi x1'));
+    h.assert('decode addi', String(!!decodeLine), 'true');
+  });
+
+  reg(3180, 'asm-set', 'set: unknown asm set error', function(h, session) {
+    const { out } = session.run(`inline [asm] .x:
+  set: not_a_set
+  NOP : 0000 + 4b
+  :`);
+    const err = out.find(l => l.startsWith('Error:')) || '';
+    h.assert('unknown set', String(err.includes("Unknown asm set 'not_a_set'")), 'true');
+  });
+
+  reg(3181, 'asm-set', 'riscv32 invalid register error', function(h, session) {
+    const { out } = session.run(`inline [asm] .rv:
+  set: riscv32
+  :
+128wire p = .rv { addi eax, x0, 1 }`);
+    const err = out.find(l => l.startsWith('Error:')) || '';
+    h.assert('bad reg', String(err.includes('unknown register')), 'true');
+  });
+
+  reg(3182, 'asm-set', 'NotAllow inline.asm.set blocks riscv32', function(h, session) {
+    const { out } = session.run(`NotAllow inline.asm.set{riscv32}
+inline [asm] .rv:
+  set: riscv32
+  :`);
+    const err = out.find(l => l.startsWith('Error:')) || '';
+    h.assert('policy block', String(err.includes('not allowed')), 'true');
+  });
+
+  reg(3183, 'asm-set', 'composition use with riscv32 preset', function(h, session) {
+    const src = `inline [asm] .rv:
+  set: riscv32
+  :
+32wire boot = .rv { addi x1, x0, 1 }
+64wire app = .rv {
+  use boot
+  addi x2, x0, 2
+}`;
+    const { interp } = session.run(src);
+    h.assert('64 bits', String(session.getWire(interp, 'app').length), '64');
+  });
+
+  reg(3184, 'asm-set', 'arm-thumb movs encode 16-bit', function(h, session) {
+    const src = `inline [asm] .th:
+  set: arm-thumb
+  :
+16wire p = .th { movs r1, 5 }`;
+    const { interp } = session.run(src);
+    h.assert('16 bits', String(session.getWire(interp, 'p').length), '16');
+    h.assert('movs pattern', session.getWire(interp, 'p'), '0010010100000001');
+  });
+
+  reg(3185, 'asm-set', 'doc(inline.asm.sets) lists presets', function(h, session) {
+    const out = session.runDoc('doc(inline.asm.sets)');
+    h.assert('has generic', String(out.some(l => l.includes('generic'))), 'true');
+    h.assert('has riscv32', String(out.some(l => l.includes('riscv32'))), 'true');
+    h.assert('has arm-thumb', String(out.some(l => l.includes('arm-thumb'))), 'true');
+  });
+
+  reg(3186, 'asm-set', 'riscv32 explicit decode on wire', function(h, session) {
+    const src = `inline [asm] .rv:
+  set: riscv32
+  :
+32wire p = .rv { addi x1, x0, 5 }`;
+    const { interp, out } = session.run(src + '\nshow(.rv:decode(p))');
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('decode text', String(text.includes('addi x1')), 'true');
+  });
+
+  reg(3187, 'asm-set', 'generic segment token rejected on riscv32 user opcode', function(h, session) {
+    const { out } = session.run(`inline [asm] .rv:
+  set: riscv32
+  FOO : 0001 + R2b + 2b
+  :`);
+    const err = out.find(l => l.startsWith('Error:')) || '';
+    h.assert('segment invalid', String(err.includes("invalid for set 'riscv32'")), 'true');
+  });
+
+  reg(3188, 'asm-set', 'doc(.rv) shows set riscv32', function(h, session) {
+    const out = session.runDoc(`inline [asm] .rv:
+  set: riscv32
+  :
+doc(.rv)`);
+    h.assert('set line', String(out.some(l => l.includes('set: riscv32'))), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

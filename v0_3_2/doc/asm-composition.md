@@ -147,6 +147,49 @@ After `use`, the composed blob may be longer than a single module — size the w
 
 ---
 
+## riscv32 preset
+
+Preset ISAs use the same composition directives. Each instruction is **32 bits**; size wires as `32 × instruction_count`.
+
+```logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+32wire boot = .rv { addi x1, x0, 1 }
+64wire app = .rv {
+  use boot
+  addi x2, x0, 2
+}
+show(app; asm)
+```
+
+`use` splices the referenced wire's expanded program. External labels (`target>`) and `base:` behave like generic asm. See [asm-set-riscv32.md](asm-set-riscv32.md).
+
+---
+
+## arm-thumb preset
+
+Each Thumb instruction is **16 bits**:
+
+```logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+16wire init = .th { movs r0, 1 }
+32wire main = .th {
+  use init
+  movs r1, 2
+  adds r2, r0, r1
+}
+show(main; asm)
+```
+
+See [asm-set-arm-thumb.md](asm-set-arm-thumb.md).
+
+---
+
 ## Related
 
 - [asm.md](asm.md) — ISA definition and ASM v1

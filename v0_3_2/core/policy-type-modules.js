@@ -117,6 +117,25 @@ function createDefaultPolicyTypeModules(ctx) {
   });
 
   registry.register({
+    moduleName: 'inline.asm.set',
+    docLabel: 'inline asm sets',
+    resolveTypeToken(token) {
+      if (typeof listAsmSetProfiles === 'function') {
+        const profiles = listAsmSetProfiles();
+        const ids = profiles.map(p => p.id);
+        if (ids.includes(token)) return token;
+      }
+      const fallback = ['generic', 'riscv32', 'arm-thumb'];
+      if (fallback.includes(token)) return token;
+      throw new Error(`Unknown entry '${token}' in inline.asm.set{}`);
+    },
+    getRuntimeId(stmt) {
+      if (!stmt || !stmt.inline || stmt.inline.kind !== 'asm') return null;
+      return stmt.inline.asmSetId || 'generic';
+    },
+  });
+
+  registry.register({
     moduleName: 'phz',
     docLabel: 'phz kinds',
     resolveTypeToken(token) {

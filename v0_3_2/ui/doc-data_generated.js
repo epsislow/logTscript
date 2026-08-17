@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -993,6 +993,49 @@ After \`use\`, the composed blob may be longer than a single module — size the
 
 ---
 
+## riscv32 preset
+
+Preset ISAs use the same composition directives. Each instruction is **32 bits**; size wires as \`32 × instruction_count\`.
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+32wire boot = .rv { addi x1, x0, 1 }
+64wire app = .rv {
+  use boot
+  addi x2, x0, 2
+}
+show(app; asm)
+\`\`\`
+
+\`use\` splices the referenced wire's expanded program. External labels (\`target>\`) and \`base:\` behave like generic asm. See [asm-set-riscv32.md](asm-set-riscv32.md).
+
+---
+
+## arm-thumb preset
+
+Each Thumb instruction is **16 bits**:
+
+\`\`\`logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+16wire init = .th { movs r0, 1 }
+32wire main = .th {
+  use init
+  movs r1, 2
+  adds r2, r0, r1
+}
+show(main; asm)
+\`\`\`
+
+See [asm-set-arm-thumb.md](asm-set-arm-thumb.md).
+
+---
+
 ## Related
 
 - [asm.md](asm.md) — ISA definition and ASM v1
@@ -1226,6 +1269,34 @@ See [cpu.md](cpu.md#microcode-mmap-cpummap) and [mmap.md](mmap.md).
 
 ---
 
+## Preset sets (\`riscv32\`, \`arm-thumb\`)
+
+Preset opcodes ship **without** micro programs. On \`comp [cpu]\`, they use the CPU's native stepping for that set (when wired) or act as encode/decode-only in wire blobs.
+
+You may attach a **\`{ micro }\` block** to a preset mnemonic in your ISA to override execution (same as generic):
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  consts:{
+    PC = ^02
+    R1 = ^21
+  }
+  FOO:
+  {
+    PC < PC
+  }
+  :
+
+32wire p = .rv { addi x1, x0, 1 }
+\`\`\`
+
+User opcode bodies that use generic segment tokens (\`R2b\`) on a preset set are rejected at ISA parse time. Literal-only overrides are allowed.
+
+See [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md), and [asm-set-generic.md](asm-set-generic.md) for segment syntax on **\`set: generic\`**.
+
+---
+
 ## Errors
 
 | Situation | Message (example) |
@@ -1244,6 +1315,463 @@ See [cpu.md](cpu.md#microcode-mmap-cpummap) and [mmap.md](mmap.md).
 - [mmap.md](mmap.md) — logical address map for CPU/DMA
 - [mem.md](mem.md) — external \`comp [mem]\` chips
 `,
+    'asm-set-arm-thumb.md': `# ASM set: arm-thumb (16-bit subset)
+
+The **arm-thumb** preset assembles a subset of **16-bit ARM Thumb** instructions into halfword-aligned encodings. Declare \`set: arm-thumb\` and write programs with \`movs\`, \`adds\`, \`ldr\`, etc.
+
+Registers are **\`r0\`–\`r7\`** in this subset. Immediates use decimal literals (\`5\` or \`\\5\`) — **\`#\` starts a comment** in LogTscript, so do not use \`#5\`.
+
+See also: [asm.md](asm.md), [riscv32 preset](asm-set-riscv32.md), [generic set](asm-set-generic.md).
+
+---
+
+## Declaration
+
+\`\`\`logts
+inline [asm] .th:
+  set: arm-thumb
+  :
+\`\`\`
+
+Each instruction encodes to **16 bits**. Use **\`16wire\`** (or \`N×16wire\`) for strict assignment.
+
+---
+
+## Preset opcode table
+
+| Mnemonic | Syntax | Summary |
+|----------|--------|---------|
+| \`movs\` | \`movs rd, imm\` | Move 8-bit immediate into low register |
+| \`adds\` | \`adds rd, rn, rm\` | \`rd = rn + rm\` |
+| \`subs\` | \`subs rd, rn, rm\` | \`rd = rn - rm\` |
+| \`b\` | \`b target\` | Unconditional branch (±256 halfwords) |
+| \`beq\` | \`beq target\` | Branch if equal |
+| \`bne\` | \`bne target\` | Branch if not equal |
+| \`ldr\` | \`ldr rd, imm(rn)\` | Load from \`[rn + imm×4]\` (5-bit offset) |
+| \`str\` | \`str rd, imm, rn\` | Store (3-arg form in this subset) |
+
+---
+
+## Runnable — move immediate
+
+\`\`\`logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+16wire p = .th { movs r1, 5 }
+show(p)
+show(p; asm)
+\`\`\`
+
+Example encoding for \`movs r1, 5\`: \`0010010100000001\` (16 bits).
+
+---
+
+## Runnable — add / subtract
+
+\`\`\`logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+32wire p = .th {
+  movs r0, 10
+  movs r1, 3
+  adds r2, r0, r1
+  subs r3, r0, r1
+}
+show(p; asm)
+\`\`\`
+
+---
+
+## Runnable — branch
+
+\`\`\`logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+32wire p = .th {
+  movs r0, 0
+again:
+  adds r0, r0, r1
+  movs r1, 1
+  b again
+}
+show(p; asm)
+\`\`\`
+
+Branch targets use the same label mechanism as generic asm; offsets must stay within Thumb range.
+
+---
+
+## Load / store
+
+\`\`\`logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+32wire p = .th {
+  movs r1, 0
+  movs r2, 42
+  str r2, 0, r1
+  ldr r0, 0(r1)
+}
+show(p; asm)
+\`\`\`
+
+---
+
+## User opcode overrides
+
+Only **literal bit patterns** are allowed for custom opcodes (same rule as riscv32). Generic tokens like \`R2b\` produce:
+
+\`segment token 'R2b' invalid for set 'arm-thumb'\`
+
+---
+
+## \`doc()\` and policy
+
+\`\`\`logts-play
+doc(inline.asm.sets)
+doc(.th)
+\`\`\`
+
+\`\`\`logts
+NotAllow inline.asm.set{arm-thumb}
+\`\`\`
+
+---
+
+## Related
+
+- [asm-set-riscv32.md](asm-set-riscv32.md) — 32-bit preset
+- [asm-composition.md](asm-composition.md) — combine Thumb blobs with \`use\`
+`,
+    'asm-set-generic.md': `# ASM set: generic (segment ISA)
+
+The **generic** asm set is the original LogTscript inline assembler model: you declare each opcode as fixed bit **segments** (\`0001 + R2b + A2b\`), and the assembler fills in register, address, and immediate fields from the program text.
+
+If you omit \`set:\` in an ISA header, **\`generic\` is assumed** — existing scripts keep working unchanged.
+
+See also: [asm.md](asm.md) (overview), [asm-composition.md](asm-composition.md), [asm-microcode.md](asm-microcode.md), [riscv32 preset](asm-set-riscv32.md), [arm-thumb preset](asm-set-arm-thumb.md).
+
+---
+
+## When to use generic
+
+| Use generic when… | Example |
+|-------------------|---------|
+| You design a custom 8/16/32-bit ISA for teaching or simulation | Mini CPU with \`NOP\`, \`LOAD\`, \`JMP\` |
+| You need segment tokens (\`R2b\`, \`A4b\`, \`S4b\`) | Signed branches, absolute addresses |
+| You want full control of every bit pattern | Every opcode line lists literals + fields |
+
+Use a **preset set** (\`riscv32\`, \`arm-thumb\`) when you want real-world mnemonics and fixed encodings without writing segment patterns — see the linked preset pages.
+
+---
+
+## Declaration
+
+\`\`\`logts
+inline [asm] .myisa:
+  set: generic
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+\`\`\`
+
+\`set: generic\` is optional (same body without that line behaves identically).
+
+---
+
+## Segment tokens (opcode table)
+
+| Token | Width | Program syntax | Meaning |
+|-------|-------|----------------|---------|
+| \`0000\`, \`1010\` | fixed | (in pattern only) | Literal bits in the instruction |
+| \`4b\` | 4 | decimal immediate | Unsigned immediate, fills 4 bits |
+| \`S4b\` | 4 | \`\\ -3\` or label | Signed offset or immediate (two's complement) |
+| \`R2b\` | 2 | \`R0\` … \`R3\` | Register index encoded in 2 bits |
+| \`A4b\` | 4 | \`A0\` … or \`loop:\` | Absolute address (label → instruction index) |
+
+All opcodes in one ISA must encode to the same **word width** (sum of segment widths).
+
+---
+
+## Opcode reference (typical 8-bit teaching ISA)
+
+| Mnemonic | Pattern | What it does (conceptually) |
+|----------|---------|----------------------------|
+| \`NOP\` | \`0000 + 4b\` | No operation; padding / timing slot |
+| \`LOAD\` | \`0001 + R2b + A2b\` | Load from memory address \`A\` into register \`R\` |
+| \`STORE\` | \`0010 + R2b + A2b\` | Store register \`R\` to address \`A\` |
+| \`ADD\` | \`0011 + R2b + R2b\` | Add two registers (destination + source encoding depends on your CPU) |
+| \`JMP\` | \`0101 + A4b\` | Jump to absolute address |
+| \`BEQ\` | \`0100 + S4b\` | Branch if equal — signed offset from PC+1 |
+
+Your CPU component interprets these bits; the assembler only **packs** them into a wire blob.
+
+---
+
+## Runnable — first program
+
+\`\`\`logts-play
+inline [asm] .myisa:
+  set: generic
+  NOP   : 0000 + 4b
+  LOAD  : 0001 + R2b + A2b
+  JMP   : 0101 + A4b
+  BEQ   : 0100 + S4b
+  :
+
+8wire nop = .myisa { NOP }
+8wire load = .myisa { LOAD R1 A3 }
+show(nop)
+show(load)
+show(load; asm)
+\`\`\`
+
+Arguments are separated by spaces (commas are optional). Wire width must match the assembled blob unless you use \`:=\` / \`=:\` padding — see [asm.md](asm.md#wire-width-and-assignment-operators).
+
+---
+
+## Labels and branches
+
+\`\`\`logts-play
+inline [asm] .myisa:
+  NOP   : 0000 + 4b
+  BEQ   : 0100 + S4b
+  :
+
+16wire prog = .myisa {
+  loop:
+  NOP
+  BEQ loop
+}
+show(prog; asm)
+\`\`\`
+
+| Field | Resolves to |
+|-------|-------------|
+| \`A4b\` | Absolute instruction index of label |
+| \`S4b\` | \`target - (currentAddr + 1)\` as signed offset |
+
+---
+
+## \`doc()\` and \`show()\`
+
+| Call | Result |
+|------|--------|
+| \`doc(inline.asm)\` | Template syntax for any asm ISA |
+| \`doc(inline.asm.sets)\` | Lists all preset sets (\`generic\`, \`riscv32\`, \`arm-thumb\`) |
+| \`doc(.myisa)\` | Opcodes and segment patterns for your instance |
+| \`show(wire; asm)\` | Bits + disassembly when wire has asm metadata |
+| \`show(.myisa:decode(wire))\` | Disassemble using a specific ISA |
+
+---
+
+## Related
+
+- [asm.md](asm.md) — naming, mem load, decode, errors
+- [asm-composition.md](asm-composition.md) — \`use\`, \`repeat\`, \`align\`, \`base:\`
+- [asm-microcode.md](asm-microcode.md) — \`{ micro }\` blocks on generic opcodes
+- [assignment-operators.md](assignment-operators.md) — \`=\`, \`:=\`, \`=:\`
+`,
+    'asm-set-riscv32.md': `# ASM set: riscv32 (RV32I subset)
+
+The **riscv32** preset provides a fixed **32-bit** RISC-V RV32I encoding for common mnemonics. You declare an almost-empty ISA with \`set: riscv32\` and write programs using standard RISC-V assembly syntax (\`addi x1, x0, 5\`).
+
+Encoding and disassembly are built in; you do **not** write \`+ R2b\` segment lines unless you intentionally override an opcode with literal bits.
+
+See also: [asm.md](asm.md), [asm-composition.md](asm-composition.md#riscv32-preset), [generic set](asm-set-generic.md), [arm-thumb set](asm-set-arm-thumb.md).
+
+---
+
+## Declaration
+
+\`\`\`logts
+inline [asm] .rv:
+  set: riscv32
+  :
+\`\`\`
+
+The closing \`:\` ends the header. No opcode lines are required — the preset supplies them.
+
+Optional: add user opcodes with **literal-only** patterns (no \`R2b\` / \`A2b\` tokens). Segment tokens from the generic set are rejected on riscv32.
+
+---
+
+## Registers
+
+| Syntax | Meaning |
+|--------|---------|
+| \`x0\` … \`x31\` | General-purpose register by number |
+| \`zero\`, \`ra\`, \`sp\`, \`gp\`, \`tp\`, \`t0\`–\`t6\`, \`s0\`–\`s11\`, \`a0\`–\`a7\` | ABI aliases (\`x0\` = \`zero\`, \`sp\` = \`x2\`, …) |
+
+---
+
+## Preset opcode table
+
+| Mnemonic | Typical use |
+|----------|-------------|
+| \`addi rd, rs1, imm\` | Add signed 12-bit immediate to \`rs1\`, write \`rd\` |
+| \`add rd, rs1, rs2\` | \`rd = rs1 + rs2\` |
+| \`sub rd, rs1, rs2\` | \`rd = rs1 - rs2\` |
+| \`lui rd, imm\` | Load upper 20 bits of immediate into \`rd\` |
+| \`lw rd, imm(rs1)\` | Load word from \`rs1 + imm\` |
+| \`sw rs2, imm(rs1)\` | Store \`rs2\` to \`rs1 + imm\` |
+| \`beq rs1, rs2, target\` | Branch if \`rs1 == rs2\` |
+| \`bne rs1, rs2, target\` | Branch if \`rs1 != rs2\` |
+| \`jal rd, target\` | Jump and link |
+| \`jalr rd, rs1, imm\` | Jump and link register |
+| \`nop\` | Pseudo-op (addi x0, x0, 0) |
+
+---
+
+## Runnable — add immediate
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+32wire p = .rv { addi x1, x0, 5 }
+show(p)
+show(p; asm)
+show(.rv:decode(p))
+\`\`\`
+
+One instruction → **32wire** (strict \`=\`). For wider ROM slots use \`32wire:=\` / \`32wire=:\` padding — see [asm.md](asm.md).
+
+---
+
+## Runnable — small sequence
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+96wire prog = .rv {
+  addi x1, x0, 5
+  addi x2, x0, 3
+  add x3, x1, x2
+}
+show(prog; asm)
+\`\`\`
+
+---
+
+## Memory operands
+
+Use \`offset(rs1)\` form (commas optional in LogTscript):
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+64wire p = .rv {
+  addi x2, x0, 100
+  sw x1, 0(x2)
+  lw x3, 0(x2)
+}
+show(p; asm)
+\`\`\`
+
+---
+
+## Branches and labels
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+128wire p = .rv {
+  addi x1, x0, 0
+loop:
+  addi x1, x1, 1
+  addi x2, x0, 10
+  bne x1, x2, loop
+}
+show(p; asm)
+\`\`\`
+
+Branch offsets are resolved at assemble time (same pass-1 label collection as generic asm).
+
+---
+
+## Composition with \`use\`
+
+Works like generic asm — referenced wire must use the same (or compatible) word width:
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+32wire boot = .rv { addi x1, x0, 1 }
+64wire app = .rv {
+  use boot
+  addi x2, x0, 2
+}
+show(app; asm)
+\`\`\`
+
+Details: [asm-composition.md](asm-composition.md#riscv32-preset).
+
+---
+
+## CPU bridge
+
+Bind a riscv32 ISA to \`comp [cpu]\` with **\`isa: .rv\`** (not \`set:\` on the CPU). The CPU reads \`asmSetId\` from the referenced inline instance.
+
+---
+
+## Policy
+
+Restrict which presets are allowed:
+
+\`\`\`logts
+NotAllow inline.asm.set{riscv32}
+\`\`\`
+
+See [allow-notallow.md](allow-notallow.md).
+
+---
+
+## \`doc()\`
+
+\`\`\`logts-play
+doc(inline.asm.sets)
+doc(.rv)
+\`\`\`
+
+After declaring \`.rv\`, \`doc(.rv)\` shows \`set: riscv32\` and the preset opcode list.
+
+---
+
+## Errors
+
+| Message | Cause |
+|---------|--------|
+| \`riscv32: unknown register 'eax'\` | Use \`x0\`–\`x31\` or aliases |
+| \`segment token 'R2b' invalid for set 'riscv32'\` | User opcode used generic segment token |
+| \`Expected 32 bits, got …\` | Wire width must match 32×instruction count (or use \`:=\` / \`=:\`) |
+
+---
+
+## Related
+
+- [asm-set-generic.md](asm-set-generic.md) — segment ISA from scratch
+- [asm-microcode.md](asm-microcode.md) — micro \`{ }\` override on a preset opcode (advanced)
+`,
     'asm.md': `# ASM
 
 Define a custom ISA with \`inline [asm]\`, then assemble programs to a **binary blob** with \`.myisa { ... }\` anywhere an expression is allowed.
@@ -1253,6 +1781,27 @@ Memory (\`comp [mem]\`) receives the assembled blob unchanged.
 There is **no panel UI** in v1 — logic only.
 
 For **composition** (\`use\`, \`repeat\`, \`align\`, \`base:\`, external labels), see [asm-composition.md](asm-composition.md). Wires assembled from programs carry metadata (\`asmModuleId\`). Use **\`show(wire; asm)\`** to append a decode block when metadata exists, or **\`show(.myisa:decode(wire))\`** for explicit disassembly.
+
+For **preset ISAs** (RISC-V, ARM Thumb) use \`set:\` in the ISA header — see [asm-set-generic.md](asm-set-generic.md), [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md). Default (no \`set:\`) is **generic** segment syntax below.
+
+---
+
+## Asm sets (\`set:\`)
+
+| Set | Word size | Doc |
+|-----|-----------|-----|
+| \`generic\` (default) | You define (e.g. 8, 16, 32) | [asm-set-generic.md](asm-set-generic.md) |
+| \`riscv32\` | 32-bit RV32I subset | [asm-set-riscv32.md](asm-set-riscv32.md) |
+| \`arm-thumb\` | 16-bit Thumb subset | [asm-set-arm-thumb.md](asm-set-arm-thumb.md) |
+
+\`\`\`logts
+inline [asm] .rv:
+  set: riscv32
+  :
+32wire p = .rv { addi x1, x0, 1 }
+\`\`\`
+
+\`doc(inline.asm.sets)\` lists all presets. CPU components bind via \`isa: .rv\` (inherits the set from that inline instance).
 
 ---
 
@@ -1563,6 +2112,7 @@ doc(.myisa)
 |------|--------|
 | \`doc(inline)\` | Lists all inline instances (asm, lut, protocol, …) |
 | \`doc(inline.asm)\` | ISA declaration template |
+| \`doc(inline.asm.sets)\` | Preset sets (\`generic\`, \`riscv32\`, \`arm-thumb\`) — [asm-set-generic.md](asm-set-generic.md) |
 | \`doc(.myisa)\` | Opcode layout for that asm instance |
 
 ---
@@ -1584,6 +2134,9 @@ Assembler errors include the source line and \`^^^\` under the problematic token
 
 ## Related
 
+- [asm-set-generic.md](asm-set-generic.md) — default segment ISA (\`set: generic\`)
+- [asm-set-riscv32.md](asm-set-riscv32.md) — RV32I preset
+- [asm-set-arm-thumb.md](asm-set-arm-thumb.md) — 16-bit Thumb preset
 - [asm-composition.md](asm-composition.md) — \`use\`, \`repeat\`, \`align\`, \`base:\`, external labels, multi-ISA
 - [asm-microcode.md](asm-microcode.md) — \`consts\`, \`macros\`, per-opcode \`{ micro }\`, \`READ\`/\`WRITE\`, \`doc(.cpuisa)\`
 - [mem.md](mem.md) — store assembled blob

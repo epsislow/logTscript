@@ -8,6 +8,27 @@ There is **no panel UI** in v1 — logic only.
 
 For **composition** (`use`, `repeat`, `align`, `base:`, external labels), see [asm-composition.md](asm-composition.md). Wires assembled from programs carry metadata (`asmModuleId`). Use **`show(wire; asm)`** to append a decode block when metadata exists, or **`show(.myisa:decode(wire))`** for explicit disassembly.
 
+For **preset ISAs** (RISC-V, ARM Thumb) use `set:` in the ISA header — see [asm-set-generic.md](asm-set-generic.md), [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md). Default (no `set:`) is **generic** segment syntax below.
+
+---
+
+## Asm sets (`set:`)
+
+| Set | Word size | Doc |
+|-----|-----------|-----|
+| `generic` (default) | You define (e.g. 8, 16, 32) | [asm-set-generic.md](asm-set-generic.md) |
+| `riscv32` | 32-bit RV32I subset | [asm-set-riscv32.md](asm-set-riscv32.md) |
+| `arm-thumb` | 16-bit Thumb subset | [asm-set-arm-thumb.md](asm-set-arm-thumb.md) |
+
+```logts
+inline [asm] .rv:
+  set: riscv32
+  :
+32wire p = .rv { addi x1, x0, 1 }
+```
+
+`doc(inline.asm.sets)` lists all presets. CPU components bind via `isa: .rv` (inherits the set from that inline instance).
+
 ---
 
 ## Naming rules
@@ -317,6 +338,7 @@ doc(.myisa)
 |------|--------|
 | `doc(inline)` | Lists all inline instances (asm, lut, protocol, …) |
 | `doc(inline.asm)` | ISA declaration template |
+| `doc(inline.asm.sets)` | Preset sets (`generic`, `riscv32`, `arm-thumb`) — [asm-set-generic.md](asm-set-generic.md) |
 | `doc(.myisa)` | Opcode layout for that asm instance |
 
 ---
@@ -338,6 +360,9 @@ Assembler errors include the source line and `^^^` under the problematic token w
 
 ## Related
 
+- [asm-set-generic.md](asm-set-generic.md) — default segment ISA (`set: generic`)
+- [asm-set-riscv32.md](asm-set-riscv32.md) — RV32I preset
+- [asm-set-arm-thumb.md](asm-set-arm-thumb.md) — 16-bit Thumb preset
 - [asm-composition.md](asm-composition.md) — `use`, `repeat`, `align`, `base:`, external labels, multi-ISA
 - [asm-microcode.md](asm-microcode.md) — `consts`, `macros`, per-opcode `{ micro }`, `READ`/`WRITE`, `doc(.cpuisa)`
 - [mem.md](mem.md) — store assembled blob

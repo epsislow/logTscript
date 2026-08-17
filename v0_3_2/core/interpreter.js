@@ -1384,7 +1384,13 @@ class Interpreter {
       }
       throw Error(`Inline instance '${isaRef}' is not an asm ISA`);
     }
-    const isa = { opcodes: inst.opcodes, wordWidth: inst.wordWidth, opcodeOrder: inst.opcodeOrder };
+    const isa = {
+      opcodes: inst.opcodes,
+      wordWidth: inst.wordWidth,
+      opcodeOrder: inst.opcodeOrder,
+      asmSetId: inst.asmSetId,
+      asmSet: inst.asmSet,
+    };
     const opts = {};
     if (memAttributes) {
       if (memAttributes.depth !== undefined) opts.depth = parseInt(memAttributes.depth, 10);
@@ -1685,7 +1691,13 @@ class Interpreter {
       ? disassembleProgram
       : (typeof disassembleInstruction === 'function' ? disassembleInstruction : null);
     if (!disFn) throw new Error('ASM disassembler is not loaded');
-    const isa = { opcodes: inst.opcodes, wordWidth: inst.wordWidth, opcodeOrder: inst.opcodeOrder };
+    const isa = {
+      opcodes: inst.opcodes,
+      wordWidth: inst.wordWidth,
+      opcodeOrder: inst.opcodeOrder,
+      asmSetId: inst.asmSetId,
+      asmSet: inst.asmSet,
+    };
     const text = disFn(isa, bits);
     return { value: text, isText: true, varName: `${inst.name}:decode` };
   }
@@ -1874,18 +1886,32 @@ class Interpreter {
     if (inline.kind === 'asm') {
       const parseIsaFn = typeof parseIsaBody === 'function' ? parseIsaBody : null;
       if (!parseIsaFn) throw Error('ASM assembler is not loaded');
-      const isa = parseIsaFn(inline.bodyRaw);
-      this.inlineInstances.set(inline.name, {
-        kind: inline.kind,
-        name: inline.name,
-        opcodes: isa.opcodes,
-        wordWidth: isa.wordWidth,
-        opcodeOrder: isa.opcodeOrder,
-        consts: isa.consts || {},
-        macros: isa.macros || {},
-        hasAnyMicro: !!isa.hasAnyMicro,
-        bodyRaw: inline.bodyRaw,
-      });
+      try {
+        const isa = parseIsaFn(inline.bodyRaw);
+        if (isa.asmSetId && this.usagePolicy) {
+          const setChk = this.usagePolicy.isModuleAllowed('inline.asm.set', isa.asmSetId);
+          if (!setChk.allowed) {
+            const pol = setChk.reason === 'NotAllow' ? 'NotAllow policy' : 'Allow policy';
+            throw Error(`asm set '${isa.asmSetId}' is not allowed (${pol})`);
+          }
+        }
+        this.inlineInstances.set(inline.name, {
+          kind: inline.kind,
+          name: inline.name,
+          opcodes: isa.opcodes,
+          wordWidth: isa.wordWidth,
+          opcodeOrder: isa.opcodeOrder,
+          consts: isa.consts || {},
+          macros: isa.macros || {},
+          hasAnyMicro: !!isa.hasAnyMicro,
+          asmSetId: isa.asmSetId || 'generic',
+          asmSetLabel: isa.asmSet && isa.asmSet.label ? isa.asmSet.label : null,
+          asmSet: isa.asmSet || null,
+          bodyRaw: inline.bodyRaw,
+        });
+      } catch (e) {
+        this.reportRuntimeError(e);
+      }
       return;
     }
     if (inline.kind === 'lut') {
@@ -18212,6 +18238,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     }
     if (kindName === 'lut' && LutCtor && LutCtor.formatInlineTypeDoc) {
       return LutCtor.formatInlineTypeDoc();
+    }
+    if (kindName === 'asm.sets' && typeof formatAsmSetsDoc === 'function') {
+      return formatAsmSetsDoc();
     }
     if (kindName === 'asm' && typeof formatAsmTypeDoc === 'function') {
       return formatAsmTypeDoc(kindName, null);

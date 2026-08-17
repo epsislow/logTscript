@@ -177,6 +177,10 @@ function readLogicalLine(rawSource, pos) {
   return { line, pos: nextPos, done: false };
 }
 
+function parseIsaHeader(rawSource) {
+  return { asmSetId: 'generic' };
+}
+
 function parseIsaBody(rawSource) {
   const consts = {};
   const macros = {};
@@ -184,6 +188,7 @@ function parseIsaBody(rawSource) {
   const opcodeOrder = [];
   let wordWidth = null;
   let hasAnyMicro = false;
+  let asmSetId = 'generic';
 
   let pos = 0;
   while (pos < rawSource.length) {
@@ -196,6 +201,14 @@ function parseIsaBody(rawSource) {
     let nextPos = pos + (lineEnd >= 0 ? lineEnd + 1 : rest.length);
 
     if (!line || line === ':') {
+      pos = nextPos;
+      continue;
+    }
+
+    if (/^set\s*:/i.test(line)) {
+      const val = line.replace(/^set\s*:/i, '').trim();
+      if (!val) throw new Error('set: requires an asm set id (e.g. generic, riscv32)');
+      asmSetId = val;
       pos = nextPos;
       continue;
     }
@@ -239,17 +252,29 @@ function parseIsaBody(rawSource) {
       }
     }
 
-    if (!patternLine) throw new Error(`ISA opcode '${mnemonic}' has no bit segments`);
+    let segments = null;
+    let width = null;
+    let microOnlyOverride = false;
 
-    const segments = parseIsaPatternLine(patternLine);
-    if (!segments) throw new Error(`ISA opcode '${mnemonic}' has no bit segments`);
-    const width = segments.reduce((s, seg) => s + segmentWidth(seg), 0);
-    if (wordWidth === null) wordWidth = width;
-    else if (wordWidth !== width) {
-      throw new Error(`ISA opcode '${mnemonic}' encodes to ${width} bits but wordWidth is ${wordWidth}`);
+    if (!patternLine) {
+      pos = skipWsComments(rawSource, nextPos);
+      if (pos < rawSource.length && rawSource[pos] === '{') {
+        microOnlyOverride = true;
+        patternLine = '(preset encode)';
+      } else {
+        throw new Error(`ISA opcode '${mnemonic}' has no bit segments`);
+      }
+    } else {
+      segments = parseIsaPatternLine(patternLine);
+      if (!segments) throw new Error(`ISA opcode '${mnemonic}' has no bit segments`);
+      width = segments.reduce((s, seg) => s + segmentWidth(seg), 0);
+      if (wordWidth === null) wordWidth = width;
+      else if (wordWidth !== width) {
+        throw new Error(`ISA opcode '${mnemonic}' encodes to ${width} bits but wordWidth is ${wordWidth}`);
+      }
+      pos = skipWsComments(rawSource, nextPos);
     }
 
-    pos = skipWsComments(rawSource, nextPos);
     let microRaw = null;
     let microProgram = null;
     let pcEffect = legacyPcEffect(mnemonic);
@@ -266,22 +291,41 @@ function parseIsaBody(rawSource) {
     }
 
     opcodes[mnemonic] = {
-      segments,
+      segments: microOnlyOverride ? null : segments,
       wordWidth: width,
       sourceLine: patternLine,
       microRaw,
       microProgram,
       pcEffect,
       execution: microProgram ? 'micro' : 'legacy',
+      microOnlyOverride,
     };
     opcodeOrder.push(mnemonic);
   }
 
+  const userIsa = {
+    opcodes,
+    wordWidth,
+    opcodeOrder,
+    consts,
+    macros,
+    hasAnyMicro,
+    asmSetId,
+  };
+
+  if (typeof mergeIsaWithSet === 'function') {
+    return mergeIsaWithSet(userIsa, asmSetId);
+  }
   if (wordWidth === null) throw new Error('ISA definition has no opcodes');
-  return { opcodes, wordWidth, opcodeOrder, consts, macros, hasAnyMicro };
+  return userIsa;
 }
 
 function decodeMnemonicFromBits(isa, bitsStr) {
+  const asmSet = isa && isa.asmSet;
+  if (asmSet && typeof asmSet.decodeMnemonicFromBits === 'function') {
+    const decoded = asmSet.decodeMnemonicFromBits(isa, bitsStr);
+    if (decoded) return decoded;
+  }
   const bits = String(bitsStr);
   for (const mn of isa.opcodeOrder || Object.keys(isa.opcodes)) {
     const def = isa.opcodes[mn];
@@ -716,7 +760,7 @@ function resolveArgValue(seg, arg, ctx) {
   throw new Error(`Unknown segment kind for ${mnemonic}`);
 }
 
-function encodeInstruction(isa, entry, labels, encodeCtx) {
+function encodeInstructionGeneric(isa, entry, labels, encodeCtx) {
   const def = isa.opcodes[entry.mnemonic];
   if (!def) throw new Error(`Unknown instruction '${entry.mnemonic}' at line ${entry.lineNo}`);
 
@@ -764,6 +808,21 @@ function encodeInstruction(isa, entry, labels, encodeCtx) {
     throw new Error(`Instruction '${entry.mnemonic}' encodes to ${bits.length} bits but wordWidth is ${isa.wordWidth}`);
   }
   return bits;
+}
+
+function encodeInstruction(isa, entry, labels, encodeCtx) {
+  const def = isa.opcodes[entry.mnemonic];
+  if (!def) throw new Error(`Unknown instruction '${entry.mnemonic}' at line ${entry.lineNo}`);
+  const asmSet = isa && isa.asmSet;
+  if (def.presetBuiltin || !def.segments || !def.segments.length) {
+    if (asmSet && typeof asmSet.encodeInstruction === 'function') {
+      return asmSet.encodeInstruction(isa, entry, labels, encodeCtx);
+    }
+    if (!def.segments || !def.segments.length) {
+      throw new Error(`Instruction '${entry.mnemonic}' has no encoding`);
+    }
+  }
+  return encodeInstructionGeneric(isa, entry, labels, encodeCtx);
 }
 
 function patchExternalLabels(words, instrEntries, labels, isa, pendingExternals) {
@@ -891,13 +950,21 @@ function assembleProgramModule(isa, isaRef, programRaw, ctx) {
       });
       segmentMeta.push({
         isaRef: seg.isaRef,
+        asmSetId: seg.isa.asmSetId || null,
+        wordWidth: seg.isa.wordWidth,
         instrCount: mod.instructionCount,
         blobOffset,
       });
       blobOffset += mod.blob.length;
       allWords.push(...mod.words);
       for (const ins of mod.instructions) {
-        allInstructions.push({ ...ins, index: allInstructions.length, isa: seg.isa });
+        allInstructions.push({
+          ...ins,
+          index: allInstructions.length,
+          isa: seg.isa,
+          asmSetId: seg.isa.asmSetId || ins.asmSetId,
+          wordWidth: seg.isa.wordWidth || ins.wordWidth,
+        });
       }
       allExpanded.push(...seg.flatEntries);
       allPending.push(...pending);
@@ -916,6 +983,7 @@ function assembleProgramModule(isa, isaRef, programRaw, ctx) {
       blob: allWords.join(''),
       words: allWords,
       wordWidth: isa.wordWidth,
+      asmSetId: isa.asmSetId || null,
       instructionCount: allWords.length,
       labels: globalLabels,
       instructions: allInstructions,
@@ -952,15 +1020,19 @@ function assembleProgramModule(isa, isaRef, programRaw, ctx) {
   return module;
 }
 
-function buildInstructionIndex(words, instrEntries, isa, isaRef) {
+function buildInstructionIndex(words, instrEntries, isa, isaRef, meta) {
   const instructions = [];
   let wi = 0;
+  const asmSetId = meta && meta.asmSetId != null ? meta.asmSetId : (isa && isa.asmSetId);
+  const segWordWidth = meta && meta.wordWidth != null ? meta.wordWidth : (isa && isa.wordWidth);
   for (const e of instrEntries) {
     if (e.type !== 'instr') continue;
     const argsText = e.args.join(' ');
     instructions.push({
       index: wi,
       isaRef: isaRef || null,
+      asmSetId: asmSetId || null,
+      wordWidth: segWordWidth || null,
       mnemonic: e.mnemonic,
       args: argsText,
       argsList: e.args.slice(),
@@ -992,17 +1064,27 @@ function assembleFromEntries(isa, isaRef, flatEntries, options = {}) {
   }
 
   const blob = words.join('');
-  const instructions = buildInstructionIndex(words, flatEntries, isa, isaRef);
+  const instructions = buildInstructionIndex(words, flatEntries, isa, isaRef, {
+    asmSetId: isa.asmSetId,
+    wordWidth: isa.wordWidth,
+  });
 
   return {
     blob,
     words,
     wordWidth: isa.wordWidth,
+    asmSetId: isa.asmSetId || null,
     instructionCount: words.length,
     labels,
     instructions,
     expandedEntries: flatEntries.filter(e => e.type === 'label' || e.type === 'instr'),
-    segments: [{ isaRef: isaRef || null, instrCount: words.length, blobOffset: 0 }],
+    segments: [{
+      isaRef: isaRef || null,
+      asmSetId: isa.asmSetId || null,
+      wordWidth: isa.wordWidth,
+      instrCount: words.length,
+      blobOffset: 0,
+    }],
     basePreferred: startAddr,
     externRefs: pendingExternals.map(r => ({ name: r.name, fromIndex: r.instrAddr })),
   };
@@ -1053,6 +1135,15 @@ function formatModuleDecode(module) {
 }
 
 function disassembleInstruction(isa, bitsStr) {
+  const asmSet = isa && isa.asmSet;
+  if (asmSet && typeof asmSet.disassembleInstruction === 'function') {
+    try {
+      return asmSet.disassembleInstruction(isa, bitsStr);
+    } catch (e) {
+      const msg = (e && e.message) ? e.message : String(e);
+      if (!msg.includes('no matching')) throw e;
+    }
+  }
   const bits = String(bitsStr);
   for (const mn of isa.opcodeOrder || Object.keys(isa.opcodes)) {
     const def = isa.opcodes[mn];
@@ -1102,9 +1193,9 @@ function disassembleInstruction(isa, bitsStr) {
   throw new Error('Cannot disassemble instruction — no matching opcode');
 }
 
-function disassembleProgram(isa, bitsStr) {
+function disassembleProgram(isa, bitsStr, options) {
   const bits = String(bitsStr);
-  const w = isa.wordWidth;
+  const w = (options && options.wordWidth) || isa.wordWidth;
   if (!w || w < 1) throw new Error('Invalid ISA wordWidth');
   if (bits.length % w !== 0) {
     throw new Error(
@@ -1121,9 +1212,31 @@ function disassembleProgram(isa, bitsStr) {
   return lines.join('\n');
 }
 
+function formatAsmSetsDoc() {
+  const lines = [];
+  lines.push('inline [asm] asm sets (presets)');
+  lines.push('');
+  if (typeof listAsmSetProfiles !== 'function') {
+    lines.push('  (registry not loaded)');
+    return lines;
+  }
+  for (const p of listAsmSetProfiles()) {
+    lines.push(`  set: ${p.id}`);
+    lines.push(`    ${p.label}`);
+    lines.push(`    wordWidth: ${p.wordWidth != null ? p.wordWidth : 'user-defined'}`);
+    lines.push(`    encoding: ${p.encoding || 'fixed'}`);
+    if (p.opcodeOrder && p.opcodeOrder.length) {
+      lines.push(`    opcodes: ${p.opcodeOrder.join(', ')}`);
+    }
+    lines.push('');
+  }
+  return lines;
+}
+
 function formatInstanceDoc(alias, inst) {
   const lines = [];
   lines.push(`${alias} (inline [${inst.kind || inst.type || 'asm'}])`);
+  if (inst.asmSetId) lines.push(`  set: ${inst.asmSetId}`);
   lines.push('  decode:');
   lines.push('    disassembler only');
   lines.push('  valid contexts:');
@@ -1164,6 +1277,7 @@ function formatInstanceDoc(alias, inst) {
 function formatAsmTypeDoc(typeName, templateIsa) {
   const lines = [];
   lines.push(`inline [${typeName}] .name:`);
+  lines.push('  set: generic | riscv32 | arm-thumb');
   lines.push('  consts:{ NAME = ^addr | literal }');
   lines.push('  macros:{ Name param:{ micro-ops } }');
   lines.push('  MNEMONIC : opcode + field + field');
@@ -1182,7 +1296,9 @@ function formatAsmTypeDoc(typeName, templateIsa) {
 
 const asmAssemblerExports = {
   parseFieldToken,
+  parseIsaHeader,
   parseIsaBody,
+  encodeInstructionGeneric,
   parseProgramLines,
   parseProgramBodyRaw,
   assembleProgram,
@@ -1193,6 +1309,7 @@ const asmAssemblerExports = {
   formatAsmError,
   formatInstanceDoc,
   formatAsmTypeDoc,
+  formatAsmSetsDoc,
   packSigned,
   packUnsigned,
   expandProgramEntries,

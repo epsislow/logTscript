@@ -225,6 +225,34 @@ See [cpu.md](cpu.md#microcode-mmap-cpummap) and [mmap.md](mmap.md).
 
 ---
 
+## Preset sets (`riscv32`, `arm-thumb`)
+
+Preset opcodes ship **without** micro programs. On `comp [cpu]`, they use the CPU's native stepping for that set (when wired) or act as encode/decode-only in wire blobs.
+
+You may attach a **`{ micro }` block** to a preset mnemonic in your ISA to override execution (same as generic):
+
+```logts-play
+inline [asm] .rv:
+  set: riscv32
+  consts:{
+    PC = ^02
+    R1 = ^21
+  }
+  FOO:
+  {
+    PC < PC
+  }
+  :
+
+32wire p = .rv { addi x1, x0, 1 }
+```
+
+User opcode bodies that use generic segment tokens (`R2b`) on a preset set are rejected at ISA parse time. Literal-only overrides are allowed.
+
+See [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md), and [asm-set-generic.md](asm-set-generic.md) for segment syntax on **`set: generic`**.
+
+---
+
 ## Errors
 
 | Situation | Message (example) |

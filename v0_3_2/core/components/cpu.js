@@ -427,6 +427,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       if (isaInst) {
         compInfo.isaConsts = isaInst.consts ? { ...isaInst.consts } : {};
         compInfo.isaMacros = isaInst.macros ? { ...isaInst.macros } : {};
+        compInfo.asmSetId = isaInst.asmSetId || 'generic';
       }
     }
     return compInfo;
@@ -440,6 +441,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     lines.push('');
     lines.push(`memory: ${mode}`);
     if (comp.isaRef) lines.push(`isa: ${comp.isaRef}`);
+    if (comp.asmSetId) lines.push(`asmSet: ${comp.asmSetId} (from isa)`);
     if (comp.progMemRef) lines.push(`prog = ${comp.progMemRef}`);
     else lines.push('prog: internal');
     if (comp.mmapRef) lines.push(`mmap = ${comp.mmapRef}`);

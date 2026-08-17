@@ -2802,25 +2802,19 @@ assignment() {
     // Consume first token (could be ID, KEYWORD like 'comp'/'pcb', MUX, REG, DEMUX)
     let name = this.c.value;
     this.c = this.t.get();
-    // Consume optional .type suffix (e.g. comp.7seg, pcb.bcd)
-    if (this.c.type === 'SYM' && this.c.value === '.') {
-      this.eat('SYM', '.');
-      name = name + '.' + this.c.value;
-      this.c = this.t.get();
-    } else if(name === '.' && this.c.type == 'ID') {
-      //console.log(name);
+    if (name === '.' && this.c.type === 'ID') {
       name = name + this.c.value;
       this.c = this.t.get();
     }
-    
-    if (this.c.type === 'SYM' && this.c.value === '.') {
+    while (this.c.type === 'SYM' && this.c.value === '.') {
       this.eat('SYM', '.');
       name = name + '.' + this.c.value;
       this.c = this.t.get();
-      
+    }
+    if (!name.startsWith('inline.') && name.split('.').length >= 3) {
       name = '.' + name.replaceAll('.', '_');
     }
-    
+
     this.eat('SYM', ')');
     return { doc: name };
   }
@@ -5830,7 +5824,50 @@ isBuiltinFunction(name) {
     return { compInvoke: invoke };
   }
 
+  _peekInlineAsmSetAfterId() {
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      let i = this.t.i;
+      const src = this.t.src;
+      while (i < src.length && /\s/.test(src[i])) i++;
+      if (src.substr(i, 3) !== 'asm') return false;
+      i += 3;
+      while (i < src.length && /\s/.test(src[i])) i++;
+      if (src[i] !== '.') return false;
+      i++;
+      while (i < src.length && /\s/.test(src[i])) i++;
+      if (src.substr(i, 3) !== 'set') return false;
+      i += 3;
+      while (i < src.length && /\s/.test(src[i])) i++;
+      return src[i] === '{';
+    }
+    let i = this.t.i;
+    const src = this.t.src;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (src[i] !== '.') return false;
+    i++;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (src.substr(i, 3) !== 'asm') return false;
+    i += 3;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (src[i] !== '.') return false;
+    i++;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (src.substr(i, 3) !== 'set') return false;
+    i += 3;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    return src[i] === '{';
+  }
+
   _peekModuleTypeAfterId() {
+    if (this.c.type === 'SYM' && this.c.value === '.') {
+      let i = this.t.i;
+      const src = this.t.src;
+      while (i < src.length && /\s/.test(src[i])) i++;
+      if (src.substr(i, 4) !== 'type') return false;
+      i += 4;
+      while (i < src.length && /\s/.test(src[i])) i++;
+      return src[i] === '{';
+    }
     let i = this.t.i;
     const src = this.t.src;
     while (i < src.length && /\s/.test(src[i])) i++;
@@ -5877,6 +5914,36 @@ isBuiltinFunction(name) {
     return types;
   }
 
+  _parsePolicyModuleIdEntry(id, moduleNames) {
+    if (id === 'inline') {
+      if (this._peekInlineAsmSetAfterId()) {
+        this.eat('SYM', '.');
+        this.eat('ID', 'asm');
+        this.eat('SYM', '.');
+        this.eat('ID', 'set');
+        const types = this._parseModuleTypeTokens('inline.asm.set');
+        return { kind: 'moduleType', moduleName: 'inline.asm.set', types };
+      }
+      if (this._peekModuleTypeAfterId()) {
+        this.eat('SYM', '.');
+        this.eat('ID', 'type');
+        const types = this._parseModuleTypeTokens(id);
+        return { kind: 'moduleType', moduleName: id, types };
+      }
+      return { kind: 'category', target: 'module', moduleName: id };
+    }
+    if (moduleNames.includes(id)) {
+      if (this._peekModuleTypeAfterId()) {
+        this.eat('SYM', '.');
+        this.eat('ID', 'type');
+        const types = this._parseModuleTypeTokens(id);
+        return { kind: 'moduleType', moduleName: id, types };
+      }
+      return { kind: 'category', target: 'module', moduleName: id };
+    }
+    return null;
+  }
+
   _parsePolicyEntries() {
     const entries = [];
     const builtinNames = typeof collectBuiltinNamesForPolicy === 'function'
@@ -5898,55 +5965,51 @@ isBuiltinFunction(name) {
         this.t.skip();
         continue;
       }
-      if (this.c.type === 'ID') {
+      if (this.c.type === 'ID' || (this.c.type === 'KEYWORD' && moduleNames.includes(this.c.value))) {
         const id = this.c.value;
         if (id === 'ALL' || id === 'NONE') {
-          this.eat('ID');
+          this.eat(this.c.type);
           entries.push({ kind: 'meta', value: id });
           this.t.skip();
           continue;
         }
         if (id === 'builtIn') {
-          this.eat('ID');
+          this.eat(this.c.type);
           entries.push({ kind: 'category', target: 'builtIn' });
           this.t.skip();
           continue;
         }
         if (id === 'func') {
-          this.eat('ID');
+          this.eat(this.c.type);
           entries.push({ kind: 'category', target: 'userFunc' });
           this.t.skip();
           continue;
         }
         if (id === 'def') {
-          this.eat('ID');
+          this.eat(this.c.type);
           entries.push({ kind: 'category', target: 'def' });
           this.t.skip();
           continue;
         }
-        if (moduleNames.includes(id)) {
-          this.eat('ID');
-          if (this._peekModuleTypeAfterId()) {
-            this.eat('SYM', '.');
-            this.eat('ID', 'type');
-            const types = this._parseModuleTypeTokens(id);
-            entries.push({ kind: 'moduleType', moduleName: id, types });
-          } else {
-            entries.push({ kind: 'category', target: 'module', moduleName: id });
-          }
+        if (id === 'inline' || moduleNames.includes(id)) {
+          this.eat(this.c.type);
+          const modEntry = this._parsePolicyModuleIdEntry(id, moduleNames);
+          if (modEntry) entries.push(modEntry);
           this.t.skip();
           continue;
         }
         if (builtinNames.has(id)) {
-          this.eat('ID');
+          this.eat(this.c.type);
           entries.push({ kind: 'builtin', name: id });
           this.t.skip();
           continue;
         }
-        this.eat('ID');
-        entries.push({ kind: 'userFunc', name: id });
-        this.t.skip();
-        continue;
+        if (this.c.type === 'ID') {
+          this.eat('ID');
+          entries.push({ kind: 'userFunc', name: id });
+          this.t.skip();
+          continue;
+        }
       }
       break;
     }
