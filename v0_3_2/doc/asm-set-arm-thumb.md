@@ -47,7 +47,7 @@ show(p)
 show(p; asm)
 ```
 
-Example encoding for `movs r1, 5`: `0010010100000001` (16 bits).
+Example encoding for `movs r1, 5`: `0010000100000101` (16 bits).
 
 ---
 

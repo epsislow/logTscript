@@ -1137,17 +1137,12 @@ function formatModuleDecode(module) {
 function disassembleInstruction(isa, bitsStr) {
   const asmSet = isa && isa.asmSet;
   if (asmSet && typeof asmSet.disassembleInstruction === 'function') {
-    try {
-      return asmSet.disassembleInstruction(isa, bitsStr);
-    } catch (e) {
-      const msg = (e && e.message) ? e.message : String(e);
-      if (!msg.includes('no matching')) throw e;
-    }
+    return asmSet.disassembleInstruction(isa, bitsStr);
   }
   const bits = String(bitsStr);
   for (const mn of isa.opcodeOrder || Object.keys(isa.opcodes)) {
     const def = isa.opcodes[mn];
-    if (!def) continue;
+    if (!def || !def.segments) continue;
     let pos = 0;
     const argTexts = [];
     let matched = true;

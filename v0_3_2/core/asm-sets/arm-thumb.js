@@ -62,7 +62,8 @@ function thumbEncodeBuiltin(mnemonic, args, labels, instrAddr) {
   if (mn === 'movs') {
     const rd = thumbParseReg(a[0]);
     const imm = thumbParseImm(a[1].replace(/^#/, ''), 8, false);
-    const word = 0x2000 | (imm << 8) | rd;
+    // Thumb-1 MOV immediate: bits[15:11]=00100, Rd[10:8], imm8[7:0]
+    const word = 0x2000 | ((rd & 7) << 8) | (imm & 0xff);
     return thumbBits(word, 16);
   }
   if (mn === 'adds') {
@@ -133,14 +134,15 @@ function thumbDisassemble(bits) {
   const rm = (word >> 6) & 7;
 
   if ((word & 0xf800) === 0x2000) {
-    const imm = (word >> 8) & 0xff;
-    return `movs r${rd}, #${imm}`;
+    const movRd = (word >> 8) & 7;
+    const imm = word & 0xff;
+    return `movs r${movRd}, #${imm}`;
   }
-  if ((word & 0xfc00) === 0x1800) {
-    return `adds r${rd}, r${rn}, r${rm}`;
-  }
-  if ((word & 0xfc00) === 0x1a00) {
+  if ((word & 0xfe00) === 0x1a00) {
     return `subs r${rd}, r${rn}, r${rm}`;
+  }
+  if ((word & 0xfe00) === 0x1800) {
+    return `adds r${rd}, r${rn}, r${rm}`;
   }
   if ((word & 0xf800) === 0xe000) {
     const off = ((word & 0x7ff) << 21) >> 21;

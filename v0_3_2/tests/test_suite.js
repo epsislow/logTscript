@@ -34347,7 +34347,7 @@ inline [asm] .rv:
 16wire p = .th { movs r1, 5 }`;
     const { interp } = session.run(src);
     h.assert('16 bits', String(session.getWire(interp, 'p').length), '16');
-    h.assert('movs pattern', session.getWire(interp, 'p'), '0010010100000001');
+    h.assert('movs pattern', session.getWire(interp, 'p'), '0010000100000101');
   });
 
   reg(3185, 'asm-set', 'doc(inline.asm.sets) lists presets', function(h, session) {
@@ -34382,6 +34382,33 @@ inline [asm] .rv:
   :
 doc(.rv)`);
     h.assert('set line', String(out.some(l => l.includes('set: riscv32'))), 'true');
+  });
+
+  reg(3189, 'asm-set', 'arm-thumb 4-instr program decode assembled and raw hex', function(h, session) {
+    const src = `inline [asm] .th:
+  set: arm-thumb
+  :
+
+64wire p = .th {
+  movs r0, 10
+  movs r1, 3
+  adds r2, r0, r1
+  subs r3, r0, r1
+}
+64wire p2 = ^200A 2103 1842 1A43
+show(.th:decode(p))
+show(.th:decode(p2))`;
+    const { interp, out } = session.run(src);
+    const w = session.getWire(interp, 'p');
+    const w2 = session.getWire(interp, 'p2');
+    h.assert('64 bits p', String(w.length), '64');
+    h.assert('p equals p2', w, w2);
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('decode movs r0', String(text.includes('movs r0')), 'true');
+    h.assert('decode movs r1', String(text.includes('movs r1')), 'true');
+    h.assert('decode adds r2', String(text.includes('adds r2')), 'true');
+    h.assert('decode subs r3', String(text.includes('subs r3')), 'true');
+    h.assert('no decode error', String(out.some(l => l.startsWith('Error:'))), 'false');
   });
 
   window.LogTScriptTestSuite.finalize();
