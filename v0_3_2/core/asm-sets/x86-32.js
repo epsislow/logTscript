@@ -1,4 +1,4 @@
-/* ================= ASM SET: x86-32 Intel subset (variable encoding, 1+x.1 + 1+x.1c-i) ================= */
+/* ================= ASM SET: x86-32 Intel subset (variable encoding, 1+x.1 + 1+x.1c-i/ii) ================= */
 
 const X86_REG = {
   eax: 0, ecx: 1, edx: 2, ebx: 3, esp: 4, ebp: 5, esi: 6, edi: 7,
@@ -13,6 +13,8 @@ const X86_MNEMONICS = [
   'PUSH', 'POP', 'JMP', 'JE', 'JNE',
   'JG', 'JGE', 'JL', 'JLE', 'JA', 'JAE', 'JB', 'JBE',
   'LOOP', 'LOOPE', 'LOOPZ', 'LOOPNE', 'LOOPNZ',
+  'MUL', 'IMUL', 'DIV', 'IDIV',
+  'ENTER', 'LEAVE',
   'CALL', 'RET', 'NOP', 'INT',
 ];
 
@@ -269,6 +271,28 @@ function x86EncodeTest(text, labels) {
   return x86EmitBytes([0xf7, x86ModRM(3, 0, r0), ...x86Disp32Bytes(imm)]);
 }
 
+function x86EncodeMulDiv(mnemonic, text, labels) {
+  const op = mnemonic.toLowerCase();
+  const sub = { mul: 4, imul: 5, div: 6, idiv: 7 }[op];
+  if (sub == null) throw new Error(`x86-32: unknown mul/div op '${mnemonic}'`);
+  const arg = text.replace(/^\S+\s+/, '').trim();
+  if (!arg) throw new Error(`${op} expects one operand (implicit eax)`);
+  if (/^\[/.test(arg)) {
+    const mem = x86ParseMem(arg, labels);
+    return x86EmitMemRef(0xf7, sub, mem);
+  }
+  const reg = x86ParseReg(arg);
+  return x86EmitBytes([0xf7, x86ModRM(3, sub, reg)]);
+}
+
+function x86EncodeEnter(text) {
+  const ops = x86SplitOperands(text.replace(/^enter\s+/i, ''));
+  if (!ops.length) throw new Error('enter expects at least one immediate (alloc bytes)');
+  const imm16 = x86ParseImm(ops[0]) & 0xffff;
+  const nest = ops.length > 1 ? (x86ParseImm(ops[1]) & 0xff) : 0;
+  return x86EmitBytes([0xc8, imm16 & 0xff, (imm16 >> 8) & 0xff, nest]);
+}
+
 function x86EncodeXchg(text) {
   const ops = x86SplitOperands(text.replace(/^xchg\s+/i, ''));
   if (ops.length !== 2) throw new Error('xchg expects two operands');
@@ -369,9 +393,19 @@ function x86EncodeBuiltin(mnemonic, args, labels, instrByteAddr, text) {
     if (args.length) throw new Error('ret takes no operands');
     return x86EmitBytes([0xc3]);
   }
+  if (mn === 'LEAVE') {
+    if (args.length) throw new Error('leave takes no operands');
+    return x86EmitBytes([0xc9]);
+  }
+  if (mn === 'ENTER') {
+    return x86EncodeEnter(line);
+  }
   if (mn === 'PUSH') {
-    if (args.length !== 1) throw new Error('push expects one register');
-    return x86EmitBytes([0x50 + x86ParseReg(args[0])]);
+    if (args.length !== 1) throw new Error('push expects one operand');
+    const a = String(args[0]).trim();
+    if (x86IsRegTok(a)) return x86EmitBytes([0x50 + x86ParseReg(a)]);
+    const imm = x86ParseImm(a);
+    return x86EmitBytes([0x68, ...x86Disp32Bytes(imm)]);
   }
   if (mn === 'POP') {
     if (args.length !== 1) throw new Error('pop expects one register');
@@ -392,6 +426,9 @@ function x86EncodeBuiltin(mnemonic, args, labels, instrByteAddr, text) {
   if (mn === 'NEG' || mn === 'NOT') return x86EncodeNegNot(mn, line, labels);
   if (mn === 'TEST') return x86EncodeTest(line, labels);
   if (mn === 'XCHG') return x86EncodeXchg(line);
+  if (mn === 'MUL' || mn === 'IMUL' || mn === 'DIV' || mn === 'IDIV') {
+    return x86EncodeMulDiv(mn, line, labels);
+  }
   if (mn === 'JMP' || X86_COND_SHORT[mn.toLowerCase()] != null
     || mn === 'LOOP' || mn === 'LOOPE' || mn === 'LOOPZ' || mn === 'LOOPNE' || mn === 'LOOPNZ') {
     return x86EncodeBranch(mn, line, labels, instrByteAddr);
@@ -457,6 +494,19 @@ function x86DisassembleAtOffset(bitsStr, byteOffset) {
 
   if (b0 === 0x90) return { mnemonic: 'NOP', text: 'nop', byteLength: 1, fields: {} };
   if (b0 === 0xc3) return { mnemonic: 'RET', text: 'ret', byteLength: 1, fields: {} };
+  if (b0 === 0xc9) return { mnemonic: 'LEAVE', text: 'leave', byteLength: 1, fields: {} };
+  if (b0 === 0xc8 && byteOffset + 4 <= bytes.length) {
+    const imm16 = bytes[byteOffset + 1] | (bytes[byteOffset + 2] << 8);
+    const nest = bytes[byteOffset + 3];
+    return {
+      mnemonic: 'ENTER', text: `enter ${imm16}, ${nest}`, byteLength: 4,
+      fields: { imm16, nest },
+    };
+  }
+  if (b0 === 0x68 && byteOffset + 5 <= bytes.length) {
+    const imm = x86ReadDisp32(bytes, byteOffset + 1) >>> 0;
+    return { mnemonic: 'PUSH', text: `push ${imm}`, byteLength: 5, fields: { imm } };
+  }
   if (b0 >= 0x50 && b0 <= 0x57) {
     return { mnemonic: 'PUSH', text: `push ${X86_REG_NAMES[b0 - 0x50]}`, byteLength: 1, fields: { reg: b0 - 0x50 } };
   }
@@ -559,6 +609,22 @@ function x86DisassembleAtOffset(bitsStr, byteOffset) {
     const mod = (modrm >> 6) & 3;
     const sub = (modrm >> 3) & 7;
     const rm = modrm & 7;
+    const mulOps = { 4: 'mul', 5: 'imul', 6: 'div', 7: 'idiv' };
+    if (mulOps[sub] != null) {
+      const op = mulOps[sub];
+      if (mod === 3) {
+        return {
+          mnemonic: op.toUpperCase(), text: `${op} ${X86_REG_NAMES[rm]}`, byteLength: 2,
+          fields: { op, rm, reg: rm },
+        };
+      }
+      const { mem, extra } = x86DecodeMemOperand(bytes, byteOffset, mod, rm);
+      const len = 2 + extra;
+      return {
+        mnemonic: op.toUpperCase(), text: `${op} ${x86MemText(mem)}`, byteLength: len,
+        fields: { op, mem },
+      };
+    }
     if (mod === 3) {
       if (sub === 0) {
         let len = 3;
@@ -700,6 +766,28 @@ function x86WriteMemFromReg(c, mem, regVal) {
   x86WriteMemByte(c, x86MemByteAddr(c, mem), regVal);
 }
 
+function x86ToSigned32(u) {
+  u >>>= 0;
+  return u >= 0x80000000 ? u - 0x100000000 : u;
+}
+
+function x86MarkDivByZero(c, divisor) {
+  if (divisor === 0) c.divByZero = 1;
+}
+
+function x86MulDivOperand(c, f) {
+  if (f.mem) return x86ReadMem32ZeroExt(c, f.mem);
+  const r = f.reg != null ? f.reg : f.rm;
+  if (r != null) return x86ReadReg(c, r);
+  return 0;
+}
+
+function x86SetFlagsIncDec(c, result) {
+  result = result >>> 0;
+  c.zf = result === 0 ? 1 : 0;
+  c.sf = (result & 0x80000000) ? 1 : 0;
+}
+
 function x86SetFlags(c, result, a, b, op) {
   result = result >>> 0;
   a = a >>> 0;
@@ -758,9 +846,14 @@ function x86ApplyBranch(c, pcIdx, dec, rel8, rel32) {
   return x86FindCodeIndex(c, curByte + dec.byteLength + off);
 }
 
-function x86ExecuteAlu(c, op, dst, src, flagsOp) {
+function x86ExecuteAlu(c, op, dst, src, flagsOp, srcIsReg) {
   let a = typeof dst === 'number' ? x86ReadReg(c, dst) : x86ReadMem32ZeroExt(c, dst);
-  const b = typeof src === 'number' ? (src >>> 0) : x86ReadMem32ZeroExt(c, src);
+  let b;
+  if (typeof src === 'number') {
+    b = srcIsReg ? x86ReadReg(c, src) : (src >>> 0);
+  } else {
+    b = x86ReadMem32ZeroExt(c, src);
+  }
   let res = a;
   if (op === 'add') res = (a + b) >>> 0;
   else if (op === 'sub' || op === 'cmp') res = (a - b) >>> 0;
@@ -773,6 +866,47 @@ function x86ExecuteAlu(c, op, dst, src, flagsOp) {
     else x86WriteMemFromReg(c, dst, res);
   }
   x86SetFlags(c, res, a, b, flagsOp || op);
+}
+
+function x86ExecuteMul(c, f, signed) {
+  const a = signed ? x86ToSigned32(x86ReadReg(c, 0)) : x86ReadReg(c, 0);
+  const bRaw = x86MulDivOperand(c, f);
+  const b = signed ? x86ToSigned32(bRaw) : bRaw;
+  const product = BigInt(a) * BigInt(b);
+  const lo = Number(product & BigInt(0xffffffff)) >>> 0;
+  const hi = Number((product >> BigInt(32)) & BigInt(0xffffffff)) >>> 0;
+  x86WriteReg(c, 0, lo);
+  x86WriteReg(c, 2, hi);
+}
+
+function x86ExecuteDiv(c, f, signed) {
+  const divisorRaw = x86MulDivOperand(c, f);
+  const divisor = divisorRaw >>> 0;
+  x86MarkDivByZero(c, divisor);
+  const eax = x86ReadReg(c, 0);
+  const edx = x86ReadReg(c, 2);
+  if (divisor === 0) {
+    x86WriteReg(c, 0, 0xffffffff);
+    x86WriteReg(c, 2, eax);
+    return;
+  }
+  let dividend;
+  if (signed) {
+    dividend = edx === 0
+      ? BigInt(x86ToSigned32(eax))
+      : (BigInt(x86ToSigned32(edx)) << BigInt(32)) | BigInt(eax >>> 0);
+    const d = BigInt(x86ToSigned32(divisor));
+    const q = Number(dividend / d) | 0;
+    const r = Number(dividend % d) | 0;
+    x86WriteReg(c, 0, q >>> 0);
+    x86WriteReg(c, 2, r >>> 0);
+    return;
+  }
+  dividend = (BigInt(edx) << BigInt(32)) | BigInt(eax);
+  const q = Number(dividend / BigInt(divisor)) >>> 0;
+  const r = Number(dividend % BigInt(divisor)) >>> 0;
+  x86WriteReg(c, 0, q);
+  x86WriteReg(c, 2, r);
 }
 
 function x86ExecuteInstruction(c, ctx, isaInst, decoded, instrBits) {
@@ -802,12 +936,34 @@ function x86ExecuteInstruction(c, ctx, isaInst, decoded, instrBits) {
     return;
   }
   if (dec.mnemonic === 'PUSH') {
-    if (typeof cpuPushReg === 'function') cpuPushReg(c, f.reg);
+    if (f.imm != null) {
+      if (typeof cpuPushImm === 'function') cpuPushImm(c, f.imm);
+      else if (typeof cpuPushReg === 'function') {
+        x86WriteReg(c, 0, f.imm);
+        cpuPushReg(c, 0);
+      }
+    } else if (f.reg != null && typeof cpuPushReg === 'function') {
+      cpuPushReg(c, f.reg);
+    }
     c.pc = nextPc;
     return;
   }
   if (dec.mnemonic === 'POP') {
     if (typeof cpuPopReg === 'function') cpuPopReg(c, f.reg);
+    c.pc = nextPc;
+    return;
+  }
+  if (dec.mnemonic === 'LEAVE') {
+    x86WriteReg(c, 4, x86ReadReg(c, 5));
+    if (typeof cpuPopReg === 'function') cpuPopReg(c, 5);
+    c.pc = nextPc;
+    return;
+  }
+  if (dec.mnemonic === 'ENTER') {
+    if (typeof cpuPushReg === 'function') cpuPushReg(c, 5);
+    x86WriteReg(c, 5, x86ReadReg(c, 4));
+    const slots = (f.imm16 != null ? f.imm16 : 0) >>> 2;
+    if (slots > 0) x86WriteReg(c, 4, x86ReadReg(c, 4) - slots);
     c.pc = nextPc;
     return;
   }
@@ -842,12 +998,12 @@ function x86ExecuteInstruction(c, ctx, isaInst, decoded, instrBits) {
       let v = x86ReadMemByte(c, addr);
       v = dec.mnemonic === 'INC' ? (v + 1) & 0xff : (v - 1) & 0xff;
       x86WriteMemByte(c, addr, v);
-      x86SetFlags(c, v, v, 1, dec.mnemonic === 'INC' ? 'add' : 'sub');
+      x86SetFlagsIncDec(c, v);
     } else if (f.dst != null) {
       let v = x86ReadReg(c, f.dst);
       v = dec.mnemonic === 'INC' ? (v + 1) >>> 0 : (v - 1) >>> 0;
       x86WriteReg(c, f.dst, v);
-      x86SetFlags(c, v, v, 1, dec.mnemonic === 'INC' ? 'add' : 'sub');
+      x86SetFlagsIncDec(c, v);
     }
     c.pc = nextPc;
     return;
@@ -877,10 +1033,30 @@ function x86ExecuteInstruction(c, ctx, isaInst, decoded, instrBits) {
     } else if (f.mem && f.dst != null) {
       x86ExecuteAlu(c, op, f.dst, f.mem, op);
     } else if (f.mem && f.src != null) {
-      x86ExecuteAlu(c, op, f.mem, f.src, op);
+      x86ExecuteAlu(c, op, f.mem, f.src, op, true);
     } else if (f.dst != null && f.src != null) {
-      x86ExecuteAlu(c, op, f.dst, f.src, op);
+      x86ExecuteAlu(c, op, f.dst, f.src, op, true);
     }
+    c.pc = nextPc;
+    return;
+  }
+  if (dec.mnemonic === 'MUL') {
+    x86ExecuteMul(c, f, false);
+    c.pc = nextPc;
+    return;
+  }
+  if (dec.mnemonic === 'IMUL') {
+    x86ExecuteMul(c, f, true);
+    c.pc = nextPc;
+    return;
+  }
+  if (dec.mnemonic === 'DIV') {
+    x86ExecuteDiv(c, f, false);
+    c.pc = nextPc;
+    return;
+  }
+  if (dec.mnemonic === 'IDIV') {
+    x86ExecuteDiv(c, f, true);
     c.pc = nextPc;
     return;
   }

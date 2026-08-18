@@ -35555,5 +35555,140 @@ counter: .byte 0`, { maxSteps: 12, progLen: 80 });
   reg(3273, 'asm-set', 'x86-32 abs mem counter CPU (D38-D2)', runX86AbsMemCpuTest);
   reg(3274, 'asm-set', 'x86-32 abs mem CPU (wave)', runX86AbsMemCpuTest, { propagation: 'wave' });
 
+  function runX86MulDecodeTest(h, session) {
+    const src = `inline [asm] .x86:
+  set: x86-32
+  :
+72wire p = .x86 {
+  mov eax, 6
+  mul ebx
+  imul ecx
+}
+show(.x86:decode(p))`;
+    const { out } = session.run(src);
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('mul ebx', String(text.includes('mul ebx')), 'true');
+    h.assert('imul ecx', String(text.includes('imul ecx')), 'true');
+  }
+
+  reg(3276, 'asm-set', 'x86-32 mul/imul decode (1+x.1c-ii)', runX86MulDecodeTest);
+  reg(3277, 'asm-set', 'x86-32 mul decode (wave)', runX86MulDecodeTest, { propagation: 'wave' });
+
+  function runX86MulCpuTest(h, session) {
+    const src = x86CpuShell(`mov eax, 6
+      mov ebx, 7
+      mul ebx
+      jmp halt
+    halt:
+      jmp halt`, { maxSteps: 6, progLen: 32 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax = 42', r0.value, '00000000000000000000000000101010');
+  }
+
+  reg(3278, 'asm-set', 'x86-32 mul CPU (1+x.1c-ii)', runX86MulCpuTest);
+  reg(3279, 'asm-set', 'x86-32 mul CPU (wave)', runX86MulCpuTest, { propagation: 'wave' });
+
+  function runX86DivCpuTest(h, session) {
+    const src = x86CpuShell(`mov eax, 42
+      xor edx, edx
+      mov ebx, 6
+      div ebx
+      jmp halt
+    halt:
+      jmp halt`, { maxSteps: 8, progLen: 32 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax = 7', r0.value, '00000000000000000000000000000111');
+  }
+
+  reg(3280, 'asm-set', 'x86-32 div CPU (1+x.1c-ii)', runX86DivCpuTest);
+  reg(3281, 'asm-set', 'x86-32 div CPU (wave)', runX86DivCpuTest, { propagation: 'wave' });
+
+  function runX86DivZeroCpuTest(h, session) {
+    const src = x86CpuShell(`mov eax, 10
+      xor edx, edx
+      xor ebx, ebx
+      div ebx
+      jmp halt
+    halt:
+      jmp halt`, { maxSteps: 8, progLen: 32 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    const dz = handler.evalGetProperty(comp, 'divByZero', { var: '.u', property: 'divByZero' }, interp);
+    h.assert('divByZero', String(parseInt(dz.value, 2)), '1');
+    h.assert('eax = -1', r0.value, '11111111111111111111111111111111');
+  }
+
+  reg(3282, 'asm-set', 'x86-32 div by zero + divByZero (1+x.1c-ii)', runX86DivZeroCpuTest);
+  reg(3283, 'asm-set', 'x86-32 div zero (wave)', runX86DivZeroCpuTest, { propagation: 'wave' });
+
+  function runX86PushImmCpuTest(h, session) {
+    const src = x86CpuShell(`push 100
+      pop eax
+      jmp halt
+    halt:
+      jmp halt`, { maxSteps: 6, progLen: 32 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax = 100', r0.value, '00000000000000000000000001100100');
+  }
+
+  reg(3284, 'asm-set', 'x86-32 push imm32 CPU (1+x.1c-ii)', runX86PushImmCpuTest);
+  reg(3285, 'asm-set', 'x86-32 push imm CPU (wave)', runX86PushImmCpuTest, { propagation: 'wave' });
+
+  function runX86EnterLeaveCpuTest(h, session) {
+    const src = x86CpuShell(`push 42
+      enter 0, 0
+      leave
+      pop eax
+      jmp halt
+    halt:
+      jmp halt`, { maxSteps: 12, progLen: 48 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax = 42', r0.value, '00000000000000000000000000101010');
+  }
+
+  reg(3286, 'asm-set', 'x86-32 enter/leave CPU (1+x.1c-ii)', runX86EnterLeaveCpuTest);
+  reg(3287, 'asm-set', 'x86-32 enter/leave CPU (wave)', runX86EnterLeaveCpuTest, { propagation: 'wave' });
+
+  function runX86JbUnsignedCpuTest(h, session) {
+    const src = x86CpuShell(`mov eax, 3
+      mov ebx, 5
+      cmp eax, ebx
+      jb below
+      mov eax, 0
+      jmp done
+below:
+      mov eax, 99
+done:
+      jmp done`, { maxSteps: 10, progLen: 64 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax = 99', r0.value, '00000000000000000000000001100011');
+  }
+
+  reg(3288, 'asm-set', 'x86-32 jb unsigned after cmp (1+x.1c-ii)', runX86JbUnsignedCpuTest);
+  reg(3289, 'asm-set', 'x86-32 jb unsigned CPU (wave)', runX86JbUnsignedCpuTest, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

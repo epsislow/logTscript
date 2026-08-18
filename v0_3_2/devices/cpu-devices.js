@@ -305,6 +305,16 @@ function cpuPushReg(c, r) {
   cpuSetSpIndex(c, sp);
 }
 
+function cpuPushImm(c, val) {
+  let sp = cpuSpIndex(c);
+  if (sp == null) throw Error('PUSH requires sp register');
+  sp -= 1;
+  if (sp < 0) throw Error(`CPU stack overflow at SP ${sp}`);
+  const bits = (val >>> 0).toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
+  cpuWriteRamCell(c, sp, bits);
+  cpuSetSpIndex(c, sp);
+}
+
 function cpuPopReg(c, r) {
   if (r < 0 || r >= c.regCount) throw Error(`POP invalid register R${r}`);
   let sp = cpuSpIndex(c);

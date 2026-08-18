@@ -1603,7 +1603,7 @@ Vezi **[D38 — Extensii x86-32](#d38--extensii-x86-32-1x1c)**.
 - [x] ✅ **1+x.1b** Executor CPU x86 subset + variable fetch — teste 3252–3253
 - [x] ✅ **1+x.2a** Preset `arm-a32` assemble + exec + thumb `use` — teste 3254–3261
 - [x] **1+x.1c-i** x86 extensii batch 1 (D38): adresare A/B/C, `lea`, `test`, `xchg`, `loop`, salturi — teste 3263–3275; doc demo-uri **D38-D2/D3/D4/D5** (Laborator 4)
-- [ ] **1+x.1c-ii** x86 extensii batch 2: `mul`/`div`, `enter`/`leave`, `push imm32`
+- [x] **1+x.1c-ii** x86 extensii batch 2: `mul`/`div`, `enter`/`leave`, `push imm32`
 - [ ] **1+x.1c-iii** SIB `[base+index*scale±disp]` + prefixe/seg/x86-64 (viitor)
 - [ ] **1+x.2b** Profil mixt Thumb-2 / IT blocks (amânat)
 - [ ] **1+x.6–8** assembler extern, endianness runtime, CPU multi-set routing

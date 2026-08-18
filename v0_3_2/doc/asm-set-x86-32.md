@@ -40,18 +40,20 @@ inline [asm] .x86:
 
 ---
 
-## Preset opcode table (MVP + 1+x.1c-i)
+## Preset opcode table (MVP + 1+x.1c-i/ii)
 
 | Category | Mnemonics |
 |----------|-----------|
-| ALU | `mov`, `add`, `sub`, `cmp`, `and`, `or`, `xor`, **`lea`**, **`inc`**, **`dec`**, **`neg`**, **`not`**, **`test`**, **`xchg`** |
-| Stack | `push`, `pop` |
-| Control | `jmp`, `je`, `jne`, **`jg`**, **`jge`**, **`jl`**, **`jle`**, **`ja`**, **`jae`**, **`jb`**, **`jbe`**, **`loop`**, **`loope`**, **`loopz`**, **`loopne`**, **`loopnz`**, `call`, `ret` |
+| ALU | `mov`, `add`, `sub`, `cmp`, `and`, `or`, `xor`, `lea`, `inc`, `dec`, `neg`, `not`, `test`, `xchg`, **`mul`**, **`imul`**, **`div`**, **`idiv`** |
+| Stack | `push` (reg sau **imm32**), `pop`, **`enter`**, **`leave`** |
+| Control | `jmp`, `je`, `jne`, `jg`, `jge`, `jl`, `jle`, `ja`, `jae`, `jb`, `jbe`, `loop`, `loope`, `loopz`, `loopne`, `loopnz`, `call`, `ret` |
 | Misc | `nop`, `int imm8` |
+
+**Mul/div (1+x.1c-ii):** formă simplă cu acumulator implicit — `mul ebx` → `eax × operand`, rezultat în **`edx:eax`**; `div ebx` → `edx:eax ÷ operand`, cât în **`eax`**, rest în **`edx`**. La **`div`/`idiv` cu divisor 0:** rezultat pedagogic în **`eax`**, **`divByZero ← 1`** (ca riscv32), fără oprire simulator.
 
 **Operands:** reg↔reg, reg↔imm8/imm32, memory (**pattern A/B/C** below). No prefix bytes, no **SIB** (`[base+index*scale±disp]` → viitor **1+x.1c-iii**), no segments in MVP.
 
-**CPU flags (1+x.1c-i):** `zf`, `sf`, `cf`, `of` — folosite de `cmp`/`test` și salturi condiționale.
+**CPU flags (1+x.1c-i/ii):** `zf`, `sf`, `cf`, `of` — `cmp`/`test` și salturi; **`inc`/`dec` nu modifică `cf`** (comportament Intel); `cf` la `add`/`sub` pentru salturi unsigned (`jb`/`ja`/…).
 
 ---
 
@@ -265,28 +267,43 @@ show(.u:r0)
 
 ---
 
-## Runnable — D38-D4: stack frame (pattern **A** — decode)
+## Runnable — D38-D4: stack frame (pattern **A** — `enter`/`leave`)
 
-Acces **`[ebp±disp]`** după **`mov ebp, esp`** (frame simplu; **`enter`/`leave`** → **1+x.1c-ii**).
+Frame cu **`enter`** / **`leave`** (test **3286**). Alocarea **`enter N, 0`** folosește **`N` octeți** (convertiți la sloturi stack / 4).
 
 ```logts-play
 inline [asm] .x86:
   set: x86-32
   :
 
-64wire frame = .x86 {
-  push ebp
-  mov ebp, esp
-  mov eax, [ebp-4]
-  pop ebp
-  ret
-}
-show(.x86:decode(frame))
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 12
+  ram:
+    depth: 32
+    length: 16
+  prog:
+    depth: 8
+    length: 48
+    = .x86 {
+      push 42
+      enter 0, 0
+      leave
+      pop eax
+      jmp halt
+    halt:
+      jmp halt
+    }
+  :
+
+.u:{ run = 1 }
+show(.u:r0)
 ```
 
-**Load:** wire **`frame`** cu **`[ebp-4]`**.
-
-**Load & Run:** decode afișează **`push ebp`**, **`mov ebp, esp`**, **`mov eax, [ebp-4]`**, **`pop ebp`**, **`ret`**.
+**Load & Run:** **`r0`** = **42** — valoarea supraviețuiește frame-ului.
 
 ---
 
@@ -335,6 +352,79 @@ show(.u:r0)
 **Load & Run:** **`r0`** = **99** — **`10 > 5`**, saltul **`jg`** ia ramura **`greater`**.
 
 Demo **`test`+`je`:** **`xor eax, eax`** / **`test eax, eax`** / **`je`** — test **3265**.
+
+---
+
+## Runnable — mul / div + `divByZero` (1+x.1c-ii)
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 8
+  ram:
+    depth: 32
+    length: 16
+  prog:
+    depth: 8
+    length: 32
+    = .x86 {
+      mov eax, 6
+      mov ebx, 7
+      mul ebx
+      jmp halt
+    halt:
+      jmp halt
+    }
+  :
+
+.u:{ run = 1 }
+show(.u:r0)
+```
+
+**Load & Run:** **`r0`** (`eax`) = **42** (6×7). Teste **3278**, **3280** (`div`), **3282** (`divByZero`).
+
+---
+
+## Runnable — `push imm32` (1+x.1c-ii)
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 6
+  ram:
+    depth: 32
+    length: 16
+  prog:
+    depth: 8
+    length: 32
+    = .x86 {
+      push 100
+      pop eax
+      jmp halt
+    halt:
+      jmp halt
+    }
+  :
+
+.u:{ run = 1 }
+show(.u:r0)
+```
+
+**Load & Run:** **`r0`** = **100** (opcode **`68`** + imm32). Test **3284**.
 
 ---
 
