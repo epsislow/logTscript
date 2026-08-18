@@ -1544,7 +1544,66 @@ Branch targets use the same label mechanism as generic asm; offsets must stay wi
 
 ---
 
-## Load / store
+## CPU bridge
+
+Use **\`comp [cpu]\`** with **\`isa: .th\`** for native Thumb execution (not the 4-bit legacy CPU switch).
+
+### Requirements
+
+| Attribute | Required value |
+|-----------|----------------|
+| \`registers\` | **8** |
+| \`ram.depth\` | **16** |
+| \`prog.depth\` | **16** |
+
+Mismatch at CPU init → error (e.g. \`registers (32) must be 8 for asm set 'arm-thumb'\`).
+
+### Runnable — ALU on CPU
+
+\`\`\`logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+comp [cpu] .u:
+  isa: .th
+  registers: 8
+  on: 1
+  maxSteps: 4
+  ram:
+    depth: 16
+    length: 8
+  prog:
+    depth: 16
+    length: 4
+    = .th {
+      movs r0, 10
+      movs r1, 3
+      adds r2, r0, r1
+      subs r3, r0, r1
+    }
+  :
+
+.u:{ run = 1 }
+16wire r2 = .u:r2
+16wire r3 = .u:r3
+show(r2, r3)
+\`\`\`
+
+**Load & Run:** \`r2\` = 13, \`r3\` = 7.
+
+### Semantics (simulator)
+
+- **PC** = instruction index (one 16-bit halfword per step).
+- **\`ldr\` / \`str\`:** byte offset \`imm × 4\` from \`rn\`; RAM index = \`byteAddr >> 1\`; unaligned byte addresses error.
+- **\`beq\` / \`bne\`:** branch when the **zero flag** is set/clear after the last **\`movs\`**, **\`adds\`**, or **\`subs\`**.
+- **Micro override:** user \`{ micro }\` on a preset opcode still uses the micro engine (see [asm-microcode.md](asm-microcode.md)).
+
+See also [cpu.md](cpu.md#arm-thumb-native-exec).
+
+---
+
+## Load / store (assemble-only)
 
 \`\`\`logts-play
 inline [asm] .th:
@@ -1767,6 +1826,10 @@ Optional: add user opcodes with **literal-only** patterns (no \`R2b\` / \`A2b\` 
 | \`jal rd, target\` | Jump and link |
 | \`jalr rd, rs1, imm\` | Jump and link register |
 | \`nop\` | Pseudo-op (addi x0, x0, 0) |
+| \`mul\`, \`div\`, \`divu\`, \`rem\`, \`remu\` | M extension — multiply / divide / remainder (see [Extended exec](#extended-exec-1x3c)) |
+| \`lb\`, \`lh\`, \`lbu\`, \`lhu\`, \`sb\`, \`sh\` | Byte / half load-store (sign- or zero-extend on load; RMW on store) |
+| \`fence\`, \`fence.i\` | Memory / instruction fence (no-op in single-core simulator) |
+| \`ecall\`, \`ebreak\` | Trap halt — see \`trapCause\` in [cpu.md](cpu.md#riscv32-trap-and-divide-flags) |
 
 ---
 
@@ -1924,6 +1987,161 @@ show(x3, mem0)
 - **Heterogeneous composed blob** as CPU prog: undefined behaviour — use a single-architecture program for CPU exec.
 
 See also [cpu.md](cpu.md#riscv32-native-exec).
+
+---
+
+## Extended exec (1+x.3c)
+
+Sub-phases **3c-i → 3c-ii → 3c-iii** extend the same **\`set: riscv32\`** preset (no new profile). User **\`{ micro }\`** overrides on new opcodes follow [asm-microcode.md](asm-microcode.md) (D28).
+
+### 3c-i — M extension (\`mul\`, \`div\`, \`divu\`, \`rem\`, \`remu\`)
+
+| Instr. | Effect |
+|--------|--------|
+| \`mul\` | \`rd = (rs1 × rs2)[31:0]\` |
+| \`div\` / \`divu\` | Quotient signed / unsigned |
+| \`rem\` / \`remu\` | Remainder signed / unsigned |
+
+**Divide by zero (simulator contract — D24 A+C):**
+
+- **No throw.** \`rd\` gets the **RV32M** value (see table in [cpu.md](cpu.md#riscv32-trap-and-divide-flags)).
+- **\`divByZero ← 1\`** on the CPU (sticky until reset / prog reload). Read with **\`.u:divByZero\`**.
+
+### 3c-ii — Byte / half load-store (\`lb\`, \`lh\`, \`lbu\`, \`lhu\`, \`sb\`, \`sh\`)
+
+Same **RAM model** as **\`lw\` / \`sw\`**: each cell is one **32-bit word**; **little-endian** byte order inside the word.
+
+| Instr. | Address rule | Access |
+|--------|--------------|--------|
+| \`lb\`, \`lbu\` | Any byte address | Read byte from \`RAM[byteAddr >> 2]\`, octet \`byteAddr & 3\`; sign- or zero-extend to 32 bits |
+| \`lh\`, \`lhu\` | **Halfword-aligned** (\`byteAddr & 1 = 0\`) | Read 16 bits; **error** if misaligned |
+| \`sb\`, \`sh\` | Same alignment as load counterparts | **Read-modify-write** the affected word(s) |
+| \`lw\`, \`sw\` | **Word-aligned** (\`byteAddr & 3 = 0\`) | Unchanged (D19) |
+
+Halfwords that span a 32-bit word boundary use the composed 16-bit value from adjacent bytes (little-endian), matching typical RV32 memory layout teaching.
+
+### 3c-iii — System (\`fence\`, \`fence.i\`, \`ecall\`, \`ebreak\`)
+
+| Instr. | Hardware role (summary) | Simulator (didactic) |
+|--------|-------------------------|----------------------|
+| **\`fence\`** | Memory ordering fence between cores / devices | **No-op** — advance **\`PC\`** (single-core synchronous RAM) |
+| **\`fence.i\`** | Instruction-fetch fence (I/D coherence) | **No-op** — advance **\`PC\`** |
+| **\`ecall\`** | Syscall / trap to supervisor (OS entry) | **\`halted ← 1\`**, **\`trapCause ← 8\`**, **\`PC\`** unchanged |
+| **\`ebreak\`** | Debugger breakpoint | **\`halted ← 1\`**, **\`trapCause ← 3\`**, **\`PC\`** unchanged |
+
+No automatic jump to **\`mtvec\`**, no **\`mepc\`** save — inspect **\`halted\`** and **\`trapCause\`** instead. Full property list: [cpu.md — riscv32 trap and divide flags](cpu.md#riscv32-trap-and-divide-flags).
+
+**Floating point (F extension):** deferred (**D27** / 1+x.3d).
+
+### Runnable — multiply and divide by zero
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 3
+  ram:
+    depth: 32
+    length: 4
+  prog:
+    depth: 32
+    length: 4
+    = .rv {
+      addi x1, x0, 6
+      addi x2, x0, 7
+      mul x3, x1, x2
+      div x4, x3, x0
+      loop: beq x0, x0, loop
+    }
+  :
+
+.u:{ run = 1 }
+32wire prod = .u:r3
+32wire quot = .u:r4
+1wire dz = .u:divByZero
+show(prod, quot, dz)
+\`\`\`
+
+**Load:** wires and CPU are declared; press **Load & Run** to execute.
+
+**Load & Run:** \`prod\` = \`…0101010\` (42 = 6×7), \`quot\` = all bits \`1\` (RV32M \`div\` by zero → −1), \`dz\` = \`1\` (sticky **\`divByZero\`**).
+
+### Runnable — byte load / store (\`lb\`, \`sb\`)
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 6
+  ram:
+    depth: 32
+    length: 8
+  prog:
+    depth: 32
+    length: 8
+    = .rv {
+      addi x1, x0, 0
+      addi x2, x0, 255
+      sw x2, 0(x1)
+      addi x2, x0, 171
+      sb x2, 1(x1)
+      lb x3, 0(x1)
+      lw x4, 0(x1)
+      loop: beq x0, x0, loop
+    }
+  :
+
+.u:{ run = 1 }
+32wire b0 = .u:r3
+32wire word = .u:r4
+show(b0, word)
+\`\`\`
+
+**Load & Run:** \`b0\` = sign-extended \`0xFF\` (all bits \`1\` in 32-bit), \`word\` = \`…1010101111111111\` (\`0x0000ABFF\` — byte 0 unchanged, byte 1 patched to \`171\`).
+
+### Runnable — \`ecall\` trap halt
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 2
+  ram:
+    depth: 32
+    length: 4
+  prog:
+    depth: 32
+    length: 4
+    = .rv {
+      addi x1, x0, 1
+      ecall
+      addi x2, x0, 9
+    }
+  :
+
+.u:{ run = 1 }
+1wire h = .u:halted
+8wire cause = .u:trapCause
+32wire x2 = .u:r2
+show(h, cause, x2)
+\`\`\`
+
+**Load & Run:** \`h\` = \`1\`, \`cause\` = \`8\`, \`x2\` stays \`0\` (instruction after **\`ecall\`** does not run). **\`PC\`** remains on **\`ecall\`**.
 
 ---
 
@@ -10488,6 +10706,7 @@ Reload program with **\`.u:prog = …\`** (not direct assign on the component bo
 | \`resetPC\`, \`resetRAM\`, \`resetRegs\`, \`resetSP\`, \`resetHalted\` | Granular resets (active \`1\`) |
 | \`ramAdr\`, \`progAdr\` | Address for peek ports |
 | \`pc\`, \`halted\`, \`instr\` | Pout-style reads |
+| \`trapCause\`, \`divByZero\` | Read-only ( **\`set: riscv32\`**, extended exec **1+x.3c** ) — see [riscv32 trap and divide flags](#riscv32-trap-and-divide-flags) |
 | \`r0\`…\`rN\` | Register peek |
 | \`ram:get\`, \`prog:get\` | Read word at \`ramAdr\` / \`progAdr\` |
 | \`trace:get\` | Trace text when \`trace: 1\` or \`output\` |
@@ -10567,6 +10786,159 @@ show(x3)
 **Load & Run:** \`x3\` shows \`…1100\` (decimal 12).
 
 Details: [asm-set-riscv32.md](asm-set-riscv32.md#cpu-bridge).
+
+Extended opcodes (M, byte/half memory, system traps) — **1+x.3c** — are documented in [asm-set-riscv32.md](asm-set-riscv32.md#extended-exec-1x3c) and [riscv32 trap/divide flags](#riscv32-trap-and-divide-flags) below.
+
+---
+
+## riscv32 trap and divide flags
+
+When the CPU runs **\`set: riscv32\`** with extended instructions (**1+x.3c**), these **read-only** properties expose simulator state (LogTscript extensions — not full RISC-V CSRs):
+
+| Property | Width | Meaning |
+|----------|-------|---------|
+| \`.u:halted\` | 1 | \`1\` after **\`ecall\`** / **\`ebreak\`** (or micro **\`HALTED\`**) |
+| \`.u:trapCause\` | small int | Why the CPU stopped; \`0\` if not a trap halt |
+| \`.u:divByZero\` | 1 | \`1\` if the last **\`div\`**, **\`divu\`**, **\`rem\`**, or **\`remu\`** had **\`rs2 = 0\`**; sticky until **\`reset\`** or prog reload |
+
+### \`trapCause\` values (didactic mapping)
+
+| Value | Set by | Real-world meaning |
+|-------|--------|-------------------|
+| \`0\` | (default) | No trap — normal run or halt via micro |
+| \`3\` | **\`ebreak\`** | Breakpoint (debugger stop) |
+| \`8\` | **\`ecall\`** | Environment call / syscall entry |
+
+After **\`ecall\`** or **\`ebreak\`**: **\`halted ← 1\`**, **\`trapCause ←\`** value above, **\`PC\`** points at the trapping instruction (does not advance). **\`run\`** / **\`set\`** do not continue until **\`reset\`**, prog reload, or you clear state manually.
+
+**Not simulated in MVP:** jump to **\`mtvec\`**, save **\`mepc\`**, privilege modes, or OS syscall dispatch. Use **\`show(.u:halted, .u:trapCause)\`** or **\`doc(.u)\`** to inspect.
+
+### \`divByZero\` (M extension)
+
+On **\`div\`**, **\`divu\`**, **\`rem\`**, **\`remu\`** with **\`rs2 = 0\`**:
+
+1. **\`rd\`** receives the **RV32M-defined value** (no simulator error):
+
+| Instr. | \`rd\` when \`rs2 = 0\` |
+|--------|---------------------|
+| \`div\` | −1 (all bits set in 32-bit signed sense: \`0xFFFFFFFF\`) |
+| \`divu\` | \`0xFFFFFFFF\` |
+| \`rem\`, \`remu\` | **\`rs1\`** (dividend unchanged) |
+
+2. **\`divByZero ← 1\`** (sticky until **\`reset\`** / prog reload / explicit clear on reset flags).
+
+RISC-V has **no integer flag register** like x86; **\`divByZero\`** is a **teaching aid** only.
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 2
+  ram:
+    depth: 32
+    length: 4
+  prog:
+    depth: 32
+    length: 4
+    = .rv {
+      addi x1, x0, 10
+      ecall
+    }
+  :
+
+.u:{ run = 1 }
+1wire h = .u:halted
+8wire cause = .u:trapCause
+show(h, cause)
+\`\`\`
+
+**Load & Run:** \`h\` = \`1\`, \`cause\` = \`8\`.
+
+### Runnable — divide by zero flag
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 2
+  ram:
+    depth: 32
+    length: 4
+  prog:
+    depth: 32
+    length: 4
+    = .rv {
+      addi x1, x0, 10
+      div x3, x1, x0
+      loop: beq x0, x0, loop
+    }
+  :
+
+.u:{ run = 1 }
+32wire q = .u:r3
+1wire dz = .u:divByZero
+show(q, dz)
+\`\`\`
+
+**Load & Run:** \`q\` = all bits \`1\` (RV32M quotient −1), \`dz\` = \`1\`. No simulator error — inspect **\`divByZero\`** instead of trapping.
+
+---
+
+## arm-thumb native exec
+
+When **\`isa:\`** references an inline ASM with **\`set: arm-thumb\`**, the CPU uses the **native Thumb executor** (16-bit halfwords). Requirements:
+
+| Attribute | Value |
+|-----------|-------|
+| \`registers\` | 8 (\`r0\`–\`r7\`) |
+| \`ram.depth\` | 16 |
+| \`prog.depth\` | 16 |
+
+Conditional branches **\`beq\` / \`bne\`** use a **zero flag** updated by **\`movs\`**, **\`adds\`**, and **\`subs\`** (result equals zero). Execution order: **micro** → **native arm-thumb** → error.
+
+\`\`\`logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+comp [cpu] .u:
+  isa: .th
+  registers: 8
+  on: 1
+  maxSteps: 4
+  ram:
+    depth: 16
+    length: 8
+  prog:
+    depth: 16
+    length: 4
+    = .th {
+      movs r0, 10
+      movs r1, 3
+      adds r2, r0, r1
+      subs r3, r0, r1
+    }
+  :
+
+.u:{ run = 1 }
+16wire r2 = .u:r2
+16wire r3 = .u:r3
+show(r2, r3)
+\`\`\`
+
+**Load & Run:** \`r2\` is \`…1101\` (13), \`r3\` is \`…0111\` (7).
+
+Details: [asm-set-arm-thumb.md](asm-set-arm-thumb.md#cpu-bridge).
 
 ---
 

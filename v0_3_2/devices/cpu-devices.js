@@ -128,6 +128,8 @@ function addCpu(id, config) {
     fixedVectors: config.fixedVectors || null,
     isaRef: config.isaRef || null,
     microSlots: new Map(),
+    trapCause: 0,
+    divByZero: 0,
   });
   if (config.spReg != null) cpuInitSp(cpus.get(id));
 }
@@ -165,6 +167,8 @@ function loadCpuProg(id, blob) {
   cpuWriteProgBlob(c, blob);
   c.pc = c.pcInit;
   c.halted = 0;
+  c.trapCause = 0;
+  c.divByZero = 0;
 }
 
 function cpuAfterProgReload(id) {
@@ -172,6 +176,8 @@ function cpuAfterProgReload(id) {
   if (!c) return;
   c.pc = c.pcInit;
   c.halted = 0;
+  c.trapCause = 0;
+  c.divByZero = 0;
 }
 
 function cpuResetFlags(id, flags) {
@@ -189,7 +195,11 @@ function cpuResetFlags(id, flags) {
   if (set.has('sp') && c.spReg != null && c.spReg >= 0 && c.spReg < c.regCount) {
     cpuInitSp(c);
   }
-  if (set.has('halted')) c.halted = 0;
+  if (set.has('halted')) {
+    c.halted = 0;
+    c.trapCause = 0;
+    c.divByZero = 0;
+  }
   if (set.has('pc') || set.has('halted') || set.has('regs')) {
     c.ie = 0;
     c.irqPending = 0;

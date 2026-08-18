@@ -34821,5 +34821,156 @@ comp [cpu] .u:
   reg(3214, 'asm-set', 'arm-thumb CPU raw prog exec', runThumbCpuRawProgTest);
   reg(3215, 'asm-set', 'arm-thumb CPU raw prog exec (wave)', runThumbCpuRawProgTest, { propagation: 'wave' });
 
+  function runRiscvMulTest(h, session) {
+    const src = riscvCpuShell(`addi x1, x0, 6
+      addi x2, x0, 7
+      mul x3, x1, x2
+      loop: beq x0, x0, loop`, { maxSteps: 3, progLen: 8 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r3 = handler.evalGetProperty(comp, 'r3', { var: '.u', property: 'r3' }, interp);
+    h.assert('x3 = 42', r3.value, '00000000000000000000000000101010');
+  }
+
+  reg(3216, 'asm-set', 'riscv32 CPU mul native exec', runRiscvMulTest);
+  reg(3217, 'asm-set', 'riscv32 CPU mul native exec (wave)', runRiscvMulTest, { propagation: 'wave' });
+
+  function runRiscvDivTest(h, session) {
+    const src = riscvCpuShell(`addi x1, x0, 20
+      addi x2, x0, 4
+      div x3, x1, x2
+      loop: beq x0, x0, loop`, { maxSteps: 3, progLen: 8 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r3 = handler.evalGetProperty(comp, 'r3', { var: '.u', property: 'r3' }, interp);
+    h.assert('x3 = 5', r3.value, '00000000000000000000000000000101');
+  }
+
+  reg(3218, 'asm-set', 'riscv32 CPU div native exec', runRiscvDivTest);
+  reg(3219, 'asm-set', 'riscv32 CPU div native exec (wave)', runRiscvDivTest, { propagation: 'wave' });
+
+  function runRiscvDivZeroTest(h, session) {
+    const src = riscvCpuShell(`addi x1, x0, 10
+      div x3, x1, x0
+      loop: beq x0, x0, loop`, { maxSteps: 2, progLen: 4 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r3 = handler.evalGetProperty(comp, 'r3', { var: '.u', property: 'r3' }, interp);
+    const dz = handler.evalGetProperty(comp, 'divByZero', { var: '.u', property: 'divByZero' }, interp);
+    h.assert('divByZero', String(parseInt(dz.value, 2)), '1');
+    h.assert('div x3 = -1', r3.value, '11111111111111111111111111111111');
+  }
+
+  reg(3220, 'asm-set', 'riscv32 CPU div by zero RV result', runRiscvDivZeroTest);
+  reg(3221, 'asm-set', 'riscv32 CPU div by zero RV result (wave)', runRiscvDivZeroTest, { propagation: 'wave' });
+
+  function runRiscvRemTest(h, session) {
+    const src = riscvCpuShell(`addi x1, x0, 10
+      addi x2, x0, 3
+      rem x3, x1, x2
+      loop: beq x0, x0, loop`, { maxSteps: 3, progLen: 8 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r3 = handler.evalGetProperty(comp, 'r3', { var: '.u', property: 'r3' }, interp);
+    h.assert('x3 = 1', r3.value, '00000000000000000000000000000001');
+  }
+
+  reg(3222, 'asm-set', 'riscv32 CPU rem native exec', runRiscvRemTest);
+  reg(3223, 'asm-set', 'riscv32 CPU rem native exec (wave)', runRiscvRemTest, { propagation: 'wave' });
+
+  function runRiscvLbTest(h, session) {
+    const src = riscvCpuShell(`addi x1, x0, 0
+      addi x2, x0, 130
+      sw x2, 0(x1)
+      addi x2, x0, 0
+      lb x3, 0(x1)
+      loop: beq x0, x0, loop`, { maxSteps: 5, progLen: 8 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r3 = handler.evalGetProperty(comp, 'r3', { var: '.u', property: 'r3' }, interp);
+    h.assert('lb sign ext 0x82', r3.value, '11111111111111111111111110000010');
+  }
+
+  reg(3224, 'asm-set', 'riscv32 CPU lb sign extend', runRiscvLbTest);
+  reg(3225, 'asm-set', 'riscv32 CPU lb sign extend (wave)', runRiscvLbTest, { propagation: 'wave' });
+
+  function runRiscvSbTest(h, session) {
+    const src = riscvCpuShell(`addi x1, x0, 0
+      addi x2, x0, 255
+      sw x2, 0(x1)
+      addi x2, x0, 171
+      sb x2, 1(x1)
+      lw x3, 0(x1)
+      loop: beq x0, x0, loop`, { maxSteps: 6, progLen: 8 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r3 = handler.evalGetProperty(comp, 'r3', { var: '.u', property: 'r3' }, interp);
+    h.assert('sb patch byte 1', r3.value, '00000000000000001010101111111111');
+  }
+
+  reg(3226, 'asm-set', 'riscv32 CPU sb byte patch', runRiscvSbTest);
+  reg(3227, 'asm-set', 'riscv32 CPU sb byte patch (wave)', runRiscvSbTest, { propagation: 'wave' });
+
+  function runRiscvEcallTest(h, session) {
+    const src = riscvCpuShell(`addi x1, x0, 1
+      ecall
+      addi x2, x0, 9`, { maxSteps: 3, progLen: 4 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+    const cause = handler.evalGetProperty(comp, 'trapCause', { var: '.u', property: 'trapCause' }, interp);
+    const r2 = handler.evalGetProperty(comp, 'r2', { var: '.u', property: 'r2' }, interp);
+    h.assert('halted', String(parseInt(halted.value, 2)), '1');
+    h.assert('trapCause 8', String(parseInt(cause.value, 2)), '8');
+    h.assert('x2 not run', r2.value, '00000000000000000000000000000000');
+  }
+
+  reg(3228, 'asm-set', 'riscv32 CPU ecall halt trapCause', runRiscvEcallTest);
+  reg(3229, 'asm-set', 'riscv32 CPU ecall halt trapCause (wave)', runRiscvEcallTest, { propagation: 'wave' });
+
+  function runRiscvEbreakTest(h, session) {
+    const src = riscvCpuShell(`ebreak
+      addi x1, x0, 1`, { maxSteps: 2, progLen: 4 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+    const cause = handler.evalGetProperty(comp, 'trapCause', { var: '.u', property: 'trapCause' }, interp);
+    h.assert('halted', String(parseInt(halted.value, 2)), '1');
+    h.assert('trapCause 3', String(parseInt(cause.value, 2)), '3');
+  }
+
+  reg(3230, 'asm-set', 'riscv32 CPU ebreak halt trapCause', runRiscvEbreakTest);
+  reg(3231, 'asm-set', 'riscv32 CPU ebreak halt trapCause (wave)', runRiscvEbreakTest, { propagation: 'wave' });
+
+  reg(3232, 'asm-set', 'riscv32 extended mul encode decode', function(h, session) {
+    const src = `inline [asm] .rv:
+  set: riscv32
+  :
+64wire p = .rv {
+  addi x1, x0, 2
+  mul x2, x1, x1
+}`;
+    const { interp, out } = session.run(src + '\nshow(.rv:decode(p))');
+    h.assert('64 bits', String(session.getWire(interp, 'p').length), '64');
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('decode mul', String(text.includes('mul x2')), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

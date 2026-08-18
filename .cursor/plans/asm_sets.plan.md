@@ -27,8 +27,17 @@ todos:
     content: "1+x.3b: Executor CPU arm-thumb (după riscv32 POC)"
     status: completed
   - id: f1x3c-riscv-ext
-    content: "1+x.3c: riscv32 extended — mul/div, lb/lh/sb/sh, fence, ecall, FP"
-    status: pending
+    content: "1+x.3c: riscv32 extended (3c-i M, 3c-ii mem, 3c-iii system; FP amânat)"
+    status: completed
+  - id: f1x3ci-m-ext
+    content: "1+x.3c-i: mul/div/divu/rem/remu + encode/exec/teste"
+    status: completed
+  - id: f1x3cii-mem
+    content: "1+x.3c-ii: lb/lh/lbu/lhu/sb/sh + align rules + teste"
+    status: completed
+  - id: f1x3ciii-sys
+    content: "1+x.3c-iii: fence/ecall/ebreak didactic + teste"
+    status: completed
   - id: f1x-deferred
     content: "1+x.1+ (amânat): x86, variable-length, directives .byte/.word, CPU multi-set routing"
     status: pending
@@ -47,9 +56,9 @@ Relaționat: [faza_7_micro_asm.plan.md](faza_7_micro_asm.plan.md) · [comp_cpu.p
 
 ## Starea codului (aug 2026)
 
-**AsmSet: implementat (faze 1.1–1.5 + 1+x.3a ✅ + 1+x.3b ✅)** — registry, preset-uri `generic`/`riscv32`/`arm-thumb`, policy `inline.asm.set{}`, metadata `asmSetId`, composition multi-set, **executoare CPU nativ riscv32 + arm-thumb**, teste 3176–3215 (**2557** teste).
+**AsmSet: implementat (faze 1.1–1.5 + 1+x.3a ✅ + 1+x.3b ✅ + 1+x.3c ✅)** — registry, preset-uri `generic`/`riscv32`/`arm-thumb`, policy `inline.asm.set{}`, metadata `asmSetId`, composition multi-set, **executoare CPU nativ riscv32 + arm-thumb**, teste 3176–3232 (**2574** teste).
 
-**Următorul pas:** **1+x.3c** — extensii riscv32 (mul/div, lb/lh, fence, ecall, FP; sub-set FP de decis la implementare).
+**Următorul pas:** **1+x.3d** (FP amânat D27) sau **1+x.2** (dacă reprioritizat).
 
 Inline ASM rămâne un **mini-asamblor declarativ** — fără x86/ARM/RISC-V preset „din cutie” până la implementarea acestui plan. Utilizatorul definește manual fiecare ISA (sau va folosi preset-uri după 1.3+):
 
@@ -204,6 +213,12 @@ Contract profil + flux: `parseIsaHeader → registry → merge → inlineInstanc
 | **D20** | Exec MVP = subset encode faza 1.3; extensii (mul, div, lb/lh, fence, ecall, FP) → **1+x.3c** | **Confirmat** |
 | **D21** | CPU decode/exec cu **profil unic** din `isa:` (fără metadata per instrucțiune); prog heterogen/raw permis la load — comportament nedorit **documentat**, fără eroare/warning | **Confirmat** |
 | **D22** | **1+x.3a** = proof of concept riscv32; **arm-thumb exec** → 1+x.3b | **Confirmat** |
+| **D23** | **1+x.3c** în sub-faze **3c-i → 3c-ii → 3c-iii** (fără FP) | **Confirmat** |
+| **D24** | **M minimal:** `mul`, `div`, `divu`, `rem`, `remu`; **÷0 = A+C:** rezultate RV32M în `rd` + flag pedagogic **`divByZero`** (fără throw) | **Confirmat** |
+| **D25** | Mem byte/half: RAM 32-bit cells; aliniere ca RV; little-endian; RMW la `sb/sh` | **Confirmat** |
+| **D26** | `fence`/`fence.i` no-op; `ecall`/`ebreak` → `halted` + **`trapCause`** | **Confirmat** |
+| **D27** | **FP amânat** (1+x.3d) | **Confirmat** |
+| **D28** | Extindere preset **`riscv32`** + override **`{ micro }`** pe opcodes noi | **Confirmat** |
 
 ### D1 — Default `generic`
 
@@ -622,7 +637,7 @@ show(prog; asm)
 
 ## Faza 1+x.3 — Executor CPU per AsmSet
 
-**1+x.3a ✅ livrat.** **1+x.3b ✅ livrat.** Următorul pas: **1+x.3c** (riscv32 extended).
+**1+x.3a ✅ livrat.** **1+x.3b ✅ livrat.** **1+x.3c ✅ livrat.** Următorul pas: **1+x.3d** (FP) sau **1+x.2**.
 
 ### Obiectiv
 
@@ -678,7 +693,67 @@ Pe lângă encode/decode, profilul preset expune:
 | **D21** | Prog = raw binary, mem externă, sau blob compus — CPU decodează tot cu profilul `isa:`; doc: prog multi-arhitectură pe un singur CPU = nedefinit |
 | **D22** | Sub-faze: 3a riscv32 → 3b thumb → 3c extended RV |
 
-### Subset D20 — MVP 1+x.3a (exec)
+### 1+x.3c — extensii riscv32 (D23–D28)
+
+**Scope:** sub-faze confirmate; **FP amânat (D27)**.
+
+| Sub-fază | Livrabil |
+|----------|----------|
+| **3c-i** | `mul`, `div`, `divu`, `rem`, `remu` — encode + decode + exec + teste legacy/wave |
+| **3c-ii** | `lb`, `lh`, `lbu`, `lhu`, `sb`, `sh` — reguli aliniere D25 + teste |
+| **3c-iii** | `fence`, `fence.i`, `ecall`, `ebreak` — exec didactic D26 + teste |
+
+Fiecare sub-fază = extindere **`riscv32.js`** (D28) + doc `logts-play` + teste. Override `{ micro }` permis pe orice opcode nou.
+
+#### D24 — M extension + împărțire la zero
+
+| Instrucțiune | Semnificație |
+|--------------|--------------|
+| `mul` | `rd = (rs1 × rs2)[31:0]` (32-bit low product) |
+| `div` | `rd = rs1 ÷ rs2` semnat |
+| `divu` | `rd = rs1 ÷ rs2` nesemnat |
+| `rem` | `rd = rs1 mod rs2` semnat |
+| `remu` | `rd = rs1 mod rs2` nesemnat |
+
+**RISC-V real:** nu aruncă excepție la ÷0; nu are „flag ZF/SF” ca x86. Rezultate definite:
+
+| Instr. | rs2 = 0 → rd |
+|--------|----------------|
+| `div` | −1 |
+| `divu` | 0xFFFFFFFF |
+| `rem` / `remu` | rs1 (dividendul) |
+
+**Simulator (D24 — opțiunea A+C):** scriem **rezultatele RV32M** în `rd` (**fără `throw`**). Când `rs2=0` la `div`/`divu`/`rem`/`remu`, setăm și **`divByZero = 1`** (sticky până la `reset` / reload prog) — **extensie pedagogică LogTscript**, documentată în [cpu.md](../../v0_3_2/doc/cpu.md) și [asm-set-riscv32.md](../../v0_3_2/doc/asm-set-riscv32.md); nu este CSR hardware RISC-V.
+
+#### D25 — Load/store byte/half (recomandare didactică „spre real”)
+
+- Aceeași **RAM internă**: fiecare celulă = un cuvânt 32-bit (`ram.depth = 32`).
+- **`lb` / `lbu`:** adresă byte oarecare; citește octetul din cuvântul `RAM[byteAddr >> 2]`, index octet `byteAddr & 3`; sign/zero-extend la 32 bit.
+- **`lh` / `lhu`:** adresă **halfword-aligned** (`byteAddr & 1 === 0`); altfel **eroare runtime**; citește 16 bit din cuvânt (poate span 2 celule dacă cross-word — implementare explicită).
+- **`sb` / `sh`:** read-modify-write pe cuvânt(urile) afectate; **`lw`/`sw`** păstrează regula D19 (align 4).
+- **Endianness:** little-endian (ca RV).
+
+#### D26 — System (didactic)
+
+| Instr. | Rol real (scurt) | Exec simulator |
+|--------|------------------|----------------|
+| **`fence`** | Ordine vizibilitate load/store între nuclee / dispozitive | **No-op** (memoria e sincronă); `PC++` |
+| **`fence.i`** | Flush pipeline instrucțiuni (coerență I/D-cache) | **No-op**; `PC++` |
+| **`ecall` | Syscall / trap în SO (ex. Linux: apel kernel) | **`halted = 1`**, `trapCause = 8` (environment call) |
+| **`ebreak` | Breakpoint debugger | **`halted = 1`**, `trapCause = 3` (breakpoint) |
+
+Proprietăți CPU documentate: **`halted`**, **`trapCause`**, **`divByZero`** (read-only unde e cazul). Fără `mtvec`/`mepc`/handler automat în MVP — programe didactice pot folosi micro `{ HALTED < 1 }` dacă vor alt comportament. Vezi [cpu.md](../../v0_3_2/doc/cpu.md#riscv32-trap-and-divide-flags).
+
+#### D27 — Floating point (amânat)
+
+Extensia **F** ar necesita: registre **`f0`–`f31`** (separate de `x*`), instrucțiuni `*.s` / `*.d`, `flw`/`fsw`, reguli NaN/rounding, eventual **`cpuRequirements`** extins. **Nu intră în 3c** — planificat **1+x.3d** sau item separat în Amânat.
+
+#### D28 — Profil și micro
+
+- Toate opcodes noi în **`set: riscv32`** existent (merge D3).
+- User poate suprascrie orice mnemonic cu bloc **`{ micro }`** (D14); router CPU: micro → native → eroare.
+
+### Subset D20 — MVP 1+x.3a (exec) ✅
 
 | Mnemonic | Exec MVP |
 |----------|----------|
@@ -687,16 +762,14 @@ Pe lângă encode/decode, profilul preset expune:
 | `beq`, `bne`, `jal`, `jalr` | Da |
 | `nop` | Da |
 
-### 1+x.3c — extensii riscv32 (după POC)
+### 1+x.3c — extensii (plan vechi — vezi D23–D28 mai sus)
 
-| Categorie | Mnemonici planificate |
-|-----------|----------------------|
-| M extension | `mul`, `div`, … |
-| Load/store byte/half | `lb`, `lh`, `lbu`, `lhu`, `sb`, `sh` |
-| System | `fence`, `ecall`, `ebreak` |
-| Floating point | `fadd`, `fmul`, … (sub-set de decis) |
-
-Fiecare grup = encode + decode + exec + teste (același model ca MVP).
+| Categorie | Mnemonici | Sub-fază |
+|-----------|-----------|----------|
+| M extension | `mul`, `div`, `divu`, `rem`, `remu` | **3c-i** |
+| Load/store byte/half | `lb`, `lh`, `lbu`, `lhu`, `sb`, `sh` | **3c-ii** |
+| System | `fence`, `fence.i`, `ecall`, `ebreak` | **3c-iii** |
+| Floating point | — | **Amânat D27** |
 
 ### Sub-faze
 
@@ -704,7 +777,9 @@ Fiecare grup = encode + decode + exec + teste (același model ca MVP).
 |----|----------|
 | **1+x.3a ✅** | Router `cpuStep`; `executeInstruction` riscv32; validare init CPU; teste ALU/branch/mem/micro; doc `cpu.md` + `asm-set-riscv32.md` |
 | **1+x.3b ✅** | Executor `arm-thumb`; `cpuRequirements` 8×16; teste ALU/ldr/str/beq + legacy/wave; doc `cpu.md` + `asm-set-arm-thumb.md` |
-| **1+x.3c** | Extindere riscv32: mul/div, byte/half mem, fence/ecall, FP (sub-set FP de decis la implementare) |
+| **1+x.3c-i ✅** | M: mul/div/divu/rem/remu + divByZero pedagogic |
+| **1+x.3c-ii ✅** | Mem byte/half (D25) |
+| **1+x.3c-iii ✅** | fence / ecall / ebreak (D26) |
 
 ### Modificări fișiere (1+x.3a)
 
@@ -768,8 +843,8 @@ show(.u:ram:0)
 | 1+x.2 | **ARM Cortex-A (ARM + Thumb-2 mixt)** | Mix 16/32-bit, IT blocks |
 | **1+x.3a ✅** | **Executor riscv32 MVP** | Livrat — D15–D22, teste 3197–3206 |
 | **1+x.3b ✅** | **Executor arm-thumb** | Livrat — teste 3207–3215 |
-| **1+x.3c** | **riscv32 extended** | **Următorul pas** |
-| **1+x.3c** | **riscv32 extended** (mul/div, lb/lh, fence, ecall, FP) | După 3a |
+| **1+x.3c-i…iii ✅** | **riscv32 extended** (M, mem, system) | Livrat — D23–D28, teste 3216–3232 |
+| **1+x.3d** | **Floating point (F extension)** | Amânat D27 |
 | 1+x.4 | **Variable wordWidth per instrucțiune** | Blob concatenare fixă; x86 necesită model byte-oriented |
 | 1+x.5 | **Directives per set** (`.byte`, `.word`, `.org`) | Utile pentru x86/ARM |
 | 1+x.6 | **Integrare assembler extern** (Capstone/LLVM MC) | Overkill pentru simulare |
@@ -817,7 +892,8 @@ show(.u:ram:0)
 | 1.5 Policy + doc | Mic ✅ |
 | 1+x.3a riscv32 exec | Mediu ✅ |
 | 1+x.3b thumb exec | Mediu ✅ |
-| 1+x.3c riscv32 extended | Mediu–Mare |
+| 1+x.3c-i…iii riscv32 extended | Mediu–Mare |
+| 1+x.3d FP (F ext) | Mare (amânat) |
 | 1+x x86 | Mare |
 
 ---
@@ -825,7 +901,7 @@ show(.u:ram:0)
 ## Checklist implementare
 
 - [x] **Confirmare user:** D9 (`inline.asm.set{…}`), D10, D11 corp gol, D12 riscv32 fără CPU exec
-- [x] **Confirmare user:** D15–D22 (exec CPU 1+x.3)
+- [x] **Confirmare user:** D23–D28 (scope 3c-i/ii/iii, M minimal, mem D25, system D26, FP amânat, preset riscv32 + micro)
 - [x] ✅ **1.1** AsmSet registry + `parseIsaHeader` + `set: generic` implicit + merge preset (D11) + teste backward compat
 - [x] ✅ **1.2** Profil generic formalizat + validare segmente per set + `doc(inline.asm.sets)`
 - [x] ✅ **1.3** Preset `riscv32` + round-trip + **composition `use` (D13)**
@@ -833,5 +909,8 @@ show(.u:ram:0)
 - [x] ✅ **1.5** policy, CPU bridge, `asmSetId`, **composition + micro tests (D13/D14)**
 - [x] ✅ **1+x.3a** Router `cpuStep` + executor riscv32 MVP (D20 subset) + validare init + teste legacy/wave + doc
 - [x] ✅ **1+x.3b** Executor arm-thumb + validare init + teste legacy/wave + doc
-- [ ] **1+x.3c** riscv32 extended (mul/div, lb/lh, fence, ecall, FP)
+- [x] ✅ **1+x.3c-i** M extension (D24)
+- [x] ✅ **1+x.3c-ii** lb/lh/sb/sh (D25)
+- [x] ✅ **1+x.3c-iii** fence/ecall/ebreak (D26)
+- [ ] **1+x.3d** FP (D27 amânat)
 - [ ] **1+x.1+** x86, variable-length, directives `.byte`/`.word` (amânat)

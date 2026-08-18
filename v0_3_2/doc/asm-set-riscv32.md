@@ -46,6 +46,10 @@ Optional: add user opcodes with **literal-only** patterns (no `R2b` / `A2b` toke
 | `jal rd, target` | Jump and link |
 | `jalr rd, rs1, imm` | Jump and link register |
 | `nop` | Pseudo-op (addi x0, x0, 0) |
+| `mul`, `div`, `divu`, `rem`, `remu` | M extension — multiply / divide / remainder (see [Extended exec](#extended-exec-1x3c)) |
+| `lb`, `lh`, `lbu`, `lhu`, `sb`, `sh` | Byte / half load-store (sign- or zero-extend on load; RMW on store) |
+| `fence`, `fence.i` | Memory / instruction fence (no-op in single-core simulator) |
+| `ecall`, `ebreak` | Trap halt — see `trapCause` in [cpu.md](cpu.md#riscv32-trap-and-divide-flags) |
 
 ---
 
@@ -203,6 +207,161 @@ show(x3, mem0)
 - **Heterogeneous composed blob** as CPU prog: undefined behaviour — use a single-architecture program for CPU exec.
 
 See also [cpu.md](cpu.md#riscv32-native-exec).
+
+---
+
+## Extended exec (1+x.3c)
+
+Sub-phases **3c-i → 3c-ii → 3c-iii** extend the same **`set: riscv32`** preset (no new profile). User **`{ micro }`** overrides on new opcodes follow [asm-microcode.md](asm-microcode.md) (D28).
+
+### 3c-i — M extension (`mul`, `div`, `divu`, `rem`, `remu`)
+
+| Instr. | Effect |
+|--------|--------|
+| `mul` | `rd = (rs1 × rs2)[31:0]` |
+| `div` / `divu` | Quotient signed / unsigned |
+| `rem` / `remu` | Remainder signed / unsigned |
+
+**Divide by zero (simulator contract — D24 A+C):**
+
+- **No throw.** `rd` gets the **RV32M** value (see table in [cpu.md](cpu.md#riscv32-trap-and-divide-flags)).
+- **`divByZero ← 1`** on the CPU (sticky until reset / prog reload). Read with **`.u:divByZero`**.
+
+### 3c-ii — Byte / half load-store (`lb`, `lh`, `lbu`, `lhu`, `sb`, `sh`)
+
+Same **RAM model** as **`lw` / `sw`**: each cell is one **32-bit word**; **little-endian** byte order inside the word.
+
+| Instr. | Address rule | Access |
+|--------|--------------|--------|
+| `lb`, `lbu` | Any byte address | Read byte from `RAM[byteAddr >> 2]`, octet `byteAddr & 3`; sign- or zero-extend to 32 bits |
+| `lh`, `lhu` | **Halfword-aligned** (`byteAddr & 1 = 0`) | Read 16 bits; **error** if misaligned |
+| `sb`, `sh` | Same alignment as load counterparts | **Read-modify-write** the affected word(s) |
+| `lw`, `sw` | **Word-aligned** (`byteAddr & 3 = 0`) | Unchanged (D19) |
+
+Halfwords that span a 32-bit word boundary use the composed 16-bit value from adjacent bytes (little-endian), matching typical RV32 memory layout teaching.
+
+### 3c-iii — System (`fence`, `fence.i`, `ecall`, `ebreak`)
+
+| Instr. | Hardware role (summary) | Simulator (didactic) |
+|--------|-------------------------|----------------------|
+| **`fence`** | Memory ordering fence between cores / devices | **No-op** — advance **`PC`** (single-core synchronous RAM) |
+| **`fence.i`** | Instruction-fetch fence (I/D coherence) | **No-op** — advance **`PC`** |
+| **`ecall`** | Syscall / trap to supervisor (OS entry) | **`halted ← 1`**, **`trapCause ← 8`**, **`PC`** unchanged |
+| **`ebreak`** | Debugger breakpoint | **`halted ← 1`**, **`trapCause ← 3`**, **`PC`** unchanged |
+
+No automatic jump to **`mtvec`**, no **`mepc`** save — inspect **`halted`** and **`trapCause`** instead. Full property list: [cpu.md — riscv32 trap and divide flags](cpu.md#riscv32-trap-and-divide-flags).
+
+**Floating point (F extension):** deferred (**D27** / 1+x.3d).
+
+### Runnable — multiply and divide by zero
+
+```logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 3
+  ram:
+    depth: 32
+    length: 4
+  prog:
+    depth: 32
+    length: 4
+    = .rv {
+      addi x1, x0, 6
+      addi x2, x0, 7
+      mul x3, x1, x2
+      div x4, x3, x0
+      loop: beq x0, x0, loop
+    }
+  :
+
+.u:{ run = 1 }
+32wire prod = .u:r3
+32wire quot = .u:r4
+1wire dz = .u:divByZero
+show(prod, quot, dz)
+```
+
+**Load:** wires and CPU are declared; press **Load & Run** to execute.
+
+**Load & Run:** `prod` = `…0101010` (42 = 6×7), `quot` = all bits `1` (RV32M `div` by zero → −1), `dz` = `1` (sticky **`divByZero`**).
+
+### Runnable — byte load / store (`lb`, `sb`)
+
+```logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 6
+  ram:
+    depth: 32
+    length: 8
+  prog:
+    depth: 32
+    length: 8
+    = .rv {
+      addi x1, x0, 0
+      addi x2, x0, 255
+      sw x2, 0(x1)
+      addi x2, x0, 171
+      sb x2, 1(x1)
+      lb x3, 0(x1)
+      lw x4, 0(x1)
+      loop: beq x0, x0, loop
+    }
+  :
+
+.u:{ run = 1 }
+32wire b0 = .u:r3
+32wire word = .u:r4
+show(b0, word)
+```
+
+**Load & Run:** `b0` = sign-extended `0xFF` (all bits `1` in 32-bit), `word` = `…1010101111111111` (`0x0000ABFF` — byte 0 unchanged, byte 1 patched to `171`).
+
+### Runnable — `ecall` trap halt
+
+```logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 2
+  ram:
+    depth: 32
+    length: 4
+  prog:
+    depth: 32
+    length: 4
+    = .rv {
+      addi x1, x0, 1
+      ecall
+      addi x2, x0, 9
+    }
+  :
+
+.u:{ run = 1 }
+1wire h = .u:halted
+8wire cause = .u:trapCause
+32wire x2 = .u:r2
+show(h, cause, x2)
+```
+
+**Load & Run:** `h` = `1`, `cause` = `8`, `x2` stays `0` (instruction after **`ecall`** does not run). **`PC`** remains on **`ecall`**.
 
 ---
 

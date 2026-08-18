@@ -11,6 +11,9 @@ const RISCV_REG_ALIASES = {
 
 const RISCV_MNEMONICS = [
   'addi', 'add', 'sub', 'lui', 'lw', 'sw', 'beq', 'bne', 'jal', 'jalr', 'nop',
+  'mul', 'div', 'divu', 'rem', 'remu',
+  'lb', 'lh', 'lbu', 'lhu', 'sb', 'sh',
+  'fence', 'fence.i', 'ecall', 'ebreak',
 ];
 
 function riscvParseReg(tok) {
@@ -158,6 +161,42 @@ function riscvEncodeBuiltin(mnemonic, args, labels, instrAddr) {
     const imm = riscvParseImm(a[2] || '0', 12, true);
     return riscvBits(imm, 12) + riscvBits(rs1, 5) + '000' + riscvBits(rd, 5) + '1100111';
   }
+  if (mn === 'MUL' || mn === 'DIV' || mn === 'DIVU' || mn === 'REM' || mn === 'REMU') {
+    const rd = riscvParseReg(a[0]);
+    const rs1 = riscvParseReg(a[1]);
+    const rs2 = riscvParseReg(a[2]);
+    const f3Map = { MUL: '000', DIV: '100', DIVU: '101', REM: '110', REMU: '111' };
+    return '0000001' + riscvBits(rs2, 5) + riscvBits(rs1, 5) + f3Map[mn] + riscvBits(rd, 5) + '0110011';
+  }
+  if (mn === 'LB' || mn === 'LH' || mn === 'LBU' || mn === 'LHU') {
+    const rd = riscvParseReg(a[0]);
+    const mem = riscvParseMemArg(1, a);
+    const imm = riscvParseImm(mem.imm, 12, true);
+    const rs1 = riscvParseReg(mem.rs1);
+    const f3Map = { LB: '000', LH: '001', LBU: '100', LHU: '101' };
+    return riscvBits(imm, 12) + riscvBits(rs1, 5) + f3Map[mn] + riscvBits(rd, 5) + '0000011';
+  }
+  if (mn === 'SB' || mn === 'SH') {
+    const rs2 = riscvParseReg(a[0]);
+    const mem = riscvParseMemArg(1, a);
+    const imm = riscvParseImm(mem.imm, 12, true);
+    const rs1 = riscvParseReg(mem.rs1);
+    const immVal = parseInt(riscvBits(imm, 12), 2);
+    const f3 = mn === 'SB' ? '000' : '001';
+    return riscvBits(immVal >> 5, 7) + riscvBits(rs2, 5) + riscvBits(rs1, 5) + f3 + riscvBits(immVal & 0x1f, 5) + '0100011';
+  }
+  if (mn === 'FENCE') {
+    return '0000000000000000000000000001111';
+  }
+  if (mn === 'FENCE.I') {
+    return '0000000000000000010000000001111';
+  }
+  if (mn === 'ECALL') {
+    return '00000000000000000000000001110011';
+  }
+  if (mn === 'EBREAK') {
+    return '00000000000100000000000001110011';
+  }
   throw new Error(`Unknown riscv32 instruction '${mnemonic}'`);
 }
 
@@ -223,17 +262,64 @@ function riscvDisassemble(bits) {
     const immS = imm >= 2048 ? imm - 4096 : imm;
     return `jalr ${riscvRegName(rd)}, ${riscvRegName(rs1)}, ${immS}`;
   }
+  if (opcode === '0110011' && f7 === '0000001') {
+    if (f3 === '000') return `mul ${riscvRegName(rd)}, ${riscvRegName(rs1)}, ${riscvRegName(rs2)}`;
+    if (f3 === '100') return `div ${riscvRegName(rd)}, ${riscvRegName(rs1)}, ${riscvRegName(rs2)}`;
+    if (f3 === '101') return `divu ${riscvRegName(rd)}, ${riscvRegName(rs1)}, ${riscvRegName(rs2)}`;
+    if (f3 === '110') return `rem ${riscvRegName(rd)}, ${riscvRegName(rs1)}, ${riscvRegName(rs2)}`;
+    if (f3 === '111') return `remu ${riscvRegName(rd)}, ${riscvRegName(rs1)}, ${riscvRegName(rs2)}`;
+  }
+  if (opcode === '0000011' && f3 === '000') {
+    const imm = parseInt(b.slice(0, 12), 2);
+    const immS = imm >= 2048 ? imm - 4096 : imm;
+    return `lb ${riscvRegName(rd)}, ${immS}(${riscvRegName(rs1)})`;
+  }
+  if (opcode === '0000011' && f3 === '001') {
+    const imm = parseInt(b.slice(0, 12), 2);
+    const immS = imm >= 2048 ? imm - 4096 : imm;
+    return `lh ${riscvRegName(rd)}, ${immS}(${riscvRegName(rs1)})`;
+  }
+  if (opcode === '0000011' && f3 === '100') {
+    const imm = parseInt(b.slice(0, 12), 2);
+    const immS = imm >= 2048 ? imm - 4096 : imm;
+    return `lbu ${riscvRegName(rd)}, ${immS}(${riscvRegName(rs1)})`;
+  }
+  if (opcode === '0000011' && f3 === '101') {
+    const imm = parseInt(b.slice(0, 12), 2);
+    const immS = imm >= 2048 ? imm - 4096 : imm;
+    return `lhu ${riscvRegName(rd)}, ${immS}(${riscvRegName(rs1)})`;
+  }
+  if (opcode === '0100011' && f3 === '000') {
+    const imm = (parseInt(b.slice(0, 7), 2) << 5) | parseInt(b.slice(20, 25), 2);
+    const immS = imm >= 2048 ? imm - 4096 : imm;
+    return `sb ${riscvRegName(rs2)}, ${immS}(${riscvRegName(rs1)})`;
+  }
+  if (opcode === '0100011' && f3 === '001') {
+    const imm = (parseInt(b.slice(0, 7), 2) << 5) | parseInt(b.slice(20, 25), 2);
+    const immS = imm >= 2048 ? imm - 4096 : imm;
+    return `sh ${riscvRegName(rs2)}, ${immS}(${riscvRegName(rs1)})`;
+  }
+  if (opcode === '0001111') {
+    return f3 === '001' ? 'fence.i' : 'fence';
+  }
+  if (opcode === '1110011' && f3 === '000' && rd === 0 && rs1 === 0) {
+    const imm = parseInt(b.slice(0, 12), 2);
+    if (imm === 0) return 'ecall';
+    if (imm === 1) return 'ebreak';
+  }
   throw new Error('Cannot disassemble instruction — no matching riscv32 opcode');
 }
 
 function createRiscv32BuiltinOpcode(mnemonic) {
+  const mn = mnemonic.toLowerCase();
+  const seq = ['beq', 'bne', 'jal', 'jalr', 'ecall', 'ebreak'].includes(mn);
   return {
     segments: null,
     wordWidth: 32,
     sourceLine: `${mnemonic} (riscv32 preset)`,
     microRaw: null,
     microProgram: null,
-    pcEffect: ['beq', 'bne', 'jal', 'jalr'].includes(mnemonic) ? 'seq' : 'autoInc',
+    pcEffect: seq ? 'seq' : 'autoInc',
     execution: 'preset',
     presetBuiltin: true,
   };
@@ -253,8 +339,8 @@ function riscv32ReadReg(c, idx) {
 function riscv32WriteReg(c, idx, val) {
   if (idx <= 0) return;
   if (idx >= c.regCount) throw new Error(`riscv32: register x${idx} out of range (CPU has ${c.regCount} registers)`);
-  const mask = c.regDepth >= 32 ? 0xffffffff : ((1 << c.regDepth) - 1);
-  c.regs[idx] = ((val >>> 0) & mask).toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
+  const uval = val >>> 0;
+  c.regs[idx] = uval.toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
 }
 
 function riscv32BranchImm(b) {
@@ -290,9 +376,96 @@ function riscv32WriteRamWord(c, byteAddr, val) {
   if (idx < 0 || idx >= c.ramLength) {
     throw new Error(`riscv32: memory write out of range (byte ${byteAddr})`);
   }
-  const mask = c.ramDepth >= 32 ? 0xffffffff : ((1 << c.ramDepth) - 1);
-  const bits = ((val >>> 0) & mask).toString(2).padStart(c.ramDepth, '0').slice(-c.ramDepth);
+  const bits = (val >>> 0).toString(2).padStart(c.ramDepth, '0').slice(-c.ramDepth);
   cpuWriteRamCell(c, idx, bits);
+}
+
+function riscv32ReadRamWordRaw(c, idx) {
+  if (idx < 0 || idx >= c.ramLength) {
+    throw new Error(`riscv32: memory read out of range (word index ${idx})`);
+  }
+  const cell = cpuReadRamCell(c, idx);
+  return cell != null ? (parseInt(cell, 2) >>> 0) : 0;
+}
+
+function riscv32WriteRamWordRaw(c, idx, val) {
+  if (idx < 0 || idx >= c.ramLength) {
+    throw new Error(`riscv32: memory write out of range (word index ${idx})`);
+  }
+  const bits = (val >>> 0).toString(2).padStart(c.ramDepth, '0').slice(-c.ramDepth);
+  cpuWriteRamCell(c, idx, bits);
+}
+
+function riscv32ReadMemByte(c, byteAddr) {
+  const idx = byteAddr >>> 2;
+  const off = byteAddr & 3;
+  return (riscv32ReadRamWordRaw(c, idx) >>> (off * 8)) & 0xff;
+}
+
+function riscv32ReadMemHalf(c, byteAddr) {
+  if ((byteAddr & 1) !== 0) {
+    throw new Error(`riscv32: unaligned halfword access at byte address ${byteAddr}`);
+  }
+  const off = byteAddr & 3;
+  const idx = byteAddr >>> 2;
+  if (off <= 2) {
+    return (riscv32ReadRamWordRaw(c, idx) >>> (off * 8)) & 0xffff;
+  }
+  const lo = (riscv32ReadRamWordRaw(c, idx) >>> 24) & 0xff;
+  const hi = riscv32ReadRamWordRaw(c, idx + 1) & 0xff;
+  return lo | (hi << 8);
+}
+
+function riscv32WriteMemByte(c, byteAddr, val) {
+  const idx = byteAddr >>> 2;
+  const off = byteAddr & 3;
+  const mask = ~(0xff << (off * 8)) >>> 0;
+  const word = riscv32ReadRamWordRaw(c, idx);
+  const next = (word & mask) | ((val & 0xff) << (off * 8));
+  riscv32WriteRamWordRaw(c, idx, next);
+}
+
+function riscv32WriteMemHalf(c, byteAddr, val) {
+  if ((byteAddr & 1) !== 0) {
+    throw new Error(`riscv32: unaligned halfword store at byte address ${byteAddr}`);
+  }
+  const off = byteAddr & 3;
+  const idx = byteAddr >>> 2;
+  val &= 0xffff;
+  if (off <= 2) {
+    const mask = ~(0xffff << (off * 8)) >>> 0;
+    const word = riscv32ReadRamWordRaw(c, idx);
+    riscv32WriteRamWordRaw(c, idx, (word & mask) | (val << (off * 8)));
+    return;
+  }
+  riscv32WriteMemByte(c, byteAddr, val & 0xff);
+  riscv32WriteMemByte(c, byteAddr + 1, (val >> 8) & 0xff);
+}
+
+function riscv32ToSigned32(u) {
+  u >>>= 0;
+  return u >= 0x80000000 ? u - 0x100000000 : u;
+}
+
+function riscv32MarkDivByZero(c, rs2) {
+  if (rs2 === 0) c.divByZero = 1;
+}
+
+function riscv32DivQuotient(rs1, rs2, signed) {
+  if (rs2 === 0) return 0xffffffff;
+  if (signed) return (Math.trunc(riscv32ToSigned32(rs1) / riscv32ToSigned32(rs2))) | 0;
+  return Math.floor((rs1 >>> 0) / (rs2 >>> 0)) >>> 0;
+}
+
+function riscv32DivRemainder(rs1, rs2, signed) {
+  if (rs2 === 0) return rs1 >>> 0;
+  if (signed) return (riscv32ToSigned32(rs1) % riscv32ToSigned32(rs2)) | 0;
+  return (rs1 >>> 0) % (rs2 >>> 0);
+}
+
+function riscv32TrapHalt(c, cause) {
+  c.halted = 1;
+  c.trapCause = cause | 0;
 }
 
 function riscv32ExecuteInstruction(c, ctx, isaInst, decoded, instrBits) {
@@ -373,6 +546,66 @@ function riscv32ExecuteInstruction(c, ctx, isaInst, decoded, instrBits) {
     nextPc = (riscv32ReadReg(c, rs1) + imm) >>> 0;
     c.pc = nextPc;
     return;
+  }
+  if (opcode === '0110011' && f7 === '0000001') {
+    const v1 = riscv32ReadReg(c, rs1);
+    const v2 = riscv32ReadReg(c, rs2);
+    if (f3 === '000') {
+      riscv32WriteReg(c, rd, (v1 * v2) >>> 0);
+    } else if (f3 === '100') {
+      riscv32MarkDivByZero(c, v2);
+      riscv32WriteReg(c, rd, riscv32DivQuotient(v1, v2, true));
+    } else if (f3 === '101') {
+      riscv32MarkDivByZero(c, v2);
+      riscv32WriteReg(c, rd, riscv32DivQuotient(v1, v2, false));
+    } else if (f3 === '110') {
+      riscv32MarkDivByZero(c, v2);
+      riscv32WriteReg(c, rd, riscv32DivRemainder(v1, v2, true));
+    } else if (f3 === '111') {
+      riscv32MarkDivByZero(c, v2);
+      riscv32WriteReg(c, rd, riscv32DivRemainder(v1, v2, false));
+    } else {
+      throw new Error(`riscv32: unsupported M-extension funct3 ${f3} at PC ${pc}`);
+    }
+    c.pc = nextPc;
+    return;
+  }
+  if (opcode === '0000011' && (f3 === '000' || f3 === '001' || f3 === '100' || f3 === '101')) {
+    const imm = riscv32SignExtend(parseInt(b.slice(0, 12), 2), 12);
+    const byteAddr = (riscv32ReadReg(c, rs1) + imm) >>> 0;
+    let val;
+    if (f3 === '000') val = riscv32SignExtend(riscv32ReadMemByte(c, byteAddr), 8);
+    else if (f3 === '001') val = riscv32SignExtend(riscv32ReadMemHalf(c, byteAddr), 16);
+    else if (f3 === '100') val = riscv32ReadMemByte(c, byteAddr);
+    else val = riscv32ReadMemHalf(c, byteAddr);
+    riscv32WriteReg(c, rd, val >>> 0);
+    c.pc = nextPc;
+    return;
+  }
+  if (opcode === '0100011' && (f3 === '000' || f3 === '001')) {
+    const imm = (parseInt(b.slice(0, 7), 2) << 5) | parseInt(b.slice(20, 25), 2);
+    const immS = riscv32SignExtend(imm, 12);
+    const byteAddr = (riscv32ReadReg(c, rs1) + immS) >>> 0;
+    const val = riscv32ReadReg(c, rs2);
+    if (f3 === '000') riscv32WriteMemByte(c, byteAddr, val);
+    else riscv32WriteMemHalf(c, byteAddr, val);
+    c.pc = nextPc;
+    return;
+  }
+  if (opcode === '0001111') {
+    c.pc = nextPc;
+    return;
+  }
+  if (opcode === '1110011' && f3 === '000' && rd === 0 && rs1 === 0) {
+    const imm = parseInt(b.slice(0, 12), 2);
+    if (imm === 0) {
+      riscv32TrapHalt(c, 8);
+      return;
+    }
+    if (imm === 1) {
+      riscv32TrapHalt(c, 3);
+      return;
+    }
   }
   throw new Error(`riscv32: unsupported instruction '${mn}' at PC ${pc}`);
 }

@@ -77,6 +77,7 @@ Reload program with **`.u:prog = …`** (not direct assign on the component body
 | `resetPC`, `resetRAM`, `resetRegs`, `resetSP`, `resetHalted` | Granular resets (active `1`) |
 | `ramAdr`, `progAdr` | Address for peek ports |
 | `pc`, `halted`, `instr` | Pout-style reads |
+| `trapCause`, `divByZero` | Read-only ( **`set: riscv32`**, extended exec **1+x.3c** ) — see [riscv32 trap and divide flags](#riscv32-trap-and-divide-flags) |
 | `r0`…`rN` | Register peek |
 | `ram:get`, `prog:get` | Read word at `ramAdr` / `progAdr` |
 | `trace:get` | Trace text when `trace: 1` or `output` |
@@ -156,6 +157,111 @@ show(x3)
 **Load & Run:** `x3` shows `…1100` (decimal 12).
 
 Details: [asm-set-riscv32.md](asm-set-riscv32.md#cpu-bridge).
+
+Extended opcodes (M, byte/half memory, system traps) — **1+x.3c** — are documented in [asm-set-riscv32.md](asm-set-riscv32.md#extended-exec-1x3c) and [riscv32 trap/divide flags](#riscv32-trap-and-divide-flags) below.
+
+---
+
+## riscv32 trap and divide flags
+
+When the CPU runs **`set: riscv32`** with extended instructions (**1+x.3c**), these **read-only** properties expose simulator state (LogTscript extensions — not full RISC-V CSRs):
+
+| Property | Width | Meaning |
+|----------|-------|---------|
+| `.u:halted` | 1 | `1` after **`ecall`** / **`ebreak`** (or micro **`HALTED`**) |
+| `.u:trapCause` | small int | Why the CPU stopped; `0` if not a trap halt |
+| `.u:divByZero` | 1 | `1` if the last **`div`**, **`divu`**, **`rem`**, or **`remu`** had **`rs2 = 0`**; sticky until **`reset`** or prog reload |
+
+### `trapCause` values (didactic mapping)
+
+| Value | Set by | Real-world meaning |
+|-------|--------|-------------------|
+| `0` | (default) | No trap — normal run or halt via micro |
+| `3` | **`ebreak`** | Breakpoint (debugger stop) |
+| `8` | **`ecall`** | Environment call / syscall entry |
+
+After **`ecall`** or **`ebreak`**: **`halted ← 1`**, **`trapCause ←`** value above, **`PC`** points at the trapping instruction (does not advance). **`run`** / **`set`** do not continue until **`reset`**, prog reload, or you clear state manually.
+
+**Not simulated in MVP:** jump to **`mtvec`**, save **`mepc`**, privilege modes, or OS syscall dispatch. Use **`show(.u:halted, .u:trapCause)`** or **`doc(.u)`** to inspect.
+
+### `divByZero` (M extension)
+
+On **`div`**, **`divu`**, **`rem`**, **`remu`** with **`rs2 = 0`**:
+
+1. **`rd`** receives the **RV32M-defined value** (no simulator error):
+
+| Instr. | `rd` when `rs2 = 0` |
+|--------|---------------------|
+| `div` | −1 (all bits set in 32-bit signed sense: `0xFFFFFFFF`) |
+| `divu` | `0xFFFFFFFF` |
+| `rem`, `remu` | **`rs1`** (dividend unchanged) |
+
+2. **`divByZero ← 1`** (sticky until **`reset`** / prog reload / explicit clear on reset flags).
+
+RISC-V has **no integer flag register** like x86; **`divByZero`** is a **teaching aid** only.
+
+```logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 2
+  ram:
+    depth: 32
+    length: 4
+  prog:
+    depth: 32
+    length: 4
+    = .rv {
+      addi x1, x0, 10
+      ecall
+    }
+  :
+
+.u:{ run = 1 }
+1wire h = .u:halted
+8wire cause = .u:trapCause
+show(h, cause)
+```
+
+**Load & Run:** `h` = `1`, `cause` = `8`.
+
+### Runnable — divide by zero flag
+
+```logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 2
+  ram:
+    depth: 32
+    length: 4
+  prog:
+    depth: 32
+    length: 4
+    = .rv {
+      addi x1, x0, 10
+      div x3, x1, x0
+      loop: beq x0, x0, loop
+    }
+  :
+
+.u:{ run = 1 }
+32wire q = .u:r3
+1wire dz = .u:divByZero
+show(q, dz)
+```
+
+**Load & Run:** `q` = all bits `1` (RV32M quotient −1), `dz` = `1`. No simulator error — inspect **`divByZero`** instead of trapping.
 
 ---
 

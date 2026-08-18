@@ -263,6 +263,8 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       { bits: '1', name: 'halted' },
       { bits: '1', name: 'ie' },
       { bits: '1', name: 'irqPending' },
+      { bits: '8', name: 'trapCause' },
+      { bits: '1', name: 'divByZero' },
       { bits: String(prog.depth), name: 'instr' },
       { bits: String(ram.depth), name: 'ram:get' },
       { bits: String(prog.depth), name: 'prog:get' },
@@ -312,7 +314,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   }
 
   supportsPropertyName(property, attributes) {
-    if (['pc', 'halted', 'ie', 'irqPending', 'instr', 'ram:get', 'prog:get', 'trace:get'].includes(property)) return true;
+    if (['pc', 'halted', 'ie', 'irqPending', 'trapCause', 'divByZero', 'instr', 'ram:get', 'prog:get', 'trace:get'].includes(property)) return true;
     if (/^r\d+$/.test(property)) {
       const n = parseInt(property.substring(1), 10);
       return n >= 0 && n < this._regCount(attributes);
@@ -321,13 +323,13 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   }
 
   getSupportedProperties() {
-    return ['pc', 'halted', 'ie', 'irqPending', 'instr', 'ram:get', 'prog:get', 'trace:get',
+    return ['pc', 'halted', 'ie', 'irqPending', 'trapCause', 'divByZero', 'instr', 'ram:get', 'prog:get', 'trace:get',
       'set', 'run', 'reset', 'ramAdr', 'progAdr', 'irq', 'irqVec', 'wait',
       'resetPC', 'resetRAM', 'resetRegs', 'resetSP', 'resetHalted'];
   }
 
   getRedirectProperties() {
-    return ['pc', 'halted', 'ie', 'irqPending', 'instr', 'ram:get', 'prog:get', 'trace:get',
+    return ['pc', 'halted', 'ie', 'irqPending', 'trapCause', 'divByZero', 'instr', 'ram:get', 'prog:get', 'trace:get',
       'r0', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7'];
   }
 
@@ -602,6 +604,14 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     }
     if (property === 'irqPending') {
       return { value: c.irqPending ? '1' : '0', ref: null, varName: `${a.var}:irqPending`, bitWidth: 1 };
+    }
+    if (property === 'trapCause') {
+      const tc = c.trapCause != null ? (c.trapCause | 0) : 0;
+      const val = tc.toString(2).padStart(8, '0').slice(-8);
+      return { value: val, ref: null, varName: `${a.var}:trapCause`, bitWidth: 8 };
+    }
+    if (property === 'divByZero') {
+      return { value: c.divByZero ? '1' : '0', ref: null, varName: `${a.var}:divByZero`, bitWidth: 1 };
     }
     if (property === 'instr') {
       return { value: c.lastInstr, ref: null, varName: `${a.var}:instr`, bitWidth: c.progDepth };
