@@ -34541,13 +34541,17 @@ inline [asm] .rv:
     h.assert('asmSetId', String(isa.asmSetId), 'riscv32');
   });
 
-  reg(3195, 'asm-set', 'CPU riscv32 addi micro override step', function(h, session) {
+  function runRiscvMicroAddiHaltTest(h, session) {
     const src = `inline [asm] .rv:
 ${RISCV32_MICRO_ADDI_CPU}
 comp [cpu] .u:
   isa: .rv
-  registers: 2
+  registers: 32
   on: 1
+  maxSteps: 1
+  ram:
+    depth: 32
+    length: 4
   prog:
     depth: 32
     length: 2
@@ -34557,10 +34561,13 @@ comp [cpu] .u:
     const { interp } = session.run(src);
     const handler = session._ensureRegistry().get('cpu');
     const comp = interp.components.get('.u');
-    session.execStmts(interp, '.u:{ set = 1 }');
+    session.execStmts(interp, '.u:{ run = 1 }');
     const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
     h.assert('halted via micro addi', String(parseInt(halted.value, 2)), '1');
-  });
+  }
+
+  reg(3195, 'asm-set', 'CPU riscv32 addi micro override step', runRiscvMicroAddiHaltTest);
+  reg(3206, 'asm-set', 'CPU riscv32 addi micro override step (wave)', runRiscvMicroAddiHaltTest, { propagation: 'wave' });
 
   reg(3196, 'asm-set', 'Allow inline.asm.set permits whitelisted preset', function(h, session) {
     const src = `Allow NONE inline.type{asm} inline.asm.set{riscv32}
@@ -34572,6 +34579,123 @@ inline [asm] .rv:
     h.assert('32 bits', String(session.getWire(interp, 'p').length), '32');
     h.assert('no error', String(out.some(l => l.startsWith('Error:'))), 'false');
   });
+
+  const RISCV32_CPU_ISA = `inline [asm] .rv:
+  set: riscv32
+  :
+`;
+
+  function riscvCpuShell(progBody, opts) {
+    opts = opts || {};
+    const regs = opts.registers != null ? opts.registers : 32;
+    const ramLen = opts.ramLen || 16;
+    const progLen = opts.progLen || 8;
+    const maxStepsLine = opts.maxSteps != null ? `  maxSteps: ${opts.maxSteps}\n` : '';
+    return RISCV32_CPU_ISA + `
+comp [cpu] .u:
+  isa: .rv
+  registers: ${regs}
+  on: 1
+${maxStepsLine}  ram:
+    depth: 32
+    length: ${ramLen}
+  prog:
+    depth: 32
+    length: ${progLen}
+    = .rv {
+      ${progBody}
+    }
+  :
+`;
+  }
+
+  function runRiscvCpuAddTest(h, session) {
+    const src = riscvCpuShell(`addi x1, x0, 5
+      addi x2, x0, 3
+      add x3, x1, x2
+      loop: beq x0, x0, loop`, { maxSteps: 4, progLen: 8 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r3 = handler.evalGetProperty(comp, 'r3', { var: '.u', property: 'r3' }, interp);
+    h.assert('x3 = 8', r3.value, '00000000000000000000000000001000');
+  }
+
+  reg(3197, 'asm-set', 'riscv32 CPU addi add native exec', runRiscvCpuAddTest);
+  reg(3198, 'asm-set', 'riscv32 CPU addi add native exec (wave)', runRiscvCpuAddTest, { propagation: 'wave' });
+
+  function runRiscvCpuLwSwTest(h, session) {
+    const src = riscvCpuShell(`addi x1, x0, 42
+      sw x1, 0(x0)
+      addi x1, x0, 0
+      lw x2, 0(x0)
+      loop: beq x0, x0, loop`, { maxSteps: 4, progLen: 8 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r2 = handler.evalGetProperty(comp, 'r2', { var: '.u', property: 'r2' }, interp);
+    h.assert('x2 = 42', r2.value, '00000000000000000000000000101010');
+  }
+
+  reg(3199, 'asm-set', 'riscv32 CPU lw sw native exec', runRiscvCpuLwSwTest);
+  reg(3200, 'asm-set', 'riscv32 CPU lw sw native exec (wave)', runRiscvCpuLwSwTest, { propagation: 'wave' });
+
+  reg(3201, 'asm-set', 'riscv32 CPU init rejects wrong register count', function(h, session) {
+    let err = '';
+    try {
+      session.run(riscvCpuShell('addi x1, x0, 1', { registers: 4, progLen: 4 }));
+    } catch (e) {
+      err = String(e.message || e);
+    }
+    h.assert('reg count error', String(err.includes('registers (4) must be 32')), 'true');
+  });
+
+  function runRiscvCpuX0Test(h, session) {
+    const src = riscvCpuShell(`addi x0, x0, 99
+      addi x1, x0, 7
+      loop: beq x0, x0, loop`, { maxSteps: 2, progLen: 4 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    const r1 = handler.evalGetProperty(comp, 'r1', { var: '.u', property: 'r1' }, interp);
+    h.assert('x0 stays 0', r0.value, '00000000000000000000000000000000');
+    h.assert('x1 = 7', r1.value, '00000000000000000000000000000111');
+  }
+
+  reg(3202, 'asm-set', 'riscv32 CPU x0 read-only', runRiscvCpuX0Test);
+  reg(3203, 'asm-set', 'riscv32 CPU x0 read-only (wave)', runRiscvCpuX0Test, { propagation: 'wave' });
+
+  function runRiscvCpuRawProgTest(h, session) {
+    const src = RISCV32_CPU_ISA + `
+32wire raw = .rv { addi x1, x0, 5 }
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 1
+  ram:
+    depth: 32
+    length: 4
+  prog:
+    depth: 32
+    length: 4
+    = raw
+  :
+`;
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r1 = handler.evalGetProperty(comp, 'r1', { var: '.u', property: 'r1' }, interp);
+    h.assert('raw addi x1', r1.value, '00000000000000000000000000000101');
+  }
+
+  reg(3204, 'asm-set', 'riscv32 CPU raw prog hex exec', runRiscvCpuRawProgTest);
+  reg(3205, 'asm-set', 'riscv32 CPU raw prog hex exec (wave)', runRiscvCpuRawProgTest, { propagation: 'wave' });
 
   window.LogTScriptTestSuite.finalize();
 })();

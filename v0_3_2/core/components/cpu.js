@@ -379,6 +379,22 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     const isaMembers = attributes.isaMembers;
     if (isaMembers && isaMembers.length) isaRef = isaMembers[0];
 
+    if (isaRef && ctx && ctx.inlineInstances) {
+      const isaInst = ctx.inlineInstances.get(isaRef);
+      const req = isaInst && isaInst.asmSet && isaInst.asmSet.cpuRequirements;
+      if (req) {
+        if (req.regCount != null && regCount !== req.regCount) {
+          throw Error(`CPU registers (${regCount}) must be ${req.regCount} for asm set '${isaInst.asmSetId || isaInst.asmSet.id}'`);
+        }
+        if (req.regDepth != null && ram.depth !== req.regDepth) {
+          throw Error(`CPU ram depth (${ram.depth}) must be ${req.regDepth} for asm set '${isaInst.asmSetId || isaInst.asmSet.id}'`);
+        }
+        if (req.progDepth != null && prog.depth !== req.progDepth) {
+          throw Error(`CPU prog depth (${prog.depth}) must be ${req.progDepth} for asm set '${isaInst.asmSetId || isaInst.asmSet.id}'`);
+        }
+      }
+    }
+
     if (typeof addCpu === 'function') {
       addCpu(baseId, {
         regCount,
@@ -457,7 +473,11 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       lines.push('');
     }
     lines.push('execution:');
-    lines.push('  legacy switch — opcodes without { micro }');
+    if (comp.asmSetId && comp.asmSetId !== 'generic') {
+      lines.push(`  native ${comp.asmSetId} — preset opcodes without { micro }`);
+    } else {
+      lines.push('  legacy switch — opcodes without { micro } (generic set)');
+    }
     lines.push('  micro engine — opcodes with { micro } use ISA consts address map');
     return lines;
   }

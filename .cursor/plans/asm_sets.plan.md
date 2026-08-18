@@ -7,21 +7,30 @@ todos:
     status: completed
   - id: f1-1-registry
     content: "Faza 1.1: AsmSet registry + parseIsaHeader + set: generic implicit + teste backward compat"
-    status: pending
+    status: completed
   - id: f1-2-generic
     content: "Faza 1.2: Profil generic formalizat + validare segmente per set + doc(inline.asm.sets)"
-    status: pending
+    status: completed
   - id: f1-3-riscv
     content: "Faza 1.3: Preset riscv32 + parser operanzi + round-trip + composition use (D13)"
-    status: pending
+    status: completed
   - id: f1-4-thumb
     content: "Faza 1.4: Preset arm-thumb 16-bit + composition multi-width (D13) + doc"
-    status: pending
+    status: completed
   - id: f1-5-ext-policy
     content: "Faza 1.5: policy inline.asm.set{}, CPU bridge, asmSetId, composition + micro tests (D13/D14)"
+    status: completed
+  - id: f1x3a-riscv-exec
+    content: "1+x.3a: Executor CPU riscv32 MVP (D15–D21, subset D20)"
+    status: pending
+  - id: f1x3b-thumb-exec
+    content: "1+x.3b: Executor CPU arm-thumb (după riscv32 POC)"
+    status: pending
+  - id: f1x3c-riscv-ext
+    content: "1+x.3c: riscv32 extended — mul/div, lb/lh/sb/sh, fence, ecall, FP"
     status: pending
   - id: f1x-deferred
-    content: "1+x (amânat): x86 variable-length, CPU executor per set, directives .byte/.word"
+    content: "1+x.1+ (amânat): x86, variable-length, directives .byte/.word, CPU multi-set routing"
     status: pending
 isProject: false
 ---
@@ -38,7 +47,9 @@ Relaționat: [faza_7_micro_asm.plan.md](faza_7_micro_asm.plan.md) · [comp_cpu.p
 
 ## Starea codului (aug 2026)
 
-**AsmSet: neimplementat** — zero referințe la `asmSet`, `asm-set-registry`, `riscv32`, `parseIsaHeader`.
+**AsmSet: implementat (faze 1.1–1.5)** — registry, preset-uri `generic`/`riscv32`/`arm-thumb`, policy `inline.asm.set{}`, metadata `asmSetId`, composition multi-set + teste 3176–3196 (2538 teste).
+
+**Lipsește:** executor CPU nativ per preset (1+x.3a) — `cpuStep` încă cade în legacy pentru preset fără micro.
 
 Inline ASM rămâne un **mini-asamblor declarativ** — fără x86/ARM/RISC-V preset „din cutie” până la implementarea acestui plan. Utilizatorul definește manual fiecare ISA (sau va folosi preset-uri după 1.3+):
 
@@ -185,6 +196,14 @@ Contract profil + flux: `parseIsaHeader → registry → merge → inlineInstanc
 | **D12** | Faza 1.3 riscv32: **assemble + decode**; exec CPU pe set amânat (1+x.3) | **Confirmat** |
 | **D13** | **ASM composition** (`use`, `repeat`, `align`, `base:`) funcționează cu preset-uri AsmSet | **Confirmat** — obligatoriu în implementare |
 | **D14** | **Microcode** pe seturi noi: model stratificat (vezi secțiune dedicată) | **Confirmat** |
+| **D15** | **Routing exec CPU:** micro → executor nativ AsmSet → legacy **doar** `generic`; set non-generic fără micro/executor → **eroare** | **Confirmat** |
+| **D16** | Executor nativ pe **profil AsmSet** (`executeInstruction` în `asm-sets/*.js`); `cpuStep` = router subțire | **Confirmat** |
+| **D17** | **D17-A:** mapare directă `xN` → `c.regs[N]`; **eroare la init CPU** dacă `registers` / `regDepth` ≠ cerințele profilului | **Confirmat** |
+| **D18** | **D18-A:** PC = **index instrucțiune** (nu adresă byte RV); `prog[PC]` fetch | **Confirmat** |
+| **D19** | **D19-A:** `lw`/`sw` word-aligned, `ram[index]` cu `index = byteAddr >> 2`; `ram.depth` = wordWidth profil | **Confirmat** |
+| **D20** | Exec MVP = subset encode faza 1.3; extensii (mul, div, lb/lh, fence, ecall, FP) → **1+x.3c** | **Confirmat** |
+| **D21** | CPU decode/exec cu **profil unic** din `isa:` (fără metadata per instrucțiune); prog heterogen/raw permis la load — comportament nedorit **documentat**, fără eroare/warning | **Confirmat** |
+| **D22** | **1+x.3a** = proof of concept riscv32; **arm-thumb exec** → 1+x.3b | **Confirmat** |
 
 ### D1 — Default `generic`
 
@@ -409,7 +428,7 @@ show(app; asm)
 ### Limitări acceptate (MVP)
 
 - **Nu** impunem același `set:` pe program și pe wire-ul `use` — combinații libere dacă encode/decode per segment reușesc
-- **CPU exec** pe program compus multi-set → **1+x.3** (routing pe `asmSetId` per fetch, sau restricție documentată: CPU `isa:` trebuie să match-uie setul majoritar — de decis la 1+x.3)
+- **CPU exec** pe blob compus multi-set: CPU folosește **un singur profil** din `isa:` (D21); metadata per instrucțiune e pentru `:decode`, nu pentru fetch CPU; prog heterogen ca input CPU → comportament nedorit documentat, fără eroare la load
 
 ---
 
@@ -601,17 +620,158 @@ show(prog; asm)
 
 ---
 
+## Faza 1+x.3 — Executor CPU per AsmSet
+
+### Obiectiv
+
+`comp [cpu] isa: .rv` execută preset **riscv32** nativ (fără micro pe fiecare mnemonic). Generic rămâne pe `cpuStepLegacy`.
+
+### Flux exec (D15, D16)
+
+```mermaid
+flowchart TD
+  step[cpuStep] --> fetch["fetch prog[PC] — wordWidth = prog.depth"]
+  fetch --> decode["decodeMnemonicFromBits(isa + asmSet)"]
+  decode --> micro{microProgram?}
+  micro -->|da| microEng[cpuRunMicroSequence]
+  micro -->|nu| native{asmSet.executeInstruction?}
+  native -->|da| execNat[executor profil]
+  native -->|nu| generic{asmSetId === generic?}
+  generic -->|da| legacy[cpuStepLegacy]
+  generic -->|nu| err["Error: no executor for set"]
+  execNat --> pcNext[actualizează PC / halted]
+  legacy --> pcNext
+  microEng --> pcNext
+```
+
+### Contract profil (extindere interfață)
+
+Pe lângă encode/decode, profilul preset expune:
+
+```js
+{
+  // cerințe CPU — validate la init comp [cpu] (D17)
+  cpuRequirements: {
+    regCount: 32,      // registers:
+    regDepth: 32,      // = ram.depth pentru date; prog.depth = wordWidth
+    progDepth: 32,
+  },
+  executeInstruction(c, ctx, isaInst, decoded, instrBits) {
+    // return { nextPc } sau throw; poate seta c.halted
+  },
+}
+```
+
+`generic` păstrează `executeInstruction: null` → legacy.
+
+### Decizii 1+x.3 (detaliu)
+
+| ID | Regulă |
+|----|--------|
+| **D15** | Fără fallback legacy pe set non-generic |
+| **D17** | `xN` → `c.regs[N]`; mismatch `registers`/`regDepth`/`prog.depth` vs `cpuRequirements` → **eroare init** |
+| **D18** | PC = index instrucțiune; branch offset în unități de **instrucțiune** |
+| **D19** | `lw`/`sw`: `index = (rs1 + imm) >> 2`; nealiniat la 4 → eroare runtime |
+| **D20** | Subset MVP exec = subset encode 1.3 (vezi tabel mai jos) |
+| **D21** | Prog = raw binary, mem externă, sau blob compus — CPU decodează tot cu profilul `isa:`; doc: prog multi-arhitectură pe un singur CPU = nedefinit |
+| **D22** | Sub-faze: 3a riscv32 → 3b thumb → 3c extended RV |
+
+### Subset D20 — MVP 1+x.3a (exec)
+
+| Mnemonic | Exec MVP |
+|----------|----------|
+| `addi`, `add`, `sub`, `lui` | Da |
+| `lw`, `sw` | Da (D19-A) |
+| `beq`, `bne`, `jal`, `jalr` | Da |
+| `nop` | Da |
+
+### 1+x.3c — extensii riscv32 (după POC)
+
+| Categorie | Mnemonici planificate |
+|-----------|----------------------|
+| M extension | `mul`, `div`, … |
+| Load/store byte/half | `lb`, `lh`, `lbu`, `lhu`, `sb`, `sh` |
+| System | `fence`, `ecall`, `ebreak` |
+| Floating point | `fadd`, `fmul`, … (sub-set de decis) |
+
+Fiecare grup = encode + decode + exec + teste (același model ca MVP).
+
+### Sub-faze
+
+| ID | Livrabil |
+|----|----------|
+| **1+x.3a** | Router `cpuStep`; `executeInstruction` riscv32; validare init CPU; teste ALU/branch/mem; doc `cpu.md` |
+| **1+x.3b** | Executor `arm-thumb` (subset movs/adds/subs/…) |
+| **1+x.3c** | Extindere riscv32: mul/div, byte/half mem, fence/ecall, FP |
+
+### Modificări fișiere (1+x.3a)
+
+| Fișier | Schimbare |
+|--------|-----------|
+| [`cpu-devices.js`](../v0_3_2/devices/cpu-devices.js) | Router D15; apel `asmSet.executeInstruction` |
+| [`asm-sets/riscv32.js`](../v0_3_2/core/asm-sets/riscv32.js) | `cpuRequirements` + executor subset D20 |
+| [`cpu.js`](../v0_3_2/core/components/cpu.js) | Validare init vs `cpuRequirements` |
+| [`doc/cpu.md`](../v0_3_2/doc/cpu.md), [`asm-set-riscv32.md`](../v0_3_2/doc/asm-set-riscv32.md) | Exec nativ, D18/D19/D21 |
+| `tests/test_suite.js` | E2E riscv32 CPU (addi, loop beq, lw/sw) |
+
+### Teste acceptanță 1+x.3a
+
+1. `addi` + `add` → registru corect, `x0` read-only
+2. `beq` loop simplu
+3. `lw`/`sw` round-trip RAM (word-aligned)
+4. Init CPU cu `registers: 4` + `isa: .rv` → eroare
+5. Preset fără micro, fără executor (mock) → eroare step, nu legacy
+6. Prog raw `= ^hex` cu același `isa:` → exec OK
+
+### Exemplu țintă
+
+```logts
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  ram:
+    depth: 32
+    length: 64
+    = ^0
+  prog:
+    depth: 32
+    length: 16
+    = .rv {
+      addi x1, x0, 5
+      addi x2, x0, 3
+      add x3, x1, x2
+      sw x3, 0(x0)
+      halt: beq x0, x0, halt
+    }
+  :
+
+.u:{ set = 1 }
+show(.u:ram:0)
+```
+
+*(Ultima instrucțiune: infinite loop sau mnemonic HALT user cu micro — de aliniat la subset; alternativ `jalr` spre sine.)*
+
+---
+
 ## Amânat (1+x)
 
 | ID | Feature | Motiv amânare |
 |----|---------|---------------|
 | 1+x.1 | **x86 / x86-64** | Variable-length encoding, prefixe, ModR/M |
 | 1+x.2 | **ARM Cortex-A (ARM + Thumb-2 mixt)** | Mix 16/32-bit, IT blocks |
-| 1+x.3 | **Executor CPU generic per AsmSet** | Exec preset fără micro obligatoriu; routing `asmSetId` per step; composition multi-set |
+| **1+x.3a** | **Executor riscv32 MVP** | **Următorul pas** — D15–D22 |
+| **1+x.3b** | **Executor arm-thumb** | După POC riscv32 |
+| **1+x.3c** | **riscv32 extended** (mul/div, lb/lh, fence, ecall, FP) | După 3a |
 | 1+x.4 | **Variable wordWidth per instrucțiune** | Blob concatenare fixă; x86 necesită model byte-oriented |
 | 1+x.5 | **Directives per set** (`.byte`, `.word`, `.org`) | Utile pentru x86/ARM |
 | 1+x.6 | **Integrare assembler extern** (Capstone/LLVM MC) | Overkill pentru simulare |
 | 1+x.7 | **Endianness runtime** | Metadata acum; aplicare la encode multi-byte |
+| 1+x.8 | **CPU routing multi-set per fetch** (metadata-independent) | D21: doc comportament nedorit e suficient pentru MVP |
 
 ---
 
@@ -652,6 +812,9 @@ show(prog; asm)
 | 1.3 RISC-V preset | Mediu |
 | 1.4 ARM Thumb preset | Mediu |
 | 1.5 Policy + doc | Mic |
+| 1+x.3a riscv32 exec | Mediu |
+| 1+x.3b thumb exec | Mediu |
+| 1+x.3c riscv32 extended | Mediu–Mare |
 | 1+x x86 | Mare |
 
 ---
@@ -659,9 +822,13 @@ show(prog; asm)
 ## Checklist implementare
 
 - [x] **Confirmare user:** D9 (`inline.asm.set{…}`), D10, D11 corp gol, D12 riscv32 fără CPU exec
-- [ ] **1.1** AsmSet registry + `parseIsaHeader` + `set: generic` implicit + merge preset (D11) + teste backward compat
-- [ ] **1.2** Profil generic formalizat + validare segmente per set + `doc(inline.asm.sets)`
-- [ ] **1.3** Preset `riscv32` + round-trip + **composition `use` (D13)**
-- [ ] **1.4** Preset `arm-thumb` + **multi-width composition (D13)**
-- [ ] **1.5** policy, CPU bridge, `asmSetId`, **composition + micro tests (D13/D14)**
-- [ ] **1+x** x86, CPU executor per set, directives `.byte`/`.word` (amânat)
+- [x] **Confirmare user:** D15–D22 (exec CPU 1+x.3)
+- [x] **1.1** AsmSet registry + `parseIsaHeader` + `set: generic` implicit + merge preset (D11) + teste backward compat
+- [x] **1.2** Profil generic formalizat + validare segmente per set + `doc(inline.asm.sets)`
+- [x] **1.3** Preset `riscv32` + round-trip + **composition `use` (D13)**
+- [x] **1.4** Preset `arm-thumb` + **multi-width composition (D13)**
+- [x] **1.5** policy, CPU bridge, `asmSetId`, **composition + micro tests (D13/D14)**
+- [ ] **1+x.3a** Router `cpuStep` + executor riscv32 MVP (D20 subset) + validare init + teste
+- [ ] **1+x.3b** Executor arm-thumb
+- [ ] **1+x.3c** riscv32 extended (mul/div, lb/lh, fence, ecall, FP)
+- [ ] **1+x.1+** x86, variable-length, directives `.byte`/`.word` (amânat)

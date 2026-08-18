@@ -335,7 +335,9 @@ function cpuConstLiteral(consts, name) {
 }
 
 function cpuMicroMask(c) {
-  return (1 << c.regDepth) - 1;
+  const depth = c.regDepth | 0;
+  if (depth >= 32) return 0xffffffff;
+  return (1 << depth) - 1;
 }
 
 function cpuMicroArchRegAddr(consts, idx) {
@@ -621,26 +623,43 @@ function cpuStep(id, ctx) {
   const instr = cpuFetchInstr(c);
   c.lastInstr = instr;
 
-  if (c.isaRef && ctx && ctx.inlineInstances && typeof decodeMnemonicFromBits === 'function') {
-    const isaInst = ctx.inlineInstances.get(c.isaRef);
-    if (isaInst && isaInst.opcodes) {
-      const isa = {
-        opcodes: isaInst.opcodes,
-        wordWidth: isaInst.wordWidth,
-        opcodeOrder: isaInst.opcodeOrder,
-        asmSet: isaInst.asmSet || null,
-        asmSetId: isaInst.asmSetId || null,
-      };
-      const decoded = decodeMnemonicFromBits(isa, instr);
-      if (decoded) {
-        const opDef = isaInst.opcodes[decoded.mnemonic];
-        if (opDef && opDef.microProgram && opDef.microProgram.length) {
-          cpuRunMicroSequence(c, isaInst, opDef, decoded.fields);
-          cpuTraceStep(c, ctx, instr);
-          if (!c.halted) cpuTryServeIrq(c);
-          return;
-        }
+  let isaInst = null;
+  if (c.isaRef && ctx && ctx.inlineInstances) {
+    isaInst = ctx.inlineInstances.get(c.isaRef);
+  }
+
+  if (isaInst && isaInst.opcodes && typeof decodeMnemonicFromBits === 'function') {
+    const isa = {
+      opcodes: isaInst.opcodes,
+      wordWidth: isaInst.wordWidth,
+      opcodeOrder: isaInst.opcodeOrder,
+      asmSet: isaInst.asmSet || null,
+      asmSetId: isaInst.asmSetId || null,
+    };
+    const decoded = decodeMnemonicFromBits(isa, instr);
+    const asmSetId = isaInst.asmSetId || (isaInst.asmSet && isaInst.asmSet.id) || 'generic';
+
+    if (decoded) {
+      const opDef = isaInst.opcodes[decoded.mnemonic];
+      if (opDef && opDef.microProgram && opDef.microProgram.length) {
+        cpuRunMicroSequence(c, isaInst, opDef, decoded.fields);
+        cpuTraceStep(c, ctx, instr);
+        if (!c.halted) cpuTryServeIrq(c);
+        return;
       }
+      if (isaInst.asmSet && typeof isaInst.asmSet.executeInstruction === 'function') {
+        isaInst.asmSet.executeInstruction(c, ctx, isaInst, decoded, instr, opDef);
+        cpuTraceStep(c, ctx, instr);
+        if (!c.halted) cpuTryServeIrq(c);
+        return;
+      }
+    }
+
+    if (asmSetId !== 'generic') {
+      const msg = decoded
+        ? `No executor for opcode '${decoded.mnemonic}' on asm set '${asmSetId}' at PC ${c.pc}`
+        : `Cannot decode instruction at PC ${c.pc} for asm set '${asmSetId}'`;
+      throw Error(msg);
     }
   }
 

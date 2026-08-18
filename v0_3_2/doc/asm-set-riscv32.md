@@ -146,7 +146,63 @@ Details: [asm-composition.md](asm-composition.md#riscv32-preset).
 
 ## CPU bridge
 
-Bind a riscv32 ISA to `comp [cpu]` with **`isa: .rv`** (not `set:` on the CPU). The CPU reads `asmSetId` from the referenced inline instance.
+Bind a riscv32 ISA to `comp [cpu]` with **`isa: .rv`** (not `set:` on the CPU). The CPU reads `asmSetId` from the referenced inline instance and runs the **native riscv32 executor** (phase 1+x.3a).
+
+### Requirements
+
+| Attribute | Required value |
+|-----------|----------------|
+| `registers` | **32** |
+| `ram.depth` | **32** |
+| `prog.depth` | **32** |
+
+Mismatch at CPU init → error (e.g. `registers (4) must be 32 for asm set 'riscv32'`).
+
+### Runnable — add, store, load
+
+```logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 4
+  ram:
+    depth: 32
+    length: 16
+  prog:
+    depth: 32
+    length: 8
+    = .rv {
+      addi x1, x0, 5
+      addi x2, x0, 3
+      add x3, x1, x2
+      sw x3, 0(x0)
+      loop: beq x0, x0, loop
+    }
+  :
+
+.u:{ run = 1 }
+32wire x3 = .u:r3
+.u:{ ramAdr = 0 }
+32wire mem0 = .u:ram:get
+show(x3, mem0)
+```
+
+**Load & Run:** `x3` and `mem0` are both `…1000` (decimal 8).
+
+### Semantics (simulator)
+
+- **PC** = instruction index (not byte address).
+- **`lw` / `sw`:** byte offset with `index = byteAddr >> 2`; unaligned addresses error.
+- **`x0`:** writes ignored (always zero).
+- **Micro override:** opcodes with user `{ micro }` still use the micro engine (see [asm-microcode.md](asm-microcode.md)).
+- **Heterogeneous composed blob** as CPU prog: undefined behaviour — use a single-architecture program for CPU exec.
+
+See also [cpu.md](cpu.md#riscv32-native-exec).
 
 ---
 

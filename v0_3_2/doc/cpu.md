@@ -113,7 +113,51 @@ Trace to a [terminal](terminal.md) (`trace = .tr` or `trace: .tr`) is emitted **
 
 ---
 
-## Stall / `wait` (phase 5c)
+## riscv32 native exec
+
+When **`isa:`** references an inline ASM with **`set: riscv32`**, the CPU uses the **native RISC-V executor** (not the 4-bit legacy switch). Requirements:
+
+| Attribute | Value |
+|-----------|-------|
+| `registers` | 32 |
+| `ram.depth` | 32 |
+| `prog.depth` | 32 |
+
+Execution order per instruction: **micro** (if opcode has `{ micro }`) → **native riscv32** → error (no legacy fallback).
+
+```logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 3
+  ram:
+    depth: 32
+    length: 8
+  prog:
+    depth: 32
+    length: 4
+    = .rv {
+      addi x1, x0, 10
+      addi x2, x0, 2
+      add x3, x1, x2
+    }
+  :
+
+.u:{ run = 1 }
+32wire x3 = .u:r3
+show(x3)
+```
+
+**Load & Run:** `x3` shows `…1100` (decimal 12).
+
+Details: [asm-set-riscv32.md](asm-set-riscv32.md#cpu-bridge).
+
+---
 
 When the CPU must not touch shared RAM while [DMA](dma.md) (or another master) is active, bind a **1-bit hold** wire with **`wait`** on the CPU body or drive the **`wait`** pin in a wave block.
 

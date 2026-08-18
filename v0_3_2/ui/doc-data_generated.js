@@ -179,6 +179,37 @@ Default: everything allowed (\`Allow ALL\` implicit), nothing blocked (\`NotAllo
 - \`def\` — defining functions with \`def\`
 - \`comp\`, \`chip\`, \`board\`, \`pcb\`, \`inline\`, \`phz\` — all items in that module
 
+## ASM preset sets (\`inline.asm.set{}\`)
+
+Restrict which **AsmSet presets** may appear in an \`inline [asm]\` header (\`set: generic\`, \`set: riscv32\`, \`set: arm-thumb\`, …). Checked when the inline module is executed and when a program references that preset.
+
+| Token | Allow | NotAllow |
+|-------|-------|----------|
+| \`inline.asm.set{riscv32}\` | only \`riscv32\` allowed (plus implicit \`generic\` if not blocked) | blocks \`set: riscv32\` |
+| \`inline.asm.set{riscv32 arm-thumb}\` | whitelist multiple presets | blacklist multiple presets |
+
+\`generic\` is the default when \`set:\` is omitted. To allow **only** a preset, combine with \`Allow NONE\`:
+
+\`\`\`logts
+Allow NONE inline.type{asm} inline.asm.set{riscv32}
+inline [asm] .rv:
+  set: riscv32
+  :
+\`\`\`
+
+Block RISC-V but keep Thumb:
+
+\`\`\`logts
+NotAllow inline.asm.set{riscv32}
+inline [asm] .th:
+  set: arm-thumb
+  :
+\`\`\`
+
+Runtime error (neutral message): \`Inline asm set 'riscv32' is not allowed (NotAllow policy)\`.
+
+List available presets: \`doc(inline.asm.sets)\`.
+
 ## Typed lists (\`module.type{}\`)
 
 - \`comp.type{reg key ~ +}\` — specific component types (shortcuts as in \`comp [+]\`)
@@ -199,8 +230,14 @@ Allow NONE ADD
 NotAllow comp.type{led}
 comp [led] .x:           # error
 
+NotAllow inline.asm.set{riscv32}
+inline [asm] .rv:
+  set: riscv32
+  :                      # error at execInline
+
 doc(Allow)               # current Allow policy
 doc(NotAllow)            # current NotAllow policy
+doc(inline.asm.sets)     # registered AsmSet presets
 \`\`\`
 
 ## Errors
@@ -1036,6 +1073,60 @@ See [asm-set-arm-thumb.md](asm-set-arm-thumb.md).
 
 ---
 
+## Multi-set composition (heterogeneous presets)
+
+\`use\` splices the **referenced wire's ISA and AsmSet**, not the outer program's. A single blob may concatenate segments with different **\`asmSetId\`** and **\`wordWidth\`** values (same model as legacy multi-ISA composition).
+
+Each instruction in module metadata carries its own \`isa\`, \`asmSetId\`, and \`wordWidth\`. \`:decode\` formats every instruction with **that** instruction's ISA (not only the outer \`.isaRef\`).
+
+\`\`\`logts-play
+inline [asm] .boot:
+  set: generic
+  NOP : 0000 + 4b
+  :
+
+inline [asm] .app:
+  set: riscv32
+  :
+
+8wire bootBlob = .boot { NOP }
+40wire app = .app {
+  use bootBlob
+  addi x1, x0, 5
+}
+show(app; asm)
+show(.app:decode(app))
+\`\`\`
+
+Mixed **16-bit Thumb** + **32-bit RISC-V**:
+
+\`\`\`logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+inline [asm] .rv:
+  set: riscv32
+  :
+
+16wire init = .th { movs r0, 1 }
+48wire mix = .rv {
+  use init
+  addi x1, x0, 5
+}
+show(mix; asm)
+show(.rv:decode(mix))
+\`\`\`
+
+| Metadata | Meaning |
+|----------|---------|
+| \`module.segments[]\` | One entry per \`use\` segment or local chunk: \`isaRef\`, \`asmSetId\`, \`wordWidth\`, \`blobOffset\`, \`instrCount\` |
+| \`module.instructions[]\` | Per instruction: \`word\`, \`asmSetId\`, \`wordWidth\`, \`isa\` |
+
+**CPU execution** on a heterogeneous blob (fetch/decode across sets) is **not** covered here — see executor per AsmSet (phase 1+x.3). Encode, wire assignment, and \`:decode\` work today.
+
+---
+
 ## Related
 
 - [asm.md](asm.md) — ISA definition and ASM v1
@@ -1269,31 +1360,77 @@ See [cpu.md](cpu.md#microcode-mmap-cpummap) and [mmap.md](mmap.md).
 
 ---
 
-## Preset sets (\`riscv32\`, \`arm-thumb\`)
+## Preset sets (\`riscv32\`, \`arm-thumb\`) — D14
 
-Preset opcodes ship **without** micro programs. On \`comp [cpu]\`, they use the CPU's native stepping for that set (when wired) or act as encode/decode-only in wire blobs.
+Preset opcodes ship **without** \`microProgram\`. On \`comp [cpu]\`:
 
-You may attach a **\`{ micro }\` block** to a preset mnemonic in your ISA to override execution (same as generic):
+| Case | Behaviour |
+|------|-----------|
+| Preset mnemonic, **no** user \`{ micro }\` | Encode/decode OK; CPU uses legacy 8-bit interpreter or waits for **native exec per AsmSet** (phase 1+x.3) |
+| User **\`{ micro }\` on preset mnemonic** | **Micro engine** runs for that opcode only; preset encode/decode unchanged |
+| \`consts:\` / \`macros:\` in header | Merged with preset — valid on any set |
+
+### Override a preset mnemonic (micro-only body)
+
+Omit the bit pattern line; encoding stays on the preset profile:
 
 \`\`\`logts-play
 inline [asm] .rv:
   set: riscv32
   consts:{
-    PC = ^02
-    R1 = ^21
+    MAR = ^10
   }
-  FOO:
+  addi:
   {
-    PC < PC
+    MAR < 5
   }
   :
 
-32wire p = .rv { addi x1, x0, 1 }
+comp [cpu] .u:
+  isa: .rv
+  registers: 2
+  on: 1
+  prog:
+    depth: 32
+    length: 2
+    = .rv { addi x1, x0, 5; nop }
+  :
+
+.u:{ set = 1 }
 \`\`\`
+
+After one step, micro \`addi\` runs (not legacy LOAD/ADDI). Operands from preset decode (\`fields.R\`, \`fields.imm\`, …) are empty on riscv32 today — use const literals or \`{ micro }\` demos that do not rely on decoded operands until field mapping is extended.
 
 User opcode bodies that use generic segment tokens (\`R2b\`) on a preset set are rejected at ISA parse time. Literal-only overrides are allowed.
 
-See [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md), and [asm-set-generic.md](asm-set-generic.md) for segment syntax on **\`set: generic\`**.
+### Composition + micro (generic segment + preset \`use\`)
+
+A program may \`use\` a wire assembled with **\`set: generic\`** micro opcodes, then append preset instructions. Each segment keeps its own opcodes, consts, and micro definitions:
+
+\`\`\`logts-play
+inline [asm] .gen:
+  set: generic
+  consts:{ MAR = ^10 }
+  DEMO:
+  11 + 2b
+  {
+    MAR < 1
+  }
+  :
+
+inline [asm] .rv:
+  set: riscv32
+  :
+
+4wire boot = .gen { DEMO }
+36wire fw = .rv {
+  use boot
+  addi x1, x0, 1
+}
+show(fw; asm)
+\`\`\`
+
+See [asm-composition.md](asm-composition.md#multi-set-composition-heterogeneous-presets), [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md), and [asm-set-generic.md](asm-set-generic.md).
 
 ---
 
@@ -1364,7 +1501,7 @@ show(p)
 show(p; asm)
 \`\`\`
 
-Example encoding for \`movs r1, 5\`: \`0010010100000001\` (16 bits).
+Example encoding for \`movs r1, 5\`: \`0010000100000101\` (16 bits).
 
 ---
 
@@ -1730,7 +1867,63 @@ Details: [asm-composition.md](asm-composition.md#riscv32-preset).
 
 ## CPU bridge
 
-Bind a riscv32 ISA to \`comp [cpu]\` with **\`isa: .rv\`** (not \`set:\` on the CPU). The CPU reads \`asmSetId\` from the referenced inline instance.
+Bind a riscv32 ISA to \`comp [cpu]\` with **\`isa: .rv\`** (not \`set:\` on the CPU). The CPU reads \`asmSetId\` from the referenced inline instance and runs the **native riscv32 executor** (phase 1+x.3a).
+
+### Requirements
+
+| Attribute | Required value |
+|-----------|----------------|
+| \`registers\` | **32** |
+| \`ram.depth\` | **32** |
+| \`prog.depth\` | **32** |
+
+Mismatch at CPU init → error (e.g. \`registers (4) must be 32 for asm set 'riscv32'\`).
+
+### Runnable — add, store, load
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 4
+  ram:
+    depth: 32
+    length: 16
+  prog:
+    depth: 32
+    length: 8
+    = .rv {
+      addi x1, x0, 5
+      addi x2, x0, 3
+      add x3, x1, x2
+      sw x3, 0(x0)
+      loop: beq x0, x0, loop
+    }
+  :
+
+.u:{ run = 1 }
+32wire x3 = .u:r3
+.u:{ ramAdr = 0 }
+32wire mem0 = .u:ram:get
+show(x3, mem0)
+\`\`\`
+
+**Load & Run:** \`x3\` and \`mem0\` are both \`…1000\` (decimal 8).
+
+### Semantics (simulator)
+
+- **PC** = instruction index (not byte address).
+- **\`lw\` / \`sw\`:** byte offset with \`index = byteAddr >> 2\`; unaligned addresses error.
+- **\`x0\`:** writes ignored (always zero).
+- **Micro override:** opcodes with user \`{ micro }\` still use the micro engine (see [asm-microcode.md](asm-microcode.md)).
+- **Heterogeneous composed blob** as CPU prog: undefined behaviour — use a single-architecture program for CPU exec.
+
+See also [cpu.md](cpu.md#riscv32-native-exec).
 
 ---
 
@@ -10331,7 +10524,51 @@ Trace to a [terminal](terminal.md) (\`trace = .tr\` or \`trace: .tr\`) is emitte
 
 ---
 
-## Stall / \`wait\` (phase 5c)
+## riscv32 native exec
+
+When **\`isa:\`** references an inline ASM with **\`set: riscv32\`**, the CPU uses the **native RISC-V executor** (not the 4-bit legacy switch). Requirements:
+
+| Attribute | Value |
+|-----------|-------|
+| \`registers\` | 32 |
+| \`ram.depth\` | 32 |
+| \`prog.depth\` | 32 |
+
+Execution order per instruction: **micro** (if opcode has \`{ micro }\`) → **native riscv32** → error (no legacy fallback).
+
+\`\`\`logts-play
+inline [asm] .rv:
+  set: riscv32
+  :
+
+comp [cpu] .u:
+  isa: .rv
+  registers: 32
+  on: 1
+  maxSteps: 3
+  ram:
+    depth: 32
+    length: 8
+  prog:
+    depth: 32
+    length: 4
+    = .rv {
+      addi x1, x0, 10
+      addi x2, x0, 2
+      add x3, x1, x2
+    }
+  :
+
+.u:{ run = 1 }
+32wire x3 = .u:r3
+show(x3)
+\`\`\`
+
+**Load & Run:** \`x3\` shows \`…1100\` (decimal 12).
+
+Details: [asm-set-riscv32.md](asm-set-riscv32.md#cpu-bridge).
+
+---
 
 When the CPU must not touch shared RAM while [DMA](dma.md) (or another master) is active, bind a **1-bit hold** wire with **\`wait\`** on the CPU body or drive the **\`wait\`** pin in a wave block.
 
