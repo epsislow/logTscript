@@ -240,6 +240,7 @@ Contract profil + flux: `parseIsaHeader → registry → merge → inlineInstanc
 | **D35** | **x86-32** preset: `encoding: 'variable'`, sintaxă **Intel** (MVP); subset ~20 mnemonici — vezi [exemple D35](#d35--exemple-x86-intel-mvp) | **Confirmat** — 1+x.1 |
 | **D36** | **ARM A32:** strategie **2a** = preset separat `arm-a32` (fixed 32 sau variable 4B) + `use` cu `arm-thumb`; **2b** (amânat) = profil mixt `arm-cortex-a` cu directive `.thumb`/`.arm` | **Confirmat** — 1+x.2 |
 | **D37** | **Nu implementa x86/ARM** pe modelul blob fix-width actual — obligatoriu **1+x.4 + 1+x.5** înainte | **Confirmat** |
+| **D38** | **x86-32 extensii 1+x.1c:** adresare didactică (pattern A/B/C), `lea`, `test`, `xchg`, `loop`/`loope`/`loopne`, salturi signed/unsigned — vezi [D38](#d38--extensii-x86-32-1x1c) | **Confirmat** — 1+x.1c |
 
 ### D33 — Exemple directives
 
@@ -510,7 +511,56 @@ show(.x86:decode(.u:prog:get))
 | Misc | `nop`, `int` (imm8) |
 | Operanzi | reg-reg, reg-imm8/imm32, reg↔`[ebp±disp8]` |
 
-**Amânat 1+x.1c:** `lea`, `mul`, `div`, segment overrides, `word` ptr, prefix `0x66`/`0x67`, x86-64.
+**Extins în 1+x.1c (D38):** adresare didactică, `lea`, `test`, `xchg`, `loop`/`loope`/`loopne`, salturi `jg`/`jl`/… — vezi [D38](#d38--extensii-x86-32-1x1c).
+
+**Amânat după 1+x.1c-i/ii:** SIB `[base+index*scale±disp]` (1+x.1c-iii), segment overrides, prefix `0x66`/`0x67`, x86-64, SSE/AVX.
+
+
+### D38 — Extensii x86-32 (1+x.1c)
+
+Scope confirmat user. Două batch-uri implementare + adresare SIB **în viitor**.
+
+#### Adresare didactică (1+x.1c-i)
+
+Trei **pattern-uri** documentate în `asm-set-x86-32.md` — nu listă goală ModR/M:
+
+| Pattern | Forme permise | Scop didactic |
+|---------|---------------|---------------|
+| **A — Stack frame** | `[ebp±disp8]`, `[esp±disp8]`, `[ebp±disp32]`, `[esp±disp32]` | variabile locale, argumente stack (MVP + disp32) |
+| **B — Pointer / array** | `[reg]`, `[reg±disp8]`, `[reg±disp32]`, `lea reg, [reg±disp]` | parcurgere buffer; baze: `eax`–`ebx`, `ebp`, `esi`, `edi` |
+| **C — Absolut** | `[disp32]` | tabele `.org`, variabile la adresă fixă în RAM |
+
+**Excluderi batch 1:** **`[esp]`** fără disp (necesită SIB în x86 real); **`[base+index*scale±disp]`** → **1+x.1c-iii** (viitor).
+
+#### 1+x.1c-i — batch 1 (prioritate)
+
+| Categorie | Mnemonici / item | Encode/decode | Exec CPU |
+|-----------|------------------|---------------|----------|
+| Adresare | Pattern A/B/C (mai sus) | da | da |
+| ALU | `lea`, `inc`, `dec`, `neg`, `not` | da | da |
+| ALU | `test`, `xchg` | da | da |
+| ALU | exec `and`/`or`/`xor` (encode MVP) | — | da |
+| Control | `jg`, `jl`, `jge`, `jle`, `ja`, `jb`, `jae`, `jbe` | da | da |
+| Control | `loop`, `loope`/`loopz`, `loopne`/`loopnz` | da | da (`ecx`→`r1`, `zf`) |
+
+**Teste planificate:** 3263+ — round-trip per pattern; demo CPU `loop` array; `test`+`je`; `xchg`; salturi signed după `cmp`.
+
+#### 1+x.1c-ii — batch 2
+
+| Item | Notă |
+|------|------|
+| `mul` / `imul` (formă simplă) | operand implicit `eax` |
+| `div` / `idiv` | + flag **`divByZero`** (ca riscv32) |
+| `push imm32` | opcode `68` |
+| `enter` / `leave` | stack frame |
+| Flags | `cf` la add/sub pentru salturi unsigned fidel |
+
+#### 1+x.1c-iii — viitor (amânat)
+
+- **SIB:** `[base+index*scale±disp]` — ex. `mov eax, [esi+ecx*4]`, `[ebp+eax*2-8]`;
+- prefixe `0x66`/`0x67`, segment overrides (`fs:`/`gs:`);
+- **x86-64** = preset separat sau mod pe profil (decizie la implementare);
+- SSE/AVX — mult după MVP.
 
 
 ### D1 — Default `generic`
@@ -1318,10 +1368,13 @@ Vezi **[D35 — Exemple x86 Intel](#d35--exemple-x86-intel-mvp)** (confirmat use
 - `cpuRequirements`: `regCount: 8`, `progDepth: 8`, `encoding: variable`;
 - Router `cpuStep`: ramură fetch variable (D32).
 
-#### 1+x.1c — extensii (amânat)
+#### 1+x.1c — extensii (D38 — confirmat)
 
-- Prefixe, moduri adresare 32-bit, `lea`, segment overrides;
-- **x86-64** = preset separat sau mod pe același profil (decizie la implementare).
+Vezi **[D38 — Extensii x86-32](#d38--extensii-x86-32-1x1c)**.
+
+- **1+x.1c-i:** adresare didactică A/B/C, `lea`, `test`, `xchg`, `inc`/`dec`/`neg`/`not`, salturi signed/unsigned, `loop`/`loope`/`loopne`, exec ALU logic;
+- **1+x.1c-ii:** `mul`/`div`, `push imm32`, `enter`/`leave`, flags `cf` îmbunătățite;
+- **1+x.1c-iii (viitor):** SIB `[base+index*scale±disp]`, prefixe, segmente, x86-64.
 
 ---
 
@@ -1382,6 +1435,9 @@ Vezi **[D35 — Exemple x86 Intel](#d35--exemple-x86-intel-mvp)** (confirmat use
 | **1+x.5 ✅** | **Directives** (`.byte`, `.word`, `.org`, `.skip`, `.align`) | Livrat — teste 3242–3247 |
 | **1+x.1 ✅** | **x86-32** Intel variable + CPU exec | Livrat — teste 3248–3253, doc asm-set-x86-32.md |
 | **1+x.2 ✅** | **arm-a32** + composition Thumb | Livrat — teste 3254–3261, doc asm-set-arm-a32.md |
+| **1+x.1c-i** | **x86-32 extensii batch 1** (D38) | Adresare A/B/C, `lea`, `test`, `xchg`, `loop`, salturi | 1+x.1 ✅ |
+| **1+x.1c-ii** | **x86-32 extensii batch 2** | `mul`/`div`, `enter`/`leave`, `push imm32` | 1+x.1c-i |
+| **1+x.1c-iii** | **SIB** `[base+index*scale±disp]` + prefixe/seg/x86-64 | Amânat — după 1+x.1c-ii | 1+x.1c-ii |
 | **1+x.3a ✅** | Executor riscv32 MVP | Livrat — teste 3197–3206 | — |
 | **1+x.3b ✅** | Executor arm-thumb | Livrat — teste 3207–3215 | — |
 | **1+x.3c ✅** | riscv32 extended (M, mem, system) | Livrat — teste 3216–3232 | — |
@@ -1445,6 +1501,7 @@ Vezi **[D35 — Exemple x86 Intel](#d35--exemple-x86-intel-mvp)** (confirmat use
 - [x] **Confirmare user:** D9 (`inline.asm.set{…}`), D10, D11 corp gol, D12 riscv32 fără CPU exec
 - [x] **Confirmare user:** D23–D28 (scope 3c-i/ii/iii, M minimal, mem D25, system D26, FP amânat, preset riscv32 + micro)
 - [x] **Confirmare user:** D29–D37 (variable encoding, directives, x86/ARM ordine, Intel syntax, ARM strategie 2a)
+- [x] **Confirmare user:** D38 (x86 1+x.1c-i/ii scope, SIB amânat 1+x.1c-iii)
 - [x] ✅ **1.1** AsmSet registry + `parseIsaHeader` + `set: generic` implicit + merge preset (D11) + teste backward compat
 - [x] ✅ **1.2** Profil generic formalizat + validare segmente per set + `doc(inline.asm.sets)`
 - [x] ✅ **1.3** Preset `riscv32` + round-trip + **composition `use` (D13)**
@@ -1462,5 +1519,8 @@ Vezi **[D35 — Exemple x86 Intel](#d35--exemple-x86-intel-mvp)** (confirmat use
 - [x] ✅ **1+x.1a** Preset `x86-32` assemble MVP (Intel, subset ModR/M) — teste 3248–3253
 - [x] ✅ **1+x.1b** Executor CPU x86 subset + variable fetch — teste 3252–3253
 - [x] ✅ **1+x.2a** Preset `arm-a32` assemble + exec + thumb `use` — teste 3254–3261
+- [ ] **1+x.1c-i** x86 extensii batch 1 (D38): adresare A/B/C, `lea`, `test`, `xchg`, `loop`, salturi — teste 3263+
+- [ ] **1+x.1c-ii** x86 extensii batch 2: `mul`/`div`, `enter`/`leave`, `push imm32`
+- [ ] **1+x.1c-iii** SIB `[base+index*scale±disp]` + prefixe/seg/x86-64 (viitor)
 - [ ] **1+x.2b** Profil mixt Thumb-2 / IT blocks (amânat)
 - [ ] **1+x.6–8** assembler extern, endianness runtime, CPU multi-set routing
