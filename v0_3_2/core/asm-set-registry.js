@@ -1,6 +1,6 @@
 /* ================= ASM SET REGISTRY ================= */
 
-const ASM_SET_BUILTIN_ORDER = ['generic', 'riscv32', 'arm-thumb'];
+const ASM_SET_BUILTIN_ORDER = ['generic', 'riscv32', 'arm-thumb', 'variable8'];
 
 function createAsmSetRegistry() {
   const sets = new Map();
@@ -77,6 +77,8 @@ function createAsmSetRegistry() {
       throw new Error('ISA definition has no opcodes');
     }
 
+    const encoding = userIsa.encoding != null ? userIsa.encoding : (profile.encoding || 'fixed');
+
     if (Object.keys(mergedOpcodes).length) {
       for (const mn of order) {
         const def = mergedOpcodes[mn];
@@ -87,7 +89,7 @@ function createAsmSetRegistry() {
             : (seg.kind === 'literal' ? seg.bits.length : seg.width)), 0)
           : wordWidth);
         if (def.wordWidth == null && w) def.wordWidth = w;
-        if (wordWidth != null && w && wordWidth !== w) {
+        if (encoding !== 'variable' && wordWidth != null && w && wordWidth !== w) {
           throw new Error(`ISA opcode '${mn}' encodes to ${w} bits but wordWidth is ${wordWidth}`);
         }
       }
@@ -96,6 +98,7 @@ function createAsmSetRegistry() {
     return {
       opcodes: mergedOpcodes,
       wordWidth,
+      encoding,
       opcodeOrder: order,
       consts: { ...(profile.consts || {}), ...(userIsa.consts || {}) },
       macros: { ...(profile.macros || {}), ...(userIsa.macros || {}) },
@@ -118,6 +121,9 @@ function initDefaultAsmSetRegistry() {
   }
   if (typeof createArmThumbAsmSet === 'function') {
     registry.register(createArmThumbAsmSet());
+  }
+  if (typeof createVariable8AsmSet === 'function') {
+    registry.register(createVariable8AsmSet());
   }
   return registry;
 }

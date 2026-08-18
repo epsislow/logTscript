@@ -34972,5 +34972,59 @@ comp [cpu] .u:
     h.assert('decode mul', String(text.includes('mul x2')), 'true');
   });
 
+  function runVariable8AssembleTest(h, session) {
+    const src = `inline [asm] .v8:
+  set: variable8
+  :
+
+24wire prog = .v8 {
+  w8
+  w16 5
+}
+show(prog)`;
+    const { interp, out } = session.run(src);
+    const bits = session.getWire(interp, 'prog');
+    h.assert('24 bits total', String(bits.length), '24');
+    h.assert('byte0 w8', bits.substr(0, 8), '11000000');
+    h.assert('byte1 w16 prefix', bits.substr(8, 8), '11100000');
+    h.assert('byte2 imm 5', bits.substr(16, 8), '00000101');
+    const wire = interp.wires.get('prog');
+    const mod = wire && wire.asmModuleId != null ? interp.asmModules.get(wire.asmModuleId) : null;
+    h.assert('2 instructions', String(mod && mod.instructionCount), '2');
+    h.assert('ins0 byteLength 1', String(mod && mod.instructions[0].byteLength), '1');
+    h.assert('ins1 byteLength 2', String(mod && mod.instructions[1].byteLength), '2');
+    h.assert('ins1 byteOffset 1', String(mod && mod.instructions[1].byteOffset), '1');
+    h.assert('encoding variable', String(mod && mod.encoding), 'variable');
+  }
+
+  reg(3233, 'asm-set', 'variable8 SPIKE assemble 8+16 bit blob', runVariable8AssembleTest);
+  reg(3234, 'asm-set', 'variable8 SPIKE assemble 8+16 bit blob (wave)', runVariable8AssembleTest, { propagation: 'wave' });
+
+  function runVariable8DecodeTest(h, session) {
+    const src = `inline [asm] .v8:
+  set: variable8
+  :
+
+24wire prog = .v8 {
+  w8
+  w16 5
+}
+show(.v8:decode(prog))`;
+    const { out } = session.run(src);
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('decode w8', String(text.includes('w8')), 'true');
+    h.assert('decode w16 5', String(/w16\s+5/.test(text)), 'true');
+  }
+
+  reg(3235, 'asm-set', 'variable8 SPIKE decode round-trip', runVariable8DecodeTest);
+  reg(3236, 'asm-set', 'variable8 SPIKE decode round-trip (wave)', runVariable8DecodeTest, { propagation: 'wave' });
+
+  reg(3237, 'asm-set', 'variable8 preset in doc(inline.asm.sets)', function(h, session) {
+    const out = session.runDoc('doc(inline.asm.sets)');
+    const text = out.join('\n');
+    h.assert('lists variable8', String(text.includes('variable8')), 'true');
+    h.assert('encoding variable', String(text.includes('encoding: variable')), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

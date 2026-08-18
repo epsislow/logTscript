@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -1458,7 +1458,7 @@ The **arm-thumb** preset assembles a subset of **16-bit ARM Thumb** instructions
 
 Registers are **\`r0\`–\`r7\`** in this subset. Immediates use decimal literals (\`5\` or \`\\5\`) — **\`#\` starts a comment** in LogTscript, so do not use \`#5\`.
 
-See also: [asm.md](asm.md), [riscv32 preset](asm-set-riscv32.md), [generic set](asm-set-generic.md).
+See also: [asm.md](asm.md), [riscv32 preset](asm-set-riscv32.md), [variable8 preset](asm-set-variable8.md), [generic set](asm-set-generic.md).
 
 ---
 
@@ -1645,6 +1645,7 @@ NotAllow inline.asm.set{arm-thumb}
 ## Related
 
 - [asm-set-riscv32.md](asm-set-riscv32.md) — 32-bit preset
+- [asm-set-variable8.md](asm-set-variable8.md) — variable-length SPIKE
 - [asm-composition.md](asm-composition.md) — combine Thumb blobs with \`use\`
 `,
     'asm-set-generic.md': `# ASM set: generic (segment ISA)
@@ -1653,7 +1654,7 @@ The **generic** asm set is the original LogTscript inline assembler model: you d
 
 If you omit \`set:\` in an ISA header, **\`generic\` is assumed** — existing scripts keep working unchanged.
 
-See also: [asm.md](asm.md) (overview), [asm-composition.md](asm-composition.md), [asm-microcode.md](asm-microcode.md), [riscv32 preset](asm-set-riscv32.md), [arm-thumb preset](asm-set-arm-thumb.md).
+See also: [asm.md](asm.md) (overview), [asm-composition.md](asm-composition.md), [asm-microcode.md](asm-microcode.md), [riscv32 preset](asm-set-riscv32.md), [arm-thumb preset](asm-set-arm-thumb.md), [variable8 preset](asm-set-variable8.md).
 
 ---
 
@@ -1784,7 +1785,7 @@ The **riscv32** preset provides a fixed **32-bit** RISC-V RV32I encoding for com
 
 Encoding and disassembly are built in; you do **not** write \`+ R2b\` segment lines unless you intentionally override an opcode with literal bits.
 
-See also: [asm.md](asm.md), [asm-composition.md](asm-composition.md#riscv32-preset), [generic set](asm-set-generic.md), [arm-thumb set](asm-set-arm-thumb.md).
+See also: [asm.md](asm.md), [asm-composition.md](asm-composition.md#riscv32-preset), [generic set](asm-set-generic.md), [arm-thumb set](asm-set-arm-thumb.md), [variable8 set](asm-set-variable8.md).
 
 ---
 
@@ -2183,6 +2184,226 @@ After declaring \`.rv\`, \`doc(.rv)\` shows \`set: riscv32\` and the preset opco
 - [asm-set-generic.md](asm-set-generic.md) — segment ISA from scratch
 - [asm-microcode.md](asm-microcode.md) — micro \`{ }\` override on a preset opcode (advanced)
 `,
+    'asm-set-variable8.md': `# ASM set: variable8 (variable-length encoding SPIKE)
+
+The **variable8** preset is a **didactic SPIKE** for phase **1+x.4** — **variable-length** machine code with a **byte-oriented blob**. Unlike \`riscv32\` and \`arm-thumb\` (fixed width per instruction), each mnemonic may encode to a **different number of bytes**.
+
+Use it to learn and test the **\`encoding: 'variable'\`** assembler path before full **x86** / **ARM A32** presets. There is **no CPU native executor** for \`variable8\` yet — **assemble and decode only**.
+
+See also: [asm.md](asm.md), [generic set](asm-set-generic.md), [riscv32 preset](asm-set-riscv32.md) (fixed 32-bit), [arm-thumb preset](asm-set-arm-thumb.md) (fixed 16-bit).
+
+---
+
+## Declaration
+
+\`\`\`logts
+inline [asm] .v8:
+  set: variable8
+  :
+\`\`\`
+
+The header ends with \`:\`. No opcode lines are required — the preset supplies **\`w8\`** and **\`w16\`**.
+
+| Property | Value |
+|----------|--------|
+| \`encoding\` | **\`variable\`** |
+| \`wordWidth\` | **8** (minimum storage unit — one byte per prog/RAM cell in future CPU bridge) |
+| Blob layout | Concatenated **bytes** (8 bits each), no padding between instructions |
+
+---
+
+## Preset opcode table
+
+| Mnemonic | Operands | Encoded size | Bit pattern (summary) |
+|----------|----------|--------------|------------------------|
+| \`w8\` | none | **1 byte** | Fixed \`11000000\` (0xC0) |
+| \`w16 imm\` | 8-bit immediate \`0\`–\`255\` | **2 bytes** | \`11100000\` + imm8 (little-endian byte order in blob) |
+
+Immediates use decimal or \`0x…\` hex (same rules as other presets). **\`#\` starts a comment** in LogTscript.
+
+User opcode overrides are **not supported** in this SPIKE (\`variable8 preset does not support user opcode overrides in SPIKE 1+x.4a\`).
+
+---
+
+## Wire width
+
+Total blob bits = **sum of instruction byte lengths × 8**. Declare the wire explicitly:
+
+| Program | Instructions | Bytes | Wire |
+|---------|--------------|-------|------|
+| \`w8\` | 1 × 1 byte | 1 | **\`8wire\`** |
+| \`w8\` + \`w16 5\` | 1 + 2 bytes | 3 | **\`24wire\`** |
+| three \`w16\` | 3 × 2 bytes | 6 | **\`48wire\`** |
+
+Strict assignment \`=\` requires an exact bit count. Use \`show(wire)\` to inspect the concatenated binary.
+
+---
+
+## Metadata (\`byteOffset\`, \`byteLength\`)
+
+Assembled modules store per-instruction metadata (phase **1+x.4**, decision **D31**):
+
+| Field | Meaning |
+|-------|---------|
+| \`byteOffset\` | Byte index of this instruction in the blob |
+| \`byteLength\` | Length of this instruction in bytes (1 for \`w8\`, 2 for \`w16\`) |
+| \`kind\` | \`'code'\` for preset mnemonics |
+| \`encoding\` | \`'variable'\` on the module |
+
+Use **\`show(wire; asm)\`** to list source lines; **\`show(.v8:decode(wire))\`** walks the blob by variable offsets.
+
+---
+
+## Runnable — single \`w8\`
+
+\`\`\`logts-play
+inline [asm] .v8:
+  set: variable8
+  :
+
+8wire one = .v8 { w8 }
+show(one)
+show(one; asm)
+show(.v8:decode(one))
+\`\`\`
+
+**Load:** declares ISA \`.v8\` and wire \`one\`.
+
+**Load & Run:** \`one\` = \`11000000\` (one byte). **\`show(one; asm)\`** prints \`w8\`. **\`:decode\`** prints \`w8\`.
+
+---
+
+## Runnable — mixed 8-bit and 16-bit (\`w8\` + \`w16\`)
+
+\`\`\`logts-play
+inline [asm] .v8:
+  set: variable8
+  :
+
+24wire prog = .v8 {
+  w8
+  w16 5
+}
+show(prog)
+show(prog; asm)
+show(.v8:decode(prog))
+\`\`\`
+
+**Load & Run:** \`prog\` is **24 bits** (3 bytes):
+
+| Byte offset | Hex | Instruction |
+|-------------|-----|-------------|
+| 0 | \`C0\` | \`w8\` |
+| 1 | \`E0\` | \`w16\` prefix |
+| 2 | \`05\` | immediate **5** |
+
+**\`:decode\`** output (two lines):
+
+\`\`\`text
+w8
+w16 5
+\`\`\`
+
+---
+
+## Runnable — longer sequence
+
+\`\`\`logts-play
+inline [asm] .v8:
+  set: variable8
+  :
+
+40wire seq = .v8 {
+  w16 10
+  w8
+  w16 255
+}
+show(seq; asm)
+show(.v8:decode(seq))
+\`\`\`
+
+**Load & Run:** **40 bits** = 5 bytes (\`w16\` + \`w8\` + \`w16\`). Decode lists three lines with the immediates **10** and **255**.
+
+---
+
+## Runnable — labels (byte addresses, D34 preview)
+
+Labels on variable programs resolve to **byte offsets** (not instruction indices). Branch operands are **not** part of this SPIKE preset — labels are for layout and \`show\` only:
+
+\`\`\`logts-play
+inline [asm] .v8:
+  set: variable8
+  :
+
+24wire tagged = .v8 {
+entry:
+  w8
+  w16 42
+tail:
+  w16 0
+}
+show(tagged; asm)
+\`\`\`
+
+**Load & Run:** **\`entry\`** at byte **0**, **\`tail\`** at byte **3**. Useful when combining with **1+x.5** directives (\`.org\`, \`.byte\`) later.
+
+---
+
+## Fixed vs variable (comparison)
+
+| Aspect | \`riscv32\` / \`arm-thumb\` | \`variable8\` |
+|--------|-------------------------|-------------|
+| \`encoding\` | \`fixed\` | **\`variable\`** |
+| Bits per instruction | Always 32 or 16 | **8 or 16** in this SPIKE |
+| Blob decode | Split every \`wordWidth\` bits | Walk using **\`disassembleAtOffset\`** |
+| CPU exec | Native executor | **Not yet** — use fixed presets for \`comp [cpu]\` |
+
+---
+
+## CPU bridge
+
+**Not available** for \`variable8\` in SPIKE **1+x.4a**. Native variable fetch (\`instructions[PC].byteOffset\`, D32) will arrive with **x86-32** (**1+x.1**). Until then, use **\`riscv32\`** or **\`arm-thumb\`** for **\`comp [cpu]\`** examples ([cpu.md](cpu.md)).
+
+---
+
+## \`doc()\` and policy
+
+\`\`\`logts-play
+doc(inline.asm.sets)
+doc(.v8)
+\`\`\`
+
+**Load & Run:** \`doc(inline.asm.sets)\` lists **\`variable8\`** with **\`encoding: variable\`**. \`doc(.v8)\` shows opcodes **\`W8\`**, **\`W16\`**.
+
+Restrict the preset:
+
+\`\`\`logts
+NotAllow inline.asm.set{variable8}
+\`\`\`
+
+See [allow-notallow.md](allow-notallow.md).
+
+---
+
+## Errors
+
+| Message | Cause |
+|---------|--------|
+| \`w16 expects one immediate operand\` | Missing or extra operand on \`w16\` |
+| \`w16 immediate must be 0..255\` | Immediate out of range |
+| \`Cannot disassemble variable program — … not a whole number of bytes\` | Wire bit length not multiple of 8 |
+| \`variable8: no matching opcode at byte N\` | Corrupt blob or wrong ISA in \`:decode\` |
+| \`variable8 preset does not support user opcode overrides\` | Custom mnemonic lines in ISA header |
+
+---
+
+## Related
+
+- [asm.md](asm.md) — overview and preset table
+- [asm-composition.md](asm-composition.md) — multi-set \`use\` (variable + fixed segments: **1+x.4b**)
+- [asm-set-riscv32.md](asm-set-riscv32.md) — fixed 32-bit preset with CPU exec
+- [asm-set-arm-thumb.md](asm-set-arm-thumb.md) — fixed 16-bit preset with CPU exec
+`,
     'asm.md': `# ASM
 
 Define a custom ISA with \`inline [asm]\`, then assemble programs to a **binary blob** with \`.myisa { ... }\` anywhere an expression is allowed.
@@ -2193,7 +2414,7 @@ There is **no panel UI** in v1 — logic only.
 
 For **composition** (\`use\`, \`repeat\`, \`align\`, \`base:\`, external labels), see [asm-composition.md](asm-composition.md). Wires assembled from programs carry metadata (\`asmModuleId\`). Use **\`show(wire; asm)\`** to append a decode block when metadata exists, or **\`show(.myisa:decode(wire))\`** for explicit disassembly.
 
-For **preset ISAs** (RISC-V, ARM Thumb) use \`set:\` in the ISA header — see [asm-set-generic.md](asm-set-generic.md), [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md). Default (no \`set:\`) is **generic** segment syntax below.
+For **preset ISAs** (RISC-V, ARM Thumb, variable8 SPIKE) use \`set:\` in the ISA header — see [asm-set-generic.md](asm-set-generic.md), [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md), [asm-set-variable8.md](asm-set-variable8.md). Default (no \`set:\`) is **generic** segment syntax below.
 
 ---
 
@@ -2204,6 +2425,7 @@ For **preset ISAs** (RISC-V, ARM Thumb) use \`set:\` in the ISA header — see [
 | \`generic\` (default) | You define (e.g. 8, 16, 32) | [asm-set-generic.md](asm-set-generic.md) |
 | \`riscv32\` | 32-bit RV32I subset | [asm-set-riscv32.md](asm-set-riscv32.md) |
 | \`arm-thumb\` | 16-bit Thumb subset | [asm-set-arm-thumb.md](asm-set-arm-thumb.md) |
+| \`variable8\` | Variable-length SPIKE (8/16-bit instr, byte blob) | [asm-set-variable8.md](asm-set-variable8.md) |
 
 \`\`\`logts
 inline [asm] .rv:
@@ -2548,6 +2770,7 @@ Assembler errors include the source line and \`^^^\` under the problematic token
 - [asm-set-generic.md](asm-set-generic.md) — default segment ISA (\`set: generic\`)
 - [asm-set-riscv32.md](asm-set-riscv32.md) — RV32I preset
 - [asm-set-arm-thumb.md](asm-set-arm-thumb.md) — 16-bit Thumb preset
+- [asm-set-variable8.md](asm-set-variable8.md) — variable-length encoding SPIKE (1+x.4)
 - [asm-composition.md](asm-composition.md) — \`use\`, \`repeat\`, \`align\`, \`base:\`, external labels, multi-ISA
 - [asm-microcode.md](asm-microcode.md) — \`consts\`, \`macros\`, per-opcode \`{ micro }\`, \`READ\`/\`WRITE\`, \`doc(.cpuisa)\`
 - [mem.md](mem.md) — store assembled blob

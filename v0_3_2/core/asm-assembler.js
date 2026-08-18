@@ -952,7 +952,9 @@ function assembleProgramModule(isa, isaRef, programRaw, ctx) {
         isaRef: seg.isaRef,
         asmSetId: seg.isa.asmSetId || null,
         wordWidth: seg.isa.wordWidth,
+        encoding: isaEncoding(seg.isa),
         instrCount: mod.instructionCount,
+        byteLength: mod.byteLength != null ? mod.byteLength : mod.blob.length / 8,
         blobOffset,
       });
       blobOffset += mod.blob.length;
@@ -1020,26 +1022,45 @@ function assembleProgramModule(isa, isaRef, programRaw, ctx) {
   return module;
 }
 
-function buildInstructionIndex(words, instrEntries, isa, isaRef, meta) {
+function isaEncoding(isa) {
+  if (!isa) return 'fixed';
+  if (isa.encoding) return isa.encoding;
+  if (isa.asmSet && isa.asmSet.encoding) return isa.asmSet.encoding;
+  return 'fixed';
+}
+
+function buildInstructionIndex(chunks, instrEntries, isa, isaRef, meta) {
   const instructions = [];
+  const encoding = isaEncoding(isa);
+  const unitBytes = encoding === 'variable' ? 1 : ((isa && isa.wordWidth) ? isa.wordWidth / 8 : 1);
   let wi = 0;
+  let byteOffset = 0;
   const asmSetId = meta && meta.asmSetId != null ? meta.asmSetId : (isa && isa.asmSetId);
   const segWordWidth = meta && meta.wordWidth != null ? meta.wordWidth : (isa && isa.wordWidth);
   for (const e of instrEntries) {
     if (e.type !== 'instr') continue;
+    const word = chunks[wi];
+    const bitLength = word ? word.length : 0;
+    const byteLength = bitLength / 8;
     const argsText = e.args.join(' ');
     instructions.push({
       index: wi,
+      kind: 'code',
       isaRef: isaRef || null,
       asmSetId: asmSetId || null,
       wordWidth: segWordWidth || null,
+      encoding: encoding,
+      byteOffset,
+      byteLength,
+      bitLength,
       mnemonic: e.mnemonic,
       args: argsText,
       argsList: e.args.slice(),
       sourceLine: e.text,
-      word: words[wi],
+      word,
     });
     wi++;
+    byteOffset += encoding === 'variable' ? byteLength : unitBytes;
   }
   return instructions;
 }
@@ -1052,29 +1073,39 @@ function assembleFromEntries(isa, isaRef, flatEntries, options = {}) {
     pendingExternals,
     deferExternal: options.deferExternal !== false,
   };
-  const words = [];
+  const chunks = [];
+  const encoding = isaEncoding(isa);
 
   for (const e of flatEntries) {
     if (e.type !== 'instr') continue;
-    words.push(encodeInstruction(isa, e, labels, encodeCtx));
+    const bits = encodeInstruction(isa, e, labels, encodeCtx);
+    if (encoding === 'fixed' && bits.length !== isa.wordWidth) {
+      throw new Error(`Instruction '${e.mnemonic}' encodes to ${bits.length} bits but wordWidth is ${isa.wordWidth}`);
+    }
+    if (encoding === 'variable' && bits.length % 8 !== 0) {
+      throw new Error(`Instruction '${e.mnemonic}' encodes to ${bits.length} bits — not a whole number of bytes`);
+    }
+    chunks.push(bits);
   }
 
   if (pendingExternals.length && options.resolveExternals) {
-    patchExternalLabels(words, flatEntries, labels, isa, pendingExternals);
+    patchExternalLabels(chunks, flatEntries, labels, isa, pendingExternals);
   }
 
-  const blob = words.join('');
-  const instructions = buildInstructionIndex(words, flatEntries, isa, isaRef, {
+  const blob = chunks.join('');
+  const instructions = buildInstructionIndex(chunks, flatEntries, isa, isaRef, {
     asmSetId: isa.asmSetId,
     wordWidth: isa.wordWidth,
   });
 
   return {
     blob,
-    words,
+    words: chunks,
     wordWidth: isa.wordWidth,
+    encoding,
     asmSetId: isa.asmSetId || null,
-    instructionCount: words.length,
+    instructionCount: chunks.length,
+    byteLength: blob.length / 8,
     labels,
     instructions,
     expandedEntries: flatEntries.filter(e => e.type === 'label' || e.type === 'instr'),
@@ -1082,7 +1113,9 @@ function assembleFromEntries(isa, isaRef, flatEntries, options = {}) {
       isaRef: isaRef || null,
       asmSetId: isa.asmSetId || null,
       wordWidth: isa.wordWidth,
-      instrCount: words.length,
+      encoding,
+      instrCount: chunks.length,
+      byteLength: blob.length / 8,
       blobOffset: 0,
     }],
     basePreferred: startAddr,
@@ -1190,6 +1223,32 @@ function disassembleInstruction(isa, bitsStr) {
 
 function disassembleProgram(isa, bitsStr, options) {
   const bits = String(bitsStr);
+  const encoding = (options && options.encoding) || isaEncoding(isa);
+
+  if (encoding === 'variable') {
+    const asmSet = isa && isa.asmSet;
+    if (!asmSet || typeof asmSet.disassembleAtOffset !== 'function') {
+      throw new Error('Cannot disassemble variable program — asm set lacks disassembleAtOffset');
+    }
+    const totalBytes = bits.length / 8;
+    if (bits.length % 8 !== 0) {
+      throw new Error(
+        `Cannot disassemble variable program — ${bits.length} bits is not a whole number of bytes`
+      );
+    }
+    const lines = [];
+    let byteOff = 0;
+    while (byteOff < totalBytes) {
+      const dec = asmSet.disassembleAtOffset(isa, bits, byteOff);
+      lines.push(dec.text || dec.mnemonic);
+      byteOff += dec.byteLength;
+    }
+    if (byteOff !== totalBytes) {
+      throw new Error(`Variable disassembly stopped at byte ${byteOff} but blob has ${totalBytes} bytes`);
+    }
+    return lines.length === 1 ? lines[0] : lines.join('\n');
+  }
+
   const w = (options && options.wordWidth) || isa.wordWidth;
   if (!w || w < 1) throw new Error('Invalid ISA wordWidth');
   if (bits.length % w !== 0) {
@@ -1272,7 +1331,7 @@ function formatInstanceDoc(alias, inst) {
 function formatAsmTypeDoc(typeName, templateIsa) {
   const lines = [];
   lines.push(`inline [${typeName}] .name:`);
-  lines.push('  set: generic | riscv32 | arm-thumb');
+  lines.push(`  set: generic | riscv32 | arm-thumb | variable8`);
   lines.push('  consts:{ NAME = ^addr | literal }');
   lines.push('  macros:{ Name param:{ micro-ops } }');
   lines.push('  MNEMONIC : opcode + field + field');
@@ -1312,6 +1371,7 @@ const asmAssemblerExports = {
   buildMicroProgram,
   decodeMnemonicFromBits,
   computePcEffect,
+  isaEncoding,
 };
 
 if (typeof module !== 'undefined' && module.exports) {

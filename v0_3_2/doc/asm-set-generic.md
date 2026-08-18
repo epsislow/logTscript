@@ -4,7 +4,7 @@ The **generic** asm set is the original LogTscript inline assembler model: you d
 
 If you omit `set:` in an ISA header, **`generic` is assumed** — existing scripts keep working unchanged.
 
-See also: [asm.md](asm.md) (overview), [asm-composition.md](asm-composition.md), [asm-microcode.md](asm-microcode.md), [riscv32 preset](asm-set-riscv32.md), [arm-thumb preset](asm-set-arm-thumb.md).
+See also: [asm.md](asm.md) (overview), [asm-composition.md](asm-composition.md), [asm-microcode.md](asm-microcode.md), [riscv32 preset](asm-set-riscv32.md), [arm-thumb preset](asm-set-arm-thumb.md), [variable8 preset](asm-set-variable8.md).
 
 ---
 

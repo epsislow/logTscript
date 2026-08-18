@@ -4,7 +4,7 @@ The **riscv32** preset provides a fixed **32-bit** RISC-V RV32I encoding for com
 
 Encoding and disassembly are built in; you do **not** write `+ R2b` segment lines unless you intentionally override an opcode with literal bits.
 
-See also: [asm.md](asm.md), [asm-composition.md](asm-composition.md#riscv32-preset), [generic set](asm-set-generic.md), [arm-thumb set](asm-set-arm-thumb.md).
+See also: [asm.md](asm.md), [asm-composition.md](asm-composition.md#riscv32-preset), [generic set](asm-set-generic.md), [arm-thumb set](asm-set-arm-thumb.md), [variable8 set](asm-set-variable8.md).
 
 ---
 

@@ -4,7 +4,7 @@ The **arm-thumb** preset assembles a subset of **16-bit ARM Thumb** instructions
 
 Registers are **`r0`–`r7`** in this subset. Immediates use decimal literals (`5` or `\5`) — **`#` starts a comment** in LogTscript, so do not use `#5`.
 
-See also: [asm.md](asm.md), [riscv32 preset](asm-set-riscv32.md), [generic set](asm-set-generic.md).
+See also: [asm.md](asm.md), [riscv32 preset](asm-set-riscv32.md), [variable8 preset](asm-set-variable8.md), [generic set](asm-set-generic.md).
 
 ---
 
@@ -191,4 +191,5 @@ NotAllow inline.asm.set{arm-thumb}
 ## Related
 
 - [asm-set-riscv32.md](asm-set-riscv32.md) — 32-bit preset
+- [asm-set-variable8.md](asm-set-variable8.md) — variable-length SPIKE
 - [asm-composition.md](asm-composition.md) — combine Thumb blobs with `use`

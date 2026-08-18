@@ -1387,6 +1387,7 @@ class Interpreter {
     const isa = {
       opcodes: inst.opcodes,
       wordWidth: inst.wordWidth,
+      encoding: inst.encoding,
       opcodeOrder: inst.opcodeOrder,
       asmSetId: inst.asmSetId,
       asmSet: inst.asmSet,
@@ -1694,6 +1695,7 @@ class Interpreter {
     const isa = {
       opcodes: inst.opcodes,
       wordWidth: inst.wordWidth,
+      encoding: inst.encoding,
       opcodeOrder: inst.opcodeOrder,
       asmSetId: inst.asmSetId,
       asmSet: inst.asmSet,
@@ -1900,6 +1902,7 @@ class Interpreter {
           name: inline.name,
           opcodes: isa.opcodes,
           wordWidth: isa.wordWidth,
+          encoding: isa.encoding || (isa.asmSet && isa.asmSet.encoding) || 'fixed',
           opcodeOrder: isa.opcodeOrder,
           consts: isa.consts || {},
           macros: isa.macros || {},
