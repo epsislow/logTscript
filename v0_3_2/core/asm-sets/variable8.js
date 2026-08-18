@@ -84,6 +84,7 @@ function createVariable8AsmSet() {
     label: 'Variable encoding SPIKE (8-bit unit, 8/16-bit instr)',
     wordWidth: 8,
     encoding: 'variable',
+    wordEmitBytes: 4,
     endianness: 'na',
     operandGrammar: 'variable8',
     defaultOpcodes,

@@ -35026,5 +35026,151 @@ show(.v8:decode(prog))`;
     h.assert('encoding variable', String(text.includes('encoding: variable')), 'true');
   });
 
+  function runVariable8CompositionTest(h, session) {
+    const src = `inline [asm] .v8:
+  set: variable8
+  :
+
+8wire chunk = .v8 { w8 }
+24wire prog = .v8 {
+  use chunk
+  w16 3
+}
+show(prog; asm)`;
+    const { interp, out } = session.run(src);
+    const bits = session.getWire(interp, 'prog');
+    h.assert('24 bits', String(bits.length), '24');
+    h.assert('byte0 w8', bits.substr(0, 8), '11000000');
+    h.assert('w16 imm 3', bits.substr(16, 8), '00000011');
+    const wire = interp.wires.get('prog');
+    const mod = wire && wire.asmModuleId != null ? interp.asmModules.get(wire.asmModuleId) : null;
+    h.assert('2 code entries', String(mod && mod.instructions.length), '2');
+    h.assert('ins0 byteOffset 0', String(mod && mod.instructions[0].byteOffset), '0');
+    h.assert('ins1 byteOffset 1', String(mod && mod.instructions[1].byteOffset), '1');
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('asm w8', String(text.includes('w8')), 'true');
+    h.assert('asm w16 3', String(/w16\s+3/.test(text)), 'true');
+  }
+
+  reg(3238, 'asm-set', 'variable8 composition use + byteOffset merge (1+x.4b)', runVariable8CompositionTest);
+  reg(3239, 'asm-set', 'variable8 composition use (wave)', runVariable8CompositionTest, { propagation: 'wave' });
+
+  function runVariable8MixedCompositionTest(h, session) {
+    const src = `inline [asm] .v8:
+  set: variable8
+  :
+
+inline [asm] .rv:
+  set: riscv32
+  :
+
+8wire chunk = .v8 { w8 }
+32wire rv = .rv { addi x1, x0, 1 }
+40wire mix = .v8 {
+  use chunk
+  use rv
+}
+show(mix; asm)`;
+    const { interp, out } = session.run(src);
+    h.assert('40 bits', String(session.getWire(interp, 'mix').length), '40');
+    const wire = interp.wires.get('mix');
+    const mod = wire && wire.asmModuleId != null ? interp.asmModules.get(wire.asmModuleId) : null;
+    h.assert('ins0 w8 offset 0', String(mod && mod.instructions[0].byteOffset), '0');
+    h.assert('ins1 rv offset 1', String(mod && mod.instructions[1].byteOffset), '1');
+    h.assert('ins1 kind code', String(mod && mod.instructions[1].kind), 'code');
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('decode w8', String(text.includes('w8')), 'true');
+    h.assert('decode addi', String(/addi\s+x1,\s*x0,\s*1/.test(text)), 'true');
+  }
+
+  reg(3240, 'asm-set', 'variable8 + riscv32 composition (1+x.4b)', runVariable8MixedCompositionTest);
+  reg(3241, 'asm-set', 'variable8 + riscv32 composition (wave)', runVariable8MixedCompositionTest, { propagation: 'wave' });
+
+  function runVariable8DirectivesTest(h, session) {
+    const src = `inline [asm] .v8:
+  set: variable8
+  :
+
+48wire layout = .v8 {
+  .org 4
+  .byte 0xAA
+  w8
+}
+show(layout; asm)`;
+    const { interp, out } = session.run(src);
+    const bits = session.getWire(interp, 'layout');
+    h.assert('48 bits', String(bits.length), '48');
+    h.assert('pad bytes zero', bits.substr(0, 32), '00000000000000000000000000000000');
+    h.assert('byte 0xAA', bits.substr(32, 8), '10101010');
+    h.assert('w8 opcode', bits.substr(40, 8), '11000000');
+    const wire = interp.wires.get('layout');
+    const mod = wire && wire.asmModuleId != null ? interp.asmModules.get(wire.asmModuleId) : null;
+    h.assert('w8 at byte 5', String(mod && mod.instructions[1].byteOffset), '5');
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('asm .byte', String(text.includes('.byte')), 'true');
+    h.assert('asm w8', String(text.includes('w8')), 'true');
+  }
+
+  reg(3242, 'asm-set', 'variable8 directives .org .byte (1+x.5)', runVariable8DirectivesTest);
+  reg(3243, 'asm-set', 'variable8 directives .org .byte (wave)', runVariable8DirectivesTest, { propagation: 'wave' });
+
+  function runVariable8WordSkipAlignTest(h, session) {
+    const src = `inline [asm] .v8:
+  set: variable8
+  :
+
+72wire blob = .v8 {
+  .word 0x12345678
+  .skip 2
+  .align 4
+  w8
+}
+show(blob; asm)`;
+    const { interp, out } = session.run(src);
+    const bits = session.getWire(interp, 'blob');
+    h.assert('72 bits', String(bits.length), '72');
+    h.assert('word LE byte0', bits.substr(0, 8), '01111000');
+    h.assert('word LE byte1', bits.substr(8, 8), '01010110');
+    h.assert('w8 at byte 8', bits.substr(64, 8), '11000000');
+    const wire = interp.wires.get('blob');
+    const mod = wire && wire.asmModuleId != null ? interp.asmModules.get(wire.asmModuleId) : null;
+    h.assert('w8 offset 8', String(mod && mod.instructions[2].byteOffset), '8');
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('asm .word', String(text.includes('.word')), 'true');
+    h.assert('asm .skip', String(text.includes('.skip')), 'true');
+    h.assert('asm w8', String(text.includes('w8')), 'true');
+  }
+
+  reg(3244, 'asm-set', 'variable8 directives .word .skip .align (1+x.5)', runVariable8WordSkipAlignTest);
+  reg(3245, 'asm-set', 'variable8 directives .word .skip .align (wave)', runVariable8WordSkipAlignTest, { propagation: 'wave' });
+
+  reg(3246, 'asm-set', 'directives rejected on fixed encoding', function(h, session) {
+    const { out } = session.run(`inline [asm] .rv:
+  set: riscv32
+  :
+32wire p = .rv { .byte 1 }`);
+    const err = out.find(l => l.startsWith('Error:')) || '';
+    h.assert('require variable encoding', String(err.includes('require encoding: variable')), 'true');
+  });
+
+  reg(3247, 'asm-set', 'variable8 label byte address', function(h, session) {
+    const src = `inline [asm] .v8:
+  set: variable8
+  :
+
+40wire tagged = .v8 {
+entry:
+  w8
+  w16 42
+tail:
+  w16 0
+}`;
+    const { interp } = session.run(src);
+    const wire = interp.wires.get('tagged');
+    const mod = wire && wire.asmModuleId != null ? interp.asmModules.get(wire.asmModuleId) : null;
+    h.assert('entry at 0', String(mod && mod.labels.entry), '0');
+    h.assert('tail at 3', String(mod && mod.labels.tail), '3');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

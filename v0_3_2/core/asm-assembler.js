@@ -494,6 +494,50 @@ function parseProgramBodyRaw(raw) {
   return entries;
 }
 
+function parseDirectiveInt(raw) {
+  const t = String(raw).trim();
+  if (t.startsWith('\\')) {
+    const n = t.slice(1);
+    if (!/^-?\d+$/.test(n)) throw new Error(`Invalid directive integer '${raw}'`);
+    return parseInt(n, 10);
+  }
+  if (/^0[xX]/.test(t)) return parseInt(t, 16);
+  if (/^\d+$/.test(t)) return parseInt(t, 10);
+  throw new Error(`Invalid directive integer '${raw}'`);
+}
+
+function parseDirectiveValueList(raw) {
+  return String(raw).split(',').map(s => s.trim()).filter(Boolean).map(v => parseDirectiveInt(v));
+}
+
+function parseDirectiveLine(text, lineNo) {
+  const t = text.trim();
+  const orgM = /^\.org\s+(.+)$/i.exec(t);
+  if (orgM) return [{ type: 'org', valueRaw: orgM[1].trim(), lineNo, text: t }];
+  const byteM = /^\.byte\s+(.+)$/i.exec(t);
+  if (byteM) {
+    return [{ type: 'data_byte', values: parseDirectiveValueList(byteM[1]), lineNo, text: t }];
+  }
+  const wordM = /^\.word\s+(.+)$/i.exec(t);
+  if (wordM) return [{ type: 'data_word', valueRaw: wordM[1].trim(), lineNo, text: t }];
+  const skipM = /^\.skip\s+(.+)$/i.exec(t);
+  if (skipM) return [{ type: 'skip', countRaw: skipM[1].trim(), lineNo, text: t }];
+  const alignM = /^\.align\s+(\d+)$/i.exec(t);
+  if (alignM) {
+    return [{ type: 'align_pad', alignment: parseInt(alignM[1], 10), lineNo, text: t }];
+  }
+  return null;
+}
+
+function isDirectiveEntry(e) {
+  return e.type === 'org' || e.type === 'data_byte' || e.type === 'data_word' ||
+    e.type === 'skip' || e.type === 'align_pad';
+}
+
+function isProgramContentEntry(e) {
+  return e.type === 'label' || e.type === 'instr' || isDirectiveEntry(e);
+}
+
 function parseProgramEntry(text, lineNo) {
   const labelInstr = /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/.exec(text);
   if (labelInstr) {
@@ -505,6 +549,9 @@ function parseProgramEntry(text, lineNo) {
   }
   const onlyLabel = /^([A-Za-z_][A-Za-z0-9_]*)\s*:$/.exec(text);
   if (onlyLabel) return [{ type: 'label', name: onlyLabel[1], lineNo, text }];
+
+  const directive = parseDirectiveLine(text, lineNo);
+  if (directive) return directive;
 
   const tokens = text.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
   if (!tokens.length) return [];
@@ -589,7 +636,7 @@ function expandProgramEntries(entries, ctx) {
         pc = localPc;
         continue;
       }
-      if (e.type === 'label' || e.type === 'instr') {
+      if (e.type === 'label' || e.type === 'instr' || isDirectiveEntry(e)) {
         result.push(e);
         if (e.type === 'instr') localPc++;
         pc = localPc;
@@ -612,7 +659,83 @@ function relabelEntriesForBase(entries, baseVal) {
   return [{ type: 'base', valueRaw: String(baseVal), lineNo: 0 }, ...withoutBase];
 }
 
-function pass1CollectLabels(entries, startAddr = 0) {
+function isaWordEmitBytes(isa) {
+  if (!isa) return 4;
+  if (isa.wordEmitBytes != null) return isa.wordEmitBytes;
+  if (isa.asmSet && isa.asmSet.wordEmitBytes != null) return isa.asmSet.wordEmitBytes;
+  const ww = isa.wordWidth || 32;
+  return ww >= 32 ? 4 : Math.max(1, ww / 8);
+}
+
+function estimateInstrByteLength(isa, entry) {
+  if (!isa) return 1;
+  if (isaEncoding(isa) === 'fixed') return (isa.wordWidth || 8) / 8;
+  const def = isa.opcodes && isa.opcodes[entry.mnemonic.toUpperCase()];
+  if (def && def.wordWidth) return def.wordWidth / 8;
+  try {
+    const bits = encodeInstruction(isa, entry, {}, { deferExternal: true, pendingExternals: [] });
+    return bits.length / 8;
+  } catch (_) {
+    return 1;
+  }
+}
+
+function pass1CollectLabels(entries, startAddr = 0, isa) {
+  if (isa && isaEncoding(isa) === 'variable') {
+    const labels = {};
+    let addr = startAddr;
+    const wordBytes = isaWordEmitBytes(isa);
+
+    function padToOrg(target) {
+      if (addr < target) addr = target;
+      else if (addr > target) {
+        throw new Error(`.org ${target} overlaps prior data at byte ${addr}`);
+      }
+    }
+
+    function padAlign(alignment) {
+      if (alignment < 1 || (alignment & (alignment - 1)) !== 0) {
+        throw new Error(`.align ${alignment} requires a power-of-2 alignment`);
+      }
+      const gap = (alignment - (addr % alignment)) % alignment;
+      addr += gap;
+    }
+
+    for (const e of entries) {
+      if (e.type === 'label') labels[e.name] = addr;
+      if (e.type === 'org') {
+        padToOrg(parseDirectiveInt(e.valueRaw));
+        continue;
+      }
+      if (e.type === 'align_pad') {
+        padAlign(e.alignment);
+        continue;
+      }
+      if (e.type === 'skip') {
+        const n = parseDirectiveInt(e.countRaw);
+        if (n < 0) throw new Error(`.skip count must be non-negative`);
+        e.addr = addr;
+        addr += n;
+        continue;
+      }
+      if (e.type === 'data_byte') {
+        e.addr = addr;
+        addr += e.values.length;
+        continue;
+      }
+      if (e.type === 'data_word') {
+        e.addr = addr;
+        addr += wordBytes;
+        continue;
+      }
+      if (e.type === 'instr') {
+        e.addr = addr;
+        addr += estimateInstrByteLength(isa, e);
+      }
+    }
+    return labels;
+  }
+
   const labels = {};
   let addr = startAddr;
   for (const e of entries) {
@@ -623,6 +746,26 @@ function pass1CollectLabels(entries, startAddr = 0) {
     }
   }
   return labels;
+}
+
+function emitByteChunk(val) {
+  return ((val >>> 0) & 0xff).toString(2).padStart(8, '0');
+}
+
+function emitWordLe(val, wordBytes) {
+  val >>>= 0;
+  const chunks = [];
+  for (let i = 0; i < wordBytes; i++) {
+    chunks.push(((val >> (8 * i)) & 0xff).toString(2).padStart(8, '0'));
+  }
+  return chunks;
+}
+
+function assertDirectivesAllowed(isa, flatEntries) {
+  if (!flatEntries.some(isDirectiveEntry)) return;
+  if (isaEncoding(isa) !== 'variable') {
+    throw new Error('Assembly directives (.org, .byte, .word, .skip, .align) require encoding: variable');
+  }
 }
 
 function packUnsigned(value, width) {
@@ -938,8 +1081,9 @@ function assembleProgramModule(isa, isaRef, programRaw, ctx) {
     const allExpanded = [];
     const allPending = [];
     const segmentMeta = [];
-    let globalAddr = startAddr;
     let blobOffset = 0;
+    let blobOffsetBytes = 0;
+    let globalAddr = startAddr;
 
     for (const seg of segments) {
       const pending = [];
@@ -958,11 +1102,14 @@ function assembleProgramModule(isa, isaRef, programRaw, ctx) {
         blobOffset,
       });
       blobOffset += mod.blob.length;
+      const segByteLen = mod.byteLength != null ? mod.byteLength : mod.blob.length / 8;
       allWords.push(...mod.words);
       for (const ins of mod.instructions) {
         allInstructions.push({
           ...ins,
           index: allInstructions.length,
+          byteOffset: (ins.byteOffset != null ? ins.byteOffset : 0) + blobOffsetBytes,
+          encoding: isaEncoding(seg.isa),
           isa: seg.isa,
           asmSetId: seg.isa.asmSetId || ins.asmSetId,
           wordWidth: seg.isa.wordWidth || ins.wordWidth,
@@ -970,11 +1117,15 @@ function assembleProgramModule(isa, isaRef, programRaw, ctx) {
       }
       allExpanded.push(...seg.flatEntries);
       allPending.push(...pending);
-      globalAddr += mod.instructionCount;
+      globalAddr += segByteLen;
+      blobOffsetBytes += segByteLen;
     }
 
-    const globalLabels = pass1CollectLabels(allExpanded, startAddr);
+    const globalLabels = pass1CollectLabels(allExpanded, startAddr, isa);
     if (allPending.length) {
+      if (isaEncoding(isa) === 'variable') {
+        throw new Error('External labels in variable encoding programs are not yet supported');
+      }
       patchExternalLabels(allWords, allExpanded, globalLabels, isa, allPending);
       allInstructions.forEach((ins, i) => {
         if (allWords[i] != null) ins.word = allWords[i];
@@ -985,11 +1136,13 @@ function assembleProgramModule(isa, isaRef, programRaw, ctx) {
       blob: allWords.join(''),
       words: allWords,
       wordWidth: isa.wordWidth,
+      encoding: isaEncoding(isa),
       asmSetId: isa.asmSetId || null,
-      instructionCount: allWords.length,
+      instructionCount: allInstructions.length,
+      byteLength: allWords.join('').length / 8,
       labels: globalLabels,
       instructions: allInstructions,
-      expandedEntries: allExpanded.filter(e => e.type === 'label' || e.type === 'instr'),
+      expandedEntries: allExpanded.filter(isProgramContentEntry),
       segments: segmentMeta,
       basePreferred: startAddr,
       externRefs: allPending.map(r => ({ name: r.name, fromIndex: r.instrAddr })),
@@ -1065,16 +1218,202 @@ function buildInstructionIndex(chunks, instrEntries, isa, isaRef, meta) {
   return instructions;
 }
 
-function assembleFromEntries(isa, isaRef, flatEntries, options = {}) {
+function assembleFromEntriesVariable(isa, isaRef, flatEntries, options = {}) {
   const startAddr = options.startAddr || 0;
-  const labels = pass1CollectLabels(flatEntries, startAddr);
+  const labels = pass1CollectLabels(flatEntries, startAddr, isa);
   const pendingExternals = options.pendingExternalsOut || [];
   const encodeCtx = {
     pendingExternals,
     deferExternal: options.deferExternal !== false,
   };
   const chunks = [];
+  const instructions = [];
+  const encoding = 'variable';
+  const wordBytes = isaWordEmitBytes(isa);
+  const asmSetId = isa.asmSetId || null;
+  let byteOffset = 0;
+  let locationCounter = startAddr;
+
+  function padToOrg(target) {
+    if (locationCounter < target) {
+      const gap = target - locationCounter;
+      for (let i = 0; i < gap; i++) {
+        chunks.push(emitByteChunk(0));
+      }
+      locationCounter = target;
+      byteOffset = target - startAddr;
+    } else if (locationCounter > target) {
+      throw new Error(`.org ${target} overlaps prior data at byte ${locationCounter}`);
+    }
+  }
+
+  function padAlign(alignment) {
+    if (alignment < 1 || (alignment & (alignment - 1)) !== 0) {
+      throw new Error(`.align ${alignment} requires a power-of-2 alignment`);
+    }
+    const gap = (alignment - (locationCounter % alignment)) % alignment;
+    if (gap > 0) {
+      for (let i = 0; i < gap; i++) chunks.push(emitByteChunk(0));
+      locationCounter += gap;
+      byteOffset += gap;
+    }
+  }
+
+  for (const e of flatEntries) {
+    if (e.type === 'label') continue;
+    if (e.type === 'org') {
+      padToOrg(parseDirectiveInt(e.valueRaw));
+      continue;
+    }
+    if (e.type === 'align_pad') {
+      padAlign(e.alignment);
+      continue;
+    }
+    if (e.type === 'skip') {
+      const n = parseDirectiveInt(e.countRaw);
+      if (n < 0) throw new Error(`.skip count must be non-negative`);
+      for (let i = 0; i < n; i++) chunks.push(emitByteChunk(0));
+      instructions.push({
+        index: instructions.length,
+        kind: 'data',
+        isaRef: isaRef || null,
+        asmSetId,
+        wordWidth: isa.wordWidth,
+        encoding,
+        byteOffset,
+        byteLength: n,
+        bitLength: n * 8,
+        mnemonic: '.skip',
+        args: String(n),
+        argsList: [String(n)],
+        sourceLine: e.text,
+        word: null,
+      });
+      byteOffset += n;
+      locationCounter += n;
+      continue;
+    }
+    if (e.type === 'data_byte') {
+      const byteChunks = e.values.map(v => emitByteChunk(v));
+      for (const chunk of byteChunks) chunks.push(chunk);
+      instructions.push({
+        index: instructions.length,
+        kind: 'data',
+        isaRef: isaRef || null,
+        asmSetId,
+        wordWidth: isa.wordWidth,
+        encoding,
+        byteOffset,
+        byteLength: e.values.length,
+        bitLength: e.values.length * 8,
+        mnemonic: '.byte',
+        args: e.values.join(', '),
+        argsList: e.values.map(String),
+        sourceLine: e.text,
+        word: byteChunks.join(''),
+      });
+      byteOffset += e.values.length;
+      locationCounter += e.values.length;
+      continue;
+    }
+    if (e.type === 'data_word') {
+      const val = parseDirectiveInt(e.valueRaw);
+      const wordChunks = emitWordLe(val, wordBytes);
+      for (const chunk of wordChunks) chunks.push(chunk);
+      instructions.push({
+        index: instructions.length,
+        kind: 'data',
+        isaRef: isaRef || null,
+        asmSetId,
+        wordWidth: isa.wordWidth,
+        encoding,
+        byteOffset,
+        byteLength: wordBytes,
+        bitLength: wordBytes * 8,
+        mnemonic: '.word',
+        args: e.valueRaw,
+        argsList: [e.valueRaw],
+        sourceLine: e.text,
+        word: wordChunks.join(''),
+      });
+      byteOffset += wordBytes;
+      locationCounter += wordBytes;
+      continue;
+    }
+    if (e.type !== 'instr') continue;
+    const bits = encodeInstruction(isa, e, labels, encodeCtx);
+    if (bits.length % 8 !== 0) {
+      throw new Error(`Instruction '${e.mnemonic}' encodes to ${bits.length} bits — not a whole number of bytes`);
+    }
+    chunks.push(bits);
+    instructions.push({
+      index: instructions.length,
+      kind: 'code',
+      isaRef: isaRef || null,
+      asmSetId,
+      wordWidth: isa.wordWidth,
+      encoding,
+      byteOffset,
+      byteLength: bits.length / 8,
+      bitLength: bits.length,
+      mnemonic: e.mnemonic,
+      args: e.args.join(' '),
+      argsList: e.args.slice(),
+      sourceLine: e.text,
+      word: bits,
+    });
+    byteOffset += bits.length / 8;
+    locationCounter += bits.length / 8;
+  }
+
+  if (pendingExternals.length && options.resolveExternals) {
+    if (isaEncoding(isa) === 'variable') {
+      throw new Error('External label patching on variable encoding is not yet supported');
+    }
+    patchExternalLabels(chunks, flatEntries, labels, isa, pendingExternals);
+  }
+
+  const blob = chunks.join('');
+  return {
+    blob,
+    words: chunks,
+    wordWidth: isa.wordWidth,
+    encoding,
+    asmSetId,
+    instructionCount: instructions.length,
+    byteLength: blob.length / 8,
+    labels,
+    instructions,
+    expandedEntries: flatEntries.filter(isProgramContentEntry),
+    segments: [{
+      isaRef: isaRef || null,
+      asmSetId,
+      wordWidth: isa.wordWidth,
+      encoding,
+      instrCount: instructions.length,
+      byteLength: blob.length / 8,
+      blobOffset: 0,
+    }],
+    basePreferred: startAddr,
+    externRefs: pendingExternals.map(r => ({ name: r.name, fromIndex: r.instrAddr })),
+  };
+}
+
+function assembleFromEntries(isa, isaRef, flatEntries, options = {}) {
+  assertDirectivesAllowed(isa, flatEntries);
   const encoding = isaEncoding(isa);
+  if (encoding === 'variable') {
+    return assembleFromEntriesVariable(isa, isaRef, flatEntries, options);
+  }
+
+  const startAddr = options.startAddr || 0;
+  const labels = pass1CollectLabels(flatEntries, startAddr, isa);
+  const pendingExternals = options.pendingExternalsOut || [];
+  const encodeCtx = {
+    pendingExternals,
+    deferExternal: options.deferExternal !== false,
+  };
+  const chunks = [];
 
   for (const e of flatEntries) {
     if (e.type !== 'instr') continue;
@@ -1108,7 +1447,7 @@ function assembleFromEntries(isa, isaRef, flatEntries, options = {}) {
     byteLength: blob.length / 8,
     labels,
     instructions,
-    expandedEntries: flatEntries.filter(e => e.type === 'label' || e.type === 'instr'),
+    expandedEntries: flatEntries.filter(isProgramContentEntry),
     segments: [{
       isaRef: isaRef || null,
       asmSetId: isa.asmSetId || null,
@@ -1151,8 +1490,11 @@ function formatModuleDecode(module) {
   const isa = module.isa;
   if (isa) {
     return module.instructions.map(ins => {
+      if (ins.kind === 'data') {
+        return ins.sourceLine || (ins.args ? `${ins.mnemonic} ${ins.args}` : ins.mnemonic);
+      }
       const segIsa = ins.isa || isa;
-      if (ins.word) {
+      if (ins.word && ins.kind === 'code') {
         try {
           return disassembleInstruction(segIsa, ins.word);
         } catch (_) { /* fall through */ }

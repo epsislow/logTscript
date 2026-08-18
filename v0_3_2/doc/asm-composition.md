@@ -242,6 +242,12 @@ show(.rv:decode(mix))
 
 **CPU execution** on a heterogeneous blob (fetch/decode across sets) is **not** covered here — see executor per AsmSet (phase 1+x.3). Encode, wire assignment, and `:decode` work today.
 
+### Variable encoding (`variable8`, 1+x.4b)
+
+On **`encoding: 'variable'`**, labels and **`byteOffset`** metadata use **byte addresses**. Composition merges segments with corrected global offsets; **`show(wire; asm)`** uses module metadata (including **`.byte`** / **`.word`** data lines).
+
+See [asm-set-variable8.md](asm-set-variable8.md) for **`use`** + directives with **Load / Load & Run** examples.
+
 ---
 
 ## Related

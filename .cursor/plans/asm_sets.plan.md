@@ -43,7 +43,7 @@ todos:
     status: completed
   - id: f1x5-directives
     content: "1+x.5: directives .byte/.word/.org/.skip + label byte offset"
-    status: pending
+    status: completed
   - id: f1x1-x86
     content: "1+x.1: preset x86-32 assemble (+ exec subset după 4+5)"
     status: pending
@@ -1378,8 +1378,8 @@ Vezi **[D35 — Exemple x86 Intel](#d35--exemple-x86-intel-mvp)** (confirmat use
 | ID | Feature | Motiv / stare | Depinde de |
 |----|---------|---------------|------------|
 | **1+x.4a ✅** | **Variable encoding SPIKE** (`variable8`, w8+w16) | Livrat — teste 3233–3237, D29–D32 |
-| **1+x.4b** | Composition + `:decode` multi-set variable | Următor pas 1+x.4 |
-| **1+x.5** | **Directives** (`.byte`, `.word`, `.org`, `.skip`) | Layout + date raw — **secțiune dedicată mai sus** | 1+x.4 (recomandat) |
+| **1+x.4b ✅** | Composition + `:decode` multi-set variable | Livrat — teste 3238–3241 |
+| **1+x.5 ✅** | **Directives** (`.byte`, `.word`, `.org`, `.skip`, `.align`) | Livrat — teste 3242–3247 |
 | 1+x.1 | **x86 / x86-64** | Variable-length, prefixe, ModR/M — sub-faze 1a/1b/1c | **1+x.4**, **1+x.5** |
 | 1+x.2 | **ARM Cortex-A (ARM + Thumb-2 mixt)** | Strategie 2a (preset separat) / 2b (mixt) | **1+x.4**, **1+x.5** |
 | **1+x.3a ✅** | Executor riscv32 MVP | Livrat — teste 3197–3206 | — |
@@ -1457,8 +1457,8 @@ Vezi **[D35 — Exemple x86 Intel](#d35--exemple-x86-intel-mvp)** (confirmat use
 - [x] ✅ **1+x.3c-iii** fence/ecall/ebreak (D26)
 - [ ] **1+x.3d** FP (D27 amânat)
 - [x] ✅ **1+x.4a** SPIKE `variable8` — `encoding: variable`, blob bytes, metadata `byteOffset`/`byteLength`, decode offset walk (teste 3233–3237)
-- [ ] **1+x.4b** Integrare composition multi-set variable + regression extinsă
-- [ ] **1+x.5** Directives `.org`/`.byte`/`.word`/`.skip` + label byte offset
+- [x] ✅ **1+x.4b** Integrare composition multi-set variable + `:decode` / `show(wire; asm)` (teste 3238–3241)
+- [x] ✅ **1+x.5** Directives `.org`/`.byte`/`.word`/`.skip`/`.align` + label byte offset (teste 3242–3247)
 - [ ] **1+x.1a** Preset `x86-32` assemble MVP (Intel, subset ModR/M)
 - [ ] **1+x.1b** Executor CPU x86 subset + flags pedagogice
 - [ ] **1+x.2a** Preset `arm-a32` assemble (+ exec subset opțional)

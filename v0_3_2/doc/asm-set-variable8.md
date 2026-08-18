@@ -140,7 +140,7 @@ show(.v8:decode(seq))
 
 ---
 
-## Runnable — labels (byte addresses, D34 preview)
+## Runnable — labels (byte addresses, D34)
 
 Labels on variable programs resolve to **byte offsets** (not instruction indices). Branch operands are **not** part of this SPIKE preset — labels are for layout and `show` only:
 
@@ -149,7 +149,7 @@ inline [asm] .v8:
   set: variable8
   :
 
-24wire tagged = .v8 {
+40wire tagged = .v8 {
 entry:
   w8
   w16 42
@@ -159,7 +159,110 @@ tail:
 show(tagged; asm)
 ```
 
-**Load & Run:** **`entry`** at byte **0**, **`tail`** at byte **3**. Useful when combining with **1+x.5** directives (`.org`, `.byte`) later.
+**Load & Run:** **`entry`** at byte **0**, **`tail`** at byte **3** (1 byte + 2 bytes). Useful with directives below.
+
+---
+
+## Directives (1+x.5 — D33)
+
+On **`encoding: 'variable'`** only. The **`locationCounter`** is a **byte address**; gaps at **`.org`** are filled with **`0x00`**.
+
+| Directive | Meaning |
+|-----------|---------|
+| `.org expr` | Next byte at logical address (decimal or `0x…`) |
+| `.byte n [, n …]` | Raw byte(s) |
+| `.word expr` | **4 bytes** little-endian (`wordEmitBytes: 4` on this preset) |
+| `.skip n` | Reserve `n` zero bytes |
+| `.align n` | Pad to next multiple of `n` bytes (`n` = power of 2) |
+
+Directives on **fixed** presets (`riscv32`, `arm-thumb`) → error: *require encoding: variable*.
+
+### Runnable — `.org` + `.byte` + code
+
+```logts-play
+inline [asm] .v8:
+  set: variable8
+  :
+
+48wire layout = .v8 {
+  .org 4
+  .byte 0xAA
+  w8
+}
+show(layout)
+show(layout; asm)
+```
+
+**Load:** declares `.v8` and wire `layout`.
+
+**Load & Run:** **48 bits** = 6 bytes: four zero padding bytes, **`0xAA`**, then **`w8`** (`11000000`). **`show(layout; asm)`** lists `.byte 0xAA` and `w8`.
+
+### Runnable — `.word`, `.skip`, `.align`
+
+```logts-play
+inline [asm] .v8:
+  set: variable8
+  :
+
+72wire blob = .v8 {
+  .word 0x12345678
+  .skip 2
+  .align 4
+  w8
+}
+show(blob; asm)
+```
+
+**Load & Run:** **72 bits** (9 bytes): word LE `78 56 34 12`, two skip bytes, two align pad bytes, **`w8`** at byte offset **8**.
+
+---
+
+## Composition `use` (1+x.4b)
+
+Combine **variable** and **fixed** segments; each segment keeps its ISA. Instruction **`byteOffset`** in module metadata is **global** across the merged blob.
+
+### Runnable — `use` two variable8 chunks
+
+```logts-play
+inline [asm] .v8:
+  set: variable8
+  :
+
+8wire chunk = .v8 { w8 }
+24wire prog = .v8 {
+  use chunk
+  w16 3
+}
+show(prog)
+show(prog; asm)
+show(.v8:decode(prog))
+```
+
+**Load & Run:** **24 bits** — byte 0 = `w8`, bytes 1–2 = `w16 3`. **`show(prog; asm)`** shows both lines; **`:decode`** matches.
+
+### Runnable — variable8 + riscv32
+
+```logts-play
+inline [asm] .v8:
+  set: variable8
+  :
+
+inline [asm] .rv:
+  set: riscv32
+  :
+
+8wire chunk = .v8 { w8 }
+32wire rv = .rv { addi x1, x0, 1 }
+40wire mix = .v8 {
+  use chunk
+  use rv
+}
+show(mix; asm)
+```
+
+**Load & Run:** **40 bits** = 1 byte `w8` + 4-byte RISC-V `addi`. **`show(mix; asm)`** decodes each segment with its own ISA (metadata on the assembled module).
+
+See [asm-composition.md](asm-composition.md) for general `use` / `repeat` / `align` rules.
 
 ---
 
@@ -208,12 +311,14 @@ See [allow-notallow.md](allow-notallow.md).
 | `Cannot disassemble variable program — … not a whole number of bytes` | Wire bit length not multiple of 8 |
 | `variable8: no matching opcode at byte N` | Corrupt blob or wrong ISA in `:decode` |
 | `variable8 preset does not support user opcode overrides` | Custom mnemonic lines in ISA header |
+| `require encoding: variable` | Directive used on a **fixed** preset |
+| `.org N overlaps prior data at byte M` | `.org` target is before current location |
 
 ---
 
 ## Related
 
 - [asm.md](asm.md) — overview and preset table
-- [asm-composition.md](asm-composition.md) — multi-set `use` (variable + fixed segments: **1+x.4b**)
+- [asm-composition.md](asm-composition.md) — multi-set `use` (**1+x.4b** ✅ variable + fixed segments)
 - [asm-set-riscv32.md](asm-set-riscv32.md) — fixed 32-bit preset with CPU exec
 - [asm-set-arm-thumb.md](asm-set-arm-thumb.md) — fixed 16-bit preset with CPU exec
