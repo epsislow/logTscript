@@ -1625,7 +1625,7 @@ Vezi **[D38 — Extensii x86-32](#d38--extensii-x86-32-1x1c)**.
 - [x] **1+x.1c-i** x86 extensii batch 1 (D38): pattern A/B/C, `lea`, `test`, `xchg`, `loop`, salturi — teste 3263–3275; doc D38-D2…D5
 - [x] **1+x.1c-ii** x86 extensii batch 2: `mul`/`div`, `enter`/`leave`, `push imm32` — teste 3276–3289
 - [x] **1+x.1c-iii-a** pattern D (SIB) + D38-D6
-- [ ] **1+x.1c-iii-b** prefixe 66/67 (opțional)
+- [x] **1+x.1c-iii-b** prefixe 66/67 + doc runnable
 - [ ] **1+x.1c-iii-c** segmente fs/gs — skip MVP
 - [ ] **1+x.1c-iv** șiruri `rep` (amânat)
 - [ ] **1+x.1d** preset x86-64 (amânat)

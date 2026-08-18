@@ -35778,5 +35778,83 @@ slot: .byte 11`, { maxSteps: 8, progLen: 80 });
   reg(3296, 'asm-set', 'x86-32 reject esp as SIB index', runX86SibRejectEspIndexTest);
   reg(3297, 'asm-set', 'x86-32 reject esp index (wave)', runX86SibRejectEspIndexTest, { propagation: 'wave' });
 
+  function runX86Prefix66DecodeTest(h, session) {
+    const src = `inline [asm] .x86:
+  set: x86-32
+  :
+
+80wire p = .x86 {
+  mov ax, bx
+  mov ax, 5
+  add ax, bx
+}
+show(.x86:decode(p))`;
+    const { out, interp } = session.run(src);
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    const bits = session.getWire(interp, 'p');
+    h.assert('mov ax, bx', String(text.includes('mov ax, bx')), 'true');
+    h.assert('add ax, bx', String(text.includes('add ax, bx')), 'true');
+    h.assert('prefix 66 byte0', bits.substr(0, 8), '01100110');
+  }
+
+  reg(3298, 'asm-set', 'x86-32 prefix 0x66 decode (1+x.1c-iii-b)', runX86Prefix66DecodeTest);
+  reg(3299, 'asm-set', 'x86-32 prefix 66 decode (wave)', runX86Prefix66DecodeTest, { propagation: 'wave' });
+
+  function runX86Prefix66CpuTest(h, session) {
+    const src = x86CpuShell(`      mov ax, 5
+      mov bx, 10
+      add ax, bx
+      jmp halt
+    halt:
+      jmp halt`, { maxSteps: 8, progLen: 32 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax low16 = 15', r0.value, '00000000000000000000000000001111');
+  }
+
+  reg(3300, 'asm-set', 'x86-32 prefix 0x66 CPU add ax,bx', runX86Prefix66CpuTest);
+  reg(3301, 'asm-set', 'x86-32 prefix 66 CPU (wave)', runX86Prefix66CpuTest, { propagation: 'wave' });
+
+  function runX86Prefix67DecodeTest(h, session) {
+    const src = `inline [asm] .x86:
+  set: x86-32
+  :
+
+64wire p = .x86 {
+  mov ax, [si]
+  lea bx, [bx+di]
+}
+show(.x86:decode(p))`;
+    const { out } = session.run(src);
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('mov ax, [si]', String(text.includes('mov ax, [si]')), 'true');
+    h.assert('lea bx+di', String(text.includes('lea bx, [bx+di]')), 'true');
+  }
+
+  reg(3302, 'asm-set', 'x86-32 prefix 0x67 decode (1+x.1c-iii-b)', runX86Prefix67DecodeTest);
+  reg(3303, 'asm-set', 'x86-32 prefix 67 decode (wave)', runX86Prefix67DecodeTest, { propagation: 'wave' });
+
+  function runX86Prefix67CpuTest(h, session) {
+    const src = x86CpuShell(`      mov si, 0x40
+      mov ax, [si]
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x40
+val: .byte 0x2a`, { maxSteps: 8, progLen: 80 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('ax = 42', r0.value, '00000000000000000000000000101010');
+  }
+
+  reg(3304, 'asm-set', 'x86-32 prefix 0x67 CPU mov ax,[si]', runX86Prefix67CpuTest);
+  reg(3305, 'asm-set', 'x86-32 prefix 67 CPU (wave)', runX86Prefix67CpuTest, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

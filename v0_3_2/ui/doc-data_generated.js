@@ -2746,7 +2746,7 @@ inline [asm] .x86:
 
 **Mul/div (1+x.1c-ii):** formă simplă cu acumulator implicit — \`mul ebx\` → \`eax × operand\`, rezultat în **\`edx:eax\`**; \`div ebx\` → \`edx:eax ÷ operand\`, cât în **\`eax\`**, rest în **\`edx\`**. La **\`div\`/\`idiv\` cu divisor 0:** rezultat pedagogic în **\`eax\`**, **\`divByZero ← 1\`** (ca riscv32), fără oprire simulator.
 
-**Operands:** reg↔reg, reg↔imm8/imm32, memory (**pattern A/B/C/D** below). No prefix bytes, no segments in MVP.
+**Operands:** reg↔reg, reg↔imm8/imm32, memory (**pattern A/B/C/D** below). Prefixe **\`0x66\`** (operand 16-bit) și **\`0x67\`** (adresare 16-bit) sunt emise **automat** când sintaxa folosește registre **\`ax\`–\`di\`** / **\`[bx]\`/\`[si]\`/\`[bx+di]\`** etc. Fără segmente în MVP.
 
 **CPU flags (1+x.1c-i/ii):** \`zf\`, \`sf\`, \`cf\`, \`of\` — \`cmp\`/\`test\` și salturi; **\`inc\`/\`dec\` nu modifică \`cf\`** (comportament Intel); \`cf\` la \`add\`/\`sub\` pentru salturi unsigned (\`jb\`/\`ja\`/…).
 
@@ -2771,11 +2771,18 @@ Preset-ul grupează operanzii de memorie în **pattern-uri didactice** (nu tabel
 
 - scale **1, 2, 4, 8**; sintaxă unificată Intel: \`[base+index*4+8]\`, nu \`[base][index]\`;
 - **\`esp\` nu e index** (conform x86); **\`[esp+disp]\`** prin SIB cu index absent — **\`[esp]\`** simplu rămâne respins;
-- fără prefixe segment (\`fs:\`/\`gs:\`) și fără \`0x66\`/\`0x67\` (subfaze **1+x.1c-iii-b/c**).
+- fără prefixe segment (\`fs:\`/\`gs:\`) — subfază **1+x.1c-iii-c** (skip MVP).
 
-**Memorie CPU:** **1 octet per celulă** prog/RAM (\`prog.depth: 8\`). Citirea în registru zero-extinde octetul la 32 de biți.
+**Prefixe (1+x.1c-iii-b):**
 
-**Operandi neacoperiți (amânat):** \`rep\` / șiruri cu ESI/EDI implicit, prefixe segment, x86-64 — vezi plan **1+x.1c-iii-b…** și **1+x.1d**.
+| Prefix | Rol în mod 32-bit | Când se emite |
+|--------|-------------------|---------------|
+| **\`0x66\`** | operand **16-bit** | registre **\`ax\`–\`di\`**, ex. \`mov ax, bx\` |
+| **\`0x67\`** | adresare **16-bit** (8086) | **\`[si]\`**, **\`[bx+di]\`** — doar **\`bx/bp/si/di\`** |
+
+**Memorie CPU:** **1 octet per celulă** prog/RAM (\`prog.depth: 8\`). Citirea 8-bit zero-extinde; cu **\`0x66\`**, citirea **word** (2 octeți LE) zero-extinde la 32 de biți.
+
+**Operandi neacoperiți (amânat):** \`rep\` / șiruri cu ESI/EDI implicit, segmente \`fs:\`/\`gs:\`, x86-64 — vezi **1+x.1c-iii-c/iv** și **1+x.1d**.
 
 ---
 
@@ -3191,6 +3198,108 @@ tab: .byte 10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0
 \`\`\`
 
 **Load & Run:** \`eax = 60\` (\`10+20+30\`). Compară cu **D38-D3** (vector octeți, pattern **B** + \`loop\`).
+
+---
+
+## Runnable — prefix **0x66** (operand 16-bit)
+
+\`mov ax, bx\` / \`add ax, bx\` emit **\`0x66\`** automat; rezultatul ocupă **16 biți** în registrul 32-bit (partea superioară păstrată). Teste **3298**, **3300**.
+
+\`\`\`logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+80wire p16 = .x86 {
+  mov ax, 5
+  mov bx, 10
+  add ax, bx
+}
+show(.x86:decode(p16))
+\`\`\`
+
+**Load:** wire **\`p16\`** cu trei instrucțiuni 16-bit.
+
+**Load & Run:** decode arată **\`mov ax, …\`**, **\`add ax, bx\`**; primul byte al wire-ului = **\`0x66\`**.
+
+### CPU — \`add ax, bx\` → 15
+
+\`\`\`logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 8
+  prog:
+    depth: 8
+    length: 32
+    = .x86 {
+      mov ax, 5
+      mov bx, 10
+      add ax, bx
+      jmp halt
+    halt:
+      jmp halt
+    }
+  :
+\`\`\`
+
+**Load & Run:** **\`r0\`** (\`eax\`) = **15** — sumă pe **\`ax\`/\`bx\`**.
+
+---
+
+## Runnable — prefix **0x67** (adresare 16-bit)
+
+**\`[si]\`**, **\`[bx+di]\`** folosesc registre **8086** (\`si\`, nu \`esi\`) → prefix **\`0x67\`**. Teste **3302**, **3304**.
+
+\`\`\`logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+64wire a16 = .x86 {
+  mov ax, [si]
+  lea bx, [bx+di]
+}
+show(.x86:decode(a16))
+\`\`\`
+
+**Load & Run:** decode: **\`mov ax, [si]\`**, **\`lea bx, [bx+di]\`**; combinație tipică **\`66 67\`** când operandul e tot 16-bit.
+
+### CPU — \`mov ax, [si]\`
+
+\`\`\`logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 8
+  prog:
+    depth: 8
+    length: 80
+    = .x86 {
+      mov si, 0x40
+      mov ax, [si]
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x40
+val: .byte 0x2a
+    }
+  :
+\`\`\`
+
+**Load & Run:** **\`r0\`** = **42** (\`0x2a\`) — citire **word** de la **\`[si]\`** (octet la **\`0x40\`**, zero-extins în **\`ax\`**).
 
 ---
 
