@@ -35856,5 +35856,75 @@ val: .byte 0x2a`, { maxSteps: 8, progLen: 80 });
   reg(3304, 'asm-set', 'x86-32 prefix 0x67 CPU mov ax,[si]', runX86Prefix67CpuTest);
   reg(3305, 'asm-set', 'x86-32 prefix 67 CPU (wave)', runX86Prefix67CpuTest, { propagation: 'wave' });
 
+  function runX86RepMovsbDecodeTest(h, session) {
+    const src = `inline [asm] .x86:
+  set: x86-32
+  :
+
+24wire p = .x86 {
+  rep movsb
+  movsb
+}
+show(.x86:decode(p))`;
+    const { out, interp } = session.run(src);
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    const bits = session.getWire(interp, 'p');
+    h.assert('rep movsb', String(text.includes('rep movsb')), 'true');
+    h.assert('movsb', String(text.includes('movsb')), 'true');
+    h.assert('prefix f3', bits.substr(0, 8), '11110011');
+    h.assert('opcode a4', bits.substr(8, 8), '10100100');
+  }
+
+  reg(3306, 'asm-set', 'x86-32 rep movsb decode (1+x.1c-iv)', runX86RepMovsbDecodeTest);
+  reg(3307, 'asm-set', 'x86-32 rep movsb decode (wave)', runX86RepMovsbDecodeTest, { propagation: 'wave' });
+
+  function runX86RepMovsbCpuTest(h, session) {
+    const src = x86CpuShell(`      mov esi, 0x40
+      mov edi, 0x50
+      mov ecx, 5
+      rep movsb
+      mov ebx, 0x54
+      mov eax, [ebx]
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x40
+src: .byte 1, 2, 3, 4, 5
+      .org 0x50
+dst: .byte 0, 0, 0, 0, 0`, { maxSteps: 12, progLen: 128 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax = 5 (last byte copied)', r0.value, '00000000000000000000000000000101');
+  }
+
+  reg(3308, 'asm-set', 'x86-32 rep movsb CPU copy (1+x.1c-iv)', runX86RepMovsbCpuTest);
+  reg(3309, 'asm-set', 'x86-32 rep movsb CPU (wave)', runX86RepMovsbCpuTest, { propagation: 'wave' });
+
+  function runX86MovsbCpuTest(h, session) {
+    const src = x86CpuShell(`      mov esi, 0x40
+      mov edi, 0x50
+      movsb
+      mov eax, [0x50]
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x40
+      .byte 0x2a
+      .org 0x50
+      .byte 0`, { maxSteps: 10, progLen: 96 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax = 42', r0.value, '00000000000000000000000000101010');
+  }
+
+  reg(3310, 'asm-set', 'x86-32 movsb CPU single byte', runX86MovsbCpuTest);
+  reg(3311, 'asm-set', 'x86-32 movsb CPU (wave)', runX86MovsbCpuTest, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

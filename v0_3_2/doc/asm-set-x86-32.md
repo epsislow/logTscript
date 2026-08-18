@@ -87,7 +87,7 @@ Preset-ul grupează operanzii de memorie în **pattern-uri didactice** (nu tabel
 
 **Memorie CPU:** **1 octet per celulă** prog/RAM (`prog.depth: 8`). Citirea 8-bit zero-extinde; cu **`0x66`**, citirea **word** (2 octeți LE) zero-extinde la 32 de biți.
 
-**Operandi neacoperiți (amânat):** `rep` / șiruri cu ESI/EDI implicit, segmente `fs:`/`gs:`, x86-64 — vezi **1+x.1c-iii-c/iv** și **1+x.1d**.
+**Operandi neacoperiți (amânat):** segmente `fs:`/`gs:` (flat skip), x86-64 — vezi **1+x.1c-iii-c** și **1+x.1d**.
 
 ---
 
@@ -281,7 +281,7 @@ show(.u:r0)
 
 **Load:** cod la **`0`**, vector la **`.org 0x40`**.
 
-**Load & Run:** **`r0`** = **15** (`000…1111`). **`loop`** decrementează **`ecx`** (`r1`); la **`0`** iese din buclă.
+**Load & Run:** **`r0`** = **15** (`000…1111`). **`loop`** decrementează **`ecx`** (`r1`); vezi și **`rep movsb`** (**1+x.1c-iv**) pentru copiere buffer fără buclă manuală.
 
 ---
 
@@ -605,6 +605,110 @@ val: .byte 0x2a
 ```
 
 **Load & Run:** **`r0`** = **42** (`0x2a`) — citire **word** de la **`[si]`** (octet la **`0x40`**, zero-extins în **`ax`**).
+
+---
+
+## Runnable — șiruri `rep` / `movsb` (1+x.1c-iv)
+
+Instrucțiuni **fără operanzi expliciti** — registre **implicite** Intel:
+
+| Registru | Rol la `movsb` |
+|----------|----------------|
+| **`esi`** | sursă `[esi]` |
+| **`edi`** | destinație `[edi]` |
+| **`ecx`** | contor (doar cu **`rep`**) |
+
+**`rep movsb`** = prefix **`0xF3`** + opcode **`0xA4`**. Copiază **`ecx`** octeți, incrementează **`esi`** / **`edi`** (direcție forward, **`DF=0`**). Teste **3306**, **3308**.
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+24wire str = .x86 {
+  rep movsb
+  movsb
+}
+show(.x86:decode(str))
+```
+
+**Load:** wire **`str`** — decode **`rep movsb`** + **`movsb`**.
+
+**Load & Run:** primii **16 biți** = **`F3 A4`** (`rep movsb`); următorii **8 biți** = **`A4`** (`movsb`).
+
+### CPU — copiere buffer (`rep movsb`)
+
+Alternativă la **D38-D3** (buclă manuală + `loop`): copiere **`1…5`** de la **`0x40`** → **`0x50`**.
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 12
+  prog:
+    depth: 8
+    length: 128
+    = .x86 {
+      mov esi, 0x40
+      mov edi, 0x50
+      mov ecx, 5
+      rep movsb
+      mov ebx, 0x54
+      mov eax, [ebx]
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x40
+src: .byte 1, 2, 3, 4, 5
+      .org 0x50
+dst: .byte 0, 0, 0, 0, 0
+    }
+  :
+```
+
+**Load & Run:** **`r0`** = **5** — ultimul octet copiat la **`0x54`**. **`esi`/`edi`** avansate; **`ecx`** = **0**.
+
+### CPU — un octet (`movsb`)
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 10
+  prog:
+    depth: 8
+    length: 96
+    = .x86 {
+      mov esi, 0x40
+      mov edi, 0x50
+      movsb
+      mov eax, [0x50]
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x40
+      .byte 0x2a
+      .org 0x50
+      .byte 0
+    }
+  :
+```
+
+**Load & Run:** **`r0`** = **42** (`0x2a`) — un singur octet copiat de la **`[esi]`** la **`[edi]`**.
+
+**Suport MVP:** **`movsb`**, **`rep movsb`**, **`stosb`**, **`rep stosb`**, **`movsw`**, **`rep movsw`** (word); fără **`repne`/`repe`**, fără **`DF`** reverse.
 
 ---
 

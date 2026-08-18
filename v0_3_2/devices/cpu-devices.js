@@ -48,7 +48,7 @@ function cpuReadProgCell(c, adr) {
 
 function cpuWriteProgCell(c, adr, val) {
   if (adr < 0 || adr >= c.progLength) return;
-  if (c.progReadonly) return;
+  if (c.progReadonly && c.progMemId) return;
   if (c.progMemId && typeof setMem === 'function') {
     setMem(c.progMemId, adr, val);
     return;

@@ -1,4 +1,4 @@
-/* ================= ASM SET: x86-32 Intel subset (variable encoding, 1+x.1 + 1+x.1c-i/ii/iii-a/b) ================= */
+/* ================= ASM SET: x86-32 Intel subset (variable encoding, 1+x.1 + 1+x.1c-i…iv) ================= */
 
 const X86_REG = {
   eax: 0, ecx: 1, edx: 2, ebx: 3, esp: 4, ebp: 5, esi: 6, edi: 7,
@@ -52,12 +52,14 @@ function x86PeelPrefixes(bytes, byteOffset) {
   let off = byteOffset;
   let opSize16 = false;
   let addrSize16 = false;
+  let rep = false;
   while (off < bytes.length) {
     if (bytes[off] === 0x66) { opSize16 = true; off++; }
     else if (bytes[off] === 0x67) { addrSize16 = true; off++; }
+    else if (bytes[off] === 0xf3) { rep = true; off++; }
     else break;
   }
-  return { off, opSize16, addrSize16, prefixLen: off - byteOffset };
+  return { off, opSize16, addrSize16, rep, prefixLen: off - byteOffset };
 }
 
 function x86TryParseMemAddr16(inner, labels) {
@@ -203,6 +205,7 @@ const X86_MNEMONICS = [
   'LOOP', 'LOOPE', 'LOOPZ', 'LOOPNE', 'LOOPNZ',
   'MUL', 'IMUL', 'DIV', 'IDIV',
   'ENTER', 'LEAVE',
+  'REP', 'MOVSB', 'MOVSW', 'STOSB', 'STOSW',
   'CALL', 'RET', 'NOP', 'INT',
 ];
 
@@ -215,6 +218,26 @@ const X86_COND_NEAR = {
   je: 0x84, jne: 0x85, jl: 0x8c, jle: 0x8e, jg: 0x8f, jge: 0x8d,
   jb: 0x82, jbe: 0x86, ja: 0x87, jae: 0x83,
 };
+
+const X86_STRING_OP = { movsb: 0xa4, movsw: 0xa5, stosb: 0xaa, stosw: 0xab };
+
+function x86ParseStringOp(tok) {
+  const op = String(tok).trim().toLowerCase();
+  if (X86_STRING_OP[op] == null) {
+    throw new Error(`x86-32: unsupported string op '${tok}' (expected movsb/movsw/stosb/stosw)`);
+  }
+  return op;
+}
+
+function x86EncodeString(mnemonic, args, rep) {
+  const opTok = rep ? args[0] : (args.length ? args[0] : mnemonic);
+  const op = x86ParseStringOp(opTok);
+  if (rep && args.length !== 1) throw new Error('rep expects one string operation (movsb/stosb/…)');
+  if (!rep && args.length) throw new Error(`${op} takes no operands`);
+  const bytes = [X86_STRING_OP[op]];
+  if (rep) bytes.unshift(0xf3);
+  return x86EmitBytes(bytes);
+}
 
 function x86ParseReg(tok) {
   const t = String(tok).trim().toLowerCase();
@@ -741,6 +764,10 @@ function x86EncodeBuiltin(mnemonic, args, labels, instrByteAddr, text) {
     const rel32 = x86ResolveLabel(labels, instrByteAddr, 5, args[0]);
     return x86EmitBytes([0xe8, ...x86Disp32Bytes(rel32)]);
   }
+  if (mn === 'REP') return x86EncodeString(mn, args, true);
+  if (mn === 'MOVSB' || mn === 'MOVSW' || mn === 'STOSB' || mn === 'STOSW') {
+    return x86EncodeString(mn, args, false);
+  }
   if (mn === 'MOV') return x86EncodeMov(line, labels, instrByteAddr);
   if (mn === 'LEA') return x86EncodeLea(line, labels);
   if (mn === 'INC' || mn === 'DEC') return x86EncodeIncDec(mn, line, labels);
@@ -873,6 +900,7 @@ function x86DisassembleAtOffset(bitsStr, byteOffset) {
       dec.fields = Object.assign({}, dec.fields, {
         opSize16: ctx.opSize16,
         addrSize16: ctx.addrSize16,
+        rep: ctx.rep,
       });
     }
     return dec;
@@ -935,6 +963,16 @@ function x86DisassembleAtOffset(bitsStr, byteOffset) {
     const names = { 0xe0: 'loopne', 0xe1: 'loope', 0xe2: 'loop' };
     const mn = names[b0].toUpperCase();
     return finishDec({ mnemonic: mn, text: `${names[b0]} ${rel >= 0 ? '+' : ''}${rel}`, byteLength: 2, fields: { rel8: rel, loopKind: names[b0] } });
+  }
+
+  const stringOp = { 0xa4: 'movsb', 0xa5: 'movsw', 0xaa: 'stosb', 0xab: 'stosw' }[b0];
+  if (stringOp) {
+    const text = ctx.rep ? `rep ${stringOp}` : stringOp;
+    const mnemonic = ctx.rep ? 'REP' : stringOp.toUpperCase();
+    return finishDec({
+      mnemonic, text, byteLength: 1,
+      fields: { stringOp, rep: ctx.rep },
+    });
   }
 
   const regDestOps = {
@@ -1311,6 +1349,52 @@ function x86ExecuteDiv(c, f, signed) {
   x86WriteReg(c, 2, r);
 }
 
+function x86ExecuteStringOp(c, f) {
+  const op = f.stringOp || 'movsb';
+  const rep = !!f.rep;
+  const step = (op === 'movsw' || op === 'stosw') ? 2 : 1;
+  const esi = 6;
+  const edi = 7;
+  const ecx = 1;
+
+  function once() {
+    if (op === 'movsb') {
+      const src = x86ReadReg(c, esi);
+      const dst = x86ReadReg(c, edi);
+      const b = x86ReadMemByte(c, src);
+      x86WriteMemByte(c, dst, b);
+      x86WriteReg(c, esi, src + step);
+      x86WriteReg(c, edi, dst + step);
+    } else if (op === 'movsw') {
+      const src = x86ReadReg(c, esi);
+      const dst = x86ReadReg(c, edi);
+      const w = x86ReadMem16(c, src);
+      x86WriteMem16(c, dst, w);
+      x86WriteReg(c, esi, src + step);
+      x86WriteReg(c, edi, dst + step);
+    } else if (op === 'stosb') {
+      const dst = x86ReadReg(c, edi);
+      x86WriteMemByte(c, dst, x86ReadReg(c, 0) & 0xff);
+      x86WriteReg(c, edi, dst + step);
+    } else if (op === 'stosw') {
+      const dst = x86ReadReg(c, edi);
+      x86WriteMem16(c, dst, x86ReadReg16(c, 0));
+      x86WriteReg(c, edi, dst + step);
+    }
+  }
+
+  if (rep) {
+    let count = x86ReadReg(c, ecx);
+    while (count > 0) {
+      once();
+      count--;
+    }
+    x86WriteReg(c, ecx, 0);
+  } else {
+    once();
+  }
+}
+
 function x86ExecuteInstruction(c, ctx, isaInst, decoded, instrBits) {
   const dec = x86DisassembleAtOffset(instrBits, 0);
   const pcIdx = c.pc;
@@ -1366,6 +1450,12 @@ function x86ExecuteInstruction(c, ctx, isaInst, decoded, instrBits) {
     x86WriteReg(c, 5, x86ReadReg(c, 4));
     const slots = (f.imm16 != null ? f.imm16 : 0) >>> 2;
     if (slots > 0) x86WriteReg(c, 4, x86ReadReg(c, 4) - slots);
+    c.pc = nextPc;
+    return;
+  }
+  if (dec.mnemonic === 'REP' || dec.mnemonic === 'MOVSB' || dec.mnemonic === 'MOVSW'
+    || dec.mnemonic === 'STOSB' || dec.mnemonic === 'STOSW') {
+    x86ExecuteStringOp(c, f);
     c.pc = nextPc;
     return;
   }

@@ -609,7 +609,7 @@ sumLoop:
   loop sumLoop
 ```
 
-**Load & Run:** `eax = 15`. Doc: **`loop`** folosește **`ecx`** (`r1`) ca contor; **`rep`/șiruri** → **1+x.1c-iv** (amânat).
+**Load & Run:** `eax = 15`. Doc: **`loop`** folosește **`ecx`** (`r1`) ca contor; alternativă **`rep movsb`** → **1+x.1c-iv** (livrat).
 
 **D38-D4 — Stack frame (bazat pe ebp):**
 
@@ -647,7 +647,7 @@ sumLoop:
 | **1+x.1c-iii-a** | **Pattern D (SIB):** `[base+index*scale±disp]`, scale 1/2/4/8; **`esp` nu index**; `[esp+disp]`; encode/decode/exec; demo **D38-D6** | teste 3290+, doc `logts-play` | **Următorul** — după 1c-ii |
 | **1+x.1c-iii-b** | Prefixe operand/adresă **`0x66`/`0x67`** (opțional, dacă e nevoie de fidelitate width) | doc + teste narrow | Scăzută — doar dacă cerință explicită |
 | **1+x.1c-iii-c** | Prefixe segment **`fs:`/`gs:`** | doc stub sau skip | **Skip MVP** — memorie flat în simulator |
-| **1+x.1c-iv** | **Șiruri:** `rep`, `movsb`/`movsw`, ESI/EDI/ECX implicit | batch separat | Amânat — după SIB |
+| **1+x.1c-iv** | **Șiruri:** `rep`, `movsb`/`movsw`, ESI/EDI/ECX implicit | teste 3306–3311, doc `logts-play` | **Livrat** |
 | **1+x.1d** | **x86-64:** preset separat `x86-64` (REX, reg 64-bit) — **nu** extindere `x86-32` | preset + plan propriu | Amânat — decizie separată |
 
 **1+x.1c-iii-a — checklist implementare:**
@@ -1539,7 +1539,7 @@ Vezi **[D38 — Extensii x86-32](#d38--extensii-x86-32-1x1c)**.
 | **1+x.1c-iii-a** | **Pattern D (SIB)** | `[base+index*scale±disp]`, D38-D6 | 1+x.1c-ii |
 | **1+x.1c-iii-b** | Prefixe `0x66`/`0x67` | Opțional | 1+x.1c-iii-a |
 | **1+x.1c-iii-c** | Segmente `fs:`/`gs:` | Skip MVP | — |
-| **1+x.1c-iv** | Șiruri `rep` + ESI/EDI implicit | Amânat | 1+x.1c-iii-a |
+| **1+x.1c-iv** | Șiruri `rep` + ESI/EDI implicit | Livrat (3306–3311) | 1+x.1c-iii-a |
 | **1+x.1d** | Preset **x86-64** | Separat de x86-32 | 1+x.1c-iii-a sau paralel |
 | **1+x.3a ✅** | Executor riscv32 MVP | Livrat — teste 3197–3206 | — |
 | **1+x.3b ✅** | Executor arm-thumb | Livrat — teste 3207–3215 | — |
@@ -1626,8 +1626,8 @@ Vezi **[D38 — Extensii x86-32](#d38--extensii-x86-32-1x1c)**.
 - [x] **1+x.1c-ii** x86 extensii batch 2: `mul`/`div`, `enter`/`leave`, `push imm32` — teste 3276–3289
 - [x] **1+x.1c-iii-a** pattern D (SIB) + D38-D6
 - [x] **1+x.1c-iii-b** prefixe 66/67 + doc runnable
+- [x] **1+x.1c-iv** șiruri `rep` + movsb (amânat → livrat)
 - [ ] **1+x.1c-iii-c** segmente fs/gs — skip MVP
-- [ ] **1+x.1c-iv** șiruri `rep` (amânat)
 - [ ] **1+x.1d** preset x86-64 (amânat)
 - [ ] **1+x.2b** Profil mixt Thumb-2 / IT blocks (amânat)
 - [ ] **1+x.6–8** assembler extern, endianness runtime, CPU multi-set routing
