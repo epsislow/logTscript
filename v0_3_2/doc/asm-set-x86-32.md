@@ -40,16 +40,34 @@ inline [asm] .x86:
 
 ---
 
-## Preset opcode table (MVP)
+## Preset opcode table (MVP + 1+x.1c-i)
 
 | Category | Mnemonics |
 |----------|-----------|
-| ALU | `mov`, `add`, `sub`, `cmp`, `and`, `or`, `xor` |
+| ALU | `mov`, `add`, `sub`, `cmp`, `and`, `or`, `xor`, **`lea`**, **`inc`**, **`dec`**, **`neg`**, **`not`**, **`test`**, **`xchg`** |
 | Stack | `push`, `pop` |
-| Control | `jmp`, `je`, `jne`, `call`, `ret` |
+| Control | `jmp`, `je`, `jne`, **`jg`**, **`jge`**, **`jl`**, **`jle`**, **`ja`**, **`jae`**, **`jb`**, **`jbe`**, **`loop`**, **`loope`**, **`loopz`**, **`loopne`**, **`loopnz`**, `call`, `ret` |
 | Misc | `nop`, `int imm8` |
 
-**Operands:** reg↔reg, reg↔imm8/imm32, reg↔`[ebp±disp8]` / `[esp±disp8]`. No prefix bytes, no SIB, no segments in MVP.
+**Operands:** reg↔reg, reg↔imm8/imm32, memory (**pattern A/B/C** below). No prefix bytes, no **SIB** (`[base+index*scale±disp]` → viitor **1+x.1c-iii**), no segments in MVP.
+
+**CPU flags (1+x.1c-i):** `zf`, `sf`, `cf`, `of` — folosite de `cmp`/`test` și salturi condiționale.
+
+---
+
+## Moduri de adresare (Laborator 4 — pattern A / B / C)
+
+Trei pattern-uri didactice (nu tabel ModR/M complet):
+
+| Pattern | Forme | Scop |
+|---------|-------|------|
+| **A — Stack frame** | `[ebp±disp8]`, `[esp±disp8]`, `[ebp±disp32]`, `[esp±disp32]` | variabile pe stack, argumente |
+| **B — Pointer / vector** | `[reg]`, `[reg±disp8]`, `[reg±disp32]`, `lea reg, [reg±disp]` | parcurgere buffer (`esi`, `ebx`, …) |
+| **C — Absolut** | `[disp32]` | date la adresă fixă (`.org`, `.byte`) |
+
+**Excluderi batch 1:** `[esp]` fără disp (SIB în x86 real); indexare scalată `[esi+ecx*4]` → **1+x.1c-iii**.
+
+Memoria CPU: **1 octet per celulă prog/RAM** (`prog.depth: 8`). `[disp32]` citește/scrie un octet zero-extins la 32 de biți în registru.
 
 ---
 
@@ -154,6 +172,194 @@ show(.u:r0)
 ```
 
 **Load & Run:** after **`run`**, **`r0`** (`eax`) = **13** (`000…1101`). Variable fetch uses **`instructions[PC].byteOffset`** (D32).
+
+---
+
+## Runnable — D38-D2: variabilă la adresă fixă (pattern **C**)
+
+Contor în memorie la **`0x40`**, incrementat cu **`inc`** (test **3273**).
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 12
+  ram:
+    depth: 32
+    length: 16
+  prog:
+    depth: 8
+    length: 80
+    = .x86 {
+      mov eax, [0x40]
+      inc eax
+      mov [0x40], eax
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x40
+counter: .byte 0
+    }
+  :
+
+.u:{ run = 1 }
+show(.u:r0)
+```
+
+**Load:** CPU + program cu **`[0x40]`** și **`counter`** la **`.org 0x40`**.
+
+**Load & Run:** **`r0`** (`eax`) = **1** — octetul de la **`0x40`** a fost incrementat.
+
+---
+
+## Runnable — D38-D3: vector + `loop` (pattern **B**)
+
+Sumă **`1+2+3+4+5 = 15`** cu **`ebx`** ca pointer și **`ecx`** contor (test **3269**).
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 40
+  ram:
+    depth: 32
+    length: 16
+  prog:
+    depth: 8
+    length: 128
+    = .x86 {
+      xor eax, eax
+      mov ebx, 0x40
+      mov ecx, 5
+sumLoop:
+      add eax, [ebx]
+      inc ebx
+      loop sumLoop
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x40
+vec: .byte 1, 2, 3, 4, 5
+    }
+  :
+
+.u:{ run = 1 }
+show(.u:r0)
+```
+
+**Load:** cod la **`0`**, vector la **`.org 0x40`**.
+
+**Load & Run:** **`r0`** = **15** (`000…1111`). **`loop`** decrementează **`ecx`** (`r1`); la **`0`** iese din buclă.
+
+---
+
+## Runnable — D38-D4: stack frame (pattern **A** — decode)
+
+Acces **`[ebp±disp]`** după **`mov ebp, esp`** (frame simplu; **`enter`/`leave`** → **1+x.1c-ii**).
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+64wire frame = .x86 {
+  push ebp
+  mov ebp, esp
+  mov eax, [ebp-4]
+  pop ebp
+  ret
+}
+show(.x86:decode(frame))
+```
+
+**Load:** wire **`frame`** cu **`[ebp-4]`**.
+
+**Load & Run:** decode afișează **`push ebp`**, **`mov ebp, esp`**, **`mov eax, [ebp-4]`**, **`pop ebp`**, **`ret`**.
+
+---
+
+## Runnable — D38-D5: `test`, `xchg`, salturi signed
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 10
+  ram:
+    depth: 32
+    length: 16
+  prog:
+    depth: 8
+    length: 64
+    = .x86 {
+      mov eax, 10
+      mov ebx, 20
+      xchg eax, ebx
+      mov eax, 10
+      mov ebx, 5
+      cmp eax, ebx
+      jg greater
+      mov eax, 0
+      jmp done
+greater:
+      mov eax, 99
+done:
+      jmp done
+    }
+  :
+
+.u:{ run = 1 }
+show(.u:r0)
+```
+
+**Load:** **`xchg`** apoi **`cmp`** + **`jg`** (signed).
+
+**Load & Run:** **`r0`** = **99** — **`10 > 5`**, saltul **`jg`** ia ramura **`greater`**.
+
+Demo **`test`+`je`:** **`xor eax, eax`** / **`test eax, eax`** / **`je`** — test **3265**.
+
+---
+
+## Runnable — decode memorie extinsă (1+x.1c-i)
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+88wire p = .x86 {
+  mov eax, [esi]
+  lea edi, [esi+4]
+  mov eax, [0x20]
+}
+show(.x86:decode(p))
+```
+
+**Load & Run:** trei linii — **`[esi]`** (B), **`lea … [esi+4]`**, **`[0x20]`** (C). Test **3263**.
+
+---
+
+## Viitor — D38-D6 (SIB, 1+x.1c-iii)
+
+Indexare scalată **`[esi+ecx*4+disp]`**, prefixe **`0x66`/`0x67`**, segmente — **neimplementat**; placeholder pentru Laborator 4 §4.2.4 avansat.
 
 ---
 

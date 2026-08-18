@@ -46,6 +46,16 @@ function cpuReadProgCell(c, adr) {
   return c.prog[adr];
 }
 
+function cpuWriteProgCell(c, adr, val) {
+  if (adr < 0 || adr >= c.progLength) return;
+  if (c.progReadonly) return;
+  if (c.progMemId && typeof setMem === 'function') {
+    setMem(c.progMemId, adr, val);
+    return;
+  }
+  c.prog[adr] = val;
+}
+
 function cpuWriteProgBlob(c, blob) {
   const chunks = splitBlob(blob, c.progDepth, c.progLength);
   const z = cpuZero(c.progDepth);
@@ -133,6 +143,7 @@ function addCpu(id, config) {
     zf: 0,
     sf: 0,
     cf: 0,
+    of: 0,
     progEncoding: 'fixed',
     progCodeTable: null,
   });
@@ -763,6 +774,6 @@ function getCpuProg(id, adr) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     addCpu, getCpu, loadCpuRam, loadCpuProg, cpuAfterProgReload, cpuResetFlags, cpuStep, cpuRun,
-    getCpuReg, getCpuRam, getCpuProg, splitBlob, cpuSetIrqPins,
+    getCpuReg, getCpuRam, getCpuProg, cpuReadProgCell, cpuWriteProgCell, splitBlob, cpuSetIrqPins,
   };
 }

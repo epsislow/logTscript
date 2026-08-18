@@ -545,6 +545,89 @@ Trei **pattern-uri** documentate în `asm-set-x86-32.md` — nu listă goală Mo
 
 **Teste planificate:** 3263+ — round-trip per pattern; demo CPU `loop` array; `test`+`je`; `xchg`; salturi signed după `cmp`.
 
+#### Demo-uri didactice — Laborator 4 (livrabile 1+x.1c-i)
+
+Doc **`asm-set-x86-32.md`**: secțiune nouă **„Moduri de adresare”**, structurată ca lab (4.2.1→4.2.4). Fiecare subsecțiune = explicație scurtă + **`logts-play`** + (unde e cazul) test automat.
+
+| ID | Lab § | Titlu | Pattern / mnemonici | Verificare |
+|----|-------|-------|---------------------|------------|
+| **D38-D1** | 4.2.1–4.2.2 | Imediat + registru | `mov`, `add` imm/reg (MVP — recap) | doc only |
+| **D38-D2** | 4.2.3 | Variabilă la adresă fixă | **C** — `[disp32]`, `.org`, `.byte` | test **3269** + doc |
+| **D38-D3** | 4.2.4 | Vector de octeți | **B** — `[reg+disp32]`, `inc`, **`loop`**, `ecx` contor | test **3266** + doc CPU |
+| **D38-D4** | 4.2.4 | Stack / struct locală | **A** — `push ebp`, `mov ebp,esp`, `[ebp±disp]`, `leave` | test + doc CPU |
+| **D38-D5** | extensii | `test`, `xchg`, salturi | `test`+`je`, `xchg`, `jg`/`jl` după `cmp` | teste **3264–3265**, **3268** |
+| **D38-D6** | 4.2.4 (viitor) | Tablou dword scalat | **SIB** — `[esi+ecx*4+disp]` | **1+x.1c-iii** — doc placeholder |
+
+**D38-D2 — Variabilă globală (direct):**
+
+```logts
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 20
+  prog:
+    depth: 8
+    length: 64
+    = .x86 {
+      .org 0x100
+counter: .byte 0
+      .org 0
+      mov eax, [0x100]
+      inc eax
+      mov [0x100], eax
+      jmp halt
+    halt:
+      jmp halt
+    }
+  :
+```
+
+**Load & Run:** `counter` (byte la `0x100`) devine `1`.
+
+**D38-D3 — Vector + loop (indexat):**
+
+```logts
+; date la .org 0x403000 (5 octeți: 1+2+3+4+5 = 15)
+; esi = index 0..4, ecx = 5, eax = sumă
+  .org 0x403000
+vec: .byte 1, 2, 3, 4, 5
+  .org 0
+  xor eax, eax
+  xor esi, esi
+  mov ecx, 5
+sumLoop:
+  add eax, [esi + 0x403000]
+  inc esi
+  loop sumLoop
+```
+
+**Load & Run:** `eax = 15`. Doc notează: același **`ecx`** ca la **`rep`** / §4.2.5 (șiruri — amânat).
+
+**D38-D4 — Stack frame (bazat pe ebp):**
+
+```logts
+  push ebp
+  mov ebp, esp
+  sub esp, 8
+  mov [ebp-4], eax
+  mov eax, [ebp-4]
+  leave
+  ret
+```
+
+**Checklist implementare 1+x.1c-i (doc):**
+
+- [x] Secțiune „Moduri de adresare” în `asm-set-x86-32.md` (4.2.1 imediat … 4.2.4 indexat)
+- [x] `logts-play` D38-D2, D38-D3, D38-D4 (minim 3 runnable)
+- [x] Cross-link lab ↔ pattern A/B/C din D38
+- [x] D38-D6 menționat ca „viitor 1+x.1c-iii (SIB)”
+
 #### 1+x.1c-ii — batch 2
 
 | Item | Notă |
@@ -1372,7 +1455,7 @@ Vezi **[D35 — Exemple x86 Intel](#d35--exemple-x86-intel-mvp)** (confirmat use
 
 Vezi **[D38 — Extensii x86-32](#d38--extensii-x86-32-1x1c)**.
 
-- **1+x.1c-i:** adresare didactică A/B/C, `lea`, `test`, `xchg`, `inc`/`dec`/`neg`/`not`, salturi signed/unsigned, `loop`/`loope`/`loopne`, exec ALU logic;
+- **1+x.1c-i:** adresare didactică A/B/C, `lea`, `test`, `xchg`, `inc`/`dec`/`neg`/`not`, salturi signed/unsigned, `loop`/`loope`/`loopne`, exec ALU logic; **doc demo-uri D38-D1…D5** (Laborator 4);
 - **1+x.1c-ii:** `mul`/`div`, `push imm32`, `enter`/`leave`, flags `cf` îmbunătățite;
 - **1+x.1c-iii (viitor):** SIB `[base+index*scale±disp]`, prefixe, segmente, x86-64.
 
@@ -1519,7 +1602,7 @@ Vezi **[D38 — Extensii x86-32](#d38--extensii-x86-32-1x1c)**.
 - [x] ✅ **1+x.1a** Preset `x86-32` assemble MVP (Intel, subset ModR/M) — teste 3248–3253
 - [x] ✅ **1+x.1b** Executor CPU x86 subset + variable fetch — teste 3252–3253
 - [x] ✅ **1+x.2a** Preset `arm-a32` assemble + exec + thumb `use` — teste 3254–3261
-- [ ] **1+x.1c-i** x86 extensii batch 1 (D38): adresare A/B/C, `lea`, `test`, `xchg`, `loop`, salturi — teste 3263+
+- [x] **1+x.1c-i** x86 extensii batch 1 (D38): adresare A/B/C, `lea`, `test`, `xchg`, `loop`, salturi — teste 3263–3275; doc demo-uri **D38-D2/D3/D4/D5** (Laborator 4)
 - [ ] **1+x.1c-ii** x86 extensii batch 2: `mul`/`div`, `enter`/`leave`, `push imm32`
 - [ ] **1+x.1c-iii** SIB `[base+index*scale±disp]` + prefixe/seg/x86-64 (viitor)
 - [ ] **1+x.2b** Profil mixt Thumb-2 / IT blocks (amânat)
