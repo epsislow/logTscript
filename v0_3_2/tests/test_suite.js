@@ -34697,5 +34697,129 @@ comp [cpu] .u:
   reg(3204, 'asm-set', 'riscv32 CPU raw prog hex exec', runRiscvCpuRawProgTest);
   reg(3205, 'asm-set', 'riscv32 CPU raw prog hex exec (wave)', runRiscvCpuRawProgTest, { propagation: 'wave' });
 
+  const THUMB_CPU_ISA = `inline [asm] .th:
+  set: arm-thumb
+  :
+`;
+
+  function thumbCpuShell(progBody, opts) {
+    opts = opts || {};
+    const regs = opts.registers != null ? opts.registers : 8;
+    const ramLen = opts.ramLen || 16;
+    const progLen = opts.progLen || 8;
+    const maxStepsLine = opts.maxSteps != null ? `  maxSteps: ${opts.maxSteps}\n` : '';
+    return THUMB_CPU_ISA + `
+comp [cpu] .u:
+  isa: .th
+  registers: ${regs}
+  on: 1
+${maxStepsLine}  ram:
+    depth: 16
+    length: ${ramLen}
+  prog:
+    depth: 16
+    length: ${progLen}
+    = .th {
+      ${progBody}
+    }
+  :
+`;
+  }
+
+  function runThumbCpuAluTest(h, session) {
+    const src = thumbCpuShell(`movs r0, 10
+      movs r1, 3
+      adds r2, r0, r1
+      subs r3, r0, r1
+      loop: b loop`, { maxSteps: 4, progLen: 8 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r2 = handler.evalGetProperty(comp, 'r2', { var: '.u', property: 'r2' }, interp);
+    const r3 = handler.evalGetProperty(comp, 'r3', { var: '.u', property: 'r3' }, interp);
+    h.assert('r2 = 13', r2.value, '0000000000001101');
+    h.assert('r3 = 7', r3.value, '0000000000000111');
+  }
+
+  reg(3207, 'asm-set', 'arm-thumb CPU movs adds subs native exec', runThumbCpuAluTest);
+  reg(3208, 'asm-set', 'arm-thumb CPU movs adds subs native exec (wave)', runThumbCpuAluTest, { propagation: 'wave' });
+
+  function runThumbCpuLdrStrTest(h, session) {
+    const src = thumbCpuShell(`movs r1, 0
+      movs r2, 42
+      str r2, 0, r1
+      ldr r0, 0(r1)
+      loop: b loop`, { maxSteps: 4, progLen: 8 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('r0 = 42', r0.value, '0000000000101010');
+  }
+
+  reg(3209, 'asm-set', 'arm-thumb CPU ldr str native exec', runThumbCpuLdrStrTest);
+  reg(3210, 'asm-set', 'arm-thumb CPU ldr str native exec (wave)', runThumbCpuLdrStrTest, { propagation: 'wave' });
+
+  reg(3211, 'asm-set', 'arm-thumb CPU init rejects wrong register count', function(h, session) {
+    let err = '';
+    try {
+      session.run(thumbCpuShell('movs r0, 1', { registers: 32, progLen: 4 }));
+    } catch (e) {
+      err = String(e.message || e);
+    }
+    h.assert('reg count error', String(err.includes('registers (32) must be 8')), 'true');
+  });
+
+  function runThumbCpuBeqTest(h, session) {
+    const src = thumbCpuShell(`movs r0, 5
+      movs r1, 5
+      subs r2, r0, r1
+      beq skip
+      movs r3, 99
+skip:
+      movs r4, 7`, { maxSteps: 5, progLen: 8 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r3 = handler.evalGetProperty(comp, 'r3', { var: '.u', property: 'r3' }, interp);
+    const r4 = handler.evalGetProperty(comp, 'r4', { var: '.u', property: 'r4' }, interp);
+    h.assert('beq skipped movs r3', r3.value, '0000000000000000');
+    h.assert('r4 = 7', r4.value, '0000000000000111');
+  }
+
+  reg(3212, 'asm-set', 'arm-thumb CPU beq on zero flag', runThumbCpuBeqTest);
+  reg(3213, 'asm-set', 'arm-thumb CPU beq on zero flag (wave)', runThumbCpuBeqTest, { propagation: 'wave' });
+
+  function runThumbCpuRawProgTest(h, session) {
+    const src = THUMB_CPU_ISA + `
+16wire raw = .th { movs r1, 5 }
+comp [cpu] .u:
+  isa: .th
+  registers: 8
+  on: 1
+  maxSteps: 1
+  ram:
+    depth: 16
+    length: 4
+  prog:
+    depth: 16
+    length: 4
+    = raw
+  :
+`;
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r1 = handler.evalGetProperty(comp, 'r1', { var: '.u', property: 'r1' }, interp);
+    h.assert('raw movs r1', r1.value, '0000000000000101');
+  }
+
+  reg(3214, 'asm-set', 'arm-thumb CPU raw prog exec', runThumbCpuRawProgTest);
+  reg(3215, 'asm-set', 'arm-thumb CPU raw prog exec (wave)', runThumbCpuRawProgTest, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

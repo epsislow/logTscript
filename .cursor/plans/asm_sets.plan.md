@@ -22,10 +22,10 @@ todos:
     status: completed
   - id: f1x3a-riscv-exec
     content: "1+x.3a: Executor CPU riscv32 MVP (D15–D21, subset D20)"
-    status: pending
+    status: completed
   - id: f1x3b-thumb-exec
     content: "1+x.3b: Executor CPU arm-thumb (după riscv32 POC)"
-    status: pending
+    status: completed
   - id: f1x3c-riscv-ext
     content: "1+x.3c: riscv32 extended — mul/div, lb/lh/sb/sh, fence, ecall, FP"
     status: pending
@@ -47,9 +47,9 @@ Relaționat: [faza_7_micro_asm.plan.md](faza_7_micro_asm.plan.md) · [comp_cpu.p
 
 ## Starea codului (aug 2026)
 
-**AsmSet: implementat (faze 1.1–1.5)** — registry, preset-uri `generic`/`riscv32`/`arm-thumb`, policy `inline.asm.set{}`, metadata `asmSetId`, composition multi-set + teste 3176–3196 (2538 teste).
+**AsmSet: implementat (faze 1.1–1.5 + 1+x.3a ✅ + 1+x.3b ✅)** — registry, preset-uri `generic`/`riscv32`/`arm-thumb`, policy `inline.asm.set{}`, metadata `asmSetId`, composition multi-set, **executoare CPU nativ riscv32 + arm-thumb**, teste 3176–3215 (**2557** teste).
 
-**Lipsește:** executor CPU nativ per preset (1+x.3a) — `cpuStep` încă cade în legacy pentru preset fără micro.
+**Următorul pas:** **1+x.3c** — extensii riscv32 (mul/div, lb/lh, fence, ecall, FP; sub-set FP de decis la implementare).
 
 Inline ASM rămâne un **mini-asamblor declarativ** — fără x86/ARM/RISC-V preset „din cutie” până la implementarea acestui plan. Utilizatorul definește manual fiecare ISA (sau va folosi preset-uri după 1.3+):
 
@@ -531,7 +531,7 @@ flowchart LR
 
 ## Faze de implementare
 
-### Faza 1.1 — Infrastructură AsmSet registry
+### Faza 1.1 — Infrastructură AsmSet registry ✅
 
 **Scop:** suport `set:` fără schimbare de comportament.
 
@@ -548,7 +548,7 @@ flowchart LR
 
 ---
 
-### Faza 1.2 — Formalizare profil `generic` + validare pe set
+### Faza 1.2 — Formalizare profil `generic` + validare pe set ✅
 
 **Scop:** reguli explicite pentru setul actual.
 
@@ -559,7 +559,7 @@ flowchart LR
 
 ---
 
-### Faza 1.3 — Preset `riscv32` (RV32I subset)
+### Faza 1.3 — Preset `riscv32` (RV32I subset) ✅
 
 **Scop:** primul set real, fixed 32-bit — **assemble/decode only** (fără CPU exec).
 
@@ -595,7 +595,7 @@ show(prog; asm)
 
 ---
 
-### Faza 1.4 — Preset `arm-thumb` (16-bit subset)
+### Faza 1.4 — Preset `arm-thumb` (16-bit subset) ✅
 
 **Scop:** al doilea set, demonstrează modularitatea.
 
@@ -607,7 +607,7 @@ show(prog; asm)
 
 ---
 
-### Faza 1.5 — Policy, CPU bridge, metadata, composition + micro
+### Faza 1.5 — Policy, CPU bridge, metadata, composition + micro ✅
 
 - Parser Allow/NotAllow: **`inline.asm.set{generic riscv32 arm-thumb}`** (D9)
 - CPU: propagare `asmSet` din `isaRef` → `cpuStep()`; `doc(.cpu)` afișează set moștenit (D7-A)
@@ -621,6 +621,8 @@ show(prog; asm)
 ---
 
 ## Faza 1+x.3 — Executor CPU per AsmSet
+
+**1+x.3a ✅ livrat.** **1+x.3b ✅ livrat.** Următorul pas: **1+x.3c** (riscv32 extended).
 
 ### Obiectiv
 
@@ -700,9 +702,9 @@ Fiecare grup = encode + decode + exec + teste (același model ca MVP).
 
 | ID | Livrabil |
 |----|----------|
-| **1+x.3a** | Router `cpuStep`; `executeInstruction` riscv32; validare init CPU; teste ALU/branch/mem; doc `cpu.md` |
-| **1+x.3b** | Executor `arm-thumb` (subset movs/adds/subs/…) |
-| **1+x.3c** | Extindere riscv32: mul/div, byte/half mem, fence/ecall, FP |
+| **1+x.3a ✅** | Router `cpuStep`; `executeInstruction` riscv32; validare init CPU; teste ALU/branch/mem/micro; doc `cpu.md` + `asm-set-riscv32.md` |
+| **1+x.3b ✅** | Executor `arm-thumb`; `cpuRequirements` 8×16; teste ALU/ldr/str/beq + legacy/wave; doc `cpu.md` + `asm-set-arm-thumb.md` |
+| **1+x.3c** | Extindere riscv32: mul/div, byte/half mem, fence/ecall, FP (sub-set FP de decis la implementare) |
 
 ### Modificări fișiere (1+x.3a)
 
@@ -764,8 +766,9 @@ show(.u:ram:0)
 |----|---------|---------------|
 | 1+x.1 | **x86 / x86-64** | Variable-length encoding, prefixe, ModR/M |
 | 1+x.2 | **ARM Cortex-A (ARM + Thumb-2 mixt)** | Mix 16/32-bit, IT blocks |
-| **1+x.3a** | **Executor riscv32 MVP** | **Următorul pas** — D15–D22 |
-| **1+x.3b** | **Executor arm-thumb** | După POC riscv32 |
+| **1+x.3a ✅** | **Executor riscv32 MVP** | Livrat — D15–D22, teste 3197–3206 |
+| **1+x.3b ✅** | **Executor arm-thumb** | Livrat — teste 3207–3215 |
+| **1+x.3c** | **riscv32 extended** | **Următorul pas** |
 | **1+x.3c** | **riscv32 extended** (mul/div, lb/lh, fence, ecall, FP) | După 3a |
 | 1+x.4 | **Variable wordWidth per instrucțiune** | Blob concatenare fixă; x86 necesită model byte-oriented |
 | 1+x.5 | **Directives per set** (`.byte`, `.word`, `.org`) | Utile pentru x86/ARM |
@@ -811,9 +814,9 @@ show(.u:ram:0)
 | 1.2 Generic formalizat | Mic |
 | 1.3 RISC-V preset | Mediu |
 | 1.4 ARM Thumb preset | Mediu |
-| 1.5 Policy + doc | Mic |
-| 1+x.3a riscv32 exec | Mediu |
-| 1+x.3b thumb exec | Mediu |
+| 1.5 Policy + doc | Mic ✅ |
+| 1+x.3a riscv32 exec | Mediu ✅ |
+| 1+x.3b thumb exec | Mediu ✅ |
 | 1+x.3c riscv32 extended | Mediu–Mare |
 | 1+x x86 | Mare |
 
@@ -823,12 +826,12 @@ show(.u:ram:0)
 
 - [x] **Confirmare user:** D9 (`inline.asm.set{…}`), D10, D11 corp gol, D12 riscv32 fără CPU exec
 - [x] **Confirmare user:** D15–D22 (exec CPU 1+x.3)
-- [x] **1.1** AsmSet registry + `parseIsaHeader` + `set: generic` implicit + merge preset (D11) + teste backward compat
-- [x] **1.2** Profil generic formalizat + validare segmente per set + `doc(inline.asm.sets)`
-- [x] **1.3** Preset `riscv32` + round-trip + **composition `use` (D13)**
-- [x] **1.4** Preset `arm-thumb` + **multi-width composition (D13)**
-- [x] **1.5** policy, CPU bridge, `asmSetId`, **composition + micro tests (D13/D14)**
-- [ ] **1+x.3a** Router `cpuStep` + executor riscv32 MVP (D20 subset) + validare init + teste
-- [ ] **1+x.3b** Executor arm-thumb
+- [x] ✅ **1.1** AsmSet registry + `parseIsaHeader` + `set: generic` implicit + merge preset (D11) + teste backward compat
+- [x] ✅ **1.2** Profil generic formalizat + validare segmente per set + `doc(inline.asm.sets)`
+- [x] ✅ **1.3** Preset `riscv32` + round-trip + **composition `use` (D13)**
+- [x] ✅ **1.4** Preset `arm-thumb` + **multi-width composition (D13)**
+- [x] ✅ **1.5** policy, CPU bridge, `asmSetId`, **composition + micro tests (D13/D14)**
+- [x] ✅ **1+x.3a** Router `cpuStep` + executor riscv32 MVP (D20 subset) + validare init + teste legacy/wave + doc
+- [x] ✅ **1+x.3b** Executor arm-thumb + validare init + teste legacy/wave + doc
 - [ ] **1+x.3c** riscv32 extended (mul/div, lb/lh, fence, ecall, FP)
 - [ ] **1+x.1+** x86, variable-length, directives `.byte`/`.word` (amânat)

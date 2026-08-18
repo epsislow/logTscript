@@ -177,6 +177,110 @@ function createThumbBuiltinOpcode(mnemonic) {
   };
 }
 
+function thumbSignExtend(val, bits) {
+  const sign = 1 << (bits - 1);
+  if (val & sign) val -= (1 << bits);
+  return val;
+}
+
+function thumbReadReg(c, idx) {
+  if (idx < 0 || idx >= c.regCount) throw new Error(`arm-thumb: register r${idx} out of range`);
+  return parseInt(c.regs[idx], 2) & 0xffff;
+}
+
+function thumbWriteReg(c, idx, val) {
+  if (idx < 0 || idx >= c.regCount) throw new Error(`arm-thumb: register r${idx} out of range`);
+  const masked = val & 0xffff;
+  c.regs[idx] = masked.toString(2).padStart(c.regDepth, '0').slice(-c.regDepth);
+  c.condZero = masked === 0 ? 1 : 0;
+}
+
+function thumbRamIndex(byteAddr) {
+  if ((byteAddr & 1) !== 0) {
+    throw new Error(`arm-thumb: unaligned memory access at byte address ${byteAddr}`);
+  }
+  return byteAddr >> 1;
+}
+
+function thumbReadRamHalf(c, byteAddr) {
+  const idx = thumbRamIndex(byteAddr);
+  if (idx < 0 || idx >= c.ramLength) {
+    throw new Error(`arm-thumb: memory read out of range (byte ${byteAddr})`);
+  }
+  const cell = cpuReadRamCell(c, idx);
+  return cell != null ? (parseInt(cell, 2) & 0xffff) : 0;
+}
+
+function thumbWriteRamHalf(c, byteAddr, val) {
+  const idx = thumbRamIndex(byteAddr);
+  if (idx < 0 || idx >= c.ramLength) {
+    throw new Error(`arm-thumb: memory write out of range (byte ${byteAddr})`);
+  }
+  const bits = (val & 0xffff).toString(2).padStart(c.ramDepth, '0').slice(-c.ramDepth);
+  cpuWriteRamCell(c, idx, bits);
+}
+
+function thumbExecuteInstruction(c, ctx, isaInst, decoded, instrBits) {
+  const b = String(instrBits).padStart(16, '0').slice(-16);
+  const word = parseInt(b, 2);
+  const pc = c.pc;
+  let nextPc = pc + 1;
+  const rd = word & 7;
+  const rn = (word >> 3) & 7;
+  const rm = (word >> 6) & 7;
+
+  if (c.condZero == null) c.condZero = 0;
+
+  if ((word & 0xf800) === 0x2000) {
+    const movRd = (word >> 8) & 7;
+    const imm = word & 0xff;
+    thumbWriteReg(c, movRd, imm);
+    c.pc = nextPc;
+    return;
+  }
+  if ((word & 0xfe00) === 0x1800) {
+    thumbWriteReg(c, rd, thumbReadReg(c, rn) + thumbReadReg(c, rm));
+    c.pc = nextPc;
+    return;
+  }
+  if ((word & 0xfe00) === 0x1a00) {
+    thumbWriteReg(c, rd, thumbReadReg(c, rn) - thumbReadReg(c, rm));
+    c.pc = nextPc;
+    return;
+  }
+  if ((word & 0xf800) === 0xe000) {
+    const off = thumbSignExtend(word & 0x7ff, 11);
+    nextPc = pc + off * 2;
+    c.pc = nextPc;
+    return;
+  }
+  if ((word & 0xf800) === 0xd000) {
+    const off = thumbSignExtend((word >> 3) & 0xff, 8);
+    const cond = word & 0x7;
+    const take = (cond === 0 && c.condZero) || (cond === 1 && !c.condZero);
+    if (take) nextPc = pc + off * 2;
+    c.pc = nextPc;
+    return;
+  }
+  if ((word & 0xf800) === 0x6800) {
+    const imm = (word >> 6) & 0x1f;
+    const byteAddr = (thumbReadReg(c, rn) + (imm << 2)) >>> 0;
+    thumbWriteReg(c, rd, thumbReadRamHalf(c, byteAddr));
+    c.pc = nextPc;
+    return;
+  }
+  if ((word & 0xf800) === 0x6000) {
+    const imm = (word >> 6) & 0x1f;
+    const byteAddr = (thumbReadReg(c, rn) + (imm << 2)) >>> 0;
+    thumbWriteRamHalf(c, byteAddr, thumbReadReg(c, rd));
+    c.pc = nextPc;
+    return;
+  }
+
+  const mn = decoded && decoded.mnemonic ? decoded.mnemonic.toUpperCase() : '?';
+  throw new Error(`arm-thumb: unsupported instruction '${mn}' at PC ${pc}`);
+}
+
 function createArmThumbAsmSet() {
   const defaultOpcodes = {};
   const opcodeOrder = [];
@@ -192,10 +296,19 @@ function createArmThumbAsmSet() {
     encoding: 'fixed',
     endianness: 'little',
     operandGrammar: 'thumb',
+    cpuRequirements: {
+      regCount: 8,
+      regDepth: 16,
+      progDepth: 16,
+    },
     defaultOpcodes,
     opcodeOrder,
     consts: {},
     macros: {},
+
+    executeInstruction(c, ctx, isaInst, decoded, instrBits) {
+      thumbExecuteInstruction(c, ctx, isaInst, decoded, instrBits);
+    },
 
     validateUserOpcode(mnemonic, def) {
       if (def.presetBuiltin) return null;
@@ -249,6 +362,7 @@ if (typeof module !== 'undefined' && module.exports) {
     createArmThumbAsmSet,
     thumbEncodeBuiltin,
     thumbDisassemble,
+    thumbExecuteInstruction,
     THUMB_MNEMONICS,
   };
 }

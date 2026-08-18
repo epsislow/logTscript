@@ -159,6 +159,54 @@ Details: [asm-set-riscv32.md](asm-set-riscv32.md#cpu-bridge).
 
 ---
 
+## arm-thumb native exec
+
+When **`isa:`** references an inline ASM with **`set: arm-thumb`**, the CPU uses the **native Thumb executor** (16-bit halfwords). Requirements:
+
+| Attribute | Value |
+|-----------|-------|
+| `registers` | 8 (`r0`–`r7`) |
+| `ram.depth` | 16 |
+| `prog.depth` | 16 |
+
+Conditional branches **`beq` / `bne`** use a **zero flag** updated by **`movs`**, **`adds`**, and **`subs`** (result equals zero). Execution order: **micro** → **native arm-thumb** → error.
+
+```logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+comp [cpu] .u:
+  isa: .th
+  registers: 8
+  on: 1
+  maxSteps: 4
+  ram:
+    depth: 16
+    length: 8
+  prog:
+    depth: 16
+    length: 4
+    = .th {
+      movs r0, 10
+      movs r1, 3
+      adds r2, r0, r1
+      subs r3, r0, r1
+    }
+  :
+
+.u:{ run = 1 }
+16wire r2 = .u:r2
+16wire r3 = .u:r3
+show(r2, r3)
+```
+
+**Load & Run:** `r2` is `…1101` (13), `r3` is `…0111` (7).
+
+Details: [asm-set-arm-thumb.md](asm-set-arm-thumb.md#cpu-bridge).
+
+---
+
 When the CPU must not touch shared RAM while [DMA](dma.md) (or another master) is active, bind a **1-bit hold** wire with **`wait`** on the CPU body or drive the **`wait`** pin in a wave block.
 
 | Signal | Effect |

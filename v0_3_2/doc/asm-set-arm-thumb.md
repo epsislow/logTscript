@@ -90,7 +90,66 @@ Branch targets use the same label mechanism as generic asm; offsets must stay wi
 
 ---
 
-## Load / store
+## CPU bridge
+
+Use **`comp [cpu]`** with **`isa: .th`** for native Thumb execution (not the 4-bit legacy CPU switch).
+
+### Requirements
+
+| Attribute | Required value |
+|-----------|----------------|
+| `registers` | **8** |
+| `ram.depth` | **16** |
+| `prog.depth` | **16** |
+
+Mismatch at CPU init → error (e.g. `registers (32) must be 8 for asm set 'arm-thumb'`).
+
+### Runnable — ALU on CPU
+
+```logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+comp [cpu] .u:
+  isa: .th
+  registers: 8
+  on: 1
+  maxSteps: 4
+  ram:
+    depth: 16
+    length: 8
+  prog:
+    depth: 16
+    length: 4
+    = .th {
+      movs r0, 10
+      movs r1, 3
+      adds r2, r0, r1
+      subs r3, r0, r1
+    }
+  :
+
+.u:{ run = 1 }
+16wire r2 = .u:r2
+16wire r3 = .u:r3
+show(r2, r3)
+```
+
+**Load & Run:** `r2` = 13, `r3` = 7.
+
+### Semantics (simulator)
+
+- **PC** = instruction index (one 16-bit halfword per step).
+- **`ldr` / `str`:** byte offset `imm × 4` from `rn`; RAM index = `byteAddr >> 1`; unaligned byte addresses error.
+- **`beq` / `bne`:** branch when the **zero flag** is set/clear after the last **`movs`**, **`adds`**, or **`subs`**.
+- **Micro override:** user `{ micro }` on a preset opcode still uses the micro engine (see [asm-microcode.md](asm-microcode.md)).
+
+See also [cpu.md](cpu.md#arm-thumb-native-exec).
+
+---
+
+## Load / store (assemble-only)
 
 ```logts-play
 inline [asm] .th:
