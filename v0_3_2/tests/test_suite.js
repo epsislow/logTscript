@@ -35690,5 +35690,93 @@ done:
   reg(3288, 'asm-set', 'x86-32 jb unsigned after cmp (1+x.1c-ii)', runX86JbUnsignedCpuTest);
   reg(3289, 'asm-set', 'x86-32 jb unsigned CPU (wave)', runX86JbUnsignedCpuTest, { propagation: 'wave' });
 
+  function runX86SibDecodeTest(h, session) {
+    const src = `inline [asm] .x86:
+  set: x86-32
+  :
+
+88wire p = .x86 {
+  mov eax, [esi+ecx*4]
+  lea edi, [ebx+edi*2+8]
+  add eax, [esp+12]
+}
+show(.x86:decode(p))`;
+    const { out } = session.run(src);
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('mov SIB', String(text.includes('mov eax, [esi+ecx*4]')), 'true');
+    h.assert('lea SIB+disp', String(text.includes('lea edi, [ebx+edi*2+8]')), 'true');
+    h.assert('add esp+disp', String(text.includes('add eax, [esp+12]')), 'true');
+  }
+
+  reg(3290, 'asm-set', 'x86-32 SIB decode (1+x.1c-iii-a)', runX86SibDecodeTest);
+  reg(3291, 'asm-set', 'x86-32 SIB decode (wave)', runX86SibDecodeTest, { propagation: 'wave' });
+
+  function runX86SibDwordSumCpuTest(h, session) {
+    const src = x86CpuShell(`      xor eax, eax
+      xor ecx, ecx
+      mov esi, 0x40
+      mov ebx, 3
+sumLoop:
+      add eax, [esi+ecx*4]
+      inc ecx
+      dec ebx
+      jne sumLoop
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x40
+tab: .byte 10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0`, { maxSteps: 40, progLen: 128 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax = 60', r0.value, '00000000000000000000000000111100');
+  }
+
+  reg(3292, 'asm-set', 'x86-32 SIB dword sum CPU (D38-D6)', runX86SibDwordSumCpuTest);
+  reg(3293, 'asm-set', 'x86-32 SIB sum CPU (wave)', runX86SibDwordSumCpuTest, { propagation: 'wave' });
+
+  function runX86EspDispCpuTest(h, session) {
+    const src = x86CpuShell(`      mov esp, 0x30
+      mov eax, [esp+8]
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x38
+slot: .byte 11`, { maxSteps: 8, progLen: 80 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax = 11', r0.value, '00000000000000000000000000001011');
+  }
+
+  reg(3294, 'asm-set', 'x86-32 [esp+disp] CPU (1+x.1c-iii-a)', runX86EspDispCpuTest);
+  reg(3295, 'asm-set', 'x86-32 esp disp CPU (wave)', runX86EspDispCpuTest, { propagation: 'wave' });
+
+  function runX86SibRejectEspIndexTest(h, session) {
+    const src = `inline [asm] .x86:
+  set: x86-32
+  :
+
+32wire p = .x86 {
+  mov eax, [ebx+esp*4]
+}`;
+    if (session.propagation === 'wave') {
+      h.assertThrows('esp index rejected', function() {
+        session.run(src);
+      }, 'esp cannot be SIB index');
+      return;
+    }
+    const { out } = session.run(src);
+    const err = out.find(l => l.startsWith('Error:')) || '';
+    h.assert('esp index rejected', String(/esp cannot be SIB index/i.test(err)), 'true');
+  }
+
+  reg(3296, 'asm-set', 'x86-32 reject esp as SIB index', runX86SibRejectEspIndexTest);
+  reg(3297, 'asm-set', 'x86-32 reject esp index (wave)', runX86SibRejectEspIndexTest, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

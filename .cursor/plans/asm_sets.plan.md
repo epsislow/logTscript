@@ -513,24 +513,26 @@ show(.x86:decode(.u:prog:get))
 
 **Extins în 1+x.1c (D38):** adresare didactică, `lea`, `test`, `xchg`, `loop`/`loope`/`loopne`, salturi `jg`/`jl`/… — vezi [D38](#d38--extensii-x86-32-1x1c).
 
-**Amânat după 1+x.1c-i/ii:** SIB `[base+index*scale±disp]` (1+x.1c-iii), segment overrides, prefix `0x66`/`0x67`, x86-64, SSE/AVX.
+**Amânat (subfaze 1+x.1c-iii):** pattern **D (SIB)**, prefixe, segmente, x86-64 — vezi [1+x.1c-iii](#1xc-iii--subfaze-decizie-user-2026-08).
 
 
 ### D38 — Extensii x86-32 (1+x.1c)
 
-Scope confirmat user. Două batch-uri implementare + adresare SIB **în viitor**.
+Scope confirmat user. Batch-uri **1+x.1c-i/ii** livrate; **1+x.1c-iii** = subfaze (SIB + opționale); x86-64 separat.
 
-#### Adresare didactică (1+x.1c-i)
+#### Adresare didactică — pattern LogTscript (1+x.1c-i … 1+x.1c-iii)
 
-Trei **pattern-uri** documentate în `asm-set-x86-32.md` — nu listă goală ModR/M:
+Documentat în **`asm-set-x86-32.md`** — nu listă ModR/M completă:
 
-| Pattern | Forme permise | Scop didactic |
-|---------|---------------|---------------|
-| **A — Stack frame** | `[ebp±disp8]`, `[esp±disp8]`, `[ebp±disp32]`, `[esp±disp32]` | variabile locale, argumente stack (MVP + disp32) |
-| **B — Pointer / array** | `[reg]`, `[reg±disp8]`, `[reg±disp32]`, `lea reg, [reg±disp]` | parcurgere buffer; baze: `eax`–`ebx`, `ebp`, `esi`, `edi` |
-| **C — Absolut** | `[disp32]` | tabele `.org`, variabile la adresă fixă în RAM |
+| Pattern | Forme permise | Scop |
+|---------|---------------|------|
+| **— Imediat / registru** | `reg, imm`, `reg, reg` | MVP 1+x.1 |
+| **A — Stack frame** | `[ebp±disp8]`, `[esp±disp8]`, `[ebp±disp32]`, `[esp±disp32]` | variabile locale, argumente stack |
+| **B — Pointer / vector** | `[reg]`, `[reg±disp8]`, `[reg±disp32]`, `lea reg, [reg±disp]` | parcurgere buffer |
+| **C — Absolut** | `[disp32]` | tabele `.org`, variabile la adresă fixă |
+| **D — SIB (1c-iii-a)** | `[base+index*scale±disp]`, scale 1/2/4/8 | tablouri tipizate, structuri compuse |
 
-**Excluderi batch 1:** **`[esp]`** fără disp (necesită SIB în x86 real); **`[base+index*scale±disp]`** → **1+x.1c-iii** (viitor).
+**Excluderi până la 1c-iii-a:** **`[base+index*scale±disp]`**; **`[esp]`** fără disp (rezolvat cu SIB la 1c-iii-a).
 
 #### 1+x.1c-i — batch 1 (prioritate)
 
@@ -545,18 +547,18 @@ Trei **pattern-uri** documentate în `asm-set-x86-32.md` — nu listă goală Mo
 
 **Teste planificate:** 3263+ — round-trip per pattern; demo CPU `loop` array; `test`+`je`; `xchg`; salturi signed după `cmp`.
 
-#### Demo-uri didactice — Laborator 4 (livrabile 1+x.1c-i)
+#### Demo-uri didactice D38 (livrabile doc + teste)
 
-Doc **`asm-set-x86-32.md`**: secțiune nouă **„Moduri de adresare”**, structurată ca lab (4.2.1→4.2.4). Fiecare subsecțiune = explicație scurtă + **`logts-play`** + (unde e cazul) test automat.
+Doc **`asm-set-x86-32.md`**: pattern + **`logts-play`** + teste unde e cazul.
 
-| ID | Lab § | Titlu | Pattern / mnemonici | Verificare |
-|----|-------|-------|---------------------|------------|
-| **D38-D1** | 4.2.1–4.2.2 | Imediat + registru | `mov`, `add` imm/reg (MVP — recap) | doc only |
-| **D38-D2** | 4.2.3 | Variabilă la adresă fixă | **C** — `[disp32]`, `.org`, `.byte` | test **3269** + doc |
-| **D38-D3** | 4.2.4 | Vector de octeți | **B** — `[reg+disp32]`, `inc`, **`loop`**, `ecx` contor | test **3266** + doc CPU |
-| **D38-D4** | 4.2.4 | Stack / struct locală | **A** — `push ebp`, `mov ebp,esp`, `[ebp±disp]`, `leave` | test + doc CPU |
-| **D38-D5** | extensii | `test`, `xchg`, salturi | `test`+`je`, `xchg`, `jg`/`jl` după `cmp` | teste **3264–3265**, **3268** |
-| **D38-D6** | 4.2.4 (viitor) | Tablou dword scalat | **SIB** — `[esi+ecx*4+disp]` | **1+x.1c-iii** — doc placeholder |
+| ID | Titlu | Pattern / mnemonici | Verificare |
+|----|-------|---------------------|------------|
+| **D38-D1** | Imediat + registru | `mov`, `add` imm/reg (recap MVP) | doc only |
+| **D38-D2** | Variabilă la adresă fixă | **C** — `[disp32]`, `.org`, `.byte` | test **3273** + doc |
+| **D38-D3** | Vector de octeți | **B** — `[reg+disp]`, `inc`, **`loop`**, `ecx` | test **3269** + doc CPU |
+| **D38-D4** | Stack / frame local | **A** + **`enter`/`leave`** | test **3286** + doc |
+| **D38-D5** | `test`, `xchg`, salturi | `test`+`je`, `xchg`, `jg`/`jl` după `cmp` | teste **3265**, **3271** |
+| **D38-D6** | Tablou dword scalat | **D (SIB)** — `[esi+ecx*4+disp]` | test **3292** + doc |
 
 **D38-D2 — Variabilă globală (direct):**
 
@@ -607,7 +609,7 @@ sumLoop:
   loop sumLoop
 ```
 
-**Load & Run:** `eax = 15`. Doc notează: același **`ecx`** ca la **`rep`** / §4.2.5 (șiruri — amânat).
+**Load & Run:** `eax = 15`. Doc: **`loop`** folosește **`ecx`** (`r1`) ca contor; **`rep`/șiruri** → **1+x.1c-iv** (amânat).
 
 **D38-D4 — Stack frame (bazat pe ebp):**
 
@@ -623,10 +625,10 @@ sumLoop:
 
 **Checklist implementare 1+x.1c-i (doc):**
 
-- [x] Secțiune „Moduri de adresare” în `asm-set-x86-32.md` (4.2.1 imediat … 4.2.4 indexat)
+- [x] Secțiune „Moduri de adresare” în `asm-set-x86-32.md` (tabel pattern + imediat/registru)
 - [x] `logts-play` D38-D2, D38-D3, D38-D4 (minim 3 runnable)
-- [x] Cross-link lab ↔ pattern A/B/C din D38
-- [x] D38-D6 menționat ca „viitor 1+x.1c-iii (SIB)”
+- [x] Cross-link demo-uri ↔ pattern A/B/C
+- [x] D38-D6 menționat ca pattern **D** / **1+x.1c-iii-a**
 
 #### 1+x.1c-ii — batch 2
 
@@ -638,12 +640,26 @@ sumLoop:
 | `enter` / `leave` | stack frame |
 | Flags | `cf` la add/sub pentru salturi unsigned fidel |
 
-#### 1+x.1c-iii — viitor (amânat)
+#### 1+x.1c-iii — subfaze (decizie user 2026-08)
 
-- **SIB:** `[base+index*scale±disp]` — ex. `mov eax, [esi+ecx*4]`, `[ebp+eax*2-8]`;
-- prefixe `0x66`/`0x67`, segment overrides (`fs:`/`gs:`);
-- **x86-64** = preset separat sau mod pe profil (decizie la implementare);
-- SSE/AVX — mult după MVP.
+| Subfază | Conținut | Livrabile | Prioritate |
+|---------|----------|-----------|------------|
+| **1+x.1c-iii-a** | **Pattern D (SIB):** `[base+index*scale±disp]`, scale 1/2/4/8; **`esp` nu index**; `[esp+disp]`; encode/decode/exec; demo **D38-D6** | teste 3290+, doc `logts-play` | **Următorul** — după 1c-ii |
+| **1+x.1c-iii-b** | Prefixe operand/adresă **`0x66`/`0x67`** (opțional, dacă e nevoie de fidelitate width) | doc + teste narrow | Scăzută — doar dacă cerință explicită |
+| **1+x.1c-iii-c** | Prefixe segment **`fs:`/`gs:`** | doc stub sau skip | **Skip MVP** — memorie flat în simulator |
+| **1+x.1c-iv** | **Șiruri:** `rep`, `movsb`/`movsw`, ESI/EDI/ECX implicit | batch separat | Amânat — după SIB |
+| **1+x.1d** | **x86-64:** preset separat `x86-64` (REX, reg 64-bit) — **nu** extindere `x86-32` | preset + plan propriu | Amânat — decizie separată |
+
+**1+x.1c-iii-a — checklist implementare:**
+
+- [x] `x86ParseMem` + ModR/M **SIB byte** (mod=0/1/2, rm=4)
+- [x] `lea` / `mov` / ALU cu pattern D
+- [x] Reguli: index ≠ `esp`; scale valid; reject `[esp]` simplu fără disp până la SIB
+- [x] Teste: round-trip SIB, CPU sumă dword `[esi+ecx*4+base]`, demo D38-D6
+- [x] Doc: tabel pattern D + runnable Load/Load & Run
+- [ ] SSE/AVX — **în afara scope** (mult după MVP)
+
+**Notă:** prefixe și segmente **nu** blochează 1c-iii-a; rămân subfaze opționale.
 
 
 ### D1 — Default `generic`
@@ -1455,9 +1471,9 @@ Vezi **[D35 — Exemple x86 Intel](#d35--exemple-x86-intel-mvp)** (confirmat use
 
 Vezi **[D38 — Extensii x86-32](#d38--extensii-x86-32-1x1c)**.
 
-- **1+x.1c-i:** adresare didactică A/B/C, `lea`, `test`, `xchg`, `inc`/`dec`/`neg`/`not`, salturi signed/unsigned, `loop`/`loope`/`loopne`, exec ALU logic; **doc demo-uri D38-D1…D5** (Laborator 4);
-- **1+x.1c-ii:** `mul`/`div`, `push imm32`, `enter`/`leave`, flags `cf` îmbunătățite;
-- **1+x.1c-iii (viitor):** SIB `[base+index*scale±disp]`, prefixe, segmente, x86-64.
+- **1+x.1c-i:** pattern A/B/C, `lea`, `test`, `xchg`, salturi, `loop` — doc demo-uri **D38-D1…D5**;
+- **1+x.1c-ii:** `mul`/`div`, `enter`/`leave`, `push imm32` — ✅;
+- **1+x.1c-iii-a…d:** SIB (pattern D), opțional prefixe/seg, șiruri, x86-64 — vezi [1+x.1c-iii](#1xc-iii--subfaze-decizie-user-2026-08).
 
 ---
 
@@ -1518,9 +1534,13 @@ Vezi **[D38 — Extensii x86-32](#d38--extensii-x86-32-1x1c)**.
 | **1+x.5 ✅** | **Directives** (`.byte`, `.word`, `.org`, `.skip`, `.align`) | Livrat — teste 3242–3247 |
 | **1+x.1 ✅** | **x86-32** Intel variable + CPU exec | Livrat — teste 3248–3253, doc asm-set-x86-32.md |
 | **1+x.2 ✅** | **arm-a32** + composition Thumb | Livrat — teste 3254–3261, doc asm-set-arm-a32.md |
-| **1+x.1c-i** | **x86-32 extensii batch 1** (D38) | Adresare A/B/C, `lea`, `test`, `xchg`, `loop`, salturi | 1+x.1 ✅ |
-| **1+x.1c-ii** | **x86-32 extensii batch 2** | `mul`/`div`, `enter`/`leave`, `push imm32` | 1+x.1c-i |
-| **1+x.1c-iii** | **SIB** `[base+index*scale±disp]` + prefixe/seg/x86-64 | Amânat — după 1+x.1c-ii | 1+x.1c-ii |
+| **1+x.1c-i ✅** | **x86-32 extensii batch 1** (D38) | Pattern A/B/C, `lea`, `test`, `xchg`, `loop`, salturi | 1+x.1 ✅ |
+| **1+x.1c-ii ✅** | **x86-32 extensii batch 2** | `mul`/`div`, `enter`/`leave`, `push imm32` | 1+x.1c-i |
+| **1+x.1c-iii-a** | **Pattern D (SIB)** | `[base+index*scale±disp]`, D38-D6 | 1+x.1c-ii |
+| **1+x.1c-iii-b** | Prefixe `0x66`/`0x67` | Opțional | 1+x.1c-iii-a |
+| **1+x.1c-iii-c** | Segmente `fs:`/`gs:` | Skip MVP | — |
+| **1+x.1c-iv** | Șiruri `rep` + ESI/EDI implicit | Amânat | 1+x.1c-iii-a |
+| **1+x.1d** | Preset **x86-64** | Separat de x86-32 | 1+x.1c-iii-a sau paralel |
 | **1+x.3a ✅** | Executor riscv32 MVP | Livrat — teste 3197–3206 | — |
 | **1+x.3b ✅** | Executor arm-thumb | Livrat — teste 3207–3215 | — |
 | **1+x.3c ✅** | riscv32 extended (M, mem, system) | Livrat — teste 3216–3232 | — |
@@ -1602,8 +1622,12 @@ Vezi **[D38 — Extensii x86-32](#d38--extensii-x86-32-1x1c)**.
 - [x] ✅ **1+x.1a** Preset `x86-32` assemble MVP (Intel, subset ModR/M) — teste 3248–3253
 - [x] ✅ **1+x.1b** Executor CPU x86 subset + variable fetch — teste 3252–3253
 - [x] ✅ **1+x.2a** Preset `arm-a32` assemble + exec + thumb `use` — teste 3254–3261
-- [x] **1+x.1c-i** x86 extensii batch 1 (D38): adresare A/B/C, `lea`, `test`, `xchg`, `loop`, salturi — teste 3263–3275; doc demo-uri **D38-D2/D3/D4/D5** (Laborator 4)
-- [x] **1+x.1c-ii** x86 extensii batch 2: `mul`/`div`, `enter`/`leave`, `push imm32`
-- [ ] **1+x.1c-iii** SIB `[base+index*scale±disp]` + prefixe/seg/x86-64 (viitor)
+- [x] **1+x.1c-i** x86 extensii batch 1 (D38): pattern A/B/C, `lea`, `test`, `xchg`, `loop`, salturi — teste 3263–3275; doc D38-D2…D5
+- [x] **1+x.1c-ii** x86 extensii batch 2: `mul`/`div`, `enter`/`leave`, `push imm32` — teste 3276–3289
+- [x] **1+x.1c-iii-a** pattern D (SIB) + D38-D6
+- [ ] **1+x.1c-iii-b** prefixe 66/67 (opțional)
+- [ ] **1+x.1c-iii-c** segmente fs/gs — skip MVP
+- [ ] **1+x.1c-iv** șiruri `rep` (amânat)
+- [ ] **1+x.1d** preset x86-64 (amânat)
 - [ ] **1+x.2b** Profil mixt Thumb-2 / IT blocks (amânat)
 - [ ] **1+x.6–8** assembler extern, endianness runtime, CPU multi-set routing

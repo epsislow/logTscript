@@ -1,4 +1,4 @@
-/* ================= ASM SET: x86-32 Intel subset (variable encoding, 1+x.1 + 1+x.1c-i/ii) ================= */
+/* ================= ASM SET: x86-32 Intel subset (variable encoding, 1+x.1 + 1+x.1c-i/ii/iii-a) ================= */
 
 const X86_REG = {
   eax: 0, ecx: 1, edx: 2, ebx: 3, esp: 4, ebp: 5, esi: 6, edi: 7,
@@ -123,11 +123,55 @@ function x86ResolveLabel(labels, instrByteAddr, instrLen, tok) {
   return x86ParseImm(tok);
 }
 
+const X86_SCALE_ENC = { 1: 0, 2: 1, 4: 2, 8: 3 };
+
+function x86ParseScale(tok) {
+  const s = parseInt(String(tok).trim(), 10);
+  if (s !== 1 && s !== 2 && s !== 4 && s !== 8) {
+    throw new Error(`x86-32: invalid SIB scale *${tok} (expected 1, 2, 4, or 8)`);
+  }
+  return s;
+}
+
 function x86ParseMem(tok, labels) {
   const t = String(tok).trim();
   if (!/^\[/.test(t)) throw new Error(`x86-32: expected memory operand '[…]', got '${tok}'`);
   const inner = t.replace(/^\[\s*/, '').replace(/\]\s*$/, '').trim();
   if (!inner) throw new Error(`x86-32: empty memory operand '${tok}'`);
+
+  if (inner.includes('*')) {
+    const m1 = /^(\w+)\s*\+\s*(\w+)\s*\*\s*([1248])(?:\s*([+-])\s*(.+))?$/i.exec(inner);
+    const m2 = /^(\w+)\s*\*\s*([1248])\s*\+\s*(\w+)(?:\s*([+-])\s*(.+))?$/i.exec(inner);
+    let base;
+    let index;
+    let scale;
+    let dispSign;
+    let dispTok;
+    if (m1) {
+      base = x86ParseReg(m1[1]);
+      index = x86ParseReg(m1[2]);
+      scale = x86ParseScale(m1[3]);
+      dispSign = m1[4];
+      dispTok = m1[5];
+    } else if (m2) {
+      index = x86ParseReg(m2[1]);
+      scale = x86ParseScale(m2[2]);
+      base = x86ParseReg(m2[3]);
+      dispSign = m2[4];
+      dispTok = m2[5];
+    } else {
+      throw new Error(`x86-32: unsupported SIB memory operand '${tok}'`);
+    }
+    if (index === 4) {
+      throw new Error(`x86-32: esp cannot be SIB index in '${tok}'`);
+    }
+    let disp = 0;
+    if (dispTok) {
+      disp = x86ParseImm(dispTok.trim());
+      if (dispSign === '-') disp = -disp;
+    }
+    return { kind: 'sib', base, index, scale, disp };
+  }
 
   const regDisp = /^(\w+)\s*([+-])\s*(.+)$/i.exec(inner);
   if (regDisp && x86IsRegTok(regDisp[1])) {
@@ -155,23 +199,59 @@ function x86ParseMem(tok, labels) {
   return { kind: 'abs', disp };
 }
 
+function x86FormatDispSuffix(disp) {
+  if (disp === 0) return '';
+  const sign = disp >= 0 ? '+' : '-';
+  const mag = Math.abs(disp);
+  const dispTok = mag >= 0x1000 ? `0x${mag.toString(16)}` : String(mag);
+  return `${sign}${dispTok}`;
+}
+
 function x86MemText(mem) {
   if (mem.kind === 'abs') {
     return `[0x${(mem.disp >>> 0).toString(16)}]`;
   }
+  if (mem.kind === 'sib') {
+    return `[${X86_REG_NAMES[mem.base]}+${X86_REG_NAMES[mem.index]}*${mem.scale}${x86FormatDispSuffix(mem.disp)}]`;
+  }
   if (mem.disp === 0) return `[${X86_REG_NAMES[mem.base]}]`;
-  const sign = mem.disp >= 0 ? '+' : '-';
-  const mag = Math.abs(mem.disp);
-  const dispTok = mag >= 0x1000 ? `0x${mag.toString(16)}` : String(mag);
-  return `[${X86_REG_NAMES[mem.base]}${sign}${dispTok}]`;
+  return `[${X86_REG_NAMES[mem.base]}${x86FormatDispSuffix(mem.disp)}]`;
+}
+
+function x86SibByte(scale, index, base) {
+  const scaleEnc = X86_SCALE_ENC[scale] != null ? X86_SCALE_ENC[scale] : 0;
+  const indexEnc = index != null ? index : 4;
+  return (scaleEnc << 6) | (indexEnc << 3) | (base & 7);
+}
+
+function x86MemNeedsSib(mem) {
+  if (mem.kind === 'sib') return true;
+  if (mem.kind === 'base' && mem.base === 4) return true;
+  return false;
 }
 
 function x86EmitMemRef(opcode, regField, mem) {
   if (mem.kind === 'abs') {
     return x86EmitBytes([opcode, x86ModRM(0, regField, 5), ...x86Disp32Bytes(mem.disp)]);
   }
-  const base = mem.base;
   const disp = mem.disp | 0;
+  if (x86MemNeedsSib(mem)) {
+    const base = mem.base;
+    const index = mem.kind === 'sib' ? mem.index : null;
+    const scale = mem.kind === 'sib' ? mem.scale : 1;
+    const sib = x86SibByte(scale, index, base);
+    if (disp === 0 && base !== 5) {
+      return x86EmitBytes([opcode, x86ModRM(0, regField, 4), sib]);
+    }
+    if (disp === 0 && base === 5) {
+      return x86EmitBytes([opcode, x86ModRM(0, regField, 4), sib, ...x86Disp32Bytes(0)]);
+    }
+    if (disp >= -128 && disp <= 127) {
+      return x86EmitBytes([opcode, x86ModRM(1, regField, 4), sib, disp & 0xff]);
+    }
+    return x86EmitBytes([opcode, x86ModRM(2, regField, 4), sib, ...x86Disp32Bytes(disp)]);
+  }
+  const base = mem.base;
   if (disp === 0 && base === 5) {
     return x86EmitBytes([opcode, x86ModRM(1, regField, 5), 0]);
   }
@@ -466,8 +546,33 @@ function x86DecodeMemOperand(bytes, byteOffset, mod, rm) {
     const disp = x86ReadDisp32(bytes, byteOffset + 2);
     return { mem: { kind: 'abs', disp: disp >>> 0 }, extra: 4 };
   }
-  if (mod === 0 && rm === 4) {
-    throw new Error('x86-32: SIB addressing not supported (1+x.1c-iii)');
+  if (rm === 4) {
+    if (byteOffset + 3 > bytes.length) throw new Error('x86-32: truncated SIB');
+    const sib = bytes[byteOffset + 2];
+    const scale = [1, 2, 4, 8][(sib >> 6) & 3];
+    const indexField = (sib >> 3) & 7;
+    const base = sib & 7;
+    let extra = 1;
+    let disp = 0;
+    const dispOff = byteOffset + 3;
+    if (mod === 0 && base === 5) {
+      if (dispOff + 4 > bytes.length) throw new Error('x86-32: truncated SIB disp32');
+      disp = x86ReadDisp32(bytes, dispOff);
+      extra += 4;
+    } else if (mod === 1) {
+      if (dispOff >= bytes.length) throw new Error('x86-32: truncated SIB disp8');
+      disp = x86SignExtend8(bytes[dispOff]);
+      extra += 1;
+    } else if (mod === 2) {
+      if (dispOff + 4 > bytes.length) throw new Error('x86-32: truncated SIB disp32');
+      disp = x86ReadDisp32(bytes, dispOff);
+      extra += 4;
+    }
+    const index = indexField === 4 ? null : indexField;
+    if (index != null) {
+      return { mem: { kind: 'sib', base, index, scale, disp }, extra };
+    }
+    return { mem: { kind: 'base', base, disp }, extra };
   }
   if (mod === 0) {
     return { mem: { kind: 'base', base: rm, disp: 0 }, extra: 0 };
@@ -714,7 +819,11 @@ function x86WriteReg(c, r, val) {
 
 function x86MemByteAddr(c, mem) {
   if (mem.kind === 'abs') return mem.disp >>> 0;
-  return (x86ReadReg(c, mem.base) + mem.disp) >>> 0;
+  let addr = x86ReadReg(c, mem.base);
+  if (mem.kind === 'sib') {
+    addr = (addr + x86ReadReg(c, mem.index) * mem.scale) >>> 0;
+  }
+  return (addr + (mem.disp | 0)) >>> 0;
 }
 
 function x86ReadMemByte(c, byteAddr) {

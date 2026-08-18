@@ -51,25 +51,36 @@ inline [asm] .x86:
 
 **Mul/div (1+x.1c-ii):** formă simplă cu acumulator implicit — `mul ebx` → `eax × operand`, rezultat în **`edx:eax`**; `div ebx` → `edx:eax ÷ operand`, cât în **`eax`**, rest în **`edx`**. La **`div`/`idiv` cu divisor 0:** rezultat pedagogic în **`eax`**, **`divByZero ← 1`** (ca riscv32), fără oprire simulator.
 
-**Operands:** reg↔reg, reg↔imm8/imm32, memory (**pattern A/B/C** below). No prefix bytes, no **SIB** (`[base+index*scale±disp]` → viitor **1+x.1c-iii**), no segments in MVP.
+**Operands:** reg↔reg, reg↔imm8/imm32, memory (**pattern A/B/C/D** below). No prefix bytes, no segments in MVP.
 
 **CPU flags (1+x.1c-i/ii):** `zf`, `sf`, `cf`, `of` — `cmp`/`test` și salturi; **`inc`/`dec` nu modifică `cf`** (comportament Intel); `cf` la `add`/`sub` pentru salturi unsigned (`jb`/`ja`/…).
 
 ---
 
-## Moduri de adresare (Laborator 4 — pattern A / B / C)
+## Moduri de adresare (LogTscript — pattern A / B / C / D)
 
-Trei pattern-uri didactice (nu tabel ModR/M complet):
+Preset-ul grupează operanzii de memorie în **pattern-uri didactice** (nu tabel ModR/M complet). Operandii **immediat** și **registru** sunt baza MVP; pattern-urile A–D acoperă **memoria**.
 
-| Pattern | Forme | Scop |
-|---------|-------|------|
-| **A — Stack frame** | `[ebp±disp8]`, `[esp±disp8]`, `[ebp±disp32]`, `[esp±disp32]` | variabile pe stack, argumente |
-| **B — Pointer / vector** | `[reg]`, `[reg±disp8]`, `[reg±disp32]`, `lea reg, [reg±disp]` | parcurgere buffer (`esi`, `ebx`, …) |
-| **C — Absolut** | `[disp32]` | date la adresă fixă (`.org`, `.byte`) |
+| Clasă | Pattern | Forme sintaxă | Exemple | Scop | Stare |
+|-------|---------|---------------|---------|------|-------|
+| **Immediat** | — | `reg, imm8/imm32` | `mov eax, 10`, `add eax, 1` | constante în cod | ✅ 1+x.1 |
+| **Registru** | — | `reg, reg` | `mov eax, ebx`, `add eax, ebx` | ALU rapid, fără memorie | ✅ 1+x.1 |
+| **Memorie** | **A — stack frame** | `[ebp±disp8]`, `[esp±disp8]`, `[ebp±disp32]`, `[esp±disp32]` | `mov eax, [ebp-4]` | variabile locale, argumente stack | ✅ 1+x.1c-i |
+| **Memorie** | **B — pointer / vector** | `[reg]`, `[reg±disp8]`, `[reg±disp32]`, `lea reg, [reg±disp]` | `mov eax, [ebx]`, `lea edi, [esi+4]` | parcurgere buffer, pointeri | ✅ 1+x.1c-i |
+| **Memorie** | **C — absolut** | `[disp32]`, label ca adresă | `mov eax, [0x40]`, `mov [counter], al` | date la `.org`, variabile fixe | ✅ 1+x.1c-i |
+| **Memorie** | **D — indexat scalat (SIB)** | `[base+index*scale±disp]`, scale `*1/2/4/8` | `mov eax, [esi+ecx*4]`, `add eax, [ebx+edi*2+8]` | tablouri tipizate, structuri compuse | ✅ 1+x.1c-iii-a |
 
-**Excluderi batch 1:** `[esp]` fără disp (SIB în x86 real); indexare scalată `[esi+ecx*4]` → **1+x.1c-iii**.
+**Registre bază/index permise (pattern B/D):** `eax`–`edi`, `ebp`, `esi` (ca în subsetul Intel 32-bit al preset-ului).
 
-Memoria CPU: **1 octet per celulă prog/RAM** (`prog.depth: 8`). `[disp32]` citește/scrie un octet zero-extins la 32 de biți în registru.
+**Reguli pattern D (1+x.1c-iii-a):**
+
+- scale **1, 2, 4, 8**; sintaxă unificată Intel: `[base+index*4+8]`, nu `[base][index]`;
+- **`esp` nu e index** (conform x86); **`[esp+disp]`** prin SIB cu index absent — **`[esp]`** simplu rămâne respins;
+- fără prefixe segment (`fs:`/`gs:`) și fără `0x66`/`0x67` (subfaze **1+x.1c-iii-b/c**).
+
+**Memorie CPU:** **1 octet per celulă** prog/RAM (`prog.depth: 8`). Citirea în registru zero-extinde octetul la 32 de biți.
+
+**Operandi neacoperiți (amânat):** `rep` / șiruri cu ESI/EDI implicit, prefixe segment, x86-64 — vezi plan **1+x.1c-iii-b…** și **1+x.1d**.
 
 ---
 
@@ -447,9 +458,44 @@ show(.x86:decode(p))
 
 ---
 
-## Viitor — D38-D6 (SIB, 1+x.1c-iii)
+## Runnable — D38-D6: tablou scalat (pattern **D** — SIB)
 
-Indexare scalată **`[esi+ecx*4+disp]`**, prefixe **`0x66`/`0x67`**, segmente — **neimplementat**; placeholder pentru Laborator 4 §4.2.4 avansat.
+Sumă peste **3 dword-uri** la pas **`*4`**: **`[esi+ecx*4]`** (test **3292**). Date la **`.org 0x40`** — octetul LSB al fiecărui dword (zero-extins la citire).
+
+```logts-play
+inline [asm] .x86:
+  set: x86-32
+  :
+
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+  maxSteps: 40
+  prog:
+    depth: 8
+    length: 128
+    = .x86 {
+      xor eax, eax
+      xor ecx, ecx
+      mov esi, 0x40
+      mov ebx, 3
+sumLoop:
+      add eax, [esi+ecx*4]
+      inc ecx
+      dec ebx
+      jne sumLoop
+      jmp halt
+    halt:
+      jmp halt
+      .org 0x40
+tab: .byte 10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0
+    }
+  :
+```
+
+**Load & Run:** `eax = 60` (`10+20+30`). Compară cu **D38-D3** (vector octeți, pattern **B** + `loop`).
 
 ---
 
