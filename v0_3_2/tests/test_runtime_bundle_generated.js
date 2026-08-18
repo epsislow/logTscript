@@ -72,6 +72,8 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/asm-sets/riscv32.js",
   "core/asm-sets/arm-thumb.js",
   "core/asm-sets/variable8.js",
+  "core/asm-sets/x86-32.js",
+  "core/asm-sets/arm-a32.js",
   "core/asm-set-registry.js",
   "core/asm-assembler.js",
   "core/protocol-assembler.js",

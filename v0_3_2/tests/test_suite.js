@@ -35172,5 +35172,216 @@ tail:
     h.assert('tail at 3', String(mod && mod.labels.tail), '3');
   });
 
+  const X86_CPU_ISA = `inline [asm] .x86:
+  set: x86-32
+  :
+`;
+
+  function x86CpuShell(progBody, opts) {
+    opts = opts || {};
+    const progLen = opts.progLen || 64;
+    const maxStepsLine = opts.maxSteps != null ? `  maxSteps: ${opts.maxSteps}\n` : '';
+    return X86_CPU_ISA + `
+comp [cpu] .u:
+  isa: .x86
+  registers: 8
+  sp: 4
+  on: 1
+${maxStepsLine}  ram:
+    depth: 32
+    length: 16
+  prog:
+    depth: 8
+    length: ${progLen}
+    = .x86 {
+      ${progBody}
+    }
+  :
+`;
+  }
+
+  function runX86AssembleDemoTest(h, session) {
+    const src = `inline [asm] .x86:
+  set: x86-32
+  :
+
+112wire demo = .x86 {
+  mov eax, ebx
+  mov eax, 5
+  add eax, 1
+  sub eax, 2
+  nop
+}`;
+    const { interp } = session.run(src);
+    const bits = session.getWire(interp, 'demo');
+    h.assert('112 bits', String(bits.length), '112');
+    h.assert('mov reg-reg', bits.substr(0, 16), '1000100111011000');
+    h.assert('mov imm byte0', bits.substr(16, 8), '10111000');
+    h.assert('nop last byte', bits.substr(104, 8), '10010000');
+    const wire = interp.wires.get('demo');
+    const mod = wire && wire.asmModuleId != null ? interp.asmModules.get(wire.asmModuleId) : null;
+    h.assert('5 code entries', String(mod && mod.instructions.length), '5');
+    h.assert('encoding variable', String(mod && mod.encoding), 'variable');
+  }
+
+  reg(3248, 'asm-set', 'x86-32 assemble demo bytes (1+x.1a)', runX86AssembleDemoTest);
+  reg(3249, 'asm-set', 'x86-32 assemble demo (wave)', runX86AssembleDemoTest, { propagation: 'wave' });
+
+  function runX86DecodeTest(h, session) {
+    const src = `inline [asm] .x86:
+  set: x86-32
+  :
+
+24wire p = .x86 {
+  push eax
+  pop ebx
+  ret
+}
+show(.x86:decode(p))`;
+    const { out } = session.run(src);
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('push eax', String(text.includes('push eax')), 'true');
+    h.assert('pop ebx', String(text.includes('pop ebx')), 'true');
+    h.assert('ret', String(text.includes('ret')), 'true');
+  }
+
+  reg(3250, 'asm-set', 'x86-32 decode round-trip', runX86DecodeTest);
+  reg(3251, 'asm-set', 'x86-32 decode round-trip (wave)', runX86DecodeTest, { propagation: 'wave' });
+
+  function runX86CpuAddTest(h, session) {
+    const src = x86CpuShell(`mov eax, 10
+      mov ebx, 3
+      add eax, ebx
+      jmp halt
+    halt:
+      jmp halt`, { maxSteps: 4, progLen: 32 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('eax = 13', r0.value, '00000000000000000000000000001101');
+  }
+
+  reg(3252, 'asm-set', 'x86-32 CPU mov add jmp exec (1+x.1b)', runX86CpuAddTest);
+  reg(3253, 'asm-set', 'x86-32 CPU exec (wave)', runX86CpuAddTest, { propagation: 'wave' });
+
+  const A32_CPU_ISA = `inline [asm] .a32:
+  set: arm-a32
+  :
+`;
+
+  function a32CpuShell(progBody, opts) {
+    opts = opts || {};
+    const progLen = opts.progLen || 32;
+    const maxStepsLine = opts.maxSteps != null ? `  maxSteps: ${opts.maxSteps}\n` : '';
+    return A32_CPU_ISA + `
+comp [cpu] .u:
+  isa: .a32
+  registers: 16
+  sp: 13
+  on: 1
+${maxStepsLine}  ram:
+    depth: 32
+    length: 16
+  prog:
+    depth: 8
+    length: ${progLen}
+    = .a32 {
+      ${progBody}
+    }
+  :
+`;
+  }
+
+  function runArmA32AssembleTest(h, session) {
+    const src = `inline [asm] .a32:
+  set: arm-a32
+  :
+
+64wire p = .a32 {
+  mov r1, 5
+  add r2, r0, r1
+}
+show(p; asm)`;
+    const { interp, out } = session.run(src);
+    h.assert('64 bits', String(session.getWire(interp, 'p').length), '64');
+    const wire = interp.wires.get('p');
+    const mod = wire && wire.asmModuleId != null ? interp.asmModules.get(wire.asmModuleId) : null;
+    h.assert('2 instructions', String(mod && mod.instructions.length), '2');
+    h.assert('ins0 4 bytes', String(mod && mod.instructions[0].byteLength), '4');
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('mov r1', String(/mov\s+r1/i.test(text)), 'true');
+    h.assert('add r2', String(/add\s+r2/i.test(text)), 'true');
+  }
+
+  reg(3254, 'asm-set', 'arm-a32 assemble mov add (1+x.2a)', runArmA32AssembleTest);
+  reg(3255, 'asm-set', 'arm-a32 assemble (wave)', runArmA32AssembleTest, { propagation: 'wave' });
+
+  function runArmA32DecodeTest(h, session) {
+    const src = `inline [asm] .a32:
+  set: arm-a32
+  :
+
+32wire one = .a32 { mov r0, 7 }
+show(.a32:decode(one))`;
+    const { out } = session.run(src);
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('mov r0 7', String(/mov\s+r0/i.test(text) && text.includes('7')), 'true');
+  }
+
+  reg(3256, 'asm-set', 'arm-a32 decode round-trip', runArmA32DecodeTest);
+  reg(3257, 'asm-set', 'arm-a32 decode (wave)', runArmA32DecodeTest, { propagation: 'wave' });
+
+  function runArmA32MixedCompositionTest(h, session) {
+    const src = `inline [asm] .a32:
+  set: arm-a32
+  :
+
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+16wire th = .th { movs r0, 1 }
+48wire mix = .a32 {
+  use th
+  mov r1, 5
+}
+show(mix; asm)`;
+    const { interp, out } = session.run(src);
+    h.assert('48 bits', String(session.getWire(interp, 'mix').length), '48');
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('thumb movs', String(text.includes('movs r0')), 'true');
+    h.assert('a32 mov', String(/mov\s+r1/i.test(text)), 'true');
+  }
+
+  reg(3258, 'asm-set', 'arm-a32 + arm-thumb composition (1+x.2a)', runArmA32MixedCompositionTest);
+  reg(3259, 'asm-set', 'arm-a32 + thumb composition (wave)', runArmA32MixedCompositionTest, { propagation: 'wave' });
+
+  function runArmA32CpuTest(h, session) {
+    const src = a32CpuShell(`mov r1, 10
+      mov r2, 3
+      add r3, r1, r2
+    loop:
+      b loop`, { maxSteps: 4, progLen: 32 });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r3 = handler.evalGetProperty(comp, 'r3', { var: '.u', property: 'r3' }, interp);
+    h.assert('r3 = 13', r3.value, '00000000000000000000000000001101');
+  }
+
+  reg(3260, 'asm-set', 'arm-a32 CPU mov add exec', runArmA32CpuTest);
+  reg(3261, 'asm-set', 'arm-a32 CPU exec (wave)', runArmA32CpuTest, { propagation: 'wave' });
+
+  reg(3262, 'asm-set', 'x86-32 and arm-a32 in doc(inline.asm.sets)', function(h, session) {
+    const out = session.runDoc('doc(inline.asm.sets)');
+    const text = out.join('\n');
+    h.assert('lists x86-32', String(text.includes('x86-32')), 'true');
+    h.assert('lists arm-a32', String(text.includes('arm-a32')), 'true');
+    h.assert('x86 variable', String(/x86-32[\s\S]*encoding: variable/.test(text)), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

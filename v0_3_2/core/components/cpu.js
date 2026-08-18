@@ -172,6 +172,9 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     if (typeof initialValue === 'string') return initialValue;
     if (typeof initialValue === 'object' && initialValue.kind === 'asmProgram') {
       const assembled = ctx.evalAsmProgram(initialValue, attributes);
+      if (assembled.asmModuleId != null && ctx.asmModules) {
+        ctx._pendingCpuAsmModule = ctx.asmModules.get(assembled.asmModuleId) || null;
+      }
       return assembled.value;
     }
     if (typeof initialValue === 'object' && initialValue.varRef) {
@@ -179,6 +182,9 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       if (!wire) throw Error(`Undefined wire '${initialValue.varRef}' for CPU init`);
       const resolved = ctx.getWireEffectiveValue(initialValue.varRef);
       if (resolved === null) throw Error(`Wire '${initialValue.varRef}' has no value for CPU init`);
+      if (wire.asmModuleId != null && ctx.asmModules) {
+        ctx._pendingCpuAsmModule = ctx.asmModules.get(wire.asmModuleId) || null;
+      }
       return resolved;
     }
     return null;
@@ -186,9 +192,13 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
 
   _loadSpace(comp, space, blob, ctx) {
     const id = this._cpuId(comp);
-    if (space === 'prog' && typeof loadCpuProg === 'function') loadCpuProg(id, blob, ctx);
+    const asmModule = space === 'prog' && ctx && ctx._pendingCpuAsmModule ? ctx._pendingCpuAsmModule : null;
+    if (space === 'prog' && typeof loadCpuProg === 'function') loadCpuProg(id, blob, asmModule);
     else if (space === 'ram' && typeof loadCpuRam === 'function') loadCpuRam(id, blob, ctx);
-    if (space === 'prog' && typeof cpuAfterProgReload === 'function') cpuAfterProgReload(id);
+    if (space === 'prog') {
+      if (ctx) ctx._pendingCpuAsmModule = null;
+      if (typeof cpuAfterProgReload === 'function') cpuAfterProgReload(id);
+    }
   }
 
   _resolveMemoryLayout(attributes, ctx) {

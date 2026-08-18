@@ -8,7 +8,7 @@ There is **no panel UI** in v1 — logic only.
 
 For **composition** (`use`, `repeat`, `align`, `base:`, external labels), see [asm-composition.md](asm-composition.md). Wires assembled from programs carry metadata (`asmModuleId`). Use **`show(wire; asm)`** to append a decode block when metadata exists, or **`show(.myisa:decode(wire))`** for explicit disassembly.
 
-For **preset ISAs** (RISC-V, ARM Thumb, variable8 SPIKE) use `set:` in the ISA header — see [asm-set-generic.md](asm-set-generic.md), [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md), [asm-set-variable8.md](asm-set-variable8.md). Default (no `set:`) is **generic** segment syntax below.
+For **preset ISAs** (RISC-V, ARM Thumb, ARM A32, x86-32, variable8 SPIKE) use `set:` in the ISA header — see [asm-set-generic.md](asm-set-generic.md), [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md), [asm-set-arm-a32.md](asm-set-arm-a32.md), [asm-set-x86-32.md](asm-set-x86-32.md), [asm-set-variable8.md](asm-set-variable8.md). Default (no `set:`) is **generic** segment syntax below.
 
 ---
 
@@ -19,6 +19,8 @@ For **preset ISAs** (RISC-V, ARM Thumb, variable8 SPIKE) use `set:` in the ISA h
 | `generic` (default) | You define (e.g. 8, 16, 32) | [asm-set-generic.md](asm-set-generic.md) |
 | `riscv32` | 32-bit RV32I subset | [asm-set-riscv32.md](asm-set-riscv32.md) |
 | `arm-thumb` | 16-bit Thumb subset | [asm-set-arm-thumb.md](asm-set-arm-thumb.md) |
+| `arm-a32` | 32-bit ARM subset (variable 4B/instr) | [asm-set-arm-a32.md](asm-set-arm-a32.md) |
+| `x86-32` | x86 Intel subset (variable bytes) | [asm-set-x86-32.md](asm-set-x86-32.md) |
 | `variable8` | Variable-length SPIKE (8/16-bit instr, byte blob) | [asm-set-variable8.md](asm-set-variable8.md) |
 
 ```logts

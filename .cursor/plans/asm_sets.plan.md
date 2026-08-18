@@ -1380,8 +1380,8 @@ Vezi **[D35 — Exemple x86 Intel](#d35--exemple-x86-intel-mvp)** (confirmat use
 | **1+x.4a ✅** | **Variable encoding SPIKE** (`variable8`, w8+w16) | Livrat — teste 3233–3237, D29–D32 |
 | **1+x.4b ✅** | Composition + `:decode` multi-set variable | Livrat — teste 3238–3241 |
 | **1+x.5 ✅** | **Directives** (`.byte`, `.word`, `.org`, `.skip`, `.align`) | Livrat — teste 3242–3247 |
-| 1+x.1 | **x86 / x86-64** | Variable-length, prefixe, ModR/M — sub-faze 1a/1b/1c | **1+x.4**, **1+x.5** |
-| 1+x.2 | **ARM Cortex-A (ARM + Thumb-2 mixt)** | Strategie 2a (preset separat) / 2b (mixt) | **1+x.4**, **1+x.5** |
+| **1+x.1 ✅** | **x86-32** Intel variable + CPU exec | Livrat — teste 3248–3253, doc asm-set-x86-32.md |
+| **1+x.2 ✅** | **arm-a32** + composition Thumb | Livrat — teste 3254–3261, doc asm-set-arm-a32.md |
 | **1+x.3a ✅** | Executor riscv32 MVP | Livrat — teste 3197–3206 | — |
 | **1+x.3b ✅** | Executor arm-thumb | Livrat — teste 3207–3215 | — |
 | **1+x.3c ✅** | riscv32 extended (M, mem, system) | Livrat — teste 3216–3232 | — |
@@ -1459,8 +1459,8 @@ Vezi **[D35 — Exemple x86 Intel](#d35--exemple-x86-intel-mvp)** (confirmat use
 - [x] ✅ **1+x.4a** SPIKE `variable8` — `encoding: variable`, blob bytes, metadata `byteOffset`/`byteLength`, decode offset walk (teste 3233–3237)
 - [x] ✅ **1+x.4b** Integrare composition multi-set variable + `:decode` / `show(wire; asm)` (teste 3238–3241)
 - [x] ✅ **1+x.5** Directives `.org`/`.byte`/`.word`/`.skip`/`.align` + label byte offset (teste 3242–3247)
-- [ ] **1+x.1a** Preset `x86-32` assemble MVP (Intel, subset ModR/M)
-- [ ] **1+x.1b** Executor CPU x86 subset + flags pedagogice
-- [ ] **1+x.2a** Preset `arm-a32` assemble (+ exec subset opțional)
+- [x] ✅ **1+x.1a** Preset `x86-32` assemble MVP (Intel, subset ModR/M) — teste 3248–3253
+- [x] ✅ **1+x.1b** Executor CPU x86 subset + variable fetch — teste 3252–3253
+- [x] ✅ **1+x.2a** Preset `arm-a32` assemble + exec + thumb `use` — teste 3254–3261
 - [ ] **1+x.2b** Profil mixt Thumb-2 / IT blocks (amânat)
 - [ ] **1+x.6–8** assembler extern, endianness runtime, CPU multi-set routing

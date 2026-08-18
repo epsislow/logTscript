@@ -125,7 +125,7 @@ function createDefaultPolicyTypeModules(ctx) {
         const ids = profiles.map(p => p.id);
         if (ids.includes(token)) return token;
       }
-      const fallback = ['generic', 'riscv32', 'arm-thumb', 'variable8'];
+      const fallback = ['generic', 'riscv32', 'arm-thumb', 'arm-a32', 'variable8', 'x86-32'];
       if (fallback.includes(token)) return token;
       throw new Error(`Unknown entry '${token}' in inline.asm.set{}`);
     },

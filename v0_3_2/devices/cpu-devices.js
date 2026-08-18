@@ -130,6 +130,11 @@ function addCpu(id, config) {
     microSlots: new Map(),
     trapCause: 0,
     divByZero: 0,
+    zf: 0,
+    sf: 0,
+    cf: 0,
+    progEncoding: 'fixed',
+    progCodeTable: null,
   });
   if (config.spReg != null) cpuInitSp(cpus.get(id));
 }
@@ -161,10 +166,11 @@ function loadCpuRam(id, blob) {
   cpuWriteRamBlob(c, blob);
 }
 
-function loadCpuProg(id, blob) {
+function loadCpuProg(id, blob, asmModule) {
   const c = getCpu(id);
   if (!c) return;
   cpuWriteProgBlob(c, blob);
+  cpuApplyAsmModule(c, asmModule || null);
   c.pc = c.pcInit;
   c.halted = 0;
   c.trapCause = 0;
@@ -214,13 +220,46 @@ function s4(bits) {
 }
 
 function cpuCodeLimit(c) {
+  if (c.progEncoding === 'variable' && c.progCodeTable && c.progCodeTable.length) {
+    return c.progCodeTable.length;
+  }
   return c.fetchFrom === 'ram' ? c.ramLength : c.progLength;
+}
+
+function cpuReadProgBytes(c, byteOff, byteLen) {
+  let bits = '';
+  for (let i = 0; i < byteLen; i++) {
+    const cell = cpuReadProgCell(c, byteOff + i);
+    const chunk = cell != null ? String(cell) : cpuZero(c.progDepth);
+    bits += chunk.padStart(c.progDepth, '0').slice(-c.progDepth);
+  }
+  return bits;
+}
+
+function cpuApplyAsmModule(c, asmModule) {
+  if (!c || !asmModule) {
+    c.progEncoding = 'fixed';
+    c.progCodeTable = null;
+    return;
+  }
+  if (asmModule.encoding === 'variable') {
+    c.progEncoding = 'variable';
+    c.progCodeTable = (asmModule.instructions || []).filter(ins => ins.kind === 'code');
+  } else {
+    c.progEncoding = 'fixed';
+    c.progCodeTable = null;
+  }
 }
 
 function cpuFetchInstr(c) {
   const limit = cpuCodeLimit(c);
   if (c.pc < 0 || c.pc >= limit) {
     throw Error(`CPU PC ${c.pc} out of ${c.fetchFrom} range 0..${limit - 1}`);
+  }
+  if (c.progEncoding === 'variable' && c.progCodeTable && c.progCodeTable.length) {
+    const ins = c.progCodeTable[c.pc];
+    if (!ins) throw Error(`CPU variable PC ${c.pc} has no instruction metadata`);
+    return cpuReadProgBytes(c, ins.byteOffset, ins.byteLength);
   }
   let word;
   if (c.fetchFrom === 'ram') {

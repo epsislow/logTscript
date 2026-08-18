@@ -1673,7 +1673,7 @@ function formatInstanceDoc(alias, inst) {
 function formatAsmTypeDoc(typeName, templateIsa) {
   const lines = [];
   lines.push(`inline [${typeName}] .name:`);
-  lines.push(`  set: generic | riscv32 | arm-thumb | variable8`);
+  lines.push(`  set: generic | riscv32 | arm-thumb | arm-a32 | variable8 | x86-32`);
   lines.push('  consts:{ NAME = ^addr | literal }');
   lines.push('  macros:{ Name param:{ micro-ops } }');
   lines.push('  MNEMONIC : opcode + field + field');

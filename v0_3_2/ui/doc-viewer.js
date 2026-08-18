@@ -107,6 +107,8 @@ const DOC_SECTIONS = [
       { file: 'asm-set-generic.md', label: 'ASM set — generic', searchExtra: 'set generic segment R2b A4b S4b opcode pattern preset' },
       { file: 'asm-set-riscv32.md', label: 'ASM set — riscv32', searchExtra: 'riscv32 RV32I addi lw sw beq jal preset set' },
       { file: 'asm-set-arm-thumb.md', label: 'ASM set — arm-thumb', searchExtra: 'arm thumb movs adds ldr str 16-bit preset set' },
+      { file: 'asm-set-arm-a32.md', label: 'ASM set — arm-a32', searchExtra: 'arm-a32 ARM A32 32-bit mov add ldr str b bl preset set variable' },
+      { file: 'asm-set-x86-32.md', label: 'ASM set — x86-32', searchExtra: 'x86-32 Intel mov add jmp push pop variable encoding preset set eax' },
       { file: 'asm-set-variable8.md', label: 'ASM set — variable8', searchExtra: 'variable8 variable encoding w8 w16 byte blob SPIKE 1+x.4 disassembleAtOffset byteOffset byteLength' },
       { file: 'asm-microcode.md', label: 'ASM microcode', searchPrimary: 'consts macros', searchExtra: 'consts macros micro READ WRITE MAR MDR pcEffect legacy dual doc(.cpuisa) doc(.cpuintern) FOO hybrid preset' },
       { file: 'asm-composition.md', label: 'ASM composition', searchExtra: 'use repeat align base external label multi-isa firmware boot dsp metadata asmModuleId' },

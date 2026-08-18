@@ -279,7 +279,7 @@ See [asm-composition.md](asm-composition.md) for general `use` / `repeat` / `ali
 
 ## CPU bridge
 
-**Not available** for `variable8` in SPIKE **1+x.4a**. Native variable fetch (`instructions[PC].byteOffset`, D32) will arrive with **x86-32** (**1+x.1**). Until then, use **`riscv32`** or **`arm-thumb`** for **`comp [cpu]`** examples ([cpu.md](cpu.md)).
+**Native variable fetch** (`instructions[PC].byteOffset`, D32) is implemented for **`x86-32`** and **`arm-a32`** CPU programs (`prog.depth: 8`). For **`variable8`** SPIKE there is still no dedicated executor — use **`x86-32`** / **`arm-a32`** or fixed presets for didactic CPU demos.
 
 ---
 

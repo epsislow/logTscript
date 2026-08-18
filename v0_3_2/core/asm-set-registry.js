@@ -1,6 +1,6 @@
 /* ================= ASM SET REGISTRY ================= */
 
-const ASM_SET_BUILTIN_ORDER = ['generic', 'riscv32', 'arm-thumb', 'variable8'];
+const ASM_SET_BUILTIN_ORDER = ['generic', 'riscv32', 'arm-thumb', 'arm-a32', 'variable8', 'x86-32'];
 
 function createAsmSetRegistry() {
   const sets = new Map();
@@ -124,6 +124,12 @@ function initDefaultAsmSetRegistry() {
   }
   if (typeof createVariable8AsmSet === 'function') {
     registry.register(createVariable8AsmSet());
+  }
+  if (typeof createX8632AsmSet === 'function') {
+    registry.register(createX8632AsmSet());
+  }
+  if (typeof createArmA32AsmSet === 'function') {
+    registry.register(createArmA32AsmSet());
   }
   return registry;
 }
