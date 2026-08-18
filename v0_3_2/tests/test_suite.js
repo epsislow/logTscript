@@ -34411,5 +34411,167 @@ show(.th:decode(p2))`;
     h.assert('no decode error', String(out.some(l => l.startsWith('Error:'))), 'false');
   });
 
+  const RISCV32_MICRO_ADDI_HEADER = `  set: riscv32
+  consts:{
+    MAR = ^10
+  }
+  addi:
+  {
+    MAR < 5
+  }
+  :
+`;
+
+  const RISCV32_MICRO_ADDI_CPU = `  set: riscv32
+  addi:
+  {
+    HALTED < 1
+  }
+  :
+`;
+
+  reg(3190, 'asm-set', 'composition generic 8b + riscv32 32b metadata', function(h, session) {
+    const src = `inline [asm] .boot:
+  set: generic
+  NOP : 0000 + 4b
+  :
+
+inline [asm] .app:
+  set: riscv32
+  :
+
+8wire bootBlob = .boot { NOP }
+40wire app = .app {
+  use bootBlob
+  addi x1, x0, 5
+}`;
+    const { interp } = session.run(src);
+    h.assert('40 bits', String(session.getWire(interp, 'app').length), '40');
+    const wire = interp.wires.get('app');
+    const mod = wire && wire.asmModuleId != null ? interp.asmModules.get(wire.asmModuleId) : null;
+    h.assert('has module', String(!!mod), 'true');
+    h.assert('2 segments', String(mod && mod.segments.length), '2');
+    h.assert('seg0 generic', String(mod && mod.segments[0].asmSetId), 'generic');
+    h.assert('seg1 riscv32', String(mod && mod.segments[1].asmSetId), 'riscv32');
+    h.assert('2 instructions', String(mod && mod.instructions.length), '2');
+    h.assert('instr0 generic', String(mod && mod.instructions[0].asmSetId), 'generic');
+    h.assert('instr1 riscv32', String(mod && mod.instructions[1].asmSetId), 'riscv32');
+  });
+
+  reg(3191, 'asm-set', 'composition arm-thumb 16b + riscv32 32b decode', function(h, session) {
+    const src = `inline [asm] .th:
+  set: arm-thumb
+  :
+
+inline [asm] .rv:
+  set: riscv32
+  :
+
+16wire init = .th { movs r0, 1 }
+48wire mix = .rv {
+  use init
+  addi x1, x0, 5
+}
+show(.rv:decode(mix))`;
+    const { interp, out } = session.run(src);
+    h.assert('48 bits', String(session.getWire(interp, 'mix').length), '48');
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('decode movs', String(text.includes('movs r0')), 'true');
+    h.assert('decode addi', String(text.includes('addi x1')), 'true');
+    h.assert('no error', String(out.some(l => l.startsWith('Error:'))), 'false');
+  });
+
+  reg(3192, 'asm-set', 'composition heterogeneous decode per instruction isa', function(h, session) {
+    const src = `inline [asm] .boot:
+  set: generic
+  NOP : 0000 + 4b
+  :
+
+inline [asm] .app:
+  set: riscv32
+  :
+
+8wire bootBlob = .boot { NOP }
+40wire app = .app {
+  use bootBlob
+  addi x1, x0, 5
+}
+show(.app:decode(app))`;
+    const { out } = session.run(src);
+    const text = out.filter(l => !l.startsWith('Error:')).join('\n');
+    h.assert('decode NOP', String(/NOP/.test(text)), 'true');
+    h.assert('decode addi', String(text.includes('addi x1')), 'true');
+    h.assert('no error', String(out.some(l => l.startsWith('Error:'))), 'false');
+  });
+
+  reg(3193, 'asm-set', 'composition generic micro segment + riscv32 use', function(h, session) {
+    const src = `inline [asm] .gen:
+  set: generic
+  consts:{ MAR = ^10 }
+  DEMO:
+  11 + 2b
+  {
+    MAR < 1
+  }
+  :
+
+inline [asm] .rv:
+  set: riscv32
+  :
+
+4wire boot = .gen { DEMO }
+36wire fw = .rv {
+  use boot
+  addi x1, x0, 1
+}`;
+    const { interp } = session.run(src);
+    h.assert('36 bits', String(session.getWire(interp, 'fw').length), '36');
+    const wire = interp.wires.get('fw');
+    const mod = wire && wire.asmModuleId != null ? interp.asmModules.get(wire.asmModuleId) : null;
+    const demoIsa = mod && mod.instructions[0] && mod.instructions[0].isa;
+    h.assert('DEMO has micro', String(demoIsa && demoIsa.opcodes && demoIsa.opcodes.DEMO && demoIsa.opcodes.DEMO.execution), 'micro');
+    h.assert('mixed asmSetId', String(mod && mod.instructions[0].asmSetId === 'generic' && mod.instructions[1].asmSetId === 'riscv32'), 'true');
+  });
+
+  reg(3194, 'asm-set', 'riscv32 addi micro-only override merge', function(h, session) {
+    const isa = parseIsaBody(RISCV32_MICRO_ADDI_HEADER);
+    h.assert('ADDI micro', String(isa.opcodes.ADDI.execution), 'micro');
+    h.assert('ADDI microProgram', String(isa.opcodes.ADDI.microProgram && isa.opcodes.ADDI.microProgram.length >= 1), 'true');
+    h.assert('preset encode', String(isa.opcodes.ADDI.segments == null), 'true');
+    h.assert('asmSetId', String(isa.asmSetId), 'riscv32');
+  });
+
+  reg(3195, 'asm-set', 'CPU riscv32 addi micro override step', function(h, session) {
+    const src = `inline [asm] .rv:
+${RISCV32_MICRO_ADDI_CPU}
+comp [cpu] .u:
+  isa: .rv
+  registers: 2
+  on: 1
+  prog:
+    depth: 32
+    length: 2
+    = .rv { addi x1, x0, 5; nop }
+  :
+`;
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ set = 1 }');
+    const halted = handler.evalGetProperty(comp, 'halted', { var: '.u', property: 'halted' }, interp);
+    h.assert('halted via micro addi', String(parseInt(halted.value, 2)), '1');
+  });
+
+  reg(3196, 'asm-set', 'Allow inline.asm.set permits whitelisted preset', function(h, session) {
+    const src = `Allow NONE inline.type{asm} inline.asm.set{riscv32}
+inline [asm] .rv:
+  set: riscv32
+  :
+32wire p = .rv { addi x1, x0, 1 }`;
+    const { interp, out } = session.run(src);
+    h.assert('32 bits', String(session.getWire(interp, 'p').length), '32');
+    h.assert('no error', String(out.some(l => l.startsWith('Error:'))), 'false');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

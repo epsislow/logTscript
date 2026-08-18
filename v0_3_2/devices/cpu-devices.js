@@ -628,6 +628,8 @@ function cpuStep(id, ctx) {
         opcodes: isaInst.opcodes,
         wordWidth: isaInst.wordWidth,
         opcodeOrder: isaInst.opcodeOrder,
+        asmSet: isaInst.asmSet || null,
+        asmSetId: isaInst.asmSetId || null,
       };
       const decoded = decodeMnemonicFromBits(isa, instr);
       if (decoded) {

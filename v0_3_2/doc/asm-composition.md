@@ -190,6 +190,60 @@ See [asm-set-arm-thumb.md](asm-set-arm-thumb.md).
 
 ---
 
+## Multi-set composition (heterogeneous presets)
+
+`use` splices the **referenced wire's ISA and AsmSet**, not the outer program's. A single blob may concatenate segments with different **`asmSetId`** and **`wordWidth`** values (same model as legacy multi-ISA composition).
+
+Each instruction in module metadata carries its own `isa`, `asmSetId`, and `wordWidth`. `:decode` formats every instruction with **that** instruction's ISA (not only the outer `.isaRef`).
+
+```logts-play
+inline [asm] .boot:
+  set: generic
+  NOP : 0000 + 4b
+  :
+
+inline [asm] .app:
+  set: riscv32
+  :
+
+8wire bootBlob = .boot { NOP }
+40wire app = .app {
+  use bootBlob
+  addi x1, x0, 5
+}
+show(app; asm)
+show(.app:decode(app))
+```
+
+Mixed **16-bit Thumb** + **32-bit RISC-V**:
+
+```logts-play
+inline [asm] .th:
+  set: arm-thumb
+  :
+
+inline [asm] .rv:
+  set: riscv32
+  :
+
+16wire init = .th { movs r0, 1 }
+48wire mix = .rv {
+  use init
+  addi x1, x0, 5
+}
+show(mix; asm)
+show(.rv:decode(mix))
+```
+
+| Metadata | Meaning |
+|----------|---------|
+| `module.segments[]` | One entry per `use` segment or local chunk: `isaRef`, `asmSetId`, `wordWidth`, `blobOffset`, `instrCount` |
+| `module.instructions[]` | Per instruction: `word`, `asmSetId`, `wordWidth`, `isa` |
+
+**CPU execution** on a heterogeneous blob (fetch/decode across sets) is **not** covered here — see executor per AsmSet (phase 1+x.3). Encode, wire assignment, and `:decode` work today.
+
+---
+
 ## Related
 
 - [asm.md](asm.md) — ISA definition and ASM v1

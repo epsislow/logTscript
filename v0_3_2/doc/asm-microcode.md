@@ -225,31 +225,77 @@ See [cpu.md](cpu.md#microcode-mmap-cpummap) and [mmap.md](mmap.md).
 
 ---
 
-## Preset sets (`riscv32`, `arm-thumb`)
+## Preset sets (`riscv32`, `arm-thumb`) — D14
 
-Preset opcodes ship **without** micro programs. On `comp [cpu]`, they use the CPU's native stepping for that set (when wired) or act as encode/decode-only in wire blobs.
+Preset opcodes ship **without** `microProgram`. On `comp [cpu]`:
 
-You may attach a **`{ micro }` block** to a preset mnemonic in your ISA to override execution (same as generic):
+| Case | Behaviour |
+|------|-----------|
+| Preset mnemonic, **no** user `{ micro }` | Encode/decode OK; CPU uses legacy 8-bit interpreter or waits for **native exec per AsmSet** (phase 1+x.3) |
+| User **`{ micro }` on preset mnemonic** | **Micro engine** runs for that opcode only; preset encode/decode unchanged |
+| `consts:` / `macros:` in header | Merged with preset — valid on any set |
+
+### Override a preset mnemonic (micro-only body)
+
+Omit the bit pattern line; encoding stays on the preset profile:
 
 ```logts-play
 inline [asm] .rv:
   set: riscv32
   consts:{
-    PC = ^02
-    R1 = ^21
+    MAR = ^10
   }
-  FOO:
+  addi:
   {
-    PC < PC
+    MAR < 5
   }
   :
 
-32wire p = .rv { addi x1, x0, 1 }
+comp [cpu] .u:
+  isa: .rv
+  registers: 2
+  on: 1
+  prog:
+    depth: 32
+    length: 2
+    = .rv { addi x1, x0, 5; nop }
+  :
+
+.u:{ set = 1 }
 ```
+
+After one step, micro `addi` runs (not legacy LOAD/ADDI). Operands from preset decode (`fields.R`, `fields.imm`, …) are empty on riscv32 today — use const literals or `{ micro }` demos that do not rely on decoded operands until field mapping is extended.
 
 User opcode bodies that use generic segment tokens (`R2b`) on a preset set are rejected at ISA parse time. Literal-only overrides are allowed.
 
-See [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md), and [asm-set-generic.md](asm-set-generic.md) for segment syntax on **`set: generic`**.
+### Composition + micro (generic segment + preset `use`)
+
+A program may `use` a wire assembled with **`set: generic`** micro opcodes, then append preset instructions. Each segment keeps its own opcodes, consts, and micro definitions:
+
+```logts-play
+inline [asm] .gen:
+  set: generic
+  consts:{ MAR = ^10 }
+  DEMO:
+  11 + 2b
+  {
+    MAR < 1
+  }
+  :
+
+inline [asm] .rv:
+  set: riscv32
+  :
+
+4wire boot = .gen { DEMO }
+36wire fw = .rv {
+  use boot
+  addi x1, x0, 1
+}
+show(fw; asm)
+```
+
+See [asm-composition.md](asm-composition.md#multi-set-composition-heterogeneous-presets), [asm-set-riscv32.md](asm-set-riscv32.md), [asm-set-arm-thumb.md](asm-set-arm-thumb.md), and [asm-set-generic.md](asm-set-generic.md).
 
 ---
 
