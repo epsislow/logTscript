@@ -37009,5 +37009,21 @@ comp [logic] .loopLogic:
     h.assert('row0 age 25', table.slice(32, 64), '00000000000000000000000000011001');
   });
 
+  reg(3548, 'logic', 'inline query maxSolutions option caps vector', function(h, session) {
+    const src = INLINE_LOGIC_OWNS + `
+8wire[4] cars = .world:query({ owns(john, _) }, maxSolutions=\\1)`;
+    const { interp } = session.run(src);
+    const cars = interp.getWireEffectiveValue('cars');
+    h.assert('one slot', cars.slice(0, 8), '01100011');
+    h.assert('fill slot1', cars.slice(8, 16), '00000000');
+  });
+
+  reg(3549, 'logic', 'inline query maxDepth option', function(h, session) {
+    const src = INLINE_LOGIC_LOOP + `
+1wire ok = .loop:query({ loop(a) }, maxDepth=\\8)`;
+    const { interp } = session.run(src);
+    h.assert('depth cap unprovable', interp.getWireEffectiveValue('ok'), '0');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

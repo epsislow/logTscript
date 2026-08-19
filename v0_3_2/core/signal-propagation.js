@@ -887,6 +887,11 @@ Interpreter.prototype.forEachSubExprInAtom = function(atom, visit) {
       if (bind && bind.expr) nested.push(bind.expr);
     }
   }
+  if (atom.inlineMethod && atom.inlineMethod.queryOptions) {
+    for (const opt of atom.inlineMethod.queryOptions) {
+      if (opt && opt.expr) nested.push(opt.expr);
+    }
+  }
   for (const sub of nested) {
     if (Array.isArray(sub)) visit(sub);
   }

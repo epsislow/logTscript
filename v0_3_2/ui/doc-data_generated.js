@@ -22070,9 +22070,10 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 
 | Topic | Summary |
 |-------|---------|
-| **Syntax** | \`.module:query({ goals }, Var=wire, …)\` |
+| **Syntax** | \`.module:query({ goals }, Var=wire, maxDepth=\\\\N, maxSolutions=\\\\N)\` |
 | **Goals** | Prolog body in \`{ }\` — comma = AND, \`\\+\`, \`=:=\`, etc. |
 | **Inputs** | Optional \`, X=wire\` after the block |
+| **Limits** | Optional \`, maxDepth=\\\\N\`, \`, maxSolutions=\\\\N\` (decimal literals; default **256** / **64**) |
 | **\`_\`** | Anonymous slot — collected into vector/matrix bulk output |
 | **Boolean** | \`1wire\` LHS + all vars bound → \`1\` / \`0\` |
 | **Bulk** | \`8wire[N]\` / \`32wire[R,C]\` LHS + free vars → vector / matrix |
@@ -22084,6 +22085,8 @@ In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Lo
 \`\`\`logts
 result = .world:query({ owns(john, X) }, X=car)
 
+1wire ok = .world:query({ owns(john, X) }, X=car, maxDepth=\\10, maxSolutions=\\3)
+
 8wire[10] cars = .world:query({ owns(john, _) })
 \`\`\`
 
@@ -22092,6 +22095,10 @@ result = .world:query({ owns(john, X) }, X=car)
 | **\`.world:query(...)\`** | Single method **\`query\`** on \`inline [logic]\` \`.world\` |
 | **\`{ goals }\`** | Prolog goals (same grammar as inline query body) |
 | **\`, Var=expr\`** | Bind logic variables before solve (wire → atom/number/bool) |
+| **\`, maxDepth=\\\\N\`** | Optional — max goal steps (default **256**) |
+| **\`, maxSolutions=\\\\N\`** | Optional — max solutions collected (default **64**) |
+
+**No pout flags:** inline \`query\` does **not** expose \`truncated\` / \`depthExceeded\` — caps apply silently (extra solutions dropped, depth failure = unprovable / boolean \`0\`).
 
 **Not supported:** \`.world:available(...)\` per query name, or redirect selectors like \`{ johnOwns:0 }\` inside the block — only **goals**.
 
@@ -22209,7 +22216,7 @@ Each row is one \`age/2\` solution; column 0 = person atom, column 1 = age.
 | **Trigger** | Runs when expression evaluates | \`set\` pin + \`on:\` |
 | **Inputs** | \`, Var=wire\` on call | Program block + exec \`pin = wire\` |
 | **Outputs** | Expression return / LHS wire | \`query >= wire\` redirects |
-| **Limits** | Engine defaults (256 depth / 64 solutions) | \`maxDepth\` / \`maxSolutions\` on comp |
+| **Limits** | Per-call \`maxDepth\` / \`maxSolutions\` (defaults 256 / 64); no \`truncated\`/\`depthExceeded\` pout | \`maxDepth\` / \`maxSolutions\` on comp + pout redirects |
 
 For repeated solves driven by hardware-style wiring, prefer **comp [logic]**. For functional “run this goal now” in an assignment, use **\`.world:query({ })\`**.
 

@@ -5120,6 +5120,7 @@ assignment() {
       if (this.c.type === 'SYM' && this.c.value === '(') {
         const methodArgs = [];
         let methodBindings = null;
+        let methodQueryOptions = null;
         this.eat('SYM', '(');
         this.t.skip();
         let callTags = null;
@@ -5129,16 +5130,15 @@ assignment() {
           methodArgs.push({ kind: 'logicGoalsBlock', raw });
           this.t.skip();
           methodBindings = [];
+          methodQueryOptions = [];
+          const LOGIC_QUERY_OPTS = new Set(['maxDepth', 'maxSolutions']);
           while (this.c.type === 'SYM' && this.c.value === ',') {
             this.eat('SYM', ',');
             this.t.skip();
             if (this.c.type !== 'ID') {
-              throw Error(`Expected Prolog variable name after ',' in logic query at ${this.c.line}:${this.c.col}`);
+              throw Error(`Expected name after ',' in logic query at ${this.c.line}:${this.c.col}`);
             }
             const bindName = this.c.value;
-            if (!/^[A-Z_][A-Za-z0-9_]*$/.test(bindName)) {
-              throw Error(`Logic query binding must be a Prolog variable (uppercase), got '${bindName}' at ${this.c.line}:${this.c.col}`);
-            }
             this.eat('ID');
             this.t.skip();
             if (this.c.type !== 'SYM' || this.c.value !== '=') {
@@ -5146,7 +5146,14 @@ assignment() {
             }
             this.eat('SYM', '=');
             this.t.skip();
-            methodBindings.push({ name: bindName, expr: this.expr() });
+            const bindExpr = this.expr();
+            if (LOGIC_QUERY_OPTS.has(bindName)) {
+              methodQueryOptions.push({ name: bindName, expr: bindExpr });
+            } else if (/^[A-Z_][A-Za-z0-9_]*$/.test(bindName)) {
+              methodBindings.push({ name: bindName, expr: bindExpr });
+            } else {
+              throw Error(`Logic query: unknown option or invalid variable '${bindName}' at ${this.c.line}:${this.c.col}`);
+            }
             this.t.skip();
           }
         } else {
@@ -5169,6 +5176,9 @@ assignment() {
         this.eat('SYM', ')');
         const method = { var: compName, method: property, args: methodArgs };
         if (methodBindings && methodBindings.length) method.bindings = methodBindings;
+        if (methodQueryOptions && methodQueryOptions.length) {
+          method.queryOptions = methodQueryOptions;
+        }
         if (callTags) method.callTags = callTags;
         if (globalRef) method.globalRef = true;
         return tagGlobal({ inlineMethod: method });

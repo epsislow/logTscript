@@ -118,7 +118,9 @@ class LogicEngine {
     let queryTruncated = false;
     let queryDepthExceeded = false;
     const self = this;
+    this._solutionCapReached = false;
     this._solveGoals(igGoals, env, 0, (solEnv) => {
+      if (self._solutionCapReached) return false;
       const freeVars = logicCollectFreeVarsInGoals(igGoals);
       const sol = {};
       for (const v of freeVars) {
@@ -127,10 +129,12 @@ class LogicEngine {
       solutions.push(sol);
       if (solutions.length >= self.maxSolutions) {
         queryTruncated = true;
+        self._solutionCapReached = true;
         return false;
       }
       return true;
     }, () => { queryDepthExceeded = true; });
+    this._solutionCapReached = false;
     if (queryDepthExceeded) this.depthExceeded = true;
     if (queryTruncated) this.truncated = true;
     return solutions;
@@ -173,6 +177,7 @@ class LogicEngine {
     const clauses = this.index.get(key) || [];
     let any = false;
     for (const clause of clauses) {
+      if (this._solutionCapReached) break;
       const trail = env.trailLength();
       const head = logicDerefCompound(clause.head, env);
       if (!logicUnifyCompound(goal, head, env, this.table)) {
@@ -182,6 +187,10 @@ class LogicEngine {
       const newGoals = (clause.body || []).concat(rest);
       const ok = this._solveGoals(newGoals, env, depth + 1, onSuccess, onDepthExceeded);
       env.undo(trail);
+      if (this._solutionCapReached) {
+        any = true;
+        break;
+      }
       if (ok) any = true;
     }
     return any;

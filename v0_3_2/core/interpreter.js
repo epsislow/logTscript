@@ -1737,7 +1737,13 @@ class Interpreter {
       inputEnv[bind.name] = pinFn(bits, bindType);
     }
     const preparedGoals = prepFn(goals);
-    const execResult = execFn(merged, goals, inputEnv, {});
+    const execOpts = {};
+    for (const opt of invoke.queryOptions || []) {
+      const label = `${instName}:query ${opt.name}`;
+      const n = this._evalCallArgDecimalInt(opt.expr, label);
+      execOpts[opt.name] = n;
+    }
+    const execResult = execFn(merged, goals, inputEnv, execOpts);
     const solutions = execResult.solutions || [];
     const freeVars = outVarsFn(preparedGoals, inputEnv);
 

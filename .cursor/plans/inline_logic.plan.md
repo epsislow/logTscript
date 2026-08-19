@@ -1626,7 +1626,7 @@ comp [logic] .peopleLogic:
 - [x] Teste **3544–3547**; suite **2709/2709**
 - [x] Doc `logic-query-exec.md` + manifest
 
-**Amânat post-F9:** scalar `8wire` fără `[N]` → prima soluție; atribute `maxDepth` pe inline; test opțional 3548 cap.
+**Amânat post-F9:** scalar `8wire` fără `[N]` → prima soluție; ~~atribute `maxDepth` pe inline~~ **(done — per-call options)**.
 
 ---
 
