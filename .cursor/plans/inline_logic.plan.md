@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–8 complete (negație, depth tuning)."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–8 complete; **Faza 9** = inline query invoke (1+h)."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -29,6 +29,9 @@ todos:
   - id: logic-depth-tuning
     content: "Faza 8: maxDepth/maxSolutions pe comp, pout truncated/depthExceeded, teste 3540+, doc"
     status: completed
+  - id: logic-inline-query
+    content: "Faza 9: .world:query({ goal }, Var=wire) — inlineMethod, D30–D32, teste 3544+, doc"
+    status: pending
 isProject: false
 ---
 
@@ -318,7 +321,7 @@ sequenceDiagram
 
 ## Decizii de luat — tabel rezumat
 
-> **D1–D29:** D25–D29 **confirmed** pentru Faza 8. **Fazele 0–7 (completed).** **Faza 8 (ready-to-implement).**
+> **D1–D32:** D25–D29 **confirmed** (Faza 8). **D30–D32 confirmed** (Faza 9). **Fazele 0–8 (completed).** **Faza 9 (ready-to-implement).**
 
 | ID | Subiect | Decizia ta |
 |----|---------|------------|
@@ -1151,11 +1154,49 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **1+e** | Facts dinamice runtime | assert/retract | |
 | **1+f** | ~~Multi-var vague~~ | **Mutat în Faza 5** — redirect matrix/vector | D12 |
 | **1+g** | `use` nested profund / circular deps | lint la elaborare | D16 |
-| **1+h** | Invoke `.world:available(...)` | pattern inlineMethod | |
+| **1+h** | ~~Invoke `.world:query({ goal })`~~ | **Promovat → Faza 9** (D30–D32) | D12, D30–D32 |
 | **1+i** | Cut | | D5 |
 | **1+j** | Integrare PHZ | | |
 | **1+k** | POUT declarate pe comp (D7-B) | Low priority — user: „nu prea il vad ca va fi facut”; probe/debug | D7 |
 | **1+l** | **`query = …` explicit** (D2-C) | Optimizare când A (toate query-urile) e prea lent; **nu redundant** cu redirect | D2 |
+
+### Note backlog — explicații (fără fază încă)
+
+#### **1+e** — Facts dinamice runtime (`assert` / `retract`)
+
+**Ce e în Prolog (pe scurt):**
+
+| Comandă | Semnificație |
+|---------|--------------|
+| **`assert(Fact)`** | Adaugă un **fapt** în baza de cunoștințe **la runtime** (ex. `assert(owns(john, tesla))`) |
+| **`retract(Goal)`** | Șterge **prima** clauză/fapt care se potrivește cu `Goal` (ex. `retract(owns(john, chevy))`) |
+
+După `assert`, query-urile văd faptul nou; după `retract`, dispare. Baza **nu** mai e doar ce ai scris în fișier la compile.
+
+**Exemplu Prolog — inventar:**
+
+```prolog
+owns(john, chevy).          % static la load
+
+?- assert(owns(john, tesla)).
+?- retract(owns(john, chevy)).
+?- owns(john, X).
+X = tesla.
+```
+
+**Unde ar avea sens în LogTScript (dacă s-ar face vreodată):**
+
+- **Nu** în exec block (`.logic:{ … }`) — acolo e frontiera **circuit** (pin ↔ wire, redirect, `set`), nu motor Prolog.
+- Natural: **goal în body de regulă** — ex. `sell(Car) <- owns(john, Car), retract(owns(john, Car))`.
+- Sau API intern / persistență între `set`-uri pe comp — **neconfirmat**.
+
+**Ce avem azi:** facts/rules **statice** din `inline [logic]`; `comp [logic]` **citește** la fiecare solve. **Fără** assert/retract.
+
+**Status:** rămâne în **Amânate** — decizii viitoare (persistență, sintaxă, interacțiune cu `use` / `\+`).
+
+#### ~~**1+h**~~ → **Faza 9**
+
+Decizii **D30–D32** și detaliu implementare: vezi **Faza 9** mai jos.
 
 ---
 
@@ -1172,6 +1213,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 6** Allow/NotAllow | `inline.type{logic}`, `comp.type{logic}` | **(completed)** |
 | **Faza 7** Negation `\+` | D20–D24 | **(completed)** |
 | **Faza 8** Depth tuning | D25–D29 | **(completed)** |
+| **Faza 9** Inline query invoke `.world:query({ })` | D30–D32 | **(ready-to-implement)** |
 
 ---
 
@@ -1515,6 +1557,116 @@ comp [logic] .peopleLogic:
 
 ---
 
+## Decizii Faza 9 — inline query invoke (D30–D32)
+
+> **Sursă:** item **1+h** promovat din backlog.  
+> **Stare:** **D30=A, D31=A, D32=A (confirmed).**
+
+### Rezumat D30–D32
+
+| ID | Subiect | Decizie |
+|----|---------|---------|
+| **D30** | Return expresie | **A (confirmed)** — aceeași formă/encoding ca redirect comp (D12/D12a/D12b); LHS wire fixează scalar vs vector vs matrix |
+| **D31** | Conținut bloc `{ }` | **A (confirmed)** — goals Prolog (body query), **nu** nume query / selector redirect |
+| **D32** | Input trailing | **A (confirmed)** — `, Var=expr` opțional; decode number/text/bool ca pin boundary comp |
+
+### D31 — Bloc = goals Prolog **(confirmed)**
+
+**Exemple canonice:**
+
+```logts
+1wire y = .world:query({ owns(john, X) }, X=car)
+
+8wire[10] y = .world:query({ owns(john, _) })
+```
+
+| În `{ }` | Semnificație |
+|----------|--------------|
+| `goal1, goal2, …` | Gramatică ca body `query` / regulă — comma = AND, `\+`, `=:=`, etc. |
+| **`_`** | Poziție colectată la bulk output (vector/matrix) |
+| **Respins** | `{ queryName }`, `{ queryName:0 }`, `.world:available(...)` |
+
+### D32 — Binding-uri `Var=expr` **(confirmed)**
+
+`, X=car, Item=itemWire` — variabile Prolog legate **înainte** de solve (fără comp / program block).
+
+### D30 — Return **(confirmed)**
+
+| Vars libere (după goals + bind) | LHS | Return |
+|---------------------------------|-----|--------|
+| **0** | scalar / `1wire` | **`1`** / **`0`** |
+| **1** (inclusiv `_`) | `8wire[N]` | vector soluții |
+| **2** | `32wire[R,C]` | matrix soluții |
+| **1** + scalar (fără `[N]`) | `8wire` | prima soluție (TBD la implementare) |
+
+**D33 (recommended):** `maxDepth` / `maxSolutions` — default engine (**256** / **64**, D29) la invoke inline; fără atribute pe inline (spre deosebire de comp F8).
+
+---
+
+### Faza 9 — Inline query invoke `.world:query({ })` **(ready-to-implement)**
+
+**Scop:** promovat din **1+h** — apel expresie **`.inline:query({ goals }, Var=wire, …)`** pe `inline [logic]`, fără `comp [logic]`.
+
+#### Ce lipsește azi
+
+| Layer | Stare | Faza 9 |
+|-------|-------|--------|
+| `inlineMethod` logic | doar LUT/protocol/… | method **`query`** pe kind `logic` |
+| Parser apel | args poziționale | bloc `{ goals }` raw + trailing `Var=expr` |
+| Motor | `executeLogicQueries` (named queries) | **`executeLogicGoals(def, goals, inputEnv, opts)`** — ad-hoc goal list |
+| Return | N/A | refolosește pack/encode din [`logic.js`](../v0_3_2/core/components/logic.js) |
+| Doc | absent | secțiune în [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) |
+
+#### Fișiere de modificat
+
+| Fișier | Change |
+|--------|--------|
+| [`parser.js`](../v0_3_2/core/parser.js) | `.logic:query({ … } [, Var=expr …]` — primul arg bloc brace raw; trailing named binds după `)` |
+| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | `parseLogicGoalsBlock(raw)` — parse doar goals (fără facts/queries header); reutilizează `LogicParser` |
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `executeLogicGoals(inst, goals, inputEnv, opts)` — solve + solutions; raportează truncated/depthExceeded opțional |
+| [`interpreter.js`](../v0_3_2/core/interpreter.js) | `evalInlineMethod` — ramură logic: resolve binds, call engine, encode return după LHS wire shape |
+| [`logic.js`](../v0_3_2/core/components/logic.js) | **Extract/export** funcții pack/encode (sau modul partajat) — fără duplicare față de redirect |
+| [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md) | Secțiune `.world:query({ })`, exemple boolean + vector + matrix |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3544+** |
+
+#### Exemplu țintă
+
+```logts
+inline [logic] .world:
+    owns(john, chevy).
+    owns(john, tesla).
+    owns(mary, bmw).
+
+8wire car = chevy
+
+1wire ok = .world:query({ owns(john, X) }, X=car)     ; ok = 1
+
+8wire[10] cars = .world:query({ owns(john, _) })       ; chevy, tesla, …
+
+32wire[R,2] pairs = .world:query({ owns(john, Car), age(john, Age) })
+```
+
+#### Teste minime propuse
+
+| ID | Scop |
+|----|------|
+| **3544** | Boolean: `owns(john, X), X=car` → `1`; alt `car` → `0` |
+| **3545** | Vector: `{ owns(john, _) }` pe `8wire[10]` — 2 soluții + fill |
+| **3546** | Multi-goal + `\+` în bloc |
+| **3547** | Matrix 2 vars libere pe `32wire[R,C]` |
+| **3548** | `maxSolutions` cap — vector trunchiat (opțional) |
+
+#### Criterii done
+
+- [ ] Parser + `evalInlineMethod` logic `query`
+- [ ] `executeLogicGoals` + encode partajat cu comp redirect
+- [ ] Teste **3544–3547** (+ opțional 3548); suite verde
+- [ ] Doc inline-logic + manifest
+
+**Amânat post-F9:** scalar `8wire` fără `[N]` → prima soluție (D30 row TBD); atribute `maxDepth` pe inline instance.
+
+---
+
 ## Exemplu țintă complet (sketch v2, D1 completed)
 
 ```logts
@@ -1605,12 +1757,13 @@ comp [logic] .peopleLogic:
 | boolean redirect | **D7a completed:** `isJohnOwner >= wire` |
 | Quoted atoms `'John'` | amânat post-MVP (D8) |
 | Negation `\+` | **Faza 7 (completed)** |
-| Depth / truncated / depthExceeded | **Faza 8 (ready-to-implement)** — D25–D29 confirmed |
+| Depth / truncated / depthExceeded | **Faza 8 (completed)** |
+| Inline query `.world:query({ })` | **Faza 9 (ready-to-implement)** — D30–D32 |
 
 ---
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 7~~ **(completed)**
-2. **Faza 8** — depth tuning **(ready-to-implement)**
-3. Opțional: **1+l**, **1+k**, **1+b**
+1. ~~Faza 0~~ → ~~Faza 8~~ **(completed)**
+2. **Faza 9** — inline query invoke **(ready-to-implement)**
+3. Opțional: **1+l**, **1+k**, **1+b**, **1+e**
