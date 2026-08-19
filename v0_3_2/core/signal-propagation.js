@@ -595,6 +595,10 @@ class SignalPropagationStrategy {
   }
 
   _finishPropagate(allChanged) {
+    const interp = this.interp;
+    if (interp && interp._probeInitialising && typeof interp._refreshLogicWaveRedirects === 'function') {
+      interp._refreshLogicWaveRedirects();
+    }
     this._syncComponentsAfterPropagate(allChanged);
     this.flushDeferredShows();
     if (this.interp) {

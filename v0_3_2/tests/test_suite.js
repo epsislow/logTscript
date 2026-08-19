@@ -36239,6 +36239,87 @@ comp [logic] .characterLogic:
     h.assert('result=2', interp.getWireEffectiveValue('result'), '00000010');
   }, { propagation: 'wave' });
 
+  reg(3509, 'logic', 'comp [logic] top-level show after redirect (wave)', function(h, session) {
+    const src = INLINE_LOGIC_CHARACTER + `
+comp [logic] .characterLogic:
+    on: 1
+
+    .character {
+        X is number myX
+    }
+
+:
+
+8wire scoreIn = 00001111
+8wire result = 00000000
+1wire trigger = 1
+
+.characterLogic:{
+    myX = scoreIn
+    modifier:0 >= result
+    set = trigger
+}
+
+show(result)`;
+    const { out } = session.run(src);
+    h.assert('show line', String(out.some((l) => l.includes('00000010'))), 'true');
+  }, { propagation: 'wave' });
+
+  reg(3510, 'logic', 'comp [logic] show inside property block after redirect (wave)', function(h, session) {
+    const src = INLINE_LOGIC_CHARACTER + `
+comp [logic] .characterLogic:
+    on: 1
+
+    .character {
+        X is number myX
+    }
+
+:
+
+8wire scoreIn = 00001111
+8wire result = 00000000
+1wire trigger = 1
+
+.characterLogic:{
+    myX = scoreIn
+    modifier:0 >= result
+    set = trigger
+    show(result)
+}`;
+    const { out, interp } = session.run(src);
+    h.assert('wire=2', interp.getWireEffectiveValue('result'), '00000010');
+    h.assert('show line', String(out.some((l) => l.includes('00000010'))), 'true');
+  }, { propagation: 'wave' });
+
+  reg(3511, 'logic', 'comp [logic] in-block and top-level show agree (wave)', function(h, session) {
+    const src = INLINE_LOGIC_CHARACTER + `
+comp [logic] .characterLogic:
+    on: 1
+
+    .character {
+        X is number myX
+    }
+
+:
+
+8wire scoreIn = 00001111
+8wire result = 00000000
+1wire trigger = 1
+
+.characterLogic:{
+    myX = scoreIn
+    modifier:0 >= result
+    set = trigger
+    show(result)
+}
+
+show(result)`;
+    const { out, interp } = session.run(src);
+    const showLines = out.filter((l) => l.includes('result') && l.includes('00000010'));
+    h.assert('wire=2', interp.getWireEffectiveValue('result'), '00000010');
+    h.assert('two show lines', String(showLines.length), '2');
+  }, { propagation: 'wave' });
+
   reg(3504, 'logic', 'comp [logic] johnOwns indexed redirect', function(h, session) {
     const src = INLINE_LOGIC_PEOPLE + `
 comp [logic] .peopleLogic:

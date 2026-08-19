@@ -10,6 +10,14 @@ function logicWriteWire(wireName, value, width, ctx) {
   if (v.length < width) v = v.padStart(width, '0');
   else if (v.length > width) v = v.slice(-width);
   if (!ctx.wires.has(wireName)) throw Error(`Logic output wire '${wireName}' not found`);
+  if (ctx._logicRedirectSyncWrite) {
+    ctx.writeWireStable(wireName, v);
+    if (typeof ctx.deferWirePropagation === 'function' && ctx.deferWirePropagation()
+        && ctx.signalPropagationStrategy) {
+      ctx.signalPropagationStrategy.wirePendingStates.set(wireName, v);
+    }
+    return;
+  }
   if (typeof ctx.publishWireValue === 'function') {
     ctx.publishWireValue(wireName, v);
     return;

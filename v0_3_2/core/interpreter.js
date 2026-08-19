@@ -9731,7 +9731,6 @@ if (this.isBuiltinDEMUX(name)) {
     this._probeInitialising = true;
     this.signalPropagationStrategy.initializeFromElaboration();
     this.startProc();
-    this._refreshLogicWaveRedirects();
     this._probeInitialising = false;
     this.clearNetworkSendDedup();
   }
@@ -9740,11 +9739,16 @@ if (this.isBuiltinDEMUX(name)) {
     if (!this.deferWirePropagation() || !this.componentRegistry) return;
     const handler = this.componentRegistry.get('logic');
     if (!handler || typeof handler._applyRedirects !== 'function') return;
-    for (const [compName, comp] of this.components) {
-      if (comp.type !== 'logic' || !comp.queryResults) continue;
-      const redirects = comp._logicRedirectProps;
-      if (!redirects || !redirects.length) continue;
-      handler._applyRedirects(comp, compName, redirects, this);
+    this._logicRedirectSyncWrite = true;
+    try {
+      for (const [compName, comp] of this.components) {
+        if (comp.type !== 'logic' || !comp.queryResults) continue;
+        const redirects = comp._logicRedirectProps;
+        if (!redirects || !redirects.length) continue;
+        handler._applyRedirects(comp, compName, redirects, this);
+      }
+    } finally {
+      this._logicRedirectSyncWrite = false;
     }
   }
 
