@@ -53,6 +53,47 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
   static get type() { return 'logic'; }
   static get shortnames() { return {}; }
   static get isReservedName() { return true; }
+  static get TEXT_PIN_MIN_BITS() { return 8; }
+  static get TEXT_PIN_MAX_BITS() { return 256; }
+  static get NUMBER_PIN_MIN_BITS() { return 8; }
+  static get NUMBER_PIN_DEFAULT_BITS() { return 64; }
+  static get NUMBER_PIN_MAX_BITS() { return 64; }
+
+  _fitTextPinWidth(bitLen) {
+    let n = bitLen == null || bitLen <= 0 ? LogicComponent.TEXT_PIN_MIN_BITS : bitLen;
+    if (n % 8 !== 0) n = Math.ceil(n / 8) * 8;
+    return Math.min(LogicComponent.TEXT_PIN_MAX_BITS, Math.max(LogicComponent.TEXT_PIN_MIN_BITS, n));
+  }
+
+  _fitNumberPinWidth(bitLen) {
+    if (bitLen == null || bitLen <= 0) return LogicComponent.NUMBER_PIN_DEFAULT_BITS;
+    let n = bitLen;
+    if (n % 8 !== 0) n = Math.ceil(n / 8) * 8;
+    return Math.min(LogicComponent.NUMBER_PIN_MAX_BITS, Math.max(LogicComponent.NUMBER_PIN_MIN_BITS, n));
+  }
+
+  _writeVarPinStorage(pin, value, ctx, fitFn) {
+    const targetBits = fitFn(value != null ? String(value).length : 0);
+    let v = value != null ? String(value) : '';
+    if (v.length < targetBits) v = v.padStart(targetBits, '0');
+    else if (v.length > targetBits) v = v.slice(-targetBits);
+    if (pin.bits !== targetBits) {
+      const storageIdx = ctx.storeValue(v);
+      pin.ref = `&${storageIdx}`;
+      pin.bits = targetBits;
+    } else {
+      ctx.setValueAtRef(pin.ref, v);
+    }
+    return v;
+  }
+
+  _writeTextPinStorage(pin, value, ctx) {
+    return this._writeVarPinStorage(pin, value, ctx, (n) => this._fitTextPinWidth(n));
+  }
+
+  _writeNumberPinStorage(pin, value, ctx) {
+    return this._writeVarPinStorage(pin, value, ctx, (n) => this._fitNumberPinWidth(n));
+  }
 
   getSpecialParseAttributes() {
     return {
@@ -114,7 +155,13 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       pinDefs[b.pinName] = {
         logicVar: b.logicVar,
         bindType: b.bindType,
-        bits: b.bindType === 'bool' ? 1 : 8,
+        bits: b.bindType === 'bool'
+          ? 1
+          : b.bindType === 'text'
+            ? LogicComponent.TEXT_PIN_MIN_BITS
+            : b.bindType === 'number'
+              ? LogicComponent.NUMBER_PIN_DEFAULT_BITS
+              : 8,
       };
     }
 
@@ -172,6 +219,14 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
   handleImmediateAssignment(comp, property, value, ctx) {
     const pin = comp.pinStorage && comp.pinStorage[property];
     if (!pin) return false;
+    if (pin.bindType === 'text') {
+      this._writeTextPinStorage(pin, value, ctx);
+      return true;
+    }
+    if (pin.bindType === 'number') {
+      this._writeNumberPinStorage(pin, value, ctx);
+      return true;
+    }
     let v = value || '0'.repeat(pin.bits);
     if (v.length < pin.bits) v = v.padStart(pin.bits, '0');
     else if (v.length > pin.bits) v = v.slice(-pin.bits);
@@ -209,8 +264,14 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       } else {
         bits = ctx.getValueFromRef(pin.ref) || '0'.repeat(pin.bits);
       }
-      if (bits.length < pin.bits) bits = bits.padStart(pin.bits, '0');
-      else if (bits.length > pin.bits) bits = bits.slice(-pin.bits);
+      if (pin.bindType === 'text') {
+        bits = this._writeTextPinStorage(pin, bits, ctx);
+      } else if (pin.bindType === 'number') {
+        bits = this._writeNumberPinStorage(pin, bits, ctx);
+      } else {
+        if (bits.length < pin.bits) bits = bits.padStart(pin.bits, '0');
+        else if (bits.length > pin.bits) bits = bits.slice(-pin.bits);
+      }
       const term = typeof logicPinToInputValue === 'function'
         ? logicPinToInputValue(bits, pin.bindType)
         : { kind: 'number', value: parseInt(bits, 2) || 0 };

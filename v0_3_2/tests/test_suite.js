@@ -36397,6 +36397,20 @@ comp [logic] .characterLogic:
 
 :`;
 
+  const INLINE_LOGIC_WORLD_RT = `inline [logic] .world:
+
+    age(john, 25)
+    age(mary, 30)
+    age(joe, 22)
+
+    query allAges:
+        age(X, Y)
+
+    query lookupAge:
+        age(X, Y)
+
+:`;
+
   reg(3512, 'logic', 'comp [logic] vector bulk redirect johnOwns >= allCars', function(h, session) {
     const src = INLINE_LOGIC_PEOPLE + `
 comp [logic] .peopleLogic:
@@ -36528,6 +36542,127 @@ comp [logic] .worldLogic:
     h.assert('col1 age25', col1.slice(0, 32), '00000000000000000000000000011001');
     h.assert('col1 age30', col1.slice(32, 64), '00000000000000000000000000011110');
     h.assert('col1 age22', col1.slice(64, 96), '00000000000000000000000000010110');
+  });
+
+  reg(3517, 'logic', 'comp [logic] text pin round-trip wire to logic', function(h, session) {
+    const src = INLINE_LOGIC_WORLD_RT + `
+comp [logic] .worldFetch:
+    on: 1
+
+    .world {
+    }
+
+:
+
+comp [logic] .worldLookup:
+    on: 1
+
+    .world {
+        X is text myX
+    }
+
+:
+
+32wire nameSlot = ${'0'.repeat(32)}
+8wire ageOut = 00000000
+1wire trigger = 1
+
+.worldFetch:{
+    allAges:0:0 >= nameSlot
+    set = trigger
+}
+
+.worldLookup:{
+    myX = nameSlot
+    lookupAge:0 >= ageOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('nameSlot john', interp.getWireEffectiveValue('nameSlot'), '01101010011011110110100001101110');
+    h.assert('ageOut 25', interp.getWireEffectiveValue('ageOut'), '00011001');
+  });
+
+  reg(3518, 'logic', 'comp [logic] text pin width follows wire (mod 8, max 256)', function(h, session) {
+    const inline = `inline [logic] .world:
+
+    age(myWickedLongName, 42)
+
+    query allAges:
+        age(X, Y)
+
+    query lookupAge:
+        age(X, Y)
+
+:`;
+    const wireBits = 160;
+    const zeros = '0'.repeat(wireBits);
+    const src = inline + `
+comp [logic] .worldFetch:
+    on: 1
+    .world { }
+:
+
+comp [logic] .worldLookup:
+    on: 1
+    .world { X is text myX }
+:
+
+${wireBits}wire nameSlot = ${zeros}
+8wire ageOut = 00000000
+1wire trigger = 1
+
+.worldFetch:{
+    allAges:0:0 >= nameSlot
+    set = trigger
+}
+
+.worldLookup:{
+    myX = nameSlot
+    lookupAge:0 >= ageOut
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.worldLookup');
+    h.assert('pin width=wire', String(comp.pinStorage.myX.bits), String(wireBits));
+    h.assert('ageOut 42', interp.getWireEffectiveValue('ageOut'), '00101010');
+  });
+
+  reg(3519, 'logic', 'comp [logic] number pin 8 bits from 8wire assign', function(h, session) {
+    const src = INLINE_LOGIC_CHARACTER + `
+comp [logic] .characterLogic:
+    on: 1
+    .character { X is number myX }
+:
+8wire scoreIn = 00001111
+1wire trigger = 1
+.characterLogic:{
+    myX = scoreIn
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.characterLogic');
+    h.assert('pin 8 from 8wire', String(comp.pinStorage.myX.bits), '8');
+  });
+
+  reg(3520, 'logic', 'comp [logic] number pin capped at 64 from wide wire', function(h, session) {
+    const val128 = '0'.repeat(120) + '00001111';
+    const src = INLINE_LOGIC_CHARACTER + `
+comp [logic] .characterLogic:
+    on: 1
+    .character { X is number myX }
+:
+128wire wideIn = ${val128}
+8wire result = 00000000
+1wire trigger = 1
+.characterLogic:{
+    myX = wideIn
+    modifier:0 >= result
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const comp = interp.components.get('.characterLogic');
+    h.assert('pin capped 64', String(comp.pinStorage.myX.bits), '64');
+    h.assert('value preserved low 64', String(parseInt(interp.getValueFromRef(comp.pinStorage.myX.ref).slice(-64), 2)), '15');
   });
 
   window.LogTScriptTestSuite.finalize();

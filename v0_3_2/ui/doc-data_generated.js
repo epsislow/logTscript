@@ -11213,11 +11213,37 @@ comp [logic] .characterLogic:
 
 | Form | Meaning |
 |------|---------|
-| \`X is number myX\` | Logic variable **X** ← unsigned pin **myX** |
-| \`Name is text myName\` | ASCII text on pin width |
+| \`X is number myX\` | Variabilă **X** ← unsigned binary; lățime pin de la wire la assign, **default/max 64** biți |
+| \`Name is text myName\` | ASCII text — **lățimea pinului = lățimea wire-ului** la assign (\`myName = wire\`), multiplu de 8, max **256** biți; decode oprește la \`\\0\` |
 | \`Alive is bool myAlive\` | 1-bit boolean |
 
 Only **\`number\`**, **\`text\`**, and **\`bool\`** are supported at the pin boundary.
+
+### Pin \`text\` — lățime variabilă (nu fixă)
+
+\`X is text myX\` **nu** alocă un pin de 32 biți. Pinul \`text\` pornește gol (8 biți) și **la fiecare** \`myX = wire\` își ia lățimea de la wire:
+
+| Regulă | Comportament |
+|--------|--------------|
+| **Sursă** | Lățimea wire-ului din exec block (\`32wire\`, \`160wire\`, …) |
+| **Pas** | Multiplu de **8** biți (octet ASCII) |
+| **Max** | **256** biți (32 caractere) |
+| **Decode** | Octeți → string; oprire la \`\\0\` → atom Prolog |
+
+Exemplu: \`160wire nameSlot\` + \`myX = nameSlot\` → pin **160** biți → \`"myWickedLongName"\` încape integral (17 octeți + padding \`\\0\`), **nu** trunchiat la 4 caractere.
+
+### Pin \`number\` — lățime variabilă, plafon 64
+
+\`X is number myX\` la elaborare alocă **64 biți** (zero). La \`myX = wire\`, pinul ia lățimea wire-ului, cu **max 64**:
+
+| Regulă | Comportament |
+|--------|--------------|
+| **Înainte de assign** | 64 biți (default) |
+| **La assign** | Lățime wire (multiplu de 8), min 8 |
+| **Plafon** | **64 biți** — wire mai lat → trunchiere la cei 64 biți low |
+| **Decode** | Unsigned binary → integer Prolog |
+
+Exemplu: \`8wire scoreIn\` + \`myX = scoreIn\` → pin **8** biți; \`128wire big\` → pin **64** biți.
 
 ---
 
@@ -11279,7 +11305,7 @@ Use **\`on: 1\`** in examples so **Load & Run** performs a solve pass immediatel
 | Pin / pout | Bits | Description |
 |------------|------|-------------|
 | **\`set\`** | 1 | Trigger one solve pass when active |
-| **\`myX\`, …** | 8 default (number/text) | Input pins from program block |
+| **\`myX\`, …** | \`bool\`: 1 bit; **\`number\`**: 8…64 (default 64); **\`text\`**: 8…256 de la wire | Input pins from program block |
 | **\`execCount\`** | 16 | Solve passes completed (\`.logic:execCount\`) |
 
 ---
@@ -11486,6 +11512,72 @@ show(col1)
 \`\`\`
 
 \`::0\` → all \`X\` values (names); \`::1\` → all \`Y\` values (ages). Unused rows in the declared vector are filled with \`\\0\` per cell.
+
+---
+
+## Example — text pin round-trip (wire → pin → logic)
+
+Demonstrates the full **out-and-back** path: query writes an atom to a wire (ASCII), a second exec block loads the wire into a **\`text\` pin**, and a **parameterized query** reads \`X\` from that pin to resolve \`Y\`.
+
+Use **two components** when the first pass must run **without** pin bindings (an bound but empty \`text\` pin would constrain free variables in the fetch query).
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    age(john, 25)
+    age(mary, 30)
+    age(joe, 22)
+
+    query allAges:
+        age(X, Y)
+
+    query lookupAge:
+        age(X, Y)
+
+:
+
+comp [logic] .worldFetch:
+    on: 1
+
+    .world {
+    }
+
+:
+
+comp [logic] .worldLookup:
+    on: 1
+
+    .world {
+        X is text myX
+    }
+
+:
+
+32wire nameSlot = 0
+8wire ageOut = 00000000
+1wire trigger = 1
+
+.worldFetch:{
+    allAges:0:0 >= nameSlot
+    set = trigger
+}
+
+.worldLookup:{
+    myX = nameSlot
+    lookupAge:0 >= ageOut
+    set = trigger
+}
+
+show(nameSlot; ascii)
+show(ageOut)
+\`\`\`
+
+| Step | Block | Effect |
+|------|-------|--------|
+| 1 | \`.worldFetch\` | \`allAges:0:0\` writes \`"john"\` (ASCII) to \`nameSlot\` |
+| 2 | \`.worldLookup\` | \`myX = nameSlot\` → pin; \`lookupAge\` with \`X\` input → \`Y = 25\` → \`ageOut\` |
+
+Round-trip chain: **atom \`john\` → wire → \`text\` pin → logic var \`X\` → fact \`age(john, 25)\`**.
 
 ---
 

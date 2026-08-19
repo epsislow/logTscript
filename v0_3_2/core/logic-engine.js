@@ -106,7 +106,7 @@ class LogicEngine {
   solveQuery(goal, inputEnv) {
     const ig = logicInternGoal(goal, this.table);
     const solutions = [];
-    const env = logicCloneEnv(inputEnv);
+    const env = logicCloneEnv(logicPrepareInputEnv(inputEnv, this.table));
     this._solveGoals([ig], env, 0, (solEnv) => {
       const freeVars = logicCollectFreeVarsInGoal(ig);
       const sol = {};
@@ -175,6 +175,40 @@ function logicEnv() {
     },
     get(name) { return this.bindings.get(name); },
   };
+}
+
+function logicInternInputValue(term, table) {
+  if (!term) return term;
+  if (term.kind === 'atom') {
+    const name = term.name != null ? term.name : (term.id != null ? table.name(term.id) : '');
+    return { kind: 'atom', id: table.intern(name) };
+  }
+  if (term.kind === 'number') return term;
+  if (term.kind === 'compound') {
+    return {
+      kind: 'compound',
+      predicate: term.predicate,
+      arity: (term.args || []).length,
+      args: (term.args || []).map((a) => logicInternInputValue(a, table)),
+    };
+  }
+  if (term.kind === 'arith') {
+    return {
+      kind: 'arith',
+      op: term.op,
+      left: logicInternInputValue(term.left, table),
+      right: logicInternInputValue(term.right, table),
+    };
+  }
+  return term;
+}
+
+function logicPrepareInputEnv(inputEnv, table) {
+  const out = {};
+  for (const [k, v] of Object.entries(inputEnv || {})) {
+    out[k] = logicInternInputValue(v, table);
+  }
+  return out;
 }
 
 function logicCloneEnv(inputEnv) {
