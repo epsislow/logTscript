@@ -16,7 +16,8 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 | **Limits** | Optional `, maxDepth=\\N`, `, maxSolutions=\\N` (decimal literals; default **256** / **64**) |
 | **`_`** | Anonymous slot — collected into vector/matrix bulk output |
 | **Boolean** | `1wire` LHS + all vars bound → `1` / `0` |
-| **Bulk** | `8wire[N]` / `32wire[R,C]` LHS + free vars → vector / matrix |
+| **Scalar (1st sol.)** | `8wire` / `40wire` / `80wire` LHS + one free var → **first solution** on that width (ASCII atom + `\0` pad) |
+| **Bulk** | `8wire[N]` / `40wire[N]` / `32wire[R,C]` LHS + free vars → vector / matrix |
 
 ---
 
@@ -49,9 +50,12 @@ result = .world:query({ owns(john, X) }, X=car)
 | Situation | LHS wire | Result |
 |-----------|----------|--------|
 | All Prolog vars bound (in goal or via `, Var=wire`) | `1wire` | **`1`** if satisfiable, **`0`** otherwise |
-| One collected var (`_` or free name) | `8wire[N]` | Vector of solutions (discovery order, `\0` fill) |
+| One free var — **first solution only** | `8wire`, `40wire`, `80wire`, … (no `[N]`) | First binding for that var, encoded on **full wire width** (atom → ASCII + `\0` pad) |
+| One collected var (`_` or free name) — **all solutions** | `8wire[N]`, `40wire[N]`, … | Vector — one solution per slot (discovery order, `\0` fill on unused slots) |
 | Two free vars | `32wire[R,C]` | Matrix — row = solution, column = variable |
 | Existence with free vars | `1wire` | **`1`** / **`0`** (boolean — not first binding) |
+
+**Wire width = cell width:** an atom such as `chevy` (5 letters) needs **`40wire`** (5×8 bits) for the full name. **`8wire`** holds only **one ASCII character** (the first letter). Same rule as [comp-logic.md](comp-logic.md) redirects.
 
 Encoding matches comp redirects: **atoms → ASCII + padding**, **numbers → unsigned binary** on cell width (see [comp-logic.md](comp-logic.md) D12b).
 
@@ -89,7 +93,63 @@ show(ok)
 
 `ok = 1` when `car` holds the atom `chevy`.
 
-### Vector — all cars john owns
+### Scalar — first solution (`40wire`, not `8wire[1]`)
+
+Use a **plain scalar wire** (no `[N]`) when you want **one** answer, not a list:
+
+```logts-play
+inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(mary, bike)
+
+:
+
+40wire firstCar = .world:query({ owns(john, X) })
+
+8wire firstChar = .world:query({ owns(john, X) })
+
+show(firstCar; ascii)
+show(firstChar; ascii)
+```
+
+| Wire | Value | Meaning |
+|------|-------|---------|
+| `40wire firstCar` | `chevy` | Full atom on 40 bits (5×8, `\0` padded) |
+| `8wire firstChar` | `c` | Only **8 bits** — first character of the first solution |
+
+Wider wires pad with `\0`:
+
+```logts
+80wire name = .world:query({ owns(john, X) })   # "chevy" + zero-fill to 80 bits
+```
+
+### Vector — all cars john owns (full names)
+
+Use **`40wire[N]`** when each solution is a **symbol atom** (full name). **`8wire[N]`** stores **one character per slot**.
+
+```logts-play
+inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(mary, bike)
+
+:
+
+40wire[4] cars = .world:query({ owns(john, _) })
+
+8wire[4] initials = .world:query({ owns(john, _) })
+
+show(cars; ascii)
+show(initials; ascii)
+```
+
+Two solutions (`chevy`, `ford`); remaining slots filled with `\0`.  
+`initials` shows `c`, `f`, … — one letter per 8-bit cell.
+
+### Vector — narrow cells (8 bits per slot)
 
 ```logts-play
 inline [logic] .world:
@@ -105,7 +165,7 @@ inline [logic] .world:
 show(cars; ascii)
 ```
 
-Two solutions (`chevy`, `ford`); remaining slots filled with `\0`.
+Each slot is **8 bits** — first character of each atom (`c`, `f`), not the full name.
 
 ### Multi-goal + negation
 
@@ -120,13 +180,13 @@ inline [logic] .world:
 
 1wire ok = .world:query({ person(X), \+ banned(X) })
 
-8wire[4] eligible = .world:query({ person(X), \+ banned(X) })
+40wire[4] eligible = .world:query({ person(X), \+ banned(X) })
 
 show(ok)
 show(eligible; ascii)
 ```
 
-`ok = 1` (at least one eligible person). Vector bulk returns `john` only.
+`ok = 1` (at least one eligible person). Vector bulk returns `john` only (full name on 40-bit cells).
 
 ### Matrix — two free variables
 

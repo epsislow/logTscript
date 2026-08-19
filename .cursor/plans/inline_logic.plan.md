@@ -1597,7 +1597,7 @@ comp [logic] .peopleLogic:
 | **0** | scalar / `1wire` | **`1`** / **`0`** |
 | **1** (inclusiv `_`) | `8wire[N]` | vector soluții |
 | **2** | `32wire[R,C]` | matrix soluții |
-| **1** + scalar (fără `[N]`) | `8wire` | prima soluție (TBD la implementare) |
+| **1** + scalar (fără `[N]`) | `8wire` / `40wire` / … | prima soluție pe lățimea wire-ului (ASCII + pad) **(completed — teste 3550–3553, doc)** |
 
 **D33 (recommended):** `maxDepth` / `maxSolutions` — default engine (**256** / **64**, D29) la invoke inline; fără atribute pe inline (spre deosebire de comp F8).
 
@@ -1617,16 +1617,16 @@ comp [logic] .peopleLogic:
 | [`interpreter.js`](../v0_3_2/core/interpreter.js) | `evalLogicInlineQuery`, `_inlineLogicAssignWire`, `_logicShapeFromDecl` |
 | [`logic.js`](../v0_3_2/core/components/logic.js) | export `logicWireShape` |
 | [`doc/logic-query-exec.md`](../v0_3_2/doc/logic-query-exec.md) | Pagină nouă + exemple `logts-play` Load & Run |
-| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3544–3547** |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3544–3547**, **3548–3549** (limits), **3550–3553** (scalar width) |
 
 #### Criterii done
 
 - [x] Parser + `evalInlineMethod` logic `query`
 - [x] `executeLogicGoals` + encode partajat cu comp redirect
-- [x] Teste **3544–3547**; suite **2709/2709**
-- [x] Doc `logic-query-exec.md` + manifest
+- [x] Teste **3544–3553**; suite verde
+- [x] Doc `logic-query-exec.md` — scalar width + vector cell width + manifest
 
-**Amânat post-F9:** scalar `8wire` fără `[N]` → prima soluție; ~~atribute `maxDepth` pe inline~~ **(done — per-call options)**.
+**Post-F9 (completed):** scalar `8wire`/`40wire`/… fără `[N]` → prima soluție pe lățimea wire-ului; `40wire[N]` pentru nume atom complete. ~~Atribute `maxDepth` pe inline~~ **(done — per-call options)**.
 
 ---
 

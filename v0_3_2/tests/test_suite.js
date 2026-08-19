@@ -37025,5 +37025,42 @@ comp [logic] .loopLogic:
     h.assert('depth cap unprovable', interp.getWireEffectiveValue('ok'), '0');
   });
 
+  reg(3550, 'logic', 'inline query scalar 40wire first solution full atom', function(h, session) {
+    const src = INLINE_LOGIC_OWNS + `
+40wire firstCar = .world:query({ owns(john, X) })`;
+    const { interp } = session.run(src);
+    h.assert('40 bits', String(interp.getWireEffectiveValue('firstCar').length), '40');
+    h.assert('chevy ascii', interp.getWireEffectiveValue('firstCar'), CHEVY40);
+  });
+
+  reg(3551, 'logic', 'inline query scalar 8wire first solution one char', function(h, session) {
+    const src = INLINE_LOGIC_OWNS + `
+8wire firstChar = .world:query({ owns(john, X) })`;
+    const { interp } = session.run(src);
+    h.assert('8 bits', String(interp.getWireEffectiveValue('firstChar').length), '8');
+    h.assert('letter c', interp.getWireEffectiveValue('firstChar'), '01100011');
+  });
+
+  reg(3552, 'logic', 'inline query vector 40wire full atom names', function(h, session) {
+    const src = INLINE_LOGIC_OWNS + `
+40wire[4] allCars = .world:query({ owns(john, _) })`;
+    const { interp } = session.run(src);
+    const allCars = interp.getWireEffectiveValue('allCars');
+    h.assert('160 bits', String(allCars.length), '160');
+    h.assert('slot0 chevy', allCars.slice(0, 40), CHEVY40);
+    h.assert('slot1 ford', allCars.slice(40, 80), FORD40);
+    h.assert('slot2 fill', allCars.slice(80, 120), '0'.repeat(40));
+  });
+
+  reg(3553, 'logic', 'inline query scalar 80wire atom zero-padded', function(h, session) {
+    const src = INLINE_LOGIC_OWNS + `
+80wire name = .world:query({ owns(john, X) })`;
+    const { interp } = session.run(src);
+    const name = interp.getWireEffectiveValue('name');
+    h.assert('80 bits', String(name.length), '80');
+    h.assert('chevy prefix', name.slice(0, 40), CHEVY40);
+    h.assert('zero tail', name.slice(40, 80), '0'.repeat(40));
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();
