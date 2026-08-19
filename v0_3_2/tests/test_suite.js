@@ -36781,5 +36781,94 @@ comp [logic] .characterLogic:
     h.assert('wire trim left', session.getWire(interp, 't'), strBin('a  \0').padEnd(48, '0'));
   });
 
+  const INLINE_LOGIC_NEGATION = `inline [logic] .peopleNeg:
+
+    person(john)
+    person(mary)
+    person(peter)
+
+    age(john, 25)
+    age(mary, 30)
+
+    banned(john)
+
+    eligible(X) <- person(X), \\+ banned(X)
+
+    query personWithoutAge:
+        person(X), \\+ age(X, _)
+
+    query johnHasNoAge:
+        \\+ age(john, _)
+
+    query peterHasNoAge:
+        \\+ age(peter, _)
+
+    query eligibleQ:
+        eligible(X)
+
+:`;
+
+  reg(3536, 'logic', 'parse query goals comma and negation token', function(h, session) {
+    const p = new Parser(new Tokenizer(preprocessLoop(INLINE_LOGIC_NEGATION)), session._ensureRegistry());
+    const stmts = p.parse();
+    const prog = parseLogicBody(stmts[0].inline.bodyRaw);
+    h.assert('queries', String(prog.queries.length), '4');
+    const q = prog.queries.find((x) => x.name === 'personWithoutAge');
+    h.assert('goals count', String(q.goals.length), '2');
+    h.assert('second goal not', q.goals[1].kind, 'not');
+  });
+
+  reg(3537, 'logic', 'executeLogicQueries negation peter has no age', function(h, session) {
+    session.run(INLINE_LOGIC_NEGATION);
+    const inst = session.interp.inlineInstances.get('.peopleNeg');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    const results = executeLogicQueries(merged, {});
+    h.assert('peterHasNoAge one sol', String(results.peterHasNoAge.length), '1');
+    h.assert('johnHasNoAge none', String(results.johnHasNoAge.length), '0');
+    h.assert('X=peter', results.personWithoutAge[0].X.name, 'peter');
+    h.assert('eligible mary first', results.eligibleQ[0].X.name, 'mary');
+    h.assert('eligible peter second', results.eligibleQ[1].X.name, 'peter');
+  });
+
+  reg(3538, 'logic', 'comp [logic] boolean negation redirect', function(h, session) {
+    const src = INLINE_LOGIC_NEGATION + `
+comp [logic] .peopleNegLogic:
+    on: 1
+    .peopleNeg { }
+:
+
+1wire peterFlag = 0
+1wire johnFlag = 0
+1wire trigger = 1
+
+.peopleNegLogic:{
+    peterHasNoAge >= peterFlag
+    johnHasNoAge >= johnFlag
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('peter flag=1', interp.getWireEffectiveValue('peterFlag'), '1');
+    h.assert('john flag=0', interp.getWireEffectiveValue('johnFlag'), '0');
+  });
+
+  reg(3539, 'logic', 'comp [logic] multi-goal negation scalar redirect', function(h, session) {
+    const src = INLINE_LOGIC_NEGATION + `
+comp [logic] .peopleNegLogic:
+    on: 1
+    .peopleNeg { }
+:
+
+8wire who = 00000000
+1wire trigger = 1
+
+.peopleNegLogic:{
+    personWithoutAge:0 >= who
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('8 bits', String(interp.getWireEffectiveValue('who').length), '8');
+    h.assert('ascii p first char', interp.getWireEffectiveValue('who'), '01110000');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

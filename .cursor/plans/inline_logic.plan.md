@@ -24,8 +24,8 @@ todos:
     content: "Faza 6: inline.type{logic} + comp.type{logic} — Allow/NotAllow, doc, teste policy"
     status: completed
   - id: logic-negation
-    content: "Faza 7: negație \\ + goal — parser, engine NAF, query multi-goal, teste 3521+, doc"
-    status: pending
+    content: "Faza 7: negație \\ + goal — parser, engine NAF, query multi-goal, teste 3533+, doc"
+    status: completed
 isProject: false
 ---
 
@@ -1029,7 +1029,7 @@ age(john, 25). age(mary, 30).
 | **Faza 4** docs/tests | — | **(completed)** |
 | **Faza 5** matrix/vector output | 2 vars max, redirect ca [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md) + extensii pin/round-trip | **(completed)** |
 | **Faza 6** Allow/NotAllow | `inline.type{logic}`, `comp.type{logic}` | **(completed)** |
-| **Faza 7** Negation `\+` | D20–D24 | **(ready-to-implement)** — D20–D24 **confirmed** |
+| **Faza 7** Negation `\+` | D20–D24 | **(completed)** |
 | **Faza 8** Recursivitate + depth tuning | **1+d** | amânat post-F7 |
 
 ---
@@ -1205,7 +1205,7 @@ comp [reg] .bad:       # blocat
 
 ---
 
-### Faza 7 — Negation `\+` **(ready-to-implement)**
+### Faza 7 — Negation `\+` **(completed)**
 
 **Scop:** extinde motorul D5-A cu **negation as failure** (`\+ goal`), promovat din **1+c**. Permite query-uri de tip „cine nu are X?” și filtrare în body de regulă.
 
@@ -1234,7 +1234,7 @@ comp [reg] .bad:       # blocat
 | [`components/logic.js`](../v0_3_2/core/components/logic.js) | Elaborare: free vars din `q.goals` (dacă D22-A) |
 | [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md) | Sintaxă `\\+`, semantica NAF, diferențe Prolog, query multi-goal |
 | [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md) | Exemplu comp: boolean + vector „person fără age” |
-| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | Grup `logic` **3521–3525** (minim) |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | Grup `logic` **3536–3539** |
 
 **Fără schimbări:** [`parser.js`](../v0_3_2/core/parser.js) redirect, [`components/logic.js`](../v0_3_2/core/components/logic.js) `_applyRedirects` — negația e transparentă la runtime comp.
 

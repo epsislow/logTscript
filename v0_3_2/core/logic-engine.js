@@ -72,6 +72,9 @@ function logicInternGoal(goal, table) {
       right: logicInternTerm(goal.right, table),
     };
   }
+  if (goal.kind === 'not') {
+    return { kind: 'not', goal: logicInternGoal(goal.goal, table) };
+  }
   return goal;
 }
 
@@ -98,17 +101,18 @@ class LogicEngine {
   executeQueries(queries, inputEnv) {
     const out = {};
     for (const q of queries || []) {
-      out[q.name] = this.solveQuery(q.goal, inputEnv || {});
+      const goals = logicEngineQueryGoals(q);
+      out[q.name] = this.solveQuery(goals, inputEnv || {});
     }
     return out;
   }
 
-  solveQuery(goal, inputEnv) {
-    const ig = logicInternGoal(goal, this.table);
+  solveQuery(goals, inputEnv) {
+    const igGoals = (goals || []).map((g) => logicInternGoal(g, this.table));
     const solutions = [];
     const env = logicCloneEnv(logicPrepareInputEnv(inputEnv, this.table));
-    this._solveGoals([ig], env, 0, (solEnv) => {
-      const freeVars = logicCollectFreeVarsInGoal(ig);
+    this._solveGoals(igGoals, env, 0, (solEnv) => {
+      const freeVars = logicCollectFreeVarsInGoals(igGoals);
       const sol = {};
       for (const v of freeVars) {
         sol[v] = logicResolveTerm({ kind: 'var', name: v }, solEnv, this.table);
@@ -133,6 +137,17 @@ class LogicEngine {
     }
     if (g0.kind === 'call') {
       return this._solveCall(g0, rest, env, depth, onSuccess);
+    }
+    if (g0.kind === 'not') {
+      const trail = env.trailLength();
+      let found = false;
+      this._solveGoals([g0.goal], env, depth + 1, () => {
+        found = true;
+        return false;
+      });
+      env.undo(trail);
+      if (found) return false;
+      return this._solveGoals(rest, env, depth + 1, onSuccess);
     }
     return false;
   }
@@ -344,6 +359,12 @@ function logicResolveTerm(term, env, table) {
   return d;
 }
 
+function logicEngineQueryGoals(q) {
+  if (q && q.goals && q.goals.length) return q.goals;
+  if (q && q.goal) return [q.goal];
+  return [];
+}
+
 function logicCollectFreeVarsInGoal(goal) {
   const free = new Set();
   function walkTerm(t) {
@@ -355,13 +376,22 @@ function logicCollectFreeVarsInGoal(goal) {
   }
   function walkGoal(g) {
     if (!g) return;
-    if (g.kind === 'call' || g.kind === 'compound') {
+    if (g.kind === 'not') walkGoal(g.goal);
+    else if (g.kind === 'call' || g.kind === 'compound') {
       for (const a of g.args || []) walkTerm(a);
     } else if (g.kind === 'cmp' || g.kind === 'unify') {
       walkTerm(g.left); walkTerm(g.right);
     }
   }
   walkGoal(goal);
+  return [...free];
+}
+
+function logicCollectFreeVarsInGoals(goals) {
+  const free = new Set();
+  for (const g of goals || []) {
+    for (const v of logicCollectFreeVarsInGoal(g)) free.add(v);
+  }
   return [...free];
 }
 

@@ -480,6 +480,68 @@ comp [logic] .worldLogic:
 
 ---
 
+## Example — negation `\+` and multi-goal query
+
+This demo shows:
+
+- **`query peterHasNoAge: \+ age(peter, _)`** — **0 free vars** → boolean redirect (`1` / `0`)
+- **`query personWithoutAge: person(X), \+ age(X, _)`** — comma = **AND**; only **`X`** is output (not two bits for the two goals)
+
+```logts-play
+inline [logic] .world:
+
+    person(john)
+    person(mary)
+    person(peter)
+
+    age(john, 25)
+    age(mary, 30)
+
+    query personWithoutAge:
+        person(X), \+ age(X, _)
+
+    query johnHasNoAge:
+        \+ age(john, _)
+
+    query peterHasNoAge:
+        \+ age(peter, _)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+
+    .world {
+    }
+
+:
+
+8wire who = 00000000
+1wire johnFlag = 0
+1wire peterFlag = 0
+1wire trigger = 1
+
+.worldLogic:{
+    personWithoutAge:0 >= who
+    johnHasNoAge >= johnFlag
+    peterHasNoAge >= peterFlag
+    set = trigger
+    show(who; ascii)
+}
+```
+
+After **Load & Run**:
+
+| Wire | Expected |
+|------|----------|
+| `who` | ASCII **`p`** — first solution `X = peter` |
+| `johnFlag` | **`0`** — john has an `age` fact |
+| `peterFlag` | **`1`** — peter has no `age` fact |
+
+The comma in `person(X), \+ age(X, _)` does **not** produce `"01"` or two booleans on one wire. The engine returns **solutions for free variables** (`X` only); each redirect picks scalar, vector, matrix, or boolean form as documented above.
+
+---
+
 ## Multiple exec blocks
 
 Several property blocks may target the same component. Query result slots are **shared**; the **last successful** exec block wins (last-write-wins), matching other multi-block components.

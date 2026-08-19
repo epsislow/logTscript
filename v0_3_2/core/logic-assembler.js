@@ -37,6 +37,9 @@ function logicTokenize(src) {
     if (ch === ')' ) { tokens.push({ type: 'RP', value: ')', line: startLine }); i++; continue; }
     if (ch === '.' ) { tokens.push({ type: 'DOT', value: '.', line: startLine }); i++; continue; }
     if (ch === ':' ) { tokens.push({ type: 'COLON', value: ':', line: startLine }); i++; continue; }
+    if (ch === '\\' && src[i + 1] === '+') {
+      tokens.push({ type: 'NOT', value: '\\+', line: startLine }); i += 2; continue;
+    }
     if (ch === '+' || ch === '-' || ch === '*' || ch === '/') {
       tokens.push({ type: 'OP', value: ch, line: startLine }); i++; continue;
     }
@@ -120,8 +123,8 @@ class LogicParser {
         this.advance();
         const qName = this.expect('ID').value;
         this.expect('COLON');
-        const goal = this.parseCompound();
-        queries.push({ name: qName, goal });
+        const goals = this.parseBodyGoals();
+        queries.push({ name: qName, goals });
         continue;
       }
       const clause = this.parseClause();
@@ -151,6 +154,10 @@ class LogicParser {
   }
 
   parseBodyGoal() {
+    if (this.at('NOT')) {
+      this.advance();
+      return { kind: 'not', goal: this.parseBodyGoal() };
+    }
     if (this.at('ID') && this.tokens[this.pos + 1] && this.tokens[this.pos + 1].type === 'LP') {
       const compound = this.parseCompound();
       return { kind: 'call', predicate: compound.predicate, args: compound.args };
@@ -232,10 +239,16 @@ function parseLogicBody(bodyRaw) {
 
 function logicValidateProgram(prog) {
   for (const q of prog.queries || []) {
-    if (!q.name || !q.goal) {
+    if (!q.name || !logicQueryGoals(q).length) {
       throw new Error('logic query requires name and goal');
     }
   }
+}
+
+function logicQueryGoals(q) {
+  if (q && q.goals && q.goals.length) return q.goals;
+  if (q && q.goal) return [q.goal];
+  return [];
 }
 
 function logicListFreeVarsInGoal(goal) {
@@ -251,13 +264,22 @@ function logicListFreeVarsInGoal(goal) {
   }
   function walkGoal(g) {
     if (!g) return;
-    if (g.kind === 'call' || g.kind === 'compound') {
+    if (g.kind === 'not') walkGoal(g.goal);
+    else if (g.kind === 'call' || g.kind === 'compound') {
       for (const a of g.args || []) walkTerm(a);
     } else if (g.kind === 'cmp' || g.kind === 'unify') {
       walkTerm(g.left); walkTerm(g.right);
     }
   }
   walkGoal(goal);
+  return [...free];
+}
+
+function logicListFreeVarsInGoals(goals) {
+  const free = new Set();
+  for (const g of goals || []) {
+    for (const v of logicListFreeVarsInGoal(g)) free.add(v);
+  }
   return [...free];
 }
 
@@ -328,7 +350,7 @@ function formatLogicInstanceDoc(name, inst) {
   }
   for (const q of inst.queries || []) {
     lines.push(`  query ${q.name}:`);
-    lines.push(`    ${logicFormatCompound(q.goal)}`);
+    lines.push(`    ${logicQueryGoals(q).map(logicFormatGoal).join(', ')}`);
   }
   lines.push('  :');
   return lines.join('\n');
@@ -342,6 +364,7 @@ function logicFormatCompound(c) {
 
 function logicFormatGoal(g) {
   if (!g) return '';
+  if (g.kind === 'not') return `\\+ ${logicFormatGoal(g.goal)}`;
   if (g.kind === 'call' || g.kind === 'compound') return logicFormatCompound(g);
   if (g.kind === 'cmp') return `${logicFormatTerm(g.left)} ${g.op} ${logicFormatTerm(g.right)}`;
   if (g.kind === 'unify') return `${logicFormatTerm(g.left)} = ${logicFormatTerm(g.right)}`;
@@ -389,6 +412,8 @@ if (typeof globalThis !== 'undefined') {
   globalThis.formatLogicTypeDoc = formatLogicTypeDoc;
   globalThis.logicFingerprintProgram = logicFingerprintProgram;
   globalThis.logicListFreeVarsInGoal = logicListFreeVarsInGoal;
+  globalThis.logicListFreeVarsInGoals = logicListFreeVarsInGoals;
+  globalThis.logicQueryGoals = logicQueryGoals;
   globalThis.logicCountFreeVarsInGoal = logicCountFreeVarsInGoal;
 }
 
@@ -400,6 +425,8 @@ if (typeof module !== 'undefined' && module.exports) {
     formatLogicInstanceDoc,
     logicFingerprintProgram,
     logicCountFreeVarsInGoal,
+    logicListFreeVarsInGoals,
+    logicQueryGoals,
     logicIsVarName,
     logicTokenize,
   };

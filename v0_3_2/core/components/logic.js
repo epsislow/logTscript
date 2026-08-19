@@ -168,11 +168,24 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     const merged = typeof logicResolveMerged === 'function'
       ? logicResolveMerged(prog.inst, ctx.inlineInstances)
       : prog.inst;
-    const listFn = typeof logicListFreeVarsInGoal === 'function' ? logicListFreeVarsInGoal : null;
+    const listGoalsFn = typeof logicListFreeVarsInGoals === 'function' ? logicListFreeVarsInGoals : null;
+    const listGoalFn = typeof logicListFreeVarsInGoal === 'function' ? logicListFreeVarsInGoal : null;
+    const queryGoalsFn = typeof logicQueryGoals === 'function' ? logicQueryGoals : null;
     const queryMeta = {};
-    if (listFn) {
+    if (listGoalsFn || listGoalFn) {
       for (const q of merged.queries || []) {
-        const free = listFn(q.goal).filter((v) => !inputVars.has(v));
+        const goals = queryGoalsFn ? queryGoalsFn(q) : (q.goals || (q.goal ? [q.goal] : []));
+        let free;
+        if (listGoalsFn) {
+          free = listGoalsFn(goals);
+        } else {
+          const acc = new Set();
+          for (const g of goals) {
+            for (const v of listGoalFn(g)) acc.add(v);
+          }
+          free = [...acc];
+        }
+        free = free.filter((v) => !inputVars.has(v));
         if (free.length > 2) {
           throw Error(`logic ${name}: query '${q.name}' has ${free.length} output variables (maximum 2)`);
         }
