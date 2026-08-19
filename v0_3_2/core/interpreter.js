@@ -4626,6 +4626,10 @@ class Interpreter {
     if (name === 'WWIDTH' && args && args.length === 1) {
       return this._inferExprStaticBitWidth(args[0]);
     }
+    if (name === 'EQT') return 1;
+    if (name === 'TRIMT' && args && args.length >= 1) {
+      return this._inferExprStaticBitWidth(args[0]);
+    }
     const unaryPreserve = new Set([
       'NOT', 'REVERSE', 'ABS', 'CLAMP', 'NFORMAT', 'LSHIFT', 'RSHIFT', 'LROTATE', 'RROTATE',
       'HIGH', 'LOW', 'ISDIGIT',
@@ -6036,6 +6040,7 @@ class Interpreter {
          'REVERSE', 'LROTATE', 'RROTATE',
          'ADD', 'SUBTRACT', 'MULTIPLY', 'DIVIDE', 'MAC', 'SUM', 'DOT',
          'GT', 'LT', 'MIN', 'MAX', 'ARGMAX', 'ARGMIN', 'CLAMP', 'ABS', 'NFORMAT', 'ISDIGIT',
+         'EQT', 'TRIMT',
          'CNTN10S', 'N2N10S', 'N10S2N',
          'CNTN16S', 'N2N16S', 'N16S2N',
          'PIVOT', 'IDENTITY', 'ZEROS', 'FILL', 'DIAG', 'IOTA', 'SHAPE', 'RANK',
@@ -7228,12 +7233,19 @@ const idx = parseInt(
   let axisMode = null;
   let nformatSpec = null;
   let sortOpts = null;
+  let textTrimMode = 'any';
   if (name === 'SORT') {
     sortOpts = { desc: false, col: null, row: null };
     if (callTags && callTags.length) {
       const SB = typeof LogTScriptSortBuiltin !== 'undefined' ? LogTScriptSortBuiltin : null;
       if (!SB) fail('SORT: internal error (sort-builtin not loaded)');
       sortOpts = SB.parseSortCallTags(callTags, (msg) => fail(msg));
+    }
+  } else if (name === 'EQT' || name === 'TRIMT') {
+    const TB = typeof LogTScriptTextBuiltin !== 'undefined' ? LogTScriptTextBuiltin : null;
+    if (!TB) fail(`${name}: internal error (text-builtin not loaded)`);
+    if (callTags && callTags.length) {
+      textTrimMode = TB.parseTextTrimCallTags(callTags, name, (msg) => fail(msg));
     }
   } else if (callTags && callTags.length) {
     const isBuiltin = !!Interpreter.BUILTIN_DOC[name];
@@ -9607,6 +9619,30 @@ if (this.isBuiltinDEMUX(name)) {
     if (argValues.length !== 1) fail('ISDIGIT expects 1 argument');
     this._zstateRequireBinary(argValues, 'ISDIGIT', ['value']);
     const v = isDecimalDigitBin(argValues[0]);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'EQT') {
+    const TB = typeof LogTScriptTextBuiltin !== 'undefined' ? LogTScriptTextBuiltin : null;
+    if (!TB) fail('EQT: internal error (text-builtin not loaded)');
+    if (args.length !== 2) fail('EQT expects 2 arguments');
+    const a = this._evalCallArgValue(args[0]);
+    const b = this._evalCallArgValue(args[1]);
+    const v = TB.eqtEqual(a, b, textTrimMode);
+    return computeRefs
+      ? { value: v, ref: `&${this.storeValue(v)}` }
+      : { value: v, ref: null };
+  }
+
+  if (name === 'TRIMT') {
+    const TB = typeof LogTScriptTextBuiltin !== 'undefined' ? LogTScriptTextBuiltin : null;
+    if (!TB) fail('TRIMT: internal error (text-builtin not loaded)');
+    if (args.length !== 2) fail('TRIMT expects 2 arguments');
+    const src = this._evalCallArgValue(args[0]);
+    const trimSet = this._evalCallArgValue(args[1]);
+    const v = TB.trimtApply(src, trimSet, textTrimMode, src.length);
     return computeRefs
       ? { value: v, ref: `&${this.storeValue(v)}` }
       : { value: v, ref: null };
@@ -17922,6 +17958,20 @@ Interpreter.BUILTIN_DOC = {
     'NFORMAT((X+Y)bit a; qXpY to_<dst>) -> Wdst result, 4bit status',
   ],
   ISDIGIT:  ['ISDIGIT(Xbit value) -> 1bit'],
+  EQT:      [
+    'EQT(Wbit textA, Wbit textB) -> 1bit',
+    'EQT(Wbit textA, Wbit textB ; left) -> 1bit',
+    'EQT(Wbit textA, Wbit textB ; right) -> 1bit',
+    'EQT(Wbit textA, Wbit textB ; left right) -> 1bit',
+    'EQT(Wbit textA, Wbit textB ; any) -> 1bit',
+  ],
+  TRIMT:    [
+    'TRIMT(Wbit text, Wbit trimChars) -> Wbit',
+    'TRIMT(Wbit text, Wbit trimChars ; left) -> Wbit',
+    'TRIMT(Wbit text, Wbit trimChars ; right) -> Wbit',
+    'TRIMT(Wbit text, Wbit trimChars ; left right) -> Wbit',
+    'TRIMT(Wbit text, Wbit trimChars ; any) -> Wbit',
+  ],
   HIGH:     ['HIGH(Xbit) -> Xbit'],
   LOW:      ['LOW(Xbit) -> Xbit'],
   ANY:      ['ANY(Xbit) -> 1bit'],

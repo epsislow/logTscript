@@ -95,6 +95,7 @@ const TEST_RUNTIME_SCRIPTS = [
   "core/tensor-axis-reduce.js",
   "core/tensor-builtins.js",
   "core/sort-builtin.js",
+  "core/text-builtin.js",
   "core/watch-expand.js",
   "files/storage.js",
   "core/user-func-overloads.js",

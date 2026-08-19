@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -6388,6 +6388,100 @@ show(eqv)
 
 [GT](builtin-GT.md) · [LT](builtin-LT.md) · [builtin-logic-gate-functions.md](builtin-logic-gate-functions.md)
 `,
+    'builtin-EQT.md': `# EQT (ASCII text equality)
+
+Index: [Text functions](text-functions.md) · [builtin-functions.md](builtin-functions.md)
+
+Compare two **ASCII text** wire values. Unlike bitwise \`EQ\`, **\`EQT\` ignores NUL (\`\\0\`) bytes** according to call tags — useful for padded strings, logic \`text\` pins, and C-style null-terminated blobs.
+
+## Signatures
+
+\`\`\`
+EQT(Wbit textA, Wbit textB) -> 1bit
+EQT(Wbit textA, Wbit textB ; left) -> 1bit
+EQT(Wbit textA, Wbit textB ; right) -> 1bit
+EQT(Wbit textA, Wbit textB ; left right) -> 1bit
+EQT(Wbit textA, Wbit textB ; any) -> 1bit
+\`\`\`
+
+Operands are **8-bit ASCII cells** (wire string literals \`"joe"\`, \`"joe\\0"\`, or any binary blob interpreted as bytes).
+
+## Call tags (NUL handling)
+
+| Tag | NUL (\`\\0\`) handling before compare |
+|-----|-------------------------------------|
+| *(default)* / \`any\` | Remove **every** \`\\0\` byte in each operand |
+| \`left\` | Remove leading \`\\0\` bytes only |
+| \`right\` | Remove trailing \`\\0\` bytes only |
+| \`left right\` | Remove leading **and** trailing \`\\0\` only (interior \`\\0\` kept) |
+
+**Mutual exclusion:** \`any\` cannot be combined with \`left\` or \`right\` → parse/runtime error.
+
+## Examples
+
+### Default — ignore \`\\0\` anywhere
+
+\`\`\`logts-play
+1wire eq0 = EQT("joe\\0", "joe")
+1wire eq1 = EQT("\\0joe\\0", "joe")
+1wire eq2 = EQT("\\0jo\\0e\\0", "joe")
+show(eq0)
+show(eq1)
+show(eq2)
+\`\`\`
+
+→ \`111\`.
+
+### \`;right\` — trailing NUL only
+
+\`\`\`logts-play
+1wire a = EQT("joe\\0", "joe" ;right)
+1wire b = EQT("\\0joe", "joe" ;right)
+show(a)
+show(b)
+\`\`\`
+
+→ \`a=1\`, \`b=0\`.
+
+### \`;left\` — leading NUL only
+
+\`\`\`logts-play
+1wire a = EQT("joe\\0", "joe" ;left)
+1wire b = EQT("\\0joe", "joe" ;left)
+1wire c = EQT("\\0joe\\0", "joe" ;left)
+show(a)
+show(b)
+show(c)
+\`\`\`
+
+→ \`a=0\`, \`b=1\`, \`c=0\`.
+
+### \`;left right\` — edge NUL only
+
+\`\`\`logts-play
+1wire eq = EQT("\\0joe\\0", "joe" ;left right)
+show(eq)
+\`\`\`
+
+→ \`1\`.
+
+### \`;any\` — interior NUL ignored
+
+\`\`\`logts-play
+1wire a = EQT("jo\\0e", "joe" ;any)
+1wire b = EQT("jo\\0e\\0\\0\\0\\0", "joe" ;any)
+1wire c = EQT("jo\\0b", "joe" ;any)
+show(a)
+show(b)
+show(c)
+\`\`\`
+
+→ \`a=1\`, \`b=1\`, \`c=0\`.
+
+## See also
+
+[TRIMT](builtin-TRIMT.md) · [Text functions](text-functions.md) · [EQ](builtin-EQ.md) (bitwise)
+`,
     'builtin-FILL.md': `# FILL (constant matrix · bit pattern tile)
 
 Index: [builtin-functions.md](builtin-functions.md) · [2D tensors](wire-vectors.md)
@@ -6519,6 +6613,7 @@ Full \`doc()\` reference: [doc-function.md](doc-function.md).
 | **Vector reduction** | \`SUM\`, \`DOT\`, \`ARGMAX\`, \`ARGMIN\` | [vector-reduction.md](vector-reduction.md) · **\`; matrix\`** (element-wise 2D): [matrix-reduction.md](matrix-reduction.md) |
 | **Tensor / matrix** | \`SHAPE\`, \`RANK\`, \`PIVOT\`, \`REPEAT\`, \`IDENTITY\`, \`ZEROS\`, \`FILL\`, \`DIAG\`, \`IOTA\`, \`OUTER\`, \`TRACE\`, \`NORM\`, \`L2\`, \`TRIL\`, \`TRIU\`, \`FLIPUD\`, \`FLIPLR\`, \`MCAT\`, \`MSLICE\` | [wire-vectors.md](wire-vectors.md) · [builtin-SHAPE.md](builtin-SHAPE.md) · [builtin-RANK.md](builtin-RANK.md) · [builtin-REPEAT.md](builtin-REPEAT.md) · [builtin-FILL.md](builtin-FILL.md) (matrix + bit pattern) |
 | **Number conversion** | \`CNTN10S\`, \`N2N10S\`, \`N10S2N\`, \`CNTN16S\`, \`N2N16S\`, \`N16S2N\`, \`ISDIGIT\` | [number-conversion.md](number-conversion.md) |
+| **Text (ASCII)** | \`EQT\`, \`TRIMT\` | [text-functions.md](text-functions.md) · [builtin-EQT.md](builtin-EQT.md) · [builtin-TRIMT.md](builtin-TRIMT.md) |
 | **Bit selection** | \`HIGH\`, \`LOW\`, \`ANY\`, \`ZERO\`, \`ANY*\`, \`ALL*\`, \`BITINDEX\`, \`ONEHOT\` | [builtin-bit-selection-functions.md](builtin-bit-selection-functions.md) |
 | **Bit analysis** | \`PARITY\`, \`PARITYEVEN\`, \`PARITYODD\`, \`CNTONE\`, \`CNTZERO\`, \`BITSIZE\`, \`WWIDTH\` | [builtin-bit-analysis-functions.md](builtin-bit-analysis-functions.md) · UART parity: [builtin-PARITYEVEN.md](builtin-PARITYEVEN.md) |
 | **Bit transform** | \`LSHIFT\`, \`RSHIFT\`, \`REVERSE\`, \`LROTATE\`, \`RROTATE\` | [builtin-bit-transform-functions.md](builtin-bit-transform-functions.md) · \`RSHIFT\` \`; signed\` = ASHR · **\`; matrix\`**: [matrix-reduction.md](matrix-reduction.md) |
@@ -9279,6 +9374,79 @@ show(lo)
 ## See also
 
 [TRIU](builtin-TRIU.md) · [PIVOT](wire-vectors.md#pivot)
+`,
+    'builtin-TRIMT.md': `# TRIMT (ASCII text trim)
+
+Index: [Text functions](text-functions.md) · [builtin-functions.md](builtin-functions.md)
+
+Remove characters from an **ASCII text** wire using a **trim set** (second argument). Same call-tag model as [EQT](builtin-EQT.md), but trims arbitrary bytes instead of comparing.
+
+## Signatures
+
+\`\`\`
+TRIMT(Wbit text, Wbit trimChars) -> Wbit
+TRIMT(Wbit text, Wbit trimChars ; left) -> Wbit
+TRIMT(Wbit text, Wbit trimChars ; right) -> Wbit
+TRIMT(Wbit text, Wbit trimChars ; left right) -> Wbit
+TRIMT(Wbit text, Wbit trimChars ; any) -> Wbit
+\`\`\`
+
+- **First argument:** source text (wire or string literal).
+- **Second argument:** trim set — each **8-bit cell** is one character to remove (e.g. \`" "\` or \`" \\0"\`).
+- **Result width:** same bit width as the first argument; shorter logical text is **right-padded with \`\\0\`**.
+
+## Call tags
+
+| Tag | Trim behaviour |
+|-----|----------------|
+| *(default)* / \`any\` | Remove **every** character in the trim set **wherever** it appears |
+| \`left\` | Remove trim-set characters from the **start** only |
+| \`right\` | Remove trim-set characters from the **end** only; trailing \`\\0\` padding is peeled first (LogTScript text convention) |
+| \`left right\` | Trim from **both** edges (interior characters kept); trailing \`\\0\` padding peeled before right trim |
+
+**Mutual exclusion:** \`any\` cannot be combined with \`left\` or \`right\`.
+
+## Examples
+
+### \`;right\` — trailing \`\\0\`
+
+\`\`\`logts-play
+48wire t = TRIMT("  a  \\0", "\\0" ;right)
+show(t; ascii)
+\`\`\`
+
+→ \`"  a  "\` (trailing NUL removed).
+
+### \`;right\` — trailing spaces (after NUL peel)
+
+\`\`\`logts-play
+48wire t = TRIMT("  a  \\0", " " ;right)
+show(t; ascii)
+\`\`\`
+
+→ \`"  a"\` (trailing spaces removed; leading spaces kept).
+
+### \`;any\` — all spaces
+
+\`\`\`logts-play
+48wire t = TRIMT("  a  \\0", " " ;any)
+show(t; ascii)
+\`\`\`
+
+→ \`"a"\` (every space removed).
+
+### \`;any\` — spaces and NUL everywhere
+
+\`\`\`logts-play
+48wire t = TRIMT("  a  \\0", " \\0" ;any)
+show(t; ascii)
+\`\`\`
+
+→ \`"a"\`.
+
+## See also
+
+[EQT](builtin-EQT.md) · [Text functions](text-functions.md) · [wire-literals.md — strings](wire-literals.md)
 `,
     'builtin-TRIU.md': `# TRIU (upper triangle)
 
@@ -39599,6 +39767,67 @@ Use **lcd** when text must be written to specific screen positions.
 - [lcd.md](lcd.md) — pixel matrix at fixed coordinates
 - [debug.md](debug.md) — \`probe\` / \`show\`
 - [future-component-ideas.md](future-component-ideas.md) — C6 Text terminal
+`,
+    'text-functions.md': `# Text functions (ASCII)
+
+Built-ins for **ASCII text on wires** — equality with NUL-aware rules and trimming. Complements bitwise [EQ](builtin-EQ.md) and display tag \`ascii\` in [debug.md](debug.md).
+
+Index: [builtin-functions.md](builtin-functions.md)
+
+---
+
+## Overview
+
+| Function | Role |
+|----------|------|
+| [EQT](builtin-EQT.md) | Compare two text blobs; \`\\0\` ignored per call tags → \`1bit\` |
+| [TRIMT](builtin-TRIMT.md) | Remove trim-set characters from a text wire → same width |
+
+Operands use **8-bit ASCII cells** (wire string literals \`"hello"\`, \`"a\\0"\`, grouped \`\\65 \\66;ascii\`, or assigned wires).
+
+Shared **call tags:** \`left\`, \`right\`, \`left right\`, \`any\` (default). Tag \`any\` is mutually exclusive with \`left\` / \`right\`.
+
+---
+
+## EQT — quick reference
+
+\`\`\`
+EQT(textA, textB) -> 1bit          # default: strip all \\0, then compare
+EQT(textA, textB ; right) -> 1bit  # strip trailing \\0 only
+\`\`\`
+
+\`\`\`logts-play
+1wire ok = EQT("joe\\0", "joe")
+show(ok)
+\`\`\`
+
+See [builtin-EQT.md](builtin-EQT.md).
+
+---
+
+## TRIMT — quick reference
+
+\`\`\`
+TRIMT(text, trimSet) -> Wbit       # default: remove all trim-set chars everywhere
+TRIMT(text, trimSet ; right) -> Wbit # trim from end (peels trailing \\0 first)
+\`\`\`
+
+\`\`\`logts-play
+48wire t = TRIMT("  a  \\0", " " ;right)
+show(t; ascii)
+\`\`\`
+
+See [builtin-TRIMT.md](builtin-TRIMT.md).
+
+---
+
+## Related
+
+| Topic | Page |
+|-------|------|
+| Wire string literals | [wire-literals.md](wire-literals.md) |
+| Logic \`text\` pins | [comp-logic.md](comp-logic.md) |
+| \`show(…; ascii)\` | [debug.md](debug.md) |
 `,
     'user-functions.md': `# User-defined functions (\`def\`)
 

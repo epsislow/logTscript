@@ -139,6 +139,7 @@ const DOC_SECTIONS = [
     items: [
       { file: 'allow-notallow.md', label: 'Allow / NotAllow' },
       { file: 'builtin-DIAG.md', label: 'DIAG (diagonal matrix)', searchPrimary: 'DIAG' },
+      { file: 'builtin-EQT.md', label: 'EQT (ASCII text equality)', searchPrimary: 'EQT' },
       { file: 'builtin-FLIPLR.md', label: 'FLIPLR (flip columns)', searchPrimary: 'FLIPLR' },
       { file: 'builtin-FLIPUD.md', label: 'FLIPUD (flip rows)', searchPrimary: 'FLIPUD' },
       { file: 'builtin-IDENTITY.md', label: 'IDENTITY (identity matrix)', searchPrimary: 'IDENTITY' },
@@ -152,6 +153,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-SORT.md', label: 'SORT', searchPrimary: 'SORT' },
       { file: 'builtin-TRACE.md', label: 'TRACE (matrix trace)', searchPrimary: 'TRACE' },
       { file: 'builtin-TRIL.md', label: 'TRIL (lower triangle)', searchPrimary: 'TRIL' },
+      { file: 'builtin-TRIMT.md', label: 'TRIMT (ASCII text trim)', searchPrimary: 'TRIMT' },
       { file: 'builtin-TRIU.md', label: 'TRIU (upper triangle)', searchPrimary: 'TRIU' },
       { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)', searchPrimary: 'ZEROS' },
       { file: 'chip-board-execution.md', label: 'Chip and board execution' },
@@ -161,7 +163,8 @@ const DOC_SECTIONS = [
       { file: 'mmap.md', label: 'Memory map (`comp [mmap]`)' },
       { file: 'network-chat.md', label: 'Network chat — socket uplink + packet downlink (wave)' },
       { file: 'servo.md', label: 'Servo component' },
-      { file: 'sock.md', label: 'Socket (`sock`) — dynamic bit stream', searchPrimary: 'sock' }
+      { file: 'sock.md', label: 'Socket (`sock`) — dynamic bit stream', searchPrimary: 'sock' },
+      { file: 'text-functions.md', label: 'Text functions (ASCII)', searchPrimary: 'ASCII EQT TRIMT' }
     ],
   }
 ];
@@ -304,6 +307,9 @@ const DOC_SEARCH_ONLY = [
     { file: 'builtin-DIAG.md', label: 'DIAG', section: 'Tensor / matrix',
       searchPrimary:
         'DIAG' },
+    { file: 'builtin-EQT.md', label: 'EQT', section: 'Built-in',
+      searchPrimary:
+        'EQT' },
     { file: 'builtin-FLIPLR.md', label: 'FLIPLR', section: 'Tensor / matrix',
       searchPrimary:
         'FLIPLR' },
@@ -343,6 +349,9 @@ const DOC_SEARCH_ONLY = [
     { file: 'builtin-TRIL.md', label: 'TRIL', section: 'Tensor / matrix',
       searchPrimary:
         'TRIL' },
+    { file: 'builtin-TRIMT.md', label: 'TRIMT', section: 'Built-in',
+      searchPrimary:
+        'TRIMT' },
     { file: 'builtin-TRIU.md', label: 'TRIU', section: 'Tensor / matrix',
       searchPrimary:
         'TRIU' },

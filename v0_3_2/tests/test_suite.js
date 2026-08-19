@@ -36665,5 +36665,104 @@ comp [logic] .characterLogic:
     h.assert('value preserved low 64', String(parseInt(interp.getValueFromRef(comp.pinStorage.myX.ref).slice(-64), 2)), '15');
   });
 
+  function strBin(str) {
+    return LogTScriptWireLiterals.wireStringToBin(str);
+  }
+
+  reg(3521, 'text-builtin', 'EQT — default ignores NUL anywhere', function(h, session) {
+    const { interp } = session.run(
+      '1wire a = EQT("joe\\0", "joe")\n' +
+      '1wire b = EQT("\\0joe\\0", "joe")\n' +
+      '1wire c = EQT("\\0jo\\0e\\0", "joe")'
+    );
+    h.assert('joe\\0', session.getWire(interp, 'a'), '1');
+    h.assert('\\0joe\\0', session.getWire(interp, 'b'), '1');
+    h.assert('\\0jo\\0e\\0', session.getWire(interp, 'c'), '1');
+  });
+
+  reg(3522, 'text-builtin', 'EQT — right tag trailing NUL only', function(h, session) {
+    const { interp } = session.run(
+      '1wire a = EQT("joe\\0", "joe" ;right)\n' +
+      '1wire b = EQT("\\0joe", "joe" ;right)'
+    );
+    h.assert('right joe\\0', session.getWire(interp, 'a'), '1');
+    h.assert('right \\0joe', session.getWire(interp, 'b'), '0');
+  });
+
+  reg(3523, 'text-builtin', 'EQT — left tag leading NUL only', function(h, session) {
+    const { interp } = session.run(
+      '1wire a = EQT("joe\\0", "joe" ;left)\n' +
+      '1wire b = EQT("\\0joe", "joe" ;left)\n' +
+      '1wire c = EQT("\\0joe\\0", "joe" ;left)'
+    );
+    h.assert('left joe\\0', session.getWire(interp, 'a'), '0');
+    h.assert('left \\0joe', session.getWire(interp, 'b'), '1');
+    h.assert('left \\0joe\\0', session.getWire(interp, 'c'), '0');
+  });
+
+  reg(3524, 'text-builtin', 'EQT — left right edge NUL', function(h, session) {
+    const { interp } = session.run('1wire eq = EQT("\\0joe\\0", "joe" ;left right)');
+    h.assert('edge', session.getWire(interp, 'eq'), '1');
+  });
+
+  reg(3525, 'text-builtin', 'EQT — any interior NUL', function(h, session) {
+    const { interp } = session.run(
+      '1wire a = EQT("jo\\0e", "joe" ;any)\n' +
+      '1wire b = EQT("jo\\0e\\0\\0\\0\\0", "joe" ;any)\n' +
+      '1wire c = EQT("jo\\0b", "joe" ;any)'
+    );
+    h.assert('interior ok', session.getWire(interp, 'a'), '1');
+    h.assert('interior pads', session.getWire(interp, 'b'), '1');
+    h.assert('interior diff', session.getWire(interp, 'c'), '0');
+  });
+
+  reg(3526, 'text-builtin', 'EQT — any with left/right error', function(h, session) {
+    const r1 = session.run('1wire x = EQT("jo\\0b", "joe" ;left any)');
+    const err1 = r1.out.find(l => l.startsWith('Error:')) || '';
+    h.assert('left any', String(err1.includes('cannot use any with left or right')), 'true');
+    const r2 = session.run('1wire x = EQT("jo\\0b", "joe" ;right any)');
+    const err2 = r2.out.find(l => l.startsWith('Error:')) || '';
+    h.assert('right any', String(err2.includes('cannot use any with left or right')), 'true');
+  });
+
+  reg(3527, 'text-builtin', 'TRIMT — right trim NUL', function(h, session) {
+    const { interp } = session.run('48wire t = TRIMT("  a  \\0", "\\0" ;right)');
+    h.assert('trim nul', session.getWire(interp, 't'), strBin('  a  ').padEnd(48, '0'));
+  });
+
+  reg(3528, 'text-builtin', 'TRIMT — right trim spaces after NUL peel', function(h, session) {
+    const { interp } = session.run('48wire t = TRIMT("  a  \\0", " " ;right)');
+    h.assert('trim sp right', session.getWire(interp, 't'), strBin('  a').padEnd(48, '0'));
+  });
+
+  reg(3529, 'text-builtin', 'TRIMT — any removes all spaces', function(h, session) {
+    const { interp } = session.run('48wire t = TRIMT("  a  \\0", " " ;any)');
+    h.assert('trim sp any', session.getWire(interp, 't'), strBin('a').padEnd(48, '0'));
+  });
+
+  reg(3530, 'text-builtin', 'TRIMT — any removes spaces and NUL', function(h, session) {
+    const { interp } = session.run('48wire t = TRIMT("  a  \\0", " \\0" ;any)');
+    h.assert('trim all', session.getWire(interp, 't'), strBin('a').padEnd(48, '0'));
+  });
+
+  reg(3531, 'doc', 'BUILTIN_DOC — EQT signatures', function(h, session) {
+    const lines = Interpreter.getDocLines('EQT');
+    h.assert('EQT 5 signatures', String(lines.length), '5');
+    h.assert('EQT any tag', String(lines.some(l => l.includes('; any'))), 'true');
+  });
+
+  reg(3532, 'doc', 'BUILTIN_DOC — TRIMT signatures', function(h, session) {
+    const lines = Interpreter.getDocLines('TRIMT');
+    h.assert('TRIMT 5 signatures', String(lines.length), '5');
+    h.assert('TRIMT left right', String(lines.some(l => l.includes('; left right'))), 'true');
+  });
+
+  reg(3533, 'text-builtin', 'isBuiltinFunction — EQT TRIMT recognized', function(h, session) {
+    for (const fn of ['EQT', 'TRIMT']) {
+      const lines = Interpreter.getDocLines(fn, new Map());
+      h.assert(fn + ' recognized', String(lines[0].includes('undefined function')), 'false');
+    }
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

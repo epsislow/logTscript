@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — motor relațional declarativ, model ASM-like. MVP complet: Fazele 0–6 (inclusiv Faza 5 matrix/vector redirect + extensii pin frontieră)."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — motor relațional declarativ, model ASM-like. MVP complet: Fazele 0–6. Următor pas: Faza 7 negație `\\+` (ex-1+c)."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -23,6 +23,9 @@ todos:
   - id: logic-allow-notallow
     content: "Faza 6: inline.type{logic} + comp.type{logic} — Allow/NotAllow, doc, teste policy"
     status: completed
+  - id: logic-negation
+    content: "Faza 7: negație \\ + goal — parser, engine NAF, query multi-goal, teste 3521+, doc"
+    status: pending
 isProject: false
 ---
 
@@ -312,7 +315,7 @@ sequenceDiagram
 
 ## Decizii de luat — tabel rezumat
 
-> **D1–D19 closed.** **Fazele 0–6 implementate (completed).** Faza 5: matrix/vector redirect, D12a/D12b, extensii pin `number`/`text`, slice `::c`, round-trip text.
+> **D1–D24:** D20–D24 **confirmed** pentru Faza 7. **Fazele 0–6 (completed).** **Faza 7 (ready-to-implement).** **Faza 8** = **1+d** depth tuning post-F7.
 
 | ID | Subiect | Decizia ta |
 |----|---------|------------|
@@ -818,13 +821,191 @@ Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C**
 
 ---
 
+## Decizii Faza 7 — negație `\+` (D20–D24)
+
+> **Sursă:** item **1+c** promovat din backlog post-MVP.  
+> **Stare:** **D20=A, D21=A, D23=A (confirmed).** **D22=A** — confirmat după clarificare output (vezi secțiunea D22). **D24=A (confirmed)** — folosește `maxDepth` existent; tuning avansat → **Faza 8 / 1+d**.
+
+### Rezumat D20–D24
+
+| ID | Subiect | Decizie |
+|----|---------|---------|
+| **D20** | Sintaxă negație | **A (confirmed)** — `\+ goal` |
+| **D21** | Unde e permis | **A (confirmed)** — body + query |
+| **D22** | Query multi-goal | **A (confirmed)** — comma = AND; output = soluții vars libere, **nu** vector de booleeni per goal |
+| **D23** | Semantica NAF | **A (confirmed)** — Prolog NAF |
+| **D24** | Depth / soluții în negat | **A (confirmed)** — inner respectă `maxDepth` (256); oprește la prima soluție inner |
+
+---
+
+### D20 — Sintaxă negație **(completed: A)**
+
+**Decizie țintă:** operator prefix **`\+`** în [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js), ca Prolog.
+
+```logts
+eligible(X) <- person(X), \+ banned(X)
+
+query noAgeForJohn:
+    \+ age(john, _)
+```
+
+| Opțiune | Pro | Contra |
+|---------|-----|--------|
+| **A — `\+ goal` (recommended)** | Familiar Prolog; aliniat cu sketch 1+c | Tokenizer nou (`\` + `+`); atenție la `=\\=` existent |
+| **B — `not goal`** | Lizibil fără escape | Nu e Prolog; `not` ar putea confunda cu atom |
+| **C — `!goal`** | Scurt | Coliziune semantică cu negare LogTScript built-in `!` |
+
+**Implementare tokenizer (A):** în `logicTokenize`, înainte de `OP '+'`, recunoaște `\` + `+` → token `NOT` / valoare `\\+`.
+
+**AST:** `{ kind: 'not', goal: <BodyGoal> }` — recursiv (suportă `\+ \+ goal`).
+
+---
+
+### D21 — Unde e permis `\+` **(completed: A)**
+
+| Opțiune | Scope |
+|---------|-------|
+| **A — body + query (recommended)** | `parseBodyGoal` + goals în `query` (vezi D22) |
+| **B — doar body** | Negație doar după `<-`; query-uri boolean doar via predicate auxiliar |
+
+**Fără schimbări comp:** redirect boolean (`query >= wire`) funcționează deja când query are **0** vars libere — ex. `query ok: \+ age(peter, _)`.
+
+---
+
+### D22 — Query multi-goal **(completed: A)**
+
+**Ce înseamnă `person(X), \+ age(X, _)` — NU e output „11” / două booleeni**
+
+Virgula = **AND** (ca în body de regulă). Motorul caută **o singură legare pentru X** care satisface **ambele** goals în secvență:
+
+1. `person(X)` — găsește un X care e persoană
+2. `\+ age(X, _)` — **același X**: nu se poate demonstra că are vârstă
+
+`_` e variabilă anonimă — **nu** apare la output.
+
+**Vars libere la output:** doar **`X`** (1 var). Goals intermediare / negația **nu** produc biți separați pe wire.
+
+**Soluții (discovery order):**
+
+| X încercat | person(X) | \+ age(X, _) | Rezultat |
+|------------|-----------|--------------|----------|
+| john | ok | eșuează (john are age) | respins |
+| mary | ok | eșuează | respins |
+| peter | ok | reușește | **soluție** `{ X: peter }` |
+
+Dacă ar exista mai mulți oameni fără vârstă → **mai multe soluții**, fiecare cu câte un `X`.
+
+**Ce merge pe wire (comp redirect) — același model ca azi:**
+
+| Redirect | Ce primești |
+|----------|-------------|
+| `personWithoutAge >= flag` (0 vars) | **1 bit:** `1` dacă există ≥1 soluție, altfel `0` — **nu** `"11"` |
+| `personWithoutAge:0 >= who` (1 var, scalar) | **Valoarea lui X** din soluția 0 — atom `peter` → ASCII pe wire (ex. `8wire`) |
+| `personWithoutAge >= vector` (1 var) | **Vector de X-uri** — câte un slot per soluție: `[peter, …]` encoded |
+| `personWithoutAge:1 >= who2` | A doua soluție X (dacă există) |
+
+**Contrast — query cu 0 vars (boolean pur):**
+
+```logts
+query johnHasNoAge:
+    \+ age(john, _)
+```
+
+→ 0 vars libere → `johnHasNoAge >= flag` = **`0`** (john are age), un singur bit.
+
+**Problemă actuală:** parserul acceptă la `query` **un singur** compound:
+
+```123:124:v0_3_2/core/logic-assembler.js
+        const goal = this.parseCompound();
+        queries.push({ name: qName, goal });
+```
+
+Pattern canonical Prolog **nu compilează** azi:
+
+```logts
+query personWithoutAge:
+    person(X), \+ age(X, _)
+```
+
+| Opțiune | Schimbare | Pro | Contra |
+|---------|-----------|-----|--------|
+| **A — extend query (recommended)** | `queries.push({ name, goals: parseBodyGoals() })`; migrare `q.goal` → `q.goals[]` | Direct, ca body regulă | Mic breaking change intern (3–4 fișiere) |
+| **B — un singur compound** | Fără schimbare query | Minim diff | Nu acoperă exemplul user fără predicate wrapper |
+| **C — wrapper predicate (change)** | `noAge(X) <- person(X), \+ age(X, _)` + `query q: noAge(X)` | Query syntax neschimbat | Verbozitate; predicate „artificial” |
+
+**Impact D22-A:**
+
+| Fișier | Change |
+|--------|--------|
+| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | `parseProgram` query → `parseBodyGoals()`; `logicListFreeVarsInGoal` → walk pe toate goals; `logicFormatGoal` / validate |
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `solveQuery(goals[])` → `_solveGoals(goals, …)` |
+| [`components/logic.js`](../v0_3_2/core/components/logic.js) | free-var count pe `q.goals` |
+
+---
+
+### D23 — Semantica negation as failure **(completed: A)**
+
+**Definiție (A — recommended):** `\+ G` reușește ⟺ `_solveGoals([G], env, …)` nu produce **nicio** soluție. Nu e negare logică clasică — e test procedural (ca SWI-Prolog).
+
+**Algoritm engine (schimbare în `_solveGoals`):**
+
+```javascript
+if (g0.kind === 'not') {
+  const trail = env.trailLength();
+  let found = false;
+  this._solveGoals([g0.goal], env, depth + 1, () => { found = true; return false; });
+  env.undo(trail);           // obligatoriu — nu propagă legări din inner
+  if (found) return false;
+  return this._solveGoals(rest, env, depth + 1, onSuccess);
+}
+```
+
+| Opțiune | Comportament |
+|---------|--------------|
+| **A — NAF Prolog (recommended)** | Ca mai sus; documentăm caveat-uri vars libere în negat |
+| **B — safe negation (change)** | Înainte de inner solve, verifică vars din `G` sunt ground; altfel `fail` sau eroare |
+| **C — static ground** | Respinge la parse dacă negated goal conține vars |
+
+**Exemplu referință (user):**
+
+```logts
+person(john). person(mary). person(peter).
+age(john, 25). age(mary, 30).
+; query: person(X), \+ age(X, _)  →  X = peter
+```
+
+---
+
+### D24 — `maxDepth` / `maxSolutions` în negat **(completed: A)**
+
+| Opțiune | Comportament |
+|---------|--------------|
+| **A (confirmed)** | Inner solve respectă `maxDepth` (256 azi); oprește la **prima** soluție inner |
+| **B** | Inner fără limită depth — risc stack/recursiv infinit în negat |
+| **C** | Inner caută toate soluțiile — inutil pentru NAF, mai lent |
+
+**Ce există deja (Faza 2):** `LogicEngine.maxDepth = 256`, `maxSolutions = 64`. Faza 7 doar **aplică** aceleași limite în branch-ul `not` — fără API nou.
+
+**Faza 8 / 1+d (amânat — după F7):** recursivitate + depth tuning avansat:
+
+- `maxDepth` / `maxSolutions` configurabile per comp sau inline
+- mesaje eroare clare când depth depășit (nu doar `fail` silent)
+- lint recursivitate / documentare pattern-uri sigure
+- interacțiune **1+i** cut + depth
+
+**Recomandare:** **1+d NU blochează Faza 7.** NAF are nevoie doar să contorizeze depth la inner solve (D24-A). Tuning-ul poate fi **Faza 8** imediat după `\+`.
+
+**Legat de amânate:** **1+i** (cut în negat) — post-F7.
+
+---
+
 ## Amânate (post-MVP)
 
 | ID | Subiect | Detaliu | Legat de |
 |----|---------|---------|----------|
 | **1+a** | Inline-native (sketch v1) | `.people:johnOwns:0` direct pe inline, fără comp | D1 respins |
 | **1+b** | Result policies | `;all`, `;unique`, `first`, `last` | D10 |
-| **1+c** | Negation | `\+ goal` | D5 |
+| **1+c** | ~~Negation~~ | **Promovat → Faza 7** (`\+ goal`) | D5, D20–D24 |
 | **1+d** | Recursivitate + depth limit | | D5 |
 | **1+e** | Facts dinamice runtime | assert/retract | |
 | **1+f** | ~~Multi-var vague~~ | **Mutat în Faza 5** — redirect matrix/vector | D12 |
@@ -848,6 +1029,8 @@ Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C**
 | **Faza 4** docs/tests | — | **(completed)** |
 | **Faza 5** matrix/vector output | 2 vars max, redirect ca [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md) + extensii pin/round-trip | **(completed)** |
 | **Faza 6** Allow/NotAllow | `inline.type{logic}`, `comp.type{logic}` | **(completed)** |
+| **Faza 7** Negation `\+` | D20–D24 | **(ready-to-implement)** — D20–D24 **confirmed** |
+| **Faza 8** Recursivitate + depth tuning | **1+d** | amânat post-F7 |
 
 ---
 
@@ -862,9 +1045,9 @@ Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C**
 | **3** | [`components/logic.js`](../v0_3_2/core/components/logic.js), program block în comp header, redirect `query:N >=`, `query >=` boolean |
 | **4** | [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md), [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md), teste **3500–3505**, doc-viewer |
 | **6** | [`allow-notallow.md`](../v0_3_2/doc/allow-notallow.md), teste **3506–3507** |
-| **5** | — neimplementat |
+| **5** | F5 vector/matrix, **3512–3520**, pin limits, round-trip |
 
-**Teste:** 2669/2669 trec (inclusiv grupul `logic` + `allow-notallow`).
+**Teste:** 2682/2682 trec (inclusiv grupul `logic` + `allow-notallow`).
 
 **Notă:** `logic-comp-bind.js` planificat separat → integrat în `logic-assembler.js` (`parseLogicProgramBlock`) + `components/logic.js`.
 
@@ -872,7 +1055,7 @@ Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C**
 
 ### Faza 0 — Spec **(completed)**
 
-Toate deciziile D1–D19 confirmate. **Fazele 0–6 (completed).** Amânate: **1+l**, **1+k**, **1+b** opțional.
+Toate deciziile D1–D19 confirmate. **Fazele 0–6 (completed).** **Faza 7** așteaptă confirmare **D20–D24**. Amânate: **1+l**, **1+k**, **1+b** opțional.
 
 ---
 
@@ -1022,6 +1205,120 @@ comp [reg] .bad:       # blocat
 
 ---
 
+### Faza 7 — Negation `\+` **(ready-to-implement)**
+
+**Scop:** extinde motorul D5-A cu **negation as failure** (`\+ goal`), promovat din **1+c**. Permite query-uri de tip „cine nu are X?” și filtrare în body de regulă.
+
+**Prerequisite:** Fazele 1–2 (parser + engine); Faza 3 (redirect boolean 0 vars deja funcțional).
+
+**Decizii de confirmat:** **D20–D24** (tabel + secțiuni de mai sus).
+
+#### Ce lipsește azi
+
+| Layer | Stare actuală | Faza 7 |
+|-------|---------------|--------|
+| Tokenizer | `\` folosit doar în `=\\=` | Token **`\+`** |
+| `parseBodyGoal` | call / cmp / unify | Branch **`not`** |
+| `query` | un singur `parseCompound()` | **D22:** `parseBodyGoals()` |
+| `_solveGoals` | call, cmp, unify | Branch **`not`** + undo trail |
+| `logicInternGoal` / free-vars walk | fără `not` | Recursiv pe inner goal |
+| Docs | „Not built-in — use facts” | Secțiune NAF + exemple |
+| Teste | — | **3521+** |
+
+#### Fișiere de modificat
+
+| Fișier | Rol |
+|--------|-----|
+| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | Token `\\+`; AST `kind:'not'`; query → `goals[]`; format/validate/free-vars |
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | NAF în `_solveGoals`; `logicInternGoal(not)`; `logicCollectFreeVarsInGoal(not)` |
+| [`components/logic.js`](../v0_3_2/core/components/logic.js) | Elaborare: free vars din `q.goals` (dacă D22-A) |
+| [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md) | Sintaxă `\\+`, semantica NAF, diferențe Prolog, query multi-goal |
+| [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md) | Exemplu comp: boolean + vector „person fără age” |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | Grup `logic` **3521–3525** (minim) |
+
+**Fără schimbări:** [`parser.js`](../v0_3_2/core/parser.js) redirect, [`components/logic.js`](../v0_3_2/core/components/logic.js) `_applyRedirects` — negația e transparentă la runtime comp.
+
+#### Flux NAF (mermaid)
+
+```mermaid
+flowchart TD
+  solveGoals["_solveGoals goals, env"]
+  notGoal{"goal.kind == not?"}
+  innerSolve["_solveGoals innerGoal, env"]
+  anySol{"prima solutie gasita?"}
+  undoTrail["env.undo trail"]
+  failNeg["return false"]
+  contRest["_solveGoals rest, env"]
+
+  solveGoals --> notGoal
+  notGoal -->|nu| contRest
+  notGoal -->|da| innerSolve
+  innerSolve --> anySol
+  anySol -->|da| undoTrail
+  undoTrail --> failNeg
+  anySol -->|nu| undoTrail2["env.undo trail"]
+  undoTrail2 --> contRest
+```
+
+#### Exemplu țintă inline + comp
+
+```logts
+inline [logic] .world:
+
+    person(john)
+    person(mary)
+    person(peter)
+
+    age(john, 25)
+    age(mary, 30)
+
+    query personWithoutAge:
+        person(X), \+ age(X, _)
+
+    query johnHasNoAge:
+        \+ age(john, _)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+    .world { }
+:
+
+8wire who = \0
+1wire flag = 0
+1wire trigger = 1
+
+.worldLogic:{
+    personWithoutAge:0 >= who
+    johnHasNoAge >= flag
+    set = trigger
+}
+; who = ASCII peter (primul index); flag = 0 (john are age)
+```
+
+#### Teste minime propuse
+
+| ID | Scop |
+|----|------|
+| **3521** | Engine unit: `executeLogicQueries` — `\\+ age(peter, _)` → soluție booleană (0 vars) |
+| **3522** | Engine: `\\+ age(john, _)` → **zero** soluții (john are age) |
+| **3523** | Regulă: `eligible(X) <- person(X), \\+ banned(X)` |
+| **3524** | Comp boolean redirect: `johnHasNoAge >= flag` |
+| **3525** | Comp scalar/vector: `personWithoutAge:0 >= who` → `peter` |
+
+#### Criterii done
+
+- [ ] ~~D20–D24 confirmate de user~~ **(completed)**
+- [ ] Parser + engine + internare AST `not`
+- [ ] Query multi-goal (dacă D22-A)
+- [ ] Teste **3521–3525** verzi; suite completă regresie
+- [ ] Doc inline-logic + comp-logic + manifest doc regenerat
+
+**Amânate legate (nu F7):** **1+i** cut, **1+d** depth policy avansat, **1+b** filtrare soluții după NAF.
+
+---
+
 ## Exemplu țintă complet (sketch v2, D1 completed)
 
 ```logts
@@ -1111,6 +1408,7 @@ comp [logic] .peopleLogic:
 | `use` circular | lint la elaborare **1+g** |
 | boolean redirect | **D7a completed:** `isJohnOwner >= wire` |
 | Quoted atoms `'John'` | amânat post-MVP (D8) |
+| Negation `\+` | **Faza 7 (ready-to-implement)** — D20–D24 neconfirmate |
 
 ---
 
@@ -1120,5 +1418,7 @@ comp [logic] .peopleLogic:
 2. ~~Faza 1~~ → ~~Faza 2~~ → ~~Faza 3~~ → ~~Faza 4~~ **(completed)**
 3. ~~Faza 6~~ — Allow/NotAllow **(completed)**
 4. ~~**Faza 5**~~ — matrix/vector output + pin limits + round-trip **(completed)**
+5. **Faza 7** — negație `\+` **(ready-to-implement)** — D20–D24 confirmed
+6. **Faza 8** — recursivitate + depth tuning **(1+d)** — post-F7
 
-**Plan MVP+ logic: închis.** Următorii pași opționali: **1+l** (query selectiv), **1+k** (POUT), **1+b** (filtrare soluții).
+**Plan MVP+ logic: Fazele 0–6 închise.** Următor pas planificat: **Faza 7**. Opțional post-F7: **1+l**, **1+k**, **1+b**.
