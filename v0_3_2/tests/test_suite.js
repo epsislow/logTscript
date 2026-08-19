@@ -37062,5 +37062,120 @@ comp [logic] .loopLogic:
     h.assert('zero tail', name.slice(40, 80), '0'.repeat(40));
   });
 
+  const INLINE_LOGIC_OWNS_DUP = `inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, chevy)
+    owns(john, ford)
+
+:`;
+
+  const INLINE_LOGIC_OWNS_TRIPLE = `inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(john, bike)
+
+:`;
+
+  const INLINE_LOGIC_AGE_DUP = `inline [logic] .world:
+
+    age(john, 25)
+    age(john, 25)
+    age(mary, 30)
+
+:`;
+
+  reg(3554, 'logic', 'inline query vector ;unique dedupes duplicate facts', function(h, session) {
+    const src = INLINE_LOGIC_OWNS_DUP + `
+8wire[4] raw = .world:query({ owns(john, _) })
+8wire[4] uniq = .world:query({ owns(john, _) };unique)`;
+    const { interp } = session.run(src);
+    const raw = interp.getWireEffectiveValue('raw');
+    const uniq = interp.getWireEffectiveValue('uniq');
+    h.assert('raw slot0 c', raw.slice(0, 8), '01100011');
+    h.assert('raw slot1 c dup', raw.slice(8, 16), '01100011');
+    h.assert('raw slot2 f', raw.slice(16, 24), '01100110');
+    h.assert('uniq slot0 c', uniq.slice(0, 8), '01100011');
+    h.assert('uniq slot1 f', uniq.slice(8, 16), '01100110');
+    h.assert('uniq slot2 fill', uniq.slice(16, 24), '00000000');
+  });
+
+  reg(3555, 'logic', 'inline query matrix ;unique dedupes duplicate rows', function(h, session) {
+    const src = INLINE_LOGIC_AGE_DUP + `
+32wire[3, 2] raw = .world:query({ age(X, Y) })
+32wire[3, 2] uniq = .world:query({ age(X, Y) };unique)`;
+    const { interp } = session.run(src);
+    const raw = interp.getWireEffectiveValue('raw');
+    const uniq = interp.getWireEffectiveValue('uniq');
+    h.assert('raw 192 bits', String(raw.length), '192');
+    h.assert('uniq 192 bits', String(uniq.length), '192');
+    h.assert('raw row1 john dup', raw.slice(64, 96), '01101010' + '01101111' + '01101000' + '01101110');
+    h.assert('raw row2 mary', raw.slice(128, 160), '01101101' + '01100001' + '01110010' + '01111001');
+    h.assert('uniq row0 john', uniq.slice(0, 32), '01101010' + '01101111' + '01101000' + '01101110');
+    h.assert('uniq row0 age', uniq.slice(32, 64), '00000000000000000000000000011001');
+    h.assert('uniq row1 mary', uniq.slice(64, 96), '01101101' + '01100001' + '01110010' + '01111001');
+    h.assert('uniq row1 age', uniq.slice(96, 128), '00000000000000000000000000011110');
+    h.assert('uniq row2 fill', uniq.slice(128, 160), '0'.repeat(32));
+  });
+
+  reg(3556, 'logic', 'inline query ;last returns final discovery solution', function(h, session) {
+    const src = INLINE_LOGIC_OWNS_TRIPLE + `
+8wire firstChar = .world:query({ owns(john, X) };first)
+8wire lastChar = .world:query({ owns(john, X) };last)
+40wire lastCar = .world:query({ owns(john, X) };last)`;
+    const { interp } = session.run(src);
+    h.assert('first c', interp.getWireEffectiveValue('firstChar'), '01100011');
+    h.assert('last b', interp.getWireEffectiveValue('lastChar'), '01100010');
+    h.assert('last bike', interp.getWireEffectiveValue('lastCar'), BIKE40);
+  });
+
+  reg(3557, 'logic', 'comp [logic] redirect ;unique bulk and :count after dedupe', function(h, session) {
+    const src = `inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, chevy)
+    owns(john, ford)
+
+    query johnOwns:
+        owns(john, X)
+
+:
+
+comp [logic] .peopleLogic:
+    on: 1
+
+    .world { }
+
+:
+
+8wire[4] uniqCars = 00000000000000000000000000000000
+8wire numUniq = 00000000
+1wire trigger = 1
+
+.peopleLogic:{
+    johnOwns;unique >= uniqCars
+    johnOwns;unique:count >= numUniq
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const uniqCars = interp.getWireEffectiveValue('uniqCars');
+    h.assert('deduped slot0 c', uniqCars.slice(0, 8), '01100011');
+    h.assert('deduped slot1 f', uniqCars.slice(8, 16), '01100110');
+    h.assert('deduped slot2 fill', uniqCars.slice(16, 24), '00000000');
+    h.assert('count after dedupe', interp.getWireEffectiveValue('numUniq'), '00000010');
+  });
+
+  reg(3558, 'logic', 'inline query binding with ;unique', function(h, session) {
+    const src = INLINE_LOGIC_OWNS_DUP + `
+40wire car = ${CHEVY40}
+
+1wire ok = .world:query({ owns(john, X) }, X=car;unique)
+1wire bad = .world:query({ owns(john, X) }, X=${BIKE40};unique)`;
+    const { interp } = session.run(src);
+    h.assert('ok=1', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('bad=0', interp.getWireEffectiveValue('bad'), '0');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

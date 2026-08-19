@@ -142,7 +142,10 @@ Exemplu: `8wire scoreIn` + `myX = scoreIn` → pin **8** biți; `128wire big` �
 | **0 free** (boolean) | `isJohnOwner >= flagWire` | `1` if satisfiable, else `0` |
 | **1 free** | `johnOwns:0 >= firstCar` | Solution **N** → scalar wire (ASCII atom / binary number) |
 | **1 free** | `johnOwns >= allCars` | **Vector bulk** — one solution per element (`8wire[N]`) |
+| **1 free** | `johnOwns;unique >= allCars` | Vector bulk **after dedupe** on the free variable |
+| **1 free** | `johnOwns;last >= lastCar` | **Last** solution only (scalar or first slot) |
 | **1 free** | `johnOwns:count >= numRows` | Solution count (capped at vector length) |
+| **1 free** | `johnOwns;unique:count >= numRows` | Count **after** `;unique` dedupe |
 | **2 free** | `allAges >= table` | **Matrix bulk** — row = solution, col = variable (`32wire[R,C]`) |
 | **2 free** | `allAges:0 >= row0` | **Row slice** (`32wire[C]`) |
 | **2 free** | `allAges::0 >= col0` | **Column slice** |
@@ -164,6 +167,25 @@ Solution order follows **discovery order** (Prolog-style backtracking).
 **Encoding:** atoms → **ASCII + `\0` padding** per cell; numbers → unsigned binary on cell width. Unused slots are filled from the wire init pattern (or `\0` per cell if undeclared).
 
 **Limits:** max **2** free variables per query at the redirect interface.
+
+### Result policies (`;unique`, `;first`, `;last`)
+
+Place **`;policy`** immediately after the query name, **before** redirect selectors (`:0`, `:count`, `>=`):
+
+```logts
+johnOwns;unique >= allCars
+johnOwns;unique:count >= numRows
+johnOwns;last >= lastCar
+```
+
+| Policy | When applied | Effect |
+|--------|--------------|--------|
+| **`;unique`** | After solve, before pack | Dedupe by binding tuple — vector: one column; matrix: full row |
+| **`;first`** | After solve | First solution only (useful when vector length > 1 but you want slot 0) |
+| **`;last`** | After solve | Last solution in **discovery order** (engine still enumerates up to limits) |
+| *(none)* | — | All solutions within `maxSolutions` (default behaviour) |
+
+**`:count`** reflects the list **after** the policy runs — e.g. three raw solutions with one duplicate → **`;unique:count`** returns **2**.
 
 ---
 
@@ -553,6 +575,78 @@ After **Load & Run**:
 | `peterFlag` | **`1`** — peter has no `age` fact |
 
 The comma in `person(X), \+ age(X, _)` does **not** produce `"01"` or two booleans on one wire. The engine returns **solutions for free variables** (`X` only); each redirect picks scalar, vector, matrix, or boolean form as documented above.
+
+---
+
+## Example — `;unique` dedupe and `:count`
+
+Duplicate facts produce duplicate solutions until you apply **`;unique`**:
+
+```logts-play
+inline [logic] .people:
+
+    owns(john, chevy)
+    owns(john, chevy)
+    owns(john, ford)
+
+    query johnOwns:
+        owns(john, X)
+
+:
+
+comp [logic] .peopleLogic:
+    on: 1
+
+    .people { }
+
+:
+
+8wire[4] uniqCars = 00000000000000000000000000000000
+8wire numUniq = 00000000
+1wire trigger = 1
+
+.peopleLogic:{
+    johnOwns;unique >= uniqCars
+    johnOwns;unique:count >= numUniq
+    set = trigger
+}
+```
+
+After **Load & Run**: `uniqCars` holds **`c`**, **`f`** (not two `c` slots); **`numUniq = 2`**.
+
+---
+
+## Example — `;last` redirect
+
+```logts-play
+inline [logic] .people:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(john, bike)
+
+    query johnOwns:
+        owns(john, X)
+
+:
+
+comp [logic] .peopleLogic:
+    on: 1
+
+    .people { }
+
+:
+
+8wire lastCar = 00000000
+1wire trigger = 1
+
+.peopleLogic:{
+    johnOwns;last >= lastCar
+    set = trigger
+}
+```
+
+After **Load & Run**: `lastCar` = **`b`** (first letter of **`bike`**, the last solution in discovery order).
 
 ---
 

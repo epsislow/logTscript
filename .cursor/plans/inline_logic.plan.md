@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–9 complete; Faza 10 (1+b) planificată."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–10 complete."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -34,7 +34,7 @@ todos:
     status: completed
   - id: logic-result-policies
     content: "Faza 10: result policies (1+b) — ;unique / ;first / ;last — D34–D37 confirmed, D38=A"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -1217,7 +1217,7 @@ Decizii **D30–D32** și detaliu implementare: vezi **Faza 9** mai jos.
 | **Faza 7** Negation `\+` | D20–D24 | **(completed)** |
 | **Faza 8** Depth tuning | D25–D29 | **(completed)** |
 | **Faza 9** Inline query invoke `.world:query({ })` | D30–D32 | **(completed)** |
-| **Faza 10** Result policies (1+b) | D34–D38 | **(ready-to-implement)** — D34–D37 confirmed |
+| **Faza 10** Result policies (1+b) | D34–D38 | **(completed)** — teste 3554–3558, doc logts-play |
 
 ---
 
@@ -1767,10 +1767,10 @@ comp [logic] .peopleLogic:
 
 ### Criterii done
 
-- [ ] Parser `;unique` / `;first` / `;last` — redirect + inline query (trailing după bindings)
-- [ ] `logicApplyResultPolicy(solutions, policy, freeVars)` — dedupe tuple, first/last pack rules
-- [ ] Teste **3554+** — duplicate facts + `;unique`; matrix duplicate rows; `:count` după dedupe; `;last` cu 3 soluții
-- [ ] Doc `comp-logic.md` + `logic-query-exec.md`
+- [x] Parser `;unique` / `;first` / `;last` — redirect + inline query (trailing după bindings)
+- [x] `logicApplyResultPolicy(solutions, policy, freeVars)` — dedupe tuple, first/last pack rules
+- [x] Teste **3554–3558** — duplicate facts + `;unique`; matrix duplicate rows; `:count` după dedupe; `;last` cu 3 soluții
+- [x] Doc `comp-logic.md` + `logic-query-exec.md`
 
 **Amânat post-F10:** `;unique` + NAF; sort key invers (non-discovery `last`).
 

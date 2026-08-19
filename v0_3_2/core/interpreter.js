@@ -1744,8 +1744,12 @@ class Interpreter {
       execOpts[opt.name] = n;
     }
     const execResult = execFn(merged, goals, inputEnv, execOpts);
-    const solutions = execResult.solutions || [];
+    let solutions = execResult.solutions || [];
     const freeVars = outVarsFn(preparedGoals, inputEnv);
+    const applyFn = typeof logicApplyResultPolicy === 'function' ? logicApplyResultPolicy : null;
+    if (invoke.resultPolicy && applyFn) {
+      solutions = applyFn(solutions, invoke.resultPolicy, freeVars);
+    }
 
     const targetWireName = this._inlineLogicAssignWire;
     let shape = { kind: 'scalar', ew: 1 };

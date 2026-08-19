@@ -28,6 +28,17 @@ function logicWriteWire(wireName, value, width, ctx) {
   }
 }
 
+function logicSolutionsForRedirect(comp, qName, rd) {
+  const raw = comp.queryResults && comp.queryResults[qName];
+  if (!raw || !raw.length) return raw || [];
+  const meta = comp.queryMeta && comp.queryMeta[qName];
+  const freeVars = meta && meta.freeVars ? meta.freeVars : [];
+  const policy = rd && rd.resultPolicy;
+  const applyFn = typeof logicApplyResultPolicy === 'function' ? logicApplyResultPolicy : null;
+  if (!policy || !applyFn) return raw;
+  return applyFn(raw, policy, freeVars);
+}
+
 function logicWireShape(wire, ctx) {
   if (wire && wire.tensor && wire.tensor.dims) {
     const rows = wire.tensor.dims[0];
@@ -371,7 +382,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           const count = comp.execCount != null ? comp.execCount : 0;
           bits = count.toString(2).padStart(width, '0').slice(-width);
         } else {
-          const solutions = comp.queryResults && comp.queryResults[qName];
+          let solutions = logicSolutionsForRedirect(comp, qName, rd);
           if (!solutions) continue;
           const meta = comp.queryMeta && comp.queryMeta[qName];
           const freeVars = meta && meta.freeVars ? meta.freeVars : [];
@@ -391,7 +402,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           }
         }
       } else if (rd.property === 'logicQuery>') {
-        const solutions = comp.queryResults && comp.queryResults[qName];
+        let solutions = logicSolutionsForRedirect(comp, qName, rd);
         if (!solutions) continue;
 
         const meta = comp.queryMeta && comp.queryMeta[qName];

@@ -10,10 +10,11 @@ In the **documentation viewer**, `logts-play` blocks support **Load** and **Load
 
 | Topic | Summary |
 |-------|---------|
-| **Syntax** | `.module:query({ goals }, Var=wire, maxDepth=\\N, maxSolutions=\\N)` |
+| **Syntax** | `.module:query({ goals }, Var=wire, maxDepth=\\N, maxSolutions=\\N;policy)` |
 | **Goals** | Prolog body in `{ }` — comma = AND, `\+`, `=:=`, etc. |
 | **Inputs** | Optional `, X=wire` after the block |
 | **Limits** | Optional `, maxDepth=\\N`, `, maxSolutions=\\N` (decimal literals; default **256** / **64**) |
+| **Result policy** | Optional trailing `;unique`, `;first`, or `;last` (after bindings/options) |
 | **`_`** | Anonymous slot — collected into vector/matrix bulk output |
 | **Boolean** | `1wire` LHS + all vars bound → `1` / `0` |
 | **Scalar (1st sol.)** | `8wire` / `40wire` / `80wire` LHS + one free var → **first solution** on that width (ASCII atom + `\0` pad) |
@@ -38,8 +39,29 @@ result = .world:query({ owns(john, X) }, X=car)
 | **`, Var=expr`** | Bind logic variables before solve (wire → atom/number/bool) |
 | **`, maxDepth=\\N`** | Optional — max goal steps (default **256**) |
 | **`, maxSolutions=\\N`** | Optional — max solutions collected (default **64**) |
+| **`;unique` / `;first` / `;last`** | Optional — post-process solutions before pack (see below) |
 
 **No pout flags:** inline `query` does **not** expose `truncated` / `depthExceeded` — caps apply silently (extra solutions dropped, depth failure = unprovable / boolean `0`).
+
+**Default (no policy):** all solutions in discovery order, within `maxSolutions` — same as comp bulk redirect without `;policy`.
+
+### Result policies (`;unique`, `;first`, `;last`)
+
+Applied **after** the engine collects solutions, **before** encoding on the LHS wire. Same semantics as [comp-logic.md](comp-logic.md) redirects.
+
+| Policy | Effect |
+|--------|--------|
+| **`;unique`** | Drop duplicate bindings — one column for vector, full row for matrix (first occurrence kept) |
+| **`;first`** | Keep only the first solution (scalar / vector slot 0 / matrix row 0) |
+| **`;last`** | Keep only the **last** solution in discovery order (not SQL-style sort) |
+
+Syntax: trailing semicolon **after** optional bindings and limits:
+
+```logts
+8wire[4] cars = .world:query({ owns(john, _) };unique)
+40wire last = .world:query({ owns(john, X) };last)
+1wire ok = .world:query({ owns(john, X) }, X=car;unique)
+```
 
 **Not supported:** `.world:available(...)` per query name, or redirect selectors like `{ johnOwns:0 }` inside the block — only **goals**.
 
@@ -205,6 +227,48 @@ show(table)
 ```
 
 Each row is one `age/2` solution; column 0 = person atom, column 1 = age.
+
+### Result policy — `;unique` on duplicate facts
+
+Duplicate facts can yield duplicate solutions (same binding, different proof paths). Use **`;unique`** to dedupe before packing:
+
+```logts-play
+inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, chevy)
+    owns(john, ford)
+
+:
+
+8wire[4] raw = .world:query({ owns(john, _) })
+8wire[4] uniq = .world:query({ owns(john, _) };unique)
+
+show(raw; ascii)
+show(uniq; ascii)
+```
+
+Without policy: three slots (`c`, `c`, `f`). With **`;unique`**: two slots (`c`, `f`).
+
+### Result policy — `;last` (three solutions)
+
+```logts-play
+inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(john, bike)
+
+:
+
+8wire firstChar = .world:query({ owns(john, X) };first)
+8wire lastChar = .world:query({ owns(john, X) };last)
+
+show(firstChar; ascii)
+show(lastChar; ascii)
+```
+
+Discovery order is `chevy` → `ford` → `bike`. **`;first`** → `c`, **`;last`** → `b`.
 
 ---
 

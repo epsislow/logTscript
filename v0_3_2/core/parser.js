@@ -1305,6 +1305,23 @@ parseFuncTags() {
   return tags;
 }
 
+parseLogicResultPolicy() {
+  const allowed = new Set(['unique', 'first', 'last']);
+  if (this.c.type !== 'SYM' || this.c.value !== ';') {
+    throw Error(`Expected ';' before result policy at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  this.eat('SYM', ';');
+  if (this.c.type !== 'ID' || !allowed.has(this.c.value)) {
+    throw Error(`Expected result policy unique, first, or last after ';' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  const policy = this.c.value;
+  this.eat('ID');
+  if (this.c.type === 'ID' && allowed.has(this.c.value)) {
+    throw Error(`Only one result policy allowed (got '${policy}' and '${this.c.value}') at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+  }
+  return policy;
+}
+
 _parseDisplayTagValue(tagName) {
   if (tagName === 'elRange') {
     let spec = '';
@@ -2255,7 +2272,7 @@ parseBoardInstance() {
     this.c = savedC;
   }
 
-  tryParseLogicQueryRedirect(propName) {
+  tryParseLogicQueryRedirect(propName, resultPolicy) {
     if (this.c.type !== 'SYM' || this.c.value !== ':') return null;
     const savedPos = this.t.i;
     const savedLine = this.t.line;
@@ -2337,6 +2354,7 @@ parseBoardInstance() {
       solutionIndex,
       rowIndex,
       colIndex,
+      resultPolicy: resultPolicy || null,
       target: targetAtom,
       expr: null,
       ...enableSuffix,
@@ -2380,6 +2398,10 @@ parseBoardInstance() {
 
     let propName = this.c.value;
     this.eat('ID');
+    let resultPolicy = null;
+    if (this.c.type === 'SYM' && this.c.value === ';') {
+      resultPolicy = this.parseLogicResultPolicy();
+    }
     while (this.c.type === 'SYM' && this.c.value === ':') {
       const next = this.t.peekToken();
       // `prop: value` uses colon as separator — if next is not a path segment start for multi-prop, break
@@ -2462,11 +2484,11 @@ parseBoardInstance() {
       }
 
       const enableSuffix = this.parseOptionalBusEnableSuffix();
-      return { property: 'pout>', poutName: propName, target: targetAtom, expr: null, ...enableSuffix };
+      return { property: 'pout>', poutName: propName, target: targetAtom, expr: null, resultPolicy, ...enableSuffix };
     }
 
     if (this.c.type === 'SYM' && this.c.value === ':') {
-      const logicRedirect = this.tryParseLogicQueryRedirect(propName);
+      const logicRedirect = this.tryParseLogicQueryRedirect(propName, resultPolicy);
       if (logicRedirect) return logicRedirect;
     }
 
@@ -5121,6 +5143,7 @@ assignment() {
         const methodArgs = [];
         let methodBindings = null;
         let methodQueryOptions = null;
+        let methodResultPolicy = null;
         this.eat('SYM', '(');
         this.t.skip();
         let callTags = null;
@@ -5156,6 +5179,9 @@ assignment() {
             }
             this.t.skip();
           }
+          if (this.c.type === 'SYM' && this.c.value === ';') {
+            methodResultPolicy = this.parseLogicResultPolicy();
+          }
         } else {
           while (!(this.c.type === 'SYM' && this.c.value === ')')) {
             if (this.c.type === 'EOF') {
@@ -5179,6 +5205,7 @@ assignment() {
         if (methodQueryOptions && methodQueryOptions.length) {
           method.queryOptions = methodQueryOptions;
         }
+        if (methodResultPolicy) method.resultPolicy = methodResultPolicy;
         if (callTags) method.callTags = callTags;
         if (globalRef) method.globalRef = true;
         return tagGlobal({ inlineMethod: method });

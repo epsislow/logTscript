@@ -2720,7 +2720,12 @@
       {"id":3550,"group":"logic","title":"inline query scalar 40wire first solution full atom","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["40 bits","chevy ascii"]}},
       {"id":3551,"group":"logic","title":"inline query scalar 8wire first solution one char","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["8 bits","letter c"]}},
       {"id":3552,"group":"logic","title":"inline query vector 40wire full atom names","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["160 bits","slot0 chevy","slot1 ford","slot2 fill"]}},
-      {"id":3553,"group":"logic","title":"inline query scalar 80wire atom zero-padded","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["80 bits","chevy prefix","zero tail"]}}
+      {"id":3553,"group":"logic","title":"inline query scalar 80wire atom zero-padded","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["80 bits","chevy prefix","zero tail"]}},
+      {"id":3554,"group":"logic","title":"inline query vector ;unique dedupes duplicate facts","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["raw slot0 c","raw slot1 c dup","raw slot2 f","uniq slot0 c","uniq slot1 f","uniq slot2 fill"]}},
+      {"id":3555,"group":"logic","title":"inline query matrix ;unique dedupes duplicate rows","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["raw 192 bits","uniq 192 bits","raw row1 john dup","raw row2 mary","uniq row0 john","uniq row0 age","uniq row1 mary","uniq row1 age","uniq row2 fill"]}},
+      {"id":3556,"group":"logic","title":"inline query ;last returns final discovery solution","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["first c","last b","last bike"]}},
+      {"id":3557,"group":"logic","title":"comp [logic] redirect ;unique bulk and :count after dedupe","detail":{"scripts":["inline [logic] .world:\n\n    owns(john, chevy)\n    owns(john, chevy)\n    owns(john, ford)\n\n    query johnOwns:\n        owns(john, X)\n\n:\n\ncomp [logic] .peopleLogic:\n    on: 1\n\n    .world { }\n\n:\n\n8wire[4] uniqCars = 00000000000000000000000000000000\n8wire numUniq = 00000000\n1wire trigger = 1\n\n.peopleLogic:{\n    johnOwns;unique >= uniqCars\n    johnOwns;unique:count >= numUniq\n    set = trigger\n}"],"steps":[],"assertions":["deduped slot0 c","deduped slot1 f","deduped slot2 fill","count after dedupe"]}},
+      {"id":3558,"group":"logic","title":"inline query binding with ;unique","detail":{"scripts":[],"steps":["run(src) [nerezolvat]"],"assertions":["ok=1","bad=0"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -2794,7 +2799,7 @@
       { id: 'key', label: 'key', rangeLabel: '1594–1596', testIds: [1594, 1595, 1596] },
       { id: 'keyboard', label: 'keyboard', rangeLabel: '1599–1602, 1602.1, 1603–1609, 1616–1642, 1656–1660', testIds: [1599, 1600, 1601, 1602, 1602.1, 1603, 1604, 1605, 1606, 1607, 1608, 1609, 1616, 1617, 1618, 1619, 1620, 1621, 1622, 1623, 1624, 1625, 1626, 1627, 1628, 1629, 1630, 1631, 1632, 1633, 1634, 1635, 1636, 1637, 1638, 1639, 1640, 1641, 1642, 1656, 1657, 1658, 1659, 1660] },
       { id: 'latch', label: 'latch', rangeLabel: '720–725', testIds: [720, 721, 722, 723, 724, 725] },
-      { id: 'logic', label: 'logic', rangeLabel: '3500–3505, 3508–3520, 3536–3553', testIds: [3500, 3501, 3502, 3503, 3504, 3505, 3508, 3509, 3510, 3511, 3512, 3513, 3514, 3515, 3516, 3517, 3518, 3519, 3520, 3536, 3537, 3538, 3539, 3540, 3541, 3542, 3543, 3544, 3545, 3546, 3547, 3548, 3549, 3550, 3551, 3552, 3553] },
+      { id: 'logic', label: 'logic', rangeLabel: '3500–3505, 3508–3520, 3536–3558', testIds: [3500, 3501, 3502, 3503, 3504, 3505, 3508, 3509, 3510, 3511, 3512, 3513, 3514, 3515, 3516, 3517, 3518, 3519, 3520, 3536, 3537, 3538, 3539, 3540, 3541, 3542, 3543, 3544, 3545, 3546, 3547, 3548, 3549, 3550, 3551, 3552, 3553, 3554, 3555, 3556, 3557, 3558] },
       { id: 'gates-reduce', label: 'Logic gate reduce / expand', rangeLabel: '22–37', testIds: [22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37] },
       { id: 'loop', label: 'Loop preprocessor', rangeLabel: '6–10, 13–14, 1743–1745', testIds: [6, 7, 8, 9, 10, 13, 14, 1743, 1744, 1745] },
       { id: 'lut-decode', label: 'LUT decode()', rangeLabel: '941–944', testIds: [941, 942, 943, 944] },

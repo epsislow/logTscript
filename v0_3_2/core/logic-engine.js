@@ -473,6 +473,39 @@ function logicInferBindType(bitWidth) {
   return 'number';
 }
 
+function logicSolutionTupleKey(sol, freeVars) {
+  if (!sol || !freeVars || !freeVars.length) return '';
+  const parts = [];
+  for (const v of freeVars) {
+    const term = sol[v];
+    if (!term) parts.push('');
+    else if (term.kind === 'atom') parts.push(`a:${term.name}`);
+    else if (term.kind === 'number') parts.push(`n:${term.value}`);
+    else if (term.kind === 'var') parts.push(`v:${term.name}`);
+    else parts.push('?');
+  }
+  return parts.join('\0');
+}
+
+function logicApplyResultPolicy(solutions, policy, freeVars) {
+  const list = solutions || [];
+  if (!list.length || !policy) return list;
+  if (policy === 'unique') {
+    const seen = new Set();
+    const out = [];
+    for (const sol of list) {
+      const key = logicSolutionTupleKey(sol, freeVars);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(sol);
+    }
+    return out;
+  }
+  if (policy === 'first') return [list[0]];
+  if (policy === 'last') return [list[list.length - 1]];
+  return list;
+}
+
 function executeLogicGoals(mergedDef, goals, inputEnv, options) {
   const engine = new LogicEngine(mergedDef.clauses || []);
   const opts = options || {};
@@ -657,6 +690,8 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicPackMatrixSolutions = logicPackMatrixSolutions;
   globalThis.logicPackMatrixRow = logicPackMatrixRow;
   globalThis.logicPackMatrixCol = logicPackMatrixCol;
+  globalThis.logicApplyResultPolicy = logicApplyResultPolicy;
+  globalThis.logicSolutionTupleKey = logicSolutionTupleKey;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -676,5 +711,7 @@ if (typeof module !== 'undefined' && module.exports) {
     logicPackMatrixSolutions,
     logicPackMatrixRow,
     logicPackMatrixCol,
+    logicApplyResultPolicy,
+    logicSolutionTupleKey,
   };
 }
