@@ -1,28 +1,28 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — motor relațional declarativ, model ASM-like. Deciziile D1–D19 (except D12 parțial) sunt closed. Fazele 1–3 ready-to-implement; Faza 6 — Allow/NotAllow pentru tipurile logic."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — motor relațional declarativ, model ASM-like. MVP implementat (Fazele 0–4, 6). Rămâne Faza 5 (matrix/vector redirect)."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
     status: completed
   - id: logic-assembler
     content: "Faza 1: logic-assembler.js — parser inline [logic] (facts, relations, queries, use)"
-    status: pending
+    status: completed
   - id: logic-engine
     content: "Faza 2: logic-engine.js — backtracking, atom table, aritmetică, comparații Prolog-style"
-    status: pending
+    status: completed
   - id: logic-comp
     content: "Faza 3: comp [logic] — program block parse, pin/wire, redirect results, on:"
-    status: pending
+    status: completed
   - id: logic-docs-tests
-    content: "Faza 4: doc/logic.md, teste, doc-viewer"
-    status: pending
+    content: "Faza 4: doc/inline-logic.md, doc/comp-logic.md, teste, doc-viewer"
+    status: completed
   - id: logic-matrix-output
     content: "Faza 5: redirect matrix/vector — 2 vars libere max, indexare ca wire-vectors"
     status: pending
   - id: logic-allow-notallow
     content: "Faza 6: inline.type{logic} + comp.type{logic} — Allow/NotAllow, doc, teste policy"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -312,7 +312,7 @@ sequenceDiagram
 
 ## Decizii de luat — tabel rezumat
 
-> **D1–D19 closed** (D12/D19/1+l/1+k amânate). Fazele 1–3 **(ready-to-implement)**.
+> **D1–D19 closed** (D12/D19/1+l/1+k amânate). **Fazele 0–4, 6 implementate.** Faza 5 (matrix/vector) rămâne de făcut.
 
 | ID | Subiect | Decizia ta |
 |----|---------|------------|
@@ -731,16 +731,33 @@ Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C**
 | Fază | Decizii | Status |
 |------|---------|--------|
 | **Faza 0** | D1–D19 **(completed)**; D12/D19 amânate | **(completed)** |
-| **Faza 1** parse inline | D8, D9, D12, D16, D18 | **(ready-to-implement)** |
-| **Faza 2** engine | D5, D6, D15, D17 | **(ready-to-implement)** |
-| **Faza 3** comp runtime | D2–D4, D7, D11, D13, D14 | **(ready-to-implement)** |
-| **Faza 4** docs/tests | — | după Faza 3 |
-| **Faza 5** matrix/vector output | 2 vars max, redirect ca [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md) | după Faza 4 |
-| **Faza 6** Allow/NotAllow | `inline.type{logic}`, `comp.type{logic}` | după Faza 5 |
+| **Faza 1** parse inline | D8, D9, D12, D16, D18 | **(completed)** |
+| **Faza 2** engine | D5, D6, D15, D17 | **(completed)** |
+| **Faza 3** comp runtime | D2–D4, D7, D11, D13, D14 | **(completed)** |
+| **Faza 4** docs/tests | — | **(completed)** |
+| **Faza 5** matrix/vector output | 2 vars max, redirect ca [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md) | **(pending)** |
+| **Faza 6** Allow/NotAllow | `inline.type{logic}`, `comp.type{logic}` | **(completed)** |
 
 ---
 
 ## Faze de implementare
+
+### Rezumat livrare MVP **(2026-08-19)**
+
+| Fază | Livrat |
+|------|--------|
+| **1** | [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js), whitelist parser, `execInline`, `INLINE_KINDS` |
+| **2** | [`logic-engine.js`](../v0_3_2/core/logic-engine.js) — backtracking, atom table, `executeLogicQueries` |
+| **3** | [`components/logic.js`](../v0_3_2/core/components/logic.js), program block în comp header, redirect `query:N >=`, `query >=` boolean |
+| **4** | [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md), [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md), teste **3500–3505**, doc-viewer |
+| **6** | [`allow-notallow.md`](../v0_3_2/doc/allow-notallow.md), teste **3506–3507** |
+| **5** | — neimplementat |
+
+**Teste:** 2669/2669 trec (inclusiv grupul `logic` + `allow-notallow`).
+
+**Notă:** `logic-comp-bind.js` planificat separat → integrat în `logic-assembler.js` (`parseLogicProgramBlock`) + `components/logic.js`.
+
+---
 
 ### Faza 0 — Spec **(completed)**
 
@@ -748,23 +765,22 @@ Toate deciziile D1–D19 confirmate. **Faza 5** (D12 matrix/vector) definită. A
 
 ---
 
-### Faza 1 — `inline [logic]` parse + registry **(ready-to-implement)**
+### Faza 1 — `inline [logic]` parse + registry **(completed)**
 
 | Fișier | Rol |
 |--------|-----|
-| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | **Parser principal inline:** facts, relations, queries, `use`, operatori Prolog, var/atom |
-| [`logic-comp-bind.js`](../v0_3_2/core/logic-comp-bind.js) (sau secțiune mică) | Parse program block `X is type pin` — doar comp |
-| [`policy-type-modules.js`](../v0_3_2/core/policy-type-modules.js) | `'logic'` în `INLINE_KINDS` (prerequisite policy; **Faza 6** — doc + teste Allow/NotAllow) |
-| [`parser.js`](../v0_3_2/core/parser.js) | Whitelist `inline [logic]`; `parseCompLogic` |
-| [`interpreter.js`](../v0_3_2/core/interpreter.js) | `execInline` → `inlineInstances` (definiție only) |
+| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | **Parser principal inline:** facts, relations, queries, `use`, operatori Prolog, var/atom; `parseLogicProgramBlock` pentru comp |
+| [`policy-type-modules.js`](../v0_3_2/core/policy-type-modules.js) | `'logic'` în `INLINE_KINDS` |
+| [`parser.js`](../v0_3_2/core/parser.js) | Whitelist `inline [logic]`; program block `.module { }` în comp header |
+| [`interpreter.js`](../v0_3_2/core/interpreter.js) | `execInline` → `inlineInstances`; `doc(inline.logic)` |
 
 **Validare D16:** parse acceptă `query` în orice inline; la `use` merge doar facts/relations — queries din module used rămân neexportate.
 
-**Validare D12 (Fazele 1–4):** query cu **>1** var liberă → eroare elaborare. **Faza 5** relaxează la max **2** vars.
+**Validare D12 (MVP):** la elaborare comp, max **1** var de output per query (vars din program block excluse). **Faza 5** va relaxa la **2** vars + matrix/vector.
 
 ---
 
-### Faza 2 — `logic-engine.js` **(ready-to-implement)**
+### Faza 2 — `logic-engine.js` **(completed)**
 
 - Atom table (D15) + integers.
 - Index clauses per `predicate/arity` (D18).
@@ -775,13 +791,13 @@ Toate deciziile D1–D19 confirmate. **Faza 5** (D12 matrix/vector) definită. A
 
 ---
 
-### Faza 3 — `comp [logic]` **(ready-to-implement)**
+### Faza 3 — `comp [logic]` **(completed)**
 
 | Fișier | Rol |
 |--------|-----|
-| [`components/logic.js`](../v0_3_2/core/components/logic.js) | Elaborare, pin storage, `on:`, exec, redirect |
-| [`interpreter.js`](../v0_3_2/core/interpreter.js) | Property block: pin←wire, query redirect, trigger |
-| [`signal-propagation.js`](../v0_3_2/core/signal-propagation.js) | Propagare după redirect |
+| [`components/logic.js`](../v0_3_2/core/components/logic.js) | Elaborare (`earlyReturn`), pin storage, `on:`, exec, redirect |
+| [`parser.js`](../v0_3_2/core/parser.js) | Property block: `logicQuery>` (`query:N >=`), `pout>` (boolean `query >=`) |
+| [`interpreter.js`](../v0_3_2/core/interpreter.js) | Property block: pin←wire, `_logicRedirects`, trigger la `set` |
 
 Flux:
 
@@ -790,16 +806,16 @@ Flux:
 
 ---
 
-### Faza 4 — Docs + teste **(ready-to-implement după Faza 3)**
+### Faza 4 — Docs + teste **(completed)**
 
-- [`doc/logic.md`](../v0_3_2/doc/logic.md) — arhitectură inline/comp, diferență protocol/asm.
-- [`doc/logic-language.md`](../v0_3_2/doc/logic-language.md) — operatori, program block, exec block.
-- Teste: modifier2/character, owns(john,…), use .vehicles, redirect results.
-- `doc(inline.logic)`, `doc(comp.logic)`.
+- [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md) — definiție inline, sintaxă Prolog, diferențe față de Prolog, exemple `logts-play`.
+- [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md) — pipeline runtime, program/exec block, redirect, exemple `logts-play`.
+- Teste **3500–3505** (`logic`): parse, engine, comp integration, boolean/index redirect.
+- `doc(inline.logic)`, `doc(comp.logic)`; secțiuni în doc-viewer.
 
 ---
 
-### Faza 5 — Matrix / vector query output **(ready-to-implement după Faza 4)**
+### Faza 5 — Matrix / vector query output **(pending)**
 
 **Scop:** 2 vars libere max; redirect aliniat cu [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md). **>2 vars** → eroare.
 
@@ -823,7 +839,7 @@ Flux:
 
 ---
 
-### Faza 6 — Allow / NotAllow pentru `logic` **(ready-to-implement după Faza 5)**
+### Faza 6 — Allow / NotAllow pentru `logic` **(completed)**
 
 **Scop:** expune tipurile noi în sistemul de policy Allow/NotAllow, aliniat cu pattern-ul existent (`inline.type{asm protocol}`, `comp.type{reg}`, …) — vezi [`allow-notallow.md`](../v0_3_2/doc/allow-notallow.md).
 
@@ -872,7 +888,7 @@ comp [reg] .bad:       # blocat
 3. `Allow NONE inline.type{logic} comp.type{logic}` → doar logic permis pe ambele module.
 4. `doc(Allow)` / `doc(inline.type)` listează `logic` după înregistrare.
 
-**Notă:** wiring-ul minimal (`INLINE_KINDS`, registry comp) rămâne în Fazele 1/3 ca parser/runtime să funcționeze; **Faza 6** finalizează documentația, verifică enforcement end-to-end și adaugă teste dedicate policy.
+**Notă:** wiring-ul (`INLINE_KINDS`, registry comp) a fost făcut în Fazele 1/3; Faza 6 a adăugat doc + teste policy (**3506–3507**).
 
 ---
 
@@ -960,7 +976,7 @@ comp [logic] .peopleLogic:
 | Topic | Status |
 |-------|--------|
 | `query = …` | **1+l** amânat |
-| Multi-var query | **Faza 5** — matrix/vector; **>2 vars** eroare |
+| Multi-var query | **MVP:** max 1 var output (Fazele 1–4, 6); **Faza 5 pending** — matrix/vector, max 2 vars |
 | POUT declarate comp | **1+k** low priority |
 | `use` circular | lint la elaborare **1+g** |
 | boolean redirect | **D7a completed:** `isJohnOwner >= wire` |
@@ -971,8 +987,6 @@ comp [logic] .peopleLogic:
 ## Ordine recomandată
 
 1. ~~Faza 0~~ **(completed)**
-2. **Faza 1** → **Faza 2** → **Faza 3** → **Faza 4** **(ready-to-implement)**
-3. **Faza 5** — matrix/vector output **(ready-to-implement după Faza 4)**
-4. **Faza 6** — Allow/NotAllow `inline.type{logic}` + `comp.type{logic}` **(ready-to-implement după Faza 5)**
-
-Spune **„execute the plan”** când vrei cod (Fazele 1–3).
+2. ~~Faza 1~~ → ~~Faza 2~~ → ~~Faza 3~~ → ~~Faza 4~~ **(completed)**
+3. ~~Faza 6~~ — Allow/NotAllow **(completed)**
+4. **Faza 5** — matrix/vector output **(pending)** — singura fază rămasă din planul MVP+

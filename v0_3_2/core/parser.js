@@ -2371,6 +2371,46 @@ parseBoardInstance() {
     }
 
     if (this.c.type === 'SYM' && this.c.value === ':') {
+      const savedPos = this.t.i;
+      const savedLine = this.t.line;
+      const savedCol = this.t.col;
+      const savedC = this.c;
+      this.eat('SYM', ':');
+      this.t.skip();
+      if (this.c.type === 'DEC' || this.c.type === 'BIN') {
+        const idx = parseInt(this.c.value, 10);
+        this.eat(this.c.type);
+        this.t.skip();
+        if (this.c.type === 'SYM' && this.c.value === '>') {
+          this.eat('SYM', '>');
+          if (this.c.type === 'SYM' && this.c.value === '=') {
+            this.eat('SYM', '=');
+          }
+          const targetAtom = this.atom();
+          if (targetAtom.bitRange) {
+            throw Error(`Bit ranges not allowed in ${propName}:N>= property at ${this.c.line}:${this.c.col}`);
+          }
+          if (!targetAtom.var || targetAtom.var.startsWith('.')) {
+            throw Error(`Invalid target for ${propName}:N>= property at ${this.c.line}:${this.c.col}`);
+          }
+          const enableSuffix = this.parseOptionalBusEnableSuffix();
+          return {
+            property: 'logicQuery>',
+            queryName: propName,
+            solutionIndex: idx,
+            target: targetAtom,
+            expr: null,
+            ...enableSuffix,
+          };
+        }
+      }
+      this.t.i = savedPos;
+      this.t.line = savedLine;
+      this.t.col = savedCol;
+      this.c = savedC;
+    }
+
+    if (this.c.type === 'SYM' && this.c.value === ':') {
       this.eat('SYM', ':');
     } else {
       this.eat('SYM', '=');
@@ -3376,6 +3416,19 @@ assignment() {
 
       if (foundEndColon) {
         break;
+      }
+
+      if (this.c.type === 'SYM' && this.c.value === '.' && compType === 'logic') {
+        const logicRef = this.parseDotComponentRef();
+        this.t.skip();
+        if (this.c.type === 'SYM' && this.c.value === '{') {
+          const bracePos = this.t.i - 1;
+          const bodyRaw = this.parseRawBraceBlock(bracePos);
+          if (!attributes.logicPrograms) attributes.logicPrograms = [];
+          attributes.logicPrograms.push({ ref: logicRef, bodyRaw });
+          continue;
+        }
+        throw Error(`Expected '{' after logic program ref '${logicRef}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
       }
 
       if (this.c.type === 'ID' || (this.c.type === 'KEYWORD' && this.c.value === 'MODE')) {
@@ -5239,8 +5292,8 @@ isBuiltinFunction(name) {
     if (pos >= src.length || src[pos] !== ']') {
       throw Error(`Expected ']' after inline kind at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
-    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol' && kind !== 'plc') {
-      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol, plc)`);
+    if (kind !== 'asm' && kind !== 'lut' && kind !== 'protocol' && kind !== 'plc' && kind !== 'logic') {
+      throw Error(`Unknown inline kind '${kind}' at ${this.c.file}: ${this.c.line}:${this.c.col} (supported: asm, lut, protocol, plc, logic)`);
     }
     if (this.usagePolicy) {
       const chk = this.usagePolicy.isModuleAllowed('inline', kind);
@@ -5278,7 +5331,7 @@ isBuiltinFunction(name) {
     return stmt;
   }
 
-  parseAsmProgramRaw(bracePos) {
+  parseRawBraceBlock(bracePos) {
     const src = this.t.src;
     let pos = bracePos + 1;
     let depth = 1;
@@ -5293,11 +5346,16 @@ isBuiltinFunction(name) {
       pos++;
     }
     if (depth !== 0) {
-      throw Error(`Unclosed asm program block — expected '}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
+      throw Error(`Unclosed block — expected '}' at ${this.c.file}: ${this.c.line}:${this.c.col}`);
     }
     const raw = src.substring(start, pos);
     pos++;
     this._syncTokenizerAt(pos);
+    return raw;
+  }
+
+  parseAsmProgramRaw(bracePos) {
+    const raw = this.parseRawBraceBlock(bracePos);
     return { kind: 'asmProgram', raw };
   }
 

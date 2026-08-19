@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -214,7 +214,7 @@ List available presets: \`doc(inline.asm.sets)\`.
 
 - \`comp.type{reg key ~ +}\` — specific component types (shortcuts as in \`comp [+]\`)
 - \`chip.type{myChip}\` — specific chip definitions
-- \`board.type{myBoard}\`, \`pcb.type{myPcb}\`, \`inline.type{asm protocol}\`, \`phz.type{obj gen cont}\`
+- \`board.type{myBoard}\`, \`pcb.type{myPcb}\`, \`inline.type{asm protocol logic}\`, \`phz.type{obj gen cont}\`
 
 Bare IDs like \`led\` or \`asm\` refer to **user function names**, not comp/inline types. Use \`comp.type{led}\` for component types.
 
@@ -234,6 +234,12 @@ NotAllow inline.asm.set{riscv32}
 inline [asm] .rv:
   set: riscv32
   :                      # error at execInline
+
+NotAllow inline.type{logic}
+inline [logic] .kb:      # error at execInline
+
+NotAllow comp.type{logic}
+comp [logic] .solver:   # error at parse/elaboration
 
 doc(Allow)               # current Allow policy
 doc(NotAllow)            # current NotAllow policy
@@ -11126,6 +11132,252 @@ peek(touchOut)
 - [seven-seg.md](seven-seg.md) — 7-segment component
 - [components.md](components.md)
 `,
+    'comp-logic.md': `# Component logic — \`comp [logic]\`
+
+\`comp [logic]\` is the **runtime layer** for declarative queries. It binds logic variables to component pins, reads wired inputs, runs all queries defined in the linked \`inline [logic]\`, and redirects results to LogTScript wires.
+
+Definition of facts/rules/queries → [inline-logic.md](inline-logic.md).
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run** (use \`on: 1\` so the first run executes when \`set = 1\`).
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Program block** | \`.module { X is number myX }\` in comp header |
+| **Exec block** | \`.logic:{ myX = scoreIn, query:0 >= out, set = trigger }\` |
+| **Trigger** | \`set\` pin — respects \`on:\` (\`raise\` / \`edge\` / \`1\`) |
+| **Inputs** | Pin ← wire in exec block (\`myX = scoreIn\`) |
+| **Outputs** | Query redirect (\`modifier:0 >= result\`) |
+| **Doc** | \`doc(comp.logic)\`, \`doc(.characterLogic)\` |
+
+---
+
+## Pipeline
+
+\`\`\`mermaid
+sequenceDiagram
+  participant W as Wire scoreIn
+  participant P as Pin myX
+  participant L as Logic var X
+  participant E as Engine
+  participant Q as Query modifier
+  participant R as Wire result
+
+  W->>P: exec block myX = scoreIn
+  P->>L: read pin convert number
+  L->>E: input env X=15
+  E->>Q: resolve all queries
+  Q->>R: modifier:0 >= result
+\`\`\`
+
+| Step | Where | What happens |
+|------|-------|--------------|
+| 1 | **Elaboration** | Program block maps logic vars → pins (\`X is number myX\`) |
+| 2 | **Exec block** | Wires assign pins (\`myX = scoreIn\`) |
+| 3 | **Trigger** | Active \`set\` (per \`on:\`) starts one solve pass |
+| 4 | **Engine** | All queries from inline run with input bindings |
+| 5 | **Redirect** | Selected solutions written to target wires |
+
+---
+
+## Declaration
+
+\`\`\`logts
+comp [logic] .characterLogic:
+    on: 1
+
+    .character {
+        X is number myX
+    }
+
+:
+\`\`\`
+
+| Attribute | Description |
+|-----------|-------------|
+| **\`.module { … }\`** | Links \`inline [logic]\` + pin bindings (required) |
+| **\`on:\`** | Property-block trigger mode (see below) |
+
+### Program block bindings
+
+\`\`\`logts
+.character {
+    X is number myX
+    Name is text myName
+    Alive is bool myAlive
+}
+\`\`\`
+
+| Form | Meaning |
+|------|---------|
+| \`X is number myX\` | Logic variable **X** ← unsigned pin **myX** |
+| \`Name is text myName\` | ASCII text on pin width |
+| \`Alive is bool myAlive\` | 1-bit boolean |
+
+Only **\`number\`**, **\`text\`**, and **\`bool\`** are supported at the pin boundary.
+
+---
+
+## Exec block — wiring and redirects
+
+\`\`\`logts
+8wire scoreIn = 00001111
+8wire result = 00000000
+1wire trigger = 1
+
+.characterLogic:{
+    myX = scoreIn
+    modifier:0 >= result
+    set = trigger
+}
+\`\`\`
+
+| Line | Role |
+|------|------|
+| \`myX = scoreIn\` | Wire → **pin** (not logic var directly) |
+| \`modifier:0 >= result\` | Solution **0** of query \`modifier\` → wire |
+| \`set = trigger\` | Run engine when trigger active |
+
+### Redirect forms
+
+| Query vars | Syntax | Target |
+|------------|--------|--------|
+| **0 free** (boolean) | \`isJohnOwner >= flagWire\` | \`1\` if satisfiable, else \`0\` |
+| **1 free** | \`johnOwns:0 >= firstCar\` | Index \`N\` solution → wire |
+| **1 free** | \`johnOwns:1 >= secondCar\` | Next solution |
+
+Solution order follows **discovery order** (Prolog-style backtracking).
+
+---
+
+## \`on:\` modes
+
+| \`on:\` | Load & Run with \`set = 1\` | Typical use |
+|-------|---------------------------|-------------|
+| **\`1\`** / **\`level\`** | Runs immediately | Documentation and deterministic demos |
+| **\`raise\`** (default) | Waits for \`0→1\` edge | Interactive / wave setups |
+
+Use **\`on: 1\`** in examples so **Load & Run** performs a solve pass immediately.
+
+---
+
+## Pins and pouts
+
+| Pin / pout | Bits | Description |
+|------------|------|-------------|
+| **\`set\`** | 1 | Trigger one solve pass when active |
+| **\`myX\`, …** | 8 default (number/text) | Input pins from program block |
+| **\`execCount\`** | 16 | Solve passes completed (\`.logic:execCount\`) |
+
+---
+
+## Full example — modifier table
+
+\`\`\`logts-play
+inline [logic] .character:
+
+    modifier2(1, -4)
+    modifier2(X,  0) <- X >= 9,  X =< 12
+    modifier2(X,  2) <- X >= 15, X =< 16
+
+    query modifier:
+        modifier2(X, Y)
+
+:
+
+comp [logic] .characterLogic:
+    on: 1
+
+    .character {
+        X is number myX
+    }
+
+:
+
+8wire scoreIn = 00001111
+8wire result = 00000000
+1wire trigger = 1
+
+.characterLogic:{
+    myX = scoreIn
+    modifier:0 >= result
+    set = trigger
+}
+
+show(result)
+\`\`\`
+
+\`scoreIn = 15\` → logic binds \`X = 15\` → rule \`modifier2(X, 2) <- X >= 15, X =< 16\` → \`Y = 2\` → \`result = 2\`.
+
+---
+
+## Example — ownership queries
+
+\`\`\`logts-play
+inline [logic] .people:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(mary, bike)
+
+    query isJohnOwner:
+        owns(john, _)
+
+    query johnOwns:
+        owns(john, X)
+
+:
+
+comp [logic] .peopleLogic:
+    on: 1
+
+    .people {
+    }
+
+:
+
+1wire flag = 0
+8wire firstCar = \\0
+1wire trigger = 1
+
+.peopleLogic:{
+    isJohnOwner >= flag
+    johnOwns:0 >= firstCar
+    set = trigger
+}
+
+show(flag)
+show(firstCar)
+\`\`\`
+
+---
+
+## Multiple exec blocks
+
+Several property blocks may target the same component. Query result slots are **shared**; the **last successful** exec block wins (last-write-wins), matching other multi-block components.
+
+---
+
+## Errors
+
+| Situation | Result |
+|-----------|--------|
+| Missing program block | Elaboration error |
+| Inline ref not \`inline [logic]\` | Elaboration error |
+| Query with **>1** free variable | Elaboration error |
+| Unknown redirect query name | Redirect skipped silently if no results |
+| Policy block | \`NotAllow comp.type{logic}\` — see [allow-notallow.md](allow-notallow.md) |
+
+---
+
+## Related
+
+- Knowledge definition → [inline-logic.md](inline-logic.md)
+- Similar two-layer model → [plc.md](plc.md), [asm.md](asm.md)
+`,
     'component-color-attributes.md': `# Component color attributes
 
 Panel components expose **color attributes** (\`color\`, \`frameColor\`, \`bgColor\`, \`focusColor\`, \`colorFor\`, …) to style glyphs on the devices panel. Each attribute accepts either:
@@ -18885,6 +19137,170 @@ See [protocol-assemble.md — static vs dynamic width](protocol-assemble.md#stat
 - [protocol-assemble.md](protocol-assemble.md) — \`def\`, \`length\`, \`lengthOf\`, \`withLength\`
 - [protocol-lut.md](protocol-lut.md) — \`expand\`, \`collapse\`
 - [assignment-operators.md](assignment-operators.md) — \`=\`, \`=:\`, \`:=\` for dynamic-width wires
+`,
+    'inline-logic.md': `# Inline logic — \`inline [logic]\`
+
+\`inline [logic]\` defines a **declarative knowledge base**: ground facts, rules with bodies, and named queries. It is **not executed** by itself — like \`inline [asm]\` (definition only), not like \`inline [protocol]\` (invoke recipe).
+
+Runtime wiring lives in [\`comp [logic]\`](comp-logic.md).
+
+In the **documentation viewer**, blocks marked \`logts-play\` open in the script editor with **Load** and **Load & Run**.
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Role** | Definition layer — facts, rules, queries |
+| **Execution** | None at inline level; queries run on \`comp [logic]\` |
+| **Syntax style** | Prolog-like (variables, atoms, \`<-\` rules, backtracking) |
+| **Composition** | \`use .otherModule\` merges facts and rules (not queries) |
+| **Doc helpers** | \`doc(inline.logic)\`, \`doc(.myModule)\` |
+
+---
+
+## Architecture
+
+\`\`\`text
+inline [logic] .character          comp [logic] .characterLogic
+  facts / rules / queries    -->     program block + exec block
+  (definition only)                  (runtime — see comp-logic.md)
+\`\`\`
+
+---
+
+## Prolog-friendly syntax
+
+LogTScript logic follows common Prolog conventions:
+
+| Construct | Example | Meaning |
+|-----------|---------|---------|
+| **Variable** | \`X\`, \`Person\`, \`_\` | Uppercase or \`_\` — unbound until unified |
+| **Atom** | \`john\`, \`chevy\`, \`might\` | Lowercase identifier — constant symbol |
+| **Number** | \`15\`, \`-4\` | Integer literal |
+| **Fact** | \`owns(john, chevy)\` | Ground clause (no body) |
+| **Rule** | \`modifier2(X, 0) <- X >= 9, X =< 12\` | Head \`<-\` body goals (comma = AND) |
+| **Query** | \`query johnOwns: owns(john, X)\` | Named goal exported to runtime |
+
+Multiple clauses with the same predicate name and arity are **OR** alternatives (first successful match in discovery order, with backtracking).
+
+---
+
+## Differences from Prolog
+
+| Prolog | LogTScript logic |
+|--------|------------------|
+| \`.\` ends every clause | Newline / next clause; module ends with \`:\` |
+| \`:-\` rule neck | \`<-\` rule neck |
+| \`true\` / \`fail\` | Not built-in — use facts or empty query failure |
+| Lists, strings, floats | **Not supported** — atoms + integers only |
+| Quoted atoms \`'John'\` | **Not supported** — use lowercase atoms |
+| Arbitrary arity / DCG / modules | Single inline namespace + \`use\` merge |
+| Top-level consult | **\`inline [logic]\`** + **\`comp [logic]\`** split |
+
+Operators in rule bodies:
+
+| Operator | Role |
+|----------|------|
+| \`=\` | Bind / unify / arithmetic solve |
+| \`=:=\` | Numeric equality test |
+| \`=\\=\` | Numeric inequality test |
+| \`>=\`, \`=<\`, \`>\`, \`<\` | Numeric comparison |
+| \`+\`, \`-\`, \`*\`, \`/\` | Integer arithmetic |
+
+---
+
+## Module shape
+
+\`\`\`logts
+inline [logic] .people:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(mary, bike)
+
+    modifier2(1, -4)
+    modifier2(X,  0) <- X >= 9,  X =< 12
+    modifier2(X,  2) <- X >= 15, X =< 16
+
+    query isJohnOwner:
+        owns(john, _)
+
+    query johnOwns:
+        owns(john, X)
+
+:
+\`\`\`
+
+| Section | Description |
+|---------|-------------|
+| **Facts** | \`predicate(args)\` — no \`<-\` |
+| **Rules** | \`head <- goal1, goal2, …\` |
+| **Queries** | \`query name:\` then one compound goal |
+| **End** | Solitary \`:\` on its own line (same as other inline kinds) |
+
+---
+
+## Queries and free variables
+
+Each \`query\` may expose **at most one** free variable. That variable becomes the value (or values) redirected to wires on the component.
+
+| Free vars | Redirect pattern (on comp) |
+|-----------|----------------------------|
+| **0** | \`queryName >= wire\` — \`1\` if any solution, else \`0\` |
+| **1** | \`queryName:0 >= wire\`, \`queryName:1 >= wire\`, … — solution index |
+
+---
+
+## Composition — \`use\`
+
+\`\`\`logts
+inline [logic] .vehicles:
+
+    wheeled(car)
+
+:
+
+inline [logic] .world:
+
+    use .vehicles
+
+    query available:
+        wheeled(X)
+
+:
+\`\`\`
+
+- **\`use\`** merges **facts and rules** from the referenced module.
+- **Queries are never imported** — each inline defines its own query list.
+
+---
+
+## Example — parse and inspect
+
+\`\`\`logts-play
+inline [logic] .character:
+
+    modifier2(1, -4)
+    modifier2(X,  0) <- X >= 9,  X =< 12
+    modifier2(X,  2) <- X >= 15, X =< 16
+
+    query modifier:
+        modifier2(X, Y)
+
+:
+
+show(doc(.character))
+\`\`\`
+
+---
+
+## Related
+
+- Runtime, pins, exec blocks → [comp-logic.md](comp-logic.md)
+- Allow / NotAllow → [allow-notallow.md](allow-notallow.md) — \`inline.type{logic}\`
+- Analogies: [asm.md](asm.md) (definition vs runtime), [plc.md](plc.md) (component scan)
 `,
     'interactive-components.md': `# Interactive components
 

@@ -2003,7 +2003,21 @@ class Interpreter {
       });
       return;
     }
-    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc)`);
+    if (inline.kind === 'logic') {
+      const parseLogicFn = typeof parseLogicBody === 'function' ? parseLogicBody : null;
+      if (!parseLogicFn) throw Error('Logic assembler is not loaded');
+      const prog = parseLogicFn(inline.bodyRaw);
+      this.inlineInstances.set(inline.name, {
+        kind: inline.kind,
+        name: inline.name,
+        uses: prog.uses || [],
+        queries: prog.queries || [],
+        clauses: prog.clauses || [],
+        bodyRaw: inline.bodyRaw,
+      });
+      return;
+    }
+    throw Error(`Unknown inline kind '${inline.kind}' (supported: asm, lut, protocol, plc, logic)`);
   }
 
   _emitComputedForBodyComponents(internalPrefix) {
@@ -14212,6 +14226,10 @@ if (s.assignment) {
     if(!comp){
       return;
     }
+
+    if (comp.type === 'logic') {
+      comp._logicRedirects = properties.filter((p) => p.property === 'logicQuery>' || p.property === 'pout>');
+    }
     
     // If reEvaluate is true, check if this block is a constant set=1 block with no dependencies
     // These blocks should only execute during initial RUN(), not when re-evaluating
@@ -14248,7 +14266,7 @@ if (s.assignment) {
       const property = prop.property;
       
       // Skip get>, mod>, carry>, over>, out>, and pout> properties - they are processed after all properties are applied
-      if(isGetRedirectProperty(property) || isGenericPoutRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>'){
+      if(isGetRedirectProperty(property) || isGenericPoutRedirectProperty(property) || property === 'mod>' || property === 'carry>' || property === 'over>' || property === 'out>' || property === 'pout>' || property === 'logicQuery>'){
         continue;
       }
 
@@ -18219,6 +18237,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
         if (kindName === 'plc' && typeof formatPlcInstanceDoc === 'function') {
           return formatPlcInstanceDoc(alias, inst);
         }
+        if (kindName === 'logic' && typeof formatLogicInstanceDoc === 'function') {
+          return formatLogicInstanceDoc(alias, inst);
+        }
       }
     }
     if (inlineInstances) {
@@ -18235,6 +18256,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
           }
           if (kindName === 'plc' && typeof formatPlcInstanceDoc === 'function') {
             return formatPlcInstanceDoc(instName, inst);
+          }
+          if (kindName === 'logic' && typeof formatLogicInstanceDoc === 'function') {
+            return formatLogicInstanceDoc(instName, inst);
           }
         }
       }
@@ -18254,6 +18278,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
     if (kindName === 'plc' && typeof formatPlcTypeDoc === 'function') {
       return formatPlcTypeDoc();
     }
+    if (kindName === 'logic' && typeof formatLogicTypeDoc === 'function') {
+      return formatLogicTypeDoc();
+    }
     return [`${name}: (no inline doc available)`];
   }
 
@@ -18272,6 +18299,9 @@ Interpreter.getDocLines = function(name, alias,  funcs, compDefs, registry, pcbI
       }
       if (inst.kind === 'plc' && typeof formatPlcInstanceDoc === 'function') {
         return formatPlcInstanceDoc(name, inst);
+      }
+      if (inst.kind === 'logic' && typeof formatLogicInstanceDoc === 'function') {
+        return formatLogicInstanceDoc(name, inst);
       }
     }
   }

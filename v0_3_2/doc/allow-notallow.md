@@ -53,7 +53,7 @@ List available presets: `doc(inline.asm.sets)`.
 
 - `comp.type{reg key ~ +}` — specific component types (shortcuts as in `comp [+]`)
 - `chip.type{myChip}` — specific chip definitions
-- `board.type{myBoard}`, `pcb.type{myPcb}`, `inline.type{asm protocol}`, `phz.type{obj gen cont}`
+- `board.type{myBoard}`, `pcb.type{myPcb}`, `inline.type{asm protocol logic}`, `phz.type{obj gen cont}`
 
 Bare IDs like `led` or `asm` refer to **user function names**, not comp/inline types. Use `comp.type{led}` for component types.
 
@@ -73,6 +73,12 @@ NotAllow inline.asm.set{riscv32}
 inline [asm] .rv:
   set: riscv32
   :                      # error at execInline
+
+NotAllow inline.type{logic}
+inline [logic] .kb:      # error at execInline
+
+NotAllow comp.type{logic}
+comp [logic] .solver:   # error at parse/elaboration
 
 doc(Allow)               # current Allow policy
 doc(NotAllow)            # current NotAllow policy

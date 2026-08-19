@@ -36142,5 +36142,144 @@ done:
 
   reg(3407, 'cpu-multicore', 'parkCore clears active bit', runMcParkCoreTest);
 
+  const INLINE_LOGIC_CHARACTER = `inline [logic] .character:
+
+    modifier2(1, -4)
+    modifier2(X,  0) <- X >= 9,  X =< 12
+    modifier2(X,  2) <- X >= 15, X =< 16
+
+    query modifier:
+        modifier2(X, Y)
+
+:`;
+
+  const INLINE_LOGIC_PEOPLE = `inline [logic] .people:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(mary, bike)
+
+    query isJohnOwner:
+        owns(john, _)
+
+    query johnOwns:
+        owns(john, X)
+
+:`;
+
+  reg(3500, 'logic', 'parse inline [logic]', function(h, session) {
+    const p = new Parser(new Tokenizer(preprocessLoop(INLINE_LOGIC_CHARACTER)), session._ensureRegistry());
+    const stmts = p.parse();
+    h.assert('kind logic', stmts[0].inline.kind, 'logic');
+    const prog = parseLogicBody(stmts[0].inline.bodyRaw);
+    h.assert('queries', String(prog.queries.length), '1');
+    h.assert('clauses', String(prog.clauses.length >= 3), 'true');
+  });
+
+  reg(3501, 'logic', 'execInline stores logic definition', function(h, session) {
+    session.run(INLINE_LOGIC_CHARACTER);
+    const inst = session.interp.inlineInstances.get('.character');
+    h.assert('kind', inst.kind, 'logic');
+    h.assert('query name', inst.queries[0].name, 'modifier');
+  });
+
+  reg(3502, 'logic', 'executeLogicQueries modifier score 15', function(h, session) {
+    session.run(INLINE_LOGIC_CHARACTER);
+    const inst = session.interp.inlineInstances.get('.character');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    const results = executeLogicQueries(merged, { X: { kind: 'number', value: 15 } });
+    h.assert('Y=2', String(results.modifier[0].Y.value), '2');
+  });
+
+  reg(3503, 'logic', 'comp [logic] integration modifier redirect', function(h, session) {
+    const src = INLINE_LOGIC_CHARACTER + `
+comp [logic] .characterLogic:
+    on: 1
+
+    .character {
+        X is number myX
+    }
+
+:
+
+8wire scoreIn = 00001111
+8wire result = 00000000
+1wire trigger = 1
+
+.characterLogic:{
+    myX = scoreIn
+    modifier:0 >= result
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('result=2', interp.getWireEffectiveValue('result'), '00000010');
+  });
+
+  reg(3504, 'logic', 'comp [logic] johnOwns indexed redirect', function(h, session) {
+    const src = INLINE_LOGIC_PEOPLE + `
+comp [logic] .peopleLogic:
+    on: 1
+
+    .people {
+    }
+
+:
+
+8wire firstCar = 00000000
+1wire trigger = 1
+
+.peopleLogic:{
+    johnOwns:0 >= firstCar
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const val = interp.getWireEffectiveValue('firstCar');
+    h.assert('8 bits', String(val.length), '8');
+    h.assert('non-zero atom hash', String(parseInt(val, 2) > 0), 'true');
+  });
+
+  reg(3505, 'logic', 'comp [logic] boolean query redirect', function(h, session) {
+    const src = INLINE_LOGIC_PEOPLE + `
+comp [logic] .peopleLogic:
+    on: 1
+
+    .people {
+    }
+
+:
+
+1wire flag = 0
+1wire trigger = 1
+
+.peopleLogic:{
+    isJohnOwner >= flag
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('flag=1', interp.getWireEffectiveValue('flag'), '1');
+  });
+
+  reg(3506, 'allow-notallow', 'NotAllow inline.type{logic}', function(h, session) {
+    let err = '';
+    try {
+      session.run(`NotAllow inline.type{logic}
+${INLINE_LOGIC_CHARACTER}`);
+    } catch (e) { err = String(e.message || e); }
+    h.assert('blocked', String(err.includes('not allowed')), 'true');
+  });
+
+  reg(3507, 'allow-notallow', 'NotAllow comp.type{logic}', function(h, session) {
+    let err = '';
+    try {
+      session.run(`NotAllow comp.type{logic}
+${INLINE_LOGIC_CHARACTER}
+comp [logic] .characterLogic:
+    on: 1
+    .character { X is number myX }
+:`);
+    } catch (e) { err = String(e.message || e); }
+    h.assert('blocked', String(err.includes('not allowed')), 'true');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

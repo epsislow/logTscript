@@ -1,6 +1,6 @@
 /* ================= POLICY TYPE MODULES (module.type{}) ================= */
 
-var INLINE_KINDS = ['asm', 'lut', 'protocol', 'plc'];
+var INLINE_KINDS = ['asm', 'lut', 'protocol', 'plc', 'logic'];
 
 var PolicyTypeModuleRegistry = class PolicyTypeModuleRegistry {
   constructor() {
@@ -43,7 +43,7 @@ function resolveCompTypeToken(token, ctx) {
   const validTypes = registry && registry.getAllTypes
     ? registry.getAllTypes()
     : ['led', 'switch', 'dip', 'mem', 'reg', 'counter', 'adder', 'subtract',
-      'divider', 'multiplier', 'shifter', 'rotary', 'lcd', 'key', 'osc'];
+      'divider', 'multiplier', 'shifter', 'rotary', 'lcd', 'key', 'osc', 'logic'];
   if (shortnames[token]) return shortnames[token];
   if (token === '~') return 'osc';
   if (validTypes.includes(token)) return token;
