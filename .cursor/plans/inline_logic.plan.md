@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — motor relațional declarativ, model ASM-like. MVP implementat (Fazele 0–4, 6). Rămâne Faza 5 (matrix/vector redirect)."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — motor relațional declarativ, model ASM-like. MVP complet: Fazele 0–6 (inclusiv Faza 5 matrix/vector redirect + extensii pin frontieră)."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: logic-matrix-output
     content: "Faza 5: redirect matrix/vector — 2 vars libere max, indexare ca wire-vectors"
-    status: pending
+    status: completed
   - id: logic-allow-notallow
     content: "Faza 6: inline.type{logic} + comp.type{logic} — Allow/NotAllow, doc, teste policy"
     status: completed
@@ -312,7 +312,7 @@ sequenceDiagram
 
 ## Decizii de luat — tabel rezumat
 
-> **D1–D19 closed** (D12/D19/1+l/1+k amânate). **D12a + D12b closed** (fill/truncate/count + ASCII encoding F5). **Fazele 0–4, 6 implementate.** Faza 5 rămâne de implementat.
+> **D1–D19 closed.** **Fazele 0–6 implementate (completed).** Faza 5: matrix/vector redirect, D12a/D12b, extensii pin `number`/`text`, slice `::c`, round-trip text.
 
 | ID | Subiect | Decizia ta |
 |----|---------|------------|
@@ -725,6 +725,16 @@ row  col0 (X)              col1 (Y)
 
 **D14a (decis):** text = **ASCII pe width wire** — aceleași convenții ca assign string/ascii în LogTScript.
 
+**D14b (Faza 5+ — completed):** lățime pin **variabilă de la wire** la assign (`myX = wire`), nu fixă la elaborare.
+
+| Tip pin | Default elaborare | La assign | Min | Max |
+|---------|-------------------|-----------|-----|-----|
+| **`number`** | 64 biți (zero) | lățime wire | 8 | **64** |
+| **`text`** | 8 biți (gol) | lățime wire | 8 | **256** |
+| **`bool`** | 1 bit | 1 bit | 1 | 1 |
+
+Decode: `number` → unsigned binary; `text` → ASCII, oprire la `\0` → atom; inputEnv internează atomii pin (`logicPrepareInputEnv`) pentru unificare cu facts.
+
 ---
 
 ### D15 — Reprezentare internă termeni **(completed: A — atom table)**
@@ -836,7 +846,7 @@ Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C**
 | **Faza 2** engine | D5, D6, D15, D17 | **(completed)** |
 | **Faza 3** comp runtime | D2–D4, D7, D11, D13, D14 | **(completed)** |
 | **Faza 4** docs/tests | — | **(completed)** |
-| **Faza 5** matrix/vector output | 2 vars max, redirect ca [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md) | **(pending)** |
+| **Faza 5** matrix/vector output | 2 vars max, redirect ca [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md) + extensii pin/round-trip | **(completed)** |
 | **Faza 6** Allow/NotAllow | `inline.type{logic}`, `comp.type{logic}` | **(completed)** |
 
 ---
@@ -862,7 +872,7 @@ Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C**
 
 ### Faza 0 — Spec **(completed)**
 
-Toate deciziile D1–D19 confirmate. **Faza 5** (D12 + **D12a**) definită. Amânate: **1+l**, **1+k**, **1+b** opțional.
+Toate deciziile D1–D19 confirmate. **Fazele 0–6 (completed).** Amânate: **1+l**, **1+k**, **1+b** opțional.
 
 ---
 
@@ -877,7 +887,7 @@ Toate deciziile D1–D19 confirmate. **Faza 5** (D12 + **D12a**) definită. Amâ
 
 **Validare D16:** parse acceptă `query` în orice inline; la `use` merge doar facts/relations — queries din module used rămân neexportate.
 
-**Validare D12 (MVP):** la elaborare comp, max **1** var de output per query (vars din program block excluse). **Faza 5** va relaxa la **2** vars + matrix/vector.
+**Validare D12:** la elaborare comp, max **2** vars de output per query (vars din program block excluse). **(completed — Faza 5)**
 
 ---
 
@@ -911,12 +921,12 @@ Flux:
 
 - [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md) — definiție inline, sintaxă Prolog, diferențe față de Prolog, exemple `logts-play`.
 - [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md) — pipeline runtime, program/exec block, redirect, exemple `logts-play`.
-- Teste **3500–3505** (`logic`): parse, engine, comp integration, boolean/index redirect.
+- Teste **3500–3511**, **3512–3520** (`logic`): parse, engine, comp, wave redirect, F5 vector/matrix/`::c`, round-trip, pin width limits.
 - `doc(inline.logic)`, `doc(comp.logic)`; secțiuni în doc-viewer.
 
 ---
 
-### Faza 5 — Matrix / vector query output **(pending)**
+### Faza 5 — Matrix / vector query output **(completed)**
 
 **Scop:** 2 vars libere max; redirect aliniat cu [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md). **>2 vars** → eroare. **Fill/truncate/count:** D12a. **Encoding ASCII:** D12b (inclusiv scalar `:N >=` MVP — același encoding, fără hash).
 
@@ -931,16 +941,31 @@ Flux:
 | **2** | `query:count >= wire` | k rânduri scrise |
 | **2** | `query:width >= wire` | C cols (constante elaborare) |
 
-**Implementare:**
+**Implementat (core):**
 
-- Extinde parser property block — `query >=`, `query:r`, `query::c`, `query:r:c`, `query:count`, `query:width`.
-- Extinde `components/logic.js` — pack soluții row-major; **prefix pack + tail fill** (D12a); truncate fără eroare.
-- Elaborare: cols matrix = nr vars libere; capture **fill sentinel** din init literal; `:width` constant.
-- Relaxare D12: permite 2 vars; eroare la ≥3.
-- Extinde `logic-engine.js` / `logic.js` — **atom → ASCII** (nu hash) pe toate redirect-urile; `\0` trim la citire pin text.
-- Teste: vector/matrix (F5); **3504** actualizat ASCII; round-trip `table:0:0` → `myX`.
+| Fișier | Ce |
+|--------|-----|
+| [`parser.js`](../v0_3_2/core/parser.js) | `tryParseLogicQueryRedirect`: `>=`, `:N`, `:r:c`, `::c`, `:count`, `:width` |
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | Pack vector/matrix/row/col; atom→ASCII; `logicPrepareInputEnv` |
+| [`logic.js`](../v0_3_2/core/components/logic.js) | `_applyRedirects` extins; tensor 1D `[N]` = vector; max 2 vars |
+| [`interpreter.js`](../v0_3_2/core/interpreter.js) | `_captureLogicElementFill` la declarare wire |
 
-**Legat de 1+b:** filtrare/policies (`;unique`, cap rows) poate completa Faza 5 sau faza ulterioară.
+**Teste F5:** **3512–3516** (vector bulk, matrix, cell, ASCII show, column slice `::c`); **3504** actualizat ASCII; **3517–3520** (round-trip text, pin width text/number).
+
+**Exemple `logts-play`:** [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md) — vector, matrix, `::c`, round-trip.
+
+#### Faza 5+ — extensii pin frontieră + round-trip **(completed)**
+
+| Topic | Decizie / implementare |
+|-------|------------------------|
+| **Slice coloană `::c`** | `allAges::0 >= col0` — pack coloană variabilă liberă; test **3516** |
+| **Round-trip pin `text`** | wire (ASCII redirect) → `myX = wire` → pin → motor (`logicPinToInputValue` + internare atom); pattern **două comp-uri** (fetch fără pin legat + lookup cu `X is text myX`); test **3517** |
+| **Pin `text` — limită** | Lățime de la wire la assign; min 8, **max 256** biți (D14b); test **3518** (`myWickedLongName` pe `160wire`) |
+| **Pin `number` — limită** | Default elaborare **64** biți; la assign lățime wire, min 8, **max 64** biți (D14b); teste **3519**, **3520** |
+
+**Notă round-trip:** comp cu `X is text myX` legat dar pin gol (`\0…`) constrânge query-urile la prima rulare — separă fetch (program block gol) de lookup (pin populat din wire).
+
+**Legat de 1+b:** filtrare/policies (`;unique`, cap rows) — amânat post-F5.
 
 ---
 
@@ -1081,7 +1106,7 @@ comp [logic] .peopleLogic:
 | Topic | Status |
 |-------|--------|
 | `query = …` | **1+l** amânat |
-| Multi-var query | **Fazele 1–4, 6:** max 1 var; **Faza 5:** matrix/vector + D12a fill/truncate/count |
+| Multi-var query | **Faza 5 (completed):** max 2 vars; matrix/vector + D12a + D12b + `::c` |
 | POUT declarate comp | **1+k** low priority |
 | `use` circular | lint la elaborare **1+g** |
 | boolean redirect | **D7a completed:** `isJohnOwner >= wire` |
@@ -1094,4 +1119,6 @@ comp [logic] .peopleLogic:
 1. ~~Faza 0~~ **(completed)**
 2. ~~Faza 1~~ → ~~Faza 2~~ → ~~Faza 3~~ → ~~Faza 4~~ **(completed)**
 3. ~~Faza 6~~ — Allow/NotAllow **(completed)**
-4. **Faza 5** — matrix/vector output **(pending)** — singura fază rămasă din planul MVP+
+4. ~~**Faza 5**~~ — matrix/vector output + pin limits + round-trip **(completed)**
+
+**Plan MVP+ logic: închis.** Următorii pași opționali: **1+l** (query selectiv), **1+k** (POUT), **1+b** (filtrare soluții).
