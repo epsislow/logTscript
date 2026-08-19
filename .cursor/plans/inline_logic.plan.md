@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–9 complete (inclusiv inline query invoke)."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–9 complete; Faza 10 (1+b) planificată."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -32,6 +32,9 @@ todos:
   - id: logic-inline-query
     content: "Faza 9: .world:query({ goal }, Var=wire) — inlineMethod, D30–D32, teste 3544+, doc"
     status: completed
+  - id: logic-result-policies
+    content: "Faza 10: result policies (1+b) — ;unique / ;first / ;last — D34–D37 confirmed, D38=A"
+    status: pending
 isProject: false
 ---
 
@@ -1148,7 +1151,7 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | ID | Subiect | Detaliu | Legat de |
 |----|---------|---------|----------|
 | **1+a** | Inline-native (sketch v1) | `.people:johnOwns:0` direct pe inline, fără comp | D1 respins |
-| **1+b** | Result policies | `;all`, `;unique`, `first`, `last` | D10 |
+| **1+b** | ~~Result policies~~ | **Promovat → Faza 10** (`;unique`, `first`, `last`, `;all`) | D10, D12a |
 | **1+c** | ~~Negation~~ | **Promovat → Faza 7** (`\+ goal`) | D5, D20–D24 |
 | **1+d** | ~~Recursivitate + depth limit~~ | **Promovat → Faza 8** (D25–D29) | D5 |
 | **1+e** | Facts dinamice runtime | assert/retract | |
@@ -1214,6 +1217,7 @@ Decizii **D30–D32** și detaliu implementare: vezi **Faza 9** mai jos.
 | **Faza 7** Negation `\+` | D20–D24 | **(completed)** |
 | **Faza 8** Depth tuning | D25–D29 | **(completed)** |
 | **Faza 9** Inline query invoke `.world:query({ })` | D30–D32 | **(completed)** |
+| **Faza 10** Result policies (1+b) | D34–D38 | **(ready-to-implement)** — D34–D37 confirmed |
 
 ---
 
@@ -1630,6 +1634,148 @@ comp [logic] .peopleLogic:
 
 ---
 
+## Decizii Faza 10 — result policies (D34–D38)
+
+> **Sursă:** item **1+b** promovat din backlog post-MVP.  
+> **Stare:** **D34–D37 confirmed**, **D38=A (confirmed)**. Gata de implementare.
+
+### Context — ce există deja (fără policies)
+
+| Nevoie | Acoperire azi |
+|--------|----------------|
+| Prima soluție scalar | `query:0 >= wire`, `40wire = .world:query({ … })` (F5/F9) |
+| Toate soluțiile (prefix) | `query >= vector` — discovery order, truncate la N (D12a); **fără `;unique`** = toate (până la cap) |
+| Număr soluții | `query:count >= wire` |
+| Cap colectare | `maxSolutions` pe comp / per-call la `:query` (F8/F9) |
+
+**Lacuna 1+b:** dedupe (`;unique`), cap listă orientat (`;first`), ultima soluție discovery (`;last`).
+
+---
+
+### D34 — Sintaxă **(confirmed: A)**
+
+**Redirect comp** — policy ca **suffix pe nume query**, înainte de `>=`:
+
+```logts
+johnOwns;unique >= allCars
+johnOwns;last >= lastCar
+```
+
+**Inline `:query`** — policy **după binding-uri** (trailing), nu imediat după `{ }`:
+
+```logts
+40wire[4] cars = .world:query({ owns(john, _) }, X=car, Y=year;unique)
+1wire ok = .world:query({ owns(john, X) }, X=car;unique)
+```
+
+| Formă | Verdict |
+|-------|---------|
+| `.world:query({ … };unique, X=val)` | **Respins** — ciudat; policy după args |
+| `.world:query({ … }, X=val, Y=val;unique)` | **Confirmed** |
+| `johnOwns;unique >= wire` | **Confirmed** |
+
+Aliniat cu `SORT(m; col=2)` — `;` introduce modiferi trailing.
+
+---
+
+### D35 — `;unique` **(confirmed: A)**
+
+| Regulă | Comportament |
+|--------|--------------|
+| **Vector** (1 var) | Dedupe după valoarea encodată a var-ului liber (tuple 1-coloană) |
+| **Matrix** (2 vars) | Dedupe după **întreg rândul** (tuple ambele cols) — același `(X,Y)` pe rânduri diferite → **o singură** păstrată |
+| **Ordine** | Păstrează **prima** apariție în discovery order (D10) |
+| **`:count`** | Numără soluțiile **după** dedupe |
+
+**Duplicate pe rânduri diferite — da, se poate:** același binding poate proveni din căi de demonstrație diferite (clauze/fapte duplicate, reguli overlap). `;unique` comprimă lista înainte de pack pe wire.
+
+---
+
+### D36 — `;first` / `;last` **(confirmed parțial)**
+
+#### `;first`
+
+| Context | Semnificație |
+|---------|--------------|
+| **Scalar** | Redundant cu `maxSolutions=\1` / `:0 >=` — **nu e focus MVP** |
+| **Vector / matrix** | **Nu e redundant** — limitează **pack-ul** la prima soluție în buffer (slot `:0` / rând 0), chiar dacă motorul a colectat mai multe; util când vrei listă dar doar primul element semnificativ |
+
+#### `;last`
+
+| Regulă | Comportament |
+|--------|--------------|
+| **Semantica** | Ultima soluție în **discovery order** (ordinea backtracking Prolog), **nu** sortare arbitrară |
+| **vs MySQL `ORDER BY id DESC LIMIT 1`** | **Nu** există „găsim ultima direct” fără enumerare — motorul explorează în ordine fixă; `;last` = colectează (până la `maxSolutions` / epuizare) → ia **ultimul** element |
+| **Optimizare viitoare** | Index / ordine inversă pe facts — **out of scope** F10; eventual notă 1+b+ |
+
+**MVP F10:** `;unique` obligatoriu; `;first` + `;last` dacă timp — prioritate **`;unique`**, apoi **`;last`**.
+
+---
+
+### D37 — `;all` **(confirmed: respins)**
+
+**Fără policy** = deja „all” în limitele D12a / `maxSolutions`:
+
+- vector: prefix soluții + fill tail
+- truncate silent dacă k > N slots (comp: pout `truncated`)
+
+**`;all` nu se implementează** — lipsește `;unique` ⇒ nu dedupe; colectare normală.
+
+---
+
+### D38 — Unde se aplică **(confirmed: A)**
+
+**Ambele** — același post-procesor după `executeLogicGoals`:
+
+- redirect `query;policy >= wire` în exec block comp
+- trailing `;policy` pe `.inline:query({ }, …;policy)`
+
+---
+
+### Exemple țintă
+
+```logts
+inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, chevy)    # duplicate fact — demo ;unique
+    owns(john, ford)
+
+:
+
+40wire[4] uniq = .world:query({ owns(john, _) };unique)
+
+40wire car = 01100011'01101000'01100101'01110110'01111001
+1wire ok = .world:query({ owns(john, X) }, X=car;unique)
+
+comp [logic] .peopleLogic:
+    on: 1
+    .people { }
+:
+
+8wire[4] allCars = 00000000
+1wire trigger = 1
+
+.peopleLogic:{
+    johnOwns;unique >= allCars
+    johnOwns;last >= lastCar
+    set = trigger
+}
+```
+
+---
+
+### Criterii done
+
+- [ ] Parser `;unique` / `;first` / `;last` — redirect + inline query (trailing după bindings)
+- [ ] `logicApplyResultPolicy(solutions, policy, freeVars)` — dedupe tuple, first/last pack rules
+- [ ] Teste **3554+** — duplicate facts + `;unique`; matrix duplicate rows; `:count` după dedupe; `;last` cu 3 soluții
+- [ ] Doc `comp-logic.md` + `logic-query-exec.md`
+
+**Amânat post-F10:** `;unique` + NAF; sort key invers (non-discovery `last`).
+
+---
+
 ## Exemplu țintă complet (sketch v2, D1 completed)
 
 ```logts
@@ -1722,10 +1868,12 @@ comp [logic] .peopleLogic:
 | Negation `\+` | **Faza 7 (completed)** |
 | Depth / truncated / depthExceeded | **Faza 8 (completed)** |
 | Inline query `.world:query({ })` | **Faza 9 (completed)** — D30–D32 |
+| Result policies `;unique` / `;first` / `;last` | **Faza 10 (ready)** — D34–D38 confirmed; fără `;all` |
 
 ---
 
 ## Ordine recomandată
 
 1. ~~Faza 0~~ → ~~Faza 9~~ **(completed)**
-2. Opțional: **1+l**, **1+k**, **1+b**, **1+e**
+2. **Faza 10 (1+b)** — D34–D37 confirmed → implementare
+3. Opțional: **1+l**, **1+k**, **1+e**, **1+i**
