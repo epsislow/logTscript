@@ -14,9 +14,11 @@ TRIMT(Wbit text, Wbit trimChars ; left right) -> Wbit
 TRIMT(Wbit text, Wbit trimChars ; any) -> Wbit
 ```
 
-- **First argument:** source text (wire or string literal).
+- **First argument:** source text — wire or string literal.
 - **Second argument:** trim set — each **8-bit cell** is one character to remove (e.g. `" "` or `" \0"`).
 - **Result width:** same bit width as the first argument; shorter logical text is **right-padded with `\0`**.
+
+**Wire operands:** `TRIMT(myWire, " "; left)` reads the wire value at call time; output width matches `myWire`.
 
 ## Call tags
 
@@ -57,6 +59,16 @@ show(t; ascii)
 ```
 
 → `"a"` (every space removed).
+
+### Wire operands
+
+```logts-play
+48wire src =: "  a  \0"
+48wire t = TRIMT(src, " "; left)
+show(t; ascii)
+```
+
+→ `"a  "` (leading spaces trimmed; wire width preserved).
 
 ### `;any` — spaces and NUL everywhere
 

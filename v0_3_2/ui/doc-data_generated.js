@@ -6404,7 +6404,9 @@ EQT(Wbit textA, Wbit textB ; left right) -> 1bit
 EQT(Wbit textA, Wbit textB ; any) -> 1bit
 \`\`\`
 
-Operands are **8-bit ASCII cells** (wire string literals \`"joe"\`, \`"joe\\0"\`, or any binary blob interpreted as bytes).
+Operands are **8-bit ASCII cells** — wire string literals (\`"joe"\`, \`"joe\\0"\`), **whole wires** (\`EQT(a, b)\`), grouped \`\\65 \\66;ascii\`, or any binary blob interpreted as bytes.
+
+**Wire operands:** pass the wire name directly (e.g. \`EQT(a, b; right)\`). Each operand is read as the wire's current bit value.
 
 ## Call tags (NUL handling)
 
@@ -6460,6 +6462,17 @@ show(c)
 
 \`\`\`logts-play
 1wire eq = EQT("\\0joe\\0", "joe" ;left right)
+show(eq)
+\`\`\`
+
+→ \`1\`.
+
+### Wire operands
+
+\`\`\`logts-play
+32wire a =: "joe\\0"
+32wire b =: "joe"
+1wire eq = EQT(a, b; right)
 show(eq)
 \`\`\`
 
@@ -9391,9 +9404,11 @@ TRIMT(Wbit text, Wbit trimChars ; left right) -> Wbit
 TRIMT(Wbit text, Wbit trimChars ; any) -> Wbit
 \`\`\`
 
-- **First argument:** source text (wire or string literal).
+- **First argument:** source text — wire or string literal.
 - **Second argument:** trim set — each **8-bit cell** is one character to remove (e.g. \`" "\` or \`" \\0"\`).
 - **Result width:** same bit width as the first argument; shorter logical text is **right-padded with \`\\0\`**.
+
+**Wire operands:** \`TRIMT(myWire, " "; left)\` reads the wire value at call time; output width matches \`myWire\`.
 
 ## Call tags
 
@@ -9434,6 +9449,16 @@ show(t; ascii)
 \`\`\`
 
 → \`"a"\` (every space removed).
+
+### Wire operands
+
+\`\`\`logts-play
+48wire src =: "  a  \\0"
+48wire t = TRIMT(src, " "; left)
+show(t; ascii)
+\`\`\`
+
+→ \`"a  "\` (leading spaces trimmed; wire width preserved).
 
 ### \`;any\` — spaces and NUL everywhere
 
@@ -39783,7 +39808,7 @@ Index: [builtin-functions.md](builtin-functions.md)
 | [EQT](builtin-EQT.md) | Compare two text blobs; \`\\0\` ignored per call tags → \`1bit\` |
 | [TRIMT](builtin-TRIMT.md) | Remove trim-set characters from a text wire → same width |
 
-Operands use **8-bit ASCII cells** (wire string literals \`"hello"\`, \`"a\\0"\`, grouped \`\\65 \\66;ascii\`, or assigned wires).
+Operands use **8-bit ASCII cells** — wire string literals, **whole wires** (\`EQT(a, b)\`, \`TRIMT(src, " ")\`), grouped \`\\65 \\66;ascii\`, or assigned wires.
 
 Shared **call tags:** \`left\`, \`right\`, \`left right\`, \`any\` (default). Tag \`any\` is mutually exclusive with \`left\` / \`right\`.
 

@@ -36764,5 +36764,22 @@ comp [logic] .characterLogic:
     }
   });
 
+  reg(3534, 'text-builtin', 'EQT — wire operands EQT(a, b; right)', function(h, session) {
+    const { interp } = session.run(
+      '32wire a =: "joe\\0"\n' +
+      '32wire b =: "joe"\n' +
+      '1wire eq = EQT(a, b; right)'
+    );
+    h.assert('wire eq', session.getWire(interp, 'eq'), '1');
+  });
+
+  reg(3535, 'text-builtin', 'TRIMT — wire source TRIMT(a, " "; left)', function(h, session) {
+    const { interp } = session.run(
+      '48wire src =: "  a  \\0"\n' +
+      '48wire t = TRIMT(src, " "; left)'
+    );
+    h.assert('wire trim left', session.getWire(interp, 't'), strBin('a  \0').padEnd(48, '0'));
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

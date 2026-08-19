@@ -2700,7 +2700,9 @@
       {"id":3530,"group":"text-builtin","title":"TRIMT — any removes spaces and NUL","detail":{"scripts":["48wire t = TRIMT(\"  a  \\0\", \" \\0\" ;any)"],"steps":[],"assertions":["trim all"]}},
       {"id":3531,"group":"doc","title":"BUILTIN_DOC — EQT signatures","detail":{"scripts":[],"steps":["getDocLines(EQT)"],"assertions":["EQT 5 signatures","EQT any tag"]}},
       {"id":3532,"group":"doc","title":"BUILTIN_DOC — TRIMT signatures","detail":{"scripts":[],"steps":["getDocLines(TRIMT)"],"assertions":["TRIMT 5 signatures","TRIMT left right"]}},
-      {"id":3533,"group":"text-builtin","title":"isBuiltinFunction — EQT TRIMT recognized","detail":{"scripts":[],"steps":["getDocLines(EQT)","getDocLines(TRIMT)"],"assertions":["fn + …"]}}
+      {"id":3533,"group":"text-builtin","title":"isBuiltinFunction — EQT TRIMT recognized","detail":{"scripts":[],"steps":["getDocLines(EQT)","getDocLines(TRIMT)"],"assertions":["fn + …"]}},
+      {"id":3534,"group":"text-builtin","title":"EQT — wire operands EQT(a, b; right)","detail":{"scripts":["32wire a =: \"joe\\0\""],"steps":[],"assertions":["wire eq"]}},
+      {"id":3535,"group":"text-builtin","title":"TRIMT — wire source TRIMT(a, \" \"; left)","detail":{"scripts":["48wire src =: \"  a  \\0\""],"steps":[],"assertions":["wire trim left"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -2819,7 +2821,7 @@
       { id: 'sock', label: 'sock', rangeLabel: '2450–2488, 2561', testIds: [2450, 2451, 2452, 2453, 2454, 2455, 2456, 2457, 2458, 2459, 2460, 2461, 2462, 2463, 2464, 2465, 2466, 2467, 2468, 2469, 2470, 2471, 2472, 2473, 2474, 2475, 2476, 2477, 2478, 2479, 2480, 2481, 2482, 2483, 2484, 2485, 2486, 2487, 2488, 2561] },
       { id: 'socket-chat', label: 'socket-chat', rangeLabel: '2528–2536, 2569–2571', testIds: [2528, 2529, 2530, 2531, 2532, 2533, 2534, 2535, 2536, 2569, 2570, 2571] },
       { id: 'terminal', label: 'Terminal component', rangeLabel: '960–983, 1571–1574, 1643–1653, 1661, 1663', testIds: [960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 1571, 1572, 1573, 1574, 1643, 1644, 1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1661, 1663] },
-      { id: 'text-builtin', label: 'text-builtin', rangeLabel: '3521–3530, 3533', testIds: [3521, 3522, 3523, 3524, 3525, 3526, 3527, 3528, 3529, 3530, 3533] },
+      { id: 'text-builtin', label: 'text-builtin', rangeLabel: '3521–3530, 3533–3535', testIds: [3521, 3522, 3523, 3524, 3525, 3526, 3527, 3528, 3529, 3530, 3533, 3534, 3535] },
       { id: 'unsigned-width-tags', label: 'unsigned-width-tags', rangeLabel: '2410–2419', testIds: [2410, 2411, 2412, 2413, 2414, 2415, 2416, 2417, 2418, 2419] },
       { id: 'user-def', label: 'user-def', rangeLabel: '1764–1775, 2996', testIds: [1764, 1765, 1766, 1767, 1768, 1769, 1770, 1771, 1772, 1773, 1774, 1775, 2996] },
       { id: 'user-def-tags', label: 'user-def-tags', rangeLabel: '1776–1781', testIds: [1776, 1777, 1778, 1779, 1780, 1781] },

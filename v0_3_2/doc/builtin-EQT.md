@@ -14,7 +14,9 @@ EQT(Wbit textA, Wbit textB ; left right) -> 1bit
 EQT(Wbit textA, Wbit textB ; any) -> 1bit
 ```
 
-Operands are **8-bit ASCII cells** (wire string literals `"joe"`, `"joe\0"`, or any binary blob interpreted as bytes).
+Operands are **8-bit ASCII cells** — wire string literals (`"joe"`, `"joe\0"`), **whole wires** (`EQT(a, b)`), grouped `\65 \66;ascii`, or any binary blob interpreted as bytes.
+
+**Wire operands:** pass the wire name directly (e.g. `EQT(a, b; right)`). Each operand is read as the wire's current bit value.
 
 ## Call tags (NUL handling)
 
@@ -70,6 +72,17 @@ show(c)
 
 ```logts-play
 1wire eq = EQT("\0joe\0", "joe" ;left right)
+show(eq)
+```
+
+→ `1`.
+
+### Wire operands
+
+```logts-play
+32wire a =: "joe\0"
+32wire b =: "joe"
+1wire eq = EQT(a, b; right)
 show(eq)
 ```
 

@@ -13,7 +13,7 @@ Index: [builtin-functions.md](builtin-functions.md)
 | [EQT](builtin-EQT.md) | Compare two text blobs; `\0` ignored per call tags → `1bit` |
 | [TRIMT](builtin-TRIMT.md) | Remove trim-set characters from a text wire → same width |
 
-Operands use **8-bit ASCII cells** (wire string literals `"hello"`, `"a\0"`, grouped `\65 \66;ascii`, or assigned wires).
+Operands use **8-bit ASCII cells** — wire string literals, **whole wires** (`EQT(a, b)`, `TRIMT(src, " ")`), grouped `\65 \66;ascii`, or assigned wires.
 
 Shared **call tags:** `left`, `right`, `left right`, `any` (default). Tag `any` is mutually exclusive with `left` / `right`.
 
