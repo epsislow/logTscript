@@ -5119,26 +5119,56 @@ assignment() {
 
       if (this.c.type === 'SYM' && this.c.value === '(') {
         const methodArgs = [];
+        let methodBindings = null;
         this.eat('SYM', '(');
         this.t.skip();
         let callTags = null;
-        while (!(this.c.type === 'SYM' && this.c.value === ')')) {
-          if (this.c.type === 'EOF') {
-            throw Error(`Unclosed '(' in inline method at ${this.c.line}:${this.c.col}`);
-          }
-          if (this.c.type === 'SYM' && this.c.value === ';') {
-            callTags = this.parseFuncTags();
-            break;
-          }
-          if (methodArgs.length > 0) this.eat('SYM', ',');
-          methodArgs.push(this.expr());
+        if (property === 'query' && this.c.type === 'SYM' && this.c.value === '{') {
+          const bracePos = this.t.i - 1;
+          const raw = this.parseRawBraceBlock(bracePos);
+          methodArgs.push({ kind: 'logicGoalsBlock', raw });
           this.t.skip();
+          methodBindings = [];
+          while (this.c.type === 'SYM' && this.c.value === ',') {
+            this.eat('SYM', ',');
+            this.t.skip();
+            if (this.c.type !== 'ID') {
+              throw Error(`Expected Prolog variable name after ',' in logic query at ${this.c.line}:${this.c.col}`);
+            }
+            const bindName = this.c.value;
+            if (!/^[A-Z_][A-Za-z0-9_]*$/.test(bindName)) {
+              throw Error(`Logic query binding must be a Prolog variable (uppercase), got '${bindName}' at ${this.c.line}:${this.c.col}`);
+            }
+            this.eat('ID');
+            this.t.skip();
+            if (this.c.type !== 'SYM' || this.c.value !== '=') {
+              throw Error(`Expected '=' after '${bindName}' in logic query at ${this.c.line}:${this.c.col}`);
+            }
+            this.eat('SYM', '=');
+            this.t.skip();
+            methodBindings.push({ name: bindName, expr: this.expr() });
+            this.t.skip();
+          }
+        } else {
+          while (!(this.c.type === 'SYM' && this.c.value === ')')) {
+            if (this.c.type === 'EOF') {
+              throw Error(`Unclosed '(' in inline method at ${this.c.line}:${this.c.col}`);
+            }
+            if (this.c.type === 'SYM' && this.c.value === ';') {
+              callTags = this.parseFuncTags();
+              break;
+            }
+            if (methodArgs.length > 0) this.eat('SYM', ',');
+            methodArgs.push(this.expr());
+            this.t.skip();
+          }
         }
         if (callTags == null && this.c.type === 'SYM' && this.c.value === ';') {
           callTags = this.parseFuncTags();
         }
         this.eat('SYM', ')');
         const method = { var: compName, method: property, args: methodArgs };
+        if (methodBindings && methodBindings.length) method.bindings = methodBindings;
         if (callTags) method.callTags = callTags;
         if (globalRef) method.globalRef = true;
         return tagGlobal({ inlineMethod: method });

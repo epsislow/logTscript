@@ -395,7 +395,11 @@ function formatLogicTypeDoc() {
     '  Program block (.module { X is number myX }) binds logic variables to component pins.',
     '  Exec block (.logic:{ myX = scoreIn, query:0 >= out, set = trigger }) wires pins and redirects results.',
     '',
-    'See doc/inline-logic.md and doc/comp-logic.md',
+    'Inline query exec (expression, no comp):',
+    '',
+    '  .world:query({ owns(john, X) }, X=car)   — boolean / vector / matrix per LHS wire',
+    '',
+    'See doc/inline-logic.md, doc/logic-query-exec.md, doc/comp-logic.md',
     'doc(inline.logic)  doc(comp.logic)',
   ];
 }
@@ -404,8 +408,21 @@ function logicFingerprintProgram(inst) {
   return JSON.stringify({ clauses: inst.clauses, queries: inst.queries, uses: inst.uses });
 }
 
+function parseLogicGoalsBlock(bodyRaw) {
+  const src = bodyRaw == null ? '' : String(bodyRaw).trim();
+  if (!src) throw new Error('logic query block requires at least one goal');
+  const tokens = logicTokenize(src);
+  const parser = new LogicParser(tokens);
+  const goals = parser.parseBodyGoals();
+  if (!parser.at('EOF')) {
+    logicError('unexpected tokens after query goals', parser.peek().line);
+  }
+  return goals;
+}
+
 if (typeof globalThis !== 'undefined') {
   globalThis.parseLogicBody = parseLogicBody;
+  globalThis.parseLogicGoalsBlock = parseLogicGoalsBlock;
   globalThis.parseLogicProgramBlock = parseLogicProgramBlock;
   globalThis.logicResolveMerged = logicResolveMerged;
   globalThis.formatLogicInstanceDoc = formatLogicInstanceDoc;
@@ -420,6 +437,7 @@ if (typeof globalThis !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     parseLogicBody,
+    parseLogicGoalsBlock,
     parseLogicProgramBlock,
     logicResolveMerged,
     formatLogicInstanceDoc,

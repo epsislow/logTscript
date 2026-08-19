@@ -36941,5 +36941,73 @@ comp [logic] .loopLogic:
     h.assert('depthExceeded=1', interp.getWireEffectiveValue('hitDepth'), '1');
   });
 
+  const INLINE_LOGIC_OWNS = `inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(mary, bike)
+
+:`;
+
+  const CHEVY40 = '01100011' + '01101000' + '01100101' + '01110110' + '01111001';
+  const FORD40 = '01100110' + '01101111' + '01110010' + '01100100' + '00000000';
+  const BIKE40 = '01100010' + '01101001' + '01101011' + '01100101' + '00000000';
+
+  reg(3544, 'logic', 'inline query boolean with Var=wire binding', function(h, session) {
+    const src = INLINE_LOGIC_OWNS + `
+40wire car = ${CHEVY40}
+
+1wire ok = .world:query({ owns(john, X) }, X=car)
+
+40wire notCar = ${BIKE40}
+1wire bad = .world:query({ owns(john, X) }, X=notCar)`;
+    const { interp } = session.run(src);
+    h.assert('ok=1', interp.getWireEffectiveValue('ok'), '1');
+    h.assert('bad=0', interp.getWireEffectiveValue('bad'), '0');
+  });
+
+  reg(3545, 'logic', 'inline query vector bulk owns(john, _)', function(h, session) {
+    const src = INLINE_LOGIC_OWNS + `
+8wire[4] cars = .world:query({ owns(john, _) })`;
+    const { interp } = session.run(src);
+    const cars = interp.getWireEffectiveValue('cars');
+    h.assert('len 32', String(cars.length), '32');
+    h.assert('slot0 c', cars.slice(0, 8), '01100011');
+    h.assert('slot1 f', cars.slice(8, 16), '01100110');
+    h.assert('slot2 fill', cars.slice(16, 24), '00000000');
+  });
+
+  reg(3546, 'logic', 'inline query multi-goal with negation', function(h, session) {
+    const src = `inline [logic] .world:
+
+    person(john)
+    person(mary)
+    banned(mary)
+
+    query eligible:
+        person(X), \\+ banned(X)
+
+:
+
+1wire ok = .world:query({ person(X), \\+ banned(X) })
+
+8wire[4] who = .world:query({ person(X), \\+ banned(X) })`;
+    const { interp } = session.run(src);
+    h.assert('boolean ok', interp.getWireEffectiveValue('ok'), '1');
+    const who = interp.getWireEffectiveValue('who');
+    h.assert('who len', String(who.length), '32');
+    h.assert('john first char', who.slice(0, 8), '01101010');
+  });
+
+  reg(3547, 'logic', 'inline query matrix two free vars', function(h, session) {
+    const src = INLINE_LOGIC_WORLD + `
+32wire[3, 2] table = .world:query({ age(X, Y) })`;
+    const { interp } = session.run(src);
+    const table = interp.getWireEffectiveValue('table');
+    h.assert('192 bits', String(table.length), '192');
+    h.assert('row0 john', table.slice(0, 32), '01101010' + '01101111' + '01101000' + '01101110');
+    h.assert('row0 age 25', table.slice(32, 64), '00000000000000000000000000011001');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

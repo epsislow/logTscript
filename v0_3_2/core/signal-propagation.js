@@ -878,7 +878,14 @@ Interpreter.prototype.forEachSubExprInAtom = function(atom, visit) {
     }
   }
   if (atom.inlineMethod && atom.inlineMethod.args) {
-    nested.push(...atom.inlineMethod.args);
+    for (const arg of atom.inlineMethod.args) {
+      if (Array.isArray(arg)) nested.push(arg);
+    }
+  }
+  if (atom.inlineMethod && atom.inlineMethod.bindings) {
+    for (const bind of atom.inlineMethod.bindings) {
+      if (bind && bind.expr) nested.push(bind.expr);
+    }
   }
   for (const sub of nested) {
     if (Array.isArray(sub)) visit(sub);

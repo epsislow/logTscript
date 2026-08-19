@@ -420,6 +420,92 @@ function executeLogicQueries(mergedDef, inputEnv, options) {
   return out;
 }
 
+function logicPrepareGoalsForInvoke(goals) {
+  let collectIdx = 0;
+  function mapTerm(t) {
+    if (!t) return t;
+    if (t.kind === 'var' && t.name === '_') {
+      return { kind: 'var', name: `__collect${collectIdx++}` };
+    }
+    if (t.kind === 'compound') {
+      return { kind: 'compound', predicate: t.predicate, args: (t.args || []).map(mapTerm) };
+    }
+    if (t.kind === 'arith') {
+      return { kind: 'arith', op: t.op, left: mapTerm(t.left), right: mapTerm(t.right) };
+    }
+    return t;
+  }
+  function mapGoal(g) {
+    if (!g) return g;
+    if (g.kind === 'not') return { kind: 'not', goal: mapGoal(g.goal) };
+    if (g.kind === 'call' || g.kind === 'compound') {
+      return { kind: 'call', predicate: g.predicate, args: (g.args || []).map(mapTerm) };
+    }
+    if (g.kind === 'cmp') {
+      return { kind: 'cmp', op: g.op, left: mapTerm(g.left), right: mapTerm(g.right) };
+    }
+    if (g.kind === 'unify') {
+      return { kind: 'unify', left: mapTerm(g.left), right: mapTerm(g.right) };
+    }
+    return g;
+  }
+  return (goals || []).map(mapGoal);
+}
+
+function logicOutputFreeVars(goals, inputEnv) {
+  const bound = inputEnv ? Object.keys(inputEnv) : [];
+  const boundSet = new Set(bound);
+  return logicCollectFreeVarsInGoals(goals).filter((v) => !boundSet.has(v));
+}
+
+function logicInferBindType(bitWidth) {
+  if (bitWidth === 1) return 'bool';
+  if (bitWidth >= 8 && bitWidth % 8 === 0) return 'text';
+  return 'number';
+}
+
+function executeLogicGoals(mergedDef, goals, inputEnv, options) {
+  const engine = new LogicEngine(mergedDef.clauses || []);
+  const opts = options || {};
+  if (opts.maxSolutions != null) engine.maxSolutions = opts.maxSolutions;
+  if (opts.maxDepth != null) engine.maxDepth = opts.maxDepth;
+  const prepared = logicPrepareGoalsForInvoke(goals);
+  const solutions = engine.solveQuery(prepared, inputEnv || {});
+  return {
+    solutions,
+    _logicMeta: { truncated: engine.truncated, depthExceeded: engine.depthExceeded },
+  };
+}
+
+function logicEncodeInlineQueryResult(solutions, freeVars, shape, fillBits, scalarWidth) {
+  if (!freeVars || freeVars.length === 0) {
+    const val = solutions && solutions.length > 0 ? 1 : 0;
+    const w = shape && shape.kind === 'scalar' ? (scalarWidth || shape.ew || 1) : 1;
+    return logicNumberToBits(val, w);
+  }
+  if (freeVars.length === 1 && shape && shape.kind === 'vector') {
+    return logicPackVectorSolutions(
+      solutions, freeVars, shape.count, shape.ew, fillBits,
+    );
+  }
+  if (freeVars.length === 2 && shape && shape.kind === 'matrix') {
+    return logicPackMatrixSolutions(
+      solutions, freeVars, shape.rows, shape.cols, shape.ew, fillBits,
+    );
+  }
+  if (freeVars.length >= 1 && solutions && solutions.length > 0) {
+    const w = scalarWidth || (shape && shape.ew) || 8;
+    return logicEncodeSolutionTerm(solutions[0][freeVars[0]], w);
+  }
+  if (shape && shape.kind === 'vector') {
+    return fillBits.repeat(shape.count);
+  }
+  if (shape && shape.kind === 'matrix') {
+    return fillBits.repeat(shape.rows * shape.cols);
+  }
+  return logicNumberToBits(0, scalarWidth || (shape && shape.ew) || 1);
+}
+
 function logicAtomToAsciiBits(name, width) {
   let bits = '';
   const s = name != null ? String(name) : '';
@@ -548,6 +634,11 @@ function logicPinToInputValue(bits, bindType) {
 
 if (typeof globalThis !== 'undefined') {
   globalThis.executeLogicQueries = executeLogicQueries;
+  globalThis.executeLogicGoals = executeLogicGoals;
+  globalThis.logicPrepareGoalsForInvoke = logicPrepareGoalsForInvoke;
+  globalThis.logicOutputFreeVars = logicOutputFreeVars;
+  globalThis.logicInferBindType = logicInferBindType;
+  globalThis.logicEncodeInlineQueryResult = logicEncodeInlineQueryResult;
   globalThis.LogicEngine = LogicEngine;
   globalThis.logicTermToWireValue = logicTermToWireValue;
   globalThis.logicPinToInputValue = logicPinToInputValue;
@@ -562,6 +653,11 @@ if (typeof globalThis !== 'undefined') {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     executeLogicQueries,
+    executeLogicGoals,
+    logicPrepareGoalsForInvoke,
+    logicOutputFreeVars,
+    logicInferBindType,
+    logicEncodeInlineQueryResult,
     LogicEngine,
     logicTermToWireValue,
     logicPinToInputValue,

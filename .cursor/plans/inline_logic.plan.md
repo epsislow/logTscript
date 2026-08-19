@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–8 complete; **Faza 9** = inline query invoke (1+h)."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–9 complete (inclusiv inline query invoke)."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -31,7 +31,7 @@ todos:
     status: completed
   - id: logic-inline-query
     content: "Faza 9: .world:query({ goal }, Var=wire) — inlineMethod, D30–D32, teste 3544+, doc"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -1213,7 +1213,7 @@ Decizii **D30–D32** și detaliu implementare: vezi **Faza 9** mai jos.
 | **Faza 6** Allow/NotAllow | `inline.type{logic}`, `comp.type{logic}` | **(completed)** |
 | **Faza 7** Negation `\+` | D20–D24 | **(completed)** |
 | **Faza 8** Depth tuning | D25–D29 | **(completed)** |
-| **Faza 9** Inline query invoke `.world:query({ })` | D30–D32 | **(ready-to-implement)** |
+| **Faza 9** Inline query invoke `.world:query({ })` | D30–D32 | **(completed)** |
 
 ---
 
@@ -1603,67 +1603,30 @@ comp [logic] .peopleLogic:
 
 ---
 
-### Faza 9 — Inline query invoke `.world:query({ })` **(ready-to-implement)**
+### Faza 9 — Inline query invoke `.world:query({ })` **(completed)**
 
 **Scop:** promovat din **1+h** — apel expresie **`.inline:query({ goals }, Var=wire, …)`** pe `inline [logic]`, fără `comp [logic]`.
 
-#### Ce lipsește azi
-
-| Layer | Stare | Faza 9 |
-|-------|-------|--------|
-| `inlineMethod` logic | doar LUT/protocol/… | method **`query`** pe kind `logic` |
-| Parser apel | args poziționale | bloc `{ goals }` raw + trailing `Var=expr` |
-| Motor | `executeLogicQueries` (named queries) | **`executeLogicGoals(def, goals, inputEnv, opts)`** — ad-hoc goal list |
-| Return | N/A | refolosește pack/encode din [`logic.js`](../v0_3_2/core/components/logic.js) |
-| Doc | absent | secțiune în [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) |
-
-#### Fișiere de modificat
+#### Livrat
 
 | Fișier | Change |
 |--------|--------|
-| [`parser.js`](../v0_3_2/core/parser.js) | `.logic:query({ … } [, Var=expr …]` — primul arg bloc brace raw; trailing named binds după `)` |
-| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | `parseLogicGoalsBlock(raw)` — parse doar goals (fără facts/queries header); reutilizează `LogicParser` |
-| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `executeLogicGoals(inst, goals, inputEnv, opts)` — solve + solutions; raportează truncated/depthExceeded opțional |
-| [`interpreter.js`](../v0_3_2/core/interpreter.js) | `evalInlineMethod` — ramură logic: resolve binds, call engine, encode return după LHS wire shape |
-| [`logic.js`](../v0_3_2/core/components/logic.js) | **Extract/export** funcții pack/encode (sau modul partajat) — fără duplicare față de redirect |
-| [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md) | Secțiune `.world:query({ })`, exemple boolean + vector + matrix |
-| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3544+** |
-
-#### Exemplu țintă
-
-```logts
-inline [logic] .world:
-    owns(john, chevy).
-    owns(john, tesla).
-    owns(mary, bmw).
-
-8wire car = chevy
-
-1wire ok = .world:query({ owns(john, X) }, X=car)     ; ok = 1
-
-8wire[10] cars = .world:query({ owns(john, _) })       ; chevy, tesla, …
-
-32wire[R,2] pairs = .world:query({ owns(john, Car), age(john, Age) })
-```
-
-#### Teste minime propuse
-
-| ID | Scop |
-|----|------|
-| **3544** | Boolean: `owns(john, X), X=car` → `1`; alt `car` → `0` |
-| **3545** | Vector: `{ owns(john, _) }` pe `8wire[10]` — 2 soluții + fill |
-| **3546** | Multi-goal + `\+` în bloc |
-| **3547** | Matrix 2 vars libere pe `32wire[R,C]` |
-| **3548** | `maxSolutions` cap — vector trunchiat (opțional) |
+| [`parser.js`](../v0_3_2/core/parser.js) | `.logic:query({ … } [, Var=expr …])` — bloc goals + binding-uri |
+| [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | `parseLogicGoalsBlock(raw)` |
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `executeLogicGoals`, `logicEncodeInlineQueryResult`, `_` → collect |
+| [`interpreter.js`](../v0_3_2/core/interpreter.js) | `evalLogicInlineQuery`, `_inlineLogicAssignWire`, `_logicShapeFromDecl` |
+| [`logic.js`](../v0_3_2/core/components/logic.js) | export `logicWireShape` |
+| [`doc/logic-query-exec.md`](../v0_3_2/doc/logic-query-exec.md) | Pagină nouă + exemple `logts-play` Load & Run |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3544–3547** |
 
 #### Criterii done
 
-- [ ] Parser + `evalInlineMethod` logic `query`
-- [ ] `executeLogicGoals` + encode partajat cu comp redirect
-- [ ] Teste **3544–3547** (+ opțional 3548); suite verde
-- [ ] Doc inline-logic + manifest
+- [x] Parser + `evalInlineMethod` logic `query`
+- [x] `executeLogicGoals` + encode partajat cu comp redirect
+- [x] Teste **3544–3547**; suite **2709/2709**
+- [x] Doc `logic-query-exec.md` + manifest
 
-**Amânat post-F9:** scalar `8wire` fără `[N]` → prima soluție (D30 row TBD); atribute `maxDepth` pe inline instance.
+**Amânat post-F9:** scalar `8wire` fără `[N]` → prima soluție; atribute `maxDepth` pe inline; test opțional 3548 cap.
 
 ---
 
@@ -1758,12 +1721,11 @@ comp [logic] .peopleLogic:
 | Quoted atoms `'John'` | amânat post-MVP (D8) |
 | Negation `\+` | **Faza 7 (completed)** |
 | Depth / truncated / depthExceeded | **Faza 8 (completed)** |
-| Inline query `.world:query({ })` | **Faza 9 (ready-to-implement)** — D30–D32 |
+| Inline query `.world:query({ })` | **Faza 9 (completed)** — D30–D32 |
 
 ---
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 8~~ **(completed)**
-2. **Faza 9** — inline query invoke **(ready-to-implement)**
-3. Opțional: **1+l**, **1+k**, **1+b**, **1+e**
+1. ~~Faza 0~~ → ~~Faza 9~~ **(completed)**
+2. Opțional: **1+l**, **1+k**, **1+b**, **1+e**

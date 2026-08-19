@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-query-exec.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -19792,7 +19792,7 @@ See [protocol-assemble.md — static vs dynamic width](protocol-assemble.md#stat
 
 \`inline [logic]\` defines a **declarative knowledge base**: ground facts, rules with bodies, and named queries. It is **not executed** by itself — like \`inline [asm]\` (definition only), not like \`inline [protocol]\` (invoke recipe).
 
-Runtime wiring lives in [\`comp [logic]\`](comp-logic.md).
+Runtime wiring lives in [\`comp [logic]\`](comp-logic.md). For **ad-hoc goals in expressions** (no component), see [\`logic-query-exec.md\`](logic-query-exec.md) — **\`.world:query({ goals }, Var=wire)\`**.
 
 In the **documentation viewer**, blocks marked \`logts-play\` open in the script editor with **Load** and **Load & Run**.
 
@@ -19803,7 +19803,7 @@ In the **documentation viewer**, blocks marked \`logts-play\` open in the script
 | Topic | Summary |
 |-------|---------|
 | **Role** | Definition layer — facts, rules, queries |
-| **Execution** | None at inline level; queries run on \`comp [logic]\` |
+| **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries on \`comp [logic]\` |
 | **Syntax style** | Prolog-like (variables, atoms, \`<-\` rules, backtracking) |
 | **Composition** | \`use .otherModule\` merges facts and rules (not queries) |
 | **Doc helpers** | \`doc(inline.logic)\`, \`doc(.myModule)\` |
@@ -22057,6 +22057,168 @@ comp [led] .name:
 - Bit order is **left-to-right**: bit index \`0\` is the leftmost LED.
 - The \`color\` attribute applies to all LEDs in the group. Individual LED colors are not supported within a single component — declare separate \`led\` components for different colors.
 - \`nl\` places a line break after the **last** LED in the group.
+`,
+    'logic-query-exec.md': `# Inline logic query — \`.world:query({ })\`
+
+Run **ad-hoc Prolog goals** on an \`inline [logic]\` instance **directly from a LogTScript expression**, without \`comp [logic]\`. Same goal syntax as a \`query name:\` body in [inline-logic.md](inline-logic.md). Return shape follows the **LHS wire** (scalar / vector / matrix), using the same encoding as [comp-logic.md](comp-logic.md) redirects.
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run**.
+
+---
+
+## Quick reference
+
+| Topic | Summary |
+|-------|---------|
+| **Syntax** | \`.module:query({ goals }, Var=wire, …)\` |
+| **Goals** | Prolog body in \`{ }\` — comma = AND, \`\\+\`, \`=:=\`, etc. |
+| **Inputs** | Optional \`, X=wire\` after the block |
+| **\`_\`** | Anonymous slot — collected into vector/matrix bulk output |
+| **Boolean** | \`1wire\` LHS + all vars bound → \`1\` / \`0\` |
+| **Bulk** | \`8wire[N]\` / \`32wire[R,C]\` LHS + free vars → vector / matrix |
+
+---
+
+## Syntax
+
+\`\`\`logts
+result = .world:query({ owns(john, X) }, X=car)
+
+8wire[10] cars = .world:query({ owns(john, _) })
+\`\`\`
+
+| Part | Meaning |
+|------|---------|
+| **\`.world:query(...)\`** | Single method **\`query\`** on \`inline [logic]\` \`.world\` |
+| **\`{ goals }\`** | Prolog goals (same grammar as inline query body) |
+| **\`, Var=expr\`** | Bind logic variables before solve (wire → atom/number/bool) |
+
+**Not supported:** \`.world:available(...)\` per query name, or redirect selectors like \`{ johnOwns:0 }\` inside the block — only **goals**.
+
+---
+
+## Return value (LHS wire drives shape)
+
+| Situation | LHS wire | Result |
+|-----------|----------|--------|
+| All Prolog vars bound (in goal or via \`, Var=wire\`) | \`1wire\` | **\`1\`** if satisfiable, **\`0\`** otherwise |
+| One collected var (\`_\` or free name) | \`8wire[N]\` | Vector of solutions (discovery order, \`\\0\` fill) |
+| Two free vars | \`32wire[R,C]\` | Matrix — row = solution, column = variable |
+| Existence with free vars | \`1wire\` | **\`1\`** / **\`0\`** (boolean — not first binding) |
+
+Encoding matches comp redirects: **atoms → ASCII + padding**, **numbers → unsigned binary** on cell width (see [comp-logic.md](comp-logic.md) D12b).
+
+### Input binding (\`Var=wire\`)
+
+Wire width selects decode mode:
+
+| Width | Decode |
+|-------|--------|
+| **1 bit** | Boolean / 0–1 |
+| **≥ 8, multiple of 8** | Text → atom (stop at \`\\0\`) |
+| **Other** | Unsigned number |
+
+---
+
+## Examples
+
+### Boolean — “does john own this car?”
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(mary, bike)
+
+:
+
+40wire car = 01100011'01101000'01100101'01110110'01111001
+
+1wire ok = .world:query({ owns(john, X) }, X=car)
+
+show(ok)
+\`\`\`
+
+\`ok = 1\` when \`car\` holds the atom \`chevy\`.
+
+### Vector — all cars john owns
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(mary, bike)
+
+:
+
+8wire[4] cars = .world:query({ owns(john, _) })
+
+show(cars; ascii)
+\`\`\`
+
+Two solutions (\`chevy\`, \`ford\`); remaining slots filled with \`\\0\`.
+
+### Multi-goal + negation
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    person(john)
+    person(mary)
+    banned(mary)
+
+:
+
+1wire ok = .world:query({ person(X), \\+ banned(X) })
+
+8wire[4] eligible = .world:query({ person(X), \\+ banned(X) })
+
+show(ok)
+show(eligible; ascii)
+\`\`\`
+
+\`ok = 1\` (at least one eligible person). Vector bulk returns \`john\` only.
+
+### Matrix — two free variables
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    age(john, 25)
+    age(mary, 30)
+    age(joe, 22)
+
+:
+
+32wire[3, 2] table = .world:query({ age(X, Y) })
+
+show(table)
+\`\`\`
+
+Each row is one \`age/2\` solution; column 0 = person atom, column 1 = age.
+
+---
+
+## vs \`comp [logic]\`
+
+| | **\`.world:query({ })\`** | **\`comp [logic]\`** |
+|---|-------------------------|-------------------|
+| **Use** | One-off expression / assign | Circuit trigger + redirects |
+| **Trigger** | Runs when expression evaluates | \`set\` pin + \`on:\` |
+| **Inputs** | \`, Var=wire\` on call | Program block + exec \`pin = wire\` |
+| **Outputs** | Expression return / LHS wire | \`query >= wire\` redirects |
+| **Limits** | Engine defaults (256 depth / 64 solutions) | \`maxDepth\` / \`maxSolutions\` on comp |
+
+For repeated solves driven by hardware-style wiring, prefer **comp [logic]**. For functional “run this goal now” in an assignment, use **\`.world:query({ })\`**.
+
+---
+
+## Related
+
+- [inline-logic.md](inline-logic.md) — define facts, rules, named queries
+- [comp-logic.md](comp-logic.md) — runtime component, redirects, pins
 `,
     'loop.md': `# Loop preprocessor (\`loop N..M[\`)
 

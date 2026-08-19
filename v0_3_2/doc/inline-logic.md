@@ -2,7 +2,7 @@
 
 `inline [logic]` defines a **declarative knowledge base**: ground facts, rules with bodies, and named queries. It is **not executed** by itself — like `inline [asm]` (definition only), not like `inline [protocol]` (invoke recipe).
 
-Runtime wiring lives in [`comp [logic]`](comp-logic.md).
+Runtime wiring lives in [`comp [logic]`](comp-logic.md). For **ad-hoc goals in expressions** (no component), see [`logic-query-exec.md`](logic-query-exec.md) — **`.world:query({ goals }, Var=wire)`**.
 
 In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run**.
 
@@ -13,7 +13,7 @@ In the **documentation viewer**, blocks marked `logts-play` open in the script e
 | Topic | Summary |
 |-------|---------|
 | **Role** | Definition layer — facts, rules, queries |
-| **Execution** | None at inline level; queries run on `comp [logic]` |
+| **Execution** | None at inline level; ad-hoc via [logic-query-exec.md](logic-query-exec.md); named queries on `comp [logic]` |
 | **Syntax style** | Prolog-like (variables, atoms, `<-` rules, backtracking) |
 | **Composition** | `use .otherModule` merges facts and rules (not queries) |
 | **Doc helpers** | `doc(inline.logic)`, `doc(.myModule)` |

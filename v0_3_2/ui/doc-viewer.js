@@ -158,6 +158,7 @@ const DOC_SECTIONS = [
       { file: 'builtin-ZEROS.md', label: 'ZEROS (zero matrix)', searchPrimary: 'ZEROS' },
       { file: 'chip-board-execution.md', label: 'Chip and board execution' },
       { file: 'conditional-assignment.md', label: 'Conditional assignment (`on:`)', searchPrimary: 'on:' },
+      { file: 'logic-query-exec.md', label: 'Inline logic query — `.world:query({ })`' },
       { file: 'matrix-reduction.md', label: 'Matrix element-wise mode (`; matrix`)' },
       { file: 'meta-constants.md', label: 'Meta constants' },
       { file: 'mmap.md', label: 'Memory map (`comp [mmap]`)' },

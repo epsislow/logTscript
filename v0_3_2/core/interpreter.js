@@ -1704,6 +1704,101 @@ class Interpreter {
     return { value: text, isText: true, varName: `${inst.name}:decode` };
   }
 
+  evalLogicInlineQuery(invoke) {
+    const instName = invoke.var;
+    const inlineInst = this.inlineInstances.get(instName);
+    if (!inlineInst || inlineInst.kind !== 'logic') {
+      throw new Error(`Logic query invoke requires inline [logic] instance ${instName}`);
+    }
+    const blockArg = invoke.args && invoke.args[0];
+    if (!blockArg || blockArg.kind !== 'logicGoalsBlock' || blockArg.raw == null) {
+      throw new Error(`${instName}:query({ }) requires a goal block`);
+    }
+    const parseGoalsFn = typeof parseLogicGoalsBlock === 'function' ? parseLogicGoalsBlock : null;
+    const resolveFn = typeof logicResolveMerged === 'function' ? logicResolveMerged : null;
+    const execFn = typeof executeLogicGoals === 'function' ? executeLogicGoals : null;
+    const pinFn = typeof logicPinToInputValue === 'function' ? logicPinToInputValue : null;
+    const inferFn = typeof logicInferBindType === 'function' ? logicInferBindType : null;
+    const outVarsFn = typeof logicOutputFreeVars === 'function' ? logicOutputFreeVars : null;
+    const prepFn = typeof logicPrepareGoalsForInvoke === 'function' ? logicPrepareGoalsForInvoke : null;
+    const encFn = typeof logicEncodeInlineQueryResult === 'function' ? logicEncodeInlineQueryResult : null;
+    const shapeFn = typeof logicWireShape === 'function' ? logicWireShape : null;
+    const fillFn = typeof logicGetElementFill === 'function' ? logicGetElementFill : null;
+    if (!parseGoalsFn || !resolveFn || !execFn || !pinFn || !inferFn || !outVarsFn || !prepFn || !encFn || !shapeFn) {
+      throw new Error('Logic engine is not loaded');
+    }
+
+    const goals = parseGoalsFn(blockArg.raw);
+    const merged = resolveFn(inlineInst, this.inlineInstances);
+    const inputEnv = {};
+    for (const bind of invoke.bindings || []) {
+      const bits = this._evalCallArgValue(bind.expr);
+      const bindType = inferFn(bits.length);
+      inputEnv[bind.name] = pinFn(bits, bindType);
+    }
+    const preparedGoals = prepFn(goals);
+    const execResult = execFn(merged, goals, inputEnv, {});
+    const solutions = execResult.solutions || [];
+    const freeVars = outVarsFn(preparedGoals, inputEnv);
+
+    const targetWireName = this._inlineLogicAssignWire;
+    let shape = { kind: 'scalar', ew: 1 };
+    let fillBits = '0';
+    let scalarWidth = 1;
+    if (targetWireName) {
+      const wire = this.wires.get(targetWireName);
+      if (wire) {
+        shape = shapeFn(wire, this);
+        fillBits = fillFn ? fillFn(wire, this) : '0'.repeat(shape.ew || 8);
+        scalarWidth = this.getBitWidth(wire.type) || shape.ew || 1;
+      } else if (this.currentStmt && this.currentStmt.decls) {
+        const decl = this.currentStmt.decls.find((d) => d.name === targetWireName);
+        const declShape = this._logicShapeFromDecl(decl);
+        if (declShape) {
+          shape = declShape;
+          fillBits = '0'.repeat(shape.ew || 8);
+          scalarWidth = shape.ew || 1;
+        }
+      }
+    } else if (freeVars.length === 1) {
+      shape = { kind: 'scalar', ew: 8 };
+      scalarWidth = 8;
+      fillBits = '0'.repeat(8);
+    }
+
+    let encodeFreeVars = freeVars;
+    if (shape.kind === 'scalar' && scalarWidth === 1) {
+      encodeFreeVars = [];
+    }
+
+    const bits = encFn(solutions, encodeFreeVars, shape, fillBits, scalarWidth);
+    return {
+      value: bits,
+      ref: null,
+      varName: `${instName}:query`,
+      bitWidth: bits.length,
+    };
+  }
+
+  _logicShapeFromDecl(decl) {
+    if (!decl || !decl.type || !this.isWire(decl.type)) return null;
+    const ew = this.getBitWidth(decl.type);
+    if (!ew) return null;
+    const TS = typeof LogTScriptTensorShape !== 'undefined' ? LogTScriptTensorShape : null;
+    const dims = TS ? TS.normalizeDeclTensor(decl) : null;
+    if (dims && TS && !TS.isScalarTensor(dims)) {
+      const { rows, cols } = dims;
+      if (decl.tensorSingleDim || rows === 1) {
+        return { kind: 'vector', ew, count: rows * cols };
+      }
+      return { kind: 'matrix', ew, rows, cols };
+    }
+    if (decl.vectorCount != null) {
+      return { kind: 'vector', ew, count: decl.vectorCount };
+    }
+    return { kind: 'scalar', ew };
+  }
+
   evalInlineMethod(invoke, computeRefs) {
     const instName = invoke.var;
     const method = invoke.method;
@@ -1818,6 +1913,9 @@ class Interpreter {
     }
 
     const inlineInst = this.inlineInstances.get(instName);
+    if (inlineInst && inlineInst.kind === 'logic' && method === 'query') {
+      return this.evalLogicInlineQuery(invoke);
+    }
     if (inlineInst && inlineInst.kind === 'protocol' && method === 'decode') {
       return this.evalProtocolDecode(inlineInst, args, computeRefs);
     }
@@ -12378,10 +12476,16 @@ if (s.assignment) {
 
     let exprResult;
     try {
+      const declTargetWire = s.decls && s.decls[0] && s.decls[0].name && this.isWire(s.decls[0].type)
+        ? s.decls[0].name
+        : null;
+      if (declTargetWire) this._inlineLogicAssignWire = declTargetWire;
       exprResult = this.evalExpr(s.expr, computeRefs);
     } catch (e) {
       this.reportRuntimeError(e);
       return;
+    } finally {
+      this._inlineLogicAssignWire = null;
     }
     
     // Compute total value from expression
@@ -12713,16 +12817,19 @@ if (s.assignment) {
         return outputs;
       }
       try {
+        this._inlineLogicAssignWire = wireName;
         this.lowerUseExprInStatement(s, varArrayFieldTarget ? bits : (sliceRange ? this._sliceRangeWidth(sliceRange) : bits));
         if (s.assignment.busEnable) {
           const enVal = this._evalCallArgValue(s.assignment.busEnableExpr);
           if (!this._zConnectShouldDrive(enVal, s.assignment.busEnable)) {
+            this._inlineLogicAssignWire = null;
             this.currentStmt = prevStmt;
             return outputs;
           }
         }
         const exprResult = this.evalExpr(s.assignment.expr, false);
         if (exprResult.some(part => part.zConnectNoDrive)) {
+          this._inlineLogicAssignWire = null;
           this.currentStmt = prevStmt;
           return outputs;
         }
@@ -12801,6 +12908,7 @@ if (s.assignment) {
           throw e;
         }
       } finally {
+        this._inlineLogicAssignWire = null;
         this.currentStmt = prevStmt;
       }
       return outputs;
@@ -12813,6 +12921,10 @@ if (s.assignment) {
     const declUseExprWidth = this._resolveUseExprWireWidth(s);
     if (declUseExprWidth != null) {
       this.lowerUseExprInStatement(s, declUseExprWidth);
+    }
+    const declTargetWire = s.decls && s.decls[0] && s.decls[0].name ? s.decls[0].name : null;
+    if (declTargetWire && this.isWire(s.decls[0].type)) {
+      this._inlineLogicAssignWire = declTargetWire;
     }
     // During NEXT(~) recomputation, use computeRefs=false to avoid creating new storage for literals
     const exprResult = this.evalExpr(s.expr, false);
@@ -12955,6 +13067,7 @@ if (s.assignment) {
         throw e;
       }
     } finally {
+      this._inlineLogicAssignWire = null;
       this.currentStmt = prevStmt;
     }
     return outputs;

@@ -482,6 +482,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
   }
 };
 
+if (typeof globalThis !== 'undefined') {
+  globalThis.logicWireShape = logicWireShape;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = LogicComponent;
 }
