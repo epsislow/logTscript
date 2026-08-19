@@ -11340,7 +11340,7 @@ comp [logic] .peopleLogic:
 :
 
 1wire flag = 0
-8wire firstCar = \\0
+8wire firstCar = 00000000
 1wire trigger = 1
 
 .peopleLogic:{
@@ -13926,8 +13926,58 @@ Wide values may use hex groups (\`^A3 + 10\`) — same formatting as the variabl
 ### When to use
 
 - **Default choice** for displaying results at the end of a script or after **NEXT(~)**.
-- On **Wave** propagation, \`show\` runs **after** dependent wires have settled — you see consistent combinational results.
-- Multiple \`show\` calls in one script each emit at their turn during execution, but on Wave each \`show\` still reflects values **after** the propagation step triggered by preceding statements in that run.
+- On **Wave** propagation, top-level \`show\` runs **after** dependent wires have settled — you see consistent combinational results.
+- Multiple top-level \`show\` calls in one script are **deferred** on Wave and flushed together at the end of **RUN** (see [Top-level vs property block](#top-level-vs-property-block-wave) below).
+
+### Top-level vs property block (Wave)
+
+On **Wave**, where you write \`show\` changes **when** it runs — this is general debug behaviour, not specific to any one component type:
+
+| Placement | When it runs | Matches Variables panel after RUN? |
+|-----------|--------------|-------------------------------------|
+| **Top-level** — \`show(x)\` after a property block | After initial wave propagate **settles** at end of **RUN** | Yes (same settled wires) |
+| **Inside property block** — \`.comp:{ … show(x) }\` | **Immediately** at that line (not deferred) | No — snapshot mid-script; downstream settle and post-RUN refresh may not have happened yet |
+
+\`peek\` is always **immediate** (top-level or inside a block). Use **\`peek\`** for order-of-execution debugging; use **top-level \`show\`** for final demo output that should match the Variables panel.
+
+Component **redirects** (\`pout>\`, \`logicQuery>\`, \`get>\`, …) that write wires during a property block participate in the same settle step before deferred top-level \`show\` is flushed.
+
+\`\`\`logts-play wave
+inline [logic] .character:
+
+    modifier2(1, -4)
+    modifier2(X,  0) <- X >= 9,  X =< 12
+    modifier2(X,  2) <- X >= 15, X =< 16
+
+    query modifier:
+        modifier2(X, Y)
+
+:
+
+comp [logic] .characterLogic:
+    on: 1
+
+    .character {
+        X is number myX
+    }
+
+:
+
+8wire scoreIn = 00001111
+8wire result = 00000000
+1wire trigger = 1
+
+.characterLogic:{
+    myX = scoreIn
+    modifier:0 >= result
+    set = trigger
+    show(result)
+}
+
+show(result)
+\`\`\`
+
+After **RUN**: in-block \`show\` may run before post-RUN settle; top-level \`show(result)\` and the Variables panel both show the settled redirect value (\`00000010\` here). Tests **3509–3511**.
 
 ### Example — combinational logic
 
