@@ -104,21 +104,36 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
   getWidthBits() { return 1; }
 
   getSupportedProperties() {
-    return ['execCount'];
+    return ['execCount', 'truncated', 'depthExceeded'];
   }
 
   getRedirectProperties() {
-    return ['execCount'];
+    return ['execCount', 'truncated', 'depthExceeded'];
+  }
+
+  _parsePositiveIntAttr(attributes, name, compName) {
+    if (attributes[name] == null || attributes[name] === '') return null;
+    const n = parseInt(String(attributes[name]), 10);
+    if (isNaN(n) || n < 1) {
+      throw Error(`logic ${compName}: ${name} must be a positive integer`);
+    }
+    return n;
   }
 
   getDef() {
     return {
       attrs: [
         { name: 'on', value: 'mode (raise / edge / 1)' },
+        { name: 'maxDepth', value: 'integer (default 256)' },
+        { name: 'maxSolutions', value: 'integer (default 64)' },
       ],
       initValue: '1bit',
       pins: [{ bits: '1', name: 'set' }],
-      pouts: [{ bits: '16', name: 'execCount' }],
+      pouts: [
+        { bits: '16', name: 'execCount' },
+        { bits: '1', name: 'truncated' },
+        { bits: '1', name: 'depthExceeded' },
+      ],
       returns: '1bit',
     };
   }
@@ -193,6 +208,9 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       }
     }
 
+    const maxDepth = this._parsePositiveIntAttr(attributes, 'maxDepth', name);
+    const maxSolutions = this._parsePositiveIntAttr(attributes, 'maxSolutions', name);
+
     const compInfo = {
       type: 'logic',
       name,
@@ -206,6 +224,10 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       queryResults: {},
       queryMeta,
       execCount: 0,
+      truncated: 0,
+      depthExceeded: 0,
+      maxDepth,
+      maxSolutions,
       _logicRedirects: [],
     };
 
@@ -303,8 +325,15 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
 
     const merged = resolveFn(inst, ctx.inlineInstances);
     const inputEnv = this._readPinValues(comp, pending, reEvaluate, ctx);
-    const results = execFn(merged, inputEnv);
-    comp.queryResults = results;
+    const execOpts = {};
+    if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
+    if (comp.maxSolutions != null) execOpts.maxSolutions = comp.maxSolutions;
+    const raw = execFn(merged, inputEnv, execOpts);
+    const meta = raw._logicMeta || {};
+    delete raw._logicMeta;
+    comp.queryResults = raw;
+    comp.truncated = meta.truncated ? 1 : 0;
+    comp.depthExceeded = meta.depthExceeded ? 1 : 0;
     comp.execCount = (comp.execCount || 0) + 1;
 
     this._applyRedirects(comp, compName, redirects, ctx);
@@ -322,11 +351,6 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
 
     for (const rd of redirects) {
       const qName = rd.queryName || rd.poutName;
-      const solutions = comp.queryResults && comp.queryResults[qName];
-      if (!solutions) continue;
-
-      const meta = comp.queryMeta && comp.queryMeta[qName];
-      const freeVars = meta && meta.freeVars ? meta.freeVars : [];
 
       const targetName = rd.target && rd.target.var;
       if (!targetName) continue;
@@ -339,21 +363,39 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       let bits = null;
 
       if (rd.property === 'pout>') {
-        if (freeVars.length === 0) {
-          const val = solutions.length > 0 ? 1 : 0;
-          bits = encFn ? encFn({ kind: 'number', value: val }, width, 'bool') : (val ? '1' : '0');
-        } else if (freeVars.length === 1 && shape.kind === 'vector' && packVecFn) {
-          bits = packVecFn(solutions, freeVars, shape.count, shape.ew, fillBits);
-        } else if (freeVars.length === 2 && shape.kind === 'matrix' && packMatFn) {
-          bits = packMatFn(solutions, freeVars, shape.rows, shape.cols, shape.ew, fillBits);
-        } else if (freeVars.length >= 1 && solutions.length > 0) {
-          const sol = solutions[0];
-          const term = sol[freeVars[0]];
-          bits = encFn ? encFn(term, width, 'number') : '0'.repeat(width);
+        if (rd.poutName === 'truncated') {
+          bits = comp.truncated ? '1' : '0';
+        } else if (rd.poutName === 'depthExceeded') {
+          bits = comp.depthExceeded ? '1' : '0';
+        } else if (rd.poutName === 'execCount') {
+          const count = comp.execCount != null ? comp.execCount : 0;
+          bits = count.toString(2).padStart(width, '0').slice(-width);
         } else {
-          bits = fillBits.padStart(width, '0').slice(-width);
+          const solutions = comp.queryResults && comp.queryResults[qName];
+          if (!solutions) continue;
+          const meta = comp.queryMeta && comp.queryMeta[qName];
+          const freeVars = meta && meta.freeVars ? meta.freeVars : [];
+          if (freeVars.length === 0) {
+            const val = solutions.length > 0 ? 1 : 0;
+            bits = encFn ? encFn({ kind: 'number', value: val }, width, 'bool') : (val ? '1' : '0');
+          } else if (freeVars.length === 1 && shape.kind === 'vector' && packVecFn) {
+            bits = packVecFn(solutions, freeVars, shape.count, shape.ew, fillBits);
+          } else if (freeVars.length === 2 && shape.kind === 'matrix' && packMatFn) {
+            bits = packMatFn(solutions, freeVars, shape.rows, shape.cols, shape.ew, fillBits);
+          } else if (freeVars.length >= 1 && solutions.length > 0) {
+            const sol = solutions[0];
+            const term = sol[freeVars[0]];
+            bits = encFn ? encFn(term, width, 'number') : '0'.repeat(width);
+          } else {
+            bits = fillBits.padStart(width, '0').slice(-width);
+          }
         }
       } else if (rd.property === 'logicQuery>') {
+        const solutions = comp.queryResults && comp.queryResults[qName];
+        if (!solutions) continue;
+
+        const meta = comp.queryMeta && comp.queryMeta[qName];
+        const freeVars = meta && meta.freeVars ? meta.freeVars : [];
         const mode = rd.redirectMode || (rd.solutionIndex != null ? 'indexOrRow' : null);
 
         if (mode === 'count') {
@@ -423,10 +465,20 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
   }
 
   evalGetProperty(comp, property, a, ctx) {
-    if (property !== 'execCount') return null;
-    const count = comp.execCount != null ? comp.execCount : 0;
-    const val = count.toString(2).padStart(16, '0');
-    return { value: val, ref: null, varName: `${a.var}:execCount`, bitWidth: 16 };
+    if (property === 'execCount') {
+      const count = comp.execCount != null ? comp.execCount : 0;
+      const val = count.toString(2).padStart(16, '0');
+      return { value: val, ref: null, varName: `${a.var}:execCount`, bitWidth: 16 };
+    }
+    if (property === 'truncated') {
+      const val = comp.truncated ? '1' : '0';
+      return { value: val, ref: null, varName: `${a.var}:truncated`, bitWidth: 1 };
+    }
+    if (property === 'depthExceeded') {
+      const val = comp.depthExceeded ? '1' : '0';
+      return { value: val, ref: null, varName: `${a.var}:depthExceeded`, bitWidth: 1 };
+    }
+    return null;
   }
 };
 

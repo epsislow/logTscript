@@ -88,6 +88,8 @@ class LogicEngine {
     this.index = new Map();
     this.maxSolutions = 64;
     this.maxDepth = 256;
+    this.truncated = false;
+    this.depthExceeded = false;
     for (const c of clauses || []) {
       const ic = logicInternClause(c, this.table);
       const head = ic.head;
@@ -99,6 +101,8 @@ class LogicEngine {
   }
 
   executeQueries(queries, inputEnv) {
+    this.truncated = false;
+    this.depthExceeded = false;
     const out = {};
     for (const q of queries || []) {
       const goals = logicEngineQueryGoals(q);
@@ -111,32 +115,44 @@ class LogicEngine {
     const igGoals = (goals || []).map((g) => logicInternGoal(g, this.table));
     const solutions = [];
     const env = logicCloneEnv(logicPrepareInputEnv(inputEnv, this.table));
+    let queryTruncated = false;
+    let queryDepthExceeded = false;
+    const self = this;
     this._solveGoals(igGoals, env, 0, (solEnv) => {
       const freeVars = logicCollectFreeVarsInGoals(igGoals);
       const sol = {};
       for (const v of freeVars) {
-        sol[v] = logicResolveTerm({ kind: 'var', name: v }, solEnv, this.table);
+        sol[v] = logicResolveTerm({ kind: 'var', name: v }, solEnv, self.table);
       }
       solutions.push(sol);
-      return solutions.length < this.maxSolutions;
-    });
+      if (solutions.length >= self.maxSolutions) {
+        queryTruncated = true;
+        return false;
+      }
+      return true;
+    }, () => { queryDepthExceeded = true; });
+    if (queryDepthExceeded) this.depthExceeded = true;
+    if (queryTruncated) this.truncated = true;
     return solutions;
   }
 
-  _solveGoals(goals, env, depth, onSuccess) {
+  _solveGoals(goals, env, depth, onSuccess, onDepthExceeded) {
     if (goals.length === 0) return onSuccess(env);
-    if (depth > this.maxDepth) return false;
+    if (depth > this.maxDepth) {
+      if (typeof onDepthExceeded === 'function') onDepthExceeded();
+      return false;
+    }
     const [g0, ...rest] = goals;
     if (g0.kind === 'cmp') {
       if (!logicEvalCmp(g0, env, this.table)) return false;
-      return this._solveGoals(rest, env, depth + 1, onSuccess);
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'unify') {
       if (!logicUnifyExpr(g0.left, g0.right, env, this.table)) return false;
-      return this._solveGoals(rest, env, depth + 1, onSuccess);
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'call') {
-      return this._solveCall(g0, rest, env, depth, onSuccess);
+      return this._solveCall(g0, rest, env, depth, onSuccess, onDepthExceeded);
     }
     if (g0.kind === 'not') {
       const trail = env.trailLength();
@@ -144,15 +160,15 @@ class LogicEngine {
       this._solveGoals([g0.goal], env, depth + 1, () => {
         found = true;
         return false;
-      });
+      }, onDepthExceeded);
       env.undo(trail);
       if (found) return false;
-      return this._solveGoals(rest, env, depth + 1, onSuccess);
+      return this._solveGoals(rest, env, depth + 1, onSuccess, onDepthExceeded);
     }
     return false;
   }
 
-  _solveCall(goal, rest, env, depth, onSuccess) {
+  _solveCall(goal, rest, env, depth, onSuccess, onDepthExceeded) {
     const key = logicPredicateKey(goal.predicate, goal.arity);
     const clauses = this.index.get(key) || [];
     let any = false;
@@ -164,7 +180,7 @@ class LogicEngine {
         continue;
       }
       const newGoals = (clause.body || []).concat(rest);
-      const ok = this._solveGoals(newGoals, env, depth + 1, onSuccess);
+      const ok = this._solveGoals(newGoals, env, depth + 1, onSuccess, onDepthExceeded);
       env.undo(trail);
       if (ok) any = true;
     }
@@ -398,7 +414,10 @@ function logicCollectFreeVarsInGoals(goals) {
 function executeLogicQueries(mergedDef, inputEnv, options) {
   const engine = new LogicEngine(mergedDef.clauses || []);
   if (options && options.maxSolutions != null) engine.maxSolutions = options.maxSolutions;
-  return engine.executeQueries(mergedDef.queries || [], inputEnv);
+  if (options && options.maxDepth != null) engine.maxDepth = options.maxDepth;
+  const out = engine.executeQueries(mergedDef.queries || [], inputEnv);
+  out._logicMeta = { truncated: engine.truncated, depthExceeded: engine.depthExceeded };
+  return out;
 }
 
 function logicAtomToAsciiBits(name, width) {

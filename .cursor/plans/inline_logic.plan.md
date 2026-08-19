@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — motor relațional declarativ, model ASM-like. MVP complet: Fazele 0–6. Următor pas: Faza 7 negație `\\+` (ex-1+c)."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–8 complete (negație, depth tuning)."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -24,7 +24,10 @@ todos:
     content: "Faza 6: inline.type{logic} + comp.type{logic} — Allow/NotAllow, doc, teste policy"
     status: completed
   - id: logic-negation
-    content: "Faza 7: negație \\ + goal — parser, engine NAF, query multi-goal, teste 3533+, doc"
+    content: "Faza 7: negație \\ + goal — parser, engine NAF, query multi-goal, teste 3536+, doc"
+    status: completed
+  - id: logic-depth-tuning
+    content: "Faza 8: maxDepth/maxSolutions pe comp, pout truncated/depthExceeded, teste 3540+, doc"
     status: completed
 isProject: false
 ---
@@ -315,7 +318,7 @@ sequenceDiagram
 
 ## Decizii de luat — tabel rezumat
 
-> **D1–D24:** D20–D24 **confirmed** pentru Faza 7. **Fazele 0–6 (completed).** **Faza 7 (ready-to-implement).** **Faza 8** = **1+d** depth tuning post-F7.
+> **D1–D29:** D25–D29 **confirmed** pentru Faza 8. **Fazele 0–7 (completed).** **Faza 8 (ready-to-implement).**
 
 | ID | Subiect | Decizia ta |
 |----|---------|------------|
@@ -999,6 +1002,144 @@ age(john, 25). age(mary, 30).
 
 ---
 
+## Decizii Faza 8 — depth tuning (D25–D29)
+
+> **Sursă:** item **1+d** promovat din backlog.  
+> **Stare:** **D25=A, D26=A, D27=A1, D28=A, D29=A (confirmed).**
+
+### Rezumat D25–D29
+
+| ID | Subiect | Decizie |
+|----|---------|---------|
+| **D25** | Unde se configurează | **A (confirmed)** — atribute pe **`comp [logic]`**: `maxDepth:`, `maxSolutions:` |
+| **D26** | Ce limite | **A (confirmed)** — ambele |
+| **D27** | Observabilitate depășire | **A1 (confirmed)** — pout comp-level **`truncated`**, **`depthExceeded`** (OR pe toate query-urile din pass) |
+| **D28** | Recursivitate | **A (confirmed)** — runtime only + doc; **fără** lint/respingere (ca Prolog) |
+| **D29** | Default | **A (confirmed)** — **256** / **64** (ca azi) |
+
+**Amânat (D27):** **A2** flag per query (`johnOwns:truncated >= wire`) — post-F8 dacă e nevoie.
+
+---
+
+### D25 — Unde se configurează **(completed: A)**
+
+```logts
+comp [logic] .peopleLogic:
+    on: 1
+    maxDepth: 128
+    maxSolutions: 16
+
+    .people { }
+:
+```
+
+| Opțiune | Status |
+|---------|--------|
+| **A — pe comp** | **confirmed** |
+| B — pe inline | amânat |
+| C — exec block | amânat |
+
+---
+
+### D26 — Ce limite **(completed: A)**
+
+| Limită | Rol |
+|--------|-----|
+| **`maxDepth`** | Plafon pași goal în `_solveGoals` (inclusiv inner la `\+`) |
+| **`maxSolutions`** | Plafon soluții colectate per query |
+
+Transmis la engine via `executeLogicQueries(..., { maxDepth, maxSolutions })`.
+
+---
+
+### D27 — Pout-uri observabilitate **(completed: A1)**
+
+**Sintaxă exec block** — la fel ca query redirect: **`pout >= wire`**, nu `wire = pout`:
+
+```logts
+comp [logic] .peopleLogic:
+    on: 1
+    maxSolutions: 2
+    .people { }
+:
+
+8wire car0 = 0
+8wire car1 = 0
+1wire wasTruncated = 0
+1wire trigger = 1
+
+.peopleLogic:{
+    johnOwns:0 >= car0
+    johnOwns:1 >= car1
+    truncated >= wasTruncated
+    set = trigger
+}
+```
+
+**`truncated`:** `1` dacă **orice** query din pass a avut mai multe soluții decât `maxSolutions` (lista tăiată).
+
+**`depthExceeded`:**
+
+```logts
+comp [logic] .graphLogic:
+    on: 1
+    maxDepth: 5
+    .graph { }
+:
+
+1wire hitDepth = 0
+8wire dest = 0
+1wire trigger = 1
+
+.graphLogic:{
+    reach:0 >= dest
+    depthExceeded >= hitDepth
+    set = trigger
+}
+```
+
+**`depthExceeded`:** `1` dacă **orice** query a lovit `maxDepth` (fail silent pe ramura respectivă).
+
+| Pout | Biți | Semnificație pass curent |
+|------|------|--------------------------|
+| **`truncated`** | 1 | OR — cel puțin un query capped la `maxSolutions` |
+| **`depthExceeded`** | 1 | OR — cel puțin un query a atins `maxDepth` |
+| **`execCount`** | 16 | (existent) număr solve passes |
+
+**Notă:** cu mai multe query-uri nu se știe **care** a declanșat flag-ul — doar că s-a întâmplat. Per-query → **A2** amânat.
+
+Comportament la depășire: **fail silent** pe goal (Prolog-like) + flag pentru UI/debug — **nu** eroare runtime.
+
+---
+
+### D28 — Recursivitate **(completed: A)**
+
+| Opțiune | Comportament | Prolog? |
+|---------|--------------|---------|
+| **A — runtime only** | Reguli recursive permise; limite D25–D27 | **Da** (SWI: `call_with_depth_limit`, fără lint compile) |
+| B — lint warning | Avertisment direct self-recursion | Mai strict |
+| C — respinge recursive | Elaboration error | Mult mai strict |
+
+**Exemplu valid (ca Prolog):**
+
+```logts
+path(X, Y) <- edge(X, Y)
+path(X, Z) <- edge(X, Y), path(Y, Z)
+```
+
+**Occurs check** (ex. `X = f(X)`) — **out of scope** F8; alt subiect.
+
+---
+
+### D29 — Default **(completed: A)**
+
+| Parametru | Default | Dacă omis pe comp |
+|-----------|---------|-------------------|
+| `maxDepth` | **256** | engine default |
+| `maxSolutions` | **64** | engine default |
+
+---
+
 ## Amânate (post-MVP)
 
 | ID | Subiect | Detaliu | Legat de |
@@ -1006,7 +1147,7 @@ age(john, 25). age(mary, 30).
 | **1+a** | Inline-native (sketch v1) | `.people:johnOwns:0` direct pe inline, fără comp | D1 respins |
 | **1+b** | Result policies | `;all`, `;unique`, `first`, `last` | D10 |
 | **1+c** | ~~Negation~~ | **Promovat → Faza 7** (`\+ goal`) | D5, D20–D24 |
-| **1+d** | Recursivitate + depth limit | | D5 |
+| **1+d** | ~~Recursivitate + depth limit~~ | **Promovat → Faza 8** (D25–D29) | D5 |
 | **1+e** | Facts dinamice runtime | assert/retract | |
 | **1+f** | ~~Multi-var vague~~ | **Mutat în Faza 5** — redirect matrix/vector | D12 |
 | **1+g** | `use` nested profund / circular deps | lint la elaborare | D16 |
@@ -1030,7 +1171,7 @@ age(john, 25). age(mary, 30).
 | **Faza 5** matrix/vector output | 2 vars max, redirect ca [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md) + extensii pin/round-trip | **(completed)** |
 | **Faza 6** Allow/NotAllow | `inline.type{logic}`, `comp.type{logic}` | **(completed)** |
 | **Faza 7** Negation `\+` | D20–D24 | **(completed)** |
-| **Faza 8** Recursivitate + depth tuning | **1+d** | amânat post-F7 |
+| **Faza 8** Depth tuning | D25–D29 | **(completed)** |
 
 ---
 
@@ -1309,13 +1450,68 @@ comp [logic] .worldLogic:
 
 #### Criterii done
 
-- [ ] ~~D20–D24 confirmate de user~~ **(completed)**
-- [ ] Parser + engine + internare AST `not`
-- [ ] Query multi-goal (dacă D22-A)
-- [ ] Teste **3521–3525** verzi; suite completă regresie
-- [ ] Doc inline-logic + comp-logic + manifest doc regenerat
+- [x] ~~D20–D24 confirmate~~ **(completed)**
+- [x] Parser + engine + internare AST `not`
+- [x] Query multi-goal (D22-A)
+- [x] Teste **3536–3539**; suite **2701/2701**
+- [x] Doc inline-logic + comp-logic
 
-**Amânate legate (nu F7):** **1+i** cut, **1+d** depth policy avansat, **1+b** filtrare soluții după NAF.
+**Amânate legate (nu F7):** **1+i** cut, **1+b** filtrare soluții după NAF.
+
+---
+
+### Faza 8 — Depth tuning + pout observabilitate **(completed)**
+
+**Scop:** promovat din **1+d** — limite configurabile pe comp, pout **`truncated`** / **`depthExceeded`**, doc recursivitate Prolog-like.
+
+**Decizii:** **D25–D29 confirmed** (vezi secțiuni de mai sus).
+
+#### Ce lipsește azi
+
+| Layer | Stare | Faza 8 |
+|-------|-------|--------|
+| `maxDepth` / `maxSolutions` | hardcodat 256/64 în engine | citit din atribute **`comp [logic]`** |
+| `executeLogicQueries` options | doar `maxSolutions` | + `maxDepth` |
+| Pout-uri comp | doar `execCount` | + **`truncated`**, **`depthExceeded`** (1 bit) |
+| Exec redirect | query → wire | **`truncated >= wire`**, **`depthExceeded >= wire`** |
+| Doc | absent | limite + exemple `logts-play` |
+
+#### Fișiere de modificat
+
+| Fișier | Change |
+|--------|--------|
+| [`components/logic.js`](../v0_3_2/core/components/logic.js) | Parse `maxDepth`/`maxSolutions`; pout defs; set flags după exec; redirect pout |
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | Raportează `truncated`/`depthExceeded` per query sau callback; options `maxDepth` |
+| [`parser.js`](../v0_3_2/core/parser.js) | Recunoaște redirect `truncated >=`, `depthExceeded >=` (ca query pout) |
+| [`doc/comp-logic.md`](../v0_3_2/doc/comp-logic.md) | Atribute, pout, exemple Load & Run |
+| [`doc/inline-logic.md`](../v0_3_2/doc/inline-logic.md) | Secțiune limite engine + recursivitate |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3540+** truncated, depthExceeded, defaults |
+
+#### Exemplu țintă (exec block — sintaxă corectă)
+
+```logts
+comp [logic] .peopleLogic:
+    on: 1
+    maxSolutions: 2
+    .people { }
+:
+
+.peopleLogic:{
+    johnOwns:0 >= car0
+    johnOwns:1 >= car1
+    truncated >= wasTruncated
+    depthExceeded >= hitDepth
+    set = trigger
+}
+```
+
+#### Criterii done
+
+- [x] Atribute `maxDepth` / `maxSolutions` pe comp (default D29)
+- [x] Pout `truncated`, `depthExceeded` + redirect în exec block
+- [x] Teste **3540–3543** + doc + manifest
+
+**Amânat post-F8:** D27 **A2** (flag per query), D28 **B** (lint warning).
 
 ---
 
@@ -1408,17 +1604,13 @@ comp [logic] .peopleLogic:
 | `use` circular | lint la elaborare **1+g** |
 | boolean redirect | **D7a completed:** `isJohnOwner >= wire` |
 | Quoted atoms `'John'` | amânat post-MVP (D8) |
-| Negation `\+` | **Faza 7 (ready-to-implement)** — D20–D24 neconfirmate |
+| Negation `\+` | **Faza 7 (completed)** |
+| Depth / truncated / depthExceeded | **Faza 8 (ready-to-implement)** — D25–D29 confirmed |
 
 ---
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ **(completed)**
-2. ~~Faza 1~~ → ~~Faza 2~~ → ~~Faza 3~~ → ~~Faza 4~~ **(completed)**
-3. ~~Faza 6~~ — Allow/NotAllow **(completed)**
-4. ~~**Faza 5**~~ — matrix/vector output + pin limits + round-trip **(completed)**
-5. **Faza 7** — negație `\+` **(ready-to-implement)** — D20–D24 confirmed
-6. **Faza 8** — recursivitate + depth tuning **(1+d)** — post-F7
-
-**Plan MVP+ logic: Fazele 0–6 închise.** Următor pas planificat: **Faza 7**. Opțional post-F7: **1+l**, **1+k**, **1+b**.
+1. ~~Faza 0~~ → ~~Faza 7~~ **(completed)**
+2. **Faza 8** — depth tuning **(ready-to-implement)**
+3. Opțional: **1+l**, **1+k**, **1+b**

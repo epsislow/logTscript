@@ -66,6 +66,8 @@ comp [logic] .characterLogic:
 |-----------|-------------|
 | **`.module { … }`** | Links `inline [logic]` + pin bindings (required) |
 | **`on:`** | Property-block trigger mode (see below) |
+| **`maxDepth:`** | Optional — max goal steps per solve (default **256**) |
+| **`maxSolutions:`** | Optional — max solutions collected per query (default **64**) |
 
 ### Program block bindings
 
@@ -146,6 +148,16 @@ Exemplu: `8wire scoreIn` + `myX = scoreIn` → pin **8** biți; `128wire big` �
 | **2 free** | `allAges::0 >= col0` | **Column slice** |
 | **2 free** | `allAges:0:1 >= ageWire` | **Single cell** (scalar wire) |
 | **2 free** | `allAges:count >= numRows` | Rows written; `allAges:width >= numCols` → column count |
+| **pout** | `truncated >= wire` | **`1`** if any query hit `maxSolutions` cap this pass |
+| **pout** | `depthExceeded >= wire` | **`1`** if any query hit `maxDepth` this pass |
+
+Pout redirects use the same syntax as query redirects: **`poutName >= wire`** (not `wire = pout`).
+
+| Pout | Bits | Meaning (OR across all queries in the pass) |
+|------|------|---------------------------------------------|
+| **`truncated`** | 1 | At least one query had more solutions than `maxSolutions` |
+| **`depthExceeded`** | 1 | At least one query exceeded `maxDepth` during search |
+| **`execCount`** | 16 | Total solve passes (existing) |
 
 Solution order follows **discovery order** (Prolog-style backtracking).
 
@@ -173,6 +185,8 @@ Use **`on: 1`** in examples so **Load & Run** performs a solve pass immediately.
 | **`set`** | 1 | Trigger one solve pass when active |
 | **`myX`, …** | `bool`: 1 bit; **`number`**: 8…64 (default 64); **`text`**: 8…256 de la wire | Input pins from program block |
 | **`execCount`** | 16 | Solve passes completed (`.logic:execCount`) |
+| **`truncated`** | 1 | Set when any query was capped by `maxSolutions` |
+| **`depthExceeded`** | 1 | Set when any query hit `maxDepth` |
 
 ---
 
@@ -539,6 +553,78 @@ After **Load & Run**:
 | `peterFlag` | **`1`** — peter has no `age` fact |
 
 The comma in `person(X), \+ age(X, _)` does **not** produce `"01"` or two booleans on one wire. The engine returns **solutions for free variables** (`X` only); each redirect picks scalar, vector, matrix, or boolean form as documented above.
+
+---
+
+## Example — `maxSolutions` and `truncated` pout
+
+```logts-play
+inline [logic] .people:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(john, bike)
+
+    query johnOwns:
+        owns(john, X)
+
+:
+
+comp [logic] .peopleLogic:
+    on: 1
+    maxSolutions: 2
+
+    .people { }
+
+:
+
+8wire car0 = 00000000
+8wire car1 = 00000000
+1wire wasTruncated = 0
+1wire trigger = 1
+
+.peopleLogic:{
+    johnOwns:0 >= car0
+    johnOwns:1 >= car1
+    truncated >= wasTruncated
+    set = trigger
+}
+```
+
+After **Load & Run**: `car0` / `car1` hold the first two cars; **`wasTruncated = 1`** because a third solution exists but was not collected.
+
+---
+
+## Example — `maxDepth` and `depthExceeded` pout
+
+```logts-play
+inline [logic] .loop:
+
+    loop(X) <- loop(X)
+
+    query run:
+        loop(a)
+
+:
+
+comp [logic] .loopLogic:
+    on: 1
+    maxDepth: 8
+
+    .loop { }
+
+:
+
+1wire hitDepth = 0
+1wire trigger = 1
+
+.loopLogic:{
+    depthExceeded >= hitDepth
+    set = trigger
+}
+```
+
+After **Load & Run**: **`hitDepth = 1`** — recursive rule exceeded depth (fail silent on deep branches). Query may still return **`run >= flag = 0`** (no complete proof within depth).
 
 ---
 

@@ -36870,5 +36870,76 @@ comp [logic] .peopleNegLogic:
     h.assert('ascii p first char', interp.getWireEffectiveValue('who'), '01110000');
   });
 
+  reg(3540, 'logic', 'executeLogicQueries truncated when maxSolutions capped', function(h, session) {
+    session.run(INLINE_LOGIC_PEOPLE);
+    const inst = session.interp.inlineInstances.get('.people');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    const results = executeLogicQueries(merged, {}, { maxSolutions: 2 });
+    h.assert('two solutions', String(results.johnOwns.length), '2');
+    h.assert('truncated meta', String(results._logicMeta && results._logicMeta.truncated), 'true');
+  });
+
+  const INLINE_LOGIC_LOOP = `inline [logic] .loop:
+
+    loop(X) <- loop(X)
+
+    query run:
+        loop(a)
+
+:`;
+
+  reg(3541, 'logic', 'executeLogicQueries depthExceeded when maxDepth low', function(h, session) {
+    session.run(INLINE_LOGIC_LOOP);
+    const inst = session.interp.inlineInstances.get('.loop');
+    const merged = logicResolveMerged(inst, session.interp.inlineInstances);
+    const results = executeLogicQueries(merged, {}, { maxDepth: 8 });
+    h.assert('depth meta', String(results._logicMeta && results._logicMeta.depthExceeded), 'true');
+  });
+
+  reg(3542, 'logic', 'comp [logic] truncated pout redirect', function(h, session) {
+    const src = INLINE_LOGIC_PEOPLE + `
+comp [logic] .peopleLogic:
+    on: 1
+    maxSolutions: 2
+    .people { }
+:
+
+8wire car0 = 00000000
+8wire car1 = 00000000
+1wire wasTruncated = 0
+1wire trigger = 1
+
+.peopleLogic:{
+    johnOwns:0 >= car0
+    johnOwns:1 >= car1
+    truncated >= wasTruncated
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('maxSolutions on comp', String(interp.components.get('.peopleLogic').maxSolutions), '2');
+    h.assert('truncated=1', interp.getWireEffectiveValue('wasTruncated'), '1');
+  });
+
+  reg(3543, 'logic', 'comp [logic] depthExceeded pout redirect', function(h, session) {
+    const src = INLINE_LOGIC_LOOP + `
+comp [logic] .loopLogic:
+    on: 1
+    maxDepth: 8
+    .loop { }
+:
+
+8wire dest = 00000000
+1wire hitDepth = 0
+1wire trigger = 1
+
+.loopLogic:{
+    run >= dest
+    depthExceeded >= hitDepth
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('depthExceeded=1', interp.getWireEffectiveValue('hitDepth'), '1');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();

@@ -60,6 +60,7 @@ Multiple clauses with the same predicate name and arity are **OR** alternatives 
 | Quoted atoms `'John'` | **Not supported** — use lowercase atoms |
 | Arbitrary arity / DCG / modules | Single inline namespace + `use` merge |
 | Top-level consult | **`inline [logic]`** + **`comp [logic]`** split |
+| Depth / solution limits | Configurable on **`comp [logic]`** — see [comp-logic.md](comp-logic.md) |
 
 Operators in rule bodies:
 
@@ -205,6 +206,19 @@ show(doc(.world))
 ```
 
 Use **Load** to inspect the module; **Load & Run** runs `show(doc(.world))` in the editor.
+
+---
+
+## Engine limits (defaults)
+
+Configured on **`comp [logic]`** (not inline). Defaults apply when omitted.
+
+| Limit | Default | Effect when exceeded |
+|-------|---------|----------------------|
+| **`maxDepth`** | **256** | Goal fails silently (as unprovable); pout **`depthExceeded`** |
+| **`maxSolutions`** | **64** | Extra solutions dropped; pout **`truncated`** |
+
+Recursive rules are allowed (Prolog-style). Use **`maxDepth`** to bound runaway recursion — see [comp-logic.md](comp-logic.md) for **`depthExceeded >= wire`** examples with **Load & Run**.
 
 ---
 
