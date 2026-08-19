@@ -33,7 +33,7 @@ const COMPONENT_DOC_FILES = new Set([
   'switch.md', 'key.md', 'keyboard.md', 'dip.md', 'ioport.md', 'rotary.md', 'slider.md',
   'led.md', 'led-bar.md', 'seven-seg.md', '14seg.md', 'lcd.md', 'clcd.md', 'alu.md', 'terminal.md', 'dots.md',
   'adder.md', 'subtract.md', 'multiplier.md', 'divider.md', 'shifter.md', 'counter.md',
-  'mem.md', 'cpu.md', 'dma.md', 'reg.md', 'queue.md', 'stack.md', 'network.md', 'oscillator.md', 'lut.md',
+  'mem.md', 'cpu.md', 'cpu-multicore.md', 'dma.md', 'reg.md', 'queue.md', 'stack.md', 'network.md', 'oscillator.md', 'lut.md',
 ]);
 
 function isComponentDocPage(file) {
