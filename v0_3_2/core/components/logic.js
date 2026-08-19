@@ -298,8 +298,12 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
           } else {
             bits = fillBits;
           }
-        } else if (mode === 'col' && packColFn && shape.kind !== 'scalar') {
+        } else if (mode === 'col' && packColFn) {
+          if (freeVars.length < 2) {
+            throw Error(`logic ${compName}: query '${qName}' column slice requires 2 free variables`);
+          }
           const col = rd.colIndex != null ? rd.colIndex : 0;
+          if (col < 0 || col >= freeVars.length) continue;
           const maxRows = shape.kind === 'matrix' ? shape.rows : shape.count;
           bits = packColFn(solutions, freeVars, col, maxRows, shape.ew, fillBits);
         } else if (mode === 'indexOrRow') {

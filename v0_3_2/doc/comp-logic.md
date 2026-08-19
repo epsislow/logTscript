@@ -313,6 +313,48 @@ Column 0 = names (ASCII); column 1 = ages (binary).
 
 ---
 
+## Example — column slice `::c`
+
+Extract one matrix column into a vector — row `r` of column `c` is solution `r`, variable at index `c` (left-to-right in the query goal).
+
+```logts-play
+inline [logic] .world:
+
+    age(john, 25)
+    age(mary, 30)
+    age(joe, 22)
+
+    query allAges:
+        age(X, Y)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+
+    .world {
+    }
+
+:
+
+32wire[5] col0 = 0
+32wire[5] col1 = 0
+1wire trigger = 1
+
+.worldLogic:{
+    allAges::0 >= col0
+    allAges::1 >= col1
+    set = trigger
+}
+
+show(col0; ascii)
+show(col1)
+```
+
+`::0` → all `X` values (names); `::1` → all `Y` values (ages). Unused rows in the declared vector are filled with `\0` per cell.
+
+---
+
 ## Example — cell redirect + ASCII show
 
 ```logts-play

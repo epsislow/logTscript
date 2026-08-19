@@ -36498,5 +36498,37 @@ comp [logic] .worldLogic:
     h.assert('show john', String(out.some((l) => l.includes('john'))), 'true');
   });
 
+  reg(3516, 'logic', 'comp [logic] matrix column slice allAges::c >= col', function(h, session) {
+    const zeros160 = '0'.repeat(160);
+    const src = INLINE_LOGIC_WORLD + `
+comp [logic] .worldLogic:
+    on: 1
+
+    .world {
+    }
+
+:
+
+32wire[5] col0 = ${zeros160}
+32wire[5] col1 = ${zeros160}
+1wire trigger = 1
+
+.worldLogic:{
+    allAges::0 >= col0
+    allAges::1 >= col1
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const col0 = interp.getWireEffectiveValue('col0');
+    const col1 = interp.getWireEffectiveValue('col1');
+    h.assert('col0 john', col0.slice(0, 32), '01101010011011110110100001101110');
+    h.assert('col0 mary', col0.slice(32, 64), '01101101011000010111001001111001');
+    h.assert('col0 joe', col0.slice(64, 96), '01101010011011110110010100000000');
+    h.assert('col0 fill', col0.slice(96, 128), '0'.repeat(32));
+    h.assert('col1 age25', col1.slice(0, 32), '00000000000000000000000000011001');
+    h.assert('col1 age30', col1.slice(32, 64), '00000000000000000000000000011110');
+    h.assert('col1 age22', col1.slice(64, 96), '00000000000000000000000000010110');
+  });
+
   window.LogTScriptTestSuite.finalize();
 })();
