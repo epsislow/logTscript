@@ -2906,6 +2906,7 @@ class Interpreter {
       const wireEntry = { type: decl.type, ref: `&${storageIdx}`, initOnly: true };
       this._applyDeclVectorMeta(wireEntry, decl);
       this._applySchemaRefToWireEntry(wireEntry, decl, bits, null);
+      this._captureLogicElementFill(wireEntry, init);
       this.wires.set(decl.name, wireEntry);
     } else {
       const existing = this.wires.get(decl.name);
@@ -4268,6 +4269,18 @@ class Interpreter {
 
   _applyDeclVectorMeta(wireEntry, decl) {
     this._applyDeclTensorMeta(wireEntry, decl);
+  }
+
+  _captureLogicElementFill(wireEntry, initBits) {
+    if (!wireEntry) return;
+    const ew = (wireEntry.tensor && wireEntry.tensor.elementWidth)
+      || (wireEntry.vector && wireEntry.vector.elementCount > 1 && wireEntry.vector.elementWidth)
+      || null;
+    if (!ew) return;
+    let fill = initBits != null ? String(initBits) : '0'.repeat(ew);
+    if (fill.length < ew) fill = fill.padStart(ew, '0');
+    else if (fill.length > ew) fill = fill.slice(-ew);
+    wireEntry.logicElementFill = fill;
   }
 
   bindSchemaRegistry(registry) {
@@ -5947,6 +5960,7 @@ class Interpreter {
         const wireEntry = { type: d.type, ref: `&${storageIdx}`, initOnly: true };
         this._applyDeclVectorMeta(wireEntry, d);
         this._applySchemaRefToWireEntry(wireEntry, d, bits, loc);
+        this._captureLogicElementFill(wireEntry, slice);
         this.wires.set(d.name, wireEntry);
         if (this.deferWirePropagation()) {
           this.scheduleWireChange(d.name, slice);
@@ -12242,6 +12256,7 @@ if (s.assignment) {
           const wireEntry = { type: d.type, ref: `&${storageIdx}`, initOnly: true };
           this._applyDeclVectorMeta(wireEntry, d);
           this._applySchemaRefToWireEntry(wireEntry, d, bits, loc);
+          this._captureLogicElementFill(wireEntry, initValue);
           this.wires.set(d.name, wireEntry);
           if (this.deferWirePropagation()) {
             this.scheduleWireChange(d.name, initValue);
@@ -12273,6 +12288,7 @@ if (s.assignment) {
         const wireEntry = { type: d.type, ref: `&${storageIdx}`, initOnly: true };
         this._applyDeclVectorMeta(wireEntry, d);
         this._applySchemaRefToWireEntry(wireEntry, d, bits, loc);
+        this._captureLogicElementFill(wireEntry, initVal);
         this.wires.set(d.name, wireEntry);
       }
       return;

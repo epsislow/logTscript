@@ -2248,6 +2248,101 @@ parseBoardInstance() {
     return {};
   }
 
+  _restoreTokenCursor(savedPos, savedLine, savedCol, savedC) {
+    this.t.i = savedPos;
+    this.t.line = savedLine;
+    this.t.col = savedCol;
+    this.c = savedC;
+  }
+
+  tryParseLogicQueryRedirect(propName) {
+    if (this.c.type !== 'SYM' || this.c.value !== ':') return null;
+    const savedPos = this.t.i;
+    const savedLine = this.t.line;
+    const savedCol = this.t.col;
+    const savedC = this.c;
+
+    this.eat('SYM', ':');
+    this.t.skip();
+
+    let redirectMode = null;
+    let solutionIndex = null;
+    let rowIndex = null;
+    let colIndex = null;
+
+    if (this.c.type === 'SYM' && this.c.value === ':') {
+      this.eat('SYM', ':');
+      this.t.skip();
+      if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+        this._restoreTokenCursor(savedPos, savedLine, savedCol, savedC);
+        return null;
+      }
+      colIndex = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      redirectMode = 'col';
+    } else if (this.c.type === 'ID' && this.c.value === 'count') {
+      this.eat('ID');
+      redirectMode = 'count';
+    } else if (this.c.type === 'ID' && this.c.value === 'width') {
+      this.eat('ID');
+      redirectMode = 'width';
+    } else if (this.c.type === 'DEC' || this.c.type === 'BIN') {
+      const first = parseInt(this.c.value, 10);
+      this.eat(this.c.type);
+      this.t.skip();
+      if (this.c.type === 'SYM' && this.c.value === ':') {
+        this.eat('SYM', ':');
+        this.t.skip();
+        if (this.c.type !== 'DEC' && this.c.type !== 'BIN') {
+          this._restoreTokenCursor(savedPos, savedLine, savedCol, savedC);
+          return null;
+        }
+        rowIndex = first;
+        colIndex = parseInt(this.c.value, 10);
+        this.eat(this.c.type);
+        redirectMode = 'cell';
+      } else {
+        solutionIndex = first;
+        rowIndex = first;
+        redirectMode = 'indexOrRow';
+      }
+    } else {
+      this._restoreTokenCursor(savedPos, savedLine, savedCol, savedC);
+      return null;
+    }
+
+    this.t.skip();
+    if (this.c.type !== 'SYM' || this.c.value !== '>') {
+      this._restoreTokenCursor(savedPos, savedLine, savedCol, savedC);
+      return null;
+    }
+    this.eat('SYM', '>');
+    if (this.c.type === 'SYM' && this.c.value === '=') {
+      this.eat('SYM', '=');
+    }
+
+    const targetAtom = this.atom();
+    if (targetAtom.bitRange) {
+      throw Error(`Bit ranges not allowed in ${propName} redirect at ${this.c.line}:${this.c.col}`);
+    }
+    if (!targetAtom.var || targetAtom.var.startsWith('.')) {
+      throw Error(`Invalid target for ${propName} redirect at ${this.c.line}:${this.c.col}`);
+    }
+
+    const enableSuffix = this.parseOptionalBusEnableSuffix();
+    return {
+      property: 'logicQuery>',
+      queryName: propName,
+      redirectMode,
+      solutionIndex,
+      rowIndex,
+      colIndex,
+      target: targetAtom,
+      expr: null,
+      ...enableSuffix,
+    };
+  }
+
   parsePropertyBlockItem(componentName, usedGetRedirects, usedGenericRedirects) {
     const REDIRECT_PROPS = new Set(['mod', 'carry', 'over', 'out']);
     const GENERIC_REDIRECT_PROPS = new Set(['front', 'top', 'empty', 'full', 'size', 'capacity', 'free']);
@@ -2371,43 +2466,8 @@ parseBoardInstance() {
     }
 
     if (this.c.type === 'SYM' && this.c.value === ':') {
-      const savedPos = this.t.i;
-      const savedLine = this.t.line;
-      const savedCol = this.t.col;
-      const savedC = this.c;
-      this.eat('SYM', ':');
-      this.t.skip();
-      if (this.c.type === 'DEC' || this.c.type === 'BIN') {
-        const idx = parseInt(this.c.value, 10);
-        this.eat(this.c.type);
-        this.t.skip();
-        if (this.c.type === 'SYM' && this.c.value === '>') {
-          this.eat('SYM', '>');
-          if (this.c.type === 'SYM' && this.c.value === '=') {
-            this.eat('SYM', '=');
-          }
-          const targetAtom = this.atom();
-          if (targetAtom.bitRange) {
-            throw Error(`Bit ranges not allowed in ${propName}:N>= property at ${this.c.line}:${this.c.col}`);
-          }
-          if (!targetAtom.var || targetAtom.var.startsWith('.')) {
-            throw Error(`Invalid target for ${propName}:N>= property at ${this.c.line}:${this.c.col}`);
-          }
-          const enableSuffix = this.parseOptionalBusEnableSuffix();
-          return {
-            property: 'logicQuery>',
-            queryName: propName,
-            solutionIndex: idx,
-            target: targetAtom,
-            expr: null,
-            ...enableSuffix,
-          };
-        }
-      }
-      this.t.i = savedPos;
-      this.t.line = savedLine;
-      this.t.col = savedCol;
-      this.c = savedC;
+      const logicRedirect = this.tryParseLogicQueryRedirect(propName);
+      if (logicRedirect) return logicRedirect;
     }
 
     if (this.c.type === 'SYM' && this.c.value === ':') {

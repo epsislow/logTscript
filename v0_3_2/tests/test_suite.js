@@ -36340,7 +36340,7 @@ comp [logic] .peopleLogic:
     const { interp } = session.run(src);
     const val = interp.getWireEffectiveValue('firstCar');
     h.assert('8 bits', String(val.length), '8');
-    h.assert('non-zero atom hash', String(parseInt(val, 2) > 0), 'true');
+    h.assert('ascii chevy first char', val, '01100011');
   });
 
   reg(3505, 'logic', 'comp [logic] boolean query redirect', function(h, session) {
@@ -36384,6 +36384,118 @@ comp [logic] .characterLogic:
 :`);
     } catch (e) { err = String(e.message || e); }
     h.assert('blocked', String(err.includes('not allowed')), 'true');
+  });
+
+  const INLINE_LOGIC_WORLD = `inline [logic] .world:
+
+    age(john, 25)
+    age(mary, 30)
+    age(joe, 22)
+
+    query allAges:
+        age(X, Y)
+
+:`;
+
+  reg(3512, 'logic', 'comp [logic] vector bulk redirect johnOwns >= allCars', function(h, session) {
+    const src = INLINE_LOGIC_PEOPLE + `
+comp [logic] .peopleLogic:
+    on: 1
+
+    .people {
+    }
+
+:
+
+8wire[4] allCars = 00000000000000000000000000000000
+8wire numRows = 00000000
+1wire trigger = 1
+
+.peopleLogic:{
+    johnOwns >= allCars
+    johnOwns:count >= numRows
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('slot0 c', interp.getWireEffectiveValue('allCars').slice(0, 8), '01100011');
+    h.assert('slot1 f', interp.getWireEffectiveValue('allCars').slice(8, 16), '01100110');
+    h.assert('slot2 fill', interp.getWireEffectiveValue('allCars').slice(16, 24), '00000000');
+    h.assert('count=2', interp.getWireEffectiveValue('numRows'), '00000010');
+  });
+
+  reg(3513, 'logic', 'comp [logic] matrix bulk redirect allAges >= table', function(h, session) {
+    const zeros320 = '0'.repeat(320);
+    const zeros64 = '0'.repeat(64);
+    const src = INLINE_LOGIC_WORLD + `
+comp [logic] .worldLogic:
+    on: 1
+
+    .world {
+    }
+
+:
+
+32wire[5, 2] table = ${zeros320}
+32wire[2] row0 = ${zeros64}
+8wire numRows = 00000000
+1wire trigger = 1
+
+.worldLogic:{
+    allAges >= table
+    allAges:0 >= row0
+    allAges:count >= numRows
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    const row0 = interp.getWireEffectiveValue('row0');
+    h.assert('row0 john ascii', row0.slice(0, 32), '01101010011011110110100001101110');
+    h.assert('row0 age 25', row0.slice(32, 64), '00000000000000000000000000011001');
+    h.assert('count=3', interp.getWireEffectiveValue('numRows'), '00000011');
+    h.assert('table row0 matches', interp.getWireEffectiveValue('table').slice(0, 64), row0);
+  });
+
+  reg(3514, 'logic', 'comp [logic] matrix cell redirect allAges:0:1 >= ageWire', function(h, session) {
+    const src = INLINE_LOGIC_WORLD + `
+comp [logic] .worldLogic:
+    on: 1
+
+    .world {
+    }
+
+:
+
+32wire ageWire = ${'0'.repeat(32)}
+1wire trigger = 1
+
+.worldLogic:{
+    allAges:0:1 >= ageWire
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('john age 25', interp.getWireEffectiveValue('ageWire'), '00000000000000000000000000011001');
+  });
+
+  reg(3515, 'logic', 'comp [logic] ASCII atom redirect round-trip on wire', function(h, session) {
+    const src = INLINE_LOGIC_WORLD + `
+comp [logic] .worldLogic:
+    on: 1
+
+    .world {
+    }
+
+:
+
+32wire nameSlot = ${'0'.repeat(32)}
+1wire trigger = 1
+
+.worldLogic:{
+    allAges:0:0 >= nameSlot
+    set = trigger
+    show(nameSlot; ascii)
+}`;
+    const { out, interp } = session.run(src);
+    h.assert('wire john', interp.getWireEffectiveValue('nameSlot').slice(0, 32), '01101010011011110110100001101110');
+    h.assert('show john', String(out.some((l) => l.includes('john'))), 'true');
   });
 
   window.LogTScriptTestSuite.finalize();

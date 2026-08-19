@@ -337,33 +337,108 @@ function executeLogicQueries(mergedDef, inputEnv, options) {
   return engine.executeQueries(mergedDef.queries || [], inputEnv);
 }
 
+function logicAtomToAsciiBits(name, width) {
+  let bits = '';
+  const s = name != null ? String(name) : '';
+  for (let i = 0; i < s.length; i++) {
+    bits += s.charCodeAt(i).toString(2).padStart(8, '0');
+  }
+  if (bits.length < width) bits = bits.padEnd(width, '0');
+  else if (bits.length > width) bits = bits.slice(0, width);
+  return bits;
+}
+
+function logicNumberToBits(n, width) {
+  let v = n;
+  if (v == null || isNaN(v)) v = 0;
+  if (v < 0) v = (1 << width) + v;
+  return (v >>> 0).toString(2).padStart(width, '0').slice(-width);
+}
+
+function logicEncodeSolutionTerm(term, elementWidth) {
+  if (!term) return '0'.repeat(elementWidth);
+  if (term.kind === 'number') return logicNumberToBits(term.value, elementWidth);
+  if (term.kind === 'atom') return logicAtomToAsciiBits(term.name, elementWidth);
+  return '0'.repeat(elementWidth);
+}
+
+function logicGetElementFill(wire, ctx) {
+  if (wire && wire.logicElementFill) return wire.logicElementFill;
+  const ew = (wire && wire.tensor && wire.tensor.elementWidth)
+    || (wire && wire.vector && wire.vector.elementWidth)
+    || (ctx && wire && ctx.getBitWidth(wire.type))
+    || 8;
+  return '0'.repeat(ew);
+}
+
+function logicPackVectorSolutions(solutions, freeVars, elementCount, elementWidth, fillBits) {
+  const cells = [];
+  const k = Math.min(solutions.length, elementCount);
+  for (let i = 0; i < elementCount; i++) {
+    if (i < k && freeVars.length >= 1) {
+      cells.push(logicEncodeSolutionTerm(solutions[i][freeVars[0]], elementWidth));
+    } else {
+      cells.push(fillBits);
+    }
+  }
+  return cells.join('');
+}
+
+function logicPackMatrixSolutions(solutions, freeVars, rows, cols, elementWidth, fillBits) {
+  const k = Math.min(solutions.length, rows);
+  const cells = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (r < k && freeVars[c]) {
+        cells.push(logicEncodeSolutionTerm(solutions[r][freeVars[c]], elementWidth));
+      } else {
+        cells.push(fillBits);
+      }
+    }
+  }
+  return cells.join('');
+}
+
+function logicPackMatrixRow(solutions, freeVars, rowIndex, cols, elementWidth, fillBits) {
+  let bits = '';
+  if (rowIndex >= solutions.length) {
+    return fillBits.repeat(cols);
+  }
+  const sol = solutions[rowIndex];
+  for (let c = 0; c < cols; c++) {
+    bits += logicEncodeSolutionTerm(sol[freeVars[c]], elementWidth);
+  }
+  return bits;
+}
+
+function logicPackMatrixCol(solutions, freeVars, colIndex, maxRows, elementWidth, fillBits) {
+  const k = Math.min(solutions.length, maxRows);
+  let bits = '';
+  for (let r = 0; r < maxRows; r++) {
+    if (r < k) {
+      bits += logicEncodeSolutionTerm(solutions[r][freeVars[colIndex]], elementWidth);
+    } else {
+      bits += fillBits;
+    }
+  }
+  return bits;
+}
+
 function logicTermToWireValue(term, width, bindType) {
   if (bindType === 'bool') {
     if (term.kind === 'number') return term.value !== 0 ? '1' : '0';
     return '0';
   }
-  if (bindType === 'number' || !bindType) {
-    let n = 0;
-    if (term.kind === 'number') n = term.value;
-    else if (term.kind === 'atom') {
-      let h = 0;
-      for (let i = 0; i < term.name.length; i++) h = (h * 31 + term.name.charCodeAt(i)) >>> 0;
-      n = h & ((1 << Math.min(width, 31)) - 1);
-    }
-    if (n < 0) n = (1 << width) + n;
-    return (n >>> 0).toString(2).padStart(width, '0').slice(-width);
-  }
-  if (bindType === 'text') {
+  if (bindType === 'text' || (term && term.kind === 'atom')) {
     let s = '';
     if (term.kind === 'atom') s = term.name;
     else if (term.kind === 'number') s = String(term.value);
-    let bits = '';
-    for (let i = 0; i < s.length; i++) {
-      bits += s.charCodeAt(i).toString(2).padStart(8, '0');
-    }
-    if (bits.length < width) bits = bits.padEnd(width, '0');
-    else if (bits.length > width) bits = bits.slice(-width);
-    return bits;
+    return logicAtomToAsciiBits(s, width);
+  }
+  if (bindType === 'number' || !bindType) {
+    if (term.kind === 'number') return logicNumberToBits(term.value, width);
+    if (term.kind === 'atom') return logicAtomToAsciiBits(term.name, width);
+    return '0'.repeat(width);
   }
   return '0'.repeat(width);
 }
@@ -393,6 +468,12 @@ if (typeof globalThis !== 'undefined') {
   globalThis.LogicEngine = LogicEngine;
   globalThis.logicTermToWireValue = logicTermToWireValue;
   globalThis.logicPinToInputValue = logicPinToInputValue;
+  globalThis.logicEncodeSolutionTerm = logicEncodeSolutionTerm;
+  globalThis.logicGetElementFill = logicGetElementFill;
+  globalThis.logicPackVectorSolutions = logicPackVectorSolutions;
+  globalThis.logicPackMatrixSolutions = logicPackMatrixSolutions;
+  globalThis.logicPackMatrixRow = logicPackMatrixRow;
+  globalThis.logicPackMatrixCol = logicPackMatrixCol;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -401,5 +482,11 @@ if (typeof module !== 'undefined' && module.exports) {
     LogicEngine,
     logicTermToWireValue,
     logicPinToInputValue,
+    logicEncodeSolutionTerm,
+    logicGetElementFill,
+    logicPackVectorSolutions,
+    logicPackMatrixSolutions,
+    logicPackMatrixRow,
+    logicPackMatrixCol,
   };
 }

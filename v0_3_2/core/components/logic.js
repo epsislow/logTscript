@@ -28,6 +28,27 @@ function logicWriteWire(wireName, value, width, ctx) {
   }
 }
 
+function logicWireShape(wire, ctx) {
+  if (wire && wire.tensor && wire.tensor.dims) {
+    const rows = wire.tensor.dims[0];
+    const cols = wire.tensor.dims[1];
+    const ew = wire.tensor.elementWidth;
+    if (wire.tensor.singleDim || rows === 1) {
+      return { kind: 'vector', ew, count: rows * cols };
+    }
+    return { kind: 'matrix', ew, rows, cols };
+  }
+  if (wire && wire.vector && wire.vector.elementCount > 1) {
+    return {
+      kind: 'vector',
+      ew: wire.vector.elementWidth,
+      count: wire.vector.elementCount,
+    };
+  }
+  const w = ctx.getBitWidth(wire.type);
+  return { kind: 'scalar', ew: w };
+}
+
 var LogicComponent = class LogicComponent extends BuiltinComponent {
   static get type() { return 'logic'; }
   static get shortnames() { return {}; }
@@ -101,12 +122,14 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       ? logicResolveMerged(prog.inst, ctx.inlineInstances)
       : prog.inst;
     const listFn = typeof logicListFreeVarsInGoal === 'function' ? logicListFreeVarsInGoal : null;
+    const queryMeta = {};
     if (listFn) {
       for (const q of merged.queries || []) {
         const free = listFn(q.goal).filter((v) => !inputVars.has(v));
-        if (free.length > 1) {
-          throw Error(`logic ${name}: query '${q.name}' has ${free.length} output variables (maximum 1)`);
+        if (free.length > 2) {
+          throw Error(`logic ${name}: query '${q.name}' has ${free.length} output variables (maximum 2)`);
         }
+        queryMeta[q.name] = { freeVars: free };
       }
     }
 
@@ -121,6 +144,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       pinDefs,
       pinStorage: {},
       queryResults: {},
+      queryMeta,
       execCount: 0,
       _logicRedirects: [],
     };
@@ -214,53 +238,99 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
 
   _applyRedirects(comp, compName, redirects, ctx) {
     if (!redirects || !redirects.length) return;
-    const inputVars = new Set();
-    for (const pin of Object.values(comp.pinStorage || {})) {
-      if (pin.logicVar) inputVars.add(pin.logicVar);
-    }
+    const encFn = typeof logicTermToWireValue === 'function' ? logicTermToWireValue : null;
+    const fillFn = typeof logicGetElementFill === 'function' ? logicGetElementFill : null;
+    const packVecFn = typeof logicPackVectorSolutions === 'function' ? logicPackVectorSolutions : null;
+    const packMatFn = typeof logicPackMatrixSolutions === 'function' ? logicPackMatrixSolutions : null;
+    const packRowFn = typeof logicPackMatrixRow === 'function' ? logicPackMatrixRow : null;
+    const packColFn = typeof logicPackMatrixCol === 'function' ? logicPackMatrixCol : null;
+    const encodeFn = typeof logicEncodeSolutionTerm === 'function' ? logicEncodeSolutionTerm : null;
+
     for (const rd of redirects) {
       const qName = rd.queryName || rd.poutName;
       const solutions = comp.queryResults && comp.queryResults[qName];
       if (!solutions) continue;
 
-      let term = null;
-      let bindType = 'number';
-
-      if (rd.property === 'pout>' && solutions.length > 0) {
-        const sol = solutions[0];
-        const outKeys = Object.keys(sol).filter((k) => !inputVars.has(k));
-        if (outKeys.length === 0) {
-          term = { kind: 'number', value: 1 };
-          bindType = 'bool';
-        } else {
-          term = sol[outKeys[0]];
-        }
-      } else if (rd.property === 'pout>' && solutions.length === 0) {
-        term = { kind: 'number', value: 0 };
-        bindType = 'bool';
-      } else if (rd.property === 'logicQuery>') {
-        const idx = rd.solutionIndex != null ? rd.solutionIndex : 0;
-        if (!solutions[idx]) continue;
-        const sol = solutions[idx];
-        const outKeys = Object.keys(sol).filter((k) => !inputVars.has(k));
-        if (outKeys.length === 0) {
-          term = { kind: 'number', value: 1 };
-          bindType = 'bool';
-        } else {
-          term = sol[outKeys[0]];
-          bindType = 'number';
-        }
-      } else {
-        continue;
-      }
+      const meta = comp.queryMeta && comp.queryMeta[qName];
+      const freeVars = meta && meta.freeVars ? meta.freeVars : [];
 
       const targetName = rd.target && rd.target.var;
       if (!targetName) continue;
       const wire = ctx.wires.get(targetName);
       if (!wire) throw Error(`Logic redirect wire '${targetName}' not found`);
+      const shape = logicWireShape(wire, ctx);
       const width = ctx.getBitWidth(wire.type);
-      const encFn = typeof logicTermToWireValue === 'function' ? logicTermToWireValue : null;
-      const bits = encFn ? encFn(term, width, bindType) : '0'.repeat(width);
+      const fillBits = fillFn ? fillFn(wire, ctx) : '0'.repeat(shape.ew || width);
+
+      let bits = null;
+
+      if (rd.property === 'pout>') {
+        if (freeVars.length === 0) {
+          const val = solutions.length > 0 ? 1 : 0;
+          bits = encFn ? encFn({ kind: 'number', value: val }, width, 'bool') : (val ? '1' : '0');
+        } else if (freeVars.length === 1 && shape.kind === 'vector' && packVecFn) {
+          bits = packVecFn(solutions, freeVars, shape.count, shape.ew, fillBits);
+        } else if (freeVars.length === 2 && shape.kind === 'matrix' && packMatFn) {
+          bits = packMatFn(solutions, freeVars, shape.rows, shape.cols, shape.ew, fillBits);
+        } else if (freeVars.length >= 1 && solutions.length > 0) {
+          const sol = solutions[0];
+          const term = sol[freeVars[0]];
+          bits = encFn ? encFn(term, width, 'number') : '0'.repeat(width);
+        } else {
+          bits = fillBits.padStart(width, '0').slice(-width);
+        }
+      } else if (rd.property === 'logicQuery>') {
+        const mode = rd.redirectMode || (rd.solutionIndex != null ? 'indexOrRow' : null);
+
+        if (mode === 'count') {
+          let count = solutions.length;
+          if (shape.kind === 'matrix') count = Math.min(count, shape.rows);
+          else if (shape.kind === 'vector') count = Math.min(count, shape.count);
+          bits = encFn ? encFn({ kind: 'number', value: count }, width, 'number') : String(count);
+        } else if (mode === 'width') {
+          const cols = shape.kind === 'matrix' ? shape.cols : freeVars.length;
+          bits = encFn ? encFn({ kind: 'number', value: cols }, width, 'number') : String(cols);
+        } else if (mode === 'cell' && encodeFn) {
+          const r = rd.rowIndex != null ? rd.rowIndex : 0;
+          const c = rd.colIndex != null ? rd.colIndex : 0;
+          if (r < solutions.length && freeVars[c]) {
+            bits = encodeFn(solutions[r][freeVars[c]], shape.ew);
+          } else {
+            bits = fillBits;
+          }
+        } else if (mode === 'col' && packColFn && shape.kind !== 'scalar') {
+          const col = rd.colIndex != null ? rd.colIndex : 0;
+          const maxRows = shape.kind === 'matrix' ? shape.rows : shape.count;
+          bits = packColFn(solutions, freeVars, col, maxRows, shape.ew, fillBits);
+        } else if (mode === 'indexOrRow') {
+          const idx = rd.solutionIndex != null ? rd.solutionIndex : rd.rowIndex;
+          if (freeVars.length === 1 && shape.kind === 'scalar') {
+            if (!solutions[idx]) continue;
+            const term = solutions[idx][freeVars[0]];
+            bits = encFn ? encFn(term, width, 'number') : '0'.repeat(width);
+          } else if (freeVars.length === 2 && shape.kind === 'vector' && packRowFn) {
+            const cols = freeVars.length;
+            bits = packRowFn(solutions, freeVars, idx, cols, shape.ew, fillBits);
+          } else if (freeVars.length === 1 && shape.kind === 'vector' && encodeFn) {
+            const cells = [];
+            for (let i = 0; i < shape.count; i++) {
+              if (i === idx && solutions[idx]) {
+                cells.push(encodeFn(solutions[idx][freeVars[0]], shape.ew));
+              } else {
+                cells.push(fillBits);
+              }
+            }
+            bits = cells.join('');
+          } else if (!solutions[idx]) {
+            continue;
+          } else {
+            const term = solutions[idx][freeVars[0]];
+            bits = encFn ? encFn(term, width, 'number') : '0'.repeat(width);
+          }
+        }
+      }
+
+      if (bits == null) continue;
       logicWriteWire(targetName, bits, width, ctx);
     }
   }

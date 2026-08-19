@@ -312,7 +312,7 @@ sequenceDiagram
 
 ## Decizii de luat — tabel rezumat
 
-> **D1–D19 closed** (D12/D19/1+l/1+k amânate). **Fazele 0–4, 6 implementate.** Faza 5 (matrix/vector) rămâne de făcut.
+> **D1–D19 closed** (D12/D19/1+l/1+k amânate). **D12a + D12b closed** (fill/truncate/count + ASCII encoding F5). **Fazele 0–4, 6 implementate.** Faza 5 rămâne de implementat.
 
 | ID | Subiect | Decizia ta |
 |----|---------|------------|
@@ -566,7 +566,7 @@ query johnOwns:
 | `allPairs >= pairMatrix` | `16wire[R,2]` | matrix completă |
 | `allPairs:0 >= row0` | `16wire[2]` vector | **rând** 0 (`:r` = rând, ca LogTScript) |
 | `allPairs::0 >= col0` | `16wire[R]` vector | **coloană** 0 (`::c` = coloană) |
-| `allPairs:0:1 >= cell` | `16wire` scalar | celula `(0,1)` — opțional |
+| `allPairs:0:1 >= cell` | `16wire` scalar | celula `(0,1)` |
 
 ```logts
 query allPairs:
@@ -594,6 +594,107 @@ query fullRecord: something(X, Y, Z, T)
 ```
 
 **Fazele 1–4:** max **1** var liberă. **Faza 5:** max **2**. Motorul Prolog poate rezolva N vars; limita e la **interfața redirect**.
+
+---
+
+### D12a — Vector/matrix fill, truncate, count **(Faza 5 — completed decizie)**
+
+**Principiu:** redirect `query >= vector|matrix` **nu** folosește operatorii `:=` / `=:` ai init-ului wire (`=`, `:=`, `=:` rămân doar pentru assign LogTScript). Pack/fill la redirect are **o singură regulă fixă**, indiferent cum a fost declarat wire-ul.
+
+#### Pack layout (fix)
+
+| Regulă | Comportament |
+|--------|--------------|
+| **Ordine soluții** | Discovery order → element **`:0`, `:1`, …** (stânga→dreapta în listă) |
+| **Underfill** | Sloturi `:k` … `:N−1` (coadă) = **fill** |
+| **Overflow** | k > N (vector) sau k > R (matrix) → **truncate** primele N/R rânduri — **fără eroare** |
+| **0 soluții** | **Tot buffer-ul** = fill (vector sau matrix) |
+
+Analogie: soluțiile ocupă **prefixul** din stânga; padding-ul e **la dreapta** (tail) — ca „valori la stânga, zerouri la dreapta” pe listă, **nu** legat de `wire =:` la declarare.
+
+```text
+8wire[4] allCars — john are chevy, ford (k=2):
+
+  :0      :1      :2      :3
+ chevy   ford    FILL    FILL
+```
+
+#### Valoare fill (sentinel)
+
+| Sursă | Fill per slot nefolosit |
+|-------|-------------------------|
+| **Elaborare:** init literal pe declarație (`\0`, `0000…`, `\FF`, …) | Acel pattern **per element** (capturat la parse, nu recitit la RUN) |
+| **Fără init** / init strict `=` blob complet | **`\0`** pe `elementWidth` |
+
+**Respinge:** fill derivat din `:`/`:=`/`=:` la init; fill din valoarea **runtime** a wire-ului (wire poate fi modificat între RUN-uri).
+
+#### Count redirect
+
+| Țintă | `query:count >= wire` | `query:width >= wire` |
+|-------|----------------------|------------------------|
+| **Vector** (1 var) | k = soluții scrise (0…N) | — |
+| **Matrix** (2 vars) | k = **rânduri** scrise (0…R) | C = cols (= 2) — **constantă** la elaborare |
+
+**Respinge:** `query:0:count` pentru „număr coloane” — cols e fix din query; slice coloană `::c` are lungime utilă = k (același `:count`).
+
+```logts
+8wire[10] allCars = 00000000000000000000000000000000   # strict =, 32 bit — OK
+8wire[10] allCars := \0                                 # idem fill \0 per element la elaborare
+8wire numRows = \0
+
+.peopleLogic:{
+    johnOwns >= allCars
+    johnOwns:count >= numRows
+    set = trigger
+}
+```
+
+---
+
+### D12b — Encoding celule (atom → ASCII, nu hash) **(Faza 5 — completed decizie)**
+
+**Problema hash (MVP Fazele 1–4):** `logicTermToWireValue` cu `bindType number` hash-uiește atomii la redirect scalar (`johnOwns:0 >= firstCar`) — **round-trip imposibil** (`firstCar` / `table:0:0` → `myX` → `X = john`).
+
+**Decizie F5 (confirmată):** **toate** redirect-urile care scriu termeni `atom` pe wire — scalar `:N >=`, vector bulk, matrix, slice, celulă — folosesc **ASCII + `\0` padding**, **nu hash**. `number` rămâne binary unsigned pe lățimea celulei/wire-ului.
+
+#### Lățime uniformă (constraint LogTScript)
+
+| Construct | Regulă |
+|-----------|--------|
+| **`Wwire[N]`** / **`Wwire[R,C]`** | **Un singur `elementWidth` (= W)** pentru toate celulele — nu există coloane cu biți diferiți |
+| **Schema variable matrix** | Variabil **număr rânduri/coloane** (`8[1-3,2]`) — **nu** lățimi diferite per celulă |
+| **Declarare** | User alege W suficient (ex. `32wire[5,2]` → 4 caractere ASCII / număr până la 32 bit per celulă) |
+
+**Elaborare (lint opțional):** max lungime atom din inline vs `W` (caractere × 8 ≤ W); warning/error dacă `"john"` nu încape.
+
+#### Encoding per coloană / celulă (la scriere redirect)
+
+| Termen soluție | Encoding în celulă de W biți |
+|----------------|--------------------------------|
+| **`atom`** | **ASCII**, octet per caracter, **padding `\0`** la dreapta în celulă |
+| **`number`** | **Unsigned binary** pe W biți |
+| **Fill slot** | `\0` pe întreaga celulă (D12a) |
+
+Exemplu `32wire[5,2] table` — query `age(X,Y)`:
+
+```text
+row  col0 (X)              col1 (Y)
+ 0   "john\0\0\0\0" (32b)   \25 (32b)
+ 1   "mary\0\0\0\0"         \30
+ 2   "joe\0\0\0\0\0"        \22
+```
+
+#### Citire înapoi (round-trip)
+
+| Direcție | Regulă |
+|----------|--------|
+| **Pin `text`** | **`logicPinToInputValue`:** oprește la octet **`0`** → `"joe"` ≡ atom `joe` |
+| **Wire → pin** | `myX = table:0:0` → pin; program block `X is text myX` |
+| **Prolog** | `age(john,25)` din facts ≡ X citit `"john"` după trim `\0` |
+
+**Respinge:** hash pe orice redirect logic atom→wire; celule cu W diferit per coloană pe tensor simplu; W auto la runtime.
+
+**F5 aliniază MVP:** teste **3504** (`firstCar`) hash → ASCII; doc `comp-logic.md` actualizat — **fără** limbaj „breaking change” față de user (feature încă neadoptat).
 
 ---
 
@@ -761,7 +862,7 @@ Legat de **D2 completed**: MVP folosește **A** (toate query-urile). **D19 = C**
 
 ### Faza 0 — Spec **(completed)**
 
-Toate deciziile D1–D19 confirmate. **Faza 5** (D12 matrix/vector) definită. Amânate: **1+l**, **1+k**, **1+b** opțional.
+Toate deciziile D1–D19 confirmate. **Faza 5** (D12 + **D12a**) definită. Amânate: **1+l**, **1+k**, **1+b** opțional.
 
 ---
 
@@ -817,23 +918,27 @@ Flux:
 
 ### Faza 5 — Matrix / vector query output **(pending)**
 
-**Scop:** 2 vars libere max; redirect aliniat cu [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md). **>2 vars** → eroare.
+**Scop:** 2 vars libere max; redirect aliniat cu [`wire-vectors.md`](../v0_3_2/doc/wire-vectors.md). **>2 vars** → eroare. **Fill/truncate/count:** D12a. **Encoding ASCII:** D12b (inclusiv scalar `:N >=` MVP — același encoding, fără hash).
 
 | Vars libere | Redirect nou | Validare țintă wire |
 |-------------|--------------|---------------------|
-| **1** | `query >= vector` | `Wwire[N]` — rows = soluții |
-| **2** | `query >= matrix` | `Wwire[R,C]` — R≥rows, C=2 |
+| **1** | `query >= vector` | `Wwire[N]` — soluții ≤ N |
+| **1** | `query:count >= wire` | scalar — k soluții scrise |
+| **2** | `query >= matrix` | `Wwire[R,C]` — rânduri ≤ R, C = nr. vars |
 | **2** | `query:r >= vector` | rând `r` — width `C×W` |
-| **2** | `query::c >= vector` | coloană `c` — width `R×W` |
-| **2** | `query:r:c >= scalar` | celulă — opțional |
+| **2** | `query::c >= vector` | coloană `c` — width `R×W` (k celule utile) |
+| **2** | `query:r:c >= scalar` | celulă `(r,c)` |
+| **2** | `query:count >= wire` | k rânduri scrise |
+| **2** | `query:width >= wire` | C cols (constante elaborare) |
 
 **Implementare:**
 
-- Extinde parser property block — recunoaște `query >=`, `query:r`, `query::c`, `query:r:c` (distinct de pin redirect `myX =`).
-- Extinde `components/logic.js` — pack soluții în bit-string row-major (ca matrix LogTScript).
-- Elaborare: validează cols matrix = nr vars libere (1 sau 2); rows ≤ R declarat; width element consistent (atom/number encoding pe col).
-- Relaxare D12: permite 2 vars în query; păstrează eroare la ≥3.
-- Teste: `owns(X,Y)` → matrix; slice rând/coloană; `johnOwns >= vector`; `something(X,Y,Z)` → error.
+- Extinde parser property block — `query >=`, `query:r`, `query::c`, `query:r:c`, `query:count`, `query:width`.
+- Extinde `components/logic.js` — pack soluții row-major; **prefix pack + tail fill** (D12a); truncate fără eroare.
+- Elaborare: cols matrix = nr vars libere; capture **fill sentinel** din init literal; `:width` constant.
+- Relaxare D12: permite 2 vars; eroare la ≥3.
+- Extinde `logic-engine.js` / `logic.js` — **atom → ASCII** (nu hash) pe toate redirect-urile; `\0` trim la citire pin text.
+- Teste: vector/matrix (F5); **3504** actualizat ASCII; round-trip `table:0:0` → `myX`.
 
 **Legat de 1+b:** filtrare/policies (`;unique`, cap rows) poate completa Faza 5 sau faza ulterioară.
 
@@ -976,7 +1081,7 @@ comp [logic] .peopleLogic:
 | Topic | Status |
 |-------|--------|
 | `query = …` | **1+l** amânat |
-| Multi-var query | **MVP:** max 1 var output (Fazele 1–4, 6); **Faza 5 pending** — matrix/vector, max 2 vars |
+| Multi-var query | **Fazele 1–4, 6:** max 1 var; **Faza 5:** matrix/vector + D12a fill/truncate/count |
 | POUT declarate comp | **1+k** low priority |
 | `use` circular | lint la elaborare **1+g** |
 | boolean redirect | **D7a completed:** `isJohnOwner >= wire` |

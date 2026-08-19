@@ -11246,10 +11246,20 @@ Only **\`number\`**, **\`text\`**, and **\`bool\`** are supported at the pin bou
 | Query vars | Syntax | Target |
 |------------|--------|--------|
 | **0 free** (boolean) | \`isJohnOwner >= flagWire\` | \`1\` if satisfiable, else \`0\` |
-| **1 free** | \`johnOwns:0 >= firstCar\` | Index \`N\` solution → wire |
-| **1 free** | \`johnOwns:1 >= secondCar\` | Next solution |
+| **1 free** | \`johnOwns:0 >= firstCar\` | Solution **N** → scalar wire (ASCII atom / binary number) |
+| **1 free** | \`johnOwns >= allCars\` | **Vector bulk** — one solution per element (\`8wire[N]\`) |
+| **1 free** | \`johnOwns:count >= numRows\` | Solution count (capped at vector length) |
+| **2 free** | \`allAges >= table\` | **Matrix bulk** — row = solution, col = variable (\`32wire[R,C]\`) |
+| **2 free** | \`allAges:0 >= row0\` | **Row slice** (\`32wire[C]\`) |
+| **2 free** | \`allAges::0 >= col0\` | **Column slice** |
+| **2 free** | \`allAges:0:1 >= ageWire\` | **Single cell** (scalar wire) |
+| **2 free** | \`allAges:count >= numRows\` | Rows written; \`allAges:width >= numCols\` → column count |
 
 Solution order follows **discovery order** (Prolog-style backtracking).
+
+**Encoding:** atoms → **ASCII + \`\\0\` padding** per cell; numbers → unsigned binary on cell width. Unused slots are filled from the wire init pattern (or \`\\0\` per cell if undeclared).
+
+**Limits:** max **2** free variables per query at the redirect interface.
 
 ---
 
@@ -11353,6 +11363,121 @@ show(flag)
 show(firstCar)
 \`\`\`
 
+\`firstCar\` receives the first character of \`chevy\` in ASCII (\`c\` on 8 bits).
+
+---
+
+## Example — vector bulk + count
+
+\`\`\`logts-play
+inline [logic] .people:
+
+    owns(john, chevy)
+    owns(john, ford)
+    owns(mary, bike)
+
+    query johnOwns:
+        owns(john, X)
+
+:
+
+comp [logic] .peopleLogic:
+    on: 1
+
+    .people {
+    }
+
+:
+
+8wire[4] allCars = 00000000000000000000000000000000
+8wire numRows = 00000000
+1wire trigger = 1
+
+.peopleLogic:{
+    johnOwns >= allCars
+    johnOwns:count >= numRows
+    set = trigger
+}
+
+show(allCars; ascii)
+show(numRows)
+\`\`\`
+
+---
+
+## Example — matrix \`age(X,Y)\` + row slice
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    age(john, 25)
+    age(mary, 30)
+    age(joe, 22)
+
+    query allAges:
+        age(X, Y)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+
+    .world {
+    }
+
+:
+
+32wire[5, 2] table = 0
+32wire[2] row0 = 0
+8wire numRows = 00000000
+1wire trigger = 1
+
+.worldLogic:{
+    allAges >= table
+    allAges:0 >= row0
+    allAges:count >= numRows
+    set = trigger
+}
+
+show(row0; ascii)
+show(numRows)
+\`\`\`
+
+Column 0 = names (ASCII); column 1 = ages (binary).
+
+---
+
+## Example — cell redirect + ASCII show
+
+\`\`\`logts-play
+inline [logic] .world:
+
+    age(john, 25)
+    age(mary, 30)
+
+    query allAges:
+        age(X, Y)
+
+:
+
+comp [logic] .worldLogic:
+    on: 1
+
+    .world {
+    }
+
+:
+
+32wire nameSlot = 0
+1wire trigger = 1
+
+.worldLogic:{
+    allAges:0:0 >= nameSlot
+    set = trigger
+    show(nameSlot; ascii)
+}
+\`\`\`
+
 ---
 
 ## Multiple exec blocks
@@ -11367,7 +11492,7 @@ Several property blocks may target the same component. Query result slots are **
 |-----------|--------|
 | Missing program block | Elaboration error |
 | Inline ref not \`inline [logic]\` | Elaboration error |
-| Query with **>1** free variable | Elaboration error |
+| Query with **>2** free variables | Elaboration error |
 | Unknown redirect query name | Redirect skipped silently if no results |
 | Policy block | \`NotAllow comp.type{logic}\` — see [allow-notallow.md](allow-notallow.md) |
 
