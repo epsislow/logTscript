@@ -4170,6 +4170,25 @@ assignment() {
         }
         break;
       }
+      if (this.c.type === 'ID' && /^core\d+$/.test(this.c.value)) {
+        const mark = this.t.i;
+        const tok = this.c;
+        this.eat('ID');
+        this.t.skip();
+        if (this.c.type === 'SYM' && this.c.value === ':') {
+          if (sub.initialValue != null) {
+            this.t.i = mark;
+            this.c = tok;
+            break;
+          }
+          this.eat('SYM', ':');
+          this.t.skip();
+          sub[tok.value] = this._parseCpuSubSection();
+          continue;
+        }
+        this.t.i = mark;
+        this.c = tok;
+      }
       if (this.c.type !== 'ID') break;
       const key = this.c.value;
       this.eat('ID');

@@ -2658,7 +2658,15 @@
       {"id":3308,"group":"asm-set","title":"x86-32 rep movsb CPU copy (1+x.1c-iv)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["eax = 5 (last byte copied)"]}},
       {"id":3309,"group":"asm-set","title":"x86-32 rep movsb CPU (wave)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["eax = 5 (last byte copied)"]}},
       {"id":3310,"group":"asm-set","title":"x86-32 movsb CPU single byte","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["eax = 42"]}},
-      {"id":3311,"group":"asm-set","title":"x86-32 movsb CPU (wave)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["eax = 42"]}}
+      {"id":3311,"group":"asm-set","title":"x86-32 movsb CPU (wave)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["eax = 42"]}},
+      {"id":3400,"group":"cpu-multicore","title":"cores:1 backward compat x86-32","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["cores:1 eax = 13"]}},
+      {"id":3401,"group":"cpu-multicore","title":"cores:1 compat (wave)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["cores:1 eax = 13"]}},
+      {"id":3402,"group":"cpu-multicore","title":"boot core0 only core1 parked","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["core1 halted at boot","coresActive = 01","core0 ran eax=1","core1 still parked"]}},
+      {"id":3403,"group":"cpu-multicore","title":"wakeCore enables core1 x86-32","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["core1 eax = 42 after wake","core1 not halted"]}},
+      {"id":3404,"group":"cpu-multicore","title":"wakeCore (wave)","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["core1 eax = 42 after wake","core1 not halted"]}},
+      {"id":3405,"group":"cpu-multicore","title":"shared RAM visible to all cores","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["shared ram word0 = 5","same ram after wake core1"]}},
+      {"id":3406,"group":"cpu-multicore","title":"shared prog pcInit per core","detail":{"scripts":["inline [asm] .x86:\n  set: x86-32\n  :\n128wire p = .x86 {\n  mov eax, 1\n  jmp done\nworker:\n  mov eax, 77\n  jmp done\ndone:\n  jmp done\n}"],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["core0 eax=1","core1 worker eax=77"]}},
+      {"id":3407,"group":"cpu-multicore","title":"parkCore clears active bit","detail":{"scripts":[],"steps":["run(src) [nerezolvat]","session._ensureRegistry()"],"assertions":["park clears bit1","core1 halted after park"]}}
     ],
     groups: [
       { id: 'wire-init', label: ': wire initial assignment', rangeLabel: '82–101, 497–499', testIds: [82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 497, 498, 499] },
@@ -2713,6 +2721,7 @@
       { id: 'compare', label: 'compare', rangeLabel: '1670–1672, 1679', testIds: [1670, 1671, 1672, 1679] },
       { id: 'registry', label: 'Component registry', rangeLabel: '200–223', testIds: [200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223] },
       { id: 'conditional-assignment', label: 'conditional-assignment', rangeLabel: '2060–2075, 2123–2124, 2247–2252, 2544–2548', testIds: [2060, 2061, 2062, 2063, 2064, 2065, 2066, 2067, 2068, 2069, 2070, 2071, 2072, 2073, 2074, 2075, 2123, 2124, 2247, 2248, 2249, 2250, 2251, 2252, 2544, 2545, 2546, 2547, 2548] },
+      { id: 'cpu-multicore', label: 'cpu-multicore', rangeLabel: '3400–3407', testIds: [3400, 3401, 3402, 3403, 3404, 3405, 3406, 3407] },
       { id: 'decimal', label: 'decimal', rangeLabel: '1610–1613, 1615', testIds: [1610, 1611, 1612, 1613, 1615] },
       { id: 'literals', label: 'Decimal \\\\N literals', rangeLabel: '15–17, 19–21, 1937–1945, 1947–1952, 2553–2560', testIds: [15, 16, 17, 19, 20, 21, 1937, 1938, 1939, 1940, 1941, 1942, 1943, 1944, 1945, 1947, 1948, 1949, 1950, 1951, 1952, 2553, 2554, 2555, 2556, 2557, 2558, 2559, 2560] },
       { id: 'dip', label: 'dip', rangeLabel: '2990', testIds: [2990] },

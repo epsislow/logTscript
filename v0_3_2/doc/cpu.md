@@ -2,7 +2,7 @@
 
 Contained interpreter CPU (Harvard v1): internal **program** (`prog`) and **data RAM** (`ram`), register file, one instruction per active `set` pulse — or many instructions per **`run`** pulse (see [Run and `maxSteps`](#run-and-maxsteps)). Opcode decoding uses an `inline [asm]` ISA profile (8-bit words in the MVP test profile).
 
-For a board-level stepping demo with external mem chips, see [mini-cpu-v2.md](mini-cpu-v2.md). For bulk memcpy between memory chips (and shared RAM with the CPU), see [dma.md](dma.md).
+For a board-level stepping demo with external mem chips, see [mini-cpu-v2.md](mini-cpu-v2.md). For bulk memcpy between memory chips (and shared RAM with the CPU), see [dma.md](dma.md). For **multi-core** (`cores: N`, wake/park, per-core prog), see [cpu-multicore.md](cpu-multicore.md).
 
 In the **documentation viewer**, blocks marked `logts-play` open in the script editor with **Load** and **Load & Run** (same as [mini-cpu-v2.md](mini-cpu-v2.md)).
 

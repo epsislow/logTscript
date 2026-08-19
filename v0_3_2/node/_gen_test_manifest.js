@@ -255,7 +255,8 @@ function validateScriptEditorHtml() {
   const scripts = loadTestScripts();
   const required = scripts.runtime.filter(f =>
     /^core\/components\/(?!index\.js)/.test(f) ||
-    /^devices\/[a-z]+-devices\.js$/.test(f)
+    /^devices\/[a-z]+-devices\.js$/.test(f) ||
+    /^core\/asm-sets\//.test(f)
   );
   const html = fs.readFileSync(SCRIPT_EDITOR_HTML, 'utf8');
   const missing = required.filter(f => !html.includes(`src="${f}"`));

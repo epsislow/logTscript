@@ -11,6 +11,168 @@ function cpuZero(depth) {
   return '0'.repeat(depth);
 }
 
+function cpuCoreCount(c) {
+  return c && c.coreCount != null ? c.coreCount : 1;
+}
+
+function cpuIsMulti(c) {
+  return cpuCoreCount(c) > 1;
+}
+
+function cpuParseActiveMask(bits, coreCount) {
+  if (bits == null || bits === '') return 1;
+  const s = String(bits).trim();
+  let mask = /^[01]+$/.test(s) ? parseInt(s, 2) : parseInt(s, 10);
+  if (isNaN(mask) || mask < 0) mask = 0;
+  const limit = (1 << coreCount) - 1;
+  return mask & limit;
+}
+
+function cpuInitCoreFields(config, regCount, ramDepth, progDepth, progLen) {
+  const regs = [];
+  for (let i = 0; i < regCount; i++) regs.push(cpuZero(ramDepth));
+  const prog = [];
+  const zp = cpuZero(progDepth);
+  if (!config.progMemId) {
+    for (let i = 0; i < progLen; i++) prog.push(zp);
+  }
+  return {
+    pc: config.pcInit != null ? config.pcInit : 0,
+    pcInit: config.pcInit != null ? config.pcInit : 0,
+    halted: config.halted != null ? config.halted : 0,
+    regs,
+    prog,
+    progMemId: config.progMemId || null,
+    progDepth,
+    progLength: progLen,
+    progReadonly: config.progReadonly !== false,
+    progEncoding: 'fixed',
+    progCodeTable: null,
+    lastInstr: zp,
+    trapCause: 0,
+    divByZero: 0,
+    zf: 0,
+    sf: 0,
+    cf: 0,
+    of: 0,
+    microSlots: new Map(),
+  };
+}
+
+function cpuBindCoreForExec(c, idx) {
+  if (!cpuIsMulti(c)) {
+    c.activeCore = 0;
+    return;
+  }
+  const core = c.cores[idx];
+  if (!core) return;
+  c.activeCore = idx;
+  c.pc = core.pc;
+  c.regs = core.regs;
+  c.halted = core.halted;
+  c.prog = core.prog;
+  c.progMemId = core.progMemId;
+  c.progLength = core.progLength;
+  c.progDepth = core.progDepth;
+  c.progEncoding = core.progEncoding;
+  c.progCodeTable = core.progCodeTable;
+  c.progReadonly = core.progReadonly;
+  c.lastInstr = core.lastInstr;
+  c.trapCause = core.trapCause;
+  c.divByZero = core.divByZero;
+  c.zf = core.zf;
+  c.sf = core.sf;
+  c.cf = core.cf;
+  c.of = core.of;
+  c.microSlots = core.microSlots;
+}
+
+function cpuFlushCoreFromExec(c) {
+  if (!cpuIsMulti(c)) return;
+  const idx = c.activeCore;
+  const core = c.cores[idx];
+  if (!core) return;
+  core.pc = c.pc;
+  core.regs = c.regs;
+  core.halted = c.halted;
+  core.lastInstr = c.lastInstr;
+  core.trapCause = c.trapCause;
+  core.divByZero = c.divByZero;
+  core.zf = c.zf;
+  core.sf = core.sf;
+  core.cf = core.cf;
+  core.of = core.of;
+  core.microSlots = c.microSlots;
+}
+
+function cpuCoreActiveBit(c, idx) {
+  const mask = c.coresActive != null ? c.coresActive : 1;
+  return ((mask >> idx) & 1) === 1;
+}
+
+function cpuAnyRunnable(c) {
+  if (!cpuIsMulti(c)) return !c.halted;
+  for (let i = 0; i < c.coreCount; i++) {
+    if (cpuCoreActiveBit(c, i) && !c.cores[i].halted) return true;
+  }
+  return false;
+}
+
+function cpuPickNextCore(c) {
+  for (let attempt = 0; attempt < c.coreCount; attempt++) {
+    const i = (c.rrIndex + attempt) % c.coreCount;
+    if (cpuCoreActiveBit(c, i) && !c.cores[i].halted) {
+      c.rrIndex = (i + 1) % c.coreCount;
+      return i;
+    }
+  }
+  return -1;
+}
+
+function cpuWakeCore(c, idx) {
+  if (!cpuIsMulti(c) || idx < 0 || idx >= c.coreCount) return;
+  const core = c.cores[idx];
+  core.halted = 0;
+  core.pc = core.pcInit;
+  c.coresActive = (c.coresActive | (1 << idx)) >>> 0;
+}
+
+function cpuParkCore(c, idx) {
+  if (!cpuIsMulti(c) || idx < 0 || idx >= c.coreCount) return;
+  c.cores[idx].halted = 1;
+  c.coresActive = (c.coresActive & ~(1 << idx)) >>> 0;
+}
+
+function cpuApplyAsmModuleToCore(core, asmModule) {
+  if (!core || !asmModule) {
+    if (core) {
+      core.progEncoding = 'fixed';
+      core.progCodeTable = null;
+    }
+    return;
+  }
+  if (asmModule.encoding === 'variable') {
+    core.progEncoding = 'variable';
+    core.progCodeTable = (asmModule.instructions || []).filter(ins => ins.kind === 'code');
+  } else {
+    core.progEncoding = 'fixed';
+    core.progCodeTable = null;
+  }
+}
+
+function cpuWriteProgBlobToCore(core, blob) {
+  const chunks = splitBlob(blob, core.progDepth, core.progLength);
+  const z = cpuZero(core.progDepth);
+  for (let i = 0; i < core.progLength; i++) {
+    const word = i < chunks.length ? chunks[i] : z;
+    if (core.progMemId) {
+      if (typeof setMem === 'function') setMem(core.progMemId, i, word);
+    } else {
+      core.prog[i] = word;
+    }
+  }
+}
+
 function cpuReadRamCell(c, adr) {
   if (adr < 0 || adr >= c.ramLength) return null;
   if (c.mmapId && typeof mmapRead === 'function') {
@@ -86,37 +248,24 @@ function addCpu(id, config) {
   const ramLen = config.ramLength != null ? config.ramLength : 16;
   const progDepth = config.progDepth != null ? config.progDepth : 8;
   const progLen = config.progLength != null ? config.progLength : 32;
-  const regs = [];
-  for (let i = 0; i < regCount; i++) regs.push(cpuZero(ramDepth));
+  const coreCount = config.coreCount != null ? config.coreCount : 1;
+  const pcInitList = config.pcInitList || null;
+  const coreProgConfigs = config.coreProgConfigs || null;
   const ram = [];
-  const prog = [];
   const z = cpuZero(ramDepth);
-  const zp = cpuZero(progDepth);
   if (!config.ramMemId) {
     for (let i = 0; i < ramLen; i++) ram.push(z);
   }
-  if (!config.progMemId) {
-    for (let i = 0; i < progLen; i++) prog.push(zp);
-  }
-  cpus.set(id, {
+
+  const shared = {
     regCount,
     regDepth: ramDepth,
     ramDepth,
     ramLength: ramLen,
-    progDepth,
-    progLength: progLen,
-    regs,
     ram,
-    prog,
     ramMemId: config.ramMemId || null,
     mmapId: config.mmapId || null,
     mmapRef: config.mmapRef || null,
-    progMemId: config.progMemId || null,
-    progReadonly: config.progReadonly !== false,
-    pc: 0,
-    pcInit: config.pcInit != null ? config.pcInit : 0,
-    halted: 0,
-    lastInstr: zp,
     spReg: config.spReg != null ? config.spReg : null,
     stackTop: config.stackTop != null ? config.stackTop : ramLen - 1,
     onReset: config.onReset || ['pc', 'regs', 'sp', 'halted'],
@@ -137,17 +286,91 @@ function addCpu(id, config) {
     vectorBase: config.vectorBase != null ? config.vectorBase : null,
     fixedVectors: config.fixedVectors || null,
     isaRef: config.isaRef || null,
-    microSlots: new Map(),
+    coreCount,
+    coresActive: 1,
+    rrIndex: 0,
+    activeCore: 0,
+  };
+
+  if (coreCount <= 1) {
+    const zp = cpuZero(progDepth);
+    const prog = [];
+    if (!config.progMemId) {
+      for (let i = 0; i < progLen; i++) prog.push(zp);
+    }
+    const regs = [];
+    for (let i = 0; i < regCount; i++) regs.push(cpuZero(ramDepth));
+    cpus.set(id, Object.assign({}, shared, {
+      progDepth,
+      progLength: progLen,
+      regs,
+      prog,
+      progMemId: config.progMemId || null,
+      progReadonly: config.progReadonly !== false,
+      pc: config.pcInit != null ? config.pcInit : 0,
+      pcInit: config.pcInit != null ? config.pcInit : 0,
+      halted: 0,
+      lastInstr: zp,
+      trapCause: 0,
+      divByZero: 0,
+      zf: 0,
+      sf: 0,
+      cf: 0,
+      of: 0,
+      microSlots: new Map(),
+      progEncoding: 'fixed',
+      progCodeTable: null,
+    }));
+    const c = cpus.get(id);
+    if (config.spReg != null) cpuInitSp(c);
+    return;
+  }
+
+  const cores = [];
+  for (let i = 0; i < coreCount; i++) {
+    const pi = pcInitList && pcInitList[i] != null ? pcInitList[i] : 0;
+    const cpCfg = coreProgConfigs && coreProgConfigs[i] ? coreProgConfigs[i] : {};
+    const cProgLen = cpCfg.progLength != null ? cpCfg.progLength : progLen;
+    const cProgDepth = cpCfg.progDepth != null ? cpCfg.progDepth : progDepth;
+    cores.push(cpuInitCoreFields({
+      pcInit: pi,
+      halted: i === 0 ? 0 : 1,
+      progMemId: cpCfg.progMemId || null,
+      progReadonly: cpCfg.progReadonly != null ? cpCfg.progReadonly : (config.progReadonly !== false),
+    }, regCount, ramDepth, cProgDepth, cProgLen));
+  }
+  const lead = cores[0];
+  cpus.set(id, Object.assign({}, shared, {
+    cores,
+    progDepth: lead.progDepth,
+    progLength: lead.progLength,
+    regs: lead.regs,
+    prog: lead.prog,
+    progMemId: lead.progMemId,
+    progReadonly: lead.progReadonly,
+    pc: lead.pc,
+    pcInit: lead.pcInit,
+    halted: lead.halted,
+    lastInstr: lead.lastInstr,
     trapCause: 0,
     divByZero: 0,
     zf: 0,
     sf: 0,
     cf: 0,
     of: 0,
-    progEncoding: 'fixed',
-    progCodeTable: null,
-  });
-  if (config.spReg != null) cpuInitSp(cpus.get(id));
+    microSlots: lead.microSlots,
+    progEncoding: lead.progEncoding,
+    progCodeTable: lead.progCodeTable,
+  }));
+  const c = cpus.get(id);
+  if (config.spReg != null) {
+    for (let i = 0; i < coreCount; i++) {
+      cpuBindCoreForExec(c, i);
+      cpuInitSp(c);
+      cpuFlushCoreFromExec(c);
+    }
+    cpuBindCoreForExec(c, 0);
+  }
 }
 
 function getCpu(id) {
@@ -177,9 +400,14 @@ function loadCpuRam(id, blob) {
   cpuWriteRamBlob(c, blob);
 }
 
-function loadCpuProg(id, blob, asmModule) {
+function loadCpuProg(id, blob, asmModule, coreIdx) {
   const c = getCpu(id);
   if (!c) return;
+  if (cpuIsMulti(c)) {
+    const idx = coreIdx != null ? coreIdx : 0;
+    loadCpuCoreProg(id, idx, blob, asmModule);
+    return;
+  }
   cpuWriteProgBlob(c, blob);
   cpuApplyAsmModule(c, asmModule || null);
   c.pc = c.pcInit;
@@ -188,9 +416,38 @@ function loadCpuProg(id, blob, asmModule) {
   c.divByZero = 0;
 }
 
+function loadCpuCoreProg(id, coreIdx, blob, asmModule) {
+  const c = getCpu(id);
+  if (!c || !cpuIsMulti(c)) return;
+  if (coreIdx < 0 || coreIdx >= c.coreCount) {
+    throw Error(`CPU core index ${coreIdx} out of range 0..${c.coreCount - 1}`);
+  }
+  const core = c.cores[coreIdx];
+  cpuWriteProgBlobToCore(core, blob);
+  cpuApplyAsmModuleToCore(core, asmModule || null);
+  core.pc = core.pcInit;
+  core.halted = coreIdx === 0 ? 0 : 1;
+  core.trapCause = 0;
+  core.divByZero = 0;
+  if (coreIdx === 0) cpuBindCoreForExec(c, 0);
+}
+
 function cpuAfterProgReload(id) {
   const c = getCpu(id);
   if (!c) return;
+  if (cpuIsMulti(c)) {
+    for (let i = 0; i < c.coreCount; i++) {
+      const core = c.cores[i];
+      core.pc = core.pcInit;
+      core.halted = i === 0 ? 0 : 1;
+      core.trapCause = 0;
+      core.divByZero = 0;
+    }
+    c.coresActive = 1;
+    c.rrIndex = 0;
+    cpuBindCoreForExec(c, 0);
+    return;
+  }
   c.pc = c.pcInit;
   c.halted = 0;
   c.trapCause = 0;
@@ -202,24 +459,59 @@ function cpuResetFlags(id, flags) {
   if (!c) return;
   const set = new Set(flags || []);
   const z = cpuZero(c.regDepth);
-  if (set.has('pc')) c.pc = c.pcInit;
-  if (set.has('regs')) {
-    for (let i = 0; i < c.regCount; i++) c.regs[i] = z;
+
+  function resetOne(state, idx) {
+    if (set.has('pc')) state.pc = state.pcInit;
+    if (set.has('regs')) {
+      for (let i = 0; i < c.regCount; i++) state.regs[i] = z;
+    }
+    if (set.has('halted')) {
+      state.halted = idx === 0 ? 0 : 1;
+      state.trapCause = 0;
+      state.divByZero = 0;
+    }
   }
+
+  if (cpuIsMulti(c)) {
+    for (let i = 0; i < c.coreCount; i++) resetOne(c.cores[i], i);
+    if (set.has('halted') || set.has('pc')) {
+      c.coresActive = 1;
+      c.rrIndex = 0;
+    }
+    if (set.has('sp') && c.spReg != null) {
+      for (let i = 0; i < c.coreCount; i++) {
+        cpuBindCoreForExec(c, i);
+        cpuInitSp(c);
+        cpuFlushCoreFromExec(c);
+      }
+      cpuBindCoreForExec(c, 0);
+    }
+    if (set.has('pc') || set.has('halted') || set.has('regs')) {
+      c.ie = 0;
+      c.irqPending = 0;
+    }
+    cpuBindCoreForExec(c, c.activeCore || 0);
+  } else {
+    if (set.has('pc')) c.pc = c.pcInit;
+    if (set.has('regs')) {
+      for (let i = 0; i < c.regCount; i++) c.regs[i] = z;
+    }
+    if (set.has('sp') && c.spReg != null && c.spReg >= 0 && c.spReg < c.regCount) {
+      cpuInitSp(c);
+    }
+    if (set.has('halted')) {
+      c.halted = 0;
+      c.trapCause = 0;
+      c.divByZero = 0;
+    }
+    if (set.has('pc') || set.has('halted') || set.has('regs')) {
+      c.ie = 0;
+      c.irqPending = 0;
+    }
+  }
+
   if (set.has('ram')) {
     for (let i = 0; i < c.ramLength; i++) cpuWriteRamCell(c, i, z);
-  }
-  if (set.has('sp') && c.spReg != null && c.spReg >= 0 && c.spReg < c.regCount) {
-    cpuInitSp(c);
-  }
-  if (set.has('halted')) {
-    c.halted = 0;
-    c.trapCause = 0;
-    c.divByZero = 0;
-  }
-  if (set.has('pc') || set.has('halted') || set.has('regs')) {
-    c.ie = 0;
-    c.irqPending = 0;
   }
 }
 
@@ -248,7 +540,12 @@ function cpuReadProgBytes(c, byteOff, byteLen) {
 }
 
 function cpuApplyAsmModule(c, asmModule) {
-  if (!c || !asmModule) {
+  if (!c) return;
+  if (cpuIsMulti(c)) {
+    cpuApplyAsmModuleToCore(c.cores[c.activeCore || 0], asmModule);
+    return;
+  }
+  if (!asmModule) {
     c.progEncoding = 'fixed';
     c.progCodeTable = null;
     return;
@@ -377,7 +674,8 @@ function cpuTryServeIrq(c) {
 
 function cpuTraceStep(c, ctx, instr) {
   if (!ctx || !c.traceMode || c.traceMode === 'off') return;
-  const line = `# step pc=${c.pc} instr=${instr} halted=${c.halted} ie=${c.ie}`;
+  const prefix = cpuIsMulti(c) ? `[c${c.activeCore}] ` : '';
+  const line = `# ${prefix}step pc=${c.pc} instr=${instr} halted=${c.halted} ie=${c.ie}`;
   c.traceBuffer.push(line);
   if (c.traceMode === 'output' && typeof ctx._cpuTraceOutput === 'function') {
     ctx._cpuTraceOutput(c, line);
@@ -685,11 +983,7 @@ function cpuStepLegacy(c, ctx, instr) {
   if (opc !== '0111' && opc !== '1110') c.pc = nextPc;
 }
 
-function cpuStep(id, ctx) {
-  const c = getCpu(id);
-  if (!c) return;
-  c._stepCtx = ctx || null;
-  if (c.halted) return;
+function cpuStepBody(c, ctx) {
   const instr = cpuFetchInstr(c);
   c.lastInstr = instr;
 
@@ -714,13 +1008,13 @@ function cpuStep(id, ctx) {
       if (opDef && opDef.microProgram && opDef.microProgram.length) {
         cpuRunMicroSequence(c, isaInst, opDef, decoded.fields);
         cpuTraceStep(c, ctx, instr);
-        if (!c.halted) cpuTryServeIrq(c);
+        if (!c.halted && (!cpuIsMulti(c) || c.activeCore === 0)) cpuTryServeIrq(c);
         return;
       }
       if (isaInst.asmSet && typeof isaInst.asmSet.executeInstruction === 'function') {
         isaInst.asmSet.executeInstruction(c, ctx, isaInst, decoded, instr, opDef);
         cpuTraceStep(c, ctx, instr);
-        if (!c.halted) cpuTryServeIrq(c);
+        if (!c.halted && (!cpuIsMulti(c) || c.activeCore === 0)) cpuTryServeIrq(c);
         return;
       }
     }
@@ -735,7 +1029,30 @@ function cpuStep(id, ctx) {
 
   cpuStepLegacy(c, ctx, instr);
   cpuTraceStep(c, ctx, instr);
-  if (!c.halted) cpuTryServeIrq(c);
+  if (!c.halted && (!cpuIsMulti(c) || c.activeCore === 0)) cpuTryServeIrq(c);
+}
+
+function cpuStep(id, ctx) {
+  const c = getCpu(id);
+  if (!c) return;
+  c._stepCtx = ctx || null;
+
+  if (cpuIsMulti(c)) {
+    const idx = cpuPickNextCore(c);
+    if (idx < 0) return;
+    cpuBindCoreForExec(c, idx);
+    if (c.halted) {
+      cpuFlushCoreFromExec(c);
+      return;
+    }
+    cpuStepBody(c, ctx);
+    cpuFlushCoreFromExec(c);
+    cpuBindCoreForExec(c, 0);
+    return;
+  }
+
+  if (c.halted) return;
+  cpuStepBody(c, ctx);
 }
 
 function cpuSetIrqPins(c, irqActive, irqVec) {
@@ -746,10 +1063,11 @@ function cpuSetIrqPins(c, irqActive, irqVec) {
 
 function cpuRun(id, maxSteps, ctx, shouldStall) {
   const c = getCpu(id);
-  if (!c || c.halted) return 0;
+  if (!c) return 0;
+  if (!cpuIsMulti(c) && c.halted) return 0;
   const limit = maxSteps != null ? maxSteps : c.maxSteps;
   let steps = 0;
-  while (!c.halted && steps < limit) {
+  while (cpuAnyRunnable(c) && steps < limit) {
     if (typeof shouldStall === 'function' && shouldStall()) break;
     cpuStep(id, ctx);
     steps += 1;
@@ -763,9 +1081,14 @@ function cpuInitSp(c) {
   cpuSetSpIndex(c, start);
 }
 
-function getCpuReg(id, r) {
+function getCpuReg(id, r, coreIdx) {
   const c = getCpu(id);
   if (!c || r < 0 || r >= c.regCount) return null;
+  if (cpuIsMulti(c)) {
+    const idx = coreIdx != null ? coreIdx : 0;
+    if (idx < 0 || idx >= c.coreCount) return null;
+    return c.cores[idx].regs[r];
+  }
   return c.regs[r];
 }
 
@@ -775,15 +1098,24 @@ function getCpuRam(id, adr) {
   return cpuReadRamCell(c, adr);
 }
 
-function getCpuProg(id, adr) {
+function getCpuProg(id, adr, coreIdx) {
   const c = getCpu(id);
-  if (!c || adr < 0 || adr >= c.progLength) return null;
+  if (!c) return null;
+  if (cpuIsMulti(c)) {
+    const idx = coreIdx != null ? coreIdx : (c.activeCore || 0);
+    const core = c.cores[idx];
+    if (!core || adr < 0 || adr >= core.progLength) return null;
+    if (core.progMemId && typeof getMem === 'function') return getMem(core.progMemId, adr);
+    return core.prog[adr];
+  }
+  if (adr < 0 || adr >= c.progLength) return null;
   return cpuReadProgCell(c, adr);
 }
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    addCpu, getCpu, loadCpuRam, loadCpuProg, cpuAfterProgReload, cpuResetFlags, cpuStep, cpuRun,
+    addCpu, getCpu, loadCpuRam, loadCpuProg, loadCpuCoreProg, cpuAfterProgReload, cpuResetFlags, cpuStep, cpuRun,
     getCpuReg, getCpuRam, getCpuProg, cpuReadProgCell, cpuWriteProgCell, splitBlob, cpuSetIrqPins,
+    cpuWakeCore, cpuParkCore, cpuParseActiveMask, cpuIsMulti, cpuCoreCount,
   };
 }

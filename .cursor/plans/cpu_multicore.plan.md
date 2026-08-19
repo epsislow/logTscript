@@ -4,22 +4,22 @@ overview: "Extindere `comp [cpu]` cu `cores: N` — N fire de execuție cu acela
 todos:
   - id: mc-spec
     content: "Decizii D-MC1…MC8 + sintaxă cores/prog/pcInit per core + coresActive wake"
-    status: pending
+    status: completed
   - id: mc-device
     content: "cpu-devices.js: structură cores[], round-robin cpuStepMulti, cpuRunMulti, reset per core"
-    status: pending
+    status: completed
   - id: mc-component
     content: "cpu.js: parse cores, evalGetProperty coreN:pc/r0, property wakeCore/coresActive, trace prefix [cN]"
-    status: pending
+    status: completed
   - id: mc-prog
     content: "Prog partajat + pcInit SAU prog nested per core (core0/core1…) — ambele în Faza A; wake obligatoriu pentru core1+"
-    status: pending
+    status: completed
   - id: mc-tests
     content: "Teste: boot core0, wake core1, producer/consumer RAM, round-robin trace, reset granular"
-    status: pending
+    status: completed
   - id: mc-doc
-    content: "doc/cpu.md secțiune multi-core + logts-play Load/Load & Run; _gen_doc_data.js"
-    status: pending
+    content: "doc/cpu-multicore.md + logts-play Load/Load & Run; _gen_doc_data.js"
+    status: completed
 isProject: false
 ---
 

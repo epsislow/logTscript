@@ -52,6 +52,34 @@ function cpuParseVectorBase(map) {
   return isNaN(n) ? null : n;
 }
 
+function cpuParsePcInitList(attr, coreCount) {
+  const out = [];
+  if (attr == null) {
+    for (let i = 0; i < coreCount; i++) out.push(0);
+    return out;
+  }
+  let parts;
+  if (Array.isArray(attr)) {
+    parts = attr.map(x => parseInt(x, 10));
+  } else {
+    parts = String(attr).split(/[\s,]+/).map(x => parseInt(x.trim(), 10));
+  }
+  for (let i = 0; i < coreCount; i++) {
+    const n = parts[i];
+    out.push(isNaN(n) ? 0 : n);
+  }
+  return out;
+}
+
+function cpuParseCoreCount(attributes) {
+  if (!attributes || attributes.cores === undefined) return 1;
+  const n = parseInt(attributes.cores, 10);
+  if (isNaN(n) || n < 1 || n > 8) {
+    throw Error(`CPU cores must be 1..8, got '${attributes.cores}'`);
+  }
+  return n;
+}
+
 var CpuComponent = class CpuComponent extends BuiltinComponent {
   static get type() { return 'cpu'; }
   static get shortnames() { return {}; }
@@ -62,7 +90,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       bindingAttrs: ['isa', 'clock', 'output', 'trace', 'prog', 'ram', 'mmap'],
       wireRefAttrs: ['wait'],
       nestedBlockAttrs: ['ram', 'prog', 'map'],
-      listAttrs: ['vectors'],
+      listAttrs: ['vectors', 'pcInit'],
     };
   }
 
@@ -190,15 +218,29 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     return null;
   }
 
-  _loadSpace(comp, space, blob, ctx) {
+  _loadSpace(comp, space, blob, ctx, coreIdx) {
     const id = this._cpuId(comp);
     const asmModule = space === 'prog' && ctx && ctx._pendingCpuAsmModule ? ctx._pendingCpuAsmModule : null;
-    if (space === 'prog' && typeof loadCpuProg === 'function') loadCpuProg(id, blob, asmModule);
-    else if (space === 'ram' && typeof loadCpuRam === 'function') loadCpuRam(id, blob, ctx);
+    if (space === 'prog' && coreIdx != null && typeof loadCpuCoreProg === 'function') {
+      loadCpuCoreProg(id, coreIdx, blob, asmModule);
+    } else if (space === 'prog' && typeof loadCpuProg === 'function') {
+      loadCpuProg(id, blob, asmModule);
+    } else if (space === 'ram' && typeof loadCpuRam === 'function') {
+      loadCpuRam(id, blob, ctx);
+    }
     if (space === 'prog') {
       if (ctx) ctx._pendingCpuAsmModule = null;
-      if (typeof cpuAfterProgReload === 'function') cpuAfterProgReload(id);
+      if (coreIdx == null && typeof cpuAfterProgReload === 'function') cpuAfterProgReload(id);
     }
+  }
+
+  _progHasPerCoreSections(progSection, coreCount) {
+    if (!progSection || coreCount <= 1) return false;
+    for (let i = 0; i < coreCount; i++) {
+      const ck = `core${i}`;
+      if (progSection[ck] && progSection[ck].initialValue != null) return true;
+    }
+    return false;
   }
 
   _resolveMemoryLayout(attributes, ctx) {
@@ -288,7 +330,8 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         { name: 'isa', value: '.asm' },
         { name: 'registers', value: 'integer' },
         { name: 'sp', value: 'integer' },
-        { name: 'pcInit', value: 'integer' },
+        { name: 'cores', value: 'integer' },
+        { name: 'pcInit', value: 'list' },
         { name: 'onReset', value: 'list' },
         { name: 'fetch', value: 'prog|ram' },
         { name: 'maxSteps', value: 'integer' },
@@ -324,7 +367,9 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
   }
 
   supportsPropertyName(property, attributes) {
-    if (['pc', 'halted', 'ie', 'irqPending', 'trapCause', 'divByZero', 'instr', 'ram:get', 'prog:get', 'trace:get'].includes(property)) return true;
+    if (['pc', 'halted', 'ie', 'irqPending', 'trapCause', 'divByZero', 'instr', 'ram:get', 'prog:get', 'trace:get',
+      'coresActive', 'wakeCore', 'parkCore'].includes(property)) return true;
+    if (/^core\d+:(pc|halted|r\d+|instr|prog:get)$/.test(property)) return true;
     if (/^r\d+$/.test(property)) {
       const n = parseInt(property.substring(1), 10);
       return n >= 0 && n < this._regCount(attributes);
@@ -334,8 +379,39 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
 
   getSupportedProperties() {
     return ['pc', 'halted', 'ie', 'irqPending', 'trapCause', 'divByZero', 'instr', 'ram:get', 'prog:get', 'trace:get',
+      'coresActive', 'wakeCore', 'parkCore',
       'set', 'run', 'reset', 'ramAdr', 'progAdr', 'irq', 'irqVec', 'wait',
       'resetPC', 'resetRAM', 'resetRegs', 'resetSP', 'resetHalted'];
+  }
+
+  _evalCoreScalar(comp, c, id, coreIdx, property, a) {
+    const core = c.cores[coreIdx];
+    if (!core) return null;
+    if (property === 'pc') {
+      const bw = cpuAddrBits(core.progLength);
+      const val = core.pc.toString(2).padStart(bw, '0');
+      return { value: val, ref: null, varName: `${a.var}:core${coreIdx}:pc`, bitWidth: bw };
+    }
+    if (property === 'halted') {
+      return { value: core.halted ? '1' : '0', ref: null, varName: `${a.var}:core${coreIdx}:halted`, bitWidth: 1 };
+    }
+    if (property === 'instr') {
+      return { value: core.lastInstr, ref: null, varName: `${a.var}:core${coreIdx}:instr`, bitWidth: core.progDepth };
+    }
+    if (property === 'prog:get') {
+      const adr = c.peekProgAdr;
+      let val = typeof getCpuProg === 'function' ? getCpuProg(id, adr, coreIdx) : null;
+      if (val == null) val = '0'.repeat(core.progDepth);
+      return { value: val, ref: null, varName: `${a.var}:core${coreIdx}:prog:get`, bitWidth: core.progDepth };
+    }
+    const rm = /^r(\d+)$/.exec(property);
+    if (rm) {
+      const ri = parseInt(rm[1], 10);
+      let val = typeof getCpuReg === 'function' ? getCpuReg(id, ri, coreIdx) : null;
+      if (val == null) val = '0'.repeat(c.regDepth);
+      return { value: val, ref: null, varName: `${a.var}:core${coreIdx}:${property}`, bitWidth: c.regDepth };
+    }
+    return null;
   }
 
   getRedirectProperties() {
@@ -364,7 +440,9 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       throw Error('CPU cannot use both vectors: and map.vectorBase');
     }
     const regCount = this._regCount(attributes);
-    const pcInit = attributes.pcInit !== undefined ? parseInt(attributes.pcInit, 10) : 0;
+    const coreCount = cpuParseCoreCount(attributes);
+    const pcInitList = cpuParsePcInitList(attributes.pcInit, coreCount);
+    const pcInit = pcInitList[0];
     const spReg = attributes.sp !== undefined ? parseInt(attributes.sp, 10) : null;
     const stackTop = map.stack !== undefined ? parseInt(map.stack, 10) : ram.length - 1;
     const fetchFrom = this._parseFetch(attributes);
@@ -407,9 +485,31 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       }
     }
 
+    const progSection = attributes.prog && typeof attributes.prog === 'object' ? attributes.prog : {};
+    const perCoreProg = this._progHasPerCoreSections(progSection, coreCount);
+    if (coreCount > 1 && perCoreProg && progSection.initialValue != null) {
+      throw Error('CPU prog: use either shared = … or core0:/core1: sections, not both');
+    }
+
+    let coreProgConfigs = null;
+    if (coreCount > 1) {
+      coreProgConfigs = [];
+      for (let i = 0; i < coreCount; i++) {
+        coreProgConfigs.push({
+          progDepth: prog.depth,
+          progLength: prog.length,
+          progMemId: progLink ? progLink.memId : null,
+          progReadonly: progLink ? progLink.readonly : true,
+        });
+      }
+    }
+
     if (typeof addCpu === 'function') {
       addCpu(baseId, {
         regCount,
+        coreCount,
+        pcInitList,
+        coreProgConfigs,
         ramDepth: ram.depth,
         ramLength: ram.length,
         progDepth: prog.depth,
@@ -423,7 +523,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
         traceMode,
         traceTerminalId,
         outputTerminalId,
-        progMemId: progLink ? progLink.memId : null,
+        progMemId: coreCount > 1 ? null : (progLink ? progLink.memId : null),
         ramMemId: ramLink ? ramLink.memId : null,
         mmapId: mmapLink ? mmapLink.mmapId : null,
         mmapRef: mmapLink ? mmapLink.compRef : null,
@@ -435,10 +535,41 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     }
 
     const ramInit = !ramLink && ram.initialValue != null ? this._resolveBlob(ram.initialValue, attributes, ctx) : null;
-    const progInit = !progLink && prog.initialValue != null ? this._resolveBlob(prog.initialValue, attributes, ctx) : null;
     if (ramInit) this._loadSpace({ deviceIds: [baseId] }, 'ram', ramInit, ctx);
-    if (progInit) this._loadSpace({ deviceIds: [baseId] }, 'prog', progInit, ctx);
-    else if (!progLink && typeof cpuAfterProgReload === 'function') cpuAfterProgReload(baseId);
+
+    if (coreCount > 1) {
+      if (perCoreProg) {
+        for (let i = 0; i < coreCount; i++) {
+          const ck = `core${i}`;
+          const sec = progSection[ck];
+          if (!sec || sec.initialValue == null) {
+            throw Error(`CPU cores:${coreCount} requires prog ${ck}: = …`);
+          }
+          const blob = this._resolveBlob(sec.initialValue, attributes, ctx);
+          if (blob != null) this._loadSpace({ deviceIds: [baseId] }, 'prog', blob, ctx, i);
+        }
+      } else if (!progLink && prog.initialValue != null) {
+        const blob = this._resolveBlob(prog.initialValue, attributes, ctx);
+        const asmModule = ctx && ctx._pendingCpuAsmModule ? ctx._pendingCpuAsmModule : null;
+        if (blob != null) {
+          for (let i = 0; i < coreCount; i++) {
+            if (typeof loadCpuCoreProg === 'function') {
+              loadCpuCoreProg(baseId, i, blob, asmModule);
+            } else {
+              this._loadSpace({ deviceIds: [baseId] }, 'prog', blob, ctx, i);
+            }
+          }
+          if (ctx) ctx._pendingCpuAsmModule = null;
+          if (typeof cpuAfterProgReload === 'function') cpuAfterProgReload(baseId);
+        }
+      } else if (!progLink && typeof cpuAfterProgReload === 'function') {
+        cpuAfterProgReload(baseId);
+      }
+    } else {
+      const progInit = !progLink && prog.initialValue != null ? this._resolveBlob(prog.initialValue, attributes, ctx) : null;
+      if (progInit) this._loadSpace({ deviceIds: [baseId] }, 'prog', progInit, ctx);
+      else if (!progLink && typeof cpuAfterProgReload === 'function') cpuAfterProgReload(baseId);
+    }
 
     const compInfo = {
       deviceIds: [baseId],
@@ -476,6 +607,7 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     else if (comp.ramMemRef) lines.push(`ram = ${comp.ramMemRef}`);
     else lines.push('ram: internal');
     lines.push(`registers: ${attrs.registers !== undefined ? attrs.registers : 4}`);
+    if (attrs.cores !== undefined) lines.push(`cores: ${attrs.cores}`);
     lines.push('');
     if (comp.isaConsts && Object.keys(comp.isaConsts).length) {
       lines.push('ISA consts:');
@@ -561,6 +693,26 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
       if (c) c.peekProgAdr = parseInt(v, 2);
     }
 
+    const cDev = typeof getCpu === 'function' ? getCpu(id) : null;
+    if (cDev && typeof cpuIsMulti === 'function' && cpuIsMulti(cDev)) {
+      if (pending.coresActive !== undefined) {
+        const v = this.reEvalPendingValue(pending, 'coresActive', reEvaluate, ctx);
+        if (typeof cpuParseActiveMask === 'function') {
+          cDev.coresActive = cpuParseActiveMask(v, cDev.coreCount);
+        }
+      }
+      if (pending.wakeCore !== undefined) {
+        const v = this.reEvalPendingValue(pending, 'wakeCore', reEvaluate, ctx);
+        const idx = parseInt(v, 10);
+        if (!isNaN(idx) && typeof cpuWakeCore === 'function') cpuWakeCore(cDev, idx);
+      }
+      if (pending.parkCore !== undefined) {
+        const v = this.reEvalPendingValue(pending, 'parkCore', reEvaluate, ctx);
+        const idx = parseInt(v, 10);
+        if (!isNaN(idx) && typeof cpuParkCore === 'function') cpuParkCore(cDev, idx);
+      }
+    }
+
     if (pending.set !== undefined && this._isActive(this.reEvalPendingValue(pending, 'set', reEvaluate, ctx))) {
       this._syncIrqPins(comp, pending, reEvaluate, ctx);
       if (!this._isWaitActive(comp, pending, reEvaluate, ctx) && typeof cpuStep === 'function') {
@@ -601,6 +753,19 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     const c = typeof getCpu === 'function' ? getCpu(id) : null;
     if (!c) return null;
 
+    const coreProp = /^core(\d+):(.+)$/.exec(property);
+    if (coreProp && typeof cpuIsMulti === 'function' && cpuIsMulti(c)) {
+      const coreIdx = parseInt(coreProp[1], 10);
+      return this._evalCoreScalar(comp, c, id, coreIdx, coreProp[2], a);
+    }
+
+    if (property === 'coresActive' && typeof cpuIsMulti === 'function' && cpuIsMulti(c)) {
+      const bw = Math.max(1, c.coreCount || 1);
+      const mask = c.coresActive != null ? c.coresActive : 1;
+      const val = mask.toString(2).padStart(bw, '0').slice(-bw);
+      return { value: val, ref: null, varName: `${a.var}:coresActive`, bitWidth: bw };
+    }
+
     if (property === 'pc') {
       const bw = cpuAddrBits(c.progLength);
       const val = c.pc.toString(2).padStart(bw, '0');
@@ -634,7 +799,8 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     }
     if (property === 'prog:get') {
       const adr = c.peekProgAdr;
-      let val = typeof getCpuProg === 'function' ? getCpuProg(id, adr) : null;
+      const coreIdx = (typeof cpuIsMulti === 'function' && cpuIsMulti(c)) ? 0 : undefined;
+      let val = typeof getCpuProg === 'function' ? getCpuProg(id, adr, coreIdx) : null;
       if (val == null) val = '0'.repeat(c.progDepth);
       return { value: val, ref: null, varName: `${a.var}:prog:get`, bitWidth: c.progDepth };
     }
@@ -645,7 +811,8 @@ var CpuComponent = class CpuComponent extends BuiltinComponent {
     const rm = /^r(\d+)$/.exec(property);
     if (rm) {
       const ri = parseInt(rm[1], 10);
-      let val = typeof getCpuReg === 'function' ? getCpuReg(id, ri) : null;
+      const coreIdx = (typeof cpuIsMulti === 'function' && cpuIsMulti(c)) ? 0 : undefined;
+      let val = typeof getCpuReg === 'function' ? getCpuReg(id, ri, coreIdx) : null;
       if (val == null) val = '0'.repeat(c.regDepth);
       return { value: val, ref: null, varName: `${a.var}:${property}`, bitWidth: c.regDepth };
     }

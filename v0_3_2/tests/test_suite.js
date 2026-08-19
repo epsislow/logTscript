@@ -35926,5 +35926,221 @@ dst: .byte 0, 0, 0, 0, 0`, { maxSteps: 12, progLen: 128 });
   reg(3310, 'asm-set', 'x86-32 movsb CPU single byte', runX86MovsbCpuTest);
   reg(3311, 'asm-set', 'x86-32 movsb CPU (wave)', runX86MovsbCpuTest, { propagation: 'wave' });
 
+  function x86MultiCpuShell(opts) {
+    opts = opts || {};
+    const cores = opts.cores != null ? opts.cores : 2;
+    const progLen = opts.progLen || 64;
+    const maxStepsLine = opts.maxSteps != null ? `  maxSteps: ${opts.maxSteps}\n` : '';
+    const pcInitLine = opts.pcInit != null ? `  pcInit: ${opts.pcInit}\n` : '';
+    const coresLine = cores !== 1 ? `  cores: ${cores}\n` : (opts.forceCoresLine ? `  cores: 1\n` : '');
+    let progBlock;
+    if (opts.perCore) {
+      progBlock = `  prog:
+    depth: 8
+    length: ${progLen}
+    core0:
+      = .x86 {
+        ${opts.core0}
+      }
+    core1:
+      = .x86 {
+        ${opts.core1}
+      }
+  :`;
+    } else {
+      progBlock = `  prog:
+    depth: 8
+    length: ${progLen}
+    = .x86 {
+      ${opts.prog}
+    }
+  :`;
+    }
+    return X86_CPU_ISA + `
+comp [cpu] .u:
+  isa: .x86
+${coresLine}  registers: 8
+  sp: 4
+  on: 1
+${maxStepsLine}${pcInitLine}  ram:
+    depth: 32
+    length: 16
+${opts.ramInit ? '    = ' + opts.ramInit + '\n' : ''}${progBlock}
+`;
+  }
+
+  function runMcCores1CompatTest(h, session) {
+    const src = x86MultiCpuShell({
+      cores: 1,
+      forceCoresLine: true,
+      maxSteps: 4,
+      progLen: 32,
+      prog: `mov eax, 10
+      mov ebx, 3
+      add eax, ebx
+      jmp halt
+    halt:
+      jmp halt`,
+    });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('cores:1 eax = 13', r0.value, '00000000000000000000000000001101');
+  }
+
+  reg(3400, 'cpu-multicore', 'cores:1 backward compat x86-32', runMcCores1CompatTest);
+  reg(3401, 'cpu-multicore', 'cores:1 compat (wave)', runMcCores1CompatTest, { propagation: 'wave' });
+
+  function runMcBootParkedTest(h, session) {
+    const src = x86MultiCpuShell({
+      maxSteps: 8,
+      perCore: true,
+      core0: `mov eax, 1
+      jmp halt
+    halt:
+      jmp halt`,
+      core1: `mov eax, 99
+      jmp halt
+    halt:
+      jmp halt`,
+    });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    const h1 = handler.evalGetProperty(comp, 'core1:halted', { var: '.u', property: 'core1:halted' }, interp);
+    const active = handler.evalGetProperty(comp, 'coresActive', { var: '.u', property: 'coresActive' }, interp);
+    h.assert('core1 halted at boot', h1.value, '1');
+    h.assert('coresActive = 01', active.value, '01');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    const r1 = handler.evalGetProperty(comp, 'core1:r0', { var: '.u', property: 'core1:r0' }, interp);
+    h.assert('core0 ran eax=1', r0.value, '00000000000000000000000000000001');
+    h.assert('core1 still parked', r1.value, '00000000000000000000000000000000');
+  }
+
+  reg(3402, 'cpu-multicore', 'boot core0 only core1 parked', runMcBootParkedTest);
+
+  function runMcWakeCoreTest(h, session) {
+    const src = x86MultiCpuShell({
+      maxSteps: 8,
+      perCore: true,
+      core0: `mov eax, 1
+      jmp halt
+    halt:
+      jmp halt`,
+      core1: `mov eax, 42
+      jmp halt
+    halt:
+      jmp halt`,
+    });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    session.execStmts(interp, '.u:{ coresActive = 011, wakeCore = 1, run = 1 }');
+    const r1 = handler.evalGetProperty(comp, 'core1:r0', { var: '.u', property: 'core1:r0' }, interp);
+    const h1 = handler.evalGetProperty(comp, 'core1:halted', { var: '.u', property: 'core1:halted' }, interp);
+    h.assert('core1 eax = 42 after wake', r1.value, '00000000000000000000000000101010');
+    h.assert('core1 not halted', h1.value, '0');
+  }
+
+  reg(3403, 'cpu-multicore', 'wakeCore enables core1 x86-32', runMcWakeCoreTest);
+  reg(3404, 'cpu-multicore', 'wakeCore (wave)', runMcWakeCoreTest, { propagation: 'wave' });
+
+  function runMcSharedRamTest(h, session) {
+    const src = x86MultiCpuShell({
+      maxSteps: 4,
+      perCore: true,
+      ramInit: '^00000005',
+      progLen: 32,
+      core0: `jmp halt
+    halt:
+      jmp halt`,
+      core1: `jmp halt
+    halt:
+      jmp halt`,
+    });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ ramAdr = 0, set = 1 }');
+    const ram0 = handler.evalGetProperty(comp, 'ram:get', { var: '.u', property: 'ram:get' }, interp);
+    h.assert('shared ram word0 = 5', ram0.value, '00000000000000000000000000000101');
+    session.execStmts(interp, '.u:{ coresActive = 011, wakeCore = 1, ramAdr = 0, set = 1 }');
+    const ram1 = handler.evalGetProperty(comp, 'ram:get', { var: '.u', property: 'ram:get' }, interp);
+    h.assert('same ram after wake core1', ram1.value, ram0.value);
+  }
+
+  reg(3405, 'cpu-multicore', 'shared RAM visible to all cores', runMcSharedRamTest);
+
+  function asmLabelPcInit(mod, name) {
+    if (!mod || mod.labels == null || mod.labels[name] == null) return 0;
+    const off = mod.labels[name];
+    const ins = (mod.instructions || []).find(x => x.kind === 'code' && x.byteOffset === off);
+    return ins && ins.index != null ? ins.index : 0;
+  }
+
+  function runMcSharedProgPcInitTest(h, session) {
+    const labelSrc = X86_CPU_ISA + `128wire p = .x86 {
+  mov eax, 1
+  jmp done
+worker:
+  mov eax, 77
+  jmp done
+done:
+  jmp done
+}`;
+    const { interp: i0 } = session.run(labelSrc);
+    const wire = i0.wires.get('p');
+    const mod = wire && wire.asmModuleId != null ? i0.asmModules.get(wire.asmModuleId) : null;
+    const workerPc = asmLabelPcInit(mod, 'worker');
+    const src = x86MultiCpuShell({
+      maxSteps: 10,
+      progLen: 64,
+      pcInit: `0, ${workerPc}`,
+      prog: `mov eax, 1
+      jmp done
+    worker:
+      mov eax, 77
+      jmp done
+    done:
+      jmp done`,
+    });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ run = 1 }');
+    const r0 = handler.evalGetProperty(comp, 'r0', { var: '.u', property: 'r0' }, interp);
+    h.assert('core0 eax=1', r0.value, '00000000000000000000000000000001');
+    session.execStmts(interp, '.u:{ coresActive = 011, wakeCore = 1, run = 1 }');
+    const r1 = handler.evalGetProperty(comp, 'core1:r0', { var: '.u', property: 'core1:r0' }, interp);
+    h.assert('core1 worker eax=77', r1.value, '00000000000000000000000001001101');
+  }
+
+  reg(3406, 'cpu-multicore', 'shared prog pcInit per core', runMcSharedProgPcInitTest);
+
+  function runMcParkCoreTest(h, session) {
+    const src = x86MultiCpuShell({
+      maxSteps: 20,
+      perCore: true,
+      core0: `loop0:
+      jmp loop0`,
+      core1: `loop1:
+      jmp loop1`,
+    });
+    const { interp } = session.run(src);
+    const handler = session._ensureRegistry().get('cpu');
+    const comp = interp.components.get('.u');
+    session.execStmts(interp, '.u:{ coresActive = 011, wakeCore = 1, parkCore = 1, set = 1 }');
+    const active = handler.evalGetProperty(comp, 'coresActive', { var: '.u', property: 'coresActive' }, interp);
+    const h1 = handler.evalGetProperty(comp, 'core1:halted', { var: '.u', property: 'core1:halted' }, interp);
+    h.assert('park clears bit1', active.value, '01');
+    h.assert('core1 halted after park', h1.value, '1');
+  }
+
+  reg(3407, 'cpu-multicore', 'parkCore clears active bit', runMcParkCoreTest);
+
   window.LogTScriptTestSuite.finalize();
 })();
