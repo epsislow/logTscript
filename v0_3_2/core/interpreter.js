@@ -9731,8 +9731,21 @@ if (this.isBuiltinDEMUX(name)) {
     this._probeInitialising = true;
     this.signalPropagationStrategy.initializeFromElaboration();
     this.startProc();
+    this._refreshLogicWaveRedirects();
     this._probeInitialising = false;
     this.clearNetworkSendDedup();
+  }
+
+  _refreshLogicWaveRedirects() {
+    if (!this.deferWirePropagation() || !this.componentRegistry) return;
+    const handler = this.componentRegistry.get('logic');
+    if (!handler || typeof handler._applyRedirects !== 'function') return;
+    for (const [compName, comp] of this.components) {
+      if (comp.type !== 'logic' || !comp.queryResults) continue;
+      const redirects = comp._logicRedirectProps;
+      if (!redirects || !redirects.length) continue;
+      handler._applyRedirects(comp, compName, redirects, this);
+    }
   }
 
   clearNetworkSendDedup() {
@@ -14228,7 +14241,8 @@ if (s.assignment) {
     }
 
     if (comp.type === 'logic') {
-      comp._logicRedirects = properties.filter((p) => p.property === 'logicQuery>' || p.property === 'pout>');
+      comp._logicRedirectProps = properties.filter((p) => p.property === 'logicQuery>' || p.property === 'pout>');
+      comp._logicRedirects = comp._logicRedirectProps;
     }
     
     // If reEvaluate is true, check if this block is a constant set=1 block with no dependencies

@@ -10,6 +10,10 @@ function logicWriteWire(wireName, value, width, ctx) {
   if (v.length < width) v = v.padStart(width, '0');
   else if (v.length > width) v = v.slice(-width);
   if (!ctx.wires.has(wireName)) throw Error(`Logic output wire '${wireName}' not found`);
+  if (typeof ctx.publishWireValue === 'function') {
+    ctx.publishWireValue(wireName, v);
+    return;
+  }
   ctx.writeWireStable(wireName, v);
   if (typeof ctx.updateConnectedComponents === 'function') {
     ctx.updateConnectedComponents(wireName, v);

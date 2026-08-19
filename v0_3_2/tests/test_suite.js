@@ -36215,6 +36215,30 @@ comp [logic] .characterLogic:
     h.assert('result=2', interp.getWireEffectiveValue('result'), '00000010');
   });
 
+  reg(3508, 'logic', 'comp [logic] integration modifier redirect (wave)', function(h, session) {
+    const src = INLINE_LOGIC_CHARACTER + `
+comp [logic] .characterLogic:
+    on: 1
+
+    .character {
+        X is number myX
+    }
+
+:
+
+8wire scoreIn = 00001111
+8wire result = 00000000
+1wire trigger = 1
+
+.characterLogic:{
+    myX = scoreIn
+    modifier:0 >= result
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('result=2', interp.getWireEffectiveValue('result'), '00000010');
+  }, { propagation: 'wave' });
+
   reg(3504, 'logic', 'comp [logic] johnOwns indexed redirect', function(h, session) {
     const src = INLINE_LOGIC_PEOPLE + `
 comp [logic] .peopleLogic:
