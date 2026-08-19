@@ -160,30 +160,30 @@ function resolveExpr(expr, localConsts, sharedConsts, depth = 0) {
   return null;
 }
 
-function braceDepthAt(code, index) {
+function buildBraceDepthAt(code) {
+  const depthAt = new Int32Array(code.length);
   let depth = 0;
-  let i = 0;
-  while (i < index) {
+  for (let i = 0; i < code.length; i++) {
+    depthAt[i] = depth;
     const quoted = readQuotedString(code, i);
     if (quoted) {
-      i = quoted.end;
+      i = quoted.end - 1;
       continue;
     }
     const c = code[i];
     if (c === '{') depth++;
     else if (c === '}') depth--;
-    i++;
   }
-  return depth;
+  return depthAt;
 }
 
 function extractConstExprs(code) {
   const exprs = new Map();
+  const depthAt = buildBraceDepthAt(code);
   const re = /const\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*/g;
   let m;
   while ((m = re.exec(code)) !== null) {
-    // Only file-level consts (inside the suite IIFE, not inside reg/test callbacks).
-    if (braceDepthAt(code, m.index) !== 1) continue;
+    if (depthAt[m.index] !== 1) continue;
     const name = m[1];
     const valueStart = m.index + m[0].length;
     const expr = readExpression(code, valueStart);
