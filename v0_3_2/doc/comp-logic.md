@@ -895,6 +895,67 @@ After **Load & Run**: **`where`** shows **`c2`**; **`failed = 0`**.
 
 ---
 
+## Constraint check — `.whLogic:check({ + / - })`
+
+Simulate a mutation transaction **read-only**: same ops syntax and constraint validator as **`logic { }`**, but the dynamic store is **not** modified and **`mutationFailed`** is **not** set.
+
+Invoke on **`comp [logic]`** only (not on inline instances):
+
+```logts
+1wire ok = .whLogic:check({
+    + inside(box2, text containerNameWire)
+})
+```
+
+| Result | Meaning |
+|--------|---------|
+| **`1`** | Proposed transaction would **commit** (constraints pass) |
+| **`0`** | Constraints would **fail** (same rollback rules as mutation) |
+| **Error** | Empty block **`check({ })`**, **non-ground** fact (Prolog variable), or **`data: static`** |
+
+**Wire refs** (`text w`, `number w`, `bool w`, bare atom id) resolve at eval time — identical to **`logic { }`**.
+
+```logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+16wire containerNameWire = "c2"
+1wire wouldPass = .whLogic:check({ + inside(box2, text containerNameWire) })
+1wire hasBox2 = 0
+1wire trigger = 1
+
+.whLogic:{
+    hasBox2 >= hasBox2
+    set = trigger
+}
+```
+
+After **Load & Run**: **`wouldPass = 1`**; **`hasBox2 = 0`** — the KB is unchanged until a real **`logic { }`** mutation runs.
+
+Constraint validation details → [logic-constraints.md — check](logic-constraints.md#constraint-check-simulation).
+
+---
+
 ## Multiple exec blocks
 
 Several property blocks may target the same component. Query result slots are **shared**; the **last successful** exec block wins (last-write-wins), matching other multi-block components.

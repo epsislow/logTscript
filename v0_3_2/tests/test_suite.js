@@ -39658,5 +39658,191 @@ comp [logic] .whLogic:
     h.assert('three query results wave', String(Object.keys(comp.queryResults || {}).length), '3');
   }, { propagation: 'wave' });
 
+  reg(3664, 'logic', 'check pass returns 1 without mutating (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire checkOk = .whLogic:check({ + inside(box2, c1) })
+1wire hasBox2 = 0
+1wire trigger = 1
+
+.whLogic:{
+    hasBox2 >= hasBox2
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('checkOk=1', interp.getWireEffectiveValue('checkOk'), '1');
+    h.assert('hasBox2 still 0', interp.getWireEffectiveValue('hasBox2'), '0');
+  });
+
+  reg(3665, 'logic', 'check pass returns 1 without mutating (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire checkOk = .whLogic:check({ + inside(box2, c1) })
+1wire hasBox2 = 0
+1wire trigger = 1
+
+.whLogic:{
+    hasBox2 >= hasBox2
+    set = trigger
+}`;
+    const { interp } = session.run(src);
+    h.assert('checkOk=1 wave', interp.getWireEffectiveValue('checkOk'), '1');
+    h.assert('hasBox2 still 0 wave', interp.getWireEffectiveValue('hasBox2'), '0');
+  }, { propagation: 'wave' });
+
+  reg(3666, 'logic', 'check constraint fail returns 0 (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire checkOk = .whLogic:check({ + inside(box3, ghost) })`;
+    const { interp } = session.run(src);
+    h.assert('checkOk=0', interp.getWireEffectiveValue('checkOk'), '0');
+  });
+
+  reg(3667, 'logic', 'check constraint fail returns 0 (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire checkOk = .whLogic:check({ + inside(box3, ghost) })`;
+    const { interp } = session.run(src);
+    h.assert('checkOk=0 wave', interp.getWireEffectiveValue('checkOk'), '0');
+  }, { propagation: 'wave' });
+
+  reg(3668, 'logic', 'check empty block throws (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire checkOk = .whLogic:check({ })`;
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    h.assert('empty check error', err && err.message.includes('requires at least one op') ? '1' : '0', '1');
+  });
+
+  reg(3669, 'logic', 'check empty block throws (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire checkOk = .whLogic:check({ })`;
+    h.assertThrows('empty check throws wave', function() {
+      session.run(src);
+    }, 'requires at least one op');
+  }, { propagation: 'wave' });
+
+  reg(3670, 'logic', 'check non-ground fact throws (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire checkOk = .whLogic:check({ + inside(box1, X) })`;
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    h.assert('non-ground check error', err && err.message.includes('non-ground fact') ? '1' : '0', '1');
+  });
+
+  reg(3671, 'logic', 'check non-ground fact throws (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire checkOk = .whLogic:check({ + inside(box1, X) })`;
+    h.assertThrows('non-ground check throws wave', function() {
+      session.run(src);
+    }, 'non-ground fact');
+  }, { propagation: 'wave' });
+
+  reg(3672, 'logic', 'data static forbids check (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: static
+    on: 1
+    .warehouse { }
+:
+
+1wire checkOk = .whLogic:check({ + inside(box2, c1) })`;
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    h.assert('static forbids check error', err && err.message.includes('data: static forbids') ? '1' : '0', '1');
+  });
+
+  reg(3673, 'logic', 'data static forbids check (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    data: static
+    on: 1
+    .warehouse { }
+:
+
+1wire checkOk = .whLogic:check({ + inside(box2, c1) })`;
+    h.assertThrows('static forbids check wave', function() {
+      session.run(src);
+    }, 'data: static forbids');
+  }, { propagation: 'wave' });
+
+  reg(3674, 'logic', 'check text wire ref resolves (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+16wire containerNameWire = "c2"
+1wire checkOk = .whLogic:check({ + inside(box2, text containerNameWire) })`;
+    const { interp } = session.run(src);
+    h.assert('checkOk=1 wire', interp.getWireEffectiveValue('checkOk'), '1');
+  });
+
+  reg(3675, 'logic', 'check text wire ref resolves (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+16wire containerNameWire = "c2"
+1wire checkOk = .whLogic:check({ + inside(box2, text containerNameWire) })`;
+    const { interp } = session.run(src);
+    h.assert('checkOk=1 wire wave', interp.getWireEffectiveValue('checkOk'), '1');
+  }, { propagation: 'wave' });
+
+  reg(3676, 'logic', 'inline check rejected (legacy)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+1wire checkOk = .warehouse:check({ + inside(box2, c1) })`;
+    session.run(src);
+    const err = session.interp && session.interp.lastReportedError;
+    h.assert('inline check error', err && err.message.includes('comp [logic]') ? '1' : '0', '1');
+  });
+
+  reg(3677, 'logic', 'inline check rejected (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_C + `
+1wire checkOk = .warehouse:check({ + inside(box2, c1) })`;
+    h.assertThrows('inline check rejected wave', function() {
+      session.run(src);
+    }, 'comp [logic]');
+  }, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

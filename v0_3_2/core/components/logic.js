@@ -851,6 +851,90 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     comp._logicQueryOpts = null;
   }
 
+  evalCheckInvoke(comp, compName, invoke, ctx) {
+    if (!comp || comp.type !== 'logic') {
+      throw Error(`${compName}:check requires comp [logic]`);
+    }
+    if (comp.dataMode === 'static') {
+      throw Error(`logic ${compName}: data: static forbids check({ })`);
+    }
+    const blockArg = invoke.args && invoke.args[0];
+    if (!blockArg || blockArg.kind !== 'logicMutationBlock' || blockArg.raw == null) {
+      throw Error(`${compName}:check({ }) requires a mutation block`);
+    }
+    const parseFn = typeof parseLogicMutationBlock === 'function' ? parseLogicMutationBlock : null;
+    const resolveFn = typeof logicResolveMerged === 'function' ? logicResolveMerged : null;
+    const simFn = typeof logicSimulateCheckTransaction === 'function'
+      ? logicSimulateCheckTransaction : null;
+    const buildFn = typeof logicBuildRuntimeClauses === 'function' ? logicBuildRuntimeClauses : null;
+    const groundFn = typeof logicTermIsGround === 'function' ? logicTermIsGround : null;
+    const formatOpFn = typeof logicFormatMutationOpForTrace === 'function'
+      ? logicFormatMutationOpForTrace : null;
+    if (!parseFn || !resolveFn || !simFn || !buildFn || !groundFn) {
+      throw Error('Logic engine is not loaded');
+    }
+
+    let parsed;
+    try {
+      parsed = parseFn(blockArg.raw);
+    } catch (err) {
+      const msg = err && err.message ? err.message : String(err);
+      throw Error(msg);
+    }
+    if (!parsed || !parsed.length) {
+      throw Error(`logic ${compName}: check({ }) requires at least one op`);
+    }
+
+    const ops = [];
+    for (const item of parsed) {
+      ops.push({
+        op: item.op,
+        head: this._resolveMutationTerm(item.head, ctx, compName),
+      });
+    }
+
+    for (const op of ops) {
+      if (!op || !op.head || !groundFn(op.head)) {
+        const bad = op && op.head && formatOpFn ? formatOpFn(op) : '?';
+        throw Error(`logic ${compName}: non-ground fact in ${bad}`);
+      }
+    }
+
+    const inst = ctx.inlineInstances.get(comp.programRef);
+    if (!inst) throw Error(`logic ${compName}: inline ${comp.programRef} not found`);
+    const merged = resolveFn(inst, ctx.inlineInstances);
+    if (!comp.dynamicStore) {
+      comp.dynamicStore = typeof logicCreateDynamicStore === 'function'
+        ? logicCreateDynamicStore() : { adds: new Map(), tombstones: new Set() };
+    }
+
+    const buildOpts = this._buildDataOpts(comp);
+    const execOpts = {};
+    if (comp.maxDepth != null) execOpts.maxDepth = comp.maxDepth;
+    if (comp.maxSolutions != null) execOpts.maxSolutions = comp.maxSolutions;
+    if (comp.indexFacts) {
+      const indexFn = typeof logicBuildFactIndex === 'function' ? logicBuildFactIndex : null;
+      if (indexFn && buildFn) {
+        const runtimeClauses = buildFn(merged.clauses, comp.dynamicStore, buildOpts);
+        execOpts.factIndex = indexFn(runtimeClauses);
+        execOpts.ruleClauses = comp.ruleClauses || merged.ruleClauses || [];
+      } else if (comp.factIndex) {
+        execOpts.factIndex = comp.factIndex;
+        execOpts.ruleClauses = comp.ruleClauses || [];
+      }
+    }
+
+    const result = simFn(
+      merged.clauses,
+      comp.dynamicStore,
+      ops,
+      merged.constraints || [],
+      { ...buildOpts, execOpts },
+    );
+    const pass = result && result.pass ? '1' : '0';
+    return { value: pass, ref: null, varName: `${compName}:check`, bitWidth: 1 };
+  }
+
   evalGetProperty(comp, property, a, ctx) {
     if (property === 'execCount') {
       const count = comp.execCount != null ? comp.execCount : 0;

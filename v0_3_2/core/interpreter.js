@@ -1922,7 +1922,19 @@ class Interpreter {
       }
     }
 
+    const comp = this.components.get(instName);
+    if (comp && comp.type === 'logic' && method === 'check') {
+      const handler = this.componentRegistry.get('logic');
+      if (!handler || typeof handler.evalCheckInvoke !== 'function') {
+        throw new Error('Logic check is not available');
+      }
+      return handler.evalCheckInvoke(comp, instName, invoke, this);
+    }
+
     const inlineInst = this.inlineInstances.get(instName);
+    if (inlineInst && inlineInst.kind === 'logic' && method === 'check') {
+      throw new Error(`${instName}:check is only available on comp [logic], not inline [logic]`);
+    }
     if (inlineInst && inlineInst.kind === 'logic' && method === 'query') {
       return this.evalLogicInlineQuery(invoke);
     }

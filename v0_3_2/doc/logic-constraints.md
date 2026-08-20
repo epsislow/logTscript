@@ -435,6 +435,44 @@ Queries always run on the **committed** KB (unchanged if rollback).
 
 ---
 
+## Constraint check simulation
+
+**`.whLogic:check({ + / - })`** on **`comp [logic]`** applies the **same** constraint rules as a mutation commit, without writing to the dynamic store.
+
+| Case | Outcome |
+|------|---------|
+| All **`+`** facts satisfy every matching **`constraint`** | Boolean **`1`** |
+| Any **`+`** fact fails a constraint body | Boolean **`0`** |
+| **`check({ })`** — no ops | **Error** |
+| **`+ inside(box1, X)`** — Prolog variable | **Error** (non-ground) |
+| **`data: static`** component | **Error** |
+
+**`-`** ops participate in the simulated KB overlay; only **`+`** facts are validated against constraints (same as mutation commit).
+
+```logts-play
+inline [logic] .warehouse:
+
+    object(box3)
+    container(c1)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = .whLogic:check({ + inside(box3, ghost) })
+```
+
+After **Load & Run**: **`ok = 0`** — **`ghost`** is not a declared **`container/1`** fact.
+
+---
+
 ## Wave and legacy
 
 Constraint and mutation results are intended to be **identical** under wave and legacy propagation. Automated tests cover both modes.

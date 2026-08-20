@@ -688,6 +688,19 @@ function logicSimulateMutationStore(store, ops, options) {
   return sim;
 }
 
+function logicSimulateCheckTransaction(staticClauses, store, ops, constraints, options) {
+  const opts = options || {};
+  const buildOpts = opts.dataMode ? { dataMode: opts.dataMode } : undefined;
+  const proposedStore = logicSimulateMutationStore(store, ops, buildOpts);
+  if (!proposedStore) return { pass: 0 };
+  const proposedClauses = logicBuildRuntimeClauses(staticClauses, proposedStore, buildOpts);
+  if (!constraints || !constraints.length) return { pass: 1 };
+  const deltaFacts = logicMutationDeltaPlusFacts(ops);
+  const execOpts = opts.execOpts || {};
+  const vResult = logicValidateConstraintsForFacts(constraints, proposedClauses, deltaFacts, execOpts);
+  return { pass: vResult.ok ? 1 : 0 };
+}
+
 function logicTermsEqualGround(a, b) {
   if (!a || !b) return false;
   if (a.kind !== b.kind) return false;
@@ -1188,6 +1201,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicApplyMutationTransaction = logicApplyMutationTransaction;
   globalThis.logicCloneDynamicStore = logicCloneDynamicStore;
   globalThis.logicSimulateMutationStore = logicSimulateMutationStore;
+  globalThis.logicSimulateCheckTransaction = logicSimulateCheckTransaction;
   globalThis.logicValidateStaticKnowledge = logicValidateStaticKnowledge;
   globalThis.logicValidateConstraintsForFacts = logicValidateConstraintsForFacts;
   globalThis.logicFormatFactForTrace = logicFormatFactForTrace;
@@ -1232,6 +1246,7 @@ if (typeof module !== 'undefined' && module.exports) {
     logicApplyMutationTransaction,
     logicCloneDynamicStore,
     logicSimulateMutationStore,
+    logicSimulateCheckTransaction,
     logicValidateStaticKnowledge,
     logicValidateConstraintsForFacts,
     logicFormatFactForTrace,

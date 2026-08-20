@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–18 complete.
+overview: Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–19 complete; Faza 20a (use as) ready-to-implement.
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed; D19 → Faza 18 (1+l)"
@@ -59,6 +59,12 @@ todos:
   - id: logic-explicit-query
     content: "Faza 18: query = … explicit (1+l) — D95–D99 confirmed, completed"
     status: completed
+  - id: logic-constraint-check
+    content: "Faza 19: constraint-as-query helper (1+u) — D100–D106 completed"
+    status: completed
+  - id: logic-use-as
+    content: "Faza 20a: use .mod as alias (prefixed import) — D107–D116 confirmed, ready-to-implement"
+    status: pending
 isProject: false
 ---
 
@@ -1211,6 +1217,9 @@ path(X, Z) <- edge(X, Y), path(Y, Z)
 | **Faza 16** Filter **Logic** Signal Trace (1+t) | D82–D85 | **(completed)** |
 | **Faza 17** `comp [logic] data:` static + seed (1+r) | D88–D94 | **(completed)** |
 | **Faza 18** `query = …` explicit (1+l) | D95–D99 | **(completed)** |
+| **Faza 19** constraint-as-query helper (1+u) | D100–D106 | **(completed)** |
+| **Faza 20a** `use .mod as alias` (prefixed import) | D107–D116 | **(ready-to-implement)** |
+| **Faza 20b** scope blocks nested `{ }` | — | **(deferred)** |
 
 ---
 
@@ -2928,7 +2937,7 @@ rollback — constraint inside/2 #2 failed on + inside(box3, "c1")
 
 **Expand L3 / `[+]`** (opțional F14): snippet body al constraint-ului eșuat.
 
-**Debug constraint ca query** — documentat ca **workflow manual** (nu F14); helper dedicat **backlog**.
+**Debug constraint ca query** — promovat **Faza 19** (`1+u`); vezi **D100–D106**.
 
 **Decizie:** **A**.
 
@@ -3596,7 +3605,370 @@ Exec block cu `query = audit` dar `modifier:0 >= result`:
 - [x] Per exec block (D98)
 - [x] Teste **3651–3663** legacy + wave; doc EN; suite verde (2825/2825)
 
-**Backlog (nu F18):** **1+p**, **1+s**, **1+o**, **1+u**, …
+**Backlog (nu F18):** **1+p**, **1+s**, **1+o**, …
+
+---
+
+## Decizii Faza 19 — constraint-as-query helper (D100–D106) **(1+u)**
+
+> **Sursă:** F12/F14 — constraints la init + commit; trace `rollback — constraint #K` (D72). **1+u** = helper scriptabil de debug, **nu** filter UI (D85), **nu** `mutationReason` (1+s).  
+> **Stare:** **D100–D106 implemented** — F19 **complete** (2026-08-20).
+
+### Rezumat decizii F19
+
+| ID | Decizie | Notă |
+|----|---------|------|
+| **D100** | **A** | Metodă pe **`comp [logic]`** — `.whLogic:check({ … })` |
+| **D101** | **A** | Simulare tranzacție `{ + / - }` pe KB curentă (D53) |
+| **D102** | **A** | Sintaxă **`check({ + fact, - fact })`** — același parser ca `logic { }` |
+| **D103** | **A** | Rezultat **boolean** 1/0 |
+| **D104** | **A** | **Separate** de **1+p** |
+| **D105** | **A** | **`data:`** comp-ului — același runtime KB ca solve; **`data: static` + ops** → **elaboration error** (ca D89 / `logic { }`) |
+| **D106** | **A** | Bloc **gol** → **error**; **non-ground** (variabile) → **error**; **wire refs** ca `logic { }` pe **comp** |
+
+### Problema
+
+| Azi | Limită |
+|-----|--------|
+| Mutare cu `logic { + / - }` | Eșec → `mutationFailed=1` + trace L2 — trebuie **commit trial** |
+| `.world:query({ … })` | Solve goals — **nu** validează constraints; KB **static** inline |
+| `query` pe comp | Citește soluții — **nu** răspunde „ar trece tranzacția X constraints?” |
+
+**Scop F19:** invoke **read-only** care rulează **aceeași validare** ca la mutation commit (D52–D54), pe **KB efectivă** a comp-ului, **fără** COMMIT / **fără** `mutationFailed`.
+
+---
+### D100 — Invoke pe **comp** vs **inline** **(confirmed: A — user 2026-08-20)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — comp `[logic]` (confirmed)** | `.whLogic:check({ … })` — vede **runtime KB** (overlay/seed/static per F17) |
+| **B — inline `.world:check`** | Doar KB static merged — **respins** |
+| **C — ambele** | Duplicare API — **respins** |
+
+**Decizie:** **A**.
+
+---
+
+### D101 — Ce validează **check** **(confirmed: A — user 2026-08-20)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — tranzacție simulată (recommended)** | Args `{ + fact, - fact, … }` → build **proposed KB** (D53) → `validateConstraintsForFacts` pe delta+ — **fără** apply store |
+| **B — un singur fact ground** | Doar `check({ inside(box2, c1) })` fără `-` — subset al A |
+| **C — scan KB completă** | „E legală starea **acum**?” — suprapune **1+p**, nu helper tranzacție |
+
+**Motiv A:** răspunde la „dacă aș face **acest** `logic { }`, trec constraints?” — workflow din D72 fără rollback real.
+
+**Decizie:** **A**.
+
+---
+
+### D102 — Sintaxă **(confirmed: A — user 2026-08-20)**
+
+Model: extinde pattern F9 **`inlineMethod`**, dar pe **GREF comp** (ca `getWire` / property), nu pe inline.
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — `check({ + / - })` (recommended)** | Paralel cu body `logic { }` — aceleași ops, același parser mutation |
+| **B — `checkConstraint(inside/2, …)`** | API per constraint declarat — prea rigid |
+| **C — `wouldMutate({ … })`** | Nume alternativ — prefer **`check`** (scurt, aliniat validare) |
+
+Sketch:
+
+```logts
+16wire containerNameWire = "c2"
+
+1wire ok = .whLogic:check({
+    + inside(box1, text containerNameWire)
+})
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    set = trigger
+}
+; ok=1 → mutația ar trece; ok=0 → aceleași constraints ca rollback
+```
+
+**Decizie:** **A**.
+
+---
+
+### D103 — Tip rezultat **(confirmed: A — user 2026-08-20)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — boolean (recommended)** | `1wire ok = .whLogic:check({ … })` — **1** pass, **0** fail constraint; bloc gol / non-ground → **error** |
+| **B — text cu mesaj `#K`** | `40wire msg = .whLogic:checkMsg({ … })` — duplică trace |
+| **C — structurat pe wire lat** | Prea greu pentru v1 |
+
+**Motiv A:** ca `.world:query` boolean; motiv eșec → Signal Trace / viitor **1+s** (`mutationReason`), nu F19.
+
+**Follow-up opțional (nu F19):** metodă **`checkDetail`** — doar dacă user cere explicit.
+
+**Decizie:** **A**.
+
+---
+
+### D104 — **1+p** vs **1+u** **(confirmed: A — user 2026-08-20)**
+
+| Item | Focus |
+|------|--------|
+| **1+u (F19)** | **Simulare** tranzacție `{ ± }` — „ar trece **dacă** aș muta?” |
+| **1+p (backlog)** | Validare **stare curentă** la query pass / flag opt-in — „**e** legal acum?” |
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — separate (recommended)** | F19 livrează **check**; **1+p** rămâne backlog distinct |
+| **B — merge în F19** | `check({})` fără ops = legalitate KB curentă — conflă cu D106 |
+
+**Decizie:** **A** — separate.
+
+---
+
+### D105 — **`data:` modes** **(confirmed: A — user 2026-08-20)**
+
+| Mode | **check** folosește |
+|------|---------------------|
+| **overlay** | static ∖ tombstones ∪ dynamic + ops simulate |
+| **seed** | dynamic + ops |
+| **static** | static clauses + ops **respins**? (static fără mutații) |
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — same runtime KB as solve (recommended)** | `logicBuildRuntimeClauses` + store simulate — identic mutation path |
+| **B — check ignoră data:** | Surpriză — **respins** |
+
+| **static** | **`check({ + / - })`** → **elaboration error** — **aceeași eroare** ca `logic { }` în exec (D89) |
+
+**Decizie:** **A** — `check` folosește **`data:`** declarat pe comp; overlay/seed ca la solve.
+
+---
+
+### D106 — Ops, ground, wire refs **(confirmed: A — rev. user 2026-08-20)**
+
+| Caz | Rezultat **`check`** |
+|-----|----------------------|
+| **`check({})` gol** — zero ops | **Error** — „check requires at least one op” (nu returna **1**) |
+| **`+ inside(box1, X)`** — variabilă Prolog | **Error** — non-ground fact (nu boolean **0**) |
+| **`+ inside(box2, text containerNameWire)`** | **OK** — wire ref; rezolvat la eval ca în `logic { }` → apoi validate |
+| **`+ inside(box2, ghost)`** + constraint fail | **`0`** — boolean fail (constraints), nu throw |
+| zero constraints în inline | **`1`** — pass trivial |
+
+#### Invoke pe **comp**, nu pe **inline**
+
+**D100:** API-ul e pe **`comp [logic]`**, **nu** `.world:check`:
+
+```logts
+; CORECT — vede runtime KB (overlay/seed)
+1wire ok = .whLogic:check({
+    + inside(box1, text containerNameWire)
+})
+
+; GREȘIT — .world e inline [logic]; query/check pe inline = static only (F9)
+; 1wire ok = .world:check({ ... })
+```
+
+**Wire refs** (`text w`, `number w`, `bool w`, bare id = atom): **identic** cu `logic { }` — la eval se citește wire-ul, fact devine **ground**, apoi rulează validarea constraints.
+
+#### Ce înseamnă **fact non-ground**
+
+Un fact **ground** = complet instanțiat, **fără variabile Prolog**:
+
+| Fact | Ground? |
+|------|---------|
+| `inside(box1, c1)` | **Da** |
+| `inside(box1, X)` | **Nu** — `X` variabilă → **Error** la `check` |
+| `inside(box1, text w)` | **Da** după resolve wire → ex. `inside(box1, "c2")` |
+
+**Non-ground ≠ wire ref.** Test **3562**: `logic { + inside(box1, X) }` → `mutationFailed=1`; la **`check`** același caz → **Error** (fail-fast la eval).
+
+**Decizie:** **A** — rev. user: bloc gol + non-ground = **error**; constraint fail = boolean **0**; wire refs pe **`.whLogic:check`**.
+
+---
+
+### Implementare F19
+
+| Layer | Fișier | Acțiune |
+|-------|--------|---------|
+| Parse | [`parser.js`](../v0_3_2/core/parser.js) | `.comp:check({ + / - })` — reuse mutation op parse |
+| Engine | [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | `logicSimulateCheckTransaction(compKB, ops, constraints, opts)` |
+| Runtime | [`logic.js`](../v0_3_2/core/components/logic.js) + [`interpreter.js`](../v0_3_2/core/interpreter.js) | `evalLogicCompCheck` — effective KB + simulate |
+| Teste | [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3664+** — pass/fail; fail=#K; static error; legacy+wave |
+| Doc | [`logic-constraints.md`](../v0_3_2/doc/logic-constraints.md), [`comp-logic.md`](../v0_3_2/doc/comp-logic.md) | secțiune **check** + `logts-play` |
+
+### Criterii done
+
+- [x] **D100–D106** confirmate + implementate
+- [x] **`.whLogic:check({ ± })`** — read-only; același validator ca commit
+- [x] Rezultat boolean la constraint fail; **error** la `{}` gol sau fact non-ground
+- [x] **Nu** modifică store; **nu** setează `mutationFailed`
+- [x] `data: static` + check cu ops → error (D105)
+- [x] Teste **3664–3677** — pass, fail **0**, empty→error, non-ground→error, wire ref, static error; legacy + wave; doc EN; suite verde (**2839/2839**)
+
+**Backlog (nu F19):** **1+p**, **1+s**, **1+o**, …
+
+---
+
+## Decizii Faza 20a — `use .mod as alias` (prefixed import) **(D107–D116)**
+
+> **Sursă:** organizare KB la scară mare — izolare la import fără merge plat; extinde F15.  
+> **Stare:** **D107–D116 confirmed** (user 2026-08-20) — F20a **(ready-to-implement)**.  
+> **F20b** (blocuri nested `a { b { } }`) — **amânat**.
+
+### Rezumat decizii F20a
+
+| ID | Decizie | Notă |
+|----|---------|------|
+| **D107** | **A** | Syntax **`use [once] .mod as alias`** — un singur keyword `use` |
+| **D108** | **A** | Prefix **predicate** (facts, rules, constraints importate); **nu** atomii argument |
+| **D109** | **A** | Rezolvă modul importat complet (inclusiv `use` interne), **apoi** prefix `alias.` la graniță |
+| **D110** | **A** | Referințe **`alias.predicate(args)`** — un nivel; necalificat = doar local |
+| **D111** | **A** | **O singură** importare per `.mod` per rezolvare — a doua linie nu adaugă alt prefix |
+| **D112** | **A** | Mix permis: `use .shared` (plat) + `use .veh as veh` (module diferite) |
+| **D113** | **A** | Alias lowercase atom; duplicate alias → error |
+| **D114** | **A** | Mutations / `check` / `.world:query` — aceleași predicate calificate |
+| **D115** | **A** | **`use once … as`** — skip F15; **nu** re-prefix cu al doilea alias (vezi D111) |
+| **D116** | **A** | **`use .mod`** fără `as` neschimbat; F20a opt-in; fără breaking |
+
+### D107 — Syntax **(confirmed: A — user 2026-08-20)**
+
+```logts
+use .vehicles as veh
+use once .vehicles as veh
+```
+
+| Form | Comportament |
+|------|--------------|
+| **`use .mod`** | Neschimbat (F15) — merge **plat** |
+| **`use .mod as alias`** | Import **cu prefix** — predicate importate devin **`alias.predicate/arity`** |
+| **`use once .mod as alias`** | F15 skip + prefix la primul merge |
+
+**Respinge:** keyword `import`; `use as alias .mod` (ordine inversă).
+
+---
+
+### D108 — Ce se prefixează **(confirmed: A — user 2026-08-20)**
+
+| Prefixat | Neprefixat |
+|----------|------------|
+| Predicate în facts / rules / constraints din modul importat (după D109) | Atomii din argumente (`box1`, `car`, `john`) |
+| Constraint head + body din import | **Queries** — rămân neimportate (ca F15) |
+
+```logts
+; .vehicles: wheeled(car)
+; .world:
+use .vehicles as veh
+query hasCar:
+    veh.wheeled(car)     ; OK
+; wheeled(car)           ; FAIL — nu există unprefixed din import
+```
+
+---
+
+### D109 — Momentul prefixării **(confirmed: A — user 2026-08-20)**
+
+1. **`logicResolveMerged(.vehicles)`** — rezolvare completă (inclusiv `use` / `use once` **interne**, merge plat ca F15).
+2. Prefix **`alias.`** pe **toate** clauzele + constraints rezultate.
+3. Concat la modulul curent. Clauze **proprii** — fără prefix.
+
+**Nu** se prefixează per-`use` în submodule — o singură graniță `as`.
+
+---
+
+### D111 + D115 — O modul, un prefix; `use once` + al doilea `as` **(confirmed — user 2026-08-20)**
+
+**Regulă:** per rezolvare, `.mod` contribuie **cel mult o dată** (F15 `merged`). Al doilea `use` / `use once` spre același `.mod` **nu** aplică un al doilea alias.
+
+| Linii | Rezultat |
+|-------|----------|
+| `use once .veh as v` apoi `use once .veh as w` | Primul: merge cu **`v.`**; al doilea: **skip** (F78) — **fără** `w.` |
+| `veh.wheeled(car)` / `v.car()` | **OK** (predicate prefixate `v.`) |
+| `w.car()` | **FAIL** — `w.*` nu există |
+| `use .veh as v` apoi `use .veh as w` (strict) | **Error** D80 — reuse strict |
+
+```logts
+inline [logic] .veh:
+    car(toyota)
+:
+
+inline [logic] .world:
+    use once .veh as v
+    use once .veh as w
+
+    query q1:
+        v.car(X)          ; OK
+
+    query q2:
+        w.car(X)          ; FAIL — w nu a fost prefixat
+:
+```
+
+**Strict vs once:** același `.mod` nu poate primi **două prefixe diferite**; `use once` face al doilea rând **silent skip**, nu re-import.
+
+---
+
+### D110 — Referințe calificate **(confirmed: A — implicit F20a)**
+
+- Syntax: **`alias.predicate(term, …)`** — parser extins (predicate cu dot sau pereche alias+pred).
+- **Un nivel** — `a.b.c.pred` amânat (F20b).
+- Necalificat = predicate **locale** modul curent.
+
+---
+
+### D112 — Mix plat + prefixed **(confirmed: A — implicit F20a)**
+
+```logts
+use .shared           ; plat — predicate globale
+use .vehicles as veh  ; izolat sub veh.*
+```
+
+Interzis: `use .vehicles` + `use .vehicles as veh` (a doua = reuse / conflict F15).
+
+---
+
+### D113 — Alias naming **(confirmed: A — implicit F20a)**
+
+- Alias = atom lowercase (`veh`, `wh`) — fără `.`.
+- Duplicate **`as veh`** în același modul → elaboration error.
+- Alias necunoscut în goal → elaboration / resolve error.
+
+---
+
+### D114 — Runtime **(confirmed: A — implicit F20a)**
+
+```logts
+logic { + veh.inside(box2, c1) }
+.whLogic:check({ + veh.inside(box2, text w) })
+1wire ok = .world:query({ veh.wheeled(X) })
+```
+
+---
+
+### D116 — Compatibilitate **(confirmed: A)**
+
+- **`use .mod`** fără `as` = comportament F15 neschimbat.
+- Inline/comp logic **pre-producție** — F20a opt-in.
+
+---
+
+### Implementare F20a (plan)
+
+| Layer | Fișier | Acțiune |
+|-------|--------|---------|
+| Parse | [`logic-assembler.js`](../v0_3_2/core/logic-assembler.js) | `use [once] .mod as alias`; `alias.predicate` în compound |
+| Merge | `logicResolveMerged` | branch `as` → resolve child → prefix predicates |
+| Engine | [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | predicate `veh.wheeled` în atom table (dacă e nevoie) |
+| Teste | [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3678+** — prefix OK, unprefixed fail, mix plat+as, use once double-as, mutations/check/query; legacy+wave |
+| Doc | [`inline-logic.md`](../v0_3_2/doc/inline-logic.md) | secțiune **`use … as`** + logts-play |
+
+### Criterii done F20a
+
+- [ ] **D107–D116** implementate
+- [ ] **`use .mod as alias`** — prefix la graniță; **`use .mod`** neschimbat
+- [ ] **`use once .mod as v`** + **`use once .mod as w`** → doar **`v.*`**
+- [ ] Teste **3678+** legacy + wave; doc EN; suite verde
+
+**Amânat (F20b):** blocuri nested `warehouse { … }`, path relativ în bloc.
 
 ---
 
@@ -3687,21 +4059,24 @@ Rezumat rapid — detaliu complet în [Backlog post-MVP](#backlog-post-mvp):
 |-------|------------|
 | Fazele 0–17 | **(completed)** |
 | **Faza 18** `query = …` explicit | **1+l** **(completed)** |
+| **Faza 19** constraint-as-query helper | **1+u** **(completed)** |
+| **Faza 20a** `use .mod as alias` | **(ready-to-implement)** — D107–D116 |
+| **Faza 20b** scope blocks | **(deferred)** |
 | **`use` / `use once`** | **Faza 15** **(completed)** |
 | Constraint `#K (line L)` trace | **1+v** **(pause)** |
 | POUT declarate comp | **1+k** |
 | Persistență KB | **1+o** |
 | Validare constraints la query | **1+p** |
-| Quoted atoms `'John'` | D8 post-MVP |
 | `mutationReason` text pout | **1+s** |
 
 ---
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 17~~ **(completed)**
-2. ~~**Faza 18**~~ — `query = …` explicit **(1+l)** — **(completed)**
-3. Apoi backlog: **1+p**, **1+s**, **1+o**, **1+u**, …
+1. ~~Faza 0~~ → ~~Faza 19~~ **(completed)**
+2. **Faza 20a** — **`use .mod as alias`** — D107–D116 **(ready-to-implement)**
+3. Apoi backlog: **1+p**, **1+s**, **1+o**, …
+4. **F20b** scope blocks — când e nevoie
 
 ---
 
@@ -3732,7 +4107,7 @@ Tabel master **1+a … 1+v**. **Stare:** ✅ promovat/livrat · ❌ respins · �
 | ✅ | ~~**1+…**~~ | Mutation Signal Trace | **Promovat → Faza 14** — `logic-mut` | D69–D76 |
 | ⏳ | **1+s** | `mutationReason` text pout | Motiv scriptabil pe wire; F14 livrează trace `logic-mut` | F14 |
 | ✅ | ~~**1+t**~~ | Filter **Logic** Signal Trace | **Promovat → Faza 16** — D82–D85 **(completed)** | F14, D82–D85 |
-| ⏳ | **1+u** | Constraint-as-query helper | Debug constraints ca query manual | F14 |
+| ✅ | ~~**1+u**~~ | **Constraint-as-query helper** | **Promovat → Faza 19** — D100–D106 **(ready-to-implement)** | F12, F14 |
 | ⏸ | **1+v** | Constraint trace `#K (line L)` | **Pause** — nu se promovează fază; D72-A (`#K`) e suficient acum | F14, D72-B |
 
 ### Note backlog — explicații
@@ -3782,6 +4157,10 @@ Filter toolbar **Logic** dedicat — **`logic-mut` exclusiv** (D82–D85): scoas
 #### ~~**1+l**~~ → **Faza 18**
 
 **Scope:** **`query = name, …`** subset; linie **`query none`** zero query-uri; **omit** = all. Decizii **D95–D99** — vezi **Faza 18**.
+
+#### ~~**1+u**~~ → **Faza 19**
+
+**Scope:** **`.whLogic:check({ + / - })`** — simulare read-only constraints (debug fără COMMIT). Decizii **D100–D106** — vezi **Faza 19**. Distinct de **1+p** (validare stare curentă la query).
 
 #### **1+v** ⏸ — pause
 

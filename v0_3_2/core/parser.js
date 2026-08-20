@@ -5187,7 +5187,11 @@ assignment() {
         this.eat('SYM', '(');
         this.t.skip();
         let callTags = null;
-        if (property === 'query' && this.c.type === 'SYM' && this.c.value === '{') {
+        if (property === 'check' && this.c.type === 'SYM' && this.c.value === '{') {
+          const bracePos = this.t.i - 1;
+          const raw = this.parseRawBraceBlock(bracePos);
+          methodArgs.push({ kind: 'logicMutationBlock', raw });
+        } else if (property === 'query' && this.c.type === 'SYM' && this.c.value === '{') {
           const bracePos = this.t.i - 1;
           const raw = this.parseRawBraceBlock(bracePos);
           methodArgs.push({ kind: 'logicGoalsBlock', raw });
