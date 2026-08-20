@@ -1,6 +1,6 @@
 ---
 name: inline logic engine
-overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–12 complete; Faza 13 (1+q) ready."
+overview: "Plan pentru `inline [logic]` + `comp [logic]` — Fazele 0–14 complete."
 todos:
   - id: logic-decisions
     content: "Decizii D1–D19 closed (D12: amânat 1+f; D19/1+l amânat)"
@@ -43,7 +43,10 @@ todos:
     status: completed
   - id: logic-scale-perf
     content: "Faza 13: scale & perf (1+q) — fact index, count/2, D60–D68 confirmed"
-    status: pending
+    status: completed
+  - id: logic-mut-trace
+    content: "Faza 14: logic-mut Signal Trace + doc/signal-trace.md — D69–D76 confirmed"
+    status: completed
 isProject: false
 ---
 
@@ -1242,7 +1245,8 @@ comp [logic] .whLogic:
 | **Faza 10** Result policies (1+b) | D34–D38 | **(completed)** — teste 3554–3558, doc logts-play |
 | **Faza 11** Runtime mutation (1+e) | D40–D49 | **(completed)** |
 | **Faza 12** Constraints | D50–D59 | **(completed)** |
-| **Faza 13** Scale & perf (1+q) | D60–D68 | **(ready-to-implement)** — D60–D68 confirmed |
+| **Faza 13** Scale & perf (1+q) | D60–D68 | **(completed)** |
+| **Faza 14** Mutation Signal Trace (`logic-mut`) | D69–D76 | **(ready-to-implement)** — D69–D76 confirmed |
 
 ---
 
@@ -1259,9 +1263,9 @@ comp [logic] .whLogic:
 | **6** | [`allow-notallow.md`](../v0_3_2/doc/allow-notallow.md), teste **3506–3507** |
 | **5** | F5 vector/matrix, **3512–3520**, pin limits, round-trip |
 | **7–10** | `\+` NAF, depth tuning, `.world:query`, `;unique`/ `;last` — teste **3536–3558** |
-| **11–13** | **F11–F12 completed**; **F13 ready** — scale/perf 1+q D60–D68 |
+| **11–14** | **F11–F13 completed**; **F14 ready** — logic-mut Signal Trace D69–D76 |
 
-**Teste:** 2720/2720 (2026-08-20, post-F10).
+**Teste:** 2768/2768 (post-F13).
 
 **Notă:** `logic-comp-bind.js` planificat separat → integrat în `logic-assembler.js` (`parseLogicProgramBlock`) + `components/logic.js`.
 
@@ -2541,7 +2545,7 @@ comp [logic] .whLogic:
 ## Decizii Faza 13 — scale & perf (1+q) (D60–D68)
 
 > **Sursă:** backlog **1+q** — index dynamic facts, aggregates constraints (ex-D57-C), optimizări D54.  
-> **Stare:** **D60–D68 confirmed** — F13 **(ready-to-implement)**.
+> **Stare:** **D60–D68 confirmed** — F13 **(completed)**.
 
 ### Rezumat decizii F13
 
@@ -2796,7 +2800,7 @@ comp [logic] .whLogic:
 
 ---
 
-## Faza 13 — scale & perf (1+q) **(ready-to-implement — D60–D68 confirmed)**
+## Faza 13 — scale & perf (1+q) **(completed — D60–D68)**
 
 **Scop:** index facts efective per `comp [logic]`; **`count(Goal, N)`** în engine; constraints capacity/uniqueness simplificate; perf merge/validate/query identic semantic.
 
@@ -2850,12 +2854,255 @@ inline [logic] .warehouse:
 ### Criterii done
 
 - [x] Decizii **D60–D68** confirmate
-- [ ] `indexFacts:` + `indexRebuild: full|delta`; delta idempotentă; **Error** la inconsistență (fără fallback full)
-- [ ] `count/2` în engine (constraint + rule + query)
-- [ ] Teste **3594+** legacy + wave; suite verde
-- [ ] Doc **logts-play** — capacity cu `count/2`
+- [x] `indexFacts:` + `indexRebuild: full|delta`; delta idempotentă; **Error** la inconsistență (fără fallback full)
+- [x] `count/2` în engine (constraint + rule + query)
+- [x] Teste **3594–3606** legacy + wave; suite verde (**2768**)
+- [x] Doc [`logic-indexing.md`](../v0_3_2/doc/logic-indexing.md) + updates logts-play
 
 **Rămâne backlog (nu F13):** **1+p** (validate at query); revalidare A2 globală (doar dacă D60-D); **1+r** independent.
+
+---
+
+## Decizii Faza 14 — mutation Signal Trace (`logic-mut`) (D69–D76)
+
+> **Sursă:** debug UX — `mutationFailed` e doar 1 bit; user vrea motiv + vizibilitate în **Signal Trace** (Win → Signal Trace).  
+> **Stare:** **D69–D76 confirmed** — F14 **(ready-to-implement)**.
+
+### Rezumat decizii F14
+
+| ID | Decizie | Notă |
+|----|---------|------|
+| **D69** | **A** | Linii **`logic-mut`** în Signal Trace (model `lut-mut` / `phz spawn`) — **nu** panel nou |
+| **D70** | **A** | **`try`** + **`commit`** / **`rollback`** — ambele outcome-uri trace-uite |
+| **D71** | **A** | **`commit (N ops, M net)`** — ca MySQL *affected rows*; **rollback fără ops/net** |
+| **D72** | **A** | Constraint fail: **`inside/2 #K`** — ordinal 1-based în inline (duplicate head) |
+| **D73** | **A** | **`try`** truncat (max **4** ops inline) + **`... (+N)`** + expand **`[+]`** |
+| **D74** | **A** | **`try`** afișează valori **rezolvate** (wire → literal), **fără** prefix `text`/`number` |
+| **D75** | **A** | **Zero** linii dacă exec block **fără** `logic { }` |
+| **D76** | **A** | Engine returnează **motiv structurat** (intern); `mutationFailed` **neschimbat** (1 bit) |
+
+---
+
+### D69 — Unde afișăm **(confirmed: A — Signal Trace)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — Signal Trace `logic-mut` (confirmed)** | `_emitWaveListen` / `emitWaveListenLine`; L2, filter **Components** |
+| **B — pout `mutationReason` text** | Scriptabil dar API extra — **amânat** (poate follow-up după F14) |
+| **C — Output `show()` buffer** | Ca CPU trace:get — respins ca MVP |
+
+**Prefix linie:** același ca restul panelului — **`[step N]`** (legacy) / **`[wave N]`** (wave).
+
+**Activare:** doar când **Signal Trace ON** + exec pass conține **`logic { }`**.
+
+**Decizie:** **A**.
+
+---
+
+### D70 — Ce trace-uit **(confirmed: A — try + outcome)**
+
+| Outcome | Linii |
+|---------|-------|
+| **Success** | `try { … }` apoi `commit (N ops, M net)` |
+| **Fail** | `try { … }` apoi `rollback — <code>: <message>` |
+| **Fără block** | *(nimic — D75)* |
+
+**Exemple confirmate:**
+
+```text
+[step 2] logic-mut .whLogic: try { + inside(box3, "c1") }
+[step 2] logic-mut .whLogic: rollback — constraint inside/2 #2 failed on + inside(box3, "c1")
+```
+
+```text
+[step 2] logic-mut .whLogic: try { - inside(box1, "c1"); + inside(box1, "c2") }
+[step 2] logic-mut .whLogic: commit (2 ops, 2 net)
+```
+
+**Decizie:** **A** — trace la **success și fail**.
+
+---
+
+### D71 — **`ops` vs `net` pe commit **(confirmed: A)**
+
+| Term | Semnificație |
+|------|--------------|
+| **`ops`** | Număr operații în tranzacție (lungime listă parse / collect) |
+| **`net`** | Operații care **nu** au fost no-op la apply (în ordine, aliniat cu store + idempotență F11/F13) |
+
+**Exemple:**
+
+| Tranzacție | ops | net | Linie commit |
+|------------|-----|-----|--------------|
+| `- a; - a; - a` (același key) | 3 | 1 | `commit (3 ops, 1 net)` |
+| `+ x; + x; + x` (același key) | 3 | 1 | `commit (3 ops, 1 net)` |
+| `- a; + b` (move) | 2 | 2 | `commit (2 ops, 2 net)` |
+| 3× retract key deja absent | 3 | 0 | `commit (3 ops, 0 net)` |
+
+**Rollback:** **nu** afișează `(ops, net)` — doar cod + mesaj.
+
+**Implementare net:** simulare apply pe copie store sau flag per op la apply — același contract ca delta idempotent.
+
+**Decizie:** **A**.
+
+---
+
+### D72 — Constraint fail — care constraint **(confirmed: A — ordinal `#K`)**
+
+Când există **mai multe** `constraint inside(O,C) <= …` (AND, head identic), trace indică **ordinal 1-based** în ordinea din **`inline [logic]`**:
+
+```text
+rollback — constraint inside/2 #2 failed on + inside(box3, "c1")
+```
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — `#K` ordinal inline (confirmed)** | Stabil, diferențiază duplicate head |
+| **B — line number la parse** | Follow-up opțional: `#2 (line 14)` |
+| **C — hash body** | Prea obscur pentru user |
+
+**Engine:** `logicValidateConstraintsForFacts` / `logicValidateFactConstraints` returnează `{ ok, code, fact, constraintIndex, constraintHead, failKind }` — folosit pentru trace; **`mutationFailed`** rămâne 0/1.
+
+**Expand L3 / `[+]`** (opțional F14): snippet body al constraint-ului eșuat.
+
+**Debug constraint ca query** — documentat ca **workflow manual** (nu F14); helper dedicat **backlog**.
+
+**Decizie:** **A**.
+
+---
+
+### D73 — Truncare `try` + expand **`[+]`** **(confirmed: A)**
+
+| Regulă | Valoare |
+|--------|---------|
+| Max ops inline în `try` | **4** |
+| Peste limită | `try { op1; op2; op3; op4; ... (+16) }` |
+| Expand panel | **`[+]`** — listă completă ops (ca PHZ) |
+
+Rollback/commit nu re-listează toate ops — rezumat + fact respins / mesaj.
+
+**Decizie:** **A**.
+
+---
+
+### D74 — Valori rezolvate în `try` **(confirmed: A — fără prefix tip)**
+
+După `_collectMutationOps`, facts sunt **ground**. Trace afișează **valoarea efectivă**, nu numele wire-ului:
+
+| Sursă mutation | Afișare |
+|----------------|---------|
+| atom `box3` | `box3` |
+| `text w` → `"warehouse"` | `"warehouse"` |
+| `number w` → 34 | `34` |
+| `bool w` → 1 | `1` |
+
+**Fără** prefix `text` / `number` / `bool` — tipul e evident din literal.
+
+```text
+try { + inside(box3, "c1") }
+try { + level(box1, 15) }
+```
+
+**Decizie:** **A**.
+
+---
+
+### D75 — Fără `logic { }` **(confirmed: A)**
+
+| Exec block | Trace |
+|------------|-------|
+| **Fără** `logic { }` | **Zero** linii `logic-mut` |
+| **Cu** `logic { }` (chiar gol) | `try` + outcome (edge: parse gol → fără try sau `try { }` minimal — implementare decide) |
+
+**Decizie:** **A** — nu poluăm trace când nu s-a încercat mutation.
+
+---
+
+### D76 — API intern motiv **(confirmed: A)**
+
+| Opțiune | Descriere |
+|---------|-----------|
+| **A — rezultat structurat intern (confirmed)** | `{ ok, code: 'parse'|'ground'|'constraint'|'store', message, … }` |
+| **B — schimbă `mutationFailed` în enum** | Breaking — respins |
+
+**Coduri rollback:**
+
+| Code | Mesaj exemplu |
+|------|----------------|
+| **`parse`** | `wire 'missingWire' not found` |
+| **`ground`** | `non-ground fact in + inside(X, c1)` |
+| **`constraint`** | `constraint inside/2 #2 failed on + inside(box3, "c1")` |
+| **`store`** | `apply transaction failed` (rar) |
+
+**Decizie:** **A** — fără breaking changes pe pout.
+
+---
+
+## Faza 14 — mutation Signal Trace (`logic-mut`) **(ready-to-implement — D69–D76 confirmed)**
+
+**Scop:** la fiecare pass cu `logic { + / - }`, Signal Trace arată **try**, apoi **commit (ops, net)** sau **rollback — motiv** (inclusiv constraint **`#K`**); valori wire rezolvate în `try`; wave = legacy. **Doc:** pagină dedicată [`signal-trace.md`](../v0_3_2/doc/signal-trace.md) (mutare din `debug.md` + secțiune **`logic-mut`**).
+
+### Fișiere țintă
+
+| Fișier | Modificări |
+|--------|------------|
+| [`logic.js`](../v0_3_2/core/components/logic.js) | `_applyMutations` → motiv structurat; emit `logic-mut` via strategy; format ops pentru trace |
+| [`logic-engine.js`](../v0_3_2/core/logic-engine.js) | validate return structurat; helper `logicFormatFactForTrace`; op **net** count |
+| [`signal-propagation.js`](../v0_3_2/core/signal-propagation.js) | kind **`logic-mut`** → filter Components (dacă nu mapează deja `component`) |
+| [`doc/signal-trace.md`](../v0_3_2/doc/signal-trace.md) | **pagină dedicată** — vezi [Documentație F14](#documentație-f14) |
+| [`doc/debug.md`](../v0_3_2/doc/debug.md) | mută secțiunea Signal Trace → stub scurt + link `signal-trace.md` |
+| [`doc/logic-runtime.md`](../v0_3_2/doc/logic-runtime.md) | link `signal-trace.md#logic-mut` |
+| [`doc/phz.md`](../v0_3_2/doc/phz.md), [`doc/sock.md`](../v0_3_2/doc/sock.md), [`doc/huffman-v2.md`](../v0_3_2/doc/huffman-v2.md) | cross-link → `signal-trace.md` (nu doar `debug.md`) |
+| [`ui/doc-viewer.js`](../v0_3_2/ui/doc-viewer.js) | intrare **Signal Trace (UI panel)** — searchPrimary L1 L2 L3 wave legacy lut-mut phz logic-mut |
+| [`test_suite.js`](../v0_3_2/tests/test_suite.js) | **3607+** (grup `wave-debug` / `logic`) |
+
+### Documentație F14
+
+**Livrabil:** [`doc/signal-trace.md`](../v0_3_2/doc/signal-trace.md) — pagină dedicată (nu secțiune îngropată în `debug.md`).
+
+| Acțiune | Detaliu |
+|---------|---------|
+| **Mutare** | Conținutul actual § Signal Trace din [`debug.md`](../v0_3_2/doc/debug.md) → `signal-trace.md` (controls, L1–L3, Fmt, Filter, wave/legacy, line catalog PHZ/lut-mut, value formatting) |
+| **Stub în debug.md** | 3–5 rânduri: ce e panelul, Win → Signal Trace, link **[signal-trace.md](signal-trace.md)** — păstrează anchor `#signal-trace-ui-panel` sau redirect text |
+| **Extindere logic** | Secțiune **`logic-mut`**: contract try / commit `(N ops, M net)` / rollback `#K`; truncare + `[+]`; valori rezolvate; zero linii fără `logic { }`; **logts-play** exemple success + constraint fail |
+| **vs alte tool-uri** | Tabel scurt: Signal Trace vs `probe` vs `watch` vs `show` (mutat/rezumat din debug) |
+| **Cross-linkuri** | `phz.md`, `sock.md`, `huffman-v2.md`, `logic-runtime.md`, `logic-indexing.md` → `signal-trace.md`; Wave debug patterns din debug rămân în debug cu link la signal-trace |
+| **doc-viewer** | Label + searchPrimary/Extra pentru discoverability |
+| **Regen** | `node node/_gen_doc_data.js` după fișiere doc |
+
+**Nu în F14 doc:** filter UI dedicat **Logic** (rămâne **Components**); `mutationReason` pout.
+
+### Contract linii (MVP)
+
+```text
+logic-mut .<comp>: try { <ops, max 4, valori rezolvate> [; ... (+N)] }
+logic-mut .<comp>: commit (<ops> ops, <net> net)
+logic-mut .<comp>: rollback — <code>: <message>
+```
+
+### Teste țintă (3607+)
+
+| ID | Titlu |
+|----|-------|
+| 3607 | success — `commit (2 ops, 2 net)` move; trace conține `try` + `commit` |
+| 3608 | fail constraint — rollback cu `inside/2 #2`; `mutationFailed=1` |
+| 3609 | `try` truncare 5+ ops + expand `[+]` (smoke UI sau parse trace payload) |
+| 3610 | wire `text`/`number` — valori rezolvate în `try` (`"c1"`, `15`) |
+| 3611 | triple `-` same key — `commit (3 ops, 1 net)` |
+| 3612 | exec fără `logic { }` — **zero** linii `logic-mut` |
+| 3613–3618 | perechi **wave** pentru 3607–3612 |
+
+### Criterii done
+
+- [ ] Decizii **D69–D76** confirmate *(done în plan)*
+- [ ] Linii `logic-mut` L2, Signal Trace ON, wave = legacy
+- [ ] `try` truncat + `[+]`; valori rezolvate fără prefix tip
+- [ ] `commit (N ops, M net)`; rollback cu `#K` la constraint
+- [ ] Fără `logic { }` → zero linii
+- [ ] Teste **3607+** legacy + wave; suite verde
+- [ ] Doc **[`signal-trace.md`](../v0_3_2/doc/signal-trace.md)** — pagină dedicată; mutare din debug.md; secțiune **`logic-mut`**; logts-play; cross-linkuri + doc-viewer
+
+**Backlog (nu F14):** `mutationReason` text pout; constraint-as-query helper; `#K (line L)` la parse; filter **Logic** dedicat în UI.
 
 ---
 
@@ -2955,7 +3202,8 @@ comp [logic] .peopleLogic:
 | Runtime mutation `logic { + / - }` | **Faza 11 (completed)** — D40–D49 |
 | `comp [logic] data:` copy/static/seed | **1+r** amânat |
 | Constraints `constraint P <= body` | **Faza 12 (completed)** — D50–D59 |
-| Scale / perf index + count (1+q) | **Faza 13 (ready-to-implement)** — D60–D68 confirmed |
+| Scale / perf index + count (1+q) | **Faza 13 (completed)** — D60–D68 |
+| Mutation Signal Trace `logic-mut` | **Faza 14 (ready-to-implement)** — D69–D76; doc [`signal-trace.md`](../v0_3_2/doc/signal-trace.md) |
 | `"atom"` vs wire prefix în mutation | **D59-A (completed)** |
 | `assert`/`retract` în reguli | **1+n** amânat |
 | Inline `.world:mutate` | **1+m** amânat, low priority |
@@ -2964,6 +3212,6 @@ comp [logic] .peopleLogic:
 
 ## Ordine recomandată
 
-1. ~~Faza 0~~ → ~~Faza 12~~ **(completed)**
-2. **Faza 13 (1+q)** — **D60–D68 confirmed** → index facts + `count/2`
-3. Backlog: **1+r**, **1+l**, **1+k**, **1+i**, **1+m**, **1+n**, **1+o**, **1+p**
+1. ~~Faza 0~~ → ~~Faza 13~~ **(completed)**
+2. **Faza 14** — **D69–D76 confirmed** → `logic-mut` Signal Trace + doc **`signal-trace.md`**
+3. Backlog: **1+r**, **1+l**, **1+k**, **1+i**, **1+m**, **1+n**, **1+o**, **1+p**, `mutationReason` pout

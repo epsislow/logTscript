@@ -1,7 +1,7 @@
 /**
  * AUTO-GENERATED — do not edit.
  * Regenerate: node node/_gen_doc_data.js
- * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-constraints.md, logic-indexing.md, logic-query-exec.md, logic-runtime.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
+ * Files: 14seg.md, adder.md, allow-notallow.md, alu.md, arithmetic.md, asm-composition.md, asm-microcode.md, asm-set-arm-a32.md, asm-set-arm-thumb.md, asm-set-generic.md, asm-set-riscv32.md, asm-set-variable8.md, asm-set-x86-32.md, asm.md, assignment-operators.md, board.md, boolean-analysis.md, boolean-lut.md, builtin-ABS.md, builtin-ADD.md, builtin-ARGMAX.md, builtin-ARGMIN.md, builtin-bit-analysis-functions.md, builtin-bit-selection-functions.md, builtin-bit-transform-functions.md, builtin-CLAMP.md, builtin-DIAG.md, builtin-DIVIDE.md, builtin-DOT.md, builtin-EQ.md, builtin-EQT.md, builtin-FILL.md, builtin-FLIPLR.md, builtin-FLIPUD.md, builtin-functions.md, builtin-GT.md, builtin-IDENTITY.md, builtin-IOTA.md, builtin-L2.md, builtin-logic-gate-functions.md, builtin-LROTATE.md, builtin-LSHIFT.md, builtin-LT.md, builtin-MAC.md, builtin-MAX.md, builtin-MCAT.md, builtin-MIN.md, builtin-MSLICE.md, builtin-MULTIPLY.md, builtin-NFORMAT.md, builtin-NORM.md, builtin-OUTER.md, builtin-PARITYEVEN.md, builtin-RANK.md, builtin-REPEAT.md, builtin-REVERSE.md, builtin-routing-functions.md, builtin-RROTATE.md, builtin-RSHIFT.md, builtin-sequential-functions.md, builtin-SHAPE.md, builtin-SORT.md, builtin-SUBTRACT.md, builtin-SUM.md, builtin-tagged-index.md, builtin-TRACE.md, builtin-TRIL.md, builtin-TRIMT.md, builtin-TRIU.md, builtin-ZEROS.md, cache.md, chip-board-execution.md, chip.md, clcd-symbols.md, clcd.md, comp-logic.md, component-color-attributes.md, components.md, conditional-assignment.md, counter.md, cpu-multicore.md, cpu.md, debug.md, dip.md, divider.md, dma.md, doc-function.md, doc-viewer.md, dots.md, editorUI.md, future-component-ideas.md, huffman-v2.md, huffman.md, inline-logic.md, interactive-components.md, ioport.md, json-subset.md, key.md, keyboard.md, lcd.md, led-bar.md, led.md, logic-constraints.md, logic-indexing.md, logic-query-exec.md, logic-runtime.md, loop.md, lut.md, matrix-reduction.md, mem.md, meta-constants.md, mini-cpu-plan.md, mini-cpu-v2.md, mini-cpu.md, mmap.md, modes.md, motor.md, multiplier.md, network-chat.md, network-traffic-panel.md, network.md, number-conversion.md, oscillator.md, pcb.md, phz.md, plc-language.md, plc.md, pocket-calc.md, protocol-assemble.md, protocol-lut.md, protocol-parse.md, protocol-repeat.md, protocol-tentative.md, protocol.md, queue.md, reg.md, rotary.md, scanner.md, schema-field-arrays.md, schema-frame-padding.md, schema-variable-arrays.md, schema-variable-matrix.md, semantic-schemas.md, sensor.md, servo.md, seven-seg.md, shifter.md, short-notation.md, signal-propagation.md, signal-trace.md, slider.md, sock.md, stack.md, subtract.md, switch.md, terminal.md, text-functions.md, user-functions.md, vector-reduction.md, wire-literals.md, wire-vectors.md, zstate.md
  */
 (function () {
   'use strict';
@@ -14498,59 +14498,11 @@ After **RUN**, toggle \`.s1\` in the panel — **\`probe\`** logs each change wi
 
 ## Signal Trace (UI panel)
 
-Signal propagation trace — **separate panel**, not Output. Open from **Win ▾ → Signal Trace** (formerly Wave Listen).
+Signal propagation trace lives in a **separate panel** (not Output). Open from **Win ▾ → Signal Trace**.
 
-| Control | Role |
-|---------|------|
-| **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
-| **L1 / L2 / L3** | Trace verbosity (\`debugLevel\` on propagation engine) |
-| **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / u8 / q4p4 / fp16 / bf16 / ascii / auto (dropdown, persisted) |
-| **Filter ▾** | All / Wires / Components / Internals / PHZ (persisted as \`prog/signalTraceFilter\`) |
-| **Clear** | Clears panel history (no auto-clear on Run) |
-| **Tracing…** badge | Internal trace active while script runs (distinct from ON/OFF) |
+Full reference — controls, line catalog, value formatting, **\`logic-mut\`** for \`comp [logic]\` mutations, and runnable examples: **[signal-trace.md](signal-trace.md)**.
 
-**Trace** is runtime-only: ON at Run start (if armed), stays ON after Run complete when armed (interactive key/switch updates). OFF at Stop or when disarmed.
-
-Example trace — **Wave** (level 1):
-
-\`\`\`text
-[wave 0] RUN init → recompute all wires
-[wave 1] commit packetEncoded = ^4808…
-[wave 1] lut-mut .huff:clear → re-exec st(1062:asg) packetEncoded := …
-* script stopped trace is OFF
-\`\`\`
-
-Example trace — **Legacy** (level 1):
-
-\`\`\`text
-* Run start (legacy cascade) — trace is ON
-[step 1] commit a = ^3
-[step 2] commit b = ^3
-lut-mut .huff:clear → re-exec st(5:asg) packetEncoded := …
-* Run complete — trace stays ON (interactive updates)
-\`\`\`
-
-Legacy uses **\`[step N]\`** prefix (immediate cascade) instead of **\`[wave N]\`**. Level 2 adds \`exec\` on cascade re-eval; level 3 adds \`eval\` (wire values computed before commit).
-
-### Component & internal lines (L2–L3)
-
-| Line kind | Example | Level | Filter |
-|-----------|---------|-------|--------|
-| **commit component** | \`[step 2] commit component .s = ^101\` | L2 | Components |
-| **prop** | \`[step 2] prop .s.data = ^101\` | L2 | Components |
-| **connect** | \`[step 2] connect .alu:get → result\` | L2 | Components |
-| **exec block** | \`[step 3] exec block .cnt.on:raise\` | L3 | Internals |
-| **state** | \`[step 3] state mem1[0] = ^0101\` | L3 | Internals |
-| **phz** | \`[step 2] phz spawn phz[obj] id=\\1 floor=\\0 → .room:inside (count 1)\` | L2 (+ attrs \`[+]\` at L3) | PHZ |
-| **lut-mut** | \`lut-mut .huff:clear → re-exec …\` | L1 | Wires + Components |
-
-**Filter** (toolbar): **All** shows everything; **Wires** — wire commit/exec/eval, init, flush, schedule, lut-mut; **Components** — commit component, prop, connect, lut-mut; **Internals** — eval L3, block exec, state/mem, schedule (wave L3); **PHZ** — spawn / move / remove ownership events.
-
-PHZ lines (L2+): spawn shows \`id\` + \`floor\` inline; other attributes appear under **\`[+]\`** at L3. Move/remove list type + id and destination — named \`.cont:coll\`, or \`phz.[bin < cont]:inside id=\\N (count N)\` when the owning container is anonymous (e.g. after \`to = .belt:start:0:inside\`). See [phz.md](phz.md).
-
-**Value formatting:** dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / u8 / q4p4 / fp16 / bf16 / ascii / auto**. Formatele numerice grupează pe lățimea fixă (8 sau 16 bit). **oct**, **b32hex**, **b32c** produc literali \`o^…\`, \`x^…\`, \`xc^…\` (roundtrip ca la hex). **ascii** afișează ca \`show(…; ascii)\` — \`"Hello"\` sau \`\\72 \\101 …;ascii\`. Suffix **\`(Nbits)\`** la afișare. **\`[cpy]\`** — literal script: **bin** = biți continui; **hex** = \`^…\` fără spații; **oct/b32hex/b32c** = \`o^…\` / \`x^…\` / \`xc^…\` fără spații; **dec/s8/…** = cu \`;format\`; **ascii** = \`"abc"\` pentru text printabil, \`"abc" + \\2 + "zz"\` dacă mix, \`\\65 \\66;ascii\` dacă doar \`\\N\` (2+ cu \`;ascii\`). X/Z → fallback hex la copy.
-
-See [Wave debug patterns](#wave-debug-patterns) and [huffman-v2.md](huffman-v2.md) (SC round-trip).
+For wave/legacy debug workflows (\`peek\`, \`deps\`, Huffman SC), see [Wave debug patterns](#wave-debug-patterns) below.
 
 ---
 
@@ -14575,7 +14527,7 @@ deps(source + codebook) # ad-hoc expr — upstream only
 deps(.huff)             # stmts re-exec on LUT mutation
 \`\`\`
 
-Works in **wave and legacy** (static elaboration index). For Huffman SC debugging, use with [Signal Trace](#signal-trace-ui-panel) — see [wave-debug patterns](#wave-debug-patterns).
+Works in **wave and legacy** (static elaboration index). For Huffman SC debugging, use with [Signal Trace](signal-trace.md) — see [wave-debug patterns](#wave-debug-patterns).
 
 ---
 
@@ -14589,7 +14541,7 @@ Works in **wave and legacy** (static elaboration index). For Huffman SC debuggin
 | **\`probe(.huff:size())\`** | Witness LUT mutations |
 | **\`watch(ph.*)\`** | FSM + multi-step protocol |
 | **\`deps(wire)\`** | Before Run — see \`.huff\` / protocol links |
-| **Signal Trace ON** | During Run — commits and LUT re-eval (wave or legacy) |
+| **Signal Trace ON** | During Run — commits and LUT re-eval (wave or legacy); see [signal-trace.md](signal-trace.md) |
 
 Huffman SC round-trip: [huffman-v2.md — Load & Run](huffman-v2.md).
 
@@ -19499,7 +19451,7 @@ huffSz (8wire) = 00000011 (ref: &5)
 
 **\`peek\` vs \`show\`:** \`peek(expr)\` citește valoarea **fix în acel moment** (înainte de propagation ulterioară). \`show(expr)\` rulează după ce se termină propagation — deci \`show(packetEncoded)\` *după* \`.huff:clear()\` poate afișa un packet corupt (\`… + 000\` în loc de \`… + 111\`), pentru că \`.huffPacketSC\` depinde de \`expand(..., .huff)\` și LUT-ul e gol. Folosește \`peek\` pentru encode + snapshot, \`show\` doar pe rezultatele finale care nu depind de \`.huff\`.
 
-**Wave debug:** \`deps(packetEncoded)\` arată legătura cu \`.huff\` / \`.huffPacketSC\`; **Wave Listen** (Win ▾) arată re-eval după \`:clear()\` — vezi [debug.md — wave-debug patterns](debug.md#wave-debug-patterns).
+**Wave debug:** \`deps(packetEncoded)\` shows links to \`.huff\` / \`.huffPacketSC\`; **Signal Trace** (Win ▾, L2+) shows re-eval after \`:clear()\` — see [signal-trace.md](signal-trace.md) and [debug.md — wave-debug patterns](debug.md#wave-debug-patterns).
 
 ### Policy
 
@@ -19562,6 +19514,7 @@ See [protocol-parse.md](protocol-parse.md) — Faza 0a–0d (\`mode: parse\`, \`
 - [assignment-operators.md](assignment-operators.md) — \`=:\` padding
 - [wire-literals.md](wire-literals.md) — \`'Hello World!'\` wire strings, \`show(w; ascii)\`
 - [debug.md](debug.md) — \`show(…; ascii)\` display tags
+- [signal-trace.md](signal-trace.md) — Signal Trace panel (wave / legacy)
 `,
     'huffman.md': `# Huffman coding walkthrough
 
@@ -23390,6 +23343,8 @@ Mutations run **before** queries in the same pass, so redirects can observe upda
 ---
 
 ## \`mutationFailed\` pout
+
+When a mutation fails, the component sets **\`mutationFailed = 1\`** and leaves the dynamic store unchanged. For a human-readable reason (constraint ordinal, parse error, resolved ops), arm **Signal Trace** at **L2** — see [signal-trace.md — logic-mut](signal-trace.md#logic-mut).
 
 | Value | Meaning |
 |-------|---------|
@@ -30614,7 +30569,7 @@ When \`moveReady\` becomes \`1\`, the engine executes the property block and cre
 
 Conveyors / elevators remain **user** types (e.g. \`phz +[conveyor < cont]:\`), not built-in PHZ kinds. Pair them with [\`motor.md\`](motor.md) \`maxDistance\` / \`:distance\` / \`:laps\`, or with [\`servo.md\`](servo.md) for positional travel — see [Example: Elevator](#example-elevator).
 
-**Signal Trace:** with the panel armed (L2+), PHZ emits \`phz spawn\` / \`phz move\` / \`phz remove\` lines (filter **PHZ**). Spawn shows \`id\` + \`floor\` inline; other attributes expand under **\`[+]\`** at L3. See [debug.md](debug.md).
+**Signal Trace:** with the panel armed (L2+), PHZ emits \`phz spawn\` / \`phz move\` / \`phz remove\` lines (filter **PHZ**). Spawn shows \`id\` + \`floor\` inline; other attributes expand under **\`[+]\`** at L3. See [signal-trace.md](signal-trace.md).
 
 ---
 
@@ -40463,6 +40418,226 @@ See chip tests **540–543** (legacy) and **556–557** (wave) in the test runne
 - [Oscillator](oscillator.md) — real-time \`osc\` and wire connections
 - [LED](led.md) — displays driven by wires and components
 `,
+    'signal-trace.md': `# Signal Trace (UI panel)
+
+Signal propagation trace — **separate panel**, not Output. Open from **Win ▾ → Signal Trace** (formerly Wave Listen).
+
+Related: [debug.md](debug.md) (show / peek / probe / watch), [logic-runtime.md](logic-runtime.md) (logic mutations), [phz.md](phz.md) (PHZ ownership lines), [huffman-v2.md](huffman-v2.md) (SC round-trip debugging).
+
+In the **documentation viewer**, \`logts-play\` blocks support **Load** and **Load & Run** (\`on: 1\` on the component). Arm **Signal Trace ON** and set **L2** before Run to see mutation lines.
+
+---
+
+## Controls
+
+| Control | Role |
+|---------|------|
+| **ON / OFF** | Arms the panel for the next **Run** (persists across runs) |
+| **L1 / L2 / L3** | Trace verbosity (\`debugLevel\` on propagation engine) |
+| **Fmt ▾** | hex / oct / b32hex / b32c / bin / dec / s8 / u8 / q4p4 / fp16 / bf16 / ascii / auto (dropdown, persisted) |
+| **Filter ▾** | All / Wires / Components / Internals / PHZ (persisted as \`prog/signalTraceFilter\`) |
+| **Clear** | Clears panel history (no auto-clear on Run) |
+| **Tracing…** badge | Internal trace active while script runs (distinct from ON/OFF) |
+
+**Trace** is runtime-only: ON at Run start (if armed), stays ON after Run complete when armed (interactive key/switch updates). OFF at Stop or when disarmed.
+
+---
+
+## Wave vs legacy prefix
+
+Example trace — **Wave** (level 1):
+
+\`\`\`text
+[wave 0] RUN init → recompute all wires
+[wave 1] commit packetEncoded = ^4808…
+[wave 1] lut-mut .huff:clear → re-exec st(1062:asg) packetEncoded := …
+* script stopped trace is OFF
+\`\`\`
+
+Example trace — **Legacy** (level 1):
+
+\`\`\`text
+* Run start (legacy cascade) — trace is ON
+[step 1] commit a = ^3
+[step 2] commit b = ^3
+lut-mut .huff:clear → re-exec st(5:asg) packetEncoded := …
+* Run complete — trace stays ON (interactive updates)
+\`\`\`
+
+Legacy uses **\`[step N]\`** prefix (immediate cascade) instead of **\`[wave N]\`**. Level 2 adds \`exec\` on cascade re-eval; level 3 adds \`eval\` (wire values computed before commit).
+
+---
+
+## Line catalog (L1–L3)
+
+| Line kind | Example | Level | Filter |
+|-----------|---------|-------|--------|
+| **commit component** | \`[step 2] commit component .s = ^101\` | L2 | Components |
+| **prop** | \`[step 2] prop .s.data = ^101\` | L2 | Components |
+| **connect** | \`[step 2] connect .alu:get → result\` | L2 | Components |
+| **exec block** | \`[step 3] exec block .cnt.on:raise\` | L3 | Internals |
+| **state** | \`[step 3] state mem1[0] = ^0101\` | L3 | Internals |
+| **phz** | \`[step 2] phz spawn phz[obj] id=\\1 floor=\\0 → .room:inside (count 1)\` | L2 (+ attrs \`[+]\` at L3) | PHZ |
+| **lut-mut** | \`lut-mut .huff:clear → re-exec …\` | L1 | Wires + Components |
+| **logic-mut** | \`logic-mut .whLogic: try { … }\` then \`commit\` or \`rollback\` | L2 | Components |
+
+**Filter** (toolbar): **All** shows everything; **Wires** — wire commit/exec/eval, init, flush, schedule, lut-mut; **Components** — commit component, prop, connect, lut-mut, **logic-mut**; **Internals** — eval L3, block exec, state/mem, schedule (wave L3); **PHZ** — spawn / move / remove ownership events.
+
+PHZ lines (L2+): spawn shows \`id\` + \`floor\` inline; other attributes appear under **\`[+]\`** at L3. Move/remove list type + id and destination — named \`.cont:coll\`, or \`phz.[bin < cont]:inside id=\\N (count N)\` when the owning container is anonymous. See [phz.md](phz.md).
+
+---
+
+## Value formatting
+
+Dropdown **hex / oct / b32hex / b32c / bin / dec / s8 / u8 / q4p4 / fp16 / bf16 / ascii / auto**. Numeric formats group on fixed width (8 or 16 bit). **oct**, **b32hex**, **b32c** produce \`o^…\`, \`x^…\`, \`xc^…\` literals (roundtrip like hex). **ascii** displays like \`show(…; ascii)\`. Suffix **\`(Nbits)\`** on display. **\`[cpy]\`** — script literal copy rules per format (see [debug.md](debug.md)).
+
+---
+
+## Signal Trace vs other debug tools
+
+| Tool | Output | Best for |
+|------|--------|----------|
+| **Signal Trace** | Dedicated panel; wave/legacy propagation | Commits, LUT re-eval, PHZ ownership, **logic mutations** |
+| **\`probe(wire)\`** | Output on change | Single-wire change log with driver |
+| **\`watch(pattern)\`** | Output on change | Multi-wire / FSM patterns |
+| **\`show(wire)\`** | Output snapshot | One-shot values at statement |
+| **\`peek(wire)\`** | Output snapshot | Pre-mutation baseline |
+
+For Huffman SC round-trip patterns, see [debug.md — Wave debug patterns](debug.md#wave-debug-patterns) and [huffman-v2.md](huffman-v2.md).
+
+---
+
+## logic-mut
+
+When a \`comp [logic]\` exec block contains **\`logic { … }\`**, Signal Trace (L2+, panel armed) emits **\`logic-mut\`** lines for each mutation attempt:
+
+\`\`\`text
+logic-mut .<comp>: try { <ops> }
+logic-mut .<comp>: commit (<ops> ops, <net> net)
+\`\`\`
+
+or on failure:
+
+\`\`\`text
+logic-mut .<comp>: try { <ops> }
+logic-mut .<comp>: rollback — <reason>
+\`\`\`
+
+| Term | Meaning |
+|------|---------|
+| **\`ops\`** | Number of operations in the transaction (parsed list length) |
+| **\`net\`** | Operations that actually changed the dynamic store (idempotent retract/add skipped) |
+| **\`try\`** | Shows resolved ground facts — wires replaced by literals (\`"c1"\`, \`15\`, \`box3\`) without \`text\`/\`number\` prefixes |
+| **Truncation** | At most **4** ops inline; extra ops shown as \`… (+N)\` with full list under **\`[+]\`** expand |
+| **Constraint fail** | \`rollback — constraint inside/2 #K failed on + inside(…)\` — **\`#K\`** is 1-based ordinal in the inline program |
+| **No \`logic { }\`** | **Zero** \`logic-mut\` lines (queries-only passes are silent) |
+
+\`mutationFailed\` on the component remains a **1-bit** flag; the trace carries the human-readable reason.
+
+### Example — successful move (commit)
+
+Arm Signal Trace **ON**, level **L2**, then **Load & Run**:
+
+\`\`\`logts-play
+inline [logic] .warehouse:
+
+    object(box1)
+    object(box2)
+    container(c1)
+    container(c2)
+
+    inside(box1, c1)
+    inside(box2, c1)
+
+    capacity(c1, 2)
+    capacity(c2, 2)
+
+    constraint inside(Object, Container) <=
+        object(Object),
+        container(Container),
+        capacity(Container, Max),
+        count(inside(_, Container), N),
+        N =< Max
+
+    query countC1one:
+        count(inside(_, c1), 1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    countC1one >= ok
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+Expected trace (legacy):
+
+\`\`\`text
+[step N] logic-mut .whLogic: try { - inside(box1, c1); + inside(box1, c2) }
+[step N] logic-mut .whLogic: commit (2 ops, 2 net)
+\`\`\`
+
+### Example — constraint failure (rollback)
+
+Two constraints with the same head — the trace names which one failed (\`#2\`):
+
+\`\`\`logts-play
+inline [logic] .wh:
+
+    object(box1)
+    object(box2)
+    container(c1)
+
+    allowed(box1, c1)
+
+    constraint inside(O, C) <= object(O), container(C)
+    constraint inside(O, C) <= allowed(O, C)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:
+
+comp [logic] .whLogic:
+    on: 1
+    .wh { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    mutationFailed >= failed
+    set = trigger
+}
+\`\`\`
+
+Expected trace:
+
+\`\`\`text
+[step N] logic-mut .whLogic: try { + inside(box2, c1) }
+[step N] logic-mut .whLogic: rollback — constraint inside/2 #2 failed on + inside(box2, c1)
+\`\`\`
+
+\`mutationFailed\` stays **1**; the KB is unchanged.
+
+See also: [logic-runtime.md](logic-runtime.md), [logic-constraints.md](logic-constraints.md), [logic-indexing.md](logic-indexing.md).
+`,
     'slider.md': `# Slider component
 
 \`comp [slider]\` is a **panel slider** for scalar N-bit values. The user drags a thumb along a track; the output is the step index as an unsigned binary value (\`0 … 2^length − 1\`).
@@ -40903,7 +41078,7 @@ probe(rx; u8)
 4wire hdr << rx./4
 \`\`\`
 
-\`probe(rx./4)\` peeks the front slice; append and consume update probe/watch without extra assignments. Signal Trace (Wave Listen) logs sock commits as \`commit sock rx\`.
+\`probe(rx./4)\` peeks the front slice; append and consume update probe/watch without extra assignments. Signal Trace logs sock commits as \`commit sock rx\` — see [signal-trace.md](signal-trace.md).
 
 ---
 

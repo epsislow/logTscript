@@ -733,7 +733,7 @@ When `moveReady` becomes `1`, the engine executes the property block and creates
 
 Conveyors / elevators remain **user** types (e.g. `phz +[conveyor < cont]:`), not built-in PHZ kinds. Pair them with [`motor.md`](motor.md) `maxDistance` / `:distance` / `:laps`, or with [`servo.md`](servo.md) for positional travel — see [Example: Elevator](#example-elevator).
 
-**Signal Trace:** with the panel armed (L2+), PHZ emits `phz spawn` / `phz move` / `phz remove` lines (filter **PHZ**). Spawn shows `id` + `floor` inline; other attributes expand under **`[+]`** at L3. See [debug.md](debug.md).
+**Signal Trace:** with the panel armed (L2+), PHZ emits `phz spawn` / `phz move` / `phz remove` lines (filter **PHZ**). Spawn shows `id` + `floor` inline; other attributes expand under **`[+]`** at L3. See [signal-trace.md](signal-trace.md).
 
 ---
 

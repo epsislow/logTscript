@@ -138,6 +138,8 @@ Mutations run **before** queries in the same pass, so redirects can observe upda
 
 ## `mutationFailed` pout
 
+When a mutation fails, the component sets **`mutationFailed = 1`** and leaves the dynamic store unchanged. For a human-readable reason (constraint ordinal, parse error, resolved ops), arm **Signal Trace** at **L2** — see [signal-trace.md — logic-mut](signal-trace.md#logic-mut).
+
 | Value | Meaning |
 |-------|---------|
 | **`0`** | No mutation block, or last transaction **committed** |

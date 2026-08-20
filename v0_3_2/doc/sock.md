@@ -310,7 +310,7 @@ probe(rx; u8)
 4wire hdr << rx./4
 ```
 
-`probe(rx./4)` peeks the front slice; append and consume update probe/watch without extra assignments. Signal Trace (Wave Listen) logs sock commits as `commit sock rx`.
+`probe(rx./4)` peeks the front slice; append and consume update probe/watch without extra assignments. Signal Trace logs sock commits as `commit sock rx` — see [signal-trace.md](signal-trace.md).
 
 ---
 

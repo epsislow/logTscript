@@ -1100,7 +1100,7 @@ huffSz (8wire) = 00000011 (ref: &5)
 
 **`peek` vs `show`:** `peek(expr)` citește valoarea **fix în acel moment** (înainte de propagation ulterioară). `show(expr)` rulează după ce se termină propagation — deci `show(packetEncoded)` *după* `.huff:clear()` poate afișa un packet corupt (`… + 000` în loc de `… + 111`), pentru că `.huffPacketSC` depinde de `expand(..., .huff)` și LUT-ul e gol. Folosește `peek` pentru encode + snapshot, `show` doar pe rezultatele finale care nu depind de `.huff`.
 
-**Wave debug:** `deps(packetEncoded)` arată legătura cu `.huff` / `.huffPacketSC`; **Wave Listen** (Win ▾) arată re-eval după `:clear()` — vezi [debug.md — wave-debug patterns](debug.md#wave-debug-patterns).
+**Wave debug:** `deps(packetEncoded)` shows links to `.huff` / `.huffPacketSC`; **Signal Trace** (Win ▾, L2+) shows re-eval after `:clear()` — see [signal-trace.md](signal-trace.md) and [debug.md — wave-debug patterns](debug.md#wave-debug-patterns).
 
 ### Policy
 
@@ -1163,3 +1163,4 @@ See [protocol-parse.md](protocol-parse.md) — Faza 0a–0d (`mode: parse`, `wit
 - [assignment-operators.md](assignment-operators.md) — `=:` padding
 - [wire-literals.md](wire-literals.md) — `'Hello World!'` wire strings, `show(w; ascii)`
 - [debug.md](debug.md) — `show(…; ascii)` display tags
+- [signal-trace.md](signal-trace.md) — Signal Trace panel (wave / legacy)

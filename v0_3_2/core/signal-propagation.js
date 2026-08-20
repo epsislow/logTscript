@@ -45,7 +45,7 @@ class SignalPropagationStrategy {
   _listenCategoryFor(kind, opts) {
     const o = opts || {};
     if (o.traceCategory) return o.traceCategory;
-    if (kind === 'lut-mut' || kind === 'prop' || kind === 'connect') return 'component';
+    if (kind === 'lut-mut' || kind === 'logic-mut' || kind === 'prop' || kind === 'connect') return 'component';
     if (kind === 'state' || kind === 'eval' || kind === 'schedule') return 'internal';
     if (o.isComponent && kind === 'commit') return 'component';
     if (kind === 'commit' || kind === 'exec' || kind === 'init' || kind === 'flush') return 'wire';
@@ -203,6 +203,29 @@ class SignalPropagationStrategy {
       phzExpandLines: expandLines && expandLines.length ? expandLines : null,
     };
     interp.emitWaveListenLine(payload, 'phz');
+  }
+
+  /** Logic mutation try / commit / rollback. Category filter: Components (L2). */
+  emitListenLogicMut(compName, detail, expandLines, minLevel = 2) {
+    if (this.debugLevel < minLevel) return;
+    const interp = this.interp;
+    if (!interp || !interp.waveListenActive) return;
+    if (typeof interp.emitWaveListenLine !== 'function') return;
+    const name = String(compName || '').replace(/^\./, '');
+    let text = `logic-mut .${name}: ${detail}`;
+    if (this._isLegacyListen()) {
+      const step = this._currentLegacyStep() || this._legacyCascadeStep();
+      text = `[step ${step}] ${text}`;
+    } else {
+      const wave = this._listenWaveIndex != null ? this._listenWaveIndex : 0;
+      text = `[wave ${wave}] ${text}`;
+    }
+    const payload = {
+      listenText: text,
+      traceCategory: 'component',
+      phzExpandLines: expandLines && expandLines.length ? expandLines : null,
+    };
+    interp.emitWaveListenLine(payload, 'logic-mut');
   }
 
   _emitWaveListen(text, kind, minLevel = 1, traceCategory) {

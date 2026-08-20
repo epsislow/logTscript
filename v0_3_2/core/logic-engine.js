@@ -710,15 +710,124 @@ function logicValidateConstraintBody(bodyGoals, proposedClauses, inputEnv, optio
   return solutions && solutions.length > 0;
 }
 
+function logicFormatFactForTrace(term) {
+  if (!term) return '?';
+  if (term.kind === 'atom') {
+    if (term.logicTraceAsString) return `"${term.name != null ? String(term.name) : ''}"`;
+    return term.name != null ? String(term.name) : '';
+  }
+  if (term.kind === 'number') return String(term.value);
+  if (term.kind === 'compound') {
+    const args = (term.args || []).map(logicFormatFactForTrace).join(', ');
+    const pred = term.predicate != null ? term.predicate : '';
+    return `${pred}(${args})`;
+  }
+  return '?';
+}
+
+function logicFormatMutationOpForTrace(op) {
+  if (!op || !op.head) return '?';
+  const sign = op.op === 'remove' ? '-' : '+';
+  return `${sign} ${logicFormatFactForTrace(op.head)}`;
+}
+
+const LOGIC_MUT_TRY_INLINE_MAX = 4;
+
+function logicFormatMutationTryBlock(ops) {
+  const formatted = (ops || []).map(logicFormatMutationOpForTrace);
+  if (!formatted.length) return { summary: '', expandLines: null };
+  let summary;
+  let expandLines = null;
+  if (formatted.length <= LOGIC_MUT_TRY_INLINE_MAX) {
+    summary = formatted.join('; ');
+  } else {
+    const shown = formatted.slice(0, LOGIC_MUT_TRY_INLINE_MAX);
+    const extra = formatted.length - LOGIC_MUT_TRY_INLINE_MAX;
+    summary = `${shown.join('; ')}; ... (+${extra})`;
+    expandLines = formatted;
+  }
+  return { summary, expandLines };
+}
+
+function logicMutationOpIsNet(store, op) {
+  if (!store || !op || !op.head || !logicTermIsGround(op.head)) return false;
+  const clause = { head: op.head, body: [] };
+  const key = logicFactClauseKey(clause);
+  const adds = store.adds || new Map();
+  const tombs = store.tombstones || new Set();
+  if (op.op === 'add') {
+    if (tombs.has(key)) return true;
+    if (!adds.has(key)) return true;
+    const existing = adds.get(key);
+    return !(existing && existing.head && logicTermsEqualGround(existing.head, op.head));
+  }
+  if (op.op === 'remove') {
+    if (adds.has(key)) return true;
+    if (tombs.has(key)) return false;
+    return true;
+  }
+  return false;
+}
+
+function logicCountMutationNetOps(store, ops) {
+  const sim = logicCloneDynamicStore(store);
+  let net = 0;
+  for (const op of ops || []) {
+    if (logicMutationOpIsNet(sim, op)) net++;
+    logicApplyMutationTransaction(sim, [op]);
+  }
+  return net;
+}
+
+function logicFormatMutRollbackLine(result) {
+  if (!result || result.ok) return '';
+  const code = result.code || 'store';
+  const msg = result.message || 'mutation failed';
+  if (code === 'constraint') return `rollback — ${msg}`;
+  return `rollback — ${code}: ${msg}`;
+}
+
 function logicValidateFactConstraints(factHead, constraints, proposedClauses, options) {
   const matching = logicMatchingConstraints(factHead, constraints);
-  if (!matching.length) return true;
+  if (!matching.length) return { ok: true };
   for (const c of matching) {
     const env = logicBindConstraintHead(c.head, factHead);
-    if (!env) return false;
-    if (!logicValidateConstraintBody(c.body, proposedClauses, env, options)) return false;
+    if (!env) {
+      const head = c && c.head;
+      const pred = head && head.predicate;
+      const arity = head
+        ? (head.arity != null ? head.arity : (head.args || []).length)
+        : 0;
+      const idx = c && c.constraintIndex != null ? `#${c.constraintIndex}` : '';
+      const factStr = logicFormatFactForTrace(factHead);
+      return {
+        ok: false,
+        code: 'constraint',
+        constraintIndex: c && c.constraintIndex,
+        constraintHead: head,
+        fact: factHead,
+        message: `constraint ${pred}/${arity} ${idx} failed on + ${factStr}`.replace(/\s+/g, ' ').trim(),
+      };
+    }
+    if (!logicValidateConstraintBody(c.body, proposedClauses, env, options)) {
+      const head = c.head;
+      const pred = head && head.predicate;
+      const arity = head
+        ? (head.arity != null ? head.arity : (head.args || []).length)
+        : 0;
+      const idx = c.constraintIndex != null ? `#${c.constraintIndex}` : '';
+      const factStr = logicFormatFactForTrace(factHead);
+      return {
+        ok: false,
+        code: 'constraint',
+        constraintIndex: c.constraintIndex,
+        constraintHead: head,
+        fact: factHead,
+        message: `constraint ${pred}/${arity} ${idx} failed on + ${factStr}`.replace(/\s+/g, ' ').trim(),
+      };
+    }
   }
-  return true;
+  return { ok: true };
 }
 
 function logicCollectStaticGroundFacts(clauses) {
@@ -731,15 +840,16 @@ function logicCollectStaticGroundFacts(clauses) {
 }
 
 function logicValidateConstraintsForFacts(constraints, proposedClauses, facts, options) {
-  if (!constraints || !constraints.length) return true;
+  if (!constraints || !constraints.length) return { ok: true };
   for (const fact of facts || []) {
-    if (!logicValidateFactConstraints(fact, constraints, proposedClauses, options)) return false;
+    const r = logicValidateFactConstraints(fact, constraints, proposedClauses, options);
+    if (!r.ok) return r;
   }
-  return true;
+  return { ok: true };
 }
 
 function logicValidateStaticKnowledge(constraints, staticClauses, options) {
-  if (!constraints || !constraints.length) return true;
+  if (!constraints || !constraints.length) return { ok: true };
   const facts = logicCollectStaticGroundFacts(staticClauses);
   return logicValidateConstraintsForFacts(constraints, staticClauses, facts, options);
 }
@@ -1038,6 +1148,11 @@ if (typeof globalThis !== 'undefined') {
   globalThis.logicSimulateMutationStore = logicSimulateMutationStore;
   globalThis.logicValidateStaticKnowledge = logicValidateStaticKnowledge;
   globalThis.logicValidateConstraintsForFacts = logicValidateConstraintsForFacts;
+  globalThis.logicFormatFactForTrace = logicFormatFactForTrace;
+  globalThis.logicFormatMutationOpForTrace = logicFormatMutationOpForTrace;
+  globalThis.logicFormatMutationTryBlock = logicFormatMutationTryBlock;
+  globalThis.logicCountMutationNetOps = logicCountMutationNetOps;
+  globalThis.logicFormatMutRollbackLine = logicFormatMutRollbackLine;
   globalThis.logicMutationDeltaPlusFacts = logicMutationDeltaPlusFacts;
   globalThis.logicCollectStaticGroundFacts = logicCollectStaticGroundFacts;
   globalThis.logicFactClauseKey = logicFactClauseKey;
@@ -1076,6 +1191,11 @@ if (typeof module !== 'undefined' && module.exports) {
     logicSimulateMutationStore,
     logicValidateStaticKnowledge,
     logicValidateConstraintsForFacts,
+    logicFormatFactForTrace,
+    logicFormatMutationOpForTrace,
+    logicFormatMutationTryBlock,
+    logicCountMutationNetOps,
+    logicFormatMutRollbackLine,
     logicMutationDeltaPlusFacts,
     logicCollectStaticGroundFacts,
     logicFactClauseKey,

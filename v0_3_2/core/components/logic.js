@@ -268,7 +268,7 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         execOpts.factIndex = typeof logicBuildFactIndex === 'function'
           ? logicBuildFactIndex(staticClauses) : null;
       }
-      if (!validateStaticFn(merged.constraints, staticClauses, execOpts)) {
+      if (!validateStaticFn(merged.constraints, staticClauses, execOpts).ok) {
         throw Error(`logic ${name}: static knowledge violates constraints (${prog.ref})`);
       }
     }
@@ -422,7 +422,11 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       const bits = ctx.getWireEffectiveValue(wireName) || '';
       const pinFn = typeof logicPinToInputValue === 'function' ? logicPinToInputValue : null;
       if (!pinFn) throw Error('Logic engine is not loaded');
-      return pinFn(bits, term.bindType);
+      const resolved = pinFn(bits, term.bindType);
+      if (term.bindType === 'text' && resolved && resolved.kind === 'atom') {
+        return { ...resolved, logicTraceAsString: true };
+      }
+      return resolved;
     }
     if (term.kind === 'compound') {
       return {
@@ -451,6 +455,13 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
     return ops;
   }
 
+  _traceLogicMut(ctx, compName, detail, expandLines) {
+    const strat = ctx && ctx.signalPropagationStrategy;
+    if (!strat || !ctx.waveListenActive) return;
+    if (typeof strat.emitListenLogicMut !== 'function') return;
+    strat.emitListenLogicMut(compName, detail, expandLines, 2);
+  }
+
   _applyMutations(comp, compName, mutationBlocks, ctx, merged) {
     const applyFn = typeof logicApplyMutationTransaction === 'function'
       ? logicApplyMutationTransaction : null;
@@ -461,6 +472,14 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       ? logicValidateConstraintsForFacts : null;
     const deltaFn = typeof logicMutationDeltaPlusFacts === 'function'
       ? logicMutationDeltaPlusFacts : null;
+    const tryFmtFn = typeof logicFormatMutationTryBlock === 'function'
+      ? logicFormatMutationTryBlock : null;
+    const netFn = typeof logicCountMutationNetOps === 'function'
+      ? logicCountMutationNetOps : null;
+    const rollbackFmtFn = typeof logicFormatMutRollbackLine === 'function'
+      ? logicFormatMutRollbackLine : null;
+    const formatOpFn = typeof logicFormatMutationOpForTrace === 'function'
+      ? logicFormatMutationOpForTrace : null;
 
     if (!applyFn || !mutationBlocks || !mutationBlocks.length) {
       comp.mutationFailed = 0;
@@ -476,21 +495,55 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
       ops = this._collectMutationOps(mutationBlocks, ctx, compName);
     } catch (err) {
       comp.mutationFailed = 1;
+      const msg = err && err.message ? err.message : String(err);
+      if (rollbackFmtFn) {
+        this._traceLogicMut(ctx, compName, rollbackFmtFn({ ok: false, code: 'parse', message: msg }), null);
+      } else {
+        this._traceLogicMut(ctx, compName, `rollback — parse: ${msg}`, null);
+      }
       return;
     }
+
+    if (!ops || !ops.length) {
+      comp.mutationFailed = 0;
+      return;
+    }
+
+    const emitTry = () => {
+      if (!tryFmtFn) return;
+      const tryFmt = tryFmtFn(ops);
+      if (!tryFmt.summary) return;
+      this._traceLogicMut(ctx, compName, `try { ${tryFmt.summary} }`, tryFmt.expandLines);
+    };
 
     for (const op of ops) {
       if (!op || !op.head || !logicTermIsGround(op.head)) {
         comp.mutationFailed = 1;
+        emitTry();
+        const bad = op && op.head ? formatOpFn(op) : '?';
+        const msg = `non-ground fact in ${bad}`;
+        if (rollbackFmtFn) {
+          this._traceLogicMut(ctx, compName, rollbackFmtFn({ ok: false, code: 'ground', message: msg }), null);
+        } else {
+          this._traceLogicMut(ctx, compName, `rollback — ground: ${msg}`, null);
+        }
         return;
       }
     }
+
+    emitTry();
 
     const constraints = (merged && merged.constraints) || [];
     if (constraints.length && simFn && buildFn && validateFactsFn && deltaFn) {
       const proposedStore = simFn(comp.dynamicStore, ops);
       if (!proposedStore) {
         comp.mutationFailed = 1;
+        const msg = 'simulate store failed';
+        if (rollbackFmtFn) {
+          this._traceLogicMut(ctx, compName, rollbackFmtFn({ ok: false, code: 'store', message: msg }), null);
+        } else {
+          this._traceLogicMut(ctx, compName, `rollback — store: ${msg}`, null);
+        }
         return;
       }
       const proposedClauses = buildFn(merged.clauses, proposedStore);
@@ -502,17 +555,33 @@ var LogicComponent = class LogicComponent extends BuiltinComponent {
         execOpts.factIndex = logicBuildFactIndex(proposedClauses);
         execOpts.ruleClauses = comp.ruleClauses || [];
       }
-      if (!validateFactsFn(constraints, proposedClauses, deltaFacts, execOpts)) {
+      const vResult = validateFactsFn(constraints, proposedClauses, deltaFacts, execOpts);
+      if (!vResult.ok) {
         comp.mutationFailed = 1;
+        if (rollbackFmtFn) {
+          this._traceLogicMut(ctx, compName, rollbackFmtFn(vResult), null);
+        } else if (vResult.message) {
+          this._traceLogicMut(ctx, compName, `rollback — ${vResult.message}`, null);
+        }
         return;
       }
     }
 
+    const net = netFn ? netFn(comp.dynamicStore, ops) : ops.length;
     const result = applyFn(comp.dynamicStore, ops);
     if (result && result.success) {
       this._updateFactIndexAfterCommit(comp, merged, ops);
+      comp.mutationFailed = 0;
+      this._traceLogicMut(ctx, compName, `commit (${ops.length} ops, ${net} net)`, null);
+    } else {
+      comp.mutationFailed = 1;
+      const msg = 'apply transaction failed';
+      if (rollbackFmtFn) {
+        this._traceLogicMut(ctx, compName, rollbackFmtFn({ ok: false, code: 'store', message: msg }), null);
+      } else {
+        this._traceLogicMut(ctx, compName, `rollback — store: ${msg}`, null);
+      }
     }
-    comp.mutationFailed = result && result.success ? 0 : 1;
   }
 
   _runLogic(comp, compName, pending, reEvaluate, ctx, redirects, mutationBlocks) {

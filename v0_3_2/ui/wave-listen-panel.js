@@ -97,7 +97,7 @@ function _inferTraceCategory(entry) {
   if (entry.traceCategory) return entry.traceCategory;
   const kind = entry.kind || 'trace';
   if (kind === 'phz') return 'phz';
-  if (kind === 'lut-mut' || kind === 'prop' || kind === 'connect') return 'component';
+  if (kind === 'lut-mut' || kind === 'logic-mut' || kind === 'prop' || kind === 'connect') return 'component';
   if (kind === 'state' || kind === 'eval' || kind === 'schedule') return 'internal';
   if (entry.label === 'commit component' || entry.isComponent) return 'component';
   if (kind === 'commit' || kind === 'exec' || kind === 'init' || kind === 'flush') return 'wire';
@@ -110,13 +110,13 @@ function waveListenEntryMatchesFilter(entry, filter) {
   const kind = entry.kind || 'trace';
   const cat = _inferTraceCategory(entry);
   if (filter === 'wires') {
-    if (kind === 'lut-mut') return true;
+    if (kind === 'lut-mut' || kind === 'logic-mut') return true;
     if (cat === 'wire') return true;
     if (kind === 'init' || kind === 'flush') return true;
     return false;
   }
   if (filter === 'components') {
-    if (kind === 'lut-mut') return true;
+    if (kind === 'lut-mut' || kind === 'logic-mut') return true;
     if (cat === 'component') return true;
     if (kind === 'prop' || kind === 'connect') return true;
     return false;
@@ -355,6 +355,7 @@ function _waveListenLineClass(kind) {
     case 'meta': return 'wave-listen-line--meta';
     case 'status': return 'wave-listen-line--status';
     case 'lut-mut': return 'wave-listen-line--lut-mut';
+    case 'logic-mut': return 'wave-listen-line--logic-mut';
     case 'commit': return 'wave-listen-line--commit';
     case 'flush': return 'wave-listen-line--flush';
     case 'init': return 'wave-listen-line--init';

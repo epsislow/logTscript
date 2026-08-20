@@ -38487,5 +38487,371 @@ comp [logic] .whLogic:
     h.assert('failed=1 wave', interp.getWireEffectiveValue('failed'), '1');
   }, { propagation: 'wave' });
 
+  function _logicMutTraceLines(session, src, level, propagation) {
+    const processed = preprocessLoop(src);
+    const registry = session._ensureRegistry();
+    const strategy = session._ensureSignalPropagationStrategy();
+    strategy.setDebugLevel(level);
+    strategy.deferWireWrites = propagation === 'wave';
+    const p = new Parser(new Tokenizer(processed), registry);
+    const stmts = p.parse();
+    const lines = [];
+    const expands = [];
+    const interp = new Interpreter(p.funcs, [], p.pcbs, registry, strategy, p.chips, p.boards);
+    interp.waveListenActive = true;
+    interp.onWaveListenLine = function (payload) {
+      if (payload && payload.listenText != null) {
+        lines.push(payload.listenText);
+        if (payload.phzExpandLines) expands.push(payload.phzExpandLines);
+      } else {
+        lines.push(String(payload));
+      }
+    };
+    for (const s of stmts) interp.exec(s);
+    interp.postExecSrc();
+    return { lines, expands, interp };
+  }
+
+  function _logicMutLines(lines) {
+    return (lines || []).filter((l) => l.includes('logic-mut'));
+  }
+
+  const INLINE_LOGIC_WH_DUP_CONSTRAINT = `inline [logic] .wh:
+
+    object(box1)
+    object(box2)
+    container(c1)
+
+    allowed(box1, c1)
+
+    constraint inside(O, C) <= object(O), container(C)
+    constraint inside(O, C) <= allowed(O, C)
+
+    query hasBox2:
+        inside(box2, c1)
+
+:`;
+
+  reg(3607, 'logic', 'Signal Trace logic-mut success commit move', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { lines, interp } = _logicMutTraceLines(session, src, 2, 'legacy');
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    const mut = _logicMutLines(lines);
+    h.assert('try line', String(mut.some((l) => /try \{/.test(l) && l.includes('- inside(box1, c1)') && l.includes('+ inside(box1, c2)'))), 'true');
+    h.assert('commit line', String(mut.some((l) => /commit \(2 ops, 2 net\)/.test(l))), 'true');
+  });
+
+  reg(3608, 'logic', 'Signal Trace logic-mut constraint rollback #2', function(h, session) {
+    const src = INLINE_LOGIC_WH_DUP_CONSTRAINT + `
+comp [logic] .whLogic:
+    on: 1
+    .wh { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { lines, interp } = _logicMutTraceLines(session, src, 2, 'legacy');
+    h.assert('failed=1', interp.getWireEffectiveValue('failed'), '1');
+    const mut = _logicMutLines(lines);
+    h.assert('try line', String(mut.some((l) => /try \{/.test(l) && l.includes('+ inside(box2, c1)'))), 'true');
+    h.assert('rollback #2', String(mut.some((l) => /rollback — constraint inside\/2 #2 failed/.test(l))), 'true');
+  });
+
+  const INLINE_LOGIC_OBJECTS_ONLY = `inline [logic] .objs:
+
+    object(box1)
+
+:`;
+
+  reg(3609, 'logic', 'Signal Trace logic-mut try truncate expand', function(h, session) {
+    const src = INLINE_LOGIC_OBJECTS_ONLY + `
+comp [logic] .objLogic:
+    on: 1
+    .objs { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.objLogic:{
+    logic {
+        + object(box2)
+        + object(box3)
+        + object(box4)
+        + object(box5)
+        + object(box6)
+    }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { lines, expands, interp } = _logicMutTraceLines(session, src, 2, 'legacy');
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    const mut = _logicMutLines(lines);
+    h.assert('truncated try', String(mut.some((l) => /try \{/.test(l) && /\.\.\. \(\+1\)/.test(l))), 'true');
+    h.assert('expand payload', String(expands.length > 0 && expands[0].length === 5), 'true');
+  });
+
+  reg(3610, 'logic', 'Signal Trace logic-mut resolved wire values in try', function(h, session) {
+    const srcNum = `inline [logic] .nums:
+
+    object(box1)
+
+    constraint level(O, N) <= object(O), N >= 0, N =< 99
+
+:
+
+comp [logic] .numLogic:
+    on: 1
+    .nums { }
+:
+
+8wire scoreIn = 00001111
+1wire trigger = 1
+
+.numLogic:{
+    logic { + level(box1, number scoreIn) }
+    set = trigger
+}`;
+    const { lines: linesN } = _logicMutTraceLines(session, srcNum, 2, 'legacy');
+    h.assert('number resolved', String(_logicMutLines(linesN).some((l) => l.includes('level(box1, 15)'))), 'true');
+
+    const srcText = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+16wire cName = "c2"
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, text cName) }
+    set = trigger
+}`;
+    const { lines: linesT } = _logicMutTraceLines(session, srcText, 2, 'legacy');
+    h.assert('text resolved', String(_logicMutLines(linesT).some((l) => l.includes('"c2"'))), 'true');
+  });
+
+  reg(3611, 'logic', 'Signal Trace logic-mut triple retract same key net 1', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        - inside(box1, c1)
+        - inside(box1, c1)
+    }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { lines, interp } = _logicMutTraceLines(session, src, 2, 'legacy');
+    h.assert('failed=0', interp.getWireEffectiveValue('failed'), '0');
+    const mut = _logicMutLines(lines);
+    h.assert('commit net 1', String(mut.some((l) => /commit \(3 ops, 1 net\)/.test(l))), 'true');
+  });
+
+  reg(3612, 'logic', 'Signal Trace logic-mut zero lines without logic block', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    countC1 >= ok
+    set = trigger
+}`;
+    const { lines } = _logicMutTraceLines(session, src, 2, 'legacy');
+    h.assert('no logic-mut', String(_logicMutLines(lines).length), '0');
+  });
+
+  reg(3613, 'logic', 'Signal Trace logic-mut success commit move (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        + inside(box1, c2)
+    }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { lines, interp } = _logicMutTraceLines(session, src, 2, 'wave');
+    h.assert('failed=0 wave', interp.getWireEffectiveValue('failed'), '0');
+    const mut = _logicMutLines(lines);
+    h.assert('try line wave', String(mut.some((l) => /try \{/.test(l) && l.includes('+ inside(box1, c2)'))), 'true');
+    h.assert('commit line wave', String(mut.some((l) => /commit \(2 ops, 2 net\)/.test(l))), 'true');
+  }, { propagation: 'wave' });
+
+  reg(3614, 'logic', 'Signal Trace logic-mut constraint rollback #2 (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WH_DUP_CONSTRAINT + `
+comp [logic] .whLogic:
+    on: 1
+    .wh { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box2, c1) }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { lines, interp } = _logicMutTraceLines(session, src, 2, 'wave');
+    h.assert('failed=1 wave', interp.getWireEffectiveValue('failed'), '1');
+    const mut = _logicMutLines(lines);
+    h.assert('rollback #2 wave', String(mut.some((l) => /rollback — constraint inside\/2 #2 failed/.test(l))), 'true');
+  }, { propagation: 'wave' });
+
+  reg(3615, 'logic', 'Signal Trace logic-mut try truncate expand (wave)', function(h, session) {
+    const src = INLINE_LOGIC_OBJECTS_ONLY + `
+comp [logic] .objLogic:
+    on: 1
+    .objs { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.objLogic:{
+    logic {
+        + object(box2)
+        + object(box3)
+        + object(box4)
+        + object(box5)
+        + object(box6)
+    }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { lines, expands, interp } = _logicMutTraceLines(session, src, 2, 'wave');
+    h.assert('failed=0 wave', interp.getWireEffectiveValue('failed'), '0');
+    h.assert('expand payload wave', String(expands.length > 0 && expands[0].length === 5), 'true');
+  }, { propagation: 'wave' });
+
+  reg(3616, 'logic', 'Signal Trace logic-mut resolved wire values (wave)', function(h, session) {
+    const srcNum = `inline [logic] .nums:
+
+    object(box1)
+
+    constraint level(O, N) <= object(O), N >= 0, N =< 99
+
+:
+
+comp [logic] .numLogic:
+    on: 1
+    .nums { }
+:
+
+8wire scoreIn = 00001111
+1wire trigger = 1
+
+.numLogic:{
+    logic { + level(box1, number scoreIn) }
+    set = trigger
+}`;
+    const { lines: linesN } = _logicMutTraceLines(session, srcNum, 2, 'wave');
+    h.assert('number resolved wave', String(_logicMutLines(linesN).some((l) => l.includes('level(box1, 15)'))), 'true');
+
+    const srcText = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+16wire cName = "c2"
+1wire trigger = 1
+
+.whLogic:{
+    logic { + inside(box3, text cName) }
+    set = trigger
+}`;
+    const { lines: linesT } = _logicMutTraceLines(session, srcText, 2, 'wave');
+    h.assert('text resolved wave', String(_logicMutLines(linesT).some((l) => l.includes('"c2"'))), 'true');
+  }, { propagation: 'wave' });
+
+  reg(3617, 'logic', 'Signal Trace logic-mut triple retract net 1 (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire failed = 0
+1wire trigger = 1
+
+.whLogic:{
+    logic {
+        - inside(box1, c1)
+        - inside(box1, c1)
+        - inside(box1, c1)
+    }
+    mutationFailed >= failed
+    set = trigger
+}`;
+    const { lines, interp } = _logicMutTraceLines(session, src, 2, 'wave');
+    h.assert('failed=0 wave', interp.getWireEffectiveValue('failed'), '0');
+    const mut = _logicMutLines(lines);
+    h.assert('commit net 1 wave', String(mut.some((l) => /commit \(3 ops, 1 net\)/.test(l))), 'true');
+  }, { propagation: 'wave' });
+
+  reg(3618, 'logic', 'Signal Trace logic-mut zero lines without logic block (wave)', function(h, session) {
+    const src = INLINE_LOGIC_WAREHOUSE_COUNT + `
+comp [logic] .whLogic:
+    on: 1
+    .warehouse { }
+:
+
+1wire ok = 0
+1wire trigger = 1
+
+.whLogic:{
+    countC1 >= ok
+    set = trigger
+}`;
+    const { lines } = _logicMutTraceLines(session, src, 2, 'wave');
+    h.assert('no logic-mut wave', String(_logicMutLines(lines).length), '0');
+  }, { propagation: 'wave' });
+
   window.LogTScriptTestSuite.finalize();
 })();

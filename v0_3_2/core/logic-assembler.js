@@ -137,7 +137,7 @@ class LogicParser {
         }
         this.advance();
         const body = this.parseBodyGoals();
-        constraints.push({ head, body });
+        constraints.push({ head, body, constraintIndex: constraints.length + 1 });
         continue;
       }
       const clause = this.parseClause();
